@@ -1355,6 +1355,137 @@ vchiq_ioctl_compat_await_completion(struct vchiq_ioctl_ctxt *ctxt)
 
 #endif
 
+static long
+vchiq_ioctl_do_dequeue_message(struct vchiq_ioctl_ctxt *ctxt)
+{
+	VCHIQ_DEQUEUE_MESSAGE_T *args = ctxt->args;
+	USER_SERVICE_T *user_service;
+	VCHIQ_HEADER_T *header;
+	long ret = 0;
+
+	DEBUG_INITIALISE(g_state.local)
+
+	ctxt->service = find_service_for_instance(ctxt->instance, args->handle);
+	if (!ctxt->service)
+		return -EINVAL;
+
+	user_service = (USER_SERVICE_T *)(ctxt->service)->base.userdata;
+	if (!user_service->is_vchi)
+		return -EINVAL;
+
+	spin_lock(&msg_queue_spinlock);
+	if (user_service->msg_remove == user_service->msg_insert) {
+		if (!args->blocking) {
+			spin_unlock(&msg_queue_spinlock);
+			DEBUG_TRACE(DEQUEUE_MESSAGE_LINE);
+			return -EWOULDBLOCK;
+		}
+
+		user_service->dequeue_pending = 1;
+		do {
+			spin_unlock(&msg_queue_spinlock);
+			DEBUG_TRACE(DEQUEUE_MESSAGE_LINE);
+			if (down_interruptible(&user_service->insert_event)) {
+				vchiq_log_info(vchiq_arm_log_level,
+					       "DEQUEUE_MESSAGE interrupted");
+				return -EINTR;
+			}
+			spin_lock(&msg_queue_spinlock);
+		} while (user_service->msg_remove == user_service->msg_insert);
+	}
+
+	BUG_ON((int)(user_service->msg_insert - user_service->msg_remove) < 0);
+
+	header = user_service->msg_queue[user_service->msg_remove &
+		(MSG_QUEUE_SIZE - 1)];
+	user_service->msg_remove++;
+	spin_unlock(&msg_queue_spinlock);
+
+	up(&user_service->remove_event);
+
+	if (!header)
+		return -ENOTCONN;
+
+	if (header->size > args->bufsize) {
+		vchiq_log_error(vchiq_arm_log_level,
+				"header %pK: bufsize %x < size %x",
+				header, args->bufsize, header->size);
+		WARN(1, "invalid size\n");
+		return -EMSGSIZE;
+	}
+
+	if (args->buf)
+		if (copy_to_user(args->buf,
+				 header->data,
+				 header->size))
+			return -EFAULT;
+
+	ret = header->size;
+	vchiq_release_message(ctxt->service->handle, header);
+
+	DEBUG_TRACE(DEQUEUE_MESSAGE_LINE);
+
+	return ret;
+}
+
+static long
+vchiq_ioctl_dequeue_message(struct vchiq_ioctl_ctxt *ctxt)
+{
+	VCHIQ_DEQUEUE_MESSAGE_T __user *puargs =
+		(VCHIQ_DEQUEUE_MESSAGE_T __user *)ctxt->arg;
+	VCHIQ_DEQUEUE_MESSAGE_T args;
+
+	DEBUG_INITIALISE(g_state.local)
+
+	DEBUG_TRACE(DEQUEUE_MESSAGE_LINE);
+
+	if (copy_from_user(&args, puargs, sizeof(args)))
+		return -EFAULT;
+
+	ctxt->args = &args;
+
+	return vchiq_ioctl_do_dequeue_message(ctxt);
+}
+
+#if defined(CONFIG_COMPAT)
+
+struct vchiq_dequeue_message32 {
+	unsigned int handle;
+	int blocking;
+	unsigned int bufsize;
+	compat_uptr_t buf;
+};
+
+#define VCHIQ_IOC_DEQUEUE_MESSAGE32 \
+	_IOWR(VCHIQ_IOC_MAGIC, 8, struct vchiq_dequeue_message32)
+
+static long
+vchiq_ioctl_compat_dequeue_message(struct vchiq_ioctl_ctxt *ctxt)
+{
+	struct vchiq_dequeue_message32 __user *puargs32 =
+		(struct vchiq_dequeue_message32 __user *)ctxt->arg;
+	struct vchiq_dequeue_message32 args32;
+	VCHIQ_DEQUEUE_MESSAGE_T args;
+
+	DEBUG_INITIALISE(g_state.local)
+
+	DEBUG_TRACE(DEQUEUE_MESSAGE_LINE);
+
+	if (copy_from_user(&args32, puargs32, sizeof(args32)))
+		return -EFAULT;
+
+	args.handle = args32.handle;
+	args.blocking = args32.blocking;
+	args.bufsize = args32.bufsize;
+	args.buf = compat_ptr(args32.buf);
+
+	ctxt->args = &args;
+
+	return vchiq_ioctl_do_dequeue_message(ctxt);
+}
+
+#endif
+
 /****************************************************************************
 *
 *   vchiq_ioctl
@@ -1368,7 +1499,6 @@ vchiq_ioctl(struct file *file, unsigned int cmd, unsigned long arg)
 	VCHIQ_SERVICE_T *service = NULL;
 	long ret = 0;
 	int i, rc;
-	DEBUG_INITIALISE(g_state.local)
 
 	switch (cmd) {
 	case VCHIQ_IOC_CREATE_SERVICE:
@@ -1383,6 +1513,9 @@ vchiq_ioctl(struct file *file, unsigned int cmd, unsigned long arg)
 					    file, cmd, arg);
 	case VCHIQ_IOC_AWAIT_COMPLETION:
 		return vchiq_dispatch_ioctl(vchiq_ioctl_await_completion,
+					    file, cmd, arg);
+	case VCHIQ_IOC_DEQUEUE_MESSAGE:
+		return vchiq_dispatch_ioctl(vchiq_ioctl_dequeue_message,
 					    file, cmd, arg);
 	default:
 		break;
@@ -1522,89 +1655,6 @@ vchiq_ioctl(struct file *file, unsigned int cmd, unsigned long arg)
 			ret = -EINVAL;
 	} break;
 
-	case VCHIQ_IOC_DEQUEUE_MESSAGE: {
-		VCHIQ_DEQUEUE_MESSAGE_T args;
-		USER_SERVICE_T *user_service;
-		VCHIQ_HEADER_T *header;
-
-		DEBUG_TRACE(DEQUEUE_MESSAGE_LINE);
-		if (copy_from_user
-			 (&args, (const void __user *)arg,
-			  sizeof(args)) != 0) {
-			ret = -EFAULT;
-			break;
-		}
-		service = find_service_for_instance(instance, args.handle);
-		if (!service) {
-			ret = -EINVAL;
-			break;
-		}
-		user_service = (USER_SERVICE_T *)service->base.userdata;
-		if (user_service->is_vchi == 0) {
-			ret = -EINVAL;
-			break;
-		}
-
-		spin_lock(&msg_queue_spinlock);
-		if (user_service->msg_remove == user_service->msg_insert) {
-			if (!args.blocking) {
-				spin_unlock(&msg_queue_spinlock);
-				DEBUG_TRACE(DEQUEUE_MESSAGE_LINE);
-				ret = -EWOULDBLOCK;
-				break;
-			}
-			user_service->dequeue_pending = 1;
-			do {
-				spin_unlock(&msg_queue_spinlock);
-				DEBUG_TRACE(DEQUEUE_MESSAGE_LINE);
-				if (down_interruptible(
-					&user_service->insert_event) != 0) {
-					vchiq_log_info(vchiq_arm_log_level,
-						"DEQUEUE_MESSAGE interrupted");
-					ret = -EINTR;
-					break;
-				}
-				spin_lock(&msg_queue_spinlock);
-			} while (user_service->msg_remove ==
-				user_service->msg_insert);
-
-			if (ret)
-				break;
-		}
-
-		BUG_ON((int)(user_service->msg_insert -
-			user_service->msg_remove) < 0);
-
-		header = user_service->msg_queue[user_service->msg_remove &
-			(MSG_QUEUE_SIZE - 1)];
-		user_service->msg_remove++;
-		spin_unlock(&msg_queue_spinlock);
-
-		up(&user_service->remove_event);
-		if (header == NULL)
-			ret = -ENOTCONN;
-		else if (header->size <= args.bufsize) {
-			/* Copy to user space if msgbuf is not NULL */
-			if ((args.buf == NULL) ||
-				(copy_to_user((void __user *)args.buf,
-				header->data,
-				header->size) == 0)) {
-				ret = header->size;
-				vchiq_release_message(
-					service->handle,
-					header);
-			} else
-				ret = -EFAULT;
-		} else {
-			vchiq_log_error(vchiq_arm_log_level,
-				"header %pK: bufsize %x < size %x",
-				header, args.bufsize, header->size);
-			WARN(1, "invalid size\n");
-			ret = -EMSGSIZE;
-		}
-		DEBUG_TRACE(DEQUEUE_MESSAGE_LINE);
-	} break;
-
 	case VCHIQ_IOC_GET_CLIENT_ID: {
 		VCHIQ_SERVICE_HANDLE_T handle = (VCHIQ_SERVICE_HANDLE_T)arg;
 
@@ -1742,6 +1792,9 @@ vchiq_ioctl_compat(struct file *file, unsigned int cmd, unsigned long arg)
 					    file, cmd, arg);
 	case VCHIQ_IOC_AWAIT_COMPLETION32:
 		return vchiq_dispatch_ioctl(vchiq_ioctl_compat_await_completion,
+					    file, cmd, arg);
+	case VCHIQ_IOC_DEQUEUE_MESSAGE32:
+		return vchiq_dispatch_ioctl(vchiq_ioctl_compat_dequeue_message,
 					    file, cmd, arg);
 	default:
 		return vchiq_ioctl(file, cmd, arg);
