@@ -47,6 +47,7 @@
 #include <linux/list.h>
 #include <linux/of.h>
 #include <linux/platform_device.h>
+#include <linux/compat.h>
 #include <soc/bcm2835/raspberrypi-firmware.h>
 
 #include "vchiq_core.h"
@@ -506,6 +507,254 @@ vchiq_ioc_queue_message(VCHIQ_SERVICE_HANDLE_T handle,
 				   &context, total_size);
 }
 
+struct vchiq_ioctl_ctxt;
+typedef long (*vchiq_ioctl_cpyret_handler_t)(struct vchiq_ioctl_ctxt *ctxt);
+
+/*
+ * struct vchiq_ioctl_ctxt
+ *
+ * Holds context information across a single ioctl call from user mode.
+ * This structure is used to reduce the number of parameters passed
+ * to each of the handler functions to process the ioctl.
+ */
+
+struct vchiq_ioctl_ctxt {
+	struct file *file;
+	unsigned int cmd;
+	unsigned long arg;
+	void *args;
+	VCHIQ_INSTANCE_T instance;
+	VCHIQ_STATUS_T status;
+	VCHIQ_SERVICE_T *service;
+	vchiq_ioctl_cpyret_handler_t cpyret_handler;
+};
+
+typedef long (*vchiq_ioctl_handler_t)(struct vchiq_ioctl_ctxt *ctxt);
+
+static long
+vchiq_map_status(VCHIQ_STATUS_T status)
+{
+	switch (status) {
+	case VCHIQ_SUCCESS:
+		return 0;
+	case VCHIQ_ERROR:
+		return -EIO;
+	case VCHIQ_RETRY:
+		return -EINTR;
+	default:
+		return -EIO;
+	}
+}
+
+static long
+vchiq_dispatch_ioctl(vchiq_ioctl_handler_t handler,
+		     struct file *file, unsigned int cmd, unsigned long arg) {
+	struct vchiq_ioctl_ctxt ctxt;
+	long ret = 0;
+
+	ctxt.file		= file;
+	ctxt.cmd		= cmd;
+	ctxt.arg		= arg;
+	ctxt.args		= NULL;
+	ctxt.instance		= file->private_data;
+	ctxt.status		= VCHIQ_SUCCESS;
+	ctxt.service		= NULL;
+	ctxt.cpyret_handler	= NULL;
+
+	vchiq_log_trace(vchiq_arm_log_level,
+			"vchiq_ioctl - instance %pK, cmd %s, arg %lx",
+			ctxt.instance,
+			ioctl_names[_IOC_NR(cmd)],
+			arg);
+
+	ret = handler(&ctxt);
+
+	if (ctxt.service)
+		unlock_service(ctxt.service);
+
+	if (ret < 0)
+		vchiq_log_info(vchiq_arm_log_level,
+			       "  ioctl instance %lx, cmd %s -> status %d, %ld",
+			       (unsigned long)ctxt.instance,
+			       ioctl_names[_IOC_NR(cmd)],
+			       ctxt.status, ret);
+	else
+		vchiq_log_trace(vchiq_arm_log_level,
+				"  ioctl instance %lx, cmd %s -> status %d, %ld",
+				(unsigned long)ctxt.instance,
+				ioctl_names[_IOC_NR(cmd)],
+				ctxt.status, ret);
+
+	return ret;
+}
+
+static long
+vchiq_ioctl_do_create_service(struct vchiq_ioctl_ctxt *ctxt)
+{
+	VCHIQ_CREATE_SERVICE_T *args = ctxt->args;
+	VCHIQ_INSTANCE_T instance = ctxt->instance;
+	VCHIQ_SERVICE_T *service = NULL;
+	USER_SERVICE_T *user_service = NULL;
+	void *userdata;
+	int srvstate;
+
+	user_service = kmalloc(sizeof(USER_SERVICE_T), GFP_KERNEL);
+	if (!user_service)
+		return -ENOMEM;
+
+	if (args->is_open) {
+		if (!instance->connected) {
+			kfree(user_service);
+			return -ENOTCONN;
+		}
+		srvstate = VCHIQ_SRVSTATE_OPENING;
+	} else {
+		srvstate =
+			 instance->connected ?
+			 VCHIQ_SRVSTATE_LISTENING :
+			 VCHIQ_SRVSTATE_HIDDEN;
+	}
+
+	userdata = args->params.userdata;
+	args->params.callback = service_callback;
+	args->params.userdata = user_service;
+
+	service = vchiq_add_service_internal(
+			instance->state,
+			&args->params, srvstate,
+			instance, user_service_free);
+
+	if (!service) {
+		kfree(user_service);
+		return -EEXIST;
+	}
+
+	user_service->service = service;
+	user_service->userdata = userdata;
+	user_service->instance = instance;
+	user_service->is_vchi = (args->is_vchi != 0);
+	user_service->dequeue_pending = 0;
+	user_service->close_pending = 0;
+	user_service->message_available_pos = instance->completion_remove - 1;
+	user_service->msg_insert = 0;
+	user_service->msg_remove = 0;
+	sema_init(&user_service->insert_event, 0);
+	sema_init(&user_service->remove_event, 0);
+	sema_init(&user_service->close_event, 0);
+
+	if (args->is_open) {
+		ctxt->status =
+			vchiq_open_service_internal(service, instance->pid);
+
+		if (ctxt->status != VCHIQ_SUCCESS) {
+			vchiq_remove_service(service->handle);
+			return vchiq_map_status(ctxt->status);
+		}
+	}
+
+	args->handle = service->handle;
+
+	if (ctxt->cpyret_handler(ctxt)) {
+		vchiq_remove_service(args->handle);
+		return -EFAULT;
+	}
+
+	return 0;
+}
+
+static long
+vchiq_ioctl_create_service_cpyret(struct vchiq_ioctl_ctxt *ctxt)
+{
+	VCHIQ_CREATE_SERVICE_T __user *puargs =
+		(VCHIQ_CREATE_SERVICE_T __user *)ctxt->arg;
+	VCHIQ_CREATE_SERVICE_T *args = ctxt->args;
+
+	return copy_to_user(&puargs->handle,
+			    &args->handle,
+			    sizeof(args->handle));
+}
+
+static long
+vchiq_ioctl_create_service(struct vchiq_ioctl_ctxt *ctxt)
+{
+	VCHIQ_CREATE_SERVICE_T __user *puargs =
+		(VCHIQ_CREATE_SERVICE_T __user *)ctxt->arg;
+	VCHIQ_CREATE_SERVICE_T args;
+
+	if (copy_from_user(&args, puargs, sizeof(args)))
+		return -EFAULT;
+
+	ctxt->args = &args;
+	ctxt->cpyret_handler = vchiq_ioctl_create_service_cpyret;
+
+	return vchiq_ioctl_do_create_service(ctxt);
+}
+
+#if defined(CONFIG_COMPAT)
+
+struct vchiq_service_base32 {
+	int fourcc;
+	compat_uptr_t callback;
+	compat_uptr_t userdata;
+};
+
+struct vchiq_service_params32 {
+	int fourcc;
+	compat_uptr_t callback;
+	compat_uptr_t userdata;
+	short version;       /* Increment for non-trivial changes */
+	short version_min;   /* Update for incompatible changes */
+};
+
+struct vchiq_create_service32 {
+	struct vchiq_service_params32 params;
+	int is_open;
+	int is_vchi;
+	unsigned int handle;       /* OUT */
+};
+
+#define VCHIQ_IOC_CREATE_SERVICE32 \
+	_IOWR(VCHIQ_IOC_MAGIC, 2, struct vchiq_create_service32)
+
+static long
+vchiq_ioctl_compat_create_service_cpyret(struct vchiq_ioctl_ctxt *ctxt)
+{
+	struct vchiq_create_service32 __user *puargs =
+		(struct vchiq_create_service32 __user *)ctxt->arg;
+	VCHIQ_CREATE_SERVICE_T *args = ctxt->args;
+
+	return copy_to_user(&puargs->handle,
+			    &args->handle,
+			    sizeof(args->handle));
+}
+
+static long
+vchiq_ioctl_compat_create_service(struct vchiq_ioctl_ctxt *ctxt)
+{
+	struct vchiq_create_service32 __user *puargs =
+		((struct vchiq_create_service32 __user *)ctxt->arg);
+	struct vchiq_create_service32 args32;
+	VCHIQ_CREATE_SERVICE_T args;
+
+	if (copy_from_user(&args32, puargs, sizeof(args32)))
+		return -EFAULT;
+
+	args.params.fourcc	= args32.params.fourcc;
+	args.params.callback	= compat_ptr(args32.params.callback);
+	args.params.userdata	= compat_ptr(args32.params.userdata);
+	args.params.version	= args32.params.version;
+	args.params.version_min = args32.params.version_min;
+	args.is_open		= args32.is_open;
+	args.is_vchi		= args32.is_vchi;
+
+	ctxt->args = &args;
+	ctxt->cpyret_handler = vchiq_ioctl_compat_create_service_cpyret;
+
+	return vchiq_ioctl_do_create_service(ctxt);
+}
+
+#endif
+
 /****************************************************************************
 *
 *   vchiq_ioctl
@@ -520,6 +769,14 @@ vchiq_ioctl(struct file *file, unsigned int cmd, unsigned long arg)
 	long ret = 0;
 	int i, rc;
 	DEBUG_INITIALISE(g_state.local)
+
+	switch (cmd) {
+	case VCHIQ_IOC_CREATE_SERVICE:
+		return vchiq_dispatch_ioctl(vchiq_ioctl_create_service,
+					    file, cmd, arg);
+	default:
+		break;
+	}
 
 	vchiq_log_trace(vchiq_arm_log_level,
 		"vchiq_ioctl - instance %pK, cmd %s, arg %lx",
@@ -575,90 +832,6 @@ vchiq_ioctl(struct file *file, unsigned int cmd, unsigned long arg)
 			vchiq_log_error(vchiq_arm_log_level,
 				"vchiq: could not connect: %d", status);
 		break;
-
-	case VCHIQ_IOC_CREATE_SERVICE: {
-		VCHIQ_CREATE_SERVICE_T args;
-		USER_SERVICE_T *user_service = NULL;
-		void *userdata;
-		int srvstate;
-
-		if (copy_from_user
-			 (&args, (const void __user *)arg,
-			  sizeof(args)) != 0) {
-			ret = -EFAULT;
-			break;
-		}
-
-		user_service = kmalloc(sizeof(USER_SERVICE_T), GFP_KERNEL);
-		if (!user_service) {
-			ret = -ENOMEM;
-			break;
-		}
-
-		if (args.is_open) {
-			if (!instance->connected) {
-				ret = -ENOTCONN;
-				kfree(user_service);
-				break;
-			}
-			srvstate = VCHIQ_SRVSTATE_OPENING;
-		} else {
-			srvstate =
-				 instance->connected ?
-				 VCHIQ_SRVSTATE_LISTENING :
-				 VCHIQ_SRVSTATE_HIDDEN;
-		}
-
-		userdata = args.params.userdata;
-		args.params.callback = service_callback;
-		args.params.userdata = user_service;
-		service = vchiq_add_service_internal(
-				instance->state,
-				&args.params, srvstate,
-				instance, user_service_free);
-
-		if (service != NULL) {
-			user_service->service = service;
-			user_service->userdata = userdata;
-			user_service->instance = instance;
-			user_service->is_vchi = (args.is_vchi != 0);
-			user_service->dequeue_pending = 0;
-			user_service->close_pending = 0;
-			user_service->message_available_pos =
-				instance->completion_remove - 1;
-			user_service->msg_insert = 0;
-			user_service->msg_remove = 0;
-			sema_init(&user_service->insert_event, 0);
-			sema_init(&user_service->remove_event, 0);
-			sema_init(&user_service->close_event, 0);
-
-			if (args.is_open) {
-				status = vchiq_open_service_internal
-					(service, instance->pid);
-				if (status != VCHIQ_SUCCESS) {
-					vchiq_remove_service(service->handle);
-					service = NULL;
-					ret = (status == VCHIQ_RETRY) ?
-						-EINTR : -EIO;
-					break;
-				}
-			}
-
-			if (copy_to_user((void __user *)
-				&(((VCHIQ_CREATE_SERVICE_T __user *)
-					arg)->handle),
-				(const void *)&service->handle,
-				sizeof(service->handle)) != 0) {
-				ret = -EFAULT;
-				vchiq_remove_service(service->handle);
-			}
-
-			service = NULL;
-		} else {
-			ret = -EEXIST;
-			kfree(user_service);
-		}
-	} break;
 
 	case VCHIQ_IOC_CLOSE_SERVICE: {
 		VCHIQ_SERVICE_HANDLE_T handle = (VCHIQ_SERVICE_HANDLE_T)arg;
@@ -1218,6 +1391,22 @@ vchiq_ioctl(struct file *file, unsigned int cmd, unsigned long arg)
 	return ret;
 }
 
+#if defined(CONFIG_COMPAT)
+
+static long
+vchiq_ioctl_compat(struct file *file, unsigned int cmd, unsigned long arg)
+{
+	switch (cmd) {
+	case VCHIQ_IOC_CREATE_SERVICE32:
+		return vchiq_dispatch_ioctl(vchiq_ioctl_compat_create_service,
+					    file, cmd, arg);
+	default:
+		return vchiq_ioctl(file, cmd, arg);
+	}
+}
+
+#endif
+
 /****************************************************************************
 *
 *   vchiq_open
@@ -1672,6 +1861,9 @@ static const struct file_operations
 vchiq_fops = {
 	.owner = THIS_MODULE,
 	.unlocked_ioctl = vchiq_ioctl,
+#if defined(CONFIG_COMPAT)
+	.compat_ioctl = vchiq_ioctl_compat,
+#endif
 	.open = vchiq_open,
 	.release = vchiq_release,
 	.read = vchiq_read
