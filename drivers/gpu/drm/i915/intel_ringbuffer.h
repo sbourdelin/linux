@@ -381,7 +381,6 @@ struct intel_engine_cs {
 	struct rb_node *execlist_first;
 	unsigned int fw_domains;
 	bool disable_lite_restore_wa;
-	bool preempt_wa;
 	u32 ctx_desc_template;
 
 	/* Contexts are pinned whilst they are active on the GPU. The last
