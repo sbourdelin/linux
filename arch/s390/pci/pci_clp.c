@@ -521,14 +521,16 @@ static int clp_normal_command(struct clp_req *req)
 	if (!lpcb)
 		return -ENOMEM;
 
-	rc = -EFAULT;
 	uptr = (void __force __user *)(unsigned long) req->data_p;
-	if (copy_from_user(lpcb, uptr, PAGE_SIZE) != 0)
+	if (copy_from_user(lpcb, uptr, PAGE_SIZE) != 0) {
+		rc = -EFAULT;
 		goto out_free;
+	}
 
-	rc = -EINVAL;
-	if (lpcb->fmt != 0 || lpcb->reserved1 != 0 || lpcb->reserved2 != 0)
+	if (lpcb->fmt != 0 || lpcb->reserved1 != 0 || lpcb->reserved2 != 0) {
+		rc = -EINVAL;
 		goto out_free;
+	}
 
 	switch (req->lps) {
 	case 0:
@@ -541,9 +543,8 @@ static int clp_normal_command(struct clp_req *req)
 	if (rc)
 		goto out_free;
 
-	rc = -EFAULT;
 	if (copy_to_user(uptr, lpcb, PAGE_SIZE) != 0)
-		goto out_free;
+		rc = -EFAULT;
 
 	rc = 0;
 
