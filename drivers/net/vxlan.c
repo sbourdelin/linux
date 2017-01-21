@@ -3276,6 +3276,12 @@ static int vxlan_netdevice_event(struct notifier_block *unused,
 		vxlan_handle_lowerdev_unregister(vn, dev);
 	else if (event == NETDEV_UDP_TUNNEL_PUSH_INFO)
 		vxlan_push_rx_ports(dev);
+	else if (event == NETDEV_CHANGE) {
+		if (dev->netdev_ops == &vxlan_netdev_ops) {
+			if (netif_running(dev) && !netif_oper_up(dev))
+				vxlan_flush(netdev_priv(dev));
+		}
+	}
 
 	return NOTIFY_DONE;
 }
