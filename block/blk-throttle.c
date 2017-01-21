@@ -1191,9 +1191,10 @@ static ssize_t tg_set_conf(struct kernfs_open_file *of,
 	if (ret)
 		return ret;
 
-	ret = -EINVAL;
-	if (sscanf(ctx.body, "%llu", &v) != 1)
+	if (sscanf(ctx.body, "%llu", &v) != 1) {
+		ret = -EINVAL;
 		goto out_finish;
+	}
 	if (!v)
 		v = -1;
 
