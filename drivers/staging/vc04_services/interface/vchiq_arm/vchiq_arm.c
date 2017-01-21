@@ -1486,6 +1486,74 @@ vchiq_ioctl_compat_dequeue_message(struct vchiq_ioctl_ctxt *ctxt)
 
 #endif
 
+static long
+vchiq_ioctl_get_config(struct vchiq_ioctl_ctxt *ctxt)
+{
+	VCHIQ_GET_CONFIG_T __user *puargs =
+		(VCHIQ_GET_CONFIG_T __user *)ctxt->arg;
+	VCHIQ_GET_CONFIG_T args;
+	VCHIQ_CONFIG_T config;
+	VCHIQ_INSTANCE_T instance = ctxt->instance;
+
+	if (copy_from_user(&args, puargs, sizeof(args)))
+		return -EFAULT;
+
+	if (args.config_size > sizeof(config))
+		return -EINVAL;
+
+	ctxt->status = vchiq_get_config(instance, args.config_size, &config);
+
+	if (ctxt->status != VCHIQ_SUCCESS)
+		return vchiq_map_status(ctxt->status);
+
+	if (copy_to_user(args.pconfig,
+			 &config,
+			 args.config_size))
+		return -EFAULT;
+
+	return 0;
+}
+
+#if defined(CONFIG_COMPAT)
+
+struct vchiq_get_config32 {
+	unsigned int config_size;
+	compat_uptr_t pconfig;
+};
+
+#define VCHIQ_IOC_GET_CONFIG32 \
+	_IOWR(VCHIQ_IOC_MAGIC, 10, struct vchiq_get_config32)
+
+static long
+vchiq_ioctl_compat_get_config(struct vchiq_ioctl_ctxt *ctxt)
+{
+	struct vchiq_get_config32 __user *puargs32 =
+		(struct vchiq_get_config32 __user *)ctxt->arg;
+	struct vchiq_get_config32 args32;
+	VCHIQ_CONFIG_T config;
+	VCHIQ_INSTANCE_T instance = ctxt->instance;
+
+	if (copy_from_user(&args32, puargs32, sizeof(args32)))
+		return -EFAULT;
+
+	if (args32.config_size > sizeof(config))
+		return -EINVAL;
+
+	ctxt->status = vchiq_get_config(instance, args32.config_size, &config);
+
+	if (ctxt->status != VCHIQ_SUCCESS)
+		return vchiq_map_status(ctxt->status);
+
+	if (copy_to_user(compat_ptr(args32.pconfig),
+			 &config,
+			 args32.config_size))
+		return -EFAULT;
+
+	return 0;
+}
+
+#endif
+
 /****************************************************************************
 *
 *   vchiq_ioctl
@@ -1516,6 +1584,9 @@ vchiq_ioctl(struct file *file, unsigned int cmd, unsigned long arg)
 					    file, cmd, arg);
 	case VCHIQ_IOC_DEQUEUE_MESSAGE:
 		return vchiq_dispatch_ioctl(vchiq_ioctl_dequeue_message,
+					    file, cmd, arg);
+	case VCHIQ_IOC_GET_CONFIG:
+		return vchiq_dispatch_ioctl(vchiq_ioctl_get_config,
 					    file, cmd, arg);
 	default:
 		break;
@@ -1661,29 +1732,6 @@ vchiq_ioctl(struct file *file, unsigned int cmd, unsigned long arg)
 		ret = vchiq_get_client_id(handle);
 	} break;
 
-	case VCHIQ_IOC_GET_CONFIG: {
-		VCHIQ_GET_CONFIG_T args;
-		VCHIQ_CONFIG_T config;
-
-		if (copy_from_user(&args, (const void __user *)arg,
-			sizeof(args)) != 0) {
-			ret = -EFAULT;
-			break;
-		}
-		if (args.config_size > sizeof(config)) {
-			ret = -EINVAL;
-			break;
-		}
-		status = vchiq_get_config(instance, args.config_size, &config);
-		if (status == VCHIQ_SUCCESS) {
-			if (copy_to_user((void __user *)args.pconfig,
-				    &config, args.config_size) != 0) {
-				ret = -EFAULT;
-				break;
-			}
-		}
-	} break;
-
 	case VCHIQ_IOC_SET_SERVICE_OPTION: {
 		VCHIQ_SET_SERVICE_OPTION_T args;
 
@@ -1795,6 +1843,9 @@ vchiq_ioctl_compat(struct file *file, unsigned int cmd, unsigned long arg)
 					    file, cmd, arg);
 	case VCHIQ_IOC_DEQUEUE_MESSAGE32:
 		return vchiq_dispatch_ioctl(vchiq_ioctl_compat_dequeue_message,
+					    file, cmd, arg);
+	case VCHIQ_IOC_GET_CONFIG32:
+		return vchiq_dispatch_ioctl(vchiq_ioctl_compat_get_config,
 					    file, cmd, arg);
 	default:
 		return vchiq_ioctl(file, cmd, arg);
