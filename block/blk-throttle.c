@@ -1327,27 +1327,30 @@ static ssize_t tg_set_max(struct kernfs_open_file *of,
 			break;
 		ctx.body += len;
 
-		ret = -EINVAL;
 		p = tok;
 		strsep(&p, "=");
-		if (!p || (sscanf(p, "%llu", &val) != 1 && strcmp(p, "max")))
+		if (!p || (sscanf(p, "%llu", &val) != 1 && strcmp(p, "max"))) {
+			ret = -EINVAL;
 			goto out_finish;
+		}
 
-		ret = -ERANGE;
-		if (!val)
+		if (!val) {
+			ret = -ERANGE;
 			goto out_finish;
+		}
 
-		ret = -EINVAL;
-		if (!strcmp(tok, "rbps"))
+		if (!strcmp(tok, "rbps")) {
 			v[0] = val;
-		else if (!strcmp(tok, "wbps"))
+		} else if (!strcmp(tok, "wbps")) {
 			v[1] = val;
-		else if (!strcmp(tok, "riops"))
+		} else if (!strcmp(tok, "riops")) {
 			v[2] = min_t(u64, val, UINT_MAX);
-		else if (!strcmp(tok, "wiops"))
+		} else if (!strcmp(tok, "wiops")) {
 			v[3] = min_t(u64, val, UINT_MAX);
-		else
+		} else {
+			ret = -EINVAL;
 			goto out_finish;
+		}
 	}
 
 	tg->bps[READ] = v[0];
