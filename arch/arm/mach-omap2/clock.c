@@ -112,26 +112,6 @@ void omap2_init_clk_clkdm(struct clk_hw *hw)
 	}
 }
 
-static int __initdata mpurate;
-
-/*
- * By default we use the rate set by the bootloader.
- * You can override this with mpurate= cmdline option.
- */
-static int __init omap_clk_setup(char *str)
-{
-	get_option(&str, &mpurate);
-
-	if (!mpurate)
-		return 1;
-
-	if (mpurate < 1000)
-		mpurate *= 1000000;
-
-	return 1;
-}
-__setup("mpurate=", omap_clk_setup);
-
 /**
  * omap2_clk_print_new_rates - print summary of current clock tree rates
  * @hfclkin_ck_name: clk name for the off-chip HF oscillator
