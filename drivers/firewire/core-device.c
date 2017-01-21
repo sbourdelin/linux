@@ -689,7 +689,7 @@ static void fw_unit_release(struct device *dev)
 	kfree(unit);
 }
 
-static struct device_type fw_unit_type = {
+static const struct device_type fw_unit_type = {
 	.uevent		= fw_unit_uevent,
 	.release	= fw_unit_release,
 };
@@ -849,7 +849,7 @@ static void fw_device_release(struct device *dev)
 	fw_card_put(card);
 }
 
-static struct device_type fw_device_type = {
+static const struct device_type fw_device_type = {
 	.release = fw_device_release,
 };
 
