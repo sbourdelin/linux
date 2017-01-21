@@ -170,7 +170,7 @@ static u8 intel_dp_max_lane_count(struct intel_dp *intel_dp)
 	u8 source_max, sink_max;
 
 	source_max = intel_dig_port->max_lanes;
-	sink_max = intel_dp->max_sink_lane_count;
+	sink_max = intel_dp->max_link_lane_count;
 
 	return min(source_max, sink_max);
 }
@@ -323,11 +323,11 @@ int intel_dp_get_link_train_fallback_values(struct intel_dp *intel_dp,
 				   intel_dp->num_common_rates,
 				   link_rate);
 	if (index > 0) {
-		intel_dp->max_sink_link_rate = intel_dp->common_rates[index - 1];
-		intel_dp->max_sink_lane_count = lane_count;
+		intel_dp->max_link_rate = intel_dp->common_rates[index - 1];
+		intel_dp->max_link_lane_count = lane_count;
 	} else if (lane_count > 1) {
-		intel_dp->max_sink_link_rate = intel_dp_max_sink_rate(intel_dp);
-		intel_dp->max_sink_lane_count = lane_count >> 1;
+		intel_dp->max_link_rate = intel_dp_max_sink_rate(intel_dp);
+		intel_dp->max_link_lane_count = lane_count >> 1;
 	} else {
 		DRM_ERROR("Link Training Unsuccessful\n");
 		return -1;
@@ -1562,8 +1562,7 @@ intel_dp_max_link_rate(struct intel_dp *intel_dp)
 {
 	int len;
 
-	len = intel_dp_common_len_rate_limit(intel_dp,
-					     intel_dp->max_sink_link_rate);
+	len = intel_dp_common_len_rate_limit(intel_dp, intel_dp->max_link_rate);
 	if (WARN_ON(len <= 0))
 		return 162000;
 
@@ -1633,7 +1632,7 @@ intel_dp_compute_config(struct intel_encoder *encoder,
 	uint8_t link_bw, rate_select;
 
 	common_len = intel_dp_common_len_rate_limit(intel_dp,
-						    intel_dp->max_sink_link_rate);
+						    intel_dp->max_link_rate);
 
 	/* No common link rates between source and sink */
 	WARN_ON(common_len <= 0);
@@ -4529,11 +4528,11 @@ intel_dp_long_pulse(struct intel_connector *intel_connector)
 		      yesno(intel_dp_source_supports_hbr2(intel_dp)),
 		      yesno(drm_dp_tps3_supported(intel_dp->dpcd)));
 
-	/* Set the max lane count for sink */
-	intel_dp->max_sink_lane_count = drm_dp_max_lane_count(intel_dp->dpcd);
+	/* Set the max lane count for link */
+	intel_dp->max_link_lane_count = drm_dp_max_lane_count(intel_dp->dpcd);
 
-	/* Set the max link rate for sink */
-	intel_dp->max_sink_link_rate = intel_dp_max_sink_rate(intel_dp);
+	/* Set the max link rate for link */
+	intel_dp->max_link_rate = intel_dp_max_sink_rate(intel_dp);
 
 	intel_dp_print_rates(intel_dp);
 
