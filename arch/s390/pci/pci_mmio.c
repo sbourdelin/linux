@@ -57,12 +57,11 @@ SYSCALL_DEFINE3(s390_pci_mmio_write, unsigned long, mmio_addr,
 		goto out;
 	io_addr = (void __iomem *)((pfn << PAGE_SHIFT) | (mmio_addr & ~PAGE_MASK));
 
-	ret = -EFAULT;
-	if ((unsigned long) io_addr < ZPCI_IOMAP_ADDR_BASE)
+	if ((unsigned long)io_addr < ZPCI_IOMAP_ADDR_BASE ||
+	    copy_from_user(buf, user_buffer, length)) {
+		ret = -EFAULT;
 		goto out;
-
-	if (copy_from_user(buf, user_buffer, length))
-		goto out;
+	}
 
 	ret = zpci_memcpy_toio(io_addr, buf, length);
 out:
