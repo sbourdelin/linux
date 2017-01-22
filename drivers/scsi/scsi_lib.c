@@ -1222,8 +1222,9 @@ scsi_prep_state_check(struct scsi_device *sdev, struct request *req)
 			 * commands.  The device must be brought online
 			 * before trying any recovery commands.
 			 */
-			sdev_printk(KERN_ERR, sdev,
-				    "rejecting I/O to offline device\n");
+			if (printk_ratelimit())
+				sdev_printk(KERN_ERR, sdev,
+					    "rejecting I/O to offline device\n");
 			ret = BLKPREP_KILL;
 			break;
 		case SDEV_DEL:
@@ -1231,8 +1232,9 @@ scsi_prep_state_check(struct scsi_device *sdev, struct request *req)
 			 * If the device is fully deleted, we refuse to
 			 * process any commands as well.
 			 */
-			sdev_printk(KERN_ERR, sdev,
-				    "rejecting I/O to dead device\n");
+			if (printk_ratelimit())
+				sdev_printk(KERN_ERR, sdev,
+					    "rejecting I/O to dead device\n");
 			ret = BLKPREP_KILL;
 			break;
 		case SDEV_BLOCK:
@@ -1711,8 +1713,9 @@ static void scsi_request_fn(struct request_queue *q)
 			break;
 
 		if (unlikely(!scsi_device_online(sdev))) {
-			sdev_printk(KERN_ERR, sdev,
-				    "rejecting I/O to offline device\n");
+			if (printk_ratelimit())
+				sdev_printk(KERN_ERR, sdev,
+					    "rejecting I/O to offline device\n");
 			scsi_kill_request(req, q);
 			continue;
 		}
