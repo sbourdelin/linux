@@ -1930,7 +1930,8 @@ static void mmc_detect(struct mmc_host *host)
 	}
 }
 
-static int _mmc_suspend(struct mmc_host *host, bool is_suspend)
+static int _mmc_suspend(struct mmc_host *host, bool is_suspend,
+	bool is_runtime_pm)
 {
 	int err = 0;
 	unsigned int notify_type = is_suspend ? EXT_CSD_POWER_OFF_SHORT :
@@ -1942,6 +1943,24 @@ static int _mmc_suspend(struct mmc_host *host, bool is_suspend)
 		goto out;
 
 	if (mmc_card_doing_bkops(host->card)) {
+		if (is_runtime_pm && host->card->ext_csd.auto_bkops_en) {
+			err = mmc_read_bkops_status(host->card);
+			if (err) {
+				pr_err("%s: error %d reading BKOPS Status\n",
+						mmc_hostname(host), err);
+				goto out;
+			}
+
+			if (host->card->ext_csd.raw_bkops_status >=
+					EXT_CSD_BKOPS_LEVEL_2) {
+				/*
+				 * We don’t allow Runtime Suspend while device
+				 * still needs time to complete internal BKOPS
+				 */
+				err = -EBUSY;
+				goto out;
+			}
+		}
 		err = mmc_stop_bkops(host->card);
 		if (err)
 			goto out;
@@ -1975,7 +1994,7 @@ static int mmc_suspend(struct mmc_host *host)
 {
 	int err;
 
-	err = _mmc_suspend(host, true);
+	err = _mmc_suspend(host, true, false);
 	if (!err) {
 		pm_runtime_disable(&host->card->dev);
 		pm_runtime_set_suspended(&host->card->dev);
@@ -2022,7 +2041,7 @@ static int mmc_shutdown(struct mmc_host *host)
 		err = _mmc_resume(host);
 
 	if (!err)
-		err = _mmc_suspend(host, false);
+		err = _mmc_suspend(host, false, false);
 
 	return err;
 }
@@ -2046,7 +2065,7 @@ static int mmc_runtime_suspend(struct mmc_host *host)
 	if (!(host->caps & MMC_CAP_AGGRESSIVE_PM))
 		return 0;
 
-	err = _mmc_suspend(host, true);
+	err = _mmc_suspend(host, true, true);
 	if (err)
 		pr_err("%s: error %d doing aggressive suspend\n",
 			mmc_hostname(host), err);
