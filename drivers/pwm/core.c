@@ -823,6 +823,10 @@ struct pwm_device *pwm_get(struct device *dev, const char *con_id)
 		return ERR_PTR(-ENODEV);
 
 	chip = pwmchip_find_by_name(chosen->provider);
+	if (!chip && chosen->module_name) {
+		request_module(chosen->module_name);
+		chip = pwmchip_find_by_name(chosen->provider);
+	}
 	if (!chip)
 		return ERR_PTR(-EPROBE_DEFER);
 
