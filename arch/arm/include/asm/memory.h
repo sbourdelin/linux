@@ -83,6 +83,8 @@
 #define IOREMAP_MAX_ORDER	24
 #endif
 
+#define VECTORS_BASE		UL(0xffff0000)
+
 #else /* CONFIG_MMU */
 
 /*
@@ -110,8 +112,6 @@
 #define XIP_VIRT_ADDR(physaddr)  (physaddr)
 
 #endif /* !CONFIG_MMU */
-
-#define VECTORS_BASE		UL(0xffff0000)
 
 /*
  * We fix the TCM memories max 32 KiB ITCM resp DTCM at these
