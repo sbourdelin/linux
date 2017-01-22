@@ -159,7 +159,17 @@ static inline bool virtio_has_iommu_quirk(const struct virtio_device *vdev)
 	 * Note the reverse polarity of the quirk feature (compared to most
 	 * other features), this is for compatibility with legacy systems.
 	 */
-	return !virtio_has_feature(vdev, VIRTIO_F_IOMMU_PLATFORM);
+	if (virtio_has_feature(vdev, VIRTIO_F_IOMMU_PLATFORM))
+		return false;
+
+	/*
+	 * fastboot emulator for ARM puts virtio devices behind an SMMU
+	 * and never bypasses it for legacy devices.
+	 */
+	if (IS_ENABLED(CONFIG_ARM) || IS_ENABLED(CONFIG_ARM64))
+		return virtio_has_feature(vdev, VIRTIO_F_VERSION_1);
+
+	return true;
 }
 
 static inline

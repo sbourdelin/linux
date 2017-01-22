@@ -1278,7 +1278,9 @@ static pci_ers_result_t vfio_pci_aer_err_detected(struct pci_dev *pdev,
 
 	mutex_lock(&vdev->igate);
 
-	if (vdev->err_trigger)
+	if (state == pci_channel_io_normal && vdev->non_fatal_err_trigger)
+		eventfd_signal(vdev->non_fatal_err_trigger, 1);
+	else if (vdev->err_trigger)
 		eventfd_signal(vdev->err_trigger, 1);
 
 	mutex_unlock(&vdev->igate);
@@ -1288,8 +1290,38 @@ static pci_ers_result_t vfio_pci_aer_err_detected(struct pci_dev *pdev,
 	return PCI_ERS_RESULT_CAN_RECOVER;
 }
 
+static pci_ers_result_t vfio_pci_aer_slot_reset(struct pci_dev *pdev)
+{
+	struct vfio_pci_device *vdev;
+	struct vfio_device *device;
+	static pci_ers_result_t err = PCI_ERS_RESULT_NONE;
+
+	device = vfio_device_get_from_dev(&pdev->dev);
+	if (!device)
+		goto err_dev;
+
+	vdev = vfio_device_data(device);
+	if (!vdev)
+		goto err_data;
+
+	mutex_lock(&vdev->igate);
+
+	if (vdev->err_trigger)
+		eventfd_signal(vdev->err_trigger, 1);
+
+	mutex_unlock(&vdev->igate);
+
+	err = PCI_ERS_RESULT_RECOVERED;
+
+err_data:
+	vfio_device_put(device);
+err_dev:
+	return err;
+}
+
 static const struct pci_error_handlers vfio_err_handlers = {
 	.error_detected = vfio_pci_aer_err_detected,
+	.slot_reset = vfio_pci_aer_slot_reset,
 };
 
 static struct pci_driver vfio_pci_driver = {
