@@ -651,8 +651,7 @@ static struct kvm *kvm_create_vm(unsigned long type)
 	if (init_srcu_struct(&kvm->irq_srcu))
 		goto out_err_no_irq_srcu;
 	for (i = 0; i < KVM_NR_BUSES; i++) {
-		kvm->buses[i] = kzalloc(sizeof(struct kvm_io_bus),
-					GFP_KERNEL);
+		kvm->buses[i] = kzalloc(sizeof(*kvm->buses[i]), GFP_KERNEL);
 		if (!kvm->buses[i])
 			goto out_err;
 	}
