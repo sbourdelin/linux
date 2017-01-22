@@ -972,7 +972,7 @@ static void svm_disable_lbrv(struct vcpu_svm *svm)
  */
 #define SVM_VM_DATA_HASH_BITS	8
 DECLARE_HASHTABLE(svm_vm_data_hash, SVM_VM_DATA_HASH_BITS);
-static spinlock_t svm_vm_data_hash_lock;
+static DEFINE_SPINLOCK(svm_vm_data_hash_lock);
 
 /* Note:
  * This function is called from IOMMU driver to notify
