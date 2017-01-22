@@ -111,6 +111,8 @@
 
 #endif /* !CONFIG_MMU */
 
+#define VECTORS_BASE		UL(0xffff0000)
+
 /*
  * We fix the TCM memories max 32 KiB ITCM resp DTCM at these
  * locations
