@@ -2743,17 +2743,14 @@ static long kvm_vcpu_compat_ioctl(struct file *filp,
 		sigset_t sigset;
 
 		if (argp) {
-			r = -EFAULT;
 			if (copy_from_user(&kvm_sigmask, argp,
 					   sizeof(kvm_sigmask)))
-				goto out;
-			r = -EINVAL;
+				return -EFAULT;
 			if (kvm_sigmask.len != sizeof(csigset))
-				goto out;
-			r = -EFAULT;
+				return -EINVAL;
 			if (copy_from_user(&csigset, sigmask_arg->sigset,
 					   sizeof(csigset)))
-				goto out;
+				return -EFAULT;
 			sigset_from_compat(&sigset, &csigset);
 			r = kvm_vcpu_ioctl_set_sigmask(vcpu, &sigset);
 		} else
@@ -2763,8 +2760,6 @@ static long kvm_vcpu_compat_ioctl(struct file *filp,
 	default:
 		r = kvm_vcpu_ioctl(filp, ioctl, arg);
 	}
-
-out:
 	return r;
 }
 #endif
