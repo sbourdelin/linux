@@ -3133,10 +3133,9 @@ static long kvm_vm_compat_ioctl(struct file *filp,
 		struct compat_kvm_dirty_log compat_log;
 		struct kvm_dirty_log log;
 
-		r = -EFAULT;
 		if (copy_from_user(&compat_log, (void __user *)arg,
 				   sizeof(compat_log)))
-			goto out;
+			return -EFAULT;
 		log.slot	 = compat_log.slot;
 		log.padding1	 = compat_log.padding1;
 		log.padding2	 = compat_log.padding2;
@@ -3148,8 +3147,6 @@ static long kvm_vm_compat_ioctl(struct file *filp,
 	default:
 		r = kvm_vm_ioctl(filp, ioctl, arg);
 	}
-
-out:
 	return r;
 }
 #endif
