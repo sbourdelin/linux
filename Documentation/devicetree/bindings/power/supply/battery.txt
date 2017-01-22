@@ -1,0 +1,24 @@
+Battery State Machine Support
+
+Required Properties:
+ - compatible: Must be "fixed-battery"
+
+Optional Properties:
+ - nominal-microvolt: dead battery voltage in microvolts
+ - design-microwatt-hours: battery design mWh in microwatts
+ - design-microamp-hours: battery design mAh in microamps
+
+Example:
+
+	bat: battery@0 {
+		compatible = "fixed-battery";
+		nominal-microvolt = <3700000>;
+		design-microwatt-hours = <5290000>;
+		design-microamp-hours = <1430000>;
+	};
+
+	fuel_gauge: fuel_gauge@0 {
+		....
+		monitored-battery = <&bat>;
+		...
+	};
