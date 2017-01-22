@@ -2569,7 +2569,7 @@ static long kvm_vcpu_ioctl(struct file *filp,
 	case KVM_GET_REGS: {
 		struct kvm_regs *kvm_regs;
 
-		kvm_regs = kzalloc(sizeof(struct kvm_regs), GFP_KERNEL);
+		kvm_regs = kzalloc(sizeof(*kvm_regs), GFP_KERNEL);
 		if (!kvm_regs) {
 			r = -ENOMEM;
 			goto put_vcpu;
@@ -2577,7 +2577,7 @@ static long kvm_vcpu_ioctl(struct file *filp,
 		r = kvm_arch_vcpu_ioctl_get_regs(vcpu, kvm_regs);
 		if (r)
 			goto free_regs;
-		if (copy_to_user(argp, kvm_regs, sizeof(struct kvm_regs)))
+		if (copy_to_user(argp, kvm_regs, sizeof(*kvm_regs)))
 			r = -EFAULT;
 free_regs:
 		kfree(kvm_regs);
@@ -2598,7 +2598,7 @@ free_regs:
 	case KVM_GET_SREGS: {
 		struct kvm_sregs *kvm_sregs;
 
-		kvm_sregs = kzalloc(sizeof(struct kvm_sregs), GFP_KERNEL);
+		kvm_sregs = kzalloc(sizeof(*kvm_sregs), GFP_KERNEL);
 		if (!kvm_sregs) {
 			r = -ENOMEM;
 			goto put_vcpu;
@@ -2606,7 +2606,7 @@ free_regs:
 		r = kvm_arch_vcpu_ioctl_get_sregs(vcpu, kvm_sregs);
 		if (r)
 			goto free_sregs;
-		if (copy_to_user(argp, kvm_sregs, sizeof(struct kvm_sregs)))
+		if (copy_to_user(argp, kvm_sregs, sizeof(*kvm_sregs)))
 			r = -EFAULT;
 free_sregs:
 		kfree(kvm_sregs);
@@ -2697,7 +2697,7 @@ free_sregs:
 	case KVM_GET_FPU: {
 		struct kvm_fpu *fpu;
 
-		fpu = kzalloc(sizeof(struct kvm_fpu), GFP_KERNEL);
+		fpu = kzalloc(sizeof(*fpu), GFP_KERNEL);
 		if (!fpu) {
 			r = -ENOMEM;
 			goto put_vcpu;
@@ -2705,7 +2705,7 @@ free_sregs:
 		r = kvm_arch_vcpu_ioctl_get_fpu(vcpu, fpu);
 		if (r)
 			goto free_fpu;
-		if (copy_to_user(argp, fpu, sizeof(struct kvm_fpu)))
+		if (copy_to_user(argp, fpu, sizeof(*fpu)))
 			r = -EFAULT;
 free_fpu:
 		kfree(fpu);
