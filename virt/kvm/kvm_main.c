@@ -184,7 +184,7 @@ bool kvm_make_all_cpus_request(struct kvm *kvm, unsigned int req)
 		/* Set ->requests bit before we read ->mode. */
 		smp_mb__after_atomic();
 
-		if (cpus != NULL && cpu != -1 && cpu != me &&
+		if (cpus && cpu != -1 && cpu != me &&
 		      kvm_vcpu_exiting_guest_mode(vcpu) != OUTSIDE_GUEST_MODE)
 			cpumask_set_cpu(cpu, cpus);
 	}
@@ -1532,10 +1532,9 @@ static kvm_pfn_t hva_to_pfn(unsigned long addr, bool atomic, bool *async,
 
 retry:
 	vma = find_vma_intersection(current->mm, addr, addr + 1);
-
-	if (vma == NULL)
+	if (!vma) {
 		pfn = KVM_PFN_ERR_FAULT;
-	else if (vma->vm_flags & (VM_IO | VM_PFNMAP)) {
+	} else if (vma->vm_flags & (VM_IO | VM_PFNMAP)) {
 		r = hva_to_pfn_remapped(vma, addr, async, write_fault, &pfn);
 		if (r == -EAGAIN)
 			goto retry;
@@ -2835,7 +2834,7 @@ int kvm_register_device_ops(struct kvm_device_ops *ops, u32 type)
 	if (type >= ARRAY_SIZE(kvm_device_ops_table))
 		return -ENOSPC;
 
-	if (kvm_device_ops_table[type] != NULL)
+	if (kvm_device_ops_table[type])
 		return -EEXIST;
 
 	kvm_device_ops_table[type] = ops;
@@ -2844,7 +2843,7 @@ int kvm_register_device_ops(struct kvm_device_ops *ops, u32 type)
 
 void kvm_unregister_device_ops(u32 type)
 {
-	if (kvm_device_ops_table[type] != NULL)
+	if (kvm_device_ops_table[type])
 		kvm_device_ops_table[type] = NULL;
 }
 
@@ -2860,7 +2859,7 @@ static int kvm_ioctl_create_device(struct kvm *kvm,
 		return -ENODEV;
 
 	ops = kvm_device_ops_table[cd->type];
-	if (ops == NULL)
+	if (!ops)
 		return -ENODEV;
 
 	if (test)
@@ -3392,7 +3391,7 @@ static int kvm_io_bus_get_first_dev(struct kvm_io_bus *bus,
 
 	range = bsearch(&key, bus->range, bus->dev_count,
 			sizeof(struct kvm_io_range), kvm_io_bus_sort_cmp);
-	if (range == NULL)
+	if (!range)
 		return -ENOENT;
 
 	off = range - bus->range;
@@ -3803,7 +3802,7 @@ static int kvm_init_debug(void)
 	struct kvm_stats_debugfs_item *p;
 
 	kvm_debugfs_dir = debugfs_create_dir("kvm", NULL);
-	if (kvm_debugfs_dir == NULL)
+	if (!kvm_debugfs_dir)
 		goto out;
 
 	kvm_debugfs_num_entries = 0;
