@@ -304,7 +304,7 @@ struct sbridge_info {
 	u64		(*rir_limit)(u32 reg);
 	u64		(*sad_limit)(u32 reg);
 	u32		(*interleave_mode)(u32 reg);
-	char*		(*show_interleave_mode)(u32 reg);
+	const char*	(*show_interleave_mode)(u32 reg);
 	u32		(*dram_attr)(u32 reg);
 	const u32	*dram_rule;
 	const u32	*interleave_list;
@@ -811,7 +811,7 @@ static u32 interleave_mode(u32 reg)
 	return GET_BITFIELD(reg, 1, 1);
 }
 
-char *show_interleave_mode(u32 reg)
+static const char *show_interleave_mode(u32 reg)
 {
 	return interleave_mode(reg) ? "8:6" : "[8:6]XOR[18:16]";
 }
@@ -831,9 +831,9 @@ static u32 knl_interleave_mode(u32 reg)
 	return GET_BITFIELD(reg, 1, 2);
 }
 
-static char *knl_show_interleave_mode(u32 reg)
+static const char *knl_show_interleave_mode(u32 reg)
 {
-	char *s;
+	const char *s;
 
 	switch (knl_interleave_mode(reg)) {
 	case 0:
@@ -850,6 +850,7 @@ static char *knl_show_interleave_mode(u32 reg)
 		break;
 	default:
 		WARN_ON(1);
+		s = "";
 		break;
 	}
 
