@@ -4,6 +4,7 @@
  * Copyright (C) 2013-2015 Alexei Starovoitov <ast@kernel.org>
  * Copyright (C) 2015 Wang Nan <wangnan0@huawei.com>
  * Copyright (C) 2015 Huawei Inc.
+ * Copyright (C) 2017 Nicira, Inc.
  *
  * This program is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Lesser General Public
@@ -22,6 +23,7 @@
 #include <stdlib.h>
 #include <stdio.h>
 #include <stdarg.h>
+#include <libgen.h>
 #include <inttypes.h>
 #include <string.h>
 #include <unistd.h>
@@ -31,7 +33,10 @@
 #include <linux/err.h>
 #include <linux/kernel.h>
 #include <linux/bpf.h>
+#include <linux/magic.h>
 #include <linux/list.h>
+#include <linux/limits.h>
+#include <sys/vfs.h>
 #include <libelf.h>
 #include <gelf.h>
 
@@ -1235,6 +1240,77 @@ out:
 	bpf_object__unload(obj);
 	pr_warning("failed to load object '%s'\n", obj->path);
 	return err;
+}
+
+static int check_path(const char *path)
+{
+	struct statfs st_fs;
+	char *dname, *dir;
+	int err = 0;
+
+	if (path == NULL)
+		return -EINVAL;
+
+	dname = strdup(path);
+	dir = dirname(dname);
+	if (statfs(dir, &st_fs)) {
+		pr_warning("failed to statfs %s: %s\n", dir, strerror(errno));
+		err = -errno;
+	}
+	free(dname);
+
+	if (!err && st_fs.f_type != BPF_FS_MAGIC) {
+		pr_warning("specified path %s is not on BPF FS\n", path);
+		err = -EINVAL;
+	}
+
+	return err;
+}
+
+int bpf_program__pin(struct bpf_program *prog, const char *path)
+{
+	int i, err;
+
+	err = check_path(path);
+	if (err)
+		return err;
+
+	if (prog == NULL) {
+		pr_warning("invalid program pointer\n");
+		return -EINVAL;
+	}
+
+	if (prog->instances.nr <= 0) {
+		pr_warning("no instances of prog %s to pin\n",
+			   prog->section_name);
+		return -EINVAL;
+	}
+
+	if (bpf_obj_pin(prog->instances.fds[0], path)) {
+		pr_warning("failed to pin program: %s\n", strerror(errno));
+		return -errno;
+	}
+	pr_debug("pinned program '%s'\n", path);
+
+	for (i = 1; i < prog->instances.nr; i++) {
+		char buf[PATH_MAX];
+		int len;
+
+		len = snprintf(buf, PATH_MAX, "%s_%d", path, i);
+		if (len < 0)
+			return -EINVAL;
+		else if (len > PATH_MAX)
+			return -ENAMETOOLONG;
+
+		if (bpf_obj_pin(prog->instances.fds[i], buf)) {
+			pr_warning("failed to pin program: %s\n",
+				   strerror(errno));
+			return -errno;
+		}
+		pr_debug("pinned program '%s'\n", buf);
+	}
+
+	return 0;
 }
 
 void bpf_object__close(struct bpf_object *obj)
