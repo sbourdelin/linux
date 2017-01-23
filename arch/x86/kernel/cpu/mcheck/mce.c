@@ -1110,6 +1110,23 @@ void do_machine_check(struct pt_regs *regs, long error_code)
 
 	mce_gather_info(&m, regs);
 
+	/*
+	 * Check if this MCE is signaled to only this logical processor,
+	 * on Intel only.
+	 */
+	if (m.cpuvendor == X86_VENDOR_INTEL)
+		lmce = m.mcgstatus & MCG_STATUS_LMCES;
+
+	/*
+	 * Special treatment for Intel broadcasted machine check:
+	 * To avoid panic due to MCE synchronization in case of kdump,
+	 * after system panic, clear global status and bail out.
+	 */
+	if (!lmce && atomic_read(&panic_cpu) != PANIC_CPU_INVALID) {
+		wrmsrl(MSR_IA32_MCG_STATUS, 0);
+		goto out;
+	}
+
 	final = this_cpu_ptr(&mces_seen);
 	*final = m;
 
@@ -1125,13 +1142,6 @@ void do_machine_check(struct pt_regs *regs, long error_code)
 	 */
 	if (!(m.mcgstatus & MCG_STATUS_RIPV))
 		kill_it = 1;
-
-	/*
-	 * Check if this MCE is signaled to only this logical processor,
-	 * on Intel only.
-	 */
-	if (m.cpuvendor == X86_VENDOR_INTEL)
-		lmce = m.mcgstatus & MCG_STATUS_LMCES;
 
 	/*
 	 * Go through all banks in exclusion of the other CPUs. This way we
