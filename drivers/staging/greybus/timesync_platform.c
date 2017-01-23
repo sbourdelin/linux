@@ -45,13 +45,18 @@ u32 gb_timesync_platform_get_clock_rate(void)
 
 int gb_timesync_platform_lock_bus(struct gb_timesync_svc *pdata)
 {
+	if (!arche_platform_change_state_cb)
+		return 0;
+
 	return arche_platform_change_state_cb(ARCHE_PLATFORM_STATE_TIME_SYNC,
 					      pdata);
 }
 
 void gb_timesync_platform_unlock_bus(void)
 {
-	arche_platform_change_state_cb(ARCHE_PLATFORM_STATE_ACTIVE, NULL);
+	if (arche_platform_change_state_cb)
+		arche_platform_change_state_cb(ARCHE_PLATFORM_STATE_ACTIVE,
+					       NULL);
 }
 
 static const struct of_device_id arch_timer_of_match[] = {
