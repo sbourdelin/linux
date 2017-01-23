@@ -2392,6 +2392,10 @@ int snd_ymfpci_create(struct snd_card *card,
 	chip->rev = pci->revision;
 	chip->reg_area_phys = pci_resource_start(pci, 0);
 	chip->reg_area_virt = ioremap_nocache(chip->reg_area_phys, 0x8000);
+	if (!chip->reg_area_virt) {
+		pci_disable_device(pci);
+		return -ENOMEM;
+	}
 	pci_set_master(pci);
 	chip->src441_used = -1;
 
