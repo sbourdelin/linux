@@ -1,0 +1,68 @@
+STMicroelectronics STM32 Digital Filter for Sigma Delta Modulator (DFSDM)
+ulti-function device.
+
+The STM32 DFSDM device is a multifunction device that handles the DFSDM IP.
+
+The DFSDM IP allows to add processing on Sigma Delta ADC based on SinC filters.
+For this, a pool of m filters can be connected to a pool of n channels.
+For STM32H7 : m = 4, n = 8.
+
+Each channel n is assigned to the SPI or Manchester interface n or n + 1.
+Channels 0 to 2 can also be connected to ADC IP instance 1 to 3.
+Filtering result is stored in a left aligned register, with 8 LSB reserved for
+the input channel ID.
+
+Each filter instance supports two contexts to manage conversions, each one has
+its own configurable sequence and trigger:
+- regular conversion: used for single or continuous conversion.
+- injected conversions: used for triggered conversion.
+
+Interfaces supported:
+- sigma delta ADCs trough IIO framework.
+- PDM microphones through ASoC framework.
+
+Required properties:
+- compatible:	Must be "st,stm32h7-dfsdm".
+- reg:		Specifies the DFSDM block register address and length.
+- interrupts:	IRQ lines connected to each DFSDM filter instance.
+- clocks:	IP and serial interfaces clocking. Should be set according
+		to rcc clock ID and "clock-names".
+- clock-names:	Input clock name "dfsdm_clk" must be defined,
+		"audio_clk" is optional. If defined CLKOUT is based on the audio
+		clock, else "dfsdm_clk" is used.
+
+Optional properties:
+- st,clkout-freq: clkout clock frequency (Hz).This clock must be set according
+		  to "clock" property. Frequency must be a multiple of the rcc
+		  clock frequency. If not, clkout frequency will not be
+		  accurate.
+- pinctrl-names:  set to "default".
+- pinctrl-0:	  List of phandles pointing to pin configuration nodes for DFSDM
+		  module.
+		  For Pinctrl properties see ../pinctrl/pinctrl-bindings.txt
+Example :
+	dfsdm: dfsdm@4400D000 {
+		compatible = "st,stm32h7-dfsdm";
+		reg = <0x40017000 0x400>;
+		interrupts = <110>, <111>, <112>, <113>;
+		clocks = <&timer_clk>;
+		clock-names = "dfsdm_clk";
+		pinctrl-0 = <&dfsdm_ch0 &dfsdm_ch1>;
+		pinctrl-names = "default";
+		st,clkout-freq = <2480000>;
+
+		iio_dfsdm0: iio-dfsdm@0 {
+			compatible = "st,stm32-dfsdm-adc";
+			#io-channel-cells = <1>;
+			reg = <0>;
+			status = "disabled";
+		};
+		dai_dfsdm0: dfsdm-audio@0 {
+			compatible = "st,stm32-dfsdm-audio";
+			#sound-dai-cells = <0>;
+			reg = <0>;
+			dmas = <&dmamux1 101 0x400 0x00>;
+			dma-names = "rx";
+			status = "disabled";
+		};
+	};
