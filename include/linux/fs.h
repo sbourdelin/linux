@@ -2544,14 +2544,26 @@ static inline void file_start_write(struct file *file)
 {
 	if (!S_ISREG(file_inode(file)->i_mode))
 		return;
+	__sb_start_write(locks_inode(file)->i_sb, SB_FREEZE_WRITE, true);
+	if (likely(locks_inode(file) == file_inode(file)))
+		return;
 	__sb_start_write(file_inode(file)->i_sb, SB_FREEZE_WRITE, true);
+
 }
 
 static inline bool file_start_write_trylock(struct file *file)
 {
+	int ret;
+
 	if (!S_ISREG(file_inode(file)->i_mode))
 		return true;
-	return __sb_start_write(file_inode(file)->i_sb, SB_FREEZE_WRITE, false);
+	ret = __sb_start_write(locks_inode(file)->i_sb, SB_FREEZE_WRITE, false);
+	if (!ret || likely(locks_inode(file) == file_inode(file)))
+		return ret;
+	ret = __sb_start_write(file_inode(file)->i_sb, SB_FREEZE_WRITE, false);
+	if (!ret)
+		__sb_end_write(locks_inode(file)->i_sb, SB_FREEZE_WRITE);
+	return ret;
 }
 
 static inline void file_end_write(struct file *file)
@@ -2559,6 +2571,9 @@ static inline void file_end_write(struct file *file)
 	if (!S_ISREG(file_inode(file)->i_mode))
 		return;
 	__sb_end_write(file_inode(file)->i_sb, SB_FREEZE_WRITE);
+	if (likely(locks_inode(file) == file_inode(file)))
+		return;
+	__sb_end_write(locks_inode(file)->i_sb, SB_FREEZE_WRITE);
 }
 
 /*
