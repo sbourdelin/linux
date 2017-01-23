@@ -221,7 +221,13 @@ static int i2c_acpi_get_info(struct acpi_device *adev,
 
 	acpi_dev_free_resource_list(&resource_list);
 
-	strlcpy(info->type, dev_name(&adev->dev), sizeof(info->type));
+	/*
+	 * Populate modalias from compatible property if available,
+	 * otherwise use native ACPI information
+	 */
+	if ((!adev->data.of_compatible) ||
+	    acpi_of_modalias(adev, info->type, sizeof(info->type)))
+		strlcpy(info->type, dev_name(&adev->dev), sizeof(info->type));
 
 	return 0;
 }
