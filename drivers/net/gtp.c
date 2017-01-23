@@ -186,7 +186,7 @@ static int gtp_rx(struct sk_buff *skb, struct pdp_ctx *pctx, unsigned int hdrlen
 
 	if (!gtp_check_src_ms(skb, pctx, hdrlen)) {
 		pr_debug("No PDP ctx for this MS\n");
-		return -1;
+		return 1;
 	}
 
 	/* Get rid of the GTP + UDP headers. */
@@ -236,7 +236,7 @@ static int gtp0_udp_encap_recv(struct gtp_dev *gtp, struct sk_buff *skb)
 	pctx = gtp0_pdp_find(gtp, be64_to_cpu(gtp0->tid));
 	if (IS_ERR(pctx)) {
 		netdev_dbg(gtp->dev, "No PDP ctx to decap skb=%p\n", skb);
-		return -1;
+		return 1;
 	}
 
 	return gtp_rx(skb, pctx, hdrlen);
@@ -278,7 +278,7 @@ static int gtp1u_udp_encap_recv(struct gtp_dev *gtp, struct sk_buff *skb)
 	pctx = gtp1_pdp_find(gtp, ntohl(gtp1->tid));
 	if (IS_ERR(pctx)) {
 		netdev_dbg(gtp->dev, "No PDP ctx to decap skb=%p\n", skb);
-		return -1;
+		return 1;
 	}
 
 	return gtp_rx(skb, pctx, hdrlen);
