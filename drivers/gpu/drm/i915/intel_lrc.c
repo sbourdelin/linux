@@ -1163,18 +1163,6 @@ static int gen9_init_indirectctx_bb(struct intel_engine_cs *engine,
 	return wa_ctx_end(wa_ctx, *offset = index, CACHELINE_DWORDS);
 }
 
-static int gen9_init_perctx_bb(struct intel_engine_cs *engine,
-			       struct i915_wa_ctx_bb *wa_ctx,
-			       uint32_t *batch,
-			       uint32_t *offset)
-{
-	uint32_t index = wa_ctx_start(wa_ctx, *offset, CACHELINE_DWORDS);
-
-	wa_ctx_emit(batch, index, MI_BATCH_BUFFER_END);
-
-	return wa_ctx_end(wa_ctx, *offset = index, 1);
-}
-
 static int lrc_setup_wa_ctx_obj(struct intel_engine_cs *engine, u32 size)
 {
 	struct drm_i915_gem_object *obj;
@@ -1239,7 +1227,9 @@ static int intel_init_workaround_bb(struct intel_engine_cs *engine)
 
 	page = i915_gem_object_get_dirty_page(wa_ctx->vma->obj, 0);
 	batch = kmap_atomic(page);
-	offset = 0;
+
+	/* skip first cacheline to use offset 0 as no wa_ctx */
+	offset = CACHELINE_DWORDS;
 
 	if (IS_GEN8(engine->i915)) {
 		ret = gen8_init_indirectctx_bb(engine,
@@ -1260,13 +1250,6 @@ static int intel_init_workaround_bb(struct intel_engine_cs *engine)
 					       &wa_ctx->indirect_ctx,
 					       batch,
 					       &offset);
-		if (ret)
-			goto out;
-
-		ret = gen9_init_perctx_bb(engine,
-					  &wa_ctx->per_ctx,
-					  batch,
-					  &offset);
 		if (ret)
 			goto out;
 	}
@@ -1993,19 +1976,25 @@ static void execlists_init_reg_state(u32 *reg_state,
 			       RING_INDIRECT_CTX(engine->mmio_base), 0);
 		ASSIGN_CTX_REG(reg_state, CTX_RCS_INDIRECT_CTX_OFFSET,
 			       RING_INDIRECT_CTX_OFFSET(engine->mmio_base), 0);
-		if (engine->wa_ctx.vma) {
+
+		if (engine->wa_ctx.indirect_ctx.offset) {
 			struct i915_ctx_workarounds *wa_ctx = &engine->wa_ctx;
-			u32 ggtt_offset = i915_ggtt_offset(wa_ctx->vma);
 
 			reg_state[CTX_RCS_INDIRECT_CTX+1] =
-				(ggtt_offset + wa_ctx->indirect_ctx.offset * sizeof(uint32_t)) |
+				(i915_ggtt_offset(wa_ctx->vma) +
+				 wa_ctx->indirect_ctx.offset * sizeof(uint32_t)) |
 				(wa_ctx->indirect_ctx.size / CACHELINE_DWORDS);
+		}
+
+		if (engine->wa_ctx.per_ctx.offset) {
+			struct i915_ctx_workarounds *wa_ctx = &engine->wa_ctx;
 
 			reg_state[CTX_RCS_INDIRECT_CTX_OFFSET+1] =
 				intel_lr_indirect_ctx_offset(engine) << 6;
 
 			reg_state[CTX_BB_PER_CTX_PTR+1] =
-				(ggtt_offset + wa_ctx->per_ctx.offset * sizeof(uint32_t)) |
+				(i915_ggtt_offset(wa_ctx->vma) +
+				 wa_ctx->per_ctx.offset * sizeof(uint32_t)) |
 				0x01;
 		}
 	}
