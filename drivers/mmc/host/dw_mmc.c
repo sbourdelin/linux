@@ -3311,6 +3311,7 @@ int dw_mci_runtime_resume(struct device *dev)
 {
 	int i, ret = 0;
 	struct dw_mci *host = dev_get_drvdata(dev);
+	u32 sdmmc_cmd_bits = SDMMC_CMD_UPD_CLK | SDMMC_CMD_PRV_DAT_WAIT;
 
 	if (host->cur_slot &&
 	    (mmc_can_gpio_cd(host->cur_slot->mmc) ||
@@ -3357,6 +3358,9 @@ int dw_mci_runtime_resume(struct device *dev)
 		if (slot->mmc->pm_flags & MMC_PM_KEEP_POWER) {
 			dw_mci_set_ios(slot->mmc, &slot->mmc->ios);
 			dw_mci_setup_bus(slot, true);
+		} else {
+			/* restore CIU */
+			mci_send_cmd(slot, sdmmc_cmd_bits, 0);
 		}
 	}
 
