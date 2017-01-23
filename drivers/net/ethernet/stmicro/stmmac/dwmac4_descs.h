@@ -1,6 +1,6 @@
 /*
  * Header File to describe the DMA descriptors and related definitions specific
- * for DesignWare databook 4.xx.
+ * for the DesignWare Ethernet QoS Controller
  *
  * Copyright (C) 2015  STMicroelectronics Ltd
  *

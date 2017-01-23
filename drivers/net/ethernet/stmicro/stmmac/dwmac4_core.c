@@ -1,6 +1,6 @@
 /*
- * This is the driver for the GMAC on-chip Ethernet controller for ST SoCs.
- * DWC Ether MAC version 4.00  has been used for developing this code.
+ * This is the driver for the DesignWare Ethernet QoS Controller.
+ * For historical reasons it started in 4.x version.
  *
  * This only implements the mac core functions for this chip.
  *

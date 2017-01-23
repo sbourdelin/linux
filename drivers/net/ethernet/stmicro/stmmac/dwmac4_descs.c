@@ -1,6 +1,6 @@
 /*
- * This contains the functions to handle the descriptors for DesignWare databook
- * 4.xx.
+ * This contains the functions to handle the descriptors for the DesignWare
+ * Ethernet QoS Controller. For historical reasons it started in 4.x version.
  *
  * Copyright (C) 2015  STMicroelectronics Ltd
  *
