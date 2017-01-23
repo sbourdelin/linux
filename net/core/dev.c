@@ -2532,13 +2532,36 @@ static void skb_warn_bad_offload(const struct sk_buff *skb)
 	     skb_shinfo(skb)->gso_type, skb->ip_summed);
 }
 
-/*
- * Invalidate hardware checksum when packet is to be mangled, and
- * complete checksum manually on outgoing path.
- */
-int skb_checksum_help(struct sk_buff *skb)
+/* compute 16-bit RFC1624 checksum and store it at skb->data + offset */
+static int skb_rfc1624_csum(struct sk_buff *skb, int offset)
 {
 	__wsum csum;
+	int ret = 0;
+
+	csum = skb_checksum(skb, offset, skb->len - offset, 0);
+
+	offset += skb->csum_offset;
+	BUG_ON(offset + sizeof(__sum16) > skb_headlen(skb));
+
+	if (skb_cloned(skb) &&
+	    !skb_clone_writable(skb, offset + sizeof(__sum16))) {
+		ret = pskb_expand_head(skb, 0, 0, GFP_ATOMIC);
+		if (ret)
+			goto out;
+	}
+	*(__sum16 *)(skb->data + offset) = csum_fold(csum) ?: CSUM_MANGLED_0;
+out:
+	return ret;
+}
+
+/* Invalidate hardware checksum when packet is to be mangled, and
+ * complete checksum manually on outgoing path.
+ *    @skb - buffer that needs checksum
+ *    @csum_algo(skb, offset) - function used to compute the checksum
+ */
+static int __skb_checksum_help(struct sk_buff *skb,
+			       int (*csum_algo)(struct sk_buff *, int))
+{
 	int ret = 0, offset;
 
 	if (skb->ip_summed == CHECKSUM_COMPLETE)
@@ -2560,23 +2583,19 @@ int skb_checksum_help(struct sk_buff *skb)
 
 	offset = skb_checksum_start_offset(skb);
 	BUG_ON(offset >= skb_headlen(skb));
-	csum = skb_checksum(skb, offset, skb->len - offset, 0);
 
-	offset += skb->csum_offset;
-	BUG_ON(offset + sizeof(__sum16) > skb_headlen(skb));
-
-	if (skb_cloned(skb) &&
-	    !skb_clone_writable(skb, offset + sizeof(__sum16))) {
-		ret = pskb_expand_head(skb, 0, 0, GFP_ATOMIC);
-		if (ret)
-			goto out;
-	}
-
-	*(__sum16 *)(skb->data + offset) = csum_fold(csum) ?: CSUM_MANGLED_0;
+	ret = csum_algo(skb, offset);
+	if (ret)
+		goto out;
 out_set_summed:
 	skb->ip_summed = CHECKSUM_NONE;
 out:
 	return ret;
+}
+
+int skb_checksum_help(struct sk_buff *skb)
+{
+	return __skb_checksum_help(skb, skb_rfc1624_csum);
 }
 EXPORT_SYMBOL(skb_checksum_help);
 
