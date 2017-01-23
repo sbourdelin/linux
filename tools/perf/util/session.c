@@ -2050,10 +2050,10 @@ int __perf_session__set_tracepoints_handlers(struct perf_session *session,
 		evsel = perf_evlist__find_tracepoint_by_name(session->evlist, assocs[i].name);
 		if (evsel == NULL)
 			continue;
-
-		err = -EEXIST;
-		if (evsel->handler != NULL)
+		if (evsel->handler) {
+			err = -EEXIST;
 			goto out;
+		}
 		evsel->handler = assocs[i].handler;
 	}
 
