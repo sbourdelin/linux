@@ -2554,6 +2554,29 @@ out:
 	return ret;
 }
 
+/* compute 32-bit RFC3309 checksum and store it at skb->data + offset */
+static int skb_rfc3309_csum(struct sk_buff *skb, int offset)
+{
+	__le32 crc32c_csum;
+	int ret = 0;
+
+	crc32c_csum = cpu_to_le32(~__skb_checksum(skb, offset,
+						  skb->len - offset, ~(__u32)0,
+						  sctp_csum_stub));
+	offset += skb->csum_offset;
+	BUG_ON((offset + sizeof(__le32)) > skb_headlen(skb));
+
+	if (skb_cloned(skb) &&
+	    !skb_clone_writable(skb, offset + sizeof(__le32))) {
+		ret = pskb_expand_head(skb, 0, 0, GFP_ATOMIC);
+		if (ret)
+			goto out;
+	}
+	*(__le32 *)(skb->data + offset) = crc32c_csum;
+out:
+	return ret;
+}
+
 /* Invalidate hardware checksum when packet is to be mangled, and
  * complete checksum manually on outgoing path.
  *    @skb - buffer that needs checksum
@@ -2598,6 +2621,12 @@ int skb_checksum_help(struct sk_buff *skb)
 	return __skb_checksum_help(skb, skb_rfc1624_csum);
 }
 EXPORT_SYMBOL(skb_checksum_help);
+
+int skb_sctp_csum_help(struct sk_buff *skb)
+{
+	return __skb_checksum_help(skb, skb_rfc3309_csum);
+}
+EXPORT_SYMBOL(skb_sctp_csum_help);
 
 __be16 skb_network_protocol(struct sk_buff *skb, int *depth)
 {
