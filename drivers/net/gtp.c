@@ -69,7 +69,6 @@ struct gtp_dev {
 	struct socket		*sock0;
 	struct socket		*sock1u;
 
-	struct net		*net;
 	struct net_device	*dev;
 
 	unsigned int		hash_size;
@@ -292,7 +291,7 @@ static int gtp_encap_recv(struct sock *sk, struct sk_buff *skb)
 
 	netdev_dbg(gtp->dev, "encap_recv sk=%p\n", sk);
 
-	xnet = !net_eq(gtp->net, dev_net(gtp->dev));
+	xnet = !net_eq(sock_net(sk), dev_net(gtp->dev));
 
 	switch (udp_sk(sk)->encap_type) {
 	case UDP_ENCAP_GTP0:
@@ -642,7 +641,7 @@ static void gtp_link_setup(struct net_device *dev)
 static int gtp_hashtable_new(struct gtp_dev *gtp, int hsize);
 static void gtp_hashtable_free(struct gtp_dev *gtp);
 static int gtp_encap_enable(struct net_device *dev, struct gtp_dev *gtp,
-			    struct net *src_net, struct nlattr *data[]);
+			    struct nlattr *data[]);
 static void gtp_encap_disable(struct gtp_dev *gtp);
 
 static int gtp_newlink(struct net *src_net, struct net_device *dev,
@@ -660,7 +659,7 @@ static int gtp_newlink(struct net *src_net, struct net_device *dev,
 		hashsize = nla_get_u32(data[IFLA_GTP_PDP_HASHSIZE]);
 
 	if (data[IFLA_GTP_FD0] || data[IFLA_GTP_FD1]) {
-		err = gtp_encap_enable(dev, gtp, src_net, data);
+		err = gtp_encap_enable(dev, gtp, data);
 		if (err < 0)
 			goto out_err;
 	}
@@ -839,7 +838,7 @@ out_sock:
 }
 
 static int gtp_encap_enable(struct net_device *dev, struct gtp_dev *gtp,
-			    struct net *src_net, struct nlattr *data[])
+			    struct nlattr *data[])
 {
 	struct socket *sock0 = NULL;
 	struct socket *sock1u = NULL;
@@ -867,7 +866,6 @@ static int gtp_encap_enable(struct net_device *dev, struct gtp_dev *gtp,
 
 	gtp->sock0 = sock0;
 	gtp->sock1u = sock1u;
-	gtp->net = src_net;
 
 	return 0;
 }
