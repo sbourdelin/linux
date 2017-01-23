@@ -373,6 +373,7 @@ struct intel_engine_cs {
 
 	/* Execlists */
 	struct tasklet_struct irq_tasklet;
+#define IRQ_CTX_SWITCH (BITS_PER_LONG - 1) /* TASKLET_STATE_USER */
 	struct execlist_port {
 		struct drm_i915_gem_request *request;
 		unsigned int count;
