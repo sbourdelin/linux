@@ -616,6 +616,7 @@ static int smaps_pte_range(pmd_t *pmd, unsigned long addr, unsigned long end,
 	return 0;
 }
 
+#pragma GCC diagnostic ignored "-Woverride-init"
 static void show_smap_vma_flags(struct seq_file *m, struct vm_area_struct *vma)
 {
 	/*
@@ -682,6 +683,7 @@ static void show_smap_vma_flags(struct seq_file *m, struct vm_area_struct *vma)
 	}
 	seq_putc(m, '\n');
 }
+#pragma GCC diagnostic warning "-Woverride-init"
 
 #ifdef CONFIG_HUGETLB_PAGE
 static int smaps_hugetlb_range(pte_t *pte, unsigned long hmask,

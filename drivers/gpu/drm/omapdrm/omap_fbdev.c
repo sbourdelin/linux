@@ -80,6 +80,8 @@ fallback:
 	return drm_fb_helper_pan_display(var, fbi);
 }
 
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Woverride-init"
 static struct fb_ops omap_fb_ops = {
 	.owner = THIS_MODULE,
 	DRM_FB_HELPER_DEFAULT_OPS,
@@ -95,6 +97,7 @@ static struct fb_ops omap_fb_ops = {
 
 	.fb_pan_display = omap_fbdev_pan_display,
 };
+#pragma GCC diagnostic pop
 
 static int omap_fbdev_create(struct drm_fb_helper *helper,
 		struct drm_fb_helper_surface_size *sizes)

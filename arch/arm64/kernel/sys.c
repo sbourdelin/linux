@@ -55,6 +55,7 @@ asmlinkage long sys_rt_sigreturn_wrapper(void);
 #undef __SYSCALL
 #define __SYSCALL(nr, sym)	[nr] = sym,
 
+#pragma GCC diagnostic ignored "-Woverride-init"
 /*
  * The sys_call_table array must be 4K aligned to be accessible from
  * kernel/entry.S.

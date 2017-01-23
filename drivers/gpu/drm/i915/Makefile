@@ -5,6 +5,7 @@
 subdir-ccflags-$(CONFIG_DRM_I915_WERROR) := -Werror
 subdir-ccflags-y += \
 	$(call as-instr,movntdqa (%eax)$(comma)%xmm0,-DCONFIG_AS_MOVNTDQA)
+subdir-ccflags-y += $(call cc-disable-warning, override-init)
 
 # Please keep these build lists sorted!
 

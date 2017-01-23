@@ -1265,6 +1265,7 @@ EXPORT_PER_CPU_SYMBOL(__preempt_count);
  * limit), all of them are 4K, except the debug stack which
  * is 8K.
  */
+#pragma GCC diagnostic ignored "-Woverride-init"
 static const unsigned int exception_stack_sizes[N_EXCEPTION_STACKS] = {
 	  [0 ... N_EXCEPTION_STACKS - 1]	= EXCEPTION_STKSZ,
 	  [DEBUG_STACK - 1]			= DEBUG_STKSZ

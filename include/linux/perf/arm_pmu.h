@@ -41,6 +41,7 @@ struct arm_pmu_platdata {
 #define C(_x)				PERF_COUNT_HW_CACHE_##_x
 #define CACHE_OP_UNSUPPORTED		0xFFFF
 
+#pragma GCC diagnostic ignored "-Woverride-init"
 #define PERF_MAP_ALL_UNSUPPORTED					\
 	[0 ... PERF_COUNT_HW_MAX - 1] = HW_OP_UNSUPPORTED
 

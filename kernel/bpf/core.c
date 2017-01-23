@@ -547,6 +547,7 @@ EXPORT_SYMBOL_GPL(__bpf_call_base);
  *
  * Decode and execute eBPF instructions.
  */
+#pragma GCC diagnostic ignored "-Woverride-init"
 static unsigned int __bpf_prog_run(void *ctx, const struct bpf_insn *insn)
 {
 	u64 stack[MAX_BPF_STACK / sizeof(u64)];
@@ -1003,6 +1004,7 @@ load_byte:
 		WARN_RATELIMIT(1, "unknown opcode %02x\n", insn->code);
 		return 0;
 }
+#pragma GCC diagnostic warning "-Woverride-init"
 STACK_FRAME_NON_STANDARD(__bpf_prog_run); /* jump table */
 
 bool bpf_prog_array_compatible(struct bpf_array *array,
