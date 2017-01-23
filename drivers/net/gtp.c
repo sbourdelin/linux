@@ -235,7 +235,7 @@ static int gtp0_udp_encap_recv(struct gtp_dev *gtp, struct sk_buff *skb)
 
 	pctx = gtp0_pdp_find(gtp, be64_to_cpu(gtp0->tid));
 	if (IS_ERR(pctx)) {
-		netdev_dbg(gtp->dev, "No PDP ctx to decap skb=%p\n", skb);
+		pr_debug("No PDP ctx to decap skb=%p\n", skb);
 		return 1;
 	}
 
@@ -277,7 +277,7 @@ static int gtp1u_udp_encap_recv(struct gtp_dev *gtp, struct sk_buff *skb)
 
 	pctx = gtp1_pdp_find(gtp, ntohl(gtp1->tid));
 	if (IS_ERR(pctx)) {
-		netdev_dbg(gtp->dev, "No PDP ctx to decap skb=%p\n", skb);
+		pr_debug("No PDP ctx to decap skb=%p\n", skb);
 		return 1;
 	}
 
@@ -296,15 +296,15 @@ static int gtp_encap_recv(struct sock *sk, struct sk_buff *skb)
 	if (!gtp)
 		return 1;
 
-	netdev_dbg(gtp->dev, "encap_recv sk=%p\n", sk);
+	pr_debug("encap_recv sk=%p\n", sk);
 
 	switch (udp_sk(sk)->encap_type) {
 	case UDP_ENCAP_GTP0:
-		netdev_dbg(gtp->dev, "received GTP0 packet\n");
+		pr_debug("received GTP0 packet\n");
 		ret = gtp0_udp_encap_recv(gtp, skb);
 		break;
 	case UDP_ENCAP_GTP1U:
-		netdev_dbg(gtp->dev, "received GTP1U packet\n");
+		pr_debug("received GTP1U packet\n");
 		ret = gtp1u_udp_encap_recv(gtp, skb);
 		break;
 	default:
@@ -313,12 +313,12 @@ static int gtp_encap_recv(struct sock *sk, struct sk_buff *skb)
 
 	switch (ret) {
 	case 1:
-		netdev_dbg(gtp->dev, "pass up to the process\n");
+		pr_debug("pass up to the process\n");
 		break;
 	case 0:
 		break;
 	case -1:
-		netdev_dbg(gtp->dev, "GTP packet has been dropped\n");
+		pr_debug("GTP packet has been dropped\n");
 		kfree_skb(skb);
 		ret = 0;
 		break;
