@@ -1601,7 +1601,7 @@ int aac_issue_bmic_identify(struct aac_dev *dev, u32 bus, u32 target)
  *	Update our hba map with the information gathered from the FW
  */
 void aac_update_hba_map(struct aac_dev *dev,
-		struct aac_ciss_phys_luns_resp *phys_luns)
+		struct aac_ciss_phys_luns_resp *phys_luns, int rescan)
 {
 	/* ok and extended reporting */
 	u32 lun_count, nexus;
@@ -1646,7 +1646,10 @@ void aac_update_hba_map(struct aac_dev *dev,
 			dev->hba_map[bus][target].qd_limit = 32;
 
 update_devtype:
-		dev->hba_map[bus][target].devtype = devtype;
+		if (rescan == AAC_INIT)
+			dev->hba_map[bus][target].devtype = devtype;
+		else
+			dev->hba_map[bus][target].new_devtype = devtype;
 	}
 }
 
@@ -1658,7 +1661,7 @@ update_devtype:
  *	Execute a CISS REPORT PHYS LUNS and process the results into
  *	the current hba_map.
  */
-int aac_report_phys_luns(struct aac_dev *dev, struct fib *fibptr)
+int aac_report_phys_luns(struct aac_dev *dev, struct fib *fibptr, int rescan)
 {
 	int fibsize, datasize;
 	struct aac_ciss_phys_luns_resp *phys_luns;
@@ -1715,7 +1718,7 @@ int aac_report_phys_luns(struct aac_dev *dev, struct fib *fibptr)
 		/* analyse data */
 		if (rcode >= 0 && phys_luns->resp_flag == 2) {
 			/* ok and extended reporting */
-			aac_update_hba_map(dev, phys_luns);
+			aac_update_hba_map(dev, phys_luns, rescan);
 		}
 	}
 
@@ -1828,7 +1831,7 @@ int aac_get_adapter_info(struct aac_dev* dev)
 	if (!dev->sync_mode && dev->sa_firmware &&
 			dev->supplement_adapter_info.VirtDeviceBus != 0xffff) {
 		/* Thor SA Firmware -> CISS_REPORT_PHYSICAL_LUNS */
-		rcode = aac_report_phys_luns(dev, fibptr);
+		rcode = aac_report_phys_luns(dev, fibptr, AAC_INIT);
 	}
 
 	if (!dev->in_reset) {
