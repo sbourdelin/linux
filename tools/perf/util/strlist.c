@@ -118,9 +118,10 @@ static int strlist__parse_list_entry(struct strlist *slist, const char *s,
 		return strlist__load(slist, s + 7);
 
 	if (subst_dir) {
-		err = -ENOMEM;
-		if (asprintf(&subst, "%s/%s", subst_dir, s) < 0)
+		if (asprintf(&subst, "%s/%s", subst_dir, s) < 0) {
+			err = -ENOMEM;
 			goto out;
+		}
 
 		if (access(subst, F_OK) == 0) {
 			err = strlist__load(slist, subst);
