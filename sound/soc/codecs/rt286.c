@@ -36,6 +36,8 @@
 #define RT286_VENDOR_ID 0x10ec0286
 #define RT288_VENDOR_ID 0x10ec0288
 
+#define AMP_OUT_MUTE 0xb080
+
 struct rt286_priv {
 	struct reg_default *index_cache;
 	int index_cache_size;
@@ -47,6 +49,7 @@ struct rt286_priv {
 	struct delayed_work jack_detect_work;
 	int sys_clk;
 	int clk_id;
+	void (*mute_hpo_func)(struct snd_soc_codec *codec);
 };
 
 static const struct reg_default rt286_index_def[] = {
@@ -472,10 +475,51 @@ static int rt286_set_dmic1_event(struct snd_soc_dapm_widget *w,
 	return 0;
 }
 
+/* Add HV, VREF and LDO1 event functions to workaround headphone crack noise */
+static int rt286_hv_event(struct snd_soc_dapm_widget *w,
+			     struct snd_kcontrol *kcontrol, int event)
+{
+	struct snd_soc_codec *codec = snd_soc_dapm_to_codec(w->dapm);
+	struct rt286_priv *rt286 = snd_soc_codec_get_drvdata(codec);
+
+	if (rt286->mute_hpo_func)
+		rt286->mute_hpo_func(codec);
+
+	return 0;
+}
+
+static int rt286_vref_event(struct snd_soc_dapm_widget *w,
+			     struct snd_kcontrol *kcontrol, int event)
+{
+	struct snd_soc_codec *codec = snd_soc_dapm_to_codec(w->dapm);
+	struct rt286_priv *rt286 = snd_soc_codec_get_drvdata(codec);
+
+	if (rt286->mute_hpo_func)
+		rt286->mute_hpo_func(codec);
+
+	return 0;
+}
+
+static int rt286_ldo1_event(struct snd_soc_dapm_widget *w,
+			     struct snd_kcontrol *kcontrol, int event)
+{
+	struct snd_soc_codec *codec = snd_soc_dapm_to_codec(w->dapm);
+	struct rt286_priv *rt286 = snd_soc_codec_get_drvdata(codec);
+
+	if (rt286->mute_hpo_func)
+		rt286->mute_hpo_func(codec);
+
+	return 0;
+}
+
 static int rt286_ldo2_event(struct snd_soc_dapm_widget *w,
 			     struct snd_kcontrol *kcontrol, int event)
 {
 	struct snd_soc_codec *codec = snd_soc_dapm_to_codec(w->dapm);
+	struct rt286_priv *rt286 = snd_soc_codec_get_drvdata(codec);
+
+	if (rt286->mute_hpo_func)
+		rt286->mute_hpo_func(codec);
 
 	switch (event) {
 	case SND_SOC_DAPM_POST_PMU:
@@ -516,16 +560,24 @@ static int rt286_mic1_event(struct snd_soc_dapm_widget *w,
 	return 0;
 }
 
+static void dell_dino_mute_hpo(struct snd_soc_codec *codec)
+{
+	snd_soc_write(codec, RT286_SET_AMP_GAIN_HPO, AMP_OUT_MUTE);
+}
+
 static const struct snd_soc_dapm_widget rt286_dapm_widgets[] = {
 	SND_SOC_DAPM_SUPPLY_S("HV", 1, RT286_POWER_CTRL1,
-		12, 1, NULL, 0),
+		12, 1, rt286_hv_event, SND_SOC_DAPM_PRE_PMD |
+		SND_SOC_DAPM_PRE_PMU),
 	SND_SOC_DAPM_SUPPLY("VREF", RT286_POWER_CTRL1,
-		0, 1, NULL, 0),
+		0, 1, rt286_vref_event, SND_SOC_DAPM_PRE_PMD |
+		SND_SOC_DAPM_PRE_PMU),
 	SND_SOC_DAPM_SUPPLY_S("LDO1", 1, RT286_POWER_CTRL2,
-		2, 0, NULL, 0),
+		2, 0, rt286_ldo1_event, SND_SOC_DAPM_PRE_PMD |
+		SND_SOC_DAPM_PRE_PMU),
 	SND_SOC_DAPM_SUPPLY_S("LDO2", 2, RT286_POWER_CTRL1,
 		13, 1, rt286_ldo2_event, SND_SOC_DAPM_PRE_PMD |
-		SND_SOC_DAPM_POST_PMU),
+		SND_SOC_DAPM_PRE_PMU | SND_SOC_DAPM_POST_PMU),
 	SND_SOC_DAPM_SUPPLY("MCLK MODE", RT286_PLL_CTRL1,
 		5, 0, NULL, 0),
 	SND_SOC_DAPM_SUPPLY("MIC1 Input Buffer", SND_SOC_NOPM,
@@ -1192,6 +1244,11 @@ static int rt286_i2c_probe(struct i2c_client *i2c,
 		regmap_update_bits(rt286->regmap,
 					RT286_CBJ_CTRL1, 0xf000, 0xb000);
 	} else {
+		/* Fix headphone click noise */
+		if (dmi_check_system(dmi_dell_dino))
+			regmap_write(rt286->regmap,
+					RT286_MIC1_DET_CTRL, 0x0020);
+
 		regmap_update_bits(rt286->regmap,
 					RT286_CBJ_CTRL1, 0xf000, 0x5000);
 	}
@@ -1206,6 +1263,7 @@ static int rt286_i2c_probe(struct i2c_client *i2c,
 	mdelay(10);
 
 	regmap_write(rt286->regmap, RT286_MISC_CTRL1, 0x0000);
+
 	/* Power down LDO, VREF */
 	regmap_update_bits(rt286->regmap, RT286_POWER_CTRL2, 0xc, 0x0);
 	regmap_update_bits(rt286->regmap, RT286_POWER_CTRL1, 0x1001, 0x1001);
@@ -1224,6 +1282,7 @@ static int rt286_i2c_probe(struct i2c_client *i2c,
 			RT286_SET_GPIO_DATA, 0x40, 0x40);
 		regmap_update_bits(rt286->regmap,
 			RT286_GPIO_CTRL, 0xc, 0x8);
+		rt286->mute_hpo_func = dell_dino_mute_hpo;
 	}
 
 	if (rt286->i2c->irq) {
