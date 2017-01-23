@@ -9,10 +9,11 @@ struct device_node;
 #ifdef CONFIG_NUMA
 
 /*
- * If zone_reclaim_mode is enabled, a RECLAIM_DISTANCE of 10 will mean that
- * all zones on all nodes will be eligible for zone_reclaim().
+ * If node_reclaim_mode is enabled, a RECLAIM_DISTANCE of 30 means that
+ * the preferred node and its directly adjacent nodes are eligible for
+ * node_reclaim().
  */
-#define RECLAIM_DISTANCE 10
+#define RECLAIM_DISTANCE	30
 
 #include <asm/mmzone.h>
 
