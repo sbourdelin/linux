@@ -1607,6 +1607,17 @@ config MFD_STW481X
 	  in various ST Microelectronics and ST-Ericsson embedded
 	  Nomadik series.
 
+config MFD_STM32_DFSDM
+	tristate "ST Microelectronics STM32 DFSDM"
+	depends on (ARCH_STM32 && OF) || COMPILE_TEST
+	select MFD_CORE
+	select REGMAP
+	select REGMAP_MMIO
+	help
+	  Select this option to enable the STM32 Digital Filter
+	  for Sigma Delta Modulators (DFSDM) driver used
+	  in various STM32 series.
+
 menu "Multimedia Capabilities Port drivers"
 	depends on ARCH_SA1100
 
