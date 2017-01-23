@@ -36,6 +36,7 @@
 #include <linux/magic.h>
 #include <linux/list.h>
 #include <linux/limits.h>
+#include <sys/stat.h>
 #include <sys/vfs.h>
 #include <libelf.h>
 #include <gelf.h>
@@ -1332,6 +1333,78 @@ int bpf_map__pin(struct bpf_map *map, const char *path)
 	}
 
 	pr_debug("pinned map '%s'\n", path);
+	return 0;
+}
+
+static int make_dir(const char *path, const char *dir)
+{
+	char buf[PATH_MAX];
+	int len, err = 0;
+
+	len = snprintf(buf, PATH_MAX, "%s/%s", path, dir);
+	if (len < 0)
+		err = -EINVAL;
+	else if (len >= PATH_MAX)
+		err = -ENAMETOOLONG;
+	if (!err && mkdir(buf, 0700) && errno != EEXIST)
+		err = -errno;
+
+	if (err)
+		pr_warning("failed to make dir %s/%s: %s\n", path, dir,
+			   strerror(-err));
+	return err;
+}
+
+int bpf_object__pin(struct bpf_object *obj, const char *path)
+{
+	struct bpf_program *prog;
+	struct bpf_map *map;
+	int err;
+
+	if (!obj)
+		return -ENOENT;
+
+	if (!obj->loaded) {
+		pr_warning("object not yet loaded; load it first\n");
+		return -ENOENT;
+	}
+
+	err = make_dir(path, "maps");
+	if (err)
+		return err;
+
+	bpf_map__for_each(map, obj) {
+		char buf[PATH_MAX];
+		int len;
+
+		len = snprintf(buf, PATH_MAX, "%s/maps/%s", path,
+			       bpf_map__name(map));
+		if (len < 0 || len > PATH_MAX)
+			return -EINVAL;
+
+		err = bpf_map__pin(map, buf);
+		if (err)
+			return err;
+	}
+
+	err = make_dir(path, "progs");
+	if (err)
+		return err;
+
+	bpf_object__for_each_program(prog, obj) {
+		char buf[PATH_MAX];
+		int len;
+
+		len = snprintf(buf, PATH_MAX, "%s/progs/%s", path,
+			       prog->section_name);
+		if (len < 0 || len > PATH_MAX)
+			return -EINVAL;
+
+		err = bpf_program__pin(prog, buf);
+		if (err)
+			return err;
+	}
+
 	return 0;
 }
 
