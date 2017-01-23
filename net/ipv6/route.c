@@ -3235,7 +3235,8 @@ static int rt6_fill_node(struct net *net,
 	rtm->rtm_flags = 0;
 	if (!netif_carrier_ok(rt->dst.dev)) {
 		rtm->rtm_flags |= RTNH_F_LINKDOWN;
-		if (rt->rt6i_idev->cnf.ignore_routes_with_linkdown)
+		if (rt->rt6i_idev &&
+		    rt->rt6i_idev->cnf.ignore_routes_with_linkdown)
 			rtm->rtm_flags |= RTNH_F_DEAD;
 	}
 	rtm->rtm_scope = RT_SCOPE_UNIVERSE;
