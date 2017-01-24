@@ -6955,10 +6955,8 @@ bnx2_get_link_ksettings(struct net_device *dev,
 
 	cmd->base.phy_address = bp->phy_addr;
 
-	ethtool_convert_legacy_u32_to_link_mode(cmd->link_modes.supported,
-						supported);
-	ethtool_convert_legacy_u32_to_link_mode(cmd->link_modes.advertising,
-						advertising);
+	ethtool_u32_to_ks(cmd->link_modes.supported, supported);
+	ethtool_u32_to_ks(cmd->link_modes.advertising, advertising);
 
 	return 0;
 }
@@ -6992,8 +6990,7 @@ bnx2_set_link_ksettings(struct net_device *dev,
 	if (cmd->base.autoneg == AUTONEG_ENABLE) {
 		autoneg |= AUTONEG_SPEED;
 
-		ethtool_convert_link_mode_to_legacy_u32(
-			&advertising, cmd->link_modes.advertising);
+		ethtool_ks_to_u32(&advertising, cmd->link_modes.advertising);
 
 		if (cmd->base.port == PORT_TP) {
 			advertising &= ETHTOOL_ALL_COPPER_SPEED;

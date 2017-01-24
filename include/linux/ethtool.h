@@ -116,26 +116,25 @@ struct ethtool_link_ksettings {
 };
 
 /**
- * ethtool_link_ksettings_zero_link_mode - clear link_ksettings link mode mask
+ * ethtool_ks_clear - clear link_ksettings link mode mask
  *   @ptr : pointer to struct ethtool_link_ksettings
  *   @name : one of supported/advertising/lp_advertising
  */
-#define ethtool_link_ksettings_zero_link_mode(ptr, name)		\
+#define ethtool_ks_clear(ptr, name)		\
 	bitmap_zero((ptr)->link_modes.name, __ETHTOOL_LINK_MODE_MASK_NBITS)
 
 /**
- * ethtool_link_ksettings_add_link_mode - set bit in link_ksettings
+ * ethtool_ks_add_mode - set bit in link_ksettings
  * link mode mask
  *   @ptr : pointer to struct ethtool_link_ksettings
  *   @name : one of supported/advertising/lp_advertising
  *   @mode : one of the ETHTOOL_LINK_MODE_*_BIT
  * (not atomic, no bound checking)
  */
-#define ethtool_link_ksettings_add_link_mode(ptr, name, mode)		\
+#define ethtool_ks_add_mode(ptr, name, mode)		\
 	__set_bit(ETHTOOL_LINK_MODE_ ## mode ## _BIT, (ptr)->link_modes.name)
-
 /**
- * ethtool_link_ksettings_test_link_mode - test bit in ksettings link mode mask
+ * ethtool_ks_test - test bit in ksettings link mode mask
  *   @ptr : pointer to struct ethtool_link_ksettings
  *   @name : one of supported/advertising/lp_advertising
  *   @mode : one of the ETHTOOL_LINK_MODE_*_BIT
@@ -143,19 +142,15 @@ struct ethtool_link_ksettings {
  *
  * Returns true/false.
  */
-#define ethtool_link_ksettings_test_link_mode(ptr, name, mode)		\
+#define ethtool_ks_test(ptr, name, mode)		\
 	test_bit(ETHTOOL_LINK_MODE_ ## mode ## _BIT, (ptr)->link_modes.name)
-
 extern int
 __ethtool_get_link_ksettings(struct net_device *dev,
 			     struct ethtool_link_ksettings *link_ksettings);
-
-void ethtool_convert_legacy_u32_to_link_mode(unsigned long *dst,
-					     u32 legacy_u32);
+void ethtool_u32_to_ks(unsigned long *dst, u32 legacy_u32);
 
 /* return false if src had higher bits set. lower bits always updated. */
-bool ethtool_convert_link_mode_to_legacy_u32(u32 *legacy_u32,
-				     const unsigned long *src);
+bool ethtool_ks_to_u32(u32 *legacy_u32, const unsigned long *src);
 
 /**
  * struct ethtool_ops - optional netdev operations

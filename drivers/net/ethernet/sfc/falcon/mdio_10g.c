@@ -241,12 +241,9 @@ int ef4_mdio_set_link_ksettings(struct ef4_nic *efx,
 
 	efx->phy_op->get_link_ksettings(efx, &prev);
 
-	ethtool_convert_link_mode_to_legacy_u32(&advertising,
-						cmd->link_modes.advertising);
-	ethtool_convert_link_mode_to_legacy_u32(&prev_advertising,
-						prev.link_modes.advertising);
-	ethtool_convert_link_mode_to_legacy_u32(&prev_supported,
-						prev.link_modes.supported);
+	ethtool_ks_to_u32(&advertising, cmd->link_modes.advertising);
+	ethtool_ks_to_u32(&prev_advertising, prev.link_modes.advertising);
+	ethtool_ks_to_u32(&prev_supported, prev.link_modes.supported);
 
 	if (advertising == prev_advertising &&
 	    cmd->base.speed == prev.base.speed &&

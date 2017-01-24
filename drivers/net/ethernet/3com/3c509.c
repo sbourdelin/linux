@@ -1078,8 +1078,7 @@ el3_netdev_get_ecmd(struct net_device *dev, struct ethtool_link_ksettings *cmd)
 			cmd->base.duplex = DUPLEX_FULL;
 	}
 
-	ethtool_convert_legacy_u32_to_link_mode(cmd->link_modes.supported,
-						supported);
+	ethtool_u32_to_ks(cmd->link_modes.supported, supported);
 	cmd->base.speed = SPEED_10;
 	EL3WINDOW(1);
 	return 0;

@@ -1807,10 +1807,9 @@ static int get_link_ksettings(struct net_device *dev,
 	struct port_info *p = netdev_priv(dev);
 	u32 supported;
 
-	ethtool_convert_legacy_u32_to_link_mode(cmd->link_modes.supported,
-						p->link_config.supported);
-	ethtool_convert_legacy_u32_to_link_mode(cmd->link_modes.advertising,
-						p->link_config.advertising);
+	ethtool_u32_to_ks(cmd->link_modes.supported, p->link_config.supported);
+	ethtool_u32_to_ks(cmd->link_modes.advertising,
+			  p->link_config.advertising);
 
 	if (netif_carrier_ok(dev)) {
 		cmd->base.speed = p->link_config.speed;
@@ -1820,8 +1819,7 @@ static int get_link_ksettings(struct net_device *dev,
 		cmd->base.duplex = DUPLEX_UNKNOWN;
 	}
 
-	ethtool_convert_link_mode_to_legacy_u32(&supported,
-						cmd->link_modes.supported);
+	ethtool_ks_to_u32(&supported, cmd->link_modes.supported);
 
 	cmd->base.port = (supported & SUPPORTED_TP) ? PORT_TP : PORT_FIBRE;
 	cmd->base.phy_address = p->phy.mdio.prtad;
@@ -1871,8 +1869,7 @@ static int set_link_ksettings(struct net_device *dev,
 	struct link_config *lc = &p->link_config;
 	u32 advertising;
 
-	ethtool_convert_link_mode_to_legacy_u32(&advertising,
-						cmd->link_modes.advertising);
+	ethtool_ks_to_u32(&advertising, cmd->link_modes.advertising);
 
 	if (!(lc->supported & SUPPORTED_Autoneg)) {
 		/*

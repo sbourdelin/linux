@@ -420,13 +420,13 @@ static int qede_get_link_ksettings(struct net_device *dev,
 	memset(&current_link, 0, sizeof(current_link));
 	edev->ops->common->get_link(edev->cdev, &current_link);
 
-	ethtool_link_ksettings_zero_link_mode(cmd, supported);
+	ethtool_ks_clear(cmd, supported);
 	QEDE_DRV_TO_ETHTOOL_CAPS(current_link.supported_caps, cmd, supported)
 
-	ethtool_link_ksettings_zero_link_mode(cmd, advertising);
+	ethtool_ks_clear(cmd, advertising);
 	QEDE_DRV_TO_ETHTOOL_CAPS(current_link.advertised_caps, cmd, advertising)
 
-	ethtool_link_ksettings_zero_link_mode(cmd, lp_advertising);
+	ethtool_ks_clear(cmd, lp_advertising);
 	QEDE_DRV_TO_ETHTOOL_CAPS(current_link.lp_caps, cmd, lp_advertising)
 
 	if ((edev->state == QEDE_STATE_OPEN) && (current_link.link_up)) {
