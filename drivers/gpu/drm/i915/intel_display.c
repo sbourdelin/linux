@@ -3391,6 +3391,7 @@ static void skylake_update_primary_plane(struct drm_plane *plane,
 	if (IS_GEMINILAKE(dev_priv)) {
 		u32 plane_color =
 			PLANE_COLOR_PIPE_GAMMA_ENABLE |
+			PLANE_CTL_PIPE_CSC_ENABLE |
 			PLANE_COLOR_PLANE_GAMMA_DISABLE;
 
 		I915_WRITE(PLANE_COLOR_CTL(pipe, 0), plane_color);
