@@ -34,7 +34,7 @@ from load_config import loadConfig
 # Add any Sphinx extension module names here, as strings. They can be
 # extensions coming with Sphinx (named 'sphinx.ext.*') or your custom
 # ones.
-extensions = ['kerneldoc', 'rstFlatTable', 'kernel_include', 'cdomain']
+extensions = ['rstKernelDoc', 'rstFlatTable', 'kernel_include', 'cdomain' ]
 
 # The name of the math extension changed on Sphinx 1.4
 if major == 1 and minor > 3:
@@ -505,8 +505,8 @@ pdf_documents = [
 # kernel-doc extension configuration for running Sphinx directly (e.g. by Read
 # the Docs). In a normal build, these are supplied from the Makefile via command
 # line arguments.
-kerneldoc_bin = '../scripts/kernel-doc'
-kerneldoc_srctree = '..'
+kernel_doc_verbose_warn = False
+kernel_doc_raise_error = False
 
 # ------------------------------------------------------------------------------
 # Since loadConfig overwrites settings from the global namespace, it has to be

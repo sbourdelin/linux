@@ -1,0 +1,11 @@
+#!/usr/bin/python
+
+import sys
+from os import path
+
+linuxdoc = path.abspath(path.join(path.dirname(__file__), '..'))
+linuxdoc = path.join(linuxdoc, 'Documentation', 'sphinx')
+sys.path.insert(0, linuxdoc)
+
+import kernel_doc
+kernel_doc.main()
