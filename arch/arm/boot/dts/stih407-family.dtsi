@@ -222,8 +222,9 @@
 			compatible = "st,asc";
 			reg = <0x9830000 0x2c>;
 			interrupts = <GIC_SPI 122 IRQ_TYPE_NONE>;
-			pinctrl-names = "default";
-			pinctrl-0 = <&pinctrl_serial0>;
+			pinctrl-names = "default", "manual-rts";
+			pinctrl-0 = <&pinctrl_serial0_flowctrl>;
+			pinctrl-1 = <&pinctrl_serial0>;
 			clocks = <&clk_s_c0_flexgen CLK_EXT2F_A9>;
 
 			status = "disabled";
