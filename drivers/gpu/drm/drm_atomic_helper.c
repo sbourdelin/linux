@@ -385,8 +385,15 @@ mode_fixup(struct drm_atomic_state *state)
 
 		WARN_ON(!!conn_state->best_encoder != !!conn_state->crtc);
 
-		if (!conn_state->crtc || !conn_state->best_encoder)
+		if (!conn_state->crtc || !conn_state->best_encoder) {
+			const struct drm_connector_helper_funcs *conn_funcs;
+
+			conn_funcs = connector->helper_private;
+			if (conn_funcs->atomic_release)
+				conn_funcs->atomic_release(connector,
+							   conn_state);
 			continue;
+		}
 
 		crtc_state = drm_atomic_get_existing_crtc_state(state,
 								conn_state->crtc);
