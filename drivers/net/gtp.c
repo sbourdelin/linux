@@ -84,6 +84,8 @@ struct gtp_net {
 
 static u32 gtp_h_initval;
 
+static void pdp_context_delete(struct pdp_ctx *pctx);
+
 static inline u32 gtp0_hashfn(u64 tid)
 {
 	u32 *tid32 = (u32 *) &tid;
@@ -775,13 +777,10 @@ static void gtp_hashtable_free(struct gtp_dev *gtp)
 	struct pdp_ctx *pctx;
 	int i;
 
-	for (i = 0; i < gtp->hash_size; i++) {
-		hlist_for_each_entry_rcu(pctx, &gtp->tid_hash[i], hlist_tid) {
-			hlist_del_rcu(&pctx->hlist_tid);
-			hlist_del_rcu(&pctx->hlist_addr);
-			kfree_rcu(pctx, rcu_head);
-		}
-	}
+	for (i = 0; i < gtp->hash_size; i++)
+		hlist_for_each_entry_rcu(pctx, &gtp->tid_hash[i], hlist_tid)
+			pdp_context_delete(pctx);
+
 	synchronize_rcu();
 	kfree(gtp->addr_hash);
 	kfree(gtp->tid_hash);
@@ -984,6 +983,20 @@ static int ipv4_pdp_add(struct net_device *dev, struct genl_info *info)
 	return 0;
 }
 
+static void pdp_context_free(struct rcu_head *head)
+{
+	struct pdp_ctx *pctx = container_of(head, struct pdp_ctx, rcu_head);
+
+	kfree(pctx);
+}
+
+static void pdp_context_delete(struct pdp_ctx *pctx)
+{
+	hlist_del_rcu(&pctx->hlist_tid);
+	hlist_del_rcu(&pctx->hlist_addr);
+	call_rcu(&pctx->rcu_head, pdp_context_free);
+}
+
 static int gtp_genl_new_pdp(struct sk_buff *skb, struct genl_info *info)
 {
 	struct net_device *dev;
@@ -1082,10 +1095,7 @@ static int gtp_genl_del_pdp(struct sk_buff *skb, struct genl_info *info)
 		pr_debug("GTPv1-U: deleting tunnel id = %x/%x (pdp %p)\n",
 			 pctx->u.v1.i_tei, pctx->u.v1.o_tei, pctx);
 
-	hlist_del_rcu(&pctx->hlist_tid);
-	hlist_del_rcu(&pctx->hlist_addr);
-	kfree_rcu(pctx, rcu_head);
-
+	pdp_context_delete(pctx);
 	return 0;
 }
 
