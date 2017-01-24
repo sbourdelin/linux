@@ -317,21 +317,24 @@ static ssize_t ima_write_policy(struct file *file, const char __user *buf,
 
 	/* No partial writes. */
 	result = -EINVAL;
-	if (*ppos != 0)
+	if (*ppos != 0) {
+		result = -EINVAL;
 		goto reset_validity;
+	}
 
-	result = -ENOMEM;
 	if (datalen >= PAGE_SIZE)
 		datalen = PAGE_SIZE - 1;
 	data = kmalloc(datalen + 1, GFP_KERNEL);
-	if (!data)
+	if (!data) {
+		result = -ENOMEM;
 		goto reset_validity;
+	}
 
 	*(data + datalen) = '\0';
-
-	result = -EFAULT;
-	if (copy_from_user(data, buf, datalen))
+	if (copy_from_user(data, buf, datalen)) {
+		result = -EFAULT;
 		goto out_free;
+	}
 
 	result = mutex_lock_interruptible(&ima_write_mutex);
 	if (result < 0)
