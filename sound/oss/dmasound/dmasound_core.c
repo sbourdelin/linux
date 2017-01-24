@@ -1269,13 +1269,15 @@ static int state_open(struct inode *inode, struct file *file)
 	int ret;
 
 	mutex_lock(&dmasound_core_mutex);
-	ret = -EBUSY;
-	if (state.busy)
+	if (state.busy) {
+		ret = -EBUSY;
 		goto out;
+	}
 
-	ret = -ENODEV;
-	if (!try_module_get(dmasound.mach.owner))
+	if (!try_module_get(dmasound.mach.owner)) {
+		ret = -ENODEV;
 		goto out;
+	}
 
 	state.ptr = 0;
 	state.busy = 1;
