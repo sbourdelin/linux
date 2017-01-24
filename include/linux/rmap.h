@@ -232,6 +232,71 @@ static inline bool page_check_address_transhuge(struct page *page,
 }
 #endif
 
+/* Avoid racy checks */
+#define PAGE_CHECK_WALK_SYNC		(1 << 0)
+/* Look for migarion entries rather than present ptes */
+#define PAGE_CHECK_WALK_MIGRATION	(1 << 1)
+
+struct page_check_walk {
+	struct page *page;
+	struct vm_area_struct *vma;
+	unsigned long address;
+	pmd_t *pmd;
+	pte_t *pte;
+	spinlock_t *ptl;
+	unsigned int flags;
+};
+
+static inline void page_check_walk_done(struct page_check_walk *pcw)
+{
+	if (pcw->pte)
+		pte_unmap(pcw->pte);
+	if (pcw->ptl)
+		spin_unlock(pcw->ptl);
+}
+
+bool __page_check_walk(struct page_check_walk *pcw);
+
+/**
+ * page_check_walk - check if @pcw->page is mapped in @pcw->vma at @pcw->address
+ * @pcw: pointer to struce page_check_walk. page, vma and address must be set.
+ *
+ * Returns true, if the page is mapped in the vma. @pcw->pmd and @pcw->pte point
+ * to relevant page table entries. @pcw->ptl is locked. @pcw->address is
+ * adjusted if needed (for PTE-mapped THPs).
+ *
+ * If @pcw->pmd is set, but @pcw->pte is not, you have found PMD-mapped page
+ * (usually THP). For PTE-mapped THP, you should run page_check_walk() in 
+ * a loop to find all PTEs that maps the THP.
+ *
+ * For HugeTLB pages, @pcw->pte is set to relevant page table entry regardless
+ * which page table level the page mapped at. @pcw->pmd is NULL.
+ *
+ * Retruns false, if there's no more page table entries for the page in the vma.
+ * @pcw->ptl is unlocked and @pcw->pte is unmapped.
+ *
+ * If you need to stop the walk before page_check_walk() returned false, use
+ * page_check_walk_done(). It will do the housekeeping.
+ */
+static inline bool page_check_walk(struct page_check_walk *pcw)
+{
+	/* The only possible pmd mapping has been handled on last iteration */
+	if (pcw->pmd && !pcw->pte) {
+		page_check_walk_done(pcw);
+		return false;
+	}
+
+	/* Only for THP, seek to next pte entry makes sense */
+	if (pcw->pte) {
+		if (!PageTransHuge(pcw->page) || PageHuge(pcw->page)) {
+			page_check_walk_done(pcw);
+			return false;
+		}
+	}
+
+	return __page_check_walk(pcw);
+}
+
 /*
  * Used by swapoff to help locate where page is expected in vma.
  */
