@@ -260,7 +260,10 @@ static void fsl_ifc_run_command(struct mtd_info *mtd)
 		int sector_end = sector + chip->ecc.steps - 1;
 
 		for (i = sector / 4; i <= sector_end / 4; i++)
-			eccstat[i] = ifc_in32(&ifc->ifc_nand.nand_eccstat[i]);
+			eccstat[i] = ifc_in32(
+				(ctrl->version >= FSL_IFC_VERSION_2_0_0) ?
+				&ifc->ifc_nand.v2_nand_eccstat[i] :
+				&ifc->ifc_nand.v1_nand_eccstat[i]);
 
 		for (i = sector; i <= sector_end; i++) {
 			errors = check_read_ecc(mtd, ctrl, eccstat, i);
