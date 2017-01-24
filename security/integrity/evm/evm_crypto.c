@@ -53,12 +53,14 @@ int evm_set_key(void *key, size_t keylen)
 {
 	int rc;
 
-	rc = -EBUSY;
-	if (test_and_set_bit(EVM_SET_KEY_BUSY, &evm_set_key_flags))
+	if (test_and_set_bit(EVM_SET_KEY_BUSY, &evm_set_key_flags)) {
+		rc = -EBUSY;
 		goto busy;
-	rc = -EINVAL;
-	if (keylen > MAX_KEY_SIZE)
+	}
+	if (keylen > MAX_KEY_SIZE) {
+		rc = -EINVAL;
 		goto inval;
+	}
 	memcpy(evmkey, key, keylen);
 	evm_initialized |= EVM_INIT_HMAC;
 	pr_info("key initialized\n");
