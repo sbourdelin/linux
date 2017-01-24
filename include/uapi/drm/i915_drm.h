@@ -397,6 +397,12 @@ typedef struct drm_i915_irq_wait {
 #define I915_PARAM_HAS_SCHEDULER	 41
 #define I915_PARAM_HUC_STATUS		 42
 
+/* Query whether DRM_I915_GEM_EXECBUFFER2 supports the ability to capture
+ * user specified bufffers for post-mortem debugging of GPU hangs. See
+ * EXEC_OBJECT_CAPTURE.
+ */
+#define I915_PARAM_HAS_EXEC_CAPTURE	 43
+
 typedef struct drm_i915_getparam {
 	__s32 param;
 	/*
@@ -737,8 +743,9 @@ struct drm_i915_gem_exec_object2 {
 #define EXEC_OBJECT_SUPPORTS_48B_ADDRESS (1<<3)
 #define EXEC_OBJECT_PINNED		 (1<<4)
 #define EXEC_OBJECT_PAD_TO_SIZE		 (1<<5)
+#define EXEC_OBJECT_CAPTURE		 (1<<6)
 /* All remaining bits are MBZ and RESERVED FOR FUTURE USE */
-#define __EXEC_OBJECT_UNKNOWN_FLAGS -(EXEC_OBJECT_PAD_TO_SIZE<<1)
+#define __EXEC_OBJECT_UNKNOWN_FLAGS -(EXEC_OBJECT_CAPTURE<<1)
 	__u64 flags;
 
 	union {
