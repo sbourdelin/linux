@@ -78,6 +78,33 @@ static bool intel_dp_mst_compute_config(struct intel_encoder *encoder,
 
 }
 
+static void intel_dp_mst_atomic_release(struct drm_connector *connector,
+					struct drm_connector_state *conn_state)
+{
+	struct intel_dp_mst_encoder *intel_mst;
+	struct drm_dp_mst_topology_mgr *mgr;
+	struct drm_dp_mst_topology_state *topology_state;
+	struct drm_encoder *encoder;
+	struct intel_connector *intel_connector = to_intel_connector(connector);
+
+	encoder = connector->state->best_encoder;
+	if (!encoder || to_intel_encoder(encoder)->type != INTEL_OUTPUT_DP_MST)
+		return;
+
+	intel_mst = enc_to_mst(encoder);
+	mgr = &intel_mst->primary->dp.mst_mgr;
+
+	topology_state = drm_atomic_get_mst_topology_state(conn_state->state,
+							   mgr);
+	if (IS_ERR(topology_state)) {
+		DRM_DEBUG_KMS("failed to create MST topology state %ld\n",
+				PTR_ERR(topology_state));
+		return;
+	}
+
+	drm_dp_atomic_release_vcpi_slots(topology_state, intel_connector->port);
+}
+
 static void intel_mst_disable_dp(struct intel_encoder *encoder,
 				 struct intel_crtc_state *old_crtc_state,
 				 struct drm_connector_state *old_conn_state)
@@ -401,6 +428,7 @@ static const struct drm_connector_helper_funcs intel_dp_mst_connector_helper_fun
 	.mode_valid = intel_dp_mst_mode_valid,
 	.atomic_best_encoder = intel_mst_atomic_best_encoder,
 	.best_encoder = intel_mst_best_encoder,
+	.atomic_release = intel_dp_mst_atomic_release,
 };
 
 static void intel_dp_mst_encoder_destroy(struct drm_encoder *encoder)
