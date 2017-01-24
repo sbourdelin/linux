@@ -618,8 +618,8 @@ static void gtp_link_setup(struct net_device *dev)
 				  sizeof(struct gtp0_header);
 }
 
-static int gtp_hashtable_new(struct gtp_dev *gtp, int hsize);
-static void gtp_hashtable_free(struct gtp_dev *gtp);
+static int gtp_dev_hashtable_new(struct gtp_dev *gtp, int hsize);
+static void gtp_dev_hashtable_free(struct gtp_dev *gtp);
 static int gtp_encap_enable(struct net_device *dev, struct gtp_dev *gtp,
 			    int hsize, struct nlattr *data[]);
 static void gtp_encap_disable(struct gtp_dev *gtp);
@@ -644,7 +644,7 @@ static int gtp_newlink(struct net *src_net, struct net_device *dev,
 			goto out_err;
 	}
 
-	err = gtp_hashtable_new(gtp, hashsize);
+	err = gtp_dev_hashtable_new(gtp, hashsize);
 	if (err < 0)
 		goto out_socket;
 
@@ -662,7 +662,7 @@ static int gtp_newlink(struct net *src_net, struct net_device *dev,
 	return 0;
 
 out_hashtable:
-	gtp_hashtable_free(gtp);
+	gtp_dev_hashtable_free(gtp);
 out_socket:
 	gtp_encap_disable(gtp);
 out_err:
@@ -673,7 +673,7 @@ static void gtp_dellink(struct net_device *dev, struct list_head *head)
 {
 	struct gtp_dev *gtp = netdev_priv(dev);
 
-	gtp_hashtable_free(gtp);
+	gtp_dev_hashtable_free(gtp);
 	if (gtp->sock0)
 		sockfd_put(gtp->sock0);
 	if (gtp->sock1u)
@@ -742,7 +742,7 @@ static struct net *gtp_genl_get_net(struct net *src_net, struct nlattr *tb[])
 	return net;
 }
 
-static int gtp_hashtable_new(struct gtp_dev *gtp, int hsize)
+static int gtp_dev_hashtable_new(struct gtp_dev *gtp, int hsize)
 {
 	int i;
 
@@ -758,7 +758,7 @@ static int gtp_hashtable_new(struct gtp_dev *gtp, int hsize)
 	return 0;
 }
 
-static void gtp_hashtable_free(struct gtp_dev *gtp)
+static void gtp_dev_hashtable_free(struct gtp_dev *gtp)
 {
 	struct pdp_ctx *pctx;
 	int i;
