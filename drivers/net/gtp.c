@@ -778,7 +778,7 @@ static void gtp_hashtable_free(struct gtp_dev *gtp)
 	int i;
 
 	for (i = 0; i < gtp->hash_size; i++)
-		hlist_for_each_entry_rcu(pctx, &gtp->tid_hash[i], hlist_tid)
+		hlist_for_each_entry_rcu(pctx, &gtp->addr_hash[i], hlist_addr)
 			pdp_context_delete(pctx);
 
 	synchronize_rcu();
@@ -1195,7 +1195,7 @@ static int gtp_genl_dump_pdp(struct sk_buff *skb,
 			last_gtp = NULL;
 
 		for (i = k; i < gtp->hash_size; i++) {
-			hlist_for_each_entry_rcu(pctx, &gtp->tid_hash[i], hlist_tid) {
+			hlist_for_each_entry_rcu(pctx, &gtp->addr_hash[i], hlist_addr) {
 				if (tid && tid != pctx->u.tid)
 					continue;
 				else
