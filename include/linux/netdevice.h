@@ -4200,6 +4200,13 @@ static inline bool netif_reduces_vlan_mtu(struct net_device *dev)
 	return dev->priv_flags & IFF_MACSEC;
 }
 
+/* return true if we should preserve skb nfct before calling ndo_start_xmit() */
+static inline bool netif_needs_ct(struct net_device *dev)
+{
+	/* any kind of virtual device needs to preserve the ct entry */
+	return dev->features & NETIF_F_LLTX;
+}
+
 extern struct pernet_operations __net_initdata loopback_net_ops;
 
 /* Logging, debugging and troubleshooting/diagnostic helpers. */
