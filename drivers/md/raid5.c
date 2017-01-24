@@ -556,7 +556,7 @@ static struct stripe_head *__find_stripe(struct r5conf *conf, sector_t sector,
  * of the two sections, and some non-in_sync devices may
  * be insync in the section most affected by failed devices.
  */
-static int calc_degraded(struct r5conf *conf)
+int calc_degraded(struct r5conf *conf)
 {
 	int degraded, degraded2;
 	int i;
@@ -2606,6 +2606,7 @@ static void raid5_error(struct mddev *mddev, struct md_rdev *rdev)
 		bdevname(rdev->bdev, b),
 		mdname(mddev),
 		conf->raid_disks - mddev->degraded);
+	r5c_update_on_rdev_error(mddev);
 }
 
 /*
