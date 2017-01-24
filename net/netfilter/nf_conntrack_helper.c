@@ -213,17 +213,27 @@ int __nf_ct_try_assign_helper(struct nf_conn *ct, struct nf_conn *tmpl,
 	}
 
 	help = nfct_help(ct);
-	if (net->ct.sysctl_auto_assign_helper && helper == NULL) {
-		helper = __nf_ct_helper_find(&ct->tuplehash[IP_CT_DIR_REPLY].tuple);
-		if (unlikely(!net->ct.auto_assign_helper_warned && helper)) {
+	if (!helper) {
+		if (unlikely(!net->ct.sysctl_auto_assign_helper &&
+				!net->ct.auto_assign_helper_warned &&
+				__nf_ct_helper_find(&ct->tuplehash[IP_CT_DIR_REPLY].tuple))) {
+			pr_info("nf_conntrack: default automatic helper assignment "
+				"has been turned off for security reasons "
+				"and CT-based firewall rule not found. Use the "
+				"iptables CT target to attach helpers instead.\n");
+			net->ct.auto_assign_helper_warned = true;
+		} else {
+			helper = __nf_ct_helper_find(&ct->tuplehash[IP_CT_DIR_REPLY].tuple);
+			if (unlikely(!net->ct.auto_assign_helper_warned && helper &&
+					!net->ct.auto_assign_helper_warned)) {
 			pr_info("nf_conntrack: automatic helper "
 				"assignment is deprecated and it will "
 				"be removed soon. Use the iptables CT target "
 				"to attach helpers instead.\n");
 			net->ct.auto_assign_helper_warned = true;
+			}
 		}
 	}
-
 	if (helper == NULL) {
 		if (help)
 			RCU_INIT_POINTER(help->helper, NULL);
