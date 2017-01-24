@@ -1845,6 +1845,7 @@ static int packet_sendmsg_spkt(struct socket *sock, struct msghdr *msg,
 	__be16 proto = 0;
 	int err;
 	int extra_len = 0;
+	int newlen;
 
 	/*
 	 *	Get and verify the address.
@@ -1920,7 +1921,11 @@ retry:
 		goto retry;
 	}
 
-	if (!dev_validate_header(dev, skb->data, len)) {
+	newlen = dev_validate_header(dev, skb->data, len);
+	/* As comments above this function indicate, a full L2 header
+	 * must be passed to this function, so if newlen > len, bail.
+	 */
+	if (newlen < 0 || newlen > len) {
 		err = -EINVAL;
 		goto out_unlock;
 	}
@@ -2447,14 +2452,21 @@ static int tpacket_fill_skb(struct packet_sock *po, struct sk_buff *skb,
 			return -EINVAL;
 	} else if (copylen) {
 		int hdrlen = min_t(int, copylen, tp_len);
+		int newlen;
 
 		skb_push(skb, dev->hard_header_len);
 		skb_put(skb, copylen - dev->hard_header_len);
 		err = skb_store_bits(skb, 0, data, hdrlen);
 		if (unlikely(err))
 			return err;
-		if (!dev_validate_header(dev, skb->data, hdrlen))
+		newlen = dev_validate_header(dev, skb->data, hdrlen);
+		if (newlen < 0)
 			return -EINVAL;
+		/* Caller has allocated for copylen in non-paged part of
+		 * skb so we should never find newlen > hdrlen
+		 */
+		WARN_ON(newlen > hdrlen);
+
 		if (!skb->protocol)
 			tpacket_set_protocol(dev, skb);
 
@@ -2857,10 +2869,13 @@ static int packet_snd(struct socket *sock, struct msghdr *msg, size_t len)
 	if (err)
 		goto out_free;
 
-	if (sock->type == SOCK_RAW &&
-	    !dev_validate_header(dev, skb->data, len)) {
-		err = -EINVAL;
-		goto out_free;
+	if (sock->type == SOCK_RAW) {
+		int newlen = dev_validate_header(dev, skb->data, len);
+
+		if (newlen < 0 || newlen > len) {
+			err = -EINVAL;
+			goto out_free;
+		}
 	}
 
 	sock_tx_timestamp(sk, sockc.tsflags, &skb_shinfo(skb)->tx_flags);
