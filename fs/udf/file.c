@@ -194,8 +194,7 @@ long udf_ioctl(struct file *filp, unsigned int cmd, unsigned long arg)
 		if (copy_to_user((char __user *)arg,
 				 UDF_SB(inode->i_sb)->s_volume_ident, 32))
 			return -EFAULT;
-		else
-			return 0;
+		return 0;
 	case UDF_RELOCATE_BLOCKS:
 		if (!capable(CAP_SYS_ADMIN))
 			return -EPERM;
