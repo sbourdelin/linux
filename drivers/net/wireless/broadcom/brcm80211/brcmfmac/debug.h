@@ -45,26 +45,10 @@
 #undef pr_fmt
 #define pr_fmt(fmt)		KBUILD_MODNAME ": " fmt
 
-/* Macro for error messages. net_ratelimit() is used when driver
- * debugging is not selected. When debugging the driver error
- * messages are as important as other tracing or even more so.
- */
-#ifndef CONFIG_BRCM_TRACING
-#ifdef CONFIG_BRCMDBG
-#define brcmf_err(fmt, ...)	pr_err("%s: " fmt, __func__, ##__VA_ARGS__)
-#else
-#define brcmf_err(fmt, ...)						\
-	do {								\
-		if (net_ratelimit())					\
-			pr_err("%s: " fmt, __func__, ##__VA_ARGS__);	\
-	} while (0)
-#endif
-#else
 __printf(2, 3)
 void __brcmf_err(const char *func, const char *fmt, ...);
 #define brcmf_err(fmt, ...) \
 	__brcmf_err(__func__, fmt, ##__VA_ARGS__)
-#endif
 
 #if defined(DEBUG) || defined(CONFIG_BRCM_TRACING)
 __printf(3, 4)
