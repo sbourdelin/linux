@@ -103,6 +103,7 @@ static void brcmf_sdiod_dummy_irqhandler(struct sdio_func *func)
 
 int brcmf_sdiod_intr_register(struct brcmf_sdio_dev *sdiodev)
 {
+	struct brcmf_pub *pub = sdiodev->bus_if->drvr;
 	struct brcmfmac_sdio_pd *pdata;
 	int ret = 0;
 	u8 data;
@@ -117,7 +118,7 @@ int brcmf_sdiod_intr_register(struct brcmf_sdio_dev *sdiodev)
 				  pdata->oob_irq_flags, "brcmf_oob_intr",
 				  &sdiodev->func[1]->dev);
 		if (ret != 0) {
-			brcmf_err("request_irq failed %d\n", ret);
+			brcmf_err(pub, "request_irq failed %d\n", ret);
 			return ret;
 		}
 		sdiodev->oob_irq_requested = true;
@@ -128,7 +129,7 @@ int brcmf_sdiod_intr_register(struct brcmf_sdio_dev *sdiodev)
 
 		ret = enable_irq_wake(pdata->oob_irq_nr);
 		if (ret != 0) {
-			brcmf_err("enable_irq_wake failed %d\n", ret);
+			brcmf_err(pub, "enable_irq_wake failed %d\n", ret);
 			return ret;
 		}
 		sdiodev->irq_wake = true;
@@ -253,6 +254,7 @@ static inline int brcmf_sdiod_f0_writeb(struct sdio_func *func,
 static int brcmf_sdiod_request_data(struct brcmf_sdio_dev *sdiodev, u8 fn,
 				    u32 addr, u8 regsz, void *data, bool write)
 {
+	struct brcmf_pub *pub = sdiodev->bus_if->drvr;
 	struct sdio_func *func;
 	int ret = -EINVAL;
 
@@ -292,7 +294,7 @@ static int brcmf_sdiod_request_data(struct brcmf_sdio_dev *sdiodev, u8 fn,
 			*(u32 *)data = sdio_readl(func, addr, &ret);
 		break;
 	default:
-		brcmf_err("invalid size: %d\n", regsz);
+		brcmf_err(pub, "invalid size: %d\n", regsz);
 		break;
 	}
 
@@ -306,6 +308,7 @@ static int brcmf_sdiod_request_data(struct brcmf_sdio_dev *sdiodev, u8 fn,
 static int brcmf_sdiod_regrw_helper(struct brcmf_sdio_dev *sdiodev, u32 addr,
 				   u8 regsz, void *data, bool write)
 {
+	struct brcmf_pub *pub = sdiodev->bus_if->drvr;
 	u8 func;
 	s32 retry = 0;
 	int ret;
@@ -344,7 +347,7 @@ static int brcmf_sdiod_regrw_helper(struct brcmf_sdio_dev *sdiodev, u32 addr,
 		 * in the logs.
 		 */
 		if (addr != SBSDIO_FUNC1_SLEEPCSR)
-			brcmf_err("failed to %s data F%d@0x%05x, err: %d\n",
+			brcmf_err(pub, "failed to %s data F%d@0x%05x, err: %d\n",
 				  write ? "write" : "read", func, addr, ret);
 		else
 			brcmf_dbg(SDIO, "failed to %s data F%d@0x%05x, err: %d\n",
@@ -356,6 +359,7 @@ static int brcmf_sdiod_regrw_helper(struct brcmf_sdio_dev *sdiodev, u32 addr,
 static int
 brcmf_sdiod_set_sbaddr_window(struct brcmf_sdio_dev *sdiodev, u32 address)
 {
+	struct brcmf_pub *pub = sdiodev->bus_if->drvr;
 	int err = 0, i;
 	u8 addr[3];
 
@@ -371,7 +375,7 @@ brcmf_sdiod_set_sbaddr_window(struct brcmf_sdio_dev *sdiodev, u32 address)
 					       SBSDIO_FUNC1_SBADDRLOW + i,
 					       sizeof(u8), &addr[i], true);
 		if (err) {
-			brcmf_err("failed at addr: 0x%0x\n",
+			brcmf_err(pub, "failed at addr: 0x%0x\n",
 				  SBSDIO_FUNC1_SBADDRLOW + i);
 			break;
 		}
@@ -512,6 +516,7 @@ static int brcmf_sdiod_sglist_rw(struct brcmf_sdio_dev *sdiodev, uint fn,
 	unsigned int max_req_sz, orig_offset, dst_offset;
 	unsigned short max_seg_cnt, seg_sz;
 	unsigned char *pkt_data, *orig_data, *dst_data;
+	struct brcmf_pub *pub = sdiodev->bus_if->drvr;
 	struct sk_buff *pkt_next = NULL, *local_pkt_next;
 	struct sk_buff_head local_list, *target_list;
 	struct mmc_request mmc_req;
@@ -604,7 +609,7 @@ static int brcmf_sdiod_sglist_rw(struct brcmf_sdio_dev *sdiodev, uint fn,
 		seg_sz -= sg_cnt;
 
 		if (req_sz % func_blk_sz != 0) {
-			brcmf_err("sg request length %u is not %u aligned\n",
+			brcmf_err(pub, "sg request length %u is not %u aligned\n",
 				  req_sz, func_blk_sz);
 			ret = -ENOTBLK;
 			goto exit;
@@ -626,7 +631,7 @@ static int brcmf_sdiod_sglist_rw(struct brcmf_sdio_dev *sdiodev, uint fn,
 			brcmf_sdiod_change_state(sdiodev, BRCMF_SDIOD_NOMEDIUM);
 			break;
 		} else if (ret != 0) {
-			brcmf_err("CMD53 sg block %s failed %d\n",
+			brcmf_err(pub, "CMD53 sg block %s failed %d\n",
 				  write ? "write" : "read", ret);
 			ret = -EIO;
 			break;
@@ -667,12 +672,13 @@ exit:
 
 int brcmf_sdiod_recv_buf(struct brcmf_sdio_dev *sdiodev, u8 *buf, uint nbytes)
 {
+	struct brcmf_pub *pub = sdiodev->bus_if->drvr;
 	struct sk_buff *mypkt;
 	int err;
 
 	mypkt = brcmu_pkt_buf_get_skb(nbytes);
 	if (!mypkt) {
-		brcmf_err("brcmu_pkt_buf_get_skb failed: len %d\n",
+		brcmf_err(pub, "brcmu_pkt_buf_get_skb failed: len %d\n",
 			  nbytes);
 		return -EIO;
 	}
@@ -745,13 +751,14 @@ done:
 
 int brcmf_sdiod_send_buf(struct brcmf_sdio_dev *sdiodev, u8 *buf, uint nbytes)
 {
+	struct brcmf_pub *pub = sdiodev->bus_if->drvr;
 	struct sk_buff *mypkt;
 	u32 addr = sdiodev->sbwad;
 	int err;
 
 	mypkt = brcmu_pkt_buf_get_skb(nbytes);
 	if (!mypkt) {
-		brcmf_err("brcmu_pkt_buf_get_skb failed: len %d\n",
+		brcmf_err(pub, "brcmu_pkt_buf_get_skb failed: len %d\n",
 			  nbytes);
 		return -EIO;
 	}
@@ -800,6 +807,7 @@ int
 brcmf_sdiod_ramrw(struct brcmf_sdio_dev *sdiodev, bool write, u32 address,
 		  u8 *data, uint size)
 {
+	struct brcmf_pub *pub = sdiodev->bus_if->drvr;
 	int bcmerror = 0;
 	struct sk_buff *pkt;
 	u32 sdaddr;
@@ -808,7 +816,7 @@ brcmf_sdiod_ramrw(struct brcmf_sdio_dev *sdiodev, bool write, u32 address,
 	dsize = min_t(uint, SBSDIO_SB_OFT_ADDR_LIMIT, size);
 	pkt = dev_alloc_skb(dsize);
 	if (!pkt) {
-		brcmf_err("dev_alloc_skb failed: len %d\n", dsize);
+		brcmf_err(pub, "dev_alloc_skb failed: len %d\n", dsize);
 		return -EIO;
 	}
 	pkt->priority = 0;
@@ -842,7 +850,7 @@ brcmf_sdiod_ramrw(struct brcmf_sdio_dev *sdiodev, bool write, u32 address,
 		bcmerror = brcmf_sdiod_buffrw(sdiodev, SDIO_FUNC_1, write,
 					      sdaddr, pkt);
 		if (bcmerror) {
-			brcmf_err("membytes transfer failed\n");
+			brcmf_err(pub, "membytes transfer failed\n");
 			break;
 		}
 		if (!write)
@@ -863,7 +871,7 @@ brcmf_sdiod_ramrw(struct brcmf_sdio_dev *sdiodev, bool write, u32 address,
 
 	/* Return the window to backplane enumeration space for core access */
 	if (brcmf_sdiod_set_sbaddr_window(sdiodev, sdiodev->sbwad))
-		brcmf_err("FAILED to set window back to 0x%x\n",
+		brcmf_err(pub, "FAILED to set window back to 0x%x\n",
 			  sdiodev->sbwad);
 
 	sdio_release_host(sdiodev->func[1]);
@@ -886,6 +894,7 @@ int brcmf_sdiod_abort(struct brcmf_sdio_dev *sdiodev, uint fn)
 
 void brcmf_sdiod_sgtable_alloc(struct brcmf_sdio_dev *sdiodev)
 {
+	struct brcmf_pub *pub = sdiodev->bus_if->drvr;
 	struct sdio_func *func;
 	struct mmc_host *host;
 	uint max_blocks;
@@ -914,7 +923,7 @@ void brcmf_sdiod_sgtable_alloc(struct brcmf_sdio_dev *sdiodev)
 	brcmf_dbg(TRACE, "nents=%d\n", nents);
 	err = sg_alloc_table(&sdiodev->sgtable, nents, GFP_KERNEL);
 	if (err < 0) {
-		brcmf_err("allocation failed: disable scatter-gather");
+		brcmf_err(pub, "allocation failed: disable scatter-gather");
 		sdiodev->sg_support = false;
 	}
 
@@ -1047,13 +1056,13 @@ static int brcmf_sdiod_probe(struct brcmf_sdio_dev *sdiodev)
 
 	ret = sdio_set_block_size(sdiodev->func[1], SDIO_FUNC1_BLOCKSIZE);
 	if (ret) {
-		brcmf_err("Failed to set F1 blocksize\n");
+		brcmf_err(NULL, "Failed to set F1 blocksize\n");
 		sdio_release_host(sdiodev->func[1]);
 		goto out;
 	}
 	ret = sdio_set_block_size(sdiodev->func[2], SDIO_FUNC2_BLOCKSIZE);
 	if (ret) {
-		brcmf_err("Failed to set F2 blocksize\n");
+		brcmf_err(NULL, "Failed to set F2 blocksize\n");
 		sdio_release_host(sdiodev->func[1]);
 		goto out;
 	}
@@ -1065,7 +1074,7 @@ static int brcmf_sdiod_probe(struct brcmf_sdio_dev *sdiodev)
 	ret = sdio_enable_func(sdiodev->func[1]);
 	sdio_release_host(sdiodev->func[1]);
 	if (ret) {
-		brcmf_err("Failed to enable F1: err=%d\n", ret);
+		brcmf_err(NULL, "Failed to enable F1: err=%d\n", ret);
 		goto out;
 	}
 
@@ -1179,7 +1188,7 @@ static int brcmf_ops_sdio_probe(struct sdio_func *func,
 	brcmf_dbg(SDIO, "F2 found, calling brcmf_sdiod_probe...\n");
 	err = brcmf_sdiod_probe(sdiodev);
 	if (err) {
-		brcmf_err("F2 error, probe failed %d...\n", err);
+		brcmf_err(NULL, "F2 error, probe failed %d...\n", err);
 		goto fail;
 	}
 
@@ -1244,6 +1253,7 @@ static int brcmf_ops_sdio_suspend(struct device *dev)
 	struct sdio_func *func;
 	struct brcmf_bus *bus_if;
 	struct brcmf_sdio_dev *sdiodev;
+	struct brcmf_pub *pub;
 	mmc_pm_flag_t sdio_flags;
 
 	func = container_of(dev, struct sdio_func, dev);
@@ -1254,6 +1264,7 @@ static int brcmf_ops_sdio_suspend(struct device *dev)
 
 	bus_if = dev_get_drvdata(dev);
 	sdiodev = bus_if->bus_priv.sdio;
+	pub = bus_if->drvr;
 
 	brcmf_sdiod_freezer_on(sdiodev);
 	brcmf_sdio_wd_timer(sdiodev->bus, 0);
@@ -1266,7 +1277,7 @@ static int brcmf_ops_sdio_suspend(struct device *dev)
 			sdio_flags |= MMC_PM_WAKE_SDIO_IRQ;
 	}
 	if (sdio_set_host_pm_flags(sdiodev->func[1], sdio_flags))
-		brcmf_err("Failed to set pm_flags %x\n", sdio_flags);
+		brcmf_err(pub, "Failed to set pm_flags %x\n", sdio_flags);
 	return 0;
 }
 
@@ -1309,7 +1320,7 @@ void brcmf_sdio_register(void)
 
 	ret = sdio_register_driver(&brcmf_sdmmc_driver);
 	if (ret)
-		brcmf_err("sdio_register_driver failed: %d\n", ret);
+		brcmf_err(NULL, "sdio_register_driver failed: %d\n", ret);
 }
 
 void brcmf_sdio_exit(void)

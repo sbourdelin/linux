@@ -343,7 +343,7 @@ void brcmf_flowring_open(struct brcmf_flowring *flow, u16 flowid)
 
 	ring = flow->rings[flowid];
 	if (!ring) {
-		brcmf_err("Ring NULL, for flowid %d\n", flowid);
+		brcmf_err(NULL, "Ring NULL, for flowid %d\n", flowid);
 		return;
 	}
 

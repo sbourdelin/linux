@@ -215,7 +215,7 @@ static bool brcmf_btcoex_is_sco_active(struct brcmf_if *ifp)
 		ioc_res = brcmf_btcoex_params_read(ifp, 27, &param27);
 
 		if (ioc_res < 0) {
-			brcmf_err("ioc read btc params error\n");
+			brcmf_err(ifp->drvr, "ioc read btc params error\n");
 			break;
 		}
 
@@ -345,7 +345,8 @@ static void brcmf_btcoex_handler(struct work_struct *work)
 		goto idle;
 
 	default:
-		brcmf_err("invalid state=%d !!!\n", btci->bt_state);
+		brcmf_err(btci->cfg->pub, "invalid state=%d !!!\n",
+			  btci->bt_state);
 		goto idle;
 	}
 

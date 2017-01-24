@@ -49,8 +49,8 @@ struct brcmf_pub;
 
 __printf(3, 4)
 void __brcmf_err(struct brcmf_pub *pub, const char *func, const char *fmt, ...);
-#define brcmf_err(fmt, ...) \
-	__brcmf_err(NULL, __func__, fmt, ##__VA_ARGS__)
+#define brcmf_err(pub, fmt, ...) \
+	__brcmf_err(pub, __func__, fmt, ##__VA_ARGS__)
 
 #if defined(DEBUG) || defined(CONFIG_BRCM_TRACING)
 __printf(3, 4)

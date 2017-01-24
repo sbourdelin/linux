@@ -253,6 +253,7 @@ brcmf_usb_ctlwrite_complete(struct urb *urb)
 static int
 brcmf_usb_send_ctl(struct brcmf_usbdev_info *devinfo, u8 *buf, int len)
 {
+	struct brcmf_pub *pub = devinfo->pub;
 	int ret;
 	u16 size;
 
@@ -277,7 +278,7 @@ brcmf_usb_send_ctl(struct brcmf_usbdev_info *devinfo, u8 *buf, int len)
 
 	ret = usb_submit_urb(devinfo->ctl_urb, GFP_ATOMIC);
 	if (ret < 0)
-		brcmf_err("usb_submit_urb failed %d\n", ret);
+		brcmf_err(pub, "usb_submit_urb failed %d\n", ret);
 
 	return ret;
 }
@@ -285,6 +286,7 @@ brcmf_usb_send_ctl(struct brcmf_usbdev_info *devinfo, u8 *buf, int len)
 static int
 brcmf_usb_recv_ctl(struct brcmf_usbdev_info *devinfo, u8 *buf, int len)
 {
+	struct brcmf_pub *pub = devinfo->pub;
 	int ret;
 	u16 size;
 
@@ -311,7 +313,7 @@ brcmf_usb_recv_ctl(struct brcmf_usbdev_info *devinfo, u8 *buf, int len)
 
 	ret = usb_submit_urb(devinfo->ctl_urb, GFP_ATOMIC);
 	if (ret < 0)
-		brcmf_err("usb_submit_urb failed %d\n", ret);
+		brcmf_err(pub, "usb_submit_urb failed %d\n", ret);
 
 	return ret;
 }
@@ -321,6 +323,7 @@ static int brcmf_usb_tx_ctlpkt(struct device *dev, u8 *buf, u32 len)
 	int err = 0;
 	int timeout = 0;
 	struct brcmf_usbdev_info *devinfo = brcmf_usb_get_businfo(dev);
+	struct brcmf_pub *pub = devinfo->pub;
 
 	brcmf_dbg(USB, "Enter\n");
 	if (devinfo->bus_pub.state != BRCMFMAC_USB_STATE_UP)
@@ -332,14 +335,14 @@ static int brcmf_usb_tx_ctlpkt(struct device *dev, u8 *buf, u32 len)
 	devinfo->ctl_completed = false;
 	err = brcmf_usb_send_ctl(devinfo, buf, len);
 	if (err) {
-		brcmf_err("fail %d bytes: %d\n", err, len);
+		brcmf_err(pub, "fail %d bytes: %d\n", err, len);
 		clear_bit(0, &devinfo->ctl_op);
 		return err;
 	}
 	timeout = brcmf_usb_ioctl_resp_wait(devinfo);
 	clear_bit(0, &devinfo->ctl_op);
 	if (!timeout) {
-		brcmf_err("Txctl wait timed out\n");
+		brcmf_err(pub, "Txctl wait timed out\n");
 		err = -EIO;
 	}
 	return err;
@@ -350,6 +353,7 @@ static int brcmf_usb_rx_ctlpkt(struct device *dev, u8 *buf, u32 len)
 	int err = 0;
 	int timeout = 0;
 	struct brcmf_usbdev_info *devinfo = brcmf_usb_get_businfo(dev);
+	struct brcmf_pub *pub = devinfo->pub;
 
 	brcmf_dbg(USB, "Enter\n");
 	if (devinfo->bus_pub.state != BRCMFMAC_USB_STATE_UP)
@@ -361,7 +365,7 @@ static int brcmf_usb_rx_ctlpkt(struct device *dev, u8 *buf, u32 len)
 	devinfo->ctl_completed = false;
 	err = brcmf_usb_recv_ctl(devinfo, buf, len);
 	if (err) {
-		brcmf_err("fail %d bytes: %d\n", err, len);
+		brcmf_err(pub, "fail %d bytes: %d\n", err, len);
 		clear_bit(0, &devinfo->ctl_op);
 		return err;
 	}
@@ -369,7 +373,7 @@ static int brcmf_usb_rx_ctlpkt(struct device *dev, u8 *buf, u32 len)
 	err = devinfo->ctl_urb_status;
 	clear_bit(0, &devinfo->ctl_op);
 	if (!timeout) {
-		brcmf_err("rxctl wait timed out\n");
+		brcmf_err(pub, "rxctl wait timed out\n");
 		err = -EIO;
 	}
 	if (!err)
@@ -432,7 +436,7 @@ brcmf_usbdev_qinit(struct list_head *q, int qsize)
 	}
 	return reqs;
 fail:
-	brcmf_err("fail!\n");
+	brcmf_err(NULL, "fail!\n");
 	while (!list_empty(q)) {
 		req = list_entry(q->next, struct brcmf_usbreq, list);
 		if (req)
@@ -449,7 +453,7 @@ static void brcmf_usb_free_q(struct list_head *q, bool pending)
 	int i = 0;
 	list_for_each_entry_safe(req, next, q, list) {
 		if (!req->urb) {
-			brcmf_err("bad req\n");
+			brcmf_err(NULL, "bad req\n");
 			break;
 		}
 		i++;
@@ -559,10 +563,11 @@ static void brcmf_usb_rx_refill(struct brcmf_usbdev_info *devinfo,
 
 static void brcmf_usb_rx_fill_all(struct brcmf_usbdev_info *devinfo)
 {
+	struct brcmf_pub *pub = devinfo->pub;
 	struct brcmf_usbreq *req;
 
 	if (devinfo->bus_pub.state != BRCMFMAC_USB_STATE_UP) {
-		brcmf_err("bus is not up=%d\n", devinfo->bus_pub.state);
+		brcmf_err(pub, "bus is not up=%d\n", devinfo->bus_pub.state);
 		return;
 	}
 	while ((req = brcmf_usb_deq(devinfo, &devinfo->rx_freeq, NULL)) != NULL)
@@ -599,6 +604,7 @@ brcmf_usb_state_change(struct brcmf_usbdev_info *devinfo, int state)
 static int brcmf_usb_tx(struct device *dev, struct sk_buff *skb)
 {
 	struct brcmf_usbdev_info *devinfo = brcmf_usb_get_businfo(dev);
+	struct brcmf_pub *pub = devinfo->pub;
 	struct brcmf_usbreq  *req;
 	int ret;
 	unsigned long flags;
@@ -612,7 +618,7 @@ static int brcmf_usb_tx(struct device *dev, struct sk_buff *skb)
 	req = brcmf_usb_deq(devinfo, &devinfo->tx_freeq,
 					&devinfo->tx_freecount);
 	if (!req) {
-		brcmf_err("no req to send\n");
+		brcmf_err(pub, "no req to send\n");
 		ret = -ENOMEM;
 		goto fail;
 	}
@@ -625,7 +631,7 @@ static int brcmf_usb_tx(struct device *dev, struct sk_buff *skb)
 	brcmf_usb_enq(devinfo, &devinfo->tx_postq, req, NULL);
 	ret = usb_submit_urb(req->urb, GFP_ATOMIC);
 	if (ret) {
-		brcmf_err("brcmf_usb_tx usb_submit_urb FAILED\n");
+		brcmf_err(pub, "brcmf_usb_tx usb_submit_urb FAILED\n");
 		brcmf_usb_del_fromq(devinfo, req);
 		req->skb = NULL;
 		brcmf_usb_enq(devinfo, &devinfo->tx_freeq, req,
@@ -719,6 +725,7 @@ brcmf_usb_sync_complete(struct urb *urb)
 static int brcmf_usb_dl_cmd(struct brcmf_usbdev_info *devinfo, u8 cmd,
 			    void *buffer, int buflen)
 {
+	struct brcmf_pub *pub = devinfo->pub;
 	int ret;
 	char *tmpbuf;
 	u16 size;
@@ -748,7 +755,7 @@ static int brcmf_usb_dl_cmd(struct brcmf_usbdev_info *devinfo, u8 cmd,
 	devinfo->ctl_completed = false;
 	ret = usb_submit_urb(devinfo->ctl_urb, GFP_ATOMIC);
 	if (ret < 0) {
-		brcmf_err("usb_submit_urb failed %d\n", ret);
+		brcmf_err(pub, "usb_submit_urb failed %d\n", ret);
 		goto finalize;
 	}
 
@@ -800,6 +807,7 @@ brcmf_usb_dlneeded(struct brcmf_usbdev_info *devinfo)
 static int
 brcmf_usb_resetcfg(struct brcmf_usbdev_info *devinfo)
 {
+	struct brcmf_pub *pub = devinfo->pub;
 	struct bootrom_id_le id;
 	u32 loop_cnt;
 	int err;
@@ -825,7 +833,7 @@ brcmf_usb_resetcfg(struct brcmf_usbdev_info *devinfo)
 		brcmf_usb_dl_cmd(devinfo, DL_RESETCFG, &id, sizeof(id));
 		return 0;
 	} else {
-		brcmf_err("Cannot talk to Dongle. Firmware is not UP, %d ms\n",
+		brcmf_err(pub, "Cannot talk to Dongle. Firmware is not UP, %d ms\n",
 			  BRCMF_USB_RESET_GETVER_SPINWAIT * loop_cnt);
 		return -EINVAL;
 	}
@@ -835,6 +843,7 @@ brcmf_usb_resetcfg(struct brcmf_usbdev_info *devinfo)
 static int
 brcmf_usb_dl_send_bulk(struct brcmf_usbdev_info *devinfo, void *buffer, int len)
 {
+	struct brcmf_pub *pub = devinfo->pub;
 	int ret;
 
 	if ((devinfo == NULL) || (devinfo->bulk_urb == NULL))
@@ -850,7 +859,7 @@ brcmf_usb_dl_send_bulk(struct brcmf_usbdev_info *devinfo, void *buffer, int len)
 	devinfo->ctl_completed = false;
 	ret = usb_submit_urb(devinfo->bulk_urb, GFP_ATOMIC);
 	if (ret) {
-		brcmf_err("usb_submit_urb failed %d\n", ret);
+		brcmf_err(pub, "usb_submit_urb failed %d\n", ret);
 		return ret;
 	}
 	ret = brcmf_usb_ioctl_resp_wait(devinfo);
@@ -860,6 +869,7 @@ brcmf_usb_dl_send_bulk(struct brcmf_usbdev_info *devinfo, void *buffer, int len)
 static int
 brcmf_usb_dl_writeimage(struct brcmf_usbdev_info *devinfo, u8 *fw, int fwlen)
 {
+	struct brcmf_pub *pub = devinfo->pub;
 	unsigned int sendlen, sent, dllen;
 	char *bulkchunk = NULL, *dlpos;
 	struct rdl_state_le state;
@@ -882,7 +892,7 @@ brcmf_usb_dl_writeimage(struct brcmf_usbdev_info *devinfo, u8 *fw, int fwlen)
 
 	/* 2) Check we are in the Waiting state */
 	if (rdlstate != DL_WAITING) {
-		brcmf_err("Failed to DL_START\n");
+		brcmf_err(pub, "Failed to DL_START\n");
 		err = -EINVAL;
 		goto fail;
 	}
@@ -911,7 +921,7 @@ brcmf_usb_dl_writeimage(struct brcmf_usbdev_info *devinfo, u8 *fw, int fwlen)
 			memcpy(bulkchunk, dlpos, sendlen);
 			if (brcmf_usb_dl_send_bulk(devinfo, bulkchunk,
 						   sendlen)) {
-				brcmf_err("send_bulk failed\n");
+				brcmf_err(pub, "send_bulk failed\n");
 				err = -EINVAL;
 				goto fail;
 			}
@@ -922,7 +932,7 @@ brcmf_usb_dl_writeimage(struct brcmf_usbdev_info *devinfo, u8 *fw, int fwlen)
 		err = brcmf_usb_dl_cmd(devinfo, DL_GETSTATE, &state,
 				       sizeof(state));
 		if (err) {
-			brcmf_err("DL_GETSTATE Failed\n");
+			brcmf_err(pub, "DL_GETSTATE Failed\n");
 			goto fail;
 		}
 
@@ -931,7 +941,7 @@ brcmf_usb_dl_writeimage(struct brcmf_usbdev_info *devinfo, u8 *fw, int fwlen)
 
 		/* restart if an error is reported */
 		if (rdlstate == DL_BAD_HDR || rdlstate == DL_BAD_CRC) {
-			brcmf_err("Bad Hdr or Bad CRC state %d\n",
+			brcmf_err(pub, "Bad Hdr or Bad CRC state %d\n",
 				  rdlstate);
 			err = -EINVAL;
 			goto fail;
@@ -968,6 +978,7 @@ static int brcmf_usb_dlstart(struct brcmf_usbdev_info *devinfo, u8 *fw, int len)
 
 static int brcmf_usb_dlrun(struct brcmf_usbdev_info *devinfo)
 {
+	struct brcmf_pub *pub = devinfo->pub;
 	struct rdl_state_le state;
 
 	brcmf_dbg(USB, "Enter\n");
@@ -989,7 +1000,7 @@ static int brcmf_usb_dlrun(struct brcmf_usbdev_info *devinfo)
 			return -ENODEV;
 		/* The Dongle may go for re-enumeration. */
 	} else {
-		brcmf_err("Dongle not runnable\n");
+		brcmf_err(pub, "Dongle not runnable\n");
 		return -EINVAL;
 	}
 	brcmf_dbg(USB, "Exit\n");
@@ -999,6 +1010,7 @@ static int brcmf_usb_dlrun(struct brcmf_usbdev_info *devinfo)
 static int
 brcmf_usb_fw_download(struct brcmf_usbdev_info *devinfo)
 {
+	struct brcmf_pub *pub = devinfo->pub;
 	int err;
 
 	brcmf_dbg(USB, "Enter\n");
@@ -1006,7 +1018,7 @@ brcmf_usb_fw_download(struct brcmf_usbdev_info *devinfo)
 		return -ENODEV;
 
 	if (!devinfo->image) {
-		brcmf_err("No firmware!\n");
+		brcmf_err(pub, "No firmware!\n");
 		return -ENOENT;
 	}
 
@@ -1109,7 +1121,7 @@ struct brcmf_usbdev *brcmf_usb_attach(struct brcmf_usbdev_info *devinfo,
 	return &devinfo->bus_pub;
 
 error:
-	brcmf_err("failed!\n");
+	brcmf_err(NULL, "failed!\n");
 	brcmf_usb_detach(devinfo);
 	return NULL;
 }
@@ -1143,7 +1155,7 @@ static int brcmf_usb_bus_setup(struct brcmf_usbdev_info *devinfo)
 	/* Attach to the common driver interface */
 	ret = brcmf_attach(dev, devinfo->settings);
 	if (ret) {
-		brcmf_err("brcmf_attach failed\n");
+		brcmf_err(NULL, "brcmf_attach failed\n");
 		return ret;
 	}
 	devinfo->pub = bus->drvr;
@@ -1175,7 +1187,7 @@ static void brcmf_usb_probe_phase2(struct device *dev,
 	devinfo = bus->bus_priv.usb->devinfo;
 	ret = check_file(fw->data);
 	if (ret < 0) {
-		brcmf_err("invalid firmware\n");
+		brcmf_err(NULL, "invalid firmware\n");
 		release_firmware(fw);
 		goto error;
 	}
@@ -1259,7 +1271,7 @@ static int brcmf_usb_probe_cb(struct brcmf_usbdev_info *devinfo)
 	ret = brcmf_fw_get_firmwares(dev, 0, devinfo->fw_name, NULL,
 				     brcmf_usb_probe_phase2);
 	if (ret) {
-		brcmf_err("firmware request failed: %d\n", ret);
+		brcmf_err(NULL, "firmware request failed: %d\n", ret);
 		goto fail;
 	}
 
@@ -1313,7 +1325,7 @@ brcmf_usb_probe(struct usb_interface *intf, const struct usb_device_id *id)
 
 	/* Check that the device supports only one configuration */
 	if (usb->descriptor.bNumConfigurations != 1) {
-		brcmf_err("Number of configurations: %d not supported\n",
+		brcmf_err(NULL, "Number of configurations: %d not supported\n",
 			  usb->descriptor.bNumConfigurations);
 		ret = -ENODEV;
 		goto fail;
@@ -1322,7 +1334,7 @@ brcmf_usb_probe(struct usb_interface *intf, const struct usb_device_id *id)
 	if ((usb->descriptor.bDeviceClass != USB_CLASS_VENDOR_SPEC) &&
 	    (usb->descriptor.bDeviceClass != USB_CLASS_MISC) &&
 	    (usb->descriptor.bDeviceClass != USB_CLASS_WIRELESS_CONTROLLER)) {
-		brcmf_err("Device class: 0x%x not supported\n",
+		brcmf_err(NULL, "Device class: 0x%x not supported\n",
 			  usb->descriptor.bDeviceClass);
 		ret = -ENODEV;
 		goto fail;
@@ -1332,7 +1344,7 @@ brcmf_usb_probe(struct usb_interface *intf, const struct usb_device_id *id)
 	if ((desc->bInterfaceClass != USB_CLASS_VENDOR_SPEC) ||
 	    (desc->bInterfaceSubClass != 2) ||
 	    (desc->bInterfaceProtocol != 0xff)) {
-		brcmf_err("non WLAN interface %d: 0x%x:0x%x:0x%x\n",
+		brcmf_err(NULL, "non WLAN interface %d: 0x%x:0x%x:0x%x\n",
 			  desc->bInterfaceNumber, desc->bInterfaceClass,
 			  desc->bInterfaceSubClass, desc->bInterfaceProtocol);
 		ret = -ENODEV;
@@ -1356,12 +1368,12 @@ brcmf_usb_probe(struct usb_interface *intf, const struct usb_device_id *id)
 		}
 	}
 	if (devinfo->rx_pipe == 0) {
-		brcmf_err("No RX (in) Bulk EP found\n");
+		brcmf_err(NULL, "No RX (in) Bulk EP found\n");
 		ret = -ENODEV;
 		goto fail;
 	}
 	if (devinfo->tx_pipe == 0) {
-		brcmf_err("No TX (out) Bulk EP found\n");
+		brcmf_err(NULL, "No TX (out) Bulk EP found\n");
 		ret = -ENODEV;
 		goto fail;
 	}

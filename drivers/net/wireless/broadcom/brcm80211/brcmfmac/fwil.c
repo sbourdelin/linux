@@ -110,7 +110,7 @@ brcmf_fil_cmd_data(struct brcmf_if *ifp, u32 cmd, void *data, u32 len, bool set)
 	s32 err;
 
 	if (drvr->bus_if->state != BRCMF_BUS_UP) {
-		brcmf_err("bus is down. we have nothing to do.\n");
+		brcmf_err(drvr, "bus is down. we have nothing to do.\n");
 		return -EIO;
 	}
 
@@ -236,7 +236,7 @@ brcmf_fil_iovar_data_set(struct brcmf_if *ifp, char *name, const void *data,
 					 buflen, true);
 	} else {
 		err = -EPERM;
-		brcmf_err("Creating iovar failed\n");
+		brcmf_err(drvr, "Creating iovar failed\n");
 	}
 
 	mutex_unlock(&drvr->proto_block);
@@ -262,7 +262,7 @@ brcmf_fil_iovar_data_get(struct brcmf_if *ifp, char *name, void *data,
 			memcpy(data, drvr->proto_buf, len);
 	} else {
 		err = -EPERM;
-		brcmf_err("Creating iovar failed\n");
+		brcmf_err(drvr, "Creating iovar failed\n");
 	}
 
 	brcmf_dbg(FIL, "ifidx=%d, name=%s, len=%d\n", ifp->ifidx, name, len);
@@ -312,7 +312,7 @@ brcmf_create_bsscfg(s32 bsscfgidx, char *name, char *data, u32 datalen,
 	iolen = prefixlen + namelen + sizeof(bsscfgidx_le) + datalen;
 
 	if (buflen < iolen) {
-		brcmf_err("buffer is too short\n");
+		brcmf_err(NULL, "buffer is too short\n");
 		return 0;
 	}
 
@@ -360,7 +360,7 @@ brcmf_fil_bsscfg_data_set(struct brcmf_if *ifp, char *name,
 					 buflen, true);
 	} else {
 		err = -EPERM;
-		brcmf_err("Creating bsscfg failed\n");
+		brcmf_err(drvr, "Creating bsscfg failed\n");
 	}
 
 	mutex_unlock(&drvr->proto_block);
@@ -386,7 +386,7 @@ brcmf_fil_bsscfg_data_get(struct brcmf_if *ifp, char *name,
 			memcpy(data, drvr->proto_buf, len);
 	} else {
 		err = -EPERM;
-		brcmf_err("Creating bsscfg failed\n");
+		brcmf_err(drvr, "Creating bsscfg failed\n");
 	}
 	brcmf_dbg(FIL, "ifidx=%d, bsscfgidx=%d, name=%s, len=%d\n", ifp->ifidx,
 		  ifp->bsscfgidx, name, len);
