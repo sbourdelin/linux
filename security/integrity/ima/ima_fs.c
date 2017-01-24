@@ -315,15 +315,14 @@ static ssize_t ima_write_policy(struct file *file, const char __user *buf,
 	char *data;
 	ssize_t result;
 
-	if (datalen >= PAGE_SIZE)
-		datalen = PAGE_SIZE - 1;
-
 	/* No partial writes. */
 	result = -EINVAL;
 	if (*ppos != 0)
 		goto reset_validity;
 
 	result = -ENOMEM;
+	if (datalen >= PAGE_SIZE)
+		datalen = PAGE_SIZE - 1;
 	data = kmalloc(datalen + 1, GFP_KERNEL);
 	if (!data)
 		goto reset_validity;
