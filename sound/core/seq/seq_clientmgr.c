@@ -1925,16 +1925,16 @@ static int snd_seq_ioctl_query_subs(struct snd_seq_client *client, void *arg)
 {
 	struct snd_seq_query_subs *subs = arg;
 	int result = -ENXIO;
-	struct snd_seq_client *cptr = NULL;
-	struct snd_seq_client_port *port = NULL;
+	struct snd_seq_client *cptr;
+	struct snd_seq_client_port *port;
 	struct snd_seq_port_subs_info *group;
 	struct list_head *p;
 	int i;
 
 	if ((cptr = snd_seq_client_use_ptr(subs->root.client)) == NULL)
-		goto __end;
+		goto exit;
 	if ((port = snd_seq_port_use_ptr(cptr, subs->root.port)) == NULL)
-		goto __end;
+		goto unlock_client;
 
 	switch (subs->type) {
 	case SNDRV_SEQ_QUERY_SUBS_READ:
@@ -1944,7 +1944,7 @@ static int snd_seq_ioctl_query_subs(struct snd_seq_client *client, void *arg)
 		group = &port->c_dest;
 		break;
 	default:
-		goto __end;
+		goto unlock_port;
 	}
 
 	down_read(&group->list_mutex);
@@ -1970,13 +1970,11 @@ static int snd_seq_ioctl_query_subs(struct snd_seq_client *client, void *arg)
 		}
 	}
 	up_read(&group->list_mutex);
-
-      __end:
-   	if (port)
-		snd_seq_port_unlock(port);
-	if (cptr)
-		snd_seq_client_unlock(cptr);
-
+unlock_port:
+	snd_seq_port_unlock(port);
+unlock_client:
+	snd_seq_client_unlock(cptr);
+exit:
 	return result;
 }
 
