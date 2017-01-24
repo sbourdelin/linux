@@ -213,10 +213,6 @@ struct nvm_target {
 	struct gendisk *disk;
 };
 
-struct nvm_tgt_instance {
-	struct nvm_tgt_type *tt;
-};
-
 #define ADDR_EMPTY (~0ULL)
 
 #define NVM_VERSION_MAJOR 1
@@ -224,10 +220,9 @@ struct nvm_tgt_instance {
 #define NVM_VERSION_PATCH 0
 
 struct nvm_rq;
-typedef void (nvm_end_io_fn)(struct nvm_rq *);
+typedef void (nvm_end_io_fn)(struct nvm_rq *, int);
 
 struct nvm_rq {
-	struct nvm_tgt_instance *ins;
 	struct nvm_tgt_dev *dev;
 
 	struct bio *bio;
@@ -250,7 +245,8 @@ struct nvm_rq {
 	uint16_t flags;
 
 	u64 ppa_status; /* ppa media status */
-	int error;
+
+	void *private;
 };
 
 static inline struct nvm_rq *nvm_rq_from_pdu(void *pdu)
@@ -450,7 +446,6 @@ struct nvm_tgt_type {
 	/* target entry points */
 	nvm_tgt_make_rq_fn *make_rq;
 	nvm_tgt_capacity_fn *capacity;
-	nvm_end_io_fn *end_io;
 
 	/* module-specific init/teardown */
 	nvm_tgt_init_fn *init;

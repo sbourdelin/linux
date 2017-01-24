@@ -776,14 +776,13 @@ EXPORT_SYMBOL(nvm_free_rqd_ppalist);
 void nvm_end_io(struct nvm_rq *rqd, int error)
 {
 	struct nvm_tgt_dev *tgt_dev = rqd->dev;
-	struct nvm_tgt_instance *ins = rqd->ins;
 
 	/* Convert address space */
 	if (tgt_dev)
 		nvm_rq_dev_to_tgt(tgt_dev, rqd);
 
-	rqd->error = error;
-	ins->tt->end_io(rqd);
+	if (rqd->end_io)
+		rqd->end_io(rqd, error);
 }
 EXPORT_SYMBOL(nvm_end_io);
 
