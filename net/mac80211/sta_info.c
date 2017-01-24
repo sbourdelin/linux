@@ -1855,13 +1855,13 @@ int sta_info_move_state(struct sta_info *sta,
 	switch (new_state) {
 	case IEEE80211_STA_NONE:
 		if (sta->sta_state == IEEE80211_STA_AUTH)
-			clear_bit(WLAN_STA_AUTH, &sta->_flags);
+			clear_sta_flag(sta, WLAN_STA_AUTH);
 		break;
 	case IEEE80211_STA_AUTH:
 		if (sta->sta_state == IEEE80211_STA_NONE) {
-			set_bit(WLAN_STA_AUTH, &sta->_flags);
+			set_sta_flag(sta, WLAN_STA_AUTH);
 		} else if (sta->sta_state == IEEE80211_STA_ASSOC) {
-			clear_bit(WLAN_STA_ASSOC, &sta->_flags);
+			clear_sta_flag(sta, WLAN_STA_ASSOC);
 			ieee80211_recalc_min_chandef(sta->sdata);
 			if (!sta->sta.support_p2p_ps)
 				ieee80211_recalc_p2p_go_ps_allowed(sta->sdata);
@@ -1869,13 +1869,13 @@ int sta_info_move_state(struct sta_info *sta,
 		break;
 	case IEEE80211_STA_ASSOC:
 		if (sta->sta_state == IEEE80211_STA_AUTH) {
-			set_bit(WLAN_STA_ASSOC, &sta->_flags);
+			set_sta_flag(sta, WLAN_STA_ASSOC);
 			ieee80211_recalc_min_chandef(sta->sdata);
 			if (!sta->sta.support_p2p_ps)
 				ieee80211_recalc_p2p_go_ps_allowed(sta->sdata);
 		} else if (sta->sta_state == IEEE80211_STA_AUTHORIZED) {
 			ieee80211_vif_dec_num_mcast(sta->sdata);
-			clear_bit(WLAN_STA_AUTHORIZED, &sta->_flags);
+			clear_sta_flag(sta, WLAN_STA_AUTHORIZED);
 			ieee80211_clear_fast_xmit(sta);
 			ieee80211_clear_fast_rx(sta);
 		}
@@ -1883,7 +1883,7 @@ int sta_info_move_state(struct sta_info *sta,
 	case IEEE80211_STA_AUTHORIZED:
 		if (sta->sta_state == IEEE80211_STA_ASSOC) {
 			ieee80211_vif_inc_num_mcast(sta->sdata);
-			set_bit(WLAN_STA_AUTHORIZED, &sta->_flags);
+			set_sta_flag(sta, WLAN_STA_AUTHORIZED);
 			ieee80211_check_fast_xmit(sta);
 			ieee80211_check_fast_rx(sta);
 		}
