@@ -736,18 +736,10 @@ static void __pci_disable_link_state(struct pci_dev *pdev, int state, bool sem)
 	if (!parent || !parent->link_state)
 		return;
 
-	/*
-	 * A driver requested that ASPM be disabled on this device, but
-	 * if we don't have permission to manage ASPM (e.g., on ACPI
-	 * systems we have to observe the FADT ACPI_FADT_NO_ASPM bit and
-	 * the _OSC method), we can't honor that request.  Windows has
-	 * a similar mechanism using "PciASPMOptOut", which is also
-	 * ignored in this situation.
-	 */
-	if (aspm_disabled) {
-		dev_warn(&pdev->dev, "can't disable ASPM; OS doesn't have ASPM control\n");
-		return;
-	}
+	dev_info(&pdev->dev, "disabling %sASPM%s%s\n",
+		 (state & PCIE_LINK_STATE_CLKPM) ? "Clock PM " : "",
+		 (state & PCIE_LINK_STATE_L0S) ? " L0s" : "",
+		 (state & PCIE_LINK_STATE_L1) ? " L1" : "");
 
 	if (sem)
 		down_read(&pci_bus_sem);
