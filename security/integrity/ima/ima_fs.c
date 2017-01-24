@@ -321,12 +321,12 @@ static ssize_t ima_write_policy(struct file *file, const char __user *buf,
 	/* No partial writes. */
 	result = -EINVAL;
 	if (*ppos != 0)
-		goto out;
+		goto reset_validity;
 
 	result = -ENOMEM;
 	data = kmalloc(datalen + 1, GFP_KERNEL);
 	if (!data)
-		goto out;
+		goto reset_validity;
 
 	*(data + datalen) = '\0';
 
@@ -353,8 +353,8 @@ static ssize_t ima_write_policy(struct file *file, const char __user *buf,
 	mutex_unlock(&ima_write_mutex);
 out_free:
 	kfree(data);
-out:
 	if (result < 0)
+reset_validity:
 		valid_policy = 0;
 
 	return result;
