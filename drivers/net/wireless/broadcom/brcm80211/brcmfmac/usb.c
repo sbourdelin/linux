@@ -174,6 +174,7 @@ struct brcmf_usbdev_info {
 
 	bool wowl_enabled;
 	struct brcmf_mp_device *settings;
+	struct brcmf_pub *pub;
 };
 
 static void brcmf_usb_rx_refill(struct brcmf_usbdev_info *devinfo,
@@ -1135,26 +1136,29 @@ static const struct brcmf_bus_ops brcmf_usb_bus_ops = {
 
 static int brcmf_usb_bus_setup(struct brcmf_usbdev_info *devinfo)
 {
+	struct device *dev = devinfo->dev;
+	struct brcmf_bus *bus = dev_get_drvdata(dev);
 	int ret;
 
 	/* Attach to the common driver interface */
-	ret = brcmf_attach(devinfo->dev, devinfo->settings);
+	ret = brcmf_attach(dev, devinfo->settings);
 	if (ret) {
 		brcmf_err("brcmf_attach failed\n");
 		return ret;
 	}
+	devinfo->pub = bus->drvr;
 
-	ret = brcmf_usb_up(devinfo->dev);
+	ret = brcmf_usb_up(dev);
 	if (ret)
 		goto fail;
 
-	ret = brcmf_bus_started(devinfo->dev);
+	ret = brcmf_bus_started(dev);
 	if (ret)
 		goto fail;
 
 	return 0;
 fail:
-	brcmf_detach(devinfo->dev);
+	brcmf_detach(dev);
 	return ret;
 }
 
