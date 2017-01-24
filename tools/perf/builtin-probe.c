@@ -616,7 +616,7 @@ __cmd_probe(int argc, const char **argv, const char *prefix __maybe_unused)
 	 * nor change running kernel. So if user gives offline vmlinux,
 	 * ignore its buildid.
 	 */
-	if (!strchr("lda", params.command) && symbol_conf.vmlinux_name)
+	if ((!strchr("lda", params.command) || probe_event_dry_run) && symbol_conf.vmlinux_name)
 		symbol_conf.ignore_vmlinux_buildid = true;
 
 	switch (params.command) {
