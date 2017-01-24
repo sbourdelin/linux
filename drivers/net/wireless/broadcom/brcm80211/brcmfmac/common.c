@@ -223,6 +223,7 @@ done:
 #ifndef CONFIG_BRCM_TRACING
 void __brcmf_err(struct brcmf_pub *pub, const char *func, const char *fmt, ...)
 {
+	struct device *dev = pub && pub->bus_if ? pub->bus_if->dev : NULL;
 	struct va_format vaf;
 	va_list args;
 
@@ -233,7 +234,7 @@ void __brcmf_err(struct brcmf_pub *pub, const char *func, const char *fmt, ...)
 
 	vaf.fmt = fmt;
 	vaf.va = &args;
-	pr_err("%s: %pV", func, &vaf);
+	dev_err(dev, "%s: %pV", func, &vaf);
 
 	va_end(args);
 }

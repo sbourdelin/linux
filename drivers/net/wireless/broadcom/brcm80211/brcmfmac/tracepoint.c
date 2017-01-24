@@ -25,6 +25,7 @@
 
 void __brcmf_err(struct brcmf_pub *pub, const char *func, const char *fmt, ...)
 {
+	struct device *dev = pub && pub->bus_if ? pub->bus_if->dev : NULL;
 	struct va_format vaf = {
 		.fmt = fmt,
 	};
@@ -32,7 +33,7 @@ void __brcmf_err(struct brcmf_pub *pub, const char *func, const char *fmt, ...)
 
 	va_start(args, fmt);
 	vaf.va = &args;
-	pr_err("%s: %pV", func, &vaf);
+	dev_err(dev, "%s: %pV", func, &vaf);
 	trace_brcmf_err(func, &vaf);
 	va_end(args);
 }
