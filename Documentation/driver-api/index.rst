@@ -37,3 +37,5 @@ available subsections can be seen below.
    =======
 
    * :ref:`genindex`
+
+   .. todolist::

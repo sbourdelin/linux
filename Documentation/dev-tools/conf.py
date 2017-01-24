@@ -8,3 +8,5 @@ latex_documents = [
     ('index', 'dev-tools.tex', project,
      'The kernel development community', 'manual'),
 ]
+
+todo_include_todos = True

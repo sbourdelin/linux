@@ -6,3 +6,5 @@ latex_documents = [
     ('index', 'security.tex', project,
      'The kernel development community', 'manual'),
 ]
+
+todo_include_todos = True

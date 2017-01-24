@@ -31,3 +31,5 @@ whole; patches welcome!
    =======
 
    * :ref:`genindex`
+
+   .. todolist::

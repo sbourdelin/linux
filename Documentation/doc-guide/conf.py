@@ -8,3 +8,5 @@ latex_documents = [
     ('index', 'kernel-doc-guide.tex', 'Linux Kernel Documentation Guide',
      'The kernel development community', 'manual'),
 ]
+
+todo_include_todos = True

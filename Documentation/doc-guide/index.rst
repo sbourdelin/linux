@@ -18,3 +18,5 @@ How to write kernel documentation
    =======
 
    * :ref:`genindex`
+
+   .. todolist::
