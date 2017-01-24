@@ -1186,6 +1186,13 @@ static int sdhci_msm_probe(struct platform_device *pdev)
 			       CORE_VENDOR_SPEC_CAPABILITIES0);
 	}
 
+	/* Enable delayed IRQ handling workaround on 8992 */
+	if (core_major == 1 && core_minor == 0x3e) {
+		/* Add 40us delay in interrupt handler when operating
+		 * at initialization frequency of 400KHz. */
+		host->quirks2 |= SDHCI_QUIRK2_SLOW_INT_CLR;
+	}
+
 	/* Setup IRQ for handling power/voltage tasks with PMIC */
 	msm_host->pwr_irq = platform_get_irq_byname(pdev, "pwr_irq");
 	if (msm_host->pwr_irq < 0) {

@@ -24,6 +24,8 @@
  * Controller registers
  */
 
+#define SDHCI_QUIRK2_SLOW_INT_CLR	(1<<5)
+
 #define SDHCI_DMA_ADDRESS	0x00
 #define SDHCI_ARGUMENT2		SDHCI_DMA_ADDRESS
 
