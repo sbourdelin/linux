@@ -43,6 +43,15 @@
 	status = "okay";
 };
 
+&usbdrd_dwc3_0 {
+	/*
+	 * without that, usb devices are not recognized when
+	 * they are plugged.
+	 * cf: https://lkml.org/lkml/2017/1/18/678
+	 */
+	snps,dis_u3_susphy_quirk;
+};
+
 &usbdrd_dwc3_1 {
 	dr_mode = "host";
 };
