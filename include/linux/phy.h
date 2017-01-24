@@ -25,7 +25,6 @@
 #include <linux/timer.h>
 #include <linux/workqueue.h>
 #include <linux/mod_devicetable.h>
-#include <linux/phy_led_triggers.h>
 
 #include <linux/atomic.h>
 
@@ -342,6 +341,8 @@ struct phy_c45_device_ids {
 	u32 devices_in_package;
 	u32 device_ids[8];
 };
+
+#include <linux/phy_led_triggers.h>
 
 /* phy_device: An instance of a PHY
  *

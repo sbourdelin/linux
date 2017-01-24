@@ -20,9 +20,8 @@ struct phy_device;
 #include <linux/leds.h>
 
 #define PHY_LED_TRIGGER_SPEED_SUFFIX_SIZE	10
-#define PHY_MII_BUS_ID_SIZE	(20 - 3)
 
-#define PHY_LINK_LED_TRIGGER_NAME_SIZE (PHY_MII_BUS_ID_SIZE + \
+#define PHY_LINK_LED_TRIGGER_NAME_SIZE (MII_BUS_ID_SIZE + \
 				       FIELD_SIZEOF(struct mdio_device, addr)+\
 				       PHY_LED_TRIGGER_SPEED_SUFFIX_SIZE)
 
