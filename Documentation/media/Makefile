@@ -103,6 +103,7 @@ html: all
 epub: all
 xml: all
 latex: $(IMGPDF) all
+kernel-doc-man: $(BUILDDIR) ${TARGETS}
 
 clean:
 	-rm -f $(DOTTGT) $(IMGTGT) ${TARGETS} 2>/dev/null

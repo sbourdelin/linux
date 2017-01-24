@@ -89,10 +89,12 @@ epubdocs:
 xmldocs:
 	@$(foreach var,$(SPHINXDIRS),$(call loop_cmd,sphinx,xml,$(var),xml,$(var)))
 
+mandocs:
+	@$(foreach var,$(SPHINXDIRS),$(call loop_cmd,sphinx,kernel-doc-man,$(var),man,$(var)))
+
 # no-ops for the Sphinx toolchain
 sgmldocs:
 psdocs:
-mandocs:
 installmandocs:
 
 cleandocs:
@@ -106,6 +108,7 @@ dochelp:
 	@echo  '  htmldocs        - HTML'
 	@echo  '  latexdocs       - LaTeX'
 	@echo  '  pdfdocs         - PDF'
+	@echo  '  mandocs         - man pages'
 	@echo  '  epubdocs        - EPUB'
 	@echo  '  xmldocs         - XML'
 	@echo  '  cleandocs       - clean all generated files'

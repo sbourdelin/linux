@@ -35,7 +35,7 @@ from load_config import loadConfig
 # extensions coming with Sphinx (named 'sphinx.ext.*') or your custom
 # ones.
 extensions = ['rstKernelDoc', 'rstFlatTable', 'kernel_include', 'cdomain',
-              'sphinx.ext.todo' ]
+              'manKernelDoc', 'sphinx.ext.todo' ]
 
 # The name of the math extension changed on Sphinx 1.4
 if major == 1 and minor > 3:
@@ -508,6 +508,7 @@ pdf_documents = [
 # line arguments.
 kernel_doc_verbose_warn = False
 kernel_doc_raise_error = False
+kernel_doc_mansect = 9
 
 # ------------------------------------------------------------------------------
 # Since loadConfig overwrites settings from the global namespace, it has to be
