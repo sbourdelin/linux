@@ -219,7 +219,7 @@ done:
 }
 
 #ifndef CONFIG_BRCM_TRACING
-void __brcmf_err(const char *func, const char *fmt, ...)
+void __brcmf_err(struct brcmf_pub *pub, const char *func, const char *fmt, ...)
 {
 	struct va_format vaf;
 	va_list args;

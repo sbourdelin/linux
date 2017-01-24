@@ -18,10 +18,12 @@
 
 #ifndef __CHECKER__
 #define CREATE_TRACE_POINTS
+#include "bus.h"
+#include "core.h"
 #include "tracepoint.h"
 #include "debug.h"
 
-void __brcmf_err(const char *func, const char *fmt, ...)
+void __brcmf_err(struct brcmf_pub *pub, const char *func, const char *fmt, ...)
 {
 	struct va_format vaf = {
 		.fmt = fmt,
