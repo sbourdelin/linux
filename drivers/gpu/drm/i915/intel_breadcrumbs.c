@@ -81,7 +81,7 @@ static void irq_enable(struct intel_engine_cs *engine)
 	 * we still need to force the barrier before reading the seqno,
 	 * just in case.
 	 */
-	engine->breadcrumbs.irq_posted = true;
+	__set_bit(ENGINE_IRQ_BREADCRUMB, &engine->irq_posted);
 
 	/* Caller disables interrupts */
 	spin_lock(&engine->i915->irq_lock);
@@ -96,7 +96,7 @@ static void irq_disable(struct intel_engine_cs *engine)
 	engine->irq_disable(engine);
 	spin_unlock(&engine->i915->irq_lock);
 
-	engine->breadcrumbs.irq_posted = false;
+	__clear_bit(ENGINE_IRQ_BREADCRUMB, &engine->irq_posted);
 }
 
 static void __intel_breadcrumbs_enable_irq(struct intel_breadcrumbs *b)
@@ -257,7 +257,8 @@ static bool __intel_engine_add_wait(struct intel_engine_cs *engine,
 			 * in case the seqno passed.
 			 */
 			__intel_breadcrumbs_enable_irq(b);
-			if (READ_ONCE(b->irq_posted))
+			if (test_bit(ENGINE_IRQ_BREADCRUMB,
+				     &engine->irq_posted))
 				wake_up_process(to_wait(next)->tsk);
 		}
 
@@ -610,7 +611,7 @@ void intel_engine_reset_breadcrumbs(struct intel_engine_cs *engine)
 	if (intel_engine_has_waiter(engine)) {
 		b->timeout = wait_timeout();
 		__intel_breadcrumbs_enable_irq(b);
-		if (READ_ONCE(b->irq_posted))
+		if (test_bit(ENGINE_IRQ_BREADCRUMB, &engine->irq_posted))
 			wake_up_process(b->first_wait->tsk);
 	} else {
 		/* sanitize the IMR and unmask any auxiliary interrupts */
