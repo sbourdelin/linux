@@ -3099,7 +3099,7 @@ EXPORT_SYMBOL(sdev_enable_disk_events);
  */
 int scsi_vpd_lun_id(struct scsi_device *sdev, char *id, size_t id_len)
 {
-	u8 cur_id_type = 0xff;
+	int cur_id_pref = 0;
 	u8 cur_id_size = 0;
 	unsigned char *d, *cur_id_str;
 	unsigned char __rcu *vpd_pg83;
@@ -3142,30 +3142,23 @@ int scsi_vpd_lun_id(struct scsi_device *sdev, char *id, size_t id_len)
 		switch (d[1] & 0xf) {
 		case 0x1:
 			/* T10 Vendor ID */
-			if (cur_id_size > d[3])
-				break;
-			/* Prefer anything */
-			if (cur_id_type > 0x01 && cur_id_type != 0xff)
+			if (cur_id_pref > 1 || (cur_id_pref == 1 && cur_id_size > d[3]))
 				break;
 			cur_id_size = d[3];
 			if (cur_id_size + 4 > id_len)
 				cur_id_size = id_len - 4;
 			cur_id_str = d + 4;
-			cur_id_type = d[1] & 0xf;
+			cur_id_pref = 1;
 			id_size = snprintf(id, id_len, "t10.%*pE",
 					   cur_id_size, cur_id_str);
 			break;
 		case 0x2:
 			/* EUI-64 */
-			if (cur_id_size > d[3])
-				break;
-			/* Prefer NAA IEEE Registered Extended */
-			if (cur_id_type == 0x3 &&
-			    cur_id_size == d[3])
+			if (cur_id_pref > 2 || (cur_id_pref == 2 && cur_id_size >= d[3]))
 				break;
 			cur_id_size = d[3];
 			cur_id_str = d + 4;
-			cur_id_type = d[1] & 0xf;
+			cur_id_pref = 2;
 			switch (cur_id_size) {
 			case 8:
 				id_size = snprintf(id, id_len,
@@ -3189,11 +3182,11 @@ int scsi_vpd_lun_id(struct scsi_device *sdev, char *id, size_t id_len)
 			break;
 		case 0x3:
 			/* NAA */
-			if (cur_id_size > d[3])
+			if (cur_id_pref > 2 || (cur_id_pref == 2 && cur_id_size > d[3]))
 				break;
 			cur_id_size = d[3];
 			cur_id_str = d + 4;
-			cur_id_type = d[1] & 0xf;
+			cur_id_pref = 2;
 			switch (cur_id_size) {
 			case 8:
 				id_size = snprintf(id, id_len,
@@ -3212,6 +3205,8 @@ int scsi_vpd_lun_id(struct scsi_device *sdev, char *id, size_t id_len)
 			break;
 		case 0x8:
 			/* SCSI name string */
+			if (cur_id_pref > 3 || (cur_id_pref == 3 && cur_id_size > d[3]))
+				break;
 			if (cur_id_size + 4 > d[3])
 				break;
 			/* Prefer others for truncated descriptor */
@@ -3219,7 +3214,7 @@ int scsi_vpd_lun_id(struct scsi_device *sdev, char *id, size_t id_len)
 				break;
 			cur_id_size = id_size = d[3];
 			cur_id_str = d + 4;
-			cur_id_type = d[1] & 0xf;
+			cur_id_pref = 3;
 			if (cur_id_size >= id_len)
 				cur_id_size = id_len - 1;
 			memcpy(id, cur_id_str, cur_id_size);
