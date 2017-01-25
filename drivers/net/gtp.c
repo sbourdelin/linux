@@ -956,7 +956,7 @@ static int ipv4_pdp_add(struct net_device *dev, struct genl_info *info)
 
 	}
 
-	pctx = kmalloc(sizeof(struct pdp_ctx), GFP_KERNEL);
+	pctx = kmalloc(sizeof(*pctx), GFP_KERNEL);
 	if (pctx == NULL)
 		return -ENOMEM;
 
