@@ -20,6 +20,7 @@
  */
 
 #include <linux/acpi.h>
+#include <linux/module.h>
 #include <linux/clk.h>
 #include <linux/cpumask.h>
 #include <linux/interrupt.h>
