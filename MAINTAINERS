@@ -7038,6 +7038,7 @@ F:	Documentation/virtual/kvm/
 F:	arch/*/kvm/
 F:	arch/x86/kernel/kvm.c
 F:	arch/x86/kernel/kvmclock.c
+F:	arch/x86/include/asm/pvclock-abi.h
 F:	arch/*/include/asm/kvm*
 F:	include/linux/kvm*
 F:	include/uapi/linux/kvm*
@@ -13476,6 +13477,7 @@ M:	Juergen Gross <jgross@suse.com>
 L:	xen-devel@lists.xenproject.org (moderated for non-subscribers)
 T:	git git://git.kernel.org/pub/scm/linux/kernel/git/xen/tip.git
 S:	Supported
+F:	arch/x86/include/asm/pvclock-abi.h
 F:	arch/x86/xen/
 F:	drivers/*/xen-*front.c
 F:	drivers/xen/
