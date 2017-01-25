@@ -56,6 +56,12 @@ struct hrtimer_sleeper;
 #endif
 
 #ifdef CONFIG_DEBUG_RT_MUTEXES
+ extern void rt_mutex_destroy(struct rt_mutex *lock);
+#else
+ static inline void rt_mutex_destroy(struct rt_mutex *lock) {}
+#endif
+
+#ifdef CONFIG_DEBUG_RT_MUTEXES
 # define __DEBUG_RT_MUTEX_INITIALIZER(mutexname) \
 	, .name = #mutexname, .file = __FILE__, .line = __LINE__
 # define rt_mutex_init(mutex)			__rt_mutex_init(mutex, __func__)
@@ -87,7 +93,6 @@ static inline int rt_mutex_is_locked(struct rt_mutex *lock)
 }
 
 extern void __rt_mutex_init(struct rt_mutex *lock, const char *name);
-extern void rt_mutex_destroy(struct rt_mutex *lock);
 
 extern void rt_mutex_lock(struct rt_mutex *lock);
 extern int rt_mutex_lock_interruptible(struct rt_mutex *lock);
