@@ -66,6 +66,7 @@ void __init xen_vmalloc_p2m_tree(void);
 void xen_init_irq_ops(void);
 void xen_setup_timer(int cpu);
 void xen_setup_runstate_info(int cpu);
+int xen_setup_vsyscall_time_info(int cpu);
 void xen_teardown_timer(int cpu);
 u64 xen_clocksource_read(void);
 void xen_setup_cpu_clockevents(void);

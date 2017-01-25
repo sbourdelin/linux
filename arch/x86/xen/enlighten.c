@@ -270,6 +270,8 @@ void xen_vcpu_restore(void)
 		    HYPERVISOR_vcpu_op(VCPUOP_up, xen_vcpu_nr(cpu), NULL))
 			BUG();
 	}
+
+	xen_setup_vsyscall_time_info(0);
 }
 
 static void __init xen_banner(void)

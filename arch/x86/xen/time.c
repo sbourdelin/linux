@@ -367,6 +367,56 @@ static const struct pv_time_ops xen_time_ops __initconst = {
 	.steal_clock = xen_steal_clock,
 };
 
+int xen_setup_vsyscall_time_info(int cpu)
+{
+	struct pvclock_vsyscall_time_info *xen_clock;
+	struct vcpu_register_time_memory_area t;
+	struct pvclock_vcpu_time_info *pvti;
+	unsigned long addr;
+	u8 flags;
+	int ret;
+
+	addr = get_zeroed_page(GFP_KERNEL);
+	if (!addr)
+		return -ENOMEM;
+
+	xen_clock = (struct pvclock_vsyscall_time_info *) addr;
+	memset(xen_clock, 0, PAGE_SIZE);
+
+	t.addr.v = &xen_clock->pvti;
+
+	ret = HYPERVISOR_vcpu_op(VCPUOP_register_vcpu_time_memory_area,
+				 cpu, &t);
+
+	if (ret) {
+		pr_debug("xen: cannot register vcpu_time_info err %d\n", ret);
+		free_page(addr);
+		return ret;
+	}
+
+	pvti = &xen_clock->pvti;
+	flags = pvti->flags;
+
+	if (!(flags & PVCLOCK_TSC_STABLE_BIT)) {
+		t.addr.v = NULL;
+		ret = HYPERVISOR_vcpu_op(VCPUOP_register_vcpu_time_memory_area,
+					 cpu, &t);
+		if (!ret)
+			free_page(addr);
+
+		WARN_ON(ret);
+		pr_debug("xen: VCLOCK_PVCLOCK not supported\n");
+		return -ENOTSUPP;
+	}
+
+	pvclock_set_flags(PVCLOCK_TSC_STABLE_BIT);
+	pvclock_set_pvti_cpu0_va(xen_clock);
+
+	xen_clocksource.archdata.vclock_mode = VCLOCK_PVCLOCK;
+
+	return 0;
+}
+
 static void __init xen_time_init(void)
 {
 	int cpu = smp_processor_id();
@@ -393,6 +443,7 @@ static void __init xen_time_init(void)
 	setup_force_cpu_cap(X86_FEATURE_TSC);
 
 	xen_setup_runstate_info(cpu);
+	xen_setup_vsyscall_time_info(cpu);
 	xen_setup_timer(cpu);
 	xen_setup_cpu_clockevents();
 
