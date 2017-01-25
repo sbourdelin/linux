@@ -24,7 +24,6 @@
 #include <linux/io.h>
 #include <linux/platform_device.h>
 #include <linux/of_gpio.h>
-#include <linux/gpio/driver.h>
 #include <linux/acpi.h>
 
 #include "gpiolib.h"

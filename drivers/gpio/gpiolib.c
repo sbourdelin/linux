@@ -14,7 +14,6 @@
 #include <linux/idr.h>
 #include <linux/slab.h>
 #include <linux/acpi.h>
-#include <linux/gpio/driver.h>
 #include <linux/gpio/machine.h>
 #include <linux/pinctrl/consumer.h>
 #include <linux/cdev.h>

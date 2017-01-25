@@ -12,8 +12,6 @@
 
 #include <linux/errno.h>
 #include <linux/gpio.h>
-#include <linux/gpio/consumer.h>
-#include <linux/gpio/driver.h>
 #include <linux/gpio/machine.h>
 #include <linux/export.h>
 #include <linux/acpi.h>

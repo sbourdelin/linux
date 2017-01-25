@@ -8,7 +8,6 @@
  * All enquiries to support@picochip.com
  */
 #include <linux/acpi.h>
-#include <linux/gpio/driver.h>
 /* FIXME: for gpio_get_value(), replace this with direct register read */
 #include <linux/gpio.h>
 #include <linux/err.h>
