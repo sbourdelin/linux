@@ -109,6 +109,13 @@ static int get_reg_offset(struct insn *insn, struct pt_regs *regs,
 		regno = X86_SIB_INDEX(insn->sib.value);
 		if (X86_REX_X(insn->rex_prefix.value))
 			regno += 8;
+		/*
+		 * If mod !=3, register R/ESP (regno=4) is not used as index in
+		 * the address computation. Check is done after looking at REX.X
+		 * This is because R12 (regno=12) can be used as an index.
+		 */
+		if (regno == 4 && X86_MODRM_MOD(insn->modrm.value) != 3)
+			return -EINVAL;
 		break;
 
 	case REG_TYPE_BASE:
@@ -157,11 +164,16 @@ static void __user *mpx_get_addr_ref(struct insn *insn, struct pt_regs *regs)
 				goto out_err;
 
 			indx_offset = get_reg_offset(insn, regs, REG_TYPE_INDEX);
+			/*
+			 * A negative offset means that the register cannot be
+			 * be used as an index.
+			 */
 			if (indx_offset < 0)
-				goto out_err;
+				indx = 0;
+			else
+				indx = regs_get_register(regs, indx_offset);
 
 			base = regs_get_register(regs, base_offset);
-			indx = regs_get_register(regs, indx_offset);
 			addr = base + indx * (1 << X86_SIB_SCALE(sib));
 		} else {
 			addr_offset = get_reg_offset(insn, regs, REG_TYPE_RM);
