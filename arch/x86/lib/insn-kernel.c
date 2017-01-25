@@ -95,6 +95,11 @@ static int get_reg_offset(struct insn *insn, struct pt_regs *regs,
 	return regoff[regno];
 }
 
+int insn_get_reg_offset_rm(struct insn *insn, struct pt_regs *regs)
+{
+	return get_reg_offset(insn, regs, REG_TYPE_RM);
+}
+
 /*
  * return the address being referenced be instruction
  * for rm=3 returning the content of the rm reg

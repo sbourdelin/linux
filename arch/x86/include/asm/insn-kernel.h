@@ -12,5 +12,6 @@
 #include <asm/ptrace.h>
 
 void __user *insn_get_addr_ref(struct insn *insn, struct pt_regs *regs);
+int insn_get_reg_offset_rm(struct insn *insn, struct pt_regs *regs);
 
 #endif /* _ASM_X86_INSN_KERNEL_H */
