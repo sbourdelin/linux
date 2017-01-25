@@ -466,7 +466,7 @@ static const struct twlreg_info TWL4030_INFO_##label = { \
 		.type = REGULATOR_VOLTAGE, \
 		.owner = THIS_MODULE, \
 		.enable_time = turnon_delay, \
-		.of_map_mode = twl4030reg_map_mode, \
+		.map_mode = twl4030reg_map_mode, \
 		}, \
 	}
 
@@ -482,7 +482,7 @@ static const struct twlreg_info TWL4030_INFO_##label = { \
 		.type = REGULATOR_VOLTAGE, \
 		.owner = THIS_MODULE, \
 		.enable_time = turnon_delay, \
-		.of_map_mode = twl4030reg_map_mode, \
+		.map_mode = twl4030reg_map_mode, \
 		}, \
 	}
 
@@ -501,7 +501,7 @@ static const struct twlreg_info TWLFIXED_INFO_##label = { \
 		.owner = THIS_MODULE, \
 		.min_uV = mVolts * 1000, \
 		.enable_time = turnon_delay, \
-		.of_map_mode = twl4030reg_map_mode, \
+		.map_mode = twl4030reg_map_mode, \
 		}, \
 	}
 

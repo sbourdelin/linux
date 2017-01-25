@@ -569,7 +569,7 @@ static const struct twlreg_info TWLFIXED_INFO_##label = { \
 		.owner = THIS_MODULE, \
 		.min_uV = mVolts * 1000, \
 		.enable_time = turnon_delay, \
-		.of_map_mode = NULL, \
+		.map_mode = NULL, \
 		}, \
 	}
 
