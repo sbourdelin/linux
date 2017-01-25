@@ -120,6 +120,14 @@ static int get_reg_offset(struct insn *insn, struct pt_regs *regs,
 
 	case REG_TYPE_BASE:
 		regno = X86_SIB_BASE(insn->sib.value);
+		/*
+		 * If R/EBP (regno = 5) is indicated in the base part of the SIB
+		 * byte, an explicit displacement must be specified. In other
+		 * words, the mod part of the ModRM byte cannot be zero.
+		 */
+		if (regno == 5 && X86_MODRM_MOD(insn->modrm.value) == 0)
+			return -EINVAL;
+
 		if (X86_REX_B(insn->rex_prefix.value))
 			regno += 8;
 		break;
