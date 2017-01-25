@@ -4824,7 +4824,8 @@ again:
 				err = btrfs_log_inode(trans, root,
 						BTRFS_I(other_inode),
 						LOG_OTHER_INODE, 0, LLONG_MAX,
-						ctx); iput(other_inode);
+						ctx);
+				iput(other_inode);
 				if (err)
 					goto out_unlock;
 				else
