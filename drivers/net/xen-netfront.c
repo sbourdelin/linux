@@ -567,6 +567,10 @@ static int xennet_start_xmit(struct sk_buff *skb, struct net_device *dev)
 	u16 queue_index;
 	struct sk_buff *nskb;
 
+	/* Basic sanity check */
+	if (unlikely(skb->len < ETH_HLEN))
+		goto drop;
+
 	/* Drop the packet if no queues are set up */
 	if (num_queues < 1)
 		goto drop;
@@ -609,6 +613,11 @@ static int xennet_start_xmit(struct sk_buff *skb, struct net_device *dev)
 	}
 
 	len = skb_headlen(skb);
+	if (unlikely(len < ETH_HLEN)) {
+		if (!__pskb_pull_tail(skb, ETH_HLEN - len))
+			goto drop;
+		len = ETH_HLEN;
+	}
 
 	spin_lock_irqsave(&queue->tx_lock, flags);
 
