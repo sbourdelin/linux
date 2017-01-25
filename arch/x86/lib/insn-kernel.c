@@ -8,6 +8,7 @@
 #include <asm/inat.h>
 #include <asm/insn.h>
 #include <asm/insn-kernel.h>
+#include <asm/vm86.h>
 
 enum reg_type {
 	REG_TYPE_RM = 0,
@@ -95,6 +96,194 @@ static int get_reg_offset(struct insn *insn, struct pt_regs *regs,
 	return regoff[regno];
 }
 
+#ifdef CONFIG_VM86
+
+/*
+ * Obtain the segment selector to use based on any prefixes in the instruction
+ * or in the offset of the register given by the r/m part of the ModRM byte. The
+ * register offset is as found in struct pt_regs.
+ */
+static unsigned short __get_segment_selector_16(struct pt_regs *regs,
+						struct insn *insn, int regoff)
+{
+	int i;
+
+	struct kernel_vm86_regs *vm86regs = (struct kernel_vm86_regs *)regs;
+
+	/*
+	 * If not in virtual-8086 mode, the segment selector is not used
+	 * to compute addresses but to select the segment descriptor. Return
+	 * 0 to ease the computation of address.
+	 */
+	if (!v8086_mode(regs))
+		return 0;
+
+	insn_get_prefixes(insn);
+
+	/* Check first if we have selector overrides */
+	for (i = 0; i < insn->prefixes.nbytes; i++) {
+		switch (insn->prefixes.bytes[i]) {
+		/*
+		 * Code and stack segment selector register are saved in all
+		 * processor modes. Thus, it makes sense to take them
+		 * from pt_regs.
+		 */
+		case 0x2e:
+			return (unsigned short)regs->cs;
+		case 0x36:
+			return (unsigned short)regs->ss;
+		/*
+		 * The rest of the segment selector registers are only saved
+		 * in virtual-8086 mode. Thus, we must obtain them from the
+		 * vm86 register structure.
+		 */
+		case 0x3e:
+			return vm86regs->ds;
+		case 0x26:
+			return vm86regs->es;
+		case 0x64:
+			return vm86regs->fs;
+		case 0x65:
+			return vm86regs->gs;
+		/*
+		 * No default action needed. We simply did not find any
+		 * relevant prefixes.
+		 */
+		}
+	}
+
+	/*
+	 * If no overrides, use default selectors as described in the
+	 * Intel documentationn.
+	 */
+	switch (regoff) {
+	case -EINVAL: /* no register involved in address computation */
+	case offsetof(struct pt_regs, bx):
+	case offsetof(struct pt_regs, di):
+	case offsetof(struct pt_regs, si):
+		return vm86regs->ds;
+	case offsetof(struct pt_regs, bp):
+	case offsetof(struct pt_regs, sp):
+		return (unsigned short)regs->ss;
+	/* ax, cx, dx are not valid registers for 16-bit addressing*/
+	default:
+		return -EINVAL;
+	}
+}
+
+/*
+ * Obtain offsets from pt_regs to the two registers indicated by the
+ * r/m part of the ModRM byte. A negative offset indicates that the
+ * register should not be used.
+ */
+static int get_reg_offset_16(struct insn *insn, struct pt_regs *regs,
+			     int *offs1, int *offs2)
+{
+	/* 16-bit addressing can use one or two registers */
+	static const int regoff1[] = {
+		offsetof(struct pt_regs, bx),
+		offsetof(struct pt_regs, bx),
+		offsetof(struct pt_regs, bp),
+		offsetof(struct pt_regs, bp),
+		offsetof(struct pt_regs, si),
+		offsetof(struct pt_regs, di),
+		offsetof(struct pt_regs, bp),
+		offsetof(struct pt_regs, bx),
+	};
+
+	static const int regoff2[] = {
+		offsetof(struct pt_regs, si),
+		offsetof(struct pt_regs, di),
+		offsetof(struct pt_regs, si),
+		offsetof(struct pt_regs, di),
+		-EINVAL,
+		-EINVAL,
+		-EINVAL,
+		-EINVAL,
+	};
+
+	if (!offs1 || !offs2)
+		return -EINVAL;
+
+	/* operand is a register, use the generic function */
+	if (X86_MODRM_MOD(insn->modrm.value) == 3) {
+		*offs1 = insn_get_reg_offset_rm(insn, regs);
+		*offs2 = -EINVAL;
+		return 0;
+	}
+
+	*offs1 = regoff1[X86_MODRM_RM(insn->modrm.value)];
+	*offs2 = regoff2[X86_MODRM_RM(insn->modrm.value)];
+
+	/*
+	 * If no displacement is indicated in the mod part of the ModRM byte,
+	 * (mod part is 0) and the r/m part of the same byte is 6, no register
+	 * is used caculate the operand address. An r/m part of 6 means that
+	 * the second register offset is already invalid.
+	 */
+	if ((X86_MODRM_MOD(insn->modrm.value) == 0) &&
+	    (X86_MODRM_RM(insn->modrm.value) == 6))
+		*offs1 = -EINVAL;
+
+	return 0;
+}
+
+static void __user *insn_get_addr_ref_16(struct insn *insn,
+					 struct pt_regs *regs)
+{
+	unsigned long addr;
+	unsigned short addr1 = 0, addr2 = 0;
+	int addr_offset1, addr_offset2;
+	int ret;
+	unsigned short seg = 0;
+
+	insn_get_displacement(insn);
+
+	/*
+	 * If operand is a register, the layout is the same as in
+	 * 32-bit and 64-bit addressing.
+	 */
+	if (X86_MODRM_MOD(insn->modrm.value) == 3) {
+		addr_offset1 = get_reg_offset(insn, regs, REG_TYPE_RM);
+		if (addr_offset1 < 0)
+			goto out_err;
+		seg = __get_segment_selector_16(regs, insn, addr_offset1);
+		addr = (seg << 4) + regs_get_register(regs, addr_offset1);
+	} else {
+		ret = get_reg_offset_16(insn, regs, &addr_offset1,
+					&addr_offset2);
+		if (ret < 0)
+			goto out_err;
+		/*
+		 * Don't fail on invalid offset values. They might be invalid
+		 * because they are not supported. Instead, use them in the
+		 * calculation only if they contain a valid value.
+		 */
+		if (addr_offset1 >= 0)
+			addr1 = regs_get_register(regs, addr_offset1);
+		if (addr_offset2 >= 0)
+			addr2 = regs_get_register(regs, addr_offset2);
+		seg = __get_segment_selector_16(regs, insn, addr_offset1);
+		if (seg < 0)
+			goto out_err;
+		addr =  (seg << 4) + addr1 + addr2;
+	}
+	addr += insn->displacement.value;
+
+	return (void __user *)addr;
+out_err:
+	return (void __user *)-1;
+}
+#else
+
+static void __user *insn_get_addr_ref_16(struct insn *insn,
+					 struct pt_regs *regs)
+{
+	return (void __user *)-1;
+}
+
+#endif /* CONFIG_VM86 */
+
 int insn_get_reg_offset_rm(struct insn *insn, struct pt_regs *regs)
 {
 	return get_reg_offset(insn, regs, REG_TYPE_RM);
@@ -110,6 +299,9 @@ void __user *insn_get_addr_ref(struct insn *insn, struct pt_regs *regs)
 	unsigned long addr, base, indx;
 	int addr_offset, base_offset, indx_offset;
 	insn_byte_t sib;
+
+	if (insn->addr_bytes == 2)
+		return insn_get_addr_ref_16(insn, regs);
 
 	insn_get_modrm(insn);
 	insn_get_sib(insn);
