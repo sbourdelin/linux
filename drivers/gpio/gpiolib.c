@@ -735,6 +735,7 @@ static irqreturn_t lineevent_irq_thread(int irq, void *p)
 
 static int lineevent_create(struct gpio_device *gdev, void __user *ip)
 {
+	struct gpio_chip *chip = gdev->chip;
 	struct gpioevent_request eventreq;
 	struct lineevent_state *le;
 	struct gpio_desc *desc;
@@ -807,7 +808,8 @@ static int lineevent_create(struct gpio_device *gdev, void __user *ip)
 		goto out_free_desc;
 
 	le->irq = gpiod_to_irq(desc);
-	if (le->irq <= 0) {
+	/* Mockup gpiochips don't have to support this. */
+	if (le->irq <= 0 && !chip->mockup) {
 		ret = -ENODEV;
 		goto out_free_desc;
 	}
@@ -823,15 +825,20 @@ static int lineevent_create(struct gpio_device *gdev, void __user *ip)
 	init_waitqueue_head(&le->wait);
 	mutex_init(&le->read_lock);
 
-	/* Request a thread to read the events */
-	ret = request_threaded_irq(le->irq,
-			NULL,
-			lineevent_irq_thread,
-			irqflags,
-			le->label,
-			le);
-	if (ret)
-		goto out_free_desc;
+	if (!chip->mockup) {
+		/*
+		 * Request a thread to read the events unless we're dealing
+		 * with a mockup gpiochip.
+		 */
+		ret = request_threaded_irq(le->irq,
+				NULL,
+				lineevent_irq_thread,
+				irqflags,
+				le->label,
+				le);
+		if (ret)
+			goto out_free_desc;
+	}
 
 	fd = get_unused_fd_flags(O_RDONLY | O_CLOEXEC);
 	if (fd < 0) {

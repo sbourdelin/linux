@@ -82,6 +82,9 @@ enum single_ended_mode {
  *	implies that if the chip supports IRQs, these IRQs need to be threaded
  *	as the chip access may sleep when e.g. reading out the IRQ status
  *	registers.
+ * @mockup: if set, the flag signifies that this gpiochip does not model a
+ *      real device; this can affect the way the chip is handled internally
+ *      by gpiolib.
  * @read_reg: reader function for generic GPIO
  * @write_reg: writer function for generic GPIO
  * @pin2mask: some generic GPIO controllers work with the big-endian bits
@@ -166,6 +169,7 @@ struct gpio_chip {
 	u16			ngpio;
 	const char		*const *names;
 	bool			can_sleep;
+	bool			mockup;
 
 #if IS_ENABLED(CONFIG_GPIO_GENERIC)
 	unsigned long (*read_reg)(void __iomem *reg);
