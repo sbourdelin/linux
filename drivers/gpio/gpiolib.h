@@ -23,6 +23,7 @@ enum of_gpio_flags;
 enum gpiod_flags;
 enum gpio_lookup_flags;
 struct acpi_device;
+struct lineevent_state;
 
 /**
  * struct gpio_device - internal state container for GPIO devices
@@ -196,12 +197,15 @@ struct gpio_desc {
 	const char		*label;
 	/* Name of the GPIO */
 	const char		*name;
+	/* Private: line event context for the GPIO */
+	struct lineevent_state  *le;
 };
 
 int gpiod_request(struct gpio_desc *desc, const char *label);
 void gpiod_free(struct gpio_desc *desc);
 int gpiod_hog(struct gpio_desc *desc, const char *name,
 		unsigned long lflags, enum gpiod_flags dflags);
+void gpiod_inject_event(struct gpio_desc *desc);
 
 /*
  * Return the GPIO number of the passed descriptor relative to its chip

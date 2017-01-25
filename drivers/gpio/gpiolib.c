@@ -643,6 +643,7 @@ static int lineevent_release(struct inode *inode, struct file *filep)
 	struct gpio_device *gdev = le->gdev;
 
 	free_irq(le->irq, le);
+	le->desc->le = NULL;
 	gpiod_free(le->desc);
 	kfree(le->label);
 	kfree(le);
@@ -733,6 +734,20 @@ static irqreturn_t lineevent_irq_thread(int irq, void *p)
 	return IRQ_HANDLED;
 }
 
+void gpiod_inject_event(struct gpio_desc *desc)
+{
+	struct lineevent_state *le = desc->le;
+	unsigned long flags;
+
+	if (le) {
+		/* Act as if we were in interrupt context. */
+		local_irq_save(flags);
+		lineevent_irq_thread(-1 /* unused */, le);
+		local_irq_restore(flags);
+	}
+}
+EXPORT_SYMBOL(gpiod_inject_event);
+
 static int lineevent_create(struct gpio_device *gdev, void __user *ip)
 {
 	struct gpio_chip *chip = gdev->chip;
@@ -794,6 +809,7 @@ static int lineevent_create(struct gpio_device *gdev, void __user *ip)
 	if (ret)
 		goto out_free_desc;
 	le->desc = desc;
+	desc->le = le;
 	le->eflags = eflags;
 
 	if (lflags & GPIOHANDLE_REQUEST_ACTIVE_LOW)
