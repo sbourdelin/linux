@@ -1,0 +1,33 @@
+* Synopsys DesignWare AXI DMA Controller
+
+Required properties:
+- compatible: "snps,axi-dma"
+- reg: Address range of the DMAC registers. This should include
+  all of the per-channel registers.
+- interrupt: Should contain the DMAC interrupt number.
+- interrupt-parent: Should be the phandle for the interrupt controller
+  that services interrupts for this device.
+- dma-channels: Number of channels supported by hardware.
+- dma-masters: Number of AXI masters supported by the hardware.
+- data-width: Maximum AXI data width supported by hardware.
+  (0 - 8bits, 1 - 16bits, 2 - 32bits, ..., 6 - 512bits)
+- priority: Priority of channel. Array property. Priority value must be
+  programmed within [0:dma-channels-1] range. (0 - minimum priority)
+- block-size: Maximum block size supported by the controller channel. Array
+  property.
+
+Example:
+
+dmac: dmac@80000 {
+	compatible = "snps,axi-dma";
+	reg = <0x80000 0x400>;
+	clocks = <&core_clk>;
+	interrupt-parent = <&intc>;
+	interrupts = <27>;
+
+	dma-channels = <4>;
+	dma-masters = <2>;
+	data-width = <3>;
+	block-size = <4096 4096 4096 4096>;
+	priority = <0 1 2 3>;
+};
