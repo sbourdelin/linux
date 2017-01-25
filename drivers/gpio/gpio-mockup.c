@@ -101,6 +101,7 @@ static int mockup_gpio_add(struct device *dev,
 	cntr->gc.direction_output = mockup_gpio_dirout;
 	cntr->gc.direction_input = mockup_gpio_dirin;
 	cntr->gc.get_direction = mockup_gpio_get_direction;
+	cntr->gc.mockup = true;
 	cntr->stats = devm_kzalloc(dev, sizeof(*cntr->stats) * cntr->gc.ngpio,
 				   GFP_KERNEL);
 	if (!cntr->stats) {
