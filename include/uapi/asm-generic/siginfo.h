@@ -213,7 +213,10 @@ typedef struct siginfo {
 #define SEGV_ACCERR	(__SI_FAULT|2)	/* invalid permissions for mapped object */
 #define SEGV_BNDERR	(__SI_FAULT|3)  /* failed address bound checks */
 #define SEGV_PKUERR	(__SI_FAULT|4)  /* failed protection key checks */
-#define NSIGSEGV	4
+#define SEGV_ACCADI	(__SI_FAULT|5)	/* ADI not enabled for mapped object */
+#define SEGV_ADIDERR	(__SI_FAULT|6)	/* Disrupting MCD error */
+#define SEGV_ADIPERR	(__SI_FAULT|7)	/* Precise MCD exception */
+#define NSIGSEGV	7
 
 /*
  * SIGBUS si_codes
