@@ -300,6 +300,8 @@ void kasan_report(unsigned long addr, size_t size,
 	if (likely(!kasan_report_enabled()))
 		return;
 
+	disable_trace_on_warning();
+
 	info.access_addr = (void *)addr;
 	info.access_size = size;
 	info.is_write = is_write;
