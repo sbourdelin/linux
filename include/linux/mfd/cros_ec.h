@@ -148,6 +148,7 @@ struct cros_ec_device {
 
 	struct ec_response_get_next_event event_data;
 	int event_size;
+	u32 host_event_wake_mask;
 };
 
 /**
@@ -298,6 +299,17 @@ int cros_ec_query_all(struct cros_ec_device *ec_dev);
  * Returns: 0 on success, Linux error number on failure
  */
 int cros_ec_get_next_event(struct cros_ec_device *ec_dev);
+
+/**
+ * cros_ec_get_host_event - Return a mask of event set by the EC.
+ *
+ * Once cros_ec_get_next_event() has been called, if the event source is
+ * a host event, this function returns the precise event that triggered
+ * the interrupt.
+ *
+ * This function is a helper to know which events are raised.
+ */
+u32 cros_ec_get_host_event(struct cros_ec_device *ec_dev);
 
 /* sysfs stuff */
 extern struct attribute_group cros_ec_attr_group;
