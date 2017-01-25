@@ -241,7 +241,7 @@ int bcm_phy_downshift_get(struct phy_device *phydev, u8 *count)
 		return val;
 
 	/* Check if wirespeed is enabled or not */
-	if (!(val & MII_BCM54XX_AUXCTL_SHDWSEL_MISC_WIRESPEED_EN)) {
+	if (!(val & MII_BCM54XX_AUXCTL_MISC_WIRESPEED_EN)) {
 		*count = DOWNSHIFT_DEV_DISABLE;
 		return 0;
 	}
@@ -283,12 +283,12 @@ int bcm_phy_downshift_set(struct phy_device *phydev, u8 count)
 	val |= MII_BCM54XX_AUXCTL_MISC_WREN;
 
 	if (count == DOWNSHIFT_DEV_DISABLE) {
-		val &= ~MII_BCM54XX_AUXCTL_SHDWSEL_MISC_WIRESPEED_EN;
+		val &= ~MII_BCM54XX_AUXCTL_MISC_WIRESPEED_EN;
 		return bcm54xx_auxctl_write(phydev,
 					    MII_BCM54XX_AUXCTL_SHDWSEL_MISC,
 					    val);
 	} else {
-		val |= MII_BCM54XX_AUXCTL_SHDWSEL_MISC_WIRESPEED_EN;
+		val |= MII_BCM54XX_AUXCTL_MISC_WIRESPEED_EN;
 		ret = bcm54xx_auxctl_write(phydev,
 					   MII_BCM54XX_AUXCTL_SHDWSEL_MISC,
 					   val);
