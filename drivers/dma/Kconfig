@@ -578,6 +578,14 @@ config ZX_DMA
 	help
 	  Support the DMA engine for ZTE ZX296702 platform devices.
 
+config AXI_DW_DMAC
+	tristate "Synopsys DesignWare AXI DMA support"
+	depends on OF && !64BIT
+	select DMA_ENGINE
+	select DMA_VIRTUAL_CHANNELS
+	help
+	  Enable support for Synopsys DesignWare AXI DMA controller.
+
 
 # driver files
 source "drivers/dma/bestcomm/Kconfig"
