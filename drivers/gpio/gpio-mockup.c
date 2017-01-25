@@ -17,6 +17,7 @@
 #include <linux/platform_device.h>
 #include <linux/debugfs.h>
 #include <linux/uaccess.h>
+#include <linux/slab.h>
 
 #include "gpiolib.h"
 
@@ -47,6 +48,10 @@ struct mockup_gpio_controller {
 static int gpio_mockup_ranges[MAX_GC << 1];
 static int gpio_mockup_params_nr;
 module_param_array(gpio_mockup_ranges, int, &gpio_mockup_params_nr, 0400);
+
+static bool gpio_mockup_named_lines;
+module_param_named(gpio_mockup_named_lines,
+		   gpio_mockup_named_lines, bool, 0400);
 
 static const char pins_name_start = 'A';
 static struct dentry *dbg_dir;
@@ -169,7 +174,8 @@ static int mockup_gpio_add(struct device *dev,
 			   struct mockup_gpio_controller *cntr,
 			   const char *name, int base, int ngpio)
 {
-	int ret;
+	char **names;
+	int ret, i;
 
 	cntr->gc.base = base;
 	cntr->gc.ngpio = ngpio;
@@ -188,6 +194,28 @@ static int mockup_gpio_add(struct device *dev,
 		ret = -ENOMEM;
 		goto err;
 	}
+
+	if (gpio_mockup_named_lines) {
+		names = devm_kzalloc(dev,
+				     sizeof(char *) * cntr->gc.ngpio,
+				     GFP_KERNEL);
+		if (!names) {
+			ret = -ENOMEM;
+			goto err;
+		}
+
+		for (i = 0; i < cntr->gc.ngpio; i++) {
+			names[i] = devm_kasprintf(dev, GFP_KERNEL,
+						  "%s-%d", cntr->gc.label, i);
+			if (!names[i]) {
+				ret = -ENOMEM;
+				goto err;
+			}
+		}
+
+		cntr->gc.names = (const char *const*)names;
+	}
+
 	ret = devm_gpiochip_add_data(dev, &cntr->gc, cntr);
 	if (ret)
 		goto err;
