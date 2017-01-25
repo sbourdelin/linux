@@ -53,13 +53,27 @@ reset:
 
 }
 
+static bool ath_rx_active_check(struct ath_softc *sc)
+{
+	if (sc->rx_active) {
+		sc->rx_active = 0;
+		return true;
+	}
+
+	ath_dbg(ath9k_hw_common(sc->sc_ah), RESET,
+		"rx path inactive, resetting the chip\n");
+	ath9k_queue_reset(sc, RESET_TYPE_RX_INACTIVE);
+	return false;
+}
+
 void ath_hw_check_work(struct work_struct *work)
 {
 	struct ath_softc *sc = container_of(work, struct ath_softc,
 					    hw_check_work.work);
 
 	if (!ath_hw_check(sc) ||
-	    !ath_tx_complete_check(sc))
+	    !ath_tx_complete_check(sc) ||
+	    !ath_rx_active_check(sc))
 		return;
 
 	ieee80211_queue_delayed_work(sc->hw, &sc->hw_check_work,

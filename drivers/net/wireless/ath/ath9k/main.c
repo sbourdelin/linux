@@ -269,6 +269,7 @@ static bool ath_complete_reset(struct ath_softc *sc, bool start)
 	}
 
 	sc->gtt_cnt = 0;
+	sc->rx_active = 1;
 
 	ath9k_hw_set_interrupts(ah);
 	ath9k_hw_enable_interrupts(ah);
@@ -452,6 +453,7 @@ void ath9k_tasklet(unsigned long data)
 			ath_rx_tasklet(sc, 0, true);
 
 		ath_rx_tasklet(sc, 0, false);
+		sc->rx_active = 1;
 	}
 
 	if (status & ATH9K_INT_TX) {
