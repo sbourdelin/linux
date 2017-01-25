@@ -195,10 +195,22 @@ static int linear_add(struct mddev *mddev, struct md_rdev *rdev)
 	if (!newconf)
 		return -ENOMEM;
 
+	/* In linear_congested(), mddev->raid_disks and mddev->private
+	 * are accessed without protection by mddev_suspend(). If on
+	 * another CPU,  in linear_congested() mddev->private is still seen
+	 * to contains old value but mddev->raid_disks is seen to have the
+	 * increased value, the last iteration to conf->disks[i].rdev will
+	 * trigger a NULL pointer deference. To avoid this race, here
+	 * mddev->private must be updated before increasing
+	 * mddev->raid_disks, and a smp_mb() is required between them. Then
+	 * in linear_congested(), we are sure the updated mddev->private is
+	 * seen when iterating conf->disks[i].
+	 */
 	mddev_suspend(mddev);
 	oldconf = mddev->private;
-	mddev->raid_disks++;
 	mddev->private = newconf;
+	smp_mb();
+	mddev->raid_disks++;
 	md_set_array_sectors(mddev, linear_size(mddev, 0, 0));
 	set_capacity(mddev->gendisk, mddev->array_sectors);
 	mddev_resume(mddev);
