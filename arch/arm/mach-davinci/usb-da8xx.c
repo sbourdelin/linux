@@ -275,7 +275,7 @@ int __init da8xx_register_usb20_phy_clk(bool use_usb_refclkin)
 	struct clk *parent;
 	int ret;
 
-	usb20_clk = clk_get(&da8xx_usb20_dev.dev, "usb20");
+	usb20_clk = clk_get(&da8xx_usb20_dev.dev, NULL);
 	ret = PTR_ERR_OR_ZERO(usb20_clk);
 	if (ret)
 		return ret;
