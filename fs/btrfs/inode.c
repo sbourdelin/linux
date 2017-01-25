@@ -3824,10 +3824,12 @@ cache_acl:
 		break;
 	case S_IFDIR:
 		inode->i_fop = &btrfs_dir_file_operations;
-		if (root == fs_info->tree_root)
+		if (root == fs_info->tree_root) {
 			inode->i_op = &btrfs_dir_ro_inode_operations;
-		else
+			inode->i_opflags &= ~IOP_XATTR;
+		} else {
 			inode->i_op = &btrfs_dir_inode_operations;
+		}
 		break;
 	case S_IFLNK:
 		inode->i_op = &btrfs_symlink_inode_operations;
@@ -5729,6 +5731,7 @@ static struct inode *new_simple_dir(struct super_block *s,
 
 	inode->i_ino = BTRFS_EMPTY_SUBVOL_DIR_OBJECTID;
 	inode->i_op = &btrfs_dir_ro_inode_operations;
+	inode->i_opflags &= ~IOP_XATTR;
 	inode->i_fop = &simple_dir_operations;
 	inode->i_mode = S_IFDIR | S_IRUGO | S_IWUSR | S_IXUGO;
 	inode->i_mtime = current_time(inode);
