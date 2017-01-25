@@ -3823,8 +3823,11 @@ int intel_freq_opcode(struct drm_i915_private *dev_priv, int val);
 	} while (upper != old_upper && loop++ < 2);			\
 	(u64)upper << 32 | lower; })
 
-#define POSTING_READ(reg)	(void)I915_READ_NOTRACE(reg)
-#define POSTING_READ16(reg)	(void)I915_READ16_NOTRACE(reg)
+#define POSTING_READ(reg) ( \
+	intel_vgpu_active(dev_priv) ? (void)0 : (void)I915_READ_NOTRACE(reg))
+
+#define POSTING_READ16(reg) ( \
+	intel_vgpu_active(dev_priv) ? (void)0 : (void)I915_READ16_NOTRACE(reg))
 
 #define __raw_read(x, s) \
 static inline uint##x##_t __raw_i915_read##x(struct drm_i915_private *dev_priv, \
@@ -3881,7 +3884,8 @@ __raw_write(64, q)
 #define I915_READ_FW(reg__) __raw_i915_read32(dev_priv, (reg__))
 #define I915_WRITE_FW(reg__, val__) __raw_i915_write32(dev_priv, (reg__), (val__))
 #define I915_WRITE64_FW(reg__, val__) __raw_i915_write64(dev_priv, (reg__), (val__))
-#define POSTING_READ_FW(reg__) (void)I915_READ_FW(reg__)
+#define POSTING_READ_FW(reg__) ( \
+	intel_vgpu_active(dev_priv) ? (void)0 : (void)I915_READ_FW(reg__))
 
 /* "Broadcast RGB" property */
 #define INTEL_BROADCAST_RGB_AUTO 0
