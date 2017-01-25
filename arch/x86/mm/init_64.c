@@ -54,6 +54,7 @@
 #include <asm/init.h>
 #include <asm/uv/uv.h>
 #include <asm/setup.h>
+#include <linux/rodata_test.h>
 
 #include "mm_internal.h"
 
@@ -1009,9 +1010,6 @@ void __init mem_init(void)
 
 	mem_init_print_info(NULL);
 }
-
-const int rodata_test_data = 0xC3;
-EXPORT_SYMBOL_GPL(rodata_test_data);
 
 int kernel_set_to_readonly;
 

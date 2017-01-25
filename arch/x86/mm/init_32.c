@@ -51,6 +51,7 @@
 #include <asm/cacheflush.h>
 #include <asm/page_types.h>
 #include <asm/init.h>
+#include <linux/rodata_test.h>
 
 #include "mm_internal.h"
 
@@ -863,9 +864,6 @@ static noinline int do_test_wp_bit(void)
 
 	return flag;
 }
-
-const int rodata_test_data = 0xC3;
-EXPORT_SYMBOL_GPL(rodata_test_data);
 
 int kernel_set_to_readonly __read_mostly;
 
