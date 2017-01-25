@@ -188,6 +188,39 @@ nf_ct_helper_ext_add(struct nf_conn *ct,
 }
 EXPORT_SYMBOL_GPL(nf_ct_helper_ext_add);
 
+static struct nf_conntrack_helper *find_auto_helper(struct nf_conn *ct)
+{
+	return __nf_ct_helper_find(&ct->tuplehash[IP_CT_DIR_REPLY].tuple);
+}
+
+static struct nf_conntrack_helper *ct_lookup_helper(struct nf_conn *ct, struct net *net)
+{
+	struct nf_conntrack_helper *ret;
+
+	if (!net->ct.sysctl_auto_assign_helper) {
+		if (net->ct.auto_assign_helper_warned)
+			return NULL;
+		if (!find_auto_helper(ct))
+			return NULL;
+		pr_info("nf_conntrack: default automatic helper assignment "
+			"has been turned off for security reasons and CT-based "
+			" firewall rule not found. Use the iptables CT target "
+			"to attach helpers instead.\n");
+		net->ct.auto_assign_helper_warned = 1;
+		return NULL;
+	}
+
+	ret = find_auto_helper(ct);
+	if (!ret || net->ct.auto_assign_helper_warned)
+		return ret;
+	pr_info("nf_conntrack: automatic helper assignment is deprecated and it will "
+		"be removed soon. Use the iptables CT target to attach helpers "
+		" instead.\n");
+	net->ct.auto_assign_helper_warned = 1;
+	return ret;
+}
+
+
 int __nf_ct_try_assign_helper(struct nf_conn *ct, struct nf_conn *tmpl,
 			      gfp_t flags)
 {
@@ -213,26 +246,19 @@ int __nf_ct_try_assign_helper(struct nf_conn *ct, struct nf_conn *tmpl,
 	}
 
 	help = nfct_help(ct);
-	if (net->ct.sysctl_auto_assign_helper && helper == NULL) {
-		helper = __nf_ct_helper_find(&ct->tuplehash[IP_CT_DIR_REPLY].tuple);
-		if (unlikely(!net->ct.auto_assign_helper_warned && helper)) {
-			pr_info("nf_conntrack: automatic helper "
-				"assignment is deprecated and it will "
-				"be removed soon. Use the iptables CT target "
-				"to attach helpers instead.\n");
-			net->ct.auto_assign_helper_warned = true;
+
+	if (!helper) {
+		helper = ct_lookup_helper(ct, net);
+		if (!helper) {
+			if (help)
+				RCU_INIT_POINTER(help->helper, NULL);
+			return 0;
 		}
 	}
 
-	if (helper == NULL) {
-		if (help)
-			RCU_INIT_POINTER(help->helper, NULL);
-		return 0;
-	}
-
-	if (help == NULL) {
+	if (!help) {
 		help = nf_ct_helper_ext_add(ct, helper, flags);
-		if (help == NULL)
+		if (!help)
 			return -ENOMEM;
 	} else {
 		/* We only allow helper re-assignment of the same sort since
