@@ -42,7 +42,7 @@ static int bcm54810_config(struct phy_device *phydev)
 		return rc;
 
 	val = bcm54xx_auxctl_read(phydev, MII_BCM54XX_AUXCTL_SHDWSEL_MISC);
-	val &= ~MII_BCM54XX_AUXCTL_SHDWSEL_MISC_RGMII_SKEW_EN;
+	val &= ~MII_BCM54XX_AUXCTL_MISC_RXD_RXC_SKEW;
 	val |= MII_BCM54XX_AUXCTL_MISC_WREN;
 	rc = bcm54xx_auxctl_write(phydev, MII_BCM54XX_AUXCTL_SHDWSEL_MISC,
 				  val);
