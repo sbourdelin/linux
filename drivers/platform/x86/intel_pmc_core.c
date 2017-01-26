@@ -184,12 +184,8 @@ DEFINE_DEBUGFS_ATTRIBUTE(pmc_core_dev_state, pmc_core_dev_state_get, NULL, "%llu
 
 static int pmc_core_check_read_lock_bit(void)
 {
-	struct pmc_dev *pmcdev = &pmc;
-	u32 value;
-
-	value = pmc_core_reg_read(pmcdev, SPT_PMC_PM_CFG_OFFSET);
-	return test_bit(SPT_PMC_READ_DISABLE_BIT,
-			(unsigned long *)&value);
+	u32 value = pmc_core_reg_read(&pmc, SPT_PMC_PM_CFG_OFFSET);
+	return value & (1U << SPT_PMC_READ_DISABLE_BIT);
 }
 
 #if IS_ENABLED(CONFIG_DEBUG_FS)
@@ -234,12 +230,8 @@ static const struct file_operations pmc_core_ppfear_ops = {
 /* This function should return link status, 0 means ready */
 static int pmc_core_mtpmc_link_status(void)
 {
-	struct pmc_dev *pmcdev = &pmc;
-	u32 value;
-
-	value = pmc_core_reg_read(pmcdev, SPT_PMC_PM_STS_OFFSET);
-	return test_bit(SPT_PMC_MSG_FULL_STS_BIT,
-			(unsigned long *)&value);
+	u32 value = pmc_core_reg_read(&pmc, SPT_PMC_PM_STS_OFFSET);
+	return value & (1U << SPT_PMC_MSG_FULL_STS_BIT);
 }
 
 static int pmc_core_send_msg(u32 *addr_xram)
