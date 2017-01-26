@@ -2632,15 +2632,20 @@ static int cvmx_usb_poll_channel(struct octeon_hcd *usb, int channel)
 		if (!usbc_hcint.s.chhltd) {
 			if (usbc_hcchar.s.chena) {
 				union cvmx_usbcx_hcintmskx hcintmsk;
+				u64	address;
 				/* Disable all interrupts except CHHLTD */
 				hcintmsk.u32 = 0;
 				hcintmsk.s.chhltdmsk = 1;
+				address = CVMX_USBCX_HCINTMSKX(channel,
+							       usb->index);
 				cvmx_usb_write_csr32(usb,
-						     CVMX_USBCX_HCINTMSKX(channel, usb->index),
+						     address,
 						     hcintmsk.u32);
 				usbc_hcchar.s.chdis = 1;
+				address =  CVMX_USBCX_HCCHARX(channel,
+							      usb->index);
 				cvmx_usb_write_csr32(usb,
-						     CVMX_USBCX_HCCHARX(channel, usb->index),
+						     address,
 						     usbc_hcchar.u32);
 				return 0;
 			} else if (usbc_hcint.s.xfercompl) {
