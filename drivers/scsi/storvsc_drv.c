@@ -1878,10 +1878,17 @@ static struct hv_driver storvsc_drv = {
 	.remove = storvsc_remove,
 };
 
+/*
+ * The driver cannot functionally back all transport
+ * attributes so select only those pertinent including
+ * the lightweight model.
+ */
+
 #if IS_ENABLED(CONFIG_SCSI_FC_ATTRS)
 static struct fc_function_template fc_transport_functions = {
 	.show_host_node_name = 1,
 	.show_host_port_name = 1,
+	.lightweight_transport = 1,
 };
 #endif
 
@@ -1906,11 +1913,6 @@ static int __init storvsc_drv_init(void)
 	fc_transport_template = fc_attach_transport(&fc_transport_functions);
 	if (!fc_transport_template)
 		return -ENODEV;
-
-	/*
-	 * Install Hyper-V specific timeout handler.
-	 */
-	fc_transport_template->eh_timed_out = storvsc_eh_timed_out;
 #endif
 
 	ret = vmbus_driver_register(&storvsc_drv);
