@@ -1600,6 +1600,7 @@ qla2x00_abort_all_cmds(scsi_qla_host_t *vha, int res)
 	srb_t *sp;
 	struct qla_hw_data *ha = vha->hw;
 	struct req_que *req;
+	struct scsi_cmnd *scmd;
 
 	qlt_host_reset_handler(ha);
 
@@ -1613,10 +1614,12 @@ qla2x00_abort_all_cmds(scsi_qla_host_t *vha, int res)
 		for (cnt = 1; cnt < req->num_outstanding_cmds; cnt++) {
 			sp = req->outstanding_cmds[cnt];
 			if (sp) {
+				scmd = GET_CMD_SP(sp);
+
 				/* Don't abort commands in adapter during EEH
 				 * recovery as it's not accessible/responding.
 				 */
-				if (!ha->flags.eeh_busy) {
+				if (scmd && !ha->flags.eeh_busy) {
 					/* Get a reference to the sp and drop the lock.
 					 * The reference ensures this sp->done() call
 					 * - and not the call in qla2xxx_eh_abort() -
@@ -1624,7 +1627,7 @@ qla2x00_abort_all_cmds(scsi_qla_host_t *vha, int res)
 					 */
 					sp_get(sp);
 					spin_unlock_irqrestore(&ha->hardware_lock, flags);
-					qla2xxx_eh_abort(GET_CMD_SP(sp));
+					qla2xxx_eh_abort(scmd);
 					spin_lock_irqsave(&ha->hardware_lock, flags);
 				}
 				req->outstanding_cmds[cnt] = NULL;
