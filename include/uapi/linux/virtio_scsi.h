@@ -113,6 +113,11 @@ struct virtio_scsi_config {
 	__u16 max_channel;
 	__u16 max_target;
 	__u32 max_lun;
+	__u8  primary_wwpn[8];
+	__u8  primary_wwnn[8];
+	__u8  secondary_wwpn[8];
+	__u8  secondary_wwnn[8];
+	__u8  primary_active;
 } __attribute__((packed));
 
 /* Feature Bits */
@@ -120,6 +125,7 @@ struct virtio_scsi_config {
 #define VIRTIO_SCSI_F_HOTPLUG                  1
 #define VIRTIO_SCSI_F_CHANGE                   2
 #define VIRTIO_SCSI_F_T10_PI                   3
+#define VIRTIO_SCSI_F_FC_HOST                  4
 
 /* Response codes */
 #define VIRTIO_SCSI_S_OK                       0
