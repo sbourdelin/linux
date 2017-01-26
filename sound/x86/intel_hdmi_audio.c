@@ -396,6 +396,7 @@ static int snd_intelhad_prog_audio_ctrl_v2(struct snd_pcm_substream *substream,
 	else
 		cfg_val.cfg_regx_v2.layout = LAYOUT1;
 
+	cfg_val.cfg_regx_v2.val_bit = 1;
 	had_write_register(AUD_CONFIG, cfg_val.cfg_regval);
 	return 0;
 }
@@ -447,6 +448,7 @@ static int snd_intelhad_prog_audio_ctrl_v1(struct snd_pcm_substream *substream,
 
 	}
 
+	cfg_val.cfg_regx.val_bit = 1;
 	had_write_register(AUD_CONFIG, cfg_val.cfg_regval);
 	return 0;
 }
