@@ -2690,6 +2690,7 @@ int mlx5e_modify_rqs_vsd(struct mlx5e_priv *priv, bool vsd)
 	return 0;
 }
 
+#ifdef CONFIG_MLX5_CORE_EN_TC
 static int mlx5e_setup_tc(struct net_device *netdev, u8 tc)
 {
 	struct mlx5e_priv *priv = netdev_priv(netdev);
@@ -2743,6 +2744,7 @@ mqprio:
 
 	return mlx5e_setup_tc(dev, tc->tc);
 }
+#endif
 
 static void
 mlx5e_get_stats(struct net_device *dev, struct rtnl_link_stats64 *stats)
@@ -3323,7 +3325,9 @@ static const struct net_device_ops mlx5e_netdev_ops_basic = {
 	.ndo_open                = mlx5e_open,
 	.ndo_stop                = mlx5e_close,
 	.ndo_start_xmit          = mlx5e_xmit,
+#ifdef CONFIG_MLX5_CORE_EN_TC
 	.ndo_setup_tc            = mlx5e_ndo_setup_tc,
+#endif
 	.ndo_select_queue        = mlx5e_select_queue,
 	.ndo_get_stats64         = mlx5e_get_stats,
 	.ndo_set_rx_mode         = mlx5e_set_rx_mode,
@@ -3349,7 +3353,9 @@ static const struct net_device_ops mlx5e_netdev_ops_sriov = {
 	.ndo_open                = mlx5e_open,
 	.ndo_stop                = mlx5e_close,
 	.ndo_start_xmit          = mlx5e_xmit,
+#ifdef CONFIG_MLX5_CORE_EN_TC
 	.ndo_setup_tc            = mlx5e_ndo_setup_tc,
+#endif
 	.ndo_select_queue        = mlx5e_select_queue,
 	.ndo_get_stats64         = mlx5e_get_stats,
 	.ndo_set_rx_mode         = mlx5e_set_rx_mode,
@@ -3762,9 +3768,11 @@ static int mlx5e_init_nic_rx(struct mlx5e_priv *priv)
 		goto err_destroy_direct_tirs;
 	}
 
+#ifdef CONFIG_MLX5_CORE_EN_TC
 	err = mlx5e_tc_init(priv);
 	if (err)
 		goto err_destroy_flow_steering;
+#endif
 
 	return 0;
 
@@ -3786,7 +3794,9 @@ static void mlx5e_cleanup_nic_rx(struct mlx5e_priv *priv)
 {
 	int i;
 
+#ifdef CONFIG_MLX5_CORE_EN_TC
 	mlx5e_tc_cleanup(priv);
+#endif
 	mlx5e_destroy_flow_steering(priv);
 	mlx5e_destroy_direct_tirs(priv);
 	mlx5e_destroy_indirect_tirs(priv);
