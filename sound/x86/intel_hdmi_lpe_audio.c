@@ -563,7 +563,13 @@ static int hdmi_lpe_audio_probe(struct platform_device *pdev)
 	if (pci_dev_present(cherryview_ids)) {
 		dev_dbg(&hlpe_pdev->dev, "%s: Cherrytrail LPE - Detected\n",
 				__func__);
-		ctx->had_config_offset = AUDIO_HDMI_CONFIG_C;
+		//ctx->had_config_offset = AUDIO_HDMI_CONFIG_C;
+		/* FIXME: hard-coding to CONFIG_A enables DP audio on CHT,
+		 *  how do I find out which config to use ?
+		 * the pipe is -1 (invalid) when the notify function is called,
+		 * so not sure how to go about this
+		 */
+		ctx->had_config_offset = AUDIO_HDMI_CONFIG_A;
 	} else {
 		dev_dbg(&hlpe_pdev->dev, "%s: Baytrail LPE - Assume\n",
 				__func__);
