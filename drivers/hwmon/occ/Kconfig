@@ -13,3 +13,17 @@ menuconfig SENSORS_PPC_OCC
 
 	  This driver can also be built as a module. If so, the module
 	  will be called occ.
+
+if SENSORS_PPC_OCC
+
+config SENSORS_PPC_OCC_P8_I2C
+	tristate "POWER8 OCC hwmon support"
+	depends on I2C
+	help
+	 Provide a hwmon sysfs interface for the POWER8 On-Chip Controller,
+	 exposing temperature, frequency and power measurements.
+
+	 This driver can also be built as a module. If so, the module will be
+	 called p8-occ-i2c.
+
+endif
