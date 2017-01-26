@@ -1004,6 +1004,23 @@ int copyout_from_xsaves(unsigned int pos, unsigned int count, void *kbuf,
 	}
 
 	/*
+	 * Restoring SSE/YMM state requires that MXCSR & MXCSR_MASK are saved.
+	 * Those fields are part of the legacy FP state, and only get saved
+	 * above if XFEATURES_MASK_FP is set.
+	 *
+	 * Copy out those fields if we have SSE/YMM but no FP register data.
+	 */
+	if ((header.xfeatures & (XFEATURE_MASK_SSE|XFEATURE_MASK_YMM)) &&
+			!(header.xfeatures & XFEATURE_MASK_FP)) {
+		size = sizeof(u64);
+		ret = xstate_copyout(offset, size, kbuf, ubuf,
+				     &xsave->i387.mxcsr, 0, count);
+
+		if (ret)
+			return ret;
+	}
+
+	/*
 	 * Fill xsave->i387.sw_reserved value for ptrace frame:
 	 */
 	offset = offsetof(struct fxregs_state, sw_reserved);
@@ -1030,6 +1047,7 @@ int copyin_to_xsaves(const void *kbuf, const void __user *ubuf,
 	int i;
 	u64 xfeatures;
 	u64 allowed_features;
+	void *dst;
 
 	offset = offsetof(struct xregs_state, header);
 	size = sizeof(xfeatures);
@@ -1053,7 +1071,7 @@ int copyin_to_xsaves(const void *kbuf, const void __user *ubuf,
 		u64 mask = ((u64)1 << i);
 
 		if (xfeatures & mask) {
-			void *dst = __raw_xsave_addr(xsave, 1 << i);
+			dst = __raw_xsave_addr(xsave, 1 << i);
 
 			offset = xstate_offsets[i];
 			size = xstate_sizes[i];
@@ -1064,6 +1082,25 @@ int copyin_to_xsaves(const void *kbuf, const void __user *ubuf,
 				if (__copy_from_user(dst, ubuf + offset, size))
 					return -EFAULT;
 			}
+		}
+	}
+
+	/*
+	 * SSE/YMM state depends on the MXCSR & MXCSR_MASK fields from the FP
+	 * state. If we restored only SSE/YMM state but not FP state, copy
+	 * those fields to ensure the SSE/YMM state restore works.
+	 */
+	if ((xfeatures & (XFEATURE_MASK_SSE|XFEATURE_MASK_YMM)) &&
+			!(xfeatures & XFEATURE_MASK_FP)) {
+		offset = offsetof(struct fxregs_state, mxcsr);
+		dst = xsave + offset;
+		size = sizeof(u64);
+
+		if (kbuf) {
+			memcpy(dst, kbuf + offset, size);
+		} else {
+			if (__copy_from_user(dst, ubuf + offset, size))
+				return -EFAULT;
 		}
 	}
 
