@@ -248,6 +248,15 @@ static int lpe_audio_setup(struct drm_i915_private *dev_priv)
 		goto err_free_irq;
 	}
 
+	/* Enable DPAudio debug bits by default */
+	if (IS_CHERRYVIEW(dev_priv)) {
+		u32 chicken_bit;
+
+		chicken_bit = I915_READ(VLV_AUD_CHICKEN_BIT_REG);
+		I915_WRITE(VLV_AUD_CHICKEN_BIT_REG,
+			   chicken_bit | CHICKEN_BIT_DBG_ENABLE);
+	}
+
 	return 0;
 err_free_irq:
 	irq_free_desc(dev_priv->lpe_audio.irq);
@@ -357,6 +366,24 @@ void intel_lpe_audio_notify(struct drm_i915_private *dev_priv,
 			pdata->tmds_clock_speed = tmds_clk_speed;
 		if (link_rate)
 			pdata->link_rate = link_rate;
+
+		if (dp_output) { /* unmute the amp */
+			u32 audio_enable;
+
+			if (port == PORT_B) {
+				audio_enable = I915_READ(VLV_AUD_PORT_EN_B_DBG);
+				I915_WRITE(VLV_AUD_PORT_EN_B_DBG,
+					   audio_enable & ~AMP_UNMUTE);
+			} else if (port == PORT_C) {
+				audio_enable = I915_READ(VLV_AUD_PORT_EN_C_DBG);
+				I915_WRITE(VLV_AUD_PORT_EN_C_DBG,
+					   audio_enable & ~AMP_UNMUTE);
+			} else if (port == PORT_D) {
+				audio_enable = I915_READ(VLV_AUD_PORT_EN_D_DBG);
+				I915_WRITE(VLV_AUD_PORT_EN_D_DBG,
+					   audio_enable & ~AMP_UNMUTE);
+			}
+		}
 	} else {
 		memset(pdata->eld.eld_data, 0,
 			HDMI_MAX_ELD_BYTES);
