@@ -8064,7 +8064,8 @@ restart:
  *  * for kernel addresses: <start address>[/<size>]
  *  * for object files:     <start address>[/<size>]@</path/to/object/file>
  *
- * if <size> is not specified, the range is treated as a single address.
+ * if <size> is not specified or is zero, the range is treated as a single
+ * address.
  */
 enum {
 	IF_ACT_NONE = -1,
@@ -8130,7 +8131,7 @@ perf_event_parse_addr_filter(struct perf_event *event, char *fstr,
 		switch (token) {
 		case IF_ACT_FILTER:
 		case IF_ACT_START:
-			filter->filter = 1;
+			filter->action = PERF_ADDR_FILTER_ACTION_FILTER;
 
 		case IF_ACT_STOP:
 			if (state != IF_STATE_ACTION)
@@ -8148,15 +8149,12 @@ perf_event_parse_addr_filter(struct perf_event *event, char *fstr,
 			if (state != IF_STATE_SOURCE)
 				goto fail;
 
-			if (token == IF_SRC_FILE || token == IF_SRC_KERNEL)
-				filter->range = 1;
-
 			*args[0].to = 0;
 			ret = kstrtoul(args[0].from, 0, &filter->offset);
 			if (ret)
 				goto fail;
 
-			if (filter->range) {
+			if (token == IF_SRC_KERNEL || token == IF_SRC_FILE) {
 				*args[1].to = 0;
 				ret = kstrtoul(args[1].from, 0, &filter->size);
 				if (ret)
@@ -8164,7 +8162,7 @@ perf_event_parse_addr_filter(struct perf_event *event, char *fstr,
 			}
 
 			if (token == IF_SRC_FILE || token == IF_SRC_FILEADDR) {
-				int fpos = filter->range ? 2 : 1;
+				int fpos = token == IF_SRC_FILE ? 2 : 1;
 
 				filename = match_strdup(&args[fpos]);
 				if (!filename) {

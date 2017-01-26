@@ -392,35 +392,18 @@ static int etm_addr_filters_validate(struct list_head *filters)
 		if (++index > ETM_ADDR_CMP_MAX)
 			return -EOPNOTSUPP;
 
-		/*
-		 * As taken from the struct perf_addr_filter documentation:
-		 *	@range:	1: range, 0: address
-		 *
-		 * At this time we don't allow range and start/stop filtering
-		 * to cohabitate, they have to be mutually exclusive.
-		 */
-		if ((filter->range == 1) && address)
-			return -EOPNOTSUPP;
-
-		if ((filter->range == 0) && range)
-			return -EOPNOTSUPP;
-
-		/*
-		 * For range filtering, the second address in the address
-		 * range comparator needs to be higher than the first.
-		 * Invalid otherwise.
-		 */
-		if (filter->range && filter->size == 0)
-			return -EINVAL;
-
-		/*
-		 * Everything checks out with this filter, record what we've
-		 * received before moving on to the next one.
-		 */
-		if (filter->range)
+		/* filter::size==0 means single address trigger */
+		if (filter->size)
 			range = true;
 		else
 			address = true;
+
+		/*
+		 * At this time we don't allow range and start/stop filtering
+		 * to cohabitate, they have to be mutually exclusive.
+		 */
+		if (range && address)
+			return -EOPNOTSUPP;
 	}
 
 	return 0;
@@ -445,7 +428,7 @@ static void etm_addr_filters_sync(struct perf_event *event)
 			etm_filter->stop_addr = stop;
 			etm_filter->type = ETM_ADDR_TYPE_RANGE;
 		} else {
-			if (filter->filter == 1) {
+			if (filter->action == PERF_ADDR_FILTER_ACTION_START) {
 				etm_filter->start_addr = start;
 				etm_filter->type = ETM_ADDR_TYPE_START;
 			} else {

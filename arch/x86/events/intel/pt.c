@@ -1101,7 +1101,7 @@ static int pt_event_addr_filters_validate(struct list_head *filters)
 
 	list_for_each_entry(filter, filters, entry) {
 		/* PT doesn't support single address triggers */
-		if (!filter->range || !filter->size)
+		if (!filter->size)
 			return -EOPNOTSUPP;
 
 		if (!filter->inode) {
@@ -1141,7 +1141,10 @@ static void pt_event_addr_filters_sync(struct perf_event *event)
 
 		filters->filter[range].msr_a  = msr_a;
 		filters->filter[range].msr_b  = msr_b;
-		filters->filter[range].config = filter->filter ? 1 : 2;
+		if (filter->action == PERF_ADDR_FILTER_ACTION_FILTER)
+			filters->filter[range].config = 1;
+		else
+			filters->filter[range].config = 2;
 		range++;
 	}
 
