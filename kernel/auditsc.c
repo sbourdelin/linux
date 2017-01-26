@@ -1172,6 +1172,14 @@ out:
 	kfree(buf_head);
 }
 
+static void audit_log_kern_module(struct audit_context *context,
+				  struct audit_buffer **ab)
+{
+	audit_log_format(*ab, " name=");
+	audit_log_untrustedstring(*ab, context->module.name);
+	kfree(context->module.name);
+}
+
 static void show_special(struct audit_context *context, int *call_panic)
 {
 	struct audit_buffer *ab;
@@ -1268,6 +1276,9 @@ static void show_special(struct audit_context *context, int *call_panic)
 	case AUDIT_EXECVE: {
 		audit_log_execve_info(context, &ab);
 		break; }
+	case AUDIT_MODULE_INIT:
+		audit_log_kern_module(context, &ab);
+		break;
 	}
 	audit_log_end(ab);
 }
@@ -2366,6 +2377,15 @@ void __audit_mmap_fd(int fd, int flags)
 	context->mmap.fd = fd;
 	context->mmap.flags = flags;
 	context->type = AUDIT_MMAP;
+}
+
+void __audit_module_init(char *name)
+{
+	struct audit_context *context = current->audit_context;
+
+	context->module.name = kmalloc(strlen(name) + 1, GFP_KERNEL);
+	strcpy(context->module.name, name);
+	context->type = AUDIT_MODULE_INIT;
 }
 
 static void audit_log_task(struct audit_buffer *ab)
