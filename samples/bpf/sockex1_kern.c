@@ -24,6 +24,9 @@ int bpf_prog1(struct __sk_buff *skb)
 	if (value)
 		__sync_fetch_and_add(value, skb->len);
 
+	char fmt[] = "skb %p netns inode %u\n";
+
+	bpf_trace_printk(fmt, sizeof(fmt), skb, skb->netns_inum);
 	return 0;
 }
 char _license[] SEC("license") = "GPL";

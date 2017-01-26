@@ -546,6 +546,7 @@ struct __sk_buff {
 	__u32 tc_classid;
 	__u32 data;
 	__u32 data_end;
+	__u32 netns_inum;
 };
 
 struct bpf_tunnel_key {
@@ -581,6 +582,7 @@ struct bpf_sock {
 	__u32 family;
 	__u32 type;
 	__u32 protocol;
+	__u32 netns_inum;
 };
 
 #define XDP_PACKET_HEADROOM 256

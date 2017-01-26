@@ -3118,6 +3118,22 @@ static u32 sk_filter_convert_ctx_access(enum bpf_access_type type, int dst_reg,
 			*insn++ = BPF_MOV64_IMM(dst_reg, 0);
 		break;
 #endif
+	case offsetof(struct __sk_buff, netns_inum):
+#ifdef CONFIG_NET_NS
+		/* return dev_net(skb->dev)->ns.inum; */
+		BUILD_BUG_ON(FIELD_SIZEOF(struct net, ns.inum) != 4);
+		*insn++ = BPF_LDX_MEM(BPF_FIELD_SIZEOF(struct sk_buff, dev),
+				      dst_reg, src_reg,
+				      offsetof(struct sk_buff, dev));
+		*insn++ = BPF_JMP_IMM(BPF_JEQ, dst_reg, 0, 2);
+		*insn++ = BPF_LDX_MEM(BPF_SIZEOF(void *), dst_reg, dst_reg,
+				      offsetof(struct net_device, nd_net));
+		*insn++ = BPF_LDX_MEM(BPF_W, dst_reg, dst_reg,
+				      offsetof(struct net, ns.inum));
+#else
+		*insn++ = BPF_MOV64_IMM(dst_reg, 0);
+		break;
+#endif
 	}
 
 	return insn - insn_buf;
@@ -3163,6 +3179,17 @@ static u32 sock_filter_convert_ctx_access(enum bpf_access_type type,
 		*insn++ = BPF_ALU32_IMM(BPF_AND, dst_reg, SK_FL_PROTO_MASK);
 		*insn++ = BPF_ALU32_IMM(BPF_RSH, dst_reg, SK_FL_PROTO_SHIFT);
 		break;
+	case offsetof(struct bpf_sock, netns_inum):
+#ifdef CONFIG_NET_NS
+		/* return sock_net(sk)->ns.inum; */
+		*insn++ = BPF_LDX_MEM(BPF_SIZEOF(void *), dst_reg, src_reg,
+				      offsetof(struct sock, sk_net));
+		*insn++ = BPF_LDX_MEM(BPF_W, dst_reg, dst_reg,
+				      offsetof(struct net, ns.inum));
+#else
+		*insn++ = BPF_MOV64_IMM(dst_reg, 0);
+		break;
+#endif
 	}
 
 	return insn - insn_buf;
