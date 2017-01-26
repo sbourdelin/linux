@@ -772,6 +772,7 @@ static void intel_detect_preproduction_hw(struct drm_i915_private *dev_priv)
 
 	sdv |= IS_HSW_EARLY_SDV(dev_priv);
 	sdv |= IS_SKL_REVID(dev_priv, 0, SKL_REVID_F0);
+	sdv |= IS_BXT_REVID(dev_priv, 0, BXT_REVID_B_LAST);
 
 	if (sdv) {
 		DRM_ERROR("This is a pre-production stepping. "
