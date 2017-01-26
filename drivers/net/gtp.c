@@ -791,7 +791,7 @@ static int gtp_hashtable_new(struct gtp_dev *gtp, int hsize)
 	gtp->tid_hash = kmalloc_array(hsize, sizeof(*gtp->tid_hash),
 				      GFP_KERNEL);
 	if (!gtp->tid_hash)
-		goto err1;
+		goto free_hash;
 
 	gtp->hash_size = hsize;
 
@@ -800,7 +800,7 @@ static int gtp_hashtable_new(struct gtp_dev *gtp, int hsize)
 		INIT_HLIST_HEAD(&gtp->tid_hash[i]);
 	}
 	return 0;
-err1:
+free_hash:
 	kfree(gtp->addr_hash);
 	return -ENOMEM;
 }
