@@ -41,6 +41,9 @@ static bool kernfs_lockdep(struct kernfs_node *kn)
 
 static int kernfs_name_locked(struct kernfs_node *kn, char *buf, size_t buflen)
 {
+	if (!kn)
+		return strlcpy(buf, "(null)", buflen);
+
 	return strlcpy(buf, kn->parent ? kn->name : "/", buflen);
 }
 
@@ -122,6 +125,9 @@ static int kernfs_path_from_node_locked(struct kernfs_node *kn_to,
 	const char parent_str[] = "/..";
 	size_t depth_from, depth_to, len = 0;
 	int i, j;
+
+	if (!kn_to)
+		return strlcpy(buf, "(null)", buflen);
 
 	if (!kn_from)
 		kn_from = kernfs_root(kn_to)->kn;
