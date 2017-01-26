@@ -338,7 +338,9 @@ static void pcie_aspm_check_latency(struct pci_dev *endpoint)
 	}
 }
 
-static void pcie_aspm_cap_init(struct pcie_link_state *link, int blacklist)
+static
+void pcie_aspm_cap_init(struct pci_dev *pdev, struct pcie_link_state *link,
+			int blacklist)
 {
 	struct pci_dev *child, *parent = link->pdev;
 	struct pci_bus *linkbus = parent->subordinate;
@@ -398,7 +400,12 @@ static void pcie_aspm_cap_init(struct pcie_link_state *link, int blacklist)
 	link->latency_dw.l1 = calc_l1_latency(dwreg.latency_encoding_l1);
 
 	/* Save default state */
-	link->aspm_default = link->aspm_enabled;
+	if (!atomic_read(&pdev->enable_cnt)) {
+		link->aspm_default = link->aspm_enabled;
+		pdev->aspm_default = link->aspm_default;
+	} else {
+		link->aspm_default = pdev->aspm_default;
+	}
 
 	/* Setup initial capable state. Will be updated later */
 	link->aspm_capable = link->aspm_support;
@@ -599,7 +606,7 @@ void pcie_aspm_init_link_state(struct pci_dev *pdev)
 	 * upstream links also because capable state of them can be
 	 * update through pcie_aspm_cap_init().
 	 */
-	pcie_aspm_cap_init(link, blacklist);
+	pcie_aspm_cap_init(pdev, link, blacklist);
 
 	/* Setup initial Clock PM state */
 	pcie_clkpm_cap_init(link, blacklist);
