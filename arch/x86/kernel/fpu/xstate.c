@@ -992,13 +992,13 @@ int copyout_from_xsaves(unsigned int pos, unsigned int count, void *kbuf,
 			offset = xstate_offsets[i];
 			size = xstate_sizes[i];
 
+			if (offset + size > count)
+				break;
+
 			ret = xstate_copyout(offset, size, kbuf, ubuf, src, 0, count);
 
 			if (ret)
 				return ret;
-
-			if (offset + size >= count)
-				break;
 		}
 
 	}
