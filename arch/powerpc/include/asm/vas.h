@@ -37,4 +37,12 @@ enum vas_thresh_ctl {
 	VAS_THRESH_FIFO_GT_EIGHTH_FULL,
 };
 
+/*
+ * Get/Set bit fields
+ */
+#define GET_FIELD(m, v)		(((v) & (m)) >> MASK_LSH(m))
+#define MASK_LSH(m)		(__builtin_ffsl(m) - 1)
+#define SET_FIELD(m, v, val)	\
+		(((v) & ~(m)) | ((((typeof(v))(val)) << MASK_LSH(m)) & (m)))
+
 #endif
