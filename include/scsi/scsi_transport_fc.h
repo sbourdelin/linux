@@ -718,6 +718,8 @@ struct fc_function_template {
 	unsigned long	show_host_system_hostname:1;
 
 	unsigned long	disable_target_scan:1;
+	/* Limited attributes of port_name and host_name */
+	unsigned long	lightweight_transport:1;
 };
 
 
