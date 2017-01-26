@@ -949,15 +949,20 @@ static int mlx5_init_once(struct mlx5_core_dev *dev, struct mlx5_priv *priv)
 	}
 #endif
 
+#ifdef CONFIG_MLX5_CORE_EN_SRIOV
 	err = mlx5_sriov_init(dev);
 	if (err) {
 		dev_err(&pdev->dev, "Failed to init sriov %d\n", err);
 		goto err_eswitch_cleanup;
 	}
+#endif
 
 	return 0;
 
+#ifdef CONFIG_MLX5_CORE_EN_SRIOV
 err_eswitch_cleanup:
+#endif
+
 #ifdef CONFIG_MLX5_CORE_EN_ESWITCH
 	mlx5_eswitch_cleanup(dev->priv.eswitch);
 
@@ -980,7 +985,9 @@ out:
 
 static void mlx5_cleanup_once(struct mlx5_core_dev *dev)
 {
+#ifdef CONFIG_MLX5_CORE_EN_SRIOV
 	mlx5_sriov_cleanup(dev);
+#endif
 #ifdef CONFIG_MLX5_CORE_EN_ESWITCH
 	mlx5_eswitch_cleanup(dev->priv.eswitch);
 #endif
@@ -1135,11 +1142,13 @@ static int mlx5_load_one(struct mlx5_core_dev *dev, struct mlx5_priv *priv,
 	mlx5_eswitch_attach(dev->priv.eswitch);
 #endif
 
+#ifdef CONFIG_MLX5_CORE_EN_SRIOV
 	err = mlx5_sriov_attach(dev);
 	if (err) {
 		dev_err(&pdev->dev, "sriov init failed %d\n", err);
 		goto err_sriov;
 	}
+#endif
 
 	if (mlx5_device_registered(dev)) {
 		mlx5_attach_device(dev);
@@ -1159,9 +1168,12 @@ out:
 	return 0;
 
 err_reg_dev:
+#ifdef CONFIG_MLX5_CORE_EN_SRIOV
 	mlx5_sriov_detach(dev);
 
 err_sriov:
+#endif
+
 #ifdef CONFIG_MLX5_CORE_EN_ESWITCH
 	mlx5_eswitch_detach(dev->priv.eswitch);
 #endif
@@ -1232,7 +1244,9 @@ static int mlx5_unload_one(struct mlx5_core_dev *dev, struct mlx5_priv *priv,
 	if (mlx5_device_registered(dev))
 		mlx5_detach_device(dev);
 
+#ifdef CONFIG_MLX5_CORE_EN_SRIOV
 	mlx5_sriov_detach(dev);
+#endif
 #ifdef CONFIG_MLX5_CORE_EN_ESWITCH
 	mlx5_eswitch_detach(dev->priv.eswitch);
 #endif
@@ -1533,7 +1547,9 @@ static struct pci_driver mlx5_core_driver = {
 	.remove         = remove_one,
 	.shutdown	= shutdown,
 	.err_handler	= &mlx5_err_handler,
+#ifdef CONFIG_MLX5_CORE_EN_SRIOV
 	.sriov_configure   = mlx5_core_sriov_configure,
+#endif
 };
 
 static void mlx5_core_verify_params(void)
