@@ -33,7 +33,7 @@
 #include <linux/pci.h>
 #include <linux/mlx5/driver.h>
 #include "mlx5_core.h"
-#ifdef CONFIG_MLX5_CORE_EN
+#ifdef CONFIG_MLX5_CORE_ESWITCH
 #include "eswitch.h"
 #endif
 
@@ -57,7 +57,7 @@ static int mlx5_device_enable_sriov(struct mlx5_core_dev *dev, int num_vfs)
 		return -EBUSY;
 	}
 
-#ifdef CONFIG_MLX5_CORE_EN
+#ifdef CONFIG_MLX5_CORE_ESWITCH
 	err = mlx5_eswitch_enable_sriov(dev->priv.eswitch, num_vfs, SRIOV_LEGACY);
 	if (err) {
 		mlx5_core_warn(dev,
@@ -102,7 +102,7 @@ static void mlx5_device_disable_sriov(struct mlx5_core_dev *dev)
 		sriov->enabled_vfs--;
 	}
 
-#ifdef CONFIG_MLX5_CORE_EN
+#ifdef CONFIG_MLX5_CORE_ESWITCH
 	mlx5_eswitch_disable_sriov(dev->priv.eswitch);
 #endif
 

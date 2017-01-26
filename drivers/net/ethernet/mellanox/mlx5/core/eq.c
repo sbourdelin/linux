@@ -35,7 +35,7 @@
 #include <linux/mlx5/driver.h>
 #include <linux/mlx5/cmd.h>
 #include "mlx5_core.h"
-#ifdef CONFIG_MLX5_CORE_EN
+#ifdef CONFIG_MLX5_CORE_EN_ESWITCH
 #include "eswitch.h"
 #endif
 
@@ -462,7 +462,7 @@ static irqreturn_t mlx5_eq_int(int irq, void *eq_ptr)
 			}
 			break;
 
-#ifdef CONFIG_MLX5_CORE_EN
+#ifdef CONFIG_MLX5_CORE_EN_ESWITCH
 		case MLX5_EVENT_TYPE_NIC_VPORT_CHANGE:
 			mlx5_eswitch_vport_event(dev->priv.eswitch, eqe);
 			break;

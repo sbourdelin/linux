@@ -128,6 +128,7 @@ err_create_ft:
 	return rule;
 }
 
+#ifdef CONFIG_MLX5_CORE_EN_ESWITCH
 static struct mlx5_flow_handle *
 mlx5e_tc_add_fdb_flow(struct mlx5e_priv *priv,
 		      struct mlx5_flow_spec *spec,
@@ -160,6 +161,7 @@ static void mlx5e_detach_encap(struct mlx5e_priv *priv,
 		kfree(e);
 	}
 }
+#endif /* CONFIG_MLX5_CORE_EN_ESWITCH */
 
 /* we get here also when setting rule to the FW failed, etc. It means that the
  * flow rule itself might not exist, but some offloading related to the actions
@@ -168,7 +170,6 @@ static void mlx5e_detach_encap(struct mlx5e_priv *priv,
 static void mlx5e_tc_del_flow(struct mlx5e_priv *priv,
 			      struct mlx5e_tc_flow *flow)
 {
-	struct mlx5_eswitch *esw = priv->mdev->priv.eswitch;
 	struct mlx5_fc *counter = NULL;
 
 	if (!IS_ERR(flow->rule)) {
@@ -177,11 +178,17 @@ static void mlx5e_tc_del_flow(struct mlx5e_priv *priv,
 		mlx5_fc_destroy(priv->mdev, counter);
 	}
 
-	if (esw && esw->mode == SRIOV_OFFLOADS) {
-		mlx5_eswitch_del_vlan_action(esw, flow->attr);
-		if (flow->attr->action & MLX5_FLOW_CONTEXT_ACTION_ENCAP)
-			mlx5e_detach_encap(priv, flow);
+#ifdef CONFIG_MLX5_CORE_EN_ESWITCH
+	{
+		struct mlx5_eswitch *esw = priv->mdev->priv.eswitch;
+
+		if (esw && esw->mode == SRIOV_OFFLOADS) {
+			mlx5_eswitch_del_vlan_action(esw, flow->attr);
+			if (flow->attr->action & MLX5_FLOW_CONTEXT_ACTION_ENCAP)
+				mlx5e_detach_encap(priv, flow);
+		}
 	}
+#endif
 
 	if (!mlx5e_tc_num_filters(priv) && (priv->fs.tc.t)) {
 		mlx5_destroy_flow_table(priv->fs.tc.t);
@@ -679,6 +686,7 @@ static inline int hash_encap_info(struct ip_tunnel_key *key)
 	return jhash(key, sizeof(*key), 0);
 }
 
+#ifdef CONFIG_MLX5_CORE_EN_ESWITCH
 static int mlx5e_route_lookup_ipv4(struct mlx5e_priv *priv,
 				   struct net_device *mirred_dev,
 				   struct net_device **out_dev,
@@ -1129,20 +1137,27 @@ static int parse_tc_fdb_actions(struct mlx5e_priv *priv, struct tcf_exts *exts,
 	}
 	return 0;
 }
+#endif /* CONFIG_MLX5_CORE_EN_ESWITCH */
 
 int mlx5e_configure_flower(struct mlx5e_priv *priv, __be16 protocol,
 			   struct tc_cls_flower_offload *f)
 {
 	struct mlx5e_tc_table *tc = &priv->fs.tc;
 	int err = 0;
+#ifdef CONFIG_MLX5_CORE_EN_ESWITCH
 	bool fdb_flow = false;
+#endif
 	u32 flow_tag, action;
 	struct mlx5e_tc_flow *flow;
 	struct mlx5_flow_spec *spec;
-	struct mlx5_eswitch *esw = priv->mdev->priv.eswitch;
 
-	if (esw && esw->mode == SRIOV_OFFLOADS)
-		fdb_flow = true;
+#ifdef CONFIG_MLX5_CORE_EN_ESWITCH
+	{
+		struct mlx5_eswitch *esw = priv->mdev->priv.eswitch;
+
+		if (esw && esw->mode == SRIOV_OFFLOADS)
+			fdb_flow = true;
+	}
 
 	if (fdb_flow)
 		flow = kzalloc(sizeof(*flow) +
@@ -1150,6 +1165,9 @@ int mlx5e_configure_flower(struct mlx5e_priv *priv, __be16 protocol,
 			       GFP_KERNEL);
 	else
 		flow = kzalloc(sizeof(*flow), GFP_KERNEL);
+#else
+	flow = kzalloc(sizeof(*flow), GFP_KERNEL);
+#endif
 
 	spec = mlx5_vzalloc(sizeof(*spec));
 	if (!spec || !flow) {
@@ -1163,13 +1181,16 @@ int mlx5e_configure_flower(struct mlx5e_priv *priv, __be16 protocol,
 	if (err < 0)
 		goto err_free;
 
+#ifdef CONFIG_MLX5_CORE_EN_ESWITCH
 	if (fdb_flow) {
 		flow->attr  = (struct mlx5_esw_flow_attr *)(flow + 1);
 		err = parse_tc_fdb_actions(priv, f->exts, flow);
 		if (err < 0)
 			goto err_free;
 		flow->rule = mlx5e_tc_add_fdb_flow(priv, spec, flow->attr);
-	} else {
+	} else
+#endif
+	{
 		err = parse_tc_nic_actions(priv, f->exts, &action, &flow_tag);
 		if (err < 0)
 			goto err_free;

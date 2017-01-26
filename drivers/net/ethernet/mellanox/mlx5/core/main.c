@@ -53,7 +53,7 @@
 #include <net/devlink.h>
 #include "mlx5_core.h"
 #include "fs_core.h"
-#ifdef CONFIG_MLX5_CORE_EN
+#ifdef CONFIG_MLX5_CORE_EN_ESWITCH
 #include "eswitch.h"
 #endif
 
@@ -941,7 +941,7 @@ static int mlx5_init_once(struct mlx5_core_dev *dev, struct mlx5_priv *priv)
 		goto err_tables_cleanup;
 	}
 
-#ifdef CONFIG_MLX5_CORE_EN
+#ifdef CONFIG_MLX5_CORE_EN_ESWITCH
 	err = mlx5_eswitch_init(dev);
 	if (err) {
 		dev_err(&pdev->dev, "Failed to init eswitch %d\n", err);
@@ -958,7 +958,7 @@ static int mlx5_init_once(struct mlx5_core_dev *dev, struct mlx5_priv *priv)
 	return 0;
 
 err_eswitch_cleanup:
-#ifdef CONFIG_MLX5_CORE_EN
+#ifdef CONFIG_MLX5_CORE_EN_ESWITCH
 	mlx5_eswitch_cleanup(dev->priv.eswitch);
 
 err_rl_cleanup:
@@ -981,7 +981,7 @@ out:
 static void mlx5_cleanup_once(struct mlx5_core_dev *dev)
 {
 	mlx5_sriov_cleanup(dev);
-#ifdef CONFIG_MLX5_CORE_EN
+#ifdef CONFIG_MLX5_CORE_EN_ESWITCH
 	mlx5_eswitch_cleanup(dev->priv.eswitch);
 #endif
 	mlx5_cleanup_rl_table(dev);
@@ -1131,7 +1131,7 @@ static int mlx5_load_one(struct mlx5_core_dev *dev, struct mlx5_priv *priv,
 		goto err_fs;
 	}
 
-#ifdef CONFIG_MLX5_CORE_EN
+#ifdef CONFIG_MLX5_CORE_EN_ESWITCH
 	mlx5_eswitch_attach(dev->priv.eswitch);
 #endif
 
@@ -1162,7 +1162,7 @@ err_reg_dev:
 	mlx5_sriov_detach(dev);
 
 err_sriov:
-#ifdef CONFIG_MLX5_CORE_EN
+#ifdef CONFIG_MLX5_CORE_EN_ESWITCH
 	mlx5_eswitch_detach(dev->priv.eswitch);
 #endif
 	mlx5_cleanup_fs(dev);
@@ -1233,7 +1233,7 @@ static int mlx5_unload_one(struct mlx5_core_dev *dev, struct mlx5_priv *priv,
 		mlx5_detach_device(dev);
 
 	mlx5_sriov_detach(dev);
-#ifdef CONFIG_MLX5_CORE_EN
+#ifdef CONFIG_MLX5_CORE_EN_ESWITCH
 	mlx5_eswitch_detach(dev->priv.eswitch);
 #endif
 	mlx5_cleanup_fs(dev);
@@ -1269,7 +1269,7 @@ struct mlx5_core_event_handler {
 };
 
 static const struct devlink_ops mlx5_devlink_ops = {
-#ifdef CONFIG_MLX5_CORE_EN
+#ifdef CONFIG_MLX5_CORE_EN_ESWITCH
 	.eswitch_mode_set = mlx5_devlink_eswitch_mode_set,
 	.eswitch_mode_get = mlx5_devlink_eswitch_mode_get,
 	.eswitch_inline_mode_set = mlx5_devlink_eswitch_inline_mode_set,
