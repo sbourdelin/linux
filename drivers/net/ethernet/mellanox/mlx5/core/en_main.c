@@ -34,14 +34,16 @@
 #include <linux/crash_dump.h>
 #include <net/pkt_cls.h>
 #include <linux/mlx5/fs.h>
-#include <net/vxlan.h>
 #include <linux/bpf.h>
 #include "en.h"
 #include "en_tc.h"
 #ifdef CONFIG_MLX5_CORE_EN_ESWITCH
 #include "eswitch.h"
 #endif
+#ifdef CONFIG_MLX5_CORE_EN_UDP_ENCAP_OFFLOAD
+#include <net/vxlan.h>
 #include "vxlan.h"
+#endif
 
 struct mlx5e_rq_param {
 	u32			rqc[MLX5_ST_SZ_DW(rqc)];
@@ -3111,6 +3113,7 @@ static int mlx5e_get_vf_stats(struct net_device *dev,
 }
 #endif /* CONFIG_MLX5_CORE_EN_ESWITCH */
 
+#ifdef CONFIG_MLX5_CORE_EN_UDP_ENCAP_OFFLOAD
 void mlx5e_add_vxlan_port(struct net_device *netdev,
 			  struct udp_tunnel_info *ti)
 {
@@ -3171,20 +3174,22 @@ out:
 	/* Disable CSUM and GSO if the udp dport is not offloaded by HW */
 	return features & ~(NETIF_F_CSUM_MASK | NETIF_F_GSO_MASK);
 }
+#endif
 
 static netdev_features_t mlx5e_features_check(struct sk_buff *skb,
 					      struct net_device *netdev,
 					      netdev_features_t features)
 {
-	struct mlx5e_priv *priv = netdev_priv(netdev);
-
 	features = vlan_features_check(skb, features);
+#ifdef CONFIG_MLX5_CORE_EN_UDP_ENCAP_OFFLOAD
 	features = vxlan_features_check(skb, features);
 
 	/* Validate if the tunneled packet is being offloaded by HW */
 	if (skb->encapsulation &&
 	    (features & NETIF_F_CSUM_MASK || features & NETIF_F_GSO_MASK))
-		return mlx5e_vxlan_features_check(priv, skb, features);
+		return mlx5e_vxlan_features_check(netdev_priv(netdev),
+						  skb, features);
+#endif
 
 	return features;
 }
@@ -3365,8 +3370,10 @@ static const struct net_device_ops mlx5e_netdev_ops_sriov = {
 	.ndo_set_features        = mlx5e_set_features,
 	.ndo_change_mtu          = mlx5e_change_mtu,
 	.ndo_do_ioctl            = mlx5e_ioctl,
+#ifdef CONFIG_MLX5_CORE_EN_UDP_ENCAP_OFFLOAD
 	.ndo_udp_tunnel_add	 = mlx5e_add_vxlan_port,
 	.ndo_udp_tunnel_del	 = mlx5e_del_vxlan_port,
+#endif
 	.ndo_set_tx_maxrate      = mlx5e_set_tx_maxrate,
 	.ndo_features_check      = mlx5e_features_check,
 #ifdef CONFIG_RFS_ACCEL
@@ -3643,6 +3650,7 @@ static void mlx5e_build_nic_netdev(struct net_device *netdev)
 	netdev->hw_features      |= NETIF_F_HW_VLAN_CTAG_RX;
 	netdev->hw_features      |= NETIF_F_HW_VLAN_CTAG_FILTER;
 
+#ifdef CONFIG_MLX5_CORE_EN_UDP_ENCAP_OFFLOAD
 	if (mlx5e_vxlan_allowed(mdev)) {
 		netdev->hw_features     |= NETIF_F_GSO_UDP_TUNNEL |
 					   NETIF_F_GSO_UDP_TUNNEL_CSUM |
@@ -3656,6 +3664,7 @@ static void mlx5e_build_nic_netdev(struct net_device *netdev)
 					   NETIF_F_GSO_PARTIAL;
 		netdev->gso_partial_features = NETIF_F_GSO_UDP_TUNNEL_CSUM;
 	}
+#endif
 
 	mlx5_query_port_fcs(mdev, &fcs_supported, &fcs_enabled);
 
@@ -3717,16 +3726,18 @@ static void mlx5e_nic_init(struct mlx5_core_dev *mdev,
 			   const struct mlx5e_profile *profile,
 			   void *ppriv)
 {
-	struct mlx5e_priv *priv = netdev_priv(netdev);
-
 	mlx5e_build_nic_netdev_priv(mdev, netdev, profile, ppriv);
 	mlx5e_build_nic_netdev(netdev);
-	mlx5e_vxlan_init(priv);
+#ifdef CONFIG_MLX5_CORE_EN_UDP_ENCAP_OFFLOAD
+	mlx5e_vxlan_init(netdev_priv(netdev));
+#endif
 }
 
 static void mlx5e_nic_cleanup(struct mlx5e_priv *priv)
 {
+#ifdef CONFIG_MLX5_CORE_EN_UDP_ENCAP_OFFLOAD
 	mlx5e_vxlan_cleanup(priv);
+#endif
 
 	if (priv->xdp_prog)
 		bpf_prog_put(priv->xdp_prog);
@@ -3847,12 +3858,14 @@ static void mlx5e_nic_enable(struct mlx5e_priv *priv)
 	if (netdev->reg_state != NETREG_REGISTERED)
 		return;
 
+#ifdef CONFIG_MLX5_CORE_EN_UDP_ENCAP_OFFLOAD
 	/* Device already registered: sync netdev system state */
 	if (mlx5e_vxlan_allowed(mdev)) {
 		rtnl_lock();
 		udp_tunnel_get_rx_info(netdev);
 		rtnl_unlock();
 	}
+#endif
 
 	queue_work(priv->wq, &priv->set_rx_mode_work);
 }
