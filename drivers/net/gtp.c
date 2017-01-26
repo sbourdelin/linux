@@ -840,20 +840,20 @@ static int gtp_encap_enable(struct net_device *dev, struct gtp_dev *gtp,
 	if (sock0->sk->sk_protocol != IPPROTO_UDP) {
 		netdev_dbg(dev, "socket fd=%d not UDP\n", fd_gtp0);
 		err = -EINVAL;
-		goto err1;
+		goto put_socket;
 	}
 
 	sock1u = sockfd_lookup(fd_gtp1, &err);
 	if (!sock1u) {
 		netdev_dbg(dev, "socket fd=%d not found (gtp1u)\n", fd_gtp1);
 		err = -ENOENT;
-		goto err1;
+		goto put_socket;
 	}
 
 	if (sock1u->sk->sk_protocol != IPPROTO_UDP) {
 		netdev_dbg(dev, "socket fd=%d not UDP\n", fd_gtp1);
 		err = -EINVAL;
-		goto err2;
+		goto put_socket_u;
 	}
 
 	netdev_dbg(dev, "enable gtp on %p, %p\n", sock0, sock1u);
@@ -873,9 +873,9 @@ static int gtp_encap_enable(struct net_device *dev, struct gtp_dev *gtp,
 	setup_udp_tunnel_sock(sock_net(gtp->sock1u->sk), gtp->sock1u, &tuncfg);
 
 	err = 0;
-err2:
+put_socket_u:
 	sockfd_put(sock1u);
-err1:
+put_socket:
 	sockfd_put(sock0);
 	return err;
 }
