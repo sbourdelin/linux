@@ -773,9 +773,11 @@ static void intel_detect_preproduction_hw(struct drm_i915_private *dev_priv)
 	sdv |= IS_HSW_EARLY_SDV(dev_priv);
 	sdv |= IS_SKL_REVID(dev_priv, 0, SKL_REVID_F0);
 
-	if (sdv)
+	if (sdv) {
 		DRM_ERROR("This is a pre-production stepping. "
 			  "It may not be fully functional.\n");
+		add_taint(TAINT_MACHINE_CHECK, LOCKDEP_STILL_OK);
+	}
 }
 
 /**
