@@ -157,14 +157,14 @@ static int anatop_regmap_set_bypass(struct regulator_dev *reg, bool enable)
 	return regulator_set_voltage_sel_regmap(reg, sel);
 }
 
-static struct regulator_ops anatop_rops = {
+static const struct regulator_ops anatop_rops = {
 	.set_voltage_sel = regulator_set_voltage_sel_regmap,
 	.get_voltage_sel = regulator_get_voltage_sel_regmap,
 	.list_voltage = regulator_list_voltage_linear,
 	.map_voltage = regulator_map_voltage_linear,
 };
 
-static struct regulator_ops anatop_core_rops = {
+static const struct regulator_ops anatop_core_rops = {
 	.enable = anatop_regmap_enable,
 	.disable = anatop_regmap_disable,
 	.is_enabled = anatop_regmap_is_enabled,
