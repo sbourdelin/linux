@@ -189,7 +189,7 @@ static unsigned long i915_stolen_to_physical(struct drm_i915_private *dev_priv)
 		base = tom - tseg_size - ggtt->stolen_size;
 	}
 
-	if (base == 0)
+	if (base == 0 || base + ggtt->stolen_size <= base)
 		return 0;
 
 	/* make sure we don't clobber the GTT if it's within stolen memory */
