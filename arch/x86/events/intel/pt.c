@@ -28,6 +28,7 @@
 #include <asm/insn.h>
 #include <asm/io.h>
 #include <asm/intel_pt.h>
+#include <asm/intel-family.h>
 
 #include "../perf_event.h"
 #include "pt.h"
@@ -112,6 +113,7 @@ PMU_FORMAT_ATTR(mtc,		"config:9"	);
 PMU_FORMAT_ATTR(tsc,		"config:10"	);
 PMU_FORMAT_ATTR(noretcomp,	"config:11"	);
 PMU_FORMAT_ATTR(ptw,		"config:12"	);
+PMU_FORMAT_ATTR(no_branch,	"config:13"	);
 PMU_FORMAT_ATTR(mtc_period,	"config:14-17"	);
 PMU_FORMAT_ATTR(cyc_thresh,	"config:19-22"	);
 PMU_FORMAT_ATTR(psb_period,	"config:24-27"	);
@@ -124,6 +126,7 @@ static struct attribute *pt_formats_attr[] = {
 	&format_attr_tsc.attr,
 	&format_attr_noretcomp.attr,
 	&format_attr_ptw.attr,
+	&format_attr_no_branch.attr,
 	&format_attr_mtc_period.attr,
 	&format_attr_cyc_thresh.attr,
 	&format_attr_psb_period.attr,
@@ -204,6 +207,19 @@ static int __init pt_pmu_hw_init(void)
 		pt_pmu.tsc_art_den = eax;
 	}
 
+	/* model-specific quirks */
+	switch (boot_cpu_data.x86_model) {
+	case INTEL_FAM6_BROADWELL_CORE:
+	case INTEL_FAM6_BROADWELL_XEON_D:
+	case INTEL_FAM6_BROADWELL_GT3E:
+	case INTEL_FAM6_BROADWELL_X:
+		/* not setting BRANCH_EN will #GP, erratum BDM106 */
+		pt_pmu.branch_en_always_on = true;
+		break;
+	default:
+		break;
+	}
+
 	if (boot_cpu_has(X86_FEATURE_VMX)) {
 		/*
 		 * Intel SDM, 36.5 "Tracing post-VMXON" says that
@@ -272,6 +288,7 @@ fail:
 
 #define PT_CONFIG_MASK (RTIT_CTL_TSC_EN		| \
 			RTIT_CTL_DISRETC	| \
+			RTIT_CTL_BRANCH_EN	| \
 			RTIT_CTL_CYC_PSB	| \
 			RTIT_CTL_MTC		| \
 			RTIT_CTL_PWR_EVT_EN	| \
@@ -338,6 +355,10 @@ static bool pt_event_valid(struct perf_event *event)
 		    !(config & RTIT_CTL_PTW_EN))
 			return false;
 	}
+
+	/* trying to unset BRANCH_EN where it is not supported */
+	if (config & RTIT_CTL_BRANCH_EN && pt_pmu.branch_en_always_on)
+		return false;
 
 	return true;
 }
@@ -426,7 +447,20 @@ static void pt_config(struct perf_event *event)
 	}
 
 	reg = pt_config_filters(event);
-	reg |= RTIT_CTL_TOPA | RTIT_CTL_BRANCH_EN | RTIT_CTL_TRACEEN;
+	reg |= RTIT_CTL_TOPA | RTIT_CTL_TRACEEN;
+
+	/*
+	 * Previously, we had BRANCH_EN on by default, but now that PT has
+	 * grown features outside of branch tracing, it is useful to allow
+	 * the user to disable it. So, to keep compatibility, setting
+	 * BRANCH_EN bit in the event config (no_branch=1) will have the
+	 * reverse effect and *not* set BRANCH_EN in the hardware
+	 * configuration.
+	 */
+	if (!(event->attr.config & RTIT_CTL_BRANCH_EN))
+		reg |= RTIT_CTL_BRANCH_EN;
+	else
+		event->attr.config &= ~RTIT_CTL_BRANCH_EN;
 
 	if (!event->attr.exclude_kernel)
 		reg |= RTIT_CTL_OS;
