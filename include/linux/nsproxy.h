@@ -33,7 +33,7 @@ struct nsproxy {
 	struct ipc_namespace *ipc_ns;
 	struct mnt_namespace *mnt_ns;
 	struct pid_namespace *pid_ns_for_children;
-	struct net 	     *net_ns;
+	struct net	     *net_ns;
 	struct cgroup_namespace *cgroup_ns;
 };
 extern struct nsproxy init_nsproxy;
@@ -68,15 +68,15 @@ int copy_namespaces(unsigned long flags, struct task_struct *tsk);
 void exit_task_namespaces(struct task_struct *tsk);
 void switch_task_namespaces(struct task_struct *tsk, struct nsproxy *new);
 void free_nsproxy(struct nsproxy *ns);
-int unshare_nsproxy_namespaces(unsigned long, struct nsproxy **,
-	struct cred *, struct fs_struct *);
+int unshare_nsproxy_namespaces(unsigned long unshare_flags,
+	struct nsproxy **new_nsp, struct cred *new_cred,
+	struct fs_struct *new_fs);
 int __init nsproxy_cache_init(void);
 
 static inline void put_nsproxy(struct nsproxy *ns)
 {
-	if (atomic_dec_and_test(&ns->count)) {
+	if (atomic_dec_and_test(&ns->count))
 		free_nsproxy(ns);
-	}
 }
 
 static inline void get_nsproxy(struct nsproxy *ns)
