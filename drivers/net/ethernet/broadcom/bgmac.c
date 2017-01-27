@@ -777,7 +777,7 @@ static void bgmac_write_mac_address(struct bgmac *bgmac, u8 *addr)
 
 static void bgmac_set_rx_mode(struct net_device *net_dev)
 {
-	struct bgmac *bgmac = netdev_priv(net_dev);
+	struct bgmac *bgmac = *(struct bgmac **)netdev_priv(net_dev);
 
 	if (net_dev->flags & IFF_PROMISC)
 		bgmac_cmdcfg_maskset(bgmac, ~0, BGMAC_CMDCFG_PROM, true);
@@ -1112,7 +1112,7 @@ static void bgmac_chip_init(struct bgmac *bgmac)
 
 static irqreturn_t bgmac_interrupt(int irq, void *dev_id)
 {
-	struct bgmac *bgmac = netdev_priv(dev_id);
+	struct bgmac *bgmac = *(struct bgmac **)netdev_priv(dev_id);
 
 	u32 int_status = bgmac_read(bgmac, BGMAC_INT_STATUS);
 	int_status &= bgmac->int_mask;
@@ -1161,7 +1161,7 @@ static int bgmac_poll(struct napi_struct *napi, int weight)
 
 static int bgmac_open(struct net_device *net_dev)
 {
-	struct bgmac *bgmac = netdev_priv(net_dev);
+	struct bgmac *bgmac = *(struct bgmac **)netdev_priv(net_dev);
 	int err = 0;
 
 	bgmac_chip_reset(bgmac);
@@ -1191,7 +1191,7 @@ static int bgmac_open(struct net_device *net_dev)
 
 static int bgmac_stop(struct net_device *net_dev)
 {
-	struct bgmac *bgmac = netdev_priv(net_dev);
+	struct bgmac *bgmac = *(struct bgmac **)netdev_priv(net_dev);
 
 	netif_carrier_off(net_dev);
 
@@ -1210,7 +1210,7 @@ static int bgmac_stop(struct net_device *net_dev)
 static netdev_tx_t bgmac_start_xmit(struct sk_buff *skb,
 				    struct net_device *net_dev)
 {
-	struct bgmac *bgmac = netdev_priv(net_dev);
+	struct bgmac *bgmac = *(struct bgmac **)netdev_priv(net_dev);
 	struct bgmac_dma_ring *ring;
 
 	/* No QOS support yet */
@@ -1220,7 +1220,7 @@ static netdev_tx_t bgmac_start_xmit(struct sk_buff *skb,
 
 static int bgmac_set_mac_address(struct net_device *net_dev, void *addr)
 {
-	struct bgmac *bgmac = netdev_priv(net_dev);
+	struct bgmac *bgmac = *(struct bgmac **)netdev_priv(net_dev);
 	int ret;
 
 	ret = eth_prepare_mac_addr_change(net_dev, addr);
@@ -1356,7 +1356,7 @@ static void bgmac_get_strings(struct net_device *dev, u32 stringset,
 static void bgmac_get_ethtool_stats(struct net_device *dev,
 				    struct ethtool_stats *ss, uint64_t *data)
 {
-	struct bgmac *bgmac = netdev_priv(dev);
+	struct bgmac *bgmac = *(struct bgmac **)netdev_priv(dev);
 	const struct bgmac_stat *s;
 	unsigned int i;
 	u64 val;
@@ -1396,7 +1396,7 @@ static const struct ethtool_ops bgmac_ethtool_ops = {
 
 void bgmac_adjust_link(struct net_device *net_dev)
 {
-	struct bgmac *bgmac = netdev_priv(net_dev);
+	struct bgmac *bgmac = *(struct bgmac **)netdev_priv(net_dev);
 	struct phy_device *phy_dev = net_dev->phydev;
 	bool update = false;
 
@@ -1446,21 +1446,19 @@ int bgmac_phy_connect_direct(struct bgmac *bgmac)
 }
 EXPORT_SYMBOL_GPL(bgmac_phy_connect_direct);
 
-int bgmac_enet_probe(struct bgmac *info)
+int bgmac_enet_probe(struct bgmac *bgmac)
 {
 	struct net_device *net_dev;
-	struct bgmac *bgmac;
 	int err;
 
 	/* Allocation and references */
-	net_dev = alloc_etherdev(sizeof(*bgmac));
+	net_dev = alloc_etherdev(sizeof(struct bgmac **));
 	if (!net_dev)
 		return -ENOMEM;
 
 	net_dev->netdev_ops = &bgmac_netdev_ops;
 	net_dev->ethtool_ops = &bgmac_ethtool_ops;
-	bgmac = netdev_priv(net_dev);
-	memcpy(bgmac, info, sizeof(*bgmac));
+	*(struct bgmac **)netdev_priv(net_dev) = bgmac;
 	bgmac->net_dev = net_dev;
 	net_dev->irq = bgmac->irq;
 	SET_NETDEV_DEV(net_dev, bgmac->dev);

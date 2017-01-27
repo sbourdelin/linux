@@ -98,7 +98,7 @@ static void platform_bgmac_cmn_maskset32(struct bgmac *bgmac, u16 offset,
 
 static void bgmac_nicpm_speed_set(struct net_device *net_dev)
 {
-	struct bgmac *bgmac = netdev_priv(net_dev);
+	struct bgmac *bgmac = *(struct bgmac **)netdev_priv(net_dev);
 	u32 val;
 
 	if (!bgmac->plat.nicpm_base)
