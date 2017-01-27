@@ -956,8 +956,10 @@ static int spi_qup_pm_resume_runtime(struct device *device)
 		return ret;
 
 	ret = clk_prepare_enable(controller->cclk);
-	if (ret)
+	if (ret) {
+		clk_disable_unprepare(controller->iclk);
 		return ret;
+	}
 
 	/* Disable clocks auto gaiting */
 	config = readl_relaxed(controller->base + QUP_CONFIG);
@@ -983,8 +985,7 @@ static int spi_qup_suspend(struct device *device)
 		return ret;
 
 	if (!pm_runtime_suspended(device)) {
-		clk_disable_unprepare(controller->cclk);
-		clk_disable_unprepare(controller->iclk);
+		pm_runtime_put(device);
 	}
 	return 0;
 }
@@ -995,18 +996,17 @@ static int spi_qup_resume(struct device *device)
 	struct spi_qup *controller = spi_master_get_devdata(master);
 	int ret;
 
-	ret = clk_prepare_enable(controller->iclk);
-	if (ret)
+	ret = pm_runtime_get_sync(device);
+	if (ret < 0) {
+		dev_err(device, "pm runtime failed in resume\n");
 		return ret;
-
-	ret = clk_prepare_enable(controller->cclk);
-	if (ret)
-		return ret;
+	}
 
 	ret = spi_qup_set_state(controller, QUP_STATE_RESET);
 	if (ret)
 		return ret;
 
+	pm_runtime_put(device);
 	return spi_master_resume(master);
 }
 #endif /* CONFIG_PM_SLEEP */
