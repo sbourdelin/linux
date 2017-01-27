@@ -858,11 +858,13 @@ void rt2x00usb_disconnect(struct usb_interface *usb_intf)
 {
 	struct ieee80211_hw *hw = usb_get_intfdata(usb_intf);
 	struct rt2x00_dev *rt2x00dev = hw->priv;
+	struct usb_anchor *anchor = rt2x00dev->anchor;
 
 	/*
 	 * Free all allocated data.
 	 */
 	rt2x00lib_remove_dev(rt2x00dev);
+	usb_kill_anchored_urbs(anchor);
 	rt2x00usb_free_reg(rt2x00dev);
 	ieee80211_free_hw(hw);
 
