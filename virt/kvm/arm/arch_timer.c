@@ -98,13 +98,13 @@ static void kvm_timer_inject_irq_work(struct work_struct *work)
 	kvm_vcpu_kick(vcpu);
 }
 
-static u64 kvm_timer_compute_delta(struct kvm_vcpu *vcpu)
+static u64 kvm_timer_compute_delta(struct kvm_vcpu *vcpu,
+				   struct arch_timer_context *timer_ctx)
 {
 	u64 cval, now;
-	struct arch_timer_context *vtimer = vcpu_vtimer(vcpu);
 
-	cval = vtimer->cnt_cval;
-	now = kvm_phys_timer_read() - vtimer->cntvoff;
+	cval = timer_ctx->cnt_cval;
+	now = kvm_phys_timer_read() - timer_ctx->cntvoff;
 
 	if (now < cval) {
 		u64 ns;
@@ -133,7 +133,7 @@ static enum hrtimer_restart kvm_timer_expire(struct hrtimer *hrt)
 	 * PoV (NTP on the host may have forced it to expire
 	 * early). If we should have slept longer, restart it.
 	 */
-	ns = kvm_timer_compute_delta(vcpu);
+	ns = kvm_timer_compute_delta(vcpu, vcpu_vtimer(vcpu));
 	if (unlikely(ns)) {
 		hrtimer_forward_now(hrt, ns_to_ktime(ns));
 		return HRTIMER_RESTART;
@@ -143,42 +143,40 @@ static enum hrtimer_restart kvm_timer_expire(struct hrtimer *hrt)
 	return HRTIMER_NORESTART;
 }
 
-static bool kvm_timer_irq_can_fire(struct kvm_vcpu *vcpu)
+static bool kvm_timer_irq_can_fire(struct arch_timer_context *timer_ctx)
 {
-	struct arch_timer_context *vtimer = vcpu_vtimer(vcpu);
-
-	return !(vtimer->cnt_ctl & ARCH_TIMER_CTRL_IT_MASK) &&
-		(vtimer->cnt_ctl & ARCH_TIMER_CTRL_ENABLE);
+	return !(timer_ctx->cnt_ctl & ARCH_TIMER_CTRL_IT_MASK) &&
+		(timer_ctx->cnt_ctl & ARCH_TIMER_CTRL_ENABLE);
 }
 
-bool kvm_timer_should_fire(struct kvm_vcpu *vcpu)
+bool kvm_timer_should_fire(struct kvm_vcpu *vcpu,
+			   struct arch_timer_context *timer_ctx)
 {
-	struct arch_timer_context *vtimer = vcpu_vtimer(vcpu);
 	u64 cval, now;
 
-	if (!kvm_timer_irq_can_fire(vcpu))
+	if (!kvm_timer_irq_can_fire(timer_ctx))
 		return false;
 
-	cval = vtimer->cnt_cval;
-	now = kvm_phys_timer_read() - vtimer->cntvoff;
+	cval = timer_ctx->cnt_cval;
+	now = kvm_phys_timer_read() - timer_ctx->cntvoff;
 
 	return cval <= now;
 }
 
-static void kvm_timer_update_irq(struct kvm_vcpu *vcpu, bool new_level)
+static void kvm_timer_update_mapped_irq(struct kvm_vcpu *vcpu, bool new_level,
+					struct arch_timer_context *timer_ctx)
 {
 	int ret;
-	struct arch_timer_context *vtimer = vcpu_vtimer(vcpu);
 
 	BUG_ON(!vgic_initialized(vcpu->kvm));
 
-	vtimer->active_cleared_last = false;
-	vtimer->irq.level = new_level;
-	trace_kvm_timer_update_irq(vcpu->vcpu_id, vtimer->irq.irq,
-				   vtimer->irq.level);
+	timer_ctx->active_cleared_last = false;
+	timer_ctx->irq.level = new_level;
+	trace_kvm_timer_update_irq(vcpu->vcpu_id, timer_ctx->irq.irq,
+				   timer_ctx->irq.level);
 	ret = kvm_vgic_inject_mapped_irq(vcpu->kvm, vcpu->vcpu_id,
-					 vtimer->irq.irq,
-					 vtimer->irq.level);
+					 timer_ctx->irq.irq,
+					 timer_ctx->irq.level);
 	WARN_ON(ret);
 }
 
@@ -200,8 +198,8 @@ static int kvm_timer_update_state(struct kvm_vcpu *vcpu)
 	if (!vgic_initialized(vcpu->kvm) || !timer->enabled)
 		return -ENODEV;
 
-	if (kvm_timer_should_fire(vcpu) != vtimer->irq.level)
-		kvm_timer_update_irq(vcpu, !vtimer->irq.level);
+	if (kvm_timer_should_fire(vcpu, vtimer) != vtimer->irq.level)
+		kvm_timer_update_mapped_irq(vcpu, !vtimer->irq.level, vtimer);
 
 	return 0;
 }
@@ -214,6 +212,7 @@ static int kvm_timer_update_state(struct kvm_vcpu *vcpu)
 void kvm_timer_schedule(struct kvm_vcpu *vcpu)
 {
 	struct arch_timer_cpu *timer = &vcpu->arch.timer_cpu;
+	struct arch_timer_context *vtimer = vcpu_vtimer(vcpu);
 
 	BUG_ON(timer_is_armed(timer));
 
@@ -222,18 +221,18 @@ void kvm_timer_schedule(struct kvm_vcpu *vcpu)
 	 * already expired, because kvm_vcpu_block will return before putting
 	 * the thread to sleep.
 	 */
-	if (kvm_timer_should_fire(vcpu))
+	if (kvm_timer_should_fire(vcpu, vtimer))
 		return;
 
 	/*
 	 * If the timer is not capable of raising interrupts (disabled or
 	 * masked), then there's no more work for us to do.
 	 */
-	if (!kvm_timer_irq_can_fire(vcpu))
+	if (!kvm_timer_irq_can_fire(vtimer))
 		return;
 
 	/*  The timer has not yet expired, schedule a background timer */
-	timer_arm(timer, kvm_timer_compute_delta(vcpu));
+	timer_arm(timer, kvm_timer_compute_delta(vcpu, vtimer));
 }
 
 void kvm_timer_unschedule(struct kvm_vcpu *vcpu)
