@@ -210,16 +210,17 @@ static void i915_gem_request_retire(struct drm_i915_gem_request *request)
 	struct i915_gem_active *active, *next;
 
 	lockdep_assert_held(&request->i915->drm.struct_mutex);
-	GEM_BUG_ON(!i915_sw_fence_signaled(&request->submit));
-	GEM_BUG_ON(!i915_sw_fence_signaled(&request->execute));
 	GEM_BUG_ON(!i915_gem_request_completed(request));
-	GEM_BUG_ON(!request->i915->gt.active_requests);
 
 	trace_i915_gem_request_retire(request);
 
 	spin_lock_irq(&engine->timeline->lock);
 	list_del_init(&request->link);
 	spin_unlock_irq(&engine->timeline->lock);
+
+	GEM_BUG_ON(!i915_sw_fence_signaled(&request->submit));
+	GEM_BUG_ON(!i915_sw_fence_signaled(&request->execute));
+	GEM_BUG_ON(!request->i915->gt.active_requests);
 
 	/* We know the GPU must have read the request to have
 	 * sent us the seqno + interrupt, so use the position
