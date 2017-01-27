@@ -381,6 +381,11 @@ static int eeprom_93xx46_probe_dt(struct spi_device *spi)
 	enum of_gpio_flags of_flags;
 	int ret;
 
+	if (!of_id) {
+		dev_err(&spi->dev, "Error: No device match found\n");
+		return -ENODEV;
+	}
+
 	pd = devm_kzalloc(&spi->dev, sizeof(*pd), GFP_KERNEL);
 	if (!pd)
 		return -ENOMEM;
