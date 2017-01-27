@@ -266,6 +266,7 @@ struct ixgbe_ring {
 		struct ixgbe_tx_buffer *tx_buffer_info;
 		struct ixgbe_rx_buffer *rx_buffer_info;
 	};
+	unsigned int buffer_size;
 	unsigned long state;
 	u8 __iomem *tail;
 	dma_addr_t dma;			/* phys. address of descriptor ring */
@@ -299,6 +300,8 @@ struct ixgbe_ring {
 		struct ixgbe_tx_queue_stats tx_stats;
 		struct ixgbe_rx_queue_stats rx_stats;
 	};
+	bool ddma;	      /* ring data buffers mapped to userspace */
+	struct sock *rx_kick; /* rx kick userspace */
 } ____cacheline_internodealigned_in_smp;
 
 enum ixgbe_ring_f_enum {
