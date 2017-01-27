@@ -57,13 +57,15 @@ static int linear_congested(struct mddev *mddev, int bits)
 	struct linear_conf *conf;
 	int i, ret = 0;
 
-	conf = mddev->private;
+	rcu_read_lock();
+	conf = rcu_dereference(mddev->private);
 
 	for (i = 0; i < mddev->raid_disks && !ret ; i++) {
 		struct request_queue *q = bdev_get_queue(conf->disks[i].rdev->bdev);
 		ret |= bdi_congested(&q->backing_dev_info, bits);
 	}
 
+	rcu_read_unlock();
 	return ret;
 }
 
@@ -172,6 +174,13 @@ static int linear_run (struct mddev *mddev)
 	return ret;
 }
 
+static void free_conf(struct rcu_head *head)
+{
+	struct linear_conf *conf =
+			container_of(head, struct linear_conf, rcu);
+	kfree(conf);
+}
+
 static int linear_add(struct mddev *mddev, struct md_rdev *rdev)
 {
 	/* Adding a drive to a linear array allows the array to grow.
@@ -195,15 +204,27 @@ static int linear_add(struct mddev *mddev, struct md_rdev *rdev)
 	if (!newconf)
 		return -ENOMEM;
 
+	/* In linear_congested(), mddev->raid_disks and mddev->private
+	 * are accessed without protection by mddev_suspend(). If on
+	 * another CPU,  in linear_congested() mddev->private is still seen
+	 * to contains old value but mddev->raid_disks is seen to have the
+	 * increased value, the last iteration to conf->disks[i].rdev will
+	 * trigger a NULL pointer deference. To avoid this race, here
+	 * mddev->private must be updated before increasing
+	 * mddev->raid_disks, and a smp_mb() is required between them. Then
+	 * in linear_congested(), we are sure the updated mddev->private is
+	 * seen when iterating conf->disks[i].
+	 */
 	mddev_suspend(mddev);
-	oldconf = mddev->private;
+	oldconf = rcu_dereference(mddev->private);
+	rcu_assign_pointer(mddev->private, newconf);
+	smp_mb();
 	mddev->raid_disks++;
-	mddev->private = newconf;
 	md_set_array_sectors(mddev, linear_size(mddev, 0, 0));
 	set_capacity(mddev->gendisk, mddev->array_sectors);
 	mddev_resume(mddev);
 	revalidate_disk(mddev->gendisk);
-	kfree(oldconf);
+	call_rcu(&oldconf->rcu, free_conf);
 	return 0;
 }
 
