@@ -449,6 +449,7 @@ submit_notify(struct i915_sw_fence *fence, enum i915_sw_fence_notify state)
 
 	switch (state) {
 	case FENCE_COMPLETE:
+		trace_i915_gem_request_submit(request);
 		request->engine->submit_request(request);
 		break;
 
@@ -468,6 +469,7 @@ execute_notify(struct i915_sw_fence *fence, enum i915_sw_fence_notify state)
 
 	switch (state) {
 	case FENCE_COMPLETE:
+		trace_i915_gem_request_execute(request);
 		break;
 
 	case FENCE_FREE:
