@@ -112,6 +112,16 @@ static unsigned long mmap_legacy_base(unsigned long rnd,
  * This function, called very early during the creation of a new
  * process VM image, sets up which VM layout function to use:
  */
+static void arch_pick_mmap_base(unsigned long *base, unsigned long *legacy_base,
+		unsigned long random_factor, unsigned long task_size)
+{
+	*legacy_base =  mmap_legacy_base(random_factor, task_size);
+	if (mmap_is_legacy())
+		*base = *legacy_base;
+	else
+		*base = mmap_base(random_factor, task_size);
+}
+
 void arch_pick_mmap_layout(struct mm_struct *mm)
 {
 	unsigned long random_factor = 0UL;
@@ -119,15 +129,18 @@ void arch_pick_mmap_layout(struct mm_struct *mm)
 	if (current->flags & PF_RANDOMIZE)
 		random_factor = arch_mmap_rnd();
 
-	mm->mmap_legacy_base = mmap_legacy_base(random_factor, TASK_SIZE);
-
-	if (mmap_is_legacy()) {
-		mm->mmap_base = mm->mmap_legacy_base;
+	if (mmap_is_legacy())
 		mm->get_unmapped_area = arch_get_unmapped_area;
-	} else {
-		mm->mmap_base = mmap_base(random_factor, TASK_SIZE);
+	else
 		mm->get_unmapped_area = arch_get_unmapped_area_topdown;
-	}
+
+	arch_pick_mmap_base(&mm->mmap_base, &mm->mmap_legacy_base,
+			random_factor, TASK_SIZE_MAX);
+
+#ifdef CONFIG_COMPAT
+	arch_pick_mmap_base(&mm->mmap_compat_base, &mm->mmap_compat_legacy_base,
+			random_factor, IA32_PAGE_OFFSET);
+#endif
 }
 
 const char *arch_vma_name(struct vm_area_struct *vma)

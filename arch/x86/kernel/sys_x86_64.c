@@ -16,6 +16,7 @@
 #include <linux/uaccess.h>
 #include <linux/elf.h>
 
+#include <asm/compat.h>
 #include <asm/ia32.h>
 #include <asm/syscalls.h>
 
@@ -113,10 +114,19 @@ static void find_start_end(unsigned long flags, unsigned long *begin,
 		if (current->flags & PF_RANDOMIZE) {
 			*begin = randomize_page(*begin, 0x02000000);
 		}
-	} else {
-		*begin = current->mm->mmap_legacy_base;
-		*end = TASK_SIZE;
+		return;
 	}
+
+#ifdef CONFIG_COMPAT
+	if (in_compat_syscall()) {
+		*begin = current->mm->mmap_compat_legacy_base;
+		*end = IA32_PAGE_OFFSET;
+		return;
+	}
+#endif
+
+	*begin = current->mm->mmap_legacy_base;
+	*end = TASK_SIZE_MAX;
 }
 
 unsigned long
@@ -157,6 +167,16 @@ arch_get_unmapped_area(struct file *filp, unsigned long addr,
 	return vm_unmapped_area(&info);
 }
 
+static unsigned long find_top(void)
+{
+#ifdef CONFIG_COMPAT
+	if (in_compat_syscall())
+		return current->mm->mmap_compat_base;
+	else
+#endif
+		return current->mm->mmap_base;
+}
+
 unsigned long
 arch_get_unmapped_area_topdown(struct file *filp, const unsigned long addr0,
 			  const unsigned long len, const unsigned long pgoff,
@@ -190,7 +210,7 @@ arch_get_unmapped_area_topdown(struct file *filp, const unsigned long addr0,
 	info.flags = VM_UNMAPPED_AREA_TOPDOWN;
 	info.length = len;
 	info.low_limit = PAGE_SIZE;
-	info.high_limit = mm->mmap_base;
+	info.high_limit = find_top();
 	info.align_mask = 0;
 	info.align_offset = pgoff << PAGE_SHIFT;
 	if (filp) {

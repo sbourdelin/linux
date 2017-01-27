@@ -671,6 +671,13 @@ config ARCH_MMAP_RND_COMPAT_BITS
 	  This value can be changed after boot using the
 	  /proc/sys/vm/mmap_rnd_compat_bits tunable
 
+config HAVE_ARCH_COMPAT_MMAP_BASES
+	bool
+	help
+	  If this is set, one program can do native and compatible syscall
+	  mmap() on architecture. Thus kernel has different bases to
+	  compute high and low virtual address limits for allocation.
+
 config HAVE_COPY_THREAD_TLS
 	bool
 	help
