@@ -516,7 +516,8 @@ static int fw_mgmt_ioctl(struct fw_mgmt *fw_mgmt, unsigned int cmd,
 		 */
 		fw_mgmt->mode_switch_started = true;
 
-		ret = gb_interface_request_mode_switch(fw_mgmt->connection->intf);
+		ret = gb_interface_request_mode_switch(
+				fw_mgmt->connection->intf);
 		if (ret) {
 			dev_err(fw_mgmt->parent, "Mode-switch failed: %d\n",
 				ret);
