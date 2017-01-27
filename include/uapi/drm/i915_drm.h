@@ -29,6 +29,11 @@
 
 #include "drm.h"
 
+/* Disable unused sparse attributes from userspace */
+#ifndef __user
+#define __user
+#endif
+
 #if defined(__cplusplus)
 extern "C" {
 #endif
