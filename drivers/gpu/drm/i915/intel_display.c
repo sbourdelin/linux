@@ -7389,6 +7389,26 @@ static int i945_get_display_clock_speed(struct drm_device *dev)
 	return 400000;
 }
 
+static int 945gm_get_display_clock_speed(struct drm_device *dev)
+{
+	struct pci_dev *pdev = dev->pdev;
+	u16 gcfgc = 0;
+
+	pci_read_config_word(pdev, GCFGC, &gcfgc);
+
+	if (gcfgc & GC_LOW_FREQUENCY_ENABLE)
+		return 133333;
+	else {
+		switch (gcfgc & GC_DISPLAY_CLOCK_MASK) {
+		case GC_DISPLAY_CLOCK_333_320_MHZ:
+			return 320000;
+		default:
+		case GC_DISPLAY_CLOCK_190_200_MHZ:
+			return 200000;
+		}
+	}
+}
+
 static int i915_get_display_clock_speed(struct drm_device *dev)
 {
 	return 333333;
@@ -7435,7 +7455,7 @@ static int i915gm_get_display_clock_speed(struct drm_device *dev)
 		return 133333;
 	else {
 		switch (gcfgc & GC_DISPLAY_CLOCK_MASK) {
-		case GC_DISPLAY_CLOCK_333_MHZ:
+		case GC_DISPLAY_CLOCK_333_320_MHZ:
 			return 333333;
 		default:
 		case GC_DISPLAY_CLOCK_190_200_MHZ:
@@ -15992,9 +16012,12 @@ void intel_init_display_hooks(struct drm_i915_private *dev_priv)
 	else if (IS_I915G(dev_priv))
 		dev_priv->display.get_display_clock_speed =
 			i915_get_display_clock_speed;
-	else if (IS_I945GM(dev_priv) || IS_845G(dev_priv))
+	else if (IS_845G(dev_priv))
 		dev_priv->display.get_display_clock_speed =
 			i9xx_misc_get_display_clock_speed;
+	else if (IS_I945GM(dev_priv))
+		dev_priv->display.get_display_clock_speed =
+			954gm_get_display_clock_speed;
 	else if (IS_I915GM(dev_priv))
 		dev_priv->display.get_display_clock_speed =
 			i915gm_get_display_clock_speed;
