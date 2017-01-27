@@ -244,6 +244,12 @@ static int wd719x_queuecommand(struct Scsi_Host *sh, struct scsi_cmnd *cmd)
 	scb->sense_buf_length = SCSI_SENSE_BUFFERSIZE;
 	cmd->SCp.dma_handle = dma_map_single(&wd->pdev->dev, cmd->sense_buffer,
 			SCSI_SENSE_BUFFERSIZE, DMA_FROM_DEVICE);
+	if (dma_mapping_error(&wd->pdev->dev, cmd->SCp.dma_handle)) {
+		dev_err(&wd->pdev->dev, "unable to map dma\n");
+		wd719x_finish_cmd(cmd, DID_ERROR);
+		spin_unlock_irqrestore(wd->sh->host_lock, flags);
+		return 0;
+	}
 	scb->sense_buf = cpu_to_le32(cmd->SCp.dma_handle);
 
 	/* request autosense */
