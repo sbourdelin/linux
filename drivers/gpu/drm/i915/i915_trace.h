@@ -607,11 +607,6 @@ DEFINE_EVENT(i915_gem_request, i915_gem_request_retire,
 	    TP_ARGS(req)
 );
 
-DEFINE_EVENT(i915_gem_request, i915_gem_request_complete,
-	    TP_PROTO(struct drm_i915_gem_request *req),
-	    TP_ARGS(req)
-);
-
 TRACE_EVENT(i915_gem_request_wait_begin,
 	    TP_PROTO(struct drm_i915_gem_request *req),
 	    TP_ARGS(req),
