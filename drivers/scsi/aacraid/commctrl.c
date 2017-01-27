@@ -1011,6 +1011,29 @@ static int aac_get_pci_info(struct aac_dev* dev, void __user *arg)
 	}
 	return 0;
 }
+
+static int aac_get_hba_info(struct aac_dev *dev, void __user *arg)
+{
+	struct aac_hba_info hbainfo;
+
+	hbainfo.AdapterNumber		= (u8) dev->id;
+	hbainfo.SystemIoBusNumber	= dev->pdev->bus->number;
+	hbainfo.DeviceNumber		= (dev->pdev->devfn >> 3);
+	hbainfo.FunctionNumber		= (dev->pdev->devfn & 0x0007);
+
+	hbainfo.VendorID		= dev->pdev->vendor;
+	hbainfo.DeviceID		= dev->pdev->device;
+	hbainfo.SubVendorID		= dev->pdev->subsystem_vendor;
+	hbainfo.SubSystemID		= dev->pdev->subsystem_device;
+
+	if (copy_to_user(arg, &hbainfo, sizeof(struct aac_hba_info))) {
+		dprintk((KERN_DEBUG "aacraid: Could not copy hba info\n"));
+		return -EFAULT;
+	}
+
+	return 0;
+}
+
 struct aac_reset_iop {
 	u8	reset_type;
 };
@@ -1069,6 +1092,9 @@ int aac_do_ioctl(struct aac_dev * dev, int cmd, void __user *arg)
 		break;
 	case FSACTL_GET_PCI_INFO:
 		status = aac_get_pci_info(dev,arg);
+		break;
+	case FSACTL_GET_HBA_INFO:
+		status = aac_get_hba_info(dev, arg);
 		break;
 	case FSACTL_RESET_IOP:
 		status = aac_send_reset_adapter(dev, arg);

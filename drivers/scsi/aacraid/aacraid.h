@@ -2338,6 +2338,7 @@ struct revision
 #define FSACTL_GET_CONTAINERS			2131
 #define FSACTL_SEND_LARGE_FIB			CTL_CODE(2138, METHOD_BUFFERED)
 #define FSACTL_RESET_IOP			CTL_CODE(2140, METHOD_BUFFERED)
+#define FSACTL_GET_HBA_INFO			CTL_CODE(2150, METHOD_BUFFERED)
 /* flags defined for IOP & HW SOFT RESET */
 #define HW_IOP_RESET				0x01
 #define HW_SOFT_RESET				0x02
@@ -2375,6 +2376,57 @@ struct aac_common
 };
 
 extern struct aac_common aac_config;
+
+/*
+ * This is for management ioctl purpose only.
+ */
+struct aac_hba_info {
+
+	u8	DriverName[50];
+	u8	AdapterNumber;
+	u8	SystemIoBusNumber;
+	u8	DeviceNumber;
+	u32	FunctionNumber;
+	u32	VendorID;
+	u32	DeviceID;
+	u32	SubVendorID;
+	u32	SubSystemID;
+	u32	MappedBaseAddressSize;
+	u32	BasePhysicalAddress_HighPart;
+	u32	BasePhysicalAddress_LowPart;
+
+	u32	MaxCommandSize;
+	u32	MaxFibSize;
+	u32	MaxScatterGatherFromOs;
+	u32	MaxScatterGatherToFw;
+	u32	MaxOutstandingFibs;
+
+	u32	QueueStartThreshold;
+	u32	QueueDumpThreshold;
+	u32	MaxIoSizeQueued;
+	u32	OutstandingIO;
+
+	u32	FirmwareBuildNumber;
+	u32	BIOSBuildNumber;
+	u32	DriverBuildNumber;
+	u32	SerialNumber_HighPart;
+	u32	SerialNumber_LowPart;
+	u32	SupportedOptions;
+	u32	FeatureBits;
+	u32	currentnumberPorts;
+
+	u8	NewCommInterface:1;
+	u8	NewCommandsSupported:1;
+	u8	DisablePassthrough:1;
+	u8	ExposeNonDasd:1;
+	u8	QueueAllowed:1;
+	u8	BLEDCheckEnabled:1;
+	u8	reserved1:1;
+	u8	reserted2:1;
+
+	u32	reserved3[10];
+
+};
 
 /*
  *	The following macro is used when sending and receiving FIBs. It is
