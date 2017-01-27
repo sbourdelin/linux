@@ -2110,6 +2110,8 @@ struct aac_fsinfo {
 
 struct  aac_blockdevinfo {
 	__le32	block_size;
+	__le32  logical_phys_map;
+	u8	identifier[16];
 };
 
 union aac_contentinfo {
