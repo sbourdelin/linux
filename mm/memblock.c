@@ -292,7 +292,7 @@ static void __init_memblock memblock_remove_region(struct memblock_type *type, u
 		type->regions[0].base = 0;
 		type->regions[0].size = 0;
 		type->regions[0].flags = 0;
-		memblock_set_region_node(&type->regions[0], MAX_NUMNODES);
+		memblock_set_region_node(&type->regions[0], NUMA_NO_NODE);
 	}
 }
 
@@ -616,7 +616,7 @@ int __init_memblock memblock_add(phys_addr_t base, phys_addr_t size)
 		     (unsigned long long)base + size - 1,
 		     0UL, (void *)_RET_IP_);
 
-	return memblock_add_range(&memblock.memory, base, size, MAX_NUMNODES, 0);
+	return memblock_add_range(&memblock.memory, base, size, NUMA_NO_NODE, 0);
 }
 
 /**
@@ -734,7 +734,7 @@ int __init_memblock memblock_reserve(phys_addr_t base, phys_addr_t size)
 		     (unsigned long long)base + size - 1,
 		     0UL, (void *)_RET_IP_);
 
-	return memblock_add_range(&memblock.reserved, base, size, MAX_NUMNODES, 0);
+	return memblock_add_range(&memblock.reserved, base, size, NUMA_NO_NODE, 0);
 }
 
 /**
@@ -1687,7 +1687,7 @@ static void __init_memblock memblock_dump(struct memblock_type *type, char *name
 		size = rgn->size;
 		flags = rgn->flags;
 #ifdef CONFIG_HAVE_MEMBLOCK_NODE_MAP
-		if (memblock_get_region_node(rgn) != MAX_NUMNODES)
+		if (memblock_get_region_node(rgn) != NUMA_NO_NODE)
 			snprintf(nid_buf, sizeof(nid_buf), " on node %d",
 				 memblock_get_region_node(rgn));
 #endif
