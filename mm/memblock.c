@@ -1084,12 +1084,16 @@ void __init_memblock __next_mem_pfn_range(int *idx, int nid,
 	struct memblock_type *type = &memblock.memory;
 	struct memblock_region *r;
 
+	if (WARN_ONCE(nid == MAX_NUMNODES,
+	"Usage of MAX_NUMNODES is deprecated. Use NUMA_NO_NODE instead\n"))
+		nid = NUMA_NO_NODE;
+
 	while (++*idx < type->cnt) {
 		r = &type->regions[*idx];
 
 		if (PFN_UP(r->base) >= PFN_DOWN(r->base + r->size))
 			continue;
-		if (nid == MAX_NUMNODES || nid == r->nid)
+		if (nid == NUMA_NO_NODE || nid == r->nid)
 			break;
 	}
 	if (*idx >= type->cnt) {
