@@ -107,15 +107,15 @@ static int __control_devkmsg(char *str)
 	if (!str)
 		return -EINVAL;
 
-	if (!strncmp(str, "on", 2)) {
+	if (!strcmp(str, "on")) {
 		devkmsg_log = DEVKMSG_LOG_MASK_ON;
-		return 2;
-	} else if (!strncmp(str, "off", 3)) {
+		return 0;
+	} else if (!strcmp(str, "off")) {
 		devkmsg_log = DEVKMSG_LOG_MASK_OFF;
-		return 3;
-	} else if (!strncmp(str, "ratelimit", 9)) {
+		return 0;
+	} else if (!strcmp(str, "ratelimit")) {
 		devkmsg_log = DEVKMSG_LOG_MASK_DEFAULT;
-		return 9;
+		return 0;
 	}
 	return -EINVAL;
 }
@@ -177,7 +177,7 @@ int devkmsg_sysctl_set_loglvl(struct ctl_table *table, int write,
 		 * Do not accept an unknown string OR a known string with
 		 * trailing crap...
 		 */
-		if (err < 0 || (err + 1 != *lenp)) {
+		if (err < 0) {
 
 			/* ... and restore old setting. */
 			devkmsg_log = old;
