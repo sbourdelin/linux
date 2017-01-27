@@ -1035,7 +1035,7 @@ static void notify_ring(struct intel_engine_cs *engine)
 {
 	set_bit(ENGINE_IRQ_BREADCRUMB, &engine->irq_posted);
 	if (intel_engine_wakeup(engine))
-		trace_i915_gem_request_notify(engine);
+		trace_i915_gem_ring_notify(engine);
 }
 
 static void vlv_c0_read(struct drm_i915_private *dev_priv,

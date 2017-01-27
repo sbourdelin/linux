@@ -606,7 +606,7 @@ trace_i915_gem_request_execute(struct drm_i915_gem_request *req)
 #endif
 #endif
 
-TRACE_EVENT(i915_gem_request_notify,
+TRACE_EVENT(i915_gem_ring_notify,
 	    TP_PROTO(struct intel_engine_cs *engine),
 	    TP_ARGS(engine),
 
