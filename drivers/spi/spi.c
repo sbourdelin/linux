@@ -1722,13 +1722,20 @@ static acpi_status acpi_register_spi_device(struct spi_master *master,
 		return AE_OK;
 	}
 
+	/*
+	 * Populate modalias from compatible property if available,
+	 * otherwise use native ACPI information
+	 */
+	if (acpi_of_modalias(adev, spi->modalias, sizeof(spi->modalias)))
+		strlcpy(spi->modalias, acpi_device_hid(adev),
+			sizeof(spi->modalias));
+
 	if (spi->irq < 0)
 		spi->irq = acpi_dev_gpio_irq_get(adev, 0);
 
 	acpi_device_set_enumerated(adev);
 
 	adev->power.flags.ignore_parent = true;
-	strlcpy(spi->modalias, acpi_device_hid(adev), sizeof(spi->modalias));
 	if (spi_add_device(spi)) {
 		adev->power.flags.ignore_parent = false;
 		dev_err(&master->dev, "failed to add SPI device %s from ACPI\n",
