@@ -23,11 +23,6 @@
 #include <linux/hrtimer.h>
 #include <linux/workqueue.h>
 
-struct arch_timer_kvm {
-	/* Virtual offset */
-	u64			cntvoff;
-};
-
 struct arch_timer_context {
 	/* Registers: control register, timer value */
 	u32				cnt_ctl;
@@ -38,6 +33,9 @@ struct arch_timer_context {
 
 	/* Active IRQ state caching */
 	bool				active_cleared_last;
+
+	/* Virtual offset */
+	u64			cntvoff;
 };
 
 struct arch_timer_cpu {

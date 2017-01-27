@@ -60,9 +60,6 @@ struct kvm_arch {
 	/* The last vcpu id that ran on each physical CPU */
 	int __percpu *last_vcpu_ran;
 
-	/* Timer */
-	struct arch_timer_kvm	timer;
-
 	/*
 	 * Anything that is not used directly from assembly code goes
 	 * here.
@@ -74,6 +71,9 @@ struct kvm_arch {
 
 	/* Stage-2 page table */
 	pgd_t *pgd;
+
+	/* A lock to synchronize cntvoff among all vtimer context of vcpus */
+	spinlock_t cntvoff_lock;
 
 	/* Interrupt controller */
 	struct vgic_dist	vgic;

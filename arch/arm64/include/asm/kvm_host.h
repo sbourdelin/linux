@@ -71,8 +71,8 @@ struct kvm_arch {
 	/* Interrupt controller */
 	struct vgic_dist	vgic;
 
-	/* Timer */
-	struct arch_timer_kvm	timer;
+	/* A lock to synchronize cntvoff among all vtimer context of vcpus */
+	spinlock_t cntvoff_lock;
 };
 
 #define KVM_NR_MEM_OBJS     40
