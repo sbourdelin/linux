@@ -16,6 +16,7 @@
 #include <linux/kernel.h>
 #include <linux/errno.h>
 #include <linux/module.h>
+#include <linux/fb.h>
 #include <linux/input.h>
 #include <linux/slab.h>
 
@@ -108,7 +109,7 @@ static irqreturn_t input_handler(int rq, void *dev_id)
 static int xenkbd_probe(struct xenbus_device *dev,
 				  const struct xenbus_device_id *id)
 {
-	int ret, i;
+	int ret, i, width, height;
 	unsigned int abs;
 	struct xenkbd_info *info;
 	struct input_dev *kbd, *ptr;
@@ -173,9 +174,17 @@ static int xenkbd_probe(struct xenbus_device *dev,
 	ptr->id.product = 0xfffe;
 
 	if (abs) {
+		width = XENFB_WIDTH;
+		height = XENFB_HEIGHT;
+#ifdef CONFIG_FB
+		if (registered_fb[0]) {
+			width = registered_fb[0]->var.xres_virtual;
+			height = registered_fb[0]->var.yres_virtual;
+		}
+#endif
 		__set_bit(EV_ABS, ptr->evbit);
-		input_set_abs_params(ptr, ABS_X, 0, XENFB_WIDTH, 0, 0);
-		input_set_abs_params(ptr, ABS_Y, 0, XENFB_HEIGHT, 0, 0);
+		input_set_abs_params(ptr, ABS_X, 0, width, 0, 0);
+		input_set_abs_params(ptr, ABS_Y, 0, height, 0, 0);
 	} else {
 		input_set_capability(ptr, EV_REL, REL_X);
 		input_set_capability(ptr, EV_REL, REL_Y);
