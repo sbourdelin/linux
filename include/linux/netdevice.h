@@ -54,6 +54,8 @@
 #include <uapi/linux/pkt_cls.h>
 #include <linux/hashtable.h>
 
+#include <net/af_packet.h>
+
 struct netpoll_info;
 struct device;
 struct phy_device;
@@ -1324,6 +1326,12 @@ struct net_device_ops {
 						       int needed_headroom);
 	int			(*ndo_xdp)(struct net_device *dev,
 					   struct netdev_xdp *xdp);
+	int			(*ndo_ddma_map)(struct net_device *dev,
+					unsigned int rindex,
+					struct sock *sk,
+					struct packet_ring_buffer *rb);
+	void			(*ndo_ddma_unmap)(struct net_device *dev,
+						  unsigned int rindex);
 };
 
 /**

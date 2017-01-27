@@ -3731,6 +3731,34 @@ packet_setsockopt(struct socket *sock, int level, int optname, char __user *optv
 		po->xmit = val ? packet_direct_xmit : dev_queue_xmit;
 		return 0;
 	}
+	case PACKET_RX_DIRECT:
+	{
+		struct packet_ring_buffer *rb = &po->rx_ring;
+		struct net_device *dev;
+		unsigned int index;
+		int err;
+
+		if (optlen != sizeof(index))
+			return -EINVAL;
+		if (copy_from_user(&index, optval, sizeof(index)))
+			return -EFAULT;
+
+		/* This call only works after a bind call which calls a dev_hold
+		 * operation so we do not need to increment dev ref counter
+		 */
+		dev = __dev_get_by_index(sock_net(sk), po->ifindex);
+		if (!dev)
+			return -EINVAL;
+		if (!dev->netdev_ops->ndo_ddma_map)
+			return -EOPNOTSUPP;
+		if (!atomic_read(&po->mapped))
+			return -EINVAL;
+
+		err =  dev->netdev_ops->ndo_ddma_map(dev, index, sk, rb);
+		if (!err)
+			rb->ddma = true;
+		return err;
+	}
 	default:
 		return -ENOPROTOOPT;
 	}
@@ -4228,6 +4256,15 @@ static int packet_set_ring(struct sock *sk, union tpacket_req_u *req_u,
 		if (atomic_read(&po->mapped))
 			pr_err("packet_mmap: vma is busy: %d\n",
 			       atomic_read(&po->mapped));
+
+		if (rb->ddma) {
+			struct net_device *dev =
+				__dev_get_by_index(sock_net(sk), po->ifindex);
+
+			if (dev && dev->netdev_ops->ndo_ddma_map)
+				dev->netdev_ops->ndo_ddma_unmap(dev, 0);
+			rb->ddma = false;
+		}
 	}
 	mutex_unlock(&po->pg_vec_lock);
 

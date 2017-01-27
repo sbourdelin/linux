@@ -133,6 +133,20 @@ static void status_bar_update(void)
 	}
 }
 
+static void print_payload(void *pay, size_t len)
+{
+	unsigned char *payload = pay;
+	int i;
+
+	printf("payload (bytes %lu): ", len);
+	for (i = 0; i < len; i++) {
+		if ((i % 32) == 0)
+			printf("\n");
+		printf("0x%02x ", payload[i]);
+	}
+	printf("\n");
+}
+
 static void test_payload(void *pay, size_t len)
 {
 	struct ethhdr *eth = pay;
@@ -148,6 +162,7 @@ static void test_payload(void *pay, size_t len)
 			"type: 0x%x!\n", ntohs(eth->h_proto));
 		exit(1);
 	}
+	print_payload(pay, len);
 }
 
 static void create_payload(void *pay, size_t *len)
@@ -232,21 +247,21 @@ static inline void __v1_v2_rx_user_ready(void *base, int version)
 static void walk_v1_v2_rx(int sock, struct ring *ring)
 {
 	struct pollfd pfd;
-	int udp_sock[2];
+	//int udp_sock[2];
 	union frame_map ppd;
 	unsigned int frame_num = 0;
 
 	bug_on(ring->type != PACKET_RX_RING);
 
-	pair_udp_open(udp_sock, PORT_BASE);
-	pair_udp_setfilter(sock);
+	//pair_udp_open(udp_sock, PORT_BASE);
+	//pair_udp_setfilter(sock);
 
 	memset(&pfd, 0, sizeof(pfd));
 	pfd.fd = sock;
 	pfd.events = POLLIN | POLLERR;
 	pfd.revents = 0;
 
-	pair_udp_send(udp_sock, NUM_PACKETS);
+	//pair_udp_send(udp_sock, NUM_PACKETS);
 
 	while (total_packets < NUM_PACKETS * 2) {
 		while (__v1_v2_rx_kernel_ready(ring->rd[frame_num].iov_base,
@@ -257,6 +272,9 @@ static void walk_v1_v2_rx(int sock, struct ring *ring)
 			case TPACKET_V1:
 				test_payload((uint8_t *) ppd.raw + ppd.v1->tp_h.tp_mac,
 					     ppd.v1->tp_h.tp_snaplen);
+				print_payload((uint8_t *) ppd.raw +
+						ppd.v2->tp_h.tp_mac,
+					      ppd.v2->tp_h.tp_snaplen);
 				total_bytes += ppd.v1->tp_h.tp_snaplen;
 				break;
 
@@ -278,7 +296,7 @@ static void walk_v1_v2_rx(int sock, struct ring *ring)
 		poll(&pfd, 1, 1);
 	}
 
-	pair_udp_close(udp_sock);
+	//pair_udp_close(udp_sock);
 
 	if (total_packets != 2 * NUM_PACKETS) {
 		fprintf(stderr, "walk_v%d_rx: received %u out of %u pkts\n",
@@ -372,7 +390,8 @@ static void walk_v1_v2_tx(int sock, struct ring *ring)
 
 	pair_udp_setfilter(rcv_sock);
 
-	ll.sll_ifindex = if_nametoindex("lo");
+	/* hacking my test up */
+	ll.sll_ifindex = if_nametoindex("eth3");
 	ret = bind(rcv_sock, (struct sockaddr *) &ll, sizeof(ll));
 	if (ret == -1) {
 		perror("bind");
@@ -687,7 +706,7 @@ static void bind_ring(int sock, struct ring *ring)
 
 	ring->ll.sll_family = PF_PACKET;
 	ring->ll.sll_protocol = htons(ETH_P_ALL);
-	ring->ll.sll_ifindex = if_nametoindex("lo");
+	ring->ll.sll_ifindex = if_nametoindex("eth3");
 	ring->ll.sll_hatype = 0;
 	ring->ll.sll_pkttype = 0;
 	ring->ll.sll_halen = 0;
@@ -755,6 +774,19 @@ static const char *type_str[] = {
 	[PACKET_TX_RING] = "PACKET_TX_RING",
 };
 
+void direct_dma_ring(int sock)
+{
+	int ret;
+	int index = 1;
+
+	ret = setsockopt(sock, SOL_PACKET, PACKET_RX_DIRECT,
+			 &index, sizeof(index));
+	if (ret == -10)
+		printf("Failed direct dma socket with %i\n", ret);
+	else
+		printf("Configured a direct dma socket!\n");
+}
+
 static int test_tpacket(int version, int type)
 {
 	int sock;
@@ -777,6 +809,7 @@ static int test_tpacket(int version, int type)
 	setup_ring(sock, &ring, version, type);
 	mmap_ring(sock, &ring);
 	bind_ring(sock, &ring);
+	direct_dma_ring(sock);
 	walk_ring(sock, &ring);
 	unmap_ring(sock, &ring);
 	close(sock);
@@ -789,13 +822,17 @@ int main(void)
 {
 	int ret = 0;
 
+#if 0
 	ret |= test_tpacket(TPACKET_V1, PACKET_RX_RING);
 	ret |= test_tpacket(TPACKET_V1, PACKET_TX_RING);
+#endif
 
 	ret |= test_tpacket(TPACKET_V2, PACKET_RX_RING);
+#if 0
 	ret |= test_tpacket(TPACKET_V2, PACKET_TX_RING);
 
 	ret |= test_tpacket(TPACKET_V3, PACKET_RX_RING);
+#endif
 
 	if (ret)
 		return 1;
