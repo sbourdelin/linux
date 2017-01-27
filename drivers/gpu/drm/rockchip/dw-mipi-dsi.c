@@ -1075,14 +1075,21 @@ MODULE_DEVICE_TABLE(of, dw_mipi_dsi_dt_ids);
 static int dw_mipi_dsi_bind(struct device *dev, struct device *master,
 			     void *data)
 {
-	const struct of_device_id *of_id =
-			of_match_device(dw_mipi_dsi_dt_ids, dev);
-	const struct dw_mipi_dsi_plat_data *pdata = of_id->data;
+	const struct of_device_id *of_id;
+	const struct dw_mipi_dsi_plat_data *pdata;
 	struct platform_device *pdev = to_platform_device(dev);
 	struct drm_device *drm = data;
 	struct dw_mipi_dsi *dsi;
 	struct resource *res;
 	int ret;
+
+	of_id = of_match_device(dw_mipi_dsi_dt_ids, dev);
+	if (!of_id) {
+		dev_err(dev, "Error: No device match found\n");
+		return -ENODEV;
+	}
+
+	pdata = of_id->data;
 
 	dsi = devm_kzalloc(dev, sizeof(*dsi), GFP_KERNEL);
 	if (!dsi)
