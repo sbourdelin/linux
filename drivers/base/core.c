@@ -13,19 +13,19 @@
 #include <linux/device.h>
 #include <linux/err.h>
 #include <linux/fwnode.h>
+#include <linux/genhd.h>
 #include <linux/init.h>
-#include <linux/module.h>
-#include <linux/slab.h>
-#include <linux/string.h>
+#include <linux/kallsyms.h>
 #include <linux/kdev_t.h>
+#include <linux/module.h>
+#include <linux/mutex.h>
+#include <linux/netdevice.h>
 #include <linux/notifier.h>
 #include <linux/of.h>
 #include <linux/of_device.h>
-#include <linux/genhd.h>
-#include <linux/kallsyms.h>
-#include <linux/mutex.h>
 #include <linux/pm_runtime.h>
-#include <linux/netdevice.h>
+#include <linux/slab.h>
+#include <linux/string.h>
 #include <linux/sysfs.h>
 
 #include "base.h"
