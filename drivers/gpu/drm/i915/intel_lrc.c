@@ -505,6 +505,7 @@ static void execlists_dequeue(struct intel_engine_cs *engine)
 		cursor->priotree.priority = INT_MAX;
 
 		__i915_gem_request_submit(cursor);
+		trace_i915_gem_request_in(cursor, port - engine->execlist_port);
 		last = cursor;
 		submit = true;
 	}
@@ -561,6 +562,7 @@ static void intel_lrc_irq_handler(unsigned long data)
 	struct intel_engine_cs *engine = (struct intel_engine_cs *)data;
 	struct execlist_port *port = engine->execlist_port;
 	struct drm_i915_private *dev_priv = engine->i915;
+	unsigned int portidx = 0;
 
 	intel_uncore_forcewake_get(dev_priv, engine->fw_domains);
 
@@ -597,6 +599,8 @@ static void intel_lrc_irq_handler(unsigned long data)
 				execlists_context_status_change(port[0].request,
 								INTEL_CONTEXT_SCHEDULE_OUT);
 
+				trace_i915_gem_request_out(port[0].request,
+							   portidx++);
 				i915_gem_request_put(port[0].request);
 				port[0] = port[1];
 				memset(&port[1], 0, sizeof(port[1]));

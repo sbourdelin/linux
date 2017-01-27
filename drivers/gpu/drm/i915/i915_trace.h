@@ -582,6 +582,35 @@ DEFINE_EVENT(i915_gem_request, i915_gem_request_add,
 	    TP_ARGS(req)
 );
 
+DECLARE_EVENT_CLASS(i915_gem_request_hw,
+		    TP_PROTO(struct drm_i915_gem_request *req,
+			     unsigned int port),
+		    TP_ARGS(req, port),
+
+		    TP_STRUCT__entry(
+				     __field(u32, dev)
+				     __field(u32, ring)
+				     __field(u32, seqno)
+				     __field(u32, global_seqno)
+				     __field(u32, ctx)
+				     __field(u32, port)
+				    ),
+
+		    TP_fast_assign(
+			           __entry->dev = req->i915->drm.primary->index;
+			           __entry->ring = req->engine->id;
+			           __entry->ctx = req->ctx->hw_id;
+			           __entry->seqno = req->fence.seqno;
+			           __entry->global_seqno = req->global_seqno;
+			           __entry->port = port;
+			          ),
+
+		    TP_printk("dev=%u, ring=%u, ctx=%u, seqno=%u, global_seqno=%u, port=%u",
+			      __entry->dev, __entry->ring, __entry->ctx,
+			      __entry->seqno, __entry->global_seqno,
+			      __entry->port)
+);
+
 #if defined(CONFIG_DRM_I915_LOW_LEVEL_TRACEPOINTS)
 DEFINE_EVENT(i915_gem_request, i915_gem_request_submit,
 	     TP_PROTO(struct drm_i915_gem_request *req),
@@ -592,6 +621,16 @@ DEFINE_EVENT(i915_gem_request, i915_gem_request_execute,
 	     TP_PROTO(struct drm_i915_gem_request *req),
 	     TP_ARGS(req)
 );
+
+DEFINE_EVENT(i915_gem_request_hw, i915_gem_request_in,
+	     TP_PROTO(struct drm_i915_gem_request *req, unsigned int port),
+	     TP_ARGS(req, port)
+);
+
+DEFINE_EVENT(i915_gem_request_hw, i915_gem_request_out,
+	     TP_PROTO(struct drm_i915_gem_request *req, unsigned int port),
+	     TP_ARGS(req, port)
+);
 #else
 #if !defined(TRACE_HEADER_MULTI_READ)
 static inline void
@@ -601,6 +640,16 @@ trace_i915_gem_request_submit(struct drm_i915_gem_request *req)
 
 static inline void
 trace_i915_gem_request_execute(struct drm_i915_gem_request *req)
+{
+}
+
+static inline void
+trace_i915_gem_request_in(struct drm_i915_gem_request *req, unsigned int port)
+{
+}
+
+static inline void
+trace_i915_gem_request_out(struct drm_i915_gem_request *req, unsigned int port)
 {
 }
 #endif
