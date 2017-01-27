@@ -12,6 +12,7 @@
 #include <linux/module.h>
 #include <linux/ulpi/driver.h>
 #include <linux/gpio/consumer.h>
+#include <linux/property.h>
 
 #include "ulpi_phy.h"
 

@@ -22,6 +22,7 @@
 #include <linux/slab.h>
 #include <linux/delay.h>
 #include <linux/gpio/consumer.h>
+#include <linux/property.h>
 #include <linux/regulator/consumer.h>
 
 #include <dt-bindings/input/ti-drv260x.h>

@@ -27,6 +27,7 @@
 #include <linux/of.h>
 #include <linux/gpio/consumer.h>
 #include <linux/power_supply.h>
+#include <linux/property.h>
 #include <linux/slab.h>
 
 #include <linux/power/bq24735-charger.h>
