@@ -296,6 +296,11 @@ static int mxs_gpio_probe(struct platform_device *pdev)
 	int irq_base;
 	int err;
 
+	if (!of_id) {
+		dev_err(&pdev->dev, "Error: No device match found\n");
+		return -ENODEV;
+	}
+
 	port = devm_kzalloc(&pdev->dev, sizeof(*port), GFP_KERNEL);
 	if (!port)
 		return -ENOMEM;

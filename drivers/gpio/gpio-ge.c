@@ -59,6 +59,11 @@ static int __init gef_gpio_probe(struct platform_device *pdev)
 	void __iomem *regs;
 	int ret;
 
+	if (!of_id) {
+		dev_err(&pdev->dev, "Error: No device match found\n");
+		return -ENODEV;
+	}
+
 	gc = devm_kzalloc(&pdev->dev, sizeof(*gc), GFP_KERNEL);
 	if (!gc)
 		return -ENOMEM;
