@@ -138,11 +138,18 @@ static int __init weim_timing_setup(struct device_node *np, void __iomem *base,
 static int __init weim_parse_dt(struct platform_device *pdev,
 				void __iomem *base)
 {
-	const struct of_device_id *of_id = of_match_device(weim_id_table,
-							   &pdev->dev);
-	const struct imx_weim_devtype *devtype = of_id->data;
+	const struct of_device_id *of_id;
+	const struct imx_weim_devtype *devtype;
 	struct device_node *child;
 	int ret, have_child = 0;
+
+	of_id = of_match_device(weim_id_table, &pdev->dev);
+	if (!of_id) {
+		dev_err(&pdev->dev, "Error: No device match found\n");
+		return -ENODEV;
+	}
+
+	devtype = of_id->data;
 
 	if (devtype == &imx50_weim_devtype) {
 		ret = imx_weim_gpr_setup(pdev);
