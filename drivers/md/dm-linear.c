@@ -159,6 +159,29 @@ static long linear_direct_access(struct dm_target *ti, sector_t sector,
 	return ret;
 }
 
+static long linear_dax_direct_access(struct dm_target *ti, phys_addr_t dev_addr,
+				     void **kaddr, pfn_t *pfn, long size)
+{
+	struct linear_c *lc = ti->private;
+	struct block_device *bdev = lc->dev->bdev;
+	struct dax_inode *dax_inode = lc->dev->dax_inode;
+	struct blk_dax_ctl dax = {
+		.sector = linear_map_sector(ti, dev_addr >> SECTOR_SHIFT),
+		.size = size,
+	};
+	long ret;
+
+	ret = bdev_dax_direct_access(bdev, dax_inode, &dax);
+	*kaddr = dax.addr;
+	*pfn = dax.pfn;
+
+	return ret;
+}
+
+static const struct dm_dax_operations linear_dax_ops = {
+	.dm_direct_access = linear_dax_direct_access,
+};
+
 static struct target_type linear_target = {
 	.name   = "linear",
 	.version = {1, 3, 0},
@@ -170,6 +193,7 @@ static struct target_type linear_target = {
 	.prepare_ioctl = linear_prepare_ioctl,
 	.iterate_devices = linear_iterate_devices,
 	.direct_access = linear_direct_access,
+	.dax_ops = &linear_dax_ops,
 };
 
 int __init dm_linear_init(void)

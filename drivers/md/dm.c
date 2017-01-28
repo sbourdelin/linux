@@ -627,6 +627,7 @@ static int open_table_device(struct table_device *td, dev_t dev,
 	}
 
 	td->dm_dev.bdev = bdev;
+	td->dm_dev.dax_inode = dax_get_by_host(bdev->bd_disk->disk_name);
 	return 0;
 }
 
@@ -640,7 +641,9 @@ static void close_table_device(struct table_device *td, struct mapped_device *md
 
 	bd_unlink_disk_holder(td->dm_dev.bdev, dm_disk(md));
 	blkdev_put(td->dm_dev.bdev, td->dm_dev.mode | FMODE_EXCL);
+	put_dax_inode(td->dm_dev.dax_inode);
 	td->dm_dev.bdev = NULL;
+	td->dm_dev.dax_inode = NULL;
 }
 
 static struct table_device *find_table_device(struct list_head *l, dev_t dev,
@@ -907,7 +910,7 @@ int dm_set_target_max_io_len(struct dm_target *ti, sector_t len)
 EXPORT_SYMBOL_GPL(dm_set_target_max_io_len);
 
 static long __dm_direct_access(struct mapped_device *md, phys_addr_t dev_addr,
-			       void **kaddr, pfn_t *pfn, long size)
+			       void **kaddr, pfn_t *pfn, long size, bool blk)
 {
 	sector_t sector = dev_addr >> SECTOR_SHIFT;
 	struct dm_table *map;
@@ -926,8 +929,11 @@ static long __dm_direct_access(struct mapped_device *md, phys_addr_t dev_addr,
 	len = max_io_len(sector, ti) << SECTOR_SHIFT;
 	size = min(len, size);
 
-	if (ti->type->direct_access)
+	if (blk && ti->type->direct_access)
 		ret = ti->type->direct_access(ti, sector, kaddr, pfn, size);
+	else if (ti->type->dax_ops)
+		ret = ti->type->dax_ops->dm_direct_access(ti, dev_addr, kaddr,
+				pfn, size);
 out:
 	dm_put_live_table(md, srcu_idx);
 	return min(ret, size);
@@ -938,7 +944,8 @@ static long dm_blk_direct_access(struct block_device *bdev, sector_t sector,
 {
 	struct mapped_device *md = bdev->bd_disk->private_data;
 
-	return __dm_direct_access(md, sector << SECTOR_SHIFT, kaddr, pfn, size);
+	return __dm_direct_access(md, sector << SECTOR_SHIFT, kaddr, pfn, size,
+			true);
 }
 
 static long dm_dax_direct_access(struct dax_inode *dax_inode,
@@ -947,7 +954,8 @@ static long dm_dax_direct_access(struct dax_inode *dax_inode,
 {
 	struct mapped_device *md = dax_inode_get_private(dax_inode);
 
-	return __dm_direct_access(md, dev_addr, kaddr, pfn, size);
+	return __dm_direct_access(md, dev_addr, kaddr, pfn, size,
+			false);
 }
 
 /*

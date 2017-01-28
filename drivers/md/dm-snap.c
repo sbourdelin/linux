@@ -2309,6 +2309,13 @@ static long origin_direct_access(struct dm_target *ti, sector_t sector,
 	return -EIO;
 }
 
+static long origin_dax_direct_access(struct dm_target *ti, phys_addr_t dev_addr,
+		void **kaddr, pfn_t *pfn, long size)
+{
+	DMWARN("device does not support dax.");
+	return -EIO;
+}
+
 /*
  * Set the target "max_io_len" field to the minimum of all the snapshots'
  * chunk sizes.
@@ -2357,6 +2364,10 @@ static int origin_iterate_devices(struct dm_target *ti,
 	return fn(ti, o->dev, 0, ti->len, data);
 }
 
+static const struct dm_dax_operations origin_dax_ops = {
+	.dm_direct_access = origin_dax_direct_access,
+};
+
 static struct target_type origin_target = {
 	.name    = "snapshot-origin",
 	.version = {1, 9, 0},
@@ -2369,6 +2380,7 @@ static struct target_type origin_target = {
 	.status  = origin_status,
 	.iterate_devices = origin_iterate_devices,
 	.direct_access = origin_direct_access,
+	.dax_ops = &origin_dax_ops,
 };
 
 static struct target_type snapshot_target = {

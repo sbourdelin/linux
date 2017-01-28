@@ -331,6 +331,31 @@ static long stripe_direct_access(struct dm_target *ti, sector_t sector,
 	return ret;
 }
 
+static long stripe_dax_direct_access(struct dm_target *ti, phys_addr_t dev_addr,
+		void **kaddr, pfn_t *pfn, long size)
+{
+	struct stripe_c *sc = ti->private;
+	uint32_t stripe;
+	struct block_device *bdev;
+	struct dax_inode *dax_inode;
+	struct blk_dax_ctl dax = {
+		.size = size,
+	};
+	long ret;
+
+	stripe_map_sector(sc, dev_addr >> SECTOR_SHIFT, &stripe, &dax.sector);
+
+	dax.sector += sc->stripe[stripe].physical_start;
+	bdev = sc->stripe[stripe].dev->bdev;
+	dax_inode = sc->stripe[stripe].dev->dax_inode;
+
+	ret = bdev_dax_direct_access(bdev, dax_inode, &dax);
+	*kaddr = dax.addr;
+	*pfn = dax.pfn;
+
+	return ret;
+}
+
 /*
  * Stripe status:
  *
@@ -437,6 +462,10 @@ static void stripe_io_hints(struct dm_target *ti,
 	blk_limits_io_opt(limits, chunk_size * sc->stripes);
 }
 
+static const struct dm_dax_operations stripe_dax_ops = {
+	.dm_direct_access = stripe_dax_direct_access,
+};
+
 static struct target_type stripe_target = {
 	.name   = "striped",
 	.version = {1, 6, 0},
@@ -449,6 +478,7 @@ static struct target_type stripe_target = {
 	.iterate_devices = stripe_iterate_devices,
 	.io_hints = stripe_io_hints,
 	.direct_access = stripe_direct_access,
+	.dax_ops = &stripe_dax_ops,
 };
 
 int __init dm_stripe_init(void)

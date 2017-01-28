@@ -154,6 +154,16 @@ static long io_err_direct_access(struct dm_target *ti, sector_t sector,
 	return -EIO;
 }
 
+static long io_err_dax_direct_access(struct dm_target *ti, phys_addr_t dev_addr,
+				     void **kaddr, pfn_t *pfn, long size)
+{
+	return -EIO;
+}
+
+static const struct dm_dax_operations err_dax_ops = {
+	.dm_direct_access = io_err_dax_direct_access,
+};
+
 static struct target_type error_target = {
 	.name = "error",
 	.version = {1, 5, 0},
@@ -165,6 +175,7 @@ static struct target_type error_target = {
 	.clone_and_map_rq = io_err_clone_and_map_rq,
 	.release_clone_rq = io_err_release_clone_rq,
 	.direct_access = io_err_direct_access,
+	.dax_ops = &err_dax_ops,
 };
 
 int __init dm_target_init(void)

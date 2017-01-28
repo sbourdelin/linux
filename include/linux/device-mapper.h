@@ -137,11 +137,17 @@ void dm_error(const char *message);
 
 struct dm_dev {
 	struct block_device *bdev;
+	struct dax_inode *dax_inode;
 	fmode_t mode;
 	char name[16];
 };
 
 dev_t dm_get_dev_t(const char *path);
+
+struct dm_dax_operations {
+	long (*dm_direct_access)(struct dm_target *ti, phys_addr_t dev_addr,
+			void **kaddr, pfn_t *pfn, long size);
+};
 
 /*
  * Constructors should call these functions to ensure destination devices
@@ -180,6 +186,7 @@ struct target_type {
 	dm_iterate_devices_fn iterate_devices;
 	dm_io_hints_fn io_hints;
 	dm_direct_access_fn direct_access;
+	const struct dm_dax_operations *dax_ops;
 
 	/* For internal device-mapper use. */
 	struct list_head list;
