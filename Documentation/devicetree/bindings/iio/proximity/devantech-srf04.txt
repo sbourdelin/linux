@@ -1,0 +1,17 @@
+* Devantech SRF04 ultrasonic range finder
+  Bit-banging driver
+
+Required properties:
+ - compatible:	Should be "devantech,srf04"
+ - trig-gpios:	Definition of the GPIO for the triggering input
+ - echo-gpios:	Definition of the GPIO for the echo
+		needs to be an interrupt input
+		See Documentation/devicetree/bindings/gpio/gpio.txt
+
+Example:
+srf04@0 {
+	compatible = "devantech,srf04";
+	trig-gpios = <&gpio1 15 GPIO_ACTIVE_HIGH>;
+	echo-gpios = <&gpio2  6 GPIO_ACTIVE_HIGH>;
+};
+
