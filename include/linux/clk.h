@@ -267,6 +267,29 @@ struct clk *devm_get_clk_from_child(struct device *dev,
 				    struct device_node *np, const char *con_id);
 
 /**
+ * devm_clk_prepare - prepare clock source as a managed resource
+ * @dev: device owning the resource
+ * @clk: clock source
+ *
+ * This prepares the clock source for use.
+ *
+ * Must not be called from within atomic context.
+ */
+int devm_clk_prepare(struct device *dev, struct clk *clk);
+
+/**
+ * devm_clk_unprepare - undo preparation of a managed clock source
+ * @dev: device used to prepare the clock
+ * @clk: clock source
+ *
+ * This undoes preparation of a clock, previously prepared with a call
+ * to devm_clk_pepare().
+ *
+ * Must not be called from within atomic context.
+ */
+void devm_clk_unprepare(struct device *dev, struct clk *clk);
+
+/**
  * clk_enable - inform the system when the clock source should be running.
  * @clk: clock source
  *
@@ -277,6 +300,19 @@ struct clk *devm_get_clk_from_child(struct device *dev,
  * Returns success (0) or negative errno.
  */
 int clk_enable(struct clk *clk);
+
+/**
+ * devm_clk_enable - enable clock source as a managed resource
+ * @dev: device owning the resource
+ * @clk: clock source
+ *
+ * If the clock can not be enabled/disabled, this should return success.
+ *
+ * May be not called from atomic contexts.
+ *
+ * Returns success (0) or negative errno.
+ */
+int devm_clk_enable(struct device *dev, struct clk *clk);
 
 /**
  * clk_disable - inform the system when the clock source is no longer required.
@@ -293,6 +329,40 @@ int clk_enable(struct clk *clk);
  * disabled.
  */
 void clk_disable(struct clk *clk);
+
+/**
+ * devm_clk_disable - disable managed clock source resource
+ * @dev: device owning the clock source
+ * @clk: clock source
+ *
+ * Inform the system that a clock source is no longer required by
+ * a driver and may be shut down.
+ *
+ * Must not be called from atomic contexts.
+ */
+void devm_clk_disable(struct device *dev, struct clk *clk);
+
+/**
+ * devm_clk_prepare_enable - prepare and enable a managed clock source
+ * @dev: device owning the clock source
+ * @clk: clock source
+ *
+ * This prepares the clock source for use and enables it.
+ *
+ * Must not be called from within atomic context.
+ */
+int devm_clk_prepare_enable(struct device *dev, struct clk *clk);
+
+/**
+ * devm_clk_disable_unprepare - disable and undo preparation of a managed clock source
+ * @dev: device used to prepare and enable the clock
+ * @clk: clock source
+ *
+ * This disables and undoes a previously prepared clock.
+ *
+ * Must not be called from within atomic context.
+ */
+void devm_clk_disable_unprepare(struct device *dev, struct clk *clk);
 
 /**
  * clk_get_rate - obtain the current clock rate (in Hz) for a clock source.
@@ -460,12 +530,43 @@ static inline void clk_put(struct clk *clk) {}
 
 static inline void devm_clk_put(struct device *dev, struct clk *clk) {}
 
+static inline int devm_clk_prepare(struct device *dev, struct clk *clk)
+{
+	might_sleep();
+	return 0;
+}
+
+static inline void devm_clk_unprepare(struct device *dev, struct clk *clk)
+{
+	might_sleep();
+}
+
 static inline int clk_enable(struct clk *clk)
 {
 	return 0;
 }
 
 static inline void clk_disable(struct clk *clk) {}
+
+static inline int devm_clk_enable(struct device *dev, struct clk *clk)
+{
+	might_sleep();
+	return 0;
+}
+
+static inline void devm_clk_disable(struct device *dev, struct clk *clk) {}
+
+static inline int devm_clk_prepare_enable(struct device *dev, struct clk *clk)
+{
+	might_sleep();
+	return 0;
+}
+
+static inline void devm_clk_disable_unprepare(struct device *dev,
+					      struct clk *clk)
+{
+	might_sleep();
+}
 
 static inline unsigned long clk_get_rate(struct clk *clk)
 {

@@ -9,30 +9,20 @@
 #include <linux/export.h>
 #include <linux/gfp.h>
 
-static void devm_clk_release(struct device *dev, void *res)
+static int devm_clk_create_devres(struct device *dev, struct clk *clk,
+				  void (*release)(struct device *, void *))
 {
-	clk_put(*(struct clk **)res);
-}
+	struct clk **ptr;
 
-struct clk *devm_clk_get(struct device *dev, const char *id)
-{
-	struct clk **ptr, *clk;
-
-	ptr = devres_alloc(devm_clk_release, sizeof(*ptr), GFP_KERNEL);
+	ptr = devres_alloc(release, sizeof(*ptr), GFP_KERNEL);
 	if (!ptr)
-		return ERR_PTR(-ENOMEM);
+		return -ENOMEM;
 
-	clk = clk_get(dev, id);
-	if (!IS_ERR(clk)) {
-		*ptr = clk;
-		devres_add(dev, ptr);
-	} else {
-		devres_free(ptr);
-	}
+	*ptr = clk;
+	devres_add(dev, ptr);
 
-	return clk;
+	return 0;
 }
-EXPORT_SYMBOL(devm_clk_get);
 
 static int devm_clk_match(struct device *dev, void *res, void *data)
 {
@@ -44,31 +34,76 @@ static int devm_clk_match(struct device *dev, void *res, void *data)
 	return *c == data;
 }
 
-void devm_clk_put(struct device *dev, struct clk *clk)
+#define DEFINE_DEVM_CLK_DESTROY_OP(destroy_op)				\
+static void devm_##destroy_op##_release(struct device *dev, void *res)	\
+{									\
+	destroy_op(*(struct clk **)res);				\
+}									\
+									\
+void devm_##destroy_op(struct device *dev, struct clk *clk)		\
+{									\
+	WARN_ON(devres_release(dev, devm_##destroy_op##_release,	\
+				devm_clk_match, clk));			\
+}									\
+EXPORT_SYMBOL(devm_##destroy_op)
+
+#define DEFINE_DEVM_CLK_OP(create_op, destroy_op)			\
+DEFINE_DEVM_CLK_DESTROY_OP(destroy_op);					\
+int devm_##create_op(struct device *dev, struct clk *clk)		\
+{									\
+	int error;							\
+									\
+	error = create_op(clk);						\
+	if (error)							\
+		return error;						\
+									\
+	error = devm_clk_create_devres(dev, clk,			\
+					devm_##destroy_op##_release);	\
+	if (error) {							\
+		destroy_op(clk);					\
+		return error;						\
+	}								\
+									\
+	return 0;							\
+}									\
+EXPORT_SYMBOL(devm_##create_op)
+
+DEFINE_DEVM_CLK_DESTROY_OP(clk_put);
+DEFINE_DEVM_CLK_OP(clk_prepare, clk_unprepare);
+DEFINE_DEVM_CLK_OP(clk_enable, clk_disable);
+DEFINE_DEVM_CLK_OP(clk_prepare_enable, clk_disable_unprepare);
+
+struct clk *devm_clk_get(struct device *dev, const char *id)
 {
-	int ret;
+	struct clk *clk;
+	int error;
 
-	ret = devres_release(dev, devm_clk_release, devm_clk_match, clk);
+	clk = clk_get(dev, id);
+	if (!IS_ERR(clk)) {
+		error = devm_clk_create_devres(dev, clk, devm_clk_put_release);
+		if (error) {
+			clk_put(clk);
+			return ERR_PTR(error);
+		}
+	}
 
-	WARN_ON(ret);
+	return clk;
 }
-EXPORT_SYMBOL(devm_clk_put);
+EXPORT_SYMBOL(devm_clk_get);
 
 struct clk *devm_get_clk_from_child(struct device *dev,
 				    struct device_node *np, const char *con_id)
 {
-	struct clk **ptr, *clk;
-
-	ptr = devres_alloc(devm_clk_release, sizeof(*ptr), GFP_KERNEL);
-	if (!ptr)
-		return ERR_PTR(-ENOMEM);
+	struct clk *clk;
+	int error;
 
 	clk = of_clk_get_by_name(np, con_id);
 	if (!IS_ERR(clk)) {
-		*ptr = clk;
-		devres_add(dev, ptr);
-	} else {
-		devres_free(ptr);
+		error = devm_clk_create_devres(dev, clk, devm_clk_put_release);
+		if (error) {
+			clk_put(clk);
+			return ERR_PTR(error);
+		}
 	}
 
 	return clk;
