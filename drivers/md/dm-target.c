@@ -148,12 +148,6 @@ static void io_err_release_clone_rq(struct request *clone)
 {
 }
 
-static long io_err_direct_access(struct dm_target *ti, sector_t sector,
-				 void **kaddr, pfn_t *pfn, long size)
-{
-	return -EIO;
-}
-
 static long io_err_dax_direct_access(struct dm_target *ti, phys_addr_t dev_addr,
 				     void **kaddr, pfn_t *pfn, long size)
 {
@@ -174,7 +168,6 @@ static struct target_type error_target = {
 	.map_rq = io_err_map_rq,
 	.clone_and_map_rq = io_err_clone_and_map_rq,
 	.release_clone_rq = io_err_release_clone_rq,
-	.direct_access = io_err_direct_access,
 	.dax_ops = &err_dax_ops,
 };
 

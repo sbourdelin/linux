@@ -395,14 +395,6 @@ static long __brd_direct_access(struct brd_device *brd, phys_addr_t dev_addr,
 	return PAGE_SIZE;
 }
 
-static long brd_blk_direct_access(struct block_device *bdev, sector_t sector,
-			void **kaddr, pfn_t *pfn, long size)
-{
-	struct brd_device *brd = bdev->bd_disk->private_data;
-
-	return __brd_direct_access(brd, sector * 512, kaddr, pfn, size);
-}
-
 static long brd_dax_direct_access(struct dax_inode *dax_inode,
 		phys_addr_t dev_addr, void **kaddr, pfn_t *pfn, long size)
 {
@@ -414,14 +406,11 @@ static long brd_dax_direct_access(struct dax_inode *dax_inode,
 static const struct dax_operations brd_dax_ops = {
 	.direct_access = brd_dax_direct_access,
 };
-#else
-#define brd_blk_direct_access NULL
 #endif
 
 static const struct block_device_operations brd_fops = {
 	.owner =		THIS_MODULE,
 	.rw_page =		brd_rw_page,
-	.direct_access =	brd_blk_direct_access,
 };
 
 /*

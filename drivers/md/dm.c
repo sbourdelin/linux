@@ -910,7 +910,7 @@ int dm_set_target_max_io_len(struct dm_target *ti, sector_t len)
 EXPORT_SYMBOL_GPL(dm_set_target_max_io_len);
 
 static long __dm_direct_access(struct mapped_device *md, phys_addr_t dev_addr,
-			       void **kaddr, pfn_t *pfn, long size, bool blk)
+			       void **kaddr, pfn_t *pfn, long size)
 {
 	sector_t sector = dev_addr >> SECTOR_SHIFT;
 	struct dm_table *map;
@@ -929,23 +929,12 @@ static long __dm_direct_access(struct mapped_device *md, phys_addr_t dev_addr,
 	len = max_io_len(sector, ti) << SECTOR_SHIFT;
 	size = min(len, size);
 
-	if (blk && ti->type->direct_access)
-		ret = ti->type->direct_access(ti, sector, kaddr, pfn, size);
-	else if (ti->type->dax_ops)
+	if (ti->type->dax_ops)
 		ret = ti->type->dax_ops->dm_direct_access(ti, dev_addr, kaddr,
 				pfn, size);
 out:
 	dm_put_live_table(md, srcu_idx);
 	return min(ret, size);
-}
-
-static long dm_blk_direct_access(struct block_device *bdev, sector_t sector,
-				 void **kaddr, pfn_t *pfn, long size)
-{
-	struct mapped_device *md = bdev->bd_disk->private_data;
-
-	return __dm_direct_access(md, sector << SECTOR_SHIFT, kaddr, pfn, size,
-			true);
 }
 
 static long dm_dax_direct_access(struct dax_inode *dax_inode,
@@ -954,8 +943,7 @@ static long dm_dax_direct_access(struct dax_inode *dax_inode,
 {
 	struct mapped_device *md = dax_inode_get_private(dax_inode);
 
-	return __dm_direct_access(md, dev_addr, kaddr, pfn, size,
-			false);
+	return __dm_direct_access(md, dev_addr, kaddr, pfn, size);
 }
 
 /*
@@ -2769,7 +2757,6 @@ static const struct block_device_operations dm_blk_dops = {
 	.open = dm_blk_open,
 	.release = dm_blk_close,
 	.ioctl = dm_blk_ioctl,
-	.direct_access = dm_blk_direct_access,
 	.getgeo = dm_blk_getgeo,
 	.pr_ops = &dm_pr_ops,
 	.owner = THIS_MODULE

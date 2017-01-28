@@ -125,14 +125,6 @@ typedef void (*dm_io_hints_fn) (struct dm_target *ti,
  */
 typedef int (*dm_busy_fn) (struct dm_target *ti);
 
-/*
- * Returns:
- *  < 0 : error
- * >= 0 : the number of bytes accessible at the address
- */
-typedef long (*dm_direct_access_fn) (struct dm_target *ti, sector_t sector,
-				     void **kaddr, pfn_t *pfn, long size);
-
 void dm_error(const char *message);
 
 struct dm_dev {
@@ -185,7 +177,6 @@ struct target_type {
 	dm_busy_fn busy;
 	dm_iterate_devices_fn iterate_devices;
 	dm_io_hints_fn io_hints;
-	dm_direct_access_fn direct_access;
 	const struct dm_dax_operations *dax_ops;
 
 	/* For internal device-mapper use. */

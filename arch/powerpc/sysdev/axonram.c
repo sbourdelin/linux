@@ -148,23 +148,8 @@ __axon_ram_direct_access(struct axon_ram_bank *bank, phys_addr_t offset,
 	return bank->size - offset;
 }
 
-/**
- * axon_ram_direct_access - direct_access() method for block device
- * @device, @sector, @data: see block_device_operations method
- */
-static long
-axon_ram_blk_direct_access(struct block_device *device, sector_t sector,
-		       void **kaddr, pfn_t *pfn, long size)
-{
-	struct axon_ram_bank *bank = device->bd_disk->private_data;
-
-	return __axon_ram_direct_access(bank, sector << AXON_RAM_SECTOR_SHIFT,
-			kaddr, pfn, size);
-}
-
 static const struct block_device_operations axon_ram_devops = {
 	.owner		= THIS_MODULE,
-	.direct_access	= axon_ram_blk_direct_access
 };
 
 static long

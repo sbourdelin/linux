@@ -2302,13 +2302,6 @@ static int origin_map(struct dm_target *ti, struct bio *bio)
 	return do_origin(o->dev, bio);
 }
 
-static long origin_direct_access(struct dm_target *ti, sector_t sector,
-		void **kaddr, pfn_t *pfn, long size)
-{
-	DMWARN("device does not support dax.");
-	return -EIO;
-}
-
 static long origin_dax_direct_access(struct dm_target *ti, phys_addr_t dev_addr,
 		void **kaddr, pfn_t *pfn, long size)
 {
@@ -2379,7 +2372,6 @@ static struct target_type origin_target = {
 	.postsuspend = origin_postsuspend,
 	.status  = origin_status,
 	.iterate_devices = origin_iterate_devices,
-	.direct_access = origin_direct_access,
 	.dax_ops = &origin_dax_ops,
 };
 

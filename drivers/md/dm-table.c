@@ -856,7 +856,7 @@ static bool dm_table_supports_dax(struct dm_table *t)
 	while (i < dm_table_get_num_targets(t)) {
 		ti = dm_table_get_target(t, i++);
 
-		if (!ti->type->direct_access)
+		if (!ti->type->dax_ops)
 			return false;
 
 		if (!ti->type->iterate_devices ||
