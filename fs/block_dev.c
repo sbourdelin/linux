@@ -806,14 +806,16 @@ int bdev_dax_supported(struct super_block *sb, int blocksize)
 		.sector = 0,
 		.size = PAGE_SIZE,
 	};
-	int err;
+	int err, id;
 
 	if (blocksize != PAGE_SIZE) {
 		vfs_msg(sb, KERN_ERR, "error: unsupported blocksize for dax");
 		return -EINVAL;
 	}
 
-	err = bdev_direct_access(sb->s_bdev, &dax);
+	id = dax_read_lock();
+	err = bdev_dax_direct_access(sb->s_bdev, sb->s_dax, &dax);
+	dax_read_unlock(id);
 	if (err < 0) {
 		switch (err) {
 		case -EOPNOTSUPP:

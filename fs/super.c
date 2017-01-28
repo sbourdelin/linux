@@ -26,6 +26,7 @@
 #include <linux/mount.h>
 #include <linux/security.h>
 #include <linux/writeback.h>		/* for the emergency remount stuff */
+#include <linux/dax.h>
 #include <linux/idr.h>
 #include <linux/mutex.h>
 #include <linux/backing-dev.h>
@@ -1038,9 +1039,17 @@ struct dentry *mount_ns(struct file_system_type *fs_type,
 EXPORT_SYMBOL(mount_ns);
 
 #ifdef CONFIG_BLOCK
+struct mount_bdev_data {
+	struct block_device *bdev;
+	struct dax_inode *dax_inode;
+};
+
 static int set_bdev_super(struct super_block *s, void *data)
 {
-	s->s_bdev = data;
+	struct mount_bdev_data *mb_data = data;
+
+	s->s_bdev = mb_data->bdev;
+	s->s_dax = mb_data->dax_inode;
 	s->s_dev = s->s_bdev->bd_dev;
 
 	/*
@@ -1053,14 +1062,18 @@ static int set_bdev_super(struct super_block *s, void *data)
 
 static int test_bdev_super(struct super_block *s, void *data)
 {
-	return (void *)s->s_bdev == data;
+	struct mount_bdev_data *mb_data = data;
+
+	return s->s_bdev == mb_data->bdev;
 }
 
 struct dentry *mount_bdev(struct file_system_type *fs_type,
 	int flags, const char *dev_name, void *data,
 	int (*fill_super)(struct super_block *, void *, int))
 {
+	struct mount_bdev_data mb_data;
 	struct block_device *bdev;
+	struct dax_inode *dax_inode;
 	struct super_block *s;
 	fmode_t mode = FMODE_READ | FMODE_EXCL;
 	int error = 0;
@@ -1071,6 +1084,11 @@ struct dentry *mount_bdev(struct file_system_type *fs_type,
 	bdev = blkdev_get_by_path(dev_name, mode, fs_type);
 	if (IS_ERR(bdev))
 		return ERR_CAST(bdev);
+
+	if (IS_ENABLED(CONFIG_FS_DAX))
+		dax_inode = dax_get_by_host(bdev->bd_disk->disk_name);
+	else
+		dax_inode = NULL;
 
 	/*
 	 * once the super is inserted into the list by sget, s_umount
@@ -1083,8 +1101,13 @@ struct dentry *mount_bdev(struct file_system_type *fs_type,
 		error = -EBUSY;
 		goto error_bdev;
 	}
+
+	mb_data = (struct mount_bdev_data) {
+		.bdev = bdev,
+		.dax_inode = dax_inode,
+	};
 	s = sget(fs_type, test_bdev_super, set_bdev_super, flags | MS_NOSEC,
-		 bdev);
+		 &mb_data);
 	mutex_unlock(&bdev->bd_fsfreeze_mutex);
 	if (IS_ERR(s))
 		goto error_s;
@@ -1126,6 +1149,7 @@ error_s:
 	error = PTR_ERR(s);
 error_bdev:
 	blkdev_put(bdev, mode);
+	put_dax_inode(dax_inode);
 error:
 	return ERR_PTR(error);
 }
@@ -1133,6 +1157,7 @@ EXPORT_SYMBOL(mount_bdev);
 
 void kill_block_super(struct super_block *sb)
 {
+	struct dax_inode *dax_inode = sb->s_dax;
 	struct block_device *bdev = sb->s_bdev;
 	fmode_t mode = sb->s_mode;
 
@@ -1141,6 +1166,7 @@ void kill_block_super(struct super_block *sb)
 	sync_blockdev(bdev);
 	WARN_ON_ONCE(!(mode & FMODE_EXCL));
 	blkdev_put(bdev, mode | FMODE_EXCL);
+	put_dax_inode(dax_inode);
 }
 
 EXPORT_SYMBOL(kill_block_super);
