@@ -185,6 +185,9 @@ struct mesh_rmc {
 /* Number of frames buffered per destination for unresolved destinations */
 #define MESH_FRAME_QUEUE_LEN	10
 
+/* Moving failure average weight of mesh peer link (in percent) */
+#define MESH_FAIL_AVG_WEIGHT 10
+
 /* Public interfaces */
 /* Various */
 int ieee80211_fill_mesh_addresses(struct ieee80211_hdr *hdr, __le16 *fc,
