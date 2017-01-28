@@ -13,7 +13,9 @@
 #ifndef __DAX_H__
 #define __DAX_H__
 struct dax_inode;
-struct dax_inode *alloc_dax_inode(void *private, const char *host);
+struct dax_operations;
+struct dax_inode *alloc_dax_inode(void *private, const char *host,
+		const struct dax_operations *ops);
 void put_dax_inode(struct dax_inode *dax_inode);
 bool dax_inode_alive(struct dax_inode *dax_inode);
 void kill_dax_inode(struct dax_inode *dax_inode);

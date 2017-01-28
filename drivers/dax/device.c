@@ -560,7 +560,11 @@ struct dax_dev *devm_create_dax_dev(struct dax_region *dax_region,
 		goto err_id;
 	}
 
-	dax_inode = alloc_dax_inode(dax_dev, NULL);
+	/*
+	 * No 'host' or dax_operations since there is no access to this
+	 * device outside of mmap of the resulting character device.
+	 */
+	dax_inode = alloc_dax_inode(dax_dev, NULL, NULL);
 	if (!dax_inode)
 		goto err_inode;
 

@@ -17,6 +17,7 @@
 #include <linux/cdev.h>
 #include <linux/hash.h>
 #include <linux/slab.h>
+#include <linux/dax.h>
 #include <linux/fs.h>
 
 static int nr_dax = CONFIG_NR_DEV_DAX;
@@ -61,6 +62,7 @@ struct dax_inode {
 	const char *host;
 	void *private;
 	bool alive;
+	const struct dax_operations *ops;
 };
 
 bool dax_inode_alive(struct dax_inode *dax_inode)
@@ -204,7 +206,8 @@ static void dax_add_host(struct dax_inode *dax_inode, const char *host)
 	spin_unlock(&dax_host_lock);
 }
 
-struct dax_inode *alloc_dax_inode(void *private, const char *__host)
+struct dax_inode *alloc_dax_inode(void *private, const char *__host,
+		const struct dax_operations *ops)
 {
 	struct dax_inode *dax_inode;
 	const char *host;
@@ -225,6 +228,7 @@ struct dax_inode *alloc_dax_inode(void *private, const char *__host)
 		goto err_inode;
 
 	dax_add_host(dax_inode, host);
+	dax_inode->ops = ops;
 	dax_inode->private = private;
 	return dax_inode;
 

@@ -7,6 +7,11 @@
 #include <asm/pgtable.h>
 
 struct iomap_ops;
+struct dax_inode;
+struct dax_operations {
+	long (*direct_access)(struct dax_inode *, phys_addr_t, void **,
+			pfn_t *, long);
+};
 
 int dax_read_lock(void);
 void dax_read_unlock(int id);
