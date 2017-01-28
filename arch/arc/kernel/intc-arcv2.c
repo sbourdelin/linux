@@ -24,25 +24,8 @@ void arc_init_IRQ(void)
 {
 	unsigned int tmp, irq_prio;
 
-	struct irq_build {
-#ifdef CONFIG_CPU_BIG_ENDIAN
-		unsigned int pad:3, firq:1, prio:4, exts:8, irqs:8, ver:8;
-#else
-		unsigned int ver:8, irqs:8, exts:8, prio:4, firq:1, pad:3;
-#endif
-	} irq_bcr;
-
-	struct aux_irq_ctrl {
-#ifdef CONFIG_CPU_BIG_ENDIAN
-		unsigned int res3:18, save_idx_regs:1, res2:1,
-			     save_u_to_u:1, save_lp_regs:1, save_blink:1,
-			     res:4, save_nr_gpr_pairs:5;
-#else
-		unsigned int save_nr_gpr_pairs:5, res:4,
-			     save_blink:1, save_lp_regs:1, save_u_to_u:1,
-			     res2:1, save_idx_regs:1, res3:18;
-#endif
-	} ictrl;
+	struct bcr_irq_arcv2 irq_bcr;
+	struct aux_irq_ctrl_arcv2 ictrl;
 
 	*(unsigned int *)&ictrl = 0;
 
@@ -69,7 +52,7 @@ void arc_init_IRQ(void)
 		irq_bcr.firq ? " FIRQ (not used)":"");
 
 	/* setup status32, don't enable intr yet as kernel doesn't want */
-	tmp = read_aux_reg(0xa);
+	tmp = read_aux_reg(ARC_REG_STATUS32);
 	tmp |= STATUS_AD_MASK | (ARCV2_IRQ_DEF_PRIO << 1);
 	tmp &= ~STATUS_IE_MASK;
 	asm volatile("kflag %0	\n"::"r"(tmp));

@@ -38,6 +38,9 @@
 #define ARC_REG_CLUSTER_BCR	0xcf
 #define ARC_REG_AUX_ICCM	0x208	/* ICCM Base Addr (ARCv2) */
 
+/* Common for ARCompact and ARCv2 status register */
+#define ARC_REG_STATUS32	0x0A
+
 /* status32 Bits Positions */
 #define STATUS_AE_BIT		5	/* Exception active */
 #define STATUS_DE_BIT		6	/* PC is in delay slot */
@@ -230,6 +233,29 @@ struct bcr_generic {
 	unsigned int info:24, ver:8;
 #else
 	unsigned int ver:8, info:24;
+#endif
+};
+
+struct bcr_irq_arcv2 {
+#ifdef CONFIG_CPU_BIG_ENDIAN
+	unsigned int pad:3, firq:1, prio:4, exts:8, irqs:8, ver:8;
+#else
+	unsigned int ver:8, irqs:8, exts:8, prio:4, firq:1, pad:3;
+#endif
+};
+
+/*
+ ***********************************************
+ * Control registers for configuration of CPU
+ */
+
+struct aux_irq_ctrl_arcv2 {
+#ifdef CONFIG_CPU_BIG_ENDIAN
+	unsigned int res3:18, save_idx_regs:1, res2:1, save_u_to_u:1,
+		     save_lp_regs:1, save_blink:1, res:4, save_nr_gpr_pairs:5;
+#else
+	unsigned int save_nr_gpr_pairs:5, res:4, save_blink:1, save_lp_regs:1,
+		     save_u_to_u:1, res2:1, save_idx_regs:1, res3:18;
 #endif
 };
 
