@@ -433,6 +433,7 @@ enum dwc2_ep0_state {
  *			needed.
  *			0 - No (default)
  *			1 - Yes
+ * @needs_supplies:	Chip needs supplies (for vusb_a and vusb_d)
  * @ahb_burst:          Specifies the AHB burst.
  *                       0 - Single
  *                       1 - INCR
@@ -510,6 +511,7 @@ struct dwc2_core_params {
 	int uframe_sched;
 	int external_id_pin_ctl;
 	int hibernation;
+	bool needs_supplies;
 
 	/*
 	 * The following parameters are *only* set via device

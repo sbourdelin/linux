@@ -67,6 +67,7 @@ static const struct dwc2_core_params params_hi6220 = {
 	.uframe_sched			= 0,
 	.external_id_pin_ctl		= -1,
 	.hibernation			= -1,
+	.needs_supplies			= false,
 };
 
 static const struct dwc2_core_params params_bcm2835 = {
@@ -104,6 +105,7 @@ static const struct dwc2_core_params params_bcm2835 = {
 	.uframe_sched			= 0,
 	.external_id_pin_ctl		= -1,
 	.hibernation			= -1,
+	.needs_supplies			= false,
 };
 
 static const struct dwc2_core_params params_rk3066 = {
@@ -135,6 +137,7 @@ static const struct dwc2_core_params params_rk3066 = {
 	.uframe_sched			= -1,
 	.external_id_pin_ctl		= -1,
 	.hibernation			= -1,
+	.needs_supplies			= false,
 };
 
 static const struct dwc2_core_params params_ltq = {
@@ -166,6 +169,7 @@ static const struct dwc2_core_params params_ltq = {
 	.uframe_sched			= -1,
 	.external_id_pin_ctl		= -1,
 	.hibernation			= -1,
+	.needs_supplies			= false,
 };
 
 static const struct dwc2_core_params params_amlogic = {
@@ -197,6 +201,7 @@ static const struct dwc2_core_params params_amlogic = {
 	.uframe_sched			= 0,
 	.external_id_pin_ctl		= -1,
 	.hibernation			= -1,
+	.needs_supplies			= false,
 };
 
 static const struct dwc2_core_params params_default = {
@@ -234,6 +239,7 @@ static const struct dwc2_core_params params_default = {
 	.uframe_sched			= -1,
 	.external_id_pin_ctl		= -1,
 	.hibernation			= -1,
+	.needs_supplies			= true,
 };
 
 const struct of_device_id dwc2_of_match_table[] = {

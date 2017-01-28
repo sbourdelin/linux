@@ -125,10 +125,12 @@ static int __dwc2_lowlevel_hw_enable(struct dwc2_hsotg *hsotg)
 	struct platform_device *pdev = to_platform_device(hsotg->dev);
 	int ret;
 
-	ret = regulator_bulk_enable(ARRAY_SIZE(hsotg->supplies),
-				    hsotg->supplies);
-	if (ret)
-		return ret;
+	if (hsotg->params.needs_supplies) {
+		ret = regulator_bulk_enable(ARRAY_SIZE(hsotg->supplies),
+					    hsotg->supplies);
+		if (ret)
+			return ret;
+	}
 
 	if (hsotg->clk) {
 		ret = clk_prepare_enable(hsotg->clk);
@@ -185,8 +187,9 @@ static int __dwc2_lowlevel_hw_disable(struct dwc2_hsotg *hsotg)
 	if (hsotg->clk)
 		clk_disable_unprepare(hsotg->clk);
 
-	ret = regulator_bulk_disable(ARRAY_SIZE(hsotg->supplies),
-				     hsotg->supplies);
+	if (hsotg->params.needs_supplies)
+		ret = regulator_bulk_disable(ARRAY_SIZE(hsotg->supplies),
+					     hsotg->supplies);
 
 	return ret;
 }
@@ -293,12 +296,17 @@ static int dwc2_lowlevel_hw_init(struct dwc2_hsotg *hsotg)
 	for (i = 0; i < ARRAY_SIZE(hsotg->supplies); i++)
 		hsotg->supplies[i].supply = dwc2_hsotg_supply_names[i];
 
-	ret = devm_regulator_bulk_get(hsotg->dev, ARRAY_SIZE(hsotg->supplies),
-				      hsotg->supplies);
-	if (ret) {
-		dev_err(hsotg->dev, "failed to request supplies: %d\n", ret);
-		return ret;
+	if (hsotg->params.needs_supplies) {
+		ret = devm_regulator_bulk_get(hsotg->dev,
+					      ARRAY_SIZE(hsotg->supplies),
+					      hsotg->supplies);
+		if (ret) {
+			dev_err(hsotg->dev,
+				"failed to request supplies: %d\n", ret);
+			return ret;
+		}
 	}
+
 	return 0;
 }
 
