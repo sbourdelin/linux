@@ -24,10 +24,23 @@ module_param(nr_dax, int, S_IRUGO);
 MODULE_PARM_DESC(nr_dax, "max number of dax device instances");
 
 static dev_t dax_devt;
+DEFINE_STATIC_SRCU(dax_srcu);
 static struct vfsmount *dax_mnt;
 static DEFINE_IDA(dax_minor_ida);
 static struct kmem_cache *dax_cache __read_mostly;
 static struct super_block *dax_superblock __read_mostly;
+
+int dax_read_lock(void)
+{
+	return srcu_read_lock(&dax_srcu);
+}
+EXPORT_SYMBOL_GPL(dax_read_lock);
+
+void dax_read_unlock(int id)
+{
+	srcu_read_unlock(&dax_srcu, id);
+}
+EXPORT_SYMBOL_GPL(dax_read_unlock);
 
 /**
  * struct dax_inode - anchor object for dax services
@@ -45,8 +58,7 @@ struct dax_inode {
 
 bool dax_inode_alive(struct dax_inode *dax_inode)
 {
-	RCU_LOCKDEP_WARN(!rcu_read_lock_held(),
-			"dax operations require rcu_read_lock()\n");
+	lockdep_assert_held(&dax_srcu);
 	return dax_inode->alive;
 }
 EXPORT_SYMBOL_GPL(dax_inode_alive);
@@ -55,7 +67,7 @@ EXPORT_SYMBOL_GPL(dax_inode_alive);
  * Note, rcu is not protecting the liveness of dax_inode, rcu is
  * ensuring that any fault handlers or operations that might have seen
  * dax_inode_alive(), have completed.  Any operations that start after
- * synchronize_rcu() has run will abort upon seeing !dax_inode_alive().
+ * synchronize_srcu() has run will abort upon seeing !dax_inode_alive().
  */
 void kill_dax_inode(struct dax_inode *dax_inode)
 {
@@ -63,7 +75,7 @@ void kill_dax_inode(struct dax_inode *dax_inode)
 		return;
 
 	dax_inode->alive = false;
-	synchronize_rcu();
+	synchronize_srcu(&dax_srcu);
 	dax_inode->private = NULL;
 }
 EXPORT_SYMBOL_GPL(kill_dax_inode);
