@@ -25,6 +25,7 @@
 
 #include <linux/bio.h>
 #include <linux/blkdev.h>
+#include <linux/dax.h>
 #include <linux/device.h>
 #include <linux/errno.h>
 #include <linux/fs.h>
@@ -62,6 +63,7 @@ static int azfs_major, azfs_minor;
 struct axon_ram_bank {
 	struct platform_device	*device;
 	struct gendisk		*disk;
+	struct dax_inode	*dax_inode;
 	unsigned int		irq_id;
 	unsigned long		ph_addr;
 	unsigned long		io_addr;
@@ -137,25 +139,45 @@ axon_ram_make_request(struct request_queue *queue, struct bio *bio)
 	return BLK_QC_T_NONE;
 }
 
-/**
- * axon_ram_direct_access - direct_access() method for block device
- * @device, @sector, @data: see block_device_operations method
- */
 static long
-axon_ram_direct_access(struct block_device *device, sector_t sector,
+__axon_ram_direct_access(struct axon_ram_bank *bank, phys_addr_t offset,
 		       void **kaddr, pfn_t *pfn, long size)
 {
-	struct axon_ram_bank *bank = device->bd_disk->private_data;
-	loff_t offset = (loff_t)sector << AXON_RAM_SECTOR_SHIFT;
-
 	*kaddr = (void *) bank->io_addr + offset;
 	*pfn = phys_to_pfn_t(bank->ph_addr + offset, PFN_DEV);
 	return bank->size - offset;
 }
 
+/**
+ * axon_ram_direct_access - direct_access() method for block device
+ * @device, @sector, @data: see block_device_operations method
+ */
+static long
+axon_ram_blk_direct_access(struct block_device *device, sector_t sector,
+		       void **kaddr, pfn_t *pfn, long size)
+{
+	struct axon_ram_bank *bank = device->bd_disk->private_data;
+
+	return __axon_ram_direct_access(bank, sector << AXON_RAM_SECTOR_SHIFT,
+			kaddr, pfn, size);
+}
+
 static const struct block_device_operations axon_ram_devops = {
 	.owner		= THIS_MODULE,
-	.direct_access	= axon_ram_direct_access
+	.direct_access	= axon_ram_blk_direct_access
+};
+
+static long
+axon_ram_dax_direct_access(struct dax_inode *dax_inode, phys_addr_t dev_addr,
+		       void **kaddr, pfn_t *pfn, long size)
+{
+	struct axon_ram_bank *bank = dax_inode_get_private(dax_inode);
+
+	return __axon_ram_direct_access(bank, dev_addr, kaddr, pfn, size);
+}
+
+static const struct dax_operations axon_ram_dax_ops = {
+	.direct_access = axon_ram_dax_direct_access,
 };
 
 /**
@@ -219,6 +241,7 @@ static int axon_ram_probe(struct platform_device *device)
 		goto failed;
 	}
 
+
 	bank->disk->major = azfs_major;
 	bank->disk->first_minor = azfs_minor;
 	bank->disk->fops = &axon_ram_devops;
@@ -226,6 +249,11 @@ static int axon_ram_probe(struct platform_device *device)
 
 	sprintf(bank->disk->disk_name, "%s%d",
 			AXON_RAM_DEVICE_NAME, axon_ram_bank_id);
+
+	bank->dax_inode = alloc_dax_inode(bank, bank->disk->disk_name,
+			&axon_ram_dax_ops);
+	if (!bank->dax_inode)
+		goto failed;
 
 	bank->disk->queue = blk_alloc_queue(GFP_KERNEL);
 	if (bank->disk->queue == NULL) {
@@ -276,6 +304,10 @@ failed:
 						bank->disk->disk_name);
 			del_gendisk(bank->disk);
 		}
+		if (bank->dax_inode) {
+			kill_dax_inode(bank->dax_inode);
+			put_dax_inode(bank->dax_inode);
+		}
 		device->dev.platform_data = NULL;
 		if (bank->io_addr != 0)
 			iounmap((void __iomem *) bank->io_addr);
@@ -298,6 +330,8 @@ axon_ram_remove(struct platform_device *device)
 
 	device_remove_file(&device->dev, &dev_attr_ecc);
 	free_irq(bank->irq_id, device);
+	kill_dax_inode(bank->dax_inode);
+	put_dax_inode(bank->dax_inode);
 	del_gendisk(bank->disk);
 	iounmap((void __iomem *) bank->io_addr);
 	kfree(bank);
