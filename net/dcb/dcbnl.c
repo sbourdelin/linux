@@ -398,7 +398,7 @@ static int dcbnl_setnumtcs(struct net_device *netdev, struct nlmsghdr *nlh,
 		return ret;
 
 	for (i = DCB_NUMTCS_ATTR_ALL+1; i <= DCB_NUMTCS_ATTR_MAX; i++) {
-		if (data[i] == NULL)
+		if (!data[i])
 			continue;
 
 		value = nla_get_u8(data[i]);
@@ -741,7 +741,7 @@ static int dcbnl_setpfccfg(struct net_device *netdev, struct nlmsghdr *nlh,
 		return ret;
 
 	for (i = DCB_PFC_UP_ATTR_0; i <= DCB_PFC_UP_ATTR_7; i++) {
-		if (data[i] == NULL)
+		if (!data[i])
 			continue;
 		value = nla_get_u8(data[i]);
 		netdev->dcbnl_ops->setpfccfg(netdev,
@@ -955,7 +955,7 @@ static int dcbnl_bcn_setcfg(struct net_device *netdev, struct nlmsghdr *nlh,
 		return ret;
 
 	for (i = DCB_BCN_ATTR_RP_0; i <= DCB_BCN_ATTR_RP_7; i++) {
-		if (data[i] == NULL)
+		if (!data[i])
 			continue;
 		value_byte = nla_get_u8(data[i]);
 		netdev->dcbnl_ops->setbcnrp(netdev,
@@ -963,7 +963,7 @@ static int dcbnl_bcn_setcfg(struct net_device *netdev, struct nlmsghdr *nlh,
 	}
 
 	for (i = DCB_BCN_ATTR_BCNA_0; i <= DCB_BCN_ATTR_RI; i++) {
-		if (data[i] == NULL)
+		if (!data[i])
 			continue;
 		value_int = nla_get_u32(data[i]);
 		netdev->dcbnl_ops->setbcncfg(netdev,
@@ -1632,7 +1632,7 @@ static int dcbnl_setfeatcfg(struct net_device *netdev, struct nlmsghdr *nlh,
 		goto err;
 
 	for (i = DCB_FEATCFG_ATTR_ALL+1; i <= DCB_FEATCFG_ATTR_MAX; i++) {
-		if (data[i] == NULL)
+		if (!data[i])
 			continue;
 
 		value = nla_get_u8(data[i]);
