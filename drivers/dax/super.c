@@ -65,6 +65,39 @@ struct dax_inode {
 	const struct dax_operations *ops;
 };
 
+long dax_direct_access(struct dax_inode *dax_inode, phys_addr_t dev_addr,
+		void **kaddr, pfn_t *pfn, long size)
+{
+	long avail;
+
+	/*
+	 * The device driver is allowed to sleep, in order to make the
+	 * memory directly accessible.
+	 */
+	might_sleep();
+
+	if (!dax_inode)
+		return -EOPNOTSUPP;
+
+	if (!dax_inode_alive(dax_inode))
+		return -ENXIO;
+
+	if (size < 0)
+		return size;
+
+	if (dev_addr % PAGE_SIZE)
+		return -EINVAL;
+
+	avail = dax_inode->ops->direct_access(dax_inode, dev_addr, kaddr, pfn,
+			size);
+	if (!avail)
+		return -ERANGE;
+	if (avail > 0 && avail & ~PAGE_MASK)
+		return -ENXIO;
+	return min(avail, size);
+}
+EXPORT_SYMBOL_GPL(dax_direct_access);
+
 bool dax_inode_alive(struct dax_inode *dax_inode)
 {
 	lockdep_assert_held(&dax_srcu);

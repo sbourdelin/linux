@@ -22,6 +22,8 @@ void *dax_inode_get_private(struct dax_inode *dax_inode);
 void put_dax_inode(struct dax_inode *dax_inode);
 bool dax_inode_alive(struct dax_inode *dax_inode);
 void kill_dax_inode(struct dax_inode *dax_inode);
+long dax_direct_access(struct dax_inode *dax_inode, phys_addr_t dev_addr,
+		void **kaddr, pfn_t *pfn, long size);
 
 /*
  * We use lowest available bit in exceptional entry for locking, one bit for

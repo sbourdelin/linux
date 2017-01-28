@@ -18,6 +18,7 @@
 #include <linux/module.h>
 #include <linux/blkpg.h>
 #include <linux/magic.h>
+#include <linux/dax.h>
 #include <linux/buffer_head.h>
 #include <linux/swap.h>
 #include <linux/pagevec.h>
@@ -761,6 +762,33 @@ long bdev_direct_access(struct block_device *bdev, struct blk_dax_ctl *dax)
 	return min(avail, size);
 }
 EXPORT_SYMBOL_GPL(bdev_direct_access);
+
+/**
+ * bdev_dax_direct_access() - bdev-sector to pfn_t and kernel virtual address
+ * @bdev: host block device for @dax_inode
+ * @dax_inode: interface data and operations for a memory device
+ * @dax: control and output parameters for ->direct_access
+ *
+ * Return: negative errno if an error occurs, otherwise the number of bytes
+ * accessible at this address.
+ *
+ * Locking: must be called with dax_read_lock() held
+ */
+long bdev_dax_direct_access(struct block_device *bdev,
+		struct dax_inode *dax_inode, struct blk_dax_ctl *dax)
+{
+	sector_t sector = dax->sector;
+
+	if (!blk_queue_dax(bdev->bd_queue))
+		return -EOPNOTSUPP;
+	if ((sector + DIV_ROUND_UP(dax->size, 512))
+			> part_nr_sects_read(bdev->bd_part))
+		return -ERANGE;
+	sector += get_start_sect(bdev);
+	return dax_direct_access(dax_inode, sector * 512, &dax->addr,
+			&dax->pfn, dax->size);
+}
+EXPORT_SYMBOL_GPL(bdev_dax_direct_access);
 
 /**
  * bdev_dax_supported() - Check if the device supports dax for filesystem

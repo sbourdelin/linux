@@ -1903,6 +1903,9 @@ extern int bdev_read_page(struct block_device *, sector_t, struct page *);
 extern int bdev_write_page(struct block_device *, sector_t, struct page *,
 						struct writeback_control *);
 extern long bdev_direct_access(struct block_device *, struct blk_dax_ctl *);
+struct dax_inode;
+extern long bdev_dax_direct_access(struct block_device *bdev,
+		struct dax_inode *dax_inode, struct blk_dax_ctl *dax);
 extern int bdev_dax_supported(struct super_block *, int);
 #else /* CONFIG_BLOCK */
 
