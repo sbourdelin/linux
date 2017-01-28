@@ -24,6 +24,8 @@ struct dm_kobject_holder {
 	struct completion completion;
 };
 
+struct dax_inode;
+
 /*
  * DM core internal structure that used directly by dm.c and dm-rq.c
  * DM targets must _not_ deference a mapped_device to directly access its members!
@@ -58,6 +60,7 @@ struct mapped_device {
 	struct target_type *immutable_target_type;
 
 	struct gendisk *disk;
+	struct dax_inode *dax_inode;
 	char name[16];
 
 	void *interface_ptr;

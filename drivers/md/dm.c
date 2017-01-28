@@ -15,6 +15,7 @@
 #include <linux/blkpg.h>
 #include <linux/bio.h>
 #include <linux/mempool.h>
+#include <linux/dax.h>
 #include <linux/slab.h>
 #include <linux/idr.h>
 #include <linux/hdreg.h>
@@ -905,10 +906,10 @@ int dm_set_target_max_io_len(struct dm_target *ti, sector_t len)
 }
 EXPORT_SYMBOL_GPL(dm_set_target_max_io_len);
 
-static long dm_blk_direct_access(struct block_device *bdev, sector_t sector,
-				 void **kaddr, pfn_t *pfn, long size)
+static long __dm_direct_access(struct mapped_device *md, phys_addr_t dev_addr,
+			       void **kaddr, pfn_t *pfn, long size)
 {
-	struct mapped_device *md = bdev->bd_disk->private_data;
+	sector_t sector = dev_addr >> SECTOR_SHIFT;
 	struct dm_table *map;
 	struct dm_target *ti;
 	int srcu_idx;
@@ -930,6 +931,23 @@ static long dm_blk_direct_access(struct block_device *bdev, sector_t sector,
 out:
 	dm_put_live_table(md, srcu_idx);
 	return min(ret, size);
+}
+
+static long dm_blk_direct_access(struct block_device *bdev, sector_t sector,
+				 void **kaddr, pfn_t *pfn, long size)
+{
+	struct mapped_device *md = bdev->bd_disk->private_data;
+
+	return __dm_direct_access(md, sector << SECTOR_SHIFT, kaddr, pfn, size);
+}
+
+static long dm_dax_direct_access(struct dax_inode *dax_inode,
+				 phys_addr_t dev_addr, void **kaddr, pfn_t *pfn,
+				 long size)
+{
+	struct mapped_device *md = dax_inode_get_private(dax_inode);
+
+	return __dm_direct_access(md, dev_addr, kaddr, pfn, size);
 }
 
 /*
@@ -1376,6 +1394,7 @@ static int next_free_minor(int *minor)
 }
 
 static const struct block_device_operations dm_blk_dops;
+static const struct dax_operations dm_dax_ops;
 
 static void dm_wq_work(struct work_struct *work);
 
@@ -1423,6 +1442,12 @@ static void cleanup_mapped_device(struct mapped_device *md)
 	if (md->bs)
 		bioset_free(md->bs);
 
+	if (md->dax_inode) {
+		kill_dax_inode(md->dax_inode);
+		put_dax_inode(md->dax_inode);
+		md->dax_inode = NULL;
+	}
+
 	if (md->disk) {
 		spin_lock(&_minor_lock);
 		md->disk->private_data = NULL;
@@ -1450,6 +1475,7 @@ static void cleanup_mapped_device(struct mapped_device *md)
 static struct mapped_device *alloc_dev(int minor)
 {
 	int r, numa_node_id = dm_get_numa_node();
+	struct dax_inode *dax_inode;
 	struct mapped_device *md;
 	void *old_md;
 
@@ -1514,6 +1540,12 @@ static struct mapped_device *alloc_dev(int minor)
 	md->disk->queue = md->queue;
 	md->disk->private_data = md;
 	sprintf(md->disk->disk_name, "dm-%d", minor);
+
+	dax_inode = alloc_dax_inode(md, md->disk->disk_name, &dm_dax_ops);
+	if (!dax_inode)
+		goto bad;
+	md->dax_inode = dax_inode;
+
 	add_disk(md->disk);
 	format_dev_t(md->name, MKDEV(_major, minor));
 
@@ -2733,6 +2765,10 @@ static const struct block_device_operations dm_blk_dops = {
 	.getgeo = dm_blk_getgeo,
 	.pr_ops = &dm_pr_ops,
 	.owner = THIS_MODULE
+};
+
+static const struct dax_operations dm_dax_ops = {
+	.direct_access = dm_dax_direct_access,
 };
 
 /*
