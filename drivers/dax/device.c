@@ -560,7 +560,7 @@ struct dax_dev *devm_create_dax_dev(struct dax_region *dax_region,
 		goto err_id;
 	}
 
-	dax_inode = alloc_dax_inode(dax_dev);
+	dax_inode = alloc_dax_inode(dax_dev, NULL);
 	if (!dax_inode)
 		goto err_inode;
 
