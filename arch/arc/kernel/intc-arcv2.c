@@ -98,7 +98,7 @@ static int arcv2_irq_map(struct irq_domain *d, unsigned int irq,
 	 * core intc IRQs [16, 23]:
 	 * Statically assigned always private-per-core (Timers, WDT, IPI, PCT)
 	 */
-	if (hw < 24) {
+	if (hw < FIRST_EXT_IRQ) {
 		/*
 		 * A subsequent request_percpu_irq() fails if percpu_devid is
 		 * not set. That in turns sets NOAUTOEN, meaning each core needs
