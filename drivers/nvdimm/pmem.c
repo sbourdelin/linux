@@ -28,6 +28,7 @@
 #include <linux/pfn_t.h>
 #include <linux/slab.h>
 #include <linux/pmem.h>
+#include <linux/dax.h>
 #include <linux/nd.h>
 #include "pmem.h"
 #include "pfn.h"
@@ -199,13 +200,12 @@ static int pmem_rw_page(struct block_device *bdev, sector_t sector,
 }
 
 /* see "strong" declaration in tools/testing/nvdimm/pmem-dax.c */
-__weak long pmem_direct_access(struct block_device *bdev, sector_t sector,
-		      void **kaddr, pfn_t *pfn, long size)
+__weak long __pmem_direct_access(struct pmem_device *pmem, phys_addr_t dev_addr,
+		void **kaddr, pfn_t *pfn, long size)
 {
-	struct pmem_device *pmem = bdev->bd_queue->queuedata;
-	resource_size_t offset = sector * 512 + pmem->data_offset;
+	resource_size_t offset = dev_addr + pmem->data_offset;
 
-	if (unlikely(is_bad_pmem(&pmem->bb, sector, size)))
+	if (unlikely(is_bad_pmem(&pmem->bb, dev_addr / 512, size)))
 		return -EIO;
 	*kaddr = pmem->virt_addr + offset;
 	*pfn = phys_to_pfn_t(pmem->phys_addr + offset, pmem->pfn_flags);
@@ -219,11 +219,31 @@ __weak long pmem_direct_access(struct block_device *bdev, sector_t sector,
 	return pmem->size - pmem->pfn_pad - offset;
 }
 
+static long pmem_blk_direct_access(struct block_device *bdev, sector_t sector,
+		void **kaddr, pfn_t *pfn, long size)
+{
+	struct pmem_device *pmem = bdev->bd_queue->queuedata;
+
+	return __pmem_direct_access(pmem, sector * 512, kaddr, pfn, size);
+}
+
 static const struct block_device_operations pmem_fops = {
 	.owner =		THIS_MODULE,
 	.rw_page =		pmem_rw_page,
-	.direct_access =	pmem_direct_access,
+	.direct_access =	pmem_blk_direct_access,
 	.revalidate_disk =	nvdimm_revalidate_disk,
+};
+
+static long pmem_dax_direct_access(struct dax_inode *dax_inode,
+		phys_addr_t dev_addr, void **kaddr, pfn_t *pfn, long size)
+{
+	struct pmem_device *pmem = dax_inode_get_private(dax_inode);
+
+	return __pmem_direct_access(pmem, dev_addr, kaddr, pfn, size);
+}
+
+static const struct dax_operations pmem_dax_ops = {
+	.direct_access = pmem_dax_direct_access,
 };
 
 static void pmem_release_queue(void *q)
@@ -231,10 +251,14 @@ static void pmem_release_queue(void *q)
 	blk_cleanup_queue(q);
 }
 
-static void pmem_release_disk(void *disk)
+static void pmem_release_disk(void *__pmem)
 {
-	del_gendisk(disk);
-	put_disk(disk);
+	struct pmem_device *pmem = __pmem;
+
+	kill_dax_inode(pmem->dax_inode);
+	put_dax_inode(pmem->dax_inode);
+	del_gendisk(pmem->disk);
+	put_disk(pmem->disk);
 }
 
 static int pmem_attach_disk(struct device *dev,
@@ -245,6 +269,7 @@ static int pmem_attach_disk(struct device *dev,
 	struct vmem_altmap __altmap, *altmap = NULL;
 	struct resource *res = &nsio->res;
 	struct nd_pfn *nd_pfn = NULL;
+	struct dax_inode *dax_inode;
 	int nid = dev_to_node(dev);
 	struct nd_pfn_sb *pfn_sb;
 	struct pmem_device *pmem;
@@ -325,6 +350,7 @@ static int pmem_attach_disk(struct device *dev,
 	disk = alloc_disk_node(0, nid);
 	if (!disk)
 		return -ENOMEM;
+	pmem->disk = disk;
 
 	disk->fops		= &pmem_fops;
 	disk->queue		= q;
@@ -336,9 +362,16 @@ static int pmem_attach_disk(struct device *dev,
 		return -ENOMEM;
 	nvdimm_badblocks_populate(nd_region, &pmem->bb, res);
 	disk->bb = &pmem->bb;
-	device_add_disk(dev, disk);
 
-	if (devm_add_action_or_reset(dev, pmem_release_disk, disk))
+	dax_inode = alloc_dax_inode(pmem, disk->disk_name, &pmem_dax_ops);
+	if (!dax_inode) {
+		put_disk(disk);
+		return -ENOMEM;
+	}
+	pmem->dax_inode = dax_inode;
+
+	device_add_disk(dev, disk);
+	if (devm_add_action_or_reset(dev, pmem_release_disk, pmem))
 		return -ENOMEM;
 
 	revalidate_disk(disk);

@@ -16,6 +16,12 @@ struct dax_operations {
 int dax_read_lock(void);
 void dax_read_unlock(int id);
 struct dax_inode *dax_get_by_host(const char *host);
+struct dax_inode *alloc_dax_inode(void *private, const char *host,
+		const struct dax_operations *ops);
+void *dax_inode_get_private(struct dax_inode *dax_inode);
+void put_dax_inode(struct dax_inode *dax_inode);
+bool dax_inode_alive(struct dax_inode *dax_inode);
+void kill_dax_inode(struct dax_inode *dax_inode);
 
 /*
  * We use lowest available bit in exceptional entry for locking, one bit for
