@@ -3344,6 +3344,7 @@ retry:
 
 	iomap->flags = 0;
 	iomap->bdev = inode->i_sb->s_bdev;
+	iomap->dax_inode = inode->i_sb->s_dax;
 	iomap->offset = first_block << blkbits;
 
 	if (ret == 0) {

@@ -813,6 +813,7 @@ static int ext2_iomap_begin(struct inode *inode, loff_t offset, loff_t length,
 
 	iomap->flags = 0;
 	iomap->bdev = inode->i_sb->s_bdev;
+	iomap->dax_inode = inode->i_sb->s_dax;
 	iomap->offset = (u64)first_block << blkbits;
 
 	if (ret == 0) {

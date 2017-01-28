@@ -774,6 +774,9 @@ xfs_open_devices(
 	if (!mp->m_ddev_targp)
 		goto out_close_rtdev;
 
+	/* associate dax inode for filesystem-dax */
+	mp->m_ddev_targp->bt_dax = mp->m_super->s_dax;
+
 	if (rtdev) {
 		mp->m_rtdev_targp = xfs_alloc_buftarg(mp, rtdev);
 		if (!mp->m_rtdev_targp)
