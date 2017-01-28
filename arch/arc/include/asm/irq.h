@@ -18,6 +18,9 @@
  */
 #define NR_CPU_IRQS	240
 
+/* A fixed number of exceptions which occupy first interrupt lines */
+#define NR_EXCEPTIONS	16
+
 /*
  * ARCv2 can support 240 interrupts in the core interrupts controllers and
  * 128 interrupts in IDU. Thus 512 virtual IRQs must be enough for most
