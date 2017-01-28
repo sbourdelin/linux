@@ -315,7 +315,7 @@ static int dcbnl_getcap(struct net_device *netdev, struct nlmsghdr *nlh,
 	if (data[DCB_CAP_ATTR_ALL])
 		getall = 1;
 
-	for (i = DCB_CAP_ATTR_ALL+1; i <= DCB_CAP_ATTR_MAX; i++) {
+	for (i = DCB_CAP_ATTR_ALL + 1; i <= DCB_CAP_ATTR_MAX; i++) {
 		if (!getall && !data[i])
 			continue;
 
@@ -359,7 +359,7 @@ static int dcbnl_getnumtcs(struct net_device *netdev, struct nlmsghdr *nlh,
 	if (data[DCB_NUMTCS_ATTR_ALL])
 		getall = 1;
 
-	for (i = DCB_NUMTCS_ATTR_ALL+1; i <= DCB_NUMTCS_ATTR_MAX; i++) {
+	for (i = DCB_NUMTCS_ATTR_ALL + 1; i <= DCB_NUMTCS_ATTR_MAX; i++) {
 		if (!getall && !data[i])
 			continue;
 
@@ -397,7 +397,7 @@ static int dcbnl_setnumtcs(struct net_device *netdev, struct nlmsghdr *nlh,
 	if (ret)
 		return ret;
 
-	for (i = DCB_NUMTCS_ATTR_ALL+1; i <= DCB_NUMTCS_ATTR_MAX; i++) {
+	for (i = DCB_NUMTCS_ATTR_ALL + 1; i <= DCB_NUMTCS_ATTR_MAX; i++) {
 		if (!data[i])
 			continue;
 
@@ -1593,7 +1593,7 @@ static int dcbnl_getfeatcfg(struct net_device *netdev, struct nlmsghdr *nlh,
 	if (data[DCB_FEATCFG_ATTR_ALL])
 		getall = 1;
 
-	for (i = DCB_FEATCFG_ATTR_ALL+1; i <= DCB_FEATCFG_ATTR_MAX; i++) {
+	for (i = DCB_FEATCFG_ATTR_ALL + 1; i <= DCB_FEATCFG_ATTR_MAX; i++) {
 		if (!getall && !data[i])
 			continue;
 
@@ -1631,7 +1631,7 @@ static int dcbnl_setfeatcfg(struct net_device *netdev, struct nlmsghdr *nlh,
 	if (ret)
 		goto err;
 
-	for (i = DCB_FEATCFG_ATTR_ALL+1; i <= DCB_FEATCFG_ATTR_MAX; i++) {
+	for (i = DCB_FEATCFG_ATTR_ALL + 1; i <= DCB_FEATCFG_ATTR_MAX; i++) {
 		if (!data[i])
 			continue;
 
@@ -1669,7 +1669,7 @@ struct reply_func {
 		    struct nlattr **, struct sk_buff *);
 };
 
-static const struct reply_func reply_funcs[DCB_CMD_MAX+1] = {
+static const struct reply_func reply_funcs[DCB_CMD_MAX + 1] = {
 	[DCB_CMD_GSTATE]	= { RTM_GETDCB, dcbnl_getstate },
 	[DCB_CMD_SSTATE]	= { RTM_SETDCB, dcbnl_setstate },
 	[DCB_CMD_PFC_GCFG]	= { RTM_GETDCB, dcbnl_getpfccfg },
