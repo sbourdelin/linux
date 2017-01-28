@@ -13,6 +13,7 @@
 #include <asm/errno.h>
 #include <asm/arcregs.h>
 #include <asm/irqflags.h>
+#include <asm/irq.h>
 
 	.cpu HS
 
@@ -52,7 +53,7 @@ VECTOR	handle_interrupt	; unused
 VECTOR	handle_interrupt	; (23) unused
 # End of fixed IRQs
 
-.rept CONFIG_ARC_NUMBER_OF_INTERRUPTS - 8
+.rept NR_CPU_IRQS - 8
 	VECTOR	handle_interrupt
 .endr
 
