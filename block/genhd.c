@@ -612,6 +612,13 @@ void device_add_disk(struct device *parent, struct gendisk *disk)
 
 	disk_alloc_events(disk);
 
+	/*
+	 * Take a reference on the devt and assign it to queue since it
+	 * must not be reallocated while the bdi is registerted
+	 */
+	disk->queue->disk_devt = disk->disk_devt;
+	get_disk_devt(disk->disk_devt);
+
 	/* Register BDI before referencing it from bdev */
 	bdi = &disk->queue->backing_dev_info;
 	bdi_register_owner(bdi, disk_to_dev(disk));

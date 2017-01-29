@@ -167,6 +167,22 @@ struct blk_integrity {
 };
 
 #endif	/* CONFIG_BLK_DEV_INTEGRITY */
+struct disk_devt {
+	struct kref kref;
+	void (*release)(struct kref *);
+};
+
+static inline void put_disk_devt(struct disk_devt *disk_devt)
+{
+	if (disk_devt)
+		kref_put(&disk_devt->kref, disk_devt->release);
+}
+
+static inline void get_disk_devt(struct disk_devt *disk_devt)
+{
+	if (disk_devt)
+		kref_get(&disk_devt->kref);
+}
 
 struct gendisk {
 	/* major, first_minor and minors are input parameters only,
@@ -176,6 +192,7 @@ struct gendisk {
 	int first_minor;
 	int minors;                     /* maximum number of minors, =1 for
                                          * disks that can't be partitioned. */
+	struct disk_devt *disk_devt;
 
 	char disk_name[DISK_NAME_LEN];	/* name of major driver */
 	char *(*devnode)(struct gendisk *gd, umode_t *mode);

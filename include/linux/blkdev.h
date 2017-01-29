@@ -426,6 +426,7 @@ struct request_queue {
 	 */
 	struct delayed_work	delay_work;
 
+	struct disk_devt	*disk_devt;
 	struct backing_dev_info	backing_dev_info;
 
 	/*
