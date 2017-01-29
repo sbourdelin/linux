@@ -211,12 +211,35 @@ static int seq_fid_alloc_prep(struct lu_client_seq *seq,
 	return 0;
 }
 
-static void seq_fid_alloc_fini(struct lu_client_seq *seq)
+static void seq_fid_alloc_fini(struct lu_client_seq *seq, u64 seqnr,
+			       bool whole)
 {
 	LASSERT(seq->lcs_update == 1);
+
 	mutex_lock(&seq->lcs_mutex);
+	if (seqnr != 0) {
+		CDEBUG(D_INFO, "%s: New sequence [0x%16.16llx]\n",
+		       seq->lcs_name, seqnr);
+
+		seq->lcs_fid.f_seq = seqnr;
+		if (whole) {
+			/*
+			 * Since the caller require the whole seq,
+			 * so marked this seq to be used
+			 */
+			if (seq->lcs_type == LUSTRE_SEQ_METADATA)
+				seq->lcs_fid.f_oid =
+					LUSTRE_METADATA_SEQ_MAX_WIDTH;
+			else
+				seq->lcs_fid.f_oid = LUSTRE_DATA_SEQ_MAX_WIDTH;
+		} else {
+			seq->lcs_fid.f_oid = LUSTRE_FID_INIT_OID;
+		}
+		seq->lcs_fid.f_ver = 0;
+	}
+
 	--seq->lcs_update;
-	wake_up(&seq->lcs_waitq);
+	wake_up_all(&seq->lcs_waitq);
 }
 
 /* Allocate new fid on passed client @seq and save it to @fid. */
@@ -238,41 +261,33 @@ int seq_client_alloc_fid(const struct lu_env *env,
 	while (1) {
 		u64 seqnr;
 
-		if (!fid_is_zero(&seq->lcs_fid) &&
-		    fid_oid(&seq->lcs_fid) < seq->lcs_width) {
+		if (unlikely(!fid_is_zero(&seq->lcs_fid) &&
+			     fid_oid(&seq->lcs_fid) < seq->lcs_width)) {
 			/* Just bump last allocated fid and return to caller. */
-			seq->lcs_fid.f_oid += 1;
+			seq->lcs_fid.f_oid++;
 			rc = 0;
 			break;
 		}
 
+		/*
+		 * Release seq::lcs_mutex via seq_fid_alloc_prep() to avoid
+		 * deadlock during seq_client_alloc_seq().
+		 */
 		rc = seq_fid_alloc_prep(seq, &link);
 		if (rc)
 			continue;
 
 		rc = seq_client_alloc_seq(env, seq, &seqnr);
+		/* Re-take seq::lcs_mutex via seq_fid_alloc_fini(). */
+		seq_fid_alloc_fini(seq, rc ? 0 : seqnr, false);
 		if (rc) {
-			CERROR("%s: Can't allocate new sequence, rc %d\n",
+			CERROR("%s: Can't allocate new sequence, rc = %d\n",
 			       seq->lcs_name, rc);
-			seq_fid_alloc_fini(seq);
 			mutex_unlock(&seq->lcs_mutex);
 			return rc;
 		}
 
-		CDEBUG(D_INFO, "%s: Switch to sequence [0x%16.16Lx]\n",
-		       seq->lcs_name, seqnr);
-
-		seq->lcs_fid.f_oid = LUSTRE_FID_INIT_OID;
-		seq->lcs_fid.f_seq = seqnr;
-		seq->lcs_fid.f_ver = 0;
-
-		/*
-		 * Inform caller that sequence switch is performed to allow it
-		 * to setup FLD for it.
-		 */
 		rc = 1;
-
-		seq_fid_alloc_fini(seq);
 		break;
 	}
 
