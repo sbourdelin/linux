@@ -1820,7 +1820,8 @@ static int ethtool_get_strings(struct net_device *dev, void __user *useraddr)
 
 	gstrings.len = ret;
 
-	data = kcalloc(gstrings.len, ETH_GSTRING_LEN, GFP_USER);
+	data = kcalloc(gstrings.len, ETH_GSTRING_LEN,
+		       GFP_USER | __GFP_NORETRY | __GFP_NOWARN);
 	if (!data)
 		return -ENOMEM;
 
@@ -1918,7 +1919,8 @@ static int ethtool_get_stats(struct net_device *dev, void __user *useraddr)
 		return -EFAULT;
 
 	stats.n_stats = n_stats;
-	data = kmalloc(n_stats * sizeof(u64), GFP_USER);
+	data = kmalloc_array(n_stats, sizeof(u64),
+			     GFP_USER | __GFP_NORETRY | __GFP_NOWARN);
 	if (!data)
 		return -ENOMEM;
 
@@ -1957,7 +1959,8 @@ static int ethtool_get_phy_stats(struct net_device *dev, void __user *useraddr)
 		return -EFAULT;
 
 	stats.n_stats = n_stats;
-	data = kmalloc_array(n_stats, sizeof(u64), GFP_USER);
+	data = kmalloc_array(n_stats, sizeof(u64),
+			     GFP_USER | __GFP_NORETRY | __GFP_NOWARN);
 	if (!data)
 		return -ENOMEM;
 
