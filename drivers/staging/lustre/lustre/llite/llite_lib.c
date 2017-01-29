@@ -2553,7 +2553,7 @@ static int ll_linkea_decode(struct linkea_data *ldata, unsigned int linkno,
 	unsigned int idx;
 	int rc;
 
-	rc = linkea_init(ldata);
+	rc = linkea_init_with_rec(ldata);
 	if (rc < 0)
 		return rc;
 
