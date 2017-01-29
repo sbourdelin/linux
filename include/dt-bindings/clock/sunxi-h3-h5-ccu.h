@@ -142,4 +142,7 @@
 
 #define CLK_GPU			114
 
+/* New clocks imported in H5 */
+#define CLK_BUS_SCR1		115
+
 #endif /* _DT_BINDINGS_CLK_SUNXI_H3_H5_H_ */

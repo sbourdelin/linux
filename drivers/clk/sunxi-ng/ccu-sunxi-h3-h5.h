@@ -57,6 +57,9 @@
 
 /* And the GPU module clock is exported */
 
-#define CLK_NUMBER		(CLK_GPU + 1)
+/* New clocks imported in H5 */
+/* The SCR1 bus gate is exported */
+
+#define CLK_NUMBER		(CLK_BUS_SCR1 + 1)
 
 #endif /* _CCU_SUNXI_H3_H5_H_ */
