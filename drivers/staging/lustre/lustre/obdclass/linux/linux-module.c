@@ -224,8 +224,10 @@ health_check_show(struct kobject *kobj, struct attribute *attr, char *buf)
 	int i;
 	size_t len = 0;
 
-	if (libcfs_catastrophe)
-		return sprintf(buf, "LBUG\n");
+	if (libcfs_catastrophe) {
+		len = sprintf(buf, "LBUG\n");
+		healthy = false;
+	}
 
 	read_lock(&obd_dev_lock);
 	for (i = 0; i < class_devno_max(); i++) {
