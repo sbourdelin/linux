@@ -190,6 +190,14 @@ static void motu_bus_update(struct fw_unit *unit)
 	snd_motu_transaction_reregister(motu);
 }
 
+static struct snd_motu_spec motu_828orig = {
+	.name = "828",
+	.protocol = &snd_motu_protocol_v1,
+
+	.analog_in_ports = 8,
+	.analog_out_ports = 8,
+};
+
 #define SND_MOTU_DEV_ENTRY(model, data)			\
 {							\
 	.match_flags	= IEEE1394_MATCH_VENDOR_ID |	\
@@ -202,6 +210,7 @@ static void motu_bus_update(struct fw_unit *unit)
 }
 
 static const struct ieee1394_device_id motu_id_table[] = {
+	SND_MOTU_DEV_ENTRY(0x102802, &motu_828orig),
 	{ }
 };
 MODULE_DEVICE_TABLE(ieee1394, motu_id_table);
