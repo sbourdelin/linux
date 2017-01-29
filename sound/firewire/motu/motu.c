@@ -31,9 +31,11 @@ static void name_card(struct snd_motu *motu)
 	}
 
 	strcpy(motu->card->driver, "FW-MOTU");
+	strcpy(motu->card->shortname, motu->spec->name);
+	strcpy(motu->card->mixername, motu->spec->name);
 	snprintf(motu->card->longname, sizeof(motu->card->longname),
-		 "MOTU (version:%d), GUID %08x%08x at %s, S%d",
-		 version,
+		 "MOTU %s (version:%d), GUID %08x%08x at %s, S%d",
+		 motu->spec->name, version,
 		 fw_dev->config_rom[3], fw_dev->config_rom[4],
 		 dev_name(&motu->unit->device), 100 << fw_dev->max_speed);
 }
@@ -101,6 +103,7 @@ static int motu_probe(struct fw_unit *unit,
 	if (motu == NULL)
 		return -ENOMEM;
 
+	motu->spec = (const struct snd_motu_spec *)entry->driver_data;
 	motu->unit = fw_unit_get(unit);
 	dev_set_drvdata(&unit->device, motu);
 
