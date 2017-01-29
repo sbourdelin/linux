@@ -2125,12 +2125,12 @@ static int do_proc_dointvec_conv(bool *negp, unsigned long *lvalp,
 	return 0;
 }
 
-static int do_proc_douintvec_conv(bool *negp, unsigned long *lvalp,
-				 int *valp,
-				 int write, void *data)
+static int do_proc_douintvec_conv(unsigned long *lvalp,
+				  unsigned int *valp,
+				  int write, void *data)
 {
 	if (write) {
-		if (*negp)
+		if (*lvalp > (unsigned long) UINT_MAX)
 			return -EINVAL;
 		*valp = *lvalp;
 	} else {
@@ -2243,6 +2243,115 @@ static int do_proc_dointvec(struct ctl_table *table, int write,
 			buffer, lenp, ppos, conv, data);
 }
 
+static int __do_proc_douintvec(void *tbl_data, struct ctl_table *table,
+			       int write, void __user *buffer,
+			       size_t *lenp, loff_t *ppos,
+			       int (*conv)(unsigned long *lvalp,
+					   unsigned int *valp,
+					   int write, void *data),
+			       void *data)
+{
+	unsigned int *i, vleft;
+	bool first = true;
+	int err = 0;
+	size_t left;
+	char *kbuf = NULL, *p;
+
+	if (!tbl_data || !table->maxlen || !*lenp || (*ppos && !write)) {
+		*lenp = 0;
+		return 0;
+	}
+
+	i = (unsigned int *) tbl_data;
+	vleft = table->maxlen / sizeof(*i);
+	left = *lenp;
+
+	if (!conv)
+		conv = do_proc_douintvec_conv;
+
+	if (write) {
+		if (*ppos) {
+			switch (sysctl_writes_strict) {
+			case SYSCTL_WRITES_STRICT:
+				goto out;
+			case SYSCTL_WRITES_WARN:
+				warn_sysctl_write(table);
+				break;
+			default:
+				break;
+			}
+		}
+
+		if (left > PAGE_SIZE - 1)
+			left = PAGE_SIZE - 1;
+		p = kbuf = memdup_user_nul(buffer, left);
+		if (IS_ERR(kbuf))
+			return PTR_ERR(kbuf);
+	}
+
+	for (; left && vleft--; i++, first=false) {
+		unsigned long lval;
+		bool neg;
+
+		if (write) {
+			left -= proc_skip_spaces(&p);
+
+			if (!left)
+				break;
+			err = proc_get_long(&p, &left, &lval, &neg,
+					     proc_wspace_sep,
+					     sizeof(proc_wspace_sep), NULL);
+			if (neg) {
+				err = -EINVAL;
+				break;
+			}
+			if (err)
+				break;
+			if (conv(&lval, i, 1, data)) {
+				err = -EINVAL;
+				break;
+			}
+		} else {
+			if (conv(&lval, i, 0, data)) {
+				err = -EINVAL;
+				break;
+			}
+			if (!first)
+				err = proc_put_char(&buffer, &left, '\t');
+			if (err)
+				break;
+			err = proc_put_long(&buffer, &left, lval, false);
+			if (err)
+				break;
+		}
+	}
+
+	if (!write && !first && left && !err)
+		err = proc_put_char(&buffer, &left, '\n');
+	if (write && !err && left)
+		left -= proc_skip_spaces(&p);
+	if (write) {
+		kfree(kbuf);
+		if (first)
+			return err ? : -EINVAL;
+	}
+	*lenp -= left;
+out:
+	*ppos += *lenp;
+	return err;
+}
+
+static int do_proc_douintvec(struct ctl_table *table, int write,
+			     void __user *buffer, size_t *lenp, loff_t *ppos,
+			     int (*conv)(unsigned long *lvalp,
+					 unsigned int *valp,
+					 int write, void *data),
+			     void *data)
+{
+	return __do_proc_douintvec(table->data, table, write,
+				   buffer, lenp, ppos, conv, data);
+}
+
 /**
  * proc_dointvec - read a vector of integers
  * @table: the sysctl table
@@ -2278,8 +2387,8 @@ int proc_dointvec(struct ctl_table *table, int write,
 int proc_douintvec(struct ctl_table *table, int write,
 		     void __user *buffer, size_t *lenp, loff_t *ppos)
 {
-	return do_proc_dointvec(table, write, buffer, lenp, ppos,
-				do_proc_douintvec_conv, NULL);
+	return do_proc_douintvec(table, write, buffer, lenp, ppos,
+				 do_proc_douintvec_conv, NULL);
 }
 
 /*
