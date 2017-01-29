@@ -31,7 +31,7 @@
  */
 
 #include <linux/kernel.h>
-#include <linux/module.h>
+#include <linux/export.h>
 
 #include <asm/octeon/cvmx.h>
 #include <asm/octeon/cvmx-spinlock.h>

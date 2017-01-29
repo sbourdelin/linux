@@ -15,6 +15,7 @@
  */
 
 #include <linux/init.h>
+#include <linux/export.h>
 
 #include <asm/bootinfo.h>
 #include <asm/wbflush.h>
@@ -88,7 +89,4 @@ static void wbflush_mips(void)
 {
 	__fast_iob();
 }
-
-#include <linux/module.h>
-
 EXPORT_SYMBOL(__wbflush);

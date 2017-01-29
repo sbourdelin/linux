@@ -14,7 +14,7 @@
 #include <linux/ioport.h>
 #include <linux/irq.h>
 #include <linux/irqnr.h>
-#include <linux/module.h>
+#include <linux/export.h>
 #include <linux/param.h>
 #include <linux/percpu-defs.h>
 #include <linux/sched.h>
