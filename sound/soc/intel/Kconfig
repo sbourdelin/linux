@@ -5,22 +5,6 @@ menuconfig SND_SOC_SST
 
 if SND_SOC_SST
 
-config SND_MFLD_MACHINE
-	tristate "SOC Machine Audio driver for Intel Medfield MID platform"
-	depends on INTEL_SCU_IPC
-	select SND_SOC_SN95031
-	select SND_SST_ATOM_HIFI2_PLATFORM
-	select SND_SST_IPC_PCI
-	help
-          This adds support for ASoC machine driver for Intel(R) MID Medfield platform
-          used as alsa device in audio substem in Intel(R) MID devices
-          Say Y if you have such a device.
-          If unsure select "N".
-
-config SND_SST_ATOM_HIFI2_PLATFORM
-	tristate
-	select SND_SOC_COMPRESS
-
 config SND_SST_IPC
 	tristate
 
@@ -71,29 +55,6 @@ config SND_SOC_INTEL_HASWELL_MACH
 	  Say Y if you have such a device.
 	  If unsure select "N".
 
-config SND_SOC_INTEL_BYT_RT5640_MACH
-	tristate "ASoC Audio driver for Intel Baytrail with RT5640 codec"
-	depends on X86_INTEL_LPSS && I2C
-	depends on DMADEVICES
-	depends on SND_SST_IPC_ACPI = n
-	select SND_SOC_INTEL_BAYTRAIL
-	select SND_SOC_RT5640
-	help
-	  This adds audio driver for Intel Baytrail platform based boards
-	  with the RT5640 audio codec. This driver is deprecated, use
-	  SND_SOC_INTEL_BYTCR_RT5640_MACH instead for better functionality.
-
-config SND_SOC_INTEL_BYT_MAX98090_MACH
-	tristate "ASoC Audio driver for Intel Baytrail with MAX98090 codec"
-	depends on X86_INTEL_LPSS && I2C
-	depends on DMADEVICES
-	depends on SND_SST_IPC_ACPI = n
-	select SND_SOC_INTEL_BAYTRAIL
-	select SND_SOC_MAX98090
-	help
-	  This adds audio driver for Intel Baytrail platform based boards
-	  with the MAX98090 audio codec.
-
 config SND_SOC_INTEL_BDW_RT5677_MACH
 	tristate "ASoC Audio driver for Intel Broadwell with RT5677 codec"
 	depends on X86_INTEL_LPSS && GPIOLIB && I2C
@@ -116,11 +77,55 @@ config SND_SOC_INTEL_BROADWELL_MACH
 	  Say Y if you have such a device.
 	  If unsure select "N".
 
+config SND_SST_ATOM_HIFI2_PLATFORM
+	tristate "Intel Smart Sound Technology for BYT/CHT/BSW/MERR platforms"
+	select SND_SOC_COMPRESS
+	help
+	  Audio support for Intel Smart Sound Technology for Baytrai
+          Cherrytrail braswell and Merrifield HiFi 2 platfroms.
+
+config SND_MFLD_MACHINE
+	tristate "SOC Machine Audio driver for Intel Medfield MID platform"
+	depends on INTEL_SCU_IPC
+	select SND_SOC_SN95031
+	depends on SND_SST_ATOM_HIFI2_PLATFORM
+	select SND_SST_IPC_PCI
+	help
+          This adds support for ASoC machine driver for Intel(R) MID Medfield platform
+          used as alsa device in audio substem in Intel(R) MID devices
+          Say Y if you have such a device.
+          If unsure select "N".
+
+config SND_SOC_INTEL_BYT_RT5640_MACH
+	tristate "ASoC Audio driver for Intel Baytrail with RT5640 codec"
+	depends on X86_INTEL_LPSS && I2C
+	depends on DMADEVICES
+	depends on SND_SST_IPC_ACPI = n
+	depends on SND_SST_ATOM_HIFI2_PLATFORM
+	select SND_SOC_INTEL_BAYTRAIL
+	select SND_SOC_RT5640
+	help
+	  This adds audio driver for Intel Baytrail platform based boards
+	  with the RT5640 audio codec. This driver is deprecated, use
+	  SND_SOC_INTEL_BYTCR_RT5640_MACH instead for better functionality.
+
+config SND_SOC_INTEL_BYT_MAX98090_MACH
+	tristate "ASoC Audio driver for Intel Baytrail with MAX98090 codec"
+	depends on X86_INTEL_LPSS && I2C
+	depends on DMADEVICES
+	depends on SND_SST_IPC_ACPI = n
+	depends on SND_SST_ATOM_HIFI2_PLATFORM
+	select SND_SOC_INTEL_BAYTRAIL
+	select SND_SOC_MAX98090
+	help
+	  This adds audio driver for Intel Baytrail platform based boards
+	  with the MAX98090 audio codec.
+
 config SND_SOC_INTEL_BYTCR_RT5640_MACH
         tristate "ASoC Audio driver for Intel Baytrail and Baytrail-CR with RT5640 codec"
 	depends on X86 && I2C && ACPI
+	depends on SND_SST_ATOM_HIFI2_PLATFORM
 	select SND_SOC_RT5640
-	select SND_SST_ATOM_HIFI2_PLATFORM
 	select SND_SST_IPC_ACPI
 	select SND_SOC_INTEL_SST_MATCH if ACPI
 	help
@@ -132,8 +137,8 @@ config SND_SOC_INTEL_BYTCR_RT5640_MACH
 config SND_SOC_INTEL_BYTCR_RT5651_MACH
         tristate "ASoC Audio driver for Intel Baytrail and Baytrail-CR with RT5651 codec"
 	depends on X86 && I2C && ACPI
+	depends on SND_SST_ATOM_HIFI2_PLATFORM
 	select SND_SOC_RT5651
-	select SND_SST_ATOM_HIFI2_PLATFORM
 	select SND_SST_IPC_ACPI
 	select SND_SOC_INTEL_SST_MATCH if ACPI
 	help
@@ -145,8 +150,8 @@ config SND_SOC_INTEL_BYTCR_RT5651_MACH
 config SND_SOC_INTEL_CHT_BSW_RT5672_MACH
         tristate "ASoC Audio driver for Intel Cherrytrail & Braswell with RT5672 codec"
         depends on X86_INTEL_LPSS && I2C && ACPI
+        depends on SND_SST_ATOM_HIFI2_PLATFORM
         select SND_SOC_RT5670
-        select SND_SST_ATOM_HIFI2_PLATFORM
         select SND_SST_IPC_ACPI
 	select SND_SOC_INTEL_SST_MATCH if ACPI
         help
@@ -158,8 +163,8 @@ config SND_SOC_INTEL_CHT_BSW_RT5672_MACH
 config SND_SOC_INTEL_CHT_BSW_RT5645_MACH
 	tristate "ASoC Audio driver for Intel Cherrytrail & Braswell with RT5645/5650 codec"
 	depends on X86_INTEL_LPSS && I2C && ACPI
+	depends on SND_SST_ATOM_HIFI2_PLATFORM
 	select SND_SOC_RT5645
-	select SND_SST_ATOM_HIFI2_PLATFORM
 	select SND_SST_IPC_ACPI
 	select SND_SOC_INTEL_SST_MATCH if ACPI
 	help
@@ -170,9 +175,9 @@ config SND_SOC_INTEL_CHT_BSW_RT5645_MACH
 config SND_SOC_INTEL_CHT_BSW_MAX98090_TI_MACH
 	tristate "ASoC Audio driver for Intel Cherrytrail & Braswell with MAX98090 & TI codec"
 	depends on X86_INTEL_LPSS && I2C && ACPI
+	depends on SND_SST_ATOM_HIFI2_PLATFORM
 	select SND_SOC_MAX98090
 	select SND_SOC_TS3A227E
-	select SND_SST_ATOM_HIFI2_PLATFORM
 	select SND_SST_IPC_ACPI
 	select SND_SOC_INTEL_SST_MATCH if ACPI
 	help
