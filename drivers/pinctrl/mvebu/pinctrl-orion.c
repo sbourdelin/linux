@@ -225,6 +225,10 @@ static int orion_pinctrl_probe(struct platform_device *pdev)
 		of_match_device(orion_pinctrl_of_match, &pdev->dev);
 	struct resource *res;
 
+	if (!match) {
+		dev_err(&pdev->dev, "Error: No device match found\n");
+		return -ENODEV;
+	}
 	pdev->dev.platform_data = (void*)match->data;
 
 	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);

@@ -769,6 +769,10 @@ static int dove_pinctrl_probe(struct platform_device *pdev)
 	struct resource fb_res;
 	const struct of_device_id *match =
 		of_match_device(dove_pinctrl_of_match, &pdev->dev);
+	if (!match) {
+		dev_err(&pdev->dev, "Error: No device match found\n");
+		return -ENODEV;
+	}
 	pdev->dev.platform_data = (void *)match->data;
 
 	/*
