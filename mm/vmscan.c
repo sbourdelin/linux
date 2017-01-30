@@ -205,7 +205,8 @@ unsigned long zone_reclaimable_pages(struct zone *zone)
 	unsigned long nr;
 
 	nr = zone_page_state_snapshot(zone, NR_ZONE_INACTIVE_FILE) +
-		zone_page_state_snapshot(zone, NR_ZONE_ACTIVE_FILE);
+		zone_page_state_snapshot(zone, NR_ZONE_ACTIVE_FILE) +
+		zone_page_state_snapshot(zone, NR_ZONE_LAZYFREE);
 	if (get_nr_swap_pages() > 0)
 		nr += zone_page_state_snapshot(zone, NR_ZONE_INACTIVE_ANON) +
 			zone_page_state_snapshot(zone, NR_ZONE_ACTIVE_ANON);
@@ -219,7 +220,9 @@ unsigned long pgdat_reclaimable_pages(struct pglist_data *pgdat)
 
 	nr = node_page_state_snapshot(pgdat, NR_ACTIVE_FILE) +
 	     node_page_state_snapshot(pgdat, NR_INACTIVE_FILE) +
-	     node_page_state_snapshot(pgdat, NR_ISOLATED_FILE);
+	     node_page_state_snapshot(pgdat, NR_ISOLATED_FILE) +
+	     node_page_state_snapshot(pgdat, NR_LAZYFREE) +
+	     node_page_state_snapshot(pgdat, NR_ISOLATED_LAZYFREE);
 
 	if (get_nr_swap_pages() > 0)
 		nr += node_page_state_snapshot(pgdat, NR_ACTIVE_ANON) +
@@ -1602,7 +1605,7 @@ int isolate_lru_page(struct page *page)
  * the LRU list will go small and be scanned faster than necessary, leading to
  * unnecessary swapping, thrashing and OOM.
  */
-static int too_many_isolated(struct pglist_data *pgdat, int file,
+static int too_many_isolated(struct pglist_data *pgdat, enum lru_list lru,
 		struct scan_control *sc)
 {
 	unsigned long inactive, isolated;
@@ -1613,12 +1616,15 @@ static int too_many_isolated(struct pglist_data *pgdat, int file,
 	if (!sane_reclaim(sc))
 		return 0;
 
-	if (file) {
+	if (is_file_lru(lru)) {
 		inactive = node_page_state(pgdat, NR_INACTIVE_FILE);
 		isolated = node_page_state(pgdat, NR_ISOLATED_FILE);
-	} else {
+	} else if (is_anon_lru(lru)) {
 		inactive = node_page_state(pgdat, NR_INACTIVE_ANON);
 		isolated = node_page_state(pgdat, NR_ISOLATED_ANON);
+	} else {
+		inactive = node_page_state(pgdat, NR_LAZYFREE);
+		isolated = node_page_state(pgdat, NR_ISOLATED_LAZYFREE);
 	}
 
 	/*
@@ -1718,7 +1724,7 @@ shrink_inactive_list(unsigned long nr_to_scan, struct lruvec *lruvec,
 	struct pglist_data *pgdat = lruvec_pgdat(lruvec);
 	struct zone_reclaim_stat *reclaim_stat = &lruvec->reclaim_stat;
 
-	while (unlikely(too_many_isolated(pgdat, file, sc))) {
+	while (unlikely(too_many_isolated(pgdat, lru, sc))) {
 		congestion_wait(BLK_RW_ASYNC, HZ/10);
 
 		/* We are about to die and free our memory. Return now. */
@@ -2498,7 +2504,8 @@ static inline bool should_continue_reclaim(struct pglist_data *pgdat,
 	 * inactive lists are large enough, continue reclaiming
 	 */
 	pages_for_compaction = compact_gap(sc->order);
-	inactive_lru_pages = node_page_state(pgdat, NR_INACTIVE_FILE);
+	inactive_lru_pages = node_page_state(pgdat, NR_INACTIVE_FILE) +
+			node_page_state(pgdat, NR_LAZYFREE);
 	if (get_nr_swap_pages() > 0)
 		inactive_lru_pages += node_page_state(pgdat, NR_INACTIVE_ANON);
 	if (sc->nr_reclaimed < pages_for_compaction &&

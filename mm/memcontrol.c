@@ -120,6 +120,7 @@ static const char * const mem_cgroup_lru_names[] = {
 	"active_anon",
 	"inactive_file",
 	"active_file",
+	"lazyfree",
 	"unevictable",
 };
 
@@ -1263,6 +1264,8 @@ static bool mem_cgroup_out_of_memory(struct mem_cgroup *memcg, gfp_t gfp_mask,
 static bool test_mem_cgroup_node_reclaimable(struct mem_cgroup *memcg,
 		int nid, bool noswap)
 {
+	if (mem_cgroup_node_nr_lru_pages(memcg, nid, BIT(LRU_LAZYFREE)))
+		return true;
 	if (mem_cgroup_node_nr_lru_pages(memcg, nid, LRU_ALL_FILE))
 		return true;
 	if (noswap || !total_swap_pages)
@@ -3086,6 +3089,7 @@ static int memcg_numa_stat_show(struct seq_file *m, void *v)
 		{ "total", LRU_ALL },
 		{ "file", LRU_ALL_FILE },
 		{ "anon", LRU_ALL_ANON },
+		{ "lazyfree", BIT(LRU_LAZYFREE) },
 		{ "unevictable", BIT(LRU_UNEVICTABLE) },
 	};
 	const struct numa_stat *stat;

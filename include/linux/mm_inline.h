@@ -81,6 +81,8 @@ static inline enum lru_list page_lru_base_type(struct page *page)
 {
 	if (page_is_file_cache(page))
 		return LRU_INACTIVE_FILE;
+	if (PageLazyFree(page))
+		return LRU_LAZYFREE;
 	return LRU_INACTIVE_ANON;
 }
 
@@ -100,6 +102,8 @@ static __always_inline enum lru_list page_off_lru(struct page *page)
 		lru = LRU_UNEVICTABLE;
 	} else {
 		lru = page_lru_base_type(page);
+		if (lru == LRU_LAZYFREE)
+			__ClearPageLazyFree(page);
 		if (PageActive(page)) {
 			__ClearPageActive(page);
 			lru += LRU_ACTIVE;
@@ -123,6 +127,8 @@ static __always_inline enum lru_list page_lru(struct page *page)
 		lru = LRU_UNEVICTABLE;
 	else {
 		lru = page_lru_base_type(page);
+		if (lru == LRU_LAZYFREE)
+			return lru;
 		if (PageActive(page))
 			lru += LRU_ACTIVE;
 	}
@@ -139,6 +145,8 @@ static inline int lru_isolate_index(enum lru_list lru)
 {
 	if (lru == LRU_INACTIVE_FILE || lru == LRU_ACTIVE_FILE)
 		return NR_ISOLATED_FILE;
+	if (lru == LRU_LAZYFREE)
+		return NR_ISOLATED_LAZYFREE;
 	return NR_ISOLATED_ANON;
 }
 
@@ -152,6 +160,8 @@ static inline int page_isolate_index(struct page *page)
 {
 	if (!PageSwapBacked(page))
 		return NR_ISOLATED_FILE;
+	else if (PageLazyFree(page))
+		return NR_ISOLATED_LAZYFREE;
 	return NR_ISOLATED_ANON;
 }
 

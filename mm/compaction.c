@@ -637,16 +637,18 @@ isolate_freepages_range(struct compact_control *cc,
 /* Similar to reclaim, but different enough that they don't share logic */
 static bool too_many_isolated(struct zone *zone)
 {
-	unsigned long active, inactive, isolated;
+	unsigned long active, inactive, lazyfree, isolated;
 
 	inactive = node_page_state(zone->zone_pgdat, NR_INACTIVE_FILE) +
 			node_page_state(zone->zone_pgdat, NR_INACTIVE_ANON);
 	active = node_page_state(zone->zone_pgdat, NR_ACTIVE_FILE) +
 			node_page_state(zone->zone_pgdat, NR_ACTIVE_ANON);
+	lazyfree = node_page_state(zone->zone_pgdat, NR_LAZYFREE);
 	isolated = node_page_state(zone->zone_pgdat, NR_ISOLATED_FILE) +
-			node_page_state(zone->zone_pgdat, NR_ISOLATED_ANON);
+			node_page_state(zone->zone_pgdat, NR_ISOLATED_ANON) +
+			node_page_state(zone->zone_pgdat, NR_ISOLATED_LAZYFREE);
 
-	return isolated > (inactive + active) / 2;
+	return isolated > (inactive + active + lazyfree) / 2;
 }
 
 /**

@@ -12,8 +12,9 @@
 
 #define RECLAIM_WB_ANON		0x0001u
 #define RECLAIM_WB_FILE		0x0002u
+#define RECLAIM_WB_LAZYFREE	0x0004u
 #define RECLAIM_WB_MIXED	0x0010u
-#define RECLAIM_WB_SYNC		0x0004u /* Unused, all reclaim async */
+#define RECLAIM_WB_SYNC		0x0020u /* Unused, all reclaim async */
 #define RECLAIM_WB_ASYNC	0x0008u
 #define RECLAIM_WB_LRU		(RECLAIM_WB_ANON|RECLAIM_WB_FILE)
 
@@ -21,20 +22,23 @@
 	(flags) ? __print_flags(flags, "|",			\
 		{RECLAIM_WB_ANON,	"RECLAIM_WB_ANON"},	\
 		{RECLAIM_WB_FILE,	"RECLAIM_WB_FILE"},	\
+		{RECLAIM_WB_LAZYFREE,	"RECLAIM_WB_LAZYFREE"},	\
 		{RECLAIM_WB_MIXED,	"RECLAIM_WB_MIXED"},	\
 		{RECLAIM_WB_SYNC,	"RECLAIM_WB_SYNC"},	\
 		{RECLAIM_WB_ASYNC,	"RECLAIM_WB_ASYNC"}	\
 		) : "RECLAIM_WB_NONE"
 
 #define trace_reclaim_flags(page) ( \
-	(page_is_file_cache(page) ? RECLAIM_WB_FILE : RECLAIM_WB_ANON) | \
+	(page_is_file_cache(page) ? RECLAIM_WB_FILE : \
+	 PageLazyFree(page) ? RECLAIM_WB_LAZYFREE : RECLAIM_WB_ANON) | \
 	(RECLAIM_WB_ASYNC) \
 	)
 
 #define trace_shrink_flags(isolate_index) \
 	( \
 		(isolate_index == NR_ISOLATED_FILE ? RECLAIM_WB_FILE : \
-			RECLAIM_WB_ANON) | \
+			isolate_index == NR_ISOLATED_ANON ? RECLAIM_WB_ANON: \
+			RECLAIM_WB_LAZYFREE) | \
 		(RECLAIM_WB_ASYNC) \
 	)
 

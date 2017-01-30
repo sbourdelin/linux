@@ -244,6 +244,7 @@ IF_HAVE_VM_SOFTDIRTY(VM_SOFTDIRTY,	"softdirty"	)		\
 		EM (LRU_ACTIVE_ANON, "active_anon") \
 		EM (LRU_INACTIVE_FILE, "inactive_file") \
 		EM (LRU_ACTIVE_FILE, "active_file") \
+		EM (LRU_LAZYFREE, "lazyfree") \
 		EMe(LRU_UNEVICTABLE, "unevictable")
 
 /*
