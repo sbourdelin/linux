@@ -174,6 +174,29 @@ static void mpol_relative_nodemask(nodemask_t *ret, const nodemask_t *orig,
 	nodes_onto(*ret, tmp, *rel);
 }
 
+#ifdef CONFIG_COHERENT_DEVICE
+static void mark_vma_cdm(nodemask_t *nmask,
+		struct page *page, struct vm_area_struct *vma)
+{
+	if (!page)
+		return;
+
+	if (vma->vm_flags & VM_CDM)
+		return;
+
+	if (nmask && !nodemask_has_cdm(*nmask))
+		return;
+
+	if (is_cdm_node(page_to_nid(page)))
+		vma->vm_flags |= VM_CDM;
+}
+#else
+static void mark_vma_cdm(nodemask_t *nmask,
+		struct page *page, struct vm_area_struct *vma)
+{
+}
+#endif
+
 static int mpol_new_interleave(struct mempolicy *pol, const nodemask_t *nodes)
 {
 	if (nodes_empty(*nodes))
@@ -2039,6 +2062,7 @@ retry_cpuset:
 	nmask = policy_nodemask(gfp, pol);
 	zl = policy_zonelist(gfp, pol, node);
 	page = __alloc_pages_nodemask(gfp, order, zl, nmask);
+	mark_vma_cdm(nmask, page, vma);
 	mpol_cond_put(pol);
 out:
 	if (unlikely(!page && read_mems_allowed_retry(cpuset_mems_cookie)))
