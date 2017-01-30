@@ -1736,7 +1736,7 @@ shrink_inactive_list(unsigned long nr_to_scan, struct lruvec *lruvec,
 	nr_taken = isolate_lru_pages(nr_to_scan, lruvec, &page_list,
 				     &nr_scanned, sc, isolate_mode, lru);
 
-	__mod_node_page_state(pgdat, NR_ISOLATED_ANON + file, nr_taken);
+	__mod_node_page_state(pgdat, lru_isolate_index(lru), nr_taken);
 	reclaim_stat->recent_scanned[file] += nr_taken;
 
 	if (global_reclaim(sc)) {
@@ -1765,7 +1765,7 @@ shrink_inactive_list(unsigned long nr_to_scan, struct lruvec *lruvec,
 
 	putback_inactive_pages(lruvec, &page_list);
 
-	__mod_node_page_state(pgdat, NR_ISOLATED_ANON + file, -nr_taken);
+	__mod_node_page_state(pgdat, lru_isolate_index(lru), -nr_taken);
 
 	spin_unlock_irq(&pgdat->lru_lock);
 
@@ -1843,7 +1843,7 @@ shrink_inactive_list(unsigned long nr_to_scan, struct lruvec *lruvec,
 			stat.nr_congested, stat.nr_immediate,
 			stat.nr_activate, stat.nr_ref_keep,
 			stat.nr_unmap_fail,
-			sc->priority, file);
+			sc->priority, lru_isolate_index(lru));
 	return nr_reclaimed;
 }
 
@@ -1940,7 +1940,7 @@ static void shrink_active_list(unsigned long nr_to_scan,
 	nr_taken = isolate_lru_pages(nr_to_scan, lruvec, &l_hold,
 				     &nr_scanned, sc, isolate_mode, lru);
 
-	__mod_node_page_state(pgdat, NR_ISOLATED_ANON + file, nr_taken);
+	__mod_node_page_state(pgdat, lru_isolate_index(lru), nr_taken);
 	reclaim_stat->recent_scanned[file] += nr_taken;
 
 	if (global_reclaim(sc))
@@ -2003,13 +2003,13 @@ static void shrink_active_list(unsigned long nr_to_scan,
 
 	nr_activate = move_active_pages_to_lru(lruvec, &l_active, &l_hold, lru);
 	nr_deactivate = move_active_pages_to_lru(lruvec, &l_inactive, &l_hold, lru - LRU_ACTIVE);
-	__mod_node_page_state(pgdat, NR_ISOLATED_ANON + file, -nr_taken);
+	__mod_node_page_state(pgdat, lru_isolate_index(lru), -nr_taken);
 	spin_unlock_irq(&pgdat->lru_lock);
 
 	mem_cgroup_uncharge_list(&l_hold);
 	free_hot_cold_page_list(&l_hold, true);
 	trace_mm_vmscan_lru_shrink_active(pgdat->node_id, nr_taken, nr_activate,
-			nr_deactivate, nr_rotated, sc->priority, file);
+		nr_deactivate, nr_rotated, sc->priority, lru_isolate_index(lru));
 }
 
 /*
@@ -2038,11 +2038,12 @@ static void shrink_active_list(unsigned long nr_to_scan,
  *    1TB     101        10GB
  *   10TB     320        32GB
  */
-static bool inactive_list_is_low(struct lruvec *lruvec, bool file,
+static bool inactive_list_is_low(struct lruvec *lruvec, enum lru_list lru,
 						struct scan_control *sc, bool trace)
 {
 	unsigned long inactive_ratio;
 	unsigned long inactive, active;
+	bool file = is_file_lru(lru);
 	enum lru_list inactive_lru = file * LRU_FILE;
 	enum lru_list active_lru = file * LRU_FILE + LRU_ACTIVE;
 	unsigned long gb;
@@ -2068,7 +2069,7 @@ static bool inactive_list_is_low(struct lruvec *lruvec, bool file,
 				sc->reclaim_idx,
 				lruvec_lru_size(lruvec, inactive_lru, MAX_NR_ZONES), inactive,
 				lruvec_lru_size(lruvec, active_lru, MAX_NR_ZONES), active,
-				inactive_ratio, file);
+				inactive_ratio, lru_isolate_index(lru));
 
 	return inactive * inactive_ratio < active;
 }
@@ -2077,7 +2078,7 @@ static unsigned long shrink_list(enum lru_list lru, unsigned long nr_to_scan,
 				 struct lruvec *lruvec, struct scan_control *sc)
 {
 	if (is_active_lru(lru)) {
-		if (inactive_list_is_low(lruvec, is_file_lru(lru), sc, true))
+		if (inactive_list_is_low(lruvec, lru, sc, true))
 			shrink_active_list(nr_to_scan, lruvec, sc, lru);
 		return 0;
 	}

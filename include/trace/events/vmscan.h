@@ -31,9 +31,10 @@
 	(RECLAIM_WB_ASYNC) \
 	)
 
-#define trace_shrink_flags(file) \
+#define trace_shrink_flags(isolate_index) \
 	( \
-		(file ? RECLAIM_WB_FILE : RECLAIM_WB_ANON) | \
+		(isolate_index == NR_ISOLATED_FILE ? RECLAIM_WB_FILE : \
+			RECLAIM_WB_ANON) | \
 		(RECLAIM_WB_ASYNC) \
 	)
 
@@ -345,11 +346,11 @@ TRACE_EVENT(mm_vmscan_lru_shrink_inactive,
 		unsigned long nr_congested, unsigned long nr_immediate,
 		unsigned long nr_activate, unsigned long nr_ref_keep,
 		unsigned long nr_unmap_fail,
-		int priority, int file),
+		int priority, int isolate_index),
 
 	TP_ARGS(nid, nr_scanned, nr_reclaimed, nr_dirty, nr_writeback,
 		nr_congested, nr_immediate, nr_activate, nr_ref_keep,
-		nr_unmap_fail, priority, file),
+		nr_unmap_fail, priority, isolate_index),
 
 	TP_STRUCT__entry(
 		__field(int, nid)
@@ -378,7 +379,7 @@ TRACE_EVENT(mm_vmscan_lru_shrink_inactive,
 		__entry->nr_ref_keep = nr_ref_keep;
 		__entry->nr_unmap_fail = nr_unmap_fail;
 		__entry->priority = priority;
-		__entry->reclaim_flags = trace_shrink_flags(file);
+		__entry->reclaim_flags = trace_shrink_flags(isolate_index);
 	),
 
 	TP_printk("nid=%d nr_scanned=%ld nr_reclaimed=%ld nr_dirty=%ld nr_writeback=%ld nr_congested=%ld nr_immediate=%ld nr_activate=%ld nr_ref_keep=%ld nr_unmap_fail=%ld priority=%d flags=%s",
@@ -395,9 +396,9 @@ TRACE_EVENT(mm_vmscan_lru_shrink_active,
 
 	TP_PROTO(int nid, unsigned long nr_taken,
 		unsigned long nr_active, unsigned long nr_deactivated,
-		unsigned long nr_referenced, int priority, int file),
+		unsigned long nr_referenced, int priority, int isolate_index),
 
-	TP_ARGS(nid, nr_taken, nr_active, nr_deactivated, nr_referenced, priority, file),
+	TP_ARGS(nid, nr_taken, nr_active, nr_deactivated, nr_referenced, priority, isolate_index),
 
 	TP_STRUCT__entry(
 		__field(int, nid)
@@ -416,7 +417,7 @@ TRACE_EVENT(mm_vmscan_lru_shrink_active,
 		__entry->nr_deactivated = nr_deactivated;
 		__entry->nr_referenced = nr_referenced;
 		__entry->priority = priority;
-		__entry->reclaim_flags = trace_shrink_flags(file);
+		__entry->reclaim_flags = trace_shrink_flags(isolate_index);
 	),
 
 	TP_printk("nid=%d nr_taken=%ld nr_active=%ld nr_deactivated=%ld nr_referenced=%ld priority=%d flags=%s",
@@ -432,9 +433,9 @@ TRACE_EVENT(mm_vmscan_inactive_list_is_low,
 	TP_PROTO(int nid, int reclaim_idx,
 		unsigned long total_inactive, unsigned long inactive,
 		unsigned long total_active, unsigned long active,
-		unsigned long ratio, int file),
+		unsigned long ratio, int isolate_index),
 
-	TP_ARGS(nid, reclaim_idx, total_inactive, inactive, total_active, active, ratio, file),
+	TP_ARGS(nid, reclaim_idx, total_inactive, inactive, total_active, active, ratio, isolate_index),
 
 	TP_STRUCT__entry(
 		__field(int, nid)
@@ -455,7 +456,7 @@ TRACE_EVENT(mm_vmscan_inactive_list_is_low,
 		__entry->total_active = total_active;
 		__entry->active = active;
 		__entry->ratio = ratio;
-		__entry->reclaim_flags = trace_shrink_flags(file) & RECLAIM_WB_LRU;
+		__entry->reclaim_flags = trace_shrink_flags(isolate_index) & RECLAIM_WB_LRU;
 	),
 
 	TP_printk("nid=%d reclaim_idx=%d total_inactive=%ld inactive=%ld total_active=%ld active=%ld ratio=%ld flags=%s",

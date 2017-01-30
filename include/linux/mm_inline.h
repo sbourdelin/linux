@@ -124,6 +124,32 @@ static __always_inline enum lru_list page_lru(struct page *page)
 	return lru;
 }
 
+/*
+ * lru_isolate_index - which item should a lru be accounted for
+ * @lru: the lru list
+ *
+ * Returns the accounting item index of the lru
+ */
+static inline int lru_isolate_index(enum lru_list lru)
+{
+	if (lru == LRU_INACTIVE_FILE || lru == LRU_ACTIVE_FILE)
+		return NR_ISOLATED_FILE;
+	return NR_ISOLATED_ANON;
+}
+
+/*
+ * page_isolate_index - which item should a page be accounted for
+ * @page: the page to test
+ *
+ * Returns the accounting item index of the page
+ */
+static inline int page_isolate_index(struct page *page)
+{
+	if (!PageSwapBacked(page))
+		return NR_ISOLATED_FILE;
+	return NR_ISOLATED_ANON;
+}
+
 #define lru_to_page(head) (list_entry((head)->prev, struct page, lru))
 
 #endif
