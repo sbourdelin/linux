@@ -493,6 +493,7 @@ static int q6v5_mpss_load(struct q6v5 *qproc)
 	const struct firmware *fw;
 	struct elf32_hdr *ehdr;
 	phys_addr_t mpss_reloc;
+	phys_addr_t boot_addr;
 	phys_addr_t min_addr = (phys_addr_t)ULLONG_MAX;
 	phys_addr_t max_addr = 0;
 	bool relocate = false;
@@ -573,7 +574,8 @@ static int q6v5_mpss_load(struct q6v5 *qproc)
 
 		size = readl(qproc->rmb_base + RMB_PMI_CODE_LENGTH_REG);
 		if (!size) {
-			writel(mpss_reloc, qproc->rmb_base + RMB_PMI_CODE_START_REG);
+			boot_addr = relocate ? qproc->mpss_phys : min_addr;
+			writel(boot_addr, qproc->rmb_base + RMB_PMI_CODE_START_REG);
 			writel(RMB_CMD_LOAD_READY, qproc->rmb_base + RMB_MBA_COMMAND_REG);
 		}
 
