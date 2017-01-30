@@ -84,6 +84,9 @@ struct r5l_log {
 	/* to for chunk_aligned_read in writeback mode, details below */
 	spinlock_t tree_lock;
 	struct radix_tree_root big_stripe_tree;
+
+	/* handlers for log operations */
+	struct r5l_policy *policy;
 };
 
 /*
@@ -131,6 +134,17 @@ enum r5l_io_unit_state {
 				 * don't accepting new bio */
 	IO_UNIT_IO_END = 2,	/* io_unit bio finish writing to log */
 	IO_UNIT_STRIPE_END = 3,	/* stripes data finished writing to raid */
+};
+
+struct r5l_policy {
+	int (*init_log)(struct r5l_log *log, struct r5conf *conf);
+	void (*exit_log)(struct r5l_log *log);
+	int (*write_stripe)(struct r5l_log *log, struct stripe_head *sh);
+	void (*write_stripe_run)(struct r5l_log *log);
+	void (*flush_stripe_to_raid)(struct r5l_log *log);
+	void (*stripe_write_finished)(struct r5l_io_unit *io);
+	int (*handle_flush_request)(struct r5l_log *log, struct bio *bio);
+	void (*quiesce)(struct r5l_log *log, int state);
 };
 
 extern int r5l_init_log(struct r5conf *conf, struct md_rdev *rdev);
