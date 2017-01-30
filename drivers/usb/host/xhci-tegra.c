@@ -903,6 +903,10 @@ static int tegra_xusb_probe(struct platform_device *pdev)
 		return -ENOMEM;
 
 	tegra->soc = of_device_get_match_data(&pdev->dev);
+	if (!tegra->soc) {
+		dev_err(&pdev->dev, "no device match found\n");
+		return -ENODEV;
+	}
 	mutex_init(&tegra->lock);
 	tegra->dev = &pdev->dev;
 
