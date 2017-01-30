@@ -873,7 +873,20 @@ static void __ppl_exit_log(struct r5l_log *log)
 {
 	struct ppl_conf *ppl_conf = log->private;
 
-	kfree(ppl_conf->child_logs);
+	if (ppl_conf->child_logs) {
+		struct r5l_log *log_child;
+		int i;
+
+		for (i = 0; i < ppl_conf->count; i++) {
+			log_child = &ppl_conf->child_logs[i];
+			if (log_child->rdev) {
+				log_child->rdev->ppl.offset = 0;
+				log_child->rdev->ppl.sector = 0;
+				log_child->rdev->ppl.size = 0;
+			}
+		}
+		kfree(ppl_conf->child_logs);
+	}
 	kfree(ppl_conf);
 
 	mempool_destroy(log->meta_pool);
@@ -1004,6 +1017,10 @@ static int __ppl_init_log(struct r5l_log *log, struct r5conf *conf)
 		 */
 		mddev->recovery_cp = MaxSector;
 		set_bit(MD_SB_CHANGE_CLEAN, &mddev->sb_flags);
+	} else if (mddev->pers && ppl_conf->mismatch_count > 0) {
+		/* no mismatch allowed when enabling PPL for a running array */
+		ret = -EINVAL;
+		goto err;
 	}
 
 	conf->log = log;
