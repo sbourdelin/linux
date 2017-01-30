@@ -583,6 +583,11 @@ static int mxs_mmc_probe(struct platform_device *pdev)
 	struct regulator *reg_vmmc;
 	struct mxs_ssp *ssp;
 
+	if (!of_id) {
+		dev_err(&pdev->dev, "Error: No device match found\n");
+		return -ENODEV;
+	}
+
 	irq_err = platform_get_irq(pdev, 0);
 	if (irq_err < 0)
 		return irq_err;
