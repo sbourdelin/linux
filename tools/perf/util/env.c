@@ -60,29 +60,45 @@ out_enomem:
 
 int perf_env__read_cpu_topology_map(struct perf_env *env)
 {
-	int cpu, nr_cpus;
+	int cpu, nr_cpus, i, err = 0;
+	struct cpu_map *map;
 
 	if (env->cpu != NULL)
 		return 0;
 
-	if (env->nr_cpus_avail == 0)
-		env->nr_cpus_avail = sysconf(_SC_NPROCESSORS_CONF);
+	map = cpu_map__new(NULL);
+	if (map == NULL) {
+		pr_debug("failed to get system cpumap\n");
+		err = -ENOMEM;
+		goto out;
+	}
 
-	nr_cpus = env->nr_cpus_avail;
-	if (nr_cpus == -1)
-		return -EINVAL;
+	if (env->nr_cpus_online == 0)
+		env->nr_cpus_online = map->nr;
+
+	nr_cpus = env->nr_cpus_online;
+	if (nr_cpus == -1 || map->nr < nr_cpus) {
+		err = -EINVAL;
+		goto out_free;
+	}
 
 	env->cpu = calloc(nr_cpus, sizeof(env->cpu[0]));
-	if (env->cpu == NULL)
-		return -ENOMEM;
+	if (env->cpu == NULL) {
+		err = -ENOMEM;
+		goto out_free;
+	}
 
-	for (cpu = 0; cpu < nr_cpus; ++cpu) {
-		env->cpu[cpu].core_id	= cpu_map__get_core_id(cpu);
-		env->cpu[cpu].socket_id	= cpu_map__get_socket_id(cpu);
+	for (i = 0; i < nr_cpus; i++) {
+		cpu = map->map[i];
+		env->cpu[i].core_id	= cpu_map__get_core_id(cpu);
+		env->cpu[i].socket_id	= cpu_map__get_socket_id(cpu);
 	}
 
 	env->nr_cpus_avail = nr_cpus;
-	return 0;
+out_free:
+	cpu_map__put(map);
+out:
+	return err;
 }
 
 void cpu_cache_level__free(struct cpu_cache_level *cache)

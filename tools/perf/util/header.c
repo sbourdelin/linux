@@ -505,41 +505,45 @@ static void free_cpu_topo(struct cpu_topo *tp)
 
 static struct cpu_topo *build_cpu_topology(void)
 {
-	struct cpu_topo *tp;
+	struct cpu_topo *tp = NULL;
 	void *addr;
-	u32 nr, i;
+	u32 i;
 	size_t sz;
-	long ncpus;
-	int ret = -1;
+	int ret = 0, cpu;
+	struct cpu_map *map;
 
-	ncpus = sysconf(_SC_NPROCESSORS_CONF);
-	if (ncpus < 0)
-		return NULL;
+	map = cpu_map__new(NULL);
+	if (map == NULL) {
+		pr_debug("failed to get system cpumap\n");
+		goto out;
+	}
 
-	nr = (u32)(ncpus & UINT_MAX);
-
-	sz = nr * sizeof(char *);
-
+	sz = map->nr * sizeof(char *);
 	addr = calloc(1, sizeof(*tp) + 2 * sz);
 	if (!addr)
-		return NULL;
+		goto out_free;
 
 	tp = addr;
-	tp->cpu_nr = nr;
+	tp->cpu_nr = map->nr;
 	addr += sizeof(*tp);
 	tp->core_siblings = addr;
 	addr += sz;
 	tp->thread_siblings = addr;
 
-	for (i = 0; i < nr; i++) {
-		ret = build_cpu_topo(tp, i);
+	for (i = 0; i < tp->cpu_nr; i++) {
+		cpu = map->map[i];
+		ret = build_cpu_topo(tp, cpu);
 		if (ret < 0)
 			break;
 	}
+
+out_free:
+	cpu_map__put(map);
 	if (ret) {
 		free_cpu_topo(tp);
 		tp = NULL;
 	}
+out:
 	return tp;
 }
 
@@ -577,7 +581,7 @@ static int write_cpu_topology(int fd, struct perf_header *h __maybe_unused,
 	if (ret < 0)
 		goto done;
 
-	for (j = 0; j < perf_env.nr_cpus_avail; j++) {
+	for (j = 0; j < perf_env.nr_cpus_online; j++) {
 		ret = do_write(fd, &perf_env.cpu[j].core_id,
 			       sizeof(perf_env.cpu[j].core_id));
 		if (ret < 0)

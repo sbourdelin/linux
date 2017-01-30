@@ -66,17 +66,18 @@ static int check_cpu_topology(char *path, struct cpu_map *map)
 	TEST_ASSERT_VAL("can't get session", session);
 
 	for (i = 0; i < session->header.env.nr_cpus_online; i++) {
-		pr_debug("CPU %d, core %d, socket %d\n", i,
+		pr_debug("CPU %d, core %d, socket %d\n", map->map[i],
 			 session->header.env.cpu[i].core_id,
 			 session->header.env.cpu[i].socket_id);
 	}
 
 	for (i = 0; i < map->nr; i++) {
+		int cpu = map->map[i];
 		TEST_ASSERT_VAL("Core ID doesn't match",
-			(session->header.env.cpu[map->map[i]].core_id == (cpu_map__get_core(map, i, NULL) & 0xffff)));
+			(session->header.env.cpu[i].core_id == (cpu_map__get_core_id(cpu) & 0xffff)));
 
 		TEST_ASSERT_VAL("Socket ID doesn't match",
-			(session->header.env.cpu[map->map[i]].socket_id == cpu_map__get_socket(map, i, NULL)));
+			(session->header.env.cpu[i].socket_id == cpu_map__get_socket_id(cpu)));
 	}
 
 	perf_session__delete(session);
