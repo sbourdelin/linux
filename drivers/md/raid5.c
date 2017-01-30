@@ -926,7 +926,8 @@ static void ops_run_io(struct stripe_head *sh, struct stripe_head_state *s)
 
 	might_sleep();
 
-	if (!test_bit(STRIPE_R5C_CACHING, &sh->state)) {
+	if (!test_bit(STRIPE_R5C_CACHING, &sh->state) ||
+	    test_bit(MD_HAS_PPL, &conf->mddev->flags)) {
 		/* writing out phase */
 		if (s->waiting_extra_page)
 			return;
@@ -7171,6 +7172,13 @@ static int raid5_run(struct mddev *mddev)
 		BUG_ON(mddev->delta_disks != 0);
 	}
 
+	if (test_bit(MD_HAS_JOURNAL, &mddev->flags) &&
+	    test_bit(MD_HAS_PPL, &mddev->flags)) {
+		pr_warn("md/raid:%s: using journal device and PPL not allowed - disabling PPL\n",
+			mdname(mddev));
+		clear_bit(MD_HAS_PPL, &mddev->flags);
+	}
+
 	if (mddev->private == NULL)
 		conf = setup_conf(mddev);
 	else
@@ -7396,6 +7404,11 @@ static int raid5_run(struct mddev *mddev)
 		pr_debug("md/raid:%s: using device %s as journal\n",
 			 mdname(mddev), bdevname(journal_dev->bdev, b));
 		if (r5l_init_log(conf, journal_dev))
+			goto abort;
+	} else if (test_bit(MD_HAS_PPL, &mddev->flags)) {
+		pr_debug("md/raid:%s: enabling distributed Partial Parity Log\n",
+			 mdname(mddev));
+		if (r5l_init_log(conf, NULL))
 			goto abort;
 	}
 

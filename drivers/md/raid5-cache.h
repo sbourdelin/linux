@@ -87,6 +87,8 @@ struct r5l_log {
 
 	/* handlers for log operations */
 	struct r5l_policy *policy;
+
+	void *private;
 };
 
 /*
@@ -177,4 +179,10 @@ extern void r5c_check_cached_full_stripe(struct r5conf *conf);
 extern struct md_sysfs_entry r5c_journal_mode;
 extern void r5c_update_on_rdev_error(struct mddev *mddev);
 extern bool r5c_big_stripe_cached(struct r5conf *conf, sector_t sect);
+
+extern void __r5l_set_io_unit_state(struct r5l_io_unit *io,
+				    enum r5l_io_unit_state state);
+extern void r5l_io_run_stripes(struct r5l_io_unit *io);
+extern void r5l_run_no_mem_stripe(struct r5l_log *log);
+
 #endif /* _RAID5_CACHE_H */
