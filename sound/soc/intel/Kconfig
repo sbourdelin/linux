@@ -1,3 +1,10 @@
+menuconfig SND_SOC_SST
+	bool "Audio support for Intel Smart Sound Technology"
+	help
+	  Audio support for Intel Smart Sound Technology
+
+if SND_SOC_SST
+
 config SND_MFLD_MACHINE
 	tristate "SOC Machine Audio driver for Intel Medfield MID platform"
 	depends on INTEL_SCU_IPC
@@ -247,3 +254,5 @@ config SND_SOC_INTEL_SKL_NAU88L25_MAX98357A_MACH
 	  create an alsa sound card for NAU88L25 + MAX98357A.
 	  Say Y if you have such a device.
 	  If unsure select "N".
+
+endif
