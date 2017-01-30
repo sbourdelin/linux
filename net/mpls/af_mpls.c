@@ -31,7 +31,9 @@
 #define MPLS_NEIGH_TABLE_UNSPEC (NEIGH_LINK_TABLE + 1)
 
 static int zero = 0;
+static int one = 1;
 static int label_limit = (1 << 20) - 1;
+static int ttl_max = 255;
 
 static void rtmsg_lfib(int event, u32 label, struct mpls_route *rt,
 		       struct nlmsghdr *nlh, struct net *net, u32 portid,
@@ -219,8 +221,8 @@ out:
 	return &rt->rt_nh[nh_index];
 }
 
-static bool mpls_egress(struct mpls_route *rt, struct sk_buff *skb,
-			struct mpls_entry_decoded dec)
+static bool mpls_egress(struct net *net, struct mpls_route *rt,
+			struct sk_buff *skb, struct mpls_entry_decoded dec)
 {
 	enum mpls_payload_type payload_type;
 	bool success = false;
@@ -243,24 +245,29 @@ static bool mpls_egress(struct mpls_route *rt, struct sk_buff *skb,
 		payload_type = ip_hdr(skb)->version;
 
 	switch (payload_type) {
-	case MPT_IPV4: {
-		struct iphdr *hdr4 = ip_hdr(skb);
-		skb->protocol = htons(ETH_P_IP);
-		csum_replace2(&hdr4->check,
-			      htons(hdr4->ttl << 8),
-			      htons(dec.ttl << 8));
-		hdr4->ttl = dec.ttl;
+	case MPT_IPV4:
+		if (net->mpls.ip_ttl_propagate) {
+			struct iphdr *hdr4 = ip_hdr(skb);
+
+			skb->protocol = htons(ETH_P_IP);
+			csum_replace2(&hdr4->check,
+				      htons(hdr4->ttl << 8),
+				      htons(dec.ttl << 8));
+			hdr4->ttl = dec.ttl;
+		}
 		success = true;
 		break;
-	}
-	case MPT_IPV6: {
-		struct ipv6hdr *hdr6 = ipv6_hdr(skb);
-		skb->protocol = htons(ETH_P_IPV6);
-		hdr6->hop_limit = dec.ttl;
+	case MPT_IPV6:
+		if (net->mpls.ip_ttl_propagate) {
+			struct ipv6hdr *hdr6 = ipv6_hdr(skb);
+
+			skb->protocol = htons(ETH_P_IPV6);
+			hdr6->hop_limit = dec.ttl;
+		}
 		success = true;
 		break;
-	}
 	case MPT_UNSPEC:
+		/* Should have decided which protocol it is by now */
 		break;
 	}
 
@@ -360,7 +367,7 @@ static int mpls_forward(struct sk_buff *skb, struct net_device *dev,
 
 	if (unlikely(!new_header_size && dec.bos)) {
 		/* Penultimate hop popping */
-		if (!mpls_egress(rt, skb, dec))
+		if (!mpls_egress(dev_net(out_dev), rt, skb, dec))
 			goto err;
 	} else {
 		bool bos;
@@ -1764,6 +1771,9 @@ static int mpls_platform_labels(struct ctl_table *table, int write,
 	return ret;
 }
 
+#define MPLS_NS_SYSCTL_OFFSET(field)		\
+	(&((struct net *)0)->field)
+
 static const struct ctl_table mpls_table[] = {
 	{
 		.procname	= "platform_labels",
@@ -1772,21 +1782,47 @@ static const struct ctl_table mpls_table[] = {
 		.mode		= 0644,
 		.proc_handler	= mpls_platform_labels,
 	},
+	{
+		.procname	= "ip_ttl_propagate",
+		.data		= MPLS_NS_SYSCTL_OFFSET(mpls.ip_ttl_propagate),
+		.maxlen		= sizeof(int),
+		.mode		= 0644,
+		.proc_handler	= proc_dointvec_minmax,
+		.extra1		= &zero,
+		.extra2		= &one,
+	},
+	{
+		.procname	= "default_ttl",
+		.data		= MPLS_NS_SYSCTL_OFFSET(mpls.default_ttl),
+		.maxlen		= sizeof(int),
+		.mode		= 0644,
+		.proc_handler	= proc_dointvec_minmax,
+		.extra1		= &one,
+		.extra2		= &ttl_max,
+	},
 	{ }
 };
 
 static int mpls_net_init(struct net *net)
 {
 	struct ctl_table *table;
+	int i;
 
 	net->mpls.platform_labels = 0;
 	net->mpls.platform_label = NULL;
+	net->mpls.ip_ttl_propagate = 1;
+	net->mpls.default_ttl = 255;
 
 	table = kmemdup(mpls_table, sizeof(mpls_table), GFP_KERNEL);
 	if (table == NULL)
 		return -ENOMEM;
 
-	table[0].data = net;
+	/* Table data contains only offsets relative to the base of
+	 * the mdev at this point, so make them absolute.
+	 */
+	for (i = 0; i < ARRAY_SIZE(mpls_table) - 1; i++)
+		table[i].data = (char *)net + (uintptr_t)table[i].data;
+
 	net->mpls.ctl = register_net_sysctl(net, "net/mpls", table);
 	if (net->mpls.ctl == NULL) {
 		kfree(table);

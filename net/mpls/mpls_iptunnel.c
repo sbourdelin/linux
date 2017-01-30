@@ -49,6 +49,7 @@ static int mpls_xmit(struct sk_buff *skb)
 	struct rtable *rt = NULL;
 	struct rt6_info *rt6 = NULL;
 	struct mpls_dev *out_mdev;
+	struct net *net;
 	int err = 0;
 	bool bos;
 	int i;
@@ -56,13 +57,20 @@ static int mpls_xmit(struct sk_buff *skb)
 
 	/* Find the output device */
 	out_dev = dst->dev;
+	net = dev_net(out_dev);
 
 	/* Obtain the ttl */
 	if (dst->ops->family == AF_INET) {
-		ttl = ip_hdr(skb)->ttl;
+		if (net->mpls.ip_ttl_propagate)
+			ttl = ip_hdr(skb)->ttl;
+		else
+			ttl = net->mpls.default_ttl;
 		rt = (struct rtable *)dst;
 	} else if (dst->ops->family == AF_INET6) {
-		ttl = ipv6_hdr(skb)->hop_limit;
+		if (net->mpls.ip_ttl_propagate)
+			ttl = ipv6_hdr(skb)->hop_limit;
+		else
+			ttl = net->mpls.default_ttl;
 		rt6 = (struct rt6_info *)dst;
 	} else {
 		goto drop;
