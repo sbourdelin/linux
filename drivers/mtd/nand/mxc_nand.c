@@ -1596,6 +1596,10 @@ static int __init mxcnd_probe_dt(struct mxc_nand_host *host)
 	if (!np)
 		return 1;
 
+	if (!of_id) {
+		dev_err(host->dev, "Error: No device match found\n");
+		return -ENODEV;
+	}
 	host->devtype_data = of_id->data;
 
 	return 0;
