@@ -71,33 +71,6 @@ config SND_SOC_INTEL_HASWELL_MACH
 	  Say Y if you have such a device.
 	  If unsure select "N".
 
-config SND_SOC_INTEL_BXT_DA7219_MAX98357A_MACH
-	tristate "ASoC Audio driver for Broxton with DA7219 and MAX98357A in I2S Mode"
-	depends on X86 && ACPI && I2C
-	select SND_SOC_INTEL_SKYLAKE
-	select SND_SOC_DA7219
-	select SND_SOC_MAX98357A
-	select SND_SOC_DMIC
-	select SND_SOC_HDAC_HDMI
-	help
-	   This adds support for ASoC machine driver for Broxton-P platforms
-	   with DA7219 + MAX98357A I2S audio codec.
-	   Say Y if you have such a device.
-	   If unsure select "N".
-
-config SND_SOC_INTEL_BXT_RT298_MACH
-	tristate "ASoC Audio driver for Broxton with RT298 I2S mode"
-	depends on X86 && ACPI && I2C
-	select SND_SOC_INTEL_SKYLAKE
-	select SND_SOC_RT298
-	select SND_SOC_DMIC
-	select SND_SOC_HDAC_HDMI
-	help
-	   This adds support for ASoC machine driver for Broxton platforms
-	   with RT286 I2S audio codec.
-	   Say Y if you have such a device.
-	   If unsure select "N".
-
 config SND_SOC_INTEL_BYT_RT5640_MACH
 	tristate "ASoC Audio driver for Intel Baytrail with RT5640 codec"
 	depends on X86_INTEL_LPSS && I2C
@@ -208,16 +181,19 @@ config SND_SOC_INTEL_CHT_BSW_MAX98090_TI_MACH
 	  If unsure select "N".
 
 config SND_SOC_INTEL_SKYLAKE
-	tristate
+	tristate "Intel Smart Sound Technology for SKL/BXT/KBL platforms"
 	select SND_HDA_EXT_CORE
 	select SND_HDA_DSP_LOADER
 	select SND_SOC_TOPOLOGY
 	select SND_SOC_INTEL_SST
+	help
+	  Intel Smart Sound Technology for Skylake Broxton and Kabylake
+          platforms.
 
 config SND_SOC_INTEL_SKL_RT286_MACH
 	tristate "ASoC Audio driver for SKL with RT286 I2S mode"
 	depends on X86 && ACPI && I2C
-	select SND_SOC_INTEL_SKYLAKE
+	depends on SND_SOC_INTEL_SKYLAKE
 	select SND_SOC_RT286
 	select SND_SOC_DMIC
 	select SND_SOC_HDAC_HDMI
@@ -230,7 +206,7 @@ config SND_SOC_INTEL_SKL_RT286_MACH
 config SND_SOC_INTEL_SKL_NAU88L25_SSM4567_MACH
 	tristate "ASoC Audio driver for SKL with NAU88L25 and SSM4567 in I2S Mode"
 	depends on X86_INTEL_LPSS && I2C
-	select SND_SOC_INTEL_SKYLAKE
+	depends on SND_SOC_INTEL_SKYLAKE
 	select SND_SOC_NAU8825
 	select SND_SOC_SSM4567
 	select SND_SOC_DMIC
@@ -244,7 +220,7 @@ config SND_SOC_INTEL_SKL_NAU88L25_SSM4567_MACH
 config SND_SOC_INTEL_SKL_NAU88L25_MAX98357A_MACH
 	tristate "ASoC Audio driver for SKL with NAU88L25 and MAX98357A in I2S Mode"
 	depends on X86_INTEL_LPSS && I2C
-	select SND_SOC_INTEL_SKYLAKE
+	depends on SND_SOC_INTEL_SKYLAKE
 	select SND_SOC_NAU8825
 	select SND_SOC_MAX98357A
 	select SND_SOC_DMIC
@@ -254,5 +230,32 @@ config SND_SOC_INTEL_SKL_NAU88L25_MAX98357A_MACH
 	  create an alsa sound card for NAU88L25 + MAX98357A.
 	  Say Y if you have such a device.
 	  If unsure select "N".
+
+config SND_SOC_INTEL_BXT_DA7219_MAX98357A_MACH
+	tristate "ASoC Audio driver for Broxton with DA7219 and MAX98357A in I2S Mode"
+	depends on X86 && ACPI && I2C
+	depends on SND_SOC_INTEL_SKYLAKE
+	select SND_SOC_DA7219
+	select SND_SOC_MAX98357A
+	select SND_SOC_DMIC
+	select SND_SOC_HDAC_HDMI
+	help
+	   This adds support for ASoC machine driver for Broxton-P platforms
+	   with DA7219 + MAX98357A I2S audio codec.
+	   Say Y if you have such a device.
+	   If unsure select "N".
+
+config SND_SOC_INTEL_BXT_RT298_MACH
+	tristate "ASoC Audio driver for Broxton with RT298 I2S mode"
+	depends on X86 && ACPI && I2C
+	depends on SND_SOC_INTEL_SKYLAKE
+	select SND_SOC_RT298
+	select SND_SOC_DMIC
+	select SND_SOC_HDAC_HDMI
+	help
+	   This adds support for ASoC machine driver for Broxton platforms
+	   with RT286 I2S audio codec.
+	   Say Y if you have such a device.
+	   If unsure select "N".
 
 endif
