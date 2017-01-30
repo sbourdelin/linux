@@ -170,6 +170,13 @@ static bool name_in_tp_list(char *sys, struct tracepoint_path *tps)
 	return false;
 }
 
+#define for_each_event_system(dir, dent, tps)			\
+	while ((dent = readdir(dir)))				\
+		if (dent->d_type == DT_DIR &&			\
+		    (strcmp(dent->d_name, ".")) &&		\
+		    (strcmp(dent->d_name, "..")) &&		\
+		    (name_in_tp_list(dent->d_name, tps)))
+
 static int copy_event_system(const char *sys, struct tracepoint_path *tps)
 {
 	struct dirent *dent;
@@ -186,12 +193,7 @@ static int copy_event_system(const char *sys, struct tracepoint_path *tps)
 		return -errno;
 	}
 
-	while ((dent = readdir(dir))) {
-		if (dent->d_type != DT_DIR ||
-		    strcmp(dent->d_name, ".") == 0 ||
-		    strcmp(dent->d_name, "..") == 0 ||
-		    !name_in_tp_list(dent->d_name, tps))
-			continue;
+	for_each_event_system(dir, dent, tps) {
 		if (asprintf(&format, "%s/%s/format", sys, dent->d_name) < 0) {
 			err = -ENOMEM;
 			goto out;
@@ -210,12 +212,7 @@ static int copy_event_system(const char *sys, struct tracepoint_path *tps)
 	}
 
 	rewinddir(dir);
-	while ((dent = readdir(dir))) {
-		if (dent->d_type != DT_DIR ||
-		    strcmp(dent->d_name, ".") == 0 ||
-		    strcmp(dent->d_name, "..") == 0 ||
-		    !name_in_tp_list(dent->d_name, tps))
-			continue;
+	for_each_event_system(dir, dent, tps) {
 		if (asprintf(&format, "%s/%s/format", sys, dent->d_name) < 0) {
 			err = -ENOMEM;
 			goto out;
@@ -266,6 +263,14 @@ static bool system_in_tp_list(char *sys, struct tracepoint_path *tps)
 	return false;
 }
 
+#define for_each_event_file(dir, dent, tps)			\
+	while ((dent = readdir(dir)))				\
+		if (dent->d_type == DT_DIR &&			\
+		    (strcmp(dent->d_name, ".")) &&		\
+		    (strcmp(dent->d_name, "..")) &&		\
+		    (strcmp(dent->d_name, "ftrace")) &&		\
+		    (system_in_tp_list(dent->d_name, tps)))
+
 static int record_event_files(struct tracepoint_path *tps)
 {
 	struct dirent *dent;
@@ -290,13 +295,7 @@ static int record_event_files(struct tracepoint_path *tps)
 		goto out;
 	}
 
-	while ((dent = readdir(dir))) {
-		if (dent->d_type != DT_DIR ||
-		    strcmp(dent->d_name, ".") == 0 ||
-		    strcmp(dent->d_name, "..") == 0 ||
-		    strcmp(dent->d_name, "ftrace") == 0 ||
-		    !system_in_tp_list(dent->d_name, tps))
-			continue;
+	for_each_event_file(dir, dent, tps) {
 		count++;
 	}
 
@@ -307,13 +306,7 @@ static int record_event_files(struct tracepoint_path *tps)
 	}
 
 	rewinddir(dir);
-	while ((dent = readdir(dir))) {
-		if (dent->d_type != DT_DIR ||
-		    strcmp(dent->d_name, ".") == 0 ||
-		    strcmp(dent->d_name, "..") == 0 ||
-		    strcmp(dent->d_name, "ftrace") == 0 ||
-		    !system_in_tp_list(dent->d_name, tps))
-			continue;
+	for_each_event_file(dir, dent, tps) {
 		if (asprintf(&sys, "%s/%s", path, dent->d_name) < 0) {
 			err = -ENOMEM;
 			goto out;
