@@ -1,5 +1,5 @@
 /*
- * Qualcomm ADSP Peripheral Image Loader for MSM8974 and MSM8996
+ * Qualcomm ADSP/SLPI Peripheral Image Loader for MSM8974 and MSM8996
  *
  * Copyright (C) 2016 Linaro Ltd
  * Copyright (C) 2014 Sony Mobile Communications AB
@@ -455,9 +455,17 @@ static const struct adsp_data adsp_resource_init = {
 		.pas_id = 1,
 		.has_aggre2_clk = 0,
 };
+
+static const struct adsp_data slpi_resource_init = {
+		.crash_reason_smem = 424,
+		.firmware_name = "slpi.mdt",
+		.pas_id = 12,
+		.has_aggre2_clk = 1,
+};
 static const struct of_device_id adsp_of_match[] = {
 	{ .compatible = "qcom,msm8974-adsp-pil", .data = &adsp_resource_init},
 	{ .compatible = "qcom,msm8996-adsp-pil", .data = &adsp_resource_init},
+	{ .compatible = "qcom,msm8996-slpi-pil", .data = &slpi_resource_init},
 	{ },
 };
 MODULE_DEVICE_TABLE(of, adsp_of_match);
