@@ -23,9 +23,7 @@
 #include <linux/remoteproc.h>
 #include <linux/sizes.h>
 #include <linux/slab.h>
-
-#include "remoteproc_internal.h"
-#include "qcom_mdt_loader.h"
+#include <linux/soc/qcom/mdt_loader.h>
 
 static bool mdt_phdr_valid(const struct elf32_phdr *phdr)
 {
