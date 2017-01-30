@@ -24,6 +24,8 @@
 
 #ifdef CONFIG_FA_DUMP
 
+#include <asm/setup.h>
+
 /*
  * The RMA region will be saved for later dumping when kernel crashes.
  * RMA is Real Mode Area, the first block of logical memory address owned
@@ -44,6 +46,8 @@
 			+ (0x1UL << 26))
 
 #define memblock_num_regions(memblock_type)	(memblock.memblock_type.cnt)
+
+#define FADUMP_FORMAT_VERSION	0x00000002
 
 /* Firmware provided dump sections */
 #define FADUMP_CPU_STATE_DATA	0x0001
@@ -126,6 +130,13 @@ struct fw_dump {
 	/* cmd line option during boot */
 	unsigned long	reserve_bootvar;
 
+	/*
+	 * Area to pass info to capture (fadump) kernel. For now,
+	 * we are only passing parameters to append.
+	 */
+	unsigned long	handover_area_start;
+	unsigned long	handover_area_size;
+
 	unsigned long	fadumphdr_addr;
 	unsigned long	cpu_notes_buf;
 	unsigned long	cpu_notes_buf_size;
@@ -158,6 +169,22 @@ static inline u64 str_to_u64(const char *str)
 
 #define FADUMP_CRASH_INFO_MAGIC		STR_TO_HEX("FADMPINF")
 #define REGSAVE_AREA_MAGIC		STR_TO_HEX("REGSAVE")
+
+/*
+ * The start address for an area to pass off certain configuration details
+ * like parameters to append to the commandline for a capture (fadump) kernel.
+ * Setting it to 128MB as this needs to be accessed in realmode.
+ */
+#define FADUMP_HANDOVER_AREA_START	(1UL << 27)
+
+#define FADUMP_PARAMS_AREA_MARKER	STR_TO_HEX("FADMPCMD")
+#define FADUMP_PARAMS_INFO_SIZE		sizeof(struct fadump_params_info)
+
+/* fadump parameters info */
+struct fadump_params_info {
+	u64		params_area_marker;
+	char		params[COMMAND_LINE_SIZE/2];
+};
 
 /* The firmware-assisted dump format.
  *
@@ -200,6 +227,7 @@ struct fad_crash_memory_ranges {
 
 extern int early_init_dt_scan_fw_dump(unsigned long node,
 		const char *uname, int depth, void *data);
+extern char *get_fadump_parameters_realmode(void);
 extern int fadump_reserve_mem(void);
 extern int setup_fadump(void);
 extern int is_fadump_active(void);

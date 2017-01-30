@@ -41,7 +41,6 @@
 #include <asm/rtas.h>
 #include <asm/fadump.h>
 #include <asm/debug.h>
-#include <asm/setup.h>
 
 static struct fw_dump fw_dump;
 static struct fadump_mem_struct fdm;
@@ -73,6 +72,9 @@ int __init early_init_dt_scan_fw_dump(unsigned long node,
 
 	fw_dump.fadump_supported = 1;
 	fw_dump.ibm_configure_kernel_dump = be32_to_cpu(*token);
+
+	fw_dump.handover_area_start = FADUMP_HANDOVER_AREA_START;
+	fw_dump.handover_area_size = PAGE_ALIGN(FADUMP_PARAMS_INFO_SIZE);
 
 	/*
 	 * The 'ibm,kernel-dump' rtas node is present only if there is
@@ -147,7 +149,7 @@ static unsigned long init_fadump_mem_struct(struct fadump_mem_struct *fdm,
 	memset(fdm, 0, sizeof(struct fadump_mem_struct));
 	addr = addr & PAGE_MASK;
 
-	fdm->header.dump_format_version = cpu_to_be32(0x00000001);
+	fdm->header.dump_format_version = cpu_to_be32(FADUMP_FORMAT_VERSION);
 	fdm->header.dump_num_sections = cpu_to_be16(3);
 	fdm->header.dump_status_flag = 0;
 	fdm->header.offset_first_dump_section =
@@ -253,6 +255,29 @@ static unsigned long get_fadump_area_size(void)
 	return size;
 }
 
+static char *get_fadump_params_buf(struct fadump_params_info *params_info)
+{
+	char *params = NULL;
+
+	if (params_info->params_area_marker == FADUMP_PARAMS_AREA_MARKER)
+		params = params_info->params;
+
+	return params;
+}
+
+char * __init get_fadump_parameters_realmode(void)
+{
+	char *params = NULL;
+	struct fadump_params_info *params_info =
+		(struct fadump_params_info *)fw_dump.handover_area_start;
+
+	if (fdm_active && fdm_active->header.dump_format_version ==
+	    cpu_to_be32(FADUMP_FORMAT_VERSION))
+		params = get_fadump_params_buf(params_info);
+
+	return params;
+}
+
 int __init fadump_reserve_mem(void)
 {
 	unsigned long base, size, memory_boundary;
@@ -296,6 +321,15 @@ int __init fadump_reserve_mem(void)
 		memory_boundary = memory_limit;
 	else
 		memory_boundary = memblock_end_of_DRAM();
+
+	/*
+	 * Reserve some memory to pass config info like parameters to append
+	 * to fadump (capture) kernel.
+	 */
+	memblock_reserve(fw_dump.handover_area_start, fw_dump.handover_area_size);
+	printk(KERN_INFO "Reserved %lu bytes at 0x%lx for passing "
+	       "some config info to fadump kernel\n",
+	       fw_dump.handover_area_size, fw_dump.handover_area_start);
 
 	if (fw_dump.dump_active) {
 		printk(KERN_INFO "Firmware-assisted dump is active.\n");
@@ -926,6 +960,20 @@ static int fadump_create_elfcore_headers(char *bufp)
 	return 0;
 }
 
+static void init_fadump_params_area(void)
+{
+	struct fadump_params_info *params_info;
+
+	params_info = __va(fw_dump.handover_area_start);
+	memset(params_info, 0, sizeof(*params_info));
+	params_info->params_area_marker = FADUMP_PARAMS_AREA_MARKER;
+}
+
+static void init_fadump_handover_area(void)
+{
+	init_fadump_params_area();
+}
+
 static unsigned long init_fadump_header(unsigned long addr)
 {
 	struct fadump_crash_info_header *fdh;
@@ -1137,6 +1185,14 @@ static ssize_t fadump_register_show(struct kobject *kobj,
 	return sprintf(buf, "%d\n", fw_dump.dump_registered);
 }
 
+static ssize_t fadump_params_show(struct kobject *kobj,
+				   struct kobj_attribute *attr,
+				   char *buf)
+{
+	return sprintf(buf, "%s\n",
+		get_fadump_params_buf(__va(fw_dump.handover_area_start)));
+}
+
 static ssize_t fadump_register_store(struct kobject *kobj,
 					struct kobj_attribute *attr,
 					const char *buf, size_t count)
@@ -1173,6 +1229,61 @@ static ssize_t fadump_register_store(struct kobject *kobj,
 unlock_out:
 	mutex_unlock(&fadump_mutex);
 	return ret < 0 ? ret : count;
+}
+
+static ssize_t fadump_params_store(struct kobject *kobj,
+				   struct kobj_attribute *attr,
+				   const char *buf, size_t count)
+{
+	int ret;
+	bool is_truncated = false;
+	char *ptr;
+	size_t size;
+	struct fadump_params_info *params_info;
+
+	if (!fw_dump.fadump_enabled || fdm_active)
+		return -EPERM;
+
+	mutex_lock(&fadump_mutex);
+
+	ret = count;
+
+	/*
+	 * Passing 'fadump=' here is counter-intuitive.
+	 * So, throw an error when that happens.
+	 */
+	ptr = strstr(buf, "fadump=");
+	if (ptr) {
+		pr_err("'fadump=' parameter not supported here.\n");
+		ret = -EINVAL;
+		goto unlock_out;
+	}
+
+	params_info = __va(fw_dump.handover_area_start);
+	size = sizeof(params_info->params) - 1;
+	memset(params_info->params, 0, (size + 1));
+
+	if (buf[0] != ' ') {
+		params_info->params[0] = ' ';
+		size--;
+	}
+
+	if (count > size) {
+		is_truncated = true;
+		count = size;
+	}
+
+	strncat(params_info->params, buf, count);
+	size = strlen(params_info->params);
+	if (size && params_info->params[size-1] == '\n')
+		params_info->params[size-1] = 0;
+
+	if (is_truncated)
+		pr_warn("Modified: %s\n", params_info->params);
+
+unlock_out:
+	mutex_unlock(&fadump_mutex);
+	return ret;
 }
 
 static int fadump_region_show(struct seq_file *m, void *private)
@@ -1245,6 +1356,10 @@ static struct kobj_attribute fadump_attr = __ATTR(fadump_enabled,
 static struct kobj_attribute fadump_register_attr = __ATTR(fadump_registered,
 						0644, fadump_register_show,
 						fadump_register_store);
+static struct
+kobj_attribute fadump_cmdline_append_attr = __ATTR(fadump_cmdline_append,
+						   0644, fadump_params_show,
+						   fadump_params_store);
 
 static int fadump_region_open(struct inode *inode, struct file *file)
 {
@@ -1272,6 +1387,11 @@ static void fadump_init_files(void)
 	if (rc)
 		printk(KERN_ERR "fadump: unable to create sysfs file"
 			" fadump_registered (%d)\n", rc);
+
+	rc = sysfs_create_file(kernel_kobj, &fadump_cmdline_append_attr.attr);
+	if (rc)
+		printk(KERN_ERR "fadump: unable to create sysfs file"
+			" fadump_cmdline_append (%d)\n", rc);
 
 	debugfs_file = debugfs_create_file("fadump_region", 0444,
 					powerpc_debugfs_root, NULL,
@@ -1319,6 +1439,7 @@ int __init setup_fadump(void)
 	/* Initialize the kernel dump memory structure for FAD registration. */
 	else if (fw_dump.reserve_dump_area_size)
 		init_fadump_mem_struct(&fdm, fw_dump.reserve_dump_area_start);
+	init_fadump_handover_area();
 	fadump_init_files();
 
 	return 1;
