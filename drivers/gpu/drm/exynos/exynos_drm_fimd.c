@@ -1072,6 +1072,10 @@ static int fimd_probe(struct platform_device *pdev)
 	ctx->dev = dev;
 	ctx->suspended = true;
 	ctx->driver_data = of_device_get_match_data(dev);
+	if (!ctx->driver_data) {
+		dev_err(dev, "no device match found\n");
+		return -ENODEV;
+	}
 
 	if (of_property_read_bool(dev->of_node, "samsung,invert-vden"))
 		ctx->vidcon1 |= VIDCON1_INV_VDEN;

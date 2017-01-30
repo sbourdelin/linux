@@ -1792,6 +1792,10 @@ static int hdmi_probe(struct platform_device *pdev)
 		return -ENOMEM;
 
 	hdata->drv_data = of_device_get_match_data(dev);
+	if (!hdata->drv_data) {
+		dev_err(dev, "no device match found\n");
+		return -ENODEV;
+	}
 
 	platform_set_drvdata(pdev, hdata);
 

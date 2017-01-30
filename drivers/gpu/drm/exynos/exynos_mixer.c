@@ -1212,6 +1212,10 @@ static int mixer_probe(struct platform_device *pdev)
 	}
 
 	drv = of_device_get_match_data(dev);
+	if (!drv) {
+		dev_err(dev, "no device match found\n");
+		return -ENODEV;
+	}
 
 	ctx->pdev = pdev;
 	ctx->dev = dev;

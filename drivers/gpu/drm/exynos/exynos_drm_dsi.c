@@ -1765,6 +1765,10 @@ static int exynos_dsi_probe(struct platform_device *pdev)
 
 	dsi->dev = dev;
 	dsi->driver_data = of_device_get_match_data(dev);
+	if (!dsi->driver_data) {
+		dev_err(dev, "no device match found\n");
+		return -ENODEV;
+	}
 
 	ret = exynos_dsi_parse_dt(dsi);
 	if (ret)
