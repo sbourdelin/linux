@@ -1551,33 +1551,100 @@ out:
 	return found;
 }
 
-static noinline void __unlock_for_delalloc(struct inode *inode,
-					   struct page *locked_page,
-					   u64 start, u64 end)
+/*
+ * index_ret:  record where we stop
+ * This only returns errors when page_ops has PAGE_LOCK.
+ */
+static int
+__process_pages_contig(struct address_space *mapping, struct page *locked_page,
+		       pgoff_t start_index, pgoff_t end_index,
+		       unsigned long page_ops, pgoff_t *index_ret)
 {
-	int ret;
+	unsigned long nr_pages = end_index - start_index + 1;
+	pgoff_t index = start_index;
 	struct page *pages[16];
-	unsigned long index = start >> PAGE_SHIFT;
-	unsigned long end_index = end >> PAGE_SHIFT;
-	unsigned long nr_pages = end_index - index + 1;
+	unsigned pages_locked = 0;
+	unsigned ret;
+	int err = 0;
 	int i;
 
-	if (index == locked_page->index && end_index == index)
-		return;
+	/*
+	 * Do NOT skip locked_page since we may need to set PagePrivate2 on it.
+	 */
+
+	/* PAGE_LOCK should not be mixed with other ops. */
+	if (page_ops & PAGE_LOCK) {
+		ASSERT(page_ops == PAGE_LOCK);
+		ASSERT(index_ret);
+		ASSERT(*index_ret == start_index);
+	}
+
+	if ((page_ops & PAGE_SET_ERROR) && nr_pages > 0)
+		mapping_set_error(mapping, -EIO);
 
 	while (nr_pages > 0) {
-		ret = find_get_pages_contig(inode->i_mapping, index,
-				     min_t(unsigned long, nr_pages,
-				     ARRAY_SIZE(pages)), pages);
+		ret = find_get_pages_contig(mapping, index,
+				     min_t(unsigned long,
+				     nr_pages, ARRAY_SIZE(pages)), pages);
+		if (ret == 0) {
+			/*
+			 * Only if we're going to lock these pages, can we find
+			 * nothing at @index.
+			 */
+			ASSERT(page_ops & PAGE_LOCK);
+			goto out;
+		}
+
 		for (i = 0; i < ret; i++) {
-			if (pages[i] != locked_page)
-				unlock_page(pages[i]);
+			if (page_ops & PAGE_SET_PRIVATE2)
+				SetPagePrivate2(pages[i]);
+
+			if (pages[i] != locked_page) {
+				if (page_ops & PAGE_CLEAR_DIRTY)
+					clear_page_dirty_for_io(pages[i]);
+				if (page_ops & PAGE_SET_WRITEBACK)
+					set_page_writeback(pages[i]);
+				if (page_ops & PAGE_SET_ERROR)
+					SetPageError(pages[i]);
+				if (page_ops & PAGE_END_WRITEBACK)
+					end_page_writeback(pages[i]);
+				if (page_ops & PAGE_UNLOCK)
+					unlock_page(pages[i]);
+				if (page_ops & PAGE_LOCK) {
+					lock_page(pages[i]);
+					if (!PageDirty(pages[i]) ||
+					    pages[i]->mapping != mapping) {
+						unlock_page(pages[i]);
+						put_page(pages[i]);
+						err = -EAGAIN;
+						goto out;
+					}
+				}
+			}
 			put_page(pages[i]);
+			pages_locked++;
 		}
 		nr_pages -= ret;
 		index += ret;
 		cond_resched();
 	}
+out:
+	if (err && index_ret) {
+		*index_ret = start_index + pages_locked - 1;
+	}
+	return err;
+}
+
+static noinline void __unlock_for_delalloc(struct inode *inode,
+					   struct page *locked_page,
+					   u64 start, u64 end)
+{
+	unsigned long page_ops = PAGE_UNLOCK;
+
+	ASSERT(locked_page);
+	__process_pages_contig(inode->i_mapping, locked_page,
+			       start >> PAGE_SHIFT, end >> PAGE_SHIFT,
+			       page_ops, NULL);
 }
 
 static noinline int lock_delalloc_pages(struct inode *inode,
@@ -1585,60 +1652,21 @@ static noinline int lock_delalloc_pages(struct inode *inode,
 					u64 delalloc_start,
 					u64 delalloc_end)
 {
-	unsigned long index = delalloc_start >> PAGE_SHIFT;
-	unsigned long start_index = index;
-	unsigned long end_index = delalloc_end >> PAGE_SHIFT;
-	unsigned long pages_locked = 0;
-	struct page *pages[16];
-	unsigned long nrpages;
-	int ret;
-	int i;
+	pgoff_t index = delalloc_start >> PAGE_SHIFT;
+	pgoff_t start_index = index;
+	pgoff_t end_index = delalloc_end >> PAGE_SHIFT;
+	unsigned long page_ops = PAGE_LOCK;
+	int ret = 0;
 
-	/* the caller is responsible for locking the start index */
-	if (index == locked_page->index && index == end_index)
-		return 0;
+	ASSERT(locked_page);
 
-	/* skip the page at the start index */
-	nrpages = end_index - index + 1;
-	while (nrpages > 0) {
-		ret = find_get_pages_contig(inode->i_mapping, index,
-				     min_t(unsigned long,
-				     nrpages, ARRAY_SIZE(pages)), pages);
-		if (ret == 0) {
-			ret = -EAGAIN;
-			goto done;
-		}
-		/* now we have an array of pages, lock them all */
-		for (i = 0; i < ret; i++) {
-			/*
-			 * the caller is taking responsibility for
-			 * locked_page
-			 */
-			if (pages[i] != locked_page) {
-				lock_page(pages[i]);
-				if (!PageDirty(pages[i]) ||
-				    pages[i]->mapping != inode->i_mapping) {
-					ret = -EAGAIN;
-					unlock_page(pages[i]);
-					put_page(pages[i]);
-					goto done;
-				}
-			}
-			put_page(pages[i]);
-			pages_locked++;
-		}
-		nrpages -= ret;
-		index += ret;
-		cond_resched();
+	ret = __process_pages_contig(inode->i_mapping, locked_page, start_index,
+			       end_index, page_ops, &index);
+	if (ret == -EAGAIN) {
+		__unlock_for_delalloc(inode, locked_page, delalloc_start,
+				      ((u64)index) << PAGE_SHIFT);
 	}
-	ret = 0;
-done:
-	if (ret && pages_locked) {
-		__unlock_for_delalloc(inode, locked_page,
-			      delalloc_start,
-			      ((u64)(start_index + pages_locked - 1)) <<
-			      PAGE_SHIFT);
-	}
+
 	return ret;
 }
 
@@ -1734,49 +1762,11 @@ void extent_clear_unlock_delalloc(struct inode *inode, u64 start, u64 end,
 				 unsigned long page_ops)
 {
 	struct extent_io_tree *tree = &BTRFS_I(inode)->io_tree;
-	int ret;
-	struct page *pages[16];
-	unsigned long index = start >> PAGE_SHIFT;
-	unsigned long end_index = end >> PAGE_SHIFT;
-	unsigned long nr_pages = end_index - index + 1;
-	int i;
 
 	clear_extent_bit(tree, start, end, clear_bits, 1, 0, NULL, GFP_NOFS);
-	if (page_ops == 0)
-		return;
-
-	if ((page_ops & PAGE_SET_ERROR) && nr_pages > 0)
-		mapping_set_error(inode->i_mapping, -EIO);
-
-	while (nr_pages > 0) {
-		ret = find_get_pages_contig(inode->i_mapping, index,
-				     min_t(unsigned long,
-				     nr_pages, ARRAY_SIZE(pages)), pages);
-		for (i = 0; i < ret; i++) {
-
-			if (page_ops & PAGE_SET_PRIVATE2)
-				SetPagePrivate2(pages[i]);
-
-			if (pages[i] == locked_page) {
-				put_page(pages[i]);
-				continue;
-			}
-			if (page_ops & PAGE_CLEAR_DIRTY)
-				clear_page_dirty_for_io(pages[i]);
-			if (page_ops & PAGE_SET_WRITEBACK)
-				set_page_writeback(pages[i]);
-			if (page_ops & PAGE_SET_ERROR)
-				SetPageError(pages[i]);
-			if (page_ops & PAGE_END_WRITEBACK)
-				end_page_writeback(pages[i]);
-			if (page_ops & PAGE_UNLOCK)
-				unlock_page(pages[i]);
-			put_page(pages[i]);
-		}
-		nr_pages -= ret;
-		index += ret;
-		cond_resched();
-	}
+	__process_pages_contig(inode->i_mapping, locked_page,
+			       start >> PAGE_SHIFT, end >> PAGE_SHIFT,
+			       page_ops, NULL);
 }
 
 /*
