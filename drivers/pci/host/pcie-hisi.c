@@ -273,6 +273,10 @@ static int hisi_pcie_probe(struct platform_device *pdev)
 	driver = dev->driver;
 
 	match = of_match_device(driver->of_match_table, dev);
+	if (!match) {
+		dev_err(dev, "Error: No device match found\n");
+		return -ENODEV;
+	}
 	hisi_pcie->soc_ops = (struct pcie_soc_ops *) match->data;
 
 	hisi_pcie->subctrl =
