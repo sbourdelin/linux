@@ -175,6 +175,16 @@ static void mpol_relative_nodemask(nodemask_t *ret, const nodemask_t *orig,
 }
 
 #ifdef CONFIG_COHERENT_DEVICE
+static inline void set_vm_cdm(struct vm_area_struct *vma)
+{
+	vma->vm_flags |= VM_CDM;
+}
+
+static inline void clr_vm_cdm(struct vm_area_struct *vma)
+{
+	vma->vm_flags &= ~VM_CDM;
+}
+
 static void mark_vma_cdm(nodemask_t *nmask,
 		struct page *page, struct vm_area_struct *vma)
 {
@@ -191,6 +201,9 @@ static void mark_vma_cdm(nodemask_t *nmask,
 		vma->vm_flags |= VM_CDM;
 }
 #else
+static inline void set_vm_cdm(struct vm_area_struct *vma) { }
+static inline void clr_vm_cdm(struct vm_area_struct *vma) { }
+
 static void mark_vma_cdm(nodemask_t *nmask,
 		struct page *page, struct vm_area_struct *vma)
 {
@@ -769,6 +782,10 @@ static int mbind_range(struct mm_struct *mm, unsigned long start,
 		next = vma->vm_next;
 		vmstart = max(start, vma->vm_start);
 		vmend   = min(end, vma->vm_end);
+
+		if ((new_pol->mode == MPOL_BIND)
+			&& nodemask_has_cdm(new_pol->v.nodes))
+			set_vm_cdm(vma);
 
 		if (mpol_equal(vma_policy(vma), new_pol))
 			continue;
