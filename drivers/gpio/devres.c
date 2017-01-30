@@ -123,18 +123,19 @@ struct gpio_desc *__must_check devm_gpiod_get_index(struct device *dev,
 EXPORT_SYMBOL(devm_gpiod_get_index);
 
 /**
- * devm_fwnode_get_gpiod_from_child - get a GPIO descriptor from a device's
- *				      child node
+ * devm_fwnode_get_index_gpiod_from_child - get a GPIO descriptor from a
+ *					    device's child node
  * @dev:	GPIO consumer
  * @con_id:	function within the GPIO consumer
+ * @index:	index of the GPIO to obtain in the consumer
  * @child:	firmware node (child of @dev)
  *
  * GPIO descriptors returned from this function are automatically disposed on
  * driver detach.
  */
-struct gpio_desc *devm_fwnode_get_gpiod_from_child(struct device *dev,
-						   const char *con_id,
-						   struct fwnode_handle *child)
+struct gpio_desc *devm_fwnode_get_index_gpiod_from_child(struct device *dev,
+						const char *con_id, int index,
+						struct fwnode_handle *child)
 {
 	static const char * const suffixes[] = { "gpios", "gpio" };
 	char prop_name[32]; /* 32 is max size of property name */
@@ -155,7 +156,7 @@ struct gpio_desc *devm_fwnode_get_gpiod_from_child(struct device *dev,
 			snprintf(prop_name, sizeof(prop_name), "%s",
 							       suffixes[i]);
 
-		desc = fwnode_get_named_gpiod(child, prop_name);
+		desc = fwnode_get_named_gpiod(child, prop_name, index);
 		if (!IS_ERR(desc) || (PTR_ERR(desc) != -ENOENT))
 			break;
 	}
@@ -169,7 +170,7 @@ struct gpio_desc *devm_fwnode_get_gpiod_from_child(struct device *dev,
 
 	return desc;
 }
-EXPORT_SYMBOL(devm_fwnode_get_gpiod_from_child);
+EXPORT_SYMBOL(devm_fwnode_get_index_gpiod_from_child);
 
 /**
  * devm_gpiod_get_index_optional - Resource-managed gpiod_get_index_optional()
