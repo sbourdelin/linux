@@ -185,6 +185,11 @@ static int tegra_pwm_probe(struct platform_device *pdev)
 		return -ENOMEM;
 
 	pwm->soc = of_device_get_match_data(&pdev->dev);
+	if (!pwm->soc) {
+		dev_err(&pdev->dev, "no device match found\n");
+		return -ENODEV;
+	}
+
 	pwm->dev = &pdev->dev;
 
 	r = platform_get_resource(pdev, IORESOURCE_MEM, 0);
