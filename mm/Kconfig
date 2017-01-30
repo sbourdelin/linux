@@ -143,6 +143,11 @@ config HAVE_GENERIC_RCU_GUP
 config ARCH_DISCARD_MEMBLOCK
 	bool
 
+config COHERENT_DEVICE
+	bool
+	depends on CPUSETS
+	default n
+
 config NO_BOOTMEM
 	bool
 
