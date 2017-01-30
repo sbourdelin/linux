@@ -1236,8 +1236,13 @@ static int samsung_i2s_probe(struct platform_device *pdev)
 	const struct samsung_i2s_dai_data *i2s_dai_data;
 	int ret;
 
-	if (IS_ENABLED(CONFIG_OF) && pdev->dev.of_node)
+	if (IS_ENABLED(CONFIG_OF) && pdev->dev.of_node) {
 		i2s_dai_data = of_device_get_match_data(&pdev->dev);
+		if (!i2s_dai_data) {
+			dev_err(&pdev->dev, "no device match found\n");
+			return -ENODEV;
+		}
+	}
 	else
 		i2s_dai_data = (struct samsung_i2s_dai_data *)
 				platform_get_device_id(pdev)->driver_data;
