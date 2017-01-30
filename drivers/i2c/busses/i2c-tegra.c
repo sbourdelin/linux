@@ -920,6 +920,10 @@ static int tegra_i2c_probe(struct platform_device *pdev)
 	tegra_i2c_parse_dt(i2c_dev);
 
 	i2c_dev->hw = of_device_get_match_data(&pdev->dev);
+	if (!i2c_dev->hw) {
+		dev_err(&pdev->dev, "no device match found\n");
+		return -ENODEV;
+	}
 	i2c_dev->is_dvc = of_device_is_compatible(pdev->dev.of_node,
 						  "nvidia,tegra20-i2c-dvc");
 	init_completion(&i2c_dev->msg_complete);
