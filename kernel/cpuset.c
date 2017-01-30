@@ -2133,6 +2133,8 @@ int __init cpuset_init(void)
 	set_bit(CS_SCHED_LOAD_BALANCE, &top_cpuset.flags);
 	top_cpuset.relax_domain_level = -1;
 
+	cpuset_inc();
+
 	err = register_filesystem(&cpuset_fs_type);
 	if (err < 0)
 		return err;
