@@ -378,10 +378,9 @@ static int madvise_free_pte_range(pmd_t *pmd, unsigned long addr,
 			ptent = pte_mkclean(ptent);
 			ptent = pte_wrprotect(ptent);
 			set_pte_at(mm, addr, pte, ptent);
-			if (PageActive(page))
-				deactivate_page(page);
 			tlb_remove_tlb_entry(tlb, pte, addr);
 		}
+		move_page_to_lazyfree_list(page);
 	}
 out:
 	if (nr_swap) {
