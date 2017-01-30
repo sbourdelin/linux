@@ -974,7 +974,7 @@ static unsigned long shrink_page_list(struct list_head *page_list,
 		int may_enter_fs;
 		enum page_references references = PAGEREF_RECLAIM_CLEAN;
 		bool dirty, writeback;
-		bool lazyfree = false;
+		bool lazyfree;
 		int ret = SWAP_SUCCESS;
 
 		cond_resched();
@@ -989,6 +989,8 @@ static unsigned long shrink_page_list(struct list_head *page_list,
 
 		sc->nr_scanned++;
 
+		lazyfree = page_is_lazyfree(page);
+
 		if (unlikely(!page_evictable(page)))
 			goto cull_mlocked;
 
@@ -996,7 +998,7 @@ static unsigned long shrink_page_list(struct list_head *page_list,
 			goto keep_locked;
 
 		/* Double the slab pressure for mapped and swapcache pages */
-		if (page_mapped(page) || PageSwapCache(page))
+		if ((page_mapped(page) || PageSwapCache(page)) && !lazyfree)
 			sc->nr_scanned++;
 
 		may_enter_fs = (sc->gfp_mask & __GFP_FS) ||
@@ -1110,6 +1112,14 @@ static unsigned long shrink_page_list(struct list_head *page_list,
 			; /* try to reclaim the page below */
 		}
 
+		/* lazyfree page could be freed directly */
+		if (lazyfree) {
+			if (unlikely(PageTransHuge(page)) &&
+			    split_huge_page_to_list(page, page_list))
+				goto keep_locked;
+			goto unmap_page;
+		}
+
 		/*
 		 * Anonymous process memory has backing store?
 		 * Try to allocate it some swap space here.
@@ -1119,7 +1129,6 @@ static unsigned long shrink_page_list(struct list_head *page_list,
 				goto keep_locked;
 			if (!add_to_swap(page, page_list))
 				goto activate_locked;
-			lazyfree = true;
 			may_enter_fs = 1;
 
 			/* Adding to swap updated mapping */
@@ -1130,13 +1139,14 @@ static unsigned long shrink_page_list(struct list_head *page_list,
 				goto keep_locked;
 		}
 
+unmap_page:
 		VM_BUG_ON_PAGE(PageTransHuge(page), page);
 
 		/*
 		 * The page is mapped into the page tables of one or more
 		 * processes. Try to unmap it here.
 		 */
-		if (page_mapped(page) && mapping) {
+		if (page_mapped(page) && (mapping || lazyfree)) {
 			switch (ret = try_to_unmap(page, lazyfree ?
 				(ttu_flags | TTU_BATCH_FLUSH | TTU_LZFREE) :
 				(ttu_flags | TTU_BATCH_FLUSH))) {
@@ -1148,7 +1158,13 @@ static unsigned long shrink_page_list(struct list_head *page_list,
 			case SWAP_MLOCK:
 				goto cull_mlocked;
 			case SWAP_LZFREE:
-				goto lazyfree;
+				if (page_ref_freeze(page, 1)) {
+					if (!PageDirty(page))
+						goto lazyfree;
+					else
+						page_ref_unfreeze(page, 1);
+				}
+				goto keep_locked;
 			case SWAP_SUCCESS:
 				; /* try to free the page below */
 			}
@@ -1260,10 +1276,10 @@ static unsigned long shrink_page_list(struct list_head *page_list,
 			}
 		}
 
-lazyfree:
 		if (!mapping || !__remove_mapping(mapping, page, true))
 			goto keep_locked;
 
+lazyfree:
 		/*
 		 * At this point, we have no other references and there is
 		 * no way to pick any more up (removed from LRU, removed
@@ -1288,6 +1304,8 @@ free_it:
 cull_mlocked:
 		if (PageSwapCache(page))
 			try_to_free_swap(page);
+		if (lazyfree)
+			ClearPageLazyFree(page);
 		unlock_page(page);
 		list_add(&page->lru, &ret_pages);
 		continue;
@@ -1297,6 +1315,8 @@ activate_locked:
 		if (PageSwapCache(page) && mem_cgroup_swap_full(page))
 			try_to_free_swap(page);
 		VM_BUG_ON_PAGE(PageActive(page), page);
+		if (lazyfree)
+			ClearPageLazyFree(page);
 		SetPageActive(page);
 		pgactivate++;
 keep_locked:
@@ -1743,6 +1763,7 @@ shrink_inactive_list(unsigned long nr_to_scan, struct lruvec *lruvec,
 				     &nr_scanned, sc, isolate_mode, lru);
 
 	__mod_node_page_state(pgdat, lru_isolate_index(lru), nr_taken);
+	/* LAZYFREE pages will be charged into anon recent_scanned */
 	reclaim_stat->recent_scanned[file] += nr_taken;
 
 	if (global_reclaim(sc)) {
@@ -1830,7 +1851,8 @@ shrink_inactive_list(unsigned long nr_to_scan, struct lruvec *lruvec,
 		 * that pages are cycling through the LRU faster than
 		 * they are written so also forcibly stall.
 		 */
-		if (stat.nr_immediate && current_may_throttle())
+		if (stat.nr_immediate && current_may_throttle() &&
+		    lru != LRU_LAZYFREE)
 			congestion_wait(BLK_RW_ASYNC, HZ/10);
 	}
 
@@ -1840,7 +1862,7 @@ shrink_inactive_list(unsigned long nr_to_scan, struct lruvec *lruvec,
 	 * unqueued dirty pages or cycling through the LRU too quickly.
 	 */
 	if (!sc->hibernation_mode && !current_is_kswapd() &&
-	    current_may_throttle())
+	    current_may_throttle() && lru != LRU_LAZYFREE)
 		wait_iff_congested(pgdat, BLK_RW_ASYNC, HZ/10);
 
 	trace_mm_vmscan_lru_shrink_inactive(pgdat->node_id,
@@ -2341,6 +2363,24 @@ static void shrink_node_memcg(struct pglist_data *pgdat, struct mem_cgroup *memc
 	unsigned long nr_to_reclaim = sc->nr_to_reclaim;
 	struct blk_plug plug;
 	bool scan_adjusted;
+
+	/* reclaim all lazyfree pages so don't apply priority  */
+	nr[LRU_LAZYFREE] = lruvec_lru_size(lruvec, LRU_LAZYFREE, sc->reclaim_idx);
+	while (nr[LRU_LAZYFREE]) {
+		nr_to_scan = min(nr[LRU_LAZYFREE], SWAP_CLUSTER_MAX);
+		nr[LRU_LAZYFREE] -= nr_to_scan;
+		nr_reclaimed += shrink_inactive_list(nr_to_scan, lruvec, sc,
+			LRU_LAZYFREE);
+
+		if (nr_reclaimed >= nr_to_reclaim)
+			break;
+		cond_resched();
+	}
+
+	if (nr_reclaimed >= nr_to_reclaim) {
+		sc->nr_reclaimed += nr_reclaimed;
+		return;
+	}
 
 	get_scan_count(lruvec, memcg, sc, nr, lru_pages);
 
