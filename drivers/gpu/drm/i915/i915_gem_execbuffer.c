@@ -1229,7 +1229,7 @@ validate_exec_list(struct drm_device *dev,
 
 static struct i915_gem_context *
 i915_gem_validate_context(struct drm_device *dev, struct drm_file *file,
-			  struct intel_engine_cs *engine, const u32 ctx_id)
+			  const u32 ctx_id)
 {
 	struct i915_gem_context *ctx;
 
@@ -1647,7 +1647,7 @@ i915_gem_do_execbuffer(struct drm_device *dev, void *data,
 	if (ret)
 		goto pre_mutex_err;
 
-	ctx = i915_gem_validate_context(dev, file, engine, ctx_id);
+	ctx = i915_gem_validate_context(dev, file, ctx_id);
 	if (IS_ERR(ctx)) {
 		mutex_unlock(&dev->struct_mutex);
 		ret = PTR_ERR(ctx);
