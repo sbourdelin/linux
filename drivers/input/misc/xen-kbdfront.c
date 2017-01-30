@@ -16,6 +16,7 @@
 #include <linux/kernel.h>
 #include <linux/errno.h>
 #include <linux/module.h>
+#include <linux/fb.h>
 #include <linux/input.h>
 #include <linux/slab.h>
 
@@ -39,6 +40,9 @@ struct xenkbd_info {
 	int irq;
 	struct xenbus_device *xbdev;
 	char phys[32];
+#ifdef CONFIG_FB_NOTIFY
+	struct notifier_block nb;
+#endif
 };
 
 static int xenkbd_remove(struct xenbus_device *);
@@ -105,10 +109,29 @@ static irqreturn_t input_handler(int rq, void *dev_id)
 	return IRQ_HANDLED;
 }
 
+#ifdef CONFIG_FB
+#ifdef CONFIG_FB_NOTIFY
+static int xenkbd_fb_event(struct notifier_block *self,
+			   unsigned long action, void *data)
+{
+	struct xenkbd_info *info = container_of(self, struct xenkbd_info, nb);
+	struct fb_info *fb = registered_fb[0];
+
+	if (action != FB_EVENT_FB_REGISTERED || !fb)
+		return 0;
+
+	input_set_abs_params(info->ptr, ABS_X, 0, fb->var.xres_virtual, 0, 0);
+	input_set_abs_params(info->ptr, ABS_Y, 0, fb->var.yres_virtual, 0, 0);
+
+	return 0;
+}
+#endif
+#endif
+
 static int xenkbd_probe(struct xenbus_device *dev,
 				  const struct xenbus_device_id *id)
 {
-	int ret, i;
+	int ret, i, width, height;
 	unsigned int abs;
 	struct xenkbd_info *info;
 	struct input_dev *kbd, *ptr;
@@ -173,9 +196,22 @@ static int xenkbd_probe(struct xenbus_device *dev,
 	ptr->id.product = 0xfffe;
 
 	if (abs) {
+		width = XENFB_WIDTH;
+		height = XENFB_HEIGHT;
+#ifdef CONFIG_FB
+		if (registered_fb[0]) {
+			width = registered_fb[0]->var.xres_virtual;
+			height = registered_fb[0]->var.yres_virtual;
+		} else {
+#ifdef CONFIG_FB_NOTIFY
+			info->nb.notifier_call = xenkbd_fb_event;
+			fb_register_client(&info->nb);
+#endif
+		}
+#endif
 		__set_bit(EV_ABS, ptr->evbit);
-		input_set_abs_params(ptr, ABS_X, 0, XENFB_WIDTH, 0, 0);
-		input_set_abs_params(ptr, ABS_Y, 0, XENFB_HEIGHT, 0, 0);
+		input_set_abs_params(ptr, ABS_X, 0, width, 0, 0);
+		input_set_abs_params(ptr, ABS_Y, 0, height, 0, 0);
 	} else {
 		input_set_capability(ptr, EV_REL, REL_X);
 		input_set_capability(ptr, EV_REL, REL_Y);
@@ -222,6 +258,10 @@ static int xenkbd_remove(struct xenbus_device *dev)
 	struct xenkbd_info *info = dev_get_drvdata(&dev->dev);
 
 	xenkbd_disconnect_backend(info);
+#ifdef CONFIG_FB_NOTIFY
+	if (info->nb.notifier_call)
+		fb_unregister_client(&info->nb);
+#endif
 	if (info->kbd)
 		input_unregister_device(info->kbd);
 	if (info->ptr)
