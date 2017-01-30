@@ -906,7 +906,7 @@ static ssize_t hw_error_scrub_show(struct device *dev,
 	struct nvdimm_bus_descriptor *nd_desc = to_nd_desc(nvdimm_bus);
 	struct acpi_nfit_desc *acpi_desc = to_acpi_desc(nd_desc);
 
-	return sprintf(buf, "%d\n", acpi_desc->scrub_mode);
+	return sprintf(buf, "%u\n", acpi_desc->scrub_mode);
 }
 
 /*
@@ -967,7 +967,7 @@ static ssize_t scrub_show(struct device *dev,
 	if (nd_desc) {
 		struct acpi_nfit_desc *acpi_desc = to_acpi_desc(nd_desc);
 
-		rc = sprintf(buf, "%d%s", acpi_desc->scrub_count,
+		rc = sprintf(buf, "%u%s", acpi_desc->scrub_count,
 				(work_busy(&acpi_desc->work)) ? "+\n" : "\n");
 	}
 	device_unlock(dev);
