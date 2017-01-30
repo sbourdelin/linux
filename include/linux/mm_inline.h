@@ -22,6 +22,11 @@ static inline int page_is_file_cache(struct page *page)
 	return !PageSwapBacked(page);
 }
 
+static inline bool page_is_lazyfree(struct page *page)
+{
+	return PageSwapBacked(page) && PageLazyFree(page);
+}
+
 static __always_inline void __update_lru_size(struct lruvec *lruvec,
 				enum lru_list lru, enum zone_type zid,
 				int nr_pages)
