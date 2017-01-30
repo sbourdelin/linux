@@ -204,6 +204,10 @@ static int pxa_ssp_probe(struct platform_device *pdev)
 	if (dev->of_node) {
 		const struct of_device_id *id =
 			of_match_device(of_match_ptr(pxa_ssp_of_ids), dev);
+		if (!id) {
+			dev_err(dev, "Error: No device match found\n");
+			return -ENODEV;
+		}
 		ssp->type = (int) id->data;
 	} else {
 		const struct platform_device_id *id =
