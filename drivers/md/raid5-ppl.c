@@ -291,6 +291,12 @@ static void ppl_submit_iounit(struct r5l_io_unit *io)
 
 	bio = bio_alloc_bioset(GFP_NOIO, BIO_MAX_PAGES, log->bs);
 	bio->bi_private = io;
+
+	if (!log->rdev || test_bit(Faulty, &log->rdev->flags)) {
+		ppl_log_endio(bio);
+		return;
+	}
+
 	bio->bi_end_io = ppl_log_endio;
 	bio->bi_opf = REQ_OP_WRITE | REQ_FUA;
 	bio->bi_bdev = log->rdev->bdev;
@@ -1008,6 +1014,47 @@ err:
 	return ret;
 }
 
+static int __ppl_modify_log(struct r5l_log *log, struct md_rdev *rdev,
+			    enum r5l_modify_log_operation operation)
+{
+	struct r5l_log *log_child;
+	struct ppl_conf *ppl_conf = log->private;
+	int ret = 0;
+	char b[BDEVNAME_SIZE];
+
+	if (!rdev)
+		return -EINVAL;
+
+	pr_debug("%s: disk: %d operation: %s dev: %s\n",
+		 __func__, rdev->raid_disk,
+		 operation == R5L_MODIFY_LOG_DISK_REMOVE ? "remove" :
+		 (operation == R5L_MODIFY_LOG_DISK_ADD ? "add" : "?"),
+		 bdevname(rdev->bdev, b));
+
+	if (rdev->raid_disk < 0)
+		return 0;
+
+	if (rdev->raid_disk >= ppl_conf->count)
+		return -ENODEV;
+
+	log_child = &ppl_conf->child_logs[rdev->raid_disk];
+
+	mutex_lock(&log_child->io_mutex);
+	if (operation == R5L_MODIFY_LOG_DISK_REMOVE) {
+		log_child->rdev = NULL;
+	} else if (operation == R5L_MODIFY_LOG_DISK_ADD) {
+		log_child->rdev = rdev;
+		if (rdev->mddev->external)
+			log_child->uuid_checksum = log->uuid_checksum;
+		ret = ppl_write_empty_header(log_child);
+	} else {
+		ret = -EINVAL;
+	}
+	mutex_unlock(&log_child->io_mutex);
+
+	return ret;
+}
+
 static int __ppl_write_stripe(struct r5l_log *log, struct stripe_head *sh)
 {
 	struct ppl_conf *ppl_conf = log->private;
@@ -1027,6 +1074,7 @@ static void __ppl_write_stripe_run(struct r5l_log *log)
 struct r5l_policy r5l_ppl = {
 	.init_log = __ppl_init_log,
 	.exit_log = __ppl_exit_log,
+	.modify_log = __ppl_modify_log,
 	.write_stripe = __ppl_write_stripe,
 	.write_stripe_run = __ppl_write_stripe_run,
 	.flush_stripe_to_raid = NULL,

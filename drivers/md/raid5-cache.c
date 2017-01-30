@@ -2774,6 +2774,14 @@ void r5l_exit_log(struct r5l_log *log)
 	kfree(log);
 }
 
+int r5l_modify_log(struct r5l_log *log, struct md_rdev *rdev,
+		   enum r5l_modify_log_operation operation)
+{
+	if (log && log->policy->modify_log)
+		return log->policy->modify_log(log, rdev, operation);
+	return 0;
+}
+
 struct r5l_policy r5l_journal = {
 	.init_log = __r5l_init_log,
 	.exit_log = __r5l_exit_log,

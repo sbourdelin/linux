@@ -138,9 +138,16 @@ enum r5l_io_unit_state {
 	IO_UNIT_STRIPE_END = 3,	/* stripes data finished writing to raid */
 };
 
+enum r5l_modify_log_operation {
+	R5L_MODIFY_LOG_DISK_REMOVE,
+	R5L_MODIFY_LOG_DISK_ADD,
+};
+
 struct r5l_policy {
 	int (*init_log)(struct r5l_log *log, struct r5conf *conf);
 	void (*exit_log)(struct r5l_log *log);
+	int (*modify_log)(struct r5l_log *log, struct md_rdev *rdev,
+			  enum r5l_modify_log_operation operation);
 	int (*write_stripe)(struct r5l_log *log, struct stripe_head *sh);
 	void (*write_stripe_run)(struct r5l_log *log);
 	void (*flush_stripe_to_raid)(struct r5l_log *log);
@@ -151,6 +158,8 @@ struct r5l_policy {
 
 extern int r5l_init_log(struct r5conf *conf, struct md_rdev *rdev);
 extern void r5l_exit_log(struct r5l_log *log);
+extern int r5l_modify_log(struct r5l_log *log, struct md_rdev *rdev,
+			  enum r5l_modify_log_operation operation);
 extern int r5l_write_stripe(struct r5l_log *log, struct stripe_head *sh);
 extern void r5l_write_stripe_run(struct r5l_log *log);
 extern void r5l_flush_stripe_to_raid(struct r5l_log *log);
