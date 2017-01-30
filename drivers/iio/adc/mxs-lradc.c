@@ -1570,10 +1570,8 @@ static int mxs_lradc_probe_touchscreen(struct mxs_lradc *lradc,
 
 static int mxs_lradc_probe(struct platform_device *pdev)
 {
-	const struct of_device_id *of_id =
-		of_match_device(mxs_lradc_dt_ids, &pdev->dev);
-	const struct mxs_lradc_of_config *of_cfg =
-		&mxs_lradc_of_config[(enum mxs_lradc_id)of_id->data];
+	const struct of_device_id *of_id;
+	const struct mxs_lradc_of_config *of_cfg;
 	struct device *dev = &pdev->dev;
 	struct device_node *node = dev->of_node;
 	struct mxs_lradc *lradc;
@@ -1582,6 +1580,14 @@ static int mxs_lradc_probe(struct platform_device *pdev)
 	int ret = 0, touch_ret;
 	int i, s;
 	u64 scale_uv;
+
+	of_id = of_match_device(mxs_lradc_dt_ids, &pdev->dev);
+	if (!of_id) {
+		dev_err(&pdev->dev, "Error: No device match found\n");
+		return -ENODEV;
+	}
+
+	of_cfg = &mxs_lradc_of_config[(enum mxs_lradc_id)of_id->data];
 
 	/* Allocate the IIO device. */
 	iio = devm_iio_device_alloc(dev, sizeof(*lradc));
