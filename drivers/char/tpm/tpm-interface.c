@@ -456,7 +456,7 @@ ssize_t tpm_getcap(struct tpm_chip *chip, u32 subcap_id, cap_t *cap,
 		tpm_cmd.params.getcap_in.cap = cpu_to_be32(subcap_id);
 		/*subcap field not necessary */
 		tpm_cmd.params.getcap_in.subcap_size = cpu_to_be32(0);
-		tpm_cmd.header.in.length -= cpu_to_be32(sizeof(__be32));
+		tpm_cmd.header.in.length = cpu_to_be32(18);
 	} else {
 		if (subcap_id == TPM_CAP_FLAG_PERM ||
 		    subcap_id == TPM_CAP_FLAG_VOL)
