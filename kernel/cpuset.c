@@ -1210,15 +1210,6 @@ static int update_nodemask(struct cpuset *cs, struct cpuset *trialcs,
 	int retval;
 
 	/*
-	 * top_cpuset.mems_allowed tracks node_stats[N_MEMORY];
-	 * it's read-only
-	 */
-	if (cs == &top_cpuset) {
-		retval = -EACCES;
-		goto done;
-	}
-
-	/*
 	 * An empty mems_allowed is ok iff there are no tasks in the cpuset.
 	 * Since nodelist_parse() fails on an empty mask, we special case
 	 * that parsing.  The validate_change() call ensures that cpusets
@@ -1232,7 +1223,7 @@ static int update_nodemask(struct cpuset *cs, struct cpuset *trialcs,
 			goto done;
 
 		if (!nodes_subset(trialcs->mems_allowed,
-				  top_cpuset.mems_allowed)) {
+				  node_states[N_MEMORY])) {
 			retval = -EINVAL;
 			goto done;
 		}
@@ -1249,6 +1240,16 @@ static int update_nodemask(struct cpuset *cs, struct cpuset *trialcs,
 	spin_lock_irq(&callback_lock);
 	cs->mems_allowed = trialcs->mems_allowed;
 	spin_unlock_irq(&callback_lock);
+
+	if (cs == &top_cpuset) {
+		spin_lock_irq(&callback_lock);
+		cs->effective_mems = trialcs->mems_allowed;
+		spin_unlock_irq(&callback_lock);
+
+		update_tasks_nodemask(cs);
+		cpuset_inc();
+		goto done;
+	}
 
 	/* use trialcs->mems_allowed as a temp variable */
 	update_nodemasks_hier(cs, &trialcs->mems_allowed);
