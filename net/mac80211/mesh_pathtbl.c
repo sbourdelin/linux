@@ -537,6 +537,7 @@ void mesh_plink_broken(struct sta_info *sta)
 				WLAN_REASON_MESH_PATH_DEST_UNREACHABLE, bcast);
 		}
 	}
+	sta->mesh->fail_avg = 0;
 out:
 	rhashtable_walk_stop(&iter);
 	rhashtable_walk_exit(&iter);
