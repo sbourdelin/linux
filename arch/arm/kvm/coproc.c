@@ -205,6 +205,24 @@ static bool access_dcsw(struct kvm_vcpu *vcpu,
 	return true;
 }
 
+static bool emulate_tlb_invalidate(struct kvm_vcpu *vcpu,
+				   const struct coproc_params *p,
+				   const struct coproc_reg *r)
+{
+	/*
+	 * Based on system register encoding from ARM v8 ARM
+	 * (DDI 0487A.k F5.1.103)
+	 */
+	u32 opcode = p->Op1 << 21 | p->CRn << 16 | p->Op2 << 5 | p->CRm << 0;
+
+	kvm_call_hyp(__kvm_emulate_tlb_invalidate,
+		     vcpu->kvm, opcode, p->Rt1);
+	trace_kvm_tlb_invalidate(*vcpu_pc(vcpu), opcode);
+	++vcpu->stat.tlb_invalidate;
+
+	return true;
+}
+
 /*
  * Generic accessor for VM registers. Only called as long as HCR_TVM
  * is set.  If the guest enables the MMU, we stop trapping the VM
@@ -354,6 +372,44 @@ static const struct coproc_reg cp15_regs[] = {
 	{ CRn( 7), CRm( 6), Op1( 0), Op2( 2), is32, access_dcsw},
 	{ CRn( 7), CRm(10), Op1( 0), Op2( 2), is32, access_dcsw},
 	{ CRn( 7), CRm(14), Op1( 0), Op2( 2), is32, access_dcsw},
+
+	/* TLBIALLIS */
+	{ CRn( 8), CRm( 3), Op1( 0), Op2( 0), is32, emulate_tlb_invalidate},
+	/* TLBIMVAIS */
+	{ CRn( 8), CRm( 3), Op1( 0), Op2( 1), is32, emulate_tlb_invalidate},
+	/* TLBIASIDIS */
+	{ CRn( 8), CRm( 3), Op1( 0), Op2( 2), is32, emulate_tlb_invalidate},
+	/* TLBIMVAAIS */
+	{ CRn( 8), CRm( 3), Op1( 0), Op2( 3), is32, emulate_tlb_invalidate},
+	/* TLBIMVALIS */
+	{ CRn( 8), CRm( 3), Op1( 0), Op2( 5), is32, emulate_tlb_invalidate},
+	/* TLBIMVAALIS */
+	{ CRn( 8), CRm( 3), Op1( 0), Op2( 7), is32, emulate_tlb_invalidate},
+	/* ITLBIALL */
+	{ CRn( 8), CRm( 5), Op1( 0), Op2( 0), is32, emulate_tlb_invalidate},
+	/* ITLBIMVA */
+	{ CRn( 8), CRm( 5), Op1( 0), Op2( 1), is32, emulate_tlb_invalidate},
+	/* ITLBIASID */
+	{ CRn( 8), CRm( 5), Op1( 0), Op2( 2), is32, emulate_tlb_invalidate},
+	/* DTLBIALL */
+	{ CRn( 8), CRm( 6), Op1( 0), Op2( 0), is32, emulate_tlb_invalidate},
+	/* DTLBIMVA */
+	{ CRn( 8), CRm( 6), Op1( 0), Op2( 1), is32, emulate_tlb_invalidate},
+	/* DTLBIASID */
+	{ CRn( 8), CRm( 6), Op1( 0), Op2( 2), is32, emulate_tlb_invalidate},
+	/* TLBIALL */
+	{ CRn( 8), CRm( 7), Op1( 0), Op2( 0), is32, emulate_tlb_invalidate},
+	/* TLBIMVA */
+	{ CRn( 8), CRm( 7), Op1( 0), Op2( 1), is32, emulate_tlb_invalidate},
+	/* TLBIASID */
+	{ CRn( 8), CRm( 7), Op1( 0), Op2( 2), is32, emulate_tlb_invalidate},
+	/* TLBIMVAA */
+	{ CRn( 8), CRm( 7), Op1( 0), Op2( 3), is32, emulate_tlb_invalidate},
+	/* TLBIMVAL */
+	{ CRn( 8), CRm( 7), Op1( 0), Op2( 5), is32, emulate_tlb_invalidate},
+	/* TLBIMVAAL */
+	{ CRn( 8), CRm( 7), Op1( 0), Op2( 7), is32, emulate_tlb_invalidate},
+
 	/*
 	 * L2CTLR access (guest wants to know #CPUs).
 	 */
