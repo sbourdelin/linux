@@ -201,13 +201,13 @@
 			#size-cells = <1>;
 			ranges = <0 MBUS_ID(0x08, 0x00) 0 0x100000>;
 
-                        dfx_coredivclk: corediv-clock@f8268 {
-                                compatible = "marvell,mv98dx3236-corediv-clock";
-                                reg = <0xf8268 0xc>;
-                                #clock-cells = <1>;
-                                clocks = <&mainpll>;
-                                clock-output-names = "nand";
-                        };
+			dfx_coredivclk: corediv-clock@f8268 {
+				compatible = "marvell,mv98dx3236-corediv-clock";
+				reg = <0xf8268 0xc>;
+				#clock-cells = <1>;
+				clocks = <&mainpll>;
+				clock-output-names = "nand";
+			};
 
 			dfx: dfx@0 {
 				compatible = "marvell,dfx-server";
