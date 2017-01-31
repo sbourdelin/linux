@@ -13,6 +13,8 @@
 
 #include "cxl.h"
 
+#ifdef CONFIG_DEBUG_FS
+
 static struct dentry *cxl_debugfs;
 
 void cxl_stop_trace(struct cxl *adapter)
@@ -151,3 +153,50 @@ void cxl_debugfs_exit(void)
 {
 	debugfs_remove_recursive(cxl_debugfs);
 }
+
+#else /* CONFIG_DEBUG_FS */
+
+void cxl_stop_trace(struct cxl *cxl)
+{
+}
+
+void cxl_debugfs_add_adapter_psl_regs(struct cxl *adapter, struct dentry *dir)
+{
+}
+
+void cxl_debugfs_add_adapter_xsl_regs(struct cxl *adapter, struct dentry *dir)
+{
+}
+
+int cxl_debugfs_adapter_add(struct cxl *adapter)
+{
+	return 0;
+}
+
+void cxl_debugfs_adapter_remove(struct cxl *adapter)
+{
+}
+
+void cxl_debugfs_add_afu_psl_regs(struct cxl_afu *afu, struct dentry *dir)
+{
+}
+
+int cxl_debugfs_afu_add(struct cxl_afu *afu)
+{
+	return 0;
+}
+
+void cxl_debugfs_afu_remove(struct cxl_afu *afu)
+{
+}
+
+int __init cxl_debugfs_init(void)
+{
+	return 0;
+}
+
+void cxl_debugfs_exit(void)
+{
+}
+
+#endif /* CONFIG_DEBUG_FS */
