@@ -307,6 +307,7 @@ struct kvm_vcpu_stat {
 	u64 mmio_exit_user;
 	u64 mmio_exit_kernel;
 	u64 exits;
+	u64 tlb_invalidate;
 };
 
 int kvm_vcpu_preferred_target(struct kvm_vcpu_init *init);
