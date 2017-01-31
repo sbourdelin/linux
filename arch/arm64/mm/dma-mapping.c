@@ -19,6 +19,7 @@
 
 #include <linux/gfp.h>
 #include <linux/acpi.h>
+#include <linux/acpi_iort.h>
 #include <linux/bootmem.h>
 #include <linux/cache.h>
 #include <linux/export.h>
@@ -347,6 +348,12 @@ static int __swiotlb_get_sgtable(struct device *dev, struct sg_table *sgt,
 
 static int __swiotlb_dma_supported(struct device *hwdev, u64 mask)
 {
+	int dma_limit;
+
+	dma_limit = iort_get_memory_address_limit(hwdev);
+	if (dma_limit >= 0 && DMA_BIT_MASK(dma_limit) < mask)
+		return 0;
+
 	if (swiotlb)
 		return swiotlb_dma_supported(hwdev, mask);
 	return 1;
@@ -784,6 +791,17 @@ static void __iommu_unmap_sg_attrs(struct device *dev,
 	iommu_dma_unmap_sg(dev, sgl, nelems, dir, attrs);
 }
 
+static int __iommu_dma_supported(struct device *hwdev, u64 mask)
+{
+	int dma_limit;
+
+	dma_limit = iort_get_memory_address_limit(hwdev);
+	if (dma_limit >= 0 && DMA_BIT_MASK(dma_limit) < mask)
+		return 0;
+
+	return iommu_dma_supported(hwdev, mask);
+}
+
 static struct dma_map_ops iommu_dma_ops = {
 	.alloc = __iommu_alloc_attrs,
 	.free = __iommu_free_attrs,
@@ -799,7 +817,7 @@ static struct dma_map_ops iommu_dma_ops = {
 	.sync_sg_for_device = __iommu_sync_sg_for_device,
 	.map_resource = iommu_dma_map_resource,
 	.unmap_resource = iommu_dma_unmap_resource,
-	.dma_supported = iommu_dma_supported,
+	.dma_supported = __iommu_dma_supported,
 	.mapping_error = iommu_dma_mapping_error,
 };
 
