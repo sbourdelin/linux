@@ -569,6 +569,31 @@ void iort_set_dma_mask(struct device *dev)
 }
 
 /**
+ * iort_get_memory_address_limit - If a named component node exists in the IORT
+ *                                 for a device, get the number of address bits
+ *                                 that the device can effectively use when
+ *                                 accessing memory.
+ *
+ * @dev: The device
+ *
+ * Returns: ENOENT when no corresponding named component node found for dev
+ *          Named component memory_address_limit field otherwise
+ */
+int iort_get_memory_address_limit(struct device *dev)
+{
+	struct acpi_iort_node *node;
+	struct acpi_iort_named_component *ncomp;
+
+	node = iort_scan_node(ACPI_IORT_NODE_NAMED_COMPONENT,
+			      iort_match_node_callback, dev);
+	if (!node)
+		return -ENOENT;
+
+	ncomp = (struct acpi_iort_named_component *)node->node_data;
+	return ncomp->memory_address_limit;
+}
+
+/**
  * iort_iommu_configure - Set-up IOMMU configuration for a device.
  *
  * @dev: device to configure

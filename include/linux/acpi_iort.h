@@ -36,6 +36,7 @@ u32 iort_msi_map_rid(struct device *dev, u32 req_id);
 struct irq_domain *iort_get_device_domain(struct device *dev, u32 req_id);
 /* IOMMU interface */
 void iort_set_dma_mask(struct device *dev);
+int iort_get_memory_address_limit(struct device *dev);
 const struct iommu_ops *iort_iommu_configure(struct device *dev);
 #else
 static inline void acpi_iort_init(void) { }
@@ -47,6 +48,8 @@ static inline struct irq_domain *iort_get_device_domain(struct device *dev,
 { return NULL; }
 /* IOMMU interface */
 static inline void iort_set_dma_mask(struct device *dev) { }
+static inline int iort_get_memory_address_limit(struct device *dev)
+{ return -ENOENT; }
 static inline
 const struct iommu_ops *iort_iommu_configure(struct device *dev)
 { return NULL; }
