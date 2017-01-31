@@ -16647,6 +16647,17 @@ int intel_modeset_init(struct drm_device *dev)
 	} else if (IS_GEN2(dev_priv)) {
 		dev->mode_config.cursor_width = GEN2_CURSOR_WIDTH;
 		dev->mode_config.cursor_height = GEN2_CURSOR_HEIGHT;
+	} else if (IS_GEN5(dev_priv)) {
+		/*
+		 * actually the hardware should be capable to handle
+		 * MAX_CURSOR_{WIDTH,HEIGHT} (i.e. 256), but on some GEN 5
+		 * hardware this results in fifo underruns, occasional
+		 * hardware lockups and display artifacts.
+		 * See https://bugs.freedesktop.org/show_bug.cgi?id=98742 for
+		 * more details.
+		 */
+		dev->mode_config.cursor_width = 64;
+		dev->mode_config.cursor_height = 64;
 	} else {
 		dev->mode_config.cursor_width = MAX_CURSOR_WIDTH;
 		dev->mode_config.cursor_height = MAX_CURSOR_HEIGHT;
