@@ -493,6 +493,7 @@ static int clariion_std_inquiry(struct scsi_device *sdev,
 	sdev_printk(KERN_INFO, sdev,
 		    "%s: detected Clariion %s, flags %x\n",
 		    CLARIION_NAME, sp_model, csdev->flags);
+	err = 0;
 out:
 	return err;
 }
