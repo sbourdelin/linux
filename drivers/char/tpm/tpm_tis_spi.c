@@ -175,29 +175,32 @@ exit:
 
 static int tpm_tis_spi_read16(struct tpm_tis_data *data, u32 addr, u16 *result)
 {
+	__le16 tmp;
 	int rc;
 
-	rc = data->phy_ops->read_bytes(data, addr, sizeof(u16), (u8 *)result);
+	rc = data->phy_ops->read_bytes(data, addr, sizeof(u16), (u8 *)&tmp);
 	if (!rc)
-		*result = le16_to_cpu(*result);
+		*result = le16_to_cpu(tmp);
 	return rc;
 }
 
 static int tpm_tis_spi_read32(struct tpm_tis_data *data, u32 addr, u32 *result)
 {
+	__le32 tmp;
 	int rc;
 
-	rc = data->phy_ops->read_bytes(data, addr, sizeof(u32), (u8 *)result);
+	rc = data->phy_ops->read_bytes(data, addr, sizeof(u32), (u8 *)&tmp);
 	if (!rc)
-		*result = le32_to_cpu(*result);
+		*result = le32_to_cpu(tmp);
 	return rc;
 }
 
 static int tpm_tis_spi_write32(struct tpm_tis_data *data, u32 addr, u32 value)
 {
-	value = cpu_to_le32(value);
-	return data->phy_ops->write_bytes(data, addr, sizeof(u32),
-					   (u8 *)&value);
+	__le32 tmp;
+
+	tmp = cpu_to_le32(value);
+	return data->phy_ops->write_bytes(data, addr, sizeof(u32), (u8 *)&tmp);
 }
 
 static const struct tpm_tis_phy_ops tpm_spi_phy_ops = {
