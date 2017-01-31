@@ -200,26 +200,11 @@ freq_get_state(struct devfreq_cooling_device *dfc, unsigned long freq)
 	return THERMAL_CSTATE_INVALID;
 }
 
-/**
- * get_static_power() - calculate the static power
- * @dfc:	Pointer to devfreq cooling device
- * @freq:	Frequency in Hz
- *
- * Calculate the static power in milliwatts using the supplied
- * get_static_power().  The current voltage is calculated using the
- * OPP library.  If no get_static_power() was supplied, assume the
- * static power is negligible.
- */
-static unsigned long
-get_static_power(struct devfreq_cooling_device *dfc, unsigned long freq)
+static unsigned long get_voltage(struct devfreq *df, unsigned long freq)
 {
-	struct devfreq *df = dfc->devfreq;
 	struct device *dev = df->dev.parent;
 	unsigned long voltage;
 	struct dev_pm_opp *opp;
-
-	if (!dfc->power_ops->get_static_power)
-		return 0;
 
 	rcu_read_lock();
 
@@ -235,8 +220,34 @@ get_static_power(struct devfreq_cooling_device *dfc, unsigned long freq)
 		dev_warn_ratelimited(dev,
 				     "Failed to get voltage for frequency %lu: %ld\n",
 				     freq, IS_ERR(opp) ? PTR_ERR(opp) : 0);
-		return 0;
 	}
+
+	return voltage;
+}
+
+/**
+ * get_static_power() - calculate the static power
+ * @dfc:	Pointer to devfreq cooling device
+ * @freq:	Frequency in Hz
+ *
+ * Calculate the static power in milliwatts using the supplied
+ * get_static_power().  The current voltage is calculated using the
+ * OPP library.  If no get_static_power() was supplied, assume the
+ * static power is negligible.
+ */
+static unsigned long
+get_static_power(struct devfreq_cooling_device *dfc, unsigned long freq)
+{
+	struct devfreq *df = dfc->devfreq;
+	unsigned long voltage;
+
+	if (!dfc->power_ops->get_static_power)
+		return 0;
+
+	voltage = get_voltage(df, freq);
+
+	if (voltage == 0)
+		return 0;
 
 	return dfc->power_ops->get_static_power(df, voltage);
 }
