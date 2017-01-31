@@ -641,7 +641,7 @@ struct r8152 {
 	u32 coalesce;
 	u16 ocp_base;
 	u16 speed;
-	u8 *intr_buff;
+	u8 intr_buff[INTBUFSIZE] ____cacheline_aligned;
 	u8 version;
 	u8 duplex;
 	u8 autoneg;
@@ -1342,9 +1342,6 @@ static void free_all_mem(struct r8152 *tp)
 
 	usb_free_urb(tp->intr_urb);
 	tp->intr_urb = NULL;
-
-	kfree(tp->intr_buff);
-	tp->intr_buff = NULL;
 }
 
 static int alloc_all_mem(struct r8152 *tp)
@@ -1421,10 +1418,6 @@ static int alloc_all_mem(struct r8152 *tp)
 
 	tp->intr_urb = usb_alloc_urb(0, GFP_KERNEL);
 	if (!tp->intr_urb)
-		goto err1;
-
-	tp->intr_buff = kmalloc(INTBUFSIZE, GFP_KERNEL);
-	if (!tp->intr_buff)
 		goto err1;
 
 	tp->intr_interval = (int)ep_intr->desc.bInterval;
