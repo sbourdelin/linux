@@ -198,7 +198,7 @@ static int icmp6_checksum(struct ipv6hdr *ipv6, u16 *ptr, int len)
 	memset(&pseudo_header, 0, sizeof(pseudo_header));
 	memcpy(&pseudo_header.ph.ph_src, &ipv6->saddr.in6_u.u6_addr8, 16);
 	memcpy(&pseudo_header.ph.ph_dst, &ipv6->daddr.in6_u.u6_addr8, 16);
-	pseudo_header.ph.ph_len = ipv6->payload_len;
+	pseudo_header.ph.ph_len = be16_to_cpu(ipv6->payload_len);
 	pseudo_header.ph.ph_nxt = ipv6->nexthdr;
 
 	w = (u16 *)&pseudo_header;
@@ -308,7 +308,7 @@ static int gdm_lte_emulate_ndp(struct sk_buff *skb_in, u32 nic_type)
 		memcpy(icmp_na + sizeof(struct icmp6hdr), &na,
 		       sizeof(struct neighbour_advertisement));
 
-		icmp6_out.icmp6_cksum = icmp6_checksum(&ipv6_out,
+		icmp6_out.icmp6_cksum = (__force __sum16) icmp6_checksum(&ipv6_out,
 					(u16 *)icmp_na, sizeof(icmp_na));
 	} else {
 		return -1;
