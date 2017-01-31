@@ -2887,21 +2887,6 @@ bool ilk_disable_lp_wm(struct drm_device *dev)
 
 #define SKL_SAGV_BLOCK_TIME	30 /* µs */
 
-/*
- * FIXME: We still don't have the proper code detect if we need to apply the WA,
- * so assume we'll always need it in order to avoid underruns.
- */
-static bool skl_needs_memory_bw_wa(struct intel_atomic_state *state)
-{
-	struct drm_i915_private *dev_priv = to_i915(state->base.dev);
-
-	if (IS_SKYLAKE(dev_priv) || IS_BROXTON(dev_priv) ||
-	    IS_KABYLAKE(dev_priv))
-		return true;
-
-	return false;
-}
-
 static bool
 intel_has_sagv(struct drm_i915_private *dev_priv)
 {
@@ -3049,7 +3034,8 @@ bool intel_can_enable_sagv(struct drm_atomic_state *state)
 
 		latency = dev_priv->wm.skl_latency[level];
 
-		if (skl_needs_memory_bw_wa(intel_state) &&
+		if (intel_state->wm_results.mem_attr.mem_wa !=
+		    WATERMARK_WA_NONE &&
 		    plane->base.state->fb->modifier ==
 		    I915_FORMAT_MOD_X_TILED)
 			latency += 15;
@@ -3581,7 +3567,7 @@ static int skl_compute_plane_wm(const struct drm_i915_private *dev_priv,
 	uint32_t y_min_scanlines;
 	struct intel_atomic_state *state =
 		to_intel_atomic_state(cstate->base.state);
-	bool apply_memory_bw_wa = skl_needs_memory_bw_wa(state);
+	enum watermark_memory_wa mem_wa;
 	bool y_tiled, x_tiled;
 
 	if (latency == 0 || !cstate->base.active || !intel_pstate->base.visible) {
@@ -3597,7 +3583,8 @@ static int skl_compute_plane_wm(const struct drm_i915_private *dev_priv,
 	if (IS_KABYLAKE(dev_priv) && dev_priv->ipc_enabled)
 		latency += 4;
 
-	if (apply_memory_bw_wa && x_tiled)
+	mem_wa = state->wm_results.mem_attr.mem_wa;
+	if (mem_wa != WATERMARK_WA_NONE && x_tiled)
 		latency += 15;
 
 	width = drm_rect_width(&intel_pstate->base.src) >> 16;
@@ -3632,7 +3619,7 @@ static int skl_compute_plane_wm(const struct drm_i915_private *dev_priv,
 		y_min_scanlines = 4;
 	}
 
-	if (apply_memory_bw_wa)
+	if (mem_wa == WATERMARK_WA_Y_TILED)
 		y_min_scanlines *= 2;
 
 	plane_bytes_per_line = width * cpp;
@@ -4061,6 +4048,16 @@ skl_compute_ddb(struct drm_atomic_state *state)
 	}
 
 	/*
+	 * If Watermark workaround is changed we need to recalculate
+	 * watermark values for all active pipes
+	 */
+	if (intel_state->wm_results.mem_attr.mem_wa !=
+				dev_priv->wm.skl_hw.mem_attr.mem_wa) {
+		realloc_pipes = ~0;
+		intel_state->wm_results.dirty_pipes = ~0;
+	}
+
+	/*
 	 * We're not recomputing for the pipes not included in the commit, so
 	 * make sure we start with the current state.
 	 */
@@ -4082,6 +4079,130 @@ skl_compute_ddb(struct drm_atomic_state *state)
 			return ret;
 	}
 
+	return 0;
+}
+
+static int
+skl_compute_memory_bandwidth_wm_wa(struct drm_atomic_state *state)
+{
+	struct drm_device *dev = state->dev;
+	struct drm_i915_private *dev_priv = to_i915(dev);
+	struct intel_atomic_state *intel_state = to_intel_atomic_state(state);
+	struct memdev_info *memdev_info = &dev_priv->memdev_info;
+	struct skl_mem_bw_attr *mem_attr = &intel_state->wm_results.mem_attr;
+	struct drm_crtc *crtc;
+	struct drm_crtc_state *cstate;
+	int active_pipes = 0;
+	uint32_t max_pipe_bw_kbps = 0, total_pipe_bw_kbps;
+	int display_bw_percentage;
+	bool y_tile_enabled = false;
+	int ret, i;
+
+	if (!IS_GEN9(dev_priv)) {
+		mem_attr->mem_wa = WATERMARK_WA_NONE;
+		return 0;
+	}
+
+	if (!memdev_info->valid)
+		goto exit;
+
+	/*
+	 * We hold wm_mutex lock, so any other flip can't proceed beyond WM
+	 * calculation step until this flip writes modified WM values.
+	 * So it's safe to read plane_state of other pipes without taking CRTC lock
+	 */
+	ret = drm_modeset_lock(&dev_priv->wm.wm_ww_mutex, state->acquire_ctx);
+	if (ret)
+		return ret;
+
+	memcpy(mem_attr, &dev_priv->wm.skl_hw.mem_attr, sizeof(mem_attr));
+
+	for_each_crtc_in_state(state, crtc, cstate, i) {
+		struct drm_plane *plane;
+		const struct drm_plane_state *pstate;
+		int active_planes = 0;
+		uint32_t max_plane_bw_kbps = 0;
+
+		mem_attr->pipe_y_tiled[i] = false;
+
+		if (!cstate->active) {
+			mem_attr->pipe_bw_kbps[i] = 0;
+			continue;
+		}
+
+		drm_atomic_crtc_state_for_each_plane_state(plane, pstate,
+								cstate) {
+			struct drm_framebuffer *fb;
+			uint32_t plane_bw_kbps;
+			enum plane_id id = to_intel_plane(plane)->id;
+
+			if (!pstate->visible)
+				continue;
+
+			if (WARN_ON(!pstate->fb))
+				continue;
+
+			if (id == PLANE_CURSOR)
+				continue;
+
+			fb = pstate->fb;
+			if ((fb->modifier == I915_FORMAT_MOD_Y_TILED ||
+				fb->modifier == I915_FORMAT_MOD_Yf_TILED))
+				mem_attr->pipe_y_tiled[i] = true;
+
+			plane_bw_kbps = skl_adjusted_plane_pixel_rate(
+						to_intel_crtc_state(cstate),
+						to_intel_plane_state(pstate));
+			max_plane_bw_kbps = max(plane_bw_kbps,
+							max_plane_bw_kbps);
+			active_planes++;
+		}
+		mem_attr->pipe_bw_kbps[i] = max_plane_bw_kbps * active_planes;
+	}
+
+	for_each_pipe(dev_priv, i) {
+		if (mem_attr->pipe_bw_kbps[i]) {
+			max_pipe_bw_kbps = max(max_pipe_bw_kbps,
+					mem_attr->pipe_bw_kbps[i]);
+			active_pipes++;
+		}
+		if (mem_attr->pipe_y_tiled[i])
+			y_tile_enabled = true;
+	}
+
+	total_pipe_bw_kbps = max_pipe_bw_kbps * active_pipes;
+	display_bw_percentage = DIV_ROUND_UP_ULL((uint64_t)total_pipe_bw_kbps *
+					100, memdev_info->bandwidth_kbps);
+
+	/*
+	 * If there is any Ytile plane enabled and arbitrated display
+	 * bandwidth > 20% of raw system memory bandwidth
+	 * Enale Y-tile related WA
+	 *
+	 * If memory is dual channel single rank, Xtile limit = 35%, else Xtile
+	 * limit = 60%
+	 * If there is no Ytile plane enabled and
+	 * arbitrated display bandwidth > Xtile limit
+	 * Enable X-tile realated WA
+	 */
+	if (y_tile_enabled && (display_bw_percentage > 20))
+		mem_attr->mem_wa = WATERMARK_WA_Y_TILED;
+	else {
+		int x_tile_percentage = 60;
+		enum rank rank = memdev_info->rank;
+
+		if ((rank == I915_DRAM_RANK_SINGLE) &&
+					(memdev_info->num_channels == 2))
+			x_tile_percentage = 35;
+
+		if (display_bw_percentage > x_tile_percentage)
+			mem_attr->mem_wa = WATERMARK_WA_X_TILED;
+	}
+
+	return 0;
+
+exit:
+	mem_attr->mem_wa = WATERMARK_WA_Y_TILED;
 	return 0;
 }
 
@@ -4159,6 +4280,10 @@ skl_compute_wm(struct drm_atomic_state *state)
 
 	/* Clear all dirty flags */
 	results->dirty_pipes = 0;
+
+	ret = skl_compute_memory_bandwidth_wm_wa(state);
+	if (ret)
+		return ret;
 
 	ret = skl_compute_ddb(state);
 	if (ret)

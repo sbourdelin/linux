@@ -14581,6 +14581,38 @@ static void intel_atomic_track_fbs(struct drm_atomic_state *state)
 				  to_intel_plane(plane)->frontbuffer_bit);
 }
 
+static void
+intel_update_wm_bw_wa(struct drm_atomic_state *state)
+{
+	struct intel_atomic_state *intel_state = to_intel_atomic_state(state);
+	struct drm_i915_private *dev_priv = to_i915(state->dev);
+	const struct drm_crtc *crtc;
+	const struct drm_crtc_state *cstate;
+	const struct memdev_info *memdev_info = &dev_priv->memdev_info;
+	struct skl_mem_bw_attr *results = &intel_state->wm_results.mem_attr;
+	struct skl_mem_bw_attr *hw_vals = &dev_priv->wm.skl_hw.mem_attr;
+	int i;
+
+	if (!IS_GEN9(dev_priv))
+		return;
+
+	if (!memdev_info->valid)
+		return;
+
+	for_each_crtc_in_state(state, crtc, cstate, i) {
+		hw_vals->pipe_bw_kbps[i] = results->pipe_bw_kbps[i];
+		hw_vals->pipe_y_tiled[i] = results->pipe_y_tiled[i];
+	}
+
+	hw_vals->mem_wa = results->mem_wa;
+
+	/*
+	 * As we already updated state variables no need to hold the lock,
+	 * other commits can proceed now with their calculation
+	 */
+	drm_modeset_unlock(&dev_priv->wm.wm_ww_mutex);
+}
+
 /**
  * intel_atomic_commit - commit validated state object
  * @dev: DRM device
@@ -14620,6 +14652,8 @@ static int intel_atomic_commit(struct drm_device *dev,
 	dev_priv->wm.distrust_bios_wm = false;
 	intel_shared_dpll_swap_state(state);
 	intel_atomic_track_fbs(state);
+
+	intel_update_wm_bw_wa(state);
 
 	if (intel_state->modeset) {
 		memcpy(dev_priv->min_pixclk, intel_state->min_pixclk,

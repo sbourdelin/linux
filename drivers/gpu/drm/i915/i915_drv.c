@@ -814,6 +814,7 @@ static int i915_driver_init_early(struct drm_i915_private *dev_priv,
 	mutex_init(&dev_priv->modeset_restore_lock);
 	mutex_init(&dev_priv->av_mutex);
 	mutex_init(&dev_priv->wm.wm_mutex);
+	drm_modeset_lock_init(&dev_priv->wm.wm_ww_mutex);
 	mutex_init(&dev_priv->pps_mutex);
 
 	intel_uc_init_early(dev_priv);

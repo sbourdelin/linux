@@ -1173,6 +1173,13 @@ enum intel_sbi_destination {
 	SBI_MPHY,
 };
 
+/* SKL+ Watermark arbitrated display bandwidth Workarounds */
+enum watermark_memory_wa {
+	WATERMARK_WA_NONE,
+	WATERMARK_WA_X_TILED,
+	WATERMARK_WA_Y_TILED,
+};
+
 #define QUIRK_PIPEA_FORCE (1<<0)
 #define QUIRK_LVDS_SSC_DISABLE (1<<1)
 #define QUIRK_INVERT_BRIGHTNESS (1<<2)
@@ -1743,8 +1750,15 @@ struct skl_ddb_allocation {
 	struct skl_ddb_entry y_plane[I915_MAX_PIPES][I915_MAX_PLANES];
 };
 
+struct skl_mem_bw_attr {
+	enum watermark_memory_wa mem_wa;
+	uint32_t pipe_bw_kbps[I915_MAX_PIPES];
+	bool pipe_y_tiled[I915_MAX_PIPES];
+};
+
 struct skl_wm_values {
 	unsigned dirty_pipes;
+	struct skl_mem_bw_attr mem_attr;
 	struct skl_ddb_allocation ddb;
 };
 
@@ -2347,6 +2361,7 @@ struct drm_i915_private {
 		 * cstate->wm.need_postvbl_update.
 		 */
 		struct mutex wm_mutex;
+		struct drm_modeset_lock wm_ww_mutex; /* protect DDB/WM redistribution among pipes */
 
 		/*
 		 * Set during HW readout of watermarks/DDB.  Some platforms
