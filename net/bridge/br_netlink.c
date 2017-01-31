@@ -851,6 +851,7 @@ static const struct nla_policy br_policy[IFLA_BR_MAX + 1] = {
 	[IFLA_BR_MCAST_STATS_ENABLED] = { .type = NLA_U8 },
 	[IFLA_BR_MCAST_IGMP_VERSION] = { .type = NLA_U8 },
 	[IFLA_BR_MCAST_MLD_VERSION] = { .type = NLA_U8 },
+	[IFLA_BR_USED_ENABLED] = { .type = NLA_U8 },
 };
 
 static int br_changelink(struct net_device *brdev, struct nlattr *tb[],
@@ -1102,6 +1103,11 @@ static int br_changelink(struct net_device *brdev, struct nlattr *tb[],
 		br->nf_call_arptables = val ? true : false;
 	}
 #endif
+	if (data[IFLA_BR_USED_ENABLED]) {
+		u8 val = nla_get_u8(data[IFLA_BR_USED_ENABLED]);
+
+		br->used_enabled = !!val;
+	}
 
 	return 0;
 }
@@ -1175,6 +1181,7 @@ static size_t br_get_size(const struct net_device *brdev)
 	       nla_total_size(sizeof(u8)) +     /* IFLA_BR_NF_CALL_IP6TABLES */
 	       nla_total_size(sizeof(u8)) +     /* IFLA_BR_NF_CALL_ARPTABLES */
 #endif
+	       nla_total_size(sizeof(u8)) +	/* IFLA_BR_USED_ENABLED */
 	       0;
 }
 
@@ -1246,7 +1253,8 @@ static int br_fill_info(struct sk_buff *skb, const struct net_device *brdev)
 	    nla_put_u32(skb, IFLA_BR_MCAST_STARTUP_QUERY_CNT,
 			br->multicast_startup_query_count) ||
 	    nla_put_u8(skb, IFLA_BR_MCAST_IGMP_VERSION,
-		       br->multicast_igmp_version))
+		       br->multicast_igmp_version) ||
+	    nla_put_u8(skb, IFLA_BR_USED_ENABLED, br->used_enabled))
 		return -EMSGSIZE;
 #if IS_ENABLED(CONFIG_IPV6)
 	if (nla_put_u8(skb, IFLA_BR_MCAST_MLD_VERSION,

@@ -281,6 +281,7 @@ struct net_bridge {
 	struct net_device		*dev;
 	struct pcpu_sw_netstats		__percpu *stats;
 	/* These fields are accessed on each packet */
+	u8				used_enabled;
 #ifdef CONFIG_BRIDGE_VLAN_FILTERING
 	u8				vlan_enabled;
 	u8				vlan_stats_enabled;
