@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2007-2014 Nicira, Inc.
+ * Copyright (c) 2007-2017 Nicira, Inc.
  *
  * This program is free software; you can redistribute it and/or
  * modify it under the terms of version 2 of the GNU General Public
@@ -58,6 +58,40 @@ struct ovs_len_tbl {
 
 #define OVS_ATTR_NESTED -1
 #define OVS_ATTR_VARIABLE -2
+
+static bool actions_may_change_flow(const struct nlattr *actions)
+{
+	struct nlattr *nla;
+	int rem;
+
+	nla_for_each_nested(nla, actions, rem) {
+		u16 action = nla_type(nla);
+
+		switch (action) {
+		case OVS_ACTION_ATTR_OUTPUT:
+		case OVS_ACTION_ATTR_RECIRC:
+		case OVS_ACTION_ATTR_USERSPACE:
+		case OVS_ACTION_ATTR_SAMPLE:
+		case OVS_ACTION_ATTR_TRUNC:
+		case OVS_ACTION_ATTR_CLONE:
+			break;
+
+		case OVS_ACTION_ATTR_PUSH_MPLS:
+		case OVS_ACTION_ATTR_POP_MPLS:
+		case OVS_ACTION_ATTR_PUSH_VLAN:
+		case OVS_ACTION_ATTR_POP_VLAN:
+		case OVS_ACTION_ATTR_SET:
+		case OVS_ACTION_ATTR_SET_MASKED:
+		case OVS_ACTION_ATTR_HASH:
+		case OVS_ACTION_ATTR_CT:
+		case OVS_ACTION_ATTR_PUSH_ETH:
+		case OVS_ACTION_ATTR_POP_ETH:
+		default:
+			return true;
+		}
+	}
+	return false;
+}
 
 static void update_range(struct sw_flow_match *match,
 			 size_t offset, size_t size, bool is_mask)
@@ -2342,6 +2376,46 @@ static int validate_userspace(const struct nlattr *attr)
 	return 0;
 }
 
+static int copy_clone(struct net *net, const struct nlattr *attr,
+		      const struct sw_flow_key *key, int depth,
+		      struct sw_flow_actions **sfa,
+		      __be16 eth_type, __be16 vlan_tci, bool log, bool last)
+{
+	int start, err;
+	bool exec;
+
+	start = add_nested_action_start(sfa, OVS_ACTION_ATTR_CLONE, log);
+	if (start < 0)
+		return start;
+
+	/* When both skb and flow may be changed, put the clone
+	 * into a deferred fifo. On the other hand, if only skb
+	 * may be modified, the actions can be executed in place.
+	 *
+	 * Do this analysis at the flow installation time.
+	 * Set 'clone_action->exec' to true if the actions can be
+	 * executed without being deferred.
+	 *
+	 * If the clone is the last action, it can always be excuted
+	 * rather than deferred.
+	 */
+	exec = last || !actions_may_change_flow(attr);
+
+	if (exec) {
+		err = ovs_nla_add_action(sfa, OVS_CLONE_ATTR_EXEC, NULL, 0,
+					 log);
+		if (err)
+			return err;
+	}
+
+	err = __ovs_nla_copy_actions(net, attr, key, depth, sfa,
+				     eth_type, vlan_tci, log);
+
+	add_nested_action_end(*sfa, start);
+
+	return err;
+}
+
 static int copy_action(const struct nlattr *from,
 		       struct sw_flow_actions **sfa, bool log)
 {
@@ -2386,6 +2460,7 @@ static int __ovs_nla_copy_actions(struct net *net, const struct nlattr *attr,
 			[OVS_ACTION_ATTR_TRUNC] = sizeof(struct ovs_action_trunc),
 			[OVS_ACTION_ATTR_PUSH_ETH] = sizeof(struct ovs_action_push_eth),
 			[OVS_ACTION_ATTR_POP_ETH] = 0,
+			[OVS_ACTION_ATTR_CLONE] = (u32)-1,
 		};
 		const struct ovs_action_push_vlan *vlan;
 		int type = nla_type(a);
@@ -2536,6 +2611,14 @@ static int __ovs_nla_copy_actions(struct net *net, const struct nlattr *attr,
 			mac_proto = MAC_PROTO_ETHERNET;
 			break;
 
+		case OVS_ACTION_ATTR_CLONE:
+			err = copy_clone(net, a, key, depth, sfa, eth_type,
+					 vlan_tci, log, nla_is_last(a, rem));
+			if (err)
+				return err;
+			skip_copy = true;
+			break;
+
 		default:
 			OVS_NLERR(log, "Unknown Action type %d", type);
 			return -EINVAL;
@@ -2606,6 +2689,32 @@ static int sample_action_to_attr(const struct nlattr *attr, struct sk_buff *skb)
 	}
 
 	nla_nest_end(skb, start);
+	return err;
+}
+
+static int clone_action_to_attr(const struct nlattr *clone,
+				struct sk_buff *skb)
+{
+	struct nlattr *start, *actions;
+	int rem, err = 0;
+
+	start = nla_nest_start(skb, OVS_ACTION_ATTR_CLONE);
+	if (!start)
+		return -EMSGSIZE;
+
+	actions = nla_data(clone);
+	rem = nla_len(clone);
+	/* Skip internal 'OVS_CLONE_ATTR_EXEC' flag, if present,
+	 */
+	if (nla_type(actions) == OVS_CLONE_ATTR_EXEC)
+		actions = nla_next(actions, &rem);
+
+	err = ovs_nla_put_actions(actions, rem, skb);
+	if (err)
+		return err;
+
+	nla_nest_end(skb, start);
+
 	return err;
 }
 
@@ -2693,6 +2802,12 @@ int ovs_nla_put_actions(const struct nlattr *attr, int len, struct sk_buff *skb)
 
 		case OVS_ACTION_ATTR_CT:
 			err = ovs_ct_action_to_attr(nla_data(a), skb);
+			if (err)
+				return err;
+			break;
+
+		case OVS_ACTION_ATTR_CLONE:
+			err = clone_action_to_attr(a, skb);
 			if (err)
 				return err;
 			break;

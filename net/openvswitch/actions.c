@@ -1156,6 +1156,55 @@ static int execute_recirc(struct datapath *dp, struct sk_buff *skb,
 	return 0;
 }
 
+static int execute_clone(struct datapath *dp, struct sk_buff *skb,
+			 struct sw_flow_key *key, const struct nlattr *a)
+{
+	struct nlattr *actions;
+	struct sw_flow_key *orig = key;
+	int rem;
+	int err = 0;
+	bool exec = false;
+
+	actions = nla_data(a);
+	rem = nla_len(a);
+	if (nla_type(a) == OVS_CLONE_ATTR_EXEC) {
+		exec = true;
+		actions = nla_next(actions, &rem);
+	}
+
+	/* In case the clone actions won't change 'key',
+	 * we can use key for the clone execution.
+	 * Otherwise, try to allocate a key from the
+	 * next recursion level of 'flow_keys'. If
+	 * successful, we can still execute the clone
+	 * actions  without deferring.
+	 *
+	 * Defer the clone action if the action recursion
+	 * limit has been reached.
+	 */
+	if (!exec) {
+		__this_cpu_inc(exec_actions_level);
+		key = clone_key(key);
+	}
+
+	if (key) {
+		err = do_execute_actions(dp, skb, key, actions, rem);
+	} else {
+		struct deferred_action *da;
+
+		da = add_deferred_actions(skb, orig, actions, rem);
+
+		if (!da && net_ratelimit())
+			pr_warn("%s: deferred action limit reached, drop clone action\n",
+				ovs_dp_name(dp));
+	}
+
+	if (!exec)
+		__this_cpu_dec(exec_actions_level);
+
+	return err;
+}
+
 /* Execute a list of actions against 'skb'. */
 static int do_execute_actions(struct datapath *dp, struct sk_buff *skb,
 			      struct sw_flow_key *key,
@@ -1271,6 +1320,23 @@ static int do_execute_actions(struct datapath *dp, struct sk_buff *skb,
 		case OVS_ACTION_ATTR_POP_ETH:
 			err = pop_eth(skb, key);
 			break;
+
+		case OVS_ACTION_ATTR_CLONE: {
+			bool last = nla_is_last(a, rem);
+			struct sk_buff *clone_skb;
+
+			clone_skb = last ? skb : skb_clone(skb, GFP_ATOMIC);
+
+			if (!clone_skb)
+				/* Out of memory, skip this clone action.
+				 */
+				break;
+
+			err = execute_clone(dp, clone_skb, key, a);
+			if (last)
+				return err;
+			break;
+			}
 		}
 
 		if (unlikely(err)) {
