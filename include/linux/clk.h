@@ -267,6 +267,29 @@ struct clk *devm_get_clk_from_child(struct device *dev,
 				    struct device_node *np, const char *con_id);
 
 /**
+ * devm_clk_prepare - prepare clock source as a managed resource
+ * @dev: device owning the resource
+ * @clk: clock source
+ *
+ * This prepares the clock source for use.
+ *
+ * Must not be called from within atomic context.
+ */
+int devm_clk_prepare(struct device *dev, struct clk *clk);
+
+/**
+ * devm_clk_unprepare - undo preparation of a managed clock source
+ * @dev: device used to prepare the clock
+ * @clk: clock source
+ *
+ * This undoes preparation of a clock, previously prepared with a call
+ * to devm_clk_pepare().
+ *
+ * Must not be called from within atomic context.
+ */
+void devm_clk_unprepare(struct device *dev, struct clk *clk);
+
+/**
  * clk_enable - inform the system when the clock source should be running.
  * @clk: clock source
  *
@@ -293,6 +316,28 @@ int clk_enable(struct clk *clk);
  * disabled.
  */
 void clk_disable(struct clk *clk);
+
+/**
+ * devm_clk_prepare_enable - prepare and enable a managed clock source
+ * @dev: device owning the clock source
+ * @clk: clock source
+ *
+ * This prepares the clock source for use and enables it.
+ *
+ * Must not be called from within atomic context.
+ */
+int devm_clk_prepare_enable(struct device *dev, struct clk *clk);
+
+/**
+ * devm_clk_disable_unprepare - disable and undo preparation of a managed clock
+ * @dev: device used to prepare and enable the clock
+ * @clk: clock source
+ *
+ * This disables and undoes a previously prepared clock.
+ *
+ * Must not be called from within atomic context.
+ */
+void devm_clk_disable_unprepare(struct device *dev, struct clk *clk);
 
 /**
  * clk_get_rate - obtain the current clock rate (in Hz) for a clock source.
@@ -460,12 +505,35 @@ static inline void clk_put(struct clk *clk) {}
 
 static inline void devm_clk_put(struct device *dev, struct clk *clk) {}
 
+static inline int devm_clk_prepare(struct device *dev, struct clk *clk)
+{
+	might_sleep();
+	return 0;
+}
+
+static inline void devm_clk_unprepare(struct device *dev, struct clk *clk)
+{
+	might_sleep();
+}
+
 static inline int clk_enable(struct clk *clk)
 {
 	return 0;
 }
 
 static inline void clk_disable(struct clk *clk) {}
+
+static inline int devm_clk_prepare_enable(struct device *dev, struct clk *clk)
+{
+	might_sleep();
+	return 0;
+}
+
+static inline void devm_clk_disable_unprepare(struct device *dev,
+					      struct clk *clk)
+{
+	might_sleep();
+}
 
 static inline unsigned long clk_get_rate(struct clk *clk)
 {
