@@ -302,7 +302,7 @@ static int crb_map_io(struct acpi_device *device, struct crb_priv *priv,
 	u32 pa_high, pa_low;
 	u64 cmd_pa;
 	u32 cmd_size;
-	u64 rsp_pa;
+	__le64 rsp_pa;
 	u32 rsp_size;
 	int ret;
 
@@ -350,11 +350,11 @@ static int crb_map_io(struct acpi_device *device, struct crb_priv *priv,
 	}
 
 	memcpy_fromio(&rsp_pa, &priv->cca->rsp_pa, 8);
-	rsp_pa = le64_to_cpu(rsp_pa);
 	rsp_size = ioread32(&priv->cca->rsp_size);
 
-	if (cmd_pa != rsp_pa) {
-		priv->rsp = crb_map_res(dev, priv, &io_res, rsp_pa, rsp_size);
+	if (cmd_pa != le64_to_cpu(rsp_pa)) {
+		priv->rsp = crb_map_res(dev, priv, &io_res,
+					le64_to_cpu(rsp_pa), rsp_size);
 		ret = PTR_ERR_OR_ZERO(priv->rsp);
 		goto out;
 	}
