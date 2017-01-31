@@ -711,6 +711,7 @@ struct ieee80211_if_mesh {
 	struct mesh_table *mpp_paths; /* Store paths for MPP&MAP */
 	int mesh_paths_generation;
 	int mpp_paths_generation;
+	u8 fail_avg_weight;
 };
 
 #ifdef CONFIG_MAC80211_MESH

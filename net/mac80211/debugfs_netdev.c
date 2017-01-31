@@ -586,6 +586,32 @@ IEEE80211_IF_FILE(peer, u.wds.remote_addr, MAC);
 #ifdef CONFIG_MAC80211_MESH
 IEEE80211_IF_FILE(estab_plinks, u.mesh.estab_plinks, ATOMIC);
 
+static ssize_t ieee80211_if_fmt_fail_avg_weight(
+	const struct ieee80211_sub_if_data *sdata, char *buf, int buflen)
+{
+	return snprintf(buf, buflen, "%d\n", sdata->u.mesh.fail_avg_weight);
+}
+
+static ssize_t ieee80211_if_parse_fail_avg_weight(
+	struct ieee80211_sub_if_data *sdata, const char *buf, int buflen)
+{
+	u8 val;
+	int ret;
+
+	ret = kstrtou8(buf, 0, &val);
+	if (ret)
+		return ret;
+
+	if (val > 100)
+		return -ERANGE;
+
+	sdata->u.mesh.fail_avg_weight = val;
+
+	return buflen;
+}
+
+IEEE80211_IF_FILE_RW(fail_avg_weight);
+
 /* Mesh stats attributes */
 IEEE80211_IF_FILE(fwded_mcast, u.mesh.mshstats.fwded_mcast, DEC);
 IEEE80211_IF_FILE(fwded_unicast, u.mesh.mshstats.fwded_unicast, DEC);
@@ -711,6 +737,7 @@ static void add_mesh_files(struct ieee80211_sub_if_data *sdata)
 {
 	DEBUGFS_ADD_MODE(tsf, 0600);
 	DEBUGFS_ADD_MODE(estab_plinks, 0400);
+	DEBUGFS_ADD_MODE(fail_avg_weight, 0600);
 }
 
 static void add_mesh_stats(struct ieee80211_sub_if_data *sdata)

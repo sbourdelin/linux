@@ -301,6 +301,7 @@ void ieee80211s_update_metric(struct ieee80211_local *local,
 	struct ieee80211_tx_info *txinfo = IEEE80211_SKB_CB(skb);
 	struct ieee80211_hdr *hdr = (struct ieee80211_hdr *) skb->data;
 	u32 fail_avg = sta->mesh->fail_avg;
+	u8 fail_avg_weight = sta->sdata->u.mesh.fail_avg_weight;
 	int failed;
 
 	if (!ieee80211_is_data(hdr->frame_control))
@@ -309,7 +310,8 @@ void ieee80211s_update_metric(struct ieee80211_local *local,
 	failed = !(txinfo->flags & IEEE80211_TX_STAT_ACK);
 
 	/* moving average, scaled to 100 */
-	fail_avg = ((80 * fail_avg + 5) / 100 + 20 * failed);
+	fail_avg = (((100 - fail_avg_weight) * fail_avg + 5) / 100 +
+		    fail_avg_weight * failed);
 
 	/* bump up fail average since fractional part of average is ignored.
 	 * Otherwise fail average always stuck at the same level and
