@@ -107,17 +107,17 @@ static int __control_devkmsg(char *str)
 	if (!str)
 		return -EINVAL;
 
-	if (!strncmp(str, "on", 2)) {
+	/* Do exact match by comparing also the trailing '\0'. */
+	if (!strncmp(str, "on", 3))
 		devkmsg_log = DEVKMSG_LOG_MASK_ON;
-		return 2;
-	} else if (!strncmp(str, "off", 3)) {
+	else if (!strncmp(str, "off", 4))
 		devkmsg_log = DEVKMSG_LOG_MASK_OFF;
-		return 3;
-	} else if (!strncmp(str, "ratelimit", 9)) {
+	else if (!strncmp(str, "ratelimit", 10))
 		devkmsg_log = DEVKMSG_LOG_MASK_DEFAULT;
-		return 9;
-	}
-	return -EINVAL;
+	else
+		return -EINVAL;
+
+	return 0;
 }
 
 static int __init control_devkmsg(char *str)
@@ -155,14 +155,12 @@ int devkmsg_sysctl_set_loglvl(struct ctl_table *table, int write,
 			      void __user *buffer, size_t *lenp, loff_t *ppos)
 {
 	char old_str[DEVKMSG_STR_MAX_SIZE];
-	unsigned int old;
 	int err;
 
 	if (write) {
 		if (devkmsg_log & DEVKMSG_LOG_MASK_LOCK)
 			return -EINVAL;
 
-		old = devkmsg_log;
 		strncpy(old_str, devkmsg_log_str, DEVKMSG_STR_MAX_SIZE);
 	}
 
@@ -173,21 +171,12 @@ int devkmsg_sysctl_set_loglvl(struct ctl_table *table, int write,
 	if (write) {
 		err = __control_devkmsg(devkmsg_log_str);
 
-		/*
-		 * Do not accept an unknown string OR a known string with
-		 * trailing crap...
-		 */
-		if (err < 0 || (err + 1 != *lenp)) {
-
-			/* ... and restore old setting. */
-			devkmsg_log = old;
+		/* Restore old setting when unknown parameter was used. */
+		if (err)
 			strncpy(devkmsg_log_str, old_str, DEVKMSG_STR_MAX_SIZE);
-
-			return -EINVAL;
-		}
 	}
 
-	return 0;
+	return err;
 }
 
 /*

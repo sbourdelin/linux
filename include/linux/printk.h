@@ -77,8 +77,8 @@ static inline void console_verbose(void)
 		console_loglevel = CONSOLE_LOGLEVEL_MOTORMOUTH;
 }
 
-/* strlen("ratelimit") + 1 */
-#define DEVKMSG_STR_MAX_SIZE 10
+/* strlen("ratelimit") + '\0' + one character to detect wrong entry */
+#define DEVKMSG_STR_MAX_SIZE 11
 extern char devkmsg_log_str[];
 struct ctl_table;
 
