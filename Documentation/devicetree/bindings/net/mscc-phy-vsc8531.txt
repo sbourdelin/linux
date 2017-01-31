@@ -27,6 +27,12 @@ Optional properties:
 			  'vddmac'.
 			  Default value is 0%.
 			  Ref: Table:1 - Edge rate change (below).
+- vsc8531,led-0-mode	: LED mode. Specify how the LED[0] should behave.
+			  Allowed values is listed in the 'PHY LED Mode' -
+			  Table 2 (below).  Default value is 1.
+- vsc8531,led-1-mode	: LED mode. Specify how the LED[1] should behave.
+			  Allowed values is listed in the 'PHY LED Mode' -
+			  Table 2 (below).  Default value is 2.
 
 Table: 1 - Edge rate change
 ----------------------------------------------------------------|
@@ -54,10 +60,43 @@ Table: 1 - Edge rate change
 | (slowest)							|
 |---------------------------------------------------------------|
 
+Table: 2 - PHY LED Mode
+|-----------------------------------------------|
+| LINK_ACTIVITY			| 0		|
+|-----------------------------------------------|
+| LINK_1000_ACTIVITY		| 1		|
+|-----------------------------------------------|
+| LINK_100_ACTIVITY		| 2		|
+|-----------------------------------------------|
+| LINK_10_ACTIVITY		| 3		|
+|-----------------------------------------------|
+| LINK_100_1000_ACTIVITY	| 4		|
+|-----------------------------------------------|
+| LINK_10_1000_ACTIVITY		| 5		|
+|-----------------------------------------------|
+| LINK_10_100_ACTIVITY		| 6		|
+|-----------------------------------------------|
+| DUPLEX_COLLISION		| 8		|
+|-----------------------------------------------|
+| COLLISION			| 9		|
+|-----------------------------------------------|
+| ACTIVITY			| 10		|
+|-----------------------------------------------|
+| AUTONEG_FAULT			| 12		|
+|-----------------------------------------------|
+| SERIAL_MODE			| 13		|
+|-----------------------------------------------|
+| FORCE_LED_OFF			| 14		|
+|-----------------------------------------------|
+| FORCE_LED_ON			| 15		|
+|-----------------------------------------------|
+
 Example:
 
         vsc8531_0: ethernet-phy@0 {
                 compatible = "ethernet-phy-id0007.0570";
                 vsc8531,vddmac		= <3300>;
                 vsc8531,edge-slowdown	= <7>;
+                vsc8531,led-0-mode	= <1>;
+                vsc8531,led-1-mode	= <2>;
         };
