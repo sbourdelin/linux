@@ -824,6 +824,7 @@ void pci_process_bridge_OF_ranges(struct pci_controller *hose,
 		}
 	}
 }
+EXPORT_SYMBOL_GPL(pci_process_bridge_OF_ranges);
 
 /* Decide whether to display the domain number in /proc */
 int pci_proc_domain(struct pci_bus *bus)

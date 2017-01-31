@@ -222,6 +222,15 @@ int cxl_pci_vphb_add(struct cxl_afu *afu)
 	if (!phb)
 		return -ENODEV;
 
+	/* Parse IO and memory ranges */
+	if (dev_is_pci(parent)) {
+		struct pci_dev *pdev;
+
+		pdev = to_pci_dev(parent);
+		vphb_dn = pnv_pci_get_phb_node(pdev);
+		pci_process_bridge_OF_ranges(phb, vphb_dn, false);
+	}
+
 	/* Setup parent in sysfs */
 	phb->parent = parent;
 
