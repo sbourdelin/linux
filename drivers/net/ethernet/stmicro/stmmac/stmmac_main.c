@@ -1299,10 +1299,11 @@ static void stmmac_dma_operation_mode(struct stmmac_priv *priv)
  * @priv: driver private structure
  * Description: it reclaims the transmit resources after transmission completes.
  */
-static void stmmac_tx_clean(struct stmmac_priv *priv)
+static int stmmac_tx_clean(struct stmmac_priv *priv, int budget)
 {
 	unsigned int bytes_compl = 0, pkts_compl = 0;
 	unsigned int entry = priv->dirty_tx;
+	int work = 0;
 
 	netif_tx_lock(priv->dev);
 
@@ -1369,6 +1370,9 @@ static void stmmac_tx_clean(struct stmmac_priv *priv)
 		priv->hw->desc->release_tx_desc(p, priv->mode);
 
 		entry = STMMAC_GET_ENTRY(entry, DMA_TX_SIZE);
+		work++;
+		if (work >= budget)
+			break;
 	}
 	priv->dirty_tx = entry;
 
@@ -1386,6 +1390,11 @@ static void stmmac_tx_clean(struct stmmac_priv *priv)
 		mod_timer(&priv->eee_ctrl_timer, STMMAC_LPI_T(eee_timer));
 	}
 	netif_tx_unlock(priv->dev);
+
+	if (work < budget)
+		work = 0;
+
+	return work;
 }
 
 static inline void stmmac_enable_dma_irq(struct stmmac_priv *priv)
@@ -1617,7 +1626,7 @@ static void stmmac_tx_timer(unsigned long data)
 {
 	struct stmmac_priv *priv = (struct stmmac_priv *)data;
 
-	stmmac_tx_clean(priv);
+	stmmac_tx_clean(priv, 256);
 }
 
 /**
@@ -2657,9 +2666,10 @@ static int stmmac_poll(struct napi_struct *napi, int budget)
 	int work_done = 0;
 
 	priv->xstats.napi_poll++;
-	stmmac_tx_clean(priv);
+	work_done += stmmac_tx_clean(priv, budget);
 
-	work_done = stmmac_rx(priv, budget);
+	if (work_done < budget)
+		work_done += stmmac_rx(priv, budget - work_done);
 	if (work_done < budget) {
 		napi_complete(napi);
 		stmmac_enable_dma_irq(priv);
