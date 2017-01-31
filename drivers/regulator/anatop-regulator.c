@@ -157,14 +157,14 @@ static int anatop_regmap_set_bypass(struct regulator_dev *reg, bool enable)
 	return regulator_set_voltage_sel_regmap(reg, sel);
 }
 
-static struct regulator_ops anatop_rops = {
+static const struct regulator_ops anatop_rops = {
 	.set_voltage_sel = regulator_set_voltage_sel_regmap,
 	.get_voltage_sel = regulator_get_voltage_sel_regmap,
 	.list_voltage = regulator_list_voltage_linear,
 	.map_voltage = regulator_map_voltage_linear,
 };
 
-static struct regulator_ops anatop_core_rops = {
+static const struct regulator_ops anatop_core_rops = {
 	.enable = anatop_regmap_enable,
 	.disable = anatop_regmap_disable,
 	.is_enabled = anatop_regmap_is_enabled,
@@ -301,7 +301,19 @@ static int anatop_regulator_probe(struct platform_device *pdev)
 			return -EINVAL;
 		}
 	} else {
+		u32 enable_bit;
+
 		rdesc->ops = &anatop_rops;
+
+		if (!of_property_read_u32(np, "anatop-enable-bit",
+					  &enable_bit)) {
+			anatop_rops.enable  = regulator_enable_regmap;
+			anatop_rops.disable = regulator_disable_regmap;
+			anatop_rops.is_enabled = regulator_is_enabled_regmap;
+
+			rdesc->enable_reg = sreg->control_reg;
+			rdesc->enable_mask = BIT(enable_bit);
+		}
 	}
 
 	/* register regulator */
