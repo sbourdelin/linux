@@ -2356,6 +2356,18 @@ struct drm_i915_private {
 		bool distrust_bios_wm;
 	} wm;
 
+	struct memdev_info {
+		bool valid;
+		uint32_t bandwidth_kbps;
+		uint8_t num_channels;
+		enum rank {
+			I915_DRAM_RANK_INVALID = 0,
+			I915_DRAM_RANK_SINGLE,
+			I915_DRAM_RANK_DUAL
+		} rank;
+	} memdev_info;
+
+
 	struct i915_runtime_pm pm;
 
 	struct {
