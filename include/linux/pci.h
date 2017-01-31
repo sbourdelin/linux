@@ -321,6 +321,7 @@ struct pci_dev {
 
 #ifdef CONFIG_PCIEASPM
 	struct pcie_link_state	*link_state;	/* ASPM link state */
+	unsigned int	aspm_default;		/* ASPM policy set by BIOS */
 #endif
 
 	pci_channel_state_t error_state;	/* current connectivity state */
