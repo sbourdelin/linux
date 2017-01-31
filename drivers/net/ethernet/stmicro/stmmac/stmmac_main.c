@@ -749,7 +749,7 @@ static void stmmac_adjust_link(struct net_device *dev)
 				break;
 			default:
 				netif_warn(priv, link, priv->dev,
-					   "Speed (%d) not 10/100\n",
+					   "Speed (%d) not 10/100/1000\n",
 					   phydev->speed);
 				break;
 			}
