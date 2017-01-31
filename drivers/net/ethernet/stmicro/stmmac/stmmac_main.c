@@ -885,6 +885,7 @@ static int stmmac_init_phy(struct net_device *dev)
 	netdev_dbg(priv->dev, "%s: attached to PHY (UID 0x%x) Link = %d\n",
 		   __func__, phydev->phy_id, phydev->link);
 
+	phy_attached_info(phydev);
 	return 0;
 }
 
