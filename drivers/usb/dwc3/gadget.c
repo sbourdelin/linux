@@ -1894,8 +1894,6 @@ static int dwc3_gadget_stop(struct usb_gadget *g)
 	if (pm_runtime_suspended(dwc->dev))
 		goto out;
 
-	__dwc3_gadget_stop(dwc);
-
 	for (epnum = 2; epnum < DWC3_ENDPOINTS_NUM; epnum++) {
 		struct dwc3_ep  *dep = dwc->eps[epnum];
 
@@ -1909,6 +1907,8 @@ static int dwc3_gadget_stop(struct usb_gadget *g)
 				    !(dep->flags & DWC3_EP_END_TRANSFER_PENDING),
 				    dwc->lock);
 	}
+
+	__dwc3_gadget_stop(dwc);
 
 out:
 	dwc->gadget_driver	= NULL;
