@@ -213,4 +213,12 @@ config BNXT_DCB
 
 	  If unsure, say N.
 
+config BNXT_XDP
+	bool "Xpress Data Path (XDP) driver support"
+	default n
+	depends on BNXT && BPF
+	---help---
+	  Say Y here if you want to enable XDP in the driver to support
+	  eBPF programs in the fast path.
+
 endif # NET_VENDOR_BROADCOM
