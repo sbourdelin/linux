@@ -370,9 +370,11 @@ static void gpio_keys_gpio_report_event(struct gpio_button_data *bdata)
 		return;
 	}
 
-	if (type == EV_ABS) {
+	if (type == EV_ABS || type == EV_REL) {
 		if (state)
 			input_event(input, type, button->code, button->value);
+		else
+			input_event(input, type, button->code, 0);
 	} else {
 		input_event(input, type, *bdata->code, state);
 	}
@@ -584,6 +586,14 @@ static int gpio_keys_setup_key(struct platform_device *pdev,
 	*bdata->code = button->code;
 	input_set_capability(input, button->type ?: EV_KEY, *bdata->code);
 
+	if (button->type == EV_ABS) {
+		if (input_abs_get_max(input, button->code) < button->value)
+			input_abs_set_max(input, button->code, button->value);
+
+		if (input_abs_get_min(input, button->code) > button->value)
+			input_abs_set_min(input, button->code, button->value);
+	}
+
 	/*
 	 * Install custom action to cancel release timer and
 	 * workqueue item.
@@ -667,6 +677,7 @@ gpio_keys_get_devtree_pdata(struct device *dev)
 	struct gpio_keys_button *button;
 	struct fwnode_handle *child;
 	int nbuttons;
+	int error;
 
 	nbuttons = device_get_child_node_count(dev);
 	if (nbuttons == 0)
@@ -701,9 +712,21 @@ gpio_keys_get_devtree_pdata(struct device *dev)
 
 		fwnode_property_read_string(child, "label", &button->desc);
 
-		if (fwnode_property_read_u32(child, "linux,input-type",
-					     &button->type))
+		error = fwnode_property_read_u32(child, "linux,input-type",
+					     &button->type);
+		if (error) {
 			button->type = EV_KEY;
+		} else {
+			error = fwnode_property_read_u32(child,
+						     "linux,input-value",
+						     &button->value);
+			if ((button->type == EV_ABS || button->type == EV_REL)
+			    && error) {
+				dev_err(dev,
+					"EV_ABS/EV_REL button without value\n");
+				return ERR_PTR(-EINVAL);
+			}
+		}
 
 		button->wakeup =
 			fwnode_property_read_bool(child, "wakeup-source") ||
