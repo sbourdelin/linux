@@ -30,6 +30,7 @@
 #include <linux/highmem.h>
 #include <linux/perf_event.h>
 #include <linux/preempt.h>
+#include <linux/hardirq.h>
 
 #include <asm/bug.h>
 #include <asm/cpufeature.h>
@@ -40,6 +41,8 @@
 #include <asm/system_misc.h>
 #include <asm/pgtable.h>
 #include <asm/tlbflush.h>
+
+#include <acpi/ghes.h>
 
 static const char *fault_name(unsigned int esr);
 
@@ -499,6 +502,14 @@ static int do_sea(unsigned long addr, unsigned int esr, struct pt_regs *regs)
 
 	pr_err("Synchronous External Abort: %s (0x%08x) at 0x%016lx\n",
 		 fault_name(esr), esr, addr);
+
+	/*
+	 * synchronize_rcu() will wait for nmi_exit(), so no need to
+	 * rcu_read_lock().
+	 */
+	nmi_enter();
+	ghes_notify_sea();
+	nmi_exit();
 
 	info.si_signo = SIGBUS;
 	info.si_errno = 0;
