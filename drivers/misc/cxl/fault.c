@@ -145,25 +145,26 @@ static void cxl_handle_page_fault(struct cxl_context *ctx,
 		return cxl_ack_ae(ctx);
 	}
 
-	/*
-	 * update_mmu_cache() will not have loaded the hash since current->trap
-	 * is not a 0x400 or 0x300, so just call hash_page_mm() here.
-	 */
-	access = _PAGE_PRESENT | _PAGE_READ;
-	if (dsisr & CXL_PSL_DSISR_An_S)
-		access |= _PAGE_WRITE;
+	if (!radix_enabled()) {
+		/*
+		 * update_mmu_cache() will not have loaded the hash since current->trap
+		 * is not a 0x400 or 0x300, so just call hash_page_mm() here.
+		 */
+		access = _PAGE_PRESENT | _PAGE_READ;
+		if (dsisr & CXL_PSL_DSISR_An_S)
+			access |= _PAGE_WRITE;
 
-	access |= _PAGE_PRIVILEGED;
-	if ((!ctx->kernel) || (REGION_ID(dar) == USER_REGION_ID))
-		access &= ~_PAGE_PRIVILEGED;
+		access |= _PAGE_PRIVILEGED;
+		if ((!ctx->kernel) || (REGION_ID(dar) == USER_REGION_ID))
+			access &= ~_PAGE_PRIVILEGED;
 
-	if (dsisr & DSISR_NOHPTE)
-		inv_flags |= HPTE_NOHPTE_UPDATE;
+		if (dsisr & DSISR_NOHPTE)
+			inv_flags |= HPTE_NOHPTE_UPDATE;
 
-	local_irq_save(flags);
-	hash_page_mm(mm, dar, access, 0x300, inv_flags);
-	local_irq_restore(flags);
-
+		local_irq_save(flags);
+		hash_page_mm(mm, dar, access, 0x300, inv_flags);
+		local_irq_restore(flags);
+	}
 	pr_devel("Page fault successfully handled for pe: %i!\n", ctx->pe);
 	cxl_ops->ack_irq(ctx, CXL_PSL_TFC_An_R, 0);
 }
@@ -227,6 +228,15 @@ void cxl_handle_fault(struct work_struct *fault_work)
 		if (dsisr & CXL_PSL_DSISR_An_DS)
 			cxl_handle_segment_miss(ctx, mm, dar);
 		else if (dsisr & CXL_PSL_DSISR_An_DM)
+			cxl_handle_page_fault(ctx, mm, dsisr, dar);
+		else
+			WARN(1, "cxl_handle_fault has nothing to handle\n");
+	}
+	if (cxl_is_psl9(ctx->afu)) {
+		if ((dsisr & CXL_PSL9_DSISR_An_CO_MASK) &
+			(CXL_PSL9_DSISR_An_PF_SLR | CXL_PSL9_DSISR_An_PF_RGC |
+			 CXL_PSL9_DSISR_An_PF_RGP | CXL_PSL9_DSISR_An_PF_HRH |
+			 CXL_PSL9_DSISR_An_PF_STEG))
 			cxl_handle_page_fault(ctx, mm, dsisr, dar);
 		else
 			WARN(1, "cxl_handle_fault has nothing to handle\n");
