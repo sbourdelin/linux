@@ -190,6 +190,7 @@ static inline void ct_assert_unique_operations(void)
 {
 	switch (0) {
 #include GENL_MAGIC_INCLUDE_FILE
+	default:
 		;
 	}
 }
@@ -208,6 +209,7 @@ static inline void ct_assert_unique_top_level_attributes(void)
 {
 	switch (0) {
 #include GENL_MAGIC_INCLUDE_FILE
+	default:
 		;
 	}
 }
@@ -218,6 +220,7 @@ static inline void ct_assert_unique_ ## s_name ## _attributes(void)	\
 {									\
 	switch (0) {							\
 		s_fields						\
+		default:						\
 			;						\
 	}								\
 }
