@@ -371,7 +371,6 @@ stmmac_probe_config_dt(struct platform_device *pdev, const char **mac)
 	} else {
 		clk_prepare_enable(plat->clk_ptp_ref);
 		plat->clk_ptp_rate = clk_get_rate(plat->clk_ptp_ref);
-		dev_info(&pdev->dev, "No reset control found\n");
 	}
 
 	plat->stmmac_rst = devm_reset_control_get(&pdev->dev,
