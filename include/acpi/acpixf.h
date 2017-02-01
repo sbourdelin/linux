@@ -946,7 +946,7 @@ ACPI_DBG_DEPENDENT_RETURN_VOID(ACPI_PRINTF_LIKE(6) __nocapture(3)
 						const char *module_name,
 						u32 component_id,
 						const char *format, ...))
-ACPI_DBG_DEPENDENT_RETURN_VOID(ACPI_PRINTF_LIKE(6)
+ACPI_DBG_DEPENDENT_RETURN_VOID(ACPI_PRINTF_LIKE(6) __nocapture(3)
 				void ACPI_INTERNAL_VAR_XFACE
 				acpi_debug_print_raw(u32 requested_debug_level,
 						     u32 line_number,

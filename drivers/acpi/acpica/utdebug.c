@@ -154,7 +154,7 @@ static const char *acpi_ut_trim_function_name(const char *function_name)
  *
  ******************************************************************************/
 
-void ACPI_INTERNAL_VAR_XFACE
+void __unverified_nocapture(3) ACPI_INTERNAL_VAR_XFACE
 acpi_debug_print(u32 requested_debug_level,
 		 u32 line_number,
 		 const char *function_name,
