@@ -682,44 +682,66 @@ out:
 }
 EXPORT_SYMBOL_GPL(fwnode_property_match_string);
 
+static int property_copy_string_array(struct property_entry *dst,
+				      const struct property_entry *src)
+{
+	char **d;
+	size_t nval = src->length / sizeof(*d);
+	size_t i;
+
+	d = kcalloc(nval, sizeof(*d), GFP_KERNEL);
+	if (!d)
+		return -ENOMEM;
+
+	for (i = 0; i < nval; i++) {
+		d[i] = kstrdup(src->pointer.str[i], GFP_KERNEL);
+		if (!d[i] && src->pointer.str[i]) {
+			while (--i >= 0)
+				kfree(d[i]);
+			kfree(d);
+			return -ENOMEM;
+		}
+	}
+
+	dst->pointer.str = (void *)d;
+	return 0;
+}
+
 static int property_entry_copy(struct property_entry *dst,
 			       const struct property_entry *src)
 {
-	const char **d, **s;
-	size_t i, nval;
+	int error;
 
 	dst->name = kstrdup(src->name, GFP_KERNEL);
 	if (!dst->name)
 		return -ENOMEM;
 
 	if (src->is_array) {
-		if (!src->length)
-			return -ENODATA;
+		if (!src->length) {
+			error = -ENODATA;
+			goto out_free_name;
+		}
 
 		if (src->is_string) {
-			nval = src->length / sizeof(const char *);
-			dst->pointer.str = kcalloc(nval, sizeof(const char *),
-						   GFP_KERNEL);
-			if (!dst->pointer.str)
-				return -ENOMEM;
-
-			d = dst->pointer.str;
-			s = src->pointer.str;
-			for (i = 0; i < nval; i++) {
-				d[i] = kstrdup(s[i], GFP_KERNEL);
-				if (!d[i] && s[i])
-					return -ENOMEM;
+			error = property_copy_string_array(dst, src);
+			if (error) {
+				error = -ENOMEM;
+				goto out_free_name;
 			}
 		} else {
 			dst->pointer.raw_data = kmemdup(src->pointer.raw_data,
 							src->length, GFP_KERNEL);
-			if (!dst->pointer.raw_data)
-				return -ENOMEM;
+			if (!dst->pointer.raw_data) {
+				error = -ENOMEM;
+				goto out_free_name;
+			}
 		}
 	} else if (src->is_string) {
 		dst->value.str = kstrdup(src->value.str, GFP_KERNEL);
-		if (!dst->value.str && src->value.str)
-			return -ENOMEM;
+		if (!dst->value.str && src->value.str) {
+			error = -ENOMEM;
+			goto out_free_name;
+		}
 	} else {
 		dst->value.raw_data = src->value.raw_data;
 	}
@@ -729,6 +751,10 @@ static int property_entry_copy(struct property_entry *dst,
 	dst->is_string = src->is_string;
 
 	return 0;
+
+out_free_name:
+	kfree(dst->name);
+	return error;
 }
 
 /**
