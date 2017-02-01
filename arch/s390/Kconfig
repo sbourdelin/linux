@@ -38,7 +38,7 @@ config ARCH_DMA_ADDR_T_64BIT
 	def_bool y
 
 config GENERIC_LOCKBREAK
-	def_bool y if SMP && PREEMPT
+	def_bool y if SMP && PREEMPT && !DEBUG_LOCK_ALLOC
 
 config PGSTE
 	def_bool y if KVM

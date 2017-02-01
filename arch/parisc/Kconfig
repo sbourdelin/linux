@@ -56,7 +56,7 @@ config STACK_GROWSUP
 config GENERIC_LOCKBREAK
 	bool
 	default y
-	depends on SMP && PREEMPT
+	depends on SMP && PREEMPT && !DEBUG_LOCK_ALLOC
 
 config RWSEM_GENERIC_SPINLOCK
 	def_bool y
