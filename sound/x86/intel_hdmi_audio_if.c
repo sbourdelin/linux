@@ -109,7 +109,7 @@ int hdmi_audio_suspend(void *haddata, struct hdmi_audio_event event)
 	had_stream = intelhaddata->private_data;
 	substream = intelhaddata->stream_info.had_substream;
 
-	if (intelhaddata->dev->power.runtime_status != RPM_SUSPENDED) {
+	if (!pm_runtime_status_suspended(intelhaddata->dev)) {
 		pr_err("audio stream is active\n");
 		return -EAGAIN;
 	}
