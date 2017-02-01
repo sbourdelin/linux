@@ -440,6 +440,7 @@ config PHY_QCOM_UFS
 
 config PHY_QCOM_USB_HS
 	tristate "Qualcomm USB HS PHY module"
+	depends on EXTCON
 	depends on USB_ULPI_BUS
 	select GENERIC_PHY
 	help
