@@ -160,6 +160,73 @@ static void uverbs_uobject_add(struct ib_uobject *uobject)
 	mutex_unlock(&uobject->context->lock);
 }
 
+static struct ib_uobject *alloc_begin_fd_uobject(const struct uverbs_obj_type *type,
+						 struct ib_ucontext *ucontext)
+{
+	const struct uverbs_obj_fd_type *fd_type =
+		container_of(type, struct uverbs_obj_fd_type, type);
+	int new_fd;
+	struct ib_uobject_file *uobj_file = NULL;
+	struct file *filp;
+
+	new_fd = get_unused_fd_flags(O_CLOEXEC);
+	if (new_fd < 0)
+		return ERR_PTR(new_fd);
+
+	uobj_file = kmalloc(fd_type->obj_size, GFP_KERNEL);
+	if (!uobj_file) {
+		put_unused_fd(new_fd);
+		return ERR_PTR(-ENOMEM);
+	}
+
+	filp = anon_inode_getfile(fd_type->name,
+				  fd_type->fops,
+				  uobj_file,
+				  fd_type->flags);
+	if (IS_ERR(filp)) {
+		put_unused_fd(new_fd);
+		kfree(uobj_file);
+		return (void *)filp;
+	}
+
+	init_uobj(&uobj_file->uobj, ucontext, type);
+	uobj_file->uobj.id = new_fd;
+	uobj_file->uobj.object = filp;
+	uobj_file->ufile = ucontext->ufile;
+
+	return &uobj_file->uobj;
+}
+
+static struct ib_uobject *lookup_get_fd_uobject(const struct uverbs_obj_type *type,
+						struct ib_ucontext *ucontext,
+						int id, bool write)
+{
+	struct file *f;
+	struct ib_uobject *uobject;
+	const struct uverbs_obj_fd_type *fd_type =
+		container_of(type, struct uverbs_obj_fd_type, type);
+
+	if (write)
+		return ERR_PTR(-EOPNOTSUPP);
+
+	f = fget(id);
+	if (!f)
+		return ERR_PTR(-EBADF);
+
+	uobject = f->private_data;
+	if (f->f_op != fd_type->fops ||
+	    !uobject->context) {
+		fput(f);
+		return ERR_PTR(-EBADF);
+	}
+
+	/*
+	 * No need to protect it with a ref count, as fget increases
+	 * f_count.
+	 */
+	return uobject;
+}
+
 static void alloc_commit_idr_uobject(struct ib_uobject *uobj)
 {
 	uverbs_uobject_add(uobj);
@@ -194,6 +261,38 @@ static void lookup_put_idr_uobject(struct ib_uobject *uobj, bool write)
 		up_write(&uobj->currently_used);
 	else
 		up_read(&uobj->currently_used);
+}
+
+static void lookup_put_fd_uobject(struct ib_uobject *uobj, bool write)
+{
+	struct file *filp = uobj->object;
+
+	WARN_ON(write);
+	fput(filp);
+}
+
+static void alloc_commit_fd_uobject(struct ib_uobject *uobj)
+{
+	struct ib_uobject_file *uobj_file =
+		container_of(uobj, struct ib_uobject_file, uobj);
+
+	kref_get(&uobj_file->ufile->ref);
+	uverbs_uobject_add(&uobj_file->uobj);
+	fd_install(uobj_file->uobj.id, uobj->object);
+	/* This shouldn't be used anymore. Use the file object instead */
+	uobj_file->uobj.id = 0;
+}
+
+static void alloc_abort_fd_uobject(struct ib_uobject *uobj)
+{
+	struct ib_uobject_file *uobj_file =
+		container_of(uobj, struct ib_uobject_file, uobj);
+	struct file *filp = uobj->object;
+
+	/* Unsuccessful NEW */
+	fput(filp);
+	put_unused_fd(uobj_file->uobj.id);
+	uverbs_uobject_put(&uobj_file->uobj);
 }
 
 static void destroy_commit_idr_uobject(struct ib_uobject *uobj)
@@ -233,6 +332,16 @@ static void release_idr_uobject(struct ib_uobject *uobj)
 	kfree_rcu(uobj, rcu);
 }
 
+static void release_fd_uobject(struct ib_uobject *uobj)
+{
+	kfree(container_of(uobj, struct ib_uobject_file, uobj));
+}
+
+static void destroy_commit_null_uobject(struct ib_uobject *uobj)
+{
+	WARN_ON(true);
+}
+
 const struct uverbs_obj_type_ops uverbs_idr_ops = {
 	.alloc_begin = alloc_begin_idr_uobject,
 	.lookup_get = lookup_get_idr_uobject,
@@ -254,8 +363,15 @@ void uverbs_cleanup_ucontext(struct ib_ucontext *ucontext, bool device_removed)
 
 		/*
 		 * This shouldn't run while executing other commands on this
-		 * context, thus no lock is required.
+		 * context. Thus, the only thing we should take care of is
+		 * releasing a FD while traversing this list. The FD could be
+		 * closed and released from the _release fop of this FD.
+		 * In order to mitigate this, we add a lock.
+		 * We take and release the lock per order traversal in order
+		 * to let other threads (which might still use the FDs) chance
+		 * to run.
 		 */
+		mutex_lock(&ucontext->lock);
 		list_for_each_entry_safe(obj, next_obj, &ucontext->uobjects,
 					 list)
 			if (obj->type->destroy_order == cur_order) {
@@ -265,6 +381,7 @@ void uverbs_cleanup_ucontext(struct ib_ucontext *ucontext, bool device_removed)
 				next_order = min(next_order,
 						 obj->type->destroy_order);
 			}
+		mutex_unlock(&ucontext->lock);
 		cur_order = next_order;
 	}
 }
@@ -273,5 +390,43 @@ void uverbs_initialize_ucontext(struct ib_ucontext *ucontext)
 {
 	mutex_init(&ucontext->lock);
 	INIT_LIST_HEAD(&ucontext->uobjects);
+}
+
+static void hot_unplug_fd_uobject(struct ib_uobject *uobj, bool device_removed)
+{
+	const struct uverbs_obj_fd_type *fd_type =
+		container_of(uobj->type, struct uverbs_obj_fd_type, type);
+	struct ib_uobject_file *uobj_file =
+		container_of(uobj, struct ib_uobject_file, uobj);
+
+	fd_type->hot_unplug(uobj_file, device_removed);
+	uobj_file->uobj.context = NULL;
+}
+
+const struct uverbs_obj_type_ops uverbs_fd_ops = {
+	.alloc_begin = alloc_begin_fd_uobject,
+	.lookup_get = lookup_get_fd_uobject,
+	.alloc_commit = alloc_commit_fd_uobject,
+	.alloc_abort = alloc_abort_fd_uobject,
+	.lookup_put = lookup_put_fd_uobject,
+	.destroy_commit = destroy_commit_null_uobject,
+	.hot_unplug = hot_unplug_fd_uobject,
+	.release = release_fd_uobject,
+};
+
+void uverbs_close_fd(struct file *f)
+{
+	struct ib_uobject_file *uobj_file = f->private_data;
+
+	mutex_lock(&uobj_file->ufile->cleanup_mutex);
+	if (uobj_file->uobj.context) {
+		mutex_lock(&uobj_file->uobj.context->lock);
+		list_del(&uobj_file->uobj.list);
+		mutex_unlock(&uobj_file->uobj.context->lock);
+		uobj_file->uobj.context = NULL;
+	}
+	mutex_unlock(&uobj_file->ufile->cleanup_mutex);
+	kref_put(&uobj_file->ufile->ref, ib_uverbs_release_file);
+	uverbs_uobject_put(&uobj_file->uobj);
 }
 
