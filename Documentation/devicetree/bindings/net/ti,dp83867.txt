@@ -18,6 +18,10 @@ Optional property:
 	- ti,max-output-impedance - MAC Interface Impedance control to set
 				    the programmable output impedance to
 				    maximum value (70 ohms).
+	- ti,port-mirroring - Set port mirroring. It is possible to overwrite -
+			      enable (by setting <1>) or disable
+			      (by setting <0>) the port mirroring feature set
+			      by bootstrap initial reading.
 
 Note: ti,min-output-impedance and ti,max-output-impedance are mutually
       exclusive. When both properties are present ti,max-output-impedance
