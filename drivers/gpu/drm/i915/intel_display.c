@@ -17292,9 +17292,17 @@ void intel_connector_unregister(struct drm_connector *connector)
 void intel_modeset_cleanup(struct drm_device *dev)
 {
 	struct drm_i915_private *dev_priv = to_i915(dev);
+	struct intel_connector *connector;
 
 	flush_work(&dev_priv->atomic_helper.free_work);
 	WARN_ON(!llist_empty(&dev_priv->atomic_helper.free_list));
+
+	for_each_intel_connector(dev, connector) {
+		if (connector->base.state->crtc) {
+			drm_connector_unreference(&connector->base);
+			connector->base.state->crtc = NULL;
+		}
+	}
 
 	intel_disable_gt_powersave(dev_priv);
 
