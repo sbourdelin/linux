@@ -21,8 +21,6 @@
    along with drbd; see the file COPYING.  If not, write to
    the Free Software Foundation, 675 Mass Ave, Cambridge, MA 02139, USA.
  */
-
-
 #include <linux/module.h>
 
 #include <linux/uaccess.h>
@@ -36,6 +34,7 @@
 #include <linux/memcontrol.h>
 #include <linux/mm_inline.h>
 #include <linux/slab.h>
+#include <uapi/linux/sched/types.h>
 #include <linux/pkt_sched.h>
 #define __KERNEL_SYSCALLS__
 #include <linux/unistd.h>
