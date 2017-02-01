@@ -27,8 +27,6 @@
 #include "fsl-mc-private.h"
 #include "dprc-cmd.h"
 
-static struct kmem_cache *mc_dev_cache;
-
 /**
  * Default DMA mask for devices on a fsl-mc bus
  */
@@ -422,17 +420,12 @@ bool fsl_mc_is_root_dprc(struct device *dev)
 static void fsl_mc_device_release(struct device *dev)
 {
 	struct fsl_mc_device *mc_dev = to_fsl_mc_device(dev);
-	struct fsl_mc_bus *mc_bus = NULL;
 
 	kfree(mc_dev->regions);
-
-	if (strcmp(mc_dev->obj_desc.type, "dprc") == 0)
-		mc_bus = to_fsl_mc_bus(mc_dev);
-
-	if (mc_bus)
-		devm_kfree(mc_dev->dev.parent, mc_bus);
+	if (!strcmp(mc_dev->obj_desc.type, "dprc"))
+		kfree(to_fsl_mc_bus(mc_dev));
 	else
-		kmem_cache_free(mc_dev_cache, mc_dev);
+		kfree(mc_dev);
 }
 
 /**
@@ -457,7 +450,7 @@ int fsl_mc_device_add(struct dprc_obj_desc *obj_desc,
 		/*
 		 * Allocate an MC bus device object:
 		 */
-		mc_bus = devm_kzalloc(parent_dev, sizeof(*mc_bus), GFP_KERNEL);
+		mc_bus = kzalloc(sizeof(*mc_bus), GFP_KERNEL);
 		if (!mc_bus)
 			return -ENOMEM;
 
@@ -466,7 +459,7 @@ int fsl_mc_device_add(struct dprc_obj_desc *obj_desc,
 		/*
 		 * Allocate a regular fsl_mc_device object:
 		 */
-		mc_dev = kmem_cache_zalloc(mc_dev_cache, GFP_KERNEL);
+		mc_dev = kzalloc(sizeof(*mc_dev), GFP_KERNEL);
 		if (!mc_dev)
 			return -ENOMEM;
 	}
@@ -561,10 +554,7 @@ int fsl_mc_device_add(struct dprc_obj_desc *obj_desc,
 
 error_cleanup_dev:
 	kfree(mc_dev->regions);
-	if (mc_bus)
-		devm_kfree(parent_dev, mc_bus);
-	else
-		kmem_cache_free(mc_dev_cache, mc_dev);
+	kfree(mc_bus ? (void *)mc_bus : (void *)mc_dev);
 
 	return error;
 }
@@ -578,23 +568,11 @@ EXPORT_SYMBOL_GPL(fsl_mc_device_add);
  */
 void fsl_mc_device_remove(struct fsl_mc_device *mc_dev)
 {
-	struct fsl_mc_bus *mc_bus = NULL;
-
-	kfree(mc_dev->regions);
-
 	/*
 	 * The device-specific remove callback will get invoked by device_del()
 	 */
 	device_del(&mc_dev->dev);
 	put_device(&mc_dev->dev);
-
-	if (strcmp(mc_dev->obj_desc.type, "dprc") == 0)
-		mc_bus = to_fsl_mc_bus(mc_dev);
-
-	if (mc_bus)
-		devm_kfree(mc_dev->dev.parent, mc_bus);
-	else
-		kmem_cache_free(mc_dev_cache, mc_dev);
 }
 EXPORT_SYMBOL_GPL(fsl_mc_device_remove);
 
@@ -835,14 +813,6 @@ static int __init fsl_mc_bus_driver_init(void)
 {
 	int error;
 
-	mc_dev_cache = kmem_cache_create("fsl_mc_device",
-					 sizeof(struct fsl_mc_device), 0, 0,
-					 NULL);
-	if (!mc_dev_cache) {
-		pr_err("Could not create fsl_mc_device cache\n");
-		return -ENOMEM;
-	}
-
 	error = bus_register(&fsl_mc_bus_type);
 	if (error < 0) {
 		pr_err("bus type registration failed: %d\n", error);
@@ -882,7 +852,6 @@ error_cleanup_bus:
 	bus_unregister(&fsl_mc_bus_type);
 
 error_cleanup_cache:
-	kmem_cache_destroy(mc_dev_cache);
 	return error;
 }
 postcore_initcall(fsl_mc_bus_driver_init);
