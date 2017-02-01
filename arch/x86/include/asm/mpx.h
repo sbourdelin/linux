@@ -99,6 +99,11 @@ static inline void mpx_mm_init(struct mm_struct *mm)
 }
 void mpx_notify_unmap(struct mm_struct *mm, struct vm_area_struct *vma,
 		      unsigned long start, unsigned long end);
+
+static inline int mpx_bd_size_shift(struct mm_struct *mm)
+{
+	return mm->context.mpx_bd_shift;
+}
 #else
 static inline siginfo_t *mpx_generate_siginfo(struct pt_regs *regs)
 {
@@ -119,6 +124,12 @@ static inline void mpx_notify_unmap(struct mm_struct *mm,
 				    struct vm_area_struct *vma,
 				    unsigned long start, unsigned long end)
 {
+}
+/* Should never be called, but need stub to avoid an #ifdef */
+static inline int mpx_bd_size_shift(struct mm_struct *mm)
+{
+	WARN_ON(1);
+	return 0;
 }
 #endif /* CONFIG_X86_INTEL_MPX */
 

@@ -9,6 +9,7 @@
 
 #include <asm/tlbflush.h>
 #include <asm/mmu_context.h>
+#include <asm/mpx.h>
 #include <asm/cache.h>
 #include <asm/apic.h>
 #include <asm/uv/uv.h>
@@ -69,6 +70,50 @@ void switch_mm(struct mm_struct *prev, struct mm_struct *next,
 	local_irq_save(flags);
 	switch_mm_irqs_off(prev, next, tsk);
 	local_irq_restore(flags);
+}
+
+/*
+ * The MPX tables change sizes based on the size of the virtual
+ * (aka. linear) address space.  There is an MSR to tell the CPU
+ * whether we want the legacy-style ones or the larger ones when
+ * we are running with an eXtended virtual address space.
+ */
+static inline void switch_mpx_bd(struct mm_struct *prev, struct mm_struct *next)
+{
+	/*
+	 * Note: there is one and only one bit in use in the MSR
+	 * at this time, so we do not have to be concerned with
+	 * preserving any of the other bits.  Just write 0 or 1.
+	 */
+	u32 IA32_MPX_LAX_ENABLE_MASK = 0x00000001;
+
+	/*
+	 * Avoid the MSR on CPUs without MPX, obviously:
+	 */
+	if (!cpu_feature_enabled(X86_FEATURE_MPX))
+		return;
+	/*
+	 * FIXME: do we want a check here for the 5-level paging
+	 * CR4 bit or CPUID bit, or is the mawa check below OK?
+	 * It's not obvious what would be the fastest or if it
+	 * matters.
+	 */
+
+	/*
+	 * Avoid the relatively costly MSR if we are not changing
+	 * MAWA state.  All processes not using MPX will have a
+	 * mpx_mawa_shift()=0, so we do not need to check
+	 * separately for whether MPX management is enabled.
+	 */
+	if (likely(mpx_bd_size_shift(prev) == mpx_bd_size_shift(next)))
+		return;
+
+	if (mpx_bd_size_shift(next)) {
+		wrmsr(MSR_IA32_MPX_LAX, IA32_MPX_LAX_ENABLE_MASK, 0x0);
+	} else {
+		/* clear the enable bit: */
+		wrmsr(MSR_IA32_MPX_LAX, 0x0, 0x0);
+	}
 }
 
 void switch_mm_irqs_off(struct mm_struct *prev, struct mm_struct *next,
@@ -136,6 +181,7 @@ void switch_mm_irqs_off(struct mm_struct *prev, struct mm_struct *next,
 		/* Load per-mm CR4 state */
 		load_mm_cr4(next);
 
+		switch_mpx_bd(prev, next);
 #ifdef CONFIG_MODIFY_LDT_SYSCALL
 		/*
 		 * Load the LDT, if the LDT is different.

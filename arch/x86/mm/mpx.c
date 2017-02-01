@@ -20,11 +20,6 @@
 #define CREATE_TRACE_POINTS
 #include <asm/trace/mpx.h>
 
-static inline int mpx_bd_size_shift(struct mm_struct *mm)
-{
-	return mm->context.mpx_bd_shift;
-}
-
 static inline unsigned long mpx_bd_size_bytes(struct mm_struct *mm)
 {
 	if (!is_64bit_mm(mm))
