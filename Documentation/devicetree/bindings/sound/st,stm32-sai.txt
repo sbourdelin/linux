@@ -1,0 +1,79 @@
+STMicroelectronics STM32 Serial Audio Interface (SAI).
+
+The SAI interface (Serial Audio Interface) offers a wide set of audio protocols
+as I2S standards, LSB or MSB-justified, PCM/DSP, TDM, and AC'97.
+The SAI contains two independent audio sub-blocks. Each sub-block has
+its own clock generator and I/O lines controller.
+
+Required properties:
+  - compatible: Should be "st,stm32f4-sai"
+  - reg: Base address and size of SAI common register set.
+  - clocks: Must contain phandle and clock specifier pairs for each entry
+	in clock-names.
+  - clock-names: Must contain "clk_x8k" and "clk_x11k"
+	"clk_x8k": SAI parent clock for sampling rates multiple of 8kHz.
+	"clk_x11k": SAI parent clock for sampling rates multiple of 11.025kHz.
+  - interrupts: cpu DAI interrupt line shared by SAI sub-blocks
+
+Note: Each SAI controller should have an alias correctly numbered
+in "aliases" node, to provide explicit name to CPU DAI.
+
+Optional properties:
+  - resets: Reference to a reset controller asserting the SAI
+
+SAI subnodes:
+Two subnodes corresponding to SAI sub-block instances A et B can be defined.
+Subnode can be omitted for unsused sub-block.
+
+SAI subnodes required properties:
+  - compatible: Should be "st,stm32-sai-sub-a" or "st,stm32-sai-sub-b"
+	for SAI sub-block A or B respectively.
+  - reg: Base address and size of SAI sub-block register set.
+  - clocks: Must contain one phandle and clock specifier pair
+	for sai_ck which feeds the internal clock generator.
+  - clock-names: Must contain "sai_ck".
+  - dmas: see Documentation/devicetree/bindings/dma/stm32-dma.txt
+  - dma-names: identifier string for each DMA request line
+	"tx": if sai sub-block is configured as playback DAI
+	"rx": if sai sub-block is configured as capture DAI
+  - pinctrl-names: should contain only value "default"
+  - pinctrl-0: see Documentation/devicetree/bindings/pinctrl/pinctrl-stm32.txt
+
+Example:
+sai1: sai1@40015800 {
+	compatible = "st,stm32f4-sai";
+	reg = <0x40015800 0x400>;
+	clocks = <&rcc 1 CLK_SAIQ_PDIV>, <&rcc 1 CLK_I2SQ_PDIV>;
+	clock-names = "clk_x8k", "clk_x11k";
+	interrupts = <87>;
+	resets = <&rcc 310>;
+
+	sai1b: sai@1 {
+		#sound-dai-cells = <0>;
+		compatible = "st,stm32-sai-sub-b";
+		clocks = <&rcc 1 CLK_SAI2>;
+		clock-names = "sai_ck";
+		dmas = <&dma2 5 0 0x400 0x1>;
+		dma-names = "tx";
+	};
+};
+
+sound {
+	compatible = "simple-audio-card";
+	simple-audio-card,name = "STM32-Sound-Card";
+	status = "okay";
+
+	simple-audio-card,dai-link@0 {
+		format = "i2s";
+		cpu {
+			sound-dai = <&sai1b>;
+		};
+		codec {
+			sound-dai = <&codec>;
+		};
+	};
+};
+
+aliases {
+	sai1 = &sai1;
+};
