@@ -118,9 +118,21 @@ struct uverbs_obj_fd_type {
 };
 
 extern const struct uverbs_obj_type_ops uverbs_idr_ops;
+extern const struct uverbs_obj_type_ops uverbs_fd_ops;
 
 #define UVERBS_BUILD_BUG_ON(cond) (sizeof(char[1 - 2 * !!(cond)]) -	\
 				   sizeof(char))
+#define UVERBS_TYPE_ALLOC_FD(_order, _obj_size, _hot_unplug, _fops, _name, _flags)\
+	 {.type = {							\
+		.destroy_order = _order,				\
+		.ops = &uverbs_fd_ops,					\
+	 },								\
+	 .obj_size = (_obj_size) +					\
+		UVERBS_BUILD_BUG_ON((_obj_size) < sizeof(struct ib_uobject_file)), \
+	 .hot_unplug = _hot_unplug,					\
+	 .fops = _fops,							\
+	 .name = _name,							\
+	 .flags = _flags}
 #define UVERBS_TYPE_ALLOC_IDR_SZ(_size, _order, _hot_unplug)		\
 	 {.type = {							\
 		.destroy_order = _order,				\
