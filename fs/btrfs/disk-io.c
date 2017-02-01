@@ -3981,14 +3981,19 @@ void close_ctree(struct btrfs_root *root)
 
 	btrfs_put_block_group_cache(fs_info);
 
-	btrfs_free_block_groups(fs_info);
-
 	/*
 	 * we must make sure there is not any read request to
 	 * submit after we stopping all workers.
 	 */
 	invalidate_inode_pages2(fs_info->btree_inode->i_mapping);
 	btrfs_stop_all_workers(fs_info);
+
+	/*
+	 * Free block groups only after stopping all workers, since we could
+	 * have block group caching kthreads running, and therefore they could
+	 * race with us if we freed the block groups before stopping them.
+	 */
+	btrfs_free_block_groups(fs_info);
 
 	clear_bit(BTRFS_FS_OPEN, &fs_info->flags);
 	free_root_pointers(fs_info, 1);
