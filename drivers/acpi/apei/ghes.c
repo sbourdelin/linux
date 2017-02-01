@@ -512,7 +512,12 @@ static void ghes_do_proc(struct ghes *ghes,
 
 		}
 #endif
-		else {
+		else if (!uuid_le_cmp(sec_type, CPER_SEC_PROC_ARM)) {
+			struct cper_sec_proc_arm *arm_err;
+
+			arm_err = acpi_hest_generic_data_payload(gdata);
+			trace_arm_event(arm_err);
+		} else {
 			void *unknown_err = acpi_hest_generic_data_payload(gdata);
 			trace_unknown_sec_event(&sec_type,
 					fru_id, fru_text, sec_sev,
