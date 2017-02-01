@@ -660,6 +660,10 @@ static noinline int replay_one_extent(struct btrfs_trans_handle *trans,
 	if (ret)
 		goto out;
 
+	if (btrfs_file_extent_disk_bytenr(eb, item) == 0 &&
+	    btrfs_fs_incompat(fs_info, NO_HOLES))
+		goto update_inode;
+
 	if (found_type == BTRFS_FILE_EXTENT_REG ||
 	    found_type == BTRFS_FILE_EXTENT_PREALLOC) {
 		u64 offset;
@@ -804,6 +808,7 @@ static noinline int replay_one_extent(struct btrfs_trans_handle *trans,
 	}
 
 	inode_add_bytes(inode, nbytes);
+update_inode:
 	ret = btrfs_update_inode(trans, root, inode);
 out:
 	if (inode)
