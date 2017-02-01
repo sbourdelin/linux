@@ -20,9 +20,10 @@
 typedef struct raw_spinlock {
 	arch_spinlock_t raw_lock;
 #ifdef CONFIG_GENERIC_LOCKBREAK
-	unsigned int break_lock;
+	unsigned short break_lock;
 #endif
 #ifdef CONFIG_DEBUG_SPINLOCK
+	unsigned short lockup;
 	unsigned int magic, owner_cpu;
 	void *owner;
 #endif
@@ -43,6 +44,7 @@ typedef struct raw_spinlock {
 
 #ifdef CONFIG_DEBUG_SPINLOCK
 # define SPIN_DEBUG_INIT(lockname)		\
+	.lockup = 0,				\
 	.magic = SPINLOCK_MAGIC,		\
 	.owner_cpu = -1,			\
 	.owner = SPINLOCK_OWNER_INIT,
