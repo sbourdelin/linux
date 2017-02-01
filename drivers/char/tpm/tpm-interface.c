@@ -478,7 +478,7 @@ static const struct tpm_input_header tpm_getcap_header = {
 };
 
 ssize_t tpm_getcap(struct tpm_chip *chip, u32 subcap_id, cap_t *cap,
-		   const char *desc, size_t min_cap_length)
+		   size_t min_cap_length, const char *desc)
 {
 	struct tpm_cmd_t tpm_cmd;
 	int rc;
@@ -555,8 +555,8 @@ int tpm_get_timeouts(struct tpm_chip *chip)
 		return 0;
 	}
 
-	rc = tpm_getcap(chip, TPM_CAP_PROP_TIS_TIMEOUT, &cap, NULL,
-			sizeof(cap.timeout));
+	rc = tpm_getcap(chip, TPM_CAP_PROP_TIS_TIMEOUT, &cap,
+			sizeof(cap.timeout), NULL);
 	if (rc == TPM_ERR_INVALID_POSTINIT) {
 		/* The TPM is not started, we are the first to talk to it.
 		   Execute a startup command. */
@@ -565,8 +565,8 @@ int tpm_get_timeouts(struct tpm_chip *chip)
 			return rc;
 
 		rc = tpm_getcap(chip, TPM_CAP_PROP_TIS_TIMEOUT, &cap,
-				"attempting to determine the timeouts",
-				sizeof(cap.timeout));
+				sizeof(cap.timeout),
+				"attempting to determine the timeouts");
 	}
 
 	if (rc) {
@@ -630,8 +630,8 @@ int tpm_get_timeouts(struct tpm_chip *chip)
 	chip->timeout_d = usecs_to_jiffies(timeout_eff[3]);
 
 	rc = tpm_getcap(chip, TPM_CAP_PROP_TIS_DURATION, &cap,
-			"attempting to determine the durations",
-			sizeof(cap.duration));
+			sizeof(cap.duration),
+			"attempting to determine the durations");
 	if (rc)
 		return rc;
 
