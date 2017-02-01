@@ -454,6 +454,7 @@ config GCC_PLUGIN_INITIFY
 config GCC_PLUGIN_INITIFY_VERBOSE
 	bool "Report initification"
 	depends on GCC_PLUGIN_INITIFY
+	depends on !COMPILE_TEST
 	help
 	  Print all initified strings and all functions which should be
 	  __init/__exit.
