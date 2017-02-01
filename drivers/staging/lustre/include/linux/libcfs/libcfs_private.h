@@ -291,7 +291,7 @@ do {							    \
  *       value  after  conversion...
  *
  */
-#define CLASSERT(cond) do {switch (42) {case (cond): case 0: break; } } while (0)
+#define CLASSERT(cond) do {switch (42) {case (cond): case 0: default: break; } } while (0)
 
 /* max value for numeric network address */
 #define MAX_NUMERIC_VALUE 0xffffffff
