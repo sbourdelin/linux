@@ -534,6 +534,7 @@ out:
 static void ieee80211_beacons_start(struct ieee80211_device *ieee)
 {
 	unsigned long flags;
+
 	spin_lock_irqsave(&ieee->beacon_lock,flags);
 
 	ieee->beacon_txing = 1;
@@ -975,6 +976,7 @@ static void ieee80211_resp_to_probe(struct ieee80211_device *ieee, u8 *dest)
 
 
 	struct sk_buff *buf = ieee80211_probe_resp(ieee, dest);
+
 	if (buf)
 		softmac_mgmt_xmit(buf, ieee);
 }
@@ -1160,6 +1162,7 @@ ieee80211_association_req(struct ieee80211_network *beacon,
 	if (beacon->BssCcxVerNumber >= 2) {
 		u8			CcxVerNumBuf[] = {0x00, 0x40, 0x96, 0x03, 0x00};
 		OCTET_STRING	osCcxVerNum;
+		
 		CcxVerNumBuf[4] = beacon->BssCcxVerNumber;
 		osCcxVerNum.Octet = CcxVerNumBuf;
 		osCcxVerNum.Length = sizeof(CcxVerNumBuf);
@@ -1225,6 +1228,7 @@ void ieee80211_associate_abort(struct ieee80211_device *ieee)
 {
 
 	unsigned long flags;
+
 	spin_lock_irqsave(&ieee->lock, flags);
 
 	ieee->associate_seq++;
@@ -1336,6 +1340,7 @@ static void ieee80211_associate_step2(struct ieee80211_device *ieee)
 static void ieee80211_associate_complete_wq(struct work_struct *work)
 {
 	struct ieee80211_device *ieee = container_of(work, struct ieee80211_device, associate_complete_wq);
+
 	printk(KERN_INFO "Associated successfully\n");
 	if(ieee80211_is_54g(&ieee->current_network) &&
 		(ieee->modulation & IEEE80211_OFDM_MODULATION)){
@@ -1392,6 +1397,7 @@ static void ieee80211_associate_complete(struct ieee80211_device *ieee)
 static void ieee80211_associate_procedure_wq(struct work_struct *work)
 {
 	struct ieee80211_device *ieee = container_of(work, struct ieee80211_device, associate_procedure_wq);
+	
 	ieee->sync_scan_hurryup = 1;
 	mutex_lock(&ieee->wx_mutex);
 
@@ -1538,6 +1544,7 @@ static inline u16 auth_parse(struct sk_buff *skb, u8 **challenge, int *chlen)
 {
 	struct ieee80211_authentication *a;
 	u8 *t;
+	
 	if (skb->len < (sizeof(struct ieee80211_authentication) - sizeof(struct ieee80211_info_element))) {
 		IEEE80211_DEBUG_MGMT("invalid len in auth resp: %d\n",skb->len);
 		return 0xcafe;
@@ -2197,6 +2204,7 @@ EXPORT_SYMBOL(ieee80211_softmac_xmit);
 static void ieee80211_resume_tx(struct ieee80211_device *ieee)
 {
 	int i;
+
 	for(i = ieee->tx_pending.frag; i < ieee->tx_pending.txb->nr_frags; i++) {
 
 		if (ieee->queue_stop){
@@ -2674,6 +2682,7 @@ void ieee80211_start_protocol(struct ieee80211_device *ieee)
 void ieee80211_softmac_init(struct ieee80211_device *ieee)
 {
 	int i;
+
 	memset(&ieee->current_network, 0, sizeof(struct ieee80211_network));
 
 	ieee->state = IEEE80211_NOLINK;
