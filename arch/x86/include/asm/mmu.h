@@ -34,6 +34,7 @@ typedef struct {
 #ifdef CONFIG_X86_INTEL_MPX
 	/* address of the bounds directory */
 	void __user *bd_addr;
+	int mpx_bd_shift;
 #endif
 } mm_context_t;
 

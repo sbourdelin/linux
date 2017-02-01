@@ -68,6 +68,12 @@ static inline void mpx_mm_init(struct mm_struct *mm)
 	 * directory, so point this at an invalid address.
 	 */
 	mm->context.bd_addr = MPX_INVALID_BOUNDS_DIR;
+	/*
+	 * All processes start out in "legacy" MPX mode with
+	 * the old bounds directory size.  This corresponds to
+	 * what the specs call MAWA=0.
+	 */
+	mm->context.mpx_bd_shift = 0;
 }
 void mpx_notify_unmap(struct mm_struct *mm, struct vm_area_struct *vma,
 		      unsigned long start, unsigned long end);
