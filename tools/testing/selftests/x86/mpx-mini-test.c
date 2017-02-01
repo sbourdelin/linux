@@ -40,6 +40,8 @@ int zap_all_every_this_many_mallocs = 1000;
 #include "mpx-debug.h"
 #include "mpx-mm.h"
 
+#include "../../../../include/uapi/linux/prctl.h"
+
 #ifndef __always_inline
 #define __always_inline inline __attribute__((always_inline)
 #endif
@@ -666,7 +668,7 @@ bool process_specific_init(void)
 	check_clear(dir, size);
 	enable_mpx(dir);
 	check_clear(dir, size);
-	if (prctl(43, 0, 0, 0, 0)) {
+	if (prctl(PR_MPX_ENABLE_MANAGEMENT, 0, 0, 0, 0)) {
 		printf("no MPX support\n");
 		abort();
 		return false;
@@ -676,7 +678,7 @@ bool process_specific_init(void)
 
 bool process_specific_finish(void)
 {
-	if (prctl(44)) {
+	if (prctl(PR_MPX_DISABLE_MANAGEMENT)) {
 		printf("no MPX support\n");
 		return false;
 	}
