@@ -61,15 +61,19 @@ static bool platform_bgmac_clk_enabled(struct bgmac *bgmac)
 
 static void platform_bgmac_clk_enable(struct bgmac *bgmac, u32 flags)
 {
-	bgmac_idm_write(bgmac, BCMA_IOCTL,
-			(BCMA_IOCTL_CLK | BCMA_IOCTL_FGC | flags));
+	u32 regval;
+
+	/* Some bits of BCMA_IOCTL set by HW/ATF & should not change */
+	regval = bgmac_idm_read(bgmac, BCMA_IOCTL) & BCMA_IOCTL_DO_NOT_MODIFY;
+	regval |= ((flags & (~BCMA_IOCTL_DO_NOT_MODIFY)) | BCMA_IOCTL_CLK);
+	bgmac_idm_write(bgmac, BCMA_IOCTL, regval | BCMA_IOCTL_FGC);
 	bgmac_idm_read(bgmac, BCMA_IOCTL);
 
 	bgmac_idm_write(bgmac, BCMA_RESET_CTL, 0);
 	bgmac_idm_read(bgmac, BCMA_RESET_CTL);
 	udelay(1);
 
-	bgmac_idm_write(bgmac, BCMA_IOCTL, (BCMA_IOCTL_CLK | flags));
+	bgmac_idm_write(bgmac, BCMA_IOCTL, regval);
 	bgmac_idm_read(bgmac, BCMA_IOCTL);
 	udelay(1);
 }
