@@ -14,15 +14,30 @@
 #define MPX_BD_ENTRY_VALID_FLAG	0x1
 
 /*
- * The upper 28 bits [47:20] of the virtual address in 64-bit
- * are used to index into bounds directory (BD).
+ * The uppermost bits [56:20] of the virtual address in 64-bit
+ * are used to index into bounds directory (BD).  On processors
+ * with support for smaller virtual address space size, the "56"
+ * is obviously smaller.
  *
- * The directory is 2G (2^31) in size, and with 8-byte entries
- * it has 2^28 entries.
+ * When using 47-bit virtual addresses, the directory is 2G
+ * (2^31) bytes in size, and with 8-byte entries it has 2^28
+ * entries.  With 56-bit virtual addresses, it goes to 1T in size
+ * and has 2^37 entries.
+ *
+ * Needs to be ULL so we can use this in 32-bit kernels without
+ * warnings.
  */
-#define MPX_BD_SIZE_BYTES_64	(1UL<<31)
+#define MPX_BD_BASE_SIZE_BYTES_64	(1ULL<<31)
 #define MPX_BD_ENTRY_BYTES_64	8
-#define MPX_BD_NR_ENTRIES_64	(MPX_BD_SIZE_BYTES_64/MPX_BD_ENTRY_BYTES_64)
+/*
+ * Note: size of tables on 64-bit is not constant, so we have no
+ * fixed definition for MPX_BD_NR_ENTRIES_64.
+ *
+ * The 5-Level Paging Whitepaper says:  "A bound directory
+ * comprises 2^(28+MAWA) 64-bit entries."  Since MAWA=0 in
+ * legacy mode:
+ */
+#define MPX_BD_LEGACY_NR_ENTRIES_64	(1UL<<28)
 
 /*
  * The 32-bit directory is 4MB (2^22) in size, and with 4-byte

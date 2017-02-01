@@ -20,12 +20,21 @@
 #define CREATE_TRACE_POINTS
 #include <asm/trace/mpx.h>
 
+static inline int mpx_bd_size_shift(struct mm_struct *mm)
+{
+	return mm->context.mpx_bd_shift;
+}
+
 static inline unsigned long mpx_bd_size_bytes(struct mm_struct *mm)
 {
-	if (is_64bit_mm(mm))
-		return MPX_BD_SIZE_BYTES_64;
-	else
+	if (!is_64bit_mm(mm))
 		return MPX_BD_SIZE_BYTES_32;
+
+	/*
+	 * The bounds directory grows with the address space size.
+	 * The "legacy" shift is 0.
+	 */
+	return MPX_BD_BASE_SIZE_BYTES_64 << mpx_bd_shift_shift(mm);
 }
 
 static inline unsigned long mpx_bt_size_bytes(struct mm_struct *mm)
@@ -724,6 +733,7 @@ static inline unsigned long bd_entry_virt_space(struct mm_struct *mm)
 {
 	unsigned long long virt_space;
 	unsigned long long GB = (1ULL << 30);
+	unsigned long legacy_64bit_vaddr_bits = 48;
 
 	/*
 	 * This covers 32-bit emulation as well as 32-bit kernels
@@ -733,12 +743,16 @@ static inline unsigned long bd_entry_virt_space(struct mm_struct *mm)
 		return (4ULL * GB) / MPX_BD_NR_ENTRIES_32;
 
 	/*
-	 * 'x86_virt_bits' returns what the hardware is capable
-	 * of, and returns the full >32-bit address space when
-	 * running 32-bit kernels on 64-bit hardware.
+	 * With 5-level paging, the virtual address space size
+	 * gets bigger.  A bounds directory entry still points to
+	 * a single bounds table and the *tables* stay the same
+	 * size.  Thus, the address space that a directory entry
+	 * covers does not change based on the paging mode or the
+	 * size of the bounds directory itself.  Just use the
+	 * legacy size.
 	 */
-	virt_space = (1ULL << boot_cpu_data.x86_virt_bits);
-	return virt_space / MPX_BD_NR_ENTRIES_64;
+	virt_space = (1ULL << legacy_64bit_vaddr_bits);
+	return virt_space / MPX_BD_LEGACY_NR_ENTRIES_64;
 }
 
 /*
