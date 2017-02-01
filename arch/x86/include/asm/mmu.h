@@ -32,9 +32,13 @@ typedef struct {
 	s16 execute_only_pkey;
 #endif
 #ifdef CONFIG_X86_INTEL_MPX
-	/* address of the bounds directory */
-	void __user *bd_addr;
-	int mpx_bd_shift;
+	/*
+	 * The bounds directory must be page-aligned, so we store
+	 * its address in the high bits and information about its
+	 * size in some low bits.  A bit is also used to indicate
+	 * when the directory is invalid and MPX management is off.
+	 */
+	unsigned long mpx_directory_info;
 #endif
 } mm_context_t;
 

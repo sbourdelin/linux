@@ -339,29 +339,31 @@ static __user void *mpx_get_bounds_dir(void)
 		(bndcsr->bndcfgu & MPX_BNDCFG_ADDR_MASK);
 }
 
-int mpx_set_mm_bd_size(unsigned long bd_size)
+int mpx_set_dir_size(unsigned long bd_size, unsigned long *mpx_directory_info)
 {
 	struct mm_struct *mm = current->mm;
+	int ret = 0;
+	bool large_dir = false;
 
 	switch ((unsigned long long)bd_size) {
 	case 0:
-		/* Legacy call to prctl(): */
-		mm->context.mpx_bd_shift = 0;
-		return 0;
+		/* Legacy call to prctl() */
+		break;
 	case MPX_BD_SIZE_BYTES_32:
 		/* 32-bit, legacy-sized bounds directory: */
-		if (is_64bit_mm(mm))
-			return -EINVAL;
-		mm->context.mpx_bd_shift = 0;
-		return 0;
+		if (is_64bit_mm(mm)) {
+			ret = -EINVAL;
+			break;
+		}
+		ret = 0;
+		break;
 	case MPX_BD_BASE_SIZE_BYTES_64:
 		/* 64-bit, legacy-sized bounds directory: */
 		if (!is_64bit_mm(mm)
 		// FIXME && ! opted-in to larger address space
 		)
-			return -EINVAL;
-		mm->context.mpx_bd_shift = 0;
-		return 0;
+			ret = -EINVAL;
+		break;
 	case MPX_BD_BASE_SIZE_BYTES_64 << MPX_LARGE_BOUNDS_DIR_SHIFT:
 		/*
 		 * Non-legacy call, with larger directory.
@@ -370,7 +372,7 @@ int mpx_set_mm_bd_size(unsigned long bd_size)
 		 * change sizes.
 		 */
 		if (!is_64bit_mm(mm))
-			return -EINVAL;
+			ret = -EINVAL;
 		/*
 		 * Do not let this be enabled unles we are on
 		 * 5-level hardware *and* have that feature
@@ -379,16 +381,20 @@ int mpx_set_mm_bd_size(unsigned long bd_size)
 		if (!cpu_feature_enabled(X86_FEATURE_LA57)
 		// FIXME && opted into larger address space
 		)
-			return -EINVAL;
-		mm->context.mpx_bd_shift = MPX_LARGE_BOUNDS_DIR_SHIFT;
-		return 0;
+			ret = -EINVAL;
+		if (ret)
+			break;
+		large_dir = true;
+		break;
 	}
-	return -EINVAL;
+	if (large_dir)
+		(*mpx_directory_info) |= MPX_LARGE_BOUNDS_DIR;
+	return ret;
 }
 
 int mpx_enable_management(unsigned long bd_size)
 {
-	void __user *bd_base = MPX_INVALID_BOUNDS_DIR;
+	void __user *bd_base;
 	struct mm_struct *mm = current->mm;
 	int ret = 0;
 
@@ -404,13 +410,16 @@ int mpx_enable_management(unsigned long bd_size)
 	 * unmap path; we can just use mm->context.bd_addr instead.
 	 */
 	bd_base = mpx_get_bounds_dir();
+	if (bd_base == MPX_INVALID_BOUNDS_DIR)
+		return -ENXIO;
+
 	down_write(&mm->mmap_sem);
-	ret = mpx_set_mm_bd_size(bd_size);
+	/* Mask out the invalid bit: */
+	mm->context.mpx_directory_info &= ~MPX_INVALID_BOUNDS_DIR;
+	ret = mpx_set_dir_size(bd_size, &mm->context.mpx_directory_info);
 	if (ret)
 		goto out;
-	mm->context.bd_addr = bd_base;
-	if (mm->context.bd_addr == MPX_INVALID_BOUNDS_DIR)
-		ret = -ENXIO;
+	mm->context.mpx_directory_info |= bd_base;
 out:
 	up_write(&mm->mmap_sem);
 	return ret;
@@ -424,7 +433,7 @@ int mpx_disable_management(void)
 		return -ENXIO;
 
 	down_write(&mm->mmap_sem);
-	mm->context.bd_addr = MPX_INVALID_BOUNDS_DIR;
+	mm->context.mpx_directory_info = MPX_INVALID_BOUNDS_DIR;
 	up_write(&mm->mmap_sem);
 	return 0;
 }
@@ -1006,7 +1015,7 @@ static int try_unmap_single_bt(struct mm_struct *mm,
 		end = bta_end_vaddr;
 	}
 
-	bde_vaddr = mm->context.bd_addr + mpx_get_bd_entry_offset(mm, start);
+	bde_vaddr = mpx_bounds_dir_addr(mm) + mpx_get_bd_entry_offset(mm, start);
 	ret = get_bt_addr(mm, bde_vaddr, &bt_addr);
 	/*
 	 * No bounds table there, so nothing to unmap.

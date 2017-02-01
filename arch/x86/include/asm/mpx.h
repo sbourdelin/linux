@@ -6,10 +6,14 @@
 #include <asm/insn.h>
 
 /*
- * NULL is theoretically a valid place to put the bounds
- * directory, so point this at an invalid address.
+ * These get stored into mm_context_t->mpx_directory_info.
+ * We could theoretically use bits 0 and 1, but those are
+ * used in the BNDCFGU register that also holds the bounds
+ * directory pointer.  To avoid confusion, use different bits.
  */
-#define MPX_INVALID_BOUNDS_DIR	((void __user *)-1)
+#define MPX_INVALID_BOUNDS_DIR	(1UL<<2)
+#define MPX_LARGE_BOUNDS_DIR	(1UL<<3)
+
 #define MPX_BNDCFG_ENABLE_FLAG	0x1
 #define MPX_BD_ENTRY_VALID_FLAG	0x1
 
@@ -44,7 +48,7 @@
  * bounds directory.  There are only two sizes supported: large
  * and small, so we only need a single value here.
  */
-#define MPX_LARGE_BOUNDS_DIR_SHIFT 9
+#define MPX_LARGE_BOUNDS_DIR_SHIFT	9
 
 /*
  * The 32-bit directory is 4MB (2^22) in size, and with 4-byte
@@ -79,32 +83,38 @@
 #ifdef CONFIG_X86_INTEL_MPX
 siginfo_t *mpx_generate_siginfo(struct pt_regs *regs);
 int mpx_handle_bd_fault(void);
+static inline void __user *mpx_bounds_dir_addr(struct mm_struct *mm)
+{
+	/*
+	 * The only bit that can be set in a valid bounds
+	 * directory is MPX_LARGE_BOUNDS_DIR, so only mask
+	 * it back off.
+	 */
+	return (void __user *)
+		(mm->context.mpx_directory_info & ~MPX_LARGE_BOUNDS_DIR);
+}
 static inline int kernel_managing_mpx_tables(struct mm_struct *mm)
 {
-	return (mm->context.bd_addr != MPX_INVALID_BOUNDS_DIR);
+	return (mm->context.mpx_directory_info != MPX_INVALID_BOUNDS_DIR);
 }
 static inline void mpx_mm_init(struct mm_struct *mm)
 {
 	/*
-	 * NULL is theoretically a valid place to put the bounds
-	 * directory, so point this at an invalid address.
+	 * MPX starts out off (invalid) and with a legacy-size
+	 * bounds directory (cleared MPX_LARGE_BOUNDS_DIR bit).
 	 */
-	mm->context.bd_addr = MPX_INVALID_BOUNDS_DIR;
-	/*
-	 * All processes start out in "legacy" MPX mode with
-	 * the old bounds directory size.  This corresponds to
-	 * what the specs call MAWA=0.
-	 */
-	mm->context.mpx_bd_shift = 0;
+	mm->context.mpx_directory_info = MPX_INVALID_BOUNDS_DIR;
 }
 void mpx_notify_unmap(struct mm_struct *mm, struct vm_area_struct *vma,
 		      unsigned long start, unsigned long end);
-
 static inline int mpx_bd_size_shift(struct mm_struct *mm)
 {
-	return mm->context.mpx_bd_shift;
+	if (!kernel_managing_mpx_tables(mm))
+		return 0;
+	if (mm->context.mpx_directory_info & MPX_LARGE_BOUNDS_DIR)
+		return MPX_LARGE_BOUNDS_DIR_SHIFT;
+	return 0;
 }
-#else
 static inline siginfo_t *mpx_generate_siginfo(struct pt_regs *regs)
 {
 	return NULL;
