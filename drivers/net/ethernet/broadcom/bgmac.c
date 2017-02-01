@@ -1222,11 +1222,15 @@ static int bgmac_set_mac_address(struct net_device *net_dev, void *addr)
 {
 	struct bgmac *bgmac = netdev_priv(net_dev);
 	int ret;
+	struct sockaddr *sa = addr;
 
 	ret = eth_prepare_mac_addr_change(net_dev, addr);
 	if (ret < 0)
 		return ret;
-	bgmac_write_mac_address(bgmac, (u8 *)addr);
+
+	ether_addr_copy(bgmac->mac_addr, sa->sa_data);
+	bgmac_write_mac_address(bgmac, bgmac->mac_addr);
+
 	eth_commit_mac_addr_change(net_dev, addr);
 	return 0;
 }
