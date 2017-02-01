@@ -1,6 +1,8 @@
 #ifndef _LINUX_SCHED_TOPOLOGY_H
 #define _LINUX_SCHED_TOPOLOGY_H
 
+#include <linux/sched/idle.h>
+
 /*
  * sched-domains (multiprocessor balancing) declarations:
  */
