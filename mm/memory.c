@@ -1128,9 +1128,8 @@ again:
 	arch_enter_lazy_mmu_mode();
 	do {
 		pte_t ptent = *pte;
-		if (pte_none(ptent)) {
+		if (pte_none(ptent))
 			continue;
-		}
 
 		if (pte_present(ptent)) {
 			struct page *page;
