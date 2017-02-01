@@ -462,6 +462,72 @@ static inline void cpuid_count(unsigned int op, int count,
 }
 
 #define XSTATE_CPUID	    0x0000000d
+#define CPUID_MAWA_LEAF	    0x00000007
+#define CPUID_MAWA_SUBLEAF  0x00000000
+#define CPUID_MAWA_BOTTOM_BIT	17
+#define CPUID_MAWA_TOP_BIT	21
+
+/*
+ * On CPUs supporting 5-level paging with a larger virtual address
+ * space, the bounds directory is also larger.  The mechanism to
+ * grow the bounds directory is called "MPX Address-Width Adjust"
+ * (MAWA) and its presence is enumerated via CPUID.
+ */
+static inline int bd_size_shift(void)
+{
+	unsigned int eax, ebx, ecx, edx;
+	unsigned int shift;
+
+	cpuid_count(CPUID_MAWA_LEAF, CPUID_MAWA_SUBLEAF,
+			&eax, &ebx, &ecx, &edx);
+
+	shift = ecx;
+	shift >>= CPUID_MAWA_BOTTOM_BIT;
+	shift &= (1U << (CPUID_MAWA_TOP_BIT - CPUID_MAWA_BOTTOM_BIT)) - 1;
+
+	return shift;
+}
+
+#define CPUID_LA57_LEAF		0x00000007
+#define CPUID_LA57_SUBLEAF	0x00000000
+#define CPUID_LA57_ECX_MASK	(1UL << 16)
+
+/* Intel-defined CPU features, CPUID level 0x00000007:0 (ecx) */
+static inline int cpu_supports_lax(void)
+{
+	unsigned int eax, ebx, ecx, edx;
+
+	cpuid_count(CPUID_LA57_LEAF, CPUID_LA57_SUBLEAF,
+			&eax, &ebx, &ecx, &edx);
+
+	return !!(ecx & CPUID_LA57_ECX_MASK);
+}
+
+unsigned long long mpx_bounds_dir_hw_size_bytes(void)
+{
+#ifdef __i386__
+	/* 32-bit has a fixed size directory: */
+	return MPX_BOUNDS_DIR_SIZE_BYTES;
+#else
+	/*
+	 * 64-bit depends on what mode the hardware is in.
+	 * Are we in LA57 mode, and has the kernel set up
+	 * the "MAWA" MSR for us?
+	 */
+	return MPX_LEGACY_BOUNDS_DIR_SIZE_BYTES << bd_size_shift();
+#endif
+}
+
+unsigned long long mpx_bounds_dir_alloc_size_bytes(void)
+{
+#ifdef __i386__
+	return mpx_bounds_dir_hw_size_bytes();
+#else
+	if (cpu_supports_lax())
+		return MPX_LA57_BOUNDS_DIR_SIZE_BYTES;
+	return MPX_LEGACY_BOUNDS_DIR_SIZE_BYTES;
+#endif
+}
 
 /*
  * List of XSAVE features Linux knows about:
@@ -601,7 +667,8 @@ struct mpx_bounds_dir *bounds_dir_ptr;
 
 unsigned long __bd_incore(const char *func, int line)
 {
-	unsigned long ret = nr_incore(bounds_dir_ptr, MPX_BOUNDS_DIR_SIZE_BYTES);
+	unsigned long ret = nr_incore(bounds_dir_ptr,
+				      mpx_bounds_dir_hw_size_bytes());
 	return ret;
 }
 #define bd_incore() __bd_incore(__func__, __LINE__)
@@ -624,43 +691,50 @@ void check_clear_bd(void)
 	check_clear(bounds_dir_ptr, 2UL << 30);
 }
 
-#define USE_MALLOC_FOR_BOUNDS_DIR 1
-bool process_specific_init(void)
+void *alloc_bounds_directory(unsigned long long size)
 {
-	unsigned long size;
-	unsigned long *dir;
+	/*
+	 * This can make debugging easier because the
+	 * address calculations are simpler:
+	 */
+	void *hint_addr = NULL; //0x200000000000;
 	/* Guarantee we have the space to align it, add padding: */
 	unsigned long pad = getpagesize();
+	unsigned long *dir;
+	int flags;
 
-	size = 2UL << 30; /* 2GB */
-	if (sizeof(unsigned long) == 4)
-		size = 4UL << 20; /* 4MB */
-	dprintf1("trying to allocate %ld MB bounds directory\n", (size >> 20));
-
-	if (USE_MALLOC_FOR_BOUNDS_DIR) {
-		unsigned long _dir;
-
-		dir = malloc(size + pad);
-		assert(dir);
-		_dir = (unsigned long)dir;
-		_dir += 0xfffUL;
-		_dir &= ~0xfffUL;
-		dir = (void *)_dir;
-	} else {
-		/*
-		 * This makes debugging easier because the address
-		 * calculations are simpler:
-		 */
-		dir = mmap((void *)0x200000000000, size + pad,
-				PROT_READ|PROT_WRITE,
-				MAP_ANONYMOUS|MAP_PRIVATE, -1, 0);
-		if (dir == (void *)-1) {
-			perror("unable to allocate bounds directory");
-			abort();
-		}
-		check_clear(dir, size);
+	/*
+	 * The bounds directory can be very large and cause us
+	 * to exceed overcommit limits.  Use MAP_NORESERVE to
+	 * avoid the overcommit limits.
+	 */
+	flags = MAP_ANONYMOUS | MAP_PRIVATE | MAP_NORESERVE;
+	dir = mmap(hint_addr, size + pad , PROT_READ|PROT_WRITE, flags, -1, 0);
+	if (dir == (void *)-1) {
+		perror("unable to allocate bounds directory");
+		abort();
 	}
-	bounds_dir_ptr = (void *)dir;
+	check_clear(dir, size);
+	return dir;
+}
+
+#define USE_MALLOC_FOR_BOUNDS_DIR 0
+bool process_specific_init(void)
+{
+	unsigned long long size;
+	unsigned long *dir;
+	int err;
+
+	size = mpx_bounds_dir_alloc_size_bytes();
+	dprintf1("trying to allocate %lld MB bounds directory\n", (size >> 20));
+
+	dir = alloc_bounds_directory(size);
+	/*
+	 * The directory is a large anonymous allocation, so it
+	 * looks like an ideal place to use transparent large pages.
+	 * But, in practice, it's usually sparsely populated and
+	 * will waste lots of memory.  Turn THP off:
+	 */
 	madvise(bounds_dir_ptr, size, MADV_NOHUGEPAGE);
 	bd_incore();
 	dprintf1("bounds directory: 0x%p -> 0x%p\n", bounds_dir_ptr,
@@ -668,7 +742,19 @@ bool process_specific_init(void)
 	check_clear(dir, size);
 	enable_mpx(dir);
 	check_clear(dir, size);
-	if (prctl(PR_MPX_ENABLE_MANAGEMENT, 0, 0, 0, 0)) {
+
+	/* Try to tell newer kernels the size of the directory: */
+	err = prctl(PR_MPX_ENABLE_MANAGEMENT, size, 0, 0, 0);
+	/*
+	 * But also handle older kernels that need argument 2 to be 0.
+	 * If the hardware supports larger bounds directories, we
+	 * allocated a large one in anticipation of needing it. But,
+	 * the kernel does not support it, so will use only a
+	 * small portion (1/512th) of it in these tests.
+	 */
+	if (err)
+		err = prctl(PR_MPX_ENABLE_MANAGEMENT, 0, 0, 0, 0);
+	if (err) {
 		printf("no MPX support\n");
 		abort();
 		return false;

@@ -32,7 +32,8 @@
 #define MPX_BOUNDS_TABLE_ENTRY_SIZE_BYTES	32
 #define MPX_BOUNDS_TABLE_SIZE_BYTES		(1ULL << 22) /* 4MB */
 #define MPX_BOUNDS_DIR_ENTRY_SIZE_BYTES		8
-#define MPX_BOUNDS_DIR_SIZE_BYTES		(1ULL << 31) /* 2GB */
+#define MPX_LEGACY_BOUNDS_DIR_SIZE_BYTES	(1ULL << 31) /* 2GB */
+#define MPX_LA57_BOUNDS_DIR_SIZE_BYTES		(1ULL << 40) /* 1TB */
 
 #define MPX_BOUNDS_TABLE_BOTTOM_BIT		3
 #define MPX_BOUNDS_TABLE_TOP_BIT		19
@@ -41,8 +42,23 @@
 
 #endif
 
+/* What size should we allocate for the bounds directory? */
+extern unsigned long long mpx_bounds_dir_alloc_size_bytes(void);
+/*
+ * How large is the hardware currently expecting the bounds
+ * directory to be?
+ *
+ * Note: We have to *tell* the hardware when we want it to use
+ * a larger bounds directory.  Until that point, this will
+ * return the smaller "legacy" value.  But, we *allocate* the
+ * directory before well tell the hardware what size we want
+ * it to be.  So, we need to separate the concepts and have two
+ * different functions.
+ */
+extern unsigned long long mpx_bounds_dir_hw_size_bytes(void);
+
 #define MPX_BOUNDS_DIR_NR_ENTRIES	\
-	(MPX_BOUNDS_DIR_SIZE_BYTES/MPX_BOUNDS_DIR_ENTRY_SIZE_BYTES)
+	(mpx_bounds_dir_hw_size_bytes()/MPX_BOUNDS_DIR_ENTRY_SIZE_BYTES)
 #define MPX_BOUNDS_TABLE_NR_ENTRIES	\
 	(MPX_BOUNDS_TABLE_SIZE_BYTES/MPX_BOUNDS_TABLE_ENTRY_SIZE_BYTES)
 
@@ -63,7 +79,8 @@ struct mpx_bt_entry {
 } __attribute__((packed));
 
 struct mpx_bounds_dir {
-	struct mpx_bd_entry entries[MPX_BOUNDS_DIR_NR_ENTRIES];
+	/* This is a variable size array: */
+	struct mpx_bd_entry entries[0];
 } __attribute__((packed));
 
 struct mpx_bounds_table {
