@@ -25,7 +25,7 @@ typedef struct raw_spinlock {
 #ifdef CONFIG_DEBUG_SPINLOCK
 	unsigned short lockup;
 	unsigned int magic, owner_cpu;
-	void *owner;
+	void *owner, *tail;
 #endif
 #ifdef CONFIG_DEBUG_LOCK_ALLOC
 	struct lockdep_map dep_map;
@@ -47,7 +47,8 @@ typedef struct raw_spinlock {
 	.lockup = 0,				\
 	.magic = SPINLOCK_MAGIC,		\
 	.owner_cpu = -1,			\
-	.owner = SPINLOCK_OWNER_INIT,
+	.owner = SPINLOCK_OWNER_INIT,		\
+	.tail = NULL,
 #else
 # define SPIN_DEBUG_INIT(lockname)
 #endif
