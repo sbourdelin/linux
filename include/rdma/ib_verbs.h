@@ -1334,17 +1334,6 @@ struct ib_umem;
 struct ib_ucontext {
 	struct ib_device       *device;
 	struct ib_uverbs_file  *ufile;
-	struct list_head	pd_list;
-	struct list_head	mr_list;
-	struct list_head	mw_list;
-	struct list_head	cq_list;
-	struct list_head	qp_list;
-	struct list_head	srq_list;
-	struct list_head	ah_list;
-	struct list_head	xrcd_list;
-	struct list_head	rule_list;
-	struct list_head	wq_list;
-	struct list_head	rwq_ind_tbl_list;
 	int			closing;
 
 	/* locking the uobjects_list */
@@ -1377,10 +1366,8 @@ struct ib_uobject {
 	struct list_head	list;		/* link to context's list */
 	int			id;		/* index into kernel idr */
 	struct kref		ref;
-	struct rw_semaphore	mutex;		/* protects .live */
 	struct rw_semaphore	currently_used;	/* protects exclusive access */
 	struct rcu_head		rcu;		/* kfree_rcu() overhead */
-	int			live;
 
 	const struct uverbs_obj_type *type;
 };
