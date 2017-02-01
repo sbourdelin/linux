@@ -56,6 +56,7 @@
 #include <linux/ptp_clock_kernel.h>
 #include <net/devlink.h>
 #include <net/dst_metadata.h>
+#include <net/switchdev.h>
 
 #include "i40e_type.h"
 #include "i40e_prototype.h"
