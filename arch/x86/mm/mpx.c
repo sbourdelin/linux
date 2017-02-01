@@ -344,7 +344,54 @@ static __user void *mpx_get_bounds_dir(void)
 		(bndcsr->bndcfgu & MPX_BNDCFG_ADDR_MASK);
 }
 
-int mpx_enable_management(void)
+int mpx_set_mm_bd_size(unsigned long bd_size)
+{
+	struct mm_struct *mm = current->mm;
+
+	switch ((unsigned long long)bd_size) {
+	case 0:
+		/* Legacy call to prctl(): */
+		mm->context.mpx_bd_shift = 0;
+		return 0;
+	case MPX_BD_SIZE_BYTES_32:
+		/* 32-bit, legacy-sized bounds directory: */
+		if (is_64bit_mm(mm))
+			return -EINVAL;
+		mm->context.mpx_bd_shift = 0;
+		return 0;
+	case MPX_BD_BASE_SIZE_BYTES_64:
+		/* 64-bit, legacy-sized bounds directory: */
+		if (!is_64bit_mm(mm)
+		// FIXME && ! opted-in to larger address space
+		)
+			return -EINVAL;
+		mm->context.mpx_bd_shift = 0;
+		return 0;
+	case MPX_BD_BASE_SIZE_BYTES_64 << MPX_LARGE_BOUNDS_DIR_SHIFT:
+		/*
+		 * Non-legacy call, with larger directory.
+		 * Note that there is no 32-bit equivalent for
+		 * this case since its address space does not
+		 * change sizes.
+		 */
+		if (!is_64bit_mm(mm))
+			return -EINVAL;
+		/*
+		 * Do not let this be enabled unles we are on
+		 * 5-level hardware *and* have that feature
+		 * enabled. FIXME: need runtime check
+		 */
+		if (!cpu_feature_enabled(X86_FEATURE_LA57)
+		// FIXME && opted into larger address space
+		)
+			return -EINVAL;
+		mm->context.mpx_bd_shift = MPX_LARGE_BOUNDS_DIR_SHIFT;
+		return 0;
+	}
+	return -EINVAL;
+}
+
+int mpx_enable_management(unsigned long bd_size)
 {
 	void __user *bd_base = MPX_INVALID_BOUNDS_DIR;
 	struct mm_struct *mm = current->mm;
@@ -363,10 +410,13 @@ int mpx_enable_management(void)
 	 */
 	bd_base = mpx_get_bounds_dir();
 	down_write(&mm->mmap_sem);
+	ret = mpx_set_mm_bd_size(bd_size);
+	if (ret)
+		goto out;
 	mm->context.bd_addr = bd_base;
 	if (mm->context.bd_addr == MPX_INVALID_BOUNDS_DIR)
 		ret = -ENXIO;
-
+out:
 	up_write(&mm->mmap_sem);
 	return ret;
 }

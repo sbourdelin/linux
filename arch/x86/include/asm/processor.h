@@ -874,14 +874,14 @@ extern int get_tsc_mode(unsigned long adr);
 extern int set_tsc_mode(unsigned int val);
 
 /* Register/unregister a process' MPX related resource */
-#define MPX_ENABLE_MANAGEMENT()	mpx_enable_management()
+#define MPX_ENABLE_MANAGEMENT(bd_size)	mpx_enable_management(bd_size)
 #define MPX_DISABLE_MANAGEMENT()	mpx_disable_management()
 
 #ifdef CONFIG_X86_INTEL_MPX
-extern int mpx_enable_management(void);
+extern int mpx_enable_management(unsigned long bd_size);
 extern int mpx_disable_management(void);
 #else
-static inline int mpx_enable_management(void)
+static inline int mpx_enable_management(unsigned long bd_size)
 {
 	return -EINVAL;
 }

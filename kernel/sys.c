@@ -92,7 +92,7 @@
 # define SET_TSC_CTL(a)		(-EINVAL)
 #endif
 #ifndef MPX_ENABLE_MANAGEMENT
-# define MPX_ENABLE_MANAGEMENT()	(-EINVAL)
+# define MPX_ENABLE_MANAGEMENT(bd_size)	(-EINVAL)
 #endif
 #ifndef MPX_DISABLE_MANAGEMENT
 # define MPX_DISABLE_MANAGEMENT()	(-EINVAL)
@@ -2246,9 +2246,9 @@ SYSCALL_DEFINE5(prctl, int, option, unsigned long, arg2, unsigned long, arg3,
 		up_write(&me->mm->mmap_sem);
 		break;
 	case PR_MPX_ENABLE_MANAGEMENT:
-		if (arg2 || arg3 || arg4 || arg5)
+		if (arg3 || arg4 || arg5)
 			return -EINVAL;
-		error = MPX_ENABLE_MANAGEMENT();
+		error = MPX_ENABLE_MANAGEMENT(arg2);
 		break;
 	case PR_MPX_DISABLE_MANAGEMENT:
 		if (arg2 || arg3 || arg4 || arg5)

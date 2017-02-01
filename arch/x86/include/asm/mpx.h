@@ -40,6 +40,13 @@
 #define MPX_BD_LEGACY_NR_ENTRIES_64	(1UL<<28)
 
 /*
+ * When the hardware "MAWA" feature is enabled, we have a larger
+ * bounds directory.  There are only two sizes supported: large
+ * and small, so we only need a single value here.
+ */
+#define MPX_LARGE_BOUNDS_DIR_SHIFT 9
+
+/*
  * The 32-bit directory is 4MB (2^22) in size, and with 4-byte
  * entries it has 2^20 entries.
  */
