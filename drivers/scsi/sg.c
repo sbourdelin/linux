@@ -890,14 +890,9 @@ sg_ioctl(struct file *filp, unsigned int cmd_in, unsigned long arg)
 		result = get_user(val, ip);
 		if (result)
 			return result;
-		if (val) {
+		if (val)
 			sfp->low_dma = 1;
-			if ((0 == sfp->low_dma) && (0 == sg_res_in_use(sfp))) {
-				val = (int) sfp->reserve.bufflen;
-				sg_remove_scat(sfp, &sfp->reserve);
-				sg_build_reserve(sfp, val);
-			}
-		} else {
+		else {
 			if (atomic_read(&sdp->detaching))
 				return -ENODEV;
 			sfp->low_dma = sdp->device->host->unchecked_isa_dma;
