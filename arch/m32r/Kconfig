@@ -242,7 +242,7 @@ config IRAM_SIZE
 config GENERIC_LOCKBREAK
 	bool
 	default y
-	depends on SMP && PREEMPT
+	depends on SMP && PREEMPT && !DEBUG_LOCK_ALLOC
 
 config RWSEM_GENERIC_SPINLOCK
 	bool

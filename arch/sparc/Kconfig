@@ -286,7 +286,7 @@ config US3_MC
 config GENERIC_LOCKBREAK
 	bool
 	default y
-	depends on SPARC64 && SMP && PREEMPT
+	depends on SPARC64 && SMP && PREEMPT && !DEBUG_LOCK_ALLOC
 
 config NUMA
 	bool "NUMA support"

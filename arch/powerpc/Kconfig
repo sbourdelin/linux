@@ -60,7 +60,7 @@ config RWSEM_XCHGADD_ALGORITHM
 config GENERIC_LOCKBREAK
 	bool
 	default y
-	depends on SMP && PREEMPT
+	depends on SMP && PREEMPT && !DEBUG_LOCK_ALLOC
 
 config ARCH_HAS_ILOG2_U32
 	bool
