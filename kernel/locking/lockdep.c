@@ -3464,6 +3464,23 @@ out:
 	return ret;
 }
 
+static int validate_held_lock(struct task_struct *curr, unsigned int depth,
+			      int idx)
+{
+	struct held_lock *hlock;
+
+	for (hlock = curr->held_locks + idx; idx < depth; idx++, hlock++)
+		if (!__lock_acquire(hlock->instance,
+				    hlock_class(hlock)->subclass,
+				    hlock->trylock,
+				    hlock->read, hlock->check,
+				    hlock->hardirqs_off,
+				    hlock->nest_lock, hlock->acquire_ip,
+				    hlock->references, hlock->pin_count))
+			return 1;
+	return 0;
+}
+
 static int
 __lock_set_class(struct lockdep_map *lock, const char *name,
 		 struct lock_class_key *key, unsigned int subclass,
@@ -3494,15 +3511,8 @@ __lock_set_class(struct lockdep_map *lock, const char *name,
 	curr->lockdep_depth = i;
 	curr->curr_chain_key = hlock->prev_chain_key;
 
-	for (; i < depth; i++) {
-		hlock = curr->held_locks + i;
-		if (!__lock_acquire(hlock->instance,
-			hlock_class(hlock)->subclass, hlock->trylock,
-				hlock->read, hlock->check, hlock->hardirqs_off,
-				hlock->nest_lock, hlock->acquire_ip,
-				hlock->references, hlock->pin_count))
-			return 0;
-	}
+	if (validate_held_lock(curr, depth, i))
+		return 0;
 
 	/*
 	 * I took it apart and put it back together again, except now I have
@@ -3573,15 +3583,8 @@ __lock_release(struct lockdep_map *lock, int nested, unsigned long ip)
 	curr->lockdep_depth = i;
 	curr->curr_chain_key = hlock->prev_chain_key;
 
-	for (i++; i < depth; i++) {
-		hlock = curr->held_locks + i;
-		if (!__lock_acquire(hlock->instance,
-			hlock_class(hlock)->subclass, hlock->trylock,
-				hlock->read, hlock->check, hlock->hardirqs_off,
-				hlock->nest_lock, hlock->acquire_ip,
-				hlock->references, hlock->pin_count))
-			return 0;
-	}
+	if (validate_held_lock(curr, depth, i + 1))
+		return 0;
 
 	/*
 	 * We had N bottles of beer on the wall, we drank one, but now
