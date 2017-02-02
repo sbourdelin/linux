@@ -4138,13 +4138,36 @@ intel_dp_check_link_status(struct intel_dp *intel_dp)
 		return;
 
 	/* if link training is requested we should perform it always */
-	if ((intel_dp->compliance.test_type == DP_TEST_LINK_TRAINING) ||
-	    (!drm_dp_channel_eq_ok(link_status, intel_dp->lane_count))) {
-		DRM_DEBUG_KMS("%s: channel EQ not ok, retraining\n",
-			      intel_encoder->base.name);
+	if (intel_dp->compliance.test_type == DP_TEST_LINK_TRAINING) {
+		DRM_DEBUG_KMS("%s: compliance test mode, retraining\n",
+			intel_encoder->base.name);
+	} else {
+		u8 retry;
 
-		intel_dp_retrain_link(intel_dp);
+		for (retry = 0; retry < 3; retry++) {
+			if (!drm_dp_channel_eq_ok(link_status, intel_dp->lane_count)) {
+				/*
+				 * EQ not ok may caused by fast link train while exit PSR active,
+				 * wait at least 1000 us then read it again.
+				 */
+				DRM_DEBUG_KMS("%s: channel EQ not ok, retry = %d, DPCD 0x202 = 0x%x, 0x203 = 0x%x, 0x204 = 0x%x\n",
+					intel_encoder->base.name, retry, link_status[0], link_status[1], link_status[2]);
+				usleep_range(1000, 1500);
+				if (!intel_dp_get_link_status(intel_dp, link_status)) {
+					DRM_ERROR("Failed to get link status\n");
+					return;
+				}
+			} else {
+				/* channel EQ is fine */
+				return;
+			}
+		}
+
+		DRM_DEBUG_KMS("%s: channel EQ not ok, retraining\n",
+			intel_encoder->base.name);
 	}
+
+	intel_dp_retrain_link(intel_dp);
 }
 
 /*
