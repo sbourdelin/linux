@@ -7,7 +7,6 @@
 
 #include <asm/param.h>	/* for HZ */
 
-#include <linux/capability.h>
 #include <linux/threads.h>
 #include <linux/kernel.h>
 #include <linux/types.h>
