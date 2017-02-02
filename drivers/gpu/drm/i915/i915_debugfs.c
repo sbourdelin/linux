@@ -61,6 +61,21 @@ drm_add_fake_info_node(struct drm_minor *minor,
 	return 0;
 }
 
+static void seq_param_bool(struct seq_file *m, const char *name, param_bool x)
+{
+	seq_printf(m, "i915.%s=%s\n", name, yesno(x));
+}
+
+static void seq_param_int(struct seq_file *m, const char *name, param_int x)
+{
+	seq_printf(m, "i915.%s=%d\n", name, x);
+}
+
+static void seq_param_uint(struct seq_file *m, const char *name, param_uint x)
+{
+	seq_printf(m, "i915.%s=%u\n", name, x);
+}
+
 static int i915_capabilities(struct seq_file *m, void *data)
 {
 	struct drm_i915_private *dev_priv = node_to_i915(m->private);
@@ -69,9 +84,14 @@ static int i915_capabilities(struct seq_file *m, void *data)
 	seq_printf(m, "gen: %d\n", INTEL_GEN(dev_priv));
 	seq_printf(m, "platform: %s\n", intel_platform_name(info->platform));
 	seq_printf(m, "pch: %d\n", INTEL_PCH_TYPE(dev_priv));
+
 #define PRINT_FLAG(x)  seq_printf(m, #x ": %s\n", yesno(info->x))
 	DEV_INFO_FOR_EACH_FLAG(PRINT_FLAG);
 #undef PRINT_FLAG
+
+#define PRINT(T, x) seq_##T(m, #x, i915.x);
+	I915_PARAMS_FOR_EACH(PRINT);
+#undef PRINT
 
 	return 0;
 }
