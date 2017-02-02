@@ -4,6 +4,7 @@
 #include <linux/kernel.h>
 #include <linux/atomic.h>
 #include <linux/sched.h>
+#include <linux/gfp.h>
 
 /*
  * Routines for handling mm_structs
