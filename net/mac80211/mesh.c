@@ -469,9 +469,9 @@ int mesh_add_vht_cap_ie(struct ieee80211_sub_if_data *sdata,
 
 	sband = local->hw.wiphy->bands[band];
 	if (!sband->vht_cap.vht_supported ||
-	    sdata->vif.bss_conf.chandef.width == NL80211_CHAN_WIDTH_20_NOHT ||
-	    sdata->vif.bss_conf.chandef.width == NL80211_CHAN_WIDTH_5 ||
-	    sdata->vif.bss_conf.chandef.width == NL80211_CHAN_WIDTH_10)
+	    !(sdata->vif.bss_conf.chandef.width == NL80211_CHAN_WIDTH_80 ||
+	    sdata->vif.bss_conf.chandef.width == NL80211_CHAN_WIDTH_80P80 ||
+	    sdata->vif.bss_conf.chandef.width == NL80211_CHAN_WIDTH_160))
 		return 0;
 
 	if (skb_tailroom(skb) < 2 + sizeof(struct ieee80211_vht_cap))
@@ -506,9 +506,9 @@ int mesh_add_vht_oper_ie(struct ieee80211_sub_if_data *sdata,
 	vht_cap = &sband->vht_cap;
 
 	if (!vht_cap->vht_supported ||
-	    sdata->vif.bss_conf.chandef.width == NL80211_CHAN_WIDTH_20_NOHT ||
-	    sdata->vif.bss_conf.chandef.width == NL80211_CHAN_WIDTH_5 ||
-	    sdata->vif.bss_conf.chandef.width == NL80211_CHAN_WIDTH_10)
+	    !(sdata->vif.bss_conf.chandef.width == NL80211_CHAN_WIDTH_80 ||
+	    sdata->vif.bss_conf.chandef.width == NL80211_CHAN_WIDTH_80P80 ||
+	    sdata->vif.bss_conf.chandef.width == NL80211_CHAN_WIDTH_160))
 		return 0;
 
 	if (skb_tailroom(skb) < 2 + sizeof(struct ieee80211_vht_operation))
