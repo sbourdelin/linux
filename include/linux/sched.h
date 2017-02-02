@@ -46,7 +46,6 @@
 #include <linux/kcov.h>
 #include <linux/task_io_accounting.h>
 #include <linux/latencytop.h>
-#include <linux/cred.h>
 #include <linux/llist.h>
 #include <linux/uidgid.h>
 #include <linux/gfp.h>
