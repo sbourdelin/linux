@@ -28,7 +28,7 @@
    the loader.  We need to make sure that it is out of the way of the program
    that it will "exec", and that there is sufficient room for the brk.  */
 
-#define ELF_ET_DYN_BASE	0x20000000
+#define ELF_ET_DYN_BASE	(TASK_SIZE - PAGE_SIZE)
 
 #define ELF_CORE_EFLAGS (is_elf2_task() ? 2 : 0)
 
