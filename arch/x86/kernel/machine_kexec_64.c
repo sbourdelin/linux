@@ -337,7 +337,7 @@ void arch_crash_save_vmcoreinfo(void)
 #endif
 	vmcoreinfo_append_str("KERNELOFFSET=%lx\n",
 			      kaslr_offset());
-	VMCOREINFO_NUMBER(KERNEL_IMAGE_SIZE);
+	VMCOREINFO_NUMBER(KERNEL_MAPPING_SIZE);
 }
 
 /* arch-dependent functionality related to kexec file-based syscall */

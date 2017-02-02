@@ -468,7 +468,7 @@ NEXT_PAGE(level2_kernel_pgt)
 	 *  too.)
 	 */
 	PMDS(0, __PAGE_KERNEL_LARGE_EXEC,
-		KERNEL_IMAGE_SIZE/PMD_SIZE)
+		KERNEL_MAPPING_SIZE/PMD_SIZE)
 
 NEXT_PAGE(level2_fixmap_pgt)
 	.fill	506,8,0

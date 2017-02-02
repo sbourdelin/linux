@@ -42,6 +42,12 @@
  */
 #define KERNEL_IMAGE_SIZE	(512 * 1024 * 1024)
 
+/*
+ * Kernel mapping size is limited to 512 MB which is equal to kernel image
+ * size.
+ */
+#define KERNEL_MAPPING_SIZE	KERNEL_IMAGE_SIZE
+
 #ifndef __ASSEMBLY__
 
 /*

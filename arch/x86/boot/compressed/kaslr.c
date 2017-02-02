@@ -439,7 +439,7 @@ static void process_e820_entry(struct e820entry *entry,
 		return;
 
 	/* On 32-bit, ignore entries entirely above our maximum. */
-	if (IS_ENABLED(CONFIG_X86_32) && entry->addr >= KERNEL_IMAGE_SIZE)
+	if (IS_ENABLED(CONFIG_X86_32) && entry->addr >= KERNEL_MAPPING_SIZE)
 		return;
 
 	/* Ignore entries entirely below our minimum. */
@@ -469,8 +469,8 @@ static void process_e820_entry(struct e820entry *entry,
 
 		/* On 32-bit, reduce region size to fit within max size. */
 		if (IS_ENABLED(CONFIG_X86_32) &&
-		    region.start + region.size > KERNEL_IMAGE_SIZE)
-			region.size = KERNEL_IMAGE_SIZE - region.start;
+		    region.start + region.size > KERNEL_MAPPING_SIZE)
+			region.size = KERNEL_MAPPING_SIZE - region.start;
 
 		/* Return if region can't contain decompressed kernel */
 		if (region.size < image_size)
@@ -542,9 +542,9 @@ static unsigned long find_random_virt_addr(unsigned long minimum,
 	/*
 	 * There are how many CONFIG_PHYSICAL_ALIGN-sized slots
 	 * that can hold image_size within the range of minimum to
-	 * KERNEL_IMAGE_SIZE?
+	 * KERNEL_MAPPING_SIZE?
 	 */
-	slots = (KERNEL_IMAGE_SIZE - minimum - image_size) /
+	slots = (KERNEL_MAPPING_SIZE - minimum - image_size) /
 		 CONFIG_PHYSICAL_ALIGN + 1;
 
 	random_addr = kaslr_get_random_long("Virtual") % slots;

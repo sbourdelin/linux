@@ -18,7 +18,7 @@ unsigned long __phys_addr(unsigned long x)
 	if (unlikely(x > y)) {
 		x = y + phys_base;
 
-		VIRTUAL_BUG_ON(y >= KERNEL_IMAGE_SIZE);
+		VIRTUAL_BUG_ON(y >= KERNEL_MAPPING_SIZE);
 	} else {
 		x = y + (__START_KERNEL_map - PAGE_OFFSET);
 
@@ -35,7 +35,7 @@ unsigned long __phys_addr_symbol(unsigned long x)
 	unsigned long y = x - __START_KERNEL_map;
 
 	/* only check upper bounds since lower bounds will trigger carry */
-	VIRTUAL_BUG_ON(y >= KERNEL_IMAGE_SIZE);
+	VIRTUAL_BUG_ON(y >= KERNEL_MAPPING_SIZE);
 
 	return y + phys_base;
 }
@@ -50,7 +50,7 @@ bool __virt_addr_valid(unsigned long x)
 	if (unlikely(x > y)) {
 		x = y + phys_base;
 
-		if (y >= KERNEL_IMAGE_SIZE)
+		if (y >= KERNEL_MAPPING_SIZE)
 			return false;
 	} else {
 		x = y + (__START_KERNEL_map - PAGE_OFFSET);
