@@ -20,6 +20,68 @@
 #include "bnxt_xdp.h"
 
 #ifdef CONFIG_BNXT_XDP
+static int bnxt_xmit_xdp(struct bnxt *bp, struct bnxt_tx_ring_info *txr,
+			 struct page *page, dma_addr_t mapping, u32 offset,
+			 u32 len)
+{
+	struct bnxt_sw_tx_bd *tx_buf;
+	struct tx_bd_ext *txbd1;
+	struct tx_bd *txbd;
+	u32 flags;
+	u16 prod;
+
+	if (bnxt_tx_avail(bp, txr) < 2)
+		return -ENOSPC;
+
+	prod = txr->tx_prod;
+	txbd = &txr->tx_desc_ring[TX_RING(prod)][TX_IDX(prod)];
+
+	tx_buf = &txr->tx_buf_ring[prod];
+	tx_buf->page = page;
+	dma_unmap_addr_set(tx_buf, mapping, mapping);
+	flags = (len << TX_BD_LEN_SHIFT) | TX_BD_TYPE_LONG_TX_BD |
+		(2 << TX_BD_FLAGS_BD_CNT_SHIFT) | TX_BD_FLAGS_PACKET_END |
+		bnxt_lhint_arr[len >> 9];
+	txbd->tx_bd_len_flags_type = cpu_to_le32(flags);
+	txbd->tx_bd_opaque = prod;
+	txbd->tx_bd_haddr = cpu_to_le64(mapping + offset);
+
+	prod = NEXT_TX(prod);
+	txbd1 = (struct tx_bd_ext *)
+		&txr->tx_desc_ring[TX_RING(prod)][TX_IDX(prod)];
+
+	txbd1->tx_bd_hsize_lflags = cpu_to_le32(0);
+	txbd1->tx_bd_mss = cpu_to_le32(0);
+	txbd1->tx_bd_cfa_action = cpu_to_le32(0);
+	txbd1->tx_bd_cfa_meta = cpu_to_le32(0);
+
+	prod = NEXT_TX(prod);
+	txr->tx_prod = prod;
+	return 0;
+}
+
+void bnxt_tx_int_xdp(struct bnxt *bp, struct bnxt_napi *bnapi, int nr_pkts)
+{
+	struct bnxt_tx_ring_info *txr = bnapi->tx_ring;
+	struct device *dev = &bp->pdev->dev;
+	u16 cons = txr->tx_cons;
+	int i;
+
+	for (i = 0; i < nr_pkts; i++) {
+		struct bnxt_sw_tx_bd *tx_buf;
+
+		tx_buf = &txr->tx_buf_ring[cons];
+		cons = NEXT_TX(cons);
+		cons = NEXT_TX(cons);
+
+		dma_unmap_page(dev, dma_unmap_addr(tx_buf, mapping), PAGE_SIZE,
+			       bp->rx_dir);
+		__free_page(tx_buf->page);
+		tx_buf->page = NULL;
+	}
+	txr->tx_cons = cons;
+}
+
 /* returns the following:
  * true    - packet consumed by XDP and new buffer is allocated.
  * false   - packet should be passed to the stack.
@@ -61,6 +123,28 @@ bool bnxt_rx_xdp(struct bnxt *bp, struct bnxt_rx_ring_info *rxr, u16 cons,
 	case XDP_PASS:
 		return false;
 
+	case XDP_TX: {
+		struct bnxt_tx_ring_info *txr = rxr->bnapi->tx_ring;
+		int rc;
+
+		rc = bnxt_alloc_rx_data(bp, rxr, rxr->rx_prod, GFP_ATOMIC);
+		if (unlikely(rc)) {
+			trace_xdp_exception(bp->dev, xdp_prog, act);
+			bnxt_reuse_rx_data(rxr, cons, page);
+			return true;
+		}
+		dma_sync_single_for_device(&pdev->dev, mapping + offset, len,
+					   bp->rx_dir);
+		if (bnxt_xmit_xdp(bp, txr, page, mapping, offset, len)) {
+			trace_xdp_exception(bp->dev, xdp_prog, act);
+			dma_unmap_page(&bp->pdev->dev, mapping, PAGE_SIZE,
+				       bp->rx_dir);
+			__free_page(page);
+			return true;
+		}
+		*event |= BNXT_TX_EVENT;
+		return true;
+	}
 	default:
 		bpf_warn_invalid_xdp_action(act);
 		/* Fall thru */
@@ -153,5 +237,11 @@ int bnxt_xdp(struct net_device *dev, struct netdev_xdp *xdp)
 		break;
 	}
 	return rc;
+}
+
+#else
+
+void bnxt_tx_int_xdp(struct bnxt *bp, struct bnxt_napi *bnapi, int nr_pkts)
+{
 }
 #endif
