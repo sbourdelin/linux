@@ -44,7 +44,6 @@ typedef unsigned int param_uint;
 	func(param_int, enable_ppgtt); \
 	func(param_int, enable_execlists); \
 	func(param_int, enable_psr); \
-	func(param_uint, alpha_support); \
 	func(param_int, disable_power_well); \
 	func(param_int, enable_ips); \
 	func(param_int, invert_brightness); \
@@ -56,6 +55,7 @@ typedef unsigned int param_uint;
 	func(param_int, edp_vswing); \
 	func(param_uint, inject_load_failure); \
 	/* leave bools at the end to not create holes */ \
+	func(param_bool, alpha_support); \
 	func(param_bool, enable_cmd_parser); \
 	func(param_bool, enable_hangcheck); \
 	func(param_bool, fastboot); \
