@@ -2,7 +2,7 @@
 # Installing headers
 #
 # All headers under include/uapi, include/generated/uapi,
-# arch/<arch>/include/uapi/asm and arch/<arch>/include/generated/uapi/asm are
+# arch/<arch>/include/uapi and arch/<arch>/include/generated/uapi are
 # exported.
 # They are preprocessed to remove __KERNEL__ section of the file.
 #
@@ -28,7 +28,6 @@ include scripts/Kbuild.include
 installdir    := $(INSTALL_HDR_PATH)/$(subst uapi/,,$(_dst))
 
 subdirs       := $(patsubst $(srctree)/$(obj)/%/.,%,$(wildcard $(srctree)/$(obj)/*/.))
-subdirs       += $(subdir-y)
 header-files  := $(notdir $(wildcard $(srctree)/$(obj)/*.h))
 header-files  += $(notdir $(wildcard $(srctree)/$(obj)/*.agh))
 header-files  := $(filter-out $(header-n), $(header-files))
