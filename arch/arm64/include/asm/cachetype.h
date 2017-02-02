@@ -39,6 +39,12 @@
 
 extern unsigned long __icache_flags;
 
+extern bool __skip_dcache_pou;
+
+#define CLIDR_LOUIS_SHIFT	(21)
+#define CLIDR_LOUIS_MASK	(0x7)
+#define CLIDR_LOUIS(x)		(((x) >> CLIDR_LOUIS_SHIFT) & CLIDR_LOUIS_MASK)
+
 /*
  * NumSets, bits[27:13] - (Number of sets in cache) - 1
  * Associativity, bits[12:3] - (Associativity of cache) - 1

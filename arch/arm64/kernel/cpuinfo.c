@@ -50,6 +50,7 @@ static char *icache_policy_str[] = {
 };
 
 unsigned long __icache_flags;
+bool __skip_dcache_pou = true;
 
 static const char *const hwcap_str[] = {
 	"fp",
@@ -307,6 +308,25 @@ static void cpuinfo_detect_icache_policy(struct cpuinfo_arm64 *info)
 	pr_info("Detected %s I-cache on CPU%d\n", icache_policy_str[l1ip], cpu);
 }
 
+/*
+ * Check if all the data cache levels below LoUIS doesn't support WB.
+ * Return value 1 if any one of cache level below LoUIS has WB cache
+ * else return value 0.
+ */
+static bool is_dcache_below_pou_wt(void)
+{
+	u32 louis = CLIDR_LOUIS(read_sysreg(clidr_el1));
+	u32 lvl, csidr;
+
+	for (lvl = 0; lvl < louis; lvl++) {
+		csidr = cache_get_ccsidr(lvl << 1);
+		if (csidr & CCSIDR_EL1_WRITE_BACK)
+			return false;
+	}
+
+	return true;
+}
+
 static void __cpuinfo_store_cpu(struct cpuinfo_arm64 *info)
 {
 	info->reg_cntfrq = arch_timer_get_cntfrq();
@@ -347,6 +367,9 @@ static void __cpuinfo_store_cpu(struct cpuinfo_arm64 *info)
 	}
 
 	cpuinfo_detect_icache_policy(info);
+
+	if (__skip_dcache_pou)
+		__skip_dcache_pou = is_dcache_below_pou_wt();
 }
 
 void cpuinfo_store_cpu(void)

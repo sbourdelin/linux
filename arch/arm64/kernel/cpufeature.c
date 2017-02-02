@@ -763,6 +763,12 @@ static bool has_no_fpsimd(const struct arm64_cpu_capabilities *entry, int __unus
 					ID_AA64PFR0_FP_SHIFT) < 0;
 }
 
+static bool check_dcache_pou_skipped(const struct arm64_cpu_capabilities *entry,
+				     int __unused)
+{
+	return __skip_dcache_pou;
+}
+
 static const struct arm64_cpu_capabilities arm64_features[] = {
 	{
 		.desc = "GIC system register CPU interface",
@@ -855,6 +861,12 @@ static const struct arm64_cpu_capabilities arm64_features[] = {
 		.def_scope = SCOPE_SYSTEM,
 		.min_field_value = 0,
 		.matches = has_no_fpsimd,
+	},
+	{
+		.desc = "Skip data cache clean PoU operation",
+		.capability = ARM64_SKIP_DCACHE_POU,
+		.def_scope = SCOPE_SYSTEM,
+		.matches = check_dcache_pou_skipped,
 	},
 	{},
 };
