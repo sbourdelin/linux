@@ -27,6 +27,7 @@ void __raw_spin_lock_init(raw_spinlock_t *lock, const char *name,
 	lock->magic = SPINLOCK_MAGIC;
 	lock->owner = SPINLOCK_OWNER_INIT;
 	lock->owner_cpu = -1;
+	lock->lockup = 0;
 }
 
 EXPORT_SYMBOL(__raw_spin_lock_init);
@@ -101,6 +102,24 @@ static inline void debug_spin_unlock(raw_spinlock_t *lock)
 							lock, "wrong CPU");
 	lock->owner = SPINLOCK_OWNER_INIT;
 	lock->owner_cpu = -1;
+	lock->lockup = 0;
+}
+
+static inline void __spin_lockup(raw_spinlock_t *lock)
+{
+	/*
+	 * lockup suspected:
+	 *
+	 * Only one of the lock waiters will be allowed to print the lockup
+	 * message in order to avoid an avalanche of lockup and backtrace
+	 * messages from different lock waiters of the same lock.
+	 */
+	if (!xchg(&lock->lockup, 1)) {
+		spin_dump(lock, "lockup suspected");
+#ifdef CONFIG_SMP
+		trigger_all_cpu_backtrace();
+#endif
+	}
 }
 
 static void __spin_lock_debug(raw_spinlock_t *lock)
@@ -113,11 +132,8 @@ static void __spin_lock_debug(raw_spinlock_t *lock)
 			return;
 		__delay(1);
 	}
-	/* lockup suspected: */
-	spin_dump(lock, "lockup suspected");
-#ifdef CONFIG_SMP
-	trigger_all_cpu_backtrace();
-#endif
+
+	__spin_lockup(lock);
 
 	/*
 	 * The trylock above was causing a livelock.  Give the lower level arch

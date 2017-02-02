@@ -23,7 +23,7 @@ typedef struct raw_spinlock {
 	unsigned int break_lock;
 #endif
 #ifdef CONFIG_DEBUG_SPINLOCK
-	unsigned int magic, owner_cpu;
+	unsigned int magic, owner_cpu, lockup;
 	void *owner;
 #endif
 #ifdef CONFIG_DEBUG_LOCK_ALLOC
@@ -45,6 +45,7 @@ typedef struct raw_spinlock {
 # define SPIN_DEBUG_INIT(lockname)		\
 	.magic = SPINLOCK_MAGIC,		\
 	.owner_cpu = -1,			\
+	.lockup = 0,				\
 	.owner = SPINLOCK_OWNER_INIT,
 #else
 # define SPIN_DEBUG_INIT(lockname)
