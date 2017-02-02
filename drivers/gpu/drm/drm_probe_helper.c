@@ -298,8 +298,8 @@ int drm_helper_probe_single_connector_modes(struct drm_connector *connector,
 	dev->mode_config.poll_running = drm_kms_helper_poll;
 
 	if (connector->status == connector_status_disconnected) {
-		DRM_DEBUG_KMS("[CONNECTOR:%d:%s] disconnected\n",
-			connector->base.id, connector->name);
+		DRM_ERROR("[CONNECTOR:%d:%s] disconnected\n",
+			  connector->base.id, connector->name);
 		drm_mode_connector_update_edid_property(connector, NULL);
 		verbose_prune = false;
 		goto prune;
