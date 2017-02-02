@@ -1050,6 +1050,9 @@ static int ipoib_start_xmit(struct sk_buff *skb, struct net_device *dev)
 	struct ipoib_header *header;
 	unsigned long flags;
 
+	/* we can held the skb for along time; avoid hanging ct */
+	nf_reset(skb);
+
 	phdr = (struct ipoib_pseudo_header *) skb->data;
 	skb_pull(skb, sizeof(*phdr));
 	header = (struct ipoib_header *) skb->data;
