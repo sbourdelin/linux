@@ -1264,7 +1264,7 @@ static inline struct sk_buff *bnxt_tpa_end(struct bnxt *bp,
 					   u32 *raw_cons,
 					   struct rx_tpa_end_cmp *tpa_end,
 					   struct rx_tpa_end_cmp_ext *tpa_end1,
-					   bool *agg_event)
+					   u8 *event)
 {
 	struct bnxt_cp_ring_info *cpr = &bnapi->cp_ring;
 	struct bnxt_rx_ring_info *rxr = bnapi->rx_ring;
@@ -1299,7 +1299,7 @@ static inline struct sk_buff *bnxt_tpa_end(struct bnxt *bp,
 		if (!bnxt_agg_bufs_valid(bp, cpr, agg_bufs, raw_cons))
 			return ERR_PTR(-EBUSY);
 
-		*agg_event = true;
+		*event |= BNXT_AGG_EVENT;
 		cp_cons = NEXT_CMP(cp_cons);
 	}
 
@@ -1385,7 +1385,7 @@ static inline struct sk_buff *bnxt_tpa_end(struct bnxt *bp,
  * -EIO    - packet aborted due to hw error indicated in BD
  */
 static int bnxt_rx_pkt(struct bnxt *bp, struct bnxt_napi *bnapi, u32 *raw_cons,
-		       bool *agg_event)
+		       u8 *event)
 {
 	struct bnxt_cp_ring_info *cpr = &bnapi->cp_ring;
 	struct bnxt_rx_ring_info *rxr = bnapi->rx_ring;
@@ -1426,8 +1426,7 @@ static int bnxt_rx_pkt(struct bnxt *bp, struct bnxt_napi *bnapi, u32 *raw_cons,
 	} else if (cmp_type == CMP_TYPE_RX_L2_TPA_END_CMP) {
 		skb = bnxt_tpa_end(bp, bnapi, &tmp_raw_cons,
 				   (struct rx_tpa_end_cmp *)rxcmp,
-				   (struct rx_tpa_end_cmp_ext *)rxcmp1,
-				   agg_event);
+				   (struct rx_tpa_end_cmp_ext *)rxcmp1, event);
 
 		if (unlikely(IS_ERR(skb)))
 			return -EBUSY;
@@ -1461,7 +1460,7 @@ static int bnxt_rx_pkt(struct bnxt *bp, struct bnxt_napi *bnapi, u32 *raw_cons,
 			return -EBUSY;
 
 		cp_cons = NEXT_CMP(cp_cons);
-		*agg_event = true;
+		*event |= BNXT_AGG_EVENT;
 	}
 
 	rx_buf->data = NULL;
@@ -1714,8 +1713,7 @@ static int bnxt_poll_work(struct bnxt *bp, struct bnxt_napi *bnapi, int budget)
 	u32 cons;
 	int tx_pkts = 0;
 	int rx_pkts = 0;
-	bool rx_event = false;
-	bool agg_event = false;
+	u8 event = 0;
 	struct tx_cmp *txcmp;
 
 	while (1) {
@@ -1737,12 +1735,12 @@ static int bnxt_poll_work(struct bnxt *bp, struct bnxt_napi *bnapi, int budget)
 			if (unlikely(tx_pkts > bp->tx_wake_thresh))
 				rx_pkts = budget;
 		} else if ((TX_CMP_TYPE(txcmp) & 0x30) == 0x10) {
-			rc = bnxt_rx_pkt(bp, bnapi, &raw_cons, &agg_event);
+			rc = bnxt_rx_pkt(bp, bnapi, &raw_cons, &event);
 			if (likely(rc >= 0))
 				rx_pkts += rc;
 			else if (rc == -EBUSY)	/* partial completion */
 				break;
-			rx_event = true;
+			event |= BNXT_RX_EVENT;
 		} else if (unlikely((TX_CMP_TYPE(txcmp) ==
 				     CMPL_BASE_TYPE_HWRM_DONE) ||
 				    (TX_CMP_TYPE(txcmp) ==
@@ -1767,12 +1765,12 @@ static int bnxt_poll_work(struct bnxt *bp, struct bnxt_napi *bnapi, int budget)
 	if (tx_pkts)
 		bnxt_tx_int(bp, bnapi, tx_pkts);
 
-	if (rx_event) {
+	if (event & BNXT_RX_EVENT) {
 		struct bnxt_rx_ring_info *rxr = bnapi->rx_ring;
 
 		writel(DB_KEY_RX | rxr->rx_prod, rxr->rx_doorbell);
 		writel(DB_KEY_RX | rxr->rx_prod, rxr->rx_doorbell);
-		if (agg_event) {
+		if (event & BNXT_AGG_EVENT) {
 			writel(DB_KEY_RX | rxr->rx_agg_prod,
 			       rxr->rx_agg_doorbell);
 			writel(DB_KEY_RX | rxr->rx_agg_prod,
@@ -1793,7 +1791,7 @@ static int bnxt_poll_nitroa0(struct napi_struct *napi, int budget)
 	u32 cp_cons, tmp_raw_cons;
 	u32 raw_cons = cpr->cp_raw_cons;
 	u32 rx_pkts = 0;
-	bool agg_event = false;
+	u8 event = 0;
 
 	while (1) {
 		int rc;
@@ -1817,7 +1815,7 @@ static int bnxt_poll_nitroa0(struct napi_struct *napi, int budget)
 			rxcmp1->rx_cmp_cfa_code_errors_v2 |=
 				cpu_to_le32(RX_CMPL_ERRORS_CRC_ERROR);
 
-			rc = bnxt_rx_pkt(bp, bnapi, &raw_cons, &agg_event);
+			rc = bnxt_rx_pkt(bp, bnapi, &raw_cons, &event);
 			if (likely(rc == -EIO))
 				rx_pkts++;
 			else if (rc == -EBUSY)	/* partial completion */
@@ -1840,7 +1838,7 @@ static int bnxt_poll_nitroa0(struct napi_struct *napi, int budget)
 	writel(DB_KEY_RX | rxr->rx_prod, rxr->rx_doorbell);
 	writel(DB_KEY_RX | rxr->rx_prod, rxr->rx_doorbell);
 
-	if (agg_event) {
+	if (event & BNXT_AGG_EVENT) {
 		writel(DB_KEY_RX | rxr->rx_agg_prod, rxr->rx_agg_doorbell);
 		writel(DB_KEY_RX | rxr->rx_agg_prod, rxr->rx_agg_doorbell);
 	}
