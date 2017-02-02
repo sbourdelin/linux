@@ -329,7 +329,7 @@ static int ext4_dax_pfn_mkwrite(struct vm_fault *vmf)
 static const struct vm_operations_struct ext4_dax_vm_ops = {
 	.fault		= ext4_dax_fault,
 	.huge_fault	= ext4_dax_fault,
-	.page_mkwrite	= ext4_dax_fault,
+	.page_mkwrite	= ext4_dax_huge_fault,
 	.pfn_mkwrite	= ext4_dax_pfn_mkwrite,
 };
 #else
