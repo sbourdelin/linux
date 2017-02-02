@@ -265,6 +265,7 @@ struct brcmf_pciedev_info {
 	void (*write_ptr)(struct brcmf_pciedev_info *devinfo, u32 mem_offset,
 			  u16 value);
 	struct brcmf_mp_device *settings;
+	struct brcmf_pub *pub;
 };
 
 struct brcmf_pcie_ringbuf {
@@ -1564,14 +1565,18 @@ static void brcmf_pcie_release_resource(struct brcmf_pciedev_info *devinfo)
 
 static int brcmf_pcie_attach_bus(struct brcmf_pciedev_info *devinfo)
 {
+	struct device *dev = &devinfo->pdev->dev;
+	struct brcmf_bus *bus = dev_get_drvdata(dev);
 	int ret;
 
 	/* Attach to the common driver interface */
-	ret = brcmf_attach(&devinfo->pdev->dev, devinfo->settings);
+	ret = brcmf_attach(dev, devinfo->settings);
 	if (ret) {
 		brcmf_err("brcmf_attach failed\n");
 	} else {
-		ret = brcmf_bus_started(&devinfo->pdev->dev);
+		devinfo->pub = bus->drvr;
+
+		ret = brcmf_bus_started(dev);
 		if (ret)
 			brcmf_err("dongle is not responding\n");
 	}
