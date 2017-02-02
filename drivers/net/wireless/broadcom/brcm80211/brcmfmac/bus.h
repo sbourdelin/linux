@@ -17,6 +17,8 @@
 #ifndef BRCMFMAC_BUS_H
 #define BRCMFMAC_BUS_H
 
+#include <linux/device.h>
+
 #include "debug.h"
 
 /* IDs of the 6 default common rings of msgbuf protocol */
