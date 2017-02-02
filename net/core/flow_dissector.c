@@ -113,6 +113,68 @@ __be32 __skb_flow_get_ports(const struct sk_buff *skb, int thoff, u8 ip_proto,
 }
 EXPORT_SYMBOL(__skb_flow_get_ports);
 
+static bool skb_flow_dissect_nd(const struct sk_buff *skb,
+				struct flow_dissector_key_nd *key_nd,
+				void *data, int nhoff, int hlen,
+				int icmp_len)
+{
+	const struct nd_msg *nd;
+	struct nd_msg *_nd;
+	int off;
+
+	nd = __skb_header_pointer(skb, nhoff, sizeof(_nd), data, hlen, &_nd);
+	if (!nd)
+		return false;
+
+	key_nd->target = nd->target;
+
+	off = sizeof(_nd);
+	while (icmp_len - off >= sizeof(struct nd_opt_hdr) + ETH_ALEN) {
+		const struct nd_opt_hdr *opt_hdr;
+		struct nd_opt_hdr *_opt_hdr;
+		unsigned char *ll_addr = NULL;
+		int opt_data_len;
+
+		opt_hdr = __skb_header_pointer(skb, nhoff + off,
+					       sizeof(_opt_hdr), data,
+					       hlen, &_opt_hdr);
+		if (!opt_hdr)
+			return false;
+		opt_data_len = opt_hdr->nd_opt_len * 8 - sizeof(_opt_hdr);
+		if (opt_data_len < 0)
+			return false;
+		off += sizeof(_opt_hdr);
+
+		if (opt_data_len == ETH_ALEN) {
+			if (opt_hdr->nd_opt_type == ND_OPT_SOURCE_LL_ADDR)
+				ll_addr = key_nd->sll;
+			else if (opt_hdr->nd_opt_type == ND_OPT_TARGET_LL_ADDR)
+				ll_addr = key_nd->tll;
+		}
+
+		if (ll_addr) {
+			const unsigned char *opt_data;
+			unsigned char _opt_data[ETH_ALEN];
+
+			/* Fail if the option is a duplicate */
+			if (!is_zero_ether_addr(ll_addr))
+				return false;
+
+			opt_data = __skb_header_pointer(skb, nhoff + off,
+							opt_data_len, data,
+							hlen, &_opt_data);
+			if (!opt_data)
+				return false;
+
+			ether_addr_copy(ll_addr, opt_data);
+		}
+
+		off += opt_data_len;
+	}
+
+	return true;
+}
+
 /**
  * __skb_flow_dissect - extract the flow_keys struct and return it
  * @skb: sk_buff to extract the flow from, can be NULL if the rest are specified
@@ -141,9 +203,11 @@ bool __skb_flow_dissect(const struct sk_buff *skb,
 	struct flow_dissector_key_arp *key_arp;
 	struct flow_dissector_key_ports *key_ports;
 	struct flow_dissector_key_icmp *key_icmp;
+	struct flow_dissector_key_nd *key_nd;
 	struct flow_dissector_key_tags *key_tags;
 	struct flow_dissector_key_vlan *key_vlan;
 	struct flow_dissector_key_keyid *key_keyid;
+	int ipv6_payload_len = 0;
 	bool skip_vlan = false;
 	u8 ip_proto = 0;
 	bool ret;
@@ -232,6 +296,7 @@ ipv6:
 			goto out_bad;
 
 		ip_proto = iph->nexthdr;
+		ipv6_payload_len = ntohs(iph->payload_len);
 		nhoff += sizeof(struct ipv6hdr);
 
 		if (dissector_uses_key(flow_dissector,
@@ -556,6 +621,7 @@ ip_proto_again:
 	case NEXTHDR_HOP:
 	case NEXTHDR_ROUTING:
 	case NEXTHDR_DEST: {
+		int hdr_ext_len;
 		u8 _opthdr[2], *opthdr;
 
 		if (proto != htons(ETH_P_IPV6))
@@ -567,7 +633,9 @@ ip_proto_again:
 			goto out_bad;
 
 		ip_proto = opthdr[0];
-		nhoff += (opthdr[1] + 1) << 3;
+		hdr_ext_len = (opthdr[1] + 1) << 3;
+		nhoff += hdr_ext_len;
+		ipv6_payload_len -= hdr_ext_len;
 
 		goto ip_proto_again;
 	}
@@ -586,6 +654,7 @@ ip_proto_again:
 		key_control->flags |= FLOW_DIS_IS_FRAGMENT;
 
 		nhoff += sizeof(_fh);
+		ipv6_payload_len -= sizeof(_fh);
 		ip_proto = fh->nexthdr;
 
 		if (!(fh->frag_off & htons(IP6_OFFSET))) {
@@ -633,6 +702,18 @@ ip_proto_again:
 						     FLOW_DISSECTOR_KEY_ICMP,
 						     target_container);
 		key_icmp->icmp = skb_flow_get_be16(skb, nhoff, data, hlen);
+
+		if (dissector_uses_key(flow_dissector, FLOW_DISSECTOR_KEY_ND) &&
+		    ip_proto == IPPROTO_IPV6 && key_icmp->code == 0 &&
+		    (key_icmp->type == NDISC_NEIGHBOUR_SOLICITATION ||
+		     key_icmp->type == NDISC_NEIGHBOUR_ADVERTISEMENT)) {
+			key_nd = skb_flow_dissector_target(flow_dissector,
+							   FLOW_DISSECTOR_KEY_ND,
+							   target_container);
+			if (!(skb_flow_dissect_nd(skb, key_nd, data, nhoff,
+						  hlen, ipv6_payload_len)))
+				goto out_bad;
+		}
 	}
 
 out_good:

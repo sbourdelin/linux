@@ -140,6 +140,19 @@ struct flow_dissector_key_icmp {
 };
 
 /**
+ * flow_dissector_key_nd:
+ *	@ports: neighbour discovery fields
+ *		target: target IP address
+ *		sll: source link-layer address
+ *		tll: target link-layer address
+ */
+struct flow_dissector_key_nd {
+	struct in6_addr target;
+	unsigned char sll[ETH_ALEN];
+	unsigned char tll[ETH_ALEN];
+};
+
+/**
  * struct flow_dissector_key_eth_addrs:
  * @src: source Ethernet address
  * @dst: destination Ethernet address
@@ -157,6 +170,7 @@ enum flow_dissector_key_id {
 	FLOW_DISSECTOR_KEY_IPV6_ADDRS, /* struct flow_dissector_key_ipv6_addrs */
 	FLOW_DISSECTOR_KEY_PORTS, /* struct flow_dissector_key_ports */
 	FLOW_DISSECTOR_KEY_ICMP, /* struct flow_dissector_key_icmp */
+	FLOW_DISSECTOR_KEY_ND, /* struct flow_dissector_key_nd */
 	FLOW_DISSECTOR_KEY_ETH_ADDRS, /* struct flow_dissector_key_eth_addrs */
 	FLOW_DISSECTOR_KEY_TIPC_ADDRS, /* struct flow_dissector_key_tipc_addrs */
 	FLOW_DISSECTOR_KEY_ARP, /* struct flow_dissector_key_arp */
