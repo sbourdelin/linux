@@ -174,6 +174,9 @@ struct intel_guc {
 
 	/* To serialize the intel_guc_send actions */
 	struct mutex send_mutex;
+
+	/* GuC's FW specific send function */
+	int (*send)(struct intel_guc *guc, const u32 *data, u32 len);
 };
 
 struct intel_huc {
@@ -185,8 +188,12 @@ struct intel_huc {
 
 /* intel_uc.c */
 void intel_uc_init_early(struct drm_i915_private *dev_priv);
-int intel_guc_send(struct intel_guc *guc, const u32 *action, u32 len);
 int intel_guc_sample_forcewake(struct intel_guc *guc);
+
+static inline int intel_guc_send(struct intel_guc *guc, const u32 *action, u32 len)
+{
+	return guc->send(guc, action, len);
+}
 
 /* intel_guc_loader.c */
 extern void intel_guc_init(struct drm_i915_private *dev_priv);
