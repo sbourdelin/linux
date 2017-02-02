@@ -902,7 +902,8 @@ static int _nbu2ss_epn_out_pio(
 		/* Copy of every four bytes */
 		for (i = 0; i < iWordLength; i++) {
 			pBuf32->dw =
-			_nbu2ss_readl(&preg->EP_REGS[ep->epnum - 1].EP_READ);
+				_nbu2ss_readl(
+					&preg->EP_REGS[ep->epnum - 1].EP_READ);
 			pBuf32++;
 		}
 		result = iWordLength * sizeof(u32);
@@ -912,7 +913,8 @@ static int _nbu2ss_epn_out_pio(
 	if (data > 0) {
 		/*---------------------------------------------------------*/
 		/* Copy of fraction byte */
-		Temp32.dw = _nbu2ss_readl(&preg->EP_REGS[ep->epnum - 1].EP_READ);
+		Temp32.dw =
+			_nbu2ss_readl(&preg->EP_REGS[ep->epnum - 1].EP_READ);
 		for (i = 0 ; i < data ; i++)
 			pBuf32->byte.DATA[i] = Temp32.byte.DATA[i];
 		result += data;
@@ -977,8 +979,8 @@ static int _nbu2ss_epn_out_transfer(
 
 	/*-------------------------------------------------------------*/
 	/* Receive Length */
-	iRecvLength
-		= _nbu2ss_readl(&preg->EP_REGS[num].EP_LEN_DCNT) & EPn_LDATA;
+	iRecvLength =
+		_nbu2ss_readl(&preg->EP_REGS[num].EP_LEN_DCNT) & EPn_LDATA;
 
 	if (iRecvLength != 0) {
 		result = _nbu2ss_epn_out_data(udc, ep, req, iRecvLength);
@@ -2651,7 +2653,8 @@ static int nbu2ss_ep_queue(
 	}
 
 	req = container_of(_req, struct nbu2ss_req, req);
-	if (unlikely(!_req->complete || !_req->buf || !list_empty(&req->queue))) {
+	if (unlikely(!_req->complete || !_req->buf
+			|| !list_empty(&req->queue))) {
 		if (!_req->complete)
 			pr_err("udc: %s --- !_req->complete\n", __func__);
 
