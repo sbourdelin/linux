@@ -1266,8 +1266,14 @@ int fwnode_graph_parse_endpoint(struct fwnode_handle *fwnode,
 	 * If they don't then the default value 0 is used.
 	 */
 	if (is_acpi_node(port_fwnode)) {
+		struct fwnode_handle *iter;
+
 		fwnode_property_read_u32(port_fwnode, "port", &endpoint->port);
-		fwnode_property_read_u32(fwnode, "endpoint", &endpoint->id);
+
+		for (iter = fwnode_get_next_child_node(port_fwnode, NULL);
+		     iter != fwnode;
+		     iter = fwnode_get_next_child_node(port_fwnode, iter))
+			endpoint->id++;
 	} else {
 		fwnode_property_read_u32(port_fwnode, "reg", &endpoint->port);
 		fwnode_property_read_u32(fwnode, "reg", &endpoint->id);
