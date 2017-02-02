@@ -706,6 +706,40 @@ fsmap_sizeof(
 #define FMR_OWN_INODES		(-7ULL)	/* inodes */
 #define FMR_OWN_DEFECTIVE	(-10ULL) /* bad blocks */
 
+/* ext4fs geometry.  Most of the fields are the same as the XFS version. */
+struct ext4_fsop_geom {
+	__u32		blocksize;	/* filesystem (data) block size */
+	__u32		inodecount;	/* inode count			*/
+	__u32		agblocks;	/* fsblocks in an AG		*/
+	__u32		agcount;	/* number of allocation groups	*/
+	__u32		logblocks;	/* fsblocks in the log		*/
+	__u32		resvblocks;	/* number of reserved blocks	*/
+	__u32		inodesize;	/* inode size in bytes		*/
+	__u32		agiblocks;	/* inode blocks per AG		*/
+	__u64		datablocks;	/* fsblocks in data subvolume	*/
+	__u64		resv64[3];
+	unsigned char	uuid[16];	/* unique id of the filesystem	*/
+	__u32		sunit;		/* stripe unit, fsblocks	*/
+	__u32		swidth;		/* stripe width, fsblocks	*/
+	__s32		version;	/* structure version		*/
+	__u32		flags;		/* superblock version flags	*/
+	__u32		resv32[4];
+};
+
+#define EXT4_FSOP_GEOM_VERSION	0
+
+#define EXT4_FSOP_GEOM_FLAGS_ATTR	0x00001	/* attributes in use	 */
+#define EXT4_FSOP_GEOM_FLAGS_NLINK	0x00002	/* 32-bit nlink values	 */
+#define EXT4_FSOP_GEOM_FLAGS_QUOTA	0x00004	/* quotas enabled	 */
+#define EXT4_FSOP_GEOM_FLAGS_PROJQ	0x00008	/* project quotas	 */
+#define EXT4_FSOP_GEOM_FLAGS_METACRC	0x00010	/* metadata checksums	 */
+#define EXT4_FSOP_GEOM_FLAGS_FTYPE	0x00020	/* inode directory types */
+#define EXT4_FSOP_GEOM_FLAGS_64BIT	0x00040	/* 64-bit support	 */
+#define EXT4_FSOP_GEOM_FLAGS_INLINEDATA	0x00080	/* inline data		 */
+#define EXT4_FSOP_GEOM_FLAGS_ENCRYPT	0x00100	/* encrypted files	 */
+#define EXT4_FSOP_GEOM_FLAGS_LARGEDIR	0x00200	/* large directories	 */
+#define EXT4_FSOP_GEOM_FLAGS_BIGALLOC	0x00400	/* bigalloc		 */
+
 /*
  * ioctl commands
  */
@@ -731,6 +765,7 @@ fsmap_sizeof(
 #define EXT4_IOC_GET_ENCRYPTION_PWSALT	FS_IOC_GET_ENCRYPTION_PWSALT
 #define EXT4_IOC_GET_ENCRYPTION_POLICY	FS_IOC_GET_ENCRYPTION_POLICY
 #define EXT4_IOC_GETFSMAP		_IOWR('X', 59, struct fsmap_head)
+#define EXT4_IOC_FSGEOMETRY		_IOR ('f', 19, struct ext4_fsop_geom)
 
 #ifndef FS_IOC_FSGETXATTR
 /* Until the uapi changes get merged for project quota... */
