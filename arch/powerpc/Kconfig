@@ -22,6 +22,38 @@ config MMU
 	bool
 	default y
 
+config ARCH_MMAP_RND_BITS_MIN
+       default 5 if PPC_256K_PAGES && 32BIT
+       default 12 if PPC_256K_PAGES && 64BIT
+       default 7 if PPC_64K_PAGES && 32BIT
+       default 14 if PPC_64K_PAGES && 64BIT
+       default 9 if PPC_16K_PAGES && 32BIT
+       default 16 if PPC_16K_PAGES && 64BIT
+       default 11 if PPC_4K_PAGES && 32BIT
+       default 18 if PPC_4K_PAGES && 64BIT
+
+# max bits determined by the following formula:
+#  VA_BITS - PAGE_SHIFT - 4
+#  for e.g for 64K page and 64BIT = 48 - 16 - 4 = 28
+config ARCH_MMAP_RND_BITS_MAX
+       default 10 if PPC_256K_PAGES && 32BIT
+       default 26 if PPC_256K_PAGES && 64BIT
+       default 12 if PPC_64K_PAGES && 32BIT
+       default 28 if PPC_64K_PAGES && 64BIT
+       default 14 if PPC_16K_PAGES && 32BIT
+       default 30 if PPC_16K_PAGES && 64BIT
+       default 16 if PPC_4K_PAGES && 32BIT
+       default 32 if PPC_4K_PAGES && 64BIT
+
+config ARCH_MMAP_RND_COMPAT_BITS_MIN
+       default 5 if PPC_256K_PAGES
+       default 7 if PPC_64K_PAGES
+       default 9 if PPC_16K_PAGES
+       default 11
+
+config ARCH_MMAP_RND_COMPAT_BITS_MAX
+       default 16
+
 config HAVE_SETUP_PER_CPU_AREA
 	def_bool PPC64
 
@@ -100,6 +132,8 @@ config PPC
 	select HAVE_EFFICIENT_UNALIGNED_ACCESS if !(CPU_LITTLE_ENDIAN && POWER7_CPU)
 	select HAVE_KPROBES
 	select HAVE_ARCH_KGDB
+	select HAVE_ARCH_MMAP_RND_BITS
+	select HAVE_ARCH_MMAP_RND_COMPAT_BITS if COMPAT
 	select HAVE_KRETPROBES
 	select HAVE_ARCH_TRACEHOOK
 	select HAVE_MEMBLOCK
