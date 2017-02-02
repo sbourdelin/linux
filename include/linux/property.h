@@ -13,7 +13,9 @@
 #ifndef _LINUX_PROPERTY_H_
 #define _LINUX_PROPERTY_H_
 
+#include <linux/device.h>
 #include <linux/fwnode.h>
+#include <linux/of.h>
 #include <linux/types.h>
 
 struct device;
@@ -272,5 +274,16 @@ struct fwnode_handle *fwnode_graph_get_remote_port(
 	struct fwnode_handle *fwnode);
 struct fwnode_handle *fwnode_graph_get_remote_endpoint(
 	struct fwnode_handle *fwnode);
+
+static inline struct fwnode_handle *device_fwnode_handle(struct device *dev)
+{
+	if (dev->of_node)
+		return of_fwnode_handle(dev->of_node);
+	else
+		return dev->fwnode;
+}
+
+int fwnode_graph_parse_endpoint(struct fwnode_handle *fwnode,
+				struct fwnode_endpoint *endpoint);
 
 #endif /* _LINUX_PROPERTY_H_ */
