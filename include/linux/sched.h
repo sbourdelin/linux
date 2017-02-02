@@ -2384,9 +2384,6 @@ extern long sched_getaffinity(pid_t pid, struct cpumask *mask);
 extern struct task_group root_task_group;
 #endif /* CONFIG_CGROUP_SCHED */
 
-extern int task_can_switch_user(struct user_struct *up,
-					struct task_struct *tsk);
-
 #ifdef CONFIG_TASK_XACCT
 static inline void add_rchar(struct task_struct *tsk, ssize_t amt)
 {
