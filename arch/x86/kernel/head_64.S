@@ -458,14 +458,12 @@ NEXT_PAGE(level3_kernel_pgt)
 
 NEXT_PAGE(level2_kernel_pgt)
 	/*
-	 * 512 MB kernel mapping. We spend a full page on this pagetable
-	 * anyway.
+	 * 1 GB kernel mapping. We spend a full page on this pagetable.
 	 *
-	 * The kernel code+data+bss must not be bigger than that.
+	 * The kernel image size including code+data+bss must not be bigger
+	 * than this.
 	 *
-	 * (NOTE: at +512MB starts the module area, see MODULES_VADDR.
-	 *  If you want to increase this then increase MODULES_VADDR
-	 *  too.)
+	 * (NOTE: at +1GB starts the module area, see MODULES_VADDR.
 	 */
 	PMDS(0, __PAGE_KERNEL_LARGE_EXEC,
 		KERNEL_MAPPING_SIZE/PMD_SIZE)
