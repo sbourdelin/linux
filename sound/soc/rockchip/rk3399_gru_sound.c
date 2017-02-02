@@ -22,6 +22,7 @@
 #include <linux/gpio.h>
 #include <linux/of_gpio.h>
 #include <linux/delay.h>
+#include <linux/property.h>
 #include <linux/spi/spi.h>
 #include <linux/input.h>
 #include <sound/core.h>

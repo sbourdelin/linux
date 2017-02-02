@@ -34,6 +34,7 @@
 #include <linux/input/touchscreen.h>
 #include <linux/platform_data/ad7879.h>
 #include <linux/module.h>
+#include <linux/property.h>
 #include "ad7879.h"
 
 #define AD7879_REG_ZEROS		0
