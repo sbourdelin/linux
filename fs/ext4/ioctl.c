@@ -18,6 +18,8 @@
 #include <linux/uaccess.h>
 #include "ext4_jbd2.h"
 #include "ext4.h"
+#include "fsmap.h"
+#include <trace/events/ext4.h>
 
 /**
  * Swap memory between @a and @b for @len bytes.
@@ -442,6 +444,108 @@ static inline unsigned long ext4_xflags_to_iflags(__u32 xflags)
 	return iflags;
 }
 
+struct getfsmap_info {
+	struct super_block	*sb;
+	struct fsmap __user	*data;
+	__u32			last_flags;
+};
+
+static int
+ext4_getfsmap_format(
+	struct ext4_fsmap	*xfm,
+	void			*priv)
+{
+	struct getfsmap_info	*info = priv;
+	struct fsmap		fm;
+
+	trace_ext4_getfsmap_mapping(info->sb, xfm->fmr_device,
+			xfm->fmr_physical, xfm->fmr_length, xfm->fmr_owner,
+			0, xfm->fmr_flags);
+
+	info->last_flags = xfm->fmr_flags;
+	ext4_fsmap_from_internal(info->sb, &fm, xfm);
+	if (copy_to_user(info->data, &fm, sizeof(struct fsmap)))
+		return -EFAULT;
+
+	info->data++;
+	return 0;
+}
+
+static int
+ext4_ioc_getfsmap(
+	struct super_block	*sb,
+	void			__user *arg)
+{
+	struct getfsmap_info	info;
+	struct ext4_fsmap_head	xhead = {0};
+	struct fsmap_head	head;
+	bool			aborted = false;
+	int			error;
+
+	if (copy_from_user(&head, arg, sizeof(struct fsmap_head)))
+		return -EFAULT;
+	if (head.fmh_reserved[0] || head.fmh_reserved[1] ||
+	    head.fmh_reserved[2] || head.fmh_reserved[3] ||
+	    head.fmh_reserved[4] || head.fmh_reserved[5] ||
+	    head.fmh_keys[0].fmr_offset ||
+	    (head.fmh_keys[1].fmr_offset != 0 &&
+	     head.fmh_keys[1].fmr_offset != -1ULL) ||
+	    head.fmh_keys[0].fmr_reserved[0] ||
+	    head.fmh_keys[0].fmr_reserved[1] ||
+	    head.fmh_keys[0].fmr_reserved[2] ||
+	    head.fmh_keys[1].fmr_reserved[0] ||
+	    head.fmh_keys[1].fmr_reserved[1] ||
+	    head.fmh_keys[1].fmr_reserved[2])
+		return -EINVAL;
+
+	xhead.fmh_iflags = head.fmh_iflags;
+	xhead.fmh_count = head.fmh_count;
+	ext4_fsmap_to_internal(sb, &xhead.fmh_keys[0], &head.fmh_keys[0]);
+	ext4_fsmap_to_internal(sb, &xhead.fmh_keys[1], &head.fmh_keys[1]);
+
+	trace_ext4_getfsmap_low_key(sb,
+			xhead.fmh_keys[0].fmr_device,
+			xhead.fmh_keys[0].fmr_physical,
+			xhead.fmh_keys[0].fmr_length,
+			xhead.fmh_keys[0].fmr_owner,
+			0,
+			xhead.fmh_keys[0].fmr_flags);
+
+	trace_ext4_getfsmap_high_key(sb,
+			xhead.fmh_keys[1].fmr_device,
+			xhead.fmh_keys[1].fmr_physical,
+			xhead.fmh_keys[1].fmr_length,
+			xhead.fmh_keys[1].fmr_owner,
+			0,
+			xhead.fmh_keys[1].fmr_flags);
+
+	info.sb = sb;
+	info.data = ((__force struct fsmap_head *)arg)->fmh_recs;
+	error = ext4_getfsmap(sb, &xhead, ext4_getfsmap_format, &info);
+	if (error == EXT4_QUERY_RANGE_ABORT) {
+		error = 0;
+		aborted = true;
+	} else if (error)
+		return error;
+
+	/* If we didn't abort, set the "last" flag in the last fmx */
+	if (!aborted && xhead.fmh_entries) {
+		info.data--;
+		info.last_flags |= FMR_OF_LAST;
+		if (copy_to_user(&info.data->fmr_flags, &info.last_flags,
+				sizeof(info.last_flags)))
+			return -EFAULT;
+	}
+
+	/* copy back header */
+	head.fmh_entries = xhead.fmh_entries;
+	head.fmh_oflags = xhead.fmh_oflags;
+	if (copy_to_user(arg, &head, sizeof(struct fsmap_head)))
+		return -EFAULT;
+
+	return 0;
+}
+
 long ext4_ioctl(struct file *filp, unsigned int cmd, unsigned long arg)
 {
 	struct inode *inode = file_inode(filp);
@@ -452,6 +556,8 @@ long ext4_ioctl(struct file *filp, unsigned int cmd, unsigned long arg)
 	ext4_debug("cmd = %u, arg = %lu\n", cmd, arg);
 
 	switch (cmd) {
+	case EXT4_IOC_GETFSMAP:
+		return ext4_ioc_getfsmap(sb, (void __user *)arg);
 	case EXT4_IOC_GETFLAGS:
 		ext4_get_inode_flags(ei);
 		flags = ei->i_flags & EXT4_FL_USER_VISIBLE;
