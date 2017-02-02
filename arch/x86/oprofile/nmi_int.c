@@ -416,7 +416,7 @@ static int nmi_create_files(struct dentry *root)
 
 	for (i = 0; i < model->num_virt_counters; ++i) {
 		struct dentry *dir;
-		char buf[4];
+		char buf[32];
 
 		/* quick little hack to _not_ expose a counter if it is not
 		 * available for use.  This should protect userspace app.

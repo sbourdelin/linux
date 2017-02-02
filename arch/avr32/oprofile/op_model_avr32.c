@@ -101,7 +101,7 @@ static int avr32_perf_counter_create_files(struct dentry *root)
 {
 	struct dentry *dir;
 	unsigned int i;
-	char filename[4];
+	char filename[32];
 
 	for (i = 0; i < NR_counter; i++) {
 		snprintf(filename, sizeof(filename), "%u", i);

@@ -43,7 +43,7 @@ void oprofile_create_stats_files(struct dentry *root)
 	struct oprofile_cpu_buffer *cpu_buf;
 	struct dentry *cpudir;
 	struct dentry *dir;
-	char buf[10];
+	char buf[32];
 	int i;
 
 	dir = oprofilefs_mkdir(root, "stats");
@@ -52,7 +52,7 @@ void oprofile_create_stats_files(struct dentry *root)
 
 	for_each_possible_cpu(i) {
 		cpu_buf = &per_cpu(op_cpu_buffer, i);
-		snprintf(buf, 10, "cpu%d", i);
+		snprintf(buf, sizeof(buf), "cpu%d", i);
 		cpudir = oprofilefs_mkdir(dir, buf);
 
 		/* Strictly speaking access to these ulongs is racy,
