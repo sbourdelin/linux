@@ -33,24 +33,27 @@ static int brcmf_cfg80211_vndr_cmds_dcmd_handler(struct wiphy *wiphy,
 {
 	struct brcmf_cfg80211_vif *vif;
 	struct brcmf_if *ifp;
+	struct brcmf_pub *pub;
 	const struct brcmf_vndr_dcmd_hdr *cmdhdr = data;
 	struct sk_buff *reply;
 	int ret, payload, ret_len;
 	void *dcmd_buf = NULL, *wr_pointer;
 	u16 msglen, maxmsglen = PAGE_SIZE - 0x100;
 
-	if (len < sizeof(*cmdhdr)) {
-		brcmf_err("vendor command too short: %d\n", len);
-		return -EINVAL;
-	}
-
 	vif = container_of(wdev, struct brcmf_cfg80211_vif, wdev);
 	ifp = vif->ifp;
+	pub = ifp->drvr;
+
+	if (len < sizeof(*cmdhdr)) {
+		brcmf_err(pub, "vendor command too short: %d\n", len);
+		return -EINVAL;
+	}
 
 	brcmf_dbg(TRACE, "ifidx=%d, cmd=%d\n", ifp->ifidx, cmdhdr->cmd);
 
 	if (cmdhdr->offset > len) {
-		brcmf_err("bad buffer offset %d > %d\n", cmdhdr->offset, len);
+		brcmf_err(pub, "bad buffer offset %d > %d\n", cmdhdr->offset,
+			  len);
 		return -EINVAL;
 	}
 
@@ -58,11 +61,11 @@ static int brcmf_cfg80211_vndr_cmds_dcmd_handler(struct wiphy *wiphy,
 	ret_len = cmdhdr->len;
 	if (ret_len > 0 || len > 0) {
 		if (len > BRCMF_DCMD_MAXLEN) {
-			brcmf_err("oversize input buffer %d\n", len);
+			brcmf_err(pub, "oversize input buffer %d\n", len);
 			len = BRCMF_DCMD_MAXLEN;
 		}
 		if (ret_len > BRCMF_DCMD_MAXLEN) {
-			brcmf_err("oversize return buffer %d\n", ret_len);
+			brcmf_err(pub, "oversize return buffer %d\n", ret_len);
 			ret_len = BRCMF_DCMD_MAXLEN;
 		}
 		payload = max(ret_len, len) + 1;

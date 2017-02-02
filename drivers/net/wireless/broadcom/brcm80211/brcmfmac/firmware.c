@@ -578,7 +578,7 @@ int brcmf_fw_map_chip_to_name(u32 chip, u32 chiprev,
 	}
 
 	if (i == table_size) {
-		brcmf_err("Unknown chipid %d [%d]\n", chip, chiprev);
+		brcmf_err(NULL, "Unknown chipid %d [%d]\n", chip, chiprev);
 		return -ENODEV;
 	}
 

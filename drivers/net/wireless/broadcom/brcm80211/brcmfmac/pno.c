@@ -48,6 +48,7 @@ static int brcmf_pno_config(struct brcmf_if *ifp, u32 scan_freq,
 			    u32 mscan, u32 bestn)
 {
 	struct brcmf_pno_param_le pfn_param;
+	struct brcmf_pub *pub = ifp->drvr;
 	u16 flags;
 	u32 pfnmem;
 	s32 err;
@@ -75,13 +76,13 @@ static int brcmf_pno_config(struct brcmf_if *ifp, u32 scan_freq,
 		/* set bestn in firmware */
 		err = brcmf_fil_iovar_int_set(ifp, "pfnmem", pfnmem);
 		if (err < 0) {
-			brcmf_err("failed to set pfnmem\n");
+			brcmf_err(pub, "failed to set pfnmem\n");
 			goto exit;
 		}
 		/* get max mscan which the firmware supports */
 		err = brcmf_fil_iovar_int_get(ifp, "pfnmem", &pfnmem);
 		if (err < 0) {
-			brcmf_err("failed to get pfnmem\n");
+			brcmf_err(pub, "failed to get pfnmem\n");
 			goto exit;
 		}
 		mscan = min_t(u32, mscan, pfnmem);
@@ -95,7 +96,7 @@ static int brcmf_pno_config(struct brcmf_if *ifp, u32 scan_freq,
 	err = brcmf_fil_iovar_data_set(ifp, "pfn_set", &pfn_param,
 				       sizeof(pfn_param));
 	if (err)
-		brcmf_err("pfn_set failed, err=%d\n", err);
+		brcmf_err(pub, "pfn_set failed, err=%d\n", err);
 
 exit:
 	return err;
@@ -105,6 +106,7 @@ static int brcmf_pno_set_random(struct brcmf_if *ifp, u8 *mac_addr,
 				u8 *mac_mask)
 {
 	struct brcmf_pno_macaddr_le pfn_mac;
+	struct brcmf_pub *pub = ifp->drvr;
 	int err, i;
 
 	pfn_mac.version = BRCMF_PFN_MACADDR_CFG_VER;
@@ -123,7 +125,7 @@ static int brcmf_pno_set_random(struct brcmf_if *ifp, u8 *mac_addr,
 	err = brcmf_fil_iovar_data_set(ifp, "pfn_macaddr", &pfn_mac,
 				       sizeof(pfn_mac));
 	if (err)
-		brcmf_err("pfn_macaddr failed, err=%d\n", err);
+		brcmf_err(pub, "pfn_macaddr failed, err=%d\n", err);
 
 	return err;
 }
@@ -165,6 +167,7 @@ static bool brcmf_is_ssid_active(struct cfg80211_ssid *ssid,
 
 int brcmf_pno_clean(struct brcmf_if *ifp)
 {
+	struct brcmf_pub *pub = ifp->drvr;
 	int ret;
 
 	/* Disable pfn */
@@ -174,7 +177,7 @@ int brcmf_pno_clean(struct brcmf_if *ifp)
 		ret = brcmf_fil_iovar_data_set(ifp, "pfnclear", NULL, 0);
 	}
 	if (ret < 0)
-		brcmf_err("failed code %d\n", ret);
+		brcmf_err(pub, "failed code %d\n", ret);
 
 	return ret;
 }
@@ -182,6 +185,7 @@ int brcmf_pno_clean(struct brcmf_if *ifp)
 int brcmf_pno_start_sched_scan(struct brcmf_if *ifp,
 			       struct cfg80211_sched_scan_request *req)
 {
+	struct brcmf_pub *pub = ifp->drvr;
 	struct brcmu_d11inf *d11inf;
 	struct brcmf_pno_config_le pno_cfg;
 	struct cfg80211_ssid *ssid;
@@ -191,7 +195,7 @@ int brcmf_pno_start_sched_scan(struct brcmf_if *ifp,
 	/* clean up everything */
 	ret = brcmf_pno_clean(ifp);
 	if  (ret < 0) {
-		brcmf_err("failed error=%d\n", ret);
+		brcmf_err(pub, "failed error=%d\n", ret);
 		return ret;
 	}
 
@@ -223,7 +227,7 @@ int brcmf_pno_start_sched_scan(struct brcmf_if *ifp,
 	for (i = 0; i < req->n_match_sets; i++) {
 		ssid = &req->match_sets[i].ssid;
 		if (!ssid->ssid_len) {
-			brcmf_err("skip broadcast ssid\n");
+			brcmf_err(pub, "skip broadcast ssid\n");
 			continue;
 		}
 
@@ -236,7 +240,7 @@ int brcmf_pno_start_sched_scan(struct brcmf_if *ifp,
 	/* Enable the PNO */
 	ret = brcmf_fil_iovar_int_set(ifp, "pfn", 1);
 	if (ret < 0)
-		brcmf_err("PNO enable failed!! ret=%d\n", ret);
+		brcmf_err(pub, "PNO enable failed!! ret=%d\n", ret);
 
 	return ret;
 }
