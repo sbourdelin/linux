@@ -12,6 +12,7 @@
 #include <linux/debug_locks.h>
 #include <linux/delay.h>
 #include <linux/export.h>
+#include "mcs_spinlock.h"
 
 void __raw_spin_lock_init(raw_spinlock_t *lock, const char *name,
 			  struct lock_class_key *key)
@@ -26,6 +27,7 @@ void __raw_spin_lock_init(raw_spinlock_t *lock, const char *name,
 	lock->raw_lock = (arch_spinlock_t)__ARCH_SPIN_LOCK_UNLOCKED;
 	lock->magic = SPINLOCK_MAGIC;
 	lock->owner = SPINLOCK_OWNER_INIT;
+	lock->tail = NULL;
 	lock->owner_cpu = -1;
 	lock->lockup = 0;
 }
@@ -105,7 +107,7 @@ static inline void debug_spin_unlock(raw_spinlock_t *lock)
 	lock->lockup = 0;
 }
 
-static inline void __spin_lockup(raw_spinlock_t *lock)
+static inline void __spin_chk_lockup(raw_spinlock_t *lock, u64 loops)
 {
 	/*
 	 * lockup suspected:
@@ -113,37 +115,52 @@ static inline void __spin_lockup(raw_spinlock_t *lock)
 	 * Only one of the lock waiters will be allowed to print the lockup
 	 * message in order to avoid an avalanche of lockup and backtrace
 	 * messages from different lock waiters of the same lock.
+	 *
+	 * With the original __deley(1) call, lockup can happen when both
+	 * threads of a hyperthreaded CPU core contend on the same lock. So
+	 * cpu_relax() is used here instead.
 	 */
-	if (!xchg(&lock->lockup, 1)) {
+	if (unlikely(!loops && !xchg(&lock->lockup, 1))) {
 		spin_dump(lock, "lockup suspected");
 #ifdef CONFIG_SMP
 		trigger_all_cpu_backtrace();
 #endif
 	}
+	cpu_relax();
 }
 
+/*
+ * The lock waiters are put into a MCS queue to maintain lock fairness
+ * as well as avoiding excessive contention on the lock cacheline. It
+ * also helps to reduce false positive because of unfairness instead
+ * of real lockup.
+ *
+ * The trylock before entering the MCS queue makes this code perform
+ * reasonably well in a virtual machine where some of the lock waiters
+ * may have their vCPUs preempted.
+ */
 static void __spin_lock_debug(raw_spinlock_t *lock)
 {
-	u64 i;
 	u64 loops = loops_per_jiffy * HZ;
+	struct mcs_spinlock node, *prev;
 
-	for (i = 0; i < loops; i++) {
-		if (arch_spin_trylock(&lock->raw_lock))
-			return;
-		__delay(1);
+	node.next = NULL;
+	node.locked = 0;
+	prev = xchg(&lock->tail, &node);
+	if (prev) {
+		WRITE_ONCE(prev->next, &node);
+		while (!READ_ONCE(node.locked))
+			__spin_chk_lockup(lock, loops--);
 	}
 
-	__spin_lockup(lock);
+	while (!arch_spin_trylock(&lock->raw_lock))
+		__spin_chk_lockup(lock, loops--);
 
-	/*
-	 * The trylock above was causing a livelock.  Give the lower level arch
-	 * specific lock code a chance to acquire the lock. We have already
-	 * printed a warning/backtrace at this point. The non-debug arch
-	 * specific code might actually succeed in acquiring the lock.  If it is
-	 * not successful, the end-result is the same - there is no forward
-	 * progress.
-	 */
-	arch_spin_lock(&lock->raw_lock);
+	if (cmpxchg(&lock->tail, &node, NULL) == &node)
+		return;
+	while (!READ_ONCE(node.next))
+		cpu_relax();
+	WRITE_ONCE(node.next->locked, 1);
 }
 
 void do_raw_spin_lock(raw_spinlock_t *lock)
