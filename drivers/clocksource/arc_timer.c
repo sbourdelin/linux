@@ -145,10 +145,8 @@ static int __init arc_cs_setup_rtc(struct device_node *node)
 	}
 
 	/* Local to CPU hence not usable in SMP */
-	if (IS_ENABLED(CONFIG_SMP)) {
+	if (IS_ENABLED(CONFIG_SMP))
 		pr_warn("Local-64-bit-Ctr not usable in SMP");
-		return -EINVAL;
-	}
 
 	ret = arc_get_timer_clk(node);
 	if (ret)
