@@ -19,6 +19,8 @@
 
 #include <linux/net.h>	/* net_ratelimit() */
 
+struct brcmf_pub;
+
 /* message levels */
 #define BRCMF_TRACE_VAL		0x00000002
 #define BRCMF_INFO_VAL		0x00000004
@@ -45,8 +47,8 @@
 #undef pr_fmt
 #define pr_fmt(fmt)		KBUILD_MODNAME ": " fmt
 
-__printf(2, 3)
-void __brcmf_err(const char *func, const char *fmt, ...);
+__printf(3, 4)
+void __brcmf_err(struct brcmf_pub *pub, const char *func, const char *fmt, ...);
 /* Macro for error messages. When debugging / tracing the driver all error
  * messages are important to us.
  */
@@ -55,7 +57,7 @@ void __brcmf_err(const char *func, const char *fmt, ...);
 		if (IS_ENABLED(CONFIG_BRCMDBG) ||			\
 		    IS_ENABLED(CONFIG_BRCM_TRACING) ||			\
 		    net_ratelimit())					\
-			__brcmf_err(__func__, fmt, ##__VA_ARGS__);	\
+			__brcmf_err(NULL, __func__, fmt, ##__VA_ARGS__);\
 	} while (0)
 
 #if defined(DEBUG) || defined(CONFIG_BRCM_TRACING)
@@ -99,7 +101,6 @@ do {									\
 
 extern int brcmf_msg_level;
 
-struct brcmf_pub;
 #ifdef DEBUG
 void brcmf_debugfs_init(void);
 void brcmf_debugfs_exit(void);
