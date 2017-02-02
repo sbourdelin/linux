@@ -28,7 +28,6 @@
 #endif
 #include <linux/ioctl.h>
 #include <linux/types.h>
-#include <linux/version.h>
 
 #define MEDIA_API_VERSION	KERNEL_VERSION(0, 1, 0)
 
