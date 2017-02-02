@@ -59,7 +59,7 @@ struct brcmf_if *brcmf_get_ifp(struct brcmf_pub *drvr, int ifidx)
 	s32 bsscfgidx;
 
 	if (ifidx < 0 || ifidx >= BRCMF_MAX_IFS) {
-		brcmf_err("ifidx %d out of range\n", ifidx);
+		brcmf_err(drvr, "ifidx %d out of range\n", ifidx);
 		return NULL;
 	}
 
@@ -74,6 +74,7 @@ struct brcmf_if *brcmf_get_ifp(struct brcmf_pub *drvr, int ifidx)
 static void _brcmf_set_multicast_list(struct work_struct *work)
 {
 	struct brcmf_if *ifp;
+	struct brcmf_pub *pub;
 	struct net_device *ndev;
 	struct netdev_hw_addr *ha;
 	u32 cmd_value, cnt;
@@ -83,6 +84,7 @@ static void _brcmf_set_multicast_list(struct work_struct *work)
 	s32 err;
 
 	ifp = container_of(work, struct brcmf_if, multicast_work);
+	pub = ifp->drvr;
 
 	brcmf_dbg(TRACE, "Enter, bsscfgidx=%d\n", ifp->bsscfgidx);
 
@@ -113,7 +115,7 @@ static void _brcmf_set_multicast_list(struct work_struct *work)
 
 	err = brcmf_fil_iovar_data_set(ifp, "mcast_list", buf, buflen);
 	if (err < 0) {
-		brcmf_err("Setting mcast_list failed, %d\n", err);
+		brcmf_err(pub, "Setting mcast_list failed, %d\n", err);
 		cmd_value = cnt ? true : cmd_value;
 	}
 
@@ -126,13 +128,13 @@ static void _brcmf_set_multicast_list(struct work_struct *work)
 	 */
 	err = brcmf_fil_iovar_int_set(ifp, "allmulti", cmd_value);
 	if (err < 0)
-		brcmf_err("Setting allmulti failed, %d\n", err);
+		brcmf_err(pub, "Setting allmulti failed, %d\n", err);
 
 	/*Finally, pick up the PROMISC flag */
 	cmd_value = (ndev->flags & IFF_PROMISC) ? true : false;
 	err = brcmf_fil_cmd_int_set(ifp, BRCMF_C_SET_PROMISC, cmd_value);
 	if (err < 0)
-		brcmf_err("Setting BRCMF_C_SET_PROMISC failed, %d\n",
+		brcmf_err(pub, "Setting BRCMF_C_SET_PROMISC failed, %d\n",
 			  err);
 }
 
@@ -156,7 +158,7 @@ static void _brcmf_update_ndtable(struct work_struct *work)
 					       &ifp->ipv6_addr_tbl[i],
 					       sizeof(struct in6_addr));
 		if (ret)
-			brcmf_err("add nd ip err %d\n", ret);
+			brcmf_err(ifp->drvr, "add nd ip err %d\n", ret);
 	}
 }
 #else
@@ -176,7 +178,7 @@ static int brcmf_netdev_set_mac_address(struct net_device *ndev, void *addr)
 	err = brcmf_fil_iovar_data_set(ifp, "cur_etheraddr", sa->sa_data,
 				       ETH_ALEN);
 	if (err < 0) {
-		brcmf_err("Setting cur_etheraddr failed, %d\n", err);
+		brcmf_err(ifp->drvr, "Setting cur_etheraddr failed, %d\n", err);
 	} else {
 		brcmf_dbg(TRACE, "updated to %pM\n", sa->sa_data);
 		memcpy(ifp->mac_addr, sa->sa_data, ETH_ALEN);
@@ -204,7 +206,8 @@ static netdev_tx_t brcmf_netdev_start_xmit(struct sk_buff *skb,
 
 	/* Can the device send data? */
 	if (drvr->bus_if->state != BRCMF_BUS_UP) {
-		brcmf_err("xmit rejected state=%d\n", drvr->bus_if->state);
+		brcmf_err(drvr, "xmit rejected state=%d\n",
+			  drvr->bus_if->state);
 		netif_stop_queue(ndev);
 		dev_kfree_skb(skb);
 		ret = -ENODEV;
@@ -222,7 +225,7 @@ static netdev_tx_t brcmf_netdev_start_xmit(struct sk_buff *skb,
 		dev_kfree_skb(skb);
 		skb = skb2;
 		if (skb == NULL) {
-			brcmf_err("%s: skb_realloc_headroom failed\n",
+			brcmf_err(drvr, "%s: skb_realloc_headroom failed\n",
 				  brcmf_ifname(ifp));
 			ret = -ENOMEM;
 			goto done;
@@ -466,7 +469,7 @@ static int brcmf_netdev_open(struct net_device *ndev)
 
 	/* If bus is not ready, can't continue */
 	if (bus_if->state != BRCMF_BUS_UP) {
-		brcmf_err("failed bus is not ready\n");
+		brcmf_err(drvr, "failed bus is not ready\n");
 		return -EAGAIN;
 	}
 
@@ -480,7 +483,7 @@ static int brcmf_netdev_open(struct net_device *ndev)
 		ndev->features &= ~NETIF_F_IP_CSUM;
 
 	if (brcmf_cfg80211_up(ndev)) {
-		brcmf_err("failed to bring up cfg80211\n");
+		brcmf_err(drvr, "failed to bring up cfg80211\n");
 		return -EIO;
 	}
 
@@ -525,7 +528,7 @@ int brcmf_net_attach(struct brcmf_if *ifp, bool rtnl_locked)
 	else
 		err = register_netdev(ndev);
 	if (err != 0) {
-		brcmf_err("couldn't register the net device\n");
+		brcmf_err(drvr, "couldn't register the net device\n");
 		goto fail;
 	}
 
@@ -613,7 +616,7 @@ static int brcmf_net_p2p_attach(struct brcmf_if *ifp)
 	memcpy(ndev->dev_addr, ifp->mac_addr, ETH_ALEN);
 
 	if (register_netdev(ndev) != 0) {
-		brcmf_err("couldn't register the p2p net device\n");
+		brcmf_err(ifp->drvr, "couldn't register the p2p net device\n");
 		goto fail;
 	}
 
@@ -643,7 +646,7 @@ struct brcmf_if *brcmf_add_if(struct brcmf_pub *drvr, s32 bsscfgidx, s32 ifidx,
 	 */
 	if (ifp) {
 		if (ifidx) {
-			brcmf_err("ERROR: netdev:%s already exists\n",
+			brcmf_err(drvr, "ERROR: netdev:%s already exists\n",
 				  ifp->ndev->name);
 			netif_stop_queue(ifp->ndev);
 			brcmf_net_detach(ifp->ndev, false);
@@ -702,7 +705,7 @@ static void brcmf_del_if(struct brcmf_pub *drvr, s32 bsscfgidx,
 	ifp = drvr->iflist[bsscfgidx];
 	drvr->iflist[bsscfgidx] = NULL;
 	if (!ifp) {
-		brcmf_err("Null interface, bsscfgidx=%d\n", bsscfgidx);
+		brcmf_err(drvr, "Null interface, bsscfgidx=%d\n", bsscfgidx);
 		return;
 	}
 	brcmf_dbg(TRACE, "Enter, bsscfgidx=%d, ifidx=%d\n", bsscfgidx,
@@ -787,7 +790,7 @@ static int brcmf_inetaddr_changed(struct notifier_block *nb,
 	ret = brcmf_fil_iovar_data_get(ifp, "arp_hostip", addr_table,
 				       sizeof(addr_table));
 	if (ret) {
-		brcmf_err("fail to get arp ip table err:%d\n", ret);
+		brcmf_err(drvr, "fail to get arp ip table err:%d\n", ret);
 		return NOTIFY_OK;
 	}
 
@@ -804,7 +807,7 @@ static int brcmf_inetaddr_changed(struct notifier_block *nb,
 			ret = brcmf_fil_iovar_data_set(ifp, "arp_hostip",
 				&ifa->ifa_address, sizeof(ifa->ifa_address));
 			if (ret)
-				brcmf_err("add arp ip err %d\n", ret);
+				brcmf_err(drvr, "add arp ip err %d\n", ret);
 		}
 		break;
 	case NETDEV_DOWN:
@@ -816,7 +819,7 @@ static int brcmf_inetaddr_changed(struct notifier_block *nb,
 			ret = brcmf_fil_iovar_data_set(ifp, "arp_hostip_clear",
 						       NULL, 0);
 			if (ret) {
-				brcmf_err("fail to clear arp ip table err:%d\n",
+				brcmf_err(drvr, "fail to clear arp ip table err:%d\n",
 					  ret);
 				return NOTIFY_OK;
 			}
@@ -827,7 +830,7 @@ static int brcmf_inetaddr_changed(struct notifier_block *nb,
 							       &addr_table[i],
 							       sizeof(addr_table[i]));
 				if (ret)
-					brcmf_err("add arp ip err %d\n",
+					brcmf_err(drvr, "add arp ip err %d\n",
 						  ret);
 			}
 		}
@@ -923,7 +926,7 @@ int brcmf_attach(struct device *dev, struct brcmf_mp_device *settings)
 	/* Attach and link in the protocol */
 	ret = brcmf_proto_attach(drvr);
 	if (ret != 0) {
-		brcmf_err("brcmf_prot_attach failed\n");
+		brcmf_err(drvr, "brcmf_prot_attach failed\n");
 		goto fail;
 	}
 
@@ -1045,7 +1048,7 @@ int brcmf_bus_started(struct device *dev)
 	return 0;
 
 fail:
-	brcmf_err("failed: %d\n", ret);
+	brcmf_err(drvr, "failed: %d\n", ret);
 	if (drvr->config) {
 		brcmf_cfg80211_detach(drvr->config);
 		drvr->config = NULL;
@@ -1152,7 +1155,7 @@ int brcmf_netdev_wait_pend8021x(struct brcmf_if *ifp)
 				 MAX_WAIT_FOR_8021X_TX);
 
 	if (!err)
-		brcmf_err("Timed out waiting for no pending 802.1x packets\n");
+		brcmf_err(ifp->drvr, "Timed out waiting for no pending 802.1x packets\n");
 
 	return !err;
 }
