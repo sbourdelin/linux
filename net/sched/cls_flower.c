@@ -40,6 +40,7 @@ struct fl_flow_key {
 	};
 	struct flow_dissector_key_ports tp;
 	struct flow_dissector_key_icmp icmp;
+	struct flow_dissector_key_nd nd;
 	struct flow_dissector_key_arp arp;
 	struct flow_dissector_key_keyid enc_key_id;
 	union {
@@ -418,6 +419,12 @@ static const struct nla_policy fl_policy[TCA_FLOWER_MAX + 1] = {
 	[TCA_FLOWER_KEY_ARP_SHA_MASK]	= { .len = ETH_ALEN },
 	[TCA_FLOWER_KEY_ARP_THA]	= { .len = ETH_ALEN },
 	[TCA_FLOWER_KEY_ARP_THA_MASK]	= { .len = ETH_ALEN },
+	[TCA_FLOWER_KEY_ND_TARGET]	= { .len = sizeof(struct in6_addr) },
+	[TCA_FLOWER_KEY_ND_TARGET_MASK]	= { .len = sizeof(struct in6_addr) },
+	[TCA_FLOWER_KEY_ND_SLL]		= { .len = ETH_ALEN },
+	[TCA_FLOWER_KEY_ND_SLL_MASK]	= { .len = ETH_ALEN },
+	[TCA_FLOWER_KEY_ND_TLL]		= { .len = ETH_ALEN },
+	[TCA_FLOWER_KEY_ND_TLL_MASK]	= { .len = ETH_ALEN },
 };
 
 static void fl_set_key_val(struct nlattr **tb,
@@ -589,6 +596,22 @@ static int fl_set_key(struct net *net, struct nlattr **tb,
 			       &mask->icmp.code,
 			       TCA_FLOWER_KEY_ICMPV6_CODE_MASK,
 			       sizeof(key->icmp.code));
+		if (key->icmp.code == 0 && mask->icmp.code == 0xff &&
+		    (key->icmp.type == NDISC_NEIGHBOUR_SOLICITATION ||
+		     key->icmp.type == NDISC_NEIGHBOUR_ADVERTISEMENT) &&
+		    mask->icmp.type == 0xff) {
+			fl_set_key_val(tb, &key->nd.target,
+				       TCA_FLOWER_KEY_ND_TARGET,
+				       &mask->nd.target,
+				       TCA_FLOWER_KEY_ND_TARGET_MASK,
+				       sizeof(key->nd.target));
+			fl_set_key_val(tb, key->nd.sll, TCA_FLOWER_KEY_ND_SLL,
+				       mask->nd.sll, TCA_FLOWER_KEY_ND_SLL_MASK,
+				       sizeof(key->nd.sll));
+			fl_set_key_val(tb, key->nd.tll, TCA_FLOWER_KEY_ND_TLL,
+				       mask->nd.tll, TCA_FLOWER_KEY_ND_TLL_MASK,
+				       sizeof(key->nd.tll));
+		}
 	} else if (key->basic.n_proto == htons(ETH_P_ARP) ||
 		   key->basic.n_proto == htons(ETH_P_RARP)) {
 		fl_set_key_val(tb, &key->arp.sip, TCA_FLOWER_KEY_ARP_SIP,
@@ -724,6 +747,8 @@ static void fl_init_dissector(struct cls_fl_head *head,
 			     FLOW_DISSECTOR_KEY_ICMP, icmp);
 	FL_KEY_SET_IF_MASKED(&mask->key, keys, cnt,
 			     FLOW_DISSECTOR_KEY_ARP, arp);
+	FL_KEY_SET_IF_MASKED(&mask->key, keys, cnt,
+			     FLOW_DISSECTOR_KEY_ND, nd);
 	FL_KEY_SET_IF_MASKED(&mask->key, keys, cnt,
 			     FLOW_DISSECTOR_KEY_VLAN, vlan);
 	FL_KEY_SET_IF_MASKED(&mask->key, keys, cnt,
@@ -1162,7 +1187,22 @@ static int fl_dump(struct net *net, struct tcf_proto *tp, unsigned long fh,
 		  fl_dump_key_val(skb, &key->icmp.code,
 				  TCA_FLOWER_KEY_ICMPV6_CODE, &mask->icmp.code,
 				  TCA_FLOWER_KEY_ICMPV6_CODE_MASK,
-				  sizeof(key->icmp.code))))
+				  sizeof(key->icmp.code)) ||
+		 (key->icmp.code == 0 && mask->icmp.code == 0xff &&
+		  (key->icmp.type == NDISC_NEIGHBOUR_SOLICITATION ||
+		   key->icmp.type == NDISC_NEIGHBOUR_ADVERTISEMENT) &&
+		  mask->icmp.type == 0xff &&
+		  (fl_dump_key_val(skb, &key->nd.target,
+				   TCA_FLOWER_KEY_ND_TARGET,
+				   &mask->nd.target,
+				   TCA_FLOWER_KEY_ND_TARGET_MASK,
+				   sizeof(key->nd.target)) ||
+		   fl_dump_key_val(skb, key->nd.sll, TCA_FLOWER_KEY_ND_SLL,
+				   mask->nd.sll, TCA_FLOWER_KEY_ND_SLL_MASK,
+				   sizeof(key->nd.sll)) ||
+		   fl_dump_key_val(skb, key->nd.tll, TCA_FLOWER_KEY_ND_TLL,
+				   mask->nd.tll, TCA_FLOWER_KEY_ND_TLL_MASK,
+				   sizeof(key->nd.tll))))))
 		goto nla_put_failure;
 	else if ((key->basic.n_proto == htons(ETH_P_ARP) ||
 		  key->basic.n_proto == htons(ETH_P_RARP)) &&

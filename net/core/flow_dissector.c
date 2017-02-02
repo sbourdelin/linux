@@ -119,7 +119,7 @@ static bool skb_flow_dissect_nd(const struct sk_buff *skb,
 				int icmp_len)
 {
 	const struct nd_msg *nd;
-	struct nd_msg *_nd;
+	struct nd_msg _nd;
 	int off;
 
 	nd = __skb_header_pointer(skb, nhoff, sizeof(_nd), data, hlen, &_nd);
@@ -131,7 +131,7 @@ static bool skb_flow_dissect_nd(const struct sk_buff *skb,
 	off = sizeof(_nd);
 	while (icmp_len - off >= sizeof(struct nd_opt_hdr) + ETH_ALEN) {
 		const struct nd_opt_hdr *opt_hdr;
-		struct nd_opt_hdr *_opt_hdr;
+		struct nd_opt_hdr _opt_hdr;
 		unsigned char *ll_addr = NULL;
 		int opt_data_len;
 
@@ -704,7 +704,7 @@ ip_proto_again:
 		key_icmp->icmp = skb_flow_get_be16(skb, nhoff, data, hlen);
 
 		if (dissector_uses_key(flow_dissector, FLOW_DISSECTOR_KEY_ND) &&
-		    ip_proto == IPPROTO_IPV6 && key_icmp->code == 0 &&
+		    ip_proto == IPPROTO_ICMPV6 && key_icmp->code == 0 &&
 		    (key_icmp->type == NDISC_NEIGHBOUR_SOLICITATION ||
 		     key_icmp->type == NDISC_NEIGHBOUR_ADVERTISEMENT)) {
 			key_nd = skb_flow_dissector_target(flow_dissector,
