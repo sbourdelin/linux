@@ -505,7 +505,9 @@ config PHY_MESON8B_USB2
 config PHY_NSP_USB3
 	tristate "Broadcom NorthStar plus USB3 PHY driver"
 	depends on OF && (ARCH_BCM_NSP || COMPILE_TEST)
+	depends on NETDEVICES # for PHYLIB
 	select GENERIC_PHY
+	select PHYLIB
 	default ARCH_BCM_NSP
 	help
 	  Enable this to support the Broadcom Northstar plus USB3 PHY.
