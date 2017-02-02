@@ -2005,7 +2005,7 @@ handle_read_data(struct TCP_Server_Info *server, struct mid_q_entry *mid,
 	rdata->iov[0].iov_len = 4;
 	rdata->iov[1].iov_base = buf + 4;
 	rdata->iov[1].iov_len = server->vals->read_rsp_size - 4;
-	cifs_dbg(FYI, "0: iov_base=%p iov_len=%lu\n",
+	cifs_dbg(FYI, "0: iov_base=%p iov_len=%zu\n",
 		 rdata->iov[0].iov_base, server->vals->read_rsp_size);
 
 	length = rdata->copy_into_pages(server, rdata, &iter);
