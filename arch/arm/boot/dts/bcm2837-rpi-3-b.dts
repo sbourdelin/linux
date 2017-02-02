@@ -1,0 +1,2 @@
+#include "../../../arm64/boot/dts/broadcom/bcm2837-rpi-3-b.dts"
+
