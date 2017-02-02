@@ -2,6 +2,7 @@
 #define _LINUX_SCHED_SIGNAL_H
 
 #include <linux/sched.h>
+#include <linux/sched/jobctl.h>
 
 /*
  * Types defining task->signal and task->sighand and APIs using them:
