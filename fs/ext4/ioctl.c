@@ -442,6 +442,45 @@ static inline unsigned long ext4_xflags_to_iflags(__u32 xflags)
 	return iflags;
 }
 
+int ext4_goingdown(struct super_block *sb, unsigned long arg)
+{
+	struct ext4_sb_info *sbi = EXT4_SB(sb);
+	__u32 flags;
+
+	if (!capable(CAP_SYS_ADMIN))
+		return -EPERM;
+
+	if (get_user(flags, (__u32 __user *)arg))
+		return -EFAULT;
+
+	if (flags > EXT4_GOING_FLAGS_NOLOGFLUSH)
+		return -EINVAL;
+
+	if (ext4_forced_shutdown(sbi))
+		return 0;
+
+	switch (flags) {
+	case EXT4_GOING_FLAGS_DEFAULT:
+		freeze_bdev(sb->s_bdev);
+		set_bit(EXT4_FLAGS_SHUTDOWN, &sbi->s_ext4_flags);
+		thaw_bdev(sb->s_bdev, sb);
+		break;
+	case EXT4_GOING_FLAGS_LOGFLUSH:
+		if (sbi->s_journal && !is_journal_aborted(sbi->s_journal))
+		    (void) ext4_force_commit(sb);
+		/* fall through */
+	case EXT4_GOING_FLAGS_NOLOGFLUSH:
+		if (sbi->s_journal && !is_journal_aborted(sbi->s_journal))
+			(void) jbd2_journal_destroy(sbi->s_journal);
+		sbi->s_journal = NULL;
+		set_bit(EXT4_FLAGS_SHUTDOWN, &sbi->s_ext4_flags);
+		break;
+	default:
+		return -EINVAL;
+	}
+	return 0;
+}
+
 long ext4_ioctl(struct file *filp, unsigned int cmd, unsigned long arg)
 {
 	struct inode *inode = file_inode(filp);
@@ -893,6 +932,8 @@ resizefs_out:
 
 		return 0;
 	}
+	case EXT4_IOC_GOiNGDOWN:
+		return ext4_goingdown(sb, arg);
 	default:
 		return -ENOTTY;
 	}
@@ -959,6 +1000,7 @@ long ext4_compat_ioctl(struct file *file, unsigned int cmd, unsigned long arg)
 	case EXT4_IOC_SET_ENCRYPTION_POLICY:
 	case EXT4_IOC_GET_ENCRYPTION_PWSALT:
 	case EXT4_IOC_GET_ENCRYPTION_POLICY:
+	case EXT4_IOC_GOiNGDOWN:
 		break;
 	default:
 		return -ENOIOCTLCMD;
