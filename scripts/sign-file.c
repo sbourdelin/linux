@@ -24,6 +24,7 @@
 #include <arpa/inet.h>
 #include <openssl/opensslv.h>
 #include <openssl/bio.h>
+#include <openssl/conf.h>
 #include <openssl/evp.h>
 #include <openssl/pem.h>
 #include <openssl/err.h>
@@ -137,7 +138,6 @@ static EVP_PKEY *read_private_key(const char *private_key_name)
 	if (!strncmp(private_key_name, "pkcs11:", 7)) {
 		ENGINE *e;
 
-		ENGINE_load_builtin_engines();
 		drain_openssl_errors();
 		e = ENGINE_by_id("pkcs11");
 		ERR(!e, "Load PKCS#11 ENGINE");
@@ -227,9 +227,20 @@ int main(int argc, char **argv)
 	X509 *x509;
 	BIO *bd, *bm;
 	int opt, n;
+
 	OpenSSL_add_all_algorithms();
+	OPENSSL_load_builtin_modules();
+	ENGINE_load_builtin_engines();
 	ERR_load_crypto_strings();
 	ERR_clear_error();
+
+	if (CONF_modules_load_file(NULL, NULL,
+		CONF_MFLAGS_DEFAULT_SECTION |
+		CONF_MFLAGS_IGNORE_MISSING_FILE) <= 0) {
+		fprintf(stderr, "FATAL: error loading configuration file.\n");
+		ERR_print_errors_fp(stderr);
+		exit(4);
+	}
 
 	key_pass = getenv("KBUILD_SIGN_PIN");
 
