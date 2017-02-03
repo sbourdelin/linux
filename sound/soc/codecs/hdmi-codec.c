@@ -479,6 +479,18 @@ static int hdmi_codec_probe(struct platform_device *pdev)
 
 static int hdmi_codec_remove(struct platform_device *pdev)
 {
+	struct device *dev = &pdev->dev;
+	struct list_head *pos;
+
+	list_for_each(pos, &hdmi_device_list) {
+		struct hdmi_device *tmp = pos_to_hdmi_device(pos);
+
+		if (tmp->dev == dev->parent) {
+			list_del(pos);
+			break;
+		}
+	}
+
 	snd_soc_unregister_codec(&pdev->dev);
 	return 0;
 }
