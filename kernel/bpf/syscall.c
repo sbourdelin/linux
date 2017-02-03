@@ -1043,6 +1043,64 @@ static int bpf_prog_detach(const union bpf_attr *attr)
 
 	return 0;
 }
+
+#define BPF_PROG_GET_ATTACH_LAST_FIELD insns_get
+
+static int bpf_prog_get_attach(union bpf_attr *attr,
+			       union bpf_attr __user *uattr)
+{
+	struct bpf_prog *prog;
+	struct cgroup *cgrp;
+	u32 ptype;
+	int err;
+
+	if (!capable(CAP_NET_ADMIN))
+		return -EPERM;
+
+	if (CHECK_ATTR(BPF_PROG_GET_ATTACH))
+		return -EINVAL;
+
+	if (attr->attach_type_get >= MAX_BPF_ATTACH_TYPE)
+		return -EINVAL;
+
+	cgrp = cgroup_get_from_fd(attr->target_get_fd);
+	if (IS_ERR(cgrp))
+		return PTR_ERR(cgrp);
+
+	prog = cgroup_bpf_get(cgrp, attr->attach_type_get);
+	cgroup_put(cgrp);
+
+	if (IS_ERR(prog))
+		return PTR_ERR(prog);
+
+	/* no program means nothing to copy */
+	if (!prog) {
+		u32 zero = 0;
+
+		if (copy_to_user(&uattr->insn_cnt_get, &zero, sizeof(u32)) ||
+		    copy_to_user(&uattr->prog_type_get, &zero, sizeof(u32)))
+			return -EFAULT;
+
+		return 0;
+	}
+
+	err = -E2BIG;
+	if (attr->insn_cnt_get < prog->len)
+		goto out;
+
+	err = 0;
+	ptype = prog->type;
+	if (copy_to_user(&uattr->insn_cnt_get, &prog->len, sizeof(u32)) ||
+	    copy_to_user(&uattr->prog_type_get, &ptype, sizeof(u32))    ||
+	    copy_to_user(u64_to_user_ptr(attr->insns_get), prog->insns,
+			 bpf_prog_insn_size(prog))) {
+		err = -EFAULT;
+	}
+out:
+	bpf_prog_free(prog);
+	return err;
+}
+
 #endif /* CONFIG_CGROUP_BPF */
 
 SYSCALL_DEFINE3(bpf, int, cmd, union bpf_attr __user *, uattr, unsigned int, size)
@@ -1118,6 +1176,9 @@ SYSCALL_DEFINE3(bpf, int, cmd, union bpf_attr __user *, uattr, unsigned int, siz
 		break;
 	case BPF_PROG_DETACH:
 		err = bpf_prog_detach(&attr);
+		break;
+	case BPF_PROG_GET_ATTACH:
+		err = bpf_prog_get_attach(&attr, uattr);
 		break;
 #endif
 

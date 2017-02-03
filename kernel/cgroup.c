@@ -6508,6 +6508,18 @@ void cgroup_bpf_update(struct cgroup *cgrp,
 	__cgroup_bpf_update(cgrp, parent, prog, type);
 	mutex_unlock(&cgroup_mutex);
 }
+
+struct bpf_prog *cgroup_bpf_get(struct cgroup *cgrp,
+				enum bpf_attach_type type)
+{
+	struct bpf_prog *prog;
+
+	mutex_lock(&cgroup_mutex);
+	prog = __cgroup_bpf_get(cgrp, type);
+	mutex_unlock(&cgroup_mutex);
+
+	return prog;
+}
 #endif /* CONFIG_CGROUP_BPF */
 
 #ifdef CONFIG_CGROUP_DEBUG

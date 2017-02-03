@@ -117,6 +117,37 @@ void __cgroup_bpf_update(struct cgroup *cgrp,
 	}
 }
 
+struct bpf_prog *__cgroup_bpf_get(struct cgroup *cgrp,
+				  enum bpf_attach_type type)
+{
+	struct bpf_prog *cgrp_prog, *prog;
+	struct bpf_insn *insns;
+	u32 len;
+
+	cgrp_prog = rcu_dereference_protected(cgrp->bpf.effective[type],
+					      lockdep_is_held(&cgroup_mutex));
+	if (!cgrp_prog)
+		return NULL;
+
+	if (cgrp_prog->orig_prog) {
+		len = cgrp_prog->orig_prog->len;
+		insns = cgrp_prog->orig_prog->insn;
+	} else {
+		len = cgrp_prog->len;
+		insns = cgrp_prog->insnsi;
+	}
+
+	prog = bpf_prog_alloc(bpf_prog_size(len), GFP_USER);
+	if (!prog)
+		return ERR_PTR(-ENOMEM);
+
+	prog->len = len;
+	memcpy(prog->insns, insns, bpf_prog_insn_size(prog));
+	prog->type = cgrp_prog->type;
+
+	return prog;
+}
+
 /**
  * __cgroup_bpf_run_filter_skb() - Run a program for packet filtering
  * @sk: The socken sending or receiving traffic

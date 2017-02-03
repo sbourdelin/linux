@@ -81,6 +81,7 @@ enum bpf_cmd {
 	BPF_OBJ_GET,
 	BPF_PROG_ATTACH,
 	BPF_PROG_DETACH,
+	BPF_PROG_GET_ATTACH,
 };
 
 enum bpf_map_type {
@@ -178,6 +179,14 @@ union bpf_attr {
 		__u32		target_fd;	/* container object to attach to */
 		__u32		attach_bpf_fd;	/* eBPF program to attach */
 		__u32		attach_type;
+	};
+
+	struct { /* anonymous struct used by BPF_PROG_ATTACH_GET command */
+		__u32		target_get_fd;	/* container object attached to */
+		__u32		attach_type_get;
+		__u32		prog_type_get;	/* one of enum bpf_prog_type */
+		__u32		insn_cnt_get;
+		__aligned_u64	insns_get;
 	};
 } __attribute__((aligned(8)));
 

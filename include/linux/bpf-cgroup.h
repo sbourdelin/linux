@@ -36,6 +36,13 @@ void cgroup_bpf_update(struct cgroup *cgrp,
 		       struct bpf_prog *prog,
 		       enum bpf_attach_type type);
 
+struct bpf_prog *__cgroup_bpf_get(struct cgroup *cgrp,
+				  enum bpf_attach_type type);
+
+/* Wrapper for __cgroup_bpf_get() protected by cgroup_mutex */
+struct bpf_prog *cgroup_bpf_get(struct cgroup *cgrp,
+				enum bpf_attach_type type);
+
 int __cgroup_bpf_run_filter_skb(struct sock *sk,
 				struct sk_buff *skb,
 				enum bpf_attach_type type);
