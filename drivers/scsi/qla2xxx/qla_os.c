@@ -4322,7 +4322,11 @@ qla2x00_post_work(struct scsi_qla_host *vha, struct qla_work_evt *e)
 	spin_lock_irqsave(&vha->work_lock, flags);
 	list_add_tail(&e->list, &vha->work_list);
 	spin_unlock_irqrestore(&vha->work_lock, flags);
-	qla2xxx_wake_dpc(vha);
+
+	if (QLA_EARLY_LINKUP(vha->hw))
+		qla2x00_schedule_work(vha);
+	else
+		qla2xxx_wake_dpc(vha);
 
 	return QLA_SUCCESS;
 }
@@ -4570,6 +4574,45 @@ qla2x00_do_work(struct scsi_qla_host *vha)
 		/* For each work completed decrement vha ref count */
 		QLA_VHA_MARK_NOT_BUSY(vha);
 	}
+}
+
+static void qla2x00_iocb_work_fn(struct work_struct *work)
+{
+	struct scsi_qla_host *vha = container_of(work,
+		struct scsi_qla_host, iocb_work);
+	unsigned long flags;
+	int cnt = 0;
+
+	while (!list_empty(&vha->work_list)) {
+		qla2x00_do_work(vha);
+		cnt++;
+		if (cnt > 10)
+			break;
+	}
+
+	spin_lock_irqsave(&vha->work_lock, flags);
+	vha->flags.iocb_work_sheduled = 0;
+	spin_unlock_irqrestore(&vha->work_lock, flags);
+}
+
+void qla2x00_schedule_work(struct scsi_qla_host *vha)
+{
+	unsigned long flags;
+
+	spin_lock_irqsave(&vha->work_lock, flags);
+	if (vha->flags.iocb_work_sheduled) {
+		spin_unlock_irqrestore(&vha->work_lock, flags);
+		return;
+	}
+	vha->flags.iocb_work_sheduled = 1;
+	spin_unlock_irqrestore(&vha->work_lock, flags);
+
+	/*
+	 * We're in the middle of bringing up the adapter.
+	 * the scheduled work need to go out now.
+	 */
+	INIT_WORK(&vha->iocb_work, qla2x00_iocb_work_fn);
+	schedule_work(&vha->iocb_work);
 }
 
 /* Relogins all the fcports of a vport

@@ -193,6 +193,7 @@ extern int qla24xx_post_upd_fcport_work(struct scsi_qla_host *, fc_port_t *);
 void qla2x00_handle_login_done_event(struct scsi_qla_host *, fc_port_t *,
 	uint16_t *);
 int qla24xx_post_gnl_work(struct scsi_qla_host *, fc_port_t *);
+void qla2x00_schedule_work(struct scsi_qla_host *);
 
 /*
  * Global Functions in qla_mid.c source file.
