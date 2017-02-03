@@ -2519,10 +2519,54 @@ static u32 al_eth_get_rxfh_indir_size(struct net_device *netdev)
 	return AL_ETH_RX_RSS_TABLE_SIZE;
 }
 
+static void al_eth_get_wol(struct net_device *netdev,
+			   struct ethtool_wolinfo *wol)
+{
+	struct al_eth_adapter *adapter = netdev_priv(netdev);
+	struct phy_device *phydev;
+
+	wol->wolopts = adapter->wol;
+
+	if ((adapter) && (adapter->phy_exist) && (adapter->mdio_bus)) {
+		phydev = mdiobus_get_phy(adapter->mdio_bus, adapter->phy_addr);
+		if (phydev) {
+			phy_ethtool_get_wol(phydev, wol);
+			wol->supported |= WAKE_PHY;
+			return;
+		}
+	}
+
+	wol->supported |= WAKE_UCAST | WAKE_MCAST | WAKE_BCAST;
+}
+
+static int al_eth_set_wol(struct net_device *netdev,
+			  struct ethtool_wolinfo *wol)
+{
+	struct al_eth_adapter *adapter = netdev_priv(netdev);
+	struct phy_device *phydev;
+
+	if (wol->wolopts & (WAKE_ARP | WAKE_MAGICSECURE))
+		return -EOPNOTSUPP;
+
+	adapter->wol = wol->wolopts;
+
+	if ((adapter) && (adapter->phy_exist) && (adapter->mdio_bus)) {
+		phydev = mdiobus_get_phy(adapter->mdio_bus, adapter->phy_addr);
+		if (phydev)
+			return phy_ethtool_set_wol(phydev, wol);
+	}
+
+	device_set_wakeup_enable(&adapter->pdev->dev, adapter->wol);
+
+	return 0;
+}
+
 static const struct ethtool_ops al_eth_ethtool_ops = {
 	.get_settings		= al_eth_get_settings,
 	.set_settings		= al_eth_set_settings,
 	.get_drvinfo		= al_eth_get_drvinfo,
+	.get_wol		= al_eth_get_wol,
+	.set_wol		= al_eth_set_wol,
 	.get_msglevel		= al_eth_get_msglevel,
 	.set_msglevel		= al_eth_set_msglevel,
 
