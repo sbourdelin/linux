@@ -20,6 +20,12 @@
 #define AL_ADDR_LOW(x)	((u32)((dma_addr_t)(x)))
 #define AL_ADDR_HIGH(x)	((u32)((((dma_addr_t)(x)) >> 16) >> 16))
 
+/* Number of xfi_txclk cycles that accumulate into 100ns */
+#define ETH_MAC_KR_10_PCS_CFG_EEE_TIMER_VAL 52
+#define ETH_MAC_KR_25_PCS_CFG_EEE_TIMER_VAL 80
+#define ETH_MAC_XLG_40_PCS_CFG_EEE_TIMER_VAL 63
+#define ETH_MAC_XLG_50_PCS_CFG_EEE_TIMER_VAL 85
+
 #define AL_ETH_TX_PKT_UDMA_FLAGS	(AL_ETH_TX_FLAGS_NO_SNOOP | \
 					 AL_ETH_TX_FLAGS_INT)
 
@@ -2639,6 +2645,89 @@ int al_eth_flow_control_config(struct al_hw_eth_adapter *adapter,
 	return 0;
 }
 
+int al_eth_eee_get(struct al_hw_eth_adapter *adapter,
+		   struct al_eth_eee_params *params)
+{
+	u32 reg;
+
+	netdev_dbg(adapter->netdev, "[%s]: getting eee.\n", adapter->name);
+
+	reg = readl(&adapter->ec_regs_base->eee.cfg_e);
+	params->enable = (reg & EC_EEE_CFG_E_ENABLE) ? true : false;
+
+	params->tx_eee_timer = readl(&adapter->ec_regs_base->eee.pre_cnt);
+	params->min_interval = readl(&adapter->ec_regs_base->eee.post_cnt);
+	params->stop_cnt = readl(&adapter->ec_regs_base->eee.stop_cnt);
+
+	return 0;
+}
+
+int al_eth_eee_config(struct al_hw_eth_adapter *adapter,
+		      struct al_eth_eee_params *params)
+{
+	u32 reg;
+
+	netdev_dbg(adapter->netdev, "[%s]: config eee.\n", adapter->name);
+
+	if (params->enable == 0) {
+		netdev_dbg(adapter->netdev, "[%s]: disable eee.\n",
+			   adapter->name);
+		writel(0, &adapter->ec_regs_base->eee.cfg_e);
+		return 0;
+	}
+	if (AL_ETH_IS_10G_MAC(adapter->mac_mode) || AL_ETH_IS_25G_MAC(adapter->mac_mode)) {
+		reg = readl(&adapter->mac_regs_base->kr.pcs_cfg);
+		reg &= ~ETH_MAC_KR_PCS_CFG_EEE_TIMER_VAL_MASK;
+		reg |= (AL_ETH_IS_10G_MAC(adapter->mac_mode) ?
+			ETH_MAC_KR_10_PCS_CFG_EEE_TIMER_VAL :
+			ETH_MAC_KR_25_PCS_CFG_EEE_TIMER_VAL) <<
+			ETH_MAC_KR_PCS_CFG_EEE_TIMER_VAL_SHIFT,
+		writel(reg, &adapter->mac_regs_base->kr.pcs_cfg);
+	}
+	if ((adapter->mac_mode == AL_ETH_MAC_MODE_XLG_LL_40G) ||
+	    (adapter->mac_mode == AL_ETH_MAC_MODE_XLG_LL_50G)) {
+		reg = readl(&adapter->mac_regs_base->gen_v3.pcs_40g_ll_eee_cfg);
+		reg &= ~ETH_MAC_GEN_V3_PCS_40G_LL_EEE_CFG_TIMER_VAL_MASK;
+		reg |= ((adapter->mac_mode == AL_ETH_MAC_MODE_XLG_LL_40G) ?
+			ETH_MAC_XLG_40_PCS_CFG_EEE_TIMER_VAL :
+			ETH_MAC_XLG_50_PCS_CFG_EEE_TIMER_VAL) <<
+			ETH_MAC_GEN_V3_PCS_40G_LL_EEE_CFG_TIMER_VAL_SHIFT;
+		writel(reg, &adapter->mac_regs_base->gen_v3.pcs_40g_ll_eee_cfg);
+
+		/* set Deep sleep mode as the LPI function (instead of Fast wake mode) */
+		al_eth_40g_pcs_reg_write(adapter, ETH_MAC_GEN_V3_PCS_40G_EEE_CONTROL_ADDR,
+					 params->fast_wake ? 1 : 0);
+	}
+
+	writel(params->tx_eee_timer, &adapter->ec_regs_base->eee.pre_cnt);
+	writel(params->min_interval, &adapter->ec_regs_base->eee.post_cnt);
+	writel(params->stop_cnt, &adapter->ec_regs_base->eee.stop_cnt);
+
+	reg = EC_EEE_CFG_E_MASK_EC_TMI_STOP | EC_EEE_CFG_E_MASK_MAC_EEE |
+	      EC_EEE_CFG_E_ENABLE | EC_EEE_CFG_E_USE_EC_TX_FIFO |
+	      EC_EEE_CFG_E_USE_EC_RX_FIFO;
+
+	/*
+	 * Addressing RMN: 3732
+	 *
+	 * RMN description:
+	 * When the HW get into eee mode, it can't transmit any pause packet
+	 * (when flow control policy is enabled).
+	 * In such case, the HW has no way to handle extreme pushback from
+	 * the Rx_path fifos.
+	 *
+	 * Software flow:
+	 * Configure RX_FIFO empty as eee mode term.
+	 * That way, nothing will prevent pause packet transmittion in
+	 * case of extreme pushback from the Rx_path fifos.
+	 *
+	 */
+
+	writel(reg, &adapter->ec_regs_base->eee.cfg_e);
+
+	return 0;
+}
+
 /* get statistics */
 int al_eth_mac_stats_get(struct al_hw_eth_adapter *adapter, struct al_eth_mac_stats *stats)
 {
@@ -2859,6 +2948,9 @@ int al_eth_mac_stats_get(struct al_hw_eth_adapter *adapter, struct al_eth_mac_st
 		stats->etherStatsPkts1024to1518Octets = _40g_mac_reg_read32(&reg_rx_stats->etherStatsPkts1024to1518Octets);
 		stats->etherStatsPkts1519toX = _40g_mac_reg_read32(&reg_rx_stats->etherStatsPkts1519toMax);
 	}
+
+	stats->eee_in = readl(&adapter->mac_regs_base->stat.eee_in);
+	stats->eee_out = readl(&adapter->mac_regs_base->stat.eee_out);
 
 /*	stats->etherStatsPkts = 1; */
 	return 0;
