@@ -849,6 +849,14 @@ config VMAP_STACK
 	  the stack to map directly to the KASAN shadow map using a formula
 	  that is incorrect if the stack is in vmalloc space.
 
+config NR_VMAP_STACK_CACHE
+	int "Number of cached stacks"
+	default "2"
+	depends on VMAP_STACK
+	---help---
+	  This determines how many stacks can be cached for virtually
+	  mapped kernel stacks.
+
 config ARCH_WANT_RELAX_ORDER
 	bool
 

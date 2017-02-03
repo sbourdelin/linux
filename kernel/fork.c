@@ -166,7 +166,7 @@ void __weak arch_release_thread_stack(unsigned long *stack)
  * vmalloc() is a bit slow, and calling vfree() enough times will force a TLB
  * flush.  Try to minimize the number of calls by caching stacks.
  */
-#define NR_CACHED_STACKS 2
+#define NR_CACHED_STACKS CONFIG_NR_VMAP_STACK_CACHE
 
 struct vm_stack_cache {
 	struct vm_struct **vm_stacks;
