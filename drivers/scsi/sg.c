@@ -752,6 +752,20 @@ sg_new_write(Sg_fd *sfp, struct file *file, const char __user *buf,
 	return count;
 }
 
+static bool sg_is_valid_direction(int dxfer_direction)
+{
+	switch (dxfer_direction) {
+	case SG_DXFER_NONE:
+	case SG_DXFER_TO_DEV:
+	case SG_DXFER_FROM_DEV:
+	case SG_DXFER_TO_FROM_DEV:
+	case SG_DXFER_UNKNOWN:
+		return true;
+	default:
+		return false;
+	}
+}
+
 static int
 sg_common_write(Sg_fd * sfp, Sg_request * srp,
 		unsigned char *cmnd, int timeout, int blocking)
@@ -771,6 +785,11 @@ sg_common_write(Sg_fd * sfp, Sg_request * srp,
 	SCSI_LOG_TIMEOUT(4, sg_printk(KERN_INFO, sfp->parentdp,
 			"sg_common_write:  scsi opcode=0x%02x, cmd_size=%d\n",
 			(int) cmnd[0], (int) hp->cmd_len));
+
+	if (!sg_is_valid_direction(hp->dxfer_direction))
+		return -EINVAL;
+	if (hp->dxferp == NULL && hp->dxfer_len > 0)
+		return -EINVAL;
 
 	k = sg_start_req(srp, cmnd);
 	if (k) {
