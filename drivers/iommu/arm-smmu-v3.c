@@ -2698,9 +2698,8 @@ static int arm_smmu_device_probe(struct platform_device *pdev)
 		return ret;
 
 	smmu->iommu.ops = &arm_smmu_ops;
+	smmu->iommu.fwnode = dev->fwnode;
 	ret = iommu_device_register(&smmu->iommu);
-
-	iommu_register_instance(dev->fwnode, &arm_smmu_ops);
 
 #ifdef CONFIG_PCI
 	if (pci_bus_type.iommu_ops != &arm_smmu_ops) {
