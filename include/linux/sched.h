@@ -5,51 +5,23 @@
 
 #include <linux/sched/prio.h>
 
-#include <asm/param.h>	/* for HZ */
-
-#include <linux/threads.h>
-#include <linux/kernel.h>
-#include <linux/types.h>
-#include <linux/timex.h>
-#include <linux/jiffies.h>
 #include <linux/plist.h>
-#include <linux/rbtree.h>
-#include <linux/thread_info.h>
-#include <linux/cpumask.h>
-#include <linux/errno.h>
-#include <linux/nodemask.h>
 #include <linux/mm_types.h>
-#include <linux/preempt.h>
 
-#include <asm/page.h>
-
-#include <linux/smp.h>
 #include <linux/sem.h>
 #include <linux/shm.h>
 #include <linux/signal.h>
-#include <linux/compiler.h>
-#include <linux/completion.h>
 #include <linux/pid.h>
-#include <linux/percpu.h>
-#include <linux/topology.h>
 #include <linux/seccomp.h>
-#include <linux/rcupdate.h>
 #include <linux/rculist.h>
 
-#include <linux/time.h>
-#include <linux/param.h>
 #include <linux/resource.h>
-#include <linux/timer.h>
 #include <linux/hrtimer.h>
 #include <linux/kcov.h>
 #include <linux/task_io_accounting.h>
 #include <linux/latencytop.h>
-#include <linux/llist.h>
-#include <linux/uidgid.h>
 #include <linux/gfp.h>
 #include <linux/magic.h>
-
-#include <asm/processor.h>
 
 struct sched_attr;
 struct sched_param;
