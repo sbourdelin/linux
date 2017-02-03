@@ -8090,6 +8090,9 @@ static void perf_event_addr_filters_apply(struct perf_event *event)
 	if (task == TASK_TOMBSTONE)
 		return;
 
+	if (!event->ctx->task)
+		goto restart;
+
 	mm = get_task_mm(event->ctx->task);
 	if (!mm)
 		goto restart;
@@ -8264,6 +8267,20 @@ perf_event_parse_addr_filter(struct perf_event *event, char *fstr,
 				goto fail;
 
 			if (!kernel) {
+				/*
+				 * For now, we only support user
+				 * filtering in per-task events; doing
+				 * so for CPU-wide events requires
+				 * additional context switching
+				 * trickery, since same object code
+				 * will be mapped at different virtual
+				 * addresses in different processes.
+				 */
+				ret = -EOPNOTSUPP;
+				if (!event->ctx->task)
+					goto fail;
+
+				ret = -EINVAL;
 				if (!filename)
 					goto fail;
 
@@ -8320,15 +8337,6 @@ perf_event_set_addr_filter(struct perf_event *event, char *filter_str)
 
 	if (WARN_ON_ONCE(event->parent))
 		return -EINVAL;
-
-	/*
-	 * For now, we only support filtering in per-task events; doing so
-	 * for CPU-wide events requires additional context switching trickery,
-	 * since same object code will be mapped at different virtual
-	 * addresses in different processes.
-	 */
-	if (!event->ctx->task)
-		return -EOPNOTSUPP;
 
 	ret = perf_event_parse_addr_filter(event, filter_str, &filters);
 	if (ret)
