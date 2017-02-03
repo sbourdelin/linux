@@ -275,4 +275,19 @@ config FM10K
 	  To compile this driver as a module, choose M here. The module
 	  will be called fm10k.  MSI-X interrupt support is required
 
+config PCI_RELAX_ORDER
+        bool "PCI relax order mode support"
+        default n
+        select ARCH_WANT_RELAX_ORDER
+        ---help---
+          This allows one to enable relax order mode in driver.
+          CONFIG_ARCH_WANT_RELAX_ORDER is a common macro for some
+          CPU architecture to use relax order mode in NIC's source codes.
+          CONFIG_ARCH_WANT_RELAX_ORDER can be defined in arch/xxx/Kconfig,
+          such as sparc system exists in arch/sparc/Kconfig, but not all
+          of arm64 systems can use relax order mode, so it can't be defined
+          in arch/arm64/Kconfig. Therefore PCI_RELAX_ORDER provide one way
+          to define macro CONFIG_ARCH_WANT_RELAX_ORDER. Say Y here if you
+          want to enable relax order.
+
 endif # NET_VENDOR_INTEL
