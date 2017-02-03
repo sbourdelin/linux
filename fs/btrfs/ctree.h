@@ -647,6 +647,10 @@ struct btrfs_block_group_cache {
 	 * Protected by free_space_lock.
 	 */
 	int needs_free_space;
+
+	/* Scrub full stripe lock tree for RAID5/6 scrub */
+	struct rb_root scrub_lock_root;
+	spinlock_t scrub_lock;
 };
 
 /* delayed seq elem */

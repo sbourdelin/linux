@@ -130,6 +130,7 @@ void btrfs_put_block_group(struct btrfs_block_group_cache *cache)
 	if (atomic_dec_and_test(&cache->count)) {
 		WARN_ON(cache->pinned > 0);
 		WARN_ON(cache->reserved > 0);
+		WARN_ON(!RB_EMPTY_ROOT(&cache->scrub_lock_root));
 		kfree(cache->free_space_ctl);
 		kfree(cache);
 	}
@@ -9906,6 +9907,8 @@ btrfs_create_block_group_cache(struct btrfs_fs_info *fs_info,
 
 	atomic_set(&cache->count, 1);
 	spin_lock_init(&cache->lock);
+	spin_lock_init(&cache->scrub_lock);
+	cache->scrub_lock_root = RB_ROOT;
 	init_rwsem(&cache->data_rwsem);
 	INIT_LIST_HEAD(&cache->list);
 	INIT_LIST_HEAD(&cache->cluster_list);
