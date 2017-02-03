@@ -194,6 +194,21 @@ static int alloc_vm_stack_cache(unsigned int cpu)
 	vm_stack_cache->cur = 0;
 	vm_stack_cache->nr = 0;
 
+	for (i = 0; i < NR_CACHED_STACKS; i++) {
+		void *stack = __vmalloc_node_range(THREAD_SIZE, THREAD_SIZE,
+						VMALLOC_START, VMALLOC_END,
+						THREADINFO_GFP | __GFP_HIGHMEM,
+						PAGE_KERNEL,
+						0, cpu_to_node(cpu),
+						__builtin_return_address(0));
+		if (!stack)
+			return -ENOMEM;
+
+		vm_stacks[i] = find_vm_area(stack);
+		vm_stack_cache->cur++;
+		vm_stack_cache->nr++;
+	}
+
 	return 0;
 }
 
