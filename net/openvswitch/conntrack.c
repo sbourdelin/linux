@@ -152,8 +152,8 @@ static void __ovs_ct_update_key(struct sw_flow_key *key, u8 state,
 				const struct nf_conntrack_zone *zone,
 				const struct nf_conn *ct)
 {
-	key->ct.state = state;
-	key->ct.zone = zone->id;
+	key->ct_state = state;
+	key->ct_zone = zone->id;
 	key->ct.mark = ovs_ct_get_mark(ct);
 	ovs_ct_get_labels(ct, &key->ct.labels);
 
@@ -161,7 +161,7 @@ static void __ovs_ct_update_key(struct sw_flow_key *key, u8 state,
 	if (ct && ct->master)
 		ct = ct->master;
 
-	key->ct.orig_proto = 0;
+	key->ct_orig_proto = 0;
 	key->ct.orig_tp.src = 0;
 	key->ct.orig_tp.dst = 0;
 	if (key->eth.type == htons(ETH_P_IP)) {
@@ -172,7 +172,7 @@ static void __ovs_ct_update_key(struct sw_flow_key *key, u8 state,
 
 			key->ipv4.ct_orig.src = orig->src.u3.ip;
 			key->ipv4.ct_orig.dst = orig->dst.u3.ip;
-			key->ct.orig_proto = orig->dst.protonum;
+			key->ct_orig_proto = orig->dst.protonum;
 			if (orig->dst.protonum == IPPROTO_ICMP) {
 				key->ct.orig_tp.src
 					= htons(orig->dst.u.icmp.type);
@@ -195,7 +195,7 @@ static void __ovs_ct_update_key(struct sw_flow_key *key, u8 state,
 
 			key->ipv6.ct_orig.src = orig->src.u3.in6;
 			key->ipv6.ct_orig.dst = orig->dst.u3.in6;
-			key->ct.orig_proto = orig->dst.protonum;
+			key->ct_orig_proto = orig->dst.protonum;
 			if (orig->dst.protonum == IPPROTO_ICMPV6) {
 				key->ct.orig_tp.src
 					= htons(orig->dst.u.icmp.type);
@@ -238,7 +238,7 @@ static void ovs_ct_update_key(const struct sk_buff *skb,
 		if (ct->master)
 			state |= OVS_CS_F_RELATED;
 		if (keep_nat_flags) {
-			state |= key->ct.state & OVS_CS_F_NAT_MASK;
+			state |= key->ct_state & OVS_CS_F_NAT_MASK;
 		} else {
 			if (ct->status & IPS_SRC_NAT)
 				state |= OVS_CS_F_SRC_NAT;
@@ -269,11 +269,11 @@ void ovs_ct_fill_key(const struct sk_buff *skb, struct sw_flow_key *key)
 int ovs_ct_put_key(const struct sw_flow_key *swkey,
 		   const struct sw_flow_key *output, struct sk_buff *skb)
 {
-	if (nla_put_u32(skb, OVS_KEY_ATTR_CT_STATE, output->ct.state))
+	if (nla_put_u32(skb, OVS_KEY_ATTR_CT_STATE, output->ct_state))
 		return -EMSGSIZE;
 
 	if (IS_ENABLED(CONFIG_NF_CONNTRACK_ZONES) &&
-	    nla_put_u16(skb, OVS_KEY_ATTR_CT_ZONE, output->ct.zone))
+	    nla_put_u16(skb, OVS_KEY_ATTR_CT_ZONE, output->ct_zone))
 		return -EMSGSIZE;
 
 	if (IS_ENABLED(CONFIG_NF_CONNTRACK_MARK) &&
@@ -285,25 +285,25 @@ int ovs_ct_put_key(const struct sw_flow_key *swkey,
 		    &output->ct.labels))
 		return -EMSGSIZE;
 
-	if (swkey->eth.type == htons(ETH_P_IP) && swkey->ct.orig_proto) {
+	if (swkey->eth.type == htons(ETH_P_IP) && swkey->ct_orig_proto) {
 		struct ovs_key_ct_tuple_ipv4 orig = {
 			output->ipv4.ct_orig.src,
 			output->ipv4.ct_orig.dst,
 			output->ct.orig_tp.src,
 			output->ct.orig_tp.dst,
-			output->ct.orig_proto,
+			output->ct_orig_proto,
 		};
 		if (nla_put(skb, OVS_KEY_ATTR_CT_ORIG_TUPLE_IPV4, sizeof(orig),
 			    &orig))
 			return -EMSGSIZE;
 	} else if (swkey->eth.type == htons(ETH_P_IPV6) &&
-		   swkey->ct.orig_proto) {
+		   swkey->ct_orig_proto) {
 		struct ovs_key_ct_tuple_ipv6 orig = {
 			IN6_ADDR_INITIALIZER(output->ipv6.ct_orig.src),
 			IN6_ADDR_INITIALIZER(output->ipv6.ct_orig.dst),
 			output->ct.orig_tp.src,
 			output->ct.orig_tp.dst,
-			output->ct.orig_proto,
+			output->ct_orig_proto,
 		};
 		if (nla_put(skb, OVS_KEY_ATTR_CT_ORIG_TUPLE_IPV6, sizeof(orig),
 			    &orig))
@@ -630,11 +630,11 @@ static bool skb_nfct_cached(struct net *net,
 	 * due to an upcall.  If the connection was not confirmed, it is not
 	 * cached and needs to be run through conntrack again.
 	 */
-	if (!ct && key->ct.state & OVS_CS_F_TRACKED &&
-	    !(key->ct.state & OVS_CS_F_INVALID) &&
-	    key->ct.zone == info->zone.id) {
+	if (!ct && key->ct_state & OVS_CS_F_TRACKED &&
+	    !(key->ct_state & OVS_CS_F_INVALID) &&
+	    key->ct_zone == info->zone.id) {
 		ct = ovs_ct_find_existing(net, &info->zone, info->family, skb,
-					  !!(key->ct.state
+					  !!(key->ct_state
 					     & OVS_CS_F_NAT_MASK));
 		if (ct)
 			nf_ct_get(skb, &ctinfo);
@@ -759,7 +759,7 @@ static void ovs_nat_update_key(struct sw_flow_key *key,
 	if (maniptype == NF_NAT_MANIP_SRC) {
 		__be16 src;
 
-		key->ct.state |= OVS_CS_F_SRC_NAT;
+		key->ct_state |= OVS_CS_F_SRC_NAT;
 		if (key->eth.type == htons(ETH_P_IP))
 			key->ipv4.addr.src = ip_hdr(skb)->saddr;
 		else if (key->eth.type == htons(ETH_P_IPV6))
@@ -781,7 +781,7 @@ static void ovs_nat_update_key(struct sw_flow_key *key,
 	} else {
 		__be16 dst;
 
-		key->ct.state |= OVS_CS_F_DST_NAT;
+		key->ct_state |= OVS_CS_F_DST_NAT;
 		if (key->eth.type == htons(ETH_P_IP))
 			key->ipv4.addr.dst = ip_hdr(skb)->daddr;
 		else if (key->eth.type == htons(ETH_P_IPV6))
@@ -906,7 +906,7 @@ static int __ovs_ct_lookup(struct net *net, struct sw_flow_key *key,
 		 * NAT after the nf_conntrack_in() call.  We can actually clear
 		 * the whole state, as it will be re-initialized below.
 		 */
-		key->ct.state = 0;
+		key->ct_state = 0;
 
 		/* Update the key, but keep the NAT flags. */
 		ovs_ct_update_key(skb, info, key, true, true);
@@ -922,9 +922,9 @@ static int __ovs_ct_lookup(struct net *net, struct sw_flow_key *key,
 		 *
 		 * NAT will be done only if the CT action has NAT, and only
 		 * once per packet (per zone), as guarded by the NAT bits in
-		 * the key->ct.state.
+		 * the key->ct_state.
 		 */
-		if (info->nat && !(key->ct.state & OVS_CS_F_NAT_MASK) &&
+		if (info->nat && !(key->ct_state & OVS_CS_F_NAT_MASK) &&
 		    (nf_ct_is_confirmed(ct) || info->commit) &&
 		    ovs_ct_nat(net, key, info, skb, ct, ctinfo) != NF_ACCEPT) {
 			return -EINVAL;
