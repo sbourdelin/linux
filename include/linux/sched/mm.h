@@ -4,6 +4,7 @@
 #include <linux/kernel.h>
 #include <linux/atomic.h>
 #include <linux/sched.h>
+#include <linux/mm_types.h>
 #include <linux/gfp.h>
 
 /*

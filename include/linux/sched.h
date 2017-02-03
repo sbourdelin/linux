@@ -6,7 +6,7 @@
 #include <linux/sched/prio.h>
 
 #include <linux/plist.h>
-#include <linux/mm_types.h>
+#include <linux/mm_types_task.h>
 
 #include <linux/sem.h>
 #include <linux/shm.h>
