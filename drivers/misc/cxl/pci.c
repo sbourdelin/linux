@@ -1487,8 +1487,6 @@ static int cxl_configure_adapter(struct cxl *adapter, struct pci_dev *dev)
 	if ((rc = cxl_native_register_psl_err_irq(adapter)))
 		goto err;
 
-	/* Release the context lock as adapter is configured */
-	cxl_adapter_context_unlock(adapter);
 	return 0;
 
 err:
@@ -1587,6 +1585,9 @@ static struct cxl *cxl_pci_init_adapter(struct pci_dev *dev)
 	if ((rc = cxl_sysfs_adapter_add(adapter)))
 		goto err_put1;
 
+	/* Release the context lock as adapter is configured */
+	cxl_adapter_context_unlock(adapter);
+
 	return adapter;
 
 err_put1:
@@ -1606,6 +1607,9 @@ err_release:
 static void cxl_pci_remove_adapter(struct cxl *adapter)
 {
 	pr_devel("cxl_remove_adapter\n");
+
+	/* Forcibly take the adapter context lock */
+	cxl_adapter_context_force_lock(adapter);
 
 	cxl_sysfs_adapter_remove(adapter);
 	cxl_debugfs_adapter_remove(adapter);
@@ -1778,6 +1782,9 @@ static pci_ers_result_t cxl_pci_error_detected(struct pci_dev *pdev,
 	 */
 	schedule();
 
+	/* forcibly take the context lock to prevent new context activation */
+	cxl_adapter_context_force_lock(adapter);
+
 	/* If we're permanently dead, give up. */
 	if (state == pci_channel_io_perm_failure) {
 		/* Tell the AFU drivers; but we don't care what they
@@ -1879,11 +1886,15 @@ static pci_ers_result_t cxl_pci_error_detected(struct pci_dev *pdev,
 		/* Only continue if everyone agrees on NEED_RESET */
 		if (result != PCI_ERS_RESULT_NEED_RESET)
 			return result;
+	}
 
+	for (i = 0; i < adapter->slices; i++) {
+		afu = adapter->afu[i];
 		cxl_context_detach_all(afu);
 		cxl_ops->afu_deactivate_mode(afu, afu->current_mode);
 		pci_deconfigure_afu(afu);
 	}
+
 	cxl_deconfigure_adapter(adapter);
 
 	return result;
@@ -1979,6 +1990,9 @@ static void cxl_pci_resume(struct pci_dev *pdev)
 				afu_dev->driver->err_handler->resume(afu_dev);
 		}
 	}
+
+	/* Unlock context activation for the adapter */
+	cxl_adapter_context_unlock(adapter);
 }
 
 static const struct pci_error_handlers cxl_err_handler = {

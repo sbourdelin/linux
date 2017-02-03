@@ -970,4 +970,7 @@ int cxl_adapter_context_lock(struct cxl *adapter);
 /* Unlock the contexts-lock if taken. Warn and force unlock otherwise */
 void cxl_adapter_context_unlock(struct cxl *adapter);
 
+/* Force contexts-lock to be taken */
+void cxl_adapter_context_force_lock(struct cxl *adapter);
+
 #endif

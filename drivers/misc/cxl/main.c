@@ -301,6 +301,16 @@ void cxl_adapter_context_put(struct cxl *adapter)
 	atomic_dec_if_positive(&adapter->contexts_num);
 }
 
+void cxl_adapter_context_force_lock(struct cxl *adapter)
+{
+	int count = atomic_read(&adapter->contexts_num);
+
+	if (count > 0)
+		pr_warn("Forcing context lock with %d active contexts\n",
+			count);
+	atomic_set(&adapter->contexts_num, -1);
+}
+
 int cxl_adapter_context_lock(struct cxl *adapter)
 {
 	int rc;
