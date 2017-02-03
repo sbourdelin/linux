@@ -774,7 +774,6 @@ static noinline void unlock_stripe(struct btrfs_raid_bio *rbio)
 	int bucket;
 	struct btrfs_stripe_hash *h;
 	unsigned long flags;
-	int keep_cache = 0;
 
 	bucket = rbio_bucket(rbio);
 	h = rbio->fs_info->stripe_hash_table->table + bucket;
@@ -786,19 +785,6 @@ static noinline void unlock_stripe(struct btrfs_raid_bio *rbio)
 	spin_lock(&rbio->bio_list_lock);
 
 	if (!list_empty(&rbio->hash_list)) {
-		/*
-		 * if we're still cached and there is no other IO
-		 * to perform, just leave this rbio here for others
-		 * to steal from later
-		 */
-		if (list_empty(&rbio->plug_list) &&
-		    test_bit(RBIO_CACHE_BIT, &rbio->flags)) {
-			keep_cache = 1;
-			clear_bit(RBIO_RMW_LOCKED_BIT, &rbio->flags);
-			BUG_ON(!bio_list_empty(&rbio->bio_list));
-			goto done;
-		}
-
 		list_del_init(&rbio->hash_list);
 		atomic_dec(&rbio->refs);
 
@@ -846,13 +832,11 @@ static noinline void unlock_stripe(struct btrfs_raid_bio *rbio)
 			goto done_nolock;
 		}
 	}
-done:
 	spin_unlock(&rbio->bio_list_lock);
 	spin_unlock_irqrestore(&h->lock, flags);
 
 done_nolock:
-	if (!keep_cache)
-		remove_rbio_from_cache(rbio);
+	remove_rbio_from_cache(rbio);
 }
 
 static void __free_raid_bio(struct btrfs_raid_bio *rbio)
