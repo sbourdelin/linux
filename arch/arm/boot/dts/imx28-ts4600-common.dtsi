@@ -116,6 +116,11 @@
 		ts-strobe-gpios = <&gpio0 25 GPIO_ACTIVE_HIGH>;
 		ts-ale-gpios    = <&gpio0 26 GPIO_ACTIVE_HIGH>;
 		ts-rdy-gpios    = <&gpio0 21 GPIO_ACTIVE_HIGH>;
+
+		watchdog@2a {
+			compatible = "technologic,ts4600-wdt";
+			reg = <0x2a>;
+		};
 	};
 
 };

@@ -500,6 +500,17 @@ config NUC900_WATCHDOG
 	  To compile this driver as a module, choose M here: the
 	  module will be called nuc900_wdt.
 
+config TS4600_WATCHDOG
+	tristate "TS-4600 Watchdog"
+	depends on TS_NBUS
+	depends on HAS_IOMEM && OF
+	depends on SOC_IMX28 || COMPILE_TEST
+	select WATCHDOG_CORE
+	help
+	  Technologic Systems TS-4600 has watchdog timer implemented in
+	  an external FPGA. Say Y here if you want to support for the
+	  watchdog timer on TS-4600 board.
+
 config TS4800_WATCHDOG
 	tristate "TS-4800 Watchdog"
 	depends on HAS_IOMEM && OF
