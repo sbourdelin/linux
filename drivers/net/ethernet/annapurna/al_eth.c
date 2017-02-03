@@ -2388,6 +2388,41 @@ static void al_eth_set_msglevel(struct net_device *netdev, u32 value)
 	adapter->msg_enable = value;
 }
 
+static void al_eth_get_stats64(struct net_device *netdev,
+			       struct rtnl_link_stats64 *stats)
+{
+	struct al_eth_adapter *adapter = netdev_priv(netdev);
+	struct al_eth_mac_stats *mac_stats = &adapter->mac_stats;
+
+	if (!adapter->up)
+		return NULL;
+
+	al_eth_mac_stats_get(&adapter->hw_adapter, mac_stats);
+
+	stats->rx_packets = mac_stats->aFramesReceivedOK; /* including pause frames */
+	stats->tx_packets = mac_stats->aFramesTransmittedOK; /* including pause frames */
+	stats->rx_bytes = mac_stats->aOctetsReceivedOK;
+	stats->tx_bytes = mac_stats->aOctetsTransmittedOK;
+	stats->rx_dropped = 0;
+	stats->multicast = mac_stats->ifInMulticastPkts;
+	stats->collisions = 0;
+
+	stats->rx_length_errors = (mac_stats->etherStatsUndersizePkts + /* good but short */
+				   mac_stats->etherStatsFragments + /* short and bad*/
+				   mac_stats->etherStatsJabbers + /* with crc errors */
+				   mac_stats->etherStatsOversizePkts);
+	stats->rx_crc_errors = mac_stats->aFrameCheckSequenceErrors;
+	stats->rx_frame_errors = mac_stats->aAlignmentErrors;
+	stats->rx_fifo_errors = mac_stats->etherStatsDropEvents;
+	stats->rx_missed_errors = 0;
+	stats->tx_window_errors = 0;
+
+	stats->rx_errors = mac_stats->ifInErrors;
+	stats->tx_errors = mac_stats->ifOutErrors;
+
+	return stats;
+}
+
 static void al_eth_get_drvinfo(struct net_device *dev,
 			       struct ethtool_drvinfo *info)
 {
@@ -2763,6 +2798,7 @@ static const struct net_device_ops al_eth_netdev_ops = {
 	.ndo_stop		= al_eth_close,
 	.ndo_start_xmit		= al_eth_start_xmit,
 	.ndo_select_queue	= al_eth_select_queue,
+	.ndo_get_stats64	= al_eth_get_stats64,
 	.ndo_do_ioctl		= al_eth_ioctl,
 	.ndo_tx_timeout		= al_eth_tx_timeout,
 	.ndo_change_mtu		= al_eth_change_mtu,

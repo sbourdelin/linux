@@ -982,6 +982,15 @@ struct al_eth_mac_stats {
 };
 
 /*
+ * get mac statistics
+ * @param adapter pointer to the private structure.
+ * @param stats pointer to structure that will be filled with statistics.
+ *
+ * @return return 0 on success. otherwise on failure.
+ */
+int al_eth_mac_stats_get(struct al_hw_eth_adapter *adapter, struct al_eth_mac_stats *stats);
+
+/*
  * perform Function Level Reset RMN
  *
  * Addressing RMN: 714
