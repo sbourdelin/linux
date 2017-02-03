@@ -22,7 +22,6 @@
 #include <linux/preempt.h>
 
 #include <asm/page.h>
-#include <asm/ptrace.h>
 
 #include <linux/smp.h>
 #include <linux/sem.h>
