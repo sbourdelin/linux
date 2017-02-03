@@ -14,7 +14,6 @@
 #include <linux/atomic.h>
 #include <linux/cpumask.h>
 #include <linux/threads.h>
-#include <linux/sched/fork.h>
 
 #include <asm/cachectl.h>
 #include <asm/cpu.h>
