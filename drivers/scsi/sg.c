@@ -154,6 +154,8 @@ typedef struct sg_fd {		/* holds the state of a file descriptor */
 	unsigned char next_cmd_len; /* 0: automatic, >0: use on next write() */
 	char keep_orphan;	/* 0 -> drop orphan (def), 1 -> keep for read() */
 	char mmap_called;	/* 0 -> mmap() never called on this fd */
+	unsigned long flags;
+#define SG_RESERVED_IN_USE 1
 	struct kref f_ref;
 	struct execute_work ew;
 } Sg_fd;
@@ -197,7 +199,6 @@ static void sg_remove_sfp(struct kref *);
 static Sg_request *sg_get_rq_mark(Sg_fd * sfp, int pack_id);
 static Sg_request *sg_add_request(Sg_fd * sfp);
 static int sg_remove_request(Sg_fd * sfp, Sg_request * srp);
-static int sg_res_in_use(Sg_fd * sfp);
 static Sg_device *sg_get_dev(int dev);
 static void sg_device_destroy(struct kref *kref);
 
@@ -720,7 +721,7 @@ sg_new_write(Sg_fd *sfp, struct file *file, const char __user *buf,
 			sg_remove_request(sfp, srp);
 			return -EINVAL;	/* either MMAP_IO or DIRECT_IO (not both) */
 		}
-		if (sg_res_in_use(sfp)) {
+		if (test_bit(SG_RESERVED_IN_USE, &sfp->flags)) {
 			sg_remove_request(sfp, srp);
 			return -EBUSY;	/* reserve buffer already being used */
 		}
@@ -952,10 +953,14 @@ sg_ioctl(struct file *filp, unsigned int cmd_in, unsigned long arg)
 		val = min_t(int, val,
 			    max_sectors_bytes(sdp->device->request_queue));
 		if (val != sfp->reserve.bufflen) {
-			if (sg_res_in_use(sfp) || sfp->mmap_called)
+			if (sfp->mmap_called)
 				return -EBUSY;
+			if (test_and_set_bit(SG_RESERVED_IN_USE, &sfp->flags))
+				return -EBUSY;
+
 			sg_remove_scat(sfp, &sfp->reserve);
 			sg_build_reserve(sfp, val);
+			clear_bit(SG_RESERVED_IN_USE, &sfp->flags);
 		}
 		return 0;
 	case SG_GET_RESERVED_SIZE:
@@ -1709,7 +1714,9 @@ sg_start_req(Sg_request *srp, unsigned char *cmd)
 		md = &map_data;
 
 	if (md) {
-		if (!sg_res_in_use(sfp) && dxfer_len <= rsv_schp->bufflen)
+		if (dxfer_len <= rsv_schp->bufflen &&
+		    test_and_set_bit(SG_RESERVED_IN_USE,
+				     &sfp->flags) == 0)
 			sg_link_reserve(sfp, srp, dxfer_len);
 		else {
 			res = sg_build_indirect(req_schp, sfp, dxfer_len);
@@ -2003,6 +2010,7 @@ sg_unlink_reserve(Sg_fd * sfp, Sg_request * srp)
 	req_schp->sglist_len = 0;
 	sfp->save_scat_len = 0;
 	srp->res_used = 0;
+	clear_bit(SG_RESERVED_IN_USE, &sfp->flags);
 }
 
 static Sg_request *
@@ -2185,20 +2193,6 @@ sg_remove_sfp(struct kref *kref)
 
 	INIT_WORK(&sfp->ew.work, sg_remove_sfp_usercontext);
 	schedule_work(&sfp->ew.work);
-}
-
-static int
-sg_res_in_use(Sg_fd * sfp)
-{
-	const Sg_request *srp;
-	unsigned long iflags;
-
-	read_lock_irqsave(&sfp->rq_list_lock, iflags);
-	for (srp = sfp->headrp; srp; srp = srp->nextrp)
-		if (srp->res_used)
-			break;
-	read_unlock_irqrestore(&sfp->rq_list_lock, iflags);
-	return srp ? 1 : 0;
 }
 
 #ifdef CONFIG_SCSI_PROC_FS
