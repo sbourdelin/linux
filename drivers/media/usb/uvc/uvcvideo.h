@@ -506,9 +506,15 @@ struct uvc_streaming {
 		__u32 max_payload_size;
 	} bulk;
 
-	struct urb *urb[UVC_URBS];
-	char *urb_buffer[UVC_URBS];
-	dma_addr_t urb_dma[UVC_URBS];
+	/* Maximum number of URBs that can be submitted */
+	u32 max_urbs;
+
+	/* Maximum number of packets per URB */
+	u32 max_packets;
+
+	struct urb **urb;
+	char **urb_buffer;
+	dma_addr_t *urb_dma;
 	unsigned int urb_size;
 
 	__u32 sequence;

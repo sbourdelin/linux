@@ -190,6 +190,89 @@ static struct uvc_format_desc uvc_fmts[] = {
 	},
 };
 
+/* Sysfs attributes for show and store max_urbs/max_packets per URB */
+
+static ssize_t get_max_urbs_show(struct device *dev,
+	struct device_attribute *attr, char *buf) {
+
+	struct uvc_streaming *stream = NULL;
+	struct usb_interface *intf = to_usb_interface(dev);
+	struct uvc_device *udev = usb_get_intfdata(intf);
+	u32 ret_len = 0;
+	u32 stream_num = 0;
+
+	list_for_each_entry(stream, &udev->streams, list) {
+		ret_len += scnprintf((char *)(buf + ret_len), PAGE_SIZE,
+				"stream[%d] = %d\n", stream_num++,
+						stream->max_urbs);
+	}
+
+	return ret_len;
+}
+static DEVICE_ATTR_RO(get_max_urbs);
+
+static ssize_t set_max_urbs_store(struct device *dev,
+	struct device_attribute *attr, const char *buf, size_t count) {
+
+	struct uvc_streaming *stream;
+	struct usb_interface *intf = to_usb_interface(dev);
+	struct uvc_device *udev = usb_get_intfdata(intf);
+
+	list_for_each_entry(stream, &udev->streams, list) {
+		sscanf(buf, "%d", &stream->max_urbs);
+	}
+
+	return count;
+}
+static DEVICE_ATTR_WO(set_max_urbs);
+
+static ssize_t get_max_packets_show(struct device *dev,
+	struct device_attribute *attr, char *buf) {
+
+	struct uvc_streaming *stream = NULL;
+	struct usb_interface *intf = to_usb_interface(dev);
+	struct uvc_device *udev = usb_get_intfdata(intf);
+	u32 ret_len = 0;
+	u32 stream_num = 0;
+
+	list_for_each_entry(stream, &udev->streams, list) {
+		ret_len += scnprintf((char *)(buf + ret_len), PAGE_SIZE,
+				"stream[%d] = %d\n", stream_num++,
+						stream->max_packets);
+	}
+
+	return ret_len;
+}
+static DEVICE_ATTR_RO(get_max_packets);
+
+static ssize_t set_max_packets_store(struct device *dev,
+	struct device_attribute *attr, const char *buf, size_t count) {
+
+	struct uvc_streaming *stream;
+	struct usb_interface *intf = to_usb_interface(dev);
+	struct uvc_device *udev = usb_get_intfdata(intf);
+
+	list_for_each_entry(stream, &udev->streams, list) {
+		sscanf(buf, "%d", &stream->max_packets);
+	}
+
+	return count;
+}
+static DEVICE_ATTR_WO(set_max_packets);
+
+static struct attribute *uvc_attributes[] = {
+	&dev_attr_get_max_urbs.attr,
+	&dev_attr_set_max_urbs.attr,
+	&dev_attr_get_max_packets.attr,
+	&dev_attr_set_max_packets.attr,
+	NULL
+};
+
+static const struct attribute_group uvc_attr_group = {
+	.attrs = uvc_attributes,
+};
+
+
 /* ------------------------------------------------------------------------
  * Utility functions
  */
@@ -2095,6 +2178,12 @@ static int uvc_probe(struct usb_interface *intf,
 		uvc_printk(KERN_INFO, "Unable to initialize the status "
 			"endpoint (%d), status interrupt will not be "
 			"supported.\n", ret);
+	}
+
+	ret = sysfs_create_group(&dev->intf->dev.kobj, &uvc_attr_group);
+	if (ret < 0) {
+		uvc_printk(KERN_ERR, "Failed to create sysfs node %d\n", ret);
+		return ret;
 	}
 
 	uvc_trace(UVC_TRACE_PROBE, "UVC device initialized.\n");

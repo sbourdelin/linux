@@ -1361,7 +1361,7 @@ static void uvc_free_urb_buffers(struct uvc_streaming *stream)
 {
 	unsigned int i;
 
-	for (i = 0; i < UVC_URBS; ++i) {
+	for (i = 0; i < stream->max_urbs; ++i) {
 		if (stream->urb_buffer[i]) {
 #ifndef CONFIG_DMA_NONCOHERENT
 			usb_free_coherent(stream->dev->udev, stream->urb_size,
@@ -1373,6 +1373,11 @@ static void uvc_free_urb_buffers(struct uvc_streaming *stream)
 		}
 	}
 
+	/* Free memory used for storing URB pointers */
+	kfree(stream->urb);
+	kfree(stream->urb_buffer);
+	kfree(stream->urb_dma);
+
 	stream->urb_size = 0;
 }
 
@@ -1381,7 +1386,7 @@ static void uvc_free_urb_buffers(struct uvc_streaming *stream)
  * already allocated when resuming from suspend, in which case it will
  * return without touching the buffers.
  *
- * Limit the buffer size to UVC_MAX_PACKETS bulk/isochronous packets. If the
+ * Limit the buffer size to stream->max_packets bulk/isochronous packets. If the
  * system is too low on memory try successively smaller numbers of packets
  * until allocation succeeds.
  *
@@ -1397,16 +1402,24 @@ static int uvc_alloc_urb_buffers(struct uvc_streaming *stream,
 	if (stream->urb_size)
 		return stream->urb_size / psize;
 
+	/* Allocate memory for storing URB pointers */
+	stream->urb = (struct urb **)kcalloc(stream->max_urbs,
+			sizeof(struct urb *), gfp_flags | __GFP_NOWARN);
+	stream->urb_buffer = (char **)kcalloc(stream->max_urbs,
+				sizeof(char *), gfp_flags | __GFP_NOWARN);
+	stream->urb_dma = (dma_addr_t *)kcalloc(stream->max_urbs,
+				sizeof(dma_addr_t), gfp_flags | __GFP_NOWARN);
+
 	/* Compute the number of packets. Bulk endpoints might transfer UVC
 	 * payloads across multiple URBs.
 	 */
 	npackets = DIV_ROUND_UP(size, psize);
-	if (npackets > UVC_MAX_PACKETS)
-		npackets = UVC_MAX_PACKETS;
+	if (npackets > stream->max_packets)
+		npackets = stream->max_packets;
 
 	/* Retry allocations until one succeed. */
 	for (; npackets > 1; npackets /= 2) {
-		for (i = 0; i < UVC_URBS; ++i) {
+		for (i = 0; i < stream->max_urbs; ++i) {
 			stream->urb_size = psize * npackets;
 #ifndef CONFIG_DMA_NONCOHERENT
 			stream->urb_buffer[i] = usb_alloc_coherent(
@@ -1422,9 +1435,9 @@ static int uvc_alloc_urb_buffers(struct uvc_streaming *stream,
 			}
 		}
 
-		if (i == UVC_URBS) {
+		if (i == stream->max_urbs) {
 			uvc_trace(UVC_TRACE_VIDEO, "Allocated %u URB buffers "
-				"of %ux%u bytes each.\n", UVC_URBS, npackets,
+				"of %ux%u bytes each.\n", stream->max_urbs, npackets,
 				psize);
 			return npackets;
 		}
@@ -1445,7 +1458,7 @@ static void uvc_uninit_video(struct uvc_streaming *stream, int free_buffers)
 
 	uvc_video_stats_stop(stream);
 
-	for (i = 0; i < UVC_URBS; ++i) {
+	for (i = 0; i < stream->max_urbs; ++i) {
 		urb = stream->urb[i];
 		if (urb == NULL)
 			continue;
@@ -1506,7 +1519,7 @@ static int uvc_init_video_isoc(struct uvc_streaming *stream,
 
 	size = npackets * psize;
 
-	for (i = 0; i < UVC_URBS; ++i) {
+	for (i = 0; i < stream->max_urbs; ++i) {
 		urb = usb_alloc_urb(npackets, gfp_flags);
 		if (urb == NULL) {
 			uvc_uninit_video(stream, 1);
@@ -1572,7 +1585,7 @@ static int uvc_init_video_bulk(struct uvc_streaming *stream,
 	if (stream->type == V4L2_BUF_TYPE_VIDEO_OUTPUT)
 		size = 0;
 
-	for (i = 0; i < UVC_URBS; ++i) {
+	for (i = 0; i < stream->max_urbs; ++i) {
 		urb = usb_alloc_urb(0, gfp_flags);
 		if (urb == NULL) {
 			uvc_uninit_video(stream, 1);
@@ -1677,7 +1690,7 @@ static int uvc_init_video(struct uvc_streaming *stream, gfp_t gfp_flags)
 		return ret;
 
 	/* Submit the URBs. */
-	for (i = 0; i < UVC_URBS; ++i) {
+	for (i = 0; i < stream->max_urbs; ++i) {
 		ret = usb_submit_urb(stream->urb[i], gfp_flags);
 		if (ret < 0) {
 			uvc_printk(KERN_ERR, "Failed to submit URB %u "
@@ -1837,6 +1850,10 @@ int uvc_video_init(struct uvc_streaming *stream)
 	stream->def_format = format;
 	stream->cur_format = format;
 	stream->cur_frame = frame;
+
+	/* Set max URB numbers & max packets per URB to default */
+	stream->max_urbs = UVC_URBS;
+	stream->max_packets = UVC_MAX_PACKETS;
 
 	/* Select the video decoding function */
 	if (stream->type == V4L2_BUF_TYPE_VIDEO_CAPTURE) {
