@@ -265,6 +265,8 @@ static struct nf_conn_labels *ovs_ct_get_conn_labels(struct nf_conn *ct)
 	return cl;
 }
 
+static bool labels_nonzero(const struct ovs_key_ct_labels *labels);
+
 /* Initialize labels for a new, to be committed conntrack entry.  Note that
  * since the new connection is not yet confirmed, and thus no-one else has
  * access to it's labels, we simply write them over.  Also, we refrain from
@@ -275,18 +277,35 @@ static int ovs_ct_init_labels(struct nf_conn *ct, struct sw_flow_key *key,
 			      const struct ovs_key_ct_labels *labels,
 			      const struct ovs_key_ct_labels *mask)
 {
-	struct nf_conn_labels *cl;
-	u32 *dst;
-	int i;
+	struct nf_conn_labels *cl, *master_cl;
+	bool have_mask = labels_nonzero(mask);
+
+	/* Inherit master's labels to the related connection? */
+	master_cl = (ct->master) ? nf_ct_labels_find(ct->master) : NULL;
+
+	if (!master_cl && !have_mask)
+		return 0;   /* Nothing to do. */
 
 	cl = ovs_ct_get_conn_labels(ct);
 	if (!cl)
 		return -ENOSPC;
 
-	dst = (u32 *)cl->bits;
-	for (i = 0; i < OVS_CT_LABELS_LEN_32; i++)
-		dst[i] = (dst[i] & ~mask->ct_labels_32[i]) |
-			(labels->ct_labels_32[i] & mask->ct_labels_32[i]);
+	/* Inherit the master's labels, if any. */
+	if (master_cl) {
+		size_t len = sizeof(master_cl->bits);
+
+		memcpy(&cl->bits, &master_cl->bits,
+		       len > OVS_CT_LABELS_LEN ? OVS_CT_LABELS_LEN : len);
+	}
+	if (have_mask) {
+		u32 *dst = (u32 *)cl->bits;
+		int i;
+
+		for (i = 0; i < OVS_CT_LABELS_LEN_32; i++)
+			dst[i] = (dst[i] & ~mask->ct_labels_32[i]) |
+				(labels->ct_labels_32[i]
+				 & mask->ct_labels_32[i]);
+	}
 
 	memcpy(&key->ct.labels, cl->bits, OVS_CT_LABELS_LEN);
 
@@ -916,13 +935,14 @@ static int ovs_ct_commit(struct net *net, struct sw_flow_key *key,
 		if (err)
 			return err;
 	}
-	if (labels_nonzero(&info->labels.mask)) {
-		if (!nf_ct_is_confirmed(ct))
-			err = ovs_ct_init_labels(ct, key, &info->labels.value,
-						 &info->labels.mask);
-		else
-			err = ovs_ct_set_labels(ct, key, &info->labels.value,
-						&info->labels.mask);
+	if (!nf_ct_is_confirmed(ct)) {
+		err = ovs_ct_init_labels(ct, key, &info->labels.value,
+					 &info->labels.mask);
+		if (err)
+			return err;
+	} else if (labels_nonzero(&info->labels.mask)) {
+		err = ovs_ct_set_labels(ct, key, &info->labels.value,
+					&info->labels.mask);
 		if (err)
 			return err;
 	}
