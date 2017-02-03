@@ -3555,20 +3555,22 @@ static int _notifier_call_chain(struct regulator_dev *rdev,
 int regulator_bulk_get(struct device *dev, int num_consumers,
 		       struct regulator_bulk_data *consumers)
 {
+	struct regulator *r;
 	int i;
 	int ret;
 
-	for (i = 0; i < num_consumers; i++)
-		consumers[i].consumer = NULL;
-
 	for (i = 0; i < num_consumers; i++) {
-		consumers[i].consumer = regulator_get(dev,
-						      consumers[i].supply);
-		if (IS_ERR(consumers[i].consumer)) {
-			ret = PTR_ERR(consumers[i].consumer);
+		r = _regulator_get(dev, consumers[i].supply,
+				   consumers[i].optional ?
+					OPTIONAL_GET : NORMAL_GET);
+		ret = PTR_ERR_OR_ZERO(r);
+		if (!ret) {
+			consumers[i].consumer = r;
+		} else if (ret == -ENODEV && consumers[i].optional) {
+			consumers[i].consumer = NULL;
+		} else {
 			dev_err(dev, "Failed to get supply '%s': %d\n",
 				consumers[i].supply, ret);
-			consumers[i].consumer = NULL;
 			goto err;
 		}
 	}
@@ -3577,7 +3579,8 @@ int regulator_bulk_get(struct device *dev, int num_consumers,
 
 err:
 	while (--i >= 0)
-		regulator_put(consumers[i].consumer);
+		if (consumers[i].consumer)
+			regulator_put(consumers[i].consumer);
 
 	return ret;
 }
@@ -3610,7 +3613,7 @@ int regulator_bulk_enable(int num_consumers,
 	int ret = 0;
 
 	for (i = 0; i < num_consumers; i++) {
-		if (consumers[i].consumer->always_on)
+		if (!consumers[i].consumer || consumers[i].consumer->always_on)
 			consumers[i].ret = 0;
 		else
 			async_schedule_domain(regulator_bulk_enable_async,
@@ -3634,7 +3637,7 @@ err:
 		if (consumers[i].ret < 0)
 			pr_err("Failed to enable %s: %d\n", consumers[i].supply,
 			       consumers[i].ret);
-		else
+		else if (consumers[i].consumer)
 			regulator_disable(consumers[i].consumer);
 	}
 
@@ -3661,6 +3664,9 @@ int regulator_bulk_disable(int num_consumers,
 	int ret, r;
 
 	for (i = num_consumers - 1; i >= 0; --i) {
+		if (!consumers[i].consumer)
+			continue;
+
 		ret = regulator_disable(consumers[i].consumer);
 		if (ret != 0)
 			goto err;
@@ -3671,6 +3677,9 @@ int regulator_bulk_disable(int num_consumers,
 err:
 	pr_err("Failed to disable %s: %d\n", consumers[i].supply, ret);
 	for (++i; i < num_consumers; ++i) {
+		if (!consumers[i].consumer)
+			continue;
+
 		r = regulator_enable(consumers[i].consumer);
 		if (r != 0)
 			pr_err("Failed to re-enable %s: %d\n",
@@ -3702,8 +3711,8 @@ int regulator_bulk_force_disable(int num_consumers,
 	int ret = 0;
 
 	for (i = 0; i < num_consumers; i++) {
-		consumers[i].ret =
-			    regulator_force_disable(consumers[i].consumer);
+		consumers[i].ret = consumers[i].consumer ?
+			regulator_force_disable(consumers[i].consumer) : 0;
 
 		/* Store first error for reporting */
 		if (consumers[i].ret && !ret)
@@ -3729,8 +3738,10 @@ void regulator_bulk_free(int num_consumers,
 	int i;
 
 	for (i = 0; i < num_consumers; i++) {
-		regulator_put(consumers[i].consumer);
-		consumers[i].consumer = NULL;
+		if (consumers[i].consumer) {
+			regulator_put(consumers[i].consumer);
+			consumers[i].consumer = NULL;
+		}
 	}
 }
 EXPORT_SYMBOL_GPL(regulator_bulk_free);
