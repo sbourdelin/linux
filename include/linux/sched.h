@@ -10,7 +10,7 @@
 
 #include <linux/sem.h>
 #include <linux/shm.h>
-#include <linux/signal.h>
+#include <linux/signal_types.h>
 #include <linux/pid.h>
 #include <linux/seccomp.h>
 #include <linux/rculist.h>
