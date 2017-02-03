@@ -1,6 +1,8 @@
 #ifndef _LINUX_SCHED_CLOCK_H
 #define _LINUX_SCHED_CLOCK_H
 
+#include <linux/smp.h>
+
 /*
  * Do not use outside of architecture code which knows its limitations.
  *
