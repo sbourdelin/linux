@@ -354,22 +354,22 @@ static int setup_affinity(struct irq_desc *desc, struct cpumask *mask)
 
 	/*
 	 * Preserve the managed affinity setting and an userspace affinity
-	 * setup, but make sure that one of the targets is online.
+	 * setup, but make sure that one of the targets is present.
 	 */
 	if (irqd_affinity_is_managed(&desc->irq_data) ||
 	    irqd_has_set(&desc->irq_data, IRQD_AFFINITY_SET)) {
 		if (cpumask_intersects(desc->irq_common_data.affinity,
-				       cpu_online_mask))
+				       cpu_present_mask))
 			set = desc->irq_common_data.affinity;
 		else
 			irqd_clear(&desc->irq_data, IRQD_AFFINITY_SET);
 	}
 
-	cpumask_and(mask, cpu_online_mask, set);
+	cpumask_and(mask, cpu_present_mask, set);
 	if (node != NUMA_NO_NODE) {
 		const struct cpumask *nodemask = cpumask_of_node(node);
 
-		/* make sure at least one of the cpus in nodemask is online */
+		/* make sure at least one of the cpus in nodemask is present */
 		if (cpumask_intersects(mask, nodemask))
 			cpumask_and(mask, mask, nodemask);
 	}
