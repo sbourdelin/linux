@@ -9,6 +9,8 @@
  */
 
 #include <stddef.h>
+#include <errno.h> /* for EINVAL */
+#include <string.h> /* for strcmp */
 #include <linux/ptrace.h> /* for struct user_pt_regs */
 #include <dwarf-regs.h>
 
@@ -74,4 +76,22 @@ static const struct pt_regs_offset regoffset_table[] = {
 const char *get_arch_regstr(unsigned int n)
 {
 	return (n < ARCH_MAX_REGS) ? regoffset_table[n].name : NULL;
+}
+
+/* Reuse code from arch/arm64/kernel/ptrace.c */
+/**
+ * regs_query_register_offset() - query register offset from its name
+ * @name:	the name of a register
+ *
+ * regs_query_register_offset() returns the offset of a register in struct
+ * user_pt_regs from its name. If the name is invalid, this returns -EINVAL;
+ */
+int regs_query_register_offset(const char *name)
+{
+	const struct pt_regs_offset *roff;
+
+	for (roff = regoffset_table; roff->name != NULL; roff++)
+		if (!strcmp(roff->name, name))
+			return roff->offset;
+	return -EINVAL;
 }
