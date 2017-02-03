@@ -204,6 +204,20 @@ struct iommu_ops {
 	unsigned long pgsize_bitmap;
 };
 
+/**
+ * struct iommu_device - IOMMU core representation of one IOMMU hardware
+ *			 instance
+ * @list: Used by the iommu-core to keep a list of registered iommus
+ * @ops: iommu-ops for talking to this iommu
+ */
+struct iommu_device {
+	struct list_head list;
+	const struct iommu_ops *ops;
+};
+
+int  iommu_device_register(struct iommu_device *iommu);
+void iommu_device_unregister(struct iommu_device *iommu);
+
 #define IOMMU_GROUP_NOTIFY_ADD_DEVICE		1 /* Device added */
 #define IOMMU_GROUP_NOTIFY_DEL_DEVICE		2 /* Pre Device removed */
 #define IOMMU_GROUP_NOTIFY_BIND_DRIVER		3 /* Pre Driver bind */
