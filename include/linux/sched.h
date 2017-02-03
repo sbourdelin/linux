@@ -38,10 +38,6 @@ struct nameidata;
 struct signal_struct;
 struct sighand_struct;
 
-#define VMACACHE_BITS 2
-#define VMACACHE_SIZE (1U << VMACACHE_BITS)
-#define VMACACHE_MASK (VMACACHE_SIZE - 1)
-
 #if defined(CONFIG_SMP) && defined(CONFIG_NO_HZ_COMMON)
 extern void cpu_load_update_nohz_start(void);
 extern void cpu_load_update_nohz_stop(void);
@@ -746,9 +742,10 @@ struct task_struct {
 #endif
 
 	struct mm_struct *mm, *active_mm;
-	/* per-thread vma caching */
-	u32 vmacache_seqnum;
-	struct vm_area_struct *vmacache[VMACACHE_SIZE];
+
+	/* Per-thread vma caching: */
+	struct vmacache vmacache;
+
 #if defined(SPLIT_RSS_COUNTING)
 	struct task_rss_stat	rss_stat;
 #endif
