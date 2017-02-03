@@ -16,10 +16,12 @@
 #include <linux/atomic.h>
 #include <linux/audit.h>
 #include <linux/compat.h>
+#include <linux/kmemleak.h>
 #include <linux/sched.h>
 #include <linux/seccomp.h>
 #include <linux/slab.h>
 #include <linux/syscalls.h>
+#include <linux/sysctl.h>
 
 #ifdef CONFIG_HAVE_ARCH_SECCOMP_FILTER
 #include <asm/syscall.h>
@@ -906,3 +908,51 @@ out:
 	return ret;
 }
 #endif
+
+#ifdef CONFIG_SYSCTL
+
+#define SECCOMP_RET_KILL_NAME		"kill"
+#define SECCOMP_RET_TRAP_NAME		"trap"
+#define SECCOMP_RET_ERRNO_NAME		"errno"
+#define SECCOMP_RET_TRACE_NAME		"trace"
+#define SECCOMP_RET_ALLOW_NAME		"allow"
+
+static char seccomp_actions_avail[] = SECCOMP_RET_KILL_NAME	" "
+				      SECCOMP_RET_TRAP_NAME	" "
+				      SECCOMP_RET_ERRNO_NAME	" "
+				      SECCOMP_RET_TRACE_NAME	" "
+				      SECCOMP_RET_ALLOW_NAME;
+
+static struct ctl_path seccomp_sysctl_path[] = {
+	{ .procname = "kernel", },
+	{ .procname = "seccomp", },
+	{ }
+};
+
+static struct ctl_table seccomp_sysctl_table[] = {
+	{
+		.procname	= "actions_avail",
+		.data		= &seccomp_actions_avail,
+		.maxlen		= sizeof(seccomp_actions_avail),
+		.mode		= 0444,
+		.proc_handler	= proc_dostring,
+	},
+	{ }
+};
+
+static int __init seccomp_sysctl_init(void)
+{
+	struct ctl_table_header *hdr;
+
+	hdr = register_sysctl_paths(seccomp_sysctl_path, seccomp_sysctl_table);
+	kmemleak_not_leak(hdr);
+	return 0;
+}
+
+#else /* CONFIG_SYSCTL */
+
+static __init int seccomp_sysctl_init(void) { return 0; }
+
+#endif /* CONFIG_SYSCTL */
+
+device_initcall(seccomp_sysctl_init)
