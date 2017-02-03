@@ -395,11 +395,15 @@ struct srb_iocb {
 			struct completion comp;
 		} abt;
 		struct ct_arg ctarg;
+#define MAX_IOCB_MB_REG 28
+#define SIZEOF_IOCB_MB_REG (MAX_IOCB_MB_REG * sizeof(uint16_t))
 		struct {
-			__le16 in_mb[28]; 	/* fr fw */
-			__le16 out_mb[28];	/* to fw */
+			__le16 in_mb[MAX_IOCB_MB_REG];	/* from FW */
+			__le16 out_mb[MAX_IOCB_MB_REG];	/* to FW */
 			void *out, *in;
 			dma_addr_t out_dma, in_dma;
+			struct completion comp;
+			int rc;
 		} mbx;
 		struct {
 			struct imm_ntfy_from_isp *ntfy;
