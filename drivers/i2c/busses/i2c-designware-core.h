@@ -126,6 +126,7 @@ struct dw_i2c_dev {
 	void			(*release_lock)(struct dw_i2c_dev *dev);
 	bool			pm_runtime_disabled;
 	bool			dynamic_tar_update_enabled;
+	bool			suspended;
 };
 
 #define ACCESS_SWAP		0x00000001
