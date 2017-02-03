@@ -498,6 +498,7 @@ static int l2cap_sock_getsockopt(struct socket *sock, int level, int optname,
 	struct l2cap_chan *chan = l2cap_pi(sk)->chan;
 	struct bt_security sec;
 	struct bt_power pwr;
+	struct bt_le_conn_param conn_param;
 	int len, err = 0;
 
 	BT_DBG("sk %p", sk);
@@ -514,6 +515,47 @@ static int l2cap_sock_getsockopt(struct socket *sock, int level, int optname,
 	lock_sock(sk);
 
 	switch (optname) {
+	case BT_LE_CONN_PARAM: {
+		struct hci_conn_params *params;
+		struct hci_conn *hcon;
+
+		if (!chan->conn) {
+			err = -ENOTCONN;
+			break;
+		}
+
+		hcon = chan->conn->hcon;
+		hci_dev_lock(hcon->hdev);
+
+		params = hci_conn_params_lookup(hcon->hdev,
+			&hcon->dst, hcon->dst_type);
+
+		memset(&conn_param, 0, sizeof(conn_param));
+		if (params) {
+			conn_param.min_interval = params->conn_min_interval;
+			conn_param.max_interval = params->conn_max_interval;
+			conn_param.latency = params->conn_latency;
+			conn_param.supervision_timeout =
+				params->supervision_timeout;
+		} else {
+			conn_param.min_interval =
+				chan->conn->hcon->hdev->le_conn_min_interval;
+			conn_param.max_interval =
+				chan->conn->hcon->hdev->le_conn_max_interval;
+			conn_param.latency =
+				chan->conn->hcon->hdev->le_conn_latency;
+			conn_param.supervision_timeout =
+				chan->conn->hcon->hdev->le_supv_timeout;
+		}
+
+		hci_dev_unlock(hcon->hdev);
+
+		len = min_t(unsigned int, len, sizeof(conn_param));
+		if (copy_to_user(optval, (char *) &conn_param, len))
+			err = -EFAULT;
+
+		break;
+	}
 	case BT_SECURITY:
 		if (chan->chan_type != L2CAP_CHAN_CONN_ORIENTED &&
 		    chan->chan_type != L2CAP_CHAN_FIXED &&
@@ -746,6 +788,7 @@ static int l2cap_sock_setsockopt(struct socket *sock, int level, int optname,
 	struct l2cap_chan *chan = l2cap_pi(sk)->chan;
 	struct bt_security sec;
 	struct bt_power pwr;
+	struct bt_le_conn_param conn_param;
 	struct l2cap_conn *conn;
 	int len, err = 0;
 	u32 opt;
@@ -761,6 +804,61 @@ static int l2cap_sock_setsockopt(struct socket *sock, int level, int optname,
 	lock_sock(sk);
 
 	switch (optname) {
+	case BT_LE_CONN_PARAM: {
+		struct hci_conn_params *hci_param;
+		struct hci_conn *hcon;
+
+		len = min_t(unsigned int, sizeof(conn_param), optlen);
+		if (copy_from_user((char *) &conn_param, optval, len)) {
+			err = -EFAULT;
+			break;
+		}
+
+		if (!chan->conn) {
+			err = -ENOTCONN;
+			break;
+		}
+
+		if (hci_check_conn_params(conn_param.min_interval,
+			conn_param.max_interval, conn_param.latency,
+			conn_param.supervision_timeout) < 0) {
+			err = -EINVAL;
+			BT_ERR("Ignoring invalid connection parameters");
+			break;
+		}
+
+		hcon = chan->conn->hcon;
+
+		hci_dev_lock(hcon->hdev);
+
+		hci_conn_params_clear_disabled(hcon->hdev);
+
+		hci_param = hci_conn_params_add(hcon->hdev,
+			&hcon->dst, hcon->dst_type);
+		if (!hci_param) {
+			err = -ENOMEM;
+			BT_ERR("Failed to add connection parameters");
+			hci_dev_unlock(hcon->hdev);
+			break;
+		}
+
+		hci_param->conn_min_interval = conn_param.min_interval;
+		hci_param->conn_max_interval = conn_param.max_interval;
+		hci_param->conn_latency = conn_param.latency;
+		hci_param->supervision_timeout = conn_param.supervision_timeout;
+
+		hci_dev_unlock(hcon->hdev);
+
+		hci_le_conn_update(hcon, conn_param.min_interval,
+			conn_param.max_interval, conn_param.latency,
+			conn_param.supervision_timeout);
+		mgmt_new_conn_param(hcon->hdev,
+			&hcon->dst, hcon->dst_type,
+			true, conn_param.min_interval, conn_param.max_interval,
+			conn_param.latency, conn_param.supervision_timeout);
+		break;
+	}
+
 	case BT_SECURITY:
 		if (chan->chan_type != L2CAP_CHAN_CONN_ORIENTED &&
 		    chan->chan_type != L2CAP_CHAN_FIXED &&
