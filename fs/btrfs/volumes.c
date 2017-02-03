@@ -2064,6 +2064,7 @@ void btrfs_destroy_dev_replace_tgtdev(struct btrfs_fs_info *fs_info,
 	WARN_ON(!tgtdev);
 	mutex_lock(&fs_info->fs_devices->device_list_mutex);
 
+	wait_target_device(tgtdev);
 	btrfs_sysfs_rm_device_link(fs_info->fs_devices, tgtdev);
 
 	if (tgtdev->bdev)
@@ -2598,6 +2599,8 @@ int btrfs_init_dev_replace_tgtdev(struct btrfs_fs_info *fs_info,
 	device->is_tgtdev_for_dev_replace = 1;
 	device->mode = FMODE_EXCL;
 	device->dev_stats_valid = 1;
+	atomic_set(&device->tgtdev_refs, 0);
+	init_waitqueue_head(&device->tgtdev_wait);
 	set_blocksize(device->bdev, 4096);
 	device->fs_devices = fs_info->fs_devices;
 	list_add(&device->dev_list, &fs_info->fs_devices->devices);
@@ -2624,6 +2627,8 @@ void btrfs_init_dev_replace_tgtdev_for_resume(struct btrfs_fs_info *fs_info,
 	tgtdev->sector_size = sectorsize;
 	tgtdev->fs_info = fs_info;
 	tgtdev->in_fs_metadata = 1;
+	atomic_set(&tgtdev->tgtdev_refs, 0);
+	init_waitqueue_head(&tgtdev->tgtdev_wait);
 }
 
 static noinline int btrfs_update_device(struct btrfs_trans_handle *trans,
@@ -5302,6 +5307,32 @@ static struct btrfs_bio *alloc_btrfs_bio(int total_stripes, int real_stripes)
 	return bbio;
 }
 
+static void pin_bbio_target_device(struct btrfs_bio *bbio)
+{
+	int i;
+
+	for (i = 0; i < bbio->num_stripes; i++) {
+		struct btrfs_device *device = bbio->stripes[i].dev;
+
+		if (device->is_tgtdev_for_dev_replace)
+			atomic_inc(&device->tgtdev_refs);
+	}
+}
+
+static void unpin_bbio_target_device(struct btrfs_bio *bbio)
+{
+	int i;
+
+	for (i = 0; i < bbio->num_stripes; i++) {
+		struct btrfs_device *device = bbio->stripes[i].dev;
+
+		if (device->is_tgtdev_for_dev_replace) {
+			atomic_dec(&device->tgtdev_refs);
+			wake_up(&device->tgtdev_wait);
+		}
+	}
+}
+
 void btrfs_get_bbio(struct btrfs_bio *bbio)
 {
 	WARN_ON(!atomic_read(&bbio->refs));
@@ -5312,8 +5343,10 @@ void btrfs_put_bbio(struct btrfs_bio *bbio)
 {
 	if (!bbio)
 		return;
-	if (atomic_dec_and_test(&bbio->refs))
+	if (atomic_dec_and_test(&bbio->refs)) {
+		unpin_bbio_target_device(bbio);
 		kfree(bbio);
+	}
 }
 
 static int __btrfs_map_block(struct btrfs_fs_info *fs_info,
@@ -5868,6 +5901,7 @@ static int __btrfs_map_block(struct btrfs_fs_info *fs_info,
 		bbio->stripes[0].physical = physical_to_patch_in_first_stripe;
 		bbio->mirror_num = map->num_stripes + 1;
 	}
+	pin_bbio_target_device(bbio);
 out:
 	if (dev_replace_is_ongoing) {
 		btrfs_dev_replace_clear_lock_blocking(dev_replace);
