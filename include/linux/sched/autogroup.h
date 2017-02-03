@@ -2,6 +2,7 @@
 #define _LINUX_SCHED_AUTOGROUP_H
 
 struct signal_struct;
+struct task_struct;
 struct seq_file;
 
 #ifdef CONFIG_SCHED_AUTOGROUP

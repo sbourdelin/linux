@@ -2,6 +2,7 @@
 #define _LINUX_SCHED_USER_H
 
 #include <linux/uidgid.h>
+#include <linux/atomic.h>
 
 struct key;
 
