@@ -35,7 +35,6 @@
 #include <linux/seccomp.h>
 #include <linux/rcupdate.h>
 #include <linux/rculist.h>
-#include <linux/rtmutex.h>
 
 #include <linux/time.h>
 #include <linux/param.h>
