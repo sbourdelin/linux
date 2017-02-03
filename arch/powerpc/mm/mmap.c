@@ -60,11 +60,12 @@ unsigned long arch_mmap_rnd(void)
 {
 	unsigned long rnd;
 
-	/* 8MB for 32bit, 1GB for 64bit */
+#ifdef CONFIG_COMPAT
 	if (is_32bit_task())
-		rnd = get_random_long() % (1<<(23-PAGE_SHIFT));
+		rnd = get_random_long() & ((1UL << mmap_rnd_compat_bits) - 1);
 	else
-		rnd = get_random_long() % (1UL<<(30-PAGE_SHIFT));
+#endif
+		rnd = get_random_long() & ((1UL << mmap_rnd_bits) - 1);
 
 	return rnd << PAGE_SHIFT;
 }
