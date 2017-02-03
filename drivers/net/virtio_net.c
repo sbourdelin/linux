@@ -1505,18 +1505,42 @@ static void virtnet_set_affinity(struct virtnet_info *vi)
 	 * queue pairs, we let the queue pairs to be private to one cpu by
 	 * setting the affinity hint to eliminate the contention.
 	 */
-	if (vi->curr_queue_pairs == 1 ||
-	    vi->max_queue_pairs != num_online_cpus()) {
+	if (vi->curr_queue_pairs == 1) {
 		virtnet_clean_affinity(vi, -1);
 		return;
 	}
 
+	/* If there are more cpus than queues, then assign the queues'
+	 * interrupts to the first cpus until we run out.
+	 */
 	i = 0;
 	for_each_online_cpu(cpu) {
+		if (i == vi->max_queue_pairs)
+			break;
 		virtqueue_set_affinity(vi->rq[i].vq, cpu);
 		virtqueue_set_affinity(vi->sq[i].vq, cpu);
-		netif_set_xps_queue(vi->dev, cpumask_of(cpu), i);
 		i++;
+	}
+
+	/* Stripe the XPS affinities across the online CPUs.
+	 * Hyperthread pairs are typically assigned such that Linux's
+	 * CPU X and X + (numcpus / 2) are hyperthread twins, so we cause
+	 * hyperthread twins to share TX queues, in the case where there are
+	 * more cpus than queues.
+	 */
+	for (i = 0; i < vi->max_queue_pairs; i++) {
+		struct cpumask mask;
+		int skip = i;
+
+		cpumask_clear(&mask);
+		for_each_online_cpu(cpu) {
+			while (skip--)
+				cpu = cpumask_next(cpu, cpu_online_mask);
+			if (cpu < num_possible_cpus())
+				cpumask_set_cpu(cpu, &mask);
+			skip = vi->max_queue_pairs - 1;
+		}
+		netif_set_xps_queue(vi->dev, &mask, i);
 	}
 
 	vi->affinity_hint_set = true;
