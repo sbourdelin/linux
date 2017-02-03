@@ -1,12 +1,14 @@
 #ifndef _LINUX_SCHED_TASK_H
 #define _LINUX_SCHED_TASK_H
 
+#include <linux/spinlock.h>
+
+struct task_struct;
+
 /*
  * Interface between the scheduler and various task lifetime (fork()/exit())
  * functionality:
  */
-
-#include <linux/sched.h>
 
 /*
  * This serializes "schedule()" and also protects
@@ -24,21 +26,6 @@ extern int lockdep_tasklist_lock_is_held(void);
 extern asmlinkage void schedule_tail(struct task_struct *prev);
 extern void init_idle(struct task_struct *idle, int cpu);
 extern void init_idle_bootup_task(struct task_struct *idle);
-
-static inline void rcu_copy_process(struct task_struct *p)
-{
-#ifdef CONFIG_PREEMPT_RCU
-	p->rcu_read_lock_nesting = 0;
-	p->rcu_read_unlock_special.s = 0;
-	p->rcu_blocked_node = NULL;
-	INIT_LIST_HEAD(&p->rcu_node_entry);
-#endif /* #ifdef CONFIG_PREEMPT_RCU */
-#ifdef CONFIG_TASKS_RCU
-	p->rcu_tasks_holdout = false;
-	INIT_LIST_HEAD(&p->rcu_tasks_holdout_list);
-	p->rcu_tasks_idle_cpu = -1;
-#endif /* #ifdef CONFIG_TASKS_RCU */
-}
 
 extern int sched_fork(unsigned long clone_flags, struct task_struct *p);
 extern void sched_dead(struct task_struct *p);
