@@ -948,6 +948,11 @@ struct snd_ctl_tlv {
 	unsigned int length;	/* in bytes aligned to 4 */
 	unsigned int tlv[0];	/* first TLV */
 };
+/*Struct to read/write multiple element values */
+struct snd_ctl_elem_values {
+	unsigned int num_vals;/* Number of values*/
+	struct snd_ctl_elem_value *pvals;/* Pointer to the array of values */
+};
 
 #define SNDRV_CTL_IOCTL_PVERSION	_IOR('U', 0x00, int)
 #define SNDRV_CTL_IOCTL_CARD_INFO	_IOR('U', 0x01, struct snd_ctl_card_info)
@@ -974,6 +979,9 @@ struct snd_ctl_tlv {
 #define SNDRV_CTL_IOCTL_RAWMIDI_PREFER_SUBDEVICE _IOW('U', 0x42, int)
 #define SNDRV_CTL_IOCTL_POWER		_IOWR('U', 0xd0, int)
 #define SNDRV_CTL_IOCTL_POWER_STATE	_IOR('U', 0xd1, int)
+/*Multipe controls' values read and write*/
+#define SNDRV_CTL_IOCTL_ELEMS_READ	_IOWR('U', 0xe0, struct snd_ctl_elem_values)
+#define SNDRV_CTL_IOCTL_ELEMS_WRITE	_IOWR('U', 0xe1, struct snd_ctl_elem_values)
 
 /*
  *  Read interface.

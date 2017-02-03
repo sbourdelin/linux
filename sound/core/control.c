@@ -920,27 +920,6 @@ static int snd_ctl_elem_read(struct snd_card *card,
 	return result;
 }
 
-static int snd_ctl_elem_read_user(struct snd_card *card,
-				  struct snd_ctl_elem_value __user *_control)
-{
-	struct snd_ctl_elem_value *control;
-	int result;
-
-	control = memdup_user(_control, sizeof(*control));
-	if (IS_ERR(control))
-		return PTR_ERR(control);
-
-	snd_power_lock(card);
-	result = snd_power_wait(card, SNDRV_CTL_POWER_D0);
-	if (result >= 0)
-		result = snd_ctl_elem_read(card, control);
-	snd_power_unlock(card);
-	if (result >= 0)
-		if (copy_to_user(_control, control, sizeof(*control)))
-			result = -EFAULT;
-	kfree(control);
-	return result;
-}
 
 static int snd_ctl_elem_write(struct snd_card *card, struct snd_ctl_file *file,
 			      struct snd_ctl_elem_value *control)
@@ -976,28 +955,117 @@ static int snd_ctl_elem_write(struct snd_card *card, struct snd_ctl_file *file,
 	return result;
 }
 
-static int snd_ctl_elem_write_user(struct snd_ctl_file *file,
-				   struct snd_ctl_elem_value __user *_control)
+/**
+ * snd_ctl_elem_rw_user - Read/write value of an element
+ * @file: pointer to control file object
+ * @_control: user pointer to struct snd_ctl_elem_value
+ * @write_flag: flag, true for write, false for read operation
+ *
+ * This function reads the value of controls with the given IDs
+ * of the same card
+ * Return: On success, it returns positive number returned by
+ * snd_ctl_elem_write/snd_ctl_elem_read
+ * On failure, it returns appropriate error
+ */
+
+static int snd_ctl_elem_rw_user(struct snd_ctl_file *file,
+				  struct snd_ctl_elem_value __user *_control,
+			bool write_flag)
 {
 	struct snd_ctl_elem_value *control;
 	struct snd_card *card;
 	int result;
-
 	control = memdup_user(_control, sizeof(*control));
 	if (IS_ERR(control))
 		return PTR_ERR(control);
-
 	card = file->card;
 	snd_power_lock(card);
 	result = snd_power_wait(card, SNDRV_CTL_POWER_D0);
-	if (result >= 0)
-		result = snd_ctl_elem_write(card, file, control);
+	if (result >= 0) {
+		if (write_flag == true)
+			result = snd_ctl_elem_write(card, file, control);
+		else
+			result = snd_ctl_elem_read(card, control);
+	}
 	snd_power_unlock(card);
 	if (result >= 0)
 		if (copy_to_user(_control, control, sizeof(*control)))
 			result = -EFAULT;
 	kfree(control);
 	return result;
+}
+
+/**
+ * snd_ctl_elems_rw_user - Read/Write values of more than one element,
+ * one by one
+ * @file: pointer to control file object
+ * @pucontrols: user-space pointer to struct snd_ctl_elem_values
+ * @write_flag: this flag distinguises write or read type request
+ *
+ * This function reads/writes the value of controls with the given IDs
+ * of the same card
+ * Return: On full/partial success, It returns number of successful
+ * controls read/written.
+ * On failure, it returns appropriate error
+ */
+static int snd_ctl_elems_rw_user(struct snd_ctl_file *file,
+				struct snd_ctl_elem_values __user *pucontrols,
+				bool write_flag)
+{
+	struct snd_ctl_elem_values controls;
+	struct snd_ctl_elem_value *pcontrol;
+	struct snd_ctl_elem_value __user *puvals;
+	struct snd_card *card;
+	int result;
+	int vals;
+	int controls_count = 0;
+
+	if (copy_from_user(&controls, pucontrols, sizeof(controls)))
+		return -EFAULT;
+	card = file->card;
+	if (!controls.num_vals || controls.num_vals > card->controls_count)
+		return -EINVAL;
+	/*assign user-space pointer**/
+	puvals = (struct snd_ctl_elem_value __user *) controls.pvals;
+	/**allocate memory to pcontrol*/
+	pcontrol = kmalloc(sizeof(*pcontrol), GFP_KERNEL);
+	if (!pcontrol)
+		return -ENOMEM;
+	for (vals = 0; vals < controls.num_vals; vals++) {
+		if (copy_from_user(pcontrol, puvals + vals, sizeof(*pcontrol)))
+			goto exit_err;
+		snd_power_lock(card);
+		result = snd_power_wait(card, SNDRV_CTL_POWER_D0);
+		if (result >= 0) {
+			if (write_flag == true)
+				result = snd_ctl_elem_write(card, file,
+						pcontrol);
+			else
+				result = snd_ctl_elem_read(card,  pcontrol);
+		}
+		snd_power_unlock(card);
+		if (result < 0) {
+			/**If control failed to set/get
+			 * inform user by sending back -1 in reserved field
+			 * so that one can try again for failed elements
+			 */
+			pcontrol->reserved[0] = (unsigned char) -1;
+			pr_err("ALSA: control: snd_ctl_elem_write/read failed\
+			for control name = %s\n", pcontrol->id.name);
+		} else {
+			controls_count++;
+		}
+		if (copy_to_user(puvals + vals, pcontrol, sizeof(*pcontrol)))
+			goto exit_err;
+	}
+	pr_debug("ALSA: control: Num values successfully read/written %u\n",\
+	controls_count);
+	kfree(pcontrol);
+	/**Return successful control count to user**/
+	return controls_count;
+exit_err:
+	kfree(pcontrol);
+	return -EFAULT;
 }
 
 static int snd_ctl_elem_lock(struct snd_ctl_file *file,
@@ -1514,9 +1582,13 @@ static long snd_ctl_ioctl(struct file *file, unsigned int cmd, unsigned long arg
 	case SNDRV_CTL_IOCTL_ELEM_INFO:
 		return snd_ctl_elem_info_user(ctl, argp);
 	case SNDRV_CTL_IOCTL_ELEM_READ:
-		return snd_ctl_elem_read_user(card, argp);
+		return snd_ctl_elem_rw_user(ctl, argp, false);
+	case SNDRV_CTL_IOCTL_ELEMS_READ:
+		return snd_ctl_elems_rw_user(ctl, argp, false);
 	case SNDRV_CTL_IOCTL_ELEM_WRITE:
-		return snd_ctl_elem_write_user(ctl, argp);
+		return snd_ctl_elem_rw_user(ctl, argp, true);
+	case SNDRV_CTL_IOCTL_ELEMS_WRITE:
+		return snd_ctl_elems_rw_user(ctl, argp, true);
 	case SNDRV_CTL_IOCTL_ELEM_LOCK:
 		return snd_ctl_elem_lock(ctl, argp);
 	case SNDRV_CTL_IOCTL_ELEM_UNLOCK:
