@@ -155,6 +155,59 @@ static void __ovs_ct_update_key(struct sw_flow_key *key, u8 state,
 	key->ct.zone = zone->id;
 	key->ct.mark = ovs_ct_get_mark(ct);
 	ovs_ct_get_labels(ct, &key->ct.labels);
+
+	/* Use the master if we have one. */
+	if (ct && ct->master)
+		ct = ct->master;
+
+	key->ct.orig_proto = 0;
+	key->ct.orig_tp.src = 0;
+	key->ct.orig_tp.dst = 0;
+	if (key->eth.type == htons(ETH_P_IP)) {
+		/* IP version must match. */
+		if (ct && nf_ct_l3num(ct) == NFPROTO_IPV4) {
+			const struct nf_conntrack_tuple *orig =
+				&ct->tuplehash[IP_CT_DIR_ORIGINAL].tuple;
+
+			key->ipv4.ct_orig.src = orig->src.u3.ip;
+			key->ipv4.ct_orig.dst = orig->dst.u3.ip;
+			key->ct.orig_proto = orig->dst.protonum;
+			if (orig->dst.protonum == IPPROTO_ICMP) {
+				key->ct.orig_tp.src
+					= htons(orig->dst.u.icmp.type);
+				key->ct.orig_tp.dst
+					= htons(orig->dst.u.icmp.code);
+			} else {
+				key->ct.orig_tp.src = orig->src.u.all;
+				key->ct.orig_tp.dst = orig->dst.u.all;
+			}
+		} else
+			memset(&key->ipv4.ct_orig, 0,
+			       sizeof(key->ipv4.ct_orig));
+	} else if (key->eth.type == htons(ETH_P_IPV6) &&
+		   /* IPv6 orig tuple addresses overlap with ND. */
+		   !sw_flow_key_is_nd(key)) {
+		/* IP version must match. */
+		if (ct && nf_ct_l3num(ct) == NFPROTO_IPV6) {
+			const struct nf_conntrack_tuple *orig =
+				&ct->tuplehash[IP_CT_DIR_ORIGINAL].tuple;
+
+			key->ipv6.ct_orig.src = orig->src.u3.in6;
+			key->ipv6.ct_orig.dst = orig->dst.u3.in6;
+			key->ct.orig_proto = orig->dst.protonum;
+			if (orig->dst.protonum == IPPROTO_ICMPV6) {
+				key->ct.orig_tp.src
+					= htons(orig->dst.u.icmp.type);
+				key->ct.orig_tp.dst
+					= htons(orig->dst.u.icmp.code);
+			} else {
+				key->ct.orig_tp.src = orig->src.u.all;
+				key->ct.orig_tp.dst = orig->dst.u.all;
+			}
+		} else
+			memset(&key->ipv6.ct_orig, 0,
+			       sizeof(key->ipv6.ct_orig));
+	}
 }
 
 /* Update 'key' based on skb->nfct.  If 'post_ct' is true, then OVS has
@@ -208,23 +261,53 @@ void ovs_ct_fill_key(const struct sk_buff *skb, struct sw_flow_key *key)
 	ovs_ct_update_key(skb, NULL, key, false, false);
 }
 
-int ovs_ct_put_key(const struct sw_flow_key *key, struct sk_buff *skb)
+#define IN6_ADDR_INITIALIZER(ADDR) \
+	{ (ADDR).s6_addr32[0], (ADDR).s6_addr32[1], \
+	  (ADDR).s6_addr32[2], (ADDR).s6_addr32[3] }
+
+int ovs_ct_put_key(const struct sw_flow_key *swkey,
+		   const struct sw_flow_key *output, struct sk_buff *skb)
 {
-	if (nla_put_u32(skb, OVS_KEY_ATTR_CT_STATE, key->ct.state))
+	if (nla_put_u32(skb, OVS_KEY_ATTR_CT_STATE, output->ct.state))
 		return -EMSGSIZE;
 
 	if (IS_ENABLED(CONFIG_NF_CONNTRACK_ZONES) &&
-	    nla_put_u16(skb, OVS_KEY_ATTR_CT_ZONE, key->ct.zone))
+	    nla_put_u16(skb, OVS_KEY_ATTR_CT_ZONE, output->ct.zone))
 		return -EMSGSIZE;
 
 	if (IS_ENABLED(CONFIG_NF_CONNTRACK_MARK) &&
-	    nla_put_u32(skb, OVS_KEY_ATTR_CT_MARK, key->ct.mark))
+	    nla_put_u32(skb, OVS_KEY_ATTR_CT_MARK, output->ct.mark))
 		return -EMSGSIZE;
 
 	if (IS_ENABLED(CONFIG_NF_CONNTRACK_LABELS) &&
-	    nla_put(skb, OVS_KEY_ATTR_CT_LABELS, sizeof(key->ct.labels),
-		    &key->ct.labels))
+	    nla_put(skb, OVS_KEY_ATTR_CT_LABELS, sizeof(output->ct.labels),
+		    &output->ct.labels))
 		return -EMSGSIZE;
+
+	if (swkey->eth.type == htons(ETH_P_IP) && swkey->ct.orig_proto) {
+		struct ovs_key_ct_tuple_ipv4 orig = {
+			output->ipv4.ct_orig.src,
+			output->ipv4.ct_orig.dst,
+			output->ct.orig_tp.src,
+			output->ct.orig_tp.dst,
+			output->ct.orig_proto,
+		};
+		if (nla_put(skb, OVS_KEY_ATTR_CT_ORIG_TUPLE_IPV4, sizeof(orig),
+			    &orig))
+			return -EMSGSIZE;
+	} else if (swkey->eth.type == htons(ETH_P_IPV6) &&
+		   swkey->ct.orig_proto) {
+		struct ovs_key_ct_tuple_ipv6 orig = {
+			IN6_ADDR_INITIALIZER(output->ipv6.ct_orig.src),
+			IN6_ADDR_INITIALIZER(output->ipv6.ct_orig.dst),
+			output->ct.orig_tp.src,
+			output->ct.orig_tp.dst,
+			output->ct.orig_proto,
+		};
+		if (nla_put(skb, OVS_KEY_ATTR_CT_ORIG_TUPLE_IPV6, sizeof(orig),
+			    &orig))
+			return -EMSGSIZE;
+	}
 
 	return 0;
 }
