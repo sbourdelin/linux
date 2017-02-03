@@ -120,7 +120,7 @@ static int dp83867_of_init(struct phy_device *phydev)
 	int ret;
 
 	if (!of_node)
-		return -ENODEV;
+		return 0;
 
 	dp83867->io_impedance = -EINVAL;
 
