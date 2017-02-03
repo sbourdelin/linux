@@ -25,6 +25,7 @@
 #include <linux/smpboot.h>
 #include <linux/relay.h>
 #include <linux/slab.h>
+#include <linux/irq.h>
 
 #include <trace/events/power.h>
 #define CREATE_TRACE_POINTS
@@ -1247,6 +1248,11 @@ static struct cpuhp_step cpuhp_ap_states[] = {
 		.name			= "smpboot/threads:online",
 		.startup.single		= smpboot_unpark_threads,
 		.teardown.single	= NULL,
+	},
+	[CPUHP_AP_IRQ_AFFINIY_ONLINE] = {
+		.name			= "irq/affinity:online",
+		.startup.single		= irq_affinity_online_cpu,
+		.teardown.single	= irq_affinity_offline_cpu,
 	},
 	[CPUHP_AP_PERF_ONLINE] = {
 		.name			= "perf:online",

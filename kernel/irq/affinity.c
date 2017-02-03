@@ -1,8 +1,12 @@
-
+/*
+ * Copyright (C) 2016 Thomas Gleixner.
+ * Copyright (C) 2016-2017 Christoph Hellwig.
+ */
 #include <linux/interrupt.h>
 #include <linux/kernel.h>
 #include <linux/slab.h>
 #include <linux/cpu.h>
+#include "internals.h"
 
 static cpumask_var_t node_to_present_cpumask[MAX_NUMNODES] __read_mostly;
 
@@ -146,6 +150,157 @@ int irq_calc_affinity_vectors(int maxvec, const struct irq_affinity *affd)
 	int vecs = maxvec - resv;
 
 	return min_t(int, cpumask_weight(cpu_present_mask), vecs) + resv;
+}
+
+static void __irq_affinity_set(unsigned int irq, struct irq_desc *desc,
+		cpumask_t *mask)
+{
+	struct irq_data *data = irq_desc_get_irq_data(desc);
+	struct irq_chip *chip = irq_data_get_irq_chip(data);
+	int ret;
+
+	if (!irqd_can_move_in_process_context(data) && chip->irq_mask)
+		chip->irq_mask(data);
+	ret = chip->irq_set_affinity(data, mask, true);
+	WARN_ON_ONCE(ret);
+
+	/*
+	 * We unmask if the irq was not marked masked by the core code.
+	 * That respects the lazy irq disable behaviour.
+	 */
+	if (!irqd_can_move_in_process_context(data) &&
+	    !irqd_irq_masked(data) && chip->irq_unmask)
+		chip->irq_unmask(data);
+}
+
+static void irq_affinity_online_irq(unsigned int irq, struct irq_desc *desc,
+		unsigned int cpu)
+{
+	const struct cpumask *affinity;
+	struct irq_data *data;
+	struct irq_chip *chip;
+	unsigned long flags;
+	cpumask_var_t mask;
+
+	if (!desc)
+		return;
+
+	raw_spin_lock_irqsave(&desc->lock, flags);
+
+	data = irq_desc_get_irq_data(desc);
+	affinity = irq_data_get_affinity_mask(data);
+	if (!irqd_affinity_is_managed(data) ||
+	    !irq_has_action(irq) ||
+	    !cpumask_test_cpu(cpu, affinity))
+		goto out_unlock;
+
+	/*
+	 * The interrupt descriptor might have been cleaned up
+	 * already, but it is not yet removed from the radix tree
+	 */
+	chip = irq_data_get_irq_chip(data);
+	if (!chip)
+		goto out_unlock;
+
+	if (WARN_ON_ONCE(!chip->irq_set_affinity))
+		goto out_unlock;
+
+	if (!zalloc_cpumask_var(&mask, GFP_KERNEL)) {
+		pr_err("failed to allocate memory for cpumask\n");
+		goto out_unlock;
+	}
+
+	cpumask_and(mask, affinity, cpu_online_mask);
+	cpumask_set_cpu(cpu, mask);
+	if (irqd_has_set(data, IRQD_AFFINITY_SUSPENDED)) {
+		irq_startup(desc, false);
+		irqd_clear(data, IRQD_AFFINITY_SUSPENDED);
+	} else {
+		__irq_affinity_set(irq, desc, mask);
+	}
+
+	free_cpumask_var(mask);
+out_unlock:
+	raw_spin_unlock_irqrestore(&desc->lock, flags);
+}
+
+int irq_affinity_online_cpu(unsigned int cpu)
+{
+	struct irq_desc *desc;
+	unsigned int irq;
+
+	for_each_irq_desc(irq, desc)
+		irq_affinity_online_irq(irq, desc, cpu);
+	return 0;
+}
+
+static void irq_affinity_offline_irq(unsigned int irq, struct irq_desc *desc,
+		unsigned int cpu)
+{
+	const struct cpumask *affinity;
+	struct irq_data *data;
+	struct irq_chip *chip;
+	unsigned long flags;
+	cpumask_var_t mask;
+
+	if (!desc)
+		return;
+
+	raw_spin_lock_irqsave(&desc->lock, flags);
+
+	data = irq_desc_get_irq_data(desc);
+	affinity = irq_data_get_affinity_mask(data);
+	if (!irqd_affinity_is_managed(data) ||
+	    !irq_has_action(irq) ||
+	    irqd_has_set(data, IRQD_AFFINITY_SUSPENDED) ||
+	    !cpumask_test_cpu(cpu, affinity))
+		goto out_unlock;
+
+	/*
+	 * Complete the irq move. This cpu is going down and for
+	 * non intr-remapping case, we can't wait till this interrupt
+	 * arrives at this cpu before completing the irq move.
+	 */
+	irq_force_complete_move(desc);
+
+	/*
+	 * The interrupt descriptor might have been cleaned up
+	 * already, but it is not yet removed from the radix tree
+	 */
+	chip = irq_data_get_irq_chip(data);
+	if (!chip)
+		goto out_unlock;
+
+	if (WARN_ON_ONCE(!chip->irq_set_affinity))
+		goto out_unlock;
+
+	if (!zalloc_cpumask_var(&mask, GFP_KERNEL)) {
+		pr_err("failed to allocate memory for cpumask\n");
+		goto out_unlock;
+	}
+
+	cpumask_copy(mask, affinity);
+	cpumask_clear_cpu(cpu, mask);
+	if (cpumask_empty(mask)) {
+		irqd_set(data, IRQD_AFFINITY_SUSPENDED);
+		irq_shutdown(desc);
+	} else {
+		__irq_affinity_set(irq, desc, mask);
+	}
+
+	free_cpumask_var(mask);
+out_unlock:
+	raw_spin_unlock_irqrestore(&desc->lock, flags);
+}
+
+int irq_affinity_offline_cpu(unsigned int cpu)
+{
+	struct irq_desc *desc;
+	unsigned int irq;
+
+	for_each_irq_desc(irq, desc)
+		irq_affinity_offline_irq(irq, desc, cpu);
+	return 0;
 }
 
 static int __init irq_build_cpumap(void)

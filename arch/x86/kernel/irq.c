@@ -449,7 +449,8 @@ void fixup_irqs(void)
 
 		data = irq_desc_get_irq_data(desc);
 		affinity = irq_data_get_affinity_mask(data);
-		if (!irq_has_action(irq) || irqd_is_per_cpu(data) ||
+		if (irqd_affinity_is_managed(data) ||
+		    !irq_has_action(irq) || irqd_is_per_cpu(data) ||
 		    cpumask_subset(affinity, cpu_online_mask)) {
 			raw_spin_unlock(&desc->lock);
 			continue;
