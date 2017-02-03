@@ -1840,7 +1840,12 @@ static int addr_filter__resolve_kernel_syms(struct addr_filter *filt)
 		if (err)
 			return err;
 		filt->size = start + size - filt->addr;
-		no_size = !!size;
+		/*
+		 * When to has no size assume it's a end symbol.
+		 * This allows filters like _text / _end
+		 */
+		if (size == 0)
+			filt->size = start - filt->addr;
 	}
 
 	/* The very last symbol in kallsyms does not imply a particular size */
