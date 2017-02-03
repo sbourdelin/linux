@@ -10,6 +10,7 @@
 #include <linux/sched/idle.h>
 #include <linux/sched/debug.h>
 #include <linux/sched/fork.h>
+#include <linux/sched/task_stack.h>
 #include <linux/init.h>
 #include <linux/export.h>
 #include <linux/pm.h>

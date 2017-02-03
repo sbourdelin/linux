@@ -17,11 +17,8 @@
 #include <linux/signal.h>
 #include <linux/sched.h>
 #include <linux/sched/debug.h>
-<<<<<<< HEAD
-=======
 #include <linux/sched/fork.h>
 #include <linux/sched/task_stack.h>
->>>>>>> 9ecfbdbd2d46... fork.h fixes
 #include <linux/kernel.h>
 #include <linux/errno.h>
 #include <linux/string.h>

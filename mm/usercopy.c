@@ -17,11 +17,8 @@
 #include <linux/mm.h>
 #include <linux/slab.h>
 #include <linux/sched.h>
-<<<<<<< HEAD
-=======
 #include <linux/sched/fork.h>
 #include <linux/sched/task_stack.h>
->>>>>>> 9ecfbdbd2d46... fork.h fixes
 #include <asm/sections.h>
 
 enum {
