@@ -2189,6 +2189,23 @@ struct qlt_plogi_ack_t {
 	void		*fcport;
 };
 
+enum qla_tgt_prot_op {
+	QLA_PROT_NORMAL  = 0,
+	QLA_PROT_DIN_INSERT,
+	QLA_PROT_DOUT_INSERT,
+	QLA_PROT_DIN_STRIP,
+	QLA_PROT_DOUT_STRIP,
+	QLA_PROT_DIN_PASS,
+	QLA_PROT_DOUT_PASS,
+};
+
+enum qla_tgt_prot_type {
+	QLA_TGT_PROT_TYPE0,
+	QLA_TGT_PROT_TYPE1,
+	QLA_TGT_PROT_TYPE2,
+	QLA_TGT_PROT_TYPE3,
+};
+
 struct ct_sns_desc {
 	struct ct_sns_pkt	*ct_sns;
 	dma_addr_t		ct_sns_dma;

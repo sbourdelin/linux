@@ -376,6 +376,38 @@ static u32 tcm_qla2xxx_sess_get_index(struct se_session *se_sess)
 	return 0;
 }
 
+static void tcm_qla2xxx_prot_op(struct qla_tgt_cmd *cmd)
+{
+	switch (cmd->se_cmd.prot_op) {
+	case TARGET_PROT_NORMAL:
+		cmd->prot_op = QLA_PROT_NORMAL;
+		break;
+	case TARGET_PROT_DIN_INSERT:
+		cmd->prot_op = QLA_PROT_DIN_INSERT;
+		break;
+	case TARGET_PROT_DOUT_INSERT:
+		cmd->prot_op = QLA_PROT_DOUT_INSERT;
+		break;
+	case TARGET_PROT_DIN_STRIP:
+		cmd->prot_op = QLA_PROT_DIN_STRIP;
+		break;
+	case TARGET_PROT_DOUT_STRIP:
+		cmd->prot_op = QLA_PROT_DOUT_STRIP;
+		break;
+	case TARGET_PROT_DIN_PASS:
+		cmd->prot_op = QLA_PROT_DIN_PASS;
+		break;
+	case TARGET_PROT_DOUT_PASS:
+		cmd->prot_op = QLA_PROT_DOUT_PASS;
+		break;
+	}
+}
+
+static void tcm_qla2xxx_prot_type(struct qla_tgt_cmd *cmd)
+{
+	cmd->prot_type = cmd->se_cmd.prot_type;
+}
+
 static int tcm_qla2xxx_write_pending(struct se_cmd *se_cmd)
 {
 	struct qla_tgt_cmd *cmd = container_of(se_cmd,
@@ -405,6 +437,8 @@ static int tcm_qla2xxx_write_pending(struct se_cmd *se_cmd)
 	cmd->prot_sg = se_cmd->t_prot_sg;
 	cmd->blk_sz  = se_cmd->se_dev->dev_attrib.block_size;
 	se_cmd->pi_err = 0;
+	tcm_qla2xxx_prot_op(cmd);
+	tcm_qla2xxx_prot_type(cmd);
 
 	/*
 	 * qla_target.c:qlt_rdy_to_xfer() will call pci_map_sg() to setup
@@ -505,6 +539,24 @@ static void tcm_qla2xxx_handle_data_work(struct work_struct *work)
 		if (cmd->se_cmd.transport_state & CMD_T_ABORTED)
 			return;
 
+		switch (cmd->dif_err_code) {
+		case DIF_ERR_GRD:
+			cmd->se_cmd.pi_err =
+			    TCM_LOGICAL_BLOCK_GUARD_CHECK_FAILED;
+			break;
+		case DIF_ERR_REF:
+			cmd->se_cmd.pi_err =
+			    TCM_LOGICAL_BLOCK_REF_TAG_CHECK_FAILED;
+			break;
+		case DIF_ERR_APP:
+			cmd->se_cmd.pi_err =
+			    TCM_LOGICAL_BLOCK_APP_TAG_CHECK_FAILED;
+			break;
+		case DIF_ERR_NONE:
+		default:
+			break;
+		}
+
 		if (cmd->se_cmd.pi_err)
 			transport_generic_request_failure(&cmd->se_cmd,
 				cmd->se_cmd.pi_err);
@@ -529,25 +581,23 @@ static void tcm_qla2xxx_handle_data(struct qla_tgt_cmd *cmd)
 	queue_work_on(smp_processor_id(), tcm_qla2xxx_free_wq, &cmd->work);
 }
 
-static void tcm_qla2xxx_handle_dif_work(struct work_struct *work)
+static int tcm_qla2xxx_chk_dif_tags(uint32_t tag)
 {
-	struct qla_tgt_cmd *cmd = container_of(work, struct qla_tgt_cmd, work);
-
-	/* take an extra kref to prevent cmd free too early.
-	 * need to wait for SCSI status/check condition to
-	 * finish responding generate by transport_generic_request_failure.
-	 */
-	kref_get(&cmd->se_cmd.cmd_kref);
-	transport_generic_request_failure(&cmd->se_cmd, cmd->se_cmd.pi_err);
+	return 0;
 }
 
-/*
- * Called from qla_target.c:qlt_do_ctio_completion()
- */
-static void tcm_qla2xxx_handle_dif_err(struct qla_tgt_cmd *cmd)
+static int tcm_qla2xxx_dif_tags(struct qla_tgt_cmd *cmd,
+    uint16_t *pfw_prot_opts)
 {
-	INIT_WORK(&cmd->work, tcm_qla2xxx_handle_dif_work);
-	queue_work(tcm_qla2xxx_free_wq, &cmd->work);
+	struct se_cmd *se_cmd = &cmd->se_cmd;
+
+	if (!(se_cmd->prot_checks & TARGET_DIF_CHECK_GUARD))
+		*pfw_prot_opts |= PO_DISABLE_GUARD_CHECK;
+
+	if (!(se_cmd->prot_checks & TARGET_DIF_CHECK_APPTAG))
+		*pfw_prot_opts |= PO_DIS_APP_TAG_VALD;
+
+	return 0;
 }
 
 /*
@@ -634,6 +684,7 @@ static int tcm_qla2xxx_queue_data_in(struct se_cmd *se_cmd)
 	cmd->prot_sg = se_cmd->t_prot_sg;
 	cmd->blk_sz  = se_cmd->se_dev->dev_attrib.block_size;
 	se_cmd->pi_err = 0;
+	tcm_qla2xxx_prot_op(cmd);
 
 	/*
 	 * Now queue completed DATA_IN the qla2xxx LLD and response ring
@@ -1588,7 +1639,6 @@ static void tcm_qla2xxx_update_sess(struct fc_port *sess, port_id_t s_id,
 static struct qla_tgt_func_tmpl tcm_qla2xxx_template = {
 	.handle_cmd		= tcm_qla2xxx_handle_cmd,
 	.handle_data		= tcm_qla2xxx_handle_data,
-	.handle_dif_err		= tcm_qla2xxx_handle_dif_err,
 	.handle_tmr		= tcm_qla2xxx_handle_tmr,
 	.free_cmd		= tcm_qla2xxx_free_cmd,
 	.free_mcmd		= tcm_qla2xxx_free_mcmd,
@@ -1600,6 +1650,8 @@ static struct qla_tgt_func_tmpl tcm_qla2xxx_template = {
 	.clear_nacl_from_fcport_map = tcm_qla2xxx_clear_nacl_from_fcport_map,
 	.put_sess		= tcm_qla2xxx_put_sess,
 	.shutdown_sess		= tcm_qla2xxx_shutdown_sess,
+	.get_dif_tags		= tcm_qla2xxx_dif_tags,
+	.chk_dif_tags		= tcm_qla2xxx_chk_dif_tags,
 };
 
 static int tcm_qla2xxx_init_lport(struct tcm_qla2xxx_lport *lport)
