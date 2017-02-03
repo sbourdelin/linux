@@ -21,6 +21,7 @@
 #include <linux/seq_file.h>
 #include <linux/spinlock.h>
 #include <linux/sched/signal.h>
+#include <linux/sched/fork.h>
 
 #include <asm/processor.h>
 #include <asm/mmu_context.h>

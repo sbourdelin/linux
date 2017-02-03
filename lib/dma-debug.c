@@ -19,6 +19,7 @@
 
 #include <linux/scatterlist.h>
 #include <linux/dma-mapping.h>
+#include <linux/sched/fork.h>
 #include <linux/stacktrace.h>
 #include <linux/dma-debug.h>
 #include <linux/spinlock.h>

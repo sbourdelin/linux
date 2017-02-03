@@ -11,6 +11,8 @@
 #include <linux/errno.h>
 #include <linux/module.h>
 #include <linux/sched.h>
+#include <linux/sched/fork.h>
+
 #include <linux/mm.h>
 #include <linux/fs.h>
 #include <linux/unistd.h>

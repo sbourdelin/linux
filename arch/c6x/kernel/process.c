@@ -17,6 +17,7 @@
 #include <linux/mqueue.h>
 #include <linux/syscalls.h>
 #include <linux/reboot.h>
+#include <linux/sched/fork.h>
 
 #include <asm/syscalls.h>
 

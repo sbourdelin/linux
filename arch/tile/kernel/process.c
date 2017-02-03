@@ -14,6 +14,7 @@
 
 #include <linux/sched.h>
 #include <linux/sched/debug.h>
+#include <linux/sched/fork.h>
 #include <linux/preempt.h>
 #include <linux/module.h>
 #include <linux/fs.h>

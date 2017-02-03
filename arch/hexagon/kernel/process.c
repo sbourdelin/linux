@@ -20,6 +20,7 @@
 
 #include <linux/sched.h>
 #include <linux/sched/debug.h>
+#include <linux/sched/fork.h>
 #include <linux/types.h>
 #include <linux/module.h>
 #include <linux/tick.h>

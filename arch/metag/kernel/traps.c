@@ -11,6 +11,7 @@
 #include <linux/export.h>
 #include <linux/sched.h>
 #include <linux/sched/debug.h>
+#include <linux/sched/fork.h>
 #include <linux/signal.h>
 #include <linux/kernel.h>
 #include <linux/mm.h>

@@ -1,4 +1,5 @@
 #include <linux/sched/signal.h>
+#include <linux/sched/fork.h>
 #include <linux/slab.h>
 #include <asm/processor.h>
 #include <asm/fpu.h>

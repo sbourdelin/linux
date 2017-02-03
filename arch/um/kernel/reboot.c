@@ -4,6 +4,7 @@
  */
 
 #include <linux/sched/signal.h>
+#include <linux/sched/fork.h>
 #include <linux/spinlock.h>
 #include <linux/slab.h>
 #include <linux/oom.h>

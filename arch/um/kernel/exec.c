@@ -8,6 +8,7 @@
 #include <linux/fs.h>
 #include <linux/ptrace.h>
 #include <linux/sched.h>
+#include <linux/sched/fork.h>
 #include <linux/slab.h>
 #include <asm/current.h>
 #include <asm/processor.h>
