@@ -133,6 +133,16 @@ struct btrfs_raid_bio {
 	/* second bad stripe (for raid6 use) */
 	int failb;
 
+	/*
+	 * For steal_rbio, we can steal recovered correct page,
+	 * but in finish_parity_scrub(), we still use bad on-disk
+	 * page to calculate parity.
+	 * Use these members to info finish_parity_scrub() to use
+	 * correct pages
+	 */
+	int bad_ondisk_a;
+	int bad_ondisk_b;
+
 	int scrubp;
 	/*
 	 * number of pages needed to represent the full
@@ -309,6 +319,12 @@ static void steal_rbio(struct btrfs_raid_bio *src, struct btrfs_raid_bio *dest)
 
 	if (!test_bit(RBIO_CACHE_READY_BIT, &src->flags))
 		return;
+
+	/* Record recovered stripe number */
+	if (src->faila != -1)
+		dest->bad_ondisk_a = src->faila;
+	if (src->failb != -1)
+		dest->bad_ondisk_b = src->failb;
 
 	for (i = 0; i < dest->nr_pages; i++) {
 		s = src->stripe_pages[i];
@@ -997,6 +1013,8 @@ static struct btrfs_raid_bio *alloc_rbio(struct btrfs_fs_info *fs_info,
 	rbio->stripe_npages = stripe_npages;
 	rbio->faila = -1;
 	rbio->failb = -1;
+	rbio->bad_ondisk_a = -1;
+	rbio->bad_ondisk_b = -1;
 	atomic_set(&rbio->refs, 1);
 	atomic_set(&rbio->error, 0);
 	atomic_set(&rbio->stripes_pending, 0);
@@ -2259,6 +2277,9 @@ static int alloc_rbio_essential_pages(struct btrfs_raid_bio *rbio)
 	int bit;
 	int index;
 	struct page *page;
+	struct page *bio_page;
+	void *ptr;
+	void *bio_ptr;
 
 	for_each_set_bit(bit, rbio->dbitmap, rbio->stripe_npages) {
 		for (i = 0; i < rbio->real_stripes; i++) {
@@ -2269,6 +2290,23 @@ static int alloc_rbio_essential_pages(struct btrfs_raid_bio *rbio)
 			page = alloc_page(GFP_NOFS | __GFP_HIGHMEM);
 			if (!page)
 				return -ENOMEM;
+
+			/*
+			 * It's possible that only several pages need recover,
+			 * and rest are all good.
+			 * In that case we need to copy good bio pages into
+			 * stripe_pages[], as we will use stripe_pages[] other
+			 * than bio_pages[] in finish_parity_scrub().
+			 */
+			bio_page = page_in_rbio(rbio, i, bit, 0);
+			if ((i == rbio->bad_ondisk_a ||
+			     i == rbio->bad_ondisk_b) && bio_page) {
+				ptr = kmap(page);
+				bio_ptr = kmap(bio_page);
+				memcpy(ptr, bio_ptr, PAGE_SIZE);
+				kunmap(bio_page);
+				kunmap(page);
+			}
 			rbio->stripe_pages[index] = page;
 		}
 	}
@@ -2280,6 +2318,7 @@ static noinline void finish_parity_scrub(struct btrfs_raid_bio *rbio,
 {
 	struct btrfs_bio *bbio = rbio->bbio;
 	void *pointers[rbio->real_stripes];
+	struct page *mapped_pages[rbio->real_stripes];
 	DECLARE_BITMAP(pbitmap, rbio->stripe_npages);
 	int nr_data = rbio->nr_data;
 	int stripe;
@@ -2340,12 +2379,24 @@ static noinline void finish_parity_scrub(struct btrfs_raid_bio *rbio,
 		void *parity;
 		/* first collect one page from each data stripe */
 		for (stripe = 0; stripe < nr_data; stripe++) {
-			p = page_in_rbio(rbio, stripe, pagenr, 0);
+
+			/*
+			 * Use stolen recovered page other than bad
+			 * on disk pages
+			 */
+			if (stripe == rbio->bad_ondisk_a ||
+			    stripe == rbio->bad_ondisk_b)
+				p = rbio_stripe_page(rbio, stripe, pagenr);
+			else
+				p = page_in_rbio(rbio, stripe, pagenr, 0);
 			pointers[stripe] = kmap(p);
+			mapped_pages[stripe] = p;
 		}
 
 		/* then add the parity stripe */
-		pointers[stripe++] = kmap(p_page);
+		pointers[stripe] = kmap(p_page);
+		mapped_pages[stripe] = p_page;
+		stripe++;
 
 		if (q_stripe != -1) {
 
@@ -2353,7 +2404,9 @@ static noinline void finish_parity_scrub(struct btrfs_raid_bio *rbio,
 			 * raid6, add the qstripe and call the
 			 * library function to fill in our p/q
 			 */
-			pointers[stripe++] = kmap(q_page);
+			pointers[stripe] = kmap(q_page);
+			mapped_pages[stripe] = q_page;
+			stripe++;
 
 			raid6_call.gen_syndrome(rbio->real_stripes, PAGE_SIZE,
 						pointers);
@@ -2373,8 +2426,9 @@ static noinline void finish_parity_scrub(struct btrfs_raid_bio *rbio,
 			bitmap_clear(rbio->dbitmap, pagenr, 1);
 		kunmap(p);
 
+		/* Free mapped pages */
 		for (stripe = 0; stripe < rbio->real_stripes; stripe++)
-			kunmap(page_in_rbio(rbio, stripe, pagenr, 0));
+			kunmap(mapped_pages[stripe]);
 	}
 
 	__free_page(p_page);
