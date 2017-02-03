@@ -239,7 +239,7 @@ static int blk_mq_register_hctx(struct blk_mq_hw_ctx *hctx)
 	return ret;
 }
 
-static void __blk_mq_unregister_dev(struct device *dev, struct request_queue *q)
+void blk_mq_unregister_dev(struct device *dev, struct request_queue *q)
 {
 	struct blk_mq_hw_ctx *hctx;
 	struct blk_mq_ctx *ctx;
@@ -265,13 +265,6 @@ static void __blk_mq_unregister_dev(struct device *dev, struct request_queue *q)
 	q->mq_sysfs_init_done = false;
 }
 
-void blk_mq_unregister_dev(struct device *dev, struct request_queue *q)
-{
-	blk_mq_disable_hotplug();
-	__blk_mq_unregister_dev(dev, q);
-	blk_mq_enable_hotplug();
-}
-
 void blk_mq_hctx_kobj_init(struct blk_mq_hw_ctx *hctx)
 {
 	kobject_init(&hctx->kobj, &blk_mq_hw_ktype);
@@ -295,13 +288,11 @@ int blk_mq_register_dev(struct device *dev, struct request_queue *q)
 	struct blk_mq_hw_ctx *hctx;
 	int ret, i;
 
-	blk_mq_disable_hotplug();
-
 	blk_mq_sysfs_init(q);
 
 	ret = kobject_add(&q->mq_kobj, kobject_get(&dev->kobj), "%s", "mq");
 	if (ret < 0)
-		goto out;
+		return ret;
 
 	kobject_uevent(&q->mq_kobj, KOBJ_ADD);
 
@@ -310,16 +301,13 @@ int blk_mq_register_dev(struct device *dev, struct request_queue *q)
 	queue_for_each_hw_ctx(q, hctx, i) {
 		ret = blk_mq_register_hctx(hctx);
 		if (ret)
-			break;
+			goto fail;
 	}
 
-	if (ret)
-		__blk_mq_unregister_dev(dev, q);
-	else
-		q->mq_sysfs_init_done = true;
-out:
-	blk_mq_enable_hotplug();
-
+	q->mq_sysfs_init_done = true;
+	return 0;
+fail:
+	blk_mq_unregister_dev(dev, q);
 	return ret;
 }
 EXPORT_SYMBOL_GPL(blk_mq_register_dev);
