@@ -27,6 +27,9 @@
  * must ensure the call is done inside a loop, confirming that the
  * wakeup condition has in fact occurred.
  */
+
+struct task_struct;
+
 struct wake_q_node {
 	struct wake_q_node *next;
 };

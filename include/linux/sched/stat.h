@@ -1,6 +1,8 @@
 #ifndef _LINUX_SCHED_STAT_H
 #define _LINUX_SCHED_STAT_H
 
+#include <linux/percpu.h>
+
 /*
  * Various counters maintained by the scheduler and fork(),
  * exposed via /proc, sys.c or used by drivers via these APIs.
