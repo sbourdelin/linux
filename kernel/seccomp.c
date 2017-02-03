@@ -510,6 +510,24 @@ static void seccomp_send_sigsys(int syscall, int reason)
 }
 #endif	/* CONFIG_SECCOMP_FILTER */
 
+static u32 seccomp_max_action_to_log = SECCOMP_RET_KILL;
+
+static void seccomp_log(unsigned long syscall, long signr, u32 action)
+{
+	/* Force an audit message to be emitted when the action is not greater
+	 * than the configured maximum action.
+	 */
+	if (action <= seccomp_max_action_to_log)
+		return __audit_seccomp(syscall, signr, action);
+
+	/* If the action is not an ALLOW action, let the audit subsystem decide
+	 * if it should be audited based on whether the current task itself is
+	 * being audited.
+	 */
+	if (action != SECCOMP_RET_ALLOW)
+		return audit_seccomp(syscall, signr, action);
+}
+
 /*
  * Secure computing mode 1 allows only read/write/exit/sigreturn.
  * To be fully secure this must be combined with rlimit
@@ -535,7 +553,7 @@ static void __secure_computing_strict(int this_syscall)
 #ifdef SECCOMP_DEBUG
 	dump_stack();
 #endif
-	audit_seccomp(this_syscall, SIGKILL, SECCOMP_RET_KILL);
+	seccomp_log(this_syscall, SIGKILL, SECCOMP_RET_KILL);
 	do_exit(SIGKILL);
 }
 
@@ -634,18 +652,19 @@ static int __seccomp_filter(int this_syscall, const struct seccomp_data *sd,
 		return 0;
 
 	case SECCOMP_RET_ALLOW:
+		seccomp_log(this_syscall, 0, action);
 		return 0;
 
 	case SECCOMP_RET_KILL:
 	default:
-		audit_seccomp(this_syscall, SIGSYS, action);
+		seccomp_log(this_syscall, SIGSYS, action);
 		do_exit(SIGSYS);
 	}
 
 	unreachable();
 
 skip:
-	audit_seccomp(this_syscall, 0, action);
+	seccomp_log(this_syscall, 0, action);
 	return -1;
 }
 #else
@@ -911,17 +930,101 @@ out:
 
 #ifdef CONFIG_SYSCTL
 
+/* Human readable action names for friendly sysctl interaction */
 #define SECCOMP_RET_KILL_NAME		"kill"
 #define SECCOMP_RET_TRAP_NAME		"trap"
 #define SECCOMP_RET_ERRNO_NAME		"errno"
 #define SECCOMP_RET_TRACE_NAME		"trace"
 #define SECCOMP_RET_ALLOW_NAME		"allow"
 
+/* Largest strlen() of all action names */
+#define SECCOMP_RET_MAX_NAME_LEN	5
+
 static char seccomp_actions_avail[] = SECCOMP_RET_KILL_NAME	" "
 				      SECCOMP_RET_TRAP_NAME	" "
 				      SECCOMP_RET_ERRNO_NAME	" "
 				      SECCOMP_RET_TRACE_NAME	" "
 				      SECCOMP_RET_ALLOW_NAME;
+
+struct seccomp_action_name {
+	u32		action;
+	const char	*name;
+};
+
+static struct seccomp_action_name seccomp_action_names[] = {
+	{ SECCOMP_RET_KILL, SECCOMP_RET_KILL_NAME },
+	{ SECCOMP_RET_TRAP, SECCOMP_RET_TRAP_NAME },
+	{ SECCOMP_RET_ERRNO, SECCOMP_RET_ERRNO_NAME },
+	{ SECCOMP_RET_TRACE, SECCOMP_RET_TRACE_NAME },
+	{ SECCOMP_RET_ALLOW, SECCOMP_RET_ALLOW_NAME },
+	{ }
+};
+
+static bool seccomp_name_from_action(const char **namep, u32 action)
+{
+	struct seccomp_action_name *cur;
+
+	for (cur = seccomp_action_names; cur->name; cur++) {
+		if (cur->action == action) {
+			*namep = cur->name;
+			return true;
+		}
+	}
+
+	return false;
+}
+
+static bool seccomp_action_from_name(u32 *action, const char *name)
+{
+	struct seccomp_action_name *cur;
+
+	for (cur = seccomp_action_names; cur->name; cur++) {
+		if (!strcmp(cur->name, name)) {
+			*action = cur->action;
+			return true;
+		}
+	}
+
+	return false;
+}
+
+static int seccomp_max_action_to_log_handler(struct ctl_table *table, int write,
+					     void __user *buffer, size_t *lenp,
+					     loff_t *ppos)
+{
+	char name[SECCOMP_RET_MAX_NAME_LEN + 1] = {0};
+	int ret;
+
+	if (write && !capable(CAP_SYS_ADMIN))
+		return -EPERM;
+
+	if (!write) {
+		const char *namep;
+
+		if (!seccomp_name_from_action(&namep,
+					      seccomp_max_action_to_log))
+			return -EINVAL;
+
+		strncpy(name, namep, sizeof(name) - 1);
+	}
+
+	table->data = name;
+	table->maxlen = sizeof(name);
+	ret = proc_dostring(table, write, buffer, lenp, ppos);
+	if (ret)
+		return ret;
+
+	if (write) {
+		u32 action;
+
+		if (!seccomp_action_from_name(&action, table->data))
+			return -EINVAL;
+
+		seccomp_max_action_to_log = action;
+	}
+
+	return 0;
+}
 
 static struct ctl_path seccomp_sysctl_path[] = {
 	{ .procname = "kernel", },
@@ -936,6 +1039,11 @@ static struct ctl_table seccomp_sysctl_table[] = {
 		.maxlen		= sizeof(seccomp_actions_avail),
 		.mode		= 0444,
 		.proc_handler	= proc_dostring,
+	},
+	{
+		.procname	= "max_action_to_log",
+		.mode		= 0644,
+		.proc_handler	= seccomp_max_action_to_log_handler,
 	},
 	{ }
 };
