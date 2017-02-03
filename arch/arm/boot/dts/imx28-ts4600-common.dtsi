@@ -44,6 +44,28 @@
 					fsl,pull-up = <MXS_PULL_DISABLE>;
 				};
 
+				nbus_pins: nbus_pins {
+					fsl,pinmux-ids = <
+						MX28_PAD_GPMI_D00__GPIO_0_0
+						MX28_PAD_GPMI_D01__GPIO_0_1
+						MX28_PAD_GPMI_D02__GPIO_0_2
+						MX28_PAD_GPMI_D03__GPIO_0_3
+						MX28_PAD_GPMI_D04__GPIO_0_4
+						MX28_PAD_GPMI_D05__GPIO_0_5
+						MX28_PAD_GPMI_D06__GPIO_0_6
+						MX28_PAD_GPMI_D07__GPIO_0_7
+						MX28_PAD_GPMI_CE0N__GPIO_0_16
+						MX28_PAD_GPMI_RDY1__GPIO_0_21
+						MX28_PAD_GPMI_RDN__GPIO_0_24
+						MX28_PAD_GPMI_WRN__GPIO_0_25
+						MX28_PAD_GPMI_ALE__GPIO_0_26
+					>;
+					fsl,drive-strength = <MXS_DRIVE_4mA>;
+					fsl,voltage = <MXS_VOLTAGE_HIGH>;
+					fsl,pull-up = <MXS_PULL_DISABLE>;
+
+				};
+
 			};
 		};
 
@@ -73,6 +95,27 @@
 			regulator-boot-on;
 			gpio = <&gpio3 28 0>;
 		};
+	};
+
+	nbus {
+		compatible = "technologic,ts-nbus";
+		pinctrl-0 = <&nbus_pins>;
+		#address-cells = <1>;
+		#size-cells = <0>;
+		pwms = <&pwm 2 83>;
+		ts-data-gpios   = <&gpio0 0 GPIO_ACTIVE_HIGH
+				   &gpio0 1 GPIO_ACTIVE_HIGH
+				   &gpio0 2 GPIO_ACTIVE_HIGH
+				   &gpio0 3 GPIO_ACTIVE_HIGH
+				   &gpio0 4 GPIO_ACTIVE_HIGH
+				   &gpio0 5 GPIO_ACTIVE_HIGH
+				   &gpio0 6 GPIO_ACTIVE_HIGH
+				   &gpio0 7 GPIO_ACTIVE_HIGH>;
+		ts-csn-gpios    = <&gpio0 16 GPIO_ACTIVE_HIGH>;
+		ts-txrx-gpios   = <&gpio0 24 GPIO_ACTIVE_HIGH>;
+		ts-strobe-gpios = <&gpio0 25 GPIO_ACTIVE_HIGH>;
+		ts-ale-gpios    = <&gpio0 26 GPIO_ACTIVE_HIGH>;
+		ts-rdy-gpios    = <&gpio0 21 GPIO_ACTIVE_HIGH>;
 	};
 
 };
