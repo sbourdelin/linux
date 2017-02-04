@@ -465,10 +465,8 @@ static int cp_rx_poll(struct napi_struct *napi, int budget)
 	struct cp_private *cp = container_of(napi, struct cp_private, napi);
 	struct net_device *dev = cp->dev;
 	unsigned int rx_tail = cp->rx_tail;
-	int rx;
+	int rx = 0;
 
-	rx = 0;
-rx_status_loop:
 	cpw16(IntrStatus, cp_rx_intr_mask);
 
 	while (rx < budget) {
@@ -557,16 +555,13 @@ rx_next:
 	 * this round of polling
 	 */
 	if (rx < budget) {
-		unsigned long flags;
+		if (napi_complete_done(napi, rx)) {
+			unsigned long flags;
 
-		if (cpr16(IntrStatus) & cp_rx_intr_mask)
-			goto rx_status_loop;
-
-		napi_gro_flush(napi, false);
-		spin_lock_irqsave(&cp->lock, flags);
-		__napi_complete(napi);
-		cpw16_f(IntrMask, cp_intr_mask);
-		spin_unlock_irqrestore(&cp->lock, flags);
+			spin_lock_irqsave(&cp->lock, flags);
+			cpw16_f(IntrMask, cp_intr_mask);
+			spin_unlock_irqrestore(&cp->lock, flags);
+		}
 	}
 
 	return rx;
