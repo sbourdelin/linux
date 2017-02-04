@@ -10,6 +10,25 @@ clocks: 	Phandle of the clock used by the thermal sensor.
 
 Example:
 
+thermal-zones {
+	gpu_thermal: gpu-thermal {
+		polling-delay-passive = <0>;
+		polling-delay = <1000>;
+
+		thermal-sensors = <&thermal>;
+
+		trips {
+			cpu-crit {
+				temperature	= <80000>;
+				hysteresis	= <0>;
+				type		= "critical";
+			};
+		};
+		cooling-maps {
+		};
+	};
+};
+
 thermal: thermal@7e212000 {
 	compatible = "brcm,bcm2835-thermal";
 	reg = <0x7e212000 0x8>;
