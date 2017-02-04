@@ -70,6 +70,7 @@ struct bq27xxx_device_info {
 	struct list_head list;
 	struct mutex lock;
 	u8 *regs;
+	u8 buffer[32];
 };
 
 void bq27xxx_battery_update(struct bq27xxx_device_info *di);
