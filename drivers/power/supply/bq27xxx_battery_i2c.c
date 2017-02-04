@@ -229,7 +229,7 @@ static const struct i2c_device_id bq27xxx_i2c_id_table[] = {
 	{ "bq27742", BQ27541 },
 	{ "bq27545", BQ27545 },
 	{ "bq27421", BQ27421 },
-	{ "bq27425", BQ27421 },
+	{ "bq27425", BQ27425 },
 	{ "bq27441", BQ27421 },
 	{ "bq27621", BQ27421 },
 	{},
