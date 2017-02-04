@@ -52,6 +52,7 @@
 #include <net/dst_metadata.h>
 #include <net/dst.h>
 #include <net/sock_reuseport.h>
+#include <linux/proc_ns.h>
 
 /**
  *	sk_filter_trim_cap - run a packet through a socket filter
@@ -2597,6 +2598,34 @@ static const struct bpf_func_proto bpf_xdp_event_output_proto = {
 	.arg5_type	= ARG_CONST_STACK_SIZE,
 };
 
+BPF_CALL_1(bpf_sk_netns_id, struct sock *, sk)
+{
+	return proc_get_ns_devid_inum(&sock_net(sk)->ns);
+}
+
+static const struct bpf_func_proto bpf_sk_netns_id_proto = {
+	.func		= bpf_sk_netns_id,
+	.gpl_only	= false,
+	.ret_type	= RET_INTEGER,
+	.arg1_type	= ARG_PTR_TO_CTX,
+};
+
+BPF_CALL_1(bpf_skb_netns_id, struct sk_buff *, skb)
+{
+	struct net_device *dev = skb->dev;
+
+	if (!dev)
+		return 0;
+	return proc_get_ns_devid_inum(&dev_net(dev)->ns);
+}
+
+static const struct bpf_func_proto bpf_skb_netns_id_proto = {
+	.func		= bpf_skb_netns_id,
+	.gpl_only	= false,
+	.ret_type	= RET_INTEGER,
+	.arg1_type	= ARG_PTR_TO_CTX,
+};
+
 static const struct bpf_func_proto *
 sk_filter_func_proto(enum bpf_func_id func_id)
 {
@@ -2620,6 +2649,8 @@ sk_filter_func_proto(enum bpf_func_id func_id)
 	case BPF_FUNC_trace_printk:
 		if (capable(CAP_SYS_ADMIN))
 			return bpf_get_trace_printk_proto();
+	case BPF_FUNC_sk_netns_id:
+		return &bpf_skb_netns_id_proto;
 	default:
 		return NULL;
 	}
@@ -2694,6 +2725,17 @@ xdp_func_proto(enum bpf_func_id func_id)
 		return &bpf_get_smp_processor_id_proto;
 	case BPF_FUNC_xdp_adjust_head:
 		return &bpf_xdp_adjust_head_proto;
+	default:
+		return sk_filter_func_proto(func_id);
+	}
+}
+
+static const struct bpf_func_proto *
+cg_sock_func_proto(enum bpf_func_id func_id)
+{
+	switch (func_id) {
+	case BPF_FUNC_sk_netns_id:
+		return &bpf_sk_netns_id_proto;
 	default:
 		return sk_filter_func_proto(func_id);
 	}
@@ -3255,7 +3297,7 @@ static const struct bpf_verifier_ops lwt_xmit_ops = {
 };
 
 static const struct bpf_verifier_ops cg_sock_ops = {
-	.get_func_proto		= sk_filter_func_proto,
+	.get_func_proto		= cg_sock_func_proto,
 	.is_valid_access	= sock_filter_is_valid_access,
 	.convert_ctx_access	= sock_filter_convert_ctx_access,
 };

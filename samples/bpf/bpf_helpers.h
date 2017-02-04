@@ -94,6 +94,8 @@ static int (*bpf_skb_under_cgroup)(void *ctx, void *map, int index) =
 	(void *) BPF_FUNC_skb_under_cgroup;
 static int (*bpf_skb_change_head)(void *, int len, int flags) =
 	(void *) BPF_FUNC_skb_change_head;
+static unsigned long long (*bpf_sk_netns_id)(void *) =
+	(void *) BPF_FUNC_sk_netns_id;
 
 #if defined(__x86_64__)
 

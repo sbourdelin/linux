@@ -48,7 +48,7 @@ extern int pid_ns_prepare_proc(struct pid_namespace *ns);
 extern void pid_ns_release_proc(struct pid_namespace *ns);
 extern int proc_alloc_inum(unsigned int *pino);
 extern void proc_free_inum(unsigned int inum);
-
+extern u64 proc_get_ns_devid_inum(struct ns_common *ns);
 #else /* CONFIG_PROC_FS */
 
 static inline int pid_ns_prepare_proc(struct pid_namespace *ns) { return 0; }
@@ -61,6 +61,7 @@ static inline int proc_alloc_inum(unsigned int *inum)
 }
 static inline void proc_free_inum(unsigned int inum) {}
 
+static u64 proc_get_ns_devid_inum(struct ns_common *ns) { return 0; }
 #endif /* CONFIG_PROC_FS */
 
 static inline int ns_alloc_inum(struct ns_common *ns)

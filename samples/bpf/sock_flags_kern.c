@@ -9,8 +9,10 @@ SEC("cgroup/sock1")
 int bpf_prog1(struct bpf_sock *sk)
 {
 	char fmt[] = "socket: family %d type %d protocol %d\n";
+	char fmt2[] = "socket: netns dev+inode %llx\n";
 
 	bpf_trace_printk(fmt, sizeof(fmt), sk->family, sk->type, sk->protocol);
+	bpf_trace_printk(fmt2, sizeof(fmt2), bpf_sk_netns_id(sk));
 
 	/* block PF_INET6, SOCK_RAW, IPPROTO_ICMPV6 sockets
 	 * ie., make ping6 fail

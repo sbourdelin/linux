@@ -16,6 +16,7 @@ int bpf_prog1(struct __sk_buff *skb)
 {
 	int index = load_byte(skb, ETH_HLEN + offsetof(struct iphdr, protocol));
 	long *value;
+	char fmt[] = "netns dev+inode %llx\n";
 
 	if (skb->pkt_type != PACKET_OUTGOING)
 		return 0;
@@ -24,6 +25,7 @@ int bpf_prog1(struct __sk_buff *skb)
 	if (value)
 		__sync_fetch_and_add(value, skb->len);
 
+	bpf_trace_printk(fmt, sizeof(fmt), bpf_sk_netns_id(skb));
 	return 0;
 }
 char _license[] SEC("license") = "GPL";

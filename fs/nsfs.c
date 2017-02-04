@@ -49,6 +49,13 @@ static void nsfs_evict(struct inode *inode)
 	ns->ops->put(ns);
 }
 
+u64 proc_get_ns_devid_inum(struct ns_common *ns)
+{
+	u64 dev = new_encode_dev(nsfs_mnt->mnt_sb->s_dev);
+
+	return (dev << 32) | ns->inum;
+}
+
 static void *__ns_get_path(struct path *path, struct ns_common *ns)
 {
 	struct vfsmount *mnt = nsfs_mnt;
