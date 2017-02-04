@@ -9665,6 +9665,31 @@ static const struct net_device_ops i40e_netdev_ops = {
 	.ndo_xdp                = i40e_xdp,
 };
 
+static int i40e_pf_attr_get(struct net_device *dev, struct switchdev_attr *attr)
+{
+	struct i40e_netdev_priv *np = netdev_priv(dev);
+	struct i40e_vsi *vsi = np->vsi;
+	struct i40e_pf *pf = vsi->back;
+
+	if (pf->eswitch_mode == DEVLINK_ESWITCH_MODE_LEGACY)
+		return -EOPNOTSUPP;
+
+	switch (attr->id) {
+	case SWITCHDEV_ATTR_ID_PORT_PARENT_ID:
+		attr->u.ppid.id_len = ETH_ALEN;
+		ether_addr_copy(attr->u.ppid.id, dev->dev_addr);
+		break;
+	default:
+		return -EOPNOTSUPP;
+	}
+
+	return 0;
+}
+
+static const struct switchdev_ops i40e_pf_switchdev_ops = {
+	.switchdev_port_attr_get        = i40e_pf_attr_get,
+};
+
 /**
  * i40e_config_netdev - Setup the netdev flags
  * @vsi: the VSI being configured
@@ -9783,6 +9808,9 @@ static int i40e_config_netdev(struct i40e_vsi *vsi)
 	i40e_set_ethtool_ops(netdev);
 #ifdef I40E_FCOE
 	i40e_fcoe_config_netdev(netdev, vsi);
+#endif
+#ifdef CONFIG_NET_SWITCHDEV
+	netdev->switchdev_ops = &i40e_pf_switchdev_ops;
 #endif
 
 	/* MTU range: 68 - 9706 */
