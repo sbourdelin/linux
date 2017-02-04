@@ -4607,6 +4607,105 @@ static int i915_forcewake_create(struct dentry *root, struct drm_minor *minor)
 	return drm_add_fake_info_node(minor, ent, &i915_forcewake_fops);
 }
 
+static int i915_hpd_storm_ctl_show(struct seq_file *m, void *data)
+{
+	struct drm_i915_private *dev_priv = m->private;
+
+	if (delayed_work_pending(&dev_priv->hotplug.reenable_work))
+		seq_printf(m, "detected\n");
+	else if (dev_priv->hotplug.hpd_storm_detect_enabled)
+		seq_printf(m, "on\n");
+	else
+		seq_printf(m, "off\n");
+
+	return 0;
+}
+
+static void i915_hpd_storm_reset(struct drm_i915_private *dev_priv)
+{
+	int i;
+
+	spin_lock_irq(&dev_priv->irq_lock);
+	for (i = 0; i < ARRAY_SIZE(dev_priv->hotplug.stats); i++) {
+		dev_priv->hotplug.stats[i].count = 0;
+		dev_priv->hotplug.stats[i].last_jiffies = jiffies;
+	}
+	spin_unlock_irq(&dev_priv->irq_lock);
+
+	if (delayed_work_pending(&dev_priv->hotplug.reenable_work))
+		flush_delayed_work(&dev_priv->hotplug.reenable_work);
+	else
+		schedule_delayed_work(&dev_priv->hotplug.reenable_work, 0);
+}
+
+static ssize_t i915_hpd_storm_ctl_write(struct file *file,
+					const char __user *ubuf, size_t len,
+					loff_t *offp)
+{
+	struct seq_file *m = file->private_data;
+	struct drm_i915_private *dev_priv = m->private;
+	struct i915_hotplug *hotplug = &dev_priv->hotplug;
+	char tmp[16];
+	enum {
+		HPD_STORM_DISABLE = 0,
+		HPD_STORM_ENABLE,
+		HPD_STORM_RESET
+	} action;
+
+	if (len >= sizeof(tmp))
+		return -EINVAL;
+
+	if (copy_from_user(tmp, ubuf, len))
+		return -EFAULT;
+
+	tmp[len] = '\0';
+
+	if (strcmp(tmp, "off") == 0 || strcmp(tmp, "off\n") == 0)
+		action = HPD_STORM_DISABLE;
+	else if (strcmp(tmp, "on") == 0 || strcmp(tmp, "on\n") == 0)
+		action = HPD_STORM_ENABLE;
+	else if (strcmp(tmp, "reset") == 0 || strcmp(tmp, "reset\n") == 0)
+		action = HPD_STORM_RESET;
+	else
+		return -EINVAL;
+
+	switch (action) {
+		case HPD_STORM_DISABLE:
+			DRM_DEBUG_KMS("Disabling HPD storm detection\n");
+
+			WRITE_ONCE(hotplug->hpd_storm_detect_enabled, false);
+			i915_hpd_storm_reset(dev_priv);
+			break;
+		case HPD_STORM_ENABLE:
+			DRM_DEBUG_KMS("Enabling HPD storm detection\n");
+
+			i915_hpd_storm_reset(dev_priv);
+			hotplug->hpd_storm_detect_enabled = true;
+			break;
+		case HPD_STORM_RESET:
+			DRM_DEBUG_KMS("Resetting HPD storm stats\n");
+
+			i915_hpd_storm_reset(dev_priv);
+			break;
+	}
+
+	return len;
+}
+
+static int i915_hpd_storm_ctl_open(struct inode *inode, struct file *file)
+{
+	return single_open(file, i915_hpd_storm_ctl_show, inode->i_private);
+}
+
+static const struct file_operations i915_hpd_storm_ctl_fops = {
+	.owner = THIS_MODULE,
+	.open = i915_hpd_storm_ctl_open,
+	.read = seq_read,
+	.llseek = seq_lseek,
+	.release = single_release,
+	.write = i915_hpd_storm_ctl_write
+};
+
 static int i915_debugfs_create(struct dentry *root,
 			       struct drm_minor *minor,
 			       const char *name,
@@ -4700,7 +4799,8 @@ static const struct i915_debugfs_files {
 	{"i915_dp_test_data", &i915_displayport_test_data_fops},
 	{"i915_dp_test_type", &i915_displayport_test_type_fops},
 	{"i915_dp_test_active", &i915_displayport_test_active_fops},
-	{"i915_guc_log_control", &i915_guc_log_control_fops}
+	{"i915_guc_log_control", &i915_guc_log_control_fops},
+	{"i915_hpd_storm_ctl", &i915_hpd_storm_ctl_fops}
 };
 
 int i915_debugfs_register(struct drm_i915_private *dev_priv)

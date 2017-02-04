@@ -129,7 +129,8 @@ static bool intel_hpd_irq_storm_detect(struct drm_i915_private *dev_priv,
 		dev_priv->hotplug.stats[pin].last_jiffies = jiffies;
 		dev_priv->hotplug.stats[pin].count = 0;
 		DRM_DEBUG_KMS("Received HPD interrupt on PIN %d - cnt: 0\n", pin);
-	} else if (dev_priv->hotplug.stats[pin].count > HPD_STORM_THRESHOLD) {
+	} else if (dev_priv->hotplug.stats[pin].count > HPD_STORM_THRESHOLD &&
+		   dev_priv->hotplug.hpd_storm_detect_enabled) {
 		dev_priv->hotplug.stats[pin].state = HPD_MARK_DISABLED;
 		DRM_DEBUG_KMS("HPD interrupt storm detected on PIN %d\n", pin);
 		storm = true;
