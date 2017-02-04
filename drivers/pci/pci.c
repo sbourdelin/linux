@@ -2072,7 +2072,13 @@ int pci_finish_runtime_suspend(struct pci_dev *dev)
 
 	dev->runtime_d3cold = target_state == PCI_D3cold;
 
-	__pci_enable_wake(dev, target_state, true, pci_dev_run_wake(dev));
+	/*
+	 * Enable PME if dev can generate wakeup events at runtime, but not on
+	 * hotplug ports since PME signals unwanted interrupts if the slot is
+	 * occupied (PCIe Base Specification, section 6.7.3.4).
+	 */
+	__pci_enable_wake(dev, target_state, true, pci_dev_run_wake(dev) &&
+						   !dev->is_hotplug_bridge);
 
 	error = pci_set_power_state(dev, target_state);
 
