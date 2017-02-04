@@ -10,17 +10,22 @@
 
 #include <stddef.h>
 #include <dwarf-regs.h>
+#include <linux/ptrace.h> /* for struct user_pt_regs */
+#include "util.h"
 
 struct pt_regs_dwarfnum {
 	const char *name;
 	unsigned int dwarfnum;
+	unsigned int ptregs_offset;
 };
 
-#define STR(s) #s
-#define REG_DWARFNUM_NAME(r, num) {.name = r, .dwarfnum = num}
-#define GPR_DWARFNUM_NAME(num) \
-	{.name = STR(%x##num), .dwarfnum = num}
-#define REG_DWARFNUM_END {.name = NULL, .dwarfnum = 0}
+#define REG_DWARFNUM_NAME(r, num)					\
+		{.name = STR(%)STR(r), .dwarfnum = num,			\
+		.ptregs_offset = offsetof(struct user_pt_regs, r)}
+#define GPR_DWARFNUM_NAME(num)						\
+		{.name = STR(%x##num), .dwarfnum = num,		\
+		.ptregs_offset = offsetof(struct user_pt_regs, regs[num])}
+#define REG_DWARFNUM_END {.name = NULL, .dwarfnum = 0, .ptregs_offset = 0}
 
 /*
  * Reference:
@@ -57,8 +62,9 @@ static const struct pt_regs_dwarfnum regdwarfnum_table[] = {
 	GPR_DWARFNUM_NAME(27),
 	GPR_DWARFNUM_NAME(28),
 	GPR_DWARFNUM_NAME(29),
-	REG_DWARFNUM_NAME("%lr", 30),
-	REG_DWARFNUM_NAME("%sp", 31),
+	{.name = "%lr", .dwarfnum = 30,
+	 .ptregs_offset = offsetof(struct user_pt_regs, regs[30])},
+	REG_DWARFNUM_NAME(sp, 31),
 	REG_DWARFNUM_END,
 };
 
@@ -77,4 +83,14 @@ const char *get_arch_regstr(unsigned int n)
 		if (roff->dwarfnum == n)
 			return roff->name;
 	return NULL;
+}
+
+int regs_query_register_offset(const char *name)
+{
+	const struct pt_regs_dwarfnum *roff;
+
+	for (roff = regdwarfnum_table; roff->name != NULL; roff++)
+		if (!strcmp(roff->name, name))
+			return roff->ptregs_offset;
+	return -EINVAL;
 }
