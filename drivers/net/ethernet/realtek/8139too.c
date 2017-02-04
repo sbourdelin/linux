@@ -2136,15 +2136,13 @@ static int rtl8139_poll(struct napi_struct *napi, int budget)
 		work_done += rtl8139_rx(dev, tp, budget);
 
 	if (work_done < budget) {
-		unsigned long flags;
-		/*
-		 * Order is important since data can get interrupted
-		 * again when we think we are done.
-		 */
-		spin_lock_irqsave(&tp->lock, flags);
-		__napi_complete(napi);
-		RTL_W16_F(IntrMask, rtl8139_intr_mask);
-		spin_unlock_irqrestore(&tp->lock, flags);
+		if (napi_complete_done(napi, work_done)) {
+			unsigned long flags;
+
+			spin_lock_irqsave(&tp->lock, flags);
+			RTL_W16_F(IntrMask, rtl8139_intr_mask);
+			spin_unlock_irqrestore(&tp->lock, flags);
+		}
 	}
 	spin_unlock(&tp->rx_lock);
 
