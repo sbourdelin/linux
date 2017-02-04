@@ -3,12 +3,13 @@
 
 #include <linux/spinlock.h>
 
-struct task_struct;
-
 /*
  * Interface between the scheduler and various task lifetime (fork()/exit())
  * functionality:
  */
+
+struct task_struct;
+union thread_union;
 
 /*
  * This serializes "schedule()" and also protects
@@ -18,6 +19,9 @@ struct task_struct;
  */
 extern rwlock_t tasklist_lock;
 extern spinlock_t mmlist_lock;
+
+extern union thread_union init_thread_union;
+extern struct task_struct init_task;
 
 #ifdef CONFIG_PROVE_RCU
 extern int lockdep_tasklist_lock_is_held(void);
