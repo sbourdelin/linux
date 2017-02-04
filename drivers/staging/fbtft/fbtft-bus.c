@@ -10,6 +10,7 @@
  *
  *****************************************************************************/
 
+#define	nop_modifier(expr)		(expr)
 #define define_fbtft_write_reg(func, type, modifier)                          \
 void func(struct fbtft_par *par, int len, ...)                                \
 {                                                                             \
@@ -68,9 +69,9 @@ void func(struct fbtft_par *par, int len, ...)                                \
 }                                                                             \
 EXPORT_SYMBOL(func);
 
-define_fbtft_write_reg(fbtft_write_reg8_bus8, u8, )
+define_fbtft_write_reg(fbtft_write_reg8_bus8, u8, nop_modifier)
 define_fbtft_write_reg(fbtft_write_reg16_bus8, u16, cpu_to_be16)
-define_fbtft_write_reg(fbtft_write_reg16_bus16, u16, )
+define_fbtft_write_reg(fbtft_write_reg16_bus16, u16, nop_modifier)
 
 void fbtft_write_reg8_bus9(struct fbtft_par *par, int len, ...)
 {
