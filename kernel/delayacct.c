@@ -14,6 +14,7 @@
  */
 
 #include <linux/sched.h>
+#include <linux/sched/fork.h>
 #include <linux/slab.h>
 #include <linux/taskstats.h>
 #include <linux/time.h>

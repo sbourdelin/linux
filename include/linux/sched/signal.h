@@ -4,6 +4,7 @@
 #include <linux/signal.h>
 #include <linux/sched.h>
 #include <linux/sched/jobctl.h>
+#include <linux/sched/fork.h>
 #include <linux/cred.h>
 
 /*

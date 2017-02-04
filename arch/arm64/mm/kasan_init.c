@@ -13,6 +13,7 @@
 #define pr_fmt(fmt) "kasan: " fmt
 #include <linux/kasan.h>
 #include <linux/kernel.h>
+#include <linux/sched/fork.h>
 #include <linux/memblock.h>
 #include <linux/start_kernel.h>
 
