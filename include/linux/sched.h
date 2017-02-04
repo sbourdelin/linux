@@ -1464,8 +1464,6 @@ static inline int kstack_end(void *addr)
 extern union thread_union init_thread_union;
 extern struct task_struct init_task;
 
-extern struct pid_namespace init_pid_ns;
-
 /*
  * find a task by one of its numerical ids
  *
