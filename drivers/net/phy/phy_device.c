@@ -1709,6 +1709,7 @@ static int phy_probe(struct device *dev)
 	struct phy_device *phydev = to_phy_device(dev);
 	struct device_driver *drv = phydev->mdio.dev.driver;
 	struct phy_driver *phydrv = to_phy_driver(drv);
+	bool should_start = false;
 	int err = 0;
 
 	phydev->drv = phydrv;
@@ -1758,12 +1759,18 @@ static int phy_probe(struct device *dev)
 	}
 
 	/* Set the state to READY by default */
-	phydev->state = PHY_READY;
+	if (phydev->state > PHY_UP && phydev->state != PHY_HALTED)
+		should_start = true;
+	else
+		phydev->state = PHY_READY;
 
 	if (phydev->drv->probe)
 		err = phydev->drv->probe(phydev);
 
 	mutex_unlock(&phydev->lock);
+
+	if (should_start)
+		phy_start(phydev);
 
 	return err;
 }
@@ -1771,10 +1778,26 @@ static int phy_probe(struct device *dev)
 static int phy_remove(struct device *dev)
 {
 	struct phy_device *phydev = to_phy_device(dev);
+	bool should_stop = false;
+	enum phy_state state;
+
+	cancel_delayed_work_sync(&phydev->state_queue);
 
 	mutex_lock(&phydev->lock);
-	phydev->state = PHY_DOWN;
+	state = phydev->state;
+	if (state > PHY_UP && state != PHY_HALTED)
+		should_stop = true;
+	else
+		phydev->state = PHY_DOWN;
 	mutex_unlock(&phydev->lock);
+
+	/* phy_stop() sets the state to HALTED, undo that for the ->probe() function
+	 * to have a chance to resume where we left
+	 */
+	if (should_stop) {
+		phy_stop(phydev);
+		phydev->state = state;
+	}
 
 	if (phydev->drv->remove)
 		phydev->drv->remove(phydev);
