@@ -42,6 +42,7 @@
 #include <linux/of_address.h>
 #include <linux/of_irq.h>
 #include <linux/of_net.h>
+#include <linux/of_mdio.h>
 #include <linux/slab.h>
 
 #include <asm/processor.h>
@@ -2420,6 +2421,179 @@ static int emac_read_uint_prop(struct device_node *np, const char *name,
 	return 0;
 }
 
+static void emac_adjust_link(struct net_device *ndev)
+{
+	struct emac_instance *dev = netdev_priv(ndev);
+	struct phy_device *phy = dev->phy_dev;
+
+	mutex_lock(&dev->link_lock);
+	dev->phy.autoneg = phy->autoneg;
+	dev->phy.speed = phy->speed;
+	dev->phy.duplex = phy->duplex;
+	dev->phy.pause = phy->pause;
+	dev->phy.asym_pause = phy->asym_pause;
+	dev->phy.advertising = phy->advertising;
+	mutex_unlock(&dev->link_lock);
+}
+
+static int emac_mii_bus_read(struct mii_bus *bus, int addr, int regnum)
+{
+	return emac_mdio_read(bus->priv, addr, regnum);
+}
+
+static int emac_mii_bus_write(struct mii_bus *bus, int addr, int regnum,
+			      u16 val)
+{
+	emac_mdio_write(bus->priv, addr, regnum, val);
+	return 0;
+}
+
+static int emac_mii_bus_reset(struct mii_bus *bus)
+{
+	struct emac_instance *dev = netdev_priv(bus->priv);
+
+	emac_mii_reset_phy(&dev->phy);
+	return 0;
+}
+
+static int emac_mdio_probe(struct emac_instance *dev)
+{
+	struct device_node *mii_np;
+	struct mii_bus *bus;
+	int res;
+
+	bus = mdiobus_alloc();
+	if (!bus)
+		return -ENOMEM;
+
+	mii_np = of_get_child_by_name(dev->ofdev->dev.of_node, "mdio");
+	if (!mii_np) {
+		dev_err(&dev->ndev->dev, "no mdio definition found.");
+		return -ENODEV;
+	}
+
+	if (!of_device_is_available(mii_np))
+		return 0;
+
+	bus->priv = dev->ndev;
+	bus->parent = dev->ndev->dev.parent;
+	bus->name = "emac_mdio";
+	bus->read = &emac_mii_bus_read;
+	bus->write = &emac_mii_bus_write;
+	bus->reset = &emac_mii_bus_reset;
+
+	snprintf(bus->id, MII_BUS_ID_SIZE, "%s", bus->name);
+
+	res = of_mdiobus_register(bus, mii_np);
+	if (res) {
+		dev_err(&dev->ndev->dev, "cannot register MDIO bus %s\n",
+			bus->name);
+		mdiobus_free(bus);
+	}
+
+	dev->mii_bus = bus;
+	return res;
+}
+
+static void emac_mdio_cleanup(struct emac_instance *dev)
+{
+	if (dev->mii_bus) {
+		if (dev->mii_bus->state == MDIOBUS_REGISTERED)
+			mdiobus_unregister(dev->mii_bus);
+		mdiobus_free(dev->mii_bus);
+		dev->mii_bus = NULL;
+		kfree(dev->phy.def);
+	}
+}
+
+static int stub_setup_aneg(struct mii_phy *phy, u32 advertise)
+{
+	return 0;
+}
+
+static int stub_setup_forced(struct mii_phy *phy, int speed, int fd)
+{
+	return 0;
+}
+
+static int stub_poll_link(struct mii_phy *phy)
+{
+	struct net_device *ndev = phy->dev;
+	struct emac_instance *dev = netdev_priv(ndev);
+
+	return dev->opened;
+}
+
+static int stub_read_link(struct mii_phy *phy)
+{
+	struct net_device *ndev = phy->dev;
+	struct emac_instance *dev = netdev_priv(ndev);
+
+	phy_start(dev->phy_dev);
+	return 0;
+}
+
+static const struct mii_phy_ops emac_stub_phy_ops = {
+	.setup_aneg	= stub_setup_aneg,
+	.setup_forced	= stub_setup_forced,
+	.poll_link	= stub_poll_link,
+	.read_link	= stub_read_link,
+};
+
+static int emac_probe_dt_phy(struct emac_instance *dev)
+{
+	struct device_node *np = dev->ofdev->dev.of_node;
+	struct device_node *phy_handle;
+	struct net_device *ndev = dev->ndev;
+	int res;
+
+	phy_handle = of_parse_phandle(np, "phy-handle", 0);
+
+	if (phy_handle) {
+		res = emac_mdio_probe(dev);
+		if (res)
+			goto err_cleanup;
+
+		dev->phy.def = kzalloc(sizeof(*dev->phy.def), GFP_KERNEL);
+		if (!dev->phy.def) {
+			res = -ENOMEM;
+			goto err_cleanup;
+		}
+
+		dev->phy_dev = of_phy_connect(ndev, phy_handle,
+					      &emac_adjust_link, 0,
+					      PHY_INTERFACE_MODE_RGMII);
+		if (!dev->phy_dev) {
+			res = -ENODEV;
+			goto err_cleanup;
+		}
+
+		of_node_put(phy_handle);
+		dev->phy.def->phy_id = dev->phy_dev->drv->phy_id;
+		dev->phy.def->phy_id_mask = dev->phy_dev->drv->phy_id_mask;
+		dev->phy.def->name = dev->phy_dev->drv->name;
+		dev->phy.def->ops = &emac_stub_phy_ops;
+		/* Disable any PHY features not supported by the platform */
+		dev->phy.def->features =  dev->phy_dev->drv->features &
+					  ~dev->phy_feat_exc;
+		dev->phy.features = dev->phy.def->features;
+		dev->phy.address = dev->phy_dev->mdio.addr;
+		dev->phy.mode = dev->phy_dev->interface;
+		return 0;
+	}
+
+	/* if the device tree didn't specifiy the the phy, then
+	 * we simply fallback to the old emac_phy.c probe code
+	 * for compatibility reasons.
+	 */
+	return 1;
+
+ err_cleanup:
+	of_node_put(phy_handle);
+	kfree(dev->phy.def);
+	return res;
+}
+
 static int emac_init_phy(struct emac_instance *dev)
 {
 	struct device_node *np = dev->ofdev->dev.of_node;
@@ -2489,6 +2663,13 @@ static int emac_init_phy(struct emac_instance *dev)
 	}
 
 	emac_configure(dev);
+
+	if (emac_has_feature(dev, EMAC_FTR_HAS_RGMII)) {
+		int res = emac_probe_dt_phy(dev);
+
+		if (res <= 0)
+			return res;
+	}
 
 	if (dev->phy_address != 0xffffffff)
 		phy_map = ~(1 << dev->phy_address);
@@ -2938,6 +3119,8 @@ static int emac_probe(struct platform_device *ofdev)
 	/* I have a bad feeling about this ... */
 
  err_detach_tah:
+	emac_mdio_cleanup(dev);
+
 	if (emac_has_feature(dev, EMAC_FTR_HAS_TAH))
 		tah_detach(dev->tah_dev, dev->tah_port);
  err_detach_rgmii:
@@ -2987,6 +3170,11 @@ static int emac_remove(struct platform_device *ofdev)
 		rgmii_detach(dev->rgmii_dev, dev->rgmii_port);
 	if (emac_has_feature(dev, EMAC_FTR_HAS_ZMII))
 		zmii_detach(dev->zmii_dev, dev->zmii_port);
+
+	if (dev->phy_dev)
+		phy_disconnect(dev->phy_dev);
+
+	emac_mdio_cleanup(dev);
 
 	busy_phy_map &= ~(1 << dev->phy.address);
 	DBG(dev, "busy_phy_map now %#x" NL, busy_phy_map);
