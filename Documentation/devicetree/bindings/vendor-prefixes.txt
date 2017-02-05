@@ -252,6 +252,7 @@ rikomagic	Rikomagic Tech Corp. Ltd
 rockchip	Fuzhou Rockchip Electronics Co., Ltd
 samsung	Samsung Semiconductor
 samtec	Samtec/Softing company
+samyoung Samyoung S&C Co., Ltd
 sandisk	Sandisk Corporation
 sbs	Smart Battery System
 schindler	Schindler
@@ -259,6 +260,7 @@ seagate	Seagate Technology PLC
 semtech	Semtech Corporation
 sgx	SGX Sensortech
 sharp	Sharp Corporation
+shinyei Shinyei Technology Co., Ltd
 si-en	Si-En Technology Ltd.
 sigma	Sigma Designs, Inc.
 sii	Seiko Instruments, Inc.
