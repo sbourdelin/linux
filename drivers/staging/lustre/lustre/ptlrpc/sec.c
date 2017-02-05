@@ -40,6 +40,7 @@
 #include <linux/crypto.h>
 #include <linux/cred.h>
 #include <linux/key.h>
+#include <linux/sched/fork.h>
 
 #include "../include/obd.h"
 #include "../include/obd_class.h"
