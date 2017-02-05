@@ -21,6 +21,8 @@
 #include <linux/regulator/consumer.h>
 
 struct phy;
+struct clk;
+struct reset_control;
 
 enum phy_mode {
 	PHY_MODE_INVALID,
@@ -77,6 +79,8 @@ struct phy {
 	int			power_count;
 	struct phy_attrs	attrs;
 	struct regulator	*pwr;
+	struct clk		*clk;
+	struct reset_control	*reset;
 };
 
 /**

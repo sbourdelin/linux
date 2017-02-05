@@ -22,6 +22,8 @@
 #include <linux/idr.h>
 #include <linux/pm_runtime.h>
 #include <linux/regulator/consumer.h>
+#include <linux/reset.h>
+#include <linux/clk.h>
 
 static struct class *phy_class;
 static DEFINE_MUTEX(phy_provider_mutex);
@@ -286,6 +288,12 @@ int phy_power_on(struct phy *phy)
 			goto out;
 	}
 
+	if (phy->clk) {
+		ret = clk_prepare_enable(phy->clk);
+		if (ret)
+			goto err_clk_enable;
+	}
+
 	ret = phy_pm_runtime_get_sync(phy);
 	if (ret < 0 && ret != -ENOTSUPP)
 		goto err_pm_sync;
@@ -293,6 +301,11 @@ int phy_power_on(struct phy *phy)
 	ret = 0; /* Override possible ret == -ENOTSUPP */
 
 	mutex_lock(&phy->mutex);
+	if (phy->power_count == 0 && phy->reset) {
+		ret = reset_control_deassert(phy->reset);
+		if (ret)
+			goto err_reset_deassert;
+	}
 	if (phy->power_count == 0 && phy->ops->power_on) {
 		ret = phy->ops->power_on(phy);
 		if (ret < 0) {
@@ -305,9 +318,15 @@ int phy_power_on(struct phy *phy)
 	return 0;
 
 err_pwr_on:
+	if (phy->reset)
+		reset_control_assert(phy->reset);
+err_reset_deassert:
 	mutex_unlock(&phy->mutex);
 	phy_pm_runtime_put_sync(phy);
 err_pm_sync:
+	if (phy->clk)
+		clk_disable_unprepare(phy->clk);
+err_clk_enable:
 	if (phy->pwr)
 		regulator_disable(phy->pwr);
 out:
@@ -331,10 +350,18 @@ int phy_power_off(struct phy *phy)
 			return ret;
 		}
 	}
+	if (phy->power_count == 1 && phy->reset) {
+		ret = reset_control_assert(phy->reset);
+		if (ret < 0)
+			dev_warn(&phy->dev,
+				"phy reset assert failed --> %d\n", ret);
+	}
 	--phy->power_count;
 	mutex_unlock(&phy->mutex);
 	phy_pm_runtime_put(phy);
 
+	if (phy->clk)
+		clk_disable_unprepare(phy->clk);
 	if (phy->pwr)
 		regulator_disable(phy->pwr);
 
@@ -755,6 +782,24 @@ struct phy *phy_create(struct device *dev, struct device_node *node,
 		phy->pwr = NULL;
 	}
 
+	phy->clk = clk_get(dev, "phy");
+	if (IS_ERR(phy->clk)) {
+		ret = PTR_ERR(phy->clk);
+		if (ret == -ENOENT)
+			phy->clk = NULL;
+		else
+			goto put_dev;
+	}
+
+	phy->reset = reset_control_get(dev, "phy");
+	if (IS_ERR(phy->reset)) {
+		ret = PTR_ERR(phy->reset);
+		if (ret == -ENOENT || ret == -ENOTSUPP)
+			phy->reset = NULL;
+		else
+			goto put_dev;
+	}
+
 	ret = device_add(&phy->dev);
 	if (ret)
 		goto put_dev;
@@ -991,6 +1036,9 @@ static void phy_release(struct device *dev)
 
 	phy = to_phy(dev);
 	dev_vdbg(dev, "releasing '%s'\n", dev_name(dev));
+	if (phy->reset)
+		reset_control_put(phy->reset);
+	clk_put(phy->clk);
 	regulator_put(phy->pwr);
 	ida_simple_remove(&phy_ida, phy->id);
 	kfree(phy);
