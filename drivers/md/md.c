@@ -193,10 +193,14 @@ EXPORT_SYMBOL_GPL(bio_alloc_mddev);
 struct bio *bio_clone_mddev(struct bio *bio, gfp_t gfp_mask,
 			    struct mddev *mddev)
 {
-	if (!mddev || !mddev->bio_set)
-		return bio_clone(bio, gfp_mask);
+	struct bio_set *bs;
 
-	return bio_clone_bioset(bio, gfp_mask, mddev->bio_set);
+	if (!mddev || !mddev->bio_set)
+		bs = fs_bio_set;
+	else
+		bs = mddev->bio_set;
+
+	return bio_clone_fast(bio, gfp_mask, bs);
 }
 EXPORT_SYMBOL_GPL(bio_clone_mddev);
 
