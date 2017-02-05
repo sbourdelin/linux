@@ -4488,9 +4488,16 @@ int extent_fiemap(struct inode *inode, struct fiemap_extent_info *fieinfo,
 		if (!test_bit(EXTENT_FLAG_COMPRESSED, &em->flags))
 			offset_in_extent = em_start - em->start;
 		em_end = extent_map_end(em);
-		em_len = em_end - em_start;
 		disko = 0;
 		flags = 0;
+
+		if (fieinfo->fi_flags & FIEMAP_FLAG_ONDISK &&
+		    em->block_start != EXTENT_MAP_INLINE &&
+		    em->block_len != (u64)-1) {
+
+			em_len = em->block_len;
+		} else
+			em_len = em_end - em_start;
 
 		/*
 		 * bump off for our next call to get_extent

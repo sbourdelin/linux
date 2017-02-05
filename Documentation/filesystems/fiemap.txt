@@ -58,6 +58,13 @@ If this flag is set, the kernel will sync the file before mapping extents.
 If this flag is set, the extents returned will describe the inodes
 extended attribute lookup tree, instead of its data tree.
 
+* FIEMAP_FLAG_ONDISK
+If this flag is set, fe_length returns size of blocks allocated on the disk,
+rather than actual data length contained in extent.
+
+For example, if extent have the FIEMAP_EXTENT_ENCODED flag set and
+the data are compressed, then actual data size contained by extent
+differs from blocks allocated on disk.
 
 Extent Mapping
 --------------

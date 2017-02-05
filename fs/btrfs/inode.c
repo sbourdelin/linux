@@ -8744,7 +8744,7 @@ out:
 	return ret;
 }
 
-#define BTRFS_FIEMAP_FLAGS	(FIEMAP_FLAG_SYNC)
+#define BTRFS_FIEMAP_FLAGS	(FIEMAP_FLAG_SYNC|FIEMAP_FLAG_ONDISK)
 
 static int btrfs_fiemap(struct inode *inode, struct fiemap_extent_info *fieinfo,
 		__u64 start, __u64 len)
