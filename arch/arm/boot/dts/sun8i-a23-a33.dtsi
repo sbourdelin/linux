@@ -316,7 +316,7 @@
 				bias-pull-up;
 			};
 
-			pwm0_pins: pwm0 {
+			pwm0_pins_a: pwm0 {
 				pins = "PH0";
 				function = "pwm0";
 			};

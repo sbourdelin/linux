@@ -321,6 +321,11 @@
 				bias-pull-up;
 			};
 
+			pwm0_pins_a: pwm0@0 {
+				pins = "PB2";
+				function = "pwm0";
+			};
+
 			spi2_pins_a: spi2@0 {
 				pins = "PE1", "PE2", "PE3";
 				function = "spi2";
@@ -339,11 +344,6 @@
 			uart3_pins_cts_rts_a: uart3-cts-rts@0 {
 				pins = "PG11", "PG12";
 				function = "uart3";
-			};
-
-			pwm0_pins: pwm0 {
-				pins = "PB2";
-				function = "pwm";
 			};
 		};
 
