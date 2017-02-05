@@ -488,6 +488,32 @@ int opal_machine_check(struct pt_regs *regs)
 	return 0;
 }
 
+#ifdef CONFIG_KVM_BOOK3S_HV_POSSIBLE
+/*
+ * opal_machine_check_guest() is a hook which is invoked at the time
+ * of guest exit to facilitate the host-side handling of machine check
+ * exception before the exception is passed on to the guest. This hook
+ * is invoked from host virtual mode from KVM (before exiting the guest
+ * with KVM_EXIT_NMI reason) for machine check exception that occurs in
+ * the guest.
+ *
+ * Currently no action is performed in the host other than printing the
+ * event information. The machine check exception is passed on to the
+ * guest kernel and the guest kernel will attempt for recovery.
+ */
+int opal_machine_check_guest(struct machine_check_event *evt)
+{
+	/* Print things out */
+	if (evt->version != MCE_V1) {
+		pr_err("Machine Check Exception, Unknown event version %d !\n",
+		       evt->version);
+		return 0;
+	}
+	machine_check_print_event_info(evt);
+	return 0;
+}
+#endif
+
 /* Early hmi handler called in real mode. */
 int opal_hmi_exception_early(struct pt_regs *regs)
 {

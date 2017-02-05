@@ -17,6 +17,7 @@
 #ifndef __ASSEMBLY__
 
 #include <linux/notifier.h>
+#include <asm/mce.h>
 
 /* We calculate number of sg entries based on PAGE_SIZE */
 #define SG_ENTRIES_PER_NODE ((PAGE_SIZE - 16) / sizeof(struct opal_sg_entry))
@@ -280,6 +281,9 @@ extern int opal_hmi_handler_init(void);
 extern int opal_event_init(void);
 
 extern int opal_machine_check(struct pt_regs *regs);
+#ifdef CONFIG_KVM_BOOK3S_HV_POSSIBLE
+extern int opal_machine_check_guest(struct machine_check_event *evt);
+#endif
 extern bool opal_mce_check_early_recovery(struct pt_regs *regs);
 extern int opal_hmi_exception_early(struct pt_regs *regs);
 extern int opal_handle_hmi_exception(struct pt_regs *regs);

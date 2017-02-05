@@ -968,15 +968,25 @@ static int kvmppc_handle_exit_hv(struct kvm_run *run, struct kvm_vcpu *vcpu,
 		r = RESUME_GUEST;
 		break;
 	case BOOK3S_INTERRUPT_MACHINE_CHECK:
+		/* Exit to guest with KVM_EXIT_NMI as exit reason */
+		run->exit_reason = KVM_EXIT_NMI;
+		run->hw.hardware_exit_reason = vcpu->arch.trap;
+		/* Clear out the old NMI status from run->flags */
+		run->flags &= ~KVM_RUN_PPC_NMI_DISP_MASK;
+		/* Now set the NMI status */
+		if (vcpu->arch.mce_evt.disposition == MCE_DISPOSITION_RECOVERED)
+			run->flags |= KVM_RUN_PPC_NMI_DISP_FULLY_RECOV;
+		else
+			run->flags |= KVM_RUN_PPC_NMI_DISP_NOT_RECOV;
+
+		r = RESUME_HOST;
 		/*
-		 * Deliver a machine check interrupt to the guest.
-		 * We have to do this, even if the host has handled the
-		 * machine check, because machine checks use SRR0/1 and
-		 * the interrupt might have trashed guest state in them.
+		 * Invoke host-kernel handler to perform any host-side
+		 * handling before exiting the guest.
 		 */
-		kvmppc_book3s_queue_irqprio(vcpu,
-					    BOOK3S_INTERRUPT_MACHINE_CHECK);
-		r = RESUME_GUEST;
+		if (ppc_md.machine_check_exception_guest)
+			ppc_md.machine_check_exception_guest(
+							&vcpu->arch.mce_evt);
 		break;
 	case BOOK3S_INTERRUPT_PROGRAM:
 	{

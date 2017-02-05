@@ -264,6 +264,9 @@ static void __init pnv_setup_machdep_opal(void)
 	ppc_md.mce_check_early_recovery = opal_mce_check_early_recovery;
 	ppc_md.hmi_exception_early = opal_hmi_exception_early;
 	ppc_md.handle_hmi_exception = opal_handle_hmi_exception;
+#ifdef CONFIG_KVM_BOOK3S_HV_POSSIBLE
+	ppc_md.machine_check_exception_guest = opal_machine_check_guest;
+#endif
 }
 
 static int __init pnv_probe(void)

@@ -15,6 +15,7 @@
 #include <linux/export.h>
 
 #include <asm/setup.h>
+#include <asm/mce.h>
 
 /* We export this macro for external modules like Alsa to know if
  * ppc_md.feature_call is implemented or not
@@ -111,6 +112,12 @@ struct machdep_calls {
 
 	/* Called during machine check exception to retrive fixup address. */
 	bool		(*mce_check_early_recovery)(struct pt_regs *regs);
+
+#ifdef CONFIG_KVM_BOOK3S_HV_POSSIBLE
+	/* Called after KVM interrupt handler finishes handling MCE for guest */
+	int		(*machine_check_exception_guest)
+					(struct machine_check_event *evt);
+#endif
 
 	/* Motherboard/chipset features. This is a kind of general purpose
 	 * hook used to control some machine specific features (like reset
