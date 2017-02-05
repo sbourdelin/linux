@@ -5,6 +5,7 @@
 
 #include <linux/sched/prio.h>
 
+#include <linux/mutex.h>
 #include <linux/plist.h>
 #include <linux/mm_types_task.h>
 
