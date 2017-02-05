@@ -962,11 +962,6 @@ struct task_struct {
  */
 };
 
-static inline int tsk_nr_cpus_allowed(struct task_struct *p)
-{
-	return p->nr_cpus_allowed;
-}
-
 static inline struct pid *task_pid(struct task_struct *task)
 {
 	return task->pids[PIDTYPE_PID].pid;
