@@ -346,6 +346,14 @@ struct xpad_output_packet {
 /* Sequence numbers will be added before the packets are sent */
 static const struct xpad_output_packet xone_init_pkt[] = {
 	/*
+	 * This packet is required for the Titanfall 2 Xbox One pads
+	 * (0x0e6f:0x0165) to finish initialization and for Hori pads
+	 * (0x0f0d:0x0067) to make the analog sticks work.
+	 */
+	{{0x01, 0x20, 0x00, 0x09, 0x00, 0x04, 0x20, 0x3a,
+	  0x00, 0x00, 0x00, 0x80, 0x00}, 13, true},
+
+	/*
 	 * This packet is required for all Xbox One pads with 2015
 	 * or later firmware installed (or present from the factory).
 	 */
