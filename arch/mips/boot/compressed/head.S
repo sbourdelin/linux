@@ -25,6 +25,19 @@ start:
 	move	s2, a2
 	move	s3, a3
 
+#ifdef CONFIG_ZBOOT_VMLINUZ_AT_VMLINUX_LOAD_ADDRESS
+	/* Move the text, data section and DTB to the correct address */
+	PTR_LA	a0, .text
+	PTR_LI	a1, VMLINUX_LOAD_ADDRESS
+	PTR_LA	a2, _edata
+0:
+	lw	a3, 0(a1)
+	sw	a3, 0(a0)
+	addiu	a1, a1, 4
+	bne	a2, a0, 0b
+	 addiu	a0, a0, 4
+#endif
+
 	/* Clear BSS */
 	PTR_LA	a0, _edata
 	PTR_LA	a2, _end

@@ -2961,6 +2961,14 @@ choice
 		bool "Extend builtin kernel arguments with bootloader arguments"
 endchoice
 
+config ZBOOT_VMLINUZ_AT_VMLINUX_LOAD_ADDRESS
+	bool "Load compressed images at the same address as uncompressed"
+	depends on SYS_SUPPORTS_ZBOOT
+	help
+	  vmlinux and vmlinuz normally have different load addresses, with
+	  this option vmlinuz expect to be loaded at the same address as
+	  vmlinux.
+
 endmenu
 
 config LOCKDEP_SUPPORT
