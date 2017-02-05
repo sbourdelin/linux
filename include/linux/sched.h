@@ -962,9 +962,6 @@ struct task_struct {
  */
 };
 
-/* Future-safe accessor for struct task_struct's cpus_allowed. */
-#define tsk_cpus_allowed(tsk) (&(tsk)->cpus_allowed)
-
 static inline int tsk_nr_cpus_allowed(struct task_struct *p)
 {
 	return p->nr_cpus_allowed;
