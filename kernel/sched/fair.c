@@ -8750,7 +8750,8 @@ out:
 		 * balance for itself and we need to update the
 		 * nohz.next_balance accordingly.
 		 */
-		if ((idle == CPU_IDLE) && time_after(nohz.next_balance, rq->next_balance))
+		if ((idle == CPU_IDLE) && time_after(nohz.next_balance, rq->next_balance) &&
+			!test_bit(NOHZ_BALANCE_KICK, nohz_flags(this_rq()->cpu)))
 			nohz.next_balance = rq->next_balance;
 #endif
 	}
