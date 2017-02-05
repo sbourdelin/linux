@@ -6,6 +6,7 @@
  */
 
 #include <linux/sched.h>
+#include <linux/magic.h>
 
 #ifdef CONFIG_THREAD_INFO_IN_TASK
 
