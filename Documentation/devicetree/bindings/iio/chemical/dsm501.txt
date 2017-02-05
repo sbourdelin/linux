@@ -1,0 +1,16 @@
+* DSM501 particle sensor
+
+Required properties:
+
+- compatible: should be one of:
+	      "samyoung,dsm501"
+	      "shinyei,ppd42ns"
+- gpios: should specify the GPIO connected to the sensor's data line, see
+  	 "gpios property" in Documentation/devicetree/bindings/gpio/gpio.txt
+
+Example:
+
+dsm501 {
+	compatible = "samyoung,dsm501";
+	gpios = <&gpio1 28 0>;
+};
