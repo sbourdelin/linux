@@ -675,6 +675,9 @@ extern void mddev_suspend(struct mddev *mddev);
 extern void mddev_resume(struct mddev *mddev);
 extern struct bio *bio_clone_mddev(struct bio *bio, gfp_t gfp_mask,
 				   struct mddev *mddev);
+extern struct bio *bio_clone_slow_mddev_partial(struct bio *bio, gfp_t gfp_mask,
+						struct mddev *mddev, int offset,
+						int size);
 extern struct bio *bio_alloc_mddev(gfp_t gfp_mask, int nr_iovecs,
 				   struct mddev *mddev);
 

@@ -200,6 +200,22 @@ struct bio *bio_clone_mddev(struct bio *bio, gfp_t gfp_mask,
 }
 EXPORT_SYMBOL_GPL(bio_clone_mddev);
 
+struct bio *bio_clone_slow_mddev_partial(struct bio *bio, gfp_t gfp_mask,
+					 struct mddev *mddev, int offset,
+					 int size)
+{
+	struct bio_set *bs;
+
+	if (!mddev || !mddev->bio_set)
+		bs = fs_bio_set;
+	else
+		bs = mddev->bio_set;
+
+	return bio_clone_bioset_partial(bio, gfp_mask, bs, offset << 9,
+					size << 9);
+}
+EXPORT_SYMBOL_GPL(bio_clone_slow_mddev_partial);
+
 /*
  * We have a system wide 'event count' that is incremented
  * on any 'interesting' event, and readers of /proc/mdstat
