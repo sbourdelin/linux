@@ -4,5 +4,6 @@
 
 # When adding new entries keep the list in alphabetical order
 obj-$(CONFIG_ATLAS_PH_SENSOR)	+= atlas-ph-sensor.o
+obj-$(CONFIG_DSM501)		+= dsm501.o
 obj-$(CONFIG_IAQCORE)		+= ams-iaq-core.o
 obj-$(CONFIG_VZ89X)		+= vz89x.o

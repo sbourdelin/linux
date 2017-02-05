@@ -21,6 +21,16 @@ config ATLAS_PH_SENSOR
 	 To compile this driver as module, choose M here: the
 	 module will be called atlas-ph-sensor.
 
+config DSM501
+	tristate "Samyoung DSM501 particle sensor"
+	depends on GPIOLIB
+	help
+	 Say yes here to build support for the Samyoung DSM501
+	 particle sensor.
+
+	 To compile this driver as a module, choose M here: the module
+	 will be called dsm501.
+
 config IAQCORE
 	tristate "AMS iAQ-Core VOC sensors"
 	depends on I2C
