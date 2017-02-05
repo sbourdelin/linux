@@ -6,6 +6,7 @@
 #include <linux/percpu_ida.h>    /* struct percpu_ida */
 #include <linux/percpu-refcount.h>
 #include <linux/semaphore.h>     /* struct semaphore */
+#include <linux/completion.h>
 
 #define TARGET_CORE_VERSION		"v5.0"
 
