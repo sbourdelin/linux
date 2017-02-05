@@ -15,6 +15,14 @@ config GENERIC_PHY
 	  phy users can obtain reference to the PHY. All the users of this
 	  framework should select this config.
 
+config PHY_ATH79_USB
+	tristate "Atheros AR71XX/9XXX USB PHY driver"
+	depends on ATH79 || COMPILE_TEST
+	default y if USB_EHCI_HCD_PLATFORM
+	select GENERIC_PHY
+	help
+	  Enable this to support the USB PHY on Atheros AR71XX/9XXX SoCs.
+
 config PHY_BCM_NS_USB2
 	tristate "Broadcom Northstar USB 2.0 PHY Driver"
 	depends on ARCH_BCM_IPROC || COMPILE_TEST
