@@ -443,6 +443,9 @@ _dispatch_do_ipage_fault:
 	__HEAD
 	.global _start
 _start:
+	/* Init r0 to zero as per spec */
+	CLEAR_GPR(r0)
+
 	/* save kernel parameters */
 	l.or	r25,r0,r3	/* pointer to fdt */
 
