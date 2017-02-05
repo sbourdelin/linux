@@ -358,6 +358,13 @@ static const struct xpad_output_packet xone_init_pkt[] = {
 	 * or later firmware installed (or present from the factory).
 	 */
 	{{0x05, 0x20, 0x00, 0x01, 0x00}, 5, true},
+
+	/*
+	 * A rumble packet is required for some PowerA pads to start
+	 * sending input reports. One of those pads is (0x24c6:0x543a).
+	 */
+	{{0x09, 0x00, 0x00, 0x09, 0x00, 0x0F, 0x00, 0x00,
+	  0x00, 0x00, 0x00, 0x00, 0x00}, 13, true},
 };
 
 #define XPAD_OUT_CMD_IDX	0
