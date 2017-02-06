@@ -1308,9 +1308,8 @@ int prism2mgmt_wlansniff(struct wlandevice *wlandev, void *msgp)
 			hw->sniffhdr = 0;
 			wlandev->netdev->type = ARPHRD_IEEE80211_PRISM;
 		} else
-		    if ((msg->wlanheader.status ==
-			 P80211ENUM_msgitem_status_data_ok)
-			&& (msg->wlanheader.data == P80211ENUM_truth_true)) {
+		    if ((msg->wlanheader.status == P80211ENUM_msgitem_status_data_ok) && 
+			(msg->wlanheader.data == P80211ENUM_truth_true)) {
 			hw->sniffhdr = 1;
 			wlandev->netdev->type = ARPHRD_IEEE80211_PRISM;
 		} else {
