@@ -149,7 +149,7 @@ static inline unsigned long radix__pte_update(struct mm_struct *mm,
 		 * the below sequence and batch the tlb flush. The
 		 * tlb flush batching is done by mmu gather code
 		 */
-		if (new_pte) {
+		if (1 || new_pte) {
 			asm volatile("ptesync" : : : "memory");
 			radix__flush_tlb_pte_p9_dd1(old_pte, mm, addr);
 			__radix_pte_update(ptep, 0, new_pte);
@@ -179,7 +179,7 @@ static inline void radix__ptep_set_access_flags(struct mm_struct *mm,
 
 		unsigned long old_pte, new_pte;
 
-		old_pte = __radix_pte_update(ptep, ~0, 0);
+		old_pte = __radix_pte_update(ptep, ~0ul, 0);
 		asm volatile("ptesync" : : : "memory");
 		/*
 		 * new value of pte
@@ -202,9 +202,18 @@ static inline int radix__pte_none(pte_t pte)
 	return (pte_val(pte) & ~RADIX_PTE_NONE_MASK) == 0;
 }
 
+static inline int __pte_present(pte_t pte)
+{
+	return !!(pte_raw(pte) & cpu_to_be64(_PAGE_PRESENT));
+}
 static inline void radix__set_pte_at(struct mm_struct *mm, unsigned long addr,
 				 pte_t *ptep, pte_t pte, int percpu)
 {
+	if (__pte_present(*ptep)) {
+		unsigned long old_pte = __radix_pte_update(ptep, ~0ul, 0);
+                asm volatile("ptesync" : : : "memory");
+		radix__flush_tlb_pte_p9_dd1(old_pte, mm, addr);
+	}
 	*ptep = pte;
 	asm volatile("ptesync" : : : "memory");
 }
