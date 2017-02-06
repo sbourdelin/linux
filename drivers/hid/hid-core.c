@@ -133,10 +133,9 @@ static int open_collection(struct hid_parser *parser, unsigned type)
 	if (parser->device->maxcollection == parser->device->collection_size) {
 		collection = kmalloc(sizeof(struct hid_collection) *
 				parser->device->collection_size * 2, GFP_KERNEL);
-		if (collection == NULL) {
-			hid_err(parser->device, "failed to reallocate collection array\n");
+		if (!collection)
 			return -ENOMEM;
-		}
+
 		memcpy(collection, parser->device->collection,
 			sizeof(struct hid_collection) *
 			parser->device->collection_size);
