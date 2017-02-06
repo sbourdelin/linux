@@ -135,6 +135,7 @@ static inline int strtobool(const char *s, bool *res)
 }
 
 int match_string(const char * const *array, size_t n, const char *string);
+unsigned int ascii2utf16le(char const *s, u8 *buf, unsigned int len);
 
 #ifdef CONFIG_BINARY_PRINTF
 int vbin_printf(u32 *bin_buf, size_t size, const char *fmt, va_list args);

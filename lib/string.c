@@ -952,3 +952,29 @@ char *strreplace(char *s, char old, char new)
 	return s;
 }
 EXPORT_SYMBOL(strreplace);
+
+/**
+ * ascii2utf16le() - Helper routine for producing UTF-16LE string descriptors
+ * @s: Null-terminated ASCII (actually ISO-8859-1) string
+ * @buf: Buffer for UTF-16LE string
+ * @len: Length (in bytes; may be odd) of UTF-16LE buffer.
+ *
+ * Return: The number of bytes filled in: 2*strlen(s) or @len, whichever is less
+ */
+unsigned int ascii2utf16le(char const *s, u8 *buf, unsigned int len)
+{
+	unsigned int n, t = 2 * strlen(s);
+
+	if (len > t)
+		len = t;
+	n = len;
+	while (n--) {
+		t = (unsigned char)*s++;
+		*buf++ = t;
+		if (!n--)
+			break;
+		*buf++ = t >> 8;
+	}
+	return len;
+}
+EXPORT_SYMBOL(ascii2utf16le);
