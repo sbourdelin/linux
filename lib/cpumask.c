@@ -43,6 +43,29 @@ int cpumask_any_but(const struct cpumask *mask, unsigned int cpu)
 }
 EXPORT_SYMBOL(cpumask_any_but);
 
+/**
+ * cpumask_any_and_but - pick a "random" cpu from *mask1 & *mask2, but not this one.
+ * @mask1: the first input cpumask
+ * @mask2: the second input cpumask
+ * @cpu: the cpu to ignore
+ *
+ * Returns >= nr_cpu_ids if no cpus set.
+ */
+int cpumask_any_and_but(const struct cpumask *mask1,
+			const struct cpumask *mask2,
+			unsigned int cpu)
+{
+	unsigned int i;
+
+	cpumask_check(cpu);
+	i = cpumask_first_and(mask1, mask2);
+	if (i != cpu)
+		return i;
+
+	return cpumask_next_and(cpu, mask1, mask2);
+}
+EXPORT_SYMBOL(cpumask_any_and_but);
+
 /* These are not inline because of header tangles. */
 #ifdef CONFIG_CPUMASK_OFFSTACK
 /**

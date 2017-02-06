@@ -210,6 +210,9 @@ static inline unsigned int cpumask_next_zero(int n, const struct cpumask *srcp)
 
 int cpumask_next_and(int n, const struct cpumask *, const struct cpumask *);
 int cpumask_any_but(const struct cpumask *mask, unsigned int cpu);
+int cpumask_any_and_but(const struct cpumask *mask1,
+			const struct cpumask *mask2,
+			unsigned int cpu);
 unsigned int cpumask_local_spread(unsigned int i, int node);
 
 /**
