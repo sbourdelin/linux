@@ -6,6 +6,7 @@
 #ifdef CONFIG_PARAVIRT
 #include <asm/pgtable_types.h>
 #include <asm/asm.h>
+#include <asm/processor-flags.h>
 
 #include <asm/paravirt_types.h>
 
@@ -762,11 +763,6 @@ static inline notrace unsigned long arch_local_save_flags(void)
 	return PVOP_CALLEE0(unsigned long, pv_irq_ops.save_fl);
 }
 
-static inline notrace void arch_local_irq_restore(unsigned long f)
-{
-	PVOP_VCALLEE1(pv_irq_ops.restore_fl, f);
-}
-
 static inline notrace void arch_local_irq_disable(void)
 {
 	PVOP_VCALLEE0(pv_irq_ops.irq_disable);
@@ -786,6 +782,16 @@ static inline notrace unsigned long arch_local_irq_save(void)
 	return f;
 }
 
+/*
+ * In a VM, setting the IF flag can cause an expensive VM exit. So if
+ * interrupt was disabled before arch_local_irq_save(), we don't need to
+ * do anything at all, thus saving an VM exit.
+ */
+static inline notrace void arch_local_irq_restore(unsigned long f)
+{
+	if (f & X86_EFLAGS_IF)
+		arch_local_irq_enable();
+}
 
 /* Make sure as little as possible of this mess escapes. */
 #undef PARAVIRT_CALL
