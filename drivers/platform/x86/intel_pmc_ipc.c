@@ -54,6 +54,14 @@
 #define IPC_WRITE_BUFFER	0x80
 #define IPC_READ_BUFFER		0x90
 
+/* PMC Global Control Registers */
+#define GCR_TELEM_DEEP_S0IX_OFFSET	0x1078
+#define GCR_TELEM_SHLW_S0IX_OFFSET	0x1080
+
+/* Residency with clock rate at 19.2MHz to usecs */
+#define TOTAL_S0IX_RESIDENCY_IN_USECS(DEEP, SHLW) \
+				((DEEP + SHLW) * 10 / 192)
+
 /*
  * 16-byte buffer for sending data associated with IPC command.
  */
@@ -68,7 +76,7 @@
 #define PLAT_RESOURCE_IPC_INDEX		0
 #define PLAT_RESOURCE_IPC_SIZE		0x1000
 #define PLAT_RESOURCE_GCR_OFFSET	0x1008
-#define PLAT_RESOURCE_GCR_SIZE		0x4
+#define PLAT_RESOURCE_GCR_SIZE		0x1000
 #define PLAT_RESOURCE_BIOS_DATA_INDEX	1
 #define PLAT_RESOURCE_BIOS_IFACE_INDEX	2
 #define PLAT_RESOURCE_TELEM_SSRAM_INDEX	3
@@ -178,6 +186,11 @@ static inline u8 ipc_data_readb(u32 offset)
 static inline u32 ipc_data_readl(u32 offset)
 {
 	return readl(ipcdev.ipc_base + IPC_READ_BUFFER + offset);
+}
+
+static inline u64 gcr_data_readq(u32 offset)
+{
+	return readq(ipcdev.ipc_base + offset);
 }
 
 static int intel_pmc_ipc_check_status(void)
@@ -712,7 +725,8 @@ static int ipc_plat_get_res(struct platform_device *pdev)
 		dev_err(&pdev->dev, "Failed to get ipc resource\n");
 		return -ENXIO;
 	}
-	size = PLAT_RESOURCE_IPC_SIZE;
+	size = PLAT_RESOURCE_IPC_SIZE + PLAT_RESOURCE_GCR_SIZE;
+
 	if (!request_mem_region(res->start, size, pdev->name)) {
 		dev_err(&pdev->dev, "Failed to request ipc resource\n");
 		return -EBUSY;
@@ -747,6 +761,23 @@ static int ipc_plat_get_res(struct platform_device *pdev)
 
 	return 0;
 }
+
+/**
+ * intel_pmc_s0ix_counter_read() - Read S0ix residency.
+ * @data: Out param that contains current S0ix residency count.
+ */
+int intel_pmc_s0ix_counter_read(u64 *data)
+{
+	u64 deep_total, shlw_total;
+
+	deep_total = gcr_data_readq(GCR_TELEM_DEEP_S0IX_OFFSET);
+	shlw_total = gcr_data_readq(GCR_TELEM_SHLW_S0IX_OFFSET);
+
+	*data = TOTAL_S0IX_RESIDENCY_IN_USECS(deep_total, shlw_total);
+
+	return 0;
+}
+EXPORT_SYMBOL_GPL(intel_pmc_s0ix_counter_read);
 
 #ifdef CONFIG_ACPI
 static const struct acpi_device_id ipc_acpi_ids[] = {
@@ -808,8 +839,11 @@ err_device:
 	iounmap(ipcdev.ipc_base);
 	res = platform_get_resource(pdev, IORESOURCE_MEM,
 				    PLAT_RESOURCE_IPC_INDEX);
-	if (res)
-		release_mem_region(res->start, PLAT_RESOURCE_IPC_SIZE);
+	if (res) {
+		release_mem_region(res->start,
+				   PLAT_RESOURCE_IPC_SIZE +
+				   PLAT_RESOURCE_GCR_SIZE);
+	}
 	return ret;
 }
 
@@ -825,8 +859,11 @@ static int ipc_plat_remove(struct platform_device *pdev)
 	iounmap(ipcdev.ipc_base);
 	res = platform_get_resource(pdev, IORESOURCE_MEM,
 				    PLAT_RESOURCE_IPC_INDEX);
-	if (res)
-		release_mem_region(res->start, PLAT_RESOURCE_IPC_SIZE);
+	if (res) {
+		release_mem_region(res->start,
+				   PLAT_RESOURCE_IPC_SIZE +
+				   PLAT_RESOURCE_GCR_SIZE);
+	}
 	ipcdev.dev = NULL;
 	return 0;
 }
