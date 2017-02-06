@@ -16,6 +16,7 @@
 #include <linux/freezer.h>
 #include <linux/init.h>
 #include <linux/kthread.h>
+#include <linux/sched/fork.h>
 #include <linux/module.h>
 #include <linux/moduleparam.h>
 #include <linux/random.h>

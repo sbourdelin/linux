@@ -7,6 +7,7 @@
 #include <asm/cmdline.h>
 
 #include <linux/sched.h>
+#include <linux/sched/fork.h>
 #include <linux/init.h>
 
 /*

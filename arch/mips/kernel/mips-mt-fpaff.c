@@ -9,6 +9,8 @@
 #include <linux/kernel.h>
 #include <linux/init.h>
 #include <linux/sched.h>
+#include <linux/sched/fork.h>
+#include <linux/cred.h>
 #include <linux/security.h>
 #include <linux/types.h>
 #include <linux/uaccess.h>

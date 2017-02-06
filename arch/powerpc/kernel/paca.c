@@ -10,6 +10,7 @@
 #include <linux/smp.h>
 #include <linux/export.h>
 #include <linux/memblock.h>
+#include <linux/sched/fork.h>
 
 #include <asm/lppaca.h>
 #include <asm/paca.h>

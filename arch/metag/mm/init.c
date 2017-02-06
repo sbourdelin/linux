@@ -12,6 +12,7 @@
 #include <linux/percpu.h>
 #include <linux/memblock.h>
 #include <linux/initrd.h>
+#include <linux/sched/fork.h>
 
 #include <asm/setup.h>
 #include <asm/page.h>
