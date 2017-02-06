@@ -135,17 +135,20 @@ static int dp83867_of_init(struct phy_device *phydev)
 	if (ret &&
 	    (phydev->interface == PHY_INTERFACE_MODE_RGMII_ID ||
 	     phydev->interface == PHY_INTERFACE_MODE_RGMII_RXID))
-		return ret;
+		dp83867->rx_id_delay = DP83867_RGMIIDCTL_2_00_NS;
 
 	ret = of_property_read_u32(of_node, "ti,tx-internal-delay",
 				   &dp83867->tx_id_delay);
 	if (ret &&
 	    (phydev->interface == PHY_INTERFACE_MODE_RGMII_ID ||
 	     phydev->interface == PHY_INTERFACE_MODE_RGMII_TXID))
-		return ret;
+		dp83867->tx_id_delay = DP83867_RGMIIDCTL_2_00_NS;
 
-	return of_property_read_u32(of_node, "ti,fifo-depth",
-				   &dp83867->fifo_depth);
+	ret = of_property_read_u32(of_node, "ti,fifo-depth", &dp83867->fifo_depth);
+	if (ret)
+		dp83867->fifo_depth = DP83867_PHYCR_FIFO_DEPTH_4_B_NIB;
+
+	return 0;
 }
 #else
 static int dp83867_of_init(struct phy_device *phydev)
