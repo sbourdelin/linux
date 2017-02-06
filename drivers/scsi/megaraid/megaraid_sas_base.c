@@ -6393,6 +6393,7 @@ megasas_suspend(struct pci_dev *pdev, pm_message_t state)
 	if (instance->ev != NULL) {
 		struct megasas_aen_event *ev = instance->ev;
 		cancel_delayed_work_sync(&ev->hotplug_work);
+		flush_scheduled_work();
 		instance->ev = NULL;
 	}
 
@@ -6619,6 +6620,7 @@ skip_firing_dcmds:
 	if (instance->ev != NULL) {
 		struct megasas_aen_event *ev = instance->ev;
 		cancel_delayed_work_sync(&ev->hotplug_work);
+		flush_scheduled_work();
 		instance->ev = NULL;
 	}
 
