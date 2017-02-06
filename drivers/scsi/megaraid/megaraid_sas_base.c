@@ -5602,9 +5602,7 @@ megasas_register_aen(struct megasas_instance *instance, u32 seq_num,
 	/*
 	 * Issue the aen registration frame
 	 */
-	instance->instancet->issue_dcmd(instance, cmd);
-
-	return 0;
+	return instance->instancet->issue_dcmd(instance, cmd);
 }
 
 /**
