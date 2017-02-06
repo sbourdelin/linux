@@ -529,4 +529,13 @@ struct lpfc_scsi_buf *lpfc_get_scsi_buf(struct lpfc_hba *phba,
 					struct lpfc_nodelist *ndlp);
 
 /* NVME interfaces. */
+void lpfc_nvme_unregister_port(struct lpfc_nodelist *ndlp);
+int lpfc_nvme_register_port(struct lpfc_vport *vport,
+			struct lpfc_nodelist *ndlp);
+int lpfc_nvme_create_localport(struct lpfc_vport *vport);
+void lpfc_nvme_destroy_localport(struct lpfc_vport *vport);
+void lpfc_nvme_update_localport(struct lpfc_vport *vport);
 void lpfc_nvme_mod_param_dep(struct lpfc_hba *phba);
+void lpfc_nvme_abort_fcreq_cmpl(struct lpfc_hba *phba,
+				struct lpfc_iocbq *cmdiocb,
+				struct lpfc_wcqe_complete *abts_cmpl);
