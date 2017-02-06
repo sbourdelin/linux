@@ -226,13 +226,16 @@ static int add_dt_node(__be32 parent_phandle, __be32 drc_index)
 		return -ENOENT;
 
 	dn = dlpar_configure_connector(drc_index, parent_dn);
-	if (!dn)
-		return -ENOENT;
+	if (!dn) {
+		rc = -ENOENT;
+		goto out;
+	}
 
 	rc = dlpar_attach_node(dn);
 	if (rc)
 		dlpar_free_cc_nodes(dn);
 
+out:
 	of_node_put(parent_dn);
 	return rc;
 }
