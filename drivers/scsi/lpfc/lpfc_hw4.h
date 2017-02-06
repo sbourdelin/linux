@@ -108,6 +108,7 @@ struct lpfc_sli_intf {
 #define LPFC_MAX_MQ_PAGE		8
 #define LPFC_MAX_WQ_PAGE_V0		4
 #define LPFC_MAX_WQ_PAGE		8
+#define LPFC_MAX_RQ_PAGE		8
 #define LPFC_MAX_CQ_PAGE		4
 #define LPFC_MAX_EQ_PAGE		8
 
@@ -198,7 +199,7 @@ struct lpfc_sli_intf {
 /* Configuration of Interrupts / sec for entire HBA port */
 #define LPFC_MIN_IMAX          5000
 #define LPFC_MAX_IMAX          5000000
-#define LPFC_DEF_IMAX          50000
+#define LPFC_DEF_IMAX          150000
 
 #define LPFC_MIN_CPU_MAP       0
 #define LPFC_MAX_CPU_MAP       2
@@ -348,6 +349,7 @@ struct lpfc_cqe {
 #define CQE_CODE_RECEIVE		0x4
 #define CQE_CODE_XRI_ABORTED		0x5
 #define CQE_CODE_RECEIVE_V1		0x9
+#define CQE_CODE_NVME_ERSP		0xd
 
 /*
  * Define mask value for xri_aborted and wcqe completed CQE extended status.
@@ -367,6 +369,9 @@ struct lpfc_wcqe_complete {
 #define lpfc_wcqe_c_hw_status_SHIFT	0
 #define lpfc_wcqe_c_hw_status_MASK	0x000000FF
 #define lpfc_wcqe_c_hw_status_WORD	word0
+#define lpfc_wcqe_c_ersp0_SHIFT		0
+#define lpfc_wcqe_c_ersp0_MASK		0x0000FFFF
+#define lpfc_wcqe_c_ersp0_WORD		word0
 	uint32_t total_data_placed;
 	uint32_t parameter;
 #define lpfc_wcqe_c_bg_edir_SHIFT	5
@@ -400,6 +405,9 @@ struct lpfc_wcqe_complete {
 #define lpfc_wcqe_c_code_SHIFT		lpfc_cqe_code_SHIFT
 #define lpfc_wcqe_c_code_MASK		lpfc_cqe_code_MASK
 #define lpfc_wcqe_c_code_WORD		lpfc_cqe_code_WORD
+#define lpfc_wcqe_c_sqhead_SHIFT	0
+#define lpfc_wcqe_c_sqhead_MASK		0x0000FFFF
+#define lpfc_wcqe_c_sqhead_WORD		word3
 };
 
 /* completion queue entry for wqe release */
@@ -1244,10 +1252,10 @@ struct rq_context {
 #define LPFC_RQ_RING_SIZE_1024		10	/* 1024 entries */
 #define LPFC_RQ_RING_SIZE_2048		11	/* 2048 entries */
 #define LPFC_RQ_RING_SIZE_4096		12	/* 4096 entries */
-#define lpfc_rq_context_rqe_count_1_SHIFT	16	/* Version 1 Only */
+#define lpfc_rq_context_rqe_count_1_SHIFT	16	/* Version 1-2 Only */
 #define lpfc_rq_context_rqe_count_1_MASK	0x0000FFFF
 #define lpfc_rq_context_rqe_count_1_WORD	word0
-#define lpfc_rq_context_rqe_size_SHIFT	8		/* Version 1 Only */
+#define lpfc_rq_context_rqe_size_SHIFT	8		/* Version 1-2 Only */
 #define lpfc_rq_context_rqe_size_MASK	0x0000000F
 #define lpfc_rq_context_rqe_size_WORD	word0
 #define LPFC_RQE_SIZE_8		2
@@ -1259,7 +1267,13 @@ struct rq_context {
 #define lpfc_rq_context_page_size_MASK	0x000000FF
 #define lpfc_rq_context_page_size_WORD	word0
 #define	LPFC_RQ_PAGE_SIZE_4096	0x1
-	uint32_t reserved1;
+	uint32_t word1;
+#define lpfc_rq_context_data_size_SHIFT	16		/* Version 2 Only */
+#define lpfc_rq_context_data_size_MASK	0x0000FFFF
+#define lpfc_rq_context_data_size_WORD	word1
+#define lpfc_rq_context_hdr_size_SHIFT	0		/* Version 2 Only */
+#define lpfc_rq_context_hdr_size_MASK	0x0000FFFF
+#define lpfc_rq_context_hdr_size_WORD	word1
 	uint32_t word2;
 #define lpfc_rq_context_cq_id_SHIFT	16
 #define lpfc_rq_context_cq_id_MASK	0x000003FF
@@ -1267,6 +1281,9 @@ struct rq_context {
 #define lpfc_rq_context_buf_size_SHIFT	0
 #define lpfc_rq_context_buf_size_MASK	0x0000FFFF
 #define lpfc_rq_context_buf_size_WORD	word2
+#define lpfc_rq_context_base_cq_SHIFT	0		/* Version 2 Only */
+#define lpfc_rq_context_base_cq_MASK	0x0000FFFF
+#define lpfc_rq_context_base_cq_WORD	word2
 	uint32_t buffer_size;				/* Version 1 Only */
 };
 
@@ -1288,10 +1305,65 @@ struct lpfc_mbx_rq_create {
 #define lpfc_mbx_rq_create_ulp_num_MASK		0x000000FF
 #define lpfc_mbx_rq_create_ulp_num_WORD		word0
 			struct rq_context context;
-			struct dma_address page[LPFC_MAX_WQ_PAGE];
+			struct dma_address page[LPFC_MAX_RQ_PAGE];
 		} request;
 		struct {
 			uint32_t word0;
+#define lpfc_mbx_rq_create_q_cnt_v2_SHIFT	16
+#define lpfc_mbx_rq_create_q_cnt_v2_MASK	0x0000FFFF
+#define lpfc_mbx_rq_create_q_cnt_v2_WORD	word0
+#define lpfc_mbx_rq_create_q_id_SHIFT		0
+#define lpfc_mbx_rq_create_q_id_MASK		0x0000FFFF
+#define lpfc_mbx_rq_create_q_id_WORD		word0
+			uint32_t doorbell_offset;
+			uint32_t word2;
+#define lpfc_mbx_rq_create_bar_set_SHIFT	0
+#define lpfc_mbx_rq_create_bar_set_MASK		0x0000FFFF
+#define lpfc_mbx_rq_create_bar_set_WORD		word2
+#define lpfc_mbx_rq_create_db_format_SHIFT	16
+#define lpfc_mbx_rq_create_db_format_MASK	0x0000FFFF
+#define lpfc_mbx_rq_create_db_format_WORD	word2
+		} response;
+	} u;
+};
+
+struct lpfc_mbx_rq_create_v2 {
+	union  lpfc_sli4_cfg_shdr cfg_shdr;
+	union {
+		struct {
+			uint32_t word0;
+#define lpfc_mbx_rq_create_num_pages_SHIFT	0
+#define lpfc_mbx_rq_create_num_pages_MASK	0x0000FFFF
+#define lpfc_mbx_rq_create_num_pages_WORD	word0
+#define lpfc_mbx_rq_create_rq_cnt_SHIFT		16
+#define lpfc_mbx_rq_create_rq_cnt_MASK		0x000000FF
+#define lpfc_mbx_rq_create_rq_cnt_WORD		word0
+#define lpfc_mbx_rq_create_dua_SHIFT		16
+#define lpfc_mbx_rq_create_dua_MASK		0x00000001
+#define lpfc_mbx_rq_create_dua_WORD		word0
+#define lpfc_mbx_rq_create_bqu_SHIFT		17
+#define lpfc_mbx_rq_create_bqu_MASK		0x00000001
+#define lpfc_mbx_rq_create_bqu_WORD		word0
+#define lpfc_mbx_rq_create_ulp_num_SHIFT	24
+#define lpfc_mbx_rq_create_ulp_num_MASK		0x000000FF
+#define lpfc_mbx_rq_create_ulp_num_WORD		word0
+#define lpfc_mbx_rq_create_dim_SHIFT		29
+#define lpfc_mbx_rq_create_dim_MASK		0x00000001
+#define lpfc_mbx_rq_create_dim_WORD		word0
+#define lpfc_mbx_rq_create_dfd_SHIFT		30
+#define lpfc_mbx_rq_create_dfd_MASK		0x00000001
+#define lpfc_mbx_rq_create_dfd_WORD		word0
+#define lpfc_mbx_rq_create_dnb_SHIFT		31
+#define lpfc_mbx_rq_create_dnb_MASK		0x00000001
+#define lpfc_mbx_rq_create_dnb_WORD		word0
+			struct rq_context context;
+			struct dma_address page[1];
+		} request;
+		struct {
+			uint32_t word0;
+#define lpfc_mbx_rq_create_q_cnt_v2_SHIFT	16
+#define lpfc_mbx_rq_create_q_cnt_v2_MASK	0x0000FFFF
+#define lpfc_mbx_rq_create_q_cnt_v2_WORD	word0
 #define lpfc_mbx_rq_create_q_id_SHIFT		0
 #define lpfc_mbx_rq_create_q_id_MASK		0x0000FFFF
 #define lpfc_mbx_rq_create_q_id_WORD		word0
@@ -2841,12 +2913,18 @@ struct lpfc_sli4_parameters {
 #define cfg_mqv_WORD				word6
 	uint32_t word7;
 	uint32_t word8;
+#define cfg_wqpcnt_SHIFT			0
+#define cfg_wqpcnt_MASK				0x0000000f
+#define cfg_wqpcnt_WORD				word8
 #define cfg_wqsize_SHIFT			8
 #define cfg_wqsize_MASK				0x0000000f
 #define cfg_wqsize_WORD				word8
 #define cfg_wqv_SHIFT				14
 #define cfg_wqv_MASK				0x00000003
 #define cfg_wqv_WORD				word8
+#define cfg_wqpsize_SHIFT			16
+#define cfg_wqpsize_MASK			0x000000ff
+#define cfg_wqpsize_WORD			word8
 	uint32_t word9;
 	uint32_t word10;
 #define cfg_rqv_SHIFT				14
@@ -2897,6 +2975,12 @@ struct lpfc_sli4_parameters {
 #define cfg_mds_diags_SHIFT			1
 #define cfg_mds_diags_MASK			0x00000001
 #define cfg_mds_diags_WORD			word19
+#define cfg_nvme_SHIFT				3
+#define cfg_nvme_MASK				0x00000001
+#define cfg_nvme_WORD				word19
+#define cfg_xib_SHIFT				4
+#define cfg_xib_MASK				0x00000001
+#define cfg_xib_WORD				word19
 };
 
 #define LPFC_SET_UE_RECOVERY		0x10
@@ -3300,6 +3384,7 @@ struct lpfc_mqe {
 		struct lpfc_mbx_cq_create cq_create;
 		struct lpfc_mbx_wq_create wq_create;
 		struct lpfc_mbx_rq_create rq_create;
+		struct lpfc_mbx_rq_create_v2 rq_create_v2;
 		struct lpfc_mbx_mq_destroy mq_destroy;
 		struct lpfc_mbx_eq_destroy eq_destroy;
 		struct lpfc_mbx_cq_destroy cq_destroy;
@@ -3659,6 +3744,9 @@ struct wqe_common {
 #define wqe_ebde_cnt_SHIFT    0
 #define wqe_ebde_cnt_MASK     0x0000000f
 #define wqe_ebde_cnt_WORD     word10
+#define wqe_nvme_SHIFT        4
+#define wqe_nvme_MASK         0x00000001
+#define wqe_nvme_WORD         word10
 #define wqe_oas_SHIFT         6
 #define wqe_oas_MASK          0x00000001
 #define wqe_oas_WORD          word10
@@ -3719,9 +3807,18 @@ struct wqe_common {
 #define LPFC_ELS_ID_FDISC	2
 #define LPFC_ELS_ID_LOGO	1
 #define LPFC_ELS_ID_DEFAULT	0
+#define wqe_irsp_SHIFT        4
+#define wqe_irsp_MASK         0x00000001
+#define wqe_irsp_WORD         word11
+#define wqe_sup_SHIFT         6
+#define wqe_sup_MASK          0x00000001
+#define wqe_sup_WORD          word11
 #define wqe_wqec_SHIFT        7
 #define wqe_wqec_MASK         0x00000001
 #define wqe_wqec_WORD         word11
+#define wqe_irsplen_SHIFT     8
+#define wqe_irsplen_MASK      0x0000000f
+#define wqe_irsplen_WORD      word11
 #define wqe_cqid_SHIFT        16
 #define wqe_cqid_MASK         0x0000ffff
 #define wqe_cqid_WORD         word11
@@ -3971,6 +4068,35 @@ struct fcp_icmnd64_wqe {
 	uint32_t rsvd_12_15[4];        /* word 12-15 */
 };
 
+struct fcp_trsp64_wqe {
+	struct ulp_bde64 bde;
+	uint32_t response_len;
+	uint32_t rsvd_4_5[2];
+	struct wqe_common wqe_com;      /* words 6-11 */
+	uint32_t rsvd_12_15[4];         /* word 12-15 */
+};
+
+struct fcp_tsend64_wqe {
+	struct ulp_bde64 bde;
+	uint32_t payload_offset_len;
+	uint32_t relative_offset;
+	uint32_t reserved;
+	struct wqe_common wqe_com;     /* words 6-11 */
+	uint32_t fcp_data_len;         /* word 12 */
+	uint32_t rsvd_13_15[3];        /* word 13-15 */
+};
+
+struct fcp_treceive64_wqe {
+	struct ulp_bde64 bde;
+	uint32_t payload_offset_len;
+	uint32_t relative_offset;
+	uint32_t reserved;
+	struct wqe_common wqe_com;     /* words 6-11 */
+	uint32_t fcp_data_len;         /* word 12 */
+	uint32_t rsvd_13_15[3];        /* word 13-15 */
+};
+#define TXRDY_PAYLOAD_LEN      12
+
 
 union lpfc_wqe {
 	uint32_t words[16];
@@ -3986,6 +4112,10 @@ union lpfc_wqe {
 	struct xmit_els_rsp64_wqe xmit_els_rsp;
 	struct els_request64_wqe els_req;
 	struct gen_req64_wqe gen_req;
+	struct fcp_trsp64_wqe fcp_trsp;
+	struct fcp_tsend64_wqe fcp_tsend;
+	struct fcp_treceive64_wqe fcp_treceive;
+
 };
 
 union lpfc_wqe128 {
@@ -3994,6 +4124,9 @@ union lpfc_wqe128 {
 	struct fcp_icmnd64_wqe fcp_icmd;
 	struct fcp_iread64_wqe fcp_iread;
 	struct fcp_iwrite64_wqe fcp_iwrite;
+	struct fcp_trsp64_wqe fcp_trsp;
+	struct fcp_tsend64_wqe fcp_tsend;
+	struct fcp_treceive64_wqe fcp_treceive;
 	struct xmit_seq64_wqe xmit_sequence;
 	struct gen_req64_wqe gen_req;
 };
@@ -4017,11 +4150,39 @@ struct lpfc_grp_hdr {
 	uint8_t revision[32];
 };
 
-#define FCP_COMMAND 0x0
-#define FCP_COMMAND_DATA_OUT 0x1
-#define ELS_COMMAND_NON_FIP 0xC
-#define ELS_COMMAND_FIP 0xD
-#define OTHER_COMMAND 0x8
+/* Defines for WQE command type */
+#define FCP_COMMAND		0x0
+#define NVME_READ_CMD		0x0
+#define FCP_COMMAND_DATA_OUT	0x1
+#define NVME_WRITE_CMD		0x1
+#define FCP_COMMAND_TRECEIVE	0x2
+#define FCP_COMMAND_TRSP	0x3
+#define FCP_COMMAND_TSEND	0x7
+#define OTHER_COMMAND		0x8
+#define ELS_COMMAND_NON_FIP	0xC
+#define ELS_COMMAND_FIP		0xD
+
+#define LPFC_NVME_EMBED_CMD	0x0
+#define LPFC_NVME_EMBED_WRITE	0x1
+#define LPFC_NVME_EMBED_READ	0x2
+
+/* WQE Commands */
+#define CMD_ABORT_XRI_WQE       0x0F
+#define CMD_XMIT_SEQUENCE64_WQE 0x82
+#define CMD_XMIT_BCAST64_WQE    0x84
+#define CMD_ELS_REQUEST64_WQE   0x8A
+#define CMD_XMIT_ELS_RSP64_WQE  0x95
+#define CMD_XMIT_BLS_RSP64_WQE  0x97
+#define CMD_FCP_IWRITE64_WQE    0x98
+#define CMD_FCP_IREAD64_WQE     0x9A
+#define CMD_FCP_ICMND64_WQE     0x9C
+#define CMD_FCP_TSEND64_WQE     0x9F
+#define CMD_FCP_TRECEIVE64_WQE  0xA1
+#define CMD_FCP_TRSP64_WQE      0xA3
+#define CMD_GEN_REQUEST64_WQE   0xC2
+
+#define CMD_WQE_MASK            0xff
+
 
 #define LPFC_FW_DUMP	1
 #define LPFC_FW_RESET	2

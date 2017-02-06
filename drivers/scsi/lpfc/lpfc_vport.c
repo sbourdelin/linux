@@ -33,6 +33,7 @@
 #include <scsi/scsi_device.h>
 #include <scsi/scsi_host.h>
 #include <scsi/scsi_transport_fc.h>
+
 #include "lpfc_hw4.h"
 #include "lpfc_hw.h"
 #include "lpfc_sli.h"
@@ -401,6 +402,8 @@ lpfc_vport_create(struct fc_vport *fc_vport, bool disable)
 		vport->fdmi_hba_mask = phba->pport->fdmi_hba_mask;
 		vport->fdmi_port_mask = phba->pport->fdmi_port_mask;
 	}
+
+	/* todo: init: register port with nvme */
 
 	/*
 	 * In SLI4, the vpi must be activated before it can be used
