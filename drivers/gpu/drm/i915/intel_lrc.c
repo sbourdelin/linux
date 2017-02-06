@@ -2093,6 +2093,11 @@ static void execlists_init_reg_state(u32 *reg_state,
 		 * other PDP Descriptors are ignored.
 		 */
 		ASSIGN_CTX_PML4(ppgtt, reg_state);
+	} else {
+		ASSIGN_CTX_PDP(ppgtt, reg_state, 0);
+		ASSIGN_CTX_PDP(ppgtt, reg_state, 1);
+		ASSIGN_CTX_PDP(ppgtt, reg_state, 2);
+		ASSIGN_CTX_PDP(ppgtt, reg_state, 3);
 	}
 
 	if (engine->id == RCS) {

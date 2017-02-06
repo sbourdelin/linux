@@ -754,10 +754,19 @@ static bool gen8_ppgtt_clear_pt(struct i915_address_space *vm,
 
 	GEM_BUG_ON(pte_end > GEN8_PTES);
 
-	bitmap_clear(pt->used_ptes, pte, num_entries);
+	/*
+	 * As there is only one PPGTT page table used to mirror the GGTT
+	 * space in the system under aliasing PPGTT mode, we don't need
+	 * to shrink it. Leave the PT pages "always used", so the upper
+	 * level page table pages are safe during clear_range().
+	 *
+	 */
+	if (USES_FULL_PPGTT(vm->i915)) {
+		bitmap_clear(pt->used_ptes, pte, num_entries);
 
-	if (bitmap_empty(pt->used_ptes, GEN8_PTES))
-		return true;
+		if (bitmap_empty(pt->used_ptes, GEN8_PTES))
+			return true;
+	}
 
 	pt_vaddr = kmap_px(pt);
 
