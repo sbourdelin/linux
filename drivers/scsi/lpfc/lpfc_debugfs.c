@@ -34,6 +34,9 @@
 #include <scsi/scsi_device.h>
 #include <scsi/scsi_host.h>
 #include <scsi/scsi_transport_fc.h>
+#include <scsi/fc/fc_fs.h>
+
+#include <linux/nvme-fc-driver.h>
 
 #include "lpfc_hw4.h"
 #include "lpfc_hw.h"
@@ -41,8 +44,9 @@
 #include "lpfc_sli4.h"
 #include "lpfc_nl.h"
 #include "lpfc_disc.h"
-#include "lpfc_scsi.h"
 #include "lpfc.h"
+#include "lpfc_scsi.h"
+#include "lpfc_nvme.h"
 #include "lpfc_logmsg.h"
 #include "lpfc_crtn.h"
 #include "lpfc_vport.h"
@@ -535,6 +539,10 @@ lpfc_debugfs_nodelist_data(struct lpfc_vport *vport, char *buf, int size)
 	struct Scsi_Host *shost = lpfc_shost_from_vport(vport);
 	struct lpfc_nodelist *ndlp;
 	unsigned char *statep;
+	struct nvme_fc_local_port *localport;
+	struct lpfc_nvme_lport *lport;
+	struct lpfc_nvme_rport *rport;
+	struct nvme_fc_remote_port *nrport;
 
 	cnt = (LPFC_NODELIST_SIZE / LPFC_NODELIST_ENTRY_SIZE);
 
@@ -611,6 +619,255 @@ lpfc_debugfs_nodelist_data(struct lpfc_vport *vport, char *buf, int size)
 		len +=  snprintf(buf+len, size-len, "\n");
 	}
 	spin_unlock_irq(shost->host_lock);
+
+	len += snprintf(buf+len, size-len, "\nNVME Lport/Rport Entries ...\n");
+
+	localport = vport->localport;
+	if (!localport)
+		goto out_exit;
+
+	spin_lock_irq(shost->host_lock);
+	lport = (struct lpfc_nvme_lport *)localport->private;
+
+	/* Port state is only one of two values for now. */
+	if (localport->port_id)
+		statep = "ONLINE";
+	else
+		statep = "UNKNOWN ";
+
+	len += snprintf(buf+len, size-len,
+			"Lport DID x%06x PortState %s\n",
+			localport->port_id, statep);
+
+	len += snprintf(buf+len, size-len, "\tRport List:\n");
+	list_for_each_entry(rport, &lport->rport_list, list) {
+		/* local short-hand pointer. */
+		nrport = rport->remoteport;
+
+		/* Port state is only one of two values for now. */
+		switch (nrport->port_state) {
+		case FC_OBJSTATE_ONLINE:
+			statep = "ONLINE";
+			break;
+		case FC_OBJSTATE_UNKNOWN:
+			statep = "UNKNOWN ";
+			break;
+		default:
+			statep = "UNSUPPORTED";
+			break;
+		}
+
+		/* Tab in to show lport ownership. */
+		len += snprintf(buf+len, size-len,
+				"\t%s Port ID:x%06x ",
+				statep, nrport->port_id);
+		len += snprintf(buf+len, size-len, "WWPN x%llx ",
+				nrport->port_name);
+		len += snprintf(buf+len, size-len, "WWNN x%llx ",
+				nrport->node_name);
+		switch (nrport->port_role) {
+		case FC_PORT_ROLE_NVME_INITIATOR:
+			len +=  snprintf(buf+len, size-len,
+					 "NVME INITIATOR ");
+			break;
+		case FC_PORT_ROLE_NVME_TARGET:
+			len +=  snprintf(buf+len, size-len,
+					 "NVME TARGET ");
+			break;
+		case FC_PORT_ROLE_NVME_DISCOVERY:
+			len +=  snprintf(buf+len, size-len,
+					 "NVME DISCOVERY ");
+			break;
+		default:
+			len +=  snprintf(buf+len, size-len,
+					 "UNKNOWN ROLE x%x",
+					 nrport->port_role);
+			break;
+		}
+
+		/* Terminate the string. */
+		len +=  snprintf(buf+len, size-len, "\n");
+	}
+
+	spin_unlock_irq(shost->host_lock);
+ out_exit:
+	return len;
+}
+
+/**
+ * lpfc_debugfs_nvmestat_data - Dump target node list to a buffer
+ * @vport: The vport to gather target node info from.
+ * @buf: The buffer to dump log into.
+ * @size: The maximum amount of data to process.
+ *
+ * Description:
+ * This routine dumps the NVME statistics associated with @vport
+ *
+ * Return Value:
+ * This routine returns the amount of bytes that were dumped into @buf and will
+ * not exceed @size.
+ **/
+static int
+lpfc_debugfs_nvmestat_data(struct lpfc_vport *vport, char *buf, int size)
+{
+	struct lpfc_hba   *phba = vport->phba;
+	int len = 0;
+
+	if (phba->nvmet_support == 0) {
+		if (!(phba->cfg_enable_fc4_type & LPFC_ENABLE_NVME))
+			return len;
+
+		len += snprintf(buf+len, size-len,
+				"\nNVME Lport Statistics\n");
+
+		len += snprintf(buf+len, size-len,
+				"LS: Xmt %016llx Cmpl %016llx\n",
+				phba->fc4NvmeLsRequests,
+				phba->fc4NvmeLsCmpls);
+
+		len += snprintf(buf+len, size-len,
+				"FCP: Rd %016llx Wr %016llx IO %016llx\n",
+				phba->fc4NvmeInputRequests,
+				phba->fc4NvmeOutputRequests,
+				phba->fc4NvmeControlRequests);
+
+		len += snprintf(buf+len, size-len,
+				"    Cmpl %016llx\n", phba->fc4NvmeIoCmpls);
+	}
+
+	return len;
+}
+
+
+/**
+ * lpfc_debugfs_nvmektime_data - Dump target node list to a buffer
+ * @vport: The vport to gather target node info from.
+ * @buf: The buffer to dump log into.
+ * @size: The maximum amount of data to process.
+ *
+ * Description:
+ * This routine dumps the NVME statistics associated with @vport
+ *
+ * Return Value:
+ * This routine returns the amount of bytes that were dumped into @buf and will
+ * not exceed @size.
+ **/
+static int
+lpfc_debugfs_nvmektime_data(struct lpfc_vport *vport, char *buf, int size)
+{
+	struct lpfc_hba   *phba = vport->phba;
+	int len = 0;
+
+	if (phba->nvmet_support == 0) {
+		/* NVME Initiator */
+		len += snprintf(buf + len, PAGE_SIZE-len,
+				"ktime %s: Total Samples: %lld\n",
+				(phba->ktime_on ?  "Enabled" : "Disabled"),
+				phba->ktime_data_samples);
+		if (phba->ktime_data_samples == 0)
+			return len;
+
+		len += snprintf(
+			buf + len, PAGE_SIZE-len,
+			"Segment 1: Last NVME Cmd cmpl "
+			"done -to- Start of next NVME cnd (in driver)\n");
+		len += snprintf(
+			buf + len, PAGE_SIZE-len,
+			"avg:%08lld min:%08lld max %08lld\n",
+			phba->ktime_seg1_total /
+			phba->ktime_data_samples,
+			phba->ktime_seg1_min,
+			phba->ktime_seg1_max);
+		len += snprintf(
+			buf + len, PAGE_SIZE-len,
+			"Segment 2: Driver start of NVME cmd "
+			"-to- Firmware WQ doorbell\n");
+		len += snprintf(
+			buf + len, PAGE_SIZE-len,
+			"avg:%08lld min:%08lld max %08lld\n",
+			phba->ktime_seg2_total /
+			phba->ktime_data_samples,
+			phba->ktime_seg2_min,
+			phba->ktime_seg2_max);
+		len += snprintf(
+			buf + len, PAGE_SIZE-len,
+			"Segment 3: Firmware WQ doorbell -to- "
+			"MSI-X ISR cmpl\n");
+		len += snprintf(
+			buf + len, PAGE_SIZE-len,
+			"avg:%08lld min:%08lld max %08lld\n",
+			phba->ktime_seg3_total /
+			phba->ktime_data_samples,
+			phba->ktime_seg3_min,
+			phba->ktime_seg3_max);
+		len += snprintf(
+			buf + len, PAGE_SIZE-len,
+			"Segment 4: MSI-X ISR cmpl -to- "
+			"NVME cmpl done\n");
+		len += snprintf(
+			buf + len, PAGE_SIZE-len,
+			"avg:%08lld min:%08lld max %08lld\n",
+			phba->ktime_seg4_total /
+			phba->ktime_data_samples,
+			phba->ktime_seg4_min,
+			phba->ktime_seg4_max);
+		len += snprintf(
+			buf + len, PAGE_SIZE-len,
+			"Total IO avg time: %08lld\n",
+			((phba->ktime_seg1_total +
+			phba->ktime_seg2_total  +
+			phba->ktime_seg3_total +
+			phba->ktime_seg4_total) /
+			phba->ktime_data_samples));
+		return len;
+	}
+
+	return len;
+}
+
+/**
+ * lpfc_debugfs_cpucheck_data - Dump target node list to a buffer
+ * @vport: The vport to gather target node info from.
+ * @buf: The buffer to dump log into.
+ * @size: The maximum amount of data to process.
+ *
+ * Description:
+ * This routine dumps the NVME statistics associated with @vport
+ *
+ * Return Value:
+ * This routine returns the amount of bytes that were dumped into @buf and will
+ * not exceed @size.
+ **/
+static int
+lpfc_debugfs_cpucheck_data(struct lpfc_vport *vport, char *buf, int size)
+{
+	struct lpfc_hba   *phba = vport->phba;
+	int i;
+	int len = 0;
+	uint32_t tot_xmt = 0;
+	uint32_t tot_cmpl = 0;
+
+	if (phba->nvmet_support == 0) {
+		/* NVME Initiator */
+		len += snprintf(buf + len, PAGE_SIZE - len,
+				"CPUcheck %s\n",
+				(phba->cpucheck_on & LPFC_CHECK_NVME_IO ?
+					"Enabled" : "Disabled"));
+		for (i = 0; i < phba->sli4_hba.num_present_cpu; i++) {
+			if (i >= LPFC_CHECK_CPU_CNT)
+				break;
+			len += snprintf(buf + len, PAGE_SIZE - len,
+					"%02d: xmit x%08x cmpl x%08x\n",
+					i, phba->cpucheck_xmt_io[i],
+					phba->cpucheck_cmpl_io[i]);
+			tot_xmt += phba->cpucheck_xmt_io[i];
+			tot_cmpl += phba->cpucheck_cmpl_io[i];
+		}
+		len += snprintf(buf + len, PAGE_SIZE - len,
+				"tot:xmit x%08x cmpl x%08x\n",
+				tot_xmt, tot_cmpl);
+		return len;
+	}
 
 	return len;
 }
@@ -1229,6 +1486,245 @@ lpfc_debugfs_dumpDataDif_release(struct inode *inode, struct file *file)
 	kfree(debug);
 
 	return 0;
+}
+
+
+static int
+lpfc_debugfs_nvmestat_open(struct inode *inode, struct file *file)
+{
+	struct lpfc_vport *vport = inode->i_private;
+	struct lpfc_debug *debug;
+	int rc = -ENOMEM;
+
+	debug = kmalloc(sizeof(*debug), GFP_KERNEL);
+	if (!debug)
+		goto out;
+
+	 /* Round to page boundary */
+	debug->buffer = kmalloc(LPFC_NVMESTAT_SIZE, GFP_KERNEL);
+	if (!debug->buffer) {
+		kfree(debug);
+		goto out;
+	}
+
+	debug->len = lpfc_debugfs_nvmestat_data(vport, debug->buffer,
+		LPFC_NVMESTAT_SIZE);
+
+	debug->i_private = inode->i_private;
+	file->private_data = debug;
+
+	rc = 0;
+out:
+	return rc;
+}
+
+static int
+lpfc_debugfs_nvmektime_open(struct inode *inode, struct file *file)
+{
+	struct lpfc_vport *vport = inode->i_private;
+	struct lpfc_debug *debug;
+	int rc = -ENOMEM;
+
+	debug = kmalloc(sizeof(*debug), GFP_KERNEL);
+	if (!debug)
+		goto out;
+
+	 /* Round to page boundary */
+	debug->buffer = kmalloc(LPFC_NVMEKTIME_SIZE, GFP_KERNEL);
+	if (!debug->buffer) {
+		kfree(debug);
+		goto out;
+	}
+
+	debug->len = lpfc_debugfs_nvmektime_data(vport, debug->buffer,
+		LPFC_NVMEKTIME_SIZE);
+
+	debug->i_private = inode->i_private;
+	file->private_data = debug;
+
+	rc = 0;
+out:
+	return rc;
+}
+
+static ssize_t
+lpfc_debugfs_nvmektime_write(struct file *file, const char __user *buf,
+			     size_t nbytes, loff_t *ppos)
+{
+	struct lpfc_debug *debug = file->private_data;
+	struct lpfc_vport *vport = (struct lpfc_vport *)debug->i_private;
+	struct lpfc_hba   *phba = vport->phba;
+	char mybuf[64];
+	char *pbuf;
+
+	if (nbytes > 64)
+		nbytes = 64;
+
+	/* Protect copy from user */
+	if (!access_ok(VERIFY_READ, buf, nbytes))
+		return -EFAULT;
+
+	memset(mybuf, 0, sizeof(mybuf));
+
+	if (copy_from_user(mybuf, buf, nbytes))
+		return -EFAULT;
+	pbuf = &mybuf[0];
+
+	if ((strncmp(pbuf, "on", sizeof("on") - 1) == 0)) {
+		phba->ktime_data_samples = 0;
+		phba->ktime_status_samples = 0;
+		phba->ktime_seg1_total = 0;
+		phba->ktime_seg1_max = 0;
+		phba->ktime_seg1_min = 0xffffffff;
+		phba->ktime_seg2_total = 0;
+		phba->ktime_seg2_max = 0;
+		phba->ktime_seg2_min = 0xffffffff;
+		phba->ktime_seg3_total = 0;
+		phba->ktime_seg3_max = 0;
+		phba->ktime_seg3_min = 0xffffffff;
+		phba->ktime_seg4_total = 0;
+		phba->ktime_seg4_max = 0;
+		phba->ktime_seg4_min = 0xffffffff;
+		phba->ktime_seg5_total = 0;
+		phba->ktime_seg5_max = 0;
+		phba->ktime_seg5_min = 0xffffffff;
+		phba->ktime_seg6_total = 0;
+		phba->ktime_seg6_max = 0;
+		phba->ktime_seg6_min = 0xffffffff;
+		phba->ktime_seg7_total = 0;
+		phba->ktime_seg7_max = 0;
+		phba->ktime_seg7_min = 0xffffffff;
+		phba->ktime_seg8_total = 0;
+		phba->ktime_seg8_max = 0;
+		phba->ktime_seg8_min = 0xffffffff;
+		phba->ktime_seg9_total = 0;
+		phba->ktime_seg9_max = 0;
+		phba->ktime_seg9_min = 0xffffffff;
+		phba->ktime_seg10_total = 0;
+		phba->ktime_seg10_max = 0;
+		phba->ktime_seg10_min = 0xffffffff;
+
+		phba->ktime_on = 1;
+		return strlen(pbuf);
+	} else if ((strncmp(pbuf, "off",
+		   sizeof("off") - 1) == 0)) {
+		phba->ktime_on = 0;
+		return strlen(pbuf);
+	} else if ((strncmp(pbuf, "zero",
+		   sizeof("zero") - 1) == 0)) {
+		phba->ktime_data_samples = 0;
+		phba->ktime_status_samples = 0;
+		phba->ktime_seg1_total = 0;
+		phba->ktime_seg1_max = 0;
+		phba->ktime_seg1_min = 0xffffffff;
+		phba->ktime_seg2_total = 0;
+		phba->ktime_seg2_max = 0;
+		phba->ktime_seg2_min = 0xffffffff;
+		phba->ktime_seg3_total = 0;
+		phba->ktime_seg3_max = 0;
+		phba->ktime_seg3_min = 0xffffffff;
+		phba->ktime_seg4_total = 0;
+		phba->ktime_seg4_max = 0;
+		phba->ktime_seg4_min = 0xffffffff;
+		phba->ktime_seg5_total = 0;
+		phba->ktime_seg5_max = 0;
+		phba->ktime_seg5_min = 0xffffffff;
+		phba->ktime_seg6_total = 0;
+		phba->ktime_seg6_max = 0;
+		phba->ktime_seg6_min = 0xffffffff;
+		phba->ktime_seg7_total = 0;
+		phba->ktime_seg7_max = 0;
+		phba->ktime_seg7_min = 0xffffffff;
+		phba->ktime_seg8_total = 0;
+		phba->ktime_seg8_max = 0;
+		phba->ktime_seg8_min = 0xffffffff;
+		phba->ktime_seg9_total = 0;
+		phba->ktime_seg9_max = 0;
+		phba->ktime_seg9_min = 0xffffffff;
+		phba->ktime_seg10_total = 0;
+		phba->ktime_seg10_max = 0;
+		phba->ktime_seg10_min = 0xffffffff;
+		return strlen(pbuf);
+	}
+	return -EINVAL;
+}
+
+static int
+lpfc_debugfs_cpucheck_open(struct inode *inode, struct file *file)
+{
+	struct lpfc_vport *vport = inode->i_private;
+	struct lpfc_debug *debug;
+	int rc = -ENOMEM;
+
+	debug = kmalloc(sizeof(*debug), GFP_KERNEL);
+	if (!debug)
+		goto out;
+
+	 /* Round to page boundary */
+	debug->buffer = kmalloc(LPFC_CPUCHECK_SIZE, GFP_KERNEL);
+	if (!debug->buffer) {
+		kfree(debug);
+		goto out;
+	}
+
+	debug->len = lpfc_debugfs_cpucheck_data(vport, debug->buffer,
+		LPFC_NVMEKTIME_SIZE);
+
+	debug->i_private = inode->i_private;
+	file->private_data = debug;
+
+	rc = 0;
+out:
+	return rc;
+}
+
+static ssize_t
+lpfc_debugfs_cpucheck_write(struct file *file, const char __user *buf,
+			    size_t nbytes, loff_t *ppos)
+{
+	struct lpfc_debug *debug = file->private_data;
+	struct lpfc_vport *vport = (struct lpfc_vport *)debug->i_private;
+	struct lpfc_hba   *phba = vport->phba;
+	char mybuf[64];
+	char *pbuf;
+	int i;
+
+	if (nbytes > 64)
+		nbytes = 64;
+
+	/* Protect copy from user */
+	if (!access_ok(VERIFY_READ, buf, nbytes))
+		return -EFAULT;
+
+	memset(mybuf, 0, sizeof(mybuf));
+
+	if (copy_from_user(mybuf, buf, nbytes))
+		return -EFAULT;
+	pbuf = &mybuf[0];
+
+	if ((strncmp(pbuf, "on", sizeof("on") - 1) == 0)) {
+		phba->cpucheck_on |= LPFC_CHECK_NVME_IO;
+		return strlen(pbuf);
+	} else if ((strncmp(pbuf, "rcv",
+		   sizeof("rcv") - 1) == 0)) {
+		return -EINVAL;
+	} else if ((strncmp(pbuf, "off",
+		   sizeof("off") - 1) == 0)) {
+		phba->cpucheck_on = LPFC_CHECK_OFF;
+		return strlen(pbuf);
+	} else if ((strncmp(pbuf, "zero",
+		   sizeof("zero") - 1) == 0)) {
+		for (i = 0; i < phba->sli4_hba.num_present_cpu; i++) {
+			if (i >= LPFC_CHECK_CPU_CNT)
+				break;
+			phba->cpucheck_rcv_io[i] = 0;
+			phba->cpucheck_xmt_io[i] = 0;
+			phba->cpucheck_cmpl_io[i] = 0;
+			phba->cpucheck_ccmpl_io[i] = 0;
+		}
+		return strlen(pbuf);
+	}
+	return -EINVAL;
 }
 
 /*
@@ -2209,6 +2705,7 @@ lpfc_idiag_queinfo_read(struct file *file, char __user *buf, size_t nbytes,
 			if (len >= max_cnt)
 				goto too_big;
 
+			/* will dump both fcp and nvme cqs/wqs for the eq */
 			rc = lpfc_idiag_cqs_for_eq(phba, pbuffer, &len,
 				max_cnt, qp->queue_id);
 			if (rc)
@@ -2564,6 +3061,17 @@ lpfc_idiag_queacc_write(struct file *file, const char __user *buf,
 			idiag.ptr_private = phba->sli4_hba.nvmels_cq;
 			goto pass_check;
 		}
+		/* NVME LS complete queue */
+		if (phba->sli4_hba.nvmels_cq &&
+		    phba->sli4_hba.nvmels_cq->queue_id == queid) {
+			/* Sanity check */
+			rc = lpfc_idiag_que_param_check(
+					phba->sli4_hba.nvmels_cq, index, count);
+			if (rc)
+				goto error_out;
+			idiag.ptr_private = phba->sli4_hba.nvmels_cq;
+			goto pass_check;
+		}
 		/* FCP complete queue */
 		if (phba->sli4_hba.fcp_cq) {
 			for (qidx = 0; qidx < phba->cfg_fcp_io_channel;
@@ -2579,6 +3087,25 @@ lpfc_idiag_queacc_write(struct file *file, const char __user *buf,
 					goto pass_check;
 				}
 			}
+		}
+		/* NVME complete queue */
+		if (phba->sli4_hba.nvme_cq) {
+			qidx = 0;
+			do {
+				if (phba->sli4_hba.nvme_cq[qidx] &&
+				    phba->sli4_hba.nvme_cq[qidx]->queue_id ==
+				    queid) {
+					/* Sanity check */
+					rc = lpfc_idiag_que_param_check(
+						phba->sli4_hba.nvme_cq[qidx],
+						index, count);
+					if (rc)
+						goto error_out;
+					idiag.ptr_private =
+						phba->sli4_hba.nvme_cq[qidx];
+					goto pass_check;
+				}
+			} while (++qidx < phba->cfg_nvme_io_channel);
 		}
 		goto error_out;
 		break;
@@ -2606,6 +3133,17 @@ lpfc_idiag_queacc_write(struct file *file, const char __user *buf,
 			if (rc)
 				goto error_out;
 			idiag.ptr_private = phba->sli4_hba.els_wq;
+			goto pass_check;
+		}
+		/* NVME LS work queue */
+		if (phba->sli4_hba.nvmels_wq &&
+		    phba->sli4_hba.nvmels_wq->queue_id == queid) {
+			/* Sanity check */
+			rc = lpfc_idiag_que_param_check(
+					phba->sli4_hba.nvmels_wq, index, count);
+			if (rc)
+				goto error_out;
+			idiag.ptr_private = phba->sli4_hba.nvmels_wq;
 			goto pass_check;
 		}
 		/* NVME LS work queue */
@@ -2647,6 +3185,27 @@ lpfc_idiag_queacc_write(struct file *file, const char __user *buf,
 					if (rc)
 						goto error_out;
 					idiag.ptr_private = qp;
+					goto pass_check;
+				}
+			}
+		}
+
+		/* NVME work queues */
+		if (phba->sli4_hba.nvme_wq) {
+			for (qidx = 0; qidx < phba->cfg_nvme_io_channel;
+				qidx++) {
+				if (!phba->sli4_hba.nvme_wq[qidx])
+					continue;
+				if (phba->sli4_hba.nvme_wq[qidx]->queue_id ==
+				    queid) {
+					/* Sanity check */
+					rc = lpfc_idiag_que_param_check(
+						phba->sli4_hba.nvme_wq[qidx],
+						index, count);
+					if (rc)
+						goto error_out;
+					idiag.ptr_private =
+						phba->sli4_hba.nvme_wq[qidx];
 					goto pass_check;
 				}
 			}
@@ -3634,6 +4193,35 @@ static const struct file_operations lpfc_debugfs_op_dumpHostSlim = {
 	.release =      lpfc_debugfs_release,
 };
 
+#undef lpfc_debugfs_op_nvmestat
+static const struct file_operations lpfc_debugfs_op_nvmestat = {
+	.owner =        THIS_MODULE,
+	.open =         lpfc_debugfs_nvmestat_open,
+	.llseek =       lpfc_debugfs_lseek,
+	.read =         lpfc_debugfs_read,
+	.release =      lpfc_debugfs_release,
+};
+
+#undef lpfc_debugfs_op_nvmektime
+static const struct file_operations lpfc_debugfs_op_nvmektime = {
+	.owner =        THIS_MODULE,
+	.open =         lpfc_debugfs_nvmektime_open,
+	.llseek =       lpfc_debugfs_lseek,
+	.read =         lpfc_debugfs_read,
+	.write =	lpfc_debugfs_nvmektime_write,
+	.release =      lpfc_debugfs_release,
+};
+
+#undef lpfc_debugfs_op_cpucheck
+static const struct file_operations lpfc_debugfs_op_cpucheck = {
+	.owner =        THIS_MODULE,
+	.open =         lpfc_debugfs_cpucheck_open,
+	.llseek =       lpfc_debugfs_lseek,
+	.read =         lpfc_debugfs_read,
+	.write =	lpfc_debugfs_cpucheck_write,
+	.release =      lpfc_debugfs_release,
+};
+
 #undef lpfc_debugfs_op_dumpData
 static const struct file_operations lpfc_debugfs_op_dumpData = {
 	.owner =        THIS_MODULE,
@@ -4284,6 +4872,39 @@ lpfc_debugfs_initialize(struct lpfc_vport *vport)
 		goto debug_failed;
 	}
 
+	snprintf(name, sizeof(name), "nvmestat");
+	vport->debug_nvmestat =
+		debugfs_create_file(name, 0644,
+				    vport->vport_debugfs_root,
+				    vport, &lpfc_debugfs_op_nvmestat);
+	if (!vport->debug_nvmestat) {
+		lpfc_printf_vlog(vport, KERN_ERR, LOG_INIT,
+				 "0811 Cannot create debugfs nvmestat\n");
+		goto debug_failed;
+	}
+
+	snprintf(name, sizeof(name), "nvmektime");
+	vport->debug_nvmektime =
+		debugfs_create_file(name, 0644,
+				    vport->vport_debugfs_root,
+				    vport, &lpfc_debugfs_op_nvmektime);
+	if (!vport->debug_nvmektime) {
+		lpfc_printf_vlog(vport, KERN_ERR, LOG_INIT,
+				 "0815 Cannot create debugfs nvmektime\n");
+		goto debug_failed;
+	}
+
+	snprintf(name, sizeof(name), "cpucheck");
+	vport->debug_cpucheck =
+		debugfs_create_file(name, 0644,
+				    vport->vport_debugfs_root,
+				    vport, &lpfc_debugfs_op_cpucheck);
+	if (!vport->debug_cpucheck) {
+		lpfc_printf_vlog(vport, KERN_ERR, LOG_INIT,
+				 "0819 Cannot create debugfs cpucheck\n");
+		goto debug_failed;
+	}
+
 	/*
 	 * The following section is for additional directories/files for the
 	 * physical port.
@@ -4448,140 +5069,120 @@ lpfc_debugfs_terminate(struct lpfc_vport *vport)
 		kfree(vport->disc_trc);
 		vport->disc_trc = NULL;
 	}
-	if (vport->debug_disc_trc) {
-		debugfs_remove(vport->debug_disc_trc); /* discovery_trace */
-		vport->debug_disc_trc = NULL;
-	}
-	if (vport->debug_nodelist) {
-		debugfs_remove(vport->debug_nodelist); /* nodelist */
-		vport->debug_nodelist = NULL;
-	}
+
+	debugfs_remove(vport->debug_disc_trc); /* discovery_trace */
+	vport->debug_disc_trc = NULL;
+
+	debugfs_remove(vport->debug_nodelist); /* nodelist */
+	vport->debug_nodelist = NULL;
+
+	debugfs_remove(vport->debug_nvmestat); /* nvmestat */
+	vport->debug_nvmestat = NULL;
+
+	debugfs_remove(vport->debug_nvmektime); /* nvmektime */
+	vport->debug_nvmektime = NULL;
+
+	debugfs_remove(vport->debug_cpucheck); /* cpucheck */
+	vport->debug_cpucheck = NULL;
+
 	if (vport->vport_debugfs_root) {
 		debugfs_remove(vport->vport_debugfs_root); /* vportX */
 		vport->vport_debugfs_root = NULL;
 		atomic_dec(&phba->debugfs_vport_count);
 	}
+
 	if (atomic_read(&phba->debugfs_vport_count) == 0) {
 
-		if (phba->debug_hbqinfo) {
-			debugfs_remove(phba->debug_hbqinfo); /* hbqinfo */
-			phba->debug_hbqinfo = NULL;
-		}
-		if (phba->debug_dumpHBASlim) {
-			debugfs_remove(phba->debug_dumpHBASlim); /* HBASlim */
-			phba->debug_dumpHBASlim = NULL;
-		}
-		if (phba->debug_dumpHostSlim) {
-			debugfs_remove(phba->debug_dumpHostSlim); /* HostSlim */
-			phba->debug_dumpHostSlim = NULL;
-		}
-		if (phba->debug_dumpData) {
-			debugfs_remove(phba->debug_dumpData); /* dumpData */
-			phba->debug_dumpData = NULL;
-		}
+		debugfs_remove(phba->debug_hbqinfo); /* hbqinfo */
+		phba->debug_hbqinfo = NULL;
 
-		if (phba->debug_dumpDif) {
-			debugfs_remove(phba->debug_dumpDif); /* dumpDif */
-			phba->debug_dumpDif = NULL;
-		}
-		if (phba->debug_InjErrLBA) {
-			debugfs_remove(phba->debug_InjErrLBA); /* InjErrLBA */
-			phba->debug_InjErrLBA = NULL;
-		}
-		if (phba->debug_InjErrNPortID) {	 /* InjErrNPortID */
-			debugfs_remove(phba->debug_InjErrNPortID);
-			phba->debug_InjErrNPortID = NULL;
-		}
-		if (phba->debug_InjErrWWPN) {
-			debugfs_remove(phba->debug_InjErrWWPN); /* InjErrWWPN */
-			phba->debug_InjErrWWPN = NULL;
-		}
-		if (phba->debug_writeGuard) {
-			debugfs_remove(phba->debug_writeGuard); /* writeGuard */
-			phba->debug_writeGuard = NULL;
-		}
-		if (phba->debug_writeApp) {
-			debugfs_remove(phba->debug_writeApp); /* writeApp */
-			phba->debug_writeApp = NULL;
-		}
-		if (phba->debug_writeRef) {
-			debugfs_remove(phba->debug_writeRef); /* writeRef */
-			phba->debug_writeRef = NULL;
-		}
-		if (phba->debug_readGuard) {
-			debugfs_remove(phba->debug_readGuard); /* readGuard */
-			phba->debug_readGuard = NULL;
-		}
-		if (phba->debug_readApp) {
-			debugfs_remove(phba->debug_readApp); /* readApp */
-			phba->debug_readApp = NULL;
-		}
-		if (phba->debug_readRef) {
-			debugfs_remove(phba->debug_readRef); /* readRef */
-			phba->debug_readRef = NULL;
-		}
+		debugfs_remove(phba->debug_dumpHBASlim); /* HBASlim */
+		phba->debug_dumpHBASlim = NULL;
+
+		debugfs_remove(phba->debug_dumpHostSlim); /* HostSlim */
+		phba->debug_dumpHostSlim = NULL;
+
+		debugfs_remove(phba->debug_dumpData); /* dumpData */
+		phba->debug_dumpData = NULL;
+
+		debugfs_remove(phba->debug_dumpDif); /* dumpDif */
+		phba->debug_dumpDif = NULL;
+
+		debugfs_remove(phba->debug_InjErrLBA); /* InjErrLBA */
+		phba->debug_InjErrLBA = NULL;
+
+		debugfs_remove(phba->debug_InjErrNPortID);
+		phba->debug_InjErrNPortID = NULL;
+
+		debugfs_remove(phba->debug_InjErrWWPN); /* InjErrWWPN */
+		phba->debug_InjErrWWPN = NULL;
+
+		debugfs_remove(phba->debug_writeGuard); /* writeGuard */
+		phba->debug_writeGuard = NULL;
+
+		debugfs_remove(phba->debug_writeApp); /* writeApp */
+		phba->debug_writeApp = NULL;
+
+		debugfs_remove(phba->debug_writeRef); /* writeRef */
+		phba->debug_writeRef = NULL;
+
+		debugfs_remove(phba->debug_readGuard); /* readGuard */
+		phba->debug_readGuard = NULL;
+
+		debugfs_remove(phba->debug_readApp); /* readApp */
+		phba->debug_readApp = NULL;
+
+		debugfs_remove(phba->debug_readRef); /* readRef */
+		phba->debug_readRef = NULL;
 
 		if (phba->slow_ring_trc) {
 			kfree(phba->slow_ring_trc);
 			phba->slow_ring_trc = NULL;
 		}
-		if (phba->debug_slow_ring_trc) {
-			/* slow_ring_trace */
-			debugfs_remove(phba->debug_slow_ring_trc);
-			phba->debug_slow_ring_trc = NULL;
-		}
+
+		/* slow_ring_trace */
+		debugfs_remove(phba->debug_slow_ring_trc);
+		phba->debug_slow_ring_trc = NULL;
 
 		/*
 		 * iDiag release
 		 */
 		if (phba->sli_rev == LPFC_SLI_REV4) {
-			if (phba->idiag_ext_acc) {
-				/* iDiag extAcc */
-				debugfs_remove(phba->idiag_ext_acc);
-				phba->idiag_ext_acc = NULL;
-			}
-			if (phba->idiag_mbx_acc) {
-				/* iDiag mbxAcc */
-				debugfs_remove(phba->idiag_mbx_acc);
-				phba->idiag_mbx_acc = NULL;
-			}
-			if (phba->idiag_ctl_acc) {
-				/* iDiag ctlAcc */
-				debugfs_remove(phba->idiag_ctl_acc);
-				phba->idiag_ctl_acc = NULL;
-			}
-			if (phba->idiag_drb_acc) {
-				/* iDiag drbAcc */
-				debugfs_remove(phba->idiag_drb_acc);
-				phba->idiag_drb_acc = NULL;
-			}
-			if (phba->idiag_que_acc) {
-				/* iDiag queAcc */
-				debugfs_remove(phba->idiag_que_acc);
-				phba->idiag_que_acc = NULL;
-			}
-			if (phba->idiag_que_info) {
-				/* iDiag queInfo */
-				debugfs_remove(phba->idiag_que_info);
-				phba->idiag_que_info = NULL;
-			}
-			if (phba->idiag_bar_acc) {
-				/* iDiag barAcc */
-				debugfs_remove(phba->idiag_bar_acc);
-				phba->idiag_bar_acc = NULL;
-			}
-			if (phba->idiag_pci_cfg) {
-				/* iDiag pciCfg */
-				debugfs_remove(phba->idiag_pci_cfg);
-				phba->idiag_pci_cfg = NULL;
-			}
+			/* iDiag extAcc */
+			debugfs_remove(phba->idiag_ext_acc);
+			phba->idiag_ext_acc = NULL;
+
+			/* iDiag mbxAcc */
+			debugfs_remove(phba->idiag_mbx_acc);
+			phba->idiag_mbx_acc = NULL;
+
+			/* iDiag ctlAcc */
+			debugfs_remove(phba->idiag_ctl_acc);
+			phba->idiag_ctl_acc = NULL;
+
+			/* iDiag drbAcc */
+			debugfs_remove(phba->idiag_drb_acc);
+			phba->idiag_drb_acc = NULL;
+
+			/* iDiag queAcc */
+			debugfs_remove(phba->idiag_que_acc);
+			phba->idiag_que_acc = NULL;
+
+			/* iDiag queInfo */
+			debugfs_remove(phba->idiag_que_info);
+			phba->idiag_que_info = NULL;
+
+			/* iDiag barAcc */
+			debugfs_remove(phba->idiag_bar_acc);
+			phba->idiag_bar_acc = NULL;
+
+			/* iDiag pciCfg */
+			debugfs_remove(phba->idiag_pci_cfg);
+			phba->idiag_pci_cfg = NULL;
 
 			/* Finally remove the iDiag debugfs root */
-			if (phba->idiag_root) {
-				/* iDiag root */
-				debugfs_remove(phba->idiag_root);
-				phba->idiag_root = NULL;
-			}
+			debugfs_remove(phba->idiag_root);
+			phba->idiag_root = NULL;
 		}
 
 		if (phba->hba_debugfs_root) {
@@ -4590,10 +5191,8 @@ lpfc_debugfs_terminate(struct lpfc_vport *vport)
 			atomic_dec(&lpfc_debugfs_hba_count);
 		}
 
-		if (atomic_read(&lpfc_debugfs_hba_count) == 0) {
-			debugfs_remove(lpfc_debugfs_root); /* lpfc */
-			lpfc_debugfs_root = NULL;
-		}
+		debugfs_remove(lpfc_debugfs_root); /* lpfc */
+		lpfc_debugfs_root = NULL;
 	}
 #endif
 	return;

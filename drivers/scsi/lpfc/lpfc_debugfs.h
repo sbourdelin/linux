@@ -50,6 +50,11 @@ enum {
 	DUMP_NVMELS,
 };
 
+/* nvmestat output buffer size */
+#define LPFC_NVMESTAT_SIZE 8192
+#define LPFC_NVMEKTIME_SIZE 8192
+#define LPFC_CPUCHECK_SIZE 8192
+
 /*
  * For SLI4 iDiag debugfs diagnostics tool
  */
