@@ -93,6 +93,7 @@ struct lpfc_iocbq {
 #define LPFC_PRLI_FCP_REQ	0x100000 /* This is an NVME PRLI. */
 #define LPFC_IO_NVME	        0x200000 /* NVME FCP command */
 #define LPFC_IO_NVME_LS		0x400000 /* NVME LS command */
+#define LPFC_IO_NVMET		0x800000 /* NVMET command */
 
 	uint32_t drvrTimeout;	/* driver timeout in seconds */
 	struct lpfc_vport *vport;/* virtual port pointer */
