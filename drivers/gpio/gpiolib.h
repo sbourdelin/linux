@@ -13,6 +13,7 @@
 #define GPIOLIB_H
 
 #include <linux/gpio/driver.h>
+#include <linux/gpio/consumer.h>
 #include <linux/err.h>
 #include <linux/device.h>
 #include <linux/module.h>
