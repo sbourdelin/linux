@@ -322,7 +322,7 @@ uint32_t lpfc_sli_get_buffer_tag(struct lpfc_hba *);
 struct lpfc_dmabuf * lpfc_sli_ring_taggedbuf_get(struct lpfc_hba *,
 			struct lpfc_sli_ring *, uint32_t );
 
-int lpfc_sli_hbq_count(struct lpfc_hba *phba);
+int lpfc_sli_hbq_count(void);
 int lpfc_sli_hbqbuf_add_hbqs(struct lpfc_hba *, uint32_t);
 void lpfc_sli_hbqbuf_free_all(struct lpfc_hba *);
 int lpfc_sli_hbq_size(struct lpfc_hba *phba);

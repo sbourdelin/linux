@@ -4162,7 +4162,7 @@ typedef struct _IOCB {	/* IOCB structure */
 
 /* HBQ entries are 4 words each = 4k */
 #define LPFC_TOTAL_HBQ_SIZE (sizeof(struct lpfc_hbq_entry) *  \
-			     lpfc_sli_hbq_count(phba))
+			     lpfc_sli_hbq_count())
 
 struct lpfc_sli2_slim {
 	MAILBOX_t mbx;

@@ -6697,7 +6697,7 @@ lpfc_sli_pci_mem_setup(struct lpfc_hba *phba)
 	if (!phba->hbqslimp.virt)
 		goto out_free_slim;
 
-	hbq_count = lpfc_sli_hbq_count(phba);
+	hbq_count = lpfc_sli_hbq_count();
 	ptr = phba->hbqslimp.virt;
 	for (i = 0; i < hbq_count; ++i) {
 		phba->hbqs[i].hbq_virt = ptr;
