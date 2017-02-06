@@ -986,8 +986,11 @@ static void rcar_dmac_free_chan_resources(struct dma_chan *chan)
 {
 	struct rcar_dmac_chan *rchan = to_rcar_dmac_chan(chan);
 	struct rcar_dmac *dmac = to_rcar_dmac(chan->device);
+	struct platform_device *pdev = to_platform_device(dmac->dev);
 	struct rcar_dmac_desc_page *page, *_page;
 	struct rcar_dmac_desc *desc;
+	int irq;
+	char pdev_irqname[5];
 	LIST_HEAD(list);
 
 	/* Protect against ISR */
@@ -995,6 +998,14 @@ static void rcar_dmac_free_chan_resources(struct dma_chan *chan)
 	rcar_dmac_chan_halt(rchan);
 	spin_unlock_irq(&rchan->lock);
 
+	sprintf(pdev_irqname, "ch%u", rchan->index);
+	irq = platform_get_irq_byname(pdev, pdev_irqname);
+	if (irq < 0) {
+		dev_err(dmac->dev, "no IRQ specified for channel %u\n",
+			rchan->index);
+		return;
+	}
+	synchronize_irq(irq);
 	/* Now no new interrupts will occur */
 
 	if (rchan->mid_rid >= 0) {
