@@ -975,7 +975,7 @@ int hid_open_report(struct hid_device *device)
 	device->rdesc = start;
 	device->rsize = size;
 
-	parser = vzalloc(sizeof(struct hid_parser));
+	parser = vzalloc(sizeof(*parser));
 	if (!parser) {
 		ret = -ENOMEM;
 		goto err;
@@ -986,7 +986,7 @@ int hid_open_report(struct hid_device *device)
 	end = start + size;
 
 	device->collection = kcalloc(HID_DEFAULT_NUM_COLLECTIONS,
-				     sizeof(struct hid_collection), GFP_KERNEL);
+				     sizeof(*device->collection), GFP_KERNEL);
 	if (!device->collection) {
 		ret = -ENOMEM;
 		goto err;
