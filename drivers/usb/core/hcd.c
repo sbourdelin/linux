@@ -407,27 +407,25 @@ MODULE_PARM_DESC(authorized_default,
  * USB String descriptors can contain at most 126 characters; input
  * strings longer than that are truncated.
  */
-static unsigned
-ascii2desc(char const *s, u8 *buf, unsigned len)
+static unsigned int
+ascii2desc(char const *s, u8 *buf, unsigned int len)
 {
-	unsigned n, t = 2 + 2*strlen(s);
+	unsigned int t = 2 + 2 * strlen(s);
 
 	if (t > 254)
 		t = 254;	/* Longest possible UTF string descriptor */
 	if (len > t)
 		len = t;
+	if (!len)
+		return 0;
 
 	t += USB_DT_STRING << 8;	/* Now t is first 16 bits to store */
+	*buf++ = t;
+	if (len < 2)
+		return len;
+	*buf++ = t >> 8;
 
-	n = len;
-	while (n--) {
-		*buf++ = t;
-		if (!n--)
-			break;
-		*buf++ = t >> 8;
-		t = (unsigned char)*s++;
-	}
-	return len;
+	return ascii2utf16le(s, buf, (len - 2)) + 2;
 }
 
 /**
