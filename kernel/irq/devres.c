@@ -2,6 +2,7 @@
 #include <linux/interrupt.h>
 #include <linux/device.h>
 #include <linux/gfp.h>
+#include <linux/irq.h>
 
 /*
  * Device resource management aware IRQ request/free implementation.
@@ -137,3 +138,40 @@ void devm_free_irq(struct device *dev, unsigned int irq, void *dev_id)
 	free_irq(irq, dev_id);
 }
 EXPORT_SYMBOL(devm_free_irq);
+
+struct irq_desc_devres {
+	int from;
+	int cnt;
+};
+
+static void devm_irq_desc_release(struct device *dev, void *res)
+{
+	struct irq_desc_devres *this = res;
+
+	irq_free_descs(this->from, this->cnt);
+}
+
+int __devm_irq_alloc_descs(struct device *dev, int irq, unsigned int from,
+			   unsigned int cnt, int node, struct module *owner,
+			   const struct cpumask *affinity)
+{
+	struct irq_desc_devres *dr;
+	int base;
+
+	dr = devres_alloc(devm_irq_desc_release, sizeof(*dr), GFP_KERNEL);
+	if (!dr)
+		return -ENOMEM;
+
+	base = __irq_alloc_descs(irq, from, cnt, node, owner, affinity);
+	if (base < 0) {
+		devres_free(dr);
+		return base;
+	}
+
+	dr->from = base;
+	dr->cnt = cnt;
+	devres_add(dev, dr);
+
+	return base;
+}
+EXPORT_SYMBOL_GPL(__devm_irq_alloc_descs);
