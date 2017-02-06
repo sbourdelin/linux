@@ -513,10 +513,12 @@ void mlx4_en_recover_from_oom(struct mlx4_en_priv *priv)
 	if (!priv->port_up)
 		return;
 
+	local_bh_disable();
 	for (ring = 0; ring < priv->rx_ring_num; ring++) {
 		if (mlx4_en_is_ring_empty(priv->rx_ring[ring]))
 			napi_reschedule(&priv->rx_cq[ring]->napi);
 	}
+	local_bh_enable();
 }
 
 /* When the rx ring is running in page-per-packet mode, a released frame can go
