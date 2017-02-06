@@ -2211,7 +2211,13 @@ lpfc_issue_els_prli(struct lpfc_vport *vport, struct lpfc_nodelist *ndlp,
 		    !phba->nvmet_support)
 			bf_set(prli_fba, npr_nvme, 1);
 
-		bf_set(prli_init, npr_nvme, 1);
+		if (phba->nvmet_support) {
+			bf_set(prli_tgt, npr_nvme, 1);
+			bf_set(prli_disc, npr_nvme, 1);
+
+		} else {
+			bf_set(prli_init, npr_nvme, 1);
+		}
 		npr_nvme->word1 = cpu_to_be32(npr_nvme->word1);
 		npr_nvme->word4 = cpu_to_be32(npr_nvme->word4);
 		elsiocb->iocb_flag |= LPFC_PRLI_NVME_REQ;
@@ -2623,8 +2629,11 @@ out:
 		phba->pport->fc_myDID = 0;
 
 		if ((phba->cfg_enable_fc4_type == LPFC_ENABLE_BOTH) ||
-		    (phba->cfg_enable_fc4_type == LPFC_ENABLE_NVME))
-			lpfc_nvme_update_localport(phba->pport);
+		    (phba->cfg_enable_fc4_type == LPFC_ENABLE_NVME)) {
+			if (!phba->nvmet_support)
+				lpfc_nvme_update_localport(phba->pport);
+			/* todo: tgt: update targetport attributes */
+		}
 
 		mbox = mempool_alloc(phba->mbox_mem_pool, GFP_KERNEL);
 		if (mbox) {
@@ -4407,7 +4416,22 @@ lpfc_els_rsp_prli_acc(struct lpfc_vport *vport, struct lpfc_iocbq *oldiocb,
 		bf_set(prli_type_code, npr_nvme, PRLI_NVME_TYPE);
 		bf_set(prli_estabImagePair, npr_nvme, 0);  /* Should be 0 */
 		bf_set(prli_acc_rsp_code, npr_nvme, PRLI_REQ_EXECUTED);
-		bf_set(prli_init, npr_nvme, 1);
+		if (phba->nvmet_support) {
+			bf_set(prli_tgt, npr_nvme, 1);
+			bf_set(prli_disc, npr_nvme, 1);
+			if (phba->cfg_nvme_enable_fb) {
+				bf_set(prli_fba, npr_nvme, 1);
+
+				/* TBD.  Target mode needs to post buffers
+				 * that support the configured first burst
+				 * byte size.
+				 */
+				bf_set(prli_fb_sz, npr_nvme,
+				       phba->cfg_nvmet_fb_size);
+			}
+		} else {
+			bf_set(prli_init, npr_nvme, 1);
+		}
 
 		lpfc_printf_vlog(vport, KERN_INFO, LOG_NVME_DISC,
 				 "6015 NVME issue PRLI ACC word1 x%08x "
@@ -5824,6 +5848,8 @@ lpfc_rscn_recovery_check(struct lpfc_vport *vport)
 		if (!NLP_CHK_NODE_ACT(ndlp) ||
 		    (ndlp->nlp_state == NLP_STE_UNUSED_NODE) ||
 		    !lpfc_rscn_payload_check(vport, ndlp->nlp_DID))
+			continue;
+		if (vport->phba->nvmet_support)
 			continue;
 		lpfc_disc_state_machine(vport, ndlp, NULL,
 					NLP_EVT_DEVICE_RECOVERY);
