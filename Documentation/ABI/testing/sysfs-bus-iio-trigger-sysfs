@@ -40,3 +40,11 @@ Description:
 		associated file, representing the id of the trigger that needs
 		to be removed. If the trigger can't be found, an invalid
 		argument message will be returned to the user.
+
+What:		/sys/bus/iio/devices/triggerX/parent_trigger
+KernelVersion:	4.12
+Contact:	linux-iio@vger.kernel.org
+Description:
+		This attribute is used to set a trigger as parent for the
+		current trigger. If the trigger can't use the parent an
+		invalid argument message will be returned.

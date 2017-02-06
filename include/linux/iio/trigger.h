@@ -29,6 +29,7 @@ struct iio_trigger;
  *			use count is zero (may be NULL)
  * @validate_device:	function to validate the device when the
  *			current trigger gets changed.
+ * @validate_trigger:	function to validate the parent trigger (may be NULL)
  *
  * This is typically static const within a driver and shared by
  * instances of a given device.
@@ -39,8 +40,9 @@ struct iio_trigger_ops {
 	int (*try_reenable)(struct iio_trigger *trig);
 	int (*validate_device)(struct iio_trigger *trig,
 			       struct iio_dev *indio_dev);
+	int (*validate_trigger)(struct iio_trigger *trig,
+				struct iio_trigger *parent);
 };
-
 
 /**
  * struct iio_trigger - industrial I/O trigger device
@@ -59,6 +61,7 @@ struct iio_trigger_ops {
  * @attached_own_device:[INTERN] if we are using our own device as trigger,
  *			i.e. if we registered a poll function to the same
  *			device as the one providing the trigger.
+ * @parent_trigger:	[INTERN] parent trigger
  **/
 struct iio_trigger {
 	const struct iio_trigger_ops	*ops;
@@ -77,6 +80,7 @@ struct iio_trigger {
 	unsigned long pool[BITS_TO_LONGS(CONFIG_IIO_CONSUMERS_PER_TRIGGER)];
 	struct mutex			pool_lock;
 	bool				attached_own_device;
+	struct iio_trigger		*parent_trigger;
 };
 
 

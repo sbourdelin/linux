@@ -58,8 +58,76 @@ static ssize_t iio_trigger_read_name(struct device *dev,
 
 static DEVICE_ATTR(name, S_IRUGO, iio_trigger_read_name, NULL);
 
+/**
+ * iio_trigger_read_parent() - trigger consumer sysfs query parent trigger
+ * @dev:	device associated with an industrial I/O trigger
+ * @attr:	pointer to the device_attribute structure that
+ *		is being processed
+ * @buf:	buffer where the current trigger name will be printed into
+ *
+ * Return: a negative number on failure, the number of characters written
+ *	   on success or 0 if no trigger is available
+ */
+static ssize_t iio_trigger_read_parent(struct device *dev,
+				       struct device_attribute *attr,
+				       char *buf)
+{
+	struct iio_trigger *trig = to_iio_trigger(dev);
+
+	if (trig->parent_trigger)
+		return sprintf(buf, "%s\n", trig->parent_trigger->name);
+
+	return 0;
+}
+
+static struct iio_trigger *iio_trigger_find_by_name(const char *name,
+						    size_t len);
+
+/**
+ * iio_trigger_write_parent() - trigger consumer sysfs set parent trigger
+ * @dev:	device associated with an industrial I/O trigger
+ * @attr:	device attribute that is being processed
+ * @buf:	string buffer that holds the name of the trigger
+ * @len:	length of the trigger name held by buf
+ *
+ * Return: negative error code on failure or length of the buffer
+ *	   on success
+ */
+static ssize_t iio_trigger_write_parent(struct device *dev,
+					struct device_attribute *attr,
+					const char *buf,
+					size_t len)
+{
+	struct iio_trigger *parent;
+	struct iio_trigger *child = to_iio_trigger(dev);
+	int ret;
+
+	if (!child->ops->validate_trigger)
+		return -EINVAL;
+
+	if (atomic_read(&child->use_count))
+		return -EBUSY;
+
+	parent = iio_trigger_find_by_name(buf, len);
+
+	if (parent == child->parent_trigger)
+		return len;
+
+	ret = child->ops->validate_trigger(child, parent);
+	if (ret)
+		return ret;
+
+	child->parent_trigger = parent;
+
+	return len;
+}
+static DEVICE_ATTR(parent_trigger, S_IRUGO | S_IWUSR,
+		   iio_trigger_read_parent,
+		   iio_trigger_write_parent);
+
 static struct attribute *iio_trig_dev_attrs[] = {
 	&dev_attr_name.attr,
+	&dev_attr_parent_trigger.attr,
 	NULL,
 };
 ATTRIBUTE_GROUPS(iio_trig_dev);
