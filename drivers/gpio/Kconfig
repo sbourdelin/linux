@@ -298,6 +298,7 @@ config GPIO_MOCKUP
 	tristate "GPIO Testing Driver"
 	depends on GPIOLIB && SYSFS
 	select GPIO_SYSFS
+	select GPIOLIB_IRQCHIP
 	help
 	  This enables GPIO Testing driver, which provides a way to test GPIO
 	  subsystem through sysfs(or char device) and debugfs. GPIO_SYSFS
