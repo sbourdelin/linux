@@ -28,8 +28,8 @@
  * to debug if we run into issues
  */
 
-static struct snd_card *g_card = NULL;
-static struct bcm2835_chip *g_chip = NULL;
+static struct snd_card *g_card;
+static struct bcm2835_chip *g_chip;
 
 static int snd_bcm2835_free(struct bcm2835_chip *chip)
 {
@@ -50,7 +50,7 @@ static int snd_bcm2835_dev_free(struct snd_device *device)
  */
 static int snd_bcm2835_create(struct snd_card *card,
 	struct platform_device *pdev,
-	struct bcm2835_chip ** rchip)
+	struct bcm2835_chip **rchip)
 {
 	struct bcm2835_chip *chip;
 	int err;
@@ -139,7 +139,7 @@ static int snd_bcm2835_alsa_probe_dt(struct platform_device *pdev)
 
 	err = snd_card_register(card);
 	if (err) {
-		dev_err(dev, "Failed to register bcm2835 ALSA card \n");
+		dev_err(dev, "Failed to register bcm2835 ALSA card\n");
 		goto err_free;
 	}
 
@@ -219,8 +219,7 @@ static struct platform_driver bcm2835_alsa0_driver = {
 	.suspend = snd_bcm2835_alsa_suspend,
 	.resume = snd_bcm2835_alsa_resume,
 #endif
-	.driver =
-	{
+	.driver = {
 		.name = "bcm2835_AUD0",
 		.owner = THIS_MODULE,
 		.of_match_table = snd_bcm2835_of_match_table,
@@ -229,14 +228,13 @@ static struct platform_driver bcm2835_alsa0_driver = {
 
 static int bcm2835_alsa_device_init(void)
 {
-	int err;
-	err = platform_driver_register(&bcm2835_alsa0_driver);
-	if (err) {
-		pr_err("Error registering bcm2835_alsa0_driver %d .\n", err);
-		return err;
-	}
+	int ret;
 
-	return 0;
+	ret = platform_driver_register(&bcm2835_alsa0_driver);
+	if (ret)
+		pr_err("Error registering bcm2835_alsa0_driver %d .\n", ret);
+
+	return ret;
 }
 
 static void bcm2835_alsa_device_exit(void)
