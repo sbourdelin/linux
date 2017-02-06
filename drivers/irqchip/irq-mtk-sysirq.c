@@ -24,7 +24,9 @@
 
 struct mtk_sysirq_chip_data {
 	spinlock_t lock;
-	void __iomem *intpol_base;
+	u32 nr_intpol_bases;
+	void __iomem **intpol_bases;
+	u32 *intpol_words;
 };
 
 static int mtk_sysirq_set_type(struct irq_data *data, unsigned int type)
@@ -33,13 +35,15 @@ static int mtk_sysirq_set_type(struct irq_data *data, unsigned int type)
 	struct mtk_sysirq_chip_data *chip_data = data->chip_data;
 	u32 offset, reg_index, value;
 	unsigned long flags;
-	int ret;
+	int ret, i;
 
 	offset = hwirq & 0x1f;
 	reg_index = hwirq >> 5;
+	for (i = 0; reg_index >= chip_data->intpol_words[i]; i++)
+		reg_index -= chip_data->intpol_words[i];
 
 	spin_lock_irqsave(&chip_data->lock, flags);
-	value = readl_relaxed(chip_data->intpol_base + reg_index * 4);
+	value = readl_relaxed(chip_data->intpol_bases[i] + reg_index * 4);
 	if (type == IRQ_TYPE_LEVEL_LOW || type == IRQ_TYPE_EDGE_FALLING) {
 		if (type == IRQ_TYPE_LEVEL_LOW)
 			type = IRQ_TYPE_LEVEL_HIGH;
@@ -49,7 +53,8 @@ static int mtk_sysirq_set_type(struct irq_data *data, unsigned int type)
 	} else {
 		value &= ~(1 << offset);
 	}
-	writel(value, chip_data->intpol_base + reg_index * 4);
+
+	writel(value, chip_data->intpol_bases[i] + reg_index * 4);
 
 	data = data->parent_data;
 	ret = data->chip->irq_set_type(data, type);
@@ -124,8 +129,7 @@ static int __init mtk_sysirq_of_init(struct device_node *node,
 {
 	struct irq_domain *domain, *domain_parent;
 	struct mtk_sysirq_chip_data *chip_data;
-	int ret, size, intpol_num;
-	struct resource res;
+	int ret, size, intpol_num = 0, nr_intpol_bases, i;
 
 	domain_parent = irq_find_host(parent);
 	if (!domain_parent) {
@@ -133,36 +137,61 @@ static int __init mtk_sysirq_of_init(struct device_node *node,
 		return -EINVAL;
 	}
 
-	ret = of_address_to_resource(node, 0, &res);
-	if (ret)
-		return ret;
-
 	chip_data = kzalloc(sizeof(*chip_data), GFP_KERNEL);
 	if (!chip_data)
 		return -ENOMEM;
 
-	size = resource_size(&res);
-	intpol_num = size * 8;
-	chip_data->intpol_base = ioremap(res.start, size);
-	if (!chip_data->intpol_base) {
-		pr_err("mtk_sysirq: unable to map sysirq register\n");
-		ret = -ENXIO;
-		goto out_free;
+	if (of_property_read_u32(node, "#intpol-bases", &nr_intpol_bases))
+		nr_intpol_bases = 1;
+
+	chip_data->intpol_words =
+		kcalloc(nr_intpol_bases, sizeof(u32), GFP_KERNEL);
+	if (!chip_data->intpol_words) {
+		ret = -ENOMEM;
+		goto out_free_chip;
+	}
+
+	chip_data->intpol_bases =
+		kcalloc(nr_intpol_bases, sizeof(void __iomem *), GFP_KERNEL);
+	if (!chip_data->intpol_bases) {
+		ret = -ENOMEM;
+		goto out_free_intpol_words;
+	}
+
+	for (i = 0; i < nr_intpol_bases; i++) {
+		struct resource res;
+
+		ret = of_address_to_resource(node, i, &res);
+		size = resource_size(&res);
+		intpol_num += size * 8;
+		chip_data->intpol_words[i] = size / 4;
+		chip_data->intpol_bases[i] = of_iomap(node, i);
+		if (ret || !chip_data->intpol_bases[i]) {
+			pr_err("%s: couldn't map region %d\n",
+			       node->full_name, i);
+			ret = -ENODEV;
+			goto out_free_intpol;
+		}
 	}
 
 	domain = irq_domain_add_hierarchy(domain_parent, 0, intpol_num, node,
 					  &sysirq_domain_ops, chip_data);
 	if (!domain) {
 		ret = -ENOMEM;
-		goto out_unmap;
+		goto out_free_intpol;
 	}
 	spin_lock_init(&chip_data->lock);
 
 	return 0;
 
-out_unmap:
-	iounmap(chip_data->intpol_base);
-out_free:
+out_free_intpol:
+	for (i = 0; i < nr_intpol_bases; i++)
+		if (chip_data->intpol_bases[i])
+			iounmap(chip_data->intpol_bases[i]);
+	kfree(chip_data->intpol_bases);
+out_free_intpol_words:
+	kfree(chip_data->intpol_words);
+out_free_chip:
 	kfree(chip_data);
 	return ret;
 }
