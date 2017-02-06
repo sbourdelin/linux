@@ -276,6 +276,8 @@ struct sysmmu_drvdata {
 	struct list_head owner_node;	/* node for owner controllers list */
 	phys_addr_t pgtable;		/* assigned page table structure */
 	unsigned int version;		/* our version */
+
+	struct iommu_device iommu;	/* IOMMU core handle */
 };
 
 static struct exynos_iommu_domain *to_exynos_domain(struct iommu_domain *dom)
@@ -556,6 +558,7 @@ static int __init exynos_sysmmu_probe(struct platform_device *pdev)
 	struct device *dev = &pdev->dev;
 	struct sysmmu_drvdata *data;
 	struct resource *res;
+	resource_size_t ioaddr;
 
 	data = devm_kzalloc(dev, sizeof(*data), GFP_KERNEL);
 	if (!data)
@@ -565,6 +568,7 @@ static int __init exynos_sysmmu_probe(struct platform_device *pdev)
 	data->sfrbase = devm_ioremap_resource(dev, res);
 	if (IS_ERR(data->sfrbase))
 		return PTR_ERR(data->sfrbase);
+	ioaddr = res->start;
 
 	irq = platform_get_irq(pdev, 0);
 	if (irq <= 0) {
@@ -610,6 +614,18 @@ static int __init exynos_sysmmu_probe(struct platform_device *pdev)
 
 	data->sysmmu = dev;
 	spin_lock_init(&data->lock);
+
+	ret = iommu_device_sysfs_add(&data->iommu, &pdev->dev, NULL,
+				     "sysmmu.%pa", &ioaddr);
+	if (ret)
+		return ret;
+
+	data->iommu.ops    = &exynos_iommu_ops;
+	data->iommu.fwnode = &dev->of_node->fwnode;
+
+	ret = iommu_device_register(&data->iommu);
+	if (ret)
+		return ret;
 
 	platform_set_drvdata(pdev, data);
 
