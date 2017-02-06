@@ -130,11 +130,27 @@ static u64 __maybe_unused gic_read_iar(void)
 }
 #endif
 
+/**
+ * Check whether the GIC implementation supports two security
+ * states or only one security state.
+ * return true if it has two security states else return false.
+ */
+static bool gic_has_security_extn(void)
+{
+	u32 typer = readl_relaxed(gic_data.dist_base + GICD_TYPER);
+
+	return !!(typer & GICD_TYPER_SECURITY_EXTN);
+}
+
 static void gic_enable_redist(bool enable)
 {
 	void __iomem *rbase;
 	u32 count = 1000000;	/* 1s! */
 	u32 val;
+
+	/* With only one security state, GICR_WAKE is RAZ/WI to non-secure */
+	if (gic_has_security_extn())
+		return;
 
 	rbase = gic_data_rdist_rd_base();
 
@@ -397,16 +413,18 @@ static void __init gic_dist_init(void)
 	writel_relaxed(0, base + GICD_CTLR);
 	gic_dist_wait_for_rwp();
 
-	/*
-	 * Configure SPIs as non-secure Group-1. This will only matter
-	 * if the GIC only has a single security state. This will not
-	 * do the right thing if the kernel is running in secure mode,
-	 * but that's not the intended use case anyway.
-	 */
-	for (i = 32; i < gic_data.irq_nr; i += 32)
-		writel_relaxed(~0, base + GICD_IGROUPR + i / 8);
+	if (!gic_has_security_extn()) {
+		/*
+		 * Configure SPIs as non-secure Group-1. This will only matter
+		 * if the GIC only has a single security state. This will not
+		 * do the right thing if the kernel is running in secure mode,
+		 * but that's not the intended use case anyway.
+		 */
+		for (i = 32; i < gic_data.irq_nr; i += 32)
+			writel_relaxed(~0, base + GICD_IGROUPR + i / 8);
 
-	gic_dist_config(base, gic_data.irq_nr, gic_dist_wait_for_rwp);
+		gic_dist_config(base, gic_data.irq_nr, gic_dist_wait_for_rwp);
+	}
 
 	/* Enable distributor with ARE, Group1 */
 	writel_relaxed(GICD_CTLR_ARE_NS | GICD_CTLR_ENABLE_G1A | GICD_CTLR_ENABLE_G1,
