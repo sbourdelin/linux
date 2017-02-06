@@ -14365,6 +14365,79 @@ err_exit:
 	return -EINVAL;
 }
 
+struct deferred_dev {
+	struct list_head list;
+	u64 guid;
+	u32 bdf;
+	bool deferred;
+};
+
+static LIST_HEAD(device_list);
+static DEFINE_MUTEX(device_list_lock); /* protects device_list */
+#define HFI_ASIC_GUID(guid) ((guid) & ~(1ULL << GUID_HFI_INDEX_SHIFT))
+
+static int hfi1_need_defer(struct hfi1_devdata *dd)
+{
+	struct deferred_dev *def_dev = NULL;
+	struct pci_dev *pdev = dd->pcidev;
+	static bool deferred;
+	static u64 deferred_guid;
+	bool found_deferred = false;
+
+	mutex_lock(&device_list_lock);
+	/* Try to find an re-probed device first based on the BDF address */
+	list_for_each_entry(def_dev, &device_list, list) {
+		if (def_dev->bdf == (pdev->bus->number << 8 | pdev->devfn)) {
+			found_deferred = true;
+			break;
+		}
+	}
+
+	/* If not found then allocate one */
+	if (!found_deferred) {
+		def_dev = kzalloc(sizeof(*def_dev), GFP_KERNEL);
+
+		if (!def_dev) {
+			mutex_unlock(&device_list_lock);
+			return -ENOMEM;
+		}
+
+		def_dev->guid = dd->base_guid;
+		def_dev->bdf = pdev->bus->number << 8 | pdev->devfn;
+		def_dev->deferred = false;
+		list_add_tail(&def_dev->list, &device_list);
+	}
+
+	/*
+	 * If device has been already deferred we need to wait for the other
+	 * port and defer other devices until we get to the other port or
+	 * back the same device
+	 */
+	if (deferred && (HFI_ASIC_GUID(deferred_guid) != dd->base_guid) &&
+	    !def_dev->deferred) {
+		def_dev->deferred = true;
+		mutex_unlock(&device_list_lock);
+		return -EPROBE_DEFER;
+	} else if (!deferred && ((dd->base_guid >> GUID_HFI_INDEX_SHIFT) & 1)) {
+		/*
+		 * If no device is currently deferred check by guid if we need
+		 * to defer this one and if so store the deferred guid to find
+		 * the sister port by the guid
+		 */
+		deferred = true;
+		def_dev->deferred = true;
+		deferred_guid = dd->base_guid;
+		mutex_unlock(&device_list_lock);
+		return -EPROBE_DEFER;
+	}
+
+	deferred = false;
+	def_dev->deferred = false;
+	mutex_unlock(&device_list_lock);
+
+	return 0;
+}
+
 /**
  * Allocate and initialize the device structure for the hfi.
  * @dev: the pci_dev for hfi1_ib device
@@ -14456,6 +14529,13 @@ struct hfi1_devdata *hfi1_init_dd(struct pci_dev *pdev,
 	if (ret < 0)
 		goto bail_free;
 
+	/* needs to be done before we look for the peer device */
+	read_guid(dd);
+
+	ret = hfi1_need_defer(dd);
+	if (ret)
+		goto bail_cleanup;
+
 	/* verify that reads actually work, save revision for reset check */
 	dd->revision = read_csr(dd, CCE_REVISION);
 	if (dd->revision == ~(u64)0) {
@@ -14538,9 +14618,6 @@ struct hfi1_devdata *hfi1_init_dd(struct pci_dev *pdev,
 			RCV_AVAIL_TIME_OUT_TIME_OUT_RELOAD_MASK;
 	else if (dd->rcv_intr_timeout_csr == 0 && rcv_intr_timeout)
 		dd->rcv_intr_timeout_csr = 1;
-
-	/* needs to be done before we look for the peer device */
-	read_guid(dd);
 
 	/* set up shared ASIC data with peer device */
 	ret = init_asic_data(dd);
@@ -14700,6 +14777,18 @@ bail_free:
 	dd = ERR_PTR(ret);
 bail:
 	return dd;
+}
+
+void hfi1_device_list_cleanup(void)
+{
+	struct deferred_dev *dev, *tmp;
+
+	mutex_lock(&device_list_lock);
+	list_for_each_entry_safe(dev, tmp, &device_list, list) {
+		list_del(&dev->list);
+		kfree(dev);
+	}
+	mutex_unlock(&device_list_lock);
 }
 
 static u16 delay_cycles(struct hfi1_pportdata *ppd, u32 desired_egress_rate,

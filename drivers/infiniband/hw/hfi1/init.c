@@ -1298,6 +1298,7 @@ static void __exit hfi1_mod_cleanup(void)
 	idr_destroy(&hfi1_unit_table);
 	dispose_firmware();	/* asymmetric with obtain_firmware() */
 	dev_cleanup();
+	hfi1_device_list_cleanup();
 }
 
 module_exit(hfi1_mod_cleanup);

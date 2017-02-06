@@ -1358,7 +1358,7 @@ int hfi1_clear_ctxt_jkey(struct hfi1_devdata *dd, unsigned ctxt);
 int hfi1_set_ctxt_pkey(struct hfi1_devdata *dd, unsigned ctxt, u16 pkey);
 int hfi1_clear_ctxt_pkey(struct hfi1_devdata *dd, unsigned ctxt);
 void hfi1_read_link_quality(struct hfi1_devdata *dd, u8 *link_quality);
-
+void hfi1_device_list_cleanup(void);
 /*
  * Interrupt source table.
  *
