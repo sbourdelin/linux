@@ -131,8 +131,9 @@ static int open_collection(struct hid_parser *parser, unsigned type)
 	}
 
 	if (parser->device->maxcollection == parser->device->collection_size) {
-		collection = kmalloc(sizeof(struct hid_collection) *
-				parser->device->collection_size * 2, GFP_KERNEL);
+		collection = kmalloc_array(parser->device->collection_size * 2,
+					   sizeof(*collection),
+					   GFP_KERNEL);
 		if (!collection)
 			return -ENOMEM;
 
