@@ -284,6 +284,8 @@ struct device_driver {
 	const struct dev_pm_ops *pm;
 
 	struct driver_private *p;
+
+	atomic_t deferred_probe_ctr;
 };
 
 
