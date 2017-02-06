@@ -1062,7 +1062,7 @@ static int i40e_vfpr_netdev_stop(struct net_device *dev)
  *
  * Fills the hw statistics from the VSI corresponding to the associated VFPR
  **/
-void
+static void
 i40e_vfpr_netdev_get_stats64(struct net_device *netdev,
 			     struct rtnl_link_stats64 *stats)
 {
