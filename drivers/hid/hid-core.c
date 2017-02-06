@@ -138,11 +138,9 @@ static int open_collection(struct hid_parser *parser, unsigned type)
 			return -ENOMEM;
 
 		memcpy(collection, parser->device->collection,
-			sizeof(struct hid_collection) *
-			parser->device->collection_size);
+		       sizeof(*collection) * parser->device->collection_size);
 		memset(collection + parser->device->collection_size, 0,
-			sizeof(struct hid_collection) *
-			parser->device->collection_size);
+		       sizeof(*collection) * parser->device->collection_size);
 		kfree(parser->device->collection);
 		parser->device->collection = collection;
 		parser->device->collection_size *= 2;
