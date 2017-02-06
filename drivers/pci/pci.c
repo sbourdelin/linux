@@ -2096,6 +2096,14 @@ bool pci_dev_run_wake(struct pci_dev *dev)
 {
 	struct pci_bus *bus = dev->bus;
 
+	/*
+	 * Don't enable PME at runtime on hotplug ports (even if supported)
+	 * since PME sends unwanted interrupts if the slot is occupied while
+	 * suspended to D3hot (PCIe Base Specification, section 6.7.3.4).
+	 */
+	if (dev->is_hotplug_bridge)
+		return false;
+
 	if (device_run_wake(&dev->dev))
 		return true;
 
