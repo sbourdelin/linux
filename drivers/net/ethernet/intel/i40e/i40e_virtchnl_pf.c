@@ -1204,7 +1204,7 @@ static const struct switchdev_ops i40e_vfpr_switchdev_ops = {
  *
  * add/delete VFs broadcast filter
  **/
-void i40e_update_vf_broadcast_filter(struct i40e_vf *vf, bool enable)
+static void i40e_update_vf_broadcast_filter(struct i40e_vf *vf, bool enable)
 {
 	struct i40e_pf *pf = vf->pf;
 	struct i40e_vsi *vsi = pf->vsi[vf->lan_vsi_idx];
