@@ -27,3 +27,29 @@ Description:
 		Reading returns the current sampling frequency.
 		Writing an value different of 0 set and start sampling.
 		Writing 0 stop sampling.
+
+What:		/sys/bus/iio/devices/iio:deviceX/slave_mode_available
+KernelVersion:	4.12
+Contact:	benjamin.gaignard@st.com
+Description:
+		Reading returns the list possible slave modes which are:
+		- "disabled"  : The prescaler is clocked directly by the internal clock.
+		- "encoder_1" : Counter counts up/down on TI2FP1 edge depending on TI1FP2 level.
+		- "encoder_2" : Counter counts up/down on TI1FP2 edge depending on TI2FP1 level.
+		- "encoder_3" : Counter counts up/down on both TI1FP1 and TI2FP2 edges depending
+				on the level of the other input.
+		- "reset"     : Rising edge of the selected trigger input reinitializes the counter
+				and generates an update of the registers.
+		- "gated"     : The counter clock is enabled when the trigger input is high.
+				The counter stops (but is not reset) as soon as the trigger becomes low.
+				Both start and stop of the counter are controlled.
+		- "trigger"   : The counter starts at a rising edge of the trigger TRGI (but it is not
+				reset). Only the start of the counter is controlled.
+		- "external_clock": Rising edges of the selected trigger (TRGI) clock the counter.
+
+What:		/sys/bus/iio/devices/iio:deviceX/slave_mode
+KernelVersion:	4.12
+Contact:	benjamin.gaignard@st.com
+Description:
+		Reading returns the current slave mode.
+		Writing set the slave mode

@@ -15,6 +15,7 @@
 #include <linux/platform_device.h>
 
 #define MAX_TRIGGERS 6
+#define MAX_VALIDS 5
 
 /* List the triggers created by each timer */
 static const void *triggers_table[][MAX_TRIGGERS] = {
@@ -32,12 +33,29 @@ static const void *triggers_table[][MAX_TRIGGERS] = {
 	{ TIM12_TRGO, TIM12_CH1, TIM12_CH2,},
 };
 
+/* List the triggers accepted by each timer */
+static const void *valids_table[][MAX_VALIDS] = {
+	{ TIM5_TRGO, TIM2_TRGO, TIM4_TRGO, TIM3_TRGO,},
+	{ TIM1_TRGO, TIM8_TRGO, TIM3_TRGO, TIM4_TRGO,},
+	{ TIM1_TRGO, TIM8_TRGO, TIM5_TRGO, TIM4_TRGO,},
+	{ TIM1_TRGO, TIM2_TRGO, TIM3_TRGO, TIM8_TRGO,},
+	{ TIM2_TRGO, TIM3_TRGO, TIM4_TRGO, TIM8_TRGO,},
+	{ }, /* timer 6 */
+	{ }, /* timer 7 */
+	{ TIM1_TRGO, TIM2_TRGO, TIM4_TRGO, TIM5_TRGO,},
+	{ TIM2_TRGO, TIM3_TRGO,},
+	{ }, /* timer 10 */
+	{ }, /* timer 11 */
+	{ TIM4_TRGO, TIM5_TRGO,},
+};
+
 struct stm32_timer_trigger {
 	struct device *dev;
 	struct regmap *regmap;
 	struct clk *clk;
 	u32 max_arr;
 	const void *triggers;
+	const void *valids;
 };
 
 static int stm32_timer_start(struct stm32_timer_trigger *priv,
@@ -221,10 +239,65 @@ static IIO_DEVICE_ATTR(master_mode, 0660,
 		       stm32_tt_store_master_mode,
 		       0);
 
+static char *slave_mode_table[] = {
+	"disabled",
+	"encoder_1",
+	"encoder_2",
+	"encoder_3",
+	"reset",
+	"gated",
+	"trigger",
+	"external_clock",
+};
+
+static ssize_t stm32_tt_show_slave_mode(struct device *dev,
+					struct device_attribute *attr,
+					char *buf)
+{
+	struct iio_dev *indio_dev = dev_to_iio_dev(dev);
+	struct stm32_timer_trigger *priv = iio_priv(indio_dev);
+	u32 smcr;
+
+	regmap_read(priv->regmap, TIM_SMCR, &smcr);
+	smcr &= TIM_SMCR_SMS;
+
+	return snprintf(buf, PAGE_SIZE, "%s\n", slave_mode_table[smcr]);
+}
+
+static ssize_t stm32_tt_store_slave_mode(struct device *dev,
+					 struct device_attribute *attr,
+					 const char *buf, size_t len)
+{
+	struct iio_dev *indio_dev = dev_to_iio_dev(dev);
+	struct stm32_timer_trigger *priv = iio_priv(indio_dev);
+	int i;
+
+	for (i = 0; i < ARRAY_SIZE(slave_mode_table); i++) {
+		if (!strncmp(slave_mode_table[i], buf,
+			     strlen(slave_mode_table[i]))) {
+			regmap_update_bits(priv->regmap,
+					   TIM_SMCR, TIM_SMCR_SMS, i);
+			return len;
+		}
+	}
+
+	return -EINVAL;
+}
+
+static IIO_CONST_ATTR(slave_mode_available,
+"disabled encoder_1 encoder_2 encoder_3 reset gated trigger external_clock");
+
+static IIO_DEVICE_ATTR(slave_mode, 0660,
+		       stm32_tt_show_slave_mode,
+		       stm32_tt_store_slave_mode,
+		       0);
+
 static struct attribute *stm32_trigger_attrs[] = {
 	&iio_dev_attr_sampling_frequency.dev_attr.attr,
 	&iio_dev_attr_master_mode.dev_attr.attr,
 	&iio_const_attr_master_mode_available.dev_attr.attr,
+	&iio_dev_attr_slave_mode.dev_attr.attr,
+	&iio_const_attr_slave_mode_available.dev_attr.attr,
 	NULL,
 };
 
@@ -237,8 +310,38 @@ static const struct attribute_group *stm32_trigger_attr_groups[] = {
 	NULL,
 };
 
+static int stm32_validate_trigger(struct iio_trigger *trig,
+				  struct iio_trigger *parent)
+{
+	struct stm32_timer_trigger *priv = iio_trigger_get_drvdata(trig);
+	const char * const *cur = priv->valids;
+	unsigned int i = 0;
+
+	if (!parent) {
+		regmap_update_bits(priv->regmap, TIM_SMCR, TIM_SMCR_TS, 0);
+		return 0;
+	}
+
+	if (!is_stm32_timer_trigger(parent))
+		return -EINVAL;
+
+	while (cur && *cur) {
+		if (!strncmp(parent->name, *cur, strlen(parent->name))) {
+			regmap_update_bits(priv->regmap,
+					   TIM_SMCR, TIM_SMCR_TS,
+					   i << TIM_SMCR_TS_SHIFT);
+			return 0;
+		}
+		cur++;
+		i++;
+	}
+
+	return -EINVAL;
+}
+
 static const struct iio_trigger_ops timer_trigger_ops = {
 	.owner = THIS_MODULE,
+	.validate_trigger = stm32_validate_trigger,
 };
 
 static int stm32_setup_iio_triggers(struct stm32_timer_trigger *priv)
@@ -312,6 +415,7 @@ static int stm32_timer_trigger_probe(struct platform_device *pdev)
 	priv->clk = ddata->clk;
 	priv->max_arr = ddata->max_arr;
 	priv->triggers = triggers_table[index];
+	priv->valids = valids_table[index];
 
 	ret = stm32_setup_iio_triggers(priv);
 	if (ret)
