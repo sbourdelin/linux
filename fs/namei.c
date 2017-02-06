@@ -1599,7 +1599,7 @@ static int lookup_fast(struct nameidata *nd,
 		dentry = __d_lookup(parent, &nd->last);
 		if (unlikely(!dentry))
 			return 0;
-		if (unlikely(dentry->d_flags & DCACHE_OP_REVALIDATE))
+		if (dentry->d_flags & DCACHE_OP_REVALIDATE)
 			status = d_revalidate(dentry, nd->flags);
 	}
 	if (unlikely(status <= 0)) {
