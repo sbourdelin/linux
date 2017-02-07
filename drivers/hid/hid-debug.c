@@ -508,9 +508,7 @@ char *hid_resolv_usage(unsigned usage, struct seq_file *f) {
 							max(0,HID_DEBUG_BUFSIZE - len - 1),
 							"%s", p->description);
 					else
-						seq_printf(f,
-							"%s",
-							p->description);
+						seq_puts(f, p->description);
 					return buf;
 				}
 			break;
@@ -533,18 +531,21 @@ void hid_dump_field(struct hid_field *field, int n, struct seq_file *f) {
 
 	if (field->physical) {
 		tab(n, f);
-		seq_printf(f, "Physical(");
-		hid_resolv_usage(field->physical, f); seq_printf(f, ")\n");
+		seq_puts(f, "Physical(");
+		hid_resolv_usage(field->physical, f);
+		seq_puts(f, ")\n");
 	}
 	if (field->logical) {
 		tab(n, f);
-		seq_printf(f, "Logical(");
-		hid_resolv_usage(field->logical, f); seq_printf(f, ")\n");
+		seq_puts(f, "Logical(");
+		hid_resolv_usage(field->logical, f);
+		seq_puts(f, ")\n");
 	}
 	if (field->application) {
 		tab(n, f);
-		seq_printf(f, "Application(");
-		hid_resolv_usage(field->application, f); seq_printf(f, ")\n");
+		seq_puts(f, "Application(");
+		hid_resolv_usage(field->application, f);
+		seq_puts(f, ")\n");
 	}
 	tab(n, f); seq_printf(f, "Usage(%d)\n", field->maxusage);
 	for (j = 0; j < field->maxusage; j++) {
@@ -582,7 +583,8 @@ void hid_dump_field(struct hid_field *field, int n, struct seq_file *f) {
 		data >>= 4;
 
 		if(sys > 4) {
-			tab(n, f); seq_printf(f, "Unit(Invalid)\n");
+			tab(n, f);
+			seq_puts(f, "Unit(Invalid)\n");
 		}
 		else {
 			int earlier_unit = 0;
@@ -595,7 +597,7 @@ void hid_dump_field(struct hid_field *field, int n, struct seq_file *f) {
 				if (nibble != 0) {
 					if(earlier_unit++ > 0)
 						seq_putc(f, '*');
-					seq_printf(f, "%s", units[sys][i]);
+					seq_puts(f, units[sys][i]);
 					if(nibble != 1) {
 						/* This is a _signed_ nibble(!) */
 
@@ -606,7 +608,7 @@ void hid_dump_field(struct hid_field *field, int n, struct seq_file *f) {
 					}
 				}
 			}
-			seq_printf(f, ")\n");
+			seq_puts(f, ")\n");
 		}
 	}
 	tab(n, f); seq_printf(f, "Report Size(%u)\n", field->report_size);
@@ -1036,7 +1038,7 @@ static void hid_dump_input_mapping(struct hid_device *hid, struct seq_file *f)
 				for ( j = 0; j < report->field[i]->maxusage; j++) {
 					usage = report->field[i]->usage + j;
 					hid_resolv_usage(usage->hid, f);
-					seq_printf(f, " ---> ");
+					seq_puts(f, " ---> ");
 					hid_resolv_event(usage->type, usage->code, f);
 					seq_putc(f, '\n');
 				}
@@ -1061,7 +1063,7 @@ static int hid_debug_rdesc_show(struct seq_file *f, void *p)
 	/* dump HID report descriptor */
 	for (i = 0; i < rsize; i++)
 		seq_printf(f, "%02x ", rdesc[i]);
-	seq_printf(f, "\n\n");
+	seq_puts(f, "\n\n");
 
 	/* dump parsed data and input mappings */
 	hid_dump_device(hdev, f);
