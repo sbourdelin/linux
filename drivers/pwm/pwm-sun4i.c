@@ -49,7 +49,7 @@
 
 struct sun4i_pwm_chip;
 
-static const u32 prescaler_table[] = {
+static const u32 sun4i_prescaler_table[] = {
 	120,
 	180,
 	240,
@@ -81,6 +81,7 @@ struct sun4i_pwm_data {
 	bool has_rdy;
 	unsigned int npwm;
 	const struct sunxi_reg_ops *ops;
+	const u32 *prescaler_table;
 };
 
 struct sun4i_pwm_chip {
@@ -144,6 +145,7 @@ static int sun4i_pwm_config(struct pwm_chip *chip, struct pwm_device *pwm,
 {
 	struct sun4i_pwm_chip *sun4i_pwm = to_sun4i_pwm_chip(chip);
 	const struct sunxi_reg_ops *reg_ops = sun4i_pwm->data->ops;
+	const u32 *prescaler_table = sun4i_pwm->data->prescaler_table;
 	u32 prd, dty, val, clk_gate;
 	u64 clk_rate, div = 0;
 	unsigned int prescaler = 0;
@@ -317,6 +319,7 @@ static const struct sun4i_pwm_data sun4i_pwm_data_a10 = {
 	.has_rdy = false,
 	.npwm = 2,
 	.ops = &sun4i_reg_ops,
+	.prescaler_table = sun4i_prescaler_table,
 };
 
 static const struct sun4i_pwm_data sun4i_pwm_data_a10s = {
@@ -324,6 +327,7 @@ static const struct sun4i_pwm_data sun4i_pwm_data_a10s = {
 	.has_rdy = true,
 	.npwm = 2,
 	.ops = &sun4i_reg_ops,
+	.prescaler_table = sun4i_prescaler_table,
 };
 
 static const struct sun4i_pwm_data sun4i_pwm_data_a13 = {
@@ -331,6 +335,7 @@ static const struct sun4i_pwm_data sun4i_pwm_data_a13 = {
 	.has_rdy = true,
 	.npwm = 1,
 	.ops = &sun4i_reg_ops,
+	.prescaler_table = sun4i_prescaler_table,
 };
 
 static const struct sun4i_pwm_data sun4i_pwm_data_a20 = {
@@ -338,6 +343,7 @@ static const struct sun4i_pwm_data sun4i_pwm_data_a20 = {
 	.has_rdy = true,
 	.npwm = 2,
 	.ops = &sun4i_reg_ops,
+	.prescaler_table = sun4i_prescaler_table,
 };
 
 static const struct sun4i_pwm_data sun4i_pwm_data_h3 = {
@@ -345,6 +351,7 @@ static const struct sun4i_pwm_data sun4i_pwm_data_h3 = {
 	.has_rdy = true,
 	.npwm = 1,
 	.ops = &sun4i_reg_ops,
+	.prescaler_table = sun4i_prescaler_table,
 };
 
 static const struct of_device_id sun4i_pwm_dt_ids[] = {
