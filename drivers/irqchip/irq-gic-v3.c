@@ -130,11 +130,27 @@ static u64 __maybe_unused gic_read_iar(void)
 }
 #endif
 
+/**
+ * Check whether the GIC implementation supports two security
+ * states or only one security state.
+ * return true if it has two security states else return false.
+ */
+static bool gic_has_security_extn(void)
+{
+	u32 typer = readl_relaxed(gic_data.dist_base + GICD_TYPER);
+
+	return !!(typer & GICD_TYPER_SECURITY_EXTN);
+}
+
 static void gic_enable_redist(bool enable)
 {
 	void __iomem *rbase;
 	u32 count = 1000000;	/* 1s! */
 	u32 val;
+
+	/* On two security state system, GICR_WAKE is RAZ/WI to non-secure */
+	if (gic_has_security_extn())
+		return;
 
 	rbase = gic_data_rdist_rd_base();
 
@@ -399,14 +415,24 @@ static void __init gic_dist_init(void)
 
 	/*
 	 * Configure SPIs as non-secure Group-1. This will only matter
-	 * if the GIC only has a single security state. This will not
-	 * do the right thing if the kernel is running in secure mode,
-	 * but that's not the intended use case anyway.
+	 * if the GIC only has a single security state. This will do
+	 * the right thing if the kernel is running in secure mode and
+	 * with assumption all the SPIs are allocated to Linux, but
+	 * that's not the intended use case anyway.
+	 *
+	 * IGRPMODR  IGROUPR  Definition         ShortName
+	 *    0         0     Secure Group0      G0S
+	 *    0         1     Non-secure Group1  G1NS
+	 *    1         0     Secure Group1      G1S
+	 *    1         1     Reserved           treated as G1NS
 	 */
-	for (i = 32; i < gic_data.irq_nr; i += 32)
-		writel_relaxed(~0, base + GICD_IGROUPR + i / 8);
-
-	gic_dist_config(base, gic_data.irq_nr, gic_dist_wait_for_rwp);
+	if (!gic_has_security_extn()) {
+		for (i = 32; i < gic_data.irq_nr; i += 32) {
+			writel_relaxed(0, base + GICD_IGRPMODR + i / 8);
+			writel_relaxed(~0, base + GICD_IGROUPR + i / 8);
+		}
+		gic_dist_config(base, gic_data.irq_nr, gic_dist_wait_for_rwp);
+	}
 
 	/* Enable distributor with ARE, Group1 */
 	writel_relaxed(GICD_CTLR_ARE_NS | GICD_CTLR_ENABLE_G1A | GICD_CTLR_ENABLE_G1,
