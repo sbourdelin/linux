@@ -222,10 +222,10 @@ struct uvc_control_mapping {
 	__s32 master_manual;
 	__u32 slave_ids[2];
 
-	__s32 (*get) (struct uvc_control_mapping *mapping, __u8 query,
-		      const __u8 *data);
-	void (*set) (struct uvc_control_mapping *mapping, __s32 value,
-		     __u8 *data);
+	void (*get) (struct uvc_control_mapping *mapping, __u8 query,
+		     const __u8 *data, void *value, size_t size);
+	void (*set) (struct uvc_control_mapping *mapping,
+		     __u8 *data, const void *value, size_t size);
 };
 
 struct uvc_control {
