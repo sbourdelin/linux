@@ -42,6 +42,8 @@ covered by this documentation.
 .. toctree::
    :maxdepth: 1
 
+   ebpf_maps
+
 .. links:
 
 .. _article 1992: http://www.tcpdump.org/papers/bpf-usenix93.pdf
