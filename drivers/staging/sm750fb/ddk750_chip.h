@@ -10,8 +10,8 @@
 #include <linux/uaccess.h>
 
 /* software control endianness */
-#define PEEK32(addr) readl(addr + mmio750)
-#define POKE32(addr, data) writel(data, addr + mmio750)
+#define PEEK32(addr) readl((addr) + mmio750)
+#define POKE32(addr, data) writel((data), (addr) + mmio750)
 
 extern void __iomem *mmio750;
 
