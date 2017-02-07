@@ -14,11 +14,11 @@
  * GNU General Public License for more details.
  */
 
-#ifndef _CCU_SUN8I_H3_H_
-#define _CCU_SUN8I_H3_H_
+#ifndef _CCU_SUNXI_H3_H5_H_
+#define _CCU_SUNXI_H3_H5_H_
 
-#include <dt-bindings/clock/sun8i-h3-ccu.h>
-#include <dt-bindings/reset/sun8i-h3-ccu.h>
+#include <dt-bindings/clock/sunxi-h3-h5-ccu.h>
+#include <dt-bindings/reset/sunxi-h3-h5-ccu.h>
 
 #define CLK_PLL_CPUX		0
 #define CLK_PLL_AUDIO_BASE	1
@@ -59,4 +59,4 @@
 
 #define CLK_NUMBER		(CLK_GPU + 1)
 
-#endif /* _CCU_SUN8I_H3_H_ */
+#endif /* _CCU_SUNXI_H3_H5_H_ */

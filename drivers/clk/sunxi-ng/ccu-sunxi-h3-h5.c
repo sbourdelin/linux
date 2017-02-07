@@ -27,7 +27,7 @@
 #include "ccu_nm.h"
 #include "ccu_phase.h"
 
-#include "ccu-sun8i-h3.h"
+#include "ccu-sunxi-h3-h5.h"
 
 static SUNXI_CCU_NKMP_WITH_GATE_LOCK(pll_cpux_clk, "pll-cpux",
 				     "osc24M", 0x000,
@@ -47,7 +47,7 @@ static SUNXI_CCU_NKMP_WITH_GATE_LOCK(pll_cpux_clk, "pll-cpux",
  * We don't have any need for the variable divider for now, so we just
  * hardcode it to match with the clock names
  */
-#define SUN8I_H3_PLL_AUDIO_REG	0x008
+#define SUNXI_H3_H5_PLL_AUDIO_REG	0x008
 
 static SUNXI_CCU_NM_WITH_GATE_LOCK(pll_audio_base_clk, "pll-audio-base",
 				   "osc24M", 0x008,
@@ -300,7 +300,7 @@ static SUNXI_CCU_GATE(bus_uart2_clk,	"bus-uart2",	"apb2",
 		      0x06c, BIT(18), 0);
 static SUNXI_CCU_GATE(bus_uart3_clk,	"bus-uart3",	"apb2",
 		      0x06c, BIT(19), 0);
-static SUNXI_CCU_GATE(bus_scr_clk,	"bus-scr",	"apb2",
+static SUNXI_CCU_GATE(bus_scr0_clk,	"bus-scr0",	"apb2",
 		      0x06c, BIT(20), 0);
 
 static SUNXI_CCU_GATE(bus_ephy_clk,	"bus-ephy",	"ahb1",
@@ -484,7 +484,7 @@ static SUNXI_CCU_M_WITH_MUX_GATE(mbus_clk, "mbus", mbus_parents,
 static SUNXI_CCU_M_WITH_GATE(gpu_clk, "gpu", "pll-gpu",
 			     0x1a0, 0, 3, BIT(31), 0);
 
-static struct ccu_common *sun8i_h3_ccu_clks[] = {
+static struct ccu_common *sunxi_h3_h5_ccu_clks[] = {
 	&pll_cpux_clk.common,
 	&pll_audio_base_clk.common,
 	&pll_video_clk.common,
@@ -546,7 +546,7 @@ static struct ccu_common *sun8i_h3_ccu_clks[] = {
 	&bus_uart1_clk.common,
 	&bus_uart2_clk.common,
 	&bus_uart3_clk.common,
-	&bus_scr_clk.common,
+	&bus_scr0_clk.common,
 	&bus_ephy_clk.common,
 	&bus_dbg_clk.common,
 	&ths_clk.common,
@@ -677,7 +677,7 @@ static struct clk_hw_onecell_data sun8i_h3_hw_clks = {
 		[CLK_BUS_UART1]		= &bus_uart1_clk.common.hw,
 		[CLK_BUS_UART2]		= &bus_uart2_clk.common.hw,
 		[CLK_BUS_UART3]		= &bus_uart3_clk.common.hw,
-		[CLK_BUS_SCR]		= &bus_scr_clk.common.hw,
+		[CLK_BUS_SCR0]		= &bus_scr0_clk.common.hw,
 		[CLK_BUS_EPHY]		= &bus_ephy_clk.common.hw,
 		[CLK_BUS_DBG]		= &bus_dbg_clk.common.hw,
 		[CLK_THS]		= &ths_clk.common.hw,
@@ -730,7 +730,7 @@ static struct clk_hw_onecell_data sun8i_h3_hw_clks = {
 	.num	= CLK_NUMBER,
 };
 
-static struct ccu_reset_map sun8i_h3_ccu_resets[] = {
+static struct ccu_reset_map sunxi_h3_h5_ccu_resets[] = {
 	[RST_USB_PHY0]		=  { 0x0cc, BIT(0) },
 	[RST_USB_PHY1]		=  { 0x0cc, BIT(1) },
 	[RST_USB_PHY2]		=  { 0x0cc, BIT(2) },
@@ -790,27 +790,28 @@ static struct ccu_reset_map sun8i_h3_ccu_resets[] = {
 	[RST_BUS_UART1]		=  { 0x2d8, BIT(17) },
 	[RST_BUS_UART2]		=  { 0x2d8, BIT(18) },
 	[RST_BUS_UART3]		=  { 0x2d8, BIT(19) },
-	[RST_BUS_SCR]		=  { 0x2d8, BIT(20) },
+	[RST_BUS_SCR0]		=  { 0x2d8, BIT(20) },
 };
 
 static const struct sunxi_ccu_desc sun8i_h3_ccu_desc = {
-	.ccu_clks	= sun8i_h3_ccu_clks,
-	.num_ccu_clks	= ARRAY_SIZE(sun8i_h3_ccu_clks),
+	.ccu_clks	= sunxi_h3_h5_ccu_clks,
+	.num_ccu_clks	= ARRAY_SIZE(sunxi_h3_h5_ccu_clks),
 
 	.hw_clks	= &sun8i_h3_hw_clks,
 
-	.resets		= sun8i_h3_ccu_resets,
-	.num_resets	= ARRAY_SIZE(sun8i_h3_ccu_resets),
+	.resets		= sunxi_h3_h5_ccu_resets,
+	.num_resets	= ARRAY_SIZE(sunxi_h3_h5_ccu_resets),
 };
 
-static struct ccu_mux_nb sun8i_h3_cpu_nb = {
+static struct ccu_mux_nb sunxi_h3_h5_cpu_nb = {
 	.common		= &cpux_clk.common,
 	.cm		= &cpux_clk.mux,
 	.delay_us	= 1, /* > 8 clock cycles at 24 MHz */
 	.bypass_index	= 1, /* index of 24 MHz oscillator */
 };
 
-static void __init sun8i_h3_ccu_setup(struct device_node *node)
+static void __init sunxi_h3_h5_ccu_init(struct device_node *node,
+					const struct sunxi_ccu_desc *desc)
 {
 	void __iomem *reg;
 	u32 val;
@@ -823,14 +824,19 @@ static void __init sun8i_h3_ccu_setup(struct device_node *node)
 	}
 
 	/* Force the PLL-Audio-1x divider to 4 */
-	val = readl(reg + SUN8I_H3_PLL_AUDIO_REG);
+	val = readl(reg + SUNXI_H3_H5_PLL_AUDIO_REG);
 	val &= ~GENMASK(19, 16);
-	writel(val | (3 << 16), reg + SUN8I_H3_PLL_AUDIO_REG);
+	writel(val | (3 << 16), reg + SUNXI_H3_H5_PLL_AUDIO_REG);
 
-	sunxi_ccu_probe(node, reg, &sun8i_h3_ccu_desc);
+	sunxi_ccu_probe(node, reg, desc);
 
 	ccu_mux_notifier_register(pll_cpux_clk.common.hw.clk,
-				  &sun8i_h3_cpu_nb);
+				  &sunxi_h3_h5_cpu_nb);
+}
+
+static void __init sun8i_h3_ccu_setup(struct device_node *node)
+{
+	sunxi_h3_h5_ccu_init(node, &sun8i_h3_ccu_desc);
 }
 CLK_OF_DECLARE(sun8i_h3_ccu, "allwinner,sun8i-h3-ccu",
 	       sun8i_h3_ccu_setup);

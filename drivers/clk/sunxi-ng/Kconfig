@@ -108,8 +108,8 @@ config SUN8I_A33_CCU
 	select SUNXI_CCU_PHASE
 	default MACH_SUN8I
 
-config SUN8I_H3_CCU
-	bool "Support for the Allwinner H3 CCU"
+config SUNXI_H3_H5_CCU
+	bool "Support for the Allwinner H3/H5 CCU"
 	select SUNXI_CCU_DIV
 	select SUNXI_CCU_NK
 	select SUNXI_CCU_NKM
