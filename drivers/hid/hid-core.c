@@ -959,7 +959,7 @@ int hid_open_report(struct hid_device *device)
 	size = device->dev_rsize;
 
 	buf = kmemdup(start, size, GFP_KERNEL);
-	if (buf == NULL)
+	if (!buf)
 		return -ENOMEM;
 
 	if (device->driver->report_fixup)
@@ -969,7 +969,7 @@ int hid_open_report(struct hid_device *device)
 
 	start = kmemdup(start, size, GFP_KERNEL);
 	kfree(buf);
-	if (start == NULL)
+	if (!start)
 		return -ENOMEM;
 
 	device->rdesc = start;
@@ -1414,7 +1414,7 @@ static struct hid_report *hid_get_report(struct hid_report_enum *report_enum,
 		n = *data;
 
 	report = report_enum->report_id_hash[n];
-	if (report == NULL)
+	if (!report)
 		dbg_hid("undefined report_id %u received\n", n);
 
 	return report;
@@ -2222,7 +2222,7 @@ static int hid_device_probe(struct device *dev)
 
 	if (!hdev->driver) {
 		id = hid_match_device(hdev, hdrv);
-		if (id == NULL) {
+		if (!id) {
 			ret = -ENODEV;
 			goto unlock;
 		}
@@ -2719,7 +2719,7 @@ struct hid_device *hid_allocate_device(void)
 	int ret = -ENOMEM;
 
 	hdev = kzalloc(sizeof(*hdev), GFP_KERNEL);
-	if (hdev == NULL)
+	if (!hdev)
 		return ERR_PTR(ret);
 
 	device_initialize(&hdev->dev);
