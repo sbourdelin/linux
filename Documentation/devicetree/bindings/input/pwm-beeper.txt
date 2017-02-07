@@ -5,3 +5,6 @@ Registers a PWM device as beeper.
 Required properties:
 - compatible: should be "pwm-beeper"
 - pwms: phandle to the physical PWM device
+
+optional properties:
+- bell-frequency:  bell frequency in Hz

@@ -27,6 +27,7 @@ struct pwm_beeper {
 	struct pwm_device *pwm;
 	struct work_struct work;
 	unsigned long period;
+	unsigned int bell_frequency;
 };
 
 #define HZ_TO_NANOSECONDS(x) (1000000000UL/(x))
@@ -58,20 +59,17 @@ static int pwm_beeper_event(struct input_dev *input,
 	if (type != EV_SND || value < 0)
 		return -EINVAL;
 
-	switch (code) {
-	case SND_BELL:
-		value = value ? 1000 : 0;
-		break;
-	case SND_TONE:
-		break;
-	default:
+	if (code != SND_BELL && code != SND_TONE)
 		return -EINVAL;
-	}
 
 	if (value == 0)
 		beeper->period = 0;
-	else
+	else {
+		if (code == SND_BELL)
+			value = beeper->bell_frequency;
+
 		beeper->period = HZ_TO_NANOSECONDS(value);
+	}
 
 	schedule_work(&beeper->work);
 
@@ -91,6 +89,25 @@ static void pwm_beeper_close(struct input_dev *input)
 	struct pwm_beeper *beeper = input_get_drvdata(input);
 
 	pwm_beeper_stop(beeper);
+}
+
+static void pwm_beeper_init_bell_frequency(struct device *dev,
+					   struct pwm_beeper *beeper)
+{
+	struct device_node *node;
+	unsigned int bell_frequency = 1000;
+	int error;
+
+	if (IS_ENABLED(CONFIG_OF)) {
+		node = dev->of_node;
+		error = of_property_read_u32(node, "bell-frequency",
+					     &bell_frequency);
+		if (error < 0)
+			dev_dbg(dev, "Failed to read bell-frequency, using default: %u Hz\n",
+				bell_frequency);
+	}
+
+	beeper->bell_frequency = bell_frequency;
 }
 
 static int pwm_beeper_probe(struct platform_device *pdev)
@@ -122,6 +139,7 @@ static int pwm_beeper_probe(struct platform_device *pdev)
 	pwm_apply_args(beeper->pwm);
 
 	INIT_WORK(&beeper->work, pwm_beeper_work);
+	pwm_beeper_init_bell_frequency(&pdev->dev, beeper);
 
 	beeper->input = input_allocate_device();
 	if (!beeper->input) {
