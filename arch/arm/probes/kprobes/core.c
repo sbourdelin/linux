@@ -426,6 +426,8 @@ void __naked __kprobes kretprobe_trampoline(void)
 		: : : "memory");
 }
 
+static struct kprobe dummy_retprobe = {.addr = (void *)&kretprobe_trampoline};
+
 /* Called from kretprobe_trampoline */
 static __used __kprobes void *trampoline_handler(struct pt_regs *regs)
 {
@@ -436,6 +438,11 @@ static __used __kprobes void *trampoline_handler(struct pt_regs *regs)
 	unsigned long trampoline_address = (unsigned long)&kretprobe_trampoline;
 
 	INIT_HLIST_HEAD(&empty_rp);
+
+	/* This prevents kernel to change running cpu while processing */
+	preempt_disable();
+	get_kprobe_ctlblk()->kprobe_status = KPROBE_HIT_ACTIVE;
+	__this_cpu_write(current_kprobe, &dummy_retprobe);
 	kretprobe_hash_lock(current, &head, &flags);
 
 	/*
@@ -458,9 +465,8 @@ static __used __kprobes void *trampoline_handler(struct pt_regs *regs)
 
 		if (ri->rp && ri->rp->handler) {
 			__this_cpu_write(current_kprobe, &ri->rp->kp);
-			get_kprobe_ctlblk()->kprobe_status = KPROBE_HIT_ACTIVE;
 			ri->rp->handler(ri, regs);
-			__this_cpu_write(current_kprobe, NULL);
+			__this_cpu_write(current_kprobe, &dummy_retprobe);
 		}
 
 		orig_ret_address = (unsigned long)ri->ret_addr;
@@ -477,6 +483,8 @@ static __used __kprobes void *trampoline_handler(struct pt_regs *regs)
 
 	kretprobe_assert(ri, orig_ret_address, trampoline_address);
 	kretprobe_hash_unlock(current, &flags);
+	__this_cpu_write(current_kprobe, NULL);
+	preempt_enable_no_resched();
 
 	hlist_for_each_entry_safe(ri, tmp, &empty_rp, hlist) {
 		hlist_del(&ri->hlist);
