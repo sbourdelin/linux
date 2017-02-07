@@ -4,7 +4,8 @@ eBPF maps
 
 This document describes what eBPF maps are, how you create them
 (`Creating a map`_), and how to interact with them (`Interacting with
-maps`_).
+maps`_).  The different map types available are described here:
+:doc:`ebpf_maps_types`.
 
 Using eBPF maps is a method to keep state between invocations of the
 eBPF program, and allows sharing data between eBPF kernel programs,
