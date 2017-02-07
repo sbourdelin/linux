@@ -6531,9 +6531,9 @@ static int valleyview_calc_cdclk(struct drm_i915_private *dev_priv,
 
 static int glk_calc_cdclk(int max_pixclk)
 {
-	if (max_pixclk > 2 * 158400)
+	if (max_pixclk > DIV_ROUND_UP(2 * 158400 * 99, 100))
 		return 316800;
-	else if (max_pixclk > 2 * 79200)
+	else if (max_pixclk > DIV_ROUND_UP(2 * 79200 * 99, 100))
 		return 158400;
 	else
 		return 79200;
