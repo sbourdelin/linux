@@ -22,6 +22,7 @@
 #include <net/rtnetlink.h>
 #include <net/addrconf.h>
 #include <net/ipv6.h>
+#include <net/xfrm.h>
 #include <brcmu_utils.h>
 #include <brcmu_wifi.h>
 
@@ -242,6 +243,13 @@ static netdev_tx_t brcmf_netdev_start_xmit(struct sk_buff *skb,
 	/* determine the priority */
 	if ((skb->priority == 0) || (skb->priority > 7))
 		skb->priority = cfg80211_classify8021d(skb, NULL);
+
+	/* we can keep the skb for a long time; avoid starving other
+	 * subsystems
+	 */
+	nf_reset(skb);
+	skb_dst_drop(skb);
+	secpath_reset(skb);
 
 	ret = brcmf_proto_tx_queue_data(drvr, ifp->ifidx, skb);
 	if (ret < 0)
