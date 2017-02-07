@@ -92,6 +92,13 @@ static struct notifier_block nfit_mce_dec = {
 	.notifier_call	= nfit_handle_mce,
 };
 
+bool is_ars_required(void)
+{
+        if (static_branch_unlikely(&mcsafe_key))
+                return false;
+	return true;
+}
+
 void nfit_mce_register(void)
 {
 	mce_register_decode_chain(&nfit_mce_dec);

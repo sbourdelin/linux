@@ -2500,10 +2500,12 @@ static void acpi_nfit_scrub(struct work_struct *work)
 	list_for_each_entry(nfit_spa, &acpi_desc->spas, list) {
 		/*
 		 * Flag all the ranges that still need scrubbing, but
-		 * register them now to make data available.
+		 * register them now to make data available. If the
+		 * platform supports machine-check recovery then we skip
+		 * these opportunistic scans.
 		 */
 		if (!nfit_spa->nd_region) {
-			nfit_spa->ars_required = 1;
+			nfit_spa->ars_required = is_ars_required();
 			acpi_nfit_register_region(acpi_desc, nfit_spa);
 		}
 	}

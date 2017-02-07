@@ -211,12 +211,17 @@ int acpi_nfit_ars_rescan(struct acpi_nfit_desc *acpi_desc);
 #ifdef CONFIG_X86_MCE
 void nfit_mce_register(void);
 void nfit_mce_unregister(void);
+bool is_ars_required(void);
 #else
 static inline void nfit_mce_register(void)
 {
 }
 static inline void nfit_mce_unregister(void)
 {
+}
+static inline bool is_ars_required(void)
+{
+	return true;
 }
 #endif
 
