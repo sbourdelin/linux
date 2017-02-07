@@ -456,22 +456,31 @@ void migrate_irqs(void)
 	for_each_irq_desc(irq, desc) {
 		struct irq_data *data;
 		struct irq_chip *chip;
+		const struct cpumask *affinity;
+
+		/* Interrupts are already disabled */
+		raw_spin_lock(&desc->lock);
 
 		data = irq_desc_get_irq_data(desc);
-		if (irqd_is_per_cpu(data))
-			continue;
-
+		affinity = irq_data_get_affinity_mask(data);
 		chip = irq_data_get_irq_chip(data);
+		if (!irq_has_action(irq) || irqd_is_per_cpu(data) ||
+		    cpumask_subset(affinity, cpu_online_mask) ||
+		    !chip) {
+			raw_spin_unlock(&desc->lock);
+			continue;
+		}
 
-		cpumask_and(mask, irq_data_get_affinity_mask(data), map);
-		if (cpumask_any(mask) >= nr_cpu_ids) {
+		cpumask_and(mask, affinity, map);
+		if (cpumask_empty(mask)) {
 			pr_warn("Breaking affinity for irq %i\n", irq);
 			cpumask_copy(mask, map);
 		}
 		if (chip->irq_set_affinity)
 			chip->irq_set_affinity(data, mask, true);
 		else if (desc->action && !(warned++))
-			pr_err("Cannot set affinity for irq %i\n", irq);
+			pr_debug("Cannot set affinity for irq %i\n", irq);
+		raw_spin_unlock(&desc->lock);
 	}
 
 	free_cpumask_var(mask);
