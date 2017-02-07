@@ -1735,7 +1735,7 @@ static int __qedi_probe(struct pci_dev *pdev, int mode)
 	u32 dp_module = 0;
 	u8 dp_level = 0;
 	bool is_vf = false;
-	char host_buf[16];
+	char host_buf[20];
 	struct qed_link_params link_params;
 	struct qed_slowpath_params sp_params;
 	struct qed_probe_params qed_params;
