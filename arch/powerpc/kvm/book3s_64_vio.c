@@ -173,8 +173,10 @@ long kvm_vm_ioctl_create_spapr_tce(struct kvm *kvm,
 
 	stt = kzalloc(sizeof(*stt) + npages * sizeof(struct page *),
 		      GFP_KERNEL);
-	if (!stt)
+	if (!stt) {
+		ret = -ENOMEM;
 		goto fail;
+	}
 
 	stt->liobn = args->liobn;
 	stt->page_shift = args->page_shift;
@@ -184,8 +186,10 @@ long kvm_vm_ioctl_create_spapr_tce(struct kvm *kvm,
 
 	for (i = 0; i < npages; i++) {
 		stt->pages[i] = alloc_page(GFP_KERNEL | __GFP_ZERO);
-		if (!stt->pages[i])
+		if (!stt->pages[i]) {
+			ret = -ENOMEM;
 			goto fail;
+		}
 	}
 
 	kvm_get_kvm(kvm);
