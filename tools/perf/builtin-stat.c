@@ -146,6 +146,8 @@ static aggr_get_id_t		aggr_get_id;
 static bool			append_file;
 static const char		*output_name;
 static int			output_fd;
+static bool			keep_hwdt;
+static int			prev_hwdt;	/* previous HW watchdog state */
 
 struct perf_stat {
 	bool			 record;
@@ -1539,6 +1541,39 @@ static void print_counters(struct timespec *ts, int argc, const char **argv)
 	fflush(stat_config.output);
 }
 
+static void perf_stat_toggle_hwdt(int on)
+{
+	static const char *p = "sys/kernel/nmi_watchdog";
+	int val;
+
+	if (keep_hwdt)
+		return;
+
+	if (geteuid())
+		return;
+
+	if (procfs__read_int(p, &val) < 0)
+		return;
+
+	/* Reenable only when it was enabled before. */
+	if (on) {
+		if (prev_hwdt)
+			goto write;
+	/* Disable HWDT only when it is enabled. */
+	} else {
+		prev_hwdt = val;
+
+		if (val)
+			goto write;
+	}
+
+	return;
+
+write:
+	if (procfs__write_int(p, on) < 0)
+		return;
+}
+
 static volatile int signr = -1;
 
 static void skip_signal(int signo)
@@ -1574,6 +1609,8 @@ static void sig_atexit(void)
 		kill(child_pid, SIGTERM);
 
 	sigprocmask(SIG_SETMASK, &oset, NULL);
+
+	perf_stat_toggle_hwdt(1);
 
 	if (signr == -1)
 		return;
@@ -1659,6 +1696,8 @@ static const struct option stat_options[] = {
 			"Only print computed metrics. No raw values", enable_metric_only),
 	OPT_BOOLEAN(0, "topdown", &topdown_run,
 			"measure topdown level 1 statistics"),
+	OPT_BOOLEAN(0, "dont-disable-hwdt", &keep_hwdt,
+			"Do not disable HW NMI watchdog during the current session"),
 	OPT_END()
 };
 
@@ -2522,6 +2561,8 @@ int cmd_stat(int argc, const char **argv, const char *prefix __maybe_unused)
 
 	if (perf_stat_init_aggr_mode())
 		goto out;
+
+	perf_stat_toggle_hwdt(0);
 
 	/*
 	 * We dont want to block the signals - that would cause
