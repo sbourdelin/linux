@@ -627,6 +627,14 @@
 			status = "disabled";
 		};
 
+		pwm: pwm@01c21400 {
+			compatible = "allwinner,sun6i-a31-pwm";
+			reg = <0x01c21400 0x400>;
+			clocks = <&osc24M>;
+			#pwm-cells = <3>;
+			status = "disabled";
+		};
+
 		lradc: lradc@01c22800 {
 			compatible = "allwinner,sun4i-a10-lradc-keys";
 			reg = <0x01c22800 0x100>;
