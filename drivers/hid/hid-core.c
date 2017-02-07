@@ -67,7 +67,7 @@ struct hid_report *hid_register_report(struct hid_device *device, unsigned type,
 	if (report_enum->report_id_hash[id])
 		return report_enum->report_id_hash[id];
 
-	report = kzalloc(sizeof(struct hid_report), GFP_KERNEL);
+	report = kzalloc(sizeof(*report), GFP_KERNEL);
 	if (!report)
 		return NULL;
 
