@@ -23,6 +23,7 @@ trying to get it to work optimally on a given system.
    :maxdepth: 2
 
    admin-guide/index
+   bpf/index
 
 Introduction to kernel development
 ----------------------------------
