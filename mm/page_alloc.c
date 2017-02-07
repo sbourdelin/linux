@@ -92,10 +92,6 @@ EXPORT_PER_CPU_SYMBOL(_numa_mem_);
 int _node_numa_mem_[MAX_NUMNODES];
 #endif
 
-/* work_structs for global per-cpu drains */
-DEFINE_MUTEX(pcpu_drain_mutex);
-DEFINE_PER_CPU(struct work_struct, pcpu_drain);
-
 #ifdef CONFIG_GCC_PLUGIN_LATENT_ENTROPY
 volatile unsigned long latent_entropy __latent_entropy;
 EXPORT_SYMBOL(latent_entropy);
@@ -2355,6 +2351,8 @@ static void drain_local_pages_wq(struct work_struct *work)
  */
 void drain_all_pages(struct zone *zone)
 {
+	static DEFINE_PER_CPU(struct work_struct, pcpu_drain);
+	static DEFINE_MUTEX(pcpu_drain_mutex);
 	int cpu;
 
 	/*
