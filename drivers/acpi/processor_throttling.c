@@ -64,6 +64,7 @@ struct acpi_processor_throttling_arg {
 static int acpi_processor_get_throttling(struct acpi_processor *pr);
 int acpi_processor_set_throttling(struct acpi_processor *pr,
 						int state, bool force);
+static void throttling_msr_reevaluate(int cpu);
 
 static int acpi_processor_update_tsd_coord(void)
 {
@@ -386,6 +387,15 @@ void acpi_processor_reevaluate_tstate(struct acpi_processor *pr,
 		pr->flags.throttling = 0;
 		return;
 	}
+	/*
+	 * It was found after resumed from suspend to ram, some BIOSes would
+	 * adjust the MSR tstate, however on these platforms no _PSS is provided
+	 * thus we never have a chance to adjust the MSR T-state anymore.
+	 * Thus force clearing it if MSR T-state is enabled, because generally
+	 * we never expect to come back from resume with throttling enabled.
+	 * Later let other components to adjust T-state if necessary.
+	 */
+	throttling_msr_reevaluate(pr->id);
 	/* the following is to recheck whether the T-state is valid for
 	 * the online CPU
 	 */
@@ -758,6 +768,23 @@ static int acpi_throttling_wrmsr(u64 value)
 	}
 	return ret;
 }
+
+static long msr_reevaluate_fn(void *data)
+{
+	u64 msr = 0;
+
+	acpi_throttling_rdmsr(&msr);
+	if (msr) {
+		printk_once(KERN_ERR "PM: The BIOS might have modified the MSR T-state, clear it for now.\n");
+		acpi_throttling_wrmsr(0);
+	}
+	return 0;
+}
+
+static void throttling_msr_reevaluate(int cpu)
+{
+	work_on_cpu(cpu, msr_reevaluate_fn, NULL);
+}
 #else
 static int acpi_throttling_rdmsr(u64 *value)
 {
@@ -772,6 +799,12 @@ static int acpi_throttling_wrmsr(u64 value)
 		"HARDWARE addr space,NOT supported yet\n");
 	return -1;
 }
+
+static void throttling_msr_reevaluate(int cpu)
+{
+	return -1;
+}
+
 #endif
 
 static int acpi_read_throttling_status(struct acpi_processor *pr,
