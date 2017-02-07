@@ -787,7 +787,7 @@ static int hid_scan_report(struct hid_device *hid)
 		hid_parser_reserved
 	};
 
-	parser = vzalloc(sizeof(struct hid_parser));
+	parser = vzalloc(sizeof(*parser));
 	if (!parser)
 		return -ENOMEM;
 
