@@ -723,13 +723,11 @@ static int sun4i_i2s_probe(struct platform_device *pdev)
 		}
 	}
 
-	if (!IS_ERR(i2s->rst)) {
-		ret = reset_control_deassert(i2s->rst);
-		if (ret) {
-			dev_err(&pdev->dev,
-				"Failed to deassert the reset control\n");
-			return -EINVAL;
-		}
+	ret = reset_control_deassert(i2s->rst);
+	if (ret) {
+		dev_err(&pdev->dev,
+			"Failed to deassert the reset control\n");
+		return -EINVAL;
 	}
 
 	i2s->playback_dma_data.addr = res->start + SUN4I_I2S_FIFO_TX_REG;
@@ -766,8 +764,7 @@ err_suspend:
 		sun4i_i2s_runtime_suspend(&pdev->dev);
 err_pm_disable:
 	pm_runtime_disable(&pdev->dev);
-	if (!IS_ERR(i2s->rst))
-		reset_control_assert(i2s->rst);
+	reset_control_assert(i2s->rst);
 
 	return ret;
 }
@@ -782,8 +779,7 @@ static int sun4i_i2s_remove(struct platform_device *pdev)
 	if (!pm_runtime_status_suspended(&pdev->dev))
 		sun4i_i2s_runtime_suspend(&pdev->dev);
 
-	if (!IS_ERR(i2s->rst))
-		reset_control_assert(i2s->rst);
+	reset_control_assert(i2s->rst);
 
 	return 0;
 }
