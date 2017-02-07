@@ -359,11 +359,6 @@ nfsd_setattr(struct svc_rqst *rqstp, struct svc_fh *fhp, struct iattr *iap,
 	err = fh_verify(rqstp, fhp, ftype, accmode);
 	if (err)
 		return err;
-	if (get_write_count) {
-		host_err = fh_want_write(fhp);
-		if (host_err)
-			goto out_host_err;
-	}
 
 	dentry = fhp->fh_dentry;
 	inode = d_inode(dentry);
@@ -415,6 +410,12 @@ nfsd_setattr(struct svc_rqst *rqstp, struct svc_fh *fhp, struct iattr *iap,
 	}
 
 	iap->ia_valid |= ATTR_CTIME;
+
+	if (get_write_count) {
+		host_err = fh_want_write(fhp);
+		if (host_err)
+			goto out_host_err;
+	}
 
 	fh_lock(fhp);
 	host_err = notify_change(dentry, iap, NULL);
