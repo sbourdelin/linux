@@ -237,6 +237,14 @@ static int create_perf_stat_counter(struct perf_evsel *evsel)
 	return perf_evsel__open_per_thread(evsel, evsel_list->threads);
 }
 
+static void close_perf_stat_counter(struct perf_evsel *evsel)
+{
+	if (target__has_cpu(&target))
+		perf_evsel__close_per_cpu(evsel, perf_evsel__cpus(evsel));
+
+	perf_evsel__close_per_thread(evsel, evsel_list->threads);
+}
+
 /*
  * Does the counter have nsecs as a unit?
  */
@@ -686,7 +694,9 @@ try_again:
 	 * group leaders.
 	 */
 	read_counters();
-	perf_evlist__close(evsel_list);
+
+	evlist__for_each_entry(evsel_list, counter)
+		close_perf_stat_counter(counter);
 
 	return WEXITSTATUS(status);
 }

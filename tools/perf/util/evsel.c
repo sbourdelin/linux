@@ -1655,6 +1655,18 @@ void perf_evsel__close(struct perf_evsel *evsel, int ncpus, int nthreads)
 	perf_evsel__free_fd(evsel);
 }
 
+void perf_evsel__close_per_cpu(struct perf_evsel *evsel,
+			       struct cpu_map *cpus)
+{
+	perf_evsel__close(evsel, cpus->nr, 1);
+}
+
+void perf_evsel__close_per_thread(struct perf_evsel *evsel,
+			       struct thread_map *threads)
+{
+	perf_evsel__close(evsel, 1, threads->nr);
+}
+
 static struct {
 	struct cpu_map map;
 	int cpus[1];
