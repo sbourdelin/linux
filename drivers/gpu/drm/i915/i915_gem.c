@@ -2752,7 +2752,7 @@ static void i915_gem_reset_engine(struct intel_engine_cs *engine)
 		engine_skip_context(request);
 }
 
-void i915_gem_reset_finish(struct drm_i915_private *dev_priv)
+void i915_gem_reset(struct drm_i915_private *dev_priv)
 {
 	struct intel_engine_cs *engine;
 	enum intel_engine_id id;
@@ -2764,14 +2764,19 @@ void i915_gem_reset_finish(struct drm_i915_private *dev_priv)
 	for_each_engine(engine, dev_priv, id)
 		i915_gem_reset_engine(engine);
 
-	i915_gem_restore_fences(dev_priv);
-
 	if (dev_priv->gt.awake) {
 		intel_sanitize_gt_powersave(dev_priv);
 		intel_enable_gt_powersave(dev_priv);
 		if (INTEL_GEN(dev_priv) >= 6)
 			gen6_rps_busy(dev_priv);
 	}
+}
+
+void i915_gem_reset_finish(struct drm_i915_private *dev_priv)
+{
+	lockdep_assert_held(&dev_priv->drm.struct_mutex);
+
+	i915_gem_restore_fences(dev_priv);
 }
 
 static void nop_submit_request(struct drm_i915_gem_request *request)

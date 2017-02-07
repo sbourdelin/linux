@@ -1787,7 +1787,7 @@ void i915_reset(struct drm_i915_private *dev_priv)
 		goto error;
 	}
 
-	i915_gem_reset_finish(dev_priv);
+	i915_gem_reset(dev_priv);
 	intel_overlay_reset(dev_priv);
 
 	/* Ok, now get things going again... */
@@ -1810,6 +1810,7 @@ void i915_reset(struct drm_i915_private *dev_priv)
 		goto error;
 	}
 
+	i915_gem_reset_finish(dev_priv);
 	i915_queue_hangcheck(dev_priv);
 
 wakeup:
