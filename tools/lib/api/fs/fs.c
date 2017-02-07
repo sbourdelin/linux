@@ -298,6 +298,22 @@ int filename__read_int(const char *filename, int *value)
 	return err;
 }
 
+int filename__write_int(const char *filename, int value)
+{
+	char line[64];
+	int fd = open(filename, O_WRONLY), err = -1;
+
+	if (fd < 0)
+		return -1;
+
+	snprintf(line, sizeof(int), "%d", value);
+
+	err = write(fd, line, strnlen(line, 64));
+
+	close(fd);
+	return err;
+}
+
 /*
  * Parses @value out of @filename with strtoull.
  * By using 0 for base, the strtoull detects the
@@ -382,6 +398,32 @@ int procfs__read_str(const char *entry, char **buf, size_t *sizep)
 	snprintf(path, sizeof(path), "%s/%s", procfs, entry);
 
 	return filename__read_str(path, buf, sizep);
+}
+
+int procfs__read_int(const char *entry, int *value)
+{
+	char path[PATH_MAX];
+	const char *procfs = procfs__mountpoint();
+
+	if (!procfs)
+		return -1;
+
+	snprintf(path, sizeof(path), "%s/%s", procfs, entry);
+
+	return filename__read_int(path, value);
+}
+
+int procfs__write_int(const char *entry, int value)
+{
+	char path[PATH_MAX];
+	const char *procfs = procfs__mountpoint();
+
+	if (!procfs)
+		return -1;
+
+	snprintf(path, sizeof(path), "%s/%s", procfs, entry);
+
+	return filename__write_int(path, value);
 }
 
 int sysfs__read_ull(const char *entry, unsigned long long *value)
