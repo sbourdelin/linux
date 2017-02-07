@@ -1083,12 +1083,15 @@ static int hid_debug_events_open(struct inode *inode, struct file *file)
 	struct hid_debug_list *list;
 	unsigned long flags;
 
-	if (!(list = kzalloc(sizeof(struct hid_debug_list), GFP_KERNEL))) {
+	list = kzalloc(sizeof(*list), GFP_KERNEL);
+	if (!list) {
 		err = -ENOMEM;
 		goto out;
 	}
 
-	if (!(list->hid_debug_buf = kzalloc(sizeof(char) * HID_DEBUG_BUFSIZE, GFP_KERNEL))) {
+	list->hid_debug_buf = kzalloc(sizeof(char) * HID_DEBUG_BUFSIZE,
+				      GFP_KERNEL);
+	if (!list->hid_debug_buf) {
 		err = -ENOMEM;
 		kfree(list);
 		goto out;
