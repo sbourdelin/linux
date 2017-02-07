@@ -1,9 +1,26 @@
 
 #include <linux/sched.h>
+#include <linux/sched/autogroup.h>
 #include <linux/sched/sysctl.h>
+#include <linux/sched/topology.h>
 #include <linux/sched/rt.h>
-#include <linux/u64_stats_sync.h>
 #include <linux/sched/deadline.h>
+#include <linux/sched/clock.h>
+#include <linux/sched/wake_q.h>
+#include <linux/sched/signal.h>
+#include <linux/sched/numa_balancing.h>
+#include <linux/sched/mm.h>
+#include <linux/sched/cpufreq.h>
+#include <linux/sched/stat.h>
+#include <linux/sched/nohz.h>
+#include <linux/sched/debug.h>
+#include <linux/sched/hotplug.h>
+#include <linux/sched/task.h>
+#include <linux/sched/task_stack.h>
+#include <linux/sched/cputime.h>
+#include <linux/sched/init.h>
+
+#include <linux/u64_stats_sync.h>
 #include <linux/kernel_stat.h>
 #include <linux/binfmts.h>
 #include <linux/mutex.h>
@@ -12,6 +29,10 @@
 #include <linux/irq_work.h>
 #include <linux/tick.h>
 #include <linux/slab.h>
+
+#ifdef CONFIG_PARAVIRT
+#include <asm/paravirt.h>
+#endif
 
 #include "cpupri.h"
 #include "cpudeadline.h"
@@ -223,7 +244,7 @@ bool __dl_overflow(struct dl_bw *dl_b, int cpus, u64 old_bw, u64 new_bw)
 	       dl_b->bw * cpus < dl_b->total_bw - old_bw + new_bw;
 }
 
-extern struct mutex sched_domains_mutex;
+extern void init_dl_bw(struct dl_bw *dl_b);
 
 #ifdef CONFIG_CGROUP_SCHED
 
@@ -584,6 +605,13 @@ struct root_domain {
 };
 
 extern struct root_domain def_root_domain;
+extern struct mutex sched_domains_mutex;
+extern cpumask_var_t fallback_doms;
+extern cpumask_var_t sched_domains_tmpmask;
+
+extern void init_defrootdomain(void);
+extern int init_sched_domains(const struct cpumask *cpu_map);
+extern void rq_attach_root(struct rq *rq, struct root_domain *rd);
 
 #endif /* CONFIG_SMP */
 
@@ -886,6 +914,16 @@ extern int sched_max_numa_distance;
 extern bool find_numa_distance(int distance);
 #endif
 
+#ifdef CONFIG_NUMA
+extern void sched_init_numa(void);
+extern void sched_domains_numa_masks_set(unsigned int cpu);
+extern void sched_domains_numa_masks_clear(unsigned int cpu);
+#else
+static inline void sched_init_numa(void) { }
+static inline void sched_domains_numa_masks_set(unsigned int cpu) { }
+static inline void sched_domains_numa_masks_clear(unsigned int cpu) { }
+#endif
+
 #ifdef CONFIG_NUMA_BALANCING
 /* The regions in numa_faults array from task_struct */
 enum numa_faults_stats {
@@ -1052,7 +1090,7 @@ static inline void sched_ttwu_pending(void) { }
 #endif /* CONFIG_SMP */
 
 #include "stats.h"
-#include "auto_group.h"
+#include "autogroup.h"
 
 #ifdef CONFIG_CGROUP_SCHED
 
@@ -1752,6 +1790,10 @@ static inline void double_rq_unlock(struct rq *rq1, struct rq *rq2)
 		__release(rq2->lock);
 }
 
+extern void set_rq_online (struct rq *rq);
+extern void set_rq_offline(struct rq *rq);
+extern bool sched_smp_initialized;
+
 #else /* CONFIG_SMP */
 
 /*
@@ -1796,7 +1838,6 @@ extern void print_rt_stats(struct seq_file *m, int cpu);
 extern void print_dl_stats(struct seq_file *m, int cpu);
 extern void
 print_cfs_rq(struct seq_file *m, int cpu, struct cfs_rq *cfs_rq);
-
 #ifdef CONFIG_NUMA_BALANCING
 extern void
 show_numa_stats(struct task_struct *p, struct seq_file *m);
