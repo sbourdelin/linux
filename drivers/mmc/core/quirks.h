@@ -53,7 +53,8 @@ static const struct mmc_fixup mmc_fixup_methods[] = {
 	END_FIXUP
 };
 
-void mmc_fixup_device(struct mmc_card *card, const struct mmc_fixup *table)
+static void mmc_fixup_device(struct mmc_card *card,
+			     const struct mmc_fixup *table)
 {
 	const struct mmc_fixup *f;
 	u64 rev = cid_rev_card(card);
@@ -82,4 +83,3 @@ void mmc_fixup_device(struct mmc_card *card, const struct mmc_fixup *table)
 		}
 	}
 }
-EXPORT_SYMBOL(mmc_fixup_device);
