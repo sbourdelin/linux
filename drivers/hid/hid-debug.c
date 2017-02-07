@@ -493,7 +493,7 @@ char *hid_resolv_usage(unsigned usage, struct seq_file *f) {
 
 	if (!f) {
 		len = strlen(buf);
-		snprintf(buf+len, max(0, HID_DEBUG_BUFSIZE - len), ".");
+		snprintf(buf + len, max(0, HID_DEBUG_BUFSIZE - len), ".");
 		len++;
 	}
 	else {
@@ -501,12 +501,14 @@ char *hid_resolv_usage(unsigned usage, struct seq_file *f) {
 	}
 	for (p = hid_usage_table; p->description; p++)
 		if (p->page == (usage >> 16)) {
-			for(++p; p->description && p->usage != 0; p++)
+			for (++p; p->description && p->usage != 0; p++)
 				if (p->usage == (usage & 0xffff)) {
 					if (!f)
 						snprintf(buf + len,
-							max(0,HID_DEBUG_BUFSIZE - len - 1),
-							"%s", p->description);
+							 max(0,
+							     HID_DEBUG_BUFSIZE
+							     - len - 1),
+							 "%s", p->description);
 					else
 						seq_puts(f, p->description);
 					return buf;
@@ -582,7 +584,7 @@ void hid_dump_field(struct hid_field *field, int n, struct seq_file *f) {
 		sys = data & 0xf;
 		data >>= 4;
 
-		if(sys > 4) {
+		if (sys > 4) {
 			tab(n, f);
 			seq_puts(f, "Unit(Invalid)\n");
 		}
@@ -591,19 +593,19 @@ void hid_dump_field(struct hid_field *field, int n, struct seq_file *f) {
 
 			tab(n, f); seq_printf(f, "Unit(%s : ", systems[sys]);
 
-			for (i=1 ; i<sizeof(__u32)*2 ; i++) {
+			for (i = 1; i < sizeof(__u32) * 2; i++) {
 				char nibble = data & 0xf;
 				data >>= 4;
 				if (nibble != 0) {
-					if(earlier_unit++ > 0)
+					if (earlier_unit++ > 0)
 						seq_putc(f, '*');
 					seq_puts(f, units[sys][i]);
-					if(nibble != 1) {
+					if (nibble != 1) {
 						/* This is a _signed_ nibble(!) */
-
 						int val = nibble & 0x7;
-						if(nibble & 0x08)
-							val = -((0x7 & ~val) +1);
+
+						if (nibble & 0x08)
+							val = -((0x7 & ~val) + 1);
 						seq_printf(f, "^%d", val);
 					}
 				}
@@ -634,7 +636,7 @@ void hid_dump_device(struct hid_device *device, struct seq_file *f)
 	struct hid_report_enum *report_enum;
 	struct hid_report *report;
 	struct list_head *list;
-	unsigned i,k;
+	unsigned int i, k;
 	static const char *table[] = {"INPUT", "OUTPUT", "FEATURE"};
 
 	for (i = 0; i < HID_REPORT_TYPES; i++) {
