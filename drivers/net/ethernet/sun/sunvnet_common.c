@@ -37,6 +37,35 @@
  */
 #define	VNET_MAX_RETRIES	10
 
+#define DRV_MODULE_NAME		"sunvnet_common"
+#define DRV_MODULE_VERSION	"1.1"
+#define DRV_MODULE_RELDATE	"February 3, 2017"
+
+static char version[] =
+	DRV_MODULE_NAME " " DRV_MODULE_VERSION " (" DRV_MODULE_RELDATE ")";
+MODULE_AUTHOR("David S. Miller (davem@davemloft.net)");
+MODULE_DESCRIPTION("Sun LDOM virtual network support library");
+MODULE_LICENSE("GPL");
+MODULE_VERSION(DRV_MODULE_VERSION);
+
+static int __init sunvnet_common_init(void)
+{
+	pr_info("%s\n", version);
+	return 0;
+}
+module_init(sunvnet_common_init);
+
+static void __exit sunvnet_common_exit(void)
+{
+	/* Empty function, just here to fill the exit function pointer
+	 * slot.  In some combinations of older gcc and newer kernel,
+	 * leaving this undefined results in the kernel marking it as a
+	 * permanent module; it will show up in lsmod output as [permanent]
+	 * and not be unloadable.
+	 */
+}
+module_exit(sunvnet_common_exit);
+
 static int __vnet_tx_trigger(struct vnet_port *port, u32 start);
 static void vnet_port_reset(struct vnet_port *port);
 
