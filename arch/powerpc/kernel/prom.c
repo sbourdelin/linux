@@ -683,6 +683,28 @@ void __init early_init_devtree(void *params)
 	of_scan_flat_dt(early_init_dt_scan_root, NULL);
 	of_scan_flat_dt(early_init_dt_scan_memory_ppc, NULL);
 
+#ifdef CONFIG_FA_DUMP
+	if (is_fadump_active()) {
+		size_t len = 0;
+		char *fadump_params = get_fadump_parameters_realmode();
+
+		if (fadump_params)
+			len = strlen(fadump_params);
+
+		/* Parameters to append to capture (fadump) kernel */
+		if (len) {
+			size_t boot_cmdline_len = strlen(boot_command_line);
+
+			if ((boot_cmdline_len + len) > COMMAND_LINE_SIZE)
+				len = COMMAND_LINE_SIZE - boot_cmdline_len - 1;
+
+			strncat(boot_command_line, fadump_params, len);
+			printk(KERN_INFO "fadump: appending parameters meant "
+			       "for capture kernel.\nModified cmdline: %s\n",
+			       boot_command_line);
+		}
+	}
+#endif
 	parse_early_param();
 
 	/* make sure we've parsed cmdline for mem= before this */
