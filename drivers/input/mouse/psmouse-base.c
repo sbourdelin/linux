@@ -199,9 +199,12 @@ psmouse_ret_t psmouse_process_byte(struct psmouse *psmouse)
 	}
 
 	/* Generic PS/2 Mouse */
-	input_report_key(dev, BTN_LEFT,    packet[0]       & 1);
-	input_report_key(dev, BTN_MIDDLE, (packet[0] >> 2) & 1);
-	input_report_key(dev, BTN_RIGHT,  (packet[0] >> 1) & 1);
+	input_report_key(dev, BTN_LEFT,
+			 (packet[0] | psmouse->extra_buttons)       & 1);
+	input_report_key(dev, BTN_MIDDLE,
+			 ((packet[0] | psmouse->extra_buttons) >> 2) & 1);
+	input_report_key(dev, BTN_RIGHT,
+			 ((packet[0] | psmouse->extra_buttons) >> 1) & 1);
 
 	input_report_rel(dev, REL_X, packet[1] ? (int) packet[1] - (int) ((packet[0] << 4) & 0x100) : 0);
 	input_report_rel(dev, REL_Y, packet[2] ? (int) ((packet[0] << 3) & 0x100) - (int) packet[2] : 0);
@@ -282,6 +285,19 @@ static int psmouse_handle_byte(struct psmouse *psmouse)
 	return 0;
 }
 
+static void psmouse_handle_extra_buttons(struct psmouse *psmouse,
+					 unsigned char data)
+{
+	struct input_dev *dev = psmouse->dev;
+
+	input_report_key(dev, BTN_LEFT,    data       & 1);
+	input_report_key(dev, BTN_MIDDLE, (data >> 2) & 1);
+	input_report_key(dev, BTN_RIGHT,  (data >> 1) & 1);
+	input_sync(dev);
+
+	psmouse->extra_buttons = data;
+}
+
 /*
  * psmouse_interrupt() handles incoming characters, either passing them
  * for normal processing or gathering them as command response.
@@ -304,6 +320,23 @@ static irqreturn_t psmouse_interrupt(struct serio *serio,
 				     flags & SERIO_PARITY ? " bad parity" : "");
 		ps2_cmd_aborted(&psmouse->ps2dev);
 		goto out;
+	}
+
+	if (unlikely(flags & SERIO_OOB_DATA)) {
+		switch (psmouse->oob_data_type) {
+		case PSMOUSE_OOB_NONE:
+			psmouse->oob_data_type = data;
+			goto out;
+		case PSMOUSE_OOB_EXTRA_BTNS:
+			psmouse_handle_extra_buttons(psmouse, data);
+			psmouse->oob_data_type = PSMOUSE_OOB_NONE;
+			goto out;
+		default:
+			psmouse_warn(psmouse,
+				     "unknown OOB_DATA type: 0x%02x\n",
+				     psmouse->oob_data_type);
+			psmouse->oob_data_type = PSMOUSE_OOB_NONE;
+		}
 	}
 
 	if (unlikely(psmouse->ps2dev.flags & PS2_FLAG_ACK))
