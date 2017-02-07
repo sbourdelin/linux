@@ -1008,9 +1008,10 @@ static int uvc_ctrl_populate_cache(struct uvc_video_chain *chain,
 
 static int __uvc_ctrl_get(struct uvc_video_chain *chain,
 	struct uvc_control *ctrl, struct uvc_control_mapping *mapping,
-	s32 *value)
+	void *value, size_t size)
 {
 	struct uvc_menu_info *menu;
+	s32 *value32;
 	unsigned int i;
 	int ret;
 
@@ -1029,14 +1030,14 @@ static int __uvc_ctrl_get(struct uvc_video_chain *chain,
 	}
 
 	mapping->get(mapping, UVC_GET_CUR,
-		uvc_ctrl_data(ctrl, UVC_CTRL_DATA_CURRENT),
-		value, sizeof(*value));
+		uvc_ctrl_data(ctrl, UVC_CTRL_DATA_CURRENT), value, size);
 
 	if (mapping->v4l2_type == V4L2_CTRL_TYPE_MENU) {
+		value32 = value;
 		menu = mapping->menu_info;
 		for (i = 0; i < mapping->menu_count; ++i, ++menu) {
-			if (menu->value == *value) {
-				*value = i;
+			if (menu->value == *value32) {
+				*value32 = i;
 				break;
 			}
 		}
@@ -1071,7 +1072,9 @@ static int __uvc_query_v4l2_ctrl(struct uvc_video_chain *chain,
 				   &master_map, &master_ctrl, 0);
 	if (master_ctrl && (master_ctrl->info.flags & UVC_CTRL_FLAG_GET_CUR)) {
 		s32 val;
-		int ret = __uvc_ctrl_get(chain, master_ctrl, master_map, &val);
+		/* No compound master controls so far */
+		int ret = __uvc_ctrl_get(chain, master_ctrl, master_map,
+					 &val, sizeof(val));
 		if (ret < 0)
 			return ret;
 
@@ -1290,7 +1293,8 @@ static void __uvc_ctrl_send_slave_event(struct uvc_fh *handle,
 	if (ctrl == NULL)
 		return;
 
-	if (__uvc_ctrl_get(handle->chain, ctrl, mapping, &val) == 0)
+	/* cannot send compound events, the value must be read separately */
+	if (!__uvc_ctrl_get(handle->chain, ctrl, mapping, &val, sizeof(val)))
 		changes |= V4L2_EVENT_CTRL_CH_VALUE;
 
 	uvc_ctrl_send_event(handle, ctrl, mapping, val, changes);
@@ -1319,9 +1323,19 @@ static void uvc_ctrl_status_event_work(struct work_struct *work)
 		goto free;
 
 	list_for_each_entry(mapping, &ctrl->info.mappings, list) {
-		s32 value;
+		size_t size;
+		s32 value32;
+		void *value;
 
-		mapping->get(mapping, UVC_GET_CUR, data, &value, sizeof(value));
+		if (mapping->v4l2_type >= V4L2_CTRL_COMPOUND_TYPES) {
+			value = mapping->compound;
+			size = DIV_ROUND_UP(mapping->size, 8);
+		} else {
+			value = &value32;
+			size = sizeof(value32);
+		}
+
+		mapping->get(mapping, UVC_GET_CUR, data, value, size);
 
 		for (i = 0; i < ARRAY_SIZE(mapping->slave_ids); ++i) {
 			if (!mapping->slave_ids[i])
@@ -1336,13 +1350,15 @@ static void uvc_ctrl_status_event_work(struct work_struct *work)
 			unsigned int i;
 
 			for (i = 0; i < mapping->menu_count; ++i, ++menu)
-				if (menu->value == value) {
-					value = i;
+				if (menu->value == value32) {
+					value32 = i;
 					break;
 				}
+		} else if (mapping->v4l2_type >= V4L2_CTRL_COMPOUND_TYPES) {
+			memcpy(&value32, value, min(sizeof(value32), size));
 		}
 
-		uvc_ctrl_send_event(handle, ctrl, mapping, value,
+		uvc_ctrl_send_event(handle, ctrl, mapping, value32,
 				    V4L2_EVENT_CTRL_CH_VALUE);
 	}
 
@@ -1461,7 +1477,9 @@ static int uvc_ctrl_add_event(struct v4l2_subscribed_event *sev, unsigned elems)
 		u32 changes = V4L2_EVENT_CTRL_CH_FLAGS;
 		s32 val = 0;
 
-		if (__uvc_ctrl_get(handle->chain, ctrl, mapping, &val) == 0)
+		/* events can only deliver integers so far */
+		if (__uvc_ctrl_get(handle->chain, ctrl, mapping,
+				   &val, sizeof(val)) == 0)
 			changes |= V4L2_EVENT_CTRL_CH_VALUE;
 
 		uvc_ctrl_fill_event(handle->chain, &ev, ctrl, mapping, val,
@@ -1599,12 +1617,33 @@ int uvc_ctrl_get(struct uvc_video_chain *chain,
 {
 	struct uvc_control *ctrl;
 	struct uvc_control_mapping *mapping;
+	size_t size;
+	int ret;
 
 	ctrl = uvc_find_control(chain, xctrl->id, &mapping);
 	if (ctrl == NULL)
 		return -EINVAL;
 
-	return __uvc_ctrl_get(chain, ctrl, mapping, &xctrl->value);
+	if (mapping->v4l2_type < V4L2_CTRL_COMPOUND_TYPES)
+		return __uvc_ctrl_get(chain, ctrl, mapping, &xctrl->value,
+				      sizeof(xctrl->value));
+
+	size = DIV_ROUND_UP(mapping->size, 8);
+
+	if (size < xctrl->size) {
+		uvc_warn_once(chain->dev, UVC_WARN_MINMAX,
+			      "truncating %u to %zu for \"%s\"",
+			      xctrl->size, size, mapping->name);
+		xctrl->size = size;
+	}
+
+	ret = __uvc_ctrl_get(chain, ctrl, mapping,
+			     mapping->compound, size);
+	if (ret < 0)
+		return ret;
+
+	return copy_to_user(xctrl->ptr, mapping->compound, xctrl->size) ?
+		-EFAULT : 0;
 }
 
 int uvc_ctrl_set(struct uvc_fh *handle,
@@ -1614,6 +1653,8 @@ int uvc_ctrl_set(struct uvc_fh *handle,
 	struct uvc_control *ctrl;
 	struct uvc_control_mapping *mapping;
 	s32 value;
+	void *value_p = &value;
+	size_t size = sizeof(value);
 	u32 step;
 	s32 min;
 	s32 max;
@@ -1697,6 +1738,22 @@ int uvc_ctrl_set(struct uvc_fh *handle,
 
 		break;
 
+	case V4L2_CTRL_COMPOUND_TYPES...V4L2_CTRL_TYPE_U32:
+		value_p = mapping->compound;
+
+		size = DIV_ROUND_UP(mapping->size, 8);
+		if (size < xctrl->size)
+			uvc_warn_once(chain->dev, UVC_WARN_MINMAX,
+				      "truncating %u to %zu for \"%s\"",
+				      xctrl->size, size, mapping->name);
+		else
+			size = xctrl->size;
+
+		if (copy_from_user(value_p, xctrl->ptr, size) != 0)
+			return -EFAULT;
+
+		break;
+
 	default:
 		value = xctrl->value;
 		break;
@@ -1731,7 +1788,7 @@ int uvc_ctrl_set(struct uvc_fh *handle,
 	}
 
 	mapping->set(mapping, uvc_ctrl_data(ctrl, UVC_CTRL_DATA_CURRENT),
-		     &value, sizeof(value));
+		     value_p, size);
 
 	ctrl->dirty = 1;
 	ctrl->modified = 1;
@@ -1835,11 +1892,12 @@ static int uvc_ctrl_fill_xu_info(struct uvc_device *dev,
 	uvc_ctrl_fixup_xu_info(dev, ctrl, info);
 
 	uvc_trace(UVC_TRACE_CONTROL, "XU control %pUl/%u queried: len %u, "
-		  "flags { get %u set %u auto %u }.\n",
+		  "flags { get %u set %u auto %u async %u }.\n",
 		  info->entity, info->selector, info->size,
 		  (info->flags & UVC_CTRL_FLAG_GET_CUR) ? 1 : 0,
 		  (info->flags & UVC_CTRL_FLAG_SET_CUR) ? 1 : 0,
-		  (info->flags & UVC_CTRL_FLAG_AUTO_UPDATE) ? 1 : 0);
+		  (info->flags & UVC_CTRL_FLAG_AUTO_UPDATE) ? 1 : 0,
+		  (info->flags & UVC_CTRL_FLAG_ASYNCHRONOUS) ? 1 : 0);
 
 done:
 	kfree(data);
@@ -1871,9 +1929,10 @@ static int uvc_ctrl_init_xu_ctrl(struct uvc_device *dev,
 	return ret;
 }
 
-int uvc_xu_ctrl_query(struct uvc_video_chain *chain,
+int uvc_xu_ctrl_query(struct uvc_fh *handle,
 	struct uvc_xu_control_query *xqry)
 {
+	struct uvc_video_chain *chain = handle->chain;
 	struct uvc_entity *entity;
 	struct uvc_control *ctrl;
 	unsigned int i, found = 0;
@@ -1941,6 +2000,15 @@ int uvc_xu_ctrl_query(struct uvc_video_chain *chain,
 		break;
 	case UVC_SET_CUR:
 		reqflags = UVC_CTRL_FLAG_SET_CUR;
+
+		if (ctrl->info.flags & UVC_CTRL_FLAG_ASYNCHRONOUS) {
+			if (ctrl->handle) {
+				ret = -EBUSY;
+				goto done;
+			}
+			ctrl->handle = handle;
+		}
+
 		break;
 	case UVC_GET_LEN:
 		size = 2;
@@ -2089,9 +2157,14 @@ static int __uvc_ctrl_add_mapping(struct uvc_device *dev,
 
 	size = sizeof(*mapping->menu_info) * mapping->menu_count;
 	map->menu_info = kmemdup(mapping->menu_info, size, GFP_KERNEL);
-	if (map->menu_info == NULL) {
-		kfree(map);
-		return -ENOMEM;
+	if (map->menu_info == NULL)
+		goto free_map;
+
+	if (map->v4l2_type >= V4L2_CTRL_COMPOUND_TYPES) {
+		map->compound = kmalloc(DIV_ROUND_UP(map->size, 8),
+					    GFP_KERNEL);
+		if (map->compound == NULL)
+			goto free_info;
 	}
 
 	if (map->get == NULL)
@@ -2105,6 +2178,12 @@ static int __uvc_ctrl_add_mapping(struct uvc_device *dev,
 		map->name, ctrl->info.entity, ctrl->info.selector);
 
 	return 0;
+
+free_info:
+	kfree(map->menu_info);
+free_map:
+	kfree(map);
+	return -ENOMEM;
 }
 
 int uvc_ctrl_add_mapping(struct uvc_video_chain *chain,
@@ -2302,6 +2381,7 @@ int uvc_ctrl_init_device(struct uvc_device *dev)
 
 	spin_lock_init(&dev->async_ctrl.lock);
 	INIT_WORK(&dev->async_ctrl.work, uvc_ctrl_status_event_work);
+	dev->async_ctrl.data = NULL;
 
 	/* Walk the entities list and instantiate controls */
 	list_for_each_entry(entity, &dev->entities, list) {
@@ -2362,6 +2442,7 @@ static void uvc_ctrl_cleanup_mappings(struct uvc_device *dev,
 	list_for_each_entry_safe(mapping, nm, &ctrl->info.mappings, list) {
 		list_del(&mapping->list);
 		kfree(mapping->menu_info);
+		kfree(mapping->compound);
 		kfree(mapping);
 	}
 }

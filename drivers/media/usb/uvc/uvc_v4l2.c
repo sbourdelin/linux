@@ -57,6 +57,7 @@ static int uvc_ioctl_ctrl_map(struct uvc_video_chain *chain,
 	case V4L2_CTRL_TYPE_INTEGER:
 	case V4L2_CTRL_TYPE_BOOLEAN:
 	case V4L2_CTRL_TYPE_BUTTON:
+	case V4L2_CTRL_COMPOUND_TYPES...V4L2_CTRL_TYPE_U32:
 		break;
 
 	case V4L2_CTRL_TYPE_MENU:
@@ -1256,7 +1257,7 @@ static long uvc_ioctl_default(struct file *file, void *fh, bool valid_prio,
 		return uvc_ioctl_ctrl_map(chain, arg);
 
 	case UVCIOC_CTRL_QUERY:
-		return uvc_xu_ctrl_query(chain, arg);
+		return uvc_xu_ctrl_query(handle, arg);
 
 	default:
 		return -ENOTTY;
@@ -1274,6 +1275,7 @@ struct uvc_xu_control_mapping32 {
 	__u8 offset;
 	__u32 v4l2_type;
 	__u32 data_type;
+	compat_caddr_t compound;
 
 	compat_caddr_t menu_info;
 	__u32 menu_count;
@@ -1390,7 +1392,7 @@ static long uvc_v4l2_compat_ioctl32(struct file *file,
 		ret = uvc_v4l2_get_xu_query(&karg.xqry, up);
 		if (ret)
 			return ret;
-		ret = uvc_xu_ctrl_query(handle->chain, &karg.xqry);
+		ret = uvc_xu_ctrl_query(handle, &karg.xqry);
 		if (ret)
 			return ret;
 		ret = uvc_v4l2_put_xu_query(&karg.xqry, up);

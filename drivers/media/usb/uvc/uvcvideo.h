@@ -215,6 +215,7 @@ struct uvc_control_mapping {
 	__u8 offset;
 	enum v4l2_ctrl_type v4l2_type;
 	__u32 data_type;
+	void *compound;
 
 	struct uvc_menu_info *menu_info;
 	__u32 menu_count;
@@ -753,7 +754,7 @@ extern int uvc_ctrl_get(struct uvc_video_chain *chain,
 extern int uvc_ctrl_set(struct uvc_fh *handle,
 		struct v4l2_ext_control *xctrl);
 
-extern int uvc_xu_ctrl_query(struct uvc_video_chain *chain,
+extern int uvc_xu_ctrl_query(struct uvc_fh *handle,
 		struct uvc_xu_control_query *xqry);
 
 /* Utility functions */
