@@ -215,14 +215,24 @@ int xfrm_input(struct sk_buff *skb, int nexthdr, __be32 spi, int encap_type)
 	unsigned int family;
 	int decaps = 0;
 	int async = 0;
+	bool xfrm_gro = false;
 
-	/* A negative encap_type indicates async resumption. */
 	if (encap_type < 0) {
-		async = 1;
 		x = xfrm_input_state(skb);
-		seq = XFRM_SKB_CB(skb)->seq.input.low;
 		family = x->outer_mode->afinfo->family;
-		goto resume;
+
+		/* An encap_type of -1 indicates async resumption. */
+		if (encap_type == -1) {
+			async = 1;
+			seq = XFRM_SKB_CB(skb)->seq.input.low;
+			xfrm_gro = XFRM_GRO_SKB_CB(skb)->gro.input.skb_is_gro;
+			goto resume;
+		}
+		/* encap_type < -1 indicates a GRO call. */
+		xfrm_gro = true;
+		encap_type = 0;
+		seq = XFRM_GRO_SKB_CB(skb)->gro.input.seq;
+		goto lock;
 	}
 
 	daddr = (xfrm_address_t *)(skb_network_header(skb) +
@@ -268,6 +278,7 @@ int xfrm_input(struct sk_buff *skb, int nexthdr, __be32 spi, int encap_type)
 
 		skb->sp->xvec[skb->sp->len++] = x;
 
+lock:
 		spin_lock(&x->lock);
 
 		if (unlikely(x->km.state != XFRM_STATE_VALID)) {
@@ -305,6 +316,10 @@ int xfrm_input(struct sk_buff *skb, int nexthdr, __be32 spi, int encap_type)
 
 		XFRM_SKB_CB(skb)->seq.input.low = seq;
 		XFRM_SKB_CB(skb)->seq.input.hi = seq_hi;
+		XFRM_GRO_SKB_CB(skb)->gro.input.skb_is_gro = false;
+
+		if (xfrm_gro)
+			XFRM_GRO_SKB_CB(skb)->gro.input.skb_is_gro = true;
 
 		skb_dst_force(skb);
 		dev_hold(skb->dev);
@@ -389,7 +404,14 @@ resume:
 		gro_cells_receive(&gro_cells, skb);
 		return 0;
 	} else {
-		return x->inner_mode->afinfo->transport_finish(skb, async);
+		err = x->inner_mode->afinfo->transport_finish(skb, async);
+		if (xfrm_gro) {
+			skb_dst_drop(skb);
+			gro_cells_receive(&gro_cells, skb);
+			return err;
+		}
+
+		return err;
 	}
 
 drop_unlock:
