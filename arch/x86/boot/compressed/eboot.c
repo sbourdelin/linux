@@ -34,6 +34,7 @@ static void setup_boot_services##bits(struct efi_config *c)		\
 									\
 	table = (typeof(table))sys_table;				\
 									\
+	c->runtime_services = table->runtime;				\
 	c->boot_services = table->boottime;				\
 	c->text_output = table->con_out;				\
 }
@@ -988,6 +989,13 @@ struct boot_params *efi_main(struct efi_config *c,
 		setup_boot_services64(efi_early);
 	else
 		setup_boot_services32(efi_early);
+
+	/*
+	 * If the boot loader gave us a value for secure_boot then we use that,
+	 * otherwise we ask the BIOS.
+	 */
+	if (boot_params->secure_boot == efi_secureboot_mode_unset)
+		boot_params->secure_boot = efi_get_secureboot(sys_table);
 
 	setup_graphics(boot_params);
 
