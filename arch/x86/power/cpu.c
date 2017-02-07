@@ -378,7 +378,7 @@ static int __init bsp_pm_check_init(void)
 
 core_initcall(bsp_pm_check_init);
 
-static int msr_init_context(const u32 *msr_id, const int total_num)
+static int  __maybe_unused msr_init_context(const u32 *msr_id, const int total_num)
 {
 	int i = 0;
 	struct saved_msr *msr_array;
@@ -405,40 +405,12 @@ static int msr_init_context(const u32 *msr_id, const int total_num)
 	return 0;
 }
 
-/*
- * The following section is a quirk framework for problematic BIOSen:
- * Sometimes MSRs are modified by the BIOSen after suspended to
- * RAM, this might cause unexpected behavior after wakeup.
- * Thus we save/restore these specified MSRs across suspend/resume
- * in order to work around it.
- *
- * For any further problematic BIOSen/platforms,
- * please add your own function similar to msr_initialize_bdw.
- */
-static int msr_initialize_bdw(const struct dmi_system_id *d)
-{
-	/* Add any extra MSR ids into this array. */
-	u32 bdw_msr_id[] = { MSR_IA32_THERM_CONTROL };
-
-	pr_info("x86/pm: %s detected, MSR saving is needed during suspending.\n", d->ident);
-	return msr_init_context(bdw_msr_id, ARRAY_SIZE(bdw_msr_id));
-}
-
-static struct dmi_system_id msr_save_dmi_table[] = {
-	{
-	 .callback = msr_initialize_bdw,
-	 .ident = "BROADWELL BDX_EP",
-	 .matches = {
-		DMI_MATCH(DMI_PRODUCT_NAME, "GRANTLEY"),
-		DMI_MATCH(DMI_PRODUCT_VERSION, "E63448-400"),
-		},
-	},
-	{}
-};
-
 static int pm_check_save_msr(void)
 {
-	dmi_check_system(msr_save_dmi_table);
+	/* Save/restore MSRs in the future, for example:
+	 * u32 msr_id[] = { MSR_IA32_THERM_CONTROL };
+	 * msr_init_context(msr_id, ARRAY_SIZE(msr_id));
+	 */
 	return 0;
 }
 
