@@ -1207,6 +1207,7 @@ static void m_series_init_eeprom_buffer(struct comedi_device *dev)
 	unsigned int old_iodwbsr_bits;
 	unsigned int old_iodwbsr1_bits;
 	unsigned int old_iodwcr1_bits;
+	__be32 serial_number;
 	int i;
 
 	/* IO Window 1 needs to be temporarily mapped to read the eeprom */
@@ -1223,10 +1224,10 @@ static void m_series_init_eeprom_buffer(struct comedi_device *dev)
 
 	BUG_ON(serial_number_eeprom_length > sizeof(devpriv->serial_number));
 	for (i = 0; i < serial_number_eeprom_length; ++i) {
-		char *byte_ptr = (char *)&devpriv->serial_number + i;
+		char *byte_ptr = (char *)&serial_number + i;
 		*byte_ptr = ni_readb(dev, serial_number_eeprom_offset + i);
 	}
-	devpriv->serial_number = be32_to_cpu(devpriv->serial_number);
+	devpriv->serial_number = be32_to_cpu(serial_number);
 
 	for (i = 0; i < M_SERIES_EEPROM_SIZE; ++i)
 		devpriv->eeprom_buffer[i] = ni_readb(dev, Start_Cal_EEPROM + i);
