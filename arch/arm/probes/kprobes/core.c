@@ -391,16 +391,6 @@ int __kprobes kprobe_fault_handler(struct pt_regs *regs, unsigned int fsr)
 	return 0;
 }
 
-int __kprobes kprobe_exceptions_notify(struct notifier_block *self,
-				       unsigned long val, void *data)
-{
-	/*
-	 * notify_die() is currently never called on ARM,
-	 * so this callback is currently empty.
-	 */
-	return NOTIFY_DONE;
-}
-
 /*
  * When a retprobed function returns, trampoline_handler() is called,
  * calling the kretprobe's handler. We construct a struct pt_regs to
