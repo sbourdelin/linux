@@ -614,19 +614,18 @@ void hid_dump_field(struct hid_field *field, int n, struct seq_file *f) {
 	tab(n, f); seq_printf(f, "Report Size(%u)\n", field->report_size);
 	tab(n, f); seq_printf(f, "Report Count(%u)\n", field->report_count);
 	tab(n, f); seq_printf(f, "Report Offset(%u)\n", field->report_offset);
-
-	tab(n, f); seq_printf(f, "Flags( ");
+	tab(n, f);
 	j = field->flags;
-	seq_printf(f, "%s", HID_MAIN_ITEM_CONSTANT & j ? "Constant " : "");
-	seq_printf(f, "%s", HID_MAIN_ITEM_VARIABLE & j ? "Variable " : "Array ");
-	seq_printf(f, "%s", HID_MAIN_ITEM_RELATIVE & j ? "Relative " : "Absolute ");
-	seq_printf(f, "%s", HID_MAIN_ITEM_WRAP & j ? "Wrap " : "");
-	seq_printf(f, "%s", HID_MAIN_ITEM_NONLINEAR & j ? "NonLinear " : "");
-	seq_printf(f, "%s", HID_MAIN_ITEM_NO_PREFERRED & j ? "NoPreferredState " : "");
-	seq_printf(f, "%s", HID_MAIN_ITEM_NULL_STATE & j ? "NullState " : "");
-	seq_printf(f, "%s", HID_MAIN_ITEM_VOLATILE & j ? "Volatile " : "");
-	seq_printf(f, "%s", HID_MAIN_ITEM_BUFFERED_BYTE & j ? "BufferedByte " : "");
-	seq_printf(f, ")\n");
+	seq_printf(f, "Flags( %s%s%s%s%s%s%s%s%s)\n",
+		   HID_MAIN_ITEM_CONSTANT & j ? "Constant " : "",
+		   HID_MAIN_ITEM_VARIABLE & j ? "Variable " : "Array ",
+		   HID_MAIN_ITEM_RELATIVE & j ? "Relative " : "Absolute ",
+		   HID_MAIN_ITEM_WRAP & j ? "Wrap " : "",
+		   HID_MAIN_ITEM_NONLINEAR & j ? "NonLinear " : "",
+		   HID_MAIN_ITEM_NO_PREFERRED & j ? "NoPreferredState " : "",
+		   HID_MAIN_ITEM_NULL_STATE & j ? "NullState " : "",
+		   HID_MAIN_ITEM_VOLATILE & j ? "Volatile " : "",
+		   HID_MAIN_ITEM_BUFFERED_BYTE & j ? "BufferedByte " : "");
 }
 EXPORT_SYMBOL_GPL(hid_dump_field);
 
