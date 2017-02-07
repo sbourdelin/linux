@@ -10,8 +10,8 @@
 
 .arch_extension	lse
 
-.macro alt_lse, llsc, lse
-	alternative_insn "\llsc", "\lse", ARM64_HAS_LSE_ATOMICS
+.macro alt_lse, nllsc, nlse
+	alternative_insn "\nllsc", "\nlse", ARM64_HAS_LSE_ATOMICS
 .endm
 
 #else	/* __ASSEMBLER__ */
