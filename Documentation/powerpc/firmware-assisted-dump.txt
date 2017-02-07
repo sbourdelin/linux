@@ -67,11 +67,17 @@ as follows:
 
 -- The freshly booted kernel will notice that there is a new
    node (ibm,dump-kernel) in the device tree, indicating that
-   there is crash data available from a previous boot. During
-   the early boot OS will reserve rest of the memory above
-   boot memory size effectively booting with restricted memory
-   size. This will make sure that the second kernel will not
-   touch any of the dump memory area.
+   there is crash data available from a previous boot. This
+   second kernel, where crash data is available from previous
+   boot, is referred to as capture kernel. The capture kernel,
+   early during the boot process, looks for a handover area
+   (see fig. 2), saved by the first kernel to be handed over
+   to it. This handover area contains certain config info like
+   extra parameters to append to the capture kernel. The capture
+   kernel applies this configuration accordingly. Later, reserves
+   rest of the memory above boot memory size effectively booting
+   with restricted memory size. This will make sure that the
+   capture kernel will not touch any of the dump memory area.
 
 -- User-space tools will read /proc/vmcore to obtain the contents
    of memory, which holds the previous crashed kernel dump in ELF
@@ -113,15 +119,18 @@ crash does occur.
 
   o Memory Reservation during first kernel
 
-  Low memory                                        Top of memory
-  0      boot memory size                                       |
-  |           |                       |<--Reserved dump area -->|
-  V           V                       |   Permanent Reservation V
-  +-----------+----------/ /----------+---+----+-----------+----+
-  |           |                       |CPU|HPTE|  DUMP     |ELF |
-  +-----------+----------/ /----------+---+----+-----------+----+
-        |                                           ^
-        |                                           |
+  Low memory                                              Top of memory
+  0                                                               |
+  | Handover area                                                 |
+  |   |                                                           |
+  |   |      boot memory size           |<-- Reserved dump area-->|
+  |   |          |                      |  Permanent Reservation  |
+  V   V          V                                                V
+  +--+-+--------+----------/ /----------+---+----+-----------+----+
+  |  | |        |                       |CPU|HPTE|  DUMP     |ELF |
+  +--+-+--------+----------/ /----------+---+----+-----------+----+
+  |____  _______|                                   ^
+       \/                                           |
         \                                           /
          -------------------------------------------
           Boot memory content gets transferred to
@@ -129,18 +138,21 @@ crash does occur.
           crash
                    Fig. 1
 
-  o Memory Reservation during second kernel after crash
+  o Memory Reservation during capture (fadump) kernel after crash
 
-  Low memory                                        Top of memory
-  0      boot memory size                                       |
-  |           |<------------- Reserved dump area ----------- -->|
-  V           V                                                 V
-  +-----------+----------/ /----------+---+----+-----------+----+
-  |           |                       |CPU|HPTE|  DUMP     |ELF |
-  +-----------+----------/ /----------+---+----+-----------+----+
-        |                                                    |
-        V                                                    V
-   Used by second                                    /proc/vmcore
+  Low memory                                          Top of memory
+  0                                                               |
+  |  Handover area                                                |
+  |   |                                                           |
+  |   |    boot memory size                                       |
+  |   |         |<------------- Reserved dump area ----------- -->|
+  V   V         V                                                 V
+  +--+-+--------+----------/ /----------+---+----+-----------+----+
+  |  | |        |                       |CPU|HPTE|  DUMP     |ELF |
+  +--+-+--------+----------/ /----------+---+----+-----------+----+
+  |____  _______|                                            |
+       \/                                                    V
+   Used by capture                                      /proc/vmcore
    kernel to boot
                    Fig. 2
 
@@ -196,10 +208,21 @@ Here is the list of files under kernel sysfs:
     be handled and vmcore will not be captured. This interface can be
     easily integrated with kdump service start/stop.
 
+ /sys/kernel/fadump_cmdline_append
+
+    This is used to specify the extra parameters to append to capture
+    kernel. Typically used to pass parameters that reduce memory/resource
+    consumption for dump capture kernel. To pass parameters to append to
+    dump capture kernel:
+
+    echo "nr_cpus=1 kvm_cma_resv_ratio=0" > /sys/kernel/fadump_cmdline_append
+
+    This interface can be easily integrated with kdump service start/stop.
+
  /sys/kernel/fadump_release_mem
 
     This file is available only when fadump is active during
-    second kernel. This is used to release the reserved memory
+    capture kernel. This is used to release the reserved memory
     region that are held for saving crash dump. To release the
     reserved memory echo 1 to it:
 
@@ -230,7 +253,7 @@ Here is the list of files under powerpc debugfs:
     HPTE: [0x0000006fff0020-0x0000006fff101f] 0x1000 bytes, Dumped: 0x0
     DUMP: [0x0000006fff1020-0x0000007fff101f] 0x10000000 bytes, Dumped: 0x0
 
-    Contents when fadump is active during second kernel
+    Contents when fadump is active during capture kernel
 
     # cat /sys/kernel/debug/powerpc/fadump_region
     CPU : [0x0000006ffb0000-0x0000006fff001f] 0x40020 bytes, Dumped: 0x40020
@@ -249,8 +272,8 @@ TODO:
    boot successfully when booted with restricted memory.
  o The fadump implementation introduces a fadump crash info structure
    in the scratch area before the ELF core header. The idea of introducing
-   this structure is to pass some important crash info data to the second
-   kernel which will help second kernel to populate ELF core header with
+   this structure is to pass some important crash info data to the capture
+   kernel which will help capture kernel to populate ELF core header with
    correct data before it gets exported through /proc/vmcore. The current
    design implementation does not address a possibility of introducing
    additional fields (in future) to this structure without affecting
