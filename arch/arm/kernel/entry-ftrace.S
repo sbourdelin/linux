@@ -92,11 +92,73 @@
 2:	mcount_exit
 .endm
 
+#ifdef CONFIG_DYNAMIC_FTRACE_WITH_REGS
+
+.macro __ftrace_regs_caller
+
+	add 	ip, sp, #4	@ move in IP the value of SP as it was
+				@ before the push {lr} of the mcount mechanism
+	stmdb	sp!, {ip,lr,pc}
+	stmdb	sp!, {r0-r11,lr}
+
+	@ stack content at this point:
+	@ 0  4          44    48   52       56   60   64
+	@ R0 | R1 | ... | R11 | LR | SP + 4 | LR | PC | previous LR |
+
+	mov r3, sp				@ struct pt_regs*
+	ldr r2, =function_trace_op
+	ldr r2, [r2]				@ pointer to the current
+						@ function tracing op
+	ldr	r1, [sp, #64]			@ lr of instrumented func
+	mcount_adjust_addr	r0, lr		@ instrumented function
+
+	.globl ftrace_regs_call
+ftrace_regs_call:
+	bl	ftrace_stub
+
+#ifdef CONFIG_FUNCTION_GRAPH_TRACER
+	.globl ftrace_graph_regs_call
+ftrace_graph_regs_call:
+	mov	r0, r0
+#endif
+	@ pop saved regs
+	ldr	lr, [sp, #64]			@ get the previous LR value from stack
+	ldmia   sp, {r0-r11, ip, sp, pc}	@ pop the saved registers INCLUDING
+						@ the stack pointer
+.endm
+
+#ifdef CONFIG_FUNCTION_GRAPH_TRACER
+.macro __ftrace_graph_regs_caller
+
+	sub	r0, fp, #4		@ lr of instrumented routine (parent)
+
+	@ called from __ftrace_regs_caller
+	ldr     r1, [sp, #56]		@ instrumented routine (func)
+	mcount_adjust_addr	r1, r1
+
+	sub	r2, r0, #4		@ frame pointer
+	bl	prepare_ftrace_return
+
+	@ pop regs saved in ftrace_regs_caller
+	ldr	lr, [sp, #64]			@ restore lr from the stack
+	ldmia   sp, {r0-r11, ip, sp, pc}	@ restore r0 through pc
+
+.endm
+#endif
+#endif
+
 .macro __ftrace_caller suffix
 	mcount_enter
 
 	mcount_get_lr	r1			@ lr of instrumented func
 	mcount_adjust_addr	r0, lr		@ instrumented function
+
+#ifdef CONFIG_DYNAMIC_FTRACE_WITH_REGS
+	ldr r2, =function_trace_op
+	ldr r2, [r2]				@ pointer to the current
+						@ function tracing op
+	mov r3, #0				@ regs is NULL
+#endif
 
 	.globl ftrace_call\suffix
 ftrace_call\suffix:
@@ -212,6 +274,15 @@ UNWIND(.fnstart)
 	__ftrace_caller
 UNWIND(.fnend)
 ENDPROC(ftrace_caller)
+
+#ifdef CONFIG_DYNAMIC_FTRACE_WITH_REGS
+ENTRY(ftrace_regs_caller)
+UNWIND(.fnstart)
+	__ftrace_regs_caller
+UNWIND(.fnend)
+ENDPROC(ftrace_regs_caller)
+#endif
+
 #endif
 
 #ifdef CONFIG_FUNCTION_GRAPH_TRACER
@@ -220,6 +291,14 @@ UNWIND(.fnstart)
 	__ftrace_graph_caller
 UNWIND(.fnend)
 ENDPROC(ftrace_graph_caller)
+
+#ifdef CONFIG_DYNAMIC_FTRACE_WITH_REGS
+ENTRY(ftrace_graph_regs_caller)
+UNWIND(.fnstart)
+	__ftrace_graph_regs_caller
+UNWIND(.fnend)
+ENDPROC(ftrace_graph_regs_caller)
+#endif
 #endif
 
 .purgem mcount_enter
