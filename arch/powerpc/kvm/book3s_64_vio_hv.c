@@ -237,7 +237,7 @@ long kvmppc_rm_h_put_tce_indirect(struct kvm_vcpu *vcpu,
 {
 	struct kvmppc_spapr_tce_table *stt;
 	long i, ret = H_SUCCESS;
-	unsigned long tces, entry, ua = 0;
+	unsigned long tces, entry, tce, ua = 0;
 	unsigned long *rmap = NULL;
 
 	stt = kvmppc_find_table(vcpu->kvm, liobn);
@@ -279,11 +279,15 @@ long kvmppc_rm_h_put_tce_indirect(struct kvm_vcpu *vcpu,
 	}
 
 	for (i = 0; i < npages; ++i) {
-		unsigned long tce = be64_to_cpu(((u64 *)tces)[i]);
+		tce = be64_to_cpu(((u64 *)tces)[i]);
 
 		ret = kvmppc_tce_validate(stt, tce);
 		if (ret != H_SUCCESS)
 			goto unlock_exit;
+	}
+
+	for (i = 0; i < npages; ++i) {
+		tce = be64_to_cpu(((u64 *)tces)[i]);
 
 		kvmppc_tce_put(stt, entry + i, tce);
 	}
