@@ -47,6 +47,12 @@
 
 #define BIT_CH(bit, chan)	((bit) << ((chan) * PWMCH_OFFSET))
 
+#define SUN6I_PWM_RDY_BIT	PWM_RDY_BASE
+#define SUN6I_PWM_CTL_OFFS	0x0
+#define SUN6I_PWM_PRD_OFFS	0x4
+#define SUN6I_PWM_CH_CTL(ch)	(0x10 * (ch) + SUN6I_PWM_CTL_OFFS)
+#define SUN6I_PWM_CH_PRD(ch)	(0x10 * (ch) + SUN6I_PWM_PRD_OFFS)
+
 struct sun4i_pwm_chip;
 
 static const u32 sun4i_prescaler_table[] = {
@@ -66,6 +72,25 @@ static const u32 sun4i_prescaler_table[] = {
 	0,
 	0,
 	0, /* Actually 1 but tested separately */
+};
+
+static const u32 sun6i_prescaler_table[] = {
+	1,
+	2,
+	4,
+	8,
+	16,
+	32,
+	64,
+	0,
+	0,
+	0,
+	0,
+	0,
+	0,
+	0,
+	0,
+	0,
 };
 
 struct sunxi_reg_ops {
@@ -138,6 +163,33 @@ static u32 sun4i_reg_prd_read(struct sun4i_pwm_chip *chip, int npwm)
 static void sun4i_reg_prd_write(struct sun4i_pwm_chip *chip, int npwm, u32 val)
 {
 	sun4i_pwm_writel(chip, val, PWM_CH_PRD(npwm));
+}
+
+static int sun6i_reg_ctl_rdy(struct sun4i_pwm_chip *chip, int npwm)
+{
+	u32 val = sun4i_pwm_readl(chip, SUN6I_PWM_CH_CTL(npwm));
+
+	return val & BIT(SUN6I_PWM_RDY_BIT);
+}
+
+static u32 sun6i_reg_ctl_read(struct sun4i_pwm_chip *chip, int npwm)
+{
+	return sun4i_pwm_readl(chip, SUN6I_PWM_CH_CTL(npwm));
+}
+
+static void sun6i_reg_ctl_write(struct sun4i_pwm_chip *chip, int npwm, u32 val)
+{
+	return sun4i_pwm_writel(chip, val, SUN6I_PWM_CH_CTL(npwm));
+}
+
+static u32 sun6i_reg_prd_read(struct sun4i_pwm_chip *chip, int npwm)
+{
+	return sun4i_pwm_readl(chip, SUN6I_PWM_CH_PRD(npwm));
+}
+
+static void sun6i_reg_prd_write(struct sun4i_pwm_chip *chip, int npwm, u32 val)
+{
+	return sun4i_pwm_writel(chip, val, SUN6I_PWM_CH_PRD(npwm));
 }
 
 static int sun4i_pwm_config(struct pwm_chip *chip, struct pwm_device *pwm,
@@ -306,6 +358,14 @@ static const struct sunxi_reg_ops sun4i_reg_ops = {
 	.prd_write = sun4i_reg_prd_write,
 };
 
+static const struct sunxi_reg_ops sun6i_reg_ops = {
+	.ctl_rdy   = sun6i_reg_ctl_rdy,
+	.ctl_read  = sun6i_reg_ctl_read,
+	.ctl_write = sun6i_reg_ctl_write,
+	.prd_read  = sun6i_reg_prd_read,
+	.prd_write = sun6i_reg_prd_write,
+};
+
 static const struct pwm_ops sun4i_pwm_ops = {
 	.config = sun4i_pwm_config,
 	.set_polarity = sun4i_pwm_set_polarity,
@@ -338,6 +398,14 @@ static const struct sun4i_pwm_data sun4i_pwm_data_a13 = {
 	.prescaler_table = sun4i_prescaler_table,
 };
 
+static const struct sun4i_pwm_data sun6i_pwm_data_a31 = {
+	.has_prescaler_bypass = false,
+	.has_rdy = true,
+	.npwm = 4,
+	.ops = &sun6i_reg_ops,
+	.prescaler_table = sun6i_prescaler_table,
+};
+
 static const struct sun4i_pwm_data sun4i_pwm_data_a20 = {
 	.has_prescaler_bypass = true,
 	.has_rdy = true,
@@ -364,6 +432,9 @@ static const struct of_device_id sun4i_pwm_dt_ids[] = {
 	}, {
 		.compatible = "allwinner,sun5i-a13-pwm",
 		.data = &sun4i_pwm_data_a13,
+	}, {
+		.compatible = "allwinner,sun6i-a31-pwm",
+		.data = &sun6i_pwm_data_a31,
 	}, {
 		.compatible = "allwinner,sun7i-a20-pwm",
 		.data = &sun4i_pwm_data_a20,
