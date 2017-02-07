@@ -701,20 +701,13 @@ static int gic_set_affinity(struct irq_data *d, const struct cpumask *mask_val,
 #endif
 
 #ifdef CONFIG_CPU_PM
-/* Check whether it's single security state view */
-static bool gic_dist_security_disabled(void)
-{
-	return readl_relaxed(gic_data.dist_base + GICD_CTLR) & GICD_CTLR_DS;
-}
-
 static int gic_cpu_pm_notifier(struct notifier_block *self,
 			       unsigned long cmd, void *v)
 {
 	if (cmd == CPU_PM_EXIT) {
-		if (gic_dist_security_disabled())
-			gic_enable_redist(true);
+		gic_enable_redist(true);
 		gic_cpu_sys_reg_init();
-	} else if (cmd == CPU_PM_ENTER && gic_dist_security_disabled()) {
+	} else if (cmd == CPU_PM_ENTER) {
 		gic_write_grpen1(0);
 		gic_enable_redist(false);
 	}
@@ -727,6 +720,13 @@ static struct notifier_block gic_cpu_pm_notifier_block = {
 
 static void gic_cpu_pm_init(void)
 {
+	/**
+	 * On systems with two security states, the TZ/firmware is
+	 * responsible for redistributor power management.
+	 */
+	if (gic_has_security_extn())
+		return;
+
 	cpu_pm_register_notifier(&gic_cpu_pm_notifier_block);
 }
 
