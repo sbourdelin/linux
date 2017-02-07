@@ -1,0 +1,40 @@
+Kernel driver occ
+=================
+
+Supported chips:
+ * ASPEED AST2400
+ * ASPEED AST2500
+
+Please note that the chip must be connected to a POWER8 or POWER9 processor
+(see the BMC - Host Communications section).
+
+Author: Eddie James <eajames@us.ibm.com>
+
+Description
+-----------
+
+This driver implements support for the OCC (On-Chip Controller) on the IBM
+POWER8 and POWER9 processors, from a BMC (Baseboard Management Controller). The
+OCC is an embedded processor that provides real time power and thermal
+monitoring.
+
+This driver provides an interface on a BMC to poll OCC sensor data, set user
+power caps, and perform some basic OCC error handling.
+
+Currently, all versions of the OCC support four types of sensor data: power,
+temperature, frequency, and "caps," which indicate limits and thresholds used
+internally on the OCC.
+
+BMC - Host Communications
+-------------------------
+
+For the POWER8 application, the BMC can communicate with the P8 over I2C bus.
+However, to access the OCC register space, any data transfer must use a SCOM
+operation. SCOM is a procedure to initiate a data transfer, typically of 8
+bytes. SCOMs consist of writing a 32-bit command register and then
+reading/writing two 32-bit data registers. This driver implements these
+SCOM operations over I2C bus in order to communicate with the OCC.
+
+For the POWER9 application, the BMC can communicate with the P9 over FSI bus
+and SBE engine. Once again, SCOM operations are required. This driver will
+implement SCOM ops over FSI/SBE. This will require the FSI driver.
