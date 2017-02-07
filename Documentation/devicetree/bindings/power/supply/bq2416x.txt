@@ -1,0 +1,71 @@
+Binding for TI bq2416x Li-Ion Charger
+
+Required properties:
+===================
+- compatible: one of the following:
+ * "ti,bq24160"
+ * "ti,bq24160a"
+ * "ti,bq24161"
+ * "ti,bq24161b"
+ * "ti,bq24163"
+ * "ti,bq24168"
+
+- reg:			I2c address of the device.
+- interrupt-parent:	The irq controller(phandle) connected to INT pin on BQ2416x
+- interrupts:		The irq number assigned for INT pin.
+
+Optional properties:
+===================
+- interrupt-names:		Meanigfull irq name.
+- ti,charge-voltage:		Charge volatge [mV].
+- ti,charge-current:		Charge current [mA].
+- ti,termination-current:	Termination current [mA}.
+- ti,in-current-limit:		IN source current limit. enum:
+				- IN_CURR_LIM_1500MA (0)
+				- IN_CURR_LIM_2500MA (1)
+
+- ti,usb-current-limit:		USB source current limit. enum:
+				- USB_CURR_LIM_100MA (0)
+				- USB_CURR_LIM_150MA (1)
+				- USB_CURR_LIM_500MA (2)
+				- USB_CURR_LIM_800MA (3)
+				- USB_CURR_LIM_900MA (4)
+				- USB_CURR_LIM_1500MA (5)
+
+- ti,status-pin-enable:		0 or 1. Enable charge status output STAT pin.
+- ti,current-termination-enable:0 or 1. Enable charge current termination.
+- ti,usb-dpm-voltage:		USB dpm voltage [mV]. Refer to datasheet.
+- ti,in-dpm-voltage:		IN dpm voltage [mV].
+- ti,safety-timer:		Safety timer. enum:
+			- TMR_27MIN (0)
+			- TMR_6H (1)
+			- TMR_9H (2)
+			- TMR_OFF (3)
+
+- ti,supplied-to:	string array: max 4. Names of devices to which
+			the charger supplies.
+
+Example:
+=======
+#include <dt-bindings/power/bq2416x_charger.h>
+
+bq24160@6b {
+	compatible = "ti,bq24160";
+	reg = <0x6b>;
+
+	interrupt-parent = <&gpio5>;
+	interrupts = <31 IRQ_TYPE_EDGE_RISING>;
+	interrupt-names = "bq24160-charge-status-change";
+
+	ti,charge-voltage = <4300>;
+	ti,charge-current = <1300>;
+	ti,termination-current = <100>;
+	ti,in-current-limit = <IN_CURR_LIM_1500MA>;
+	ti,usb-current-limit = <USB_CURR_LIM_1500MA>;
+	ti,status-pin-enable = <1>;
+	ti,current-termination-enable = <1>;
+	ti,usb-dpm-voltage = <4300>;
+	ti,in-dpm-voltage = <4300>;
+	ti,safety-timer = <TMR_6H>; /* charge max 6h */
+	ti,supplied-to = "bq27621-0";
+};
