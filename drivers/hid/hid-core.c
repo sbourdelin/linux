@@ -2716,11 +2716,10 @@ EXPORT_SYMBOL_GPL(hid_add_device);
 struct hid_device *hid_allocate_device(void)
 {
 	struct hid_device *hdev;
-	int ret = -ENOMEM;
 
 	hdev = kzalloc(sizeof(*hdev), GFP_KERNEL);
 	if (!hdev)
-		return ERR_PTR(ret);
+		return ERR_PTR(-ENOMEM);
 
 	device_initialize(&hdev->dev);
 	hdev->dev.release = hid_device_release;
