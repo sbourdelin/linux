@@ -34,6 +34,9 @@
 #define SOC_ID_MASK	    0xFFFF0000
 #define SOC_REV_MASK	    0xFF
 
+#define MV98DX3236_DEV_ID_MASK	0xFF00
+#define MV98DX3236_REV_MASK	0xF
+
 static u32 soc_dev_id;
 static u32 soc_rev;
 static bool is_id_valid;
@@ -42,6 +45,11 @@ static const struct of_device_id mvebu_pcie_of_match_table[] = {
 	{ .compatible = "marvell,armada-xp-pcie", },
 	{ .compatible = "marvell,armada-370-pcie", },
 	{ .compatible = "marvell,kirkwood-pcie" },
+	{},
+};
+
+static const struct of_device_id mvebu_mv98dx3236_of_match_table[] = {
+	{ .compatible = "marvell,mv98dx3236-soc-id", },
 	{},
 };
 
@@ -131,15 +139,44 @@ clk_err:
 	return ret;
 }
 
+static int __init mvebu_dfx_get_soc_id(u32 *dev, u32 *rev)
+{
+	struct device_node *np;
+	void __iomem *base;
+
+	np = of_find_matching_node(NULL, mvebu_mv98dx3236_of_match_table);
+	if (!np)
+		return -ENODEV;
+
+	base = of_iomap(np, 0);
+	if (IS_ERR(base))
+		return PTR_ERR(base);
+
+	/* SoC ID */
+	*dev = (readl(base) >> 12) & MV98DX3236_DEV_ID_MASK;
+	/* SoC revision */
+	*rev = (readl(base) >> 28) & MV98DX3236_REV_MASK;
+
+	iounmap(base);
+	of_node_put(np);
+
+	return 0;
+}
+
 static int __init mvebu_soc_id_init(void)
 {
 
 	/*
-	 * First try to get the ID and the revision by the system
-	 * register and use PCI registers only if it is not possible
+	 * First try to get the ID and the revision by from system controller
+	 * register, then try the DFX register (if applicable), finally read it
+	 * from PCI registers.
 	 */
-	if (!mvebu_system_controller_get_soc_id(&soc_dev_id, &soc_rev)) {
+	if (!mvebu_system_controller_get_soc_id(&soc_dev_id, &soc_rev))
 		is_id_valid = true;
+	else if (!mvebu_dfx_get_soc_id(&soc_dev_id, &soc_rev))
+		is_id_valid = true;
+
+	if (is_id_valid) {
 		pr_info("MVEBU SoC ID=0x%X, Rev=0x%X\n", soc_dev_id, soc_rev);
 		return 0;
 	}

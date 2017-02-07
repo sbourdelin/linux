@@ -1,0 +1,14 @@
+Marvell 98dx3236 SoC ID
+---------------------------------------------------------------
+
+Required properties:
+
+- compatible: Should be "marvell,mv98dx3236-soc-id".
+
+- reg: should be the register base and length as documented in the
+  datasheet for the Device ID Status
+
+soc-id@f8244 {
+	compatible = "marvell,mv98dx3236-soc-id";
+	reg = <0xf8244 0x4>;
+};
