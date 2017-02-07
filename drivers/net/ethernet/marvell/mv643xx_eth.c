@@ -1511,16 +1511,12 @@ mv643xx_eth_get_link_ksettings_phy(struct mv643xx_eth_private *mp,
 	/*
 	 * The MAC does not support 1000baseT_Half.
 	 */
-	ethtool_convert_link_mode_to_legacy_u32(&supported,
-						cmd->link_modes.supported);
-	ethtool_convert_link_mode_to_legacy_u32(&advertising,
-						cmd->link_modes.advertising);
+	ethtool_ks_to_u32(&supported, cmd->link_modes.supported);
+	ethtool_ks_to_u32(&advertising, cmd->link_modes.advertising);
 	supported &= ~SUPPORTED_1000baseT_Half;
 	advertising &= ~ADVERTISED_1000baseT_Half;
-	ethtool_convert_legacy_u32_to_link_mode(cmd->link_modes.supported,
-						supported);
-	ethtool_convert_legacy_u32_to_link_mode(cmd->link_modes.advertising,
-						advertising);
+	ethtool_u32_to_ks(cmd->link_modes.supported, supported);
+	ethtool_u32_to_ks(cmd->link_modes.advertising, advertising);
 
 	return err;
 }
@@ -1556,10 +1552,8 @@ mv643xx_eth_get_link_ksettings_phyless(struct mv643xx_eth_private *mp,
 	cmd->base.phy_address = 0;
 	cmd->base.autoneg = AUTONEG_DISABLE;
 
-	ethtool_convert_legacy_u32_to_link_mode(cmd->link_modes.supported,
-						supported);
-	ethtool_convert_legacy_u32_to_link_mode(cmd->link_modes.advertising,
-						advertising);
+	ethtool_u32_to_ks(cmd->link_modes.supported, supported);
+	ethtool_u32_to_ks(cmd->link_modes.advertising, advertising);
 
 	return 0;
 }
@@ -1616,11 +1610,9 @@ mv643xx_eth_set_link_ksettings(struct net_device *dev,
 	/*
 	 * The MAC does not support 1000baseT_Half.
 	 */
-	ethtool_convert_link_mode_to_legacy_u32(&advertising,
-						c.link_modes.advertising);
+	ethtool_ks_to_u32(&advertising, c.link_modes.advertising);
 	advertising &= ~ADVERTISED_1000baseT_Half;
-	ethtool_convert_legacy_u32_to_link_mode(c.link_modes.advertising,
-						advertising);
+	ethtool_u32_to_ks(c.link_modes.advertising, advertising);
 
 	ret = phy_ethtool_ksettings_set(dev->phydev, &c);
 	if (!ret)

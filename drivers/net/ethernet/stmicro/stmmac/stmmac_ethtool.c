@@ -301,12 +301,10 @@ static int stmmac_ethtool_get_link_ksettings(struct net_device *dev,
 
 		/* Encoding of PSE bits is defined in 802.3z, 37.2.1.4 */
 
-		ethtool_convert_link_mode_to_legacy_u32(
-			&supported, cmd->link_modes.supported);
-		ethtool_convert_link_mode_to_legacy_u32(
-			&advertising, cmd->link_modes.advertising);
-		ethtool_convert_link_mode_to_legacy_u32(
-			&lp_advertising, cmd->link_modes.lp_advertising);
+		ethtool_ks_to_u32(&supported, cmd->link_modes.supported);
+		ethtool_ks_to_u32(&advertising, cmd->link_modes.advertising);
+		ethtool_ks_to_u32(&lp_advertising,
+				  cmd->link_modes.lp_advertising);
 
 		if (adv.pause & STMMAC_PCS_PAUSE)
 			advertising |= ADVERTISED_Pause;
@@ -348,12 +346,10 @@ static int stmmac_ethtool_get_link_ksettings(struct net_device *dev,
 					   ADVERTISED_10baseT_Half);
 		cmd->base.port = PORT_OTHER;
 
-		ethtool_convert_legacy_u32_to_link_mode(
-			cmd->link_modes.supported, supported);
-		ethtool_convert_legacy_u32_to_link_mode(
-			cmd->link_modes.advertising, advertising);
-		ethtool_convert_legacy_u32_to_link_mode(
-			cmd->link_modes.lp_advertising, lp_advertising);
+		ethtool_u32_to_ks(cmd->link_modes.supported, supported);
+		ethtool_u32_to_ks(cmd->link_modes.advertising, advertising);
+		ethtool_u32_to_ks(cmd->link_modes.lp_advertising,
+				  lp_advertising);
 
 		return 0;
 	}

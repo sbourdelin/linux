@@ -994,8 +994,7 @@ static int pxa168_init_phy(struct net_device *dev)
 	cmd.base.phy_address = pep->phy_addr;
 	cmd.base.speed = pep->phy_speed;
 	cmd.base.duplex = pep->phy_duplex;
-	ethtool_convert_legacy_u32_to_link_mode(cmd.link_modes.advertising,
-						PHY_BASIC_FEATURES);
+	ethtool_u32_to_ks(cmd.link_modes.advertising, PHY_BASIC_FEATURES);
 	cmd.base.autoneg = AUTONEG_ENABLE;
 
 	if (cmd.base.speed != 0)

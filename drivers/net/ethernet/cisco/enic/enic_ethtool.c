@@ -109,12 +109,10 @@ static int enic_get_ksettings(struct net_device *netdev,
 	struct enic *enic = netdev_priv(netdev);
 	struct ethtool_link_settings *base = &ecmd->base;
 
-	ethtool_link_ksettings_add_link_mode(ecmd, supported,
-					     10000baseT_Full);
-	ethtool_link_ksettings_add_link_mode(ecmd, supported, FIBRE);
-	ethtool_link_ksettings_add_link_mode(ecmd, advertising,
-					     10000baseT_Full);
-	ethtool_link_ksettings_add_link_mode(ecmd, advertising, FIBRE);
+	ethtool_ks_add_mode(ecmd, supported, 10000baseT_Full);
+	ethtool_ks_add_mode(ecmd, supported, FIBRE);
+	ethtool_ks_add_mode(ecmd, advertising, 10000baseT_Full);
+	ethtool_ks_add_mode(ecmd, advertising, FIBRE);
 	base->port = PORT_FIBRE;
 
 	if (netif_carrier_ok(netdev)) {
