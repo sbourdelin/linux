@@ -1437,7 +1437,6 @@ static struct sctp_chunk *sctp_make_control(const struct sctp_association *asoc,
 static void sctp_chunk_destroy(struct sctp_chunk *chunk)
 {
 	BUG_ON(!list_empty(&chunk->list));
-	list_del_init(&chunk->transmitted_list);
 
 	consume_skb(chunk->skb);
 	consume_skb(chunk->auth_chunk);
@@ -3503,7 +3502,7 @@ int sctp_process_asconf_ack(struct sctp_association *asoc,
 	}
 
 	/* Free the cached last sent asconf chunk. */
-	list_del_init(&asconf->transmitted_list);
+	list_del(&asconf->transmitted_list);
 	sctp_chunk_free(asconf);
 	asoc->addip_last_asconf = NULL;
 

@@ -97,7 +97,7 @@ static void sctp_datamsg_destroy(struct sctp_datamsg *msg)
 
 	/* Release all references. */
 	list_for_each_safe(pos, temp, &msg->chunks) {
-		list_del_init(pos);
+		list_del(pos);
 		chunk = list_entry(pos, struct sctp_chunk, frag_list);
 		/* Check whether we _really_ need to notify. */
 		if (notify < 0) {
@@ -289,7 +289,7 @@ errout_chunk_free:
 
 errout:
 	list_for_each_safe(pos, temp, &msg->chunks) {
-		list_del_init(pos);
+		list_del(pos);
 		chunk = list_entry(pos, struct sctp_chunk, frag_list);
 		sctp_chunk_free(chunk);
 	}

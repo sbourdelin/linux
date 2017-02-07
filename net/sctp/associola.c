@@ -1637,25 +1637,19 @@ int sctp_assoc_set_id(struct sctp_association *asoc, gfp_t gfp)
 static void sctp_assoc_free_asconf_queue(struct sctp_association *asoc)
 {
 	struct sctp_chunk *asconf;
-	struct sctp_chunk *tmp;
 
-	list_for_each_entry_safe(asconf, tmp, &asoc->addip_chunk_list, list) {
-		list_del_init(&asconf->list);
+	list_for_each_entry(asconf, &asoc->addip_chunk_list, list)
 		sctp_chunk_free(asconf);
-	}
 }
 
 /* Free asconf_ack cache */
 static void sctp_assoc_free_asconf_acks(struct sctp_association *asoc)
 {
 	struct sctp_chunk *ack;
-	struct sctp_chunk *tmp;
 
-	list_for_each_entry_safe(ack, tmp, &asoc->asconf_ack_list,
-				transmitted_list) {
-		list_del_init(&ack->transmitted_list);
+	list_for_each_entry(ack, &asoc->asconf_ack_list,
+			    transmitted_list)
 		sctp_chunk_free(ack);
-	}
 }
 
 /* Clean up the ASCONF_ACK queue */
@@ -1673,7 +1667,7 @@ void sctp_assoc_clean_asconf_ack_cache(const struct sctp_association *asoc)
 				htonl(asoc->peer.addip_serial))
 			break;
 
-		list_del_init(&ack->transmitted_list);
+		list_del(&ack->transmitted_list);
 		sctp_chunk_free(ack);
 	}
 }

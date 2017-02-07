@@ -231,7 +231,7 @@ static void __sctp_outq_teardown(struct sctp_outq *q)
 
 	/* Throw away chunks that have been gap ACKed.  */
 	list_for_each_safe(lchunk, temp, &q->sacked) {
-		list_del_init(lchunk);
+		list_del(lchunk);
 		chunk = list_entry(lchunk, struct sctp_chunk,
 				   transmitted_list);
 		sctp_chunk_fail(chunk, q->error);
@@ -240,7 +240,7 @@ static void __sctp_outq_teardown(struct sctp_outq *q)
 
 	/* Throw away any chunks in the retransmit queue. */
 	list_for_each_safe(lchunk, temp, &q->retransmit) {
-		list_del_init(lchunk);
+		list_del(lchunk);
 		chunk = list_entry(lchunk, struct sctp_chunk,
 				   transmitted_list);
 		sctp_chunk_fail(chunk, q->error);
@@ -249,7 +249,7 @@ static void __sctp_outq_teardown(struct sctp_outq *q)
 
 	/* Throw away any chunks that are in the abandoned queue. */
 	list_for_each_safe(lchunk, temp, &q->abandoned) {
-		list_del_init(lchunk);
+		list_del(lchunk);
 		chunk = list_entry(lchunk, struct sctp_chunk,
 				   transmitted_list);
 		sctp_chunk_fail(chunk, q->error);
@@ -266,7 +266,7 @@ static void __sctp_outq_teardown(struct sctp_outq *q)
 
 	/* Throw away any leftover control chunks. */
 	list_for_each_entry_safe(chunk, tmp, &q->control_chunk_list, list) {
-		list_del_init(&chunk->list);
+		list_del(&chunk->list);
 		sctp_chunk_free(chunk);
 	}
 }
@@ -392,7 +392,7 @@ static int sctp_prsctp_prune_unsent(struct sctp_association *asoc,
 		    chk->sinfo.sinfo_timetolive <= sinfo->sinfo_timetolive)
 			continue;
 
-		list_del_init(&chk->list);
+		list_del(&chk->list);
 		asoc->sent_cnt_removable--;
 		asoc->abandoned_unsent[SCTP_PR_INDEX(PRIO)]++;
 
@@ -1329,7 +1329,7 @@ int sctp_outq_sack(struct sctp_outq *q, struct sctp_chunk *chunk)
 				    transmitted_list);
 		tsn = ntohl(tchunk->subh.data_hdr->tsn);
 		if (TSN_lte(tsn, ctsn)) {
-			list_del_init(&tchunk->transmitted_list);
+			list_del(&tchunk->transmitted_list);
 			if (asoc->peer.prsctp_capable &&
 			    SCTP_PR_PRIO_ENABLED(chunk->sinfo.sinfo_flags))
 				asoc->sent_cnt_removable--;
@@ -1828,7 +1828,7 @@ static void sctp_generate_fwdtsn(struct sctp_outq *q, __u32 ctsn)
 		 * the ctsn.
 		 */
 		if (TSN_lte(tsn, ctsn)) {
-			list_del_init(lchunk);
+			list_del(lchunk);
 			sctp_chunk_free(chunk);
 		} else {
 			if (TSN_lte(tsn, asoc->adv_peer_ack_point+1)) {

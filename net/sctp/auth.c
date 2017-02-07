@@ -109,7 +109,6 @@ struct sctp_shared_key *sctp_auth_shkey_create(__u16 key_id, gfp_t gfp)
 /* Free the shared key structure */
 static void sctp_auth_shkey_free(struct sctp_shared_key *sh_key)
 {
-	BUG_ON(!list_empty(&sh_key->key_list));
 	sctp_auth_key_put(sh_key->key);
 	sh_key->key = NULL;
 	kfree(sh_key);
@@ -123,11 +122,8 @@ void sctp_auth_destroy_keys(struct list_head *keys)
 	struct sctp_shared_key *ep_key;
 	struct sctp_shared_key *tmp;
 
-	if (list_empty(keys))
-		return;
-
 	key_for_each_safe(ep_key, tmp, keys) {
-		list_del_init(&ep_key->key_list);
+		list_del(&ep_key->key_list);
 		sctp_auth_shkey_free(ep_key);
 	}
 }
@@ -948,7 +944,7 @@ int sctp_auth_del_key_id(struct sctp_endpoint *ep,
 		return -EINVAL;
 
 	/* Delete the shared key */
-	list_del_init(&key->key_list);
+	list_del(&key->key_list);
 	sctp_auth_shkey_free(key);
 
 	return 0;
