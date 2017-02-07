@@ -361,6 +361,8 @@ struct i40e_ring {
 					 * i40e_clean_rx_ring_irq() is called
 					 * for this ring.
 					 */
+
+	struct bpf_prog __rcu *xdp_prog;
 } ____cacheline_internodealigned_in_smp;
 
 enum i40e_latency_range {
