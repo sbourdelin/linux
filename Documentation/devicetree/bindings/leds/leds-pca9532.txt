@@ -11,12 +11,24 @@ Required properties:
 		"nxp,pca9533"
 	- reg -  I2C slave address
 
+Optional properties:
+	- psc0: 8 bit prescaler value according to NXP data sheet
+	- pwm0: 8 bit PWM value according to NXP data sheet
+	- psc1: 8 bit prescaler value according to NXP data sheet
+	- pwm1: 8 bit PWM value according to NXP data sheet
+
 Each led is represented as a sub-node of the nxp,pca9530.
 
 Optional sub-node properties:
 	- label: see Documentation/devicetree/bindings/leds/common.txt
 	- type: Output configuration, see dt-bindings/leds/leds-pca9532.h (default NONE)
 	- linux,default-trigger: see Documentation/devicetree/bindings/leds/common.txt
+	- default-state: see Documentation/devicetree/bindings/leds/common.txt
+	  This property is only valid for sub-nodes of type <PCA9532_TYPE_LED>.
+	  In addition to the values mentioned in the document above the additional
+	  values "pwm0" and "pwm1" are valid. The corresponding LED will blink
+	  or will be dimmed depending on the configuration of prescaler and pwm
+	  values (see optional node properties above).
 
 Example:
   #include <dt-bindings/leds/leds-pca9532.h>
@@ -24,6 +36,8 @@ Example:
   leds: pca9530@60 {
     compatible = "nxp,pca9530";
     reg = <0x60>;
+    psc0 = <0x97>; // blink frequency 1Hz
+    pwm0 = <0x80>; // 50% duty cycle (500ms On / 500ms Off)
 
     red-power {
       label = "pca:red:power";
@@ -32,6 +46,14 @@ Example:
     green-power {
       label = "pca:green:power";
       type = <PCA9532_TYPE_LED>;
+    };
+    kernel-booting {
+    	type = <PCA9532_TYPE_LED>;
+    	default-state = "pwm0";
+    };
+    sys-stat {
+    	type = <PCA9532_TYPE_LED>;
+    	default-state = "keep"; // don't touch, was set by U-Boot
     };
   };
 
