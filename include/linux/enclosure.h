@@ -97,6 +97,7 @@ struct enclosure_component {
 	struct device cdev;
 	struct device *dev;
 	enum enclosure_component_type type;
+	int links_created;
 	int number;
 	int fault;
 	int active;
