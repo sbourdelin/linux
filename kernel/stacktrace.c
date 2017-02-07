@@ -14,13 +14,14 @@
 void print_stack_trace(struct stack_trace *trace, int spaces)
 {
 	int i;
+	void *ip;
 
 	if (WARN_ON(!trace->entries))
 		return;
 
 	for (i = 0; i < trace->nr_entries; i++) {
-		printk("%*c", 1 + spaces, ' ');
-		print_ip_sym(trace->entries[i]);
+		ip = (void *)trace->entries[i];
+		printk("%*c[<%p>] %pS\n", 1 + spaces, ' ', ip, ip);
 	}
 }
 EXPORT_SYMBOL_GPL(print_stack_trace);
