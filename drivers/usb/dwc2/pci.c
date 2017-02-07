@@ -124,7 +124,7 @@ static int dwc2_pci_probe(struct pci_dev *pci,
 	ret = platform_device_add_resources(dwc2, res, ARRAY_SIZE(res));
 	if (ret) {
 		dev_err(dev, "couldn't add resources to dwc2 device\n");
-		return ret;
+		goto err_device_put;
 	}
 
 	dwc2->dev.parent = dev;
@@ -133,30 +133,37 @@ static int dwc2_pci_probe(struct pci_dev *pci,
 	if (IS_ERR(phy)) {
 		dev_err(dev, "error registering generic PHY (%ld)\n",
 			PTR_ERR(phy));
-		return PTR_ERR(phy);
+		ret = PTR_ERR(phy);
+		goto err_device_put;
 	}
 
 	ret = dwc2_pci_quirks(pci, dwc2);
 	if (ret)
-		goto err;
+		goto err_unregister;
 
 	ret = platform_device_add(dwc2);
 	if (ret) {
 		dev_err(dev, "failed to register dwc2 device\n");
-		goto err;
+		goto err_unregister;
 	}
 
 	glue = kzalloc(sizeof(*glue), GFP_KERNEL);
-	if (!glue)
-		return -ENOMEM;
+	if (!glue) {
+		ret = -ENOMEM;
+		goto err_device_del;
+	}
 
 	glue->phy = phy;
 	glue->dwc2 = dwc2;
 	pci_set_drvdata(pci, glue);
 
 	return 0;
-err:
+
+err_device_del:
+	platform_device_del(dwc2);
+err_unregister:
 	usb_phy_generic_unregister(phy);
+err_device_put:
 	platform_device_put(dwc2);
 	return ret;
 }
