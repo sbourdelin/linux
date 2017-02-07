@@ -481,7 +481,7 @@ static char *resolv_usage_page(unsigned page, struct seq_file *f) {
 
 char *hid_resolv_usage(unsigned usage, struct seq_file *f) {
 	const struct hid_usage_entry *p;
-	char *buf = NULL;
+	char *buf;
 	int len = 0;
 
 	buf = resolv_usage_page(usage >> 16, f);
