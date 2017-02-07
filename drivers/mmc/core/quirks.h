@@ -17,7 +17,7 @@
 
 #include "card.h"
 
-static const struct mmc_fixup blk_fixups[] = {
+static const struct mmc_fixup mmc_blk_fixups[] = {
 	MMC_FIXUP("SEM02G", CID_MANFID_SANDISK, 0x100, add_quirk,
 		  MMC_QUIRK_INAND_CMD38),
 	MMC_FIXUP("SEM04G", CID_MANFID_SANDISK, 0x100, add_quirk,
