@@ -35,7 +35,7 @@ the `bpf(2)`_ syscall.
 
 This documentation is focused on the kernel tree's `samples/bpf/`_ and
 `tools/lib/bpf/`_.  It is worth mentioning that other projects exist,
-like BCC_, that has a slightly different user-facing
+like :doc:`bcc_tool_chain`, that has a slightly different user-facing
 syntax, but is interfacing with the same kernel facilities as those
 covered by this documentation.
 
@@ -44,6 +44,7 @@ covered by this documentation.
 
    ebpf_maps
    ebpf_maps_types
+   bcc_tool_chain
 
 .. links:
 
@@ -64,6 +65,4 @@ covered by this documentation.
    https://git.kernel.org/cgit/linux/kernel/git/torvalds/linux.git/tree/tools/lib/bpf/
 
 .. _Traffic control: http://man7.org/linux/man-pages/man8/tc-bpf.8.html
-
-.. _BCC: https://github.com/iovisor/bcc
 
