@@ -3304,6 +3304,9 @@ static int sd_start_stop_device(struct scsi_disk *sdkp, int start)
 static void sd_shutdown(struct device *dev)
 {
 	struct scsi_disk *sdkp = dev_get_drvdata(dev);
+	struct scsi_device *sdev;
+	struct Scsi_Host *shost;
+	bool scan_mutex_locked;
 
 	if (!sdkp)
 		return;         /* this can happen */
@@ -3311,14 +3314,26 @@ static void sd_shutdown(struct device *dev)
 	if (pm_runtime_suspended(dev))
 		return;
 
+	sdev = sdkp->device;
+	shost = sdev->host;
+	scan_mutex_locked = mutex_is_locked(&shost->scan_mutex);
+
 	if (sdkp->WCE && sdkp->media_present) {
+		if (scan_mutex_locked)
+			mutex_unlock(&shost->scan_mutex);
 		sd_printk(KERN_NOTICE, sdkp, "Synchronizing SCSI cache\n");
 		sd_sync_cache(sdkp);
+		if (scan_mutex_locked)
+			mutex_lock(&shost->scan_mutex);
 	}
 
 	if (system_state != SYSTEM_RESTART && sdkp->device->manage_start_stop) {
+		if (scan_mutex_locked)
+			mutex_unlock(&shost->scan_mutex);
 		sd_printk(KERN_NOTICE, sdkp, "Stopping disk\n");
 		sd_start_stop_device(sdkp, 0);
+		if (scan_mutex_locked)
+			mutex_lock(&shost->scan_mutex);
 	}
 }
 
