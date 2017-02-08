@@ -140,6 +140,8 @@
 #include <linux/hrtimer.h>
 #include <linux/netfilter_ingress.h>
 #include <linux/crash_dump.h>
+#include <linux/filter.h>
+#include <net/xdp.h>
 
 #include "net-sysfs.h"
 
@@ -6598,6 +6600,27 @@ int dev_change_proto_down(struct net_device *dev, bool proto_down)
 }
 EXPORT_SYMBOL(dev_change_proto_down);
 
+/* Run a BPF/XDP program. RCU read lock must be held */
+static u32 dev_bpf_prog_run_xdp(const void *priv,
+				struct xdp_buff *xdp)
+{
+	const struct bpf_prog *prog = (const struct bpf_prog *)priv;
+
+	return BPF_PROG_RUN(prog, (void *)xdp);
+}
+
+static void dev_bpf_prog_put_xdp(const void *priv)
+{
+	bpf_prog_put((struct bpf_prog *)priv);
+}
+
+struct xdp_hook xdp_bpf_hook = {
+	.hookfn = dev_bpf_prog_run_xdp,
+	.put_priv = dev_bpf_prog_put_xdp,
+	.priority = 0,
+	.is_bpf = true
+};
+
 /**
  *	dev_change_xdp_fd - set or clear a bpf program for a device rx path
  *	@dev: device
@@ -6610,7 +6633,6 @@ int dev_change_xdp_fd(struct net_device *dev, int fd, u32 flags)
 {
 	const struct net_device_ops *ops = dev->netdev_ops;
 	struct bpf_prog *prog = NULL;
-	struct netdev_xdp xdp;
 	int err;
 
 	ASSERT_RTNL();
@@ -6618,29 +6640,25 @@ int dev_change_xdp_fd(struct net_device *dev, int fd, u32 flags)
 	if (!ops->ndo_xdp)
 		return -EOPNOTSUPP;
 	if (fd >= 0) {
-		if (flags & XDP_FLAGS_UPDATE_IF_NOEXIST) {
-			memset(&xdp, 0, sizeof(xdp));
-			xdp.command = XDP_QUERY_PROG;
-
-			err = ops->ndo_xdp(dev, &xdp);
-			if (err < 0)
-				return err;
-			if (xdp.prog_attached)
-				return -EBUSY;
-		}
+		if ((flags & XDP_FLAGS_UPDATE_IF_NOEXIST) &&
+		    xdp_find_dev_hook(dev, &xdp_bpf_hook, NULL))
+			return -EBUSY;
 
 		prog = bpf_prog_get_type(fd, BPF_PROG_TYPE_XDP);
 		if (IS_ERR(prog))
 			return PTR_ERR(prog);
 	}
 
-	memset(&xdp, 0, sizeof(xdp));
-	xdp.command = XDP_SETUP_PROG;
-	xdp.prog = prog;
+	if (prog) {
+		err = xdp_bpf_check_prog(dev, prog);
+		if (err >= 0)
+			err = xdp_register_dev_hook(dev, &xdp_bpf_hook);
 
-	err = ops->ndo_xdp(dev, &xdp);
-	if (err < 0 && prog)
-		bpf_prog_put(prog);
+		if (err < 0)
+			bpf_prog_put(prog);
+	} else {
+		err = xdp_unregister_dev_hook(dev, &xdp_bpf_hook);
+	}
 
 	return err;
 }
@@ -7679,6 +7697,7 @@ void free_netdev(struct net_device *dev)
 	struct napi_struct *p, *n;
 
 	might_sleep();
+	xdp_unregister_all_hooks(dev);
 	netif_free_tx_queues(dev);
 #ifdef CONFIG_SYSFS
 	kvfree(dev->_rx);

@@ -52,6 +52,7 @@
 #include <net/dst_metadata.h>
 #include <net/dst.h>
 #include <net/sock_reuseport.h>
+#include <net/xdp.h>
 
 /**
  *	sk_filter_trim_cap - run a packet through a socket filter

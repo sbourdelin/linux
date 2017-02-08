@@ -38,6 +38,7 @@
 #include <linux/filter.h>
 #include <linux/pkt_cls.h>
 #include <linux/unistd.h>
+#include <net/xdp.h>
 
 #include "nfp_asm.h"
 #include "nfp_bpf.h"
