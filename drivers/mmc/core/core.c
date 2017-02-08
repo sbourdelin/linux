@@ -1869,6 +1869,12 @@ void mmc_power_cycle(struct mmc_host *host, u32 ocr)
 	mmc_power_up(host, ocr);
 }
 
+void mmc_hw_reset_pwrseq(struct mmc_host *host)
+{
+	mmc_pwrseq_reset(host);
+}
+EXPORT_SYMBOL(mmc_hw_reset_pwrseq);
+
 /*
  * Cleanup when the last reference to the bus operator is dropped.
  */
