@@ -4554,7 +4554,6 @@ intel_dp_long_pulse(struct intel_connector *intel_connector)
 	intel_dp_set_edid(intel_dp);
 	if (is_edp(intel_dp) || intel_connector->detect_edid)
 		status = connector_status_connected;
-	intel_dp->detect_done = true;
 
 	/* Try to read the source of the interrupt */
 	if (intel_dp->dpcd[DP_DPCD_REV] >= 0x11 &&
@@ -4588,11 +4587,7 @@ intel_dp_detect(struct drm_connector *connector, bool force)
 	DRM_DEBUG_KMS("[CONNECTOR:%d:%s]\n",
 		      connector->base.id, connector->name);
 
-	/* If full detect is not performed yet, do a full detect */
-	if (!intel_dp->detect_done)
-		status = intel_dp_long_pulse(intel_dp->attached_connector);
-
-	intel_dp->detect_done = false;
+	status = intel_dp_long_pulse(intel_dp->attached_connector);
 
 	return status;
 }
@@ -4966,7 +4961,6 @@ intel_dp_hpd_pulse(struct intel_digital_port *intel_dig_port, bool long_hpd)
 		      long_hpd ? "long" : "short");
 
 	if (long_hpd) {
-		intel_dp->detect_done = false;
 		return IRQ_NONE;
 	}
 
@@ -4984,14 +4978,12 @@ intel_dp_hpd_pulse(struct intel_digital_port *intel_dig_port, bool long_hpd)
 			intel_dp->is_mst = false;
 			drm_dp_mst_topology_mgr_set_mst(&intel_dp->mst_mgr,
 							intel_dp->is_mst);
-			intel_dp->detect_done = false;
 			goto put_power;
 		}
 	}
 
 	if (!intel_dp->is_mst) {
 		if (!intel_dp_short_pulse(intel_dp)) {
-			intel_dp->detect_done = false;
 			goto put_power;
 		}
 	}
