@@ -1432,10 +1432,9 @@ static void recover_queues(struct uld_ctx *ctx)
 	idr_for_each(&ctx->dev->qpidr, count_qps, &count);
 
 	qp_list.qps = kcalloc(count, sizeof(*qp_list.qps), GFP_ATOMIC);
-	if (!qp_list.qps) {
-		spin_unlock_irq(&ctx->dev->lock);
-		return;
-	}
+	if (!qp_list.qps)
+		goto unlock;
+
 	qp_list.idx = 0;
 
 	/* add and ref each qp so it doesn't get freed */
@@ -1453,6 +1452,7 @@ static void recover_queues(struct uld_ctx *ctx)
 	spin_lock_irq(&ctx->dev->lock);
 	WARN_ON(ctx->dev->db_state != RECOVERY);
 	ctx->dev->db_state = STOPPED;
+unlock:
 	spin_unlock_irq(&ctx->dev->lock);
 }
 
