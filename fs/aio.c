@@ -1556,6 +1556,11 @@ static int io_submit_one(struct kioctx *ctx, struct iocb __user *user_iocb,
 		return -EINVAL;
 	}
 
+	if (unlikely(iocb->aio_flags & ~IOCB_FLAG_RESFD)) {
+		pr_debug("EINVAL: incorrect flags\n");
+		return -EINVAL;
+	}
+
 	req = aio_get_req(ctx);
 	if (unlikely(!req))
 		return -EAGAIN;
