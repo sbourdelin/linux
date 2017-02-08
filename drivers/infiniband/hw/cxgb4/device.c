@@ -644,14 +644,12 @@ static int ep_release(struct inode *inode, struct file *file)
 static int ep_open(struct inode *inode, struct file *file)
 {
 	struct c4iw_debugfs_data *epd;
-	int ret = 0;
 	int count = 1;
 
 	epd = kmalloc(sizeof(*epd), GFP_KERNEL);
-	if (!epd) {
-		ret = -ENOMEM;
-		goto out;
-	}
+	if (!epd)
+		goto failure_indication;
+
 	epd->devp = inode->i_private;
 	epd->pos = 0;
 
@@ -663,10 +661,8 @@ static int ep_open(struct inode *inode, struct file *file)
 
 	epd->bufsize = count * 240;
 	epd->buf = vmalloc(epd->bufsize);
-	if (!epd->buf) {
-		ret = -ENOMEM;
-		goto err1;
-	}
+	if (!epd->buf)
+		goto free_epd;
 
 	spin_lock_irq(&epd->devp->lock);
 	idr_for_each(&epd->devp->hwtid_idr, dump_ep, epd);
@@ -675,11 +671,11 @@ static int ep_open(struct inode *inode, struct file *file)
 	spin_unlock_irq(&epd->devp->lock);
 
 	file->private_data = epd;
-	goto out;
-err1:
+	return 0;
+free_epd:
 	kfree(epd);
-out:
-	return ret;
+failure_indication:
+	return -ENOMEM;
 }
 
 static const struct file_operations ep_debugfs_fops = {
