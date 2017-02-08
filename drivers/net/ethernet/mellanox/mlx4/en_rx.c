@@ -927,12 +927,12 @@ int mlx4_en_process_rx_cq(struct net_device *dev, struct mlx4_en_cq *cq, int bud
 							length, cq->ring,
 							&doorbell_pending)))
 					goto consumed;
-				trace_xdp_hook_exception(dev, last_hook, act);
+				trace_xdp_exception(dev, last_hook, act);
 				goto xdp_drop_no_cnt; /* Drop on xmit failure */
 			default:
 				xdp_warn_invalid_action(act);
 			case XDP_ABORTED:
-				trace_xdp_hook_exception(dev, last_hook, act);
+				trace_xdp_exception(dev, last_hook, act);
 			case XDP_DROP:
 				ring->xdp_drop++;
 xdp_drop_no_cnt:

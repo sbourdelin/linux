@@ -134,7 +134,7 @@ bool bnxt_rx_xdp(struct bnxt *bp, struct bnxt_rx_ring_info *rxr, u16 cons,
 
 	case XDP_TX:
 		if (tx_avail < 2) {
-			trace_xdp_hook_exception(bp->dev, last_hook, act);
+			trace_xdp_exception(bp->dev, last_hook, act);
 			bnxt_reuse_rx_data(rxr, cons, page);
 			return true;
 		}
@@ -150,7 +150,7 @@ bool bnxt_rx_xdp(struct bnxt *bp, struct bnxt_rx_ring_info *rxr, u16 cons,
 		xdp_warn_invalid_action(act);
 		/* Fall thru */
 	case XDP_ABORTED:
-		trace_xdp_hook_exception(bp->dev, last_hook, act);
+		trace_xdp_exception(bp->dev, last_hook, act);
 		/* Fall thru */
 	case XDP_DROP:
 		bnxt_reuse_rx_data(rxr, cons, page);

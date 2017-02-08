@@ -740,12 +740,12 @@ static inline int mlx5e_xdp_handle(struct mlx5e_rq *rq,
 		return false;
 	case XDP_TX:
 		if (unlikely(!mlx5e_xmit_xdp_frame(rq, di, &xdp)))
-			trace_xdp_hook_exception(rq->netdev, last_hook, act);
+			trace_xdp_exception(rq->netdev, last_hook, act);
 		return true;
 	default:
 		xdp_warn_invalid_action(act);
 	case XDP_ABORTED:
-		trace_xdp_hook_exception(rq->netdev, last_hook, act);
+		trace_xdp_exception(rq->netdev, last_hook, act);
 	case XDP_DROP:
 		rq->stats.xdp_drop++;
 		mlx5e_page_release(rq, di, true);
