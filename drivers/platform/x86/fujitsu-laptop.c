@@ -762,6 +762,23 @@ static int acpi_fujitsu_bl_add(struct acpi_device *device)
 		fujitsu_bl->max_brightness = FUJITSU_LCD_N_LEVELS;
 	get_lcd_level();
 
+	if (acpi_video_get_backlight_type() == acpi_backlight_vendor) {
+		struct backlight_properties props;
+
+		memset(&props, 0, sizeof(struct backlight_properties));
+		props.type = BACKLIGHT_PLATFORM;
+		props.max_brightness = fujitsu_bl->max_brightness - 1;
+		props.brightness = fujitsu_bl->brightness_level;
+		fujitsu_bl->bl_device =
+			backlight_device_register("fujitsu-laptop", NULL, NULL,
+						  &fujitsu_bl_ops, &props);
+		if (IS_ERR(fujitsu_bl->bl_device)) {
+			error = PTR_ERR(fujitsu_bl->bl_device);
+			fujitsu_bl->bl_device = NULL;
+			goto err_unregister_input_dev;
+		}
+	}
+
 	return 0;
 
 err_unregister_input_dev:
@@ -777,6 +794,9 @@ static int acpi_fujitsu_bl_remove(struct acpi_device *device)
 {
 	struct fujitsu_bl *fujitsu_bl = acpi_driver_data(device);
 	struct input_dev *input = fujitsu_bl->input;
+
+	if (fujitsu_bl->bl_device)
+		backlight_device_unregister(fujitsu_bl->bl_device);
 
 	input_unregister_device(input);
 
@@ -1192,7 +1212,7 @@ MODULE_DEVICE_TABLE(acpi, fujitsu_ids);
 
 static int __init fujitsu_init(void)
 {
-	int ret, max_brightness;
+	int ret;
 
 	if (acpi_disabled)
 		return -ENODEV;
@@ -1229,30 +1249,9 @@ static int __init fujitsu_init(void)
 	if (ret)
 		goto fail_platform_device2;
 
-	/* Register backlight stuff */
-
-	if (acpi_video_get_backlight_type() == acpi_backlight_vendor) {
-		struct backlight_properties props;
-
-		memset(&props, 0, sizeof(struct backlight_properties));
-		max_brightness = fujitsu_bl->max_brightness;
-		props.type = BACKLIGHT_PLATFORM;
-		props.max_brightness = max_brightness - 1;
-		fujitsu_bl->bl_device = backlight_device_register("fujitsu-laptop",
-								  NULL, NULL,
-								  &fujitsu_bl_ops,
-								  &props);
-		if (IS_ERR(fujitsu_bl->bl_device)) {
-			ret = PTR_ERR(fujitsu_bl->bl_device);
-			fujitsu_bl->bl_device = NULL;
-			goto fail_sysfs_group;
-		}
-		fujitsu_bl->bl_device->props.brightness = fujitsu_bl->brightness_level;
-	}
-
 	ret = platform_driver_register(&fujitsu_pf_driver);
 	if (ret)
-		goto fail_backlight;
+		goto fail_sysfs_group;
 
 	/* Register laptop driver */
 
@@ -1282,8 +1281,6 @@ fail_laptop1:
 	kfree(fujitsu_laptop);
 fail_laptop:
 	platform_driver_unregister(&fujitsu_pf_driver);
-fail_backlight:
-	backlight_device_unregister(fujitsu_bl->bl_device);
 fail_sysfs_group:
 	sysfs_remove_group(&fujitsu_bl->pf_device->dev.kobj,
 			   &fujitsu_pf_attribute_group);
@@ -1306,8 +1303,6 @@ static void __exit fujitsu_cleanup(void)
 	kfree(fujitsu_laptop);
 
 	platform_driver_unregister(&fujitsu_pf_driver);
-
-	backlight_device_unregister(fujitsu_bl->bl_device);
 
 	sysfs_remove_group(&fujitsu_bl->pf_device->dev.kobj,
 			   &fujitsu_pf_attribute_group);
