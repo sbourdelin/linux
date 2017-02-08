@@ -163,14 +163,6 @@ static u64 hist_field_log2(struct hist_field *hist_field,
 	return (u64) ilog2(roundup_pow_of_two(val));
 }
 
-static u64 hist_field_timestamp(struct hist_field *hist_field,
-				struct tracing_map_elt *elt,
-				struct ring_buffer_event *rbe,
-				void *event)
-{
-	return ring_buffer_event_time_stamp(rbe);
-}
-
 #define DEFINE_HIST_FIELD_FN(type)					\
 	static u64 hist_field_##type(struct hist_field *hist_field,	\
 				     struct tracing_map_elt *elt,	\
@@ -223,6 +215,7 @@ enum hist_field_flags {
 	HIST_FIELD_FL_VAR_REF		= 4096,
 	HIST_FIELD_FL_EXPR		= 8192,
 	HIST_FIELD_FL_TIMESTAMP		= 16384,
+	HIST_FIELD_FL_TIMESTAMP_USECS	= 32768,
 };
 
 struct hist_trigger_attrs {
@@ -235,6 +228,7 @@ struct hist_trigger_attrs {
 	bool		pause;
 	bool		cont;
 	bool		clear;
+	bool		ts_in_usecs;
 	unsigned int	map_bits;
 };
 
@@ -254,6 +248,22 @@ struct hist_trigger_data {
 	struct tracing_map		*map;
 	bool				enable_timestamps;
 };
+
+static u64 hist_field_timestamp(struct hist_field *hist_field,
+				struct tracing_map_elt *elt,
+				struct ring_buffer_event *rbe,
+				void *event)
+{
+	struct hist_trigger_data *hist_data = elt->map->private_data;
+	struct trace_array *tr = hist_data->event_file->tr;
+
+	u64 ts = ring_buffer_event_time_stamp(rbe);
+
+	if (hist_data->attrs->ts_in_usecs && trace_clock_in_ns(tr))
+		ts = ns2usecs(ts);
+
+	return ts;
+}
 
 static LIST_HEAD(hist_var_list);
 
@@ -620,7 +630,6 @@ static struct hist_trigger_attrs *parse_hist_trigger_attrs(char *trigger_str)
 
 	while (trigger_str) {
 		char *str = strsep(&trigger_str, ":");
-
 		if (strchr(str, '=')) {
 			ret = parse_assignment(str, attrs);
 			if (ret)
@@ -948,6 +957,8 @@ parse_field(struct hist_trigger_data *hist_data, struct trace_event_file *file,
 			*flags |= HIST_FIELD_FL_SYSCALL;
 		else if (strcmp(field_str, "log2") == 0)
 			*flags |= HIST_FIELD_FL_LOG2;
+		else if (strcmp(field_str, "usecs") == 0)
+			*flags |= HIST_FIELD_FL_TIMESTAMP_USECS;
 		else
 			return ERR_PTR(-EINVAL);
 	}
@@ -955,6 +966,8 @@ parse_field(struct hist_trigger_data *hist_data, struct trace_event_file *file,
 	if (strcmp(field_name, "common_timestamp") == 0) {
 		*flags |= HIST_FIELD_FL_TIMESTAMP;
 		hist_data->enable_timestamps = true;
+		if (*flags & HIST_FIELD_FL_TIMESTAMP_USECS)
+			hist_data->attrs->ts_in_usecs = true;
 	} else {
 		field = trace_find_event_field(file->event_call, field_name);
 		if (!field)
@@ -1949,6 +1962,8 @@ static const char *get_hist_field_flags(struct hist_field *hist_field)
 		flags_str = "syscall";
 	else if (hist_field->flags & HIST_FIELD_FL_LOG2)
 		flags_str = "log2";
+	else if (hist_field->flags & HIST_FIELD_FL_TIMESTAMP_USECS)
+		flags_str = "usecs";
 
 	return flags_str;
 }
