@@ -42,7 +42,7 @@ struct lpfc_sli2_slim;
 #define LPFC_MAX_NS_RETRY	3	/* Number of retry attempts to contact
 					   the NameServer  before giving up. */
 #define LPFC_CMD_PER_LUN	3	/* max outstanding cmds per lun */
-#define LPFC_DEFAULT_SG_SEG_CNT 64	/* sg element count per scsi cmnd */
+#define LPFC_DEFAULT_SG_SEG_CNT 128	/* sg element count per scsi cmnd */
 #define LPFC_DEFAULT_MENLO_SG_SEG_CNT 128	/* sg element count per scsi
 		cmnd for menlo needs nearly twice as for firmware
 		downloads using bsg */
