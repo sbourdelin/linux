@@ -2520,7 +2520,7 @@ void free_hot_cold_page(struct page *page, bool cold)
 	}
 
 out:
-	preempt_enable_no_resched();
+	preempt_enable();
 }
 
 /*
@@ -2686,7 +2686,7 @@ static struct page *rmqueue_pcplist(struct zone *preferred_zone,
 		__count_zid_vm_events(PGALLOC, page_zonenum(page), 1 << order);
 		zone_statistics(preferred_zone, zone);
 	}
-	preempt_enable_no_resched();
+	preempt_enable();
 	return page;
 }
 
