@@ -19,7 +19,6 @@
 #include <linux/log2.h>
 #include <linux/bitops.h>
 #include <linux/jiffies.h>
-#include <linux/of.h>
 #include <linux/acpi.h>
 #include <linux/i2c.h>
 #include <linux/nvmem-provider.h>
@@ -562,26 +561,17 @@ static int at24_write(void *priv, unsigned int off, void *val, size_t count)
 	return 0;
 }
 
-#ifdef CONFIG_OF
-static void at24_get_ofdata(struct i2c_client *client,
+static void at24_fw_to_chip(struct device *dev,
 			    struct at24_platform_data *chip)
 {
-	const __be32 *val;
-	struct device_node *node = client->dev.of_node;
+	u32 val;
 
-	if (node) {
-		if (of_get_property(node, "read-only", NULL))
-			chip->flags |= AT24_FLAG_READONLY;
-		val = of_get_property(node, "pagesize", NULL);
-		if (val)
-			chip->page_size = be32_to_cpup(val);
-	}
+	if (device_property_present(dev, "read-only"))
+		chip->flags |= AT24_FLAG_READONLY;
+
+	if (device_property_read_u32(dev, "pagesize", &val) == 0)
+		chip->page_size = val;
 }
-#else
-static void at24_get_ofdata(struct i2c_client *client,
-			    struct at24_platform_data *chip)
-{ }
-#endif /* CONFIG_OF */
 
 static int at24_probe(struct i2c_client *client, const struct i2c_device_id *id)
 {
@@ -621,7 +611,7 @@ static int at24_probe(struct i2c_client *client, const struct i2c_device_id *id)
 		chip.page_size = 1;
 
 		/* update chipdata if OF is present */
-		at24_get_ofdata(client, &chip);
+		at24_fw_to_chip(&client->dev, &chip);
 
 		chip.setup = NULL;
 		chip.context = NULL;
