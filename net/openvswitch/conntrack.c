@@ -277,8 +277,9 @@ static int ovs_ct_set_labels(struct sk_buff *skb, struct sw_flow_key *key,
 	if (!cl || sizeof(cl->bits) < OVS_CT_LABELS_LEN)
 		return -ENOSPC;
 
-	err = nf_connlabels_replace(ct, (u32 *)labels, (u32 *)mask,
-				    OVS_CT_LABELS_LEN / sizeof(u32));
+	err = nf_connlabels_replace(ct, labels->ct_labels_32,
+				    mask->ct_labels_32,
+				    OVS_CT_LABELS_LEN_32);
 	if (err)
 		return err;
 
@@ -852,8 +853,8 @@ static bool labels_nonzero(const struct ovs_key_ct_labels *labels)
 {
 	size_t i;
 
-	for (i = 0; i < sizeof(*labels); i++)
-		if (labels->ct_labels[i])
+	for (i = 0; i < OVS_CT_LABELS_LEN_32; i++)
+		if (labels->ct_labels_32[i])
 			return true;
 
 	return false;
