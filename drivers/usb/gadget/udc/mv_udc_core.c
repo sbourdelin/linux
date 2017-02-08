@@ -509,7 +509,7 @@ static int mv_ep_enable(struct usb_ep *_ep,
 	dqh = ep->dqh;
 	dqh->max_packet_length = (max << EP_QUEUE_HEAD_MAX_PKT_LEN_POS)
 		| (mult << EP_QUEUE_HEAD_MULT_POS)
-		| (zlt ? EP_QUEUE_HEAD_ZLT_SEL : 0)
+		| EP_QUEUE_HEAD_ZLT_SEL
 		| (ios ? EP_QUEUE_HEAD_IOS : 0);
 	dqh->next_dtd_ptr = 1;
 	dqh->size_ioc_int_sts = 0;
