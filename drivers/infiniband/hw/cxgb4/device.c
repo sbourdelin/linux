@@ -1091,10 +1091,10 @@ static inline int recv_rx_pkt(struct c4iw_dev *dev, const struct pkt_gl *gl,
 		goto out;
 
 	skb = copy_gl_to_skb_pkt(gl , rsp, dev->rdev.lldi.sge_pktshift);
-	if (skb == NULL)
+	if (!skb)
 		goto out;
 
-	if (c4iw_handlers[opcode] == NULL) {
+	if (!c4iw_handlers[opcode]) {
 		pr_info("%s no handler opcode 0x%x...\n", __func__,
 		       opcode);
 		kfree_skb(skb);
@@ -1114,7 +1114,7 @@ static int c4iw_uld_rx_handler(void *handle, const __be64 *rsp,
 	struct sk_buff *skb;
 	u8 opcode;
 
-	if (gl == NULL) {
+	if (!gl) {
 		/* omit RSS and rsp_ctrl at end of descriptor */
 		unsigned int len = 64 - sizeof(struct rsp_ctrl) - 8;
 
