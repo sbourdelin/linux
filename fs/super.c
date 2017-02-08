@@ -580,6 +580,10 @@ void iterate_supers(void (*f)(struct super_block *, void *), void *arg)
 	list_for_each_entry(sb, &super_blocks, s_list) {
 		if (hlist_unhashed(&sb->s_instances))
 			continue;
+
+		if (!(sb->s_flags & MS_ACTIVE))
+			continue;
+
 		sb->s_count++;
 		spin_unlock(&sb_lock);
 
