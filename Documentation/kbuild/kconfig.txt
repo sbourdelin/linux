@@ -178,6 +178,10 @@ Searching in menuconfig:
 	first (and in alphabetical order), then come all other symbols,
 	sorted in alphabetical order.
 
+	In the search result textbox, each symbol has a jump number on
+	left side if the symbol is visible. You can type the number
+	to jump to target menu to configure that symbol.
+
 ______________________________________________________________________
 User interface options for 'menuconfig'
 
