@@ -207,6 +207,7 @@
 	pinctrl-names = "default";
 
 	bus-width = <8>;
+	cap-mmc-hw-reset;
 	cap-sd-highspeed;
 	max-frequency = <200000000>;
 	non-removable;
