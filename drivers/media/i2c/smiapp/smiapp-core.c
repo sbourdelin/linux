@@ -2807,13 +2807,19 @@ static struct smiapp_hwconfig *smiapp_get_hwconfig(struct device *dev)
 	switch (bus_cfg->bus_type) {
 	case V4L2_MBUS_CSI2:
 		hwcfg->csi_signalling_mode = SMIAPP_CSI_SIGNALLING_MODE_CSI2;
+		hwcfg->lanes = bus_cfg->bus.mipi_csi2.num_data_lanes;
 		break;
-		/* FIXME: add CCP2 support. */
+	case V4L2_MBUS_CCP2:
+		hwcfg->csi_signalling_mode = (bus_cfg->bus.mipi_csi1.strobe) ?
+		SMIAPP_CSI_SIGNALLING_MODE_CCP2_DATA_STROBE :
+		SMIAPP_CSI_SIGNALLING_MODE_CCP2_DATA_CLOCK;
+		hwcfg->lanes = 1;
+		break;
 	default:
+		dev_err(dev, "unknown bus protocol\n");
 		goto out_err;
 	}
 
-	hwcfg->lanes = bus_cfg->bus.mipi_csi2.num_data_lanes;
 	dev_dbg(dev, "lanes %u\n", hwcfg->lanes);
 
 	/* NVM size is not mandatory */
@@ -2827,8 +2833,8 @@ static struct smiapp_hwconfig *smiapp_get_hwconfig(struct device *dev)
 		goto out_err;
 	}
 
-	dev_dbg(dev, "nvm %d, clk %d, csi %d\n", hwcfg->nvm_size,
-		hwcfg->ext_clk, hwcfg->csi_signalling_mode);
+	dev_dbg(dev, "nvm %d, clk %d, mode %d\n",
+		hwcfg->nvm_size, hwcfg->ext_clk, hwcfg->csi_signalling_mode);
 
 	if (!bus_cfg->nr_of_link_frequencies) {
 		dev_warn(dev, "no link frequencies defined\n");
