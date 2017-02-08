@@ -28,6 +28,8 @@
 #define ICACHE_POLICY_VIPT	2
 #define ICACHE_POLICY_PIPT	3
 
+#define DCACHE_SKIP_POU		0
+
 #ifndef __ASSEMBLY__
 
 #include <linux/bitops.h>
@@ -38,6 +40,12 @@
 #define ICACHEF_AIVIVT		1
 
 extern unsigned long __icache_flags;
+
+extern unsigned long __dcache_flags;
+
+#define CLIDR_LOUIS_SHIFT	(21)
+#define CLIDR_LOUIS_MASK	(0x7)
+#define CLIDR_LOUIS(x)		(((x) >> CLIDR_LOUIS_SHIFT) & CLIDR_LOUIS_MASK)
 
 /*
  * NumSets, bits[27:13] - (Number of sets in cache) - 1
