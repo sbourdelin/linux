@@ -426,7 +426,7 @@ int qede_set_features(struct net_device *dev, netdev_features_t features)
 		 * aggregations, so no need to actually reload.
 		 */
 		__qede_lock(edev);
-		if (edev->xdp_prog)
+		if (edev->xdp_enabled)
 			args.func(edev, &args);
 		else
 			qede_reload(edev, &args, true);
@@ -506,29 +506,21 @@ void qede_udp_tunnel_del(struct net_device *dev, struct udp_tunnel_info *ti)
 	schedule_delayed_work(&edev->sp_task, 0);
 }
 
-static void qede_xdp_reload_func(struct qede_dev *edev,
-				 struct qede_reload_args *args)
+static int qede_xdp_check_bpf(struct qede_dev *edev, struct bpf_prog *prog)
 {
-	struct bpf_prog *old;
-
-	old = xchg(&edev->xdp_prog, args->u.new_prog);
-	if (old)
-		bpf_prog_put(old);
-}
-
-static int qede_xdp_set(struct qede_dev *edev, struct bpf_prog *prog)
-{
-	struct qede_reload_args args;
-
 	if (prog && prog->xdp_adjust_head) {
 		DP_ERR(edev, "Does not support bpf_xdp_adjust_head()\n");
 		return -EOPNOTSUPP;
 	}
 
-	/* If we're called, there was already a bpf reference increment */
-	args.func = &qede_xdp_reload_func;
-	args.u.new_prog = prog;
-	qede_reload(edev, &args, false);
+	return 0;
+}
+
+static int qede_xdp_init(struct qede_dev *edev, bool enable)
+{
+	edev->xdp_enabled = enable;
+
+	qede_reload(edev, NULL, false);
 
 	return 0;
 }
@@ -538,11 +530,12 @@ int qede_xdp(struct net_device *dev, struct netdev_xdp *xdp)
 	struct qede_dev *edev = netdev_priv(dev);
 
 	switch (xdp->command) {
-	case XDP_SETUP_PROG:
-		return qede_xdp_set(edev, xdp->prog);
-	case XDP_QUERY_PROG:
-		xdp->prog_attached = !!edev->xdp_prog;
-		return 0;
+	case XDP_MODE_OFF:
+		return qede_xdp_init(edev, true);
+	case XDP_MODE_ON:
+		return qede_xdp_init(edev, false);
+	case XDP_CHECK_BPF_PROG:
+		return qede_xdp_check_bpf(edev, xdp->prog);
 	default:
 		return -EINVAL;
 	}

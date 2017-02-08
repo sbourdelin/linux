@@ -560,7 +560,7 @@ static void qede_init_ndev(struct qede_dev *edev)
 {
 	struct net_device *ndev = edev->ndev;
 	struct pci_dev *pdev = edev->pdev;
-	u32 hw_features;
+	netdev_features_t hw_features;
 
 	pci_set_drvdata(pdev, ndev);
 
@@ -580,7 +580,7 @@ static void qede_init_ndev(struct qede_dev *edev)
 	/* user-changeble features */
 	hw_features = NETIF_F_GRO | NETIF_F_SG |
 		      NETIF_F_IP_CSUM | NETIF_F_IPV6_CSUM |
-		      NETIF_F_TSO | NETIF_F_TSO6;
+		      NETIF_F_TSO | NETIF_F_TSO6 | NETIF_F_XDP;
 
 	/* Encap features*/
 	hw_features |= NETIF_F_GSO_GRE | NETIF_F_GSO_UDP_TUNNEL |
@@ -709,7 +709,7 @@ static int qede_alloc_fp_array(struct qede_dev *edev)
 			if (!fp->rxq)
 				goto err;
 
-			if (edev->xdp_prog) {
+			if (edev->xdp_enabled) {
 				fp->xdp_tx = kzalloc(sizeof(*fp->xdp_tx),
 						     GFP_KERNEL);
 				if (!fp->xdp_tx)
@@ -913,10 +913,6 @@ static void __qede_remove(struct pci_dev *pdev, enum qede_remove_mode mode)
 
 	pci_set_drvdata(pdev, NULL);
 
-	/* Release edev's reference to XDP's bpf if such exist */
-	if (edev->xdp_prog)
-		bpf_prog_put(edev->xdp_prog);
-
 	free_netdev(ndev);
 
 	/* Use global ops since we've freed edev */
@@ -1069,7 +1065,7 @@ static int qede_alloc_sge_mem(struct qede_dev *edev, struct qede_rx_queue *rxq)
 	int i;
 
 	/* Don't perform FW aggregations in case of XDP */
-	if (edev->xdp_prog)
+	if (edev->xdp_enabled)
 		edev->gro_disable = 1;
 
 	if (edev->gro_disable)
@@ -1127,7 +1123,7 @@ static int qede_alloc_mem_rxq(struct qede_dev *edev, struct qede_rx_queue *rxq)
 	/* Segment size to spilt a page in multiple equal parts,
 	 * unless XDP is used in which case we'd use the entire page.
 	 */
-	if (!edev->xdp_prog)
+	if (!edev->xdp_enabled)
 		rxq->rx_buf_seg_size = roundup_pow_of_two(rxq->rx_buf_size);
 	else
 		rxq->rx_buf_seg_size = PAGE_SIZE;
@@ -1580,8 +1576,6 @@ static int qede_stop_queues(struct qede_dev *edev)
 			rc = qede_stop_txq(edev, fp->xdp_tx, i);
 			if (rc)
 				return rc;
-
-			bpf_prog_put(fp->rxq->xdp_prog);
 		}
 	}
 
@@ -1724,13 +1718,6 @@ static int qede_start_queues(struct qede_dev *edev, bool clear_stats)
 			rc = qede_start_txq(edev, fp, fp->xdp_tx, i, XDP_PI);
 			if (rc)
 				goto out;
-
-			fp->rxq->xdp_prog = bpf_prog_add(edev->xdp_prog, 1);
-			if (IS_ERR(fp->rxq->xdp_prog)) {
-				rc = PTR_ERR(fp->rxq->xdp_prog);
-				fp->rxq->xdp_prog = NULL;
-				goto out;
-			}
 		}
 
 		if (fp->type & QEDE_FASTPATH_TX) {
