@@ -675,7 +675,7 @@ static __always_inline void pv_kick(int cpu)
 
 static __always_inline bool pv_vcpu_is_preempted(int cpu)
 {
-	return PVOP_CALLEE1(bool, pv_lock_ops.vcpu_is_preempted, cpu);
+	return PVOP_CALL1(bool, pv_lock_ops.vcpu_is_preempted, cpu);
 }
 
 #endif /* SMP && PARAVIRT_SPINLOCKS */

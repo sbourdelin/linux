@@ -595,7 +595,6 @@ __visible bool __kvm_vcpu_is_preempted(int cpu)
 
 	return !!src->preempted;
 }
-PV_CALLEE_SAVE_REGS_THUNK(__kvm_vcpu_is_preempted);
 
 /*
  * Setup pv_lock_ops to exploit KVM_FEATURE_PV_UNHALT if present.
@@ -614,10 +613,8 @@ void __init kvm_spinlock_init(void)
 	pv_lock_ops.wait = kvm_wait;
 	pv_lock_ops.kick = kvm_kick_cpu;
 
-	if (kvm_para_has_feature(KVM_FEATURE_STEAL_TIME)) {
-		pv_lock_ops.vcpu_is_preempted =
-			PV_CALLEE_SAVE(__kvm_vcpu_is_preempted);
-	}
+	if (kvm_para_has_feature(KVM_FEATURE_STEAL_TIME))
+		pv_lock_ops.vcpu_is_preempted = __kvm_vcpu_is_preempted;
 }
 
 #endif	/* CONFIG_PARAVIRT_SPINLOCKS */

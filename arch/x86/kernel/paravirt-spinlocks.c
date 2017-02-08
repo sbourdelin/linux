@@ -24,12 +24,10 @@ __visible bool __native_vcpu_is_preempted(int cpu)
 {
 	return false;
 }
-PV_CALLEE_SAVE_REGS_THUNK(__native_vcpu_is_preempted);
 
 bool pv_is_native_vcpu_is_preempted(void)
 {
-	return pv_lock_ops.vcpu_is_preempted.func ==
-		__raw_callee_save___native_vcpu_is_preempted;
+	return pv_lock_ops.vcpu_is_preempted == __native_vcpu_is_preempted;
 }
 
 struct pv_lock_ops pv_lock_ops = {
@@ -38,7 +36,7 @@ struct pv_lock_ops pv_lock_ops = {
 	.queued_spin_unlock = PV_CALLEE_SAVE(__native_queued_spin_unlock),
 	.wait = paravirt_nop,
 	.kick = paravirt_nop,
-	.vcpu_is_preempted = PV_CALLEE_SAVE(__native_vcpu_is_preempted),
+	.vcpu_is_preempted = __native_vcpu_is_preempted,
 #endif /* SMP */
 };
 EXPORT_SYMBOL(pv_lock_ops);
