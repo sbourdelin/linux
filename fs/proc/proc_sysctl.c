@@ -852,11 +852,19 @@ static int proc_sys_compare(const struct dentry *dentry,
 	inode = d_inode_rcu(dentry);
 	if (!inode)
 		return 1;
+
+	/*
+	 * Stale dentry: we cannot invalidate it right here, instead we
+	 * pretend that it matches and revalidation will kill it later.
+	 */
+	head = rcu_dereference(PROC_I(inode)->sysctl);
+	if (head && head->unregistering)
+		return 0;
+
 	if (name->len != len)
 		return 1;
 	if (memcmp(name->name, str, len))
 		return 1;
-	head = rcu_dereference(PROC_I(inode)->sysctl);
 	return !head || !sysctl_is_seen(head);
 }
 
