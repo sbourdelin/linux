@@ -489,6 +489,7 @@ static int mv_ep_enable(struct usb_ep *_ep,
 		break;
 	case USB_ENDPOINT_XFER_CONTROL:
 		ios = 1;
+		break;
 	case USB_ENDPOINT_XFER_INT:
 		mult = 0;
 		break;
