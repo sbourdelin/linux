@@ -307,6 +307,10 @@ struct kvm_hv_sint {
 	u32 sint;
 };
 
+struct kvm_gsi_eventfd {
+	struct eventfd_ctx *ctx;
+};
+
 struct kvm_kernel_irq_routing_entry {
 	u32 gsi;
 	u32 type;
@@ -327,6 +331,7 @@ struct kvm_kernel_irq_routing_entry {
 		} msi;
 		struct kvm_s390_adapter_int adapter;
 		struct kvm_hv_sint hv_sint;
+		struct kvm_gsi_eventfd eventfd;
 	};
 	struct hlist_node link;
 };
@@ -341,6 +346,8 @@ struct kvm_irq_routing_table {
 	 */
 	struct hlist_head map[0];
 };
+
+void free_irq_routing_entry(struct kvm_kernel_irq_routing_entry *e);
 #endif
 
 #ifndef KVM_PRIVATE_MEM_SLOTS

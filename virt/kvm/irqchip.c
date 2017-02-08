@@ -109,6 +109,11 @@ int kvm_set_irq(struct kvm *kvm, int irq_source_id, u32 irq, int level,
 	return ret;
 }
 
+void __attribute__((weak))
+free_irq_routing_entry(struct kvm_kernel_irq_routing_entry *e)
+{
+}
+
 static void free_irq_routing_table(struct kvm_irq_routing_table *rt)
 {
 	int i;
@@ -121,6 +126,7 @@ static void free_irq_routing_table(struct kvm_irq_routing_table *rt)
 		struct hlist_node *n;
 
 		hlist_for_each_entry_safe(e, n, &rt->map[i], link) {
+			free_irq_routing_entry(e);
 			hlist_del(&e->link);
 			kfree(e);
 		}

@@ -23,6 +23,7 @@
 #include <linux/kvm_host.h>
 #include <linux/slab.h>
 #include <linux/export.h>
+#include <linux/eventfd.h>
 #include <trace/events/kvm.h>
 
 #include <asm/msidef.h>
@@ -179,6 +180,16 @@ static int kvm_hv_set_sint(struct kvm_kernel_irq_routing_entry *e,
 	return kvm_hv_synic_set_irq(kvm, e->hv_sint.vcpu, e->hv_sint.sint);
 }
 
+static int kvm_set_gsi_eventfd(struct kvm_kernel_irq_routing_entry *e,
+			       struct kvm *kvm, int irq_source_id, int level,
+			       bool line_status)
+{
+	if (!level || eventfd_signal(e->eventfd.ctx, 1) != 1)
+		return -1;
+
+	return 1;
+}
+
 int kvm_arch_set_irq_inatomic(struct kvm_kernel_irq_routing_entry *e,
 			      struct kvm *kvm, int irq_source_id, int level,
 			      bool line_status)
@@ -292,6 +303,7 @@ int kvm_set_routing_entry(struct kvm *kvm,
 	int r = -EINVAL;
 	int delta;
 	unsigned max_pin;
+	struct eventfd_ctx *eventfd;
 
 	switch (ue->type) {
 	case KVM_IRQ_ROUTING_IRQCHIP:
@@ -331,6 +343,15 @@ int kvm_set_routing_entry(struct kvm *kvm,
 		e->set = kvm_hv_set_sint;
 		e->hv_sint.vcpu = ue->u.hv_sint.vcpu;
 		e->hv_sint.sint = ue->u.hv_sint.sint;
+		break;
+	case KVM_IRQ_ROUTING_EVENTFD:
+		eventfd = eventfd_ctx_fdget(ue->u.eventfd.fd);
+		if (IS_ERR(eventfd)) {
+			r = PTR_ERR(eventfd);
+			goto out;
+		}
+		e->eventfd.ctx = eventfd;
+		e->set = kvm_set_gsi_eventfd;
 		break;
 	default:
 		goto out;
@@ -447,4 +468,16 @@ void kvm_scan_ioapic_routes(struct kvm_vcpu *vcpu,
 void kvm_arch_irq_routing_update(struct kvm *kvm)
 {
 	kvm_hv_irq_routing_update(kvm);
+}
+
+void free_irq_routing_entry(struct kvm_kernel_irq_routing_entry *e)
+{
+	switch (e->type) {
+	case KVM_IRQ_ROUTING_EVENTFD:
+		if (e->eventfd.ctx)
+			eventfd_ctx_put(e->eventfd.ctx);
+		break;
+	default:
+		break;
+	}
 }
