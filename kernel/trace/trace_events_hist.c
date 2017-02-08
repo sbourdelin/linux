@@ -279,6 +279,7 @@ static u64 hist_field_timestamp(struct hist_field *hist_field,
 }
 
 static LIST_HEAD(hist_var_list);
+static LIST_HEAD(hist_action_list);
 
 struct hist_var_data {
 	struct list_head list;
@@ -609,6 +610,16 @@ static int parse_action(char *str, struct hist_trigger_attrs *attrs)
 
 	if (attrs->n_actions == HIST_ACTIONS_MAX)
 		return -EINVAL;
+
+	if ((strncmp(str, "onmatch(", strlen("onmatch(")) == 0)) {
+		attrs->action_str[attrs->n_actions] = kstrdup(str, GFP_KERNEL);
+		if (!attrs->action_str[attrs->n_actions]) {
+			ret = -ENOMEM;
+			return ret;
+		}
+		attrs->n_actions++;
+		ret = 1;
+	}
 
 	return ret;
 }
@@ -1823,6 +1834,129 @@ static int add_synthetic_var_refs(struct hist_trigger_data *hist_data,
 	return var_ref_idx;
 }
 
+static void action_trace(struct hist_trigger_data *hist_data,
+			 struct tracing_map_elt *elt, void *rec,
+			 struct ring_buffer_event *rbe,
+			 struct action_data *data, u64 *var_ref_vals)
+{
+	struct synthetic_event *event = data->synthetic_event;
+
+	trace_synthetic(event, var_ref_vals, data->var_ref_idx);
+}
+
+static bool check_hist_action_refs(struct hist_trigger_data *hist_data,
+				   struct synthetic_event *event)
+{
+	unsigned int i;
+
+	for (i = 0; i < hist_data->n_actions; i++) {
+		struct action_data *data = hist_data->actions[i];
+
+		if (data->fn == action_trace && data->synthetic_event == event)
+			return true;
+	}
+
+	return false;
+}
+
+static bool check_synthetic_action_refs(struct synthetic_event *event)
+{
+	struct hist_var_data *var_data;
+
+	list_for_each_entry(var_data, &hist_action_list, list)
+		if (check_hist_action_refs(var_data->hist_data, event))
+			return true;
+
+	return false;
+}
+
+static struct hist_var_data *find_hist_actions(struct hist_trigger_data *hist_data)
+{
+	struct hist_var_data *var_data, *found = NULL;
+
+	list_for_each_entry(var_data, &hist_action_list, list) {
+		if (var_data->hist_data == hist_data) {
+			found = var_data;
+			break;
+		}
+	}
+
+	return found;
+}
+
+static int save_hist_actions(struct hist_trigger_data *hist_data)
+{
+	struct hist_var_data *var_data;
+
+	var_data = find_hist_actions(hist_data);
+	if (var_data)
+		return 0;
+
+	var_data = kzalloc(sizeof(*var_data), GFP_KERNEL);
+	if (!var_data)
+		return -ENOMEM;
+
+	var_data->hist_data = hist_data;
+	list_add(&var_data->list, &hist_action_list);
+
+	return 0;
+}
+
+static int remove_hist_actions(struct hist_trigger_data *hist_data)
+{
+	struct hist_var_data *var_data;
+
+	var_data = find_hist_actions(hist_data);
+	if (!var_data)
+		return -EINVAL;
+
+	list_del(&var_data->list);
+
+	return 0;
+}
+
+static int create_onmatch_data(char *str, struct hist_trigger_data *hist_data)
+{
+	char *fn_name, *param;
+	struct action_data *data;
+	int ret = 0;
+
+	strsep(&str, ".");
+	if (!str)
+		return -EINVAL;
+
+	fn_name = strsep(&str, "(");
+	if (!fn_name || !str)
+		return -EINVAL;
+
+	if (strncmp(fn_name, "trace", strlen("trace")) == 0) {
+		struct synthetic_event *event;
+
+		param = strsep(&str, ")");
+		if (!param)
+			return -EINVAL;
+
+		event = find_synthetic_event(param);
+		if (!event)
+			return -EINVAL;
+
+		if (!resolve_pending_var_refs(event))
+			return -EINVAL;
+
+		data = kzalloc(sizeof(*data), GFP_KERNEL);
+		if (!data)
+			return -ENOMEM;
+
+		data->fn = action_trace;
+		data->synthetic_event = event;
+		data->var_ref_idx = add_synthetic_var_refs(hist_data, event);
+		hist_data->actions[hist_data->n_actions++] = data;
+		save_hist_actions(hist_data);
+	}
+
+	return ret;
+}
+
 static void destroy_actions(struct hist_trigger_data *hist_data)
 {
 	unsigned int i;
@@ -1842,6 +1976,14 @@ static int create_actions(struct hist_trigger_data *hist_data)
 
 	for (i = 0; i < hist_data->attrs->n_actions; i++) {
 		str = hist_data->attrs->action_str[i];
+
+		if (strncmp(str, "onmatch(", strlen("onmatch(")) == 0) {
+			char *action_str = str + strlen("onmatch(");
+
+			ret = create_onmatch_data(action_str, hist_data);
+			if (ret)
+				return ret;
+		}
 	}
 
 	return ret;
@@ -1858,6 +2000,16 @@ static void print_actions(struct seq_file *m,
 	}
 }
 
+static void print_onmatch_spec(struct seq_file *m,
+			       struct hist_trigger_data *hist_data,
+			       struct action_data *data)
+{
+	seq_puts(m, ":onmatch().");
+
+	if (data->synthetic_event)
+		seq_printf(m, "trace(%s)", data->synthetic_event->name);
+}
+
 static void print_actions_spec(struct seq_file *m,
 			       struct hist_trigger_data *hist_data)
 {
@@ -1865,6 +2017,9 @@ static void print_actions_spec(struct seq_file *m,
 
 	for (i = 0; i < hist_data->n_actions; i++) {
 		struct action_data *data = hist_data->actions[i];
+
+		if (data->fn == action_trace)
+			print_onmatch_spec(m, hist_data, data);
 	}
 }
 
@@ -2426,6 +2581,9 @@ static void event_hist_trigger_free(struct event_trigger_ops *ops,
 		unresolve_pending_var_refs(hist_data);
 
 		if (remove_hist_vars(hist_data))
+			return;
+
+		if (remove_hist_actions(hist_data))
 			return;
 
 		destroy_hist_data(hist_data);
@@ -3417,6 +3575,10 @@ static int create_synthetic_event(int argc, char **argv)
 	event = find_synthetic_event(token);
 	if (event) {
 		if (delete_event) {
+			if (check_synthetic_action_refs(event)) {
+				ret = -EINVAL;
+				goto out;
+			}
 			remove_synthetic_event(event);
 			goto err;
 		} else
@@ -3461,6 +3623,11 @@ static int release_all_synthetic_events(void)
 	struct synthetic_event *event, *e;
 
 	mutex_lock(&synthetic_event_mutex);
+
+	list_for_each_entry(event, &synthetic_events_list, list) {
+		if (check_synthetic_action_refs(event))
+			return -EINVAL;
+	}
 
 	list_for_each_entry_safe(event, e, &synthetic_events_list, list) {
 		remove_synthetic_event(event);
