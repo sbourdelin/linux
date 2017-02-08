@@ -1193,17 +1193,21 @@ struct pinctrl_state *pinctrl_lookup_state(struct pinctrl *p,
 EXPORT_SYMBOL_GPL(pinctrl_lookup_state);
 
 /**
- * pinctrl_select_state() - select/activate/program a pinctrl state to HW
+ * __pinctrl_select_state() - select/activate/program a pinctrl state to HW
  * @p: the pinctrl handle for the device that requests configuration
  * @state: the state handle to select/activate/program
+ * @force: ignore the state check (e.g: to re-apply default state during
+ * suspend/resume)
  */
-int pinctrl_select_state(struct pinctrl *p, struct pinctrl_state *state)
+static int __pinctrl_select_state(struct pinctrl *p,
+				  struct pinctrl_state *state,
+				  bool ignore_state_check)
 {
 	struct pinctrl_setting *setting, *setting2;
 	struct pinctrl_state *old_state = p->state;
 	int ret;
 
-	if (p->state == state)
+	if (p->state == state && !ignore_state_check)
 		return 0;
 
 	if (p->state) {
@@ -1268,6 +1272,16 @@ unapply_new_state:
 		pinctrl_select_state(p, old_state);
 
 	return ret;
+}
+
+/**
+ * pinctrl_select_state() - select/activate/program a pinctrl state to HW
+ * @p: the pinctrl handle for the device that requests configuration
+ * @state: the state handle to select/activate/program
+ */
+int pinctrl_select_state(struct pinctrl *p, struct pinctrl_state *state)
+{
+	return __pinctrl_select_state(p, state, false);
 }
 EXPORT_SYMBOL_GPL(pinctrl_select_state);
 
@@ -1435,7 +1449,8 @@ void pinctrl_unregister_map(struct pinctrl_map const *map)
 int pinctrl_force_sleep(struct pinctrl_dev *pctldev)
 {
 	if (!IS_ERR(pctldev->p) && !IS_ERR(pctldev->hog_sleep))
-		return pinctrl_select_state(pctldev->p, pctldev->hog_sleep);
+		return __pinctrl_select_state(pctldev->p,
+					      pctldev->hog_sleep, true);
 	return 0;
 }
 EXPORT_SYMBOL_GPL(pinctrl_force_sleep);
@@ -1447,7 +1462,8 @@ EXPORT_SYMBOL_GPL(pinctrl_force_sleep);
 int pinctrl_force_default(struct pinctrl_dev *pctldev)
 {
 	if (!IS_ERR(pctldev->p) && !IS_ERR(pctldev->hog_default))
-		return pinctrl_select_state(pctldev->p, pctldev->hog_default);
+		return __pinctrl_select_state(pctldev->p,
+					      pctldev->hog_default, true);
 	return 0;
 }
 EXPORT_SYMBOL_GPL(pinctrl_force_default);
