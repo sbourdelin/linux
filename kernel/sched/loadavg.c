@@ -199,6 +199,7 @@ void calc_load_enter_idle(void)
 void calc_load_exit_idle(void)
 {
 	struct rq *this_rq = this_rq();
+	unsigned long next_window;
 
 	/*
 	 * If we're still before the sample window, we're done.
@@ -210,10 +211,16 @@ void calc_load_exit_idle(void)
 	 * We woke inside or after the sample window, this means we're already
 	 * accounted through the nohz accounting, so skip the entire deal and
 	 * sync up for the next window.
+	 *
+	 * The next window is 'calc_load_update' if we haven't reached it yet,
+	 * and 'calc_load_update + 10' if we're inside the current window.
 	 */
-	this_rq->calc_load_update = calc_load_update;
-	if (time_before(jiffies, this_rq->calc_load_update + 10))
-		this_rq->calc_load_update += LOAD_FREQ;
+	next_window = calc_load_update;
+
+	if (time_in_range_open(jiffies, next_window, next_window + 10)
+		next_window += LOAD_FREQ;
+
+	this_rq->calc_load_update = next_window;
 }
 
 static long calc_load_fold_idle(void)
