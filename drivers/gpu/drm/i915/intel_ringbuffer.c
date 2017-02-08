@@ -776,6 +776,7 @@ static int bdw_init_workarounds(struct intel_engine_cs *engine)
 	/* WaDisableDopClockGating:bdw */
 	WA_SET_BIT_MASKED(GEN7_ROW_CHICKEN2,
 			  DOP_CLOCK_GATING_DISABLE);
+	WA_SET_BIT(GEN6_UCGCTL1, GEN6_EU_TCUNIT_CLOCK_GATE_DISABLE);
 
 	WA_SET_BIT_MASKED(HALF_SLICE_CHICKEN3,
 			  GEN8_SAMPLER_POWER_BYPASS_DIS);
