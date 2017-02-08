@@ -85,18 +85,18 @@ void bnxt_tx_int_xdp(struct bnxt *bp, struct bnxt_napi *bnapi, int nr_pkts)
 bool bnxt_rx_xdp(struct bnxt *bp, struct bnxt_rx_ring_info *rxr, u16 cons,
 		 struct page *page, u8 **data_ptr, unsigned int *len, u8 *event)
 {
-	struct bpf_prog *xdp_prog = READ_ONCE(rxr->xdp_prog);
 	struct bnxt_tx_ring_info *txr;
 	struct bnxt_sw_rx_bd *rx_buf;
 	struct pci_dev *pdev;
 	struct xdp_buff xdp;
+	struct xdp_hook *last_hook;
 	dma_addr_t mapping;
 	void *orig_data;
 	u32 tx_avail;
 	u32 offset;
 	u32 act;
 
-	if (!xdp_prog)
+	if (!xdp_hook_run_needed_check(bp->dev, &rxr->bnapi->napi))
 		return false;
 
 	pdev = bp->pdev;
@@ -113,7 +113,7 @@ bool bnxt_rx_xdp(struct bnxt *bp, struct bnxt_rx_ring_info *rxr, u16 cons,
 	dma_sync_single_for_cpu(&pdev->dev, mapping + offset, *len, bp->rx_dir);
 
 	rcu_read_lock();
-	act = bpf_prog_run_xdp(xdp_prog, &xdp);
+	act = xdp_hook_run_ret_last(&rxr->bnapi->napi, &xdp, &last_hook);
 	rcu_read_unlock();
 
 	tx_avail = bnxt_tx_avail(bp, txr);
@@ -134,7 +134,7 @@ bool bnxt_rx_xdp(struct bnxt *bp, struct bnxt_rx_ring_info *rxr, u16 cons,
 
 	case XDP_TX:
 		if (tx_avail < 2) {
-			trace_xdp_exception(bp->dev, xdp_prog, act);
+			trace_xdp_hook_exception(bp->dev, last_hook, act);
 			bnxt_reuse_rx_data(rxr, cons, page);
 			return true;
 		}
@@ -147,10 +147,10 @@ bool bnxt_rx_xdp(struct bnxt *bp, struct bnxt_rx_ring_info *rxr, u16 cons,
 		bnxt_reuse_rx_data(rxr, cons, page);
 		return true;
 	default:
-		bpf_warn_invalid_xdp_action(act);
+		xdp_warn_invalid_action(act);
 		/* Fall thru */
 	case XDP_ABORTED:
-		trace_xdp_exception(bp->dev, xdp_prog, act);
+		trace_xdp_hook_exception(bp->dev, last_hook, act);
 		/* Fall thru */
 	case XDP_DROP:
 		bnxt_reuse_rx_data(rxr, cons, page);
@@ -160,13 +160,15 @@ bool bnxt_rx_xdp(struct bnxt *bp, struct bnxt_rx_ring_info *rxr, u16 cons,
 }
 
 /* Under rtnl_lock */
-static int bnxt_xdp_set(struct bnxt *bp, struct bpf_prog *prog)
+static int bnxt_xdp_init(struct bnxt *bp, bool enable)
 {
 	struct net_device *dev = bp->dev;
 	int tx_xdp = 0, rc, tc;
-	struct bpf_prog *old;
 
-	if (prog && bp->dev->mtu > BNXT_MAX_PAGE_MODE_MTU) {
+	if (bp->xdp_enabled == enable)
+		return 0;
+
+	if (enable && bp->dev->mtu > BNXT_MAX_PAGE_MODE_MTU) {
 		netdev_warn(dev, "MTU %d larger than largest XDP supported MTU %d.\n",
 			    bp->dev->mtu, BNXT_MAX_PAGE_MODE_MTU);
 		return -EOPNOTSUPP;
@@ -175,7 +177,7 @@ static int bnxt_xdp_set(struct bnxt *bp, struct bpf_prog *prog)
 		netdev_warn(dev, "ethtool rx/tx channels must be combined to support XDP.\n");
 		return -EOPNOTSUPP;
 	}
-	if (prog)
+	if (enable)
 		tx_xdp = bp->rx_nr_rings;
 
 	tc = netdev_get_num_tc(dev);
@@ -190,11 +192,7 @@ static int bnxt_xdp_set(struct bnxt *bp, struct bpf_prog *prog)
 	if (netif_running(dev))
 		bnxt_close_nic(bp, true, false);
 
-	old = xchg(&bp->xdp_prog, prog);
-	if (old)
-		bpf_prog_put(old);
-
-	if (prog) {
+	if (enable) {
 		bnxt_set_rx_skb_mode(bp, true);
 	} else {
 		int rx, tx;
@@ -210,6 +208,7 @@ static int bnxt_xdp_set(struct bnxt *bp, struct bpf_prog *prog)
 	bp->tx_nr_rings = bp->tx_nr_rings_per_tc * tc + tx_xdp;
 	bp->cp_nr_rings = max_t(int, bp->tx_nr_rings, bp->rx_nr_rings);
 	bp->num_stat_ctxs = bp->cp_nr_rings;
+	bp->xdp_enabled = enable;
 	bnxt_set_tpa_flags(bp);
 	bnxt_set_ring_params(bp);
 
@@ -219,18 +218,25 @@ static int bnxt_xdp_set(struct bnxt *bp, struct bpf_prog *prog)
 	return 0;
 }
 
+static int bnxt_xdp_check_bpf(struct net_device *dev, struct bpf_prog *prog)
+{
+	return 0;
+}
+
 int bnxt_xdp(struct net_device *dev, struct netdev_xdp *xdp)
 {
 	struct bnxt *bp = netdev_priv(dev);
 	int rc;
 
 	switch (xdp->command) {
-	case XDP_SETUP_PROG:
-		rc = bnxt_xdp_set(bp, xdp->prog);
+	case XDP_MODE_ON:
+		rc = bnxt_xdp_init(bp, true);
 		break;
-	case XDP_QUERY_PROG:
-		xdp->prog_attached = !!bp->xdp_prog;
-		rc = 0;
+	case XDP_MODE_OFF:
+		rc = bnxt_xdp_init(bp, false);
+		break;
+	case XDP_CHECK_BPF_PROG:
+		rc = bnxt_xdp_check_bpf(dev, xdp->prog);
 		break;
 	default:
 		rc = -EINVAL;
