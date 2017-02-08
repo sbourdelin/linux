@@ -504,13 +504,12 @@ struct nfp_net {
 	unsigned fw_loaded:1;
 	unsigned bpf_offload_skip_sw:1;
 	unsigned bpf_offload_xdp:1;
+	unsigned xdp_enabled:1;
 
 	u32 ctrl;
 	u32 fl_bufsz;
 
 	u32 rx_offset;
-
-	struct bpf_prog *xdp_prog;
 
 	struct nfp_net_tx_ring *tx_rings;
 	struct nfp_net_rx_ring *rx_rings;
@@ -792,7 +791,7 @@ void nfp_net_coalesce_write_cfg(struct nfp_net *nn);
 int nfp_net_irqs_alloc(struct nfp_net *nn);
 void nfp_net_irqs_disable(struct nfp_net *nn);
 int
-nfp_net_ring_reconfig(struct nfp_net *nn, struct bpf_prog **xdp_prog,
+nfp_net_ring_reconfig(struct nfp_net *nn,
 		      struct nfp_net_ring_set *rx, struct nfp_net_ring_set *tx);
 
 #ifdef CONFIG_NFP_NET_DEBUG
