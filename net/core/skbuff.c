@@ -2921,9 +2921,8 @@ static void skb_ts_finish(struct ts_config *conf, struct ts_state *state)
  * @config: textsearch configuration
  *
  * Finds a pattern in the skb data according to the specified
- * textsearch configuration. Use textsearch_next() to retrieve
- * subsequent occurrences of the pattern. Returns the offset
- * to the first occurrence or UINT_MAX if no match was found.
+ * textsearch configuration. Returns the offset to the first
+ * occurrence or UINT_MAX if no match was found.
  */
 unsigned int skb_find_text(struct sk_buff *skb, unsigned int from,
 			   unsigned int to, struct ts_config *config)
