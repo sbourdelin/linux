@@ -437,9 +437,10 @@ static int __init aes_init(void)
 		drvname = aes_algs[i].base.cra_driver_name + 2;
 		basename = aes_algs[i].base.cra_driver_name;
 		simd = simd_skcipher_create_compat(algname, drvname, basename);
-		err = PTR_ERR(simd);
-		if (IS_ERR(simd))
+		if (IS_ERR(simd)) {
+			err = PTR_ERR(simd);
 			goto unregister_simds;
+		}
 
 		aes_simd_algs[i] = simd;
 	}
