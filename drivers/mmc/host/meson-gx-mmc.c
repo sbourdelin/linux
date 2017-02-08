@@ -715,6 +715,7 @@ static const struct mmc_host_ops meson_mmc_ops = {
 	.request	= meson_mmc_request,
 	.set_ios	= meson_mmc_set_ios,
 	.get_cd         = meson_mmc_get_cd,
+	.hw_reset	= mmc_hw_reset_pwrseq,
 };
 
 static int meson_mmc_probe(struct platform_device *pdev)
