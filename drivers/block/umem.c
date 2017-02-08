@@ -890,7 +890,7 @@ static int mm_pci_probe(struct pci_dev *dev, const struct pci_device_id *id)
 	card->bio = NULL;
 	card->biotail = &card->bio;
 
-	card->queue = blk_alloc_queue(GFP_KERNEL);
+	card->queue = blk_alloc_queue(GFP_KERNEL, BLK_QUEUE_NO_RESCUER);
 	if (!card->queue)
 		goto failed_alloc;
 

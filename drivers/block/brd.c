@@ -449,7 +449,7 @@ static struct brd_device *brd_alloc(int i)
 	spin_lock_init(&brd->brd_lock);
 	INIT_RADIX_TREE(&brd->brd_pages, GFP_ATOMIC);
 
-	brd->brd_queue = blk_alloc_queue(GFP_KERNEL);
+	brd->brd_queue = blk_alloc_queue(GFP_KERNEL, BLK_QUEUE_NO_RESCUER);
 	if (!brd->brd_queue)
 		goto out_free_dev;
 

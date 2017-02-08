@@ -2737,7 +2737,7 @@ static int pkt_setup_dev(dev_t dev, dev_t* pkt_dev)
 	strcpy(disk->disk_name, pd->name);
 	disk->devnode = pktcdvd_devnode;
 	disk->private_data = pd;
-	disk->queue = blk_alloc_queue(GFP_KERNEL);
+	disk->queue = blk_alloc_queue(GFP_KERNEL, BLK_QUEUE_NO_RESCUER);
 	if (!disk->queue)
 		goto out_mem2;
 

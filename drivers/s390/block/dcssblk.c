@@ -612,7 +612,7 @@ dcssblk_add_store(struct device *dev, struct device_attribute *attr, const char 
 	}
 	dev_info->gd->major = dcssblk_major;
 	dev_info->gd->fops = &dcssblk_devops;
-	dev_info->dcssblk_queue = blk_alloc_queue(GFP_KERNEL);
+	dev_info->dcssblk_queue = blk_alloc_queue(GFP_KERNEL, BLK_QUEUE_NO_RESCUER);
 	dev_info->gd->queue = dev_info->dcssblk_queue;
 	dev_info->gd->private_data = dev_info;
 	blk_queue_make_request(dev_info->dcssblk_queue, dcssblk_make_request);

@@ -2810,7 +2810,7 @@ enum drbd_ret_code drbd_create_device(struct drbd_config_context *adm_ctx, unsig
 
 	drbd_init_set_defaults(device);
 
-	q = blk_alloc_queue(GFP_KERNEL);
+	q = blk_alloc_queue(GFP_KERNEL, 0);
 	if (!q)
 		goto out_no_q;
 	device->rq_queue = q;

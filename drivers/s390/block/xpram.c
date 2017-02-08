@@ -342,7 +342,7 @@ static int __init xpram_setup_blkdev(void)
 		xpram_disks[i] = alloc_disk(1);
 		if (!xpram_disks[i])
 			goto out;
-		xpram_queues[i] = blk_alloc_queue(GFP_KERNEL);
+		xpram_queues[i] = blk_alloc_queue(GFP_KERNEL, BLK_QUEUE_NO_RESCUER);
 		if (!xpram_queues[i]) {
 			put_disk(xpram_disks[i]);
 			goto out;

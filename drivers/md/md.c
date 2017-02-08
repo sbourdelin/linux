@@ -5061,7 +5061,7 @@ static int md_alloc(dev_t dev, char *name)
 	}
 
 	error = -ENOMEM;
-	mddev->queue = blk_alloc_queue(GFP_KERNEL);
+	mddev->queue = blk_alloc_queue(GFP_KERNEL, 0);
 	if (!mddev->queue)
 		goto abort;
 	mddev->queue->queuedata = mddev;

@@ -233,7 +233,7 @@ static int gen_create_tgt(struct nvm_dev *dev, struct nvm_ioctl_create *create)
 		goto err_reserve;
 	}
 
-	tqueue = blk_alloc_queue_node(GFP_KERNEL, dev->q->node);
+	tqueue = blk_alloc_queue_node(GFP_KERNEL, dev->q->node, 0);
 	if (!tqueue)
 		goto err_dev;
 	blk_queue_make_request(tqueue, tt->make_rq);

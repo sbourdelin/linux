@@ -1245,7 +1245,7 @@ static int zram_add(void)
 
 	init_rwsem(&zram->init_lock);
 
-	queue = blk_alloc_queue(GFP_KERNEL);
+	queue = blk_alloc_queue(GFP_KERNEL, BLK_QUEUE_NO_RESCUER);
 	if (!queue) {
 		pr_err("Error allocating disk queue for device %d\n",
 			device_id);

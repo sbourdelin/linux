@@ -280,7 +280,8 @@ static int pmem_attach_disk(struct device *dev,
 		return -EBUSY;
 	}
 
-	q = blk_alloc_queue_node(GFP_KERNEL, dev_to_node(dev));
+	q = blk_alloc_queue_node(GFP_KERNEL, dev_to_node(dev),
+				 BLK_QUEUE_NO_RESCUER);
 	if (!q)
 		return -ENOMEM;
 

@@ -49,6 +49,8 @@ EXPORT_TRACEPOINT_SYMBOL_GPL(block_unplug);
 
 DEFINE_IDA(blk_queue_ida);
 
+static void bio_rescue_work(struct work_struct *);
+
 /*
  * For the allocated request tables
  */
@@ -643,9 +645,9 @@ void blk_exit_rl(struct request_list *rl)
 		mempool_destroy(rl->rq_pool);
 }
 
-struct request_queue *blk_alloc_queue(gfp_t gfp_mask)
+struct request_queue *blk_alloc_queue(gfp_t gfp_mask, int flags)
 {
-	return blk_alloc_queue_node(gfp_mask, NUMA_NO_NODE);
+	return blk_alloc_queue_node(gfp_mask, NUMA_NO_NODE, flags);
 }
 EXPORT_SYMBOL(blk_alloc_queue);
 
@@ -690,7 +692,7 @@ static void blk_rq_timed_out_timer(unsigned long data)
 	kblockd_schedule_work(&q->timeout_work);
 }
 
-struct request_queue *blk_alloc_queue_node(gfp_t gfp_mask, int node_id)
+struct request_queue *blk_alloc_queue_node(gfp_t gfp_mask, int node_id, int flags)
 {
 	struct request_queue *q;
 	int err;
@@ -760,11 +762,23 @@ struct request_queue *blk_alloc_queue_node(gfp_t gfp_mask, int node_id)
 				PERCPU_REF_INIT_ATOMIC, GFP_KERNEL))
 		goto fail_bdi;
 
+	spin_lock_init(&q->rescue_lock);
+	bio_list_init(&q->rescue_list);
+	INIT_WORK(&q->rescue_work, bio_rescue_work);
+
+	if (!(flags & BLK_QUEUE_NO_RESCUER)) {
+		q->rescue_workqueue = alloc_workqueue("rescue", WQ_MEM_RECLAIM, 0);
+		if (!q->rescue_workqueue)
+			goto fail_ref;
+	}
+
 	if (blkcg_init_queue(q))
-		goto fail_ref;
+		goto fail_rescue;
 
 	return q;
 
+fail_rescue:
+	destroy_workqueue(q->rescue_workqueue);
 fail_ref:
 	percpu_ref_exit(&q->q_usage_counter);
 fail_bdi:
@@ -823,7 +837,8 @@ blk_init_queue_node(request_fn_proc *rfn, spinlock_t *lock, int node_id)
 {
 	struct request_queue *uninit_q, *q;
 
-	uninit_q = blk_alloc_queue_node(GFP_KERNEL, node_id);
+	uninit_q = blk_alloc_queue_node(GFP_KERNEL, node_id,
+					BLK_QUEUE_NO_RESCUER);
 	if (!uninit_q)
 		return NULL;
 
@@ -1977,7 +1992,7 @@ end_io:
  */
 blk_qc_t generic_make_request(struct bio *bio)
 {
-	struct bio_list bio_list_on_stack;
+	struct bio_plug_list bio_list_on_stack;
 	blk_qc_t ret = BLK_QC_T_NONE;
 
 	if (!generic_make_request_checks(bio))
@@ -1994,7 +2009,9 @@ blk_qc_t generic_make_request(struct bio *bio)
 	 * should be added at the tail
 	 */
 	if (current->bio_list) {
-		bio_list_add(current->bio_list, bio);
+		WARN(!current->bio_list->q->rescue_workqueue,
+		     "submitting bio beneath generic_make_request() without rescuer");
+		bio_list_add(&current->bio_list->bios, bio);
 		goto out;
 	}
 
@@ -2013,19 +2030,23 @@ blk_qc_t generic_make_request(struct bio *bio)
 	 * bio_list, and call into ->make_request() again.
 	 */
 	BUG_ON(bio->bi_next);
-	bio_list_init(&bio_list_on_stack);
+	bio_list_init(&bio_list_on_stack.bios);
 	current->bio_list = &bio_list_on_stack;
+
 	do {
 		struct request_queue *q = bdev_get_queue(bio->bi_bdev);
+
+		current->bio_list->q = q;
 
 		if (likely(blk_queue_enter(q, false) == 0)) {
 			ret = q->make_request_fn(q, bio);
 
 			blk_queue_exit(q);
 
-			bio = bio_list_pop(current->bio_list);
+			bio = bio_list_pop(&current->bio_list->bios);
 		} else {
-			struct bio *bio_next = bio_list_pop(current->bio_list);
+			struct bio *bio_next =
+				bio_list_pop(&current->bio_list->bios);
 
 			bio_io_error(bio);
 			bio = bio_next;
@@ -2037,6 +2058,34 @@ out:
 	return ret;
 }
 EXPORT_SYMBOL(generic_make_request);
+
+static void bio_rescue_work(struct work_struct *work)
+{
+	struct request_queue *q =
+		container_of(work, struct request_queue, rescue_work);
+	struct bio *bio;
+
+	while (1) {
+		spin_lock(&q->rescue_lock);
+		bio = bio_list_pop(&q->rescue_list);
+		spin_unlock(&q->rescue_lock);
+
+		if (!bio)
+			break;
+
+		generic_make_request(bio);
+	}
+}
+
+void blk_punt_blocked_bios(struct bio_plug_list *list)
+{
+	spin_lock(&list->q->rescue_lock);
+	bio_list_merge(&list->q->rescue_list, &list->bios);
+	bio_list_init(&list->bios);
+	spin_unlock(&list->q->rescue_lock);
+
+	queue_work(list->q->rescue_workqueue, &list->q->rescue_work);
+}
 
 /**
  * submit_bio - submit a bio to the block device layer for I/O

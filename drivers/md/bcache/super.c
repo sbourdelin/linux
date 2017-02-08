@@ -800,7 +800,7 @@ static int bcache_device_init(struct bcache_device *d, unsigned block_size,
 	d->disk->fops		= &bcache_ops;
 	d->disk->private_data	= d;
 
-	q = blk_alloc_queue(GFP_KERNEL);
+	q = blk_alloc_queue(GFP_KERNEL, 0);
 	if (!q)
 		return -ENOMEM;
 
