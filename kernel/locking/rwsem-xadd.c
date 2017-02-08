@@ -351,6 +351,7 @@ done:
 static noinline bool rwsem_spin_on_owner(struct rw_semaphore *sem)
 {
 	struct task_struct *owner = READ_ONCE(sem->owner);
+	int loop = 0;
 
 	if (!rwsem_owner_is_writer(owner))
 		goto out;
@@ -367,10 +368,11 @@ static noinline bool rwsem_spin_on_owner(struct rw_semaphore *sem)
 
 		/*
 		 * abort spinning when need_resched or owner is not running or
-		 * owner's cpu is preempted.
+		 * owner's cpu is preempted. The preemption check is done at
+		 * a lower frequencey because of its high cost.
 		 */
 		if (!owner->on_cpu || need_resched() ||
-				vcpu_is_preempted(task_cpu(owner))) {
+		   (!(++loop & 0xff) &&	vcpu_is_preempted(task_cpu(owner)))) {
 			rcu_read_unlock();
 			return false;
 		}

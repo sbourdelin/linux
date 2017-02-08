@@ -423,6 +423,7 @@ bool mutex_spin_on_owner(struct mutex *lock, struct task_struct *owner,
 			 struct ww_acquire_ctx *ww_ctx, struct mutex_waiter *waiter)
 {
 	bool ret = true;
+	int loop = 0;
 
 	rcu_read_lock();
 	while (__mutex_owner(lock) == owner) {
@@ -436,9 +437,11 @@ bool mutex_spin_on_owner(struct mutex *lock, struct task_struct *owner,
 
 		/*
 		 * Use vcpu_is_preempted to detect lock holder preemption issue.
+		 * As vcpu_is_preempted is more costly to use, it is called at
+		 * a reduced frequencey (once every 256 iterations).
 		 */
 		if (!owner->on_cpu || need_resched() ||
-				vcpu_is_preempted(task_cpu(owner))) {
+		   (!(++loop & 0xff) &&	vcpu_is_preempted(task_cpu(owner)))) {
 			ret = false;
 			break;
 		}
