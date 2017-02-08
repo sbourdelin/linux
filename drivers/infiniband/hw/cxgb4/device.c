@@ -1363,10 +1363,10 @@ static void recover_lost_dbs(struct uld_ctx *ctx, struct qp_list *qp_list)
 					  t4_sq_host_wq_pidx(&qp->wq),
 					  t4_sq_wq_size(&qp->wq));
 		if (ret) {
-			pr_err(MOD "%s: Fatal error - "
-			       "DB overflow recovery failed - "
-			       "error syncing SQ qid %u\n",
-			       pci_name(ctx->lldi.pdev), qp->wq.sq.qid);
+			pr_err(MOD "%s%sSQ qid %u\n",
+			       pci_name(ctx->lldi.pdev),
+			       ": Fatal error - DB overflow recovery failed - error syncing ",
+			       qp->wq.sq.qid);
 			spin_unlock(&qp->lock);
 			spin_unlock_irq(&qp->rhp->lock);
 			return;
@@ -1379,10 +1379,10 @@ static void recover_lost_dbs(struct uld_ctx *ctx, struct qp_list *qp_list)
 					  t4_rq_wq_size(&qp->wq));
 
 		if (ret) {
-			pr_err(MOD "%s: Fatal error - "
-			       "DB overflow recovery failed - "
-			       "error syncing RQ qid %u\n",
-			       pci_name(ctx->lldi.pdev), qp->wq.rq.qid);
+			pr_err(MOD "%s%sRQ qid %u\n",
+			       pci_name(ctx->lldi.pdev),
+			       ": Fatal error - DB overflow recovery failed - error syncing ",
+			       qp->wq.rq.qid);
 			spin_unlock(&qp->lock);
 			spin_unlock_irq(&qp->rhp->lock);
 			return;
