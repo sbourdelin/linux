@@ -548,6 +548,24 @@ int nla_put(struct sk_buff *skb, int attrtype, int attrlen, const void *data)
 }
 EXPORT_SYMBOL(nla_put);
 
+int nla_put_u8(struct sk_buff *skb, int attrtype, u8 value)
+{
+	return nla_put(skb, attrtype, sizeof(u8), &value);
+}
+EXPORT_SYMBOL(nla_put_u8);
+
+int nla_put_u16(struct sk_buff *skb, int attrtype, u16 value)
+{
+	return nla_put(skb, attrtype, sizeof(u16), &value);
+}
+EXPORT_SYMBOL(nla_put_u16);
+
+int nla_put_u32(struct sk_buff *skb, int attrtype, u32 value)
+{
+	return nla_put(skb, attrtype, sizeof(u32), &value);
+}
+EXPORT_SYMBOL(nla_put_u32);
+
 /**
  * nla_put_64bit - Add a netlink attribute to a socket buffer and align it
  * @skb: socket buffer to add attribute to

@@ -755,10 +755,7 @@ static inline int nla_parse_nested(struct nlattr *tb[], int maxtype,
  * @attrtype: attribute type
  * @value: numeric value
  */
-static inline int nla_put_u8(struct sk_buff *skb, int attrtype, u8 value)
-{
-	return nla_put(skb, attrtype, sizeof(u8), &value);
-}
+extern int nla_put_u8(struct sk_buff *skb, int attrtype, u8 value);
 
 /**
  * nla_put_u16 - Add a u16 netlink attribute to a socket buffer
@@ -766,10 +763,7 @@ static inline int nla_put_u8(struct sk_buff *skb, int attrtype, u8 value)
  * @attrtype: attribute type
  * @value: numeric value
  */
-static inline int nla_put_u16(struct sk_buff *skb, int attrtype, u16 value)
-{
-	return nla_put(skb, attrtype, sizeof(u16), &value);
-}
+extern int nla_put_u16(struct sk_buff *skb, int attrtype, u16 value);
 
 /**
  * nla_put_be16 - Add a __be16 netlink attribute to a socket buffer
@@ -779,7 +773,7 @@ static inline int nla_put_u16(struct sk_buff *skb, int attrtype, u16 value)
  */
 static inline int nla_put_be16(struct sk_buff *skb, int attrtype, __be16 value)
 {
-	return nla_put(skb, attrtype, sizeof(__be16), &value);
+	return nla_put_u16(skb, attrtype, (u16 __force)value);
 }
 
 /**
@@ -801,7 +795,7 @@ static inline int nla_put_net16(struct sk_buff *skb, int attrtype, __be16 value)
  */
 static inline int nla_put_le16(struct sk_buff *skb, int attrtype, __le16 value)
 {
-	return nla_put(skb, attrtype, sizeof(__le16), &value);
+	return nla_put_u16(skb, attrtype, (u16 __force)value);
 }
 
 /**
@@ -810,10 +804,7 @@ static inline int nla_put_le16(struct sk_buff *skb, int attrtype, __le16 value)
  * @attrtype: attribute type
  * @value: numeric value
  */
-static inline int nla_put_u32(struct sk_buff *skb, int attrtype, u32 value)
-{
-	return nla_put(skb, attrtype, sizeof(u32), &value);
-}
+int nla_put_u32(struct sk_buff *skb, int attrtype, u32 value);
 
 /**
  * nla_put_be32 - Add a __be32 netlink attribute to a socket buffer
@@ -823,7 +814,7 @@ static inline int nla_put_u32(struct sk_buff *skb, int attrtype, u32 value)
  */
 static inline int nla_put_be32(struct sk_buff *skb, int attrtype, __be32 value)
 {
-	return nla_put(skb, attrtype, sizeof(__be32), &value);
+	return nla_put_u32(skb, attrtype, (u32 __force)value);
 }
 
 /**
@@ -845,7 +836,7 @@ static inline int nla_put_net32(struct sk_buff *skb, int attrtype, __be32 value)
  */
 static inline int nla_put_le32(struct sk_buff *skb, int attrtype, __le32 value)
 {
-	return nla_put(skb, attrtype, sizeof(__le32), &value);
+	return nla_put_u32(skb, attrtype, (u32 __force)value);
 }
 
 /**
