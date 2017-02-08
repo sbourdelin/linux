@@ -202,7 +202,7 @@ static int create_qp(struct c4iw_rdev *rdev, struct t4_wq *wq,
 	int wr_len;
 	struct c4iw_wr_wait wr_wait;
 	struct sk_buff *skb;
-	int ret = 0;
+	int ret;
 	int eqsize;
 
 	wq->sq.qid = c4iw_get_qpid(rdev, uctx);
