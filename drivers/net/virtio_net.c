@@ -93,8 +93,6 @@ struct receive_queue {
 
 	struct napi_struct napi;
 
-	struct bpf_prog __rcu *xdp_prog;
-
 	/* Chain pages by the private ptr. */
 	struct page *pages;
 
@@ -139,6 +137,9 @@ struct virtnet_info {
 
 	/* Host can handle any s/g split between our header and packet data */
 	bool any_header_sg;
+
+	/* XDP has been enabled in device */
+	bool xdp_enabled;
 
 	/* Packet virtio header size */
 	u8 hdr_len;
@@ -414,13 +415,12 @@ static struct sk_buff *receive_small(struct net_device *dev,
 				     void *buf, unsigned int len)
 {
 	struct sk_buff * skb = buf;
-	struct bpf_prog *xdp_prog;
+	struct xdp_hook *last_hook;
 
 	len -= vi->hdr_len;
 
 	rcu_read_lock();
-	xdp_prog = rcu_dereference(rq->xdp_prog);
-	if (xdp_prog) {
+	if (xdp_hook_run_needed_check(dev, &rq->napi)) {
 		struct virtio_net_hdr_mrg_rxbuf *hdr = buf;
 		struct xdp_buff xdp;
 		u32 act;
@@ -431,8 +431,7 @@ static struct sk_buff *receive_small(struct net_device *dev,
 		xdp.data_hard_start = skb->data;
 		xdp.data = skb->data + VIRTIO_XDP_HEADROOM;
 		xdp.data_end = xdp.data + len;
-		act = bpf_prog_run_xdp(xdp_prog, &xdp);
-
+		act = xdp_hook_run_ret_last(&rq->napi, &xdp, &last_hook);
 		switch (act) {
 		case XDP_PASS:
 			/* Recalculate length in case bpf program changed it */
@@ -441,13 +440,13 @@ static struct sk_buff *receive_small(struct net_device *dev,
 			break;
 		case XDP_TX:
 			if (unlikely(!virtnet_xdp_xmit(vi, rq, &xdp, skb)))
-				trace_xdp_exception(vi->dev, xdp_prog, act);
+				trace_xdp_hook_exception(vi->dev, last_hook, act);
 			rcu_read_unlock();
 			goto xdp_xmit;
 		default:
-			bpf_warn_invalid_xdp_action(act);
+			xdp_warn_invalid_action(act);
 		case XDP_ABORTED:
-			trace_xdp_exception(vi->dev, xdp_prog, act);
+			trace_xdp_hook_exception(vi->dev, last_hook, act);
 		case XDP_DROP:
 			goto err_xdp;
 		}
@@ -559,16 +558,15 @@ static struct sk_buff *receive_mergeable(struct net_device *dev,
 	struct page *page = virt_to_head_page(buf);
 	int offset = buf - page_address(page);
 	struct sk_buff *head_skb, *curr_skb;
-	struct bpf_prog *xdp_prog;
 	unsigned int truesize;
 
 	head_skb = NULL;
 
 	rcu_read_lock();
-	xdp_prog = rcu_dereference(rq->xdp_prog);
-	if (xdp_prog) {
+	if (xdp_hook_run_needed_check(dev, &rq->napi)) {
 		struct page *xdp_page;
 		struct xdp_buff xdp;
+		struct xdp_hook *last_hook;
 		void *data;
 		u32 act;
 
@@ -599,7 +597,7 @@ static struct sk_buff *receive_mergeable(struct net_device *dev,
 		xdp.data_hard_start = data - VIRTIO_XDP_HEADROOM + vi->hdr_len;
 		xdp.data = data + vi->hdr_len;
 		xdp.data_end = xdp.data + (len - vi->hdr_len);
-		act = bpf_prog_run_xdp(xdp_prog, &xdp);
+		act = xdp_hook_run_ret_last(&rq->napi, &xdp, &last_hook);
 
 		switch (act) {
 		case XDP_PASS:
@@ -622,16 +620,16 @@ static struct sk_buff *receive_mergeable(struct net_device *dev,
 			break;
 		case XDP_TX:
 			if (unlikely(!virtnet_xdp_xmit(vi, rq, &xdp, data)))
-				trace_xdp_exception(vi->dev, xdp_prog, act);
+				trace_xdp_hook_exception(vi->dev, last_hook, act);
 			ewma_pkt_len_add(&rq->mrg_avg_pkt_len, len);
 			if (unlikely(xdp_page != page))
 				goto err_xdp;
 			rcu_read_unlock();
 			goto xdp_xmit;
 		default:
-			bpf_warn_invalid_xdp_action(act);
+			xdp_warn_invalid_action(act);
 		case XDP_ABORTED:
-			trace_xdp_exception(vi->dev, xdp_prog, act);
+			trace_xdp_hook_exception(vi->dev, last_hook, act);
 		case XDP_DROP:
 			if (unlikely(xdp_page != page))
 				__free_pages(xdp_page, 0);
@@ -1599,7 +1597,7 @@ static int virtnet_set_channels(struct net_device *dev,
 	 * also when XDP is loaded all RX queues have XDP programs so we only
 	 * need to check a single RX queue.
 	 */
-	if (vi->rq[0].xdp_prog)
+	if (vi->xdp_enabled)
 		return -EINVAL;
 
 	get_online_cpus();
@@ -1770,13 +1768,22 @@ err:
 	return ret;
 }
 
-static int virtnet_xdp_set(struct net_device *dev, struct bpf_prog *prog)
+static int virtnet_xdp_check_bpf(struct net_device *dev, struct bpf_prog *prog)
+{
+	if (prog && prog->xdp_adjust_head) {
+		netdev_warn(dev, "Does not support bpf_xdp_adjust_head()\n");
+		return -EOPNOTSUPP;
+	}
+
+	return 0;
+}
+
+static int virtnet_xdp_init(struct net_device *dev, bool enable)
 {
 	unsigned long int max_sz = PAGE_SIZE - sizeof(struct padded_vnet_hdr);
 	struct virtnet_info *vi = netdev_priv(dev);
-	struct bpf_prog *old_prog;
 	u16 oxdp_qp, xdp_qp = 0, curr_qp;
-	int i, err;
+	int err;
 
 	if (virtio_has_feature(vi->vdev, VIRTIO_NET_F_GUEST_TSO4) ||
 	    virtio_has_feature(vi->vdev, VIRTIO_NET_F_GUEST_TSO6) ||
@@ -1797,7 +1804,7 @@ static int virtnet_xdp_set(struct net_device *dev, struct bpf_prog *prog)
 	}
 
 	curr_qp = vi->curr_queue_pairs - vi->xdp_queue_pairs;
-	if (prog)
+	if (enable)
 		xdp_qp = nr_cpu_ids;
 
 	/* XDP requires extra queues for XDP_TX */
@@ -1805,12 +1812,6 @@ static int virtnet_xdp_set(struct net_device *dev, struct bpf_prog *prog)
 		netdev_warn(dev, "request %i queues but max is %i\n",
 			    curr_qp + xdp_qp, vi->max_queue_pairs);
 		return -ENOMEM;
-	}
-
-	if (prog) {
-		prog = bpf_prog_add(prog, vi->max_queue_pairs - 1);
-		if (IS_ERR(prog))
-			return PTR_ERR(prog);
 	}
 
 	err = _virtnet_set_queues(vi, curr_qp + xdp_qp);
@@ -1835,12 +1836,7 @@ static int virtnet_xdp_set(struct net_device *dev, struct bpf_prog *prog)
 
 	netif_set_real_num_rx_queues(dev, curr_qp + xdp_qp);
 
-	for (i = 0; i < vi->max_queue_pairs; i++) {
-		old_prog = rtnl_dereference(vi->rq[i].xdp_prog);
-		rcu_assign_pointer(vi->rq[i].xdp_prog, prog);
-		if (old_prog)
-			bpf_prog_put(old_prog);
-	}
+	vi->xdp_enabled = enable;
 
 	return 0;
 
@@ -1855,31 +1851,18 @@ virtio_queue_err:
 	/* On queue set error we can unwind bpf ref count and user space can
 	 * retry this is most likely an allocation failure.
 	 */
-	if (prog)
-		bpf_prog_sub(prog, vi->max_queue_pairs - 1);
 	return err;
-}
-
-static bool virtnet_xdp_query(struct net_device *dev)
-{
-	struct virtnet_info *vi = netdev_priv(dev);
-	int i;
-
-	for (i = 0; i < vi->max_queue_pairs; i++) {
-		if (vi->rq[i].xdp_prog)
-			return true;
-	}
-	return false;
 }
 
 static int virtnet_xdp(struct net_device *dev, struct netdev_xdp *xdp)
 {
 	switch (xdp->command) {
-	case XDP_SETUP_PROG:
-		return virtnet_xdp_set(dev, xdp->prog);
-	case XDP_QUERY_PROG:
-		xdp->prog_attached = virtnet_xdp_query(dev);
-		return 0;
+	case XDP_MODE_ON:
+		return virtnet_xdp_init(dev, true);
+	case XDP_MODE_OFF:
+		return virtnet_xdp_init(dev, false);
+	case XDP_CHECK_BPF_PROG:
+		return virtnet_xdp_check_bpf(dev, xdp->prog);
 	default:
 		return -EINVAL;
 	}
@@ -1960,17 +1943,11 @@ static void virtnet_free_queues(struct virtnet_info *vi)
 
 static void _free_receive_bufs(struct virtnet_info *vi)
 {
-	struct bpf_prog *old_prog;
 	int i;
 
 	for (i = 0; i < vi->max_queue_pairs; i++) {
 		while (vi->rq[i].pages)
 			__free_pages(get_a_page(&vi->rq[i], GFP_KERNEL), 0);
-
-		old_prog = rtnl_dereference(vi->rq[i].xdp_prog);
-		RCU_INIT_POINTER(vi->rq[i].xdp_prog, NULL);
-		if (old_prog)
-			bpf_prog_put(old_prog);
 	}
 }
 
@@ -2283,7 +2260,8 @@ static int virtnet_probe(struct virtio_device *vdev)
 	/* Do we support "hardware" checksums? */
 	if (virtio_has_feature(vdev, VIRTIO_NET_F_CSUM)) {
 		/* This opens up the world of extra features. */
-		dev->hw_features |= NETIF_F_HW_CSUM | NETIF_F_SG;
+		dev->hw_features |= NETIF_F_HW_CSUM | NETIF_F_SG |
+				    NETIF_F_XDP;
 		if (csum)
 			dev->features |= NETIF_F_HW_CSUM | NETIF_F_SG;
 
