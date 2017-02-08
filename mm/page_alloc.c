@@ -6080,8 +6080,13 @@ static unsigned long __init early_calculate_totalpages(void)
 		unsigned long pages = end_pfn - start_pfn;
 
 		totalpages += pages;
-		if (pages)
+		if (pages) {
+#ifdef CONFIG_COHERENT_DEVICE
+			if (arch_check_node_cdm(nid))
+				node_set_state(nid, N_COHERENT_DEVICE);
+#endif
 			node_set_state(nid, N_MEMORY);
+		}
 	}
 	return totalpages;
 }
@@ -6392,8 +6397,13 @@ void __init free_area_init_nodes(unsigned long *max_zone_pfn)
 				find_min_pfn_for_node(nid), NULL);
 
 		/* Any memory on that node */
-		if (pgdat->node_present_pages)
+		if (pgdat->node_present_pages) {
+#ifdef CONFIG_COHERENT_DEVICE
+			if (arch_check_node_cdm(nid))
+				node_set_state(nid, N_COHERENT_DEVICE);
+#endif
 			node_set_state(nid, N_MEMORY);
+		}
 		check_for_memory(pgdat, nid);
 	}
 }

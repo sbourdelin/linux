@@ -81,4 +81,53 @@ static inline void register_hugetlbfs_with_node(node_registration_func_t reg,
 
 #define to_node(device) container_of(device, struct node, dev)
 
+
+#ifdef CONFIG_COHERENT_DEVICE
+extern int arch_check_node_cdm(int nid);
+
+static inline nodemask_t system_mem_nodemask(void)
+{
+	nodemask_t system_mem;
+
+	nodes_clear(system_mem);
+	nodes_andnot(system_mem, node_states[N_MEMORY],
+				node_states[N_COHERENT_DEVICE]);
+	return system_mem;
+}
+
+static inline bool is_cdm_node(int node)
+{
+	return node_isset(node, node_states[N_COHERENT_DEVICE]);
+}
+
+static inline bool nodemask_has_cdm(nodemask_t mask)
+{
+	int node, i;
+
+	node = first_node(mask);
+	for (i = 0; i < nodes_weight(mask); i++) {
+		if (is_cdm_node(node))
+			return true;
+		node = next_node(node, mask);
+	}
+	return false;
+}
+#else
+static inline int arch_check_node_cdm(int nid) { return 0; }
+
+static inline nodemask_t system_mem_nodemask(void)
+{
+	return node_states[N_MEMORY];
+}
+
+static inline bool is_cdm_node(int node)
+{
+	return false;
+}
+
+static inline bool nodemask_has_cdm(nodemask_t mask)
+{
+	return false;
+}
+#endif /* CONFIG_COHERENT_DEVICE */
 #endif /* _LINUX_NODE_H_ */
