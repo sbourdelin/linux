@@ -392,14 +392,12 @@ static int stag_release(struct inode *inode, struct file *file)
 static int stag_open(struct inode *inode, struct file *file)
 {
 	struct c4iw_debugfs_data *stagd;
-	int ret = 0;
 	int count = 1;
 
 	stagd = kmalloc(sizeof *stagd, GFP_KERNEL);
-	if (!stagd) {
-		ret = -ENOMEM;
-		goto out;
-	}
+	if (!stagd)
+		goto failure_indication;
+
 	stagd->devp = inode->i_private;
 	stagd->pos = 0;
 
@@ -409,10 +407,8 @@ static int stag_open(struct inode *inode, struct file *file)
 
 	stagd->bufsize = count * 256;
 	stagd->buf = vmalloc(stagd->bufsize);
-	if (!stagd->buf) {
-		ret = -ENOMEM;
-		goto err1;
-	}
+	if (!stagd->buf)
+		goto free_stagd;
 
 	spin_lock_irq(&stagd->devp->lock);
 	idr_for_each(&stagd->devp->mmidr, dump_stag, stagd);
@@ -420,11 +416,11 @@ static int stag_open(struct inode *inode, struct file *file)
 
 	stagd->buf[stagd->pos++] = 0;
 	file->private_data = stagd;
-	goto out;
-err1:
+	return 0;
+free_stagd:
 	kfree(stagd);
-out:
-	return ret;
+failure_indication:
+	return -ENOMEM;
 }
 
 static const struct file_operations stag_debugfs_fops = {
