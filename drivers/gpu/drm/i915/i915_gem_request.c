@@ -1084,6 +1084,9 @@ long i915_wait_request(struct drm_i915_gem_request *req,
 		if (timeout < 0)
 			goto complete;
 
+		if (!timeout)
+			return -ETIME;
+
 		GEM_BUG_ON(!i915_sw_fence_done(&req->execute));
 	}
 	GEM_BUG_ON(!i915_sw_fence_done(&req->submit));
