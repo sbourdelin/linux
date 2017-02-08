@@ -283,21 +283,21 @@ int cxio_create_qp(struct cxio_rdev *rdev_p, u32 kernel_domain,
 
 	wq->rq = kcalloc(depth, sizeof(*wq->rq), GFP_KERNEL);
 	if (!wq->rq)
-		goto err1;
+		goto put_pid;
 
 	wq->rq_addr = cxio_hal_rqtpool_alloc(rdev_p, rqsize);
 	if (!wq->rq_addr)
-		goto err2;
+		goto free_rq;
 
 	wq->sq = kcalloc(depth, sizeof(*wq->sq), GFP_KERNEL);
 	if (!wq->sq)
-		goto err3;
+		goto free_pool;
 
 	wq->queue = dma_alloc_coherent(&(rdev_p->rnic_info.pdev->dev),
 					     depth * sizeof(union t3_wr),
 					     &(wq->dma_addr), GFP_KERNEL);
 	if (!wq->queue)
-		goto err4;
+		goto free_sq;
 
 	memset(wq->queue, 0, depth * sizeof(union t3_wr));
 	dma_unmap_addr_set(wq, mapping, wq->dma_addr);
@@ -309,13 +309,13 @@ int cxio_create_qp(struct cxio_rdev *rdev_p, u32 kernel_domain,
 	PDBG("%s qpid 0x%x doorbell 0x%p udb 0x%llx\n", __func__,
 	     wq->qpid, wq->doorbell, (unsigned long long) wq->udb);
 	return 0;
-err4:
+free_sq:
 	kfree(wq->sq);
-err3:
+free_pool:
 	cxio_hal_rqtpool_free(rdev_p, wq->rq_addr, rqsize);
-err2:
+free_rq:
 	kfree(wq->rq);
-err1:
+put_pid:
 	put_qpid(rdev_p, wq->qpid, uctx);
 	return -ENOMEM;
 }
