@@ -721,18 +721,18 @@ static inline int mlx5e_xdp_handle(struct mlx5e_rq *rq,
 				   struct mlx5e_dma_info *di,
 				   void *va, u16 *rx_headroom, u32 *len)
 {
-	const struct bpf_prog *prog = READ_ONCE(rq->xdp_prog);
 	struct xdp_buff xdp;
+	struct xdp_hook *last_hook;
 	u32 act;
 
-	if (!prog)
+	if (!xdp_hook_run_needed_check(rq->netdev, rq->cq.napi))
 		return false;
 
 	xdp.data = va + *rx_headroom;
 	xdp.data_end = xdp.data + *len;
 	xdp.data_hard_start = va;
 
-	act = bpf_prog_run_xdp(prog, &xdp);
+	act = xdp_hook_run_ret_last(rq->cq.napi, &xdp, &last_hook);
 	switch (act) {
 	case XDP_PASS:
 		*rx_headroom = xdp.data - xdp.data_hard_start;
@@ -740,12 +740,12 @@ static inline int mlx5e_xdp_handle(struct mlx5e_rq *rq,
 		return false;
 	case XDP_TX:
 		if (unlikely(!mlx5e_xmit_xdp_frame(rq, di, &xdp)))
-			trace_xdp_exception(rq->netdev, prog, act);
+			trace_xdp_hook_exception(rq->netdev, last_hook, act);
 		return true;
 	default:
-		bpf_warn_invalid_xdp_action(act);
+		xdp_warn_invalid_action(act);
 	case XDP_ABORTED:
-		trace_xdp_exception(rq->netdev, prog, act);
+		trace_xdp_hook_exception(rq->netdev, last_hook, act);
 	case XDP_DROP:
 		rq->stats.xdp_drop++;
 		mlx5e_page_release(rq, di, true);
