@@ -1467,13 +1467,13 @@ static int rdma_init(struct c4iw_dev *rhp, struct c4iw_qp *qhp)
 
 	ret = c4iw_ofld_send(&rhp->rdev, skb);
 	if (ret)
-		goto err1;
+		goto free_ird;
 
 	ret = c4iw_wait_for_reply(&rhp->rdev, &qhp->ep->com.wr_wait,
 				  qhp->ep->hwtid, qhp->wq.sq.qid, __func__);
 	if (!ret)
 		goto out;
-err1:
+free_ird:
 	free_ird(rhp, qhp->attr.max_ird);
 out:
 	PDBG("%s ret %d\n", __func__, ret);
