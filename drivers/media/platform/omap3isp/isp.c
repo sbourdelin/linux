@@ -2024,21 +2024,92 @@ enum isp_of_phy {
 	ISP_OF_PHY_CSIPHY2,
 };
 
-static int isp_of_parse_node(struct device *dev, struct device_node *node,
-			     struct isp_async_subdev *isd)
+void __isp_of_parse_node_csi1(struct device *dev,
+				   struct isp_ccp2_cfg *buscfg,
+				   struct v4l2_of_endpoint *vep)
 {
-	struct isp_bus_cfg *buscfg = &isd->bus;
-	struct v4l2_of_endpoint vep;
+	buscfg->lanecfg.clk.pos = vep->bus.mipi_csi1.clock_lane;
+	buscfg->lanecfg.clk.pol =
+		vep->bus.mipi_csi1.lane_polarity[0];
+	dev_dbg(dev, "clock lane polarity %u, pos %u\n",
+		buscfg->lanecfg.clk.pol,
+		buscfg->lanecfg.clk.pos);
+
+	buscfg->lanecfg.data[0].pos = vep->bus.mipi_csi2.data_lanes[0];
+	buscfg->lanecfg.data[0].pol =
+		vep->bus.mipi_csi2.lane_polarities[1];
+	dev_dbg(dev, "data lane polarity %u, pos %u\n",
+		buscfg->lanecfg.data[0].pol,
+		buscfg->lanecfg.data[0].pos);
+
+	buscfg->strobe_clk_pol = vep->bus.mipi_csi1.clock_inv;
+	buscfg->phy_layer = vep->bus.mipi_csi1.strobe;
+	buscfg->ccp2_mode = vep->bus_type == V4L2_MBUS_CCP2;
+
+	dev_dbg(dev, "clock_inv %u strobe %u ccp2 %u\n",
+		buscfg->strobe_clk_pol,
+		buscfg->phy_layer,
+		buscfg->ccp2_mode);
+	/*
+	 * FIXME: now we assume the CRC is always there.
+	 * Implement a way to obtain this information from the
+	 * sensor. Frame descriptors, perhaps?
+	 */
+	buscfg->crc = 1;
+
+	buscfg->vp_clk_pol = 1;
+}
+
+static void isp_of_parse_node_csi1(struct device *dev,
+				   struct isp_bus_cfg *buscfg,
+				   struct v4l2_of_endpoint *vep)
+{
+	if (vep->base.port == ISP_OF_PHY_CSIPHY1)
+		buscfg->interface = ISP_INTERFACE_CCP2B_PHY1;
+	else
+		buscfg->interface = ISP_INTERFACE_CCP2B_PHY2;
+	__isp_of_parse_node_csi1(dev, &buscfg->bus.ccp2, vep);
+}
+
+static void isp_of_parse_node_csi2(struct device *dev,
+				   struct isp_bus_cfg *buscfg,
+				   struct v4l2_of_endpoint *vep)
+{
 	unsigned int i;
-	int ret;
 
-	ret = v4l2_of_parse_endpoint(node, &vep);
-	if (ret)
-		return ret;
+	if (vep->base.port == ISP_OF_PHY_CSIPHY1)
+		buscfg->interface = ISP_INTERFACE_CSI2C_PHY1;
+	else
+		buscfg->interface = ISP_INTERFACE_CSI2A_PHY2;
+	buscfg->bus.csi2.lanecfg.clk.pos = vep->bus.mipi_csi2.clock_lane;
+	buscfg->bus.csi2.lanecfg.clk.pol =
+			vep->bus.mipi_csi2.lane_polarities[0];
+	dev_dbg(dev, "clock lane polarity %u, pos %u\n",
+		buscfg->bus.csi2.lanecfg.clk.pol,
+		buscfg->bus.csi2.lanecfg.clk.pos);
 
-	dev_dbg(dev, "parsing endpoint %s, interface %u\n", node->full_name,
-		vep.base.port);
+	for (i = 0; i < ISP_CSIPHY2_NUM_DATA_LANES; i++) {
+		buscfg->bus.csi2.lanecfg.data[i].pos =
+			vep->bus.mipi_csi2.data_lanes[i];
+		buscfg->bus.csi2.lanecfg.data[i].pol =
+			vep->bus.mipi_csi2.lane_polarities[i + 1];
+		dev_dbg(dev, "data lane %u polarity %u, pos %u\n", i,
+			buscfg->bus.csi2.lanecfg.data[i].pol,
+				buscfg->bus.csi2.lanecfg.data[i].pos);
+	}
 
+	/*
+	 * FIXME: now we assume the CRC is always there.
+	 * Implement a way to obtain this information from the
+	 * sensor. Frame descriptors, perhaps?
+	 */
+	buscfg->bus.csi2.crc = 1;
+}
+
+static int isp_endpoint_to_buscfg(struct device *dev,
+				  struct v4l2_of_endpoint vep,
+				  struct isp_bus_cfg *buscfg)
+{
 	switch (vep.base.port) {
 	case ISP_OF_PHY_PARALLEL:
 		buscfg->interface = ISP_INTERFACE_PARALLEL;
@@ -2059,45 +2130,42 @@ static int isp_of_parse_node(struct device *dev, struct device_node *node,
 
 	case ISP_OF_PHY_CSIPHY1:
 	case ISP_OF_PHY_CSIPHY2:
-		/* FIXME: always assume CSI-2 for now. */
-		switch (vep.base.port) {
-		case ISP_OF_PHY_CSIPHY1:
-			buscfg->interface = ISP_INTERFACE_CSI2C_PHY1;
-			break;
-		case ISP_OF_PHY_CSIPHY2:
-			buscfg->interface = ISP_INTERFACE_CSI2A_PHY2;
-			break;
-		}
-		buscfg->bus.csi2.lanecfg.clk.pos = vep.bus.mipi_csi2.clock_lane;
-		buscfg->bus.csi2.lanecfg.clk.pol =
-			vep.bus.mipi_csi2.lane_polarities[0];
-		dev_dbg(dev, "clock lane polarity %u, pos %u\n",
-			buscfg->bus.csi2.lanecfg.clk.pol,
-			buscfg->bus.csi2.lanecfg.clk.pos);
-
-		for (i = 0; i < ISP_CSIPHY2_NUM_DATA_LANES; i++) {
-			buscfg->bus.csi2.lanecfg.data[i].pos =
-				vep.bus.mipi_csi2.data_lanes[i];
-			buscfg->bus.csi2.lanecfg.data[i].pol =
-				vep.bus.mipi_csi2.lane_polarities[i + 1];
-			dev_dbg(dev, "data lane %u polarity %u, pos %u\n", i,
-				buscfg->bus.csi2.lanecfg.data[i].pol,
-				buscfg->bus.csi2.lanecfg.data[i].pos);
-		}
-
-		/*
-		 * FIXME: now we assume the CRC is always there.
-		 * Implement a way to obtain this information from the
-		 * sensor. Frame descriptors, perhaps?
-		 */
-		buscfg->bus.csi2.crc = 1;
+		if (vep.bus_type == V4L2_MBUS_CSI2)
+			isp_of_parse_node_csi2(dev, buscfg, &vep);
+		else
+			isp_of_parse_node_csi1(dev, buscfg, &vep);
 		break;
 
 	default:
+		return -1;
+	}
+	return 0;
+}
+
+static int isp_of_parse_node_endpoint(struct device *dev,
+				      struct device_node *node,
+				      struct isp_async_subdev *isd)
+{
+	struct isp_bus_cfg *buscfg;
+	struct v4l2_of_endpoint vep;
+	int ret;
+
+	isd->bus = devm_kzalloc(dev, sizeof(*isd->bus), GFP_KERNEL);
+	if (!isd->bus)
+		return -ENOMEM;
+
+	buscfg = isd->bus;
+
+	ret = v4l2_of_parse_endpoint(node, &vep);
+	if (ret)
+		return ret;
+
+	dev_dbg(dev, "parsing endpoint %s, interface %u\n", node->full_name,
+		vep.base.port);
+
+	if (isp_endpoint_to_buscfg(dev, vep, buscfg))
 		dev_warn(dev, "%s: invalid interface %u\n", node->full_name,
 			 vep.base.port);
-		break;
-	}
 
 	return 0;
 }
@@ -2124,7 +2192,7 @@ static int isp_of_parse_nodes(struct device *dev,
 
 		notifier->subdevs[notifier->num_subdevs] = &isd->asd;
 
-		if (isp_of_parse_node(dev, node, isd)) {
+		if (isp_of_parse_node_endpoint(dev, node, isd)) {
 			of_node_put(node);
 			return -EINVAL;
 		}
