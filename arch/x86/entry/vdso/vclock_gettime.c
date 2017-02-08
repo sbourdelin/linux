@@ -17,6 +17,7 @@
 #include <asm/unistd.h>
 #include <asm/msr.h>
 #include <asm/pvclock.h>
+#include <asm/mshyperv.h>
 #include <linux/math64.h>
 #include <linux/time.h>
 #include <linux/kernel.h>
@@ -141,6 +142,49 @@ static notrace u64 vread_pvclock(int *mode)
 	return last;
 }
 #endif
+#ifdef CONFIG_HYPERV_CLOCK
+/* (a * b) >> 64 implementation */
+static inline u64 mul64x64_hi(u64 a, u64 b)
+{
+	u64 a_lo, a_hi, b_lo, b_hi, p1, p2;
+
+	a_lo = (u32)a;
+	a_hi = a >> 32;
+	b_lo = (u32)b;
+	b_hi = b >> 32;
+	p1 = a_lo * b_hi;
+	p2 = a_hi * b_lo;
+
+	return a_hi * b_hi + (p1 >> 32) + (p2 >> 32) +
+		((((a_lo * b_lo) >> 32) + (u32)p1 + (u32)p2) >> 32);
+
+}
+
+static notrace u64 vread_hvclock(int *mode)
+{
+	const struct ms_hyperv_tsc_page *tsc_pg =
+		(const struct ms_hyperv_tsc_page *)&pvclock_page;
+	u64 sequence, scale, offset, current_tick, cur_tsc;
+
+	while (1) {
+		sequence = READ_ONCE(tsc_pg->tsc_sequence);
+		if (!sequence)
+			break;
+
+		scale = READ_ONCE(tsc_pg->tsc_scale);
+		offset = READ_ONCE(tsc_pg->tsc_offset);
+		rdtscll(cur_tsc);
+
+		current_tick = mul64x64_hi(cur_tsc, scale) + offset;
+
+		if (READ_ONCE(tsc_pg->tsc_sequence) == sequence)
+			return current_tick;
+	}
+
+	*mode = VCLOCK_NONE;
+	return 0;
+}
+#endif
 
 notrace static u64 vread_tsc(void)
 {
@@ -172,6 +216,10 @@ notrace static inline u64 vgetsns(int *mode)
 #ifdef CONFIG_PARAVIRT_CLOCK
 	else if (gtod->vclock_mode == VCLOCK_PVCLOCK)
 		cycles = vread_pvclock(mode);
+#endif
+#ifdef CONFIG_HYPERV_CLOCK
+	else if (gtod->vclock_mode == VCLOCK_HVCLOCK)
+		cycles = vread_hvclock(mode);
 #endif
 	else
 		return 0;

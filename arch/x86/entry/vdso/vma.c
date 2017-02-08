@@ -21,6 +21,7 @@
 #include <asm/page.h>
 #include <asm/desc.h>
 #include <asm/cpufeature.h>
+#include <asm/mshyperv.h>
 
 #if defined(CONFIG_X86_64)
 unsigned int __read_mostly vdso64_enabled = 1;
@@ -112,13 +113,24 @@ static int vvar_fault(const struct vm_special_mapping *sm,
 		ret = vm_insert_pfn(vma, vmf->address,
 				    __pa_symbol(&__vvar_page) >> PAGE_SHIFT);
 	} else if (sym_offset == image->sym_pvclock_page) {
-		struct pvclock_vsyscall_time_info *pvti =
-			pvclock_pvti_cpu0_va();
-		if (pvti && vclock_was_used(VCLOCK_PVCLOCK)) {
-			ret = vm_insert_pfn(
-				vma,
-				vmf->address,
-				__pa(pvti) >> PAGE_SHIFT);
+		if (vclock_was_used(VCLOCK_PVCLOCK)) {
+			struct pvclock_vsyscall_time_info *pvti =
+				pvclock_pvti_cpu0_va();
+			if (pvti) {
+				ret = vm_insert_pfn(
+					vma,
+					vmf->address,
+					__pa(pvti) >> PAGE_SHIFT);
+			}
+		} else if (vclock_was_used(VCLOCK_HVCLOCK)) {
+			struct ms_hyperv_tsc_page *tsc_pg =
+				hv_get_tsc_page();
+			if (tsc_pg) {
+				ret = vm_insert_pfn(
+					vma,
+					vmf->address,
+					vmalloc_to_pfn(tsc_pg));
+			}
 		}
 	}
 
