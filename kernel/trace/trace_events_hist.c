@@ -1576,6 +1576,10 @@ static bool hist_trigger_match(struct event_trigger_data *data,
 			return false;
 		if (key_field->is_signed != key_field_test->is_signed)
 			return false;
+		if ((key_field->var_name && !key_field_test->var_name) ||
+		    (!key_field->var_name && key_field_test->var_name) ||
+		    strcmp(key_field->var_name, key_field_test->var_name) != 0)
+			return false;
 	}
 
 	for (i = 0; i < hist_data->n_sort_keys; i++) {
