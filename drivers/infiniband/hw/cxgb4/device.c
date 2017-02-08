@@ -1367,9 +1367,7 @@ static void recover_lost_dbs(struct uld_ctx *ctx, struct qp_list *qp_list)
 			       pci_name(ctx->lldi.pdev),
 			       ": Fatal error - DB overflow recovery failed - error syncing ",
 			       qp->wq.sq.qid);
-			spin_unlock(&qp->lock);
-			spin_unlock_irq(&qp->rhp->lock);
-			return;
+			goto unlock;
 		}
 		qp->wq.sq.wq_pidx_inc = 0;
 
@@ -1383,6 +1381,7 @@ static void recover_lost_dbs(struct uld_ctx *ctx, struct qp_list *qp_list)
 			       pci_name(ctx->lldi.pdev),
 			       ": Fatal error - DB overflow recovery failed - error syncing ",
 			       qp->wq.rq.qid);
+unlock:
 			spin_unlock(&qp->lock);
 			spin_unlock_irq(&qp->rhp->lock);
 			return;
