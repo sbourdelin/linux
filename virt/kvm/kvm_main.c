@@ -2550,7 +2550,8 @@ static long kvm_vcpu_ioctl(struct file *filp,
 	if (r)
 		return r;
 	switch (ioctl) {
-	case KVM_RUN:
+	case KVM_RUN: {
+		struct kvm_run *run;
 		r = -EINVAL;
 		if (arg)
 			goto out;
@@ -2564,9 +2565,15 @@ static long kvm_vcpu_ioctl(struct file *filp,
 				synchronize_rcu();
 			put_pid(oldpid);
 		}
-		r = kvm_arch_vcpu_ioctl_run(vcpu, vcpu->run);
-		trace_kvm_userspace_exit(vcpu->run->exit_reason, r);
+		run = vcpu->run;
+		if (run->immediate_exit) {
+			WRITE_ONCE(run->immediate_exit, 0);
+			return -EINTR;
+		}
+		r = kvm_arch_vcpu_ioctl_run(vcpu, run);
+		trace_kvm_userspace_exit(run->exit_reason, r);
 		break;
+	}
 	case KVM_GET_REGS: {
 		struct kvm_regs *kvm_regs;
 
@@ -2927,6 +2934,7 @@ static long kvm_vm_ioctl_check_extension_generic(struct kvm *kvm, long arg)
 #endif
 	case KVM_CAP_IOEVENTFD_ANY_LENGTH:
 	case KVM_CAP_CHECK_EXTENSION_VM:
+	case KVM_CAP_IMMEDIATE_EXIT:
 		return 1;
 #ifdef CONFIG_HAVE_KVM_IRQ_ROUTING
 	case KVM_CAP_IRQ_ROUTING:
