@@ -709,6 +709,8 @@ asm(
 NOKPROBE_SYMBOL(kretprobe_trampoline);
 STACK_FRAME_NON_STANDARD(kretprobe_trampoline);
 
+static struct kprobe dummy_retprobe = {.addr = (void *)&kretprobe_trampoline};
+
 /*
  * Called from kretprobe_trampoline
  */
@@ -722,7 +724,6 @@ __visible __used void *trampoline_handler(struct pt_regs *regs)
 	kprobe_opcode_t *correct_ret_addr = NULL;
 
 	INIT_HLIST_HEAD(&empty_rp);
-	kretprobe_hash_lock(current, &head, &flags);
 	/* fixup registers */
 #ifdef CONFIG_X86_64
 	regs->cs = __KERNEL_CS;
@@ -733,6 +734,11 @@ __visible __used void *trampoline_handler(struct pt_regs *regs)
 	regs->ip = trampoline_address;
 	regs->orig_ax = ~0UL;
 
+	/* This prevents kernel to change running cpu while processing */
+	preempt_disable();
+	get_kprobe_ctlblk()->kprobe_status = KPROBE_HIT_ACTIVE;
+	__this_cpu_write(current_kprobe, &dummy_retprobe);
+	kretprobe_hash_lock(current, &head, &flags);
 	/*
 	 * It is possible to have multiple instances associated with a given
 	 * task either because multiple functions in the call path have
@@ -773,10 +779,9 @@ __visible __used void *trampoline_handler(struct pt_regs *regs)
 		orig_ret_address = (unsigned long)ri->ret_addr;
 		if (ri->rp && ri->rp->handler) {
 			__this_cpu_write(current_kprobe, &ri->rp->kp);
-			get_kprobe_ctlblk()->kprobe_status = KPROBE_HIT_ACTIVE;
 			ri->ret_addr = correct_ret_addr;
 			ri->rp->handler(ri, regs);
-			__this_cpu_write(current_kprobe, NULL);
+			__this_cpu_write(current_kprobe, &dummy_retprobe);
 		}
 
 		recycle_rp_inst(ri, &empty_rp);
@@ -791,6 +796,8 @@ __visible __used void *trampoline_handler(struct pt_regs *regs)
 	}
 
 	kretprobe_hash_unlock(current, &flags);
+	__this_cpu_write(current_kprobe, NULL);
+	preempt_enable_no_resched();
 
 	hlist_for_each_entry_safe(ri, tmp, &empty_rp, hlist) {
 		hlist_del(&ri->hlist);
