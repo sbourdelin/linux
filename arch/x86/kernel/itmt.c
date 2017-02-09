@@ -20,7 +20,6 @@
  * frequency under ITMT.
  */
 
-#include <linux/sched.h>
 #include <linux/cpumask.h>
 #include <linux/cpuset.h>
 #include <linux/mutex.h>
