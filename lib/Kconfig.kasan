@@ -20,6 +20,15 @@ config KASAN
 	  Currently CONFIG_KASAN doesn't work with CONFIG_DEBUG_SLAB
 	  (the resulting kernel does not boot).
 
+config KASAN_EXTRA
+	bool "KAsan: extra checks"
+	depends on KASAN
+	help
+	  This enables further checks in the kernel address sanitizer, for now
+	  it only includes the address-use-after-scope check which requires the
+	  use of KASAN_OUTLINE to avoid excessive kernel stack frame sizes that
+	  might lead to stack overflows.
+
 choice
 	prompt "Instrumentation type"
 	depends on KASAN
@@ -36,6 +45,7 @@ config KASAN_OUTLINE
 
 config KASAN_INLINE
 	bool "Inline instrumentation"
+	depends on !KASAN_EXTRA
 	help
 	  Compiler directly inserts code checking shadow memory before
 	  memory accesses. This is faster than outline (in some workloads
