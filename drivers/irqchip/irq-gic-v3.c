@@ -56,7 +56,7 @@ struct gic_chip_data {
 	u64			redist_stride;
 	u32			nr_redist_regions;
 	unsigned int		irq_nr;
-	struct partition_desc	*ppi_descs[16];
+	struct partition_desc	*ppi_descs[GIC_NR_PPI];
 };
 
 static struct gic_chip_data gic_data __read_mostly;
@@ -78,7 +78,7 @@ static inline unsigned int gic_irq(struct irq_data *d)
 
 static inline int gic_irq_in_rdist(struct irq_data *d)
 {
-	return gic_irq(d) < 32;
+	return gic_irq(d) < GIC_FIRST_SPI_IRQ;
 }
 
 static inline void __iomem *gic_dist_base(struct irq_data *d)
@@ -86,7 +86,7 @@ static inline void __iomem *gic_dist_base(struct irq_data *d)
 	if (gic_irq_in_rdist(d))	/* SGI+PPI -> SGI_base for this CPU */
 		return gic_data_rdist_sgi_base();
 
-	if (d->hwirq <= 1023)		/* SPI -> dist_base */
+	if (d->hwirq <= GIC_SPURIOUS_IRQ)	/* SPI -> dist_base */
 		return gic_data.dist_base;
 
 	return NULL;
@@ -289,7 +289,8 @@ static void gic_eoimode1_eoi_irq(struct irq_data *d)
 	 * No need to deactivate an LPI, or an interrupt that
 	 * is is getting forwarded to a vcpu.
 	 */
-	if (gic_irq(d) >= 8192 || irqd_is_forwarded_to_vcpu(d))
+	if (gic_irq(d) >= GIC_FIRST_LPI_IRQ ||
+	    irqd_is_forwarded_to_vcpu(d))
 		return;
 	gic_write_dir(gic_irq(d));
 }
@@ -301,12 +302,13 @@ static int gic_set_type(struct irq_data *d, unsigned int type)
 	void __iomem *base;
 
 	/* Interrupt configuration for SGIs can't be changed */
-	if (irq < 16)
+	if (irq <= GIC_LAST_SGI_IRQ)
 		return -EINVAL;
 
 	/* SPIs have restrictions on the supported types */
-	if (irq >= 32 && type != IRQ_TYPE_LEVEL_HIGH &&
-			 type != IRQ_TYPE_EDGE_RISING)
+	if (irq >= GIC_FIRST_SPI_IRQ &&
+	    type != IRQ_TYPE_LEVEL_HIGH &&
+	    type != IRQ_TYPE_EDGE_RISING)
 		return -EINVAL;
 
 	if (gic_irq_in_rdist(d)) {
@@ -348,7 +350,8 @@ static asmlinkage void __exception_irq_entry gic_handle_irq(struct pt_regs *regs
 	do {
 		irqnr = gic_read_iar();
 
-		if (likely(irqnr > 15 && irqnr < 1020) || irqnr >= 8192) {
+		if (likely(irqnr > GIC_LAST_SGI_IRQ && irqnr < GIC_MAX_IRQ) ||
+		    irqnr >= GIC_FIRST_LPI_IRQ) {
 			int err;
 
 			if (static_key_true(&supports_deactivate))
@@ -358,7 +361,7 @@ static asmlinkage void __exception_irq_entry gic_handle_irq(struct pt_regs *regs
 			if (err) {
 				WARN_ONCE(true, "Unexpected interrupt received!\n");
 				if (static_key_true(&supports_deactivate)) {
-					if (irqnr < 8192)
+					if (irqnr < GIC_FIRST_LPI_IRQ)
 						gic_write_dir(irqnr);
 				} else {
 					gic_write_eoir(irqnr);
@@ -366,7 +369,7 @@ static asmlinkage void __exception_irq_entry gic_handle_irq(struct pt_regs *regs
 			}
 			continue;
 		}
-		if (irqnr < 16) {
+		if (irqnr <= GIC_LAST_SGI_IRQ) {
 			gic_write_eoir(irqnr);
 			if (static_key_true(&supports_deactivate))
 				gic_write_dir(irqnr);
@@ -744,30 +747,30 @@ static int gic_irq_domain_map(struct irq_domain *d, unsigned int irq,
 		chip = &gic_eoimode1_chip;
 
 	/* SGIs are private to the core kernel */
-	if (hw < 16)
+	if (hw < GIC_NR_SGI)
 		return -EPERM;
 	/* Nothing here */
-	if (hw >= gic_data.irq_nr && hw < 8192)
+	if (hw >= gic_data.irq_nr && hw < GIC_FIRST_LPI_IRQ)
 		return -EPERM;
 	/* Off limits */
 	if (hw >= GIC_ID_NR)
 		return -EPERM;
 
 	/* PPIs */
-	if (hw < 32) {
+	if (hw < GIC_FIRST_SPI_IRQ) {
 		irq_set_percpu_devid(irq);
 		irq_domain_set_info(d, irq, hw, chip, d->host_data,
 				    handle_percpu_devid_irq, NULL, NULL);
 		irq_set_status_flags(irq, IRQ_NOAUTOEN);
 	}
 	/* SPIs */
-	if (hw >= 32 && hw < gic_data.irq_nr) {
+	if (hw >= GIC_FIRST_SPI_IRQ && hw < gic_data.irq_nr) {
 		irq_domain_set_info(d, irq, hw, chip, d->host_data,
 				    handle_fasteoi_irq, NULL, NULL);
 		irq_set_probe(irq);
 	}
 	/* LPIs */
-	if (hw >= 8192 && hw < GIC_ID_NR) {
+	if (hw >= GIC_FIRST_LPI_IRQ && hw < GIC_ID_NR) {
 		if (!gic_dist_supports_lpis())
 			return -EPERM;
 		irq_domain_set_info(d, irq, hw, chip, d->host_data,
@@ -788,10 +791,10 @@ static int gic_irq_domain_translate(struct irq_domain *d,
 
 		switch (fwspec->param[0]) {
 		case 0:			/* SPI */
-			*hwirq = fwspec->param[1] + 32;
+			*hwirq = fwspec->param[1] + GIC_FIRST_SPI_IRQ;
 			break;
 		case 1:			/* PPI */
-			*hwirq = fwspec->param[1] + 16;
+			*hwirq = fwspec->param[1] + GIC_FIRST_PPI_IRQ;
 			break;
 		case GIC_IRQ_TYPE_LPI:	/* LPI */
 			*hwirq = fwspec->param[1];
@@ -933,8 +936,8 @@ static int __init gic_init_bases(void __iomem *dist_base,
 	typer = readl_relaxed(gic_data.dist_base + GICD_TYPER);
 	gic_data.rdists.id_bits = GICD_TYPER_ID_BITS(typer);
 	gic_irqs = GICD_TYPER_IRQS(typer);
-	if (gic_irqs > 1020)
-		gic_irqs = 1020;
+	if (gic_irqs > GIC_MAX_IRQ)
+		gic_irqs = GIC_MAX_IRQ;
 	gic_data.irq_nr = gic_irqs;
 
 	gic_data.domain = irq_domain_create_tree(handle, &gic_irq_domain_ops,

@@ -76,10 +76,10 @@ struct gic_chip_data {
 	void __iomem *raw_cpu_base;
 	u32 percpu_offset;
 #if defined(CONFIG_CPU_PM) || defined(CONFIG_ARM_GIC_PM)
-	u32 saved_spi_enable[DIV_ROUND_UP(1020, 32)];
-	u32 saved_spi_active[DIV_ROUND_UP(1020, 32)];
-	u32 saved_spi_conf[DIV_ROUND_UP(1020, 16)];
-	u32 saved_spi_target[DIV_ROUND_UP(1020, 4)];
+	u32 saved_spi_enable[DIV_ROUND_UP(GIC_LAST_SPI_IRQ, 32)];
+	u32 saved_spi_active[DIV_ROUND_UP(GIC_LAST_SPI_IRQ, 32)];
+	u32 saved_spi_conf[DIV_ROUND_UP(GIC_LAST_SPI_IRQ, 16)];
+	u32 saved_spi_target[DIV_ROUND_UP(GIC_LAST_SPI_IRQ, 4)];
 	u32 __percpu *saved_ppi_enable;
 	u32 __percpu *saved_ppi_active;
 	u32 __percpu *saved_ppi_conf;
@@ -296,12 +296,13 @@ static int gic_set_type(struct irq_data *d, unsigned int type)
 	unsigned int gicirq = gic_irq(d);
 
 	/* Interrupt configuration for SGIs can't be changed */
-	if (gicirq < 16)
+	if (gicirq < GIC_FIRST_PPI_IRQ)
 		return -EINVAL;
 
 	/* SPIs have restrictions on the supported types */
-	if (gicirq >= 32 && type != IRQ_TYPE_LEVEL_HIGH &&
-			    type != IRQ_TYPE_EDGE_RISING)
+	if (gicirq >= GIC_FIRST_SPI_IRQ &&
+	    type != IRQ_TYPE_LEVEL_HIGH &&
+	    type != IRQ_TYPE_EDGE_RISING)
 		return -EINVAL;
 
 	return gic_configure_irq(gicirq, type, base, NULL);
@@ -358,13 +359,14 @@ static void __exception_irq_entry gic_handle_irq(struct pt_regs *regs)
 		irqstat = readl_relaxed(cpu_base + GIC_CPU_INTACK);
 		irqnr = irqstat & GICC_IAR_INT_ID_MASK;
 
-		if (likely(irqnr > 15 && irqnr < 1020)) {
+		if (likely((irqnr >  GIC_LAST_SGI_IRQ) &&
+			   (irqnr < GIC_FIRST_SPECIAL_IRQ))) {
 			if (static_key_true(&supports_deactivate))
 				writel_relaxed(irqstat, cpu_base + GIC_CPU_EOI);
 			handle_domain_irq(gic->domain, irqnr, regs);
 			continue;
 		}
-		if (irqnr < 16) {
+		if (irqnr < GIC_FIRST_PPI_IRQ) {
 			writel_relaxed(irqstat, cpu_base + GIC_CPU_EOI);
 			if (static_key_true(&supports_deactivate))
 				writel_relaxed(irqstat, cpu_base + GIC_CPU_DEACTIVATE);
@@ -401,7 +403,8 @@ static void gic_handle_cascade_irq(struct irq_desc *desc)
 		goto out;
 
 	cascade_irq = irq_find_mapping(chip_data->domain, gic_irq);
-	if (unlikely(gic_irq < 32 || gic_irq > 1020))
+	if (unlikely(gic_irq < GIC_FIRST_SPI_IRQ ||
+		     gic_irq > GIC_LAST_SPI_IRQ))
 		handle_bad_irq(desc);
 	else
 		generic_handle_irq(cascade_irq);
@@ -1109,8 +1112,8 @@ static int gic_init_bases(struct gic_chip_data *gic, int irq_start,
 	 */
 	gic_irqs = readl_relaxed(gic_data_dist_base(gic) + GIC_DIST_CTR) & 0x1f;
 	gic_irqs = (gic_irqs + 1) * 32;
-	if (gic_irqs > 1020)
-		gic_irqs = 1020;
+	if (gic_irqs > GIC_MAX_IRQ)
+		gic_irqs = GIC_MAX_IRQ;
 	gic->gic_irqs = gic_irqs;
 
 	if (handle) {		/* DT/ACPI */
@@ -1123,17 +1126,18 @@ static int gic_init_bases(struct gic_chip_data *gic, int irq_start,
 		 * For secondary GICs, skip over PPIs, too.
 		 */
 		if (gic == &gic_data[0] && (irq_start & 31) > 0) {
-			hwirq_base = 16;
+			hwirq_base = GIC_FIRST_PPI_IRQ;
 			if (irq_start != -1)
-				irq_start = (irq_start & ~31) + 16;
+				irq_start = (irq_start & ~31) +
+					    GIC_FIRST_PPI_IRQ;
 		} else {
-			hwirq_base = 32;
+			hwirq_base = GIC_FIRST_SPI_IRQ;
 		}
 
 		gic_irqs -= hwirq_base; /* calculate # of irqs to allocate */
 
-		irq_base = irq_alloc_descs(irq_start, 16, gic_irqs,
-					   numa_node_id());
+		irq_base = irq_alloc_descs(irq_start, GIC_FIRST_PPI_IRQ,
+					   gic_irqs, numa_node_id());
 		if (irq_base < 0) {
 			WARN(1, "Cannot allocate irq_descs @ IRQ%d, assuming pre-allocated\n",
 			     irq_start);

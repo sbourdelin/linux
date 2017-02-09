@@ -588,7 +588,8 @@ static void lpi_set_config(struct irq_data *d, bool enable)
 	struct its_device *its_dev = irq_data_get_irq_chip_data(d);
 	irq_hw_number_t hwirq = d->hwirq;
 	u32 id = its_get_event_id(d);
-	u8 *cfg = page_address(gic_rdists->prop_page) + hwirq - 8192;
+	u8 *cfg = page_address(gic_rdists->prop_page) + hwirq -
+		  GIC_FIRST_LPI_IRQ;
 
 	if (enable)
 		*cfg |= LPI_PROP_ENABLED;
@@ -691,12 +692,12 @@ static DEFINE_SPINLOCK(lpi_lock);
 
 static int its_lpi_to_chunk(int lpi)
 {
-	return (lpi - 8192) >> IRQS_PER_CHUNK_SHIFT;
+	return (lpi - GIC_FIRST_LPI_IRQ) >> IRQS_PER_CHUNK_SHIFT;
 }
 
 static int its_chunk_to_lpi(int chunk)
 {
-	return (chunk << IRQS_PER_CHUNK_SHIFT) + 8192;
+	return (chunk << IRQS_PER_CHUNK_SHIFT) + GIC_FIRST_LPI_IRQ;
 }
 
 static int __init its_lpi_init(u32 id_bits)
