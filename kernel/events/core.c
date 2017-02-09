@@ -9179,7 +9179,7 @@ perf_event_alloc(struct perf_event_attr *attr, int cpu,
 	struct hw_perf_event *hwc;
 	long err = -EINVAL;
 
-	if ((unsigned)cpu >= nr_cpu_ids) {
+	if (cpu >= nr_cpu_ids) {
 		if (!task || cpu != -1)
 			return ERR_PTR(-EINVAL);
 	}
