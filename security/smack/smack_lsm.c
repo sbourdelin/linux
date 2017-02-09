@@ -2916,10 +2916,6 @@ static int smack_socket_connect(struct socket *sock, struct sockaddr *sap,
 #if IS_ENABLED(CONFIG_IPV6)
 	struct sockaddr_in6 *sip = (struct sockaddr_in6 *)sap;
 #endif
-#ifdef SMACK_IPV6_SECMARK_LABELING
-	struct smack_known *rsp;
-	struct socket_smack *ssp = sock->sk->sk_security;
-#endif
 
 	if (sock->sk == NULL)
 		return 0;
@@ -2934,10 +2930,17 @@ static int smack_socket_connect(struct socket *sock, struct sockaddr *sap,
 		if (addrlen < sizeof(struct sockaddr_in6))
 			return -EINVAL;
 #ifdef SMACK_IPV6_SECMARK_LABELING
-		rsp = smack_ipv6host_label(sip);
-		if (rsp != NULL)
-			rc = smk_ipv6_check(ssp->smk_out, rsp, sip,
-						SMK_CONNECTING);
+		{
+			struct smack_known *rsp = smack_ipv6host_label(sip);
+
+			if (rsp != NULL) {
+				struct socket_smack *ssp =
+					sock->sk->sk_security;
+
+				rc = smk_ipv6_check(ssp->smk_out, rsp, sip,
+						    SMK_CONNECTING);
+			}
+		}
 #endif
 #ifdef SMACK_IPV6_PORT_LABELING
 		rc = smk_ipv6_port_check(sock->sk, sip, SMK_CONNECTING);
