@@ -1257,6 +1257,10 @@ static int i40e_set_ringparam(struct net_device *netdev,
 	if ((ring->rx_mini_pending) || (ring->rx_jumbo_pending))
 		return -EINVAL;
 
+	/* Don't allow any change while XDP is enabled. */
+	if (i40e_enabled_xdp_vsi(vsi))
+		return -EINVAL;
+
 	if (ring->tx_pending > I40E_MAX_NUM_DESCRIPTORS ||
 	    ring->tx_pending < I40E_MIN_NUM_DESCRIPTORS ||
 	    ring->rx_pending > I40E_MAX_NUM_DESCRIPTORS ||
