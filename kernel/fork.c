@@ -170,6 +170,22 @@ void __weak arch_release_thread_stack(unsigned long *stack)
 static DEFINE_PER_CPU(struct vm_struct *, cached_stacks[NR_CACHED_STACKS]);
 #endif
 
+static int free_vm_stack_cache(unsigned int cpu)
+{
+	int i;
+
+	for (i = 0; i < NR_CACHED_STACKS; i++) {
+		struct vm_struct *vm_stack = this_cpu_read(cached_stacks[i]);
+		if (!vm_stack)
+			continue;
+
+		vfree(vm_stack->addr);
+		this_cpu_write(cached_stacks[i], NULL);
+	}
+
+	return 0;
+}
+
 static unsigned long *alloc_thread_stack_node(struct task_struct *tsk, int node)
 {
 #ifdef CONFIG_VMAP_STACK
@@ -456,6 +472,11 @@ void __init fork_init(void)
 	for (i = 0; i < UCOUNT_COUNTS; i++) {
 		init_user_ns.ucount_max[i] = max_threads/2;
 	}
+
+#ifdef CONFIG_VMAP_STACK
+	cpuhp_setup_state(CPUHP_AP_ONLINE_DYN, "vm_stack_cache",
+			  NULL, free_vm_stack_cache);
+#endif
 }
 
 int __weak arch_dup_task_struct(struct task_struct *dst,
