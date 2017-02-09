@@ -196,7 +196,7 @@ static void nfsd4_put_session_locked(struct nfsd4_session *ses)
 
 	lockdep_assert_held(&nn->client_lock);
 
-	if (atomic_dec_and_test(&ses->se_ref) && is_session_dead(ses))
+	if (!atomic_add_unless(&ses->se_ref, -1, 1) && is_session_des(ses))
 		free_session(ses);
 	put_client_renew_locked(clp);
 }
@@ -1645,7 +1645,7 @@ static void init_session(struct svc_rqst *rqstp, struct nfsd4_session *new, stru
 	new->se_flags = cses->flags;
 	new->se_cb_prog = cses->callback_prog;
 	new->se_cb_sec = cses->cb_sec;
-	atomic_set(&new->se_ref, 0);
+	atomic_set(&new->se_ref, 1);
 	idx = hash_sessionid(&new->se_sessionid);
 	list_add(&new->se_hash, &nn->sessionid_hashtbl[idx]);
 	spin_lock(&clp->cl_lock);
@@ -1792,7 +1792,7 @@ free_client(struct nfs4_client *clp)
 		ses = list_entry(clp->cl_sessions.next, struct nfsd4_session,
 				se_perclnt);
 		list_del(&ses->se_perclnt);
-		WARN_ON_ONCE(atomic_read(&ses->se_ref));
+		WARN_ON_ONCE((atomic_read(&ses->se_ref) > 1));
 		free_session(ses);
 	}
 	rpc_destroy_wait_queue(&clp->cl_cb_waitq);
