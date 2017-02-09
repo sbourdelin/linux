@@ -705,6 +705,7 @@ struct dma_chan *dma_request_chan(struct device *dev, const char *name)
 {
 	struct dma_device *d, *_d;
 	struct dma_chan *chan = NULL;
+	int ret;
 
 	/* If device-tree is present get slave info from here */
 	if (dev->of_node)
@@ -715,8 +716,9 @@ struct dma_chan *dma_request_chan(struct device *dev, const char *name)
 		chan = acpi_dma_request_slave_chan_by_name(dev, name);
 
 	if (chan) {
-		/* Valid channel found or requester need to be deferred */
-		if (!IS_ERR(chan) || PTR_ERR(chan) == -EPROBE_DEFER)
+		if (!IS_ERR(chan))
+			goto found;
+		if (PTR_ERR(chan) == -EPROBE_DEFER)
 			return chan;
 	}
 
@@ -738,7 +740,21 @@ struct dma_chan *dma_request_chan(struct device *dev, const char *name)
 	}
 	mutex_unlock(&dma_list_mutex);
 
-	return chan ? chan : ERR_PTR(-EPROBE_DEFER);
+	if (!chan)
+		return ERR_PTR(-EPROBE_DEFER);
+	if (IS_ERR(chan))
+		return chan;
+found:
+	if (chan->device->device_set_slave) {
+		chan->slave = dev;
+		ret = chan->device->device_set_slave(chan, dev);
+		if (ret) {
+			chan->slave = NULL;
+			dma_release_channel(chan);
+			chan = ERR_PTR(ret);
+		}
+	}
+	return chan;
 }
 EXPORT_SYMBOL_GPL(dma_request_chan);
 
@@ -786,6 +802,11 @@ void dma_release_channel(struct dma_chan *chan)
 	mutex_lock(&dma_list_mutex);
 	WARN_ONCE(chan->client_count != 1,
 		  "chan reference count %d != 1\n", chan->client_count);
+	if (chan->slave) {
+		if (chan->device->device_release_slave)
+			chan->device->device_release_slave(chan);
+		chan->slave = NULL;
+	}
 	dma_chan_put(chan);
 	/* drop PRIVATE cap enabled by __dma_request_channel() */
 	if (--chan->device->privatecnt == 0)

@@ -277,6 +277,9 @@ struct dma_chan {
 	struct dma_router *router;
 	void *route_data;
 
+	/* Only for SLAVE channels */
+	struct device *slave;
+
 	void *private;
 };
 
@@ -686,6 +689,10 @@ struct dma_filter {
  * @device_alloc_chan_resources: allocate resources and return the
  *	number of allocated descriptors
  * @device_free_chan_resources: release DMA channel's resources
+ * @device_set_slave: provide access to the slave device, which requested
+ *	given DMA channel, called after @device_alloc_chan_resources
+ * @device_release_slave: finishes access to the slave device, called
+ *	before @device_free_chan_resources
  * @device_prep_dma_memcpy: prepares a memcpy operation
  * @device_prep_dma_xor: prepares a xor operation
  * @device_prep_dma_xor_val: prepares a xor validation operation
@@ -745,6 +752,9 @@ struct dma_device {
 
 	int (*device_alloc_chan_resources)(struct dma_chan *chan);
 	void (*device_free_chan_resources)(struct dma_chan *chan);
+
+	int (*device_set_slave)(struct dma_chan *chan, struct device *slave);
+	void (*device_release_slave)(struct dma_chan *chan);
 
 	struct dma_async_tx_descriptor *(*device_prep_dma_memcpy)(
 		struct dma_chan *chan, dma_addr_t dst, dma_addr_t src,
