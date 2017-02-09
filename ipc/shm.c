@@ -1234,8 +1234,6 @@ long do_shmat(int shmid, char __user *shmaddr, int shmflg,
 		err = (long)addr;
 invalid:
 	up_write(&current->mm->mmap_sem);
-	if (populate)
-		mm_populate(addr, populate);
 
 out_fput:
 	fput(file);
