@@ -975,10 +975,8 @@ void i915_guc_submission_fini(struct drm_i915_private *dev_priv)
 	struct i915_guc_client *client;
 
 	client = fetch_and_zero(&guc->execbuf_client);
-	if (!client)
-		return;
-
-	guc_client_free(dev_priv, client);
+	if (client)
+		guc_client_free(dev_priv, client);
 
 	i915_vma_unpin_and_release(&guc->ads_vma);
 	i915_vma_unpin_and_release(&guc->log.vma);
