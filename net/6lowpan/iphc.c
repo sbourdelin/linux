@@ -827,8 +827,21 @@ static u8 lowpan_compress_ctx_addr(u8 **hc_ptr, const struct net_device *dev,
 		}
 		break;
 	default:
-		/* check for SAM/DAM = 11 */
-		memcpy(&tmp.s6_addr[8], lladdr, EUI64_ADDR_LEN);
+		switch (dev->addr_len) {
+		case ETH_ALEN:
+			memcpy(&tmp.s6_addr[8], lladdr, 3);
+			tmp.s6_addr[11] = 0xFF;
+			tmp.s6_addr[12] = 0xFE;
+			memcpy(&tmp.s6_addr[13], lladdr + 3, 3);
+			break;
+		case EUI64_ADDR_LEN:
+			memcpy(&tmp.s6_addr[8], lladdr, EUI64_ADDR_LEN);
+			break;
+		default:
+			dam = LOWPAN_IPHC_DAM_11;
+			goto out;
+		}
+
 		/* second bit-flip (Universe/Local) is done according RFC2464 */
 		tmp.s6_addr[8] ^= 0x02;
 		/* context information are always used */
