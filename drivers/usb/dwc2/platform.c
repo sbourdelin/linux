@@ -125,10 +125,12 @@ static int __dwc2_lowlevel_hw_enable(struct dwc2_hsotg *hsotg)
 	struct platform_device *pdev = to_platform_device(hsotg->dev);
 	int ret;
 
-	ret = regulator_bulk_enable(ARRAY_SIZE(hsotg->supplies),
-				    hsotg->supplies);
-	if (ret)
-		return ret;
+	if (hsotg->supplies_available) {
+		ret = regulator_bulk_enable(ARRAY_SIZE(hsotg->supplies),
+					    hsotg->supplies);
+		if (ret)
+			return ret;
+	}
 
 	if (hsotg->clk) {
 		ret = clk_prepare_enable(hsotg->clk);
@@ -185,6 +187,9 @@ static int __dwc2_lowlevel_hw_disable(struct dwc2_hsotg *hsotg)
 	if (hsotg->clk)
 		clk_disable_unprepare(hsotg->clk);
 
+	if (!hsotg->supplies_available)
+		return 0;
+
 	ret = regulator_bulk_disable(ARRAY_SIZE(hsotg->supplies),
 				     hsotg->supplies);
 
@@ -205,6 +210,25 @@ int dwc2_lowlevel_hw_disable(struct dwc2_hsotg *hsotg)
 	if (ret == 0)
 		hsotg->ll_hw_enabled = false;
 	return ret;
+}
+
+static bool dwc2_supplies_available(struct dwc2_hsotg *hsotg)
+{
+	struct regulator *reg;
+	int i;
+
+	for (i = 0; i < ARRAY_SIZE(dwc2_hsotg_supply_names); i++) {
+		reg = regulator_get_optional(hsotg->dev,
+					     dwc2_hsotg_supply_names[i]);
+		if (reg == ERR_PTR(-ENODEV)) {
+			hsotg->supplies_available = false;
+			return false;
+		}
+		regulator_put(reg);
+	}
+
+	hsotg->supplies_available = true;
+	return true;
 }
 
 static int dwc2_lowlevel_hw_init(struct dwc2_hsotg *hsotg)
@@ -292,6 +316,9 @@ static int dwc2_lowlevel_hw_init(struct dwc2_hsotg *hsotg)
 	/* Regulators */
 	for (i = 0; i < ARRAY_SIZE(hsotg->supplies); i++)
 		hsotg->supplies[i].supply = dwc2_hsotg_supply_names[i];
+
+	if (!dwc2_supplies_available(hsotg))
+		return 0;
 
 	ret = devm_regulator_bulk_get(hsotg->dev, ARRAY_SIZE(hsotg->supplies),
 				      hsotg->supplies);
