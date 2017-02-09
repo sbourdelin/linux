@@ -247,8 +247,8 @@ static int ti_cpufreq_init(void)
 
 	of_node_put(opp_data->opp_node);
 
-	ret = dev_pm_opp_set_supported_hw(opp_data->cpu_dev, version,
-					  VERSION_COUNT);
+	ret = PTR_ERR_OR_ZERO(dev_pm_opp_set_supported_hw(opp_data->cpu_dev,
+						 version, VERSION_COUNT));
 	if (ret) {
 		dev_err(opp_data->cpu_dev,
 			"Failed to set supported hardware\n");
