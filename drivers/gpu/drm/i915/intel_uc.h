@@ -155,6 +155,7 @@ struct intel_guc {
 
 	struct i915_vma *ads_vma;
 	struct i915_vma *ctx_pool_vma;
+	void *ctx_pool_vaddr;
 	struct ida ctx_ids;
 
 	struct i915_guc_client *execbuf_client;

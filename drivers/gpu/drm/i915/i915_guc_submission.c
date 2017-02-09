@@ -99,11 +99,9 @@ static int guc_update_doorbell_id(struct intel_guc *guc,
 				  struct i915_guc_client *client,
 				  u16 new_id)
 {
-	struct sg_table *sg = guc->ctx_pool_vma->pages;
 	void *doorbell_bitmap = guc->doorbell_bitmap;
 	struct guc_doorbell_info *doorbell;
-	struct guc_context_desc desc;
-	size_t len;
+	struct guc_context_desc *desc;
 
 	doorbell = client->vaddr + client->doorbell_offset;
 
@@ -116,15 +114,8 @@ static int guc_update_doorbell_id(struct intel_guc *guc,
 	}
 
 	/* Update the GuC's idea of the doorbell ID */
-	len = sg_pcopy_to_buffer(sg->sgl, sg->nents, &desc, sizeof(desc),
-			     sizeof(desc) * client->ctx_index);
-	if (len != sizeof(desc))
-		return -EFAULT;
-	desc.db_id = new_id;
-	len = sg_pcopy_from_buffer(sg->sgl, sg->nents, &desc, sizeof(desc),
-			     sizeof(desc) * client->ctx_index);
-	if (len != sizeof(desc))
-		return -EFAULT;
+	desc = guc->ctx_pool_vaddr + sizeof(*desc) * client->ctx_index;
+	desc->db_id = new_id;
 
 	client->doorbell_id = new_id;
 	if (new_id == GUC_INVALID_DOORBELL_ID)
@@ -230,29 +221,27 @@ static void guc_proc_desc_init(struct intel_guc *guc,
  * data structures relating to this client (doorbell, process descriptor,
  * write queue, etc).
  */
-
 static void guc_ctx_desc_init(struct intel_guc *guc,
 			      struct i915_guc_client *client)
 {
 	struct drm_i915_private *dev_priv = guc_to_i915(guc);
 	struct intel_engine_cs *engine;
 	struct i915_gem_context *ctx = client->owner;
-	struct guc_context_desc desc;
-	struct sg_table *sg;
+	struct guc_context_desc *desc;
 	unsigned int tmp;
 	u32 gfx_addr;
 
-	memset(&desc, 0, sizeof(desc));
+	desc = guc->ctx_pool_vaddr + sizeof(*desc) * client->ctx_index;
 
-	desc.attribute = GUC_CTX_DESC_ATTR_ACTIVE | GUC_CTX_DESC_ATTR_KERNEL;
-	desc.context_id = client->ctx_index;
-	desc.priority = client->priority;
-	desc.db_id = client->doorbell_id;
+	desc->attribute = GUC_CTX_DESC_ATTR_ACTIVE | GUC_CTX_DESC_ATTR_KERNEL;
+	desc->context_id = client->ctx_index;
+	desc->priority = client->priority;
+	desc->db_id = client->doorbell_id;
 
 	for_each_engine_masked(engine, dev_priv, client->engines, tmp) {
 		struct intel_context *ce = &ctx->engine[engine->id];
 		uint32_t guc_engine_id = engine->guc_id;
-		struct guc_execlist_context *lrc = &desc.lrc[guc_engine_id];
+		struct guc_execlist_context *lrc = &desc->lrc[guc_engine_id];
 
 		/* TODO: We have a design issue to be solved here. Only when we
 		 * receive the first batch, we know which engine is used by the
@@ -277,50 +266,41 @@ static void guc_ctx_desc_init(struct intel_guc *guc,
 		lrc->ring_next_free_location = lrc->ring_begin;
 		lrc->ring_current_tail_pointer_value = 0;
 
-		desc.engines_used |= (1 << guc_engine_id);
+		desc->engines_used |= (1 << guc_engine_id);
 	}
 
 	DRM_DEBUG_DRIVER("Host engines 0x%x => GuC engines used 0x%x\n",
-			client->engines, desc.engines_used);
-	WARN_ON(desc.engines_used == 0);
+			client->engines, desc->engines_used);
+	WARN_ON(desc->engines_used == 0);
 
 	/*
 	 * The doorbell, process descriptor, and workqueue are all parts
 	 * of the client object, which the GuC will reference via the GGTT
 	 */
 	gfx_addr = guc_ggtt_offset(client->vma);
-	desc.db_trigger_phy = sg_dma_address(client->vma->pages->sgl) +
+	desc->db_trigger_phy = sg_dma_address(client->vma->pages->sgl) +
 				client->doorbell_offset;
-	desc.db_trigger_cpu =
-		(uintptr_t)client->vaddr + client->doorbell_offset;
-	desc.db_trigger_uk = gfx_addr + client->doorbell_offset;
-	desc.process_desc = gfx_addr + client->proc_desc_offset;
-	desc.wq_addr = gfx_addr + client->wq_offset;
-	desc.wq_size = client->wq_size;
+	desc->db_trigger_cpu = (uintptr_t)client->vaddr +
+				client->doorbell_offset;
+	desc->db_trigger_uk = gfx_addr + client->doorbell_offset;
+	desc->process_desc = gfx_addr + client->proc_desc_offset;
+	desc->wq_addr = gfx_addr + client->wq_offset;
+	desc->wq_size = client->wq_size;
 
 	/*
 	 * XXX: Take LRCs from an existing context if this is not an
 	 * IsKMDCreatedContext client
 	 */
-	desc.desc_private = (uintptr_t)client;
-
-	/* Pool context is pinned already */
-	sg = guc->ctx_pool_vma->pages;
-	sg_pcopy_from_buffer(sg->sgl, sg->nents, &desc, sizeof(desc),
-			     sizeof(desc) * client->ctx_index);
+	desc->desc_private = (uintptr_t)client;
 }
 
 static void guc_ctx_desc_fini(struct intel_guc *guc,
 			      struct i915_guc_client *client)
 {
-	struct guc_context_desc desc;
-	struct sg_table *sg;
+	struct guc_context_desc *desc;
 
-	memset(&desc, 0, sizeof(desc));
-
-	sg = guc->ctx_pool_vma->pages;
-	sg_pcopy_from_buffer(sg->sgl, sg->nents, &desc, sizeof(desc),
-			     sizeof(desc) * client->ctx_index);
+	desc = guc->ctx_pool_vaddr + sizeof(*desc) * client->ctx_index;
+	memset(desc, 0, sizeof(*desc));
 }
 
 /**
@@ -876,6 +856,7 @@ int i915_guc_submission_init(struct drm_i915_private *dev_priv)
 	const size_t gemsize = round_up(poolsize, PAGE_SIZE);
 	struct intel_guc *guc = &dev_priv->guc;
 	struct i915_vma *vma;
+	void *vaddr;
 
 	if (!HAS_GUC_SCHED(dev_priv))
 		return 0;
@@ -895,6 +876,13 @@ int i915_guc_submission_init(struct drm_i915_private *dev_priv)
 		return PTR_ERR(vma);
 
 	guc->ctx_pool_vma = vma;
+
+	vaddr = i915_gem_object_pin_map(vma->obj, I915_MAP_WB);
+	if (IS_ERR(vaddr))
+		goto err;
+
+	guc->ctx_pool_vaddr = vaddr;
+
 	ida_init(&guc->ctx_ids);
 	intel_guc_log_create(guc);
 	guc_addon_create(guc);
@@ -983,8 +971,11 @@ void i915_guc_submission_fini(struct drm_i915_private *dev_priv)
 	i915_vma_unpin_and_release(&guc->ads_vma);
 	i915_vma_unpin_and_release(&guc->log.vma);
 
-	if (guc->ctx_pool_vma)
+	if (guc->ctx_pool_vaddr) {
 		ida_destroy(&guc->ctx_ids);
+		i915_gem_object_unpin_map(guc->ctx_pool_vma->obj);
+	}
+
 	i915_vma_unpin_and_release(&guc->ctx_pool_vma);
 }
 
@@ -1040,5 +1031,3 @@ int intel_guc_resume(struct drm_i915_private *dev_priv)
 
 	return intel_guc_send(guc, data, ARRAY_SIZE(data));
 }
-
-
