@@ -23,6 +23,7 @@ obj-$(CONFIG_BT_WILINK)		+= btwilink.o
 obj-$(CONFIG_BT_QCOMSMD)	+= btqcomsmd.o
 obj-$(CONFIG_BT_BCM)		+= btbcm.o
 obj-$(CONFIG_BT_RTL)		+= btrtl.o
+obj-$(CONFIG_BT_RTL_BTPF)	+= rtl_btpf.o
 obj-$(CONFIG_BT_QCA)		+= btqca.o
 
 btmrvl-y			:= btmrvl_main.o

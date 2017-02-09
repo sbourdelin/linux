@@ -14,6 +14,9 @@ config BT_RTL
 	tristate
 	select FW_LOADER
 
+config BT_RTL_BTPF
+	tristate
+
 config BT_QCA
 	tristate
 	select FW_LOADER
@@ -51,6 +54,19 @@ config BT_HCIBTUSB_RTL
 	  download support for Realtek Bluetooth controllers.
 
 	  Say Y here to compile support for Realtek protocol.
+
+config BT_HCIBTUSB_RTL_BTPF
+	bool "Realtek profiling support"
+	depends on BT_HCIBTUSB && BT_RTL
+	select BT_RTL_BTPF
+	default y
+	help
+	  This parameter adds Realtek Bluetooth profile profiling support
+	  that enables the gathering of profile information, which helps
+	  the firmware optimize transfer priority and balance the transmissions
+	  for multiple profiles.
+
+	  Say Y here to compile support for Realtek profiling.
 
 config BT_HCIBTSDIO
 	tristate "HCI SDIO driver"

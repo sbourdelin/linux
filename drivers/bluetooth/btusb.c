@@ -33,6 +33,10 @@
 #include "btbcm.h"
 #include "btrtl.h"
 
+#ifdef CONFIG_BT_HCIBTUSB_RTL_BTPF
+#include "rtl_btpf.h"
+#endif
+
 #define VERSION "0.8"
 
 static bool disable_scofix;
@@ -3023,6 +3027,10 @@ static int btusb_probe(struct usb_interface *intf,
 
 	usb_set_intfdata(intf, data);
 
+#ifdef CONFIG_BT_HCIBTUSB_RTL_BTPF
+	rtl_btpf_init();
+#endif
+
 	return 0;
 }
 
@@ -3044,6 +3052,10 @@ static void btusb_disconnect(struct usb_interface *intf)
 
 	if (data->diag)
 		usb_set_intfdata(data->diag, NULL);
+
+#ifdef CONFIG_BT_HCIBTUSB_RTL_BTPF
+	rtl_btpf_deinit();
+#endif
 
 	hci_unregister_dev(hdev);
 
