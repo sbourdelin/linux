@@ -233,6 +233,7 @@ static inline unsigned int i40e_txd_use_count(unsigned int size)
 #define I40E_TX_FLAGS_TSYN		BIT(8)
 #define I40E_TX_FLAGS_FD_SB		BIT(9)
 #define I40E_TX_FLAGS_UDP_TUNNEL	BIT(10)
+#define I40E_TX_FLAGS_XDP		BIT(11)
 #define I40E_TX_FLAGS_VLAN_MASK		0xffff0000
 #define I40E_TX_FLAGS_VLAN_PRIO_MASK	0xe0000000
 #define I40E_TX_FLAGS_VLAN_PRIO_SHIFT	29
@@ -243,6 +244,7 @@ struct i40e_tx_buffer {
 	union {
 		struct sk_buff *skb;
 		void *raw_buf;
+		struct page *page;
 	};
 	unsigned int bytecount;
 	unsigned short gso_segs;
@@ -363,6 +365,9 @@ struct i40e_ring {
 					 */
 
 	struct bpf_prog __rcu *xdp_prog;
+	struct i40e_ring *xdp_sibling;  /* rx to xdp, and xdp to rx */
+	bool xdp_needs_tail_bump;
+	u16 curr_in_use;
 } ____cacheline_internodealigned_in_smp;
 
 enum i40e_latency_range {
