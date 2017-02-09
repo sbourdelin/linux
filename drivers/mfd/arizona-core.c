@@ -235,14 +235,19 @@ static irqreturn_t arizona_overclocked(int irq, void *data)
 	return IRQ_HANDLED;
 }
 
+#define ARIZONA_REG_POLL_DELAY_MS 5
+#define ARIZONA_REG_POLL_DELAY_US (ARIZONA_REG_POLL_DELAY_MS * 1000)
+
 static int arizona_poll_reg(struct arizona *arizona,
-			    int timeout, unsigned int reg,
+			    int timeout_ms, unsigned int reg,
 			    unsigned int mask, unsigned int target)
 {
+	unsigned int npolls = (timeout_ms + ARIZONA_REG_POLL_DELAY_MS - 1) /
+			      ARIZONA_REG_POLL_DELAY_MS;
 	unsigned int val = 0;
 	int ret, i;
 
-	for (i = 0; i < timeout; i++) {
+	for (i = 0; i < npolls; i++) {
 		ret = regmap_read(arizona->regmap, reg, &val);
 		if (ret != 0) {
 			dev_err(arizona->dev, "Failed to read reg 0x%x: %d\n",
@@ -253,7 +258,8 @@ static int arizona_poll_reg(struct arizona *arizona,
 		if ((val & mask) == target)
 			return 0;
 
-		usleep_range(1000, 5000);
+		usleep_range(ARIZONA_REG_POLL_DELAY_US,
+			     ARIZONA_REG_POLL_DELAY_US * 2);
 	}
 
 	dev_err(arizona->dev, "Polling reg 0x%x timed out: %x\n", reg, val);
@@ -269,7 +275,7 @@ static int arizona_wait_for_boot(struct arizona *arizona)
 	 * we won't race with the interrupt handler as it'll be blocked on
 	 * runtime resume.
 	 */
-	ret = arizona_poll_reg(arizona, 5, ARIZONA_INTERRUPT_RAW_STATUS_5,
+	ret = arizona_poll_reg(arizona, 25, ARIZONA_INTERRUPT_RAW_STATUS_5,
 			       ARIZONA_BOOT_DONE_STS, ARIZONA_BOOT_DONE_STS);
 
 	if (!ret)
@@ -339,7 +345,7 @@ static int arizona_enable_freerun_sysclk(struct arizona *arizona,
 			ret);
 		return ret;
 	}
-	ret = arizona_poll_reg(arizona, 25, ARIZONA_INTERRUPT_RAW_STATUS_5,
+	ret = arizona_poll_reg(arizona, 125, ARIZONA_INTERRUPT_RAW_STATUS_5,
 			       ARIZONA_FLL1_CLOCK_OK_STS,
 			       ARIZONA_FLL1_CLOCK_OK_STS);
 	if (ret)
@@ -403,7 +409,7 @@ static int wm5102_apply_hardware_patch(struct arizona *arizona)
 		goto err;
 	}
 
-	ret = arizona_poll_reg(arizona, 5, ARIZONA_WRITE_SEQUENCER_CTRL_1,
+	ret = arizona_poll_reg(arizona, 25, ARIZONA_WRITE_SEQUENCER_CTRL_1,
 			       ARIZONA_WSEQ_BUSY, 0);
 	if (ret)
 		regmap_write(arizona->regmap, ARIZONA_WRITE_SEQUENCER_CTRL_0,
