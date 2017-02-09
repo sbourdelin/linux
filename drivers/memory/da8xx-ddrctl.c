@@ -122,10 +122,8 @@ static int da8xx_ddrctl_probe(struct platform_device *pdev)
 
 	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
 	ddrctl = devm_ioremap_resource(dev, res);
-	if (IS_ERR(ddrctl)) {
-		dev_err(dev, "unable to map memory controller registers\n");
+	if (IS_ERR(ddrctl))
 		return PTR_ERR(ddrctl);
-	}
 
 	for (; setting->name; setting++) {
 		knob = da8xx_ddrctl_match_knob(setting);
