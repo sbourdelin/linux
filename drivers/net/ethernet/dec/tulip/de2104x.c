@@ -1488,11 +1488,9 @@ static void __de_get_regs(struct de_private *de, u8 *buf)
 static int __de_get_link_ksettings(struct de_private *de,
 				   struct ethtool_link_ksettings *cmd)
 {
-	ethtool_convert_legacy_u32_to_link_mode(cmd->link_modes.supported,
-						de->media_supported);
+	ethtool_u32_to_ks(cmd->link_modes.supported, de->media_supported);
 	cmd->base.phy_address = 0;
-	ethtool_convert_legacy_u32_to_link_mode(cmd->link_modes.advertising,
-						de->media_advertise);
+	ethtool_u32_to_ks(cmd->link_modes.advertising, de->media_advertise);
 
 	switch (de->media_type) {
 	case DE_MEDIA_AUI:
@@ -1533,8 +1531,7 @@ static int __de_set_link_ksettings(struct de_private *de,
 	u8 autoneg = cmd->base.autoneg;
 	u32 advertising;
 
-	ethtool_convert_link_mode_to_legacy_u32(&advertising,
-						cmd->link_modes.advertising);
+	ethtool_ks_to_u32(&advertising,	cmd->link_modes.advertising);
 
 	if (cmd->base.speed != 10)
 		return -EINVAL;

@@ -1956,10 +1956,8 @@ static int keystone_set_link_ksettings(struct net_device *ndev,
 	u32 advertising, supported;
 	u32 features;
 
-	ethtool_convert_link_mode_to_legacy_u32(&advertising,
-						cmd->link_modes.advertising);
-	ethtool_convert_link_mode_to_legacy_u32(&supported,
-						cmd->link_modes.supported);
+	ethtool_ks_to_u32(&advertising, cmd->link_modes.advertising);
+	ethtool_ks_to_u32(&supported, cmd->link_modes.supported);
 	features = advertising & supported;
 
 	if (!phy)

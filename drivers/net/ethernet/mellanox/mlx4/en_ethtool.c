@@ -755,8 +755,8 @@ ethtool_get_ptys_link_ksettings(struct net_device *dev,
 	       be32_to_cpu(ptys_reg.eth_proto_lp_adv));
 
 	/* reset supported/advertising masks */
-	ethtool_link_ksettings_zero_link_mode(link_ksettings, supported);
-	ethtool_link_ksettings_zero_link_mode(link_ksettings, advertising);
+	ethtool_ks_clear(link_ksettings, supported);
+	ethtool_ks_clear(link_ksettings, advertising);
 
 	ptys2ethtool_update_supported_port(link_ksettings->link_modes.supported,
 					   &ptys_reg);
@@ -769,25 +769,19 @@ ethtool_get_ptys_link_ksettings(struct net_device *dev,
 	ptys2ethtool_update_link_modes(link_ksettings->link_modes.advertising,
 				       eth_proto, ADVERTISED);
 
-	ethtool_link_ksettings_add_link_mode(link_ksettings, supported,
-					     Pause);
-	ethtool_link_ksettings_add_link_mode(link_ksettings, supported,
-					     Asym_Pause);
+	ethtool_ks_add_mode(link_ksettings, supported, Pause);
+	ethtool_ks_add_mode(link_ksettings, supported, Asym_Pause);
 
 	if (priv->prof->tx_pause)
-		ethtool_link_ksettings_add_link_mode(link_ksettings,
-						     advertising, Pause);
+		ethtool_ks_add_mode(link_ksettings, advertising, Pause);
 	if (priv->prof->tx_pause ^ priv->prof->rx_pause)
-		ethtool_link_ksettings_add_link_mode(link_ksettings,
-						     advertising, Asym_Pause);
+		ethtool_ks_add_mode(link_ksettings, advertising, Asym_Pause);
 
 	link_ksettings->base.port = ptys_get_active_port(&ptys_reg);
 
 	if (mlx4_en_autoneg_get(dev)) {
-		ethtool_link_ksettings_add_link_mode(link_ksettings,
-						     supported, Autoneg);
-		ethtool_link_ksettings_add_link_mode(link_ksettings,
-						     advertising, Autoneg);
+		ethtool_ks_add_mode(link_ksettings, supported, Autoneg);
+		ethtool_ks_add_mode(link_ksettings, advertising, Autoneg);
 	}
 
 	link_ksettings->base.autoneg
@@ -796,13 +790,12 @@ ethtool_get_ptys_link_ksettings(struct net_device *dev,
 
 	eth_proto = be32_to_cpu(ptys_reg.eth_proto_lp_adv);
 
-	ethtool_link_ksettings_zero_link_mode(link_ksettings, lp_advertising);
+	ethtool_ks_clear(link_ksettings, lp_advertising);
 	ptys2ethtool_update_link_modes(
 		link_ksettings->link_modes.lp_advertising,
 		eth_proto, ADVERTISED);
 	if (priv->port_state.flags & MLX4_EN_PORT_ANC)
-		ethtool_link_ksettings_add_link_mode(link_ksettings,
-						     lp_advertising, Autoneg);
+		ethtool_ks_add_mode(link_ksettings, lp_advertising, Autoneg);
 
 	link_ksettings->base.phy_address = 0;
 	link_ksettings->base.mdio_support = 0;
@@ -821,27 +814,21 @@ ethtool_get_default_link_ksettings(
 
 	link_ksettings->base.autoneg = AUTONEG_DISABLE;
 
-	ethtool_link_ksettings_zero_link_mode(link_ksettings, supported);
-	ethtool_link_ksettings_add_link_mode(link_ksettings, supported,
-					     10000baseT_Full);
+	ethtool_ks_clear(link_ksettings, supported);
+	ethtool_ks_add_mode(link_ksettings, supported, 10000baseT_Full);
 
-	ethtool_link_ksettings_zero_link_mode(link_ksettings, advertising);
-	ethtool_link_ksettings_add_link_mode(link_ksettings, advertising,
-					     10000baseT_Full);
+	ethtool_ks_clear(link_ksettings, advertising);
+	ethtool_ks_add_mode(link_ksettings, advertising, 10000baseT_Full);
 
 	trans_type = priv->port_state.transceiver;
 	if (trans_type > 0 && trans_type <= 0xC) {
 		link_ksettings->base.port = PORT_FIBRE;
-		ethtool_link_ksettings_add_link_mode(link_ksettings,
-						     supported, FIBRE);
-		ethtool_link_ksettings_add_link_mode(link_ksettings,
-						     advertising, FIBRE);
+		ethtool_ks_add_mode(link_ksettings, supported, FIBRE);
+		ethtool_ks_add_mode(link_ksettings, advertising, FIBRE);
 	} else if (trans_type == 0x80 || trans_type == 0) {
 		link_ksettings->base.port = PORT_TP;
-		ethtool_link_ksettings_add_link_mode(link_ksettings,
-						     supported, TP);
-		ethtool_link_ksettings_add_link_mode(link_ksettings,
-						     advertising, TP);
+		ethtool_ks_add_mode(link_ksettings, supported, TP);
+		ethtool_ks_add_mode(link_ksettings, advertising, TP);
 	} else  {
 		link_ksettings->base.port = -1;
 	}

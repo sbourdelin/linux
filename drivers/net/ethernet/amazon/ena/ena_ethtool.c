@@ -280,10 +280,8 @@ static int ena_get_link_ksettings(struct net_device *netdev,
 	link_ksettings->base.speed = link->speed;
 
 	if (link->flags & ENA_ADMIN_GET_FEATURE_LINK_DESC_AUTONEG_MASK) {
-		ethtool_link_ksettings_add_link_mode(link_ksettings,
-						     supported, Autoneg);
-		ethtool_link_ksettings_add_link_mode(link_ksettings,
-						     supported, Autoneg);
+		ethtool_ks_add_mode(link_ksettings, supported, Autoneg);
+		ethtool_ks_add_mode(link_ksettings, advertising, Autoneg);
 	}
 
 	link_ksettings->base.autoneg =
