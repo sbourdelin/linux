@@ -332,6 +332,85 @@ nfsd_sanitize_attrs(struct inode *inode, struct iattr *iap)
 	}
 }
 
+/* copy of vfs_truncate with NFS owner override hacked in, sigh.. */
+static long nfsd_truncate(const struct path *path, loff_t length)
+{
+	struct inode *inode;
+	struct dentry *upperdentry;
+	long error;
+
+	inode = path->dentry->d_inode;
+
+	/* For directories it's -EISDIR, for other non-regulars - -EINVAL */
+	if (S_ISDIR(inode->i_mode))
+		return -EISDIR;
+	if (!S_ISREG(inode->i_mode))
+		return -EINVAL;
+
+	error = mnt_want_write(path->mnt);
+	if (error)
+		goto out;
+
+	/*
+	 * The file owner always gets access permission for accesses that
+	 * would normally be checked at open time. This is to make
+	 * file access work even when the client has done a fchmod(fd, 0).
+	 *
+	 * However, `cp foo bar' should fail nevertheless when bar is
+	 * readonly. A sensible way to do this might be to reject all
+	 * attempts to truncate a read-only file, because a creat() call
+	 * always implies file truncation.
+	 * ... but this isn't really fair.  A process may reasonably call
+	 * ftruncate on an open file descriptor on a file with perm 000.
+	 * We must trust the client to do permission checking - using "ACCESS"
+	 * with NFSv3.
+	 */
+	if (!uid_eq(inode->i_uid, current_fsuid())) {
+		error = inode_permission(inode, MAY_WRITE);
+		if (error)
+			goto mnt_drop_write_and_out;
+	}
+
+	error = -EPERM;
+	if (IS_APPEND(inode))
+		goto mnt_drop_write_and_out;
+
+	/*
+	 * If this is an overlayfs then do as if opening the file so we get
+	 * write access on the upper inode, not on the overlay inode.  For
+	 * non-overlay filesystems d_real() is an identity function.
+	 */
+	upperdentry = d_real(path->dentry, NULL, O_WRONLY);
+	error = PTR_ERR(upperdentry);
+	if (IS_ERR(upperdentry))
+		goto mnt_drop_write_and_out;
+
+	error = get_write_access(upperdentry->d_inode);
+	if (error)
+		goto mnt_drop_write_and_out;
+
+	/*
+	 * Make sure that there are no leases.  get_write_access() protects
+	 * against the truncate racing with a lease-granting setlease().
+	 */
+	error = break_lease(inode, O_WRONLY);
+	if (error)
+		goto put_write_and_out;
+
+	error = locks_verify_truncate(inode, NULL, length);
+	if (!error)
+		error = security_path_truncate(path);
+	if (!error)
+		error = do_truncate(path->dentry, length, 0, NULL);
+
+put_write_and_out:
+	put_write_access(upperdentry->d_inode);
+mnt_drop_write_and_out:
+	mnt_drop_write(path->mnt);
+out:
+	return error;
+}
+
 /*
  * Set various file attributes.  After this call fhp needs an fh_put.
  */
@@ -403,7 +482,7 @@ nfsd_setattr(struct svc_rqst *rqstp, struct svc_fh *fhp, struct iattr *iap,
 		    ((iap->ia_valid & ~(ATTR_SIZE | ATTR_MTIME)) == 0))
 			implicit_mtime = true;
 
-		host_err = vfs_truncate(&path, iap->ia_size);
+		host_err = nfsd_truncate(&path, iap->ia_size);
 		if (host_err)
 			goto out_host_err;
 
