@@ -64,7 +64,6 @@ static int dev_state_ev_handler(struct notifier_block *this,
 	u8 *ip_addr_buf;
 	struct wilc_vif *vif;
 	u8 null_ip[4] = {0};
-	char wlan_dev_name[5] = "wlan0";
 
 	if (!dev_iface || !dev_iface->ifa_dev || !dev_iface->ifa_dev->dev)
 		return NOTIFY_DONE;
@@ -113,7 +112,7 @@ static int dev_state_ev_handler(struct notifier_block *this,
 			wilc_optaining_ip = false;
 		}
 
-		if (memcmp(dev_iface->ifa_label, wlan_dev_name, 5) == 0)
+		if (memcmp(dev_iface->ifa_label, "wlan0", 5) == 0)
 			wilc_set_power_mgmt(vif, 0, 0);
 
 		wilc_resolve_disconnect_aberration(vif);
