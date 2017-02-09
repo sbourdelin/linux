@@ -987,6 +987,11 @@ int i2c_dw_probe(struct dw_i2c_dev *dev)
 	    (reg & DW_IC_CON_10BITADDR_MASTER)) {
 		dev->dynamic_tar_update_enabled = true;
 		dev_dbg(dev->dev, "Dynamic TAR update enabled");
+	} else {
+		/* If test is failed then restore the original value */
+		dev->dynamic_tar_update_enabled = false;
+		dev_dbg(dev->dev, "Dynamic TAR update disable restore the value");
+		dw_writel(dev, reg, DW_IC_CON);
 	}
 
 	i2c_dw_release_lock(dev);
