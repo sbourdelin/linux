@@ -189,8 +189,10 @@ static int mall_change(struct net *net, struct sk_buff *in_skb,
 		if (err) {
 			if (tc_skip_sw(flags))
 				goto err_replace_hw_filter;
-			else
+			else {
+				new->flags |= TCA_CLS_FLAGS_SKIP_HW;
 				err = 0;
+			}
 		}
 	}
 
@@ -243,6 +245,8 @@ static int mall_dump(struct net *net, struct tcf_proto *tp, unsigned long fh,
 	if (head->res.classid &&
 	    nla_put_u32(skb, TCA_MATCHALL_CLASSID, head->res.classid))
 		goto nla_put_failure;
+
+	nla_put_u32(skb, TCA_MATCHALL_FLAGS, head->flags);
 
 	if (tcf_exts_dump(skb, &head->exts))
 		goto nla_put_failure;
