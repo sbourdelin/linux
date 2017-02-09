@@ -53,6 +53,11 @@ static inline int aac_is_msix_mode(struct aac_dev *dev)
 {
 	u32 status;
 
+	/* Don't allow switch 3405/3805 cards to MSI-X interrupt mode */
+	if (dev->pdev->subsystem_device == AAC_SUBID_3405 ||
+	    dev->pdev->subsystem_device == AAC_SUBID_3405)
+		return 0;
+
 	status = src_readl(dev, MUnit.OMR);
 	return (status & AAC_INT_MODE_MSIX);
 }

@@ -46,6 +46,9 @@
  *              D E F I N E S
  *----------------------------------------------------------------------------*/
 
+#define AAC_SUBID_3805		0x02bc
+#define AAC_SUBID_3405		0x02bb
+
 #define AAC_MAX_MSIX		32	/* vectors */
 #define AAC_PCI_MSI_ENABLE	0x8000
 
