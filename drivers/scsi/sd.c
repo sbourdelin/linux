@@ -3211,9 +3211,13 @@ static int sd_probe(struct device *dev)
 static int sd_remove(struct device *dev)
 {
 	struct scsi_disk *sdkp;
+	struct scsi_device *sdev;
+	struct Scsi_Host *shost;
 	dev_t devt;
 
 	sdkp = dev_get_drvdata(dev);
+	sdev = sdkp->device;
+	shost = sdev->host;
 	devt = disk_devt(sdkp->disk);
 	scsi_autopm_get_device(sdkp->device);
 
@@ -3221,7 +3225,9 @@ static int sd_remove(struct device *dev)
 	async_synchronize_full_domain(&scsi_sd_probe_domain);
 	device_del(&sdkp->dev);
 	del_gendisk(sdkp->disk);
+	mutex_unlock(&shost->scan_mutex);
 	sd_shutdown(dev);
+	mutex_lock(&shost->scan_mutex);
 
 	sd_zbc_remove(sdkp);
 
