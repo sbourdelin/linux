@@ -1376,7 +1376,11 @@ static int first_packet_length(struct sock *sk)
 		kfree_skb(skb);
 	}
 	res = skb ? skb->len : -1;
-	if (total)
+	/* udp_ioctl() can be used by UDP/UDPLite, but also L2TP.
+	 * We only need to call udp_rmem_release() for UDP sockets.
+	 * L2TP does have a proper skb destructor invoked at kfree_skb() time.
+	 */
+	if (total && sk->sk_prot->memory_allocated == &udp_memory_allocated)
 		udp_rmem_release(sk, total, 1);
 	spin_unlock_bh(&rcvq->lock);
 	return res;
