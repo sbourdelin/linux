@@ -471,6 +471,7 @@ void __init orion_ge11_init(struct mv643xx_eth_platform_data *eth_data,
 /*****************************************************************************
  * Ethernet switch
  ****************************************************************************/
+#if IS_BUILTIN(CONFIG_PHYLIB)
 static __initconst const char *orion_ge00_mvmdio_bus_name = "orion-mii";
 static __initdata struct mdio_board_info
 		  orion_ge00_switch_board_info;
@@ -493,6 +494,7 @@ void __init orion_ge00_switch_init(struct dsa_chip_data *d)
 
 	mdiobus_register_board_info(&orion_ge00_switch_board_info, 1);
 }
+#endif
 
 /*****************************************************************************
  * I2C
