@@ -6138,6 +6138,10 @@ sub process {
 				if ($stat =~ /$test/) {
 					my $val = $1;
 					$val = $6 if ($skip_args ne "");
+					# '0' is valid; some APIs special-case
+					# '0' as "no sysfs" node, and it's no
+					# harder to read than '0000'.
+					next if ($val eq "0");
 					if (($val =~ /^$Int$/ && $val !~ /^$Octal$/) ||
 					    ($val =~ /^$Octal$/ && length($val) ne 4)) {
 						ERROR("NON_OCTAL_PERMISSIONS",
