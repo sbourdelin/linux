@@ -185,14 +185,23 @@ static int cls_bpf_offload(struct tcf_proto *tp, struct cls_bpf_prog *prog,
 			return -EINVAL;
 		}
 	} else {
-		if (!tc_should_offload(dev, tp, prog->gen_flags))
-			return skip_sw ? -EINVAL : 0;
+		if (!tc_should_offload(dev, tp, prog->gen_flags)) {
+			if (tc_skip_sw(prog->gen_flags))
+				return -EINVAL;
+			prog->gen_flags |= TCA_CLS_FLAGS_SKIP_HW;
+			return 0;
+		}
 		cmd = TC_CLSBPF_ADD;
 	}
 
 	ret = cls_bpf_offload_cmd(tp, obj, cmd);
-	if (ret)
-		return skip_sw ? ret : 0;
+
+	if (ret) {
+		if (skip_sw)
+			return ret;
+		prog->gen_flags |= TCA_CLS_FLAGS_SKIP_HW;
+		return 0;
+	}
 
 	obj->offloaded = true;
 	if (oldprog)
