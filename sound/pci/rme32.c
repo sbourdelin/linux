@@ -1145,10 +1145,14 @@ static void snd_rme32_pb_trans_copy(struct snd_pcm_substream *substream,
 		    substream->runtime->dma_area + rec->sw_data, bytes);
 }
 
-static int snd_rme32_playback_fd_ack(struct snd_pcm_substream *substream)
+static int snd_rme32_playback_fd_ack(struct snd_pcm_substream *substream,
+				     unsigned int ack_attr)
 {
 	struct rme32 *rme32 = snd_pcm_substream_chip(substream);
 	struct snd_pcm_indirect *rec, *cprec;
+
+	if (!(ack_attr & SND_PCM_ACK))
+		return 0;
 
 	rec = &rme32->playback_pcm;
 	cprec = &rme32->capture_pcm;
@@ -1171,9 +1175,14 @@ static void snd_rme32_cp_trans_copy(struct snd_pcm_substream *substream,
 		      bytes);
 }
 
-static int snd_rme32_capture_fd_ack(struct snd_pcm_substream *substream)
+static int snd_rme32_capture_fd_ack(struct snd_pcm_substream *substream,
+					unsigned int ack_attr)
 {
 	struct rme32 *rme32 = snd_pcm_substream_chip(substream);
+
+	if (!(ack_attr & SND_PCM_ACK))
+		return 0;
+
 	snd_pcm_indirect_capture_transfer(substream, &rme32->capture_pcm,
 					  snd_rme32_cp_trans_copy);
 	return 0;

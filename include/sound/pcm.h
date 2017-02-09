@@ -63,6 +63,12 @@ struct snd_pcm_substream;
 struct snd_pcm_audio_tstamp_config; /* definitions further down */
 struct snd_pcm_audio_tstamp_report;
 
+/*
+ * Attibute to distinguish the ack for legacy code and pointer update.
+ */
+#define SND_PCM_ACK		BIT(0) /* Legacy callback */
+#define SND_PCM_UPDATE_APP_PTR	BIT(1) /* Update pointer callback */
+
 struct snd_pcm_ops {
 	int (*open)(struct snd_pcm_substream *substream);
 	int (*close)(struct snd_pcm_substream *substream);
@@ -86,7 +92,7 @@ struct snd_pcm_ops {
 	struct page *(*page)(struct snd_pcm_substream *substream,
 			     unsigned long offset);
 	int (*mmap)(struct snd_pcm_substream *substream, struct vm_area_struct *vma);
-	int (*ack)(struct snd_pcm_substream *substream);
+	int (*ack)(struct snd_pcm_substream *substream, unsigned int ack_attr);
 };
 
 /*

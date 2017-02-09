@@ -883,10 +883,15 @@ static void snd_cs46xx_pb_trans_copy(struct snd_pcm_substream *substream,
 	memcpy(cpcm->hw_buf.area + rec->hw_data, runtime->dma_area + rec->sw_data, bytes);
 }
 
-static int snd_cs46xx_playback_transfer(struct snd_pcm_substream *substream)
+static int snd_cs46xx_playback_transfer(struct snd_pcm_substream *substream,
+					unsigned int ack_attr)
 {
 	struct snd_pcm_runtime *runtime = substream->runtime;
 	struct snd_cs46xx_pcm * cpcm = runtime->private_data;
+
+	if (!(ack_attr & SND_PCM_ACK))
+		return 0;
+
 	snd_pcm_indirect_playback_transfer(substream, &cpcm->pcm_rec, snd_cs46xx_pb_trans_copy);
 	return 0;
 }
@@ -900,9 +905,14 @@ static void snd_cs46xx_cp_trans_copy(struct snd_pcm_substream *substream,
 	       chip->capt.hw_buf.area + rec->hw_data, bytes);
 }
 
-static int snd_cs46xx_capture_transfer(struct snd_pcm_substream *substream)
+static int snd_cs46xx_capture_transfer(struct snd_pcm_substream *substream,
+				       snd_pcm_ack_attributes ack_attr)
 {
 	struct snd_cs46xx *chip = snd_pcm_substream_chip(substream);
+
+	if (!(ack_attr & SND_PCM_ACK))
+		return 0;
+
 	snd_pcm_indirect_capture_transfer(substream, &chip->capt.pcm_rec, snd_cs46xx_cp_trans_copy);
 	return 0;
 }
@@ -981,11 +991,11 @@ static int snd_cs46xx_playback_trigger(struct snd_pcm_substream *substream,
 			cs46xx_dsp_pcm_link(chip,cpcm->pcm_channel);
 
 		if (substream->runtime->periods != CS46XX_FRAGS)
-			snd_cs46xx_playback_transfer(substream);
+			snd_cs46xx_playback_transfer(substream, SND_PCM_ACK);
 #else
 		spin_lock(&chip->reg_lock);
 		if (substream->runtime->periods != CS46XX_FRAGS)
-			snd_cs46xx_playback_transfer(substream);
+			snd_cs46xx_playback_transfer(substream, SND_PCM_ACK);
 		{ unsigned int tmp;
 		tmp = snd_cs46xx_peek(chip, BA1_PCTL);
 		tmp &= 0x0000ffff;

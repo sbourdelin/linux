@@ -1627,10 +1627,14 @@ static void fx8010_pb_trans_copy(struct snd_pcm_substream *substream,
 	pcm->tram_shift = tram_shift;
 }
 
-static int snd_emu10k1_fx8010_playback_transfer(struct snd_pcm_substream *substream)
+static int snd_emu10k1_fx8010_playback_transfer(struct snd_pcm_substream *substream,
+						unsigned int ack_attr)
 {
 	struct snd_emu10k1 *emu = snd_pcm_substream_chip(substream);
 	struct snd_emu10k1_fx8010_pcm *pcm = &emu->fx8010.pcm[substream->number];
+
+	if (!(ack_attr & SND_PCM_ACK))
+		return 0;
 
 	snd_pcm_indirect_playback_transfer(substream, &pcm->pcm_rec, fx8010_pb_trans_copy);
 	return 0;
@@ -1710,7 +1714,7 @@ static int snd_emu10k1_fx8010_playback_trigger(struct snd_pcm_substream *substre
 		result = snd_emu10k1_fx8010_register_irq_handler(emu, snd_emu10k1_fx8010_playback_irq, pcm->gpr_running, substream, &pcm->irq);
 		if (result < 0)
 			goto __err;
-		snd_emu10k1_fx8010_playback_transfer(substream);	/* roll the ball */
+		snd_emu10k1_fx8010_playback_transfer(substream, SND_PCM_ACK);	/* roll the ball */
 		snd_emu10k1_ptr_write(emu, emu->gpr_base + pcm->gpr_trigger, 0, 1);
 		break;
 	case SNDRV_PCM_TRIGGER_STOP:

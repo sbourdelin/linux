@@ -606,10 +606,14 @@ static void hal2_playback_transfer(struct snd_pcm_substream *substream,
 
 }
 
-static int hal2_playback_ack(struct snd_pcm_substream *substream)
+static int hal2_playback_ack(struct snd_pcm_substream *substream,
+			     unsigned int ack_attr)
 {
 	struct snd_hal2 *hal2 = snd_pcm_substream_chip(substream);
 	struct hal2_codec *dac = &hal2->dac;
+
+	if (!(ack_attr & SND_PCM_ACK))
+		return 0;
 
 	dac->pcm_indirect.hw_queue_size = H2_BUF_SIZE / 2;
 	snd_pcm_indirect_playback_transfer(substream,
@@ -698,7 +702,8 @@ static void hal2_capture_transfer(struct snd_pcm_substream *substream,
 	memcpy(substream->runtime->dma_area + rec->sw_data, buf, bytes);
 }
 
-static int hal2_capture_ack(struct snd_pcm_substream *substream)
+static int hal2_capture_ack(struct snd_pcm_substream *substream,
+			    unsigned int ack_attr)
 {
 	struct snd_hal2 *hal2 = snd_pcm_substream_chip(substream);
 	struct hal2_codec *adc = &hal2->adc;
