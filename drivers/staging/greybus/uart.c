@@ -506,6 +506,8 @@ static void gb_tty_set_termios(struct tty_struct *tty,
 	newline.parity = termios->c_cflag & PARENB ?
 				(termios->c_cflag & PARODD ? 1 : 2) +
 				(termios->c_cflag & CMSPAR ? 2 : 0) : 0;
+	newline.flow_control = termios->c_cflag & CRTSCTS ?
+				GB_SERIAL_AUTO_RTSCTS_EN : 0;
 
 	switch (termios->c_cflag & CSIZE) {
 	case CS5:
