@@ -171,6 +171,39 @@ int drm_atomic_helper_legacy_gamma_set(struct drm_crtc *crtc,
 				       uint32_t size);
 
 /**
+ * drm_atomic_duplicate_custom_state - helper macro for duplicating
+ * driver-private additions to drm_*_state.
+ * @new_state: pointer to destination state struct
+ * @old_state: pointer to source state struct
+ * @basename: name of the drm_*_state member of the new_state/old_state struct
+ *
+ * Copies the data after the base struct until the end of the custom struct,
+ * e.g. given a structure
+ *
+ * struct foo_bar_state {
+ * 	struct drm_bar_state base;
+ * 	struct foo_private priv;
+ * 	struct foo_private2 *priv2;
+ * };
+ *
+ * this copies priv and priv2. NB: the base struct *must* be the first element
+ * of the derived struct, and new_state and old_state have to be two distinct
+ * instances.
+ */
+#define drm_atomic_helper_duplicate_custom_state(new_state, old_state, basename) \
+	do { \
+		size_t base_size = sizeof(new_state->basename); \
+		size_t base_offset = offsetof(typeof(*new_state), basename); \
+		\
+		BUILD_BUG_ON(base_offset != 0); \
+		if (new_state == old_state) /* Type-check */ \
+			break; \
+		memcpy((char *)new_state + base_size, \
+		       (char *)old_state + base_size, \
+		       sizeof(*new_state) - base_size); \
+	} while(0)
+
+/**
  * drm_atomic_crtc_for_each_plane - iterate over planes currently attached to CRTC
  * @plane: the loop cursor
  * @crtc:  the crtc whose planes are iterated
