@@ -324,6 +324,21 @@ static int ixgbe_get_settings(struct net_device *netdev,
 		break;
 	}
 
+	/* When the tranceiver is external, the following is meaningful.
+	 * ecmd->reserved[0] has 3 values:
+	 * 0x0: tranceiver absent
+	 * 0x4: tranceiver present
+	 * others: not support
+	 */
+	if (ecmd->port == PORT_FIBRE) {
+		u32 status = IXGBE_READ_REG(hw, IXGBE_ESDP) & IXGBE_ESDP_SDP2;
+
+		if (status == 0x4)
+			ecmd->transceiver = XCVR_EXTERNAL_PRESENT;
+		if (status == 0x0)
+			ecmd->transceiver = XCVR_EXTERNAL_ABSENT;
+	}
+
 	/* Indicate pause support */
 	ecmd->supported |= SUPPORTED_Pause;
 

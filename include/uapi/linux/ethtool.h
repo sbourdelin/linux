@@ -1541,6 +1541,10 @@ static inline int ethtool_validate_duplex(__u8 duplex)
 #define XCVR_DUMMY2		0x03
 #define XCVR_DUMMY3		0x04
 
+/* The fiber transceiver status */
+#define XCVR_EXTERNAL_ABSENT	0x05
+#define XCVR_EXTERNAL_PRESENT	0x06
+
 /* Enable or disable autonegotiation. */
 #define AUTONEG_DISABLE		0x00
 #define AUTONEG_ENABLE		0x01
