@@ -699,13 +699,9 @@ struct dax_dev *devm_create_dax_dev(struct dax_region *dax_region,
 		goto err_inode;
 	}
 
-	/* device_initialize() so cdev can reference kobj parent */
-	device_initialize(dev);
-
 	cdev = &dax_dev->cdev;
 	cdev_init(cdev, &dax_fops);
 	cdev->owner = parent->driver->owner;
-	cdev->kobj.parent = &dev->kobj;
 	rc = cdev_add(&dax_dev->cdev, dev_t, 1);
 	if (rc)
 		goto err_cdev;
@@ -722,7 +718,7 @@ struct dax_dev *devm_create_dax_dev(struct dax_region *dax_region,
 	dev->groups = dax_attribute_groups;
 	dev->release = dax_dev_release;
 	dev_set_name(dev, "dax%d.%d", dax_region->id, dax_dev->id);
-	rc = device_add(dev);
+	rc = device_register(dev);
 	if (rc) {
 		put_device(dev);
 		return ERR_PTR(rc);
