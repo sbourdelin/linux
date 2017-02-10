@@ -1078,6 +1078,274 @@ int bnxt_qplib_destroy_qp(struct bnxt_qplib_res *res,
 	return 0;
 }
 
+void *bnxt_qplib_get_qp1_sq_buf(struct bnxt_qplib_qp *qp,
+				struct bnxt_qplib_sge *sge)
+{
+	struct bnxt_qplib_q *sq = &qp->sq;
+	u32 sw_prod;
+
+	memset(sge, 0, sizeof(*sge));
+
+	if (qp->sq_hdr_buf) {
+		sw_prod = HWQ_CMP(sq->hwq.prod, &sq->hwq);
+		sge->addr = (dma_addr_t)(qp->sq_hdr_buf_map +
+					 sw_prod * qp->sq_hdr_buf_size);
+		sge->lkey = 0xFFFFFFFF;
+		sge->size = qp->sq_hdr_buf_size;
+		return qp->sq_hdr_buf + sw_prod * sge->size;
+	}
+	return NULL;
+}
+
+void bnxt_qplib_post_send_db(struct bnxt_qplib_qp *qp)
+{
+	struct bnxt_qplib_q *sq = &qp->sq;
+	struct dbr_dbr db_msg = { 0 };
+	u32 sw_prod;
+
+	sw_prod = HWQ_CMP(sq->hwq.prod, &sq->hwq);
+
+	db_msg.index = cpu_to_le32((sw_prod << DBR_DBR_INDEX_SFT) &
+				   DBR_DBR_INDEX_MASK);
+	db_msg.type_xid =
+		cpu_to_le32(((qp->id << DBR_DBR_XID_SFT) & DBR_DBR_XID_MASK) |
+			    DBR_DBR_TYPE_SQ);
+	/* Flush all the WQE writes to HW */
+	wmb();
+	__iowrite64_copy(qp->dpi->dbr, &db_msg, sizeof(db_msg) / sizeof(u64));
+}
+
+int bnxt_qplib_post_send(struct bnxt_qplib_qp *qp,
+			 struct bnxt_qplib_swqe *wqe)
+{
+	struct bnxt_qplib_q *sq = &qp->sq;
+	struct bnxt_qplib_swq *swq;
+	struct sq_send *hw_sq_send_hdr, **hw_sq_send_ptr;
+	struct sq_sge *hw_sge;
+	u32 sw_prod;
+	u8 wqe_size16;
+	int i, rc = 0, data_len = 0, pkt_num = 0;
+	__le32 temp32;
+
+	if (qp->state != CMDQ_MODIFY_QP_NEW_STATE_RTS) {
+		rc = -EINVAL;
+		goto done;
+	}
+	if (HWQ_CMP((sq->hwq.prod + 1), &sq->hwq) ==
+	    HWQ_CMP(sq->hwq.cons, &sq->hwq)) {
+		rc = -ENOMEM;
+		goto done;
+	}
+	sw_prod = HWQ_CMP(sq->hwq.prod, &sq->hwq);
+	swq = &sq->swq[sw_prod];
+	swq->wr_id = wqe->wr_id;
+	swq->type = wqe->type;
+	swq->flags = wqe->flags;
+	if (qp->sig_type)
+		swq->flags |= SQ_SEND_FLAGS_SIGNAL_COMP;
+	swq->start_psn = sq->psn & BTH_PSN_MASK;
+
+	hw_sq_send_ptr = (struct sq_send **)sq->hwq.pbl_ptr;
+	hw_sq_send_hdr = &hw_sq_send_ptr[get_sqe_pg(sw_prod)]
+					[get_sqe_idx(sw_prod)];
+
+	memset(hw_sq_send_hdr, 0, BNXT_QPLIB_MAX_SQE_ENTRY_SIZE);
+
+	if (wqe->flags & BNXT_QPLIB_SWQE_FLAGS_INLINE) {
+		/* Copy the inline data */
+		if (wqe->inline_len > BNXT_QPLIB_SWQE_MAX_INLINE_LENGTH) {
+			dev_warn(&sq->hwq.pdev->dev,
+				 "QPLIB: Inline data length > 96 detected");
+			data_len = BNXT_QPLIB_SWQE_MAX_INLINE_LENGTH;
+		} else {
+			data_len = wqe->inline_len;
+		}
+		memcpy(hw_sq_send_hdr->data, wqe->inline_data, data_len);
+		wqe_size16 = (data_len + 15) >> 4;
+	} else {
+		for (i = 0, hw_sge = (struct sq_sge *)hw_sq_send_hdr->data;
+		     i < wqe->num_sge; i++, hw_sge++) {
+			hw_sge->va_or_pa = cpu_to_le64(wqe->sg_list[i].addr);
+			hw_sge->l_key = cpu_to_le32(wqe->sg_list[i].lkey);
+			hw_sge->size = cpu_to_le32(wqe->sg_list[i].size);
+			data_len += wqe->sg_list[i].size;
+		}
+		/* Each SGE entry = 1 WQE size16 */
+		wqe_size16 = wqe->num_sge;
+	}
+
+	/* Specifics */
+	switch (wqe->type) {
+	case BNXT_QPLIB_SWQE_TYPE_SEND:
+		if (qp->type == CMDQ_CREATE_QP1_TYPE_GSI) {
+			/* Assemble info for Raw Ethertype QPs */
+			struct sq_send_raweth_qp1 *sqe =
+				(struct sq_send_raweth_qp1 *)hw_sq_send_hdr;
+
+			sqe->wqe_type = wqe->type;
+			sqe->flags = wqe->flags;
+			sqe->wqe_size = wqe_size16 +
+				((offsetof(typeof(*sqe), data) + 15) >> 4);
+			sqe->cfa_action = cpu_to_le16(wqe->rawqp1.cfa_action);
+			sqe->lflags = cpu_to_le16(wqe->rawqp1.lflags);
+			sqe->length = cpu_to_le32(data_len);
+			sqe->cfa_meta = cpu_to_le32((wqe->rawqp1.cfa_meta &
+				SQ_SEND_RAWETH_QP1_CFA_META_VLAN_VID_MASK) <<
+				SQ_SEND_RAWETH_QP1_CFA_META_VLAN_VID_SFT);
+
+			break;
+		}
+		/* else, just fall thru */
+	case BNXT_QPLIB_SWQE_TYPE_SEND_WITH_IMM:
+	case BNXT_QPLIB_SWQE_TYPE_SEND_WITH_INV:
+	{
+		struct sq_send *sqe = (struct sq_send *)hw_sq_send_hdr;
+
+		sqe->wqe_type = wqe->type;
+		sqe->flags = wqe->flags;
+		sqe->wqe_size = wqe_size16 +
+				((offsetof(typeof(*sqe), data) + 15) >> 4);
+		sqe->inv_key_or_imm_data = cpu_to_le32(
+						wqe->send.inv_key);
+		if (qp->type == CMDQ_CREATE_QP_TYPE_UD) {
+			sqe->q_key = cpu_to_le32(wqe->send.q_key);
+			sqe->dst_qp = cpu_to_le32(
+					wqe->send.dst_qp & SQ_SEND_DST_QP_MASK);
+			sqe->length = cpu_to_le32(data_len);
+			sqe->avid = cpu_to_le32(wqe->send.avid &
+						SQ_SEND_AVID_MASK);
+			sq->psn = (sq->psn + 1) & BTH_PSN_MASK;
+		} else {
+			sqe->length = cpu_to_le32(data_len);
+			sqe->dst_qp = 0;
+			sqe->avid = 0;
+			if (qp->mtu)
+				pkt_num = (data_len + qp->mtu - 1) / qp->mtu;
+			if (!pkt_num)
+				pkt_num = 1;
+			sq->psn = (sq->psn + pkt_num) & BTH_PSN_MASK;
+		}
+		break;
+	}
+	case BNXT_QPLIB_SWQE_TYPE_RDMA_WRITE:
+	case BNXT_QPLIB_SWQE_TYPE_RDMA_WRITE_WITH_IMM:
+	case BNXT_QPLIB_SWQE_TYPE_RDMA_READ:
+	{
+		struct sq_rdma *sqe = (struct sq_rdma *)hw_sq_send_hdr;
+
+		sqe->wqe_type = wqe->type;
+		sqe->flags = wqe->flags;
+		sqe->wqe_size = wqe_size16 +
+				((offsetof(typeof(*sqe), data) + 15) >> 4);
+		sqe->imm_data = cpu_to_le32(wqe->rdma.inv_key);
+		sqe->length = cpu_to_le32((u32)data_len);
+		sqe->remote_va = cpu_to_le64(wqe->rdma.remote_va);
+		sqe->remote_key = cpu_to_le32(wqe->rdma.r_key);
+		if (qp->mtu)
+			pkt_num = (data_len + qp->mtu - 1) / qp->mtu;
+		if (!pkt_num)
+			pkt_num = 1;
+		sq->psn = (sq->psn + pkt_num) & BTH_PSN_MASK;
+		break;
+	}
+	case BNXT_QPLIB_SWQE_TYPE_ATOMIC_CMP_AND_SWP:
+	case BNXT_QPLIB_SWQE_TYPE_ATOMIC_FETCH_AND_ADD:
+	{
+		struct sq_atomic *sqe = (struct sq_atomic *)hw_sq_send_hdr;
+
+		sqe->wqe_type = wqe->type;
+		sqe->flags = wqe->flags;
+		sqe->remote_key = cpu_to_le32(wqe->atomic.r_key);
+		sqe->remote_va = cpu_to_le64(wqe->atomic.remote_va);
+		sqe->swap_data = cpu_to_le64(wqe->atomic.swap_data);
+		sqe->cmp_data = cpu_to_le64(wqe->atomic.cmp_data);
+		if (qp->mtu)
+			pkt_num = (data_len + qp->mtu - 1) / qp->mtu;
+		if (!pkt_num)
+			pkt_num = 1;
+		sq->psn = (sq->psn + pkt_num) & BTH_PSN_MASK;
+		break;
+	}
+	case BNXT_QPLIB_SWQE_TYPE_LOCAL_INV:
+	{
+		struct sq_localinvalidate *sqe =
+				(struct sq_localinvalidate *)hw_sq_send_hdr;
+
+		sqe->wqe_type = wqe->type;
+		sqe->flags = wqe->flags;
+		sqe->inv_l_key = cpu_to_le32(wqe->local_inv.inv_l_key);
+
+		break;
+	}
+	case BNXT_QPLIB_SWQE_TYPE_FAST_REG_MR:
+	{
+		struct sq_fr_pmr *sqe = (struct sq_fr_pmr *)hw_sq_send_hdr;
+
+		sqe->wqe_type = wqe->type;
+		sqe->flags = wqe->flags;
+		sqe->access_cntl = wqe->frmr.access_cntl |
+				   SQ_FR_PMR_ACCESS_CNTL_LOCAL_WRITE;
+		sqe->zero_based_page_size_log =
+			(wqe->frmr.pg_sz_log & SQ_FR_PMR_PAGE_SIZE_LOG_MASK) <<
+			SQ_FR_PMR_PAGE_SIZE_LOG_SFT |
+			(wqe->frmr.zero_based ? SQ_FR_PMR_ZERO_BASED : 0);
+		sqe->l_key = cpu_to_le32(wqe->frmr.l_key);
+		temp32 = cpu_to_le32(wqe->frmr.length);
+		memcpy(sqe->length, &temp32, sizeof(wqe->frmr.length));
+		sqe->numlevels_pbl_page_size_log =
+			((wqe->frmr.pbl_pg_sz_log <<
+					SQ_FR_PMR_PBL_PAGE_SIZE_LOG_SFT) &
+					SQ_FR_PMR_PBL_PAGE_SIZE_LOG_MASK) |
+			((wqe->frmr.levels << SQ_FR_PMR_NUMLEVELS_SFT) &
+					SQ_FR_PMR_NUMLEVELS_MASK);
+
+		for (i = 0; i < wqe->frmr.page_list_len; i++)
+			wqe->frmr.pbl_ptr[i] = cpu_to_le64(
+						wqe->frmr.page_list[i] |
+						PTU_PTE_VALID);
+		sqe->pblptr = cpu_to_le64(wqe->frmr.pbl_dma_ptr);
+		sqe->va = cpu_to_le64(wqe->frmr.va);
+
+		break;
+	}
+	case BNXT_QPLIB_SWQE_TYPE_BIND_MW:
+	{
+		struct sq_bind *sqe = (struct sq_bind *)hw_sq_send_hdr;
+
+		sqe->wqe_type = wqe->type;
+		sqe->flags = wqe->flags;
+		sqe->access_cntl = wqe->bind.access_cntl;
+		sqe->mw_type_zero_based = wqe->bind.mw_type |
+			(wqe->bind.zero_based ? SQ_BIND_ZERO_BASED : 0);
+		sqe->parent_l_key = cpu_to_le32(wqe->bind.parent_l_key);
+		sqe->l_key = cpu_to_le32(wqe->bind.r_key);
+		sqe->va = cpu_to_le64(wqe->bind.va);
+		temp32 = cpu_to_le32(wqe->bind.length);
+		memcpy(&sqe->length, &temp32, sizeof(wqe->bind.length));
+		break;
+	}
+	default:
+		/* Bad wqe, return error */
+		rc = -EINVAL;
+		goto done;
+	}
+	swq->next_psn = sq->psn & BTH_PSN_MASK;
+	if (swq->psn_search) {
+		swq->psn_search->opcode_start_psn = cpu_to_le32(
+			((swq->start_psn << SQ_PSN_SEARCH_START_PSN_SFT) &
+			 SQ_PSN_SEARCH_START_PSN_MASK) |
+			((wqe->type << SQ_PSN_SEARCH_OPCODE_SFT) &
+			 SQ_PSN_SEARCH_OPCODE_MASK));
+		swq->psn_search->flags_next_psn = cpu_to_le32(
+			((swq->next_psn << SQ_PSN_SEARCH_NEXT_PSN_SFT) &
+			 SQ_PSN_SEARCH_NEXT_PSN_MASK));
+	}
+
+	sq->hwq.prod++;
+done:
+	return rc;
+}
+
 /* CQ */
 
 /* Spinlock must be held */
