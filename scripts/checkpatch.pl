@@ -6096,6 +6096,15 @@ sub process {
 			      "recursive locking is bad, do not use this ever.\n" . $herecurr);
 		}
 
+	# check for vsprintf extension %p<foo> misuses
+	if ($line =~ /\b$logFunctions\s*\(.*$String/) {
+		my $format = get_quoted_string($line, $rawline);
+		if ($format =~ /(\%[\*\d\.]*p(?![\WFfSsBKRraEhMmIiUDdgVCbGN]).)/) {
+			WARN("VSPRINTF_POINTER_EXTENSION",
+			     "Invalid vsprintf pointer extension '$1'\n" . $herecurr);
+		}
+	}
+
 # check for lockdep_set_novalidate_class
 		if ($line =~ /^.\s*lockdep_set_novalidate_class\s*\(/ ||
 		    $line =~ /__lockdep_no_validate__\s*\)/ ) {
