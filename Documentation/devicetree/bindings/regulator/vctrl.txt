@@ -1,0 +1,56 @@
+Bindings for Voltage controlled regulators
+==========================================
+
+Required properties:
+--------------------
+- compatible		: must be "vctrl-regulator".
+- ctrl-supply:		: a phandle for the regulator supplying the control
+			  voltage.
+- output-voltage-range	: an array of two integer values specifying the range
+			  (min/max) of the output voltage. The min/max voltage
+			  constraints of the regulator (if specified) must not
+			  exceed this range.
+- ctrl-voltage-range	: an array of two integer values specifying the range
+			  (min/max) of the control voltage. The values of
+			  ctrl-voltage-range and output-voltage-range are used
+			  for the conversion between output and control voltage.
+			  The min/max values of ctrl-voltage-range must specify
+			  the control voltage needed to generate the min/max
+			  output voltage.
+
+Optional properties:
+--------------------
+- ovp-threshold-percent	: overvoltage protection (OVP) threshold of the
+			  regulator in percent. Some regulators have an OVP
+			  circuitry which shuts down the regulator when the
+			  actual output voltage deviates beyond a certain
+			  margin from the expected value for a given control
+			  voltage. On larger voltage decreases this can occur
+			  undesiredly since the output voltage does not adjust
+			  inmediately to changes in the control voltage. To
+			  avoid this situation the vctrl driver breaks down
+			  larger voltage decreases into multiple steps, where
+			  each step is within the OVP threshold.
+- min-slew-down-rate	: Describes how slowly the regulator voltage will decay
+			  down in the worst case (lightest expected load).
+			  Specified in uV / us (like main regulator ramp rate).
+			  This value is required when ovp-threshold-percent is
+			  specified.
+
+Example:
+
+	vctrl_reg {
+		compatible = "vctrl-regulator";
+		regulator-name = "vctrl_reg";
+
+		ctrl-supply = <&ctrl_supply>;
+
+		regulator-min-microvolt = <800000>;
+		regulator-max-microvolt = <1500000>;
+
+		output-voltage-range = <800000 1500000>;
+		ctrl-voltage-range = <200000 500000>;
+
+		slew-rate = <225>;
+		ovp-threshold-percent = <16>;
+	};
