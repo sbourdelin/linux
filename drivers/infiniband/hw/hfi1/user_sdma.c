@@ -731,23 +731,18 @@ int hfi1_user_sdma_process_request(struct file *fp, struct iovec *iovec,
 			ret = -EINVAL;
 			goto free_req;
 		}
-		req->tids = kcalloc(ntids, sizeof(*req->tids), GFP_KERNEL);
-		if (!req->tids) {
-			ret = -ENOMEM;
-			goto free_req;
-		}
 		/*
 		 * We have to copy all of the tids because they may vary
 		 * in size and, therefore, the TID count might not be
 		 * equal to the pkt count. However, there is no way to
 		 * tell at this point.
 		 */
-		ret = copy_from_user(req->tids, iovec[idx].iov_base,
-				     ntids * sizeof(*req->tids));
-		if (ret) {
+		req->tids = memdup_user(iovec[idx].iov_base,
+					sizeof(*req->tids) * ntids);
+		if (IS_ERR(req->tids)) {
+			ret = PTR_ERR(req->tids);
 			SDMA_DBG(req, "Failed to copy %d TIDs (%d)",
 				 ntids, ret);
-			ret = -EFAULT;
 			goto free_req;
 		}
 		req->n_tids = ntids;
@@ -1606,7 +1601,8 @@ static void user_sdma_free_request(struct user_sdma_request *req, bool unpin)
 				atomic_dec(&node->refcount);
 		}
 	}
-	kfree(req->tids);
+	if (!IS_ERR(req->tids))
+		kfree(req->tids);
 	clear_bit(req->info.comp_idx, req->pq->req_in_use);
 }
 
