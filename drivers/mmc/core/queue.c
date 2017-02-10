@@ -64,6 +64,7 @@ struct mmc_queue_req *mmc_queue_req_find(struct mmc_queue *mq,
 	mqrq->req = req;
 	mq->qcnt += 1;
 	__set_bit(mqrq->task_id, &mq->qslots);
+	mqrq->retry_cnt = 0;
 
 	return mqrq;
 }
@@ -377,7 +378,14 @@ out_err:
 
 int mmc_queue_alloc_shared_queue(struct mmc_card *card)
 {
-	return __mmc_queue_alloc_shared_queue(card, 2);
+	int qdepth;
+
+	if (card->ext_csd.cmdq_en)
+		qdepth = card->ext_csd.cmdq_depth;
+	else
+		qdepth = 2;
+
+	return __mmc_queue_alloc_shared_queue(card, qdepth);
 }
 
 /**

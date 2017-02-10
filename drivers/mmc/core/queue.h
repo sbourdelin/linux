@@ -19,9 +19,13 @@ struct mmc_blk_data;
 
 struct mmc_blk_request {
 	struct mmc_request	mrq;
-	struct mmc_command	sbc;
+	union {
+		struct mmc_command	sbc;
+		struct mmc_command	cmd44;
+	};
 	struct mmc_command	cmd;
 	struct mmc_command	stop;
+	struct mmc_command	cmd45;
 	struct mmc_data		data;
 	int			retune_retry_done;
 };
@@ -35,6 +39,7 @@ struct mmc_queue_req {
 	unsigned int		bounce_sg_len;
 	struct mmc_async_req	areq;
 	int			task_id;
+	unsigned int		retry_cnt;
 };
 
 struct mmc_queue {
@@ -50,6 +55,10 @@ struct mmc_queue {
 	int			qdepth;
 	int			qcnt;
 	unsigned long		qslots;
+	/* Following are defined for Software Command Queuing */
+	unsigned long		qsr;
+	struct mmc_async_req	*prepared_areq;
+	bool			qsr_err;
 };
 
 extern int mmc_queue_alloc_shared_queue(struct mmc_card *card);
