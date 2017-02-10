@@ -19,6 +19,12 @@
 #include <sched.h>
 #include <sys/io.h>
 
+#ifdef __x86_64__
+# define INT80_CLOBBERS "r8", "r9", "r10", "r11"
+#else
+# define INT80_CLOBBERS
+#endif
+
 static int nerrs = 0;
 
 static void sethandler(int sig, void (*handler)(int, siginfo_t *, void *),
@@ -70,7 +76,7 @@ int main(void)
 			err(1, "iopl");
 
 		printf("[RUN]\tchild: write to 0x80\n");
-		asm volatile ("outb %%al, $0x80" : : "a" (0));
+		asm volatile ("outb %%al, $0x80" : : "a" (0) : INT80_CLOBBERS);
 
 		return 0;
 	} else {
@@ -93,7 +99,7 @@ int main(void)
 	if (sigsetjmp(jmpbuf, 1) != 0) {
 		printf("[OK]\twrite was denied\n");
 	} else {
-		asm volatile ("outb %%al, $0x80" : : "a" (0));
+		asm volatile ("outb %%al, $0x80" : : "a" (0) : INT80_CLOBBERS);
 		printf("[FAIL]\twrite was allowed\n");
 		nerrs++;
 	}
