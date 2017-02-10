@@ -190,12 +190,12 @@ struct bio *bio_alloc_mddev(gfp_t gfp_mask, int nr_iovecs,
 }
 EXPORT_SYMBOL_GPL(bio_alloc_mddev);
 
-struct bio *bio_clone_mddev(struct bio *bio, gfp_t gfp_mask,
+struct bio *bio_clone_fast_mddev(struct bio *bio, gfp_t gfp_mask,
 			    struct mddev *mddev)
 {
-	return bio_clone_bioset(bio, gfp_mask, mddev->bio_set);
+	return bio_clone_fast(bio, gfp_mask, mddev->bio_set);
 }
-EXPORT_SYMBOL_GPL(bio_clone_mddev);
+EXPORT_SYMBOL_GPL(bio_clone_fast_mddev);
 
 /*
  * We have a system wide 'event count' that is incremented

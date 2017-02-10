@@ -4995,9 +4995,9 @@ static int raid5_read_one_chunk(struct mddev *mddev, struct bio *raid_bio)
 		return 0;
 	}
 	/*
-	 * use bio_clone_mddev to make a copy of the bio
+	 * use bio_clone_fast_mddev to make a copy of the bio
 	 */
-	align_bi = bio_clone_mddev(raid_bio, GFP_NOIO, mddev);
+	align_bi = bio_clone_fast_mddev(raid_bio, GFP_NOIO, mddev);
 	if (!align_bi)
 		return 0;
 	/*
