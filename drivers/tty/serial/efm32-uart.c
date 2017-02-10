@@ -572,9 +572,9 @@ static void efm32_uart_console_get_options(struct efm32_uart_port *efm_port,
 			16 * (4 + (clkdiv >> 6)));
 
 	frame = efm32_uart_read32(efm_port, UARTn_FRAME);
-	if (frame & UARTn_FRAME_PARITY_ODD)
+	if ((frame & UARTn_FRAME_PARITY_ODD) == UARTn_FRAME_PARITY_ODD)
 		*parity = 'o';
-	else if (frame & UARTn_FRAME_PARITY_EVEN)
+	else if ((frame & UARTn_FRAME_PARITY_EVEN) == UARTn_FRAME_PARITY_EVEN)
 		*parity = 'e';
 	else
 		*parity = 'n';
