@@ -414,6 +414,15 @@ checkbin:
 		echo -n '*** Please use a different binutils version.' ; \
 		false ; \
 	fi
+	@if test "$(cc-version)" = "0504" \
+		|| test "$(cc-version)" = "0601" \
+		|| test "$(cc-version)" = "0602" ; then \
+		echo -n '*** GCC-5.4 6.1 6.2 have a bad -O2 optimisation ' ; \
+		echo 'which will cause lost commandline options (at least).' ; \
+		echo '*** Please use a different GCC version.' ; \
+		false ; \
+	fi
+
 
 
 CLEAN_FILES += $(TOUT)
