@@ -6096,6 +6096,12 @@ sub process {
 			      "recursive locking is bad, do not use this ever.\n" . $herecurr);
 		}
 
+# check for bad %pK usage
+		if ($rawline =~ /\%pk/) {
+			WARN("FORMAT SPECIFIER",
+			      "%pk is close to %pK, did you mean %pK?.\n" . $herecurr);
+		}
+
 # check for lockdep_set_novalidate_class
 		if ($line =~ /^.\s*lockdep_set_novalidate_class\s*\(/ ||
 		    $line =~ /__lockdep_no_validate__\s*\)/ ) {
