@@ -191,6 +191,16 @@ config HID_CORSAIR
 	Supported devices:
 	- Vengeance K90
 
+config HID_CORSAIR_MOUSE:
+    tristate "Corsair mice"
+    depends on HID && USB
+    ---help---
+    Support for Corsair mice devices that are not fully compliant with
+    the HID standard.
+
+    Supported devices:
+    - Scimitar Pro RGB
+
 config HID_PRODIKEYS
 	tristate "Prodikeys PC-MIDI Keyboard support"
 	depends on HID && SND
