@@ -44,15 +44,24 @@ MODULE_LICENSE("GPL");
 
 #define PRIV_VMA_LOCKED ((void *)1)
 
+struct privcmd_data {
+	domid_t domid;
+};
+
 static int privcmd_vma_range_is_mapped(
                struct vm_area_struct *vma,
                unsigned long addr,
                unsigned long nr_pages);
 
-static long privcmd_ioctl_hypercall(void __user *udata)
+static long privcmd_ioctl_hypercall(struct file *file, void __user *udata)
 {
+	struct privcmd_data *data = file->private_data;
 	struct privcmd_hypercall hypercall;
 	long ret;
+
+	/* Disallow arbitrary hypercalls if restricted */
+	if (data->domid != DOMID_INVALID)
+		return -EPERM;
 
 	if (copy_from_user(&hypercall, udata, sizeof(hypercall)))
 		return -EFAULT;
@@ -591,8 +600,9 @@ static void unlock_pages(struct page *pages[], unsigned int nr_pages)
 	}
 }
 
-static long privcmd_ioctl_dm_op(void __user *udata)
+static long privcmd_ioctl_dm_op(struct file *file, void __user *udata)
 {
+	struct privcmd_data *data = file->private_data;
 	struct privcmd_dm_op kdata;
 	struct privcmd_dm_op_buf *kbufs;
 	unsigned int nr_pages = 0;
@@ -603,6 +613,10 @@ static long privcmd_ioctl_dm_op(void __user *udata)
 
 	if (copy_from_user(&kdata, udata, sizeof(kdata)))
 		return -EFAULT;
+
+	/* If restriction is in place, check the domid matches */
+	if (data->domid != DOMID_INVALID && data->domid != kdata.dom)
+		return -EPERM;
 
 	if (kdata.num == 0)
 		return 0;
@@ -682,6 +696,23 @@ out:
 	return rc;
 }
 
+static long privcmd_ioctl_restrict(struct file *file, void __user *udata)
+{
+	struct privcmd_data *data = file->private_data;
+	domid_t dom;
+
+	if (copy_from_user(&dom, udata, sizeof(dom)))
+		return -EFAULT;
+
+	/* Set restriction to the specified domain, or check it matches */
+	if (data->domid == DOMID_INVALID)
+		data->domid = dom;
+	else if (data->domid != dom)
+		return -EINVAL;
+
+	return 0;
+}
+
 static long privcmd_ioctl(struct file *file,
 			  unsigned int cmd, unsigned long data)
 {
@@ -690,7 +721,7 @@ static long privcmd_ioctl(struct file *file,
 
 	switch (cmd) {
 	case IOCTL_PRIVCMD_HYPERCALL:
-		ret = privcmd_ioctl_hypercall(udata);
+		ret = privcmd_ioctl_hypercall(file, udata);
 		break;
 
 	case IOCTL_PRIVCMD_MMAP:
@@ -706,7 +737,11 @@ static long privcmd_ioctl(struct file *file,
 		break;
 
 	case IOCTL_PRIVCMD_DM_OP:
-		ret = privcmd_ioctl_dm_op(udata);
+		ret = privcmd_ioctl_dm_op(file, udata);
+		break;
+
+	case IOCTL_PRIVCMD_RESTRICT:
+		ret = privcmd_ioctl_restrict(file, udata);
 		break;
 
 	default:
@@ -714,6 +749,28 @@ static long privcmd_ioctl(struct file *file,
 	}
 
 	return ret;
+}
+
+static int privcmd_open(struct inode *ino, struct file *file)
+{
+	struct privcmd_data *data = kzalloc(sizeof(*data), GFP_KERNEL);
+
+	if (!data)
+		return -ENOMEM;
+
+	/* DOMID_INVALID implies no restriction */
+	data->domid = DOMID_INVALID;
+
+	file->private_data = data;
+	return 0;
+}
+
+static int privcmd_release(struct inode *ino, struct file *file)
+{
+	struct privcmd_data *data = file->private_data;
+
+	kfree(data);
+	return 0;
 }
 
 static void privcmd_close(struct vm_area_struct *vma)
@@ -784,6 +841,8 @@ static int privcmd_vma_range_is_mapped(
 const struct file_operations xen_privcmd_fops = {
 	.owner = THIS_MODULE,
 	.unlocked_ioctl = privcmd_ioctl,
+	.open = privcmd_open,
+	.release = privcmd_release,
 	.mmap = privcmd_mmap,
 };
 EXPORT_SYMBOL_GPL(xen_privcmd_fops);
