@@ -41,6 +41,82 @@ static int sdhci_pci_select_drive_strength(struct sdhci_host *host,
 					   unsigned int max_dtr, int host_drv,
 					   int card_drv, int *drv_type);
 
+#ifdef CONFIG_PM_SLEEP
+static int __sdhci_pci_suspend_host(struct sdhci_pci_chip *chip)
+{
+	int i, ret;
+
+	for (i = 0; i < chip->num_slots; i++) {
+		struct sdhci_pci_slot *slot = chip->slots[i];
+
+		if (!slot)
+			continue;
+
+		ret = sdhci_suspend_host(slot->host);
+		if (ret)
+			goto err_pci_suspend;
+
+		if (slot->host->mmc->pm_flags & MMC_PM_WAKE_SDIO_IRQ)
+			sdhci_enable_irq_wakeups(slot->host);
+	}
+
+	return 0;
+
+err_pci_suspend:
+	while (--i >= 0)
+		sdhci_resume_host(chip->slots[i]->host);
+	return ret;
+}
+
+static int sdhci_pci_init_wakeup(struct sdhci_pci_chip *chip)
+{
+	mmc_pm_flag_t pm_flags = 0;
+	int i;
+
+	for (i = 0; i < chip->num_slots; i++) {
+		struct sdhci_pci_slot *slot = chip->slots[i];
+
+		if (slot)
+			pm_flags |= slot->host->mmc->pm_flags;
+	}
+
+	return device_init_wakeup(&chip->pdev->dev,
+				  (pm_flags & MMC_PM_KEEP_POWER) &&
+				  (pm_flags & MMC_PM_WAKE_SDIO_IRQ));
+}
+
+static int sdhci_pci_suspend_host(struct sdhci_pci_chip *chip)
+{
+	int ret;
+
+	ret = __sdhci_pci_suspend_host(chip);
+	if (ret)
+		return ret;
+
+	sdhci_pci_init_wakeup(chip);
+
+	return 0;
+}
+
+int sdhci_pci_resume_host(struct sdhci_pci_chip *chip)
+{
+	struct sdhci_pci_slot *slot;
+	int i, ret;
+
+	for (i = 0; i < chip->num_slots; i++) {
+		slot = chip->slots[i];
+		if (!slot)
+			continue;
+
+		ret = sdhci_resume_host(slot->host);
+		if (ret)
+			return ret;
+	}
+
+	return 0;
+}
+#endif
+
 /*****************************************************************************\
  *                                                                           *
  * Hardware specific quirk handling                                          *
@@ -78,7 +154,7 @@ static int ricoh_mmc_resume(struct sdhci_pci_chip *chip)
 	/* Otherwise it becomes confused if card state changed
 		during suspend */
 	msleep(500);
-	return 0;
+	return sdhci_pci_resume_host(chip);
 }
 #endif
 
@@ -722,13 +798,19 @@ static void jmicron_remove_slot(struct sdhci_pci_slot *slot, int dead)
 #ifdef CONFIG_PM_SLEEP
 static int jmicron_suspend(struct sdhci_pci_chip *chip)
 {
-	int i;
+	int i, ret;
+
+	ret = __sdhci_pci_suspend_host(chip);
+	if (ret)
+		return ret;
 
 	if (chip->pdev->device == PCI_DEVICE_ID_JMICRON_JMB38X_MMC ||
 	    chip->pdev->device == PCI_DEVICE_ID_JMICRON_JMB388_ESD) {
 		for (i = 0; i < chip->num_slots; i++)
 			jmicron_enable_mmc(chip->slots[i]->host, 0);
 	}
+
+	sdhci_pci_init_wakeup(chip);
 
 	return 0;
 }
@@ -749,7 +831,7 @@ static int jmicron_resume(struct sdhci_pci_chip *chip)
 		return ret;
 	}
 
-	return 0;
+	return sdhci_pci_resume_host(chip);
 }
 #endif
 
@@ -1657,83 +1739,29 @@ static const struct sdhci_ops sdhci_pci_ops = {
 static int sdhci_pci_suspend(struct device *dev)
 {
 	struct pci_dev *pdev = to_pci_dev(dev);
-	struct sdhci_pci_chip *chip;
-	struct sdhci_pci_slot *slot;
-	mmc_pm_flag_t slot_pm_flags;
-	mmc_pm_flag_t pm_flags = 0;
-	int i, ret;
+	struct sdhci_pci_chip *chip = pci_get_drvdata(pdev);
 
-	chip = pci_get_drvdata(pdev);
 	if (!chip)
 		return 0;
 
-	for (i = 0; i < chip->num_slots; i++) {
-		slot = chip->slots[i];
-		if (!slot)
-			continue;
+	if (chip->fixes && chip->fixes->suspend)
+		return chip->fixes->suspend(chip);
 
-		ret = sdhci_suspend_host(slot->host);
-
-		if (ret)
-			goto err_pci_suspend;
-
-		slot_pm_flags = slot->host->mmc->pm_flags;
-		if (slot_pm_flags & MMC_PM_WAKE_SDIO_IRQ)
-			sdhci_enable_irq_wakeups(slot->host);
-
-		pm_flags |= slot_pm_flags;
-	}
-
-	if (chip->fixes && chip->fixes->suspend) {
-		ret = chip->fixes->suspend(chip);
-		if (ret)
-			goto err_pci_suspend;
-	}
-
-	if (pm_flags & MMC_PM_KEEP_POWER) {
-		if (pm_flags & MMC_PM_WAKE_SDIO_IRQ)
-			device_init_wakeup(dev, true);
-		else
-			device_init_wakeup(dev, false);
-	} else
-		device_init_wakeup(dev, false);
-
-	return 0;
-
-err_pci_suspend:
-	while (--i >= 0)
-		sdhci_resume_host(chip->slots[i]->host);
-	return ret;
+	return sdhci_pci_suspend_host(chip);
 }
 
 static int sdhci_pci_resume(struct device *dev)
 {
 	struct pci_dev *pdev = to_pci_dev(dev);
-	struct sdhci_pci_chip *chip;
-	struct sdhci_pci_slot *slot;
-	int i, ret;
+	struct sdhci_pci_chip *chip = pci_get_drvdata(pdev);
 
-	chip = pci_get_drvdata(pdev);
 	if (!chip)
 		return 0;
 
-	if (chip->fixes && chip->fixes->resume) {
-		ret = chip->fixes->resume(chip);
-		if (ret)
-			return ret;
-	}
+	if (chip->fixes && chip->fixes->resume)
+		return chip->fixes->resume(chip);
 
-	for (i = 0; i < chip->num_slots; i++) {
-		slot = chip->slots[i];
-		if (!slot)
-			continue;
-
-		ret = sdhci_resume_host(slot->host);
-		if (ret)
-			return ret;
-	}
-
-	return 0;
+	return sdhci_pci_resume_host(chip);
 }
 #endif
 
