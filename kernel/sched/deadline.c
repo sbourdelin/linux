@@ -624,10 +624,8 @@ static enum hrtimer_restart dl_task_timer(struct hrtimer *timer)
 	 * We can be both throttled and !queued. Replenish the counter
 	 * but do not enqueue -- wait for our wakeup to do that.
 	 */
-	if (!task_on_rq_queued(p)) {
-		replenish_dl_entity(dl_se, dl_se);
+	if (!task_on_rq_queued(p))
 		goto unlock;
-	}
 
 #ifdef CONFIG_SMP
 	if (unlikely(!rq->online)) {
