@@ -94,6 +94,34 @@ struct bnxt_qplib_ah {
 	u8				nw_type;
 };
 
+struct bnxt_qplib_mrw {
+	struct bnxt_qplib_pd		*pd;
+	int				type;
+	u32				flags;
+#define BNXT_QPLIB_FR_PMR		0x80000000
+	u32				lkey;
+	u32				rkey;
+#define BNXT_QPLIB_RSVD_LKEY		0xFFFFFFFF
+	u64				va;
+	u64				total_size;
+	u32				npages;
+	u64				mr_handle;
+	struct bnxt_qplib_hwq		hwq;
+};
+
+struct bnxt_qplib_frpl {
+	int				max_pg_ptrs;
+	struct bnxt_qplib_hwq		hwq;
+};
+
+#define BNXT_QPLIB_ACCESS_LOCAL_WRITE	BIT(0)
+#define BNXT_QPLIB_ACCESS_REMOTE_READ	BIT(1)
+#define BNXT_QPLIB_ACCESS_REMOTE_WRITE	BIT(2)
+#define BNXT_QPLIB_ACCESS_REMOTE_ATOMIC	BIT(3)
+#define BNXT_QPLIB_ACCESS_MW_BIND	BIT(4)
+#define BNXT_QPLIB_ACCESS_ZERO_BASED	BIT(5)
+#define BNXT_QPLIB_ACCESS_ON_DEMAND	BIT(6)
+
 int bnxt_qplib_get_sgid(struct bnxt_qplib_res *res,
 			struct bnxt_qplib_sgid_tbl *sgid_tbl, int index,
 			struct bnxt_qplib_gid *gid);
@@ -115,4 +143,17 @@ int bnxt_qplib_get_dev_attr(struct bnxt_qplib_rcfw *rcfw,
 			    struct bnxt_qplib_dev_attr *attr);
 int bnxt_qplib_create_ah(struct bnxt_qplib_res *res, struct bnxt_qplib_ah *ah);
 int bnxt_qplib_destroy_ah(struct bnxt_qplib_res *res, struct bnxt_qplib_ah *ah);
+int bnxt_qplib_alloc_mrw(struct bnxt_qplib_res *res,
+			 struct bnxt_qplib_mrw *mrw);
+int bnxt_qplib_dereg_mrw(struct bnxt_qplib_res *res, struct bnxt_qplib_mrw *mrw,
+			 bool block);
+int bnxt_qplib_reg_mr(struct bnxt_qplib_res *res, struct bnxt_qplib_mrw *mr,
+		      u64 *pbl_tbl, int num_pbls, bool block);
+int bnxt_qplib_free_mrw(struct bnxt_qplib_res *res, struct bnxt_qplib_mrw *mr);
+int bnxt_qplib_alloc_fast_reg_mr(struct bnxt_qplib_res *res,
+				 struct bnxt_qplib_mrw *mr, int max);
+int bnxt_qplib_alloc_fast_reg_page_list(struct bnxt_qplib_res *res,
+					struct bnxt_qplib_frpl *frpl, int max);
+int bnxt_qplib_free_fast_reg_page_list(struct bnxt_qplib_res *res,
+				       struct bnxt_qplib_frpl *frpl);
 #endif /* __BNXT_QPLIB_SP_H__*/
