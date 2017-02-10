@@ -527,6 +527,34 @@ static int bnxt_qplib_alloc_pkey_tbl(struct bnxt_qplib_res *res,
 	return 0;
 };
 
+/* PDs */
+int bnxt_qplib_alloc_pd(struct bnxt_qplib_pd_tbl *pdt, struct bnxt_qplib_pd *pd)
+{
+	u32 bit_num;
+
+	bit_num = find_first_bit(pdt->tbl, pdt->max);
+	if (bit_num == pdt->max)
+		return -ENOMEM;
+
+	/* Found unused PD */
+	clear_bit(bit_num, pdt->tbl);
+	pd->id = bit_num;
+	return 0;
+}
+
+int bnxt_qplib_dealloc_pd(struct bnxt_qplib_res *res,
+			  struct bnxt_qplib_pd_tbl *pdt,
+			  struct bnxt_qplib_pd *pd)
+{
+	if (test_and_set_bit(pd->id, pdt->tbl)) {
+		dev_warn(&res->pdev->dev, "Freeing an unused PD? pdn = %d",
+			 pd->id);
+		return -EINVAL;
+	}
+	pd->id = 0;
+	return 0;
+}
+
 static void bnxt_qplib_free_pd_tbl(struct bnxt_qplib_pd_tbl *pdt)
 {
 	kfree(pdt->tbl);

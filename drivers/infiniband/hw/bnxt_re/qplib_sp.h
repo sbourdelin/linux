@@ -70,6 +70,10 @@ struct bnxt_qplib_dev_attr {
 	u8				tqm_alloc_reqs[MAX_TQM_ALLOC_REQ];
 };
 
+struct bnxt_qplib_pd {
+	u32				id;
+};
+
 struct bnxt_qplib_gid {
 	u8				data[16];
 };

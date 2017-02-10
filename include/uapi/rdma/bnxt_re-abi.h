@@ -33,33 +33,27 @@
  * OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN
  * IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  *
- * Description: IB Verbs interpreter (header)
+ * Description: Uverbs ABI header file
  */
 
-#ifndef __BNXT_RE_IB_VERBS_H__
-#define __BNXT_RE_IB_VERBS_H__
+#ifndef __BNXT_RE_UVERBS_ABI_H__
+#define __BNXT_RE_UVERBS_ABI_H__
 
-struct bnxt_re_pd {
-	struct bnxt_re_dev	*rdev;
-	struct ib_pd		ib_pd;
-	struct bnxt_qplib_pd	qplib_pd;
-	struct bnxt_qplib_dpi	dpi;
+#define BNXT_RE_ABI_VERSION	1
+
+struct bnxt_re_uctx_resp {
+	__u32 dev_id;
+	__u32 max_qp;
+	__u32 pg_size;
+	__u32 cqe_sz;
+	__u32 max_cqd;
+	__u32 rsvd;
 };
 
-struct bnxt_re_ucontext {
-	struct bnxt_re_dev	*rdev;
-	struct ib_ucontext	ib_uctx;
-	struct bnxt_qplib_dpi	*dpi;
-	void			*shpg;
-	spinlock_t		sh_lock;	/* protect shpg */
+struct bnxt_re_pd_resp {
+	__u32 pdid;
+	__u32 dpi;
+	__u64 dbr;
 };
 
-struct ib_pd *bnxt_re_alloc_pd(struct ib_device *ibdev,
-			       struct ib_ucontext *context,
-			       struct ib_udata *udata);
-int bnxt_re_dealloc_pd(struct ib_pd *pd);
-struct ib_ucontext *bnxt_re_alloc_ucontext(struct ib_device *ibdev,
-					   struct ib_udata *udata);
-int bnxt_re_dealloc_ucontext(struct ib_ucontext *context);
-int bnxt_re_mmap(struct ib_ucontext *context, struct vm_area_struct *vma);
-#endif /* __BNXT_RE_IB_VERBS_H__ */
+#endif /* __BNXT_RE_UVERBS_ABI_H__*/
