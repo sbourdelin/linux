@@ -367,6 +367,7 @@ static void at803x_link_change_notify(struct phy_device *phydev)
 static int at803x_aneg_done(struct phy_device *phydev)
 {
 	int ccr;
+	int timeout = 100; /* usecs */
 
 	int aneg_done = genphy_aneg_done(phydev);
 	if (aneg_done != BMSR_ANEGCOMPLETE)
@@ -384,7 +385,13 @@ static int at803x_aneg_done(struct phy_device *phydev)
 	phy_write(phydev, AT803X_REG_CHIP_CONFIG, ccr & ~AT803X_BT_BX_REG_SEL);
 
 	/* check if the SGMII link is OK. */
-	if (!(phy_read(phydev, AT803X_PSSR) & AT803X_PSSR_MR_AN_COMPLETE)) {
+	do {
+		if (phy_read(phydev, AT803X_PSSR) & AT803X_PSSR_MR_AN_COMPLETE)
+			break;
+		udelay(1);
+	} while (--timeout);
+
+	if (!timeout) {
 		pr_warn("803x_aneg_done: SGMII link is not ok\n");
 		aneg_done = 0;
 	}
