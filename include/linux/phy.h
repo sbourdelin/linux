@@ -893,7 +893,7 @@ struct mdio_board_info {
 	const void	*platform_data;
 };
 
-#if IS_ENABLED(CONFIG_PHYLIB)
+#if IS_ENABLED(CONFIG_PHYLIB) && IS_ENABLED(CONFIG_MDIO_BOARDINFO)
 int mdiobus_register_board_info(const struct mdio_board_info *info,
 				unsigned int n);
 #else

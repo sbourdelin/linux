@@ -55,6 +55,7 @@ void mdiobus_setup_mdiodev_from_board_info(struct mii_bus *bus)
 	}
 	mutex_unlock(&mdio_board_lock);
 }
+EXPORT_SYMBOL_GPL(mdiobus_setup_mdiodev_from_board_info);
 
 /**
  * mdio_register_board_info - register MDIO devices for a given board

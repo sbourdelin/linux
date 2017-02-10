@@ -3,8 +3,9 @@
 #
 
 menuconfig PHYLIB
-	tristate "PHY Device support and infrastructure"
+	tristate "Ethernet PHY Device support and infrastructure"
 	depends on NETDEVICES
+	select MDIO
 	help
 	  Ethernet controllers are usually attached to PHY
 	  devices.  This option provides infrastructure for
@@ -248,6 +249,16 @@ config FIXED_PHY
 	  PHYs that are not connected to the real MDIO bus.
 
 	  Currently tested with mpc866ads and mpc8349e-mitx.
+endif # PHYLIB
+
+config MDIO
+	tristate
+	help
+	  The MDIO bus is typically used ethernet PHYs, but can also be
+	  used by other PHY drivers.
+
+menu "MDIO bus drivers"
+	depends on MDIO
 
 config ICPLUS_PHY
 	tristate "ICPlus PHYs"
@@ -340,7 +351,10 @@ config XILINX_GMII2RGMII
          the Reduced Gigabit Media Independent Interface(RGMII) between
          Ethernet physical media devices and the Gigabit Ethernet controller.
 
-endif # PHYLIB
+endmenu # MDIO
+
+config MDIO_BOARDINFO
+	bool
 
 config MICREL_KS8995MA
 	tristate "Micrel KS8995MA 5-ports 10/100 managed Ethernet switch"

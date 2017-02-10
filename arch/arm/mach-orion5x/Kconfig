@@ -4,6 +4,7 @@ menuconfig ARCH_ORION5X
 	select CPU_FEROCEON
 	select GENERIC_CLOCKEVENTS
 	select GPIOLIB
+	select MDIO_BOARDINFO
 	select MVEBU_MBUS
 	select PCI
 	select PLAT_ORION_LEGACY

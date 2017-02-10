@@ -378,8 +378,6 @@ config NET_SB1000
 
 	  If you don't have this card, of course say N.
 
-source "drivers/net/phy/Kconfig"
-
 source "drivers/net/plip/Kconfig"
 
 source "drivers/net/ppp/Kconfig"

@@ -11,9 +11,6 @@ menuconfig ETHERNET
 
 if ETHERNET
 
-config MDIO
-	tristate
-
 config SUNGEM_PHY
 	tristate
 

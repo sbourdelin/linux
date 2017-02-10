@@ -2,7 +2,9 @@
 # PHY
 #
 
-menu "PHY Subsystem"
+menu "PHY drivers"
+
+menu "Generic PHY subsystem"
 
 config GENERIC_PHY
 	bool "PHY Core"
@@ -510,4 +512,8 @@ config PHY_NSP_USB3
 	help
 	  Enable this to support the Broadcom Northstar plus USB3 PHY.
 	  If unsure, say N.
+endmenu
+
+source "drivers/net/phy/Kconfig"
+
 endmenu
