@@ -93,6 +93,9 @@ struct bnxt_re_dev {
 
 	int				id;
 
+	struct delayed_work		worker;
+	u8				cur_prio_map;
+
 	/* FP Notification Queue (CQ & SRQ) */
 	struct tasklet_struct		nq_task;
 

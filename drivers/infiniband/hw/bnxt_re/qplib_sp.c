@@ -799,3 +799,40 @@ int bnxt_qplib_free_fast_reg_page_list(struct bnxt_qplib_res *res,
 	bnxt_qplib_free_hwq(res->pdev, &frpl->hwq);
 	return 0;
 }
+
+int bnxt_qplib_map_tc2cos(struct bnxt_qplib_res *res, u16 *cids)
+{
+	struct bnxt_qplib_rcfw *rcfw = res->rcfw;
+	struct cmdq_map_tc_to_cos req;
+	struct creq_map_tc_to_cos_resp *resp;
+	u16 cmd_flags = 0;
+	int tleft;
+
+	RCFW_CMD_PREP(req, MAP_TC_TO_COS, cmd_flags);
+	req.cos0 = cpu_to_le16(cids[0]);
+	req.cos1 = cpu_to_le16(cids[1]);
+
+	resp = bnxt_qplib_rcfw_send_message(rcfw, (void *)&req, NULL, 0);
+	if (!resp) {
+		dev_err(&res->pdev->dev, "QPLIB: SP: MAP_TC2COS send failed");
+		return -EINVAL;
+	}
+
+	tleft = bnxt_qplib_rcfw_block_for_resp(rcfw, le16_to_cpu(req.cookie));
+	if (!tleft) {
+		dev_err(&res->pdev->dev, "QPLIB: SP: MAP_TC2COS timed out");
+		return -ETIMEDOUT;
+	}
+
+	if (resp->status ||
+	    le16_to_cpu(resp->cookie) != le16_to_cpu(req.cookie)) {
+		dev_err(&res->pdev->dev, "QPLIB: SP: MAP_TC2COS failed ");
+		dev_err(&res->pdev->dev,
+			"QPLIB: with status 0x%x cmdq 0x%x resp 0x%x",
+			resp->status, le16_to_cpu(req.cookie),
+			le16_to_cpu(resp->cookie));
+		return -EINVAL;
+	}
+
+	return 0;
+}
