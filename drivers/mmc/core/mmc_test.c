@@ -831,16 +831,16 @@ static int mmc_test_nonblock_transfer(struct mmc_test_card *test,
 	struct mmc_command stop2;
 	struct mmc_data data2;
 
-	struct mmc_test_async_req test_areq[2];
+	struct mmc_test_async_req test_areq[2] = {
+		{ .test = test },
+		{ .test = test },
+	};
 	struct mmc_async_req *done_areq;
 	struct mmc_async_req *cur_areq = &test_areq[0].areq;
 	struct mmc_async_req *other_areq = &test_areq[1].areq;
 	enum mmc_blk_status status;
 	int i;
 	int ret = RESULT_OK;
-
-	test_areq[0].test = test;
-	test_areq[1].test = test;
 
 	mmc_test_nonblock_reset(&mrq1, &cmd1, &stop1, &data1);
 	mmc_test_nonblock_reset(&mrq2, &cmd2, &stop2, &data2);

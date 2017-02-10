@@ -686,8 +686,10 @@ struct mmc_async_req *mmc_start_areq(struct mmc_host *host,
 	struct mmc_async_req *data = host->areq;
 
 	/* Prepare a new request */
-	if (areq)
+	if (areq && !areq->pre_req_done) {
+		areq->pre_req_done = true;
 		mmc_pre_req(host, areq->mrq);
+	}
 
 	/* Finalize previous request */
 	status = mmc_finalize_areq(host);
@@ -704,12 +706,16 @@ struct mmc_async_req *mmc_start_areq(struct mmc_host *host,
 		start_err = __mmc_start_data_req(host, areq->mrq);
 
 	/* Postprocess the old request at this point */
-	if (host->areq)
+	if (host->areq) {
+		host->areq->pre_req_done = false;
 		mmc_post_req(host, host->areq->mrq, 0);
+	}
 
 	/* Cancel a prepared request if it was not started. */
-	if ((status != MMC_BLK_SUCCESS || start_err) && areq)
+	if ((status != MMC_BLK_SUCCESS || start_err) && areq) {
+		areq->pre_req_done = false;
 		mmc_post_req(host, areq->mrq, -EINVAL);
+	}
 
 	if (status != MMC_BLK_SUCCESS)
 		host->areq = NULL;
