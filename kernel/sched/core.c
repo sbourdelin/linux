@@ -1712,6 +1712,11 @@ static int ttwu_remote(struct task_struct *p, int wake_flags)
 }
 
 #ifdef CONFIG_SMP
+#define for_each_wake_list(task, node) \
+	for ((task) = llist_entry((node), struct task_struct, wake_entry); \
+	     node; (node) = llist_next(node), \
+	     (task) = llist_entry((node), struct task_struct, wake_entry))
+
 void sched_ttwu_pending(void)
 {
 	struct rq *rq = this_rq();
@@ -1726,17 +1731,8 @@ void sched_ttwu_pending(void)
 	raw_spin_lock_irqsave(&rq->lock, flags);
 	rq_pin_lock(rq, &rf);
 
-	while (llist) {
-		int wake_flags = 0;
-
-		p = llist_entry(llist, struct task_struct, wake_entry);
-		llist = llist_next(llist);
-
-		if (p->sched_remote_wakeup)
-			wake_flags = WF_MIGRATED;
-
-		ttwu_do_activate(rq, p, wake_flags, &rf);
-	}
+	for_each_wake_list(p, llist)
+		ttwu_do_activate(rq, p, p->sched_remote_wakeup ? WF_MIGRATED : 0, &rf);
 
 	rq_unpin_lock(rq, &rf);
 	raw_spin_unlock_irqrestore(&rq->lock, flags);
