@@ -104,7 +104,6 @@ struct sixpack {
 	int			buffsize;       /* Max buffers sizes */
 
 	unsigned long		flags;		/* Flag values/ mode etc */
-	unsigned char		mode;		/* 6pack mode */
 
 	/* 6pack stuff */
 	unsigned char		tx_delay;
@@ -723,11 +722,10 @@ static int sixpack_ioctl(struct tty_struct *tty, struct file *file,
 			break;
 		}
 
-		sp->mode = tmp;
-		dev->addr_len        = AX25_ADDR_LEN;
-		dev->hard_header_len = AX25_KISS_HEADER_LEN +
-		                       AX25_MAX_HEADER_LEN + 3;
-		dev->type            = ARPHRD_AX25;
+		if (tmp != 0 && tmp != 4) {
+			err = -EINVAL;
+			break;
+		}
 
 		err = 0;
 		break;

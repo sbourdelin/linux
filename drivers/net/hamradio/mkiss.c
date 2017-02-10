@@ -71,7 +71,6 @@ struct mkiss {
 #define AXF_KEEPTEST	3		/* Keepalive test flag		*/
 #define AXF_OUTWAIT	4		/* is outpacket was flag	*/
 
-	int		mode;
         int		crcmode;	/* MW: for FlexNet, SMACK etc.  */
 	int		crcauto;	/* CRC auto mode */
 
@@ -841,11 +840,10 @@ static int mkiss_ioctl(struct tty_struct *tty, struct file *file,
 			break;
 		}
 
-		ax->mode = tmp;
-		dev->addr_len        = AX25_ADDR_LEN;
-		dev->hard_header_len = AX25_KISS_HEADER_LEN +
-		                       AX25_MAX_HEADER_LEN + 3;
-		dev->type            = ARPHRD_AX25;
+		if (tmp != 4) {
+			err = -EINVAL;
+			break;
+		}
 
 		err = 0;
 		break;
