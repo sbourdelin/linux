@@ -46,6 +46,10 @@
 #include "qplib_res.h"
 #include "qplib_rcfw.h"
 #include "qplib_sp.h"
+
+const struct bnxt_qplib_gid bnxt_qplib_gid_zero = {{ 0, 0, 0, 0, 0, 0, 0, 0,
+						     0, 0, 0, 0, 0, 0, 0, 0 } };
+
 /* Device */
 int bnxt_qplib_get_dev_attr(struct bnxt_qplib_rcfw *rcfw,
 			    struct bnxt_qplib_dev_attr *attr)
@@ -126,6 +130,220 @@ int bnxt_qplib_get_dev_attr(struct bnxt_qplib_rcfw *rcfw,
 		attr->tqm_alloc_reqs[i * 4 + 2] = *(++tqm_alloc);
 		attr->tqm_alloc_reqs[i * 4 + 3] = *(++tqm_alloc);
 	}
+	return 0;
+}
+
+/* SGID */
+int bnxt_qplib_get_sgid(struct bnxt_qplib_res *res,
+			struct bnxt_qplib_sgid_tbl *sgid_tbl, int index,
+			struct bnxt_qplib_gid *gid)
+{
+	if (index > sgid_tbl->max) {
+		dev_err(&res->pdev->dev,
+			"QPLIB: Index %d exceeded SGID table max (%d)",
+			index, sgid_tbl->max);
+		return -EINVAL;
+	}
+	memcpy(gid, &sgid_tbl->tbl[index], sizeof(*gid));
+	return 0;
+}
+
+int bnxt_qplib_del_sgid(struct bnxt_qplib_sgid_tbl *sgid_tbl,
+			struct bnxt_qplib_gid *gid, bool update)
+{
+	struct bnxt_qplib_res *res = to_bnxt_qplib(sgid_tbl,
+						   struct bnxt_qplib_res,
+						   sgid_tbl);
+	struct bnxt_qplib_rcfw *rcfw = res->rcfw;
+	int index;
+
+	if (!sgid_tbl) {
+		dev_err(&res->pdev->dev, "QPLIB: SGID table not allocated");
+		return -EINVAL;
+	}
+	/* Do we need a sgid_lock here? */
+	if (!sgid_tbl->active) {
+		dev_err(&res->pdev->dev,
+			"QPLIB: SGID table has no active entries");
+		return -ENOMEM;
+	}
+	for (index = 0; index < sgid_tbl->max; index++) {
+		if (!memcmp(&sgid_tbl->tbl[index], gid, sizeof(*gid)))
+			break;
+	}
+	if (index == sgid_tbl->max) {
+		dev_warn(&res->pdev->dev, "GID not found in the SGID table");
+		return 0;
+	}
+	/* Remove GID from the SGID table */
+	if (update) {
+		struct cmdq_delete_gid req;
+		struct creq_delete_gid_resp *resp;
+		u16 cmd_flags = 0;
+
+		RCFW_CMD_PREP(req, DELETE_GID, cmd_flags);
+		if (sgid_tbl->hw_id[index] == 0xFFFF) {
+			dev_err(&res->pdev->dev,
+				"QPLIB: GID entry contains an invalid HW id");
+			return -EINVAL;
+		}
+		req.gid_index = cpu_to_le16(sgid_tbl->hw_id[index]);
+		resp = (struct creq_delete_gid_resp *)
+			bnxt_qplib_rcfw_send_message(rcfw, (void *)&req, NULL,
+						     0);
+		if (!resp) {
+			dev_err(&res->pdev->dev,
+				"QPLIB: SP: DELETE_GID send failed");
+			return -EINVAL;
+		}
+		if (!bnxt_qplib_rcfw_wait_for_resp(rcfw,
+						   le16_to_cpu(req.cookie))) {
+			/* Cmd timed out */
+			dev_err(&res->pdev->dev,
+				"QPLIB: SP: DELETE_GID timed out");
+			return -ETIMEDOUT;
+		}
+		if (resp->status ||
+		    le16_to_cpu(resp->cookie) != le16_to_cpu(req.cookie)) {
+			dev_err(&res->pdev->dev,
+				"QPLIB: SP: DELETE_GID failed ");
+			dev_err(&res->pdev->dev,
+				"QPLIB: with status 0x%x cmdq 0x%x resp 0x%x",
+				resp->status, le16_to_cpu(req.cookie),
+				le16_to_cpu(resp->cookie));
+			return -EINVAL;
+		}
+	}
+	memcpy(&sgid_tbl->tbl[index], &bnxt_qplib_gid_zero,
+	       sizeof(bnxt_qplib_gid_zero));
+	sgid_tbl->active--;
+	dev_dbg(&res->pdev->dev,
+		"QPLIB: SGID deleted hw_id[0x%x] = 0x%x active = 0x%x",
+		 index, sgid_tbl->hw_id[index], sgid_tbl->active);
+	sgid_tbl->hw_id[index] = (u16)-1;
+
+	/* unlock */
+	return 0;
+}
+
+int bnxt_qplib_add_sgid(struct bnxt_qplib_sgid_tbl *sgid_tbl,
+			struct bnxt_qplib_gid *gid, u8 *smac, u16 vlan_id,
+			bool update, u32 *index)
+{
+	struct bnxt_qplib_res *res = to_bnxt_qplib(sgid_tbl,
+						   struct bnxt_qplib_res,
+						   sgid_tbl);
+	struct bnxt_qplib_rcfw *rcfw = res->rcfw;
+	int i, free_idx, rc = 0;
+
+	if (!sgid_tbl) {
+		dev_err(&res->pdev->dev, "QPLIB: SGID table not allocated");
+		return -EINVAL;
+	}
+	/* Do we need a sgid_lock here? */
+	if (sgid_tbl->active == sgid_tbl->max) {
+		dev_err(&res->pdev->dev, "QPLIB: SGID table is full");
+		return -ENOMEM;
+	}
+	free_idx = sgid_tbl->max;
+	for (i = 0; i < sgid_tbl->max; i++) {
+		if (!memcmp(&sgid_tbl->tbl[i], gid, sizeof(*gid))) {
+			dev_dbg(&res->pdev->dev,
+				"QPLIB: SGID entry already exist in entry %d!",
+				i);
+			*index = i;
+			return -EALREADY;
+		} else if (!memcmp(&sgid_tbl->tbl[i], &bnxt_qplib_gid_zero,
+				   sizeof(bnxt_qplib_gid_zero)) &&
+			   free_idx == sgid_tbl->max) {
+			free_idx = i;
+		}
+	}
+	if (free_idx == sgid_tbl->max) {
+		dev_err(&res->pdev->dev,
+			"QPLIB: SGID table is FULL but count is not MAX??");
+		return -ENOMEM;
+	}
+	if (update) {
+		struct cmdq_add_gid req;
+		struct creq_add_gid_resp *resp;
+		u16 cmd_flags = 0;
+		u32 temp32[4];
+		u16 temp16[3];
+
+		RCFW_CMD_PREP(req, ADD_GID, cmd_flags);
+
+		memcpy(temp32, gid->data, sizeof(struct bnxt_qplib_gid));
+		req.gid[0] = cpu_to_be32(temp32[3]);
+		req.gid[1] = cpu_to_be32(temp32[2]);
+		req.gid[2] = cpu_to_be32(temp32[1]);
+		req.gid[3] = cpu_to_be32(temp32[0]);
+		if (vlan_id != 0xFFFF)
+			req.vlan = cpu_to_le16((vlan_id &
+					CMDQ_ADD_GID_VLAN_VLAN_ID_MASK) |
+					CMDQ_ADD_GID_VLAN_TPID_TPID_8100 |
+					CMDQ_ADD_GID_VLAN_VLAN_EN);
+
+		/* MAC in network format */
+		memcpy(temp16, smac, 6);
+		req.src_mac[0] = cpu_to_be16(temp16[0]);
+		req.src_mac[1] = cpu_to_be16(temp16[1]);
+		req.src_mac[2] = cpu_to_be16(temp16[2]);
+
+		resp = (struct creq_add_gid_resp *)
+			bnxt_qplib_rcfw_send_message(rcfw, (void *)&req,
+						     NULL, 0);
+		if (!resp) {
+			dev_err(&res->pdev->dev,
+				"QPLIB: SP: ADD_GID send failed");
+			return -EINVAL;
+		}
+		if (!bnxt_qplib_rcfw_wait_for_resp(rcfw,
+						   le16_to_cpu(req.cookie))) {
+			/* Cmd timed out */
+			dev_err(&res->pdev->dev,
+				"QPIB: SP: ADD_GID timed out");
+			return -ETIMEDOUT;
+		}
+		if (resp->status ||
+		    le16_to_cpu(resp->cookie) != le16_to_cpu(req.cookie)) {
+			dev_err(&res->pdev->dev, "QPLIB: SP: ADD_GID failed ");
+			dev_err(&res->pdev->dev,
+				"QPLIB: with status 0x%x cmdq 0x%x resp 0x%x",
+				resp->status, le16_to_cpu(req.cookie),
+				le16_to_cpu(resp->cookie));
+			return -EINVAL;
+		}
+		sgid_tbl->hw_id[free_idx] = le32_to_cpu(resp->xid);
+	}
+	/* Add GID to the sgid_tbl */
+	memcpy(&sgid_tbl->tbl[free_idx], gid, sizeof(*gid));
+	sgid_tbl->active++;
+	dev_dbg(&res->pdev->dev,
+		"QPLIB: SGID added hw_id[0x%x] = 0x%x active = 0x%x",
+		 free_idx, sgid_tbl->hw_id[free_idx], sgid_tbl->active);
+
+	*index = free_idx;
+	/* unlock */
+	return rc;
+}
+
+/* pkeys */
+int bnxt_qplib_get_pkey(struct bnxt_qplib_res *res,
+			struct bnxt_qplib_pkey_tbl *pkey_tbl, u16 index,
+			u16 *pkey)
+{
+	if (index == 0xFFFF) {
+		*pkey = 0xFFFF;
+		return 0;
+	}
+	if (index > pkey_tbl->max) {
+		dev_err(&res->pdev->dev,
+			"QPLIB: Index %d exceeded PKEY table max (%d)",
+			index, pkey_tbl->max);
+		return -EINVAL;
+	}
+	memcpy(pkey, &pkey_tbl->tbl[index], sizeof(*pkey));
 	return 0;
 }
 

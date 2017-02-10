@@ -60,6 +60,22 @@
 #include "ib_verbs.h"
 #include <rdma/bnxt_re-abi.h>
 
+/* Device */
+struct net_device *bnxt_re_get_netdev(struct ib_device *ibdev, u8 port_num)
+{
+	struct bnxt_re_dev *rdev = to_bnxt_re_dev(ibdev, ibdev);
+	struct net_device *netdev = NULL;
+
+	rcu_read_lock();
+	if (rdev)
+		netdev = rdev->netdev;
+	if (netdev)
+		dev_hold(netdev);
+
+	rcu_read_unlock();
+	return netdev;
+}
+
 int bnxt_re_query_device(struct ib_device *ibdev,
 			 struct ib_device_attr *ib_attr,
 			 struct ib_udata *udata)
@@ -272,6 +288,113 @@ int bnxt_re_get_port_immutable(struct ib_device *ibdev, u8 port_num,
 	immutable->max_mad_size = IB_MGMT_MAD_SIZE;
 	return 0;
 }
+
+int bnxt_re_query_pkey(struct ib_device *ibdev, u8 port_num,
+		       u16 index, u16 *pkey)
+{
+	struct bnxt_re_dev *rdev = to_bnxt_re_dev(ibdev, ibdev);
+
+	/* Ignore port_num */
+
+	memset(pkey, 0, sizeof(*pkey));
+	return bnxt_qplib_get_pkey(&rdev->qplib_res,
+				   &rdev->qplib_res.pkey_tbl, index, pkey);
+}
+
+int bnxt_re_query_gid(struct ib_device *ibdev, u8 port_num,
+		      int index, union ib_gid *gid)
+{
+	struct bnxt_re_dev *rdev = to_bnxt_re_dev(ibdev, ibdev);
+	int rc = 0;
+
+	/* Ignore port_num */
+	memset(gid, 0, sizeof(*gid));
+	rc = bnxt_qplib_get_sgid(&rdev->qplib_res,
+				 &rdev->qplib_res.sgid_tbl, index,
+				 (struct bnxt_qplib_gid *)gid);
+	return rc;
+}
+
+int bnxt_re_del_gid(struct ib_device *ibdev, u8 port_num,
+		    unsigned int index, void **context)
+{
+	int rc = 0;
+	struct bnxt_re_gid_ctx *ctx, **ctx_tbl;
+	struct bnxt_re_dev *rdev = to_bnxt_re_dev(ibdev, ibdev);
+	struct bnxt_qplib_sgid_tbl *sgid_tbl = &rdev->qplib_res.sgid_tbl;
+
+	/* Delete the entry from the hardware */
+	ctx = *context;
+	if (!ctx)
+		return -EINVAL;
+
+	if (sgid_tbl && sgid_tbl->active) {
+		if (ctx->idx >= sgid_tbl->max)
+			return -EINVAL;
+		ctx->refcnt--;
+		if (!ctx->refcnt) {
+			rc = bnxt_qplib_del_sgid
+					(sgid_tbl,
+					 &sgid_tbl->tbl[ctx->idx], true);
+			if (rc)
+				dev_err(rdev_to_dev(rdev),
+					"Failed to remove GID: %#x", rc);
+			ctx_tbl = sgid_tbl->ctx;
+			ctx_tbl[ctx->idx] = NULL;
+			kfree(ctx);
+		}
+	} else {
+		return -EINVAL;
+	}
+	return rc;
+}
+
+int bnxt_re_add_gid(struct ib_device *ibdev, u8 port_num,
+		    unsigned int index, const union ib_gid *gid,
+		    const struct ib_gid_attr *attr, void **context)
+{
+	int rc;
+	u32 tbl_idx = 0;
+	u16 vlan_id = 0xFFFF;
+	struct bnxt_re_gid_ctx *ctx, **ctx_tbl;
+	struct bnxt_re_dev *rdev = to_bnxt_re_dev(ibdev, ibdev);
+	struct bnxt_qplib_sgid_tbl *sgid_tbl = &rdev->qplib_res.sgid_tbl;
+
+	if ((attr->ndev) && is_vlan_dev(attr->ndev))
+		vlan_id = vlan_dev_vlan_id(attr->ndev);
+
+	rc = bnxt_qplib_add_sgid(sgid_tbl, (struct bnxt_qplib_gid *)gid,
+				 rdev->qplib_res.netdev->dev_addr,
+				 vlan_id, true, &tbl_idx);
+	if (rc == -EALREADY) {
+		ctx_tbl = sgid_tbl->ctx;
+		ctx_tbl[tbl_idx]->refcnt++;
+		*context = ctx_tbl[tbl_idx];
+		return 0;
+	}
+
+	if (rc < 0) {
+		dev_err(rdev_to_dev(rdev), "Failed to add GID: %#x", rc);
+		return rc;
+	}
+
+	ctx = kmalloc(sizeof(*ctx), GFP_KERNEL);
+	if (!ctx)
+		return -ENOMEM;
+	ctx_tbl = sgid_tbl->ctx;
+	ctx->idx = tbl_idx;
+	ctx->refcnt = 1;
+	ctx_tbl[tbl_idx] = ctx;
+
+	return rc;
+}
+
+enum rdma_link_layer bnxt_re_get_link_layer(struct ib_device *ibdev,
+					    u8 port_num)
+{
+	return IB_LINK_LAYER_ETHERNET;
+}
+
 /* Protection Domains */
 int bnxt_re_dealloc_pd(struct ib_pd *ib_pd)
 {
