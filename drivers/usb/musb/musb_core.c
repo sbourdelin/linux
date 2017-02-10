@@ -1879,6 +1879,7 @@ static void musb_pm_runtime_check_session(struct musb *musb)
 
 			return;
 		}
+		/* FALLTHROUGH */
 	case MUSB_QUIRK_A_DISCONNECT_19:
 		if (musb->quirk_retries--) {
 			musb_dbg(musb,
