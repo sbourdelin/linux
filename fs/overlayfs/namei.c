@@ -35,12 +35,12 @@ static int ovl_check_redirect(struct dentry *dentry, struct ovl_lookup_data *d,
 			return 0;
 		goto fail;
 	}
+	if (res == 0)
+		goto invalid;
+
 	buf = kzalloc(prelen + res + strlen(post) + 1, GFP_TEMPORARY);
 	if (!buf)
 		return -ENOMEM;
-
-	if (res == 0)
-		goto invalid;
 
 	res = vfs_getxattr(dentry, OVL_XATTR_REDIRECT, buf, res);
 	if (res < 0)
