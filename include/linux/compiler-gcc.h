@@ -280,6 +280,13 @@
 #define __no_sanitize_address __attribute__((no_sanitize_address))
 #endif
 
+#if GCC_VERSION >= 70000
+/*
+ * Tell the compiler not to warn when a switch/case fallthrough marker exists
+ */
+#define __fallthrough __attribute__ ((fallthrough))
+#endif
+
 #endif	/* gcc version >= 40000 specific checks */
 
 #if !defined(__noclone)

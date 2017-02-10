@@ -458,6 +458,12 @@ static __always_inline void __write_once_size(volatile void *p, void *res, int s
 #define __assume_aligned(a, ...)
 #endif
 
+/*
+ * switch/case fallthrough checking
+ */
+#ifndef __fallthrough
+#define __fallthrough
+#endif
 
 /* Are two types/vars the same type (ignoring qualifiers)? */
 #ifndef __same_type
