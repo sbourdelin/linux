@@ -75,6 +75,12 @@ EXPORT_SYMBOL(get_thermal_instance);
  * When a valid thermal zone reference is passed, it will fetch its
  * temperature and fill @temp.
  *
+ * IMPORTANT NOTICE:
+ * This function should not be used from driver's code which is called
+ * by IPA (power_allocator.c). The IPA already holds the tz->lock.
+ * Therefore, it is possible to get the temperature in driver code
+ * in a simple way: reading tz->temperature.
+ *
  * Return: On success returns 0, an error code otherwise
  */
 int thermal_zone_get_temp(struct thermal_zone_device *tz, int *temp)
@@ -87,7 +93,8 @@ int thermal_zone_get_temp(struct thermal_zone_device *tz, int *temp)
 	if (!tz || IS_ERR(tz) || !tz->ops->get_temp)
 		goto exit;
 
-	mutex_lock(&tz->lock);
+	if (!mutex_trylock(&tz->lock))
+		goto exit;
 
 	ret = tz->ops->get_temp(tz, temp);
 
