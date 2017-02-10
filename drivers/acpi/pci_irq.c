@@ -280,7 +280,7 @@ static int bridge_has_boot_interrupt_variant(struct pci_bus *bus)
 static int acpi_reroute_boot_interrupt(struct pci_dev *dev,
 				       struct acpi_prt_entry *entry)
 {
-	if (noioapicquirk || noioapicreroute) {
+	if (noioapicquirk || noioapicreroute || entry->index == 0) {
 		return 0;
 	} else {
 		switch (bridge_has_boot_interrupt_variant(dev->bus)) {
