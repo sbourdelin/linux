@@ -62,30 +62,79 @@
  *
  */
 
+static inline bool is_high_priority(struct i915_guc_client* client)
+{
+	return client->priority <= GUC_CTX_PRIORITY_HIGH;
+}
+
+static bool __test_doorbell(struct i915_guc_client *client)
+{
+	return test_bit(client->doorbell_id, client->guc->doorbell_bitmap);
+}
+
+static void __release_doorbell(struct i915_guc_client *client)
+{
+	GEM_BUG_ON(client->doorbell_id == GUC_DOORBELL_INVALID);
+
+	__clear_bit(client->doorbell_id, client->guc->doorbell_bitmap);
+}
+
+static int __reserve_doorbell(struct i915_guc_client *client)
+{
+	unsigned long offset;
+	unsigned long end;
+	u16 id;
+
+	GEM_BUG_ON(client->doorbell_id != GUC_DOORBELL_INVALID);
+
+	/*
+	 * The bitmap tracks which doorbell registers are currently in use.
+	 * It is split into two halves; the first half is used for normal
+	 * priority contexts, the second half for high-priority ones.
+	 * Note that logically higher priorities are numerically less than
+	 * normal ones, so the test below means "is it high-priority?"
+	 */
+
+	offset = 0;
+	if (is_high_priority(client))
+		offset = GUC_NUM_DOORBELLS/2;
+
+	end = GUC_NUM_DOORBELLS - offset;
+
+	id = find_next_zero_bit(client->guc->doorbell_bitmap, offset, end);
+	if (id == end)
+		return -ENOSPC;
+
+	__set_bit(id, client->guc->doorbell_bitmap);
+	client->doorbell_id = id;
+	DRM_DEBUG_DRIVER("client %u (high prio=%s) reserved doorbell %d: \n",
+			 client->ctx_index, yesno(is_high_priority(client)),
+			 id);
+	return 0;
+}
+
 /*
  * Tell the GuC to allocate or deallocate a specific doorbell
  */
 
-static int guc_allocate_doorbell(struct intel_guc *guc,
-				 struct i915_guc_client *client)
+static int __create_doorbell_hw(struct i915_guc_client *client)
 {
 	u32 action[] = {
 		INTEL_GUC_ACTION_ALLOCATE_DOORBELL,
 		client->ctx_index
 	};
 
-	return intel_guc_send(guc, action, ARRAY_SIZE(action));
+	return intel_guc_send(client->guc, action, ARRAY_SIZE(action));
 }
 
-static int guc_release_doorbell(struct intel_guc *guc,
-				struct i915_guc_client *client)
+static int __destroy_doorbell_hw(struct i915_guc_client *client)
 {
 	u32 action[] = {
 		INTEL_GUC_ACTION_DEALLOCATE_DOORBELL,
 		client->ctx_index
 	};
 
-	return intel_guc_send(guc, action, ARRAY_SIZE(action));
+	return intel_guc_send(client->guc, action, ARRAY_SIZE(action));
 }
 
 /*
@@ -95,104 +144,114 @@ static int guc_release_doorbell(struct intel_guc *guc,
  * client object which contains the page being used for the doorbell
  */
 
-static int guc_update_doorbell_id(struct intel_guc *guc,
-				  struct i915_guc_client *client,
-				  u16 new_id)
+static int __update_doorbell(struct i915_guc_client *client, u16 new_id)
 {
-	struct sg_table *sg = guc->ctx_pool_vma->pages;
-	void *doorbell_bitmap = guc->doorbell_bitmap;
-	struct guc_doorbell_info *doorbell;
+	struct sg_table *sg = client->guc->ctx_pool_vma->pages;
 	struct guc_context_desc desc;
 	size_t len;
 
-	doorbell = client->vaddr + client->doorbell_offset;
-
-	if (client->doorbell_id != GUC_INVALID_DOORBELL_ID &&
-	    test_bit(client->doorbell_id, doorbell_bitmap)) {
-		/* Deactivate the old doorbell */
-		doorbell->db_status = GUC_DOORBELL_DISABLED;
-		(void)guc_release_doorbell(guc, client);
-		__clear_bit(client->doorbell_id, doorbell_bitmap);
-	}
-
 	/* Update the GuC's idea of the doorbell ID */
 	len = sg_pcopy_to_buffer(sg->sgl, sg->nents, &desc, sizeof(desc),
-			     sizeof(desc) * client->ctx_index);
+				 sizeof(desc) * client->ctx_index);
 	if (len != sizeof(desc))
 		return -EFAULT;
+
 	desc.db_id = new_id;
 	len = sg_pcopy_from_buffer(sg->sgl, sg->nents, &desc, sizeof(desc),
-			     sizeof(desc) * client->ctx_index);
+				   sizeof(desc) * client->ctx_index);
 	if (len != sizeof(desc))
 		return -EFAULT;
 
-	client->doorbell_id = new_id;
-	if (new_id == GUC_INVALID_DOORBELL_ID)
-		return 0;
+	return 0;
+}
 
-	/* Activate the new doorbell */
-	__set_bit(new_id, doorbell_bitmap);
+static bool has_doorbell(struct i915_guc_client *client)
+{
+	if (client->doorbell_id == GUC_DOORBELL_INVALID)
+		return false;
+
+	return __test_doorbell(client);
+}
+
+static struct guc_doorbell_info *__get_doorbell(struct i915_guc_client *client)
+{
+	return client->vaddr + client->doorbell_offset;
+}
+
+static int __create_doorbell(struct i915_guc_client *client)
+{
+	struct guc_doorbell_info *doorbell;
+	int err;
+
+	doorbell = __get_doorbell(client);
 	doorbell->db_status = GUC_DOORBELL_ENABLED;
 	doorbell->cookie = client->doorbell_cookie;
-	return guc_allocate_doorbell(guc, client);
-}
 
-static void guc_disable_doorbell(struct intel_guc *guc,
-				 struct i915_guc_client *client)
-{
-	(void)guc_update_doorbell_id(guc, client, GUC_INVALID_DOORBELL_ID);
-
-	/* XXX: wait for any interrupts */
-	/* XXX: wait for workqueue to drain */
-}
-
-static uint16_t
-select_doorbell_register(struct intel_guc *guc, uint32_t priority)
-{
-	/*
-	 * The bitmap tracks which doorbell registers are currently in use.
-	 * It is split into two halves; the first half is used for normal
-	 * priority contexts, the second half for high-priority ones.
-	 * Note that logically higher priorities are numerically less than
-	 * normal ones, so the test below means "is it high-priority?"
-	 */
-	const bool hi_pri = (priority <= GUC_CTX_PRIORITY_HIGH);
-	const uint16_t half = GUC_MAX_DOORBELLS / 2;
-	const uint16_t start = hi_pri ? half : 0;
-	const uint16_t end = start + half;
-	uint16_t id;
-
-	id = find_next_zero_bit(guc->doorbell_bitmap, end, start);
-	if (id == end)
-		id = GUC_INVALID_DOORBELL_ID;
-
-	DRM_DEBUG_DRIVER("assigned %s priority doorbell id 0x%x\n",
-			hi_pri ? "high" : "normal", id);
-
-	return id;
+	err = __create_doorbell_hw(client);
+	if (err) {
+		doorbell->db_status = GUC_DOORBELL_DISABLED;
+		doorbell->cookie = 0;
+		__release_doorbell(client);
+	}
+	return err;
 }
 
 /*
- * Select, assign and relase doorbell cachelines
- *
- * These functions track which doorbell cachelines are in use.
- * The data they manipulate is protected by the intel_guc_send lock.
- */
-
-static uint32_t select_doorbell_cacheline(struct intel_guc *guc)
+static int create_doorbell(struct i915_guc_client *client)
 {
-	const uint32_t cacheline_size = cache_line_size();
-	uint32_t offset;
+	int err;
+
+	GEM_BUG_ON(has_doorbell(client));
+
+	err = __reserve_doorbell(client);
+	if (err)
+		return err;
+
+	return __create_doorbell(client);
+}
+*/
+
+static int __destroy_doorbell(struct i915_guc_client *client)
+{
+	struct guc_doorbell_info *doorbell;
+
+	doorbell = __get_doorbell(client);
+	doorbell->db_status = GUC_DOORBELL_DISABLED;
+	doorbell->cookie = 0;
+
+	return __destroy_doorbell_hw(client);
+}
+
+static int destroy_doorbell(struct i915_guc_client *client)
+{
+	int err;
+
+	GEM_BUG_ON(!has_doorbell(client));
+
+	/* XXX: wait for any interrupts */
+	/* XXX: wait for workqueue to drain */
+
+	err = __destroy_doorbell(client);
+	if (err)
+		return err;
+
+	__release_doorbell(client);
+
+	return 0;
+}
+
+static unsigned long __reserve_cacheline(struct intel_guc* guc)
+{
+	unsigned long offset;
 
 	/* Doorbell uses a single cache line within a page */
 	offset = offset_in_page(guc->db_cacheline);
 
 	/* Moving to next cache line to reduce contention */
-	guc->db_cacheline += cacheline_size;
+	guc->db_cacheline += cache_line_size();
 
-	DRM_DEBUG_DRIVER("selected doorbell cacheline 0x%x, next 0x%x, linesize %u\n",
-			offset, guc->db_cacheline, cacheline_size);
-
+	DRM_DEBUG_DRIVER("reserved cacheline 0x%lx, next 0x%x, linesize %u\n",
+			offset, guc->db_cacheline, cache_line_size());
 	return offset;
 }
 
@@ -584,93 +643,81 @@ err:
 	return vma;
 }
 
-static void
-guc_client_free(struct drm_i915_private *dev_priv,
-		struct i915_guc_client *client)
+static void guc_client_free(struct i915_guc_client *client)
 {
-	struct intel_guc *guc = &dev_priv->guc;
-
-	if (!client)
-		return;
-
 	/*
 	 * XXX: wait for any outstanding submissions before freeing memory.
 	 * Be sure to drop any locks
 	 */
-
-	if (client->vaddr) {
-		/*
-		 * If we got as far as setting up a doorbell, make sure we
-		 * shut it down before unmapping & deallocating the memory.
-		 */
-		guc_disable_doorbell(guc, client);
-
-		i915_gem_object_unpin_map(client->vma->obj);
-	}
-
+	WARN_ON(destroy_doorbell(client));
+	guc_ctx_desc_fini(client->guc, client);
+	i915_gem_object_unpin_map(client->vma->obj);
 	i915_vma_unpin_and_release(&client->vma);
-
-	if (client->ctx_index != GUC_INVALID_CTX_ID) {
-		guc_ctx_desc_fini(guc, client);
-		ida_simple_remove(&guc->ctx_ids, client->ctx_index);
-	}
-
+	ida_simple_remove(&client->guc->ctx_ids, client->ctx_index);
 	kfree(client);
 }
 
 /* Check that a doorbell register is in the expected state */
-static bool guc_doorbell_check(struct intel_guc *guc, uint16_t db_id)
+static bool doorbell_ok(struct intel_guc *guc, u8 db_id)
 {
 	struct drm_i915_private *dev_priv = guc_to_i915(guc);
-	i915_reg_t drbreg = GEN8_DRBREGL(db_id);
-	uint32_t value = I915_READ(drbreg);
-	bool enabled = (value & GUC_DOORBELL_ENABLED) != 0;
-	bool expected = test_bit(db_id, guc->doorbell_bitmap);
 
-	if (enabled == expected)
+	u32 drbregl = I915_READ(GEN8_DRBREGL(db_id));
+
+	bool valid = drbregl & GEN8_DRB_VALID;
+
+	if (test_bit(db_id, guc->doorbell_bitmap) == valid)
 		return true;
 
-	DRM_DEBUG_DRIVER("Doorbell %d (reg 0x%x) 0x%x, should be %s\n",
-			 db_id, drbreg.reg, value,
-			 expected ? "active" : "inactive");
+	DRM_DEBUG_DRIVER("Doorbell %d has unexpected state (0x%x): valid=%s\n",
+			 db_id, drbregl, yesno(valid));
 
 	return false;
+}
+
+static int __reset_doorbell(struct i915_guc_client* client, u16 db_id)
+{
+	int err;
+
+	err = __update_doorbell(client, db_id);
+	if (!err)
+		err = __create_doorbell(client);
+	if (!err)
+		err = __destroy_doorbell(client);
+
+	return err;
 }
 
 /*
  * Borrow the first client to set up & tear down each unused doorbell
  * in turn, to ensure that all doorbell h/w is (re)initialised.
  */
-static void guc_init_doorbell_hw(struct intel_guc *guc)
+static int guc_init_doorbell_hw(struct intel_guc *guc)
 {
 	struct i915_guc_client *client = guc->execbuf_client;
-	uint16_t db_id;
-	int i, err;
+	int err;
+	int i;
 
-	guc_disable_doorbell(guc, client);
+	if (has_doorbell(client))
+		destroy_doorbell(client);
 
-	for (i = 0; i < GUC_MAX_DOORBELLS; ++i) {
-		/* Skip if doorbell is OK */
-		if (guc_doorbell_check(guc, i))
+	for (i = 0; i < GUC_NUM_DOORBELLS; ++i) {
+		if (doorbell_ok(guc, i))
 			continue;
 
-		err = guc_update_doorbell_id(guc, client, i);
-		if (err)
-			DRM_DEBUG_DRIVER("Doorbell %d update failed, err %d\n",
-					i, err);
+		err = __reset_doorbell(client, i);
+		WARN(err, "Doorbell %d reset failed, err %d\n", i, err);
 	}
 
-	db_id = select_doorbell_register(guc, client->priority);
-	WARN_ON(db_id == GUC_INVALID_DOORBELL_ID);
-
-	err = guc_update_doorbell_id(guc, client, db_id);
+	err = __reserve_doorbell(client);
 	if (err)
-		DRM_WARN("Failed to restore doorbell to %d, err %d\n",
-			 db_id, err);
+		return err;
 
 	/* Read back & verify all doorbell registers */
-	for (i = 0; i < GUC_MAX_DOORBELLS; ++i)
-		(void)guc_doorbell_check(guc, i);
+	for (i = 0; i < GUC_NUM_DOORBELLS; ++i)
+		WARN_ON(!doorbell_ok(guc, i));
+
+	return 0;
 }
 
 /**
@@ -696,49 +743,52 @@ guc_client_alloc(struct drm_i915_private *dev_priv,
 	struct intel_guc *guc = &dev_priv->guc;
 	struct i915_vma *vma;
 	void *vaddr;
-	uint16_t db_id;
+	int ret;
 
 	client = kzalloc(sizeof(*client), GFP_KERNEL);
 	if (!client)
-		return NULL;
+		return ERR_PTR(-ENOMEM);
 
-	client->owner = ctx;
 	client->guc = guc;
+	client->owner = ctx;
 	client->engines = engines;
 	client->priority = priority;
-	client->doorbell_id = GUC_INVALID_DOORBELL_ID;
+	client->doorbell_id = GUC_DOORBELL_INVALID;
+	client->wq_offset = GUC_DB_SIZE;
+	client->wq_size = GUC_WQ_SIZE;
+	spin_lock_init(&client->wq_lock);
 
-	client->ctx_index = (uint32_t)ida_simple_get(&guc->ctx_ids, 0,
-			GUC_MAX_GPU_CONTEXTS, GFP_KERNEL);
-	if (client->ctx_index >= GUC_MAX_GPU_CONTEXTS) {
-		client->ctx_index = GUC_INVALID_CTX_ID;
-		goto err;
-	}
+	ret = ida_simple_get(&guc->ctx_ids, 0, GUC_MAX_GPU_CONTEXTS,
+				GFP_KERNEL);
+	if (ret < 0)
+		goto err_client;
+
+	client->ctx_index = ret;
 
 	/* The first page is doorbell/proc_desc. Two followed pages are wq. */
 	vma = intel_guc_allocate_vma(guc, GUC_DB_SIZE + GUC_WQ_SIZE);
-	if (IS_ERR(vma))
-		goto err;
+	if (IS_ERR(vma)) {
+		ret = PTR_ERR(vma);
+		goto err_id;
+	}
 
 	/* We'll keep just the first (doorbell/proc) page permanently kmap'd. */
 	client->vma = vma;
 
 	vaddr = i915_gem_object_pin_map(vma->obj, I915_MAP_WB);
-	if (IS_ERR(vaddr))
-		goto err;
+	if (IS_ERR(vaddr)) {
+		ret = PTR_ERR(vaddr);
+		goto err_vma;
+	}
 
 	client->vaddr = vaddr;
 
-	spin_lock_init(&client->wq_lock);
-	client->wq_offset = GUC_DB_SIZE;
-	client->wq_size = GUC_WQ_SIZE;
-
-	db_id = select_doorbell_register(guc, client->priority);
-	if (db_id == GUC_INVALID_DOORBELL_ID)
+	ret = __reserve_doorbell(client);
+	if (ret)
 		/* XXX: evict a doorbell instead? */
-		goto err;
+		goto err_vaddr;
 
-	client->doorbell_offset = select_doorbell_cacheline(guc);
+	client->doorbell_offset = __reserve_cacheline(guc);
 
 	/*
 	 * Since the doorbell only requires a single cacheline, we can save
@@ -753,26 +803,31 @@ guc_client_alloc(struct drm_i915_private *dev_priv,
 	guc_proc_desc_init(guc, client);
 	guc_ctx_desc_init(guc, client);
 
-	/* For runtime client allocation we need to enable the doorbell. Not
-	 * required yet for the static execbuf_client as this special kernel
-	 * client is enabled from i915_guc_submission_enable().
-	 *
-	 * guc_update_doorbell_id(guc, client, db_id);
-	 */
+	/* For runtime client allocation we need to enable the doorbell. */
+	ret = __create_doorbell(client);
+	if (ret)
+		goto err_db;
 
 	DRM_DEBUG_DRIVER("new priority %u client %p for engine(s) 0x%x: ctx_index %u\n",
-		priority, client, client->engines, client->ctx_index);
-	DRM_DEBUG_DRIVER("doorbell id %u, cacheline offset 0x%x\n",
-		client->doorbell_id, client->doorbell_offset);
+			 priority, client, client->engines, client->ctx_index);
+	DRM_DEBUG_DRIVER("doorbell id %u, cacheline offset 0x%lx\n",
+			 client->doorbell_id, client->doorbell_offset);
 
 	return client;
 
-err:
-	guc_client_free(dev_priv, client);
-	return NULL;
+err_db:
+	__release_doorbell(client);
+err_vaddr:
+	i915_gem_object_unpin_map(client->vma->obj);
+err_vma:
+	i915_vma_unpin_and_release(&client->vma);
+err_id:
+	ida_simple_remove(&guc->ctx_ids, client->ctx_index);
+err_client:
+	kfree(client);
+
+	return ERR_PTR(ret);
 }
-
-
 
 static void guc_policies_init(struct guc_policies *policies)
 {
@@ -881,7 +936,7 @@ int i915_guc_submission_init(struct drm_i915_private *dev_priv)
 		return 0;
 
 	/* Wipe bitmap & delete client in case of reinitialisation */
-	bitmap_clear(guc->doorbell_bitmap, 0, GUC_MAX_DOORBELLS);
+	bitmap_clear(guc->doorbell_bitmap, 0, GUC_NUM_DOORBELLS);
 	i915_guc_submission_disable(dev_priv);
 
 	if (!i915.enable_guc_submission)
@@ -932,14 +987,19 @@ int i915_guc_submission_enable(struct drm_i915_private *dev_priv)
 	struct i915_guc_client *client = guc->execbuf_client;
 	struct intel_engine_cs *engine;
 	enum intel_engine_id id;
+	int err;
 
 	if (!client)
 		return -ENODEV;
 
-	intel_guc_sample_forcewake(guc);
+	err = intel_guc_sample_forcewake(guc);
+	if (err)
+		return err;
 
 	guc_reset_wq(client);
-	guc_init_doorbell_hw(guc);
+	err = guc_init_doorbell_hw(guc);
+	if (err)
+		return err;
 
 	/* Take over from manual control of ELSP (execlists) */
 	for_each_engine(engine, dev_priv, id) {
@@ -978,7 +1038,7 @@ void i915_guc_submission_fini(struct drm_i915_private *dev_priv)
 	if (!client)
 		return;
 
-	guc_client_free(dev_priv, client);
+	guc_client_free(client);
 
 	i915_vma_unpin_and_release(&guc->ads_vma);
 	i915_vma_unpin_and_release(&guc->log.vma);
