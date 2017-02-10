@@ -519,7 +519,7 @@ static int mqueue_flush_file(struct file *filp, fl_owner_t id)
 static unsigned int mqueue_poll_file(struct file *filp, struct poll_table_struct *poll_tab)
 {
 	struct mqueue_inode_info *info = MQUEUE_I(file_inode(filp));
-	int retval = 0;
+	unsigned int retval = 0;
 
 	poll_wait(filp, &info->wait_q, poll_tab);
 
