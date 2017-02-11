@@ -468,18 +468,20 @@ void __weak __meminit vmemmap_populate_print_last(void)
 
 /**
  *  alloc_usemap_and_memmap - memory alloction for pageblock flags and vmemmap
- *  @map: usemap_map for pageblock flags or mmap_map for vmemmap
+ *  @data: usemap_map for pageblock flags or mmap_map for vmemmap
  */
 static void __init alloc_usemap_and_memmap(void (*alloc_func)
 					(void *, unsigned long, unsigned long,
-					unsigned long, int), void *data)
+					unsigned long, int),
+					void *data,
+					unsigned long last_section_nr)
 {
 	unsigned long pnum;
 	unsigned long map_count;
 	int nodeid_begin = 0;
 	unsigned long pnum_begin = 0;
 
-	for (pnum = 0; pnum < NR_MEM_SECTIONS; pnum++) {
+	for (pnum = 0; pnum <= last_section_nr; pnum++) {
 		struct mem_section *ms;
 
 		if (!present_section_nr(pnum))
@@ -490,7 +492,7 @@ static void __init alloc_usemap_and_memmap(void (*alloc_func)
 		break;
 	}
 	map_count = 1;
-	for (pnum = pnum_begin + 1; pnum < NR_MEM_SECTIONS; pnum++) {
+	for (pnum = pnum_begin + 1; pnum <= last_section_nr; pnum++) {
 		struct mem_section *ms;
 		int nodeid;
 
@@ -503,16 +505,14 @@ static void __init alloc_usemap_and_memmap(void (*alloc_func)
 			continue;
 		}
 		/* ok, we need to take cake of from pnum_begin to pnum - 1*/
-		alloc_func(data, pnum_begin, pnum,
-						map_count, nodeid_begin);
+		alloc_func(data, pnum_begin, pnum, map_count, nodeid_begin);
 		/* new start, update count etc*/
 		nodeid_begin = nodeid;
 		pnum_begin = pnum;
 		map_count = 1;
 	}
 	/* ok, last chunk */
-	alloc_func(data, pnum_begin, NR_MEM_SECTIONS,
-						map_count, nodeid_begin);
+	alloc_func(data, pnum_begin, pnum, map_count, nodeid_begin);
 }
 
 /*
@@ -526,6 +526,9 @@ void __init sparse_init(void)
 	unsigned long *usemap;
 	unsigned long **usemap_map;
 	int size;
+	unsigned long last_section_nr;
+	int i;
+	unsigned long last_pfn = 0;
 #ifdef CONFIG_SPARSEMEM_ALLOC_MEM_MAP_TOGETHER
 	int size2;
 	struct page **map_map;
@@ -536,6 +539,11 @@ void __init sparse_init(void)
 
 	/* Setup pageblock_order for HUGETLB_PAGE_SIZE_VARIABLE */
 	set_pageblock_order();
+
+	for_each_mem_pfn_range_rev(i, NUMA_NO_NODE, NULL,
+				&last_pfn, NULL)
+		break;
+	last_section_nr = pfn_to_section_nr(last_pfn);
 
 	/*
 	 * map is using big page (aka 2M in x86 64 bit)
@@ -553,7 +561,8 @@ void __init sparse_init(void)
 	if (!usemap_map)
 		panic("can not allocate usemap_map\n");
 	alloc_usemap_and_memmap(sparse_early_usemaps_alloc_node,
-							(void *)usemap_map);
+				(void *)usemap_map,
+				last_section_nr);
 
 #ifdef CONFIG_SPARSEMEM_ALLOC_MEM_MAP_TOGETHER
 	size2 = sizeof(struct page *) * NR_MEM_SECTIONS;
@@ -561,10 +570,11 @@ void __init sparse_init(void)
 	if (!map_map)
 		panic("can not allocate map_map\n");
 	alloc_usemap_and_memmap(sparse_early_mem_maps_alloc_node,
-							(void *)map_map);
+				(void *)map_map,
+				last_section_nr);
 #endif
 
-	for (pnum = 0; pnum < NR_MEM_SECTIONS; pnum++) {
+	for (pnum = 0; pnum <= last_section_nr; pnum++) {
 		if (!present_section_nr(pnum))
 			continue;
 
