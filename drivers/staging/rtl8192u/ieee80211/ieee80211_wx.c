@@ -1,34 +1,34 @@
 /******************************************************************************
-
-  Copyright(c) 2004 Intel Corporation. All rights reserved.
-
-  Portions of this file are based on the WEP enablement code provided by the
-  Host AP project hostap-drivers v0.1.3
-  Copyright (c) 2001-2002, SSH Communications Security Corp and Jouni Malinen
-  <jkmaline@cc.hut.fi>
-  Copyright (c) 2002-2003, Jouni Malinen <jkmaline@cc.hut.fi>
-
-  This program is free software; you can redistribute it and/or modify it
-  under the terms of version 2 of the GNU General Public License as
-  published by the Free Software Foundation.
-
-  This program is distributed in the hope that it will be useful, but WITHOUT
-  ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
-  FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for
-  more details.
-
-  You should have received a copy of the GNU General Public License along with
-  this program; if not, write to the Free Software Foundation, Inc., 59
-  Temple Place - Suite 330, Boston, MA  02111-1307, USA.
-
-  The full GNU General Public License is included in this distribution in the
-  file called LICENSE.
-
-  Contact Information:
-  James P. Ketrenos <ipw2100-admin@linux.intel.com>
-  Intel Corporation, 5200 N.E. Elam Young Parkway, Hillsboro, OR 97124-6497
-
-******************************************************************************/
+ *
+ *  Copyright(c) 2004 Intel Corporation. All rights reserved.
+ *
+ *  Portions of this file are based on the WEP enablement code provided by the
+ *  Host AP project hostap-drivers v0.1.3
+ *  Copyright (c) 2001-2002, SSH Communications Security Corp and Jouni Malinen
+ *  <jkmaline@cc.hut.fi>
+ *  Copyright (c) 2002-2003, Jouni Malinen <jkmaline@cc.hut.fi>
+ *
+ *  This program is free software; you can redistribute it and/or modify it
+ *  under the terms of version 2 of the GNU General Public License as
+ *  published by the Free Software Foundation.
+ *
+ *  This program is distributed in the hope that it will be useful, but WITHOUT
+ *  ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ *  FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for
+ *  more details.
+ *
+ *  You should have received a copy of the GNU General Public License along with
+ *  this program; if not, write to the Free Software Foundation, Inc., 59
+ *  Temple Place - Suite 330, Boston, MA  02111-1307, USA.
+ *
+ *  The full GNU General Public License is included in this distribution in the
+ *  file called LICENSE.
+ *
+ *  Contact Information:
+ *  James P. Ketrenos <ipw2100-admin@linux.intel.com>
+ *  Intel Corporation, 5200 N.E. Elam Young Parkway, Hillsboro, OR 97124-6497
+ *
+ ******************************************************************************/
 #include <linux/wireless.h>
 #include <linux/kmod.h>
 #include <linux/slab.h>
@@ -108,7 +108,8 @@ static inline char *rtl819x_translate_scan(struct ieee80211_device *ieee,
 	/* Add frequency/channel */
 	iwe.cmd = SIOCGIWFREQ;
 /*	iwe.u.freq.m = ieee80211_frequency(network->channel, network->mode);
-	iwe.u.freq.e = 3; */
+ *	iwe.u.freq.e = 3;
+ */
 	iwe.u.freq.m = network->channel;
 	iwe.u.freq.e = 0;
 	iwe.u.freq.i = 0;
@@ -227,7 +228,8 @@ static inline char *rtl819x_translate_scan(struct ieee80211_device *ieee,
 
 
 	/* Add EXTRA: Age to display seconds since last beacon/probe response
-	 * for given network. */
+	 * for given network.
+	 */
 	iwe.cmd = IWEVCUSTOM;
 	p = custom;
 	p += snprintf(p, MAX_CUSTOM_LEN - (p - custom),
@@ -325,7 +327,8 @@ int ieee80211_wx_set_encode(struct ieee80211_device *ieee,
 			IEEE80211_DEBUG_WX("Disabling encryption.\n");
 
 		/* Check all the keys to see if any are still configured,
-		 * and if no key index was provided, de-init them all */
+		 * and if no key index was provided, de-init them all
+		 */
 		for (i = 0; i < WEP_KEYS; i++) {
 			if (ieee->crypt[i] != NULL) {
 				if (key_provided)
@@ -352,7 +355,8 @@ int ieee80211_wx_set_encode(struct ieee80211_device *ieee,
 	if (*crypt != NULL && (*crypt)->ops != NULL &&
 	    strcmp((*crypt)->ops->name, "WEP") != 0) {
 		/* changing to use WEP; deinit previously used algorithm
-		 * on this key */
+		 * on this key
+		 */
 		ieee80211_crypt_delayed_deinit(ieee, crypt);
 	}
 
@@ -399,7 +403,8 @@ int ieee80211_wx_set_encode(struct ieee80211_device *ieee,
 				       (*crypt)->priv);
 		sec.flags |= (1 << key);
 		/* This ensures a key will be activated if no key is
-		 * explicitely set */
+		 * explicitely set
+		 */
 		if (key == sec.active_key)
 			sec.flags |= SEC_ACTIVE_KEY;
 		ieee->tx_keyidx = key;
@@ -440,7 +445,8 @@ int ieee80211_wx_set_encode(struct ieee80211_device *ieee,
 			   "OPEN" : "SHARED KEY");
 
 	/* For now we just support WEP, so only set that security level...
-	 * TODO: When WPA is added this is one place that needs to change */
+	 * TODO: When WPA is added this is one place that needs to change
+	 */
 	sec.flags |= SEC_LEVEL;
 	sec.level = SEC_LEVEL_1; /* 40 and 104 bit WEP */
 
@@ -451,7 +457,8 @@ int ieee80211_wx_set_encode(struct ieee80211_device *ieee,
 	 * generate new IEEE 802.11 authentication which may end up in looping
 	 * with IEEE 802.1X.  If your hardware requires a reset after WEP
 	 * configuration (for example... Prism2), implement the reset_port in
-	 * the callbacks structures used to initialize the 802.11 stack. */
+	 * the callbacks structures used to initialize the 802.11 stack.
+	 */
 	if (ieee->reset_on_keychange &&
 	    ieee->iw_mode != IW_MODE_INFRA &&
 	    ieee->reset_port && ieee->reset_port(dev)) {
@@ -761,9 +768,9 @@ int ieee80211_wx_set_auth(struct ieee80211_device *ieee,
 	case IW_AUTH_CIPHER_GROUP:
 	case IW_AUTH_KEY_MGMT:
 		/*
- *                  * Host AP driver does not use these parameters and allows
- *                                   * wpa_supplicant to control them internally.
- *                                                    */
+		 * Host AP driver does not use these parameters and allows
+		 * wpa_supplicant to control them internally.
+		 */
 		break;
 	case IW_AUTH_TKIP_COUNTERMEASURES:
 		ieee->tkip_countermeasures = data->value;
