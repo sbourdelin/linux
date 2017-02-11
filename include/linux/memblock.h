@@ -203,6 +203,8 @@ int memblock_search_pfn_nid(unsigned long pfn, unsigned long *start_pfn,
 			    unsigned long  *end_pfn);
 void __next_mem_pfn_range(int *idx, int nid, unsigned long *out_start_pfn,
 			  unsigned long *out_end_pfn, int *out_nid);
+void __next_mem_pfn_range_rev(int *idx, int nid, unsigned long *out_start_pfn,
+			  unsigned long *out_end_pfn, int *out_nid);
 
 /**
  * for_each_mem_pfn_range - early memory pfn range iterator
@@ -217,6 +219,22 @@ void __next_mem_pfn_range(int *idx, int nid, unsigned long *out_start_pfn,
 #define for_each_mem_pfn_range(i, nid, p_start, p_end, p_nid)		\
 	for (i = -1, __next_mem_pfn_range(&i, nid, p_start, p_end, p_nid); \
 	     i >= 0; __next_mem_pfn_range(&i, nid, p_start, p_end, p_nid))
+
+/**
+ * for_each_mem_pfn_range_rev - early memory pfn range rev-iterator
+ * @i: an integer used as loop variable
+ * @nid: node selector, %NUMA_NO_NODE for all nodes
+ * @p_start: ptr to ulong for start pfn of the range, can be %NULL
+ * @p_end: ptr to ulong for end pfn of the range, can be %NULL
+ * @p_nid: ptr to int for nid of the range, can be %NULL
+ *
+ * Walks over configured memory ranges in reverse order.
+ */
+#define for_each_mem_pfn_range_rev(i, nid, p_start, p_end, p_nid)	\
+	for (i = (int)INT_MAX,						\
+	      __next_mem_pfn_range_rev(&i, nid, p_start, p_end, p_nid); \
+	     i != (int)INT_MAX;						\
+	      __next_mem_pfn_range_rev(&i, nid, p_start, p_end, p_nid))
 #endif /* CONFIG_HAVE_MEMBLOCK_NODE_MAP */
 
 /**
