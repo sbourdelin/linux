@@ -92,9 +92,13 @@ xmldocs:
 
 # no-ops for the Sphinx toolchain
 sgmldocs:
+	@:
 psdocs:
+	@:
 mandocs:
+	@:
 installmandocs:
+	@:
 
 cleandocs:
 	$(Q)rm -rf $(BUILDDIR)
