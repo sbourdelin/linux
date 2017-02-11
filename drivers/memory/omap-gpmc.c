@@ -1926,21 +1926,63 @@ static void __maybe_unused gpmc_read_timings_dt(struct device_node *np,
 static int gpmc_probe_onenand_child(struct platform_device *pdev,
 				 struct device_node *child)
 {
-	u32 val;
+	u32 cs, val;
+	int ret;
+	unsigned long base;
+	struct resource res;
 	struct omap_onenand_platform_data *gpmc_onenand_data;
 
-	if (of_property_read_u32(child, "reg", &val) < 0) {
+	if (of_property_read_u32(child, "reg", &cs) < 0) {
 		dev_err(&pdev->dev, "%s has no 'reg' property\n",
 			child->full_name);
 		return -ENODEV;
 	}
+
+	memset(&res, 0, sizeof(res));
+	res.flags = IORESOURCE_MEM;
+	if (of_address_to_resource(child, 0, &res) < 0) {
+		dev_err(&pdev->dev, "%s has malformed 'reg' property\n",
+			child->full_name);
+		return -ENODEV;
+	}
+
+	ret = gpmc_cs_request(cs, resource_size(&res), &base);
+	if (ret < 0) {
+		dev_err(&pdev->dev, "cannot request GPMC CS %d\n", cs);
+		return ret;
+	}
+	gpmc_cs_set_name(cs, child->name);
+
+	dev_warn(&pdev->dev, "OneNAND: 0x%x-0x%x\n", res.start, res.end);
+	/* CS must be disabled while making changes to gpmc configuration */
+	gpmc_cs_disable_mem(cs);
+
+	ret = gpmc_cs_remap(cs, res.start);
+	if (ret < 0) {
+		dev_err(&pdev->dev, "cannot remap GPMC CS %d to 0x%x\n",
+			cs, res.start);
+		if (res.start < GPMC_MEM_START) {
+			dev_info(&pdev->dev,
+				 "GPMC CS %d start cannot be lesser than 0x%x\n",
+				 cs, GPMC_MEM_START);
+		} else if (res.end > GPMC_MEM_END) {
+			dev_info(&pdev->dev,
+				 "GPMC CS %d end cannot be greater than 0x%x\n",
+				 cs, GPMC_MEM_END);
+		}
+		return ret;
+	}
+
+	/* Enable CS region */
+	gpmc_cs_enable_mem(cs);
 
 	gpmc_onenand_data = devm_kzalloc(&pdev->dev, sizeof(*gpmc_onenand_data),
 					 GFP_KERNEL);
 	if (!gpmc_onenand_data)
 		return -ENOMEM;
 
-	gpmc_onenand_data->cs = val;
+	gpmc_onenand_data->cs = cs;
+	gpmc_onenand_data->resource = &res;
 	gpmc_onenand_data->of_node = child;
 	gpmc_onenand_data->dma_channel = -1;
 

@@ -19,6 +19,7 @@
 
 struct omap_onenand_platform_data {
 	int			cs;
+	struct resource		*resource;
 	int			gpio_irq;
 	struct mtd_partition	*parts;
 	int			nr_parts;

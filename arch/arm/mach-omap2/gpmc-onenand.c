@@ -35,17 +35,6 @@ static unsigned latency;
 
 static struct omap_onenand_platform_data *gpmc_onenand_data;
 
-static struct resource gpmc_onenand_resource = {
-	.flags		= IORESOURCE_MEM,
-};
-
-static struct platform_device gpmc_onenand_device = {
-	.name		= "omap2-onenand",
-	.id		= -1,
-	.num_resources	= 1,
-	.resource	= &gpmc_onenand_resource,
-};
-
 static struct gpmc_settings onenand_async = {
 	.device_width	= GPMC_DEVWIDTH_16BIT,
 	.mux_add_data	= GPMC_MUX_AD,
@@ -348,13 +337,12 @@ static int omap2_onenand_setup_sync(void __iomem *onenand_base, int *freq_ptr)
 
 static int gpmc_onenand_setup(void __iomem *onenand_base, int *freq_ptr)
 {
-	struct device *dev = &gpmc_onenand_device.dev;
 	unsigned l = ONENAND_SYNC_READ | ONENAND_SYNC_READWRITE;
 	int ret;
 
 	ret = omap2_onenand_setup_async(onenand_base);
 	if (ret) {
-		dev_err(dev, "unable to set to async mode\n");
+		pr_err("OneNAND: unable to set to async mode\n");
 		return ret;
 	}
 
@@ -363,22 +351,21 @@ static int gpmc_onenand_setup(void __iomem *onenand_base, int *freq_ptr)
 
 	ret = omap2_onenand_setup_sync(onenand_base, freq_ptr);
 	if (ret)
-		dev_err(dev, "unable to set to sync mode\n");
+		pr_err("OneNAND: unable to set to sync mode\n");
 	return ret;
 }
 
 int gpmc_onenand_init(struct omap_onenand_platform_data *_onenand_data)
 {
 	int err;
-	struct device *dev = &gpmc_onenand_device.dev;
+	struct platform_device *pdev;
 
 	gpmc_onenand_data = _onenand_data;
 	gpmc_onenand_data->onenand_setup = gpmc_onenand_setup;
-	gpmc_onenand_device.dev.platform_data = gpmc_onenand_data;
 
 	if (cpu_is_omap24xx() &&
 			(gpmc_onenand_data->flags & ONENAND_SYNC_READWRITE)) {
-		dev_warn(dev, "OneNAND using only SYNC_READ on 24xx\n");
+		pr_warn("OneNAND using only SYNC_READ on 24xx\n");
 		gpmc_onenand_data->flags &= ~ONENAND_SYNC_READWRITE;
 		gpmc_onenand_data->flags |= ONENAND_SYNC_READ;
 	}
@@ -388,22 +375,31 @@ int gpmc_onenand_init(struct omap_onenand_platform_data *_onenand_data)
 	else
 		gpmc_onenand_data->flags &= ~ONENAND_IN_OMAP34XX;
 
-	err = gpmc_cs_request(gpmc_onenand_data->cs, ONENAND_IO_SIZE,
-				(unsigned long *)&gpmc_onenand_resource.start);
-	if (err < 0) {
-		dev_err(dev, "Cannot request GPMC CS %d, error %d\n",
-			gpmc_onenand_data->cs, err);
-		return err;
+	pdev = platform_device_alloc("omap2-onenand", gpmc_onenand_data->cs);
+	if (!pdev) {
+		err = -ENOMEM;
+		goto out_free_cs;
 	}
 
-	gpmc_onenand_resource.end = gpmc_onenand_resource.start +
-							ONENAND_IO_SIZE - 1;
+	err = platform_device_add_resources(pdev,
+			gpmc_onenand_data->resource, 1);
+	if (err)
+		goto out_free_pdev;
 
-	err = platform_device_register(&gpmc_onenand_device);
+	pdev->dev.platform_data = gpmc_onenand_data;
+
+	err = platform_device_add(pdev);
 	if (err) {
-		dev_err(dev, "Unable to register OneNAND device\n");
-		gpmc_cs_free(gpmc_onenand_data->cs);
+		dev_err(&pdev->dev, "Unable to register OneNAND device\n");
+		goto out_free_pdev;
 	}
+
+	return 0;
+
+out_free_pdev:
+	platform_device_put(pdev);
+out_free_cs:
+	gpmc_cs_free(gpmc_onenand_data->cs);
 
 	return err;
 }
