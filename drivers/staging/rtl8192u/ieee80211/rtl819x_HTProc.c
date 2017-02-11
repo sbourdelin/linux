@@ -217,8 +217,8 @@ void HTDebugHTInfo(u8 *InfoIE, u8 *TitleString)
 }
 
 /*
-*	Return:		true if station in half n mode and AP supports 40 bw
-*/
+ *	Return:		true if station in half n mode and AP supports 40 bw
+ */
 static bool IsHTHalfNmode40Bandwidth(struct ieee80211_device *ieee)
 {
 	bool			retValue = false;
@@ -412,7 +412,7 @@ static void HTIOTPeerDetermine(struct ieee80211_device *ieee)
  *	     u8 *			PeerMacAddr
  *  output:  none
  *  return:  return 1 if driver should declare MCS13 only(otherwise return 0)
-  * *****************************************************************************************************************/
+ ******************************************************************************************************************/
 static u8 HTIOTActIsDisableMCS14(struct ieee80211_device *ieee, u8 *PeerMacAddr)
 {
 	return 0;
@@ -420,17 +420,17 @@ static u8 HTIOTActIsDisableMCS14(struct ieee80211_device *ieee, u8 *PeerMacAddr)
 
 
 /**
-* Function:	HTIOTActIsDisableMCS15
-*
-* Overview:	Check whether driver should declare capability of receiving MCS15
-*
-* Input:
-*			PADAPTER		Adapter,
-*
-* Output:		None
-* Return:	true if driver should disable MCS15
-* 2008.04.15	Emily
-*/
+ * Function:	HTIOTActIsDisableMCS15
+ *
+ * Overview:	Check whether driver should declare capability of receiving MCS15
+ *
+ * Input:
+ *			PADAPTER		Adapter,
+ *
+ * Output:		None
+ * Return:	true if driver should disable MCS15
+ * 2008.04.15	Emily
+ */
 static bool HTIOTActIsDisableMCS15(struct ieee80211_device *ieee)
 {
 	bool retValue = false;
@@ -457,17 +457,17 @@ static bool HTIOTActIsDisableMCS15(struct ieee80211_device *ieee)
 }
 
 /**
-* Function:	HTIOTActIsDisableMCSTwoSpatialStream
-*
-* Overview:	Check whether driver should declare capability of receiving All 2 ss packets
-*
-* Input:
-*			PADAPTER		Adapter,
-*
-* Output:		None
-* Return:	true if driver should disable all two spatial stream packet
-* 2008.04.21	Emily
-*/
+ * Function:	HTIOTActIsDisableMCSTwoSpatialStream
+ *
+ * Overview:	Check whether driver should declare capability of receiving All 2 ss packets
+ *
+ * Input:
+ *			PADAPTER		Adapter,
+ *
+ * Output:		None
+ * Return:	true if driver should disable all two spatial stream packet
+ * 2008.04.21	Emily
+ */
 static bool HTIOTActIsDisableMCSTwoSpatialStream(struct ieee80211_device *ieee,
 						 u8 *PeerMacAddr)
 {
@@ -483,7 +483,7 @@ static bool HTIOTActIsDisableMCSTwoSpatialStream(struct ieee80211_device *ieee,
  *	     u8*			PeerMacAddr
  *  output:  none
  *  return:  return 1 if driver should disable EDCA turbo mode(otherwise return 0)
-  * *****************************************************************************************************************/
+ ******************************************************************************************************************/
 static u8 HTIOTActIsDisableEDCATurbo(struct ieee80211_device *ieee,
 				     u8 *PeerMacAddr)
 {	/* default enable EDCA Turbo mode. */
@@ -495,7 +495,7 @@ static u8 HTIOTActIsDisableEDCATurbo(struct ieee80211_device *ieee,
  *   input:  struct ieee80211_network *network   //current network we live
  *  output:  none
  *  return:  return 1 if true
-  * *****************************************************************************************************************/
+ *****************************************************************************************************************/
 static u8 HTIOTActIsMgntUseCCK6M(struct ieee80211_network *network)
 {
 	u8	retValue = 0;
@@ -542,7 +542,7 @@ void HTResetIOTSetting(
  *  output:  none
  *  return:  none
  *  notice:  posHTCap can't be null and should be initialized before.
-  * *****************************************************************************************************************/
+ ******************************************************************************************************************/
 void HTConstructCapabilityElement(struct ieee80211_device *ieee, u8 *posHTCap, u8 *len, u8 IsEncrypt)
 {
 	PRT_HIGH_THROUGHPUT	pHT = ieee->pHTInfo;
@@ -660,7 +660,7 @@ void HTConstructCapabilityElement(struct ieee80211_device *ieee, u8 *posHTCap, u
  *  output:  none
  *  return:  none
  *  notice:  posHTCap can't be null and be initialized before. only AP and IBSS sta should do this
-  * *****************************************************************************************************************/
+ ******************************************************************************************************************/
 void HTConstructInfoElement(struct ieee80211_device *ieee, u8 *posHTInfo, u8 *len, u8 IsEncrypt)
 {
 	PRT_HIGH_THROUGHPUT	pHT = ieee->pHTInfo;
@@ -707,23 +707,23 @@ void HTConstructInfoElement(struct ieee80211_device *ieee, u8 *posHTInfo, u8 *le
 }
 
 /*
-  *  According to experiment, Realtek AP to STA (based on rtl8190) may achieve best performance
-  *  if both STA and AP set limitation of aggregation size to 32K, that is, set AMPDU density to 2
-  *  (Ref: IEEE 11n specification). However, if Realtek STA associates to other AP, STA should set
-  *  limitation of aggregation size to 8K, otherwise, performance of traffic stream from STA to AP
-  *  will be much less than the traffic stream from AP to STA if both of the stream runs concurrently
-  *  at the same time.
-  *
-  *  Frame Format
-  *  Element ID		Length		OUI			Type1		Reserved
-  *  1 byte			1 byte		3 bytes		1 byte		1 byte
-  *
-  *  OUI		= 0x00, 0xe0, 0x4c,
-  *  Type	= 0x02
-  *  Reserved	= 0x00
-  *
-  *  2007.8.21 by Emily
-*/
+ *  According to experiment, Realtek AP to STA (based on rtl8190) may achieve best performance
+ *  if both STA and AP set limitation of aggregation size to 32K, that is, set AMPDU density to 2
+ *  (Ref: IEEE 11n specification). However, if Realtek STA associates to other AP, STA should set
+ *  limitation of aggregation size to 8K, otherwise, performance of traffic stream from STA to AP
+ *  will be much less than the traffic stream from AP to STA if both of the stream runs concurrently
+ *  at the same time.
+ *
+ *  Frame Format
+ *  Element ID		Length		OUI			Type1		Reserved
+ *  1 byte			1 byte		3 bytes		1 byte		1 byte
+ *
+ *  OUI		= 0x00, 0xe0, 0x4c,
+ *  Type	= 0x02
+ *  Reserved	= 0x00
+ *
+ *  2007.8.21 by Emily
+ */
 /********************************************************************************************************************
  *function:  Construct  Information Element in Beacon... in RT2RT condition
  *   input:  struct ieee80211_device*	ieee
@@ -732,7 +732,7 @@ void HTConstructInfoElement(struct ieee80211_device *ieee, u8 *posHTInfo, u8 *le
  *  output:  none
  *  return:  none
  *  notice:
-  * *****************************************************************************************************************/
+ ******************************************************************************************************************/
 void HTConstructRT2RTAggElement(struct ieee80211_device *ieee, u8 *posRT2RTAgg, u8 *len)
 {
 	if (posRT2RTAgg == NULL) {
@@ -745,7 +745,7 @@ void HTConstructRT2RTAggElement(struct ieee80211_device *ieee, u8 *posRT2RTAgg, 
 	*posRT2RTAgg++ = 0x4c;
 	*posRT2RTAgg++ = 0x02;
 	*posRT2RTAgg++ = 0x01;
-	*posRT2RTAgg = 0x10;//*posRT2RTAgg = 0x02;
+	*posRT2RTAgg = 0x10; // *posRT2RTAgg = 0x02;
 
 	if (ieee->bSupportRemoteWakeUp) {
 		*posRT2RTAgg |= 0x08;//RT_HT_CAP_USE_WOW;
@@ -756,16 +756,16 @@ void HTConstructRT2RTAggElement(struct ieee80211_device *ieee, u8 *posRT2RTAgg, 
 #ifdef TODO
 #if (HAL_CODE_BASE == RTL8192 && DEV_BUS_TYPE == USB_INTERFACE)
 	/*
-	//Emily. If it is required to Ask Realtek AP to send AMPDU during AES mode, enable this
-	   section of code.
-	if(IS_UNDER_11N_AES_MODE(Adapter))
-	{
-		posRT2RTAgg->Octet[5] |=RT_HT_CAP_USE_AMPDU;
-	}else
-	{
-		posRT2RTAgg->Octet[5] &= 0xfb;
-	}
-	*/
+	 * Emily. If it is required to Ask Realtek AP to send AMPDU during AES mode, enable this
+	 *   section of code.
+	 * if(IS_UNDER_11N_AES_MODE(Adapter))
+	 * {
+	 * 	posRT2RTAgg->Octet[5] |=RT_HT_CAP_USE_AMPDU;
+	 * } else
+	 * {
+	 * 	posRT2RTAgg->Octet[5] &= 0xfb;
+	 * }
+	 */
 
 #else
 	// Do Nothing
@@ -786,7 +786,7 @@ void HTConstructRT2RTAggElement(struct ieee80211_device *ieee, u8 *posRT2RTAgg, 
  *	     u8*			pOperateMCS //A pointer to MCS rate bitmap
  *  return:  always we return true
  *  notice:
-  * *****************************************************************************************************************/
+ ******************************************************************************************************************/
 static u8 HT_PickMCSRate(struct ieee80211_device *ieee, u8 *pOperateMCS)
 {
 	u8					i;
@@ -832,16 +832,16 @@ static u8 HT_PickMCSRate(struct ieee80211_device *ieee, u8 *pOperateMCS)
 }
 
 /*
-*	Description:
-*		This function will get the highest speed rate in input MCS set.
-*
-*	/param	Adapter			Pionter to Adapter entity
-*			pMCSRateSet		Pointer to MCS rate bitmap
-*			pMCSFilter		Pointer to MCS rate filter
-*
-*	/return	Highest MCS rate included in pMCSRateSet and filtered by pMCSFilter.
-*
-*/
+ *	Description:
+ *		This function will get the highest speed rate in input MCS set.
+ *
+ *	/param	Adapter			Pionter to Adapter entity
+ *			pMCSRateSet		Pointer to MCS rate bitmap
+ *			pMCSFilter		Pointer to MCS rate filter
+ *
+ *	/return	Highest MCS rate included in pMCSRateSet and filtered by pMCSFilter.
+ *
+ */
 /********************************************************************************************************************
  *function:  This function will get the highest speed rate in input MCS set.
  *   input:  struct ieee80211_device*	ieee
@@ -849,7 +849,7 @@ static u8 HT_PickMCSRate(struct ieee80211_device *ieee, u8 *pOperateMCS)
  *	     u8*			pMCSFilter //Pointer to MCS rate filter
  *  return:  Highest MCS rate included in pMCSRateSet and filtered by pMCSFilter
  *  notice:
-  * *****************************************************************************************************************/
+ ******************************************************************************************************************/
 u8 HTGetHighestMCSRate(struct ieee80211_device *ieee, u8 *pMCSRateSet, u8 *pMCSFilter)
 {
 	u8		i, j;
@@ -894,14 +894,14 @@ u8 HTGetHighestMCSRate(struct ieee80211_device *ieee, u8 *pMCSRateSet, u8 *pMCSF
 
 
 /*
-**
-**1.Filter our operation rate set with AP's rate set
-**2.shall reference channel bandwidth, STBC, Antenna number
-**3.generate rate adative table for firmware
-**David 20060906
-**
-** \pHTSupportedCap: the connected STA's supported rate Capability element
-*/
+ *
+ *1.Filter our operation rate set with AP's rate set
+ *2.shall reference channel bandwidth, STBC, Antenna number
+ *3.generate rate adative table for firmware
+ *David 20060906
+ *
+ * \pHTSupportedCap: the connected STA's supported rate Capability element
+ */
 static u8 HTFilterMCSRate(struct ieee80211_device *ieee, u8 *pSupportMCS,
 			  u8 *pOperateMCS)
 {
@@ -1117,7 +1117,7 @@ void HTSetConnectBwModeCallback(struct ieee80211_device *ieee);
  *  output:  none
  *  return:  none
  *  notice: This function is called when *  (1) MPInitialization Phase *  (2) Receiving of Deauthentication from AP
-********************************************************************************************************************/
+ ********************************************************************************************************************/
 // TODO: Should this funciton be called when receiving of Disassociation?
 void HTInitializeHTInfo(struct ieee80211_device *ieee)
 {
@@ -1186,7 +1186,7 @@ void HTInitializeHTInfo(struct ieee80211_device *ieee)
  *  output:  none
  *  return:  none
  *  notice: This function is called when initialize network structure
-********************************************************************************************************************/
+ ********************************************************************************************************************/
 void HTInitializeBssDesc(PBSS_HT pBssHT)
 {
 
@@ -1208,7 +1208,7 @@ void HTInitializeBssDesc(PBSS_HT pBssHT)
  *  output:  none
  *  return:  none
  *  notice: This function should ONLY be called before association
-********************************************************************************************************************/
+ ********************************************************************************************************************/
 void HTResetSelfAndSavePeerSetting(struct ieee80211_device *ieee,	struct ieee80211_network *pNetwork)
 {
 	PRT_HIGH_THROUGHPUT		pHTInfo = ieee->pHTInfo;
@@ -1320,7 +1320,7 @@ EXPORT_SYMBOL(HTUpdateSelfAndPeerSetting);
  *  output:  none
  *  return:  return true if HT control field exists(false otherwise)
  *  notice:
-********************************************************************************************************************/
+ ********************************************************************************************************************/
 u8 HTCCheck(struct ieee80211_device *ieee, u8 *pFrame)
 {
 	if (ieee->pHTInfo->bCurrentHTSupport)
