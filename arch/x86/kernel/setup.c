@@ -962,11 +962,16 @@ void __init setup_arch(char **cmdline_p)
 #ifdef CONFIG_CMDLINE_OVERRIDE
 	strlcpy(boot_command_line, builtin_cmdline, COMMAND_LINE_SIZE);
 #else
-	if (builtin_cmdline[0]) {
+	if (builtin_cmdline[0] != '!') {
 		/* append boot loader cmdline to builtin */
 		strlcat(builtin_cmdline, " ", COMMAND_LINE_SIZE);
 		strlcat(builtin_cmdline, boot_command_line, COMMAND_LINE_SIZE);
 		strlcpy(boot_command_line, builtin_cmdline, COMMAND_LINE_SIZE);
+	} else {
+		/* This will provide additional secuirty to cmdline */
+		/* arguments not overriding bootloader arguments */
+		strlcat(boot_command_line, " ", COMMAND_LINE_SIZE);
+		strlcat(boot_command_line, &builtin_cmdline[1], COMMAND_LINE_SIZE);
 	}
 #endif
 #endif
