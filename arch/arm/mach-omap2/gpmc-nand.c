@@ -126,16 +126,17 @@ int gpmc_nand_init(struct omap_nand_platform_data *gpmc_nand_data,
 
 
 	pdev = platform_device_alloc("omap2-nand", gpmc_nand_data->cs);
-	if (pdev) {
-		err = platform_device_add_resources(pdev, gpmc_nand_res,
-						    ARRAY_SIZE(gpmc_nand_res));
-		if (!err)
-			pdev->dev.platform_data = gpmc_nand_data;
-	} else {
+	if (!pdev) {
 		err = -ENOMEM;
+		goto out_free_cs;
 	}
+
+	err = platform_device_add_resources(pdev, gpmc_nand_res,
+					    ARRAY_SIZE(gpmc_nand_res));
 	if (err)
 		goto out_free_pdev;
+
+	pdev->dev.platform_data = gpmc_nand_data;
 
 	err = platform_device_add(pdev);
 	if (err) {
