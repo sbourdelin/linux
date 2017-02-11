@@ -69,15 +69,7 @@ static int scm_fp_copy(struct cmsghdr *cmsg, struct scm_fp_list **fplp)
 	int *fdp = (int*)CMSG_DATA(cmsg);
 	struct scm_fp_list *fpl = *fplp;
 	struct file **fpp;
-	int i, num;
-
-	num = (cmsg->cmsg_len - sizeof(struct cmsghdr))/sizeof(int);
-
-	if (num <= 0)
-		return 0;
-
-	if (num > SCM_MAX_FD)
-		return -EINVAL;
+	unsigned int i, num;
 
 	if (!fpl)
 	{
@@ -86,18 +78,17 @@ static int scm_fp_copy(struct cmsghdr *cmsg, struct scm_fp_list **fplp)
 			return -ENOMEM;
 		*fplp = fpl;
 		fpl->count = 0;
-		fpl->max = SCM_MAX_FD;
 		fpl->user = NULL;
 	}
-	fpp = &fpl->fp[fpl->count];
 
-	if (fpl->count + num > fpl->max)
+	num = (cmsg->cmsg_len - sizeof(struct cmsghdr))/sizeof(int);
+	if (fpl->count + num > SCM_MAX_FD)
 		return -EINVAL;
 
 	/*
 	 *	Verify the descriptors and increment the usage count.
 	 */
-
+	fpp = &fpl->fp[fpl->count];
 	for (i=0; i< num; i++)
 	{
 		int fd = fdp[i];
@@ -112,7 +103,7 @@ static int scm_fp_copy(struct cmsghdr *cmsg, struct scm_fp_list **fplp)
 	if (!fpl->user)
 		fpl->user = get_uid(current_user());
 
-	return num;
+	return 0;
 }
 
 void __scm_destroy(struct scm_cookie *scm)
@@ -336,12 +327,10 @@ struct scm_fp_list *scm_fp_dup(struct scm_fp_list *fpl)
 	if (!fpl)
 		return NULL;
 
-	new_fpl = kmemdup(fpl, offsetof(struct scm_fp_list, fp[fpl->count]),
-			  GFP_KERNEL);
+	new_fpl = kmemdup(fpl, sizeof(*fpl), GFP_KERNEL);
 	if (new_fpl) {
 		for (i = 0; i < fpl->count; i++)
 			get_file(fpl->fp[i]);
-		new_fpl->max = new_fpl->count;
 		new_fpl->user = get_uid(fpl->user);
 	}
 	return new_fpl;
