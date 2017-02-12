@@ -219,7 +219,7 @@ int isa207_compute_mmcr(u64 event[], int n_ev,
 			       struct perf_event *pevents[])
 {
 	unsigned long mmcra, mmcr1, mmcr2, unit, combine, psel, cache, val;
-	unsigned int pmc, pmc_inuse;
+	unsigned int pmc, pmc_inuse, mask=0;
 	int i;
 
 	pmc_inuse = 0;
@@ -310,6 +310,24 @@ int isa207_compute_mmcr(u64 event[], int n_ev,
 		}
 
 		hwc[i] = pmc - 1;
+	}
+
+/*
+ * Pass 3: to Check for l2/l3 bus event rule. PMC4
+ * must be programmed to use L2/L3 bus events in any other PMC[1/2/3]s
+ */
+	if (cpu_has_feature(CPU_FTR_ARCH_300)) {
+		for (i = 0; i < n_ev; ++i) {
+			pmc     = (event[i] >> EVENT_PMC_SHIFT) & EVENT_PMC_MASK;
+			unit    = (event[i] >> EVENT_UNIT_SHIFT) & EVENT_UNIT_MASK;
+			if (unit >= 6 && unit <= 9)
+				mask |= 1 << (pmc - 1);
+		}
+
+		if ((mask) && ((mask & 0xf) < 0x8)) {
+			printk(KERN_ERR "Missing PMC4 L2/L3 Bus event\n");
+			return -1;
+		}
 	}
 
 	/* Return MMCRx values */
