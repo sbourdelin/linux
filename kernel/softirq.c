@@ -527,7 +527,6 @@ static __latent_entropy void tasklet_action(struct softirq_action *a)
 		t->next = NULL;
 		*__this_cpu_read(tasklet_vec.tail) = t;
 		__this_cpu_write(tasklet_vec.tail, &(t->next));
-		__raise_softirq_irqoff(TASKLET_SOFTIRQ);
 		local_irq_enable();
 	}
 }
@@ -563,7 +562,6 @@ static __latent_entropy void tasklet_hi_action(struct softirq_action *a)
 		t->next = NULL;
 		*__this_cpu_read(tasklet_hi_vec.tail) = t;
 		__this_cpu_write(tasklet_hi_vec.tail, &(t->next));
-		__raise_softirq_irqoff(HI_SOFTIRQ);
 		local_irq_enable();
 	}
 }
@@ -578,6 +576,16 @@ void tasklet_init(struct tasklet_struct *t,
 	t->data = data;
 }
 EXPORT_SYMBOL(tasklet_init);
+
+void tasklet_enable(struct tasklet_struct *t)
+{
+	if (!atomic_dec_and_test(&t->count))
+		return;
+
+	if (test_bit(TASKLET_STATE_SCHED, &t->state))
+		raise_softirq(HI_SOFTIRQ | TASKLET_SOFTIRQ);
+}
+EXPORT_SYMBOL(tasklet_enable);
 
 void tasklet_kill(struct tasklet_struct *t)
 {
