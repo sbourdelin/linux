@@ -613,8 +613,11 @@ static inline void tasklet_disable(struct tasklet_struct *t)
 
 static inline void tasklet_enable(struct tasklet_struct *t)
 {
-	smp_mb__before_atomic();
-	atomic_dec(&t->count);
+	if (!atomic_dec_and_test(&t->count))
+		return;
+
+	if (test_bit(TASKLET_STATE_SCHED, &t->state))
+		raise_softirq(HI_SOFTIRQ | TASKLET_SOFTIRQ);
 }
 
 extern void tasklet_kill(struct tasklet_struct *t);
