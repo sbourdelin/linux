@@ -30,8 +30,7 @@ static void show_cpuinfo_misc(struct seq_file *m, struct cpuinfo_x86 *c)
 		   "coma_bug\t: %s\n"
 		   "fpu\t\t: %s\n"
 		   "fpu_exception\t: %s\n"
-		   "cpuid level\t: %d\n"
-		   "wp\t\t: yes\n",
+		   "cpuid level\t: %d\n",
 		   static_cpu_has_bug(X86_BUG_FDIV) ? "yes" : "no",
 		   static_cpu_has_bug(X86_BUG_F00F) ? "yes" : "no",
 		   static_cpu_has_bug(X86_BUG_COMA) ? "yes" : "no",
@@ -45,8 +44,7 @@ static void show_cpuinfo_misc(struct seq_file *m, struct cpuinfo_x86 *c)
 	seq_printf(m,
 		   "fpu\t\t: yes\n"
 		   "fpu_exception\t: yes\n"
-		   "cpuid level\t: %d\n"
-		   "wp\t\t: yes\n",
+		   "cpuid level\t: %d\n",
 		   c->cpuid_level);
 }
 #endif
