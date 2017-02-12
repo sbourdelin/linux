@@ -340,6 +340,8 @@ static int plt_clk_probe(struct platform_device *pdev)
 
 	plt_clk_free_parent_names_loop(parent_names, data->nparents);
 
+	clk_add_alias("mclk", dev_name(&pdev->dev), "pmc_plt_clk_3", NULL);
+
 	platform_set_drvdata(pdev, data);
 	return 0;
 
