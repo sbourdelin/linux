@@ -2171,7 +2171,6 @@ static int test_akcipher_one(struct crypto_akcipher *tfm,
 
 	sg_init_one(&src, xbuf[0], vecs->c_size);
 	sg_init_one(&dst, outbuf_dec, out_len_max);
-	init_completion(&result.completion);
 	akcipher_request_set_crypt(req, &src, &dst, vecs->c_size, out_len_max);
 
 	/* Run RSA decrypt - m = c^d mod n;*/
