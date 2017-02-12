@@ -970,39 +970,31 @@ static int __dev_alloc_name(struct net *net, const char *name, char *buf)
 {
 	int i = 0;
 	const char *p;
-	const int max_netdevices = 8*PAGE_SIZE;
-	unsigned long *inuse;
 	struct net_device *d;
+	DEFINE_IDA(ida);
+	const int end = 0;
 
 	p = strnchr(name, IFNAMSIZ-1, '%');
 	if (p) {
-		/*
-		 * Verify the string as this thing may have come from
+		/* Verify the string as this thing may have come from
 		 * the user.  There must be either one "%d" and no other "%"
 		 * characters.
 		 */
 		if (p[1] != 'd' || strchr(p + 2, '%'))
 			return -EINVAL;
 
-		/* Use one page as a bit array of possible slots */
-		inuse = (unsigned long *) get_zeroed_page(GFP_ATOMIC);
-		if (!inuse)
-			return -ENOMEM;
-
 		for_each_netdev(net, d) {
 			if (!sscanf(d->name, name, &i))
 				continue;
-			if (i < 0 || i >= max_netdevices)
+			if (i < 0)
 				continue;
 
 			/*  avoid cases where sscanf is not exact inverse of printf */
 			snprintf(buf, IFNAMSIZ, name, i);
 			if (!strncmp(buf, d->name, IFNAMSIZ))
-				set_bit(i, inuse);
+				ida_simple_get(&ida, i, end, GFP_KERNEL);
 		}
-
-		i = find_first_zero_bit(inuse, max_netdevices);
-		free_page((unsigned long) inuse);
+		i = ida_simple_get(&ida, 0, end, GFP_KERNEL);
 	}
 
 	if (buf != name)
