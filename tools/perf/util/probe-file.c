@@ -38,9 +38,9 @@ static void print_open_warning(int err, bool uprobe)
 		const char *config;
 
 		if (uprobe)
-			config = "CONFIG_UPROBE_EVENTS";
+			config = "CONFIG_UPROBE_EVENT";
 		else
-			config = "CONFIG_KPROBE_EVENTS";
+			config = "CONFIG_KPROBE_EVENT";
 
 		pr_warning("%cprobe_events file does not exist"
 			   " - please rebuild kernel with %s.\n",
@@ -59,8 +59,8 @@ static void print_both_open_warning(int kerr, int uerr)
 	if (kerr == -ENOTSUP && uerr == -ENOTSUP)
 		pr_warning("Tracefs or debugfs is not mounted.\n");
 	else if (kerr == -ENOENT && uerr == -ENOENT)
-		pr_warning("Please rebuild kernel with CONFIG_KPROBE_EVENTS "
-			   "or/and CONFIG_UPROBE_EVENTS.\n");
+		pr_warning("Please rebuild kernel with CONFIG_KPROBE_EVENT "
+			   "or/and CONFIG_UPROBE_EVENT.\n");
 	else {
 		char sbuf[STRERR_BUFSIZE];
 		pr_warning("Failed to open kprobe events: %s.\n",
