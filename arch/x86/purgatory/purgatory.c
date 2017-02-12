@@ -18,6 +18,8 @@ struct sha_region {
 	unsigned long len;
 };
 
+void purgatory(void);
+
 static unsigned long backup_dest = 0;
 static unsigned long backup_src = 0;
 static unsigned long backup_sz = 0;
