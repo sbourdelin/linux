@@ -494,6 +494,17 @@ config ROCKCHIP_SARADC
 	  To compile this driver as a module, choose M here: the
 	  module will be called rockchip_saradc.
 
+config SIMPLE_SD_ADC
+	tristate "Simple sigma delta modulator"
+	depends on OF
+        select IIO_BUFFER
+        select IIO_TRIGGERED_BUFFER
+	help
+	  Select this option to enables generic sigma delta modulator.
+
+	  This driver can also be built as a module.  If so, the module
+	  will be called simple-sd-adc.
+
 config STM32_ADC_CORE
 	tristate "STMicroelectronics STM32 adc core"
 	depends on ARCH_STM32 || COMPILE_TEST
