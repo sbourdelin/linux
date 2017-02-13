@@ -21,6 +21,8 @@
 #include <linux/list.h>
 #include <linux/regmap.h>
 #include <linux/mfd/wm831x/auxadc.h>
+#include <linux/mfd/wm831x/pdata.h>
+#include <linux/of.h>
 
 /*
  * Register values.
@@ -367,6 +369,8 @@ struct wm831x {
 
 	struct regmap *regmap;
 
+	struct wm831x_pdata pdata;
+
 	int irq;  /* Our chip IRQ */
 	struct mutex irq_lock;
 	struct irq_domain *irq_domain;
@@ -426,5 +430,16 @@ static inline int wm831x_irq(struct wm831x *wm831x, int irq)
 }
 
 extern struct regmap_config wm831x_regmap_config;
+
+extern const struct of_device_id wm831x_of_match[];
+
+#ifdef CONFIG_OF
+int wm831x_of_get_type(struct device *dev);
+#else
+static inline int wm831x_of_get_type(struct device *dev)
+{
+	return 0;
+}
+#endif
 
 #endif

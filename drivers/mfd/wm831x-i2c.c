@@ -28,7 +28,13 @@ static int wm831x_i2c_probe(struct i2c_client *i2c,
 			    const struct i2c_device_id *id)
 {
 	struct wm831x *wm831x;
+	enum wm831x_parent type;
 	int ret;
+
+	if (i2c->dev.of_node)
+		type = (enum wm831x_parent)wm831x_of_get_type(&i2c->dev);
+	else
+		type = (enum wm831x_parent)id->driver_data;
 
 	wm831x = devm_kzalloc(&i2c->dev, sizeof(struct wm831x), GFP_KERNEL);
 	if (wm831x == NULL)
@@ -45,7 +51,7 @@ static int wm831x_i2c_probe(struct i2c_client *i2c,
 		return ret;
 	}
 
-	return wm831x_device_init(wm831x, id->driver_data, i2c->irq);
+	return wm831x_device_init(wm831x, type, i2c->irq);
 }
 
 static int wm831x_i2c_remove(struct i2c_client *i2c)
@@ -94,6 +100,7 @@ static struct i2c_driver wm831x_i2c_driver = {
 	.driver = {
 		.name = "wm831x",
 		.pm = &wm831x_pm_ops,
+		.of_match_table = of_match_ptr(wm831x_of_match),
 	},
 	.probe = wm831x_i2c_probe,
 	.remove = wm831x_i2c_remove,
