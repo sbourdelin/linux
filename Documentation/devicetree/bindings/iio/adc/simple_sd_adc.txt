@@ -1,0 +1,13 @@
+Device-Tree bindings for simple sigma delta adc
+
+Required properties:
+- compatible: should be "sd-modulator".
+- #io-channel-cells = <1>: See the IIO bindings section "IIO consumers".
+
+Example node:
+
+	ads1202: simple_sd_adc@0 {
+		compatible = "sd-modulator";
+		#io-channel-cells = <1>;
+		status = "okay";
+	};
