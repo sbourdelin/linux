@@ -1,0 +1,31 @@
+Cirrus Logic/Wolfson Microelectronics wm831x PMICs
+
+System PMICs with a wide range of additional features.
+
+Required properties:
+
+  - compatible : One of the following chip-specific strings:
+        "wlf,wm8310"
+        "wlf,wm8311"
+        "wlf,wm8312"
+        "wlf,wm8320"
+        "wlf,wm8321"
+        "wlf,wm8325"
+        "wlf,wm8326"
+
+  - reg : I2C slave address when connected using I2C, chip select number when
+    using SPI.
+
+  - gpio-controller : Indicates this device is a GPIO controller.
+  - #gpio-cells : Must be 2. The first cell is the pin number and the
+    second cell is used to specify optional parameters (currently unused).
+
+Example:
+
+wm8310: wm8310@36 {
+	compatible = "wlf,wm8310";
+	reg = <0x36>;
+
+	gpio-controller;
+	#gpio-cells = <2>;
+};
