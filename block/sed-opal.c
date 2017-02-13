@@ -2344,9 +2344,11 @@ bool opal_unlock_from_suspend(struct opal_dev *dev)
 }
 EXPORT_SYMBOL(opal_unlock_from_suspend);
 
-int sed_ioctl(struct opal_dev *dev, unsigned int cmd, unsigned long ptr)
+int sed_ioctl(struct opal_dev *dev, unsigned int cmd, void __user *arg)
 {
-	void __user *arg = (void __user *)ptr;
+	void *ioctl_ptr;
+	int ret = -ENOTTY;
+	unsigned int cmd_size = _IOC_SIZE(cmd);
 
 	if (!capable(CAP_SYS_ADMIN))
 		return -EACCES;
