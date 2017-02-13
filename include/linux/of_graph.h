@@ -43,6 +43,7 @@ struct of_endpoint {
 #ifdef CONFIG_OF
 int of_graph_parse_endpoint(const struct device_node *node,
 				struct of_endpoint *endpoint);
+int of_graph_get_endpoint_count(const struct device_node *np);
 struct device_node *of_graph_get_port_by_id(struct device_node *node, u32 id);
 struct device_node *of_graph_get_next_endpoint(const struct device_node *parent,
 					struct device_node *previous);
@@ -60,6 +61,12 @@ static inline int of_graph_parse_endpoint(const struct device_node *node,
 					struct of_endpoint *endpoint)
 {
 	return -ENOSYS;
+}
+
+static inline int of_graph_get_endpoint_count(const struct device_node *np,
+					      char *type)
+{
+	return 0;
 }
 
 static inline struct device_node *of_graph_get_port_by_id(
