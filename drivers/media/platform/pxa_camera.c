@@ -25,6 +25,7 @@
 #include <linux/mm.h>
 #include <linux/moduleparam.h>
 #include <linux/of.h>
+#include <linux/of_graph.h>
 #include <linux/time.h>
 #include <linux/platform_device.h>
 #include <linux/clk.h>
@@ -39,7 +40,7 @@
 #include <media/v4l2-common.h>
 #include <media/v4l2-device.h>
 #include <media/v4l2-ioctl.h>
-#include <media/v4l2-of.h>
+#include <media/v4l2-fwnode.h>
 
 #include <media/videobuf2-dma-sg.h>
 
@@ -2236,7 +2237,7 @@ static int pxa_camera_pdata_from_dt(struct device *dev,
 {
 	u32 mclk_rate;
 	struct device_node *remote, *np = dev->of_node;
-	struct v4l2_of_endpoint ep;
+	struct v4l2_fwnode_endpoint ep;
 	int err = of_property_read_u32(np, "clock-frequency",
 				       &mclk_rate);
 	if (!err) {
@@ -2250,7 +2251,7 @@ static int pxa_camera_pdata_from_dt(struct device *dev,
 		return -EINVAL;
 	}
 
-	err = v4l2_of_parse_endpoint(np, &ep);
+	err = v4l2_fwnode_endpoint_parse(of_fwnode_handle(np), &ep);
 	if (err) {
 		dev_err(dev, "could not parse endpoint\n");
 		goto out;

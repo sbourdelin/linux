@@ -33,6 +33,7 @@ config VIDEO_ATMEL_ISI
 	depends on ARCH_AT91 || COMPILE_TEST
 	depends on HAS_DMA
 	select VIDEOBUF2_DMA_CONTIG
+	select V4L2_FWNODE
 	---help---
 	  This module makes the ATMEL Image Sensor Interface available
 	  as a v4l2 device.
