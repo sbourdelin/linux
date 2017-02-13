@@ -532,6 +532,19 @@ config STM32_ADC
 	  This driver can also be built as a module.  If so, the module
 	  will be called stm32-adc.
 
+config STM32_DFSDM_ADC
+	tristate "STMicroelectronics STM32 dfsdm adc"
+	depends on (ARCH_STM32 && OF) || COMPILE_TEST
+	select REGMAP
+	select REGMAP_MMIO
+	select IIO_HW_CONSUMER
+	help
+	  Select this option to enable the  driver for STMicroelectronics
+	  STM32 digital filter for sigma delta converter (ADC).
+
+	  This driver can also be built as a module.  If so, the module
+	  will be called stm32-adc-dfsdm-adc.
+
 config STX104
 	tristate "Apex Embedded Systems STX104 driver"
 	depends on X86 && ISA_BUS_API
