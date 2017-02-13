@@ -218,6 +218,15 @@ config PWM_JZ4740
 	  To compile this driver as a module, choose M here: the module
 	  will be called pwm-jz4740.
 
+config PWM_LOONGSON1
+	tristate "Loongson1 PWM support"
+	depends on MACH_LOONGSON32
+	help
+	  Generic PWM framework driver for Loongson1 based machines.
+
+	  To compile this driver as a module, choose M here: the module
+	  will be called pwm-loongson1.
+
 config PWM_LP3943
 	tristate "TI/National Semiconductor LP3943 PWM support"
 	depends on MFD_LP3943
