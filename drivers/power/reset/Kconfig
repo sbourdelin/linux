@@ -130,6 +130,15 @@ config POWER_RESET_QNAP
 
 	  Say Y if you have a QNAP NAS.
 
+config POWER_RESET_RENESAS
+	tristate "Renesas WDT reset driver"
+	depends on ARCH_RENESAS || COMPILE_TEST
+	depends on HAS_IOMEM
+	help
+	  Reboot support for Renesas SoCs with WDT reset.
+	  Some Renesas SoCs do not have a reset register and the only way
+	  to do a SW controlled reset is to use the watchdog timer.
+
 config POWER_RESET_RESTART
 	bool "Restart power-off driver"
 	help
