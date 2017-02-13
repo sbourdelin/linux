@@ -76,6 +76,7 @@ static int xmon_gate;
 #endif /* CONFIG_SMP */
 
 static unsigned long in_xmon __read_mostly = 0;
+static int xmon_off = 0;
 
 static unsigned long adrs;
 static int size = 1;
@@ -255,8 +256,8 @@ Commands:\n\
   Sr #	read SPR #\n\
   Sw #v write v to SPR #\n\
   t	print backtrace\n\
-  x	exit monitor and recover\n\
-  X	exit monitor and don't recover\n"
+  x[z]	exit monitor and recover, turn off xmon with 'z'\n\
+  X[z]	exit monitor and don't recover, turn off xmon with 'z'\n"
 #if defined(CONFIG_PPC64) && !defined(CONFIG_PPC_BOOK3E)
 "  u	dump segment table or SLB\n"
 #elif defined(CONFIG_PPC_STD_MMU_32)
@@ -952,6 +953,8 @@ cmds(struct pt_regs *excp)
 			break;
 		case 'x':
 		case 'X':
+			if (inchar() == 'z')
+				xmon_off = 1;
 			return cmd;
 		case EOF:
 			printf(" <no input ...>\n");
@@ -3248,8 +3251,11 @@ static void xmon_init(int enable)
 static void sysrq_handle_xmon(int key)
 {
 	/* ensure xmon is enabled */
+	xmon_off = 0;
 	xmon_init(1);
 	debugger(get_irq_regs());
+	if (xmon_off)
+		xmon_init(0);
 }
 
 static struct sysrq_key_op sysrq_xmon_op = {
@@ -3266,7 +3272,7 @@ static int __init setup_xmon_sysrq(void)
 __initcall(setup_xmon_sysrq);
 #endif /* CONFIG_MAGIC_SYSRQ */
 
-static int __initdata xmon_early, xmon_off;
+static int __initdata xmon_early;
 
 static int __init early_parse_xmon(char *p)
 {
