@@ -310,12 +310,12 @@ static inline void flush_write_buffers(void)
 /*
  * do appropriate I/O accesses for token type
  */
-static inline unsigned int ioread8(void __iomem *p)
+static inline unsigned int ioread8(const void __iomem *p)
 {
 	return __builtin_read8(p);
 }
 
-static inline unsigned int ioread16(void __iomem *p)
+static inline unsigned int ioread16(const void __iomem *p)
 {
 	uint16_t ret = __builtin_read16(p);
 	if (__is_PCI_addr(p))
@@ -323,7 +323,7 @@ static inline unsigned int ioread16(void __iomem *p)
 	return ret;
 }
 
-static inline unsigned int ioread32(void __iomem *p)
+static inline unsigned int ioread32(const void __iomem *p)
 {
 	uint32_t ret = __builtin_read32(p);
 	if (__is_PCI_addr(p))
@@ -361,17 +361,17 @@ static inline void iowrite32(u32 val, void __iomem *p)
 #define iowrite16be(v, addr)	iowrite16(cpu_to_be16(v), (addr))
 #define iowrite32be(v, addr)	iowrite32(cpu_to_be32(v), (addr))
 
-static inline void ioread8_rep(void __iomem *p, void *dst, unsigned long count)
+static inline void ioread8_rep(const void __iomem *p, void *dst, unsigned long count)
 {
 	io_insb((unsigned long) p, dst, count);
 }
 
-static inline void ioread16_rep(void __iomem *p, void *dst, unsigned long count)
+static inline void ioread16_rep(const void __iomem *p, void *dst, unsigned long count)
 {
 	io_insw((unsigned long) p, dst, count);
 }
 
-static inline void ioread32_rep(void __iomem *p, void *dst, unsigned long count)
+static inline void ioread32_rep(const void __iomem *p, void *dst, unsigned long count)
 {
 	__insl_ns((unsigned long) p, dst, count);
 }

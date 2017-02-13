@@ -19,9 +19,9 @@
 #ifndef __ASSEMBLY__
 /* gcc builtins, annotated */
 
-unsigned long __builtin_read8(volatile void __iomem *);
-unsigned long __builtin_read16(volatile void __iomem *);
-unsigned long __builtin_read32(volatile void __iomem *);
+unsigned long __builtin_read8(const volatile void __iomem *);
+unsigned long __builtin_read16(const volatile void __iomem *);
+unsigned long __builtin_read32(const volatile void __iomem *);
 void __builtin_write8(volatile void __iomem *, unsigned char);
 void __builtin_write16(volatile void __iomem *, unsigned short);
 void __builtin_write32(volatile void __iomem *, unsigned long);
