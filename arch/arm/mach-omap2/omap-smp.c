@@ -300,16 +300,6 @@ static void __init omap4_smp_prepare_cpus(unsigned int max_cpus)
 		scu_enable(cfg.scu_base);
 
 	/*
-	 * Reset CPU1 before configuring, otherwise kexec will
-	 * end up trying to use old kernel startup address.
-	 */
-	if (cfg.cpu1_rstctrl_va) {
-		writel_relaxed(1, cfg.cpu1_rstctrl_va);
-		readl_relaxed(cfg.cpu1_rstctrl_va);
-		writel_relaxed(0, cfg.cpu1_rstctrl_va);
-	}
-
-	/*
 	 * Write the address of secondary startup routine into the
 	 * AuxCoreBoot1 where ROM code will jump and start executing
 	 * on secondary core once out of WFE
