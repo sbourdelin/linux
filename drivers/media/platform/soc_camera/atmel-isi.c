@@ -24,8 +24,8 @@
 #include <linux/pm_runtime.h>
 #include <linux/slab.h>
 
-#include <media/soc_camera.h>
 #include <media/drv-intf/soc_mediabus.h>
+#include <media/soc_camera.h>
 #include <media/v4l2-fwnode.h>
 #include <media/videobuf2-dma-contig.h>
 

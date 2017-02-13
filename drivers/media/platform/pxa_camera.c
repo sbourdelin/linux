@@ -39,8 +39,8 @@
 #include <media/v4l2-clk.h>
 #include <media/v4l2-common.h>
 #include <media/v4l2-device.h>
-#include <media/v4l2-ioctl.h>
 #include <media/v4l2-fwnode.h>
+#include <media/v4l2-ioctl.h>
 
 #include <media/videobuf2-dma-sg.h>
 

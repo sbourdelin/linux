@@ -40,12 +40,12 @@
 #include <linux/workqueue.h>
 #include <linux/regmap.h>
 
-#include <media/i2c/adv7604.h>
 #include <media/cec.h>
+#include <media/i2c/adv7604.h>
 #include <media/v4l2-ctrls.h>
-#include <media/v4l2-device.h>
 #include <media/v4l2-event.h>
 #include <media/v4l2-dv-timings.h>
+#include <media/v4l2-device.h>
 #include <media/v4l2-fwnode.h>
 
 static int debug;
