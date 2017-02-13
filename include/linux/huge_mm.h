@@ -104,15 +104,12 @@ void deferred_split_huge_page(struct page *page);
 void __split_huge_pmd(struct vm_area_struct *vma, pmd_t *pmd,
 		unsigned long address, bool freeze, struct page *page);
 
-#define split_huge_pmd(__vma, __pmd, __address)				\
-	do {								\
-		pmd_t *____pmd = (__pmd);				\
-		if (pmd_trans_huge(*____pmd)				\
-					|| pmd_devmap(*____pmd))	\
-			__split_huge_pmd(__vma, __pmd, __address,	\
-						false, NULL);		\
-	}  while (0)
-
+static inline void split_huge_pmd(struct vm_area_struct *vma, pmd_t *pmd,
+		unsigned long address)
+{
+	if (pmd_trans_huge(*pmd) || pmd_devmap(*pmd))
+		__split_huge_pmd(vma, pmd, address, false, NULL);
+}
 
 void split_huge_pmd_address(struct vm_area_struct *vma, unsigned long address,
 		bool freeze, struct page *page);
@@ -186,9 +183,8 @@ static inline int split_huge_page(struct page *page)
 	return 0;
 }
 static inline void deferred_split_huge_page(struct page *page) {}
-#define split_huge_pmd(__vma, __pmd, __address)	\
-	do { } while (0)
-
+static inline void split_huge_pmd(struct vm_area_struct *vma, pmd_t *pmd,
+		unsigned long address) {}
 static inline void __split_huge_pmd(struct vm_area_struct *vma, pmd_t *pmd,
 		unsigned long address, bool freeze, struct page *page) {}
 static inline void split_huge_pmd_address(struct vm_area_struct *vma,
