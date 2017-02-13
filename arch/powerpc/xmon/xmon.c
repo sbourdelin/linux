@@ -29,6 +29,12 @@
 #include <linux/nmi.h>
 #include <linux/ctype.h>
 
+#ifdef CONFIG_DEBUG_FS
+#include <linux/debugfs.h>
+#include <linux/uaccess.h>
+#include <linux/slab.h>
+#endif
+
 #include <asm/ptrace.h>
 #include <asm/string.h>
 #include <asm/prom.h>
@@ -184,7 +190,12 @@ static void dump_tlb_44x(void);
 static void dump_tlb_book3e(void);
 #endif
 
-static int xmon_no_auto_backtrace;
+/* xmon_state values */
+#define XMON_OFF	0
+#define XMON_ON	1
+#define XMON_EARLY	2
+#define XMON_NOBT	3
+static int xmon_state;
 
 #ifdef CONFIG_PPC64
 #define REG		"%.16lx"
@@ -880,8 +891,8 @@ cmds(struct pt_regs *excp)
 	last_cmd = NULL;
 	xmon_regs = excp;
 
-	if (!xmon_no_auto_backtrace) {
-		xmon_no_auto_backtrace = 1;
+	if (xmon_state != XMON_NOBT) {
+		xmon_state = XMON_NOBT;
 		xmon_show_stack(excp->gpr[1], excp->link, excp->nip);
 	}
 
@@ -3244,6 +3255,26 @@ static void xmon_init(int enable)
 	}
 }
 
+static int parse_xmon(char *p)
+{
+	if (!p || strncmp(p, "early", 5) == 0) {
+		/* just "xmon" is equivalent to "xmon=early" */
+		xmon_init(1);
+		xmon_state = XMON_EARLY;
+	} else if (strncmp(p, "on", 2) == 0) {
+		xmon_init(1);
+		xmon_state = XMON_ON;
+	} else if (strncmp(p, "off", 3) == 0) {
+		xmon_init(0);
+		xmon_state = XMON_OFF;
+	} else if (strncmp(p, "nobt", 4) == 0)
+		xmon_state = XMON_NOBT;
+	else
+		return 1;
+
+	return 0;
+}
+
 #ifdef CONFIG_MAGIC_SYSRQ
 static void sysrq_handle_xmon(int key)
 {
@@ -3266,34 +3297,89 @@ static int __init setup_xmon_sysrq(void)
 __initcall(setup_xmon_sysrq);
 #endif /* CONFIG_MAGIC_SYSRQ */
 
-static int __initdata xmon_early, xmon_off;
+#ifdef CONFIG_DEBUG_FS
+static ssize_t xmon_dbgfs_read(struct file *file, char __user *ubuffer,
+				size_t len, loff_t *offset)
+{
+	int buf_len = 0;
+	char buf[6] = { 0 };
+
+	switch (xmon_state) {
+	case XMON_OFF:
+		buf_len = sprintf(buf, "off");
+		break;
+	case XMON_ON:
+		buf_len = sprintf(buf, "on");
+		break;
+	case XMON_EARLY:
+		buf_len = sprintf(buf, "early");
+		break;
+	case XMON_NOBT:
+		buf_len = sprintf(buf, "nobt");
+		break;
+	}
+
+	return simple_read_from_buffer(ubuffer, len, offset, buf, buf_len);
+}
+
+static ssize_t xmon_dbgfs_write(struct file *file, const char __user *ubuffer,
+				size_t len, loff_t *offset)
+{
+	int ret, not_copied;
+	char *buf;
+
+	/* Valid states are on, off, early and nobt. */
+	if ((*offset != 0) || (len <= 0) || (len > 6))
+                return -EINVAL;
+
+	buf = kzalloc(len + 1, GFP_KERNEL);
+	if (!buf)
+		return -ENOMEM;
+
+	not_copied = copy_from_user(buf, ubuffer, len);
+	if (not_copied) {
+		kfree(buf);
+		return -EFAULT;
+        }
+
+	ret = parse_xmon(buf);
+	kfree(buf);
+
+	/* parse_xmon returns 0 on success. */
+	if (ret)
+		return -EINVAL;
+	return len;
+}
+
+static const struct file_operations xmon_dbgfs_ops = {
+	.owner = THIS_MODULE,
+	.open = simple_open,
+	.read = xmon_dbgfs_read,
+	.write = xmon_dbgfs_write,
+};
+
+static int __init setup_xmon_dbgfs(void)
+{
+	debugfs_create_file("xmon", 0600, powerpc_debugfs_root, NULL,
+			    &xmon_dbgfs_ops);
+	return 0;
+}
+__initcall(setup_xmon_dbgfs);
+#endif /*CONFIG_DEBUG_FS*/
 
 static int __init early_parse_xmon(char *p)
 {
-	if (!p || strncmp(p, "early", 5) == 0) {
-		/* just "xmon" is equivalent to "xmon=early" */
-		xmon_init(1);
-		xmon_early = 1;
-	} else if (strncmp(p, "on", 2) == 0)
-		xmon_init(1);
-	else if (strncmp(p, "off", 3) == 0)
-		xmon_off = 1;
-	else if (strncmp(p, "nobt", 4) == 0)
-		xmon_no_auto_backtrace = 1;
-	else
-		return 1;
-
-	return 0;
+	return parse_xmon(p);
 }
 early_param("xmon", early_parse_xmon);
 
 void __init xmon_setup(void)
 {
 #ifdef CONFIG_XMON_DEFAULT
-	if (!xmon_off)
+	if (xmon_state) /* XMON_OFF */
 		xmon_init(1);
 #endif
-	if (xmon_early)
+	if (xmon_state == XMON_EARLY)
 		debugger(NULL);
 }
 
