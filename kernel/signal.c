@@ -1738,6 +1738,20 @@ static inline int may_ptrace_stop(void)
 {
 	if (!likely(current->ptrace))
 		return 0;
+
+	/*
+	 * Other checks can only affect PTRACE_EVENT_EXIT, a task with the
+	 * pending SIGKILL can't block in TASK_TRACED. But PTRACE_EVENT_EXIT
+	 * can be reported after SIGKILL was already dequeued.
+	 */
+
+	/*
+	 * Coredump or exec. We must not stop in the latter case, debuger can
+	 * wait for cred_guard_mutex held by execing thread.
+	 */
+	if (current->signal->group_exit_task)
+		return 0;
+
 	/*
 	 * Are we in the middle of do_coredump?
 	 * If so and our tracer is also part of the coredump stopping
@@ -1746,10 +1760,6 @@ static inline int may_ptrace_stop(void)
 	 * If SIGKILL was already sent before the caller unlocked
 	 * ->siglock we must see ->core_state != NULL. Otherwise it
 	 * is safe to enter schedule().
-	 *
-	 * This is almost outdated, a task with the pending SIGKILL can't
-	 * block in TASK_TRACED. But PTRACE_EVENT_EXIT can be reported
-	 * after SIGKILL was already dequeued.
 	 */
 	if (unlikely(current->mm->core_state) &&
 	    unlikely(current->mm == current->parent->mm))
