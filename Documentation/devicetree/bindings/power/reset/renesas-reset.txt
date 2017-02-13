@@ -1,0 +1,15 @@
+Device-Tree bindings for Renesas WDT reset functionality
+
+Required properties:
+  - compatible: must be one or more of the following:
+    - "renesas,r7s72100-reset" for the r7s72100 SoC
+    - "renesas,wdt-reset"
+                This is a fallback for the above renesas,*-reset entries
+
+  - reg: base address and length of the WDT register block
+
+Example node:
+	wdt: timer@fcfe0000 {
+		compatible = "renesas,r7s72100-reset", "renesas,wdt-reset";
+		reg = <0xfcfe0000 0x6>;
+	};
