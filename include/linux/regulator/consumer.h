@@ -222,7 +222,9 @@ void devm_regulator_bulk_unregister_supply_alias(struct device *dev,
 
 /* regulator output control and status */
 int __must_check regulator_enable(struct regulator *regulator);
+int __must_check devm_regulator_enable(struct regulator *regulator);
 int regulator_disable(struct regulator *regulator);
+int devm_regulator_disable(struct regulator *regulator);
 int regulator_force_disable(struct regulator *regulator);
 int regulator_is_enabled(struct regulator *regulator);
 int regulator_disable_deferred(struct regulator *regulator, int ms);
@@ -233,8 +235,13 @@ int __must_check devm_regulator_bulk_get(struct device *dev, int num_consumers,
 					 struct regulator_bulk_data *consumers);
 int __must_check regulator_bulk_enable(int num_consumers,
 				       struct regulator_bulk_data *consumers);
+int __must_check devm_regulator_bulk_enable(struct device *dev,
+					int num_consumers,
+					struct regulator_bulk_data *consumers);
 int regulator_bulk_disable(int num_consumers,
 			   struct regulator_bulk_data *consumers);
+int devm_regulator_bulk_disable(struct device *dev, int num_consumers,
+				struct regulator_bulk_data *consumers);
 int regulator_bulk_force_disable(int num_consumers,
 			   struct regulator_bulk_data *consumers);
 void regulator_bulk_free(int num_consumers,
@@ -396,7 +403,19 @@ static inline int regulator_enable(struct regulator *regulator)
 	return 0;
 }
 
+static inline int devm_regulator_enable(struct device *dev,
+					struct regulator *regulator)
+{
+	return 0;
+}
+
 static inline int regulator_disable(struct regulator *regulator)
+{
+	return 0;
+}
+
+static inline int devm_regulator_disable(struct device *dev,
+					 struct regulator *regulator)
 {
 	return 0;
 }
@@ -436,8 +455,23 @@ static inline int regulator_bulk_enable(int num_consumers,
 	return 0;
 }
 
+static inline int devm_regulator_bulk_enable(struct device *dev,
+					int num_consumers,
+					struct regulator_bulk_data *consumers)
+{
+	return 0;
+}
+
+
 static inline int regulator_bulk_disable(int num_consumers,
 					 struct regulator_bulk_data *consumers)
+{
+	return 0;
+}
+
+static inline int devm_regulator_bulk_disable(struct device *dev,
+					int num_consumers,
+					struct regulator_bulk_data *consumers)
 {
 	return 0;
 }

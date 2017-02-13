@@ -120,6 +120,62 @@ void devm_regulator_put(struct regulator *regulator)
 }
 EXPORT_SYMBOL_GPL(devm_regulator_put);
 
+static void __devm_regulator_disable(struct device *dev, void *res)
+{
+	regulator_disable(*(struct regulator **)res);
+}
+
+/**
+ * devm_regulator_enable - Resource managed regulator_enable()
+ * @regulator: regulator to enable
+ *
+ * Managed regulator_enable(). Regulators enabled by this function are
+ * automatically disabled on driver detach. See regulator_enable() for more
+ * information.
+ */
+int devm_regulator_enable(struct regulator *regulator)
+{
+	struct regulator **ptr;
+	int error;
+
+	ptr = devres_alloc(__devm_regulator_disable, sizeof(*ptr), GFP_KERNEL);
+	if (!ptr)
+		return -ENOMEM;
+
+	error = regulator_enable(regulator);
+	if (error) {
+		devres_free(ptr);
+		return error;
+	}
+
+	*ptr = regulator;
+	devres_add(regulator->dev, ptr);
+
+	return 0;
+}
+EXPORT_SYMBOL_GPL(devm_regulator_enable);
+
+/**
+ * devm_regulator_disable - Resource managed regulator_disable()
+ * @regulator: regulator to disable
+ *
+ * Disable a regulator enabled with devm_regulator_enable(). Normally
+ * this function will not need to be called and the resource management
+ * code will ensure that the regulator is disabled.
+ */
+int devm_regulator_disable(struct regulator *regulator)
+{
+	int error;
+
+	error = devres_destroy(regulator->dev, __devm_regulator_disable,
+			       devm_regulator_match, regulator);
+	if (WARN_ON(error))
+		return error;
+
+	return regulator_disable(regulator);
+}
+EXPORT_SYMBOL_GPL(devm_regulator_disable);
+
 struct regulator_bulk_devres {
 	struct regulator_bulk_data *consumers;
 	int num_consumers;
@@ -170,6 +226,88 @@ int devm_regulator_bulk_get(struct device *dev, int num_consumers,
 	return ret;
 }
 EXPORT_SYMBOL_GPL(devm_regulator_bulk_get);
+
+static void __devm_regulator_bulk_disable(struct device *dev, void *res)
+{
+	struct regulator_bulk_devres *devres = res;
+
+	regulator_bulk_disable(devres->num_consumers, devres->consumers);
+}
+
+static int devm_regulator_bulk_match(struct device *dev, void *res, void *data)
+{
+	struct regulator_bulk_devres *r1 = res;
+	struct regulator_bulk_devres *r2 = data;
+
+	if (WARN_ON(!r1 || !r1->consumers || !r1->num_consumers))
+		return 0;
+
+	return r1->consumers == r2->consumers &&
+	       r1->num_consumers == r2->num_consumers;
+}
+
+/**
+ * devm_regulator_bulk_enable - Resource managed regulator_bulk_enable()
+ * @dev: device owning this resource
+ * @num_consumers: number of consumers in @consumers array
+ * @consumers: consumers that need be enabled
+ *
+ * Managed regulator_bulk_enable(). Regulators enabled by this function are
+ * automatically disabled on driver detach. See regulator_bulk_enable() for
+ * more information.
+ */
+int devm_regulator_bulk_enable(struct device *dev, int num_consumers,
+			       struct regulator_bulk_data *consumers)
+{
+	struct regulator_bulk_devres *devres;
+	int error;
+
+	devres = devres_alloc(__devm_regulator_bulk_disable,
+			      sizeof(*devres), GFP_KERNEL);
+	if (!devres)
+		return -ENOMEM;
+
+	error = regulator_bulk_enable(num_consumers, consumers);
+	if (error) {
+		devres_free(devres);
+		return error;
+	}
+
+	devres->consumers = consumers;
+	devres->num_consumers = num_consumers;
+	devres_add(dev, devres);
+
+	return 0;
+}
+EXPORT_SYMBOL_GPL(devm_regulator_bulk_enable);
+
+/**
+ * devm_regulator_bulk_disable - Resource managed regulator_bulk_disable()
+ * @dev: device owning this resource
+ * @num_consumers: number of consumers in @consumers array
+ * @consumers: consumers that were enabled with devm_regulator_bulk_enable()
+ *
+ * Disable regulators enabled with devm_regulator_bulk_enable(). Normally
+ * this function will not need to be called and the resource management
+ * code will ensure that the regulator is disabled.
+ */
+int devm_regulator_bulk_disable(struct device *dev, int num_consumers,
+				struct regulator_bulk_data *consumers)
+{
+	struct regulator_bulk_devres devres = {
+		.consumers	= consumers,
+		.num_consumers	= num_consumers,
+	};
+	int error;
+
+	error = devres_destroy(dev, __devm_regulator_disable,
+			       devm_regulator_bulk_match, &devres);
+	if (WARN_ON(error))
+		return error;
+
+	return regulator_bulk_disable(num_consumers, consumers);
+}
+EXPORT_SYMBOL_GPL(devm_regulator_bulk_disable);
 
 static void devm_rdev_release(struct device *dev, void *res)
 {
