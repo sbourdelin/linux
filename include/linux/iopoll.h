@@ -40,10 +40,12 @@
  * When available, you'll probably want to use one of the specialized
  * macros defined below rather than this macro directly.
  */
-#define readx_poll_timeout(op, addr, val, cond, sleep_us, timeout_us)	\
+#define readx_poll_timeout(op, addr, val, cond, sleep_us, timeout_us)   \
 ({ \
 	ktime_t timeout = ktime_add_us(ktime_get(), timeout_us); \
-	might_sleep_if(sleep_us); \
+	might_sleep(); \
+	unsigned long min = 0; \
+	unsigned long max = sleep_us | 1; \
 	for (;;) { \
 		(val) = op(addr); \
 		if (cond) \
@@ -52,8 +54,10 @@
 			(val) = op(addr); \
 			break; \
 		} \
-		if (sleep_us) \
-			usleep_range((sleep_us >> 2) + 1, sleep_us); \
+		if (min >= 10) \
+			usleep_range(min, max); \
+		max <<= 1; \
+		min = max >> 2; \
 	} \
 	(cond) ? 0 : -ETIMEDOUT; \
 })
