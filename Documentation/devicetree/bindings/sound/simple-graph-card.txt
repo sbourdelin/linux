@@ -1,0 +1,137 @@
+Simple-Graph-Card:
+
+Simple-Graph-Card specifies audio DAI connections of SoC <-> codec.
+It is based on common bindings for device graphs.
+see ${LINUX}/Documentation/devicetree/bindings/graph.txt
+
+Basically, Simple-Graph-Card property is same as Simple-Card.
+see ${LINUX}/Documentation/devicetree/bindings/sound/simple-card.txt
+
+Below are same as Simple-Card.
+
+- simple-audio-card,name
+- simple-audio-card,format
+- simple-audio-card,frame-master
+- simple-audio-card,bitclock-master
+- simple-audio-card,bitclock-inversion
+- simple-audio-card,frame-inversion
+- simple-audio-card,dai-tdm-slot-num
+- simple-audio-card,dai-tdm-slot-width
+- clocks / system-clock-frequency
+
+These should be implemented
+- simple-audio-card,widgets
+- simple-audio-card,routing
+- simple-audio-card,mclk-fs
+- simple-audio-card,hp-det-gpio
+- simple-audio-card,mic-det-gpio
+
+Required properties:
+
+- compatible				: "asoc-simple-graph-card";
+- dais					: list of CPU DAI port{s}
+
+Example: Single DAI case
+
+	sound_card: sound {
+		compatible = "asoc-simple-graph-card";
+
+		dais = <&cpu_port>;
+	};
+
+	codec {
+		...
+		port {
+			codec_endpoint: endpoint {
+				remote-endpoint = <&cpu_endpoint>;
+			};
+		};
+	};
+
+	cpu {
+		...
+		cpu_port: port@0 {
+			cpu_endpoint: endpoint {
+				remote-endpoint = <&codec_endpoint>;
+
+				simple-audio-card,format = "left_j";
+				simple-audio-card,bitclock-master = <&cpu_endpoint>;
+				simple-audio-card,frame-master = <&cpu_endpoint>;
+				...
+			};
+		};
+	};
+
+Example: Multi DAI case
+
+	sound_card: sound {
+		compatible = "asoc-simple-graph-card";
+
+		dais = <&cpu_port0
+			&cpu_port1
+			&cpu_port2>;
+	};
+
+	codec0 {
+		...
+		port {
+			codec0_endpoint: endpoint {
+				remote-endpoint = <&cpu_endpoint0>;
+			};
+		};
+	};
+
+	codec1 {
+		...
+		port {
+			codec1_endpoint: endpoint {
+				remote-endpoint = <&cpu_endpoint1>;
+			};
+		};
+	};
+
+	codec2 {
+		...
+		port {
+			codec2_endpoint: endpoint {
+				remote-endpoint = <&cpu_endpoint2>;
+			};
+		};
+	};
+
+	cpu {
+		...
+		ports {
+			cpu_port0: port@0 {
+				cpu_endpoint0: endpoint {
+					remote-endpoint = <&codec0_endpoint>;
+
+					simple-audio-card,format = "left_j";
+					simple-audio-card,bitclock-master = <&cpu_endpoint0>;
+					simple-audio-card,frame-master = <&cpu_endpoint0>;
+					...
+				};
+			};
+			cpu_port1: port@1 {
+				cpu_endpoint1: endpoint {
+					remote-endpoint = <&codec1_endpoint>;
+
+					simple-audio-card,format = "i2s";
+					simple-audio-card,bitclock-master = <&cpu_endpoint1>;
+					simple-audio-card,frame-master = <&cpu_endpoint1>;
+					...
+				};
+			};
+			cpu_port2: port@2 {
+				cpu_endpoint2: endpoint {
+					remote-endpoint = <&codec2_endpoint>;
+
+					simple-audio-card,format = "i2s";
+					simple-audio-card,bitclock-master = <&cpu_endpoint2>;
+					simple-audio-card,frame-master = <&cpu_endpoint2>;
+					...
+				};
+			};
+		};
+	};
+
