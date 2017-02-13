@@ -1705,7 +1705,7 @@ static int gfar_restore(struct device *dev)
 
 	gfar_start(priv);
 
-	priv->oldlink = 0;
+	priv->oldlink = 1;
 	priv->oldspeed = 0;
 	priv->oldduplex = -1;
 
@@ -1791,7 +1791,7 @@ static int init_phy(struct net_device *dev)
 	phy_interface_t interface;
 	struct phy_device *phydev;
 
-	priv->oldlink = 0;
+	priv->oldlink = 1;
 	priv->oldspeed = 0;
 	priv->oldduplex = -1;
 
@@ -2212,7 +2212,7 @@ int startup_gfar(struct net_device *ndev)
 	gfar_start(priv);
 
 	/* force link state update after mac reset */
-	priv->oldlink = 0;
+	priv->oldlink = 1;
 	priv->oldspeed = 0;
 	priv->oldduplex = -1;
 
