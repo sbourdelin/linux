@@ -337,6 +337,14 @@
 
 #define VI_STATUS3                            0x8528
 #define MASK_S_V_COLOR                        0x1e
+#define MASK_S_V_COLOR_RGB                    0x00
+#define MASK_S_V_COLOR_YCBCR601               0x02
+#define MASK_S_V_COLOR_YCBCR709               0x06
+#define MASK_S_V_COLOR_ADOBERGB               0x04
+#define MASK_S_V_COLOR_XVYCC601               0x0a
+#define MASK_S_V_COLOR_XVYCC709               0x0e
+#define MASK_S_V_COLOR_SYCC601                0x12
+#define MASK_S_V_COLOR_ADOBEYCC601            0x1a
 #define MASK_LIMITED                          0x01
 
 #define PHY_CTL0                              0x8531
