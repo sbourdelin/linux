@@ -430,6 +430,10 @@ static int load_elf_fdpic_binary(struct linux_binprm *bprm)
 #endif
 
 	install_exec_creds(bprm);
+	retval = de_thread(current);
+	if (retval)
+		goto error;
+
 	if (create_elf_fdpic_tables(bprm, current->mm,
 				    &exec_params, &interp_params) < 0)
 		goto error;

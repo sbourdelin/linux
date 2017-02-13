@@ -699,8 +699,9 @@ static void exit_notify(struct task_struct *tsk, int group_dead)
 	if (tsk->exit_state == EXIT_DEAD)
 		list_add(&tsk->ptrace_entry, &dead);
 
-	/* mt-exec, de_thread() is waiting for group leader */
-	if (unlikely(tsk->signal->notify_count < 0))
+	/* mt-exec, kill_sub_threads() is waiting for group exit */
+	if (unlikely(tsk->signal->notify_count < 0) &&
+	    !++tsk->signal->notify_count)
 		wake_up_process(tsk->signal->group_exit_task);
 	write_unlock_irq(&tasklist_lock);
 

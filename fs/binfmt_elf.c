@@ -855,13 +855,17 @@ static int load_elf_binary(struct linux_binprm *bprm)
 	setup_new_exec(bprm);
 	install_exec_creds(bprm);
 
+	retval = de_thread(current);
+	if (retval)
+		goto out_free_dentry;
+
 	/* Do this so that we can load the interpreter, if need be.  We will
 	   change some of these later */
 	retval = setup_arg_pages(bprm, randomize_stack_top(STACK_TOP),
 				 executable_stack);
 	if (retval < 0)
 		goto out_free_dentry;
-	
+
 	current->mm->start_stack = bprm->p;
 
 	/* Now we do a little grungy work by mmapping the ELF image into

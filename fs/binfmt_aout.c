@@ -256,6 +256,9 @@ static int load_aout_binary(struct linux_binprm * bprm)
 		return retval;
 
 	install_exec_creds(bprm);
+	retval = de_thread(current);
+	if (retval)
+		return retval;
 
 	if (N_MAGIC(ex) == OMAGIC) {
 		unsigned long text_addr, map_size;

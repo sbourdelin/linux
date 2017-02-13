@@ -101,6 +101,7 @@ extern int __must_check remove_arg_zero(struct linux_binprm *);
 extern int search_binary_handler(struct linux_binprm *);
 extern int flush_old_exec(struct linux_binprm * bprm);
 extern void setup_new_exec(struct linux_binprm * bprm);
+extern int de_thread(struct task_struct *tsk);
 extern void would_dump(struct linux_binprm *, struct file *);
 
 extern int suid_dumpable;
