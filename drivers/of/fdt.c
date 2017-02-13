@@ -582,7 +582,7 @@ static int __init __reserved_mem_reserve_reg(unsigned long node,
 	phys_addr_t base, size;
 	int len;
 	const __be32 *prop;
-	int nomap, first = 1;
+	int nomap, raw_pfn, first = 1;
 
 	prop = of_get_flat_dt_prop(node, "reg", &len);
 	if (!prop)
@@ -595,13 +595,15 @@ static int __init __reserved_mem_reserve_reg(unsigned long node,
 	}
 
 	nomap = of_get_flat_dt_prop(node, "no-map", NULL) != NULL;
+	raw_pfn = of_get_flat_dt_prop(node, "raw-pfn", NULL) != NULL;
 
 	while (len >= t_len) {
 		base = dt_mem_next_cell(dt_root_addr_cells, &prop);
 		size = dt_mem_next_cell(dt_root_size_cells, &prop);
 
 		if (size &&
-		    early_init_dt_reserve_memory_arch(base, size, nomap) == 0)
+		    early_init_dt_reserve_memory_arch(base, size, nomap,
+				raw_pfn) == 0)
 			pr_debug("Reserved memory: reserved region for node '%s': base %pa, size %ld MiB\n",
 				uname, &base, (unsigned long)size / SZ_1M);
 		else
@@ -699,7 +701,7 @@ void __init early_init_fdt_scan_reserved_mem(void)
 		fdt_get_mem_rsv(initial_boot_params, n, &base, &size);
 		if (!size)
 			break;
-		early_init_dt_reserve_memory_arch(base, size, 0);
+		early_init_dt_reserve_memory_arch(base, size, 0, 0);
 	}
 
 	of_scan_flat_dt(__fdt_scan_reserved_mem, NULL);
@@ -717,6 +719,7 @@ void __init early_init_fdt_reserve_self(void)
 	/* Reserve the dtb region */
 	early_init_dt_reserve_memory_arch(__pa(initial_boot_params),
 					  fdt_totalsize(initial_boot_params),
+					  0,
 					  0);
 }
 
@@ -1161,11 +1164,21 @@ int __init __weak early_init_dt_mark_hotplug_memory_arch(u64 base, u64 size)
 }
 
 int __init __weak early_init_dt_reserve_memory_arch(phys_addr_t base,
-					phys_addr_t size, bool nomap)
+					phys_addr_t size, bool nomap,
+					bool raw_pfn)
 {
+	int err;
+
 	if (nomap)
 		return memblock_remove(base, size);
-	return memblock_reserve(base, size);
+
+	err = memblock_reserve(base, size);
+	if (err == 0) {
+		if (raw_pfn)
+			memblock_mark_raw_pfn(base, size);
+	}
+
+	return err;
 }
 
 /*
@@ -1188,10 +1201,12 @@ int __init __weak early_init_dt_mark_hotplug_memory_arch(u64 base, u64 size)
 }
 
 int __init __weak early_init_dt_reserve_memory_arch(phys_addr_t base,
-					phys_addr_t size, bool nomap)
+					phys_addr_t size, bool nomap,
+					bool raw_pfn)
 {
-	pr_err("Reserved memory not supported, ignoring range %pa - %pa%s\n",
-		  &base, &size, nomap ? " (nomap)" : "");
+	pr_err("Reserved memory not supported, ignoring range %pa - %pa%s - %pa%s\n",
+		  &base, &size, nomap ? " (nomap)" : "",
+		  raw_pfn ? " (raw-pfn)" : "");
 	return -ENOSYS;
 }
 

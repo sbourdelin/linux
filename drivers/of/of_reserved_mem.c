@@ -33,7 +33,7 @@ static int reserved_mem_count;
 #include <linux/memblock.h>
 int __init __weak early_init_dt_alloc_reserved_memory_arch(phys_addr_t size,
 	phys_addr_t align, phys_addr_t start, phys_addr_t end, bool nomap,
-	phys_addr_t *res_base)
+	bool raw_pfn, phys_addr_t *res_base)
 {
 	phys_addr_t base;
 	/*
@@ -56,15 +56,19 @@ int __init __weak early_init_dt_alloc_reserved_memory_arch(phys_addr_t size,
 	*res_base = base;
 	if (nomap)
 		return memblock_remove(base, size);
+
+	if (raw_pfn)
+		memblock_mark_raw_pfn(base, size);
+
 	return 0;
 }
 #else
 int __init __weak early_init_dt_alloc_reserved_memory_arch(phys_addr_t size,
 	phys_addr_t align, phys_addr_t start, phys_addr_t end, bool nomap,
-	phys_addr_t *res_base)
+	bool raw_pfn, phys_addr_t *res_base)
 {
-	pr_err("Reserved memory not supported, ignoring region 0x%llx%s\n",
-		  size, nomap ? " (nomap)" : "");
+	pr_err("Reserved memory not supported, ignoring region 0x%llx%s 0x%llx%s\n",
+		  size, nomap ? " (nomap)" : "", raw_pfn ? " (raw-pfn)" : "");
 	return -ENOSYS;
 }
 #endif
@@ -103,7 +107,7 @@ static int __init __reserved_mem_alloc_size(unsigned long node,
 	phys_addr_t base = 0, align = 0, size;
 	int len;
 	const __be32 *prop;
-	int nomap;
+	int nomap, raw_pfn;
 	int ret;
 
 	prop = of_get_flat_dt_prop(node, "size", &len);
@@ -117,6 +121,7 @@ static int __init __reserved_mem_alloc_size(unsigned long node,
 	size = dt_mem_next_cell(dt_root_size_cells, &prop);
 
 	nomap = of_get_flat_dt_prop(node, "no-map", NULL) != NULL;
+	raw_pfn = of_get_flat_dt_prop(node, "raw-pfn", NULL) != NULL;
 
 	prop = of_get_flat_dt_prop(node, "alignment", &len);
 	if (prop) {
@@ -156,7 +161,8 @@ static int __init __reserved_mem_alloc_size(unsigned long node,
 						       &prop);
 
 			ret = early_init_dt_alloc_reserved_memory_arch(size,
-					align, start, end, nomap, &base);
+					align, start, end, nomap,
+					raw_pfn, &base);
 			if (ret == 0) {
 				pr_debug("allocated memory for '%s' node: base %pa, size %ld MiB\n",
 					uname, &base,
@@ -168,7 +174,8 @@ static int __init __reserved_mem_alloc_size(unsigned long node,
 
 	} else {
 		ret = early_init_dt_alloc_reserved_memory_arch(size, align,
-							0, 0, nomap, &base);
+							0, 0, nomap,
+							raw_pfn, &base);
 		if (ret == 0)
 			pr_debug("allocated memory for '%s' node: base %pa, size %ld MiB\n",
 				uname, &base, (unsigned long)size / SZ_1M);
