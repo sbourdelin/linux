@@ -165,6 +165,9 @@ static inline bool llist_empty(const struct llist_head *head)
 	return ACCESS_ONCE(head->first) == NULL;
 }
 
+/*
+ * Is this necessary? This should be obsolete unless users exist.
+ */
 static inline struct llist_node *llist_next(struct llist_node *node)
 {
 	return node->next;

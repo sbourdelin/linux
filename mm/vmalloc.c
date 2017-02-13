@@ -50,11 +50,9 @@ static void free_work(struct work_struct *w)
 {
 	struct vfree_deferred *p = container_of(w, struct vfree_deferred, wq);
 	struct llist_node *llnode = llist_del_all(&p->list);
-	while (llnode) {
-		void *p = llnode;
-		llnode = llist_next(llnode);
-		__vunmap(p, 1);
-	}
+
+	llist_for_each(llnode, llnode)
+		__vunmap((void *)llnode, 1);
 }
 
 /*** Page table manipulation functions ***/

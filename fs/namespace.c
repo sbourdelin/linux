@@ -1123,12 +1123,10 @@ static LLIST_HEAD(delayed_mntput_list);
 static void delayed_mntput(struct work_struct *unused)
 {
 	struct llist_node *node = llist_del_all(&delayed_mntput_list);
-	struct llist_node *next;
+	struct mount *m;
 
-	for (; node; node = next) {
-		next = llist_next(node);
-		cleanup_mnt(llist_entry(node, struct mount, mnt_llist));
-	}
+	llist_for_each_entry(m, node, mnt_llist)
+		cleanup_mnt(m);
 }
 static DECLARE_DELAYED_WORK(delayed_mntput_work, delayed_mntput);
 
@@ -1656,7 +1654,7 @@ out_unlock:
 	namespace_unlock();
 }
 
-/* 
+/*
  * Is the caller allowed to modify his namespace?
  */
 static inline bool may_mount(void)
@@ -2210,7 +2208,7 @@ static int do_loopback(struct path *path, const char *old_name,
 
 	err = -EINVAL;
 	if (mnt_ns_loop(old_path.dentry))
-		goto out; 
+		goto out;
 
 	mp = lock_mount(path);
 	err = PTR_ERR(mp);
