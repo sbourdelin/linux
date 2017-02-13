@@ -821,10 +821,10 @@ xfs_ialloc(
 	if (ip->i_d.di_version == 1)
 		ip->i_d.di_version = 2;
 
-	inode->i_mode = mode;
+	inode_init_owner(inode, pip ? VFS_I(pip) : NULL, mode);
 	set_nlink(inode, nlink);
-	ip->i_d.di_uid = xfs_kuid_to_uid(current_fsuid());
-	ip->i_d.di_gid = xfs_kgid_to_gid(current_fsgid());
+	ip->i_d.di_uid = i_uid_read(inode);
+	ip->i_d.di_gid = i_gid_read(inode);
 	xfs_set_projid(ip, prid);
 
 	if (pip && XFS_INHERIT_GID(pip)) {
