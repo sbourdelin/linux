@@ -1168,7 +1168,7 @@ validate_exec_list(struct drm_device *dev,
 
 	for (i = 0; i < count; i++) {
 		char __user *ptr = u64_to_user_ptr(exec[i].relocs_ptr);
-		int length; /* limited by fault_in_pages_readable() */
+		unsigned long length;
 
 		if (exec[i].flags & invalid_flags)
 			return -EINVAL;
