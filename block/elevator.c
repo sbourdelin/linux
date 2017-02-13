@@ -99,7 +99,8 @@ static void elevator_put(struct elevator_type *e)
 	module_put(e->elevator_owner);
 }
 
-static struct elevator_type *elevator_get(const char *name, bool try_loading)
+static struct elevator_type *elevator_get(const char *name, bool try_loading,
+					  bool mq_ops)
 {
 	struct elevator_type *e;
 
@@ -111,6 +112,12 @@ static struct elevator_type *elevator_get(const char *name, bool try_loading)
 		request_module("%s-iosched", name);
 		spin_lock(&elv_list_lock);
 		e = elevator_find(name);
+	}
+
+	if (e && (e->uses_mq != mq_ops)) {
+		pr_err("ERROR: attempted to choose %s %s I/O scheduler in blk%s",
+		       name, e->uses_mq ? "blk-mq" : "legacy", mq_ops ? "-mq" : "");
+		e = NULL;
 	}
 
 	if (e && !try_module_get(e->elevator_owner))
@@ -201,7 +208,7 @@ int elevator_init(struct request_queue *q, char *name)
 	q->boundary_rq = NULL;
 
 	if (name) {
-		e = elevator_get(name, true);
+		e = elevator_get(name, true, q->mq_ops);
 		if (!e)
 			return -EINVAL;
 	}
@@ -212,7 +219,7 @@ int elevator_init(struct request_queue *q, char *name)
 	 * off async and request_module() isn't allowed from async.
 	 */
 	if (!e && *chosen_elevator) {
-		e = elevator_get(chosen_elevator, false);
+		e = elevator_get(chosen_elevator, false, q->mq_ops);
 		if (!e)
 			printk(KERN_ERR "I/O scheduler %s not found\n",
 							chosen_elevator);
@@ -220,17 +227,20 @@ int elevator_init(struct request_queue *q, char *name)
 
 	if (!e) {
 		if (q->mq_ops && q->nr_hw_queues == 1)
-			e = elevator_get(CONFIG_DEFAULT_SQ_IOSCHED, false);
+			e = elevator_get(CONFIG_DEFAULT_SQ_IOSCHED, false,
+					 q->mq_ops);
 		else if (q->mq_ops)
-			e = elevator_get(CONFIG_DEFAULT_MQ_IOSCHED, false);
+			e = elevator_get(CONFIG_DEFAULT_MQ_IOSCHED, false,
+					 q->mq_ops);
 		else
-			e = elevator_get(CONFIG_DEFAULT_IOSCHED, false);
+			e = elevator_get(CONFIG_DEFAULT_IOSCHED, false,
+					 q->mq_ops);
 
 		if (!e) {
 			printk(KERN_ERR
 				"Default I/O scheduler not found. " \
 				"Using noop/none.\n");
-			e = elevator_get("noop", false);
+			e = elevator_get("noop", false, q->mq_ops);
 		}
 	}
 
@@ -1051,7 +1061,7 @@ static int __elevator_change(struct request_queue *q, const char *name)
 		return elevator_switch(q, NULL);
 
 	strlcpy(elevator_name, name, sizeof(elevator_name));
-	e = elevator_get(strstrip(elevator_name), true);
+	e = elevator_get(strstrip(elevator_name), true, q->mq_ops);
 	if (!e) {
 		printk(KERN_ERR "elevator: type %s not found\n", elevator_name);
 		return -EINVAL;
