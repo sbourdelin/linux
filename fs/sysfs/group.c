@@ -13,6 +13,7 @@
 #include <linux/kobject.h>
 #include <linux/module.h>
 #include <linux/dcache.h>
+#include <linux/device.h>
 #include <linux/namei.h>
 #include <linux/err.h>
 #include "sysfs.h"
@@ -409,3 +410,126 @@ int __compat_only_sysfs_link_entry_to_kobj(struct kobject *kobj,
 	return IS_ERR(link) ? PTR_ERR(link) : 0;
 }
 EXPORT_SYMBOL_GPL(__compat_only_sysfs_link_entry_to_kobj);
+
+struct sysfs_group_devres {
+	const struct attribute_group *group;
+};
+
+static int devm_sysfs_group_match(struct device *dev, void *res, void *data)
+{
+	return ((struct sysfs_group_devres *)res)->group == data;
+}
+
+static void devm_sysfs_group_remove_group(struct device *dev, void *res)
+{
+	struct sysfs_group_devres *devres = res;
+	const struct attribute_group *group = devres->group;
+
+	dev_dbg(dev, "%s: removing group %p\n", __func__, group);
+	sysfs_remove_group(&dev->kobj, group);
+}
+
+/**
+ * devm_sysfs_create_group - given a device, create a managed attribute group
+ * @dev:	The device to create the group for
+ * @grp:	The attribute group to create
+ *
+ * This function creates a group for the first time.  It will explicitly
+ * warn and error if any of the attribute files being created already exist.
+ *
+ * Returns 0 on success or error code on failure.
+ */
+int devm_sysfs_create_group(struct device *dev,
+			    const struct attribute_group *grp)
+{
+	struct sysfs_group_devres *devres;
+	int error;
+
+	devres = devres_alloc(devm_sysfs_group_remove_group,
+			      sizeof(*devres), GFP_KERNEL);
+	if (!devres)
+		return -ENOMEM;
+
+	error = sysfs_create_group(&dev->kobj, grp);
+	if (error) {
+		devres_free(devres);
+		return error;
+	}
+
+	devres_add(dev, devres);
+	return 0;
+}
+EXPORT_SYMBOL_GPL(devm_sysfs_create_group);
+
+/**
+ * devm_sysfs_create_groups - create a bunch of managed attribute groups
+ * @dev:	The device to create the group for
+ * @groups:	The attribute groups to create, NULL terminated
+ *
+ * This function creates a bunch of managed attribute groups.  If an error
+ * occurs when creating a group, all previously created groups will be
+ * removed, unwinding everything back to the original state when this
+ * function was called.  It will explicitly warn and error if any of the
+ * attribute files being created already exist.
+ *
+ * Returns 0 on success or error code from sysfs_create_group on failure.
+ */
+int devm_sysfs_create_groups(struct device *dev,
+			     const struct attribute_group **groups)
+{
+	int error;
+	int i;
+
+	if (!groups)
+		return 0;
+
+	for (i = 0; groups[i]; i++) {
+		error = devm_sysfs_create_group(dev, groups[i]);
+		if (error) {
+			while (--i >= 0)
+				devm_sysfs_remove_group(dev, groups[i]);
+			return error;
+		}
+	}
+
+	return 0;
+}
+EXPORT_SYMBOL_GPL(devm_sysfs_create_groups);
+
+/**
+ * devm_sysfs_remove_group: remove a managed group from a device
+ * @dev:	device to remove the group from
+ * @grp:	group to remove
+ *
+ * This function removes a group of attributes from a device.  The attributes
+ * previously have to have been created for this group, otherwise it will fail.
+ */
+void devm_sysfs_remove_group(struct device *dev,
+			     const struct attribute_group *grp)
+{
+	WARN_ON(devres_release(dev, devm_sysfs_group_remove_group,
+			       devm_sysfs_group_match,
+			       /* cast away const */ (void *)grp));
+}
+EXPORT_SYMBOL_GPL(devm_sysfs_remove_group);
+
+/**
+ * devm_sysfs_remove_groups - remove a list of managed groups
+ *
+ * @dev:	The device for the groups to be removed from
+ * @groups:	NULL terminated list of groups to be removed
+ *
+ * If groups is not NULL, remove the specified groups from the device.
+ */
+void devm_sysfs_remove_groups(struct device *dev,
+			      const struct attribute_group **groups)
+{
+	int i;
+
+	if (!groups)
+		return;
+
+	for (i = 0; groups[i]; i++)
+		devm_sysfs_remove_group(dev, groups[i]);
+}
+EXPORT_SYMBOL_GPL(devm_sysfs_remove_groups);
