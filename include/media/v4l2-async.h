@@ -57,7 +57,7 @@ struct v4l2_async_subdev {
 	enum v4l2_async_match_type match_type;
 	union {
 		struct {
-			const struct device_node *node;
+			struct device_node *node;
 		} of;
 		struct {
 			struct fwnode_handle *fwn;
