@@ -990,7 +990,7 @@ static noinline int cow_file_range(struct inode *inode,
 				  ins.offset, /* orig_block_len */
 				  ram_size, /* ram_bytes */
 				  BTRFS_COMPRESS_NONE, /* compress_type */
-				  0 /* type */);
+				  BTRFS_ORDERED_REGULAR /* type */);
 		if (IS_ERR(em))
 			goto out_reserve;
 		free_extent_map(em);
@@ -7511,7 +7511,7 @@ static struct extent_map *create_io_em(struct inode *inode, u64 start, u64 len,
 	ASSERT(type == BTRFS_ORDERED_PREALLOC ||
 	       type == BTRFS_ORDERED_COMPRESSED ||
 	       type == BTRFS_ORDERED_NOCOW ||
-	       type == 0);
+	       type == BTRFS_ORDERED_REGULAR);
 
 	em_tree = &BTRFS_I(inode)->extent_tree;
 	em = alloc_extent_map();
@@ -7528,9 +7528,9 @@ static struct extent_map *create_io_em(struct inode *inode, u64 start, u64 len,
 	em->ram_bytes = ram_bytes;
 	em->generation = -1;
 	set_bit(EXTENT_FLAG_PINNED, &em->flags);
-	if (type == BTRFS_ORDERED_PREALLOC)
+	if (type == BTRFS_ORDERED_PREALLOC) {
 		set_bit(EXTENT_FLAG_FILLING, &em->flags);
-	else if (type == BTRFS_ORDERED_COMPRESSED) {
+	} else if (type == BTRFS_ORDERED_COMPRESSED) {
 		set_bit(EXTENT_FLAG_COMPRESSED, &em->flags);
 		em->compress_type = compress_type;
 	}
