@@ -372,3 +372,19 @@ struct platform_device ls1x_wdt_pdev = {
 	.num_resources	= ARRAY_SIZE(ls1x_wdt_resources),
 	.resource	= ls1x_wdt_resources,
 };
+
+/* PWM */
+static struct resource ls1x_pwm_resources[] = {
+	{
+		.start	= LS1X_PWM0_BASE,
+		.end	= LS1X_PWM0_BASE + SZ_64 - 1,
+		.flags	= IORESOURCE_MEM,
+	},
+};
+
+struct platform_device ls1x_pwm_pdev = {
+	.name		= "ls1x-pwm",
+	.id		= -1,
+	.num_resources	= ARRAY_SIZE(ls1x_pwm_resources),
+	.resource	= ls1x_pwm_resources,
+};

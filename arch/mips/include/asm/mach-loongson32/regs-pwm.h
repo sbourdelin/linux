@@ -13,10 +13,10 @@
 #define __ASM_MACH_LOONGSON32_REGS_PWM_H
 
 /* Loongson 1 PWM Timer Register Definitions */
-#define PWM_CNT			0x0
-#define PWM_HRC			0x4
-#define PWM_LRC			0x8
-#define PWM_CTRL		0xc
+#define PWM_CNT(n)		((n << 4) + 0x0)
+#define PWM_HRC(n)		((n << 4) + 0x4)
+#define PWM_LRC(n)		((n << 4) + 0x8)
+#define PWM_CTRL(n)		((n << 4) + 0xc)
 
 /* PWM Control Register Bits */
 #define CNT_RST			BIT(7)
