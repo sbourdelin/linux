@@ -1368,6 +1368,20 @@ static void pt_event_destroy(struct perf_event *event)
 
 static int pt_event_init(struct perf_event *event)
 {
+	int cpu, vmx_on = 0;
+
+	get_online_cpus();
+	for_each_online_cpu(cpu) {
+		struct pt *pt = per_cpu_ptr(&pt_ctx, cpu);
+
+		if (READ_ONCE(pt->vmx_on))
+			vmx_on++;
+	}
+	put_online_cpus();
+
+	if (vmx_on)
+		return -EBUSY;
+
 	if (event->attr.type != pt_pmu.pmu.type)
 		return -ENOENT;
 
