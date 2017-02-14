@@ -30,7 +30,7 @@ typedef struct _TX_TS_RECORD{
 	u16				TxCurSeq;
 	BA_RECORD			TxPendingBARecord;	/*  For BA Originator */
 	BA_RECORD			TxAdmittedBARecord;	/*  For BA Originator */
-/* 	QOS_DL_RECORD		DLRecord; */
+/*	QOS_DL_RECORD	DLRecord; */
 	u8				bAddBaReqInProgress;
 	u8				bAddBaReqDelayed;
 	u8				bUsingBa;
@@ -48,7 +48,7 @@ typedef struct _RX_TS_RECORD {
 	u16				RxLastSeqNum;
 	u8				RxLastFragNum;
 	u8				num;
-/* 	QOS_DL_RECORD		DLRecord; */
+/*	QOS_DL_RECOR	DLRecord; */
 } RX_TS_RECORD, *PRX_TS_RECORD;
 
 
