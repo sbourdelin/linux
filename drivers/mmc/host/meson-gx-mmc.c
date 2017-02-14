@@ -456,7 +456,6 @@ static void meson_mmc_start_cmd(struct mmc_host *mmc, struct mmc_command *cmd)
 	desc->cmd_cfg |= (cmd->opcode & CMD_CFG_CMD_INDEX_MASK)	<<
 		CMD_CFG_CMD_INDEX_SHIFT;
 	desc->cmd_cfg |= CMD_CFG_OWNER;  /* owned by CPU */
-	desc->cmd_arg = cmd->arg;
 
 	/* Response */
 	if (cmd->flags & MMC_RSP_PRESENT) {
@@ -464,7 +463,7 @@ static void meson_mmc_start_cmd(struct mmc_host *mmc, struct mmc_command *cmd)
 		if (cmd->flags & MMC_RSP_136)
 			desc->cmd_cfg |= CMD_CFG_RESP_128;
 		desc->cmd_cfg |= CMD_CFG_RESP_NUM;
-		desc->cmd_resp = 0;
+		writel(0, host->regs + SD_EMMC_CMD_RSP);
 
 		if (!(cmd->flags & MMC_RSP_CRC))
 			desc->cmd_cfg |= CMD_CFG_RESP_NOCRC;
@@ -540,9 +539,8 @@ static void meson_mmc_start_cmd(struct mmc_host *mmc, struct mmc_command *cmd)
 	desc->cmd_cfg |= CMD_CFG_END_OF_CHAIN;
 	writel(desc->cmd_cfg, host->regs + SD_EMMC_CMD_CFG);
 	writel(desc->cmd_data, host->regs + SD_EMMC_CMD_DAT);
-	writel(desc->cmd_resp, host->regs + SD_EMMC_CMD_RSP);
 	wmb(); /* ensure descriptor is written before kicked */
-	writel(desc->cmd_arg, host->regs + SD_EMMC_CMD_ARG);
+	writel(cmd->arg, host->regs + SD_EMMC_CMD_ARG);
 }
 
 static void meson_mmc_request(struct mmc_host *mmc, struct mmc_request *mrq)
