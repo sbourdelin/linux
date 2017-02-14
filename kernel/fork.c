@@ -1166,6 +1166,10 @@ static int copy_mm(unsigned long clone_flags, struct task_struct *tsk)
 	tsk->last_switch_count = tsk->nvcsw + tsk->nivcsw;
 #endif
 
+#ifdef CONFIG_MMU
+	INIT_LIST_HEAD(&tsk->oom_reaper_list);
+#endif
+
 	tsk->mm = NULL;
 	tsk->active_mm = NULL;
 

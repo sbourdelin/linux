@@ -1,6 +1,6 @@
 /*
  *  linux/mm/oom_kill.c
- * 
+ *
  *  Copyright (C)  1998,2000  Rik van Riel
  *	Thanks go out to Claus Fischer for some serious inspiration and
  *	for goading me into coding this file...
@@ -458,7 +458,7 @@ bool process_shares_mm(struct task_struct *p, struct mm_struct *mm)
  */
 static struct task_struct *oom_reaper_th;
 static DECLARE_WAIT_QUEUE_HEAD(oom_reaper_wait);
-static struct task_struct *oom_reaper_list;
+static LIST_HEAD(oom_reaper_list);
 static DEFINE_SPINLOCK(oom_reaper_lock);
 
 static bool __oom_reap_task_mm(struct task_struct *tsk, struct mm_struct *mm)
@@ -572,7 +572,7 @@ static void oom_reap_task(struct task_struct *tsk)
 	debug_show_all_locks();
 
 done:
-	tsk->oom_reaper_list = NULL;
+	list_del_init(&tsk->oom_reaper_list);
 
 	/*
 	 * Hide this mm from OOM killer because it has been either reaped or
@@ -589,12 +589,15 @@ static int oom_reaper(void *unused)
 	while (true) {
 		struct task_struct *tsk = NULL;
 
-		wait_event_freezable(oom_reaper_wait, oom_reaper_list != NULL);
+		wait_event_freezable(oom_reaper_wait,
+				     !list_empty(&oom_reaper_list));
+
 		spin_lock(&oom_reaper_lock);
-		if (oom_reaper_list != NULL) {
-			tsk = oom_reaper_list;
-			oom_reaper_list = tsk->oom_reaper_list;
-		}
+		tsk = list_first_entry_or_null(&oom_reaper_list,
+					       struct task_struct,
+					       oom_reaper_list);
+		if (tsk)
+			list_del_init(&tsk->oom_reaper_list);
 		spin_unlock(&oom_reaper_lock);
 
 		if (tsk)
@@ -610,14 +613,13 @@ static void wake_oom_reaper(struct task_struct *tsk)
 		return;
 
 	/* tsk is already queued? */
-	if (tsk == oom_reaper_list || tsk->oom_reaper_list)
+	if (!list_empty(&tsk->oom_reaper_list))
 		return;
 
 	get_task_struct(tsk);
 
 	spin_lock(&oom_reaper_lock);
-	tsk->oom_reaper_list = oom_reaper_list;
-	oom_reaper_list = tsk;
+	list_add_tail(&tsk->oom_reaper_list, &oom_reaper_list);
 	spin_unlock(&oom_reaper_lock);
 	wake_up(&oom_reaper_wait);
 }
