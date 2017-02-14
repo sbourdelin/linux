@@ -555,11 +555,7 @@ static void meson_mmc_request(struct mmc_host *mmc, struct mmc_request *mrq)
 	writel(0, host->regs + SD_EMMC_START);
 
 	host->mrq = mrq;
-
-	if (mrq->sbc)
-		meson_mmc_start_cmd(mmc, mrq->sbc);
-	else
-		meson_mmc_start_cmd(mmc, mrq->cmd);
+	meson_mmc_start_cmd(mmc, mrq->cmd);
 }
 
 static int meson_mmc_read_resp(struct mmc_host *mmc, struct mmc_command *cmd)
@@ -690,7 +686,7 @@ static irqreturn_t meson_mmc_irq_thread(int irq, void *dev_id)
 	}
 
 	meson_mmc_read_resp(host->mmc, cmd);
-	if (!data || !data->stop || mrq->sbc)
+	if (!data || !data->stop)
 		meson_mmc_request_done(host->mmc, mrq);
 	else
 		meson_mmc_start_cmd(host->mmc, data->stop);
