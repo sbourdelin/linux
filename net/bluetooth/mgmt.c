@@ -5540,6 +5540,7 @@ static int load_conn_param(struct sock *sk, struct hci_dev *hdev, void *data,
 		hci_param->conn_max_interval = max;
 		hci_param->conn_latency = latency;
 		hci_param->supervision_timeout = timeout;
+		hci_param->conn_config = BT_LE_CONN_CONFIG_CUSTOM_LATENCY;
 	}
 
 	hci_dev_unlock(hdev);

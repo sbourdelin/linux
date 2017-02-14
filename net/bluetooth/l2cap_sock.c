@@ -514,6 +514,35 @@ static int l2cap_sock_getsockopt(struct socket *sock, int level, int optname,
 	lock_sock(sk);
 
 	switch (optname) {
+	case BT_LE_CONN_CONFIG: {
+		enum bt_le_conn_config conn_config;
+		struct hci_conn_params *params;
+		struct hci_conn *hcon;
+
+		if (!chan->conn) {
+			err = -ENOTCONN;
+			break;
+		}
+
+		hcon = chan->conn->hcon;
+		hci_dev_lock(hcon->hdev);
+
+		params = hci_conn_params_lookup(hcon->hdev,
+			&hcon->dst, hcon->dst_type);
+
+		if (params)
+			conn_config = params->conn_config;
+		else
+			conn_config = BT_LE_CONN_CONFIG_DEFAULT_LATENCY;
+
+		hci_dev_unlock(hcon->hdev);
+
+		len = min_t(unsigned int, len, sizeof(conn_config));
+		if (copy_to_user(optval, (char *) &conn_config, len))
+			err = -EFAULT;
+
+		break;
+	}
 	case BT_SECURITY:
 		if (chan->chan_type != L2CAP_CHAN_CONN_ORIENTED &&
 		    chan->chan_type != L2CAP_CHAN_FIXED &&
@@ -761,6 +790,86 @@ static int l2cap_sock_setsockopt(struct socket *sock, int level, int optname,
 	lock_sock(sk);
 
 	switch (optname) {
+	case BT_LE_CONN_CONFIG: {
+		enum bt_le_conn_config conn_config;
+		struct hci_conn_params *hci_param;
+		struct hci_conn *hcon;
+		u16 min_interval = 0, max_interval = 0, latency = 0;
+
+		len = min_t(unsigned int, sizeof(conn_config), optlen);
+		if (copy_from_user((char *) &conn_config, optval, len)) {
+			err = -EFAULT;
+			break;
+		}
+
+		if (!chan->conn) {
+			err = -ENOTCONN;
+			break;
+		}
+
+		/* CUSTOM must be set only by the kernel */
+		if (conn_config >= BT_LE_CONN_CONFIG_CUSTOM_LATENCY) {
+			err = -EINVAL;
+			BT_ERR("Ignoring invalid connection configuration");
+			break;
+		}
+
+		hcon = chan->conn->hcon;
+
+		hci_dev_lock(hcon->hdev);
+
+		hci_conn_params_clear_disabled(hcon->hdev);
+
+		/* We add new param in case it doesn't exist.
+		 * hci_param will be updated in hci_le_conn_update(). */
+		hci_param = hci_conn_params_add(hcon->hdev,
+			&hcon->dst, hcon->dst_type);
+		if (!hci_param) {
+			err = -ENOMEM;
+			BT_ERR("Failed to add connection parameters");
+			hci_dev_unlock(hcon->hdev);
+			break;
+		}
+
+		hci_param->conn_config = conn_config;
+
+		switch (conn_config) {
+		case BT_LE_CONN_CONFIG_LOW_LATENCY:
+			min_interval = 0x0006;
+			max_interval = 0x000c;
+			latency = 0x0000;
+			break;
+		case BT_LE_CONN_CONFIG_HIGH_LATENCY:
+			min_interval = 0x0038;
+			max_interval = 0x0c80;
+			latency = 0x01f3;
+			break;
+		case BT_LE_CONN_CONFIG_DEFAULT_LATENCY:
+		default:
+			/* make sure we don't have non-supported configs */
+			hci_param->conn_config =
+				BT_LE_CONN_CONFIG_DEFAULT_LATENCY;
+			min_interval = hcon->hdev->le_conn_min_interval;
+			max_interval = hcon->hdev->le_conn_max_interval;
+			latency = hcon->hdev->le_conn_latency;
+			break;
+		}
+
+		hci_dev_unlock(hcon->hdev);
+
+		l2cap_le_conn_req(chan->conn, min_interval, max_interval,
+				latency, hci_param->supervision_timeout);
+
+		/* this function also updates the hci_param value */
+		hci_le_conn_update(hcon, min_interval, max_interval, latency,
+			hci_param->supervision_timeout);
+
+		mgmt_new_conn_param(hcon->hdev, &hcon->dst, hcon->dst_type, true,
+			min_interval, max_interval, latency,
+			hci_param->supervision_timeout);
+		break;
+	}
+
 	case BT_SECURITY:
 		if (chan->chan_type != L2CAP_CHAN_CONN_ORIENTED &&
 		    chan->chan_type != L2CAP_CHAN_FIXED &&

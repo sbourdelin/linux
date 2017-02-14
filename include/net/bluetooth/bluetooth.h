@@ -122,6 +122,15 @@ struct bt_voice {
 #define BT_SNDMTU		12
 #define BT_RCVMTU		13
 
+#define BT_LE_CONN_CONFIG	14
+enum bt_le_conn_config {
+	BT_LE_CONN_CONFIG_DEFAULT_LATENCY = 0,
+	BT_LE_CONN_CONFIG_LOW_LATENCY,
+	BT_LE_CONN_CONFIG_HIGH_LATENCY,
+	/* Kernel-only configuration */
+	BT_LE_CONN_CONFIG_CUSTOM_LATENCY = 100,
+};
+
 __printf(1, 2)
 void bt_info(const char *fmt, ...);
 __printf(1, 2)

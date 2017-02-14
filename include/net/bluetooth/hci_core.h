@@ -522,6 +522,7 @@ struct hci_conn_params {
 	u16 conn_max_interval;
 	u16 conn_latency;
 	u16 supervision_timeout;
+	enum bt_le_conn_config conn_config;
 
 	enum {
 		HCI_AUTO_CONN_DISABLED,

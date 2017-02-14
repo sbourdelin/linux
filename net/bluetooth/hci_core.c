@@ -2824,6 +2824,7 @@ struct hci_conn_params *hci_conn_params_add(struct hci_dev *hdev,
 	params->conn_latency = hdev->le_conn_latency;
 	params->supervision_timeout = hdev->le_supv_timeout;
 	params->auto_connect = HCI_AUTO_CONN_DISABLED;
+	params->conn_config = BT_LE_CONN_CONFIG_DEFAULT_LATENCY;
 
 	BT_DBG("addr %pMR (type %u)", addr, addr_type);
 
