@@ -213,7 +213,8 @@ ieee80211_determine_chantype(struct ieee80211_sub_if_data *sdata,
 	}
 
 	vht_chandef = *chandef;
-	if (!ieee80211_chandef_vht_oper(vht_oper, &vht_chandef)) {
+	if (!ieee80211_chandef_vht_oper(&sdata->local->hw,
+					vht_oper, ht_oper, &vht_chandef)) {
 		if (!(ifmgd->flags & IEEE80211_STA_DISABLE_VHT))
 			sdata_info(sdata,
 				   "AP VHT information is invalid, disable VHT\n");
