@@ -1259,7 +1259,7 @@ static void pt_event_start(struct perf_event *event, int mode)
 	struct pt_buffer *buf;
 
 	if (READ_ONCE(pt->vmx_on))
-		return;
+		goto fail_stop;
 
 	buf = perf_aux_output_begin(&pt->handle, event);
 	if (!buf)
