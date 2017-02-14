@@ -814,10 +814,10 @@ xfs_ialloc(
 	if (ip->i_d.di_version == 1)
 		ip->i_d.di_version = 2;
 
-	inode->i_mode = mode;
+	inode_init_owner(inode, pip ? VFS_I(pip) : NULL, mode);
 	set_nlink(inode, nlink);
-	ip->i_d.di_uid = xfs_kuid_to_uid(current_fsuid());
-	ip->i_d.di_gid = xfs_kgid_to_gid(current_fsgid());
+	ip->i_d.di_uid = i_uid_read(inode);
+	ip->i_d.di_gid = i_gid_read(inode);
 	xfs_set_projid(ip, prid);
 
 	if (pip && XFS_INHERIT_GID(pip)) {
@@ -1172,10 +1172,9 @@ xfs_create(
 	/*
 	 * Make sure that we have allocated dquot(s) on disk.
 	 */
-	error = xfs_qm_vop_dqalloc(dp, xfs_kuid_to_uid(current_fsuid()),
-					xfs_kgid_to_gid(current_fsgid()), prid,
-					XFS_QMOPT_QUOTALL | XFS_QMOPT_INHERIT,
-					&udqp, &gdqp, &pdqp);
+	error = xfs_qm_vop_dqalloc(dp, i_fsuid(VFS_I(dp)), i_fsgid(VFS_I(dp)),
+				   prid, XFS_QMOPT_QUOTALL | XFS_QMOPT_INHERIT,
+				   &udqp, &gdqp, &pdqp);
 	if (error)
 		return error;
 
@@ -1347,10 +1346,9 @@ xfs_create_tmpfile(
 	/*
 	 * Make sure that we have allocated dquot(s) on disk.
 	 */
-	error = xfs_qm_vop_dqalloc(dp, xfs_kuid_to_uid(current_fsuid()),
-				xfs_kgid_to_gid(current_fsgid()), prid,
-				XFS_QMOPT_QUOTALL | XFS_QMOPT_INHERIT,
-				&udqp, &gdqp, &pdqp);
+	error = xfs_qm_vop_dqalloc(dp, i_fsuid(VFS_I(dp)), i_fsgid(VFS_I(dp)),
+				   prid, XFS_QMOPT_QUOTALL | XFS_QMOPT_INHERIT,
+				   &udqp, &gdqp, &pdqp);
 	if (error)
 		return error;
 
