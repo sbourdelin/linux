@@ -197,6 +197,20 @@ ieee80211_vht_cap_ie_to_sta_vht_cap(struct ieee80211_sub_if_data *sdata,
 		break;
 	}
 
+	/* keep these, no need to limit to our own */
+	vht_cap->vht_mcs.tx_highest = vht_cap_ie->supp_mcs.tx_highest;
+	vht_cap->vht_mcs.rx_highest = vht_cap_ie->supp_mcs.rx_highest;
+
+	/*
+	 * copy these only if rate control supports it, since otherwise some
+	 * helper functions might return data that's not valid
+	 */
+	if (ieee80211_hw_check(&sdata->local->hw, SUPPORTS_VHT_EXT_NSS_BW))
+		vht_cap->cap |= (cap_info & IEEE80211_VHT_CAP_EXT_NSS_BW_MASK);
+	else
+		vht_cap->vht_mcs.tx_highest &=
+			~cpu_to_le16(IEEE80211_VHT_EXT_NSS_BW_CAPABLE);
+
 	/* symmetric capabilities */
 	vht_cap->cap |= cap_info & own_cap.cap &
 			(IEEE80211_VHT_CAP_SHORT_GI_80 |
