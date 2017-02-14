@@ -624,7 +624,7 @@ static int __init sprd_early_console_setup(
 	device->con->write = sprd_early_write;
 	return 0;
 }
-OF_EARLYCON_DECLARE(sprd_serial, "sprd,sc9836-uart",
+OF_EARLYCON_DECLARE(sprd_serial, "sprd,sc-uart",
 		    sprd_early_console_setup);
 
 #else /* !CONFIG_SERIAL_SPRD_CONSOLE */
@@ -777,7 +777,7 @@ static int sprd_resume(struct device *dev)
 static SIMPLE_DEV_PM_OPS(sprd_pm_ops, sprd_suspend, sprd_resume);
 
 static const struct of_device_id serial_ids[] = {
-	{.compatible = "sprd,sc9836-uart",},
+	{.compatible = "sprd,sc-uart",},
 	{}
 };
 MODULE_DEVICE_TABLE(of, serial_ids);
