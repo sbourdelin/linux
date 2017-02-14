@@ -73,6 +73,7 @@
 #include <linux/signalfd.h>
 #include <linux/uprobes.h>
 #include <linux/aio.h>
+#include <linux/oom_score_notifier.h>
 #include <linux/compiler.h>
 #include <linux/sysctl.h>
 #include <linux/kcov.h>
@@ -391,6 +392,7 @@ void __put_task_struct(struct task_struct *tsk)
 	exit_creds(tsk);
 	delayacct_tsk_free(tsk);
 	put_signal_struct(tsk->signal);
+	oom_score_notify_free(tsk);
 
 	if (!profile_handoff_task(tsk))
 		free_task(tsk);
@@ -1790,6 +1792,10 @@ static __latent_entropy struct task_struct *copy_process(
 
 		init_task_pid(p, PIDTYPE_PID, pid);
 		if (thread_group_leader(p)) {
+			retval = oom_score_notify_new(p);
+			if (retval)
+				goto bad_fork_cancel_cgroup;
+
 			init_task_pid(p, PIDTYPE_PGID, task_pgrp(current));
 			init_task_pid(p, PIDTYPE_SID, task_session(current));
 
