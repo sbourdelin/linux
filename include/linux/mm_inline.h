@@ -126,4 +126,24 @@ static __always_inline enum lru_list page_lru(struct page *page)
 
 #define lru_to_page(head) (list_entry((head)->prev, struct page, lru))
 
+/*
+ * lazyfree pages are clean anonymous pages. They have SwapBacked flag cleared
+ * to destinguish normal anonymous pages.
+ */
+static inline void set_page_lazyfree(struct page *page)
+{
+	VM_BUG_ON_PAGE(!PageAnon(page) || !PageSwapBacked(page), page);
+	ClearPageSwapBacked(page);
+}
+
+static inline void clear_page_lazyfree(struct page *page)
+{
+	VM_BUG_ON_PAGE(!PageAnon(page) || PageSwapBacked(page), page);
+	SetPageSwapBacked(page);
+}
+
+static inline bool page_is_lazyfree(struct page *page)
+{
+	return PageAnon(page) && !PageSwapBacked(page);
+}
 #endif
