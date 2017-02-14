@@ -848,7 +848,7 @@ static ssize_t macvtap_put_user(struct macvtap_queue *q,
 		vlan_offset = offsetof(struct vlan_ethhdr, h_vlan_proto);
 		total += VLAN_HLEN;
 
-		ret = skb_copy_datagram_iter(skb, 0, iter, vlan_offset);
+		ret = __skb_copy_datagram_iter(skb, 0, iter, vlan_offset);
 		if (ret || !iov_iter_count(iter))
 			goto done;
 
@@ -857,7 +857,7 @@ static ssize_t macvtap_put_user(struct macvtap_queue *q,
 			goto done;
 	}
 
-	ret = skb_copy_datagram_iter(skb, vlan_offset, iter,
+	ret = __skb_copy_datagram_iter(skb, vlan_offset, iter,
 				     skb->len - vlan_offset);
 
 done:
@@ -899,11 +899,14 @@ static ssize_t macvtap_do_read(struct macvtap_queue *q,
 		finish_wait(sk_sleep(&q->sk), &wait);
 
 	if (skb) {
+		struct iov_iter saved = *to;
 		ret = macvtap_put_user(q, skb, to);
-		if (unlikely(ret < 0))
+		if (unlikely(ret < 0)) {
+			*to = saved;
 			kfree_skb(skb);
-		else
+		} else {
 			consume_skb(skb);
+		}
 	}
 	return ret;
 }

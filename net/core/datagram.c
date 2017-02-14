@@ -394,7 +394,7 @@ EXPORT_SYMBOL(skb_kill_datagram);
  *	@to: iovec iterator to copy to
  *	@len: amount of data to copy from buffer to iovec
  */
-int skb_copy_datagram_iter(const struct sk_buff *skb, int offset,
+int __skb_copy_datagram_iter(const struct sk_buff *skb, int offset,
 			   struct iov_iter *to, int len)
 {
 	int start = skb_headlen(skb);
@@ -445,7 +445,7 @@ int skb_copy_datagram_iter(const struct sk_buff *skb, int offset,
 		if ((copy = end - offset) > 0) {
 			if (copy > len)
 				copy = len;
-			if (skb_copy_datagram_iter(frag_iter, offset - start,
+			if (__skb_copy_datagram_iter(frag_iter, offset - start,
 						   to, copy))
 				goto fault;
 			if ((len -= copy) == 0)
@@ -471,7 +471,7 @@ short_copy:
 
 	return 0;
 }
-EXPORT_SYMBOL(skb_copy_datagram_iter);
+EXPORT_SYMBOL(__skb_copy_datagram_iter);
 
 /**
  *	skb_copy_datagram_from_iter - Copy a datagram from an iov_iter.
@@ -750,14 +750,16 @@ int skb_copy_and_csum_datagram_msg(struct sk_buff *skb,
 {
 	__wsum csum;
 	int chunk = skb->len - hlen;
+	struct iov_iter saved;
 
 	if (!chunk)
 		return 0;
 
+	saved = msg->msg_iter;
 	if (msg_data_left(msg) < chunk) {
 		if (__skb_checksum_complete(skb))
 			goto csum_error;
-		if (skb_copy_datagram_msg(skb, hlen, msg, chunk))
+		if (__skb_copy_datagram_iter(skb, hlen, &msg->msg_iter, chunk))
 			goto fault;
 	} else {
 		csum = csum_partial(skb->data, hlen, skb->csum);
@@ -771,8 +773,10 @@ int skb_copy_and_csum_datagram_msg(struct sk_buff *skb,
 	}
 	return 0;
 csum_error:
+	msg->msg_iter = saved;
 	return -EINVAL;
 fault:
+	msg->msg_iter = saved;
 	return -EFAULT;
 }
 EXPORT_SYMBOL(skb_copy_and_csum_datagram_msg);

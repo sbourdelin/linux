@@ -1394,7 +1394,7 @@ static ssize_t tun_put_user(struct tun_struct *tun,
 
 		vlan_offset = offsetof(struct vlan_ethhdr, h_vlan_proto);
 
-		ret = skb_copy_datagram_iter(skb, 0, iter, vlan_offset);
+		ret = __skb_copy_datagram_iter(skb, 0, iter, vlan_offset);
 		if (ret || !iov_iter_count(iter))
 			goto done;
 
@@ -1403,7 +1403,8 @@ static ssize_t tun_put_user(struct tun_struct *tun,
 			goto done;
 	}
 
-	skb_copy_datagram_iter(skb, vlan_offset, iter, skb->len - vlan_offset);
+	/* XXX: no error check? */
+	__skb_copy_datagram_iter(skb, vlan_offset, iter, skb->len - vlan_offset);
 
 done:
 	/* caller is in process context, */
@@ -1465,6 +1466,7 @@ static ssize_t tun_do_read(struct tun_struct *tun, struct tun_file *tfile,
 {
 	struct sk_buff *skb;
 	ssize_t ret;
+	struct iov_iter saved;
 	int err;
 
 	tun_debug(KERN_INFO, tun, "tun_do_read\n");
@@ -1477,11 +1479,14 @@ static ssize_t tun_do_read(struct tun_struct *tun, struct tun_file *tfile,
 	if (!skb)
 		return err;
 
+	saved = *to;
 	ret = tun_put_user(tun, tfile, skb, to);
-	if (unlikely(ret < 0))
+	if (unlikely(ret < 0)) {
+		*to = saved;
 		kfree_skb(skb);
-	else
+	} else {
 		consume_skb(skb);
+	}
 
 	return ret;
 }
