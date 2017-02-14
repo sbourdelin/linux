@@ -93,6 +93,14 @@ int __init parse_spcr(bool earlycon)
 		goto done;
 	}
 
+	if (!memcmp(table->header.oem_id, "QCOM  ", ACPI_OEM_ID_SIZE))
+		if (!memcmp(table->header.oem_table_id, "QDF2432 ",
+				ACPI_OEM_TABLE_ID_SIZE) ||
+				(!memcmp(table->header.oem_table_id,
+				"QDF2400 ", ACPI_OEM_TABLE_ID_SIZE) &&
+				table->header.oem_revision == 0))
+			uart = "qdf2400_e44";
+
 	snprintf(opts, sizeof(opts), "%s,%s,0x%llx,%d", uart, iotype,
 		 table->serial_port.address, baud_rate);
 
