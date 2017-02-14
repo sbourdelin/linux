@@ -399,4 +399,9 @@ do {						\
 	*(_fsgid) = __cred->fsgid;		\
 } while(0)
 
+/* return the current id in the filesystem view */
+#define i_fsuid(i) from_kuid((i)->i_sb->s_user_ns, current_fsuid())
+#define i_fsgid(i) from_kgid((i)->i_sb->s_user_ns, current_fsgid())
+
+
 #endif /* _LINUX_CRED_H */
