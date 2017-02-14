@@ -33,6 +33,8 @@
 #include <linux/rbtree.h>
 #include <linux/swap.h>
 #include <linux/crypto.h>
+#include <crypto/acompress.h>
+#include <linux/scatterlist.h>
 #include <linux/mempool.h>
 #include <linux/zpool.h>
 
@@ -122,7 +124,8 @@ module_param_named(max_pool_percent, zswap_max_pool_percent, uint, 0644);
 
 struct zswap_pool {
 	struct zpool *zpool;
-	struct crypto_comp * __percpu *tfm;
+	struct crypto_acomp * __percpu *acomp;
+	struct acomp_req * __percpu *acomp_req;
 	struct kref kref;
 	struct list_head list;
 	struct work_struct work;
@@ -393,30 +396,49 @@ static int zswap_dstmem_dead(unsigned int cpu)
 static int zswap_cpu_comp_prepare(unsigned int cpu, struct hlist_node *node)
 {
 	struct zswap_pool *pool = hlist_entry(node, struct zswap_pool, node);
-	struct crypto_comp *tfm;
+	struct crypto_acomp *acomp;
+	struct acomp_req *acomp_req;
 
-	if (WARN_ON(*per_cpu_ptr(pool->tfm, cpu)))
+	if (WARN_ON(*per_cpu_ptr(pool->acomp, cpu)))
+		return 0;
+	if (WARN_ON(*per_cpu_ptr(pool->acomp_req, cpu)))
 		return 0;
 
-	tfm = crypto_alloc_comp(pool->tfm_name, 0, 0);
-	if (IS_ERR_OR_NULL(tfm)) {
-		pr_err("could not alloc crypto comp %s : %ld\n",
-		       pool->tfm_name, PTR_ERR(tfm));
+	acomp = crypto_alloc_acomp(pool->tfm_name, 0, 0);
+	if (IS_ERR_OR_NULL(acomp)) {
+		pr_err("could not alloc crypto acomp %s : %ld\n",
+		       pool->tfm_name, PTR_ERR(acomp));
 		return -ENOMEM;
 	}
-	*per_cpu_ptr(pool->tfm, cpu) = tfm;
+	*per_cpu_ptr(pool->acomp, cpu) = acomp;
+
+	acomp_req = acomp_request_alloc(acomp);
+	if (IS_ERR_OR_NULL(acomp_req)) {
+		pr_err("could not alloc crypto acomp %s : %ld\n",
+		       pool->tfm_name, PTR_ERR(acomp));
+		return -ENOMEM;
+	}
+	*per_cpu_ptr(pool->acomp_req, cpu) = acomp_req;
+
 	return 0;
 }
 
 static int zswap_cpu_comp_dead(unsigned int cpu, struct hlist_node *node)
 {
 	struct zswap_pool *pool = hlist_entry(node, struct zswap_pool, node);
-	struct crypto_comp *tfm;
+	struct crypto_acomp *acomp;
+	struct acomp_req *acomp_req;
 
-	tfm = *per_cpu_ptr(pool->tfm, cpu);
-	if (!IS_ERR_OR_NULL(tfm))
-		crypto_free_comp(tfm);
-	*per_cpu_ptr(pool->tfm, cpu) = NULL;
+	acomp_req = *per_cpu_ptr(pool->acomp_req, cpu);
+	if (!IS_ERR_OR_NULL(acomp_req))
+		acomp_request_free(acomp_req);
+	*per_cpu_ptr(pool->acomp_req, cpu) = NULL;
+
+	acomp = *per_cpu_ptr(pool->acomp, cpu);
+	if (!IS_ERR_OR_NULL(acomp))
+		crypto_free_acomp(acomp);
+	*per_cpu_ptr(pool->acomp, cpu) = NULL;
+
 	return 0;
 }
 
@@ -531,8 +553,14 @@ static struct zswap_pool *zswap_pool_create(char *type, char *compressor)
 	pr_debug("using %s zpool\n", zpool_get_type(pool->zpool));
 
 	strlcpy(pool->tfm_name, compressor, sizeof(pool->tfm_name));
-	pool->tfm = alloc_percpu(struct crypto_comp *);
-	if (!pool->tfm) {
+	pool->acomp = alloc_percpu(struct crypto_acomp *);
+	if (!pool->acomp) {
+		pr_err("percpu alloc failed\n");
+		goto error;
+	}
+
+	pool->acomp_req = alloc_percpu(struct acomp_req *);
+	if (!pool->acomp_req) {
 		pr_err("percpu alloc failed\n");
 		goto error;
 	}
@@ -554,7 +582,8 @@ static struct zswap_pool *zswap_pool_create(char *type, char *compressor)
 	return pool;
 
 error:
-	free_percpu(pool->tfm);
+	free_percpu(pool->acomp_req);
+	free_percpu(pool->acomp);
 	if (pool->zpool)
 		zpool_destroy_pool(pool->zpool);
 	kfree(pool);
@@ -606,7 +635,8 @@ static void zswap_pool_destroy(struct zswap_pool *pool)
 	zswap_pool_debug("destroying", pool);
 
 	cpuhp_state_remove_instance(CPUHP_MM_ZSWP_POOL_PREPARE, &pool->node);
-	free_percpu(pool->tfm);
+	free_percpu(pool->acomp_req);
+	free_percpu(pool->acomp);
 	zpool_destroy_pool(pool->zpool);
 	kfree(pool);
 }
@@ -842,7 +872,8 @@ static int zswap_writeback_entry(struct zpool *pool, unsigned long handle)
 	pgoff_t offset;
 	struct zswap_entry *entry;
 	struct page *page;
-	struct crypto_comp *tfm;
+	struct scatterlist input, output;
+	struct acomp_req *req;
 	u8 *src, *dst;
 	unsigned int dlen;
 	int ret;
@@ -882,14 +913,23 @@ static int zswap_writeback_entry(struct zpool *pool, unsigned long handle)
 
 	case ZSWAP_SWAPCACHE_NEW: /* page is locked */
 		/* decompress */
+		req = *get_cpu_ptr(entry->pool->acomp_req);
 		dlen = PAGE_SIZE;
 		src = (u8 *)zpool_map_handle(entry->pool->zpool, entry->handle,
 				ZPOOL_MM_RO) + sizeof(struct zswap_header);
 		dst = kmap_atomic(page);
-		tfm = *get_cpu_ptr(entry->pool->tfm);
-		ret = crypto_comp_decompress(tfm, src, entry->length,
-					     dst, &dlen);
-		put_cpu_ptr(entry->pool->tfm);
+
+		sg_init_one(&input, src, entry->length);
+		sg_init_one(&output, dst, dlen);
+		acomp_request_set_params(req, &input, &output, entry->length,
+					 dlen);
+		acomp_request_set_callback(req, CRYPTO_TFM_REQ_MAY_BACKLOG,
+					   NULL, NULL);
+
+		ret = crypto_acomp_decompress(req);
+
+		dlen = req->dlen;
+		put_cpu_ptr(entry->pool->acomp_req);
 		kunmap_atomic(dst);
 		zpool_unmap_handle(entry->pool->zpool, entry->handle);
 		BUG_ON(ret);
@@ -965,7 +1005,8 @@ static int zswap_frontswap_store(unsigned type, pgoff_t offset,
 {
 	struct zswap_tree *tree = zswap_trees[type];
 	struct zswap_entry *entry, *dupentry;
-	struct crypto_comp *tfm;
+	struct scatterlist input, output;
+	struct acomp_req *req;
 	int ret;
 	unsigned int dlen = PAGE_SIZE, len;
 	unsigned long handle;
@@ -1004,12 +1045,27 @@ static int zswap_frontswap_store(unsigned type, pgoff_t offset,
 	}
 
 	/* compress */
+	req = *get_cpu_ptr(entry->pool->acomp_req);
+	if (!req) {
+		put_cpu_ptr(entry->pool->acomp_req);
+		ret = -EINVAL;
+		goto freepage;
+	}
+
 	dst = get_cpu_var(zswap_dstmem);
-	tfm = *get_cpu_ptr(entry->pool->tfm);
 	src = kmap_atomic(page);
-	ret = crypto_comp_compress(tfm, src, PAGE_SIZE, dst, &dlen);
+
+	sg_init_one(&input, src, PAGE_SIZE);
+	/* zswap_dstmem is of size (PAGE_SIZE * 2). Reflect same in sg_list */
+	sg_init_one(&output, dst, PAGE_SIZE * 2);
+	acomp_request_set_params(req, &input, &output, PAGE_SIZE, dlen);
+	acomp_request_set_callback(req, CRYPTO_TFM_REQ_MAY_BACKLOG, NULL,
+				   NULL);
+
+	ret = crypto_acomp_compress(req);
 	kunmap_atomic(src);
-	put_cpu_ptr(entry->pool->tfm);
+	put_cpu_ptr(entry->pool->acomp_req);
+	dlen = req->dlen;
 	if (ret) {
 		ret = -EINVAL;
 		goto put_dstmem;
@@ -1077,7 +1133,8 @@ static int zswap_frontswap_load(unsigned type, pgoff_t offset,
 {
 	struct zswap_tree *tree = zswap_trees[type];
 	struct zswap_entry *entry;
-	struct crypto_comp *tfm;
+	struct scatterlist input, output;
+	struct acomp_req *req;
 	u8 *src, *dst;
 	unsigned int dlen;
 	int ret;
@@ -1093,13 +1150,25 @@ static int zswap_frontswap_load(unsigned type, pgoff_t offset,
 	spin_unlock(&tree->lock);
 
 	/* decompress */
+	req = *get_cpu_ptr(entry->pool->acomp_req);
+	if (!req) {
+		put_cpu_ptr(entry->pool->acomp_req);
+		return -1;
+	}
 	dlen = PAGE_SIZE;
 	src = (u8 *)zpool_map_handle(entry->pool->zpool, entry->handle,
 			ZPOOL_MM_RO) + sizeof(struct zswap_header);
 	dst = kmap_atomic(page);
-	tfm = *get_cpu_ptr(entry->pool->tfm);
-	ret = crypto_comp_decompress(tfm, src, entry->length, dst, &dlen);
-	put_cpu_ptr(entry->pool->tfm);
+
+	sg_init_one(&input, src, entry->length);
+	sg_init_one(&output, dst, dlen);
+	acomp_request_set_params(req, &input, &output, entry->length, dlen);
+	acomp_request_set_callback(req, CRYPTO_TFM_REQ_MAY_BACKLOG, NULL,
+				   NULL);
+
+	ret = crypto_acomp_decompress(req);
+
+	put_cpu_ptr(entry->pool->acomp_req);
 	kunmap_atomic(dst);
 	zpool_unmap_handle(entry->pool->zpool, entry->handle);
 	BUG_ON(ret);
