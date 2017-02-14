@@ -35,7 +35,7 @@ typedef u32 ihandle;
 struct property {
 	char	*name;
 	int	length;
-	void	*value;
+	const void *value;
 	struct property *next;
 	unsigned long _flags;
 	unsigned int unique_id;

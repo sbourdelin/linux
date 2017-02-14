@@ -92,6 +92,7 @@ static void adjust_overlay_phandles(struct device_node *overlay,
 		if (phandle == OF_PHANDLE_ILLEGAL)
 			continue;
 
+		/* This is bad because we cast away const */
 		*(uint32_t *)prop->value = cpu_to_be32(overlay->phandle);
 	}
 
@@ -153,6 +154,7 @@ static int update_usages_of_a_phandle_reference(struct device_node *overlay,
 			goto err_fail;
 		}
 
+		/* This is bad because we cast away const */
 		*(__be32 *)(prop->value + offset) = cpu_to_be32(phandle);
 	}
 
@@ -221,6 +223,7 @@ static int adjust_local_phandle_references(struct device_node *local_fixups,
 
 			phandle = be32_to_cpu(*(__be32 *)(prop->value + off));
 			phandle += phandle_delta;
+			/* This is bad because we cast away const */
 			*(__be32 *)(prop->value + off) = cpu_to_be32(phandle);
 		}
 	}

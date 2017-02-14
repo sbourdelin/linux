@@ -1159,7 +1159,7 @@ EXPORT_SYMBOL_GPL(of_property_count_elems_of_size);
  * property data is too small or too large.
  *
  */
-static void *of_find_property_value_of_size(const struct device_node *np,
+static const void *of_find_property_value_of_size(const struct device_node *np,
 			const char *propname, u32 min, u32 max, size_t *len)
 {
 	struct property *prop = of_find_property(np, propname, NULL);

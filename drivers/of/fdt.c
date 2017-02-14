@@ -222,7 +222,7 @@ static void populate_properties(const void *blob,
 
 		pp->name   = (char *)pname;
 		pp->length = sz;
-		pp->value  = (__be32 *)val;
+		pp->value  = val;
 		*pprev     = pp;
 		pprev      = &pp->next;
 	}
@@ -232,6 +232,7 @@ static void populate_properties(const void *blob,
 	 */
 	if (!has_name) {
 		const char *p = nodename, *ps = p, *pa = NULL;
+		char *b;
 		int len;
 
 		while (*p) {
@@ -250,13 +251,12 @@ static void populate_properties(const void *blob,
 		if (!dryrun) {
 			pp->name   = "name";
 			pp->length = len;
-			pp->value  = pp + 1;
+			pp->value  = b = (char *)(pp + 1);
 			*pprev     = pp;
 			pprev      = &pp->next;
-			memcpy(pp->value, ps, len - 1);
-			((char *)pp->value)[len - 1] = 0;
-			pr_debug("fixed up name for %s -> %s\n",
-				 nodename, (char *)pp->value);
+			memcpy(b, ps, len - 1);
+			b[len - 1] = 0;
+			pr_debug("fixed up name for %s -> %s\n", nodename, b);
 		}
 	}
 
