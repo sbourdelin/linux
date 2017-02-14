@@ -648,6 +648,10 @@ static int __seccomp_filter(int this_syscall, const struct seccomp_data *sd,
 
 		return 0;
 
+	case SECCOMP_RET_LOG:
+		seccomp_log(this_syscall, 0, action);
+		return 0;
+
 	case SECCOMP_RET_ALLOW:
 		/* Open-coded seccomp_log(), optimized for the RET_ALLOW hot
 		 * path.
@@ -943,6 +947,7 @@ out:
 #define SECCOMP_RET_TRAP_NAME		"trap"
 #define SECCOMP_RET_ERRNO_NAME		"errno"
 #define SECCOMP_RET_TRACE_NAME		"trace"
+#define SECCOMP_RET_LOG_NAME		"log"
 #define SECCOMP_RET_ALLOW_NAME		"allow"
 
 /* Largest strlen() of all action names */
@@ -952,6 +957,7 @@ static char seccomp_actions_avail[] = SECCOMP_RET_KILL_NAME	" "
 				      SECCOMP_RET_TRAP_NAME	" "
 				      SECCOMP_RET_ERRNO_NAME	" "
 				      SECCOMP_RET_TRACE_NAME	" "
+				      SECCOMP_RET_LOG_NAME	" "
 				      SECCOMP_RET_ALLOW_NAME;
 
 struct seccomp_action_name {
@@ -964,6 +970,7 @@ static struct seccomp_action_name seccomp_action_names[] = {
 	{ SECCOMP_RET_TRAP, SECCOMP_RET_TRAP_NAME },
 	{ SECCOMP_RET_ERRNO, SECCOMP_RET_ERRNO_NAME },
 	{ SECCOMP_RET_TRACE, SECCOMP_RET_TRACE_NAME },
+	{ SECCOMP_RET_LOG, SECCOMP_RET_LOG_NAME },
 	{ SECCOMP_RET_ALLOW, SECCOMP_RET_ALLOW_NAME },
 	{ }
 };
