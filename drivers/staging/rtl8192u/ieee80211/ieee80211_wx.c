@@ -85,10 +85,10 @@ static inline char *rtl819x_translate_scan(struct ieee80211_device *ieee,
 	}
 	/* Add the protocol name */
 	iwe.cmd = SIOCGIWNAME;
-	for(i=0; i<ARRAY_SIZE(ieee80211_modes); i++) {
-		if(network->mode&(1<<i)) {
-			sprintf(pname,ieee80211_modes[i].mode_string,ieee80211_modes[i].mode_size);
-			pname +=ieee80211_modes[i].mode_size;
+	for (i = 0; i < ARRAY_SIZE(ieee80211_modes); i++) {
+		if (network->mode & (1 << i)) {
+			sprintf(pname, ieee80211_modes[i].mode_string, ieee80211_modes[i].mode_size);
+			pname += ieee80211_modes[i].mode_size;
 		}
 	}
 	*pname = '\0';
@@ -150,14 +150,15 @@ static inline char *rtl819x_translate_scan(struct ieee80211_device *ieee,
 		PHT_CAPABILITY_ELE ht_cap = NULL;
 		bool is40M = false, isShortGI = false;
 		u8 max_mcs = 0;
+
 		if (!memcmp(network->bssht.bdHTCapBuf, EWC11NHTCap, 4))
 			ht_cap = (PHT_CAPABILITY_ELE)&network->bssht.bdHTCapBuf[4];
 		else
 			ht_cap = (PHT_CAPABILITY_ELE)&network->bssht.bdHTCapBuf[0];
-		is40M = (ht_cap->ChlWidth)?1:0;
-		isShortGI = (ht_cap->ChlWidth)?
-						((ht_cap->ShortGI40Mhz)?1:0):
-						((ht_cap->ShortGI20Mhz)?1:0);
+		is40M = (ht_cap->ChlWidth) ? 1 : 0;
+		isShortGI = (ht_cap->ChlWidth) ?
+						((ht_cap->ShortGI40Mhz) ? 1 : 0) :
+						((ht_cap->ShortGI20Mhz) ? 1 : 0);
 
 		max_mcs = HTGetHighestMCSRate(ieee, ht_cap->MCS, MCS_FILTER_ALL);
 		rate = MCS_DATA_RATE[is40M][isShortGI][max_mcs&0x7f];
