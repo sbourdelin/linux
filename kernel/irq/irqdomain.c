@@ -1279,6 +1279,143 @@ out_free_desc:
 	return ret;
 }
 
+/* The irq_data was moved, fix the revmap to refer to the new location */
+static void irq_domain_fix_revmap(struct irq_data *d)
+{
+	void **slot;
+
+	if (d->hwirq < d->domain->revmap_size)
+		return; /* Not using radix tree. */
+
+	/* Fix up the revmap. */
+	mutex_lock(&revmap_trees_mutex);
+	slot = radix_tree_lookup_slot(&d->domain->revmap_tree, d->hwirq);
+	if (slot)
+		radix_tree_replace_slot(&d->domain->revmap_tree, slot, d);
+	mutex_unlock(&revmap_trees_mutex);
+}
+
+/**
+ * irq_domain_push_irq() - Push a domain in to the top of a hierarchy.
+ * @domain:	Domain to push.
+ * @virq:	Irq to push the domain in to.
+ * @arg:	Passed to the irq_domain_ops alloc() function.
+ *
+ * For an already existing irqdomain hierarchy, as might be obtained
+ * via a call to pci_enable_msix(), add an additional domain to the
+ * head of the processing chain.
+ */
+int irq_domain_push_irq(struct irq_domain *domain, int virq, void *arg)
+{
+	struct irq_data *child_irq_data;
+	struct irq_data *root_irq_data = irq_get_irq_data(virq);
+
+	if (domain == NULL)
+		return -EINVAL;
+
+	if (WARN_ON(!domain->ops->alloc))
+		return -ENOSYS;
+
+	if (!root_irq_data)
+		return -EINVAL;
+
+	child_irq_data = kzalloc_node(sizeof(*child_irq_data), GFP_KERNEL,
+				      irq_data_get_node(root_irq_data));
+	if (!child_irq_data)
+		return -ENOMEM;
+
+	mutex_lock(&irq_domain_mutex);
+
+	/* Copy the original irq_data. */
+	*child_irq_data = *root_irq_data;
+
+	irq_domain_fix_revmap(child_irq_data);
+
+	/*
+	 * Overwrite the root_irq_data, which is embedded in struct
+	 * irq_desc, with values for this domain.
+	 */
+	root_irq_data->parent_data = child_irq_data;
+	root_irq_data->domain = domain;
+	root_irq_data->mask = 0;
+	root_irq_data->hwirq = 0;
+	root_irq_data->chip = NULL;
+	root_irq_data->chip_data = NULL;
+	domain->ops->alloc(domain, virq, 1, arg);
+
+	if (root_irq_data->hwirq < domain->revmap_size) {
+		domain->linear_revmap[root_irq_data->hwirq] = virq;
+	} else {
+		mutex_lock(&revmap_trees_mutex);
+		radix_tree_insert(&domain->revmap_tree,
+				  root_irq_data->hwirq, root_irq_data);
+		mutex_unlock(&revmap_trees_mutex);
+	}
+
+	mutex_unlock(&irq_domain_mutex);
+
+	return 0;
+}
+EXPORT_SYMBOL_GPL(irq_domain_push_irq);
+
+/**
+ * irq_domain_pop_irq() - Remove a domain from the top of a hierarchy.
+ * @domain:	Domain to remove.
+ * @virq:	Irq to remove the domain from.
+ *
+ * Undo the effects of a call to irq_domain_push_irq().
+ */
+int irq_domain_pop_irq(struct irq_domain *domain, int virq)
+{
+	struct irq_data *root_irq_data = irq_get_irq_data(virq);
+	struct irq_data *child_irq_data;
+	struct irq_data *tmp_irq_data;
+
+	if (domain == NULL)
+		return -EINVAL;
+
+	if (!root_irq_data)
+		return -EINVAL;
+
+	tmp_irq_data = irq_domain_get_irq_data(domain, virq);
+
+	/* We can only "pop" if this domain is at the top of the list */
+	if (WARN_ON(root_irq_data != tmp_irq_data))
+		return -ENOSYS;
+
+	if (WARN_ON(root_irq_data->domain != domain))
+		return -ENOSYS;
+
+	child_irq_data = root_irq_data->parent_data;
+	if (WARN_ON(!child_irq_data))
+		return -ENOSYS;
+
+	mutex_lock(&irq_domain_mutex);
+
+	root_irq_data->parent_data = NULL;
+
+	if (root_irq_data->hwirq >= domain->revmap_size) {
+		mutex_lock(&revmap_trees_mutex);
+		radix_tree_delete(&domain->revmap_tree, root_irq_data->hwirq);
+		mutex_unlock(&revmap_trees_mutex);
+	}
+
+	if (domain->ops->free)
+		domain->ops->free(domain, virq, 1);
+
+	/* Restore the original irq_data. */
+	*root_irq_data = *child_irq_data;
+
+	irq_domain_fix_revmap(root_irq_data);
+
+	mutex_unlock(&irq_domain_mutex);
+
+	kfree(child_irq_data);
+
+	return 0;
+}
+EXPORT_SYMBOL_GPL(irq_domain_pop_irq);
+
 /**
  * irq_domain_free_irqs - Free IRQ number and associated data structures
  * @virq:	base IRQ number
