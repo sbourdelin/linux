@@ -150,6 +150,9 @@ static int crypt(struct blkcipher_desc *d,
 	u8 *wsrc;
 	u8 *wdst;
 
+	if (!(ctx->table.table))
+		return -ENOKEY;
+
 	err = blkcipher_walk_virt(d, w);
 	if (!(avail = w->nbytes))
 		return err;
@@ -228,6 +231,9 @@ int lrw_crypt(struct blkcipher_desc *desc, struct scatterlist *sdst,
 	int err, i;
 
 	BUG_ON(max_blks < 1);
+
+	if (!ctx->table)
+		return -ENOKEY;
 
 	blkcipher_walk_init(&walk, sdst, ssrc, nbytes);
 
