@@ -227,13 +227,13 @@ void __switch_to_xtra(struct task_struct *prev_p, struct task_struct *next_p,
 
 	propagate_user_return_notify(prev_p, next_p);
 
-	if ((tifp ^ tifn) & _TIF_BLOCKSTEP) {
-		unsigned long debugctl = get_debugctlmsr();
-
+	if ((tifp & _TIF_BLOCKSTEP || tifn & _TIF_BLOCKSTEP) &&
+	    arch_has_block_step()) {
+		unsigned long debugctl;
+		rdmsrl(MSR_IA32_DEBUGCTLMSR, debugctl);
 		debugctl &= ~DEBUGCTLMSR_BTF;
-		if (tifn & _TIF_BLOCKSTEP)
-			debugctl |= DEBUGCTLMSR_BTF;
-		update_debugctlmsr(debugctl);
+		debugctl |= (tifn & _TIF_BLOCKSTEP) >> TIF_BLOCKSTEP << _DEBUGCTLMSR_BTF;
+		wrmsrl(MSR_IA32_DEBUGCTLMSR, debugctl);
 	}
 
 	if ((tifp ^ tifn) & _TIF_NOTSC) {
