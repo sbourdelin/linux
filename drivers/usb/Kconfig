@@ -35,7 +35,6 @@ config USB_COMMON
 config USB_ARCH_HAS_HCD
 	def_bool y
 
-# ARM SA1111 chips have a non-PCI based "OHCI-compatible" USB host interface.
 config USB
 	tristate "Support for Host-side USB"
 	depends on USB_ARCH_HAS_HCD
@@ -72,6 +71,14 @@ config USB
 
 	  To compile this driver as a module, choose M here: the
 	  module will be called usbcore.
+
+config USB_PCI
+	bool "PCI based USB host interface"
+	depends on PCI
+	default y
+	---help---
+	  if system have both PCI and USB,  but USB is non-PCI related,
+	  say N here allow PCI related code not compiled.
 
 if USB
 
