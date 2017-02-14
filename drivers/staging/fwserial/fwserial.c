@@ -98,7 +98,7 @@ struct fwtty_transaction {
 	};
 };
 
-#define to_device(a, b)			(a->b)
+#define to_device((a), b)			(a->b)
 #define fwtty_err(p, fmt, ...)						\
 	dev_err(to_device(p, device), fmt, ##__VA_ARGS__)
 #define fwtty_info(p, fmt, ...)						\
