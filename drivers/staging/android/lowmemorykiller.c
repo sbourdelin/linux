@@ -42,6 +42,7 @@
 #include <linux/rcupdate.h>
 #include <linux/profile.h>
 #include <linux/notifier.h>
+#include "lowmemorykiller_stats.h"
 
 static u32 lowmem_debug_level = 1;
 static short lowmem_adj[6] = {
@@ -72,6 +73,7 @@ static unsigned long lowmem_deathpending_timeout;
 static unsigned long lowmem_count(struct shrinker *s,
 				  struct shrink_control *sc)
 {
+	lmk_inc_stats(LMK_COUNT);
 	return global_node_page_state(NR_ACTIVE_ANON) +
 		global_node_page_state(NR_ACTIVE_FILE) +
 		global_node_page_state(NR_INACTIVE_ANON) +
@@ -95,6 +97,7 @@ static unsigned long lowmem_scan(struct shrinker *s, struct shrink_control *sc)
 				global_node_page_state(NR_SHMEM) -
 				total_swapcache_pages();
 
+	lmk_inc_stats(LMK_SCAN);
 	if (lowmem_adj_size < array_size)
 		array_size = lowmem_adj_size;
 	if (lowmem_minfree_size < array_size)
@@ -134,6 +137,7 @@ static unsigned long lowmem_scan(struct shrinker *s, struct shrink_control *sc)
 		if (task_lmk_waiting(p) &&
 		    time_before_eq(jiffies, lowmem_deathpending_timeout)) {
 			task_unlock(p);
+			lmk_inc_stats(LMK_TIMEOUT);
 			rcu_read_unlock();
 			return 0;
 		}
@@ -179,7 +183,9 @@ static unsigned long lowmem_scan(struct shrinker *s, struct shrink_control *sc)
 			     other_free * (long)(PAGE_SIZE / 1024));
 		lowmem_deathpending_timeout = jiffies + HZ;
 		rem += selected_tasksize;
-	}
+		lmk_inc_stats(LMK_KILL);
+	} else
+		lmk_inc_stats(LMK_WASTE);
 
 	lowmem_print(4, "lowmem_scan %lu, %x, return %lu\n",
 		     sc->nr_to_scan, sc->gfp_mask, rem);
@@ -196,6 +202,7 @@ static struct shrinker lowmem_shrinker = {
 static int __init lowmem_init(void)
 {
 	register_shrinker(&lowmem_shrinker);
+	init_procfs_lmk();
 	return 0;
 }
 device_initcall(lowmem_init);

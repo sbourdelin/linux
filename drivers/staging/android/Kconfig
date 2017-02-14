@@ -24,6 +24,17 @@ config ANDROID_LOW_MEMORY_KILLER
 	  scripts (/init.rc), and it defines priority values with minimum free memory size
 	  for each priority.
 
+config ANDROID_LOW_MEMORY_KILLER_STATS
+	bool "Android Low Memory Killer: collect statistics"
+	depends on ANDROID_LOW_MEMORY_KILLER
+	default n
+	help
+	  Create a file in /proc/lmkstats that includes
+	  collected statistics about kills, scans and counts
+	  and  interaction with the shrinker. Its content
+	  will be different depeding on lmk implementation used.
+
+
 source "drivers/staging/android/ion/Kconfig"
 
 endif # if ANDROID
