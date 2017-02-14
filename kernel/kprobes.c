@@ -1841,6 +1841,9 @@ int register_kretprobe(struct kretprobe *rp)
 	int i;
 	void *addr;
 
+	if (rp->kp.offset)
+		return -EINVAL;
+
 	if (kretprobe_blacklist_size) {
 		addr = kprobe_addr(&rp->kp);
 		if (IS_ERR(addr))
