@@ -794,8 +794,10 @@ static int stmmac_set_coalesce(struct net_device *dev,
 	priv->tx_coal_frames = ec->tx_max_coalesced_frames;
 	priv->tx_coal_timer = ec->tx_coalesce_usecs;
 	priv->rx_riwt = rx_riwt;
-	priv->hw->dma->rx_watchdog(priv->ioaddr, priv->rx_riwt);
 
+	priv->hw->dma->rx_watchdog(priv->ioaddr,
+				   priv->dma_cap.number_rx_channel,
+				   priv->rx_riwt);
 	return 0;
 }
 

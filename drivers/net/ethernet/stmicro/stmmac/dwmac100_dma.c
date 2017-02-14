@@ -51,8 +51,9 @@ static void dwmac100_dma_init(void __iomem *ioaddr,
  * The transmit threshold can be programmed by setting the TTC bits in the DMA
  * control register.
  */
-static void dwmac100_dma_operation_mode(void __iomem *ioaddr, int txmode,
-					int rxmode, int rxfifosz)
+static void dwmac100_dma_operation_mode(void __iomem *ioaddr,
+					u32 txfifosz, u32 rxfifosz,
+					u32 txmode, u32 rxmode)
 {
 	u32 csr6 = readl(ioaddr + DMA_CONTROL);
 
@@ -66,7 +67,7 @@ static void dwmac100_dma_operation_mode(void __iomem *ioaddr, int txmode,
 	writel(csr6, ioaddr + DMA_CONTROL);
 }
 
-static void dwmac100_dump_dma_regs(void __iomem *ioaddr)
+static void dwmac100_dump_dma_regs(void __iomem *ioaddr, u32 number_channels)
 {
 	int i;
 
@@ -110,6 +111,17 @@ static void dwmac100_dma_diagnostic_fr(void *data, struct stmmac_extra_stats *x,
 	}
 }
 
+static void dwmac100_get_hw_feature(void __iomem *ioaddr,
+				    struct dma_features *dma_cap)
+{
+	/* TX and RX number of channels */
+	dma_cap->number_rx_channel = 1;
+	dma_cap->number_tx_channel = 1;
+	/* TX and RX number of queues */
+	dma_cap->number_rx_queues = 1;
+	dma_cap->number_tx_queues = 1;
+}
+
 const struct stmmac_dma_ops dwmac100_dma_ops = {
 	.reset = dwmac_dma_reset,
 	.init = dwmac100_dma_init,
@@ -124,4 +136,5 @@ const struct stmmac_dma_ops dwmac100_dma_ops = {
 	.start_rx = dwmac_dma_start_rx,
 	.stop_rx = dwmac_dma_stop_rx,
 	.dma_interrupt = dwmac_dma_interrupt,
+	.get_hw_feature = dwmac100_get_hw_feature,
 };

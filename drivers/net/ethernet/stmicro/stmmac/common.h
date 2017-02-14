@@ -322,6 +322,9 @@ struct dma_features {
 	/* TX and RX number of queues */
 	unsigned int number_rx_queues;
 	unsigned int number_tx_queues;
+	/* TX and RX fifo sizes */
+	unsigned int rx_fifosz;
+	unsigned int tx_fifosz;
 	/* Alternate (enhanced) DESC mode */
 	unsigned int enh_desc;
 };
@@ -357,6 +360,20 @@ struct dma_features {
 #define MTL_TX_ALGORITHM_PRIO	0x3
 #define MTL_RX_ALGORITHM_SP	0x4
 #define MTL_RX_ALGORITHM_WSP	0x5
+
+enum mtl_fifo_size {
+	FIFO_256 = 0x0,
+	FIFO_512 = 0x1,
+	FIFO_1k = 0x3,
+	FIFO_2k = 0x7,
+	FIFO_4k = 0xf,
+	FIFO_8k = 0x1f,
+	FIFO_16k = 0x3f,
+	FIFO_32k = 0x7f
+};
+
+#define FIFO_SIZE_B(x)		(x)
+#define FIFO_SIZE_KB(x)		((x) * 1024)
 
 /* Descriptors helpers */
 struct stmmac_desc_ops {
@@ -421,33 +438,44 @@ struct stmmac_dma_ops {
 	int (*reset)(void __iomem *ioaddr);
 	void (*init)(void __iomem *ioaddr, struct stmmac_dma_cfg *dma_cfg,
 		     u32 dma_tx, u32 dma_rx, int atds);
+	void (*init_chan)(void __iomem *ioaddr,
+			  struct stmmac_dma_cfg *dma_cfg, u32 chan);
+	void (*init_rx_chan)(void __iomem *ioaddr,
+			     struct stmmac_dma_cfg *dma_cfg,
+			     u32 dma_rx_phy, u32 chan);
+	void (*init_tx_chan)(void __iomem *ioaddr,
+			     struct stmmac_dma_cfg *dma_cfg,
+			     u32 dma_tx_phy, u32 chan);
 	/* Configure the AXI Bus Mode Register */
 	void (*axi)(void __iomem *ioaddr, struct stmmac_axi *axi);
 	/* Dump DMA registers */
-	void (*dump_regs) (void __iomem *ioaddr);
-	/* Set tx/rx threshold in the csr6 register
-	 * An invalid value enables the store-and-forward mode */
-	void (*dma_mode)(void __iomem *ioaddr, int txmode, int rxmode,
-			 int rxfifosz);
+	void (*dump_regs)(void __iomem *ioaddr, u32 number_channels);
+	/* Configure DMA Operation Mode */
+	void (*dma_mode)(void __iomem *ioaddr, u32 txfifosz, u32 rxfifosz,
+			 u32 txmode, u32 rxmode);
+	void (*dma_rx_mode)(void __iomem *ioaddr, u32 mode, u32 queue_fifo,
+			    u32 chan);
+	void (*dma_tx_mode)(void __iomem *ioaddr, u32 mode, u32 queue_fifo,
+			    u32 chan);
 	/* To track extra statistic (if supported) */
 	void (*dma_diagnostic_fr) (void *data, struct stmmac_extra_stats *x,
 				   void __iomem *ioaddr);
 	void (*enable_dma_transmission) (void __iomem *ioaddr);
-	void (*enable_dma_irq) (void __iomem *ioaddr);
-	void (*disable_dma_irq) (void __iomem *ioaddr);
-	void (*start_tx) (void __iomem *ioaddr);
-	void (*stop_tx) (void __iomem *ioaddr);
-	void (*start_rx) (void __iomem *ioaddr);
-	void (*stop_rx) (void __iomem *ioaddr);
-	int (*dma_interrupt) (void __iomem *ioaddr,
-			      struct stmmac_extra_stats *x);
+	void (*enable_dma_irq)(void __iomem *ioaddr, u32 chan);
+	void (*disable_dma_irq)(void __iomem *ioaddr, u32 chan);
+	void (*start_tx)(void __iomem *ioaddr, u32 chan);
+	void (*stop_tx)(void __iomem *ioaddr, u32 chan);
+	void (*start_rx)(void __iomem *ioaddr, u32 chan);
+	void (*stop_rx)(void __iomem *ioaddr, u32 chan);
+	int (*dma_interrupt)(void __iomem *ioaddr,
+			     struct stmmac_extra_stats *x, u32 chan);
 	/* If supported then get the optional core features */
 	void (*get_hw_feature)(void __iomem *ioaddr,
 			       struct dma_features *dma_cap);
 	/* Program the HW RX Watchdog */
-	void (*rx_watchdog) (void __iomem *ioaddr, u32 riwt);
-	void (*set_tx_ring_len)(void __iomem *ioaddr, u32 len);
-	void (*set_rx_ring_len)(void __iomem *ioaddr, u32 len);
+	void (*rx_watchdog)(void __iomem *ioaddr, u32 num_channels, u32 riwt);
+	void (*set_tx_ring_len)(void __iomem *ioaddr, u32 len, u32 chan);
+	void (*set_rx_ring_len)(void __iomem *ioaddr, u32 len, u32 chan);
 	void (*set_rx_tail_ptr)(void __iomem *ioaddr, u32 tail_ptr, u32 chan);
 	void (*set_tx_tail_ptr)(void __iomem *ioaddr, u32 tail_ptr, u32 chan);
 	void (*enable_tso)(void __iomem *ioaddr, bool en, u32 chan);
