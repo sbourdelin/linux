@@ -811,6 +811,9 @@ struct iommu_group *pci_device_group(struct device *dev)
 	if (IS_ERR(group))
 		return NULL;
 
+	if (pci_is_root_bus(bus))
+		dev_warn_once(&pdev->dev, "using shared group due to ACS path failure\n");
+
 	return group;
 }
 
