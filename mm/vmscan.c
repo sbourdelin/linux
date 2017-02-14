@@ -911,7 +911,7 @@ static void page_check_dirty_writeback(struct page *page,
 	 * Anonymous pages are not handled by flushers and must be written
 	 * from reclaim context. Do not stall reclaim based on them
 	 */
-	if (!page_is_file_cache(page)) {
+	if (!page_is_file_cache(page) || page_is_lazyfree(page)) {
 		*dirty = false;
 		*writeback = false;
 		return;
@@ -971,7 +971,7 @@ static unsigned long shrink_page_list(struct list_head *page_list,
 		int may_enter_fs;
 		enum page_references references = PAGEREF_RECLAIM_CLEAN;
 		bool dirty, writeback;
-		bool lazyfree = false;
+		bool lazyfree;
 		int ret = SWAP_SUCCESS;
 
 		cond_resched();
@@ -986,6 +986,8 @@ static unsigned long shrink_page_list(struct list_head *page_list,
 
 		sc->nr_scanned++;
 
+		lazyfree = page_is_lazyfree(page);
+
 		if (unlikely(!page_evictable(page)))
 			goto cull_mlocked;
 
@@ -993,7 +995,7 @@ static unsigned long shrink_page_list(struct list_head *page_list,
 			goto keep_locked;
 
 		/* Double the slab pressure for mapped and swapcache pages */
-		if (page_mapped(page) || PageSwapCache(page))
+		if ((page_mapped(page) || PageSwapCache(page)) && !lazyfree)
 			sc->nr_scanned++;
 
 		may_enter_fs = (sc->gfp_mask & __GFP_FS) ||
@@ -1119,13 +1121,13 @@ static unsigned long shrink_page_list(struct list_head *page_list,
 		/*
 		 * Anonymous process memory has backing store?
 		 * Try to allocate it some swap space here.
+		 * Lazyfree page could be freed directly
 		 */
-		if (PageAnon(page) && !PageSwapCache(page)) {
+		if (PageAnon(page) && !PageSwapCache(page) && !lazyfree) {
 			if (!(sc->gfp_mask & __GFP_IO))
 				goto keep_locked;
 			if (!add_to_swap(page, page_list))
 				goto activate_locked;
-			lazyfree = true;
 			may_enter_fs = 1;
 
 			/* Adding to swap updated mapping */
@@ -1142,7 +1144,7 @@ static unsigned long shrink_page_list(struct list_head *page_list,
 		 * The page is mapped into the page tables of one or more
 		 * processes. Try to unmap it here.
 		 */
-		if (page_mapped(page) && mapping) {
+		if (page_mapped(page) && (mapping || lazyfree)) {
 			switch (ret = try_to_unmap(page, lazyfree ?
 				(ttu_flags | TTU_BATCH_FLUSH | TTU_LZFREE) :
 				(ttu_flags | TTU_BATCH_FLUSH))) {
@@ -1154,7 +1156,14 @@ static unsigned long shrink_page_list(struct list_head *page_list,
 			case SWAP_MLOCK:
 				goto cull_mlocked;
 			case SWAP_LZFREE:
-				goto lazyfree;
+				/* follow __remove_mapping for reference */
+				if (page_ref_freeze(page, 1)) {
+					if (!PageDirty(page))
+						goto lazyfree;
+					else
+						page_ref_unfreeze(page, 1);
+				}
+				goto keep_locked;
 			case SWAP_SUCCESS:
 				; /* try to free the page below */
 			}
@@ -1266,10 +1275,9 @@ static unsigned long shrink_page_list(struct list_head *page_list,
 			}
 		}
 
-lazyfree:
 		if (!mapping || !__remove_mapping(mapping, page, true))
 			goto keep_locked;
-
+lazyfree:
 		/*
 		 * At this point, we have no other references and there is
 		 * no way to pick any more up (removed from LRU, removed
@@ -1294,6 +1302,8 @@ free_it:
 cull_mlocked:
 		if (PageSwapCache(page))
 			try_to_free_swap(page);
+		if (lazyfree)
+			clear_page_lazyfree(page);
 		unlock_page(page);
 		list_add(&page->lru, &ret_pages);
 		continue;
@@ -1303,6 +1313,8 @@ activate_locked:
 		if (PageSwapCache(page) && mem_cgroup_swap_full(page))
 			try_to_free_swap(page);
 		VM_BUG_ON_PAGE(PageActive(page), page);
+		if (lazyfree)
+			clear_page_lazyfree(page);
 		SetPageActive(page);
 		pgactivate++;
 keep_locked:
