@@ -510,9 +510,6 @@ static void meson_mmc_request(struct mmc_host *mmc, struct mmc_request *mrq)
 
 	WARN_ON(host->mrq != NULL);
 
-	/* Stop execution */
-	writel(0, host->regs + SD_EMMC_START);
-
 	host->mrq = mrq;
 	meson_mmc_start_cmd(mmc, mrq->cmd);
 }
@@ -521,12 +518,16 @@ static void meson_mmc_read_resp(struct mmc_host *mmc, struct mmc_command *cmd)
 {
 	struct meson_host *host = mmc_priv(mmc);
 
+	/*
+	 * reading SD_EMMC_CMD_RSP stops processing, therefore read
+	 * this register even if command has no response
+	 */
 	if (cmd->flags & MMC_RSP_136) {
 		cmd->resp[0] = readl(host->regs + SD_EMMC_CMD_RSP3);
 		cmd->resp[1] = readl(host->regs + SD_EMMC_CMD_RSP2);
 		cmd->resp[2] = readl(host->regs + SD_EMMC_CMD_RSP1);
 		cmd->resp[3] = readl(host->regs + SD_EMMC_CMD_RSP);
-	} else if (cmd->flags & MMC_RSP_PRESENT) {
+	} else {
 		cmd->resp[0] = readl(host->regs + SD_EMMC_CMD_RSP);
 	}
 }
@@ -563,6 +564,8 @@ static irqreturn_t meson_mmc_irq(int irq, void *dev_id)
 		ret = IRQ_NONE;
 		goto out;
 	}
+
+	meson_mmc_read_resp(host->mmc, cmd);
 
 	cmd->error = 0;
 	if (status & IRQ_RXD_ERR_MASK) {
@@ -610,10 +613,8 @@ out:
 	/* ack all (enabled) interrupts */
 	writel(status, host->regs + SD_EMMC_STATUS);
 
-	if (ret == IRQ_HANDLED) {
-		meson_mmc_read_resp(host->mmc, cmd);
+	if (ret == IRQ_HANDLED)
 		meson_mmc_request_done(host->mmc, cmd->mrq);
-	}
 
 	spin_unlock(&host->lock);
 	return ret;
@@ -643,7 +644,6 @@ static irqreturn_t meson_mmc_irq_thread(int irq, void *dev_id)
 		data->bytes_xfered = xfer_bytes;
 	}
 
-	meson_mmc_read_resp(host->mmc, cmd);
 	if (mmc_op_multi(cmd->opcode))
 		meson_mmc_start_cmd(host->mmc, data->stop);
 	else
