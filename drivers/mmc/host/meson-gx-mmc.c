@@ -686,10 +686,10 @@ static irqreturn_t meson_mmc_irq_thread(int irq, void *dev_id)
 	}
 
 	meson_mmc_read_resp(host->mmc, cmd);
-	if (!data || !data->stop)
-		meson_mmc_request_done(host->mmc, mrq);
-	else
+	if (mmc_op_multi(cmd->opcode))
 		meson_mmc_start_cmd(host->mmc, data->stop);
+	else
+		meson_mmc_request_done(host->mmc, mrq);
 
 	return IRQ_HANDLED;
 }
