@@ -2043,6 +2043,11 @@ struct ieee80211_txq {
  *	The stack will not do fragmentation.
  *	The callback for @set_frag_threshold should be set as well.
  *
+ * @IEEE80211_HW_SUPPORTS_VHT_EXT_NSS_BW: (Hardware) rate control supports VHT
+ *	extended NSS BW (dot11VHTExtendedNSSBWCapable). This flag will be set if
+ *	the selected rate control algorithm sets %RATE_CTRL_CAPA_VHT_EXT_NSS_BW
+ *	but if the rate control is built-in then it must be set by the driver.
+ *
  * @NUM_IEEE80211_HW_FLAGS: number of hardware flags, used for sizing arrays
  */
 enum ieee80211_hw_flags {
@@ -2085,6 +2090,7 @@ enum ieee80211_hw_flags {
 	IEEE80211_HW_TX_FRAG_LIST,
 	IEEE80211_HW_REPORTS_LOW_ACK,
 	IEEE80211_HW_SUPPORTS_TX_FRAG,
+	IEEE80211_HW_SUPPORTS_VHT_EXT_NSS_BW,
 
 	/* keep last, obviously */
 	NUM_IEEE80211_HW_FLAGS
@@ -5458,7 +5464,19 @@ struct ieee80211_tx_rate_control {
 	bool bss;
 };
 
+/**
+ * enum rate_control_capabilities - rate control capabilities
+ */
+enum rate_control_capabilities {
+	/**
+	 * @RATE_CTRL_CAPA_VHT_EXT_NSS_BW:
+	 *	support for extended NSS BW support (dot11VHTExtendedNSSCapable)
+	 */
+	RATE_CTRL_CAPA_VHT_EXT_NSS_BW = BIT(0),
+};
+
 struct rate_control_ops {
+	unsigned long capa;
 	const char *name;
 	void *(*alloc)(struct ieee80211_hw *hw, struct dentry *debugfsdir);
 	void (*free)(void *priv);
