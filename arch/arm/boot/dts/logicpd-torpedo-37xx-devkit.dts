@@ -402,3 +402,11 @@
 	mode = <3>;
 	power = <50>;
 };
+
+&ssi {
+	status = "disabled";
+};
+
+&twl_keypad {
+	status = "disabled";
+};

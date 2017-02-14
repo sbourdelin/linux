@@ -242,3 +242,7 @@
 &twl_gpio {
 	ti,use-leds;
 };
+
+&charger {
+	status = "disabled";
+};
