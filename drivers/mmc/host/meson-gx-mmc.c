@@ -495,14 +495,14 @@ static void meson_mmc_start_cmd(struct mmc_host *mmc, struct mmc_command *cmd)
 		cmd->data->bytes_xfered = 0;
 		xfer_bytes = cmd->data->blksz * cmd->data->blocks;
 		if (cmd->data->flags & MMC_DATA_WRITE) {
-			cmd_cfg |= CMD_CFG_DATA_WR;
-			WARN_ON(xfer_bytes > host->bounce_buf_size);
-			sg_copy_to_buffer(cmd->data->sg, cmd->data->sg_len,
-					  host->bounce_buf, xfer_bytes);
+			size_t len = sg_copy_to_buffer(cmd->data->sg,
+						       cmd->data->sg_len,
+						       host->bounce_buf,
+						       host->bounce_buf_size);
+			WARN_ON(len != xfer_bytes);
 			cmd->data->bytes_xfered = xfer_bytes;
+			cmd_cfg |= CMD_CFG_DATA_WR;
 			dma_wmb();
-		} else {
-			cmd_cfg &= ~CMD_CFG_DATA_WR;
 		}
 
 		cmd_data = host->bounce_dma_addr & CMD_DATA_MASK;
@@ -657,10 +657,11 @@ static irqreturn_t meson_mmc_irq_thread(int irq, void *dev_id)
 
 	data = cmd->data;
 	if (data && data->flags & MMC_DATA_READ) {
+		size_t len = sg_copy_from_buffer(data->sg, data->sg_len,
+						 host->bounce_buf,
+						 host->bounce_buf_size);
 		xfer_bytes = data->blksz * data->blocks;
-		WARN_ON(xfer_bytes > host->bounce_buf_size);
-		sg_copy_from_buffer(data->sg, data->sg_len,
-				    host->bounce_buf, xfer_bytes);
+		WARN_ON(len != xfer_bytes);
 		data->bytes_xfered = xfer_bytes;
 	}
 
