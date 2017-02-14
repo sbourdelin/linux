@@ -11,3 +11,18 @@ menuconfig SENSORS_IBM_OCC
 
 	  Generally this is used by management controllers such as a BMC
 	  on an OpenPower system.
+
+if SENSORS_IBM_OCC
+
+config SENSORS_IBM_OCC_P8_I2C
+	tristate "POWER8 OCC hwmon support"
+	depends on I2C
+	help
+	  Provide a hwmon sysfs interface for the POWER8 On-Chip Controller,
+	  exposing temperature, frequency and power measurements. This
+	  interface runs on the service processor, not the POWER CPU.
+
+	  This driver can also be built as a module. If so, the module will be
+	  called hwmon_occ_p8.
+
+endif
