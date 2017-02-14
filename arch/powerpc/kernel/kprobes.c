@@ -528,6 +528,8 @@ static struct kprobe trampoline_p = {
 
 int __init arch_init_kprobes(void)
 {
+	test_emulate_step();
+
 	return register_kprobe(&trampoline_p);
 }
 

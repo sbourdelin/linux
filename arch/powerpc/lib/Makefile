@@ -33,3 +33,7 @@ obj-$(CONFIG_ALTIVEC)	+= xor_vmx.o
 CFLAGS_xor_vmx.o += -maltivec $(call cc-option,-mabi=altivec)
 
 obj-$(CONFIG_PPC64) += $(obj64-y)
+
+ifeq ($(CONFIG_PPC64), y)
+obj-$(CONFIG_KPROBES_SANITY_TEST) += test_emulate_step.o
+endif
