@@ -269,13 +269,13 @@ static int ptp_populate_pins(struct ptp_clock *ptp)
 	struct ptp_clock_info *info = ptp->info;
 	int err = -ENOMEM, i, n_pins = info->n_pins;
 
-	ptp->pin_dev_attr = kzalloc(n_pins * sizeof(*ptp->pin_dev_attr),
+	ptp->pin_dev_attr = kcalloc(n_pins, sizeof(*ptp->pin_dev_attr),
 				    GFP_KERNEL);
 	if (!ptp->pin_dev_attr)
 		goto no_dev_attr;
 
-	ptp->pin_attr = kzalloc((1 + n_pins) * sizeof(struct attribute *),
-				GFP_KERNEL);
+	ptp->pin_attr = kmalloc_array(1 + n_pins, sizeof(*ptp->pin_attr),
+				      GFP_KERNEL);
 	if (!ptp->pin_attr)
 		goto no_pin_attr;
 
@@ -288,6 +288,9 @@ static int ptp_populate_pins(struct ptp_clock *ptp)
 		da->store = ptp_pin_store;
 		ptp->pin_attr[i] = &da->attr;
 	}
+
+	/* NULL terminator */
+	ptp->pin_attr[n_pins] = NULL;
 
 	ptp->pin_attr_group.name = "pins";
 	ptp->pin_attr_group.attrs = ptp->pin_attr;
