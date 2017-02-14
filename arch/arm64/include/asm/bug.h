@@ -20,8 +20,9 @@
 
 #include <asm/brk-imm.h>
 
-#ifdef CONFIG_GENERIC_BUG
 #define HAVE_ARCH_BUG
+
+#ifdef CONFIG_GENERIC_BUG
 
 #ifdef CONFIG_DEBUG_BUGVERBOSE
 #define _BUGVERBOSE_LOCATION(file, line) __BUGVERBOSE_LOCATION(file, line)
@@ -56,6 +57,14 @@ _BUGVERBOSE_LOCATION(__FILE__, __LINE__)		\
 } while (0)
 
 #define __WARN_TAINT(taint) _BUG_FLAGS(BUGFLAG_TAINT(taint))
+
+#else
+
+#define BUG() do {					\
+	asm volatile("brk %[imm]"			\
+		     :: [imm] "i" (BUG_BRK_IMM));	\
+	unreachable();					\
+} while (0)
 
 #endif /* ! CONFIG_GENERIC_BUG */
 
