@@ -80,6 +80,7 @@ static int meminfo_proc_show(struct seq_file *m, void *v)
 	show_val_kb(m, "Active(file):   ", pages[LRU_ACTIVE_FILE]);
 	show_val_kb(m, "Inactive(file): ", pages[LRU_INACTIVE_FILE]);
 	show_val_kb(m, "Unevictable:    ", pages[LRU_UNEVICTABLE]);
+	show_val_kb(m, "LazyFree:       ", global_node_page_state(NR_LAZYFREE));
 	show_val_kb(m, "Mlocked:        ", global_page_state(NR_MLOCK));
 
 #ifdef CONFIG_HIGHMEM
