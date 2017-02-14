@@ -3022,6 +3022,34 @@ Image Process Control IDs
     driver specific and are documented in :ref:`v4l-drivers`.
 
 
+.. _voice-coil-lens-controls:
+
+Voice Coil Lens Control Reference
+=================================
+
+The Voice Coil class controls are used to control voice coil lens
+devices. These are very simple devices that consist of a voice coil, a
+spring and a lens. The current applied on the voice coil is used to
+move the lens away from the resting position which typically is (close
+to) infinity. The higher the current applied, the closer the lens is
+typically focused.
+
+.. _voice-coil-lens-control-is:
+
+Voice Coil Lens Control IDs
+---------------------------
+
+``V4L2_CID_VOICE_COIL_CLASS (class)``
+    The VOICE_COIL class descriptor.
+
+``V4L2_CID_VOICE_COIL_CURRENT (integer)``
+    Current applied on a voice coil. The more current is applied, the
+    more is the position of the lens moved from its resting position.
+    Do note that there may be a ringing effect; the lens will
+    oscillate after changing the current applied unless the device
+    implements ringing compensation.
+
+
 .. _dv-controls:
 
 Digital Video Control Reference

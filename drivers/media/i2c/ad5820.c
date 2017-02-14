@@ -162,6 +162,7 @@ static int ad5820_set_ctrl(struct v4l2_ctrl *ctrl)
 
 	switch (ctrl->id) {
 	case V4L2_CID_FOCUS_ABSOLUTE:
+	case V4L2_CID_VOICE_COIL_CURRENT:
 		coil->focus_absolute = ctrl->val;
 		return ad5820_update_hw(coil);
 	}
@@ -192,6 +193,8 @@ static int ad5820_init_controls(struct ad5820_device *coil)
 	 */
 	v4l2_ctrl_new_std(&coil->ctrls, &ad5820_ctrl_ops,
 			  V4L2_CID_FOCUS_ABSOLUTE, 0, 1023, 1, 0);
+	v4l2_ctrl_new_std(&coil->ctrls, &ad5820_ctrl_ops,
+			  V4L2_CID_VOICE_COIL_CURRENT, 0, 1023, 1, 0);
 
 	if (coil->ctrls.error)
 		return coil->ctrls.error;
