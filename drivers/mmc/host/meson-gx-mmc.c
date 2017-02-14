@@ -118,6 +118,7 @@
 #define SD_EMMC_CFG_RESP_TIMEOUT 256 /* in clock cycles */
 #define SD_EMMC_CFG_CMD_GAP 16 /* in clock cycles */
 #define MUX_CLK_NUM_PARENTS 2
+#define MESON_MMC_MAX_SEGS 512
 
 struct meson_host {
 	struct	device		*dev;
@@ -789,8 +790,10 @@ static int meson_mmc_probe(struct platform_device *pdev)
 	if (ret)
 		goto free_host;
 
+	mmc->max_segs = MESON_MMC_MAX_SEGS;
 	mmc->max_blk_count = CMD_CFG_LENGTH_MASK;
 	mmc->max_req_size = mmc->max_blk_count * mmc->max_blk_size;
+	mmc->max_seg_size = mmc->max_req_size;
 
 	/* data bounce buffer */
 	host->bounce_buf_size = mmc->max_req_size;
