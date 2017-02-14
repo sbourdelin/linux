@@ -1,0 +1,15 @@
+Realtek platforms device tree bindings
+--------------------------------------
+
+
+RTD1295 SoC
+===========
+
+Required root node properties:
+
+ - compatible :  "realtek,rtd1295"
+
+
+Board compatible strings:
+
+ - Zidoo X9S: "zidoo,x9s"
