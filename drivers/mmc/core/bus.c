@@ -343,6 +343,22 @@ int mmc_add_card(struct mmc_card *card)
 			uhs_bus_speed_mode, type, card->rca);
 	}
 
+	if (card->ext_csd.device_life_time_est_typ_a == 0xb ||
+	    card->ext_csd.device_life_time_est_typ_b == 0xb)
+		pr_err("%s: memory has exceeded its life time",
+			mmc_hostname(card->host));
+	else if (card->ext_csd.device_life_time_est_typ_a == 0xa ||
+		 card->ext_csd.device_life_time_est_typ_b == 0xa)
+		pr_warn("%s: memory has used more than 90%% of its life time\n",
+			mmc_hostname(card->host));
+
+	if (card->ext_csd.pre_eol_info == 3)
+		pr_err("%s: out of reserved blocks\n",
+			mmc_hostname(card->host));
+	else if (card->ext_csd.pre_eol_info == 2)
+		pr_warn("%s: more than 80%% of reserved blocks consumed\n",
+			mmc_hostname(card->host));
+
 #ifdef CONFIG_DEBUG_FS
 	mmc_add_card_debugfs(card);
 #endif
