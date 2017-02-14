@@ -63,7 +63,7 @@
  * so this must be overridable.
  */
 #ifndef kprobe_lookup_name
-#define kprobe_lookup_name(name, addr) \
+#define kprobe_lookup_name(name, addr, offset) \
 	addr = ((kprobe_opcode_t *)(kallsyms_lookup_name(name)))
 #endif
 
@@ -1365,7 +1365,7 @@ static kprobe_opcode_t *kprobe_addr(struct kprobe *p)
 		goto invalid;
 
 	if (p->symbol_name) {
-		kprobe_lookup_name(p->symbol_name, addr);
+		kprobe_lookup_name(p->symbol_name, addr, p->offset);
 		if (!addr)
 			return ERR_PTR(-ENOENT);
 	}
@@ -2158,7 +2158,7 @@ static int __init init_kprobes(void)
 		/* lookup the function address from its name */
 		for (i = 0; kretprobe_blacklist[i].name != NULL; i++) {
 			kprobe_lookup_name(kretprobe_blacklist[i].name,
-					   kretprobe_blacklist[i].addr);
+					   kretprobe_blacklist[i].addr, 0);
 			if (!kretprobe_blacklist[i].addr)
 				printk("kretprobe: lookup failed: %s\n",
 				       kretprobe_blacklist[i].name);

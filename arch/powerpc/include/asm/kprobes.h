@@ -60,10 +60,10 @@ extern kprobe_opcode_t optprobe_template_end[];
 
 #ifdef PPC64_ELF_ABI_v2
 /* PPC64 ABIv2 needs local entry point */
-#define kprobe_lookup_name(name, addr)					\
+#define kprobe_lookup_name(name, addr, offset)				\
 {									\
 	addr = (kprobe_opcode_t *)kallsyms_lookup_name(name);		\
-	if (addr)							\
+	if (addr && !(offset))						\
 		addr = (kprobe_opcode_t *)ppc_function_entry(addr);	\
 }
 #elif defined(PPC64_ELF_ABI_v1)
@@ -75,7 +75,7 @@ extern kprobe_opcode_t optprobe_template_end[];
  * This ensures we always get to the actual symbol and not the descriptor.
  * Also handle <module:symbol> format.
  */
-#define kprobe_lookup_name(name, addr)					\
+#define kprobe_lookup_name(name, addr, offset)				\
 {									\
 	char dot_name[MODULE_NAME_LEN + 1 + KSYM_NAME_LEN];		\
 	const char *modsym;							\
