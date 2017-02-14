@@ -376,6 +376,7 @@ enum {
 	MM_ANONPAGES,	/* Resident anonymous pages */
 	MM_SWAPENTS,	/* Anonymous swap entries */
 	MM_SHMEMPAGES,	/* Resident shared memory pages */
+	MM_LAZYFREEPAGES, /* Lazyfree pages, also charged into MM_ANONPAGES */
 	NR_MM_COUNTERS
 };
 

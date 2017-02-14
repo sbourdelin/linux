@@ -308,6 +308,7 @@ static int madvise_free_pte_range(pmd_t *pmd, unsigned long addr,
 	struct page *page;
 	int nr_swap = 0;
 	unsigned long next;
+	int nr_lazyfree_accounted = 0;
 
 	next = pmd_addr_end(addr, end);
 	if (pmd_trans_huge(*pmd))
@@ -412,9 +413,13 @@ static int madvise_free_pte_range(pmd_t *pmd, unsigned long addr,
 			set_pte_at(mm, addr, pte, ptent);
 			tlb_remove_tlb_entry(tlb, pte, addr);
 		}
+		if (page_mapcount(page) == 1 &&
+		    !TestSetPageLazyFreeAccounted(page))
+			nr_lazyfree_accounted++;
 		mark_page_lazyfree(page);
 	}
 out:
+	add_mm_counter(mm, MM_LAZYFREEPAGES, nr_lazyfree_accounted);
 	if (nr_swap) {
 		if (current->mm == mm)
 			sync_mm_rss(mm);

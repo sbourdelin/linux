@@ -577,6 +577,8 @@ static int __collapse_huge_page_isolate(struct vm_area_struct *vma,
 		}
 		inc_node_page_state(page,
 				NR_ISOLATED_ANON + page_is_file_cache(page));
+		if (TestClearPageLazyFreeAccounted(page))
+			dec_mm_counter(vma->vm_mm, MM_LAZYFREEPAGES);
 		VM_BUG_ON_PAGE(!PageLocked(page), page);
 		VM_BUG_ON_PAGE(PageLRU(page), page);
 

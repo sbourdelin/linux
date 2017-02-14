@@ -925,6 +925,8 @@ int copy_huge_pmd(struct mm_struct *dst_mm, struct mm_struct *src_mm,
 	VM_BUG_ON_PAGE(!PageHead(src_page), src_page);
 	get_page(src_page);
 	page_dup_rmap(src_page, true);
+	if (PageAnon(src_page) && TestClearPageLazyFreeAccounted(src_page))
+		add_mm_counter(src_mm, MM_LAZYFREEPAGES, -HPAGE_PMD_NR);
 	add_mm_counter(dst_mm, MM_ANONPAGES, HPAGE_PMD_NR);
 	atomic_long_inc(&dst_mm->nr_ptes);
 	pgtable_trans_huge_deposit(dst_mm, dst_pmd, pgtable);
@@ -1572,6 +1574,8 @@ bool madvise_free_huge_pmd(struct mmu_gather *tlb, struct vm_area_struct *vma,
 		tlb_remove_pmd_tlb_entry(tlb, pmd, addr);
 	}
 
+	if (page_mapcount(page) == 1 && !TestSetPageLazyFreeAccounted(page))
+		add_mm_counter(mm, MM_LAZYFREEPAGES, HPAGE_PMD_NR);
 	mark_page_lazyfree(page);
 	ret = true;
 out:
@@ -1629,6 +1633,9 @@ int zap_huge_pmd(struct mmu_gather *tlb, struct vm_area_struct *vma,
 			pte_free(tlb->mm, pgtable);
 			atomic_long_dec(&tlb->mm->nr_ptes);
 			add_mm_counter(tlb->mm, MM_ANONPAGES, -HPAGE_PMD_NR);
+			if (TestClearPageLazyFreeAccounted(page))
+				add_mm_counter(tlb->mm, MM_LAZYFREEPAGES,
+						-HPAGE_PMD_NR);
 		} else {
 			if (arch_needs_pgtable_deposit())
 				zap_deposited_table(tlb->mm, pmd);
@@ -2160,6 +2167,7 @@ static void __split_huge_page_tail(struct page *head, int tail,
 			 (1L << PG_swapbacked) |
 			 (1L << PG_mlocked) |
 			 (1L << PG_uptodate) |
+			 (1L << PG_lazyfreeaccounted) |
 			 (1L << PG_active) |
 			 (1L << PG_locked) |
 			 (1L << PG_unevictable) |

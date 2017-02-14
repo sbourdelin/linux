@@ -1336,8 +1336,7 @@ static int try_to_unmap_one(struct page *page, struct vm_area_struct *vma,
 					mlock_vma_page(page);
 				}
 				ret = SWAP_MLOCK;
-				page_vma_mapped_walk_done(&pvmw);
-				break;
+				goto err_out;
 			}
 			if (flags & TTU_MUNLOCK)
 				continue;
@@ -1347,8 +1346,7 @@ static int try_to_unmap_one(struct page *page, struct vm_area_struct *vma,
 			if (ptep_clear_flush_young_notify(vma, address,
 						pvmw.pte)) {
 				ret = SWAP_FAIL;
-				page_vma_mapped_walk_done(&pvmw);
-				break;
+				goto err_out;
 			}
 		}
 
@@ -1428,16 +1426,14 @@ static int try_to_unmap_one(struct page *page, struct vm_area_struct *vma,
 				} else {
 					set_pte_at(mm, address, pvmw.pte, pteval);
 					ret = SWAP_FAIL;
-					page_vma_mapped_walk_done(&pvmw);
-					break;
+					goto err_out;
 				}
 			}
 
 			if (swap_duplicate(entry) < 0) {
 				set_pte_at(mm, address, pvmw.pte, pteval);
 				ret = SWAP_FAIL;
-				page_vma_mapped_walk_done(&pvmw);
-				break;
+				goto err_out;
 			}
 			if (list_empty(&mm->mmlist)) {
 				spin_lock(&mmlist_lock);
@@ -1456,8 +1452,18 @@ static int try_to_unmap_one(struct page *page, struct vm_area_struct *vma,
 discard:
 		page_remove_rmap(subpage, PageHuge(page));
 		put_page(page);
+		/* regardless of success or failure, the page isn't lazyfree */
+		if (PageAnon(page) && TestClearPageLazyFreeAccounted(page))
+			add_mm_counter(mm, MM_LAZYFREEPAGES,
+						-hpage_nr_pages(page));
 		mmu_notifier_invalidate_page(mm, address);
 	}
+	return ret;
+err_out:
+	/* regardless of success or failure, the page isn't lazyfree */
+	if (PageAnon(page) && TestClearPageLazyFreeAccounted(page))
+		add_mm_counter(mm, MM_LAZYFREEPAGES, -hpage_nr_pages(page));
+	page_vma_mapped_walk_done(&pvmw);
 	return ret;
 }
 

@@ -94,7 +94,8 @@ unsigned long task_vsize(struct mm_struct *mm)
 
 unsigned long task_statm(struct mm_struct *mm,
 			 unsigned long *shared, unsigned long *text,
-			 unsigned long *data, unsigned long *resident)
+			 unsigned long *data, unsigned long *resident,
+			 unsigned long *lazyfree)
 {
 	struct vm_area_struct *vma;
 	struct vm_region *region;
@@ -120,6 +121,7 @@ unsigned long task_statm(struct mm_struct *mm,
 	size >>= PAGE_SHIFT;
 	size += *text + *data;
 	*resident = size;
+	*lazyfree = 0;
 	return size;
 }
 

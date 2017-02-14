@@ -849,7 +849,7 @@ out:
 static inline unsigned long
 copy_one_pte(struct mm_struct *dst_mm, struct mm_struct *src_mm,
 		pte_t *dst_pte, pte_t *src_pte, struct vm_area_struct *vma,
-		unsigned long addr, int *rss)
+		unsigned long addr, int *rss, int *rss_src_lazyfree)
 {
 	unsigned long vm_flags = vma->vm_flags;
 	pte_t pte = *src_pte;
@@ -914,6 +914,9 @@ copy_one_pte(struct mm_struct *dst_mm, struct mm_struct *src_mm,
 	if (page) {
 		get_page(page);
 		page_dup_rmap(page, false);
+		if (PageAnon(page) &&
+		    TestClearPageLazyFreeAccounted(page))
+			(*rss_src_lazyfree)++;
 		rss[mm_counter(page)]++;
 	}
 
@@ -931,10 +934,12 @@ static int copy_pte_range(struct mm_struct *dst_mm, struct mm_struct *src_mm,
 	spinlock_t *src_ptl, *dst_ptl;
 	int progress = 0;
 	int rss[NR_MM_COUNTERS];
+	int rss_src_lazyfree;
 	swp_entry_t entry = (swp_entry_t){0};
 
 again:
 	init_rss_vec(rss);
+	rss_src_lazyfree = 0;
 
 	dst_pte = pte_alloc_map_lock(dst_mm, dst_pmd, addr, &dst_ptl);
 	if (!dst_pte)
@@ -962,13 +967,14 @@ again:
 			continue;
 		}
 		entry.val = copy_one_pte(dst_mm, src_mm, dst_pte, src_pte,
-							vma, addr, rss);
+					vma, addr, rss, &rss_src_lazyfree);
 		if (entry.val)
 			break;
 		progress += 8;
 	} while (dst_pte++, src_pte++, addr += PAGE_SIZE, addr != end);
 
 	arch_leave_lazy_mmu_mode();
+	add_mm_counter(src_mm, MM_LAZYFREEPAGES, -rss_src_lazyfree);
 	spin_unlock(src_ptl);
 	pte_unmap(orig_src_pte);
 	add_mm_rss_vec(dst_mm, rss);
@@ -1173,6 +1179,9 @@ again:
 					mark_page_accessed(page);
 			}
 			rss[mm_counter(page)]--;
+			if (PageAnon(page) &&
+			    TestClearPageLazyFreeAccounted(page))
+				rss[MM_LAZYFREEPAGES]--;
 			page_remove_rmap(page, false);
 			if (unlikely(page_mapcount(page) < 0))
 				print_bad_pte(vma, addr, ptent, page);

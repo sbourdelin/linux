@@ -171,6 +171,8 @@ retry:
 		 * mark_page_accessed().
 		 */
 		mark_page_accessed(page);
+		if (PageAnon(page) && TestClearPageLazyFreeAccounted(page))
+			dec_mm_counter(mm, MM_LAZYFREEPAGES);
 	}
 	if ((flags & FOLL_MLOCK) && (vma->vm_flags & VM_LOCKED)) {
 		/* Do not mlock pte-mapped THP */

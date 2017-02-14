@@ -23,9 +23,10 @@
 
 void task_mem(struct seq_file *m, struct mm_struct *mm)
 {
-	unsigned long text, lib, swap, ptes, pmds, anon, file, shmem;
+	unsigned long text, lib, swap, ptes, pmds, anon, file, shmem, lazyfree;
 	unsigned long hiwater_vm, total_vm, hiwater_rss, total_rss;
 
+	lazyfree = get_mm_counter(mm, MM_LAZYFREEPAGES);
 	anon = get_mm_counter(mm, MM_ANONPAGES);
 	file = get_mm_counter(mm, MM_FILEPAGES);
 	shmem = get_mm_counter(mm, MM_SHMEMPAGES);
@@ -59,6 +60,7 @@ void task_mem(struct seq_file *m, struct mm_struct *mm)
 		"RssAnon:\t%8lu kB\n"
 		"RssFile:\t%8lu kB\n"
 		"RssShmem:\t%8lu kB\n"
+		"RssLazyfree:\t%8lu kB\n"
 		"VmData:\t%8lu kB\n"
 		"VmStk:\t%8lu kB\n"
 		"VmExe:\t%8lu kB\n"
@@ -75,6 +77,7 @@ void task_mem(struct seq_file *m, struct mm_struct *mm)
 		anon << (PAGE_SHIFT-10),
 		file << (PAGE_SHIFT-10),
 		shmem << (PAGE_SHIFT-10),
+		lazyfree << (PAGE_SHIFT-10),
 		mm->data_vm << (PAGE_SHIFT-10),
 		mm->stack_vm << (PAGE_SHIFT-10), text, lib,
 		ptes >> 10,
@@ -90,7 +93,8 @@ unsigned long task_vsize(struct mm_struct *mm)
 
 unsigned long task_statm(struct mm_struct *mm,
 			 unsigned long *shared, unsigned long *text,
-			 unsigned long *data, unsigned long *resident)
+			 unsigned long *data, unsigned long *resident,
+			 unsigned long *lazyfree)
 {
 	*shared = get_mm_counter(mm, MM_FILEPAGES) +
 			get_mm_counter(mm, MM_SHMEMPAGES);
@@ -98,6 +102,7 @@ unsigned long task_statm(struct mm_struct *mm,
 								>> PAGE_SHIFT;
 	*data = mm->data_vm + mm->stack_vm;
 	*resident = *shared + get_mm_counter(mm, MM_ANONPAGES);
+	*lazyfree = get_mm_counter(mm, MM_LAZYFREEPAGES);
 	return mm->total_vm;
 }
 
