@@ -57,6 +57,17 @@ static inline unsigned long get_cpu_gdt_rw_vaddr(unsigned int cpu)
 	return (unsigned long)get_cpu_gdt_rw(cpu);
 }
 
+/* Provide the current original GDT */
+static inline struct desc_struct *get_current_gdt_rw(void)
+{
+	return this_cpu_ptr(&gdt_page)->gdt;
+}
+
+static inline unsigned long get_current_gdt_rw_vaddr(void)
+{
+	return (unsigned long)get_current_gdt_rw();
+}
+
 /* Get the fixmap index for a specific processor */
 static inline unsigned int get_cpu_gdt_ro_index(int cpu)
 {
@@ -233,11 +244,6 @@ static inline void native_set_ldt(const void *addr, unsigned int entries)
 	}
 }
 
-static inline void native_load_tr_desc(void)
-{
-	asm volatile("ltr %w0"::"q" (GDT_ENTRY_TSS*8));
-}
-
 static inline void native_load_gdt(const struct desc_ptr *dtr)
 {
 	asm volatile("lgdt %0"::"m" (*dtr));
@@ -257,6 +263,41 @@ static inline void native_store_idt(struct desc_ptr *dtr)
 {
 	asm volatile("sidt %0":"=m" (*dtr));
 }
+
+/*
+ * The LTR instruction marks the TSS GDT entry as busy. On 64-bit, the GDT is
+ * a read-only remapping. To prevent a page fault, the GDT is switched to the
+ * original writeable version when needed.
+ */
+#ifdef CONFIG_X86_64
+static inline void native_load_tr_desc(void)
+{
+	struct desc_ptr gdt;
+	int cpu = raw_smp_processor_id();
+	bool restore = 0;
+	struct desc_struct *fixmap_gdt;
+
+	native_store_gdt(&gdt);
+	fixmap_gdt = get_cpu_gdt_ro(cpu);
+
+	/*
+	 * If the current GDT is the read-only fixmap, swap to the original
+	 * writeable version. Swap back at the end.
+	 */
+	if (gdt.address == (unsigned long)fixmap_gdt) {
+		load_direct_gdt(cpu);
+		restore = 1;
+	}
+	asm volatile("ltr %w0"::"q" (GDT_ENTRY_TSS*8));
+	if (restore)
+		load_fixmap_gdt(cpu);
+}
+#else
+static inline void native_load_tr_desc(void)
+{
+	asm volatile("ltr %w0"::"q" (GDT_ENTRY_TSS*8));
+}
+#endif
 
 static inline unsigned long native_store_tr(void)
 {
