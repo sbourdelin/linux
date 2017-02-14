@@ -359,7 +359,7 @@ static inline void free_memmap(unsigned long start_pfn, unsigned long end_pfn)
  */
 static void __init free_unused_memmap(void)
 {
-	unsigned long start, prev_end = 0;
+	unsigned long start, end, prev_end = 0;
 	struct memblock_region *reg;
 
 	for_each_memblock(memory, reg) {
@@ -392,6 +392,18 @@ static void __init free_unused_memmap(void)
 	if (!IS_ALIGNED(prev_end, PAGES_PER_SECTION))
 		free_memmap(prev_end, ALIGN(prev_end, PAGES_PER_SECTION));
 #endif
+
+	for_each_memblock(reserved, reg) {
+		if (!(reg->flags & MEMBLOCK_RAW_PFN))
+			continue;
+
+		start = memblock_region_memory_base_pfn(reg);
+		end = round_down(memblock_region_memory_end_pfn(reg),
+				 MAX_ORDER_NR_PAGES);
+
+		if (start < end)
+			free_memmap(start, end);
+	}
 }
 #endif	/* !CONFIG_SPARSEMEM_VMEMMAP */
 
