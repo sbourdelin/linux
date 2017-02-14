@@ -184,6 +184,27 @@ actions_avail:
 	program was built, differs from the set of actions actually
 	supported in the current running kernel.
 
+log_max_action:
+	A read-write file containing the most permissive seccomp return
+	value that should be logged. The list of valid strings that can
+	be written to this file can be found in the actions_avail sysctl.
+
+	The actions_avail sysctl can also serve as a way to discover the
+	ordering of seccomp return values so that you can easily
+	understand which return values will be logged. For example,
+	assume that the actions_avail file contains
+	"kill trap errno trace allow" and "errno" is written to the
+	log_max_action file. The SECCOMP_RET_KILL, SECCOMP_RET_TRAP, and
+	SECCOMP_RET_ERRNO actions will be logged.
+
+	It is important to note that the value of log_max_action does
+	not prevent certain actions from being logged when the audit
+	subsystem is configured to audit a task. If the action is more
+	permissive than what's written to log_max_action, the final
+	decision on whether to audit the action for that task is
+	ultimately left up to the audit subsystem to decide for all
+	seccomp return values other than SECCOMP_RET_ALLOW.
+
 Adding architecture support
 -----------------------
 
