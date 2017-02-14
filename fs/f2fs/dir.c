@@ -643,14 +643,24 @@ int __f2fs_add_link(struct inode *dir, const struct qstr *name,
 				struct inode *inode, nid_t ino, umode_t mode)
 {
 	struct fscrypt_name fname;
+	struct page *page;
+	struct f2fs_dir_entry *de;
 	int err;
 
 	err = fscrypt_setup_filename(dir, name, 0, &fname);
 	if (err)
 		return err;
 
-	err = __f2fs_do_add_link(dir, &fname, inode, ino, mode);
-
+	de = __f2fs_find_entry(dir, &fname, &page);
+	if (de) {
+		f2fs_dentry_kunmap(dir, page);
+		f2fs_put_page(page, 0);
+		err = -EEXIST;
+	} else if (!IS_ERR(page)) {
+		err = __f2fs_do_add_link(dir, &fname, inode, ino, mode);
+	} else {
+		err = PTR_ERR(page);
+	}
 	fscrypt_free_filename(&fname);
 	return err;
 }
