@@ -132,6 +132,14 @@ enum fixed_addresses {
 
 extern void reserve_top_address(unsigned long reserve);
 
+/* On 64-bit, the module sections ends with the start of the fixmap */
+#ifdef CONFIG_X86_64
+#define MODULES_VADDR    (__START_KERNEL_map + KERNEL_IMAGE_SIZE)
+#define MODULES_END   __fix_to_virt(__end_of_fixed_addresses + 1)
+#define MODULES_LEN   (MODULES_END - MODULES_VADDR)
+#endif /* CONFIG_X86_64 */
+
+
 #define FIXADDR_SIZE	(__end_of_permanent_fixed_addresses << PAGE_SHIFT)
 #define FIXADDR_START		(FIXADDR_TOP - FIXADDR_SIZE)
 
