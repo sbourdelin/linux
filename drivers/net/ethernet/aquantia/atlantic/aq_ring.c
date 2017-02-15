@@ -108,18 +108,19 @@ void aq_ring_tx_append_buffs(struct aq_ring_s *self,
 			     struct aq_ring_buff_s *buffer,
 			     unsigned int buffers)
 {
-	if (likely(self->sw_tail + buffers < self->size)) {
-		memcpy(&self->buff_ring[self->sw_tail], buffer,
-		       sizeof(buffer[0]) * buffers);
-	} else {
-		unsigned int first_part = self->size - self->sw_tail;
-		unsigned int second_part = buffers - first_part;
+	int buff_len = min(self->size - self->sw_tail, buffers);
 
-		memcpy(&self->buff_ring[self->sw_tail], buffer,
-		       sizeof(buffer[0]) * first_part);
+	memcpy(&self->buff_ring[self->sw_tail],
+	       buffer,
+	       sizeof(struct aq_ring_buff_s) * buff_len);
 
-		memcpy(&self->buff_ring[0], &buffer[first_part],
-		       sizeof(buffer[0]) * second_part);
+	/* We are in the end of the ring.
+	 *  Copy remains data to beginning of the ring
+	 */
+	if (buffers > buff_len) {
+		memcpy(self->buff_ring,
+		       &buffer[buff_len],
+		       sizeof(struct aq_ring_buff_s) * (buffers - buff_len));
 	}
 }
 
