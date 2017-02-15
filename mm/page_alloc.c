@@ -2893,7 +2893,7 @@ static bool zone_allows_reclaim(struct zone *local_zone, struct zone *zone)
  */
 static struct page *
 get_page_from_freelist(gfp_t gfp_mask, unsigned int order, int alloc_flags,
-						const struct alloc_context *ac)
+			const struct alloc_context *ac, nodemask_t *orig_mask)
 {
 	struct zoneref *z = ac->preferred_zoneref;
 	struct zone *zone;
@@ -3050,7 +3050,8 @@ void warn_alloc(gfp_t gfp_mask, const char *fmt, ...)
 
 static inline struct page *
 __alloc_pages_may_oom(gfp_t gfp_mask, unsigned int order,
-	const struct alloc_context *ac, unsigned long *did_some_progress)
+	const struct alloc_context *ac, unsigned long *did_some_progress,
+	nodemask_t *orig_mask)
 {
 	struct oom_control oc = {
 		.zonelist = ac->zonelist,
@@ -3079,7 +3080,8 @@ __alloc_pages_may_oom(gfp_t gfp_mask, unsigned int order,
 	 * we're still under heavy pressure.
 	 */
 	page = get_page_from_freelist(gfp_mask | __GFP_HARDWALL, order,
-					ALLOC_WMARK_HIGH|ALLOC_CPUSET, ac);
+					ALLOC_WMARK_HIGH|ALLOC_CPUSET,
+					ac, orig_mask);
 	if (page)
 		goto out;
 
@@ -3115,14 +3117,15 @@ __alloc_pages_may_oom(gfp_t gfp_mask, unsigned int order,
 
 		if (gfp_mask & __GFP_NOFAIL) {
 			page = get_page_from_freelist(gfp_mask, order,
-					ALLOC_NO_WATERMARKS|ALLOC_CPUSET, ac);
+					ALLOC_NO_WATERMARKS|ALLOC_CPUSET,
+					ac, orig_mask);
 			/*
 			 * fallback to ignore cpuset restriction if our nodes
 			 * are depleted
 			 */
 			if (!page)
 				page = get_page_from_freelist(gfp_mask, order,
-					ALLOC_NO_WATERMARKS, ac);
+					ALLOC_NO_WATERMARKS, ac, orig_mask);
 		}
 	}
 out:
@@ -3141,7 +3144,8 @@ out:
 static struct page *
 __alloc_pages_direct_compact(gfp_t gfp_mask, unsigned int order,
 		unsigned int alloc_flags, const struct alloc_context *ac,
-		enum compact_priority prio, enum compact_result *compact_result)
+		enum compact_priority prio, enum compact_result *compact_result,
+		nodemask_t *orig_mask)
 {
 	struct page *page;
 
@@ -3162,8 +3166,8 @@ __alloc_pages_direct_compact(gfp_t gfp_mask, unsigned int order,
 	 */
 	count_vm_event(COMPACTSTALL);
 
-	page = get_page_from_freelist(gfp_mask, order, alloc_flags, ac);
-
+	page = get_page_from_freelist(gfp_mask, order,
+					alloc_flags, ac, orig_mask);
 	if (page) {
 		struct zone *zone = page_zone(page);
 
@@ -3247,7 +3251,8 @@ check_priority:
 static inline struct page *
 __alloc_pages_direct_compact(gfp_t gfp_mask, unsigned int order,
 		unsigned int alloc_flags, const struct alloc_context *ac,
-		enum compact_priority prio, enum compact_result *compact_result)
+		enum compact_priority prio, enum compact_result *compact_result,
+		nodemask_t *orig_mask)
 {
 	*compact_result = COMPACT_SKIPPED;
 	return NULL;
@@ -3314,7 +3319,7 @@ __perform_reclaim(gfp_t gfp_mask, unsigned int order,
 static inline struct page *
 __alloc_pages_direct_reclaim(gfp_t gfp_mask, unsigned int order,
 		unsigned int alloc_flags, const struct alloc_context *ac,
-		unsigned long *did_some_progress)
+		unsigned long *did_some_progress, nodemask_t *orig_mask)
 {
 	struct page *page = NULL;
 	bool drained = false;
@@ -3324,7 +3329,8 @@ __alloc_pages_direct_reclaim(gfp_t gfp_mask, unsigned int order,
 		return NULL;
 
 retry:
-	page = get_page_from_freelist(gfp_mask, order, alloc_flags, ac);
+	page = get_page_from_freelist(gfp_mask, order,
+					alloc_flags, ac, orig_mask);
 
 	/*
 	 * If an allocation failed after direct reclaim, it could be because
@@ -3517,7 +3523,7 @@ should_reclaim_retry(gfp_t gfp_mask, unsigned order,
 
 static inline struct page *
 __alloc_pages_slowpath(gfp_t gfp_mask, unsigned int order,
-						struct alloc_context *ac)
+			struct alloc_context *ac, nodemask_t *orig_mask)
 {
 	bool can_direct_reclaim = gfp_mask & __GFP_DIRECT_RECLAIM;
 	struct page *page = NULL;
@@ -3581,7 +3587,8 @@ retry_cpuset:
 	 * The adjusted alloc_flags might result in immediate success, so try
 	 * that first
 	 */
-	page = get_page_from_freelist(gfp_mask, order, alloc_flags, ac);
+	page = get_page_from_freelist(gfp_mask, order,
+					alloc_flags, ac, orig_mask);
 	if (page)
 		goto got_pg;
 
@@ -3596,7 +3603,7 @@ retry_cpuset:
 		page = __alloc_pages_direct_compact(gfp_mask, order,
 						alloc_flags, ac,
 						INIT_COMPACT_PRIORITY,
-						&compact_result);
+						&compact_result, orig_mask);
 		if (page)
 			goto got_pg;
 
@@ -3645,7 +3652,8 @@ retry:
 	}
 
 	/* Attempt with potentially adjusted zonelist and alloc_flags */
-	page = get_page_from_freelist(gfp_mask, order, alloc_flags, ac);
+	page = get_page_from_freelist(gfp_mask, order,
+					alloc_flags, ac, orig_mask);
 	if (page)
 		goto got_pg;
 
@@ -3681,13 +3689,13 @@ retry:
 
 	/* Try direct reclaim and then allocating */
 	page = __alloc_pages_direct_reclaim(gfp_mask, order, alloc_flags, ac,
-							&did_some_progress);
+						&did_some_progress, orig_mask);
 	if (page)
 		goto got_pg;
 
 	/* Try direct compaction and then allocating */
 	page = __alloc_pages_direct_compact(gfp_mask, order, alloc_flags, ac,
-					compact_priority, &compact_result);
+				compact_priority, &compact_result, orig_mask);
 	if (page)
 		goto got_pg;
 
@@ -3734,7 +3742,8 @@ retry:
 		goto retry_cpuset;
 
 	/* Reclaim has failed us, start killing things */
-	page = __alloc_pages_may_oom(gfp_mask, order, ac, &did_some_progress);
+	page = __alloc_pages_may_oom(gfp_mask, order, ac,
+					&did_some_progress, orig_mask);
 	if (page)
 		goto got_pg;
 
@@ -3826,7 +3835,8 @@ __alloc_pages_nodemask(gfp_t gfp_mask, unsigned int order,
 	}
 
 	/* First allocation attempt */
-	page = get_page_from_freelist(alloc_mask, order, alloc_flags, &ac);
+	page = get_page_from_freelist(alloc_mask, order,
+					alloc_flags, &ac, nodemask);
 	if (likely(page))
 		goto out;
 
@@ -3845,7 +3855,7 @@ no_zone:
 	if (unlikely(ac.nodemask != nodemask))
 		ac.nodemask = nodemask;
 
-	page = __alloc_pages_slowpath(alloc_mask, order, &ac);
+	page = __alloc_pages_slowpath(alloc_mask, order, &ac, nodemask);
 
 out:
 	if (memcg_kmem_enabled() && (gfp_mask & __GFP_ACCOUNT) && page &&
