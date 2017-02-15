@@ -29,6 +29,8 @@
 #include <asm/microcode.h>
 #include <asm/kasan.h>
 
+#include "multiboot2.h"
+
 /*
  * Manage page tables very early on.
  */
@@ -36,6 +38,7 @@ extern pgd_t early_level4_pgt[PTRS_PER_PGD];
 extern pmd_t early_dynamic_pgts[EARLY_DYNAMIC_PAGE_TABLES][PTRS_PER_PMD];
 static unsigned int __initdata next_early_pgt = 2;
 pmdval_t early_pmd_flags = __PAGE_KERNEL_LARGE & ~(_PAGE_GLOBAL | _PAGE_NX);
+char *multiboot_info = NULL;
 
 /* Wipe all early page tables except for the kernel symbol map */
 static void __init reset_early_page_tables(void)
@@ -130,6 +133,60 @@ static void __init copy_bootdata(char *real_mode_data)
 	}
 }
 
+static void __init copy_multiboot_cmdline(struct multiboot_tag_string *tag)
+{
+	unsigned int size = tag->size - 8;
+
+	if (size > COMMAND_LINE_SIZE)
+		size = COMMAND_LINE_SIZE;
+	boot_params.hdr.cmdline_size = size;
+	memcpy(boot_command_line, tag->string, size);
+}
+
+static void __init copy_multiboot_mmap(struct multiboot_tag_mmap *tag)
+{
+	multiboot_memory_map_t *mmap;
+	int nr = 0;
+
+	for (mmap = tag->entries;
+		(u8 *)mmap < (u8 *)tag + tag->size && nr < E820MAX;
+		mmap = (multiboot_memory_map_t *)((unsigned long)mmap +
+							tag->entry_size)) {
+		boot_params.e820_map[nr].addr = mmap->addr;
+		boot_params.e820_map[nr].size = mmap->len;
+		boot_params.e820_map[nr].type = mmap->type;
+		nr++;
+	}
+	boot_params.e820_entries = nr;
+}
+
+static void __init copy_multiboot_info(void)
+{
+	struct multiboot_tag *tag;
+	char *ptr = __va(multiboot_info);
+
+	boot_params.hdr.boot_flag = 0xAA55;
+	boot_params.hdr.header = 0x53726448;
+	boot_params.hdr.version = 0x202;
+
+	for (tag = (struct multiboot_tag *)(ptr + 8);
+		tag->type != MULTIBOOT_TAG_TYPE_END;
+		tag = (struct multiboot_tag *)((u8 *) tag +
+						((tag->size + 7) & ~7))) {
+		switch (tag->type) {
+		case MULTIBOOT_TAG_TYPE_CMDLINE:
+			copy_multiboot_cmdline(
+					(struct multiboot_tag_string *)tag);
+			break;
+		case MULTIBOOT_TAG_TYPE_MMAP:
+			copy_multiboot_mmap((struct multiboot_tag_mmap *)tag);
+			break;
+		default:
+			break;
+		}
+	}
+}
+
 asmlinkage __visible void __init x86_64_start_kernel(char * real_mode_data)
 {
 	int i;
@@ -163,7 +220,12 @@ asmlinkage __visible void __init x86_64_start_kernel(char * real_mode_data)
 		set_intr_gate(i, early_idt_handler_array[i]);
 	load_idt((const struct desc_ptr *)&idt_descr);
 
-	copy_bootdata(__va(real_mode_data));
+	if (multiboot_info) {
+		copy_multiboot_info();
+		real_mode_data = (char *) (__pa(&boot_params));
+	} else {
+		copy_bootdata(__va(real_mode_data));
+	}
 
 	/*
 	 * Load microcode early on BSP.

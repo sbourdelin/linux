@@ -585,6 +585,12 @@ config X86_AMD_PLATFORM_DEVICE
 	  I2C and UART depend on COMMON_CLK to set clock. GPIO driver is
 	  implemented under PINCTRL subsystem.
 
+config X86_MULTIBOOT_STUB
+	bool "Multiboot stub support for ELF kernel image"
+	default n
+	---help---
+	  Set whether multiboot stub is on or off.
+
 config IOSF_MBI
 	tristate "Intel SoC IOSF Sideband support for SoC platforms"
 	depends on PCI

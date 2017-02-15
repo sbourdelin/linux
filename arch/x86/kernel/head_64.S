@@ -22,6 +22,7 @@
 #include <asm/nops.h>
 #include "../entry/calling.h"
 #include <asm/export.h>
+#include <asm/boot.h>
 
 #ifdef CONFIG_PARAVIRT
 #include <asm/asm-offsets.h>
@@ -31,6 +32,8 @@
 #define GET_CR2_INTO(reg) movq %cr2, reg
 #define INTERRUPT_RETURN iretq
 #endif
+
+#include "multiboot2.h"
 
 /* we are not able to switch in one step to the final KERNEL ADDRESS SPACE
  * because we need identity-mapped pages.
@@ -65,6 +68,161 @@ startup_64:
 	 * compiled to run at we first fixup the physical addresses in our page
 	 * tables and then reload them.
 	 */
+
+#ifdef CONFIG_X86_MULTIBOOT_STUB
+	jmp multiboot_entry
+
+	.align MULTIBOOT_HEADER_ALIGN
+multiboot_header:
+        /* magic */
+        .long	MULTIBOOT2_HEADER_MAGIC
+        /* ISA: i386 */
+        .long	MULTIBOOT_ARCHITECTURE_I386
+        /* Header length.  */
+        .long	multiboot_header_end - multiboot_header
+        /* checksum */
+        .long	-(MULTIBOOT2_HEADER_MAGIC + MULTIBOOT_ARCHITECTURE_I386 + \
+		(multiboot_header_end - multiboot_header))
+
+	/* information request tag */
+infomation_request_start:
+	.short	MULTIBOOT_HEADER_TAG_INFORMATION_REQUEST
+	.short	MULTIBOOT_HEADER_TAG_OPTIONAL
+	.long	infomation_request_end - infomation_request_start
+	.long	MULTIBOOT_TAG_TYPE_CMDLINE
+	.long	MULTIBOOT_TAG_TYPE_MMAP
+infomation_request_end:
+
+	.short MULTIBOOT_HEADER_TAG_END
+	.short 0
+	.long 8
+multiboot_header_end:
+
+multiboot_entry:
+	cmpl	$MULTIBOOT2_BOOTLOADER_MAGIC, %eax
+	jne	not_multiboot
+
+	.code32
+	/* %ebp contains the address we are loaded at by the boot loader */
+	movl $_text - __START_KERNEL_map, %ebp
+
+	/* Store the Multiboot information structure */
+	movl	%ebx, (multiboot_info - startup_64)(%ebp)
+
+	/*
+	 * The Multiboot-compliant bootloader puts the machine in 32-bit mode
+	 * so we need to switch to long mode by ourself. If later version of
+	 * Multiboot protocal supports 64-bit machine state then this part of
+	 * code may be eliminated.
+	 */
+	cli
+	movl	$(__BOOT_DS), %eax
+	movl	%eax, %ds
+	movl	%eax, %es
+	movl	%eax, %ss
+
+	/* Setup a stack and make sure cpu supports long mode. */
+	movl	(__end_init_task - 8 - startup_64)(%ebp), %eax
+	movl	%eax, %esp
+
+	call	verify_cpu
+	testl	%eax, %eax
+	jnz	no_longmode
+
+/*
+ * Prepare for entering 64 bit mode
+ */
+
+	/* Load new GDT with the 64bit segments using 32bit descriptor */
+	leal	(gdt - startup_64)(%ebp), %eax
+	movl	%eax, (gdt + 2 - startup_64)(%ebp)
+	lgdt	(gdt - startup_64)(%ebp)
+
+	/* Enable PAE mode */
+	movl	%cr4, %eax
+	orl	$X86_CR4_PAE, %eax
+	movl	%eax, %cr4
+
+ /*
+  * Build early 4G boot pagetable
+  */
+	/* Initialize Page tables to 0 */
+	/*leal	pgtable(%ebp), %edi
+	xorl	%eax, %eax
+	movl	$(BOOT_INIT_PGT_SIZE/4), %ecx
+	rep	stosl*/
+
+	/* Build Level 4 */
+	leal	(pgtable - startup_64)(%ebp), %edi
+	leal	0x1007 (%edi), %eax
+	movl	%eax, 0(%edi)
+
+	/* Build Level 3 */
+	leal	(pgtable + 0x1000 - startup_64)(%ebp), %edi
+	leal	0x1007(%edi), %eax
+	movl	$4, %ecx
+1:	movl	%eax, 0x00(%edi)
+	addl	$0x00001000, %eax
+	addl	$8, %edi
+	decl	%ecx
+	jnz	1b
+
+	/* Build Level 2 */
+	leal	(pgtable + 0x2000 - startup_64)(%ebp), %edi
+	movl	$0x00000183, %eax
+	movl	$2048, %ecx
+1:	movl	%eax, 0(%edi)
+	addl	$0x00200000, %eax
+	addl	$8, %edi
+	decl	%ecx
+	jnz	1b
+
+	/* Enable the boot page tables */
+	leal	(pgtable - startup_64)(%ebp), %eax
+	movl	%eax, %cr3
+
+	/* Enable Long mode in EFER (Extended Feature Enable Register) */
+	movl	$MSR_EFER, %ecx
+	rdmsr
+	btsl	$_EFER_LME, %eax
+	wrmsr
+
+	/* After gdt is loaded */
+	xorl	%eax, %eax
+	lldt	%ax
+	movl    $__BOOT_TSS, %eax
+	ltr	%ax
+
+	/*
+	 * Setup for the jump to 64bit mode
+	 *
+	 * When the jump is performend we will be in long mode but
+	 * in 32bit compatibility mode with EFER.LME = 1, CS.L = 0, CS.D = 1
+	 * (and in turn EFER.LMA = 1).	To jump into 64bit mode we use
+	 * the new gdt/idt that has __KERNEL_CS with CS.L = 1.
+	 * We place all of the values on our mini stack so lret can
+	 * used to perform that far jump.
+	 */
+	pushl	$__KERNEL_CS
+	leal	(not_multiboot - startup_64)(%ebp), %eax
+	pushl	%eax
+
+	/* Enter paged protected Mode, activating Long Mode */
+	movl	$(X86_CR0_PG | X86_CR0_PE), %eax /* Enable Paging and Protected mode */
+	movl	%eax, %cr0
+
+	/* Jump from 32bit compatibility mode into 64bit mode. */
+	lret
+
+no_longmode:
+	/* This isn't an x86-64 CPU so hang */
+1:
+	hlt
+	jmp     1b
+
+	.code64
+not_multiboot:
+#endif
 
 	/*
 	 * Setup stack for verify_cpu(). "-8" because initial_stack is defined
@@ -488,6 +646,23 @@ ENTRY(phys_base)
 	/* This must match the first entry in level2_kernel_pgt */
 	.quad   0x0000000000000000
 EXPORT_SYMBOL(phys_base)
+
+#ifdef CONFIG_X86_MULTIBOOT_STUB
+gdt:
+	.word	gdt_end - gdt
+	.long	0
+	.word	0
+	.quad	0x0000000000000000	/* NULL descriptor */
+	.quad	0x00af9a000000ffff	/* __KERNEL_CS */
+	.quad	0x00cf92000000ffff	/* __KERNEL_DS */
+	.quad	0x0080890000000000	/* TS descriptor */
+	.quad   0x0000000000000000	/* TS continued */
+gdt_end:
+
+	.balign 4096
+pgtable:
+	.fill BOOT_PGT_SIZE, 1, 0
+#endif
 
 #include "../../x86/xen/xen-head.S"
 	

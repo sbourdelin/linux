@@ -39,6 +39,10 @@ ifdef CONFIG_X86_NEED_RELOCS
         LDFLAGS_vmlinux := --emit-relocs
 endif
 
+ifdef CONFIG_X86_MULTIBOOT_STUB
+	LDFLAGS_vmlinux += -z max-page-size=0x1000
+endif
+
 #
 # Prevent GCC from generating any FP code by mistake.
 #
