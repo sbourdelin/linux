@@ -223,7 +223,7 @@ pgd_t * __meminit vmemmap_pgd_populate(unsigned long addr, int node)
 int __meminit vmemmap_populate_basepages(unsigned long start,
 					 unsigned long end, int node)
 {
-	unsigned long addr = start;
+	unsigned long addr = start & ~(PAGE_SIZE - 1);
 	pgd_t *pgd;
 	pud_t *pud;
 	pmd_t *pmd;
