@@ -64,6 +64,7 @@
 #include <linux/page_owner.h>
 #include <linux/kthread.h>
 #include <linux/memcontrol.h>
+#include <linux/node.h>
 
 #include <asm/sections.h>
 #include <asm/tlbflush.h>
@@ -2898,6 +2899,10 @@ get_page_from_freelist(gfp_t gfp_mask, unsigned int order, int alloc_flags,
 	struct zoneref *z = ac->preferred_zoneref;
 	struct zone *zone;
 	struct pglist_data *last_pgdat_dirty_limit = NULL;
+	bool cpuset_fallback = false;
+
+	if (ac->nodemask != orig_mask)
+		cpuset_fallback = true;
 
 	/*
 	 * Scan zonelist, looking for a zone with enough free.
@@ -2907,6 +2912,24 @@ get_page_from_freelist(gfp_t gfp_mask, unsigned int order, int alloc_flags,
 								ac->nodemask) {
 		struct page *page;
 		unsigned long mark;
+
+		/*
+		 * CDM nodes get skipped if the requested gfp flag
+		 * does not have __GFP_THISNODE set or the nodemask
+		 * does not have any CDM nodes in case the nodemask
+		 * is non NULL (explicit allocation requests from
+		 * kernel or user process MPOL_BIND policy which has
+		 * CDM nodes).
+		 */
+		if (is_cdm_node(zone->zone_pgdat->node_id)) {
+			if (!(gfp_mask & __GFP_THISNODE)) {
+				if (cpuset_fallback)
+					continue;
+
+				if (!ac->nodemask)
+					continue;
+			}
+		}
 
 		if (cpusets_enabled() &&
 			(alloc_flags & ALLOC_CPUSET) &&
