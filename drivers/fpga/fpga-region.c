@@ -105,6 +105,243 @@ EXPORT_SYMBOL_GPL(fpga_region_ovl_image_info);
 
 #endif /* CONFIG_OF_FPGA_REGION */
 
+#if IS_ENABLED(CONFIG_FPGA_REGION_SYSFS)
+
+struct fpga_image_info *image_info_from_region(struct fpga_region *region)
+{
+	struct fpga_image_info *image_info;
+
+	/* If region has an overlay, display image_info from overlay. */
+	image_info = fpga_region_ovl_image_info(region);
+	if (!image_info)
+		image_info = region->image_info;
+
+	return image_info;
+}
+
+/*
+ * Controlling a region both by sysfs and by device tree overlays is
+ * not supported.
+ */
+static ssize_t firmware_name_show(struct device *dev,
+				  struct device_attribute *attr, char *buf)
+{
+	struct fpga_region *region = to_fpga_region(dev);
+	struct fpga_image_info *image_info;
+
+	image_info = image_info_from_region(region);
+
+	if (image_info && image_info->firmware_name)
+		return sprintf(buf, "%s\n", image_info->firmware_name);
+
+	return 0;
+}
+
+static ssize_t firmware_name_store(struct device *dev,
+				   struct device_attribute *attr,
+				   const char *buf, size_t count)
+{
+	struct fpga_region *region = to_fpga_region(dev);
+	char *firmware_name;
+	size_t len;
+	int ret;
+
+	/*
+	 * Controlling a region both by sysfs and by device tree overlays is
+	 * not supported.
+	 */
+	if (fpga_region_ovl_image_info(region))
+		return -EINVAL;
+
+	if (!region->image_info) {
+		region->image_info = fpga_region_alloc_image_info(region);
+		if (!region->image_info)
+			return -ENOMEM;
+	}
+
+	firmware_name = devm_kzalloc(dev, count, GFP_KERNEL);
+	if (!firmware_name)
+		return -ENOMEM;
+	pr_err("count = %d\n", count);
+	/* lose terminating \n */
+	strcpy(firmware_name, buf);
+	len = strlen(firmware_name);
+	if (firmware_name[len - 1] == '\n')
+		firmware_name[len - 1] = 0;
+	if (firmware_name[0] == 0) {
+		devm_kfree(dev, firmware_name);
+		firmware_name = NULL;
+	}
+
+	/* Release previous firmware name (if any). Save current one. */
+	if (region->image_info->firmware_name)
+		devm_kfree(dev, region->image_info->firmware_name);
+	region->image_info->firmware_name = firmware_name;
+
+	if (firmware_name) {
+		ret = fpga_region_program_fpga(region, region->image_info);
+		if (ret)
+			dev_err(dev,
+				"FPGA programming failed with value %d\n", ret);
+	} else {
+		/*
+		 * Writing null string to firmware_name will disable and put
+		 * the bridges (if there were any bridges in the bridge list).
+		 */
+		fpga_bridges_disable(&region->bridge_list);
+		if (region->get_bridges)
+			fpga_bridges_put(&region->bridge_list);
+		fpga_region_free_image_info(region, region->image_info);
+		region->image_info = NULL;
+	}
+
+	return count;
+}
+
+static ssize_t partial_config_show(struct device *dev,
+				   struct device_attribute *attr, char *buf)
+{
+	struct fpga_region *region = to_fpga_region(dev);
+	struct fpga_image_info *image_info;
+	int partial;
+
+	image_info = image_info_from_region(region);
+	if (!image_info)
+		return 0;
+
+	partial = !!(image_info->flags & FPGA_MGR_PARTIAL_RECONFIG);
+
+	return sprintf(buf, "%d\n", partial);
+}
+
+static ssize_t partial_config_store(struct device *dev,
+				    struct device_attribute *attr,
+				    const char *buf, size_t count)
+{
+	struct fpga_region *region = to_fpga_region(dev);
+	unsigned long val;
+	int ret;
+
+	if (fpga_region_ovl_image_info(region))
+		return -EINVAL;
+
+	if (!region->image_info) {
+		region->image_info = fpga_region_alloc_image_info(region);
+		if (!region->image_info)
+			return -ENOMEM;
+	}
+
+	ret = kstrtoul(buf, 0, &val);
+	if (ret)
+		return ret;
+
+	if (val == 1)
+		region->image_info->flags |= FPGA_MGR_PARTIAL_RECONFIG;
+	else if (val == 0)
+		region->image_info->flags &= ~FPGA_MGR_PARTIAL_RECONFIG;
+	else
+		return -EINVAL;
+
+	return count;
+}
+
+static ssize_t unfreeze_timeout_show(struct device *dev,
+				     struct device_attribute *attr,
+				     char *buf)
+{
+	struct fpga_region *region = to_fpga_region(dev);
+	struct fpga_image_info *image_info;
+
+	image_info = image_info_from_region(region);
+	if (!image_info)
+		return 0;
+
+	return sprintf(buf, "%d\n", image_info->enable_timeout_us);
+}
+
+static ssize_t unfreeze_timeout_store(struct device *dev,
+				      struct device_attribute *attr,
+				      const char *buf,
+				      size_t count)
+{
+	struct fpga_region *region = to_fpga_region(dev);
+	unsigned long val;
+	int ret;
+
+	if (fpga_region_ovl_image_info(region))
+		return -EINVAL;
+
+	if (!region->image_info) {
+		region->image_info = fpga_region_alloc_image_info(region);
+		if (!region->image_info)
+			return -ENOMEM;
+	}
+
+	ret = kstrtoul(buf, 0, &val);
+	if (ret)
+		return ret;
+
+	region->image_info->enable_timeout_us = val;
+
+	return count;
+}
+
+static ssize_t freeze_timeout_show(struct device *dev,
+				   struct device_attribute *attr, char *buf)
+{
+	struct fpga_region *region = to_fpga_region(dev);
+	struct fpga_image_info *image_info;
+
+	image_info = image_info_from_region(region);
+	if (!image_info)
+		return 0;
+
+	return sprintf(buf, "%d\n", image_info->disable_timeout_us);
+}
+
+static ssize_t freeze_timeout_store(struct device *dev,
+				    struct device_attribute *attr,
+				    const char *buf,
+				    size_t count)
+{
+	struct fpga_region *region = to_fpga_region(dev);
+	unsigned long val;
+	int ret;
+
+	if (fpga_region_ovl_image_info(region))
+		return -EINVAL;
+
+	if (!region->image_info) {
+		region->image_info = fpga_region_alloc_image_info(region);
+		if (!region->image_info)
+			return -ENOMEM;
+	}
+
+	ret = kstrtoul(buf, 0, &val);
+	if (ret)
+		return ret;
+
+	region->image_info->disable_timeout_us = val;
+
+	return count;
+}
+
+static DEVICE_ATTR_RW(firmware_name);
+static DEVICE_ATTR_RW(partial_config);
+static DEVICE_ATTR_RW(unfreeze_timeout);
+static DEVICE_ATTR_RW(freeze_timeout);
+
+static struct attribute *fpga_region_attrs[] = {
+	&dev_attr_firmware_name.attr,
+	&dev_attr_partial_config.attr,
+	&dev_attr_unfreeze_timeout.attr,
+	&dev_attr_freeze_timeout.attr,
+	NULL,
+};
+ATTRIBUTE_GROUPS(fpga_region);
+
+#endif /* CONFIG_FPGA_REGION_SYSFS */
+
 /**
  * fpga_region_get - get an exclusive reference to a fpga region
  * @region: FPGA Region struct
@@ -287,6 +524,10 @@ static int __init fpga_region_init(void)
 	fpga_region_class = class_create(THIS_MODULE, "fpga_region");
 	if (IS_ERR(fpga_region_class))
 		return PTR_ERR(fpga_region_class);
+
+#if IS_ENABLED(CONFIG_FPGA_REGION_SYSFS)
+	fpga_region_class->dev_groups = fpga_region_groups;
+#endif /* CONFIG_FPGA_REGION_SYSFS */
 
 	fpga_region_class->dev_release = fpga_region_dev_release;
 
