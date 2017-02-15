@@ -1298,6 +1298,33 @@ retry_journal:
 	return ret;
 }
 
+/*
+ * This function does not call mark_inode_dirty() ulike generic_write_end().
+ * It prevents change of file size for inode from being handled by two
+ * transactions.
+ */
+int ext4_block_write_end(struct file *file, struct address_space *mapping,
+                loff_t pos, unsigned len, unsigned copied,
+                struct page *page, void *fsdata)
+{
+        struct inode *inode = mapping->host;
+        loff_t old_size = inode->i_size;
+
+        copied = block_write_end(file, mapping, pos, len, copied, page, fsdata);
+
+        if (pos+copied > inode->i_size) {
+                i_size_write(inode, pos+copied);
+        }
+
+        unlock_page(page);
+        put_page(page);
+
+        if (old_size < pos)
+                pagecache_isize_extended(inode, old_size, pos);
+
+        return copied;
+}
+
 /* For write_end() in data=journal mode */
 static int write_end_fn(handle_t *handle, struct buffer_head *bh)
 {
@@ -2201,6 +2228,7 @@ static bool mpage_add_bh_to_extent(struct mpage_da_data *mpd, ext4_lblk_t lblk,
 /*
  * mpage_process_page_bufs - submit page buffers for IO or add them to extent
  *
+ * @handle - handle for journal operations
  * @mpd - extent of blocks for mapping
  * @head - the first buffer in the page
  * @bh - buffer we should start processing from
@@ -2214,12 +2242,14 @@ static bool mpage_add_bh_to_extent(struct mpage_da_data *mpd, ext4_lblk_t lblk,
  * extent to map because we cannot extend it anymore. It can also return value
  * < 0 in case of error during IO submission.
  */
-static int mpage_process_page_bufs(struct mpage_da_data *mpd,
+static int mpage_process_page_bufs(handle_t *handle,
+				   struct mpage_da_data *mpd,
 				   struct buffer_head *head,
 				   struct buffer_head *bh,
 				   ext4_lblk_t lblk)
 {
 	struct inode *inode = mpd->inode;
+	struct ext4_inode_info *ei = EXT4_I(inode);
 	int err;
 	ext4_lblk_t blocks = (i_size_read(inode) + (1 << inode->i_blkbits) - 1)
 							>> inode->i_blkbits;
@@ -2240,6 +2270,19 @@ static int mpage_process_page_bufs(struct mpage_da_data *mpd,
 		err = mpage_submit_page(mpd, head->b_page);
 		if (err < 0)
 			return err;
+
+		/* If running mark_inode_dirty() was delayed by
+                 * write(), do it here. It is executed when
+                 * i_size was changed by write() and new block
+                 * is not allocated.
+                 */
+                if (ei->i_flags & EXT4_MARK_DIRTY_FL) {
+                        ext4_mark_inode_dirty(handle, inode);
+
+			down_write(&EXT4_I(inode)->i_data_sem);
+			ei->i_flags &= ~(EXT4_MARK_DIRTY_FL);
+			up_write(&EXT4_I(inode)->i_data_sem);
+                }
 	}
 	return lblk < blocks;
 }
@@ -2248,6 +2291,7 @@ static int mpage_process_page_bufs(struct mpage_da_data *mpd,
  * mpage_map_buffers - update buffers corresponding to changed extent and
  *		       submit fully mapped pages for IO
  *
+ * @handle - handle for journal operations
  * @mpd - description of extent to map, on return next extent to map
  *
  * Scan buffers corresponding to changed extent (we expect corresponding pages
@@ -2258,7 +2302,8 @@ static int mpage_process_page_bufs(struct mpage_da_data *mpd,
  * mapped, we update @map to the next extent in the last page that needs
  * mapping. Otherwise we submit the page for IO.
  */
-static int mpage_map_and_submit_buffers(struct mpage_da_data *mpd)
+static int mpage_map_and_submit_buffers(handle_t *handle,
+					struct mpage_da_data *mpd)
 {
 	struct pagevec pvec;
 	int nr_pages, i;
@@ -2306,7 +2351,8 @@ static int mpage_map_and_submit_buffers(struct mpage_da_data *mpd)
 					 * io_end->size as the following call
 					 * can submit the page for IO.
 					 */
-					err = mpage_process_page_bufs(mpd, head,
+					err = mpage_process_page_bufs(handle,
+								      mpd, head,
 								      bh, lblk);
 					pagevec_release(&pvec);
 					if (err > 0)
@@ -2466,7 +2512,7 @@ static int mpage_map_and_submit_extent(handle_t *handle,
 		 * Update buffer state, submit mapped pages, and get us new
 		 * extent to map
 		 */
-		err = mpage_map_and_submit_buffers(mpd);
+		err = mpage_map_and_submit_buffers(handle, mpd);
 		if (err < 0)
 			goto update_disksize;
 	} while (map->m_len);
@@ -2518,6 +2564,7 @@ static int ext4_da_writepages_trans_blocks(struct inode *inode)
  * mpage_prepare_extent_to_map - find & lock contiguous range of dirty pages
  * 				 and underlying extent to map
  *
+ * @handle - handle for journal operations
  * @mpd - where to look for pages
  *
  * Walk dirty pages in the mapping. If they are fully mapped, submit them for
@@ -2532,7 +2579,8 @@ static int ext4_da_writepages_trans_blocks(struct inode *inode)
  * unnecessary complication, it is actually inevitable in blocksize < pagesize
  * case as we need to track IO to all buffers underlying a page in one io_end.
  */
-static int mpage_prepare_extent_to_map(struct mpage_da_data *mpd)
+static int mpage_prepare_extent_to_map(handle_t *handle,
+				       struct mpage_da_data *mpd)
 {
 	struct address_space *mapping = mpd->inode->i_mapping;
 	struct pagevec pvec;
@@ -2614,7 +2662,8 @@ static int mpage_prepare_extent_to_map(struct mpage_da_data *mpd)
 			lblk = ((ext4_lblk_t)page->index) <<
 				(PAGE_SHIFT - blkbits);
 			head = page_buffers(page);
-			err = mpage_process_page_bufs(mpd, head, head, lblk);
+			err = mpage_process_page_bufs(handle, mpd, head,
+				head, lblk);
 			if (err <= 0)
 				goto out;
 			err = 0;
@@ -2779,7 +2828,7 @@ retry:
 		}
 
 		trace_ext4_da_write_pages(inode, mpd.first_page, mpd.wbc);
-		ret = mpage_prepare_extent_to_map(&mpd);
+		ret = mpage_prepare_extent_to_map(handle, &mpd);
 		if (!ret) {
 			if (mpd.map.m_len)
 				ret = mpage_map_and_submit_extent(handle, &mpd,
@@ -3053,21 +3102,24 @@ static int ext4_da_write_end(struct file *file,
 	start = pos & (PAGE_SIZE - 1);
 	end = start + copied - 1;
 
-	/*
-	 * generic_write_end() will run mark_inode_dirty() if i_size
-	 * changes.  So let's piggyback the i_disksize mark_inode_dirty
-	 * into that.
-	 */
+        /*
+         * Kworker thread will run mark_inode_dirty() if i_size changes.
+         * So we just change i_size and delay insert it into transaction.
+         */
 	new_i_size = pos + copied;
 	if (copied && new_i_size > EXT4_I(inode)->i_disksize) {
 		if (ext4_has_inline_data(inode) ||
 		    ext4_da_should_update_i_disksize(page, end)) {
+			struct ext4_inode_info *ei = EXT4_I(inode);
 			ext4_update_i_disksize(inode, new_i_size);
-			/* We need to mark inode dirty even if
-			 * new_i_size is less that inode->i_size
-			 * bu greater than i_disksize.(hint delalloc)
-			 */
-			ext4_mark_inode_dirty(handle, inode);
+
+			/*
+                         * We need to mark the inode to be inserted
+                         * into transaction by kworker thread later.
+                         */
+                        down_write(&EXT4_I(inode)->i_data_sem);
+                        ei->i_flags |= EXT4_MARK_DIRTY_FL;
+                        up_write(&EXT4_I(inode)->i_data_sem);
 		}
 	}
 
@@ -3077,7 +3129,7 @@ static int ext4_da_write_end(struct file *file,
 		ret2 = ext4_da_write_inline_data_end(inode, pos, len, copied,
 						     page);
 	else
-		ret2 = generic_write_end(file, mapping, pos, len, copied,
+		ret2 = ext4_block_write_end(file, mapping, pos, len, copied,
 							page, fsdata);
 
 	copied = ret2;
