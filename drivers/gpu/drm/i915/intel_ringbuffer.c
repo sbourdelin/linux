@@ -1419,24 +1419,6 @@ gen6_ring_sync_to(struct drm_i915_gem_request *req,
 static void
 gen5_seqno_barrier(struct intel_engine_cs *engine)
 {
-	/* MI_STORE are internally buffered by the GPU and not flushed
-	 * either by MI_FLUSH or SyncFlush or any other combination of
-	 * MI commands.
-	 *
-	 * "Only the submission of the store operation is guaranteed.
-	 * The write result will be complete (coherent) some time later
-	 * (this is practically a finite period but there is no guaranteed
-	 * latency)."
-	 *
-	 * Empirically, we observe that we need a delay of at least 75us to
-	 * be sure that the seqno write is visible by the CPU.
-	 */
-	usleep_range(125, 250);
-}
-
-static void
-gen6_seqno_barrier(struct intel_engine_cs *engine)
-{
 	struct drm_i915_private *dev_priv = engine->i915;
 	i915_reg_t reg = RING_INSTPM(engine->mmio_base);
 
@@ -2569,11 +2551,11 @@ static void intel_ring_init_irq(struct drm_i915_private *dev_priv,
 	if (INTEL_GEN(dev_priv) >= 8) {
 		engine->irq_enable = gen8_irq_enable;
 		engine->irq_disable = gen8_irq_disable;
-		engine->irq_seqno_barrier = gen6_seqno_barrier;
+		engine->irq_seqno_barrier = gen5_seqno_barrier;
 	} else if (INTEL_GEN(dev_priv) >= 6) {
 		engine->irq_enable = gen6_irq_enable;
 		engine->irq_disable = gen6_irq_disable;
-		engine->irq_seqno_barrier = gen6_seqno_barrier;
+		engine->irq_seqno_barrier = gen5_seqno_barrier;
 	} else if (INTEL_GEN(dev_priv) >= 5) {
 		engine->irq_enable = gen5_irq_enable;
 		engine->irq_disable = gen5_irq_disable;
