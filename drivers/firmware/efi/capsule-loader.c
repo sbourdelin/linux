@@ -116,7 +116,7 @@ static ssize_t efi_capsule_submit_update(struct capsule_info *cap_info)
 		return -EFAULT;
 	}
 
-	ret = efi_capsule_update(cap_hdr_temp, cap_info->pages);
+	ret = efi_capsule_update(cap_hdr_temp, 0, cap_info->pages);
 	vunmap(cap_hdr_temp);
 	if (ret) {
 		pr_err("%s: efi_capsule_update() failed\n", __func__);

@@ -184,6 +184,7 @@ efi_capsule_update_locked(efi_capsule_header_t *capsule,
 /**
  * efi_capsule_update - send a capsule to the firmware
  * @capsule: capsule to send to firmware
+ * @image_offs: image offset on first data page
  * @pages: an array of capsule data pages
  *
  * Build a scatter gather list with EFI capsule block descriptors to
@@ -214,9 +215,11 @@ efi_capsule_update_locked(efi_capsule_header_t *capsule,
  *
  * Return 0 on success, a converted EFI status code on failure.
  */
-int efi_capsule_update(efi_capsule_header_t *capsule, struct page **pages)
+int efi_capsule_update(efi_capsule_header_t *capsule, unsigned int image_offs,
+		       struct page **pages)
 {
 	u32 imagesize = capsule->imagesize;
+	u32 total_size = imagesize + image_offs;
 	efi_guid_t guid = capsule->guid;
 	unsigned int count, sg_count;
 	u32 flags = capsule->flags;
@@ -224,11 +227,14 @@ int efi_capsule_update(efi_capsule_header_t *capsule, struct page **pages)
 	int rv, reset_type;
 	int i, j;
 
-	rv = efi_capsule_supported(guid, flags, imagesize, &reset_type);
+	if (image_offs >= PAGE_SIZE)
+		return -EINVAL;
+
+	rv = efi_capsule_supported(guid, flags, total_size, &reset_type);
 	if (rv)
 		return rv;
 
-	count = DIV_ROUND_UP(imagesize, PAGE_SIZE);
+	count = DIV_ROUND_UP(total_size, PAGE_SIZE);
 	sg_count = sg_pages_num(count);
 
 	sg_pages = kzalloc(sg_count * sizeof(*sg_pages), GFP_KERNEL);
@@ -255,8 +261,13 @@ int efi_capsule_update(efi_capsule_header_t *capsule, struct page **pages)
 		for (j = 0; j < SGLIST_PER_PAGE && count > 0; j++) {
 			u64 sz = min_t(u64, imagesize, PAGE_SIZE);
 
-			sglist[j].length = sz;
 			sglist[j].data = page_to_phys(*pages++);
+			if (image_offs > 0) {
+				sglist[j].data += image_offs;
+				sz -= image_offs;
+				image_offs = 0;
+			}
+			sglist[j].length = sz;
 
 			imagesize -= sz;
 			count--;
