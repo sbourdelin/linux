@@ -190,13 +190,9 @@ static int __fw_state_check(struct fw_state *fw_st, enum fw_status status)
 #else
 #define FW_OPT_USERHELPER	0
 #endif
-#ifdef CONFIG_FW_LOADER_USER_HELPER_FALLBACK
-#define FW_OPT_FALLBACK		FW_OPT_USERHELPER
-#else
-#define FW_OPT_FALLBACK		0
-#endif
 #define FW_OPT_NO_WARN	(1U << 3)
 #define FW_OPT_NOCACHE	(1U << 4)
+#define FW_OPT_FALLBACK	(1U << 5)
 
 struct firmware_cache {
 	/* firmware_buf instance will be added into the below list */
@@ -1213,8 +1209,12 @@ _request_firmware(const struct firmware **firmware_p, const char *name,
 			dev_warn(device,
 				 "Direct firmware load for %s failed with error %d\n",
 				 name, ret);
-		if (opt_flags & FW_OPT_USERHELPER) {
+		if (IS_ENABLED(CONFIG_FW_LOADER_USER_HELPER_FALLBACK) &&
+		    opt_flags & FW_OPT_FALLBACK) {
 			dev_warn(device, "Falling back to user helper\n");
+			opt_flags |= FW_OPT_USERHELPER;
+		}
+		if (opt_flags & FW_OPT_USERHELPER) {
 			ret = fw_load_from_user_helper(fw, name, device,
 						       opt_flags, timeout);
 		}
