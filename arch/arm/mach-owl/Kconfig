@@ -1,0 +1,9 @@
+menuconfig ARCH_OWL
+	bool "Actions Semi Owl family SoCs"
+	depends on ARCH_MULTI_V7
+	select GENERIC_IRQ_CHIP
+	select ARM_GIC
+	select CACHE_L2X0
+	select COMMON_CLK
+	help
+	  This enables support for the Actions Semiconductor S500 SoC family.

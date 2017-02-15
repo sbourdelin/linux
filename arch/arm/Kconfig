@@ -790,6 +790,8 @@ source "arch/arm/mach-omap2/Kconfig"
 
 source "arch/arm/mach-orion5x/Kconfig"
 
+source "arch/arm/mach-owl/Kconfig"
+
 source "arch/arm/mach-picoxcell/Kconfig"
 
 source "arch/arm/mach-pxa/Kconfig"
