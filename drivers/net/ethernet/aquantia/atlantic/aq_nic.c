@@ -476,11 +476,15 @@ static unsigned int aq_nic_map_skb_frag(struct aq_nic_s *self,
 	unsigned int ret = 0U;
 	unsigned int nr_frags = skb_shinfo(skb)->nr_frags;
 	unsigned int frag_count = 0U;
+	struct device *dev = aq_nic_get_dev(self);
 
 	dx->flags = 0U;
 	dx->len = skb_headlen(skb);
-	dx->pa = dma_map_single(aq_nic_get_dev(self), skb->data, dx->len,
-				DMA_TO_DEVICE);
+	dx->pa = dma_map_single(dev, skb->data, dx->len, DMA_TO_DEVICE);
+
+	if (unlikely(dma_mapping_error(dev, dx->pa)))
+		goto err_exit;
+
 	dx->len_pkt = skb->len;
 	dx->is_sop = 1U;
 	dx->is_mapped = 1U;
@@ -502,8 +506,10 @@ static unsigned int aq_nic_map_skb_frag(struct aq_nic_s *self,
 
 		frag_len = skb_frag_size(frag);
 
-		frag_pa = skb_frag_dma_map(aq_nic_get_dev(self), frag, 0,
+		frag_pa = skb_frag_dma_map(dev, frag, 0,
 					   frag_len, DMA_TO_DEVICE);
+		if (unlikely(dma_mapping_error(dev, frag_pa)))
+			goto err_exit;
 
 		while (frag_len > AQ_CFG_TX_FRAME_MAX) {
 			++dx;
@@ -529,6 +535,7 @@ static unsigned int aq_nic_map_skb_frag(struct aq_nic_s *self,
 	dx->is_eop = 1U;
 	dx->skb = skb;
 
+err_exit:
 	return ret;
 }
 
