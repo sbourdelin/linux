@@ -622,6 +622,11 @@ static int rproc_handle_carveout(struct rproc *rproc,
 	dev_dbg(dev, "carveout rsc: name: %s, da 0x%x, pa 0x%x, len 0x%x, flags 0x%x\n",
 		rsc->name, rsc->da, rsc->pa, rsc->len, rsc->flags);
 
+	if (rsc->pa != FW_RSC_ADDR_ANY) {
+		dev_dbg(dev, "carveout already allocated by low level driver\n");
+		return 0;
+	}
+
 	carveout = kzalloc(sizeof(*carveout), GFP_KERNEL);
 	if (!carveout)
 		return -ENOMEM;
