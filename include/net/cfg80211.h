@@ -1670,6 +1670,7 @@ struct cfg80211_bss_select_adjust {
  * @rcu_head: RCU callback used to free the struct
  * @owner_nlportid: netlink portid of owner (if this should is a request
  *	owned by a particular socket)
+ * @list: for keeping list of requests.
  * @delay: delay in seconds to use before starting the first scan
  *	cycle.  The driver may ignore this parameter and start
  *	immediately (or at any other time), if this feature is not
@@ -1714,6 +1715,7 @@ struct cfg80211_sched_scan_request {
 	unsigned long scan_start;
 	struct rcu_head rcu_head;
 	u32 owner_nlportid;
+	struct list_head list;
 
 	/* keep last */
 	struct ieee80211_channel *channels[0];
@@ -3171,7 +3173,7 @@ enum wiphy_flags {
 	WIPHY_FLAG_CONTROL_PORT_PROTOCOL	= BIT(7),
 	WIPHY_FLAG_IBSS_RSN			= BIT(8),
 	WIPHY_FLAG_MESH_AUTH			= BIT(10),
-	WIPHY_FLAG_SUPPORTS_SCHED_SCAN		= BIT(11),
+	/* use hole at 11 */
 	/* use hole at 12 */
 	WIPHY_FLAG_SUPPORTS_FW_ROAM		= BIT(13),
 	WIPHY_FLAG_AP_UAPSD			= BIT(14),
@@ -3509,6 +3511,8 @@ struct wiphy_iftype_ext_capab {
  *	this variable determines its size
  * @max_scan_ssids: maximum number of SSIDs the device can scan for in
  *	any given scan
+ * @max_sched_scan_reqs: maximum number of scheduled scan requests that
+ *	the device can run concurrently.
  * @max_sched_scan_ssids: maximum number of SSIDs the device can scan
  *	for in any given scheduled scan
  * @max_match_sets: maximum number of match sets the device can handle
@@ -3645,6 +3649,7 @@ struct wiphy {
 
 	int bss_priv_size;
 	u8 max_scan_ssids;
+	u8 max_sched_scan_reqs;
 	u8 max_sched_scan_ssids;
 	u8 max_match_sets;
 	u16 max_scan_ie_len;
