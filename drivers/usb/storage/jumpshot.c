@@ -313,7 +313,7 @@ static int jumpshot_write_data(struct us_data *us,
 				//
 				msleep(50); 
 			}
-		} while ((result != USB_STOR_TRANSPORT_GOOD) && (waitcount < 10));
+		} while ((result != USB_STOR_TRANSPORT_GOOD) && (++waitcount < 10));
 
 		if (result != USB_STOR_TRANSPORT_GOOD)
 			usb_stor_dbg(us, "Gah!  Waitcount = 10.  Bad write!?\n");
