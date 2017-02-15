@@ -142,7 +142,7 @@ static void fpga_region_put(struct fpga_region *region)
 }
 
 /**
- * fpga_region_get_manager - get exclusive reference for FPGA manager
+ * fpga_region_get_manager - get reference for FPGA manager
  * @region: FPGA region
  *
  * Get FPGA Manager from "fpga-mgr" property or from ancestor region.
@@ -265,10 +265,16 @@ static int fpga_region_program_fpga(struct fpga_region *region,
 		return PTR_ERR(mgr);
 	}
 
+	ret = fpga_mgr_lock(mgr);
+	if (ret) {
+		pr_err("FPGA manager is busy\n");
+		goto err_put_mgr;
+	}
+
 	ret = fpga_region_get_bridges(region, reg_ovl);
 	if (ret) {
 		pr_err("failed to get fpga region bridges\n");
-		goto err_put_mgr;
+		goto err_unlock_mgr;
 	}
 
 	ret = fpga_bridges_disable(&region->bridge_list);
@@ -289,6 +295,7 @@ static int fpga_region_program_fpga(struct fpga_region *region,
 		goto err_put_br;
 	}
 
+	fpga_mgr_unlock(mgr);
 	fpga_mgr_put(mgr);
 	fpga_region_put(region);
 
@@ -296,6 +303,8 @@ static int fpga_region_program_fpga(struct fpga_region *region,
 
 err_put_br:
 	fpga_bridges_put(&region->bridge_list);
+err_unlock_mgr:
+	fpga_mgr_unlock(mgr);
 err_put_mgr:
 	fpga_mgr_put(mgr);
 	fpga_region_put(region);
