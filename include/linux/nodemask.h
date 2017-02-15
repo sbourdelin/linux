@@ -388,11 +388,14 @@ enum node_states {
 	N_HIGH_MEMORY = N_NORMAL_MEMORY,
 #endif
 #ifdef CONFIG_MOVABLE_NODE
-	N_MEMORY,		/* The node has memory(regular, high, movable) */
+	N_MEMORY,	/* The node has memory(regular, high, movable, cdm) */
 #else
 	N_MEMORY = N_HIGH_MEMORY,
 #endif
 	N_CPU,		/* The node has one or more cpus */
+#ifdef CONFIG_COHERENT_DEVICE
+	N_COHERENT_DEVICE,	/* The node has CDM memory */
+#endif
 	NR_NODE_STATES
 };
 
@@ -495,6 +498,59 @@ static inline int node_random(const nodemask_t *mask)
 	return 0;
 }
 #endif
+
+#ifdef CONFIG_COHERENT_DEVICE
+extern int arch_check_node_cdm(int nid);
+
+static inline nodemask_t system_mem_nodemask(void)
+{
+	nodemask_t system_mem;
+
+	nodes_clear(system_mem);
+	nodes_andnot(system_mem, node_states[N_MEMORY],
+			node_states[N_COHERENT_DEVICE]);
+	return system_mem;
+}
+
+static inline bool is_cdm_node(int node)
+{
+	return node_isset(node, node_states[N_COHERENT_DEVICE]);
+}
+
+static inline void node_set_state_cdm(int node)
+{
+	if (arch_check_node_cdm(node))
+		node_set_state(node, N_COHERENT_DEVICE);
+}
+
+static inline void node_clear_state_cdm(int node)
+{
+	if (arch_check_node_cdm(node))
+		node_clear_state(node, N_COHERENT_DEVICE);
+}
+
+#else
+
+static inline int arch_check_node_cdm(int nid) { return 0; }
+
+static inline nodemask_t system_mem_nodemask(void)
+{
+	return node_states[N_MEMORY];
+}
+
+static inline bool is_cdm_node(int node)
+{
+	return false;
+}
+
+static inline void node_set_state_cdm(int node)
+{
+}
+
+static inline void node_clear_state_cdm(int node)
+{
+}
+#endif	/* CONFIG_COHERENT_DEVICE */
 
 #define node_online_map 	node_states[N_ONLINE]
 #define node_possible_map 	node_states[N_POSSIBLE]

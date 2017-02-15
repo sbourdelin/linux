@@ -41,6 +41,13 @@
 #include <asm/setup.h>
 #include <asm/vdso.h>
 
+#ifdef CONFIG_COHERENT_DEVICE
+inline int arch_check_node_cdm(int nid)
+{
+	return 0;
+}
+#endif
+
 static int numa_enabled = 1;
 
 static char *cmdline __initdata;

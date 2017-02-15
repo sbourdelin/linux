@@ -1030,6 +1030,7 @@ static void node_states_set_node(int node, struct memory_notify *arg)
 	if (arg->status_change_nid_high >= 0)
 		node_set_state(node, N_HIGH_MEMORY);
 
+	node_set_state_cdm(node);
 	node_set_state(node, N_MEMORY);
 }
 
@@ -1843,6 +1844,8 @@ static void node_states_clear_node(int node, struct memory_notify *arg)
 	if ((N_MEMORY != N_HIGH_MEMORY) &&
 	    (arg->status_change_nid >= 0))
 		node_clear_state(node, N_MEMORY);
+
+	node_clear_state_cdm(node);
 }
 
 static int __ref __offline_pages(unsigned long start_pfn,
