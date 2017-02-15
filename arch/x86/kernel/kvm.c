@@ -589,6 +589,7 @@ out:
 	local_irq_restore(flags);
 }
 
+#ifdef CONFIG_X86_32
 __visible bool __kvm_vcpu_is_preempted(long cpu)
 {
 	struct kvm_steal_time *src = &per_cpu(steal_time, cpu);
@@ -597,11 +598,40 @@ __visible bool __kvm_vcpu_is_preempted(long cpu)
 }
 PV_CALLEE_SAVE_REGS_THUNK(__kvm_vcpu_is_preempted);
 
+#else
+
+extern bool __raw_callee_save___kvm_vcpu_is_preempted(long);
+
+/*
+ * Hand-optimize version for x86-64 to avoid 8 64-bit register saving and
+ * restoring to/from the stack. It is assumed that the preempted value
+ * is at an offset of 16 from the beginning of the kvm_steal_time structure
+ * which is verified by the BUILD_BUG_ON() macro below.
+ */
+#define PREEMPTED_OFFSET	16
+asm(
+".pushsection .text;"
+".global __raw_callee_save___kvm_vcpu_is_preempted;"
+".type __raw_callee_save___kvm_vcpu_is_preempted, @function;"
+"__raw_callee_save___kvm_vcpu_is_preempted:"
+"movq	__per_cpu_offset(,%rdi,8), %rax;"
+"cmpb	$0, " __stringify(PREEMPTED_OFFSET) "+steal_time(%rax);"
+"setne	%al;"
+"ret;"
+".popsection");
+
+#endif
+
 /*
  * Setup pv_lock_ops to exploit KVM_FEATURE_PV_UNHALT if present.
  */
 void __init kvm_spinlock_init(void)
 {
+#ifdef CONFIG_X86_64
+	BUILD_BUG_ON((offsetof(struct kvm_steal_time, preempted)
+		!= PREEMPTED_OFFSET) || (sizeof(steal_time.preempted) != 1));
+#endif
+
 	if (!kvm_para_available())
 		return;
 	/* Does host kernel support KVM_FEATURE_PV_UNHALT? */
