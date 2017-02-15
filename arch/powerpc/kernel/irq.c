@@ -476,6 +476,14 @@ void migrate_irqs(void)
 
 	free_cpumask_var(mask);
 
+	/*
+	 * Depending on the details of the interrupt controller, it's possible
+	 * that one of the interrupts we just migrated away from this CPU is
+	 * actually already pending on this CPU. If we leave it in that state
+	 * the interrupt will never be EOI'ed, and will never fire again. So
+	 * temporarily enable interrupts here, to allow any pending interrupt to
+	 * be received (and EOI'ed), before we take this CPU offline.
+	 */
 	local_irq_enable();
 	mdelay(1);
 	local_irq_disable();
