@@ -2945,10 +2945,17 @@ static long kvm_vm_ioctl_check_extension_generic(struct kvm *kvm, long arg)
 	return kvm_vm_ioctl_check_extension(kvm, arg);
 }
 
+#ifdef KVM_DIRTY_LOG_PAGE_OFFSET
 static int kvm_vm_ioctl_enable_dirty_log_ring(struct kvm *kvm, __u32 size)
 {
 	return -EINVAL;
 }
+
+static int kvm_vm_ioctl_reset_dirty_pages(struct kvm *kvm)
+{
+	return -EINVAL;
+}
+#endif
 
 int __attribute__((weak)) kvm_vm_ioctl_enable_cap(struct kvm *kvm,
 						  struct kvm_enable_cap *cap)
@@ -2961,7 +2968,11 @@ static int kvm_vm_ioctl_enable_cap_generic(struct kvm *kvm,
 {
 	switch (cap->cap) {
 	case KVM_CAP_DIRTY_LOG_RING:
+#ifdef KVM_DIRTY_LOG_PAGE_OFFSET
 		return kvm_vm_ioctl_enable_dirty_log_ring(kvm, cap->args[0]);
+#else
+		break;
+#endif
 	default:
 		return kvm_vm_ioctl_enable_cap(kvm, cap);
 	}
@@ -3135,6 +3146,11 @@ out_free_irq_routing:
 	case KVM_CHECK_EXTENSION:
 		r = kvm_vm_ioctl_check_extension_generic(kvm, arg);
 		break;
+#ifdef KVM_DIRTY_LOG_PAGE_OFFSET
+	case KVM_RESET_DIRTY_PAGES:
+		r = kvm_vm_ioctl_reset_dirty_pages(kvm);
+		break;
+#endif /* KVM_DIRTY_LOG_PAGE_OFFSET */
 	default:
 		r = kvm_arch_vm_ioctl(filp, ioctl, arg);
 	}
