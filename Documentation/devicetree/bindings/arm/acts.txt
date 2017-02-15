@@ -17,3 +17,16 @@ Modules:
 Boards:
 
  - LeMaker Guitar Base Board rev. B: "lemaker,guitar-bb-rev-b", "lemaker,guitar"
+
+
+S900 SoC
+========
+
+Required root node properties:
+
+- compatible :  "acts,s900"
+
+
+Boards:
+
+ - uCRobotics Bubblegum-96: "ucrobotics,bubblegum-96"
