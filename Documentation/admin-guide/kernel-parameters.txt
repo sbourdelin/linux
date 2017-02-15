@@ -942,6 +942,12 @@
 			must already be setup and configured. Options are not
 			yet supported.
 
+		owl,<addr>
+			Start an early, polled-mode console on an Owl serial
+			port at the specified address. The serial port must
+			already be setup and configured. Options are not yet
+			supported.
+
 		smh	Use ARM semihosting calls for early console.
 
 		s3c2410,<addr>
