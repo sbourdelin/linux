@@ -1998,7 +1998,7 @@ unreg_dev:
 free_dev:
 	kfree(dev);
 
-	for ( ; camera > 0; camera--) {
+	for ( ; camera >= 0; camera--) {
 		bcm2835_cleanup_instance(gdev[camera]);
 		gdev[camera] = NULL;
 	}
