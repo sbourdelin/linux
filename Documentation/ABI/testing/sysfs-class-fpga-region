@@ -1,0 +1,26 @@
+What:		/sys/class/fpga_region/<fpga>/firmware_name
+Date:		February 2017
+KernelVersion:	4.11
+Contact:	Alan Tull <atull@kernel.org>
+Description:	Write the name of FPGA image file on the firmware path to
+		program the FPGA.
+
+What:		/sys/class/fpga_region/<fpga>/partial_config
+Date:		February 2017
+KernelVersion:	4.11
+Contact:	Alan Tull <atull@kernel.org>
+Description:	Write 1 to specify FPGA parital configuration.
+		Write 0 to specify FPGA full configuration.
+
+What:		/sys/class/fpga_region/<fpga>/freeze_timeout
+Date:		February 2017
+KernelVersion:	4.11
+Contact:	Alan Tull <atull@kernel.org>
+Description:	Time in uSec to wait for a FPGA bridge to disable traffic.
+
+What:		/sys/class/fpga_region/<fpga>/unfreeze_timeout
+Date:		February 2017
+KernelVersion:	4.11
+Contact:	Alan Tull <atull@kernel.org>
+Description:	Time in uSec to wait for a FPGA bridge to enable traffic.
+
