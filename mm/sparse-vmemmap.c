@@ -224,12 +224,13 @@ int __meminit vmemmap_populate_basepages(unsigned long start,
 					 unsigned long end, int node)
 {
 	unsigned long addr = start & ~(PAGE_SIZE - 1);
+	unsigned long next;
 	pgd_t *pgd;
 	pud_t *pud;
 	pmd_t *pmd;
 	pte_t *pte;
 
-	for (; addr < end; addr += PAGE_SIZE) {
+	for (; addr < end; addr = next) {
 		pgd = vmemmap_pgd_populate(addr, node);
 		if (!pgd)
 			return -ENOMEM;
@@ -239,10 +240,16 @@ int __meminit vmemmap_populate_basepages(unsigned long start,
 		pmd = vmemmap_pmd_populate(pud, addr, node);
 		if (!pmd)
 			return -ENOMEM;
-		pte = vmemmap_pte_populate(pmd, addr, node);
-		if (!pte)
-			return -ENOMEM;
-		vmemmap_verify(pte, node, addr, addr + PAGE_SIZE);
+		if (!pmd_large(*pmd)) {
+			pte = vmemmap_pte_populate(pmd, addr, node);
+			if (!pte)
+				return -ENOMEM;
+			next = addr + PAGE_SIZE;
+		} else {
+			pte = (pte_t *)pmd;
+			next = (addr & ~(PMD_SIZE - 1)) + PMD_SIZE;
+		}
+		vmemmap_verify(pte, node, addr, next);
 	}
 
 	return 0;
