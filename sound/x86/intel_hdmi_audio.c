@@ -1154,6 +1154,7 @@ static int had_pcm_hw_free(struct snd_pcm_substream *substream)
 static int had_pcm_trigger(struct snd_pcm_substream *substream, int cmd)
 {
 	int retval = 0;
+	unsigned long flags;
 	struct snd_intelhad *intelhaddata;
 
 	intelhaddata = snd_pcm_substream_chip(substream);
@@ -1180,12 +1181,12 @@ static int had_pcm_trigger(struct snd_pcm_substream *substream, int cmd)
 	case SNDRV_PCM_TRIGGER_STOP:
 	case SNDRV_PCM_TRIGGER_PAUSE_PUSH:
 	case SNDRV_PCM_TRIGGER_SUSPEND:
-		spin_lock(&intelhaddata->had_spinlock);
+		spin_lock_irqsave(&intelhaddata->had_spinlock, flags);
 
 		/* Stop reporting BUFFER_DONE/UNDERRUN to above layers */
 
 		intelhaddata->stream_info.running = false;
-		spin_unlock(&intelhaddata->had_spinlock);
+		spin_unlock_irqrestore(&intelhaddata->had_spinlock, flags);
 		/* Disable Audio */
 		had_enable_audio(intelhaddata, false);
 		/* Reset buffer pointers */
