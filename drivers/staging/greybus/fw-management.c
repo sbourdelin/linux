@@ -108,6 +108,7 @@ static int fw_mgmt_interface_fw_version_operation(struct fw_mgmt *fw_mgmt,
 	struct gb_connection *connection = fw_mgmt->connection;
 	struct gb_fw_mgmt_interface_fw_version_response response;
 	int ret;
+	size_t len;
 
 	ret = gb_operation_sync(connection,
 				GB_FW_MGMT_TYPE_INTERFACE_FW_VERSION, NULL, 0,
@@ -121,18 +122,11 @@ static int fw_mgmt_interface_fw_version_operation(struct fw_mgmt *fw_mgmt,
 	fw_info->major = le16_to_cpu(response.major);
 	fw_info->minor = le16_to_cpu(response.minor);
 
-	strncpy(fw_info->firmware_tag, response.firmware_tag,
+	len = strlcpy(fw_info->firmware_tag, response.firmware_tag,
 		GB_FIRMWARE_TAG_MAX_SIZE);
-
-	/*
-	 * The firmware-tag should be NULL terminated, otherwise throw error but
-	 * don't fail.
-	 */
-	if (fw_info->firmware_tag[GB_FIRMWARE_TAG_MAX_SIZE - 1] != '\0') {
+	if (len >= GB_FIRMWARE_TAG_MAX_SIZE)
 		dev_err(fw_mgmt->parent,
-			"fw-version: firmware-tag is not NULL terminated\n");
-		fw_info->firmware_tag[GB_FIRMWARE_TAG_MAX_SIZE - 1] = '\0';
-	}
+			"fw-version: firmware-tag has been truncated\n");
 
 	return 0;
 }
@@ -142,6 +136,7 @@ static int fw_mgmt_load_and_validate_operation(struct fw_mgmt *fw_mgmt,
 {
 	struct gb_fw_mgmt_load_and_validate_fw_request request;
 	int ret;
+	size_t len;
 
 	if (load_method != GB_FW_LOAD_METHOD_UNIPRO &&
 	    load_method != GB_FW_LOAD_METHOD_INTERNAL) {
@@ -151,16 +146,10 @@ static int fw_mgmt_load_and_validate_operation(struct fw_mgmt *fw_mgmt,
 	}
 
 	request.load_method = load_method;
-	strncpy(request.firmware_tag, tag, GB_FIRMWARE_TAG_MAX_SIZE);
-
-	/*
-	 * The firmware-tag should be NULL terminated, otherwise throw error and
-	 * fail.
-	 */
-	if (request.firmware_tag[GB_FIRMWARE_TAG_MAX_SIZE - 1] != '\0') {
-		dev_err(fw_mgmt->parent, "load-and-validate: firmware-tag is not NULL terminated\n");
-		return -EINVAL;
-	}
+	len = strlcpy(request.firmware_tag, tag, GB_FIRMWARE_TAG_MAX_SIZE);
+	if (len >= GB_FIRMWARE_TAG_MAX_SIZE)
+		dev_err(fw_mgmt->parent,
+			"load-and-validate: firmware-tag has been truncated\n");
 
 	/* Allocate ids from 1 to 255 (u8-max), 0 is an invalid id */
 	ret = ida_simple_get(&fw_mgmt->id_map, 1, 256, GFP_KERNEL);
@@ -247,18 +236,13 @@ static int fw_mgmt_backend_fw_version_operation(struct fw_mgmt *fw_mgmt,
 	struct gb_fw_mgmt_backend_fw_version_request request;
 	struct gb_fw_mgmt_backend_fw_version_response response;
 	int ret;
+	size_t len;
 
-	strncpy(request.firmware_tag, fw_info->firmware_tag,
+	len = strlcpy(request.firmware_tag, fw_info->firmware_tag,
 		GB_FIRMWARE_TAG_MAX_SIZE);
-
-	/*
-	 * The firmware-tag should be NULL terminated, otherwise throw error and
-	 * fail.
-	 */
-	if (request.firmware_tag[GB_FIRMWARE_TAG_MAX_SIZE - 1] != '\0') {
-		dev_err(fw_mgmt->parent, "backend-version: firmware-tag is not NULL terminated\n");
-		return -EINVAL;
-	}
+	if (len >= GB_FIRMWARE_TAG_MAX_SIZE)
+		dev_err(fw_mgmt->parent,
+			"backend-version: firmware-tag has been truncated\n");
 
 	ret = gb_operation_sync(connection,
 				GB_FW_MGMT_TYPE_BACKEND_FW_VERSION, &request,
@@ -301,17 +285,12 @@ static int fw_mgmt_backend_fw_update_operation(struct fw_mgmt *fw_mgmt,
 {
 	struct gb_fw_mgmt_backend_fw_update_request request;
 	int ret;
+	size_t len;
 
-	strncpy(request.firmware_tag, tag, GB_FIRMWARE_TAG_MAX_SIZE);
-
-	/*
-	 * The firmware-tag should be NULL terminated, otherwise throw error and
-	 * fail.
-	 */
-	if (request.firmware_tag[GB_FIRMWARE_TAG_MAX_SIZE - 1] != '\0') {
-		dev_err(fw_mgmt->parent, "backend-update: firmware-tag is not NULL terminated\n");
-		return -EINVAL;
-	}
+	len = strlcpy(request.firmware_tag, tag, GB_FIRMWARE_TAG_MAX_SIZE);
+	if (len >= GB_FIRMWARE_TAG_MAX_SIZE)
+		dev_err(fw_mgmt->parent,
+			"backend-update: firmware-tag has been truncated\n");
 
 	/* Allocate ids from 1 to 255 (u8-max), 0 is an invalid id */
 	ret = ida_simple_get(&fw_mgmt->id_map, 1, 256, GFP_KERNEL);
