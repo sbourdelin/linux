@@ -23,19 +23,8 @@ config PWRSEQ_SIMPLE
 	  This driver can also be built as a module. If so, the module
 	  will be called pwrseq_simple.
 
-config MMC_BLOCK
-	tristate "MMC block device driver"
-	depends on BLOCK
-	default y
-	help
-	  Say Y here to enable the MMC block device driver support.
-	  This provides a block device driver, which you can use to
-	  mount the filesystem. Almost everyone wishing MMC support
-	  should say Y or M here.
-
 config MMC_BLOCK_MINORS
 	int "Number of minors per block device"
-	depends on MMC_BLOCK
 	range 4 256
 	default 8
 	help
@@ -53,7 +42,6 @@ config MMC_BLOCK_MINORS
 
 config MMC_BLOCK_BOUNCE
 	bool "Use bounce buffer for simple hosts"
-	depends on MMC_BLOCK
 	default y
 	help
 	  SD/MMC is a high latency protocol where it is crucial to
