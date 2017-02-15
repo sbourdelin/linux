@@ -737,7 +737,7 @@ static inline char *btrfs_err_str(enum btrfs_err_code err_code)
 			return "add/delete/balance/replace/resize operation "\
 				"in progress";
 		default:
-			return NULL;
+			return 0;
 	}
 }
 
