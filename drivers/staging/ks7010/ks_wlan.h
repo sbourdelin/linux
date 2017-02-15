@@ -18,10 +18,10 @@
 #include <linux/kernel.h>
 #include <linux/module.h>
 
-#include <linux/spinlock.h>	/* spinlock_t                                   */
-#include <linux/sched.h>	/* wait_queue_head_t                            */
-#include <linux/types.h>	/* pid_t                                        */
-#include <linux/netdevice.h>	/* struct net_device_stats,  struct sk_buff     */
+#include <linux/spinlock.h>	/* spinlock_t */
+#include <linux/sched.h>	/* wait_queue_head_t */
+#include <linux/types.h>	/* pid_t */
+#include <linux/netdevice.h>	/* struct net_device_stats,  struct sk_buff */
 #include <linux/etherdevice.h>
 #include <linux/wireless.h>
 #include <linux/atomic.h>	/* struct atomic_t */
@@ -36,7 +36,9 @@
 
 #ifdef KS_WLAN_DEBUG
 #define DPRINTK(n, fmt, args...) \
-                 if (KS_WLAN_DEBUG>(n)) printk(KERN_NOTICE "%s: "fmt, __FUNCTION__, ## args)
+		do {if (KS_WLAN_DEBUG > (n)) \
+			pr_notice("%s: "fmt, __func__, ## args); \
+		} while (0)
 #else
 #define DPRINTK(n, fmt, args...)
 #endif
@@ -356,7 +358,8 @@ struct wpa_key_t {
 	u8 rx_seq[IW_ENCODE_SEQ_MAX_SIZE];	/* LSB first */
 	struct sockaddr addr;	/* ff:ff:ff:ff:ff:ff for broadcast/multicast
 				 * (group) keys or unicast address for
-				 * individual keys */
+				 * individual keys
+				 */
 	u16 alg;
 	u16 key_len;	/* WEP: 5 or 13, TKIP: 32, CCMP: 16 */
 	u8 key_val[IW_ENCODING_TOKEN_MAX];
