@@ -1438,25 +1438,26 @@ static void
 gen6_seqno_barrier(struct intel_engine_cs *engine)
 {
 	struct drm_i915_private *dev_priv = engine->i915;
+	i915_reg_t reg = RING_INSTPM(engine->mmio_base);
 
-	/* Workaround to force correct ordering between irq and seqno writes on
-	 * ivb (and maybe also on snb) by reading from a CS register (like
-	 * ACTHD) before reading the status page.
+	/* Tell the gpu to flush its render cache (which should mostly be
+	 * emptied as we flushed it before the interrupt) and wait for it
+	 * to signal completion. This imposes a round trip that is at least
+	 * as long as the memory access to memory from the GPU and the
+	 * uncached mmio - that should be sufficient for the outstanding
+	 * write of the seqno to land!
 	 *
-	 * Note that this effectively stalls the read by the time it takes to
-	 * do a memory transaction, which more or less ensures that the write
-	 * from the GPU has sufficient time to invalidate the CPU cacheline.
-	 * Alternatively we could delay the interrupt from the CS ring to give
-	 * the write time to land, but that would incur a delay after every
-	 * batch i.e. much more frequent than a delay when waiting for the
-	 * interrupt (with the same net latency).
-	 *
-	 * Also note that to prevent whole machine hangs on gen7, we have to
-	 * take the spinlock to guard against concurrent cacheline access.
+	 * Unfortunately, this requires the GPU to be kicked out of rc6 as
+	 * we wait (both incurring extra delay in acquiring the wakeref) and
+	 * extra power.
 	 */
-	spin_lock_irq(&dev_priv->uncore.lock);
-	POSTING_READ_FW(RING_ACTHD(engine->mmio_base));
-	spin_unlock_irq(&dev_priv->uncore.lock);
+
+	intel_uncore_forcewake_get(dev_priv, engine->fw_domains);
+	I915_WRITE_FW(reg, _MASKED_BIT_ENABLE(INSTPM_SYNC_FLUSH));
+	WARN_ON_ONCE(intel_wait_for_register_fw(dev_priv,
+						reg, INSTPM_SYNC_FLUSH, 0,
+						10));
+	intel_uncore_forcewake_put(dev_priv, engine->fw_domains);
 }
 
 static void
@@ -2559,6 +2560,11 @@ static void intel_ring_init_irq(struct drm_i915_private *dev_priv,
 				struct intel_engine_cs *engine)
 {
 	engine->irq_enable_mask = GT_RENDER_USER_INTERRUPT << engine->irq_shift;
+
+	engine->fw_domains =
+		intel_uncore_forcewake_for_reg(dev_priv,
+					       RING_INSTPM(engine->mmio_base),
+					       FW_REG_WRITE | FW_REG_READ);
 
 	if (INTEL_GEN(dev_priv) >= 8) {
 		engine->irq_enable = gen8_irq_enable;
