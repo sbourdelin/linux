@@ -344,7 +344,7 @@ sint r8712_update_attrib(struct _adapter *padapter, _pkt *pkt,
 	 * some settings above.
 	 */
 	if (check_fwstate(pmlmepriv, WIFI_MP_STATE))
-		pattrib->priority = (txdesc.txdw1 >> QSEL_SHT) & 0x1f;
+		pattrib->priority = (le32_to_cpu(txdesc.txdw1) >> QSEL_SHT) & 0x1f;
 	return _SUCCESS;
 }
 
