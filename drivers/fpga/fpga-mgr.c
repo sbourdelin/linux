@@ -134,6 +134,18 @@ int fpga_mgr_firmware_load(struct fpga_manager *mgr,
 }
 EXPORT_SYMBOL_GPL(fpga_mgr_firmware_load);
 
+int fpga_mgr_load(struct fpga_manager *mgr, struct fpga_image_info *info)
+{
+	if (info->firmware_name)
+		return fpga_mgr_firmware_load(mgr, info, info->firmware_name);
+	if (info->sgt)
+		return fpga_mgr_buf_load_sg(mgr, info, info->sgt);
+	if (info->buf && info->count)
+		return fpga_mgr_buf_load(mgr, info, info->buf, info->count);
+	return -EINVAL;
+}
+EXPORT_SYMBOL_GPL(fpga_mgr_load);
+
 static const char * const state_str[] = {
 	[FPGA_MGR_STATE_UNKNOWN] =		"unknown",
 	[FPGA_MGR_STATE_POWER_OFF] =		"power off",

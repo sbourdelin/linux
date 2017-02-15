@@ -75,11 +75,19 @@ enum fpga_mgr_states {
  * @flags: boolean flags as defined above
  * @enable_timeout_us: maximum time to enable traffic through bridge (uSec)
  * @disable_timeout_us: maximum time to disable traffic through bridge (uSec)
+ * @firmware_name: name of FPGA image firmware file
+ * @sgt: scatter/gather table containing FPGA image
+ * @buf: contiguous buffer containing FPGA image
+ * @count: size of buf
  */
 struct fpga_image_info {
 	u32 flags;
 	u32 enable_timeout_us;
 	u32 disable_timeout_us;
+	const char *firmware_name;
+	struct sg_table *sgt;
+	const char *buf;
+	size_t count;
 };
 
 /**
@@ -133,6 +141,8 @@ int fpga_mgr_buf_load(struct fpga_manager *mgr, struct fpga_image_info *info,
 int fpga_mgr_firmware_load(struct fpga_manager *mgr,
 			   struct fpga_image_info *info,
 			   const char *image_name);
+
+int fpga_mgr_load(struct fpga_manager *mgr, struct fpga_image_info *info);
 
 struct fpga_manager *of_fpga_mgr_get(struct device_node *node);
 

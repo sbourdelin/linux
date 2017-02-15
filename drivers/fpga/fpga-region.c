@@ -223,14 +223,11 @@ static int fpga_region_get_bridges(struct fpga_region *region,
 /**
  * fpga_region_program_fpga - program FPGA
  * @region: FPGA region
- * @firmware_name: name of FPGA image firmware file
  * @overlay: device node of the overlay
- * Program an FPGA using information in the device tree.
- * Function assumes that there is a firmware-name property.
+ * Program an FPGA using information in the region's fpga image info.
  * Return 0 for success or negative error code.
  */
 static int fpga_region_program_fpga(struct fpga_region *region,
-				    const char *firmware_name,
 				    struct device_node *overlay)
 {
 	struct fpga_manager *mgr;
@@ -260,7 +257,7 @@ static int fpga_region_program_fpga(struct fpga_region *region,
 		goto err_put_br;
 	}
 
-	ret = fpga_mgr_firmware_load(mgr, region->info, firmware_name);
+	ret = fpga_mgr_load(mgr, region->info);
 	if (ret) {
 		pr_err("failed to load fpga image\n");
 		goto err_put_br;
@@ -351,7 +348,6 @@ static int child_regions_with_firmware(struct device_node *overlay)
 static int fpga_region_notify_pre_apply(struct fpga_region *region,
 					struct of_overlay_notify_data *nd)
 {
-	const char *firmware_name = NULL;
 	struct fpga_image_info *info;
 	int ret;
 
@@ -373,7 +369,8 @@ static int fpga_region_notify_pre_apply(struct fpga_region *region,
 	if (of_property_read_bool(nd->overlay, "external-fpga-config"))
 		info->flags |= FPGA_MGR_EXTERNAL_CONFIG;
 
-	of_property_read_string(nd->overlay, "firmware-name", &firmware_name);
+	of_property_read_string(nd->overlay, "firmware-name",
+				&info->firmware_name);
 
 	of_property_read_u32(nd->overlay, "region-unfreeze-timeout-us",
 			     &info->enable_timeout_us);
@@ -382,7 +379,7 @@ static int fpga_region_notify_pre_apply(struct fpga_region *region,
 			     &info->disable_timeout_us);
 
 	/* If FPGA was externally programmed, don't specify firmware */
-	if ((info->flags & FPGA_MGR_EXTERNAL_CONFIG) && firmware_name) {
+	if ((info->flags & FPGA_MGR_EXTERNAL_CONFIG) && info->firmware_name) {
 		pr_err("error: specified firmware and external-fpga-config");
 		return -EINVAL;
 	}
@@ -392,12 +389,12 @@ static int fpga_region_notify_pre_apply(struct fpga_region *region,
 		return 0;
 
 	/* If we got this far, we should be programming the FPGA */
-	if (!firmware_name) {
+	if (!info->firmware_name) {
 		pr_err("should specify firmware-name or external-fpga-config\n");
 		return -EINVAL;
 	}
 
-	return fpga_region_program_fpga(region, firmware_name, nd->overlay);
+	return fpga_region_program_fpga(region, nd->overlay);
 }
 
 /**
