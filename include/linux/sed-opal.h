@@ -69,7 +69,7 @@ enum opal_response_token {
  */
 struct opal_resp_tok {
 	const u8 *pos;
-	size_t len;
+	ssize_t len;
 	enum opal_response_token type;
 	enum opal_atom_width width;
 	union {
