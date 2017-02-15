@@ -910,6 +910,7 @@ int hiddev_connect(struct hid_device *hid, unsigned int force)
 		kfree(hiddev);
 		return -1;
 	}
+	hid->minor = usbhid->intf->minor;
 	return 0;
 }
 
