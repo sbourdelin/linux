@@ -1769,6 +1769,10 @@ static void ath9k_bss_info_changed(struct ieee80211_hw *hw,
 	ath9k_ps_wakeup(sc);
 	mutex_lock(&sc->mutex);
 
+	/* adjust beacon timers */
+	if (changed && BSS_CHANGED_BEACON_INFO)
+		ath9k_htc_beacon_config(priv, vif);
+
 	if (changed & BSS_CHANGED_ASSOC) {
 		ath_dbg(common, CONFIG, "BSSID %pM Changed ASSOC %d\n",
 			bss_conf->bssid, bss_conf->assoc);
