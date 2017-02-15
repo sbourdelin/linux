@@ -7297,6 +7297,8 @@ static int nl80211_start_sched_scan(struct sk_buff *skb,
 	if (err)
 		goto out_err;
 
+	INIT_WORK(&sched_scan_req->results_wk, __cfg80211_sched_scan_results);
+
 	/* leave request id zero for legacy request
 	 * or if driver does not support multi-scheduled scan
 	 */
