@@ -469,6 +469,34 @@ static int macb_mii_probe(struct net_device *dev)
 	return 0;
 }
 
+static int macb_fixed_init(struct macb *bp)
+{
+	struct phy_device *phydev;
+
+	phydev = of_phy_connect(bp->dev, bp->phy_node,
+				&macb_handle_link_change, 0,
+				bp->phy_interface);
+	if (!phydev)
+		return -ENODEV;
+
+	/* mask with MAC supported features */
+	if (macb_is_gem(bp) && bp->caps & MACB_CAPS_GIGABIT_MODE_AVAILABLE)
+		phydev->supported &= PHY_GBIT_FEATURES;
+	else
+		phydev->supported &= PHY_BASIC_FEATURES;
+
+	if (bp->caps & MACB_CAPS_NO_GIGABIT_HALF)
+		phydev->supported &= ~SUPPORTED_1000baseT_Half;
+
+	phydev->advertising = phydev->supported;
+
+	bp->link = 0;
+	bp->speed = 0;
+	bp->duplex = -1;
+
+	return 0;
+}
+
 static int macb_mii_init(struct macb *bp)
 {
 	struct macb_platform_data *pdata;
@@ -3245,6 +3273,7 @@ static int macb_probe(struct platform_device *pdev)
 	const char *mac;
 	struct macb *bp;
 	int err;
+	bool fixed_link = false;
 
 	regs = platform_get_resource(pdev, IORESOURCE_MEM, 0);
 	mem = devm_ioremap_resource(&pdev->dev, regs);
@@ -3342,8 +3371,18 @@ static int macb_probe(struct platform_device *pdev)
 		macb_get_hwaddr(bp);
 
 	/* Power up the PHY if there is a GPIO reset */
-	phy_node =  of_get_next_available_child(np, NULL);
-	if (phy_node) {
+	phy_node = of_parse_phandle(np, "phy-handle", 0);
+	if (!phy_node && of_phy_is_fixed_link(np)) {
+		err = of_phy_register_fixed_link(np);
+		if (err < 0) {
+			dev_err(&pdev->dev, "broken fixed-link specification");
+			goto failed_phy;
+		}
+		/* in case of a fixed PHY, the DT node is the ethernet MAC */
+		phy_node = of_node_get(np);
+		bp->phy_node = phy_node;
+		fixed_link = true;
+	} else {
 		int gpio = of_get_named_gpio(phy_node, "reset-gpios", 0);
 
 		if (gpio_is_valid(gpio)) {
@@ -3369,7 +3408,10 @@ static int macb_probe(struct platform_device *pdev)
 	if (err)
 		goto err_out_free_netdev;
 
-	err = macb_mii_init(bp);
+	if (!fixed_link)
+		err = macb_mii_init(bp);
+	else
+		err = macb_fixed_init(bp);
 	if (err)
 		goto err_out_free_netdev;
 
@@ -3400,6 +3442,9 @@ err_out_unregister_mdio:
 	if (bp->reset_gpio)
 		gpiod_set_value(bp->reset_gpio, 0);
 
+failed_phy:
+	of_node_put(phy_node);
+
 err_out_free_netdev:
 	free_netdev(dev);
 
@@ -3423,9 +3468,14 @@ static int macb_remove(struct platform_device *pdev)
 		bp = netdev_priv(dev);
 		if (dev->phydev)
 			phy_disconnect(dev->phydev);
-		mdiobus_unregister(bp->mii_bus);
+
+		if (!bp->phy_node)
+			mdiobus_unregister(bp->mii_bus);
+
 		dev->phydev = NULL;
-		mdiobus_free(bp->mii_bus);
+
+		if (!bp->phy_node)
+			mdiobus_free(bp->mii_bus);
 
 		/* Shutdown the PHY if there is a GPIO reset */
 		if (bp->reset_gpio)
@@ -3435,6 +3485,7 @@ static int macb_remove(struct platform_device *pdev)
 		clk_disable_unprepare(bp->tx_clk);
 		clk_disable_unprepare(bp->hclk);
 		clk_disable_unprepare(bp->pclk);
+		of_node_put(bp->phy_node);
 		clk_disable_unprepare(bp->rx_clk);
 		free_netdev(dev);
 	}
