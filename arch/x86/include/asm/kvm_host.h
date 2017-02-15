@@ -1002,6 +1002,7 @@ struct kvm_x86_ops {
 	void (*enable_log_dirty_pt_masked)(struct kvm *kvm,
 					   struct kvm_memory_slot *slot,
 					   gfn_t offset, unsigned long mask);
+	int (*cpu_dirty_log_size)(void);
 	/* pmu operations of sub-arch */
 	const struct kvm_pmu_ops *pmu_ops;
 
@@ -1407,5 +1408,7 @@ static inline int kvm_cpu_get_apicid(int mps_cpu)
 	return BAD_APICID;
 #endif
 }
+
+int kvm_cpu_dirty_log_size(void);
 
 #endif /* _ASM_X86_KVM_HOST_H */

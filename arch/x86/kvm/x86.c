@@ -6704,6 +6704,12 @@ static int vcpu_enter_guest(struct kvm_vcpu *vcpu)
 		 */
 		if (kvm_check_request(KVM_REQ_HV_STIMER, vcpu))
 			kvm_hv_process_stimers(vcpu);
+
+		if (kvm_check_request(KVM_REQ_EXIT_DIRTY_LOG_FULL, vcpu)) {
+			vcpu->run->exit_reason = KVM_EXIT_DIRTY_LOG_FULL;
+			r = -EINTR;
+			goto out;
+		}
 	}
 
 	/*

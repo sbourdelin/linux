@@ -123,6 +123,7 @@ static inline bool is_error_page(struct page *page)
 #define KVM_REQ_MMU_RELOAD         1
 #define KVM_REQ_PENDING_TIMER      2
 #define KVM_REQ_UNHALT             3
+#define KVM_REQ_EXIT_DIRTY_LOG_FULL 4
 
 #define KVM_USERSPACE_IRQ_SOURCE_ID		0
 #define KVM_IRQFD_RESAMPLE_IRQ_SOURCE_ID	1
