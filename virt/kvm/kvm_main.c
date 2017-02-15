@@ -2927,6 +2927,7 @@ static long kvm_vm_ioctl_check_extension_generic(struct kvm *kvm, long arg)
 #endif
 	case KVM_CAP_IOEVENTFD_ANY_LENGTH:
 	case KVM_CAP_CHECK_EXTENSION_VM:
+	case KVM_CAP_ENABLE_CAP_VM:
 		return 1;
 #ifdef CONFIG_HAVE_KVM_IRQ_ROUTING
 	case KVM_CAP_IRQ_ROUTING:
@@ -2944,6 +2945,28 @@ static long kvm_vm_ioctl_check_extension_generic(struct kvm *kvm, long arg)
 	return kvm_vm_ioctl_check_extension(kvm, arg);
 }
 
+static int kvm_vm_ioctl_enable_dirty_log_ring(struct kvm *kvm, __u32 size)
+{
+	return -EINVAL;
+}
+
+int __attribute__((weak)) kvm_vm_ioctl_enable_cap(struct kvm *kvm,
+						  struct kvm_enable_cap *cap)
+{
+	return -EINVAL;
+}
+
+static int kvm_vm_ioctl_enable_cap_generic(struct kvm *kvm,
+					   struct kvm_enable_cap *cap)
+{
+	switch (cap->cap) {
+	case KVM_CAP_DIRTY_LOG_RING:
+		return kvm_vm_ioctl_enable_dirty_log_ring(kvm, cap->args[0]);
+	default:
+		return kvm_vm_ioctl_enable_cap(kvm, cap);
+	}
+}
+
 static long kvm_vm_ioctl(struct file *filp,
 			   unsigned int ioctl, unsigned long arg)
 {
@@ -2957,6 +2980,15 @@ static long kvm_vm_ioctl(struct file *filp,
 	case KVM_CREATE_VCPU:
 		r = kvm_vm_ioctl_create_vcpu(kvm, arg);
 		break;
+	case KVM_ENABLE_CAP: {
+		struct kvm_enable_cap cap;
+
+		r = -EFAULT;
+		if (copy_from_user(&cap, argp, sizeof(cap)))
+			goto out;
+		r = kvm_vm_ioctl_enable_cap_generic(kvm, &cap);
+		break;
+	}
 	case KVM_SET_USER_MEMORY_REGION: {
 		struct kvm_userspace_memory_region kvm_userspace_mem;
 
