@@ -44,12 +44,25 @@ To get/put a reference to a FPGA manager:
 	struct fpga_manager *of_fpga_mgr_get(struct device_node *node);
 	struct fpga_manager *fpga_mgr_get(struct device *dev);
 
-Given a DT node or device, get an exclusive reference to a FPGA manager.
+Given a DT node or device, get an reference to a FPGA manager.  Pointer
+can be saved until you are ready to program the FPGA.
 
 	void fpga_mgr_put(struct fpga_manager *mgr);
 
 Release the reference.
 
+
+To get exclusive control of a FPGA manager:
+-------------------------------------------
+
+	int fpga_mgr_lock(struct fpga_magager *mgr);
+
+Call fpga_mgr_lock and verify that it returns 0 before attempting to
+program the FPGA.
+
+	void fpga_mgr_unlock(struct fpga_magager *mgr);
+
+Call fpga_mgr_unlock when done programming the FPGA.
 
 To register or unregister the low level FPGA-specific driver:
 -------------------------------------------------------------
@@ -86,11 +99,13 @@ int ret;
 
 /* Get exclusive control of FPGA manager */
 struct fpga_manager *mgr = of_fpga_mgr_get(mgr_node);
+ret = fpga_mgr_lock(mgr);
 
 /* Load the buffer to the FPGA */
 ret = fpga_mgr_buf_load(mgr, &info, buf, count);
 
 /* Release the FPGA manager */
+fpga_mgr_unlock(mgr);
 fpga_mgr_put(mgr);
 
 
@@ -115,11 +130,13 @@ int ret;
 
 /* Get exclusive control of FPGA manager */
 struct fpga_manager *mgr = of_fpga_mgr_get(mgr_node);
+ret = fpga_mgr_lock(mgr);
 
 /* Get the firmware image (path) and load it to the FPGA */
 ret = fpga_mgr_firmware_load(mgr, &info, path);
 
 /* Release the FPGA manager */
+fpga_mgr_unlock(mgr);
 fpga_mgr_put(mgr);
 
 
