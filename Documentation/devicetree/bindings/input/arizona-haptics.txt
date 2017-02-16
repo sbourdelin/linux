@@ -1,0 +1,10 @@
+Cirrus Logic Arizona class audio SoCs
+
+This document lists haptics bindings for these codecs.
+Also see the primary binding document:
+  ../mfd/arizona.txt
+
+Optional properties:
+  - wlf,hap-act : Single value defining the actuator type, as per the HAP_ACT
+    register field. See the codec datasheet for the available HAP_ACT values
+    and their meaning.

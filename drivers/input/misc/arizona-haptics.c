@@ -14,6 +14,7 @@
 #include <linux/platform_device.h>
 #include <linux/input.h>
 #include <linux/slab.h>
+#include <linux/property.h>
 
 #include <sound/soc.h>
 #include <sound/soc-dapm.h>
@@ -163,6 +164,12 @@ static int arizona_haptics_probe(struct platform_device *pdev)
 		return -ENOMEM;
 
 	haptics->arizona = arizona;
+
+	if (!dev_get_platdata(arizona->dev))
+		device_property_read_u32(arizona->dev, "wlf,hap-act",
+					 &arizona->pdata.hap_act);
+
+	dev_dbg(arizona->dev, "hap_act=%u\n", arizona->pdata.hap_act);
 
 	ret = regmap_update_bits(arizona->regmap, ARIZONA_HAPTICS_CONTROL_1,
 				 ARIZONA_HAP_ACT, arizona->pdata.hap_act);
