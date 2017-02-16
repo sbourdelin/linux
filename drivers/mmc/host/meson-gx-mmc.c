@@ -320,11 +320,7 @@ static int meson_mmc_clk_init(struct meson_host *host)
 	/* Get the nearest minimum clock to 400KHz */
 	host->mmc->f_min = clk_round_rate(host->cfg_div_clk, 400000);
 
-	ret = meson_mmc_clk_set(host, host->mmc->f_min);
-	if (!ret)
-		clk_disable_unprepare(host->cfg_div_clk);
-
-	return ret;
+	return meson_mmc_clk_set(host, host->mmc->f_min);
 }
 
 static void meson_mmc_set_ios(struct mmc_host *mmc, struct mmc_ios *ios)
