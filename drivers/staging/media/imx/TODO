@@ -1,0 +1,36 @@
+
+- Finish v4l2-compliance
+
+- imx-csi subdev is not being autoloaded as a kernel module, probably
+  because ipu_add_client_devices() does not register the IPU client
+  platform devices, but only allocates those devices.
+
+- Currently registering with notifications from subdevs are only
+  available through the subdev device nodes and not through the main
+  capture device node. Need to come up with a way to find the capture
+  device in the current pipeline that owns the subdev that sent the
+  notify.
+
+- Clean up and move the ov5642 subdev driver to drivers/media/i2c, and
+  create the binding docs for it.
+
+- The Frame Interval Monitor could be exported to v4l2-core for
+  general use.
+
+- The subdev that is the original source of video data (referred to as
+  the "sensor" in the code), is called from various subdevs in the
+  pipeline in order to set/query the video standard ({g|s|enum}_std)
+  and to get/set the original frame interval from the capture interface
+  ([gs]_parm). Instead, the entities that need this info should call its
+  direct neighbor, and the neighbor should propagate the call to its
+  neighbor in turn if necessary.
+
+- At driver load time, the device-tree node that is the original source
+  (the "sensor"), is parsed to record its media bus configuration, and
+  this info is required in various subdevs to setup the pipeline.
+  Laurent Pinchart argues that instead the subdev should call its
+  neighbor's g_mbus_config op (which should be propagated if necessary)
+  to get this info. However Hans Verkuil is planning to remove the
+  g_mbus_config op. For now this driver uses the parsed DT mbus config
+  method until this issue is resolved.
+
