@@ -6,7 +6,7 @@
 #include <linux/uaccess.h>
 
 /**
- * probe_kernel_read(): safely attempt to read from a location
+ * probe_kernel_read() - safely attempt to read from a location.
  * @dst: pointer to the buffer that shall take the data
  * @src: address to read from
  * @size: size of the data chunk
@@ -40,7 +40,7 @@ long __probe_kernel_read(void *dst, const void *src, size_t size)
 EXPORT_SYMBOL_GPL(probe_kernel_read);
 
 /**
- * probe_kernel_write(): safely attempt to write to a location
+ * probe_kernel_write() - safely attempt to write to a location.
  * @dst: address to write to
  * @src: pointer to the data that shall be written
  * @size: size of the data chunk
@@ -67,10 +67,10 @@ long __probe_kernel_write(void *dst, const void *src, size_t size)
 EXPORT_SYMBOL_GPL(probe_kernel_write);
 
 /**
- * strncpy_from_unsafe: - Copy a NUL terminated string from unsafe address.
+ * strncpy_from_unsafe() - Copy a NUL terminated string from unsafe address.
  * @dst:   Destination address, in kernel space.  This buffer must be at
  *         least @count bytes long.
- * @src:   Unsafe address.
+ * @unsafe_addr:   Unsafe address.
  * @count: Maximum number of bytes to copy, including the trailing NUL.
  *
  * Copies a NUL-terminated string from unsafe address to kernel buffer.
