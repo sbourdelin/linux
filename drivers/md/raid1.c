@@ -2826,7 +2826,7 @@ static sector_t raid1_sync_request(struct mddev *mddev, sector_t sector_nr,
 		nr_sectors += len>>9;
 		sector_nr += len>>9;
 		sync_blocks -= (len>>9);
-	} while (r1_bio->bios[disk]->bi_vcnt < RESYNC_PAGES);
+	} while (r1_bio->bios[disk]->bi_error < RESYNC_PAGES);
  bio_full:
 	/* return .bi_error back to bio */
 	for (i = 0 ; i < conf->raid_disks * 2; i++) {

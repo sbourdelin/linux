@@ -3454,7 +3454,7 @@ static sector_t raid10_sync_request(struct mddev *mddev, sector_t sector_nr,
 		}
 		nr_sectors += len>>9;
 		sector_nr += len>>9;
-	} while (biolist->bi_vcnt < RESYNC_PAGES);
+	} while (biolist->bi_error < RESYNC_PAGES);
  bio_full:
 	/* return .bi_error back to bio, and set resync's as -EIO */
 	for (bio= biolist ; bio ; bio=bio->bi_next)
