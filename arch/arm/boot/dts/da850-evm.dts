@@ -9,6 +9,7 @@
  */
 /dts-v1/;
 #include "da850.dtsi"
+#include <dt-bindings/gpio/gpio.h>
 
 / {
 	compatible = "ti,da850-evm", "ti,da850";
@@ -78,7 +79,33 @@
 				DRVDD-supply = <&vbat>;
 				DVDD-supply = <&vbat>;
 			};
+			ui_expander: tca6416@20 {
+				compatible = "ti,tca6416";
+				reg = <0x20>;
+				gpio-controller;
+				#gpio-cells = <2>;
 
+				sel_a {
+					gpio-hog;
+					gpios = <7 GPIO_ACTIVE_HIGH>;
+					output-high;
+					line-name = "sel_a";
+				};
+
+				sel_b {
+					gpio-hog;
+					gpios = <6 GPIO_ACTIVE_HIGH>;
+					output-high;
+					line-name = "sel_b";
+				};
+
+				sel_c {
+					gpio-hog;
+					gpios = <5 GPIO_ACTIVE_HIGH>;
+					output-low;
+					line-name = "sel_c";
+				};
+			};
 		};
 		wdt: wdt@21000 {
 			status = "okay";
