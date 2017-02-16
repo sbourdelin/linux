@@ -197,6 +197,11 @@ call.
 	the regions changes. This event has a struct
 	:c:type:`v4l2_event_motion_det`
 	associated with it.
+    * - ``V4L2_EVENT_FRAME_TIMEOUT``
+      - 7
+      - This event is triggered when the video capture or output device
+	has timed out waiting for the reception or transmit completion of
+	a frame of video.
     * - ``V4L2_EVENT_PRIVATE_START``
       - 0x08000000
       - Base event number for driver-private events.
