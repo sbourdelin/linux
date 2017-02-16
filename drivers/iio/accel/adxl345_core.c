@@ -7,9 +7,7 @@
  * the GNU General Public License. See the file COPYING in the main
  * directory of this archive for more details.
  *
- * IIO driver for ADXL345
- * 7-bit I2C slave address: 0x1D (ALT ADDRESS pin tied to VDDIO) or
- * 0x53 (ALT ADDRESS pin grounded)
+ * IIO core driver for ADXL345
  */
 
 #include <linux/i2c.h>
@@ -17,6 +15,8 @@
 #include <linux/regmap.h>
 
 #include <linux/iio/iio.h>
+
+#include "adxl345.h"
 
 #define ADXL345_REG_DEVID		0x00
 #define ADXL345_REG_POWER_CTL		0x2D
@@ -46,14 +46,8 @@
 static const int adxl345_uscale = 38300;
 
 struct adxl345_data {
-	struct i2c_client *client;
 	struct regmap *regmap;
 	u8 data_range;
-};
-
-static const struct regmap_config adxl345_regmap_config = {
-	.reg_bits = 8,
-	.val_bits = 8,
 };
 
 #define ADXL345_CHANNEL(reg, axis) {					\
@@ -108,40 +102,31 @@ static const struct iio_info adxl345_info = {
 	.read_raw	= adxl345_read_raw,
 };
 
-static int adxl345_probe(struct i2c_client *client,
-			 const struct i2c_device_id *id)
+int adxl345_common_probe(struct device *dev, struct regmap *regmap,
+			 const char *name)
 {
 	struct adxl345_data *data;
 	struct iio_dev *indio_dev;
-	struct regmap *regmap;
 	int ret;
 	u32 regval;
 
-	regmap = devm_regmap_init_i2c(client, &adxl345_regmap_config);
-	if (IS_ERR(regmap)) {
-		dev_err(&client->dev, "Error initializing regmap: %d\n",
-			(int)PTR_ERR(regmap));
-		return PTR_ERR(regmap);
-	}
-
 	ret = regmap_read(regmap, ADXL345_REG_DEVID, &regval);
 	if (ret < 0) {
-		dev_err(&client->dev, "Error reading device ID: %d\n", ret);
+		dev_err(dev, "Error reading device ID: %d\n", ret);
 		return ret;
 	}
 
 	if (regval != ADXL345_DEVID) {
-		dev_err(&client->dev, "Invalid device ID: %d\n", ret);
+		dev_err(dev, "Invalid device ID: %d\n", ret);
 		return -ENODEV;
 	}
 
-	indio_dev = devm_iio_device_alloc(&client->dev, sizeof(*data));
+	indio_dev = devm_iio_device_alloc(dev, sizeof(*data));
 	if (!indio_dev)
 		return -ENOMEM;
 
 	data = iio_priv(indio_dev);
-	i2c_set_clientdata(client, indio_dev);
-	data->client = client;
+	dev_set_drvdata(dev, indio_dev);
 	data->regmap = regmap;
 	/* Enable full-resolution mode */
 	data->data_range = ADXL345_DATA_FORMAT_FULL_RES;
@@ -149,12 +134,12 @@ static int adxl345_probe(struct i2c_client *client,
 	ret = regmap_write(data->regmap, ADXL345_REG_DATA_FORMAT,
 			   data->data_range);
 	if (ret < 0) {
-		dev_err(&client->dev, "Failed to set data range: %d\n", ret);
+		dev_err(dev, "Failed to set data range: %d\n", ret);
 		return ret;
 	}
 
-	indio_dev->dev.parent = &client->dev;
-	indio_dev->name = id->name;
+	indio_dev->dev.parent = dev;
+	indio_dev->name = name;
 	indio_dev->info = &adxl345_info;
 	indio_dev->modes = INDIO_DIRECT_MODE;
 	indio_dev->channels = adxl345_channels;
@@ -164,24 +149,25 @@ static int adxl345_probe(struct i2c_client *client,
 	ret = regmap_write(data->regmap, ADXL345_REG_POWER_CTL,
 			   ADXL345_POWER_CTL_MEASURE);
 	if (ret < 0) {
-		dev_err(&client->dev, "Failed to enable measurement mode: %d\n",
+		dev_err(dev, "Failed to enable measurement mode: %d\n",
 			ret);
 		return ret;
 	}
 
 	ret = iio_device_register(indio_dev);
 	if (ret < 0) {
-		dev_err(&client->dev, "iio_device_register failed: %d\n", ret);
+		dev_err(dev, "iio_device_register failed: %d\n", ret);
 		regmap_write(data->regmap, ADXL345_REG_POWER_CTL,
 			     ADXL345_POWER_CTL_STANDBY);
 	}
 
 	return ret;
 }
+EXPORT_SYMBOL_GPL(adxl345_common_probe);
 
-static int adxl345_remove(struct i2c_client *client)
+int adxl345_common_remove(struct device *dev)
 {
-	struct iio_dev *indio_dev = i2c_get_clientdata(client);
+	struct iio_dev *indio_dev = dev_get_drvdata(dev);
 	struct adxl345_data *data = iio_priv(indio_dev);
 
 	iio_device_unregister(indio_dev);
@@ -189,25 +175,8 @@ static int adxl345_remove(struct i2c_client *client)
 	return regmap_write(data->regmap, ADXL345_REG_POWER_CTL,
 			    ADXL345_POWER_CTL_STANDBY);
 }
-
-static const struct i2c_device_id adxl345_i2c_id[] = {
-	{ "adxl345", 0 },
-	{ }
-};
-
-MODULE_DEVICE_TABLE(i2c, adxl345_i2c_id);
-
-static struct i2c_driver adxl345_driver = {
-	.driver = {
-		.name	= "adxl345",
-	},
-	.probe		= adxl345_probe,
-	.remove		= adxl345_remove,
-	.id_table	= adxl345_i2c_id,
-};
-
-module_i2c_driver(adxl345_driver);
+EXPORT_SYMBOL_GPL(adxl345_common_remove);
 
 MODULE_AUTHOR("Eva Rachel Retuya <eraretuya@gmail.com>");
-MODULE_DESCRIPTION("ADXL345 3-Axis Digital Accelerometer driver");
+MODULE_DESCRIPTION("ADXL345 3-Axis Digital Accelerometer core driver");
 MODULE_LICENSE("GPL v2");
