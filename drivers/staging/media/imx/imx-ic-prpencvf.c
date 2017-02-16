@@ -739,6 +739,7 @@ static int prp_set_fmt(struct v4l2_subdev *sd,
 		       struct v4l2_subdev_format *sdformat)
 {
 	struct prp_priv *priv = sd_to_priv(sd);
+	struct imx_media_video_dev *vdev = priv->vdev;
 	const struct imx_media_pixfmt *cc;
 	struct v4l2_mbus_framefmt *infmt;
 	u32 code;
@@ -800,6 +801,14 @@ static int prp_set_fmt(struct v4l2_subdev *sd,
 	} else {
 		priv->format_mbus[sdformat->pad] = sdformat->format;
 		priv->cc[sdformat->pad] = cc;
+		if (sdformat->pad == PRPENCVF_SRC_PAD) {
+			/*
+			 * update the capture device format if this is
+			 * the IDMAC output pad
+			 */
+			imx_media_mbus_fmt_to_pix_fmt(&vdev->fmt.fmt.pix,
+						      &sdformat->format, cc);
+		}
 	}
 
 	return 0;

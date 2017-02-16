@@ -866,6 +866,7 @@ static int csi_set_fmt(struct v4l2_subdev *sd,
 		       struct v4l2_subdev_format *sdformat)
 {
 	struct csi_priv *priv = v4l2_get_subdevdata(sd);
+	struct imx_media_video_dev *vdev = priv->vdev;
 	const struct imx_media_pixfmt *cc, *incc;
 	struct v4l2_mbus_framefmt *infmt;
 	struct imx_media_subdev *sensor;
@@ -980,6 +981,14 @@ static int csi_set_fmt(struct v4l2_subdev *sd,
 		/* Reset the crop window if this is the input pad */
 		if (sdformat->pad == CSI_SINK_PAD)
 			priv->crop = crop;
+		else if (sdformat->pad == CSI_SRC_PAD_IDMAC) {
+			/*
+			 * update the capture device format if this is
+			 * the IDMAC output pad
+			 */
+			imx_media_mbus_fmt_to_pix_fmt(&vdev->fmt.fmt.pix,
+						      &sdformat->format, cc);
+		}
 	}
 
 	return 0;
