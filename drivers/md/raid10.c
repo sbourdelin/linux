@@ -2036,6 +2036,8 @@ static void sync_request_write(struct mddev *mddev, struct r10bio *r10_bio)
 	int i, first;
 	struct bio *tbio, *fbio;
 	int vcnt;
+	struct bio_vec *bvl;
+	struct page *fbio_pages[RESYNC_PAGES], *tbio_pages[RESYNC_PAGES];
 
 	atomic_set(&r10_bio->remaining, 1);
 
@@ -2051,6 +2053,10 @@ static void sync_request_write(struct mddev *mddev, struct r10bio *r10_bio)
 	fbio = r10_bio->devs[i].bio;
 	fbio->bi_iter.bi_size = r10_bio->sectors << 9;
 	fbio->bi_iter.bi_idx = 0;
+
+	/* the bio has been filled up in raid10_sync_request */
+	bio_for_each_segment_all(bvl, fbio, i)
+		fbio_pages[i] = bvl->bv_page;
 
 	vcnt = (r10_bio->sectors + (PAGE_SIZE >> 9) - 1) >> (PAGE_SHIFT - 9);
 	/* now find blocks with errors */
@@ -2072,12 +2078,17 @@ static void sync_request_write(struct mddev *mddev, struct r10bio *r10_bio)
 			 * All vec entries are PAGE_SIZE;
 			 */
 			int sectors = r10_bio->sectors;
+
+			/* the bio has been filled up in raid10_sync_request */
+			bio_for_each_segment_all(bvl, tbio, j)
+				tbio_pages[j] = bvl->bv_page;
+
 			for (j = 0; j < vcnt; j++) {
 				int len = PAGE_SIZE;
 				if (sectors < (len / 512))
 					len = sectors * 512;
-				if (memcmp(page_address(fbio->bi_io_vec[j].bv_page),
-					   page_address(tbio->bi_io_vec[j].bv_page),
+				if (memcmp(page_address(fbio_pages[j]),
+					   page_address(tbio_pages[j]),
 					   len))
 					break;
 				sectors -= len/512;
