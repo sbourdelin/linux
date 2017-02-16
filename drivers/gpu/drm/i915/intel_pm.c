@@ -4906,13 +4906,8 @@ static void gen6_set_rps_thresholds(struct drm_i915_private *dev_priv, u8 val)
 		      GT_INTERVAL_FROM_US(dev_priv,
 					  ei_down * threshold_down / 100));
 
-	I915_WRITE_FW(GEN6_RP_CONTROL,
-		      GEN6_RP_MEDIA_TURBO |
-		      GEN6_RP_MEDIA_HW_NORMAL_MODE |
-		      GEN6_RP_MEDIA_IS_GFX |
-		      GEN6_RP_ENABLE |
-		      GEN6_RP_UP_BUSY_AVG |
-		      GEN6_RP_DOWN_IDLE_AVG);
+	/* Restart RPS to reload the thresholds */
+	I915_WRITE_FW(GEN6_RP_CONTROL, I915_READ_FW(GEN6_RP_CONTROL));
 
 	intel_uncore_forcewake_put__locked(dev_priv, FORCEWAKE_ALL);
 	spin_unlock_irq(&dev_priv->uncore.lock);
