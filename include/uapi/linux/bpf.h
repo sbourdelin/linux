@@ -437,6 +437,14 @@ union bpf_attr {
  *     @xdp_md: pointer to xdp_md
  *     @delta: An positive/negative integer to be added to xdp_md.data
  *     Return: 0 on success or negative on error
+ *
+ * int bpf_sk_netns_cmp(ctx, dev, ino)
+ *     Compare the network namespace for sk or skb against the given
+ *     device and inode number.
+ *     @ctx: pointer to struct sock or struct __sk_buff
+ *     @dev: unsigned long device id for namespace
+ *     @ino: unsigned long inode for namespace
+ *     Return: 1 on match, 0 if no match and -1 on error
  */
 #define __BPF_FUNC_MAPPER(FN)		\
 	FN(unspec),			\
@@ -483,7 +491,8 @@ union bpf_attr {
 	FN(set_hash_invalid),		\
 	FN(get_numa_node_id),		\
 	FN(skb_change_head),		\
-	FN(xdp_adjust_head),
+	FN(xdp_adjust_head),		\
+	FN(sk_netns_cmp),
 
 /* integer value in 'imm' field of BPF_CALL instruction selects which helper
  * function eBPF program intends to call

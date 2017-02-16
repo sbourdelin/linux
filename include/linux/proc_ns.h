@@ -76,6 +76,8 @@ extern struct file *proc_ns_fget(int fd);
 extern void *ns_get_path(struct path *path, struct task_struct *task,
 			const struct proc_ns_operations *ns_ops);
 
+extern int ns_cmp(struct ns_common *ns, u64 dev, u64 ino);
+
 extern int ns_get_name(char *buf, size_t size, struct task_struct *task,
 			const struct proc_ns_operations *ns_ops);
 extern void nsfs_init(void);

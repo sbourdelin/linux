@@ -28,6 +28,7 @@
 #include <net/netns/xfrm.h>
 #include <net/netns/mpls.h>
 #include <linux/ns_common.h>
+#include <linux/proc_ns.h>
 #include <linux/idr.h>
 #include <linux/skbuff.h>
 
@@ -215,6 +216,11 @@ int net_eq(const struct net *net1, const struct net *net2)
 
 void net_drop_ns(void *);
 
+static inline int netns_cmp(struct net *net, u64 dev, u64 ino)
+{
+	return ns_cmp(&net->ns, dev, ino);
+}
+
 #else
 
 static inline struct net *get_net(struct net *net)
@@ -233,6 +239,11 @@ static inline struct net *maybe_get_net(struct net *net)
 
 static inline
 int net_eq(const struct net *net1, const struct net *net2)
+{
+	return 1;
+}
+
+static inline int netns_cmp(struct net *net, u64 dev, u64 ino)
 {
 	return 1;
 }
