@@ -2060,27 +2060,37 @@ static bool update_transition_efer(struct vcpu_vmx *vmx, int efer_offset)
 static unsigned long segment_base(u16 selector)
 {
 	struct desc_struct *d;
-	unsigned long table_base;
+	struct desc_struct *table_base;
 	unsigned long v;
+	u32 high32;
 
-	if (!(selector & ~3))
+	if (!(selector & ~SEGMENT_RPL_MASK))
 		return 0;
 
-	table_base = get_current_gdt_rw_vaddr();
-
-	if (selector & 4) {           /* from ldt */
+	/* LDT selector */
+	if ((selector & SEGMENT_TI_MASK) == SEGMENT_LDT) {
 		u16 ldt_selector = kvm_read_ldt();
 
-		if (!(ldt_selector & ~3))
+		if (!(ldt_selector & ~SEGMENT_RPL_MASK))
 			return 0;
 
-		table_base = segment_base(ldt_selector);
+		table_base = (struct desc_struct *)segment_base(ldt_selector);
+	} else {
+		table_base = get_current_gdt_rw();
 	}
-	d = (struct desc_struct *)(table_base + (selector & ~7));
+
+	d = table_base + (selector >> 3);
 	v = get_desc_base(d);
 #ifdef CONFIG_X86_64
-       if (d->s == 0 && (d->type == 2 || d->type == 9 || d->type == 11))
-               v |= ((unsigned long)((struct ldttss_desc64 *)d)->base3) << 32;
+	/*
+	 * Extend the virtual address if we have a system descriptor entry for
+	 * LDT or TSS (available or busy).
+	 */
+	if (d->s == 0 && (d->type == DESC_LDT || d->type == DESC_TSS ||
+			  d->type == 11/*Busy TSS */)) {
+		high32 = ((struct ldttss_desc64 *)d)->base3;
+		v |= (u64)high32 << 32;
+	}
 #endif
 	return v;
 }
