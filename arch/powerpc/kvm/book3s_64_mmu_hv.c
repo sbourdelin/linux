@@ -96,8 +96,8 @@ long kvmppc_alloc_hpt(struct kvm *kvm, u32 *htab_orderp)
 	kvm->arch.revmap = rev;
 	kvm->arch.sdr1 = __pa(hpt) | (order - 18);
 
-	pr_info("KVM guest htab at %lx (order %ld), LPID %x\n",
-		hpt, order, kvm->arch.lpid);
+	pr_debug("KVM guest htab at %lx (order %ld), LPID %x\n",
+		 hpt, order, kvm->arch.lpid);
 
 	if (htab_orderp)
 		*htab_orderp = order;
