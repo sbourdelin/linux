@@ -2184,6 +2184,11 @@ static void fix_recovery_read_error(struct r10bio *r10_bio)
 	int idx = 0;
 	int dr = r10_bio->devs[0].devnum;
 	int dw = r10_bio->devs[1].devnum;
+	struct bio_vec *bvl;
+	struct page *pages[RESYNC_PAGES];
+
+	bio_for_each_segment_all(bvl, bio, idx)
+		pages[idx] = bvl->bv_page;
 
 	while (sectors) {
 		int s = sectors;
@@ -2199,7 +2204,7 @@ static void fix_recovery_read_error(struct r10bio *r10_bio)
 		ok = sync_page_io(rdev,
 				  addr,
 				  s << 9,
-				  bio->bi_io_vec[idx].bv_page,
+				  pages[idx],
 				  REQ_OP_READ, 0, false);
 		if (ok) {
 			rdev = conf->mirrors[dw].rdev;
@@ -2207,7 +2212,7 @@ static void fix_recovery_read_error(struct r10bio *r10_bio)
 			ok = sync_page_io(rdev,
 					  addr,
 					  s << 9,
-					  bio->bi_io_vec[idx].bv_page,
+					  pages[idx],
 					  REQ_OP_WRITE, 0, false);
 			if (!ok) {
 				set_bit(WriteErrorSeen, &rdev->flags);
