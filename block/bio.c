@@ -1803,6 +1803,9 @@ again:
 		goto again;
 	}
 
+	if (bio->bi_bdev)
+		trace_block_bio_complete(bdev_get_queue(bio->bi_bdev),
+					 bio, bio->bi_error);
 	if (bio->bi_end_io)
 		bio->bi_end_io(bio);
 }
