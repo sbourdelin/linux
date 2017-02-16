@@ -24,6 +24,28 @@
 	};
 };
 
+&pio {
+	uart2_default_cfg: uart2default {
+		pins_cmd_dat {
+			pinmux = <MT2701_PIN_14_URXD2__FUNC_URXD2>,
+				 <MT2701_PIN_15_UTXD2__FUNC_UTXD2>,
+				 <MT2701_PIN_242_URTS2__FUNC_URTS2>,
+				 <MT2701_PIN_243_UCTS2__FUNC_UCTS2>;
+			bias-pull-up;
+		};
+	};
+};
+
 &uart0 {
+	dmas = "";
+	dma-names = "";
+
+	status = "okay";
+};
+
+&uart2 {
+	pinctrl-names = "default";
+	pinctrl-0 = <&uart2_default_cfg>;
+
 	status = "okay";
 };
