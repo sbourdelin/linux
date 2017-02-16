@@ -802,6 +802,29 @@ int bio_add_pc_page(struct request_queue *q, struct bio *bio, struct page
 EXPORT_SYMBOL(bio_add_pc_page);
 
 /**
+ *	bio_remove_last_page	-	remove the last added page
+ *	@bio: destination bio
+ *
+ *	Attempt to remove the last added page from the bio_vec maplist.
+ */
+void bio_remove_last_page(struct bio *bio)
+{
+	/*
+	 * cloned bio must not modify vec list
+	 */
+	if (WARN_ON_ONCE(bio_flagged(bio, BIO_CLONED)))
+		return;
+
+	if (bio->bi_vcnt > 0) {
+		struct bio_vec *bv = &bio->bi_io_vec[bio->bi_vcnt - 1];
+
+		bio->bi_iter.bi_size -= bv->bv_len;
+		bio->bi_vcnt--;
+	}
+}
+EXPORT_SYMBOL(bio_remove_last_page);
+
+/**
  *	bio_add_page	-	attempt to add page to bio
  *	@bio: destination bio
  *	@page: page to add

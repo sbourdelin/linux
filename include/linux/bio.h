@@ -436,6 +436,7 @@ extern void bio_init(struct bio *bio, struct bio_vec *table,
 extern void bio_reset(struct bio *);
 void bio_chain(struct bio *, struct bio *);
 
+extern void bio_remove_last_page(struct bio *bio);
 extern int bio_add_page(struct bio *, struct page *, unsigned int,unsigned int);
 extern int bio_add_pc_page(struct request_queue *, struct bio *, struct page *,
 			   unsigned int, unsigned int);
