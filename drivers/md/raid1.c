@@ -2805,10 +2805,10 @@ static sector_t raid1_sync_request(struct mddev *mddev, sector_t sector_nr,
 		for (i = 0 ; i < conf->raid_disks * 2; i++) {
 			bio = r1_bio->bios[i];
 			if (bio->bi_end_io) {
-				page = bio->bi_io_vec[bio->bi_vcnt].bv_page;
+				page = mdev_get_page_from_bio(bio, bio->bi_vcnt);
 				if (bio_add_page(bio, page, len, 0) == 0) {
 					/* stop here */
-					bio->bi_io_vec[bio->bi_vcnt].bv_page = page;
+					mdev_put_page_to_bio(bio, bio->bi_vcnt, page);
 					while (i > 0) {
 						i--;
 						bio = r1_bio->bios[i];

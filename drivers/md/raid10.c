@@ -3438,12 +3438,12 @@ static sector_t raid10_sync_request(struct mddev *mddev, sector_t sector_nr,
 			break;
 		for (bio= biolist ; bio ; bio=bio->bi_next) {
 			struct bio *bio2;
-			page = bio->bi_io_vec[bio->bi_vcnt].bv_page;
+			page = mdev_get_page_from_bio(bio, bio->bi_vcnt);
 			if (bio_add_page(bio, page, len, 0))
 				continue;
 
 			/* stop here */
-			bio->bi_io_vec[bio->bi_vcnt].bv_page = page;
+			mdev_put_page_to_bio(bio, bio->bi_vcnt, page);
 			for (bio2 = biolist;
 			     bio2 && bio2 != bio;
 			     bio2 = bio2->bi_next) {
