@@ -41,16 +41,27 @@ static int groups_to_user(gid_t __user *grouplist,
 			  const struct group_info *group_info)
 {
 	struct user_namespace *user_ns = current_user_ns();
-	int i;
+	int i, j = 0;
 	unsigned int count = group_info->ngroups;
 
 	for (i = 0; i < count; i++) {
+		kgid_t kgid = group_info->gid[i];
 		gid_t gid;
-		gid = from_kgid_munged(user_ns, group_info->gid[i]);
-		if (put_user(gid, grouplist+i))
+
+		/*
+		 * Don't return unmapped gids, since there's nothing userspace
+		 * can do about them and they are very confusing -- since
+		 * setgroups(2) is disabled in user namespaces.
+		 */
+		if (!kgid_has_mapping(user_ns, kgid))
+			continue;
+
+		gid = from_kgid(user_ns, kgid);
+		if (put_user(gid, grouplist+j))
 			return -EFAULT;
+		j++;
 	}
-	return 0;
+	return j;
 }
 
 /* fill a group_info from a user-space array - it must be allocated already */
@@ -177,10 +188,10 @@ SYSCALL_DEFINE2(getgroups, int, gidsetsize, gid_t __user *, grouplist)
 			i = -EINVAL;
 			goto out;
 		}
-		if (groups_to_user(grouplist, cred->group_info)) {
-			i = -EFAULT;
+
+		i = groups_to_user(grouplist, cred->group_info);
+		if (i < 0)
 			goto out;
-		}
 	}
 out:
 	return i;
