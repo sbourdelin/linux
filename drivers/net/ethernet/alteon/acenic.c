@@ -2630,8 +2630,7 @@ static int ace_get_link_ksettings(struct net_device *dev,
 	ecmd->rxcoal = readl(&regs->TuneRxCoalTicks);
 #endif
 
-	ethtool_convert_legacy_u32_to_link_mode(cmd->link_modes.supported,
-						supported);
+	ethtool_u32_to_ks(cmd->link_modes.supported, supported);
 
 	return 0;
 }

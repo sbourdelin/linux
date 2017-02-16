@@ -224,10 +224,8 @@ static int lio_get_link_ksettings(struct net_device *netdev,
 		supported = (SUPPORTED_10000baseT_Full | SUPPORTED_FIBRE |
 			     SUPPORTED_Pause);
 		advertising = (ADVERTISED_10000baseT_Full | ADVERTISED_Pause);
-		ethtool_convert_legacy_u32_to_link_mode(
-			ecmd->link_modes.supported, supported);
-		ethtool_convert_legacy_u32_to_link_mode(
-			ecmd->link_modes.advertising, advertising);
+		ethtool_u32_to_ks(ecmd->link_modes.supported, supported);
+		ethtool_u32_to_ks(ecmd->link_modes.advertising, advertising);
 		ecmd->base.autoneg = AUTONEG_DISABLE;
 
 	} else {

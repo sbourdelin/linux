@@ -493,12 +493,9 @@ void mdio45_ethtool_ksettings_get_npage(const struct mdio_if_info *mdio,
 
 	cmd->base.speed = speed;
 
-	ethtool_convert_legacy_u32_to_link_mode(cmd->link_modes.supported,
-						supported);
-	ethtool_convert_legacy_u32_to_link_mode(cmd->link_modes.advertising,
-						advertising);
-	ethtool_convert_legacy_u32_to_link_mode(cmd->link_modes.lp_advertising,
-						lp_advertising);
+	ethtool_u32_to_ks(cmd->link_modes.supported, supported);
+	ethtool_u32_to_ks(cmd->link_modes.advertising, advertising);
+	ethtool_u32_to_ks(cmd->link_modes.lp_advertising, lp_advertising);
 
 	/* 10GBASE-T MDI/MDI-X */
 	if (cmd->base.port == PORT_TP && (cmd->base.speed == SPEED_10000)) {

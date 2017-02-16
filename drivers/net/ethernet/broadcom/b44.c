@@ -1867,10 +1867,8 @@ static int b44_get_link_ksettings(struct net_device *dev,
 	if (cmd->base.autoneg == AUTONEG_ENABLE)
 		advertising |= ADVERTISED_Autoneg;
 
-	ethtool_convert_legacy_u32_to_link_mode(cmd->link_modes.supported,
-						supported);
-	ethtool_convert_legacy_u32_to_link_mode(cmd->link_modes.advertising,
-						advertising);
+	ethtool_u32_to_ks(cmd->link_modes.supported, supported);
+	ethtool_u32_to_ks(cmd->link_modes.advertising, advertising);
 
 	if (!netif_running(dev)){
 		cmd->base.speed = 0;
@@ -1903,8 +1901,7 @@ static int b44_set_link_ksettings(struct net_device *dev,
 
 	speed = cmd->base.speed;
 
-	ethtool_convert_link_mode_to_legacy_u32(&advertising,
-						cmd->link_modes.advertising);
+	ethtool_ks_to_u32(&advertising, cmd->link_modes.advertising);
 
 	/* We do not support gigabit. */
 	if (cmd->base.autoneg == AUTONEG_ENABLE) {

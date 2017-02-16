@@ -219,12 +219,9 @@ int mii_ethtool_get_link_ksettings(struct mii_if_info *mii,
 
 	mii->full_duplex = cmd->base.duplex;
 
-	ethtool_convert_legacy_u32_to_link_mode(cmd->link_modes.supported,
-						supported);
-	ethtool_convert_legacy_u32_to_link_mode(cmd->link_modes.advertising,
-						advertising);
-	ethtool_convert_legacy_u32_to_link_mode(cmd->link_modes.lp_advertising,
-						lp_advertising);
+	ethtool_u32_to_ks(cmd->link_modes.supported, supported);
+	ethtool_u32_to_ks(cmd->link_modes.advertising, advertising);
+	ethtool_u32_to_ks(cmd->link_modes.lp_advertising, lp_advertising);
 
 	/* ignore maxtxpkt, maxrxpkt for now */
 
@@ -359,8 +356,7 @@ int mii_ethtool_set_link_ksettings(struct mii_if_info *mii,
 		u32 advert2 = 0, tmp2 = 0;
 		u32 advertising;
 
-		ethtool_convert_link_mode_to_legacy_u32(
-			&advertising, cmd->link_modes.advertising);
+		ethtool_ks_to_u32(&advertising, cmd->link_modes.advertising);
 
 		if ((advertising & (ADVERTISED_10baseT_Half |
 				    ADVERTISED_10baseT_Full |
