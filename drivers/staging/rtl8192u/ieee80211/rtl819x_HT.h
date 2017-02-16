@@ -86,38 +86,38 @@ typedef enum _CHNLOP{
 		((_pHTInfo)->ChnlOp > CHNLOP_NONE) ? TRUE : FALSE
 
 /*
-typedef	union _HT_CAPABILITY{
-	u16	ShortData;
-	u8	CharData[2];
-	struct
-	{
-		u16	AdvCoding:1;
-		u16	ChlWidth:1;
-		u16	MimoPwrSave:2;
-		u16	GreenField:1;
-		u16	ShortGI20Mhz:1;
-		u16	ShortGI40Mhz:1;
-		u16	STBC:1;
-		u16	BeamForm:1;
-		u16	DelayBA:1;
-		u16	MaxAMSDUSize:1;
-		u16	DssCCk:1;
-		u16	PSMP:1;
-		u16	Rsvd:3;
-	}Field;
-}HT_CAPABILITY, *PHT_CAPABILITY;
-
-typedef	union _HT_CAPABILITY_MACPARA{
-	u8	ShortData;
-	u8	CharData[1];
-	struct
-	{
-		u8	MaxRxAMPDU:2;
-		u8	MPDUDensity:2;
-		u8	Rsvd:4;
-	}Field;
-}HT_CAPABILITY_MACPARA, *PHT_CAPABILITY_MACPARA;
-*/
+ * typedef	union _HT_CAPABILITY{
+ *	u16	ShortData;
+ *	u8	CharData[2];
+ *	struct
+ *	{
+ *		u16	AdvCoding:1;
+ *		u16	ChlWidth:1;
+ *		u16	MimoPwrSave:2;
+ *		u16	GreenField:1;
+ *		u16	ShortGI20Mhz:1;
+ *		u16	ShortGI40Mhz:1;
+ *		u16	STBC:1;
+ *		u16	BeamForm:1;
+ *		u16	DelayBA:1;
+ *		u16	MaxAMSDUSize:1;
+ *		u16	DssCCk:1;
+ *		u16	PSMP:1;
+ *		u16	Rsvd:3;
+ *	}Field;
+ * }HT_CAPABILITY, *PHT_CAPABILITY;
+ *
+ * typedef	union _HT_CAPABILITY_MACPARA{
+ *	u8	ShortData;
+ *	u8	CharData[1];
+ *	struct
+ *	{
+ *		u8	MaxRxAMPDU:2;
+ *		u8	MPDUDensity:2;
+ *		u8	Rsvd:4;
+ *	}Field;
+ * }HT_CAPABILITY_MACPARA, *PHT_CAPABILITY_MACPARA;
+ */
 
 typedef enum _HT_ACTION{
 	ACT_RECOMMAND_WIDTH		= 0,
@@ -421,8 +421,9 @@ extern u8 MCS_FILTER_ALL[16];
 extern u8 MCS_FILTER_1SS[16];
 
 /* 2007/07/11 MH Modify the macro. Becaus STA may link with a N-AP. If we set
-   STA in A/B/G mode and AP is still in N mode. The macro will be wrong. We have
-   to add a macro to judge wireless mode. */
+ * STA in A/B/G mode and AP is still in N mode. The macro will be wrong. We have
+ * to add a macro to judge wireless mode.
+ */
 #define PICK_RATE(_nLegacyRate, _nMcsRate)	\
 		(_nMcsRate==0)?(_nLegacyRate&0x7f):(_nMcsRate)
 /* 2007/07/12 MH We only define legacy and HT wireless mode now. */
