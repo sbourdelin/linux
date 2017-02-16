@@ -1161,19 +1161,27 @@ static int csi_set_fmt(struct v4l2_subdev *sd,
 	if (sdformat->which == V4L2_SUBDEV_FORMAT_TRY) {
 		cfg->try_fmt = sdformat->format;
 	} else {
+		struct v4l2_mbus_framefmt *f_direct, *f_idmac;
+
 		priv->format_mbus[sdformat->pad] = sdformat->format;
 		priv->cc[sdformat->pad] = cc;
-		/* Reset the crop window if this is the input pad */
-		if (sdformat->pad == CSI_SINK_PAD)
+
+		f_direct = &priv->format_mbus[CSI_SRC_PAD_DIRECT];
+		f_idmac = &priv->format_mbus[CSI_SRC_PAD_IDMAC];
+
+		if (sdformat->pad == CSI_SINK_PAD) {
+			/* reset the crop window */
 			priv->crop = crop;
-		else if (sdformat->pad == CSI_SRC_PAD_IDMAC) {
-			/*
-			 * update the capture device format if this is
-			 * the IDMAC output pad
-			 */
-			imx_media_mbus_fmt_to_pix_fmt(&vdev->fmt.fmt.pix,
-						      &sdformat->format, cc);
+
+			/* propagate format to source pads */
+			f_direct->width = crop.width;
+			f_direct->height = crop.height;
+			f_idmac->width = crop.width;
+			f_idmac->height = crop.height;
 		}
+
+		/* update the capture device format from IDMAC output pad */
+		imx_media_mbus_fmt_to_pix_fmt(&vdev->fmt.fmt.pix, f_idmac, cc);
 	}
 
 	return 0;

@@ -196,8 +196,17 @@ static int prp_set_fmt(struct v4l2_subdev *sd,
 	if (sdformat->which == V4L2_SUBDEV_FORMAT_TRY) {
 		cfg->try_fmt = sdformat->format;
 	} else {
-		priv->format_mbus[sdformat->pad] = sdformat->format;
+		struct v4l2_mbus_framefmt *f =
+			&priv->format_mbus[sdformat->pad];
+
+		*f = sdformat->format;
 		priv->cc[sdformat->pad] = cc;
+
+		/* propagate format to source pads */
+		if (sdformat->pad == PRP_SINK_PAD) {
+			priv->format_mbus[PRP_SRC_PAD_PRPENC] = *f;
+			priv->format_mbus[PRP_SRC_PAD_PRPVF] = *f;
+		}
 	}
 
 	return 0;

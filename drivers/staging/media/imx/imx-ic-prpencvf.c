@@ -806,16 +806,22 @@ static int prp_set_fmt(struct v4l2_subdev *sd,
 	if (sdformat->which == V4L2_SUBDEV_FORMAT_TRY) {
 		cfg->try_fmt = sdformat->format;
 	} else {
-		priv->format_mbus[sdformat->pad] = sdformat->format;
+		struct v4l2_mbus_framefmt *f =
+			&priv->format_mbus[sdformat->pad];
+		struct v4l2_mbus_framefmt *outf =
+			&priv->format_mbus[PRPENCVF_SRC_PAD];
+
+		*f = sdformat->format;
 		priv->cc[sdformat->pad] = cc;
-		if (sdformat->pad == PRPENCVF_SRC_PAD) {
-			/*
-			 * update the capture device format if this is
-			 * the IDMAC output pad
-			 */
-			imx_media_mbus_fmt_to_pix_fmt(&vdev->fmt.fmt.pix,
-						      &sdformat->format, cc);
+
+		/* propagate format to source pad */
+		if (sdformat->pad == PRPENCVF_SINK_PAD) {
+			outf->width = f->width;
+			outf->height = f->height;
 		}
+
+		/* update the capture device format from output pad */
+		imx_media_mbus_fmt_to_pix_fmt(&vdev->fmt.fmt.pix, outf, cc);
 	}
 
 	return 0;

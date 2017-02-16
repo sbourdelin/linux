@@ -649,8 +649,21 @@ static int vdic_set_fmt(struct v4l2_subdev *sd,
 	if (sdformat->which == V4L2_SUBDEV_FORMAT_TRY) {
 		cfg->try_fmt = sdformat->format;
 	} else {
-		priv->format_mbus[sdformat->pad] = sdformat->format;
+		struct v4l2_mbus_framefmt *f =
+			&priv->format_mbus[sdformat->pad];
+		struct v4l2_mbus_framefmt *outf =
+			&priv->format_mbus[VDIC_SRC_PAD_DIRECT];
+
+		*f = sdformat->format;
 		priv->cc[sdformat->pad] = cc;
+
+		/* propagate format to source pad */
+		if (sdformat->pad == VDIC_SINK_PAD_DIRECT ||
+		    sdformat->pad == VDIC_SINK_PAD_IDMAC) {
+			outf->width = f->width;
+			outf->height = f->height;
+			outf->field = V4L2_FIELD_NONE;
+		}
 	}
 
 	return 0;
