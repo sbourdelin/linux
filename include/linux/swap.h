@@ -166,6 +166,12 @@ enum {
 #define COUNT_CONTINUED	0x80	/* See swap_map continuation for full count */
 #define SWAP_MAP_SHMEM	0xbf	/* Owned by shmem/tmpfs, in first swap_map */
 
+enum swap_cluster_lock_class
+{
+	SWAP_CLUSTER_LOCK_NORMAL,  /* implicitly used by plain spin_lock() APIs. */
+	SWAP_CLUSTER_LOCK_NESTED,
+};
+
 /*
  * We use this to track usage of a cluster. A cluster is a block of swap disk
  * space with SWAPFILE_CLUSTER pages long and naturally aligns in disk. All

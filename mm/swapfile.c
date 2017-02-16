@@ -263,6 +263,12 @@ static inline void __lock_cluster(struct swap_cluster_info *ci)
 	spin_lock(&ci->lock);
 }
 
+static inline void __lock_cluster_nested(struct swap_cluster_info *ci,
+					 unsigned subclass)
+{
+	spin_lock_nested(&ci->lock, subclass);
+}
+
 static inline struct swap_cluster_info *lock_cluster(struct swap_info_struct *si,
 						     unsigned long offset)
 {
@@ -336,7 +342,7 @@ static void cluster_list_add_tail(struct swap_cluster_list *list,
 		 * only acquired when we held swap_info_struct->lock
 		 */
 		ci_tail = ci + tail;
-		__lock_cluster(ci_tail);
+		__lock_cluster_nested(ci_tail, SWAP_CLUSTER_LOCK_NESTED);
 		cluster_set_next(ci_tail, idx);
 		unlock_cluster(ci_tail);
 		cluster_set_next_flag(&list->tail, idx, 0);
