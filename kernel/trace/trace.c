@@ -262,11 +262,11 @@ unsigned long long ns2usecs(u64 nsec)
 /*
  * The global_trace is the descriptor that holds the tracing
  * buffers for the live tracing. For each CPU, it contains
- * a link list of pages that will store trace entries. The
- * page descriptor of the pages in the memory is used to hold
- * the link list by linking the lru item in the page descriptor
- * to each of the pages in the buffer per CPU.
- *
+ * a link list of pages that will store trace entries.
+ * Each page is wrapped by a buffer_page descriptor which contains
+ * a list element used to hold the list of pages by linking with
+ * other list elements of other buffer_page descriptors (for each
+ * of the pages) in the ring buffer per CPU.
  * For each active CPU there is a data field that holds the
  * pages for the buffer for that CPU. Each CPU has the same number
  * of pages allocated for its buffer.
