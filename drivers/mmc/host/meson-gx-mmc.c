@@ -324,11 +324,12 @@ static int meson_mmc_clk_init(struct meson_host *host)
 	writel(cfg, host->regs + SD_EMMC_CFG);
 
 	ret = clk_prepare_enable(host->cfg_div_clk);
-	if (!ret)
+	if (!ret) {
 		ret = meson_mmc_clk_set(host, f_min);
 
-	if (!ret)
-		clk_disable_unprepare(host->cfg_div_clk);
+		if (ret)
+			clk_disable_unprepare(host->cfg_div_clk);
+	}
 
 	return ret;
 }
