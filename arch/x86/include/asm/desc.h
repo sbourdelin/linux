@@ -4,6 +4,7 @@
 #include <asm/desc_defs.h>
 #include <asm/ldt.h>
 #include <asm/mmu.h>
+#include <asm/fixmap.h>
 
 #include <linux/smp.h>
 #include <linux/percpu.h>
@@ -45,9 +46,33 @@ struct gdt_page {
 
 DECLARE_PER_CPU_PAGE_ALIGNED(struct gdt_page, gdt_page);
 
-static inline struct desc_struct *get_cpu_gdt_table(unsigned int cpu)
+/* Provide the original GDT */
+static inline struct desc_struct *get_cpu_gdt_rw(unsigned int cpu)
 {
 	return per_cpu(gdt_page, cpu).gdt;
+}
+
+static inline unsigned long get_cpu_gdt_rw_vaddr(unsigned int cpu)
+{
+	return (unsigned long)get_cpu_gdt_rw(cpu);
+}
+
+/* Get the fixmap index for a specific processor */
+static inline unsigned int get_cpu_gdt_ro_index(int cpu)
+{
+	return FIX_GDT_REMAP_BEGIN + cpu;
+}
+
+/* Provide the fixmap address of the remapped GDT */
+static inline struct desc_struct *get_cpu_gdt_ro(int cpu)
+{
+	unsigned int idx = get_cpu_gdt_ro_index(cpu);
+	return (struct desc_struct *)__fix_to_virt(idx);
+}
+
+static inline unsigned long get_cpu_gdt_ro_vaddr(int cpu)
+{
+	return (unsigned long)get_cpu_gdt_ro(cpu);
 }
 
 #ifdef CONFIG_X86_64
@@ -174,7 +199,7 @@ static inline void set_tssldt_descriptor(void *d, unsigned long addr, unsigned t
 
 static inline void __set_tss_desc(unsigned cpu, unsigned int entry, void *addr)
 {
-	struct desc_struct *d = get_cpu_gdt_table(cpu);
+	struct desc_struct *d = get_cpu_gdt_rw(cpu);
 	tss_desc tss;
 
 	/*
@@ -202,7 +227,7 @@ static inline void native_set_ldt(const void *addr, unsigned int entries)
 
 		set_tssldt_descriptor(&ldt, (unsigned long)addr, DESC_LDT,
 				      entries * LDT_ENTRY_SIZE - 1);
-		write_gdt_entry(get_cpu_gdt_table(cpu), GDT_ENTRY_LDT,
+		write_gdt_entry(get_cpu_gdt_rw(cpu), GDT_ENTRY_LDT,
 				&ldt, DESC_LDT);
 		asm volatile("lldt %w0"::"q" (GDT_ENTRY_LDT*8));
 	}
@@ -244,7 +269,7 @@ static inline unsigned long native_store_tr(void)
 
 static inline void native_load_tls(struct thread_struct *t, unsigned int cpu)
 {
-	struct desc_struct *gdt = get_cpu_gdt_table(cpu);
+	struct desc_struct *gdt = get_cpu_gdt_rw(cpu);
 	unsigned int i;
 
 	for (i = 0; i < GDT_ENTRY_TLS_ENTRIES; i++)
