@@ -689,20 +689,6 @@ static void prp_stop(struct prp_priv *priv)
 	prp_put_ipu_resources(priv);
 }
 
-static int prp_enum_mbus_code(struct v4l2_subdev *sd,
-			      struct v4l2_subdev_pad_config *cfg,
-			      struct v4l2_subdev_mbus_code_enum *code)
-{
-	if (code->pad >= PRPENCVF_NUM_PADS)
-		return -EINVAL;
-
-	if (code->pad == PRPENCVF_SRC_PAD)
-		return imx_media_enum_format(NULL, &code->code, code->index,
-					     true, false);
-
-	return imx_media_enum_ipu_format(NULL, &code->code, code->index, true);
-}
-
 static struct v4l2_mbus_framefmt *
 __prp_get_fmt(struct prp_priv *priv, struct v4l2_subdev_pad_config *cfg,
 	      unsigned int pad, enum v4l2_subdev_format_whence which)
@@ -713,6 +699,25 @@ __prp_get_fmt(struct prp_priv *priv, struct v4l2_subdev_pad_config *cfg,
 		return v4l2_subdev_get_try_format(&ic_priv->sd, cfg, pad);
 	else
 		return &priv->format_mbus[pad];
+}
+
+static int prp_enum_mbus_code(struct v4l2_subdev *sd,
+			      struct v4l2_subdev_pad_config *cfg,
+			      struct v4l2_subdev_mbus_code_enum *code)
+{
+	int ret;
+
+	if (code->pad >= PRPENCVF_NUM_PADS)
+		return -EINVAL;
+
+	if (code->pad == PRPENCVF_SINK_PAD)
+		ret = imx_media_enum_ipu_format(&code->code, code->index,
+						CS_SEL_ANY);
+	else
+		ret = imx_media_enum_mbus_format(&code->code, code->index,
+						 CS_SEL_ANY, false);
+
+	return ret;
 }
 
 static int prp_get_fmt(struct v4l2_subdev *sd,
@@ -754,11 +759,13 @@ static int prp_set_fmt(struct v4l2_subdev *sd,
 		infmt = __prp_get_fmt(priv, cfg, PRPENCVF_SINK_PAD,
 				      sdformat->which);
 
-		cc = imx_media_find_format(0, sdformat->format.code,
-					   true, false);
+		cc = imx_media_find_mbus_format(sdformat->format.code,
+						CS_SEL_ANY, false);
 		if (!cc) {
-			imx_media_enum_format(NULL, &code, 0, true, false);
-			cc = imx_media_find_format(0, code, true, false);
+			imx_media_enum_mbus_format(&code, 0,
+						   CS_SEL_ANY, false);
+			cc = imx_media_find_mbus_format(code,
+							CS_SEL_ANY, false);
 			sdformat->format.code = cc->codes[0];
 		}
 
@@ -781,11 +788,11 @@ static int prp_set_fmt(struct v4l2_subdev *sd,
 					      infmt->height / 4, MAX_H_SRC,
 					      H_ALIGN_SRC, S_ALIGN);
 	} else {
-		cc = imx_media_find_ipu_format(0, sdformat->format.code,
-					       true);
+		cc = imx_media_find_ipu_format(sdformat->format.code,
+					       CS_SEL_ANY);
 		if (!cc) {
-			imx_media_enum_ipu_format(NULL, &code, 0, true);
-			cc = imx_media_find_ipu_format(0, code, true);
+			imx_media_enum_ipu_format(&code, 0, CS_SEL_ANY);
+			cc = imx_media_find_ipu_format(code, CS_SEL_ANY);
 			sdformat->format.code = cc->codes[0];
 		}
 
@@ -1021,7 +1028,7 @@ static int prp_registered(struct v4l2_subdev *sd)
 	for (i = 0; i < PRPENCVF_NUM_PADS; i++) {
 		if (i == PRPENCVF_SINK_PAD) {
 			priv->pad[i].flags = MEDIA_PAD_FL_SINK;
-			imx_media_enum_ipu_format(NULL, &code, 0, true);
+			imx_media_enum_ipu_format(&code, 0, CS_SEL_YUV);
 		} else {
 			priv->pad[i].flags = MEDIA_PAD_FL_SOURCE;
 			code = 0;

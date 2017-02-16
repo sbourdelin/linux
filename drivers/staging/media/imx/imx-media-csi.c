@@ -877,15 +877,44 @@ static int csi_enum_mbus_code(struct v4l2_subdev *sd,
 			      struct v4l2_subdev_pad_config *cfg,
 			      struct v4l2_subdev_mbus_code_enum *code)
 {
-	if (code->pad >= CSI_NUM_PADS)
+	struct csi_priv *priv = v4l2_get_subdevdata(sd);
+	const struct imx_media_pixfmt *incc;
+	struct v4l2_mbus_framefmt *infmt;
+	int ret = 0;
+	u32 cs_sel;
+
+	infmt = __csi_get_fmt(priv, cfg, CSI_SINK_PAD, code->which);
+	incc = imx_media_find_mbus_format(infmt->code, CS_SEL_ANY, true);
+
+	switch (code->pad) {
+	case CSI_SINK_PAD:
+		ret = imx_media_enum_mbus_format(&code->code, code->index,
+						 CS_SEL_ANY, true);
+		break;
+	case CSI_SRC_PAD_DIRECT:
+		cs_sel = (incc->cs == IPUV3_COLORSPACE_YUV) ?
+			CS_SEL_YUV : CS_SEL_RGB;
+		ret = imx_media_enum_ipu_format(&code->code, code->index,
+						cs_sel);
+		break;
+	case CSI_SRC_PAD_IDMAC:
+		if (incc->bayer) {
+			if (code->index != 0)
+				return -EINVAL;
+			code->code = infmt->code;
+		} else {
+			cs_sel = (incc->cs == IPUV3_COLORSPACE_YUV) ?
+				CS_SEL_YUV : CS_SEL_RGB;
+			ret = imx_media_enum_mbus_format(&code->code,
+							 code->index,
+							 cs_sel, false);
+		}
+		break;
+	default:
 		return -EINVAL;
+	}
 
-	if (code->pad == CSI_SRC_PAD_DIRECT)
-		return imx_media_enum_ipu_format(NULL, &code->code,
-						 code->index, true);
-
-	return imx_media_enum_format(NULL, &code->code, code->index,
-				     true, false);
+	return ret;
 }
 
 static int csi_get_fmt(struct v4l2_subdev *sd,
@@ -917,7 +946,7 @@ static int csi_set_fmt(struct v4l2_subdev *sd,
 	struct v4l2_mbus_framefmt *infmt;
 	struct imx_media_subdev *sensor;
 	struct v4l2_rect crop;
-	u32 code;
+	u32 code, cs_sel;
 	int ret;
 
 	if (sdformat->pad >= CSI_NUM_PADS)
@@ -932,14 +961,16 @@ static int csi_set_fmt(struct v4l2_subdev *sd,
 		return PTR_ERR(sensor);
 	}
 
-	v4l_bound_align_image(&sdformat->format.width, MIN_W, MAX_W,
-			      W_ALIGN, &sdformat->format.height,
-			      MIN_H, MAX_H, H_ALIGN, S_ALIGN);
-
 	switch (sdformat->pad) {
 	case CSI_SRC_PAD_DIRECT:
 	case CSI_SRC_PAD_IDMAC:
-		infmt = __csi_get_fmt(priv, cfg, CSI_SINK_PAD, sdformat->which);
+		infmt = __csi_get_fmt(priv, cfg, CSI_SINK_PAD,
+				      sdformat->which);
+		incc = imx_media_find_mbus_format(infmt->code,
+						  CS_SEL_ANY, true);
+
+		cs_sel = (incc->cs == IPUV3_COLORSPACE_YUV) ?
+			CS_SEL_YUV : CS_SEL_RGB;
 
 		if (sdformat->format.width < priv->crop.width * 3 / 4)
 			sdformat->format.width = priv->crop.width / 2;
@@ -952,32 +983,29 @@ static int csi_set_fmt(struct v4l2_subdev *sd,
 			sdformat->format.height = priv->crop.height;
 
 		if (sdformat->pad == CSI_SRC_PAD_IDMAC) {
-			cc = imx_media_find_format(0, sdformat->format.code,
-						   true, false);
-			if (!cc) {
-				imx_media_enum_format(NULL, &code, 0,
-						      true, false);
-				cc = imx_media_find_format(0, code,
-							   true, false);
-				sdformat->format.code = cc->codes[0];
-			}
-
-			incc = priv->cc[CSI_SINK_PAD];
-			if (cc->cs != incc->cs) {
+			if (incc->bayer) {
 				sdformat->format.code = infmt->code;
-				cc = imx_media_find_format(
-					0, sdformat->format.code,
-					true, false);
+				cc = incc;
+			} else {
+				cc = imx_media_find_mbus_format(
+					sdformat->format.code, cs_sel, false);
+				if (!cc) {
+					imx_media_enum_mbus_format(
+						&code, 0, cs_sel, false);
+					cc = imx_media_find_mbus_format(
+						code, cs_sel, false);
+					sdformat->format.code = cc->codes[0];
+				}
 			}
 
 			if (sdformat->format.field != V4L2_FIELD_NONE)
 				sdformat->format.field = infmt->field;
 		} else {
-			cc = imx_media_find_ipu_format(0, sdformat->format.code,
-						       true);
+			cc = imx_media_find_ipu_format(sdformat->format.code,
+						       cs_sel);
 			if (!cc) {
-				imx_media_enum_ipu_format(NULL, &code, 0, true);
-				cc = imx_media_find_ipu_format(0, code, true);
+				imx_media_enum_ipu_format(&code, 0, cs_sel);
+				cc = imx_media_find_ipu_format(code, cs_sel);
 				sdformat->format.code = cc->codes[0];
 			}
 
@@ -999,6 +1027,9 @@ static int csi_set_fmt(struct v4l2_subdev *sd,
 		}
 		break;
 	case CSI_SINK_PAD:
+		v4l_bound_align_image(&sdformat->format.width, MIN_W, MAX_W,
+				      W_ALIGN, &sdformat->format.height,
+				      MIN_H, MAX_H, H_ALIGN, S_ALIGN);
 		crop.left = 0;
 		crop.top = 0;
 		crop.width = sdformat->format.width;
@@ -1008,11 +1039,13 @@ static int csi_set_fmt(struct v4l2_subdev *sd,
 		if (ret)
 			return ret;
 
-		cc = imx_media_find_format(0, sdformat->format.code,
-					   true, false);
+		cc = imx_media_find_mbus_format(sdformat->format.code,
+						CS_SEL_ANY, true);
 		if (!cc) {
-			imx_media_enum_format(NULL, &code, 0, true, false);
-			cc = imx_media_find_format(0, code, true, false);
+			imx_media_enum_mbus_format(&code, 0,
+						   CS_SEL_ANY, false);
+			cc = imx_media_find_mbus_format(code,
+							CS_SEL_ANY, false);
 			sdformat->format.code = cc->codes[0];
 		}
 		break;
@@ -1157,7 +1190,7 @@ static int csi_registered(struct v4l2_subdev *sd)
 
 		code = 0;
 		if (i == CSI_SRC_PAD_DIRECT)
-			imx_media_enum_ipu_format(NULL, &code, 0, true);
+			imx_media_enum_ipu_format(&code, 0, CS_SEL_YUV);
 
 		/* set a default mbus format  */
 		ret = imx_media_init_mbus_fmt(&priv->format_mbus[i],

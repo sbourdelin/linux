@@ -96,16 +96,6 @@ static void prp_stop(struct prp_priv *priv)
 {
 }
 
-static int prp_enum_mbus_code(struct v4l2_subdev *sd,
-			      struct v4l2_subdev_pad_config *cfg,
-			      struct v4l2_subdev_mbus_code_enum *code)
-{
-	if (code->pad >= PRP_NUM_PADS)
-		return -EINVAL;
-
-	return imx_media_enum_ipu_format(NULL, &code->code, code->index, true);
-}
-
 static struct v4l2_mbus_framefmt *
 __prp_get_fmt(struct prp_priv *priv, struct v4l2_subdev_pad_config *cfg,
 	      unsigned int pad, enum v4l2_subdev_format_whence which)
@@ -116,6 +106,33 @@ __prp_get_fmt(struct prp_priv *priv, struct v4l2_subdev_pad_config *cfg,
 		return v4l2_subdev_get_try_format(&ic_priv->sd, cfg, pad);
 	else
 		return &priv->format_mbus[pad];
+}
+
+static int prp_enum_mbus_code(struct v4l2_subdev *sd,
+			      struct v4l2_subdev_pad_config *cfg,
+			      struct v4l2_subdev_mbus_code_enum *code)
+{
+	struct prp_priv *priv = sd_to_priv(sd);
+	struct v4l2_mbus_framefmt *infmt;
+	int ret = 0;
+
+	switch (code->pad) {
+	case PRP_SINK_PAD:
+		ret = imx_media_enum_ipu_format(&code->code, code->index,
+						CS_SEL_ANY);
+		break;
+	case PRP_SRC_PAD_PRPENC:
+	case PRP_SRC_PAD_PRPVF:
+		if (code->index != 0)
+			return -EINVAL;
+		infmt = __prp_get_fmt(priv, cfg, PRP_SINK_PAD, code->which);
+		code->code = infmt->code;
+		break;
+	default:
+		return -EINVAL;
+	}
+
+	return ret;
 }
 
 static int prp_get_fmt(struct v4l2_subdev *sd,
@@ -152,23 +169,28 @@ static int prp_set_fmt(struct v4l2_subdev *sd,
 	if (priv->stream_on)
 		return -EBUSY;
 
-	cc = imx_media_find_ipu_format(0, sdformat->format.code, true);
-	if (!cc) {
-		imx_media_enum_ipu_format(NULL, &code, 0, true);
-		cc = imx_media_find_ipu_format(0, code, true);
-		sdformat->format.code = cc->codes[0];
-	}
+	switch (sdformat->pad) {
+	case PRP_SINK_PAD:
+		v4l_bound_align_image(&sdformat->format.width, MIN_W, MAX_W,
+				      W_ALIGN, &sdformat->format.height,
+				      MIN_H, MAX_H, H_ALIGN, S_ALIGN);
 
-	v4l_bound_align_image(&sdformat->format.width, MIN_W, MAX_W,
-			      W_ALIGN, &sdformat->format.height,
-			      MIN_H, MAX_H, H_ALIGN, S_ALIGN);
-
-	/* Output pads mirror input pad */
-	if (sdformat->pad == PRP_SRC_PAD_PRPENC ||
-	    sdformat->pad == PRP_SRC_PAD_PRPVF) {
+		cc = imx_media_find_ipu_format(sdformat->format.code,
+					       CS_SEL_ANY);
+		if (!cc) {
+			imx_media_enum_ipu_format(&code, 0, CS_SEL_ANY);
+			cc = imx_media_find_ipu_format(code, CS_SEL_ANY);
+			sdformat->format.code = cc->codes[0];
+		}
+		break;
+	case PRP_SRC_PAD_PRPENC:
+	case PRP_SRC_PAD_PRPVF:
+		/* Output pads mirror input pad */
 		infmt = __prp_get_fmt(priv, cfg, PRP_SINK_PAD,
 				      sdformat->which);
+		cc = imx_media_find_ipu_format(infmt->code, CS_SEL_ANY);
 		sdformat->format = *infmt;
+		break;
 	}
 
 	if (sdformat->which == V4L2_SUBDEV_FORMAT_TRY) {
@@ -364,7 +386,7 @@ static int prp_registered(struct v4l2_subdev *sd)
 			MEDIA_PAD_FL_SINK : MEDIA_PAD_FL_SOURCE;
 
 		/* set a default mbus format  */
-		imx_media_enum_ipu_format(NULL, &code, 0, true);
+		imx_media_enum_ipu_format(&code, 0, CS_SEL_YUV);
 		ret = imx_media_init_mbus_fmt(&priv->format_mbus[i],
 					      640, 480, code, V4L2_FIELD_NONE,
 					      &priv->cc[i]);

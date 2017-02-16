@@ -520,20 +520,6 @@ static int vdic_s_stream(struct v4l2_subdev *sd, int enable)
 	return ret;
 }
 
-static int vdic_enum_mbus_code(struct v4l2_subdev *sd,
-			       struct v4l2_subdev_pad_config *cfg,
-			       struct v4l2_subdev_mbus_code_enum *code)
-{
-	if (code->pad >= VDIC_NUM_PADS)
-		return -EINVAL;
-
-	if (code->pad == VDIC_SINK_PAD_IDMAC)
-		return imx_media_enum_format(NULL, &code->code, code->index,
-					     false, false);
-
-	return imx_media_enum_ipu_format(NULL, &code->code, code->index, false);
-}
-
 static struct v4l2_mbus_framefmt *
 __vdic_get_fmt(struct vdic_priv *priv, struct v4l2_subdev_pad_config *cfg,
 	       unsigned int pad, enum v4l2_subdev_format_whence which)
@@ -542,6 +528,32 @@ __vdic_get_fmt(struct vdic_priv *priv, struct v4l2_subdev_pad_config *cfg,
 		return v4l2_subdev_get_try_format(&priv->sd, cfg, pad);
 	else
 		return &priv->format_mbus[pad];
+}
+
+static int vdic_enum_mbus_code(struct v4l2_subdev *sd,
+			       struct v4l2_subdev_pad_config *cfg,
+			       struct v4l2_subdev_mbus_code_enum *code)
+{
+	int ret;
+
+	switch (code->pad) {
+	case VDIC_SINK_PAD_IDMAC:
+		ret = imx_media_enum_mbus_format(&code->code, code->index,
+						 CS_SEL_YUV, false);
+		break;
+	case VDIC_SINK_PAD_DIRECT:
+		ret = imx_media_enum_ipu_format(&code->code, code->index,
+						CS_SEL_YUV);
+		break;
+	case VDIC_SRC_PAD_DIRECT:
+		ret = imx_media_enum_ipu_format(&code->code, code->index,
+						CS_SEL_YUV);
+		break;
+	default:
+		return -EINVAL;
+	}
+
+	return ret;
 }
 
 static int vdic_get_fmt(struct v4l2_subdev *sd,
@@ -578,19 +590,16 @@ static int vdic_set_fmt(struct v4l2_subdev *sd,
 	if (priv->stream_on)
 		return -EBUSY;
 
-	v4l_bound_align_image(&sdformat->format.width, MIN_W, MAX_W_VDIC,
-			      W_ALIGN, &sdformat->format.height,
-			      MIN_H, MAX_H_VDIC, H_ALIGN, S_ALIGN);
-
 	switch (sdformat->pad) {
 	case VDIC_SRC_PAD_DIRECT:
 		infmt = __vdic_get_fmt(priv, cfg, priv->active_input_pad,
 				       sdformat->which);
 
-		cc = imx_media_find_ipu_format(0, sdformat->format.code, false);
+		cc = imx_media_find_ipu_format(sdformat->format.code,
+					       CS_SEL_YUV);
 		if (!cc) {
-			imx_media_enum_ipu_format(NULL, &code, 0, false);
-			cc = imx_media_find_ipu_format(0, code, false);
+			imx_media_enum_ipu_format(&code, 0, CS_SEL_YUV);
+			cc = imx_media_find_ipu_format(code, CS_SEL_YUV);
 			sdformat->format.code = cc->codes[0];
 		}
 
@@ -599,29 +608,36 @@ static int vdic_set_fmt(struct v4l2_subdev *sd,
 		/* output is always progressive! */
 		sdformat->format.field = V4L2_FIELD_NONE;
 		break;
-	case VDIC_SINK_PAD_IDMAC:
 	case VDIC_SINK_PAD_DIRECT:
-		if (sdformat->pad == VDIC_SINK_PAD_DIRECT) {
-			cc = imx_media_find_ipu_format(0, sdformat->format.code,
-						       false);
-			if (!cc) {
-				imx_media_enum_ipu_format(NULL, &code, 0,
-							  false);
-				cc = imx_media_find_ipu_format(0, code, false);
-				sdformat->format.code = cc->codes[0];
-			}
-		} else {
-			cc = imx_media_find_format(0, sdformat->format.code,
-						   false, false);
-			if (!cc) {
-				imx_media_enum_format(NULL, &code, 0,
-						      false, false);
-				cc = imx_media_find_format(0, code,
-							   false, false);
-				sdformat->format.code = cc->codes[0];
-			}
-		}
+		v4l_bound_align_image(&sdformat->format.width,
+				      MIN_W, MAX_W_VDIC, W_ALIGN,
+				      &sdformat->format.height,
+				      MIN_H, MAX_H_VDIC, H_ALIGN, S_ALIGN);
 
+		cc = imx_media_find_ipu_format(sdformat->format.code,
+					       CS_SEL_YUV);
+		if (!cc) {
+			imx_media_enum_ipu_format(&code, 0, CS_SEL_YUV);
+			cc = imx_media_find_ipu_format(code, CS_SEL_YUV);
+			sdformat->format.code = cc->codes[0];
+		}
+		/* input must be interlaced! Choose SEQ_TB if not */
+		if (!V4L2_FIELD_HAS_BOTH(sdformat->format.field))
+			sdformat->format.field = V4L2_FIELD_SEQ_TB;
+		break;
+	case VDIC_SINK_PAD_IDMAC:
+		v4l_bound_align_image(&sdformat->format.width,
+				      MIN_W, MAX_W_VDIC, W_ALIGN,
+				      &sdformat->format.height,
+				      MIN_H, MAX_H_VDIC, H_ALIGN, S_ALIGN);
+
+		cc = imx_media_find_mbus_format(sdformat->format.code,
+						CS_SEL_YUV, false);
+		if (!cc) {
+			imx_media_enum_mbus_format(&code, 0, CS_SEL_YUV, false);
+			cc = imx_media_find_mbus_format(code, CS_SEL_YUV, false);
+			sdformat->format.code = cc->codes[0];
+		}
 		/* input must be interlaced! Choose SEQ_TB if not */
 		if (!V4L2_FIELD_HAS_BOTH(sdformat->format.field))
 			sdformat->format.field = V4L2_FIELD_SEQ_TB;
@@ -766,7 +782,7 @@ static int vdic_registered(struct v4l2_subdev *sd)
 
 		code = 0;
 		if (i != VDIC_SINK_PAD_IDMAC)
-			imx_media_enum_ipu_format(NULL, &code, 0, true);
+			imx_media_enum_ipu_format(&code, 0, CS_SEL_YUV);
 
 		/* set a default mbus format  */
 		ret = imx_media_init_mbus_fmt(&priv->format_mbus[i],
