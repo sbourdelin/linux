@@ -704,6 +704,23 @@ void serio_reconnect(struct serio *serio)
 }
 EXPORT_SYMBOL(serio_reconnect);
 
+void serio_bind_manual_driver(struct serio *serio, struct serio_driver *drv)
+{
+	mutex_lock(&serio_mutex);
+	serio->manual_bind = true;
+	serio->manual_drv = &drv->driver;
+	mutex_unlock(&serio_mutex);
+	serio_rescan(serio);
+}
+EXPORT_SYMBOL(serio_bind_manual_driver);
+
+void serio_clear_manual_driver(struct serio *serio)
+{
+	serio->manual_bind = false;
+	serio->manual_drv = NULL;
+}
+EXPORT_SYMBOL(serio_clear_manual_driver);
+
 /*
  * Submits register request to kseriod for subsequent execution.
  * Note that port registration is always asynchronous.
@@ -901,6 +918,9 @@ static int serio_bus_match(struct device *dev, struct device_driver *drv)
 {
 	struct serio *serio = to_serio_port(dev);
 	struct serio_driver *serio_drv = to_serio_driver(drv);
+
+	if (serio->manual_drv && serio->manual_drv == drv)
+		return serio_match_port(serio_drv->id_table, serio);
 
 	if (serio->manual_bind || serio_drv->manual_bind)
 		return 0;

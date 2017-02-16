@@ -64,6 +64,9 @@ struct serio {
 	 * may get indigestion when exposed to concurrent access (i8042).
 	 */
 	struct mutex *ps2_cmd_mutex;
+
+	/* Used when forcing a driver instead of the default one. */
+	struct device_driver *manual_drv;
 };
 #define to_serio_port(d)	container_of(d, struct serio, dev)
 
@@ -88,6 +91,8 @@ int serio_open(struct serio *serio, struct serio_driver *drv);
 void serio_close(struct serio *serio);
 void serio_rescan(struct serio *serio);
 void serio_reconnect(struct serio *serio);
+void serio_bind_manual_driver(struct serio *serio, struct serio_driver *drv);
+void serio_clear_manual_driver(struct serio *serio);
 irqreturn_t serio_interrupt(struct serio *serio, unsigned char data, unsigned int flags);
 
 void __serio_register_port(struct serio *serio, struct module *owner);
