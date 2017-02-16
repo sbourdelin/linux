@@ -564,6 +564,7 @@ static netdev_tx_t gtp_dev_xmit(struct sk_buff *skb, struct net_device *dev)
 {
 	unsigned int proto = ntohs(skb->protocol);
 	struct gtp_pktinfo pktinfo;
+	__be16 src_port;
 	int err;
 
 	/* Ensure there is sufficient headroom. */
@@ -571,6 +572,8 @@ static netdev_tx_t gtp_dev_xmit(struct sk_buff *skb, struct net_device *dev)
 		goto tx_err;
 
 	skb_reset_inner_headers(skb);
+
+	src_port = udp_flow_src_port(dev_net(dev), skb, 0, 0, true);
 
 	/* PDP context lookups in gtp_build_skb_*() need rcu read-side lock. */
 	rcu_read_lock();
@@ -596,7 +599,7 @@ static netdev_tx_t gtp_dev_xmit(struct sk_buff *skb, struct net_device *dev)
 				    pktinfo.iph->tos,
 				    ip4_dst_hoplimit(&pktinfo.rt->dst),
 				    0,
-				    pktinfo.gtph_port, pktinfo.gtph_port,
+				    src_port, pktinfo.gtph_port,
 				    true, false);
 		break;
 	}
