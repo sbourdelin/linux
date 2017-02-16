@@ -226,7 +226,9 @@ static struct scsi_device *get_sdev_from_queue(struct request_queue *q)
 
 	spin_lock_irqsave(q->queue_lock, flags);
 	sdev = q->queuedata;
-	if (!sdev || !get_device(&sdev->sdev_gendev))
+	if (!sdev ||
+	    !scsi_is_sdev_device(&sdev->sdev_gendev) ||
+	    !get_device(&sdev->sdev_gendev))
 		sdev = NULL;
 	spin_unlock_irqrestore(q->queue_lock, flags);
 
