@@ -284,7 +284,7 @@ static int posix_get_hrtimer_res(clockid_t which_clock, struct timespec *tp)
  */
 static __init int init_posix_timers(void)
 {
-	struct k_clock clock_realtime = {
+	const struct k_clock clock_realtime = {
 		.clock_getres	= posix_get_hrtimer_res,
 		.clock_get	= posix_clock_realtime_get,
 		.clock_set	= posix_clock_realtime_set,
@@ -296,7 +296,7 @@ static __init int init_posix_timers(void)
 		.timer_get	= common_timer_get,
 		.timer_del	= common_timer_del,
 	};
-	struct k_clock clock_monotonic = {
+	const struct k_clock clock_monotonic = {
 		.clock_getres	= posix_get_hrtimer_res,
 		.clock_get	= posix_ktime_get_ts,
 		.nsleep		= common_nsleep,
@@ -306,19 +306,19 @@ static __init int init_posix_timers(void)
 		.timer_get	= common_timer_get,
 		.timer_del	= common_timer_del,
 	};
-	struct k_clock clock_monotonic_raw = {
+	const struct k_clock clock_monotonic_raw = {
 		.clock_getres	= posix_get_hrtimer_res,
 		.clock_get	= posix_get_monotonic_raw,
 	};
-	struct k_clock clock_realtime_coarse = {
+	const struct k_clock clock_realtime_coarse = {
 		.clock_getres	= posix_get_coarse_res,
 		.clock_get	= posix_get_realtime_coarse,
 	};
-	struct k_clock clock_monotonic_coarse = {
+	const struct k_clock clock_monotonic_coarse = {
 		.clock_getres	= posix_get_coarse_res,
 		.clock_get	= posix_get_monotonic_coarse,
 	};
-	struct k_clock clock_tai = {
+	const struct k_clock clock_tai = {
 		.clock_getres	= posix_get_hrtimer_res,
 		.clock_get	= posix_get_tai,
 		.nsleep		= common_nsleep,
@@ -328,7 +328,7 @@ static __init int init_posix_timers(void)
 		.timer_get	= common_timer_get,
 		.timer_del	= common_timer_del,
 	};
-	struct k_clock clock_boottime = {
+	const struct k_clock clock_boottime = {
 		.clock_getres	= posix_get_hrtimer_res,
 		.clock_get	= posix_get_boottime,
 		.nsleep		= common_nsleep,
@@ -521,7 +521,7 @@ static struct pid *good_sigevent(sigevent_t * event)
 }
 
 void posix_timers_register_clock(const clockid_t clock_id,
-				 struct k_clock *new_clock)
+				 const struct k_clock *new_clock)
 {
 	if ((unsigned) clock_id >= MAX_CLOCKS) {
 		printk(KERN_WARNING "POSIX clock register failed for clock_id %d\n",
