@@ -490,13 +490,20 @@ void ipoib_ib_completion(struct ib_cq *cq, void *dev_ptr)
 	napi_schedule(&priv->napi);
 }
 
+static void __drain_tx_cq(struct ipoib_dev_priv *priv)
+{
+	while (poll_tx(priv))
+		; /* nothing */
+
+	priv->drain_tx_cq_stamp = jiffies;
+}
+
 static void drain_tx_cq(struct net_device *dev)
 {
 	struct ipoib_dev_priv *priv = netdev_priv(dev);
 
 	netif_tx_lock(dev);
-	while (poll_tx(priv))
-		; /* nothing */
+	__drain_tx_cq(priv);
 
 	if (netif_queue_stopped(dev))
 		mod_timer(&priv->poll_timer, jiffies + 1);
@@ -637,8 +644,7 @@ void ipoib_send(struct net_device *dev, struct sk_buff *skb,
 	}
 
 	if (unlikely(priv->tx_outstanding > MAX_SEND_CQE))
-		while (poll_tx(priv))
-			; /* nothing */
+		__drain_tx_cq(priv);
 }
 
 static void __ipoib_reap_ah(struct net_device *dev)
@@ -695,6 +701,19 @@ static void ipoib_stop_ah(struct net_device *dev)
 static void ipoib_ib_tx_timer_func(unsigned long ctx)
 {
 	drain_tx_cq((struct net_device *)ctx);
+}
+
+static void ipoib_tx_gc_timer_func(unsigned long ctx)
+{
+	struct net_device *dev = (struct net_device *)ctx;
+	struct ipoib_dev_priv *priv = netdev_priv(dev);
+
+	netif_tx_lock(dev);
+	if (time_after(jiffies, priv->drain_tx_cq_stamp + HZ))
+		__drain_tx_cq(priv);
+	netif_tx_unlock(dev);
+
+	mod_timer(&priv->tx_gc_timer, jiffies + HZ);
 }
 
 int ipoib_ib_dev_open(struct net_device *dev)
@@ -834,8 +853,7 @@ void ipoib_drain_cq(struct net_device *dev)
 		}
 	} while (n == IPOIB_NUM_WC);
 
-	while (poll_tx(priv))
-		; /* nothing */
+	__drain_tx_cq(priv);
 
 	local_bh_enable();
 }
@@ -906,6 +924,7 @@ int ipoib_ib_dev_stop(struct net_device *dev)
 
 timeout:
 	del_timer_sync(&priv->poll_timer);
+	del_timer_sync(&priv->tx_gc_timer);
 	qp_attr.qp_state = IB_QPS_RESET;
 	if (ib_modify_qp(priv->qp, &qp_attr, IB_QP_STATE))
 		ipoib_warn(priv, "Failed to modify QP to RESET state\n");
@@ -932,6 +951,10 @@ int ipoib_ib_dev_init(struct net_device *dev, struct ib_device *ca, int port)
 
 	setup_timer(&priv->poll_timer, ipoib_ib_tx_timer_func,
 		    (unsigned long) dev);
+	setup_timer(&priv->tx_gc_timer, ipoib_tx_gc_timer_func,
+		    (unsigned long) dev);
+	mod_timer(&priv->tx_gc_timer, jiffies + HZ);
+	priv->drain_tx_cq_stamp = jiffies;
 
 	if (dev->flags & IFF_UP) {
 		if (ipoib_ib_dev_open(dev)) {

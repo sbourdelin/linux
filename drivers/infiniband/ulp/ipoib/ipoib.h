@@ -402,6 +402,8 @@ struct ipoib_dev_priv {
 	u64	hca_caps;
 	struct ipoib_ethtool_st ethtool;
 	struct timer_list poll_timer;
+	struct timer_list tx_gc_timer;
+	unsigned long drain_tx_cq_stamp;
 	unsigned max_send_sge;
 	bool sm_fullmember_sendonly_support;
 };
