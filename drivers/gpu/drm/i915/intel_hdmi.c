@@ -1462,6 +1462,16 @@ intel_hdmi_set_edid(struct drm_connector *connector)
 			    intel_gmbus_get_adapter(dev_priv,
 			    intel_hdmi->ddc_bus));
 
+	/*
+	 * Use the user-supplied EDID blob in case we don't have an
+	 * EDID from the display.
+	 */
+	if (!edid && connector->override_edid) {
+		edid = kmemdup(connector->edid_blob_ptr->data,
+			       connector->edid_blob_ptr->length,
+			       GFP_KERNEL);
+	}
+
 	intel_hdmi_dp_dual_mode_detect(connector, edid != NULL);
 
 	intel_display_power_put(dev_priv, POWER_DOMAIN_GMBUS);
