@@ -4384,6 +4384,8 @@ static sector_t reshape_request(struct mddev *mddev, sector_t sector_nr,
 	struct bio *blist;
 	struct bio *bio, *read_bio;
 	int sectors_done = 0;
+	struct bio_vec *bvl;
+	struct page *pages[RESYNC_PAGES];
 
 	if (sector_nr == 0) {
 		/* If restarting in the middle, skip the initial sectors */
@@ -4547,9 +4549,12 @@ read_more:
 
 	/* Now add as many pages as possible to all of these bios. */
 
+	bio_for_each_segment_all(bvl, r10_bio->devs[0].bio, s)
+		pages[s] = bvl->bv_page;
+
 	nr_sectors = 0;
 	for (s = 0 ; s < max_sectors; s += PAGE_SIZE >> 9) {
-		struct page *page = r10_bio->devs[0].bio->bi_io_vec[s/(PAGE_SIZE>>9)].bv_page;
+		struct page *page = pages[s / (PAGE_SIZE >> 9)];
 		int len = (max_sectors - s) << 9;
 		if (len > PAGE_SIZE)
 			len = PAGE_SIZE;
