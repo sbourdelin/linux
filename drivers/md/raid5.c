@@ -7279,10 +7279,14 @@ static int raid5_remove_disk(struct mddev *mddev, struct md_rdev *rdev)
 		 * we can't wait pending write here, as this is called in
 		 * raid5d, wait will deadlock.
 		 */
-		if (atomic_read(&mddev->writes_pending))
+		lock_all_device_hash_locks_irq(conf);
+		if (atomic_read(&conf->active_stripes)) {
+			unlock_all_device_hash_locks_irq(conf);
 			return -EBUSY;
+		}
 		log = conf->log;
 		conf->log = NULL;
+		unlock_all_device_hash_locks_irq(conf);
 		synchronize_rcu();
 		r5l_exit_log(log);
 		return 0;
