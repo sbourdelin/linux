@@ -148,7 +148,8 @@ ieee80211_frag_cache_get(struct ieee80211_device *ieee,
 		memcpy(entry->dst_addr, hdr->addr1, ETH_ALEN);
 	} else {
 		/* received a fragment of a frame for which the head fragment
-		 * should have already been received */
+		 * should have already been received
+		 */
 		entry = ieee80211_frag_cache_find(ieee, seq, frag, tid,hdr->addr2,
 						  hdr->addr1);
 		if (entry != NULL) {
@@ -207,7 +208,8 @@ static int ieee80211_frag_cache_invalidate(struct ieee80211_device *ieee,
  *
  * Responsible for handling management control frames
  *
- * Called by ieee80211_rx */
+ * Called by ieee80211_rx
+ */
 static inline int
 ieee80211_rx_frame_mgmt(struct ieee80211_device *ieee, struct sk_buff *skb,
 			struct ieee80211_rx_stats *rx_stats, u16 type,
@@ -240,8 +242,9 @@ ieee80211_rx_frame_mgmt(struct ieee80211_device *ieee, struct sk_buff *skb,
 		       ieee->dev->name);
 		return 0;
 /*
-  hostap_update_sta_ps(ieee, (struct hostap_ieee80211_hdr_4addr *)
-  skb->data);*/
+ *  hostap_update_sta_ps(ieee, (struct hostap_ieee80211_hdr_4addr *)
+ *  skb->data);
+ */
 	}
 
 	if (ieee->hostapd && type == IEEE80211_TYPE_MGMT) {
@@ -249,14 +252,16 @@ ieee80211_rx_frame_mgmt(struct ieee80211_device *ieee, struct sk_buff *skb,
 		    ieee->iw_mode == IW_MODE_MASTER) {
 			struct sk_buff *skb2;
 			/* Process beacon frames also in kernel driver to
-			 * update STA(AP) table statistics */
+			 * update STA(AP) table statistics
+			 */
 			skb2 = skb_clone(skb, GFP_ATOMIC);
 			if (skb2)
 				hostap_rx(skb2->dev, skb2, rx_stats);
 		}
 
 		/* send management frames to the user space daemon for
-		 * processing */
+		 * processing
+		 */
 		ieee->apdevstats.rx_packets++;
 		ieee->apdevstats.rx_bytes += skb->len;
 		prism2_rx_80211(ieee->apdev, skb, rx_stats, PRISM2_RX_MGMT);
@@ -554,7 +559,8 @@ void ieee80211_indicate_packets(struct ieee80211_device *ieee, struct ieee80211_
 				  ethertype != ETH_P_AARP && ethertype != ETH_P_IPX) ||
 				 memcmp(sub_skb->data, bridge_tunnel_header, SNAP_SIZE) == 0)) {
 			/* remove RFC1042 or Bridge-Tunnel encapsulation and
-			 * replace EtherType */
+			 * replace EtherType
+			 */
 				skb_pull(sub_skb, SNAP_SIZE);
 				memcpy(skb_push(sub_skb, ETH_ALEN), prxb->src, ETH_ALEN);
 				memcpy(skb_push(sub_skb, ETH_ALEN), prxb->dst, ETH_ALEN);
@@ -885,7 +891,8 @@ static u8 parse_subframe(struct sk_buff *skb,
 
 /* All received frames are sent to this function. @skb contains the frame in
  * IEEE 802.11 format, i.e., in the format it was sent over air.
- * This function is called only as a tasklet (software IRQ). */
+ * This function is called only as a tasklet (software IRQ).
+ */
 int ieee80211_rx(struct ieee80211_device *ieee, struct sk_buff *skb,
 		 struct ieee80211_rx_stats *rx_stats)
 {
@@ -949,7 +956,8 @@ int ieee80211_rx(struct ieee80211_device *ieee, struct sk_buff *skb,
 	//IEEE80211_DEBUG_DATA(IEEE80211_DL_DATA, skb->data, skb->len);
 #ifdef NOT_YET
 	/* Put this code here so that we avoid duplicating it in all
-	 * Rx paths. - Jean II */
+	 * Rx paths. - Jean II
+	 */
 #ifdef IW_WIRELESS_SPY		/* defined in iw_handler.h */
 	/* If spy monitoring on */
 	if (iface->spy_data.spy_number > 0) {
@@ -984,7 +992,8 @@ int ieee80211_rx(struct ieee80211_device *ieee, struct sk_buff *skb,
 		 * bcrx_sta_key parameter is set, station specific key is used
 		 * even with broad/multicast targets (this is against IEEE
 		 * 802.11, but makes it easier to use different keys with
-		 * stations that do not support WEP key mapping). */
+		 * stations that do not support WEP key mapping).
+		 */
 
 		if (!(hdr->addr1[0] & 0x01) || local->bcrx_sta_key)
 			(void) hostap_handle_sta_crypto(local, hdr, &crypt,
@@ -992,7 +1001,8 @@ int ieee80211_rx(struct ieee80211_device *ieee, struct sk_buff *skb,
 #endif
 
 		/* allow NULL decrypt to indicate an station specific override
-		 * for default encryption */
+		 * for default encryption
+		 */
 		if (crypt && (crypt->ops == NULL ||
 			      crypt->ops->decrypt_mpdu == NULL))
 			crypt = NULL;
@@ -1001,7 +1011,8 @@ int ieee80211_rx(struct ieee80211_device *ieee, struct sk_buff *skb,
 			/* This seems to be triggered by some (multicast?)
 			 * frames from other than current BSS, so just drop the
 			 * frames silently instead of filling system log with
-			 * these reports. */
+			 * these reports.
+			 */
 			IEEE80211_DEBUG_DROP("Decryption failed (not set)"
 					     " (SA=%pM)\n",
 					     hdr->addr2);
@@ -1125,7 +1136,8 @@ int ieee80211_rx(struct ieee80211_device *ieee, struct sk_buff *skb,
 #endif
 	//IEEE80211_DEBUG_DATA(IEEE80211_DL_DATA, skb->data, skb->len);
 	/* Nullfunc frames may have PS-bit set, so they must be passed to
-	 * hostap_handle_sta_rx() before being dropped here. */
+	 * hostap_handle_sta_rx() before being dropped here.
+	 */
 	if (stype != IEEE80211_STYPE_DATA &&
 	    stype != IEEE80211_STYPE_DATA_CFACK &&
 	    stype != IEEE80211_STYPE_DATA_CFPOLL &&
@@ -1185,11 +1197,13 @@ int ieee80211_rx(struct ieee80211_device *ieee, struct sk_buff *skb,
 
 		if (frag == 0) {
 			/* copy first fragment (including full headers) into
-			 * beginning of the fragment cache skb */
+			 * beginning of the fragment cache skb
+			 */
 			memcpy(skb_put(frag_skb, flen), skb->data, flen);
 		} else {
 			/* append frame payload to the end of the fragment
-			 * cache skb */
+			 * cache skb
+			 */
 			memcpy(skb_put(frag_skb, flen), skb->data + hdrlen,
 			       flen);
 		}
@@ -1199,19 +1213,22 @@ int ieee80211_rx(struct ieee80211_device *ieee, struct sk_buff *skb,
 		if (fc & IEEE80211_FCTL_MOREFRAGS) {
 			/* more fragments expected - leave the skb in fragment
 			 * cache for now; it will be delivered to upper layers
-			 * after all fragments have been received */
+			 * after all fragments have been received
+			 */
 			goto rx_exit;
 		}
 
 		/* this was the last fragment and the frame will be
-		 * delivered, so remove skb from fragment cache */
+		 * delivered, so remove skb from fragment cache
+		 */
 		skb = frag_skb;
 		hdr = (struct rtl_80211_hdr_4addr *) skb->data;
 		ieee80211_frag_cache_invalidate(ieee, hdr);
 	}
 
 	/* skb: hdr + (possible reassembled) full MSDU payload; possibly still
-	 * encrypted/authenticated */
+	 * encrypted/authenticated
+	 */
 	if (ieee->host_decrypt && (fc & IEEE80211_FCTL_WEP) &&
 	    ieee80211_rx_frame_decrypt_msdu(ieee, skb, keyidx, crypt))
 	{
@@ -1230,7 +1247,8 @@ int ieee80211_rx(struct ieee80211_device *ieee, struct sk_buff *skb,
 
 #ifdef CONFIG_IEEE80211_DEBUG
 			/* pass unencrypted EAPOL frames even if encryption is
-			 * configured */
+			 * configured
+			 */
 			struct eapol *eap = (struct eapol *)(skb->data +
 				24);
 			IEEE80211_DEBUG_EAP("RX: IEEE 802.1X EAPOL frame: %s\n",
@@ -1265,10 +1283,10 @@ int ieee80211_rx(struct ieee80211_device *ieee, struct sk_buff *skb,
 		goto rx_dropped;
 	}
 /*
-	if(ieee80211_is_eapol_frame(ieee, skb, hdrlen)) {
-		printk(KERN_WARNING "RX: IEEE802.1X EPAOL frame!\n");
-	}
-*/
+ *	if(ieee80211_is_eapol_frame(ieee, skb, hdrlen)) {
+ *		printk(KERN_WARNING "RX: IEEE802.1X EPAOL frame!\n");
+ *	}
+ */
 //added by amy for reorder
 	if (ieee->current_network.qos_data.active && IsQoSDataFrame(skb->data)
 		&& !is_multicast_ether_addr(hdr->addr1))
@@ -1314,7 +1332,8 @@ int ieee80211_rx(struct ieee80211_device *ieee, struct sk_buff *skb,
 						  ethertype != ETH_P_AARP && ethertype != ETH_P_IPX) ||
 						 memcmp(sub_skb->data, bridge_tunnel_header, SNAP_SIZE) == 0)) {
 					/* remove RFC1042 or Bridge-Tunnel encapsulation and
-					 * replace EtherType */
+					 * replace EtherType
+					 */
 					skb_pull(sub_skb, SNAP_SIZE);
 					memcpy(skb_push(sub_skb, ETH_ALEN), src, ETH_ALEN);
 					memcpy(skb_push(sub_skb, ETH_ALEN), dst, ETH_ALEN);
@@ -1370,7 +1389,8 @@ int ieee80211_rx(struct ieee80211_device *ieee, struct sk_buff *skb,
 
 	/* Returning 0 indicates to caller that we have not handled the SKB--
 	 * so it is still allocated and can be used again by underlying
-	 * hardware as a DMA target */
+	 * hardware as a DMA target
+	 */
 	return 0;
 }
 EXPORT_SYMBOL(ieee80211_rx);
@@ -1380,9 +1400,9 @@ EXPORT_SYMBOL(ieee80211_rx);
 static u8 qos_oui[QOS_OUI_LEN] = { 0x00, 0x50, 0xF2 };
 
 /*
-* Make the structure we read from the beacon packet to have
-* the right values
-*/
+ * Make the structure we read from the beacon packet to have
+ * the right values
+ */
 static int ieee80211_verify_qos_info(struct ieee80211_qos_information_element
 				     *info_element, int sub_type)
 {
@@ -1635,7 +1655,8 @@ int ieee80211_parse_info_param(struct ieee80211_device *ieee,
 					     length, info_element->id);
 			/* We stop processing but don't return an error here
 			 * because some misbehaviour APs break this rule. ie.
-			 * Orinoco AP1000. */
+			 * Orinoco AP1000.
+			 */
 			break;
 		}
 
@@ -2259,7 +2280,8 @@ static inline int is_same_network(struct ieee80211_network *src,
 	/* A network is only a duplicate if the channel, BSSID, ESSID
 	 * and the capability field (in particular IBSS and BSS) all match.
 	 * We treat all <hidden> with the same BSSID and channel
-	 * as one network */
+	 * as one network
+	 */
 	return //((src->ssid_len == dst->ssid_len) &&
 		(((src->ssid_len == dst->ssid_len) || (ieee->iw_mode == IW_MODE_INFRA)) &&
 		(src->channel == dst->channel) &&
@@ -2495,10 +2517,12 @@ static inline void ieee80211_process_probe_response(
 	 *
 	 * NOTE:  This search is definitely not optimized.  Once its doing
 	 *        the "right thing" we'll optimize it for efficiency if
-	 *        necessary */
+	 *        necessary
+	 */
 
 	/* Search for this entry in the list and update it if it is
-	 * already there. */
+	 * already there.
+	 */
 
 	spin_lock_irqsave(&ieee->lock, flags);
 
@@ -2529,7 +2553,8 @@ static inline void ieee80211_process_probe_response(
 	}
 
 	/* If we didn't find a match, then get a new network slot to initialize
-	 * with this beacon's information */
+	 * with this beacon's information
+	 */
 	if (&target->list == &ieee->network_list) {
 		if (list_empty(&ieee->network_free_list)) {
 			/* If there are no more slots, expire the oldest */
