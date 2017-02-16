@@ -331,6 +331,11 @@ static int __kprobes do_page_fault(unsigned long addr, unsigned int esr,
 
 		if (!search_exception_tables(regs->pc))
 			die("Accessing user space memory outside uaccess.h routines", regs, esr);
+	} else if (is_permission_fault(esr, regs)) {
+		if (esr & ESR_ELx_WNR)
+			die("Attempting to write read-only memory", regs, esr);
+		else
+			die("Attempting to read unreadable memory", regs, esr);
 	}
 
 	/*
