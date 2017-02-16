@@ -3349,7 +3349,6 @@ static sector_t raid10_sync_request(struct mddev *mddev, sector_t sector_nr,
 
 			bio = r10_bio->devs[i].bio;
 			bio_reset(bio);
-			bio->bi_error = -EIO;
 			rcu_read_lock();
 			rdev = rcu_dereference(conf->mirrors[d].rdev);
 			if (rdev == NULL || test_bit(Faulty, &rdev->flags)) {
@@ -3393,7 +3392,6 @@ static sector_t raid10_sync_request(struct mddev *mddev, sector_t sector_nr,
 			/* Need to set up for writing to the replacement */
 			bio = r10_bio->devs[i].repl_bio;
 			bio_reset(bio);
-			bio->bi_error = -EIO;
 
 			sector = r10_bio->devs[i].addr;
 			bio->bi_next = biolist;
@@ -3436,14 +3434,15 @@ static sector_t raid10_sync_request(struct mddev *mddev, sector_t sector_nr,
 			len = (max_sector - sector_nr) << 9;
 		if (len == 0)
 			break;
+		/* borrow .bi_error as pre-allocated page index */
 		for (bio= biolist ; bio ; bio=bio->bi_next) {
 			struct bio *bio2;
-			page = mdev_get_page_from_bio(bio, bio->bi_vcnt);
+			page = mdev_get_page_from_bio(bio, bio->bi_error++);
 			if (bio_add_page(bio, page, len, 0))
 				continue;
 
 			/* stop here */
-			mdev_put_page_to_bio(bio, bio->bi_vcnt, page);
+			mdev_put_page_to_bio(bio, --bio->bi_error, page);
 			for (bio2 = biolist;
 			     bio2 && bio2 != bio;
 			     bio2 = bio2->bi_next) {
@@ -3457,6 +3456,13 @@ static sector_t raid10_sync_request(struct mddev *mddev, sector_t sector_nr,
 		sector_nr += len>>9;
 	} while (biolist->bi_vcnt < RESYNC_PAGES);
  bio_full:
+	/* return .bi_error back to bio, and set resync's as -EIO */
+	for (bio= biolist ; bio ; bio=bio->bi_next)
+		if (test_bit(MD_RECOVERY_SYNC, &mddev->recovery))
+			bio->bi_error = -EIO;
+		else
+			bio->bi_error = 0;
+
 	r10_bio->sectors = nr_sectors;
 
 	while (biolist) {

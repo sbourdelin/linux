@@ -2802,13 +2802,14 @@ static sector_t raid1_sync_request(struct mddev *mddev, sector_t sector_nr,
 				len = sync_blocks<<9;
 		}
 
+		/* borrow .bi_error as pre-allocated page index */
 		for (i = 0 ; i < conf->raid_disks * 2; i++) {
 			bio = r1_bio->bios[i];
 			if (bio->bi_end_io) {
-				page = mdev_get_page_from_bio(bio, bio->bi_vcnt);
+				page = mdev_get_page_from_bio(bio, bio->bi_error++);
 				if (bio_add_page(bio, page, len, 0) == 0) {
 					/* stop here */
-					mdev_put_page_to_bio(bio, bio->bi_vcnt, page);
+					mdev_put_page_to_bio(bio, --bio->bi_error, page);
 					while (i > 0) {
 						i--;
 						bio = r1_bio->bios[i];
@@ -2827,6 +2828,13 @@ static sector_t raid1_sync_request(struct mddev *mddev, sector_t sector_nr,
 		sync_blocks -= (len>>9);
 	} while (r1_bio->bios[disk]->bi_vcnt < RESYNC_PAGES);
  bio_full:
+	/* return .bi_error back to bio */
+	for (i = 0 ; i < conf->raid_disks * 2; i++) {
+		bio = r1_bio->bios[i];
+		if (bio->bi_end_io)
+			bio->bi_error = 0;
+	}
+
 	r1_bio->sectors = nr_sectors;
 
 	if (mddev_is_clustered(mddev) &&
