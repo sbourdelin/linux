@@ -2815,8 +2815,7 @@ static sector_t raid1_sync_request(struct mddev *mddev, sector_t sector_nr,
 						if (bio->bi_end_io==NULL)
 							continue;
 						/* remove last page from this bio */
-						bio->bi_vcnt--;
-						bio->bi_iter.bi_size -= len;
+						bio_remove_last_page(bio);
 						bio_clear_flag(bio, BIO_SEG_VALID);
 					}
 					goto bio_full;
