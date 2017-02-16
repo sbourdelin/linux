@@ -2003,6 +2003,9 @@ static void process_checks(struct r1bio *r1_bio)
 	int primary;
 	int i;
 	int vcnt;
+	struct bio_vec *bi;
+	int page_len[RESYNC_PAGES];
+	struct page *pbio_pages[RESYNC_PAGES], *sbio_pages[RESYNC_PAGES];
 
 	/* Fix variable parts of all bios */
 	vcnt = (r1_bio->sectors + PAGE_SIZE / 512 - 1) >> (PAGE_SHIFT - 9);
@@ -2010,7 +2013,6 @@ static void process_checks(struct r1bio *r1_bio)
 		int j;
 		int size;
 		int error;
-		struct bio_vec *bi;
 		struct bio *b = r1_bio->bios[i];
 		if (b->bi_end_io != end_sync_read)
 			continue;
@@ -2044,6 +2046,11 @@ static void process_checks(struct r1bio *r1_bio)
 			break;
 		}
 	r1_bio->read_disk = primary;
+
+	/* .bi_vcnt has been set for all read bios */
+	bio_for_each_segment_all(bi, r1_bio->bios[primary], i)
+		pbio_pages[i] = bi->bv_page;
+
 	for (i = 0; i < conf->raid_disks * 2; i++) {
 		int j;
 		struct bio *pbio = r1_bio->bios[primary];
@@ -2055,14 +2062,19 @@ static void process_checks(struct r1bio *r1_bio)
 		/* Now we can 'fixup' the error value */
 		sbio->bi_error = 0;
 
+		bio_for_each_segment_all(bi, sbio, j) {
+			sbio_pages[j] = bi->bv_page;
+			page_len[j] = bi->bv_len;
+		}
+
 		if (!error) {
 			for (j = vcnt; j-- ; ) {
 				struct page *p, *s;
-				p = pbio->bi_io_vec[j].bv_page;
-				s = sbio->bi_io_vec[j].bv_page;
+				p = pbio_pages[j];
+				s = sbio_pages[j];
 				if (memcmp(page_address(p),
 					   page_address(s),
-					   sbio->bi_io_vec[j].bv_len))
+					   page_len[j]))
 					break;
 			}
 		} else
