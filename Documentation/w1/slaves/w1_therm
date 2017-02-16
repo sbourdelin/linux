@@ -42,6 +42,7 @@ SRAM, so it is reset when the sensor gets power-cycled.
 To store the current precision configuration into EEPROM, the value 0
 has to be written to the sysfs w1_slave file. Since the EEPROM has a limited
 amount of writes (>50k), this command should be used wisely.
+Note: this precision value has to be a binary one-byte value, not ASCII.
 
 The module parameter strong_pullup can be set to 0 to disable the
 strong pullup, 1 to enable autodetection or 2 to force strong pullup.
