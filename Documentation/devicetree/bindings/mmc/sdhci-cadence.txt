@@ -19,6 +19,59 @@ if supported.  See mmc.txt for details.
 - mmc-hs400-1_8v
 - mmc-hs400-1_2v
 
+- phy-input-delay-sd-hs:
+  Value of the delay in the input path for High Speed work mode.
+  Valid range = [0:0x1F].
+  Delay configuration stay unchanged if this property is not provided.
+- phy-input-delay-sd-default:
+  Value of the delay in the input path for Default Speed work mode.
+  Valid range = [0:0x1F].
+  Delay configuration stay unchanged if this property is not provided.
+- phy-input-delay-sd-sdr12:
+  Value of the delay in the input path for SDR12 work mode.
+  Valid range = [0:0x1F].
+  Delay configuration stay unchanged if this property is not provided.
+- phy-input-delay-sd-sdr25:
+  Value of the delay in the input path for SDR25 work mode.
+  Valid range = [0:0x1F].
+  Delay configuration stay unchanged if this property is not provided.
+- phy-input-delay-sd-sdr50:
+  Value of the delay in the input path for SDR50 work mode.
+  Valid range = [0:0x1F].
+  Delay configuration stay unchanged if this property is not provided.
+- phy-input-delay-sd-ddr50:
+  Value of the delay in the input path for DDR50 work mode.
+  Valid range = [0:0x1F].
+  Delay configuration stay unchanged if this property is not provided.
+- phy-input-delay-emmc-legacy:
+  Value of the delay in the input path for eMMC legacy work mode.
+  Valid range = [0:0x1F].
+  Delay configuration stay unchanged if this property is not provided.
+- phy-input-delay-emmc-sdr:
+  Value of the delay in the input path for eMMC SDR work mode.
+  Valid range = [0:0x1F].
+  Delay configuration stay unchanged if this property is not provided.
+- phy-input-delay-emmc-ddr:
+  Value of the delay in the input path for eMMC DDR work mode.
+  Valid range = [0:0x1F].
+  Delay configuration stay unchanged if this property is not provided.
+- phy-dll-delay-sdclk:
+  Value of the delay introduced on the sdclk output
+  for all modes except HS200, HS400 and HS400_ES.
+  Valid range = [0:0x7F].
+  Delay configuration stay unchanged if this property is not provided.
+- phy-dll-delay-sdclk-hsmmc:
+  Value of the delay introduced on the sdclk output
+  for HS200, HS400 and HS400_ES speed modes.
+  Valid range = [0:0x7F].
+  Delay configuration stay unchanged if this property is not provided.
+- phy-dll-delay-strobe:
+  Value of the delay introduced on the dat_strobe input
+  used in HS400 / HS400_ES speed modes.
+  Valid range = [0:0x7F].
+  Delay configuration stay unchanged if this property is not provided.
+
+
 Example:
 	emmc: sdhci@5a000000 {
 		compatible = "socionext,uniphier-sd4hc", "cdns,sd4hc";
@@ -29,4 +82,5 @@ Example:
 		mmc-ddr-1_8v;
 		mmc-hs200-1_8v;
 		mmc-hs400-1_8v;
+		phy-input-delay-sd-hs = <0>;
 	};

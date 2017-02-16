@@ -17,6 +17,7 @@
 #include <linux/iopoll.h>
 #include <linux/module.h>
 #include <linux/mmc/host.h>
+#include <linux/of.h>
 
 #include "sdhci-pltfm.h"
 
@@ -53,6 +54,9 @@
 #define SDHCI_CDNS_PHY_DLY_EMMC_LEGACY	0x06
 #define SDHCI_CDNS_PHY_DLY_EMMC_SDR	0x07
 #define SDHCI_CDNS_PHY_DLY_EMMC_DDR	0x08
+#define SDHCI_CDNS_PHY_DLY_SDCLK	0x0b
+#define SDHCI_CDNS_PHY_DLY_HSMMC	0x0c
+#define SDHCI_CDNS_PHY_DLY_STROBE	0x0d
 
 /*
  * The tuned val register is 6 bit-wide, but not the whole of the range is
@@ -89,13 +93,73 @@ static int sdhci_cdns_write_phy_reg(struct sdhci_cdns_priv *priv,
 	return 0;
 }
 
-static void sdhci_cdns_phy_init(struct sdhci_cdns_priv *priv)
+static int sdhci_cdns_phy_parse_dt(struct device_node *np,
+				   struct sdhci_cdns_priv *priv)
 {
-	sdhci_cdns_write_phy_reg(priv, SDHCI_CDNS_PHY_DLY_SD_HS, 4);
-	sdhci_cdns_write_phy_reg(priv, SDHCI_CDNS_PHY_DLY_SD_DEFAULT, 4);
-	sdhci_cdns_write_phy_reg(priv, SDHCI_CDNS_PHY_DLY_EMMC_LEGACY, 9);
-	sdhci_cdns_write_phy_reg(priv, SDHCI_CDNS_PHY_DLY_EMMC_SDR, 2);
-	sdhci_cdns_write_phy_reg(priv, SDHCI_CDNS_PHY_DLY_EMMC_DDR, 3);
+	u32 tmp;
+	int ret;
+
+	if (!of_property_read_u32(np, "phy-input-delay-sd-hs", &tmp)) {
+		ret = sdhci_cdns_write_phy_reg(priv,
+					       SDHCI_CDNS_PHY_DLY_SD_HS, tmp);
+		if (ret)
+			return ret;
+	}
+	if (!of_property_read_u32(np, "phy-input-delay-sd-default", &tmp)) {
+		ret = sdhci_cdns_write_phy_reg(priv,
+					       SDHCI_CDNS_PHY_DLY_SD_DEFAULT,
+					       tmp);
+		if (ret)
+			return ret;
+	}
+	if (!of_property_read_u32(np, "phy-input-delay-sd-sdr12", &tmp)) {
+		ret = sdhci_cdns_write_phy_reg(priv,
+					       SDHCI_CDNS_PHY_DLY_UHS_SDR12,
+					       tmp);
+		if (ret)
+			return ret;
+	}
+	if (!of_property_read_u32(np, "phy-input-delay-sd-sdr25", &tmp)) {
+		ret = sdhci_cdns_write_phy_reg(priv,
+					       SDHCI_CDNS_PHY_DLY_UHS_SDR25,
+					       tmp);
+		if (ret)
+			return ret;
+	}
+	if (!of_property_read_u32(np, "phy-input-delay-sd-sdr50", &tmp)) {
+		ret = sdhci_cdns_write_phy_reg(priv,
+					       SDHCI_CDNS_PHY_DLY_UHS_SDR50,
+					       tmp);
+		if (ret)
+			return ret;
+	}
+	if (!of_property_read_u32(np, "phy-input-delay-sd-ddr50", &tmp)) {
+		ret = sdhci_cdns_write_phy_reg(priv,
+					       SDHCI_CDNS_PHY_DLY_UHS_DDR50,
+					       tmp);
+		if (ret)
+			return ret;
+	}
+	if (!of_property_read_u32(np, "phy-dll-delay-sdclk", &tmp)) {
+		ret = sdhci_cdns_write_phy_reg(priv,
+					       SDHCI_CDNS_PHY_DLY_SDCLK, tmp);
+
+		if (ret)
+			return ret;
+	}
+	if (!of_property_read_u32(np, "phy-dll-delay-sdclk-hsmmc", &tmp)) {
+		ret = sdhci_cdns_write_phy_reg(priv,
+					       SDHCI_CDNS_PHY_DLY_HSMMC, tmp);
+		if (ret)
+			return ret;
+	}
+	if (!of_property_read_u32(np, "phy-dll-delay-strobe", &tmp)) {
+		ret = sdhci_cdns_write_phy_reg(priv,
+					       SDHCI_CDNS_PHY_DLY_STROBE, tmp);
+		if (ret)
+			return ret;
+	}
+	return 0;
 }
 
 static inline void *sdhci_cdns_priv(struct sdhci_host *host)
@@ -224,10 +288,11 @@ static int sdhci_cdns_probe(struct platform_device *pdev)
 	struct sdhci_host *host;
 	struct sdhci_pltfm_host *pltfm_host;
 	struct sdhci_cdns_priv *priv;
+	struct device *dev = &pdev->dev;
 	struct clk *clk;
 	int ret;
 
-	clk = devm_clk_get(&pdev->dev, NULL);
+	clk = devm_clk_get(dev, NULL);
 	if (IS_ERR(clk))
 		return PTR_ERR(clk);
 
@@ -253,7 +318,9 @@ static int sdhci_cdns_probe(struct platform_device *pdev)
 	if (ret)
 		goto free;
 
-	sdhci_cdns_phy_init(priv);
+	ret = sdhci_cdns_phy_parse_dt(dev->of_node, priv);
+	if (ret)
+		goto free;
 
 	ret = sdhci_add_host(host);
 	if (ret)
