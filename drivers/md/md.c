@@ -64,6 +64,8 @@
 #include <linux/raid/md_p.h>
 #include <linux/raid/md_u.h>
 #include <linux/slab.h>
+#include <linux/percpu.h>
+
 #include <trace/events/block.h>
 #include "md.h"
 #include "bitmap.h"
@@ -2250,26 +2252,80 @@ static void export_array(struct mddev *mddev)
 	mddev->major_version = 0;
 }
 
+/*
+ * The percpu writes_pending counters are linked with ->checkers and
+ * ->lock.  If ->writes_pending can always be decremented without a
+ * lock.  It can only be incremented without a lock if ->checkers is 0
+ * and the test+incr happen in a rcu_readlocked region.
+ * ->checkers can only be changed under ->lock protection.
+ * To determine if ->writes_pending is totally zero, a quick sum without
+ * locks can be performed. If this is non-zero, then the result is final.
+ * Otherwise ->checkers must be incremented and synchronize_rcu() called.
+ * Then a sum calculated under ->lock, and the result is final until the
+ * ->checkers is decremented, or the lock is dropped.
+ *
+ */
+
+static bool __writes_pending(struct mddev *mddev)
+{
+	long cnt = 0;
+	int i;
+
+	for_each_possible_cpu(i)
+		cnt += *per_cpu_ptr(mddev->writes_pending_percpu, i);
+	return cnt != 0;
+}
+
 static bool set_in_sync(struct mddev *mddev)
 {
 	bool ret = false;
 
 	WARN_ON_ONCE(!spin_is_locked(&mddev->lock));
-	if (atomic_read(&mddev->writes_pending) == 0) {
-		if (mddev->in_sync == 0) {
+	if (!__writes_pending(mddev) && !mddev->in_sync) {
+		mddev->checkers++;
+		spin_unlock(&mddev->lock);
+		synchronize_rcu();
+		spin_lock(&mddev->lock);
+		if (!mddev->in_sync &&
+		    !__writes_pending(mddev)) {
 			mddev->in_sync = 1;
+			/*
+			 * Ensure in_sync is visible before ->checkers
+			 * is decremented
+			 */
 			smp_mb();
-			if (atomic_read(&mddev->writes_pending))
-				/* lost a race with md_write_start() */
-				mddev->in_sync = 0;
 			set_bit(MD_SB_CHANGE_CLEAN, &mddev->sb_flags);
 			sysfs_notify_dirent_safe(mddev->sysfs_state);
 		}
+		mddev->checkers--;
 		ret = true;
 	}
 	if (mddev->safemode == 1)
 		mddev->safemode = 0;
 	return ret;
+}
+
+static void inc_writes_pending(struct mddev *mddev)
+{
+	rcu_read_lock();
+	if (mddev->checkers == 0) {
+		__this_cpu_inc(*mddev->writes_pending_percpu);
+		rcu_read_unlock();
+		return;
+	}
+	rcu_read_unlock();
+	/* Need that spinlock */
+	spin_lock(&mddev->lock);
+	this_cpu_inc(*mddev->writes_pending_percpu);
+	spin_unlock(&mddev->lock);
+}
+
+static void zero_writes_pending(struct mddev *mddev)
+{
+	int i;
+
+	for_each_possible_cpu(i)
+		*per_cpu_ptr(mddev->writes_pending_percpu, i) = 0;
 }
 
 static void sync_sbs(struct mddev *mddev, int nospares)
@@ -5000,6 +5056,8 @@ static void md_free(struct kobject *ko)
 		del_gendisk(mddev->gendisk);
 		put_disk(mddev->gendisk);
 	}
+	if (mddev->writes_pending_percpu)
+		free_percpu(mddev->writes_pending_percpu);
 
 	kfree(mddev);
 }
@@ -5075,6 +5133,13 @@ static int md_alloc(dev_t dev, char *name)
 
 	blk_queue_make_request(mddev->queue, md_make_request);
 	blk_set_stacking_limits(&mddev->queue->limits);
+
+	mddev->writes_pending_percpu = alloc_percpu(long);
+	if (!mddev->writes_pending_percpu) {
+		blk_cleanup_queue(mddev->queue);
+		mddev->queue = NULL;
+		goto abort;
+	}
 
 	disk = alloc_disk(1 << shift);
 	if (!disk) {
@@ -5159,7 +5224,7 @@ static void md_safemode_timeout(unsigned long data)
 {
 	struct mddev *mddev = (struct mddev *) data;
 
-	if (!atomic_read(&mddev->writes_pending)) {
+	if (!__writes_pending(mddev)) {
 		mddev->safemode = 1;
 		if (mddev->external)
 			sysfs_notify_dirent_safe(mddev->sysfs_state);
@@ -5365,7 +5430,7 @@ int md_run(struct mddev *mddev)
 	} else if (mddev->ro == 2) /* auto-readonly not meaningful */
 		mddev->ro = 0;
 
-	atomic_set(&mddev->writes_pending,0);
+	zero_writes_pending(mddev);
 	atomic_set(&mddev->max_corr_read_errors,
 		   MD_DEFAULT_MAX_CORRECTED_READ_ERRORS);
 	mddev->safemode = 0;
@@ -7774,11 +7839,13 @@ void md_write_start(struct mddev *mddev, struct bio *bi)
 		md_wakeup_thread(mddev->sync_thread);
 		did_change = 1;
 	}
-	atomic_inc(&mddev->writes_pending);
+	rcu_read_lock();
+	inc_writes_pending(mddev);
 	smp_mb(); /* Match smp_mb in set_in_sync() */
 	if (mddev->safemode == 1)
 		mddev->safemode = 0;
-	if (mddev->in_sync) {
+	if (mddev->in_sync || mddev->checkers) {
+		rcu_read_unlock();
 		spin_lock(&mddev->lock);
 		if (mddev->in_sync) {
 			mddev->in_sync = 0;
@@ -7788,7 +7855,9 @@ void md_write_start(struct mddev *mddev, struct bio *bi)
 			did_change = 1;
 		}
 		spin_unlock(&mddev->lock);
-	}
+	} else
+		rcu_read_unlock();
+
 	if (did_change)
 		sysfs_notify_dirent_safe(mddev->sysfs_state);
 	wait_event(mddev->sb_wait,
@@ -7798,12 +7867,18 @@ EXPORT_SYMBOL(md_write_start);
 
 void md_write_end(struct mddev *mddev)
 {
-	if (atomic_dec_and_test(&mddev->writes_pending)) {
-		if (mddev->safemode == 2)
+	this_cpu_dec(*mddev->writes_pending_percpu);
+	if (mddev->safemode == 2) {
+		if (!__writes_pending(mddev))
 			md_wakeup_thread(mddev->thread);
-		else if (mddev->safemode_delay)
-			mod_timer(&mddev->safemode_timer, jiffies + mddev->safemode_delay);
-	}
+	} else if (mddev->safemode_delay)
+		/* The roundup() ensure this only performs locking once
+		 * every ->safemode_delay jiffies
+		 */
+		mod_timer(&mddev->safemode_timer,
+			  roundup(jiffies, mddev->safemode_delay) +
+			  mddev->safemode_delay);
+
 }
 EXPORT_SYMBOL(md_write_end);
 
@@ -8406,7 +8481,7 @@ void md_check_recovery(struct mddev *mddev)
 		test_bit(MD_RECOVERY_DONE, &mddev->recovery) ||
 		test_bit(MD_RELOAD_SB, &mddev->flags) ||
 		(mddev->external == 0 && mddev->safemode == 1) ||
-		(mddev->safemode == 2 && ! atomic_read(&mddev->writes_pending)
+		(mddev->safemode == 2 && !__writes_pending(mddev)
 		 && !mddev->in_sync && mddev->recovery_cp == MaxSector)
 		))
 		return;
