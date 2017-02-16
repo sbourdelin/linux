@@ -1,18 +1,18 @@
-/*++
-Copyright-c Realtek Semiconductor Corp. All rights reserved.
-
-Module Name:
-	r8192U_dm.c
-
-Abstract:
-	HW dynamic mechanism.
-
-Major Change History:
-	When		Who				What
-	----------	--------------- -------------------------------
-	2008-05-14	amy                     create version 0 porting from windows code.
-
---*/
+/*
+ * Copyright-c Realtek Semiconductor Corp. All rights reserved.
+ *
+ * Module Name:
+ *  r8192U_dm.c
+ *
+ * Abstract:
+ *	HW dynamic mechanism.
+ *
+ * Major Change History:
+ *	When		Who				What
+ *	----------	--------------- -------------------------------
+ *	2008-05-14	amy                     create version 0 porting from windows code.
+ *
+ */
 #include "r8192U.h"
 #include "r8192U_dm.h"
 #include "r8192U_hw.h"
@@ -158,20 +158,20 @@ void dm_CheckRxAggregation(struct net_device *dev)
 	unsigned long		curRxOkCnt = 0;
 
 /*
-	if (pHalData->bForcedUsbRxAggr) {
-		if (pHalData->ForcedUsbRxAggrInfo == 0) {
-			if (pHalData->bCurrentRxAggrEnable) {
-				Adapter->HalFunc.HalUsbRxAggrHandler(Adapter, FALSE);
-			}
-		} else {
-			if (!pHalData->bCurrentRxAggrEnable || (pHalData->ForcedUsbRxAggrInfo != pHalData->LastUsbRxAggrInfoSetting)) {
-				Adapter->HalFunc.HalUsbRxAggrHandler(Adapter, TRUE);
-			}
-		}
-		return;
-	}
-
-*/
+ *	if (pHalData->bForcedUsbRxAggr) {
+ *		if (pHalData->ForcedUsbRxAggrInfo == 0) {
+ *			if (pHalData->bCurrentRxAggrEnable) {
+ *				Adapter->HalFunc.HalUsbRxAggrHandler(Adapter, FALSE);
+ *			}
+ *		} else {
+ *			if (!pHalData->bCurrentRxAggrEnable || (pHalData->ForcedUsbRxAggrInfo != pHalData->LastUsbRxAggrInfoSetting)) {
+ *				Adapter->HalFunc.HalUsbRxAggrHandler(Adapter, TRUE);
+ *			}
+ *		}
+ *		return;
+ *	}
+ *
+ */
 	curTxOkCnt = priv->stats.txbytesunicast - lastTxOkCnt;
 	curRxOkCnt = priv->stats.rxbytesunicast - lastRxOkCnt;
 
@@ -293,7 +293,8 @@ void init_rate_adaptive(struct net_device *dev)
  *	When		Who		Remark
  *	05/26/08	amy	Create version 0 porting from windows code.
  *
- *---------------------------------------------------------------------------*/
+ *---------------------------------------------------------------------------
+ */
 static void dm_check_rate_adaptive(struct net_device *dev)
 {
 	struct r8192_priv *priv = ieee80211_priv(dev);
@@ -347,9 +348,10 @@ static void dm_check_rate_adaptive(struct net_device *dev)
 				((bshort_gi_enabled) ? BIT(31) : 0);
 
 		/* 2007/10/08 MH We support RA smooth scheme now. When it is the first
-		   time to link with AP. We will not change upper/lower threshold. If
-		   STA stay in high or low level, we must change two different threshold
-		   to prevent jumping frequently. */
+		 * time to link with AP. We will not change upper/lower threshold. If
+		 * STA stay in high or low level, we must change two different threshold
+		 * to prevent jumping frequently.
+		 */
 		if (pra->ratr_state == DM_RATR_STA_HIGH) {
 			HighRSSIThreshForRA	= pra->high2low_rssi_thresh_for_ra;
 			LowRSSIThreshForRA	= (priv->CurrentChannelBW != HT_CHANNEL_WIDTH_20) ?
@@ -391,7 +393,8 @@ static void dm_check_rate_adaptive(struct net_device *dev)
 					ping_rssi_state = 1;
 				}
 				/*else
-					DbgPrint("TestRSSI is between the range.\n");*/
+				 *	DbgPrint("TestRSSI is between the range.\n");
+				 */
 			} else {
 				/*DbgPrint("TestRSSI Recover to 0x%x\n", targetRATR);*/
 				ping_rssi_state = 0;
@@ -732,8 +735,9 @@ static void dm_TXPowerTrackingCallback_ThermalMeter(struct net_device *dev)
 		tmpCCK40Mindex = 0;
 	}
 	/*DbgPrint("%ddb, tmpOFDMindex = %d, tmpCCK20Mindex = %d, tmpCCK40Mindex = %d",
-		((u1Byte)tmpRegA - pHalData->ThermalMeter[0]),
-		tmpOFDMindex, tmpCCK20Mindex, tmpCCK40Mindex);*/
+	 *	((u1Byte)tmpRegA - pHalData->ThermalMeter[0]),
+	 *	tmpOFDMindex, tmpCCK20Mindex, tmpCCK40Mindex);
+	 */
 	if (priv->CurrentChannelBW != HT_CHANNEL_WIDTH_20)	/* 40M */
 		tmpCCKindex = tmpCCK40Mindex;
 	else
@@ -1623,7 +1627,8 @@ static void dm_bb_initialgain_backup(struct net_device *dev)
  *	When		Who		Remark
  *	05/29/2008	amy		Create Version 0 porting from windows code.
  *
- *---------------------------------------------------------------------------*/
+ *---------------------------------------------------------------------------
+ */
 
 void dm_change_dynamic_initgain_thresh(struct net_device *dev, u32 dm_type,
 				       u32 dm_value)
@@ -1714,7 +1719,8 @@ void dm_change_dynamic_initgain_thresh(struct net_device *dev, u32 dm_type,
  *	When		Who		Remark
  *	05/15/2008	amy		Create Version 0 porting from windows code.
  *
- *---------------------------------------------------------------------------*/
+ *---------------------------------------------------------------------------
+ */
 static void dm_dig_init(struct net_device *dev)
 {
 	struct r8192_priv *priv = ieee80211_priv(dev);
@@ -1761,7 +1767,8 @@ static void dm_dig_init(struct net_device *dev)
  * Revised History:
  *	When		Who		Remark
  *	05/27/2008	amy		Create Version 0 porting from windows code.
- *---------------------------------------------------------------------------*/
+ *---------------------------------------------------------------------------
+ */
 static void dm_ctrl_initgain_byrssi(struct net_device *dev)
 {
 	if (!dm_digtable.dig_enable_flag)
@@ -1804,7 +1811,8 @@ static void dm_ctrl_initgain_byrssi_by_driverrssi(
 		dm_digtable.cur_connect_state = DIG_DISCONNECT;
 
 	/*DbgPrint("DM_DigTable.PreConnectState = %d, DM_DigTable.CurConnectState = %d\n",
-		DM_DigTable.PreConnectState, DM_DigTable.CurConnectState);*/
+	 *	DM_DigTable.PreConnectState, DM_DigTable.CurConnectState);
+	 */
 
 	if (dm_digtable.dbg_mode == DM_DBG_OFF)
 		dm_digtable.rssi_val = priv->undecorated_smoothed_pwdb;
@@ -1846,14 +1854,17 @@ static void dm_ctrl_initgain_byrssi_by_fwfalse_alarm(
 
 	/*DbgPrint("Dig by Fw False Alarm\n");*/
 	/*if (DM_DigTable.Dig_State == DM_STA_DIG_OFF)*/
-	/*DbgPrint("DIG Check\n\r RSSI=%d LOW=%d HIGH=%d STATE=%d",
-	pHalData->UndecoratedSmoothedPWDB, DM_DigTable.RssiLowThresh,
-	DM_DigTable.RssiHighThresh, DM_DigTable.Dig_State);*/
+	/* DbgPrint("DIG Check\n\r RSSI=%d LOW=%d HIGH=%d STATE=%d",
+	 * pHalData->UndecoratedSmoothedPWDB, DM_DigTable.RssiLowThresh,
+	 * DM_DigTable.RssiHighThresh, DM_DigTable.Dig_State);
+	 */
 	/* 1. When RSSI decrease, We have to judge if it is smaller than a threshold
-		  and then execute the step below. */
+	 *	  and then execute the step below.
+	 */
 	if (priv->undecorated_smoothed_pwdb <= dm_digtable.rssi_low_thresh) {
 		/* 2008/02/05 MH When we execute silent reset, the DIG PHY parameters
-		   will be reset to init value. We must prevent the condition. */
+		 * will be reset to init value. We must prevent the condition.
+		 */
 		if (dm_digtable.dig_state == DM_STA_DIG_OFF &&
 		    (priv->reset_count == reset_cnt)) {
 			return;
@@ -1881,11 +1892,11 @@ static void dm_ctrl_initgain_byrssi_by_fwfalse_alarm(
 			 */
 			write_nic_byte(dev, (rOFDM0_XATxAFE+3), 0x00);
 			/*else if (priv->card_8192 == HARDWARE_TYPE_RTL8190P)
-				write_nic_byte(pAdapter, rOFDM0_RxDetector1, 0x40);
-			else if (pAdapter->HardwareType == HARDWARE_TYPE_RTL8192E)
-			else
-				PlatformEFIOWrite1Byte(pAdapter, rOFDM0_RxDetector1, 0x40);
-			*/
+			 *	write_nic_byte(pAdapter, rOFDM0_RxDetector1, 0x40);
+			 *else if (pAdapter->HardwareType == HARDWARE_TYPE_RTL8192E)
+			 *else
+			 *PlatformEFIOWrite1Byte(pAdapter, rOFDM0_RxDetector1, 0x40);
+			 */
 		} else
 			write_nic_byte(dev, rOFDM0_RxDetector1, 0x42);
 
@@ -1899,7 +1910,8 @@ static void dm_ctrl_initgain_byrssi_by_fwfalse_alarm(
 	}
 
 	/* 2. When RSSI increase, We have to judge if it is larger than a threshold
-		  and then execute the step below.  */
+	 *	  and then execute the step below.
+	 */
 	if (priv->undecorated_smoothed_pwdb >= dm_digtable.rssi_high_thresh) {
 		u8 reset_flag = 0;
 
@@ -1940,12 +1952,12 @@ static void dm_ctrl_initgain_byrssi_by_fwfalse_alarm(
 			 */
 			write_nic_byte(dev, (rOFDM0_XATxAFE+3), 0x20);
 			/*
-			else if (priv->card_8192 == HARDWARE_TYPE_RTL8190P)
-				write_nic_byte(dev, rOFDM0_RxDetector1, 0x42);
-			else if (pAdapter->HardwareType == HARDWARE_TYPE_RTL8192E)
-			else
-				PlatformEFIOWrite1Byte(pAdapter, rOFDM0_RxDetector1, 0x42);
-			*/
+			 *else if (priv->card_8192 == HARDWARE_TYPE_RTL8190P)
+			 *	write_nic_byte(dev, rOFDM0_RxDetector1, 0x42);
+			 *else if (pAdapter->HardwareType == HARDWARE_TYPE_RTL8192E)
+			 *else
+			 *PlatformEFIOWrite1Byte(pAdapter, rOFDM0_RxDetector1, 0x42);
+			 */
 		} else
 			write_nic_byte(dev, rOFDM0_RxDetector1, 0x44);
 
@@ -1982,7 +1994,8 @@ static void dm_ctrl_initgain_byrssi_by_fwfalse_alarm(
  *	When		Who		Remark
  *	05/28/2008	amy		Create Version 0 porting from windows code.
  *
- *---------------------------------------------------------------------------*/
+ *---------------------------------------------------------------------------
+ */
 static void dm_ctrl_initgain_byrssi_highpwr(
 	struct net_device *dev)
 {
@@ -2011,8 +2024,8 @@ static void dm_ctrl_initgain_byrssi_highpwr(
 			write_nic_byte(dev, (rOFDM0_XATxAFE+3), 0x10);
 
 			/*else if (priv->card_8192 == HARDWARE_TYPE_RTL8190P)
-				write_nic_byte(dev, rOFDM0_RxDetector1, 0x41);
-			*/
+			 *	write_nic_byte(dev, rOFDM0_RxDetector1, 0x41);
+			 */
 
 		} else
 			write_nic_byte(dev, rOFDM0_RxDetector1, 0x43);
@@ -2028,8 +2041,8 @@ static void dm_ctrl_initgain_byrssi_highpwr(
 			if (priv->CurrentChannelBW != HT_CHANNEL_WIDTH_20) {
 				write_nic_byte(dev, (rOFDM0_XATxAFE+3), 0x20);
 				/*else if (priv->card_8192 == HARDWARE_TYPE_RTL8190P)
-					write_nic_byte(dev, rOFDM0_RxDetector1, 0x42);
-				*/
+				 *	write_nic_byte(dev, rOFDM0_RxDetector1, 0x42);
+				 */
 
 			} else
 				write_nic_byte(dev, rOFDM0_RxDetector1, 0x44);
@@ -2150,8 +2163,8 @@ static void dm_pd_th(
 					 */
 					write_nic_byte(dev, (rOFDM0_XATxAFE+3), 0x00);
 					/*else if (priv->card_8192 == HARDWARE_TYPE_RTL8190P)
-						write_nic_byte(dev, rOFDM0_RxDetector1, 0x40);
-					*/
+					 *	write_nic_byte(dev, rOFDM0_RxDetector1, 0x40);
+					 */
 				} else
 					write_nic_byte(dev, rOFDM0_RxDetector1, 0x42);
 			} else if (dm_digtable.curpd_thstate == DIG_PD_AT_NORMAL_POWER) {
@@ -2163,8 +2176,8 @@ static void dm_pd_th(
 					 */
 					write_nic_byte(dev, (rOFDM0_XATxAFE+3), 0x20);
 					/*else if (priv->card_8192 == HARDWARE_TYPE_RTL8190P)
-						write_nic_byte(dev, rOFDM0_RxDetector1, 0x42);
-					*/
+					 *	write_nic_byte(dev, rOFDM0_RxDetector1, 0x42);
+					 */
 				} else
 					write_nic_byte(dev, rOFDM0_RxDetector1, 0x44);
 			} else if (dm_digtable.curpd_thstate == DIG_PD_AT_HIGH_POWER) {
@@ -2172,8 +2185,8 @@ static void dm_pd_th(
 				if (priv->CurrentChannelBW != HT_CHANNEL_WIDTH_20) {
 					write_nic_byte(dev, (rOFDM0_XATxAFE+3), 0x10);
 					/*else if (priv->card_8192 == HARDWARE_TYPE_RTL8190P)
-						write_nic_byte(dev, rOFDM0_RxDetector1, 0x41);
-					*/
+					 *	write_nic_byte(dev, rOFDM0_RxDetector1, 0x41);
+					 */
 				} else
 					write_nic_byte(dev, rOFDM0_RxDetector1, 0x43);
 			}
@@ -2366,10 +2379,10 @@ static void dm_ctstoself(struct net_device *dev)
 		return;
 	}
 	/*
-	1. Uplink
-	2. Linksys350/Linksys300N
-	3. <50 disable, >55 enable
-	*/
+	 * 1. Uplink
+	 * 2. Linksys350/Linksys300N
+	 * 3. <50 disable, >55 enable
+	 */
 
 	if (pHTInfo->IOTPeer == HT_IOT_PEER_BROADCOM) {
 		curTxOkCnt = priv->stats.txbytesunicast - lastTxOkCnt;
@@ -2401,7 +2414,8 @@ static void dm_ctstoself(struct net_device *dev)
  *	When		Who		Remark
  *	05/28/2008	amy	Create Version 0 porting from windows code.
  *
- *---------------------------------------------------------------------------*/
+ *---------------------------------------------------------------------------
+ */
 static	void	dm_check_pbc_gpio(struct net_device *dev)
 {
 	struct r8192_priv *priv = ieee80211_priv(dev);
@@ -2437,7 +2451,8 @@ static	void	dm_check_pbc_gpio(struct net_device *dev)
  *	When		Who		Remark
  *	01/30/2008	MHC		Create Version 0.
  *
- *---------------------------------------------------------------------------*/
+ *---------------------------------------------------------------------------
+ */
 void dm_rf_pathcheck_workitemcallback(struct work_struct *work)
 {
 	struct delayed_work *dwork = to_delayed_work(work);
@@ -2447,7 +2462,8 @@ void dm_rf_pathcheck_workitemcallback(struct work_struct *work)
 	u8 rfpath = 0, i;
 
 	/* 2008/01/30 MH After discussing with SD3 Jerry, 0xc04/0xd04 register will
-	   always be the same. We only read 0xc04 now. */
+	 *  always be the same. We only read 0xc04 now.
+	 */
 	read_nic_byte(dev, 0xc04, &rfpath);
 
 	/* Check Bit 0-3, it means if RF A-D is enabled. */
@@ -2694,7 +2710,8 @@ static void dm_rxpath_sel_byrssi(struct net_device *dev)
  *	When		Who		Remark
  *	05/28/2008	amy		Create Version 0 porting from windows code.
  *
- *---------------------------------------------------------------------------*/
+ *---------------------------------------------------------------------------
+ */
 static void dm_check_rx_path_selection(struct net_device *dev)
 {
 	struct r8192_priv *priv = ieee80211_priv(dev);
@@ -3017,7 +3034,8 @@ void dm_check_fsync(struct net_device *dev)
  *	When		Who		Remark
  *	05/29/2008	amy		Create Version 0 porting from windows code.
  *
- *---------------------------------------------------------------------------*/
+ *---------------------------------------------------------------------------
+ */
 void dm_shadow_init(struct net_device *dev)
 {
 	u8	page;
@@ -3056,7 +3074,8 @@ void dm_shadow_init(struct net_device *dev)
  *	When		Who		Remark
  *	03/06/2008	Jacken	Create Version 0.
  *
- *---------------------------------------------------------------------------*/
+ *---------------------------------------------------------------------------
+ */
 static void dm_init_dynamic_txpower(struct net_device *dev)
 {
 	struct r8192_priv *priv = ieee80211_priv(dev);
