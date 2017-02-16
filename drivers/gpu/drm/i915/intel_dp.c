@@ -4531,11 +4531,18 @@ intel_dp_long_pulse(struct intel_connector *intel_connector)
 		 */
 		status = connector_status_disconnected;
 		goto out;
-	} else if (connector->status == connector_status_connected) {
+	} else {
 		/*
-		 * If display was connected already and is still connected
-		 * check links status, there has been known issues of
-		 * link loss triggerring long pulse!!!!
+		 * If display is now connected check links status,
+		 * there has been known issues of link loss triggerring
+		 * long pulse.
+		 *
+		 * Some sinks (eg. ASUS PB287Q) seem to perform some
+		 * weird HPD ping pong during modesets. So we can apparely
+		 * end up with HPD going low during a modeset, and then
+		 * going back up soon after. And once that happens we must
+		 * retrain the link to get a picture. That's in case no
+		 * userspace component reacted to intermittent HPD dip.
 		 */
 		drm_modeset_lock(&dev->mode_config.connection_mutex, NULL);
 		intel_dp_check_link_status(intel_dp);
