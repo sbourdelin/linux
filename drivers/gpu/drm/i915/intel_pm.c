@@ -4891,25 +4891,31 @@ static void gen6_set_rps_thresholds(struct drm_i915_private *dev_priv, u8 val)
 		break;
 	}
 
-	I915_WRITE(GEN6_RP_UP_EI,
-		   GT_INTERVAL_FROM_US(dev_priv, ei_up));
-	I915_WRITE(GEN6_RP_UP_THRESHOLD,
-		   GT_INTERVAL_FROM_US(dev_priv,
-				       ei_up * threshold_up / 100));
+	spin_unlock_irq(&dev_priv->uncore.lock);
+	intel_uncore_forcewake_get__locked(dev_priv, FORCEWAKE_ALL);
 
-	I915_WRITE(GEN6_RP_DOWN_EI,
-		   GT_INTERVAL_FROM_US(dev_priv, ei_down));
-	I915_WRITE(GEN6_RP_DOWN_THRESHOLD,
-		   GT_INTERVAL_FROM_US(dev_priv,
-				       ei_down * threshold_down / 100));
+	I915_WRITE_FW(GEN6_RP_UP_EI,
+		      GT_INTERVAL_FROM_US(dev_priv, ei_up));
+	I915_WRITE_FW(GEN6_RP_UP_THRESHOLD,
+		      GT_INTERVAL_FROM_US(dev_priv,
+					  ei_up * threshold_up / 100));
 
-	I915_WRITE(GEN6_RP_CONTROL,
-		   GEN6_RP_MEDIA_TURBO |
-		   GEN6_RP_MEDIA_HW_NORMAL_MODE |
-		   GEN6_RP_MEDIA_IS_GFX |
-		   GEN6_RP_ENABLE |
-		   GEN6_RP_UP_BUSY_AVG |
-		   GEN6_RP_DOWN_IDLE_AVG);
+	I915_WRITE_FW(GEN6_RP_DOWN_EI,
+		      GT_INTERVAL_FROM_US(dev_priv, ei_down));
+	I915_WRITE_FW(GEN6_RP_DOWN_THRESHOLD,
+		      GT_INTERVAL_FROM_US(dev_priv,
+					  ei_down * threshold_down / 100));
+
+	I915_WRITE_FW(GEN6_RP_CONTROL,
+		      GEN6_RP_MEDIA_TURBO |
+		      GEN6_RP_MEDIA_HW_NORMAL_MODE |
+		      GEN6_RP_MEDIA_IS_GFX |
+		      GEN6_RP_ENABLE |
+		      GEN6_RP_UP_BUSY_AVG |
+		      GEN6_RP_DOWN_IDLE_AVG);
+
+	intel_uncore_forcewake_put__locked(dev_priv, FORCEWAKE_ALL);
+	spin_unlock_irq(&dev_priv->uncore.lock);
 
 	dev_priv->rps.power = new_power;
 	dev_priv->rps.up_threshold = threshold_up;
