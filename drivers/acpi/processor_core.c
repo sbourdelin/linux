@@ -344,8 +344,10 @@ void __init acpi_set_processor_mapping(void)
 {
 	/* Set persistent cpu <-> node mapping for all processors. */
 	acpi_walk_namespace(ACPI_TYPE_PROCESSOR, ACPI_ROOT_OBJECT,
-			    ACPI_UINT32_MAX, set_processor_node_mapping,
-			    NULL, NULL, NULL);
+				ACPI_UINT32_MAX, set_processor_node_mapping,
+				NULL, NULL, NULL);
+	acpi_get_devices(ACPI_PROCESSOR_DEVICE_HID, set_processor_node_mapping,
+				NULL, NULL);
 }
 #else
 void __init acpi_set_processor_mapping(void) {}
