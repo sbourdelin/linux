@@ -60,6 +60,17 @@ Optional properties:
 		 and MAC2MAC connection.
 - snps,tso: this enables the TSO feature otherwise it will be managed by
 		 MAC HW capability register. Only for GMAC4 and newer.
+- Tx MTL algorithm configuration: below the list of the available Tx algorithms:
+	- snps,tx-sched-wrr: WRR algorithm
+	- snps,tx-sched-wfq: WFQ algorithm (when DCB feature is selected)
+	- snps,tx-sched-dwrr: DWRR algorithm (when DCB feature is selected)
+	- snps,tx-sched-prio: Strict priority algorithm
+- Rx MTL algorithm configuration: below the list of the available Rx algorithms:
+	- snps,rx-sched-sp: Strict priority algorithm
+	- snps,rx-sched-wsp: Weighted strict priority algorithm
+- snps,tx-queue-weight: this is a vector to configure the TX queue weights
+- snps,rx-queue-prio: this is a vector to configure the RX queue priorities
+- snps,tx-queue-prio: this is a vector to configure the TX queue priorities
 - AXI BUS Mode parameters: below the list of all the parameters to program the
 			   AXI register inside the DMA module:
 	- snps,lpi_en: enable Low Power Interface

@@ -22,7 +22,12 @@
 #define GMAC_HASH_TAB_32_63		0x00000014
 #define GMAC_RX_FLOW_CTRL		0x00000090
 #define GMAC_QX_TX_FLOW_CTRL(x)		(0x70 + x * 4)
+#define GMAC_TXQ_PRTY_MAP0		0x98
+#define GMAC_TXQ_PRTY_MAP1		0x9C
 #define GMAC_RXQ_CTRL0			0x000000a0
+#define GMAC_RXQ_CTRL1			0x000000a4
+#define GMAC_RXQ_CTRL2			0x000000a8
+#define GMAC_RXQ_CTRL3			0x000000ac
 #define GMAC_INT_STATUS			0x000000b0
 #define GMAC_INT_EN			0x000000b4
 #define GMAC_PCS_BASE			0x000000e0
@@ -52,6 +57,14 @@
 
 /* MAC Flow Control RX */
 #define GMAC_RX_FLOW_CTRL_RFE		BIT(0)
+
+/* RX Queues Priorities */
+#define GMAC_RXQCTRL_PSRQX_MASK(x)	GENMASK(7 + ((x) * 8), 0 + ((x) * 8))
+#define GMAC_RXQCTRL_PSRQX_SHIFT(x)	((x) * 8)
+
+/* TX Queues Priorities */
+#define GMAC_TXQCTRL_PSTQX_MASK(x)	GENMASK(7 + ((x) * 8), 0 + ((x) * 8))
+#define GMAC_TXQCTRL_PSTQX_SHIFT(x)	((x) * 8)
 
 /* MAC Flow Control TX */
 #define GMAC_TX_FLOW_CTRL_TFE		BIT(1)
@@ -161,8 +174,25 @@ enum power_event {
 #define GMAC_HI_REG_AE			BIT(31)
 
 /*  MTL registers */
+#define MTL_OPERATION_MODE		0x00000c00
+#define MTL_OPERATION_SCHALG_MASK	GENMASK(6, 5)
+#define MTL_OPERATION_SCHALG_WRR	(0x0 << 5)
+#define MTL_OPERATION_SCHALG_WFQ	(0x1 << 5)
+#define MTL_OPERATION_SCHALG_DWRR	(0x2 << 5)
+#define MTL_OPERATION_SCHALG_PRIO	(0x3 << 5)
+#define MTL_OPERATION_RAA		BIT(2)
+#define MTL_OPERATION_RAA_SP		(0x0 << 2)
+#define MTL_OPERATION_RAA_WSP		(0x1 << 2)
+
 #define MTL_INT_STATUS			0x00000c20
-#define MTL_INT_Q0			BIT(0)
+#define MTL_INT_QX(q)			BIT(q)
+
+#define MTL_RXQ_DMA_MAP0		0x00000c30 /* queue 0 to 3 */
+#define MTL_RXQ_DMA_MAP1		0x00000c34 /* queue 4 to 7 */
+#define MTL_RXQ_DMA_Q04MDMACH_MASK	GENMASK(3, 0)
+#define MTL_RXQ_DMA_Q04MDMACH(x)	((x) << 0)
+#define MTL_RXQ_DMA_QXMDMACH_MASK(x)	GENMASK(11 + (8 * ((x) - 1)), 8 * (x))
+#define MTL_RXQ_DMA_QXMDMACH(chan, q)	((chan) << (8 * (q)))
 
 #define MTL_CHAN_BASE_ADDR		0x00000d00
 #define MTL_CHAN_BASE_OFFSET		0x40
@@ -200,6 +230,13 @@ enum power_event {
 #define MTL_OP_MODE_RTC_64		0
 #define MTL_OP_MODE_RTC_96		(2 << MTL_OP_MODE_RTC_SHIFT)
 #define MTL_OP_MODE_RTC_128		(3 << MTL_OP_MODE_RTC_SHIFT)
+
+/* MTL Queue Quantum Weight */
+#define MTL_TXQ_WEIGHT_BASE_ADDR	0x00000d18
+#define MTL_TXQ_WEIGHT_BASE_OFFSET	0x40
+#define MTL_TXQX_WEIGHT_BASE_ADDR(x)	(MTL_TXQ_WEIGHT_BASE_ADDR + \
+					((x) * MTL_TXQ_WEIGHT_BASE_OFFSET))
+#define MTL_TXQ_WEIGHT_ISCQW_MASK	GENMASK(20, 0)
 
 /*  MTL debug */
 #define MTL_DEBUG_TXSTSFSTS		BIT(5)

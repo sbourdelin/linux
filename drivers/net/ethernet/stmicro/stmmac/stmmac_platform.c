@@ -338,6 +338,39 @@ stmmac_probe_config_dt(struct platform_device *pdev, const char **mac)
 
 	of_property_read_u32(np, "snps,ps-speed", &plat->mac_port_sel_speed);
 
+	/* Rx MTL algorithms */
+	if (of_property_read_bool(np, "snps,rx-sched-sp"))
+		plat->mtl_rx_algorithm = MTL_RX_ALGORITHM_SP;
+	else if (of_property_read_bool(np, "snps,rx-sched-wsp"))
+		plat->mtl_rx_algorithm = MTL_RX_ALGORITHM_WSP;
+	else
+		plat->mtl_rx_algorithm = MTL_RX_ALGORITHM_SP;
+
+	/* Tx MTL algorithms */
+	if (of_property_read_bool(np, "snps,tx-sched-wrr"))
+		plat->mtl_tx_algorithm = MTL_TX_ALGORITHM_WRR;
+	else if (of_property_read_bool(np, "snps,tx-sched-wfq"))
+		plat->mtl_tx_algorithm = MTL_TX_ALGORITHM_WFQ;
+	else if (of_property_read_bool(np, "snps,tx-sched-dwrr"))
+		plat->mtl_tx_algorithm = MTL_TX_ALGORITHM_DWRR;
+	else if (of_property_read_bool(np, "snps,tx-sched-prio"))
+		plat->mtl_tx_algorithm = MTL_TX_ALGORITHM_PRIO;
+	else
+		plat->mtl_tx_algorithm = MTL_TX_ALGORITHM_WRR;
+
+	/* TX queues weight */
+	of_property_read_u32_array(np, "snps,tx-queue-weight",
+				   plat->tx_queues_weight,
+				   EQOS_MAX_NUMBER_TX_QUEUES);
+
+	/* RX and TX priority */
+	of_property_read_u32_array(np, "snps,rx-queue-prio",
+				   plat->rx_queues_prio,
+				   EQOS_MAX_NUMBER_RX_QUEUES);
+	of_property_read_u32_array(np, "snps,tx-queue-prio",
+				   plat->tx_queues_prio,
+				   EQOS_MAX_NUMBER_TX_QUEUES);
+
 	plat->axi = stmmac_axi_setup(pdev);
 
 	/* clock setup */

@@ -673,6 +673,19 @@ static void stmmac_release_ptp(struct stmmac_priv *priv)
 }
 
 /**
+ *  stmmac_mac_flow_ctrl - Configure flow control in all queues
+ *  @priv: driver private structure
+ *  Description: It is used for configuring the flow control in all queues
+ */
+static void stmmac_mac_flow_ctrl(struct stmmac_priv *priv, u32 duplex)
+{
+	u32 tx_queues_count = priv->dma_cap.number_tx_queues;
+
+	priv->hw->mac->flow_ctrl(priv->hw, duplex, priv->flow_ctrl,
+				 priv->pause, tx_queues_count);
+}
+
+/**
  * stmmac_adjust_link - adjusts the link parameters
  * @dev: net device structure
  * Description: this is the helper called by the physical abstraction layer
@@ -687,7 +700,6 @@ static void stmmac_adjust_link(struct net_device *dev)
 	struct phy_device *phydev = dev->phydev;
 	unsigned long flags;
 	int new_state = 0;
-	unsigned int fc = priv->flow_ctrl, pause_time = priv->pause;
 
 	if (!phydev)
 		return;
@@ -709,8 +721,7 @@ static void stmmac_adjust_link(struct net_device *dev)
 		}
 		/* Flow Control operation */
 		if (phydev->pause)
-			priv->hw->mac->flow_ctrl(priv->hw, phydev->duplex,
-						 fc, pause_time);
+			stmmac_mac_flow_ctrl(priv, phydev->duplex);
 
 		if (phydev->speed != priv->speed) {
 			new_state = 1;
@@ -1250,6 +1261,83 @@ static void free_dma_desc_resources(struct stmmac_priv *priv)
 }
 
 /**
+ *  stmmac_rx_queue_dma_chan_map - Map RX queue to RX dma channel
+ *  @priv: driver private structure
+ *  Description: It is used for mapping RX queues to RX dma channels
+ */
+static void stmmac_rx_queue_dma_chan_map(struct stmmac_priv *priv)
+{
+	u32 rx_queues_count = priv->dma_cap.number_rx_queues;
+	u32 queue = 0;
+
+	/* If does not have multiple queues, then this is not necessary */
+	if (rx_queues_count == 1)
+		return;
+
+	for (queue = 0; queue < rx_queues_count; queue++)
+		priv->hw->mac->map_mtl_to_dma(priv->hw, queue, queue);
+}
+
+/**
+ *  stmmac_set_tx_queue_weight - Set TX queue weight
+ *  @priv: driver private structure
+ *  Description: It is used for setting TX queues weight
+ */
+static void stmmac_set_tx_queue_weight(struct stmmac_priv *priv)
+{
+	u32 tx_queues_count = priv->dma_cap.number_tx_queues;
+	u32 weight = 0;
+	u32 queue = 0;
+
+	for (queue = 0; queue < tx_queues_count; queue++) {
+		weight = priv->plat->tx_queues_weight[queue];
+		priv->hw->mac->set_mtl_tx_queue_weight(priv->hw, weight, queue);
+	}
+}
+
+/**
+ *  stmmac_mac_config_rx_queues_prio - Configure RX Queue priority
+ *  @priv: driver private structure
+ *  Description: It is used for configuring the RX Queue Priority
+ */
+static void stmmac_mac_config_rx_queues_prio(struct stmmac_priv *priv)
+{
+	u32 rx_count = priv->dma_cap.number_rx_queues;
+	u32 queue = 0;
+	u32 prio = 0;
+
+	/* If does not have multiple queues, then this is not necessary*/
+	if (rx_count == 1)
+		return;
+
+	for (queue = 0; queue < rx_count; queue++) {
+		prio = priv->plat->rx_queues_prio[queue];
+		priv->hw->mac->rx_queue_prio(priv->hw, prio, queue);
+	}
+}
+
+/**
+ *  stmmac_mac_config_tx_queues_prio - Configure TX Queue priority
+ *  @priv: driver private structure
+ *  Description: It is used for configuring the TX Queue Priority
+ */
+static void stmmac_mac_config_tx_queues_prio(struct stmmac_priv *priv)
+{
+	u32 tx_count = priv->dma_cap.number_tx_queues;
+	u32 queue = 0;
+	u32 prio = 0;
+
+	/* If does not have multiple queues, then this is not necessary*/
+	if (tx_count == 1)
+		return;
+
+	for (queue = 0; queue < tx_count; queue++) {
+		prio = priv->plat->tx_queues_prio[queue];
+		priv->hw->mac->tx_queue_prio(priv->hw, prio, queue);
+	}
+}
+
+/**
  *  stmmac_mac_enable_rx_queues - Enable MAC rx queues
  *  @priv: driver private structure
  *  Description: It is used for enabling the rx queues in the MAC
@@ -1259,16 +1347,16 @@ static void stmmac_mac_enable_rx_queues(struct stmmac_priv *priv)
 	int rx_count = priv->dma_cap.number_rx_queues;
 	int queue = 0;
 
-	/* If GMAC does not have multiple queues, then this is not necessary*/
+	/* If does not have multiple queues, then this is not necessary*/
 	if (rx_count == 1)
 		return;
 
 	/**
-	 *  If the core is synthesized with multiple rx queues / multiple
-	 *  dma channels, then rx queues will be disabled by default.
-	 *  For now only rx queue 0 is enabled.
+	 *  If the core is synthesized with multiple rx/tx queues
+	 *  then rx queues will be disabled by default.
 	 */
-	priv->hw->mac->rx_queue_enable(priv->hw, queue);
+	for (queue = 0; queue < rx_count; queue++)
+		priv->hw->mac->rx_queue_enable(priv->hw, queue);
 }
 
 /**
@@ -1432,6 +1520,42 @@ static void stmmac_tx_err(struct stmmac_priv *priv)
 
 	priv->dev->stats.tx_errors++;
 	netif_wake_queue(priv->dev);
+}
+
+/**
+ *  stmmac_mtl_configuration - Configure MTL
+ *  @priv: driver private structure
+ *  Description: It is used for configurring MTL
+ */
+static void stmmac_mtl_configuration(struct stmmac_priv *priv)
+{
+	u32 rx_queues_count = priv->dma_cap.number_rx_queues;
+	u32 tx_queues_count = priv->dma_cap.number_tx_queues;
+
+	if (tx_queues_count > 1 && priv->hw->mac->set_mtl_tx_queue_weight)
+		stmmac_set_tx_queue_weight(priv);
+
+	/* Configure MTL RX algorithms */
+	if (rx_queues_count > 1 && priv->hw->mac->prog_mtl_rx_algorithms)
+		priv->hw->mac->prog_mtl_rx_algorithms(priv->hw,
+						priv->plat->mtl_rx_algorithm);
+
+	/* Configure MTL TX algorithms */
+	if (tx_queues_count > 1 && priv->hw->mac->prog_mtl_tx_algorithms)
+		priv->hw->mac->prog_mtl_tx_algorithms(priv->hw,
+						priv->plat->mtl_tx_algorithm);
+
+	/* Map RX MTL to DMA channels */
+	if (rx_queues_count > 1 && priv->hw->mac->map_mtl_to_dma)
+		stmmac_rx_queue_dma_chan_map(priv);
+
+	/* Enable MAC RX Queues */
+	if (rx_queues_count > 1 && priv->hw->mac->rx_queue_enable)
+		stmmac_mac_enable_rx_queues(priv);
+
+	/* Configure RX Queues Priority */
+	if (rx_queues_count > 1 && priv->hw->mac->rx_queue_prio)
+		stmmac_mac_config_rx_queues_prio(priv);
 }
 
 /**
@@ -1688,9 +1812,9 @@ static int stmmac_hw_setup(struct net_device *dev, bool init_ptp)
 	/* Initialize the MAC Core */
 	priv->hw->mac->core_init(priv->hw, dev->mtu);
 
-	/* Initialize MAC RX Queues */
-	if (priv->hw->mac->rx_queue_enable)
-		stmmac_mac_enable_rx_queues(priv);
+	/* Initialize MTL*/
+	if (priv->synopsys_id >= DWMAC_CORE_4_00)
+		stmmac_mtl_configuration(priv);
 
 	ret = priv->hw->mac->rx_ipc(priv->hw);
 	if (!ret) {
@@ -1707,6 +1831,9 @@ static int stmmac_hw_setup(struct net_device *dev, bool init_ptp)
 
 	/* Set the HW DMA mode and the COE */
 	stmmac_dma_operation_mode(priv);
+
+	if (priv->synopsys_id >= DWMAC_CORE_4_00)
+		stmmac_mac_config_tx_queues_prio(priv);
 
 	stmmac_mmc_setup(priv);
 
@@ -2813,6 +2940,9 @@ static irqreturn_t stmmac_interrupt(int irq, void *dev_id)
 	if ((priv->plat->has_gmac) || (priv->plat->has_gmac4)) {
 		int status = priv->hw->mac->host_irq_status(priv->hw,
 							    &priv->xstats);
+		if (priv->synopsys_id >= DWMAC_CORE_4_00)
+			status |= priv->hw->mac->host_mtl_irq_status(priv->hw,
+								STMMAC_CHAN0);
 		if (unlikely(status)) {
 			/* For LPI we need to save the tx status */
 			if (status & CORE_IRQ_TX_PATH_IN_LPI_MODE)

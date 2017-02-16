@@ -499,6 +499,7 @@ stmmac_set_pauseparam(struct net_device *netdev,
 		      struct ethtool_pauseparam *pause)
 {
 	struct stmmac_priv *priv = netdev_priv(netdev);
+	u32 tx_queues_count = priv->dma_cap.number_tx_queues;
 	struct phy_device *phy = netdev->phydev;
 	int new_pause = FLOW_OFF;
 
@@ -529,7 +530,8 @@ stmmac_set_pauseparam(struct net_device *netdev,
 	}
 
 	priv->hw->mac->flow_ctrl(priv->hw, phy->duplex, priv->flow_ctrl,
-				 priv->pause);
+				 priv->pause, tx_queues_count);
+
 	return 0;
 }
 
@@ -537,7 +539,13 @@ static void stmmac_get_ethtool_stats(struct net_device *dev,
 				 struct ethtool_stats *dummy, u64 *data)
 {
 	struct stmmac_priv *priv = netdev_priv(dev);
-	int i, j = 0;
+	u32 rx_queues_count = priv->dma_cap.number_rx_queues;
+	u32 tx_queues_count = priv->dma_cap.number_tx_queues;
+	u32 queue_count = 0;
+	int i, j, queue = 0;
+
+	queue_count = (tx_queues_count > rx_queues_count) ?
+		      tx_queues_count : rx_queues_count;
 
 	/* Update the DMA HW counters for dwmac10/100 */
 	if (priv->hw->dma->dma_diagnostic_fr)
@@ -565,9 +573,12 @@ static void stmmac_get_ethtool_stats(struct net_device *dev,
 		}
 
 		if ((priv->hw->mac->debug) &&
-		    (priv->synopsys_id >= DWMAC_CORE_3_50))
-			priv->hw->mac->debug(priv->ioaddr,
-					     (void *)&priv->xstats);
+		    (priv->synopsys_id >= DWMAC_CORE_3_50)) {
+			for (queue = 0; queue < queue_count; queue++)
+				priv->hw->mac->debug(priv->ioaddr,
+						     (void *)&priv->xstats,
+						     queue);
+		}
 	}
 	for (i = 0; i < STMMAC_STATS_LEN; i++) {
 		char *p = (char *)priv + stmmac_gstrings_stats[i].stat_offset;

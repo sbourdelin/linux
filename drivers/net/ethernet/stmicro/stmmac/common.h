@@ -350,6 +350,14 @@ struct dma_features {
 
 #define JUMBO_LEN		9000
 
+/* MTL algorithms identifiers */
+#define MTL_TX_ALGORITHM_WRR	0x0
+#define MTL_TX_ALGORITHM_WFQ	0x1
+#define MTL_TX_ALGORITHM_DWRR	0x2
+#define MTL_TX_ALGORITHM_PRIO	0x3
+#define MTL_RX_ALGORITHM_SP	0x4
+#define MTL_RX_ALGORITHM_WSP	0x5
+
 /* Descriptors helpers */
 struct stmmac_desc_ops {
 	/* DMA RX descriptor ring initialization */
@@ -455,16 +463,32 @@ struct stmmac_ops {
 	int (*rx_ipc)(struct mac_device_info *hw);
 	/* Enable RX Queues */
 	void (*rx_queue_enable)(struct mac_device_info *hw, u32 queue);
+	/* RX Queues Priority */
+	void (*rx_queue_prio)(struct mac_device_info *hw, u32 prio, u32 queue);
+	/* TX Queues Priority */
+	void (*tx_queue_prio)(struct mac_device_info *hw, u32 prio, u32 queue);
+	/* Program RX Algorithms */
+	void (*prog_mtl_rx_algorithms)(struct mac_device_info *hw, u32 rx_alg);
+	/* Program TX Algorithms */
+	void (*prog_mtl_tx_algorithms)(struct mac_device_info *hw, u32 tx_alg);
+	/* RX MTL queue to RX dma mapping */
+	void (*map_mtl_to_dma)(struct mac_device_info *hw, u32 queue, u32 chan);
+	/* Set MTL TX queues weight */
+	void (*set_mtl_tx_queue_weight)(struct mac_device_info *hw,
+					u32 weight, u32 queue);
 	/* Dump MAC registers */
 	void (*dump_regs)(struct mac_device_info *hw);
 	/* Handle extra events on specific interrupts hw dependent */
 	int (*host_irq_status)(struct mac_device_info *hw,
 			       struct stmmac_extra_stats *x);
+	/* Handle MTL interrupts */
+	int (*host_mtl_irq_status)(struct mac_device_info *hw, u32 chan);
 	/* Multicast filter setting */
 	void (*set_filter)(struct mac_device_info *hw, struct net_device *dev);
 	/* Flow control setting */
 	void (*flow_ctrl)(struct mac_device_info *hw, unsigned int duplex,
-			  unsigned int fc, unsigned int pause_time);
+			  unsigned int fc, unsigned int pause_time,
+			  u32 tx_queues_cnt);
 	/* Set power management mode (e.g. magic frame) */
 	void (*pmt)(struct mac_device_info *hw, unsigned long mode);
 	/* Set/Get Unicast MAC addresses */
@@ -477,7 +501,8 @@ struct stmmac_ops {
 	void (*reset_eee_mode)(struct mac_device_info *hw);
 	void (*set_eee_timer)(struct mac_device_info *hw, int ls, int tw);
 	void (*set_eee_pls)(struct mac_device_info *hw, int link);
-	void (*debug)(void __iomem *ioaddr, struct stmmac_extra_stats *x);
+	void (*debug)(void __iomem *ioaddr, struct stmmac_extra_stats *x,
+		      u32 queue);
 	/* PCS calls */
 	void (*pcs_ctrl_ane)(void __iomem *ioaddr, bool ane, bool srgmi_ral,
 			     bool loopback);

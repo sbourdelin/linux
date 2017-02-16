@@ -32,6 +32,9 @@
 #define STMMAC_RX_COE_TYPE1	1
 #define STMMAC_RX_COE_TYPE2	2
 
+#define EQOS_MAX_NUMBER_TX_QUEUES	8
+#define EQOS_MAX_NUMBER_RX_QUEUES	8
+
 /* Define the macros for CSR clock range parameters to be passed by
  * platform code.
  * This could also be configured at run time using CPU freq framework. */
@@ -147,5 +150,10 @@ struct plat_stmmacenet_data {
 	bool tso_en;
 	int mac_port_sel_speed;
 	bool en_tx_lpi_clockgating;
+	int mtl_tx_algorithm;
+	int mtl_rx_algorithm;
+	u32 tx_queues_weight[EQOS_MAX_NUMBER_TX_QUEUES];
+	u32 rx_queues_prio[EQOS_MAX_NUMBER_RX_QUEUES];
+	u32 tx_queues_prio[EQOS_MAX_NUMBER_TX_QUEUES];
 };
 #endif
