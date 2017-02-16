@@ -1283,16 +1283,39 @@ static bool i40e_alloc_mapped_page(struct i40e_ring *rx_ring,
  * @rx_ring:  rx ring in play
  * @skb: packet to send up
  * @vlan_tag: vlan tag for packet
+ * @lpbk: is it a loopback frame?
  **/
 static void i40e_receive_skb(struct i40e_ring *rx_ring,
-			     struct sk_buff *skb, u16 vlan_tag)
+			     struct sk_buff *skb, u16 vlan_tag, bool lpbk)
 {
 	struct i40e_q_vector *q_vector = rx_ring->q_vector;
+	struct i40e_pf *pf = rx_ring->vsi->back;
+	struct i40e_vf *vf;
+	struct ethhdr *eth;
+	int vf_id;
 
 	if ((rx_ring->netdev->features & NETIF_F_HW_VLAN_CTAG_RX) &&
 	    (vlan_tag & VLAN_VID_MASK))
 		__vlan_hwaccel_put_tag(skb, htons(ETH_P_8021Q), vlan_tag);
 
+	if ((pf->eswitch_mode == DEVLINK_ESWITCH_MODE_LEGACY) || !lpbk)
+		goto gro_receive;
+
+	/* If a loopback packet is received from a VF in switchdev mode, pass
+	 * the frame to the corresponding VFPR netdev based on the source MAC
+	 * in the frame.
+	 */
+	eth = (struct ethhdr *)skb_mac_header(skb);
+	for (vf_id = 0; vf_id < pf->num_alloc_vfs; vf_id++) {
+		vf = &pf->vf[vf_id];
+		if (ether_addr_equal(eth->h_source,
+				     vf->default_lan_addr.addr)) {
+			skb->dev = vf->vfpr_netdev;
+			break;
+		}
+	}
+
+gro_receive:
 	napi_gro_receive(&q_vector->napi, skb);
 }
 
@@ -1501,6 +1524,7 @@ static inline void i40e_rx_hash(struct i40e_ring *ring,
  * @rx_desc: pointer to the EOP Rx descriptor
  * @skb: pointer to current skb being populated
  * @rx_ptype: the packet type decoded by hardware
+ * @lpbk: is it a loopback frame?
  *
  * This function checks the ring, descriptor, and packet information in
  * order to populate the hash, checksum, VLAN, protocol, and
@@ -1509,7 +1533,7 @@ static inline void i40e_rx_hash(struct i40e_ring *ring,
 static inline
 void i40e_process_skb_fields(struct i40e_ring *rx_ring,
 			     union i40e_rx_desc *rx_desc, struct sk_buff *skb,
-			     u8 rx_ptype)
+			     u8 rx_ptype, bool *lpbk)
 {
 	u64 qword = le64_to_cpu(rx_desc->wb.qword1.status_error_len);
 	u32 rx_status = (qword & I40E_RXD_QW1_STATUS_MASK) >>
@@ -1517,6 +1541,9 @@ void i40e_process_skb_fields(struct i40e_ring *rx_ring,
 	u32 tsynvalid = rx_status & I40E_RXD_QW1_STATUS_TSYNVALID_MASK;
 	u32 tsyn = (rx_status & I40E_RXD_QW1_STATUS_TSYNINDX_MASK) >>
 		   I40E_RXD_QW1_STATUS_TSYNINDX_SHIFT;
+
+	*lpbk = !!((rx_status & I40E_RXD_QW1_STATUS_LPBK_MASK) >>
+		I40E_RXD_QW1_STATUS_LPBK_SHIFT);
 
 	if (unlikely(tsynvalid))
 		i40e_ptp_rx_hwtstamp(rx_ring->vsi->back, skb, tsyn);
@@ -2045,6 +2072,7 @@ static int i40e_clean_rx_irq(struct i40e_ring *rx_ring, int budget)
 		u8 rx_ptype;
 		u64 qword;
 		unsigned int xdp_consumed_bytes = 0;
+		bool lpbk;
 
 		/* return some buffers to hardware, one at a time is too slow */
 		if (cleaned_count >= I40E_RX_BUFFER_WRITE) {
@@ -2113,7 +2141,7 @@ static int i40e_clean_rx_irq(struct i40e_ring *rx_ring, int budget)
 			   I40E_RXD_QW1_PTYPE_SHIFT;
 
 		/* populate checksum, VLAN, and protocol */
-		i40e_process_skb_fields(rx_ring, rx_desc, skb, rx_ptype);
+		i40e_process_skb_fields(rx_ring, rx_desc, skb, rx_ptype, &lpbk);
 
 #ifdef I40E_FCOE
 		if (unlikely(
@@ -2127,7 +2155,7 @@ static int i40e_clean_rx_irq(struct i40e_ring *rx_ring, int budget)
 		vlan_tag = (qword & BIT(I40E_RX_DESC_STATUS_L2TAG1P_SHIFT)) ?
 			   le16_to_cpu(rx_desc->wb.qword0.lo_dword.l2tag1) : 0;
 
-		i40e_receive_skb(rx_ring, skb, vlan_tag);
+		i40e_receive_skb(rx_ring, skb, vlan_tag, lpbk);
 		skb = NULL;
 
 		/* update budget accounting */
@@ -2692,6 +2720,27 @@ static int i40e_tso(struct i40e_tx_buffer *first, u8 *hdr_len,
 }
 
 /**
+ * i40e_tvsi - set up the target vsi in TX context descriptor
+ * @tx_ring:  ptr to the target vsi
+ * @cd_type_cmd_tso_mss: Quad Word 1
+ *
+ * Returns 0
+ **/
+static int i40e_tvsi(struct i40e_vsi *tvsi, u64 *cd_type_cmd_tso_mss)
+{
+	u64 cd_cmd, cd_tvsi;
+
+	cd_cmd = I40E_TX_CTX_DESC_SWTCH_VSI;
+	cd_tvsi = tvsi->id;
+	cd_tvsi = (cd_tvsi << I40E_TXD_CTX_QW1_VSI_SHIFT) &
+		  I40E_TXD_CTX_QW1_VSI_MASK;
+	*cd_type_cmd_tso_mss |= (cd_cmd << I40E_TXD_CTX_QW1_CMD_SHIFT) |
+				 cd_tvsi;
+
+	return 0;
+}
+
+/**
  * i40e_tsyn - set up the tsyn context descriptor
  * @tx_ring:  ptr to the ring to send
  * @skb:      ptr to the skb we're sending
@@ -3223,8 +3272,12 @@ static netdev_tx_t i40e_xmit_frame_ring(struct sk_buff *skb,
 					struct i40e_ring *tx_ring)
 {
 	u64 cd_type_cmd_tso_mss = I40E_TX_DESC_DTYPE_CONTEXT;
+	struct metadata_dst *md_dst = skb_metadata_dst(skb);
 	u32 cd_tunneling = 0, cd_l2tag2 = 0;
 	struct i40e_tx_buffer *first;
+	struct i40e_vsi *t_vsi = NULL;
+	struct i40e_vf *t_vf;
+	struct i40e_pf *pf;
 	u32 td_offset = 0;
 	u32 tx_flags = 0;
 	__be16 protocol;
@@ -3276,7 +3329,26 @@ static netdev_tx_t i40e_xmit_frame_ring(struct sk_buff *skb,
 	else if (protocol == htons(ETH_P_IPV6))
 		tx_flags |= I40E_TX_FLAGS_IPV6;
 
-	tso = i40e_tso(first, &hdr_len, &cd_type_cmd_tso_mss);
+	/* If skb metadata dst points to a VF id, do a directed transmit to
+	 * that VSI. TSO is mutually exclusive with this option. So TSO is not
+	 * enabled when doing a directed transmit.
+	 */
+	if (md_dst && (md_dst->type == METADATA_HW_PORT_MUX)) {
+		pf = tx_ring->vsi->back;
+		if (md_dst->u.port_info.port_id >= pf->num_alloc_vfs) {
+			WARN_ONCE(1, "Unexpected port_id: %d num_vfs:%d\n",
+				  md_dst->u.port_info.port_id,
+				  pf->num_alloc_vfs);
+			goto out_drop;
+		}
+		t_vf = &pf->vf[md_dst->u.port_info.port_id];
+		t_vsi = pf->vsi[t_vf->lan_vsi_idx];
+	}
+
+	if (t_vsi)
+		tso = i40e_tvsi(t_vsi, &cd_type_cmd_tso_mss);
+	else
+		tso = i40e_tso(first, &hdr_len, &cd_type_cmd_tso_mss);
 
 	if (tso < 0)
 		goto out_drop;
@@ -3339,4 +3411,28 @@ netdev_tx_t i40e_lan_xmit_frame(struct sk_buff *skb, struct net_device *netdev)
 		return NETDEV_TX_OK;
 
 	return i40e_xmit_frame_ring(skb, tx_ring);
+}
+
+/**
+ * i40e_vfpr_netdev_start_xmit
+ * @skb:    send buffer
+ * @netdev: network interface device structure
+ *
+ * Sets skb->dev to PF netdev, VF id in the skb->dst and requeues
+ * skb via dev_queue_xmit()
+ **/
+netdev_tx_t i40e_vfpr_netdev_start_xmit(struct sk_buff *skb,
+					struct net_device *netdev)
+{
+	struct i40e_vfpr_netdev_priv *priv = netdev_priv(netdev);
+	struct i40e_vf *vf = priv->vf;
+	struct i40e_pf *pf = vf->pf;
+	struct i40e_vsi *vsi = pf->vsi[pf->lan_vsi];
+
+	skb_dst_drop(skb);
+	dst_hold(&priv->vfpr_dst->dst);
+	skb_dst_set(skb, &priv->vfpr_dst->dst);
+	skb->dev = vsi->netdev;
+
+	return dev_queue_xmit(skb);
 }
