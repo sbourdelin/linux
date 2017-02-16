@@ -194,4 +194,5 @@ int is_valid_tracepoint(const char *event_string);
 int valid_event_mount(const char *eventfs);
 char *parse_events_formats_error_string(char *additional_terms);
 
+void sdt_event_list__add(struct list_head *sdt_event_list);
 #endif /* __PERF_PARSE_EVENTS_H */

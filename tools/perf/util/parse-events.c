@@ -1726,13 +1726,64 @@ static void parse_events_print_error(struct parse_events_error *err,
 
 #undef MAX_WIDTH
 
+static int parse_sdt_event(const char *str, struct list_head **sdt_list)
+{
+	char *ptr = NULL;
+	int ret;
+	struct list_head *sdt_evlist;
+
+	ptr = strdup(str);
+	if (ptr == NULL)
+		return -ENOMEM;
+
+	sdt_evlist = zalloc(sizeof(*sdt_evlist));
+	if (!sdt_evlist) {
+		free(ptr);
+		pr_err("Error in sdt_evlist memory allocation\n");
+		return -ENOMEM;
+	}
+	INIT_LIST_HEAD(sdt_evlist);
+
+	/*
+	 * If there is an error in this call, no need to free
+	 * up sdt_evlist, its already free'ed up in the previous
+	 * call. Free up 'ptr' though.
+	 */
+	ret = add_sdt_event(ptr, sdt_evlist);
+
+	free(ptr);
+	if (!ret)
+		*sdt_list = sdt_evlist;
+
+	return ret;
+}
+
 int parse_events_option(const struct option *opt, const char *str,
 			int unset __maybe_unused)
 {
 	struct perf_evlist *evlist = *(struct perf_evlist **)opt->value;
 	struct parse_events_error err = { .idx = 0, };
-	int ret = parse_events(evlist, str, &err);
+	int ret = 0;
+	struct list_head *sdt_list = NULL;
+	struct sdt_event_list *event;
 
+	if (*str == '%' && is_cmd_record()) {
+		ret = parse_sdt_event(str, &sdt_list);
+		if (!ret) {
+			list_for_each_entry(event, sdt_list, list) {
+				ret = parse_events(evlist, event->event_info,
+						   &err);
+				if (ret < 0)
+					goto error;
+			}
+			/* Add it to the record struct */
+			sdt_event_list__add(sdt_list);
+		}
+	} else {
+		ret = parse_events(evlist, str, &err);
+	}
+
+error:
 	if (ret)
 		parse_events_print_error(&err, str);
 

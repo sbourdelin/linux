@@ -27,8 +27,10 @@
 #include "probe-event.h"
 #include "probe-file.h"
 #include "session.h"
+#include "probe-finder.h"
 
 #define MAX_CMDLEN 256
+#define MAX_EVENT_LENGTH 512
 
 static void print_open_warning(int err, bool uprobe)
 {
@@ -931,5 +933,100 @@ bool probe_type_is_available(enum probe_type type)
 end:
 	free(buf);
 
+	return ret;
+}
+
+void free_sdt_list(struct list_head *sdt_events)
+{
+	struct sdt_event_list *tmp, *ptr;
+
+	if (list_empty(sdt_events))
+		return;
+	list_for_each_entry_safe(tmp, ptr, sdt_events, list) {
+		list_del(&tmp->list);
+		free(tmp->event_info);
+		free(tmp);
+	}
+}
+
+/*
+ * Find the SDT event from the cache and if found add it/them
+ * to the uprobe_events file
+ */
+int add_sdt_event(char *event, struct list_head *sdt_events)
+{
+	struct perf_probe_event *pev;
+	int ret, i;
+	char *str = event + 1;
+	struct sdt_event_list *tmp;
+
+	pev = zalloc(sizeof(*pev));
+	if (!pev)
+		return -ENOMEM;
+
+	pev->sdt = true;
+	pev->uprobes = true;
+
+	/*
+	 * Parse str to find the group name and event name of
+	 * the sdt event.
+	 */
+	ret = parse_perf_probe_event_name(&str, pev);
+	if (ret) {
+		pr_err("Error in parsing sdt event %s\n", str);
+		free(pev);
+		return ret;
+	}
+
+	probe_conf.max_probes = MAX_PROBES;
+	probe_conf.force_add = 1;
+
+	/*
+	 * Find the sdt event from the cache, only cached SDT
+	 * events can be directly recorded.
+	 */
+	pev->ntevs = find_sdt_events_from_cache(pev, &pev->tevs);
+	if (pev->ntevs) {
+		if (pev->ntevs > 1) {
+			pr_warning("Warning : Recording on %d occurences of %s:%s\n",
+				   pev->ntevs, pev->group, pev->event);
+		}
+		ret = apply_perf_probe_events(pev, 1);
+		if (ret) {
+			pr_err("Error in adding SDT event : %s\n", event);
+			goto free_pev;
+		}
+	} else {
+		pr_err(" %s:%s not found in the cache\n", pev->group,
+			pev->event);
+		ret = -EINVAL;
+		goto free_pev;
+	}
+
+	/* Add the event name to "sdt_events" list */
+	for (i = 0; i < pev->ntevs; i++) {
+		tmp = zalloc(sizeof(*tmp));
+		if (!tmp) {
+			ret = -ENOMEM;
+			goto free_pev;
+		}
+
+		INIT_LIST_HEAD(&tmp->list);
+		tmp->event_info = zalloc(MAX_EVENT_LENGTH * sizeof(char));
+		if (!tmp->event_info) {
+			free_sdt_list(sdt_events);
+			ret = -ENOMEM;
+			goto free_pev;
+		}
+		snprintf(tmp->event_info, strlen(pev->tevs[i].group) +
+			 strlen(pev->tevs[i].event) + 2, "%s:%s",
+			 pev->tevs[i].group, pev->tevs[i].event);
+		list_add(&tmp->list, sdt_events);
+	}
+
+	ret = 0;
+
+free_pev:
+	cleanup_perf_probe_events(pev, 1);
 	return ret;
 }
