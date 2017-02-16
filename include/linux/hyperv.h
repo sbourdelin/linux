@@ -844,7 +844,14 @@ struct vmbus_channel {
 	 * To support per-cpu lookup mapping of relid to channel,
 	 * link up channels based on their CPU affinity.
 	 */
-	struct list_head percpu_list;
+	struct list_head __rcu percpu_list;
+
+	/*
+	 * Defer freeing channel until after all cpu's have
+	 * gone through grace period.
+	 */
+	struct rcu_head rcu;
+
 	/*
 	 * For performance critical channels (storage, networking
 	 * etc,), Hyper-V has a mechanism to enhance the throughput
