@@ -230,10 +230,13 @@ static void r10buf_pool_free(void *__r10_bio, void *data)
 	for (j=0; j < conf->copies; j++) {
 		struct bio *bio = r10bio->devs[j].bio;
 		if (bio) {
-			for (i = 0; i < RESYNC_PAGES; i++) {
-				safe_put_page(bio->bi_io_vec[i].bv_page);
-				bio->bi_io_vec[i].bv_page = NULL;
-			}
+			struct bio_vec *bvl;
+
+			/* make sure all pages can be freed */
+			bio->bi_vcnt = RESYNC_PAGES;
+
+			bio_for_each_segment_all(bvl, bio, i)
+				safe_put_page(bvl->bv_page);
 			bio_put(bio);
 		}
 		bio = r10bio->devs[j].repl_bio;

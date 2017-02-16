@@ -172,9 +172,16 @@ static void r1buf_pool_free(void *__r1_bio, void *data)
 	int i,j;
 	struct r1bio *r1bio = __r1_bio;
 
-	for (i = 0; i < RESYNC_PAGES; i++)
-		for (j = pi->raid_disks; j-- ;)
-			safe_put_page(r1bio->bios[j]->bi_io_vec[i].bv_page);
+	for (i = 0; i < pi->raid_disks; i++) {
+		struct bio_vec *bvl;
+		struct bio *bio = r1bio->bios[i];
+
+		/* make sure all pages can be freed */
+		bio->bi_vcnt = RESYNC_PAGES;
+
+		bio_for_each_segment_all(bvl, bio, j)
+			safe_put_page(bvl->bv_page);
+	}
 	for (i=0 ; i < pi->raid_disks; i++)
 		bio_put(r1bio->bios[i]);
 
