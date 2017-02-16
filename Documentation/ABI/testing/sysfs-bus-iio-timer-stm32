@@ -27,3 +27,46 @@ Description:
 		Reading returns the current sampling frequency.
 		Writing an value different of 0 set and start sampling.
 		Writing 0 stop sampling.
+
+What:		/sys/bus/iio/devices/triggerX/slave_mode_available
+KernelVersion:	4.12
+Contact:	benjamin.gaignard@st.com
+Description:
+		Reading returns the list possible slave modes which are:
+		- "disabled"  : Parent trigger levels or edges have do not impact on trigger.
+				Trigger is clocked by the internal clock.
+				This is the default mode.
+		- "encoder_1" : Trigger internal counter counts up/down on channel 2 edge depending on channel 1 level.
+		- "encoder_2" : Trigger internal counter counts up/down on channel 1 edge depending on channel 2 level.
+		- "encoder_3" : Trigger internal counter counts up/down on channels 1 & 2 edge
+				depending on channel 1 & 2 level.
+		- "reset"     : Rising edge on parent trigger reinitializes the trigger	and generates
+				an update of auto-reload, prescaler and	repetition counter registers.
+		- "gated"     : The trigger is enabled when the parent trigger input is high.
+				The trigger stops (but is not reset) as soon as the parent trigger becomes low.
+		- "trigger"   : The trigger starts at a rising edge of the parent trigger (but it is not reset).
+		- "external_clock": Rising edges of the parent trigger clock the trigger.
+
+		Encoder modes are used to automatically handle the counting direction of the internal counter.
+		Those modes are typically used for high-accuracy rotor position sensing in electrical motors
+		or for digital potentiometers. From the two outputs of a quadrature encoder sensor the timer
+		extracts a clock on each and every active edge and adjusts the counting direction depending on
+		the relative phase-shift between the two incomings signals. The timer counter thus directly
+		holds the angular position of the motor or the potentionmeter.
+
+		For "reset", "gated" and "trigger" modes the trigger will fire N+1 times when internal counter
+		will reach the value of auto-reload register. N is defined by the value of repetition counter.
+		Those modes could allow parent trigger to control when sampling frequency of the current trigger
+		start or stop.
+		Since PWM and trigger features are mixed in the same hardware block those 3 modes could be used
+		to synchronize PWMs start while PWM sysfs API is used to set period and duty cycle.
+
+		In "external clock" mode parent trigger can control the current trigger clock (and so the sampling
+		frequency) for example to correct jittering.
+
+What:		/sys/bus/iio/devices/triggerX/slave_mode
+KernelVersion:	4.12
+Contact:	benjamin.gaignard@st.com
+Description:
+		Reading returns the current slave mode.
+		Writing set the slave mode
