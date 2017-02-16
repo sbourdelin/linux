@@ -710,4 +710,25 @@ static inline void mddev_clear_unsupported_flags(struct mddev *mddev,
 {
 	mddev->flags &= ~unsupported_flags;
 }
+
+/*
+ * Both raid1 and raid10 use bio's bvec table to store the preallocated
+ * pages, so we introduces the following helpers for this kind of usage.
+ *
+ * Actually the usage is a bit similar with bio_iov_iter_get_pages().
+ *
+ * Please make sure .bi_io_vec[idx] points to one unused vector by the
+ * bio.
+ */
+static inline struct page *mdev_get_page_from_bio(struct bio *bio, unsigned idx)
+{
+	return bio->bi_io_vec[idx].bv_page;
+}
+
+static inline void mdev_put_page_to_bio(struct bio *bio, unsigned idx,
+					struct page *page)
+{
+	bio->bi_io_vec[idx].bv_page = page;
+}
+
 #endif /* _MD_MD_H */
