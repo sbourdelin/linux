@@ -148,8 +148,9 @@ static u32 dwmac1000_configure_fc(u32 csr6, int rxfifosz)
 	return csr6;
 }
 
-static void dwmac1000_dma_operation_mode(void __iomem *ioaddr, int txmode,
-					 int rxmode, int rxfifosz)
+static void dwmac1000_dma_operation_mode(void __iomem *ioaddr,
+					 u32 txfifosz, u32 rxfifosz,
+					 u32 txmode, u32 rxmode)
 {
 	u32 csr6 = readl(ioaddr + DMA_CONTROL);
 
@@ -201,7 +202,7 @@ static void dwmac1000_dma_operation_mode(void __iomem *ioaddr, int txmode,
 	writel(csr6, ioaddr + DMA_CONTROL);
 }
 
-static void dwmac1000_dump_dma_regs(void __iomem *ioaddr)
+static void dwmac1000_dump_dma_regs(void __iomem *ioaddr, u32 number_channels)
 {
 	int i;
 	pr_info(" DMA registers\n");
@@ -249,9 +250,16 @@ static void dwmac1000_get_hw_feature(void __iomem *ioaddr,
 	dma_cap->number_tx_channel = (hw_cap & DMA_HW_FEAT_TXCHCNT) >> 22;
 	/* Alternate (enhanced) DESC mode */
 	dma_cap->enh_desc = (hw_cap & DMA_HW_FEAT_ENHDESSEL) >> 24;
+	/* TX and RX number of channels */
+	dma_cap->number_rx_channel = 1;
+	dma_cap->number_tx_channel = 1;
+	/* TX and RX number of queues */
+	dma_cap->number_rx_queues = 1;
+	dma_cap->number_tx_queues = 1;
 }
 
-static void dwmac1000_rx_watchdog(void __iomem *ioaddr, u32 riwt)
+static void dwmac1000_rx_watchdog(void __iomem *ioaddr, u32 number_channels,
+				  u32 riwt)
 {
 	writel(riwt, ioaddr + DMA_RX_WATCHDOG);
 }

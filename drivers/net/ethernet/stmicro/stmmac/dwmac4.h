@@ -161,6 +161,8 @@ enum power_event {
 /* MAC HW features1 bitmap */
 #define GMAC_HW_FEAT_AVSEL		BIT(20)
 #define GMAC_HW_TSOEN			BIT(18)
+#define GMAC_HW_TXFIFOSIZE		GENMASK(10, 6)
+#define GMAC_HW_RXFIFOSIZE		GENMASK(4, 0)
 
 /* MAC HW features2 bitmap */
 #define GMAC_HW_FEAT_TXCHCNT		GENMASK(21, 18)
@@ -205,11 +207,17 @@ enum power_event {
 #define MTL_CHAN_RX_OP_MODE(x)		(MTL_CHANX_BASE_ADDR(x) + 0x30)
 #define MTL_CHAN_RX_DEBUG(x)		(MTL_CHANX_BASE_ADDR(x) + 0x38)
 
+#define MTL_RX_OP_MODE_RQS_MASK		GENMASK(31, 20)
+#define MTL_RX_OP_MODE_RQS_SHIFT	20
+#define MTL_RX_OP_MODE_RQS(x)		((x) << MTL_RX_OP_MODE_RQS_SHIFT)
+
 #define MTL_OP_MODE_RSF			BIT(5)
 #define MTL_OP_MODE_TXQEN		BIT(3)
 #define MTL_OP_MODE_TSF			BIT(1)
 
-#define MTL_OP_MODE_TQS_MASK		GENMASK(24, 16)
+#define MTL_TX_OP_MODE_TQS_MASK		GENMASK(24, 16)
+#define MTL_TX_OP_MODE_TQS_SHIFT	16
+#define MTL_TX_OP_MODE_TQS(x)		((x) << MTL_TX_OP_MODE_TQS_SHIFT)
 
 #define MTL_OP_MODE_TTC_MASK		0x70
 #define MTL_OP_MODE_TTC_SHIFT		4

@@ -14,11 +14,6 @@
 #ifndef __DWMAC4_DMA_H__
 #define __DWMAC4_DMA_H__
 
-/* Define the max channel number used for tx (also rx).
- * dwmac4 accepts up to 8 channels for TX (and also 8 channels for RX
- */
-#define DMA_CHANNEL_NB_MAX		1
-
 #define DMA_BUS_MODE			0x00001000
 #define DMA_SYS_BUS_MODE		0x00001004
 #define DMA_STATUS			0x00001008
@@ -185,17 +180,17 @@
 
 int dwmac4_dma_reset(void __iomem *ioaddr);
 void dwmac4_enable_dma_transmission(void __iomem *ioaddr, u32 tail_ptr);
-void dwmac4_enable_dma_irq(void __iomem *ioaddr);
-void dwmac410_enable_dma_irq(void __iomem *ioaddr);
-void dwmac4_disable_dma_irq(void __iomem *ioaddr);
-void dwmac4_dma_start_tx(void __iomem *ioaddr);
-void dwmac4_dma_stop_tx(void __iomem *ioaddr);
-void dwmac4_dma_start_rx(void __iomem *ioaddr);
-void dwmac4_dma_stop_rx(void __iomem *ioaddr);
+void dwmac4_enable_dma_irq(void __iomem *ioaddr, u32 chan);
+void dwmac410_enable_dma_irq(void __iomem *ioaddr, u32 chan);
+void dwmac4_disable_dma_irq(void __iomem *ioaddr, u32 chan);
+void dwmac4_dma_start_tx(void __iomem *ioaddr, u32 chan);
+void dwmac4_dma_stop_tx(void __iomem *ioaddr, u32 chan);
+void dwmac4_dma_start_rx(void __iomem *ioaddr, u32 chan);
+void dwmac4_dma_stop_rx(void __iomem *ioaddr, u32 chan);
 int dwmac4_dma_interrupt(void __iomem *ioaddr,
-			 struct stmmac_extra_stats *x);
-void dwmac4_set_rx_ring_len(void __iomem *ioaddr, u32 len);
-void dwmac4_set_tx_ring_len(void __iomem *ioaddr, u32 len);
+			struct stmmac_extra_stats *x, u32 chan);
+void dwmac4_set_rx_ring_len(void __iomem *ioaddr, u32 len, u32 chan);
+void dwmac4_set_tx_ring_len(void __iomem *ioaddr, u32 len, u32 chan);
 void dwmac4_set_rx_tail_ptr(void __iomem *ioaddr, u32 tail_ptr, u32 chan);
 void dwmac4_set_tx_tail_ptr(void __iomem *ioaddr, u32 tail_ptr, u32 chan);
 
