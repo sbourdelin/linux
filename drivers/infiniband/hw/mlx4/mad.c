@@ -2150,7 +2150,7 @@ static int mlx4_ib_alloc_demux_ctx(struct mlx4_ib_dev *dev,
 	int i;
 
 	ctx->tun = kcalloc(dev->dev->caps.sqp_demux,
-			   sizeof (struct mlx4_ib_demux_pv_ctx *), GFP_KERNEL);
+			   sizeof(*ctx->tun), GFP_KERNEL);
 	if (!ctx->tun)
 		return -ENOMEM;
 
