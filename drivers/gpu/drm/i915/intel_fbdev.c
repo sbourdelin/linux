@@ -498,7 +498,7 @@ retry:
 		conn_configured |= BIT(i);
 	}
 
-	if ((conn_configured & mask) != mask) {
+	if (count > 0 && (conn_configured & mask) != mask) {
 		pass++;
 		goto retry;
 	}
