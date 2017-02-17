@@ -1966,10 +1966,8 @@ static int alloc_pv_object(struct mlx4_ib_dev *dev, int slave, int port,
 
 static void free_pv_object(struct mlx4_ib_dev *dev, int slave, int port)
 {
-	if (dev->sriov.demux[port - 1].tun[slave]) {
-		kfree(dev->sriov.demux[port - 1].tun[slave]);
-		dev->sriov.demux[port - 1].tun[slave] = NULL;
-	}
+	kfree(dev->sriov.demux[port - 1].tun[slave]);
+	dev->sriov.demux[port - 1].tun[slave] = NULL;
 }
 
 static int create_pv_resources(struct ib_device *ibdev, int slave, int port,
