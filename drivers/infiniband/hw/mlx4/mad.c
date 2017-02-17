@@ -1173,7 +1173,6 @@ static void handle_slaves_guid_change(struct mlx4_ib_dev *dev, u8 port_num,
 out:
 	kfree(in_mad);
 	kfree(out_mad);
-	return;
 }
 
 void handle_port_mgmt_change_event(struct work_struct *work)
@@ -2140,7 +2139,6 @@ void mlx4_ib_tunnels_update_work(struct work_struct *work)
 	mlx4_ib_tunnels_update(dmxw->dev, dmxw->slave, (int) dmxw->port,
 			       dmxw->do_init);
 	kfree(dmxw);
-	return;
 }
 
 static int mlx4_ib_alloc_demux_ctx(struct mlx4_ib_dev *dev,
@@ -2268,7 +2266,6 @@ static void mlx4_ib_master_tunnels(struct mlx4_ib_dev *dev, int do_init)
 	/* initialize or tear down tunnel QPs for the master */
 	for (i = 0; i < dev->dev->caps.num_ports; i++)
 		mlx4_ib_tunnels_update(dev, mlx4_master_func_num(dev->dev), i + 1, do_init);
-	return;
 }
 
 int mlx4_ib_init_sriov(struct mlx4_ib_dev *dev)
