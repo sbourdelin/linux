@@ -43,7 +43,7 @@
 /* wake up reclaim thread periodically */
 #define R5C_RECLAIM_WAKEUP_INTERVAL (30 * HZ)
 /* start flush with these full stripes */
-#define R5C_FULL_STRIPE_FLUSH_BATCH 256
+#define R5C_FULL_STRIPE_FLUSH_BATCH 2048
 /* reclaim stripes in groups */
 #define R5C_RECLAIM_STRIPE_GROUP (NR_STRIPE_HASH_LOCKS * 2)
 
