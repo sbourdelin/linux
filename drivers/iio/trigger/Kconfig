@@ -5,6 +5,15 @@
 
 menu "Triggers - standalone"
 
+config IIO_GPIO_TRIGGER
+	tristate "Generic GPIO trigger"
+	help
+	  Provides support for a GPIO based IIO trigger, when trigger
+	  source has been connected to a GPIO line.
+
+	  To compile this driver as a module, choose M here: the
+	  module will be called iio-gpio-trigger.
+
 config IIO_HRTIMER_TRIGGER
 	tristate "High resolution timer trigger"
 	depends on IIO_SW_TRIGGER
