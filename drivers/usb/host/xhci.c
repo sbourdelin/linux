@@ -4298,23 +4298,23 @@ static unsigned long long xhci_calculate_intel_u1_timeout(
 	ep_type = usb_endpoint_type(desc);
 	switch (ep_type) {
 	case USB_ENDPOINT_XFER_CONTROL:
-		timeout_ns = udev->u1_params.sel * 3;
+		timeout_ns = (unsigned long long)udev->u1_params.sel * 3;
 		break;
 	case USB_ENDPOINT_XFER_BULK:
-		timeout_ns = udev->u1_params.sel * 5;
+		timeout_ns = (unsigned long long)udev->u1_params.sel * 5;
 		break;
 	case USB_ENDPOINT_XFER_INT:
 		intr_type = usb_endpoint_interrupt_type(desc);
 		if (intr_type == USB_ENDPOINT_INTR_NOTIFICATION) {
-			timeout_ns = udev->u1_params.sel * 3;
+			timeout_ns = (unsigned long long)udev->u1_params.sel * 3;
 			break;
 		}
 		/* Otherwise the calculation is the same as isoc eps */
 	case USB_ENDPOINT_XFER_ISOC:
 		timeout_ns = xhci_service_interval_to_ns(desc);
 		timeout_ns = DIV_ROUND_UP_ULL(timeout_ns * 105, 100);
-		if (timeout_ns < udev->u1_params.sel * 2)
-			timeout_ns = udev->u1_params.sel * 2;
+		if (timeout_ns < (unsigned long long)udev->u1_params.sel * 2)
+			timeout_ns = (unsigned long long)udev->u1_params.sel * 2;
 		break;
 	default:
 		return 0;
