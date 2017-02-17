@@ -95,3 +95,40 @@ vdd channel is connected to output 0 of the &ref device.
 		io-channels = <&adc 10>, <&adc 11>;
 		io-channel-names = "adc1", "adc2";
 	};
+
+==IIO trigger providers==
+Sources of IIO triggers can be represented by any node in the device
+tree. Those nodes are designated as IIO trigger providers. IIO trigger
+consumer uses a phandle and an IIO trigger specifier to connect to an
+IIO trigger provider.
+An IIO trigger specifier is an array of one or more cells identifying
+the IIO trigger output on a device. The length of an IIO trigger
+specifier is defined by the value of a #io-trigger-cells property in
+the IIO trigger provider node.
+
+Required properties:
+#io-trigger-cells:
+		Number of cells in an IIO trigger specifier; Typically
+		0 for nodes with a simple IIO trigger output.
+
+Example:
+	gpiotrig0: iio-gpio-trigger0 {
+		#io-trigger-cells = <0>;
+		compatible = "iio-gpio-trigger";
+		gpios = <&gpioa 11 0>;
+	}
+
+==IIO trigger consumers==
+Required properties:
+- io-triggers:	List of phandle representing the IIO trigger specifier.
+
+Optional properties:
+- io-trigger-names :
+		List of IIO trigger name strings that matches elements
+		in 'io-triggers' list property.
+
+Example:
+	some_trigger_consumer {
+		io-triggers = <&gpiotrig0>;
+		io-trigger-names = "mytrig";
+	}
