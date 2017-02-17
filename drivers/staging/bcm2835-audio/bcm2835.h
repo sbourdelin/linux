@@ -125,8 +125,8 @@ struct bcm2835_alsa_stream {
 	struct semaphore buffers_update_sem;
 	struct semaphore control_sem;
 	spinlock_t lock;
-	volatile unsigned int control;
-	volatile unsigned int status;
+	unsigned int control;
+	unsigned int status;
 
 	int open;
 	int running;
