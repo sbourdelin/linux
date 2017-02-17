@@ -1611,8 +1611,13 @@ int iwl_opmode_register(const char *name, const struct iwl_op_mode_ops *ops)
 			continue;
 		op->ops = ops;
 		/* TODO: need to handle exceptional case */
-		list_for_each_entry(drv, &op->drv, list)
+		list_for_each_entry(drv, &op->drv, list) {
 			drv->op_mode = _iwl_op_mode_start(drv, op);
+			if (!drv->op_mode) {
+				complete(&drv->request_firmware_complete);
+				device_release_driver(drv->trans->dev);
+			}
+		}
 
 		mutex_unlock(&iwlwifi_opmode_table_mtx);
 		return 0;
