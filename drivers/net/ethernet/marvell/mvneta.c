@@ -313,8 +313,8 @@
 	((addr >= txq->tso_hdrs_phys) && \
 	 (addr < txq->tso_hdrs_phys + txq->size * TSO_HEADER_SIZE))
 
-#define MVNETA_RX_GET_BM_POOL_ID(rxd) \
-	(((rxd)->status & MVNETA_RXD_BM_POOL_MASK) >> MVNETA_RXD_BM_POOL_SHIFT)
+#define MVNETA_RX_GET_BM_POOL_ID(status) \
+	(((status) & MVNETA_RXD_BM_POOL_MASK) >> MVNETA_RXD_BM_POOL_SHIFT)
 
 struct mvneta_statistic {
 	unsigned short offset;
@@ -1900,7 +1900,7 @@ static void mvneta_rxq_drop_pkts(struct mvneta_port *pp,
 		for (i = 0; i < rx_done; i++) {
 			struct mvneta_rx_desc *rx_desc =
 						  mvneta_rxq_next_desc_get(rxq);
-			u8 pool_id = MVNETA_RX_GET_BM_POOL_ID(rx_desc);
+			u8 pool_id = MVNETA_RX_GET_BM_POOL_ID(rx_desc->status);
 			struct mvneta_bm_pool *bm_pool;
 
 			bm_pool = &pp->bm_priv->bm_pools[pool_id];
@@ -2075,7 +2075,7 @@ static int mvneta_rx_hwbm(struct mvneta_port *pp, int rx_todo,
 		rx_bytes = rx_desc->data_size - (ETH_FCS_LEN + MVNETA_MH_SIZE);
 		data = (u8 *)(uintptr_t)rx_desc->buf_cookie;
 		phys_addr = rx_desc->buf_phys_addr;
-		pool_id = MVNETA_RX_GET_BM_POOL_ID(rx_desc);
+		pool_id = MVNETA_RX_GET_BM_POOL_ID(rx_status);
 		bm_pool = &pp->bm_priv->bm_pools[pool_id];
 
 		if (!mvneta_rxq_desc_is_first_last(rx_status) ||
