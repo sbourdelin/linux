@@ -175,6 +175,15 @@ nat_icmp_send - BOOLEAN
         for VS/NAT when the load balancer receives packets from real
         servers but the connection entries don't exist.
 
+pmtu_disc - BOOLEAN
+	0 - disabled
+	not 0 - enabled (default)
+
+	When enabled PMTU discovery(default) and received packets larger than
+	the next MTU, we will send back FRAG_NEEDED message and drop the
+	incoming packet. But if users prefer to fragment regardless of DF bit
+	other than drop the packet, they can disable it.
+
 secure_tcp - INTEGER
         0  - disabled (default)
 
