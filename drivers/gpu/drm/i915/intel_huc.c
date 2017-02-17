@@ -29,9 +29,14 @@
  * DOC: HuC Firmware
  *
  * Motivation:
- * GEN9 introduces a new dedicated firmware for usage in media HEVC (High
- * Efficiency Video Coding) operations. Userspace can use the firmware
- * capabilities by adding HuC specific commands to batch buffers.
+ *
+ * HuC is designed to offload some of the media functions from
+ * the CPU to GPU. These include but are not limited to bitrate
+ * control, header parsing. For example in the case of bitrate control,
+ * driver invokes HuC in the beginning of each frame encoding pass,
+ * encode bitrate is adjusted by the calculation done by HuC. Both
+ * the HuC hardware and the encode hardcode reside in GPU. Using HuC
+ * will save unnecessary CPU-GPU synchronization
  *
  * Implementation:
  * The same firmware loader is used as the GuC. However, the actual
