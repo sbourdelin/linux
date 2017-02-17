@@ -173,6 +173,10 @@ bool iio_trigger_using_own(struct iio_dev *indio_dev);
 int iio_trigger_validate_own_device(struct iio_trigger *trig,
 				     struct iio_dev *indio_dev);
 
+struct iio_trigger *iio_trigger_get_by_name(struct device *dev,
+					    const char *name);
+struct iio_trigger *devm_iio_trigger_get_by_name(struct device *dev,
+						 const char *name);
 #else
 struct iio_trigger;
 struct iio_trigger_ops;
