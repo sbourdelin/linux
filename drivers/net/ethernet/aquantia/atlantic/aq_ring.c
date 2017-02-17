@@ -278,6 +278,8 @@ int aq_ring_rx_fill(struct aq_ring_s *self)
 	struct aq_ring_buff_s *buff = NULL;
 	int err = 0;
 	int i = 0;
+	unsigned int pages_order = fls(AQ_CFG_RX_FRAME_MAX / PAGE_SIZE +
+		(AQ_CFG_RX_FRAME_MAX % PAGE_SIZE ? 1 : 0)) - 1;
 
 	for (i = aq_ring_avail_dx(self); i--;
 		self->sw_tail = aq_ring_next_dx(self, self->sw_tail)) {
@@ -287,7 +289,7 @@ int aq_ring_rx_fill(struct aq_ring_s *self)
 		buff->len = AQ_CFG_RX_FRAME_MAX;
 
 		buff->page = alloc_pages(GFP_ATOMIC | __GFP_COLD |
-					 __GFP_COMP, 0);
+					 __GFP_COMP, pages_order);
 		if (!buff->page) {
 			err = -ENOMEM;
 			goto err_exit;
