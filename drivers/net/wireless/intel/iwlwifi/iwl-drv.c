@@ -139,6 +139,8 @@ static struct iwlwifi_opmode_table {
 	const char *name;			/* name: iwldvm, iwlmvm, etc */
 	const struct iwl_op_mode_ops *ops;	/* pointer to op_mode ops */
 	struct list_head drv;		/* list of devices using this op_mode */
+	bool load_requested;		/* Do we need to load a driver ? */
+	struct iwl_drv *drv_req;	/* Device that set load_requested */
 } iwlwifi_opmode_table[] = {		/* ops set when driver is initialized */
 	[DVM_OP_MODE] = { .name = "iwldvm", .ops = NULL },
 	[MVM_OP_MODE] = { .name = "iwlmvm", .ops = NULL },
@@ -1233,27 +1235,32 @@ static void _iwl_op_mode_stop(struct iwl_drv *drv)
 	}
 }
 
-static void iwlwifi_try_load_op(struct iwlwifi_opmode_table *op,
-				struct iwl_drv *drv)
+/* We have to unlock and then lock for the caller */
+static void iwlwifi_try_load_op(struct iwlwifi_opmode_table *op)
 {
 	int ret = 0;
 
+	mutex_unlock(&iwlwifi_opmode_table_mtx);
+
 	ret = request_module("%s", op->name);
-	if (ret)
+	if (ret) {
+		mutex_lock(&iwlwifi_opmode_table_mtx);
 		goto out;
+	}
 
 	mutex_lock(&iwlwifi_opmode_table_mtx);
 	if (!op->ops)
 		ret = -ENOENT;
-	mutex_unlock(&iwlwifi_opmode_table_mtx);
 
 out:
 #ifdef CONFIG_IWLWIFI_OPMODE_MODULAR
 	if (ret)
-		IWL_ERR(drv,
+		IWL_ERR(op->drv_req,
 			"failed to load module %s (error %d), is dynamic loading enabled?\n",
 			op->name, ret);
 #endif
+	op->load_requested = false;
+	op->drv_req = NULL;
 }
 
 static void iwlwifi_opmode_start_drv(struct iwlwifi_opmode_table *op,
@@ -1294,6 +1301,8 @@ static void iwlwifi_opmode_dowork(void)
 		op = &iwlwifi_opmode_table[i];
 		if (op->ops)
 			iwlwifi_opmode_start(op);
+		else if (op->load_requested)
+			iwlwifi_try_load_op(op);
 	}
 	mutex_unlock(&iwlwifi_opmode_table_mtx);
 }
@@ -1317,7 +1326,6 @@ static void iwl_req_fw_callback(const struct firmware *ucode_raw, void *context)
 	size_t trigger_tlv_sz[FW_DBG_TRIGGER_MAX];
 	u32 api_ver;
 	int i;
-	bool load_module = false;
 	bool usniffer_images = false;
 
 	fw->ucode_capa.max_probe_length = IWL_DEFAULT_MAX_PROBE_LENGTH;
@@ -1515,18 +1523,13 @@ static void iwl_req_fw_callback(const struct firmware *ucode_raw, void *context)
 	/* add this device to the list of devices using this op_mode */
 	list_add_tail(&drv->list, &op->drv);
 
-	if (!op->ops)
-		load_module = true;
+	if (!op->ops) {
+		op->load_requested = true;
+		op->drv_req = drv;
+	}
 
 	mutex_unlock(&iwlwifi_opmode_table_mtx);
 
-	/*
-	 * Load the module last so we don't block anything
-	 * else from proceeding if the module fails to load
-	 * or hangs loading.
-	 */
-	if (load_module)
-		iwlwifi_try_load_op(op, drv);
 	iwlwifi_opmode_dowork();
 	goto free;
 
