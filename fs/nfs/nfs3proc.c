@@ -869,6 +869,19 @@ static int
 nfs3_proc_lock(struct file *filp, int cmd, struct file_lock *fl)
 {
 	struct inode *inode = file_inode(filp);
+	int status;
+	struct nfs_lock_context *l_ctx;
+
+	/* For v3, always send the unlock on FL_CLOSE */
+	if (fl->fl_type == F_UNLCK) {
+		l_ctx = nfs_get_lock_context(nfs_file_open_context(filp));
+		if (!IS_ERR(l_ctx)) {
+			status = nfs_iocounter_wait(l_ctx);
+			nfs_put_lock_context(l_ctx);
+			if (status < 0 && !(fl->fl_flags & FL_CLOSE))
+				return status;
+		}
+	}
 
 	return nlmclnt_proc(NFS_SERVER(inode)->nlm_host, cmd, fl);
 }
