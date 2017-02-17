@@ -114,6 +114,8 @@ static const char * const dss_generic_clk_source_names[] = {
 
 static bool dss_initialized;
 
+static void dss_uninit_ports(struct platform_device *pdev);
+
 bool omapdss_is_initialized(void)
 {
 	return dss_initialized;
@@ -946,6 +948,7 @@ static int dss_init_ports(struct platform_device *pdev)
 	struct device_node *parent = pdev->dev.of_node;
 	struct device_node *port;
 	int r;
+	int ret = 0;
 
 	if (parent == NULL)
 		return 0;
@@ -972,17 +975,24 @@ static int dss_init_ports(struct platform_device *pdev)
 
 		switch (port_type) {
 		case OMAP_DISPLAY_TYPE_DPI:
-			dpi_init_port(pdev, port);
+			ret = dpi_init_port(pdev, port);
+			if (ret)
+				continue;
 			break;
 		case OMAP_DISPLAY_TYPE_SDI:
-			sdi_init_port(pdev, port);
+			ret = sdi_init_port(pdev, port);
+			if (ret)
+				continue;
 			break;
 		default:
 			break;
 		}
 	} while ((port = omapdss_of_get_next_port(parent, port)) != NULL);
 
-	return 0;
+	if (ret)
+		dss_uninit_ports(pdev);
+
+	return ret;
 }
 
 static void dss_uninit_ports(struct platform_device *pdev)
