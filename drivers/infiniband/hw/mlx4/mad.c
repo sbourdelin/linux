@@ -401,7 +401,8 @@ static void forward_trap(struct mlx4_ib_dev *dev, u8 port_num, const struct ib_m
 		 */
 		spin_lock_irqsave(&dev->sm_lock, flags);
 		memcpy(send_buf->mad, mad, sizeof *mad);
-		if ((send_buf->ah = dev->sm_ah[port_num - 1]))
+		send_buf->ah = dev->sm_ah[port_num - 1];
+		if (send_buf->ah)
 			ret = ib_post_send_mad(send_buf, NULL);
 		else
 			ret = -EINVAL;
