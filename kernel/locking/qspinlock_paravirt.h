@@ -72,7 +72,7 @@ static inline bool pv_queued_spin_steal_lock(struct qspinlock *lock)
 	struct __qspinlock *l = (void *)lock;
 
 	if (!(atomic_read(&lock->val) & _Q_LOCKED_PENDING_MASK) &&
-	    (cmpxchg(&l->locked, 0, _Q_LOCKED_VAL) == 0)) {
+	    (cmpxchg_acquire(&l->locked, 0, _Q_LOCKED_VAL) == 0)) {
 		qstat_inc(qstat_pv_lock_stealing, true);
 		return true;
 	}
@@ -101,16 +101,16 @@ static __always_inline void clear_pending(struct qspinlock *lock)
 
 /*
  * The pending bit check in pv_queued_spin_steal_lock() isn't a memory
- * barrier. Therefore, an atomic cmpxchg() is used to acquire the lock
- * just to be sure that it will get it.
+ * barrier. Therefore, an atomic cmpxchg_acquire() is used to acquire the
+ * lock just to be sure that it will get it.
  */
 static __always_inline int trylock_clear_pending(struct qspinlock *lock)
 {
 	struct __qspinlock *l = (void *)lock;
 
 	return !READ_ONCE(l->locked) &&
-	       (cmpxchg(&l->locked_pending, _Q_PENDING_VAL, _Q_LOCKED_VAL)
-			== _Q_PENDING_VAL);
+	       (cmpxchg_acquire(&l->locked_pending, _Q_PENDING_VAL,
+				_Q_LOCKED_VAL) == _Q_PENDING_VAL);
 }
 #else /* _Q_PENDING_BITS == 8 */
 static __always_inline void set_pending(struct qspinlock *lock)
@@ -138,7 +138,7 @@ static __always_inline int trylock_clear_pending(struct qspinlock *lock)
 		 */
 		old = val;
 		new = (val & ~_Q_PENDING_MASK) | _Q_LOCKED_VAL;
-		val = atomic_cmpxchg(&lock->val, old, new);
+		val = atomic_cmpxchg_acquire(&lock->val, old, new);
 
 		if (val == old)
 			return 1;
@@ -361,6 +361,9 @@ static void pv_kick_node(struct qspinlock *lock, struct mcs_spinlock *node)
 	 * observe its next->locked value and advance itself.
 	 *
 	 * Matches with smp_store_mb() and cmpxchg() in pv_wait_node()
+	 *
+	 * We can't used relaxed form of cmpxchg here as the loading of
+	 * pn->state can happen before setting next->locked in some archs.
 	 */
 	if (cmpxchg(&pn->state, vcpu_halted, vcpu_hashed) != vcpu_halted)
 		return;
