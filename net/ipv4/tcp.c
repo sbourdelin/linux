@@ -1178,6 +1178,7 @@ restart:
 	while (msg_data_left(msg)) {
 		int copy = 0;
 		int max = size_goal;
+		int notsent_lowat;
 
 		skb = tcp_write_queue_tail(sk);
 		if (tcp_send_head(sk)) {
@@ -1225,6 +1226,19 @@ new_segment:
 			 */
 			if (tp->repair)
 				TCP_SKB_CB(skb)->sacked |= TCPCB_REPAIRED;
+		}
+
+		notsent_lowat = tcp_notsent_lowat(tp);
+		if (notsent_lowat != -1) {
+			/* Cap unsent bytes at no more than 50% above TCP_NOTSENT_LOWAT value */
+			notsent_lowat += (notsent_lowat >> 1) - tcp_notsent_bytes(tp);
+			notsent_lowat = (notsent_lowat / mss_now) * mss_now;
+
+			if (notsent_lowat > 0 && copy > notsent_lowat) {
+				copy = notsent_lowat;
+			} else if (notsent_lowat <= 0) {
+				goto wait_for_sndbuf;
+			}
 		}
 
 		/* Try to append data to the end of skb. */
