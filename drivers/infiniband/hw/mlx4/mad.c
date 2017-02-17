@@ -1128,17 +1128,20 @@ static void propagate_pkey_ev(struct mlx4_ib_dev *dev, int port_num,
 static void handle_slaves_guid_change(struct mlx4_ib_dev *dev, u8 port_num,
 				      u32 guid_tbl_blk_num, u32 change_bitmap)
 {
-	struct ib_smp *in_mad  = NULL;
-	struct ib_smp *out_mad  = NULL;
+	struct ib_smp *in_mad;
+	struct ib_smp *out_mad;
 	u16 i;
 
 	if (!mlx4_is_mfunc(dev->dev) || !mlx4_is_master(dev->dev))
 		return;
 
 	in_mad  = kmalloc(sizeof *in_mad, GFP_KERNEL);
+	if (!in_mad)
+		return;
+
 	out_mad = kmalloc(sizeof *out_mad, GFP_KERNEL);
-	if (!in_mad || !out_mad)
-		goto out;
+	if (!out_mad)
+		goto free_in_mad;
 
 	guid_tbl_blk_num  *= 4;
 
@@ -1171,8 +1174,9 @@ static void handle_slaves_guid_change(struct mlx4_ib_dev *dev, u8 port_num,
 	}
 
 out:
-	kfree(in_mad);
 	kfree(out_mad);
+free_in_mad:
+	kfree(in_mad);
 }
 
 void handle_port_mgmt_change_event(struct work_struct *work)
