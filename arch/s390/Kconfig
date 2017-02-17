@@ -680,6 +680,13 @@ config VFIO_CCW
 	  To compile this driver as a module, choose M here: the
 	  module will be called vfio_ccw.
 
+config VFIO_CCW_CCW0
+	def_bool n
+	prompt "Support for CCW0 translation"
+	depends on VFIO_CCW
+	help
+	  Enable translation for CCW0 programs for VFIO-CCW subchannels.
+
 endmenu
 
 menu "Dump support"
