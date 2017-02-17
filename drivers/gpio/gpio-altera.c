@@ -310,7 +310,8 @@ static int altera_gpio_probe(struct platform_device *pdev)
 	altera_gc->interrupt_trigger = reg;
 
 	ret = gpiochip_irqchip_add(&altera_gc->mmchip.gc, &altera_irq_chip, 0,
-		handle_simple_irq, IRQ_TYPE_NONE);
+		altera_gc->interrupt_trigger == IRQ_TYPE_LEVEL_HIGH ?
+		handle_level_irq : handle_simple_irq, IRQ_TYPE_NONE);
 
 	if (ret) {
 		dev_err(&pdev->dev, "could not add irqchip\n");
