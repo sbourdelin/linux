@@ -673,7 +673,7 @@ config EADM_SCH
 config VFIO_CCW
 	def_tristate n
 	prompt "Support for VFIO-CCW subchannels"
-	depends on S390_CCW_IOMMU && VFIO
+	depends on S390_CCW_IOMMU && VFIO_MDEV
 	help
 	  This driver allows usage of VFIO-CCW subchannels.
 
