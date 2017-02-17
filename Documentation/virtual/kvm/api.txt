@@ -3198,6 +3198,66 @@ struct kvm_reinject_control {
 pit_reinject = 0 (!reinject mode) is recommended, unless running an old
 operating system that uses the PIT for timing (e.g. Linux 2.4.x).
 
+4.99 KVM_X86_GET_MCE_CAP_SUPPORTED
+
+Capability: KVM_CAP_MCE
+Architectures: x86
+Type: system ioctl
+Parameters: u64 mce_cap (in/out)
+Returns: 0 on success, -1 on error
+
+Returns supported MCE capabilities. The u64 mce_cap parameter
+has the same format as the MSR_IA32_MCG_CAP register. Supported
+capabilities will have the corresponding bits set.
+
+4.100 KVM_X86_SETUP_MCE
+
+Capability: KVM_CAP_MCE
+Architectures: x86
+Type: vcpu ioctl
+Parameters: u64 mcg_cap (in)
+Returns: 0 on success,
+         -EFAULT if u64 mcg_cap cannot be read,
+         -EINVAL if the requested number of banks is invalid,
+         -EINVAL if requested MCE capability is not supported.
+
+Initializes MCE support for use. The u64 mcg_cap parameter
+has the same format as the MSR_IA32_MCG_CAP register and
+specifies which capabilities should be enabled. The maximum
+supported number of error-reporting banks can be retreive when
+checking for KVM_CAP_MCE. The supported capabilities can be
+retrieved with KVM_X86_GET_MCE_CAP_SUPPORTED.
+
+4.101 KVM_X86_SET_MCE
+
+Capability: KVM_CAP_MCE
+Architectures: x86
+Type: vcpu ioctl
+Parameters: struct kvm_x86_mce (in)
+Returns: 0 on success,
+         -EFAULT if struct kvm_x86_mce cannot be read,
+         -EINVAL if the bank number is invalid,
+         -EINVAL if VAL bit is not set in status field.
+
+Inject an MCE into the guest. The input parameter is:
+
+struct kvm_x86_mce {
+	__u64 status;
+	__u64 addr;
+	__u64 misc;
+	__u64 mcg_status;
+	__u8 bank;
+	__u8 pad1[7];
+	__u64 pad2[3];
+};
+
+If the MCE being reported is an uncorrected error, KVM will
+inject it as a MCE exception into the guest (if an MCE
+is still in progress, a triple fault is be injected).
+Otherwise, if the MCE is a corrected error, KVM will just
+store it in the corresponding bank (provided this bank is
+not holding a previously reported uncorrected error).
+
 5. The kvm_run structure
 ------------------------
 
