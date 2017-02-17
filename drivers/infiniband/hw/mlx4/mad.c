@@ -1559,8 +1559,10 @@ static void mlx4_ib_multiplex_mad(struct mlx4_ib_demux_pv_ctx *ctx, struct ib_wc
 		}
 	}
 
-	/* We are using standard ib_core services to send the mad, so generate a
-	 * stadard address handle by decoding the tunnelled mlx4_ah fields */
+	/*
+	 * We are using standard ib_core services to send the mad, so generate
+	 * a standard address handle by decoding the tunnelled mlx4_ah fields.
+	 */
 	memcpy(&ah.av, &tunnel->hdr.av, sizeof (struct mlx4_av));
 	ah.ibah.device = ctx->ib_dev;
 
