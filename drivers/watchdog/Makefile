@@ -31,6 +31,7 @@ obj-$(CONFIG_WDTPCI) += wdt_pci.o
 
 # USB-based Watchdog Cards
 obj-$(CONFIG_USBPCWATCHDOG) += pcwd_usb.o
+obj-$(CONFIG_USB_STREAMLABS_WATCHDOG) += streamlabs_wdt.o
 
 # ALPHA Architecture
 

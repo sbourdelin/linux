@@ -1852,6 +1852,22 @@ config USBPCWATCHDOG
 
 	  Most people will say N.
 
+config USB_STREAMLABS_WATCHDOG
+	tristate "StreamLabs USB watchdog driver"
+	depends on USB
+	---help---
+	  This is the driver for the USB Watchdog dongle from StreamLabs.
+	  If you correctly connect reset pins to motherboard Reset pin and
+	  to Reset button then this device will simply watch your kernel to make
+	  sure it doesn't freeze, and if it does, it reboots your computer
+	  after a certain amount of time.
+
+
+	  To compile this driver as a module, choose M here: the
+	  module will be called streamlabs_wdt.
+
+	  Most people will say N. Say yes or M if you want to use such usb device.
+
 comment "Watchdog Pretimeout Governors"
 
 config WATCHDOG_PRETIMEOUT_GOV
