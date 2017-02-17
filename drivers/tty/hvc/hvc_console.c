@@ -142,9 +142,14 @@ static uint32_t vtermnos[MAX_NR_HVC_CONSOLES] =
 static void hvc_console_print(struct console *co, const char *b,
 			      unsigned count)
 {
-	char c[N_OUTBUF] __ALIGNED__;
 	unsigned i = 0, n = 0;
 	int r, donecr = 0, index = co->index;
+
+	/*
+	 * Access to the buffer is serialized by console_sem in caller code from
+	 * kernel/printk/printk.c
+	 */
+	static char c[N_OUTBUF] __ALIGNED__;
 
 	/* Console access attempt outside of acceptable console range. */
 	if (index >= MAX_NR_HVC_CONSOLES)
