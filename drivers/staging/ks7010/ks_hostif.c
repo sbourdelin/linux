@@ -2148,8 +2148,9 @@ void hostif_sme_mode_setup(struct ks_wlan_private *priv)
 				else
 					rate_octet[i] =
 					    priv->reg.rate_set.body[i];
-			} else
+			} else {
 				break;
+			}
 		}
 
 	} else {	/* D_11G_ONLY_MODE or D_11BG_COMPATIBLE_MODE */
@@ -2163,8 +2164,9 @@ void hostif_sme_mode_setup(struct ks_wlan_private *priv)
 				else
 					rate_octet[i] =
 					    priv->reg.rate_set.body[i];
-			} else
+			} else {
 				break;
+			}
 		}
 	}
 	rate_size = i;
