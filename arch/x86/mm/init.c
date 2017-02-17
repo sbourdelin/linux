@@ -514,7 +514,7 @@ static void __init memory_map_top_down(unsigned long map_start,
 	step_size = PMD_SIZE;
 	max_pfn_mapped = 0; /* will get exact value next */
 	min_pfn_mapped = real_end >> PAGE_SHIFT;
-	last_start = start = real_end;
+	last_start = real_end;
 
 	/*
 	 * We start from the top (end of memory) and go to the bottom.
@@ -523,12 +523,10 @@ static void __init memory_map_top_down(unsigned long map_start,
 	 * for page table.
 	 */
 	while (last_start > map_start) {
-		if (last_start > step_size) {
-			start = round_down(last_start - 1, step_size);
-			if (start < map_start)
-				start = map_start;
-		} else
+		start = round_down(last_start - 1, step_size);
+		if (start < map_start)
 			start = map_start;
+
 		mapped_ram_size += init_range_memory_mapping(start,
 							last_start);
 		last_start = start;
