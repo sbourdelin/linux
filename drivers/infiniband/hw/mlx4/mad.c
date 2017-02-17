@@ -1607,7 +1607,7 @@ static int mlx4_ib_alloc_pv_bufs(struct mlx4_ib_demux_pv_ctx *ctx,
 		return -ENOMEM;
 
 	tun_qp->tx_ring = kcalloc(MLX4_NUM_TUNNEL_BUFS,
-				  sizeof (struct mlx4_ib_tun_tx_buf),
+				  sizeof(*tun_qp->tx_ring),
 				  GFP_KERNEL);
 	if (!tun_qp->tx_ring) {
 		kfree(tun_qp->ring);
