@@ -2126,8 +2126,14 @@ static void kvm_gmap_notifier(struct gmap *gmap, unsigned long start,
 
 int kvm_arch_vcpu_should_kick(struct kvm_vcpu *vcpu)
 {
-	/* kvm common code refers to this, but never calls it */
-	BUG();
+	/*
+	 * STOP indication is resetted when delivering interrupts. This
+	 * is done before we handle requests, so we only "loose" this
+	 * when we are still going to handle requests. In that case
+	 * we no longer need that STOP indication.
+	 */
+	__set_cpuflag(vcpu, CPUSTAT_STOP_INT);
+	kvm_s390_vsie_kick(vcpu);
 	return 0;
 }
 
@@ -2684,6 +2690,7 @@ static int __vcpu_run(struct kvm_vcpu *vcpu)
 	 */
 	vcpu->srcu_idx = srcu_read_lock(&vcpu->kvm->srcu);
 
+	vcpu->mode = IN_GUEST_MODE;
 	do {
 		rc = vcpu_pre_run(vcpu);
 		if (rc)
@@ -2708,6 +2715,7 @@ static int __vcpu_run(struct kvm_vcpu *vcpu)
 
 		rc = vcpu_post_run(vcpu, exit_reason);
 	} while (!signal_pending(current) && !guestdbg_exit_pending(vcpu) && !rc);
+	vcpu->mode = OUTSIDE_GUEST_MODE;
 
 	srcu_read_unlock(&vcpu->kvm->srcu, vcpu->srcu_idx);
 	return rc;
