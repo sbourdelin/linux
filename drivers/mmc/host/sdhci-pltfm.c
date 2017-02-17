@@ -44,6 +44,20 @@ unsigned int sdhci_pltfm_clk_get_max_clock(struct sdhci_host *host)
 }
 EXPORT_SYMBOL_GPL(sdhci_pltfm_clk_get_max_clock);
 
+unsigned int sdhci_pltfm_clk_get_timeout_clock(struct sdhci_host *host)
+{
+	struct sdhci_pltfm_host *pltfm_host = sdhci_priv(host);
+	unsigned int freq;
+
+	freq = DIV_ROUND_UP(clk_get_rate(pltfm_host->clk), 1000);
+
+	if (host->caps & SDHCI_TIMEOUT_CLK_UNIT)
+		freq = DIV_ROUND_UP(freq, 1000);
+
+	return freq;
+}
+EXPORT_SYMBOL_GPL(sdhci_pltfm_clk_get_timeout_clock);
+
 static const struct sdhci_ops sdhci_pltfm_ops = {
 	.set_clock = sdhci_set_clock,
 	.set_bus_width = sdhci_set_bus_width,

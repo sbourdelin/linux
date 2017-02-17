@@ -103,6 +103,7 @@ extern int sdhci_pltfm_register(struct platform_device *pdev,
 extern int sdhci_pltfm_unregister(struct platform_device *pdev);
 
 extern unsigned int sdhci_pltfm_clk_get_max_clock(struct sdhci_host *host);
+extern unsigned int sdhci_pltfm_clk_get_timeout_clock(struct sdhci_host *host);
 
 static inline void *sdhci_pltfm_priv(struct sdhci_pltfm_host *host)
 {
