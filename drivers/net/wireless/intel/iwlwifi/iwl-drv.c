@@ -1231,6 +1231,29 @@ static void _iwl_op_mode_stop(struct iwl_drv *drv)
 	}
 }
 
+static void iwlwifi_try_load_op(struct iwlwifi_opmode_table *op,
+				struct iwl_drv *drv)
+{
+	int ret = 0;
+
+	ret = request_module("%s", op->name);
+	if (ret)
+		goto out;
+
+	mutex_lock(&iwlwifi_opmode_table_mtx);
+	if (!op->ops)
+		ret = -ENOENT;
+	mutex_unlock(&iwlwifi_opmode_table_mtx);
+
+out:
+#ifdef CONFIG_IWLWIFI_OPMODE_MODULAR
+	if (ret)
+		IWL_ERR(drv,
+			"failed to load module %s (error %d), is dynamic loading enabled?\n",
+			op->name, ret);
+#endif
+}
+
 /**
  * iwl_req_fw_callback - callback when firmware was loaded
  *
@@ -1471,15 +1494,8 @@ static void iwl_req_fw_callback(const struct firmware *ucode_raw, void *context)
 	 * else from proceeding if the module fails to load
 	 * or hangs loading.
 	 */
-	if (load_module) {
-		err = request_module("%s", op->name);
-#ifdef CONFIG_IWLWIFI_OPMODE_MODULAR
-		if (err)
-			IWL_ERR(drv,
-				"failed to load module %s (error %d), is dynamic loading enabled?\n",
-				op->name, err);
-#endif
-	}
+	if (load_module)
+		iwlwifi_try_load_op(op, drv);
 	goto free;
 
  try_again:
