@@ -163,8 +163,10 @@ int bcm2835_audio_write(struct bcm2835_alsa_stream *alsa_stream,
 			unsigned int count,
 			void *src);
 void bcm2835_playback_fifo(struct bcm2835_alsa_stream *alsa_stream);
-unsigned int bcm2835_audio_retrieve_buffers(struct bcm2835_alsa_stream *alsa_stream);
+unsigned int bcm2835_audio_retrieve_buffers(
+		struct bcm2835_alsa_stream *alsa_stream);
 void bcm2835_audio_flush_buffers(struct bcm2835_alsa_stream *alsa_stream);
-void bcm2835_audio_flush_playback_buffers(struct bcm2835_alsa_stream *alsa_stream);
+void bcm2835_audio_flush_playback_buffers(
+		struct bcm2835_alsa_stream *alsa_stream);
 
 #endif /* __SOUND_ARM_BCM2835_H */
