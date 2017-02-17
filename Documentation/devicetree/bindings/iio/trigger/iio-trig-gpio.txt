@@ -1,0 +1,26 @@
+Industrial I/O - GPIO based trigger
+
+GPIOs may be used as IIO trigger provider, when trigger is connected to
+GPIO lines.
+
+Required properties:
+- compatible: Should be "iio-gpio-trigger"
+- gpios: Should specify one GPIO line used as trigger source.
+  See Documentation/devicetree/bindings/gpio/gpio.txt
+- #io-trigger-cells: Should be 0, as simple trigger provider.
+  See Documentation/devicetree/bindings/iio/iio-bindings.txt
+
+Optional properties:
+- label: String to specifiy trigger name.
+- gpio-trigger-rising-edge: A rising edge on GPIO will trigger.
+- gpio-trigger-falling-edge: A falling edge on GPIO will trigger.
+  Note: Both rising and falling edge may be used. In case none of
+  rising or falling edge is selected, rising edge is selected by
+  default.
+
+Example:
+	gpiotrig0: iio-gpio-trigger0 {
+		#io-trigger-cells = <0>;
+		compatible = "iio-gpio-trigger";
+		gpios = <&gpioa 11 0>;
+	}
