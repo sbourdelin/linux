@@ -145,6 +145,8 @@ static struct iwlwifi_opmode_table {
 	[DVM_OP_MODE] = { .name = "iwldvm", .ops = NULL },
 	[MVM_OP_MODE] = { .name = "iwlmvm", .ops = NULL },
 };
+static void iwlwifi_opmode_dowork(struct work_struct *work);
+static DECLARE_WORK(iwlwifi_opmode_work, iwlwifi_opmode_dowork);
 
 #define IWL_DEFAULT_SCAN_CHANNELS 40
 
@@ -1291,7 +1293,7 @@ static void iwlwifi_opmode_start(struct iwlwifi_opmode_table *op)
 		iwlwifi_opmode_start_drv(op, drv);
 }
 
-static void iwlwifi_opmode_dowork(void)
+static void iwlwifi_opmode_dowork(struct work_struct *unused_work)
 {
 	unsigned int i;
 	struct iwlwifi_opmode_table *op;
@@ -1530,7 +1532,7 @@ static void iwl_req_fw_callback(const struct firmware *ucode_raw, void *context)
 
 	mutex_unlock(&iwlwifi_opmode_table_mtx);
 
-	iwlwifi_opmode_dowork();
+	schedule_work(&iwlwifi_opmode_work);
 	goto free;
 
  try_again:
@@ -1614,6 +1616,7 @@ err:
 void iwl_drv_stop(struct iwl_drv *drv)
 {
 	wait_for_completion(&drv->request_firmware_complete);
+	cancel_work_sync(&iwlwifi_opmode_work);
 
 	_iwl_op_mode_stop(drv);
 
@@ -1667,7 +1670,7 @@ int iwl_opmode_register(const char *name, const struct iwl_op_mode_ops *ops)
 	mutex_unlock(&iwlwifi_opmode_table_mtx);
 
 	if (!ret)
-		iwlwifi_opmode_dowork();
+		schedule_work(&iwlwifi_opmode_work);
 
 	return ret;
 }
