@@ -2231,7 +2231,7 @@ void kvm_vcpu_kick(struct kvm_vcpu *vcpu)
 	me = get_cpu();
 	if (cpu != me && (unsigned)cpu < nr_cpu_ids && cpu_online(cpu))
 		if (kvm_arch_vcpu_should_kick(vcpu))
-			smp_send_reschedule(cpu);
+			kvm_arch_cpu_kick(cpu);
 	put_cpu();
 }
 EXPORT_SYMBOL_GPL(kvm_vcpu_kick);

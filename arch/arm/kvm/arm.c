@@ -97,6 +97,11 @@ int kvm_arch_vcpu_should_kick(struct kvm_vcpu *vcpu)
 	return kvm_vcpu_exiting_guest_mode(vcpu) == IN_GUEST_MODE;
 }
 
+void kvm_arch_cpu_kick(int cpu)
+{
+	smp_send_reschedule(cpu);
+}
+
 int kvm_arch_hardware_setup(void)
 {
 	return 0;

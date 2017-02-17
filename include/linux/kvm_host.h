@@ -766,6 +766,7 @@ void kvm_arch_hardware_unsetup(void);
 void kvm_arch_check_processor_compat(void *rtn);
 int kvm_arch_vcpu_runnable(struct kvm_vcpu *vcpu);
 int kvm_arch_vcpu_should_kick(struct kvm_vcpu *vcpu);
+void kvm_arch_cpu_kick(int cpu);
 
 void *kvm_kvzalloc(unsigned long size);
 

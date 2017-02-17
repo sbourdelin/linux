@@ -60,6 +60,11 @@ int kvm_arch_vcpu_should_kick(struct kvm_vcpu *vcpu)
 	return 1;
 }
 
+void kvm_arch_cpu_kick(int cpu)
+{
+	smp_send_reschedule(cpu);
+}
+
 /*
  * Common checks before entering the guest world.  Call with interrupts
  * disabled.

@@ -2131,6 +2131,12 @@ int kvm_arch_vcpu_should_kick(struct kvm_vcpu *vcpu)
 	return 0;
 }
 
+void kvm_arch_cpu_kick(int cpu)
+{
+	/* TODO: implement kicking with SIE */
+	BUG();
+}
+
 static int kvm_arch_vcpu_ioctl_get_one_reg(struct kvm_vcpu *vcpu,
 					   struct kvm_one_reg *reg)
 {
