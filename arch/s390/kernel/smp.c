@@ -492,6 +492,7 @@ void smp_send_reschedule(int cpu)
 {
 	pcpu_ec_call(pcpu_devices + cpu, ec_schedule);
 }
+EXPORT_SYMBOL_GPL(smp_send_reschedule);
 
 /*
  * parameter area for the set/clear control bit callbacks
