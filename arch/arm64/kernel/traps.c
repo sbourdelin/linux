@@ -84,7 +84,7 @@ static void dump_mem(const char *lvl, const char *str, unsigned long bottom,
 			if (p >= bottom && p < top) {
 				unsigned long val;
 
-				if (__get_user(val, (unsigned long *)p) == 0)
+				if (__get_user(val, (unsigned long __user *)p) == 0)
 					sprintf(str + i * 17, " %016lx", val);
 				else
 					sprintf(str + i * 17, " ????????????????");
@@ -113,7 +113,7 @@ static void __dump_instr(const char *lvl, struct pt_regs *regs)
 	for (i = -4; i < 1; i++) {
 		unsigned int val, bad;
 
-		bad = __get_user(val, &((u32 *)addr)[i]);
+		bad = __get_user(val, &((u32 __user *)addr)[i]);
 
 		if (!bad)
 			p += sprintf(p, i == 0 ? "(%08x) " : "%08x ", val);
@@ -340,23 +340,28 @@ static int call_undef_hook(struct pt_regs *regs)
 		return 1;
 
 	if (compat_thumb_mode(regs)) {
-		/* 16-bit Thumb instruction */
-		if (get_user(instr, (u16 __user *)pc))
-			goto exit;
-		instr = le16_to_cpu(instr);
-		if (aarch32_insn_is_wide(instr)) {
-			u32 instr2;
+		__le16 tinst;
 
-			if (get_user(instr2, (u16 __user *)(pc + 2)))
+		/* 16-bit Thumb instruction */
+		if (get_user(tinst, (__le16 __user *)pc))
+			goto exit;
+		instr = le16_to_cpu(tinst);
+		if (aarch32_insn_is_wide(instr)) {
+			__le16 tinstr2;
+			u16 instr2;
+
+			if (get_user(tinstr2, (__le16 __user *)(pc + 2)))
 				goto exit;
-			instr2 = le16_to_cpu(instr2);
+			instr2 = le16_to_cpu(tinstr2);
 			instr = (instr << 16) | instr2;
 		}
 	} else {
+		__le32 ainst;
+
 		/* 32-bit ARM instruction */
-		if (get_user(instr, (u32 __user *)pc))
+		if (get_user(ainst, (__le32 __user *)pc))
 			goto exit;
-		instr = le32_to_cpu(instr);
+		instr = le32_to_cpu(ainst);
 	}
 
 	raw_spin_lock_irqsave(&undef_lock, flags);
