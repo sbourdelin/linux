@@ -114,6 +114,7 @@ nfs_iocounter_wait(struct nfs_lock_context *l_ctx)
 	return wait_on_atomic_t(&l_ctx->io_count, nfs_wait_atomic_killable,
 			TASK_KILLABLE);
 }
+EXPORT_SYMBOL(nfs_iocounter_wait);
 
 /*
  * nfs_page_group_lock - lock the head of the page group

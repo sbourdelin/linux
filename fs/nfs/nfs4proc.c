@@ -5906,6 +5906,7 @@ struct nfs4_unlockdata {
 	struct nfs_locku_res res;
 	struct nfs4_lock_state *lsp;
 	struct nfs_open_context *ctx;
+	struct nfs_lock_context *l_ctx;
 	struct file_lock fl;
 	struct nfs_server *server;
 	unsigned long timestamp;
@@ -5930,6 +5931,7 @@ static struct nfs4_unlockdata *nfs4_alloc_unlockdata(struct file_lock *fl,
 	atomic_inc(&lsp->ls_count);
 	/* Ensure we don't close file until we're done freeing locks! */
 	p->ctx = get_nfs_open_context(ctx);
+	p->l_ctx = nfs_get_lock_context(ctx);
 	memcpy(&p->fl, fl, sizeof(p->fl));
 	p->server = NFS_SERVER(inode);
 	return p;
@@ -5987,6 +5989,11 @@ static void nfs4_locku_prepare(struct rpc_task *task, void *data)
 	if (test_bit(NFS_LOCK_INITIALIZED, &calldata->lsp->ls_flags) == 0) {
 		/* Note: exit _without_ running nfs4_locku_done */
 		goto out_no_action;
+	}
+
+	if (!IS_ERR(calldata->l_ctx)) {
+		nfs_iocounter_wait(calldata->l_ctx);
+		nfs_put_lock_context(calldata->l_ctx);
 	}
 	calldata->timestamp = jiffies;
 	if (nfs4_setup_sequence(calldata->server,

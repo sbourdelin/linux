@@ -684,7 +684,6 @@ static int
 do_unlk(struct file *filp, int cmd, struct file_lock *fl, int is_local)
 {
 	struct inode *inode = filp->f_mapping->host;
-	struct nfs_lock_context *l_ctx;
 	int status;
 
 	/*
@@ -693,18 +692,6 @@ do_unlk(struct file *filp, int cmd, struct file_lock *fl, int is_local)
 	 */
 	vfs_fsync(filp, 0);
 
-	l_ctx = nfs_get_lock_context(nfs_file_open_context(filp));
-	if (!IS_ERR(l_ctx)) {
-		status = nfs_iocounter_wait(l_ctx);
-		nfs_put_lock_context(l_ctx);
-		if (status < 0)
-			return status;
-	}
-
-	/* NOTE: special case
-	 * 	If we're signalled while cleaning up locks on process exit, we
-	 * 	still need to complete the unlock.
-	 */
 	/*
 	 * Use local locking if mounted with "-onolock" or with appropriate
 	 * "-olocal_lock="
