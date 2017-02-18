@@ -5149,7 +5149,8 @@ int btrfs_num_copies(struct btrfs_fs_info *fs_info, u64 logical, u64 len)
 	free_extent_map(em);
 
 	btrfs_dev_replace_lock(&fs_info->dev_replace, 0);
-	if (btrfs_dev_replace_is_ongoing(&fs_info->dev_replace))
+	if (btrfs_dev_replace_is_ongoing(&fs_info->dev_replace) &&
+	    fs_info->dev_replace.tgtdev)
 		ret++;
 	btrfs_dev_replace_unlock(&fs_info->dev_replace, 0);
 
@@ -5854,7 +5855,7 @@ static int __btrfs_map_block(struct btrfs_fs_info *fs_info,
 	}
 
 	num_alloc_stripes = num_stripes;
-	if (dev_replace_is_ongoing) {
+	if (dev_replace_is_ongoing && dev_replace->tgtdev != NULL) {
 		if (op == BTRFS_MAP_WRITE)
 			num_alloc_stripes <<= 1;
 		if (op == BTRFS_MAP_GET_READ_MIRRORS)
@@ -5867,7 +5868,7 @@ static int __btrfs_map_block(struct btrfs_fs_info *fs_info,
 		ret = -ENOMEM;
 		goto out;
 	}
-	if (dev_replace_is_ongoing)
+	if (dev_replace_is_ongoing && dev_replace->tgtdev != NULL)
 		bbio->tgtdev_map = (int *)(bbio->stripes + num_alloc_stripes);
 
 	/* build raid_map */
