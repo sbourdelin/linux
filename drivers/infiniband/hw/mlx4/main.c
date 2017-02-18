@@ -3103,7 +3103,7 @@ static void do_slave_init(struct mlx4_ib_dev *ibdev, int slave, int do_init)
 		return;
 
 	for (i = 0; i < ports; i++) {
-		dm[i] = kmalloc(sizeof (struct mlx4_ib_demux_work), GFP_ATOMIC);
+		dm[i] = kmalloc(sizeof(*dm[i]), GFP_ATOMIC);
 		if (!dm[i]) {
 			while (--i >= 0)
 				kfree(dm[i]);
