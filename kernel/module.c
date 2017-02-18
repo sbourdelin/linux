@@ -4267,6 +4267,50 @@ struct module *__module_text_address(unsigned long addr)
 }
 EXPORT_SYMBOL_GPL(__module_text_address);
 
+/**
+ * is_module_text_ro_address - is this address inside read-only module code?
+ * @addr: the address to check.
+ *
+ */
+bool is_module_ro_address(unsigned long addr)
+{
+	bool ret;
+
+	preempt_disable();
+	ret = __module_ro_address(addr) != NULL;
+	preempt_enable();
+
+	return ret;
+}
+
+/*
+ * __module_ro_address - get the module whose code contains a read-only address.
+ * @addr: the address.
+ *
+ * Must be called with preempt disabled or module mutex held so that
+ * module doesn't get freed during this.
+ */
+struct module *__module_ro_address(unsigned long addr)
+{
+	struct module *mod = __module_address(addr);
+
+	if (mod) {
+		/* Make sure it's within the read-only section. */
+		if (!within(addr, mod->init_layout.base,
+			    mod->init_layout.ro_size)
+		    && !within(addr, mod->core_layout.base,
+			       mod->core_layout.ro_size))
+			mod = NULL;
+		if (!within(addr, mod->init_layout.base,
+			    mod->init_layout.ro_after_init_size)
+		    && !within(addr, mod->core_layout.base,
+			       mod->core_layout.ro_after_init_size))
+			mod = NULL;
+	}
+	return mod;
+}
+EXPORT_SYMBOL_GPL(__module_ro_address);
+
 /* Don't grab lock, we're oopsing. */
 void print_modules(void)
 {
