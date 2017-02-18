@@ -2822,9 +2822,8 @@ static void *mlx4_ib_add(struct mlx4_dev *dev)
 	}
 	if (mlx4_is_bonded(dev))
 		for (i = 1; i < ibdev->num_ports ; ++i) {
-			new_counter_index =
-					kmalloc(sizeof(struct counter_index),
-						GFP_KERNEL);
+			new_counter_index = kmalloc(sizeof(*new_counter_index),
+						    GFP_KERNEL);
 			if (!new_counter_index)
 				goto err_counter;
 			new_counter_index->index = counter_index;
