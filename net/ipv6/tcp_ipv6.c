@@ -284,12 +284,18 @@ static int tcp_v6_connect(struct sock *sk, struct sockaddr *uaddr,
 
 	sk_set_txhash(sk);
 
-	if (!tp->write_seq && likely(!tp->repair))
+	if (!tp->write_seq && likely(!tp->repair)) {
 		tp->write_seq = secure_tcpv6_sequence_number(np->saddr.s6_addr32,
 							     sk->sk_v6_daddr.s6_addr32,
 							     inet->inet_sport,
 							     inet->inet_dport,
 							     &tp->tsoffset);
+	} else if (likely(!tp->repair)) {
+		secure_tcpv6_sequence_number(np->saddr.s6_addr32,
+					     sk->sk_v6_daddr.s6_addr32,
+					     inet->inet_sport, inet->inet_dport,
+					     &tp->tsoffset);
+	}
 
 	err = tcp_connect(sk);
 	if (err)
