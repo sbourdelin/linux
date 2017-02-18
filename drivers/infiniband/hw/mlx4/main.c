@@ -2620,11 +2620,8 @@ static void *mlx4_ib_add(struct mlx4_dev *dev)
 		return NULL;
 
 	ibdev = (struct mlx4_ib_dev *) ib_alloc_device(sizeof(*ibdev));
-	if (!ibdev) {
-		dev_err(&dev->persist->pdev->dev,
-			"Device struct alloc failed\n");
+	if (!ibdev)
 		return NULL;
-	}
 
 	iboe = &ibdev->iboe;
 
