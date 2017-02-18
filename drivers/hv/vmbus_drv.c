@@ -1053,6 +1053,11 @@ int __vmbus_driver_register(struct hv_driver *hv_driver, struct module *owner, c
 	if (ret < 0)
 		return ret;
 
+	ret = kernel_ro_address(&hv_driver);
+	if (ret < 1)
+		pr_err("Module address is not read-only.");
+		return ret;
+
 	hv_driver->driver.name = hv_driver->name;
 	hv_driver->driver.owner = owner;
 	hv_driver->driver.mod_name = mod_name;
@@ -1118,6 +1123,11 @@ struct hv_device *vmbus_device_create(const uuid_le *type,
 int vmbus_device_register(struct hv_device *child_device_obj)
 {
 	int ret = 0;
+
+	ret = kernel_ro_address(&child_device_obj);
+	if (ret < 1)
+		pr_err("Device address is not read-only.");
+		return ret;
 
 	dev_set_name(&child_device_obj->device, "%pUl",
 		     child_device_obj->channel->offermsg.offer.if_instance.b);
