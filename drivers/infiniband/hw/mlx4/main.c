@@ -3128,7 +3128,6 @@ static void do_slave_init(struct mlx4_ib_dev *ibdev, int slave, int do_init)
 	}
 out:
 	kfree(dm);
-	return;
 }
 
 static void mlx4_ib_handle_catas_error(struct mlx4_ib_dev *ibdev)
