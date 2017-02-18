@@ -32,7 +32,6 @@ enum ht_extchnl_offset {
 };
 
 struct ht_capab_ele {
-
 	u8	AdvCoding:1;
 	u8	ChlWidth:1;
 	u8	MimoPwrSave:2;
@@ -187,7 +186,6 @@ struct rt_hi_throughput {
 } __packed;
 
 struct bss_ht {
-
 	u8				bdSupportHT;
 
 	u8					bdHTCapBuf[32];
