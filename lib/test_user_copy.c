@@ -37,6 +37,7 @@
 			    !defined(CONFIG_MICROBLAZE) &&	\
 			    !defined(CONFIG_MN10300) &&		\
 			    !defined(CONFIG_NIOS2) &&		\
+			    !defined(CONFIG_PPC32) &&		\
 			    !defined(CONFIG_SUPERH))
 # define TEST_U64
 #endif
