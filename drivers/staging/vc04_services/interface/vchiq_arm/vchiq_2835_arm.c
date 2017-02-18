@@ -121,8 +121,12 @@ int vchiq_platform_init(struct platform_device *pdev, VCHIQ_STATE_T *state)
 	if (err < 0)
 		return err;
 
-	(void)of_property_read_u32(dev->of_node, "cache-line-size",
+	err = of_property_read_u32(dev->of_node, "cache-line-size",
 				   &g_cache_line_size);
+
+	if (err < 0)
+		return -ENODEV;
+
 	g_fragments_size = 2 * g_cache_line_size;
 
 	/* Allocate space for the channels in coherent memory */
