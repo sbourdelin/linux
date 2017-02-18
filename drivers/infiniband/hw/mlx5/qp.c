@@ -930,7 +930,7 @@ static int create_kernel_qp(struct mlx5_ib_dev *dev,
 	*in = mlx5_vzalloc(*inlen);
 	if (!*in) {
 		err = -ENOMEM;
-		goto err_buf;
+		goto free_buffer;
 	}
 
 	qpc = MLX5_ADDR_OF(create_qp_in, *in, qpc);
@@ -952,45 +952,56 @@ static int create_kernel_qp(struct mlx5_ib_dev *dev,
 	err = mlx5_db_alloc(dev->mdev, &qp->db);
 	if (err) {
 		mlx5_ib_dbg(dev, "err %d\n", err);
-		goto err_free;
+		goto vfree_in;
 	}
 
 	qp->sq.wrid = kmalloc_array(qp->sq.wqe_cnt,
 				    sizeof(*qp->sq.wrid),
 				    GFP_KERNEL);
+	if (!qp->sq.wrid)
+		goto free_db;
+
 	qp->sq.wr_data = kmalloc_array(qp->sq.wqe_cnt,
 				       sizeof(*qp->sq.wr_data),
 				       GFP_KERNEL);
+	if (!qp->sq.wr_data)
+		goto free_sq_wrid;
+
 	qp->rq.wrid = kmalloc_array(qp->rq.wqe_cnt,
 				    sizeof(*qp->rq.wrid),
 				    GFP_KERNEL);
+	if (!qp->rq.wrid)
+		goto free_sq_wr_data;
+
 	qp->sq.w_list = kmalloc_array(qp->sq.wqe_cnt,
 				      sizeof(*qp->sq.w_list),
 				      GFP_KERNEL);
+	if (!qp->sq.w_list)
+		goto free_rq_wrid;
+
 	qp->sq.wqe_head = kmalloc_array(qp->sq.wqe_cnt,
 					sizeof(*qp->sq.wqe_head),
 					GFP_KERNEL);
-	if (!qp->sq.wrid || !qp->sq.wr_data || !qp->rq.wrid ||
-	    !qp->sq.w_list || !qp->sq.wqe_head) {
-		err = -ENOMEM;
-		goto err_wrid;
-	}
+	if (!qp->sq.wqe_head)
+		goto free_sq_w_list;
+
 	qp->create_type = MLX5_QP_KERNEL;
 
 	return 0;
-
-err_wrid:
-	kfree(qp->sq.wqe_head);
+free_sq_w_list:
 	kfree(qp->sq.w_list);
-	kfree(qp->sq.wrid);
-	kfree(qp->sq.wr_data);
+free_rq_wrid:
 	kfree(qp->rq.wrid);
+free_sq_wr_data:
+	kfree(qp->sq.wr_data);
+free_sq_wrid:
+	kfree(qp->sq.wrid);
+free_db:
 	mlx5_db_free(dev->mdev, &qp->db);
-
-err_free:
+	err = -ENOMEM;
+vfree_in:
 	kvfree(*in);
-
-err_buf:
+free_buffer:
 	mlx5_buf_free(dev->mdev, &qp->buf);
 	return err;
 }
