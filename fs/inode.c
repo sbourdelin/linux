@@ -75,6 +75,19 @@ static DEFINE_PER_CPU(unsigned long, nr_unused);
 
 static struct kmem_cache *inode_cachep __read_mostly;
 
+struct vfs_max_timestamp_check timestamp_check = {
+	.timestamp_supported = Y2038_EXPIRY_TIMESTAMP,
+	.check_on = 0,
+};
+
+static int __init setup_timestamp_check(char *str)
+{
+	timestamp_check.check_on = 1;
+    return 0;
+}
+
+early_param("fstimestampcheck", setup_timestamp_check);
+
 static long get_nr_inodes(void)
 {
 	int i;
