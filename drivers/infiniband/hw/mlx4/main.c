@@ -2612,8 +2612,6 @@ static void *mlx4_ib_add(struct mlx4_dev *dev)
 	struct counter_index *new_counter_index;
 
 	pr_info_once("%s", mlx4_ib_version);
-
-	num_ports = 0;
 	mlx4_foreach_ib_transport_port(i, dev)
 		num_ports++;
 
