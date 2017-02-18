@@ -649,7 +649,7 @@ static int dma_init(struct device_node *cloud, struct device_node *dma_node)
 	}
 
 	dma->reg_global	 = pktdma_get_regs(dma, node, 0, &size);
-	if (!dma->reg_global)
+	if (IS_ERR(dma->reg_global))
 		return -ENODEV;
 	if (size < sizeof(struct reg_global)) {
 		dev_err(kdev->dev, "bad size %pa for global regs\n", &size);
@@ -657,22 +657,22 @@ static int dma_init(struct device_node *cloud, struct device_node *dma_node)
 	}
 
 	dma->reg_tx_chan = pktdma_get_regs(dma, node, 1, &size);
-	if (!dma->reg_tx_chan)
+	if (IS_ERR(dma->reg_tx_chan))
 		return -ENODEV;
 
 	max_tx_chan = size / sizeof(struct reg_chan);
 	dma->reg_rx_chan = pktdma_get_regs(dma, node, 2, &size);
-	if (!dma->reg_rx_chan)
+	if (IS_ERR(dma->reg_rx_chan))
 		return -ENODEV;
 
 	max_rx_chan = size / sizeof(struct reg_chan);
 	dma->reg_tx_sched = pktdma_get_regs(dma, node, 3, &size);
-	if (!dma->reg_tx_sched)
+	if (IS_ERR(dma->reg_tx_sched))
 		return -ENODEV;
 
 	max_tx_sched = size / sizeof(struct reg_tx_sched);
 	dma->reg_rx_flow = pktdma_get_regs(dma, node, 4, &size);
-	if (!dma->reg_rx_flow)
+	if (IS_ERR(ma->reg_rx_flow))
 		return -ENODEV;
 
 	max_rx_flow = size / sizeof(struct reg_rx_flow);
