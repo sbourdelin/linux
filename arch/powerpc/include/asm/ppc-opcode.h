@@ -463,4 +463,14 @@
 				       ((IH & 0x7) << 21))
 #define PPC_INVALIDATE_ERAT	PPC_SLBIA(7)
 
+/*
+ * From PowerISA v2.07, architecture provides a special NOP instruction
+ * called "Probe-Nop" defined as "and 0,0,0". This form of "and" is
+ * reserved for use exclusively by the Performance Monitor.
+ */
+#define _PROBENOP(x)	stringify_in_c(.long PPC_INST_AND	|	\
+						___PPC_RS(x)	|	\
+						___PPC_RA(x)	|	\
+						___PPC_RB(x))
+#define PROBENOP(x)	asm volatile(_PROBENOP(x))
 #endif /* _ASM_POWERPC_PPC_OPCODE_H */
