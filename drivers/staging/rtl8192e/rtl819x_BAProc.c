@@ -83,12 +83,12 @@ static struct sk_buff *rtllib_ADDBA(struct rtllib_device *ieee, u8 *Dst,
 	netdev_dbg(ieee->dev, "%s(): frame(%d) sentd to: %pM, ieee->dev:%p\n",
 		   __func__, type, Dst, ieee->dev);
 
-	if (pBA == NULL) {
+	if (!pBA) {
 		netdev_warn(ieee->dev, "pBA is NULL\n");
 		return NULL;
 	}
 	skb = dev_alloc_skb(len + sizeof(struct rtllib_hdr_3addr));
-	if (skb == NULL)
+	if (!skb)
 		return NULL;
 
 	memset(skb->data, 0, sizeof(struct rtllib_hdr_3addr));
@@ -154,7 +154,7 @@ static struct sk_buff *rtllib_DELBA(struct rtllib_device *ieee, u8 *dst,
 	DelbaParamSet.field.TID	= pBA->BaParamSet.field.TID;
 
 	skb = dev_alloc_skb(len + sizeof(struct rtllib_hdr_3addr));
-	if (skb == NULL)
+	if (!skb)
 		return NULL;
 
 	skb_reserve(skb, ieee->tx_headroom);
