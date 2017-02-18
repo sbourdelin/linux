@@ -777,7 +777,6 @@ int __mlx4_ib_query_gid(struct ib_device *ibdev, u8 port, int index,
 	struct ib_smp *out_mad;
 	int err;
 	struct mlx4_ib_dev *dev = to_mdev(ibdev);
-	int clear = 0;
 	int mad_ifc_flags = MLX4_MAD_IFC_IGNORE_KEYS;
 
 	in_mad  = kzalloc(sizeof(*in_mad), GFP_KERNEL);
@@ -806,8 +805,8 @@ int __mlx4_ib_query_gid(struct ib_device *ibdev, u8 port, int index,
 	if (mlx4_is_mfunc(dev->dev) && !netw_view) {
 		if (index) {
 			/* For any index > 0, return the null guid */
+			memset(gid->raw + 8, 0, 8);
 			err = 0;
-			clear = 1;
 			goto out;
 		}
 	}
@@ -824,8 +823,6 @@ int __mlx4_ib_query_gid(struct ib_device *ibdev, u8 port, int index,
 	memcpy(gid->raw + 8, out_mad->data + (index % 8) * 8, 8);
 
 out:
-	if (clear)
-		memset(gid->raw + 8, 0, 8);
 	kfree(out_mad);
 free_in_mad:
 	kfree(in_mad);
