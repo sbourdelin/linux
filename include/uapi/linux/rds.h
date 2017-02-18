@@ -194,14 +194,14 @@ enum rds_message_rxpath_latency {
 };
 
 struct rds_rx_trace_so {
-	u8 rx_traces;
-	u8 rx_trace_pos[RDS_MSG_RX_DGRAM_TRACE_MAX];
+	uint8_t rx_traces;
+	uint8_t rx_trace_pos[RDS_MSG_RX_DGRAM_TRACE_MAX];
 };
 
 struct rds_cmsg_rx_trace {
-	u8 rx_traces;
-	u8 rx_trace_pos[RDS_MSG_RX_DGRAM_TRACE_MAX];
-	u64 rx_trace[RDS_MSG_RX_DGRAM_TRACE_MAX];
+	uint8_t rx_traces;
+	uint8_t rx_trace_pos[RDS_MSG_RX_DGRAM_TRACE_MAX];
+	uint64_t rx_trace[RDS_MSG_RX_DGRAM_TRACE_MAX];
 };
 
 /*
