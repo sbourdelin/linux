@@ -13,3 +13,4 @@ Depth data provides distance to points, mapped onto the image plane
     :maxdepth: 1
 
     pixfmt-z16
+    pixfmt-inzi
