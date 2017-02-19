@@ -6106,7 +6106,7 @@ static int selinux_key_getsecurity(struct key *key, char **_buffer)
 
 #endif
 
-static struct security_hook_list selinux_hooks[] = {
+static struct security_hook_list selinux_hooks[] __ro_mostly_after_init = {
 	LSM_HOOK_INIT(binder_set_context_mgr, selinux_binder_set_context_mgr),
 	LSM_HOOK_INIT(binder_transaction, selinux_binder_transaction),
 	LSM_HOOK_INIT(binder_transfer_binder, selinux_binder_transfer_binder),
@@ -6381,7 +6381,7 @@ security_initcall(selinux_init);
 
 #if defined(CONFIG_NETFILTER)
 
-static struct nf_hook_ops selinux_nf_ops[] = {
+static struct nf_hook_ops selinux_nf_ops[] __ro_mostly_after_init = {
 	{
 		.hook =		selinux_ipv4_postroute,
 		.pf =		NFPROTO_IPV4,
@@ -6477,13 +6477,17 @@ int selinux_disable(void)
 	selinux_disabled = 1;
 	selinux_enabled = 0;
 
+	set_ro_mostly_after_init_rw();
 	security_delete_hooks(selinux_hooks, ARRAY_SIZE(selinux_hooks));
+	set_ro_mostly_after_init_ro();
 
 	/* Try to destroy the avc node cache */
 	avc_disable();
 
 	/* Unregister netfilter hooks. */
+	set_ro_mostly_after_init_ro();
 	selinux_nf_ip_exit();
+	set_ro_mostly_after_init_rw();
 
 	/* Unregister selinuxfs. */
 	exit_sel_fs();
