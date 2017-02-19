@@ -1126,7 +1126,7 @@ core_initcall(cpu_hotplug_pm_sync_init);
 #endif /* CONFIG_SMP */
 
 /* Boot processor state steps */
-static struct cpuhp_step cpuhp_bp_states[] = {
+static struct cpuhp_step cpuhp_bp_states[] __ro_mostly_after_init = {
 	[CPUHP_OFFLINE] = {
 		.name			= "offline",
 		.startup.single		= NULL,
@@ -1212,7 +1212,7 @@ static struct cpuhp_step cpuhp_bp_states[] = {
 };
 
 /* Application processor state steps */
-static struct cpuhp_step cpuhp_ap_states[] = {
+static struct cpuhp_step cpuhp_ap_states[] __ro_mostly_after_init = {
 #ifdef CONFIG_SMP
 	/* Final state before CPU kills itself */
 	[CPUHP_AP_IDLE_DEAD] = {
