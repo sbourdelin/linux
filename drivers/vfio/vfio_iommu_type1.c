@@ -1657,6 +1657,37 @@ static long vfio_iommu_type1_ioctl(void *iommu_data,
 		mutex_unlock(&iommu->fault_lock);
 
 		return ret;
+	} else if (cmd == VFIO_IOMMU_GET_FAULT_INFO) {
+		struct vfio_iommu_type1_get_fault_info info;
+		int fault_size = sizeof(struct vfio_iommu_fault_info);
+		int ret;
+
+		minsz = offsetofend(struct vfio_iommu_type1_get_fault_info,
+				    count);
+		if (copy_from_user(&info, (void __user *)arg, minsz))
+			return -EFAULT;
+
+		if (info.argsz < minsz)
+			return -EINVAL;
+
+		mutex_lock(&iommu->fault_lock);
+		info.count = iommu->fault_count;
+
+		if (info.argsz < sizeof(info) +
+		    iommu->fault_count * fault_size)
+			ret = -ENOSPC;
+
+		if (copy_to_user((void __user *)arg, &info, minsz))
+			ret = -EFAULT;
+
+		if (!ret & !copy_to_user((void __user *)(arg + minsz),
+		    iommu->fault_info, info.count * fault_size))
+			iommu->fault_count = 0;
+		else if (ret != ENOSPC)
+			ret = -EFAULT;
+
+		mutex_unlock(&iommu->fault_lock);
+		return ret;
 	}
 
 	return -ENOTTY;
