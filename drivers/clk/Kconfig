@@ -185,7 +185,7 @@ config COMMON_CLK_PWM
 	  at 50% duty cycle.
 
 config COMMON_CLK_PXA
-	def_bool COMMON_CLK && ARCH_PXA
+	def_bool COMMON_CLK && ARCH_PXA && ARM
 	---help---
 	  Support for the Marvell PXA SoC.
 

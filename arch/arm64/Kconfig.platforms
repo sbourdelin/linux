@@ -111,6 +111,11 @@ config ARCH_MVEBU
 	   - Armada 7K SoC Family
 	   - Armada 8K SoC Family
 
+config ARCH_PXA
+	bool "Marvell PXA SoC Family"
+	help
+	  This enables support for the Marvell PXA family.
+
 config ARCH_QCOM
 	bool "Qualcomm Platforms"
 	select GPIOLIB
