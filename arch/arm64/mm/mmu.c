@@ -444,8 +444,10 @@ void mark_rodata_ro(void)
 	debug_checkwx();
 }
 
-static void __init map_kernel_segment(pgd_t *pgd, void *va_start, void *va_end,
-				      pgprot_t prot, struct vm_struct *vma)
+static void __init __map_kernel_segment(pgd_t *pgd,
+					void *va_start, void *va_end,
+					pgprot_t prot, struct vm_struct *vma,
+					unsigned long flags)
 {
 	phys_addr_t pa_start = __pa_symbol(va_start);
 	unsigned long size = va_end - va_start;
@@ -459,10 +461,16 @@ static void __init map_kernel_segment(pgd_t *pgd, void *va_start, void *va_end,
 	vma->addr	= va_start;
 	vma->phys_addr	= pa_start;
 	vma->size	= size;
-	vma->flags	= VM_MAP;
+	vma->flags	= flags;
 	vma->caller	= __builtin_return_address(0);
 
 	vm_area_add_early(vma);
+}
+
+static void __init map_kernel_segment(pgd_t *pgd, void *va_start, void *va_end,
+				      pgprot_t prot, struct vm_struct *vma)
+{
+	return __map_kernel_segment(pgd, va_start, va_end, prot, vma, VM_MAP);
 }
 
 /*
