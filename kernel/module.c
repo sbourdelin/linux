@@ -987,8 +987,11 @@ SYSCALL_DEFINE2(delete_module, const char __user *, name_user,
 
 	mutex_unlock(&module_mutex);
 	/* Final destruction now no one is using it. */
-	if (mod->exit != NULL)
+	if (mod->exit != NULL) {
+		set_ro_mostly_after_init_rw();
 		mod->exit();
+		set_ro_mostly_after_init_ro();
+	}
 	blocking_notifier_call_chain(&module_notify_list,
 				     MODULE_STATE_GOING, mod);
 	klp_module_going(mod);
@@ -3396,8 +3399,11 @@ static noinline int do_init_module(struct module *mod)
 
 	do_mod_ctors(mod);
 	/* Start the module */
-	if (mod->init != NULL)
+	if (mod->init != NULL) {
+		set_ro_mostly_after_init_rw();
 		ret = do_one_initcall(mod->init);
+		set_ro_mostly_after_init_ro();
+	}
 	if (ret < 0) {
 		goto fail_free_freeinit;
 	}
