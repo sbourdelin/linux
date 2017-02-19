@@ -86,6 +86,13 @@ struct iommu_domain {
 	void *iova_cookie;
 };
 
+struct iommu_fault_info {
+	__u64	addr;
+	__u16   sid;
+	__u8    fault_reason;
+	__u8	is_write:1;
+};
+
 enum iommu_cap {
 	IOMMU_CAP_CACHE_COHERENCY,	/* IOMMU can enforce cache coherent DMA
 					   transactions */

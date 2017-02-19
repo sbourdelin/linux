@@ -562,6 +562,13 @@ struct vfio_iommu_type1_set_fault_eventfd {
 
 #define VFIO_IOMMU_SET_FAULT_EVENTFD	_IO(VFIO_TYPE, VFIO_BASE + 17)
 
+struct vfio_iommu_fault_info {
+	__u64	addr;
+	__u16   sid;
+	__u8    fault_reason;
+	__u8	is_write:1;
+};
+
 /* -------- Additional API for SPAPR TCE (Server POWERPC) IOMMU -------- */
 
 /*

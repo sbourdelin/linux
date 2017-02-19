@@ -56,6 +56,8 @@ module_param_named(disable_hugepages,
 MODULE_PARM_DESC(disable_hugepages,
 		 "Disable VFIO IOMMU support for IOMMU hugepages.");
 
+#define NR_IOMMU_FAULT_INFO	10
+
 struct vfio_iommu {
 	struct list_head	domain_list;
 	struct vfio_domain	*external_domain; /* domain for external user */
@@ -64,6 +66,9 @@ struct vfio_iommu {
 	struct blocking_notifier_head notifier;
 	struct eventfd_ctx	*iommu_fault_fd;
 	struct mutex            fault_lock;
+	struct vfio_iommu_fault_info fault_info[NR_IOMMU_FAULT_INFO];
+	struct blocking_notifier_head iommu_fault_notifier;
+	u8			fault_count;
 	bool			v2;
 	bool			nesting;
 };
@@ -1456,6 +1461,7 @@ static void *vfio_iommu_type1_open(unsigned long arg)
 	iommu->dma_list = RB_ROOT;
 	mutex_init(&iommu->lock);
 	mutex_init(&iommu->fault_lock);
+	iommu->fault_count = 0;
 	BLOCKING_INIT_NOTIFIER_HEAD(&iommu->notifier);
 
 	return iommu;
@@ -1514,6 +1520,30 @@ static int vfio_domains_have_iommu_cache(struct vfio_iommu *iommu)
 	mutex_unlock(&iommu->lock);
 
 	return ret;
+}
+
+static int vfio_iommu_fault_event_notifier(struct notifier_block *nb,
+					   struct iommu_fault_info *fault_info,
+					   void *data)
+{
+	struct vfio_iommu *iommu = data;
+	struct vfio_iommu_fault_info *info;
+
+	mutex_lock(&iommu->fault_lock);
+
+	info = &iommu->fault_info[iommu->fault_count];
+	info->addr = fault_info->addr;
+	info->sid = fault_info->sid;
+	info->fault_reason = fault_info->fault_reason;
+	info->is_write = fault_info->is_write;
+
+	iommu->fault_count++;
+
+	if (iommu->iommu_fault_fd)
+		eventfd_signal(iommu->iommu_fault_fd, 1);
+
+	mutex_unlock(&iommu->fault_lock);
+	return 0;
 }
 
 static long vfio_iommu_type1_ioctl(void *iommu_data,
