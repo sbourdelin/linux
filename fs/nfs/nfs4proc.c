@@ -5134,11 +5134,9 @@ static ssize_t __nfs4_get_acl_uncached(struct inode *inode, void *buf, size_t bu
 out_ok:
 	ret = res.acl_len;
 out_free:
-	for (i = 0; i < npages; i++)
-		if (pages[i])
-			__free_page(pages[i]);
-	if (res.acl_scratch)
-		__free_page(res.acl_scratch);
+	for (i = 0; i < ARRAY_SIZE(pages) && pages[i]; i++)
+		__free_page(pages[i]);
+	__free_page(res.acl_scratch);
 	return ret;
 }
 
