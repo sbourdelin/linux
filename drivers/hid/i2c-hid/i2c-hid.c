@@ -1058,13 +1058,13 @@ static int i2c_hid_probe(struct i2c_client *client,
 	}
 
 	ihid->pdata.supply = devm_regulator_get(&client->dev, "vdd");
- 	if (IS_ERR(ihid->pdata.supply)) {
- 		ret = PTR_ERR(ihid->pdata.supply);
- 		if (ret != -EPROBE_DEFER)
- 			dev_err(&client->dev, "Failed to get regulator: %d\n",
- 				ret);
- 		return ret;
- 	}
+	if (IS_ERR(ihid->pdata.supply)) {
+		ret = PTR_ERR(ihid->pdata.supply);
+		if (ret != -EPROBE_DEFER)
+			dev_err(&client->dev, "Failed to get regulator: %d\n",
+				ret);
+		goto err;
+	}
  
 	ret = regulator_enable(ihid->pdata.supply);
 	if (ret < 0) {
