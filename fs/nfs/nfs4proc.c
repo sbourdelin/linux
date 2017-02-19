@@ -5035,12 +5035,18 @@ out:
 	return ret;
 }
 
+/*
+ * We don't cache ACLs over a certain size.  I don't know if we have any
+ * real reason for this policy:
+ */
+#define NFS4_MAX_CACHED_ACL PAGE_SIZE
+
 static void nfs4_write_cached_acl(struct inode *inode, struct page **pages, size_t pgbase, size_t acl_len)
 {
 	struct nfs4_cached_acl *acl;
 	size_t buflen = sizeof(*acl) + acl_len;
 
-	if (buflen <= PAGE_SIZE) {
+	if (buflen <= NFS4_MAX_CACHED_ACL) {
 		acl = kmalloc(buflen, GFP_KERNEL);
 		if (acl == NULL)
 			goto out;
