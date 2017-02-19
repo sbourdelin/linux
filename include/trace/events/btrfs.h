@@ -1445,6 +1445,46 @@ TRACE_EVENT(qgroup_update_counters,
 		  __entry->cur_new_count)
 );
 
+DECLARE_EVENT_CLASS(btrfs_qgroup_reserved,
+
+	TP_PROTO(struct btrfs_fs_info *fs_info, u64 qgid,
+		 u64 reserved, u64 num_bytes),
+
+	TP_ARGS(fs_info, qgid, reserved, num_bytes),
+
+	TP_STRUCT__entry_btrfs(
+		__field(	u64,  qgid			)
+		__field(	u64,  reserved		)
+		__field(	u64,  num_bytes		)
+	),
+
+	TP_fast_assign_btrfs(fs_info,
+		__entry->qgid		= qgid;
+		__entry->reserved	= reserved;
+		__entry->num_bytes	= num_bytes;
+	),
+
+	TP_printk_btrfs("qgid = %llu, reserved = %llu, num_bytes = %llu",
+		  __entry->qgid,
+		  __entry->reserved,
+		  __entry->num_bytes)
+);
+
+
+DEFINE_EVENT(btrfs_qgroup_reserved, btrfs_qgroup_reserve,
+
+	TP_PROTO(struct btrfs_fs_info *fs_info, u64 qgid, u64 reserved, u64 num_bytes),
+
+	TP_ARGS(fs_info, qgid, reserved, num_bytes)
+);
+
+DEFINE_EVENT(btrfs_qgroup_reserved, btrfs_qgroup_free_refroot,
+
+	TP_PROTO(struct btrfs_fs_info *fs_info, u64 qgid, u64 reserved, u64 num_bytes),
+
+	TP_ARGS(fs_info, qgid, reserved, num_bytes)
+);
+
 #endif /* _TRACE_BTRFS_H */
 
 /* This part must be outside protection */

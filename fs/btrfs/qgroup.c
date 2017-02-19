@@ -2126,6 +2126,8 @@ static int qgroup_reserve(struct btrfs_root *root, u64 num_bytes)
 
 		qg = u64_to_ptr(unode->aux);
 
+		trace_btrfs_qgroup_reserve(fs_info, qg->qgroupid, qg->reserved, num_bytes);
+
 		qg->reserved += num_bytes;
 	}
 
@@ -2170,6 +2172,8 @@ void btrfs_qgroup_free_refroot(struct btrfs_fs_info *fs_info,
 		struct btrfs_qgroup_list *glist;
 
 		qg = u64_to_ptr(unode->aux);
+
+		trace_btrfs_qgroup_free_refroot(fs_info, qg->qgroupid, qg->reserved, num_bytes);
 
 		qg->reserved -= num_bytes;
 
