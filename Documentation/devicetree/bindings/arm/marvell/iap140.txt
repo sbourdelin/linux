@@ -1,0 +1,7 @@
+Marvell IAP140 Device Tree Bindings
+-----------------------------------
+
+Boards using a SoC of the Marvell IAP140 family must carry the following
+root node property:
+
+ - compatible :  must contain "mrvl,iap140"
