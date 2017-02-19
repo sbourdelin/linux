@@ -265,6 +265,15 @@
 	__end_data_ro_after_init = .;
 #endif
 
+#ifndef RO_MOSTLY_AFTER_INIT_DATA
+#define RO_MOSTLY_AFTER_INIT_DATA(align)				\
+	. = ALIGN(align);						\
+	VMLINUX_SYMBOL(__start_data_ro_mostly_after_init) = .;		\
+	*(.data..ro_mostly_after_init)					\
+	. = ALIGN(align);						\
+	VMLINUX_SYMBOL(__end_data_ro_mostly_after_init) = .;
+#endif
+
 /*
  * Read only Data
  */
@@ -275,6 +284,7 @@
 		*(.rodata) *(.rodata.*)					\
 		RO_AFTER_INIT_DATA	/* Read only after init */	\
 		KEEP(*(__vermagic))	/* Kernel version magic */	\
+		RO_MOSTLY_AFTER_INIT_DATA(align)			\
 		. = ALIGN(8);						\
 		VMLINUX_SYMBOL(__start___tracepoints_ptrs) = .;		\
 		KEEP(*(__tracepoints_ptrs)) /* Tracepoints: pointer array */ \

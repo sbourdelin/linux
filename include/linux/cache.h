@@ -30,6 +30,17 @@
 #define __ro_after_init __attribute__((__section__(".data..ro_after_init")))
 #endif
 
+/*
+ * __ro_mostly_after_init is almost like __ro_after_init.
+ * but __ro_mostly_after_init section is temporarily writable only during
+ * module_init/exit or dynamic de/registeration of a subsystem using
+ * set_ro_mostly_after_init_rw/ro pair.
+ */
+#ifndef __ro_mostly_after_init
+#define __ro_mostly_after_init \
+	__attribute__((__section__(".data..ro_mostly_after_init")))
+#endif
+
 #ifndef ____cacheline_aligned
 #define ____cacheline_aligned __attribute__((__aligned__(SMP_CACHE_BYTES)))
 #endif
