@@ -434,8 +434,22 @@ void mark_rodata_ro(void)
 	 * mark .rodata as read only. Use __init_begin rather than __end_rodata
 	 * to cover NOTES and EXCEPTION_TABLE.
 	 */
-	section_size = (unsigned long)__init_begin - (unsigned long)__start_rodata;
-	create_mapping_late(__pa_symbol(__start_rodata), (unsigned long)__start_rodata,
+	section_size = (unsigned long)__start_data_ro_mostly_after_init -
+		(unsigned long)__start_rodata;
+	create_mapping_late(__pa_symbol(__start_rodata),
+			    (unsigned long)__start_rodata,
+			    section_size, PAGE_KERNEL_RO);
+
+	section_size = (unsigned long)__end_data_ro_mostly_after_init -
+		(unsigned long)__start_data_ro_mostly_after_init;
+	create_mapping_late(__pa_symbol(__start_data_ro_mostly_after_init),
+			    (unsigned long)__start_data_ro_mostly_after_init,
+			    section_size, PAGE_KERNEL_RO);
+
+	section_size = (unsigned long)__init_begin -
+		(unsigned long)__end_data_ro_mostly_after_init;
+	create_mapping_late(__pa_symbol(__end_data_ro_mostly_after_init),
+			    (unsigned long)__end_data_ro_mostly_after_init,
 			    section_size, PAGE_KERNEL_RO);
 
 	/* flush the TLBs after updating live kernel mappings */
@@ -478,10 +492,18 @@ static void __init map_kernel_segment(pgd_t *pgd, void *va_start, void *va_end,
  */
 static void __init map_kernel(pgd_t *pgd)
 {
-	static struct vm_struct vmlinux_text, vmlinux_rodata, vmlinux_init, vmlinux_data;
+	static struct vm_struct vmlinux_text, vmlinux_rodata1, vmlinux_rodata2, vmlinux_ro_mostly_after_init, vmlinux_init, vmlinux_data;
 
 	map_kernel_segment(pgd, _text, _etext, PAGE_KERNEL_EXEC, &vmlinux_text);
-	map_kernel_segment(pgd, __start_rodata, __init_begin, PAGE_KERNEL, &vmlinux_rodata);
+	map_kernel_segment(pgd, __start_rodata, __start_data_ro_mostly_after_init, PAGE_KERNEL, &vmlinux_rodata1);
+	__map_kernel_segment(pgd,
+			     __start_data_ro_mostly_after_init,
+			     __end_data_ro_mostly_after_init,
+			     PAGE_KERNEL,
+			     &vmlinux_ro_mostly_after_init,
+			     VM_MAP | VM_ALLOC);
+	map_kernel_segment(pgd, __end_data_ro_mostly_after_init, __init_begin, PAGE_KERNEL, &vmlinux_rodata2);
+
 	map_kernel_segment(pgd, __init_begin, __init_end, PAGE_KERNEL_EXEC,
 			   &vmlinux_init);
 	map_kernel_segment(pgd, _data, _end, PAGE_KERNEL, &vmlinux_data);
