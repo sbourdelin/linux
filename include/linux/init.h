@@ -131,6 +131,12 @@ extern bool rodata_enabled;
 #endif
 #ifdef CONFIG_STRICT_KERNEL_RWX
 void mark_rodata_ro(void);
+
+void set_ro_mostly_after_init_rw(void);
+void set_ro_mostly_after_init_ro(void);
+#else
+static inline void set_ro_mostly_after_init_rw(void) { }
+static inline void set_ro_mostly_after_init_ro(void) { }
 #endif
 
 extern void (*late_time_init)(void);

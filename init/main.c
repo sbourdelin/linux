@@ -940,6 +940,30 @@ static void mark_readonly(void)
 	} else
 		pr_info("Kernel memory protection disabled.\n");
 }
+
+void set_ro_mostly_after_init_rw(void)
+{
+	unsigned long start = PFN_ALIGN(__start_data_ro_mostly_after_init);
+	unsigned long end = PFN_ALIGN(&__end_data_ro_mostly_after_init);
+	unsigned long nr_pages = (end - start) >> PAGE_SHIFT;
+
+	if (!rodata_enabled)
+		return;
+
+	set_memory_rw(start, nr_pages);
+}
+
+void set_ro_mostly_after_init_ro(void)
+{
+	unsigned long start = PFN_ALIGN(__start_data_ro_mostly_after_init);
+	unsigned long end = PFN_ALIGN(&__end_data_ro_mostly_after_init);
+	unsigned long nr_pages = (end - start) >> PAGE_SHIFT;
+
+	if (!rodata_enabled)
+		return;
+
+	set_memory_ro(start, nr_pages);
+}
 #else
 static inline void mark_readonly(void)
 {
