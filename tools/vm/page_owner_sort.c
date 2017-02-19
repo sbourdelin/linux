@@ -110,6 +110,8 @@ int main(int argc, char **argv)
 	buf = malloc(BUF_SIZE);
 	if (!list || !buf) {
 		printf("Out of memory\n");
+		fclose(fin);
+		fclose(fout);
 		exit(1);
 	}
 
@@ -144,6 +146,7 @@ int main(int argc, char **argv)
 
 	for (i = 0; i < count; i++)
 		fprintf(fout, "%d times:\n%s\n", list2[i].num, list2[i].txt);
-
+		
+	fclose(fout);
 	return 0;
 }
