@@ -5041,7 +5041,7 @@ out:
  */
 #define NFS4_MAX_CACHED_ACL PAGE_SIZE
 
-static void nfs4_write_cached_acl(struct inode *inode, struct page **pages, size_t pgbase, size_t acl_len)
+static void nfs4_write_cached_acl(struct inode *inode, void *buf, size_t acl_len)
 {
 	struct nfs4_cached_acl *acl;
 	size_t buflen = sizeof(*acl) + acl_len;
@@ -5051,7 +5051,7 @@ static void nfs4_write_cached_acl(struct inode *inode, struct page **pages, size
 		if (acl == NULL)
 			goto out;
 		acl->cached = 1;
-		_copy_from_pages(acl->data, pages, pgbase, acl_len);
+		memcpy(acl->data, buf, acl_len);
 	} else {
 		acl = kmalloc(sizeof(*acl), GFP_KERNEL);
 		if (acl == NULL)
@@ -5063,26 +5063,16 @@ out:
 	nfs4_set_cached_acl(inode, acl);
 }
 
-/*
- * The getxattr API returns the required buffer length when called with a
- * NULL buf. The NFSv4 acl tool then calls getxattr again after allocating
- * the required buf.  On a NULL buf, we send a page of data to the server
- * guessing that the ACL request can be serviced by a page. If so, we cache
- * up to the page of ACL data, and the 2nd call to getxattr is serviced by
- * the cache. If not so, we throw away the page, and cache the required
- * length. The next getxattr call will then produce another round trip to
- * the server, this time with the input buf of the required size.
- */
-static ssize_t __nfs4_get_acl_uncached(struct inode *inode, void *buf, size_t buflen)
+static ssize_t nfs4_do_get_acl(struct inode *inode, void *buf, size_t buflen)
 {
 	struct page *pages[NFS4ACL_MAXPAGES + 1] = {NULL, };
 	struct nfs_getaclargs args = {
 		.fh = NFS_FH(inode),
 		.acl_pages = pages,
-		.acl_len = buflen,
 	};
 	struct nfs_getaclres res = {
 		.acl_len = buflen,
+		.buf = buf,
 	};
 	struct rpc_message msg = {
 		.rpc_proc = &nfs4_procedures[NFSPROC4_CLNT_GETACL],
@@ -5112,31 +5102,44 @@ static ssize_t __nfs4_get_acl_uncached(struct inode *inode, void *buf, size_t bu
 		__func__, buf, buflen, npages, args.acl_len);
 	ret = nfs4_call_sync(NFS_SERVER(inode)->client, NFS_SERVER(inode),
 			     &msg, &args.seq_args, &res.seq_res, 0);
-	if (ret)
-		goto out_free;
-
-	/* Handle the case where the passed-in buffer is too short */
-	if (res.acl_flags & NFS4_ACL_TRUNC) {
-		/* Did the user only issue a request for the acl length? */
-		if (buf == NULL)
-			goto out_ok;
-		ret = -ERANGE;
-		goto out_free;
-	}
-	nfs4_write_cached_acl(inode, pages, res.acl_data_offset, res.acl_len);
-	if (buf) {
-		if (res.acl_len > buflen) {
-			ret = -ERANGE;
-			goto out_free;
-		}
-		_copy_from_pages(buf, pages, res.acl_data_offset, res.acl_len);
-	}
-out_ok:
-	ret = res.acl_len;
+	if (ret == 0)
+		ret = res.acl_len;
 out_free:
 	for (i = 0; i < ARRAY_SIZE(pages) && pages[i]; i++)
 		__free_page(pages[i]);
 	__free_page(res.acl_scratch);
+	return ret;
+}
+
+/*
+ * The getxattr API returns the required buffer length when called with a
+ * NULL buf. The NFSv4 acl tool then calls getxattr again after allocating
+ * the required buf. Cache the result from the first getxattr call to avoid
+ * sending another RPC.
+ */
+static ssize_t __nfs4_get_acl_uncached(struct inode *inode, void *buf, size_t buflen)
+{
+	void *priv_buf = NULL;
+	void *our_buf = buf;
+	int our_buflen = buflen;
+	static ssize_t ret = -ENOMEM;
+
+	if (!buf) {
+		priv_buf = kmalloc(NFS4_MAX_CACHED_ACL, GFP_KERNEL);
+		if (!priv_buf)
+			goto out;
+		our_buf = priv_buf;
+		our_buflen = NFS4_MAX_CACHED_ACL;
+	}
+	ret = nfs4_do_get_acl(inode, our_buf, our_buflen);
+	if (ret < 0)
+		goto out;
+	if (ret <= our_buflen)
+		nfs4_write_cached_acl(inode, our_buf, ret);
+	if (buf && ret > buflen)
+		ret = -ERANGE;
+out:
+	kfree(priv_buf);
 	return ret;
 }
 

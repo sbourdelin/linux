@@ -747,13 +747,11 @@ struct nfs_getaclargs {
 	struct page **			acl_pages;
 };
 
-/* getxattr ACL interface flags */
-#define NFS4_ACL_TRUNC		0x0001	/* ACL was truncated */
 struct nfs_getaclres {
 	struct nfs4_sequence_res	seq_res;
+	void *				buf;
 	size_t				acl_len;
 	size_t				acl_data_offset;
-	int				acl_flags;
 	struct page *			acl_scratch;
 };
 
