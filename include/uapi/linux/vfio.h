@@ -547,6 +547,21 @@ struct vfio_iommu_type1_dma_unmap {
 #define VFIO_IOMMU_ENABLE	_IO(VFIO_TYPE, VFIO_BASE + 15)
 #define VFIO_IOMMU_DISABLE	_IO(VFIO_TYPE, VFIO_BASE + 16)
 
+/*
+ * VFIO_IOMMU_SET_FAULT_EVENT_FD	_IO(VFIO_TYPE, VFIO_BASE + 17)
+ *
+ * Receive eventfd from userspace to notify fault event from IOMMU.
+ */
+struct vfio_iommu_type1_set_fault_eventfd {
+	__u32	argsz;
+	__u32   flags;
+/* What IOMMU Fault events should be reported. */
+#define VFIO_IOMMU_UR_FAULT_WITHOUT_PASID (1 << 0)
+	__s32	fd;			/* Eventfd from user space */
+};
+
+#define VFIO_IOMMU_SET_FAULT_EVENTFD	_IO(VFIO_TYPE, VFIO_BASE + 17)
+
 /* -------- Additional API for SPAPR TCE (Server POWERPC) IOMMU -------- */
 
 /*

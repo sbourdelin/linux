@@ -38,6 +38,7 @@
 #include <linux/workqueue.h>
 #include <linux/mdev.h>
 #include <linux/notifier.h>
+#include <linux/eventfd.h>
 
 #define DRIVER_VERSION  "0.2"
 #define DRIVER_AUTHOR   "Alex Williamson <alex.williamson@redhat.com>"
@@ -61,6 +62,8 @@ struct vfio_iommu {
 	struct mutex		lock;
 	struct rb_root		dma_list;
 	struct blocking_notifier_head notifier;
+	struct eventfd_ctx	*iommu_fault_fd;
+	struct mutex            fault_lock;
 	bool			v2;
 	bool			nesting;
 };
@@ -1452,6 +1455,7 @@ static void *vfio_iommu_type1_open(unsigned long arg)
 	INIT_LIST_HEAD(&iommu->domain_list);
 	iommu->dma_list = RB_ROOT;
 	mutex_init(&iommu->lock);
+	mutex_init(&iommu->fault_lock);
 	BLOCKING_INIT_NOTIFIER_HEAD(&iommu->notifier);
 
 	return iommu;
@@ -1582,6 +1586,47 @@ static long vfio_iommu_type1_ioctl(void *iommu_data,
 
 		return copy_to_user((void __user *)arg, &unmap, minsz) ?
 			-EFAULT : 0;
+	} else if (cmd == VFIO_IOMMU_SET_FAULT_EVENTFD) {
+		struct vfio_iommu_type1_set_fault_eventfd eventfd;
+		int fd;
+		int ret;
+
+		minsz = offsetofend(struct vfio_iommu_type1_set_fault_eventfd,
+				    fd);
+
+		if (copy_from_user(&eventfd, (void __user *)arg, minsz))
+			return -EFAULT;
+
+		if (eventfd.argsz < minsz)
+			return -EINVAL;
+
+
+		mutex_lock(&iommu->fault_lock);
+
+		fd = eventfd.fd;
+		if (fd == -1) {
+			if (iommu->iommu_fault_fd)
+				eventfd_ctx_put(iommu->iommu_fault_fd);
+			iommu->iommu_fault_fd = NULL;
+			ret = 0;
+		} else if (fd >= 0) {
+			struct eventfd_ctx *ctx;
+
+			ctx = eventfd_ctx_fdget(fd);
+			if (IS_ERR(ctx))
+				return PTR_ERR(ctx);
+
+			if (ctx)
+				eventfd_ctx_put(ctx);
+
+			iommu->iommu_fault_fd = ctx;
+			ret = 0;
+		} else
+			ret = -EINVAL;
+
+		mutex_unlock(&iommu->fault_lock);
+
+		return ret;
 	}
 
 	return -ENOTTY;
