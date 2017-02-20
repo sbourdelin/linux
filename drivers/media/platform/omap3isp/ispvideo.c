@@ -1205,7 +1205,6 @@ isp_video_streamoff(struct file *file, void *fh, enum v4l2_buf_type type)
 
 	mutex_lock(&video->stream_lock);
 
-	/* Make sure we're not streaming yet. */
 	mutex_lock(&video->queue_lock);
 	streaming = vb2_is_streaming(&vfh->queue);
 	mutex_unlock(&video->queue_lock);
