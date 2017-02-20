@@ -12,6 +12,7 @@
  * 0x53 (ALT ADDRESS pin grounded)
  */
 
+#include <linux/acpi.h>
 #include <linux/i2c.h>
 #include <linux/module.h>
 #include <linux/regmap.h>
@@ -54,9 +55,17 @@ static const struct i2c_device_id adxl345_i2c_id[] = {
 
 MODULE_DEVICE_TABLE(i2c, adxl345_i2c_id);
 
+static const struct acpi_device_id adxl345_acpi_id[] = {
+	{ "ADS0345", 0 },
+	{ }
+};
+
+MODULE_DEVICE_TABLE(acpi, adxl345_acpi_id);
+
 static struct i2c_driver adxl345_i2c_driver = {
 	.driver = {
 		.name	= "adxl345_i2c",
+		.acpi_match_table = ACPI_PTR(adxl345_acpi_id),
 	},
 	.probe		= adxl345_i2c_probe,
 	.remove		= adxl345_i2c_remove,

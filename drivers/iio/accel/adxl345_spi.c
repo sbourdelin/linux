@@ -10,6 +10,7 @@
  * SPI driver for ADXL345
  */
 
+#include <linux/acpi.h>
 #include <linux/module.h>
 #include <linux/regmap.h>
 #include <linux/spi/spi.h>
@@ -59,9 +60,17 @@ static const struct spi_device_id adxl345_spi_id[] = {
 
 MODULE_DEVICE_TABLE(spi, adxl345_spi_id);
 
+static const struct acpi_device_id adxl345_acpi_id[] = {
+	{ "ADS0345", 0 },
+	{ }
+};
+
+MODULE_DEVICE_TABLE(acpi, adxl345_acpi_id);
+
 static struct spi_driver adxl345_spi_driver = {
 	.driver = {
 		.name	= "adxl345_spi",
+		.acpi_match_table = ACPI_PTR(adxl345_acpi_id),
 	},
 	.probe		= adxl345_spi_probe,
 	.remove		= adxl345_spi_remove,
