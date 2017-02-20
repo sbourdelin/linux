@@ -35,7 +35,7 @@ EXPORT_SYMBOL(blk_queue_find_tag);
  */
 void blk_free_tags(struct blk_queue_tag *bqt)
 {
-	if (atomic_dec_and_test(&bqt->refcnt)) {
+	if (refcount_dec_and_test(&bqt->refcnt)) {
 		BUG_ON(find_first_bit(bqt->tag_map, bqt->max_depth) <
 							bqt->max_depth);
 
@@ -130,7 +130,7 @@ static struct blk_queue_tag *__blk_queue_init_tags(struct request_queue *q,
 	if (init_tag_map(q, tags, depth))
 		goto fail;
 
-	atomic_set(&tags->refcnt, 1);
+	refcount_set(&tags->refcnt, 1);
 	tags->alloc_policy = alloc_policy;
 	tags->next_tag = 0;
 	return tags;
@@ -180,7 +180,7 @@ int blk_queue_init_tags(struct request_queue *q, int depth,
 		queue_flag_set(QUEUE_FLAG_QUEUED, q);
 		return 0;
 	} else
-		atomic_inc(&tags->refcnt);
+		refcount_inc(&tags->refcnt);
 
 	/*
 	 * assign it, all done
@@ -225,7 +225,7 @@ int blk_queue_resize_tags(struct request_queue *q, int new_depth)
 	 * Currently cannot replace a shared tag map with a new
 	 * one, so error out if this is the case
 	 */
-	if (atomic_read(&bqt->refcnt) != 1)
+	if (refcount_read(&bqt->refcnt) != 1)
 		return -EBUSY;
 
 	/*
