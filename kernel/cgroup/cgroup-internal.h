@@ -5,6 +5,7 @@
 #include <linux/kernfs.h>
 #include <linux/workqueue.h>
 #include <linux/list.h>
+#include <linux/refcount.h>
 
 /*
  * A cgroup can be associated with multiple css_sets as different tasks may
@@ -134,10 +135,13 @@ static inline void put_css_set(struct css_set *cset)
 	 * can see it. Similar to atomic_dec_and_lock(), but for an
 	 * rwlock
 	 */
-	if (atomic_add_unless(&cset->refcount, -1, 1))
-		return;
-
 	spin_lock_irqsave(&css_set_lock, flags);
+	if (refcount_read(&cset->refcount) != 1) {
+		WARN_ON(refcount_dec_and_test(&cset->refcount));
+		spin_unlock_irqrestore(&css_set_lock, flags);
+		return;
+	}
+
 	put_css_set_locked(cset);
 	spin_unlock_irqrestore(&css_set_lock, flags);
 }
@@ -147,7 +151,7 @@ static inline void put_css_set(struct css_set *cset)
  */
 static inline void get_css_set(struct css_set *cset)
 {
-	atomic_inc(&cset->refcount);
+	refcount_inc(&cset->refcount);
 }
 
 bool cgroup_ssid_enabled(int ssid);
