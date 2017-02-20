@@ -7623,6 +7623,38 @@ static const struct ieee80211_channel ath10k_2ghz_channels[] = {
 	CHAN2G(14, 2484, 0),
 };
 
+static const struct ieee80211_channel ath10k_low_5ghz_channels[] = {
+	CHAN5G(36, 5180, 0),
+	CHAN5G(40, 5200, 0),
+	CHAN5G(44, 5220, 0),
+	CHAN5G(48, 5240, 0),
+	CHAN5G(52, 5260, 0),
+	CHAN5G(56, 5280, 0),
+	CHAN5G(60, 5300, 0),
+	CHAN5G(64, 5320, 0),
+};
+
+static const struct ieee80211_channel ath10k_high_5ghz_channels[] = {
+	CHAN5G(100, 5500, 0),
+	CHAN5G(104, 5520, 0),
+	CHAN5G(108, 5540, 0),
+	CHAN5G(112, 5560, 0),
+	CHAN5G(116, 5580, 0),
+	CHAN5G(120, 5600, 0),
+	CHAN5G(124, 5620, 0),
+	CHAN5G(128, 5640, 0),
+	CHAN5G(132, 5660, 0),
+	CHAN5G(136, 5680, 0),
+	CHAN5G(140, 5700, 0),
+	CHAN5G(144, 5720, 0),
+	CHAN5G(149, 5745, 0),
+	CHAN5G(153, 5765, 0),
+	CHAN5G(157, 5785, 0),
+	CHAN5G(161, 5805, 0),
+	CHAN5G(165, 5825, 0),
+	CHAN5G(169, 5845, 0),
+};
+
 static const struct ieee80211_channel ath10k_5ghz_channels[] = {
 	CHAN5G(36, 5180, 0),
 	CHAN5G(40, 5200, 0),
@@ -8014,6 +8046,7 @@ int ath10k_mac_register(struct ath10k *ar)
 	};
 	struct ieee80211_supported_band *band;
 	void *channels;
+	int n_channels;
 	int ret;
 
 	SET_IEEE80211_PERM_ADDR(ar->hw, ar->mac_addr);
@@ -8049,16 +8082,30 @@ int ath10k_mac_register(struct ath10k *ar)
 	}
 
 	if (ar->phy_capability & WHAL_WLAN_11A_CAPABILITY) {
-		channels = kmemdup(ath10k_5ghz_channels,
-				   sizeof(ath10k_5ghz_channels),
-				   GFP_KERNEL);
+		if (ar->high_5ghz_chan <= 5350) {
+			channels = kmemdup(ath10k_low_5ghz_channels,
+					   sizeof(ath10k_low_5ghz_channels),
+					   GFP_KERNEL);
+			n_channels = ARRAY_SIZE(ath10k_low_5ghz_channels);
+		} else if (ar->low_5ghz_chan >= 5490 &&
+			   ar->high_5ghz_chan <= 5885) {
+			channels = kmemdup(ath10k_high_5ghz_channels,
+					   sizeof(ath10k_high_5ghz_channels),
+					   GFP_KERNEL);
+			n_channels = ARRAY_SIZE(ath10k_high_5ghz_channels);
+		} else {
+			channels = kmemdup(ath10k_5ghz_channels,
+					   sizeof(ath10k_5ghz_channels),
+					   GFP_KERNEL);
+			n_channels = ARRAY_SIZE(ath10k_5ghz_channels);
+		}
 		if (!channels) {
 			ret = -ENOMEM;
 			goto err_free;
 		}
 
 		band = &ar->mac.sbands[NL80211_BAND_5GHZ];
-		band->n_channels = ARRAY_SIZE(ath10k_5ghz_channels);
+		band->n_channels = n_channels;
 		band->channels = channels;
 		band->n_bitrates = ath10k_a_rates_size;
 		band->bitrates = ath10k_a_rates;
