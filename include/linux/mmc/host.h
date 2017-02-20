@@ -303,6 +303,7 @@ struct mmc_host {
 #define MMC_CAP2_HS400_ES	(1 << 20)	/* Host supports enhanced strobe */
 #define MMC_CAP2_NO_SD		(1 << 21)	/* Do not send SD commands during initialization */
 #define MMC_CAP2_NO_MMC		(1 << 22)	/* Do not send (e)MMC commands during initialization */
+#define MMC_CAP2_SLEEP_AWAKE	(1 << 23)	/* Use Sleep/Awake (CMD5) */
 
 	mmc_pm_flag_t		pm_caps;	/* supported pm features */
 
