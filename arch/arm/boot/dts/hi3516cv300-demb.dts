@@ -1,0 +1,95 @@
+/*
+ * Copyright (c) 2016-2017 HiSilicon Technologies Co., Ltd.
+ *
+ * This program is free software; you can redistribute  it and/or modify it
+ * under  the terms of  the GNU General Public License as published by the
+ * Free Software Foundation;  either version 2 of the  License, or (at your
+ * option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
+ *
+ */
+
+
+/dts-v1/;
+#include "hi3516cv300.dtsi"
+
+/ {
+	model = "Hisilicon Hi3516CV300 DEMO Board";
+	compatible = "hisilicon,hi3516cv300-demb", "hisilicon,hi3516cv300";
+
+	aliases {
+		serial0 = &uart0;
+	};
+
+	chosen {
+		stdout-path = "serial0:115200n8";
+	};
+
+	memory {
+		device_type = "memory";
+		reg = <0x80000000 0x10000000>;
+	};
+};
+
+&dual_timer0 {
+	status = "okay";
+};
+
+&watchdog {
+	status = "okay";
+};
+
+&uart0 {
+	status = "okay";
+};
+
+&spi_bus1 {
+	status = "okay";
+	num-cs = <2>;
+	cs-gpios = <&gpio_chip5 3 0>, <&gpio_chip5 4 0>;
+	pinctrl-names = "default";
+	pinctrl-0 = <&spi1_pmux>;
+};
+
+&fmc {
+	spi-nor@0 {
+		compatible = "jedec,spi-nor";
+		reg = <0>;
+		spi-max-frequency = <160000000>;
+		m25p,fast-read;
+	};
+};
+
+&mdio {
+	phy0: phy@1 {
+		reg = <1>;
+	};
+};
+
+&hisi_femac {
+	phy-mode = "rmii";
+	phy-handle = <&phy0>;
+	hisilicon,phy-reset-delays-us = <10000 10000 150000>;
+};
+
+&dmac {
+	status = "okay";
+};
+
+&pmux {
+	spi1_pmux: spi1_pmux {
+		pinctrl-single,pins = <
+			0xc4 0x1
+			0xc8 0x1
+			0xcc 0x1
+			0xd0 0x1
+			0xd4 0x1>;
+	};
+};
