@@ -39,8 +39,8 @@ static int udelay_test_single(struct seq_file *s, int usecs, uint32_t iters)
 	uint64_t sum = 0;
 	uint64_t avg;
 	int i;
-	/* Allow udelay to be up to 0.5% fast */
-	int allowed_error_ns = usecs * 5;
+	/* Allow udelay to be up to 1% fast */
+	int allowed_error_ns = usecs * 10;
 
 	for (i = 0; i < iters; ++i) {
 		s64 kt1, kt2;
