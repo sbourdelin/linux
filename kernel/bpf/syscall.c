@@ -85,7 +85,7 @@ int bpf_map_precharge_memlock(u32 pages)
 	cur = atomic_long_read(&user->locked_vm);
 	free_uid(user);
 	if (cur + pages > memlock_limit)
-		return -EPERM;
+		return -ENOMEM;
 	return 0;
 }
 
@@ -101,7 +101,7 @@ static int bpf_map_charge_memlock(struct bpf_map *map)
 	if (atomic_long_read(&user->locked_vm) > memlock_limit) {
 		atomic_long_sub(map->pages, &user->locked_vm);
 		free_uid(user);
-		return -EPERM;
+		return -ENOMEM;
 	}
 	map->user = user;
 	return 0;
@@ -658,7 +658,7 @@ int __bpf_prog_charge(struct user_struct *user, u32 pages)
 		user_bufs = atomic_long_add_return(pages, &user->locked_vm);
 		if (user_bufs > memlock_limit) {
 			atomic_long_sub(pages, &user->locked_vm);
-			return -EPERM;
+			return -ENOMEM;
 		}
 	}
 
