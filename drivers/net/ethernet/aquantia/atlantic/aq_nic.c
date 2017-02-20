@@ -597,9 +597,9 @@ __acquires(&ring->lock)
 
 	do {
 		if (spin_trylock(&ring->header.lock)) {
-			frags = aq_nic_map_skb(self, skb, &buffers[0]);
+			frags = aq_nic_map_skb(self, skb, buffers);
 
-			aq_ring_tx_append_buffs(ring, &buffers[0], frags);
+			aq_ring_tx_append_buffs(ring, buffers, frags);
 
 			err = self->aq_hw_ops.hw_ring_tx_xmit(self->aq_hw,
 							      ring, frags);
