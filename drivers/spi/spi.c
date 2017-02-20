@@ -1594,6 +1594,17 @@ of_register_spi_device(struct spi_master *master, struct device_node *nc)
 	}
 	spi->max_speed_hz = value;
 
+	/* Device bits-per-word */
+	if (!of_property_read_u32(nc, "spi-bits-per-word", &value)) {
+		if (value > 32)
+			dev_warn(&master->dev,
+				 "bits-per-word %d not supported\n",
+				 value);
+		else
+			spi->bits_per_word = value;
+	}
+
+
 	/* Store a pointer to the node in the device structure */
 	of_node_get(nc);
 	spi->dev.of_node = nc;
@@ -1672,6 +1683,13 @@ static int acpi_spi_add_resource(struct acpi_resource *ares, void *data)
 			}
 
 			spi->max_speed_hz = sb->connection_speed;
+
+			if (sb->data_bit_length > 32)
+				dev_warn(&master->dev,
+					 "bits-per-word %d not supported\n",
+					 sb->data_bit_length);
+			else
+				spi->bits_per_word = sb->data_bit_length;
 
 			if (sb->clock_phase == ACPI_SPI_SECOND_PHASE)
 				spi->mode |= SPI_CPHA;
