@@ -580,6 +580,9 @@ struct mvneta_rx_queue {
 	/* Virtual address of the RX buffer */
 	void  **buf_virt_addr;
 
+	/* DMA address of the RX buffer */
+	dma_addr_t *buf_dma_addr;
+
 	/* Virtual address of the RX DMA descriptors array */
 	struct mvneta_rx_desc *descs;
 
@@ -1617,6 +1620,7 @@ static void mvneta_rx_desc_fill(struct mvneta_rx_desc *rx_desc,
 
 	rx_desc->buf_phys_addr = phys_addr;
 	i = rx_desc - rxq->descs;
+	rxq->buf_dma_addr[i] = phys_addr;
 	rxq->buf_virt_addr[i] = virt_addr;
 }
 
@@ -1912,10 +1916,9 @@ static void mvneta_rxq_drop_pkts(struct mvneta_port *pp,
 	}
 
 	for (i = 0; i < rxq->size; i++) {
-		struct mvneta_rx_desc *rx_desc = rxq->descs + i;
 		void *data = rxq->buf_virt_addr[i];
 
-		dma_unmap_single(pp->dev->dev.parent, rx_desc->buf_phys_addr,
+		dma_unmap_single(pp->dev->dev.parent, rxq->buf_dma_addr[i],
 				 MVNETA_RX_BUF_SIZE(pp->pkt_size), DMA_FROM_DEVICE);
 		mvneta_frag_free(pp->frag_size, data);
 	}
@@ -1953,7 +1956,7 @@ static int mvneta_rx_swbm(struct mvneta_port *pp, int rx_todo,
 		rx_bytes = rx_desc->data_size - (ETH_FCS_LEN + MVNETA_MH_SIZE);
 		index = rx_desc - rxq->descs;
 		data = rxq->buf_virt_addr[index];
-		phys_addr = rx_desc->buf_phys_addr;
+		phys_addr = rxq->buf_dma_addr[index];
 
 		if (!mvneta_rxq_desc_is_first_last(rx_status) ||
 		    (rx_status & MVNETA_RXD_ERR_SUMMARY)) {
@@ -4019,7 +4022,10 @@ static int mvneta_init(struct device *dev, struct mvneta_port *pp)
 		rxq->buf_virt_addr = devm_kmalloc(pp->dev->dev.parent,
 						  rxq->size * sizeof(void *),
 						  GFP_KERNEL);
-		if (!rxq->buf_virt_addr)
+		rxq->buf_dma_addr = devm_kmalloc(pp->dev->dev.parent,
+						 rxq->size * sizeof(dma_addr_t),
+						 GFP_KERNEL);
+		if (!rxq->buf_virt_addr || !rxq->buf_dma_addr)
 			return -ENOMEM;
 	}
 
