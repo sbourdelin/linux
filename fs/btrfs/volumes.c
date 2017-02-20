@@ -442,7 +442,7 @@ loop_lock:
 		    waitqueue_active(&fs_info->async_submit_wait))
 			wake_up(&fs_info->async_submit_wait);
 
-		BUG_ON(atomic_read(&cur->__bi_cnt) == 0);
+		BUG_ON(refcount_read(&cur->__bi_cnt) == 0);
 
 		/*
 		 * if we're doing the sync list, record that our
