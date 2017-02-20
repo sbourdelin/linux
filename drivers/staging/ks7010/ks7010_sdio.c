@@ -481,7 +481,7 @@ static void ks7010_rw_function(struct work_struct *work)
 
 	DPRINTK(4, "\n");
 
-	/* wiat after DOZE */
+	/* wait after DOZE */
 	if (time_after(priv->last_doze + ((30 * HZ) / 1000), jiffies)) {
 		DPRINTK(4, "wait after DOZE\n");
 		queue_delayed_work(priv->ks_wlan_hw.ks7010sdio_wq,
@@ -489,11 +489,9 @@ static void ks7010_rw_function(struct work_struct *work)
 		return;
 	}
 
-	/* wiat after WAKEUP */
+	/* wait after WAKEUP */
 	while (time_after(priv->last_wakeup + ((30 * HZ) / 1000), jiffies)) {
 		DPRINTK(4, "wait after WAKEUP\n");
-/*		queue_delayed_work(priv->ks_wlan_hw.ks7010sdio_wq,&priv->ks_wlan_hw.rw_wq,
-		(priv->last_wakeup + ((30*HZ)/1000) - jiffies));*/
 		dev_info(&priv->ks_wlan_hw.sdio_card->func->dev,
 			 "wake: %lu %lu\n",
 			 priv->last_wakeup + (30 * HZ) / 1000,
@@ -633,7 +631,7 @@ static void ks_sdio_interrupt(struct sdio_func *func)
 							ks_wlan_hw_wakeup_request(priv);
 							queue_delayed_work
 							    (priv->ks_wlan_hw.ks7010sdio_wq,
- 							     &priv->ks_wlan_hw.rw_wq, 1);
+								    &priv->ks_wlan_hw.rw_wq, 1);
 							return;
 						}
 					} else {
