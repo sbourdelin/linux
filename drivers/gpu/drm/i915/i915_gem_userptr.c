@@ -335,7 +335,6 @@ i915_gem_userptr_init__mm_struct(struct drm_i915_gem_object *obj)
 
 		mm->mm = current->mm;
 		mmgrab(current->mm);
-
 		mm->mn = NULL;
 
 		/* Protected by dev_priv->mm_lock */

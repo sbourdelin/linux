@@ -2923,14 +2923,14 @@ extern struct mm_struct * mm_alloc(void);
  */
 static inline void mmgrab(struct mm_struct *mm)
 {
-	atomic_inc(&mm->mm_count);
+	refcount_inc(&mm->mm_count);
 }
 
 /* mmdrop drops the mm and the page tables */
 extern void __mmdrop(struct mm_struct *);
 static inline void mmdrop(struct mm_struct *mm)
 {
-	if (unlikely(atomic_dec_and_test(&mm->mm_count)))
+	if (unlikely(refcount_dec_and_test(&mm->mm_count)))
 		__mmdrop(mm);
 }
 
@@ -2942,7 +2942,7 @@ static inline void mmdrop_async_fn(struct work_struct *work)
 
 static inline void mmdrop_async(struct mm_struct *mm)
 {
-	if (unlikely(atomic_dec_and_test(&mm->mm_count))) {
+	if (unlikely(refcount_dec_and_test(&mm->mm_count))) {
 		INIT_WORK(&mm->async_put_work, mmdrop_async_fn);
 		schedule_work(&mm->async_put_work);
 	}

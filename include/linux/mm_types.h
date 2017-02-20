@@ -427,7 +427,7 @@ struct mm_struct {
 	 * Use mmgrab()/mmdrop() to modify. When this drops to 0, the
 	 * &struct mm_struct is freed.
 	 */
-	atomic_t mm_count;
+	refcount_t mm_count;
 
 	atomic_long_t nr_ptes;			/* PTE page table pages */
 #if CONFIG_PGTABLE_LEVELS > 2

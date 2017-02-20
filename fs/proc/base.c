@@ -921,11 +921,7 @@ static ssize_t environ_read(struct file *file, char __user *buf,
 		return -ENOMEM;
 
 	ret = 0;
-<<<<<<< e5c2d109eae88b7c203d396dfaeb284f95f6ffe5
 	if (!mmget_not_zero(mm))
-=======
-	if (!refcount_inc_not_zero(&mm->mm_users))
->>>>>>> mm: convert mm_struct.mm_users from atomic_t to refcount_t
 		goto free;
 
 	down_read(&mm->mmap_sem);
@@ -1068,11 +1064,7 @@ static int __set_oom_adj(struct file *file, int oom_adj, bool legacy)
 		if (p) {
 			if (refcount_read(&p->mm->mm_users) > 1) {
 				mm = p->mm;
-<<<<<<< e5c2d109eae88b7c203d396dfaeb284f95f6ffe5
 				mmgrab(mm);
-=======
-				refcount_inc(&mm->mm_count);
->>>>>>> mm: convert mm_struct.mm_users from atomic_t to refcount_t
 			}
 			task_unlock(p);
 		}

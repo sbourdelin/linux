@@ -204,7 +204,7 @@ static void kfd_process_destroy_delayed(struct rcu_head *rcu)
 	BUG_ON(!kfd_process_wq);
 
 	p = container_of(rcu, struct kfd_process, rcu);
-	BUG_ON(atomic_read(&p->mm->mm_count) <= 0);
+	BUG_ON(refcount_read(&p->mm->mm_count) == 0);
 
 	mmdrop(p->mm);
 
