@@ -52,7 +52,9 @@ extern void __tlb_remove_table(void *_table);
 
 static inline gfp_t pgtable_get_gfp_flags(struct mm_struct *mm, gfp_t gfp)
 {
-	return gfp;
+	if (mm == &init_mm)
+		return gfp;
+	return gfp | __GFP_ACCOUNT;
 }
 
 static inline pgd_t *radix__pgd_alloc(struct mm_struct *mm)
