@@ -2082,8 +2082,7 @@ static int mvneta_rx_hwbm(struct mvneta_port *pp, int rx_todo,
 		    (rx_status & MVNETA_RXD_ERR_SUMMARY)) {
 err_drop_frame_ret_pool:
 			/* Return the buffer to the pool */
-			mvneta_bm_pool_put_bp(pp->bm_priv, bm_pool,
-					      rx_desc->buf_phys_addr);
+			mvneta_bm_pool_put_bp(pp->bm_priv, bm_pool, phys_addr);
 err_drop_frame:
 			dev->stats.rx_errors++;
 			mvneta_rx_error(pp, rx_desc);
@@ -2098,7 +2097,7 @@ err_drop_frame:
 				goto err_drop_frame_ret_pool;
 
 			dma_sync_single_range_for_cpu(dev->dev.parent,
-			                              rx_desc->buf_phys_addr,
+			                              phys_addr,
 			                              MVNETA_MH_SIZE + NET_SKB_PAD,
 			                              rx_bytes,
 			                              DMA_FROM_DEVICE);
@@ -2114,8 +2113,7 @@ err_drop_frame:
 			rcvd_bytes += rx_bytes;
 
 			/* Return the buffer to the pool */
-			mvneta_bm_pool_put_bp(pp->bm_priv, bm_pool,
-					      rx_desc->buf_phys_addr);
+			mvneta_bm_pool_put_bp(pp->bm_priv, bm_pool, phys_addr);
 
 			/* leave the descriptor and buffer untouched */
 			continue;
