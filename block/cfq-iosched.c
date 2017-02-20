@@ -2959,7 +2959,7 @@ static void cfq_arm_slice_timer(struct cfq_data *cfqd)
 	 * task has exited, don't wait
 	 */
 	cic = cfqd->active_cic;
-	if (!cic || !atomic_read(&cic->icq.ioc->active_ref))
+	if (!cic || !refcount_read(&cic->icq.ioc->active_ref))
 		return;
 
 	/*
@@ -3959,7 +3959,7 @@ cfq_update_idle_window(struct cfq_data *cfqd, struct cfq_queue *cfqq,
 
 	if (cfqq->next_rq && req_noidle(cfqq->next_rq))
 		enable_idle = 0;
-	else if (!atomic_read(&cic->icq.ioc->active_ref) ||
+	else if (!refcount_read(&cic->icq.ioc->active_ref) ||
 		 !cfqd->cfq_slice_idle ||
 		 (!cfq_cfqq_deep(cfqq) && CFQQ_SEEKY(cfqq)))
 		enable_idle = 0;
