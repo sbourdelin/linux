@@ -172,7 +172,7 @@ void ks_wlan_hw_wakeup_request(struct ks_wlan_private *priv)
 static int _ks_wlan_hw_power_save(struct ks_wlan_private *priv)
 {
 	unsigned char rw_data;
-	int retval;
+	int ret;
 
 	if (priv->reg.powermgt == POWMGT_ACTIVE_MODE)
 		return 0;
@@ -197,11 +197,11 @@ static int _ks_wlan_hw_power_save(struct ks_wlan_private *priv)
 		if (!atomic_read(&priv->psstatus.confirm_wait)
 			&& !atomic_read(&priv->psstatus.snooze_guard)
 			&& !cnt_txqbody(priv)) {
-			retval =
+			ret =
 				ks7010_sdio_read(priv, INT_PENDING,
 						&rw_data,
 						sizeof(rw_data));
-			if (retval) {
+			if (ret) {
 				DPRINTK(1,
 					" error : INT_PENDING=%02X\n",
 					rw_data);
@@ -211,12 +211,12 @@ static int _ks_wlan_hw_power_save(struct ks_wlan_private *priv)
 			}
 			if (!rw_data) {
 				rw_data = GCR_B_DOZE;
-				retval =
+				ret =
 					ks7010_sdio_write(priv,
 							GCR_B,
 							&rw_data,
 							sizeof(rw_data));
-				if (retval) {
+				if (ret) {
 					DPRINTK(1,
 						" error : GCR_B=%02X\n",
 						rw_data);
