@@ -1197,6 +1197,19 @@ void mmc_set_bus_width(struct mmc_host *host, unsigned int width)
 	mmc_set_ios(host);
 }
 
+void mmc_set_init_state(struct mmc_host *host)
+{
+	host->ios.bus_mode = host->cached_ios.bus_mode;
+	host->ios.bus_width = host->cached_ios.bus_width;
+	host->ios.timing = host->cached_ios.timing;
+	if (host->card &&
+	    host->card->mmc_avail_type & EXT_CSD_CARD_TYPE_HS400ES &&
+	    host->cached_ios.timing == MMC_TIMING_MMC_HS400)
+		host->ios.enhanced_strobe = true;
+
+	mmc_set_ios(host);
+}
+
 /*
  * Set initial state after a power cycle or a hw_reset.
  */
