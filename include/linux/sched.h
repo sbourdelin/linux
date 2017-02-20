@@ -42,6 +42,7 @@ struct sched_param {
 #include <linux/seccomp.h>
 #include <linux/rcupdate.h>
 #include <linux/rculist.h>
+#include <linux/refcount.h>
 #include <linux/rtmutex.h>
 
 #include <linux/time.h>
@@ -527,7 +528,7 @@ static inline int get_dumpable(struct mm_struct *mm)
 #define MMF_INIT_MASK		(MMF_DUMPABLE_MASK | MMF_DUMP_FILTER_MASK)
 
 struct sighand_struct {
-	atomic_t		count;
+	refcount_t		count;
 	struct k_sigaction	action[_NSIG];
 	spinlock_t		siglock;
 	wait_queue_head_t	signalfd_wqh;
