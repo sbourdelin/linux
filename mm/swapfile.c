@@ -1717,7 +1717,7 @@ int try_to_unuse(unsigned int type, bool frontswap,
 		/*
 		 * Don't hold on to start_mm if it looks like exiting.
 		 */
-		if (atomic_read(&start_mm->mm_users) == 1) {
+		if (refcount_read(&start_mm->mm_users) == 1) {
 			mmput(start_mm);
 			start_mm = &init_mm;
 			mmget(&init_mm);

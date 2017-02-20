@@ -295,7 +295,7 @@ smp_flush_tlb_mm (struct mm_struct *mm)
 	cpumask_var_t cpus;
 	preempt_disable();
 	/* this happens for the common case of a single-threaded fork():  */
-	if (likely(mm == current->active_mm && atomic_read(&mm->mm_users) == 1))
+	if (likely(mm == current->active_mm && refcount_read(&mm->mm_users) == 1))
 	{
 		local_finish_flush_tlb_mm(mm);
 		preempt_enable();

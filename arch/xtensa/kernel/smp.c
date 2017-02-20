@@ -135,8 +135,13 @@ void secondary_start_kernel(void)
 
 	/* All kernel threads share the same mm context. */
 
+<<<<<<< e5c2d109eae88b7c203d396dfaeb284f95f6ffe5
 	mmget(mm);
 	mmgrab(mm);
+=======
+	refcount_inc(&mm->mm_users);
+	atomic_inc(&mm->mm_count);
+>>>>>>> mm: convert mm_struct.mm_users from atomic_t to refcount_t
 	current->active_mm = mm;
 	cpumask_set_cpu(cpu, mm_cpumask(mm));
 	enter_lazy_tlb(mm, current);

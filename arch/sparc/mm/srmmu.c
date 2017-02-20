@@ -1662,7 +1662,7 @@ static void smp_flush_tlb_mm(struct mm_struct *mm)
 		cpumask_clear_cpu(smp_processor_id(), &cpu_mask);
 		if (!cpumask_empty(&cpu_mask)) {
 			xc1((smpfunc_t) local_ops->tlb_mm, (unsigned long) mm);
-			if (atomic_read(&mm->mm_users) == 1 && current->active_mm == mm)
+			if (refcount_read(&mm->mm_users) == 1 && current->active_mm == mm)
 				cpumask_copy(mm_cpumask(mm),
 					     cpumask_of(smp_processor_id()));
 		}

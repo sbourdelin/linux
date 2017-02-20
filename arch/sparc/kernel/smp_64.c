@@ -1063,7 +1063,7 @@ void smp_flush_tlb_mm(struct mm_struct *mm)
 	u32 ctx = CTX_HWBITS(mm->context);
 	int cpu = get_cpu();
 
-	if (atomic_read(&mm->mm_users) == 1) {
+	if (refcount_read(&mm->mm_users) == 1) {
 		cpumask_copy(mm_cpumask(mm), cpumask_of(cpu));
 		goto local_flush_and_out;
 	}
@@ -1101,7 +1101,7 @@ void smp_flush_tlb_pending(struct mm_struct *mm, unsigned long nr, unsigned long
 	info.nr = nr;
 	info.vaddrs = vaddrs;
 
-	if (mm == current->mm && atomic_read(&mm->mm_users) == 1)
+	if (mm == current->mm && refcount_read(&mm->mm_users) == 1)
 		cpumask_copy(mm_cpumask(mm), cpumask_of(cpu));
 	else
 		smp_call_function_many(mm_cpumask(mm), tlb_pending_func,
@@ -1117,7 +1117,7 @@ void smp_flush_tlb_page(struct mm_struct *mm, unsigned long vaddr)
 	unsigned long context = CTX_HWBITS(mm->context);
 	int cpu = get_cpu();
 
-	if (mm == current->mm && atomic_read(&mm->mm_users) == 1)
+	if (mm == current->mm && refcount_read(&mm->mm_users) == 1)
 		cpumask_copy(mm_cpumask(mm), cpumask_of(cpu));
 	else
 		smp_cross_call_masked(&xcall_flush_tlb_page,

@@ -511,7 +511,7 @@ void flush_tlb_mm(struct mm_struct *mm)
 {
 	preempt_disable();
 
-	if ((atomic_read(&mm->mm_users) != 1) || (current->mm != mm)) {
+	if ((refcount_read(&mm->mm_users) != 1) || (current->mm != mm)) {
 		smp_on_other_tlbs(flush_tlb_mm_ipi, mm);
 	} else {
 		unsigned int cpu;
@@ -544,7 +544,7 @@ void flush_tlb_range(struct vm_area_struct *vma, unsigned long start, unsigned l
 	struct mm_struct *mm = vma->vm_mm;
 
 	preempt_disable();
-	if ((atomic_read(&mm->mm_users) != 1) || (current->mm != mm)) {
+	if ((refcount_read(&mm->mm_users) != 1) || (current->mm != mm)) {
 		struct flush_tlb_data fd = {
 			.vma = vma,
 			.addr1 = start,
@@ -598,7 +598,7 @@ static void flush_tlb_page_ipi(void *info)
 void flush_tlb_page(struct vm_area_struct *vma, unsigned long page)
 {
 	preempt_disable();
-	if ((atomic_read(&vma->vm_mm->mm_users) != 1) || (current->mm != vma->vm_mm)) {
+	if ((refcount_read(&vma->vm_mm->mm_users) != 1) || (current->mm != vma->vm_mm)) {
 		struct flush_tlb_data fd = {
 			.vma = vma,
 			.addr1 = page,

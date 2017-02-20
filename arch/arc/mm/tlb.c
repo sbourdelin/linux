@@ -297,7 +297,7 @@ noinline void local_flush_tlb_mm(struct mm_struct *mm)
 	 * Only for fork( ) do we need to move parent to a new MMU ctxt,
 	 * all other cases are NOPs, hence this check.
 	 */
-	if (atomic_read(&mm->mm_users) == 0)
+	if (refcount_read(&mm->mm_users) == 0)
 		return;
 
 	/*

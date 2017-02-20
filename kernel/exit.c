@@ -426,7 +426,7 @@ retry:
 	 * candidates.  Do not leave the mm pointing to a possibly
 	 * freed task structure.
 	 */
-	if (atomic_read(&mm->mm_users) <= 1) {
+	if (refcount_read(&mm->mm_users) <= 1) {
 		mm->owner = NULL;
 		return;
 	}

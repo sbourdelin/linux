@@ -530,7 +530,7 @@ void flush_tlb_mm_range(struct mm_struct *mm, unsigned long start,
 	 * Don't bother flushing if this address space is about to be
 	 * destroyed.
 	 */
-	if (atomic_read(&mm->mm_users) == 0)
+	if (refcount_read(&mm->mm_users) == 0)
 		return;
 
 	fix_range(mm, start, end, 0);
