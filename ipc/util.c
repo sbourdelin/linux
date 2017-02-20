@@ -437,7 +437,7 @@ void *ipc_rcu_alloc(int size)
 	struct ipc_rcu *out = ipc_alloc(sizeof(struct ipc_rcu) + size);
 	if (unlikely(!out))
 		return NULL;
-	atomic_set(&out->refcount, 1);
+	refcount_set(&out->refcount, 1);
 	return out + 1;
 }
 
@@ -445,14 +445,14 @@ int ipc_rcu_getref(void *ptr)
 {
 	struct ipc_rcu *p = ((struct ipc_rcu *)ptr) - 1;
 
-	return atomic_inc_not_zero(&p->refcount);
+	return refcount_inc_not_zero(&p->refcount);
 }
 
 void ipc_rcu_putref(void *ptr, void (*func)(struct rcu_head *head))
 {
 	struct ipc_rcu *p = ((struct ipc_rcu *)ptr) - 1;
 
-	if (!atomic_dec_and_test(&p->refcount))
+	if (!refcount_dec_and_test(&p->refcount))
 		return;
 
 	call_rcu(&p->rcu, func);

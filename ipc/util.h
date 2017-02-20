@@ -12,6 +12,7 @@
 
 #include <linux/unistd.h>
 #include <linux/err.h>
+#include <linux/refcount.h>
 
 #define SEQ_MULTIPLIER	(IPCMNI)
 
@@ -49,7 +50,7 @@ static inline void shm_exit_ns(struct ipc_namespace *ns) { }
 
 struct ipc_rcu {
 	struct rcu_head rcu;
-	atomic_t refcount;
+	refcount_t refcount;
 } ____cacheline_aligned_in_smp;
 
 #define ipc_rcu_to_struct(p)  ((void *)(p+1))
