@@ -12,6 +12,7 @@
 #include <linux/securebits.h>
 #include <linux/seqlock.h>
 #include <linux/rbtree.h>
+#include <linux/refcount.h>
 #include <net/net_namespace.h>
 #include <linux/sched/rt.h>
 
@@ -205,7 +206,7 @@ extern struct task_group root_task_group;
 #ifdef CONFIG_THREAD_INFO_IN_TASK
 # define INIT_TASK_TI(tsk)			\
 	.thread_info = INIT_THREAD_INFO(tsk),	\
-	.stack_refcount = ATOMIC_INIT(1),
+	.stack_refcount = REFCOUNT_INIT(1),
 #else
 # define INIT_TASK_TI(tsk)
 #endif
