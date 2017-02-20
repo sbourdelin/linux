@@ -21,6 +21,7 @@
 #include <linux/idr.h>
 #include <linux/bsg.h>
 #include <linux/slab.h>
+#include <linux/refcount.h>
 
 #include <scsi/scsi.h>
 #include <scsi/scsi_ioctl.h>
@@ -38,7 +39,7 @@ struct bsg_device {
 	struct list_head busy_list;
 	struct list_head done_list;
 	struct hlist_node dev_list;
-	atomic_t ref_count;
+	refcount_t ref_count;
 	int queued_cmds;
 	int done_cmds;
 	wait_queue_head_t wq_done;
@@ -711,7 +712,7 @@ static int bsg_put_device(struct bsg_device *bd)
 
 	mutex_lock(&bsg_mutex);
 
-	do_free = atomic_dec_and_test(&bd->ref_count);
+	do_free = refcount_dec_and_test(&bd->ref_count);
 	if (!do_free) {
 		mutex_unlock(&bsg_mutex);
 		goto out;
@@ -763,7 +764,7 @@ static struct bsg_device *bsg_add_device(struct inode *inode,
 
 	bsg_set_block(bd, file);
 
-	atomic_set(&bd->ref_count, 1);
+	refcount_set(&bd->ref_count, 1);
 	mutex_lock(&bsg_mutex);
 	hlist_add_head(&bd->dev_list, bsg_dev_idx_hash(iminor(inode)));
 
@@ -783,7 +784,7 @@ static struct bsg_device *__bsg_get_device(int minor, struct request_queue *q)
 
 	hlist_for_each_entry(bd, bsg_dev_idx_hash(minor), dev_list) {
 		if (bd->queue == q) {
-			atomic_inc(&bd->ref_count);
+			refcount_inc(&bd->ref_count);
 			goto found;
 		}
 	}
