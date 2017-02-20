@@ -197,40 +197,27 @@ static int _ks_wlan_hw_power_save(struct ks_wlan_private *priv)
 		if (!atomic_read(&priv->psstatus.confirm_wait)
 			&& !atomic_read(&priv->psstatus.snooze_guard)
 			&& !cnt_txqbody(priv)) {
-			ret =
-				ks7010_sdio_read(priv, INT_PENDING,
-						&rw_data,
-						sizeof(rw_data));
+			ret = ks7010_sdio_read(priv, INT_PENDING, &rw_data,
+					       sizeof(rw_data));
 			if (ret) {
-				DPRINTK(1,
-					" error : INT_PENDING=%02X\n",
-					rw_data);
+				DPRINTK(1, " error : INT_PENDING=%02X\n", rw_data);
 				queue_delayed_work(priv->ks_wlan_hw.ks7010sdio_wq,
 						&priv->ks_wlan_hw.rw_wq, 1);
 				break;
 			}
 			if (!rw_data) {
 				rw_data = GCR_B_DOZE;
-				ret =
-					ks7010_sdio_write(priv,
-							GCR_B,
-							&rw_data,
+				ret = ks7010_sdio_write(priv, GCR_B, &rw_data,
 							sizeof(rw_data));
 				if (ret) {
-					DPRINTK(1,
-						" error : GCR_B=%02X\n",
-						rw_data);
-					queue_delayed_work
-						(priv->ks_wlan_hw.ks7010sdio_wq,
-							&priv->ks_wlan_hw.rw_wq, 1);
+					DPRINTK(1, " error : GCR_B=%02X\n", rw_data);
+					queue_delayed_work(priv->ks_wlan_hw.ks7010sdio_wq,
+							   &priv->ks_wlan_hw.rw_wq, 1);
 					break;
 				}
-				DPRINTK(4,
-					"PMG SET!! : GCR_B=%02X\n",
-					rw_data);
+				DPRINTK(4, "PMG SET!! : GCR_B=%02X\n", rw_data);
 				atomic_set(&priv->psstatus.status, PS_SNOOZE);
-				DPRINTK(3,
-					"psstatus.status=PS_SNOOZE\n");
+				DPRINTK(3, "psstatus.status=PS_SNOOZE\n");
 			} else {
 				queue_delayed_work(priv->ks_wlan_hw.ks7010sdio_wq,
 						&priv->ks_wlan_hw.rw_wq, 1);
