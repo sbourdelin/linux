@@ -224,8 +224,8 @@ static int _ks_wlan_hw_power_save(struct ks_wlan_private *priv)
 						DPRINTK(4,
 							"PMG SET!! : GCR_B=%02X\n",
 							rw_data);
-						atomic_set(&priv->psstatus.
-							   status, PS_SNOOZE);
+						atomic_set(&priv->psstatus.status,
+							PS_SNOOZE);
 						DPRINTK(3,
 							"psstatus.status=PS_SNOOZE\n");
 					} else {
@@ -233,8 +233,7 @@ static int _ks_wlan_hw_power_save(struct ks_wlan_private *priv)
 								   &priv->ks_wlan_hw.rw_wq, 1);
 					}
 				} else {
-					queue_delayed_work(priv->ks_wlan_hw.
-							   ks7010sdio_wq,
+					queue_delayed_work(priv->ks_wlan_hw.ks7010sdio_wq,
 							   &priv->ks_wlan_hw.rw_wq,
 							   0);
 				}
@@ -334,8 +333,7 @@ static void tx_device_task(void *dev)
 			if (rc) {
 				DPRINTK(1, "write_to_device error !!(%d)\n",
 					rc);
-				queue_delayed_work(priv->ks_wlan_hw.
-						   ks7010sdio_wq,
+				queue_delayed_work(priv->ks_wlan_hw.ks7010sdio_wq,
 						   &priv->ks_wlan_hw.rw_wq, 1);
 				return;
 			}
@@ -634,10 +632,8 @@ static void ks_sdio_interrupt(struct sdio_func *func)
 						if (cnt_txqbody(priv)) {
 							ks_wlan_hw_wakeup_request(priv);
 							queue_delayed_work
-							    (priv->ks_wlan_hw.
-							     ks7010sdio_wq,
-							     &priv->ks_wlan_hw.
-							     rw_wq, 1);
+							    (priv->ks_wlan_hw.ks7010sdio_wq,
+ 							     &priv->ks_wlan_hw.rw_wq, 1);
 							return;
 						}
 					} else {
