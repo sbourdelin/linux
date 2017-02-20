@@ -101,4 +101,12 @@ static void __init armadillo800eva_init(void)
 				       ARRAY_SIZE(armadillo800eva_devices));
 }
 
-board_staging("renesas,armadillo800eva", armadillo800eva_init);
+static int __init runtime_board_check(void)
+{
+	if (of_machine_is_compatible("renesas,armadillo800eva"))
+		armadillo800eva_init();
+
+	return 0;
+}
+
+device_initcall(runtime_board_check)

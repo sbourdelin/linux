@@ -22,4 +22,12 @@ static void __init kzm9d_init(void)
 	}
 }
 
-board_staging("renesas,kzm9d", kzm9d_init);
+static int __init runtime_board_check(void)
+{
+	if (of_machine_is_compatible("renesas,kzm9d"))
+		kzm9d_init();
+
+	return 0;
+}
+
+device_initcall(runtime_board_check)
