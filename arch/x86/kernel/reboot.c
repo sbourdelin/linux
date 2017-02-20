@@ -752,7 +752,7 @@ void machine_crash_shutdown(struct pt_regs *regs)
 #if defined(CONFIG_SMP)
 
 /* This keeps a track of which one is crashing cpu. */
-static int crashing_cpu;
+static int crashing_cpu = -1;
 static nmi_shootdown_cb shootdown_callback;
 
 static atomic_t waiting_for_crash_ipi;
@@ -852,6 +852,14 @@ void nmi_panic_self_stop(struct pt_regs *regs)
 	}
 }
 
+bool cpus_shotdown(void)
+{
+	if (crashing_cpu != -1)
+		return true;
+
+	return false;
+}
+
 #else /* !CONFIG_SMP */
 void nmi_shootdown_cpus(nmi_shootdown_cb callback)
 {
@@ -861,4 +869,10 @@ void nmi_shootdown_cpus(nmi_shootdown_cb callback)
 void run_crash_ipi_callback(struct pt_regs *regs)
 {
 }
+
+bool cpus_shotdown(void)
+{
+	return false;
+}
+
 #endif

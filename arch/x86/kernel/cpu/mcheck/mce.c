@@ -48,6 +48,7 @@
 #include <asm/tlbflush.h>
 #include <asm/mce.h>
 #include <asm/msr.h>
+#include <asm/reboot.h>
 
 #include "mce-internal.h"
 
@@ -1090,8 +1091,9 @@ void do_machine_check(struct pt_regs *regs, long error_code)
 	 */
 	int lmce = 1;
 
-	/* If this CPU is offline, just bail out. */
-	if (cpu_is_offline(smp_processor_id())) {
+	/* If nmi shootdown happened or this CPU is offline, just bail out. */
+	if (cpus_shotdown() ||
+	    cpu_is_offline(smp_processor_id())) {
 		u64 mcgstatus;
 
 		mcgstatus = mce_rdmsrl(MSR_IA32_MCG_STATUS);
