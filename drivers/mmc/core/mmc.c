@@ -1827,7 +1827,7 @@ static int mmc_can_sleep(struct mmc_card *card)
 	return (card && card->ext_csd.rev >= 3);
 }
 
-static int mmc_sleep(struct mmc_host *host)
+static int mmc_sleepawake(struct mmc_host *host, bool sleep)
 {
 	struct mmc_command cmd = {};
 	struct mmc_card *card = host->card;
@@ -1837,13 +1837,16 @@ static int mmc_sleep(struct mmc_host *host)
 	/* Re-tuning can't be done once the card is deselected */
 	mmc_retune_hold(host);
 
-	err = mmc_deselect_cards(host);
-	if (err)
-		goto out_release;
+	if (sleep) {
+		err = mmc_deselect_cards(host);
+		if (err)
+			goto out_release;
+	}
 
 	cmd.opcode = MMC_SLEEP_AWAKE;
 	cmd.arg = card->rca << 16;
-	cmd.arg |= 1 << 15;
+	if (sleep)
+		cmd.arg |= 1 << 15;
 
 	/*
 	 * If the max_busy_timeout of the host is specified, validate it against
@@ -1871,9 +1874,22 @@ static int mmc_sleep(struct mmc_host *host)
 	if (!cmd.busy_timeout || !(host->caps & MMC_CAP_WAIT_WHILE_BUSY))
 		mmc_delay(timeout_ms);
 
+	if (!sleep)
+		err = mmc_select_card(card);
+
 out_release:
 	mmc_retune_release(host);
 	return err;
+}
+
+static int mmc_sleep(struct mmc_host *host)
+{
+	return mmc_sleepawake(host, true);
+}
+
+static int mmc_awake(struct mmc_host *host)
+{
+	return mmc_sleepawake(host, false);
 }
 
 static int mmc_can_poweroff_notify(const struct mmc_card *card)
