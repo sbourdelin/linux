@@ -1216,13 +1216,17 @@ int spk_set_key_info(const u_char *key_info, u_char *k_buffer)
 	u_char ch, version, num_keys;
 
 	version = *cp++;
-	if (version != KEY_MAP_VER)
-		return -1;
+	if (version != KEY_MAP_VER) {
+		pr_debug("Version mismatch %d\n", -1);
+		return -EINVAL;
+	}
 	num_keys = *cp;
 	states = (int)cp[1];
 	key_data_len = (states + 1) * (num_keys + 1);
-	if (key_data_len + SHIFT_TBL_SIZE + 4 >= sizeof(spk_key_buf))
-		return -2;
+	if (key_data_len + SHIFT_TBL_SIZE + 4 >= sizeof(spk_key_buf)) {
+		pr_debug("Data len and Shift table too big %d\n", -2);
+		return -EINVAL;
+	}
 	memset(k_buffer, 0, SHIFT_TBL_SIZE);
 	memset(spk_our_keys, 0, sizeof(spk_our_keys));
 	spk_shift_table = k_buffer;
@@ -1233,14 +1237,18 @@ int spk_set_key_info(const u_char *key_info, u_char *k_buffer)
 	cp1 += 2;		/* now pointing at shift states */
 	for (i = 1; i <= states; i++) {
 		ch = *cp1++;
-		if (ch >= SHIFT_TBL_SIZE)
-			return -3;
+		if (ch >= SHIFT_TBL_SIZE) {
+			pr_debug("Key table size overflow %d\n", -3);
+			return -EINVAL;
+		}
 		spk_shift_table[ch] = i;
 	}
 	keymap_flags = *cp1++;
 	while ((ch = *cp1)) {
-		if (ch >= MAX_KEY)
-			return -4;
+		if (ch >= MAX_KEY) {
+			pr_debug("Max Key overflow %d\n", -4);
+			return -EINVAL;
+		}
 		spk_our_keys[ch] = cp1;
 		cp1 += states + 1;
 	}
