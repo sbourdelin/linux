@@ -2311,7 +2311,7 @@ err:
 	/* TODO: It's probably a good idea to release device from the driver
 	 * but calling device_release_driver() here will cause a deadlock.
 	 */
-	return;
+	;
 }
 
 int ath10k_core_register(struct ath10k *ar, u32 chip_id)
