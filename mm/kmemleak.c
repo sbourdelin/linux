@@ -105,7 +105,7 @@
 
 #include <asm/sections.h>
 #include <asm/processor.h>
-#include <linux/atomic.h>
+#include <linux/refcount.h>
 
 #include <linux/kasan.h>
 #include <linux/kmemcheck.h>
@@ -154,7 +154,7 @@ struct kmemleak_object {
 	struct rb_node rb_node;
 	struct rcu_head rcu;		/* object_list lockless traversal */
 	/* object usage count; object freed when use_count == 0 */
-	atomic_t use_count;
+	refcount_t use_count;
 	unsigned long pointer;
 	size_t size;
 	/* minimum number of a pointers found before it is considered leak */
@@ -434,7 +434,7 @@ static struct kmemleak_object *lookup_object(unsigned long ptr, int alias)
  */
 static int get_object(struct kmemleak_object *object)
 {
-	return atomic_inc_not_zero(&object->use_count);
+	return refcount_inc_not_zero(&object->use_count);
 }
 
 /*
@@ -467,7 +467,7 @@ static void free_object_rcu(struct rcu_head *rcu)
  */
 static void put_object(struct kmemleak_object *object)
 {
-	if (!atomic_dec_and_test(&object->use_count))
+	if (!refcount_dec_and_test(&object->use_count))
 		return;
 
 	/* should only get here after delete_object was called */
@@ -556,7 +556,7 @@ static struct kmemleak_object *create_object(unsigned long ptr, size_t size,
 	INIT_LIST_HEAD(&object->gray_list);
 	INIT_HLIST_HEAD(&object->area_list);
 	spin_lock_init(&object->lock);
-	atomic_set(&object->use_count, 1);
+	refcount_set(&object->use_count, 1);
 	object->flags = OBJECT_ALLOCATED;
 	object->pointer = ptr;
 	object->size = size;
@@ -629,7 +629,7 @@ static void __delete_object(struct kmemleak_object *object)
 	unsigned long flags;
 
 	WARN_ON(!(object->flags & OBJECT_ALLOCATED));
-	WARN_ON(atomic_read(&object->use_count) < 1);
+	WARN_ON(refcount_read(&object->use_count) < 1);
 
 	/*
 	 * Locking here also ensures that the corresponding memory block
@@ -1396,9 +1396,9 @@ static void kmemleak_scan(void)
 		 * With a few exceptions there should be a maximum of
 		 * 1 reference to any object at this point.
 		 */
-		if (atomic_read(&object->use_count) > 1) {
+		if (refcount_read(&object->use_count) > 1) {
 			pr_debug("object->use_count = %d\n",
-				 atomic_read(&object->use_count));
+				 refcount_read(&object->use_count));
 			dump_object_info(object);
 		}
 #endif
