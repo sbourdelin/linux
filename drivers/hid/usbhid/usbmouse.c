@@ -89,7 +89,7 @@ static void usb_mouse_irq(struct urb *urb)
 
 	input_sync(dev);
 resubmit:
-	status = usb_submit_urb (urb, GFP_ATOMIC);
+	status = usb_submit_urb(urb, GFP_ATOMIC);
 	if (status)
 		dev_err(&mouse->usbdev->dev,
 			"can't resubmit intr, %s-%s/input0, status %d\n",
@@ -115,7 +115,8 @@ static void usb_mouse_close(struct input_dev *dev)
 	usb_kill_urb(mouse->irq);
 }
 
-static int usb_mouse_probe(struct usb_interface *intf, const struct usb_device_id *id)
+static int usb_mouse_probe(struct usb_interface *intf,
+			const struct usb_device_id *id)
 {
 	struct usb_device *dev = interface_to_usbdev(intf);
 	struct usb_host_interface *interface;
@@ -202,11 +203,11 @@ static int usb_mouse_probe(struct usb_interface *intf, const struct usb_device_i
 	usb_set_intfdata(intf, mouse);
 	return 0;
 
-fail3:	
+fail3:
 	usb_free_urb(mouse->irq);
-fail2:	
+fail2:
 	usb_free_coherent(dev, 8, mouse->data, mouse->data_dma);
-fail1:	
+fail1:
 	input_free_device(input_dev);
 	kfree(mouse);
 	return error;
@@ -214,25 +215,27 @@ fail1:
 
 static void usb_mouse_disconnect(struct usb_interface *intf)
 {
-	struct usb_mouse *mouse = usb_get_intfdata (intf);
+	struct usb_mouse *mouse = usb_get_intfdata(intf);
 
 	usb_set_intfdata(intf, NULL);
 	if (mouse) {
 		usb_kill_urb(mouse->irq);
 		input_unregister_device(mouse->dev);
 		usb_free_urb(mouse->irq);
-		usb_free_coherent(interface_to_usbdev(intf), 8, mouse->data, mouse->data_dma);
+		usb_free_coherent(interface_to_usbdev(intf), 8,
+				mouse->data, mouse->data_dma);
 		kfree(mouse);
 	}
 }
 
-static struct usb_device_id usb_mouse_id_table [] = {
-	{ USB_INTERFACE_INFO(USB_INTERFACE_CLASS_HID, USB_INTERFACE_SUBCLASS_BOOT,
+static struct usb_device_id usb_mouse_id_table[] = {
+	{ USB_INTERFACE_INFO(USB_INTERFACE_CLASS_HID,
+		USB_INTERFACE_SUBCLASS_BOOT,
 		USB_INTERFACE_PROTOCOL_MOUSE) },
 	{ }	/* Terminating entry */
 };
 
-MODULE_DEVICE_TABLE (usb, usb_mouse_id_table);
+MODULE_DEVICE_TABLE(usb, usb_mouse_id_table);
 
 static struct usb_driver usb_mouse_driver = {
 	.name		= "usbmouse",
