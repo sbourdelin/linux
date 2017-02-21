@@ -519,6 +519,9 @@ int machine__process_namespaces_event(struct machine *machine __maybe_unused,
 		  "\nWARNING: perf tool seems to support more namespaces than"
 		  " the kernel.\nTry updating the kernel..\n\n");
 
+	if (dump_trace)
+		perf_event__fprintf_namespaces(event, stdout);
+
 	if (thread == NULL ||
 	    thread__set_namespaces(thread, sample->time, &event->namespaces)) {
 		dump_printf("problem processing PERF_RECORD_NAMESPACES, skipping event.\n");
