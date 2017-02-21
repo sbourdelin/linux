@@ -20,6 +20,8 @@
 #ifndef	__XFS_RMAP_ITEM_H__
 #define	__XFS_RMAP_ITEM_H__
 
+#include <linux/refcount.h>
+
 /*
  * There are (currently) three pairs of rmap btree redo item types: map, unmap,
  * and convert.  The common abbreviations for these are RUI (rmap update
@@ -64,7 +66,7 @@ struct kmem_zone;
  */
 struct xfs_rui_log_item {
 	struct xfs_log_item		rui_item;
-	atomic_t			rui_refcount;
+	refcount_t			rui_refcount;
 	atomic_t			rui_next_extent;
 	unsigned long			rui_flags;	/* misc flags */
 	struct xfs_rui_log_format	rui_format;
