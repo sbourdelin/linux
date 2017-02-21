@@ -427,13 +427,13 @@ static struct sk_buff *receive_small(struct net_device *dev,
 			break;
 		case XDP_TX:
 			if (unlikely(!virtnet_xdp_xmit(vi, rq, &xdp)))
-				trace_xdp_hook_exception(vi->dev, last_hook, act);
+				trace_xdp_exception(vi->dev, last_hook, act);
 			rcu_read_unlock();
 			goto xdp_xmit;
 		default:
 			xdp_warn_invalid_action(act);
 		case XDP_ABORTED:
-			trace_xdp_hook_exception(vi->dev, last_hook, act);
+			trace_xdp_exception(vi->dev, last_hook, act);
 		case XDP_DROP:
 			goto err_xdp;
 		}
@@ -619,7 +619,7 @@ static struct sk_buff *receive_mergeable(struct net_device *dev,
 			break;
 		case XDP_TX:
 			if (unlikely(!virtnet_xdp_xmit(vi, rq, &xdp)))
-				trace_xdp_hook_exception(vi->dev, last_hook, act);
+				trace_xdp_exception(vi->dev, last_hook, act);
 			ewma_pkt_len_add(&rq->mrg_avg_pkt_len, len);
 			if (unlikely(xdp_page != page))
 				goto err_xdp;
@@ -628,7 +628,7 @@ static struct sk_buff *receive_mergeable(struct net_device *dev,
 		default:
 			xdp_warn_invalid_action(act);
 		case XDP_ABORTED:
-			trace_xdp_hook_exception(vi->dev, last_hook, act);
+			trace_xdp_exception(vi->dev, last_hook, act);
 		case XDP_DROP:
 			if (unlikely(xdp_page != page))
 				__free_pages(xdp_page, 0);

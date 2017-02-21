@@ -811,18 +811,6 @@ struct tc_to_netdev {
  * to the netdevice through the xdp op.
  */
 enum xdp_netdev_command {
-	/* Set or clear a bpf program used in the earliest stages of packet
-	 * rx. The prog will have been loaded as BPF_PROG_TYPE_XDP. The callee
-	 * is responsible for calling bpf_prog_put on any old progs that are
-	 * stored. In case of error, the callee need not release the new prog
-	 * reference, but on success it takes ownership and must bpf_prog_put
-	 * when it is no longer used.
-	 */
-	XDP_SETUP_PROG,
-	/* Check if a bpf program is set on the device.  The callee should
-	 * return true if a program is currently attached and running.
-	 */
-	XDP_QUERY_PROG,
 	/* Initialize device to use XDP. Called when first XDP program is
 	 * registered on a device (including on a NAPI instance).
 	 */
@@ -840,11 +828,8 @@ enum xdp_netdev_command {
 struct netdev_xdp {
 	enum xdp_netdev_command command;
 	union {
-		/* XDP_SETUP_PROG */
 		/* XDP_CHECK_BPF_PROG */
 		struct bpf_prog *prog;
-		/* XDP_QUERY_PROG */
-		bool prog_attached;
 	};
 };
 

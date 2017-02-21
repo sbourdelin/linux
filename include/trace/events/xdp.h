@@ -26,35 +26,6 @@ __XDP_ACT_MAP(__XDP_ACT_TP_FN)
 TRACE_EVENT(xdp_exception,
 
 	TP_PROTO(const struct net_device *dev,
-		 const struct bpf_prog *xdp, u32 act),
-
-	TP_ARGS(dev, xdp, act),
-
-	TP_STRUCT__entry(
-		__string(name, dev->name)
-		__array(u8, prog_tag, 8)
-		__field(u32, act)
-	),
-
-	TP_fast_assign(
-		BUILD_BUG_ON(sizeof(__entry->prog_tag) != sizeof(xdp->tag));
-		memcpy(__entry->prog_tag, xdp->tag, sizeof(xdp->tag));
-		__assign_str(name, dev->name);
-		__entry->act = act;
-	),
-
-	TP_printk("prog=%s device=%s action=%s",
-		  __print_hex_str(__entry->prog_tag, 8),
-		  __get_str(name),
-		  __print_symbolic(__entry->act, __XDP_ACT_SYM_TAB))
-);
-
-/* Temporary trace function. This will be renamed to xdp_exception after all
- * the calling drivers have been patched.
- */
-TRACE_EVENT(xdp_hook_exception,
-
-	TP_PROTO(const struct net_device *dev,
 		 const struct xdp_hook *hook, u32 act),
 
 	TP_ARGS(dev, hook, act),

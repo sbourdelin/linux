@@ -1022,7 +1022,7 @@ static bool qede_rx_xdp(struct qede_dev *edev,
 		/* We need the replacement buffer before transmit. */
 		if (qede_alloc_rx_buffer(rxq, true)) {
 			qede_recycle_rx_bd_ring(rxq, 1);
-			trace_xdp_hook_exception(edev->ndev, last_hook, act);
+			trace_xdp_exception(edev->ndev, last_hook, act);
 			goto out;
 		}
 
@@ -1033,7 +1033,7 @@ static bool qede_rx_xdp(struct qede_dev *edev,
 			dma_unmap_page(rxq->dev, bd->mapping,
 				       PAGE_SIZE, DMA_BIDIRECTIONAL);
 			__free_page(bd->data);
-			trace_xdp_hook_exception(edev->ndev, last_hook, act);
+			trace_xdp_exception(edev->ndev, last_hook, act);
 		}
 
 		/* Regardless, we've consumed an Rx BD */
@@ -1043,7 +1043,7 @@ static bool qede_rx_xdp(struct qede_dev *edev,
 	default:
 		xdp_warn_invalid_action(act);
 	case XDP_ABORTED:
-		trace_xdp_hook_exception(edev->ndev, last_hook, act);
+		trace_xdp_exception(edev->ndev, last_hook, act);
 	case XDP_DROP:
 		qede_recycle_rx_bd_ring(rxq, cqe->bd_num);
 	}

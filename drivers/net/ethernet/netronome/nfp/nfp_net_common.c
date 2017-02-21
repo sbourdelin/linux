@@ -1616,15 +1616,13 @@ static int nfp_net_rx(struct nfp_net_rx_ring *rx_ring, int budget)
 				if (unlikely(!nfp_net_tx_xdp_buf(nn, rx_ring,
 								 tx_ring, rxbuf,
 								 pkt_off, pkt_len)))
-					trace_xdp_hook_exception(nn->netdev,
-								 last_hook,
-								 act);
+					trace_xdp_exception(nn->netdev,
+							    last_hook, act);
 				continue;
 			default:
 				xdp_warn_invalid_action(act);
 			case XDP_ABORTED:
-				trace_xdp_hook_exception(nn->netdev, last_hook,
-							 act);
+				trace_xdp_exception(nn->netdev, last_hook, act);
 			case XDP_DROP:
 				nfp_net_rx_give_one(rx_ring, rxbuf->frag,
 						    rxbuf->dma_addr);

@@ -2991,12 +2991,6 @@ static bool xdp_is_valid_access(int off, int size,
 	return __is_valid_xdp_access(off, size);
 }
 
-void bpf_warn_invalid_xdp_action(u32 act)
-{
-	WARN_ONCE(1, "Illegal XDP return value %u, expect packet loss\n", act);
-}
-EXPORT_SYMBOL_GPL(bpf_warn_invalid_xdp_action);
-
 static u32 bpf_convert_ctx_access(enum bpf_access_type type,
 				  const struct bpf_insn *si,
 				  struct bpf_insn *insn_buf,
