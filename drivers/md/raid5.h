@@ -806,4 +806,12 @@ extern void ppl_exit_log(struct ppl_conf *log);
 extern int ppl_write_stripe(struct ppl_conf *log, struct stripe_head *sh);
 extern void ppl_write_stripe_run(struct ppl_conf *log);
 extern void ppl_stripe_write_finished(struct stripe_head *sh);
+
+enum ppl_modify_log_operation {
+	PPL_MODIFY_LOG_DISK_REMOVE,
+	PPL_MODIFY_LOG_DISK_ADD,
+};
+extern int ppl_modify_log(struct ppl_conf *log, struct md_rdev *rdev,
+			  enum ppl_modify_log_operation operation);
+
 #endif

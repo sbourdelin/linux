@@ -319,6 +319,12 @@ static void ppl_submit_iounit(struct ppl_io_unit *io)
 
 	bio = bio_alloc_bioset(GFP_NOIO, BIO_MAX_PAGES, ppl_conf->bs);
 	bio->bi_private = io;
+
+	if (!log->rdev || test_bit(Faulty, &log->rdev->flags)) {
+		ppl_log_endio(bio);
+		return;
+	}
+
 	bio->bi_end_io = ppl_log_endio;
 	bio->bi_opf = REQ_OP_WRITE | REQ_FUA;
 	bio->bi_bdev = log->rdev->bdev;
@@ -1096,5 +1102,46 @@ int ppl_init_log(struct r5conf *conf)
 	return 0;
 err:
 	ppl_exit_log(ppl_conf);
+	return ret;
+}
+
+int ppl_modify_log(struct ppl_conf *ppl_conf, struct md_rdev *rdev,
+		   enum ppl_modify_log_operation operation)
+{
+	struct ppl_log *log;
+	int ret = 0;
+	char b[BDEVNAME_SIZE];
+
+	if (!rdev)
+		return -EINVAL;
+
+	pr_debug("%s: disk: %d operation: %s dev: %s\n",
+		 __func__, rdev->raid_disk,
+		 operation == PPL_MODIFY_LOG_DISK_REMOVE ? "remove" :
+		 (operation == PPL_MODIFY_LOG_DISK_ADD ? "add" : "?"),
+		 bdevname(rdev->bdev, b));
+
+	if (rdev->raid_disk < 0)
+		return 0;
+
+	if (rdev->raid_disk >= ppl_conf->count)
+		return -ENODEV;
+
+	log = &ppl_conf->child_logs[rdev->raid_disk];
+
+	mutex_lock(&log->io_mutex);
+	if (operation == PPL_MODIFY_LOG_DISK_REMOVE) {
+		log->rdev = NULL;
+	} else if (operation == PPL_MODIFY_LOG_DISK_ADD) {
+		ret = ppl_validate_rdev(rdev);
+		if (!ret) {
+			log->rdev = rdev;
+			ret = ppl_write_empty_header(log);
+		}
+	} else {
+		ret = -EINVAL;
+	}
+	mutex_unlock(&log->io_mutex);
+
 	return ret;
 }
