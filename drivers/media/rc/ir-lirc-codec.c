@@ -19,8 +19,6 @@
 #include <media/rc-core.h>
 #include "rc-core-priv.h"
 
-#define LIRCBUF_SIZE 256
-
 /**
  * ir_lirc_raw_event() - Send raw IR data to lirc to be relayed to userspace
  *
@@ -32,10 +30,7 @@
 int ir_lirc_raw_event(struct rc_dev *dev, struct ir_raw_event ev)
 {
 	struct lirc_codec *lirc = &dev->raw->lirc;
-	int sample;
-
-	if (!dev->raw->lirc.drv || !dev->raw->lirc.drv->rbuf)
-		return -EINVAL;
+	unsigned int sample;
 
 	/* Packet start */
 	if (ev.reset) {
@@ -70,10 +65,7 @@ int ir_lirc_raw_event(struct rc_dev *dev, struct ir_raw_event ev)
 
 	/* Normal sample */
 	} else {
-
 		if (lirc->gap) {
-			int gap_sample;
-
 			lirc->gap_duration += ktime_to_ns(ktime_sub(ktime_get(),
 				lirc->gap_start));
 
@@ -82,9 +74,7 @@ int ir_lirc_raw_event(struct rc_dev *dev, struct ir_raw_event ev)
 			lirc->gap_duration = min(lirc->gap_duration,
 							(u64)LIRC_VALUE_MASK);
 
-			gap_sample = LIRC_SPACE(lirc->gap_duration);
-			lirc_buffer_write(dev->raw->lirc.drv->rbuf,
-						(unsigned char *) &gap_sample);
+			kfifo_put(&lirc->kfifo, LIRC_SPACE(lirc->gap_duration));
 			lirc->gap = false;
 		}
 
@@ -94,9 +84,8 @@ int ir_lirc_raw_event(struct rc_dev *dev, struct ir_raw_event ev)
 			   TO_US(ev.duration), TO_STR(ev.pulse));
 	}
 
-	lirc_buffer_write(dev->raw->lirc.drv->rbuf,
-			  (unsigned char *) &sample);
-	wake_up(&dev->raw->lirc.drv->rbuf->wait_poll);
+	kfifo_put(&lirc->kfifo, sample);
+	wake_up_poll(&lirc->wait_poll, POLLIN);
 
 	return 0;
 }
@@ -326,8 +315,64 @@ static long ir_lirc_ioctl(struct file *filep, unsigned int cmd,
 	return ret;
 }
 
+static unsigned int ir_lirc_poll(struct file *filep,
+				 struct poll_table_struct *wait)
+{
+	struct lirc_codec *lirc = lirc_get_pdata(filep);
+	unsigned int events = 0;
+
+	poll_wait(filep, &lirc->wait_poll, wait);
+
+	if (!lirc->drv->attached)
+		events = POLLERR;
+	else if (!kfifo_is_empty(&lirc->kfifo))
+		events = POLLIN | POLLRDNORM;
+
+	return events;
+}
+
+static ssize_t ir_lirc_read(struct file *filep, char __user *buffer,
+			    size_t length, loff_t *ppos)
+{
+	struct lirc_codec *lirc = lirc_get_pdata(filep);
+	unsigned int copied;
+	int ret;
+
+	if (length % sizeof(unsigned int))
+		return -EINVAL;
+
+	if (!lirc->drv->attached)
+		return -ENODEV;
+
+	do {
+		if (kfifo_is_empty(&lirc->kfifo)) {
+			if (filep->f_flags & O_NONBLOCK)
+				return -EAGAIN;
+
+			ret = wait_event_interruptible(lirc->wait_poll,
+					!kfifo_is_empty(&lirc->kfifo) ||
+					!lirc->drv->attached);
+			if (ret)
+				return ret;
+		}
+
+		if (!lirc->drv->attached)
+			return -ENODEV;
+
+		ret = kfifo_to_user(&lirc->kfifo, buffer, length, &copied);
+		if (ret)
+			return ret;
+	} while (copied == 0);
+
+	return copied;
+}
+
 static int ir_lirc_open(void *data)
 {
+	struct lirc_codec *lirc = data;
+
+	kfifo_reset_out(&lirc->kfifo);
+
 	return 0;
 }
 
@@ -343,8 +388,8 @@ static const struct file_operations lirc_fops = {
 #ifdef CONFIG_COMPAT
 	.compat_ioctl	= ir_lirc_ioctl,
 #endif
-	.read		= lirc_dev_fop_read,
-	.poll		= lirc_dev_fop_poll,
+	.read		= ir_lirc_read,
+	.poll		= ir_lirc_poll,
 	.open		= lirc_dev_fop_open,
 	.release	= lirc_dev_fop_close,
 	.llseek		= no_llseek,
@@ -353,21 +398,12 @@ static const struct file_operations lirc_fops = {
 int ir_lirc_register(struct rc_dev *dev)
 {
 	struct lirc_driver *drv;
-	struct lirc_buffer *rbuf;
 	int rc = -ENOMEM;
 	unsigned long features = 0;
 
-	drv = kzalloc(sizeof(struct lirc_driver), GFP_KERNEL);
+	drv = kzalloc(sizeof(*drv), GFP_KERNEL);
 	if (!drv)
-		return rc;
-
-	rbuf = kzalloc(sizeof(struct lirc_buffer), GFP_KERNEL);
-	if (!rbuf)
-		goto rbuf_alloc_failed;
-
-	rc = lirc_buffer_init(rbuf, sizeof(int), LIRCBUF_SIZE);
-	if (rc)
-		goto rbuf_init_failed;
+		return -ENOMEM;
 
 	if (dev->driver_type != RC_DRIVER_IR_RAW_TX) {
 		features |= LIRC_CAN_REC_MODE2;
@@ -402,7 +438,6 @@ int ir_lirc_register(struct rc_dev *dev)
 	drv->minor = -1;
 	drv->features = features;
 	drv->data = &dev->raw->lirc;
-	drv->rbuf = rbuf;
 	drv->set_use_inc = &ir_lirc_open;
 	drv->set_use_dec = &ir_lirc_close;
 	drv->code_length = sizeof(struct ir_raw_event) * 8;
@@ -410,6 +445,8 @@ int ir_lirc_register(struct rc_dev *dev)
 	drv->dev.parent = &dev->dev;
 	drv->rdev = dev;
 	drv->owner = THIS_MODULE;
+	INIT_KFIFO(dev->raw->lirc.kfifo);
+	init_waitqueue_head(&dev->raw->lirc.wait_poll);
 
 	drv->minor = lirc_register_driver(drv);
 	if (drv->minor < 0) {
@@ -422,11 +459,7 @@ int ir_lirc_register(struct rc_dev *dev)
 	return 0;
 
 lirc_register_failed:
-rbuf_init_failed:
-	kfree(rbuf);
-rbuf_alloc_failed:
 	kfree(drv);
-
 	return rc;
 }
 
@@ -434,7 +467,6 @@ void ir_lirc_unregister(struct rc_dev *dev)
 {
 	struct lirc_codec *lirc = &dev->raw->lirc;
 
+	wake_up_poll(&lirc->wait_poll, POLLERR);
 	lirc_unregister_driver(lirc->drv->minor);
-	lirc_buffer_free(lirc->drv->rbuf);
-	kfree(lirc->drv->rbuf);
 }

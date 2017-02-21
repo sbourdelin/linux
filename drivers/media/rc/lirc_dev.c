@@ -328,7 +328,7 @@ int lirc_register_driver(struct lirc_driver *d)
 	if (minor < 0)
 		return minor;
 
-	if (LIRC_CAN_REC(d->features)) {
+	if (!d->rdev) {
 		err = lirc_allocate_buffer(irctls[minor]);
 		if (err)
 			lirc_unregister_driver(minor);
@@ -374,7 +374,8 @@ int lirc_unregister_driver(int minor)
 	if (d->open) {
 		dev_dbg(d->dev.parent, LOGHEAD "releasing opened driver\n",
 			d->name, d->minor);
-		wake_up_interruptible(&d->buf->wait_poll);
+		if (d->buf)
+			wake_up_interruptible(&d->buf->wait_poll);
 	}
 
 	mutex_lock(&d->irctl_lock);

@@ -19,7 +19,11 @@
 /* Define the max number of pulse/space transitions to buffer */
 #define	MAX_IR_EVENT_SIZE	512
 
+/* Define the number */
+#define LIRCBUF_SIZE		256
+
 #include <linux/slab.h>
+#include <media/lirc_dev.h>
 #include <media/rc-core.h>
 
 struct ir_raw_handler {
@@ -47,6 +51,7 @@ struct ir_raw_event_ctrl {
 	/* raw decoder state follows */
 	struct ir_raw_event prev_ev;
 	struct ir_raw_event this_ev;
+#if IS_ENABLED(CONFIG_IR_NEC_DECODER)
 	struct nec_dec {
 		int state;
 		unsigned count;
@@ -54,12 +59,16 @@ struct ir_raw_event_ctrl {
 		bool is_nec_x;
 		bool necx_repeat;
 	} nec;
+#endif
+#if IS_ENABLED(CONFIG_IR_RC5_DECODER)
 	struct rc5_dec {
 		int state;
 		u32 bits;
 		unsigned count;
 		bool is_rc5x;
 	} rc5;
+#endif
+#if IS_ENABLED(CONFIG_IR_RC6_DECODER)
 	struct rc6_dec {
 		int state;
 		u8 header;
@@ -68,11 +77,15 @@ struct ir_raw_event_ctrl {
 		unsigned count;
 		unsigned wanted_bits;
 	} rc6;
+#endif
+#if IS_ENABLED(CONFIG_IR_SONY_DECODER)
 	struct sony_dec {
 		int state;
 		u32 bits;
 		unsigned count;
 	} sony;
+#endif
+#if IS_ENABLED(CONFIG_IR_JVC_DECODER)
 	struct jvc_dec {
 		int state;
 		u16 bits;
@@ -81,17 +94,23 @@ struct ir_raw_event_ctrl {
 		bool first;
 		bool toggle;
 	} jvc;
+#endif
+#if IS_ENABLED(CONFIG_IR_SANYO_DECODER)
 	struct sanyo_dec {
 		int state;
 		unsigned count;
 		u64 bits;
 	} sanyo;
+#endif
+#if IS_ENABLED(CONFIG_IR_SHARP_DECODER)
 	struct sharp_dec {
 		int state;
 		unsigned count;
 		u32 bits;
 		unsigned int pulse_len;
 	} sharp;
+#endif
+#if IS_ENABLED(CONFIG_IR_MCE_KBD_DECODER)
 	struct mce_kbd_dec {
 		struct input_dev *idev;
 		struct timer_list rx_timeout;
@@ -103,9 +122,13 @@ struct ir_raw_event_ctrl {
 		unsigned count;
 		unsigned wanted_bits;
 	} mce_kbd;
+#endif
+#if IS_ENABLED(CONFIG_IR_LIRC_CODEC)
 	struct lirc_codec {
 		struct rc_dev *dev;
 		struct lirc_driver *drv;
+		DECLARE_KFIFO(kfifo, unsigned int, LIRCBUF_SIZE);
+		wait_queue_head_t wait_poll;
 		int carrier_low;
 
 		ktime_t gap_start;
@@ -114,11 +137,14 @@ struct ir_raw_event_ctrl {
 		bool send_timeout_reports;
 
 	} lirc;
+#endif
+#if IS_ENABLED(CONFIG_IR_XMP_DECODER)
 	struct xmp_dec {
 		int state;
 		unsigned count;
 		u32 durations[16];
 	} xmp;
+#endif
 };
 
 /* macros for IR decoders */
