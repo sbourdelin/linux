@@ -2012,6 +2012,9 @@ enum nl80211_commands {
  *	u32 attribute with an &enum nl80211_timeout_reason value. This is used,
  *	e.g., with %NL80211_CMD_CONNECT event.
  *
+ * @NL80211_ATTR_PMK: PSK for offloaded 4-Way Handshake. Relevant only
+ *	with %NL80211_CMD_CONNECT (for WPA/WPA2-PSK networks).
+ *
  * @NUM_NL80211_ATTR: total number of nl80211_attrs available
  * @NL80211_ATTR_MAX: highest attribute number currently defined
  * @__NL80211_ATTR_AFTER_LAST: internal use
@@ -2422,6 +2425,8 @@ enum nl80211_attrs {
 	NL80211_ATTR_SCHED_SCAN_RSSI_ADJUST,
 
 	NL80211_ATTR_TIMEOUT_REASON,
+
+	NL80211_ATTR_PMK,
 
 	/* add attributes here, update the policy in nl80211.c */
 
@@ -4759,6 +4764,9 @@ enum nl80211_feature_flags {
  * @NL80211_EXT_FEATURE_CQM_RSSI_LIST: With this driver the
  *	%NL80211_ATTR_CQM_RSSI_THOLD attribute accepts a list of zero or more
  *	RSSI threshold values to monitor rather than exactly one threshold.
+ * @NL80211_EXT_FEATURE_4WAY_HANDSHAKE_OFFLOAD_STA: Device supports
+ *	doing 4-way handshake in station mode (PSK is passed as part
+ *	of the connect command).
  *
  * @NUM_NL80211_EXT_FEATURES: number of extended features.
  * @MAX_NL80211_EXT_FEATURES: highest extended feature index.
@@ -4778,6 +4786,7 @@ enum nl80211_ext_feature_index {
 	NL80211_EXT_FEATURE_MGMT_TX_RANDOM_TA_CONNECTED,
 	NL80211_EXT_FEATURE_SCHED_SCAN_RELATIVE_RSSI,
 	NL80211_EXT_FEATURE_CQM_RSSI_LIST,
+	NL80211_EXT_FEATURE_4WAY_HANDSHAKE_OFFLOAD_STA,
 
 	/* add new features before the definition below */
 	NUM_NL80211_EXT_FEATURES,
