@@ -24,6 +24,7 @@
 #include <asm/cpufeature.h>
 #include <asm/alternative.h>
 #include <asm/asm-uaccess.h>
+#include <asm/cachetype.h>
 
 /*
  *	flush_icache_range(start,end)
@@ -50,6 +51,8 @@ ENTRY(flush_icache_range)
  */
 ENTRY(__flush_cache_user_range)
 	uaccess_ttbr0_enable x2, x3
+	ldr_l	x4, __dcache_flags
+	tbnz	x4, #DCACHE_SKIP_POU, 2f
 	dcache_line_size x2, x3
 	sub	x3, x2, #1
 	bic	x4, x0, x3
@@ -60,6 +63,7 @@ user_alt 9f, "dc cvau, x4",  "dc civac, x4",  ARM64_WORKAROUND_CLEAN_CACHE
 	b.lo	1b
 	dsb	ish
 
+2:
 	icache_line_size x2, x3
 	sub	x3, x2, #1
 	bic	x4, x0, x3
@@ -104,8 +108,10 @@ ENDPIPROC(__flush_dcache_area)
  *	- size    - size in question
  */
 ENTRY(__clean_dcache_area_pou)
+	ldr_l	x2, __dcache_flags
+	tbnz	x2, #DCACHE_SKIP_POU, 1f
 	dcache_by_line_op cvau, ish, x0, x1, x2, x3
-	ret
+1:	ret
 ENDPROC(__clean_dcache_area_pou)
 
 /*
