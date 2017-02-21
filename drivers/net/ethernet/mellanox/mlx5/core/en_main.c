@@ -36,6 +36,7 @@
 #include <linux/mlx5/fs.h>
 #include <net/vxlan.h>
 #include <linux/bpf.h>
+#include <net/xdp.h>
 #include "en.h"
 #include "en_tc.h"
 #include "eswitch.h"
@@ -113,7 +114,7 @@ static void mlx5e_set_rq_type_params(struct mlx5e_priv *priv, u8 rq_type)
 static void mlx5e_set_rq_priv_params(struct mlx5e_priv *priv)
 {
 	u8 rq_type = mlx5e_check_fragmented_striding_rq_cap(priv->mdev) &&
-		    !priv->xdp_prog ?
+		    !priv->xdp_enabled ?
 		    MLX5_WQ_TYPE_LINKED_LIST_STRIDING_RQ :
 		    MLX5_WQ_TYPE_LINKED_LIST;
 	mlx5e_set_rq_type_params(priv, rq_type);
@@ -568,14 +569,12 @@ static int mlx5e_create_rq(struct mlx5e_channel *c,
 	rq->ix      = c->ix;
 	rq->priv    = c->priv;
 
-	rq->xdp_prog = priv->xdp_prog ? bpf_prog_inc(priv->xdp_prog) : NULL;
-	if (IS_ERR(rq->xdp_prog)) {
-		err = PTR_ERR(rq->xdp_prog);
-		rq->xdp_prog = NULL;
-		goto err_rq_wq_destroy;
-	}
-
-	if (rq->xdp_prog) {
+	if (priv->xdp_enabled) {
+		/* Note XDP is checked whether it is enabled for the device. If
+		 * XDP programs are set per ring as opposed to setting program
+		 * across the device this could be adjusted to account for
+		 * that.
+		 */
 		rq->buff.map_dir = DMA_BIDIRECTIONAL;
 		rq->rx_headroom = XDP_PACKET_HEADROOM;
 	} else {
@@ -662,8 +661,6 @@ err_destroy_umr_mkey:
 	mlx5_core_destroy_mkey(mdev, &rq->umr_mkey);
 
 err_rq_wq_destroy:
-	if (rq->xdp_prog)
-		bpf_prog_put(rq->xdp_prog);
 	mlx5_wq_destroy(&rq->wq_ctrl);
 
 	return err;
@@ -672,9 +669,6 @@ err_rq_wq_destroy:
 static void mlx5e_destroy_rq(struct mlx5e_rq *rq)
 {
 	int i;
-
-	if (rq->xdp_prog)
-		bpf_prog_put(rq->xdp_prog);
 
 	switch (rq->wq_type) {
 	case MLX5_WQ_TYPE_LINKED_LIST_STRIDING_RQ:
@@ -1547,7 +1541,7 @@ static int mlx5e_open_channel(struct mlx5e_priv *priv, int ix,
 	c->netdev   = priv->netdev;
 	c->mkey_be  = cpu_to_be32(priv->mdev->mlx5e_res.mkey.key);
 	c->num_tc   = priv->params.num_tc;
-	c->xdp      = !!priv->xdp_prog;
+	c->xdp      = priv->xdp_enabled;
 
 	if (priv->params.rx_am_enabled)
 		rx_cq_profile = mlx5e_am_get_def_profile(priv->params.rx_cq_period_mode);
@@ -3196,96 +3190,55 @@ static void mlx5e_tx_timeout(struct net_device *dev)
 		schedule_work(&priv->tx_timeout_work);
 }
 
-static int mlx5e_xdp_set(struct net_device *netdev, struct bpf_prog *prog)
+static int mlx5e_xdp_init(struct net_device *netdev, bool enable)
 {
 	struct mlx5e_priv *priv = netdev_priv(netdev);
-	struct bpf_prog *old_prog;
 	int err = 0;
-	bool reset, was_opened;
-	int i;
+	bool was_opened;
 
 	mutex_lock(&priv->state_lock);
 
-	if ((netdev->features & NETIF_F_LRO) && prog) {
+	if (priv->xdp_enabled == enable)
+		goto unlock;
+
+	if ((netdev->features & NETIF_F_LRO) && enable) {
 		netdev_warn(netdev, "can't set XDP while LRO is on, disable LRO first\n");
 		err = -EINVAL;
 		goto unlock;
 	}
 
+	/* Committing new XDP state */
+	priv->xdp_enabled = enable;
+
 	was_opened = test_bit(MLX5E_STATE_OPENED, &priv->state);
-	/* no need for full reset when exchanging programs */
-	reset = (!priv->xdp_prog || !prog);
 
-	if (was_opened && reset)
+	if (was_opened)
 		mlx5e_close_locked(netdev);
-	if (was_opened && !reset) {
-		/* num_channels is invariant here, so we can take the
-		 * batched reference right upfront.
-		 */
-		prog = bpf_prog_add(prog, priv->params.num_channels);
-		if (IS_ERR(prog)) {
-			err = PTR_ERR(prog);
-			goto unlock;
-		}
-	}
 
-	/* exchange programs, extra prog reference we got from caller
-	 * as long as we don't fail from this point onwards.
-	 */
-	old_prog = xchg(&priv->xdp_prog, prog);
-	if (old_prog)
-		bpf_prog_put(old_prog);
+	mlx5e_set_rq_priv_params(priv);
 
-	if (reset) /* change RQ type according to priv->xdp_prog */
-		mlx5e_set_rq_priv_params(priv);
-
-	if (was_opened && reset)
+	if (was_opened)
 		mlx5e_open_locked(netdev);
-
-	if (!test_bit(MLX5E_STATE_OPENED, &priv->state) || reset)
-		goto unlock;
-
-	/* exchanging programs w/o reset, we update ref counts on behalf
-	 * of the channels RQs here.
-	 */
-	for (i = 0; i < priv->params.num_channels; i++) {
-		struct mlx5e_channel *c = priv->channel[i];
-
-		clear_bit(MLX5E_RQ_STATE_ENABLED, &c->rq.state);
-		napi_synchronize(&c->napi);
-		/* prevent mlx5e_poll_rx_cq from accessing rq->xdp_prog */
-
-		old_prog = xchg(&c->rq.xdp_prog, prog);
-
-		set_bit(MLX5E_RQ_STATE_ENABLED, &c->rq.state);
-		/* napi_schedule in case we have missed anything */
-		set_bit(MLX5E_CHANNEL_NAPI_SCHED, &c->flags);
-		napi_schedule(&c->napi);
-
-		if (old_prog)
-			bpf_prog_put(old_prog);
-	}
 
 unlock:
 	mutex_unlock(&priv->state_lock);
 	return err;
 }
 
-static bool mlx5e_xdp_attached(struct net_device *dev)
+static int mlx5_xdp_check_bpf(struct net_device *dev, struct bpf_prog *prog)
 {
-	struct mlx5e_priv *priv = netdev_priv(dev);
-
-	return !!priv->xdp_prog;
+	return 0;
 }
 
 static int mlx5e_xdp(struct net_device *dev, struct netdev_xdp *xdp)
 {
 	switch (xdp->command) {
-	case XDP_SETUP_PROG:
-		return mlx5e_xdp_set(dev, xdp->prog);
-	case XDP_QUERY_PROG:
-		xdp->prog_attached = mlx5e_xdp_attached(dev);
-		return 0;
+	case XDP_MODE_ON:
+		return mlx5e_xdp_init(dev, true);
+	case XDP_MODE_OFF:
+		return mlx5e_xdp_init(dev, false);
+	case XDP_CHECK_BPF_PROG:
+		return mlx5_xdp_check_bpf(dev, xdp->prog);
 	default:
 		return -EINVAL;
 	}
@@ -3706,9 +3659,6 @@ static void mlx5e_nic_init(struct mlx5_core_dev *mdev,
 static void mlx5e_nic_cleanup(struct mlx5e_priv *priv)
 {
 	mlx5e_vxlan_cleanup(priv);
-
-	if (priv->xdp_prog)
-		bpf_prog_put(priv->xdp_prog);
 }
 
 static int mlx5e_init_nic_rx(struct mlx5e_priv *priv)
