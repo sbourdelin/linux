@@ -989,6 +989,55 @@ out:
 	return ret;
 }
 
+/* Translate f4 floating point values to/from hexadecimal:
+ *   perl -e 'printf("%08x\n", unpack("I", pack("f", 3.93e-4   )))' # 39ce0b91
+ *   perl -e 'printf("%f\n"  , unpack("f", pack("I", 0x39ce0b91)))' # 0.000393
+ */
+
+#define BQ27XXX_REG(f,o,v) dev_info(di->dev, "offset %d, " f "\n", o, v)
+
+static void bq27xxx_battery_print_dm(struct bq27xxx_device_info *di) {
+	enum { h1, h2, i2, u1, f4 };
+
+	struct dm_reg { int offset, type; }
+		/* each array row describes one data block */
+		c425_s82[][10] = {
+			{ { 2,h1},{ 3,i2},{ 5,h2},{12,i2},{14,i2},{18,i2},{22,i2},{29,u1},{30,i2},{99,0} },
+			{ {32,i2},{34,i2},{36,i2},{38,u1},{39,u1},{40,f4},{99,0} },
+		};
+		/* add more subclass maps here */
+
+	struct dm_class { int id, len; struct dm_reg (*reg)[10]; }
+		c425[] = {
+			{ .id = 82, .len = 2, .reg = c425_s82 },
+		};
+		/* add more chip maps here */
+
+	struct dm_class *chip = c425; /* set to your chip */
+
+	struct bq27xxx_dm_buf buf = { };
+	int c, b, r;
+	for (c=0; c < 1; ++c) {
+		buf.class = chip[c].id;
+		dev_info(di->dev, "subclass %d registers...\n", chip[c].id);
+		for (b=0; b < chip[c].len; ++b) {
+			buf.block = b;
+			bq27xxx_battery_read_dm_block(di, &buf);
+			for (r=0; chip[c].reg[b][r].offset != 99; ++r) {
+				int o = chip[c].reg[b][r].offset;
+				u8* p = &buf.a[o % sizeof buf.a];
+				switch (chip[c].reg[b][r].type) {
+				case h1: BQ27XXX_REG("%02x", o,      *p); break;
+				case h2: BQ27XXX_REG("%04x", o,      be16_to_cpup((u16*)p)); break;
+				case i2: BQ27XXX_REG("%d",   o, (s16)be16_to_cpup((u16*)p)); break;
+				case u1: BQ27XXX_REG("%u",   o,      *p); break;
+				case f4: BQ27XXX_REG("%08x", o,      be32_to_cpup((u32*)p)); break;
+				}
+			}
+		}
+	}
+}
+
 static void bq27xxx_battery_print_config(struct bq27xxx_device_info *di)
 {
 	struct bq27xxx_dm_reg *reg = bq27xxx_dm_regs[di->chip];
@@ -1008,6 +1057,8 @@ static void bq27xxx_battery_print_config(struct bq27xxx_device_info *di)
 		else
 			dev_warn(di->dev, "unsupported config register %s\n", str);
 	}
+	/* bq27xxx_battery_print_dm(di); uncomment for debugging */
+	(void)bq27xxx_battery_print_dm; /* prevent compiler warning */
 }
 
 static void bq27xxx_battery_update_dm_block(struct bq27xxx_device_info *di,
