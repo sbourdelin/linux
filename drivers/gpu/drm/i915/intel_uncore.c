@@ -177,20 +177,9 @@ static void fw_domains_get_with_thread_status(struct drm_i915_private *dev_priv,
 	__gen6_gt_wait_for_thread_c0(dev_priv);
 }
 
-static void gen6_gt_check_fifodbg(struct drm_i915_private *dev_priv)
+static bool gen6_gt_check_fifodbg(struct drm_i915_private *dev_priv)
 {
-	u32 gtfifodbg;
-
-	gtfifodbg = __raw_i915_read32(dev_priv, GTFIFODBG);
-	if (WARN(gtfifodbg, "GT wake FIFO error 0x%x\n", gtfifodbg))
-		__raw_i915_write32(dev_priv, GTFIFODBG, gtfifodbg);
-}
-
-static void fw_domains_put_with_fifo(struct drm_i915_private *dev_priv,
-				     enum forcewake_domains fw_domains)
-{
-	fw_domains_put(dev_priv, fw_domains);
-	gen6_gt_check_fifodbg(dev_priv);
+	return __raw_i915_read32(dev_priv, GTFIFODBG);
 }
 
 static inline u32 fifo_free_entries(struct drm_i915_private *dev_priv)
@@ -395,6 +384,9 @@ check_for_unclaimed_mmio(struct drm_i915_private *dev_priv)
 
 	if (IS_VALLEYVIEW(dev_priv) || IS_CHERRYVIEW(dev_priv))
 		return vlv_check_for_unclaimed_mmio(dev_priv);
+
+	if (IS_GEN6(dev_priv) || IS_GEN7(dev_priv))
+		return gen6_gt_check_fifodbg(dev_priv);
 
 	return false;
 }
@@ -1124,13 +1116,10 @@ __gen2_write(32)
 #define __gen6_write(x) \
 static void \
 gen6_write##x(struct drm_i915_private *dev_priv, i915_reg_t reg, u##x val, bool trace) { \
-	u32 __fifo_ret = 0; \
 	GEN6_WRITE_HEADER; \
 	if (NEEDS_FORCE_WAKE(offset) && !dev_priv->uncore.fw_domains_active) \
-		__fifo_ret = __gen6_gt_wait_for_fifo(dev_priv); \
+		__gen6_gt_wait_for_fifo(dev_priv); \
 	__raw_i915_write##x(dev_priv, reg, val); \
-	if (unlikely(__fifo_ret)) \
-		gen6_gt_check_fifodbg(dev_priv); \
 	GEN6_WRITE_FOOTER; \
 }
 
@@ -1303,11 +1292,7 @@ static void intel_uncore_fw_domains_init(struct drm_i915_private *dev_priv)
 			       FORCEWAKE_MEDIA_GEN9, FORCEWAKE_ACK_MEDIA_GEN9);
 	} else if (IS_VALLEYVIEW(dev_priv) || IS_CHERRYVIEW(dev_priv)) {
 		dev_priv->uncore.funcs.force_wake_get = fw_domains_get;
-		if (!IS_CHERRYVIEW(dev_priv))
-			dev_priv->uncore.funcs.force_wake_put =
-				fw_domains_put_with_fifo;
-		else
-			dev_priv->uncore.funcs.force_wake_put = fw_domains_put;
+		dev_priv->uncore.funcs.force_wake_put = fw_domains_put;
 		fw_domain_init(dev_priv, FW_DOMAIN_ID_RENDER,
 			       FORCEWAKE_VLV, FORCEWAKE_ACK_VLV);
 		fw_domain_init(dev_priv, FW_DOMAIN_ID_MEDIA,
@@ -1315,11 +1300,7 @@ static void intel_uncore_fw_domains_init(struct drm_i915_private *dev_priv)
 	} else if (IS_HASWELL(dev_priv) || IS_BROADWELL(dev_priv)) {
 		dev_priv->uncore.funcs.force_wake_get =
 			fw_domains_get_with_thread_status;
-		if (IS_HASWELL(dev_priv))
-			dev_priv->uncore.funcs.force_wake_put =
-				fw_domains_put_with_fifo;
-		else
-			dev_priv->uncore.funcs.force_wake_put = fw_domains_put;
+		dev_priv->uncore.funcs.force_wake_put = fw_domains_put;
 		fw_domain_init(dev_priv, FW_DOMAIN_ID_RENDER,
 			       FORCEWAKE_MT, FORCEWAKE_ACK_HSW);
 	} else if (IS_IVYBRIDGE(dev_priv)) {
@@ -1336,8 +1317,7 @@ static void intel_uncore_fw_domains_init(struct drm_i915_private *dev_priv)
 		 */
 		dev_priv->uncore.funcs.force_wake_get =
 			fw_domains_get_with_thread_status;
-		dev_priv->uncore.funcs.force_wake_put =
-			fw_domains_put_with_fifo;
+		dev_priv->uncore.funcs.force_wake_put = fw_domains_put;
 
 		/* We need to init first for ECOBUS access and then
 		 * determine later if we want to reinit, in case of MT access is
@@ -1355,7 +1335,7 @@ static void intel_uncore_fw_domains_init(struct drm_i915_private *dev_priv)
 		spin_lock_irq(&dev_priv->uncore.lock);
 		fw_domains_get_with_thread_status(dev_priv, FORCEWAKE_ALL);
 		ecobus = __raw_i915_read32(dev_priv, ECOBUS);
-		fw_domains_put_with_fifo(dev_priv, FORCEWAKE_ALL);
+		fw_domains_put(dev_priv, FORCEWAKE_ALL);
 		spin_unlock_irq(&dev_priv->uncore.lock);
 
 		if (!(ecobus & FORCEWAKE_MT_ENABLE)) {
@@ -1367,8 +1347,7 @@ static void intel_uncore_fw_domains_init(struct drm_i915_private *dev_priv)
 	} else if (IS_GEN6(dev_priv)) {
 		dev_priv->uncore.funcs.force_wake_get =
 			fw_domains_get_with_thread_status;
-		dev_priv->uncore.funcs.force_wake_put =
-			fw_domains_put_with_fifo;
+		dev_priv->uncore.funcs.force_wake_put = fw_domains_put;
 		fw_domain_init(dev_priv, FW_DOMAIN_ID_RENDER,
 			       FORCEWAKE, FORCEWAKE_ACK);
 	}
