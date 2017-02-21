@@ -2268,7 +2268,7 @@ static void ath10k_core_register_work(struct work_struct *work)
 	status = ath10k_core_probe_fw(ar);
 	if (status) {
 		ath10k_err(ar, "could not probe fw (%d)\n", status);
-		goto err;
+		return;
 	}
 
 	status = ath10k_mac_register(ar);
@@ -2307,11 +2307,10 @@ err_unregister_mac:
 	ath10k_mac_unregister(ar);
 err_release_fw:
 	ath10k_core_free_firmware_files(ar);
-err:
-	/* TODO: It's probably a good idea to release device from the driver
-	 * but calling device_release_driver() here will cause a deadlock.
-	 */
-	return;
+
+/* TODO: It's probably a good idea to release device from the driver
+ * but calling device_release_driver() here will cause a deadlock.
+ */
 }
 
 int ath10k_core_register(struct ath10k *ar, u32 chip_id)
