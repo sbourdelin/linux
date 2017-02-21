@@ -75,7 +75,7 @@ static struct afs_server *afs_alloc_server(struct afs_cell *cell,
 
 	server = kzalloc(sizeof(struct afs_server), GFP_KERNEL);
 	if (server) {
-		atomic_set(&server->usage, 1);
+		refcount_set(&server->usage, 1);
 		server->cell = cell;
 
 		INIT_LIST_HEAD(&server->link);
@@ -91,7 +91,7 @@ static struct afs_server *afs_alloc_server(struct afs_cell *cell,
 
 		memcpy(&server->addr, addr, sizeof(struct in_addr));
 		server->addr.s_addr = addr->s_addr;
-		_leave(" = %p{%d}", server, atomic_read(&server->usage));
+		_leave(" = %p{%d}", server, refcount_read(&server->usage));
 	} else {
 		_leave(" = NULL [nomem]");
 	}
@@ -140,7 +140,7 @@ struct afs_server *afs_lookup_server(struct afs_cell *cell,
 	list_add_tail(&server->link, &cell->servers);
 
 	write_unlock(&cell->servers_lock);
-	_leave(" = %p{%d}", server, atomic_read(&server->usage));
+	_leave(" = %p{%d}", server, refcount_read(&server->usage));
 	return server;
 
 	/* found a matching server quickly */
@@ -154,7 +154,7 @@ no_longer_unused:
 		list_del_init(&server->grave);
 		spin_unlock(&afs_server_graveyard_lock);
 	}
-	_leave(" = %p{%d}", server, atomic_read(&server->usage));
+	_leave(" = %p{%d}", server, refcount_read(&server->usage));
 	return server;
 
 	/* found a matching server on the second pass */
@@ -226,13 +226,13 @@ void afs_put_server(struct afs_server *server)
 	if (!server)
 		return;
 
-	_enter("%p{%d}", server, atomic_read(&server->usage));
+	_enter("%p{%d}", server, refcount_read(&server->usage));
 
-	_debug("PUT SERVER %d", atomic_read(&server->usage));
+	_debug("PUT SERVER %d", refcount_read(&server->usage));
 
-	ASSERTCMP(atomic_read(&server->usage), >, 0);
+	ASSERTCMP(refcount_read(&server->usage), >, 0);
 
-	if (likely(!atomic_dec_and_test(&server->usage))) {
+	if (likely(!refcount_dec_and_test(&server->usage))) {
 		_leave("");
 		return;
 	}
@@ -240,7 +240,7 @@ void afs_put_server(struct afs_server *server)
 	afs_flush_callback_breaks(server);
 
 	spin_lock(&afs_server_graveyard_lock);
-	if (atomic_read(&server->usage) == 0) {
+	if (refcount_read(&server->usage) == 0) {
 		list_move_tail(&server->grave, &afs_server_graveyard);
 		server->time_of_death = get_seconds();
 		queue_delayed_work(afs_wq, &afs_server_reaper,
@@ -296,7 +296,7 @@ static void afs_reap_server(struct work_struct *work)
 
 		write_lock(&server->cell->servers_lock);
 		write_lock(&afs_servers_lock);
-		if (atomic_read(&server->usage) > 0) {
+		if (refcount_read(&server->usage) > 0) {
 			list_del_init(&server->grave);
 		} else {
 			list_move_tail(&server->grave, &corpses);

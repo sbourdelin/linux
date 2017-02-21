@@ -647,7 +647,7 @@ static int afs_proc_cell_servers_show(struct seq_file *m, void *v)
 	/* display one cell per line on subsequent lines */
 	sprintf(ipaddr, "%pI4", &server->addr);
 	seq_printf(m, "%3d %-15.15s %5d\n",
-		   atomic_read(&server->usage), ipaddr, server->fs_state);
+		   refcount_read(&server->usage), ipaddr, server->fs_state);
 
 	return 0;
 }

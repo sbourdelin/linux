@@ -265,7 +265,7 @@ struct afs_vlocation {
  * AFS fileserver record
  */
 struct afs_server {
-	atomic_t		usage;
+	refcount_t		usage;
 	time_t			time_of_death;	/* time at which put reduced usage to 0 */
 	struct in_addr		addr;		/* server address */
 	struct afs_cell		*cell;		/* cell in which server resides */
@@ -636,8 +636,8 @@ extern spinlock_t afs_server_peer_lock;
 
 #define afs_get_server(S)					\
 do {								\
-	_debug("GET SERVER %d", atomic_read(&(S)->usage));	\
-	atomic_inc(&(S)->usage);				\
+	_debug("GET SERVER %d", refcount_read(&(S)->usage));	\
+	refcount_inc(&(S)->usage);				\
 } while(0)
 
 extern struct afs_server *afs_lookup_server(struct afs_cell *,
