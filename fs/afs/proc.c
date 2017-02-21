@@ -461,7 +461,7 @@ static int afs_proc_cell_volumes_show(struct seq_file *m, void *v)
 
 	/* display one cell per line on subsequent lines */
 	seq_printf(m, "%3d %s %08x %08x %08x %s\n",
-		   atomic_read(&vlocation->usage),
+		   refcount_read(&vlocation->usage),
 		   afs_vlocation_states[vlocation->state],
 		   vlocation->vldb.vid[0],
 		   vlocation->vldb.vid[1],

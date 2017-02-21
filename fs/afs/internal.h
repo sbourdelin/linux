@@ -241,7 +241,7 @@ struct afs_cache_vhash {
  * AFS volume location record
  */
 struct afs_vlocation {
-	atomic_t		usage;
+	refcount_t		usage;
 	time_t			time_of_death;	/* time at which put reduced usage to 0 */
 	struct list_head	link;		/* link in cell volume location list */
 	struct list_head	grave;		/* link in master graveyard list */
@@ -672,7 +672,7 @@ extern int afs_vl_get_entry_by_id(struct in_addr *, struct key *,
 /*
  * vlocation.c
  */
-#define afs_get_vlocation(V) do { atomic_inc(&(V)->usage); } while(0)
+#define afs_get_vlocation(V) do { refcount_inc(&(V)->usage); } while(0)
 
 extern int __init afs_vlocation_update_init(void);
 extern struct afs_vlocation *afs_vlocation_lookup(struct afs_cell *,

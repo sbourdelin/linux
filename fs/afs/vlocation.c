@@ -176,7 +176,7 @@ static struct afs_vlocation *afs_vlocation_alloc(struct afs_cell *cell,
 	if (vl) {
 		vl->cell = cell;
 		vl->state = AFS_VL_NEW;
-		atomic_set(&vl->usage, 1);
+		refcount_set(&vl->usage, 1);
 		INIT_LIST_HEAD(&vl->link);
 		INIT_LIST_HEAD(&vl->grave);
 		INIT_LIST_HEAD(&vl->update);
@@ -432,7 +432,7 @@ fill_in_record:
 found_in_memory:
 	/* found in memory */
 	_debug("found in memory");
-	atomic_inc(&vl->usage);
+	refcount_inc(&vl->usage);
 	spin_unlock(&cell->vl_lock);
 	if (!list_empty(&vl->grave)) {
 		spin_lock(&afs_vlocation_graveyard_lock);
@@ -495,15 +495,15 @@ void afs_put_vlocation(struct afs_vlocation *vl)
 
 	_enter("%s", vl->vldb.name);
 
-	ASSERTCMP(atomic_read(&vl->usage), >, 0);
+	ASSERTCMP(refcount_read(&vl->usage), >, 0);
 
-	if (likely(!atomic_dec_and_test(&vl->usage))) {
+	if (likely(!refcount_dec_and_test(&vl->usage))) {
 		_leave("");
 		return;
 	}
 
 	spin_lock(&afs_vlocation_graveyard_lock);
-	if (atomic_read(&vl->usage) == 0) {
+	if (refcount_read(&vl->usage) == 0) {
 		_debug("buried");
 		list_move_tail(&vl->grave, &afs_vlocation_graveyard);
 		vl->time_of_death = get_seconds();
@@ -566,7 +566,7 @@ static void afs_vlocation_reaper(struct work_struct *work)
 		}
 
 		spin_lock(&vl->cell->vl_lock);
-		if (atomic_read(&vl->usage) > 0) {
+		if (refcount_read(&vl->usage) > 0) {
 			_debug("no reap");
 			list_del_init(&vl->grave);
 		} else {
@@ -641,7 +641,7 @@ static void afs_vlocation_updater(struct work_struct *work)
 
 		vl = list_entry(afs_vlocation_updates.next,
 				struct afs_vlocation, update);
-		if (atomic_read(&vl->usage) > 0)
+		if (refcount_read(&vl->usage) > 0)
 			break;
 		list_del_init(&vl->update);
 	}
@@ -656,7 +656,7 @@ static void afs_vlocation_updater(struct work_struct *work)
 	}
 
 	list_del_init(&vl->update);
-	atomic_inc(&vl->usage);
+	refcount_inc(&vl->usage);
 	spin_unlock(&afs_vlocation_updates_lock);
 
 	/* we can now perform the update */
