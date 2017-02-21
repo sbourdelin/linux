@@ -1,0 +1,32 @@
+Device tree bindings for Cypress CY8CMBR3102 CapSense Express controller.
+
+The node for this device must be a child of a I2C controller node, as the
+device communicates via I2C.
+
+Required properties:
+
+	compatible:	Must be "cypress,cy8cmbr3102".
+	reg:		The I2C slave address of the device.
+	linux,keycodes:	Specifies an array of numeric keycode values to
+			be used for reporting button presses. The array can
+			contain up to two entries.
+
+Optional properties:
+
+	autorepeat:	Enables the Linux input system's autorepeat
+			feature on the input device.
+
+Example:
+
+	&i2c1 {
+		/* ... */
+
+		touchb_tn: cy8cmbr3102@37 {
+			compatible = "cypress,cy8cmbr3102";
+			reg = <0x37>;
+			linux,keycodes = <BTN_0>, <BTN_1>;
+			autorepeat;
+		};
+
+		/* ... */
+	};
