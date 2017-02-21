@@ -167,7 +167,6 @@ static void delete_context(struct sasem_context *context)
 	usb_free_urb(context->rx_urb);  /* IR */
 	lirc_buffer_free(context->driver->rbuf);
 	kfree(context->driver->rbuf);
-	kfree(context->driver);
 	kfree(context);
 }
 
@@ -771,7 +770,7 @@ static int sasem_probe(struct usb_interface *interface,
 	driver->rbuf = rbuf;
 	driver->set_use_inc = ir_open;
 	driver->set_use_dec = ir_close;
-	driver->dev   = &interface->dev;
+	driver->dev.parent = &interface->dev;
 	driver->owner = THIS_MODULE;
 
 	mutex_lock(&context->ctx_lock);

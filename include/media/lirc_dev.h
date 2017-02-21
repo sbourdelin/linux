@@ -15,6 +15,8 @@
 #define mod(n, div) ((n) % (div))
 
 #include <linux/slab.h>
+#include <linux/cdev.h>
+#include <linux/device.h>
 #include <linux/fs.h>
 #include <linux/ioctl.h>
 #include <linux/poll.h>
@@ -182,6 +184,20 @@ static inline unsigned int lirc_buffer_write(struct lirc_buffer *buf,
  *			device.
  *
  * @owner:		the module owning this struct
+ *
+ * @attached:		1 if the device is still attached, 0 otherwise
+ *
+ * @open:		1 if the lirc char device has been opened
+ *
+ * @irctl_lock:		mutex for the structure
+ *
+ * @buf:		read buffer used if rbuf is not set
+ *
+ * @cdev:		the char device structure
+ *
+ * @task:		thread performing read polling, if present
+ *
+ * @jiffies_to_wait:	jiffies to sleep in read polling thread
  */
 struct lirc_driver {
 	char name[40];
@@ -202,8 +218,19 @@ struct lirc_driver {
 	void (*set_use_dec)(void *data);
 	struct rc_dev *rdev;
 	const struct file_operations *fops;
-	struct device *dev;
+	struct device dev;
 	struct module *owner;
+
+	int attached;
+	int open;
+
+	struct mutex irctl_lock; /* locks this driver */
+	struct lirc_buffer *buf;
+
+	struct cdev cdev;
+
+	struct task_struct *task;
+	long jiffies_to_wait;
 };
 
 /* following functions can be called ONLY from user context

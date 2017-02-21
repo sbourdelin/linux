@@ -407,7 +407,7 @@ int ir_lirc_register(struct rc_dev *dev)
 	drv->set_use_dec = &ir_lirc_close;
 	drv->code_length = sizeof(struct ir_raw_event) * 8;
 	drv->fops = &lirc_fops;
-	drv->dev = &dev->dev;
+	drv->dev.parent = &dev->dev;
 	drv->rdev = dev;
 	drv->owner = THIS_MODULE;
 
@@ -437,5 +437,4 @@ void ir_lirc_unregister(struct rc_dev *dev)
 	lirc_unregister_driver(lirc->drv->minor);
 	lirc_buffer_free(lirc->drv->rbuf);
 	kfree(lirc->drv->rbuf);
-	kfree(lirc->drv);
 }
