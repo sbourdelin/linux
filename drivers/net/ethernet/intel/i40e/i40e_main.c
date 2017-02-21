@@ -4206,8 +4206,6 @@ static int i40e_vsi_control_txq(struct i40e_vsi *vsi, bool enable, int pf_q)
  **/
 static int i40e_vsi_control_tx(struct i40e_vsi *vsi, bool enable)
 {
-	struct i40e_pf *pf = vsi->back;
-	struct i40e_hw *hw = &pf->hw;
 	int i, pf_q, ret = 0;
 
 	pf_q = vsi->base_queue;
@@ -4225,9 +4223,6 @@ static int i40e_vsi_control_tx(struct i40e_vsi *vsi, bool enable)
 				break;
 		}
 	}
-
-	if (hw->revision_id == 0)
-		mdelay(50);
 	return ret;
 }
 
