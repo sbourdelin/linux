@@ -36,6 +36,10 @@ static const struct delta_dec *delta_decoders[] = {
 #ifdef CONFIG_VIDEO_STI_DELTA_MJPEG
 	&mjpegdec,
 #endif
+#ifdef CONFIG_VIDEO_STI_DELTA_MPEG2
+	&mpeg2dec,
+	&mpeg1dec,
+#endif
 };
 
 static inline int frame_size(u32 w, u32 h, u32 fmt)

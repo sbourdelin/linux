@@ -61,4 +61,9 @@
 extern const struct delta_dec mjpegdec;
 #endif
 
+#ifdef CONFIG_VIDEO_STI_DELTA_MPEG2
+extern const struct delta_dec mpeg2dec;
+extern const struct delta_dec mpeg1dec;
+#endif
+
 #endif /* DELTA_CFG_H */
