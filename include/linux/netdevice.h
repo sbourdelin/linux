@@ -324,6 +324,7 @@ struct napi_struct {
 	struct sk_buff		*skb;
 	struct hrtimer		timer;
 	struct list_head	dev_list;
+	struct xdp_hook_set __rcu *xdp_hooks;
 	struct hlist_node	napi_hash_node;
 	unsigned int		napi_id;
 };
@@ -822,12 +823,25 @@ enum xdp_netdev_command {
 	 * return true if a program is currently attached and running.
 	 */
 	XDP_QUERY_PROG,
+	/* Initialize device to use XDP. Called when first XDP program is
+	 * registered on a device (including on a NAPI instance).
+	 */
+	XDP_MODE_ON,
+	/* XDP is finished on the device. Called after the last XDP hook
+	 * has been removed from a device.
+	 */
+	XDP_MODE_OFF,
+	/* Check if device is okay with the proposed BPF program to be loaded */
+	XDP_CHECK_BPF_PROG,
+	/* Offload a BPF program to the device */
+	XDP_OFFLOAD_BPF,
 };
 
 struct netdev_xdp {
 	enum xdp_netdev_command command;
 	union {
 		/* XDP_SETUP_PROG */
+		/* XDP_CHECK_BPF_PROG */
 		struct bpf_prog *prog;
 		/* XDP_QUERY_PROG */
 		bool prog_attached;
@@ -1668,6 +1682,8 @@ struct net_device {
 	struct list_head	close_list;
 	struct list_head	ptype_all;
 	struct list_head	ptype_specific;
+	struct xdp_hook_set __rcu *xdp_hooks;
+	unsigned int		xdp_hook_cnt;
 
 	struct {
 		struct list_head upper;

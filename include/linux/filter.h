@@ -434,19 +434,13 @@ struct sk_filter {
 	struct bpf_prog	*prog;
 };
 
-#define BPF_PROG_RUN(filter, ctx)  (*filter->bpf_func)(ctx, filter->insnsi)
+#define BPF_PROG_RUN(filter, ctx)  (*(filter)->bpf_func)(ctx, (filter)->insnsi)
 
 #define BPF_SKB_CB_LEN QDISC_CB_PRIV_LEN
 
 struct bpf_skb_data_end {
 	struct qdisc_skb_cb qdisc_cb;
 	void *data_end;
-};
-
-struct xdp_buff {
-	void *data;
-	void *data_end;
-	void *data_hard_start;
 };
 
 /* compute the linear packet data range [data, data_end) which
@@ -509,6 +503,8 @@ static inline u32 bpf_prog_run_clear_cb(const struct bpf_prog *prog,
 
 	return BPF_PROG_RUN(prog, skb);
 }
+
+struct xdp_buff;
 
 static __always_inline u32 bpf_prog_run_xdp(const struct bpf_prog *prog,
 					    struct xdp_buff *xdp)
