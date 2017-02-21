@@ -288,6 +288,7 @@ static struct ir_raw_handler nec_handler = {
 	.protocols	= RC_BIT_NEC | RC_BIT_NECX | RC_BIT_NEC32,
 	.decode		= ir_nec_decode,
 	.encode		= ir_nec_encode,
+	.carrier	= 38000,
 };
 
 static int __init ir_nec_decode_init(void)
