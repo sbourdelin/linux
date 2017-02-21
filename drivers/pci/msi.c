@@ -1187,7 +1187,7 @@ int pci_alloc_irq_vectors_affinity(struct pci_dev *dev, unsigned int min_vecs,
 		 * If there aren't any vectors left after applying the pre/post
 		 * vectors don't bother with assigning affinity.
 		 */
-		if (affd->pre_vectors + affd->post_vectors == min_vecs)
+		if (affd->pre_vectors + affd->post_vectors == max_vecs)
 			affd = NULL;
 	} else {
 		if (WARN_ON(affd))
