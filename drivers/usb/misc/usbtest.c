@@ -124,6 +124,32 @@ static struct usb_device *testdev_to_usbdev(struct usbtest_dev *test)
 
 /*-------------------------------------------------------------------------*/
 
+static inline void try_intr(struct usb_host_endpoint *e,
+			    struct usb_host_endpoint *int_in,
+			    struct usb_host_endpoint *int_out)
+{
+	if (usb_endpoint_dir_in(&e->desc)) {
+		if (!int_in)
+			int_in = e;
+	} else {
+		if (!int_out)
+			int_out = e;
+	}
+}
+
+static inline void try_iso(struct usb_host_endpoint *e,
+			   struct usb_host_endpoint *iso_in,
+			   struct usb_host_endpoint *iso_out)
+{
+	if (usb_endpoint_dir_in(&e->desc)) {
+		if (!iso_in)
+			iso_in = e;
+	} else {
+		if (!iso_out)
+			iso_out = e;
+	}
+}
+
 static int
 get_endpoints(struct usbtest_dev *dev, struct usb_interface *intf)
 {
@@ -158,11 +184,12 @@ get_endpoints(struct usbtest_dev *dev, struct usb_interface *intf)
 				break;
 			case USB_ENDPOINT_XFER_INT:
 				if (dev->info->intr)
-					goto try_intr;
+					try_intr(e, int_in, int_out);
+				continue;
 			case USB_ENDPOINT_XFER_ISOC:
 				if (dev->info->iso)
-					goto try_iso;
-				/* FALLTHROUGH */
+					try_iso(e, iso_in, iso_out);
+				/* fall through */
 			default:
 				continue;
 			}
@@ -174,23 +201,6 @@ get_endpoints(struct usbtest_dev *dev, struct usb_interface *intf)
 					out = e;
 			}
 			continue;
-try_intr:
-			if (usb_endpoint_dir_in(&e->desc)) {
-				if (!int_in)
-					int_in = e;
-			} else {
-				if (!int_out)
-					int_out = e;
-			}
-			continue;
-try_iso:
-			if (usb_endpoint_dir_in(&e->desc)) {
-				if (!iso_in)
-					iso_in = e;
-			} else {
-				if (!iso_out)
-					iso_out = e;
-			}
 		}
 		if ((in && out)  ||  iso_in || iso_out || int_in || int_out)
 			goto found;
