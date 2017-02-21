@@ -18,7 +18,7 @@
 
 #include <linux/spinlock.h>
 #include <linux/kfifo.h>
-#include <linux/time.h>
+#include <linux/lirc.h>
 #include <linux/timer.h>
 #include <media/rc-map.h>
 
@@ -95,6 +95,7 @@ enum rc_filter_type {
  *	RC_TYPE_UNKNOWN if disabled.
  * @scancode_filter: scancode filter
  * @scancode_wakeup_filter: scancode wakeup filters
+ * @kfifo: queue of received scancodes, using for lirc scancode reading
  * @scancode_mask: some hardware decoders are not capable of providing the full
  *	scancode to the application. As this is a hardware limit, we can't do
  *	anything with it. Yet, as the same keycode table can be used with other
@@ -160,6 +161,7 @@ struct rc_dev {
 	struct rc_scancode_filter	scancode_filter;
 	struct rc_scancode_filter	scancode_wakeup_filter;
 	u32				scancode_mask;
+	DECLARE_KFIFO(kfifo, struct lirc_scancode, 32);
 	u32				users;
 	void				*priv;
 	spinlock_t			keylock;

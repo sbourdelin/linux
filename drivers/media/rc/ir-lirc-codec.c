@@ -231,8 +231,31 @@ static long ir_lirc_ioctl(struct file *filep, unsigned int cmd,
 	}
 
 	switch (cmd) {
+	case LIRC_GET_REC_MODE:
+		if (dev->driver_type == RC_DRIVER_IR_RAW_TX)
+			return -ENOTTY;
 
-	/* legacy support */
+		val = lirc->rec_mode;
+		break;
+
+	case LIRC_SET_REC_MODE:
+		switch (dev->driver_type) {
+		case RC_DRIVER_SCANCODE:
+			if (val != LIRC_MODE_SCANCODE)
+				return -EINVAL;
+			break;
+		case RC_DRIVER_IR_RAW:
+			if (!(val == LIRC_MODE_SCANCODE ||
+			      val == LIRC_MODE_MODE2))
+				return -EINVAL;
+			break;
+		default:
+			return -ENOTTY;
+		}
+
+		lirc->rec_mode = val;
+		return 0;
+
 	case LIRC_GET_SEND_MODE:
 		if (!dev->tx_ir)
 			return -ENOTTY;
@@ -367,10 +390,15 @@ static unsigned int ir_lirc_poll(struct file *filep,
 
 	poll_wait(filep, &lirc->wait_poll, wait);
 
-	if (!lirc->drv->attached)
+	if (!drv->attached) {
 		events = POLLERR;
-	else if (!kfifo_is_empty(&lirc->kfifo))
-		events = POLLIN | POLLRDNORM;
+	} else if (dev->rec_mode == LIRC_MODE_SCANCODE) {
+		if (!kfifo_is_empty(&dev->kfifo))
+			events = POLLIN | POLLRDNORM;
+	} else if (dev->rec_mode == LIRC_MODE_MODE2) {
+		if (!kfifo_is_empty(&dev->raw->lirc.kfifo))
+			events = POLLIN | POLLRDNORM;
+	}
 
 	return events;
 }
@@ -382,31 +410,60 @@ static ssize_t ir_lirc_read(struct file *filep, char __user *buffer,
 	unsigned int copied;
 	int ret;
 
-	if (length % sizeof(unsigned int))
-		return -EINVAL;
-
 	if (!lirc->drv->attached)
 		return -ENODEV;
 
-	do {
-		if (kfifo_is_empty(&lirc->kfifo)) {
-			if (filep->f_flags & O_NONBLOCK)
-				return -EAGAIN;
+	if (lirc->rec_mode == LIRC_MODE_SCANCODE) {
+		struct rc_dev *rcdev = lirc->dev;
 
-			ret = wait_event_interruptible(lirc->wait_poll,
-					!kfifo_is_empty(&lirc->kfifo) ||
+		if (length % sizeof(struct lirc_scancode))
+			return -EINVAL;
+
+		do {
+			if (kfifo_is_empty(&rcdev->kfifo)) {
+				if (filep->f_flags & O_NONBLOCK)
+					return -EAGAIN;
+
+				ret = wait_event_interruptible(lirc->wait_poll,
+					!kfifo_is_empty(&rcdev->kfifo) ||
 					!lirc->drv->attached);
+				if (ret)
+					return ret;
+			}
+
+			if (!lirc->drv->attached)
+				return -ENODEV;
+
+			ret = kfifo_to_user(&rcdev->kfifo, buffer, length,
+					    &copied);
 			if (ret)
 				return ret;
-		}
+		} while (copied == 0);
+	} else {
+		if (length % sizeof(unsigned int))
+			return -EINVAL;
 
-		if (!lirc->drv->attached)
-			return -ENODEV;
+		do {
+			if (kfifo_is_empty(&lirc->kfifo)) {
+				if (filep->f_flags & O_NONBLOCK)
+					return -EAGAIN;
 
-		ret = kfifo_to_user(&lirc->kfifo, buffer, length, &copied);
-		if (ret)
-			return ret;
-	} while (copied == 0);
+				ret = wait_event_interruptible(lirc->wait_poll,
+						!kfifo_is_empty(&lirc->kfifo) ||
+						!lirc->drv->attached);
+				if (ret)
+					return ret;
+			}
+
+			if (!lirc->drv->attached)
+				return -ENODEV;
+
+			ret = kfifo_to_user(&lirc->kfifo, buffer, length,
+					    &copied);
+			if (ret)
+				return ret;
+		} while (copied == 0);
+	}
 
 	return copied;
 }
@@ -416,6 +473,7 @@ static int ir_lirc_open(void *data)
 	struct lirc_codec *lirc = data;
 
 	kfifo_reset_out(&lirc->kfifo);
+	kfifo_reset_out(&lirc->dev->kfifo);
 
 	return 0;
 }
@@ -449,12 +507,17 @@ int ir_lirc_register(struct rc_dev *dev)
 	if (!drv)
 		return -ENOMEM;
 
-	if (dev->driver_type != RC_DRIVER_IR_RAW_TX) {
-		features |= LIRC_CAN_REC_MODE2;
+	if (dev->driver_type == RC_DRIVER_SCANCODE) {
+		features |= LIRC_CAN_REC_SCANCODE;
+		dev->raw->lirc.rec_mode = LIRC_MODE_SCANCODE;
+	} else if (dev->driver_type == RC_DRIVER_IR_RAW) {
+		features |= LIRC_CAN_REC_MODE2 | LIRC_CAN_REC_SCANCODE;
 		if (dev->rx_resolution)
 			features |= LIRC_CAN_GET_REC_RESOLUTION;
+		dev->raw->lirc.rec_mode = LIRC_MODE_MODE2;
 	}
 	if (dev->tx_ir) {
+		dev->raw->lirc.send_mode = LIRC_MODE_PULSE;
 		features |= LIRC_CAN_SEND_PULSE | LIRC_CAN_SEND_SCANCODE;
 		if (dev->s_tx_mask)
 			features |= LIRC_CAN_SET_TRANSMITTER_MASK;

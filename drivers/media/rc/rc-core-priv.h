@@ -137,6 +137,7 @@ struct ir_raw_event_ctrl {
 		bool gap;
 		bool send_timeout_reports;
 		int send_mode;
+		int rec_mode;
 	} lirc;
 #endif
 #if IS_ENABLED(CONFIG_IR_XMP_DECODER)
@@ -147,6 +148,16 @@ struct ir_raw_event_ctrl {
 	} xmp;
 #endif
 };
+
+#if IS_ENABLED(CONFIG_IR_LIRC_CODEC)
+static inline void ir_wakeup_poll(struct ir_raw_event_ctrl *ctrl)
+{
+	if (ctrl)
+		wake_up_poll(&ctrl->lirc.wait_poll, POLLIN);
+}
+#else
+static inline void ir_wakeup_poll(struct ir_raw_event_ctrl *ctrl) {}
+#endif
 
 /* macros for IR decoders */
 static inline bool geq_margin(unsigned d1, unsigned d2, unsigned margin)

@@ -614,6 +614,15 @@ static void ir_timer_keyup(unsigned long cookie)
 void rc_repeat(struct rc_dev *dev)
 {
 	unsigned long flags;
+	struct lirc_scancode sc = {
+		.scancode = dev->last_scancode,
+		.rc_type = dev->last_protocol,
+		.flags = LIRC_SCANCODE_FLAG_REPEAT |
+			(dev->last_toggle ? LIRC_SCANCODE_FLAG_TOGGLE : 0),
+	};
+
+	if (kfifo_put(&dev->kfifo, sc))
+		ir_wakeup_poll(dev->raw);
 
 	spin_lock_irqsave(&dev->keylock, flags);
 
@@ -649,6 +658,13 @@ static void ir_do_keydown(struct rc_dev *dev, enum rc_type protocol,
 			  dev->last_protocol != protocol ||
 			  dev->last_scancode != scancode ||
 			  dev->last_toggle   != toggle);
+	struct lirc_scancode sc = {
+		.scancode = scancode, .rc_type = protocol,
+		.flags = toggle ? LIRC_SCANCODE_FLAG_TOGGLE : 0
+	};
+
+	if (kfifo_put(&dev->kfifo, sc))
+		ir_wakeup_poll(dev->raw);
 
 	if (new_event && dev->keypressed)
 		ir_do_keyup(dev, false);
@@ -1589,6 +1605,7 @@ struct rc_dev *rc_allocate_device(enum rc_driver_type type)
 
 		spin_lock_init(&dev->rc_map.lock);
 		spin_lock_init(&dev->keylock);
+		INIT_KFIFO(dev->kfifo);
 	}
 	mutex_init(&dev->lock);
 
