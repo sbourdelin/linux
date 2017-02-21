@@ -1180,7 +1180,7 @@ struct bnxt {
 	u8			num_leds;
 	struct bnxt_led_info	leds[BNXT_MAX_LED];
 
-	struct bpf_prog		*xdp_prog;
+	bool			xdp_enabled;
 };
 
 #define BNXT_RX_STATS_OFFSET(counter)			\
