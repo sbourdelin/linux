@@ -1126,13 +1126,11 @@ static void \
 gen6_write##x(struct drm_i915_private *dev_priv, i915_reg_t reg, u##x val, bool trace) { \
 	u32 __fifo_ret = 0; \
 	GEN6_WRITE_HEADER; \
-	if (NEEDS_FORCE_WAKE(offset)) { \
+	if (NEEDS_FORCE_WAKE(offset) && !dev_priv->uncore.fw_domains_active) \
 		__fifo_ret = __gen6_gt_wait_for_fifo(dev_priv); \
-	} \
 	__raw_i915_write##x(dev_priv, reg, val); \
-	if (unlikely(__fifo_ret)) { \
+	if (unlikely(__fifo_ret)) \
 		gen6_gt_check_fifodbg(dev_priv); \
-	} \
 	GEN6_WRITE_FOOTER; \
 }
 
