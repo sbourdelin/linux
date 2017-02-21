@@ -6376,8 +6376,8 @@ static void sched_change_group(struct task_struct *tsk, int type)
 	tsk->sched_task_group = tg;
 
 #ifdef CONFIG_FAIR_GROUP_SCHED
-	if (tsk->sched_class->task_change_group)
-		tsk->sched_class->task_change_group(tsk, type);
+	if (tsk->sched_class->task_move_group && type == TASK_MOVE_GROUP)
+		tsk->sched_class->task_move_group(tsk);
 	else
 #endif
 		set_task_rq(tsk, task_cpu(tsk));

@@ -1386,7 +1386,7 @@ struct sched_class {
 #define TASK_MOVE_GROUP	1
 
 #ifdef CONFIG_FAIR_GROUP_SCHED
-	void (*task_change_group) (struct task_struct *p, int type);
+	void (*task_move_group) (struct task_struct *p);
 #endif
 };
 
