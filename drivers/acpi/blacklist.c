@@ -188,6 +188,20 @@ static struct dmi_system_id acpi_rev_dmi_table[] __initdata = {
 		      DMI_MATCH(DMI_PRODUCT_NAME, "Latitude 3350"),
 		},
 	},
+	/*
+	 * Resolves issues that cause the system to lock up
+	 * under certain conditions when the discrete graphics
+	 * card is turned off
+	 */
+	{
+	 .callback = dmi_enable_rev_override,
+	 .ident = "DELL XPS 15 (2017)",
+	 .matches = {
+			DMI_MATCH(DMI_SYS_VENDOR, "Dell Inc."),
+			DMI_MATCH(DMI_PRODUCT_NAME, "XPS 15 9560"),
+		},
+	},
+
 #endif
 	{}
 };
