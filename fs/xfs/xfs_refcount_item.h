@@ -20,6 +20,8 @@
 #ifndef	__XFS_REFCOUNT_ITEM_H__
 #define	__XFS_REFCOUNT_ITEM_H__
 
+#include <linux/refcount.h>
+
 /*
  * There are (currently) two pairs of refcount btree redo item types:
  * increase and decrease.  The log items for these are CUI (refcount
@@ -63,7 +65,7 @@ struct kmem_zone;
  */
 struct xfs_cui_log_item {
 	struct xfs_log_item		cui_item;
-	atomic_t			cui_refcount;
+	refcount_t			cui_refcount;
 	atomic_t			cui_next_extent;
 	unsigned long			cui_flags;	/* misc flags */
 	struct xfs_cui_log_format	cui_format;
