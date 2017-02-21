@@ -344,7 +344,7 @@ again:
 		lsc.scancode = scancode;
 		lsc.flags = 0;
 		if (kfifo_put(&dev->kfifo, lsc))
-			ir_wakeup_poll(dev->raw);
+			wake_up_poll(&dev->wait_poll, POLLIN);
 		data->state = STATE_INACTIVE;
 		input_event(data->idev, EV_MSC, MSC_SCAN, scancode);
 		input_sync(data->idev);

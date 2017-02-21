@@ -622,7 +622,7 @@ void rc_repeat(struct rc_dev *dev)
 	};
 
 	if (kfifo_put(&dev->kfifo, sc))
-		ir_wakeup_poll(dev->raw);
+		wake_up_poll(&dev->wait_poll, POLLIN);
 
 	spin_lock_irqsave(&dev->keylock, flags);
 
@@ -664,7 +664,7 @@ static void ir_do_keydown(struct rc_dev *dev, enum rc_type protocol,
 	};
 
 	if (kfifo_put(&dev->kfifo, sc))
-		ir_wakeup_poll(dev->raw);
+		wake_up_poll(&dev->wait_poll, POLLIN);
 
 	if (new_event && dev->keypressed)
 		ir_do_keyup(dev, false);
@@ -1606,6 +1606,7 @@ struct rc_dev *rc_allocate_device(enum rc_driver_type type)
 		spin_lock_init(&dev->rc_map.lock);
 		spin_lock_init(&dev->keylock);
 		INIT_KFIFO(dev->kfifo);
+		init_waitqueue_head(&dev->wait_poll);
 	}
 	mutex_init(&dev->lock);
 
@@ -1794,7 +1795,7 @@ int rc_register_device(struct rc_dev *dev)
 			goto out_rx;
 	}
 
-	if (dev->driver_type != RC_DRIVER_SCANCODE) {
+	if (dev->allowed_protocols != RC_BIT_CEC) {
 		rc = ir_lirc_register(dev);
 		if (rc < 0)
 			goto out_raw;
@@ -1859,7 +1860,7 @@ void rc_unregister_device(struct rc_dev *dev)
 	if (dev->driver_type == RC_DRIVER_IR_RAW)
 		ir_raw_event_unregister(dev);
 
-	if (dev->driver_type != RC_DRIVER_SCANCODE)
+	if (dev->allowed_protocols != RC_BIT_CEC)
 		ir_lirc_unregister(dev);
 
 	rc_free_rx_device(dev);

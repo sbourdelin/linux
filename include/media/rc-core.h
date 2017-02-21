@@ -111,6 +111,12 @@ enum rc_filter_type {
  * @last_protocol: protocol of last keypress
  * @last_scancode: scancode of last keypress
  * @last_toggle: toggle value of last command
+ * @lirc_drv: lirc driver associated with this rc device
+ * @wait_poll: used for implementing poll on lirc char device
+ * @rec_mode: lirc char device recording mode (LIRC_MODE_MODE2 or
+ *	LIRC_MODE_SCANCODE).
+ * @send_mode: lirc char device sending mode (LIRC_MODE_PULSE or
+ *	LIRC_MODE_SCANCODE).
  * @timeout: optional time after which device stops sending data
  * @min_timeout: minimum timeout supported by device
  * @max_timeout: maximum timeout supported by device
@@ -172,6 +178,10 @@ struct rc_dev {
 	enum rc_type			last_protocol;
 	u32				last_scancode;
 	u8				last_toggle;
+	struct lirc_driver		*lirc_drv;
+	wait_queue_head_t		wait_poll;
+	u8				rec_mode;
+	u8				send_mode;
 	u32				timeout;
 	u32				min_timeout;
 	u32				max_timeout;
