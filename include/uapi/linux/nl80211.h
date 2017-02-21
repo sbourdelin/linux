@@ -901,6 +901,14 @@
  *	does not result in a change for the current association. Currently,
  *	only the %NL80211_ATTR_IE data is used and updated with this command.
  *
+ * @NL80211_CMD_SET_PMK: For offloaded 4-Way handshake, set the PMK or PMK-R0
+ *	for the given authenticator address (specified with &NL80211_ATTR_MAC).
+ *	When &NL80211_ATTR_PMKR0_NAME is set, &NL80211_ATTR_PMK specifies the
+ *	PMK-R0, otherwise it specifies the PMK.
+ * @NL80211_CMD_DEL_PMK: For offloaded 4-Way handshake, delete the previously
+ *	configured PMK for the authenticator address identified by
+ *	&NL80211_ATTR_MAC.
+ *
  * @NL80211_CMD_MAX: highest used command number
  * @__NL80211_CMD_AFTER_LAST: internal use
  */
@@ -1099,6 +1107,9 @@ enum nl80211_commands {
 	NL80211_CMD_SET_MULTICAST_TO_UNICAST,
 
 	NL80211_CMD_UPDATE_CONNECT_PARAMS,
+
+	NL80211_CMD_SET_PMK,
+	NL80211_CMD_DEL_PMK,
 
 	/* add new commands above here */
 
@@ -2012,8 +2023,12 @@ enum nl80211_commands {
  *	u32 attribute with an &enum nl80211_timeout_reason value. This is used,
  *	e.g., with %NL80211_CMD_CONNECT event.
  *
- * @NL80211_ATTR_PMK: PSK for offloaded 4-Way Handshake. Relevant only
- *	with %NL80211_CMD_CONNECT (for WPA/WPA2-PSK networks).
+ * @NL80211_ATTR_PMK: PMK for offloaded 4-Way Handshake. Relevant with
+ *	%NL80211_CMD_CONNECT (for WPA/WPA2-PSK networks) when PSK is used, or
+ *	with %NL80211_CMD_SET_PMK when 802.1X authentication is used.
+ *	When &NL80211_ATTR_PMKR0_NAME is specified, this attribute specifies
+ *	the PMK-R0.
+ * @NL80211_ATTR_PMKR0_NAME: PMK-R0 Name for offloaded FT.
  *
  * @NUM_NL80211_ATTR: total number of nl80211_attrs available
  * @NL80211_ATTR_MAX: highest attribute number currently defined
@@ -2427,6 +2442,7 @@ enum nl80211_attrs {
 	NL80211_ATTR_TIMEOUT_REASON,
 
 	NL80211_ATTR_PMK,
+	NL80211_ATTR_PMKR0_NAME,
 
 	/* add attributes here, update the policy in nl80211.c */
 
@@ -4767,6 +4783,9 @@ enum nl80211_feature_flags {
  * @NL80211_EXT_FEATURE_4WAY_HANDSHAKE_STA_PSK: Device supports doing 4-way
  *	handshake with PSK in station mode (PSK is passed as part of the connect
  *	and associate commands).
+ * @NL80211_EXT_FEATURE_4WAY_HANDSHAKE_STA_1X: Device supports doing 4-way
+ *	handshake with 802.1X in station mode (needs to pass EAP frames to
+ *	the host and accept the set_pmk/del_pmk commands).
  *
  * @NUM_NL80211_EXT_FEATURES: number of extended features.
  * @MAX_NL80211_EXT_FEATURES: highest extended feature index.
@@ -4787,6 +4806,7 @@ enum nl80211_ext_feature_index {
 	NL80211_EXT_FEATURE_SCHED_SCAN_RELATIVE_RSSI,
 	NL80211_EXT_FEATURE_CQM_RSSI_LIST,
 	NL80211_EXT_FEATURE_4WAY_HANDSHAKE_STA_PSK,
+	NL80211_EXT_FEATURE_4WAY_HANDSHAKE_STA_1X,
 
 	/* add new features before the definition below */
 	NUM_NL80211_EXT_FEATURES,
