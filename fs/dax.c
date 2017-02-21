@@ -1131,13 +1131,16 @@ static int dax_iomap_pte_fault(struct vm_fault *vmf, const struct iomap_ops *ops
 	int vmf_ret = 0;
 	void *entry;
 
+	trace_dax_pte_fault(inode, vmf, vmf_ret);
 	/*
 	 * Check whether offset isn't beyond end of file now. Caller is supposed
 	 * to hold locks serializing us with truncate / punch hole so this is
 	 * a reliable test.
 	 */
-	if (pos >= i_size_read(inode))
-		return VM_FAULT_SIGBUS;
+	if (pos >= i_size_read(inode)) {
+		vmf_ret = VM_FAULT_SIGBUS;
+		goto out;
+	}
 
 	if ((vmf->flags & FAULT_FLAG_WRITE) && !vmf->cow_page)
 		flags |= IOMAP_WRITE;
@@ -1148,8 +1151,10 @@ static int dax_iomap_pte_fault(struct vm_fault *vmf, const struct iomap_ops *ops
 	 * that we never have to deal with more than a single extent here.
 	 */
 	error = ops->iomap_begin(inode, pos, PAGE_SIZE, flags, &iomap);
-	if (error)
-		return dax_fault_return(error);
+	if (error) {
+		vmf_ret = dax_fault_return(error);
+		goto out;
+	}
 	if (WARN_ON_ONCE(iomap.offset + iomap.length < pos + PAGE_SIZE)) {
 		vmf_ret = dax_fault_return(-EIO);	/* fs corruption? */
 		goto finish_iomap;
@@ -1233,6 +1238,8 @@ static int dax_iomap_pte_fault(struct vm_fault *vmf, const struct iomap_ops *ops
 		 */
 		ops->iomap_end(inode, pos, PAGE_SIZE, copied, flags, &iomap);
 	}
+out:
+	trace_dax_pte_fault_done(inode, vmf, vmf_ret);
 	return vmf_ret;
 }
 
