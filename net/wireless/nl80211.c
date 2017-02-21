@@ -410,6 +410,7 @@ static const struct nla_policy nl80211_policy[NUM_NL80211_ATTR] = {
 		.len = sizeof(struct nl80211_bss_select_rssi_adjust)
 	},
 	[NL80211_ATTR_TIMEOUT_REASON] = { .type = NLA_U32 },
+	[NL80211_ATTR_PMK] = { .len = WLAN_PMK_LEN },
 };
 
 /* policy for the key attributes */
@@ -8037,6 +8038,13 @@ static int nl80211_crypto_settings(struct cfg80211_registered_device *rdev,
 			return -EINVAL;
 
 		memcpy(settings->akm_suites, data, len);
+	}
+
+	if (info->attrs[NL80211_ATTR_PMK]) {
+		if (!wiphy_ext_feature_isset(&rdev->wiphy,
+					     NL80211_EXT_FEATURE_4WAY_HANDSHAKE_STA_PSK))
+			return -EINVAL;
+		settings->psk = nla_data(info->attrs[NL80211_ATTR_PMK]);
 	}
 
 	return 0;
