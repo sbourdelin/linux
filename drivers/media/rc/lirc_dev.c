@@ -33,11 +33,9 @@
 #include <linux/device.h>
 #include <linux/cdev.h>
 
-#include <media/rc-core.h>
+#include "rc-core-priv.h"
 #include <media/lirc.h>
 #include <media/lirc_dev.h>
-
-static bool debug;
 
 #define IRCTL_DEV_NAME	"BaseRemoteCtl"
 #define NOPLUG		-1
@@ -747,7 +745,7 @@ ssize_t lirc_dev_fop_write(struct file *file, const char __user *buffer,
 EXPORT_SYMBOL(lirc_dev_fop_write);
 
 
-static int __init lirc_dev_init(void)
+int __init lirc_dev_init(void)
 {
 	int retval;
 
@@ -771,19 +769,8 @@ static int __init lirc_dev_init(void)
 	return 0;
 }
 
-static void __exit lirc_dev_exit(void)
+void __exit lirc_dev_exit(void)
 {
 	class_destroy(lirc_class);
 	unregister_chrdev_region(lirc_base_dev, MAX_IRCTL_DEVICES);
-	pr_info("module unloaded\n");
 }
-
-module_init(lirc_dev_init);
-module_exit(lirc_dev_exit);
-
-MODULE_DESCRIPTION("LIRC base driver module");
-MODULE_AUTHOR("Artur Lipowski");
-MODULE_LICENSE("GPL");
-
-module_param(debug, bool, S_IRUGO | S_IWUSR);
-MODULE_PARM_DESC(debug, "Enable debugging messages");

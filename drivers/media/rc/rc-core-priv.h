@@ -30,7 +30,7 @@ struct ir_raw_handler {
 	int (*encode)(enum rc_type protocol, u32 scancode,
 		      struct ir_raw_event *events, unsigned int max);
 
-	/* These two should only be used by the lirc decoder */
+	/* These two should only be used by the mce kbd decoder */
 	int (*raw_register)(struct rc_dev *dev);
 	int (*raw_unregister)(struct rc_dev *dev);
 };
@@ -268,6 +268,28 @@ void ir_raw_event_unregister(struct rc_dev *dev);
 int ir_raw_handler_register(struct ir_raw_handler *ir_raw_handler);
 void ir_raw_handler_unregister(struct ir_raw_handler *ir_raw_handler);
 void ir_raw_init(void);
+
+/*
+ * lirc interface bridge
+ */
+#ifdef CONFIG_IR_LIRC_CODEC
+int ir_lirc_raw_event(struct rc_dev *dev, struct ir_raw_event ev);
+int ir_lirc_register(struct rc_dev *dev);
+void ir_lirc_unregister(struct rc_dev *dev);
+#else
+static inline int ir_lirc_raw_event(struct rc_dev *dev,
+				    struct ir_raw_event ev) { return 0; }
+static inline int ir_lirc_register(struct rc_dev *dev) { return 0; }
+static inline void ir_lirc_unregister(struct rc_dev *dev) { }
+#endif
+
+#ifdef CONFIG_LIRC
+int lirc_dev_init(void);
+void lirc_dev_exit(void);
+#else
+static inline int lirc_dev_init(void) { return 0; }
+static inline void lirc_dev_exit(void) {}
+#endif
 
 /*
  * Decoder initialization code
