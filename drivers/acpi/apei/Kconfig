@@ -9,6 +9,7 @@ config ACPI_APEI
 	select MISC_FILESYSTEMS
 	select PSTORE
 	select UEFI_CPER
+	select ACPI_APEI_MEMORY_FAILURE if MEMORY_FAILURE
 	depends on HAVE_ACPI_APEI
 	help
 	  APEI allows to report errors (for example from the chipset)
