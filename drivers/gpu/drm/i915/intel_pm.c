@@ -7946,7 +7946,7 @@ int skl_pcode_request(struct drm_i915_private *dev_priv, u32 mbox, u32 request,
 		ret = 0;
 		goto out;
 	}
-	ret = _wait_for(COND, timeout_base_ms * 1000, 10);
+	ret = _wait_for(COND, timeout_base_ms * 1000, 10, 1);
 	if (!ret)
 		goto out;
 
@@ -7964,6 +7964,8 @@ int skl_pcode_request(struct drm_i915_private *dev_priv, u32 mbox, u32 request,
 	preempt_disable();
 	ret = wait_for_atomic(COND, 10);
 	preempt_enable();
+	if (ret == 0)
+		DRM_DEBUG_KMS("PCODE success after timeout\n");
 
 out:
 	return ret ? ret : status;

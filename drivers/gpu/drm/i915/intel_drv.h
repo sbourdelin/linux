@@ -51,9 +51,24 @@
  * drm_can_sleep() can be removed and in_atomic()/!in_atomic() asserts
  * added.
  */
-#define _wait_for(COND, US, W) ({ \
+#define _wait_for(COND, US, W, DEADLINE) ({ \
 	unsigned long timeout__ = jiffies + usecs_to_jiffies(US) + 1;	\
-	int ret__;							\
+	int sched__, ret__;						\
+									\
+	if ((DEADLINE) && (W)) {					\
+		struct task_struct *t = current;			\
+									\
+		if (t->policy != 0 || task_nice(t) != 0) {		\
+			sched__ = -EINVAL;				\
+		} else {						\
+			struct sched_param param =			\
+				{ .sched_priority = MAX_RT_PRIO - 1 };	\
+			sched__ = sched_setscheduler_nocheck(t,		\
+							     SCHED_FIFO,\
+							     &param);	\
+		}							\
+	}								\
+									\
 	for (;;) {							\
 		bool expired__ = time_after(jiffies, timeout__);	\
 		if (COND) {						\
@@ -70,10 +85,20 @@
 			cpu_relax();					\
 		}							\
 	}								\
+									\
+	if ((DEADLINE) && (W) && sched__ == 0) {			\
+		struct task_struct *t = current;			\
+		struct sched_param param =				\
+				{ .sched_priority = 0 };		\
+									\
+		WARN_ON(sched_setscheduler_nocheck(t, SCHED_NORMAL,	\
+						   &param));		\
+	}								\
+									\
 	ret__;								\
 })
 
-#define wait_for(COND, MS)	  	_wait_for((COND), (MS) * 1000, 1000)
+#define wait_for(COND, MS)	  	_wait_for((COND), (MS) * 1000, 1000, 0)
 
 /* If CONFIG_PREEMPT_COUNT is disabled, in_atomic() always reports false. */
 #if defined(CONFIG_DRM_I915_DEBUG) && defined(CONFIG_PREEMPT_COUNT)
@@ -123,7 +148,7 @@
 	int ret__; \
 	BUILD_BUG_ON(!__builtin_constant_p(US)); \
 	if ((US) > 10) \
-		ret__ = _wait_for((COND), (US), 10); \
+		ret__ = _wait_for((COND), (US), 10, 0); \
 	else \
 		ret__ = _wait_for_atomic((COND), (US), 0); \
 	ret__; \
