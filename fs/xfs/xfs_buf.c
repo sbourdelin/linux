@@ -151,12 +151,12 @@ xfs_buf_stale(
 	xfs_buf_ioacct_dec(bp);
 
 	spin_lock(&bp->b_lock);
-	atomic_set(&bp->b_lru_ref, 0);
+	refcount_set(&bp->b_lru_ref, 0);
 	if (!(bp->b_state & XFS_BSTATE_DISPOSE) &&
 	    (list_lru_del(&bp->b_target->bt_lru, &bp->b_lru)))
-		atomic_dec(&bp->b_hold);
+		refcount_dec(&bp->b_hold);
 
-	ASSERT(atomic_read(&bp->b_hold) >= 1);
+	ASSERT(refcount_read(&bp->b_hold) >= 1);
 	spin_unlock(&bp->b_lock);
 }
 
@@ -214,8 +214,8 @@ _xfs_buf_alloc(
 	 */
 	flags &= ~(XBF_UNMAPPED | XBF_TRYLOCK | XBF_ASYNC | XBF_READ_AHEAD);
 
-	atomic_set(&bp->b_hold, 1);
-	atomic_set(&bp->b_lru_ref, 1);
+	refcount_set(&bp->b_hold, 1);
+	refcount_set(&bp->b_lru_ref, 1);
 	init_completion(&bp->b_iowait);
 	INIT_LIST_HEAD(&bp->b_lru);
 	INIT_LIST_HEAD(&bp->b_list);
@@ -580,7 +580,7 @@ _xfs_buf_find(
 	bp = rhashtable_lookup_fast(&pag->pag_buf_hash, &cmap,
 				    xfs_buf_hash_params);
 	if (bp) {
-		atomic_inc(&bp->b_hold);
+		refcount_inc(&bp->b_hold);
 		goto found;
 	}
 
@@ -939,7 +939,7 @@ xfs_buf_hold(
 	xfs_buf_t		*bp)
 {
 	trace_xfs_buf_hold(bp, _RET_IP_);
-	atomic_inc(&bp->b_hold);
+	refcount_inc(&bp->b_hold);
 }
 
 /*
@@ -958,16 +958,16 @@ xfs_buf_rele(
 
 	if (!pag) {
 		ASSERT(list_empty(&bp->b_lru));
-		if (atomic_dec_and_test(&bp->b_hold)) {
+		if (refcount_dec_and_test(&bp->b_hold)) {
 			xfs_buf_ioacct_dec(bp);
 			xfs_buf_free(bp);
 		}
 		return;
 	}
 
-	ASSERT(atomic_read(&bp->b_hold) > 0);
+	ASSERT(refcount_read(&bp->b_hold) > 0);
 
-	release = atomic_dec_and_lock(&bp->b_hold, &pag->pag_buf_lock);
+	release = refcount_dec_and_lock(&bp->b_hold, &pag->pag_buf_lock);
 	spin_lock(&bp->b_lock);
 	if (!release) {
 		/*
@@ -976,14 +976,14 @@ xfs_buf_rele(
 		 * haven't acquired the pag lock, but the use of _XBF_IN_FLIGHT
 		 * ensures the decrement occurs only once per-buf.
 		 */
-		if ((atomic_read(&bp->b_hold) == 1) && !list_empty(&bp->b_lru))
+		if ((refcount_read(&bp->b_hold) == 1) && !list_empty(&bp->b_lru))
 			xfs_buf_ioacct_dec(bp);
 		goto out_unlock;
 	}
 
 	/* the last reference has been dropped ... */
 	xfs_buf_ioacct_dec(bp);
-	if (!(bp->b_flags & XBF_STALE) && atomic_read(&bp->b_lru_ref)) {
+	if (!(bp->b_flags & XBF_STALE) && refcount_read(&bp->b_lru_ref)) {
 		/*
 		 * If the buffer is added to the LRU take a new reference to the
 		 * buffer for the LRU and clear the (now stale) dispose list
@@ -991,7 +991,7 @@ xfs_buf_rele(
 		 */
 		if (list_lru_add(&bp->b_target->bt_lru, &bp->b_lru)) {
 			bp->b_state &= ~XFS_BSTATE_DISPOSE;
-			atomic_inc(&bp->b_hold);
+			refcount_inc(&bp->b_hold);
 		}
 		spin_unlock(&pag->pag_buf_lock);
 	} else {
@@ -1597,7 +1597,7 @@ xfs_buftarg_wait_rele(
 	struct xfs_buf		*bp = container_of(item, struct xfs_buf, b_lru);
 	struct list_head	*dispose = arg;
 
-	if (atomic_read(&bp->b_hold) > 1) {
+	if (refcount_read(&bp->b_hold) > 1) {
 		/* need to wait, so skip it this pass */
 		trace_xfs_buf_wait_buftarg(bp, _RET_IP_);
 		return LRU_SKIP;
@@ -1609,7 +1609,7 @@ xfs_buftarg_wait_rele(
 	 * clear the LRU reference count so the buffer doesn't get
 	 * ignored in xfs_buf_rele().
 	 */
-	atomic_set(&bp->b_lru_ref, 0);
+	refcount_set(&bp->b_lru_ref, 0);
 	bp->b_state |= XFS_BSTATE_DISPOSE;
 	list_lru_isolate_move(lru, item, dispose);
 	spin_unlock(&bp->b_lock);
@@ -1683,10 +1683,11 @@ xfs_buftarg_isolate(
 	 * zero. If the value is already zero, we need to reclaim the
 	 * buffer, otherwise it gets another trip through the LRU.
 	 */
-	if (!atomic_add_unless(&bp->b_lru_ref, -1, 0)) {
+	if (!refcount_read(&bp->b_lru_ref)) {
 		spin_unlock(&bp->b_lock);
 		return LRU_ROTATE;
 	}
+	refcount_dec_and_test(&bp->b_lru_ref);
 
 	bp->b_state |= XFS_BSTATE_DISPOSE;
 	list_lru_isolate_move(lru, item, dispose);
@@ -1854,7 +1855,7 @@ xfs_buf_delwri_queue(
 	 */
 	bp->b_flags |= _XBF_DELWRI_Q;
 	if (list_empty(&bp->b_list)) {
-		atomic_inc(&bp->b_hold);
+		refcount_inc(&bp->b_hold);
 		list_add_tail(&bp->b_list, list);
 	}
 

@@ -27,6 +27,7 @@
 #include <linux/buffer_head.h>
 #include <linux/uio.h>
 #include <linux/list_lru.h>
+#include <linux/refcount.h>
 
 /*
  *	Base types
@@ -154,8 +155,8 @@ typedef struct xfs_buf {
 	struct rhash_head	b_rhash_head;	/* pag buffer hash node */
 	xfs_daddr_t		b_bn;		/* block number of buffer */
 	int			b_length;	/* size of buffer in BBs */
-	atomic_t		b_hold;		/* reference count */
-	atomic_t		b_lru_ref;	/* lru reclaim ref count */
+	refcount_t		b_hold;		/* reference count */
+	refcount_t		b_lru_ref;	/* lru reclaim ref count */
 	xfs_buf_flags_t		b_flags;	/* status flags */
 	struct semaphore	b_sema;		/* semaphore for lockables */
 
@@ -354,7 +355,7 @@ extern void xfs_buf_terminate(void);
 
 static inline void xfs_buf_set_ref(struct xfs_buf *bp, int lru_ref)
 {
-	atomic_set(&bp->b_lru_ref, lru_ref);
+	refcount_set(&bp->b_lru_ref, lru_ref);
 }
 
 static inline int xfs_buf_ispinned(struct xfs_buf *bp)
