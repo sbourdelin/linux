@@ -217,10 +217,9 @@ struct qede_dev {
 	u16				geneve_dst_port;
 
 	bool wol_enabled;
+	bool xdp_enabled;
 
 	struct qede_rdma_dev		rdma_info;
-
-	struct bpf_prog *xdp_prog;
 };
 
 enum QEDE_STATE {

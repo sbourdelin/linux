@@ -41,6 +41,7 @@
 #include <linux/if_vlan.h>
 #include <net/ip6_checksum.h>
 #include "qede_ptp.h"
+#include <net/xdp.h>
 
 #include <linux/qed/qed_if.h>
 #include "qede.h"
@@ -988,13 +989,14 @@ static bool qede_pkt_is_ip_fragmented(struct eth_fast_path_rx_reg_cqe *cqe,
 static bool qede_rx_xdp(struct qede_dev *edev,
 			struct qede_fastpath *fp,
 			struct qede_rx_queue *rxq,
-			struct bpf_prog *prog,
 			struct sw_rx_data *bd,
 			struct eth_fast_path_rx_reg_cqe *cqe)
 {
 	u16 len = le16_to_cpu(cqe->len_on_first_bd);
 	struct xdp_buff xdp;
 	enum xdp_action act;
+	struct xdp_hook *last_hook;
+	bool retval = false;
 
 	xdp.data = page_address(bd->data) + cqe->placement_offset;
 	xdp.data_end = xdp.data + len;
@@ -1004,11 +1006,13 @@ static bool qede_rx_xdp(struct qede_dev *edev,
 	 * side for map helpers.
 	 */
 	rcu_read_lock();
-	act = bpf_prog_run_xdp(prog, &xdp);
-	rcu_read_unlock();
 
-	if (act == XDP_PASS)
-		return true;
+	act = xdp_hook_run_ret_last(&fp->napi, &xdp, &last_hook);
+
+	if (act == XDP_PASS) {
+		retval = true;
+		goto out;
+	}
 
 	/* Count number of packets not to be passed to stack */
 	rxq->xdp_no_pass++;
@@ -1018,8 +1022,8 @@ static bool qede_rx_xdp(struct qede_dev *edev,
 		/* We need the replacement buffer before transmit. */
 		if (qede_alloc_rx_buffer(rxq, true)) {
 			qede_recycle_rx_bd_ring(rxq, 1);
-			trace_xdp_exception(edev->ndev, prog, act);
-			return false;
+			trace_xdp_hook_exception(edev->ndev, last_hook, act);
+			goto out;
 		}
 
 		/* Now if there's a transmission problem, we'd still have to
@@ -1029,22 +1033,25 @@ static bool qede_rx_xdp(struct qede_dev *edev,
 			dma_unmap_page(rxq->dev, bd->mapping,
 				       PAGE_SIZE, DMA_BIDIRECTIONAL);
 			__free_page(bd->data);
-			trace_xdp_exception(edev->ndev, prog, act);
+			trace_xdp_hook_exception(edev->ndev, last_hook, act);
 		}
 
 		/* Regardless, we've consumed an Rx BD */
 		qede_rx_bd_ring_consume(rxq);
-		return false;
+		goto out;
 
 	default:
-		bpf_warn_invalid_xdp_action(act);
+		xdp_warn_invalid_action(act);
 	case XDP_ABORTED:
-		trace_xdp_exception(edev->ndev, prog, act);
+		trace_xdp_hook_exception(edev->ndev, last_hook, act);
 	case XDP_DROP:
 		qede_recycle_rx_bd_ring(rxq, cqe->bd_num);
 	}
 
-	return false;
+out:
+	rcu_read_unlock();
+
+	return retval;
 }
 
 static struct sk_buff *qede_rx_allocate_skb(struct qede_dev *edev,
@@ -1189,7 +1196,6 @@ static int qede_rx_process_cqe(struct qede_dev *edev,
 			       struct qede_fastpath *fp,
 			       struct qede_rx_queue *rxq)
 {
-	struct bpf_prog *xdp_prog = READ_ONCE(rxq->xdp_prog);
 	struct eth_fast_path_rx_reg_cqe *fp_cqe;
 	u16 len, pad, bd_cons_idx, parse_flag;
 	enum eth_rx_cqe_type cqe_type;
@@ -1227,8 +1233,8 @@ static int qede_rx_process_cqe(struct qede_dev *edev,
 	pad = fp_cqe->placement_offset;
 
 	/* Run eBPF program if one is attached */
-	if (xdp_prog)
-		if (!qede_rx_xdp(edev, fp, rxq, xdp_prog, bd, fp_cqe))
+	if (xdp_hook_run_needed_check(edev->ndev, &fp->napi))
+		if (!qede_rx_xdp(edev, fp, rxq, bd, fp_cqe))
 			return 1;
 
 	/* If this is an error packet then drop it */

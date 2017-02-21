@@ -342,7 +342,7 @@ static int qede_get_sset_count(struct net_device *dev, int stringset)
 		num_stats += QEDE_RSS_COUNT(edev) * QEDE_NUM_RQSTATS;
 
 		/* Account for XDP statistics [if needed] */
-		if (edev->xdp_prog)
+		if (edev->xdp_enabled)
 			num_stats += QEDE_RSS_COUNT(edev) * QEDE_NUM_TQSTATS;
 		return num_stats;
 
