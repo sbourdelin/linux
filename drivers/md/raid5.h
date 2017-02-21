@@ -230,6 +230,7 @@ struct stripe_head {
 	struct list_head	r5c; /* for r5c_cache->stripe_in_journal */
 
 	struct page		*ppl_page; /* partial parity of this stripe */
+	struct ppl_io_unit	*ppl_log_io;
 	/**
 	 * struct stripe_operations
 	 * @target - STRIPE_OP_COMPUTE_BLK target
@@ -689,6 +690,7 @@ struct r5conf {
 	int			group_cnt;
 	int			worker_cnt_per_group;
 	struct r5l_log		*log;
+	struct ppl_conf		*ppl;
 
 	struct bio_list		pending_bios;
 	spinlock_t		pending_bios_lock;
@@ -798,4 +800,10 @@ extern void r5c_check_cached_full_stripe(struct r5conf *conf);
 extern struct md_sysfs_entry r5c_journal_mode;
 extern void r5c_update_on_rdev_error(struct mddev *mddev);
 extern bool r5c_big_stripe_cached(struct r5conf *conf, sector_t sect);
+
+extern int ppl_init_log(struct r5conf *conf);
+extern void ppl_exit_log(struct ppl_conf *log);
+extern int ppl_write_stripe(struct ppl_conf *log, struct stripe_head *sh);
+extern void ppl_write_stripe_run(struct ppl_conf *log);
+extern void ppl_stripe_write_finished(struct stripe_head *sh);
 #endif

@@ -739,7 +739,7 @@ static bool stripe_can_batch(struct stripe_head *sh)
 {
 	struct r5conf *conf = sh->raid_conf;
 
-	if (conf->log)
+	if (conf->log || conf->ppl)
 		return false;
 	return test_bit(STRIPE_BATCH_READY, &sh->state) &&
 		!test_bit(STRIPE_BITMAP_PENDING, &sh->state) &&
@@ -935,6 +935,9 @@ static void ops_run_io(struct stripe_head *sh, struct stripe_head_state *s)
 			return;
 		}
 	}
+
+	if (conf->ppl && ppl_write_stripe(conf->ppl, sh) == 0)
+		return;
 
 	for (i = disks; i--; ) {
 		int op, op_flags = 0;
@@ -3308,6 +3311,16 @@ static void stripe_set_idx(sector_t stripe, struct r5conf *conf, int previous,
 			     &dd_idx, sh);
 }
 
+static void log_stripe_write_finished(struct stripe_head *sh)
+{
+	struct r5conf *conf = sh->raid_conf;
+
+	if (conf->log)
+		r5l_stripe_write_finished(sh);
+	else if (conf->ppl)
+		ppl_stripe_write_finished(sh);
+}
+
 static void
 handle_failed_stripe(struct r5conf *conf, struct stripe_head *sh,
 				struct stripe_head_state *s, int disks,
@@ -3347,7 +3360,7 @@ handle_failed_stripe(struct r5conf *conf, struct stripe_head *sh,
 		if (bi)
 			bitmap_end = 1;
 
-		r5l_stripe_write_finished(sh);
+		log_stripe_write_finished(sh);
 
 		if (test_and_clear_bit(R5_Overlap, &sh->dev[i].flags))
 			wake_up(&conf->wait_for_overlap);
@@ -3766,7 +3779,7 @@ returnbi:
 				discard_pending = 1;
 		}
 
-	r5l_stripe_write_finished(sh);
+	log_stripe_write_finished(sh);
 
 	if (!discard_pending &&
 	    test_bit(R5_Discard, &sh->dev[sh->pd_idx].flags)) {
@@ -4756,7 +4769,7 @@ static void handle_stripe(struct stripe_head *sh)
 
 	if (s.just_cached)
 		r5c_handle_cached_data_endio(conf, sh, disks, &s.return_bi);
-	r5l_stripe_write_finished(sh);
+	log_stripe_write_finished(sh);
 
 	/* Now we might consider reading some blocks, either to check/generate
 	 * parity, or to satisfy requests
@@ -6120,6 +6133,14 @@ static int  retry_aligned_read(struct r5conf *conf, struct bio *raid_bio)
 	return handled;
 }
 
+static void log_write_stripe_run(struct r5conf *conf)
+{
+	if (conf->log)
+		r5l_write_stripe_run(conf->log);
+	else if (conf->ppl)
+		ppl_write_stripe_run(conf->ppl);
+}
+
 static int handle_active_stripes(struct r5conf *conf, int group,
 				 struct r5worker *worker,
 				 struct list_head *temp_inactive_list)
@@ -6157,7 +6178,7 @@ static int handle_active_stripes(struct r5conf *conf, int group,
 
 	for (i = 0; i < batch_size; i++)
 		handle_stripe(batch[i]);
-	r5l_write_stripe_run(conf->log);
+	log_write_stripe_run(conf);
 
 	cond_resched();
 
@@ -6735,6 +6756,8 @@ static void free_conf(struct r5conf *conf)
 
 	if (conf->log)
 		r5l_exit_log(conf->log);
+	if (conf->ppl)
+		ppl_exit_log(conf->ppl);
 	if (conf->shrinker.nr_deferred)
 		unregister_shrinker(&conf->shrinker);
 
@@ -7196,6 +7219,13 @@ static int raid5_run(struct mddev *mddev)
 		BUG_ON(mddev->delta_disks != 0);
 	}
 
+	if (test_bit(MD_HAS_JOURNAL, &mddev->flags) &&
+	    test_bit(MD_HAS_PPL, &mddev->flags)) {
+		pr_warn("md/raid:%s: using journal device and PPL not allowed - disabling PPL\n",
+			mdname(mddev));
+		clear_bit(MD_HAS_PPL, &mddev->flags);
+	}
+
 	if (mddev->private == NULL)
 		conf = setup_conf(mddev);
 	else
@@ -7421,6 +7451,11 @@ static int raid5_run(struct mddev *mddev)
 		pr_debug("md/raid:%s: using device %s as journal\n",
 			 mdname(mddev), bdevname(journal_dev->bdev, b));
 		if (r5l_init_log(conf, journal_dev))
+			goto abort;
+	} else if (test_bit(MD_HAS_PPL, &mddev->flags)) {
+		pr_debug("md/raid:%s: enabling distributed Partial Parity Log\n",
+			 mdname(mddev));
+		if (ppl_init_log(conf))
 			goto abort;
 	}
 
@@ -7690,7 +7725,7 @@ static int raid5_resize(struct mddev *mddev, sector_t sectors)
 	sector_t newsize;
 	struct r5conf *conf = mddev->private;
 
-	if (conf->log)
+	if (conf->log || conf->ppl)
 		return -EINVAL;
 	sectors &= ~((sector_t)conf->chunk_sectors - 1);
 	newsize = raid5_size(mddev, sectors, mddev->raid_disks);
@@ -7743,7 +7778,7 @@ static int check_reshape(struct mddev *mddev)
 {
 	struct r5conf *conf = mddev->private;
 
-	if (conf->log)
+	if (conf->log || conf->ppl)
 		return -EINVAL;
 	if (mddev->delta_disks == 0 &&
 	    mddev->new_layout == mddev->layout &&
