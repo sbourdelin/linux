@@ -2966,12 +2966,12 @@ static inline void mmdrop_async(struct mm_struct *mm)
  */
 static inline void mmget(struct mm_struct *mm)
 {
-	atomic_inc(&mm->mm_users);
+	refcount_inc(&mm->mm_users);
 }
 
 static inline bool mmget_not_zero(struct mm_struct *mm)
 {
-	return atomic_inc_not_zero(&mm->mm_users);
+	return refcount_inc_not_zero(&mm->mm_users);
 }
 
 /* mmput gets rid of the mappings and all user-space */

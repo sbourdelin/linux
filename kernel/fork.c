@@ -759,7 +759,7 @@ static struct mm_struct *mm_init(struct mm_struct *mm, struct task_struct *p,
 	mm->mmap = NULL;
 	mm->mm_rb = RB_ROOT;
 	mm->vmacache_seqnum = 0;
-	atomic_set(&mm->mm_users, 1);
+	refcount_set(&mm->mm_users, 1);
 	atomic_set(&mm->mm_count, 1);
 	init_rwsem(&mm->mmap_sem);
 	INIT_LIST_HEAD(&mm->mmlist);
@@ -862,7 +862,7 @@ EXPORT_SYMBOL_GPL(__mmdrop);
 
 static inline void __mmput(struct mm_struct *mm)
 {
-	VM_BUG_ON(atomic_read(&mm->mm_users));
+	VM_BUG_ON(refcount_read(&mm->mm_users));
 
 	uprobe_clear_state(mm);
 	exit_aio(mm);
@@ -889,7 +889,7 @@ void mmput(struct mm_struct *mm)
 {
 	might_sleep();
 
-	if (atomic_dec_and_test(&mm->mm_users))
+	if (refcount_dec_and_test(&mm->mm_users))
 		__mmput(mm);
 }
 EXPORT_SYMBOL_GPL(mmput);
@@ -903,7 +903,7 @@ static void mmput_async_fn(struct work_struct *work)
 
 void mmput_async(struct mm_struct *mm)
 {
-	if (atomic_dec_and_test(&mm->mm_users)) {
+	if (refcount_dec_and_test(&mm->mm_users)) {
 		INIT_WORK(&mm->async_put_work, mmput_async_fn);
 		schedule_work(&mm->async_put_work);
 	}
@@ -1102,7 +1102,7 @@ void mm_release(struct task_struct *tsk, struct mm_struct *mm)
 	 */
 	if (tsk->clear_child_tid) {
 		if (!(tsk->signal->flags & SIGNAL_GROUP_COREDUMP) &&
-		    atomic_read(&mm->mm_users) > 1) {
+		    refcount_read(&mm->mm_users) > 1) {
 			/*
 			 * We don't check the error code - if userspace has
 			 * not set up a proper pointer then tough luck.

@@ -110,7 +110,7 @@ int use_cop(unsigned long acop, struct mm_struct *mm)
 	 * running. We need to send an IPI to force them to pick up any
 	 * change in PID and ACOP.
 	 */
-	if (atomic_read(&mm->mm_users) > 1)
+	if (refcount_read(&mm->mm_users) > 1)
 		smp_call_function(sync_cop, mm, 1);
 
 out:
@@ -150,7 +150,7 @@ void drop_cop(unsigned long acop, struct mm_struct *mm)
 	 * running. We need to send an IPI to force them to pick up any
 	 * change in PID and ACOP.
 	 */
-	if (atomic_read(&mm->mm_users) > 1)
+	if (refcount_read(&mm->mm_users) > 1)
 		smp_call_function(sync_cop, mm, 1);
 
 	if (free_pid != COP_PID_NONE)

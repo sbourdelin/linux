@@ -774,7 +774,7 @@ static bool task_will_free_mem(struct task_struct *task)
 	if (test_bit(MMF_OOM_SKIP, &mm->flags))
 		return false;
 
-	if (atomic_read(&mm->mm_users) <= 1)
+	if (refcount_read(&mm->mm_users) <= 1)
 		return true;
 
 	/*

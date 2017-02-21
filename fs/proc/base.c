@@ -1062,7 +1062,7 @@ static int __set_oom_adj(struct file *file, int oom_adj, bool legacy)
 		struct task_struct *p = find_lock_task_mm(task);
 
 		if (p) {
-			if (atomic_read(&p->mm->mm_users) > 1) {
+			if (refcount_read(&p->mm->mm_users) > 1) {
 				mm = p->mm;
 				mmgrab(mm);
 			}

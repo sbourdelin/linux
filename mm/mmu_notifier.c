@@ -249,7 +249,7 @@ static int do_mmu_notifier_register(struct mmu_notifier *mn,
 	struct mmu_notifier_mm *mmu_notifier_mm;
 	int ret;
 
-	BUG_ON(atomic_read(&mm->mm_users) <= 0);
+	BUG_ON(refcount_read(&mm->mm_users) == 0);
 
 	/*
 	 * Verify that mmu_notifier_init() already run and the global srcu is
@@ -295,7 +295,7 @@ out_clean:
 		up_write(&mm->mmap_sem);
 	kfree(mmu_notifier_mm);
 out:
-	BUG_ON(atomic_read(&mm->mm_users) <= 0);
+	BUG_ON(refcount_read(&mm->mm_users) == 0);
 	return ret;
 }
 

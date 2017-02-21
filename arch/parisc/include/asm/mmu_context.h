@@ -21,7 +21,7 @@ extern void free_sid(unsigned long);
 static inline int
 init_new_context(struct task_struct *tsk, struct mm_struct *mm)
 {
-	BUG_ON(atomic_read(&mm->mm_users) != 1);
+	BUG_ON(refcount_read(&mm->mm_users) != 1);
 
 	mm->context = alloc_sid();
 	return 0;

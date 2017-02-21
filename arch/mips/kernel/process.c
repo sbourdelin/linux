@@ -698,7 +698,7 @@ int mips_set_process_fp_mode(struct task_struct *task, unsigned int value)
 		/* No need to send an IPI for the local CPU */
 		max_users = (task->mm == current->mm) ? 1 : 0;
 
-		if (atomic_read(&current->mm->mm_users) > max_users)
+		if (refcount_read(&current->mm->mm_users) > max_users)
 			smp_call_function(prepare_for_fp_mode_switch,
 					  (void *)current->mm, 1);
 	}

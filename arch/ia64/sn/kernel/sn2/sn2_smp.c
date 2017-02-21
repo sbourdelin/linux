@@ -122,7 +122,7 @@ void sn_migrate(struct task_struct *task)
 void sn_tlb_migrate_finish(struct mm_struct *mm)
 {
 	/* flush_tlb_mm is inefficient if more than 1 users of mm */
-	if (mm == current->mm && mm && atomic_read(&mm->mm_users) == 1)
+	if (mm == current->mm && mm && refcount_read(&mm->mm_users) == 1)
 		flush_tlb_mm(mm);
 }
 
@@ -204,7 +204,7 @@ sn2_global_tlb_purge(struct mm_struct *mm, unsigned long start,
 		return;
 	}
 
-	if (atomic_read(&mm->mm_users) == 1 && mymm) {
+	if (refcount_read(&mm->mm_users) == 1 && mymm) {
 		flush_tlb_mm(mm);
 		__this_cpu_inc(ptcstats.change_rid);
 		preempt_enable();

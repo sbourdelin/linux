@@ -56,7 +56,7 @@ flush_tlb_mm (struct mm_struct *mm)
 	set_bit(mm->context, ia64_ctx.flushmap);
 	mm->context = 0;
 
-	if (atomic_read(&mm->mm_users) == 0)
+	if (refcount_read(&mm->mm_users) == 0)
 		return;		/* happens as a result of exit_mmap() */
 
 #ifdef CONFIG_SMP

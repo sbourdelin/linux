@@ -7,6 +7,7 @@
 #include <linux/list.h>
 #include <linux/spinlock.h>
 #include <linux/rbtree.h>
+#include <linux/refcount.h>
 #include <linux/rwsem.h>
 #include <linux/completion.h>
 #include <linux/cpumask.h>
@@ -417,7 +418,7 @@ struct mm_struct {
 	 * (which may then free the &struct mm_struct if @mm_count also
 	 * drops to 0).
 	 */
-	atomic_t mm_users;
+	refcount_t mm_users;
 
 	/**
 	 * @mm_count: The number of references to &struct mm_struct

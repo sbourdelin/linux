@@ -63,7 +63,7 @@ static unsigned long change_pte_range(struct vm_area_struct *vma, pmd_t *pmd,
 
 	/* Get target node for single threaded private VMAs */
 	if (prot_numa && !(vma->vm_flags & VM_SHARED) &&
-	    atomic_read(&vma->vm_mm->mm_users) == 1)
+	    refcount_read(&vma->vm_mm->mm_users) == 1)
 		target_node = numa_node_id();
 
 	arch_enter_lazy_mmu_mode();
