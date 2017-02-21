@@ -4,6 +4,7 @@
 #include <linux/list.h>
 #include <linux/radix-tree.h>
 #include <linux/rbtree.h>
+#include <linux/refcount.h>
 #include <linux/spinlock.h>
 #include <linux/percpu_counter.h>
 #include <linux/percpu-refcount.h>
@@ -51,7 +52,7 @@ enum wb_stat_item {
  */
 struct bdi_writeback_congested {
 	unsigned long state;		/* WB_[a]sync_congested flags */
-	atomic_t refcnt;		/* nr of attached wb's and blkg */
+	refcount_t refcnt;		/* nr of attached wb's and blkg */
 
 #ifdef CONFIG_CGROUP_WRITEBACK
 	struct backing_dev_info *bdi;	/* the associated bdi */
