@@ -241,7 +241,7 @@ static void clear_subscriber_list(struct snd_seq_client *client,
 			 * we decrease the counter, and when both ports are deleted
 			 * remove the subscriber info
 			 */
-			if (atomic_dec_and_test(&subs->ref_count))
+			if (refcount_dec_and_test(&subs->ref_count))
 				kfree(subs);
 			continue;
 		}
@@ -520,7 +520,6 @@ static int check_and_subscribe_port(struct snd_seq_client *client,
 	else
 		list_add_tail(&subs->dest_list, &grp->list_head);
 	grp->exclusive = exclusive;
-	atomic_inc(&subs->ref_count);
 	write_unlock_irq(&grp->list_lock);
 	err = 0;
 
@@ -570,7 +569,6 @@ int snd_seq_port_connect(struct snd_seq_client *connector,
 		return -ENOMEM;
 
 	subs->info = *info;
-	atomic_set(&subs->ref_count, 0);
 	INIT_LIST_HEAD(&subs->src_list);
 	INIT_LIST_HEAD(&subs->dest_list);
 
@@ -587,6 +585,7 @@ int snd_seq_port_connect(struct snd_seq_client *connector,
 	if (err < 0)
 		goto error_dest;
 
+	refcount_set(&subs->ref_count, 2);
 	return 0;
 
  error_dest:
@@ -613,7 +612,7 @@ int snd_seq_port_disconnect(struct snd_seq_client *connector,
 	/* look for the connection */
 	list_for_each_entry(subs, &src->list_head, src_list) {
 		if (match_subs_info(info, &subs->info)) {
-			atomic_dec(&subs->ref_count); /* mark as not ready */
+			refcount_dec(&subs->ref_count); /* mark as not ready */
 			err = 0;
 			break;
 		}

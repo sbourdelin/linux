@@ -21,6 +21,7 @@
 #ifndef __SND_SEQ_PORTS_H
 #define __SND_SEQ_PORTS_H
 
+#include <linux/refcount.h>
 #include <sound/seq_kernel.h>
 #include "seq_lock.h"
 
@@ -44,7 +45,7 @@ struct snd_seq_subscribers {
 	struct snd_seq_port_subscribe info;	/* additional info */
 	struct list_head src_list;	/* link of sources */
 	struct list_head dest_list;	/* link of destinations */
-	atomic_t ref_count;
+	refcount_t ref_count;
 };
 
 struct snd_seq_port_subs_info {
