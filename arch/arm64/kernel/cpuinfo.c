@@ -43,7 +43,7 @@ DEFINE_PER_CPU(struct cpuinfo_arm64, cpu_data);
 static struct cpuinfo_arm64 boot_cpu_data;
 
 static char *icache_policy_str[] = {
-	[ICACHE_POLICY_RESERVED] = "RESERVED/UNKNOWN",
+	[ICACHE_POLICY_VPIPT] = "VPIPT",
 	[ICACHE_POLICY_AIVIVT] = "AIVIVT",
 	[ICACHE_POLICY_VIPT] = "VIPT",
 	[ICACHE_POLICY_PIPT] = "PIPT",
@@ -289,7 +289,7 @@ static void cpuinfo_detect_icache_policy(struct cpuinfo_arm64 *info)
 	unsigned int cpu = smp_processor_id();
 	u32 l1ip = CTR_L1IP(info->reg_ctr);
 
-	if (l1ip != ICACHE_POLICY_PIPT) {
+	if (l1ip == ICACHE_POLICY_AIVIVT || l1ip == ICACHE_POLICY_VIPT) {
 		/*
 		 * VIPT caches are non-aliasing if the VA always equals the PA
 		 * in all bit positions that are covered by the index. This is
@@ -300,9 +300,10 @@ static void cpuinfo_detect_icache_policy(struct cpuinfo_arm64 *info)
 
 		if (l1ip != ICACHE_POLICY_VIPT || waysize > PAGE_SIZE)
 			set_bit(ICACHEF_ALIASING, &__icache_flags);
+
+		if (l1ip == ICACHE_POLICY_AIVIVT)
+			set_bit(ICACHEF_AIVIVT, &__icache_flags);
 	}
-	if (l1ip == ICACHE_POLICY_AIVIVT)
-		set_bit(ICACHEF_AIVIVT, &__icache_flags);
 
 	pr_info("Detected %s I-cache on CPU%d\n", icache_policy_str[l1ip], cpu);
 }
