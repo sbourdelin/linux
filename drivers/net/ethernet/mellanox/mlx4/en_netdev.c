@@ -42,6 +42,7 @@
 #include <net/busy_poll.h>
 #include <net/vxlan.h>
 #include <net/devlink.h>
+#include <net/xdp.h>
 
 #include <linux/mlx4/driver.h>
 #include <linux/mlx4/device.h>
@@ -2199,8 +2200,7 @@ int mlx4_en_try_alloc_resources(struct mlx4_en_priv *priv,
 				struct mlx4_en_port_profile *prof,
 				bool carry_xdp_prog)
 {
-	struct bpf_prog *xdp_prog;
-	int i, t;
+	int t;
 
 	mlx4_en_copy_priv(tmp, priv, prof);
 
@@ -2213,22 +2213,6 @@ int mlx4_en_try_alloc_resources(struct mlx4_en_priv *priv,
 			kfree(tmp->tx_cq[t]);
 		}
 		return -ENOMEM;
-	}
-
-	/* All rx_rings has the same xdp_prog.  Pick the first one. */
-	xdp_prog = rcu_dereference_protected(
-		priv->rx_ring[0]->xdp_prog,
-		lockdep_is_held(&priv->mdev->state_lock));
-
-	if (xdp_prog && carry_xdp_prog) {
-		xdp_prog = bpf_prog_add(xdp_prog, tmp->rx_ring_num);
-		if (IS_ERR(xdp_prog)) {
-			mlx4_en_free_resources(tmp);
-			return PTR_ERR(xdp_prog);
-		}
-		for (i = 0; i < tmp->rx_ring_num; i++)
-			rcu_assign_pointer(tmp->rx_ring[i]->xdp_prog,
-					   xdp_prog);
 	}
 
 	return 0;
@@ -2717,42 +2701,20 @@ static int mlx4_en_set_tx_maxrate(struct net_device *dev, int queue_index, u32 m
 	return err;
 }
 
-static int mlx4_xdp_set(struct net_device *dev, struct bpf_prog *prog)
+static int mlx4_xdp_init(struct net_device *dev, bool enable)
 {
 	struct mlx4_en_priv *priv = netdev_priv(dev);
 	struct mlx4_en_dev *mdev = priv->mdev;
 	struct mlx4_en_port_profile new_prof;
-	struct bpf_prog *old_prog;
 	struct mlx4_en_priv *tmp;
 	int tx_changed = 0;
-	int xdp_ring_num;
 	int port_up = 0;
-	int err;
-	int i;
+	int xdp_ring_num, err;
 
-	xdp_ring_num = prog ? priv->rx_ring_num : 0;
+	xdp_ring_num = enable ? ALIGN(priv->rx_ring_num, MLX4_EN_NUM_UP) : 0;
 
-	/* No need to reconfigure buffers when simply swapping the
-	 * program for a new one.
-	 */
-	if (priv->tx_ring_num[TX_XDP] == xdp_ring_num) {
-		if (prog) {
-			prog = bpf_prog_add(prog, priv->rx_ring_num - 1);
-			if (IS_ERR(prog))
-				return PTR_ERR(prog);
-		}
-		mutex_lock(&mdev->state_lock);
-		for (i = 0; i < priv->rx_ring_num; i++) {
-			old_prog = rcu_dereference_protected(
-					priv->rx_ring[i]->xdp_prog,
-					lockdep_is_held(&mdev->state_lock));
-			rcu_assign_pointer(priv->rx_ring[i]->xdp_prog, prog);
-			if (old_prog)
-				bpf_prog_put(old_prog);
-		}
-		mutex_unlock(&mdev->state_lock);
+	if (priv->tx_ring_num[TX_XDP] == xdp_ring_num)
 		return 0;
-	}
 
 	if (!mlx4_en_check_xdp_mtu(dev, dev->mtu))
 		return -EOPNOTSUPP;
@@ -2760,14 +2722,6 @@ static int mlx4_xdp_set(struct net_device *dev, struct bpf_prog *prog)
 	tmp = kzalloc(sizeof(*tmp), GFP_KERNEL);
 	if (!tmp)
 		return -ENOMEM;
-
-	if (prog) {
-		prog = bpf_prog_add(prog, priv->rx_ring_num - 1);
-		if (IS_ERR(prog)) {
-			err = PTR_ERR(prog);
-			goto out;
-		}
-	}
 
 	mutex_lock(&mdev->state_lock);
 	memcpy(&new_prof, priv->prof, sizeof(struct mlx4_en_port_profile));
@@ -2781,11 +2735,8 @@ static int mlx4_xdp_set(struct net_device *dev, struct bpf_prog *prog)
 	}
 
 	err = mlx4_en_try_alloc_resources(priv, tmp, &new_prof, false);
-	if (err) {
-		if (prog)
-			bpf_prog_sub(prog, priv->rx_ring_num - 1);
+	if (err)
 		goto unlock_out;
-	}
 
 	if (priv->port_up) {
 		port_up = 1;
@@ -2795,15 +2746,6 @@ static int mlx4_xdp_set(struct net_device *dev, struct bpf_prog *prog)
 	mlx4_en_safe_replace_resources(priv, tmp);
 	if (tx_changed)
 		netif_set_real_num_tx_queues(dev, priv->tx_ring_num[TX]);
-
-	for (i = 0; i < priv->rx_ring_num; i++) {
-		old_prog = rcu_dereference_protected(
-					priv->rx_ring[i]->xdp_prog,
-					lockdep_is_held(&mdev->state_lock));
-		rcu_assign_pointer(priv->rx_ring[i]->xdp_prog, prog);
-		if (old_prog)
-			bpf_prog_put(old_prog);
-	}
 
 	if (port_up) {
 		err = mlx4_en_start_port(dev);
@@ -2816,26 +2758,24 @@ static int mlx4_xdp_set(struct net_device *dev, struct bpf_prog *prog)
 
 unlock_out:
 	mutex_unlock(&mdev->state_lock);
-out:
 	kfree(tmp);
 	return err;
 }
 
-static bool mlx4_xdp_attached(struct net_device *dev)
+static int mlx4_xdp_check_bpf(struct net_device *dev, struct bpf_prog *prog)
 {
-	struct mlx4_en_priv *priv = netdev_priv(dev);
-
-	return !!priv->tx_ring_num[TX_XDP];
+	return 0;
 }
 
 static int mlx4_xdp(struct net_device *dev, struct netdev_xdp *xdp)
 {
 	switch (xdp->command) {
-	case XDP_SETUP_PROG:
-		return mlx4_xdp_set(dev, xdp->prog);
-	case XDP_QUERY_PROG:
-		xdp->prog_attached = mlx4_xdp_attached(dev);
-		return 0;
+	case XDP_MODE_ON:
+		return mlx4_xdp_init(dev, true);
+	case XDP_MODE_OFF:
+		return mlx4_xdp_init(dev, false);
+	case XDP_CHECK_BPF_PROG:
+		return mlx4_xdp_check_bpf(dev, xdp->prog);
 	default:
 		return -EINVAL;
 	}
@@ -3335,7 +3275,7 @@ int mlx4_en_init_netdev(struct mlx4_en_dev *mdev, int port,
 
 	dev->vlan_features = dev->hw_features;
 
-	dev->hw_features |= NETIF_F_RXCSUM | NETIF_F_RXHASH;
+	dev->hw_features |= NETIF_F_RXCSUM | NETIF_F_RXHASH | NETIF_F_XDP;
 	dev->features = dev->hw_features | NETIF_F_HIGHDMA |
 			NETIF_F_HW_VLAN_CTAG_TX | NETIF_F_HW_VLAN_CTAG_RX |
 			NETIF_F_HW_VLAN_CTAG_FILTER;

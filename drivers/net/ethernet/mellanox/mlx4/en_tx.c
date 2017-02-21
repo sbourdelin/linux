@@ -43,6 +43,7 @@
 #include <linux/ip.h>
 #include <linux/ipv6.h>
 #include <linux/moduleparam.h>
+#include <net/xdp.h>
 
 #include "mlx4_en.h"
 

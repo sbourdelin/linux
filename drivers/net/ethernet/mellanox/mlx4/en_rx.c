@@ -43,6 +43,7 @@
 #include <linux/if_vlan.h>
 #include <linux/vmalloc.h>
 #include <linux/irq.h>
+#include <net/xdp.h>
 
 #if IS_ENABLED(CONFIG_IPV6)
 #include <net/ip6_checksum.h>
@@ -547,13 +548,7 @@ void mlx4_en_destroy_rx_ring(struct mlx4_en_priv *priv,
 {
 	struct mlx4_en_dev *mdev = priv->mdev;
 	struct mlx4_en_rx_ring *ring = *pring;
-	struct bpf_prog *old_prog;
 
-	old_prog = rcu_dereference_protected(
-					ring->xdp_prog,
-					lockdep_is_held(&mdev->state_lock));
-	if (old_prog)
-		bpf_prog_put(old_prog);
 	mlx4_free_hwq_res(mdev->dev, &ring->wqres, size * stride + TXBB_SIZE);
 	vfree(ring->rx_info);
 	ring->rx_info = NULL;
@@ -802,7 +797,6 @@ int mlx4_en_process_rx_cq(struct net_device *dev, struct mlx4_en_cq *cq, int bud
 	struct mlx4_en_rx_ring *ring = priv->rx_ring[cq->ring];
 	struct mlx4_en_rx_alloc *frags;
 	struct mlx4_en_rx_desc *rx_desc;
-	struct bpf_prog *xdp_prog;
 	int doorbell_pending;
 	struct sk_buff *skb;
 	int index;
@@ -813,6 +807,7 @@ int mlx4_en_process_rx_cq(struct net_device *dev, struct mlx4_en_cq *cq, int bud
 	int factor = priv->cqe_factor;
 	u64 timestamp;
 	bool l2_tunnel;
+	bool run_xdp;
 
 	if (unlikely(!priv->port_up))
 		return 0;
@@ -820,9 +815,9 @@ int mlx4_en_process_rx_cq(struct net_device *dev, struct mlx4_en_cq *cq, int bud
 	if (unlikely(budget <= 0))
 		return polled;
 
-	/* Protect accesses to: ring->xdp_prog, priv->mac_hash list */
+	/* Protect accesses to: XDP hooks, priv->mac_hash list */
 	rcu_read_lock();
-	xdp_prog = rcu_dereference(ring->xdp_prog);
+	run_xdp = xdp_hook_run_needed_check(dev, &cq->napi);
 	doorbell_pending = 0;
 
 	/* We assume a 1:1 mapping between CQEs and Rx descriptors, so Rx
@@ -895,13 +890,14 @@ int mlx4_en_process_rx_cq(struct net_device *dev, struct mlx4_en_cq *cq, int bud
 		l2_tunnel = (dev->hw_enc_features & NETIF_F_RXCSUM) &&
 			(cqe->vlan_my_qpn & cpu_to_be32(MLX4_CQE_L2_TUNNEL));
 
-		/* A bpf program gets first chance to drop the packet. It may
+		/* An xdp program gets first chance to drop the packet. It may
 		 * read bytes but not past the end of the frag.
 		 */
-		if (xdp_prog) {
+		if (run_xdp) {
 			struct xdp_buff xdp;
 			dma_addr_t dma;
 			void *orig_data;
+			struct xdp_hook *last_hook;
 			u32 act;
 
 			dma = be64_to_cpu(rx_desc->data[0].addr);
@@ -914,7 +910,8 @@ int mlx4_en_process_rx_cq(struct net_device *dev, struct mlx4_en_cq *cq, int bud
 			xdp.data_end = xdp.data + length;
 			orig_data = xdp.data;
 
-			act = bpf_prog_run_xdp(xdp_prog, &xdp);
+			act = xdp_hook_run_ret_last(&cq->napi, &xdp,
+						    &last_hook);
 
 			if (xdp.data != orig_data) {
 				length = xdp.data_end - xdp.data;
@@ -930,12 +927,12 @@ int mlx4_en_process_rx_cq(struct net_device *dev, struct mlx4_en_cq *cq, int bud
 							length, cq->ring,
 							&doorbell_pending)))
 					goto consumed;
-				trace_xdp_exception(dev, xdp_prog, act);
+				trace_xdp_hook_exception(dev, last_hook, act);
 				goto xdp_drop_no_cnt; /* Drop on xmit failure */
 			default:
-				bpf_warn_invalid_xdp_action(act);
+				xdp_warn_invalid_action(act);
 			case XDP_ABORTED:
-				trace_xdp_exception(dev, xdp_prog, act);
+				trace_xdp_hook_exception(dev, last_hook, act);
 			case XDP_DROP:
 				ring->xdp_drop++;
 xdp_drop_no_cnt:
