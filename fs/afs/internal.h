@@ -187,7 +187,7 @@ struct afs_cache_cell {
  * AFS cell record
  */
 struct afs_cell {
-	atomic_t		usage;
+	refcount_t		usage;
 	struct list_head	link;		/* main cell list link */
 	struct key		*anonymous_key;	/* anonymous user key for this cell */
 	struct list_head	proc_link;	/* /proc cell list link */
@@ -464,7 +464,7 @@ extern void afs_callback_update_kill(void);
 extern struct rw_semaphore afs_proc_cells_sem;
 extern struct list_head afs_proc_cells;
 
-#define afs_get_cell(C) do { atomic_inc(&(C)->usage); } while(0)
+#define afs_get_cell(C) do { refcount_inc(&(C)->usage); } while(0)
 extern int afs_cell_init(char *);
 extern struct afs_cell *afs_cell_create(const char *, unsigned, char *, bool);
 extern struct afs_cell *afs_cell_lookup(const char *, unsigned, bool);

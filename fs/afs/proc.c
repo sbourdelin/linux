@@ -212,7 +212,7 @@ static int afs_proc_cells_show(struct seq_file *m, void *v)
 
 	/* display one cell per line on subsequent lines */
 	seq_printf(m, "%3d %s\n",
-		   atomic_read(&cell->usage), cell->name);
+		   refcount_read(&cell->usage), cell->name);
 	return 0;
 }
 

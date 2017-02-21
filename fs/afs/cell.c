@@ -60,7 +60,7 @@ static struct afs_cell *afs_cell_alloc(const char *name, unsigned namelen,
 	memcpy(cell->name, name, namelen);
 	cell->name[namelen] = 0;
 
-	atomic_set(&cell->usage, 1);
+	refcount_set(&cell->usage, 1);
 	INIT_LIST_HEAD(&cell->link);
 	rwlock_init(&cell->servers_lock);
 	INIT_LIST_HEAD(&cell->servers);
@@ -345,15 +345,15 @@ void afs_put_cell(struct afs_cell *cell)
 	if (!cell)
 		return;
 
-	_enter("%p{%d,%s}", cell, atomic_read(&cell->usage), cell->name);
+	_enter("%p{%d,%s}", cell, refcount_read(&cell->usage), cell->name);
 
-	ASSERTCMP(atomic_read(&cell->usage), >, 0);
+	ASSERTCMP(refcount_read(&cell->usage), >, 0);
 
 	/* to prevent a race, the decrement and the dequeue must be effectively
 	 * atomic */
 	write_lock(&afs_cells_lock);
 
-	if (likely(!atomic_dec_and_test(&cell->usage))) {
+	if (likely(!refcount_dec_and_test(&cell->usage))) {
 		write_unlock(&afs_cells_lock);
 		_leave("");
 		return;
@@ -376,20 +376,20 @@ void afs_put_cell(struct afs_cell *cell)
  */
 static void afs_cell_destroy(struct afs_cell *cell)
 {
-	_enter("%p{%d,%s}", cell, atomic_read(&cell->usage), cell->name);
+	_enter("%p{%d,%s}", cell, refcount_read(&cell->usage), cell->name);
 
-	ASSERTCMP(atomic_read(&cell->usage), >=, 0);
+	ASSERTCMP(refcount_read(&cell->usage), >=, 0);
 	ASSERT(list_empty(&cell->link));
 
 	/* wait for everyone to stop using the cell */
-	if (atomic_read(&cell->usage) > 0) {
+	if (refcount_read(&cell->usage) > 0) {
 		DECLARE_WAITQUEUE(myself, current);
 
 		_debug("wait for cell %s", cell->name);
 		set_current_state(TASK_UNINTERRUPTIBLE);
 		add_wait_queue(&afs_cells_freeable_wq, &myself);
 
-		while (atomic_read(&cell->usage) > 0) {
+		while (refcount_read(&cell->usage) > 0) {
 			schedule();
 			set_current_state(TASK_UNINTERRUPTIBLE);
 		}
@@ -399,7 +399,7 @@ static void afs_cell_destroy(struct afs_cell *cell)
 	}
 
 	_debug("cell dead");
-	ASSERTCMP(atomic_read(&cell->usage), ==, 0);
+	ASSERTCMP(refcount_read(&cell->usage), ==, 0);
 	ASSERT(list_empty(&cell->servers));
 	ASSERT(list_empty(&cell->vl_list));
 
@@ -448,7 +448,7 @@ void afs_cell_purge(void)
 
 		if (cell) {
 			_debug("PURGING CELL %s (%d)",
-			       cell->name, atomic_read(&cell->usage));
+			       cell->name, refcount_read(&cell->usage));
 
 			/* now the cell should be left with no references */
 			afs_cell_destroy(cell);
