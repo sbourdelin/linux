@@ -100,7 +100,7 @@ struct afs_volume *afs_volume_lookup(struct afs_mount_params *params)
 	if (!volume)
 		goto error_up;
 
-	atomic_set(&volume->usage, 1);
+	refcount_set(&volume->usage, 1);
 	volume->type		= params->type;
 	volume->type_force	= params->force;
 	volume->cell		= params->cell;
@@ -179,7 +179,7 @@ void afs_put_volume(struct afs_volume *volume)
 
 	_enter("%p", volume);
 
-	ASSERTCMP(atomic_read(&volume->usage), >, 0);
+	ASSERTCMP(refcount_read(&volume->usage), >, 0);
 
 	vlocation = volume->vlocation;
 
@@ -187,7 +187,7 @@ void afs_put_volume(struct afs_volume *volume)
 	 * atomic */
 	down_write(&vlocation->cell->vl_sem);
 
-	if (likely(!atomic_dec_and_test(&volume->usage))) {
+	if (likely(!refcount_dec_and_test(&volume->usage))) {
 		up_write(&vlocation->cell->vl_sem);
 		_leave("");
 		return;

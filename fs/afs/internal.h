@@ -297,7 +297,7 @@ struct afs_server {
  * AFS volume access record
  */
 struct afs_volume {
-	atomic_t		usage;
+	refcount_t		usage;
 	struct afs_cell		*cell;		/* cell to which belongs (unrefd ptr) */
 	struct afs_vlocation	*vlocation;	/* volume location */
 #ifdef CONFIG_AFS_FSCACHE
@@ -725,7 +725,7 @@ extern int afs_vnode_release_lock(struct afs_vnode *, struct key *);
 /*
  * volume.c
  */
-#define afs_get_volume(V) do { atomic_inc(&(V)->usage); } while(0)
+#define afs_get_volume(V) do { refcount_inc(&(V)->usage); } while(0)
 
 extern void afs_put_volume(struct afs_volume *);
 extern struct afs_volume *afs_volume_lookup(struct afs_mount_params *);
