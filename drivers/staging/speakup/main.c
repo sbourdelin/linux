@@ -1316,14 +1316,14 @@ static int edit_bits(struct vc_data *vc, u_char type, u_char ch, u_short key)
 }
 
 /* Allocation concurrency is protected by the console semaphore */
-static int speakup_allocate(struct vc_data *vc)
+static int speakup_allocate(struct vc_data *vc, gfp_t gfp_flags)
 {
 	int vc_num;
 
 	vc_num = vc->vc_num;
 	if (speakup_console[vc_num] == NULL) {
 		speakup_console[vc_num] = kzalloc(sizeof(*speakup_console[0]),
-						  GFP_ATOMIC);
+						  gfp_flags);
 		if (speakup_console[vc_num] == NULL)
 			return -ENOMEM;
 		speakup_date(vc);
@@ -2246,7 +2246,7 @@ static int vt_notifier_call(struct notifier_block *nb,
 	switch (code) {
 	case VT_ALLOCATE:
 		if (vc->vc_mode == KD_TEXT)
-			speakup_allocate(vc);
+			speakup_allocate(vc, GFP_ATOMIC);
 		break;
 	case VT_DEALLOCATE:
 		speakup_deallocate(vc);
@@ -2306,7 +2306,6 @@ static int __init speakup_init(void)
 {
 	int i;
 	long err = 0;
-	struct st_spk_t *first_console;
 	struct vc_data *vc = vc_cons[fg_console].d;
 	struct var_t *var;
 
@@ -2331,18 +2330,9 @@ static int __init speakup_init(void)
 	if (err)
 		goto error_virtkeyboard;
 
-	first_console = kzalloc(sizeof(*first_console), GFP_KERNEL);
-	if (!first_console) {
-		err = -ENOMEM;
-		goto error_alloc;
-	}
-
-	speakup_console[vc->vc_num] = first_console;
-	speakup_date(vc);
-
 	for (i = 0; i < MAX_NR_CONSOLES; i++)
 		if (vc_cons[i].d) {
-			err = speakup_allocate(vc_cons[i].d);
+			err = speakup_allocate(vc_cons[i].d, GFP_KERNEL);
 			if (err)
 				goto error_kobjects;
 		}
@@ -2401,7 +2391,6 @@ error_kobjects:
 	for (i = 0; i < MAX_NR_CONSOLES; i++)
 		kfree(speakup_console[i]);
 
-error_alloc:
 	speakup_remove_virtual_keyboard();
 
 error_virtkeyboard:
