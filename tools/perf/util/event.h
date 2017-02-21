@@ -39,6 +39,15 @@ struct comm_event {
 	char comm[16];
 };
 
+#define NAMESPACES_MAX			12
+
+struct namespaces_event {
+	struct perf_event_header header;
+	u32 pid, tid;
+	u64 nr_namespaces;
+	struct perf_ns_link_info link_info[NAMESPACES_MAX];
+};
+
 struct fork_event {
 	struct perf_event_header header;
 	u32 pid, ppid;
@@ -485,6 +494,7 @@ union perf_event {
 	struct mmap_event		mmap;
 	struct mmap2_event		mmap2;
 	struct comm_event		comm;
+	struct namespaces_event		namespaces;
 	struct fork_event		fork;
 	struct lost_event		lost;
 	struct lost_samples_event	lost_samples;
@@ -587,6 +597,10 @@ int perf_event__process_switch(struct perf_tool *tool,
 			       union perf_event *event,
 			       struct perf_sample *sample,
 			       struct machine *machine);
+int perf_event__process_namespaces(struct perf_tool *tool,
+				   union perf_event *event,
+				   struct perf_sample *sample,
+				   struct machine *machine);
 int perf_event__process_mmap(struct perf_tool *tool,
 			     union perf_event *event,
 			     struct perf_sample *sample,
