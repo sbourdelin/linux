@@ -11,6 +11,7 @@
 #include <linux/of_platform.h>
 
 #include <media/i2c/tvp514x.h>
+#include <media/i2c/adv7343.h>
 
 #include <mach/common.h>
 #include <mach/da8xx.h>
@@ -105,7 +106,7 @@ static struct vpif_capture_config da850_vpif_capture_config = {
 	.card_name = "DA850/OMAP-L138 Video Capture",
 };
 
-static void __init da850_vpif_legacy_init(void)
+static void __init da850_vpif_capture_legacy_init(void)
 {
 	int ret;
 
@@ -116,6 +117,70 @@ static void __init da850_vpif_legacy_init(void)
 	ret = da850_register_vpif_capture(&da850_vpif_capture_config);
 	if (ret)
 		pr_warn("%s: VPIF capture setup failed: %d\n",
+			__func__, ret);
+}
+
+static struct adv7343_platform_data adv7343_pdata = {
+	.mode_config = {
+		.dac = { 1, 1, 1 },
+	},
+	.sd_config = {
+		.sd_dac_out = { 1 },
+	},
+};
+
+static struct vpif_subdev_info da850_vpif_subdev[] = {
+	{
+		.name = "adv7343",
+		.board_info = {
+			I2C_BOARD_INFO("adv7343", 0x2a),
+			.platform_data = &adv7343_pdata,
+		},
+	},
+};
+
+static const struct vpif_output da850_ch0_outputs[] = {
+	{
+		.output = {
+			.index = 0,
+			.name = "Composite",
+			.type = V4L2_OUTPUT_TYPE_ANALOG,
+			.capabilities = V4L2_OUT_CAP_STD,
+			.std = V4L2_STD_ALL,
+		},
+		.subdev_name = "adv7343",
+		.output_route = ADV7343_COMPOSITE_ID,
+	},
+	{
+		.output = {
+			.index = 1,
+			.name = "S-Video",
+			.type = V4L2_OUTPUT_TYPE_ANALOG,
+			.capabilities = V4L2_OUT_CAP_STD,
+			.std = V4L2_STD_ALL,
+		},
+		.subdev_name = "adv7343",
+		.output_route = ADV7343_SVIDEO_ID,
+	},
+};
+
+static struct vpif_display_config da850_vpif_display_config = {
+	.subdevinfo   = da850_vpif_subdev,
+	.subdev_count = ARRAY_SIZE(da850_vpif_subdev),
+	.chan_config[0] = {
+		.outputs = da850_ch0_outputs,
+		.output_count = ARRAY_SIZE(da850_ch0_outputs),
+	},
+	.card_name    = "DA850/OMAP-L138 Video Display",
+};
+
+static void __init da850_vpif_display_legacy_init(void)
+{
+	int ret;
+
+	ret = da850_register_vpif_display(&da850_vpif_display_config);
+	if (ret)
+		pr_warn("%s: VPIF display setup failed: %d\n",
 			__func__, ret);
 }
 
@@ -131,8 +196,9 @@ static void pdata_quirks_check(struct pdata_init *quirks)
 }
 
 static struct pdata_init pdata_quirks[] __initdata = {
-	{ "ti,da850-lcdk", da850_vpif_legacy_init, },
-	{ "ti,da850-evm", da850_vpif_legacy_init, },
+	{ "ti,da850-lcdk", da850_vpif_capture_legacy_init, },
+	{ "ti,da850-evm", da850_vpif_display_legacy_init, },
+	{ "ti,da850-evm", da850_vpif_capture_legacy_init, },
 	{ /* sentinel */ },
 };
 
