@@ -822,4 +822,16 @@ config INPUT_HISI_POWERKEY
 	  To compile this driver as a module, choose M here: the
 	  module will be called hisi_powerkey.
 
+config INPUT_CY8CMBR3102
+	tristate "Cypress CY8CMBR3102 CapSense Express controller"
+	depends on I2C
+	select INPUT_POLLDEV
+	default n
+	help
+	  Say yes here to enable support for the Cypress CY8CMBR3102
+	  CapSense Express controller.
+
+	  To compile this driver as a module, choose M here: the module
+	  will be called cy8cmbr3102.
+
 endif
