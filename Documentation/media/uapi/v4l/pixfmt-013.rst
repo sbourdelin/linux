@@ -55,11 +55,21 @@ Compressed Formats
       - ``V4L2_PIX_FMT_MPEG1``
       - 'MPG1'
       - MPEG1 video elementary stream.
+    * .. _V4L2-PIX-FMT-MPEG1-PARSED:
+
+      - ``V4L2_PIX_FMT_MPEG1_PARSED``
+      - 'MG1P'
+      - MPEG-1 with parsing metadata given through controls, see :ref:`MPEG-2 Parsed Control IDs<mpeg2-parsed-control-id>`.
     * .. _V4L2-PIX-FMT-MPEG2:
 
       - ``V4L2_PIX_FMT_MPEG2``
       - 'MPG2'
       - MPEG2 video elementary stream.
+    * .. _V4L2-PIX-FMT-MPEG2-PARSED:
+
+      - ``V4L2_PIX_FMT_MPEG2_PARSED``
+      - 'MG2P'
+      - MPEG-2 with parsing metadata given through controls, see :ref:`MPEG-2 Parsed Control IDs<mpeg2-parsed-control-id>`.
     * .. _V4L2-PIX-FMT-MPEG4:
 
       - ``V4L2_PIX_FMT_MPEG4``
