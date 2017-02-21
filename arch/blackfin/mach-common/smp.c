@@ -423,7 +423,7 @@ void cpu_die(void)
 	(void)cpu_report_death();
 
 	refcount_dec(&init_mm.mm_users);
-	atomic_dec(&init_mm.mm_count);
+	refcount_dec(&init_mm.mm_count);
 
 	local_irq_disable();
 	platform_cpu_die();

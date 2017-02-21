@@ -760,7 +760,7 @@ static struct mm_struct *mm_init(struct mm_struct *mm, struct task_struct *p,
 	mm->mm_rb = RB_ROOT;
 	mm->vmacache_seqnum = 0;
 	refcount_set(&mm->mm_users, 1);
-	atomic_set(&mm->mm_count, 1);
+	refcount_set(&mm->mm_count, 1);
 	init_rwsem(&mm->mmap_sem);
 	INIT_LIST_HEAD(&mm->mmlist);
 	mm->core_state = NULL;

@@ -348,7 +348,7 @@ void __mmu_notifier_mm_destroy(struct mm_struct *mm)
  */
 void mmu_notifier_unregister(struct mmu_notifier *mn, struct mm_struct *mm)
 {
-	BUG_ON(atomic_read(&mm->mm_count) <= 0);
+	BUG_ON(refcount_read(&mm->mm_count) == 0);
 
 	if (!hlist_unhashed(&mn->hlist)) {
 		/*
@@ -381,7 +381,7 @@ void mmu_notifier_unregister(struct mmu_notifier *mn, struct mm_struct *mm)
 	 */
 	synchronize_srcu(&srcu);
 
-	BUG_ON(atomic_read(&mm->mm_count) <= 0);
+	BUG_ON(refcount_read(&mm->mm_count) == 0);
 
 	mmdrop(mm);
 }
@@ -401,7 +401,7 @@ void mmu_notifier_unregister_no_release(struct mmu_notifier *mn,
 	hlist_del_init_rcu(&mn->hlist);
 	spin_unlock(&mm->mmu_notifier_mm->lock);
 
-	BUG_ON(atomic_read(&mm->mm_count) <= 0);
+	BUG_ON(refcount_read(&mm->mm_count) == 0);
 	mmdrop(mm);
 }
 EXPORT_SYMBOL_GPL(mmu_notifier_unregister_no_release);

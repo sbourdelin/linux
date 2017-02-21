@@ -135,7 +135,7 @@ void dump_mm(const struct mm_struct *mm)
 #endif
 		mm->mmap_base, mm->mmap_legacy_base, mm->highest_vm_end,
 		mm->pgd, refcount_read(&mm->mm_users),
-		atomic_read(&mm->mm_count),
+		refcount_read(&mm->mm_count),
 		atomic_long_read((atomic_long_t *)&mm->nr_ptes),
 		mm_nr_pmds((struct mm_struct *)mm),
 		mm->map_count,
