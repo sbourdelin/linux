@@ -54,6 +54,12 @@ The generally preferred mode for receive is
 in which packets containing an int value describing an IR signal are
 read from the chardev.
 
+Alternatively, :ref:`LIRC_MODE_SCANCODE <lirc-mode-scancode>` might be available.
+Some hardware only produces scancodes so this might be the only available mode.
+In this mode, full decoded scancodes read from the chardev with their protocol
+information.
+
+
 Return Value
 ============
 

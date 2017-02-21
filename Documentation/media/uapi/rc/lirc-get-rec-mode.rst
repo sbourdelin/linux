@@ -33,10 +33,10 @@ Arguments
 Description
 ===========
 
-Get/set supported receive modes. Only :ref:`LIRC_MODE_MODE2 <lirc-mode-mode2>`
-and :ref:`LIRC_MODE_LIRCCODE <lirc-mode-lirccode>` are supported for IR
-receive. Use :ref:`lirc_get_features` to find out which modes the driver
-supports.
+Get/set supported receive modes. Only :ref:`LIRC_MODE_MODE2 <lirc-mode-mode2>`,
+:ref:`LIRC_MODE_LIRCCODE <lirc-mode-lirccode>` and
+:ref:`LIRC_MODE_SCANCODE <lirc-mode-scancode>` are supported for IR
+Use :ref:`lirc_get_features` to find out which modes the driver supports.
 
 Return Value
 ============

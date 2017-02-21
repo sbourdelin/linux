@@ -55,6 +55,14 @@ samples. The write function must block until the data has been transmitted
 by the hardware. If more data is provided than the hardware can send, the
 driver returns ``EINVAL``.
 
+When in :ref:`LIRC_MODE_SCANCODE <lirc-mode-scancode>` mode, one
+``struct lirc_scancode`` must be written to the chardev. The ``flags``
+member must be 0, and ``rc_type`` must be set to a valid protocol. Set
+the desired scancode in the ``scancode`` member. If there is no protocol
+encoder for the protocol, ``EINVAL`` is returned, or the scancode might
+not be valid for the specified protocol.
+
+
 Return Value
 ============
 
