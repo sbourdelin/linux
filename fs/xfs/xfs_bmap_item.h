@@ -20,6 +20,8 @@
 #ifndef	__XFS_BMAP_ITEM_H__
 #define	__XFS_BMAP_ITEM_H__
 
+#include <linux/refcount.h>
+
 /*
  * There are (currently) two pairs of bmap btree redo item types: map & unmap.
  * The common abbreviations for these are BUI (bmap update intent) and BUD
@@ -61,7 +63,7 @@ struct kmem_zone;
  */
 struct xfs_bui_log_item {
 	struct xfs_log_item		bui_item;
-	atomic_t			bui_refcount;
+	refcount_t			bui_refcount;
 	atomic_t			bui_next_extent;
 	unsigned long			bui_flags;	/* misc flags */
 	struct xfs_bui_log_format	bui_format;
