@@ -184,12 +184,14 @@ endif
 # Old syntax make ... SUBDIRS=$PWD is still supported
 # Setting the environment variable KBUILD_EXTMOD take precedence
 ifdef SUBDIRS
-  KBUILD_EXTMOD ?= $(SUBDIRS)
+  __KBUILD_EXTMOD ?= $(SUBDIRS)
 endif
 
 ifeq ("$(origin M)", "command line")
-  KBUILD_EXTMOD := $(M)
+  __KBUILD_EXTMOD := $(M)
 endif
+
+KBUILD_EXTMOD = $(patsubst %/,%,$(__KBUILD_EXTMOD))
 
 # If building an external module we do not care about the all: rule
 # but instead _all depend on modules
