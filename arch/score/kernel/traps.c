@@ -24,6 +24,7 @@
  */
 
 #include <linux/extable.h>
+#include <linux/ptrace.h>
 #include <linux/sched.h>
 
 #include <asm/cacheflush.h>
