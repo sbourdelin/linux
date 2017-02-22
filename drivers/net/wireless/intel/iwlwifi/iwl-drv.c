@@ -1250,7 +1250,6 @@ static void iwl_req_fw_callback(const struct firmware *ucode_raw, void *context)
 	size_t trigger_tlv_sz[FW_DBG_TRIGGER_MAX];
 	u32 api_ver;
 	int i;
-	bool load_module = false;
 	bool usniffer_images = false;
 
 	fw->ucode_capa.max_probe_length = IWL_DEFAULT_MAX_PROBE_LENGTH;
@@ -1454,8 +1453,6 @@ static void iwl_req_fw_callback(const struct firmware *ucode_raw, void *context)
 			mutex_unlock(&iwlwifi_opmode_table_mtx);
 			goto out_unbind;
 		}
-	} else {
-		load_module = true;
 	}
 	mutex_unlock(&iwlwifi_opmode_table_mtx);
 
@@ -1466,20 +1463,10 @@ static void iwl_req_fw_callback(const struct firmware *ucode_raw, void *context)
 	 */
 	complete(&drv->request_firmware_complete);
 
-	/*
-	 * Load the module last so we don't block anything
-	 * else from proceeding if the module fails to load
-	 * or hangs loading.
-	 */
-	if (load_module) {
-		err = request_module("%s", op->name);
-#ifdef CONFIG_IWLWIFI_OPMODE_MODULAR
-		if (err)
-			IWL_ERR(drv,
-				"failed to load module %s (error %d), is dynamic loading enabled?\n",
-				op->name, err);
-#endif
-	}
+	err = request_module_nowait("%s", op->name);
+	if (err)
+		goto out_unbind;
+
 	goto free;
 
  try_again:
