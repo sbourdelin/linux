@@ -13,6 +13,9 @@ Required properties:
 - reg: physical base address and length of the registers set for the device;
 - interrupts: should contain IRQ line for the VPIF
 
+Optional properties:
+- enable-gpios: phandle of the GPIOs used to select the vpif functionality
+
 Video Capture:
 
 VPIF has a 16-bit parallel bus input, supporting 2 8-bit channels or a
@@ -29,6 +32,10 @@ I2C-connected TVP5147 decoder:
 		compatible = "ti,da850-vpif";
 		reg = <0x217000 0x1000>;
 		interrupts = <92>;
+
+		enable-gpios = <&tca6416 7 GPIO_ACTIVE_HIGH
+				&tca6416 6 GPIO_ACTIVE_HIGH
+				&tca6416 5 GPIO_ACTIVE_LOW>;
 
 		port@0 {
 			vpif_input_ch0: endpoint@0 {
