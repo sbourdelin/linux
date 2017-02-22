@@ -10,6 +10,7 @@
 #include <linux/fs.h>
 #include <linux/delay.h>
 #include <linux/root_dev.h>
+#include <linux/clk.h>
 #include <linux/clk-provider.h>
 #include <linux/clocksource.h>
 #include <linux/console.h>
@@ -488,7 +489,8 @@ static int show_cpuinfo(struct seq_file *m, void *v)
 {
 	char *str;
 	int cpu_id = ptr_to_cpu(v);
-	struct device_node *core_clk = of_find_node_by_name(NULL, "core_clk");
+	struct device *cpu_dev = get_cpu_device(cpu_id);
+	struct clk *cpu_clk = clk_get(cpu_dev, "core_clk");
 	u32 freq = 0;
 
 	if (!cpu_online(cpu_id)) {
@@ -502,7 +504,7 @@ static int show_cpuinfo(struct seq_file *m, void *v)
 
 	seq_printf(m, arc_cpu_mumbojumbo(cpu_id, str, PAGE_SIZE));
 
-	of_property_read_u32(core_clk, "clock-frequency", &freq);
+	freq = clk_get_rate(cpu_clk);
 	if (freq)
 		seq_printf(m, "CPU speed\t: %u.%02u Mhz\n",
 			   freq / 1000000, (freq / 10000) % 100);
