@@ -20,6 +20,7 @@
 #include <linux/interrupt.h>
 #include <linux/platform_device.h>
 #include <linux/slab.h>
+#include <linux/gpio/consumer.h>
 
 #include <media/v4l2-ioctl.h>
 
@@ -1429,6 +1430,7 @@ static __init int vpif_probe(struct platform_device *pdev)
 {
 	struct vpif_subdev_info *subdevdata;
 	struct i2c_adapter *i2c_adap;
+	struct gpio_descs *descs;
 	struct resource *res;
 	int subdev_count;
 	int res_idx = 0;
@@ -1438,6 +1440,11 @@ static __init int vpif_probe(struct platform_device *pdev)
 		dev_warn(&pdev->dev, "Missing platform data.  Giving up.\n");
 		return -EINVAL;
 	}
+
+	descs = devm_gpiod_get_array_optional(&pdev->dev,
+					      "enable", GPIOD_OUT_HIGH);
+	if (IS_ERR(descs))
+		dev_err(&pdev->dev, "Error requesting enable GPIOs\n");
 
 	vpif_dev = &pdev->dev;
 
