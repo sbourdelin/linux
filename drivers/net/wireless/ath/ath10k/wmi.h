@@ -312,9 +312,16 @@ enum wmi_10_4_service {
 	WMI_10_4_SERVICE_TX_MODE_DYNAMIC,
 };
 
-static inline char *wmi_service_name(int service_id)
+#define SVCSTR(x) \
+{ \
+	case x: \
+		str = #x; \
+		break; \
+}
+
+static inline const char *wmi_service_name(int service_id)
 {
-#define SVCSTR(x) case x: return #x
+	const char *str = NULL;
 
 	switch (service_id) {
 	SVCSTR(WMI_SERVICE_BEACON_OFFLOAD);
@@ -408,12 +415,12 @@ static inline char *wmi_service_name(int service_id)
 	SVCSTR(WMI_SERVICE_TX_MODE_PUSH_ONLY);
 	SVCSTR(WMI_SERVICE_TX_MODE_PUSH_PULL);
 	SVCSTR(WMI_SERVICE_TX_MODE_DYNAMIC);
-	default:
-		return NULL;
 	}
 
-#undef SVCSTR
+	return str;
 }
+
+#undef SVCSTR
 
 #define WMI_SERVICE_IS_ENABLED(wmi_svc_bmap, svc_id, len) \
 	((svc_id) < (len) && \
@@ -6402,10 +6409,17 @@ enum wmi_wow_wakeup_event {
 	WOW_EVENT_MAX,
 };
 
-#define C2S(x) case x: return #x
+#define C2S(x) \
+{ \
+	case x: \
+		str = #x; \
+		break; \
+}
 
 static inline const char *wow_wakeup_event(enum wmi_wow_wakeup_event ev)
 {
+	const char *str = NULL;
+
 	switch (ev) {
 	C2S(WOW_BMISS_EVENT);
 	C2S(WOW_BETTER_AP_EVENT);
@@ -6432,9 +6446,9 @@ static inline const char *wow_wakeup_event(enum wmi_wow_wakeup_event ev)
 	C2S(WOW_BEACON_EVENT);
 	C2S(WOW_CLIENT_KICKOUT_EVENT);
 	C2S(WOW_EVENT_MAX);
-	default:
-		return NULL;
 	}
+
+	return str;
 }
 
 enum wmi_wow_wake_reason {
@@ -6472,6 +6486,8 @@ enum wmi_wow_wake_reason {
 
 static inline const char *wow_reason(enum wmi_wow_wake_reason reason)
 {
+	const char *str = NULL;
+
 	switch (reason) {
 	C2S(WOW_REASON_UNSPECIFIED);
 	C2S(WOW_REASON_NLOD);
@@ -6503,9 +6519,9 @@ static inline const char *wow_reason(enum wmi_wow_wake_reason reason)
 	C2S(WOW_REASON_BEACON_RECV);
 	C2S(WOW_REASON_CLIENT_KICKOUT_EVENT);
 	C2S(WOW_REASON_DEBUG_TEST);
-	default:
-		return NULL;
 	}
+
+	return str;
 }
 
 #undef C2S
