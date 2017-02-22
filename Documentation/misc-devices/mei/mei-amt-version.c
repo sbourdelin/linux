@@ -297,6 +297,7 @@ static bool amt_host_if_init(struct amt_host_if *acmd,
 		      unsigned long send_timeout, bool verbose)
 {
 	acmd->send_timeout = (send_timeout) ? send_timeout : 20000;
+	acmd->mei_cl.fd = -1;
 	acmd->initialized = mei_init(&acmd->mei_cl, &MEI_IAMTHIF, 0, verbose);
 	return acmd->initialized;
 }
