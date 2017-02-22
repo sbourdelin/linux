@@ -3940,6 +3940,9 @@ __i915_request_irq_complete(struct drm_i915_gem_request *req)
 {
 	struct intel_engine_cs *engine = req->engine;
 
+	if (test_bit(DMA_FENCE_FLAG_SIGNALED_BIT, &req->fence.flags))
+		return true;
+
 	/* Before we do the heavier coherent read of the seqno,
 	 * check the value (hopefully) in the CPU cacheline.
 	 */
