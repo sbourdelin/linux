@@ -70,9 +70,9 @@ enum connect_status {
 	CONNECT_STS_FORCE_16_BIT = 0xFFFF
 };
 
-struct tstrRSSI {
-	u8 u8Full;
-	u8 u8Index;
+struct tstr_RSSI {
+	u8 u8_full;
+	u8 u8_index;
 	s8 as8RSSI[NUM_RSSI];
 };
 
@@ -93,7 +93,7 @@ struct network_info {
 	u8 *ies;
 	u16 ies_len;
 	void *join_params;
-	struct tstrRSSI str_rssi;
+	struct tstr_RSSI str_rssi;
 	u64 tsf_hi;
 };
 
