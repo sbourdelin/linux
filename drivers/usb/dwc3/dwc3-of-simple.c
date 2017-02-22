@@ -29,12 +29,51 @@
 #include <linux/of.h>
 #include <linux/of_platform.h>
 #include <linux/pm_runtime.h>
+#include <linux/reset.h>
 
 struct dwc3_of_simple {
 	struct device		*dev;
 	struct clk		**clks;
 	int			num_clocks;
+	struct reset_control	**resets;
+	int			num_resets;
 };
+
+static int dwc3_of_simple_reset_init(struct dwc3_of_simple *simple, int count)
+{
+	struct device		*dev = simple->dev;
+	int			i;
+
+	simple->num_resets = count;
+
+	if (!count)
+		return 0;
+
+	simple->resets = devm_kcalloc(dev, simple->num_resets,
+				sizeof(struct reset_control *), GFP_KERNEL);
+	if (!simple->resets)
+		return -ENOMEM;
+
+	for (i = 0; i < simple->num_resets; i++) {
+		struct reset_control *reset;
+		int ret;
+
+		reset = devm_reset_control_get_by_index(dev, i);
+		if (IS_ERR(reset))
+			return PTR_ERR(reset);
+
+		simple->resets[i] = reset;
+
+		ret = reset_control_deassert(reset);
+		if (ret) {
+			while (--i >= 0)
+				reset_control_assert(reset);
+			return ret;
+		}
+	}
+
+	return 0;
+}
 
 static int dwc3_of_simple_clk_init(struct dwc3_of_simple *simple, int count)
 {
@@ -100,12 +139,19 @@ static int dwc3_of_simple_probe(struct platform_device *pdev)
 	if (ret)
 		return ret;
 
+	ret = dwc3_of_simple_reset_init(simple, of_reset_control_get_count(np));
+	if (ret)
+		return ret;
+
 	ret = of_platform_populate(np, NULL, NULL, dev);
 	if (ret) {
 		for (i = 0; i < simple->num_clocks; i++) {
 			clk_disable_unprepare(simple->clks[i]);
 			clk_put(simple->clks[i]);
 		}
+
+		for (i = 0; i < simple->num_resets; i++)
+			reset_control_assert(simple->resets[i]);
 
 		return ret;
 	}
@@ -127,6 +173,9 @@ static int dwc3_of_simple_remove(struct platform_device *pdev)
 		clk_disable_unprepare(simple->clks[i]);
 		clk_put(simple->clks[i]);
 	}
+
+	for (i = 0; i < simple->num_resets; i++)
+		reset_control_assert(simple->resets[i]);
 
 	of_platform_depopulate(dev);
 
