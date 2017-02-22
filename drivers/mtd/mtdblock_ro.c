@@ -31,7 +31,7 @@ static int mtdblock_readsect(struct mtd_blktrans_dev *dev,
 {
 	size_t retlen;
 
-	if (mtd_read(dev->mtd, (block * 512), 512, &retlen, buf))
+	if (mtd_read(dev->mtd, (loff_t)block << 9, 512, &retlen, buf))
 		return 1;
 	return 0;
 }
@@ -41,7 +41,7 @@ static int mtdblock_writesect(struct mtd_blktrans_dev *dev,
 {
 	size_t retlen;
 
-	if (mtd_write(dev->mtd, (block * 512), 512, &retlen, buf))
+	if (mtd_write(dev->mtd, (loff_t)block << 9, 512, &retlen, buf))
 		return 1;
 	return 0;
 }
