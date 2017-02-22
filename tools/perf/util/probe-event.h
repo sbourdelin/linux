@@ -135,6 +135,8 @@ bool perf_probe_with_var(struct perf_probe_event *pev);
 /* Check the perf_probe_event needs debuginfo */
 bool perf_probe_event_need_dwarf(struct perf_probe_event *pev);
 
+bool is_kretprobe_offset_supported(void);
+
 /* Release event contents */
 void clear_perf_probe_event(struct perf_probe_event *pev);
 void clear_probe_trace_event(struct probe_trace_event *tev);

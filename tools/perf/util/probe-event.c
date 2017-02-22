@@ -737,6 +737,41 @@ post_process_module_probe_trace_events(struct probe_trace_event *tevs,
 	return ret;
 }
 
+bool is_kretprobe_offset_supported(void)
+{
+	FILE *fp;
+	char *buf = NULL;
+	size_t len = 0;
+	bool target_line = false;
+	static int supported = -1;
+
+	if (supported >= 0)
+		return !!supported;
+
+	if (asprintf(&buf, "%s/README", tracing_path) < 0)
+		return false;
+
+	fp = fopen(buf, "r");
+	if (!fp)
+		goto end;
+
+	zfree(&buf);
+	while (getline(&buf, &len, fp) > 0) {
+		target_line = !!strstr(buf, "place (kretprobe): ");
+		if (!target_line)
+			continue;
+		supported = 1;
+	}
+	if (supported == -1)
+		supported = 0;
+
+	fclose(fp);
+end:
+	free(buf);
+
+	return !!supported;
+}
+
 static int
 post_process_kernel_probe_trace_events(struct probe_trace_event *tevs,
 				       int ntevs)
@@ -757,7 +792,9 @@ post_process_kernel_probe_trace_events(struct probe_trace_event *tevs,
 	}
 
 	for (i = 0; i < ntevs; i++) {
-		if (!tevs[i].point.address || tevs[i].point.retprobe)
+		if (!tevs[i].point.address)
+			continue;
+		if (tevs[i].point.retprobe && !is_kretprobe_offset_supported())
 			continue;
 		/* If we found a wrong one, mark it by NULL symbol */
 		if (kprobe_warn_out_range(tevs[i].point.symbol,
@@ -1525,11 +1562,6 @@ static int parse_perf_probe_point(char *arg, struct perf_probe_event *pev)
 
 	if (pp->offset && !pp->function) {
 		semantic_error("Offset requires an entry function.\n");
-		return -EINVAL;
-	}
-
-	if (pp->retprobe && !pp->function) {
-		semantic_error("Return probe requires an entry function.\n");
 		return -EINVAL;
 	}
 
@@ -2841,7 +2873,8 @@ static int find_probe_trace_events_from_map(struct perf_probe_event *pev,
 	}
 
 	/* Note that the symbols in the kmodule are not relocated */
-	if (!pev->uprobes && !pp->retprobe && !pev->target) {
+	if (!pev->uprobes && !pev->target &&
+			(!pp->retprobe || is_kretprobe_offset_supported())) {
 		reloc_sym = kernel_get_ref_reloc_sym();
 		if (!reloc_sym) {
 			pr_warning("Relocated base symbol is not found!\n");
