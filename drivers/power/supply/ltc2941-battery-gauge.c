@@ -9,6 +9,7 @@
  */
 #include <linux/kernel.h>
 #include <linux/module.h>
+#include <linux/of_device.h>
 #include <linux/types.h>
 #include <linux/errno.h>
 #include <linux/swab.h>
@@ -387,7 +388,7 @@ static int ltc294x_i2c_probe(struct i2c_client *client,
 
 	np = of_node_get(client->dev.of_node);
 
-	info->num_regs = id->driver_data;
+	info->num_regs = (int)of_device_get_match_data(&client->dev);
 	info->supply_desc.name = np->name;
 
 	/* r_sense can be negative, when sense+ is connected to the battery
@@ -497,9 +498,23 @@ static const struct i2c_device_id ltc294x_i2c_id[] = {
 };
 MODULE_DEVICE_TABLE(i2c, ltc294x_i2c_id);
 
+static const struct of_device_id ltc294x_i2c_of_match[] = {
+	{
+		.compatible = "maxim,max17040",
+		.data = (void *)LTC2941_NUM_REGS
+	},
+	{
+		.compatible = "maxim,max77836-battery",
+		.data = (void *)LTC2941_NUM_REGS
+	},
+	{ },
+};
+MODULE_DEVICE_TABLE(of, ltc294x_i2c_of_match);
+
 static struct i2c_driver ltc294x_driver = {
 	.driver = {
 		.name	= "LTC2941",
+		.of_match_table = of_match_ptr(ltc294x_i2c_of_match),
 		.pm	= LTC294X_PM_OPS,
 	},
 	.probe		= ltc294x_i2c_probe,
