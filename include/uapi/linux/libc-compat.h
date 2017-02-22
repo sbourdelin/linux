@@ -205,6 +205,13 @@
 #define __UAPI_DEF_TIMEZONE		1
 #endif
 
+/* Coordinate with glibc bits/uio.h header. */
+#if defined(_SYS_UIO_H) || defined(_FCNTL_H)
+#define __UAPI_DEF_IOVEC		0
+#else
+#define __UAPI_DEF_IOVEC		1
+#endif
+
 /* Definitions for xattr.h */
 #if defined(_SYS_XATTR_H)
 #define __UAPI_DEF_XATTR		0
@@ -260,6 +267,9 @@
 #define __UAPI_DEF_TIMESPEC			1
 #define __UAPI_DEF_TIMEVAL			1
 #define __UAPI_DEF_TIMEZONE			1
+
+/* Definitions for uio.h */
+#define __UAPI_DEF_IOVEC		1
 
 /* Definitions for xattr.h */
 #define __UAPI_DEF_XATTR		1
