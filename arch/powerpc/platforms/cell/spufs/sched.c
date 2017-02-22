@@ -564,8 +564,7 @@ static void spu_prio_wait(struct spu_context *ctx)
 		__spu_del_from_rq(ctx);
 	}
 	spin_unlock(&spu_prio->runq_lock);
-	__set_current_state(TASK_RUNNING);
-	remove_wait_queue(&ctx->stop_wq, &wait);
+	finish_wait(&ctx->stop_wq, &wait);
 }
 
 static struct spu *spu_get_idle(struct spu_context *ctx)
