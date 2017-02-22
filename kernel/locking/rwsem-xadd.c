@@ -609,6 +609,17 @@ struct rw_semaphore *rwsem_wake(struct rw_semaphore *sem)
 		 * state is consulted before reading the wait_lock.
 		 */
 		smp_rmb();
+
+		/*
+		 * Normally checking wait_list without wait_lock isn't safe
+		 * as we may miss an incoming waiter. With spinners present,
+		 * however, we have someone to fall back on in case that
+		 * happens. This can save a pair of spin_lock/unlock calls
+		 * when there is no waiter.
+		 */
+		if (list_empty(&sem->wait_list))
+			return sem;
+
 		if (!raw_spin_trylock_irqsave(&sem->wait_lock, flags))
 			return sem;
 		goto locked;
