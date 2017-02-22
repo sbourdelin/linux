@@ -123,6 +123,7 @@ static int tcp_v6_connect(struct sock *sk, struct sockaddr *uaddr,
 	struct dst_entry *dst;
 	int addr_type;
 	int err;
+	u32 seq;
 
 	if (addr_len < SIN6_LEN_RFC2133)
 		return -EINVAL;
@@ -284,12 +285,15 @@ static int tcp_v6_connect(struct sock *sk, struct sockaddr *uaddr,
 
 	sk_set_txhash(sk);
 
-	if (!tp->write_seq && likely(!tp->repair))
-		tp->write_seq = secure_tcpv6_sequence_number(np->saddr.s6_addr32,
-							     sk->sk_v6_daddr.s6_addr32,
-							     inet->inet_sport,
-							     inet->inet_dport,
-							     &tp->tsoffset);
+	if (likely(!tp->repair)) {
+		seq = secure_tcpv6_sequence_number(np->saddr.s6_addr32,
+						   sk->sk_v6_daddr.s6_addr32,
+						   inet->inet_sport,
+						   inet->inet_dport,
+						   &tp->tsoffset);
+		if (!tp->write_seq)
+			tp->write_seq = seq;
+	}
 
 	err = tcp_connect(sk);
 	if (err)
