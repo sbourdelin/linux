@@ -1424,6 +1424,12 @@ static int try_to_unmap_one(struct page *page, struct vm_area_struct *vma,
 				dec_mm_counter(mm, MM_ANONPAGES);
 				rp->lazyfreed++;
 				goto discard;
+			} else if (!PageSwapBacked(page)) {
+				/* dirty MADV_FREE page */
+				set_pte_at(mm, address, pvmw.pte, pteval);
+				ret = SWAP_DIRTY;
+				page_vma_mapped_walk_done(&pvmw);
+				break;
 			}
 
 			if (swap_duplicate(entry) < 0) {
@@ -1525,8 +1531,8 @@ int try_to_unmap(struct page *page, enum ttu_flags flags)
 
 	if (ret != SWAP_MLOCK && !page_mapcount(page)) {
 		ret = SWAP_SUCCESS;
-		if (rp.lazyfreed && !PageDirty(page))
-			ret = SWAP_LZFREE;
+		if (rp.lazyfreed && PageDirty(page))
+			ret = SWAP_DIRTY;
 	}
 	return ret;
 }
