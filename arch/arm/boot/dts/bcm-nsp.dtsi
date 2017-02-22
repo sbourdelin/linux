@@ -241,6 +241,12 @@
 			brcm,nand-has-wp;
 		};
 
+		crypto@2f000 {
+			compatible = "brcm,spum-nsp-crypto";
+			reg = <0x2f000 0x900>;
+			mboxes = <&mailbox 0>;
+		};
+
 		gpiob: gpio@30000 {
 			compatible = "brcm,iproc-nsp-gpio", "brcm,iproc-gpio";
 			reg = <0x30000 0x50>;
