@@ -2,6 +2,7 @@
 #define _LINUX_RESET_H_
 
 #include <linux/device.h>
+#include <linux/of.h>
 
 struct reset_control;
 
@@ -238,6 +239,21 @@ static inline struct reset_control *of_reset_control_get_shared_by_index(
 					struct device_node *node, int index)
 {
 	return __of_reset_control_get(node, NULL, index, true, false);
+}
+
+/**
+ * of_reset_control_get_count - Count number of resets available with a device
+ * @node: device to be reset by the controller
+ */
+static inline unsigned int of_reset_control_get_count(struct device_node *node)
+{
+	int count;
+
+	count = of_count_phandle_with_args(node, "resets", "#reset-cells");
+	if (count < 0)
+		return 0;
+
+	return count;
 }
 
 /**
