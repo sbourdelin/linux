@@ -3140,7 +3140,8 @@ static bool prepare_kswapd_sleep(pg_data_t *pgdat, int order, int classzone_idx)
 		if (!managed_zone(zone))
 			continue;
 
-		if (!zone_balanced(zone, order, classzone_idx))
+		if (!zone_balanced(zone, order, classzone_idx)
+			&& zone_reclaimable_pages(zone))
 			return false;
 	}
 
@@ -3503,6 +3504,7 @@ void wakeup_kswapd(struct zone *zone, int order, enum zone_type classzone_idx)
 {
 	pg_data_t *pgdat;
 	int z;
+	int node_has_relaimable_pages = 0;
 
 	if (!managed_zone(zone))
 		return;
@@ -3523,7 +3525,14 @@ void wakeup_kswapd(struct zone *zone, int order, enum zone_type classzone_idx)
 
 		if (zone_balanced(zone, order, classzone_idx))
 			return;
+
+		if (!zone_reclaimable_pages(zone))
+			node_has_relaimable_pages = 1;
 	}
+
+	/* Dont wake kswapd if no reclaimable pages */
+	if (!node_has_relaimable_pages)
+		return;
 
 	trace_mm_vmscan_wakeup_kswapd(pgdat->node_id, zone_idx(zone), order);
 	wake_up_interruptible(&pgdat->kswapd_wait);
