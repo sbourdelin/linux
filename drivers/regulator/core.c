@@ -2429,8 +2429,8 @@ int regulator_disable_deferred(struct regulator *regulator, int ms)
 	rdev->deferred_disables++;
 	mutex_unlock(&rdev->mutex);
 
-	queue_delayed_work(system_power_efficient_wq, &rdev->disable_work,
-			   msecs_to_jiffies(ms));
+	mod_fwd_delayed_work(system_power_efficient_wq, &rdev->disable_work,
+			     msecs_to_jiffies(ms));
 	return 0;
 }
 EXPORT_SYMBOL_GPL(regulator_disable_deferred);
