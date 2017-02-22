@@ -7903,7 +7903,7 @@ static bool skl_pcode_try_request(struct drm_i915_private *dev_priv, u32 mbox,
 
 	*status = sandybridge_pcode_read(dev_priv, mbox, &val);
 
-	return *status || ((val & reply_mask) == reply);
+	return (!*status) && ((val & reply_mask) == reply);
 }
 
 /**
