@@ -1152,7 +1152,12 @@ access the data:
      wrap the RCU calls to this element:
 
 	rcu_assign_keypointer(struct key *key, void *data);
+
+	/* access payload with semaphore held */
 	void *rcu_dereference_key(struct key *key);
+
+	/* access payload in RCU read-side section*/
+	void *rcu_read_dereference_key(struct key *key);
 
 
 ===================

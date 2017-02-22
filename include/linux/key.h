@@ -358,6 +358,9 @@ static inline bool key_is_instantiated(const struct key *key)
 	(rcu_dereference_protected((KEY)->payload.rcu_data0,		\
 				   rwsem_is_locked(&((struct key *)(KEY))->sem)))
 
+#define rcu_read_dereference_key(KEY)                                   \
+	(rcu_dereference((KEY)->payload.rcu_data0))
+
 #define rcu_assign_keypointer(KEY, PAYLOAD)				\
 do {									\
 	rcu_assign_pointer((KEY)->payload.rcu_data0, (PAYLOAD));	\

@@ -53,6 +53,11 @@ static inline const struct user_key_payload *user_key_payload(const struct key *
 	return (struct user_key_payload *)rcu_dereference_key(key);
 }
 
+static inline const struct user_key_payload *user_key_payload_rcu(const struct key *key)
+{
+	return (struct user_key_payload *)rcu_read_dereference_key(key);
+}
+
 #endif /* CONFIG_KEYS */
 
 #endif /* _KEYS_USER_TYPE_H */
