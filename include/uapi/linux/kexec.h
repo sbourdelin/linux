@@ -45,6 +45,9 @@
 #define KEXEC_SEGMENT_MAX 16
 
 #ifndef __KERNEL__
+
+#include <stddef.h>    /* For size_t. */
+
 /*
  * This structure is used to hold the arguments that are used when
  * loading  kernel binaries.
