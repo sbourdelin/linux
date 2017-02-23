@@ -1130,6 +1130,30 @@ void test_pkey_syscalls_on_non_allocated_pkey(int *ptr, u16 pkey)
 }
 
 /* Assumes that all pkeys other than 'pkey' are unallocated */
+void test_pkey_syscalls_on_non_allocated_random_pkey(int *ptr, u16 pkey)
+{
+	int err;
+	int nr_tests = 0;
+
+	while (nr_tests < 1000) {
+		int test_pkey = rand();
+
+		/* do not test with the pkey we know is good */
+		if (pkey == test_pkey)
+			continue;
+
+		dprintf1("trying free/mprotect bad pkey: %2d\n", test_pkey);
+		err = sys_pkey_free(test_pkey);
+		pkey_assert(err);
+
+		err = sys_mprotect_pkey(ptr, PAGE_SIZE, PROT_READ, test_pkey);
+		pkey_assert(err);
+
+		nr_tests++;
+	}
+}
+
+/* Assumes that all pkeys other than 'pkey' are unallocated */
 void test_pkey_syscalls_bad_args(int *ptr, u16 pkey)
 {
 	int err;
@@ -1335,6 +1359,7 @@ void (*pkey_tests[])(int *ptr, u16 pkey) = {
 	test_executing_on_unreadable_memory,
 	test_ptrace_of_child,
 	test_pkey_syscalls_on_non_allocated_pkey,
+	test_pkey_syscalls_on_non_allocated_random_pkey,
 	test_pkey_syscalls_bad_args,
 	test_pkey_alloc_exhaust,
 };
