@@ -1067,8 +1067,8 @@ static bool vlv_c0_above(struct drm_i915_private *dev_priv,
 	 * being blitted in X after being rendered in mesa. To account for
 	 * this we need to combine both engines into our activity counter.
 	 */
-	c0 = now->render_c0 - old->render_c0;
-	c0 += now->media_c0 - old->media_c0;
+	c0 = max(now->render_c0 - old->render_c0,
+		 now->media_c0 - old->media_c0);
 	c0 *= mul * VLV_CZ_CLOCK_TO_MILLI_SEC;
 
 	return c0 >= time;
