@@ -569,6 +569,8 @@ static struct svcxprt_rdma *rdma_create_xprt(struct svc_serv *serv,
 	spin_lock_init(&cma_xprt->sc_ctxt_lock);
 	spin_lock_init(&cma_xprt->sc_map_lock);
 
+	set_bit(XPT_CONG_CTRL, &cma_xprt->sc_xprt.xpt_flags);
+
 	if (listener)
 		set_bit(XPT_LISTENER, &cma_xprt->sc_xprt.xpt_flags);
 
