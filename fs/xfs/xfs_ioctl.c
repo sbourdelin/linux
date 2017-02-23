@@ -1931,7 +1931,7 @@ xfs_file_ioctl(
 		return error;
 	}
 
-	case XFS_IOC_GOINGDOWN: {
+	case FS_IOC_SHUTDOWN: {
 		__uint32_t in;
 
 		if (!capable(CAP_SYS_ADMIN))

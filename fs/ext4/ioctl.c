@@ -454,7 +454,7 @@ int ext4_shutdown(struct super_block *sb, unsigned long arg)
 	if (get_user(flags, (__u32 __user *)arg))
 		return -EFAULT;
 
-	if (flags > EXT4_GOING_FLAGS_NOLOGFLUSH)
+	if (flags > FS_SHUTDOWN_FLAGS_NOLOGFLUSH)
 		return -EINVAL;
 
 	if (ext4_forced_shutdown(sbi))
@@ -463,19 +463,19 @@ int ext4_shutdown(struct super_block *sb, unsigned long arg)
 	ext4_msg(sb, KERN_ALERT, "shut down requested (%d)", flags);
 
 	switch (flags) {
-	case EXT4_GOING_FLAGS_DEFAULT:
+	case FS_SHUTDOWN_FLAGS_DEFAULT:
 		freeze_bdev(sb->s_bdev);
 		set_bit(EXT4_FLAGS_SHUTDOWN, &sbi->s_ext4_flags);
 		thaw_bdev(sb->s_bdev, sb);
 		break;
-	case EXT4_GOING_FLAGS_LOGFLUSH:
+	case FS_SHUTDOWN_FLAGS_LOGFLUSH:
 		set_bit(EXT4_FLAGS_SHUTDOWN, &sbi->s_ext4_flags);
 		if (sbi->s_journal && !is_journal_aborted(sbi->s_journal)) {
 			(void) ext4_force_commit(sb);
 			jbd2_journal_abort(sbi->s_journal, 0);
 		}
 		break;
-	case EXT4_GOING_FLAGS_NOLOGFLUSH:
+	case FS_SHUTDOWN_FLAGS_NOLOGFLUSH:
 		set_bit(EXT4_FLAGS_SHUTDOWN, &sbi->s_ext4_flags);
 		if (sbi->s_journal && !is_journal_aborted(sbi->s_journal)) {
 			msleep(100);
@@ -940,7 +940,7 @@ resizefs_out:
 
 		return 0;
 	}
-	case EXT4_IOC_SHUTDOWN:
+	case FS_IOC_SHUTDOWN:
 		return ext4_shutdown(sb, arg);
 	default:
 		return -ENOTTY;
@@ -1008,7 +1008,7 @@ long ext4_compat_ioctl(struct file *file, unsigned int cmd, unsigned long arg)
 	case EXT4_IOC_SET_ENCRYPTION_POLICY:
 	case EXT4_IOC_GET_ENCRYPTION_PWSALT:
 	case EXT4_IOC_GET_ENCRYPTION_POLICY:
-	case EXT4_IOC_SHUTDOWN:
+	case FS_IOC_SHUTDOWN:
 		break;
 	default:
 		return -ENOIOCTLCMD;

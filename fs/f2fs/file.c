@@ -1685,22 +1685,22 @@ static int f2fs_ioc_shutdown(struct file *filp, unsigned long arg)
 		return ret;
 
 	switch (in) {
-	case F2FS_GOING_DOWN_FULLSYNC:
+	case FS_SHUTDOWN_FLAGS_DEFAULT:
 		sb = freeze_bdev(sb->s_bdev);
 		if (sb && !IS_ERR(sb)) {
 			f2fs_stop_checkpoint(sbi, false);
 			thaw_bdev(sb->s_bdev, sb);
 		}
 		break;
-	case F2FS_GOING_DOWN_METASYNC:
+	case FS_SHUTDOWN_FLAGS_LOGFLUSH:
 		/* do checkpoint only */
 		f2fs_sync_fs(sb, 1);
 		f2fs_stop_checkpoint(sbi, false);
 		break;
-	case F2FS_GOING_DOWN_NOSYNC:
+	case FS_SHUTDOWN_FLAGS_NOLOGFLUSH:
 		f2fs_stop_checkpoint(sbi, false);
 		break;
-	case F2FS_GOING_DOWN_METAFLUSH:
+	case FS_SHUTDOWN_FLAGS_METAFLUSH:
 		sync_meta_pages(sbi, META, LONG_MAX);
 		f2fs_stop_checkpoint(sbi, false);
 		break;
@@ -2213,7 +2213,7 @@ long f2fs_ioctl(struct file *filp, unsigned int cmd, unsigned long arg)
 		return f2fs_ioc_release_volatile_write(filp);
 	case F2FS_IOC_ABORT_VOLATILE_WRITE:
 		return f2fs_ioc_abort_volatile_write(filp);
-	case F2FS_IOC_SHUTDOWN:
+	case FS_IOC_SHUTDOWN:
 		return f2fs_ioc_shutdown(filp, arg);
 	case FITRIM:
 		return f2fs_ioc_fitrim(filp, arg);
@@ -2286,7 +2286,7 @@ long f2fs_compat_ioctl(struct file *file, unsigned int cmd, unsigned long arg)
 	case F2FS_IOC_START_VOLATILE_WRITE:
 	case F2FS_IOC_RELEASE_VOLATILE_WRITE:
 	case F2FS_IOC_ABORT_VOLATILE_WRITE:
-	case F2FS_IOC_SHUTDOWN:
+	case FS_IOC_SHUTDOWN:
 	case F2FS_IOC_SET_ENCRYPTION_POLICY:
 	case F2FS_IOC_GET_ENCRYPTION_PWSALT:
 	case F2FS_IOC_GET_ENCRYPTION_POLICY:
