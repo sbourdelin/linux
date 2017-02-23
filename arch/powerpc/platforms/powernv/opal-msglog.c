@@ -31,7 +31,13 @@ struct memcons {
 	__be32 in_cons;
 };
 
+struct hdatInfo {
+	char *base;
+	u64 size;
+};
+
 static struct memcons *opal_memcons = NULL;
+static struct hdatInfo hdat_inf;
 
 ssize_t opal_msglog_copy(char *to, loff_t pos, size_t count)
 {
@@ -139,4 +145,47 @@ void __init opal_msglog_sysfs_init(void)
 
 	if (sysfs_create_bin_file(opal_kobj, &opal_msglog_attr) != 0)
 		pr_warn("OPAL: sysfs file creation failed\n");
+}
+
+
+
+/* Read function for HDAT attribute in sysfs */
+static ssize_t hdat_read(struct file *file, struct kobject *kobj,
+			 struct bin_attribute *bin_attr, char *to,
+			 loff_t pos, size_t count)
+{
+	if (!hdat_inf.base)
+		return -ENODEV;
+
+	return memory_read_from_buffer(to, count, &pos, hdat_inf.base,
+					hdat_inf.size);
+}
+
+
+/* HDAT attribute for sysfs */
+static struct bin_attribute hdat_attr = {
+	.attr = {.name = "hdat", .mode = 0444},
+	.read = hdat_read
+};
+
+void __init opal_hdat_sysfs_init(void)
+{
+	u64 hdatAddr[2];
+
+	/* Check for the hdat-map prop in device-tree */
+	if (of_property_read_u64_array(opal_node, "hdat-map", hdatAddr, 2)) {
+		pr_debug("OPAL: Property hdat-map not found.\n");
+		return;
+	}
+
+	/* Print out hdat-map values. [0]: base, [1]: size */
+	pr_debug("HDAT Base address: %#llx\n", hdatAddr[0]);
+	pr_debug("HDAT Size: %#llx\n", hdatAddr[1]);
+
+	hdat_inf.base = phys_to_virt(hdatAddr[0]);
+	hdat_inf.size = hdatAddr[1];
+
+	if (sysfs_create_bin_file(opal_kobj, &hdat_attr) != 0)
+		pr_debug("OPAL: sysfs file creation for HDAT failed");
+
 }
