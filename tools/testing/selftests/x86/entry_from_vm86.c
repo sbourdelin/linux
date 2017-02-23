@@ -95,6 +95,22 @@ asm (
 	"int3\n\t"
 	"vmcode_int80:\n\t"
 	"int $0x80\n\t"
+	"umip:\n\t"
+	/* addressing via displacements */
+	"smsw (2052)\n\t"
+	"sidt (2054)\n\t"
+	"sgdt (2060)\n\t"
+	/* addressing via registers */
+	"mov $2066, %bx\n\t"
+	"smsw (%bx)\n\t"
+	"mov $2068, %bx\n\t"
+	"sidt (%bx)\n\t"
+	"mov $2074, %bx\n\t"
+	"sgdt (%bx)\n\t"
+	/* register operands, only for smsw */
+	"smsw %ax\n\t"
+	"mov %ax, (2080)\n\t"
+	"int $0x80\n\t"
 	".size vmcode, . - vmcode\n\t"
 	"end_vmcode:\n\t"
 	".code32\n\t"
@@ -103,7 +119,7 @@ asm (
 
 extern unsigned char vmcode[], end_vmcode[];
 extern unsigned char vmcode_bound[], vmcode_sysenter[], vmcode_syscall[],
-	vmcode_sti[], vmcode_int3[], vmcode_int80[];
+	vmcode_sti[], vmcode_int3[], vmcode_int80[], umip[];
 
 /* Returns false if the test was skipped. */
 static bool do_test(struct vm86plus_struct *v86, unsigned long eip,
@@ -217,6 +233,27 @@ int main(void)
 	/* INT80 -- should exit with "INTx 0x80" */
 	v86.regs.eax = (unsigned int)-1;
 	do_test(&v86, vmcode_int80 - vmcode, VM86_INTx, 0x80, "int80");
+
+	/* UMIP -- should exit with INTx 0x80 unless UMIP was not disabled */
+	do_test(&v86, umip - vmcode, VM86_INTx, 0x80, "UMIP tests");
+	printf("[INFO]\tResults of UMIP-protected instructions via displacements:\n");
+	printf("[INFO]\tSMSW:[0x%04x]\n", *(unsigned short *)(addr + 2052));
+	printf("[INFO]\tSIDT: limit[0x%04x]base[0x%08lx]\n",
+	       *(unsigned short *)(addr + 2054),
+	       *(unsigned long  *)(addr + 2056));
+	printf("[INFO]\tSGDT: limit[0x%04x]base[0x%08lx]\n",
+	       *(unsigned short *)(addr + 2060),
+	       *(unsigned long  *)(addr + 2062));
+	printf("[INFO]\tResults of UMIP-protected instructions via addressing in registers:\n");
+	printf("[INFO]\tSMSW:[0x%04x]\n", *(unsigned short *)(addr + 2066));
+	printf("[INFO]\tSIDT: limit[0x%04x]base[0x%08lx]\n",
+	       *(unsigned short *)(addr + 2068),
+	       *(unsigned long  *)(addr + 2070));
+	printf("[INFO]\tSGDT: limit[0x%04x]base[0x%08lx]\n",
+	       *(unsigned short *)(addr + 2074),
+	       *(unsigned long  *)(addr + 2076));
+	printf("[INFO]\tResults of SMSW via register operands:\n");
+	printf("[INFO]\tSMSW:[0x%04x]\n", *(unsigned short *)(addr + 2080));
 
 	/* Execute a null pointer */
 	v86.regs.cs = 0;
