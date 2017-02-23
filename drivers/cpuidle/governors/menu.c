@@ -273,6 +273,14 @@ again:
 	goto again;
 }
 
+int read_per_cpu_resume_latency(int cpu)
+{
+	struct device *dev = get_cpu_device(cpu);
+
+	return IS_ERR_OR_NULL(dev->power.qos) ?
+		0 : pm_qos_read_value(&dev->power.qos->resume_latency);
+}
+
 /**
  * menu_select - selects the next idle state to enter
  * @drv: cpuidle driver containing state data
@@ -281,13 +289,12 @@ again:
 static int menu_select(struct cpuidle_driver *drv, struct cpuidle_device *dev)
 {
 	struct menu_device *data = this_cpu_ptr(&menu_devices);
-	struct device *device = get_cpu_device(dev->cpu);
 	int latency_req = pm_qos_request(PM_QOS_CPU_DMA_LATENCY);
 	int i;
 	unsigned int interactivity_req;
 	unsigned int expected_interval;
 	unsigned long nr_iowaiters, cpu_load;
-	int resume_latency = dev_pm_qos_read_value(device);
+	int resume_latency = read_per_cpu_resume_latency(dev->cpu);
 
 	if (data->needs_update) {
 		menu_update(drv, dev);
