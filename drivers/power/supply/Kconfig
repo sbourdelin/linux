@@ -511,4 +511,14 @@ config AXP20X_POWER
 	  This driver provides support for the power supply features of
 	  AXP20x PMIC.
 
+config BATTERY_XMEGA16D4
+	tristate "XMEGA16D4 Battery Gauge Driver"
+	depends on SPI
+	help
+	  Say Y here to include support for XMEGA16D4 Battery Gauge. The
+	  driver reports the charge count, and measures the voltage and
+	  the current.
+
+	  This adds support for XMEGA16D4 battery.
+
 endif # POWER_SUPPLY
