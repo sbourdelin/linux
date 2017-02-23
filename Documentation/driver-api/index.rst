@@ -34,13 +34,8 @@ available subsections can be seen below.
    miscellaneous
    vme
    80211/index
-<<<<<<< HEAD
-   uio-howto
-   firmware/index
-=======
    firmware/index
    uio-howto
->>>>>>> linux-next/akpm-base
 
 .. only::  subproject and html
 

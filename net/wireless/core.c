@@ -1242,10 +1242,7 @@ static int cfg80211_netdev_notifier_call(struct notifier_block *nb,
 			kzfree(wdev->wext.keys);
 #endif
 			flush_work(&wdev->disconnect_wk);
-<<<<<<< HEAD
-=======
 			cfg80211_cqm_config_free(wdev);
->>>>>>> linux-next/akpm-base
 		}
 		/*
 		 * synchronise (so that we won't find this netdev

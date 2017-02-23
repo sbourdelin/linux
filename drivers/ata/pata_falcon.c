@@ -54,11 +54,7 @@ static unsigned int pata_falcon_data_xfer(struct ata_queued_cmd *qc,
 	bool swap = 1;
 
 	if (dev->class == ATA_DEV_ATA && cmd && cmd->request &&
-<<<<<<< HEAD
-	    !blk_rq_is_passthrough(cmd->request))
-=======
 	    cmd->request->cmd_type == REQ_TYPE_FS)
->>>>>>> linux-next/akpm-base
 		swap = 0;
 
 	/* Transfer multiple of 2 bytes */

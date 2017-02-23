@@ -35,11 +35,7 @@ int kvm_irq_bypass = 1;
 EXPORT_SYMBOL(kvm_irq_bypass);
 
 static void icp_rm_deliver_irq(struct kvmppc_xics *xics, struct kvmppc_icp *icp,
-<<<<<<< HEAD
-			    u32 new_irq);
-=======
 			    u32 new_irq, bool check_resend);
->>>>>>> linux-next/akpm-base
 static int xics_opal_set_server(unsigned int hw_irq, int server_cpu);
 
 /* -- ICS routines -- */

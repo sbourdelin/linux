@@ -601,8 +601,6 @@ static int dlpar_memory_readd_by_index(u32 drc_index, struct property *prop)
 
 	return rc;
 }
-<<<<<<< HEAD
-=======
 
 static int dlpar_memory_remove_by_ic(u32 lmbs_to_remove, u32 drc_index,
 				     struct property *prop)
@@ -691,7 +689,6 @@ static int dlpar_memory_remove_by_ic(u32 lmbs_to_remove, u32 drc_index,
 	return rc;
 }
 
->>>>>>> linux-next/akpm-base
 #else
 static inline int pseries_remove_memblock(unsigned long base,
 					  unsigned int memblock_size)
@@ -770,9 +767,6 @@ static int dlpar_add_lmb(struct of_drconf_cell *lmb)
 	rc = add_memory(nid, lmb->base_addr, block_sz);
 	if (rc)
 		dlpar_remove_device_tree_lmb(lmb);
-<<<<<<< HEAD
-	else
-=======
 		return rc;
 	}
 
@@ -781,8 +775,8 @@ static int dlpar_add_lmb(struct of_drconf_cell *lmb)
 		remove_memory(nid, lmb->base_addr, block_sz);
 		dlpar_remove_device_tree_lmb(lmb);
 	} else {
->>>>>>> linux-next/akpm-base
 		lmb->flags |= DRCONF_MEM_ASSIGNED;
+	}
 
 	return rc;
 }

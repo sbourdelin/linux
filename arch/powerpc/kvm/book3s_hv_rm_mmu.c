@@ -469,11 +469,7 @@ long kvmppc_do_h_remove(struct kvm *kvm, unsigned long flags,
 
 	if (kvm_is_radix(kvm))
 		return H_FUNCTION;
-<<<<<<< HEAD
-	if (pte_index >= kvm->arch.hpt_npte)
-=======
 	if (pte_index >= kvmppc_hpt_npte(&kvm->arch.hpt))
->>>>>>> linux-next/akpm-base
 		return H_PARAMETER;
 	hpte = (__be64 *)(kvm->arch.hpt.virt + (pte_index << 4));
 	while (!try_lock_hpte(hpte, HPTE_V_HVLOCK))
@@ -661,11 +657,7 @@ long kvmppc_h_protect(struct kvm_vcpu *vcpu, unsigned long flags,
 
 	if (kvm_is_radix(kvm))
 		return H_FUNCTION;
-<<<<<<< HEAD
-	if (pte_index >= kvm->arch.hpt_npte)
-=======
 	if (pte_index >= kvmppc_hpt_npte(&kvm->arch.hpt))
->>>>>>> linux-next/akpm-base
 		return H_PARAMETER;
 
 	hpte = (__be64 *)(kvm->arch.hpt.virt + (pte_index << 4));
@@ -736,11 +728,7 @@ long kvmppc_h_read(struct kvm_vcpu *vcpu, unsigned long flags,
 
 	if (kvm_is_radix(kvm))
 		return H_FUNCTION;
-<<<<<<< HEAD
-	if (pte_index >= kvm->arch.hpt_npte)
-=======
 	if (pte_index >= kvmppc_hpt_npte(&kvm->arch.hpt))
->>>>>>> linux-next/akpm-base
 		return H_PARAMETER;
 	if (flags & H_READ_4) {
 		pte_index &= ~3;
@@ -781,11 +769,7 @@ long kvmppc_h_clear_ref(struct kvm_vcpu *vcpu, unsigned long flags,
 
 	if (kvm_is_radix(kvm))
 		return H_FUNCTION;
-<<<<<<< HEAD
-	if (pte_index >= kvm->arch.hpt_npte)
-=======
 	if (pte_index >= kvmppc_hpt_npte(&kvm->arch.hpt))
->>>>>>> linux-next/akpm-base
 		return H_PARAMETER;
 
 	rev = real_vmalloc_addr(&kvm->arch.hpt.rev[pte_index]);
@@ -833,11 +817,7 @@ long kvmppc_h_clear_mod(struct kvm_vcpu *vcpu, unsigned long flags,
 
 	if (kvm_is_radix(kvm))
 		return H_FUNCTION;
-<<<<<<< HEAD
-	if (pte_index >= kvm->arch.hpt_npte)
-=======
 	if (pte_index >= kvmppc_hpt_npte(&kvm->arch.hpt))
->>>>>>> linux-next/akpm-base
 		return H_PARAMETER;
 
 	rev = real_vmalloc_addr(&kvm->arch.hpt.rev[pte_index]);

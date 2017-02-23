@@ -3481,11 +3481,7 @@ static void kvmppc_core_destroy_vm_hv(struct kvm *kvm)
 	if (kvm_is_radix(kvm))
 		kvmppc_free_radix(kvm);
 	else
-<<<<<<< HEAD
-		kvmppc_free_hpt(kvm);
-=======
 		kvmppc_free_hpt(&kvm->arch.hpt);
->>>>>>> linux-next/akpm-base
 
 	kvmppc_free_pimap(kvm);
 }

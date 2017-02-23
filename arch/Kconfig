@@ -414,8 +414,6 @@ config GCC_PLUGIN_LATENT_ENTROPY
 	   * https://grsecurity.net/
 	   * https://pax.grsecurity.net/
 
-<<<<<<< HEAD
-=======
 config GCC_PLUGIN_INITIFY
 	bool "Free more kernel memory after init"
 	depends on GCC_PLUGINS
@@ -456,7 +454,6 @@ config GCC_PLUGIN_INITIFY_INIT_EXIT
 	bool
 	depends on GCC_PLUGIN_INITIFY && HAVE_GCC_PLUGIN_INITIFY_INIT_EXIT
 
->>>>>>> linux-next/akpm-base
 config GCC_PLUGIN_STRUCTLEAK
 	bool "Force initialization of variables containing userspace addresses"
 	depends on GCC_PLUGINS
@@ -853,12 +850,9 @@ config VMAP_STACK
 	  the stack to map directly to the KASAN shadow map using a formula
 	  that is incorrect if the stack is in vmalloc space.
 
-<<<<<<< HEAD
-=======
 config ARCH_WANT_RELAX_ORDER
 	bool
 
->>>>>>> linux-next/akpm-base
 config ARCH_OPTIONAL_KERNEL_RWX
 	def_bool n
 
@@ -893,10 +887,4 @@ config STRICT_MODULE_RWX
 	  and non-text memory will be made non-executable. This provides
 	  protection against certain security exploits (e.g. writing to text)
 
-<<<<<<< HEAD
-config ARCH_WANT_RELAX_ORDER
-	bool
-
-=======
->>>>>>> linux-next/akpm-base
 source "kernel/gcov/Kconfig"

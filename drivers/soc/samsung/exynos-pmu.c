@@ -124,11 +124,7 @@ static int exynos_pmu_probe(struct platform_device *pdev)
 	pmu_context->dev = dev;
 	pmu_context->pmu_data = of_device_get_match_data(dev);
 
-<<<<<<< HEAD
-	if (pmu_context->pmu_data->pmu_init)
-=======
 	if (pmu_context->pmu_data && pmu_context->pmu_data->pmu_init)
->>>>>>> linux-next/akpm-base
 		pmu_context->pmu_data->pmu_init();
 
 	platform_set_drvdata(pdev, pmu_context);

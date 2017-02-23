@@ -3213,11 +3213,7 @@ struct kvm_reinject_control {
 pit_reinject = 0 (!reinject mode) is recommended, unless running an old
 operating system that uses the PIT for timing (e.g. Linux 2.4.x).
 
-<<<<<<< HEAD
-4.99 KVM_PPC_CONFIGURE_V3_MMU
-=======
 4.100 KVM_PPC_CONFIGURE_V3_MMU
->>>>>>> linux-next/akpm-base
 
 Capability: KVM_CAP_PPC_RADIX_MMU or KVM_CAP_PPC_HASH_MMU_V3
 Architectures: ppc
@@ -3248,11 +3244,7 @@ process table, which is in the guest's space.  This field is formatted
 as the second doubleword of the partition table entry, as defined in
 the Power ISA V3.00, Book III section 5.7.6.1.
 
-<<<<<<< HEAD
-4.100 KVM_PPC_GET_RMMU_INFO
-=======
 4.101 KVM_PPC_GET_RMMU_INFO
->>>>>>> linux-next/akpm-base
 
 Capability: KVM_CAP_PPC_RADIX_MMU
 Architectures: ppc
@@ -3286,8 +3278,6 @@ The ap_encodings gives the supported page sizes and their AP field
 encodings, encoded with the AP value in the top 3 bits and the log
 base 2 of the page size in the bottom 6 bits.
 
-<<<<<<< HEAD
-=======
 4.102 KVM_PPC_RESIZE_HPT_PREPARE
 
 Capability: KVM_CAP_SPAPR_RESIZE_HPT
@@ -3383,7 +3373,6 @@ struct kvm_ppc_resize_hpt {
 	__u32 pad;
 };
 
->>>>>>> linux-next/akpm-base
 5. The kvm_run structure
 ------------------------
 

@@ -182,15 +182,6 @@ out:
 
 void kvmppc_free_hpt(struct kvm_hpt_info *info)
 {
-<<<<<<< HEAD
-	vfree(kvm->arch.revmap);
-	if (kvm->arch.hpt_cma_alloc)
-		kvm_release_hpt(virt_to_page(kvm->arch.hpt_virt),
-				1 << (kvm->arch.hpt_order - PAGE_SHIFT));
-	else if (kvm->arch.hpt_virt)
-		free_pages(kvm->arch.hpt_virt,
-			   kvm->arch.hpt_order - PAGE_SHIFT);
-=======
 	vfree(info->rev);
 	if (info->cma)
 		kvm_free_hpt_cma(virt_to_page(info->virt),
@@ -199,7 +190,6 @@ void kvmppc_free_hpt(struct kvm_hpt_info *info)
 		free_pages(info->virt, info->order - PAGE_SHIFT);
 	info->virt = 0;
 	info->order = 0;
->>>>>>> linux-next/akpm-base
 }
 
 /* Bits in first HPTE dword for pagesize 4k, 64k or 16M */
@@ -784,8 +774,6 @@ static int kvm_handle_hva(struct kvm *kvm, unsigned long hva,
 	return kvm_handle_hva_range(kvm, hva, hva + 1, handler);
 }
 
-<<<<<<< HEAD
-=======
 /* Must be called with both HPTE and rmap locked */
 static void kvmppc_unmap_hpte(struct kvm *kvm, unsigned long i,
 			      unsigned long *rmapp, unsigned long gfn)
@@ -828,16 +816,11 @@ static void kvmppc_unmap_hpte(struct kvm *kvm, unsigned long i,
 	}
 }
 
->>>>>>> linux-next/akpm-base
 static int kvm_unmap_rmapp(struct kvm *kvm, struct kvm_memory_slot *memslot,
 			   unsigned long gfn)
 {
 	unsigned long i;
 	__be64 *hptep;
-<<<<<<< HEAD
-	unsigned long ptel, psize, rcbits;
-=======
->>>>>>> linux-next/akpm-base
 	unsigned long *rmapp;
 
 	rmapp = &memslot->arch.rmap[gfn - memslot->base_gfn];

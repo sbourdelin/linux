@@ -3427,8 +3427,6 @@ static void ieee80211_rx_mgmt_beacon(struct ieee80211_sub_if_data *sdata,
 				&sdata->vif,
 				NL80211_CQM_RSSI_THRESHOLD_EVENT_HIGH,
 				sig, GFP_KERNEL);
-<<<<<<< HEAD
-=======
 		}
 	}
 
@@ -3453,7 +3451,6 @@ static void ieee80211_rx_mgmt_beacon(struct ieee80211_sub_if_data *sdata,
 				&sdata->vif,
 				NL80211_CQM_RSSI_THRESHOLD_EVENT_HIGH,
 				sig, GFP_KERNEL);
->>>>>>> linux-next/akpm-base
 		}
 	}
 

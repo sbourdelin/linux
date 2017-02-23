@@ -1384,15 +1384,9 @@ static int ath10k_core_fetch_firmware_files(struct ath10k *ar)
 		if (!ret)
 			goto success;
 	}
-<<<<<<< HEAD
 
 	/* we end up here if we couldn't fetch any firmware */
 
-=======
-
-	/* we end up here if we couldn't fetch any firmware */
-
->>>>>>> linux-next/akpm-base
 	ath10k_err(ar, "Failed to find firmware-N.bin (N between %d and %d) from %s: %d",
 		   ATH10K_FW_API_MIN, ATH10K_FW_API_MAX, ar->hw_params.fw.dir,
 		   ret);

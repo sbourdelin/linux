@@ -160,21 +160,12 @@ int main(void)
 	OFFSET(TI_CPU, thread_info, cpu);
 
 #ifdef CONFIG_PPC64
-<<<<<<< HEAD
-	DEFINE(DCACHEL1BLOCKSIZE, offsetof(struct ppc64_caches, l1d.block_size));
-	DEFINE(DCACHEL1LOGBLOCKSIZE, offsetof(struct ppc64_caches, l1d.log_block_size));
-	DEFINE(DCACHEL1BLOCKSPERPAGE, offsetof(struct ppc64_caches, l1d.blocks_per_page));
-	DEFINE(ICACHEL1BLOCKSIZE, offsetof(struct ppc64_caches, l1i.block_size));
-	DEFINE(ICACHEL1LOGBLOCKSIZE, offsetof(struct ppc64_caches, l1i.log_block_size));
-	DEFINE(ICACHEL1BLOCKSPERPAGE, offsetof(struct ppc64_caches, l1i.blocks_per_page));
-=======
 	OFFSET(DCACHEL1BLOCKSIZE, ppc64_caches, l1d.block_size);
 	OFFSET(DCACHEL1LOGBLOCKSIZE, ppc64_caches, l1d.log_block_size);
 	OFFSET(DCACHEL1BLOCKSPERPAGE, ppc64_caches, l1d.blocks_per_page);
 	OFFSET(ICACHEL1BLOCKSIZE, ppc64_caches, l1i.block_size);
 	OFFSET(ICACHEL1LOGBLOCKSIZE, ppc64_caches, l1i.log_block_size);
 	OFFSET(ICACHEL1BLOCKSPERPAGE, ppc64_caches, l1i.blocks_per_page);
->>>>>>> linux-next/akpm-base
 	/* paca */
 	DEFINE(PACA_SIZE, sizeof(struct paca_struct));
 	OFFSET(PACAPACAINDEX, paca_struct, paca_index);
@@ -481,85 +472,6 @@ int main(void)
 
 	/* book3s */
 #ifdef CONFIG_KVM_BOOK3S_HV_POSSIBLE
-<<<<<<< HEAD
-	DEFINE(KVM_TLB_SETS, offsetof(struct kvm, arch.tlb_sets));
-	DEFINE(KVM_SDR1, offsetof(struct kvm, arch.sdr1));
-	DEFINE(KVM_HOST_LPID, offsetof(struct kvm, arch.host_lpid));
-	DEFINE(KVM_HOST_LPCR, offsetof(struct kvm, arch.host_lpcr));
-	DEFINE(KVM_HOST_SDR1, offsetof(struct kvm, arch.host_sdr1));
-	DEFINE(KVM_NEED_FLUSH, offsetof(struct kvm, arch.need_tlb_flush.bits));
-	DEFINE(KVM_ENABLED_HCALLS, offsetof(struct kvm, arch.enabled_hcalls));
-	DEFINE(KVM_VRMA_SLB_V, offsetof(struct kvm, arch.vrma_slb_v));
-	DEFINE(KVM_RADIX, offsetof(struct kvm, arch.radix));
-	DEFINE(VCPU_DSISR, offsetof(struct kvm_vcpu, arch.shregs.dsisr));
-	DEFINE(VCPU_DAR, offsetof(struct kvm_vcpu, arch.shregs.dar));
-	DEFINE(VCPU_VPA, offsetof(struct kvm_vcpu, arch.vpa.pinned_addr));
-	DEFINE(VCPU_VPA_DIRTY, offsetof(struct kvm_vcpu, arch.vpa.dirty));
-	DEFINE(VCPU_HEIR, offsetof(struct kvm_vcpu, arch.emul_inst));
-	DEFINE(VCPU_CPU, offsetof(struct kvm_vcpu, cpu));
-	DEFINE(VCPU_THREAD_CPU, offsetof(struct kvm_vcpu, arch.thread_cpu));
-#endif
-#ifdef CONFIG_PPC_BOOK3S
-	DEFINE(VCPU_PURR, offsetof(struct kvm_vcpu, arch.purr));
-	DEFINE(VCPU_SPURR, offsetof(struct kvm_vcpu, arch.spurr));
-	DEFINE(VCPU_IC, offsetof(struct kvm_vcpu, arch.ic));
-	DEFINE(VCPU_DSCR, offsetof(struct kvm_vcpu, arch.dscr));
-	DEFINE(VCPU_AMR, offsetof(struct kvm_vcpu, arch.amr));
-	DEFINE(VCPU_UAMOR, offsetof(struct kvm_vcpu, arch.uamor));
-	DEFINE(VCPU_IAMR, offsetof(struct kvm_vcpu, arch.iamr));
-	DEFINE(VCPU_CTRL, offsetof(struct kvm_vcpu, arch.ctrl));
-	DEFINE(VCPU_DABR, offsetof(struct kvm_vcpu, arch.dabr));
-	DEFINE(VCPU_DABRX, offsetof(struct kvm_vcpu, arch.dabrx));
-	DEFINE(VCPU_DAWR, offsetof(struct kvm_vcpu, arch.dawr));
-	DEFINE(VCPU_DAWRX, offsetof(struct kvm_vcpu, arch.dawrx));
-	DEFINE(VCPU_CIABR, offsetof(struct kvm_vcpu, arch.ciabr));
-	DEFINE(VCPU_HFLAGS, offsetof(struct kvm_vcpu, arch.hflags));
-	DEFINE(VCPU_DEC, offsetof(struct kvm_vcpu, arch.dec));
-	DEFINE(VCPU_DEC_EXPIRES, offsetof(struct kvm_vcpu, arch.dec_expires));
-	DEFINE(VCPU_PENDING_EXC, offsetof(struct kvm_vcpu, arch.pending_exceptions));
-	DEFINE(VCPU_CEDED, offsetof(struct kvm_vcpu, arch.ceded));
-	DEFINE(VCPU_PRODDED, offsetof(struct kvm_vcpu, arch.prodded));
-	DEFINE(VCPU_MMCR, offsetof(struct kvm_vcpu, arch.mmcr));
-	DEFINE(VCPU_PMC, offsetof(struct kvm_vcpu, arch.pmc));
-	DEFINE(VCPU_SPMC, offsetof(struct kvm_vcpu, arch.spmc));
-	DEFINE(VCPU_SIAR, offsetof(struct kvm_vcpu, arch.siar));
-	DEFINE(VCPU_SDAR, offsetof(struct kvm_vcpu, arch.sdar));
-	DEFINE(VCPU_SIER, offsetof(struct kvm_vcpu, arch.sier));
-	DEFINE(VCPU_SLB, offsetof(struct kvm_vcpu, arch.slb));
-	DEFINE(VCPU_SLB_MAX, offsetof(struct kvm_vcpu, arch.slb_max));
-	DEFINE(VCPU_SLB_NR, offsetof(struct kvm_vcpu, arch.slb_nr));
-	DEFINE(VCPU_FAULT_DSISR, offsetof(struct kvm_vcpu, arch.fault_dsisr));
-	DEFINE(VCPU_FAULT_DAR, offsetof(struct kvm_vcpu, arch.fault_dar));
-	DEFINE(VCPU_FAULT_GPA, offsetof(struct kvm_vcpu, arch.fault_gpa));
-	DEFINE(VCPU_INTR_MSR, offsetof(struct kvm_vcpu, arch.intr_msr));
-	DEFINE(VCPU_LAST_INST, offsetof(struct kvm_vcpu, arch.last_inst));
-	DEFINE(VCPU_TRAP, offsetof(struct kvm_vcpu, arch.trap));
-	DEFINE(VCPU_CFAR, offsetof(struct kvm_vcpu, arch.cfar));
-	DEFINE(VCPU_PPR, offsetof(struct kvm_vcpu, arch.ppr));
-	DEFINE(VCPU_FSCR, offsetof(struct kvm_vcpu, arch.fscr));
-	DEFINE(VCPU_PSPB, offsetof(struct kvm_vcpu, arch.pspb));
-	DEFINE(VCPU_EBBHR, offsetof(struct kvm_vcpu, arch.ebbhr));
-	DEFINE(VCPU_EBBRR, offsetof(struct kvm_vcpu, arch.ebbrr));
-	DEFINE(VCPU_BESCR, offsetof(struct kvm_vcpu, arch.bescr));
-	DEFINE(VCPU_CSIGR, offsetof(struct kvm_vcpu, arch.csigr));
-	DEFINE(VCPU_TACR, offsetof(struct kvm_vcpu, arch.tacr));
-	DEFINE(VCPU_TCSCR, offsetof(struct kvm_vcpu, arch.tcscr));
-	DEFINE(VCPU_ACOP, offsetof(struct kvm_vcpu, arch.acop));
-	DEFINE(VCPU_WORT, offsetof(struct kvm_vcpu, arch.wort));
-	DEFINE(VCPU_TID, offsetof(struct kvm_vcpu, arch.tid));
-	DEFINE(VCPU_PSSCR, offsetof(struct kvm_vcpu, arch.psscr));
-	DEFINE(VCORE_ENTRY_EXIT, offsetof(struct kvmppc_vcore, entry_exit_map));
-	DEFINE(VCORE_IN_GUEST, offsetof(struct kvmppc_vcore, in_guest));
-	DEFINE(VCORE_NAPPING_THREADS, offsetof(struct kvmppc_vcore, napping_threads));
-	DEFINE(VCORE_KVM, offsetof(struct kvmppc_vcore, kvm));
-	DEFINE(VCORE_TB_OFFSET, offsetof(struct kvmppc_vcore, tb_offset));
-	DEFINE(VCORE_LPCR, offsetof(struct kvmppc_vcore, lpcr));
-	DEFINE(VCORE_PCR, offsetof(struct kvmppc_vcore, pcr));
-	DEFINE(VCORE_DPDES, offsetof(struct kvmppc_vcore, dpdes));
-	DEFINE(VCORE_VTB, offsetof(struct kvmppc_vcore, vtb));
-	DEFINE(VCPU_SLB_E, offsetof(struct kvmppc_slb, orige));
-	DEFINE(VCPU_SLB_V, offsetof(struct kvmppc_slb, origv));
-=======
 	OFFSET(KVM_TLB_SETS, kvm, arch.tlb_sets);
 	OFFSET(KVM_SDR1, kvm, arch.sdr1);
 	OFFSET(KVM_HOST_LPID, kvm, arch.host_lpid);
@@ -637,7 +549,6 @@ int main(void)
 	OFFSET(VCORE_VTB, kvmppc_vcore, vtb);
 	OFFSET(VCPU_SLB_E, kvmppc_slb, orige);
 	OFFSET(VCPU_SLB_V, kvmppc_slb, origv);
->>>>>>> linux-next/akpm-base
 	DEFINE(VCPU_SLB_SIZE, sizeof(struct kvmppc_slb));
 #ifdef CONFIG_PPC_TRANSACTIONAL_MEM
 	OFFSET(VCPU_TFHAR, kvm_vcpu, arch.tfhar);
