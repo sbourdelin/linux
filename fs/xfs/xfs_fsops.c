@@ -928,7 +928,7 @@ xfs_fs_goingdown(
 	__uint32_t	inflags)
 {
 	switch (inflags) {
-	case XFS_FSOP_GOING_FLAGS_DEFAULT: {
+	case FS_SHUTDOWN_FLAGS_DEFAULT: {
 		struct super_block *sb = freeze_bdev(mp->m_super->s_bdev);
 
 		if (sb && !IS_ERR(sb)) {
@@ -938,10 +938,10 @@ xfs_fs_goingdown(
 
 		break;
 	}
-	case XFS_FSOP_GOING_FLAGS_LOGFLUSH:
+	case FS_SHUTDOWN_FLAGS_LOGFLUSH:
 		xfs_force_shutdown(mp, SHUTDOWN_FORCE_UMOUNT);
 		break;
-	case XFS_FSOP_GOING_FLAGS_NOLOGFLUSH:
+	case FS_SHUTDOWN_FLAGS_NOLOGFLUSH:
 		xfs_force_shutdown(mp,
 				SHUTDOWN_FORCE_UMOUNT | SHUTDOWN_LOG_IO_ERROR);
 		break;

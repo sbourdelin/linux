@@ -347,4 +347,12 @@ struct fscrypt_policy {
 #define RWF_DSYNC			0x00000002 /* per-IO O_DSYNC */
 #define RWF_SYNC			0x00000004 /* per-IO O_SYNC */
 
+/*
+ * Flags for fs shutdown operation
+ */
+#define FS_SHUTDOWN_FLAGS_DEFAULT	0x0	/* going down */
+#define FS_SHUTDOWN_FLAGS_LOGFLUSH	0x1	/* flush log but not data */
+#define FS_SHUTDOWN_FLAGS_NOLOGFLUSH	0x2	/* don't flush log or data */
+#define FS_IOC_SHUTDOWN			_IOR ('X', 125, __u32)
+
 #endif /* _UAPI_LINUX_FS_H */

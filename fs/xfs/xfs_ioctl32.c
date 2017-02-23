@@ -551,7 +551,7 @@ xfs_file_compat_ioctl(
 	case XFS_IOC_SET_RESBLKS:
 	case XFS_IOC_GET_RESBLKS:
 	case XFS_IOC_FSGROWFSLOG:
-	case XFS_IOC_GOINGDOWN:
+	case FS_IOC_SHUTDOWN:
 	case XFS_IOC_ERROR_INJECTION:
 	case XFS_IOC_ERROR_CLEARALL:
 		return xfs_file_ioctl(filp, cmd, p);

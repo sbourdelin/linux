@@ -454,13 +454,6 @@ typedef struct xfs_swapext
 } xfs_swapext_t;
 
 /*
- * Flags for going down operation
- */
-#define XFS_FSOP_GOING_FLAGS_DEFAULT		0x0	/* going down */
-#define XFS_FSOP_GOING_FLAGS_LOGFLUSH		0x1	/* flush log but not data */
-#define XFS_FSOP_GOING_FLAGS_NOLOGFLUSH		0x2	/* don't flush log nor data */
-
-/*
  * ioctl limits
  */
 #ifdef XATTR_LIST_MAX
@@ -533,7 +526,7 @@ typedef struct xfs_swapext
 #define XFS_IOC_ATTRLIST_BY_HANDLE   _IOW ('X', 122, struct xfs_fsop_attrlist_handlereq)
 #define XFS_IOC_ATTRMULTI_BY_HANDLE  _IOW ('X', 123, struct xfs_fsop_attrmulti_handlereq)
 #define XFS_IOC_FSGEOMETRY	     _IOR ('X', 124, struct xfs_fsop_geom)
-#define XFS_IOC_GOINGDOWN	     _IOR ('X', 125, __uint32_t)
+/*	XFS_IOC_GOINGDOWN ---------- hoisted 125	 */
 /*	XFS_IOC_GETFSUUID ---------- deprecated 140	 */
 
 
