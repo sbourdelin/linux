@@ -338,7 +338,7 @@ static int audit_field_valid(struct audit_entry *entry, struct audit_field *f)
 		    entry->rule.listnr != AUDIT_FILTER_USER)
 			return -EINVAL;
 		break;
-	};
+	}
 
 	switch(f->type) {
 	default:
@@ -411,7 +411,7 @@ static int audit_field_valid(struct audit_entry *entry, struct audit_field *f)
 		if (entry->rule.listnr != AUDIT_FILTER_EXIT)
 			return -EINVAL;
 		break;
-	};
+	}
 	return 0;
 }
 
