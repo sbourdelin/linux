@@ -523,6 +523,7 @@ static void __user *insn_get_addr_ref(struct insn *insn, struct pt_regs *regs)
 		if (addr_offset < 0)
 			goto out_err;
 		addr = regs_get_register(regs, addr_offset);
+		addr += insn_get_seg_base(regs, insn, addr_offset);
 	} else {
 		if (insn->sib.nbytes) {
 			/*
@@ -551,6 +552,7 @@ static void __user *insn_get_addr_ref(struct insn *insn, struct pt_regs *regs)
 				indx = regs_get_register(regs, indx_offset);
 
 			addr = base + indx * (1 << X86_SIB_SCALE(sib));
+			addr += insn_get_seg_base(regs, insn, base_offset);
 		} else {
 			unsigned char addr_bytes;
 
@@ -575,8 +577,10 @@ static void __user *insn_get_addr_ref(struct insn *insn, struct pt_regs *regs)
 			} else {
 				addr = regs_get_register(regs, addr_offset);
 			}
+			addr += insn_get_seg_base(regs, insn, addr_offset);
 		}
 		addr += insn->displacement.value;
+
 	}
 	return (void __user *)addr;
 out_err:
