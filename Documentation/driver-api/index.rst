@@ -16,11 +16,15 @@ available subsections can be seen below.
 
    basics
    infrastructure
+   pm/index
+   device-io
    dma-buf
    device_link
    message-based
    sound
    frame-buffer
+   regulator
+   iio/index
    input
    usb
    spi
@@ -30,8 +34,13 @@ available subsections can be seen below.
    miscellaneous
    vme
    80211/index
+<<<<<<< HEAD
    uio-howto
    firmware/index
+=======
+   firmware/index
+   uio-howto
+>>>>>>> linux-next/akpm-base
 
 .. only::  subproject and html
 

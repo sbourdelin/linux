@@ -1242,10 +1242,18 @@ out:
 	return rc;
 }
 
+<<<<<<< HEAD
 static ssize_t smc_splice_read(struct socket *sock, loff_t *ppos,
 			       struct pipe_inode_info *pipe, size_t len,
 				    unsigned int flags)
 {
+=======
+static ssize_t smc_splice_read(struct file *file, loff_t *ppos,
+			       struct pipe_inode_info *pipe, size_t len,
+				    unsigned int flags)
+{
+	struct socket *sock = file->private_data;
+>>>>>>> linux-next/akpm-base
 	struct sock *sk = sock->sk;
 	struct smc_sock *smc;
 	int rc = -ENOTCONN;
@@ -1255,7 +1263,11 @@ static ssize_t smc_splice_read(struct socket *sock, loff_t *ppos,
 	if ((sk->sk_state != SMC_ACTIVE) && (sk->sk_state != SMC_CLOSED))
 		goto out;
 	if (smc->use_fallback) {
+<<<<<<< HEAD
 		rc = smc->clcsock->ops->splice_read(smc->clcsock, ppos,
+=======
+		rc = smc->clcsock->ops->splice_read(file, ppos,
+>>>>>>> linux-next/akpm-base
 						    pipe, len, flags);
 	} else {
 		rc = -EOPNOTSUPP;

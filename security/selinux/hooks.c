@@ -2399,8 +2399,12 @@ static int selinux_bprm_set_creds(struct linux_binprm *bprm)
 
 		/* Make sure that anyone attempting to ptrace over a task that
 		 * changes its SID has the appropriate permit */
+<<<<<<< HEAD
 		if (bprm->unsafe &
 		    (LSM_UNSAFE_PTRACE | LSM_UNSAFE_PTRACE_CAP)) {
+=======
+		if (bprm->unsafe & LSM_UNSAFE_PTRACE) {
+>>>>>>> linux-next/akpm-base
 			u32 ptsid = ptrace_parent_sid();
 			if (ptsid != 0) {
 				rc = avc_has_perm(ptsid, new_tsec->sid,
