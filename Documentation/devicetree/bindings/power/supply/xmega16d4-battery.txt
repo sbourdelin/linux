@@ -1,0 +1,12 @@
+Binding for the Toby Churchill SBS battery monitor
+
+Required properties :
+ - compatible : "tcl,xmega16d4-battery"
+
+Example:
+
+	battery: smart-battery@0 {
+		compatible = "tcl,xmega16d4-battery";
+		reg = <0>;
+		spi-max-frequency = <100000>;
+	};
