@@ -323,6 +323,48 @@ static int get_desc(unsigned short seg, struct desc_struct **desc)
 }
 
 /**
+ * insn_get_seg_base() - Obtain base address contained in descriptor
+ * @regs:	Set of registers containing the segment selector
+ * @insn:	Instruction structure with selector override prefixes
+ * @regoff:	Operand offset, in pt_regs, of which the selector is needed
+ *
+ * Obtain the base address of the segment descriptor as indicated by either any
+ * segment override prefixes contained in insn or the default segment applicable
+ * to the register indicated by regoff. regoff is specified as the offset in
+ * bytes from the base of pt_regs. If insn is not null and contain any segment
+ * override prefixes, the override is used instead of the default segment.
+ *
+ * Return: In protected mode, 0 if in CONFIG_X86_64, -1L in case of error,
+ * or the base address indicated in the selected segment descriptor. In
+ * virtual-8086, the segment selector shifted four positions to the right.
+ */
+unsigned long insn_get_seg_base(struct pt_regs *regs, struct insn *insn,
+				int regoff)
+{
+	struct desc_struct *desc;
+	unsigned short seg;
+	int ret;
+
+	seg = get_segment_selector(regs, insn, regoff);
+
+	if (v8086_mode(regs))
+		/*
+		 * Base is simply the segment selector sifted 4
+		 * positions to the right.
+		 */
+		return (unsigned long)(seg << 4);
+
+	/* 64-bit mode */
+	if (!seg)
+		return 0;
+	ret = get_desc(seg, &desc);
+	if (ret)
+		return -1L;
+
+	return get_desc_base(desc);
+}
+
+/**
  * insn_get_reg_offset_modrm_rm - Obtain register in r/m part of ModRM byte
  * @insn:	Instruction structure containing the ModRM byte
  * @regs:	Set of registers indicated by the ModRM byte
