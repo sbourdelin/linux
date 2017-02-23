@@ -13,10 +13,10 @@
 #ifndef _LINUX_PROPERTY_H_
 #define _LINUX_PROPERTY_H_
 
+#include <linux/device.h>
 #include <linux/fwnode.h>
+#include <linux/of.h>
 #include <linux/types.h>
-
-struct device;
 
 enum dev_prop_type {
 	DEV_PROP_U8,
@@ -32,6 +32,12 @@ enum dev_dma_attr {
 	DEV_DMA_NON_COHERENT,
 	DEV_DMA_COHERENT,
 };
+
+static inline struct fwnode_handle *dev_fwnode(struct device *dev)
+{
+	return IS_ENABLED(CONFIG_OF) && dev->of_node ?
+		&dev->of_node->fwnode : dev->fwnode;
+}
 
 bool device_property_present(struct device *dev, const char *propname);
 int device_property_read_u8_array(struct device *dev, const char *propname,
