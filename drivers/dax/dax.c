@@ -722,6 +722,7 @@ struct dax_dev *devm_create_dax_dev(struct dax_region *dax_region,
 	dev_set_name(dev, "dax%d.%d", dax_region->id, dax_dev->id);
 	rc = device_add(dev);
 	if (rc) {
+		cdev_del(&dax_dev->cdev);
 		put_device(dev);
 		return ERR_PTR(rc);
 	}
