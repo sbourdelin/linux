@@ -8,12 +8,175 @@
 #include <asm/inat.h>
 #include <asm/insn.h>
 #include <asm/insn-eval.h>
+#include <asm/vm86.h>
 
 enum reg_type {
 	REG_TYPE_RM = 0,
 	REG_TYPE_INDEX,
 	REG_TYPE_BASE,
 };
+
+/**
+ * get_segment_selector() - obtain segment selector
+ * @regs:	Set of registers containing the segment selector
+ * @insn:	Instruction structure with selector override prefixes
+ * @regoff:	Operand offset, in pt_regs, of which the selector is needed
+ *
+ * The segment selector to which an effective address refers depends on
+ * a) segment selector overrides instruction prefixes or b) the operand
+ * register indicated in the ModRM or SiB byte.
+ *
+ * For case a), the function inspects any prefixes in the insn instruction;
+ * insn can be null to indicate that selector override prefixes shall be
+ * ignored. This is useful when the use of prefixes is forbidden (e.g.,
+ * obtaining the code selector). For case b), the operand register shall be
+ * represented as the offset from the base address of pt_regs. Also, regoff
+ * can be -EINVAL for cases in which registers are not used as operands (e.g.,
+ * when the mod and r/m parts of the ModRM byte are 0 and 5, respectively).
+ *
+ * The returned segment selector is obtained from the regs structure. Both
+ * protected and virtual-8086 modes are supported. In virtual-8086 mode,
+ * data segments are obtained from the kernel_vm86_regs structure.
+ * For CONFIG_X86_64, the returned segment selector is null if such selector
+ * refers to es, fs or gs.
+ *
+ * Return: Value of the segment selector
+ */
+static unsigned short get_segment_selector(struct pt_regs *regs,
+					   struct insn *insn, int regoff)
+{
+	int i;
+
+	struct kernel_vm86_regs *vm86regs = (struct kernel_vm86_regs *)regs;
+
+	if (!insn)
+		goto default_seg;
+
+	insn_get_prefixes(insn);
+
+	if (v8086_mode(regs)) {
+		/*
+		 * Check first if we have selector overrides. Having more than
+		 * one selector override leads to undefined behavior. We
+		 * only use the first one and return
+		 */
+		for (i = 0; i < insn->prefixes.nbytes; i++) {
+			switch (insn->prefixes.bytes[i]) {
+			/*
+			 * Code and stack segment selector register are saved in
+			 * all processor modes. Thus, it makes sense to take
+			 * them from pt_regs.
+			 */
+			case 0x2e:
+				return (unsigned short)regs->cs;
+			case 0x36:
+				return (unsigned short)regs->ss;
+			/*
+			 * The rest of the segment selector registers are only
+			 * saved in virtual-8086 mode. Thus, we must obtain them
+			 * from the vm86 register structure.
+			 */
+			case 0x3e:
+				return vm86regs->ds;
+			case 0x26:
+				return vm86regs->es;
+			case 0x64:
+				return vm86regs->fs;
+			case 0x65:
+				return vm86regs->gs;
+			/*
+			 * No default action needed. We simply did not find any
+			 * relevant prefixes.
+			 */
+			}
+		}
+	} else {/* protected mode */
+		/*
+		 * Check first if we have selector overrides. Having more than
+		 * one selector override leads to undefined behavior. We
+		 * only use the first one and return.
+		 */
+		for (i = 0; i < insn->prefixes.nbytes; i++) {
+			switch (insn->prefixes.bytes[i]) {
+			/*
+			 * Code and stack segment selector register are saved in
+			 * all processor modes. Thus, it makes sense to take
+			 * them from pt_regs.
+			 */
+			case 0x2e:
+				return (unsigned short)regs->cs;
+			case 0x36:
+				return (unsigned short)regs->ss;
+#ifdef CONFIG_X86_32
+			case 0x3e:
+				return (unsigned short)regs->ds;
+			case 0x26:
+				return (unsigned short)regs->es;
+			case 0x64:
+				return (unsigned short)regs->fs;
+			case 0x65:
+				return (unsigned short)regs->gs;
+#else
+			/* do not return any segment selector in x86_64 */
+			case 0x3e:
+			case 0x26:
+			case 0x64:
+			case 0x65:
+				return 0;
+#endif
+			/*
+			 * No default action needed. We simply did not find any
+			 * relevant prefixes.
+			 */
+			}
+		}
+	}
+
+default_seg:
+	/*
+	 * If no overrides, use default selectors as described in the
+	 * Intel documentation: SS for ESP or EBP. DS for all data references,
+	 * except when relative to stack or string destination.
+	 * Also, AX, CX and DX are not valid register operands in 16-bit
+	 * address encodings.
+	 * Callers must interpret the result correctly according to the type
+	 * of instructions (e.g., use ES for string instructions).
+	 * Also, some values of modrm and sib might seem to indicate the use
+	 * of EBP and ESP (e.g., modrm_mod = 0, modrm_rm = 5) but actually
+	 * they refer to cases in which only a displacement used. These cases
+	 * should be indentified by the caller and not with this function.
+	 */
+	switch (regoff) {
+	case offsetof(struct pt_regs, ax):
+		/* fall through */
+	case offsetof(struct pt_regs, cx):
+		/* fall through */
+	case offsetof(struct pt_regs, dx):
+		if (insn && insn->addr_bytes == 2)
+			return 0;
+	case -EDOM: /* no register involved in address computation */
+	case offsetof(struct pt_regs, bx):
+		/* fall through */
+	case offsetof(struct pt_regs, di):
+		/* fall through */
+	case offsetof(struct pt_regs, si):
+		if (v8086_mode(regs))
+			return vm86regs->ds;
+#ifdef CONFIG_X86_32
+		return (unsigned short)regs->ds;
+#else
+		return 0;
+#endif
+	case offsetof(struct pt_regs, bp):
+		/* fall through */
+	case offsetof(struct pt_regs, sp):
+		return (unsigned short)regs->ss;
+	case offsetof(struct pt_regs, ip):
+		return (unsigned short)regs->cs;
+	default:
+		return 0;
+	}
+}
 
 static int get_reg_offset(struct insn *insn, struct pt_regs *regs,
 			  enum reg_type type)
