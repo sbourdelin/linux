@@ -218,6 +218,14 @@ static int get_reg_offset(struct insn *insn, struct pt_regs *regs,
 	switch (type) {
 	case REG_TYPE_RM:
 		regno = X86_MODRM_RM(insn->modrm.value);
+		/* if mod=0, register R/EBP is not used in the address
+		 * computation. Instead, a 32-bit displacement is expected;
+		 * the instruction decoder takes care of reading such
+		 * displacement. This is true for both R/EBP and R13, as the
+		 * REX.B bit is not decoded.
+		 */
+		if (regno == 5 && X86_MODRM_MOD(insn->modrm.value) == 0)
+			return -EDOM;
 		if (X86_REX_B(insn->rex_prefix.value))
 			regno += 8;
 		break;
@@ -544,10 +552,29 @@ static void __user *insn_get_addr_ref(struct insn *insn, struct pt_regs *regs)
 
 			addr = base + indx * (1 << X86_SIB_SCALE(sib));
 		} else {
+			unsigned char addr_bytes;
+
+			addr_bytes = insn_get_seg_default_address_bytes(regs);
 			addr_offset = get_reg_offset(insn, regs, REG_TYPE_RM);
-			if (addr_offset < 0)
-				goto out_err;
-			addr = regs_get_register(regs, addr_offset);
+			if (addr_offset < 0) {
+				/* -EDOM means that we must ignore the
+				 * address_offset. The only case in which we
+				 * see this value is when R/M points to R/EBP.
+				 * In such a case, the address involves using
+				 * the instruction pointer for 64-bit mode.
+				 */
+				if (addr_offset == -EDOM) {
+					/* if in 64-bit mode */
+					if (addr_bytes == 8)
+						addr = regs->ip;
+					else
+						addr = 0;
+				} else {
+					goto out_err;
+				}
+			} else {
+				addr = regs_get_register(regs, addr_offset);
+			}
 		}
 		addr += insn->displacement.value;
 	}
