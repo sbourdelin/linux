@@ -20,6 +20,7 @@
 #include <linux/slab.h>
 #include <linux/sysctl.h>
 #include <linux/proc_fs.h>
+#include <linux/property.h>
 #include <linux/delay.h>
 #include <linux/platform_device.h>
 #include <linux/input.h>

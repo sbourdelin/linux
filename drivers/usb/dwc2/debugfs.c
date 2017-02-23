@@ -14,9 +14,10 @@
  * GNU General Public License for more details.
  */
 
-#include <linux/spinlock.h>
 #include <linux/debugfs.h>
+#include <linux/property.h>
 #include <linux/seq_file.h>
+#include <linux/spinlock.h>
 #include <linux/uaccess.h>
 
 #include "core.h"

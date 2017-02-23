@@ -75,6 +75,7 @@ static const char version[] =
 #include <linux/ioport.h>
 #include <linux/crc32.h>
 #include <linux/platform_device.h>
+#include <linux/property.h>
 #include <linux/spinlock.h>
 #include <linux/ethtool.h>
 #include <linux/mii.h>

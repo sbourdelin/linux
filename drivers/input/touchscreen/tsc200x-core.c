@@ -25,11 +25,11 @@
 #include <linux/input/touchscreen.h>
 #include <linux/interrupt.h>
 #include <linux/delay.h>
-#include <linux/pm.h>
 #include <linux/of.h>
 #include <linux/spi/tsc2005.h>
 #include <linux/regulator/consumer.h>
 #include <linux/regmap.h>
+#include <linux/property.h>
 #include <linux/gpio/consumer.h>
 #include "tsc200x-core.h"
 

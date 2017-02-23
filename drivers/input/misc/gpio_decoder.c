@@ -22,6 +22,7 @@
 #include <linux/module.h>
 #include <linux/of.h>
 #include <linux/platform_device.h>
+#include <linux/property.h>
 
 struct gpio_decoder {
 	struct input_polled_dev *poll_dev;

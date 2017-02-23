@@ -44,8 +44,9 @@
 #include <linux/spinlock.h>
 #include <linux/interrupt.h>
 #include <linux/io.h>
-#include <linux/slab.h>
 #include <linux/pci.h>
+#include <linux/property.h>
+#include <linux/slab.h>
 #include <linux/usb.h>
 
 #include <linux/usb/hcd.h>
