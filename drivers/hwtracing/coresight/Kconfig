@@ -89,4 +89,14 @@ config CORESIGHT_STM
 	  logging useful software events or data coming from various entities
 	  in the system, possibly running different OSs
 
+config CORESIGHT_DEBUG
+	bool "CoreSight debug driver"
+	depends on ARM || ARM64
+	help
+	  This driver provides support for coresight debugging module. This
+	  is primarily used to dump sample-based profiling registers for
+	  panic. By disable CPU low power states (like "nohlt" in kernel
+	  command line), this is more safe and avoid lockup issue when
+	  access debug module registers.
+
 endif
