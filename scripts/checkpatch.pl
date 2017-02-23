@@ -2139,6 +2139,7 @@ sub process {
 	my $commit_log_has_diff = 0;
 	my $reported_maintainer_file = 0;
 	my $non_utf8_charset = 0;
+	my $licensefile = '';
 
 	my $last_blank_line = 0;
 	my $last_coalesced_string_linenr = -1;
@@ -2803,6 +2804,18 @@ sub process {
 					     "DT compatible string vendor \"$vendor\" appears un-documented -- check $vp_file\n" . $herecurr);
 				}
 			}
+		}
+
+# check for using SPDX tag instead of free form license text in dts and binding header files
+		if ($licensefile ne $realfile &&
+		    ($realfile =~ /\.dtsi?$/ || $realfile =~ /dt-bindings\/.*\.h$/) &&
+		    $rawline !~ /\bSPDX-License-Identifier/ &&
+		    ($rawline =~ /^\+.*\bGeneral\s+Public\s+License/i ||
+		    $rawline =~ /^\+.*\bTHE\s+SOFTWARE\s+IS\s+PROVIDED\s+\"AS\s+IS\"/i ||
+		    $rawline =~ /^\+.*\b(GPL|BSD|X11)/)) {
+			$licensefile = $realfile;
+			WARN("SPDX_LICENSE_TAG",
+			     "Use SPDX-License-Identifier tags instead of full license text\n" . $herecurr);
 		}
 
 # check we are in a valid source file if not then ignore this hunk
