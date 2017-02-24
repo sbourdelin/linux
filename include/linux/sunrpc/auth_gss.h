@@ -93,6 +93,60 @@ struct gss_cred {
 	unsigned long		gc_upcall_timestamp;
 };
 
+/** GSS3 */
+enum gss3_type {
+	GSS3_LABEL = 0,
+	GSS3_PRIVS = 1,
+};
+
+struct gss3_chan_binding {
+	u32	cb_len;
+	void	*cb_binding;
+};
+
+struct gss3_mp_auth {
+	u32	mp_handle_len;
+	void	*mp_handle;
+	u32	*mp_mic_len;
+	void	*mp_mic;	/* header mic */
+};
+
+struct gss3_label {
+	u32			la_lfs;
+	u32			la_pi;
+	struct xdr_netobj	la_label;
+};
+
+struct gss3_privs {
+	char	*pr_name;
+	u32	pr_num;
+	void	*pr_data;
+};
+
+struct gss3_assertion_u {
+	u32	au_type;
+	union {
+		struct gss3_label	au_label;
+		struct gss3_privs	au_privs;
+	} u;
+};
+
+struct gss3_create_args {
+	struct gss3_mp_auth		*ca_mp_auth;
+	struct gss3_chan_binding	*ca_chan_bind;
+	u32			ca_num;
+	struct gss3_assertion_u	*ca_assertions;
+};
+
+struct gss3_create_res {
+	u32		cr_hlen;
+	void		*cr_handle;
+	struct gss3_mp_auth		*cr_mp_auth;
+	struct gss3_chan_binding	*cr_chan_bind;
+	u32			cr_num;
+	struct gss3_assertion_u	*cr_assertions;
+};
+
 #endif /* __KERNEL__ */
 #endif /* _LINUX_SUNRPC_AUTH_GSS_H */
 
