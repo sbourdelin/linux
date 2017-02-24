@@ -865,7 +865,7 @@ enum emulation_result kvm_mips_emul_wait(struct kvm_vcpu *vcpu)
 		 * check if any I/O interrupts are pending.
 		 */
 		if (kvm_request_test_and_clear(KVM_REQ_UNHALT, vcpu)) {
-			clear_bit(KVM_REQ_UNHALT, &vcpu->requests);
+			__kvm_request_clear(KVM_REQ_UNHALT, vcpu);
 			vcpu->run->exit_reason = KVM_EXIT_IRQ_WINDOW_OPEN;
 		}
 	}

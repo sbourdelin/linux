@@ -349,7 +349,7 @@ static void kvmppc_set_msr_pr(struct kvm_vcpu *vcpu, u64 msr)
 	if (msr & MSR_POW) {
 		if (!vcpu->arch.pending_exceptions) {
 			kvm_vcpu_block(vcpu);
-			clear_bit(KVM_REQ_UNHALT, &vcpu->requests);
+			__kvm_request_clear(KVM_REQ_UNHALT, vcpu);
 			vcpu->stat.halt_wakeup++;
 
 			/* Unset POW bit after we woke up */

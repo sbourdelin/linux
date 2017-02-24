@@ -1099,10 +1099,17 @@ static inline int kvm_ioeventfd(struct kvm *kvm, struct kvm_ioeventfd *args)
  *
  * TODO:
  *  - completely encapsulate vcpu->requests
+ *  - do not use __kvm_request* outside request helpers
  *  - do not use memory barrier in (1) and (2)
  *  - let architectures define custom vcpu kick
  *  - add kick when setting remote request
  */
+
+static inline void __kvm_request_set(unsigned req, struct kvm_vcpu *vcpu)
+{
+	set_bit(req, &vcpu->requests);
+}
+
 static inline void kvm_request_set(unsigned req, struct kvm_vcpu *vcpu)
 {
 	/*
@@ -1111,13 +1118,23 @@ static inline void kvm_request_set(unsigned req, struct kvm_vcpu *vcpu)
 	 * Paired with the smp_mb__after_atomic in kvm_request_test_and_clear.
 	 */
 	smp_wmb();
-	set_bit(req, &vcpu->requests);
+	__kvm_request_set(req, vcpu);
+}
+
+static inline bool __kvm_request_test(unsigned req, struct kvm_vcpu *vcpu)
+{
+	return test_bit(req, &vcpu->requests);
+}
+
+static inline void __kvm_request_clear(unsigned req, struct kvm_vcpu *vcpu)
+{
+	clear_bit(req, &vcpu->requests);
 }
 
 static inline bool kvm_request_test_and_clear(unsigned req, struct kvm_vcpu *vcpu)
 {
-	if (test_bit(req, &vcpu->requests)) {
-		clear_bit(req, &vcpu->requests);
+	if (__kvm_request_test(req, vcpu)) {
+		__kvm_request_clear(req, vcpu);
 
 		/*
 		 * Ensure the rest of the request is visible to

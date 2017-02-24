@@ -231,7 +231,7 @@ int kvmppc_kvm_pv(struct kvm_vcpu *vcpu)
 	case EV_HCALL_TOKEN(EV_IDLE):
 		r = EV_SUCCESS;
 		kvm_vcpu_block(vcpu);
-		clear_bit(KVM_REQ_UNHALT, &vcpu->requests);
+		__kvm_request_clear(KVM_REQ_UNHALT, vcpu);
 		break;
 	default:
 		r = EV_UNIMPLEMENTED;

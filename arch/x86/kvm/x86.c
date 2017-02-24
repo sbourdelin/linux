@@ -1767,7 +1767,7 @@ static void kvm_gen_update_masterclock(struct kvm *kvm)
 
 	/* guest entries allowed */
 	kvm_for_each_vcpu(i, vcpu, kvm)
-		clear_bit(KVM_REQ_MCLOCK_INPROGRESS, &vcpu->requests);
+		__kvm_request_clear(KVM_REQ_MCLOCK_INPROGRESS, vcpu);
 
 	spin_unlock(&ka->pvclock_gtod_sync_lock);
 #endif
@@ -2228,8 +2228,8 @@ int kvm_set_msr_common(struct kvm_vcpu *vcpu, struct msr_data *msr_info)
 			bool tmp = (msr == MSR_KVM_SYSTEM_TIME);
 
 			if (ka->boot_vcpu_runs_old_kvmclock != tmp)
-				set_bit(KVM_REQ_MASTERCLOCK_UPDATE,
-					&vcpu->requests);
+				__kvm_request_set(KVM_REQ_MASTERCLOCK_UPDATE,
+						  vcpu);
 
 			ka->boot_vcpu_runs_old_kvmclock = tmp;
 		}
@@ -2816,7 +2816,7 @@ static bool need_emulate_wbinvd(struct kvm_vcpu *vcpu)
 
 static inline void kvm_migrate_timers(struct kvm_vcpu *vcpu)
 {
-	set_bit(KVM_REQ_MIGRATE_TIMER, &vcpu->requests);
+	__kvm_request_set(KVM_REQ_MIGRATE_TIMER, vcpu);
 }
 
 void kvm_arch_vcpu_load(struct kvm_vcpu *vcpu, int cpu)
@@ -7049,7 +7049,7 @@ static int vcpu_run(struct kvm_vcpu *vcpu)
 		if (r <= 0)
 			break;
 
-		clear_bit(KVM_REQ_PENDING_TIMER, &vcpu->requests);
+		__kvm_request_clear(KVM_REQ_PENDING_TIMER, vcpu);
 		if (kvm_cpu_has_pending_timer(vcpu))
 			kvm_inject_pending_timer_irqs(vcpu);
 
@@ -7177,7 +7177,7 @@ int kvm_arch_vcpu_ioctl_run(struct kvm_vcpu *vcpu, struct kvm_run *kvm_run)
 	if (unlikely(vcpu->arch.mp_state == KVM_MP_STATE_UNINITIALIZED)) {
 		kvm_vcpu_block(vcpu);
 		kvm_apic_accept_events(vcpu);
-		clear_bit(KVM_REQ_UNHALT, &vcpu->requests);
+		__kvm_request_clear(KVM_REQ_UNHALT, vcpu);
 		r = -EAGAIN;
 		goto out;
 	}
@@ -8382,7 +8382,7 @@ static inline bool kvm_vcpu_has_events(struct kvm_vcpu *vcpu)
 	if (atomic_read(&vcpu->arch.nmi_queued))
 		return true;
 
-	if (test_bit(KVM_REQ_SMI, &vcpu->requests))
+	if (__kvm_request_test(KVM_REQ_SMI, vcpu))
 		return true;
 
 	if (kvm_arch_interrupt_allowed(vcpu) &&
