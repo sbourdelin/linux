@@ -4690,7 +4690,15 @@ static int handle_reshape_read_error(struct mddev *mddev,
 	struct r10bio *r10b = &on_stack.r10_bio;
 	int slot = 0;
 	int idx = 0;
-	struct bio_vec *bvec = r10_bio->master_bio->bi_io_vec;
+	struct bio_vec *bvl;
+	struct page *pages[RESYNC_PAGES];
+
+	/*
+	 * This bio is allocated in reshape_request(), and size
+	 * is still RESYNC_PAGES
+	 */
+	bio_for_each_segment_all(bvl, r10_bio->master_bio, idx)
+		pages[idx] = bvl->bv_page;
 
 	r10b->sector = r10_bio->sector;
 	__raid10_find_phys(&conf->prev, r10b);
@@ -4719,7 +4727,7 @@ static int handle_reshape_read_error(struct mddev *mddev,
 			success = sync_page_io(rdev,
 					       addr,
 					       s << 9,
-					       bvec[idx].bv_page,
+					       pages[idx],
 					       REQ_OP_READ, 0, false);
 			rdev_dec_pending(rdev, mddev);
 			rcu_read_lock();
