@@ -221,8 +221,8 @@ static void guc_params_init(struct drm_i915_private *dev_priv)
 
 	/* If GuC submission is enabled, set up additional parameters here */
 	if (i915.enable_guc_submission) {
-		u32 pgs = guc_ggtt_offset(dev_priv->guc.ctx_pool_vma);
-		u32 ctx_in_16 = GUC_MAX_GPU_CONTEXTS / 16;
+		u32 pgs = guc_ggtt_offset(dev_priv->guc.smurf_pool_vma);
+		u32 ctx_in_16 = GUC_MAX_GPU_SMURFS / 16;
 
 		pgs >>= PAGE_SHIFT;
 		params[GUC_CTL_CTXINFO] = (pgs << GUC_CTL_BASE_ADDR_SHIFT) |

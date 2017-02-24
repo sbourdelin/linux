@@ -32,8 +32,8 @@
 #define GUC_CTX_PRIORITY_NORMAL		3
 #define GUC_CTX_PRIORITY_NUM		4
 
-#define GUC_MAX_GPU_CONTEXTS		1024
-#define	GUC_INVALID_CTX_ID		GUC_MAX_GPU_CONTEXTS
+#define GUC_MAX_GPU_SMURFS		1024
+#define	GUC_INVALID_SMURF_ID	GUC_MAX_GPU_SMURFS
 
 #define GUC_RENDER_ENGINE		0
 #define GUC_VIDEO_ENGINE		1
@@ -68,14 +68,14 @@
 #define GUC_DOORBELL_ENABLED		1
 #define GUC_DOORBELL_DISABLED		0
 
-#define GUC_CTX_DESC_ATTR_ACTIVE	(1 << 0)
-#define GUC_CTX_DESC_ATTR_PENDING_DB	(1 << 1)
-#define GUC_CTX_DESC_ATTR_KERNEL	(1 << 2)
-#define GUC_CTX_DESC_ATTR_PREEMPT	(1 << 3)
-#define GUC_CTX_DESC_ATTR_RESET		(1 << 4)
-#define GUC_CTX_DESC_ATTR_WQLOCKED	(1 << 5)
-#define GUC_CTX_DESC_ATTR_PCH		(1 << 6)
-#define GUC_CTX_DESC_ATTR_TERMINATED	(1 << 7)
+#define GUC_SMURF_DESC_ATTR_ACTIVE	(1 << 0)
+#define GUC_SMURF_DESC_ATTR_PENDING_DB	(1 << 1)
+#define GUC_SMURF_DESC_ATTR_KERNEL	(1 << 2)
+#define GUC_SMURF_DESC_ATTR_PREEMPT	(1 << 3)
+#define GUC_SMURF_DESC_ATTR_RESET		(1 << 4)
+#define GUC_SMURF_DESC_ATTR_WQLOCKED	(1 << 5)
+#define GUC_SMURF_DESC_ATTR_PCH		(1 << 6)
+#define GUC_SMURF_DESC_ATTR_TERMINATED	(1 << 7)
 
 /* The guc control data is 10 DWORDs */
 #define GUC_CTL_CTXINFO			0
@@ -256,7 +256,7 @@ struct guc_wq_item {
 } __packed;
 
 struct guc_process_desc {
-	u32 context_id;
+	u32 smurf_id;
 	u64 db_base_addr;
 	u32 head;
 	u32 tail;
@@ -270,15 +270,15 @@ struct guc_process_desc {
 } __packed;
 
 /* engine id and context id is packed into guc_execlist_context.context_id*/
-#define GUC_ELC_CTXID_OFFSET		0
+#define GUC_ELC_SMURF_ID_OFFSET	0
 #define GUC_ELC_ENGINE_OFFSET		29
 
 /* The execlist context including software and HW information */
 struct guc_execlist_context {
 	u32 context_desc;
-	u32 context_id;
+	u32 smurf_and_engine_id;
 	u32 ring_status;
-	u32 ring_lcra;
+	u32 ring_lrca;
 	u32 ring_begin;
 	u32 ring_end;
 	u32 ring_next_free_location;
@@ -289,10 +289,10 @@ struct guc_execlist_context {
 	u16 engine_submit_queue_count;
 } __packed;
 
-/*Context descriptor for communicating between uKernel and Driver*/
-struct guc_context_desc {
+/* Smurf descriptor for communicating between uKernel and Driver */
+struct guc_smurf_desc {
 	u32 sched_common_area;
-	u32 context_id;
+	u32 smurf_id;
 	u32 pas_id;
 	u8 engines_used;
 	u64 db_trigger_cpu;

@@ -28,16 +28,27 @@
 /**
  * DOC: GuC-based command submission
  *
- * i915_guc_client:
- * We use the term client to avoid confusion with contexts. A i915_guc_client is
- * equivalent to GuC object guc_context_desc. This context descriptor is
- * allocated from a pool of 1024 entries. Kernel driver will allocate doorbell
- * and workqueue for it. Also the process descriptor (guc_process_desc), which
- * is mapped to client space. So the client can write Work Item then ring the
- * doorbell.
+ * GuC client:
+ * A i915_guc_client refers to a unique user of the GuC. Currently, there is
+ * only one of these (the execbuf_client) and this one is charged with all
+ * submissions to the GuC. This struct is the owner of a doorbell, a process
+ * descriptor and a workqueue (all of them inside a single gem object that
+ * contains all required pages for these elements).
  *
- * To simplify the implementation, we allocate one gem object that contains all
- * pages for doorbell, process descriptor and workqueue.
+ * Smurf descriptor:
+ * Technically, this is known as a "GuC Context" descriptor in the specs, but we
+ * use the term smurf to avoid confusion with all the other things already
+ * named "context" in the driver. During initialization, the driver allocates a
+ * static pool of 1024 such descriptors, and shares them with the GuC.
+ * Currently, there exists a 1:1 mapping between a i915_guc_client and a
+ * guc_smurf_desc (via the client's smurf_index), so effectively only
+ * one guc_smurf_desc gets used (since we only have one client at the
+ * moment). This smurf descriptor lets the GuC know about the doorbell and
+ * workqueue. Theoretically, it also lets the GuC know about the LRC, but we
+ * employ a kind of proxy submission where the LRC of the workload to be
+ * submitted is sent via the work item instead (the single guc_smurf_desc
+ * associated to execbuf client contains the LRCs of the default kernel context,
+ * but these are essentially unused).
  *
  * The Scratch registers:
  * There are 16 MMIO-based registers start from 0xC180. The kernel driver writes
@@ -52,7 +63,7 @@
  * Doorbells are interrupts to uKernel. A doorbell is a single cache line (QW)
  * mapped into process space.
  *
- * Work Items:
+ * Workqueue:
  * There are several types of work items that the host may place into a
  * workqueue, each with its own requirements and limitations. Currently only
  * WQ_TYPE_INORDER is needed to support legacy submission via GuC, which
@@ -71,7 +82,7 @@ static int guc_allocate_doorbell(struct intel_guc *guc,
 {
 	u32 action[] = {
 		INTEL_GUC_ACTION_ALLOCATE_DOORBELL,
-		client->ctx_index
+		client->smurf_index
 	};
 
 	return intel_guc_send(guc, action, ARRAY_SIZE(action));
@@ -82,7 +93,7 @@ static int guc_release_doorbell(struct intel_guc *guc,
 {
 	u32 action[] = {
 		INTEL_GUC_ACTION_DEALLOCATE_DOORBELL,
-		client->ctx_index
+		client->smurf_index
 	};
 
 	return intel_guc_send(guc, action, ARRAY_SIZE(action));
@@ -99,10 +110,10 @@ static int guc_update_doorbell_id(struct intel_guc *guc,
 				  struct i915_guc_client *client,
 				  u16 new_id)
 {
-	struct sg_table *sg = guc->ctx_pool_vma->pages;
+	struct sg_table *sg = guc->smurf_pool_vma->pages;
 	void *doorbell_bitmap = guc->doorbell_bitmap;
 	struct guc_doorbell_info *doorbell;
-	struct guc_context_desc desc;
+	struct guc_smurf_desc desc;
 	size_t len;
 
 	doorbell = client->vaddr + client->doorbell_offset;
@@ -117,12 +128,12 @@ static int guc_update_doorbell_id(struct intel_guc *guc,
 
 	/* Update the GuC's idea of the doorbell ID */
 	len = sg_pcopy_to_buffer(sg->sgl, sg->nents, &desc, sizeof(desc),
-			     sizeof(desc) * client->ctx_index);
+			     sizeof(desc) * client->smurf_index);
 	if (len != sizeof(desc))
 		return -EFAULT;
 	desc.db_id = new_id;
 	len = sg_pcopy_from_buffer(sg->sgl, sg->nents, &desc, sizeof(desc),
-			     sizeof(desc) * client->ctx_index);
+			     sizeof(desc) * client->smurf_index);
 	if (len != sizeof(desc))
 		return -EFAULT;
 
@@ -217,7 +228,7 @@ static void guc_proc_desc_init(struct intel_guc *guc,
 	desc->wq_base_addr = 0;
 	desc->db_base_addr = 0;
 
-	desc->context_id = client->ctx_index;
+	desc->smurf_id = client->smurf_index;
 	desc->wq_size_bytes = client->wq_size;
 	desc->wq_status = WQ_STATUS_ACTIVE;
 	desc->priority = client->priority;
@@ -231,21 +242,21 @@ static void guc_proc_desc_init(struct intel_guc *guc,
  * write queue, etc).
  */
 
-static void guc_ctx_desc_init(struct intel_guc *guc,
+static void guc_smurf_desc_init(struct intel_guc *guc,
 			      struct i915_guc_client *client)
 {
 	struct drm_i915_private *dev_priv = guc_to_i915(guc);
 	struct intel_engine_cs *engine;
 	struct i915_gem_context *ctx = client->owner;
-	struct guc_context_desc desc;
+	struct guc_smurf_desc desc;
 	struct sg_table *sg;
 	unsigned int tmp;
 	u32 gfx_addr;
 
 	memset(&desc, 0, sizeof(desc));
 
-	desc.attribute = GUC_CTX_DESC_ATTR_ACTIVE | GUC_CTX_DESC_ATTR_KERNEL;
-	desc.context_id = client->ctx_index;
+	desc.attribute = GUC_SMURF_DESC_ATTR_ACTIVE | GUC_SMURF_DESC_ATTR_KERNEL;
+	desc.smurf_id = client->smurf_index;
 	desc.priority = client->priority;
 	desc.db_id = client->doorbell_id;
 
@@ -267,10 +278,11 @@ static void guc_ctx_desc_init(struct intel_guc *guc,
 		lrc->context_desc = lower_32_bits(ce->lrc_desc);
 
 		/* The state page is after PPHWSP */
-		lrc->ring_lcra =
+		lrc->ring_lrca =
 			guc_ggtt_offset(ce->state) + LRC_STATE_PN * PAGE_SIZE;
-		lrc->context_id = (client->ctx_index << GUC_ELC_CTXID_OFFSET) |
-				(guc_engine_id << GUC_ELC_ENGINE_OFFSET);
+		lrc->smurf_and_engine_id =
+			(client->smurf_index << GUC_ELC_SMURF_ID_OFFSET) |
+			(guc_engine_id << GUC_ELC_ENGINE_OFFSET);
 
 		lrc->ring_begin = guc_ggtt_offset(ce->ring->vma);
 		lrc->ring_end = lrc->ring_begin + ce->ring->size - 1;
@@ -305,22 +317,22 @@ static void guc_ctx_desc_init(struct intel_guc *guc,
 	desc.desc_private = (uintptr_t)client;
 
 	/* Pool context is pinned already */
-	sg = guc->ctx_pool_vma->pages;
+	sg = guc->smurf_pool_vma->pages;
 	sg_pcopy_from_buffer(sg->sgl, sg->nents, &desc, sizeof(desc),
-			     sizeof(desc) * client->ctx_index);
+			     sizeof(desc) * client->smurf_index);
 }
 
-static void guc_ctx_desc_fini(struct intel_guc *guc,
+static void guc_smurf_desc_fini(struct intel_guc *guc,
 			      struct i915_guc_client *client)
 {
-	struct guc_context_desc desc;
+	struct guc_smurf_desc desc;
 	struct sg_table *sg;
 
 	memset(&desc, 0, sizeof(desc));
 
-	sg = guc->ctx_pool_vma->pages;
+	sg = guc->smurf_pool_vma->pages;
 	sg_pcopy_from_buffer(sg->sgl, sg->nents, &desc, sizeof(desc),
-			     sizeof(desc) * client->ctx_index);
+			     sizeof(desc) * client->smurf_index);
 }
 
 /**
@@ -610,9 +622,9 @@ guc_client_free(struct drm_i915_private *dev_priv,
 
 	i915_vma_unpin_and_release(&client->vma);
 
-	if (client->ctx_index != GUC_INVALID_CTX_ID) {
-		guc_ctx_desc_fini(guc, client);
-		ida_simple_remove(&guc->ctx_ids, client->ctx_index);
+	if (client->smurf_index != GUC_INVALID_SMURF_ID) {
+		guc_smurf_desc_fini(guc, client);
+		ida_simple_remove(&guc->smurf_ids, client->smurf_index);
 	}
 
 	kfree(client);
@@ -708,10 +720,10 @@ guc_client_alloc(struct drm_i915_private *dev_priv,
 	client->priority = priority;
 	client->doorbell_id = GUC_INVALID_DOORBELL_ID;
 
-	client->ctx_index = (uint32_t)ida_simple_get(&guc->ctx_ids, 0,
-			GUC_MAX_GPU_CONTEXTS, GFP_KERNEL);
-	if (client->ctx_index >= GUC_MAX_GPU_CONTEXTS) {
-		client->ctx_index = GUC_INVALID_CTX_ID;
+	client->smurf_index = (uint32_t)ida_simple_get(&guc->smurf_ids, 0,
+			GUC_MAX_GPU_SMURFS, GFP_KERNEL);
+	if (client->smurf_index >= GUC_MAX_GPU_SMURFS) {
+		client->smurf_index = GUC_INVALID_SMURF_ID;
 		goto err;
 	}
 
@@ -751,7 +763,7 @@ guc_client_alloc(struct drm_i915_private *dev_priv,
 		client->proc_desc_offset = (GUC_DB_SIZE / 2);
 
 	guc_proc_desc_init(guc, client);
-	guc_ctx_desc_init(guc, client);
+	guc_smurf_desc_init(guc, client);
 
 	/* For runtime client allocation we need to enable the doorbell. Not
 	 * required yet for the static execbuf_client as this special kernel
@@ -760,8 +772,8 @@ guc_client_alloc(struct drm_i915_private *dev_priv,
 	 * guc_update_doorbell_id(guc, client, db_id);
 	 */
 
-	DRM_DEBUG_DRIVER("new priority %u client %p for engine(s) 0x%x: ctx_index %u\n",
-		priority, client, client->engines, client->ctx_index);
+	DRM_DEBUG_DRIVER("new priority %u client %p for engine(s) 0x%x: smurf_index %u\n",
+		priority, client, client->engines, client->smurf_index);
 	DRM_DEBUG_DRIVER("doorbell id %u, cacheline offset 0x%x\n",
 		client->doorbell_id, client->doorbell_offset);
 
@@ -871,8 +883,8 @@ static void guc_addon_create(struct intel_guc *guc)
  */
 int i915_guc_submission_init(struct drm_i915_private *dev_priv)
 {
-	const size_t ctxsize = sizeof(struct guc_context_desc);
-	const size_t poolsize = GUC_MAX_GPU_CONTEXTS * ctxsize;
+	const size_t ctxsize = sizeof(struct guc_smurf_desc);
+	const size_t poolsize = GUC_MAX_GPU_SMURFS * ctxsize;
 	const size_t gemsize = round_up(poolsize, PAGE_SIZE);
 	struct intel_guc *guc = &dev_priv->guc;
 	struct i915_vma *vma;
@@ -887,15 +899,15 @@ int i915_guc_submission_init(struct drm_i915_private *dev_priv)
 	if (!i915.enable_guc_submission)
 		return 0; /* not enabled  */
 
-	if (guc->ctx_pool_vma)
+	if (guc->smurf_pool_vma)
 		return 0; /* already allocated */
 
 	vma = intel_guc_allocate_vma(guc, gemsize);
 	if (IS_ERR(vma))
 		return PTR_ERR(vma);
 
-	guc->ctx_pool_vma = vma;
-	ida_init(&guc->ctx_ids);
+	guc->smurf_pool_vma = vma;
+	ida_init(&guc->smurf_ids);
 	intel_guc_log_create(guc);
 	guc_addon_create(guc);
 
@@ -983,9 +995,9 @@ void i915_guc_submission_fini(struct drm_i915_private *dev_priv)
 	i915_vma_unpin_and_release(&guc->ads_vma);
 	i915_vma_unpin_and_release(&guc->log.vma);
 
-	if (guc->ctx_pool_vma)
-		ida_destroy(&guc->ctx_ids);
-	i915_vma_unpin_and_release(&guc->ctx_pool_vma);
+	if (guc->smurf_pool_vma)
+		ida_destroy(&guc->smurf_ids);
+	i915_vma_unpin_and_release(&guc->smurf_pool_vma);
 }
 
 /**
@@ -1040,5 +1052,3 @@ int intel_guc_resume(struct drm_i915_private *dev_priv)
 
 	return intel_guc_send(guc, data, ARRAY_SIZE(data));
 }
-
-
