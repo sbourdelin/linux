@@ -385,11 +385,11 @@ static int vsc85xx_edge_rate_magic_get(struct phy_device *phydev)
 	if (!of_node)
 		return -ENODEV;
 
-	rc = of_property_read_u16(of_node, "vsc8531,vddmac", &vdd);
+	rc = of_property_read_u16(of_node, "mscc,vddmac", &vdd);
 	if (rc != 0)
 		vdd = MSCC_VDDMAC_3300;
 
-	rc = of_property_read_u8(of_node, "vsc8531,edge-slowdown", &sd);
+	rc = of_property_read_u8(of_node, "mscc,edge-slowdown", &sd);
 	if (rc != 0)
 		sd = 0;
 
@@ -403,25 +403,43 @@ static int vsc85xx_edge_rate_magic_get(struct phy_device *phydev)
 }
 
 static int vsc85xx_dt_led_mode_get(struct phy_device *phydev,
-				   char *led,
-				   u8 default_mode)
+				   char *led)
 {
 	struct device *dev = &phydev->mdio.dev;
 	struct device_node *of_node = dev->of_node;
-	u8 led_mode;
-	int err;
+	struct vsc8531_private *vsc8531 = phydev->priv;
+	u8 led_0_mode = VSC8531_LINK_1000_ACTIVITY;
+	u8 led_1_mode = VSC8531_LINK_100_ACTIVITY;
+	const __be32 *paddr_end;
+	const __be32 *paddr;
+	int len;
 
 	if (!of_node)
 		return -ENODEV;
 
-	led_mode = default_mode;
-	err = of_property_read_u8(of_node, led, &led_mode);
-	if (!err && (led_mode > 15 || led_mode == 7 || led_mode == 11)) {
-		phydev_err(phydev, "DT %s invalid\n", led);
+	paddr = of_get_property(of_node, "mscc,led-mode", &len);
+	if (!paddr)
 		return -EINVAL;
+
+	paddr_end = paddr + (len /= sizeof(*paddr));
+	while (paddr + 1 < paddr_end) {
+		led_0_mode = be32_to_cpup(paddr++);
+		led_1_mode = be32_to_cpup(paddr++);
 	}
 
-	return led_mode;
+	if (!len && (led_0_mode > 15 || led_0_mode == 7 || led_0_mode == 11)) {
+		phydev_err(phydev, "DT %s-0 invalid\n", led);
+		return -EINVAL;
+	}
+	vsc8531->led_0_mode = led_0_mode;
+
+	if (!len && (led_1_mode > 15 || led_1_mode == 7 || led_1_mode == 11)) {
+		phydev_err(phydev, "DT %s-1 invalid\n", led);
+		return -EINVAL;
+	}
+	vsc8531->led_1_mode = led_1_mode;
+
+	return 0;
 }
 
 #else
@@ -641,17 +659,9 @@ static int vsc85xx_probe(struct phy_device *phydev)
 	vsc8531->rate_magic = rate_magic;
 
 	/* LED[0] and LED[1] mode */
-	led_mode = vsc85xx_dt_led_mode_get(phydev, "vsc8531,led-0-mode",
-					   VSC8531_LINK_1000_ACTIVITY);
+	led_mode = vsc85xx_dt_led_mode_get(phydev, "mscc,led-mode");
 	if (led_mode < 0)
 		return led_mode;
-	vsc8531->led_0_mode = led_mode;
-
-	led_mode = vsc85xx_dt_led_mode_get(phydev, "vsc8531,led-1-mode",
-					   VSC8531_LINK_100_ACTIVITY);
-	if (led_mode < 0)
-		return led_mode;
-	vsc8531->led_1_mode = led_mode;
 
 	return 0;
 }
