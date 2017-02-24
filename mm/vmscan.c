@@ -2626,6 +2626,15 @@ static bool shrink_node(pg_data_t *pgdat, struct scan_control *sc)
 	} while (should_continue_reclaim(pgdat, sc->nr_reclaimed - nr_reclaimed,
 					 sc->nr_scanned - nr_scanned, sc));
 
+	/*
+	 * Kswapd gives up on balancing particular nodes after too
+	 * many failures to reclaim anything from them. If reclaim
+	 * progress happens, reset the failure counter. A successful
+	 * direct reclaim run will knock a stuck kswapd loose again.
+	 */
+	if (reclaimable)
+		pgdat->kswapd_failures = 0;
+
 	return reclaimable;
 }
 
@@ -3134,6 +3143,10 @@ static bool prepare_kswapd_sleep(pg_data_t *pgdat, int order, int classzone_idx)
 	if (waitqueue_active(&pgdat->pfmemalloc_wait))
 		wake_up_all(&pgdat->pfmemalloc_wait);
 
+	/* Hopeless node, leave it to direct reclaim */
+	if (pgdat->kswapd_failures >= MAX_RECLAIM_RETRIES)
+		return true;
+
 	for (i = 0; i <= classzone_idx; i++) {
 		struct zone *zone = pgdat->node_zones + i;
 
@@ -3315,6 +3328,9 @@ static int balance_pgdat(pg_data_t *pgdat, int order, int classzone_idx)
 		if (raise_priority || !sc.nr_reclaimed)
 			sc.priority--;
 	} while (sc.priority >= 1);
+
+	if (!sc.nr_reclaimed)
+		pgdat->kswapd_failures++;
 
 out:
 	/*
@@ -3513,6 +3529,10 @@ void wakeup_kswapd(struct zone *zone, int order, enum zone_type classzone_idx)
 	pgdat->kswapd_classzone_idx = max(pgdat->kswapd_classzone_idx, classzone_idx);
 	pgdat->kswapd_order = max(pgdat->kswapd_order, order);
 	if (!waitqueue_active(&pgdat->kswapd_wait))
+		return;
+
+	/* Hopeless node, leave it to direct reclaim */
+	if (pgdat->kswapd_failures >= MAX_RECLAIM_RETRIES)
 		return;
 
 	/* Only wake kswapd if all zones are unbalanced */
