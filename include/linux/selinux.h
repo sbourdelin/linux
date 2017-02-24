@@ -24,11 +24,18 @@ struct kern_ipc_perm;
  * selinux_is_enabled - is SELinux enabled?
  */
 bool selinux_is_enabled(void);
+int security_current_sid_to_context(char **scontext, u32 *scontext_len);
 #else
 
 static inline bool selinux_is_enabled(void)
 {
 	return false;
+}
+
+static inline int
+security_current_sid_to_context(char **scontext, u32 *scontext_len)
+{
+	return -EINVAL;
 }
 #endif	/* CONFIG_SECURITY_SELINUX */
 
