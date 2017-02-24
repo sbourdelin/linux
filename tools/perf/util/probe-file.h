@@ -4,6 +4,7 @@
 #include "strlist.h"
 #include "strfilter.h"
 #include "probe-event.h"
+#include "parse-events.h"
 
 /* Cache of probe definitions */
 struct probe_cache_entry {
@@ -17,6 +18,28 @@ struct probe_cache_entry {
 struct probe_cache {
 	int	fd;
 	struct list_head entries;
+};
+
+struct sdt_event_list {
+	char *event_info;
+	struct list_head list;
+
+	/*
+	 * Flag to check whether this event already exists in urobe_events
+	 * file. This helps at a time of freeing sdt_event_list.
+	 */
+	bool existing_event;
+};
+
+/*
+ * This maintains list of sdt events which are already exists in
+ * uprobe_events file at the time of creating probe point for any
+ * sdt event with 'perf record'.
+ */
+struct exst_sdt_event_list {
+	struct probe_trace_event *tev;
+	struct list_head list;
+	bool match;	/* Does this event match with any new event */
 };
 
 enum probe_type {
@@ -64,6 +87,10 @@ struct probe_cache_entry *probe_cache__find_by_name(struct probe_cache *pcache,
 					const char *group, const char *event);
 int probe_cache__show_all_caches(struct strfilter *filter);
 bool probe_type_is_available(enum probe_type type);
+int add_sdt_event(char *event, struct list_head *sdt_events,
+		  struct parse_events_error *err);
+void remove_sdt_event_list(struct list_head *sdt_event_list);
+void free_sdt_list(struct list_head *sdt_events);
 #else	/* ! HAVE_LIBELF_SUPPORT */
 static inline struct probe_cache *probe_cache__new(const char *tgt __maybe_unused)
 {

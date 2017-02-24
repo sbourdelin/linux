@@ -103,19 +103,10 @@ int tracing_path__strerror_open_tp(int err, char *buf, size_t size,
 		 * - jirka
 		 */
 		if (debugfs__configured() || tracefs__configured()) {
-			/* sdt markers */
-			if (!strncmp(filename, "sdt_", 4)) {
-				snprintf(buf, size,
-					"Error:\tFile %s/%s not found.\n"
-					"Hint:\tSDT event cannot be directly recorded on.\n"
-					"\tPlease first use 'perf probe %s:%s' before recording it.\n",
-					tracing_events_path, filename, sys, name);
-			} else {
-				snprintf(buf, size,
-					 "Error:\tFile %s/%s not found.\n"
-					 "Hint:\tPerhaps this kernel misses some CONFIG_ setting to enable this feature?.\n",
-					 tracing_events_path, filename);
-			}
+			snprintf(buf, size,
+				 "Error:\tFile %s/%s not found.\n"
+				 "Hint:\tPerhaps this kernel misses some CONFIG_ setting to enable this feature?.\n",
+				 tracing_events_path, filename);
 			break;
 		}
 		snprintf(buf, size, "%s",

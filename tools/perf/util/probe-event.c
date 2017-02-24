@@ -1293,7 +1293,7 @@ err:
 	return err;
 }
 
-static int parse_perf_probe_event_name(char **arg, struct perf_probe_event *pev)
+int parse_perf_probe_event_name(char **arg, struct perf_probe_event *pev)
 {
 	char *ptr;
 
@@ -3166,6 +3166,12 @@ static int find_cached_events_all(struct perf_probe_event *pev,
 	return ret;
 }
 
+int find_sdt_events_from_cache(struct perf_probe_event *pev,
+			       struct probe_trace_event **tevs)
+{
+	return find_cached_events_all(pev, tevs);
+}
+
 static int find_probe_trace_events_from_cache(struct perf_probe_event *pev,
 					      struct probe_trace_event **tevs)
 {
@@ -3475,4 +3481,40 @@ int copy_to_probe_trace_arg(struct probe_trace_arg *tvar,
 	} else
 		tvar->name = NULL;
 	return 0;
+}
+
+/*
+ * Record session for SDT events has ended. Delete the SDT events
+ * from uprobe_events file that were created initially.
+ */
+void remove_sdt_event_list(struct list_head *sdt_events)
+{
+	struct sdt_event_list *event;
+	struct strfilter *filter = NULL;
+	const char *err = NULL;
+	int ret = 0;
+
+	if (list_empty(sdt_events))
+		return;
+
+	list_for_each_entry(event, sdt_events, list) {
+		if (event->existing_event)
+			continue;
+		if (!filter) {
+			filter = strfilter__new(event->event_info, &err);
+			if (!filter)
+				goto free_list;
+		} else {
+			ret = strfilter__or(filter, event->event_info, &err);
+		}
+	}
+
+	if (filter)
+		ret = del_perf_probe_events(filter);
+
+	if (ret)
+		pr_err("Error in deleting the SDT list\n");
+
+free_list:
+	free_sdt_list(sdt_events);
 }

@@ -76,4 +76,6 @@ struct record_opts {
 struct option;
 extern const char * const *record_usage;
 extern struct option *record_options;
+
+bool is_cmd_record(void);
 #endif

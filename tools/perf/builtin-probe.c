@@ -45,6 +45,7 @@
 #define DEFAULT_VAR_FILTER "!__k???tab_* & !__crc_*"
 #define DEFAULT_FUNC_FILTER "!_*"
 #define DEFAULT_LIST_FILTER "*"
+#define MAX_EVENT_LENGTH 512
 
 /* Session management structure */
 static struct {
@@ -312,6 +313,19 @@ static void pr_err_with_code(const char *msg, int err)
 	pr_err("\n");
 }
 
+/* Show how to use the event. */
+static void record_syntax_hint(const char *group, const char *event)
+{
+	char ge[MAX_EVENT_LENGTH];
+
+	pr_info("\nYou can now use it in all perf tools, such as:\n\n");
+	pr_info("\tperf record -e %s:%s -aR sleep 1\n\n", group, event);
+
+	snprintf(ge, strlen(group) + strlen(event) + 2, "%s:%s", group, event);
+	if (is_sdt_event(ge))
+		pr_info("Hint: SDT event can be directly recorded with 'perf record'. No need to create probe manually.\n");
+}
+
 static int perf_add_probe_events(struct perf_probe_event *pevs, int npevs)
 {
 	int ret;
@@ -356,11 +370,8 @@ static int perf_add_probe_events(struct perf_probe_event *pevs, int npevs)
 	}
 
 	/* Note that it is possible to skip all events because of blacklist */
-	if (event) {
-		/* Show how to use the event. */
-		pr_info("\nYou can now use it in all perf tools, such as:\n\n");
-		pr_info("\tperf record -e %s:%s -aR sleep 1\n\n", group, event);
-	}
+	if (event)
+		record_syntax_hint(group, event);
 
 out_cleanup:
 	cleanup_perf_probe_events(pevs, npevs);

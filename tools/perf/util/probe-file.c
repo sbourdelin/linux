@@ -27,8 +27,10 @@
 #include "probe-event.h"
 #include "probe-file.h"
 #include "session.h"
+#include "probe-finder.h"
 
 #define MAX_CMDLEN 256
+#define MAX_EVENT_LENGTH 512
 
 static void print_open_warning(int err, bool uprobe)
 {
@@ -931,5 +933,379 @@ bool probe_type_is_available(enum probe_type type)
 end:
 	free(buf);
 
+	return ret;
+}
+
+void free_sdt_list(struct list_head *sdt_events)
+{
+	struct sdt_event_list *tmp, *ptr;
+
+	if (list_empty(sdt_events))
+		return;
+	list_for_each_entry_safe(tmp, ptr, sdt_events, list) {
+		list_del(&tmp->list);
+		free(tmp->event_info);
+		free(tmp);
+	}
+}
+
+static int alloc_exst_sdt_event(struct exst_sdt_event_list **esl)
+{
+	struct exst_sdt_event_list *tmp;
+
+	tmp = zalloc(sizeof(*tmp));
+	if (!tmp)
+		return -ENOMEM;
+
+	tmp->tev = zalloc(sizeof(struct probe_trace_event));
+	if (!tmp->tev) {
+		free(tmp);
+		return -ENOMEM;
+	}
+
+	tmp->match = false;
+	*esl = tmp;
+	return 0;
+}
+
+static void free_exst_sdt_event(struct exst_sdt_event_list *esl)
+{
+	if (!esl)
+		return;
+
+	if (esl->tev) {
+		free(esl->tev->args);
+		free(esl->tev);
+	}
+
+	free(esl);
+}
+
+static void probe_file__free_exst_sdt_list(struct exst_sdt_event_list *esl)
+{
+	struct list_head *pos, *q;
+	struct exst_sdt_event_list *tmp;
+
+	list_for_each_safe(pos, q, &(esl->list)) {
+		tmp = list_entry(pos, struct exst_sdt_event_list, list);
+		free_exst_sdt_event(tmp);
+		list_del(pos);
+	}
+}
+
+/*
+ * Look into uprobe_events file and prepare list of sdt events
+ * whose probepoint is already registered.
+ */
+static int probe_file__get_exst_sdt_list(struct exst_sdt_event_list *esl)
+{
+	int fd, ret = 0;
+	struct strlist *rawlist;
+	struct str_node *ent;
+	struct exst_sdt_event_list *tmp = NULL;
+
+	fd = probe_file__open(PF_FL_RW | PF_FL_UPROBE);
+	if (fd < 0)
+		return fd;
+
+	rawlist = probe_file__get_rawlist(fd);
+
+	strlist__for_each_entry(ent, rawlist) {
+		ret = alloc_exst_sdt_event(&tmp);
+		if (ret < 0)
+			goto error;
+
+		ret = parse_probe_trace_command(ent->s, tmp->tev);
+		if (ret < 0) {
+			free_exst_sdt_event(tmp);
+			goto error;
+		}
+
+		if (!strncmp(tmp->tev->group, "sdt_", 4))
+			list_add_tail(&(tmp->list), &(esl->list));
+		else
+			free_exst_sdt_event(tmp);
+	}
+	return 0;
+
+error:
+	probe_file__free_exst_sdt_list(esl);
+	return ret;
+}
+
+/*
+ * Remove ith tev from pev->tevs list and shift remaining
+ * tevs(i+1 to pev->ntevs) one step.
+ */
+static void shift_pev(struct perf_probe_event *pev, int i)
+{
+	int j;
+
+	free(pev->tevs[i].event);
+	free(pev->tevs[i].group);
+	free(pev->tevs[i].args);
+	free(pev->tevs[i].point.realname);
+	free(pev->tevs[i].point.symbol);
+	free(pev->tevs[i].point.module);
+
+	/*
+	 * If ith element is last element, no need to shift,
+	 * just decrement pev->ntevs.
+	 */
+	if (i == pev->ntevs - 1)
+		goto ret;
+
+	for (j = i; j < pev->ntevs - 1; j++) {
+		pev->tevs[j].event          = pev->tevs[j + 1].event;
+		pev->tevs[j].group          = pev->tevs[j + 1].group;
+		pev->tevs[j].nargs          = pev->tevs[j + 1].nargs;
+		pev->tevs[j].uprobes        = pev->tevs[j + 1].uprobes;
+		pev->tevs[j].args           = pev->tevs[j + 1].args;
+		pev->tevs[j].point.realname = pev->tevs[j + 1].point.realname;
+		pev->tevs[j].point.symbol   = pev->tevs[j + 1].point.symbol;
+		pev->tevs[j].point.module   = pev->tevs[j + 1].point.module;
+		pev->tevs[j].point.offset   = pev->tevs[j + 1].point.offset;
+		pev->tevs[j].point.address  = pev->tevs[j + 1].point.address;
+		pev->tevs[j].point.retprobe = pev->tevs[j + 1].point.retprobe;
+	}
+
+ret:
+	pev->ntevs--;
+}
+
+/* Compare address and filename */
+static bool is_sdt_match(struct probe_trace_event *tev1,
+			 struct probe_trace_event *tev2)
+{
+	return (tev1->point.address == tev2->point.address &&
+		!(strcmp(tev1->point.module, tev2->point.module)));
+}
+
+/*
+ * Filter out all those pev->tevs which already exists in uprobe_events.
+ * Return 'true' if any matching entry found otherwise return 'false'.
+ */
+static bool filter_exst_sdt_events_from_pev(struct perf_probe_event *pev,
+					    struct exst_sdt_event_list *esl)
+{
+	int i;
+	bool ret = false;
+	struct exst_sdt_event_list *tmp;
+
+	list_for_each_entry(tmp, &(esl->list), list) {
+		for (i = 0; i < pev->ntevs; i++) {
+			if (is_sdt_match(&(pev->tevs[i]), tmp->tev)) {
+				shift_pev(pev, i);
+				tmp->match = true;
+				ret = true;
+			}
+		}
+	}
+
+	return ret;
+}
+
+static int list_add_sdt_event(struct list_head *sdt_events,
+			      bool existing_event,
+			      struct probe_trace_event *tev)
+{
+	struct sdt_event_list *tmp;
+
+	tmp = zalloc(sizeof(*tmp));
+	if (!tmp)
+		return -ENOMEM;
+
+	tmp->existing_event = existing_event;
+
+	INIT_LIST_HEAD(&tmp->list);
+	tmp->event_info = zalloc(MAX_EVENT_LENGTH * sizeof(char));
+	if (!tmp->event_info) {
+		free(tmp);
+		return -ENOMEM;
+	}
+
+	snprintf(tmp->event_info, strlen(tev->group) + strlen(tev->event) + 2,
+		 "%s:%s", tev->group, tev->event);
+
+	list_add(&tmp->list, sdt_events);
+
+	return 0;
+}
+
+static void print_exst_sdt_events(struct exst_sdt_event_list *tmp)
+{
+	static bool msg_head;
+
+	if (!msg_head) {
+		pr_info("Matching event(s) from uprobe_events:\n");
+		msg_head = true;
+	}
+
+	pr_info("   %s:%s  0x%" PRIx64 "@%s\n", tmp->tev->group,
+		tmp->tev->event, tmp->tev->point.address,
+		tmp->tev->point.module);
+}
+
+static void print_exst_sdt_event_footer(void)
+{
+	pr_info("Use 'perf probe -d <event>' to delete event(s).\n\n");
+}
+
+/*
+ * If there is entry with the same name in uprobe_events, record it.
+ * Return value  0: no error, not found
+ *              <0: error
+ *              >0: found
+ */
+static int probe_file__add_exst_sdt_event(struct exst_sdt_event_list *esl,
+					  struct list_head *sdt_events,
+					  struct perf_probe_event *pev)
+{
+	struct exst_sdt_event_list *tmp;
+	int ret = 0;
+
+	list_for_each_entry(tmp, &(esl->list), list) {
+		if (strcmp(tmp->tev->group, pev->group) ||
+		    strcmp(tmp->tev->event, pev->event))
+			continue;
+
+		tmp->match = true;
+
+		ret = list_add_sdt_event(sdt_events, true, tmp->tev);
+		if (ret < 0)
+			return ret;
+
+		print_exst_sdt_events(tmp);
+		print_exst_sdt_event_footer();
+		if (pev->ntevs > 1)
+			pr_warning("Warning: Found %d events from probe-cache with name '%s:%s'.\n"
+				"\t Since probe point already exists with this name, recording only 1 event.\n"
+				"Hint: Please use 'perf probe -d %s:%s*' to allow record on all events.\n\n",
+				pev->ntevs, pev->group, pev->event, pev->group, pev->event);
+		return 1;
+	}
+	return 0;
+}
+
+int add_sdt_event(char *event, struct list_head *sdt_events,
+		  struct parse_events_error *err)
+{
+	struct perf_probe_event *pev;
+	int ret = 0, i, ctr = 0, found = 0, exst_ctr = 0;
+	char *str;
+	struct exst_sdt_event_list *tmp;
+	struct exst_sdt_event_list esl;
+	bool filter;
+
+	pev = zalloc(sizeof(*pev));
+	if (!pev)
+		return -ENOMEM;
+
+	pev->sdt = true;
+	pev->uprobes = true;
+
+	str = strdup(event);
+	if (!str)
+		return -ENOMEM;
+
+	/*
+	 * Parse event to find the group name and event name of
+	 * the sdt event.
+	 */
+	ret = parse_perf_probe_event_name(&event, pev);
+	if (ret) {
+		pr_err("Error in parsing sdt event %s\n", str);
+		free(pev);
+		goto free_str;
+	}
+
+	probe_conf.max_probes = MAX_PROBES;
+	probe_conf.force_add = 1;
+
+	/*
+	 * Find the sdt event from the cache. We deliberately check failure
+	 * of this function after checking entries in uprobe_events. Because,
+	 * we may find matching entry from uprobe_events and in that case we
+	 * should continue recording that event.
+	 */
+	pev->ntevs = find_sdt_events_from_cache(pev, &pev->tevs);
+
+	/* Prepare list of existing sdt events from uprobe_events */
+	INIT_LIST_HEAD(&esl.list);
+	ret = probe_file__get_exst_sdt_list(&esl);
+	if (ret < 0)
+		goto free_str;
+
+	/* If there is entry with the same name in uprobe_events, record it. */
+	found = probe_file__add_exst_sdt_event(&esl, sdt_events, pev);
+	if (found) {
+		ret = (found > 0) ? 0 : found;
+		goto free_str;
+	}
+
+	/* Reaching here means no matching entry found in uprobe_events. */
+	filter = filter_exst_sdt_events_from_pev(pev, &esl);
+	if (!filter && pev->ntevs == 0) {
+		pr_err("%s:%s not found in the cache\n", pev->group,
+			pev->event);
+		ret = -EINVAL;
+		goto free_str;
+	} else if (pev->ntevs < 0) {
+		err->str = strdup("Cache lookup failed.\n");
+		ret = pev->ntevs;
+		goto free_str;
+	}
+
+	/* Create probe points for new events. */
+	ret = apply_perf_probe_events(pev, 1);
+	if (ret) {
+		pr_err("Error in adding SDT event : %s\n", event);
+		goto free_str;
+	}
+
+	/* Add existing event names to "sdt_events" list */
+	list_for_each_entry(tmp, &(esl.list), list) {
+		if (!tmp->match)
+			continue;
+
+		ret = list_add_sdt_event(sdt_events, true, tmp->tev);
+		if (ret < 0)
+			goto free_str;
+		print_exst_sdt_events(tmp);
+		ctr++;
+		exst_ctr++;
+	}
+	if (exst_ctr)
+		print_exst_sdt_event_footer();
+
+	/* Add new event names to "sdt_events" list */
+	for (i = 0; i < pev->ntevs; i++) {
+		ret = list_add_sdt_event(sdt_events, false, &(pev->tevs[i]));
+		if (ret < 0)
+			goto free_str;
+
+		ctr++;
+	}
+
+	/* Print warning for multiple events */
+	if (ctr > 1)
+		pr_warning("Warning: Recording on %d occurrences of %s:%s\n",
+			   ctr, pev->group, pev->event);
+
+free_str:
+	/*
+	 * User may ask for multiple events in the same record command like,
+	 *    perf record -a -e sdt_lib1:* -e sdt_a:b
+	 *
+	 * If sdt_lib1:* events are already added and there is some failure
+	 * for sdt_a:b, we need to clean sdt_lib1:* events from
+	 * record.sdt_event_list
+	 */
+	if (ret < 0)
+		sdt_event_list__remove();
+
+	free(str);
+	probe_file__free_exst_sdt_list(&esl);
+	cleanup_perf_probe_events(pev, 1);
 	return ret;
 }
