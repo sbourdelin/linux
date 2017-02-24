@@ -40,6 +40,21 @@
 #define ERR_EC_ESL_MISMATCH		-1
 #define ERR_DEEP_STATE_ESL_MISMATCH	-2
 
+/* Additional defs for debug and trace */
+
+#define RL_SHIFT      0
+#define MTL_SHIFT     4
+#define TR_SHIFT      8
+#define PSLL_SHIFT    16
+#define EC_SHIFT      20
+#define ESL_SHIFT     21
+#define INIT_PSSCR(ESL, EC, PSLL, TR, MTL, RL)	(((ESL) << (ESL_SHIFT)) | \
+						 ((EC) << (EC_SHIFT)) | \
+						 ((PSLL) << (PSLL_SHIFT)) | \
+						 ((TR) << (TR_SHIFT)) | \
+						 ((MTL) << (MTL_SHIFT)) | \
+						 ((RL) << (RL_SHIFT)))
+
 #ifndef __ASSEMBLY__
 extern u32 pnv_fastsleep_workaround_at_entry[];
 extern u32 pnv_fastsleep_workaround_at_exit[];

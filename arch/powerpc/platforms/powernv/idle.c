@@ -524,6 +524,17 @@ static int __init pnv_init_idle_states(void)
 
 	pnv_alloc_idle_core_states();
 
+	/* On POWER9 DD1, enter stop2 with ESL=EC=1 on Hotplug */
+	if (cpu_has_feature(CPU_FTR_POWER9_DD1)) {
+		pnv_deepest_stop_psscr_val =
+				/* ESL, EC, PSSL, TR,  MTL, RL */
+			INIT_PSSCR(0x1, 0x1, 0xf, 0x3, 0x3, 0x2);
+		pnv_deepest_stop_psscr_mask = PSSCR_HV_DEFAULT_MASK;
+		pr_warn("Overriding deepest_stop_psscr to: val=0x%016llx,mask=0x%016llx\n",
+			pnv_deepest_stop_psscr_val,
+			pnv_deepest_stop_psscr_mask);
+	}
+
 	if (supported_cpuidle_states & OPAL_PM_NAP_ENABLED)
 		ppc_md.power_save = power7_idle;
 	else if (supported_cpuidle_states & OPAL_PM_STOP_INST_FAST)
