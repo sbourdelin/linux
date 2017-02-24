@@ -219,6 +219,8 @@ gss_alloc_context(void)
 		ctx->gc_seq = 1;	/* NetApp 6.4R1 doesn't accept seq. no. 0 */
 		spin_lock_init(&ctx->gc_seq_lock);
 		atomic_set(&ctx->count,1);
+		INIT_LIST_HEAD(&ctx->gc_alist.assert_list);
+		spin_lock_init(&ctx->gc_alist.assert_lock);
 	}
 	return ctx;
 }
@@ -1610,6 +1612,35 @@ static int gss_cred_is_negative_entry(struct rpc_cred *cred)
 }
 
 /**
+ * The gss3_handle and gss3_assertions are allocated in gss3_dec_label
+ */
+static struct gss3_assert *
+gss3_alloc_init_assertion(struct gss3_create_res *cres)
+{
+	struct gss3_assert *ret;
+
+	ret = kzalloc(sizeof(*ret), GFP_NOFS);
+	if (!ret)
+		return ERR_PTR(-ENOMEM);
+
+	INIT_LIST_HEAD(&ret->gss3_list);
+	ret->gss3_handle.len = cres->cr_hlen;
+	ret->gss3_handle.data = cres->cr_handle;
+	ret->gss3_num = cres->cr_num;
+	ret->gss3_assertion = cres->cr_assertions;
+	return ret;
+}
+
+void
+gss3_insert_assertion(struct gss3_assert_list *alist, struct gss3_assert *g3a)
+{
+	spin_lock(&alist->assert_lock);
+	/* list_add_tail_rcu(new,head) inserts new before head */
+	list_add_tail_rcu(&g3a->gss3_list, &alist->assert_list);
+	spin_unlock(&alist->assert_lock);
+}
+
+/**
  * GSS3_createargs_maxsz and GSS3_createres_maxsz
  * include no rgss3_assertion_u payload.
  */
@@ -1820,6 +1851,7 @@ gss3_proc_create(struct rpc_cred *cred, struct gss3_assertion_u *asserts,
 		.cr_mp_auth = 0,
 	};
 	struct gss3_create_args *cargs = NULL;
+	struct gss3_assert *g3a = NULL;
 	int ret = -EINVAL;
 
 	if (!ctx || !asserts)
@@ -1856,6 +1888,13 @@ gss3_proc_create(struct rpc_cred *cred, struct gss3_assertion_u *asserts,
 		goto out_free_assert;
 	}
 	rpc_put_task(task);
+
+	g3a = gss3_alloc_init_assertion(&cres);
+	if (IS_ERR(g3a)) {
+		ret = PTR_ERR(task);
+		goto out_free_assert;
+	}
+	gss3_insert_assertion(&ctx->gc_alist, g3a);
 
 out_free_assert:
 	kfree(cargs->ca_assertions);
