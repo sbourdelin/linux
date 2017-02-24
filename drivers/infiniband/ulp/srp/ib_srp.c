@@ -2039,12 +2039,12 @@ static void srp_recv_done(struct ib_cq *cq, struct ib_wc *wc)
 
 	opcode = *(u8 *) iu->buf;
 
-	if (0) {
-		shost_printk(KERN_ERR, target->scsi_host,
-			     PFX "recv completion, opcode 0x%02x\n", opcode);
-		print_hex_dump(KERN_ERR, "", DUMP_PREFIX_OFFSET, 8, 1,
-			       iu->buf, wc->byte_len, true);
-	}
+#if 0
+	shost_printk(KERN_ERR, target->scsi_host,
+			PFX "recv completion, opcode 0x%02x\n", opcode);
+	print_hex_dump(KERN_ERR, "", DUMP_PREFIX_OFFSET, 8, 1,
+			iu->buf, wc->byte_len, true);
+#endif
 
 	switch (opcode) {
 	case SRP_RSP:
