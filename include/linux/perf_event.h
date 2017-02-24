@@ -165,6 +165,18 @@ struct hw_perf_event {
 			struct list_head		bp_list;
 		};
 #endif
+		struct { /* amd_iommu */
+			u8	iommu_bank;
+			u8	iommu_cntr;
+			u8	iommu_csource;
+			u8	padding;
+			u16	iommu_devid;
+			u16	iommu_devid_msk;
+			u16	iommu_domid;
+			u16	iommu_domid_msk;
+			u32	iommu_pasid;
+			u32	iommu_pasid_msk;
+		};
 	};
 	/*
 	 * If the event is a per task event, this will point to the task in
