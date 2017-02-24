@@ -878,30 +878,27 @@ static void XGIfb_post_setmode(struct xgifb_video_info *xgifb_info)
 			}
 
 			if ((filter >= 0) && (filter <= 7)) {
+				const u8 *f = XGI_TV_filter[filter_tb].filter[filter];
+
 				pr_debug("FilterTable[%d]-%d: %*ph\n",
 					 filter_tb, filter,
-					 4, XGI_TV_filter[filter_tb].
-						   filter[filter]);
+					 4, f);
 				xgifb_reg_set(
 					XGIPART2,
 					0x35,
-					(XGI_TV_filter[filter_tb].
-						filter[filter][0]));
-				xgifb_reg_set(
+					(f[0]));
+			        xgifb_reg_set(
 					XGIPART2,
 					0x36,
-					(XGI_TV_filter[filter_tb].
-						filter[filter][1]));
-				xgifb_reg_set(
+					(f[1]));
+			        xgifb_reg_set(
 					XGIPART2,
 					0x37,
-					(XGI_TV_filter[filter_tb].
-						filter[filter][2]));
+					(f[2]));
 				xgifb_reg_set(
 					XGIPART2,
 					0x38,
-					(XGI_TV_filter[filter_tb].
-						filter[filter][3]));
+					(f[3]));
 			}
 		}
 	}
