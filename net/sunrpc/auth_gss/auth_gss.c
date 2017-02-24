@@ -1869,6 +1869,11 @@ gss_wrap_req(struct rpc_task *task,
 	case RPC_GSS_SVC_PRIVACY:
 		status = gss_wrap_req_priv(cred, ctx, encode, rqstp, p, obj);
 		break;
+	default:
+		status = -EIO;
+		pr_warn("RPC    Unsupported service level %d\n",
+			gss_cred->gc_service);
+		break;
 	}
 out:
 	gss_put_ctx(ctx);
@@ -1979,6 +1984,11 @@ gss_unwrap_resp(struct rpc_task *task,
 		if (status)
 			goto out;
 		break;
+	default:
+		status = -EIO;
+		pr_warn("RPC    Unsupported service level %d\n",
+			gss_cred->gc_service);
+		goto out;
 	}
 	/* take into account extra slack for integrity and privacy cases: */
 	cred->cr_auth->au_rslack = cred->cr_auth->au_verfsize + (p - savedp)
