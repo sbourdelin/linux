@@ -1098,12 +1098,16 @@ static inline int kvm_ioeventfd(struct kvm *kvm, struct kvm_ioeventfd *args)
  *  3) remote request with data (= kick + mb)
  *
  * TODO:
- *  - completely encapsulate vcpu->requests
  *  - do not use __kvm_request* outside request helpers
  *  - do not use memory barrier in (1) and (2)
  *  - let architectures define custom vcpu kick
  *  - add kick when setting remote request
  */
+
+static inline bool kvm_request_pending(struct kvm_vcpu *vcpu)
+{
+	return READ_ONCE(vcpu->requests);
+}
 
 static inline void __kvm_request_set(unsigned req, struct kvm_vcpu *vcpu)
 {
