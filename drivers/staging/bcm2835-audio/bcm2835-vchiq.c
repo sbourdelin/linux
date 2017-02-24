@@ -31,12 +31,12 @@
 
 #include "bcm2835.h"
 
-/* ---- Include Files -------------------------------------------------------- */
+/*---- Include Files ----------------*/
 
 #include "interface/vchi/vchi.h"
 #include "vc_vchi_audioserv_defs.h"
 
-/* ---- Private Constants and Types ------------------------------------------ */
+/*--- Private Constants and Types ---*/
 
 #define BCM2835_AUDIO_STOP           0
 #define BCM2835_AUDIO_START          1
@@ -67,11 +67,11 @@ struct bcm2835_audio_instance {
 
 static bool force_bulk;
 
-/* ---- Private Variables ---------------------------------------------------- */
+/*---- Private Variables --------------*/
 
-/* ---- Private Function Prototypes ------------------------------------------ */
+/*---- Private Function Prototypes ----*/
 
-/* ---- Private Functions ---------------------------------------------------- */
+/*---- Private Functions --------------*/
 
 static int bcm2835_audio_stop_worker(struct bcm2835_alsa_stream *alsa_stream);
 static int bcm2835_audio_start_worker(struct bcm2835_alsa_stream *alsa_stream);
