@@ -387,8 +387,6 @@ mwifiex_sdio_remove(struct sdio_func *func)
 	if (!adapter || !adapter->priv_num)
 		return;
 
-	cancel_work_sync(&card->work);
-
 	mwifiex_dbg(adapter, INFO, "info: SDIO func num=%d\n", func->num);
 
 	ret = mwifiex_sdio_read_fw_status(adapter, &firmware_stat);
@@ -400,6 +398,7 @@ mwifiex_sdio_remove(struct sdio_func *func)
 		mwifiex_init_shutdown_fw(priv, MWIFIEX_FUNC_SHUTDOWN);
 	}
 
+	cancel_work_sync(&card->work);
 	mwifiex_remove_card(adapter);
 }
 
