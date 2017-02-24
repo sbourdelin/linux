@@ -1,6 +1,7 @@
 /* Copyright (C) 1995, 1996 Olaf Kirch <okir@monad.swb.de> */
 
 #include <linux/sched.h>
+#include <linux/selinux.h>
 #include "nfsd.h"
 #include "auth.h"
 
@@ -22,7 +23,7 @@ int nfsd_setuser(struct svc_rqst *rqstp, struct svc_export *exp)
 	struct group_info *rqgi;
 	struct group_info *gi;
 	struct cred *new;
-	int i;
+	int i, ret;
 	int flags = nfsexp_flags(rqstp, exp);
 
 	validate_process_creds();
@@ -77,6 +78,14 @@ int nfsd_setuser(struct svc_rqst *rqstp, struct svc_export *exp)
 	else
 		new->cap_effective = cap_raise_nfsd_set(new->cap_effective,
 							new->cap_permitted);
+
+	if (selinux_is_enabled() && rqstp->rq_authop->set_label &&
+	    (exp->ex_flags & NFSEXP_SECURITY_LABEL)) {
+		ret = rqstp->rq_authop->set_label(rqstp, new);
+		if (ret < 0)
+			/* Should nfsd fail this request? */
+			pr_warn("%s set_label FAILED  ret %d\n", __func__, ret);
+	}
 	validate_process_creds();
 	put_cred(override_creds(new));
 	put_cred(new);
