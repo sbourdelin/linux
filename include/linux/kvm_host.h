@@ -1084,24 +1084,45 @@ static inline int kvm_ioeventfd(struct kvm *kvm, struct kvm_ioeventfd *args)
 
 #endif /* CONFIG_HAVE_KVM_EVENTFD */
 
-static inline void kvm_make_request(int req, struct kvm_vcpu *vcpu)
+/*
+ * An API for setting KVM requests.
+ * The general API design is inspired by bit_* API.
+ *
+ * A request can be set either to itself or to a remote VCPU.  If the request
+ * is set to a remote VCPU, then the VCPU needs to be notified, which is
+ * usually done with kvm_vcpu_kick().
+ * The request can also mean that some data is ready, so a remote requests
+ * needs a smp_wmb().  i.e. there are three main types of requests:
+ *  1) local request
+ *  2) remote request with no data (= kick)
+ *  3) remote request with data (= kick + mb)
+ *
+ * TODO:
+ *  - completely encapsulate vcpu->requests
+ *  - do not use memory barrier in (1) and (2)
+ *  - let architectures define custom vcpu kick
+ *  - add kick when setting remote request
+ */
+static inline void kvm_request_set(unsigned req, struct kvm_vcpu *vcpu)
 {
 	/*
-	 * Ensure the rest of the request is published to kvm_check_request's
-	 * caller.  Paired with the smp_mb__after_atomic in kvm_check_request.
+	 * Ensure the rest of the request is published to
+	 * kvm_request_test_and_clear's caller.
+	 * Paired with the smp_mb__after_atomic in kvm_request_test_and_clear.
 	 */
 	smp_wmb();
 	set_bit(req, &vcpu->requests);
 }
 
-static inline bool kvm_check_request(int req, struct kvm_vcpu *vcpu)
+static inline bool kvm_request_test_and_clear(unsigned req, struct kvm_vcpu *vcpu)
 {
 	if (test_bit(req, &vcpu->requests)) {
 		clear_bit(req, &vcpu->requests);
 
 		/*
-		 * Ensure the rest of the request is visible to kvm_check_request's
-		 * caller.  Paired with the smp_wmb in kvm_make_request.
+		 * Ensure the rest of the request is visible to
+		 * kvm_request_test_and_clear's caller.
+		 * Paired with the smp_wmb in kvm_request_set.
 		 */
 		smp_mb__after_atomic();
 		return true;

@@ -2270,7 +2270,7 @@ static void vmx_vcpu_load(struct kvm_vcpu *vcpu, int cpu)
 		struct desc_ptr *gdt = this_cpu_ptr(&host_gdt);
 		unsigned long sysenter_esp;
 
-		kvm_make_request(KVM_REQ_TLB_FLUSH, vcpu);
+		kvm_request_set(KVM_REQ_TLB_FLUSH, vcpu);
 
 		/*
 		 * Linux uses per-cpu TSS and GDT, so set these when switching
@@ -2459,7 +2459,7 @@ static void vmx_queue_exception(struct kvm_vcpu *vcpu, unsigned nr,
 		if (kvm_exception_is_soft(nr))
 			inc_eip = vcpu->arch.event_exit_inst_len;
 		if (kvm_inject_realmode_interrupt(vcpu, nr, inc_eip) != EMULATE_DONE)
-			kvm_make_request(KVM_REQ_TRIPLE_FAULT, vcpu);
+			kvm_request_set(KVM_REQ_TRIPLE_FAULT, vcpu);
 		return;
 	}
 
@@ -4967,7 +4967,7 @@ static int vmx_deliver_nested_posted_interrupt(struct kvm_vcpu *vcpu,
 		 * we will accomplish it in the next vmentry.
 		 */
 		vmx->nested.pi_pending = true;
-		kvm_make_request(KVM_REQ_EVENT, vcpu);
+		kvm_request_set(KVM_REQ_EVENT, vcpu);
 		return 0;
 	}
 	return -1;
@@ -5354,7 +5354,7 @@ static void vmx_vcpu_reset(struct kvm_vcpu *vcpu, bool init_event)
 		vmcs_write32(TPR_THRESHOLD, 0);
 	}
 
-	kvm_make_request(KVM_REQ_APIC_PAGE_RELOAD, vcpu);
+	kvm_request_set(KVM_REQ_APIC_PAGE_RELOAD, vcpu);
 
 	if (kvm_vcpu_apicv_active(vcpu))
 		memset(&vmx->pi_desc, 0, sizeof(struct pi_desc));
@@ -5431,7 +5431,7 @@ static void vmx_inject_irq(struct kvm_vcpu *vcpu)
 		if (vcpu->arch.interrupt.soft)
 			inc_eip = vcpu->arch.event_exit_inst_len;
 		if (kvm_inject_realmode_interrupt(vcpu, irq, inc_eip) != EMULATE_DONE)
-			kvm_make_request(KVM_REQ_TRIPLE_FAULT, vcpu);
+			kvm_request_set(KVM_REQ_TRIPLE_FAULT, vcpu);
 		return;
 	}
 	intr = irq | INTR_INFO_VALID_MASK;
@@ -5468,7 +5468,7 @@ static void vmx_inject_nmi(struct kvm_vcpu *vcpu)
 
 	if (vmx->rmode.vm86_active) {
 		if (kvm_inject_realmode_interrupt(vcpu, NMI_VECTOR, 0) != EMULATE_DONE)
-			kvm_make_request(KVM_REQ_TRIPLE_FAULT, vcpu);
+			kvm_request_set(KVM_REQ_TRIPLE_FAULT, vcpu);
 		return;
 	}
 
@@ -6055,7 +6055,7 @@ static int handle_interrupt_window(struct kvm_vcpu *vcpu)
 	vmcs_clear_bits(CPU_BASED_VM_EXEC_CONTROL,
 			CPU_BASED_VIRTUAL_INTR_PENDING);
 
-	kvm_make_request(KVM_REQ_EVENT, vcpu);
+	kvm_request_set(KVM_REQ_EVENT, vcpu);
 
 	++vcpu->stat.irq_window_exits;
 	return 1;
@@ -6322,7 +6322,7 @@ static int handle_nmi_window(struct kvm_vcpu *vcpu)
 	vmcs_clear_bits(CPU_BASED_VM_EXEC_CONTROL,
 			CPU_BASED_VIRTUAL_NMI_PENDING);
 	++vcpu->stat.nmi_window_exits;
-	kvm_make_request(KVM_REQ_EVENT, vcpu);
+	kvm_request_set(KVM_REQ_EVENT, vcpu);
 
 	return 1;
 }
@@ -6829,7 +6829,7 @@ static void nested_vmx_failValid(struct kvm_vcpu *vcpu,
 static void nested_vmx_abort(struct kvm_vcpu *vcpu, u32 indicator)
 {
 	/* TODO: not to reset guest simply here. */
-	kvm_make_request(KVM_REQ_TRIPLE_FAULT, vcpu);
+	kvm_request_set(KVM_REQ_TRIPLE_FAULT, vcpu);
 	pr_debug_ratelimited("kvm: nested vmx abort, indicator %d\n", indicator);
 }
 
@@ -6839,7 +6839,7 @@ static enum hrtimer_restart vmx_preemption_timer_fn(struct hrtimer *timer)
 		container_of(timer, struct vcpu_vmx, nested.preemption_timer);
 
 	vmx->nested.preemption_timer_expired = true;
-	kvm_make_request(KVM_REQ_EVENT, &vmx->vcpu);
+	kvm_request_set(KVM_REQ_EVENT, &vmx->vcpu);
 	kvm_vcpu_kick(&vmx->vcpu);
 
 	return HRTIMER_NORESTART;
@@ -7281,7 +7281,7 @@ static int handle_vmclear(struct kvm_vcpu *vcpu)
 		 * resulted in this case, so let's shut down before doing any
 		 * more damage:
 		 */
-		kvm_make_request(KVM_REQ_TRIPLE_FAULT, vcpu);
+		kvm_request_set(KVM_REQ_TRIPLE_FAULT, vcpu);
 		return 1;
 	}
 	vmcs12 = kmap(page);
@@ -7730,7 +7730,7 @@ static int handle_invept(struct kvm_vcpu *vcpu)
 	 */
 	case VMX_EPT_EXTENT_CONTEXT:
 		kvm_mmu_sync_roots(vcpu);
-		kvm_make_request(KVM_REQ_TLB_FLUSH, vcpu);
+		kvm_request_set(KVM_REQ_TLB_FLUSH, vcpu);
 		nested_vmx_succeed(vcpu);
 		break;
 	default:
@@ -8834,7 +8834,7 @@ static void __vmx_complete_interrupts(struct kvm_vcpu *vcpu,
 	if (!idtv_info_valid)
 		return;
 
-	kvm_make_request(KVM_REQ_EVENT, vcpu);
+	kvm_request_set(KVM_REQ_EVENT, vcpu);
 
 	vector = idt_vectoring_info & VECTORING_INFO_VECTOR_MASK;
 	type = idt_vectoring_info & VECTORING_INFO_TYPE_MASK;
@@ -9132,7 +9132,7 @@ static void __noclone vmx_vcpu_run(struct kvm_vcpu *vcpu)
 	 * nested_run_pending, we need to re-enable this bit.
 	 */
 	if (vmx->nested.nested_run_pending)
-		kvm_make_request(KVM_REQ_EVENT, vcpu);
+		kvm_request_set(KVM_REQ_EVENT, vcpu);
 
 	vmx->nested.nested_run_pending = 0;
 
@@ -11094,7 +11094,7 @@ static void nested_vmx_vmexit(struct kvm_vcpu *vcpu, u32 exit_reason,
 	 * We are now running in L2, mmu_notifier will force to reload the
 	 * page's hpa for L2 vmcs. Need to reload it for L1 before entering L1.
 	 */
-	kvm_make_request(KVM_REQ_APIC_PAGE_RELOAD, vcpu);
+	kvm_request_set(KVM_REQ_APIC_PAGE_RELOAD, vcpu);
 
 	/*
 	 * Exiting from L2 to L1, we're now back to L1 which thinks it just
