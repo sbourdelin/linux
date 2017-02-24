@@ -529,6 +529,7 @@ static void msdc_set_mclk(struct msdc_host *host, unsigned char timing, u32 hz)
 	u32 mode;
 	u32 flags;
 	u32 div;
+	u32 max_div;
 	u32 sclk;
 
 	if (!hz) {
@@ -579,8 +580,18 @@ static void msdc_set_mclk(struct msdc_host *host, unsigned char timing, u32 hz)
 			sclk = (host->src_clk_freq >> 2) / div;
 		}
 	}
+
+	/**
+	 * The maximum value of div is 0xff.
+	 * Check if the div is larger than max_div.
+	 */
+	max_div = 0xff;
+	if (div > max_div) {
+		div = max_div;
+		sclk = (host->src_clk_freq >> 2) / div;
+	}
 	sdr_set_field(host->base + MSDC_CFG, MSDC_CFG_CKMOD | MSDC_CFG_CKDIV,
-			(mode << 8) | (div % 0xff));
+		      (mode << 8) | div);
 	sdr_set_bits(host->base + MSDC_CFG, MSDC_CFG_CKPDN);
 	while (!(readl(host->base + MSDC_CFG) & MSDC_CFG_CKSTB))
 		cpu_relax();
