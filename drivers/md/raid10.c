@@ -3447,8 +3447,7 @@ static sector_t raid10_sync_request(struct mddev *mddev, sector_t sector_nr,
 			     bio2 && bio2 != bio;
 			     bio2 = bio2->bi_next) {
 				/* remove last page from this bio */
-				bio2->bi_vcnt--;
-				bio2->bi_iter.bi_size -= len;
+				bio_remove_last_page(bio2);
 				bio_clear_flag(bio2, BIO_SEG_VALID);
 			}
 			goto bio_full;
@@ -4538,8 +4537,7 @@ read_more:
 			     bio2 && bio2 != bio;
 			     bio2 = bio2->bi_next) {
 				/* Remove last page from this bio */
-				bio2->bi_vcnt--;
-				bio2->bi_iter.bi_size -= len;
+				bio_remove_last_page(bio2);
 				bio_clear_flag(bio2, BIO_SEG_VALID);
 			}
 			goto bio_full;
