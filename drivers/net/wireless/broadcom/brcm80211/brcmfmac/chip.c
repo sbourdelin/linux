@@ -967,16 +967,14 @@ static int brcmf_chip_recognition(struct brcmf_chip_priv *ci)
 	if (ret)
 		return ret;
 
-	/* assure chip is passive for core access */
-	brcmf_chip_set_passive(&ci->pub);
-
 	/* Call bus specific reset function now. Cores have been determined
 	 * but further access may require a chip specific reset at this point.
 	 */
-	if (ci->ops->reset) {
+	if (ci->ops->reset)
 		ci->ops->reset(ci->ctx, &ci->pub);
-		brcmf_chip_set_passive(&ci->pub);
-	}
+
+	/* assure chip is passive for core access */
+	brcmf_chip_set_passive(&ci->pub);
 
 	return brcmf_chip_get_raminfo(ci);
 }
