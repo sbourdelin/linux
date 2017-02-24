@@ -802,3 +802,15 @@ int unit_number__scnprintf(char *buf, size_t size, u64 n)
 
 	return scnprintf(buf, size, "%" PRIu64 "%c", n, unit[i]);
 }
+
+/*
+ * If the probe point starts with '%',
+ * or starts with "sdt_" and has a ':' but no '=',
+ * then it should be a SDT/cached probe point.
+ */
+bool is_sdt_event(char *str)
+{
+	return (str[0] == '%' ||
+		(!strncmp(str, "sdt_", 4) &&
+		 !!strchr(str, ':') && !strchr(str, '=')));
+}
