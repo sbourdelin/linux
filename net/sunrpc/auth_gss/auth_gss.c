@@ -57,6 +57,8 @@
 #include "../netns.h"
 
 static int gss3_create_label(struct rpc_cred *cred, int gss_vers);
+static struct gss3_assert *gss3_use_child_handle(struct gss_cl_ctx *ctx);
+static struct gss3_assert *gss3_match_label(struct gss3_assert_list *in);
 
 static const struct rpc_authops authgss_ops;
 
@@ -1472,13 +1474,16 @@ gss_match(struct auth_cred *acred, struct rpc_cred *rc, int flags)
 {
 	struct gss_cred *gss_cred = container_of(rc, struct gss_cred, gc_base);
 	struct gss_cl_ctx *ctx;
+	struct gss3_assert *g3a;
 	int ret;
+	bool gss3_label_enabled = false;
 
 	if (test_bit(RPCAUTH_CRED_NEW, &rc->cr_flags))
 		goto out;
 	/* Don't match with creds that have expired. */
 	rcu_read_lock();
 	ctx = rcu_dereference(gss_cred->gc_ctx);
+	gss3_label_enabled = gss3_label_assertion_is_enabled(ctx->gc_v);
 	if (!ctx || time_after(jiffies, ctx->gc_expiry)) {
 		rcu_read_unlock();
 		return 0;
@@ -1509,6 +1514,13 @@ check_expire:
 		/* tell NFS layer that key will expire soon */
 		set_bit(RPC_CRED_KEY_EXPIRE_SOON, &acred->ac_flags);
 	}
+	if (ret && gss3_label_enabled) {
+		ctx = gss_cred_get_ctx(rc);
+		g3a = gss3_match_label(&ctx->gc_alist);
+		if (!g3a)
+			gss3_create_label(rc, ctx->gc_v);
+		gss_put_ctx(ctx);
+	}
 	return ret;
 }
 
@@ -1529,6 +1541,7 @@ gss_marshal(struct rpc_task *task, __be32 *p)
 	struct xdr_netobj mic;
 	struct kvec	iov;
 	struct xdr_buf	verf_buf;
+	struct gss3_assert *g3a;
 
 	dprintk("RPC: %5u %s\n", task->tk_pid, __func__);
 
@@ -1543,7 +1556,11 @@ gss_marshal(struct rpc_task *task, __be32 *p)
 	*p++ = htonl((u32)ctx->gc_proc);
 	*p++ = htonl((u32)req->rq_seqno);
 	*p++ = htonl((u32)gss_cred->gc_service);
-	p = xdr_encode_netobj(p, &ctx->gc_wire_ctx);
+	g3a = gss3_use_child_handle(ctx);
+	if (g3a)
+		p = xdr_encode_netobj(p, &g3a->gss3_handle);
+	else
+		p = xdr_encode_netobj(p, &ctx->gc_wire_ctx);
 	*cred_len = htonl((p - (cred_len + 1)) << 2);
 
 	/* We compute the checksum for the verifier over the xdr-encoded bytes
@@ -1638,6 +1655,49 @@ gss3_insert_assertion(struct gss3_assert_list *alist, struct gss3_assert *g3a)
 	/* list_add_tail_rcu(new,head) inserts new before head */
 	list_add_tail_rcu(&g3a->gss3_list, &alist->assert_list);
 	spin_unlock(&alist->assert_lock);
+}
+
+static struct gss3_assert *
+gss3_match_label(struct gss3_assert_list *in)
+{
+	struct gss3_assert *found;
+	struct xdr_netobj label;
+	int ret;
+
+	/* Need a Full Mode stanza in /etc/selinux/config to check */
+	if (!gss3_label_assertion_is_enabled(RPC_GSS3_VERSION))
+		return NULL;
+
+	/* grab the current threads subject label */
+	ret = security_current_sid_to_context((char **)&label.data, &label.len);
+	if (ret)
+		return NULL;
+	rcu_read_lock();
+	list_for_each_entry_rcu(found, &in->assert_list, gss3_list) {
+		struct gss3_label *gl;
+
+		if (found->gss3_assertion->au_type != GSS3_LABEL)
+			continue;
+		gl = &found->gss3_assertion->u.au_label;
+		if (netobj_equal(&gl->la_label, &label))
+			goto out;
+	}
+	found = NULL;
+out:
+	rcu_read_lock();
+	kfree(label.data);
+	return found;
+}
+
+static struct gss3_assert *
+gss3_use_child_handle(struct gss_cl_ctx *ctx)
+{
+	struct gss3_assert *g3a = NULL;
+
+	if (gss3_label_assertion_is_enabled(ctx->gc_v) &&
+	    ctx->gc_proc == RPC_GSS_PROC_DATA)
+		g3a = gss3_match_label(&ctx->gc_alist);
+	return g3a;
 }
 
 /**
@@ -1991,6 +2051,7 @@ gss3_reply_verifier(struct rpc_cred *cred, struct gss_cl_ctx *ctx,
 {
 	struct gss_cred *g_cred = container_of(cred, struct gss_cred, gc_base);
 	void	*gss3_buf = NULL;
+	struct gss3_assert *g3a;
 	__be32 *crlen, *ptr = NULL;
 	int len;
 
@@ -2017,7 +2078,11 @@ gss3_reply_verifier(struct rpc_cred *cred, struct gss_cl_ctx *ctx,
 	*ptr++ = htonl(ctx->gc_proc);
 	*ptr++ = *seq;
 	*ptr++ = htonl(g_cred->gc_service);
-	ptr = xdr_encode_netobj(ptr, &ctx->gc_wire_ctx);
+	g3a = gss3_use_child_handle(ctx);
+	if (g3a)
+		ptr = xdr_encode_netobj(ptr, &g3a->gss3_handle);
+	else
+		ptr = xdr_encode_netobj(ptr, &ctx->gc_wire_ctx);
 
 	/* backfill cred length */
 	*crlen = htonl((ptr - (crlen + 1)) << 2);
