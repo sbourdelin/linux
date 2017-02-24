@@ -658,6 +658,11 @@ struct dma_filter {
 	const struct dma_slave_map *map;
 };
 
+enum dmaengine_operation {
+	DMAENGINE_SLAVE_SG = 1,
+	DMAENGINE_SLAVE_LAST = DMAENGINE_SLAVE_SG,
+};
+
 /**
  * struct dma_device - info on the entity supplying DMA services
  * @chancnt: how many DMA channels are supported
@@ -700,6 +705,10 @@ struct dma_filter {
  *	be called after period_len bytes have been transferred.
  * @device_prep_interleaved_dma: Transfer expression in a generic way.
  * @device_prep_dma_imm_data: DMA's 8 byte immediate data to the dst address
+ * @device_alloc_descriptor: Allocate a dma descriptor for dmaengine operation
+ * 	specfied. Can by invoked from sleepy context.
+ * 	Cannot be called from callback context.
+ * @device_desc_prep_slave_sg: Prepare a slave sg txn for a given descriptor
  * @device_config: Pushes a new configuration to a channel, return 0 or an error
  *	code
  * @device_pause: Pauses any transfer happening on a channel. Returns
@@ -791,6 +800,12 @@ struct dma_device {
 	struct dma_async_tx_descriptor *(*device_prep_dma_imm_data)(
 		struct dma_chan *chan, dma_addr_t dst, u64 data,
 		unsigned long flags);
+
+	struct dma_async_tx_descriptor *(*device_alloc_descriptor)(
+		struct dma_chan *chan, enum dmaengine_operation op);
+	int (*device_desc_prep_slave_sg)(struct dma_chan *chan,
+		struct scatterlist *sgl, unsigned int sg_len,
+		enum dma_transfer_direction direction, unsigned long flags);
 
 	int (*device_config)(struct dma_chan *chan,
 			     struct dma_slave_config *config);
