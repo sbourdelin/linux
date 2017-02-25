@@ -49,6 +49,9 @@
 #include <linux/if_macvlan.h>
 #include <linux/if_bridge.h>
 #include <linux/prefetch.h>
+#include <linux/bpf.h>
+#include <linux/bpf_trace.h>
+#include <linux/atomic.h>
 #include <scsi/fc/fc_fcoe.h>
 #include <net/udp_tunnel.h>
 #include <net/pkt_cls.h>
@@ -2051,7 +2054,7 @@ static void ixgbe_put_rx_buffer(struct ixgbe_ring *rx_ring,
 		/* hand second half of page back to the ring */
 		ixgbe_reuse_rx_page(rx_ring, rx_buffer);
 	} else {
-		if (IXGBE_CB(skb)->dma == rx_buffer->dma) {
+		if (skb && IXGBE_CB(skb)->dma == rx_buffer->dma) {
 			/* the page has been released from the ring */
 			IXGBE_CB(skb)->page_released = true;
 		} else {
@@ -2157,6 +2160,42 @@ static struct sk_buff *ixgbe_build_skb(struct ixgbe_ring *rx_ring,
 	return skb;
 }
 
+static int ixgbe_run_xdp(struct ixgbe_ring  *rx_ring,
+			 struct ixgbe_rx_buffer *rx_buffer,
+			 unsigned int size)
+{
+	struct bpf_prog *xdp_prog;
+	struct xdp_buff xdp;
+	void *addr;
+	u32 act;
+
+	xdp_prog = READ_ONCE(rx_ring->xdp_prog);
+
+	if (!xdp_prog)
+		return 0;
+
+	addr = page_address(rx_buffer->page) + rx_buffer->page_offset;
+	xdp.data_hard_start = addr;
+	xdp.data = addr;
+	xdp.data_end = addr + size;
+
+	act = bpf_prog_run_xdp(xdp_prog, &xdp);
+	switch (act) {
+	case XDP_PASS:
+		return 0;
+	default:
+		bpf_warn_invalid_xdp_action(act);
+	case XDP_TX:
+	case XDP_ABORTED:
+		trace_xdp_exception(rx_ring->netdev, xdp_prog, act);
+		/* fallthrough -- handle aborts by dropping packet */
+	case XDP_DROP:
+		rx_buffer->pagecnt_bias++; /* give page back */
+		break;
+	}
+	return size;
+}
+
 /**
  * ixgbe_clean_rx_irq - Clean completed descriptors from Rx ring - bounce buf
  * @q_vector: structure containing interrupt and ring information
@@ -2187,6 +2226,7 @@ static int ixgbe_clean_rx_irq(struct ixgbe_q_vector *q_vector,
 		struct ixgbe_rx_buffer *rx_buffer;
 		struct sk_buff *skb;
 		unsigned int size;
+		int consumed;
 
 		/* return some buffers to hardware, one at a time is too slow */
 		if (cleaned_count >= IXGBE_RX_BUFFER_WRITE) {
@@ -2206,6 +2246,19 @@ static int ixgbe_clean_rx_irq(struct ixgbe_q_vector *q_vector,
 		dma_rmb();
 
 		rx_buffer = ixgbe_get_rx_buffer(rx_ring, rx_desc, &skb, size);
+
+		rcu_read_lock();
+		consumed = ixgbe_run_xdp(rx_ring, rx_buffer, size);
+		rcu_read_unlock();
+
+		if (consumed) {
+			ixgbe_put_rx_buffer(rx_ring, rx_buffer, skb);
+			cleaned_count++;
+			ixgbe_is_non_eop(rx_ring, rx_desc, skb);
+			total_rx_packets++;
+			total_rx_bytes += size;
+			continue;
+		}
 
 		/* retrieve a buffer from the ring */
 		if (skb)
@@ -6106,6 +6159,12 @@ err:
 	return -ENOMEM;
 }
 
+static void ixgbe_setup_xdp_resource(struct ixgbe_adapter *adapter,
+				     struct ixgbe_ring *ring)
+{
+	xchg(&ring->xdp_prog, adapter->xdp_prog);
+}
+
 /**
  * ixgbe_setup_all_rx_resources - allocate all queues Rx resources
  * @adapter: board private structure
@@ -6122,8 +6181,10 @@ static int ixgbe_setup_all_rx_resources(struct ixgbe_adapter *adapter)
 
 	for (i = 0; i < adapter->num_rx_queues; i++) {
 		err = ixgbe_setup_rx_resources(adapter->rx_ring[i]);
-		if (!err)
+		if (!err) {
+			ixgbe_setup_xdp_resource(adapter, adapter->rx_ring[i]);
 			continue;
+		}
 
 		e_err(probe, "Allocation for Rx Queue %u failed\n", i);
 		goto err_setup_rx;
@@ -9455,6 +9516,48 @@ ixgbe_features_check(struct sk_buff *skb, struct net_device *dev,
 	return features;
 }
 
+static int ixgbe_xdp_setup(struct net_device *dev, struct bpf_prog *prog)
+{
+	int i, frame_size = dev->mtu + ETH_HLEN + ETH_FCS_LEN + VLAN_HLEN;
+	struct ixgbe_adapter *adapter = netdev_priv(dev);
+	struct bpf_prog *old_adapter_prog;
+
+	/* verify ixgbe ring attributes are sufficient for XDP */
+	for (i = 0; i < adapter->num_rx_queues; i++) {
+		struct ixgbe_ring *ring = adapter->rx_ring[i];
+
+		if (ring_is_rsc_enabled(ring))
+			return -EINVAL;
+
+		if (frame_size > ixgbe_rx_bufsz(ring))
+			return -EINVAL;
+	}
+
+	old_adapter_prog = xchg(&adapter->xdp_prog, prog);
+	for (i = 0; i < adapter->num_rx_queues; i++)
+		ixgbe_setup_xdp_resource(adapter, adapter->rx_ring[i]);
+
+	if (old_adapter_prog)
+		bpf_prog_put(old_adapter_prog);
+
+	return 0;
+}
+
+static int ixgbe_xdp(struct net_device *dev, struct netdev_xdp *xdp)
+{
+	struct ixgbe_adapter *adapter = netdev_priv(dev);
+
+	switch (xdp->command) {
+	case XDP_SETUP_PROG:
+		return ixgbe_xdp_setup(dev, xdp->prog);
+	case XDP_QUERY_PROG:
+		xdp->prog_attached = !!(adapter->rx_ring[0]->xdp_prog);
+		return 0;
+	default:
+		return -EINVAL;
+	}
+}
+
 static const struct net_device_ops ixgbe_netdev_ops = {
 	.ndo_open		= ixgbe_open,
 	.ndo_stop		= ixgbe_close,
@@ -9500,6 +9603,7 @@ static const struct net_device_ops ixgbe_netdev_ops = {
 	.ndo_udp_tunnel_add	= ixgbe_add_udp_tunnel_port,
 	.ndo_udp_tunnel_del	= ixgbe_del_udp_tunnel_port,
 	.ndo_features_check	= ixgbe_features_check,
+	.ndo_xdp		= ixgbe_xdp,
 };
 
 /**
