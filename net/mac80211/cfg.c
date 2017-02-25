@@ -3601,11 +3601,12 @@ static int ieee80211_set_multicast_to_unicast(struct wiphy *wiphy,
 	return 0;
 }
 
-static int ieee80211_set_btcoex(struct wiphy *wiphy, bool enabled)
+static int ieee80211_set_btcoex(struct wiphy *wiphy, bool enabled,
+				int btcoex_priority)
 {
 	struct ieee80211_local *local = wiphy_priv(wiphy);
 
-	return drv_set_btcoex(local, enabled);
+	return drv_set_btcoex(local, enabled, btcoex_priority);
 }
 
 const struct cfg80211_ops mac80211_config_ops = {

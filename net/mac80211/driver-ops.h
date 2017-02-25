@@ -1249,13 +1249,14 @@ static inline void drv_del_nan_func(struct ieee80211_local *local,
 }
 
 static inline int drv_set_btcoex(struct ieee80211_local *local,
-				 bool enabled)
+				 bool enabled, int btcoex_priority)
 {
 	int ret = -EOPNOTSUPP;
 
-	trace_drv_set_btcoex(local, enabled);
+	trace_drv_set_btcoex(local, enabled, btcoex_priority);
 	if (local->ops->set_btcoex)
-		ret = local->ops->set_btcoex(&local->hw, enabled);
+		ret = local->ops->set_btcoex(&local->hw, enabled,
+					     btcoex_priority);
 
 	trace_drv_return_int(local, ret);
 
