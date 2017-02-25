@@ -1,5 +1,5 @@
 /*
-* tegra_alc5632.c  --  Toshiba AC100(PAZ00) machine ASoC driver
+ * tegra_alc5632.c  --  Toshiba AC100(PAZ00) machine ASoC driver
  *
  * Copyright (C) 2011 The AC100 Kernel Team <ac100@lists.lauchpad.net>
  * Copyright (C) 2012 - NVIDIA, Inc.

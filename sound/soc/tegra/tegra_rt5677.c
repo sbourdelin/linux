@@ -1,5 +1,5 @@
 /*
-* tegra_rt5677.c - Tegra machine ASoC driver for boards using RT5677 codec.
+ * tegra_rt5677.c - Tegra machine ASoC driver for boards using RT5677 codec.
  *
  * Copyright (c) 2014, The Chromium OS Authors.  All rights reserved.
  *
