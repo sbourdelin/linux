@@ -78,7 +78,7 @@ static int mxs_saif_set_dai_sysclk(struct snd_soc_dai *cpu_dai,
  * from its master_id.
  * Note that the master could be itself.
  */
-static inline struct mxs_saif *mxs_saif_get_master(struct mxs_saif * saif)
+static inline struct mxs_saif *mxs_saif_get_master(struct mxs_saif *saif)
 {
 	return mxs_saif[saif->master_id];
 }
