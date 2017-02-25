@@ -2031,6 +2031,7 @@ static bool ixgbe_can_reuse_rx_page(struct ixgbe_rx_buffer *rx_buffer)
 static void ixgbe_add_rx_frag(struct ixgbe_ring *rx_ring,
 			      struct ixgbe_rx_buffer *rx_buffer,
 			      struct sk_buff *skb,
+			      unsigned int headroom,
 			      unsigned int size)
 {
 #if (PAGE_SIZE < 8192)
@@ -2041,7 +2042,8 @@ static void ixgbe_add_rx_frag(struct ixgbe_ring *rx_ring,
 				SKB_DATA_ALIGN(size);
 #endif
 	skb_add_rx_frag(skb, skb_shinfo(skb)->nr_frags, rx_buffer->page,
-			rx_buffer->page_offset, size, truesize);
+			rx_buffer->page_offset - (IXGBE_SKB_PAD - headroom),
+			size, truesize);
 #if (PAGE_SIZE < 8192)
 	rx_buffer->page_offset ^= truesize;
 #else
@@ -2114,6 +2116,7 @@ static void ixgbe_put_rx_buffer(struct ixgbe_ring *rx_ring,
 static struct sk_buff *ixgbe_construct_skb(struct ixgbe_ring *rx_ring,
 					   struct ixgbe_rx_buffer *rx_buffer,
 					   union ixgbe_adv_rx_desc *rx_desc,
+					   unsigned int headroom,
 					   unsigned int size)
 {
 	void *va = page_address(rx_buffer->page) + rx_buffer->page_offset;
@@ -2122,6 +2125,7 @@ static struct sk_buff *ixgbe_construct_skb(struct ixgbe_ring *rx_ring,
 #else
 	unsigned int truesize = SKB_DATA_ALIGN(size);
 #endif
+	unsigned int off_page;
 	struct sk_buff *skb;
 
 	/* prefetch first cache line of first page */
@@ -2135,12 +2139,14 @@ static struct sk_buff *ixgbe_construct_skb(struct ixgbe_ring *rx_ring,
 	if (unlikely(!skb))
 		return NULL;
 
+	off_page = IXGBE_SKB_PAD - headroom;
+
 	if (size > IXGBE_RX_HDR_SIZE) {
 		if (!ixgbe_test_staterr(rx_desc, IXGBE_RXD_STAT_EOP))
 			IXGBE_CB(skb)->dma = rx_buffer->dma;
 
 		skb_add_rx_frag(skb, 0, rx_buffer->page,
-				rx_buffer->page_offset,
+				rx_buffer->page_offset - off_page,
 				size, truesize);
 #if (PAGE_SIZE < 8192)
 		rx_buffer->page_offset ^= truesize;
@@ -2148,7 +2154,8 @@ static struct sk_buff *ixgbe_construct_skb(struct ixgbe_ring *rx_ring,
 		rx_buffer->page_offset += truesize;
 #endif
 	} else {
-		memcpy(__skb_put(skb, size), va, ALIGN(size, sizeof(long)));
+		memcpy(__skb_put(skb, size), va - off_page,
+		       ALIGN(size, sizeof(long)));
 		rx_buffer->pagecnt_bias++;
 	}
 
@@ -2158,6 +2165,7 @@ static struct sk_buff *ixgbe_construct_skb(struct ixgbe_ring *rx_ring,
 static struct sk_buff *ixgbe_build_skb(struct ixgbe_ring *rx_ring,
 				       struct ixgbe_rx_buffer *rx_buffer,
 				       union ixgbe_adv_rx_desc *rx_desc,
+				       unsigned int headroom,
 				       unsigned int size)
 {
 	void *va = page_address(rx_buffer->page) + rx_buffer->page_offset;
@@ -2181,7 +2189,7 @@ static struct sk_buff *ixgbe_build_skb(struct ixgbe_ring *rx_ring,
 		return NULL;
 
 	/* update pointers within the skb to store the data */
-	skb_reserve(skb, IXGBE_SKB_PAD);
+	skb_reserve(skb, headroom);
 	__skb_put(skb, size);
 
 	/* record DMA address if this is the start of a chain of buffers */
@@ -2202,10 +2210,14 @@ static int ixgbe_xmit_xdp_ring(struct xdp_buff *xdp,
 			       struct ixgbe_adapter *adapter,
 			       struct ixgbe_ring *tx_ring);
 
+#define IXGBE_XDP_PASS 0
+#define IXGBE_XDP_CONSUMED 1
+
 static int ixgbe_run_xdp(struct ixgbe_adapter *adapter,
 			 struct ixgbe_ring  *rx_ring,
 			 struct ixgbe_rx_buffer *rx_buffer,
-			 unsigned int size)
+			 unsigned int *headroom,
+			 unsigned int *size)
 {
 	struct ixgbe_ring *xdp_ring;
 	struct bpf_prog *xdp_prog;
@@ -2216,17 +2228,19 @@ static int ixgbe_run_xdp(struct ixgbe_adapter *adapter,
 	xdp_prog = READ_ONCE(rx_ring->xdp_prog);
 
 	if (!xdp_prog)
-		return 0;
+		return IXGBE_XDP_PASS;
 
 	addr = page_address(rx_buffer->page) + rx_buffer->page_offset;
-	xdp.data_hard_start = addr;
+	xdp.data_hard_start = addr - *headroom;
 	xdp.data = addr;
-	xdp.data_end = addr + size;
+	xdp.data_end = addr + *size;
 
 	act = bpf_prog_run_xdp(xdp_prog, &xdp);
 	switch (act) {
 	case XDP_PASS:
-		return 0;
+		*headroom = xdp.data - xdp.data_hard_start;
+		*size = xdp.data_end - xdp.data;
+		return IXGBE_XDP_PASS;
 	case XDP_TX:
 		xdp_ring = adapter->xdp_ring[smp_processor_id()];
 
@@ -2246,7 +2260,7 @@ static int ixgbe_run_xdp(struct ixgbe_adapter *adapter,
 		rx_buffer->pagecnt_bias++; /* give page back */
 		break;
 	}
-	return size;
+	return IXGBE_XDP_CONSUMED;
 }
 
 /**
@@ -2275,6 +2289,7 @@ static int ixgbe_clean_rx_irq(struct ixgbe_q_vector *q_vector,
 	u16 cleaned_count = ixgbe_desc_unused(rx_ring);
 
 	while (likely(total_rx_packets < budget)) {
+		unsigned int headroom = ixgbe_rx_offset(rx_ring);
 		union ixgbe_adv_rx_desc *rx_desc;
 		struct ixgbe_rx_buffer *rx_buffer;
 		struct sk_buff *skb;
@@ -2301,7 +2316,8 @@ static int ixgbe_clean_rx_irq(struct ixgbe_q_vector *q_vector,
 		rx_buffer = ixgbe_get_rx_buffer(rx_ring, rx_desc, &skb, size);
 
 		rcu_read_lock();
-		consumed = ixgbe_run_xdp(adapter, rx_ring, rx_buffer, size);
+		consumed = ixgbe_run_xdp(adapter, rx_ring, rx_buffer,
+					 &headroom, &size);
 		rcu_read_unlock();
 
 		if (consumed) {
@@ -2315,13 +2331,14 @@ static int ixgbe_clean_rx_irq(struct ixgbe_q_vector *q_vector,
 
 		/* retrieve a buffer from the ring */
 		if (skb)
-			ixgbe_add_rx_frag(rx_ring, rx_buffer, skb, size);
+			ixgbe_add_rx_frag(rx_ring, rx_buffer, skb,
+					  headroom, size);
 		else if (ring_uses_build_skb(rx_ring))
 			skb = ixgbe_build_skb(rx_ring, rx_buffer,
-					      rx_desc, size);
+					      rx_desc, headroom, size);
 		else
 			skb = ixgbe_construct_skb(rx_ring, rx_buffer,
-						  rx_desc, size);
+						  rx_desc, headroom, size);
 
 		/* exit if we failed to retrieve a buffer */
 		if (!skb) {
