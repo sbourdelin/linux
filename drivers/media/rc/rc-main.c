@@ -1791,7 +1791,7 @@ int rc_register_device(struct rc_dev *dev)
 			goto out_rx;
 	}
 
-	if (dev->driver_type != RC_DRIVER_SCANCODE) {
+	if (dev->allowed_protocols != RC_BIT_CEC) {
 		rc = ir_lirc_register(dev);
 		if (rc < 0)
 			goto out_raw;
@@ -1856,7 +1856,7 @@ void rc_unregister_device(struct rc_dev *dev)
 	if (dev->driver_type == RC_DRIVER_IR_RAW)
 		ir_raw_event_unregister(dev);
 
-	if (dev->driver_type != RC_DRIVER_SCANCODE)
+	if (dev->allowed_protocols != RC_BIT_CEC)
 		ir_lirc_unregister(dev);
 
 	rc_free_rx_device(dev);
