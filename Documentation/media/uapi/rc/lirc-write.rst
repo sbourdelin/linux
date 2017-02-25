@@ -42,13 +42,18 @@ Description
 referenced by the file descriptor ``fd`` from the buffer starting at
 ``buf``.
 
-The data written to the chardev is a pulse/space sequence of integer
-values. Pulses and spaces are only marked implicitly by their position.
-The data must start and end with a pulse, therefore, the data must
-always include an uneven number of samples. The write function must
-block until the data has been transmitted by the hardware. If more data
-is provided than the hardware can send, the driver returns ``EINVAL``.
+The exact format of the data depends on what modes a driver supports,
+and what mode has been selected. Use :ref:`lirc_get_features` to get a
+list of supported modes, and :ref:`lirc_get_send_mode` to get or set
+the sending mode if multiple modes are available.
 
+When in :ref:`LIRC_MODE_PULSE <lirc-mode-PULSE>` mode, the data written to
+the chardev is a pulse/space sequence of integer values. Pulses and spaces
+are only marked implicitly by their position. The data must start and end
+with a pulse, therefore, the data must always include an uneven number of
+samples. The write function must block until the data has been transmitted
+by the hardware. If more data is provided than the hardware can send, the
+driver returns ``EINVAL``.
 
 Return Value
 ============
