@@ -190,7 +190,10 @@ struct vf_macvlans {
 struct ixgbe_tx_buffer {
 	union ixgbe_adv_tx_desc *next_to_watch;
 	unsigned long time_stamp;
-	struct sk_buff *skb;
+	union {
+		struct sk_buff *skb;
+		void *data; /* XDP uses addr ptr on irq_clean */
+	};
 	unsigned int bytecount;
 	unsigned short gso_segs;
 	__be16 protocol;
@@ -308,6 +311,7 @@ struct ixgbe_ring {
 	};
 
 	u8 dcb_tc;
+	bool xdp_ring;
 	struct ixgbe_queue_stats stats;
 	struct u64_stats_sync syncp;
 	union {
@@ -335,6 +339,7 @@ enum ixgbe_ring_f_enum {
 #define IXGBE_MAX_FCOE_INDICES		8
 #define MAX_RX_QUEUES			(IXGBE_MAX_FDIR_INDICES + 1)
 #define MAX_TX_QUEUES			(IXGBE_MAX_FDIR_INDICES + 1)
+#define MAX_XDP_QUEUES			(IXGBE_MAX_FDIR_INDICES + 1)
 #define IXGBE_MAX_L2A_QUEUES		4
 #define IXGBE_BAD_L2A_QUEUE		3
 #define IXGBE_MAX_MACVLANS		31
@@ -578,6 +583,10 @@ struct ixgbe_adapter {
 	__be16 vxlan_port;
 	__be16 geneve_port;
 
+	/* XDP */
+	int num_xdp_queues;
+	struct ixgbe_ring *xdp_ring[MAX_XDP_QUEUES];
+
 	/* TX */
 	struct ixgbe_ring *tx_ring[MAX_TX_QUEUES] ____cacheline_aligned_in_smp;
 
@@ -624,6 +633,7 @@ struct ixgbe_adapter {
 
 	u64 tx_busy;
 	unsigned int tx_ring_count;
+	unsigned int xdp_ring_count;
 	unsigned int rx_ring_count;
 
 	u32 link_speed;
