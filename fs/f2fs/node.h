@@ -303,11 +303,11 @@ static inline void fill_node_footer_blkaddr(struct page *page, block_t blkaddr)
 	size_t crc_offset = le32_to_cpu(ckpt->checksum_offset);
 	__u64 cp_ver = le64_to_cpu(ckpt->checkpoint_ver);
 
-	if (__is_set_ckpt_flags(ckpt, CP_CRC_RECOVERY_FLAG)) {
-		__u64 crc = le32_to_cpu(*((__le32 *)
-				((unsigned char *)ckpt + crc_offset)));
-		cp_ver |= (crc << 32);
-	}
+#ifdef CP_CRC_RECOVERY_FLAG
+	__u64 crc = le32_to_cpu(*((__le32 *)
+			((unsigned char *)ckpt + crc_offset)));
+	cp_ver |= (crc << 32);
+#endif
 	rn->footer.cp_ver = cpu_to_le64(cp_ver);
 	rn->footer.next_blkaddr = cpu_to_le32(blkaddr);
 }
