@@ -76,7 +76,7 @@ static unsigned short nuc900_ac97_read(struct snd_ac97 *ac97,
 		goto out;
 	}
 
-	val = AUDIO_READ(nuc900_audio->mmio + ACTL_ACOS0) ;
+	val = AUDIO_READ(nuc900_audio->mmio + ACTL_ACOS0);
 	val &= ~SLOT1_VALID;
 	AUDIO_WRITE(nuc900_audio->mmio + ACTL_ACOS0, val);
 
