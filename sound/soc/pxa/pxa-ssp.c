@@ -254,7 +254,8 @@ static int pxa_ssp_set_dai_sysclk(struct snd_soc_dai *cpu_dai,
 	}
 
 	/* The SSP clock must be disabled when changing SSP clock mode
-	 * on PXA2xx.  On PXA3xx it must be enabled when doing so. */
+	 * on PXA2xx.  On PXA3xx it must be enabled when doing so.
+	 */
 	if (ssp->type != PXA3xx_SSP)
 		clk_disable_unprepare(ssp->clk);
 	val = pxa_ssp_read_reg(ssp, SSCR0) | sscr0;

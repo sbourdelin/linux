@@ -70,7 +70,8 @@ static int hx4700_hw_params(struct snd_pcm_substream *substream,
 		return ret;
 
 	/* inform codec driver about clock freq *
-	 * (PXA I2S always uses divider 256)    */
+	 * (PXA I2S always uses divider 256)
+	 */
 	ret = snd_soc_dai_set_sysclk(codec_dai, 0, 256 * params_rate(params),
 			SND_SOC_CLOCK_IN);
 	if (ret < 0)
