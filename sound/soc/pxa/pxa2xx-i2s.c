@@ -80,7 +80,7 @@ struct pxa_i2s_port {
 };
 static struct pxa_i2s_port pxa_i2s;
 static struct clk *clk_i2s;
-static int clk_ena = 0;
+static int clk_ena;
 
 static unsigned long pxa2xx_i2s_pcm_stereo_out_req = 3;
 static struct snd_dmaengine_dai_dma_data pxa2xx_i2s_pcm_stereo_out = {
