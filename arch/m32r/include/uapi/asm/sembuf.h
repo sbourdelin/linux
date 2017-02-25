@@ -1,6 +1,8 @@
 #ifndef _ASM_M32R_SEMBUF_H
 #define _ASM_M32R_SEMBUF_H
 
+#include <asm/ipcbuf.h>
+
 /*
  * The semid64_ds structure for m32r architecture.
  * Note extra padding because this structure is passed back and forth

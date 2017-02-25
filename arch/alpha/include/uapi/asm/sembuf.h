@@ -1,6 +1,8 @@
 #ifndef _ALPHA_SEMBUF_H
 #define _ALPHA_SEMBUF_H
 
+#include <asm/ipcbuf.h>
+
 /* 
  * The semid64_ds structure for alpha architecture.
  * Note extra padding because this structure is passed back and forth

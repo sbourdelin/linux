@@ -1,6 +1,8 @@
 #ifndef _UAPI__ASM_AVR32_SEMBUF_H
 #define _UAPI__ASM_AVR32_SEMBUF_H
 
+#include <asm/ipcbuf.h>
+
 /*
 * The semid64_ds structure for AVR32 architecture.
  * Note extra padding because this structure is passed back and forth

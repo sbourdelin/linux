@@ -21,6 +21,7 @@
 #ifndef _XTENSA_SEMBUF_H
 #define _XTENSA_SEMBUF_H
 
+#include <asm/ipcbuf.h>
 #include <asm/byteorder.h>
 
 struct semid64_ds {

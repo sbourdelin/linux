@@ -1,6 +1,8 @@
 #ifndef _S390_SEMBUF_H
 #define _S390_SEMBUF_H
 
+#include <asm/ipcbuf.h>
+
 /* 
  * The semid64_ds structure for S/390 architecture.
  * Note extra padding because this structure is passed back and forth
