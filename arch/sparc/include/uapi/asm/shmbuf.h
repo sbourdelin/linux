@@ -1,6 +1,8 @@
 #ifndef _SPARC_SHMBUF_H
 #define _SPARC_SHMBUF_H
 
+#include <asm/ipcbuf.h>
+
 /* 
  * The shmid64_ds structure for sparc architecture.
  * Note extra padding because this structure is passed back and forth

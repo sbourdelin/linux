@@ -1,6 +1,8 @@
 #ifndef _ASM_SHMBUF_H
 #define _ASM_SHMBUF_H
 
+#include <asm/ipcbuf.h>
+
 /*
  * The shmid64_ds structure for MN10300 architecture.
  * Note extra padding because this structure is passed back and forth

@@ -1,6 +1,8 @@
 #ifndef _S390_SHMBUF_H
 #define _S390_SHMBUF_H
 
+#include <asm/ipcbuf.h>
+
 /* 
  * The shmid64_ds structure for S/390 architecture.
  * Note extra padding because this structure is passed back and forth
