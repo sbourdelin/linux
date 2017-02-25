@@ -487,74 +487,6 @@ static void serial_ir_timeout(unsigned long arg)
 	ir_raw_event_handle(serial_ir.rcdev);
 }
 
-static int serial_ir_probe(struct platform_device *dev)
-{
-	int i, nlow, nhigh, result;
-
-	result = devm_request_irq(&dev->dev, irq, serial_ir_irq_handler,
-				  share_irq ? IRQF_SHARED : 0,
-				  KBUILD_MODNAME, &hardware);
-	if (result < 0) {
-		if (result == -EBUSY)
-			dev_err(&dev->dev, "IRQ %d busy\n", irq);
-		else if (result == -EINVAL)
-			dev_err(&dev->dev, "Bad irq number or handler\n");
-		return result;
-	}
-
-	/* Reserve io region. */
-	if ((iommap &&
-	     (devm_request_mem_region(&dev->dev, iommap, 8 << ioshift,
-				      KBUILD_MODNAME) == NULL)) ||
-	     (!iommap && (devm_request_region(&dev->dev, io, 8,
-			  KBUILD_MODNAME) == NULL))) {
-		dev_err(&dev->dev, "port %04x already in use\n", io);
-		dev_warn(&dev->dev, "use 'setserial /dev/ttySX uart none'\n");
-		dev_warn(&dev->dev,
-			 "or compile the serial port driver as module and\n");
-		dev_warn(&dev->dev, "make sure this module is loaded first\n");
-		return -EBUSY;
-	}
-
-	setup_timer(&serial_ir.timeout_timer, serial_ir_timeout,
-		    (unsigned long)&serial_ir);
-
-	result = hardware_init_port();
-	if (result < 0)
-		return result;
-
-	/* Initialize pulse/space widths */
-	init_timing_params(50, 38000);
-
-	/* If pin is high, then this must be an active low receiver. */
-	if (sense == -1) {
-		/* wait 1/2 sec for the power supply */
-		msleep(500);
-
-		/*
-		 * probe 9 times every 0.04s, collect "votes" for
-		 * active high/low
-		 */
-		nlow = 0;
-		nhigh = 0;
-		for (i = 0; i < 9; i++) {
-			if (sinp(UART_MSR) & hardware[type].signal_pin)
-				nlow++;
-			else
-				nhigh++;
-			msleep(40);
-		}
-		sense = nlow >= nhigh ? 1 : 0;
-		dev_info(&dev->dev, "auto-detected active %s receiver\n",
-			 sense ? "low" : "high");
-	} else
-		dev_info(&dev->dev, "Manually using active %s receiver\n",
-			 sense ? "low" : "high");
-
-	dev_dbg(&dev->dev, "Interrupt %d, port %04x obtained\n", irq, io);
-	return 0;
-}
-
 static int serial_ir_open(struct rc_dev *rcdev)
 {
 	unsigned long flags;
@@ -679,89 +611,14 @@ static int serial_ir_resume(struct platform_device *dev)
 	return 0;
 }
 
-static struct platform_driver serial_ir_driver = {
-	.probe		= serial_ir_probe,
-	.suspend	= serial_ir_suspend,
-	.resume		= serial_ir_resume,
-	.driver		= {
-		.name	= "serial_ir",
-	},
-};
-
-static int __init serial_ir_init(void)
-{
-	int result;
-
-	result = platform_driver_register(&serial_ir_driver);
-	if (result)
-		return result;
-
-	serial_ir.pdev = platform_device_alloc("serial_ir", 0);
-	if (!serial_ir.pdev) {
-		result = -ENOMEM;
-		goto exit_driver_unregister;
-	}
-
-	result = platform_device_add(serial_ir.pdev);
-	if (result)
-		goto exit_device_put;
-
-	return 0;
-
-exit_device_put:
-	platform_device_put(serial_ir.pdev);
-exit_driver_unregister:
-	platform_driver_unregister(&serial_ir_driver);
-	return result;
-}
-
-static void serial_ir_exit(void)
-{
-	platform_device_unregister(serial_ir.pdev);
-	platform_driver_unregister(&serial_ir_driver);
-}
-
-static int __init serial_ir_init_module(void)
+static int serial_ir_probe(struct platform_device *dev)
 {
 	struct rc_dev *rcdev;
-	int result;
+	int i, nlow, nhigh, result;
 
-	switch (type) {
-	case IR_HOMEBREW:
-	case IR_IRDEO:
-	case IR_IRDEO_REMOTE:
-	case IR_ANIMAX:
-	case IR_IGOR:
-		/* if nothing specified, use ttyS0/com1 and irq 4 */
-		io = io ? io : 0x3f8;
-		irq = irq ? irq : 4;
-		break;
-	default:
-		return -EINVAL;
-	}
-	if (!softcarrier) {
-		switch (type) {
-		case IR_HOMEBREW:
-		case IR_IGOR:
-			hardware[type].set_send_carrier = false;
-			hardware[type].set_duty_cycle = false;
-			break;
-		}
-	}
-
-	/* make sure sense is either -1, 0, or 1 */
-	if (sense != -1)
-		sense = !!sense;
-
-	result = serial_ir_init();
-	if (result)
-		return result;
-
-	rcdev = devm_rc_allocate_device(&serial_ir.pdev->dev, RC_DRIVER_IR_RAW);
-	if (!rcdev) {
-		result = -ENOMEM;
-		goto serial_cleanup;
-	}
+	rcdev = devm_rc_allocate_device(&dev->dev, RC_DRIVER_IR_RAW);
+	if (!rcdev)
+		return -ENOMEM;
 
 	if (hardware[type].send_pulse && hardware[type].send_space)
 		rcdev->tx_ir = serial_ir_tx;
@@ -806,11 +663,148 @@ static int __init serial_ir_init_module(void)
 
 	serial_ir.rcdev = rcdev;
 
-	result = rc_register_device(rcdev);
+	setup_timer(&serial_ir.timeout_timer, serial_ir_timeout,
+		    (unsigned long)&serial_ir);
 
+	result = devm_request_irq(&dev->dev, irq, serial_ir_irq_handler,
+				  share_irq ? IRQF_SHARED : 0,
+				  KBUILD_MODNAME, &hardware);
+	if (result < 0) {
+		if (result == -EBUSY)
+			dev_err(&dev->dev, "IRQ %d busy\n", irq);
+		else if (result == -EINVAL)
+			dev_err(&dev->dev, "Bad irq number or handler\n");
+		return result;
+	}
+
+	/* Reserve io region. */
+	if ((iommap &&
+	     (devm_request_mem_region(&dev->dev, iommap, 8 << ioshift,
+				      KBUILD_MODNAME) == NULL)) ||
+	     (!iommap && (devm_request_region(&dev->dev, io, 8,
+			  KBUILD_MODNAME) == NULL))) {
+		dev_err(&dev->dev, "port %04x already in use\n", io);
+		dev_warn(&dev->dev, "use 'setserial /dev/ttySX uart none'\n");
+		dev_warn(&dev->dev,
+			 "or compile the serial port driver as module and\n");
+		dev_warn(&dev->dev, "make sure this module is loaded first\n");
+		return -EBUSY;
+	}
+
+	result = hardware_init_port();
+	if (result < 0)
+		return result;
+
+	/* Initialize pulse/space widths */
+	init_timing_params(50, 38000);
+
+	/* If pin is high, then this must be an active low receiver. */
+	if (sense == -1) {
+		/* wait 1/2 sec for the power supply */
+		msleep(500);
+
+		/*
+		 * probe 9 times every 0.04s, collect "votes" for
+		 * active high/low
+		 */
+		nlow = 0;
+		nhigh = 0;
+		for (i = 0; i < 9; i++) {
+			if (sinp(UART_MSR) & hardware[type].signal_pin)
+				nlow++;
+			else
+				nhigh++;
+			msleep(40);
+		}
+		sense = nlow >= nhigh ? 1 : 0;
+		dev_info(&dev->dev, "auto-detected active %s receiver\n",
+			 sense ? "low" : "high");
+	} else
+		dev_info(&dev->dev, "Manually using active %s receiver\n",
+			 sense ? "low" : "high");
+
+	dev_dbg(&dev->dev, "Interrupt %d, port %04x obtained\n", irq, io);
+
+	return devm_rc_register_device(&dev->dev, rcdev);
+}
+
+static struct platform_driver serial_ir_driver = {
+	.probe		= serial_ir_probe,
+	.suspend	= serial_ir_suspend,
+	.resume		= serial_ir_resume,
+	.driver		= {
+		.name	= "serial_ir",
+	},
+};
+
+static int __init serial_ir_init(void)
+{
+	int result;
+
+	result = platform_driver_register(&serial_ir_driver);
+	if (result)
+		return result;
+
+	serial_ir.pdev = platform_device_alloc("serial_ir", 0);
+	if (!serial_ir.pdev) {
+		result = -ENOMEM;
+		goto exit_driver_unregister;
+	}
+
+	result = platform_device_add(serial_ir.pdev);
+	if (result)
+		goto exit_device_put;
+
+	return 0;
+
+exit_device_put:
+	platform_device_put(serial_ir.pdev);
+exit_driver_unregister:
+	platform_driver_unregister(&serial_ir_driver);
+	return result;
+}
+
+static void serial_ir_exit(void)
+{
+	platform_device_unregister(serial_ir.pdev);
+	platform_driver_unregister(&serial_ir_driver);
+}
+
+static int __init serial_ir_init_module(void)
+{
+	int result;
+
+	switch (type) {
+	case IR_HOMEBREW:
+	case IR_IRDEO:
+	case IR_IRDEO_REMOTE:
+	case IR_ANIMAX:
+	case IR_IGOR:
+		/* if nothing specified, use ttyS0/com1 and irq 4 */
+		io = io ? io : 0x3f8;
+		irq = irq ? irq : 4;
+		break;
+	default:
+		return -EINVAL;
+	}
+	if (!softcarrier) {
+		switch (type) {
+		case IR_HOMEBREW:
+		case IR_IGOR:
+			hardware[type].set_send_carrier = false;
+			hardware[type].set_duty_cycle = false;
+			break;
+		}
+	}
+
+	/* make sure sense is either -1, 0, or 1 */
+	if (sense != -1)
+		sense = !!sense;
+
+	result = serial_ir_init();
 	if (!result)
 		return 0;
-serial_cleanup:
+
 	serial_ir_exit();
 	return result;
 }
@@ -818,7 +812,6 @@ serial_cleanup:
 static void __exit serial_ir_exit_module(void)
 {
 	del_timer_sync(&serial_ir.timeout_timer);
-	rc_unregister_device(serial_ir.rcdev);
 	serial_ir_exit();
 }
 
