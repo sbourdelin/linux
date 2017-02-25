@@ -876,10 +876,8 @@ struct sport_device *sport_init(struct platform_device *pdev,
 	}
 
 	sport = kzalloc(sizeof(*sport), GFP_KERNEL);
-	if (!sport) {
-		dev_err(dev, "failed to allocate for sport device\n");
+	if (!sport)
 		goto __init_err0;
-	}
 
 	sport->num = param.num;
 	sport->dma_rx_chan = param.dma_rx_chan;
@@ -921,10 +919,8 @@ struct sport_device *sport_init(struct platform_device *pdev,
 	sport->dummy_count = param.dummy_count;
 
 	sport->private_data = kzalloc(priv_size, GFP_KERNEL);
-	if (!sport->private_data) {
-		dev_err(dev, "could not alloc priv data %zu bytes\n", priv_size);
+	if (!sport->private_data)
 		goto __init_err4;
-	}
 
 	if (L1_DATA_A_LENGTH)
 		sport->dummy_buf = l1_data_sram_zalloc(param.dummy_count * 2);
