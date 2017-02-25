@@ -220,6 +220,7 @@ static struct ir_raw_handler sony_handler = {
 	.protocols	= RC_BIT_SONY12 | RC_BIT_SONY15 | RC_BIT_SONY20,
 	.decode		= ir_sony_decode,
 	.encode		= ir_sony_encode,
+	.carrier	= 40000,
 };
 
 static int __init ir_sony_decode_init(void)

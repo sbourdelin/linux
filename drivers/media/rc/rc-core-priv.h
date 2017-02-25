@@ -33,6 +33,7 @@ struct ir_raw_handler {
 	int (*decode)(struct rc_dev *dev, struct ir_raw_event event);
 	int (*encode)(enum rc_type protocol, u32 scancode,
 		      struct ir_raw_event *events, unsigned int max);
+	u32 carrier;
 
 	/* These two should only be used by the mce kbd decoder */
 	int (*raw_register)(struct rc_dev *dev);

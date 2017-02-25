@@ -484,6 +484,36 @@ int ir_raw_encode_scancode(enum rc_type protocol, u32 scancode,
 }
 EXPORT_SYMBOL(ir_raw_encode_scancode);
 
+/**
+ * ir_raw_encode_carrier() - Get carrier used for protocol
+ *
+ * @protocol:		protocol
+ *
+ * Attempts to find the carrier for the specified protocol
+ *
+ * Returns:	The carrier in Hz
+ *		-EINVAL if the protocol is invalid, or if no
+ *		compatible encoder was found.
+ */
+int ir_raw_encode_carrier(enum rc_type protocol)
+{
+	struct ir_raw_handler *handler;
+	int ret = -EINVAL;
+	u64 mask = 1ULL << protocol;
+
+	mutex_lock(&ir_raw_handler_lock);
+	list_for_each_entry(handler, &ir_raw_handler_list, list) {
+		if (handler->protocols & mask && handler->encode) {
+			ret = handler->carrier;
+			break;
+		}
+	}
+	mutex_unlock(&ir_raw_handler_lock);
+
+	return ret;
+}
+EXPORT_SYMBOL(ir_raw_encode_carrier);
+
 /*
  * Used to (un)register raw event clients
  */
