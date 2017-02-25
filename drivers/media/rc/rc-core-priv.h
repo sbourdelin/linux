@@ -45,12 +45,14 @@ struct lirc_node {
 	struct rc_dev *dev;
 	int carrier_low;
 	DECLARE_KFIFO(rawir, unsigned int, LIRCBUF_SIZE);
+	DECLARE_KFIFO(scancodes, struct lirc_scancode, 32);
 	wait_queue_head_t wait_poll;
 	ktime_t gap_start;
 	u64 gap_duration;
 	bool gap;
 	bool send_timeout_reports;
 	int send_mode;
+	int rec_mode;
 };
 
 struct ir_raw_event_ctrl {
@@ -282,11 +284,14 @@ void ir_raw_init(void);
  */
 #ifdef CONFIG_IR_LIRC_CODEC
 void ir_lirc_raw_event(struct rc_dev *dev, struct ir_raw_event ev);
+void ir_lirc_scancode_event(struct rc_dev *dev, struct lirc_scancode *lsc);
 int ir_lirc_register(struct rc_dev *dev);
 void ir_lirc_unregister(struct rc_dev *dev);
 #else
 static inline void ir_lirc_raw_event(struct rc_dev *dev,
 				     struct ir_raw_event ev) { }
+static inline void ir_lirc_scancode_event(struct rc_dev *dev,
+					  struct lirc_scancode *lsc) { }
 static inline int ir_lirc_register(struct rc_dev *dev) { return 0; }
 static inline void ir_lirc_unregister(struct rc_dev *dev) { }
 #endif
