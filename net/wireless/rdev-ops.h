@@ -1165,4 +1165,15 @@ rdev_set_coalesce(struct cfg80211_registered_device *rdev,
 	trace_rdev_return_int(&rdev->wiphy, ret);
 	return ret;
 }
+
+static inline int
+rdev_set_btcoex(struct cfg80211_registered_device *rdev, bool enabled)
+{
+	int ret = -ENOTSUPP;
+
+	trace_rdev_set_btcoex(&rdev->wiphy, enabled);
+	ret = rdev->ops->set_btcoex(&rdev->wiphy, enabled);
+	trace_rdev_return_int(&rdev->wiphy, ret);
+	return ret;
+}
 #endif /* __CFG80211_RDEV_OPS */

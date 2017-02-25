@@ -2821,6 +2821,8 @@ struct cfg80211_nan_func {
  *	All other parameters must be ignored.
  *
  * @set_multicast_to_unicast: configure multicast to unicast conversion for BSS
+ * @set_btcoex: Use this callback to call driver API when user wants to
+ *	enable/disable btcoex.
  */
 struct cfg80211_ops {
 	int	(*suspend)(struct wiphy *wiphy, struct cfg80211_wowlan *wow);
@@ -3109,6 +3111,7 @@ struct cfg80211_ops {
 	int	(*set_multicast_to_unicast)(struct wiphy *wiphy,
 					    struct net_device *dev,
 					    const bool enabled);
+	int     (*set_btcoex)(struct wiphy *wiphy, bool enabled);
 };
 
 /*

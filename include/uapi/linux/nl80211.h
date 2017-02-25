@@ -900,6 +900,8 @@
  *	BSS selection. This command can be issued only while connected and it
  *	does not result in a change for the current association. Currently,
  *	only the %NL80211_ATTR_IE data is used and updated with this command.
+ * @NL80211_CMD_SET_BTCOEX: Enable/Disable btcoex using
+ *	%NL80211_ATTR_SET_BTCOEX
  *
  * @NL80211_CMD_MAX: highest used command number
  * @__NL80211_CMD_AFTER_LAST: internal use
@@ -1099,6 +1101,8 @@ enum nl80211_commands {
 	NL80211_CMD_SET_MULTICAST_TO_UNICAST,
 
 	NL80211_CMD_UPDATE_CONNECT_PARAMS,
+
+	NL80211_CMD_SET_BTCOEX,
 
 	/* add new commands above here */
 
@@ -2011,6 +2015,9 @@ enum nl80211_commands {
  * @NL80211_ATTR_TIMEOUT_REASON: The reason for which an operation timed out.
  *	u32 attribute with an &enum nl80211_timeout_reason value. This is used,
  *	e.g., with %NL80211_CMD_CONNECT event.
+ * @NL80211_ATTR_BTCOEX_OP: u8 attribute for driver supporting
+ *     the btcoex feature. When used with %NL80211_CMD_SET_BTCOEX it contains
+ *     either 0 for disable or 1 for enable btcoex.
  *
  * @NUM_NL80211_ATTR: total number of nl80211_attrs available
  * @NL80211_ATTR_MAX: highest attribute number currently defined
@@ -2422,6 +2429,8 @@ enum nl80211_attrs {
 	NL80211_ATTR_SCHED_SCAN_RSSI_ADJUST,
 
 	NL80211_ATTR_TIMEOUT_REASON,
+
+	NL80211_ATTR_BTCOEX_OP,
 
 	/* add attributes here, update the policy in nl80211.c */
 
