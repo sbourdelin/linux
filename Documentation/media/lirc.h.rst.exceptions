@@ -28,6 +28,55 @@ ignore define LIRC_CAN_SEND_MASK
 ignore define LIRC_CAN_REC_MASK
 ignore define LIRC_CAN_SET_REC_DUTY_CYCLE
 
+# rc protocols
+
+ignore symbol RC_TYPE_UNKNOWN
+ignore symbol RC_TYPE_OTHER
+ignore symbol RC_TYPE_RC5
+ignore symbol RC_TYPE_RC5X_20
+ignore symbol RC_TYPE_RC5_SZ
+ignore symbol RC_TYPE_JVC
+ignore symbol RC_TYPE_SONY12
+ignore symbol RC_TYPE_SONY15
+ignore symbol RC_TYPE_SONY20
+ignore symbol RC_TYPE_NEC
+ignore symbol RC_TYPE_NECX
+ignore symbol RC_TYPE_NEC32
+ignore symbol RC_TYPE_SANYO
+ignore symbol RC_TYPE_MCIR2_KBD
+ignore symbol RC_TYPE_MCIR2_MSE
+ignore symbol RC_TYPE_RC6_0
+ignore symbol RC_TYPE_RC6_6A_20
+ignore symbol RC_TYPE_RC6_6A_24
+ignore symbol RC_TYPE_RC6_6A_32
+ignore symbol RC_TYPE_RC6_MCE
+ignore symbol RC_TYPE_SHARP
+ignore symbol RC_TYPE_XMP
+ignore symbol RC_TYPE_CEC
+ignore symbol RC_TYPE_UNKNOWN
+ignore symbol RC_TYPE_OTHER
+ignore symbol RC_TYPE_RC5
+ignore symbol RC_TYPE_RC5X_20
+ignore symbol RC_TYPE_RC5_SZ
+ignore symbol RC_TYPE_JVC
+ignore symbol RC_TYPE_SONY12
+ignore symbol RC_TYPE_SONY15
+ignore symbol RC_TYPE_SONY20
+ignore symbol RC_TYPE_NEC
+ignore symbol RC_TYPE_NECX
+ignore symbol RC_TYPE_NEC32
+ignore symbol RC_TYPE_SANYO
+ignore symbol RC_TYPE_MCIR2_KBD
+ignore symbol RC_TYPE_MCIR2_MSE
+ignore symbol RC_TYPE_RC6_0
+ignore symbol RC_TYPE_RC6_6A_20
+ignore symbol RC_TYPE_RC6_6A_24
+ignore symbol RC_TYPE_RC6_6A_32
+ignore symbol RC_TYPE_RC6_MCE
+ignore symbol RC_TYPE_SHARP
+ignore symbol RC_TYPE_XMP
+ignore symbol RC_TYPE_CEC
+
 # Undocumented macros
 
 ignore define PULSE_BIT
