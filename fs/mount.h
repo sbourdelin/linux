@@ -3,6 +3,7 @@
 #include <linux/poll.h>
 #include <linux/ns_common.h>
 #include <linux/fs_pin.h>
+#include <linux/nsproxy.h>
 
 struct mnt_namespace {
 	atomic_t		count;
@@ -145,3 +146,26 @@ static inline bool is_local_mountpoint(struct dentry *dentry)
 
 	return __is_local_mountpoint(dentry);
 }
+
+/*
+ * Is the caller allowed to modify his namespace?
+ */
+static inline bool may_mount(void)
+{
+	return ns_capable(current->nsproxy->mnt_ns->user_ns, CAP_SYS_ADMIN);
+}
+
+static inline int check_mnt(struct mount *mnt)
+{
+	return mnt->mnt_ns == current->nsproxy->mnt_ns;
+}
+
+struct mountpoint *lock_mount(struct path *path);
+void unlock_mount(struct mountpoint *where);
+
+void detach_mnt(struct mount *mnt, struct path *old_path);
+void attach_mnt(struct mount *mnt, struct mount *parent, struct mountpoint *mp);
+
+void touch_mnt_namespace(struct mnt_namespace *ns);
+
+void put_mountpoint(struct mountpoint *mp);

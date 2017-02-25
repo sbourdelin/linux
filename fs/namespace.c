@@ -789,7 +789,7 @@ done:
 	return mp;
 }
 
-static void put_mountpoint(struct mountpoint *mp)
+void put_mountpoint(struct mountpoint *mp)
 {
 	if (!--mp->m_count) {
 		struct dentry *dentry = mp->m_dentry;
@@ -802,15 +802,10 @@ static void put_mountpoint(struct mountpoint *mp)
 	}
 }
 
-static inline int check_mnt(struct mount *mnt)
-{
-	return mnt->mnt_ns == current->nsproxy->mnt_ns;
-}
-
 /*
  * vfsmount lock must be held for write
  */
-static void touch_mnt_namespace(struct mnt_namespace *ns)
+void touch_mnt_namespace(struct mnt_namespace *ns)
 {
 	if (ns) {
 		ns->event = ++event;
@@ -846,7 +841,7 @@ static void unhash_mnt(struct mount *mnt)
 /*
  * vfsmount lock must be held for write
  */
-static void detach_mnt(struct mount *mnt, struct path *old_path)
+void detach_mnt(struct mount *mnt, struct path *old_path)
 {
 	old_path->dentry = mnt->mnt_mountpoint;
 	old_path->mnt = &mnt->mnt_parent->mnt;
@@ -881,9 +876,7 @@ void mnt_set_mountpoint(struct mount *mnt,
 /*
  * vfsmount lock must be held for write
  */
-static void attach_mnt(struct mount *mnt,
-			struct mount *parent,
-			struct mountpoint *mp)
+void attach_mnt(struct mount *mnt, struct mount *parent, struct mountpoint *mp)
 {
 	mnt_set_mountpoint(parent, mp, mnt);
 	hlist_add_head_rcu(&mnt->mnt_hash, m_hash(&parent->mnt, mp->m_dentry));
@@ -1639,14 +1632,6 @@ out_unlock:
 	namespace_unlock();
 }
 
-/* 
- * Is the caller allowed to modify his namespace?
- */
-static inline bool may_mount(void)
-{
-	return ns_capable(current->nsproxy->mnt_ns->user_ns, CAP_SYS_ADMIN);
-}
-
 static inline bool may_mandlock(void)
 {
 #ifndef	CONFIG_MANDATORY_FILE_LOCKING
@@ -2049,7 +2034,7 @@ static int attach_recursive_mnt(struct mount *source_mnt,
 	return err;
 }
 
-static struct mountpoint *lock_mount(struct path *path)
+struct mountpoint *lock_mount(struct path *path)
 {
 	struct vfsmount *mnt;
 	struct dentry *dentry = path->dentry;
@@ -2078,7 +2063,7 @@ retry:
 	goto retry;
 }
 
-static void unlock_mount(struct mountpoint *where)
+void unlock_mount(struct mountpoint *where)
 {
 	struct dentry *dentry = where->m_dentry;
 
