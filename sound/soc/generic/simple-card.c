@@ -448,7 +448,6 @@ static int asoc_simple_card_probe(struct platform_device *pdev)
 	priv->snd_card.num_links	= num;
 
 	if (np && of_device_is_available(np)) {
-
 		ret = asoc_simple_card_parse_of(np, priv);
 		if (ret < 0) {
 			if (ret != -EPROBE_DEFER)
