@@ -55,6 +55,7 @@ static void kirin_fbdev_output_poll_changed(struct drm_device *dev)
 {
 	struct kirin_drm_private *priv = dev->dev_private;
 
+	mutex_lock(&priv->fb_lock);
 	if (priv->fbdev) {
 		drm_fbdev_cma_hotplug_event(priv->fbdev);
 	} else {
@@ -63,6 +64,7 @@ static void kirin_fbdev_output_poll_changed(struct drm_device *dev)
 		if (IS_ERR(priv->fbdev))
 			priv->fbdev = NULL;
 	}
+	mutex_unlock(&priv->fb_lock);
 }
 #endif
 
@@ -94,6 +96,8 @@ static int kirin_drm_kms_init(struct drm_device *dev)
 	priv = devm_kzalloc(dev->dev, sizeof(*priv), GFP_KERNEL);
 	if (!priv)
 		return -ENOMEM;
+
+	mutex_init(&priv->fb_lock);
 
 	dev->dev_private = priv;
 	dev_set_drvdata(dev->dev, dev);
