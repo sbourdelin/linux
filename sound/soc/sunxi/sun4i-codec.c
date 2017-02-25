@@ -1139,8 +1139,8 @@ static struct snd_soc_dai_driver dummy_cpu_dai = {
 		.stream_name	= "Capture",
 		.channels_min	= 1,
 		.channels_max	= 2,
-		.rates 		= SUN4I_CODEC_RATES,
-		.formats 	= SUN4I_CODEC_FORMATS,
+		.rates		= SUN4I_CODEC_RATES,
+		.formats	= SUN4I_CODEC_FORMATS,
 		.sig_bits	= 24,
 	 },
 };
