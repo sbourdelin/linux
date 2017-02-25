@@ -24,6 +24,7 @@
 static struct kirkwood_dma_data *kirkwood_priv(struct snd_pcm_substream *subs)
 {
 	struct snd_soc_pcm_runtime *soc_runtime = subs->private_data;
+
 	return snd_soc_dai_get_drvdata(soc_runtime->cpu_dai);
 }
 
@@ -91,6 +92,7 @@ kirkwood_dma_conf_mbus_windows(void __iomem *base, int win,
 	/* try to find matching cs for current dma address */
 	for (i = 0; i < dram->num_cs; i++) {
 		const struct mbus_dram_window *cs = dram->cs + i;
+
 		if ((cs->base & 0xffff0000) < (dma & 0xffff0000)) {
 			writel(cs->base & 0xffff0000,
 				base + KIRKWOOD_AUDIO_WIN_BASE_REG(win));
