@@ -195,7 +195,7 @@ static struct snd_soc_dai_link dm6467_evm_dai[] = {
 	{
 		.name = "TLV320AIC3X",
 		.stream_name = "AIC3X",
-		.cpu_dai_name= "davinci-mcasp.0",
+		.cpu_dai_name = "davinci-mcasp.0",
 		.codec_dai_name = "tlv320aic3x-hifi",
 		.platform_name = "davinci-mcasp.0",
 		.codec_name = "tlv320aic3x-codec.0-001a",
@@ -207,7 +207,7 @@ static struct snd_soc_dai_link dm6467_evm_dai[] = {
 	{
 		.name = "McASP",
 		.stream_name = "spdif",
-		.cpu_dai_name= "davinci-mcasp.1",
+		.cpu_dai_name = "davinci-mcasp.1",
 		.codec_dai_name = "dit-hifi",
 		.codec_name = "spdif_dit",
 		.platform_name = "davinci-mcasp.1",
@@ -232,7 +232,7 @@ static struct snd_soc_dai_link da830_evm_dai = {
 static struct snd_soc_dai_link da850_evm_dai = {
 	.name = "TLV320AIC3X",
 	.stream_name = "AIC3X",
-	.cpu_dai_name= "davinci-mcasp.0",
+	.cpu_dai_name = "davinci-mcasp.0",
 	.codec_dai_name = "tlv320aic3x-hifi",
 	.codec_name = "tlv320aic3x-codec.1-0018",
 	.platform_name = "davinci-mcasp.0",
