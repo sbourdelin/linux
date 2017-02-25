@@ -14,7 +14,6 @@
 
 #include <linux/sched.h>
 #include <linux/wait.h>
-#include <linux/module.h>
 #include <media/lirc.h>
 #include <media/lirc_dev.h>
 #include <media/rc-core.h>
@@ -23,14 +22,14 @@
 #define LIRCBUF_SIZE 256
 
 /**
- * ir_lirc_decode() - Send raw IR data to lirc_dev to be relayed to the
- *		      lircd userspace daemon for decoding.
+ * ir_lirc_raw_event() - Send raw IR data to lirc to be relayed to userspace
+ *
  * @input_dev:	the struct rc_dev descriptor of the device
  * @duration:	the struct ir_raw_event descriptor of the pulse/space
  *
  * This function returns -EINVAL if the lirc interfaces aren't wired up.
  */
-static int ir_lirc_decode(struct rc_dev *dev, struct ir_raw_event ev)
+int ir_lirc_raw_event(struct rc_dev *dev, struct ir_raw_event ev)
 {
 	struct lirc_codec *lirc = &dev->raw->lirc;
 	int sample;
@@ -351,7 +350,7 @@ static const struct file_operations lirc_fops = {
 	.llseek		= no_llseek,
 };
 
-static int ir_lirc_register(struct rc_dev *dev)
+int ir_lirc_register(struct rc_dev *dev)
 {
 	struct lirc_driver *drv;
 	struct lirc_buffer *rbuf;
@@ -431,7 +430,7 @@ rbuf_alloc_failed:
 	return rc;
 }
 
-static int ir_lirc_unregister(struct rc_dev *dev)
+void ir_lirc_unregister(struct rc_dev *dev)
 {
 	struct lirc_codec *lirc = &dev->raw->lirc;
 
@@ -439,34 +438,4 @@ static int ir_lirc_unregister(struct rc_dev *dev)
 	lirc_buffer_free(lirc->drv->rbuf);
 	kfree(lirc->drv->rbuf);
 	kfree(lirc->drv);
-
-	return 0;
 }
-
-static struct ir_raw_handler lirc_handler = {
-	.protocols	= 0,
-	.decode		= ir_lirc_decode,
-	.raw_register	= ir_lirc_register,
-	.raw_unregister	= ir_lirc_unregister,
-};
-
-static int __init ir_lirc_codec_init(void)
-{
-	ir_raw_handler_register(&lirc_handler);
-
-	printk(KERN_INFO "IR LIRC bridge handler initialized\n");
-	return 0;
-}
-
-static void __exit ir_lirc_codec_exit(void)
-{
-	ir_raw_handler_unregister(&lirc_handler);
-}
-
-module_init(ir_lirc_codec_init);
-module_exit(ir_lirc_codec_exit);
-
-MODULE_LICENSE("GPL");
-MODULE_AUTHOR("Jarod Wilson <jarod@redhat.com>");
-MODULE_AUTHOR("Red Hat Inc. (http://www.redhat.com)");
-MODULE_DESCRIPTION("LIRC IR handler bridge");

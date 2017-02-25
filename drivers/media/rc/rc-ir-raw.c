@@ -40,6 +40,7 @@ static int ir_raw_event_thread(void *data)
 				if (raw->dev->enabled_protocols &
 				    handler->protocols || !handler->protocols)
 					handler->decode(raw->dev, ev);
+			ir_lirc_raw_event(raw->dev, ev);
 			raw->prev_ev = ev;
 		}
 		mutex_unlock(&ir_raw_handler_lock);
@@ -502,18 +503,12 @@ int ir_raw_event_register(struct rc_dev *dev)
 	dev->change_protocol = change_protocol;
 	INIT_KFIFO(dev->raw->kfifo);
 
-	/*
-	 * raw transmitters do not need any event registration
-	 * because the event is coming from userspace
-	 */
-	if (dev->driver_type != RC_DRIVER_IR_RAW_TX) {
-		dev->raw->thread = kthread_run(ir_raw_event_thread, dev->raw,
-					       "rc%u", dev->minor);
+	dev->raw->thread = kthread_run(ir_raw_event_thread, dev->raw,
+				       "rc%u", dev->minor);
 
-		if (IS_ERR(dev->raw->thread)) {
-			rc = PTR_ERR(dev->raw->thread);
-			goto out;
-		}
+	if (IS_ERR(dev->raw->thread)) {
+		rc = PTR_ERR(dev->raw->thread);
+		goto out;
 	}
 
 	mutex_lock(&ir_raw_handler_lock);
