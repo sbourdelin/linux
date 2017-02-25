@@ -19,7 +19,11 @@
 /* Define the max number of pulse/space transitions to buffer */
 #define	MAX_IR_EVENT_SIZE	512
 
+/* Define the number of samples lirc can buffer or transmit */
+#define LIRCBUF_SIZE		256
+
 #include <linux/slab.h>
+#include <media/lirc_dev.h>
 #include <media/rc-core.h>
 
 struct ir_raw_handler {
@@ -33,6 +37,18 @@ struct ir_raw_handler {
 	/* These two should only be used by the mce kbd decoder */
 	int (*raw_register)(struct rc_dev *dev);
 	int (*raw_unregister)(struct rc_dev *dev);
+};
+
+struct lirc_node {
+	struct lirc_driver drv;
+	struct rc_dev *dev;
+	int carrier_low;
+	DECLARE_KFIFO(rawir, unsigned int, LIRCBUF_SIZE);
+	wait_queue_head_t wait_poll;
+	ktime_t gap_start;
+	u64 gap_duration;
+	bool gap;
+	bool send_timeout_reports;
 };
 
 struct ir_raw_event_ctrl {
@@ -103,17 +119,6 @@ struct ir_raw_event_ctrl {
 		unsigned count;
 		unsigned wanted_bits;
 	} mce_kbd;
-	struct lirc_codec {
-		struct rc_dev *dev;
-		struct lirc_driver *drv;
-		int carrier_low;
-
-		ktime_t gap_start;
-		u64 gap_duration;
-		bool gap;
-		bool send_timeout_reports;
-
-	} lirc;
 	struct xmp_dec {
 		int state;
 		unsigned count;
@@ -273,12 +278,12 @@ void ir_raw_init(void);
  * lirc interface bridge
  */
 #ifdef CONFIG_IR_LIRC_CODEC
-int ir_lirc_raw_event(struct rc_dev *dev, struct ir_raw_event ev);
+void ir_lirc_raw_event(struct rc_dev *dev, struct ir_raw_event ev);
 int ir_lirc_register(struct rc_dev *dev);
 void ir_lirc_unregister(struct rc_dev *dev);
 #else
-static inline int ir_lirc_raw_event(struct rc_dev *dev,
-				    struct ir_raw_event ev) { return 0; }
+static inline void ir_lirc_raw_event(struct rc_dev *dev,
+				     struct ir_raw_event ev) { }
 static inline int ir_lirc_register(struct rc_dev *dev) { return 0; }
 static inline void ir_lirc_unregister(struct rc_dev *dev) { }
 #endif
