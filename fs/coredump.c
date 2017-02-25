@@ -45,6 +45,7 @@
 
 #include <trace/events/task.h>
 #include "internal.h"
+#include "mount.h"
 
 #include <trace/events/sched.h>
 
@@ -180,6 +181,30 @@ put_exe_file:
 	return ret;
 }
 
+char *namespace_core_pattern(bool alloc)
+{
+	struct mnt_namespace *ns = current->nsproxy->mnt_ns;
+
+	if (!ns->core_pattern && alloc) {
+		char *new = kzalloc(CORENAME_MAX_SIZE, GFP_KERNEL);
+
+		if (new && cmpxchg(&ns->core_pattern, NULL, new))
+			kfree(new);
+	}
+
+	return ns->core_pattern;
+}
+
+static char *current_core_pattern(void)
+{
+	struct mnt_namespace *ns = current->nsproxy->mnt_ns;
+
+	if (ns->core_pattern && ns->core_pattern[0])
+		return ns->core_pattern;
+
+	return core_pattern;
+}
+
 /* format_corename will inspect the pattern parameter, and output a
  * name into corename, which must have space for at least
  * CORENAME_MAX_SIZE bytes plus one byte for the zero terminator.
@@ -187,7 +212,7 @@ put_exe_file:
 static int format_corename(struct core_name *cn, struct coredump_params *cprm)
 {
 	const struct cred *cred = current_cred();
-	const char *pat_ptr = core_pattern;
+	const char *pat_ptr = current_core_pattern();
 	int ispipe = (*pat_ptr == '|');
 	int pid_in_pattern = 0;
 	int err = 0;

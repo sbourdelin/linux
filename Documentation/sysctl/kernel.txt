@@ -26,6 +26,7 @@ show up in /proc/sys/kernel:
 - callhome		     [ S390 only ]
 - cap_last_cap
 - core_pattern
+- core_pattern_ns
 - core_pipe_limit
 - core_uses_pid
 - ctrl-alt-del
@@ -216,6 +217,14 @@ core_pattern is used to specify a core dumpfile pattern name.
 . If the first character of the pattern is a '|', the kernel will treat
   the rest of the pattern as a command to run.  The core dump will be
   written to the standard input of that program instead of to a file.
+
+==============================================================
+
+core_pattern_ns:
+
+This sysctl has the same format as core_pattern. Any non-empty string
+set here overrides core_pattern for tasks in current mount namespace.
+New mount namespace gets a copy of this configuration from parent.
 
 ==============================================================
 

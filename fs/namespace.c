@@ -24,6 +24,7 @@
 #include <linux/magic.h>
 #include <linux/bootmem.h>
 #include <linux/task_work.h>
+#include <linux/binfmts.h>	/* CORENAME_MAX_SIZE */
 #include "pnode.h"
 #include "internal.h"
 
@@ -2853,6 +2854,7 @@ static void free_mnt_ns(struct mnt_namespace *ns)
 	ns_free_inum(&ns->ns);
 	dec_mnt_namespaces(ns->ucounts);
 	put_user_ns(ns->user_ns);
+	kfree(ns->core_pattern);
 	kfree(ns);
 }
 
@@ -2897,6 +2899,7 @@ static struct mnt_namespace *alloc_mnt_ns(struct user_namespace *user_ns)
 	new_ns->ucounts = ucounts;
 	new_ns->mounts = 0;
 	new_ns->pending_mounts = 0;
+	new_ns->core_pattern = NULL;
 	return new_ns;
 }
 
@@ -2923,6 +2926,15 @@ struct mnt_namespace *copy_mnt_ns(unsigned long flags, struct mnt_namespace *ns,
 	new_ns = alloc_mnt_ns(user_ns);
 	if (IS_ERR(new_ns))
 		return new_ns;
+
+	if (ns->core_pattern) {
+		new_ns->core_pattern = kmemdup(ns->core_pattern,
+					       CORENAME_MAX_SIZE, GFP_KERNEL);
+		if (!new_ns->core_pattern) {
+			free_mnt_ns(new_ns);
+			return ERR_PTR(-ENOMEM);
+		}
+	}
 
 	namespace_lock();
 	/* First pass: copy the tree topology */

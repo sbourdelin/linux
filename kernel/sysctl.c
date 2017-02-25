@@ -483,6 +483,13 @@ static struct ctl_table kern_table[] = {
 		.proc_handler	= proc_dostring_coredump,
 	},
 	{
+		.procname	= "core_pattern_ns",
+		.data		= NULL,
+		.maxlen		= CORENAME_MAX_SIZE,
+		.mode		= 0644,
+		.proc_handler	= proc_dostring_coredump,
+	},
+	{
 		.procname	= "core_pipe_limit",
 		.data		= &core_pipe_limit,
 		.maxlen		= sizeof(unsigned int),
@@ -2408,10 +2415,27 @@ static int proc_dointvec_minmax_coredump(struct ctl_table *table, int write,
 }
 
 #ifdef CONFIG_COREDUMP
+extern char *namespace_core_pattern(bool alloc);
+
 static int proc_dostring_coredump(struct ctl_table *table, int write,
 		  void __user *buffer, size_t *lenp, loff_t *ppos)
 {
-	int error = proc_dostring(table, write, buffer, lenp, ppos);
+	struct ctl_table tmp_table;
+	char empty[] = "";
+	int error;
+
+	if (!table->data) {
+		tmp_table = *table;
+		table = &tmp_table;
+		table->data = namespace_core_pattern(write);
+		if (!table->data) {
+			if (write)
+				return -ENOMEM;
+			table->data = empty;
+		}
+	}
+
+	error = proc_dostring(table, write, buffer, lenp, ppos);
 	if (!error)
 		validate_coredump_safety();
 	return error;
