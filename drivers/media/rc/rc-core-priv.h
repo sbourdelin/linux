@@ -49,6 +49,7 @@ struct lirc_node {
 	u64 gap_duration;
 	bool gap;
 	bool send_timeout_reports;
+	int send_mode;
 };
 
 struct ir_raw_event_ctrl {
