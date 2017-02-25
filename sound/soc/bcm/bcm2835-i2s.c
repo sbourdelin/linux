@@ -296,6 +296,7 @@ static int bcm2835_i2s_hw_params(struct snd_pcm_substream *substream,
 
 	switch (dev->fmt & SND_SOC_DAIFMT_FORMAT_MASK) {
 	case SND_SOC_DAIFMT_I2S:
+	case SND_SOC_DAIFMT_DSP_A:
 		data_delay = 1;
 		break;
 	default:
@@ -312,6 +313,7 @@ static int bcm2835_i2s_hw_params(struct snd_pcm_substream *substream,
 
 	switch (params_channels(params)) {
 	case 2:
+	case 8:
 		format = BCM2835_I2S_CH1(format) | BCM2835_I2S_CH2(format);
 		format |= BCM2835_I2S_CH1(BCM2835_I2S_CHPOS(ch1pos));
 		format |= BCM2835_I2S_CH2(BCM2835_I2S_CHPOS(ch2pos));
@@ -526,7 +528,20 @@ static int bcm2835_i2s_startup(struct snd_pcm_substream *substream,
 	regmap_update_bits(dev->i2s_regmap, BCM2835_I2S_CS_A_REG,
 			BCM2835_I2S_STBY, BCM2835_I2S_STBY);
 
-	return 0;
+	/* Only allow 2 channels, unless in DSP mode where an IC (between 
+	 * the SoC and codec) is master.
+	 */
+	if ((dev->fmt & SND_SOC_DAIFMT_FORMAT_MASK)
+					== SND_SOC_DAIFMT_DSP_A)
+		if ((dev->fmt & SND_SOC_DAIFMT_MASTER_MASK)
+					!= SND_SOC_DAIFMT_IBM_IFM)
+			return -EINVAL;
+		else
+			return snd_pcm_hw_constraint_single(substream->runtime,
+						SNDRV_PCM_HW_PARAM_CHANNELS, 8);
+	else
+		return snd_pcm_hw_constraint_single(substream->runtime,
+			SNDRV_PCM_HW_PARAM_CHANNELS, 2);
 }
 
 static void bcm2835_i2s_shutdown(struct snd_pcm_substream *substream,
@@ -549,6 +564,10 @@ static void bcm2835_i2s_shutdown(struct snd_pcm_substream *substream,
 	 * not stop the clock when SND_SOC_DAIFMT_CONT
 	 */
 	bcm2835_i2s_stop_clock(dev);
+
+	/* Default to 2 channels */
+	snd_pcm_hw_constraint_single(substream->runtime,
+			SNDRV_PCM_HW_PARAM_CHANNELS, 2);
 }
 
 static const struct snd_soc_dai_ops bcm2835_i2s_dai_ops = {
