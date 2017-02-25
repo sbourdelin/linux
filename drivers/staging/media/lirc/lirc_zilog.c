@@ -100,7 +100,7 @@ struct IR {
 	struct list_head list;
 
 	/* FIXME spinlock access to l.features */
-	struct lirc_driver l;
+	struct lirc_driver *l;
 	struct lirc_buffer rbuf;
 
 	struct mutex ir_lock;
@@ -184,9 +184,9 @@ static void release_ir_device(struct kref *ref)
 	 * ir->open_count ==  0 - happens on final close()
 	 * ir_lock, tx_ref_lock, rx_ref_lock, all released
 	 */
-	if (ir->l.minor >= 0 && ir->l.minor < MAX_IRCTL_DEVICES) {
-		lirc_unregister_driver(ir->l.minor);
-		ir->l.minor = MAX_IRCTL_DEVICES;
+	if (ir->l->minor >= 0 && ir->l->minor < MAX_IRCTL_DEVICES) {
+		lirc_unregister_driver(ir->l->minor);
+		ir->l->minor = MAX_IRCTL_DEVICES;
 	}
 	if (kfifo_initialized(&ir->rbuf.fifo))
 		lirc_buffer_free(&ir->rbuf);
@@ -243,7 +243,7 @@ static void release_ir_rx(struct kref *ref)
 	 * and releasing the ir reference can cause a sleep.  That work is
 	 * performed by put_ir_rx()
 	 */
-	ir->l.features &= ~LIRC_CAN_REC_LIRCCODE;
+	ir->l->features &= ~LIRC_CAN_REC_LIRCCODE;
 	/* Don't put_ir_device(rx->ir) here; lock can't be freed yet */
 	ir->rx = NULL;
 	/* Don't do the kfree(rx) here; we still need to kill the poll thread */
@@ -288,7 +288,7 @@ static void release_ir_tx(struct kref *ref)
 	struct IR_tx *tx = container_of(ref, struct IR_tx, ref);
 	struct IR *ir = tx->ir;
 
-	ir->l.features &= ~LIRC_CAN_SEND_PULSE;
+	ir->l->features &= ~LIRC_CAN_SEND_PULSE;
 	/* Don't put_ir_device(tx->ir) here, so our lock doesn't get freed */
 	ir->tx = NULL;
 	kfree(tx);
@@ -317,12 +317,12 @@ static int add_to_buf(struct IR *ir)
 	int ret;
 	int failures = 0;
 	unsigned char sendbuf[1] = { 0 };
-	struct lirc_buffer *rbuf = ir->l.rbuf;
+	struct lirc_buffer *rbuf = ir->l->rbuf;
 	struct IR_rx *rx;
 	struct IR_tx *tx;
 
 	if (lirc_buffer_full(rbuf)) {
-		dev_dbg(ir->l.dev, "buffer overflow\n");
+		dev_dbg(&ir->adapter->dev, "buffer overflow\n");
 		return -EOVERFLOW;
 	}
 
@@ -368,17 +368,17 @@ static int add_to_buf(struct IR *ir)
 		 */
 		ret = i2c_master_send(rx->c, sendbuf, 1);
 		if (ret != 1) {
-			dev_err(ir->l.dev, "i2c_master_send failed with %d\n",
+			dev_err(&ir->adapter->dev, "i2c_master_send failed with %d\n",
 				ret);
 			if (failures >= 3) {
 				mutex_unlock(&ir->ir_lock);
-				dev_err(ir->l.dev,
+				dev_err(&ir->adapter->dev,
 					"unable to read from the IR chip after 3 resets, giving up\n");
 				break;
 			}
 
 			/* Looks like the chip crashed, reset it */
-			dev_err(ir->l.dev,
+			dev_err(&ir->adapter->dev,
 				"polling the IR receiver chip failed, trying reset\n");
 
 			set_current_state(TASK_UNINTERRUPTIBLE);
@@ -405,14 +405,14 @@ static int add_to_buf(struct IR *ir)
 		ret = i2c_master_recv(rx->c, keybuf, sizeof(keybuf));
 		mutex_unlock(&ir->ir_lock);
 		if (ret != sizeof(keybuf)) {
-			dev_err(ir->l.dev,
+			dev_err(&ir->adapter->dev,
 				"i2c_master_recv failed with %d -- keeping last read buffer\n",
 				ret);
 		} else {
 			rx->b[0] = keybuf[3];
 			rx->b[1] = keybuf[4];
 			rx->b[2] = keybuf[5];
-			dev_dbg(ir->l.dev,
+			dev_dbg(&ir->adapter->dev,
 				"key (0x%02x/0x%02x)\n",
 				rx->b[0], rx->b[1]);
 		}
@@ -463,9 +463,9 @@ static int add_to_buf(struct IR *ir)
 static int lirc_thread(void *arg)
 {
 	struct IR *ir = arg;
-	struct lirc_buffer *rbuf = ir->l.rbuf;
+	struct lirc_buffer *rbuf = ir->l->rbuf;
 
-	dev_dbg(ir->l.dev, "poll thread started\n");
+	dev_dbg(&ir->adapter->dev, "poll thread started\n");
 
 	while (!kthread_should_stop()) {
 		set_current_state(TASK_INTERRUPTIBLE);
@@ -493,7 +493,7 @@ static int lirc_thread(void *arg)
 			wake_up_interruptible(&rbuf->wait_poll);
 	}
 
-	dev_dbg(ir->l.dev, "poll thread ended\n");
+	dev_dbg(&ir->adapter->dev, "poll thread ended\n");
 	return 0;
 }
 
@@ -655,10 +655,10 @@ static int send_data_block(struct IR_tx *tx, unsigned char *data_block)
 		buf[0] = (unsigned char)(i + 1);
 		for (j = 0; j < tosend; ++j)
 			buf[1 + j] = data_block[i + j];
-		dev_dbg(tx->ir->l.dev, "%*ph", 5, buf);
+		dev_dbg(&tx->ir->adapter->dev, "%*ph", 5, buf);
 		ret = i2c_master_send(tx->c, buf, tosend + 1);
 		if (ret != tosend + 1) {
-			dev_err(tx->ir->l.dev,
+			dev_err(&tx->ir->adapter->dev,
 				"i2c_master_send failed with %d\n", ret);
 			return ret < 0 ? ret : -EFAULT;
 		}
@@ -683,7 +683,8 @@ static int send_boot_data(struct IR_tx *tx)
 	buf[1] = 0x20;
 	ret = i2c_master_send(tx->c, buf, 2);
 	if (ret != 2) {
-		dev_err(tx->ir->l.dev, "i2c_master_send failed with %d\n", ret);
+		dev_err(&tx->ir->adapter->dev, "i2c_master_send failed with %d\n",
+			ret);
 		return ret < 0 ? ret : -EFAULT;
 	}
 
@@ -700,22 +701,24 @@ static int send_boot_data(struct IR_tx *tx)
 	}
 
 	if (ret != 1) {
-		dev_err(tx->ir->l.dev, "i2c_master_send failed with %d\n", ret);
+		dev_err(&tx->ir->adapter->dev, "i2c_master_send failed with %d\n",
+			ret);
 		return ret < 0 ? ret : -EFAULT;
 	}
 
 	/* Here comes the firmware version... (hopefully) */
 	ret = i2c_master_recv(tx->c, buf, 4);
 	if (ret != 4) {
-		dev_err(tx->ir->l.dev, "i2c_master_recv failed with %d\n", ret);
+		dev_err(&tx->ir->adapter->dev, "i2c_master_recv failed with %d\n",
+			ret);
 		return 0;
 	}
 	if ((buf[0] != 0x80) && (buf[0] != 0xa0)) {
-		dev_err(tx->ir->l.dev, "unexpected IR TX init response: %02x\n",
+		dev_err(&tx->ir->adapter->dev, "unexpected IR TX init response: %02x\n",
 			buf[0]);
 		return 0;
 	}
-	dev_notice(tx->ir->l.dev,
+	dev_notice(&tx->ir->adapter->dev,
 		   "Zilog/Hauppauge IR blaster firmware version %d.%d.%d loaded\n",
 		   buf[1], buf[2], buf[3]);
 
@@ -760,15 +763,17 @@ static int fw_load(struct IR_tx *tx)
 	}
 
 	/* Request codeset data file */
-	ret = request_firmware(&fw_entry, "haup-ir-blaster.bin", tx->ir->l.dev);
+	ret = request_firmware(&fw_entry, "haup-ir-blaster.bin",
+			       &tx->ir->adapter->dev);
 	if (ret != 0) {
-		dev_err(tx->ir->l.dev,
+		dev_err(&tx->ir->adapter->dev,
 			"firmware haup-ir-blaster.bin not available (%d)\n",
 			ret);
 		ret = ret < 0 ? ret : -EFAULT;
 		goto out;
 	}
-	dev_dbg(tx->ir->l.dev, "firmware of size %zu loaded\n", fw_entry->size);
+	dev_dbg(&tx->ir->adapter->dev, "firmware of size %zu loaded\n",
+		fw_entry->size);
 
 	/* Parse the file */
 	tx_data = vmalloc(sizeof(*tx_data));
@@ -796,7 +801,7 @@ static int fw_load(struct IR_tx *tx)
 	if (!read_uint8(&data, tx_data->endp, &version))
 		goto corrupt;
 	if (version != 1) {
-		dev_err(tx->ir->l.dev,
+		dev_err(&tx->ir->adapter->dev,
 			"unsupported code set file version (%u, expected 1) -- please upgrade to a newer driver\n",
 			version);
 		fw_unload_locked();
@@ -813,7 +818,7 @@ static int fw_load(struct IR_tx *tx)
 			      &tx_data->num_code_sets))
 		goto corrupt;
 
-	dev_dbg(tx->ir->l.dev, "%u IR blaster codesets loaded\n",
+	dev_dbg(&tx->ir->adapter->dev, "%u IR blaster codesets loaded\n",
 		tx_data->num_code_sets);
 
 	tx_data->code_sets = vmalloc(
@@ -878,7 +883,7 @@ static int fw_load(struct IR_tx *tx)
 	goto out;
 
 corrupt:
-	dev_err(tx->ir->l.dev, "firmware is corrupt\n");
+	dev_err(&tx->ir->adapter->dev, "firmware is corrupt\n");
 	fw_unload_locked();
 	ret = -EFAULT;
 
@@ -893,14 +898,14 @@ static ssize_t read(struct file *filep, char __user *outbuf, size_t n,
 {
 	struct IR *ir = filep->private_data;
 	struct IR_rx *rx;
-	struct lirc_buffer *rbuf = ir->l.rbuf;
+	struct lirc_buffer *rbuf = ir->l->rbuf;
 	int ret = 0, written = 0, retries = 0;
 	unsigned int m;
 	DECLARE_WAITQUEUE(wait, current);
 
-	dev_dbg(ir->l.dev, "read called\n");
+	dev_dbg(&ir->adapter->dev, "read called\n");
 	if (n % rbuf->chunk_size) {
-		dev_dbg(ir->l.dev, "read result = -EINVAL\n");
+		dev_dbg(&ir->adapter->dev, "read result = -EINVAL\n");
 		return -EINVAL;
 	}
 
@@ -944,7 +949,7 @@ static ssize_t read(struct file *filep, char __user *outbuf, size_t n,
 			unsigned char buf[MAX_XFER_SIZE];
 
 			if (rbuf->chunk_size > sizeof(buf)) {
-				dev_err(ir->l.dev,
+				dev_err(&ir->adapter->dev,
 					"chunk_size is too big (%d)!\n",
 					rbuf->chunk_size);
 				ret = -EINVAL;
@@ -959,7 +964,7 @@ static ssize_t read(struct file *filep, char __user *outbuf, size_t n,
 				retries++;
 			}
 			if (retries >= 5) {
-				dev_err(ir->l.dev, "Buffer read failed!\n");
+				dev_err(&ir->adapter->dev, "Buffer read failed!\n");
 				ret = -EIO;
 			}
 		}
@@ -969,7 +974,7 @@ static ssize_t read(struct file *filep, char __user *outbuf, size_t n,
 	put_ir_rx(rx, false);
 	set_current_state(TASK_RUNNING);
 
-	dev_dbg(ir->l.dev, "read result = %d (%s)\n", ret,
+	dev_dbg(&ir->adapter->dev, "read result = %d (%s)\n", ret,
 		ret ? "Error" : "OK");
 
 	return ret ? ret : written;
@@ -986,7 +991,7 @@ static int send_code(struct IR_tx *tx, unsigned int code, unsigned int key)
 	ret = get_key_data(data_block, code, key);
 
 	if (ret == -EPROTO) {
-		dev_err(tx->ir->l.dev,
+		dev_err(&tx->ir->adapter->dev,
 			"failed to get data for code %u, key %u -- check lircd.conf entries\n",
 			code, key);
 		return ret;
@@ -1003,7 +1008,8 @@ static int send_code(struct IR_tx *tx, unsigned int code, unsigned int key)
 	buf[1] = 0x40;
 	ret = i2c_master_send(tx->c, buf, 2);
 	if (ret != 2) {
-		dev_err(tx->ir->l.dev, "i2c_master_send failed with %d\n", ret);
+		dev_err(&tx->ir->adapter->dev, "i2c_master_send failed with %d\n",
+			ret);
 		return ret < 0 ? ret : -EFAULT;
 	}
 
@@ -1016,18 +1022,20 @@ static int send_code(struct IR_tx *tx, unsigned int code, unsigned int key)
 	}
 
 	if (ret != 1) {
-		dev_err(tx->ir->l.dev, "i2c_master_send failed with %d\n", ret);
+		dev_err(&tx->ir->adapter->dev, "i2c_master_send failed with %d\n",
+			ret);
 		return ret < 0 ? ret : -EFAULT;
 	}
 
 	/* Send finished download? */
 	ret = i2c_master_recv(tx->c, buf, 1);
 	if (ret != 1) {
-		dev_err(tx->ir->l.dev, "i2c_master_recv failed with %d\n", ret);
+		dev_err(&tx->ir->adapter->dev, "i2c_master_recv failed with %d\n",
+			ret);
 		return ret < 0 ? ret : -EFAULT;
 	}
 	if (buf[0] != 0xA0) {
-		dev_err(tx->ir->l.dev, "unexpected IR TX response #1: %02x\n",
+		dev_err(&tx->ir->adapter->dev, "unexpected IR TX response #1: %02x\n",
 			buf[0]);
 		return -EFAULT;
 	}
@@ -1037,7 +1045,8 @@ static int send_code(struct IR_tx *tx, unsigned int code, unsigned int key)
 	buf[1] = 0x80;
 	ret = i2c_master_send(tx->c, buf, 2);
 	if (ret != 2) {
-		dev_err(tx->ir->l.dev, "i2c_master_send failed with %d\n", ret);
+		dev_err(&tx->ir->adapter->dev, "i2c_master_send failed with %d\n",
+			ret);
 		return ret < 0 ? ret : -EFAULT;
 	}
 
@@ -1047,7 +1056,8 @@ static int send_code(struct IR_tx *tx, unsigned int code, unsigned int key)
 	 * going to skip this whole mess and say we're done on the HD PVR
 	 */
 	if (!tx->post_tx_ready_poll) {
-		dev_dbg(tx->ir->l.dev, "sent code %u, key %u\n", code, key);
+		dev_dbg(&tx->ir->adapter->dev, "sent code %u, key %u\n",
+			code, key);
 		return 0;
 	}
 
@@ -1063,12 +1073,12 @@ static int send_code(struct IR_tx *tx, unsigned int code, unsigned int key)
 		ret = i2c_master_send(tx->c, buf, 1);
 		if (ret == 1)
 			break;
-		dev_dbg(tx->ir->l.dev,
+		dev_dbg(&tx->ir->adapter->dev,
 			"NAK expected: i2c_master_send failed with %d (try %d)\n",
 			ret, i+1);
 	}
 	if (ret != 1) {
-		dev_err(tx->ir->l.dev,
+		dev_err(&tx->ir->adapter->dev,
 			"IR TX chip never got ready: last i2c_master_send failed with %d\n",
 			ret);
 		return ret < 0 ? ret : -EFAULT;
@@ -1077,17 +1087,18 @@ static int send_code(struct IR_tx *tx, unsigned int code, unsigned int key)
 	/* Seems to be an 'ok' response */
 	i = i2c_master_recv(tx->c, buf, 1);
 	if (i != 1) {
-		dev_err(tx->ir->l.dev, "i2c_master_recv failed with %d\n", ret);
+		dev_err(&tx->ir->adapter->dev, "i2c_master_recv failed with %d\n",
+			ret);
 		return -EFAULT;
 	}
 	if (buf[0] != 0x80) {
-		dev_err(tx->ir->l.dev, "unexpected IR TX response #2: %02x\n",
+		dev_err(&tx->ir->adapter->dev, "unexpected IR TX response #2: %02x\n",
 			buf[0]);
 		return -EFAULT;
 	}
 
 	/* Oh good, it worked */
-	dev_dbg(tx->ir->l.dev, "sent code %u, key %u\n", code, key);
+	dev_dbg(&tx->ir->adapter->dev, "sent code %u, key %u\n", code, key);
 	return 0;
 }
 
@@ -1173,11 +1184,11 @@ static ssize_t write(struct file *filep, const char __user *buf, size_t n,
 		 */
 		if (ret != 0) {
 			/* Looks like the chip crashed, reset it */
-			dev_err(tx->ir->l.dev,
+			dev_err(&tx->ir->adapter->dev,
 				"sending to the IR transmitter chip failed, trying reset\n");
 
 			if (failures >= 3) {
-				dev_err(tx->ir->l.dev,
+				dev_err(&tx->ir->adapter->dev,
 					"unable to send to the IR chip after 3 resets, giving up\n");
 				mutex_unlock(&ir->ir_lock);
 				mutex_unlock(&tx->client_lock);
@@ -1209,10 +1220,10 @@ static unsigned int poll(struct file *filep, poll_table *wait)
 {
 	struct IR *ir = filep->private_data;
 	struct IR_rx *rx;
-	struct lirc_buffer *rbuf = ir->l.rbuf;
+	struct lirc_buffer *rbuf = ir->l->rbuf;
 	unsigned int ret;
 
-	dev_dbg(ir->l.dev, "poll called\n");
+	dev_dbg(&ir->adapter->dev, "poll called\n");
 
 	rx = get_ir_rx(ir);
 	if (rx == NULL) {
@@ -1220,7 +1231,7 @@ static unsigned int poll(struct file *filep, poll_table *wait)
 		 * Revisit this, if our poll function ever reports writeable
 		 * status for Tx
 		 */
-		dev_dbg(ir->l.dev, "poll result = POLLERR\n");
+		dev_dbg(&ir->adapter->dev, "poll result = POLLERR\n");
 		return POLLERR;
 	}
 
@@ -1233,7 +1244,7 @@ static unsigned int poll(struct file *filep, poll_table *wait)
 	/* Indicate what ops could happen immediately without blocking */
 	ret = lirc_buffer_empty(rbuf) ? 0 : (POLLIN|POLLRDNORM);
 
-	dev_dbg(ir->l.dev, "poll result = %s\n",
+	dev_dbg(&ir->adapter->dev, "poll result = %s\n",
 		ret ? "POLLIN|POLLRDNORM" : "none");
 	return ret;
 }
@@ -1245,7 +1256,7 @@ static long ioctl(struct file *filep, unsigned int cmd, unsigned long arg)
 	int result;
 	unsigned long mode, features;
 
-	features = ir->l.features;
+	features = ir->l->features;
 
 	switch (cmd) {
 	case LIRC_GET_LENGTH:
@@ -1299,7 +1310,7 @@ static struct IR *get_ir_device_by_minor(unsigned int minor)
 
 	if (!list_empty(&ir_devices_list)) {
 		list_for_each_entry(ir, &ir_devices_list, list) {
-			if (ir->l.minor == minor) {
+			if (ir->l->minor == minor) {
 				ret = get_ir_device(ir, true);
 				break;
 			}
@@ -1475,11 +1486,17 @@ static int ir_probe(struct i2c_client *client, const struct i2c_device_id *id)
 	ir = get_ir_device_by_adapter(adap);
 	if (ir == NULL) {
 		ir = kzalloc(sizeof(struct IR), GFP_KERNEL);
-		if (ir == NULL) {
+		if (!ir) {
 			ret = -ENOMEM;
 			goto out_no_ir;
 		}
 		kref_init(&ir->ref);
+		ir->l = kzalloc(sizeof(*ir->l), GFP_KERNEL);
+		if (!ir) {
+			ret = -ENOMEM;
+			kfree(ir);
+			goto out_no_ir;
+		}
 
 		/* store for use in ir_probe() again, and open() later on */
 		INIT_LIST_HEAD(&ir->list);
@@ -1492,19 +1509,19 @@ static int ir_probe(struct i2c_client *client, const struct i2c_device_id *id)
 		spin_lock_init(&ir->rx_ref_lock);
 
 		/* set lirc_dev stuff */
-		memcpy(&ir->l, &lirc_template, sizeof(struct lirc_driver));
+		memcpy(ir->l, &lirc_template, sizeof(struct lirc_driver));
 		/*
 		 * FIXME this is a pointer reference to us, but no refcount.
 		 *
 		 * This OK for now, since lirc_dev currently won't touch this
 		 * buffer as we provide our own lirc_fops.
 		 *
-		 * Currently our own lirc_fops rely on this ir->l.rbuf pointer
+		 * Currently our own lirc_fops rely on this ir->l->rbuf pointer
 		 */
-		ir->l.rbuf = &ir->rbuf;
-		ir->l.dev  = &adap->dev;
-		ret = lirc_buffer_init(ir->l.rbuf,
-				       ir->l.chunk_size, ir->l.buffer_size);
+		ir->l->rbuf = &ir->rbuf;
+		ir->l->dev.parent = &adap->dev;
+		ret = lirc_buffer_init(ir->l->rbuf,
+				       ir->l->chunk_size, ir->l->buffer_size);
 		if (ret)
 			goto out_put_ir;
 	}
@@ -1522,7 +1539,7 @@ static int ir_probe(struct i2c_client *client, const struct i2c_device_id *id)
 		kref_init(&tx->ref);
 		ir->tx = tx;
 
-		ir->l.features |= LIRC_CAN_SEND_PULSE;
+		ir->l->features |= LIRC_CAN_SEND_PULSE;
 		mutex_init(&tx->client_lock);
 		tx->c = client;
 		tx->need_boot = 1;
@@ -1548,7 +1565,7 @@ static int ir_probe(struct i2c_client *client, const struct i2c_device_id *id)
 
 		/* Proceed only if the Rx client is also ready or not needed */
 		if (rx == NULL && !tx_only) {
-			dev_info(tx->ir->l.dev,
+			dev_info(&tx->ir->adapter->dev,
 				 "probe of IR Tx on %s (i2c-%d) done. Waiting on IR Rx.\n",
 				 adap->name, adap->nr);
 			goto out_ok;
@@ -1566,7 +1583,7 @@ static int ir_probe(struct i2c_client *client, const struct i2c_device_id *id)
 		kref_init(&rx->ref);
 		ir->rx = rx;
 
-		ir->l.features |= LIRC_CAN_REC_LIRCCODE;
+		ir->l->features |= LIRC_CAN_REC_LIRCCODE;
 		mutex_init(&rx->client_lock);
 		rx->c = client;
 		rx->hdpvr_data_fmt =
@@ -1588,7 +1605,7 @@ static int ir_probe(struct i2c_client *client, const struct i2c_device_id *id)
 				       "zilog-rx-i2c-%d", adap->nr);
 		if (IS_ERR(rx->task)) {
 			ret = PTR_ERR(rx->task);
-			dev_err(tx->ir->l.dev,
+			dev_err(&tx->ir->adapter->dev,
 				"%s: could not start IR Rx polling thread\n",
 				__func__);
 			/* Failed kthread, so put back the ir ref */
@@ -1596,7 +1613,7 @@ static int ir_probe(struct i2c_client *client, const struct i2c_device_id *id)
 			/* Failure exit, so put back rx ref from i2c_client */
 			i2c_set_clientdata(client, NULL);
 			put_ir_rx(rx, true);
-			ir->l.features &= ~LIRC_CAN_REC_LIRCCODE;
+			ir->l->features &= ~LIRC_CAN_REC_LIRCCODE;
 			goto out_put_xx;
 		}
 
@@ -1609,18 +1626,18 @@ static int ir_probe(struct i2c_client *client, const struct i2c_device_id *id)
 	}
 
 	/* register with lirc */
-	ir->l.minor = minor; /* module option: user requested minor number */
-	ir->l.minor = lirc_register_driver(&ir->l);
-	if (ir->l.minor < 0 || ir->l.minor >= MAX_IRCTL_DEVICES) {
-		dev_err(tx->ir->l.dev,
+	ir->l->minor = minor; /* module option: user requested minor number */
+	ir->l->minor = lirc_register_driver(ir->l);
+	if (ir->l->minor < 0 || ir->l->minor >= MAX_IRCTL_DEVICES) {
+		dev_err(&tx->ir->adapter->dev,
 			"%s: \"minor\" must be between 0 and %d (%d)!\n",
-			__func__, MAX_IRCTL_DEVICES-1, ir->l.minor);
+			__func__, MAX_IRCTL_DEVICES - 1, ir->l->minor);
 		ret = -EBADRQC;
 		goto out_put_xx;
 	}
-	dev_info(ir->l.dev,
+	dev_info(&ir->adapter->dev,
 		 "IR unit on %s (i2c-%d) registered as lirc%d and ready\n",
-		 adap->name, adap->nr, ir->l.minor);
+		 adap->name, adap->nr, ir->l->minor);
 
 out_ok:
 	if (rx != NULL)
@@ -1628,7 +1645,7 @@ out_ok:
 	if (tx != NULL)
 		put_ir_tx(tx, true);
 	put_ir_device(ir, true);
-	dev_info(ir->l.dev,
+	dev_info(&ir->adapter->dev,
 		 "probe of IR %s on %s (i2c-%d) done\n",
 		 tx_probe ? "Tx" : "Rx", adap->name, adap->nr);
 	mutex_unlock(&ir_devices_lock);
