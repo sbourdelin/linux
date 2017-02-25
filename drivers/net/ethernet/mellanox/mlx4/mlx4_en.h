@@ -369,6 +369,7 @@ struct mlx4_en_cq {
 	int                     ring;
 	struct net_device      *dev;
 	struct napi_struct	napi;
+	u32			rx_irq_missed;
 	int size;
 	int buf_size;
 	int vector;

@@ -1132,10 +1132,14 @@ void mlx4_en_rx_irq(struct mlx4_cq *mcq)
 	struct mlx4_en_cq *cq = container_of(mcq, struct mlx4_en_cq, mcq);
 	struct mlx4_en_priv *priv = netdev_priv(cq->dev);
 
-	if (likely(priv->port_up))
-		napi_schedule_irqoff(&cq->napi);
-	else
+	if (likely(priv->port_up)) {
+		if (napi_schedule_prep(&cq->napi))
+			__napi_schedule_irqoff(&cq->napi);
+		else
+			cq->rx_irq_missed++;
+	} else {
 		mlx4_en_arm_cq(priv, cq);
+	}
 }
 
 /* Rx CQ polling - called by NAPI */
@@ -1144,9 +1148,12 @@ int mlx4_en_poll_rx_cq(struct napi_struct *napi, int budget)
 	struct mlx4_en_cq *cq = container_of(napi, struct mlx4_en_cq, napi);
 	struct net_device *dev = cq->dev;
 	struct mlx4_en_priv *priv = netdev_priv(dev);
-	int done;
+	int done = 0;
+	u32 rx_irq_missed;
 
-	done = mlx4_en_process_rx_cq(dev, cq, budget);
+again:
+	rx_irq_missed = READ_ONCE(cq->rx_irq_missed);
+	done += mlx4_en_process_rx_cq(dev, cq, budget - done);
 
 	/* If we used up all the quota - we're probably not done yet... */
 	if (done == budget) {
@@ -1171,10 +1178,21 @@ int mlx4_en_poll_rx_cq(struct napi_struct *napi, int budget)
 		 */
 		if (done)
 			done--;
+		if (napi_complete_done(napi, done))
+			mlx4_en_arm_cq(priv, cq);
+		return done;
 	}
-	/* Done for now */
-	if (napi_complete_done(napi, done))
+	if (unlikely(READ_ONCE(cq->rx_irq_missed) != rx_irq_missed))
+		goto again;
+
+	if (napi_complete_done(napi, done)) {
 		mlx4_en_arm_cq(priv, cq);
+
+		/* We might have received an interrupt too soon */
+		if (unlikely(READ_ONCE(cq->rx_irq_missed) != rx_irq_missed) &&
+		    napi_reschedule(napi))
+			goto again;
+	}
 	return done;
 }
 
