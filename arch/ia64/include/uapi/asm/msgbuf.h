@@ -1,6 +1,8 @@
 #ifndef _ASM_IA64_MSGBUF_H
 #define _ASM_IA64_MSGBUF_H
 
+#include <asm/ipcbuf.h>
+
 /*
  * The msqid64_ds structure for IA-64 architecture.
  * Note extra padding because this structure is passed back and forth

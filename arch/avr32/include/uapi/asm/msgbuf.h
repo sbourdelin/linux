@@ -1,6 +1,8 @@
 #ifndef _UAPI__ASM_AVR32_MSGBUF_H
 #define _UAPI__ASM_AVR32_MSGBUF_H
 
+#include <asm/ipcbuf.h>
+
 /*
  * The msqid64_ds structure for i386 architecture.
  * Note extra padding because this structure is passed back and forth
