@@ -3070,18 +3070,20 @@ TRACE_EVENT(rdev_set_coalesce,
 );
 
 TRACE_EVENT(rdev_set_btcoex,
-	TP_PROTO(struct wiphy *wiphy, bool enabled),
-	TP_ARGS(wiphy, enabled),
+	TP_PROTO(struct wiphy *wiphy, bool enabled, int btcoex_priority),
+	TP_ARGS(wiphy, enabled, btcoex_priority),
 	TP_STRUCT__entry(
 		WIPHY_ENTRY
 		__field(bool, enabled)
+		__field(int, btcoex_priority)
 	),
 	TP_fast_assign(
 		WIPHY_ASSIGN;
 		__entry->enabled = enabled;
+		__entry->btcoex_priority = btcoex_priority;
 	),
-	TP_printk(WIPHY_PR_FMT, ", enabled=%d",
-		  WIPHY_PR_ARG, __entry->enabled)
+	TP_printk(WIPHY_PR_FMT, ", enabled=%d btcoex_priority :%d",
+		  WIPHY_PR_ARG, __entry->enabled, __entry->btcoex_priority)
 );
 
 DEFINE_EVENT(wiphy_wdev_evt, rdev_abort_scan,

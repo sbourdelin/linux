@@ -2019,6 +2019,12 @@ enum nl80211_commands {
  *     the btcoex feature. When used with %NL80211_CMD_SET_BTCOEX it contains
  *     either 0 for disable or 1 for enable btcoex.
  *
+ * @NL80211_ATTR_BTCOEX_PRIORITY: This is for the driver which
+ *     support btcoex priority feature. It used with %NL80211_CMD_SET_BTCOEX.
+ *     This will have u32 BITMAP value which represents
+ *     frame(bk, be, vi, vo, mgmt, beacon) type and that will have more
+ *     priority than a BT traffic.
+ *
  * @NUM_NL80211_ATTR: total number of nl80211_attrs available
  * @NL80211_ATTR_MAX: highest attribute number currently defined
  * @__NL80211_ATTR_AFTER_LAST: internal use
@@ -2431,6 +2437,7 @@ enum nl80211_attrs {
 	NL80211_ATTR_TIMEOUT_REASON,
 
 	NL80211_ATTR_BTCOEX_OP,
+	NL80211_ATTR_BTCOEX_PRIORITY,
 
 	/* add attributes here, update the policy in nl80211.c */
 

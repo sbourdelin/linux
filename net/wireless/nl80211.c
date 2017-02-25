@@ -411,6 +411,7 @@ static const struct nla_policy nl80211_policy[NUM_NL80211_ATTR] = {
 	},
 	[NL80211_ATTR_TIMEOUT_REASON] = { .type = NLA_U32 },
 	[NL80211_ATTR_BTCOEX_OP] = { .type = NLA_U8 },
+	[NL80211_ATTR_BTCOEX_PRIORITY] = { .type = NLA_U32 },
 };
 
 /* policy for the key attributes */
@@ -12071,7 +12072,9 @@ static int nl80211_set_multicast_to_unicast(struct sk_buff *skb,
 static int nl80211_set_btcoex(struct sk_buff *skb, struct genl_info *info)
 {
 	struct cfg80211_registered_device *rdev = info->user_ptr[0];
+	struct wiphy *wiphy = &rdev->wiphy;
 	u8 val = 0;
+	int btcoex_priority = -1;
 
 	if (!rdev->ops->set_btcoex)
 		return -ENOTSUPP;
@@ -12085,9 +12088,20 @@ static int nl80211_set_btcoex(struct sk_buff *skb, struct genl_info *info)
 	if (val > 1)
 		return -EINVAL;
 
+	if (wiphy->btcoex_priority_support)
+		btcoex_priority = 0;
+
+	if (info->attrs[NL80211_ATTR_BTCOEX_PRIORITY]) {
+		if (!wiphy->btcoex_priority_support)
+			return -EOPNOTSUPP;
+
+		btcoex_priority =
+		nla_get_u32(info->attrs[NL80211_ATTR_BTCOEX_PRIORITY]);
+
+	}
 
 set_btcoex:
-	return rdev_set_btcoex(rdev, val);
+	return rdev_set_btcoex(rdev, val, btcoex_priority);
 }
 
 #define NL80211_FLAG_NEED_WIPHY		0x01
