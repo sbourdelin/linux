@@ -360,6 +360,7 @@ static struct vmap_area *alloc_vmap_area(unsigned long size,
 	unsigned long addr;
 	int purged = 0;
 	struct vmap_area *first;
+	unsigned long flags;
 
 	BUG_ON(!size);
 	BUG_ON(offset_in_page(size));
@@ -379,7 +380,7 @@ static struct vmap_area *alloc_vmap_area(unsigned long size,
 	kmemleak_scan_area(&va->rb_node, SIZE_MAX, gfp_mask & GFP_RECLAIM_MASK);
 
 retry:
-	spin_lock(&vmap_area_lock);
+	spin_lock_irqsave(&vmap_area_lock, flags);
 	/*
 	 * Invalidate cache if we have more permissive parameters.
 	 * cached_hole_size notes the largest hole noticed _below_
@@ -457,7 +458,7 @@ found:
 	va->flags = 0;
 	__insert_vmap_area(va);
 	free_vmap_cache = &va->rb_node;
-	spin_unlock(&vmap_area_lock);
+	spin_unlock_irqrestore(&vmap_area_lock, flags);
 
 	BUG_ON(!IS_ALIGNED(va->va_start, align));
 	BUG_ON(va->va_start < vstart);
@@ -466,7 +467,7 @@ found:
 	return va;
 
 overflow:
-	spin_unlock(&vmap_area_lock);
+	spin_unlock_irqrestore(&vmap_area_lock, flags);
 	if (!purged) {
 		purge_vmap_area_lazy();
 		purged = 1;
@@ -541,9 +542,11 @@ static void __free_vmap_area(struct vmap_area *va)
  */
 static void free_vmap_area(struct vmap_area *va)
 {
-	spin_lock(&vmap_area_lock);
+	unsigned long flags;
+
+	spin_lock_irqsave(&vmap_area_lock, flags);
 	__free_vmap_area(va);
-	spin_unlock(&vmap_area_lock);
+	spin_unlock_irqrestore(&vmap_area_lock, flags);
 }
 
 /*
@@ -629,6 +632,7 @@ static bool __purge_vmap_area_lazy(unsigned long start, unsigned long end)
 	struct vmap_area *va;
 	struct vmap_area *n_va;
 	bool do_free = false;
+	unsigned long flags;
 
 	lockdep_assert_held(&vmap_purge_lock);
 
@@ -646,15 +650,17 @@ static bool __purge_vmap_area_lazy(unsigned long start, unsigned long end)
 
 	flush_tlb_kernel_range(start, end);
 
-	spin_lock(&vmap_area_lock);
+	spin_lock_irqsave(&vmap_area_lock, flags);
 	llist_for_each_entry_safe(va, n_va, valist, purge_list) {
 		int nr = (va->va_end - va->va_start) >> PAGE_SHIFT;
 
 		__free_vmap_area(va);
 		atomic_sub(nr, &vmap_lazy_nr);
-		cond_resched_lock(&vmap_area_lock);
+		spin_unlock_irqrestore(&vmap_area_lock, flags);
+		cond_resched();
+		spin_lock_irqsave(&vmap_area_lock, flags);
 	}
-	spin_unlock(&vmap_area_lock);
+	spin_unlock_irqrestore(&vmap_area_lock, flags);
 	return true;
 }
 
@@ -713,10 +719,11 @@ static void free_unmap_vmap_area(struct vmap_area *va)
 static struct vmap_area *find_vmap_area(unsigned long addr)
 {
 	struct vmap_area *va;
+	unsigned long flags;
 
-	spin_lock(&vmap_area_lock);
+	spin_lock_irqsave(&vmap_area_lock, flags);
 	va = __find_vmap_area(addr);
-	spin_unlock(&vmap_area_lock);
+	spin_unlock_irqrestore(&vmap_area_lock, flags);
 
 	return va;
 }
@@ -1313,14 +1320,16 @@ EXPORT_SYMBOL_GPL(map_vm_area);
 static void setup_vmalloc_vm(struct vm_struct *vm, struct vmap_area *va,
 			      unsigned long flags, const void *caller)
 {
-	spin_lock(&vmap_area_lock);
+	unsigned long irq_flags;
+
+	spin_lock_irqsave(&vmap_area_lock, irq_flags);
 	vm->flags = flags;
 	vm->addr = (void *)va->va_start;
 	vm->size = va->va_end - va->va_start;
 	vm->caller = caller;
 	va->vm = vm;
 	va->flags |= VM_VM_AREA;
-	spin_unlock(&vmap_area_lock);
+	spin_unlock_irqrestore(&vmap_area_lock, irq_flags);
 }
 
 static void clear_vm_uninitialized_flag(struct vm_struct *vm)
@@ -1443,11 +1452,12 @@ struct vm_struct *remove_vm_area(const void *addr)
 	va = find_vmap_area((unsigned long)addr);
 	if (va && va->flags & VM_VM_AREA) {
 		struct vm_struct *vm = va->vm;
+		unsigned long flags;
 
-		spin_lock(&vmap_area_lock);
+		spin_lock_irqsave(&vmap_area_lock, flags);
 		va->vm = NULL;
 		va->flags &= ~VM_VM_AREA;
-		spin_unlock(&vmap_area_lock);
+		spin_unlock_irqrestore(&vmap_area_lock, flags);
 
 		vmap_debug_free_range(va->va_start, va->va_end);
 		kasan_free_shadow(vm);
@@ -1863,6 +1873,11 @@ void *vzalloc_node(unsigned long size, int node)
 }
 EXPORT_SYMBOL(vzalloc_node);
 
+void *vmalloc_gfp(unsigned long size, gfp_t gfp_mask)
+{
+	return __vmalloc_node_flags(size, NUMA_NO_NODE, gfp_mask);
+}
+
 #ifndef PAGE_KERNEL_EXEC
 # define PAGE_KERNEL_EXEC PAGE_KERNEL
 #endif
@@ -2043,12 +2058,13 @@ long vread(char *buf, char *addr, unsigned long count)
 	char *vaddr, *buf_start = buf;
 	unsigned long buflen = count;
 	unsigned long n;
+	unsigned long flags;
 
 	/* Don't allow overflow */
 	if ((unsigned long) addr + count < count)
 		count = -(unsigned long) addr;
 
-	spin_lock(&vmap_area_lock);
+	spin_lock_irqsave(&vmap_area_lock, flags);
 	list_for_each_entry(va, &vmap_area_list, list) {
 		if (!count)
 			break;
@@ -2080,7 +2096,7 @@ long vread(char *buf, char *addr, unsigned long count)
 		count -= n;
 	}
 finished:
-	spin_unlock(&vmap_area_lock);
+	spin_unlock_irqrestore(&vmap_area_lock, flags);
 
 	if (buf == buf_start)
 		return 0;
@@ -2124,13 +2140,14 @@ long vwrite(char *buf, char *addr, unsigned long count)
 	char *vaddr;
 	unsigned long n, buflen;
 	int copied = 0;
+	unsigned long flags;
 
 	/* Don't allow overflow */
 	if ((unsigned long) addr + count < count)
 		count = -(unsigned long) addr;
 	buflen = count;
 
-	spin_lock(&vmap_area_lock);
+	spin_lock_irqsave(&vmap_area_lock, flags);
 	list_for_each_entry(va, &vmap_area_list, list) {
 		if (!count)
 			break;
@@ -2161,7 +2178,7 @@ long vwrite(char *buf, char *addr, unsigned long count)
 		count -= n;
 	}
 finished:
-	spin_unlock(&vmap_area_lock);
+	spin_unlock_irqrestore(&vmap_area_lock, flags);
 	if (!copied)
 		return 0;
 	return buflen;
@@ -2421,7 +2438,7 @@ static unsigned long pvm_determine_end(struct vmap_area **pnext,
  */
 struct vm_struct **pcpu_get_vm_areas(const unsigned long *offsets,
 				     const size_t *sizes, int nr_vms,
-				     size_t align)
+				     size_t align, gfp_t gfp_mask)
 {
 	const unsigned long vmalloc_start = ALIGN(VMALLOC_START, align);
 	const unsigned long vmalloc_end = VMALLOC_END & ~(align - 1);
@@ -2430,6 +2447,7 @@ struct vm_struct **pcpu_get_vm_areas(const unsigned long *offsets,
 	int area, area2, last_area, term_area;
 	unsigned long base, start, end, last_end;
 	bool purged = false;
+	unsigned long flags;
 
 	/* verify parameters and allocate data structures */
 	BUG_ON(offset_in_page(align) || !is_power_of_2(align));
@@ -2463,19 +2481,19 @@ struct vm_struct **pcpu_get_vm_areas(const unsigned long *offsets,
 		return NULL;
 	}
 
-	vms = kcalloc(nr_vms, sizeof(vms[0]), GFP_KERNEL);
-	vas = kcalloc(nr_vms, sizeof(vas[0]), GFP_KERNEL);
+	vms = kcalloc(nr_vms, sizeof(vms[0]), gfp_mask);
+	vas = kcalloc(nr_vms, sizeof(vas[0]), gfp_mask);
 	if (!vas || !vms)
 		goto err_free2;
 
 	for (area = 0; area < nr_vms; area++) {
-		vas[area] = kzalloc(sizeof(struct vmap_area), GFP_KERNEL);
-		vms[area] = kzalloc(sizeof(struct vm_struct), GFP_KERNEL);
+		vas[area] = kzalloc(sizeof(struct vmap_area), gfp_mask);
+		vms[area] = kzalloc(sizeof(struct vm_struct), gfp_mask);
 		if (!vas[area] || !vms[area])
 			goto err_free;
 	}
 retry:
-	spin_lock(&vmap_area_lock);
+	spin_lock_irqsave(&vmap_area_lock, flags);
 
 	/* start scanning - we scan from the top, begin with the last area */
 	area = term_area = last_area;
@@ -2497,7 +2515,7 @@ retry:
 		 * comparing.
 		 */
 		if (base + last_end < vmalloc_start + last_end) {
-			spin_unlock(&vmap_area_lock);
+			spin_unlock_irqrestore(&vmap_area_lock, flags);
 			if (!purged) {
 				purge_vmap_area_lazy();
 				purged = true;
@@ -2552,7 +2570,7 @@ found:
 
 	vmap_area_pcpu_hole = base + offsets[last_area];
 
-	spin_unlock(&vmap_area_lock);
+	spin_unlock_irqrestore(&vmap_area_lock, flags);
 
 	/* insert all vm's */
 	for (area = 0; area < nr_vms; area++)
@@ -2594,7 +2612,7 @@ void pcpu_free_vm_areas(struct vm_struct **vms, int nr_vms)
 static void *s_start(struct seq_file *m, loff_t *pos)
 	__acquires(&vmap_area_lock)
 {
-	spin_lock(&vmap_area_lock);
+	spin_lock_irq(&vmap_area_lock);
 	return seq_list_start(&vmap_area_list, *pos);
 }
 
@@ -2606,7 +2624,7 @@ static void *s_next(struct seq_file *m, void *p, loff_t *pos)
 static void s_stop(struct seq_file *m, void *p)
 	__releases(&vmap_area_lock)
 {
-	spin_unlock(&vmap_area_lock);
+	spin_unlock_irq(&vmap_area_lock);
 }
 
 static void show_numa_info(struct seq_file *m, struct vm_struct *v)

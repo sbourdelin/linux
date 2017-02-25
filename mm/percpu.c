@@ -103,6 +103,11 @@
 #define __pcpu_ptr_to_addr(ptr)		(void __force *)(ptr)
 #endif	/* CONFIG_SMP */
 
+#define PCPU_BUSY_EXPAND_MAP		1	/* pcpu_alloc() is expanding the
+						 * the map
+						 */
+#define PCPU_BUSY_POPULATE_CHUNK	2	/* chunk is being populated */
+
 struct pcpu_chunk {
 	struct list_head	list;		/* linked to pcpu_slot lists */
 	int			free_size;	/* free bytes in the chunk */
@@ -118,6 +123,7 @@ struct pcpu_chunk {
 	int			first_free;	/* no free below this */
 	bool			immutable;	/* no [de]population allowed */
 	int			nr_populated;	/* # of populated pages */
+	int			busy_flags;	/* type of work in progress */
 	unsigned long		populated[];	/* populated bitmap */
 };
 
@@ -162,7 +168,6 @@ static struct pcpu_chunk *pcpu_reserved_chunk;
 static int pcpu_reserved_chunk_limit;
 
 static DEFINE_SPINLOCK(pcpu_lock);	/* all internal data structures */
-static DEFINE_MUTEX(pcpu_alloc_mutex);	/* chunk create/destroy, [de]pop, map ext */
 
 static struct list_head *pcpu_slot __read_mostly; /* chunk list slots */
 
@@ -282,29 +287,31 @@ static void __maybe_unused pcpu_next_pop(struct pcpu_chunk *chunk,
 	     (rs) < (re);						    \
 	     (rs) = (re) + 1, pcpu_next_pop((chunk), &(rs), &(re), (end)))
 
+static bool pcpu_has_unpop_pages(struct pcpu_chunk *chunk, int start, int end)
+{
+	return find_next_zero_bit(chunk->populated, end, start) < end;
+}
+
 /**
  * pcpu_mem_zalloc - allocate memory
  * @size: bytes to allocate
  *
  * Allocate @size bytes.  If @size is smaller than PAGE_SIZE,
- * kzalloc() is used; otherwise, vzalloc() is used.  The returned
+ * kzalloc() is used; otherwise, vmalloc_gfp() is used.  The returned
  * memory is always zeroed.
- *
- * CONTEXT:
- * Does GFP_KERNEL allocation.
  *
  * RETURNS:
  * Pointer to the allocated area on success, NULL on failure.
  */
-static void *pcpu_mem_zalloc(size_t size)
+static void *pcpu_mem_zalloc(size_t size, gfp_t gfp)
 {
 	if (WARN_ON_ONCE(!slab_is_available()))
 		return NULL;
 
 	if (size <= PAGE_SIZE)
-		return kzalloc(size, GFP_KERNEL);
+		return kzalloc(size, gfp);
 	else
-		return vzalloc(size);
+		return vmalloc_gfp(size, gfp | __GFP_HIGHMEM | __GFP_ZERO);
 }
 
 /**
@@ -438,15 +445,14 @@ static int pcpu_need_to_extend(struct pcpu_chunk *chunk, bool is_atomic)
  * RETURNS:
  * 0 on success, -errno on failure.
  */
-static int pcpu_extend_area_map(struct pcpu_chunk *chunk, int new_alloc)
+static int pcpu_extend_area_map(struct pcpu_chunk *chunk, int new_alloc,
+				gfp_t gfp)
 {
 	int *old = NULL, *new = NULL;
 	size_t old_size = 0, new_size = new_alloc * sizeof(new[0]);
 	unsigned long flags;
 
-	lockdep_assert_held(&pcpu_alloc_mutex);
-
-	new = pcpu_mem_zalloc(new_size);
+	new = pcpu_mem_zalloc(new_size, gfp);
 	if (!new)
 		return -ENOMEM;
 
@@ -716,16 +722,16 @@ static void pcpu_free_area(struct pcpu_chunk *chunk, int freeme,
 	pcpu_chunk_relocate(chunk, oslot);
 }
 
-static struct pcpu_chunk *pcpu_alloc_chunk(void)
+static struct pcpu_chunk *pcpu_alloc_chunk(gfp_t gfp)
 {
 	struct pcpu_chunk *chunk;
 
-	chunk = pcpu_mem_zalloc(pcpu_chunk_struct_size);
+	chunk = pcpu_mem_zalloc(pcpu_chunk_struct_size, gfp);
 	if (!chunk)
 		return NULL;
 
 	chunk->map = pcpu_mem_zalloc(PCPU_DFL_MAP_ALLOC *
-						sizeof(chunk->map[0]));
+						sizeof(chunk->map[0]), gfp);
 	if (!chunk->map) {
 		pcpu_mem_free(chunk);
 		return NULL;
@@ -811,9 +817,10 @@ static void pcpu_chunk_depopulated(struct pcpu_chunk *chunk,
  * pcpu_addr_to_page		- translate address to physical address
  * pcpu_verify_alloc_info	- check alloc_info is acceptable during init
  */
-static int pcpu_populate_chunk(struct pcpu_chunk *chunk, int off, int size);
+static int pcpu_populate_chunk(struct pcpu_chunk *chunk, int off, int size,
+			       gfp_t gfp);
 static void pcpu_depopulate_chunk(struct pcpu_chunk *chunk, int off, int size);
-static struct pcpu_chunk *pcpu_create_chunk(void);
+static struct pcpu_chunk *pcpu_create_chunk(gfp_t gfp);
 static void pcpu_destroy_chunk(struct pcpu_chunk *chunk);
 static struct page *pcpu_addr_to_page(void *addr);
 static int __init pcpu_verify_alloc_info(const struct pcpu_alloc_info *ai);
@@ -874,6 +881,7 @@ static void __percpu *pcpu_alloc(size_t size, size_t align, bool reserved,
 	bool is_atomic = (gfp & GFP_KERNEL) != GFP_KERNEL;
 	int occ_pages = 0;
 	int slot, off, new_alloc, cpu, ret;
+	int page_start, page_end;
 	unsigned long flags;
 	void __percpu *ptr;
 
@@ -893,9 +901,6 @@ static void __percpu *pcpu_alloc(size_t size, size_t align, bool reserved,
 		return NULL;
 	}
 
-	if (!is_atomic)
-		mutex_lock(&pcpu_alloc_mutex);
-
 	spin_lock_irqsave(&pcpu_lock, flags);
 
 	/* serve reserved allocations from the reserved chunk if available */
@@ -909,8 +914,7 @@ static void __percpu *pcpu_alloc(size_t size, size_t align, bool reserved,
 
 		while ((new_alloc = pcpu_need_to_extend(chunk, is_atomic))) {
 			spin_unlock_irqrestore(&pcpu_lock, flags);
-			if (is_atomic ||
-			    pcpu_extend_area_map(chunk, new_alloc) < 0) {
+			if (pcpu_extend_area_map(chunk, new_alloc, gfp) < 0) {
 				err = "failed to extend area map of reserved chunk";
 				goto fail;
 			}
@@ -933,17 +937,24 @@ restart:
 			if (size > chunk->contig_hint)
 				continue;
 
+			if (chunk->busy_flags & PCPU_BUSY_POPULATE_CHUNK)
+				continue;
+
 			new_alloc = pcpu_need_to_extend(chunk, is_atomic);
 			if (new_alloc) {
-				if (is_atomic)
-					continue;
+				chunk->busy_flags |= PCPU_BUSY_EXPAND_MAP;
 				spin_unlock_irqrestore(&pcpu_lock, flags);
-				if (pcpu_extend_area_map(chunk,
-							 new_alloc) < 0) {
+
+				ret = pcpu_extend_area_map(chunk, new_alloc,
+							   gfp);
+				spin_lock_irqsave(&pcpu_lock, flags);
+				chunk->busy_flags &= ~PCPU_BUSY_EXPAND_MAP;
+				if (ret < 0) {
+					spin_unlock_irqrestore(&pcpu_lock,
+							       flags);
 					err = "failed to extend area map";
 					goto fail;
 				}
-				spin_lock_irqsave(&pcpu_lock, flags);
 				/*
 				 * pcpu_lock has been dropped, need to
 				 * restart cpu_slot list walking.
@@ -953,53 +964,59 @@ restart:
 
 			off = pcpu_alloc_area(chunk, size, align, is_atomic,
 					      &occ_pages);
+			if (off < 0 && is_atomic) {
+				/* Try non-populated areas. */
+				off = pcpu_alloc_area(chunk, size, align, false,
+						      &occ_pages);
+			}
+
 			if (off >= 0)
 				goto area_found;
 		}
 	}
 
+	WARN_ON(!list_empty(&pcpu_slot[pcpu_nr_slots - 1]));
+
 	spin_unlock_irqrestore(&pcpu_lock, flags);
 
-	/*
-	 * No space left.  Create a new chunk.  We don't want multiple
-	 * tasks to create chunks simultaneously.  Serialize and create iff
-	 * there's still no empty chunk after grabbing the mutex.
-	 */
-	if (is_atomic)
+	chunk = pcpu_create_chunk(gfp);
+	if (!chunk) {
+		err = "failed to allocate new chunk";
 		goto fail;
-
-	if (list_empty(&pcpu_slot[pcpu_nr_slots - 1])) {
-		chunk = pcpu_create_chunk();
-		if (!chunk) {
-			err = "failed to allocate new chunk";
-			goto fail;
-		}
-
-		spin_lock_irqsave(&pcpu_lock, flags);
-		pcpu_chunk_relocate(chunk, -1);
-	} else {
-		spin_lock_irqsave(&pcpu_lock, flags);
 	}
+
+	spin_lock_irqsave(&pcpu_lock, flags);
+
+	/* Check whether someone else added a chunk while lock was
+	 * dropped.
+	 */
+	if (list_empty(&pcpu_slot[pcpu_nr_slots - 1]))
+		pcpu_chunk_relocate(chunk, -1);
+	else
+		pcpu_destroy_chunk(chunk);
 
 	goto restart;
 
 area_found:
-	spin_unlock_irqrestore(&pcpu_lock, flags);
+
+	page_start = PFN_DOWN(off);
+	page_end = PFN_UP(off + size);
 
 	/* populate if not all pages are already there */
-	if (!is_atomic) {
-		int page_start, page_end, rs, re;
+	if (pcpu_has_unpop_pages(chunk, page_start, page_end)) {
+		int rs, re;
 
-		page_start = PFN_DOWN(off);
-		page_end = PFN_UP(off + size);
+		chunk->busy_flags |= PCPU_BUSY_POPULATE_CHUNK;
+		spin_unlock_irqrestore(&pcpu_lock, flags);
 
 		pcpu_for_each_unpop_region(chunk, rs, re, page_start, page_end) {
 			WARN_ON(chunk->immutable);
 
-			ret = pcpu_populate_chunk(chunk, rs, re);
+			ret = pcpu_populate_chunk(chunk, rs, re, gfp);
 
 			spin_lock_irqsave(&pcpu_lock, flags);
 			if (ret) {
+				chunk->busy_flags &= ~PCPU_BUSY_POPULATE_CHUNK;
 				pcpu_free_area(chunk, off, &occ_pages);
 				err = "failed to populate";
 				goto fail_unlock;
@@ -1008,17 +1025,17 @@ area_found:
 			spin_unlock_irqrestore(&pcpu_lock, flags);
 		}
 
-		mutex_unlock(&pcpu_alloc_mutex);
+		spin_lock_irqsave(&pcpu_lock, flags);
+		chunk->busy_flags &= ~PCPU_BUSY_POPULATE_CHUNK;
 	}
 
-	if (chunk != pcpu_reserved_chunk) {
-		spin_lock_irqsave(&pcpu_lock, flags);
+	if (chunk != pcpu_reserved_chunk)
 		pcpu_nr_empty_pop_pages -= occ_pages;
-		spin_unlock_irqrestore(&pcpu_lock, flags);
-	}
 
 	if (pcpu_nr_empty_pop_pages < PCPU_EMPTY_POP_PAGES_LOW)
 		pcpu_schedule_balance_work();
+
+	spin_unlock_irqrestore(&pcpu_lock, flags);
 
 	/* clear the areas and return address relative to base address */
 	for_each_possible_cpu(cpu)
@@ -1042,8 +1059,6 @@ fail:
 		/* see the flag handling in pcpu_blance_workfn() */
 		pcpu_atomic_alloc_failed = true;
 		pcpu_schedule_balance_work();
-	} else {
-		mutex_unlock(&pcpu_alloc_mutex);
 	}
 	return NULL;
 }
@@ -1118,7 +1133,6 @@ static void pcpu_balance_workfn(struct work_struct *work)
 	 * There's no reason to keep around multiple unused chunks and VM
 	 * areas can be scarce.  Destroy all free chunks except for one.
 	 */
-	mutex_lock(&pcpu_alloc_mutex);
 	spin_lock_irq(&pcpu_lock);
 
 	list_for_each_entry_safe(chunk, next, free_head, list) {
@@ -1126,6 +1140,10 @@ static void pcpu_balance_workfn(struct work_struct *work)
 
 		/* spare the first one */
 		if (chunk == list_first_entry(free_head, struct pcpu_chunk, list))
+			continue;
+
+		if (chunk->busy_flags & (PCPU_BUSY_POPULATE_CHUNK |
+					 PCPU_BUSY_EXPAND_MAP))
 			continue;
 
 		list_del_init(&chunk->map_extend_list);
@@ -1162,7 +1180,7 @@ static void pcpu_balance_workfn(struct work_struct *work)
 		spin_unlock_irq(&pcpu_lock);
 
 		if (new_alloc)
-			pcpu_extend_area_map(chunk, new_alloc);
+			pcpu_extend_area_map(chunk, new_alloc, GFP_KERNEL);
 	} while (chunk);
 
 	/*
@@ -1194,20 +1212,29 @@ retry_pop:
 
 		spin_lock_irq(&pcpu_lock);
 		list_for_each_entry(chunk, &pcpu_slot[slot], list) {
+			if (chunk->busy_flags & PCPU_BUSY_POPULATE_CHUNK)
+				continue;
 			nr_unpop = pcpu_unit_pages - chunk->nr_populated;
 			if (nr_unpop)
 				break;
 		}
+
+		if (nr_unpop)
+			chunk->busy_flags |= PCPU_BUSY_POPULATE_CHUNK;
+
 		spin_unlock_irq(&pcpu_lock);
 
 		if (!nr_unpop)
 			continue;
 
-		/* @chunk can't go away while pcpu_alloc_mutex is held */
+		/* @chunk can't go away because only pcpu_balance_workfn
+		 * destroys it.
+		 */
 		pcpu_for_each_unpop_region(chunk, rs, re, 0, pcpu_unit_pages) {
 			int nr = min(re - rs, nr_to_pop);
 
-			ret = pcpu_populate_chunk(chunk, rs, rs + nr);
+			ret = pcpu_populate_chunk(chunk, rs, rs + nr,
+						  GFP_KERNEL);
 			if (!ret) {
 				nr_to_pop -= nr;
 				spin_lock_irq(&pcpu_lock);
@@ -1220,11 +1247,14 @@ retry_pop:
 			if (!nr_to_pop)
 				break;
 		}
+		spin_lock_irq(&pcpu_lock);
+		chunk->busy_flags &= ~PCPU_BUSY_POPULATE_CHUNK;
+		spin_unlock_irq(&pcpu_lock);
 	}
 
 	if (nr_to_pop) {
 		/* ran out of chunks to populate, create a new one and retry */
-		chunk = pcpu_create_chunk();
+		chunk = pcpu_create_chunk(GFP_KERNEL);
 		if (chunk) {
 			spin_lock_irq(&pcpu_lock);
 			pcpu_chunk_relocate(chunk, -1);
@@ -1232,8 +1262,6 @@ retry_pop:
 			goto retry_pop;
 		}
 	}
-
-	mutex_unlock(&pcpu_alloc_mutex);
 }
 
 /**
@@ -2297,7 +2325,7 @@ void __init percpu_init_late(void)
 
 		BUILD_BUG_ON(size > PAGE_SIZE);
 
-		map = pcpu_mem_zalloc(size);
+		map = pcpu_mem_zalloc(size, GFP_KERNEL);
 		BUG_ON(!map);
 
 		spin_lock_irqsave(&pcpu_lock, flags);
