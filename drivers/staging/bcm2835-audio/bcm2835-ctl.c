@@ -248,7 +248,8 @@ static int snd_bcm2835_spdif_mask_get(struct snd_kcontrol *kcontrol,
 {
 	/* bcm2835 supports only consumer mode and sets all other format flags
 	 * automatically. So the only thing left is signalling non-audio
-	 * content */
+	 * content
+	 */
 	ucontrol->value.iec958.status[0] = IEC958_AES0_NONAUDIO;
 	return 0;
 }
