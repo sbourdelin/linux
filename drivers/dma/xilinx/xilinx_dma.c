@@ -984,12 +984,19 @@ static void xilinx_dma_halt(struct xilinx_dma_chan *chan)
 	int err;
 	u32 val;
 
-	dma_ctrl_clr(chan, XILINX_DMA_REG_DMACR, XILINX_DMA_DMACR_RUNSTOP);
+	if (chan->xdev->dma_config->dmatype == XDMA_TYPE_CDMA) {
+		err = xilinx_dma_poll_timeout(chan, XILINX_DMA_REG_DMASR, val,
+					      val & XILINX_DMA_DMASR_IDLE, 0,
+					      XILINX_DMA_LOOP_COUNT);
+	} else {
+		dma_ctrl_clr(chan, XILINX_DMA_REG_DMACR,
+			     XILINX_DMA_DMACR_RUNSTOP);
 
-	/* Wait for the hardware to halt */
-	err = xilinx_dma_poll_timeout(chan, XILINX_DMA_REG_DMASR, val,
-				      (val & XILINX_DMA_DMASR_HALTED), 0,
-				      XILINX_DMA_LOOP_COUNT);
+		/* Wait for the hardware to halt */
+		err = xilinx_dma_poll_timeout(chan, XILINX_DMA_REG_DMASR, val,
+					      val & XILINX_DMA_DMASR_HALTED, 0,
+					      XILINX_DMA_LOOP_COUNT);
+	}
 
 	if (err) {
 		dev_err(chan->dev, "Cannot stop channel %p: %x\n",
