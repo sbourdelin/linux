@@ -37,7 +37,6 @@ struct ion_cma_buffer_info {
 	struct sg_table *table;
 };
 
-
 /* ION CMA heap operations functions */
 static int ion_cma_allocate(struct ion_heap *heap, struct ion_buffer *buffer,
 			    unsigned long len, unsigned long align,
@@ -59,7 +58,7 @@ static int ion_cma_allocate(struct ion_heap *heap, struct ion_buffer *buffer,
 	if (!info)
 		return -ENOMEM;
 
-	info->cpu_addr = dma_alloc_coherent(dev, len, &(info->handle),
+	info->cpu_addr = dma_alloc_coherent(dev, len, &info->handle,
 						GFP_HIGHUSER | __GFP_ZERO);
 
 	if (!info->cpu_addr) {
