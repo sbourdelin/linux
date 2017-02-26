@@ -1450,6 +1450,16 @@ config SYSCTL_SYSCALL
 
 	  If unsure say N here.
 
+config PIVOT_ROOT_SYSCALL
+	bool "Pivot_root syscall support" if EXPERT
+	default y
+	help
+	  pivot_root is a system call that allows the root to be moved and
+	  replaced by another root. This is needed for intermediate file
+	  systems such as initrd.
+
+	  If unsure say Y here.
+
 config POSIX_TIMERS
 	bool "Posix Clocks & timers" if EXPERT
 	default y

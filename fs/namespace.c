@@ -3083,6 +3083,7 @@ bool path_is_under(const struct path *path1, const struct path *path2)
 }
 EXPORT_SYMBOL(path_is_under);
 
+#ifdef CONFIG_PIVOT_ROOT_SYSCALL
 /*
  * pivot_root Semantics:
  * Moves the root file system of the current process to the directory put_old,
@@ -3205,6 +3206,7 @@ out1:
 out0:
 	return error;
 }
+#endif  /* CONFIG_PIVOT_ROOT_SYSCALL */
 
 static void __init init_mount_tree(void)
 {
