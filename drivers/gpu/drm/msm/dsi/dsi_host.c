@@ -422,7 +422,7 @@ exit:
 static int dsi_bus_clk_enable(struct msm_dsi_host *msm_host)
 {
 	const struct msm_dsi_config *cfg = msm_host->cfg_hnd->cfg;
-	int i, ret;
+	int i, j, ret;
 
 	DBG("id=%d", msm_host->id);
 
@@ -437,8 +437,8 @@ static int dsi_bus_clk_enable(struct msm_dsi_host *msm_host)
 
 	return 0;
 err:
-	for (; i > 0; i--)
-		clk_disable_unprepare(msm_host->bus_clks[i]);
+	for (j = 0; j < i; j++)
+		clk_disable_unprepare(msm_host->bus_clks[j]);
 
 	return ret;
 }
