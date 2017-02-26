@@ -1361,6 +1361,7 @@ int __ref add_memory_resource(int nid, struct resource *res, bool online)
 		new_pgdat = !p;
 	}
 
+	lock_device_hotplug();
 	mem_hotplug_begin();
 
 	/*
@@ -1416,6 +1417,7 @@ error:
 
 out:
 	mem_hotplug_done();
+	unlock_device_hotplug();
 	return ret;
 }
 EXPORT_SYMBOL_GPL(add_memory_resource);
