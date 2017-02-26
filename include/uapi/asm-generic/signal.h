@@ -100,6 +100,9 @@ typedef unsigned long old_sigset_t;
 #endif
 
 #ifndef __KERNEL__
+
+#include <stddef.h>	/* For size_t. */
+
 struct sigaction {
 	__sighandler_t sa_handler;
 	unsigned long sa_flags;

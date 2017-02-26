@@ -101,6 +101,9 @@ typedef unsigned long old_sigset_t;		/* at least 32 bits */
 #include <asm-generic/signal-defs.h>
 
 #ifndef __KERNEL__
+
+#include <stddef.h>	/* For size_t. */
+
 struct sigaction {
 	unsigned int	sa_flags;
 	__sighandler_t	sa_handler;

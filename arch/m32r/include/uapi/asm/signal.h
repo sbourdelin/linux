@@ -90,6 +90,9 @@ typedef unsigned long sigset_t;
 #include <asm-generic/signal-defs.h>
 
 #ifndef __KERNEL__
+
+#include <stddef.h>	/* For size_t. */
+
 /* Here we must cater to libcs that poke about in kernel headers.  */
 
 struct sigaction {

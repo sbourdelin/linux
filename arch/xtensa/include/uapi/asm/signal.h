@@ -106,6 +106,8 @@ typedef struct {
 
 #ifndef __KERNEL__
 
+#include <stddef.h>	/* For size_t. */
+
 /* Here we must cater to libcs that poke about in kernel headers.  */
 
 struct sigaction {

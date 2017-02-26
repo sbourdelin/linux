@@ -96,6 +96,9 @@ typedef unsigned long sigset_t;
 
 
 # ifndef __KERNEL__
+
+#  include <stddef.h>	/* For size_t. */
+
 /* Here we must cater to libcs that poke about in kernel headers.  */
 #ifdef __i386__
 

@@ -81,6 +81,10 @@
 
 #  include <linux/types.h>
 
+#  ifndef __KERNEL__
+#   include <stddef.h>	/* For size_t. */
+#  endif
+
 /* Avoid too many header ordering problems.  */
 struct siginfo;
 
