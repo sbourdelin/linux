@@ -186,6 +186,14 @@ do_trap_no_signal(struct task_struct *tsk, int trapnr, char *str,
 	}
 
 	if (!user_mode(regs)) {
+		/*
+		 * Exit from the kprobe's single-stepping before trying
+		 * fixup_exception() because the fixup routine is based on
+		 * trapped address (regs->ip). Single-stepping out of line
+		 * executes an instruction in different place, so it should
+		 * be fixed.
+		 */
+		kprobe_exit_singlestep(regs);
 		if (!fixup_exception(regs, trapnr)) {
 			tsk->thread.error_code = error_code;
 			tsk->thread.trap_nr = trapnr;
@@ -499,6 +507,12 @@ do_general_protection(struct pt_regs *regs, long error_code)
 
 	tsk = current;
 	if (!user_mode(regs)) {
+		/*
+		 * Exit from the kprobe's single-stepping before trying
+		 * fixup_exception(). Note that if the GPF occurred in
+		 * kprobe user handlers, it is handled in notify_die.
+		 */
+		kprobe_exit_singlestep(regs);
 		if (fixup_exception(regs, X86_TRAP_GP))
 			return;
 
@@ -803,6 +817,11 @@ static void math_error(struct pt_regs *regs, int error_code, int trapnr)
 	cond_local_irq_enable(regs);
 
 	if (!user_mode(regs)) {
+		/*
+		 * Exit from the kprobe's single-stepping before trying
+		 * fixup_exception().
+		 */
+		kprobe_exit_singlestep(regs);
 		if (!fixup_exception(regs, trapnr)) {
 			task->thread.error_code = error_code;
 			task->thread.trap_nr = trapnr;

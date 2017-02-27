@@ -948,43 +948,62 @@ out:
 }
 NOKPROBE_SYMBOL(kprobe_debug_handler);
 
+/* Fixup current ip register and reset current kprobe, if needed. */
+int kprobe_exit_singlestep(struct pt_regs *regs)
+{
+	struct kprobe_ctlblk *kcb = get_kprobe_ctlblk();
+	struct kprobe *cur = kprobe_running();
+
+	if (unlikely(regs->ip != (unsigned long)cur->ainsn.insn))
+		return 0;
+
+	/* This must happen on single-stepping */
+	WARN_ON(kcb->kprobe_status != KPROBE_HIT_SS &&
+		kcb->kprobe_status != KPROBE_REENTER);
+	/*
+	 * We are here because the instruction being single
+	 * stepped caused a page fault. We reset the current
+	 * kprobe and the ip points back to the probe address
+	 * and allow the page fault handler to continue as a
+	 * normal page fault.
+	 */
+	regs->ip = (unsigned long)cur->addr;
+	/*
+	 * Trap flag (TF) has been set here because this fault
+	 * happened where the single stepping will be done.
+	 * So clear it by resetting the current kprobe:
+	 */
+	regs->flags &= ~X86_EFLAGS_TF;
+
+	/*
+	 * If the TF flag was set before the kprobe hit,
+	 * don't touch it:
+	 */
+	regs->flags |= kcb->kprobe_old_flags;
+
+	if (kcb->kprobe_status == KPROBE_REENTER)
+		restore_previous_kprobe(kcb);
+	else
+		reset_current_kprobe();
+
+	/* Preempt has been disabled before single stepping */
+	preempt_enable_no_resched();
+
+	return 1;
+}
+NOKPROBE_SYMBOL(kprobe_exit_singlestep);
+
 int kprobe_fault_handler(struct pt_regs *regs, int trapnr)
 {
-	struct kprobe *cur = kprobe_running();
 	struct kprobe_ctlblk *kcb = get_kprobe_ctlblk();
+	struct kprobe *cur = kprobe_running();
 
-	if (unlikely(regs->ip == (unsigned long)cur->ainsn.insn)) {
-		/* This must happen on single-stepping */
-		WARN_ON(kcb->kprobe_status != KPROBE_HIT_SS &&
-			kcb->kprobe_status != KPROBE_REENTER);
-		/*
-		 * We are here because the instruction being single
-		 * stepped caused a page fault. We reset the current
-		 * kprobe and the ip points back to the probe address
-		 * and allow the page fault handler to continue as a
-		 * normal page fault.
-		 */
-		regs->ip = (unsigned long)cur->addr;
-		/*
-		 * Trap flag (TF) has been set here because this fault
-		 * happened where the single stepping will be done.
-		 * So clear it by resetting the current kprobe:
-		 */
-		regs->flags &= ~X86_EFLAGS_TF;
+	/* If the fault happened on singlestep, finish it and retry */
+	if (kprobe_exit_singlestep(regs))
+		return 0;
 
-		/*
-		 * If the TF flag was set before the kprobe hit,
-		 * don't touch it:
-		 */
-		regs->flags |= kcb->kprobe_old_flags;
-
-		if (kcb->kprobe_status == KPROBE_REENTER)
-			restore_previous_kprobe(kcb);
-		else
-			reset_current_kprobe();
-		preempt_enable_no_resched();
-	} else if (kcb->kprobe_status == KPROBE_HIT_ACTIVE ||
-		   kcb->kprobe_status == KPROBE_HIT_SSDONE) {
+	if (kcb->kprobe_status == KPROBE_HIT_ACTIVE ||
+	    kcb->kprobe_status == KPROBE_HIT_SSDONE) {
 		/*
 		 * We increment the nmissed count for accounting,
 		 * we can also use npre/npostfault count for accounting
