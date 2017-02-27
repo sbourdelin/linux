@@ -728,6 +728,8 @@ static int tw5864_frameinterval_get(struct tw5864_input *input,
 		frameinterval->denominator = 25;
 		break;
 	default:
+		frameinterval->numerator = 1;
+		frameinterval->denominator = 1;
 		WARN(1, "tw5864_frameinterval_get requested for unknown std %d\n",
 		     input->std);
 		return -EINVAL;
