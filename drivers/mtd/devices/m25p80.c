@@ -241,6 +241,7 @@ static int m25p_probe(struct spi_device *spi)
 	else
 		flash_name = spi->modalias;
 
+	nor->flags |= SNOR_F_USE_BOUNCE_BUFFER;
 	ret = spi_nor_scan(nor, flash_name, mode);
 	if (ret)
 		return ret;
