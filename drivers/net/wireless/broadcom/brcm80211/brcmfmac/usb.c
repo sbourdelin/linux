@@ -26,6 +26,7 @@
 #include "bus.h"
 #include "debug.h"
 #include "firmware.h"
+#include "fwsignal.h"
 #include "usb.h"
 #include "core.h"
 #include "common.h"
@@ -476,6 +477,7 @@ static void brcmf_usb_tx_complete(struct urb *urb)
 {
 	struct brcmf_usbreq *req = (struct brcmf_usbreq *)urb->context;
 	struct brcmf_usbdev_info *devinfo = req->devinfo;
+	struct brcmf_pub *pub = devinfo->bus_pub.bus->drvr;
 	unsigned long flags;
 
 	brcmf_dbg(USB, "Enter, urb->status=%d, skb=%p\n", urb->status,
@@ -488,7 +490,7 @@ static void brcmf_usb_tx_complete(struct urb *urb)
 	spin_lock_irqsave(&devinfo->tx_flowblock_lock, flags);
 	if (devinfo->tx_freecount > devinfo->tx_high_watermark &&
 		devinfo->tx_flowblock) {
-		brcmf_txflowblock(devinfo->dev, false);
+		brcmf_fws_bus_blocked(pub, false);
 		devinfo->tx_flowblock = false;
 	}
 	spin_unlock_irqrestore(&devinfo->tx_flowblock_lock, flags);
@@ -598,6 +600,7 @@ brcmf_usb_state_change(struct brcmf_usbdev_info *devinfo, int state)
 static int brcmf_usb_tx(struct device *dev, struct sk_buff *skb)
 {
 	struct brcmf_usbdev_info *devinfo = brcmf_usb_get_businfo(dev);
+	struct brcmf_pub *pub = devinfo->bus_pub.bus->drvr;
 	struct brcmf_usbreq  *req;
 	int ret;
 	unsigned long flags;
@@ -635,7 +638,7 @@ static int brcmf_usb_tx(struct device *dev, struct sk_buff *skb)
 	spin_lock_irqsave(&devinfo->tx_flowblock_lock, flags);
 	if (devinfo->tx_freecount < devinfo->tx_low_watermark &&
 	    !devinfo->tx_flowblock) {
-		brcmf_txflowblock(dev, true);
+		brcmf_fws_bus_blocked(pub, true);
 		devinfo->tx_flowblock = true;
 	}
 	spin_unlock_irqrestore(&devinfo->tx_flowblock_lock, flags);

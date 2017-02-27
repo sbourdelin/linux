@@ -18,6 +18,10 @@
 #ifndef FWSIGNAL_H_
 #define FWSIGNAL_H_
 
+struct brcmf_fws_info;
+struct brcmf_if;
+struct brcmf_pub;
+
 int brcmf_fws_init(struct brcmf_pub *drvr);
 void brcmf_fws_deinit(struct brcmf_pub *drvr);
 bool brcmf_fws_queue_skbs(struct brcmf_fws_info *fws);

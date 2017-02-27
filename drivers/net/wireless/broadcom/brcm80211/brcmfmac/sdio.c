@@ -44,6 +44,7 @@
 #include "firmware.h"
 #include "core.h"
 #include "common.h"
+#include "fwsignal.h"
 
 #define DCMD_RESP_TIMEOUT	msecs_to_jiffies(2500)
 #define CTL_DONE_TIMEOUT	msecs_to_jiffies(2500)
@@ -2272,6 +2273,7 @@ done:
 
 static uint brcmf_sdio_sendfromq(struct brcmf_sdio *bus, uint maxframes)
 {
+	struct brcmf_pub *pub = bus->sdiodev->bus_if->drvr;
 	struct sk_buff *pkt;
 	struct sk_buff_head pktq;
 	u32 intstatus = 0;
@@ -2328,7 +2330,7 @@ static uint brcmf_sdio_sendfromq(struct brcmf_sdio *bus, uint maxframes)
 	if ((bus->sdiodev->state == BRCMF_SDIOD_DATA) &&
 	    bus->txoff && (pktq_len(&bus->txq) < TXLOW)) {
 		bus->txoff = false;
-		brcmf_txflowblock(bus->sdiodev->dev, false);
+		brcmf_fws_bus_blocked(pub, false);
 	}
 
 	return cnt;
@@ -2723,6 +2725,7 @@ static int brcmf_sdio_bus_txdata(struct device *dev, struct sk_buff *pkt)
 	struct brcmf_bus *bus_if = dev_get_drvdata(dev);
 	struct brcmf_sdio_dev *sdiodev = bus_if->bus_priv.sdio;
 	struct brcmf_sdio *bus = sdiodev->bus;
+	struct brcmf_pub *pub = bus->sdiodev->bus_if->drvr;
 
 	brcmf_dbg(TRACE, "Enter: pkt: data %p len %d\n", pkt->data, pkt->len);
 	if (sdiodev->state != BRCMF_SDIOD_DATA)
@@ -2753,7 +2756,7 @@ static int brcmf_sdio_bus_txdata(struct device *dev, struct sk_buff *pkt)
 
 	if (pktq_len(&bus->txq) >= TXHI) {
 		bus->txoff = true;
-		brcmf_txflowblock(dev, true);
+		brcmf_fws_bus_blocked(pub, true);
 	}
 	spin_unlock_bh(&bus->txq_lock);
 
