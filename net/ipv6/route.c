@@ -2169,10 +2169,13 @@ int ip6_del_rt(struct rt6_info *rt)
 static int __ip6_del_rt_siblings(struct rt6_info *rt, struct fib6_config *cfg)
 {
 	struct nl_info *info = &cfg->fc_nlinfo;
+	struct net *net = info->nl_net;
 	struct sk_buff *skb = NULL;
 	struct fib6_table *table;
 	int err;
 
+	if (rt == net->ipv6.ip6_null_entry)
+		return -ENOENT;
 	table = rt->rt6i_table;
 	write_lock_bh(&table->tb6_lock);
 
@@ -2184,7 +2187,7 @@ static int __ip6_del_rt_siblings(struct rt6_info *rt, struct fib6_config *cfg)
 		if (skb) {
 			u32 seq = info->nlh ? info->nlh->nlmsg_seq : 0;
 
-			if (rt6_fill_node(info->nl_net, skb, rt,
+			if (rt6_fill_node(net, skb, rt,
 					  NULL, NULL, 0, RTM_DELROUTE,
 					  info->portid, seq, 0) < 0) {
 				kfree_skb(skb);
@@ -2208,7 +2211,7 @@ out:
 	ip6_rt_put(rt);
 
 	if (skb) {
-		rtnl_notify(skb, info->nl_net, info->portid, RTNLGRP_IPV6_ROUTE,
+		rtnl_notify(skb, net, info->portid, RTNLGRP_IPV6_ROUTE,
 			    info->nlh, gfp_any());
 	}
 	return err;
