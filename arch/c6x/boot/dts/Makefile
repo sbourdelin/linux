@@ -2,7 +2,7 @@
 # Makefile for device trees
 #
 
-DTC_FLAGS ?= -p 1024
+DTC_FLAGS += -p 1024
 
 ifneq ($(DTB),)
 obj-y += linked_dtb.o
