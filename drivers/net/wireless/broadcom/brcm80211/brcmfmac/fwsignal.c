@@ -2445,6 +2445,24 @@ bool brcmf_fws_fc_active(struct brcmf_fws_info *fws)
 	return fws->fcmode != BRCMF_FWS_FCMODE_NONE;
 }
 
+void brcmf_fws_txcomplete(struct device *dev, struct sk_buff *txp, bool success)
+{
+	struct brcmf_bus *bus_if = dev_get_drvdata(dev);
+	struct brcmf_pub *drvr = bus_if->drvr;
+	struct brcmf_if *ifp;
+
+	/* await txstatus signal for firmware if active */
+	if (brcmf_fws_fc_active(drvr->fws)) {
+		if (!success)
+			brcmf_fws_bustxfail(drvr->fws, txp);
+	} else {
+		if (brcmf_proto_hdrpull(drvr, false, txp, &ifp))
+			brcmu_pkt_buf_free_skb(txp);
+		else
+			brcmf_txfinalize(ifp, txp, success);
+	}
+}
+
 void brcmf_fws_bustxfail(struct brcmf_fws_info *fws, struct sk_buff *skb)
 {
 	u32 hslot;
