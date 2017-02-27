@@ -141,6 +141,7 @@ enum spi_nor_option_flags {
 	SNOR_F_NO_OP_CHIP_ERASE	= BIT(2),
 	SNOR_F_S3AN_ADDR_DEFAULT = BIT(3),
 	SNOR_F_READY_XSR_RDY	= BIT(4),
+	SNOR_F_USE_BOUNCE_BUFFER = BIT(5),
 };
 
 /**
@@ -173,6 +174,8 @@ enum spi_nor_option_flags {
  * @flash_unlock:	[FLASH-SPECIFIC] unlock a region of the SPI NOR
  * @flash_is_locked:	[FLASH-SPECIFIC] check if a region of the SPI NOR is
  *			completely locked
+ * @bounce_buf		bounce buffer to use incase of vmalloc'd buffers,
+ *			for drivers that may use DMA.
  * @priv:		the private data
  */
 struct spi_nor {
@@ -205,6 +208,7 @@ struct spi_nor {
 	int (*flash_unlock)(struct spi_nor *nor, loff_t ofs, uint64_t len);
 	int (*flash_is_locked)(struct spi_nor *nor, loff_t ofs, uint64_t len);
 
+	void *bounce_buf;
 	void *priv;
 };
 

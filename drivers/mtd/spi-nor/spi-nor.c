@@ -17,6 +17,7 @@
 #include <linux/mutex.h>
 #include <linux/math64.h>
 #include <linux/sizes.h>
+#include <linux/mm.h>
 
 #include <linux/mtd/mtd.h>
 #include <linux/of_platform.h>
@@ -1205,11 +1206,21 @@ static int spi_nor_read(struct mtd_info *mtd, loff_t from, size_t len,
 
 	while (len) {
 		loff_t addr = from;
+		bool use_bb = false;
+		u_char *dst_buf = buf;
+		size_t buf_len = len;
 
 		if (nor->flags & SNOR_F_S3AN_ADDR_DEFAULT)
 			addr = spi_nor_s3an_addr_convert(nor, addr);
 
-		ret = nor->read(nor, addr, len, buf);
+		if (!virt_addr_valid(buf) && nor->bounce_buf) {
+			use_bb = true;
+			dst_buf = nor->bounce_buf;
+			if (len > mtd->erasesize)
+				buf_len = mtd->erasesize;
+		}
+
+		ret = nor->read(nor, from, buf_len, dst_buf);
 		if (ret == 0) {
 			/* We shouldn't see 0-length reads */
 			ret = -EIO;
@@ -1217,7 +1228,8 @@ static int spi_nor_read(struct mtd_info *mtd, loff_t from, size_t len,
 		}
 		if (ret < 0)
 			goto read_err;
-
+		if (use_bb)
+			memcpy(buf, dst_buf, ret);
 		WARN_ON(ret > len);
 		*retlen += ret;
 		buf += ret;
@@ -1329,6 +1341,7 @@ static int spi_nor_write(struct mtd_info *mtd, loff_t to, size_t len,
 		return ret;
 
 	for (i = 0; i < len; ) {
+		const u_char *src_buf = buf + i;
 		ssize_t written;
 		loff_t addr = to + i;
 
@@ -1354,8 +1367,13 @@ static int spi_nor_write(struct mtd_info *mtd, loff_t to, size_t len,
 		if (nor->flags & SNOR_F_S3AN_ADDR_DEFAULT)
 			addr = spi_nor_s3an_addr_convert(nor, addr);
 
+		if (!virt_addr_valid(buf) && nor->bounce_buf) {
+			memcpy(nor->bounce_buf, buf + i, page_remain);
+			src_buf = nor->bounce_buf;
+		}
+
 		write_enable(nor);
-		ret = nor->write(nor, addr, page_remain, buf + i);
+		ret = nor->write(nor, addr, page_remain, src_buf);
 		if (ret < 0)
 			goto write_err;
 		written = ret;
@@ -1718,6 +1736,12 @@ int spi_nor_scan(struct spi_nor *nor, const char *name, enum read_mode mode)
 		dev_err(dev, "address width is too large: %u\n",
 			nor->addr_width);
 		return -EINVAL;
+	}
+
+	if (nor->flags & SNOR_F_USE_BOUNCE_BUFFER) {
+		nor->bounce_buf = devm_kmalloc(dev, mtd->erasesize, GFP_KERNEL);
+		if (!nor->bounce_buf)
+			dev_err(dev, "unable to allocated bounce buffer\n");
 	}
 
 	nor->read_dummy = spi_nor_read_dummy_cycles(nor);
