@@ -475,12 +475,10 @@ static int _rtl92e_wx_set_scan(struct net_device *dev,
 	return ret;
 }
 
-
 static int _rtl92e_wx_get_scan(struct net_device *dev,
 			       struct iw_request_info *a,
 			       union iwreq_data *wrqu, char *b)
 {
-
 	int ret;
 	struct r8192_priv *priv = rtllib_priv(dev);
 
@@ -654,7 +652,6 @@ static int _rtl92e_wx_set_wap(struct net_device *dev,
 
 }
 
-
 static int _rtl92e_wx_get_wap(struct net_device *dev,
 			      struct iw_request_info *info,
 			      union iwreq_data *wrqu, char *extra)
@@ -663,7 +660,6 @@ static int _rtl92e_wx_get_wap(struct net_device *dev,
 
 	return rtllib_wx_get_wap(priv->rtllib, info, wrqu, extra);
 }
-
 
 static int _rtl92e_wx_get_enc(struct net_device *dev,
 			      struct iw_request_info *info,
@@ -833,7 +829,6 @@ static int _rtl92e_wx_get_retry(struct net_device *dev,
 {
 	struct r8192_priv *priv = rtllib_priv(dev);
 
-
 	wrqu->retry.disabled = 0; /* can't be disabled */
 
 	if ((wrqu->retry.flags & IW_RETRY_TYPE) ==
@@ -971,7 +966,6 @@ end_hw_sec:
 	priv->rtllib->wx_set_enc = 0;
 	mutex_unlock(&priv->wx_mutex);
 	return ret;
-
 }
 
 static int _rtl92e_wx_set_auth(struct net_device *dev,
