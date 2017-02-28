@@ -739,10 +739,9 @@ static void eeh_handle_normal_event(struct eeh_pe *pe)
 		return;
 	}
 
-	eeh_pe_update_time_stamp(pe);
-	pe->freeze_count++;
-	if (pe->freeze_count > eeh_max_freezes)
-		goto excess_failures;
+	/* Update freeze counters and see if we have tripped max-freeze limit */
+	if (eeh_pe_update_freeze_counter(pe) < 0)
+		goto perm_error;
 	pr_warn("EEH: This PCI device has failed %d times in the last hour\n",
 		pe->freeze_count);
 
@@ -871,19 +870,6 @@ static void eeh_handle_normal_event(struct eeh_pe *pe)
 	eeh_pe_dev_traverse(pe, eeh_report_resume, NULL);
 
 	return;
-
-excess_failures:
-	/*
-	 * About 90% of all real-life EEH failures in the field
-	 * are due to poorly seated PCI cards. Only 10% or so are
-	 * due to actual, failed cards.
-	 */
-	pr_err("EEH: PHB#%x-PE#%x has failed %d times in the\n"
-	       "last hour and has been permanently disabled.\n"
-	       "Please try reseating or replacing it.\n",
-		pe->phb->global_number, pe->addr,
-		pe->freeze_count);
-	goto perm_error;
 
 hard_fail:
 	pr_err("EEH: Unable to recover from failure from PHB#%x-PE#%x.\n"
