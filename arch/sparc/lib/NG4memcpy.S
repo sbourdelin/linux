@@ -18,7 +18,7 @@
 #define FPU_ENTER			\
 	rd	%fprs, %o5;		\
 	andcc	%o5, FPRS_FEF, %g0;	\
-	be,a,pn	%icc, 999f;		\
+	be,a,pn	%xcc, 999f;		\
 	 wr	%g0, FPRS_FEF, %fprs;	\
 	999:
 
@@ -82,10 +82,6 @@
 #endif
 #ifndef PREAMBLE
 #define PREAMBLE
-#endif
-
-#ifndef XCC
-#define XCC xcc
 #endif
 
 	.register	%g2,#scratch
@@ -252,19 +248,16 @@ FUNC_NAME:	/* %o0=dst, %o1=src, %o2=len */
 #ifdef MEMCPY_DEBUG
 	wr		%g0, 0x80, %asi
 #endif
-	srlx		%o2, 31, %g2
-	cmp		%g2, 0
-	tne		%XCC, 5
 	PREAMBLE
 	mov		%o0, %o3
 	brz,pn		%o2, .Lexit
 	 cmp		%o2, 3
-	ble,pn		%icc, .Ltiny
+	ble,pn		%xcc, .Ltiny
 	 cmp		%o2, 19
-	ble,pn		%icc, .Lsmall
+	ble,pn		%xcc, .Lsmall
 	 or		%o0, %o1, %g2
 	cmp		%o2, 128
-	bl,pn		%icc, .Lmedium
+	bl,pn		%xcc, .Lmedium
 	 nop
 
 .Llarge:/* len >= 0x80 */
@@ -279,7 +272,7 @@ FUNC_NAME:	/* %o0=dst, %o1=src, %o2=len */
 	add		%o1, 1, %o1
 	subcc		%g1, 1, %g1
 	add		%o0, 1, %o0
-	bne,pt		%icc, 1b
+	bne,pt		%xcc, 1b
 	 EX_ST(STORE(stb, %g2, %o0 - 0x01), NG4_retl_o2_plus_g1_plus_1)
 
 51:	LOAD(prefetch, %o1 + 0x040, #n_reads_strong)
@@ -295,7 +288,7 @@ FUNC_NAME:	/* %o0=dst, %o1=src, %o2=len */
 	 * loop, or we require the alignaddr/faligndata variant.
 	 */
 	andcc		%o1, 0x7, %o5
-	bne,pn		%icc, .Llarge_src_unaligned
+	bne,pn		%xcc, .Llarge_src_unaligned
 	 sub		%g0, %o0, %g1
 
 	/* Legitimize the use of initializing stores by getting dest
@@ -309,7 +302,7 @@ FUNC_NAME:	/* %o0=dst, %o1=src, %o2=len */
 	add		%o1, 8, %o1
 	subcc		%g1, 8, %g1
 	add		%o0, 8, %o0
-	bne,pt		%icc, 1b
+	bne,pt		%xcc, 1b
 	 EX_ST(STORE(stx, %g2, %o0 - 0x08), NG4_retl_o2_plus_g1_plus_8)
 
 .Llarge_aligned:
@@ -343,16 +336,16 @@ FUNC_NAME:	/* %o0=dst, %o1=src, %o2=len */
 	add		%o0, 0x08, %o0
 	EX_ST(STORE_INIT(GLOBAL_SPARE, %o0), NG4_retl_o2_plus_o4_plus_8)
 	add		%o0, 0x08, %o0
-	bne,pt		%icc, 1b
+	bne,pt		%xcc, 1b
 	 LOAD(prefetch, %o1 + 0x200, #n_reads_strong)
 
 	membar		#StoreLoad | #StoreStore
 
 	brz,pn		%o2, .Lexit
 	 cmp		%o2, 19
-	ble,pn		%icc, .Lsmall_unaligned
+	ble,pn		%xcc, .Lsmall_unaligned
 	 nop
-	ba,a,pt		%icc, .Lmedium_noprefetch
+	ba,a,pt		%xcc, .Lmedium_noprefetch
 
 .Lexit:	retl
 	 mov		EX_RETVAL(%o3), %o0
@@ -395,7 +388,7 @@ FUNC_NAME:	/* %o0=dst, %o1=src, %o2=len */
 	EX_ST_FP(STORE(std, %f28, %o0 + 0x30), NG4_retl_o2_plus_o4_plus_16)
 	EX_ST_FP(STORE(std, %f30, %o0 + 0x38), NG4_retl_o2_plus_o4_plus_8)
 	add		%o0, 0x40, %o0
-	bne,pt		%icc, 1b
+	bne,pt		%xcc, 1b
 	 LOAD(prefetch, %g1 + 0x200, #n_reads_strong)
 #ifdef NON_USER_COPY
 	VISExitHalfFast
@@ -404,9 +397,9 @@ FUNC_NAME:	/* %o0=dst, %o1=src, %o2=len */
 #endif
 	brz,pn		%o2, .Lexit
 	 cmp		%o2, 19
-	ble,pn		%icc, .Lsmall_unaligned
+	ble,pn		%xcc, .Lsmall_unaligned
 	 nop
-	ba,a,pt		%icc, .Lmedium_unaligned
+	ba,a,pt		%xcc, .Lmedium_unaligned
 
 #ifdef NON_USER_COPY
 .Lmedium_vis_entry_fail:
@@ -415,11 +408,11 @@ FUNC_NAME:	/* %o0=dst, %o1=src, %o2=len */
 .Lmedium:
 	LOAD(prefetch, %o1 + 0x40, #n_reads_strong)
 	andcc		%g2, 0x7, %g0
-	bne,pn		%icc, .Lmedium_unaligned
+	bne,pn		%xcc, .Lmedium_unaligned
 	 nop
 .Lmedium_noprefetch:
 	andncc		%o2, 0x20 - 1, %o5
-	be,pn		%icc, 2f
+	be,pn		%xcc, 2f
 	 sub		%o2, %o5, %o2
 1:	EX_LD(LOAD(ldx, %o1 + 0x00, %g1), NG4_retl_o2_plus_o5)
 	EX_LD(LOAD(ldx, %o1 + 0x08, %g2), NG4_retl_o2_plus_o5)
@@ -431,29 +424,29 @@ FUNC_NAME:	/* %o0=dst, %o1=src, %o2=len */
 	EX_ST(STORE(stx, %g2, %o0 + 0x08), NG4_retl_o2_plus_o5_plus_24)
 	EX_ST(STORE(stx, GLOBAL_SPARE, %o0 + 0x10), NG4_retl_o2_plus_o5_plus_24)
 	EX_ST(STORE(stx, %o4, %o0 + 0x18), NG4_retl_o2_plus_o5_plus_8)
-	bne,pt		%icc, 1b
+	bne,pt		%xcc, 1b
 	 add		%o0, 0x20, %o0
 2:	andcc		%o2, 0x18, %o5
-	be,pt		%icc, 3f
+	be,pt		%xcc, 3f
 	 sub		%o2, %o5, %o2
 
 1:	EX_LD(LOAD(ldx, %o1 + 0x00, %g1), NG4_retl_o2_plus_o5)
 	add		%o1, 0x08, %o1
 	add		%o0, 0x08, %o0
 	subcc		%o5, 0x08, %o5
-	bne,pt		%icc, 1b
+	bne,pt		%xcc, 1b
 	 EX_ST(STORE(stx, %g1, %o0 - 0x08), NG4_retl_o2_plus_o5_plus_8)
 3:	brz,pt		%o2, .Lexit
 	 cmp		%o2, 0x04
-	bl,pn		%icc, .Ltiny
+	bl,pn		%xcc, .Ltiny
 	 nop
 	EX_LD(LOAD(lduw, %o1 + 0x00, %g1), NG4_retl_o2)
 	add		%o1, 0x04, %o1
 	add		%o0, 0x04, %o0
 	subcc		%o2, 0x04, %o2
-	bne,pn		%icc, .Ltiny
+	bne,pn		%xcc, .Ltiny
 	 EX_ST(STORE(stw, %g1, %o0 - 0x04), NG4_retl_o2_plus_4)
-	ba,a,pt		%icc, .Lexit
+	ba,a,pt		%xcc, .Lexit
 .Lmedium_unaligned:
 	/* First get dest 8 byte aligned.  */
 	sub		%g0, %o0, %g1
@@ -465,7 +458,7 @@ FUNC_NAME:	/* %o0=dst, %o1=src, %o2=len */
 	add		%o1, 1, %o1
 	subcc		%g1, 1, %g1
 	add		%o0, 1, %o0
-	bne,pt		%icc, 1b
+	bne,pt		%xcc, 1b
 	 EX_ST(STORE(stb, %g2, %o0 - 0x01), NG4_retl_o2_plus_g1_plus_1)
 2:
 	and		%o1, 0x7, %g1
@@ -485,30 +478,30 @@ FUNC_NAME:	/* %o0=dst, %o1=src, %o2=len */
 	or		GLOBAL_SPARE, %o4, GLOBAL_SPARE
 	EX_ST(STORE(stx, GLOBAL_SPARE, %o0 + 0x00), NG4_retl_o2_plus_o5_plus_8)
 	add		%o0, 0x08, %o0
-	bne,pt		%icc, 1b
+	bne,pt		%xcc, 1b
 	 sllx		%g3, %g1, %o4
 	srl		%g1, 3, %g1
 	add		%o1, %g1, %o1
 	brz,pn		%o2, .Lexit
 	 nop
-	ba,pt		%icc, .Lsmall_unaligned
+	ba,pt		%xcc, .Lsmall_unaligned
 
 .Ltiny:
 	EX_LD(LOAD(ldub, %o1 + 0x00, %g1), NG4_retl_o2)
 	subcc		%o2, 1, %o2
-	be,pn		%icc, .Lexit
+	be,pn		%xcc, .Lexit
 	 EX_ST(STORE(stb, %g1, %o0 + 0x00), NG4_retl_o2_plus_1)
 	EX_LD(LOAD(ldub, %o1 + 0x01, %g1), NG4_retl_o2)
 	subcc		%o2, 1, %o2
-	be,pn		%icc, .Lexit
+	be,pn		%xcc, .Lexit
 	 EX_ST(STORE(stb, %g1, %o0 + 0x01), NG4_retl_o2_plus_1)
 	EX_LD(LOAD(ldub, %o1 + 0x02, %g1), NG4_retl_o2)
-	ba,pt		%icc, .Lexit
+	ba,pt		%xcc, .Lexit
 	 EX_ST(STORE(stb, %g1, %o0 + 0x02), NG4_retl_o2)
 
 .Lsmall:
 	andcc		%g2, 0x3, %g0
-	bne,pn		%icc, .Lsmall_unaligned
+	bne,pn		%xcc, .Lsmall_unaligned
 	 andn		%o2, 0x4 - 1, %o5
 	sub		%o2, %o5, %o2
 1:
@@ -516,18 +509,18 @@ FUNC_NAME:	/* %o0=dst, %o1=src, %o2=len */
 	add		%o1, 0x04, %o1
 	subcc		%o5, 0x04, %o5
 	add		%o0, 0x04, %o0
-	bne,pt		%icc, 1b
+	bne,pt		%xcc, 1b
 	 EX_ST(STORE(stw, %g1, %o0 - 0x04), NG4_retl_o2_plus_o5_plus_4)
 	brz,pt		%o2, .Lexit
 	 nop
-	ba,a,pt		%icc, .Ltiny
+	ba,a,pt		%xcc, .Ltiny
 
 .Lsmall_unaligned:
 1:	EX_LD(LOAD(ldub, %o1 + 0x00, %g1), NG4_retl_o2)
 	add		%o1, 1, %o1
 	add		%o0, 1, %o0
 	subcc		%o2, 1, %o2
-	bne,pt		%icc, 1b
+	bne,pt		%xcc, 1b
 	 EX_ST(STORE(stb, %g1, %o0 - 0x01), NG4_retl_o2_plus_1)
-	ba,a,pt		%icc, .Lexit
+	ba,a,pt		%xcc, .Lexit
 	.size		FUNC_NAME, .-FUNC_NAME
