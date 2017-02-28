@@ -478,6 +478,9 @@ struct storvsc_device {
 	 */
 	u64 node_name;
 	u64 port_name;
+#if IS_ENABLED(CONFIG_SCSI_FC_ATTRS)
+	struct fc_rport *rport;
+#endif
 };
 
 struct hv_host_device {
@@ -1823,8 +1826,16 @@ static int storvsc_probe(struct hv_device *device,
 	}
 #if IS_ENABLED(CONFIG_SCSI_FC_ATTRS)
 	if (host->transportt == fc_transport_template) {
+		struct fc_rport_identifiers ids;
+
+		ids.node_name = 0;
+		ids.port_name = 0;
+		ids.port_id = 0;
+		ids.roles |= FC_PORT_ROLE_FCP_TARGET;
+
 		fc_host_node_name(host) = stor_device->node_name;
 		fc_host_port_name(host) = stor_device->port_name;
+		stor_device->rport = fc_remote_port_add(host, 0, &ids);
 	}
 #endif
 	return 0;
@@ -1854,8 +1865,10 @@ static int storvsc_remove(struct hv_device *dev)
 	struct Scsi_Host *host = stor_device->host;
 
 #if IS_ENABLED(CONFIG_SCSI_FC_ATTRS)
-	if (host->transportt == fc_transport_template)
+	if (host->transportt == fc_transport_template) {
+		fc_remote_port_delete(stor_device->rport);
 		fc_remove_host(host);
+	}
 #endif
 	scsi_remove_host(host);
 	storvsc_dev_remove(dev);
