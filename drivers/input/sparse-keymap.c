@@ -228,6 +228,57 @@ int sparse_keymap_setup(struct input_dev *dev,
 }
 EXPORT_SYMBOL(sparse_keymap_setup);
 
+struct sparse_keymap_devres {
+	struct input_dev *dev;
+};
+
+static void devm_sparse_keymap_free(struct device *dev, void *res)
+{
+	struct sparse_keymap_devres *devres = res;
+
+	sparse_keymap_free(devres->dev);
+}
+
+/**
+ * devm_sparse_keymap_setup - set up managed sparse keymap for an input device
+ * @dev: Input device
+ * @keymap: Keymap in form of array of &key_entry structures ending
+ *	with %KE_END type entry
+ * @setup: Function that can be used to adjust keymap entries
+ *	depending on device's needs, may be %NULL
+ *
+ * The function calculates size and allocates copy of the original
+ * keymap after which sets up input device event bits appropriately.
+ * The allocated copy of the keymap is automatically freed when it is no
+ * longer needed, thus drivers using this function must not explicitly
+ * call sparse_keymap_free() for the same input device.
+ */
+int devm_sparse_keymap_setup(struct input_dev *dev,
+			     const struct key_entry *keymap,
+			     int (*setup)(struct input_dev *,
+					  struct key_entry *))
+{
+	struct sparse_keymap_devres *devres;
+	int ret;
+
+	devres = devres_alloc(devm_sparse_keymap_free, sizeof(*devres),
+			      GFP_KERNEL);
+	if (!devres)
+		return -ENOMEM;
+
+	ret = sparse_keymap_setup(dev, keymap, setup);
+	if (ret) {
+		devres_free(devres);
+		return ret;
+	}
+
+	devres->dev = dev;
+	devres_add(dev->devres_managed ? dev->dev.parent : &dev->dev, devres);
+
+	return 0;
+}
+EXPORT_SYMBOL_GPL(devm_sparse_keymap_setup);
+
 /**
  * sparse_keymap_free - free memory allocated for sparse keymap
  * @dev: Input device using sparse keymap
