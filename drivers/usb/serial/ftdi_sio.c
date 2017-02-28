@@ -1742,7 +1742,7 @@ static ssize_t store_event_char(struct device *dev,
 	unsigned int v;
 	int rv;
 
-	rv = kstrtouint(valbuf, 10, &v);
+	rv = kstrtouint(valbuf, 0, &v);
 	if (rv)
 		return rv;
 
