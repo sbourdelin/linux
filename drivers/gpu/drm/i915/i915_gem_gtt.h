@@ -126,10 +126,10 @@ typedef uint64_t gen8_ppgtt_pml4e_t;
 #define I915_PDPES_PER_PDP(dev_priv)	(USES_FULL_48BIT_PPGTT(dev_priv) ?\
 					GEN8_PML4ES_PER_PML4 : GEN8_LEGACY_PDPES)
 
-#define PPAT_UNCACHED_INDEX		(_PAGE_PWT | _PAGE_PCD)
+#define PPAT_UNCACHED_INDEX		_PAGE_PCD
 #define PPAT_CACHED_PDE_INDEX		0 /* WB LLC */
 #define PPAT_CACHED_INDEX		_PAGE_PAT /* WB LLCeLLC */
-#define PPAT_DISPLAY_ELLC_INDEX		_PAGE_PCD /* WT eLLC */
+#define PPAT_DISPLAY_ELLC_INDEX		(_PAGE_PWT | _PAGE_PCD) /* WT eLLC */
 
 #define CHV_PPAT_SNOOP			(1<<6)
 #define GEN8_PPAT_AGE(x)		(x<<4)
