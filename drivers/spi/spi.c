@@ -686,14 +686,13 @@ int spi_register_board_info(struct spi_board_info const *info, unsigned n)
 	if (!n)
 		return -EINVAL;
 
-	bi = kzalloc(n * sizeof(*bi), GFP_KERNEL);
-	if (!bi)
-		return -ENOMEM;
-
-	for (i = 0; i < n; i++, bi++, info++) {
+	for (i = 0; i < n; i++, info++) {
 		struct spi_master *master;
 
-		memcpy(&bi->board_info, info, sizeof(*info));
+		bi = kmemdup(info, sizeof(*bi), GFP_KERNEL);
+		if (!bi)
+			return -ENOMEM;
+
 		bi->board_info.properties =
 			property_entries_dup(info->properties);
 		if (IS_ERR(bi->board_info.properties))
