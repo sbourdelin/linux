@@ -108,6 +108,7 @@
  *       may perform further validation in this case.
  *     GRE: only if the checksum is present in the header.
  *     SCTP: indicates the CRC in SCTP header has been validated.
+ *     FCOE: indicates the CRC in FC frame has been validated.
  *
  *   skb->csum_level indicates the number of consecutive checksums found in
  *   the packet minus one that have been verified as CHECKSUM_UNNECESSARY.
@@ -161,14 +162,13 @@
  *
  *   NETIF_F_IP_CSUM and NETIF_F_IPV6_CSUM are being deprecated in favor of
  *   NETIF_F_HW_CSUM. New devices should use NETIF_F_HW_CSUM to indicate
- *   checksum offload capability. If a	device has limited checksum capabilities
- *   (for instance can only perform NETIF_F_IP_CSUM or NETIF_F_IPV6_CSUM as
- *   described above) a helper function can be called to resolve
- *   CHECKSUM_PARTIAL. The helper functions are skb_csum_off_chk*. The helper
- *   function takes a spec argument that describes the protocol layer that is
- *   supported for checksum offload and can be called for each packet. If a
- *   packet does not match the specification for offload, skb_checksum_help
- *   is called to resolve the checksum.
+ *   checksum offload capability. If a device has limited checksum capabilities
+ *   (for instance it can't perform NETIF_F_IP_CSUM or NETIF_F_IPV6_CSUM as
+ *   described above) a helper function (namely skb_csum_hwoffload_help) can
+ *   be called to resolve CHECKSUM_PARTIAL. This function uses netdev_features_t
+ *   to have the Internet Checksum computed by HW, in case any feature belonging
+ *   to NETIF_F_CSUM_MASK is set, or by software using skb_checksum_help().
+ *   See also Section D.
  *
  * CHECKSUM_NONE:
  *
@@ -189,11 +189,10 @@
  *   NETIF_F_SCTP_CRC - This feature indicates that a device is capable of
  *     offloading the SCTP CRC in a packet. To perform this offload the stack
  *     will set ip_summed to CHECKSUM_PARTIAL and set csum_start and csum_offset
- *     accordingly. Note the there is no indication in the skbuff that the
- *     CHECKSUM_PARTIAL refers to an SCTP checksum, a driver that supports
- *     both IP checksum offload and SCTP CRC offload must verify which offload
- *     is configured for a packet presumably by inspecting packet headers; in
- *     case, skb_sctp_csum_help is provided to compute CRC on SCTP packets.
+ *     accordingly. skb->csum_not_inet is an indication in the skbuff that the
+ *     CHECKSUM_PARTIAL refers to an SCTP checksum: a driver can use it to
+ *     decide whether skb_checksum_help() or skb_sctp_csum_help() have to be
+ *     called on a sk_buff having ip_summed set to CHECKSUM_PARTIAL.
  *
  *   NETIF_F_FCOE_CRC - This feature indicates that a device is capable of
  *     offloading the FCOE CRC in a packet. To perform this offload the stack

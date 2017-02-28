@@ -49,8 +49,8 @@ A driver declares its offload capabilities in netdev->hw_features; see
  and csum_offset given in the SKB; if it tries to deduce these itself in
  hardware (as some NICs do) the driver should check that the values in the
  SKB match those which the hardware will deduce, and if not, fall back to
- checksumming in software instead (with skb_checksum_help or one of the
- skb_csum_off_chk* functions as mentioned in include/linux/skbuff.h).  This
+ checksumming in software instead (with skb_checksum_help or
+ skb_sctp_csum_help functions as mentioned in include/linux/skbuff.h). This
  is a pain, but that's what you get when hardware tries to be clever.
 
 The stack should, for the most part, assume that checksum offload is
@@ -60,7 +60,8 @@ The stack should, for the most part, assume that checksum offload is
  may include other offloads besides TX Checksum Offload) and, if they are
  not supported or enabled on the device (determined by netdev->features),
  performs the corresponding offload in software.  In the case of TX
- Checksum Offload, that means calling skb_checksum_help(skb).
+ Checksum Offload, that means calling skb_sctp_csum_help(skb) for SCTP
+ packets, and skb_checksum_help(skb) for other packets.
 
 
 LCO: Local Checksum Offload
