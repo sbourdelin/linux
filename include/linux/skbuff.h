@@ -759,6 +759,7 @@ struct sk_buff {
 	__u8			tc_redirected:1;
 	__u8			tc_from_ingress:1;
 #endif
+	__u8			csum_not_inet:1;
 
 #ifdef CONFIG_NET_SCHED
 	__u16			tc_index;	/* traffic control index */

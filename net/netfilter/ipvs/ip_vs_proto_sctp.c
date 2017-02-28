@@ -81,6 +81,7 @@ static void sctp_nat_csum(struct sk_buff *skb, sctp_sctphdr_t *sctph,
 			  unsigned int sctphoff)
 {
 	sctph->checksum = sctp_compute_cksum(skb, sctphoff);
+	skb->csum_not_inet = 0;
 	skb->ip_summed = CHECKSUM_UNNECESSARY;
 }
 

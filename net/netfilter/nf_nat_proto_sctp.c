@@ -49,6 +49,7 @@ sctp_manip_pkt(struct sk_buff *skb,
 
 	if (skb->ip_summed != CHECKSUM_PARTIAL) {
 		hdr->checksum = sctp_compute_cksum(skb, hdroff);
+		skb->csum_not_inet = 0;
 		skb->ip_summed = CHECKSUM_NONE;
 	}
 

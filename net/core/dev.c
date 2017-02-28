@@ -2614,6 +2614,7 @@ int skb_sctp_csum_help(struct sk_buff *skb)
 	}
 	*(__le32 *)(skb->data + offset) = crc32c_csum;
 	skb->ip_summed = CHECKSUM_NONE;
+	skb->csum_not_inet = 0;
 out:
 	return ret;
 }
@@ -2960,6 +2961,16 @@ static struct sk_buff *validate_xmit_vlan(struct sk_buff *skb,
 	return skb;
 }
 
+static int skb_csum_hwoffload_help(struct sk_buff *skb,
+				   netdev_features_t features)
+{
+	if (unlikely(skb->csum_not_inet))
+		return !(features & NETIF_F_SCTP_CRC) ?
+				skb_sctp_csum_help(skb) : 0;
+
+	return !(features & NETIF_F_CSUM_MASK) ? skb_checksum_help(skb) : 0;
+}
+
 static struct sk_buff *validate_xmit_skb(struct sk_buff *skb, struct net_device *dev)
 {
 	netdev_features_t features;
@@ -2995,8 +3006,7 @@ static struct sk_buff *validate_xmit_skb(struct sk_buff *skb, struct net_device 
 			else
 				skb_set_transport_header(skb,
 							 skb_checksum_start_offset(skb));
-			if (!(features & NETIF_F_CSUM_MASK) &&
-			    skb_checksum_help(skb))
+			if (skb_csum_hwoffload_help(skb, features))
 				goto out_kfree_skb;
 		}
 	}
