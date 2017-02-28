@@ -25,6 +25,7 @@ struct f_rndis_opts {
 	struct net_device		*net;
 	bool				bound;
 	bool				borrowed_net;
+	bool				use_ms_rndiscmp;
 
 	struct usb_os_desc		rndis_os_desc;
 	char				rndis_ext_compat_id[16];

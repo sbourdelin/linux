@@ -20,6 +20,7 @@
 #include <linux/module.h>
 #include <linux/device.h>
 #include <linux/etherdevice.h>
+#include <linux/usb/misc.h>
 
 #include <linux/atomic.h>
 
@@ -692,6 +693,18 @@ rndis_bind(struct usb_configuration *c, struct usb_function *f)
 	}
 
 	/*
+	 * Starting with Vista, Windows will match this Class/SubClass/Protocol
+	 * with rndiscmp.inf and load the proper driver without the need for a
+	 * custom .inf.
+	 * Ref: https://msdn.microsoft.com/library/ff538820(v=vs.85).aspx
+	 */
+	if (rndis_opts->use_ms_rndiscmp) {
+		rndis_iad_descriptor.bFunctionClass = USB_CLASS_MISC;
+		rndis_iad_descriptor.bFunctionSubClass = USB_MISC_SUBCLASS_RNDIS;
+		rndis_iad_descriptor.bFunctionProtocol = USB_MISC_RNDIS_PROTO_ENET;
+	}
+
+	/*
 	 * in drivers/usb/gadget/configfs.c:configfs_composite_bind()
 	 * configurations are bound in sequence with list_for_each_entry,
 	 * in each configuration its functions are bound in sequence
@@ -866,11 +879,46 @@ USB_ETHERNET_CONFIGFS_ITEM_ATTR_QMULT(rndis);
 /* f_rndis_opts_ifname */
 USB_ETHERNET_CONFIGFS_ITEM_ATTR_IFNAME(rndis);
 
+static ssize_t
+rndis_opts_use_ms_rndiscmp_show(struct config_item *item, char *page)
+{
+	struct f_rndis_opts *opts = to_f_rndis_opts(item);
+	int ret;
+
+	mutex_lock(&opts->lock);
+	ret = sprintf(page, "%d\n", opts->use_ms_rndiscmp);
+	mutex_unlock(&opts->lock);
+
+	return ret;
+}
+
+static ssize_t
+rndis_opts_use_ms_rndiscmp_store(struct config_item *item, const char *page,
+				 size_t len)
+{
+	struct f_rndis_opts *opts = to_f_rndis_opts(item);
+	int ret;
+	bool use;
+
+	mutex_lock(&opts->lock);
+	ret = strtobool(page, &use);
+	if (!ret) {
+		opts->use_ms_rndiscmp = use;
+		ret = len;
+	}
+	mutex_unlock(&opts->lock);
+
+	return ret;
+}
+
+CONFIGFS_ATTR(rndis_opts_, use_ms_rndiscmp);
+
 static struct configfs_attribute *rndis_attrs[] = {
 	&rndis_opts_attr_dev_addr,
 	&rndis_opts_attr_host_addr,
 	&rndis_opts_attr_qmult,
 	&rndis_opts_attr_ifname,
+	&rndis_opts_attr_use_ms_rndiscmp,
 	NULL,
 };
 
