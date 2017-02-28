@@ -1976,6 +1976,16 @@ static void try_to_push_tasks(void *arg)
 	src_rq = rq_of_rt_rq(rt_rq);
 
 again:
+	/*
+	 * Normally, has_pushable_tasks() would be performed within the
+	 * runqueue lock being held. But if it was not set when entering
+	 * this hard interrupt handler function, then to have it set would
+	 * require a wake up. A wake up of an RT task will either cause a
+	 * schedule if the woken task is higher priority than the running
+	 * task, or it would try to do a push from the CPU doing the wake
+	 * up. Grabbing the runqueue lock in such a case would more likely
+	 * just cause unnecessary contention.
+	 */
 	if (has_pushable_tasks(rq)) {
 		raw_spin_lock(&rq->lock);
 		push_rt_task(rq);
