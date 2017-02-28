@@ -129,17 +129,19 @@ static int set_gamma(struct fbtft_par *par, u32 *curves)
 
 	for (i = 0; i < 63; i++) {
 		if (i > 0 && curves[i] < 2) {
-			dev_err(par->info->device,
-				"Illegal value in Grayscale Lookup Table at index %d. " \
-				"Must be greater than 1\n", i);
+			dev_err(par->info->device, "%s %d. %s\n",
+				"Illegal value in Grayscale Lookup Table at index",
+				i,
+				"Must be greater than 1");
 			return -EINVAL;
 		}
 		acc += curves[i];
 		tmp[i] = acc;
 		if (acc > 180) {
-			dev_err(par->info->device,
-				"Illegal value(s) in Grayscale Lookup Table. " \
-				"At index=%d, the accumulated value has exceeded 180\n", i);
+			dev_err(par->info->device, "%s%d, %s\n",
+				"Illegal value(s) in Grayscale Lookup Table. At index=",
+				i,
+				"the accumulated value has exceeded 180");
 			return -EINVAL;
 		}
 	}
