@@ -683,9 +683,6 @@ int spi_register_board_info(struct spi_board_info const *info, unsigned n)
 	struct boardinfo *bi;
 	int i;
 
-	if (!n)
-		return -EINVAL;
-
 	for (i = 0; i < n; i++, info++) {
 		struct spi_master *master;
 
