@@ -62,6 +62,7 @@ static int iio_interrupt_trigger_probe(struct platform_device *pdev)
 	}
 	iio_trigger_set_drvdata(trig, trig_info);
 	trig_info->irq = irq;
+	trig->dev.of_node = pdev->dev.of_node;
 	trig->ops = &iio_interrupt_trigger_ops;
 	ret = request_irq(irq, iio_interrupt_trigger_poll,
 			  irqflags, trig->name, trig);
@@ -104,11 +105,20 @@ static int iio_interrupt_trigger_remove(struct platform_device *pdev)
 	return 0;
 }
 
+#ifdef CONFIG_OF
+static const struct of_device_id iio_interrupt_trigger_of_match[] = {
+	{ .compatible = "interrupt-trigger" },
+	{},
+};
+MODULE_DEVICE_TABLE(of, iio_interrupt_trigger_of_match);
+#endif
+
 static struct platform_driver iio_interrupt_trigger_driver = {
 	.probe = iio_interrupt_trigger_probe,
 	.remove = iio_interrupt_trigger_remove,
 	.driver = {
 		.name = "iio_interrupt_trigger",
+		.of_match_table = of_match_ptr(iio_interrupt_trigger_of_match),
 	},
 };
 
