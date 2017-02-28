@@ -869,8 +869,11 @@ int opal_error_code(int rc)
 	case OPAL_UNSUPPORTED:		return -EIO;
 	case OPAL_HARDWARE:		return -EIO;
 	case OPAL_INTERNAL_ERROR:	return -EIO;
+	case OPAL_WRONG_STATE:
+		pr_notice("%s: Core sleeping/offline\n", __func__);
+		return -EIO;
 	default:
-		pr_err("%s: unexpected OPAL error %d\n", __func__, rc);
+		pr_err("%s: Unexpected OPAL error %d\n", __func__, rc);
 		return -EIO;
 	}
 }
