@@ -93,6 +93,7 @@ struct vfio_pci_device {
 	struct pci_saved_state	*pci_saved_state;
 	int			refcnt;
 	struct eventfd_ctx	*err_trigger;
+	struct eventfd_ctx	*non_fatal_err_trigger;
 	struct eventfd_ctx	*req_trigger;
 	struct list_head	dummy_resources_list;
 };
