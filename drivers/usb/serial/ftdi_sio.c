@@ -1713,8 +1713,12 @@ static ssize_t latency_timer_store(struct device *dev,
 {
 	struct usb_serial_port *port = to_usb_serial_port(dev);
 	struct ftdi_private *priv = usb_get_serial_port_data(port);
-	int v = simple_strtoul(valbuf, NULL, 10);
+	unsigned int v;
 	int rv;
+
+	rv = kstrtouint(valbuf, 10, &v);
+	if (rv)
+		return rv;
 
 	if (v < 1 || v > 255)
 		return -EINVAL;
@@ -1735,10 +1739,14 @@ static ssize_t store_event_char(struct device *dev,
 	struct usb_serial_port *port = to_usb_serial_port(dev);
 	struct ftdi_private *priv = usb_get_serial_port_data(port);
 	struct usb_device *udev = port->serial->dev;
-	int v = simple_strtoul(valbuf, NULL, 10);
+	unsigned int v;
 	int rv;
 
-	if (v < 0 || v >= 0x200)
+	rv = kstrtouint(valbuf, 10, &v);
+	if (rv)
+		return rv;
+
+	if (v >= 0x200)
 		return -EINVAL;
 
 	dev_dbg(&port->dev, "%s: setting event char = %i\n", __func__, v);
