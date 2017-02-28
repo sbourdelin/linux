@@ -151,16 +151,19 @@ enum req_opf {
 	REQ_OP_FLUSH		= 2,
 	/* discard sectors */
 	REQ_OP_DISCARD		= 3,
-	/* get zone information */
-	REQ_OP_ZONE_REPORT	= 4,
 	/* securely erase sectors */
-	REQ_OP_SECURE_ERASE	= 5,
-	/* seset a zone write pointer */
-	REQ_OP_ZONE_RESET	= 6,
+	REQ_OP_SECURE_ERASE	= 4,
 	/* write the same sector many times */
-	REQ_OP_WRITE_SAME	= 7,
+	REQ_OP_WRITE_SAME	= 5,
 	/* write the zero filled sector many times */
-	REQ_OP_WRITE_ZEROES	= 8,
+	REQ_OP_WRITE_ZEROES	= 6,
+
+	REQ_OP_MEDIUM_LAST = REQ_OP_WRITE_ZEROES,
+
+	/* get zone information */
+	REQ_OP_ZONE_REPORT	= 16,
+	/* reset a zone write pointer */
+	REQ_OP_ZONE_RESET	= 17,
 
 	/* SCSI passthrough using struct scsi_request */
 	REQ_OP_SCSI_IN		= 32,

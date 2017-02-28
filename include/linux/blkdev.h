@@ -248,6 +248,18 @@ static inline bool blk_rq_is_passthrough(struct request *rq)
 	return blk_rq_is_scsi(rq) || blk_rq_is_private(rq);
 }
 
+/**
+ * blk_rq_accesses_medium - test if a request is a medium access request
+ * @rq: A block layer request.
+ *
+ * A medium access request is a regular internal request that operates on
+ * a whole number of logical blocks of the storage medium.
+ */
+static inline bool blk_rq_accesses_medium(const struct request *rq)
+{
+	return req_op(rq) <= REQ_OP_MEDIUM_LAST;
+}
+
 static inline unsigned short req_get_ioprio(struct request *req)
 {
 	return req->ioprio;
