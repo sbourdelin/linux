@@ -2237,6 +2237,47 @@ int devm_pinctrl_register_and_init(struct device *dev,
 }
 EXPORT_SYMBOL_GPL(devm_pinctrl_register_and_init);
 
+int devm_pinctrl_register_and_init_nostart(struct device *dev,
+					struct pinctrl_desc *pctldesc,
+					void *driver_data,
+					struct pinctrl_dev **pctldev)
+{
+	struct pinctrl_dev **ptr;
+	struct pinctrl_dev *p;
+
+	ptr = devres_alloc(devm_pinctrl_dev_release, sizeof(*ptr), GFP_KERNEL);
+	if (!ptr)
+		return -ENOMEM;
+
+	p = pinctrl_init_controller(pctldesc, dev, driver_data);
+	if (IS_ERR(p)) {
+		devres_free(ptr);
+		return PTR_ERR(p);
+	}
+
+	*ptr = p;
+	devres_add(dev, ptr);
+	*pctldev = p;
+
+	return 0;
+}
+EXPORT_SYMBOL_GPL(devm_pinctrl_register_and_init_nostart);
+
+int devm_pinctrl_start(struct device *dev,
+		struct pinctrl_dev *pctldev)
+{
+	int error = 0;
+
+	error = pinctrl_create_and_start(pctldev);
+	if (error) {
+		mutex_destroy(&pctldev->mutex);
+		return error;
+	}
+
+	return error;
+}
+EXPORT_SYMBOL_GPL(devm_pinctrl_start);
+
 /**
  * devm_pinctrl_unregister() - Resource managed version of pinctrl_unregister().
  * @dev: device for which which resource was allocated

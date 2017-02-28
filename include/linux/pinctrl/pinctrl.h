@@ -153,9 +153,17 @@ extern struct pinctrl_dev *pinctrl_register(struct pinctrl_desc *pctldesc,
 extern void pinctrl_unregister(struct pinctrl_dev *pctldev);
 
 extern int devm_pinctrl_register_and_init(struct device *dev,
-				struct pinctrl_desc *pctldesc,
-				void *driver_data,
-				struct pinctrl_dev **pctldev);
+					struct pinctrl_desc *pctldesc,
+					void *driver_data,
+					struct pinctrl_dev **pctldev);
+
+extern int devm_pinctrl_register_and_init_nostart(struct device *dev,
+						struct pinctrl_desc *pctldesc,
+						void *driver_data,
+						struct pinctrl_dev **pctldev);
+
+extern int devm_pinctrl_start(struct device *dev,
+			struct pinctrl_dev *pctldev);
 
 /* Please use devm_pinctrl_register_and_init() instead */
 extern struct pinctrl_dev *devm_pinctrl_register(struct device *dev,

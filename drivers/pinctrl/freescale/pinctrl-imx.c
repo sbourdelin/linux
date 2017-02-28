@@ -686,16 +686,6 @@ static int imx_pinctrl_probe_dt(struct platform_device *pdev,
 	return 0;
 }
 
-/*
- * imx_free_resources() - free memory used by this driver
- * @info: info driver instance
- */
-static void imx_free_resources(struct imx_pinctrl *ipctl)
-{
-	if (ipctl->pctl)
-		pinctrl_unregister(ipctl->pctl);
-}
-
 int imx_pinctrl_probe(struct platform_device *pdev,
 		      struct imx_pinctrl_soc_info *info)
 {
@@ -774,26 +764,30 @@ int imx_pinctrl_probe(struct platform_device *pdev,
 	ipctl->info = info;
 	ipctl->dev = info->dev;
 	platform_set_drvdata(pdev, ipctl);
-	ret = devm_pinctrl_register_and_init(&pdev->dev,
-					     imx_pinctrl_desc, ipctl,
-					     &ipctl->pctl);
+
+	ret = devm_pinctrl_register_and_init_nostart(&pdev->dev,
+						imx_pinctrl_desc, ipctl,
+						&ipctl->pctl);
+
 	if (ret) {
 		dev_err(&pdev->dev, "could not register IMX pinctrl driver\n");
-		goto free;
+		return ret;
 	}
 
 	ret = imx_pinctrl_probe_dt(pdev, ipctl);
 	if (ret) {
 		dev_err(&pdev->dev, "fail to probe dt properties\n");
-		goto free;
+		return ret;
+	}
+
+	ret = devm_pinctrl_start(&pdev->dev, ipctl->pctl);
+	if (ret) {
+		dev_err(&pdev->dev, "could not start IMX pinctrl driver\n");
+		return ret;
 	}
 
 	dev_info(&pdev->dev, "initialized IMX pinctrl driver\n");
 
 	return 0;
 
-free:
-	imx_free_resources(ipctl);
-
-	return ret;
 }
