@@ -509,6 +509,8 @@ static void rds_tcp_conn_paths_destroy(struct rds_connection *conn)
 
 	for (i = 0; i < RDS_MPATH_WORKERS; i++) {
 		cp = &conn->c_path[i];
+		if (cancel_delayed_work_sync(&cp->cp_conn_w))
+			pr_info("cancelled on path %d\n", i);
 		tc = cp->cp_transport_data;
 		if (!tc->t_sock)
 			continue;
