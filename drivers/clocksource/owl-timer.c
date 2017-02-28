@@ -31,7 +31,7 @@
 #define OWL_Tx_CTL_INTEN	BIT(1)
 #define OWL_Tx_CTL_EN		BIT(2)
 
-#define OWL_MAX_Tx 2
+#define OWL_MAX_Tx 4
 
 struct owl_timer_info {
 	int timer_offset[OWL_MAX_Tx];
@@ -43,7 +43,8 @@ static void __iomem *owl_timer_base;
 
 static inline void __iomem *owl_timer_get_base(unsigned timer_nr)
 {
-	if (timer_nr >= OWL_MAX_Tx)
+	if (timer_nr >= OWL_MAX_Tx ||
+	    owl_timer_info->timer_offset[timer_nr] == -1)
 		return NULL;
 
 	return owl_timer_base + owl_timer_info->timer_offset[timer_nr];
@@ -126,10 +127,20 @@ static irqreturn_t owl_timer1_interrupt(int irq, void *dev_id)
 static const struct owl_timer_info s500_timer_info = {
 	.timer_offset[0] = 0x08,
 	.timer_offset[1] = 0x14,
+	.timer_offset[2] = -1,
+	.timer_offset[3] = -1,
+};
+
+static const struct owl_timer_info s900_timer_info = {
+	.timer_offset[0] = 0x08,
+	.timer_offset[1] = 0x14,
+	.timer_offset[2] = 0x30,
+	.timer_offset[3] = 0x3c,
 };
 
 static const struct of_device_id owl_timer_of_matches[] = {
 	{ .compatible = "actions,s500-timer", .data = &s500_timer_info },
+	{ .compatible = "actions,s900-timer", .data = &s900_timer_info },
 	{ }
 };
 
@@ -191,3 +202,4 @@ static int __init owl_timer_init(struct device_node *node)
 	return 0;
 }
 CLOCKSOURCE_OF_DECLARE(owl_s500, "actions,s500-timer", owl_timer_init);
+CLOCKSOURCE_OF_DECLARE(owl_s900, "actions,s900-timer", owl_timer_init);
