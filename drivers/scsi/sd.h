@@ -270,8 +270,9 @@ extern int sd_zbc_setup_write_cmnd(struct scsi_cmnd *cmd);
 extern void sd_zbc_cancel_write_cmnd(struct scsi_cmnd *cmd);
 extern int sd_zbc_setup_report_cmnd(struct scsi_cmnd *cmd);
 extern int sd_zbc_setup_reset_cmnd(struct scsi_cmnd *cmd);
-extern void sd_zbc_complete(struct scsi_cmnd *cmd, unsigned int good_bytes,
-			    struct scsi_sense_hdr *sshdr);
+extern unsigned int sd_zbc_complete(struct scsi_cmnd *cmd,
+				    unsigned int good_bytes,
+				    struct scsi_sense_hdr *sshdr);
 
 #else /* CONFIG_BLK_DEV_ZONED */
 
@@ -303,9 +304,9 @@ static inline int sd_zbc_setup_reset_cmnd(struct scsi_cmnd *cmd)
 	return BLKPREP_INVALID;
 }
 
-static inline void sd_zbc_complete(struct scsi_cmnd *cmd,
-				   unsigned int good_bytes,
-				   struct scsi_sense_hdr *sshdr) {}
+static inline unsigned int sd_zbc_complete(struct scsi_cmnd *cmd,
+					   unsigned int good_bytes,
+					   struct scsi_sense_hdr *sshdr) {}
 
 #endif /* CONFIG_BLK_DEV_ZONED */
 

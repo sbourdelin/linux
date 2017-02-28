@@ -177,8 +177,18 @@ static void sd_zbc_report_zones_complete(struct scsi_cmnd *scmd,
 	unsigned long flags;
 	u8 *buf;
 
-	if (good_bytes < 64)
-		return;
+	/*
+	 * Make sure good_bytes make sense and is aligned on 64 B.
+	 * If it is less than 64B, force the nr_zones field of the
+	 * report header to become 0 by setting good_bytes to 64.
+	 */
+	if (!good_bytes || good_bytes & 0x3f) {
+		sdev_printk(KERN_INFO, scmd->device,
+			"Invalid report zone result (xfer=%u, resid=%u)\n",
+			scsi_bufflen(scmd), scsi_get_resid(scmd));
+		good_bytes = max_t(unsigned int,
+				   round_down(good_bytes, 64), 64);
+	}
 
 	memset(&hdr, 0, sizeof(struct blk_zone_report_hdr));
 
@@ -320,55 +330,76 @@ void sd_zbc_cancel_write_cmnd(struct scsi_cmnd *cmd)
 	sd_zbc_unlock_zone(cmd->request);
 }
 
-void sd_zbc_complete(struct scsi_cmnd *cmd,
-		     unsigned int good_bytes,
-		     struct scsi_sense_hdr *sshdr)
+unsigned int sd_zbc_complete(struct scsi_cmnd *scmd,
+			     unsigned int good_bytes,
+			     struct scsi_sense_hdr *sshdr)
 {
-	int result = cmd->result;
-	struct request *rq = cmd->request;
+	int result = scmd->result;
+	struct request *req = scmd->request;
 
-	switch (req_op(rq)) {
-	case REQ_OP_WRITE:
-	case REQ_OP_WRITE_SAME:
+	switch (req_op(req)) {
+
+	case REQ_OP_ZONE_REPORT:
+
+		if (result) {
+			/* Failed */
+			good_bytes = 0;
+			scsi_set_resid(scmd, blk_rq_bytes(req));
+			break;
+		}
+
+		/* Check good bytes */
+		if (good_bytes >= scsi_get_resid(scmd))
+			good_bytes -= scsi_get_resid(scmd);
+		sd_zbc_report_zones_complete(scmd, good_bytes);
+		scsi_set_resid(scmd, 0);
+
+		break;
+
 	case REQ_OP_ZONE_RESET:
 
+		if (!result) {
+			good_bytes = blk_rq_bytes(req);
+			scsi_set_resid(scmd, 0);
+		} else {
+			/* Failed */
+			good_bytes = 0;
+			scsi_set_resid(scmd, blk_rq_bytes(req));
+			if (sshdr->sense_key == ILLEGAL_REQUEST &&
+			    sshdr->asc == 0x24)
+				/*
+				 * ILLEGAL REQUEST / INVALID FIELD IN CDB
+				 * For a zone reset, this means that a reset
+				 * of a conventional zone was attempted.
+				 * Nothing to worry about, so be quiet about
+				 * the error.
+				 */
+				req->rq_flags |= RQF_QUIET;
+		}
+
+		/* Fallthru (for unlocking the zone) */
+
+	case REQ_OP_WRITE:
+	case REQ_OP_WRITE_SAME:
+
 		/* Unlock the zone */
-		sd_zbc_unlock_zone(rq);
+		sd_zbc_unlock_zone(req);
 
-		if (!result ||
-		    sshdr->sense_key != ILLEGAL_REQUEST)
-			break;
-
-		switch (sshdr->asc) {
-		case 0x24:
-			/*
-			 * INVALID FIELD IN CDB error: For a zone reset,
-			 * this means that a reset of a conventional
-			 * zone was attempted. Nothing to worry about in
-			 * this case, so be quiet about the error.
-			 */
-			if (req_op(rq) == REQ_OP_ZONE_RESET)
-				rq->rq_flags |= RQF_QUIET;
-			break;
-		case 0x21:
+		if (!result &&
+		    sshdr->sense_key == ILLEGAL_REQUEST &&
+		    sshdr->asc == 0x21)
 			/*
 			 * INVALID ADDRESS FOR WRITE error: It is unlikely that
 			 * retrying write requests failed with any kind of
 			 * alignement error will result in success. So don't.
 			 */
-			cmd->allowed = 0;
-			break;
-		}
+			scmd->allowed = 0;
 
-		break;
-
-	case REQ_OP_ZONE_REPORT:
-
-		if (!result)
-			sd_zbc_report_zones_complete(cmd, good_bytes);
 		break;
 
 	}
+
+	return good_bytes;
 }
 
 /**

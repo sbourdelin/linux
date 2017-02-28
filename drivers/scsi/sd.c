@@ -1786,27 +1786,13 @@ static int sd_done(struct scsi_cmnd *SCpnt)
 	struct scsi_sense_hdr sshdr;
 	struct scsi_disk *sdkp = scsi_disk(SCpnt->request->rq_disk);
 	struct request *req = SCpnt->request;
-	int sense_valid = 0;
-	int sense_deferred = 0;
-	unsigned char op = SCpnt->cmnd[0];
-	unsigned char unmap = SCpnt->cmnd[1] & 8;
+	bool sense_valid = false;
 
 	switch (req_op(req)) {
 	case REQ_OP_DISCARD:
 	case REQ_OP_WRITE_SAME:
-	case REQ_OP_ZONE_RESET:
 		if (!result) {
 			good_bytes = blk_rq_bytes(req);
-			scsi_set_resid(SCpnt, 0);
-		} else {
-			good_bytes = 0;
-			scsi_set_resid(SCpnt, blk_rq_bytes(req));
-		}
-		break;
-	case REQ_OP_ZONE_REPORT:
-		if (!result) {
-			good_bytes = scsi_bufflen(SCpnt)
-				- scsi_get_resid(SCpnt);
 			scsi_set_resid(SCpnt, 0);
 		} else {
 			good_bytes = 0;
@@ -1816,14 +1802,12 @@ static int sd_done(struct scsi_cmnd *SCpnt)
 	}
 
 	if (result) {
-		sense_valid = scsi_command_normalize_sense(SCpnt, &sshdr);
-		if (sense_valid)
-			sense_deferred = scsi_sense_is_deferred(&sshdr);
+		sense_valid = scsi_command_normalize_sense(SCpnt, &sshdr) &&
+			!scsi_sense_is_deferred(&sshdr);
 	}
 	sdkp->medium_access_timed_out = 0;
 
-	if (driver_byte(result) != DRIVER_SENSE &&
-	    (!sense_valid || sense_deferred))
+	if (driver_byte(result) != DRIVER_SENSE && !sense_valid)
 		goto out;
 
 	switch (sshdr.sense_key) {
@@ -1847,10 +1831,14 @@ static int sd_done(struct scsi_cmnd *SCpnt)
 			good_bytes = sd_completed_bytes(SCpnt);
 		break;
 	case ILLEGAL_REQUEST:
-		if (sshdr.asc == 0x10)  /* DIX: Host detected corruption */
+		if (sshdr.asc == 0x10) {
+			/* DIX: Host detected corruption */
 			good_bytes = sd_completed_bytes(SCpnt);
-		/* INVALID COMMAND OPCODE or INVALID FIELD IN CDB */
-		if (sshdr.asc == 0x20 || sshdr.asc == 0x24) {
+		} else if (sshdr.asc == 0x20 || sshdr.asc == 0x24) {
+			unsigned char op = SCpnt->cmnd[0];
+			unsigned char unmap = SCpnt->cmnd[1] & 8;
+
+			/* INVALID COMMAND OPCODE or INVALID FIELD IN CDB */
 			switch (op) {
 			case UNMAP:
 				sd_config_discard(sdkp, SD_LBP_DISABLE);
@@ -1876,7 +1864,7 @@ static int sd_done(struct scsi_cmnd *SCpnt)
 
  out:
 	if (sd_is_zoned(sdkp))
-		sd_zbc_complete(SCpnt, good_bytes, &sshdr);
+		good_bytes = sd_zbc_complete(SCpnt, good_bytes, &sshdr);
 
 	SCSI_LOG_HLCOMPLETE(1, scmd_printk(KERN_INFO, SCpnt,
 					   "sd_done: completed %d of %d bytes\n",
