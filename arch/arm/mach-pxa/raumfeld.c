@@ -21,6 +21,7 @@
 #include <linux/property.h>
 #include <linux/platform_device.h>
 #include <linux/interrupt.h>
+#include <linux/irq.h>
 #include <linux/gpio.h>
 #include <linux/gpio/machine.h>
 #include <linux/smsc911x.h>
@@ -1055,6 +1056,7 @@ static void __init raumfeld_common_init(void)
 
 static void __init __maybe_unused raumfeld_controller_init(void)
 {
+	struct irq_data *irqd;
 	int ret;
 
 	pxa3xx_mfp_config(ARRAY_AND_SIZE(raumfeld_controller_pin_config));
@@ -1065,6 +1067,12 @@ static void __init __maybe_unused raumfeld_controller_init(void)
 	platform_device_register(&rotary_encoder_device);
 
 	spi_register_board_info(ARRAY_AND_SIZE(controller_spi_devices));
+
+	/* Set up touchscreen interrupt */
+	irqd = irq_get_irq_data(PXA_GPIO_TO_IRQ(GPIO_TOUCH_IRQ));
+	if (irqd)
+		irqd_set_trigger_type(irqd, IRQ_TYPE_LEVEL_HIGH);
+
 	i2c_register_board_info(0, &raumfeld_controller_i2c_board_info, 1);
 
 	ret = gpio_request(GPIO_SHUTDOWN_BATT, "battery shutdown");
