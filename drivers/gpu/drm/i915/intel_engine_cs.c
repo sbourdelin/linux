@@ -29,7 +29,7 @@
 static const struct engine_info {
 	const char *name;
 	unsigned exec_id;
-	enum intel_engine_hw_id hw_id;
+	unsigned hw_id;
 	u32 mmio_base;
 	unsigned irq_shift;
 	int (*init_legacy)(struct intel_engine_cs *engine);
