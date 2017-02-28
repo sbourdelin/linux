@@ -3111,7 +3111,11 @@ static int packet_bind_spkt(struct socket *sock, struct sockaddr *uaddr,
 
 	if (addr_len != sizeof(struct sockaddr))
 		return -EINVAL;
-	strlcpy(name, uaddr->sa_data, sizeof(name));
+	/* uaddr->sa_data comes from the userspace, it's not guaranteed to be
+	 * zero-terminated.
+	 */
+	name[14] = '\0';
+	strncpy(name, uaddr->sa_data, sizeof(name));
 
 	return packet_do_bind(sk, name, 0, pkt_sk(sk)->num);
 }
