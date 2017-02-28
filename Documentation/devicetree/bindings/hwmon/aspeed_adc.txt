@@ -1,0 +1,48 @@
+Aspeed AST2400/2500 ADC
+
+This device is a 10-bit converter for 16 voltage channels.  All inputs are
+single ended.  Each channel can be individually enabled to allow for use of
+alternate pin functions.
+
+1) adc node
+
+  Required properties:
+  - compatible : Should be one of
+	"aspeed,ast2400-adc"
+	"aspeed,ast2500-adc"
+  - reg : memory window mapping address and length
+  - #address-cells : must be <1> corresponding to the channel child binding
+  - #size-cells : must be <0> corresponding to the channel child binding
+  - clocks : Input clock used to derive the sample clock. Expected to be the
+    SoC's APB clock.
+  - update-interval-ms : initial time between updates on a channel
+
+  The node contains child nodes for each channel that the platform uses.
+
+  Example adc node:
+    adc@1e6e9000 {
+	#address-cells = <1>;
+	#size-cells = <0>;
+	compatible = "aspeed,ast2400-adc";
+	reg = <0x1e6e9000 0xB0>;
+	clocks = <&clk_apb>;
+	update-interval-ms = <100>;
+
+	[ child node definitions... ]
+    };
+
+2) channel nodes
+
+  Optional properties:
+  - status: indicates the operational status of the device.
+    Value must be either "disabled" or "okay".
+  - label : string describing the monitored value
+
+  Example channel node:
+  channel@1 {
+	status = "okay";
+	label = "3V3 rail";
+
+	pinctrl-names = "default";
+	pinctrl-0 = <&pinctrl_adc0_default>;
+  };
