@@ -89,6 +89,8 @@ intel_engine_setup(struct drm_i915_private *dev_priv,
 	const struct engine_info *info = &intel_engines[id];
 	struct intel_engine_cs *engine;
 
+	BUILD_BUG_ON(ARRAY_SIZE(intel_engines) != I915_NUM_ENGINES);
+	GEM_BUG_ON(id < 0 || id >= I915_NUM_ENGINES);
 	GEM_BUG_ON(dev_priv->engine[id]);
 	engine = kzalloc(sizeof(*engine), GFP_KERNEL);
 	if (!engine)
