@@ -788,6 +788,7 @@ int blkg_conf_prep(struct blkcg *blkcg, const struct blkcg_policy *pol,
 	__acquires(rcu) __acquires(disk->queue->queue_lock)
 {
 	struct gendisk *disk;
+	struct request_queue *q;
 	struct blkcg_gq *blkg;
 	struct module *owner;
 	unsigned int major, minor;
@@ -806,44 +807,99 @@ int blkg_conf_prep(struct blkcg *blkcg, const struct blkcg_policy *pol,
 	if (!disk)
 		return -ENODEV;
 	if (part) {
-		owner = disk->fops->owner;
-		put_disk(disk);
-		module_put(owner);
-		return -ENODEV;
+		ret = -ENODEV;
+		goto fail;
+	}
+
+	q = disk->queue;
+
+	if (!blkcg_policy_enabled(q, pol)) {
+		ret = -EOPNOTSUPP;
+		goto fail;
 	}
 
 	rcu_read_lock();
-	spin_lock_irq(disk->queue->queue_lock);
+	spin_lock_irq(q->queue_lock);
 
-	if (blkcg_policy_enabled(disk->queue, pol))
-		blkg = blkg_lookup_create(blkcg, disk->queue);
-	else
-		blkg = ERR_PTR(-EOPNOTSUPP);
-
-	if (IS_ERR(blkg)) {
-		ret = PTR_ERR(blkg);
-		rcu_read_unlock();
-		spin_unlock_irq(disk->queue->queue_lock);
-		owner = disk->fops->owner;
-		put_disk(disk);
-		module_put(owner);
-		/*
-		 * If queue was bypassing, we should retry.  Do so after a
-		 * short msleep().  It isn't strictly necessary but queue
-		 * can be bypassing for some time and it's always nice to
-		 * avoid busy looping.
-		 */
-		if (ret == -EBUSY) {
-			msleep(10);
-			ret = restart_syscall();
-		}
-		return ret;
+	/*
+	 * This could be the first entry point of blkcg implementation and
+	 * we shouldn't allow anything to go through for a bypassing queue.
+	 */
+	if (unlikely(blk_queue_bypass(q))) {
+		ret = blk_queue_dying(q) ? -ENODEV : -EBUSY;
+		goto fail_unlock;
 	}
 
+	blkg = __blkg_lookup(blkcg, q, true);
+	if (blkg)
+		goto success;
+
+	/*
+	 * Create blkgs walking down from blkcg_root to @blkcg, so that all
+	 * non-root blkgs have access to their parents.
+	 */
+	while (true) {
+		struct blkcg *pos = blkcg;
+		struct blkcg *parent;
+		struct blkcg_gq *new_blkg;
+
+		parent = blkcg_parent(blkcg);
+		while (parent && !__blkg_lookup(parent, q, false)) {
+			pos = parent;
+			parent = blkcg_parent(parent);
+		}
+
+		spin_unlock_irq(q->queue_lock);
+		rcu_read_unlock();
+
+		new_blkg = blkg_alloc(pos, q, GFP_KERNEL);
+		if (unlikely(!new_blkg)) {
+			ret = -ENOMEM;
+			goto fail;
+		}
+
+		rcu_read_lock();
+		spin_lock_irq(q->queue_lock);
+
+		/* Lookup again since we dropped the lock for blkg_alloc(). */
+		blkg = __blkg_lookup(pos, q, false);
+		if (blkg) {
+			blkg_free(new_blkg);
+		} else {
+			blkg = blkg_create(pos, q, new_blkg);
+			if (unlikely(IS_ERR(blkg))) {
+				ret = PTR_ERR(blkg);
+				goto fail_unlock;
+			}
+		}
+
+		if (pos == blkcg)
+			goto success;
+	}
+success:
 	ctx->disk = disk;
 	ctx->blkg = blkg;
 	ctx->body = body;
 	return 0;
+
+fail_unlock:
+	spin_unlock_irq(q->queue_lock);
+	rcu_read_unlock();
+fail:
+	owner = disk->fops->owner;
+	put_disk(disk);
+	module_put(owner);
+	/*
+	 * If queue was bypassing, we should retry.  Do so after a
+	 * short msleep().  It isn't strictly necessary but queue
+	 * can be bypassing for some time and it's always nice to
+	 * avoid busy looping.
+	 */
+	if (ret == -EBUSY) {
+		msleep(10);
+		ret = restart_syscall();
+	}
+	return ret;
 }
 EXPORT_SYMBOL_GPL(blkg_conf_prep);
 
