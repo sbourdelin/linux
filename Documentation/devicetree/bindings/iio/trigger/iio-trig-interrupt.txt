@@ -1,0 +1,22 @@
+Interrupt based trigger
+
+Any internal or external interrupt may be used as trigger source for
+devices like sensors, ADCs... As an example, external signal can be
+routed to a GPIO, and turned into an interrupt driven trigger.
+
+Required properties:
+- compatible: Should be "interrupt-trigger"
+- interrupts: The interrupt used as trigger. Generic interrupt client node as
+  described in ../../interrupt-controller/interrupts.txt
+
+Optional properties:
+- #io-trigger-cells = <0>; See the IIO bindings, IIO trigger providers
+  and consumers sections in ../iio-bindings.txt
+
+Example:
+	trig0: interrupt-trigger0 {
+		#io-trigger-cells = <0>;
+		compatible = "interrupt-trigger";
+		interrupts = <11 0>;
+		interrupt-parent = <&gpioa>;
+	}
