@@ -429,10 +429,11 @@ tcmu_queue_cmd_ring(struct tcmu_cmd *tcmu_cmd)
 
 	mb = udev->mb_addr;
 	cmd_head = mb->cmd_head % udev->cmdr_size; /* UAM */
-	data_length = se_cmd->data_length;
+	data_length = round_up(se_cmd->data_length, DATA_BLOCK_SIZE);
 	if (se_cmd->se_cmd_flags & SCF_BIDI) {
 		BUG_ON(!(se_cmd->t_bidi_data_sg && se_cmd->t_bidi_data_nents));
-		data_length += se_cmd->t_bidi_data_sg->length;
+		data_length += round_up(se_cmd->t_bidi_data_sg->length,
+				DATA_BLOCK_SIZE);
 	}
 	if ((command_size > (udev->cmdr_size / 2)) ||
 	    data_length > udev->data_size) {
@@ -503,10 +504,14 @@ tcmu_queue_cmd_ring(struct tcmu_cmd *tcmu_cmd)
 	entry->req.iov_dif_cnt = 0;
 
 	/* Handle BIDI commands */
-	iov_cnt = 0;
-	alloc_and_scatter_data_area(udev, se_cmd->t_bidi_data_sg,
-		se_cmd->t_bidi_data_nents, &iov, &iov_cnt, false);
-	entry->req.iov_bidi_cnt = iov_cnt;
+	if (se_cmd->se_cmd_flags & SCF_BIDI) {
+		iov_cnt = 0;
+		iov++;
+		alloc_and_scatter_data_area(udev, se_cmd->t_bidi_data_sg,
+				se_cmd->t_bidi_data_nents, &iov, &iov_cnt,
+				false);
+		entry->req.iov_bidi_cnt = iov_cnt;
+	}
 
 	/* cmd's data_bitmap is what changed in process */
 	bitmap_xor(tcmu_cmd->data_bitmap, old_bitmap, udev->data_bitmap,
