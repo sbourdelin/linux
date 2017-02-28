@@ -57,6 +57,10 @@ Optional properties:
 - dmas: Phandle to dma channel for this ADC instance.
   See ../../dma/dma.txt for details.
 - dma-names: Must be "rx" when dmas property is being used.
+- io-triggers: Phandle to external interrupt trigger (e.g. EXTI). Must be
+  phandle to EXTI11 on stm32f4. See ../iio-bindings.txt for details on trigger
+  consumer.
+- io-trigger-names: Must be "exti" when io-triggers property is being used.
 
 Example:
 	adc: adc@40012000 {
@@ -87,4 +91,21 @@ Example:
 		};
 		...
 		other adc child nodes follow...
+	};
+
+Example with EXTI11 trigger:
+	trig: interrupt-trigger {
+		#io-trigger-cells = <0>;
+		compatible = "interrupt-trigger";
+		interrupts = <11 0>;
+		interrupt-parent = <&gpioa>;
+	}
+
+	adc: adc@40012000 {
+		...
+		adc@0 {
+			...
+			io-triggers = <&trig>;
+			io-trigger-names = "exti";
+		};
 	};
