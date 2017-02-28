@@ -9,6 +9,7 @@
 #include "skeleton.dtsi"
 
 #include <dt-bindings/interrupt-controller/arm-gic.h>
+#include <dt-bindings/power/s500-powergate.h>
 
 / {
 	compatible = "actions,s500";
@@ -37,6 +38,7 @@
 			compatible = "arm,cortex-a9";
 			reg = <0x2>;
 			enable-method = "actions,s500-smp";
+			power-domains = <&sps S500_PD_CPU2>;
 		};
 
 		cpu3: cpu@3 {
@@ -44,6 +46,7 @@
 			compatible = "arm,cortex-a9";
 			reg = <0x3>;
 			enable-method = "actions,s500-smp";
+			power-domains = <&sps S500_PD_CPU3>;
 		};
 	};
 
@@ -169,6 +172,12 @@
 			             <GIC_SPI 10 IRQ_TYPE_LEVEL_HIGH>,
 			             <GIC_SPI 11 IRQ_TYPE_LEVEL_HIGH>;
 			interrupt-names = "2Hz0", "2Hz1", "Timer0", "Timer1";
+		};
+
+		sps: power-controller@b01b0100 {
+			compatible = "actions,s500-sps";
+			reg = <0xb01b0100 0x100>;
+			#power-domain-cells = <1>;
 		};
 	};
 };
