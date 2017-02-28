@@ -2242,6 +2242,26 @@ __wsum skb_copy_and_csum_bits(const struct sk_buff *skb, int offset,
 }
 EXPORT_SYMBOL(skb_copy_and_csum_bits);
 
+static __wsum warn_sctp_csum_update(const void *buff, int len, __wsum sum)
+{
+	net_warn_ratelimited("attempt to compute crc32c without sctp.ko\n");
+	return 0;
+}
+
+static __wsum warn_sctp_csum_combine(__wsum csum, __wsum csum2,
+				     int offset, int len)
+{
+	net_warn_ratelimited("attempt to compute crc32c without sctp.ko\n");
+	return 0;
+}
+
+const struct skb_checksum_ops *sctp_csum_stub __read_mostly =
+	&(struct skb_checksum_ops) {
+	.update  = warn_sctp_csum_update,
+	.combine = warn_sctp_csum_combine,
+};
+EXPORT_SYMBOL(sctp_csum_stub);
+
  /**
  *	skb_zerocopy_headlen - Calculate headroom needed for skb_zerocopy()
  *	@from: source buffer
