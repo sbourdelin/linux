@@ -1716,6 +1716,9 @@ static ssize_t latency_timer_store(struct device *dev,
 	int v = simple_strtoul(valbuf, NULL, 10);
 	int rv;
 
+	if (v < 1 || v > 255)
+		return -EINVAL;
+
 	priv->latency = v;
 	rv = write_latency_timer(port);
 	if (rv < 0)
