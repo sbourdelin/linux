@@ -28,7 +28,15 @@
 
 #define OWL_CPUx_FLAG_BOOT	0x55aa
 
+#define OWL_SPS_PG_CTL	0x0
+
+#define OWL_SPS_PG_CTL_PWR_CPU2	BIT(5)
+#define OWL_SPS_PG_CTL_PWR_CPU3	BIT(6)
+#define OWL_SPS_PG_CTL_ACK_CPU2	BIT(21)
+#define OWL_SPS_PG_CTL_ACK_CPU3	BIT(22)
+
 static void __iomem *scu_base_addr;
+static void __iomem *sps_base_addr;
 static void __iomem *timer_base_addr;
 static int ncores;
 
@@ -40,6 +48,39 @@ static void write_pen_release(int val)
 	smp_wmb();
 	__cpuc_flush_dcache_area((void *)&pen_release, sizeof(pen_release));
 	outer_clean_range(__pa(&pen_release), __pa(&pen_release + 1));
+}
+
+/* The generic PM domain driver is not available this early. */
+static int owl_sps_set_pg(u32 pwr_mask, u32 ack_mask, bool enable)
+{
+	u32 val;
+	bool ack;
+	int timeout;
+
+	val = readl(sps_base_addr + OWL_SPS_PG_CTL);
+	ack = val & ack_mask;
+	if (ack == enable)
+		return 0;
+
+	if (enable)
+		val |= pwr_mask;
+	else
+		val &= ~pwr_mask;
+
+	writel(val, sps_base_addr + OWL_SPS_PG_CTL);
+
+	for (timeout = 5000; timeout > 0; timeout -= 50) {
+		val = readl(sps_base_addr + OWL_SPS_PG_CTL);
+		if ((val & ack_mask) == (enable ? ack_mask : 0))
+			break;
+		udelay(50);
+	}
+	if (timeout <= 0)
+		return -ETIMEDOUT;
+
+	udelay(10);
+
+	return 0;
 }
 
 static void s500_smp_secondary_init(unsigned int cpu)
@@ -58,14 +99,24 @@ void owl_secondary_startup(void);
 
 static int s500_wakeup_secondary(unsigned int cpu)
 {
+	int ret;
+
 	if (cpu > 3)
 		return -EINVAL;
 
 	switch (cpu) {
 	case 2:
+		ret = owl_sps_set_pg(OWL_SPS_PG_CTL_PWR_CPU2,
+				     OWL_SPS_PG_CTL_ACK_CPU2, true);
+		if (ret)
+			return ret;
+		break;
 	case 3:
-		/* CPU2/3 are power-gated */
-		return -EINVAL;
+		ret = owl_sps_set_pg(OWL_SPS_PG_CTL_PWR_CPU3,
+				     OWL_SPS_PG_CTL_ACK_CPU3, true);
+		if (ret)
+			return ret;
+		break;
 	}
 
 	/* wait for CPUx to run to WFE instruction */
@@ -130,6 +181,18 @@ static void __init s500_smp_prepare_cpus(unsigned int max_cpus)
 	timer_base_addr = of_iomap(node, 0);
 	if (!timer_base_addr) {
 		pr_err("%s: could not map timer registers\n", __func__);
+		return;
+	}
+
+	node = of_find_compatible_node(NULL, NULL, "actions,s500-sps");
+	if (!node) {
+		pr_err("%s: missing sps\n", __func__);
+		return;
+	}
+
+	sps_base_addr = of_iomap(node, 0);
+	if (!sps_base_addr) {
+		pr_err("%s: could not map sps registers\n", __func__);
 		return;
 	}
 
