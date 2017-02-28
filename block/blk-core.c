@@ -2608,7 +2608,7 @@ bool blk_update_request(struct request *req, int error, unsigned int nr_bytes)
 	req->__data_len -= total_bytes;
 
 	/* update sector only for requests with clear definition of sector */
-	if (!blk_rq_is_passthrough(req))
+	if (blk_rq_accesses_medium(req))
 		req->__sector += total_bytes >> 9;
 
 	/* mixed attributes always follow the first bio */

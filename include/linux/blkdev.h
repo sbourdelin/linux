@@ -720,7 +720,7 @@ static inline void queue_flag_clear(unsigned int flag, struct request_queue *q)
 
 static inline bool blk_account_rq(struct request *rq)
 {
-	return (rq->rq_flags & RQF_STARTED) && !blk_rq_is_passthrough(rq);
+	return (rq->rq_flags & RQF_STARTED) && blk_rq_accesses_medium(rq);
 }
 
 #define blk_rq_cpu_valid(rq)	((rq)->cpu != -1)
@@ -796,7 +796,7 @@ static inline void blk_clear_rl_full(struct request_list *rl, bool sync)
 
 static inline bool rq_mergeable(struct request *rq)
 {
-	if (blk_rq_is_passthrough(rq))
+	if (!blk_rq_accesses_medium(rq))
 		return false;
 
 	if (req_op(rq) == REQ_OP_FLUSH)
@@ -1070,7 +1070,7 @@ static inline unsigned int blk_rq_get_max_sectors(struct request *rq,
 {
 	struct request_queue *q = rq->q;
 
-	if (blk_rq_is_passthrough(rq))
+	if (!blk_rq_accesses_medium(rq))
 		return q->limits.max_hw_sectors;
 
 	if (!q->limits.chunk_sectors ||

@@ -642,16 +642,20 @@ void __elv_add_request(struct request_queue *q, struct request *rq, int where)
 
 	rq->q = q;
 
-	if (rq->rq_flags & RQF_SOFTBARRIER) {
+	if (!blk_rq_accesses_medium(rq)) {
+		/* Do not schedule zone requests */
+		where = ELEVATOR_INSERT_FRONT;
+	} if (rq->rq_flags & RQF_SOFTBARRIER) {
 		/* barriers are scheduling boundary, update end_sector */
-		if (!blk_rq_is_passthrough(rq)) {
+		if (blk_rq_accesses_medium(rq)) {
 			q->end_sector = rq_end_sector(rq);
 			q->boundary_rq = rq;
 		}
 	} else if (!(rq->rq_flags & RQF_ELVPRIV) &&
 		    (where == ELEVATOR_INSERT_SORT ||
-		     where == ELEVATOR_INSERT_SORT_MERGE))
+		     where == ELEVATOR_INSERT_SORT_MERGE)) {
 		where = ELEVATOR_INSERT_BACK;
+	}
 
 	switch (where) {
 	case ELEVATOR_INSERT_REQUEUE:
@@ -686,7 +690,7 @@ void __elv_add_request(struct request_queue *q, struct request *rq, int where)
 		if (elv_attempt_insert_merge(q, rq))
 			break;
 	case ELEVATOR_INSERT_SORT:
-		BUG_ON(blk_rq_is_passthrough(rq));
+		BUG_ON(!blk_rq_accesses_medium(rq));
 		rq->rq_flags |= RQF_SORTED;
 		q->nr_sorted++;
 		if (rq_mergeable(rq)) {

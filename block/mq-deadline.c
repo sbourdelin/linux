@@ -399,7 +399,7 @@ static void dd_insert_request(struct blk_mq_hw_ctx *hctx, struct request *rq,
 
 	blk_mq_sched_request_inserted(rq);
 
-	if (at_head || blk_rq_is_passthrough(rq)) {
+	if (at_head || !blk_rq_accesses_medium(rq)) {
 		if (at_head)
 			list_add(&rq->queuelist, &dd->dispatch);
 		else
