@@ -1829,7 +1829,7 @@ static int reset_umac(struct bcmgenet_priv *priv)
 		udelay(1);
 	}
 
-	if (timeout == 1000) {
+	if (timeout > 1000) {
 		dev_err(kdev,
 			"timeout waiting for MAC to come out of reset\n");
 		return -ETIMEDOUT;
