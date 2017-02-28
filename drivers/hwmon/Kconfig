@@ -261,6 +261,16 @@ config SENSORS_ASC7621
 	  This driver can also be built as a module.  If so, the module
 	  will be called asc7621.
 
+config SENSORS_ASPEED_ADC
+	tristate "Aspeed AST2400/AST2500 ADC"
+	depends on ARCH_ASPEED
+	help
+	  If you say yes here you get support for the Aspeed AST2400/AST2500
+	  ADC.
+
+	  This driver can also be built as a module.  If so, the module
+	  will be called aspeed_adc.
+
 config SENSORS_K8TEMP
 	tristate "AMD Athlon64/FX or Opteron temperature sensor"
 	depends on X86 && PCI
