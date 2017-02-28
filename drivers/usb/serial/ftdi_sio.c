@@ -1738,6 +1738,9 @@ static ssize_t store_event_char(struct device *dev,
 	int v = simple_strtoul(valbuf, NULL, 10);
 	int rv;
 
+	if (v < 0 || v >= 0x200)
+		return -EINVAL;
+
 	dev_dbg(&port->dev, "%s: setting event char = %i\n", __func__, v);
 
 	rv = usb_control_msg(udev,
