@@ -66,6 +66,7 @@
 #include <linux/freezer.h>
 #include <linux/pid_namespace.h>
 #include <net/netns/generic.h>
+#include <linux/dcache.h>
 
 #include "audit.h"
 
@@ -1884,6 +1885,10 @@ void audit_copy_inode(struct audit_names *name, const struct dentry *dentry,
 	name->gid   = inode->i_gid;
 	name->rdev  = inode->i_rdev;
 	security_inode_getsecid(inode, &name->osid);
+	if (name->dentry) {
+		dput(name->dentry);
+		name->dentry = NULL;
+	}
 	audit_copy_fcaps(name, dentry);
 }
 
@@ -1925,6 +1930,15 @@ void audit_log_name(struct audit_context *context, struct audit_names *n,
 			audit_log_n_untrustedstring(ab, n->name->name,
 						    n->name_len);
 		}
+	} else if (n->dentry) {
+		char *fullpath;
+		const char *fullpathp;
+
+		fullpath = kmalloc(PATH_MAX, GFP_KERNEL);
+		if (!fullpath)
+			return;
+		fullpathp = dentry_path_raw(n->dentry, fullpath, PATH_MAX);
+		audit_log_format(ab, " name=%s(%lx):%s", n->dentry->d_sb->s_type->name?:"?", n->dentry->d_sb->s_magic, fullpathp?:"?");
 	} else
 		audit_log_format(ab, " name=(null)");
 
