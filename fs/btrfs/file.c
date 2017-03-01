@@ -1865,11 +1865,10 @@ static ssize_t btrfs_file_write_iter(struct kiocb *iocb,
 	pos = iocb->ki_pos;
 	count = iov_iter_count(from);
 	start_pos = round_down(pos, fs_info->sectorsize);
+	end_pos = round_up(pos + count, fs_info->sectorsize);
 	oldsize = i_size_read(inode);
-	if (start_pos > oldsize) {
+	if (end_pos > oldsize) {
 		/* Expand hole size to cover write data, preventing empty gap */
-		end_pos = round_up(pos + count,
-				   fs_info->sectorsize);
 		err = btrfs_cont_expand(inode, oldsize, end_pos);
 		if (err) {
 			inode_unlock(inode);
