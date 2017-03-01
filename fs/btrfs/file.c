@@ -1818,7 +1818,6 @@ static ssize_t btrfs_file_write_iter(struct kiocb *iocb,
 	struct inode *inode = file_inode(file);
 	struct btrfs_fs_info *fs_info = btrfs_sb(inode->i_sb);
 	struct btrfs_root *root = BTRFS_I(inode)->root;
-	u64 start_pos;
 	u64 end_pos;
 	ssize_t num_written = 0;
 	bool sync = (file->f_flags & O_DSYNC) || IS_SYNC(file->f_mapping->host);
@@ -1826,7 +1825,6 @@ static ssize_t btrfs_file_write_iter(struct kiocb *iocb,
 	loff_t pos;
 	size_t count;
 	loff_t oldsize;
-	int clean_page = 0;
 
 	inode_lock(inode);
 	err = generic_write_checks(iocb, from);
@@ -1864,7 +1862,6 @@ static ssize_t btrfs_file_write_iter(struct kiocb *iocb,
 
 	pos = iocb->ki_pos;
 	count = iov_iter_count(from);
-	start_pos = round_down(pos, fs_info->sectorsize);
 	end_pos = round_up(pos + count, fs_info->sectorsize);
 	oldsize = i_size_read(inode);
 	if (end_pos > oldsize) {
@@ -1874,8 +1871,6 @@ static ssize_t btrfs_file_write_iter(struct kiocb *iocb,
 			inode_unlock(inode);
 			goto out;
 		}
-		if (start_pos > round_up(oldsize, fs_info->sectorsize))
-			clean_page = 1;
 	}
 
 	if (sync)
@@ -1887,7 +1882,7 @@ static ssize_t btrfs_file_write_iter(struct kiocb *iocb,
 		num_written = __btrfs_buffered_write(file, from, pos);
 		if (num_written > 0)
 			iocb->ki_pos = pos + num_written;
-		if (clean_page)
+		if (oldsize < pos)
 			pagecache_isize_extended(inode, oldsize,
 						i_size_read(inode));
 	}
