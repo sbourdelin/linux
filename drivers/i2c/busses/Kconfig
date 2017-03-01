@@ -484,6 +484,7 @@ config I2C_DESIGNWARE_SLAVE
 	select I2C_SLAVE
 	select I2C_SLAVE_EEPROM
 	depends on I2C_DESIGNWARE_PLATFORM
+	default y
 	help
 	  If you say yes to this option, support will be included for the
 	  Synopsys DesignWare I2C slave adapter.
