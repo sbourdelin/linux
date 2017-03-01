@@ -214,9 +214,16 @@ static int hi655x_regulator_probe(struct platform_device *pdev)
 	return 0;
 }
 
+static const struct of_device_id hi655x_dt_ids[] = {
+	{ .compatible = "hisilicon,hi655x-pmic",  },
+	{},
+};
+MODULE_DEVICE_TABLE(of, hi655x_dt_ids);
+
 static struct platform_driver hi655x_regulator_driver = {
 	.driver = {
 		.name	= "hi655x-regulator",
+		.of_match_table = hi655x_dt_ids,
 	},
 	.probe	= hi655x_regulator_probe,
 };
