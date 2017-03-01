@@ -2032,6 +2032,11 @@ static int sas_rediscover_dev(struct domain_device *dev, int phy_id, bool last)
 
 		sas_ex_phy_discover(dev, phy_id);
 
+		if (!SAS_ADDR(phy->attached_sas_addr)) {
+			sas_unregister_devs_sas_addr(dev, phy_id, last);
+			return res;
+		}
+
 		if (ata_dev && phy->attached_dev_type == SAS_SATA_PENDING)
 			action = ", needs recovery";
 		SAS_DPRINTK("ex %016llx phy 0x%x broadcast flutter%s\n",
