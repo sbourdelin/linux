@@ -8,3 +8,4 @@ menuconfig INTERCONNECT
 
 	  If unsure, say no.
 
+source "drivers/interconnect/qcom/Kconfig"
