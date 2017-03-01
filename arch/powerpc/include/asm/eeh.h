@@ -266,6 +266,9 @@ struct eeh_pe *eeh_pe_get(struct eeh_dev *edev);
 int eeh_add_to_parent_pe(struct eeh_dev *edev);
 int eeh_rmv_from_parent_pe(struct eeh_dev *edev);
 int eeh_pe_update_freeze_counter(struct eeh_pe *pe);
+
+void eeh_pe_reset_freeze_counter(struct eeh_pe *pe);
+
 void *eeh_pe_traverse(struct eeh_pe *root,
 		eeh_traverse_func fn, void *flag);
 void *eeh_pe_dev_traverse(struct eeh_pe *root,
@@ -338,6 +341,8 @@ static inline int eeh_check_failure(const volatile void __iomem *token)
 {
 	return 0;
 }
+
+static inline void eeh_pe_reset_freeze_counter(struct eeh_pe *pe) { }
 
 #define eeh_dev_check_failure(x) (0)
 

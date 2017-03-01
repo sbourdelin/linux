@@ -504,6 +504,23 @@ int eeh_rmv_from_parent_pe(struct eeh_dev *edev)
 }
 
 /**
+ * eeh_pe_reset_freeze_counter - Resets the PE freeze counter
+ * @pe: EEH PE
+ *
+ * This function is useful while re-configuring an FPGA adapter
+ * as its about to acquire new a personality and you don't want
+ * freeze count to be carry forwarded. As such calling this function
+ * for regular pci devices might be a bad idea.
+ */
+void eeh_pe_reset_freeze_counter(struct eeh_pe *pe)
+{
+	pr_info("Resetting freeze count for PHB#%x-PE#%x\n",
+		pe->phb->global_number, pe->addr);
+	pe->freeze_count = 0;
+}
+EXPORT_SYMBOL_GPL(eeh_pe_reset_freeze_counter);
+
+/**
  * eeh_pe_update_freeze_counter - Update PE's frozen time stamp
  * and freeze counter
  * @pe: EEH PE
