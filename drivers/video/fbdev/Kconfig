@@ -26,7 +26,7 @@ menuconfig FB
 	  You need an utility program called fbset to make full use of frame
 	  buffer devices. Please read <file:Documentation/fb/framebuffer.txt>
 	  and the Framebuffer-HOWTO at
-	  <http://www.munted.org.uk/programming/Framebuffer-HOWTO-1.3.html> for more
+	  <http://www.tldp.org/HOWTO/pdf/Framebuffer-HOWTO.pdf> for more
 	  information.
 
 	  Say Y here and to the driver for your graphics board below if you
