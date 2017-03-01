@@ -27,6 +27,7 @@ struct pwm_beeper {
 	struct pwm_device *pwm;
 	struct work_struct work;
 	unsigned long period;
+	unsigned int bell_frequency;
 };
 
 #define HZ_TO_NANOSECONDS(x) (1000000000UL/(x))
@@ -60,7 +61,7 @@ static int pwm_beeper_event(struct input_dev *input,
 
 	switch (code) {
 	case SND_BELL:
-		value = value ? 1000 : 0;
+		value = value ? beeper->bell_frequency : 0;
 		break;
 	case SND_TONE:
 		break;
@@ -97,6 +98,7 @@ static int pwm_beeper_probe(struct platform_device *pdev)
 {
 	unsigned long pwm_id = (unsigned long)dev_get_platdata(&pdev->dev);
 	struct pwm_beeper *beeper;
+	unsigned int bell_frequency = 1000;
 	int error;
 
 	beeper = kzalloc(sizeof(*beeper), GFP_KERNEL);
@@ -122,6 +124,13 @@ static int pwm_beeper_probe(struct platform_device *pdev)
 	pwm_apply_args(beeper->pwm);
 
 	INIT_WORK(&beeper->work, pwm_beeper_work);
+	error = device_property_read_u32(&pdev->dev, "beeper-hz",
+				       &bell_frequency);
+	if (error < 0)
+		dev_dbg(&pdev->dev, "'beeper-hz' not specified, using default: %u Hz\n",
+			bell_frequency);
+
+	beeper->bell_frequency = bell_frequency;
 
 	beeper->input = input_allocate_device();
 	if (!beeper->input) {
