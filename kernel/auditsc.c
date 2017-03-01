@@ -1858,6 +1858,11 @@ void __audit_inode_child(struct inode *parent,
 
 	if (!context->in_syscall)
 		return;
+	switch (parent->i_sb->s_magic) {
+	case TRACEFS_MAGIC:
+	case DEBUGFS_MAGIC:
+		return;
+	}
 
 	if (inode)
 		handle_one(inode);
