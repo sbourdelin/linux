@@ -2380,6 +2380,24 @@ static int __init keep_bootcon_setup(char *str)
 
 early_param("keep_bootcon", keep_bootcon_setup);
 
+static int match_console(struct console *newcon, struct console_cmdline *c)
+{
+	if (!newcon->match ||
+	    newcon->match(newcon, c->name, c->index, c->options) != 0) {
+		/* default matching */
+		BUILD_BUG_ON(sizeof(c->name) != sizeof(newcon->name));
+		if (strcmp(c->name, newcon->name) != 0)
+			return -ENODEV;
+		if (newcon->index >= 0 &&
+		    newcon->index != c->index)
+			return -ENODEV;
+		if (newcon->index < 0)
+			newcon->index = c->index;
+	}
+
+	return 0;
+}
+
 /*
  * The console driver calls this routine during kernel initialization
  * to register the console printing procedure with printk() and to
@@ -2460,36 +2478,28 @@ void register_console(struct console *newcon)
 	for (i = 0, c = console_cmdline;
 	     i < MAX_CMDLINECONSOLES && c->name[0];
 	     i++, c++) {
-		if (!newcon->match ||
-		    newcon->match(newcon, c->name, c->index, c->options) != 0) {
-			/* default matching */
-			BUILD_BUG_ON(sizeof(c->name) != sizeof(newcon->name));
-			if (strcmp(c->name, newcon->name) != 0)
-				continue;
-			if (newcon->index >= 0 &&
-			    newcon->index != c->index)
-				continue;
-			if (newcon->index < 0)
-				newcon->index = c->index;
+		if (match_console(newcon, c))
+			continue;
 
-			if (_braille_register_console(newcon, c))
-				return;
+		if (_braille_register_console(newcon, c))
+			return;
 
-			if (newcon->setup &&
-			    newcon->setup(newcon, c->options) != 0)
-				break;
-		}
+		if (newcon->setup &&
+		    newcon->setup(newcon, c->options) != 0)
+			break;
 
 		newcon->flags |= CON_ENABLED;
-		if (i == preferred_console) {
-			newcon->flags |= CON_CONSDEV;
-			has_preferred = true;
-		}
 		break;
 	}
 
 	if (!(newcon->flags & CON_ENABLED))
 		return;
+
+	if (preferred_console >= 0 &&
+	    match_console(newcon, console_cmdline + preferred_console) == 0) {
+		newcon->flags |= CON_CONSDEV;
+		has_preferred = true;
+	}
 
 	/*
 	 * If we have a bootconsole, and are switching to a real console,
