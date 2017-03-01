@@ -84,10 +84,15 @@ static const struct engine_info {
 
 static int
 intel_engine_setup(struct drm_i915_private *dev_priv,
-		   enum intel_engine_id id)
+		   unsigned int id)
 {
 	const struct engine_info *info = &intel_engines[id];
 	struct intel_engine_cs *engine;
+
+	BUILD_BUG_ON(ARRAY_SIZE(intel_engines) !=
+		     ARRAY_SIZE(dev_priv->engine));
+	if (GEM_WARN_ON(id >= ARRAY_SIZE(intel_engines)))
+		return -EINVAL;
 
 	GEM_BUG_ON(dev_priv->engine[id]);
 	engine = kzalloc(sizeof(*engine), GFP_KERNEL);
