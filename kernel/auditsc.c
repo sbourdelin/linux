@@ -1889,6 +1889,10 @@ void __audit_inode_child(struct inode *parent,
 		}
 	}
 
+	if (!found_parent)
+		/* Don't track if parent is "anonymous" */
+		return;
+
 	/* is there a matching child entry? */
 	list_for_each_entry(n, &context->names_list, list) {
 		/* can only match entries that have a name */
@@ -1908,14 +1912,6 @@ void __audit_inode_child(struct inode *parent,
 		}
 	}
 
-	if (!found_parent) {
-		/* create a new, "anonymous" parent record */
-		n = audit_alloc_name(context, AUDIT_TYPE_PARENT);
-		if (!n)
-			return;
-		audit_copy_inode(n, NULL, parent);
-	}
-
 	if (!found_child) {
 		found_child = audit_alloc_name(context, type);
 		if (!found_child)
@@ -1924,11 +1920,9 @@ void __audit_inode_child(struct inode *parent,
 		/* Re-use the name belonging to the slot for a matching parent
 		 * directory. All names for this context are relinquished in
 		 * audit_free_names() */
-		if (found_parent) {
-			found_child->name = found_parent->name;
-			found_child->name_len = AUDIT_NAME_FULL;
-			found_child->name->refcnt++;
-		}
+		found_child->name = found_parent->name;
+		found_child->name_len = AUDIT_NAME_FULL;
+		found_child->name->refcnt++;
 	}
 
 	if (inode)
