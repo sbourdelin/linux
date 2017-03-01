@@ -1904,6 +1904,7 @@ void __audit_inode_child(struct inode *parent,
 		if (!n)
 			return;
 		audit_copy_inode(n, NULL, parent);
+		n->hidden = true;
 	}
 
 	if (!found_child) {
@@ -1918,6 +1919,8 @@ void __audit_inode_child(struct inode *parent,
 			found_child->name = found_parent->name;
 			found_child->name_len = AUDIT_NAME_FULL;
 			found_child->name->refcnt++;
+		} else {
+			found_child->hidden = true;
 		}
 	}
 
