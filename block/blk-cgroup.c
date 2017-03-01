@@ -258,18 +258,22 @@ err_free_blkg:
  * blkg_lookup_create - lookup blkg, try to create one if not there
  * @blkcg: blkcg of interest
  * @q: request_queue of interest
+ * @wait_ok: whether blocking for memory allocations is okay
  *
  * Lookup blkg for the @blkcg - @q pair.  If it doesn't exist, try to
  * create one.  blkg creation is performed recursively from blkcg_root such
  * that all non-root blkg's have access to the parent blkg.  This function
  * should be called under RCU read lock and @q->queue_lock.
  *
+ * When @wait_ok is true, rcu and queue locks may be dropped for allocating
+ * memory. In this case, the locks will be reacquired on return.
+ *
  * Returns pointer to the looked up or created blkg on success, ERR_PTR()
  * value on error.  If @q is dead, returns ERR_PTR(-EINVAL).  If @q is not
  * dead and bypassing, returns ERR_PTR(-EBUSY).
  */
 struct blkcg_gq *blkg_lookup_create(struct blkcg *blkcg,
-				    struct request_queue *q)
+				    struct request_queue *q, bool wait_ok)
 {
 	struct blkcg_gq *blkg;
 
@@ -300,7 +304,30 @@ struct blkcg_gq *blkg_lookup_create(struct blkcg *blkcg,
 			parent = blkcg_parent(parent);
 		}
 
-		blkg = blkg_create(pos, q, NULL);
+		if (wait_ok) {
+			struct blkcg_gq *new_blkg;
+
+			spin_unlock_irq(q->queue_lock);
+			rcu_read_unlock();
+
+			new_blkg = blkg_alloc(pos, q, GFP_KERNEL);
+
+			rcu_read_lock();
+			spin_lock_irq(q->queue_lock);
+
+			if (unlikely(!new_blkg))
+				return ERR_PTR(-ENOMEM);
+
+			if (unlikely(blk_queue_bypass(q))) {
+				blkg_free(new_blkg);
+				return ERR_PTR(blk_queue_dying(q) ?
+							-ENODEV : -EBUSY);
+			}
+
+			blkg = blkg_create(pos, q, new_blkg);
+		} else
+			blkg = blkg_create(pos, q, NULL);
+
 		if (pos == blkcg || IS_ERR(blkg))
 			return blkg;
 	}
@@ -789,6 +816,7 @@ int blkg_conf_prep(struct blkcg *blkcg, const struct blkcg_policy *pol,
 {
 	struct gendisk *disk;
 	struct blkcg_gq *blkg;
+	struct request_queue *q;
 	struct module *owner;
 	unsigned int major, minor;
 	int key_len, part, ret;
@@ -812,18 +840,27 @@ int blkg_conf_prep(struct blkcg *blkcg, const struct blkcg_policy *pol,
 		return -ENODEV;
 	}
 
-	rcu_read_lock();
-	spin_lock_irq(disk->queue->queue_lock);
+	q = disk->queue;
 
-	if (blkcg_policy_enabled(disk->queue, pol))
-		blkg = blkg_lookup_create(blkcg, disk->queue);
-	else
+	rcu_read_lock();
+	spin_lock_irq(q->queue_lock);
+
+	if (blkcg_policy_enabled(q, pol)) {
+		blkg = blkg_lookup_create(blkcg, q, true /* wait_ok */);
+
+		/*
+		 * blkg_lookup_create() may have dropped and reacquired the
+		 * queue lock. Check policy enabled state again.
+		 */
+		if (!IS_ERR(blkg) && unlikely(!blkcg_policy_enabled(q, pol)))
+			blkg = ERR_PTR(-EOPNOTSUPP);
+	} else
 		blkg = ERR_PTR(-EOPNOTSUPP);
 
 	if (IS_ERR(blkg)) {
 		ret = PTR_ERR(blkg);
 		rcu_read_unlock();
-		spin_unlock_irq(disk->queue->queue_lock);
+		spin_unlock_irq(q->queue_lock);
 		owner = disk->fops->owner;
 		put_disk(disk);
 		module_put(owner);
