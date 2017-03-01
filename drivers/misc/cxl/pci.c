@@ -22,6 +22,7 @@
 #include <asm/pnv-pci.h>
 #include <asm/io.h>
 #include <asm/reg.h>
+#include <asm/eeh.h>
 
 #include "cxl.h"
 #include <misc/cxl.h>
@@ -1238,6 +1239,8 @@ static void cxl_pci_remove_afu(struct cxl_afu *afu)
 int cxl_pci_reset(struct cxl *adapter)
 {
 	struct pci_dev *dev = to_pci_dev(adapter->dev.parent);
+	struct eeh_dev *edev = pci_dev_to_eeh_dev(dev);
+	struct eeh_pe *pe = eeh_dev_to_pe(edev);
 	int rc;
 
 	if (adapter->perst_same_image) {
@@ -1250,6 +1253,17 @@ int cxl_pci_reset(struct cxl *adapter)
 
 	/* the adapter is about to be reset, so ignore errors */
 	cxl_data_cache_flush(adapter);
+
+	/* If loading a new image, reset freeze counters for the PHB
+	 * associated with the adapter.
+	 */
+	if (pe && adapter->perst_loads_image) {
+		/* Find the pe associated with the device PHB */
+		while (pe->parent != NULL && (pe->type & EEH_PE_PHB) == 0)
+			pe = pe->parent;
+
+		eeh_pe_reset_freeze_counter(pe);
+	}
 
 	/* pcie_warm_reset requests a fundamental pci reset which includes a
 	 * PERST assert/deassert.  PERST triggers a loading of the image
