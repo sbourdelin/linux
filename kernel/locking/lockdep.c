@@ -2866,7 +2866,8 @@ static void __lockdep_trace_alloc(gfp_t gfp_mask, unsigned long flags)
 		return;
 
 	/* this guy won't enter reclaim */
-	if ((curr->flags & PF_MEMALLOC) && !(gfp_mask & __GFP_NOMEMALLOC))
+	if (((curr->flags & PF_MEMALLOC) && !(gfp_mask & __GFP_NOMEMALLOC)) ||
+			curr->flags & PF_MEMALLOC_NOIO)
 		return;
 
 	/* We're only interested __GFP_FS allocations for now */
@@ -3852,7 +3853,7 @@ EXPORT_SYMBOL_GPL(lock_unpin_lock);
 
 void lockdep_set_current_reclaim_state(gfp_t gfp_mask)
 {
-	current->lockdep_reclaim_gfp = gfp_mask;
+	current->lockdep_reclaim_gfp = memalloc_noio_flags(gfp_mask);
 }
 
 void lockdep_clear_current_reclaim_state(void)
