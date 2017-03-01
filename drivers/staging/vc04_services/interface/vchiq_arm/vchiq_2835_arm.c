@@ -78,7 +78,7 @@ struct vchiq_pagelist_info {
 };
 
 static void __iomem *g_regs;
-static unsigned int g_cache_line_size = sizeof(CACHE_LINE_SIZE);
+static unsigned int g_cache_line_size = CACHE_LINE_SIZE;
 static unsigned int g_fragments_size;
 static char *g_fragments_base;
 static char *g_free_fragments;
