@@ -37,6 +37,8 @@ struct arm_pmu_platdata {
  */
 #define ARMPMU_MAX_HWEVENTS		32
 
+#define ARMPMU_MAX_EVENT_CONFLICTS	64
+
 #define HW_OP_UNSUPPORTED		0xFFFF
 #define C(_x)				PERF_COUNT_HW_CACHE_##_x
 #define CACHE_OP_UNSUPPORTED		0xFFFF
@@ -63,6 +65,12 @@ struct pmu_hw_events {
 	 * an event. A 0 means that the counter can be used.
 	 */
 	DECLARE_BITMAP(used_mask, ARMPMU_MAX_HWEVENTS);
+
+	/*
+	 * Keep track of implementation-specific events that
+	 * hardware can't schedule concurrently
+	 */
+	DECLARE_BITMAP(event_conflicts, ARMPMU_MAX_EVENT_CONFLICTS);
 
 	/*
 	 * Hardware lock to serialize accesses to PMU registers. Needed for the
