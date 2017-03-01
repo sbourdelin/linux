@@ -504,30 +504,47 @@ int eeh_rmv_from_parent_pe(struct eeh_dev *edev)
 }
 
 /**
- * eeh_pe_update_time_stamp - Update PE's frozen time stamp
+ * eeh_pe_update_freeze_counter - Update PE's frozen time stamp
+ * and freeze counter
  * @pe: EEH PE
  *
- * We have time stamp for each PE to trace its time of getting
- * frozen in last hour. The function should be called to update
- * the time stamp on first error of the specific PE. On the other
- * handle, we needn't account for errors happened in last hour.
+ * We have a freeze counter and time stamp for each PE to trace
+ * number of times the PE was frozen in the last hour. This function
+ * updates the PE's freeze counter and returns an error if its greater
+ * than eeh_max_freezes. The function should be called to once every
+ * time a specific PE freezes.
  */
-void eeh_pe_update_time_stamp(struct eeh_pe *pe)
+int eeh_pe_update_freeze_counter(struct eeh_pe *pe)
 {
 	struct timeval tstamp;
 
-	if (!pe) return;
+	if (!pe)
+		return -EINVAL;
 
-	if (pe->freeze_count <= 0) {
-		pe->freeze_count = 0;
-		do_gettimeofday(&pe->tstamp);
+	do_gettimeofday(&tstamp);
+	if (pe->freeze_count <= 0 || tstamp.tv_sec - pe->tstamp.tv_sec > 3600) {
+		pe->tstamp = tstamp;
+		pe->freeze_count = 1;
+
+	} else if (pe->freeze_count >= eeh_max_freezes) {
+		pe->freeze_count++;
+		/*
+		 * About 90% of all real-life EEH failures in the field
+		 * are due to poorly seated PCI cards. Only 10% or so are
+		 * due to actual, failed cards.
+		 */
+		pr_err("EEH: PHB#%x-PE#%x has failed %d times in the\n"
+		       "last hour and has been permanently disabled.\n"
+		       "Please try reseating or replacing it.\n",
+		       pe->phb->global_number, pe->addr,
+		       pe->freeze_count);
+		return -ENOTRECOVERABLE;
+
 	} else {
-		do_gettimeofday(&tstamp);
-		if (tstamp.tv_sec - pe->tstamp.tv_sec > 3600) {
-			pe->tstamp = tstamp;
-			pe->freeze_count = 0;
-		}
+		pe->freeze_count++;
 	}
+
+	return 0;
 }
 
 /**
