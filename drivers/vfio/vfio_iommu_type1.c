@@ -1287,8 +1287,9 @@ static int vfio_iommu_type1_attach_group(void *iommu_data,
 	INIT_LIST_HEAD(&domain->group_list);
 	list_add(&group->next, &domain->group_list);
 
-	msi_remap = resv_msi ? irq_domain_check_msi_remap() :
-				iommu_capable(bus, IOMMU_CAP_INTR_REMAP);
+	msi_remap = resv_msi && IS_ENABLED(CONFIG_IRQ_DOMAIN) ?
+			irq_domain_check_msi_remap() :
+			iommu_capable(bus, IOMMU_CAP_INTR_REMAP);
 
 	if (!allow_unsafe_interrupts && !msi_remap) {
 		pr_warn("%s: No interrupt remapping support.  Use the module param \"allow_unsafe_interrupts\" to enable VFIO IOMMU support on this platform\n",
