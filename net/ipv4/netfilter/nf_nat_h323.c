@@ -183,7 +183,7 @@ static int nat_rtp_rtcp(struct sk_buff *skb, struct nf_conn *ct,
 	struct nf_ct_h323_master *info = nfct_help_data(ct);
 	int dir = CTINFO2DIR(ctinfo);
 	int i;
-	u_int16_t nated_port;
+	u32 nated_port;
 
 	/* Set expectations for NAT */
 	rtp_exp->saved_proto.udp.port = rtp_exp->tuple.dst.u.udp.port;
@@ -218,7 +218,7 @@ static int nat_rtp_rtcp(struct sk_buff *skb, struct nf_conn *ct,
 
 	/* Try to get a pair of ports. */
 	for (nated_port = ntohs(rtp_exp->tuple.dst.u.udp.port);
-	     nated_port != 0; nated_port += 2) {
+	     nated_port <= USHRT_MAX; nated_port += 2) {
 		int ret;
 
 		rtp_exp->tuple.dst.u.udp.port = htons(nated_port);
