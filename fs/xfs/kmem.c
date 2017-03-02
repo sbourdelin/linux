@@ -34,7 +34,7 @@ kmem_zalloc_greedy(size_t *size, size_t minsize, size_t maxsize)
 	size_t		kmsize = maxsize;
 
 	while (!(ptr = vzalloc(kmsize))) {
-		if (kmsize == minsize)
+		if (kmsize == minsize || fatal_signal_pending(current))
 			break;
 		if ((kmsize >>= 1) <= minsize)
 			kmsize = minsize;
