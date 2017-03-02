@@ -53,17 +53,26 @@ static u32 calc_residency(struct drm_i915_private *dev_priv,
 
 	/* On VLV and CHV, residency time is in CZ units rather than 1.28us */
 	if (IS_VALLEYVIEW(dev_priv) || IS_CHERRYVIEW(dev_priv)) {
-		units = 1;
+		u32 lower, upper;
 		div = dev_priv->czclk_freq;
 
-		if (I915_READ(VLV_COUNTER_CONTROL) & VLV_COUNT_RANGE_HIGH)
-			units <<= 8;
+		I915_WRITE(VLV_COUNTER_CONTROL,
+			   _MASKED_BIT_ENABLE(VLV_COUNT_RANGE_HIGH));
+		upper = I915_READ(reg);
+
+		I915_WRITE(VLV_COUNTER_CONTROL,
+			   _MASKED_BIT_DISABLE(VLV_COUNT_RANGE_HIGH));
+		lower = I915_READ(reg);
+
+		raw_time = lower | (u64)upper << 8;
+		goto out;
 	} else if (IS_GEN9_LP(dev_priv)) {
 		units = 1;
 		div = 1200;		/* 833.33ns */
 	}
 
 	raw_time = I915_READ(reg) * units;
+ out:
 	ret = DIV_ROUND_UP_ULL(raw_time, div);
 
 	intel_runtime_pm_put(dev_priv);
