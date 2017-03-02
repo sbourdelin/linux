@@ -127,7 +127,11 @@ struct sigaction {
 typedef struct sigaltstack {
 	void __user *ss_sp;
 	int ss_flags;
-	size_t ss_size;
+#if defined(__x86_64__) && defined(__ILP32__)
+	unsigned int ss_size;
+#else
+	__kernel_size_t ss_size;
+#endif
 } stack_t;
 
 #endif /* __ASSEMBLY__ */
