@@ -662,9 +662,9 @@ ssize_t spk_var_store(struct kobject *kobj, struct kobj_attribute *attr,
 			var_data = param->data;
 			value = var_data->u.n.value;
 			spk_reset_default_value("pitch", synth->default_pitch,
-				value);
+						value);
 			spk_reset_default_value("vol", synth->default_vol,
-				value);
+						value);
 		}
 		break;
 	case VAR_STRING:
@@ -679,7 +679,7 @@ ssize_t spk_var_store(struct kobject *kobj, struct kobj_attribute *attr,
 		ret = spk_set_string_var(cp, param, len);
 		if (ret == -E2BIG)
 			pr_warn("value too long for %s\n",
-					param->name);
+				param->name);
 		break;
 	default:
 		pr_warn("%s unknown type %d\n",
@@ -699,7 +699,7 @@ EXPORT_SYMBOL_GPL(spk_var_store);
  */
 
 static ssize_t message_show_helper(char *buf, enum msg_index_t first,
-	enum msg_index_t last)
+				    enum msg_index_t last)
 {
 	size_t bufsize = PAGE_SIZE;
 	char *buf_pointer = buf;
@@ -712,7 +712,7 @@ static ssize_t message_show_helper(char *buf, enum msg_index_t first,
 		if (bufsize <= 1)
 			break;
 		printed = scnprintf(buf_pointer, bufsize, "%d\t%s\n",
-			index, spk_msg_get(cursor));
+				    index, spk_msg_get(cursor));
 		buf_pointer += printed;
 		bufsize -= printed;
 	}
@@ -721,7 +721,7 @@ static ssize_t message_show_helper(char *buf, enum msg_index_t first,
 }
 
 static void report_msg_status(int reset, int received, int used,
-	int rejected, char *groupname)
+			       int rejected, char *groupname)
 {
 	int len;
 	char buf[160];
@@ -742,7 +742,7 @@ static void report_msg_status(int reset, int received, int used,
 }
 
 static ssize_t message_store_helper(const char *buf, size_t count,
-	struct msg_group_t *group)
+				     struct msg_group_t *group)
 {
 	char *cp = (char *) buf;
 	char *end = cp + count;
@@ -843,7 +843,7 @@ static ssize_t message_show(struct kobject *kobj,
 }
 
 static ssize_t message_store(struct kobject *kobj, struct kobj_attribute *attr,
-	const char *buf, size_t count)
+			      const char *buf, size_t count)
 {
 	struct msg_group_t *group = spk_find_msg_group(attr->attr.name);
 
