@@ -47,6 +47,7 @@
 #define HIDDEV_BUFFER_SIZE	2048
 
 struct hiddev {
+	int minor;
 	int exist;
 	int open;
 	struct mutex existancelock;
