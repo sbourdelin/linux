@@ -183,10 +183,13 @@ struct tpm_chip {
 	unsigned long duration[3]; /* jiffies */
 	bool duration_adjusted;
 
+	bool powered_while_suspended;
+
 	struct dentry *bios_dir[TPM_NUM_EVENT_LOG_FILES];
 
 	const struct attribute_group *groups[3];
 	unsigned int groups_cnt;
+
 #ifdef CONFIG_ACPI
 	acpi_handle acpi_dev_handle;
 	char ppi_version[TPM_PPI_VERSION_LEN + 1];
