@@ -99,7 +99,7 @@ typedef __signalfn_t __user *__sighandler_t;
 typedef struct sigaltstack {
 	void __user *ss_sp;
 	int ss_flags;
-	size_t ss_size;
+	__kernel_size_t ss_size;
 } stack_t;
 
 #endif /* !__ASSEMBLY */
