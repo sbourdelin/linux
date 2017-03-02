@@ -40,4 +40,7 @@ int omap3isp_csiphy_acquire(struct isp_csiphy *phy);
 void omap3isp_csiphy_release(struct isp_csiphy *phy);
 int omap3isp_csiphy_init(struct isp_device *isp);
 
+void csiphy_routing_cfg_3430(struct isp_csiphy *phy, u32 iface, bool on,
+				    bool ccp2_strobe, bool strobe_clk_pol);
+
 #endif	/* OMAP3_ISP_CSI_PHY_H */

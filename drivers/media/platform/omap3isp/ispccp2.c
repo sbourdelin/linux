@@ -21,6 +21,7 @@
 #include <linux/mutex.h>
 #include <linux/uaccess.h>
 #include <linux/regulator/consumer.h>
+#include <linux/regmap.h>
 
 #include "isp.h"
 #include "ispreg.h"
@@ -158,6 +159,22 @@ static int ccp2_if_enable(struct isp_ccp2_device *ccp2, u8 enable)
 		ret = regulator_enable(ccp2->vdds_csib);
 		if (ret < 0)
 			return ret;
+	}
+
+	if (isp->phy_type == ISP_PHY_TYPE_3430) {
+		struct media_pad *pad;
+		struct v4l2_subdev *sensor;
+		const struct isp_ccp2_cfg *buscfg;
+
+		pad = media_entity_remote_pad(&ccp2->pads[CCP2_PAD_SINK]);
+		sensor = media_entity_to_v4l2_subdev(pad->entity);
+		/* Struct isp_bus_cfg has union inside */
+		buscfg = &((struct isp_bus_cfg *)sensor->host_priv)->bus.ccp2;
+
+		csiphy_routing_cfg_3430(&isp->isp_csiphy2,
+					ISP_INTERFACE_CCP2B_PHY1,
+					enable, !!buscfg->phy_layer,
+					buscfg->strobe_clk_pol);
 	}
 
 	/* Enable/Disable all the LCx channels */
@@ -1137,10 +1154,19 @@ int omap3isp_ccp2_init(struct isp_device *isp)
 	if (isp->revision == ISP_REVISION_2_0) {
 		ccp2->vdds_csib = devm_regulator_get(isp->dev, "vdds_csib");
 		if (IS_ERR(ccp2->vdds_csib)) {
+			if (PTR_ERR(ccp2->vdds_csib) == -EPROBE_DEFER)
+				return -EPROBE_DEFER;
 			dev_dbg(isp->dev,
 				"Could not get regulator vdds_csib\n");
 			ccp2->vdds_csib = NULL;
 		}
+		/*
+		 * If we set up ccp2->phy here,
+		 * omap3isp_csiphy_acquire() will go ahead and assume
+		 * csi2, dereferencing some null pointers.
+		 *
+		 * ccp2->phy = &isp->isp_csiphy2;
+		 */
 	} else if (isp->revision == ISP_REVISION_15_0) {
 		ccp2->phy = &isp->isp_csiphy1;
 	}

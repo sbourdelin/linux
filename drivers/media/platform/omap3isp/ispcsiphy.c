@@ -68,8 +68,8 @@ static void csiphy_routing_cfg_3630(struct isp_csiphy *phy,
 	regmap_write(phy->isp->syscon, phy->isp->syscon_offset, reg);
 }
 
-static void csiphy_routing_cfg_3430(struct isp_csiphy *phy, u32 iface, bool on,
-				    bool ccp2_strobe)
+void csiphy_routing_cfg_3430(struct isp_csiphy *phy, u32 iface, bool on,
+			     bool ccp2_strobe, bool strobe_clk_pol)
 {
 	u32 csirxfe = OMAP343X_CONTROL_CSIRXFE_PWRDNZ
 		| OMAP343X_CONTROL_CSIRXFE_RESET;
@@ -85,6 +85,9 @@ static void csiphy_routing_cfg_3430(struct isp_csiphy *phy, u32 iface, bool on,
 
 	if (ccp2_strobe)
 		csirxfe |= OMAP343X_CONTROL_CSIRXFE_SELFORM;
+	
+	if (strobe_clk_pol)
+		csirxfe |= OMAP343X_CONTROL_CSIRXFE_CSIB_INV;
 
 	regmap_write(phy->isp->syscon, phy->isp->syscon_offset, csirxfe);
 }
@@ -108,7 +111,7 @@ static void csiphy_routing_cfg(struct isp_csiphy *phy,
 	if (phy->isp->phy_type == ISP_PHY_TYPE_3630 && on)
 		return csiphy_routing_cfg_3630(phy, iface, ccp2_strobe);
 	if (phy->isp->phy_type == ISP_PHY_TYPE_3430)
-		return csiphy_routing_cfg_3430(phy, iface, on, ccp2_strobe);
+		return csiphy_routing_cfg_3430(phy, iface, on, ccp2_strobe, false);
 }
 
 /*
