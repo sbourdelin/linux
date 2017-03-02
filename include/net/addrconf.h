@@ -129,7 +129,12 @@ static inline int addrconf_ifid_eui48(u8 *eui, struct net_device *dev)
 	} else {
 		eui[3] = 0xFF;
 		eui[4] = 0xFE;
-		eui[0] ^= 2;
+
+		/*
+		 * According to RFC 7668 U/L bit shall not be toggled.
+		 */
+		if (dev->type != ARPHRD_6LOWPAN)
+			eui[0] ^= 2;
 	}
 	return 0;
 }
