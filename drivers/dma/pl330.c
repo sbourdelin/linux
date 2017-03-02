@@ -1640,6 +1640,7 @@ static int pl330_update(struct pl330_dmac *pl330)
 
 			/* Detach the req */
 			descdone = thrd->req[active].desc;
+			descdone->status = DONE;
 			thrd->req[active].desc = NULL;
 
 			thrd->req_running = -1;
@@ -1654,9 +1655,18 @@ static int pl330_update(struct pl330_dmac *pl330)
 
 	/* Now that we are in no hurry, do the callbacks */
 	list_for_each_entry_safe(descdone, tmp, &pl330->req_done, rqd) {
+		struct dma_pl330_chan *pch;
+
 		list_del(&descdone->rqd);
+
 		spin_unlock_irqrestore(&pl330->lock, flags);
-		dma_pl330_rqcb(descdone, PL330_ERR_NONE);
+		pch = descdone->pchan;
+		/* If desc aborted */
+		if (!pch) {
+			spin_lock_irqsave(&pl330->lock, flags);
+			continue;
+		}
+		tasklet_schedule(&pch->task);
 		spin_lock_irqsave(&pl330->lock, flags);
 	}
 
