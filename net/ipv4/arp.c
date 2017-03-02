@@ -641,6 +641,13 @@ void arp_xmit(struct sk_buff *skb)
 }
 EXPORT_SYMBOL(arp_xmit);
 
+static inline bool arp_is_gratuitous(unsigned int addr_type,
+				     int op, __be32 sip, __be32 tip)
+{
+	return op == ARPOP_REQUEST && tip == sip &&
+		addr_type == RTN_UNICAST;
+}
+
 /*
  *	Process an arp request.
  */
@@ -836,19 +843,30 @@ static int arp_process(struct net *net, struct sock *sk, struct sk_buff *skb)
 	n = __neigh_lookup(&arp_tbl, &sip, dev, 0);
 
 	if (IN_DEV_ARP_ACCEPT(in_dev)) {
-		unsigned int addr_type = inet_addr_type_dev_table(net, dev, sip);
+		unsigned int addr_type = inet_addr_type_dev_table(net,
+								  dev, sip);
 
 		/* Unsolicited ARP is not accepted by default.
 		   It is possible, that this option should be enabled for some
 		   devices (strip is candidate)
 		 */
-		is_garp = arp->ar_op == htons(ARPOP_REQUEST) && tip == sip &&
-			  addr_type == RTN_UNICAST;
+		is_garp = arp_is_gratuitous(addr_type, ntohs(arp->ar_op),
+					    sip, tip);
 
 		if (!n &&
 		    ((arp->ar_op == htons(ARPOP_REPLY)  &&
 				addr_type == RTN_UNICAST) || is_garp))
 			n = __neigh_lookup(&arp_tbl, &sip, dev, 1);
+	} else if (n) {
+		unsigned int addr_type = inet_addr_type_dev_table(net,
+								  dev, sip);
+
+		/* If the ARP table already contains the IP address of the
+		   gratuitous arp frame, the arp table will be updated
+		   regardless if this setting is on or off.
+		 */
+		is_garp = arp_is_gratuitous(addr_type, ntohs(arp->ar_op),
+					    sip, tip);
 	}
 
 	if (n) {
