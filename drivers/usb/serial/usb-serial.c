@@ -852,7 +852,14 @@ static int usb_serial_probe(struct usb_interface *interface,
 	}
 	/* END HORRIBLE HACK FOR PL2303 */
 #endif
-
+	if (epds->num_bulk_in < type->num_bulk_in ||
+			epds->num_bulk_out < type->num_bulk_out ||
+			epds->num_interrupt_in < type->num_interrupt_in ||
+			epds->num_interrupt_out < type->num_interrupt_out) {
+		dev_err(ddev, "required endpoints missing\n");
+		retval = -ENODEV;
+		goto err_free_epds;
+	}
 #ifdef CONFIG_USB_SERIAL_GENERIC
 	if (type == &usb_serial_generic_device) {
 		num_ports = epds->num_bulk_out;
