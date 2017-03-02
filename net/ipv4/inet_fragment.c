@@ -234,7 +234,7 @@ evict_again:
 	cond_resched();
 
 	if (read_seqretry(&f->rnd_seqlock, seq) ||
-	    percpu_counter_sum(&nf->mem))
+	    percpu_counter_sum_positive(&nf->mem))
 		goto evict_again;
 
 	percpu_counter_destroy(&nf->mem);
