@@ -32,6 +32,30 @@
  * In-kernel definitions.
  */
 
+#define HIDDEV_BUFFER_SIZE      2048
+
+struct hiddev {
+	int minor;
+	int exist;
+	int open;
+	struct mutex existancelock;
+	wait_queue_head_t wait;
+	struct hid_device *hid;
+	struct list_head list;
+	spinlock_t list_lock;
+};
+
+struct hiddev_list {
+	struct hiddev_usage_ref buffer[HIDDEV_BUFFER_SIZE];
+	int head;
+	int tail;
+	unsigned flags;
+	struct fasync_struct *fasync;
+	struct hiddev *hiddev;
+	struct list_head node;
+	struct mutex thread_lock;
+};
+
 struct hid_device;
 struct hid_usage;
 struct hid_field;

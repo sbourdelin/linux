@@ -44,29 +44,6 @@
 #define HIDDEV_MINOR_BASE	96
 #define HIDDEV_MINORS		16
 #endif
-#define HIDDEV_BUFFER_SIZE	2048
-
-struct hiddev {
-	int minor;
-	int exist;
-	int open;
-	struct mutex existancelock;
-	wait_queue_head_t wait;
-	struct hid_device *hid;
-	struct list_head list;
-	spinlock_t list_lock;
-};
-
-struct hiddev_list {
-	struct hiddev_usage_ref buffer[HIDDEV_BUFFER_SIZE];
-	int head;
-	int tail;
-	unsigned flags;
-	struct fasync_struct *fasync;
-	struct hiddev *hiddev;
-	struct list_head node;
-	struct mutex thread_lock;
-};
 
 /*
  * Find a report, given the report's type and ID.  The ID can be specified
@@ -911,6 +888,9 @@ int hiddev_connect(struct hid_device *hid, unsigned int force)
 		kfree(hiddev);
 		return -1;
 	}
+
+	hiddev->minor = usbhid->intf->minor;
+
 	return 0;
 }
 
