@@ -566,7 +566,7 @@ int insn_get_reg_offset_sib_index(struct insn *insn, struct pt_regs *regs)
  */
 void __user *insn_get_addr_ref(struct insn *insn, struct pt_regs *regs)
 {
-	unsigned long linear_addr;
+	unsigned long linear_addr, seg_base_addr;
 	long eff_addr, base, indx;
 	int addr_offset, base_offset, indx_offset;
 	insn_byte_t sib;
@@ -580,6 +580,8 @@ void __user *insn_get_addr_ref(struct insn *insn, struct pt_regs *regs)
 		if (addr_offset < 0)
 			goto out_err;
 		eff_addr = regs_get_register(regs, addr_offset);
+		seg_base_addr = insn_get_seg_base(regs, insn, addr_offset,
+						  false);
 	} else {
 		if (insn->sib.nbytes) {
 			/*
@@ -605,6 +607,8 @@ void __user *insn_get_addr_ref(struct insn *insn, struct pt_regs *regs)
 				indx = regs_get_register(regs, indx_offset);
 
 			eff_addr = base + indx * (1 << X86_SIB_SCALE(sib));
+			seg_base_addr = insn_get_seg_base(regs, insn,
+							  base_offset, false);
 		} else {
 			addr_offset = get_reg_offset(insn, regs, REG_TYPE_RM);
 			/* -EDOM means that we must ignore the address_offset.
@@ -623,10 +627,12 @@ void __user *insn_get_addr_ref(struct insn *insn, struct pt_regs *regs)
 			} else {
 				eff_addr = regs_get_register(regs, addr_offset);
 			}
+			seg_base_addr = insn_get_seg_base(regs, insn,
+							  addr_offset, false);
 		}
 		eff_addr += insn->displacement.value;
 	}
-	linear_addr = (unsigned long)eff_addr;
+	linear_addr = (unsigned long)eff_addr + seg_base_addr;
 
 	return (void __user *)linear_addr;
 out_err:
