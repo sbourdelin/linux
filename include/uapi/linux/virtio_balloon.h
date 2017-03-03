@@ -34,9 +34,13 @@
 #define VIRTIO_BALLOON_F_MUST_TELL_HOST	0 /* Tell before reclaiming pages */
 #define VIRTIO_BALLOON_F_STATS_VQ	1 /* Memory Stats virtqueue */
 #define VIRTIO_BALLOON_F_DEFLATE_ON_OOM	2 /* Deflate balloon on OOM */
+#define VIRTIO_BALLOON_F_CHUNK_TRANSFER	3 /* Transfer pages in chunks */
 
 /* Size of a PFN in the balloon interface. */
 #define VIRTIO_BALLOON_PFN_SHIFT 12
+
+/* Shift to get a chunk size */
+#define VIRTIO_BALLOON_CHUNK_SIZE_SHIFT 12
 
 struct virtio_balloon_config {
 	/* Number of pages host wants Guest to give up. */
@@ -81,5 +85,13 @@ struct virtio_balloon_stat {
 	__virtio16 tag;
 	__virtio64 val;
 } __attribute__((packed));
+
+/* Response header structure */
+struct virtio_balloon_resp_hdr {
+	u8 cmd;
+	u8 flag;
+	__le16 id; /* cmd id */
+	__le32 data_len; /* Payload len in bytes */
+};
 
 #endif /* _LINUX_VIRTIO_BALLOON_H */
