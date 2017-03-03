@@ -18,6 +18,10 @@
 #ifndef FWSIGNAL_H_
 #define FWSIGNAL_H_
 
+struct brcmf_fws_info;
+struct brcmf_if;
+struct brcmf_pub;
+
 int brcmf_fws_init(struct brcmf_pub *drvr);
 void brcmf_fws_deinit(struct brcmf_pub *drvr);
 bool brcmf_fws_queue_skbs(struct brcmf_fws_info *fws);
@@ -28,6 +32,11 @@ int brcmf_fws_process_skb(struct brcmf_if *ifp, struct sk_buff *skb);
 void brcmf_fws_reset_interface(struct brcmf_if *ifp);
 void brcmf_fws_add_interface(struct brcmf_if *ifp);
 void brcmf_fws_del_interface(struct brcmf_if *ifp);
+
+/* Notify the bus has transferred the tx packet to firmware */
+void brcmf_fws_txcomplete(struct device *dev, struct sk_buff *txp,
+			  bool success);
+
 void brcmf_fws_bustxfail(struct brcmf_fws_info *fws, struct sk_buff *skb);
 void brcmf_fws_bus_blocked(struct brcmf_pub *drvr, bool flow_blocked);
 void brcmf_fws_rxreorder(struct brcmf_if *ifp, struct sk_buff *skb);
