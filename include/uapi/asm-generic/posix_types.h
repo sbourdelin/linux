@@ -74,6 +74,16 @@ typedef __kernel_long_t	__kernel_ptrdiff_t;
 #endif
 #endif
 
+/*
+ * __kernel_uapi_size_t is a pure UAPI type, in defined(__KERNEL__) code
+ * it's always the same as __kernel_size_t.
+ * __kernel_uapi_size_t can be used as a size_t replacement in UAPI headers,
+ * e.g. in cases when size_t might differ from __kernel_size_t.
+ */
+#ifndef __kernel_uapi_size_t
+typedef __kernel_size_t __kernel_uapi_size_t;
+#endif
+
 #ifndef __kernel_fsid_t
 typedef struct {
 	int	val[2];
