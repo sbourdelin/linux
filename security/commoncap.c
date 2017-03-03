@@ -589,16 +589,17 @@ skip:
 	/*
 	 * Audit candidate if current->cap_effective is set
 	 *
-	 * We do not bother to audit if 3 things are true:
+	 * We do not bother to audit if 4 things are true:
 	 *   1) cap_effective has all caps
 	 *   2) we are root
 	 *   3) root is supposed to have all caps (SECURE_NOROOT)
+	 *   4) we are running a set*id binary
 	 * Since this is just a normal root execing a process.
 	 *
 	 * Number 1 above might fail if you don't have a full bset, but I think
 	 * that is interesting information to audit.
 	 */
-	if (!cap_issubset(new->cap_effective, new->cap_ambient)) {
+	if (!is_setid && !cap_issubset(new->cap_effective, new->cap_ambient)) {
 		if (!cap_issubset(CAP_FULL_SET, new->cap_effective) ||
 		    !uid_eq(new->euid, root_uid) || !uid_eq(new->uid, root_uid) ||
 		    issecure(SECURE_NOROOT)) {
