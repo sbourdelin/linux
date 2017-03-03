@@ -559,6 +559,15 @@ int insn_get_reg_offset_sib_index(struct insn *insn, struct pt_regs *regs)
 	return get_reg_offset(insn, regs, REG_TYPE_INDEX);
 }
 
+static inline long __to_signed_long(unsigned long val, int long_bytes)
+{
+#ifdef CONFIG_X86_64
+	return long_bytes == 4 ? (long)((int)((val) & 0xffffffff)) : (long)val;
+#else
+	return (long)val;
+#endif
+}
+
 /*
  * return the address being referenced be instruction
  * for rm=3 returning the content of the rm reg
@@ -567,19 +576,21 @@ int insn_get_reg_offset_sib_index(struct insn *insn, struct pt_regs *regs)
 void __user *insn_get_addr_ref(struct insn *insn, struct pt_regs *regs)
 {
 	unsigned long linear_addr, seg_base_addr;
-	long eff_addr, base, indx;
-	int addr_offset, base_offset, indx_offset;
+	long eff_addr, base, indx, tmp;
+	int addr_offset, base_offset, indx_offset, addr_bytes;
 	insn_byte_t sib;
 
 	insn_get_modrm(insn);
 	insn_get_sib(insn);
 	sib = insn->sib.value;
+	addr_bytes = insn->addr_bytes;
 
 	if (X86_MODRM_MOD(insn->modrm.value) == 3) {
 		addr_offset = get_reg_offset(insn, regs, REG_TYPE_RM);
 		if (addr_offset < 0)
 			goto out_err;
-		eff_addr = regs_get_register(regs, addr_offset);
+		tmp = regs_get_register(regs, addr_offset);
+		eff_addr = __to_signed_long(tmp, addr_bytes);
 		seg_base_addr = insn_get_seg_base(regs, insn, addr_offset,
 						  false);
 	} else {
@@ -591,20 +602,24 @@ void __user *insn_get_addr_ref(struct insn *insn, struct pt_regs *regs)
 			 * in the address computation.
 			 */
 			base_offset = get_reg_offset(insn, regs, REG_TYPE_BASE);
-			if (unlikely(base_offset == -EDOM))
+			if (unlikely(base_offset == -EDOM)) {
 				base = 0;
-			else if (unlikely(base_offset < 0))
+			} else if (unlikely(base_offset < 0)) {
 				goto out_err;
-			else
-				base = regs_get_register(regs, base_offset);
+			} else {
+				tmp = regs_get_register(regs, base_offset);
+				base = __to_signed_long(tmp, addr_bytes);
+			}
 
 			indx_offset = get_reg_offset(insn, regs, REG_TYPE_INDEX);
-			if (unlikely(indx_offset == -EDOM))
+			if (unlikely(indx_offset == -EDOM)) {
 				indx = 0;
-			else if (unlikely(indx_offset < 0))
+			} else if (unlikely(indx_offset < 0)) {
 				goto out_err;
-			else
-				indx = regs_get_register(regs, indx_offset);
+			} else {
+				tmp = regs_get_register(regs, indx_offset);
+				indx = __to_signed_long(tmp, addr_bytes);
+			}
 
 			eff_addr = base + indx * (1 << X86_SIB_SCALE(sib));
 			seg_base_addr = insn_get_seg_base(regs, insn,
@@ -625,13 +640,18 @@ void __user *insn_get_addr_ref(struct insn *insn, struct pt_regs *regs)
 			} else if (addr_offset < 0) {
 				goto out_err;
 			} else {
-				eff_addr = regs_get_register(regs, addr_offset);
+				tmp = regs_get_register(regs, addr_offset);
+				eff_addr = __to_signed_long(tmp, addr_bytes);
 			}
 			seg_base_addr = insn_get_seg_base(regs, insn,
 							  addr_offset, false);
 		}
 		eff_addr += insn->displacement.value;
 	}
+	/* truncate to 4 bytes for 32-bit effective addresses */
+	if (addr_bytes == 4)
+		eff_addr &= 0xffffffff;
+
 	linear_addr = (unsigned long)eff_addr + seg_base_addr;
 
 	return (void __user *)linear_addr;
