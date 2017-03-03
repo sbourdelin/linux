@@ -4428,6 +4428,126 @@ void show_free_areas(unsigned int filter)
 	show_swap_cache_info();
 }
 
+static int __mark_unused_pages(struct zone *zone, int order,
+		__le64 *pages, unsigned int size, unsigned int *pos,
+		u8 len_bits, bool part_fill)
+{
+	unsigned long pfn, flags;
+	int t, ret = 0;
+	struct list_head *curr;
+	__le64 *range;
+
+	if (zone_is_empty(zone))
+		return 0;
+
+	spin_lock_irqsave(&zone->lock, flags);
+
+	if (*pos + zone->free_area[order].nr_free > size && !part_fill) {
+		ret = -ENOSPC;
+		goto out;
+	}
+	for (t = 0; t < MIGRATE_TYPES; t++) {
+		list_for_each(curr, &zone->free_area[order].free_list[t]) {
+			pfn = page_to_pfn(list_entry(curr, struct page, lru));
+			range = pages + *pos;
+			if (order < len_bits) {
+				if (*pos + 1 > size) {
+					ret = -ENOSPC;
+					goto out;
+				}
+				*range = cpu_to_le64((pfn << len_bits)
+							| 1 << order);
+				*pos += 1;
+			} else {
+				if (*pos + 2 > size) {
+					ret = -ENOSPC;
+					goto out;
+				}
+				*range = cpu_to_le64((pfn << len_bits) | 0);
+				*(range + 1) = cpu_to_le64(1 << order);
+				*pos += 2;
+			}
+		}
+	}
+
+out:
+	spin_unlock_irqrestore(&zone->lock, flags);
+
+	return ret;
+}
+
+/*
+ * During live migration, page is discardable unless it's content
+ * is needed by the system.
+ * mark_unused_pages provides an API to mark the unused pages, these
+ * unused pages can be discarded if there is no modification since
+ * the request. Some other mechanism, like the dirty page logging
+ * can be used to track the modification.
+ *
+ * This function scans the free page list to mark the unused pages
+ * with the specified order, and set the corresponding range element
+ * in the array 'pages' if unused pages are found for the specified
+ * order.
+ *
+ * @start_zone: zone to start the mark operation.
+ * @order: page order to mark.
+ * @pages: array to save the unused page info.
+ * @size: size of array pages.
+ * @pos: offset in the array to save the page info.
+ * @len_bits: bits for the length field of the range.
+ * @part_fill: indicate if partial fill is used.
+ *
+ * return -EINVAL if parameter is invalid
+ * return -ENOSPC when bitmap can't contain the pages
+ * return 0 when sccess
+ */
+int mark_unused_pages(struct zone **start_zone, int order,
+	__le64 *pages, unsigned int size, unsigned int *pos,
+	u8 len_bits, bool part_fill)
+{
+	struct zone *zone;
+	int ret = 0;
+	bool skip_check = false;
+
+	/* make sure all the parameters are valid */
+	if (pages == NULL || pos == NULL || *pos < 0
+		|| order >= MAX_ORDER || len_bits > 64)
+		return -EINVAL;
+	if (*start_zone != NULL) {
+		bool found = false;
+
+		for_each_populated_zone(zone) {
+			if (zone != *start_zone)
+				continue;
+			found = true;
+			break;
+		}
+		if (!found)
+			return -EINVAL;
+	} else
+		skip_check = true;
+
+	for_each_populated_zone(zone) {
+		/* Start from *start_zone if it's not NULL */
+		if (!skip_check) {
+			if (*start_zone != zone)
+				continue;
+			else
+				skip_check = true;
+		}
+		ret = __mark_unused_pages(zone, order, pages, size,
+					pos, len_bits, part_fill);
+		if (ret < 0) {
+			/* record the failed zone */
+			*start_zone = zone;
+			break;
+		}
+	}
+
+	return ret;
+}
+EXPORT_SYMBOL(mark_unused_pages);
+
 static void zoneref_set_zone(struct zone *zone, struct zoneref *zoneref)
 {
 	zoneref->zone = zone;

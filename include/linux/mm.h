@@ -1772,6 +1772,9 @@ extern void free_area_init(unsigned long * zones_size);
 extern void free_area_init_node(int nid, unsigned long * zones_size,
 		unsigned long zone_start_pfn, unsigned long *zholes_size);
 extern void free_initmem(void);
+extern int mark_unused_pages(struct zone **start_zone, int order,
+		__le64 *pages, unsigned int size, unsigned int *pos,
+		u8 len_bits, bool part_fill);
 
 /*
  * Free reserved pages within range [PAGE_ALIGN(start), end & PAGE_MASK)
