@@ -306,6 +306,73 @@ static int get_reg_offset(struct insn *insn, struct pt_regs *regs,
 }
 
 /**
+ * get_reg_offset_16 - Obtain offset of register indicated by instruction
+ * @insn:	Instruction structure containing ModRM and SiB bytes
+ * @regs:	Set of registers referred by the instruction
+ * @offs1:	Offset of the first operand register
+ * @offs2:	Offset of the second opeand register, if applicable.
+ *
+ * Obtain the offset, in pt_regs, of the registers indicated by the ModRM byte
+ * within insn. This function is to be used with 16-bit address encodings. The
+ * offs1 and offs2 will be written with the offset of the two registers
+ * indicated by the instruction. In cases where any of the registers is not
+ * referenced by the instruction, the value will be set to -EDOM.
+ *
+ * Return: 0 on success, -EINVAL on failure.
+ */
+static int get_reg_offset_16(struct insn *insn, struct pt_regs *regs,
+			     int *offs1, int *offs2)
+{
+	/* 16-bit addressing can use one or two registers */
+	static const int regoff1[] = {
+		offsetof(struct pt_regs, bx),
+		offsetof(struct pt_regs, bx),
+		offsetof(struct pt_regs, bp),
+		offsetof(struct pt_regs, bp),
+		offsetof(struct pt_regs, si),
+		offsetof(struct pt_regs, di),
+		offsetof(struct pt_regs, bp),
+		offsetof(struct pt_regs, bx),
+	};
+
+	static const int regoff2[] = {
+		offsetof(struct pt_regs, si),
+		offsetof(struct pt_regs, di),
+		offsetof(struct pt_regs, si),
+		offsetof(struct pt_regs, di),
+		-EDOM,
+		-EDOM,
+		-EDOM,
+		-EDOM,
+	};
+
+	if (!offs1 || !offs2)
+		return -EINVAL;
+
+	/* operand is a register, use the generic function */
+	if (X86_MODRM_MOD(insn->modrm.value) == 3) {
+		*offs1 = insn_get_reg_offset_modrm_rm(insn, regs);
+		*offs2 = -EDOM;
+		return 0;
+	}
+
+	*offs1 = regoff1[X86_MODRM_RM(insn->modrm.value)];
+	*offs2 = regoff2[X86_MODRM_RM(insn->modrm.value)];
+
+	/*
+	 * If no displacement is indicated in the mod part of the ModRM byte,
+	 * (mod part is 0) and the r/m part of the same byte is 6, no register
+	 * is used caculate the operand address. An r/m part of 6 means that
+	 * the second register offset is already invalid.
+	 */
+	if ((X86_MODRM_MOD(insn->modrm.value) == 0) &&
+	    (X86_MODRM_RM(insn->modrm.value) == 6))
+		*offs1 = -EDOM;
+
+	return 0;
+}
+
+/**
  * get_desc() - Obtain address of segment descriptor
  * @seg:	Segment selector
  * @desc:	Pointer to the selected segment descriptor
@@ -557,6 +624,76 @@ int insn_get_reg_offset_sib_base(struct insn *insn, struct pt_regs *regs)
 int insn_get_reg_offset_sib_index(struct insn *insn, struct pt_regs *regs)
 {
 	return get_reg_offset(insn, regs, REG_TYPE_INDEX);
+}
+
+/**
+ * insn_get_addr_ref_16 - Obtain the 16-bit address referred by instruction
+ * @insn:	Instruction structure containing ModRM byte and displacement
+ * @regs:	Set of registers referred by the instruction
+ *
+ * This function is to be used with 16-bit address encodings. Obtain the memory
+ * address referred by the instruction's ModRM bytes and displacement. Also, the
+ * segment used as base is determined by either any segment override prefixes in
+ * insn or the default segment of the registers involved in the address
+ * computation.
+ * the ModRM byte
+ *
+ * Return: linear address referenced by instruction and registers
+ */
+static void __user *insn_get_addr_ref_16(struct insn *insn,
+					 struct pt_regs *regs)
+{
+	unsigned long linear_addr, seg_base_addr;
+	short eff_addr, addr1 = 0, addr2 = 0;
+	int addr_offset1, addr_offset2;
+	int ret;
+
+	insn_get_modrm(insn);
+	insn_get_displacement(insn);
+
+	/*
+	 * If operand is a register, the layout is the same as in
+	 * 32-bit and 64-bit addressing.
+	 */
+	if (X86_MODRM_MOD(insn->modrm.value) == 3) {
+		addr_offset1 = get_reg_offset(insn, regs, REG_TYPE_RM);
+		if (addr_offset1 < 0)
+			goto out_err;
+		eff_addr = regs_get_register(regs, addr_offset1);
+		seg_base_addr = insn_get_seg_base(regs, insn, addr_offset1,
+						  false);
+	} else {
+		ret = get_reg_offset_16(insn, regs, &addr_offset1,
+					&addr_offset2);
+		if (ret < 0)
+			goto out_err;
+		/*
+		 * Don't fail on invalid offset values. They might be invalid
+		 * because they cannot be used for this particular value of
+		 * the ModRM. Instead, use them in the computation only if
+		 * they contain a valid value.
+		 */
+		if (addr_offset1 != -EDOM)
+			addr1 = 0xffff & regs_get_register(regs, addr_offset1);
+		if (addr_offset2 != -EDOM)
+			addr2 = 0xffff & regs_get_register(regs, addr_offset2);
+		eff_addr = addr1 + addr2;
+		/*
+		 * The first register is in the operand implies the SS or DS
+		 * segment selectors, the second register in the operand can
+		 * only imply DS. Thus, use the first register to obtain
+		 * the segment selector.
+		 */
+		seg_base_addr = insn_get_seg_base(regs, insn, addr_offset1,
+						  false);
+
+		eff_addr += (insn->displacement.value & 0xffff);
+	}
+	linear_addr = (unsigned short)eff_addr + seg_base_addr;
+
+	return (void __user *)linear_addr;
+out_err:
+	return (void __user *)-1;
 }
 
 static inline long __to_signed_long(unsigned long val, int long_bytes)
