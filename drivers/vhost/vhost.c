@@ -312,6 +312,9 @@ static void vhost_vq_reset(struct vhost_dev *dev,
 	vq->busyloop_timeout = 0;
 	vq->umem = NULL;
 	vq->iotlb = NULL;
+	vq->max_coalesce_ktime = 0;
+	vq->max_coalesce_frames = 0;
+	vq->coalesce_frames = 0;
 }
 
 static int vhost_worker(void *data)
@@ -394,6 +397,22 @@ static void vhost_dev_free_iovecs(struct vhost_dev *dev)
 		vhost_vq_free_iovecs(dev->vqs[i]);
 }
 
+void vhost_signal(struct vhost_dev *dev, struct vhost_virtqueue *vq);
+static enum hrtimer_restart vhost_coalesce_timer(struct hrtimer *timer)
+{
+	struct vhost_virtqueue *vq =
+		container_of(timer, struct vhost_virtqueue, ctimer);
+
+	if (mutex_trylock(&vq->mutex)) {
+		vq->coalesce_frames = vq->max_coalesce_frames;
+		vhost_signal(vq->dev, vq);
+		mutex_unlock(&vq->mutex);
+	}
+
+	/* TODO: restart if lock failed and not held by handle_tx */
+	return HRTIMER_NORESTART;
+}
+
 void vhost_dev_init(struct vhost_dev *dev,
 		    struct vhost_virtqueue **vqs, int nvqs)
 {
@@ -423,6 +442,8 @@ void vhost_dev_init(struct vhost_dev *dev,
 		vq->heads = NULL;
 		vq->dev = dev;
 		mutex_init(&vq->mutex);
+		hrtimer_init(&vq->ctimer, CLOCK_MONOTONIC, HRTIMER_MODE_REL);
+		vq->ctimer.function = vhost_coalesce_timer;
 		vhost_vq_reset(dev, vq);
 		if (vq->handle_kick)
 			vhost_poll_init(&vq->poll, vq->handle_kick,
@@ -608,6 +629,7 @@ void vhost_dev_cleanup(struct vhost_dev *dev, bool locked)
 	int i;
 
 	for (i = 0; i < dev->nvqs; ++i) {
+		hrtimer_cancel(&dev->vqs[i]->ctimer);
 		if (dev->vqs[i]->error_ctx)
 			eventfd_ctx_put(dev->vqs[i]->error_ctx);
 		if (dev->vqs[i]->error)
@@ -1279,6 +1301,7 @@ long vhost_vring_ioctl(struct vhost_dev *d, int ioctl, void __user *argp)
 	struct vhost_vring_state s;
 	struct vhost_vring_file f;
 	struct vhost_vring_addr a;
+	struct vhost_vring_coalesce c;
 	u32 idx;
 	long r;
 
@@ -1333,6 +1356,30 @@ long vhost_vring_ioctl(struct vhost_dev *d, int ioctl, void __user *argp)
 		s.index = idx;
 		s.num = vq->last_avail_idx;
 		if (copy_to_user(argp, &s, sizeof s))
+			r = -EFAULT;
+		break;
+	case VHOST_SET_VRING_COALESCE:
+		if (copy_from_user(&c, argp, sizeof(c))) {
+			r = -EFAULT;
+			break;
+		}
+
+		if ((c.max_coalesce_frames && !c.max_coalesce_usecs) ||
+		    (c.max_coalesce_usecs && !c.max_coalesce_frames) ||
+		    (c.max_coalesce_usecs > 10000) ||
+		    (c.max_coalesce_frames > 1024)) {
+			r = -EINVAL;
+			break;
+		}
+
+		vq->max_coalesce_ktime = ns_to_ktime(c.max_coalesce_usecs *
+						     NSEC_PER_USEC);
+		vq->max_coalesce_frames = c.max_coalesce_frames;
+		break;
+	case VHOST_GET_VRING_COALESCE:
+		c.max_coalesce_usecs = ktime_to_us(vq->max_coalesce_ktime);
+		c.max_coalesce_frames = vq->max_coalesce_frames;
+		if (copy_to_user(argp, &c, sizeof(c)))
 			r = -EFAULT;
 		break;
 	case VHOST_SET_VRING_ADDR:
@@ -1418,6 +1465,11 @@ long vhost_vring_ioctl(struct vhost_dev *d, int ioctl, void __user *argp)
 			break;
 		}
 		if (eventfp != vq->call) {
+			/* do not update while timer is active */
+			if (hrtimer_active(&vq->ctimer)) {
+				hrtimer_cancel(&vq->ctimer);
+				vhost_signal(vq->dev, vq);
+			}
 			filep = vq->call;
 			ctx = vq->call_ctx;
 			vq->call = eventfp;
@@ -2112,6 +2164,10 @@ static int __vhost_add_used_n(struct vhost_virtqueue *vq,
 	 * signals at least once in 2^16 and remove this. */
 	if (unlikely((u16)(new - vq->signalled_used) < (u16)(new - old)))
 		vq->signalled_used_valid = false;
+
+	if (vq->max_coalesce_frames)
+		vq->coalesce_frames += count;
+
 	return 0;
 }
 
@@ -2152,6 +2208,14 @@ int vhost_add_used_n(struct vhost_virtqueue *vq, struct vring_used_elem *heads,
 }
 EXPORT_SYMBOL_GPL(vhost_add_used_n);
 
+static void vhost_coalesce_reset(struct vhost_virtqueue *vq)
+{
+	if (vq->max_coalesce_frames) {
+		vq->coalesce_frames = 0;
+		hrtimer_try_to_cancel(&vq->ctimer);
+	}
+}
+
 static bool vhost_notify(struct vhost_dev *dev, struct vhost_virtqueue *vq)
 {
 	__u16 old, new;
@@ -2161,6 +2225,14 @@ static bool vhost_notify(struct vhost_dev *dev, struct vhost_virtqueue *vq)
 	if (vhost_has_feature(vq, VIRTIO_F_NOTIFY_ON_EMPTY) &&
 	    unlikely(vq->avail_idx == vq->last_avail_idx))
 		return true;
+
+	if (vq->coalesce_frames < vq->max_coalesce_frames) {
+		if (!hrtimer_active(&vq->ctimer))
+			hrtimer_start(&vq->ctimer, vq->max_coalesce_ktime,
+				      HRTIMER_MODE_REL);
+		return false;
+	}
+	vhost_coalesce_reset(vq);
 
 	if (!vhost_has_feature(vq, VIRTIO_RING_F_EVENT_IDX)) {
 		__virtio16 flags;
@@ -2208,8 +2280,10 @@ static bool vhost_notify(struct vhost_dev *dev, struct vhost_virtqueue *vq)
 void vhost_signal(struct vhost_dev *dev, struct vhost_virtqueue *vq)
 {
 	/* Signal the Guest tell them we used something up. */
-	if (vq->call_ctx && vhost_notify(dev, vq))
+	if (vq->call_ctx && vhost_notify(dev, vq)) {
 		eventfd_signal(vq->call_ctx, 1);
+		vhost_coalesce_reset(vq);
+	}
 }
 EXPORT_SYMBOL_GPL(vhost_signal);
 
