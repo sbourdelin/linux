@@ -983,6 +983,19 @@ static void eeh_handle_special_event(void)
 		if (rc == EEH_NEXT_ERR_FROZEN_PE ||
 		    rc == EEH_NEXT_ERR_FENCED_PHB) {
 			eeh_handle_normal_event(pe);
+
+			/*
+			 * eeh_handle_normal_event() can free the PE if it
+			 * determines that the PE cannot possibly be recovered.
+			 * Make sure the PE still exists before changing its
+			 * state.
+			 */
+			if (!pe || (pe->type & EEH_PE_INVALID)
+			    || (pe->state & EEH_PE_REMOVED)) {
+				pr_warn("EEH: not clearing state on bad PE\n");
+				continue;
+			}
+
 			eeh_pe_state_clear(pe, EEH_PE_RECOVERING);
 		} else {
 			pci_lock_rescan_remove();
