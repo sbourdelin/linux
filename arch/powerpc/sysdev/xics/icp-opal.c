@@ -91,6 +91,18 @@ static unsigned int icp_opal_get_irq(void)
 
 static void icp_opal_set_cpu_priority(unsigned char cppr)
 {
+	/*
+	 * Mask only IPI's and not external interrupts
+	 * XIVE emulation of XICS exposed as an OPAL
+	 * interface uses just one priority level for
+	 * both external and IPI's. By dropping default
+	 * priority to lowest, we leave all interrupts
+	 * on, assuming the only caller is migrate_irqs_away
+	 * at the time of CPU hotplug
+	 */
+	if (cppr == DEFAULT_PRIORITY)
+		cppr = LOWEST_PRIORITY;
+
 	xics_set_base_cppr(cppr);
 	opal_int_set_cppr(cppr);
 	iosync();
