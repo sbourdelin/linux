@@ -775,6 +775,57 @@ const char *v4l2_ctrl_get_name(u32 id)
 	case V4L2_CID_MPEG_VIDEO_VPX_P_FRAME_QP:		return "VPX P-Frame QP Value";
 	case V4L2_CID_MPEG_VIDEO_VPX_PROFILE:			return "VPX Profile";
 
+	/* HEVC controls */
+	case V4L2_CID_MPEG_VIDEO_HEVC_I_FRAME_QP:		return "HEVC I frame QP value";
+	case V4L2_CID_MPEG_VIDEO_HEVC_P_FRAME_QP:		return "HEVC P frame QP value";
+	case V4L2_CID_MPEG_VIDEO_HEVC_B_FRAME_QP:		return "HEVC B frame QP value";
+	case V4L2_CID_MPEG_VIDEO_HEVC_MIN_QP:			return "HEVC Minimum QP value";
+	case V4L2_CID_MPEG_VIDEO_HEVC_MAX_QP:			return "HEVC Maximum QP value";
+	case V4L2_CID_MPEG_VIDEO_HEVC_ADAPTIVE_RC_DARK:		return "HEVC Dark region adaptive";
+	case V4L2_CID_MPEG_VIDEO_HEVC_ADAPTIVE_RC_SMOOTH:	return "HEVC Smooth region adaptive";
+	case V4L2_CID_MPEG_VIDEO_HEVC_ADAPTIVE_RC_STATIC:	return "HEVC Static region adaptive";
+	case V4L2_CID_MPEG_VIDEO_HEVC_ADAPTIVE_RC_ACTIVITY:	return "HEVC Region adaptive rate control";
+	case V4L2_CID_MPEG_VIDEO_HEVC_PROFILE:			return "HEVC Profile";
+	case V4L2_CID_MPEG_VIDEO_HEVC_LEVEL:			return "HEVC Level";
+	case V4L2_CID_MPEG_VIDEO_HEVC_TIER_FLAG:		return "HEVC tier_flag default is Main";
+	case V4L2_CID_MPEG_VIDEO_HEVC_RC_FRAME_RATE:		return "HEVC Frame rate";
+	case V4L2_CID_MPEG_VIDEO_HEVC_MAX_PARTITION_DEPTH:	return "HEVC Maximum coding unit depth";
+	case V4L2_CID_MPEG_VIDEO_HEVC_REF_NUMBER_FOR_PFRAMES:	return "HEVC Number of reference frames for P Frames";
+	case V4L2_CID_MPEG_VIDEO_HEVC_REFRESH_TYPE:		return "HEVC Refresh type";
+	case V4L2_CID_MPEG_VIDEO_HEVC_CONST_INTRA_PRED_ENABLE:	return "HEVC Constant intra prediction enable";
+	case V4L2_CID_MPEG_VIDEO_HEVC_LOSSLESS_CU_ENABLE:	return "HEVC Lossless encoding enable";
+	case V4L2_CID_MPEG_VIDEO_HEVC_WAVEFRONT_ENABLE:		return "HEVC Wavefront enable";
+	case V4L2_CID_MPEG_VIDEO_HEVC_LF_DISABLE:		return "HEVC Loop filter disable";
+	case V4L2_CID_MPEG_VIDEO_HEVC_LF_SLICE_BOUNDARY:	return "HEVC Loop filtering across slice boundary or not";
+	case V4L2_CID_MPEG_VIDEO_HEVC_LTR_ENABLE:		return "HEVC long term reference enable";
+	case V4L2_CID_MPEG_VIDEO_HEVC_HIERARCHICAL_QP_ENABLE:	return "HEVC QP values for temporal layer";
+	case V4L2_CID_MPEG_VIDEO_HEVC_HIERARCHICAL_CODING_TYPE:	return "HEVC Hierarchical Coding Type";
+	case V4L2_CID_MPEG_VIDEO_HEVC_HIERARCHICAL_CODING_LAYER:return "HEVC Hierarchical Coding Layer";
+	case V4L2_CID_MPEG_VIDEO_HEVC_HIERARCHICAL_CODING_LAYER_QP:return "HEVC Hierarchical Coding Layer QP";
+	case V4L2_CID_MPEG_VIDEO_HEVC_HIERARCHICAL_CODING_LAYER_BIT0:return "HEVC Hierarchical Coding Layer BIT0";
+	case V4L2_CID_MPEG_VIDEO_HEVC_HIERARCHICAL_CODING_LAYER_BIT1:return "HEVC Hierarchical Coding Layer BIT1";
+	case V4L2_CID_MPEG_VIDEO_HEVC_HIERARCHICAL_CODING_LAYER_BIT2:return "HEVC Hierarchical Coding Layer BIT2";
+	case V4L2_CID_MPEG_VIDEO_HEVC_HIERARCHICAL_CODING_LAYER_BIT3:return "HEVC Hierarchical Coding Layer BIT3";
+	case V4L2_CID_MPEG_VIDEO_HEVC_HIERARCHICAL_CODING_LAYER_BIT4:return "HEVC Hierarchical Coding Layer BIT4";
+	case V4L2_CID_MPEG_VIDEO_HEVC_HIERARCHICAL_CODING_LAYER_BIT5:return "HEVC Hierarchical Coding Layer BIT5";
+	case V4L2_CID_MPEG_VIDEO_HEVC_HIERARCHICAL_CODING_LAYER_BIT6:return "HEVC Hierarchical Coding Layer BIT6";
+	case V4L2_CID_MPEG_VIDEO_HEVC_HIERARCHICAL_CODING_LAYER_CH:return "HEVC Hierarchical Coding Layer Change";
+	case V4L2_CID_MPEG_VIDEO_HEVC_SIGN_DATA_HIDING:		return "HEVC Sign data hiding";
+	case V4L2_CID_MPEG_VIDEO_HEVC_GENERAL_PB_ENABLE:	return "HEVC General pb enable";
+	case V4L2_CID_MPEG_VIDEO_HEVC_TEMPORAL_ID_ENABLE:	return "HEVC Temporal id enable";
+	case V4L2_CID_MPEG_VIDEO_HEVC_STRONG_SMOTHING_FLAG:	return "HEVC Strong intra smoothing flag";
+	case V4L2_CID_MPEG_VIDEO_HEVC_DISABLE_INTRA_PU_SPLIT:	return "HEVC Disable intra pu split";
+	case V4L2_CID_MPEG_VIDEO_HEVC_DISABLE_TMV_PREDICTION:	return "HEVC Disable tmv prediction";
+	case V4L2_CID_MPEG_VIDEO_HEVC_MAX_NUM_MERGE_MV_MINUS1:	return "HEVC Max number of candidate MVs";
+	case V4L2_CID_MPEG_VIDEO_HEVC_WITHOUT_STARTCODE_ENABLE:	return "HEVC ENC without startcode enable";
+	case V4L2_CID_MPEG_VIDEO_HEVC_REFRESH_PERIOD:		return "HEVC Number of reference picture";
+	case V4L2_CID_MPEG_VIDEO_HEVC_LF_BETA_OFFSET_DIV2:	return "HEVC Loop filter beta offset";
+	case V4L2_CID_MPEG_VIDEO_HEVC_LF_TC_OFFSET_DIV2:	return "HEVC Loop filter tc offset";
+	case V4L2_CID_MPEG_VIDEO_HEVC_SIZE_OF_LENGTH_FIELD:	return "HEVC Size of length field";
+	case V4L2_CID_MPEG_VIDEO_HEVC_USE_REF:			return "HEVC User long term reference frame";
+	case V4L2_CID_MPEG_VIDEO_HEVC_STORE_REF:		return "HEVC Store long term reference frame";
+	case V4L2_CID_MPEG_VIDEO_HEVC_PREPEND_SPSPPS_TO_IDR:	return "HEVC Prepend SPS/PPS to every IDR";
+
 	/* CAMERA controls */
 	/* Keep the order of the 'case's the same as in v4l2-controls.h! */
 	case V4L2_CID_CAMERA_CLASS:		return "Camera Controls";
