@@ -176,43 +176,28 @@ int spk_handle_help(struct vc_data *vc, u_char type, u_char ch, u_short key)
 		synth_printf("%s\n", spk_msg_get(MSG_HELP_INFO));
 		build_key_data(); /* rebuild each time in case new mapping */
 		return 1;
-	} else {
-		name = NULL;
-		if ((type != KT_SPKUP) && (key > 0) && (key <= num_key_names)) {
-			synth_printf("%s\n",
-				     spk_msg_get(MSG_KEYNAMES_START + key - 1));
-			return 1;
-		}
-		for (i = 0; funcvals[i] != 0 && !name; i++) {
-			if (ch == funcvals[i])
-				name = spk_msg_get(MSG_FUNCNAMES_START + i);
-		}
-		if (!name)
-			return -1;
-		kp = spk_our_keys[key] + 1;
-		for (i = 0; i < nstates; i++) {
-			if (ch == kp[i])
-				break;
-		}
-		key += (state_tbl[i] << 8);
-		say_key(key);
-		synth_printf(spk_msg_get(MSG_KEYDESC), name);
-		synth_printf("\n");
+	}
+
+	name = NULL;
+	if ((type != KT_SPKUP) && (key > 0) && (key <= num_key_names)) {
+		synth_printf("%s\n",
+			     spk_msg_get(MSG_KEYNAMES_START + key - 1));
 		return 1;
 	}
-	name = spk_msg_get(MSG_FUNCNAMES_START + cur_item);
-	func = funcvals[cur_item];
-	synth_printf("%s", name);
-	if (key_offsets[func] == 0) {
-		synth_printf(" %s\n", spk_msg_get(MSG_IS_UNASSIGNED));
-		return 1;
+	for (i = 0; funcvals[i] != 0 && !name; i++) {
+		if (ch == funcvals[i])
+			name = spk_msg_get(MSG_FUNCNAMES_START + i);
 	}
-	p_keys = key_data + key_offsets[func];
-	for (n = 0; p_keys[n]; n++) {
-		val = p_keys[n];
-		if (n > 0)
-			synth_printf("%s ", spk_msg_get(MSG_DISJUNCTION));
-		say_key(val);
+	if (!name)
+		return -1;
+	kp = spk_our_keys[key] + 1;
+	for (i = 0; i < nstates; i++) {
+		if (ch == kp[i])
+			break;
 	}
+	key += (state_tbl[i] << 8);
+	say_key(key);
+	synth_printf(spk_msg_get(MSG_KEYDESC), name);
+	synth_printf("\n");
 	return 1;
 }
