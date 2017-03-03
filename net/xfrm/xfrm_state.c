@@ -1380,6 +1380,12 @@ out:
 		memcpy(&x1->lft, &x->lft, sizeof(x1->lft));
 		x1->km.dying = 0;
 
+		/* To update Authendication and Encryption keys */
+		x1->aalg = kmemdup(x->aalg, xfrm_alg_auth_len(x->aalg),
+								GFP_KERNEL);
+		x1->ealg = kmemdup(x->ealg, xfrm_alg_len(x->ealg),
+								GFP_KERNEL);
+
 		tasklet_hrtimer_start(&x1->mtimer, ktime_set(1, 0), HRTIMER_MODE_REL);
 		if (x1->curlft.use_time)
 			xfrm_state_check_expire(x1);
