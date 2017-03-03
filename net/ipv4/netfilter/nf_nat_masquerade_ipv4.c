@@ -38,6 +38,8 @@ nf_nat_masquerade_ipv4(struct sk_buff *skb, unsigned int hooknum,
 
 	ct = nf_ct_get(skb, &ctinfo);
 	nat = nfct_nat(ct);
+	if (!nat)
+		return NF_ACCEPT;
 
 	NF_CT_ASSERT(ct && (ctinfo == IP_CT_NEW || ctinfo == IP_CT_RELATED ||
 			    ctinfo == IP_CT_RELATED_REPLY));

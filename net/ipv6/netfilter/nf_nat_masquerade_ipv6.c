@@ -32,17 +32,21 @@ nf_nat_masquerade_ipv6(struct sk_buff *skb, const struct nf_nat_range *range,
 	enum ip_conntrack_info ctinfo;
 	struct in6_addr src;
 	struct nf_conn *ct;
+	struct nf_conn_nat *nat;
 	struct nf_nat_range newrange;
 
 	ct = nf_ct_get(skb, &ctinfo);
 	NF_CT_ASSERT(ct && (ctinfo == IP_CT_NEW || ctinfo == IP_CT_RELATED ||
 			    ctinfo == IP_CT_RELATED_REPLY));
+	nat = nfct_nat(ct);
+	if (!nat)
+		return NF_ACCEPT;
 
 	if (ipv6_dev_get_saddr(nf_ct_net(ct), out,
 			       &ipv6_hdr(skb)->daddr, 0, &src) < 0)
 		return NF_DROP;
 
-	nfct_nat(ct)->masq_index = out->ifindex;
+	nat->masq_index = out->ifindex;
 
 	newrange.flags		= range->flags | NF_NAT_RANGE_MAP_IPS;
 	newrange.min_addr.in6	= src;
