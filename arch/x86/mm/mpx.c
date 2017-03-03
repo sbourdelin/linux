@@ -120,6 +120,17 @@ static int get_reg_offset(struct insn *insn, struct pt_regs *regs,
 
 	case REG_TYPE_BASE:
 		regno = X86_SIB_BASE(insn->sib.value);
+		/*
+		 * If mod is 0 and register R/EBP (regno=5) is indicated in the
+		 * base part of the SIB byte, the value of such register should
+		 * not be used in the address computation. Also, a 32-bit
+		 * displacement is expected in this case; the instruction
+		 * decoder takes care of it. This is true for both R13 and
+		 * R/EBP as REX.B will not be decoded.
+		 */
+		if (regno == 5 && X86_MODRM_MOD(insn->modrm.value) == 0)
+			return -EDOM;
+
 		if (X86_REX_B(insn->rex_prefix.value))
 			regno += 8;
 		break;
@@ -160,16 +171,21 @@ static void __user *mpx_get_addr_ref(struct insn *insn, struct pt_regs *regs)
 		eff_addr = regs_get_register(regs, addr_offset);
 	} else {
 		if (insn->sib.nbytes) {
+			/*
+			 * Negative values in the base and index offset means
+			 * an error when decoding the SIB byte. Except -EDOM,
+			 * which means that the registers should not be used
+			 * in the address computation.
+			 */
 			base_offset = get_reg_offset(insn, regs, REG_TYPE_BASE);
-			if (base_offset < 0)
+			if (unlikely(base_offset == -EDOM))
+				base = 0;
+			else if (unlikely(base_offset < 0))
 				goto out_err;
+			else
+				base = regs_get_register(regs, base_offset);
 
 			indx_offset = get_reg_offset(insn, regs, REG_TYPE_INDEX);
-			/*
-			 * A negative offset generally means a error, except
-			 * -EDOM, which means that the contents of the register
-			 * should not be used as index.
-			 */
 			if (unlikely(indx_offset == -EDOM))
 				indx = 0;
 			else if (unlikely(indx_offset < 0))
@@ -177,7 +193,6 @@ static void __user *mpx_get_addr_ref(struct insn *insn, struct pt_regs *regs)
 			else
 				indx = regs_get_register(regs, indx_offset);
 
-			base = regs_get_register(regs, base_offset);
 			eff_addr = base + indx * (1 << X86_SIB_SCALE(sib));
 		} else {
 			addr_offset = get_reg_offset(insn, regs, REG_TYPE_RM);
