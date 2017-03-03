@@ -297,7 +297,8 @@ static int write_to_device(struct ks_wlan_private *priv, unsigned char *buffer,
 	hdr = (struct hostif_hdr *)buffer;
 
 	DPRINTK(4, "size=%d\n", hdr->size);
-	if (hdr->event < HIF_DATA_REQ || HIF_REQ_MAX < hdr->event) {
+	if (le16_to_cpu(hdr->event) < HIF_DATA_REQ ||
+	    HIF_REQ_MAX < le16_to_cpu(hdr->event)) {
 		DPRINTK(1, "unknown event=%04X\n", hdr->event);
 		return 0;
 	}
@@ -361,13 +362,14 @@ int ks_wlan_hw_tx(struct ks_wlan_private *priv, void *p, unsigned long size,
 
 	hdr = (struct hostif_hdr *)p;
 
-	if (hdr->event < HIF_DATA_REQ || HIF_REQ_MAX < hdr->event) {
+	if (le16_to_cpu(hdr->event) < HIF_DATA_REQ ||
+	    HIF_REQ_MAX < le16_to_cpu(hdr->event)) {
 		DPRINTK(1, "unknown event=%04X\n", hdr->event);
 		return 0;
 	}
 
 	/* add event to hostt buffer */
-	priv->hostt.buff[priv->hostt.qtail] = hdr->event;
+	priv->hostt.buff[priv->hostt.qtail] = le16_to_cpu(hdr->event);
 	priv->hostt.qtail = (priv->hostt.qtail + 1) % SME_EVENT_BUFF_SIZE;
 
 	DPRINTK(4, "event=%04X\n", hdr->event);
@@ -406,7 +408,7 @@ static void ks_wlan_hw_rx(void *dev, uint16_t size)
 	struct rx_device_buffer *rx_buffer;
 	struct hostif_hdr *hdr;
 	unsigned char read_status;
-	unsigned short event = 0;
+	__le16 event = 0;
 
 	DPRINTK(4, "\n");
 
@@ -459,7 +461,7 @@ static void ks_wlan_hw_rx(void *dev, uint16_t size)
 	DPRINTK(4, "READ_STATUS=%02X\n", read_status);
 
 	if (atomic_read(&priv->psstatus.confirm_wait)) {
-		if (IS_HIF_CONF(event)) {
+		if (IS_HIF_CONF(le16_to_cpu(event))) {
 			DPRINTK(4, "IS_HIF_CONF true !!\n");
 			atomic_dec(&priv->psstatus.confirm_wait);
 		}
