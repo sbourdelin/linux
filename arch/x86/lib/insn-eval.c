@@ -8,12 +8,207 @@
 #include <asm/inat.h>
 #include <asm/insn.h>
 #include <asm/insn-eval.h>
+#include <asm/vm86.h>
 
 enum reg_type {
 	REG_TYPE_RM = 0,
 	REG_TYPE_INDEX,
 	REG_TYPE_BASE,
 };
+
+enum segment {
+	SEG_CS = 0x23,
+	SEG_SS = 0x36,
+	SEG_DS = 0x3e,
+	SEG_ES = 0x26,
+	SEG_FS = 0x64,
+	SEG_GS = 0x65
+};
+
+/**
+ * resolve_seg_selector() - obtain segment selector
+ * @regs:	Set of registers containing the segment selector
+ * @insn:	Instruction structure with selector override prefixes
+ * @regoff:	Operand offset, in pt_regs, of which the selector is needed
+ * @default:	Resolve default segment selector (i.e., ignore overrides)
+ *
+ * The segment selector to which an effective address refers depends on
+ * a) segment selector overrides instruction prefixes or b) the operand
+ * register indicated in the ModRM or SiB byte.
+ *
+ * For case a), the function inspects any prefixes in the insn instruction;
+ * insn can be null to indicate that selector override prefixes shall be
+ * ignored. This is useful when the use of prefixes is forbidden (e.g.,
+ * obtaining the code selector). For case b), the operand register shall be
+ * represented as the offset from the base address of pt_regs. Also, regoff
+ * can be -EINVAL for cases in which registers are not used as operands (e.g.,
+ * when the mod and r/m parts of the ModRM byte are 0 and 5, respectively).
+ *
+ * This function returns the segment selector to utilize as per the conditions
+ * described above. Please note that this functin does not return the value
+ * of the segment selector. The value of the segment selector needs to be
+ * obtained using get_segment_selector and passing the segment selector type
+ * resolved by this function.
+ *
+ * Return: Segment selector to use, among CS, SS, DS, ES, FS or GS.
+ */
+static int resolve_seg_selector(struct insn *insn, int regoff, bool get_default)
+{
+	int i;
+
+	if (!insn)
+		return -EINVAL;
+
+	if (get_default)
+		goto default_seg;
+	/*
+	 * Check first if we have selector overrides. Having more than
+	 * one selector override leads to undefined behavior. We
+	 * only use the first one and return
+	 */
+	for (i = 0; i < insn->prefixes.nbytes; i++) {
+		switch (insn->prefixes.bytes[i]) {
+		case SEG_CS:
+			return SEG_CS;
+		case SEG_SS:
+			return SEG_SS;
+		case SEG_DS:
+			return SEG_DS;
+		case SEG_ES:
+			return SEG_ES;
+		case SEG_FS:
+			return SEG_FS;
+		case SEG_GS:
+			return SEG_GS;
+		default:
+			return -EINVAL;
+		}
+	}
+
+default_seg:
+	/*
+	 * If no overrides, use default selectors as described in the
+	 * Intel documentation: SS for ESP or EBP. DS for all data references,
+	 * except when relative to stack or string destination.
+	 * Also, AX, CX and DX are not valid register operands in 16-bit
+	 * address encodings.
+	 * Callers must interpret the result correctly according to the type
+	 * of instructions (e.g., use ES for string instructions).
+	 * Also, some values of modrm and sib might seem to indicate the use
+	 * of EBP and ESP (e.g., modrm_mod = 0, modrm_rm = 5) but actually
+	 * they refer to cases in which only a displacement used. These cases
+	 * should be indentified by the caller and not with this function.
+	 */
+	switch (regoff) {
+	case offsetof(struct pt_regs, ax):
+		/* fall through */
+	case offsetof(struct pt_regs, cx):
+		/* fall through */
+	case offsetof(struct pt_regs, dx):
+		if (insn && insn->addr_bytes == 2)
+			return -EINVAL;
+	case -EDOM: /* no register involved in address computation */
+	case offsetof(struct pt_regs, bx):
+		/* fall through */
+	case offsetof(struct pt_regs, di):
+		/* fall through */
+	case offsetof(struct pt_regs, si):
+		return SEG_DS;
+	case offsetof(struct pt_regs, bp):
+		/* fall through */
+	case offsetof(struct pt_regs, sp):
+		return SEG_SS;
+	case offsetof(struct pt_regs, ip):
+		return SEG_CS;
+	default:
+		return -EINVAL;
+	}
+}
+
+/**
+ * get_segment_selector() - obtain segment selector
+ * @regs:	Set of registers containing the segment selector
+ * @seg_type:	Type of segment selector to obtain
+ * @regoff:	Operand offset, in pt_regs, of which the selector is needed
+ *
+ * Obtain the segment selector for any of CS, SS, DS, ES, FS, GS. In
+ * CONFIG_X86_32, the segment is obtained from either pt_regs or
+ * kernel_vm86_regs as applicable. In CONFIG_X86_64, CS and SS are obtained
+ * from pt_regs. DS, ES, FS and GS are obtained by reading the ds and es, fs
+ * and gs, respectively.
+ *
+ * Return: Value of the segment selector
+ */
+static unsigned short get_segment_selector(struct pt_regs *regs,
+					   enum segment seg_type)
+{
+#ifdef CONFIG_X86_64
+	unsigned short seg_sel;
+
+	switch (seg_type) {
+	case SEG_CS:
+		return (unsigned short)(regs->cs & 0xffff);
+	case SEG_SS:
+		return (unsigned short)(regs->ss & 0xffff);
+	case SEG_DS:
+		savesegment(ds, seg_sel);
+		return seg_sel;
+	case SEG_ES:
+		savesegment(es, seg_sel);
+		return seg_sel;
+	case SEG_FS:
+		savesegment(fs, seg_sel);
+		return seg_sel;
+	case SEG_GS:
+		savesegment(gs, seg_sel);
+		return seg_sel;
+	default:
+		return -1;
+	}
+#else /* CONFIG_X86_32 */
+	struct kernel_vm86_regs *vm86regs = (struct kernel_vm86_regs *)regs;
+
+	if (v8086_mode(regs)) {
+		switch (seg_type) {
+		case SEG_CS:
+			return (unsigned short)(regs->cs & 0xffff);
+		case SEG_SS:
+			return (unsigned short)(regs->ss & 0xffff);
+		case SEG_DS:
+			return vm86regs->ds;
+		case SEG_ES:
+			return vm86regs->es;
+		case SEG_FS:
+			return vm86regs->fs;
+		case SEG_GS:
+			return vm86regs->gs;
+		default:
+			return -1;
+		}
+	}
+
+	switch (seg_type) {
+	case SEG_CS:
+		return (unsigned short)(regs->cs & 0xffff);
+	case SEG_SS:
+		return (unsigned short)(regs->ss & 0xffff);
+	case SEG_DS:
+		return (unsigned short)(regs->ds & 0xffff);
+	case SEG_ES:
+		return (unsigned short)(regs->es & 0xffff);
+	case SEG_FS:
+		return (unsigned short)(regs->fs & 0xffff);
+	case SEG_GS:
+		/*
+		 * GS may or may not be in regs as per CONFIG_X86_32_LAZY_GS.
+		 * The macro below takes care of both cases.
+		 */
+		return get_user_gs(regs);
+	default:
+		return -1;
+	}
+#endif /* CONFIG_X86_64 */
+}
 
 static int get_reg_offset(struct insn *insn, struct pt_regs *regs,
 			  enum reg_type type)
