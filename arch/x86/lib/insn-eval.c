@@ -5,9 +5,13 @@
  */
 #include <linux/kernel.h>
 #include <linux/string.h>
+#include <asm/desc_defs.h>
+#include <asm/desc.h>
 #include <asm/inat.h>
 #include <asm/insn.h>
 #include <asm/insn-eval.h>
+#include <asm/ldt.h>
+#include <linux/mmu_context.h>
 #include <asm/vm86.h>
 
 enum reg_type {
@@ -291,6 +295,63 @@ static int get_reg_offset(struct insn *insn, struct pt_regs *regs,
 		return -EINVAL;
 	}
 	return regoff[regno];
+}
+
+/**
+ * get_desc() - Obtain address of segment descriptor
+ * @seg:	Segment selector
+ * @desc:	Pointer to the selected segment descriptor
+ *
+ * Given a segment selector, obtain a memory pointer to the segment
+ * descriptor. Both global and local descriptor tables are supported.
+ * desc will contain the address of the descriptor.
+ *
+ * Return: 0 if success, -EINVAL if failure
+ */
+static int get_desc(unsigned short seg, struct desc_struct **desc)
+{
+	struct desc_ptr gdt_desc = {0, 0};
+	unsigned long desc_base;
+
+	if (!desc)
+		return -EINVAL;
+
+	desc_base = seg & ~(SEGMENT_RPL_MASK | SEGMENT_TI_MASK);
+
+#ifdef CONFIG_MODIFY_LDT_SYSCALL
+	if ((seg & SEGMENT_TI_MASK) == SEGMENT_LDT) {
+		seg >>= 3;
+
+		mutex_lock(&current->active_mm->context.lock);
+		if (unlikely(!current->active_mm->context.ldt ||
+			     seg >= current->active_mm->context.ldt->size)) {
+			*desc = NULL;
+			mutex_unlock(&current->active_mm->context.lock);
+			return -EINVAL;
+		}
+
+		*desc = &current->active_mm->context.ldt->entries[seg];
+		mutex_unlock(&current->active_mm->context.lock);
+		return 0;
+	}
+#endif
+	native_store_gdt(&gdt_desc);
+
+	/*
+	 * Bits [15:3] of the segment selector contain the index. Such
+	 * index needs to be multiplied by 8. However, as the index
+	 * least significant bit is already in bit 3, we don't have
+	 * to perform the multiplication.
+	 */
+	desc_base = seg & ~(SEGMENT_RPL_MASK | SEGMENT_TI_MASK);
+
+	if (desc_base > gdt_desc.size) {
+		*desc = NULL;
+		return -EINVAL;
+	}
+
+	*desc = (struct desc_struct *)(gdt_desc.address + desc_base);
+	return 0;
 }
 
 /**
