@@ -705,12 +705,21 @@ static inline long __to_signed_long(unsigned long val, int long_bytes)
 #endif
 }
 
-/*
- * return the address being referenced be instruction
- * for rm=3 returning the content of the rm reg
- * for rm!=3 calculates the address using SIB and Disp
+/**
+ * insn_get_addr_ref_32_64 - Obtain a 32/64-bit address referred by instruction
+ * @insn:	Instruction struct with ModRM and SiB bytes and displacement
+ * @regs:	Set of registers referred by the instruction
+ *
+ * This function is to be used with 32-bit and 64-bit address encodings. Obtain
+ * the memory address referred by the instruction's ModRM bytes and
+ * displacement. Also, the segment used as base is determined by either any
+ * segment override prefixes in insn or the default segment of the registers
+ * involved in the linear address computation.
+ *
+ * Return: linear address referenced by instruction and registers
  */
-void __user *insn_get_addr_ref(struct insn *insn, struct pt_regs *regs)
+static void __user *insn_get_addr_ref_32_64(struct insn *insn,
+					    struct pt_regs *regs)
 {
 	unsigned long linear_addr, seg_base_addr;
 	long eff_addr, base, indx, tmp;
@@ -794,4 +803,30 @@ void __user *insn_get_addr_ref(struct insn *insn, struct pt_regs *regs)
 	return (void __user *)linear_addr;
 out_err:
 	return (void __user *)-1;
+}
+
+/**
+ * insn_get_addr_ref - Obtain the linear address referred by instruction
+ * @insn:	Instruction structure containing ModRM byte and displacement
+ * @regs:	Set of registers referred by the instruction
+ *
+ * Obtain the memory address referred by the instruction's ModRM bytes and
+ * displacement. Also, the segment used as base is determined by either any
+ * segment override prefixes in insn or the default segment of the registers
+ * involved in the address computation.
+ *
+ * Return: linear address referenced by instruction and registers
+ */
+void __user *insn_get_addr_ref(struct insn *insn, struct pt_regs *regs)
+{
+	switch (insn->addr_bytes) {
+	case 2:
+		return insn_get_addr_ref_16(insn, regs);
+	case 4:
+		/* fall through */
+	case 8:
+		return insn_get_addr_ref_32_64(insn, regs);
+	default:
+		return (void __user *)-1;
+	}
 }
