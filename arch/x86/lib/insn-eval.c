@@ -355,6 +355,72 @@ static int get_desc(unsigned short seg, struct desc_struct **desc)
 }
 
 /**
+ * insn_get_seg_base() - Obtain base address contained in descriptor
+ * @regs:	Set of registers containing the segment selector
+ * @insn:	Instruction structure with selector override prefixes
+ * @regoff:	Operand offset, in pt_regs, of which the selector is needed
+ * @use_default_seg: Use the default segment instead of prefix overrides
+ *
+ * Obtain the base address of the segment descriptor as indicated by either
+ * any segment override prefixes contained in insn or the default segment
+ * applicable to the register indicated by regoff. regoff is specified as the
+ * offset in bytes from the base of pt_regs.
+ *
+ * Return: In protected mode, base address of the segment. It may be zero in
+ * certain cases for 64-bit builds and/or 64-bit applications. In virtual-8086
+ * mode, the segment selector shifed 4 positions to the right. -1L in case of
+ * error.
+ */
+unsigned long insn_get_seg_base(struct pt_regs *regs, struct insn *insn,
+				int regoff, bool use_default_seg)
+{
+	struct desc_struct *desc;
+	unsigned short seg;
+	enum segment seg_type;
+	int ret;
+
+	seg_type = resolve_seg_selector(insn, regoff, use_default_seg);
+
+	seg = get_segment_selector(regs, seg_type);
+	if (seg < 0)
+		return -1L;
+
+	if (v8086_mode(regs))
+		/*
+		 * Base is simply the segment selector shifted 4
+		 * positions to the right.
+		 */
+		return (unsigned long)(seg << 4);
+
+#ifdef CONFIG_X86_64
+	if (user_64bit_mode(regs)) {
+		/*
+		 * Only FS or GS will have a base address, the rest of
+		 * the segments' bases are forced to 0.
+		 */
+		unsigned long base;
+
+		if (seg_type == SEG_FS)
+			rdmsrl(MSR_FS_BASE, base);
+		else if (seg_type == SEG_GS)
+			/*
+			 * swapgs was called at the kernel entry point. Thus,
+			 * MSR_KERNEL_GS_BASE will have the user-space GS base.
+			 */
+			rdmsrl(MSR_KERNEL_GS_BASE, base);
+		else
+			base = 0;
+		return base;
+	}
+#endif
+	ret = get_desc(seg, &desc);
+	if (ret)
+		return -1L;
+
+	return get_desc_base(desc);
+}
+
+/**
  * insn_get_reg_offset_modrm_rm - Obtain register in r/m part of ModRM byte
  * @insn:	Instruction structure containing the ModRM byte
  * @regs:	Set of registers indicated by the ModRM byte
