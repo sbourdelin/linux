@@ -104,6 +104,14 @@ static struct s5p_mfc_fmt formats[] = {
 		.num_planes	= 1,
 		.versions	= MFC_V7_BIT | MFC_V8_BIT | MFC_V10_BIT,
 	},
+	{
+		.name		= "HEVC Encoded Stream",
+		.fourcc		= V4L2_PIX_FMT_HEVC,
+		.codec_mode	= S5P_FIMV_CODEC_HEVC_ENC,
+		.type		= MFC_FMT_ENC,
+		.num_planes	= 1,
+		.versions	= MFC_V10_BIT,
+	},
 };
 
 #define NUM_FORMATS ARRAY_SIZE(formats)
@@ -694,6 +702,447 @@ static struct mfc_control controls[] = {
 		.type = V4L2_CTRL_TYPE_INTEGER,
 		.minimum = 0,
 		.maximum = 3,
+		.step = 1,
+		.default_value = 0,
+	},
+	{
+		.id = V4L2_CID_MPEG_VIDEO_HEVC_I_FRAME_QP,
+		.type = V4L2_CTRL_TYPE_INTEGER,
+		.name = "HEVC Frame QP value",
+		.minimum = 0,
+		.maximum = 51,
+		.step = 1,
+		.default_value = 0,
+	},
+	{
+		.id = V4L2_CID_MPEG_VIDEO_HEVC_P_FRAME_QP,
+		.type = V4L2_CTRL_TYPE_INTEGER,
+		.name = "HEVC P frame QP value",
+		.minimum = 0,
+		.maximum = 51,
+		.step = 1,
+		.default_value = 0,
+	},
+	{
+		.id = V4L2_CID_MPEG_VIDEO_HEVC_B_FRAME_QP,
+		.type = V4L2_CTRL_TYPE_INTEGER,
+		.name = "HEVC B frame QP value",
+		.minimum = 0,
+		.maximum = 51,
+		.step = 1,
+		.default_value = 0,
+	},
+	{
+		.id = V4L2_CID_MPEG_VIDEO_HEVC_MIN_QP,
+		.type = V4L2_CTRL_TYPE_INTEGER,
+		.name = "HEVC Minimum QP value",
+		.minimum = 0,
+		.maximum = 51,
+		.step = 1,
+		.default_value = 0,
+	},
+	{
+		.id = V4L2_CID_MPEG_VIDEO_HEVC_MAX_QP,
+		.type = V4L2_CTRL_TYPE_INTEGER,
+		.name = "HEVC Maximum QP value",
+		.minimum = 0,
+		.maximum = 51,
+		.step = 1,
+		.default_value = 0,
+	},
+	{
+		.id = V4L2_CID_MPEG_VIDEO_HEVC_ADAPTIVE_RC_DARK,
+		.type = V4L2_CTRL_TYPE_BOOLEAN,
+		.name = "HEVC dark region adaptive",
+		.minimum = 0,
+		.maximum = 1,
+		.step = 1,
+		.default_value = 0,
+	},
+	{
+		.id = V4L2_CID_MPEG_VIDEO_HEVC_ADAPTIVE_RC_SMOOTH,
+		.type = V4L2_CTRL_TYPE_BOOLEAN,
+		.name = "HEVC smooth region adaptive",
+		.minimum = 0,
+		.maximum = 1,
+		.step = 1,
+		.default_value = 0,
+	},
+	{
+		.id = V4L2_CID_MPEG_VIDEO_HEVC_ADAPTIVE_RC_STATIC,
+		.type = V4L2_CTRL_TYPE_BOOLEAN,
+		.name = "HEVC static region adaptive",
+		.minimum = 0,
+		.maximum = 1,
+		.step = 1,
+		.default_value = 0,
+	},
+	{
+		.id = V4L2_CID_MPEG_VIDEO_HEVC_ADAPTIVE_RC_ACTIVITY,
+		.type = V4L2_CTRL_TYPE_BOOLEAN,
+		.name = "HEVC activity adaptive",
+		.minimum = 0,
+		.maximum = 1,
+		.step = 1,
+		.default_value = 0,
+	},
+	{
+		.id = V4L2_CID_MPEG_VIDEO_HEVC_PROFILE,
+		.type = V4L2_CTRL_TYPE_BOOLEAN,
+		.name = "HEVC Profile",
+		.minimum = 0,
+		.maximum = 0,
+		.step = 1,
+		.default_value = 0,
+	},
+	{
+		.id = V4L2_CID_MPEG_VIDEO_HEVC_LEVEL,
+		.type = V4L2_CTRL_TYPE_INTEGER,
+		.name = "HEVC level",
+		.minimum = 10,
+		.maximum = 62,
+		.step = 1,
+		.default_value = 10,
+	},
+	{
+		.id = V4L2_CID_MPEG_VIDEO_HEVC_TIER_FLAG,
+		.type = V4L2_CTRL_TYPE_BOOLEAN,
+		.name = "HEVC tier_flag default is Main",
+		.minimum = 0,
+		.maximum = 1,
+		.step = 1,
+		.default_value = 0,
+	},
+	{
+		.id = V4L2_CID_MPEG_VIDEO_HEVC_RC_FRAME_RATE,
+		.type = V4L2_CTRL_TYPE_INTEGER,
+		.name = "HEVC Frame rate",
+		.minimum = 1,
+		.maximum = (1 << 16) - 1,
+		.step = 1,
+		.default_value = 1,
+	},
+	{
+		.id = V4L2_CID_MPEG_VIDEO_HEVC_MAX_PARTITION_DEPTH,
+		.type = V4L2_CTRL_TYPE_BOOLEAN,
+		.name = "HEVC Maximum coding unit depth",
+		.minimum = 0,
+		.maximum = 1,
+		.step = 1,
+		.default_value = 0,
+	},
+	{
+		.id = V4L2_CID_MPEG_VIDEO_HEVC_REF_NUMBER_FOR_PFRAMES,
+		.type = V4L2_CTRL_TYPE_INTEGER,
+		.name = "HEVC Number of reference picture",
+		.minimum = 1,
+		.maximum = 2,
+		.step = 1,
+		.default_value = 1,
+	},
+	{
+		.id = V4L2_CID_MPEG_VIDEO_HEVC_REFRESH_TYPE,
+		.type = V4L2_CTRL_TYPE_INTEGER,
+		.name = "HEVC Number of reference picture",
+		.minimum = 0,
+		.maximum = 2,
+		.step = 1,
+		.default_value = 0,
+	},
+	{
+		.id = V4L2_CID_MPEG_VIDEO_HEVC_CONST_INTRA_PRED_ENABLE,
+		.type = V4L2_CTRL_TYPE_BOOLEAN,
+		.name = "HEVC refresh type",
+		.minimum = 0,
+		.maximum = 1,
+		.step = 1,
+		.default_value = 0,
+	},
+	{
+		.id = V4L2_CID_MPEG_VIDEO_HEVC_LOSSLESS_CU_ENABLE,
+		.type = V4L2_CTRL_TYPE_BOOLEAN,
+		.name = "HEVC lossless encoding select",
+		.minimum = 0,
+		.maximum = 1,
+		.step = 1,
+		.default_value = 0,
+	},
+	{
+		.id = V4L2_CID_MPEG_VIDEO_HEVC_WAVEFRONT_ENABLE,
+		.type = V4L2_CTRL_TYPE_BOOLEAN,
+		.name = "HEVC Wavefront enable",
+		.minimum = 0,
+		.maximum = 1,
+		.step = 1,
+		.default_value = 0,
+	},
+	{
+		.id = V4L2_CID_MPEG_VIDEO_HEVC_LF_DISABLE,
+		.type = V4L2_CTRL_TYPE_BOOLEAN,
+		.name = "HEVC Filter disable",
+		.minimum = 0,
+		.maximum = 1,
+		.step = 1,
+		.default_value = 0,
+	},
+	{
+		.id = V4L2_CID_MPEG_VIDEO_HEVC_LF_SLICE_BOUNDARY,
+		.type = V4L2_CTRL_TYPE_BOOLEAN,
+		.name = "across or not slice boundary",
+		.minimum = 0,
+		.maximum = 1,
+		.step = 1,
+		.default_value = 0,
+	},
+	{
+		.id = V4L2_CID_MPEG_VIDEO_HEVC_LTR_ENABLE,
+		.type = V4L2_CTRL_TYPE_BOOLEAN,
+		.name = "long term reference enable",
+		.minimum = 0,
+		.maximum = 1,
+		.step = 1,
+		.default_value = 0,
+	},
+	{
+		.id = V4L2_CID_MPEG_VIDEO_HEVC_HIERARCHICAL_QP_ENABLE,
+		.type = V4L2_CTRL_TYPE_BOOLEAN,
+		.name = "QP values for temporal layer",
+		.minimum = 0,
+		.maximum = 1,
+		.step = 1,
+		.default_value = 0,
+	},
+	{
+		.id = V4L2_CID_MPEG_VIDEO_HEVC_HIERARCHICAL_CODING_TYPE,
+		.type = V4L2_CTRL_TYPE_BOOLEAN,
+		.name = "Hierarchical Coding Type",
+		.minimum = V4L2_MPEG_VIDEO_HEVC_HIERARCHICAL_CODING_B,
+		.maximum = V4L2_MPEG_VIDEO_HEVC_HIERARCHICAL_CODING_P,
+		.step = 1,
+		.default_value = 0,
+	},
+	{
+		.id = V4L2_CID_MPEG_VIDEO_HEVC_HIERARCHICAL_CODING_LAYER,
+		.type = V4L2_CTRL_TYPE_INTEGER,
+		.name = "Hierarchical Coding Layer",
+		.minimum = 0,
+		.maximum = 7,
+		.step = 1,
+		.default_value = 0,
+	},
+	{
+		.id = V4L2_CID_MPEG_VIDEO_HEVC_HIERARCHICAL_CODING_LAYER_QP,
+		.type = V4L2_CTRL_TYPE_INTEGER,
+		.name = "Hierarchical Coding Layer QP",
+		.minimum = INT_MIN,
+		.maximum = INT_MAX,
+		.step = 1,
+		.default_value = 0,
+	},
+	{
+		.id = V4L2_CID_MPEG_VIDEO_HEVC_HIERARCHICAL_CODING_LAYER_BIT0,
+		.type = V4L2_CTRL_TYPE_INTEGER,
+		.name = "Hierarchical Coding Layer BIT0",
+		.minimum = INT_MIN,
+		.maximum = INT_MAX,
+		.step = 1,
+		.default_value = 0,
+	},
+	{
+		.id = V4L2_CID_MPEG_VIDEO_HEVC_HIERARCHICAL_CODING_LAYER_BIT1,
+		.type = V4L2_CTRL_TYPE_INTEGER,
+		.name = "Hierarchical Coding Layer BIT1",
+		.minimum = INT_MIN,
+		.maximum = INT_MAX,
+		.step = 1,
+		.default_value = 0,
+	},
+	{
+		.id = V4L2_CID_MPEG_VIDEO_HEVC_HIERARCHICAL_CODING_LAYER_BIT2,
+		.type = V4L2_CTRL_TYPE_INTEGER,
+		.name = "Hierarchical Coding Layer BIT2",
+		.minimum = INT_MIN,
+		.maximum = INT_MAX,
+		.step = 1,
+		.default_value = 0,
+	},
+	{
+		.id = V4L2_CID_MPEG_VIDEO_HEVC_HIERARCHICAL_CODING_LAYER_BIT3,
+		.type = V4L2_CTRL_TYPE_INTEGER,
+		.name = "Hierarchical Coding Layer BIT3",
+		.minimum = INT_MIN,
+		.maximum = INT_MAX,
+		.step = 1,
+		.default_value = 0,
+	},
+	{
+		.id = V4L2_CID_MPEG_VIDEO_HEVC_HIERARCHICAL_CODING_LAYER_BIT4,
+		.type = V4L2_CTRL_TYPE_INTEGER,
+		.name = "Hierarchical Coding Layer BIT4",
+		.minimum = INT_MIN,
+		.maximum = INT_MAX,
+		.step = 1,
+		.default_value = 0,
+	},
+	{
+		.id = V4L2_CID_MPEG_VIDEO_HEVC_HIERARCHICAL_CODING_LAYER_BIT5,
+		.type = V4L2_CTRL_TYPE_INTEGER,
+		.name = "Hierarchical Coding Layer BIT5",
+		.minimum = INT_MIN,
+		.maximum = INT_MAX,
+		.step = 1,
+		.default_value = 0,
+	},
+	{
+		.id = V4L2_CID_MPEG_VIDEO_HEVC_HIERARCHICAL_CODING_LAYER_BIT6,
+		.type = V4L2_CTRL_TYPE_INTEGER,
+		.name = "Hierarchical Coding Layer BIT6",
+		.minimum = INT_MIN,
+		.maximum = INT_MAX,
+		.step = 1,
+		.default_value = 0,
+	},
+	{
+		.id = V4L2_CID_MPEG_VIDEO_HEVC_HIERARCHICAL_CODING_LAYER_CH,
+		.type = V4L2_CTRL_TYPE_INTEGER,
+		.name = "Hierarchical Coding Layer Change",
+		.minimum = INT_MIN,
+		.maximum = INT_MAX,
+		.step = 1,
+		.default_value = 0,
+	},
+	{
+		.id = V4L2_CID_MPEG_VIDEO_HEVC_SIGN_DATA_HIDING,
+		.type = V4L2_CTRL_TYPE_BOOLEAN,
+		.name = "HEVC Sign data hiding",
+		.minimum = 0,
+		.maximum = 1,
+		.step = 1,
+		.default_value = 0,
+	},
+	{
+		.id = V4L2_CID_MPEG_VIDEO_HEVC_GENERAL_PB_ENABLE,
+		.type = V4L2_CTRL_TYPE_BOOLEAN,
+		.name = "HEVC General pb enable",
+		.minimum = 0,
+		.maximum = 1,
+		.step = 1,
+		.default_value = 0,
+	},
+	{
+		.id = V4L2_CID_MPEG_VIDEO_HEVC_TEMPORAL_ID_ENABLE,
+		.type = V4L2_CTRL_TYPE_BOOLEAN,
+		.name = "HEVC Temporal id enable",
+		.minimum = 0,
+		.maximum = 1,
+		.step = 1,
+		.default_value = 0,
+	},
+	{
+		.id = V4L2_CID_MPEG_VIDEO_HEVC_STRONG_SMOTHING_FLAG,
+		.type = V4L2_CTRL_TYPE_BOOLEAN,
+		.name = "HEVC Strong intra smoothing flag",
+		.minimum = 0,
+		.maximum = 1,
+		.step = 1,
+		.default_value = 0,
+	},
+	{
+		.id = V4L2_CID_MPEG_VIDEO_HEVC_DISABLE_INTRA_PU_SPLIT,
+		.type = V4L2_CTRL_TYPE_BOOLEAN,
+		.name = "HEVC disable intra pu split",
+		.minimum = 0,
+		.maximum = 1,
+		.step = 1,
+		.default_value = 0,
+	},
+	{
+		.id = V4L2_CID_MPEG_VIDEO_HEVC_DISABLE_TMV_PREDICTION,
+		.type = V4L2_CTRL_TYPE_BOOLEAN,
+		.name = "HEVC disable tmv prediction",
+		.minimum = 0,
+		.maximum = 1,
+		.step = 1,
+		.default_value = 0,
+	},
+	{
+		.id = V4L2_CID_MPEG_VIDEO_HEVC_MAX_NUM_MERGE_MV_MINUS1,
+		.type = V4L2_CTRL_TYPE_INTEGER,
+		.name = "max number of candidate MVs",
+		.minimum = 0,
+		.maximum = 4,
+		.step = 1,
+		.default_value = 0,
+	},
+	{
+		.id = V4L2_CID_MPEG_VIDEO_HEVC_WITHOUT_STARTCODE_ENABLE,
+		.type = V4L2_CTRL_TYPE_BOOLEAN,
+		.name = "ENC without startcode enable",
+		.minimum = 0,
+		.maximum = 1,
+		.step = 1,
+		.default_value = 0,
+	},
+	{
+		.id = V4L2_CID_MPEG_VIDEO_HEVC_REFRESH_PERIOD,
+		.type = V4L2_CTRL_TYPE_INTEGER,
+		.name = "HEVC Number of reference picture",
+		.minimum = 0,
+		.maximum = (1 << 16) - 1,
+		.step = 1,
+		.default_value = 0,
+	},
+	{
+		.id = V4L2_CID_MPEG_VIDEO_HEVC_LF_BETA_OFFSET_DIV2,
+		.type = V4L2_CTRL_TYPE_INTEGER,
+		.name = "HEVC loop filter beta offset",
+		.minimum = -6,
+		.maximum = 6,
+		.step = 1,
+		.default_value = 0,
+	},
+	{
+		.id = V4L2_CID_MPEG_VIDEO_HEVC_LF_TC_OFFSET_DIV2,
+		.type = V4L2_CTRL_TYPE_INTEGER,
+		.name = "HEVC loop filter tc offset",
+		.minimum = -6,
+		.maximum = 6,
+		.step = 1,
+		.default_value = 0,
+	},
+	{
+		.id = V4L2_CID_MPEG_VIDEO_HEVC_SIZE_OF_LENGTH_FIELD,
+		.type = V4L2_CTRL_TYPE_INTEGER,
+		.name = "HEVC size of length field",
+		.minimum = 0,
+		.maximum = 3,
+		.step = 1,
+		.default_value = 0,
+	},
+	{
+		.id = V4L2_CID_MPEG_VIDEO_HEVC_USE_REF,
+		.type = V4L2_CTRL_TYPE_INTEGER,
+		.name = "user long term reference frame",
+		.minimum = 0,
+		.maximum = 1,
+		.step = 1,
+		.default_value = 0,
+	},
+	{
+		.id = V4L2_CID_MPEG_VIDEO_HEVC_STORE_REF,
+		.type = V4L2_CTRL_TYPE_INTEGER,
+		.name = "store long term reference frame",
+		.minimum = 0,
+		.maximum = 2,
+		.step = 1,
+		.default_value = 0,
+	},
+	{
+		.id = V4L2_CID_MPEG_VIDEO_HEVC_PREPEND_SPSPPS_TO_IDR,
+		.type = V4L2_CTRL_TYPE_INTEGER,
+		.name = "Prepend SPS/PPS to every IDR",
+		.minimum = 0,
+		.maximum = 1,
 		.step = 1,
 		.default_value = 0,
 	},
@@ -1639,6 +2088,152 @@ static int s5p_mfc_enc_s_ctrl(struct v4l2_ctrl *ctrl)
 		break;
 	case V4L2_CID_MPEG_VIDEO_VPX_PROFILE:
 		p->codec.vp8.profile = ctrl->val;
+		break;
+	case V4L2_CID_MPEG_VIDEO_HEVC_I_FRAME_QP:
+		p->codec.hevc.rc_frame_qp = ctrl->val;
+		break;
+	case V4L2_CID_MPEG_VIDEO_HEVC_P_FRAME_QP:
+		p->codec.hevc.rc_p_frame_qp = ctrl->val;
+		break;
+	case V4L2_CID_MPEG_VIDEO_HEVC_B_FRAME_QP:
+		p->codec.hevc.rc_b_frame_qp = ctrl->val;
+		break;
+	case V4L2_CID_MPEG_VIDEO_HEVC_RC_FRAME_RATE:
+		p->codec.hevc.rc_framerate = ctrl->val;
+		break;
+	case V4L2_CID_MPEG_VIDEO_HEVC_MIN_QP:
+		p->codec.hevc.rc_min_qp = ctrl->val;
+		break;
+	case V4L2_CID_MPEG_VIDEO_HEVC_MAX_QP:
+		p->codec.hevc.rc_max_qp = ctrl->val;
+		break;
+	case V4L2_CID_MPEG_VIDEO_HEVC_LEVEL:
+		p->codec.hevc.level = ctrl->val;
+		break;
+	case V4L2_CID_MPEG_VIDEO_HEVC_PROFILE:
+		break;
+	case V4L2_CID_MPEG_VIDEO_HEVC_ADAPTIVE_RC_DARK:
+		p->codec.hevc.rc_lcu_dark = ctrl->val;
+		break;
+	case V4L2_CID_MPEG_VIDEO_HEVC_ADAPTIVE_RC_SMOOTH:
+		p->codec.hevc.rc_lcu_smooth = ctrl->val;
+		break;
+	case V4L2_CID_MPEG_VIDEO_HEVC_ADAPTIVE_RC_STATIC:
+		p->codec.hevc.rc_lcu_static = ctrl->val;
+		break;
+	case V4L2_CID_MPEG_VIDEO_HEVC_ADAPTIVE_RC_ACTIVITY:
+		p->codec.hevc.rc_lcu_activity = ctrl->val;
+		break;
+	case V4L2_CID_MPEG_VIDEO_HEVC_TIER_FLAG:
+		p->codec.hevc.tier_flag = ctrl->val;
+		break;
+	case V4L2_CID_MPEG_VIDEO_HEVC_MAX_PARTITION_DEPTH:
+		p->codec.hevc.max_partition_depth = ctrl->val;
+		break;
+	case V4L2_CID_MPEG_VIDEO_HEVC_REF_NUMBER_FOR_PFRAMES:
+		p->codec.hevc.num_refs_for_p = ctrl->val;
+		break;
+	case V4L2_CID_MPEG_VIDEO_HEVC_REFRESH_TYPE:
+		p->codec.hevc.refreshtype = ctrl->val;
+		break;
+	case V4L2_CID_MPEG_VIDEO_HEVC_CONST_INTRA_PRED_ENABLE:
+		p->codec.hevc.const_intra_period_enable = ctrl->val;
+		break;
+	case V4L2_CID_MPEG_VIDEO_HEVC_LOSSLESS_CU_ENABLE:
+		p->codec.hevc.lossless_cu_enable = ctrl->val;
+		break;
+	case V4L2_CID_MPEG_VIDEO_HEVC_WAVEFRONT_ENABLE:
+		p->codec.hevc.wavefront_enable = ctrl->val;
+		break;
+	case V4L2_CID_MPEG_VIDEO_HEVC_LF_DISABLE:
+		p->codec.hevc.loopfilter_disable = ctrl->val;
+		break;
+	case V4L2_CID_MPEG_VIDEO_HEVC_LF_SLICE_BOUNDARY:
+		p->codec.hevc.loopfilter_across = ctrl->val;
+		break;
+	case V4L2_CID_MPEG_VIDEO_HEVC_LTR_ENABLE:
+		p->codec.hevc.enable_ltr = ctrl->val;
+		break;
+	case V4L2_CID_MPEG_VIDEO_HEVC_HIERARCHICAL_QP_ENABLE:
+		p->codec.hevc.hier_qp_enable = ctrl->val;
+		break;
+	case V4L2_CID_MPEG_VIDEO_HEVC_HIERARCHICAL_CODING_TYPE:
+		p->codec.hevc.hier_qp_type =
+			(enum v4l2_mpeg_video_hevc_hier_coding_type)(ctrl->val);
+		break;
+	case V4L2_CID_MPEG_VIDEO_HEVC_HIERARCHICAL_CODING_LAYER:
+		p->codec.hevc.num_hier_layer = ctrl->val & 0x7;
+		p->codec.hevc.hier_ref_type = (ctrl->val >> 16) & 0x1;
+		break;
+	case V4L2_CID_MPEG_VIDEO_HEVC_HIERARCHICAL_CODING_LAYER_QP:
+		p->codec.hevc.hier_qp_layer[(ctrl->val >> 16) & 0x7]
+					= ctrl->val & 0xFF;
+		break;
+	case V4L2_CID_MPEG_VIDEO_HEVC_HIERARCHICAL_CODING_LAYER_BIT0:
+		p->codec.hevc.hier_bit_layer[0] = ctrl->val;
+		break;
+	case V4L2_CID_MPEG_VIDEO_HEVC_HIERARCHICAL_CODING_LAYER_BIT1:
+		p->codec.hevc.hier_bit_layer[1] = ctrl->val;
+		break;
+	case V4L2_CID_MPEG_VIDEO_HEVC_HIERARCHICAL_CODING_LAYER_BIT2:
+		p->codec.hevc.hier_bit_layer[2] = ctrl->val;
+		break;
+	case V4L2_CID_MPEG_VIDEO_HEVC_HIERARCHICAL_CODING_LAYER_BIT3:
+		p->codec.hevc.hier_bit_layer[3] = ctrl->val;
+		break;
+	case V4L2_CID_MPEG_VIDEO_HEVC_HIERARCHICAL_CODING_LAYER_BIT4:
+		p->codec.hevc.hier_bit_layer[4] = ctrl->val;
+		break;
+	case V4L2_CID_MPEG_VIDEO_HEVC_HIERARCHICAL_CODING_LAYER_BIT5:
+		p->codec.hevc.hier_bit_layer[5] = ctrl->val;
+		break;
+	case V4L2_CID_MPEG_VIDEO_HEVC_HIERARCHICAL_CODING_LAYER_BIT6:
+		p->codec.hevc.hier_bit_layer[6] = ctrl->val;
+		break;
+	case V4L2_CID_MPEG_VIDEO_HEVC_SIGN_DATA_HIDING:
+		p->codec.hevc.sign_data_hiding = ctrl->val;
+		break;
+	case V4L2_CID_MPEG_VIDEO_HEVC_GENERAL_PB_ENABLE:
+		p->codec.hevc.general_pb_enable = ctrl->val;
+		break;
+	case V4L2_CID_MPEG_VIDEO_HEVC_TEMPORAL_ID_ENABLE:
+		p->codec.hevc.temporal_id_enable = ctrl->val;
+		break;
+	case V4L2_CID_MPEG_VIDEO_HEVC_STRONG_SMOTHING_FLAG:
+		p->codec.hevc.strong_intra_smooth = ctrl->val;
+		break;
+	case V4L2_CID_MPEG_VIDEO_HEVC_DISABLE_INTRA_PU_SPLIT:
+		p->codec.hevc.intra_pu_split_disable = ctrl->val;
+		break;
+	case V4L2_CID_MPEG_VIDEO_HEVC_DISABLE_TMV_PREDICTION:
+		p->codec.hevc.tmv_prediction_disable = ctrl->val;
+		break;
+	case V4L2_CID_MPEG_VIDEO_HEVC_MAX_NUM_MERGE_MV_MINUS1:
+		p->codec.hevc.max_num_merge_mv = ctrl->val;
+		break;
+	case V4L2_CID_MPEG_VIDEO_HEVC_WITHOUT_STARTCODE_ENABLE:
+		p->codec.hevc.encoding_nostartcode_enable = ctrl->val;
+		break;
+	case V4L2_CID_MPEG_VIDEO_HEVC_REFRESH_PERIOD:
+		p->codec.hevc.refreshperiod = ctrl->val;
+		break;
+	case V4L2_CID_MPEG_VIDEO_HEVC_LF_BETA_OFFSET_DIV2:
+		p->codec.hevc.lf_beta_offset_div2 = ctrl->val;
+		break;
+	case V4L2_CID_MPEG_VIDEO_HEVC_LF_TC_OFFSET_DIV2:
+		p->codec.hevc.lf_tc_offset_div2 = ctrl->val;
+		break;
+	case V4L2_CID_MPEG_VIDEO_HEVC_SIZE_OF_LENGTH_FIELD:
+		p->codec.hevc.size_of_length_field = ctrl->val;
+		break;
+	case V4L2_CID_MPEG_VIDEO_HEVC_USE_REF:
+		p->codec.hevc.use_ref = ctrl->val;
+		break;
+	case V4L2_CID_MPEG_VIDEO_HEVC_STORE_REF:
+		p->codec.hevc.store_ref = ctrl->val;
+		break;
+	case V4L2_CID_MPEG_VIDEO_HEVC_PREPEND_SPSPPS_TO_IDR:
+		p->codec.hevc.prepend_sps_pps_to_idr = ctrl->val;
 		break;
 	default:
 		v4l2_err(&dev->v4l2_dev, "Invalid control, id=%d, val=%d\n",

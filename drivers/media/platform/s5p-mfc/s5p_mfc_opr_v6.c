@@ -301,6 +301,17 @@ static int s5p_mfc_alloc_codec_buffers_v6(struct s5p_mfc_ctx *ctx)
 			ctx->chroma_dpb_size + ctx->me_buffer_size));
 		ctx->bank2.size = 0;
 		break;
+	case S5P_MFC_CODEC_HEVC_ENC:
+		mfc_debug(2, "Use min scratch buffer size\n");
+		ctx->me_buffer_size =
+			ALIGN(ENC_V100_HEVC_ME_SIZE(lcu_width, lcu_height), 16);
+		ctx->scratch_buf_size = ALIGN(ctx->scratch_buf_size, 256);
+		ctx->bank1.size =
+			ctx->scratch_buf_size + ctx->tmv_buffer_size +
+			(ctx->pb_count * (ctx->luma_dpb_size +
+			ctx->chroma_dpb_size + ctx->me_buffer_size));
+		ctx->bank2.size = 0;
+		break;
 	default:
 		break;
 	}
@@ -350,6 +361,9 @@ static int s5p_mfc_alloc_instance_buffer_v6(struct s5p_mfc_ctx *ctx)
 		break;
 	case S5P_MFC_CODEC_H264_ENC:
 		ctx->ctx.size = buf_size->h264_enc_ctx;
+		break;
+	case S5P_MFC_CODEC_HEVC_ENC:
+		ctx->ctx.size = buf_size->hevc_enc_ctx;
 		break;
 	case S5P_MFC_CODEC_MPEG4_ENC:
 	case S5P_MFC_CODEC_H263_ENC:
@@ -1433,6 +1447,180 @@ static int s5p_mfc_set_enc_params_vp8(struct s5p_mfc_ctx *ctx)
 	return 0;
 }
 
+static int s5p_mfc_set_enc_params_hevc(struct s5p_mfc_ctx *ctx)
+{
+	struct s5p_mfc_dev *dev = ctx->dev;
+	const struct s5p_mfc_regs *mfc_regs = dev->mfc_regs;
+	struct s5p_mfc_enc_params *p = &ctx->enc_params;
+	struct s5p_mfc_hevc_enc_params *p_hevc = &p->codec.hevc;
+	unsigned int reg = 0;
+	int i;
+
+	mfc_debug_enter();
+
+	s5p_mfc_set_enc_params(ctx);
+
+	/* pictype : number of B */
+	reg = readl(mfc_regs->e_gop_config);
+	/* num_b_frame - 0 ~ 2 */
+	reg &= ~(0x3 << 16);
+	reg |= (p->num_b_frame << 16);
+	writel(reg, mfc_regs->e_gop_config);
+
+	/* UHD encoding case */
+	if ((ctx->img_width == 3840) && (ctx->img_height == 2160)) {
+		p_hevc->level = 51;
+		p_hevc->tier_flag = 0;
+	/* this tier_flag can be changed */
+	}
+
+	/* tier_flag & level */
+	reg = 0;
+	/* level */
+	reg &= ~(0xFF << 8);
+	reg |= (p_hevc->level << 8);
+	/* tier_flag - 0 ~ 1 */
+	reg |= (p_hevc->tier_flag << 16);
+	writel(reg, mfc_regs->e_picture_profile);
+
+	/* max partition depth */
+	reg = 0;
+	reg |= (p_hevc->max_partition_depth & 0x1);
+	reg |= (p_hevc->num_refs_for_p-1) << 2;
+	reg |= (2 << 3); /* always set IDR encoding */
+	reg |= (p_hevc->const_intra_period_enable & 0x1) << 5;
+	reg |= (p_hevc->lossless_cu_enable & 0x1) << 6;
+	reg |= (p_hevc->wavefront_enable & 0x1) << 7;
+	reg |= (p_hevc->loopfilter_disable & 0x1) << 8;
+	reg |= (p_hevc->loopfilter_across & 0x1) << 9;
+	reg |= (p_hevc->enable_ltr & 0x1) << 10;
+	reg |= (p_hevc->hier_qp_enable & 0x1) << 11;
+	reg |= (p_hevc->sign_data_hiding & 0x1) << 12;
+	reg |= (p_hevc->general_pb_enable & 0x1) << 13;
+	reg |= (p_hevc->temporal_id_enable & 0x1) << 14;
+	reg |= (p_hevc->strong_intra_smooth & 0x1) << 15;
+	reg |= (p_hevc->intra_pu_split_disable & 0x1) << 16;
+	reg |= (p_hevc->tmv_prediction_disable & 0x1) << 17;
+	reg |= (p_hevc->max_num_merge_mv & 0x7) << 18;
+	reg |= (0 << 21); /* always eco mode disable */
+	reg |= (p_hevc->encoding_nostartcode_enable & 0x1) << 22;
+	reg |= (p_hevc->prepend_sps_pps_to_idr << 26);
+
+	writel(reg, mfc_regs->e_hevc_options);
+	/* refresh period */
+	if (p_hevc->refreshtype) {
+		reg = 0;
+		reg |= (p_hevc->refreshperiod & 0xFFFF);
+		writel(reg, mfc_regs->e_hevc_refresh_period);
+	}
+	/* loop filter setting */
+	if (!p_hevc->loopfilter_disable) {
+		reg = 0;
+		reg |= (p_hevc->lf_beta_offset_div2);
+		writel(reg, mfc_regs->e_hevc_lf_beta_offset_div2);
+		reg = 0;
+		reg |= (p_hevc->lf_tc_offset_div2);
+		writel(reg, mfc_regs->e_hevc_lf_tc_offset_div2);
+	}
+	/* long term reference */
+	if (p_hevc->enable_ltr) {
+		reg = 0;
+		reg |= (p_hevc->store_ref & 0x3);
+		reg &= ~(0x3 << 2);
+		reg |= (p_hevc->use_ref & 0x3) << 2;
+		writel(reg, mfc_regs->e_hevc_nal_control);
+	}
+	/* hier qp enable */
+	if (p_hevc->num_hier_layer) {
+		reg = 0;
+		reg |= (p_hevc->hier_qp_type & 0x1) << 0x3;
+		reg |= p_hevc->num_hier_layer & 0x7;
+		if (p_hevc->hier_ref_type) {
+			reg |= 0x1 << 7;
+			reg |= 0x3 << 4;
+		} else {
+			reg |= 0x7 << 4;
+		}
+		writel(reg, mfc_regs->e_num_t_layer);
+		/* QP value for each layer */
+		if (p_hevc->hier_qp_enable) {
+			for (i = 0; i < 7; i++)
+				writel(p_hevc->hier_qp_layer[i],
+					mfc_regs->e_hier_qp_layer0 + i * 4);
+		}
+		if (p->rc_frame) {
+			for (i = 0; i < 7; i++)
+				writel(p_hevc->hier_bit_layer[i],
+						mfc_regs->e_hier_bit_rate_layer0
+						+ i * 4);
+		}
+	}
+
+	/* rate control config. */
+	reg = readl(mfc_regs->e_rc_config);
+	/* macroblock level rate control */
+	reg &= ~(0x1 << 8);
+	reg |= (p->rc_mb << 8);
+	writel(reg, mfc_regs->e_rc_config);
+	/* frame QP */
+	reg &= ~(0x3F);
+	reg |= p_hevc->rc_frame_qp;
+	writel(reg, mfc_regs->e_rc_config);
+
+	/* frame rate */
+	if (p->rc_frame) {
+		reg = 0;
+		reg &= ~(0xffff << 16);
+		reg |= ((p_hevc->rc_framerate * FRAME_DELTA_DEFAULT) << 16);
+		reg &= ~(0xffff);
+		reg |= FRAME_DELTA_DEFAULT;
+		writel(reg, mfc_regs->e_rc_frame_rate);
+	}
+
+	/* max & min value of QP */
+	reg = 0;
+	/* max QP */
+	reg &= ~(0x3F << 8);
+	reg |= (p_hevc->rc_max_qp << 8);
+	/* min QP */
+	reg &= ~(0x3F);
+	reg |= p_hevc->rc_min_qp;
+	writel(reg, mfc_regs->e_rc_qp_bound);
+
+	/* macroblock adaptive scaling features */
+	writel(0x0, mfc_regs->e_mb_rc_config);
+	if (p->rc_mb) {
+		reg = 0;
+		/* dark region */
+		reg &= ~(0x1 << 3);
+		reg |= (p_hevc->rc_lcu_dark << 3);
+		/* smooth region */
+		reg &= ~(0x1 << 2);
+		reg |= (p_hevc->rc_lcu_smooth << 2);
+		/* static region */
+		reg &= ~(0x1 << 1);
+		reg |= (p_hevc->rc_lcu_static << 1);
+		/* high activity region */
+		reg &= ~(0x1);
+		reg |= p_hevc->rc_lcu_activity;
+		writel(reg, mfc_regs->e_mb_rc_config);
+	}
+	writel(0x0, mfc_regs->e_fixed_picture_qp);
+	if (!p->rc_frame && !p->rc_mb) {
+		reg = 0;
+		reg &= ~(0x3f << 16);
+		reg |= (p_hevc->rc_b_frame_qp << 16);
+		reg &= ~(0x3f << 8);
+		reg |= (p_hevc->rc_p_frame_qp << 8);
+		reg &= ~(0x3f);
+		reg |= p_hevc->rc_frame_qp;
+		writel(reg, mfc_regs->e_fixed_picture_qp);
+	}
+	mfc_debug_leave();
+
+	return 0;
+}
+
 /* Initialize decoding */
 static int s5p_mfc_init_decode_v6(struct s5p_mfc_ctx *ctx)
 {
@@ -1552,6 +1740,8 @@ static int s5p_mfc_init_encode_v6(struct s5p_mfc_ctx *ctx)
 		s5p_mfc_set_enc_params_h263(ctx);
 	else if (ctx->codec_mode == S5P_MFC_CODEC_VP8_ENC)
 		s5p_mfc_set_enc_params_vp8(ctx);
+	else if (ctx->codec_mode == S5P_FIMV_CODEC_HEVC_ENC)
+		s5p_mfc_set_enc_params_hevc(ctx);
 	else {
 		mfc_err("Unknown codec for encoding (%x).\n",
 			ctx->codec_mode);
@@ -2304,6 +2494,16 @@ const struct s5p_mfc_regs *s5p_mfc_init_regs_v6_plus(struct s5p_mfc_dev *dev)
 	/* decoder registers */
 	R(d_static_buffer_addr, S5P_FIMV_D_STATIC_BUFFER_ADDR_V10);
 	R(d_static_buffer_size, S5P_FIMV_D_STATIC_BUFFER_SIZE_V10);
+
+	/* encoder registers */
+	R(e_num_t_layer, S5P_FIMV_E_NUM_T_LAYER_V10);
+	R(e_hier_qp_layer0, S5P_FIMV_E_HIERARCHICAL_QP_LAYER0_V10);
+	R(e_hier_bit_rate_layer0, S5P_FIMV_E_HIERARCHICAL_BIT_RATE_LAYER0_V10);
+	R(e_hevc_options, S5P_FIMV_E_HEVC_OPTIONS_V10);
+	R(e_hevc_refresh_period, S5P_FIMV_E_HEVC_REFRESH_PERIOD_V10);
+	R(e_hevc_lf_beta_offset_div2, S5P_FIMV_E_HEVC_LF_BETA_OFFSET_DIV2_V10);
+	R(e_hevc_lf_tc_offset_div2, S5P_FIMV_E_HEVC_LF_TC_OFFSET_DIV2_V10);
+	R(e_hevc_nal_control, S5P_FIMV_E_HEVC_NAL_CONTROL_V10);
 
 done:
 	return &mfc_regs;
