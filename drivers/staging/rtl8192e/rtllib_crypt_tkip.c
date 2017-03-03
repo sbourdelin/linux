@@ -63,7 +63,7 @@ static void *rtllib_tkip_init(int key_idx)
 	struct rtllib_tkip_data *priv;
 
 	priv = kzalloc(sizeof(*priv), GFP_ATOMIC);
-	if (priv == NULL)
+	if (!priv)
 		goto fail;
 	priv->key_idx = key_idx;
 	priv->tx_tfm_arc4 = crypto_alloc_skcipher("ecb(arc4)", 0,
