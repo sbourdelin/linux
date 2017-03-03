@@ -2,7 +2,8 @@
 # Test for gcc 'asm goto' support
 # Copyright (C) 2010, Jason Baron <jbaron@redhat.com>
 
-cat << "END" | $@ -x c - -c -o /dev/null >/dev/null 2>&1 && echo "y"
+TMPOUT=$(mktemp)
+cat << "END" | $@ -x c - -c -o $TMPOUT >/dev/null 2>&1 && echo "y"
 int main(void)
 {
 #if defined(__arm__) || defined(__aarch64__)
@@ -19,3 +20,5 @@ entry:
 	return 0;
 }
 END
+
+rm $TMPOUT 2>/dev/null 2>&1
