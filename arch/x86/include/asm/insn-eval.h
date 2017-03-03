@@ -15,6 +15,8 @@ void __user *insn_get_addr_ref(struct insn *insn, struct pt_regs *regs);
 int insn_get_reg_offset_modrm_rm(struct insn *insn, struct pt_regs *regs);
 int insn_get_reg_offset_sib_base(struct insn *insn, struct pt_regs *regs);
 int insn_get_reg_offset_sib_base(struct insn *insn, struct pt_regs *regs);
+unsigned char insn_get_seg_default_address_bytes(struct pt_regs *regs);
+unsigned char insn_get_seg_default_operand_bytes(struct pt_regs *regs);
 unsigned long insn_get_seg_base(struct pt_regs *regs, struct insn *insn,
 				int regoff, bool use_default_seg);
 

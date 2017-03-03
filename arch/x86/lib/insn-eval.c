@@ -421,6 +421,86 @@ unsigned long insn_get_seg_base(struct pt_regs *regs, struct insn *insn,
 }
 
 /**
+ * insn_get_seg_default_address_bytes - Obtain default address size of segment
+ * @regs:	Set of registers containing the segment selector
+ *
+ * Obtain the default address size as indicated in the segment descriptor
+ * selected in regs' code segment selector. In protected mode, the default
+ * address is determined by inspecting the L and D bits of the segment
+ * descriptor. In virtual-8086 mode, the default is always two bytes.
+ *
+ * Return: Default address size of segment
+ */
+unsigned char insn_get_seg_default_address_bytes(struct pt_regs *regs)
+{
+	struct desc_struct *desc;
+	unsigned short seg;
+	int ret;
+
+	if (v8086_mode(regs))
+		return 2;
+
+	seg = (unsigned short)regs->cs;
+
+	ret = get_desc(seg, &desc);
+	if (ret)
+		return 0;
+
+	switch ((desc->l << 1) | desc->d) {
+	case 0: /* Legacy mode. 16-bit addresses. CS.L=0, CS.D=0 */
+		return 2;
+	case 1: /* Legacy mode. 32-bit addresses. CS.L=0, CS.D=1 */
+		return 4;
+	case 2: /* IA-32e 64-bit mode. 64-bit addresses. CS.L=1, CS.D=0 */
+		return 8;
+	case 3: /* Invalid setting. CS.L=1, CS.D=1 */
+		/* fall through */
+	default:
+		return 0;
+	}
+}
+
+/**
+ * insn_get_seg_default_operand_bytes - Obtain default operand size of segment
+ * @regs:	Set of registers containing the segment selector
+ *
+ * Obtain the default operand size as indicated in the segment descriptor
+ * selected in regs' code segment selector. In protected mode, the default
+ * operand size is determined by inspecting the L and D bits of the segment
+ * descriptor. In virtual-8086 mode, the default is always two bytes.
+ *
+ * Return: Default operand size of segment
+ */
+unsigned char insn_get_seg_default_operand_bytes(struct pt_regs *regs)
+{
+	struct desc_struct *desc;
+	unsigned short seg;
+	int ret;
+
+	if (v8086_mode(regs))
+		return 2;
+
+	seg = (unsigned short)regs->cs;
+
+	ret = get_desc(seg, &desc);
+	if (ret)
+		return 0;
+
+	switch ((desc->l << 1) | desc->d) {
+	case 0: /* Legacy mode. 16-bit or 8-bit operands CS.L=0, CS.D=0 */
+		return 2;
+	case 1: /* Legacy mode. 32- or 8 bit operands CS.L=0, CS.D=1 */
+		/* fall through */
+	case 2: /* IA-32e 64-bit mode. 32- or 8-bit opnds. CS.L=1, CS.D=0 */
+		return 4;
+	case 3: /* Invalid setting. CS.L=1, CS.D=1 */
+		/* fall through */
+	default:
+		return 0;
+	}
+}
+
+/**
  * insn_get_reg_offset_modrm_rm - Obtain register in r/m part of ModRM byte
  * @insn:	Instruction structure containing the ModRM byte
  * @regs:	Set of registers indicated by the ModRM byte
