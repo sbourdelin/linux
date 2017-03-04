@@ -543,28 +543,6 @@ static void storvsc_host_scan(struct work_struct *work)
 	kfree(wrk);
 }
 
-static void storvsc_remove_lun(struct work_struct *work)
-{
-	struct storvsc_scan_work *wrk;
-	struct scsi_device *sdev;
-
-	wrk = container_of(work, struct storvsc_scan_work, work);
-	if (!scsi_host_get(wrk->host))
-		goto done;
-
-	sdev = scsi_device_lookup(wrk->host, 0, wrk->tgt_id, wrk->lun);
-
-	if (sdev) {
-		scsi_remove_device(sdev);
-		scsi_device_put(sdev);
-	}
-	scsi_host_put(wrk->host);
-
-done:
-	kfree(wrk);
-}
-
-
 /*
  * We can get incoming messages from the host that are not in response to
  * messages that we have sent out. An example of this would be messages
@@ -955,8 +933,7 @@ static void storvsc_handle_error(struct vmscsi_request *vm_srb,
 		}
 		break;
 	case SRB_STATUS_INVALID_LUN:
-		do_work = true;
-		process_err_fn = storvsc_remove_lun;
+		set_host_byte(scmnd, DID_NO_CONNECT);
 		break;
 	case SRB_STATUS_ABORTED:
 		if (vm_srb->srb_status & SRB_STATUS_AUTOSENSE_VALID &&
@@ -1050,32 +1027,15 @@ static void storvsc_on_io_completion(struct storvsc_device *stor_device,
 
 	stor_pkt = &request->vstor_packet;
 
-	/*
-	 * The current SCSI handling on the host side does
-	 * not correctly handle:
-	 * INQUIRY command with page code parameter set to 0x80
-	 * MODE_SENSE command with cmd[2] == 0x1c
-	 *
-	 * Setup srb and scsi status so this won't be fatal.
-	 * We do this so we can distinguish truly fatal failues
-	 * (srb status == 0x4) and off-line the device in that case.
-	 */
-
-	if ((stor_pkt->vm_srb.cdb[0] == INQUIRY) ||
-	   (stor_pkt->vm_srb.cdb[0] == MODE_SENSE)) {
-		vstor_packet->vm_srb.scsi_status = 0;
-		vstor_packet->vm_srb.srb_status = SRB_STATUS_SUCCESS;
-	}
-
-
 	/* Copy over the status...etc */
 	stor_pkt->vm_srb.scsi_status = vstor_packet->vm_srb.scsi_status;
 	stor_pkt->vm_srb.srb_status = vstor_packet->vm_srb.srb_status;
 	stor_pkt->vm_srb.sense_info_length =
 	vstor_packet->vm_srb.sense_info_length;
 
-	if (vstor_packet->vm_srb.scsi_status != 0 ||
-	    vstor_packet->vm_srb.srb_status != SRB_STATUS_SUCCESS)
+	if (stor_pkt->vm_srb.cdb[0] != INQUIRY &&
+	    (vstor_packet->vm_srb.scsi_status != 0 ||
+	     vstor_packet->vm_srb.srb_status != SRB_STATUS_SUCCESS))
 		storvsc_log(device, STORVSC_LOGGING_WARN,
 			"cmd 0x%x scsi status 0x%x srb status 0x%x\n",
 			stor_pkt->vm_srb.cdb[0],
