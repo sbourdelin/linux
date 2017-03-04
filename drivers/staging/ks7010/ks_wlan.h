@@ -243,7 +243,7 @@ struct local_ap_t {
 		u8 body[16];
 		u8 rate_pad;
 	} rate_set;
-	u16 capability;
+	__le16 capability;
 	u8 channel;
 	u8 noise;
 	struct rsn_ie_t wpa_ie;

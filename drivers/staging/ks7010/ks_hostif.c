@@ -1867,7 +1867,7 @@ void hostif_receive(struct ks_wlan_private *priv, unsigned char *p,
 static
 void hostif_sme_set_wep(struct ks_wlan_private *priv, int type)
 {
-	uint32_t val;
+	__le32 val;
 
 	switch (type) {
 	case SME_WEP_INDEX_REQUEST:
@@ -1916,13 +1916,13 @@ void hostif_sme_set_wep(struct ks_wlan_private *priv, int type)
 }
 
 struct wpa_suite_t {
-	unsigned short size;
+	__le16 size;
 	unsigned char suite[4][CIPHER_ID_LEN];
 } __packed;
 
 struct rsn_mode_t {
-	uint32_t rsn_mode;
-	uint16_t rsn_capability;
+	__le32 rsn_mode;
+	__le16 rsn_capability;
 } __packed;
 
 static
@@ -1930,7 +1930,7 @@ void hostif_sme_set_rsn(struct ks_wlan_private *priv, int type)
 {
 	struct wpa_suite_t wpa_suite;
 	struct rsn_mode_t rsn_mode;
-	uint32_t val;
+	__le32 val;
 
 	memset(&wpa_suite, 0, sizeof(wpa_suite));
 
@@ -1982,7 +1982,8 @@ void hostif_sme_set_rsn(struct ks_wlan_private *priv, int type)
 
 		hostif_mib_set_request(priv, DOT11_RSN_CONFIG_UNICAST_CIPHER,
 				       sizeof(wpa_suite.size) +
-				       CIPHER_ID_LEN * wpa_suite.size,
+				       (CIPHER_ID_LEN *
+				        le16_to_cpu(wpa_suite.size)),
 				       MIB_VALUE_TYPE_OSTRING, &wpa_suite);
 		break;
 	case SME_RSN_MCAST_REQUEST:
@@ -2074,7 +2075,8 @@ void hostif_sme_set_rsn(struct ks_wlan_private *priv, int type)
 
 		hostif_mib_set_request(priv, DOT11_RSN_CONFIG_AUTH_SUITE,
 				       sizeof(wpa_suite.size) +
-				       KEY_MGMT_ID_LEN * wpa_suite.size,
+				       (KEY_MGMT_ID_LEN *
+				        le16_to_cpu(wpa_suite.size)),
 				       MIB_VALUE_TYPE_OSTRING, &wpa_suite);
 		break;
 	case SME_RSN_ENABLED_REQUEST:
@@ -2215,7 +2217,7 @@ void hostif_sme_multicast_set(struct ks_wlan_private *priv)
 	int mc_count;
 	struct netdev_hw_addr *ha;
 	char set_address[NIC_MAX_MCAST_LIST * ETH_ALEN];
-	unsigned long filter_type;
+	__le32 filter_type;
 	int i = 0;
 
 	DPRINTK(3, "\n");
@@ -2324,7 +2326,7 @@ void hostif_sme_sleep_set(struct ks_wlan_private *priv)
 static
 void hostif_sme_set_key(struct ks_wlan_private *priv, int type)
 {
-	uint32_t val;
+	__le32 val;
 
 	switch (type) {
 	case SME_SET_FLAG:
@@ -2383,7 +2385,7 @@ static
 void hostif_sme_set_pmksa(struct ks_wlan_private *priv)
 {
 	struct pmk_cache_t {
-		uint16_t size;
+		__le16 size;
 		struct {
 			uint8_t bssid[ETH_ALEN];
 			uint8_t pmkid[IW_PMKID_LEN];
@@ -2414,7 +2416,7 @@ void hostif_sme_set_pmksa(struct ks_wlan_private *priv)
 static
 void hostif_sme_execute(struct ks_wlan_private *priv, int event)
 {
-	uint32_t val;
+	__le32 val;
 
 	DPRINTK(3, "event=%d\n", event);
 	switch (event) {
