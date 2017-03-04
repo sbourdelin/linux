@@ -164,16 +164,17 @@ struct blkcg_gq *blkg_lookup_slowpath(struct blkcg *blkcg,
 EXPORT_SYMBOL_GPL(blkg_lookup_slowpath);
 
 /*
- * If @new_blkg is %NULL, this function tries to allocate a new one as
- * necessary using %GFP_NOWAIT.  @new_blkg is always consumed on return.
+ * If gfp mask allows blocking, this function temporarily drops rcu and queue
+ * locks to allocate memory.
  */
 static struct blkcg_gq *blkg_create(struct blkcg *blkcg,
-				    struct request_queue *q,
-				    struct blkcg_gq *new_blkg)
+				    struct request_queue *q, gfp_t gfp,
+				    const struct blkcg_policy *pol)
 {
-	struct blkcg_gq *blkg;
+	struct blkcg_gq *blkg = NULL;
 	struct bdi_writeback_congested *wb_congested;
 	int i, ret;
+	const bool drop_locks = gfpflags_allow_blocking(gfp);
 
 	WARN_ON_ONCE(!rcu_read_lock_held());
 	lockdep_assert_held(q->queue_lock);
@@ -184,24 +185,48 @@ static struct blkcg_gq *blkg_create(struct blkcg *blkcg,
 		goto err_free_blkg;
 	}
 
-	wb_congested = wb_congested_get_create(q->backing_dev_info,
-					       blkcg->css.id,
-					       GFP_NOWAIT | __GFP_NOWARN);
-	if (!wb_congested) {
-		ret = -ENOMEM;
-		goto err_put_css;
+	if (drop_locks) {
+		spin_unlock_irq(q->queue_lock);
+		rcu_read_unlock();
 	}
 
-	/* allocate */
-	if (!new_blkg) {
-		new_blkg = blkg_alloc(blkcg, q, GFP_NOWAIT | __GFP_NOWARN);
-		if (unlikely(!new_blkg)) {
-			ret = -ENOMEM;
+	wb_congested = wb_congested_get_create(q->backing_dev_info,
+					       blkcg->css.id, gfp);
+	blkg = blkg_alloc(blkcg, q, gfp);
+
+	if (drop_locks) {
+		rcu_read_lock();
+		spin_lock_irq(q->queue_lock);
+	}
+
+	if (unlikely(!wb_congested)) {
+		ret = -ENOMEM;
+		goto err_put_css;
+	} else if (unlikely(!blkg)) {
+		ret = -ENOMEM;
+		goto err_put_congested;
+	}
+
+	blkg->wb_congested = wb_congested;
+
+	if (pol) {
+		WARN_ON(!drop_locks);
+
+		if (!blkcg_policy_enabled(q, pol)) {
+			ret = -EOPNOTSUPP;
+			goto err_put_congested;
+		}
+
+		/*
+		 * This could be the first entry point of blkcg implementation
+		 * and we shouldn't allow anything to go through for a bypassing
+		 * queue.
+		 */
+		if (unlikely(blk_queue_bypass(q))) {
+			ret = blk_queue_dying(q) ? -ENODEV : -EBUSY;
 			goto err_put_congested;
 		}
 	}
-	blkg = new_blkg;
-	blkg->wb_congested = wb_congested;
 
 	/* link parent */
 	if (blkcg_parent(blkcg)) {
@@ -250,7 +275,7 @@ err_put_congested:
 err_put_css:
 	css_put(&blkcg->css);
 err_free_blkg:
-	blkg_free(new_blkg);
+	blkg_free(blkg);
 	return ERR_PTR(ret);
 }
 
@@ -258,30 +283,29 @@ err_free_blkg:
  * blkg_lookup_create - lookup blkg, try to create one if not there
  * @blkcg: blkcg of interest
  * @q: request_queue of interest
+ * @gfp: gfp mask
+ * @pol: blkcg policy (optional)
  *
  * Lookup blkg for the @blkcg - @q pair.  If it doesn't exist, try to
  * create one.  blkg creation is performed recursively from blkcg_root such
  * that all non-root blkg's have access to the parent blkg.  This function
  * should be called under RCU read lock and @q->queue_lock.
  *
+ * When gfp mask allows blocking, rcu and queue locks may be dropped for
+ * allocating memory. In this case, the locks will be reacquired on return.
+ *
  * Returns pointer to the looked up or created blkg on success, ERR_PTR()
  * value on error.  If @q is dead, returns ERR_PTR(-EINVAL).  If @q is not
  * dead and bypassing, returns ERR_PTR(-EBUSY).
  */
 struct blkcg_gq *blkg_lookup_create(struct blkcg *blkcg,
-				    struct request_queue *q)
+				    struct request_queue *q, gfp_t gfp,
+				    const struct blkcg_policy *pol)
 {
 	struct blkcg_gq *blkg;
 
 	WARN_ON_ONCE(!rcu_read_lock_held());
 	lockdep_assert_held(q->queue_lock);
-
-	/*
-	 * This could be the first entry point of blkcg implementation and
-	 * we shouldn't allow anything to go through for a bypassing queue.
-	 */
-	if (unlikely(blk_queue_bypass(q)))
-		return ERR_PTR(blk_queue_dying(q) ? -ENODEV : -EBUSY);
 
 	blkg = __blkg_lookup(blkcg, q, true);
 	if (blkg)
@@ -300,7 +324,7 @@ struct blkcg_gq *blkg_lookup_create(struct blkcg *blkcg,
 			parent = blkcg_parent(parent);
 		}
 
-		blkg = blkg_create(pos, q, NULL);
+		blkg = blkg_create(pos, q, gfp, pol);
 		if (pos == blkcg || IS_ERR(blkg))
 			return blkg;
 	}
@@ -789,6 +813,7 @@ int blkg_conf_prep(struct blkcg *blkcg, const struct blkcg_policy *pol,
 {
 	struct gendisk *disk;
 	struct blkcg_gq *blkg;
+	struct request_queue *q;
 	struct module *owner;
 	unsigned int major, minor;
 	int key_len, part, ret;
@@ -812,18 +837,22 @@ int blkg_conf_prep(struct blkcg *blkcg, const struct blkcg_policy *pol,
 		return -ENODEV;
 	}
 
-	rcu_read_lock();
-	spin_lock_irq(disk->queue->queue_lock);
+	q = disk->queue;
 
-	if (blkcg_policy_enabled(disk->queue, pol))
-		blkg = blkg_lookup_create(blkcg, disk->queue);
-	else
+	rcu_read_lock();
+	spin_lock_irq(q->queue_lock);
+
+	if (!blkcg_policy_enabled(q, pol))
 		blkg = ERR_PTR(-EOPNOTSUPP);
+	else if (unlikely(blk_queue_bypass(q)))
+		blkg = ERR_PTR(blk_queue_dying(q) ? -ENODEV : -EBUSY);
+	else
+		blkg = blkg_lookup_create(blkcg, q, GFP_KERNEL, pol);
 
 	if (IS_ERR(blkg)) {
 		ret = PTR_ERR(blkg);
 		rcu_read_unlock();
-		spin_unlock_irq(disk->queue->queue_lock);
+		spin_unlock_irq(q->queue_lock);
 		owner = disk->fops->owner;
 		put_disk(disk);
 		module_put(owner);
@@ -1065,14 +1094,9 @@ int blkcg_init_queue(struct request_queue *q)
 
 	preloaded = !radix_tree_preload(GFP_KERNEL);
 
-	/*
-	 * Make sure the root blkg exists and count the existing blkgs.  As
-	 * @q is bypassing at this point, blkg_lookup_create() can't be
-	 * used.  Open code insertion.
-	 */
 	rcu_read_lock();
 	spin_lock_irq(q->queue_lock);
-	blkg = blkg_create(&blkcg_root, q, new_blkg);
+	blkg = blkg_lookup_create(&blkcg_root, q, GFP_KERNEL, NULL);
 	spin_unlock_irq(q->queue_lock);
 	rcu_read_unlock();
 
