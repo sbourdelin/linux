@@ -169,8 +169,8 @@ enum RT_CHANNEL_DOMAIN_2G {
 };
 
 #define rtw_is_channel_plan_valid(chplan)			\
-	(chplan < RT_CHANNEL_DOMAIN_MAX ||			\
-	 chplan == RT_CHANNEL_DOMAIN_REALTEK_DEFINE)
+	((chplan) < RT_CHANNEL_DOMAIN_MAX ||			\
+	 (chplan) == RT_CHANNEL_DOMAIN_REALTEK_DEFINE)
 
 struct rt_channel_plan {
 	unsigned char	Channel[MAX_CHANNEL_NUM];

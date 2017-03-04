@@ -232,7 +232,7 @@ enum WIFI_REG_DOMAIN {
 	do {    \
 		*(__le16 *)((size_t)(pbuf) + 22) = \
 			((*(__le16 *)((size_t)(pbuf) + 22)) & cpu_to_le16((unsigned short)0x000f)) | \
-			cpu_to_le16((unsigned short)(0xfff0 & (num << 4))); \
+			cpu_to_le16((unsigned short)(0xfff0 & ((num) << 4))); \
 	} while (0)
 
 #define SetDuration(pbuf, dur) \
@@ -240,15 +240,15 @@ enum WIFI_REG_DOMAIN {
 
 
 #define SetPriority(pbuf, tid)	\
-	*(__le16 *)(pbuf) |= cpu_to_le16(tid & 0xf)
+	*(__le16 *)(pbuf) |= cpu_to_le16((tid) & 0xf)
 
 #define GetPriority(pbuf)	((le16_to_cpu(*(__le16 *)(pbuf))) & 0xf)
 
 #define SetEOSP(pbuf, eosp)	\
-		*(__le16 *)(pbuf) |= cpu_to_le16((eosp & 1) << 4)
+		*(__le16 *)(pbuf) |= cpu_to_le16(((eosp) & 1) << 4)
 
 #define SetAckpolicy(pbuf, ack)	\
-	*(__le16 *)(pbuf) |= cpu_to_le16((ack & 3) << 5)
+	*(__le16 *)(pbuf) |= cpu_to_le16(((ack) & 3) << 5)
 
 #define GetAckpolicy(pbuf) (((le16_to_cpu(*(__le16 *)pbuf)) >> 5) & 0x3)
 

@@ -92,7 +92,7 @@ struct reportpwrstate_parm {
 	unsigned short rsvd;
 };
 
-#define LPS_DELAY_TIME	1*HZ /*  1 sec */
+#define LPS_DELAY_TIME	(1 * HZ) /*  1 sec */
 
 #define EXE_PWR_NONE	0x01
 #define EXE_PWR_IPS		0x02
@@ -121,7 +121,7 @@ enum rt_rf_power_state {
 #define	RT_RF_LPS_LEVEL_ASPM		BIT(31)	/* LPS with ASPM */
 
 #define	RT_IN_PS_LEVEL(ppsc, _PS_FLAG)				\
-	((ppsc->cur_ps_level & _PS_FLAG) ? true : false)
+	((ppsc->cur_ps_level & (_PS_FLAG)) ? true : false)
 #define	RT_CLEAR_PS_LEVEL(ppsc, _PS_FLAG)			\
 	(ppsc->cur_ps_level &= (~(_PS_FLAG)))
 #define	RT_SET_PS_LEVEL(ppsc, _PS_FLAG)				\
@@ -205,7 +205,7 @@ struct pwrctrl_priv {
 };
 
 #define rtw_get_ips_mode_req(pwrctrlpriv) \
-	(pwrctrlpriv)->ips_mode_req
+	((pwrctrlpriv)->ips_mode_req)
 
 #define rtw_ips_mode_req(pwrctrlpriv, ips_mode) \
 	((pwrctrlpriv)->ips_mode_req = (ips_mode))

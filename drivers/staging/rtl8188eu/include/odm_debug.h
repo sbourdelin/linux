@@ -87,7 +87,7 @@
 
 #define ODM_RT_TRACE(pDM_Odm, comp, level, fmt)				\
 	if (((comp) & pDM_Odm->DebugComponents) &&			\
-	    (level <= pDM_Odm->DebugLevel)) {				\
+	    ((level) <= pDM_Odm->DebugLevel)) {				\
 		pr_info("[ODM-8188E] ");				\
 		RT_PRINTK fmt;						\
 	}

@@ -146,7 +146,7 @@ struct txpowerinfo24g {
 #define EFUSE_REAL_CONTENT_LEN		512
 #define EFUSE_MAX_SECTION		16
 #define EFUSE_IC_ID_OFFSET		506 /* For some inferior IC purpose*/
-#define AVAILABLE_EFUSE_ADDR(addr)	(addr < EFUSE_REAL_CONTENT_LEN)
+#define AVAILABLE_EFUSE_ADDR(addr)	((addr) < EFUSE_REAL_CONTENT_LEN)
 /*  To prevent out of boundary programming case, */
 /*  leave 1byte and program full section */
 /*  9bytes + 1byt + 5bytes and pre 1byte. */
@@ -166,7 +166,7 @@ struct txpowerinfo24g {
 #define		EFUSE_MAX_WORD_UNIT_88E		4
 #define		EFUSE_IC_ID_OFFSET_88E		506
 #define		AVAILABLE_EFUSE_ADDR_88E(addr)			\
-	(addr < EFUSE_REAL_CONTENT_LEN_88E)
+	((addr) < EFUSE_REAL_CONTENT_LEN_88E)
 /*  To prevent out of boundary programming case, leave 1byte and program
  *  full section */
 /*  9bytes + 1byt + 5bytes and pre 1byte. */

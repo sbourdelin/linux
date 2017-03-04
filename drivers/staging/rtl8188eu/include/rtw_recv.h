@@ -135,8 +135,8 @@ struct rx_pkt_attrib {
 
 
 /* These definition is used for Rx packet reordering. */
-#define SN_LESS(a, b)		(((a - b) & 0x800) != 0)
-#define SN_EQUAL(a, b)	(a == b)
+#define SN_LESS(a, b)		((((a) - (b)) & 0x800) != 0)
+#define SN_EQUAL(a, b)	((a) == (b))
 #define REORDER_WAIT_TIME	(50) /*  (ms) */
 
 #define RXDESC_SIZE	24

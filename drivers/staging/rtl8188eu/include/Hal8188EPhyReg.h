@@ -495,7 +495,7 @@
 #define	bOFDMTxStatus		0x2
 
 #define	IS_BB_REG_OFFSET_92S(_Offset)			\
-	((_Offset >= 0x800) && (_Offset <= 0xfff))
+	(((_Offset) >= 0x800) && ((_Offset) <= 0xfff))
 
 /*  2. Page8(0x800) */
 #define	bRFMOD			0x1	/*  Reg 0x800 rFPGA0_RFMOD */

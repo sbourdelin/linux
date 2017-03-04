@@ -69,7 +69,7 @@ extern u32 GlobalDebugLevel;
 
 #define DBG_88E_LEVEL(_level, fmt, arg...)				\
 	do {								\
-		if (_level <= GlobalDebugLevel)				\
+		if ((_level) <= GlobalDebugLevel)			\
 			pr_info(DRIVER_PREFIX fmt, ##arg);	\
 	} while (0)
 
@@ -87,7 +87,7 @@ extern u32 GlobalDebugLevel;
 
 #define RT_TRACE(_comp, _level, fmt)					\
 	do {								\
-		if (_level <= GlobalDebugLevel) {			\
+		if ((_level) <= GlobalDebugLevel) {			\
 			pr_info("%s [0x%08x,%d]", DRIVER_PREFIX,	\
 				 (unsigned int)_comp, _level);		\
 			pr_info fmt;					\
@@ -96,7 +96,7 @@ extern u32 GlobalDebugLevel;
 
 #define RT_PRINT_DATA(_comp, _level, _titlestring, _hexdata, _hexdatalen)\
 	do {								\
-		if (_level <= GlobalDebugLevel) {			\
+		if ((_level) <= GlobalDebugLevel) {			\
 			int __i;					\
 			u8	*ptr = (u8 *)_hexdata;			\
 			pr_info("%s", DRIVER_PREFIX);			\
