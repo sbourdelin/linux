@@ -3311,8 +3311,10 @@ static int vmx_set_msr(struct kvm_vcpu *vcpu, struct msr_data *msr_info)
 		     FEATURE_CONTROL_LOCKED && !msr_info->host_initiated))
 			return 1;
 		vmx->msr_ia32_feature_control = data;
-		if (msr_info->host_initiated && data == 0)
+		if (msr_info->host_initiated && data == 0) {
+			vmx->nested.nested_run_pending = 0;
 			vmx_leave_nested(vcpu);
+		}
 		break;
 	case MSR_IA32_VMX_BASIC ... MSR_IA32_VMX_VMFUNC:
 		if (!msr_info->host_initiated)
