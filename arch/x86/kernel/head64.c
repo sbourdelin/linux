@@ -118,7 +118,7 @@ static unsigned long get_cmd_line_ptr(void)
 
 static void __init copy_bootdata(char *real_mode_data)
 {
-	char * command_line;
+	char *command_line;
 	unsigned long cmd_line_ptr;
 
 	memcpy(&boot_params, real_mode_data, sizeof boot_params);
@@ -130,7 +130,7 @@ static void __init copy_bootdata(char *real_mode_data)
 	}
 }
 
-asmlinkage __visible void __init x86_64_start_kernel(char * real_mode_data)
+asmlinkage __visible void __init x86_64_start_kernel(char *real_mode_data)
 {
 	int i;
 
@@ -163,7 +163,7 @@ asmlinkage __visible void __init x86_64_start_kernel(char * real_mode_data)
 		set_intr_gate(i, early_idt_handler_array[i]);
 	load_idt((const struct desc_ptr *)&idt_descr);
 
-	copy_bootdata(__va(real_mode_data));
+	copy_bootdata(real_mode_data);
 
 	/*
 	 * Load microcode early on BSP.
@@ -180,7 +180,7 @@ void __init x86_64_start_reservations(char *real_mode_data)
 {
 	/* version is always not zero if it is copied */
 	if (!boot_params.hdr.version)
-		copy_bootdata(__va(real_mode_data));
+		copy_bootdata(real_mode_data);
 
 	x86_early_init_platform_quirks();
 

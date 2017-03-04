@@ -266,9 +266,12 @@ ENTRY(secondary_startup_64)
 	movl	initial_gs+4(%rip),%edx
 	wrmsr
 
-	/* rsi is pointer to real mode structure with interesting info.
-	   pass it to C */
-	movq	%rsi, %rdi
+	/*
+	 * %rsi is pointer to real mode struct boot_params with interesting info.
+	 * Pass its virtual address to C.
+	 */
+	movq	$__PAGE_OFFSET_BASE, %rdi
+	addq	%rsi, %rdi
 
 .Ljump_to_C_code:
 	/*
@@ -487,6 +490,7 @@ early_gdt_descr:
 early_gdt_descr_base:
 	.quad	INIT_PER_CPU_VAR(gdt_page)
 
+/* The physical address the kernel is loaded at. */
 ENTRY(phys_base)
 	/* This must match the first entry in level2_kernel_pgt */
 	.quad   0x0000000000000000
