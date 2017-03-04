@@ -67,8 +67,6 @@
 static const struct super_operations btrfs_super_ops;
 static struct file_system_type btrfs_fs_type;
 
-static int btrfs_remount(struct super_block *sb, int *flags, char *data);
-
 const char *btrfs_decode_error(int errno)
 {
 	char *errstr = "unknown";
@@ -1359,28 +1357,6 @@ static struct dentry *mount_subvol(const char *subvol_name, u64 subvol_objectid,
 	}
 
 	mnt = vfs_kern_mount(&btrfs_fs_type, flags, device_name, newargs);
-	if (PTR_ERR_OR_ZERO(mnt) == -EBUSY) {
-		if (flags & MS_RDONLY) {
-			mnt = vfs_kern_mount(&btrfs_fs_type, flags & ~MS_RDONLY,
-					     device_name, newargs);
-		} else {
-			mnt = vfs_kern_mount(&btrfs_fs_type, flags | MS_RDONLY,
-					     device_name, newargs);
-			if (IS_ERR(mnt)) {
-				root = ERR_CAST(mnt);
-				mnt = NULL;
-				goto out;
-			}
-
-			down_write(&mnt->mnt_sb->s_umount);
-			ret = btrfs_remount(mnt->mnt_sb, &flags, NULL);
-			up_write(&mnt->mnt_sb->s_umount);
-			if (ret < 0) {
-				root = ERR_PTR(ret);
-				goto out;
-			}
-		}
-	}
 	if (IS_ERR(mnt)) {
 		root = ERR_CAST(mnt);
 		mnt = NULL;
@@ -1584,8 +1560,16 @@ static struct dentry *btrfs_mount(struct file_system_type *fs_type, int flags,
 	if (s->s_root) {
 		btrfs_close_devices(fs_devices);
 		free_fs_info(fs_info);
-		if ((flags ^ s->s_flags) & MS_RDONLY)
-			error = -EBUSY;
+		/* If s_flags is MS_RDONLY and flags is rw (~MS_RDONLY)
+		 * we need to reset s_flags so that sb can be writable
+		 * since we can be called from mount_subvol().
+		 * The vfsmount manages to preserve the ro/rw flags
+		 * of the root/orignal mount.
+		 * In case of vice-versa, s_flags is already does not
+		 * have MS_RDONLY set, so don't bother.
+		 */
+		if ((s->s_flags & MS_RDONLY) && !(flags & MS_RDONLY))
+			s->s_flags &= ~MS_RDONLY;
 	} else {
 		snprintf(s->s_id, sizeof(s->s_id), "%pg", bdev);
 		btrfs_sb(s)->bdev_holder = fs_type;
