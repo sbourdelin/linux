@@ -1,6 +1,6 @@
 #include "relocs.h"
 
-void die(char *fmt, ...)
+void die(const char *fmt, ...)
 {
 	va_list ap;
 	va_start(ap, fmt);
