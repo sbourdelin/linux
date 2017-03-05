@@ -113,6 +113,7 @@ config MDIO_GPIO
 
 config MDIO_HISI_FEMAC
 	tristate "Hisilicon FEMAC MDIO bus controller"
+	depends on ARCH_HISI || COMPILE_TEST
 	depends on HAS_IOMEM && OF_MDIO
 	help
 	  This module provides a driver for the MDIO busses found in the
