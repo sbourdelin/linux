@@ -860,6 +860,7 @@ static int ll_agl_thread(void *arg)
 	struct inode	     *dir    = d_inode(parent);
 	struct ll_inode_info     *plli   = ll_i2info(dir);
 	struct ll_inode_info     *clli;
+	struct ll_inode_info *tmp;
 	struct ll_sb_info	*sbi    = ll_i2sbi(dir);
 	struct ll_statahead_info *sai;
 	struct ptlrpc_thread *thread;
@@ -909,9 +910,7 @@ static int ll_agl_thread(void *arg)
 
 	spin_lock(&plli->lli_agl_lock);
 	sai->sai_agl_valid = 0;
-	while (!list_empty(&sai->sai_agls)) {
-		clli = list_entry(sai->sai_agls.next,
-				  struct ll_inode_info, lli_agl_list);
+	list_for_each_entry_safe(clli, tmp, &sai->sai_agls, lli_agl_list) {
 		list_del_init(&clli->lli_agl_list);
 		spin_unlock(&plli->lli_agl_lock);
 		clli->lli_agl_index = 0;
