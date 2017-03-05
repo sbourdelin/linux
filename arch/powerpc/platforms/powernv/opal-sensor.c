@@ -64,6 +64,12 @@ int opal_get_sensor_data(u32 sensor_hndl, u32 *sensor_data)
 		*sensor_data = be32_to_cpu(data);
 		break;
 
+	case OPAL_WRONG_STATE:
+		pr_notice("%s: Sensor data read failure due to "
+				"core sleeping/offline\n", __func__);
+		ret = -EIO;
+		break;
+
 	default:
 		ret = opal_error_code(ret);
 		break;
