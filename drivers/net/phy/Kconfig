@@ -127,7 +127,7 @@ config MDIO_MOXART
 
 config MDIO_OCTEON
 	tristate "Octeon and some ThunderX SOCs MDIO buses"
-	depends on 64BIT
+	depends on CAVIUM_OCTEON_SOC || ARCH_THUNDER || COMPILE_TEST
 	depends on HAS_IOMEM
 	select MDIO_CAVIUM
 	help
@@ -145,7 +145,7 @@ config MDIO_SUN4I
 
 config MDIO_THUNDER
 	tristate "ThunderX SOCs MDIO buses"
-	depends on 64BIT
+	depends on ARCH_THUNDER || COMPILE_TEST
 	depends on PCI
 	select MDIO_CAVIUM
 	help
