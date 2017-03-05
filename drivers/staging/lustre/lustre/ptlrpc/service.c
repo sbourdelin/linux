@@ -2314,6 +2314,7 @@ static void ptlrpc_svcpt_stop_threads(struct ptlrpc_service_part *svcpt)
 {
 	struct l_wait_info lwi = { 0 };
 	struct ptlrpc_thread *thread;
+	struct ptlrpc_thread *tmp;
 	LIST_HEAD(zombie);
 
 	CDEBUG(D_INFO, "Stopping threads for service %s\n",
@@ -2329,9 +2330,7 @@ static void ptlrpc_svcpt_stop_threads(struct ptlrpc_service_part *svcpt)
 
 	wake_up_all(&svcpt->scp_waitq);
 
-	while (!list_empty(&svcpt->scp_threads)) {
-		thread = list_entry(svcpt->scp_threads.next,
-				    struct ptlrpc_thread, t_link);
+	list_for_each_entry_safe(thread, tmp, &svcpt->scp_threads, t_link) {
 		if (thread_is_stopped(thread)) {
 			list_del(&thread->t_link);
 			list_add(&thread->t_link, &zombie);
