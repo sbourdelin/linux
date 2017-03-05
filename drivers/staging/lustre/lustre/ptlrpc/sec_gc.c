@@ -98,12 +98,11 @@ void sptlrpc_gc_del_sec(struct ptlrpc_sec *sec)
 static void sec_process_ctx_list(void)
 {
 	struct ptlrpc_cli_ctx *ctx;
+	struct ptlrpc_cli_ctx *tmp;
 
 	spin_lock(&sec_gc_ctx_list_lock);
 
-	while (!list_empty(&sec_gc_ctx_list)) {
-		ctx = list_entry(sec_gc_ctx_list.next,
-				 struct ptlrpc_cli_ctx, cc_gc_chain);
+	list_for_each_entry_safe(ctx, tmp, &sec_gc_ctx_list, cc_gc_chain) {
 		list_del_init(&ctx->cc_gc_chain);
 		spin_unlock(&sec_gc_ctx_list_lock);
 
