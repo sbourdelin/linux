@@ -127,6 +127,11 @@ static void nft_bitmap_activate(const struct net *net,
 	nft_bitmap_location(set, nft_set_ext_key(ext), &idx, &off);
 	/* Enter 11 state. */
 	priv->bitmap[idx] |= (genmask << off);
+
+	/* After the element is active in the bitmap, the dummy extension
+	 * object is not used anymore, free it now.
+	 */
+	nft_set_elem_destroy(set, ext, true);
 }
 
 static bool nft_bitmap_flush(const struct net *net,

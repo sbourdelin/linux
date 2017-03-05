@@ -4832,10 +4832,10 @@ static int nf_tables_commit(struct net *net, struct sk_buff *skb)
 		case NFT_MSG_NEWSETELEM:
 			te = (struct nft_trans_elem *)trans->data;
 
-			te->set->ops->activate(net, te->set, &te->elem);
 			nf_tables_setelem_notify(&trans->ctx, te->set,
 						 &te->elem,
 						 NFT_MSG_NEWSETELEM, 0);
+			te->set->ops->activate(net, te->set, &te->elem);
 			nft_trans_destroy(trans);
 			break;
 		case NFT_MSG_DELSETELEM:
