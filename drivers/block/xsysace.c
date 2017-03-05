@@ -1004,7 +1004,6 @@ static int ace_setup(struct ace_device *ace)
 	ace->gd->major = ace_major;
 	ace->gd->first_minor = ace->id * ACE_NUM_MINORS;
 	ace->gd->fops = &ace_fops;
-	ace->gd->queue = ace->queue;
 	ace->gd->private_data = ace;
 	snprintf(ace->gd->disk_name, 32, "xs%c", ace->id + 'a');
 
@@ -1031,6 +1030,8 @@ static int ace_setup(struct ace_device *ace)
 	/* Put sysace in a sane state by clearing most control reg bits */
 	ace_out(ace, ACE_CTRL, ACE_CTRL_FORCECFGMODE |
 		ACE_CTRL_DATABUFRDYIRQ | ACE_CTRL_ERRORIRQ);
+
+	ace->gd->queue = ace->queue;
 
 	/* Now we can hook up the irq handler */
 	if (ace->irq) {
