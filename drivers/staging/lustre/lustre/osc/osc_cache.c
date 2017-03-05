@@ -1996,6 +1996,7 @@ static unsigned int get_write_extents(struct osc_object *obj,
 {
 	struct client_obd *cli = osc_cli(obj);
 	struct osc_extent *ext;
+	struct osc_extent *tmp;
 	struct osc_extent *temp;
 	struct extent_rpc_data data = {
 		.erd_rpc_list = rpclist,
@@ -2014,9 +2015,7 @@ static unsigned int get_write_extents(struct osc_object *obj,
 	if (data.erd_page_count == data.erd_max_pages)
 		return data.erd_page_count;
 
-	while (!list_empty(&obj->oo_urgent_exts)) {
-		ext = list_entry(obj->oo_urgent_exts.next,
-				 struct osc_extent, oe_link);
+	list_for_each_entry_safe(ext, tmp, &obj->oo_urgent_exts, oe_link) {
 		if (!try_to_add_extent_for_io(cli, ext, &data))
 			return data.erd_page_count;
 
