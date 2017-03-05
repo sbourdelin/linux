@@ -797,8 +797,8 @@ int32_t vchi_get_peer_version(const VCHI_SERVICE_HANDLE_T handle, short *peer_ve
 {
 	int32_t ret = -1;
 	SHIM_SERVICE_T *service = (SHIM_SERVICE_T *)handle;
-	if (service)
-	{
+
+	if (service) {
 		VCHIQ_STATUS_T status;
 
 		status = vchiq_get_peer_version(service->handle, peer_version);
