@@ -1008,6 +1008,24 @@ static void sdt_warn_multi_events(int ctr, struct perf_probe_event *pev)
 		   ctr, pev->group, pev->event);
 }
 
+static void print_exst_sdt_events(struct probe_trace_event *tev)
+{
+	static bool msg_head;
+
+	if (!msg_head) {
+		pr_info("Matching event(s) from uprobe_events:\n");
+		msg_head = true;
+	}
+
+	pr_info("   %s:%s  0x%" PRIx64 "@%s\n", tev->group,
+		tev->event, tev->point.address, tev->point.module);
+}
+
+static void print_exst_sdt_event_footer(void)
+{
+	pr_info("Use 'perf probe -d <event>' to delete event(s).\n\n");
+}
+
 static int sdt_event_probepoint_exists(struct perf_probe_event *pev,
 				       struct probe_trace_event *tevs,
 				       int ntevs,
@@ -1022,9 +1040,13 @@ static int sdt_event_probepoint_exists(struct perf_probe_event *pev,
 			if (ret < 0)
 				return ret;
 
+			print_exst_sdt_events(&tevs[i]);
 			ctr++;
 		}
 	}
+
+	if (ctr > 0)
+		print_exst_sdt_event_footer();
 
 	if (ctr > 1)
 		sdt_warn_multi_events(ctr, pev);
@@ -1086,10 +1108,15 @@ static int sdt_merge_events(struct perf_probe_event *pev,
 
 				if (!ptrn_used)
 					shift_sdt_events(pev, i);
+
+				print_exst_sdt_events(&exst_tevs[j]);
 				ctr++;
 			}
 		}
 	}
+
+	if (ctr > 0)
+		print_exst_sdt_event_footer();
 
 	if (!ptrn_used || ctr == 0) {
 		/*
