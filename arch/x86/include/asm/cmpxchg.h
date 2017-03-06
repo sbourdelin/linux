@@ -2,6 +2,7 @@
 #define ASM_X86_CMPXCHG_H
 
 #include <linux/compiler.h>
+#include <linux/kasan-checks.h>
 #include <asm/cpufeatures.h>
 #include <asm/alternative.h> /* Provides LOCK_PREFIX */
 
@@ -41,6 +42,7 @@ extern void __add_wrong_size(void)
 #define __xchg_op(ptr, arg, op, lock)					\
 	({								\
 	        __typeof__ (*(ptr)) __ret = (arg);			\
+		kasan_check_write((void *)(ptr), sizeof(*(ptr)));	\
 		switch (sizeof(*(ptr))) {				\
 		case __X86_CASE_B:					\
 			asm volatile (lock #op "b %b0, %1\n"		\
@@ -86,6 +88,7 @@ extern void __add_wrong_size(void)
 	__typeof__(*(ptr)) __ret;					\
 	__typeof__(*(ptr)) __old = (old);				\
 	__typeof__(*(ptr)) __new = (new);				\
+	kasan_check_write((void *)(ptr), sizeof(*(ptr)));		\
 	switch (size) {							\
 	case __X86_CASE_B:						\
 	{								\
@@ -171,6 +174,7 @@ extern void __add_wrong_size(void)
 	BUILD_BUG_ON(sizeof(*(p2)) != sizeof(long));			\
 	VM_BUG_ON((unsigned long)(p1) % (2 * sizeof(long)));		\
 	VM_BUG_ON((unsigned long)((p1) + 1) != (unsigned long)(p2));	\
+	kasan_check_write((void *)(p1), 2 * sizeof(*(p1)));		\
 	asm volatile(pfx "cmpxchg%c4b %2; sete %0"			\
 		     : "=a" (__ret), "+d" (__old2),			\
 		       "+m" (*(p1)), "+m" (*(p2))			\
