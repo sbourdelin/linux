@@ -4025,10 +4025,8 @@ long kvm_arch_vm_ioctl(struct file *filp,
 		if (r) {
 			kvm->arch.irqchip_mode = KVM_IRQCHIP_NONE;
 			mutex_lock(&kvm->slots_lock);
-			mutex_lock(&kvm->irq_lock);
 			kvm_ioapic_destroy(kvm);
 			kvm_pic_destroy(kvm);
-			mutex_unlock(&kvm->irq_lock);
 			mutex_unlock(&kvm->slots_lock);
 			goto create_irqchip_unlock;
 		}
