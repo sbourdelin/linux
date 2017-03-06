@@ -14,6 +14,13 @@ static inline bool mmc_req_is_special(struct request *req)
 		 req_op(req) == REQ_OP_SECURE_ERASE);
 }
 
+enum mmc_issued {
+	MMC_REQ_STARTED,
+	MMC_REQ_BUSY,
+	MMC_REQ_FAILED_TO_START,
+	MMC_REQ_FINISHED,
+};
+
 struct task_struct;
 struct mmc_blk_data;
 
@@ -36,6 +43,13 @@ struct mmc_queue_req {
 	struct mmc_async_req	areq;
 };
 
+enum mmc_issue_type {
+	MMC_ISSUE_SYNC,
+	MMC_ISSUE_DCMD,
+	MMC_ISSUE_ASYNC,
+	MMC_ISSUE_MAX,
+};
+
 struct mmc_queue {
 	struct mmc_card		*card;
 	struct task_struct	*thread;
@@ -49,12 +63,18 @@ struct mmc_queue {
 	struct mmc_queue_req	*mqrq_cur;
 	struct mmc_queue_req	*mqrq_prev;
 	int			qdepth;
+	/* Following are defined for a Command Queue Engine */
+	int			cqe_in_flight[MMC_ISSUE_MAX];
+	unsigned int		cqe_busy;
+	bool			cqe_recovery_needed;
+#define MMC_CQE_DCMD_BUSY	BIT(0)
+#define MMC_CQE_QUEUE_FULL	BIT(1)
 };
 
 extern int mmc_queue_alloc_shared_queue(struct mmc_card *card);
 extern void mmc_queue_free_shared_queue(struct mmc_card *card);
 extern int mmc_init_queue(struct mmc_queue *, struct mmc_card *, spinlock_t *,
-			  const char *);
+			  const char *, int);
 extern void mmc_cleanup_queue(struct mmc_queue *);
 extern void mmc_queue_suspend(struct mmc_queue *);
 extern void mmc_queue_resume(struct mmc_queue *);
@@ -65,5 +85,26 @@ extern void mmc_queue_bounce_pre(struct mmc_queue_req *);
 extern void mmc_queue_bounce_post(struct mmc_queue_req *);
 
 extern int mmc_access_rpmb(struct mmc_queue *);
+
+void mmc_queue_set_special(struct mmc_queue *mq, struct request *req);
+void mmc_queue_clr_special(struct request *req);
+
+void mmc_cqe_kick_queue(struct mmc_queue *mq);
+
+enum mmc_issue_type mmc_cqe_issue_type(struct mmc_host *host,
+				       struct request *req);
+
+static inline int mmc_cqe_tot_in_flight(struct mmc_queue *mq)
+{
+	return mq->cqe_in_flight[MMC_ISSUE_SYNC] +
+	       mq->cqe_in_flight[MMC_ISSUE_DCMD] +
+	       mq->cqe_in_flight[MMC_ISSUE_ASYNC];
+}
+
+static inline int mmc_cqe_qcnt(struct mmc_queue *mq)
+{
+	return mq->cqe_in_flight[MMC_ISSUE_DCMD] +
+	       mq->cqe_in_flight[MMC_ISSUE_ASYNC];
+}
 
 #endif
