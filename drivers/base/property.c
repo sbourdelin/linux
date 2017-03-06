@@ -552,13 +552,27 @@ static int __fwnode_property_read_string_array(struct fwnode_handle *fwnode,
 	else if (is_acpi_node(fwnode))
 		return acpi_node_prop_read(fwnode, propname, DEV_PROP_STRING,
 					   val, nval);
-	else if (is_pset_node(fwnode))
-		return val ?
-			pset_prop_read_string_array(to_pset_node(fwnode),
-						    propname, val, nval) :
-			pset_prop_count_elems_of_size(to_pset_node(fwnode),
-						      propname,
-						      sizeof(const char *));
+	else if (is_pset_node(fwnode)) {
+		struct property_set *node = to_pset_node(fwnode);
+		struct property_entry *prop;
+
+		/* Read properties if val is non-NULL */
+		if (val)
+			return pset_prop_read_string_array(node, propname,
+							   val, nval);
+
+		prop = pset_prop_get(node, propname);
+		if (!prop)
+			return -EINVAL;
+
+		/* The array length for a non-array string property is 1. */
+		if (!prop->is_array)
+			return 1;
+
+		/* Return the length of an array. */
+		return pset_prop_count_elems_of_size(node, propname,
+						     sizeof(const char *));
+	}
 	return -ENXIO;
 }
 
