@@ -678,7 +678,7 @@ static struct ib_pd *nes_alloc_pd(struct ib_device *ibdev,
 	if (err)
 		return ERR_PTR(err);
 
-	nespd = kzalloc(sizeof (struct nes_pd), GFP_KERNEL);
+	nespd = kzalloc(sizeof(*nespd), GFP_KERNEL);
 	if (!nespd) {
 		nes_free_resource(nesadapter, nesadapter->allocated_pds, pd_num);
 		return ERR_PTR(-ENOMEM);
@@ -1447,7 +1447,7 @@ static struct ib_cq *nes_create_cq(struct ib_device *ibdev,
 	if (err)
 		return ERR_PTR(err);
 
-	nescq = kzalloc(sizeof(struct nes_cq), GFP_KERNEL);
+	nescq = kzalloc(sizeof(*nescq), GFP_KERNEL);
 	if (!nescq) {
 		nes_free_resource(nesadapter, nesadapter->allocated_cqs, cq_num);
 		return ERR_PTR(-ENOMEM);
