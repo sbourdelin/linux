@@ -1148,9 +1148,15 @@ static void parse_ddi_port(struct drm_i915_private *dev_priv, enum port port,
 			}
 		}
 	}
-	if (!child)
-		return;
+	if (!child) {
+		/* Clear the DDI VBT Port info values */
+		info->supports_dvi = false;
+		info->supports_hdmi = false;
+		info->supports_dp = false;
+		info->supports_edp = false;
 
+		return;
+	}
 	aux_channel = child->common.aux_channel;
 	ddc_pin = child->common.ddc_pin;
 
