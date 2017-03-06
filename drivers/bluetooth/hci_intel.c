@@ -610,6 +610,7 @@ static int intel_setup(struct hci_uart *hu)
 	switch (ver.hw_variant) {
 	case 0x0b:	/* 8260 LnP */
 	case 0x0c:	/* 8260 WsP */
+	case 0x12:	/* 9160/9260 ThP */
 		break;
 	default:
 		bt_dev_err(hdev, "Unsupported Intel hardware variant (%u)",
