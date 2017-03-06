@@ -585,7 +585,7 @@ struct rw_semaphore *rwsem_wake(struct rw_semaphore *sem)
 
 	/*
 	 * If a spinner is present, it is not necessary to do the wakeup.
-	 * Try to do wakeup only if the trylock succeeds to minimize
+	 * Try to do wakeup only if the wait_lock is free to minimize
 	 * spinlock contention which may introduce too much delay in the
 	 * unlock operation.
 	 *
@@ -593,7 +593,7 @@ struct rw_semaphore *rwsem_wake(struct rw_semaphore *sem)
 	 *    ---------------		-----------------------
 	 * [S]   osq_unlock()		[L]   osq
 	 *	 MB			      RMB
-	 * [RmW] rwsem_try_write_lock() [RmW] spin_trylock(wait_lock)
+	 * [RmW] rwsem_try_write_lock() [RmW] spin_is_locked(wait_lock)
 	 *
 	 * Here, it is important to make sure that there won't be a missed
 	 * wakeup while the rwsem is free and the only spinning writer goes
@@ -609,12 +609,18 @@ struct rw_semaphore *rwsem_wake(struct rw_semaphore *sem)
 		 * state is consulted before reading the wait_lock.
 		 */
 		smp_rmb();
-		if (!raw_spin_trylock_irqsave(&sem->wait_lock, flags))
+
+		/*
+		 * Normally checking wait_list without wait_lock isn't safe
+		 * as we may miss an incoming waiter. With spinners present,
+		 * however, we have someone to fall back on in case that
+		 * happens.
+		 */
+		if (list_empty(&sem->wait_list) ||
+		    raw_spin_is_locked(&sem->wait_lock))
 			return sem;
-		goto locked;
 	}
 	raw_spin_lock_irqsave(&sem->wait_lock, flags);
-locked:
 
 	if (!list_empty(&sem->wait_list))
 		__rwsem_mark_wake(sem, RWSEM_WAKE_ANY, &wake_q);
