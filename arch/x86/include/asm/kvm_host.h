@@ -727,6 +727,7 @@ struct kvm_hv {
 
 enum kvm_irqchip_mode {
 	KVM_IRQCHIP_NONE,
+	KVM_IRQCHIP_KERNEL_INIT,  /* KVM_CREATE_IRQCHIP in progress */
 	KVM_IRQCHIP_KERNEL,       /* created with KVM_CREATE_IRQCHIP */
 	KVM_IRQCHIP_SPLIT,        /* created with KVM_CAP_SPLIT_IRQCHIP */
 };

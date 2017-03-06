@@ -96,6 +96,11 @@ static inline int irqchip_split(struct kvm *kvm)
 	return kvm->arch.irqchip_mode == KVM_IRQCHIP_SPLIT;
 }
 
+static inline int irqchip_kernel_init(struct kvm *kvm)
+{
+	return kvm->arch.irqchip_mode == KVM_IRQCHIP_KERNEL_INIT;
+}
+
 static inline int irqchip_kernel(struct kvm *kvm)
 {
 	return kvm->arch.irqchip_mode == KVM_IRQCHIP_KERNEL;
@@ -103,7 +108,8 @@ static inline int irqchip_kernel(struct kvm *kvm)
 
 static inline int irqchip_in_kernel(struct kvm *kvm)
 {
-	bool ret = kvm->arch.irqchip_mode != KVM_IRQCHIP_NONE;
+	bool ret = kvm->arch.irqchip_mode == KVM_IRQCHIP_KERNEL ||
+		   kvm->arch.irqchip_mode == KVM_IRQCHIP_SPLIT;
 
 	/* Matches with wmb after initializing kvm->irq_routing. */
 	smp_rmb();
