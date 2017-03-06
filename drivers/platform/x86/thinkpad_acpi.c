@@ -1237,9 +1237,11 @@ static int tpacpi_rfk_hook_set_block(void *data, bool blocked)
 	/* try to set radio state */
 	res = (tp_rfk->ops->set_status)(blocked ?
 				TPACPI_RFK_RADIO_OFF : TPACPI_RFK_RADIO_ON);
+	if (res < 0)
+		return res;
 
 	/* and update the rfkill core with whatever the FW really did */
-	tpacpi_rfk_update_swstate(tp_rfk);
+	res = tpacpi_rfk_update_swstate(tp_rfk);
 
 	return (res < 0) ? res : 0;
 }
@@ -1371,7 +1373,10 @@ static ssize_t tpacpi_rfk_sysfs_enable_store(const enum tpacpi_rfk_id id,
 
 	res = tpacpi_rfkill_switches[id]->ops->set_status((!!t) ?
 				TPACPI_RFK_RADIO_ON : TPACPI_RFK_RADIO_OFF);
-	tpacpi_rfk_update_swstate(tpacpi_rfkill_switches[id]);
+	if (res < 0)
+		return res;
+
+	res = tpacpi_rfk_update_swstate(tpacpi_rfkill_switches[id]);
 
 	return (res < 0) ? res : count;
 }
@@ -1427,7 +1432,9 @@ static int tpacpi_rfk_procfs_write(const enum tpacpi_rfk_id id, char *buf)
 						"enable" : "disable",
 				tpacpi_rfkill_names[id]);
 		res = (tpacpi_rfkill_switches[id]->ops->set_status)(status);
-		tpacpi_rfk_update_swstate(tpacpi_rfkill_switches[id]);
+		if (res < 0)
+			return res;
+		res = tpacpi_rfk_update_swstate(tpacpi_rfkill_switches[id]);
 	}
 
 	return res;
@@ -3517,6 +3524,8 @@ static int __init hotkey_init(struct ibm_init_struct *iibm)
 	if (tp_features.hotkey_wlsw)
 		res = add_to_attr_set(hotkey_dev_attributes,
 				&dev_attr_hotkey_radio_sw.attr);
+	if (res)
+		goto err_exit;
 
 	res = hotkey_init_tablet_mode();
 	if (res < 0)
