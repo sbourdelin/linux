@@ -547,9 +547,7 @@ static void ks_sdio_interrupt(struct sdio_func *func)
 	if (priv->dev_state < DEVICE_STATE_BOOT)
 		goto intr_out;
 
-	retval =
-		ks7010_sdio_read(priv, INT_PENDING, &status,
-				sizeof(status));
+	retval = ks7010_sdio_read(priv, INT_PENDING, &status, sizeof(status));
 	if (retval) {
 		DPRINTK(1, "read INT_PENDING Failed!!(%d)\n", retval);
 		goto intr_out;
@@ -561,21 +559,18 @@ static void ks_sdio_interrupt(struct sdio_func *func)
 	/* read (General Communication B register) */
 	/* bit5 -> Write Status Idle */
 	/* bit2 -> Read Status Busy  */
-	if (status & INT_GCR_B
-		|| atomic_read(&priv->psstatus.status) == PS_SNOOZE) {
-		retval =
-			ks7010_sdio_read(priv, GCR_B, &rw_data,
-					sizeof(rw_data));
+	if (status & INT_GCR_B ||
+		atomic_read(&priv->psstatus.status) == PS_SNOOZE) {
+		retval = ks7010_sdio_read(priv, GCR_B, &rw_data,
+					  sizeof(rw_data));
 		if (retval) {
 			DPRINTK(1, " error : GCR_B=%02X\n", rw_data);
 			goto intr_out;
 		}
 		/* DPRINTK(1, "GCR_B=%02X\n", rw_data); */
 		if (rw_data == GCR_B_ACTIVE) {
-			if (atomic_read(&priv->psstatus.status) ==
-				PS_SNOOZE) {
-				atomic_set(&priv->psstatus.status,
-					PS_WAKEUP);
+			if (atomic_read(&priv->psstatus.status) == PS_SNOOZE) {
+				atomic_set(&priv->psstatus.status, PS_WAKEUP);
 				priv->wakeup_count = 0;
 			}
 			complete(&priv->psstatus.wakeup_wait);
@@ -584,30 +579,26 @@ static void ks_sdio_interrupt(struct sdio_func *func)
 
 	do {
 		/* read (WriteStatus/ReadDataSize FN1:00_0014) */
-		retval =
-			ks7010_sdio_read(priv, WSTATUS_RSIZE, &rw_data,
-					sizeof(rw_data));
+		retval = ks7010_sdio_read(priv, WSTATUS_RSIZE, &rw_data,
+					  sizeof(rw_data));
 		if (retval) {
-			DPRINTK(1, " error : WSTATUS_RSIZE=%02X\n",
-				rw_data);
+			DPRINTK(1, " error : WSTATUS_RSIZE=%02X\n", rw_data);
 			goto intr_out;
 		}
 		DPRINTK(4, "WSTATUS_RSIZE=%02X\n", rw_data);
 		rsize = rw_data & RSIZE_MASK;
-		if (rsize) {	/* Read schedule */
-			ks_wlan_hw_rx((void *)priv,
-				(uint16_t)(rsize << 4));
-		}
+		if (rsize)	/* Read schedule */
+			ks_wlan_hw_rx((void *)priv, (uint16_t)(rsize << 4));
+
 		if (rw_data & WSTATUS_MASK) {
 #if 0
-			if (status & INT_WRITE_STATUS
-				&& !cnt_txqbody(priv)) {
+			if (status & INT_WRITE_STATUS &&
+			    !cnt_txqbody(priv)) {
 				/* dummy write for interrupt clear */
 				rw_data = 0;
-				retval =
-					ks7010_sdio_write(priv, DATA_WINDOW,
-							&rw_data,
-							sizeof(rw_data));
+				retval = ks7010_sdio_write(priv, DATA_WINDOW,
+							   &rw_data,
+							   sizeof(rw_data));
 				if (retval) {
 					DPRINTK(1,
 						"write DATA_WINDOW Failed!!(%d)\n",
