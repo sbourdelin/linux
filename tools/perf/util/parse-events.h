@@ -206,4 +206,6 @@ static inline bool is_sdt_event(char *str)
 		(!strncmp(str, "sdt_", 4) &&
 		 !!strchr(str, ':') && !strchr(str, '=')));
 }
+
+void sdt_event_list__add(struct list_head *sdt_event_list);
 #endif /* __PERF_PARSE_EVENTS_H */

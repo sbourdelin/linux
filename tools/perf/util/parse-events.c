@@ -1726,12 +1726,66 @@ static void parse_events_print_error(struct parse_events_error *err,
 
 #undef MAX_WIDTH
 
+/* SDT event needs LIBELF support for creating a probe point */
+#ifdef HAVE_LIBELF_SUPPORT
+static int parse_sdt_event(struct perf_evlist *evlist, const char *str,
+			   struct parse_events_error *err)
+{
+	char *ptr = NULL;
+	int ret;
+	struct list_head *sdt_evlist;
+	struct sdt_event_list *sdt_event;
+
+	if (str[0] == '%')
+		str++;
+
+	ptr = strdup(str);
+	if (ptr == NULL)
+		return -ENOMEM;
+
+	sdt_evlist = zalloc(sizeof(*sdt_evlist));
+	if (!sdt_evlist) {
+		free(ptr);
+		pr_debug("Error in sdt_evlist memory allocation\n");
+		return -ENOMEM;
+	}
+	INIT_LIST_HEAD(sdt_evlist);
+
+	/*
+	 * If there is an error in this call, no need to free
+	 * up sdt_evlist, its already free'ed up in the previous
+	 * call. Free up 'ptr' though.
+	 */
+	ret = add_sdt_event(ptr, sdt_evlist);
+	if (!ret) {
+		list_for_each_entry(sdt_event, sdt_evlist, list) {
+			ret = parse_events(evlist, sdt_event->name, err);
+			if (ret < 0)
+				goto ret;
+		}
+		/* Add it to the record struct */
+		sdt_event_list__add(sdt_evlist);
+	}
+
+ret:
+	free(ptr);
+	return ret;
+}
+#endif /* HAVE_LIBELF_SUPPORT */
+
 int parse_events_option(const struct option *opt, const char *str,
 			int unset __maybe_unused)
 {
 	struct perf_evlist *evlist = *(struct perf_evlist **)opt->value;
 	struct parse_events_error err = { .idx = 0, };
-	int ret = parse_events(evlist, str, &err);
+	int ret = 0;
+
+#ifdef HAVE_LIBELF_SUPPORT
+	if (is_sdt_event((char *)str) && is_cmd_record())
+		ret = parse_sdt_event(evlist, str, &err);
+	else
+#endif
+		ret = parse_events(evlist, str, &err);
 
 	if (ret)
 		parse_events_print_error(&err, str);

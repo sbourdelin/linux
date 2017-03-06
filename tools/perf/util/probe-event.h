@@ -182,4 +182,8 @@ struct map *get_target_map(const char *target, bool user);
 void arch__post_process_probe_trace_events(struct perf_probe_event *pev,
 					   int ntevs);
 
+int parse_perf_probe_event_name(char **arg, struct perf_probe_event *pev);
+
+int find_cached_events_all(struct perf_probe_event *pev,
+			   struct probe_trace_event **tevs);
 #endif /*_PROBE_EVENT_H */

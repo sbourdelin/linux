@@ -39,6 +39,7 @@
 #include "util/trigger.h"
 #include "util/perf-hooks.h"
 #include "asm/bug.h"
+#include "util/probe-file.h"
 
 #include <unistd.h>
 #include <sched.h>
@@ -73,6 +74,7 @@ struct record {
 	bool			timestamp_filename;
 	struct switch_output	switch_output;
 	unsigned long long	samples;
+	struct list_head	sdt_event_list;
 };
 
 static volatile int auxtrace_record__snapshot_started;
@@ -1503,6 +1505,26 @@ static struct record record = {
 	},
 };
 
+void sdt_event_list__add(struct list_head *sdt_event_list)
+{
+	if (list_empty(sdt_event_list))
+		return;
+	list_splice(sdt_event_list, &record.sdt_event_list);
+}
+
+bool is_cmd_record(void)
+{
+	return (record.evlist != NULL);
+}
+
+static void
+sdt_event_list__remove(struct list_head *sdt_event_list __maybe_unused)
+{
+#ifdef HAVE_LIBELF_SUPPORT
+	return remove_sdt_event_list(sdt_event_list);
+#endif
+}
+
 const char record_callchain_help[] = CALLCHAIN_RECORD_HELP
 	"\n\t\t\t\tDefault: fp";
 
@@ -1671,6 +1693,7 @@ int cmd_record(int argc, const char **argv, const char *prefix __maybe_unused)
 	if (rec->evlist == NULL)
 		return -ENOMEM;
 
+	INIT_LIST_HEAD(&rec->sdt_event_list);
 	err = perf_config(perf_record_config, rec);
 	if (err)
 		return err;
@@ -1837,6 +1860,7 @@ out:
 	perf_evlist__delete(rec->evlist);
 	symbol__exit();
 	auxtrace_record__free(rec->itr);
+	sdt_event_list__remove(&rec->sdt_event_list);
 	return err;
 }
 
