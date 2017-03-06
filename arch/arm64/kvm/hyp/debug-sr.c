@@ -109,9 +109,13 @@ static void __hyp_text __debug_save_spe_nvhe(u64 *pmscr_el1)
 	dsb(nsh);
 }
 
-static hyp_alternate_select(__debug_save_spe,
-			    __debug_save_spe_nvhe, __debug_save_spe_vhe,
-			    ARM64_HAS_VIRT_HOST_EXTN);
+static void __hyp_text __debug_save_spe(u64 *pmscr_el1)
+{
+	if (has_vhe())
+		__debug_save_spe_vhe(pmscr_el1);
+	else
+		__debug_save_spe_nvhe(pmscr_el1);
+}
 
 static void __hyp_text __debug_restore_spe(u64 pmscr_el1)
 {
@@ -180,7 +184,7 @@ void __hyp_text __debug_cond_save_host_state(struct kvm_vcpu *vcpu)
 
 	__debug_save_state(vcpu, &vcpu->arch.host_debug_state.regs,
 			   kern_hyp_va(vcpu->arch.host_cpu_context));
-	__debug_save_spe()(&vcpu->arch.host_debug_state.pmscr_el1);
+	__debug_save_spe(&vcpu->arch.host_debug_state.pmscr_el1);
 }
 
 void __hyp_text __debug_cond_restore_host_state(struct kvm_vcpu *vcpu)
