@@ -1517,11 +1517,10 @@ bool is_cmd_record(void)
 	return (record.evlist != NULL);
 }
 
-static void
-sdt_event_list__remove(struct list_head *sdt_event_list __maybe_unused)
+void sdt_event_list__remove(void)
 {
 #ifdef HAVE_LIBELF_SUPPORT
-	return remove_sdt_event_list(sdt_event_list);
+	return remove_sdt_event_list(&record.sdt_event_list);
 #endif
 }
 
@@ -1860,7 +1859,7 @@ out:
 	perf_evlist__delete(rec->evlist);
 	symbol__exit();
 	auxtrace_record__free(rec->itr);
-	sdt_event_list__remove(&rec->sdt_event_list);
+	sdt_event_list__remove();
 	return err;
 }
 

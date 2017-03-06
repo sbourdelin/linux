@@ -77,4 +77,5 @@ struct option;
 extern const char * const *record_usage;
 extern struct option *record_options;
 bool is_cmd_record(void);
+void sdt_event_list__remove(void);
 #endif

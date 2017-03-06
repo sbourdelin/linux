@@ -1190,8 +1190,10 @@ int add_sdt_event(char *event, struct list_head *sdt_evlist)
 	ret = 0;
 
 free_pev:
-	if (ret < 0)
+	if (ret < 0) {
 		free_sdt_list(sdt_evlist);
+		sdt_event_list__remove();
+	}
 	cleanup_perf_probe_events(pev, 1);
 	clear_probe_trace_events(exst_tevs, exst_ntevs);
 	free(pev);
