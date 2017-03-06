@@ -602,6 +602,24 @@ static const char *fault_name(unsigned int esr)
 }
 
 /*
+ * Handle Synchronous External Aborts that occur in a guest kernel.
+ */
+int handle_guest_sea(unsigned long addr, unsigned int esr)
+{
+	/*
+	 * synchronize_rcu() will wait for nmi_exit(), so no need to
+	 * rcu_read_lock().
+	 */
+	if(IS_ENABLED(ACPI_APEI_SEA)) {
+		rcu_read_lock();
+		ghes_notify_sea();
+		rcu_read_unlock();
+	}
+
+	return 0;
+}
+
+/*
  * Dispatch a data abort to the relevant handler.
  */
 asmlinkage void __exception do_mem_abort(unsigned long addr, unsigned int esr,

@@ -29,6 +29,7 @@
 #include <asm/kvm_asm.h>
 #include <asm/kvm_emulate.h>
 #include <asm/virt.h>
+#include <asm/system_misc.h>
 
 #include "trace.h"
 
@@ -1409,6 +1410,24 @@ out:
 		kvm_set_pfn_accessed(pfn);
 }
 
+static bool is_abort_synchronous(unsigned long fault_status) {
+	switch (fault_status) {
+	case FSC_SEA:
+	case FSC_SEA_TTW0:
+	case FSC_SEA_TTW1:
+	case FSC_SEA_TTW2:
+	case FSC_SEA_TTW3:
+	case FSC_SECC:
+	case FSC_SECC_TTW0:
+	case FSC_SECC_TTW1:
+	case FSC_SECC_TTW2:
+	case FSC_SECC_TTW3:
+		return true;
+	default:
+		return false;
+	}
+}
+
 /**
  * kvm_handle_guest_abort - handles all 2nd stage aborts
  * @vcpu:	the VCPU pointer
@@ -1444,8 +1463,21 @@ int kvm_handle_guest_abort(struct kvm_vcpu *vcpu, struct kvm_run *run)
 
 	/* Check the stage-2 fault is trans. fault or write fault */
 	fault_status = kvm_vcpu_trap_get_fault_type(vcpu);
-	if (fault_status != FSC_FAULT && fault_status != FSC_PERM &&
-	    fault_status != FSC_ACCESS) {
+
+	/* The host kernel will handle the synchronous external abort. There
+	 * is no need to pass the error into the guest.
+	 */
+	if (is_abort_synchronous(fault_status)) {
+		if(handle_guest_sea((unsigned long)fault_ipa,
+				    kvm_vcpu_get_hsr(vcpu))) {
+			kvm_err("Failed to handle guest SEA, FSC: EC=%#x xFSC=%#lx ESR_EL2=%#lx\n",
+				kvm_vcpu_trap_get_class(vcpu),
+				(unsigned long)kvm_vcpu_trap_get_fault(vcpu),
+				(unsigned long)kvm_vcpu_get_hsr(vcpu));
+			return -EFAULT;
+		}
+	} else if (fault_status != FSC_FAULT && fault_status != FSC_PERM &&
+		   fault_status != FSC_ACCESS) {
 		kvm_err("Unsupported FSC: EC=%#x xFSC=%#lx ESR_EL2=%#lx\n",
 			kvm_vcpu_trap_get_class(vcpu),
 			(unsigned long)kvm_vcpu_trap_get_fault(vcpu),
