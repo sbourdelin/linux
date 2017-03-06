@@ -949,24 +949,6 @@ void free_sdt_list(struct list_head *sdt_evlist)
 	}
 }
 
-static int get_sdt_events_from_cache(struct perf_probe_event *pev)
-{
-	int ret = 0;
-
-	pev->ntevs = find_cached_events_all(pev, &pev->tevs);
-
-	if (pev->ntevs < 0) {
-		pr_err("Error: Cache lookup failed (code: %d)\n", pev->ntevs);
-		ret = pev->ntevs;
-	} else if (!pev->ntevs) {
-		pr_err("Error: %s:%s not found in the cache\n",
-			pev->group, pev->event);
-		ret = -EINVAL;
-	}
-
-	return ret;
-}
-
 static int add_event_to_sdt_evlist(struct probe_trace_event *tev,
 				   struct list_head *sdt_evlist,
 				   bool exst)
@@ -1074,6 +1056,17 @@ out:
 	pev->ntevs--;
 }
 
+static void sdt_warn_abt_exist_events(struct perf_probe_event *pev, int ctr)
+{
+	pr_warning("Warning: Found %d events from probe-cache with name '%s:%s'.\n"
+		"\t Since %d probe point%c already exists, recording only %s.\n"
+		"Hint: Please use 'perf probe -d %s:%s' to allow record on all events.\n\n",
+		pev->ntevs, pev->group, pev->event, ctr,
+		ctr > 1 ? 's' : '\0',
+		ctr > 1 ? "them" : "it",
+		pev->group, pev->event);
+}
+
 static int sdt_merge_events(struct perf_probe_event *pev,
 			    struct probe_trace_event *exst_tevs,
 			    int exst_ntevs,
@@ -1153,6 +1146,15 @@ int add_sdt_event(char *event, struct list_head *sdt_evlist)
 	probe_conf.max_probes = MAX_PROBES;
 	probe_conf.force_add = 1;
 
+	/*
+	 * This call is intentionally placed before fetching events
+	 * from uprobe_events file. If number of events found from probe-
+	 * cache is not equal to number of existing events, and somehow
+	 * we decides to record only existing events, we warn user about
+	 * the same (sdt_warn_abt_exist_events()).
+	 */
+	pev->ntevs = find_cached_events_all(pev, &pev->tevs);
+
 	/* Fetch all sdt events from uprobe_events */
 	exst_ntevs = get_exist_sdt_events(&exst_tevs);
 	if (exst_ntevs < 0) {
@@ -1164,14 +1166,29 @@ int add_sdt_event(char *event, struct list_head *sdt_evlist)
 	ret = sdt_event_probepoint_exists(pev, exst_tevs,
 					 exst_ntevs, sdt_evlist);
 	if (ret) {
+		if (ret > 0 && pev->ntevs > 0 && ret != pev->ntevs)
+			sdt_warn_abt_exist_events(pev, ret);
 		ret = ret > 0 ? 0 : ret;
 		goto free_pev;
 	}
 
-	/* Fetch all matching events from cache. */
-	ret = get_sdt_events_from_cache(pev);
-	if (ret < 0)
+	/*
+	 * Check if find_cached_events_all() failed.
+	 * We deliberately check failure of this function after checking
+	 * entries in uprobe_events. Because, even if this function fails,
+	 * we may find matching entry from uprobe_events and in that case
+	 * we should continue recording that event.
+	 */
+	if (pev->ntevs < 0) {
+		pr_err("Error: Cache lookup failed (code: %d)\n", pev->ntevs);
+		ret = pev->ntevs;
 		goto free_pev;
+	} else if (!pev->ntevs) {
+		pr_err("Error: %s:%s not found in the cache\n",
+			pev->group, pev->event);
+		ret = -EINVAL;
+		goto free_pev;
+	}
 
 	/*
 	 * Merge events found from uprobe_events with events found
