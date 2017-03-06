@@ -138,6 +138,9 @@ bool perf_probe_event_need_dwarf(struct perf_probe_event *pev);
 /* Release event contents */
 void clear_perf_probe_event(struct perf_probe_event *pev);
 void clear_probe_trace_event(struct probe_trace_event *tev);
+void clear_probe_trace_events(struct probe_trace_event *tevs, int ntevs);
+
+bool is_c_func_name(const char *name);
 
 /* Command string to line-range */
 int parse_line_range_desc(const char *cmd, struct line_range *lr);
@@ -186,4 +189,6 @@ int parse_perf_probe_event_name(char **arg, struct perf_probe_event *pev);
 
 int find_cached_events_all(struct perf_probe_event *pev,
 			   struct probe_trace_event **tevs);
+
+int get_exist_sdt_events(struct probe_trace_event **tevs);
 #endif /*_PROBE_EVENT_H */

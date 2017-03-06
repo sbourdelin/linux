@@ -20,8 +20,9 @@ struct probe_cache {
 };
 
 struct sdt_event_list {
-	char *name;		/* group:event */
 	struct list_head list;
+	char *name;             /* group:event */
+	bool exst;              /* Even already exists in uprobe_events? */
 };
 
 enum probe_type {

@@ -962,16 +962,14 @@ static int get_sdt_events_from_cache(struct perf_probe_event *pev)
 		pr_err("Error: %s:%s not found in the cache\n",
 			pev->group, pev->event);
 		ret = -EINVAL;
-	} else if (pev->ntevs > 1) {
-		pr_warning("Warning : Recording on %d occurences of %s:%s\n",
-			   pev->ntevs, pev->group, pev->event);
 	}
 
 	return ret;
 }
 
 static int add_event_to_sdt_evlist(struct probe_trace_event *tev,
-				   struct list_head *sdt_evlist)
+				   struct list_head *sdt_evlist,
+				   bool exst)
 {
 	struct sdt_event_list *tmp;
 
@@ -986,6 +984,7 @@ static int add_event_to_sdt_evlist(struct probe_trace_event *tev,
 
 	snprintf(tmp->name, strlen(tev->group) + strlen(tev->event) + 2,
 		 "%s:%s", tev->group, tev->event);
+	tmp->exst = exst;
 	list_add(&tmp->list, sdt_evlist);
 
 	return 0;
@@ -997,7 +996,7 @@ static int add_events_to_sdt_evlist(struct perf_probe_event *pev,
 	int i, ret;
 
 	for (i = 0; i < pev->ntevs; i++) {
-		ret = add_event_to_sdt_evlist(&pev->tevs[i], sdt_evlist);
+		ret = add_event_to_sdt_evlist(&pev->tevs[i], sdt_evlist, false);
 
 		if (ret < 0)
 			return ret;
@@ -1005,14 +1004,133 @@ static int add_events_to_sdt_evlist(struct perf_probe_event *pev,
 	return 0;
 }
 
-/*
- * Find the SDT event from the cache and if found add it/them
- * to the uprobe_events file
- */
+static bool sdt_is_ptrn_used(struct perf_probe_event *pev)
+{
+	return !is_c_func_name(pev->group) || !is_c_func_name(pev->event);
+}
+
+static bool sdt_name_match(struct perf_probe_event *pev,
+			   struct probe_trace_event *tev)
+{
+	if (sdt_is_ptrn_used(pev))
+		return strglobmatch(tev->group, pev->group) &&
+			strglobmatch(tev->event, pev->event);
+
+	return !strcmp(tev->group, pev->group) &&
+		!strcmp(tev->event, pev->event);
+}
+
+static void sdt_warn_multi_events(int ctr, struct perf_probe_event *pev)
+{
+	pr_warning("Warning: Recording on %d occurrences of %s:%s\n",
+		   ctr, pev->group, pev->event);
+}
+
+static int sdt_event_probepoint_exists(struct perf_probe_event *pev,
+				       struct probe_trace_event *tevs,
+				       int ntevs,
+				       struct list_head *sdt_evlist)
+{
+	int i = 0, ret = 0, ctr = 0;
+
+	for (i = 0; i < ntevs; i++) {
+		if (sdt_name_match(pev, &tevs[i])) {
+			ret = add_event_to_sdt_evlist(&tevs[i],
+						sdt_evlist, true);
+			if (ret < 0)
+				return ret;
+
+			ctr++;
+		}
+	}
+
+	if (ctr > 1)
+		sdt_warn_multi_events(ctr, pev);
+
+	return ctr;
+}
+
+static bool sdt_file_addr_match(struct probe_trace_event *tev1,
+				struct probe_trace_event *tev2)
+{
+	return (tev1->point.address == tev2->point.address &&
+		!(strcmp(tev1->point.module, tev2->point.module)));
+}
+
+static void shift_sdt_events(struct perf_probe_event *pev, int i)
+{
+	int j = 0;
+
+	clear_probe_trace_event(&pev->tevs[i]);
+
+	if (i == pev->ntevs - 1)
+		goto out;
+
+	for (j = i; j < pev->ntevs - 1; j++)
+		memcpy(&pev->tevs[j], &pev->tevs[j + 1],
+		       sizeof(struct probe_trace_event));
+
+out:
+	pev->ntevs--;
+}
+
+static int sdt_merge_events(struct perf_probe_event *pev,
+			    struct probe_trace_event *exst_tevs,
+			    int exst_ntevs,
+			    struct list_head *sdt_evlist)
+{
+	int i, j, ret = 0, ctr = 0;
+	bool ptrn_used = sdt_is_ptrn_used(pev);
+
+	for (i = 0; i < pev->ntevs; i++) {
+		for (j = 0; j < exst_ntevs; j++) {
+			if (sdt_file_addr_match(&pev->tevs[i],
+						&exst_tevs[j])) {
+				ret = add_event_to_sdt_evlist(&exst_tevs[j],
+							  sdt_evlist, true);
+				if (ret < 0)
+					return ret;
+
+				if (!ptrn_used)
+					shift_sdt_events(pev, i);
+				ctr++;
+			}
+		}
+	}
+
+	if (!ptrn_used || ctr == 0) {
+		/*
+		 * Create probe point for all probe-cached events by
+		 * adding them in uprobe_events file.
+		 */
+		ret = apply_perf_probe_events(pev, 1);
+		if (ret < 0) {
+			pr_err("Error in adding SDT event: %s:%s\n",
+				pev->group, pev->event);
+			goto out;
+		}
+
+		/* Add events to sdt_evlist. */
+		ret = add_events_to_sdt_evlist(pev, sdt_evlist);
+		if (ret < 0) {
+			pr_err("Error while updating event list\n");
+			goto out;
+		}
+
+		ctr += pev->ntevs;
+		if (ctr > 1)
+			sdt_warn_multi_events(ctr, pev);
+	}
+
+out:
+	return ret;
+}
+
 int add_sdt_event(char *event, struct list_head *sdt_evlist)
 {
 	struct perf_probe_event *pev;
-	int ret;
+	int ret, exst_ntevs;
+	struct probe_trace_event *exst_tevs = NULL;
 
 	pev = zalloc(sizeof(*pev));
 	if (!pev)
@@ -1035,23 +1153,37 @@ int add_sdt_event(char *event, struct list_head *sdt_evlist)
 	probe_conf.max_probes = MAX_PROBES;
 	probe_conf.force_add = 1;
 
+	/* Fetch all sdt events from uprobe_events */
+	exst_ntevs = get_exist_sdt_events(&exst_tevs);
+	if (exst_ntevs < 0) {
+		ret = exst_ntevs;
+		goto free_pev;
+	}
+
+	/* Check if events with same name already exists in uprobe_events. */
+	ret = sdt_event_probepoint_exists(pev, exst_tevs,
+					 exst_ntevs, sdt_evlist);
+	if (ret) {
+		ret = ret > 0 ? 0 : ret;
+		goto free_pev;
+	}
+
 	/* Fetch all matching events from cache. */
 	ret = get_sdt_events_from_cache(pev);
 	if (ret < 0)
 		goto free_pev;
 
 	/*
-	 * Create probe point for all events by adding them in
-	 * uprobe_events file
+	 * Merge events found from uprobe_events with events found
+	 * from cache. Reuse events whose probepoint already exists
+	 * in uprobe_events, while add new entries for other events
+	 * in uprobe_events.
+	 *
+	 * This always tries to give first priority to events from
+	 * uprobe_events. By doing so, it ensures the existing
+	 * behaviour of perf remains same for sdt events too.
 	 */
-	ret = apply_perf_probe_events(pev, 1);
-	if (ret) {
-		pr_err("Error in adding SDT event : %s\n", event);
-		goto free_pev;
-	}
-
-	/* Add events to sdt_evlist */
-	ret = add_events_to_sdt_evlist(pev, sdt_evlist);
+	ret = sdt_merge_events(pev, exst_tevs, exst_ntevs, sdt_evlist);
 	if (ret < 0)
 		goto free_pev;
 
@@ -1061,6 +1193,7 @@ free_pev:
 	if (ret < 0)
 		free_sdt_list(sdt_evlist);
 	cleanup_perf_probe_events(pev, 1);
+	clear_probe_trace_events(exst_tevs, exst_ntevs);
 	free(pev);
 	return ret;
 }

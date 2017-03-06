@@ -231,7 +231,7 @@ static void clear_perf_probe_point(struct perf_probe_point *pp)
 	free(pp->lazy_line);
 }
 
-static void clear_probe_trace_events(struct probe_trace_event *tevs, int ntevs)
+void clear_probe_trace_events(struct probe_trace_event *tevs, int ntevs)
 {
 	int i;
 
@@ -1198,7 +1198,7 @@ static int parse_line_num(char **ptr, int *val, const char *what)
 }
 
 /* Check the name is good for event, group or function */
-static bool is_c_func_name(const char *name)
+bool is_c_func_name(const char *name)
 {
 	if (!isalpha(*name) && *name != '_')
 		return false;
@@ -3491,6 +3491,9 @@ void remove_sdt_event_list(struct list_head *sdt_events)
 		return;
 
 	list_for_each_entry(sdt_event, sdt_events, list) {
+		if (sdt_event->exst)
+			continue;
+
 		if (!filter) {
 			filter = strfilter__new(sdt_event->name, &err);
 			if (!filter)
@@ -3500,8 +3503,57 @@ void remove_sdt_event_list(struct list_head *sdt_events)
 		}
 	}
 
-	del_perf_probe_events(filter);
+	if (filter)
+		del_perf_probe_events(filter);
 
 free_list:
 	free_sdt_list(sdt_events);
+}
+
+/*
+ * Look into uprobe_events file and prepare list of sdt events
+ * whose probepoint is already registered.
+ */
+int get_exist_sdt_events(struct probe_trace_event **tevs)
+{
+	int fd, ret, ntevs = 0;
+	struct strlist *rawlist;
+	struct str_node *ent;
+	struct probe_trace_event *tev;
+
+	fd = probe_file__open(PF_FL_RW | PF_FL_UPROBE);
+	if (fd < 0)
+		return fd;
+
+	rawlist = probe_file__get_rawlist(fd);
+	strlist__for_each_entry(ent, rawlist) {
+		tev = zalloc(sizeof(struct probe_trace_event));
+		if (!tev) {
+			ret = -ENOMEM;
+			goto err;
+		}
+
+		ret = parse_probe_trace_command(ent->s, tev);
+		if (ret < 0)
+			goto err;
+
+		if (strncmp(tev->group, "sdt_", 4)) {
+			/* Interested in SDT events only. */
+			free(tev);
+			continue;
+		}
+
+		ret = concat_probe_trace_events(tevs, &ntevs, &tev, 1);
+		if (ret < 0)
+			goto err;
+	}
+
+	close(fd);
+	return ntevs;
+
+err:
+	close(fd);
+	clear_probe_trace_events(*tevs, ntevs);
+	zfree(tevs);
+	return ret;
 }
