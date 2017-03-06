@@ -226,8 +226,16 @@ function print_table(tbl,name,fmt,n)
 }
 
 function add_flags(old,new) {
-	if (old && new)
-		return old " | " new
+	if (old == new)
+		return old
+	if (old && new) {
+		if(match(old,new))
+			return old
+		else if(match(new,old))
+			return new
+		else
+			return old " | " new
+        }
 	else if (old)
 		return old
 	else
