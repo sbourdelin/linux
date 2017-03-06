@@ -40,6 +40,8 @@
 #include <asm/ppc-opcode.h>
 #include <asm/export.h>
 
+#include "ftrace.h"
+
 /*
  * System calls.
  */

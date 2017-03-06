@@ -26,6 +26,7 @@
 #include <asm/ftrace.h>
 #include <asm/syscall.h>
 
+#include "ftrace.h"
 
 #ifdef CONFIG_DYNAMIC_FTRACE
 static unsigned int
