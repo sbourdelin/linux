@@ -317,6 +317,7 @@ static const struct usb_device_id blacklist_table[] = {
 	{ USB_DEVICE(0x1286, 0x204e), .driver_info = BTUSB_MARVELL },
 
 	/* Intel Bluetooth devices */
+	{ USB_DEVICE(0x8087, 0x0025), .driver_info = BTUSB_INTEL_NEW },
 	{ USB_DEVICE(0x8087, 0x07da), .driver_info = BTUSB_CSR },
 	{ USB_DEVICE(0x8087, 0x07dc), .driver_info = BTUSB_INTEL },
 	{ USB_DEVICE(0x8087, 0x0a2a), .driver_info = BTUSB_INTEL },
@@ -2019,6 +2020,7 @@ static int btusb_setup_intel_new(struct hci_dev *hdev)
 	switch (ver.hw_variant) {
 	case 0x0b:	/* 8260 SfP */
 	case 0x0c:	/* 8265 WsP */
+	case 0x12:	/* 9160/9260 ThP */
 		break;
 	default:
 		BT_ERR("%s: Unsupported Intel hardware variant (%u)",
