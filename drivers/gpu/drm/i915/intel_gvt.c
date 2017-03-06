@@ -77,6 +77,11 @@ int intel_gvt_init(struct drm_i915_private *dev_priv)
 		goto bail;
 	}
 
+	if (!i915.enable_execlists) {
+		DRM_DEBUG_DRIVER("Execlists unsupported, GVT-g is disabled\n");
+		goto bail;
+	}
+
 	/*
 	 * We're not in host or fail to find a MPT module, disable GVT-g
 	 */
