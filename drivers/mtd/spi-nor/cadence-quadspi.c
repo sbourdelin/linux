@@ -87,6 +87,7 @@ struct cqspi_st {
 #define CQSPI_INST_TYPE_SINGLE			0
 #define CQSPI_INST_TYPE_DUAL			1
 #define CQSPI_INST_TYPE_QUAD			2
+#define CQSPI_INST_TYPE_OCTAL			3
 
 #define CQSPI_DUMMY_CLKS_PER_BYTE		8
 #define CQSPI_DUMMY_BYTES_MAX			4
@@ -203,6 +204,14 @@ struct cqspi_st {
 #define CQSPI_REG_CMDREADDATAUPPER		0xA4
 #define CQSPI_REG_CMDWRITEDATALOWER		0xA8
 #define CQSPI_REG_CMDWRITEDATAUPPER		0xAC
+
+#define CQSPI_REG_MODULEID			0xFC
+#define CQSPI_REG_MODULEID_CONF_ID_MASK		0x3
+#define CQSPI_REG_MODULEID_CONF_ID_LSB		0
+#define CQSPI_REG_MODULEID_CONF_ID_OCTAL_PHY	0x0
+#define CQSPI_REG_MODULEID_CONF_ID_OCTAL	0x1
+#define CQSPI_REG_MODULEID_CONF_ID_QUAD_PHY	0x2
+#define CQSPI_REG_MODULEID_CONF_ID_QUAD		0x3
 
 /* Interrupt status bits */
 #define CQSPI_REG_IRQ_MODE_ERR			BIT(0)
@@ -866,6 +875,9 @@ static int cqspi_set_protocol(struct spi_nor *nor, const int read)
 		case SPI_NOR_QUAD:
 			f_pdata->data_width = CQSPI_INST_TYPE_QUAD;
 			break;
+		case SPI_NOR_OCTAL:
+			f_pdata->data_width = CQSPI_INST_TYPE_OCTAL;
+			break;
 		default:
 			return -EINVAL;
 		}
@@ -1074,8 +1086,34 @@ static int cqspi_setup_flash(struct cqspi_st *cqspi, struct device_node *np)
 	struct cqspi_flash_pdata *f_pdata;
 	struct spi_nor *nor;
 	struct mtd_info *mtd;
+	enum read_mode mode;
+	enum read_mode dt_mode = SPI_NOR_QUAD;
 	unsigned int cs;
+	unsigned int rev_reg;
 	int i, ret;
+
+	/* Determine, whether or not octal transfer MAY be supported */
+	rev_reg = readl(cqspi->iobase + CQSPI_REG_MODULEID);
+	dev_info(dev, "CQSPI Module id %x\n", rev_reg);
+
+	switch (rev_reg & CQSPI_REG_MODULEID_CONF_ID_MASK) {
+	case CQSPI_REG_MODULEID_CONF_ID_OCTAL_PHY:
+	case CQSPI_REG_MODULEID_CONF_ID_OCTAL:
+		mode = SPI_NOR_OCTAL;
+		break;
+	case CQSPI_REG_MODULEID_CONF_ID_QUAD:
+	case CQSPI_REG_MODULEID_CONF_ID_QUAD_PHY:
+		mode = SPI_NOR_QUAD;
+		break;
+	}
+
+	if (of_property_read_bool(np, "cdns,octal-controller"))
+		dt_mode = SPI_NOR_OCTAL;
+
+	if (mode == SPI_NOR_QUAD && dt_mode == SPI_NOR_OCTAL)
+		dev_warn(dev, "Requested octal mode is not supported by the device.");
+	else if (mode == SPI_NOR_OCTAL && dt_mode == SPI_NOR_QUAD)
+		mode = SPI_NOR_QUAD;
 
 	/* Get flash device data */
 	for_each_available_child_of_node(dev->of_node, np) {
@@ -1123,7 +1161,7 @@ static int cqspi_setup_flash(struct cqspi_st *cqspi, struct device_node *np)
 			goto err;
 		}
 
-		ret = spi_nor_scan(nor, NULL, SPI_NOR_QUAD);
+		ret = spi_nor_scan(nor, NULL, mode);
 		if (ret)
 			goto err;
 
