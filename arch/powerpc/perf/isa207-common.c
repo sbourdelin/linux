@@ -119,6 +119,84 @@ static bool is_thresh_cmp_valid(u64 event)
 	return true;
 }
 
+static inline u64 isa207_find_source(u64 idx, u32 sub_idx)
+{
+	u64 ret = 0;
+
+	switch(idx) {
+	case 0:
+		ret = P(LVL, NA);
+		break;
+	case 1:
+		ret = PLH(LVL, L1);
+		break;
+	case 2:
+		ret = PLH(LVL, L2);
+		break;
+	case 3:
+		ret = PLH(LVL, L3);
+		break;
+	case 4:
+		if (sub_idx <= 1)
+			ret = PLH(LVL, LOC_RAM);
+		else if (sub_idx > 1 && sub_idx <= 2)
+			ret = PLH(LVL, REM_RAM1);
+		else
+			ret = PLH(LVL, REM_RAM2);
+		ret |= P(SNOOP, HIT);
+		break;
+	case 5:
+		if ((sub_idx == 0) || (sub_idx == 2) || (sub_idx == 4))
+			ret = (PLH(LVL, REM_CCE1) | P(SNOOP, HIT));
+		else if ((sub_idx == 1) || (sub_idx == 3) || (sub_idx == 5))
+			ret = (PLH(LVL, REM_CCE1) | P(SNOOP, HITM));
+		break;
+	case 6:
+		if ((sub_idx == 0) || (sub_idx == 2))
+			ret = (PLH(LVL, REM_CCE2) | P(SNOOP, HIT));
+		else if ((sub_idx == 1) || (sub_idx == 3))
+			ret = (PLH(LVL, REM_CCE2) | P(SNOOP, HITM));
+		break;
+	case 7:
+		ret = PSM(LVL, L1);
+		break;
+	}
+
+	return ret;
+}
+
+static inline bool is_load_store_inst(u64 sier)
+{
+	u64 val;
+	val = (sier & ISA207_SIER_TYPE_MASK) >> ISA207_SIER_TYPE_SHIFT;
+
+	/* 1 = load, 2 = store */
+	return val == 1 || val == 2;
+}
+
+void isa207_get_mem_data_src(union perf_mem_data_src *dsrc, u32 flags,
+							struct pt_regs *regs)
+{
+	u64 idx;
+	u32 sub_idx;
+	u64 sier;
+
+	/* Skip if no SIER support */
+	if (!(flags & PPMU_HAS_SIER)) {
+		dsrc->val = 0;
+		return;
+	}
+
+	sier = mfspr(SPRN_SIER);
+	if (is_load_store_inst(sier)) {
+		idx = (sier & ISA207_SIER_LDST_MASK) >> ISA207_SIER_LDST_SHIFT;
+		sub_idx = (sier & ISA207_SIER_DATA_SRC_MASK) >> ISA207_SIER_DATA_SRC_SHIFT;
+
+		dsrc->val = isa207_find_source(idx, sub_idx);
+	}
+}
+
+
 int isa207_get_constraint(u64 event, unsigned long *maskp, unsigned long *valp)
 {
 	unsigned int unit, pmc, cache, ebb;
