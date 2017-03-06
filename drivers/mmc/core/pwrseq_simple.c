@@ -84,9 +84,20 @@ static void mmc_pwrseq_simple_power_off(struct mmc_host *host)
 	}
 }
 
+static void mmc_pwrseq_simple_post_ios_power_on(struct mmc_host *host)
+{
+	mmc_pwrseq_simple_pre_power_on(host);
+	mmc_pwrseq_simple_post_power_on(host);
+}
+
 static const struct mmc_pwrseq_ops mmc_pwrseq_simple_ops = {
 	.pre_power_on = mmc_pwrseq_simple_pre_power_on,
 	.post_power_on = mmc_pwrseq_simple_post_power_on,
+	.power_off = mmc_pwrseq_simple_power_off,
+};
+
+static const struct mmc_pwrseq_ops mmc_pwrseq_post_ios_ops = {
+	.post_ios_power_on = mmc_pwrseq_simple_post_ios_power_on,
 	.power_off = mmc_pwrseq_simple_power_off,
 };
 
@@ -121,7 +132,10 @@ static int mmc_pwrseq_simple_probe(struct platform_device *pdev)
 				 &pwrseq->post_power_on_delay_ms);
 
 	pwrseq->pwrseq.dev = dev;
-	pwrseq->pwrseq.ops = &mmc_pwrseq_simple_ops;
+	if (device_property_read_bool(dev, "post-ios-power-on"))
+		pwrseq->pwrseq.ops = &mmc_pwrseq_post_ios_ops;
+	else
+		pwrseq->pwrseq.ops = &mmc_pwrseq_simple_ops;
 	pwrseq->pwrseq.owner = THIS_MODULE;
 	platform_set_drvdata(pdev, pwrseq);
 
