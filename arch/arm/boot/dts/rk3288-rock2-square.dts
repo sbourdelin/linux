@@ -93,6 +93,8 @@
 		pinctrl-names = "default";
 		pinctrl-0 = <&wifi_enable>;
 		reset-gpios = <&gpio4 28 GPIO_ACTIVE_LOW>;
+		pre-power-on-delay-ms = <1>;
+		post-ios-power-on;
 	};
 
 	vcc_usb_host: vcc-host-regulator {
