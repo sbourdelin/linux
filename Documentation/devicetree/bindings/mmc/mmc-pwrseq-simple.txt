@@ -18,6 +18,8 @@ Optional properties:
   "ext_clock" (External clock provided to the card).
 - post-power-on-delay-ms : Delay in ms after powering the card and
 	de-asserting the reset-gpios (if any)
+- pre-power-on-delay-ms : Delay in ms before powering the card and
+	asserting the reset-gpios (if any)
 
 Example:
 
