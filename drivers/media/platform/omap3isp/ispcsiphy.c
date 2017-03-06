@@ -181,9 +181,10 @@ static int omap3isp_csiphy_config(struct isp_csiphy *phy)
 	}
 
 	if (buscfg->interface == ISP_INTERFACE_CCP2B_PHY1
-	    || buscfg->interface == ISP_INTERFACE_CCP2B_PHY2)
+	    || buscfg->interface == ISP_INTERFACE_CCP2B_PHY2) {
 		lanes = &buscfg->bus.ccp2.lanecfg;
-	else
+		phy->num_data_lanes = 1;
+	} else
 		lanes = &buscfg->bus.csi2.lanecfg;
 
 	/* Clock and data lanes verification */
@@ -286,13 +287,16 @@ int omap3isp_csiphy_acquire(struct isp_csiphy *phy)
 	if (rval < 0)
 		goto done;
 
-	rval = csiphy_set_power(phy, ISPCSI2_PHY_CFG_PWR_CMD_ON);
-	if (rval) {
-		regulator_disable(phy->vdd);
-		goto done;
+	if (phy->isp->revision == ISP_REVISION_15_0) {
+		rval = csiphy_set_power(phy, ISPCSI2_PHY_CFG_PWR_CMD_ON);
+		if (rval) {
+			regulator_disable(phy->vdd);
+			goto done;
+		}
+		
+		csiphy_power_autoswitch_enable(phy, true);		
 	}
 
-	csiphy_power_autoswitch_enable(phy, true);
 	phy->phy_in_use = 1;
 
 done:
