@@ -1,26 +1,29 @@
 
+# use "make O=dir" to locate all output files in "dir"
+O ?= .
+
 SOURCES	:= $(wildcard [0-9]*x[0-9]*.S)
 
-BIN	:= $(patsubst %.S, %.bin, $(SOURCES))
+BIN	:= $(patsubst %.S, $(O)/%.bin, $(SOURCES))
 
-IHEX	:= $(patsubst %.S, %.bin.ihex, $(SOURCES))
+IHEX	:= $(patsubst %.S, $(O)/%.bin.ihex, $(SOURCES))
 
-CODE	:= $(patsubst %.S, %.c, $(SOURCES))
+CODE	:= $(patsubst %.S, $(O)/%.c, $(SOURCES))
 
 all:	$(BIN) $(IHEX) $(CODE)
 
 clean:
-	@rm -f *.o *.bin.ihex *.bin *.c
+	@rm -f $(O)/*.o $(O)/*.bin.ihex $(O)/*.bin $(O)/*.c
 
-%.o:	%.S
-	@cc -c $^
+$(O)/%.o:	%.S
+	@cc -c $^ -o $@
 
-%.bin:	%.o
+$(O)/%.bin:	$(O)/%.o
 	@objcopy -Obinary $^ $@
 
-%.bin.ihex:	%.o
+$(O)/%.bin.ihex:	$(O)/%.o
 	@objcopy -Oihex $^ $@
 	@dos2unix $@ 2>/dev/null
 
-%.c:	%.bin
+$(O)/%.c:	$(O)/%.bin
 	@echo "{" >$@; hexdump -f hex $^ >>$@; echo "};" >>$@
