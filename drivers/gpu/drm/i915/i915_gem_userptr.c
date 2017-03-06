@@ -144,7 +144,8 @@ static void i915_gem_userptr_mn_invalidate_range_start(struct mmu_notifier *_mn,
 		del_object(mo);
 	spin_unlock(&mn->lock);
 
-	flush_workqueue(mn->wq);
+	if (!list_empty(&cancelled))
+		flush_workqueue(mn->wq);
 }
 
 static const struct mmu_notifier_ops i915_gem_userptr_notifier = {
@@ -486,6 +487,24 @@ __i915_gem_userptr_set_active(struct drm_i915_gem_object *obj,
 	return ret;
 }
 
+static bool has_internal_vma(struct drm_i915_private *i915,
+			     struct mm_struct *mm,
+			     unsigned long addr,
+			     unsigned long size)
+{
+	const unsigned long end = addr + size;
+	struct vm_area_struct *vma;
+
+	for (vma = find_vma (mm, addr);
+	     vma && vma->vm_start < end;
+	     vma = vma->vm_next) {
+		if (vma->vm_ops == i915->drm.driver->gem_vm_ops)
+			return true;
+	}
+
+	return false;
+}
+
 static void
 __i915_gem_userptr_get_pages_worker(struct work_struct *_work)
 {
@@ -552,8 +571,7 @@ __i915_gem_userptr_get_pages_worker(struct work_struct *_work)
 }
 
 static struct sg_table *
-__i915_gem_userptr_get_pages_schedule(struct drm_i915_gem_object *obj,
-				      bool *active)
+__i915_gem_userptr_get_pages_schedule(struct drm_i915_gem_object *obj)
 {
 	struct get_pages_work *work;
 
@@ -590,7 +608,7 @@ __i915_gem_userptr_get_pages_schedule(struct drm_i915_gem_object *obj,
 	INIT_WORK(&work->work, __i915_gem_userptr_get_pages_worker);
 	schedule_work(&work->work);
 
-	*active = true;
+	__i915_gem_userptr_set_active(obj, true);
 	return ERR_PTR(-EAGAIN);
 }
 
@@ -598,10 +616,11 @@ static struct sg_table *
 i915_gem_userptr_get_pages(struct drm_i915_gem_object *obj)
 {
 	const int num_pages = obj->base.size >> PAGE_SHIFT;
+	struct mm_struct *mm = obj->userptr.mm->mm;
 	struct page **pvec;
 	struct sg_table *pages;
-	int pinned, ret;
-	bool active;
+	bool internal;
+	int pinned;
 
 	/* If userspace should engineer that these pages are replaced in
 	 * the vma between us binding this page into the GTT and completion
@@ -628,37 +647,38 @@ i915_gem_userptr_get_pages(struct drm_i915_gem_object *obj)
 			return ERR_PTR(-EAGAIN);
 	}
 
-	/* Let the mmu-notifier know that we have begun and need cancellation */
-	ret = __i915_gem_userptr_set_active(obj, true);
-	if (ret)
-		return ERR_PTR(ret);
-
 	pvec = NULL;
 	pinned = 0;
-	if (obj->userptr.mm->mm == current->mm) {
-		pvec = drm_malloc_gfp(num_pages, sizeof(struct page *),
-				      GFP_TEMPORARY);
-		if (pvec == NULL) {
-			__i915_gem_userptr_set_active(obj, false);
-			return ERR_PTR(-ENOMEM);
-		}
 
-		pinned = __get_user_pages_fast(obj->userptr.ptr, num_pages,
-					       !obj->userptr.read_only, pvec);
+	down_read(&mm->mmap_sem);
+	internal = has_internal_vma(to_i915(obj->base.dev), mm,
+					    obj->userptr.ptr, obj->base.size);
+	if (internal) {
+		pinned = -EFAULT;
+	} else if (mm == current->mm) {
+		pvec = drm_malloc_gfp(num_pages, sizeof(struct page *),
+				      GFP_TEMPORARY |
+				      __GFP_NORETRY |
+				      __GFP_NOWARN);
+		if (pvec)
+			pinned = __get_user_pages_fast(obj->userptr.ptr,
+						       num_pages,
+						       !obj->userptr.read_only,
+						       pvec);
 	}
 
-	active = false;
 	if (pinned < 0)
 		pages = ERR_PTR(pinned), pinned = 0;
 	else if (pinned < num_pages)
-		pages = __i915_gem_userptr_get_pages_schedule(obj, &active);
+		pages = __i915_gem_userptr_get_pages_schedule(obj);
 	else
 		pages = __i915_gem_userptr_set_pages(obj, pvec, num_pages);
-	if (IS_ERR(pages)) {
-		__i915_gem_userptr_set_active(obj, active);
+	up_read(&mm->mmap_sem);
+
+	if (IS_ERR(pages))
 		release_pages(pvec, pinned, 0);
-	}
 	drm_free_large(pvec);
+
 	return pages;
 }
 
