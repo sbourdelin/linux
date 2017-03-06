@@ -141,17 +141,13 @@ static void mmc_request_fn(struct request_queue *q)
 		wake_up_process(mq->thread);
 }
 
-static struct scatterlist *mmc_alloc_sg(int sg_len, int *err)
+static struct scatterlist *mmc_alloc_sg(int sg_len)
 {
 	struct scatterlist *sg;
 
 	sg = kmalloc_array(sg_len, sizeof(*sg), GFP_KERNEL);
-	if (!sg)
-		*err = -ENOMEM;
-	else {
-		*err = 0;
+	if (sg)
 		sg_init_table(sg, sg_len);
-	}
 
 	return sg;
 }
@@ -177,62 +173,6 @@ static void mmc_queue_setup_discard(struct request_queue *q,
 		queue_flag_set_unlocked(QUEUE_FLAG_SECERASE, q);
 }
 
-#ifdef CONFIG_MMC_BLOCK_BOUNCE
-static bool mmc_queue_alloc_bounce_bufs(struct mmc_queue *mq,
-					unsigned int bouncesz)
-{
-	int i;
-
-	for (i = 0; i < mq->qdepth; i++) {
-		mq->mqrq[i].bounce_buf = kmalloc(bouncesz, GFP_KERNEL);
-		if (!mq->mqrq[i].bounce_buf)
-			goto out_err;
-	}
-
-	return true;
-
-out_err:
-	while (--i >= 0) {
-		kfree(mq->mqrq[i].bounce_buf);
-		mq->mqrq[i].bounce_buf = NULL;
-	}
-	pr_warn("%s: unable to allocate bounce buffers\n",
-		mmc_card_name(mq->card));
-	return false;
-}
-
-static int mmc_queue_alloc_bounce_sgs(struct mmc_queue *mq,
-				      unsigned int bouncesz)
-{
-	int i, ret;
-
-	for (i = 0; i < mq->qdepth; i++) {
-		mq->mqrq[i].sg = mmc_alloc_sg(1, &ret);
-		if (ret)
-			return ret;
-
-		mq->mqrq[i].bounce_sg = mmc_alloc_sg(bouncesz / 512, &ret);
-		if (ret)
-			return ret;
-	}
-
-	return 0;
-}
-#endif
-
-static int mmc_queue_alloc_sgs(struct mmc_queue *mq, int max_segs)
-{
-	int i, ret;
-
-	for (i = 0; i < mq->qdepth; i++) {
-		mq->mqrq[i].sg = mmc_alloc_sg(max_segs, &ret);
-		if (ret)
-			return ret;
-	}
-
-	return 0;
-}
-
 static void mmc_queue_req_free_bufs(struct mmc_queue_req *mqrq)
 {
 	kfree(mqrq->bounce_sg);
@@ -245,12 +185,152 @@ static void mmc_queue_req_free_bufs(struct mmc_queue_req *mqrq)
 	mqrq->bounce_buf = NULL;
 }
 
-static void mmc_queue_reqs_free_bufs(struct mmc_queue *mq)
+static void mmc_queue_reqs_free_bufs(struct mmc_queue_req *mqrq, int qdepth)
 {
 	int i;
 
-	for (i = 0; i < mq->qdepth; i++)
-		mmc_queue_req_free_bufs(&mq->mqrq[i]);
+	for (i = 0; i < qdepth; i++)
+		mmc_queue_req_free_bufs(&mqrq[i]);
+}
+
+static void mmc_queue_free_mqrqs(struct mmc_queue_req *mqrq, int qdepth)
+{
+	mmc_queue_reqs_free_bufs(mqrq, qdepth);
+	kfree(mqrq);
+}
+
+#ifdef CONFIG_MMC_BLOCK_BOUNCE
+static int mmc_queue_alloc_bounce_bufs(struct mmc_queue_req *mqrq, int qdepth,
+				       unsigned int bouncesz)
+{
+	int i;
+
+	for (i = 0; i < qdepth; i++) {
+		mqrq[i].bounce_buf = kmalloc(bouncesz, GFP_KERNEL);
+		if (!mqrq[i].bounce_buf)
+			return -ENOMEM;
+
+		mqrq[i].sg = mmc_alloc_sg(1);
+		if (!mqrq[i].sg)
+			return -ENOMEM;
+
+		mqrq[i].bounce_sg = mmc_alloc_sg(bouncesz / 512);
+		if (!mqrq[i].bounce_sg)
+			return -ENOMEM;
+	}
+
+	return 0;
+}
+
+static bool mmc_queue_alloc_bounce(struct mmc_queue_req *mqrq, int qdepth,
+				   unsigned int bouncesz)
+{
+	int ret;
+
+	ret = mmc_queue_alloc_bounce_bufs(mqrq, qdepth, bouncesz);
+	if (ret)
+		mmc_queue_reqs_free_bufs(mqrq, qdepth);
+
+	return !ret;
+}
+
+static unsigned int mmc_queue_calc_bouncesz(struct mmc_host *host)
+{
+	unsigned int bouncesz = MMC_QUEUE_BOUNCESZ;
+
+	if (host->max_segs != 1)
+		return 0;
+
+	if (bouncesz > host->max_req_size)
+		bouncesz = host->max_req_size;
+	if (bouncesz > host->max_seg_size)
+		bouncesz = host->max_seg_size;
+	if (bouncesz > host->max_blk_count * 512)
+		bouncesz = host->max_blk_count * 512;
+
+	if (bouncesz <= 512)
+		return 0;
+
+	return bouncesz;
+}
+#else
+static inline bool mmc_queue_alloc_bounce(struct mmc_queue_req *mqrq,
+					  int qdepth, unsigned int bouncesz)
+{
+	return false;
+}
+
+static unsigned int mmc_queue_calc_bouncesz(struct mmc_host *host)
+{
+	return 0;
+}
+#endif
+
+static int mmc_queue_alloc_sgs(struct mmc_queue_req *mqrq, int qdepth,
+			       int max_segs)
+{
+	int i;
+
+	for (i = 0; i < qdepth; i++) {
+		mqrq[i].sg = mmc_alloc_sg(max_segs);
+		if (!mqrq[i].sg)
+			return -ENOMEM;
+	}
+
+	return 0;
+}
+
+void mmc_queue_free_shared_queue(struct mmc_card *card)
+{
+	if (card->mqrq) {
+		mmc_queue_free_mqrqs(card->mqrq, card->qdepth);
+		card->mqrq = NULL;
+	}
+}
+
+static int __mmc_queue_alloc_shared_queue(struct mmc_card *card, int qdepth)
+{
+	struct mmc_host *host = card->host;
+	struct mmc_queue_req *mqrq;
+	unsigned int bouncesz;
+	int ret = 0;
+
+	if (card->mqrq)
+		return -EINVAL;
+
+	mqrq = kcalloc(qdepth, sizeof(*mqrq), GFP_KERNEL);
+	if (!mqrq)
+		return -ENOMEM;
+
+	card->mqrq = mqrq;
+	card->qdepth = qdepth;
+
+	bouncesz = mmc_queue_calc_bouncesz(host);
+
+	if (bouncesz && !mmc_queue_alloc_bounce(mqrq, qdepth, bouncesz)) {
+		bouncesz = 0;
+		pr_warn("%s: unable to allocate bounce buffers\n",
+			mmc_card_name(card));
+	}
+
+	card->bouncesz = bouncesz;
+
+	if (!bouncesz) {
+		ret = mmc_queue_alloc_sgs(mqrq, qdepth, host->max_segs);
+		if (ret)
+			goto out_err;
+	}
+
+	return ret;
+
+out_err:
+	mmc_queue_free_shared_queue(card);
+	return ret;
+}
+
+int mmc_queue_alloc_shared_queue(struct mmc_card *card)
+{
+	return __mmc_queue_alloc_shared_queue(card, 2);
 }
 
 /**
@@ -267,7 +347,6 @@ int mmc_init_queue(struct mmc_queue *mq, struct mmc_card *card,
 {
 	struct mmc_host *host = card->host;
 	u64 limit = BLK_BOUNCE_HIGH;
-	bool bounce = false;
 	int ret = -ENOMEM;
 
 	if (mmc_dev(host)->dma_mask && *mmc_dev(host)->dma_mask)
@@ -278,11 +357,8 @@ int mmc_init_queue(struct mmc_queue *mq, struct mmc_card *card,
 	if (!mq->queue)
 		return -ENOMEM;
 
-	mq->qdepth = 2;
-	mq->mqrq = kcalloc(mq->qdepth, sizeof(struct mmc_queue_req),
-			   GFP_KERNEL);
-	if (!mq->mqrq)
-		goto blk_cleanup;
+	mq->mqrq = card->mqrq;
+	mq->qdepth = card->qdepth;
 	mq->mqrq_cur = &mq->mqrq[0];
 	mq->mqrq_prev = &mq->mqrq[1];
 	mq->queue->queuedata = mq;
@@ -293,44 +369,17 @@ int mmc_init_queue(struct mmc_queue *mq, struct mmc_card *card,
 	if (mmc_can_erase(card))
 		mmc_queue_setup_discard(mq->queue, card);
 
-#ifdef CONFIG_MMC_BLOCK_BOUNCE
-	if (host->max_segs == 1) {
-		unsigned int bouncesz;
-
-		bouncesz = MMC_QUEUE_BOUNCESZ;
-
-		if (bouncesz > host->max_req_size)
-			bouncesz = host->max_req_size;
-		if (bouncesz > host->max_seg_size)
-			bouncesz = host->max_seg_size;
-		if (bouncesz > (host->max_blk_count * 512))
-			bouncesz = host->max_blk_count * 512;
-
-		if (bouncesz > 512 &&
-		    mmc_queue_alloc_bounce_bufs(mq, bouncesz)) {
-			blk_queue_bounce_limit(mq->queue, BLK_BOUNCE_ANY);
-			blk_queue_max_hw_sectors(mq->queue, bouncesz / 512);
-			blk_queue_max_segments(mq->queue, bouncesz / 512);
-			blk_queue_max_segment_size(mq->queue, bouncesz);
-
-			ret = mmc_queue_alloc_bounce_sgs(mq, bouncesz);
-			if (ret)
-				goto cleanup_queue;
-			bounce = true;
-		}
-	}
-#endif
-
-	if (!bounce) {
+	if (card->bouncesz) {
+		blk_queue_bounce_limit(mq->queue, BLK_BOUNCE_ANY);
+		blk_queue_max_hw_sectors(mq->queue, card->bouncesz / 512);
+		blk_queue_max_segments(mq->queue, card->bouncesz / 512);
+		blk_queue_max_segment_size(mq->queue, card->bouncesz);
+	} else {
 		blk_queue_bounce_limit(mq->queue, limit);
 		blk_queue_max_hw_sectors(mq->queue,
 			min(host->max_blk_count, host->max_req_size / 512));
 		blk_queue_max_segments(mq->queue, host->max_segs);
 		blk_queue_max_segment_size(mq->queue, host->max_seg_size);
-
-		ret = mmc_queue_alloc_sgs(mq, host->max_segs);
-		if (ret)
-			goto cleanup_queue;
 	}
 
 	sema_init(&mq->thread_sem, 1);
@@ -345,11 +394,8 @@ int mmc_init_queue(struct mmc_queue *mq, struct mmc_card *card,
 
 	return 0;
 
- cleanup_queue:
-	mmc_queue_reqs_free_bufs(mq);
-	kfree(mq->mqrq);
+cleanup_queue:
 	mq->mqrq = NULL;
-blk_cleanup:
 	blk_cleanup_queue(mq->queue);
 	return ret;
 }
@@ -371,10 +417,7 @@ void mmc_cleanup_queue(struct mmc_queue *mq)
 	blk_start_queue(q);
 	spin_unlock_irqrestore(q->queue_lock, flags);
 
-	mmc_queue_reqs_free_bufs(mq);
-	kfree(mq->mqrq);
 	mq->mqrq = NULL;
-
 	mq->card = NULL;
 }
 EXPORT_SYMBOL(mmc_cleanup_queue);
