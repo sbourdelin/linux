@@ -14,6 +14,9 @@ Required properties:
 
 Optional properties:
 - cdns,is-decoded-cs : Flag to indicate whether decoder is used or not.
+- cdns,octal-controller : Flag to indicate, that used controller supports Octal
+                          SPI transfer mode. May be intentionally omitted to
+                          switch it back to Quad SPI mode.
 
 Optional subnodes:
 Subnodes of the Cadence Quad SPI controller are spi slave nodes with additional
@@ -44,6 +47,7 @@ Example:
 		cdns,fifo-depth = <128>;
 		cdns,fifo-width = <4>;
 		cdns,trigger-address = <0x00000000>;
+		#cdns,octal-controller
 
 		flash0: n25q00@0 {
 			...
