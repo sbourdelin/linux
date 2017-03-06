@@ -416,6 +416,7 @@ static inline bool rwsem_has_spinner(struct rw_semaphore *sem)
 __visible
 struct rw_semaphore __sched *rwsem_down_read_failed(struct rw_semaphore *sem)
 {
+	bool first_in_queue = false;
 	long count, adjustment = -RWSEM_ACTIVE_READ_BIAS;
 	struct rwsem_waiter waiter;
 	DEFINE_WAKE_Q(wake_q);
@@ -423,13 +424,30 @@ struct rw_semaphore __sched *rwsem_down_read_failed(struct rw_semaphore *sem)
 	waiter.task = current;
 	waiter.type = RWSEM_WAITING_FOR_READ;
 
+	/*
+	 * Undo read bias from down_read operation to stop active locking if:
+	 * 1) Optimistic spinners are present; or
+	 * 2) the wait_lock isn't free.
+	 * Doing that after taking the wait_lock may otherwise block writer
+	 * lock stealing for too long impacting performance.
+	 */
+	if (rwsem_has_spinner(sem) || raw_spin_is_locked(&sem->wait_lock)) {
+		atomic_long_add(-RWSEM_ACTIVE_READ_BIAS, &sem->count);
+		adjustment = 0;
+	}
+
 	raw_spin_lock_irq(&sem->wait_lock);
-	if (list_empty(&sem->wait_list))
+	if (list_empty(&sem->wait_list)) {
 		adjustment += RWSEM_WAITING_BIAS;
+		first_in_queue = true;
+	}
 	list_add_tail(&waiter.list, &sem->wait_list);
 
-	/* we're now waiting on the lock, but no longer actively locking */
-	count = atomic_long_add_return(adjustment, &sem->count);
+	/* we're now waiting on the lock */
+	if (adjustment)
+		count = atomic_long_add_return(adjustment, &sem->count);
+	else
+		count = atomic_long_read(&sem->count);
 
 	/*
 	 * If there are no active locks, wake the front queued process(es).
@@ -438,8 +456,7 @@ struct rw_semaphore __sched *rwsem_down_read_failed(struct rw_semaphore *sem)
 	 * wake our own waiter to join the existing active readers !
 	 */
 	if (count == RWSEM_WAITING_BIAS ||
-	    (count > RWSEM_WAITING_BIAS &&
-	     adjustment != -RWSEM_ACTIVE_READ_BIAS))
+	    (count > RWSEM_WAITING_BIAS && first_in_queue))
 		__rwsem_mark_wake(sem, RWSEM_WAKE_ANY, &wake_q);
 
 	raw_spin_unlock_irq(&sem->wait_lock);
