@@ -544,12 +544,24 @@ static int __fwnode_property_read_string_array(struct fwnode_handle *fwnode,
 					       const char *propname,
 					       const char **val, size_t nval)
 {
-	if (is_of_node(fwnode))
-		return val ?
-			of_property_read_string_array(to_of_node(fwnode),
-						      propname, val, nval) :
-			of_property_count_strings(to_of_node(fwnode), propname);
-	else if (is_acpi_node(fwnode))
+	if (is_of_node(fwnode)) {
+		int rval;
+
+		if (!val)
+			return of_property_count_strings(to_of_node(fwnode),
+							 propname);
+
+		rval = of_property_read_string_array(to_of_node(fwnode),
+						     propname, val, nval);
+
+		if (rval < 0)
+			return rval;
+
+		if (rval == nval)
+			return 0;
+
+		return -EOVERFLOW;
+	} else if (is_acpi_node(fwnode))
 		return acpi_node_prop_read(fwnode, propname, DEV_PROP_STRING,
 					   val, nval);
 	else if (is_pset_node(fwnode)) {
