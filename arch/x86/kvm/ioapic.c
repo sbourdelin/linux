@@ -634,7 +634,9 @@ void kvm_ioapic_destroy(struct kvm *kvm)
 	struct kvm_ioapic *ioapic = kvm->arch.vioapic;
 
 	cancel_delayed_work_sync(&ioapic->eoi_inject);
+	mutex_lock(&kvm->slots_lock);
 	kvm_io_bus_unregister_dev(kvm, KVM_MMIO_BUS, &ioapic->dev);
+	mutex_unlock(&kvm->slots_lock);
 	kvm->arch.vioapic = NULL;
 	kfree(ioapic);
 }
