@@ -68,6 +68,14 @@ void mmc_pwrseq_post_power_on(struct mmc_host *host)
 		pwrseq->ops->post_power_on(host);
 }
 
+void mmc_pwrseq_post_ios_power_on(struct mmc_host *host)
+{
+	struct mmc_pwrseq *pwrseq = host->pwrseq;
+
+	if (pwrseq && pwrseq->ops->post_ios_power_on)
+		pwrseq->ops->post_ios_power_on(host);
+}
+
 void mmc_pwrseq_power_off(struct mmc_host *host)
 {
 	struct mmc_pwrseq *pwrseq = host->pwrseq;

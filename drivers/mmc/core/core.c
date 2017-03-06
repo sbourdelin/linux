@@ -1847,6 +1847,7 @@ void mmc_power_up(struct mmc_host *host, u32 ocr)
 	 * time required to reach a stable voltage.
 	 */
 	mmc_delay(10);
+	mmc_pwrseq_post_ios_power_on(host);
 }
 
 void mmc_power_off(struct mmc_host *host)
