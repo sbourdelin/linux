@@ -19,6 +19,8 @@
 #include <linux/mfd/core.h>
 #include <linux/slab.h>
 #include <linux/err.h>
+#include <linux/of.h>
+#include <linux/of_device.h>
 
 #include <linux/mfd/wm831x/core.h>
 #include <linux/mfd/wm831x/pdata.h>
@@ -1613,6 +1615,31 @@ struct regmap_config wm831x_regmap_config = {
 };
 EXPORT_SYMBOL_GPL(wm831x_regmap_config);
 
+#ifdef CONFIG_OF
+const struct of_device_id wm831x_of_match[] = {
+	{ .compatible = "wlf,wm8310", .data = (void *)WM8310 },
+	{ .compatible = "wlf,wm8311", .data = (void *)WM8311 },
+	{ .compatible = "wlf,wm8312", .data = (void *)WM8312 },
+	{ .compatible = "wlf,wm8320", .data = (void *)WM8320 },
+	{ .compatible = "wlf,wm8321", .data = (void *)WM8321 },
+	{ .compatible = "wlf,wm8325", .data = (void *)WM8325 },
+	{ .compatible = "wlf,wm8326", .data = (void *)WM8326 },
+	{ },
+};
+EXPORT_SYMBOL_GPL(wm831x_of_match);
+
+int wm831x_of_get_type(struct device *dev)
+{
+	const struct of_device_id *id = of_match_device(wm831x_of_match, dev);
+
+	if (id)
+		return (unsigned long)id->data;
+	else
+		return 0;
+}
+EXPORT_SYMBOL_GPL(wm831x_of_get_type);
+#endif
+
 /*
  * Instantiate the generic non-control parts of the device.
  */
@@ -1628,7 +1655,10 @@ int wm831x_device_init(struct wm831x *wm831x, unsigned long id, int irq)
 	dev_set_drvdata(wm831x->dev, wm831x);
 
 	if (pdata)
-		wm831x->soft_shutdown = pdata->soft_shutdown;
+		memcpy(&wm831x->pdata, pdata, sizeof(*pdata));
+	pdata = &wm831x->pdata;
+
+	wm831x->soft_shutdown = pdata->soft_shutdown;
 
 	ret = wm831x_reg_read(wm831x, WM831X_PARENT_ID);
 	if (ret < 0) {

@@ -28,7 +28,10 @@ static int wm831x_spi_probe(struct spi_device *spi)
 	enum wm831x_parent type;
 	int ret;
 
-	type = (enum wm831x_parent)id->driver_data;
+	if (spi->dev.of_node)
+		type = (enum wm831x_parent)wm831x_of_get_type(&spi->dev);
+	else
+		type = (enum wm831x_parent)id->driver_data;
 
 	wm831x = devm_kzalloc(&spi->dev, sizeof(struct wm831x), GFP_KERNEL);
 	if (wm831x == NULL)
@@ -97,6 +100,7 @@ static struct spi_driver wm831x_spi_driver = {
 	.driver = {
 		.name	= "wm831x",
 		.pm	= &wm831x_spi_pm,
+		.of_match_table = of_match_ptr(wm831x_of_match),
 	},
 	.id_table	= wm831x_spi_ids,
 	.probe		= wm831x_spi_probe,
