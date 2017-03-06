@@ -444,7 +444,8 @@ static int perf_del_probe_events(struct strfilter *filter)
 	if (ret == -ENOENT && ret2 == -ENOENT)
 		pr_debug("\"%s\" does not hit any event.\n", str);
 		/* Note that this is silently ignored */
-	ret = 0;
+	else
+		ret = 0;
 
 error:
 	if (kfd >= 0)
