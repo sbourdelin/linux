@@ -42,6 +42,7 @@ struct fwnode_handle;
 struct iommu_ops;
 struct iommu_group;
 struct iommu_fwspec;
+struct pci_dev;
 
 struct bus_attribute {
 	struct attribute	attr;
@@ -860,6 +861,9 @@ struct dev_links_info {
  * 		segment limitations.
  * @dma_pools:	Dma pools (if dma'ble device).
  * @dma_mem:	Internal for coherent mem override.
+ * @pci_dev:	PCI device associated with this device. Used by DMA mapping
+ *		operations on architectures that need access to PCI device
+ *		members that are not in struct device.
  * @cma_area:	Contiguous memory area for dma allocations
  * @archdata:	For arch-specific additions.
  * @of_node:	Associated device tree node.
@@ -940,6 +944,7 @@ struct device {
 
 	struct dma_coherent_mem	*dma_mem; /* internal for coherent mem
 					     override */
+	struct pci_dev		*pci_dev; /* for DMA mapping operations */
 #ifdef CONFIG_DMA_CMA
 	struct cma *cma_area;		/* contiguous memory area for dma
 					   allocations */

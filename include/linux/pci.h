@@ -409,7 +409,10 @@ static inline struct pci_dev *pci_physfn(struct pci_dev *dev)
 
 struct pci_dev *pci_alloc_dev(struct pci_bus *bus);
 
-#define	to_pci_dev(n) container_of(n, struct pci_dev, dev)
+static inline struct pci_dev *to_pci_dev(const struct device *dev)
+{
+	return dev->pci_dev;
+}
 #define for_each_pci_dev(d) while ((d = pci_get_device(PCI_ANY_ID, PCI_ANY_ID, d)) != NULL)
 
 static inline int pci_channel_offline(struct pci_dev *pdev)
