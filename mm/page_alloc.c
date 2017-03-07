@@ -2708,14 +2708,12 @@ struct page *rmqueue(struct zone *preferred_zone,
 	spin_lock_irqsave(&zone->lock, flags);
 
 	do {
-		page = NULL;
-		if (alloc_flags & ALLOC_HARDER) {
+		page = __rmqueue(zone, order, migratetype);
+		if (!page && alloc_flags & ALLOC_HARDER) {
 			page = __rmqueue_smallest(zone, order, MIGRATE_HIGHATOMIC);
 			if (page)
 				trace_mm_page_alloc_zone_locked(page, order, migratetype);
 		}
-		if (!page)
-			page = __rmqueue(zone, order, migratetype);
 	} while (page && check_new_pages(page, order));
 	spin_unlock(&zone->lock);
 	if (!page)
