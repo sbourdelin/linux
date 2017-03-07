@@ -15,7 +15,7 @@
 #include <linux/device.h>
 #include <linux/err.h>
 #include <linux/idr.h>
-#include <linux/module.h>
+#include <linux/init.h>
 #include <linux/mux.h>
 #include <linux/of.h>
 #include <linux/of_platform.h>
@@ -408,7 +408,3 @@ void devm_mux_control_put(struct device *dev, struct mux_control *mux)
 EXPORT_SYMBOL_GPL(devm_mux_control_put);
 
 subsys_initcall(mux_init);
-
-MODULE_DESCRIPTION("Multiplexer subsystem");
-MODULE_AUTHOR("Peter Rosin <peda@axentia.se");
-MODULE_LICENSE("GPL v2");
