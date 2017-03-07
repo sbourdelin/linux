@@ -149,9 +149,9 @@ struct request {
 
 	unsigned long atomic_flags;
 
-	/* the following two fields are internal, NEVER access directly */
-	unsigned int __data_len;	/* total data len */
+	/* the following three fields are internal, NEVER access directly */
 	int tag;
+	unsigned int __data_len;	/* total data len */
 	sector_t __sector;		/* sector cursor */
 
 	struct bio *bio;
