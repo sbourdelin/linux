@@ -344,13 +344,19 @@ static void rcar_dmac_chan_start_xfer(struct rcar_dmac_chan *chan)
 		rcar_dmac_chan_write(chan, RCAR_DMARS, chan->mid_rid);
 
 	if (desc->hwdescs.use) {
-		struct rcar_dmac_xfer_chunk *chunk;
+		struct rcar_dmac_xfer_chunk *chunk =
+			list_first_entry(&desc->chunks,
+					 struct rcar_dmac_xfer_chunk, node);
 
 		dev_dbg(chan->chan.device->dev,
 			"chan%u: queue desc %p: %u@%pad\n",
 			chan->index, desc, desc->nchunks, &desc->hwdescs.dma);
 
 #ifdef CONFIG_ARCH_DMA_ADDR_T_64BIT
+		rcar_dmac_chan_write(chan, RCAR_DMAFIXSAR,
+				     chunk->src_addr >> 32);
+		rcar_dmac_chan_write(chan, RCAR_DMAFIXDAR,
+				     chunk->dst_addr >> 32);
 		rcar_dmac_chan_write(chan, RCAR_DMAFIXDPBASE,
 				     desc->hwdescs.dma >> 32);
 #endif
@@ -368,8 +374,6 @@ static void rcar_dmac_chan_start_xfer(struct rcar_dmac_chan *chan)
 		 * should. Initialize it manually with the destination address
 		 * of the first chunk.
 		 */
-		chunk = list_first_entry(&desc->chunks,
-					 struct rcar_dmac_xfer_chunk, node);
 		rcar_dmac_chan_write(chan, RCAR_DMADAR,
 				     chunk->dst_addr & 0xffffffff);
 
@@ -855,8 +859,12 @@ rcar_dmac_chan_prep_sg(struct rcar_dmac_chan *chan, struct scatterlist *sgl,
 	unsigned int nchunks = 0;
 	unsigned int max_chunk_size;
 	unsigned int full_size = 0;
-	bool highmem = false;
+	bool cross_boundary = false;
 	unsigned int i;
+#ifdef CONFIG_ARCH_DMA_ADDR_T_64BIT
+	u32 high_src_addr = 0;
+	u32 high_dst_addr = 0;
+#endif
 
 	desc = rcar_dmac_desc_get(chan);
 	if (!desc)
@@ -885,25 +893,6 @@ rcar_dmac_chan_prep_sg(struct rcar_dmac_chan *chan, struct scatterlist *sgl,
 		while (len) {
 			unsigned int size = min(len, max_chunk_size);
 
-#ifdef CONFIG_ARCH_DMA_ADDR_T_64BIT
-			/*
-			 * Prevent individual transfers from crossing 4GB
-			 * boundaries.
-			 */
-			if (dev_addr >> 32 != (dev_addr + size - 1) >> 32)
-				size = ALIGN(dev_addr, 1ULL << 32) - dev_addr;
-			if (mem_addr >> 32 != (mem_addr + size - 1) >> 32)
-				size = ALIGN(mem_addr, 1ULL << 32) - mem_addr;
-
-			/*
-			 * Check if either of the source or destination address
-			 * can't be expressed in 32 bits. If so we can't use
-			 * hardware descriptor lists.
-			 */
-			if (dev_addr >> 32 || mem_addr >> 32)
-				highmem = true;
-#endif
-
 			chunk = rcar_dmac_xfer_chunk_get(chan);
 			if (!chunk) {
 				rcar_dmac_desc_put(chan, desc);
@@ -917,6 +906,26 @@ rcar_dmac_chan_prep_sg(struct rcar_dmac_chan *chan, struct scatterlist *sgl,
 				chunk->src_addr = mem_addr;
 				chunk->dst_addr = dev_addr;
 			}
+
+#ifdef CONFIG_ARCH_DMA_ADDR_T_64BIT
+			if (i == 0) {
+				high_src_addr = chunk->src_addr >> 32;
+				high_dst_addr = chunk->dst_addr >> 32;
+			}
+
+			/*
+			 * Prevent individual transfers from crossing 4GB
+			 * boundaries.
+			 */
+			if (dev_addr >> 32 != (dev_addr + size - 1) >> 32)
+				size = ALIGN(dev_addr, 1ULL << 32) - dev_addr;
+			if (mem_addr >> 32 != (mem_addr + size - 1) >> 32)
+				size = ALIGN(mem_addr, 1ULL << 32) - mem_addr;
+
+			if ((chunk->src_addr >> 32 != high_src_addr) ||
+			    (chunk->dst_addr >> 32 != high_dst_addr))
+				cross_boundary = true;
+#endif
 
 			chunk->size = size;
 
@@ -943,13 +952,11 @@ rcar_dmac_chan_prep_sg(struct rcar_dmac_chan *chan, struct scatterlist *sgl,
 	 * Use hardware descriptor lists if possible when more than one chunk
 	 * needs to be transferred (otherwise they don't make much sense).
 	 *
-	 * The highmem check currently covers the whole transfer. As an
-	 * optimization we could use descriptor lists for consecutive lowmem
-	 * chunks and direct manual mode for highmem chunks. Whether the
-	 * performance improvement would be significant enough compared to the
-	 * additional complexity remains to be investigated.
+	 * Source/Destination address should be located in same 4GiB region
+	 * in the 40bit address space when it uses Hardware descriptor,
+	 * and cross_boundary is checking it.
 	 */
-	desc->hwdescs.use = !highmem && nchunks > 1;
+	desc->hwdescs.use = !cross_boundary && nchunks > 1;
 	if (desc->hwdescs.use) {
 		if (rcar_dmac_fill_hwdesc(chan, desc) < 0)
 			desc->hwdescs.use = false;
