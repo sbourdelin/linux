@@ -284,5 +284,4 @@ void qxl_device_fini(struct qxl_device *qdev)
 	qdev->rom = NULL;
 	qdev->mode_info.modes = NULL;
 	qdev->mode_info.num_modes = 0;
-	qxl_debugfs_remove_files(qdev);
 }
