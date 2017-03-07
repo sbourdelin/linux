@@ -50,7 +50,6 @@
 #define SCLK_TIMER03		88
 #define SCLK_TIMER04		89
 #define SCLK_TIMER05		90
-#define SCLK_TIMER6		91
 #define SCLK_OTGPHY0		93
 #define SCLK_OTG_ADP		96
 #define SCLK_HSICPHY480M	97
