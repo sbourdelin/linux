@@ -3415,7 +3415,8 @@ __alloc_pages_direct_reclaim(gfp_t gfp_mask, unsigned int order,
 	bool drained = false;
 
 	*did_some_progress = __perform_reclaim(gfp_mask, order, ac);
-	if (unlikely(!(*did_some_progress)))
+	if (unlikely(!(*did_some_progress)
+	    && !unreserve_highatomic_pageblock(ac, false)))
 		return NULL;
 
 retry:
