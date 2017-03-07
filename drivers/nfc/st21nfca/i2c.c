@@ -286,7 +286,7 @@ static int check_crc(u8 *buf, int buflen)
 	crc = ~crc;
 
 	if (buf[buflen - 2] != (crc & 0xff) || buf[buflen - 1] != (crc >> 8)) {
-		pr_err(ST21NFCA_HCI_DRIVER_NAME
+		pr_err(ST21NFCA_HCI_I2C_DRIVER_NAME
 		       ": CRC error 0x%x != 0x%x 0x%x\n", crc, buf[buflen - 1],
 		       buf[buflen - 2]);
 
@@ -672,7 +672,7 @@ static int st21nfca_hci_i2c_probe(struct i2c_client *client,
 	r = devm_request_threaded_irq(&client->dev, client->irq, NULL,
 				st21nfca_hci_irq_thread_fn,
 				phy->irq_polarity | IRQF_ONESHOT,
-				ST21NFCA_HCI_DRIVER_NAME, phy);
+				ST21NFCA_HCI_I2C_DRIVER_NAME, phy);
 	if (r < 0) {
 		nfc_err(&client->dev, "Unable to register IRQ handler\n");
 		return r;
@@ -701,7 +701,7 @@ static int st21nfca_hci_i2c_remove(struct i2c_client *client)
 }
 
 static struct i2c_device_id st21nfca_hci_i2c_id_table[] = {
-	{ST21NFCA_HCI_DRIVER_NAME, 0},
+	{ST21NFCA_HCI_I2C_DRIVER_NAME, 0},
 	{}
 };
 MODULE_DEVICE_TABLE(i2c, st21nfca_hci_i2c_id_table);
