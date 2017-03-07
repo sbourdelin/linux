@@ -196,6 +196,14 @@ bool v4l2_detect_gtf(unsigned frame_height, unsigned hfreq, unsigned vsync,
 struct v4l2_fract v4l2_calc_aspect_ratio(u8 hor_landscape, u8 vert_portrait);
 
 /**
+ * v4l2_calc_fps - calculate the frames per seconds based on the
+ *	v4l2_dv_timings information.
+ *
+ * @t: the timings data.
+ */
+struct v4l2_fract v4l2_calc_fps(const struct v4l2_dv_timings *t);
+
+/**
  * v4l2_dv_timings_aspect_ratio - calculate the aspect ratio based on the
  *	v4l2_dv_timings information.
  *
