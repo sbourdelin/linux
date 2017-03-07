@@ -881,8 +881,7 @@ static int pn544_hci_i2c_acpi_request_resources(struct i2c_client *client)
 	struct device *dev = &client->dev;
 
 	/* Get EN GPIO from ACPI */
-	gpiod_en = devm_gpiod_get_index(dev, PN544_GPIO_NAME_EN, 1,
-					GPIOD_OUT_LOW);
+	gpiod_en = devm_gpiod_get_index(dev, "enable", 1, GPIOD_OUT_LOW);
 	if (IS_ERR(gpiod_en)) {
 		nfc_err(dev, "Unable to get EN GPIO\n");
 		return -ENODEV;
@@ -891,8 +890,7 @@ static int pn544_hci_i2c_acpi_request_resources(struct i2c_client *client)
 	phy->gpio_en = desc_to_gpio(gpiod_en);
 
 	/* Get FW GPIO from ACPI */
-	gpiod_fw = devm_gpiod_get_index(dev, PN544_GPIO_NAME_FW, 2,
-					GPIOD_OUT_LOW);
+	gpiod_fw = devm_gpiod_get_index(dev, "firmware", 2, GPIOD_OUT_LOW);
 	if (IS_ERR(gpiod_fw)) {
 		nfc_err(dev, "Unable to get FW GPIO\n");
 		return -ENODEV;
