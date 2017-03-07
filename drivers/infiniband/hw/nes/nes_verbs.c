@@ -86,15 +86,15 @@ static struct ib_mw *nes_alloc_mw(struct ib_pd *ibpd, enum ib_mw_type type,
 	next_stag_index %= nesadapter->max_mr;
 
 	ret = nes_alloc_resource(nesadapter, nesadapter->allocated_mrs,
-			nesadapter->max_mr, &stag_index, &next_stag_index, NES_RESOURCE_MW);
-	if (ret) {
+				 nesadapter->max_mr, &stag_index,
+				 &next_stag_index, NES_RESOURCE_MW);
+	if (ret)
 		return ERR_PTR(ret);
-	}
 
 	nesmr = kzalloc(sizeof(*nesmr), GFP_KERNEL);
 	if (!nesmr) {
-		nes_free_resource(nesadapter, nesadapter->allocated_mrs, stag_index);
-		return ERR_PTR(-ENOMEM);
+		ret = -ENOMEM;
+		goto err_free_res;
 	}
 
 	stag = stag_index << 8;
@@ -102,48 +102,54 @@ static struct ib_mw *nes_alloc_mw(struct ib_pd *ibpd, enum ib_mw_type type,
 	stag += (u32)stag_key;
 
 	nes_debug(NES_DBG_MR, "Registering STag 0x%08X, index = 0x%08X\n",
-			stag, stag_index);
+		  stag, stag_index);
 
 	/* Register the region with the adapter */
 	cqp_request = nes_get_cqp_request(nesdev);
-	if (cqp_request == NULL) {
-		kfree(nesmr);
-		nes_free_resource(nesadapter, nesadapter->allocated_mrs, stag_index);
-		return ERR_PTR(-ENOMEM);
+	if (!cqp_request) {
+		ret = -ENOMEM;
+		goto err_kfree;
 	}
 
 	cqp_request->waiting = 1;
 	cqp_wqe = &cqp_request->cqp_wqe;
 
 	cqp_wqe->wqe_words[NES_CQP_WQE_OPCODE_IDX] =
-			cpu_to_le32( NES_CQP_ALLOCATE_STAG | NES_CQP_STAG_RIGHTS_REMOTE_READ |
-			NES_CQP_STAG_RIGHTS_REMOTE_WRITE | NES_CQP_STAG_VA_TO |
-			NES_CQP_STAG_REM_ACC_EN);
+		cpu_to_le32((NES_CQP_ALLOCATE_STAG |
+			     NES_CQP_STAG_RIGHTS_REMOTE_READ |
+			     NES_CQP_STAG_RIGHTS_REMOTE_WRITE |
+			     NES_CQP_STAG_VA_TO |
+			     NES_CQP_STAG_REM_ACC_EN));
 
 	nes_fill_init_cqp_wqe(cqp_wqe, nesdev);
-	set_wqe_32bit_value(cqp_wqe->wqe_words, NES_CQP_STAG_WQE_LEN_HIGH_PD_IDX, (nespd->pd_id & 0x00007fff));
-	set_wqe_32bit_value(cqp_wqe->wqe_words, NES_CQP_STAG_WQE_STAG_IDX, stag);
+	set_wqe_32bit_value(cqp_wqe->wqe_words,
+			    NES_CQP_STAG_WQE_LEN_HIGH_PD_IDX,
+			    nespd->pd_id & 0x00007fff);
+	set_wqe_32bit_value(cqp_wqe->wqe_words,
+			    NES_CQP_STAG_WQE_STAG_IDX,
+			    stag);
 
 	atomic_set(&cqp_request->refcount, 2);
 	nes_post_cqp_request(nesdev, cqp_request);
 
 	/* Wait for CQP */
-	ret = wait_event_timeout(cqp_request->waitq, (cqp_request->request_done != 0),
-			NES_EVENT_TIMEOUT);
-	nes_debug(NES_DBG_MR, "Register STag 0x%08X completed, wait_event_timeout ret = %u,"
-			" CQP Major:Minor codes = 0x%04X:0x%04X.\n",
-			stag, ret, cqp_request->major_code, cqp_request->minor_code);
-	if ((!ret) || (cqp_request->major_code)) {
-		nes_put_cqp_request(nesdev, cqp_request);
-		kfree(nesmr);
-		nes_free_resource(nesadapter, nesadapter->allocated_mrs, stag_index);
-		if (!ret) {
-			return ERR_PTR(-ETIME);
-		} else {
-			return ERR_PTR(-ENOMEM);
-		}
-	}
+	ret = wait_event_timeout(cqp_request->waitq,
+				 cqp_request->request_done != 0,
+				 NES_EVENT_TIMEOUT);
+
+	nes_debug(NES_DBG_MR, "Register STag 0x%08X completed, wait_event_timeout ret = %u, CQP Major:Minor codes = 0x%04X:0x%04X\n",
+		  stag, ret, cqp_request->major_code, cqp_request->minor_code);
+
 	nes_put_cqp_request(nesdev, cqp_request);
+
+	if (!ret) {
+		ret = -ETIME;
+		goto err_kfree;
+	}
+	if (cqp_request->major_code) {
+		ret = -ENOMEM;
+		goto err_kfree;
+	}
 
 	nesmr->ibmw.rkey = stag;
 	nesmr->mode = IWNES_MEMREG_TYPE_MW;
@@ -152,8 +158,13 @@ static struct ib_mw *nes_alloc_mw(struct ib_pd *ibpd, enum ib_mw_type type,
 	nesmr->pbls_used = 0;
 
 	return ibmw;
-}
 
+err_kfree:
+	kfree(nesmr);
+err_free_res:
+	nes_free_resource(nesadapter, nesadapter->allocated_mrs, stag_index);
+	return ERR_PTR(ret);
+}
 
 /**
  * nes_dealloc_mw
