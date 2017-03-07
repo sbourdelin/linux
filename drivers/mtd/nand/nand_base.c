@@ -4590,11 +4590,12 @@ static bool invalid_ecc_page_accessors(struct nand_chip *chip)
 	 * default helpers are not suitable when the core does not
 	 * send the READ0/PAGEPROG commands.
 	 */
-	return (!ecc->read_page || !ecc->write_page ||
-		!ecc->read_page_raw || !ecc->write_page_raw ||
+	return !ecc->read_page || !ecc->read_page_raw ||
 		(NAND_HAS_SUBPAGE_READ(chip) && !ecc->read_subpage) ||
-		(NAND_HAS_SUBPAGE_WRITE(chip) && !ecc->write_subpage &&
-		 ecc->hwctl && ecc->calculate));
+		(!chip->write_page &&
+		 (!ecc->write_page || !ecc->write_page_raw ||
+		  (NAND_HAS_SUBPAGE_WRITE(chip) && !ecc->write_subpage &&
+		   ecc->hwctl && ecc->calculate)));
 }
 
 /**
@@ -4704,8 +4705,9 @@ int nand_scan_tail(struct mtd_info *mtd)
 		if ((!ecc->calculate || !ecc->correct || !ecc->hwctl) &&
 		    (!ecc->read_page ||
 		     ecc->read_page == nand_read_page_hwecc ||
-		     !ecc->write_page ||
-		     ecc->write_page == nand_write_page_hwecc)) {
+		     (!chip->write_page &&
+		      (!ecc->write_page ||
+		       ecc->write_page == nand_write_page_hwecc)))) {
 			WARN(1, "No ECC functions supplied; hardware ECC not possible\n");
 			ret = -EINVAL;
 			goto err_free;
