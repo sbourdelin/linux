@@ -517,13 +517,19 @@ else:
         cpu_mask[i] = 1
 
 if not os.path.exists('results'):
+    # Setting permissions with the mode option doesn't work on all platforms
     os.mkdir('results')
+    # so use chmod to set them. Needed because user may or may not be root.
+    os.chmod('results', 0777)
 
 os.chdir('results')
 if os.path.exists(testname):
     print('The test name directory already exists. Please provide a unique test name. Test re-run not supported, yet.')
     sys.exit()
+# Setting permissions with the mode option doesn't work on all platforms
 os.mkdir(testname)
+os.chmod(testname, 0777)
+# so use chmod to set them. Needed because user may or may not be root.
 os.chdir(testname)
 
 # Temporary (or perhaps not)
