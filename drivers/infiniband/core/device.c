@@ -39,6 +39,7 @@
 #include <linux/init.h>
 #include <linux/mutex.h>
 #include <linux/netdevice.h>
+#include <linux/pci.h>
 #include <rdma/rdma_netlink.h>
 #include <rdma/ib_addr.h>
 #include <rdma/ib_cache.h>
@@ -325,6 +326,10 @@ EXPORT_SYMBOL(ib_get_device_fw_str);
  * devices with the IB core.  All registered clients will receive a
  * callback for each device that is added. @device must be allocated
  * with ib_alloc_device().
+ *
+ * Unless requested otherwise by the caller, this function makes sure that DMA
+ * mapping operations on &device->dev behave identical to DMA mapping
+ * operations on the parent device (device->dev.parent).
  */
 int ib_register_device(struct ib_device *device,
 		       int (*port_callback)(struct ib_device *,
@@ -336,8 +341,11 @@ int ib_register_device(struct ib_device *device,
 	struct device *parent = device->dev.parent;
 
 	WARN_ON_ONCE(!parent);
-	if (!device->dev.dma_ops)
+	if (!device->dev.dma_ops) {
 		device->dev.dma_ops = parent->dma_ops;
+		device->dev.pci_dev = to_pci_dev(parent);
+		device->dev.archdata = parent->archdata;
+	}
 	if (!device->dev.dma_mask)
 		device->dev.dma_mask = parent->dma_mask;
 	if (!device->dev.coherent_dma_mask)
