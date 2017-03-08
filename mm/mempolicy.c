@@ -1692,6 +1692,27 @@ static struct zonelist *policy_zonelist(gfp_t gfp, struct mempolicy *policy,
 		WARN_ON_ONCE(policy->mode == MPOL_BIND && (gfp & __GFP_THISNODE));
 	}
 
+#ifdef CONFIG_COHERENT_DEVICE
+	/*
+	 * Coherent Device Memory (CDM)
+	 *
+	 * In case the local requesting node is not part of the nodemask, test
+	 * if the first node in the nodemask is CDM, in which case select it.
+	 *
+	 * XXX: There are multiple ways of doing this. This node check can be
+	 * restricted to the first node in the node mask as implemented here or
+	 * scan through the entire nodemask to find out any present CDM node on
+	 * it or select the first CDM node only if all other nodes in the node
+	 * mask are CDM. These are variour approaches possible, the first one
+	 * is implemented here.
+	 */
+	if (policy->mode == MPOL_BIND) {
+		if (unlikely(!node_isset(nd, policy->v.nodes))) {
+			if (is_cdm_node(first_node(policy->v.nodes)))
+				nd = first_node(policy->v.nodes);
+		}
+	}
+#endif
 	return node_zonelist(nd, gfp);
 }
 
