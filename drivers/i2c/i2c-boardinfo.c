@@ -84,8 +84,10 @@ int i2c_register_board_info(int busnum, struct i2c_board_info const *info, unsig
 		if (info->properties) {
 			devinfo->board_info.properties =
 					property_entries_dup(info->properties);
-			if (IS_ERR(devinfo->board_info.properties))
-				return PTR_ERR(devinfo->board_info.properties);
+			if (IS_ERR(devinfo->board_info.properties)) {
+				status = PTR_ERR(devinfo->board_info.properties);
+				break;
+			}
 		}
 
 		list_add_tail(&devinfo->list, &__i2c_board_list);
