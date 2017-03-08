@@ -15,6 +15,7 @@
  */
 
 #include <linux/reservation.h>
+#include <linux/sync_file.h>
 #include "etnaviv_cmdbuf.h"
 #include "etnaviv_drv.h"
 #include "etnaviv_gpu.h"
@@ -169,8 +170,10 @@ static int submit_fence_sync(const struct etnaviv_gem_submit *submit)
 	for (i = 0; i < submit->nr_bos; i++) {
 		struct etnaviv_gem_object *etnaviv_obj = submit->bos[i].obj;
 		bool write = submit->bos[i].flags & ETNA_SUBMIT_BO_WRITE;
+		bool explicit = !(submit->flags & ETNA_SUBMIT_NO_IMPLICIT);
 
-		ret = etnaviv_gpu_fence_sync_obj(etnaviv_obj, context, write);
+		ret = etnaviv_gpu_fence_sync_obj(etnaviv_obj, context, write,
+						 explicit);
 		if (ret)
 			break;
 	}
@@ -303,6 +306,7 @@ int etnaviv_ioctl_gem_submit(struct drm_device *dev, void *data,
 	struct etnaviv_gem_submit *submit;
 	struct etnaviv_cmdbuf *cmdbuf;
 	struct etnaviv_gpu *gpu;
+	struct dma_fence *in_fence = NULL;
 	void *stream;
 	int ret;
 
@@ -323,6 +327,11 @@ int etnaviv_ioctl_gem_submit(struct drm_device *dev, void *data,
 	    args->exec_state != ETNA_PIPE_2D &&
 	    args->exec_state != ETNA_PIPE_VG) {
 		DRM_ERROR("invalid exec_state: 0x%x\n", args->exec_state);
+		return -EINVAL;
+	}
+
+	if (args->flags & ~ETNA_SUBMIT_FLAGS) {
+		DRM_ERROR("invalid flags: 0x%x\n", args->flags);
 		return -EINVAL;
 	}
 
@@ -371,6 +380,8 @@ int etnaviv_ioctl_gem_submit(struct drm_device *dev, void *data,
 		goto err_submit_cmds;
 	}
 
+	submit->flags = args->flags;
+
 	ret = submit_lookup_objects(submit, file, bos, args->nr_bos);
 	if (ret)
 		goto err_submit_objects;
@@ -383,6 +394,25 @@ int etnaviv_ioctl_gem_submit(struct drm_device *dev, void *data,
 				      relocs, args->nr_relocs)) {
 		ret = -EINVAL;
 		goto err_submit_objects;
+	}
+
+	if (args->flags & ETNA_SUBMIT_FENCE_FD_IN) {
+		in_fence = sync_file_get_fence(args->fence_fd);
+		if (!in_fence) {
+			ret = -EINVAL;
+			goto err_submit_objects;
+		}
+
+		/* TODO if we get an array-fence due to userspace merging
+		 * multiple fences, we need a way to determine if all the
+		 * backing fences are from our own context..
+		 */
+
+		if (in_fence->context != gpu->fence_context) {
+			ret = dma_fence_wait(in_fence, true);
+			if (ret)
+				goto err_submit_objects;
+		}
 	}
 
 	ret = submit_fence_sync(submit);
@@ -419,6 +449,8 @@ out:
 		flush_workqueue(priv->wq);
 
 err_submit_objects:
+	if (in_fence)
+		dma_fence_put(in_fence);
 	submit_cleanup(submit);
 
 err_submit_cmds:
