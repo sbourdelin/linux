@@ -191,6 +191,22 @@ extern struct trace_event_functions exit_syscall_print_funcs;
 	SYSCALL_METADATA(sname, x, __VA_ARGS__)			\
 	__SYSCALL_DEFINEx(x, sname, __VA_ARGS__)
 
+asmlinkage void verify_pre_usermode_state(void);
+
+#ifndef CONFIG_ARCH_NO_SYSCALL_VERIFY_PRE_USERMODE_STATE
+static inline bool has_user_ds(void) {
+	bool ret = segment_eq(get_fs(), USER_DS);
+	// Prevent re-ordering the call
+	barrier();
+	return ret;
+}
+#else
+static inline bool has_user_ds(void) {
+	return false;
+}
+#endif
+
+
 #define __PROTECT(...) asmlinkage_protect(__VA_ARGS__)
 #define __SYSCALL_DEFINEx(x, name, ...)					\
 	asmlinkage long sys##name(__MAP(x,__SC_DECL,__VA_ARGS__))	\
@@ -199,7 +215,10 @@ extern struct trace_event_functions exit_syscall_print_funcs;
 	asmlinkage long SyS##name(__MAP(x,__SC_LONG,__VA_ARGS__));	\
 	asmlinkage long SyS##name(__MAP(x,__SC_LONG,__VA_ARGS__))	\
 	{								\
+		bool user_caller = has_user_ds();			\
 		long ret = SYSC##name(__MAP(x,__SC_CAST,__VA_ARGS__));	\
+		if (user_caller)					\
+			verify_pre_usermode_state();			\
 		__MAP(x,__SC_TEST,__VA_ARGS__);				\
 		__PROTECT(x, ret,__MAP(x,__SC_ARGS,__VA_ARGS__));	\
 		return ret;						\

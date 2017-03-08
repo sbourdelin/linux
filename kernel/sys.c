@@ -2453,3 +2453,14 @@ COMPAT_SYSCALL_DEFINE1(sysinfo, struct compat_sysinfo __user *, info)
 	return 0;
 }
 #endif /* CONFIG_COMPAT */
+
+/* Called before coming back to user-mode */
+asmlinkage void verify_pre_usermode_state(void)
+{
+#ifdef CONFIG_VERIFY_PRE_USERMODE_STATE_BUG
+	BUG_ON(!segment_eq(get_fs(), USER_DS));
+#else
+	if (WARN_ON(!segment_eq(get_fs(), USER_DS)))
+		set_fs(USER_DS);
+#endif
+}

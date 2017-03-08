@@ -1925,6 +1925,22 @@ config PROFILING
 config TRACEPOINTS
 	bool
 
+#
+# Set by each architecture that want to optimize how verify_pre_usermode_state
+# is called.
+#
+config ARCH_NO_SYSCALL_VERIFY_PRE_USERMODE_STATE
+	bool
+
+config VERIFY_PRE_USERMODE_STATE_BUG
+	bool "Halt on incorrect state on returning to user-mode"
+	default n
+	help
+	  By default a warning is logged and the state is fixed. This option
+	  crashes the kernel instead.
+
+	  If unsure, say Y.
+
 source "arch/Kconfig"
 
 endmenu		# General setup
