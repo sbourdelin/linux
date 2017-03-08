@@ -855,6 +855,10 @@ static int f2fs_cross_rename(struct inode *old_dir, struct dentry *old_dentry,
 			!fscrypt_has_encryption_key(new_dir)))
 		return -ENOKEY;
 
+	if (f2fs_encrypted_inode(old_dir) && !f2fs_encrypted_inode(new_inode) ||
+		f2fs_encrypted_inode(new_dir) && !f2fs_encrypted_inode(old_inode))
+		return -EPERM;
+
 	if ((f2fs_encrypted_inode(old_dir) || f2fs_encrypted_inode(new_dir)) &&
 			(old_dir != new_dir) &&
 			(!fscrypt_has_permitted_context(new_dir, old_inode) ||
