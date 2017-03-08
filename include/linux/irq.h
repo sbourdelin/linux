@@ -950,6 +950,7 @@ void irq_setup_generic_chip(struct irq_chip_generic *gc, u32 msk,
 int irq_setup_alt_chip(struct irq_data *d, unsigned int type);
 void irq_remove_generic_chip(struct irq_chip_generic *gc, u32 msk,
 			     unsigned int clr, unsigned int set);
+void irq_free_generic_chip(struct irq_chip_generic *gc);
 
 struct irq_chip_generic *irq_get_domain_generic_chip(struct irq_domain *d, unsigned int hw_irq);
 
