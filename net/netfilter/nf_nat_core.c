@@ -135,7 +135,7 @@ static u32 nf_nat_bysource_hash(const void *data, u32 len, u32 seed)
 }
 
 /* Is this tuple already taken? (not by us) */
-int
+bool
 nf_nat_used_tuple(const struct nf_conntrack_tuple *tuple,
 		  const struct nf_conn *ignored_conntrack)
 {
@@ -155,27 +155,27 @@ EXPORT_SYMBOL(nf_nat_used_tuple);
 /* If we source map this tuple so reply looks like reply_tuple, will
  * that meet the constraints of range.
  */
-static int in_range(const struct nf_nat_l3proto *l3proto,
-		    const struct nf_nat_l4proto *l4proto,
-		    const struct nf_conntrack_tuple *tuple,
-		    const struct nf_nat_range *range)
+static bool in_range(const struct nf_nat_l3proto *l3proto,
+		     const struct nf_nat_l4proto *l4proto,
+		     const struct nf_conntrack_tuple *tuple,
+		     const struct nf_nat_range *range)
 {
 	/* If we are supposed to map IPs, then we must be in the
 	 * range specified, otherwise let this drag us onto a new src IP.
 	 */
 	if (range->flags & NF_NAT_RANGE_MAP_IPS &&
 	    !l3proto->in_range(tuple, range))
-		return 0;
+		return false;
 
 	if (!(range->flags & NF_NAT_RANGE_PROTO_SPECIFIED) ||
 	    l4proto->in_range(tuple, NF_NAT_MANIP_SRC,
 			      &range->min_proto, &range->max_proto))
-		return 1;
+		return true;
 
-	return 0;
+	return false;
 }
 
-static inline int
+static inline bool
 same_src(const struct nf_conn *ct,
 	 const struct nf_conntrack_tuple *tuple)
 {
@@ -210,7 +210,7 @@ static struct rhashtable_params nf_nat_bysource_params = {
 };
 
 /* Only called for SRC manip */
-static int
+static bool
 find_appropriate_src(struct net *net,
 		     const struct nf_conntrack_zone *zone,
 		     const struct nf_nat_l3proto *l3proto,
@@ -230,7 +230,7 @@ find_appropriate_src(struct net *net,
 	hl = rhltable_lookup(&nf_nat_bysource_table, &key,
 			     nf_nat_bysource_params);
 	if (!hl)
-		return 0;
+		return false;
 
 	ct = container_of(hl, typeof(*ct), nat_bysource);
 

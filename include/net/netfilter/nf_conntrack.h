@@ -160,7 +160,7 @@ void nf_conntrack_alter_reply(struct nf_conn *ct,
 
 /* Is this tuple taken? (ignoring any belonging to the given
    conntrack). */
-int nf_conntrack_tuple_taken(const struct nf_conntrack_tuple *tuple,
+bool nf_conntrack_tuple_taken(const struct nf_conntrack_tuple *tuple,
 			     const struct nf_conn *ignored_conntrack);
 
 #define NFCT_INFOMASK	7UL

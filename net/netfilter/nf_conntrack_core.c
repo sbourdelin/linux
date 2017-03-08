@@ -837,7 +837,7 @@ EXPORT_SYMBOL_GPL(__nf_conntrack_confirm);
 
 /* Returns true if a connection correspondings to the tuple (required
    for NAT). */
-int
+bool
 nf_conntrack_tuple_taken(const struct nf_conntrack_tuple *tuple,
 			 const struct nf_conn *ignored_conntrack)
 {
@@ -870,7 +870,7 @@ nf_conntrack_tuple_taken(const struct nf_conntrack_tuple *tuple,
 		if (nf_ct_key_equal(h, tuple, zone, net)) {
 			NF_CT_STAT_INC_ATOMIC(net, found);
 			rcu_read_unlock();
-			return 1;
+			return true;
 		}
 	}
 
@@ -881,7 +881,7 @@ nf_conntrack_tuple_taken(const struct nf_conntrack_tuple *tuple,
 
 	rcu_read_unlock();
 
-	return 0;
+	return false;
 }
 EXPORT_SYMBOL_GPL(nf_conntrack_tuple_taken);
 
