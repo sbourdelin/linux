@@ -545,6 +545,18 @@ void irq_remove_generic_chip(struct irq_chip_generic *gc, u32 msk,
 }
 EXPORT_SYMBOL_GPL(irq_remove_generic_chip);
 
+/**
+ * irq_free_generic_chip - Free the memory allocated for a chip
+ * @gc:		Generic irq chip
+ *
+ * Free the data previously allocated by irq_allocate_generic_chip().
+ */
+void irq_free_generic_chip(struct irq_chip_generic *gc)
+{
+	kfree(gc);
+}
+EXPORT_SYMBOL_GPL(irq_free_generic_chip);
+
 static struct irq_data *irq_gc_get_irq_data(struct irq_chip_generic *gc)
 {
 	unsigned int virq;
