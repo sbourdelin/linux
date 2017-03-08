@@ -1771,6 +1771,15 @@ void bitmap_destroy(struct mddev *mddev)
 	if (!bitmap) /* there was no bitmap */
 		return;
 
+	/* wait for behind writes to complete */
+	if (atomic_read(&bitmap->behind_writes) > 0) {
+		printk(KERN_INFO "md:%s: behind writes in progress - waiting to stop.\n",
+		       mdname(mddev));
+		/* need to kick something here to make sure I/O goes? */
+		wait_event(bitmap->behind_wait,
+			   atomic_read(&bitmap->behind_writes) == 0);
+	}
+
 	mutex_lock(&mddev->bitmap_info.mutex);
 	spin_lock(&mddev->lock);
 	mddev->bitmap = NULL; /* disconnect from the md device */

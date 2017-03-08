@@ -5535,15 +5535,6 @@ EXPORT_SYMBOL_GPL(md_stop_writes);
 
 static void mddev_detach(struct mddev *mddev)
 {
-	struct bitmap *bitmap = mddev->bitmap;
-	/* wait for behind writes to complete */
-	if (bitmap && atomic_read(&bitmap->behind_writes) > 0) {
-		pr_debug("md:%s: behind writes in progress - waiting to stop.\n",
-			 mdname(mddev));
-		/* need to kick something here to make sure I/O goes? */
-		wait_event(bitmap->behind_wait,
-			   atomic_read(&bitmap->behind_writes) == 0);
-	}
 	if (mddev->pers && mddev->pers->quiesce) {
 		mddev->pers->quiesce(mddev, 1);
 		mddev->pers->quiesce(mddev, 0);
@@ -5575,8 +5566,8 @@ void md_stop(struct mddev *mddev)
 	/* stop the array and free an attached data structures.
 	 * This is called from dm-raid
 	 */
-	__md_stop(mddev);
 	bitmap_destroy(mddev);
+	__md_stop(mddev);
 	if (mddev->bio_set)
 		bioset_free(mddev->bio_set);
 }
@@ -5689,6 +5680,7 @@ static int do_md_stop(struct mddev *mddev, int mode,
 			set_disk_ro(disk, 0);
 
 		__md_stop_writes(mddev);
+		bitmap_destroy(mddev);
 		__md_stop(mddev);
 		mddev->queue->backing_dev_info->congested_fn = NULL;
 
@@ -5714,7 +5706,6 @@ static int do_md_stop(struct mddev *mddev, int mode,
 	if (mode == 0) {
 		pr_info("md: %s stopped.\n", mdname(mddev));
 
-		bitmap_destroy(mddev);
 		if (mddev->bitmap_info.file) {
 			struct file *f = mddev->bitmap_info.file;
 			spin_lock(&mddev->lock);
