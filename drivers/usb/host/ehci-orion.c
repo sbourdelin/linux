@@ -47,6 +47,21 @@
 #define USB_PHY_IVREF_CTRL	0x440
 #define USB_PHY_TST_GRP_CTRL	0x450
 
+#define USB_SBUSCFG		0x90
+#define	    USB_SBUSCFG_BAWR	    0x6
+#define	    USB_SBUSCFG_BARD	    0x3
+#define	    USB_SBUSCFG_AHBBRST	    0x0
+
+/* BAWR = BARD = 3 : Align read/write bursts packets larger than 128 bytes */
+#define USB_SBUSCFG_BAWR_ALIGN_128B	0x3
+#define USB_SBUSCFG_BARD_ALIGN_128B	0x3
+/* AHBBRST = 3	   : Align AHB Burst to INCR16 (64 bytes) */
+#define USB_SBUSCFG_AHBBRST_INCR16	0x3
+
+#define USB_SBUSCFG_DEF_VAL ((USB_SBUSCFG_BAWR_ALIGN_128B << USB_SBUSCFG_BAWR) \
+		     | (USB_SBUSCFG_BARD_ALIGN_128B << USB_SBUSCFG_BARD) \
+		     | (USB_SBUSCFG_AHBBRST_INCR16 << USB_SBUSCFG_AHBBRST))
+
 #define DRIVER_DESC "EHCI orion driver"
 
 #define hcd_to_orion_priv(h) ((struct orion_ehci_hcd *)hcd_to_ehci(h)->priv)
@@ -151,8 +166,31 @@ ehci_orion_conf_mbus_windows(struct usb_hcd *hcd,
 	}
 }
 
+static int ehci_orion_drv_reset(struct usb_hcd *hcd)
+{
+	struct device *dev = hcd->self.controller;
+	int retval;
+
+	retval = ehci_setup(hcd);
+	if (retval)
+		dev_err(dev, "ehci_setup failed %d\n", retval);
+
+	/*
+	 * For SoC without hlock, need to program sbuscfg value to guarantee
+	 * AHB master's burst would not overrun or underrun FIFO.
+	 *
+	 * sbuscfg reg has to be set after usb controller reset, otherwise
+	 * the value would be override to 0.
+	 */
+	if (of_device_is_compatible(dev->of_node, "marvell,armada-3700-ehci"))
+		wrl(USB_SBUSCFG, USB_SBUSCFG_DEF_VAL);
+
+	return retval;
+}
+
 static const struct ehci_driver_overrides orion_overrides __initconst = {
 	.extra_priv_size =	sizeof(struct orion_ehci_hcd),
+	.reset = ehci_orion_drv_reset,
 };
 
 static int ehci_orion_drv_probe(struct platform_device *pdev)
@@ -310,6 +348,7 @@ static int ehci_orion_drv_remove(struct platform_device *pdev)
 
 static const struct of_device_id ehci_orion_dt_ids[] = {
 	{ .compatible = "marvell,orion-ehci", },
+	{ .compatible = "marvell,armada-3700-ehci", },
 	{},
 };
 MODULE_DEVICE_TABLE(of, ehci_orion_dt_ids);
