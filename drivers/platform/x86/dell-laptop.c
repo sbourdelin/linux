@@ -2053,6 +2053,9 @@ static int __init dell_init(void)
 
 		dell_backlight_device->props.brightness =
 			dell_get_intensity(dell_backlight_device);
+		if (dell_backlight_device->props.brightness < 0) {
+			dell_backlight_device->props.brightness = props.max_brightness;
+		}
 		backlight_update_status(dell_backlight_device);
 	}
 
