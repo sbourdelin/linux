@@ -180,6 +180,7 @@ int etnaviv_gpu_init(struct etnaviv_gpu *gpu);
 int etnaviv_gpu_debugfs(struct etnaviv_gpu *gpu, struct seq_file *m);
 #endif
 
+struct dma_fence *etnaviv_gpu_fence_alloc(struct etnaviv_gpu *gpu);
 int etnaviv_gpu_fence_sync_obj(struct etnaviv_gem_object *etnaviv_obj,
 	unsigned int context, bool exclusive, bool implicit);
 
