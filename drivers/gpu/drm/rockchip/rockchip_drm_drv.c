@@ -304,34 +304,49 @@ static const struct dev_pm_ops rockchip_drm_pm_ops = {
 				rockchip_drm_sys_resume)
 };
 
-static int compare_of(struct device *dev, void *data)
-{
-	struct device_node *np = data;
+static struct platform_driver *rockchip_drm_comp_drvs[] = {
+	&vop_platform_driver,
+#ifdef CONFIG_ROCKCHIP_ANALOGIX_DP
+	&rockchip_dp_driver,
+#endif
+#ifdef CONFIG_ROCKCHIP_CDN_DP
+	&cdn_dp_driver,
+#endif
+#ifdef CONFIG_ROCKCHIP_DW_HDMI
+	&dw_hdmi_rockchip_pltfm_driver,
+#endif
+#ifdef CONFIG_ROCKCHIP_DW_MIPI_DSI
+	&dw_mipi_dsi_driver,
+#endif
+#ifdef CONFIG_ROCKCHIP_INNO_HDMI
+	&inno_hdmi_driver,
+#endif
+};
 
-	return dev->of_node == np;
+static int compare_dev(struct device *dev, void *data)
+{
+	return dev == (struct device *)data;
 }
 
-static void rockchip_add_endpoints(struct device *dev,
-				   struct component_match **match,
-				   struct device_node *port)
+static struct component_match *rockchip_drm_match_add(struct device *dev)
 {
-	struct device_node *ep, *remote;
+	struct component_match *match = NULL;
+	int i;
 
-	for_each_child_of_node(port, ep) {
-		remote = of_graph_get_remote_port_parent(ep);
-		if (!remote || !of_device_is_available(remote)) {
-			of_node_put(remote);
-			continue;
-		} else if (!of_device_is_available(remote->parent)) {
-			dev_warn(dev, "parent device of %s is not available\n",
-				 remote->full_name);
-			of_node_put(remote);
-			continue;
+	for (i = 0; i < ARRAY_SIZE(rockchip_drm_comp_drvs); i++) {
+		struct platform_driver *drv = rockchip_drm_comp_drvs[i];
+		struct device *p = NULL, *d;
+
+		while ((d = bus_find_device(&platform_bus_type, p, &drv->driver,
+					    (void *)platform_bus_type.match))) {
+			put_device(p);
+			component_match_add(dev, &match, compare_dev, d);
+			p = d;
 		}
-
-		drm_of_component_match_add(dev, match, compare_of, remote);
-		of_node_put(remote);
+		put_device(p);
 	}
+
+	return match ?: ERR_PTR(-ENODEV);
 }
 
 static const struct component_master_ops rockchip_drm_ops = {
@@ -339,21 +354,16 @@ static const struct component_master_ops rockchip_drm_ops = {
 	.unbind = rockchip_drm_unbind,
 };
 
-static int rockchip_drm_platform_probe(struct platform_device *pdev)
+static int rockchip_drm_platform_of_probe(struct device *dev)
 {
-	struct device *dev = &pdev->dev;
-	struct component_match *match = NULL;
 	struct device_node *np = dev->of_node;
 	struct device_node *port;
+	bool found = false;
 	int i;
 
 	if (!np)
 		return -ENODEV;
-	/*
-	 * Bind the crtc ports first, so that
-	 * drm_of_find_possible_crtcs called from encoder .bind callbacks
-	 * works as expected.
-	 */
+
 	for (i = 0;; i++) {
 		struct device_node *iommu;
 
@@ -377,9 +387,9 @@ static int rockchip_drm_platform_probe(struct platform_device *pdev)
 			is_support_iommu = false;
 		}
 
+		found = true;
+
 		of_node_put(iommu);
-		drm_of_component_match_add(dev, &match, compare_of,
-					   port->parent);
 		of_node_put(port);
 	}
 
@@ -388,27 +398,27 @@ static int rockchip_drm_platform_probe(struct platform_device *pdev)
 		return -ENODEV;
 	}
 
-	if (!match) {
+	if (!found) {
 		dev_err(dev, "No available vop found for display-subsystem.\n");
 		return -ENODEV;
 	}
-	/*
-	 * For each bound crtc, bind the encoders attached to its
-	 * remote endpoint.
-	 */
-	for (i = 0;; i++) {
-		port = of_parse_phandle(np, "ports", i);
-		if (!port)
-			break;
 
-		if (!of_device_is_available(port->parent)) {
-			of_node_put(port);
-			continue;
-		}
+	return 0;
+}
 
-		rockchip_add_endpoints(dev, &match, port);
-		of_node_put(port);
-	}
+static int rockchip_drm_platform_probe(struct platform_device *pdev)
+{
+	struct device *dev = &pdev->dev;
+	struct component_match *match = NULL;
+	int ret;
+
+	ret = rockchip_drm_platform_of_probe(dev);
+	if (ret)
+		return ret;
+
+	match = rockchip_drm_match_add(dev);
+	if (IS_ERR(match))
+		return PTR_ERR(match);
 
 	return component_master_add_with_match(dev, &rockchip_drm_ops, match);
 }
@@ -436,7 +446,57 @@ static struct platform_driver rockchip_drm_platform_driver = {
 	},
 };
 
-module_platform_driver(rockchip_drm_platform_driver);
+static void rockchip_drm_unregister_drivers(void)
+{
+	int i;
+
+	for (i = ARRAY_SIZE(rockchip_drm_comp_drvs) - 1; i >= 0; i--)
+		platform_driver_unregister(rockchip_drm_comp_drvs[i]);
+}
+
+static int rockchip_drm_register_drivers(void)
+{
+	int i, ret;
+
+	for (i = 0; i < ARRAY_SIZE(rockchip_drm_comp_drvs); i++) {
+		ret = platform_driver_register(rockchip_drm_comp_drvs[i]);
+		if (ret)
+			goto fail;
+	}
+	return 0;
+fail:
+	rockchip_drm_unregister_drivers();
+	return ret;
+}
+
+static int __init rockchip_drm_init(void)
+{
+	int ret;
+
+	ret = rockchip_drm_register_drivers();
+	if (ret)
+		return ret;
+
+	ret = platform_driver_register(&rockchip_drm_platform_driver);
+	if (ret)
+		goto err_unreg_drivers;
+
+	return 0;
+
+err_unreg_drivers:
+	rockchip_drm_unregister_drivers();
+	return ret;
+}
+
+static void __exit rockchip_drm_fini(void)
+{
+	platform_driver_unregister(&rockchip_drm_platform_driver);
+
+	rockchip_drm_unregister_drivers();
+}
+
+module_init(rockchip_drm_init);
+module_exit(rockchip_drm_fini);
 
 MODULE_AUTHOR("Mark Yao <mark.yao@rock-chips.com>");
 MODULE_DESCRIPTION("ROCKCHIP DRM Driver");
