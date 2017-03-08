@@ -67,12 +67,23 @@ static void __wake_up_common(wait_queue_head_t *q, unsigned int mode,
 {
 	wait_queue_t *curr, *next;
 
+	/*
+	 * We use nr_exclusive = 0 to wake up all no matter whether
+	 * WQ_FLAG_EXCLUSIVE is set. However, we have to distinguish
+	 * between the case and having finished all exclusive wake-up.
+	 * So make nr_exclusive non-zero in advance in the former case.
+	 */
+	nr_exclusive = nr_exclusive ?: -1;
+
 	list_for_each_entry_safe(curr, next, &q->task_list, task_list) {
 		unsigned flags = curr->flags;
 
+		if ((flags & WQ_FLAG_EXCLUSIVE) && !nr_exclusive)
+			continue;
+
 		if (curr->func(curr, mode, wake_flags, key) &&
-				(flags & WQ_FLAG_EXCLUSIVE) && !--nr_exclusive)
-			break;
+		    (flags & WQ_FLAG_EXCLUSIVE))
+			nr_exclusive--;
 	}
 }
 
