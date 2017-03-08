@@ -8887,6 +8887,14 @@ F:	include/linux/sunrpc/
 F:	include/uapi/linux/nfs*
 F:	include/uapi/linux/sunrpc/
 
+NI169445 MIPS ARCHITECTURE
+M:	Nathan Sullivan <nathan.sullivan@ni.com>
+L:	linux-mips@linux-mips.org
+S:	Maintained
+F:	arch/mips/boot/dts/ni/
+F:	arch/mips/configs/generic/board-ni169445.config
+F:	Documentation/devicetree/bindings/mips/ni.txt
+
 NILFS2 FILESYSTEM
 M:	Ryusuke Konishi <konishi.ryusuke@lab.ntt.co.jp>
 L:	linux-nilfs@vger.kernel.org
