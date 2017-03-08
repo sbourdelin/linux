@@ -113,7 +113,7 @@ void refcount_inc(refcount_t *r)
 {
 	WARN_ONCE(!refcount_inc_not_zero(r), "refcount_t: increment on 0; use-after-free.\n");
 }
-EXPORT_SYMBOL_GPL(refcount_inc);
+EXPORT_SYMBOL(refcount_inc);
 
 bool refcount_sub_and_test(unsigned int i, refcount_t *r)
 {
@@ -152,7 +152,7 @@ bool refcount_dec_and_test(refcount_t *r)
 {
 	return refcount_sub_and_test(1, r);
 }
-EXPORT_SYMBOL_GPL(refcount_dec_and_test);
+EXPORT_SYMBOL(refcount_dec_and_test);
 
 /*
  * Similar to atomic_dec(), it will WARN on underflow and fail to decrement
