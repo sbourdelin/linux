@@ -32,12 +32,6 @@
 #define MAP_HUGE_MASK   0x3f
 #define MAP_HUGETLB	0x40000
 
-#define SHM_HUGETLB     04000   /* segment will use huge TLB pages */
-#define SHM_HUGE_SHIFT  26
-#define SHM_HUGE_MASK   0x3f
-#define SHM_HUGE_2MB    (21 << SHM_HUGE_SHIFT)
-#define SHM_HUGE_1GB    (30 << SHM_HUGE_SHIFT)
-
 #define NUM_PAGESIZES   5
 
 #define NUM_PAGES 4
@@ -243,7 +237,7 @@ int main(void)
 
 	for (i = 0; i < num_page_sizes; i++) {
 		unsigned long ps = page_sizes[i];
-		int arg = ilog2(ps) << SHM_HUGE_SHIFT;
+		int arg = ilog2(ps) << MAP_HUGE_SHIFT;
 		printf("Testing %luMB shmget with shift %x\n", ps >> 20, arg);
 		test_shmget(ps, SHM_HUGETLB | arg);
 	}
