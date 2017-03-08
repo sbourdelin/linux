@@ -10,7 +10,9 @@ struct ctl_table_header;
 
 struct netns_mpls {
 	size_t platform_labels;
+	int ip_ttl_propagate;
 	struct mpls_route __rcu * __rcu *platform_label;
+
 	struct ctl_table_header *ctl;
 };
 
