@@ -704,6 +704,9 @@ static int __init opal_init(void)
 	/* Initialise OPAL sensor interface */
 	opal_sensor_init();
 
+	/* Initialize OPAL OCC Inband sensor interface */
+	opal_occ_sensors_init();
+
 	/* Initialise OPAL hypervisor maintainence interrupt handling */
 	opal_hmi_handler_init();
 

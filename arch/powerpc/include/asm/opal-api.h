@@ -928,6 +928,42 @@ enum {
 	OPAL_PCI_TCE_KILL_ALL,
 };
 
+/* PowerNV OPAL-OCC Inband sensor definitions */
+enum occ_sensor_type {
+	OCC_SENSOR_TYPE_INVALID		= 0x0000,
+	OCC_SENSOR_TYPE_GENERIC		= 0x0001,
+	OCC_SENSOR_TYPE_CURRENT		= 0x0002,
+	OCC_SENSOR_TYPE_VOLTAGE		= 0x0004,
+	OCC_SENSOR_TYPE_TEMPERATURE	= 0x0008,
+	OCC_SENSOR_TYPE_UTILIZATION	= 0x0010,
+	OCC_SENSOR_TYPE_TIME		= 0x0020,
+	OCC_SENSOR_TYPE_FREQUENCY	= 0x0040,
+	OCC_SENSOR_TYPE_POWER		= 0x0080,
+	OCC_SENSOR_TYPE_PERFORMANCE	= 0x0200,
+};
+
+#define MAX_OCC_SENSOR_NAME_LEN         16
+#define MAX_OCC_SENSOR_UNITS_LEN        4
+
+struct occ_hwmon_sensor {
+	int type;
+	int occ_id;
+	u64 offset;
+	char name[MAX_OCC_SENSOR_NAME_LEN * 2];
+};
+
+int opal_occ_sensors_init(void);
+struct occ_hwmon_sensor *opal_occ_sensor_get_hwmon_list(int *nr_sensors);
+int opal_occ_sensor_get_sample(int occ_id, u64 offset, u64 *val);
+int opal_occ_sensor_get_min(int occ_id, u64 offset, u64 *val);
+int opal_occ_sensor_get_max(int occ_id, u64 offset, u64 *val);
+int opal_occ_sensor_get_csm_min(int occ_id, u64 offset, u64 *val);
+int opal_occ_sensor_get_csm_max(int occ_id, u64 offset, u64 *val);
+int opal_occ_sensor_get_js_min(int occ_id, u64 offset, u64 *val);
+int opal_occ_sensor_get_js_max(int occ_id, u64 offset, u64 *val);
+int opal_occ_sensor_get_prof_min(int occ_id, u64 offset, u64 *val);
+int opal_occ_sensor_get_prof_max(int occ_id, u64 offset, u64 *val);
+
 #endif /* __ASSEMBLY__ */
 
 #endif /* __OPAL_API_H */
