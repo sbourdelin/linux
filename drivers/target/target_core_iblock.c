@@ -757,6 +757,7 @@ iblock_execute_rw(struct se_cmd *cmd, struct scatterlist *sgl, u32 sgl_nents,
 	}
 
 	iblock_submit_bios(&list);
+	blk_mq_poll_batch(bdev_get_queue(IBLOCK_DEV(dev)->ibd_bd), 4);
 	iblock_complete_cmd(cmd);
 	return 0;
 
