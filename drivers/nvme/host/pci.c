@@ -71,7 +71,7 @@ struct nvme_dev;
 struct nvme_queue;
 
 static int nvme_reset(struct nvme_dev *dev);
-static void nvme_process_cq(struct nvme_queue *nvmeq);
+static int nvme_process_cq(struct nvme_queue *nvmeq);
 static void nvme_dev_disable(struct nvme_dev *dev, bool shutdown);
 
 /*
@@ -665,75 +665,96 @@ static inline bool nvme_cqe_valid(struct nvme_queue *nvmeq, u16 head,
 	return (le16_to_cpu(nvmeq->cqes[head].status) & 1) == phase;
 }
 
-static void __nvme_process_cq(struct nvme_queue *nvmeq, unsigned int *tag)
+static inline void nvme_ring_cq_doorbell(struct nvme_queue *nvmeq)
 {
-	u16 head, phase;
-
-	head = nvmeq->cq_head;
-	phase = nvmeq->cq_phase;
-
-	while (nvme_cqe_valid(nvmeq, head, phase)) {
-		struct nvme_completion cqe = nvmeq->cqes[head];
-		struct request *req;
-
-		if (++head == nvmeq->q_depth) {
-			head = 0;
-			phase = !phase;
-		}
-
-		if (tag && *tag == cqe.command_id)
-			*tag = -1;
-
-		if (unlikely(cqe.command_id >= nvmeq->q_depth)) {
-			dev_warn(nvmeq->dev->ctrl.device,
-				"invalid id %d completed on queue %d\n",
-				cqe.command_id, le16_to_cpu(cqe.sq_id));
-			continue;
-		}
-
-		/*
-		 * AEN requests are special as they don't time out and can
-		 * survive any kind of queue freeze and often don't respond to
-		 * aborts.  We don't even bother to allocate a struct request
-		 * for them but rather special case them here.
-		 */
-		if (unlikely(nvmeq->qid == 0 &&
-				cqe.command_id >= NVME_AQ_BLKMQ_DEPTH)) {
-			nvme_complete_async_event(&nvmeq->dev->ctrl,
-					cqe.status, &cqe.result);
-			continue;
-		}
-
-		req = blk_mq_tag_to_rq(*nvmeq->tags, cqe.command_id);
-		nvme_req(req)->result = cqe.result;
-		blk_mq_complete_request(req, le16_to_cpu(cqe.status) >> 1);
-	}
-
-	if (head == nvmeq->cq_head && phase == nvmeq->cq_phase)
-		return;
-
 	if (likely(nvmeq->cq_vector >= 0))
-		writel(head, nvmeq->q_db + nvmeq->dev->db_stride);
-	nvmeq->cq_head = head;
-	nvmeq->cq_phase = phase;
-
-	nvmeq->cqe_seen = 1;
+		writel(nvmeq->cq_head, nvmeq->q_db + nvmeq->dev->db_stride);
 }
 
-static void nvme_process_cq(struct nvme_queue *nvmeq)
+static inline void nvme_handle_cqe(struct nvme_queue *nvmeq,
+		struct nvme_completion *cqe)
 {
-	__nvme_process_cq(nvmeq, NULL);
+	struct request *req;
+
+	if (unlikely(cqe->command_id >= nvmeq->q_depth)) {
+		dev_warn(nvmeq->dev->ctrl.device,
+			"invalid id %d completed on queue %d\n",
+			cqe->command_id, le16_to_cpu(cqe->sq_id));
+		return;
+	}
+
+	/*
+	 * AEN requests are special as they don't time out and can
+	 * survive any kind of queue freeze and often don't respond to
+	 * aborts.  We don't even bother to allocate a struct request
+	 * for them but rather special case them here.
+	 */
+	if (unlikely(nvmeq->qid == 0 &&
+			cqe->command_id >= NVME_AQ_BLKMQ_DEPTH)) {
+		nvme_complete_async_event(&nvmeq->dev->ctrl,
+				cqe->status, &cqe->result);
+		return;
+	}
+
+	req = blk_mq_tag_to_rq(*nvmeq->tags, cqe->command_id);
+	nvme_req(req)->result = cqe->result;
+	blk_mq_complete_request(req, le16_to_cpu(cqe->status) >> 1);
+}
+
+static inline bool nvme_read_cqe(struct nvme_queue *nvmeq,
+		struct nvme_completion *cqe)
+{
+	if (nvme_cqe_valid(nvmeq, nvmeq->cq_head, nvmeq->cq_phase)) {
+		*cqe = nvmeq->cqes[nvmeq->cq_head];
+
+		if (++nvmeq->cq_head == nvmeq->q_depth) {
+			nvmeq->cq_head = 0;
+			nvmeq->cq_phase = !nvmeq->cq_phase;
+		}
+		return true;
+	}
+	return false;
+}
+
+static int __nvme_process_cq(struct nvme_queue *nvmeq, int *tag)
+{
+	struct nvme_completion cqe;
+	int consumed = 0;
+
+	while (nvme_read_cqe(nvmeq, &cqe)) {
+		nvme_handle_cqe(nvmeq, &cqe);
+		consumed++;
+
+		if (tag && *tag == cqe.command_id) {
+			*tag = -1;
+			break;
+		}
+	}
+
+	if (consumed) {
+		nvme_ring_cq_doorbell(nvmeq);
+		nvmeq->cqe_seen = 1;
+	}
+
+	return consumed;
+}
+
+static int nvme_process_cq(struct nvme_queue *nvmeq)
+{
+	return __nvme_process_cq(nvmeq, NULL);
 }
 
 static irqreturn_t nvme_irq(int irq, void *data)
 {
 	irqreturn_t result;
 	struct nvme_queue *nvmeq = data;
+
 	spin_lock(&nvmeq->q_lock);
 	nvme_process_cq(nvmeq);
 	result = nvmeq->cqe_seen ? IRQ_HANDLED : IRQ_NONE;
 	nvmeq->cqe_seen = 0;
 	spin_unlock(&nvmeq->q_lock);
+
 	return result;
 }
 
