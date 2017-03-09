@@ -316,7 +316,7 @@ int hostif_data_indication_wpa(struct ks_wlan_private *priv, unsigned int auth_t
 	char buf[128];
 	unsigned long now;
 	struct mic_failure_t *mic_failure;
-	struct michel_mic_t michel_mic;
+	struct michael_mic_t michael_mic;
 	union iwreq_data wrqu;
 
 	eth_hdr = (struct ether_hdr *)(priv->rxp);
@@ -348,10 +348,10 @@ int hostif_data_indication_wpa(struct ks_wlan_private *priv, unsigned int auth_t
 			(priv->rxp) + ((priv->rx_size) - 8), 8);
 		priv->rx_size = priv->rx_size - 8;
 		if (auth_type > 0 && auth_type < 4) {	/* auth_type check */
-			MichaelMICFunction(&michel_mic, (u8 *)priv->wpa.key[auth_type - 1].rx_mic_key, (u8 *)priv->rxp, (int)priv->rx_size, (u8)0,	/* priority */
-					(u8 *)michel_mic.Result);
+			MichaelMICFunction(&michael_mic, (u8 *)priv->wpa.key[auth_type - 1].rx_mic_key, (u8 *)priv->rxp, (int)priv->rx_size, (u8)0,	/* priority */
+					(u8 *)michael_mic.Result);
 		}
-		if (memcmp(michel_mic.Result, RecvMIC, 8)) {
+		if (memcmp(michael_mic.Result, RecvMIC, 8)) {
 			now = jiffies;
 			mic_failure = &priv->wpa.mic_failure;
 			/* MIC FAILURE */
@@ -1128,7 +1128,7 @@ int hostif_data_request(struct ks_wlan_private *priv, struct sk_buff *packet)
 	int result = 0;
 	unsigned short eth_proto;
 	struct ether_hdr *eth_hdr;
-	struct michel_mic_t michel_mic;
+	struct michael_mic_t michael_mic;
 	unsigned short keyinfo = 0;
 	struct ieee802_1x_hdr *aa1x_hdr;
 	struct wpa_eapol_key *eap_key;
@@ -1236,10 +1236,10 @@ int hostif_data_request(struct ks_wlan_private *priv, struct sk_buff *packet)
 			pp->auth_type = cpu_to_le16((u16)TYPE_AUTH);	/* no encryption */
 		} else {
 			if (priv->wpa.pairwise_suite == IW_AUTH_CIPHER_TKIP) {
-				MichaelMICFunction(&michel_mic, (u8 *)priv->wpa.key[0].tx_mic_key, (u8 *)&pp->data[0], (int)packet_len, (u8)0,	/* priority */
-						   (u8 *)michel_mic.
+				MichaelMICFunction(&michael_mic, (u8 *)priv->wpa.key[0].tx_mic_key, (u8 *)&pp->data[0], (int)packet_len, (u8)0,	/* priority */
+						   (u8 *)michael_mic.
 						   Result);
-				memcpy(p, michel_mic.Result, 8);
+				memcpy(p, michael_mic.Result, 8);
 				length += 8;
 				packet_len += 8;
 				p += 8;
