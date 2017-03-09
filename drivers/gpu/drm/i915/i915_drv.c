@@ -1825,7 +1825,7 @@ void i915_reset(struct drm_i915_private *dev_priv)
 		return;
 
 	/* Clear any previous failed attempts at recovery. Time to try again. */
-	__clear_bit(I915_WEDGED, &error->flags);
+	i915_gem_unset_wedged(dev_priv);
 	error->reset_count++;
 
 	pr_notice("drm/i915: Resetting chip after gpu hang\n");

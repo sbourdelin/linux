@@ -2999,6 +2999,47 @@ void i915_gem_set_wedged(struct drm_i915_private *dev_priv)
 	mod_delayed_work(dev_priv->wq, &dev_priv->gt.idle_work, 0);
 }
 
+void i915_gem_unset_wedged(struct drm_i915_private *dev_priv)
+{
+	struct i915_gem_timeline *tl;
+	int i;
+
+	lockdep_assert_held(&dev_priv->drm.struct_mutex);
+	if (!test_bit(I915_WEDGED, &dev_priv->gpu_error.flags))
+		return;
+
+	/* Before unwedging, make sure that all pending operations
+	 * are flushed and errored out. No more can be submitted until
+	 * we reset the wedged bit.
+	 */
+	list_for_each_entry(tl, &dev_priv->gt.timelines, link) {
+		for (i = 0; i < ARRAY_SIZE(tl->engine); i++) {
+			struct drm_i915_gem_request *rq;
+
+			rq = i915_gem_active_peek(&tl->engine[i].last_request,
+						  &dev_priv->drm.struct_mutex);
+			if (!rq)
+				continue;
+
+			/* We can't use our normal waiter as we want to
+			 * avoid recursively trying to handle the current
+			 * reset.
+			 */
+			dma_fence_default_wait(&rq->fence, false,
+					       MAX_SCHEDULE_TIMEOUT);
+		}
+	}
+
+	/* Undo nop_submit_request */
+	if (i915.enable_execlists)
+		intel_execlists_enable_submission(dev_priv);
+	else
+		intel_ringbuffer_enable_submission(dev_priv);
+
+	smp_mb__before_atomic();
+	clear_bit(I915_WEDGED, &dev_priv->gpu_error.flags);
+}
+
 static void
 i915_gem_retire_work_handler(struct work_struct *work)
 {

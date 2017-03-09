@@ -2224,3 +2224,15 @@ int intel_init_vebox_ring_buffer(struct intel_engine_cs *engine)
 
 	return intel_init_ring_buffer(engine);
 }
+
+void intel_ringbuffer_enable_submission(struct drm_i915_private *i915)
+{
+	struct intel_engine_cs *engine;
+	enum intel_engine_id id;
+
+	for_each_engine(engine, i915, id) {
+		engine->submit_request = i9xx_submit_request;
+		if (IS_GEN6(i915) && id == VCS)
+			engine->submit_request = gen6_bsd_submit_request;
+	}
+}
