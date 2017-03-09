@@ -924,12 +924,24 @@ static int lmd_parse(char *options, struct lustre_mount_data *lmd)
 			lmd->lmd_flags |= LMD_FLG_ABORT_RECOV;
 			clear++;
 		} else if (strncmp(s1, "recovery_time_soft=", 19) == 0) {
-			lmd->lmd_recovery_time_soft = max_t(int,
-				simple_strtoul(s1 + 19, NULL, 10), time_min);
+			int res;
+
+			rc = kstrtoint(s1 + 19, 10, &res);
+			if (rc)
+				lmd->lmd_recovery_time_soft = time_min;
+			else
+				lmd->lmd_recovery_time_soft = max_t(int, res,
+								    time_min);
 			clear++;
 		} else if (strncmp(s1, "recovery_time_hard=", 19) == 0) {
-			lmd->lmd_recovery_time_hard = max_t(int,
-				simple_strtoul(s1 + 19, NULL, 10), time_min);
+			int res;
+
+			rc = kstrtoint(s1 + 19, 10, &res);
+			if (rc)
+				lmd->lmd_recovery_time_hard = time_min;
+			else
+				lmd->lmd_recovery_time_hard = max_t(int, res,
+								    time_min);
 			clear++;
 		} else if (strncmp(s1, "noir", 4) == 0) {
 			lmd->lmd_flags |= LMD_FLG_NOIR; /* test purpose only. */
