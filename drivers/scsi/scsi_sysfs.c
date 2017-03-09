@@ -1282,6 +1282,8 @@ void __scsi_remove_device(struct scsi_device *sdev)
 		return;
 
 	if (sdev->is_visible) {
+		enum scsi_device_state oldstate = sdev->sdev_state;
+
 		if (scsi_device_set_state(sdev, SDEV_CANCEL) != 0)
 			return;
 
@@ -1289,6 +1291,17 @@ void __scsi_remove_device(struct scsi_device *sdev)
 		device_unregister(&sdev->sdev_dev);
 		transport_remove_device(dev);
 		scsi_dh_remove_device(sdev);
+
+		/*
+		 * Fail new requests if the old state was offline.
+		 * This avoids from sd_shutdown() to hang.
+		 * The SYNCHRONIZE CACHE request timer will never start
+		 * in that case.
+		 */
+		if (oldstate == SDEV_TRANSPORT_OFFLINE ||
+		    oldstate == SDEV_OFFLINE)
+			blk_set_queue_dying(sdev->request_queue);
+
 		device_del(dev);
 	} else
 		put_device(&sdev->sdev_dev);
