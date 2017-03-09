@@ -369,6 +369,68 @@ static struct regulator_ops rk808_switch_ops = {
 	.set_suspend_disable	= rk808_set_suspend_disable,
 };
 
+static const struct regulator_desc rk805_reg[] = {
+	{
+		.name = "DCDC_REG1",
+		.supply_name = "vcc1",
+		.of_match = of_match_ptr("DCDC_REG1"),
+		.regulators_node = of_match_ptr("regulators"),
+		.id = RK805_ID_DCDC1,
+		.ops = &rk808_reg_ops,
+		.type = REGULATOR_VOLTAGE,
+		.min_uV = 712500,
+		.uV_step = 12500,
+		.n_voltages = 64,
+		.vsel_reg = RK805_BUCK1_ON_VSEL_REG,
+		.vsel_mask = RK818_BUCK_VSEL_MASK,
+		.enable_reg = RK805_DCDC_EN_REG,
+		.enable_mask = BIT(0),
+		.owner = THIS_MODULE,
+	}, {
+		.name = "DCDC_REG2",
+		.supply_name = "vcc2",
+		.of_match = of_match_ptr("DCDC_REG2"),
+		.regulators_node = of_match_ptr("regulators"),
+		.id = RK805_ID_DCDC2,
+		.ops = &rk808_reg_ops,
+		.type = REGULATOR_VOLTAGE,
+		.min_uV = 712500,
+		.uV_step = 12500,
+		.n_voltages = 64,
+		.vsel_reg = RK805_BUCK2_ON_VSEL_REG,
+		.vsel_mask = RK818_BUCK_VSEL_MASK,
+		.enable_reg = RK805_DCDC_EN_REG,
+		.enable_mask = BIT(1),
+		.owner = THIS_MODULE,
+	}, {
+		.name = "DCDC_REG3",
+		.supply_name = "vcc3",
+		.of_match = of_match_ptr("DCDC_REG3"),
+		.regulators_node = of_match_ptr("regulators"),
+		.id = RK805_ID_DCDC3,
+		.ops = &rk808_switch_ops,
+		.type = REGULATOR_VOLTAGE,
+		.n_voltages = 1,
+		.enable_reg = RK805_DCDC_EN_REG,
+		.enable_mask = BIT(2),
+		.owner = THIS_MODULE,
+	},
+
+	RK8XX_DESC(RK805_ID_DCDC4, "DCDC_REG4", "vcc4", 800, 3400, 100,
+		RK805_BUCK4_ON_VSEL_REG, RK818_BUCK4_VSEL_MASK,
+		RK805_DCDC_EN_REG, BIT(3), 0),
+
+	RK8XX_DESC(RK805_ID_LDO1, "LDO_REG1", "vcc5", 800, 3400, 100,
+		RK805_LDO1_ON_VSEL_REG, RK818_LDO_VSEL_MASK, RK805_LDO_EN_REG,
+		BIT(0), 400),
+	RK8XX_DESC(RK805_ID_LDO2, "LDO_REG2", "vcc5", 800, 3400, 100,
+		RK805_LDO2_ON_VSEL_REG, RK818_LDO_VSEL_MASK, RK805_LDO_EN_REG,
+		BIT(1), 400),
+	RK8XX_DESC(RK805_ID_LDO3, "LDO_REG3", "vcc6", 800, 3400, 100,
+		RK805_LDO3_ON_VSEL_REG, RK818_LDO_VSEL_MASK, RK805_LDO_EN_REG,
+		BIT(2), 400),
+};
+
 static const struct regulator_desc rk808_reg[] = {
 	{
 		.name = "DCDC_REG1",
@@ -625,6 +687,10 @@ static int rk808_regulator_probe(struct platform_device *pdev)
 	platform_set_drvdata(pdev, pdata);
 
 	switch (rk808->variant) {
+	case RK805_ID:
+		regulators = rk805_reg;
+		nregulators = RK805_NUM_REGULATORS;
+		break;
 	case RK808_ID:
 		regulators = rk808_reg;
 		nregulators = RK808_NUM_REGULATORS;
