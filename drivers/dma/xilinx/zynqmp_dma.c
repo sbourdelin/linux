@@ -999,7 +999,6 @@ static int zynqmp_dma_chan_probe(struct zynqmp_dma_device *zdev,
 	chan->common.device = &zdev->common;
 	list_add_tail(&chan->common.device_node, &zdev->common.channels);
 
-	zynqmp_dma_init(chan);
 	chan->irq = platform_get_irq(pdev, 0);
 	if (chan->irq < 0)
 		return -ENXIO;
@@ -1034,6 +1033,7 @@ static int zynqmp_dma_chan_probe(struct zynqmp_dma_device *zdev,
 
 	pm_runtime_set_active(&pdev->dev);
 	pm_runtime_enable(&pdev->dev);
+	zynqmp_dma_init(chan);
 
 	chan->desc_size = sizeof(struct zynqmp_dma_desc_ll);
 	chan->idle = true;
