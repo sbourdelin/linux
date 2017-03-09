@@ -1078,7 +1078,7 @@ rtas_return_loc:
 	b	.	/* prevent speculative execution */
 
 	.align	3
-1:	.llong	rtas_restore_regs
+1:	.8byte	rtas_restore_regs
 
 rtas_restore_regs:
 	/* relocation is on at this point */
