@@ -2903,6 +2903,20 @@ bool blk_mq_poll(struct request_queue *q, blk_qc_t cookie)
 }
 EXPORT_SYMBOL_GPL(blk_mq_poll);
 
+int blk_mq_poll_batch(struct request_queue *q, unsigned int batch)
+{
+	struct blk_mq_hw_ctx *hctx;
+
+	if (!q->mq_ops || !q->mq_ops->poll_batch)
+		return 0;
+
+	hctx = blk_mq_map_queue(q, smp_processor_id());
+	return q->mq_ops->poll_batch(hctx, batch);
+}
+EXPORT_SYMBOL_GPL(blk_mq_poll_batch);
+
+
+
 void blk_mq_disable_hotplug(void)
 {
 	mutex_lock(&all_q_mutex);
