@@ -598,6 +598,17 @@ config SENSORS_IBMPOWERNV
 	  This driver can also be built as a module. If so, the module
 	  will be called ibmpowernv.
 
+config SENSORS_IBMPOWERNV_OCC
+	tristate "IBM POWERNV OCC Inband platform sensors"
+	depends on PPC_POWERNV
+	default y
+	help
+	  If you say yes here you get support for the temperature/power
+	  OCC inband sensors on your PowerNV platform.
+
+	  This driver can also be built as a module. If so, the module
+	  will be called ibmpowernv-occ.
+
 config SENSORS_IIO_HWMON
 	tristate "Hwmon driver that uses channels specified via iio maps"
 	depends on IIO

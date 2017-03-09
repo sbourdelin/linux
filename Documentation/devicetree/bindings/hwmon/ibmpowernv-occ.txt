@@ -1,0 +1,4 @@
+IBM POWERNV OCC inband platform sensors
+
+Required device-tree property:
+- compatible: "ibm,p9-occ-inband-sensor"

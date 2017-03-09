@@ -1,0 +1,24 @@
+Kernel driver ibmpowernv-occ
+=============================
+
+Supported systems:
+ * P9 server based on POWERNV platform
+
+Description
+------------
+
+This driver exports the power and temperature sensors from OCC inband
+sensors on P9 POWERNV platforms.
+
+Sysfs attributes
+----------------
+
+powerX_input		Latest power reading
+powerX_input_highest	Minimum power
+powerX_input_lowest	Maximum power
+powerX_label		Sensor name
+
+tempX_input		Latest temperature reading
+tempX_max		Minimum temperature
+tempX_min		Maximum temperature
+tempX_label		Sensor name
