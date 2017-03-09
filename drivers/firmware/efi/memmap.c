@@ -298,6 +298,7 @@ void __init efi_memmap_insert(struct efi_memory_map *old_memmap, void *buf,
 			memcpy(new, old, old_memmap->desc_size);
 			md = new;
 			md->phys_addr = m_end + 1;
+			md->virt_addr += md->phys_addr - start;
 			md->num_pages = (end - md->phys_addr + 1) >>
 				EFI_PAGE_SHIFT;
 		}
@@ -312,6 +313,7 @@ void __init efi_memmap_insert(struct efi_memory_map *old_memmap, void *buf,
 			md = new;
 			md->attribute |= m_attr;
 			md->phys_addr = m_start;
+			md->virt_addr += md->phys_addr - start;
 			md->num_pages = (m_end - m_start + 1) >>
 				EFI_PAGE_SHIFT;
 			/* last part */
@@ -319,6 +321,7 @@ void __init efi_memmap_insert(struct efi_memory_map *old_memmap, void *buf,
 			memcpy(new, old, old_memmap->desc_size);
 			md = new;
 			md->phys_addr = m_end + 1;
+			md->virt_addr += md->phys_addr - start;
 			md->num_pages = (end - m_end) >>
 				EFI_PAGE_SHIFT;
 		}
@@ -333,6 +336,7 @@ void __init efi_memmap_insert(struct efi_memory_map *old_memmap, void *buf,
 			memcpy(new, old, old_memmap->desc_size);
 			md = new;
 			md->phys_addr = m_start;
+			md->virt_addr += md->phys_addr - start;
 			md->num_pages = (end - md->phys_addr + 1) >>
 				EFI_PAGE_SHIFT;
 			md->attribute |= m_attr;
