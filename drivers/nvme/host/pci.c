@@ -716,14 +716,15 @@ static inline bool nvme_read_cqe(struct nvme_queue *nvmeq,
 	return false;
 }
 
-static int __nvme_process_cq(struct nvme_queue *nvmeq, int *tag)
+static int __nvme_process_cq(struct nvme_queue *nvmeq, int budget, int *tag)
 {
 	struct nvme_completion cqe;
 	int consumed = 0;
 
 	while (nvme_read_cqe(nvmeq, &cqe)) {
 		nvme_handle_cqe(nvmeq, &cqe);
-		consumed++;
+		if (++consumed == budget)
+			break;
 
 		if (tag && *tag == cqe.command_id) {
 			*tag = -1;
@@ -741,7 +742,7 @@ static int __nvme_process_cq(struct nvme_queue *nvmeq, int *tag)
 
 static int nvme_process_cq(struct nvme_queue *nvmeq)
 {
-	return __nvme_process_cq(nvmeq, NULL);
+	return __nvme_process_cq(nvmeq, INT_MAX, NULL);
 }
 
 static irqreturn_t nvme_irq(int irq, void *data)
@@ -772,7 +773,7 @@ static int nvme_poll(struct blk_mq_hw_ctx *hctx, unsigned int tag)
 
 	if (nvme_cqe_valid(nvmeq, nvmeq->cq_head, nvmeq->cq_phase)) {
 		spin_lock_irq(&nvmeq->q_lock);
-		__nvme_process_cq(nvmeq, &tag);
+		__nvme_process_cq(nvmeq, INT_MAX, &tag);
 		spin_unlock_irq(&nvmeq->q_lock);
 
 		if (tag == -1)
