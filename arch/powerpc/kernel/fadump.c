@@ -319,9 +319,13 @@ int __init fadump_reserve_mem(void)
 		pr_debug("fadumphdr_addr = %p\n",
 				(void *) fw_dump.fadumphdr_addr);
 	} else {
-		/* Reserve the memory at the top of memory. */
+		/*
+		 * Reserve memory at the halfway mark to minimize
+		 * the impact of DLPAR memory remove operation.
+		 */
+		base = PAGE_ALIGN(memory_boundary/2);
 		size = get_fadump_area_size();
-		base = memory_boundary - size;
+		WARN_ON((base + size) > memory_boundary);
 		memblock_reserve(base, size);
 		printk(KERN_INFO "Reserved %ldMB of memory at %ldMB "
 				"for firmware-assisted dump\n",
