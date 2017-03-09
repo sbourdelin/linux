@@ -172,8 +172,10 @@ struct v4l2_subdev_io_pin_config {
  *
  * @s_register: callback for %VIDIOC_G_REGISTER ioctl handler code.
  *
- * @s_power: puts subdevice in power saving mode (on == 0) or normal operation
- *	mode (on == 1).
+ * @s_power: Puts subdevice in power saving mode (on == 0) or normal operation
+ *	mode (on == 1). The caller is responsible for calling the op
+ *	symmetrically, i.e. calling s_power(dev, 1) once requires later calling
+ *	s_power(dev, 0) once.
  *
  * @interrupt_service_routine: Called by the bridge chip's interrupt service
  *	handler, when an interrupt status has be raised due to this subdev,
