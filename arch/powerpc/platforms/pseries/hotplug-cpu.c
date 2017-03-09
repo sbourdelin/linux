@@ -618,7 +618,8 @@ static int dlpar_cpu_remove_by_index(u32 drc_index)
 	}
 
 	rc = dlpar_cpu_remove(dn, drc_index);
-	of_node_put(dn);
+	if (rc)
+		of_node_put(dn);
 	return rc;
 }
 
@@ -855,9 +856,12 @@ static ssize_t dlpar_cpu_release(const char *buf, size_t count)
 	}
 
 	rc = dlpar_cpu_remove(dn, drc_index);
-	of_node_put(dn);
-
-	return rc ? rc : count;
+	if (rc) {
+		of_node_put(dn);
+		return rc;
+	} else {
+		return count;
+	}
 }
 
 #endif /* CONFIG_ARCH_CPU_PROBE_RELEASE */
