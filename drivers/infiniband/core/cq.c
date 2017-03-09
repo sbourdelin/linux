@@ -63,8 +63,6 @@ static int __ib_process_cq(struct ib_cq *cq, int budget)
  */
 int ib_process_cq_direct(struct ib_cq *cq, int budget)
 {
-	WARN_ON_ONCE(cq->poll_ctx != IB_POLL_DIRECT);
-
 	return __ib_process_cq(cq, budget);
 }
 EXPORT_SYMBOL(ib_process_cq_direct);
