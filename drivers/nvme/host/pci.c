@@ -716,7 +716,7 @@ static inline bool nvme_read_cqe(struct nvme_queue *nvmeq,
 	return false;
 }
 
-static int __nvme_process_cq(struct nvme_queue *nvmeq, int budget, int *tag)
+static int __nvme_process_cq(struct nvme_queue *nvmeq, int budget)
 {
 	struct nvme_completion cqe;
 	int consumed = 0;
@@ -725,11 +725,6 @@ static int __nvme_process_cq(struct nvme_queue *nvmeq, int budget, int *tag)
 		nvme_handle_cqe(nvmeq, &cqe);
 		if (++consumed == budget)
 			break;
-
-		if (tag && *tag == cqe.command_id) {
-			*tag = -1;
-			break;
-		}
 	}
 
 	if (consumed) {
@@ -742,7 +737,7 @@ static int __nvme_process_cq(struct nvme_queue *nvmeq, int budget, int *tag)
 
 static int nvme_process_cq(struct nvme_queue *nvmeq)
 {
-	return __nvme_process_cq(nvmeq, INT_MAX, NULL);
+	return __nvme_process_cq(nvmeq, INT_MAX);
 }
 
 static irqreturn_t nvme_irq(int irq, void *data)
@@ -770,17 +765,28 @@ static irqreturn_t nvme_irq_check(int irq, void *data)
 static int nvme_poll(struct blk_mq_hw_ctx *hctx, unsigned int tag)
 {
 	struct nvme_queue *nvmeq = hctx->driver_data;
+	struct nvme_completion cqe;
+	int found = 0, consumed = 0;
 
-	if (nvme_cqe_valid(nvmeq, nvmeq->cq_head, nvmeq->cq_phase)) {
-		spin_lock_irq(&nvmeq->q_lock);
-		__nvme_process_cq(nvmeq, INT_MAX, &tag);
-		spin_unlock_irq(&nvmeq->q_lock);
+	if (!nvme_cqe_valid(nvmeq, nvmeq->cq_head, nvmeq->cq_phase))
+		return 0;
 
-		if (tag == -1)
-			return 1;
+	spin_lock_irq(&nvmeq->q_lock);
+	while (nvme_read_cqe(nvmeq, &cqe)) {
+		nvme_handle_cqe(nvmeq, &cqe);
+		consumed++;
+
+		if (tag == cqe.command_id) {
+			found = 1;
+			break;
+		}
 	}
 
-	return 0;
+	if (consumed)
+		nvme_ring_cq_doorbell(nvmeq);
+	spin_unlock_irq(&nvmeq->q_lock);
+
+	return found;
 }
 
 static void nvme_pci_submit_async_event(struct nvme_ctrl *ctrl, int aer_idx)
