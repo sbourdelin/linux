@@ -95,7 +95,7 @@ void kill_bdev(struct block_device *bdev)
 
 	invalidate_bh_lrus();
 	truncate_inode_pages(mapping, 0);
-}	
+}
 EXPORT_SYMBOL(kill_bdev);
 
 /* Invalidate clean unused buffers and pagecache. */
@@ -617,13 +617,13 @@ static loff_t block_llseek(struct file *file, loff_t offset, int whence)
 	inode_unlock(bd_inode);
 	return retval;
 }
-	
+
 int blkdev_fsync(struct file *filp, loff_t start, loff_t end, int datasync)
 {
 	struct inode *bd_inode = bdev_file_inode(filp);
 	struct block_device *bdev = I_BDEV(bd_inode);
 	int error;
-	
+
 	error = filemap_write_and_wait_range(filp->f_mapping, start, end);
 	if (error)
 		return error;
@@ -1038,7 +1038,7 @@ void bdput(struct block_device *bdev)
 }
 
 EXPORT_SYMBOL(bdput);
- 
+
 static struct block_device *bd_acquire(struct inode *inode)
 {
 	struct block_device *bdev;
@@ -1880,7 +1880,10 @@ static void __blkdev_put(struct block_device *bdev, fmode_t mode, int for_part)
 		 * Detaching bdev inode from its wb in __destroy_inode()
 		 * is too late: the queue which embeds its bdi (along with
 		 * root wb) can be gone as soon as we put_disk() below.
+		 * Before detaching wb, wait for any writeback activity for
+		 * inode to settle.
 		 */
+		inode_wait_for_writeback(bdev->bd_inode);
 		inode_detach_wb(bdev->bd_inode);
 	}
 	if (bdev->bd_contains == bdev) {
