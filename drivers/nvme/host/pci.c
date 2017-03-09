@@ -789,6 +789,21 @@ static int nvme_poll(struct blk_mq_hw_ctx *hctx, unsigned int tag)
 	return found;
 }
 
+static int nvme_poll_batch(struct blk_mq_hw_ctx *hctx, unsigned int batch)
+{
+	struct nvme_queue *nvmeq = hctx->driver_data;
+	int completed;
+
+	if (!nvme_cqe_valid(nvmeq, nvmeq->cq_head, nvmeq->cq_phase))
+		return 0;
+
+	spin_lock_irq(&nvmeq->q_lock);
+	completed = __nvme_process_cq(nvmeq, batch);
+	spin_unlock_irq(&nvmeq->q_lock);
+
+	return completed;
+}
+
 static void nvme_pci_submit_async_event(struct nvme_ctrl *ctrl, int aer_idx)
 {
 	struct nvme_dev *dev = to_nvme_dev(ctrl);
@@ -1174,6 +1189,7 @@ static struct blk_mq_ops nvme_mq_ops = {
 	.map_queues	= nvme_pci_map_queues,
 	.timeout	= nvme_timeout,
 	.poll		= nvme_poll,
+	.poll_batch	= nvme_poll_batch,
 };
 
 static void nvme_dev_remove_admin(struct nvme_dev *dev)
