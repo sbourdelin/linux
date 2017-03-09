@@ -468,12 +468,10 @@ static int dwmac4_irq_status(struct mac_device_info *hw,
 	return ret;
 }
 
-static void dwmac4_debug(void __iomem *ioaddr, struct stmmac_extra_stats *x)
+static void dwmac4_debug(void __iomem *ioaddr, struct stmmac_extra_stats *x,
+			 u32 queue)
 {
-	u32 value;
-
-	/*  Currently only channel 0 is supported */
-	value = readl(ioaddr + MTL_CHAN_TX_DEBUG(STMMAC_CHAN0));
+	u32 value = readl(ioaddr + MTL_CHAN_TX_DEBUG(queue));
 
 	if (value & MTL_DEBUG_TXSTSFSTS)
 		x->mtl_tx_status_fifo_full++;
@@ -496,7 +494,7 @@ static void dwmac4_debug(void __iomem *ioaddr, struct stmmac_extra_stats *x)
 	if (value & MTL_DEBUG_TXPAUSED)
 		x->mac_tx_in_pause++;
 
-	value = readl(ioaddr + MTL_CHAN_RX_DEBUG(STMMAC_CHAN0));
+	value = readl(ioaddr + MTL_CHAN_RX_DEBUG(queue));
 
 	if (value & MTL_DEBUG_RXFSTS_MASK) {
 		u32 rxfsts = (value & MTL_DEBUG_RXFSTS_MASK)
