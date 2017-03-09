@@ -778,13 +778,6 @@ out:
 	return ret;
 }
 
-static int intel_crt_set_property(struct drm_connector *connector,
-				  struct drm_property *property,
-				  uint64_t value)
-{
-	return 0;
-}
-
 void intel_crt_reset(struct drm_encoder *encoder)
 {
 	struct drm_i915_private *dev_priv = to_i915(encoder->dev);
@@ -816,7 +809,7 @@ static const struct drm_connector_funcs intel_crt_connector_funcs = {
 	.late_register = intel_connector_register,
 	.early_unregister = intel_connector_unregister,
 	.destroy = intel_crt_destroy,
-	.set_property = intel_crt_set_property,
+	.set_property = drm_atomic_helper_connector_set_property,
 	.atomic_destroy_state = drm_atomic_helper_connector_destroy_state,
 	.atomic_duplicate_state = drm_atomic_helper_connector_duplicate_state,
 	.atomic_get_property = intel_connector_atomic_get_property,
