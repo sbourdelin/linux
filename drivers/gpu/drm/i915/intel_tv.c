@@ -48,8 +48,6 @@ struct intel_tv {
 	struct intel_encoder base;
 
 	int type;
-	const char *tv_format;
-	int margin[4];
 	u32 save_TV_H_CTL_1;
 	u32 save_TV_H_CTL_2;
 	u32 save_TV_H_CTL_3;
@@ -84,6 +82,16 @@ struct intel_tv {
 	u32 save_TV_DAC;
 	u32 save_TV_CTL;
 };
+
+struct intel_tv_connector_state {
+	struct drm_connector_state base;
+
+	int format;
+	int margin[4];
+};
+
+#define to_intel_tv_connector_state(state) \
+	container_of((state), struct intel_tv_connector_state, base)
 
 struct video_levels {
 	u16 blank, black;
@@ -873,32 +881,18 @@ intel_disable_tv(struct intel_encoder *encoder,
 	I915_WRITE(TV_CTL, I915_READ(TV_CTL) & ~TV_ENC_ENABLE);
 }
 
-static const struct tv_mode *
-intel_tv_mode_lookup(const char *tv_format)
+static const struct tv_mode *intel_tv_mode_find(struct drm_connector_state *conn_state)
 {
-	int i;
+	int format = to_intel_tv_connector_state(conn_state)->format;
 
-	for (i = 0; i < ARRAY_SIZE(tv_modes); i++) {
-		const struct tv_mode *tv_mode = &tv_modes[i];
-
-		if (!strcmp(tv_format, tv_mode->name))
-			return tv_mode;
-	}
-	return NULL;
-}
-
-static const struct tv_mode *
-intel_tv_mode_find(struct intel_tv *intel_tv)
-{
-	return intel_tv_mode_lookup(intel_tv->tv_format);
+	return &tv_modes[format];
 }
 
 static enum drm_mode_status
 intel_tv_mode_valid(struct drm_connector *connector,
 		    struct drm_display_mode *mode)
 {
-	struct intel_tv *intel_tv = intel_attached_tv(connector);
-	const struct tv_mode *tv_mode = intel_tv_mode_find(intel_tv);
+	const struct tv_mode *tv_mode = intel_tv_mode_find(connector->state);
 	int max_dotclk = to_i915(connector->dev)->max_dotclk_freq;
 
 	if (mode->clock > max_dotclk)
@@ -925,8 +919,7 @@ intel_tv_compute_config(struct intel_encoder *encoder,
 			struct intel_crtc_state *pipe_config,
 			struct drm_connector_state *conn_state)
 {
-	struct intel_tv *intel_tv = enc_to_tv(encoder);
-	const struct tv_mode *tv_mode = intel_tv_mode_find(intel_tv);
+	const struct tv_mode *tv_mode = intel_tv_mode_find(conn_state);
 
 	if (!tv_mode)
 		return false;
@@ -1032,7 +1025,7 @@ static void intel_tv_pre_enable(struct intel_encoder *encoder,
 	struct drm_i915_private *dev_priv = to_i915(encoder->base.dev);
 	struct intel_crtc *intel_crtc = to_intel_crtc(encoder->base.crtc);
 	struct intel_tv *intel_tv = enc_to_tv(encoder);
-	const struct tv_mode *tv_mode = intel_tv_mode_find(intel_tv);
+	const struct tv_mode *tv_mode = intel_tv_mode_find(conn_state);
 	u32 tv_ctl;
 	u32 scctl1, scctl2, scctl3;
 	int i, j;
@@ -1041,6 +1034,8 @@ static void intel_tv_pre_enable(struct intel_encoder *encoder,
 	bool burst_ena;
 	int xpos = 0x0, ypos = 0x0;
 	unsigned int xsize, ysize;
+	struct intel_tv_connector_state *tv_state =
+		to_intel_tv_connector_state(conn_state);
 
 	if (!tv_mode)
 		return;	/* can't happen (mode_prepare prevents this) */
@@ -1135,12 +1130,12 @@ static void intel_tv_pre_enable(struct intel_encoder *encoder,
 	else
 		ysize = 2*tv_mode->nbr_end + 1;
 
-	xpos += intel_tv->margin[TV_MARGIN_LEFT];
-	ypos += intel_tv->margin[TV_MARGIN_TOP];
-	xsize -= (intel_tv->margin[TV_MARGIN_LEFT] +
-		  intel_tv->margin[TV_MARGIN_RIGHT]);
-	ysize -= (intel_tv->margin[TV_MARGIN_TOP] +
-		  intel_tv->margin[TV_MARGIN_BOTTOM]);
+	xpos += tv_state->margin[TV_MARGIN_LEFT];
+	ypos += tv_state->margin[TV_MARGIN_TOP];
+	xsize -= (tv_state->margin[TV_MARGIN_LEFT] +
+		  tv_state->margin[TV_MARGIN_RIGHT]);
+	ysize -= (tv_state->margin[TV_MARGIN_TOP] +
+		  tv_state->margin[TV_MARGIN_BOTTOM]);
 	I915_WRITE(TV_WIN_POS, (xpos<<16)|ypos);
 	I915_WRITE(TV_WIN_SIZE, (xsize<<16)|ysize);
 
@@ -1288,7 +1283,7 @@ intel_tv_detect_type(struct intel_tv *intel_tv,
 static void intel_tv_find_better_format(struct drm_connector *connector)
 {
 	struct intel_tv *intel_tv = intel_attached_tv(connector);
-	const struct tv_mode *tv_mode = intel_tv_mode_find(intel_tv);
+	const struct tv_mode *tv_mode = intel_tv_mode_find(connector->state);
 	int i;
 
 	if ((intel_tv->type == DRM_MODE_CONNECTOR_Component) ==
@@ -1304,9 +1299,7 @@ static void intel_tv_find_better_format(struct drm_connector *connector)
 			break;
 	}
 
-	intel_tv->tv_format = tv_mode->name;
-	drm_object_property_set_value(&connector->base,
-		connector->dev->mode_config.tv_mode_property, i);
+	to_intel_tv_connector_state(connector->state)->format = i;
 }
 
 /**
@@ -1344,18 +1337,17 @@ intel_tv_detect(struct drm_connector *connector, bool force)
 		} else
 			status = connector_status_unknown;
 
+		if (status == connector_status_connected) {
+			intel_tv->type = type;
+			intel_tv_find_better_format(connector);
+		}
+
 		drm_modeset_drop_locks(&ctx);
 		drm_modeset_acquire_fini(&ctx);
+
+		return status;
 	} else
 		return connector->status;
-
-	if (status != connector_status_connected)
-		return status;
-
-	intel_tv->type = type;
-	intel_tv_find_better_format(connector);
-
-	return connector_status_connected;
 }
 
 static const struct input_res {
@@ -1378,8 +1370,7 @@ static void
 intel_tv_chose_preferred_modes(struct drm_connector *connector,
 			       struct drm_display_mode *mode_ptr)
 {
-	struct intel_tv *intel_tv = intel_attached_tv(connector);
-	const struct tv_mode *tv_mode = intel_tv_mode_find(intel_tv);
+	const struct tv_mode *tv_mode = intel_tv_mode_find(connector->state);
 
 	if (tv_mode->nbr_end < 480 && mode_ptr->vdisplay == 480)
 		mode_ptr->type |= DRM_MODE_TYPE_PREFERRED;
@@ -1403,8 +1394,7 @@ static int
 intel_tv_get_modes(struct drm_connector *connector)
 {
 	struct drm_display_mode *mode_ptr;
-	struct intel_tv *intel_tv = intel_attached_tv(connector);
-	const struct tv_mode *tv_mode = intel_tv_mode_find(intel_tv);
+	const struct tv_mode *tv_mode = intel_tv_mode_find(connector->state);
 	int j, count = 0;
 	u64 tmp;
 
@@ -1462,56 +1452,97 @@ intel_tv_destroy(struct drm_connector *connector)
 	kfree(connector);
 }
 
-
 static int
-intel_tv_set_property(struct drm_connector *connector, struct drm_property *property,
-		      uint64_t val)
+intel_tv_atomic_set_property(struct drm_connector *connector,
+			     struct drm_connector_state *conn_state,
+			     struct drm_property *property,
+			     uint64_t val)
 {
 	struct drm_device *dev = connector->dev;
-	struct intel_tv *intel_tv = intel_attached_tv(connector);
-	struct drm_crtc *crtc = intel_tv->base.base.crtc;
-	int ret = 0;
+
+	struct intel_tv_connector_state *tv_state =
+		to_intel_tv_connector_state(conn_state);
 	bool changed = false;
 
-	ret = drm_object_property_set_value(&connector->base, property, val);
-	if (ret < 0)
-		goto out;
+	if (property == dev->mode_config.tv_left_margin_property) {
+		changed = tv_state->margin[TV_MARGIN_LEFT] != val;
 
-	if (property == dev->mode_config.tv_left_margin_property &&
-		intel_tv->margin[TV_MARGIN_LEFT] != val) {
-		intel_tv->margin[TV_MARGIN_LEFT] = val;
-		changed = true;
-	} else if (property == dev->mode_config.tv_right_margin_property &&
-		intel_tv->margin[TV_MARGIN_RIGHT] != val) {
-		intel_tv->margin[TV_MARGIN_RIGHT] = val;
-		changed = true;
-	} else if (property == dev->mode_config.tv_top_margin_property &&
-		intel_tv->margin[TV_MARGIN_TOP] != val) {
-		intel_tv->margin[TV_MARGIN_TOP] = val;
-		changed = true;
-	} else if (property == dev->mode_config.tv_bottom_margin_property &&
-		intel_tv->margin[TV_MARGIN_BOTTOM] != val) {
-		intel_tv->margin[TV_MARGIN_BOTTOM] = val;
-		changed = true;
+		tv_state->margin[TV_MARGIN_LEFT] = val;
+	} else if (property == dev->mode_config.tv_right_margin_property) {
+		changed = tv_state->margin[TV_MARGIN_RIGHT] != val;
+
+		tv_state->margin[TV_MARGIN_RIGHT] = val;
+	} else if (property == dev->mode_config.tv_top_margin_property) {
+		changed = tv_state->margin[TV_MARGIN_TOP] != val;
+
+		tv_state->margin[TV_MARGIN_TOP] = val;
+	} else if (property == dev->mode_config.tv_bottom_margin_property) {
+		changed = tv_state->margin[TV_MARGIN_BOTTOM] != val;
+
+		tv_state->margin[TV_MARGIN_BOTTOM] = val;
 	} else if (property == dev->mode_config.tv_mode_property) {
 		if (val >= ARRAY_SIZE(tv_modes)) {
-			ret = -EINVAL;
-			goto out;
-		}
-		if (!strcmp(intel_tv->tv_format, tv_modes[val].name))
-			goto out;
+			DRM_DEBUG_ATOMIC("value %llu out of tv_modes array bounds\n", val);
 
-		intel_tv->tv_format = tv_modes[val].name;
-		changed = true;
+			return -EINVAL;
+		}
+
+		changed = tv_state->format != val;
+		tv_state->format = val;
 	} else {
-		ret = -EINVAL;
-		goto out;
+		DRM_DEBUG_ATOMIC("Unknown atomic property %s\n", property->name);
+		return -EINVAL;
 	}
 
-	if (changed && crtc)
-		intel_crtc_restore_mode(crtc);
-out:
-	return ret;
+	/* Trigger a modeset when connector properties are changed. */
+	if (changed && conn_state->crtc) {
+		struct drm_crtc_state *crtc_state =
+			drm_atomic_get_existing_crtc_state(conn_state->state,
+							   conn_state->crtc);
+
+		crtc_state->connectors_changed = true;
+	}
+	return 0;
+}
+
+static int
+intel_tv_atomic_get_property(struct drm_connector *connector,
+				    const struct drm_connector_state *state,
+				    struct drm_property *property,
+				    uint64_t *val)
+{
+	struct drm_device *dev = connector->dev;
+	struct intel_tv_connector_state *tv_state =
+		to_intel_tv_connector_state(state);
+
+	if (property == dev->mode_config.tv_left_margin_property)
+		*val = tv_state->margin[TV_MARGIN_LEFT];
+	else if (property == dev->mode_config.tv_right_margin_property)
+		*val = tv_state->margin[TV_MARGIN_RIGHT];
+	else if (property == dev->mode_config.tv_top_margin_property)
+		*val = tv_state->margin[TV_MARGIN_TOP];
+	else if (property == dev->mode_config.tv_bottom_margin_property)
+		*val = tv_state->margin[TV_MARGIN_BOTTOM];
+	else if (property == dev->mode_config.tv_mode_property) {
+		*val = tv_state->format;
+	} else {
+		DRM_DEBUG_ATOMIC("Unknown atomic property %s\n", property->name);
+		return -EINVAL;
+	}
+
+	return 0;
+}
+
+static struct drm_connector_state *
+intel_tv_duplicate_state(struct drm_connector *connector)
+{
+	struct intel_tv_connector_state *state;
+
+	state = kmemdup(&connector->state, sizeof(*state), GFP_KERNEL);
+	if (state)
+		__drm_atomic_helper_connector_duplicate_state(connector, &state->base);
+
+	return &state->base;
 }
 
 static const struct drm_connector_funcs intel_tv_connector_funcs = {
@@ -1520,11 +1551,12 @@ static const struct drm_connector_funcs intel_tv_connector_funcs = {
 	.late_register = intel_connector_register,
 	.early_unregister = intel_connector_unregister,
 	.destroy = intel_tv_destroy,
-	.set_property = intel_tv_set_property,
-	.atomic_get_property = intel_connector_atomic_get_property,
+	.set_property = drm_atomic_helper_connector_set_property,
+	.atomic_set_property = intel_tv_atomic_set_property,
+	.atomic_get_property = intel_tv_atomic_get_property,
 	.fill_modes = drm_helper_probe_single_connector_modes,
 	.atomic_destroy_state = drm_atomic_helper_connector_destroy_state,
-	.atomic_duplicate_state = drm_atomic_helper_connector_duplicate_state,
+	.atomic_duplicate_state = intel_tv_duplicate_state,
 };
 
 static const struct drm_connector_helper_funcs intel_tv_connector_helper_funcs = {
@@ -1547,6 +1579,7 @@ intel_tv_init(struct drm_i915_private *dev_priv)
 	u32 tv_dac_on, tv_dac_off, save_tv_dac;
 	const char *tv_format_names[ARRAY_SIZE(tv_modes)];
 	int i, initial_mode = 0;
+	struct intel_tv_connector_state *state;
 
 	if ((I915_READ(TV_CTL) & TV_FUSE_STATE_MASK) == TV_FUSE_STATE_DISABLED)
 		return;
@@ -1580,15 +1613,16 @@ intel_tv_init(struct drm_i915_private *dev_priv)
 		return;
 
 	intel_tv = kzalloc(sizeof(*intel_tv), GFP_KERNEL);
-	if (!intel_tv) {
-		return;
-	}
-
-	intel_connector = intel_connector_alloc();
-	if (!intel_connector) {
+	intel_connector = kzalloc(sizeof(*intel_connector), GFP_KERNEL);
+	state = kzalloc(sizeof(*state), GFP_KERNEL);
+	if (!intel_tv || !intel_connector || !state) {
+		kfree(intel_connector);
+		kfree(state);
 		kfree(intel_tv);
 		return;
 	}
+
+	__drm_atomic_helper_connector_reset(&intel_connector->base, &state->base);
 
 	intel_encoder = &intel_tv->base;
 	connector = &intel_connector->base;
@@ -1629,12 +1663,12 @@ intel_tv_init(struct drm_i915_private *dev_priv)
 	intel_tv->type = DRM_MODE_CONNECTOR_Unknown;
 
 	/* BIOS margin values */
-	intel_tv->margin[TV_MARGIN_LEFT] = 54;
-	intel_tv->margin[TV_MARGIN_TOP] = 36;
-	intel_tv->margin[TV_MARGIN_RIGHT] = 46;
-	intel_tv->margin[TV_MARGIN_BOTTOM] = 37;
+	state->margin[TV_MARGIN_LEFT] = 54;
+	state->margin[TV_MARGIN_TOP] = 36;
+	state->margin[TV_MARGIN_RIGHT] = 46;
+	state->margin[TV_MARGIN_BOTTOM] = 37;
 
-	intel_tv->tv_format = tv_modes[initial_mode].name;
+	state->format = initial_mode;
 
 	drm_connector_helper_add(connector, &intel_tv_connector_helper_funcs);
 	connector->interlace_allowed = false;
@@ -1648,17 +1682,17 @@ intel_tv_init(struct drm_i915_private *dev_priv)
 				      tv_format_names);
 
 	drm_object_attach_property(&connector->base, dev->mode_config.tv_mode_property,
-				   initial_mode);
+				   state->format);
 	drm_object_attach_property(&connector->base,
 				   dev->mode_config.tv_left_margin_property,
-				   intel_tv->margin[TV_MARGIN_LEFT]);
+				   state->margin[TV_MARGIN_LEFT]);
 	drm_object_attach_property(&connector->base,
 				   dev->mode_config.tv_top_margin_property,
-				   intel_tv->margin[TV_MARGIN_TOP]);
+				   state->margin[TV_MARGIN_TOP]);
 	drm_object_attach_property(&connector->base,
 				   dev->mode_config.tv_right_margin_property,
-				   intel_tv->margin[TV_MARGIN_RIGHT]);
+				   state->margin[TV_MARGIN_RIGHT]);
 	drm_object_attach_property(&connector->base,
 				   dev->mode_config.tv_bottom_margin_property,
-				   intel_tv->margin[TV_MARGIN_BOTTOM]);
+				   state->margin[TV_MARGIN_BOTTOM]);
 }
