@@ -318,6 +318,8 @@ int hostif_data_indication_wpa(struct ks_wlan_private *priv, unsigned int auth_t
 	struct mic_failure_t *mic_failure;
 	struct michael_mic_t michael_mic;
 	union iwreq_data wrqu;
+	unsigned int key_index = auth_type - 1;
+	struct wpa_key_t *key = &priv->wpa.key[key_index];
 
 	eth_hdr = (struct ether_hdr *)(priv->rxp);
 	eth_proto = ntohs(eth_hdr->h_proto);
@@ -340,7 +342,7 @@ int hostif_data_indication_wpa(struct ks_wlan_private *priv, unsigned int auth_t
 			|| (auth_type == TYPE_GMK2
 				&& priv->wpa.group_suite ==
 				IW_AUTH_CIPHER_TKIP))
-		&& priv->wpa.key[auth_type - 1].key_len) {
+		&& key->key_len) {
 		DPRINTK(4, "TKIP: protocol=%04X: size=%u\n",
 			eth_proto, priv->rx_size);
 		/* MIC save */
@@ -348,7 +350,7 @@ int hostif_data_indication_wpa(struct ks_wlan_private *priv, unsigned int auth_t
 			(priv->rxp) + ((priv->rx_size) - 8), 8);
 		priv->rx_size = priv->rx_size - 8;
 		if (auth_type > 0 && auth_type < 4) {	/* auth_type check */
-			MichaelMICFunction(&michael_mic, (u8 *)priv->wpa.key[auth_type - 1].rx_mic_key, (u8 *)priv->rxp, (int)priv->rx_size, (u8)0,	/* priority */
+			MichaelMICFunction(&michael_mic, (u8 *)key->rx_mic_key, (u8 *)priv->rxp, (int)priv->rx_size, (u8)0,	/* priority */
 					(u8 *)michael_mic.Result);
 		}
 		if (memcmp(michael_mic.Result, recv_mic_buf, 8)) {
@@ -382,7 +384,7 @@ int hostif_data_indication_wpa(struct ks_wlan_private *priv, unsigned int auth_t
 			sprintf(wrqu_buf,
 				"MLME-MICHAELMICFAILURE.indication(keyid=%d %scast addr="
 				"%pM)",
-				auth_type - 1,
+				key_index,
 				eth_hdr->
 				h_dest[0] & 0x01 ? "broad" :
 				"uni", eth_hdr->h_source);
