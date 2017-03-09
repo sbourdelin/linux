@@ -46,7 +46,6 @@ static void nvmet_execute_rw(struct nvmet_req *req)
 	struct scatterlist *sg;
 	struct bio *bio;
 	sector_t sector;
-	blk_qc_t cookie;
 	int op, op_flags = 0, i;
 
 	if (!req->sg_cnt) {
@@ -85,16 +84,17 @@ static void nvmet_execute_rw(struct nvmet_req *req)
 			bio_set_op_attrs(bio, op, op_flags);
 
 			bio_chain(bio, prev);
-			cookie = submit_bio(prev);
+			submit_bio(prev);
 		}
 
 		sector += sg->length >> 9;
 		sg_cnt--;
 	}
 
-	cookie = submit_bio(bio);
+	submit_bio(bio);
 
-	blk_mq_poll(bdev_get_queue(req->ns->bdev), cookie);
+	/* magic 4 is what we are willing to grab before we return */
+	blk_mq_poll_batch(bdev_get_queue(req->ns->bdev), 4);
 }
 
 static void nvmet_execute_flush(struct nvmet_req *req)
