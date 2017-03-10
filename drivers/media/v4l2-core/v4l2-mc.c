@@ -22,6 +22,7 @@
 #include <linux/usb.h>
 #include <media/media-device.h>
 #include <media/media-entity.h>
+#include <media/v4l2-ctrls.h>
 #include <media/v4l2-fh.h>
 #include <media/v4l2-mc.h>
 #include <media/v4l2-subdev.h>
@@ -237,6 +238,53 @@ int v4l_vb2q_enable_media_source(struct vb2_queue *q)
 	return 0;
 }
 EXPORT_SYMBOL_GPL(v4l_vb2q_enable_media_source);
+
+int __v4l2_pipeline_inherit_controls(struct video_device *vfd,
+				     struct media_entity *start_entity)
+{
+	struct media_device *mdev = start_entity->graph_obj.mdev;
+	struct media_entity *entity;
+	struct media_graph graph;
+	struct v4l2_subdev *sd;
+	int ret;
+
+	ret = media_graph_walk_init(&graph, mdev);
+	if (ret)
+		return ret;
+
+	media_graph_walk_start(&graph, start_entity);
+
+	while ((entity = media_graph_walk_next(&graph))) {
+		if (!is_media_entity_v4l2_subdev(entity))
+			continue;
+
+		sd = media_entity_to_v4l2_subdev(entity);
+
+		ret = v4l2_ctrl_add_handler(vfd->ctrl_handler,
+					    sd->ctrl_handler,
+					    NULL);
+		if (ret)
+			break;
+	}
+
+	media_graph_walk_cleanup(&graph);
+	return ret;
+}
+EXPORT_SYMBOL_GPL(__v4l2_pipeline_inherit_controls);
+
+int v4l2_pipeline_inherit_controls(struct video_device *vfd,
+				   struct media_entity *start_entity)
+{
+	struct media_device *mdev = start_entity->graph_obj.mdev;
+	int ret;
+
+	mutex_lock(&mdev->graph_mutex);
+	ret = __v4l2_pipeline_inherit_controls(vfd, start_entity);
+	mutex_unlock(&mdev->graph_mutex);
+
+	return ret;
+}
+EXPORT_SYMBOL_GPL(v4l2_pipeline_inherit_controls);
 
 /* -----------------------------------------------------------------------------
  * Pipeline power management
