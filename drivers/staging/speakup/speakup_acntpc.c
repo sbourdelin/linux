@@ -281,7 +281,7 @@ static int synth_probe(struct spk_synth *synth)
 			if (port_val == 0x53fc) {
 				/* 'S' and out&input bits */
 				synth_port_control = synth_portlist[i];
-				speakup_info.port_tts = synth_port_control+1;
+				speakup_info.port_tts = synth_port_control + 1;
 				break;
 			}
 		}
@@ -304,7 +304,7 @@ static int synth_probe(struct spk_synth *synth)
 static void accent_release(void)
 {
 	if (speakup_info.port_tts)
-		synth_release_region(speakup_info.port_tts-1, SYNTH_IO_EXTENT);
+		synth_release_region(speakup_info.port_tts - 1, SYNTH_IO_EXTENT);
 	speakup_info.port_tts = 0;
 }
 
