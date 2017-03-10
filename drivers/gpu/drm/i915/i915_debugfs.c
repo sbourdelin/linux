@@ -4138,6 +4138,10 @@ i915_wedged_set(void *data, u64 val)
 	i915_handle_error(dev_priv, val,
 			  "Manually setting wedged to %llu", val);
 
+	wait_on_bit(&dev_priv->gpu_error.flags,
+		    I915_RESET_IN_PROGRESS,
+		    TASK_UNINTERRUPTIBLE);
+
 	return 0;
 }
 
