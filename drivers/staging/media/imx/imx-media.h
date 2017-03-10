@@ -262,7 +262,7 @@ struct imx_media_fim;
 void imx_media_fim_eof_monitor(struct imx_media_fim *fim, struct timespec *ts);
 int imx_media_fim_set_power(struct imx_media_fim *fim, bool on);
 int imx_media_fim_set_stream(struct imx_media_fim *fim,
-			     struct imx_media_subdev *sensor,
+			     const struct v4l2_fract *frame_interval,
 			     bool on);
 struct imx_media_fim *imx_media_fim_init(struct v4l2_subdev *sd);
 void imx_media_fim_free(struct imx_media_fim *fim);

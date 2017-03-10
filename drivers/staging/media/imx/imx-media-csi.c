@@ -63,6 +63,7 @@ struct csi_priv {
 
 	struct v4l2_mbus_framefmt format_mbus[CSI_NUM_PADS];
 	const struct imx_media_pixfmt *cc[CSI_NUM_PADS];
+	struct v4l2_fract frame_interval;
 	struct v4l2_rect crop;
 
 	/* active vb2 buffers to send to video dev sink */
@@ -570,7 +571,8 @@ static int csi_start(struct csi_priv *priv)
 
 	/* start the frame interval monitor */
 	if (priv->fim) {
-		ret = imx_media_fim_set_stream(priv->fim, priv->sensor, true);
+		ret = imx_media_fim_set_stream(priv->fim,
+					       &priv->frame_interval, true);
 		if (ret)
 			goto idmac_stop;
 	}
@@ -585,7 +587,8 @@ static int csi_start(struct csi_priv *priv)
 
 fim_off:
 	if (priv->fim)
-		imx_media_fim_set_stream(priv->fim, priv->sensor, false);
+		imx_media_fim_set_stream(priv->fim,
+					 &priv->frame_interval, false);
 idmac_stop:
 	if (priv->dest == IPU_CSI_DEST_IDMAC)
 		csi_idmac_stop(priv);
@@ -599,7 +602,8 @@ static void csi_stop(struct csi_priv *priv)
 
 	/* stop the frame interval monitor */
 	if (priv->fim)
-		imx_media_fim_set_stream(priv->fim, priv->sensor, false);
+		imx_media_fim_set_stream(priv->fim,
+					 &priv->frame_interval, false);
 
 	ipu_csi_disable(priv->csi);
 }
@@ -607,6 +611,36 @@ static void csi_stop(struct csi_priv *priv)
 /*
  * V4L2 subdev operations.
  */
+
+static int csi_g_frame_interval(struct v4l2_subdev *sd,
+				struct v4l2_subdev_frame_interval *fi)
+{
+	struct csi_priv *priv = v4l2_get_subdevdata(sd);
+
+	mutex_lock(&priv->lock);
+	fi->interval = priv->frame_interval;
+	mutex_unlock(&priv->lock);
+
+	return 0;
+}
+
+static int csi_s_frame_interval(struct v4l2_subdev *sd,
+				struct v4l2_subdev_frame_interval *fi)
+{
+	struct csi_priv *priv = v4l2_get_subdevdata(sd);
+
+	mutex_lock(&priv->lock);
+
+	/* Output pads mirror active input pad, no limits on input pads */
+	if (fi->pad == CSI_SRC_PAD_IDMAC || fi->pad == CSI_SRC_PAD_DIRECT)
+		fi->interval = priv->frame_interval;
+
+	priv->frame_interval = fi->interval;
+
+	mutex_unlock(&priv->lock);
+
+	return 0;
+}
 
 static int csi_s_stream(struct v4l2_subdev *sd, int enable)
 {
@@ -1204,6 +1238,10 @@ static int csi_registered(struct v4l2_subdev *sd)
 			goto put_csi;
 	}
 
+	/* init default frame interval */
+	priv->frame_interval.numerator = 1;
+	priv->frame_interval.denominator = 30;
+
 	priv->fim = imx_media_fim_init(&priv->sd);
 	if (IS_ERR(priv->fim)) {
 		ret = PTR_ERR(priv->fim);
@@ -1254,6 +1292,8 @@ static struct v4l2_subdev_core_ops csi_core_ops = {
 };
 
 static struct v4l2_subdev_video_ops csi_video_ops = {
+	.g_frame_interval = csi_g_frame_interval,
+	.s_frame_interval = csi_s_frame_interval,
 	.s_stream = csi_s_stream,
 };
 
