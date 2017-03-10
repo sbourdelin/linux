@@ -395,7 +395,9 @@ int f2fs_submit_page_mbio(struct f2fs_io_info *fio)
 		__submit_merged_bio(io);
 alloc_new:
 	if (io->bio == NULL) {
-		if ((fio->type == DATA || fio->type == NODE) &&
+		if (!is_read && (fio->type == DATA || fio->type == NODE) &&
+				bio_page->mapping != META_MAPPING(sbi) &&
+				fio->new_blkaddr != fio->old_blkaddr &&
 				fio->new_blkaddr & F2FS_IO_SIZE_MASK(sbi)) {
 			err = -EAGAIN;
 			if (!is_read)
