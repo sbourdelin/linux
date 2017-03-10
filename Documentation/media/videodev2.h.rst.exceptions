@@ -460,6 +460,7 @@ replace define V4L2_EVENT_FRAME_SYNC event-type
 replace define V4L2_EVENT_SOURCE_CHANGE event-type
 replace define V4L2_EVENT_MOTION_DET event-type
 replace define V4L2_EVENT_FRAME_INTERVAL_ERROR event-type
+replace define V4L2_EVENT_NEW_FRAME_BEFORE_EOF event-type
 replace define V4L2_EVENT_PRIVATE_START event-type
 
 replace define V4L2_EVENT_CTRL_CH_VALUE ctrl-changes-flags

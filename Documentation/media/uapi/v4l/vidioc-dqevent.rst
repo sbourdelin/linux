@@ -203,6 +203,12 @@ call.
 	has measured an interval between the reception or transmit
 	completion of two consecutive frames of video that is outside
 	the nominal frame interval by some tolerance value.
+    * - ``V4L2_EVENT_NEW_FRAME_BEFORE_EOF``
+      - 8
+      - This event is triggered when the video capture or output device
+	has signaled a new frame is ready before a previous frame has
+	completed reception or transmission. This usually indicates a
+	DMA read/write channel is having trouble gaining bus access.
     * - ``V4L2_EVENT_PRIVATE_START``
       - 0x08000000
       - Base event number for driver-private events.
