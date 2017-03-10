@@ -2922,6 +2922,18 @@ static int vxlan_dev_configure(struct net *src_net, struct net_device *dev,
 		pr_info("multicast destination requires interface to be specified\n");
 		return -EINVAL;
 	}
+#if IS_ENABLED(CONFIG_IPV6)
+	else if (!conf->remote_ifindex &&
+		 ((conf->saddr.sa.sa_family == AF_INET6 &&
+		  (ipv6_addr_type(&conf->saddr.sin6.sin6_addr) &
+		   IPV6_ADDR_LINKLOCAL)) ||
+		  (dst->remote_ip.sa.sa_family == AF_INET6 &&
+		   (ipv6_addr_type(&dst->remote_ip.sin6.sin6_addr) &
+		    IPV6_ADDR_LINKLOCAL)))) {
+		pr_info("link-local local/remote addresses require interface to be specified\n");
+		return -EINVAL;
+	}
+#endif
 
 	if (conf->mtu) {
 		int max_mtu = ETH_MAX_MTU;
