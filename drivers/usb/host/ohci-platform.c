@@ -185,6 +185,8 @@ static int ohci_platform_probe(struct platform_device *dev)
 				goto err_put_hcd;
 			}
 		}
+		/* Avoiding phy_get in usb_add_hcd() */
+		hcd->phy = priv->phys[0];
 
 		for (clk = 0; clk < OHCI_MAX_CLKS; clk++) {
 			priv->clks[clk] = of_clk_get(dev->dev.of_node, clk);
