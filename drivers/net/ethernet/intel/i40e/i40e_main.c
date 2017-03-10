@@ -4188,6 +4188,8 @@ static int i40e_vsi_control_rx(struct i40e_vsi *vsi, bool enable)
 		}
 	}
 
+	/* HW needs up to 50ms to finish RX queue disable*/
+	mdelay(50);
 	return ret;
 }
 
