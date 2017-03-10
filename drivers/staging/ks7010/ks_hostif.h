@@ -1,6 +1,6 @@
 /*
  *   Driver for KeyStream wireless LAN
- *   
+ *
  *   Copyright (c) 2005-2008 KeyStream Corp.
  *   Copyright (C) 2009 Renesas Technology Corp.
  *
@@ -360,7 +360,7 @@ struct hostif_ps_adhoc_set_request_t {
 #define CTS_MODE_TRUE	1
 	uint16_t channel;
 	struct rate_set16_t rate_set;
-	uint16_t capability;	/* bit5:preamble bit6:pbcc pbcc not supported always 0 
+	uint16_t capability;	/* bit5:preamble bit6:pbcc pbcc not supported always 0
 				 * bit10:ShortSlotTime bit13:DSSS-OFDM DSSS-OFDM not supported always 0 */
 	uint16_t scan_type;
 } __packed;
@@ -376,7 +376,7 @@ struct hostif_infrastructure_set_request_t {
 	uint16_t cts_mode;
 	struct rate_set16_t rate_set;
 	struct ssid_t ssid;
-	uint16_t capability;	/* bit5:preamble bit6:pbcc pbcc not supported always 0 
+	uint16_t capability;	/* bit5:preamble bit6:pbcc pbcc not supported always 0
 				 * bit10:ShortSlotTime bit13:DSSS-OFDM DSSS-OFDM not supported always 0 */
 	uint16_t beacon_lost_count;
 	uint16_t auth_type;
@@ -392,7 +392,7 @@ struct hostif_infrastructure_set2_request_t {
 	uint16_t cts_mode;
 	struct rate_set16_t rate_set;
 	struct ssid_t ssid;
-	uint16_t capability;	/* bit5:preamble bit6:pbcc pbcc not supported always 0 
+	uint16_t capability;	/* bit5:preamble bit6:pbcc pbcc not supported always 0
 				 * bit10:ShortSlotTime bit13:DSSS-OFDM DSSS-OFDM not supported always 0 */
 	uint16_t beacon_lost_count;
 	uint16_t auth_type;
@@ -415,7 +415,7 @@ struct hostif_adhoc_set_request_t {
 	uint16_t channel;
 	struct rate_set16_t rate_set;
 	struct ssid_t ssid;
-	uint16_t capability;	/* bit5:preamble bit6:pbcc pbcc not supported always 0 
+	uint16_t capability;	/* bit5:preamble bit6:pbcc pbcc not supported always 0
 				 * bit10:ShortSlotTime bit13:DSSS-OFDM DSSS-OFDM not supported always 0 */
 	uint16_t scan_type;
 } __packed;
@@ -427,7 +427,7 @@ struct hostif_adhoc_set2_request_t {
 	uint16_t reserved;
 	struct rate_set16_t rate_set;
 	struct ssid_t ssid;
-	uint16_t capability;	/* bit5:preamble bit6:pbcc pbcc not supported always 0 
+	uint16_t capability;	/* bit5:preamble bit6:pbcc pbcc not supported always 0
 				 * bit10:ShortSlotTime bit13:DSSS-OFDM DSSS-OFDM not supported always 0 */
 	uint16_t scan_type;
 	struct channel_list_t channel_list;
@@ -568,7 +568,7 @@ struct hostif_mic_failure_confirm_t {
 #define TX_RATE_48M	(uint8_t)(480 / 5)
 #define TX_RATE_54M	(uint8_t)(540 / 5)
 
-#define IS_11B_RATE(A) (((A & RATE_MASK) == TX_RATE_1M ) || ((A & RATE_MASK) == TX_RATE_2M) || \
+#define IS_11B_RATE(A) (((A & RATE_MASK) == TX_RATE_1M) || ((A & RATE_MASK) == TX_RATE_2M) || \
                         ((A & RATE_MASK) == TX_RATE_5M) || ((A & RATE_MASK) == TX_RATE_11M))
 
 #define IS_OFDM_RATE(A) (((A & RATE_MASK) == TX_RATE_6M) || ((A & RATE_MASK) == TX_RATE_12M) || \
@@ -612,7 +612,7 @@ enum {
 #define IS_HIF_CONF(_EVENT) ((_EVENT & HIF_EVENT_MASK) == 0xE800  && \
                              (_EVENT & ~HIF_EVENT_MASK) > 0x0000  && \
                              (_EVENT & ~HIF_EVENT_MASK) < 0x0012  && \
-                             !IS_HIF_IND(_EVENT) )
+                             !IS_HIF_IND(_EVENT))
 
 #ifdef __KERNEL__
 
