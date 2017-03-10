@@ -11087,7 +11087,7 @@ static int i40e_probe(struct pci_dev *pdev, const struct pci_device_id *ent)
 	static u16 pfs_found;
 	u16 wol_nvm_bits;
 	u16 link_status;
-	int err;
+	int err, globr_probe = 1;
 	u32 val;
 	u32 i;
 	u8 set_fc_aq_fail;
@@ -11171,6 +11171,11 @@ static int i40e_probe(struct pci_dev *pdev, const struct pci_device_id *ent)
 					NETIF_MSG_LINK);
 	if (debug < -1)
 		pf->hw.debug_mask = debug;
+
+	if (globr_probe) {
+		i40e_do_reset_safe(pf, BIT(__I40E_GLOBAL_RESET_REQUESTED));
+		globr_probe = 0;
+	}
 
 	/* do a special CORER for clearing PXE mode once at init */
 	if (hw->revision_id == 0 &&
