@@ -929,6 +929,16 @@ int v4l2_subdev_link_validate_default(struct v4l2_subdev *sd,
 				      struct v4l2_subdev_format *sink_fmt);
 
 /**
+ * v4l2_subdev_link_validate_frame_interval - validates a media link
+ *
+ * @link: pointer to &struct media_link
+ *
+ * This function ensures that the frame intervals, if specified by
+ * both the source and sink subdevs of the link, are equal.
+ */
+int v4l2_subdev_link_validate_frame_interval(struct media_link *link);
+
+/**
  * v4l2_subdev_link_validate - validates a media link
  *
  * @link: pointer to &struct media_link
