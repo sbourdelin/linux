@@ -1,10 +1,9 @@
 /*
- * Device Tree file for Freescale LS2080a RDB Board.
+ * Device Tree file for Freescale LS2088A RDB Board.
  *
  * Copyright (C) 2016-17, Freescale Semiconductor
  *
  * Abhimanyu Saini <abhimanyu.saini@nxp.com>
- * Bhupesh Sharma <bhupesh.sharma@freescale.com>
  *
  * This file is dual-licensed: you can use it either under the terms
  * of the GPLv2 or the X11 license, at your option. Note that this dual
@@ -47,12 +46,12 @@
 
 /dts-v1/;
 
-#include "fsl-ls2080a.dtsi"
+#include "fsl-ls2088a.dtsi"
 #include "fsl-ls208xa-rdb.dtsi"
 
 / {
-	model = "Freescale Layerscape 2080a RDB Board";
-	compatible = "fsl,ls2080a-rdb", "fsl,ls2080a";
+	model = "Freescale Layerscape 2088A RDB Board";
+	compatible = "fsl,ls2088a-rdb", "fsl,ls2088a";
 
 	aliases {
 		serial0 = &serial0;
