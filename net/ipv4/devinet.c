@@ -1192,6 +1192,18 @@ out:
 	return done;
 }
 
+static __be32 in_dev_select_addr(const struct in_device *in_dev,
+				 int scope)
+{
+	for_primary_ifa(in_dev) {
+		if (ifa->ifa_scope != RT_SCOPE_LINK &&
+		    ifa->ifa_scope <= scope)
+			return ifa->ifa_local;
+	} endfor_ifa(in_dev);
+
+	return 0;
+}
+
 __be32 inet_select_addr(const struct net_device *dev, __be32 dst, int scope)
 {
 	__be32 addr = 0;
@@ -1230,13 +1242,9 @@ no_in_dev:
 		if (dev) {
 			in_dev = __in_dev_get_rcu(dev);
 			if (in_dev) {
-				for_primary_ifa(in_dev) {
-					if (ifa->ifa_scope != RT_SCOPE_LINK &&
-					    ifa->ifa_scope <= scope) {
-						addr = ifa->ifa_local;
-						goto out_unlock;
-					}
-				} endfor_ifa(in_dev);
+				addr = in_dev_select_addr(in_dev, scope);
+				if (addr)
+					goto out_unlock;
 			}
 		}
 
@@ -1251,14 +1259,9 @@ no_in_dev:
 			in_dev = __in_dev_get_rcu(dev);
 			if (!in_dev)
 				continue;
-
-			for_primary_ifa(in_dev) {
-				if (ifa->ifa_scope != RT_SCOPE_LINK &&
-				    ifa->ifa_scope <= scope) {
-					addr = ifa->ifa_local;
-					goto out_unlock;
-				}
-			} endfor_ifa(in_dev);
+			addr = in_dev_select_addr(in_dev, scope);
+			if (addr)
+				goto out_unlock;
 		}
 	}
 out_unlock:
