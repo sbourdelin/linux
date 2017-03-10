@@ -74,6 +74,14 @@ config VIDEO_M32R_AR_M64278
 	  To compile this driver as a module, choose M here: the
 	  module will be called arv.
 
+config VIDEO_MULTIPLEXER
+	tristate "Video Multiplexer"
+	depends on VIDEO_V4L2_SUBDEV_API && MEDIA_CONTROLLER
+	help
+	  This driver provides support for SoC internal N:1 video bus
+	  multiplexers controlled by register bitfields as well as external
+	  2:1 video multiplexers controlled by a single GPIO.
+
 config VIDEO_OMAP3
 	tristate "OMAP 3 Camera support"
 	depends on VIDEO_V4L2 && I2C && VIDEO_V4L2_SUBDEV_API && ARCH_OMAP3
