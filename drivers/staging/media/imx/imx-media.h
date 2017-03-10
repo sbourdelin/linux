@@ -91,6 +91,7 @@ struct imx_media_pixfmt {
 	int     bpp;     /* total bpp */
 	enum ipu_color_space cs;
 	bool    planar;  /* is a planar format */
+	bool    bayer;   /* is a raw bayer format */
 	bool    ipufmt;  /* is one of the IPU internal formats */
 };
 
