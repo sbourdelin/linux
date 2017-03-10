@@ -224,7 +224,8 @@ static struct vxlan_sock *vxlan_find_sock(struct net *net, sa_family_t family,
 	return NULL;
 }
 
-static struct vxlan_dev *vxlan_vs_find_vni(struct vxlan_sock *vs, __be32 vni)
+static struct vxlan_dev *vxlan_vs_find_vni(struct vxlan_sock *vs, int ifindex,
+					   __be32 vni)
 {
 	struct vxlan_dev *vxlan;
 
@@ -233,17 +234,30 @@ static struct vxlan_dev *vxlan_vs_find_vni(struct vxlan_sock *vs, __be32 vni)
 		vni = 0;
 
 	hlist_for_each_entry_rcu(vxlan, vni_head(vs, vni), hlist) {
-		if (vxlan->default_dst.remote_vni == vni)
-			return vxlan;
+		if (vxlan->default_dst.remote_vni != vni)
+			continue;
+
+		if (IS_ENABLED(CONFIG_IPV6)) {
+			const struct vxlan_config *cfg = &vxlan->cfg;
+
+			if (cfg->remote_ifindex != 0 &&
+			    cfg->remote_ifindex != ifindex &&
+			    cfg->saddr.sa.sa_family == AF_INET6 &&
+			    (ipv6_addr_type(&cfg->saddr.sin6.sin6_addr) &
+			     IPV6_ADDR_LINKLOCAL))
+				continue;
+		}
+
+		return vxlan;
 	}
 
 	return NULL;
 }
 
 /* Look up VNI in a per net namespace table */
-static struct vxlan_dev *vxlan_find_vni(struct net *net, __be32 vni,
-					sa_family_t family, __be16 port,
-					u32 flags)
+static struct vxlan_dev *vxlan_find_vni(struct net *net, int ifindex,
+					__be32 vni, sa_family_t family,
+					__be16 port, u32 flags)
 {
 	struct vxlan_sock *vs;
 
@@ -251,7 +265,7 @@ static struct vxlan_dev *vxlan_find_vni(struct net *net, __be32 vni,
 	if (!vs)
 		return NULL;
 
-	return vxlan_vs_find_vni(vs, vni);
+	return vxlan_vs_find_vni(vs, ifindex, vni);
 }
 
 /* Fill in neighbour message in skbuff. */
@@ -1342,7 +1356,7 @@ static int vxlan_rcv(struct sock *sk, struct sk_buff *skb)
 
 	vni = vxlan_vni(vxlan_hdr(skb)->vx_vni);
 
-	vxlan = vxlan_vs_find_vni(vs, vni);
+	vxlan = vxlan_vs_find_vni(vs, skb->dev->ifindex, vni);
 	if (!vxlan)
 		goto drop;
 
@@ -2002,8 +2016,10 @@ static void vxlan_encap_bypass(struct sk_buff *skb, struct vxlan_dev *src_vxlan,
 }
 
 static int encap_bypass_if_local(struct sk_buff *skb, struct net_device *dev,
-				 struct vxlan_dev *vxlan, union vxlan_addr *daddr,
-				 __be16 dst_port, __be32 vni, struct dst_entry *dst,
+				 struct vxlan_dev *vxlan,
+				 union vxlan_addr *daddr,
+				 __be16 dst_port, int dst_ifindex, __be32 vni,
+				 struct dst_entry *dst,
 				 u32 rt_flags)
 {
 #if IS_ENABLED(CONFIG_IPV6)
@@ -2019,7 +2035,7 @@ static int encap_bypass_if_local(struct sk_buff *skb, struct net_device *dev,
 		struct vxlan_dev *dst_vxlan;
 
 		dst_release(dst);
-		dst_vxlan = vxlan_find_vni(vxlan->net, vni,
+		dst_vxlan = vxlan_find_vni(vxlan->net, dst_ifindex, vni,
 					   daddr->sa.sa_family, dst_port,
 					   vxlan->flags);
 		if (!dst_vxlan) {
@@ -2051,6 +2067,7 @@ static void vxlan_xmit_one(struct sk_buff *skb, struct net_device *dev,
 	struct dst_entry *ndst = NULL;
 	__be32 vni, label;
 	__u8 tos, ttl;
+	int ifindex;
 	int err;
 	u32 flags = vxlan->flags;
 	bool udp_sum = false;
@@ -2071,6 +2088,7 @@ static void vxlan_xmit_one(struct sk_buff *skb, struct net_device *dev,
 
 		dst_port = rdst->remote_port ? rdst->remote_port : vxlan->cfg.dst_port;
 		vni = (rdst->remote_vni) ? : default_vni;
+		ifindex = rdst->remote_ifindex;
 		local_ip = vxlan->cfg.saddr;
 		dst_cache = &rdst->dst_cache;
 		md->gbp = skb->mark;
@@ -2104,6 +2122,7 @@ static void vxlan_xmit_one(struct sk_buff *skb, struct net_device *dev,
 		dst = &remote_ip;
 		dst_port = info->key.tp_dst ? : vxlan->cfg.dst_port;
 		vni = tunnel_id_to_key32(info->key.tun_id);
+		ifindex = 0;
 		dst_cache = &info->dst_cache;
 		if (info->options_len)
 			md = ip_tunnel_info_opts(info);
@@ -2121,8 +2140,7 @@ static void vxlan_xmit_one(struct sk_buff *skb, struct net_device *dev,
 		struct rtable *rt;
 		__be16 df = 0;
 
-		rt = vxlan_get_route(vxlan, dev, sock4, skb,
-				     rdst ? rdst->remote_ifindex : 0, tos,
+		rt = vxlan_get_route(vxlan, dev, sock4, skb, ifindex, tos,
 				     dst->sin.sin_addr.s_addr,
 				     &local_ip.sin.sin_addr.s_addr,
 				     dst_port, src_port,
@@ -2135,8 +2153,8 @@ static void vxlan_xmit_one(struct sk_buff *skb, struct net_device *dev,
 		/* Bypass encapsulation if the destination is local */
 		if (!info) {
 			err = encap_bypass_if_local(skb, dev, vxlan, dst,
-						    dst_port, vni, &rt->dst,
-						    rt->rt_flags);
+						    dst_port, ifindex, vni,
+						    &rt->dst, rt->rt_flags);
 			if (err)
 				goto out_unlock;
 		} else if (info->key.tun_flags & TUNNEL_DONT_FRAGMENT) {
@@ -2158,8 +2176,7 @@ static void vxlan_xmit_one(struct sk_buff *skb, struct net_device *dev,
 	} else {
 		struct vxlan_sock *sock6 = rcu_dereference(vxlan->vn6_sock);
 
-		ndst = vxlan6_get_route(vxlan, dev, sock6, skb,
-					rdst ? rdst->remote_ifindex : 0, tos,
+		ndst = vxlan6_get_route(vxlan, dev, sock6, skb, ifindex, tos,
 					label, &dst->sin6.sin6_addr,
 					&local_ip.sin6.sin6_addr,
 					dst_port, src_port,
@@ -2174,8 +2191,8 @@ static void vxlan_xmit_one(struct sk_buff *skb, struct net_device *dev,
 			u32 rt6i_flags = ((struct rt6_info *)ndst)->rt6i_flags;
 
 			err = encap_bypass_if_local(skb, dev, vxlan, dst,
-						    dst_port, vni, ndst,
-						    rt6i_flags);
+						    dst_port, ifindex, vni,
+						    ndst, rt6i_flags);
 			if (err)
 				goto out_unlock;
 		}
@@ -2984,15 +3001,30 @@ static int vxlan_dev_configure(struct net *src_net, struct net_device *dev,
 		return 0;
 
 	list_for_each_entry(tmp, &vn->vxlan_list, next) {
-		if (tmp->cfg.vni == conf->vni &&
-		    (tmp->default_dst.remote_ip.sa.sa_family == AF_INET6 ||
-		     tmp->cfg.saddr.sa.sa_family == AF_INET6) == use_ipv6 &&
-		    tmp->cfg.dst_port == vxlan->cfg.dst_port &&
-		    (tmp->flags & VXLAN_F_RCV_FLAGS) ==
-		    (vxlan->flags & VXLAN_F_RCV_FLAGS)) {
-			pr_info("duplicate VNI %u\n", be32_to_cpu(conf->vni));
-			return -EEXIST;
-		}
+		if (tmp->cfg.vni != conf->vni)
+			continue;
+		if ((tmp->default_dst.remote_ip.sa.sa_family == AF_INET6 ||
+		     tmp->cfg.saddr.sa.sa_family == AF_INET6) != use_ipv6)
+			continue;
+		if (tmp->cfg.dst_port != vxlan->cfg.dst_port)
+			continue;
+		if ((tmp->flags & VXLAN_F_RCV_FLAGS) !=
+		    (vxlan->flags & VXLAN_F_RCV_FLAGS))
+			continue;
+
+#if IS_ENABLED(CONFIG_IPV6)
+		if (conf->remote_ifindex != tmp->cfg.remote_ifindex &&
+		    conf->saddr.sa.sa_family == AF_INET6 &&
+		    tmp->cfg.saddr.sa.sa_family == AF_INET6 &&
+		    (ipv6_addr_type(&conf->saddr.sin6.sin6_addr) &
+		     IPV6_ADDR_LINKLOCAL) &&
+		    (ipv6_addr_type(&tmp->cfg.saddr.sin6.sin6_addr) &
+		     IPV6_ADDR_LINKLOCAL))
+			continue;
+#endif
+
+		pr_info("duplicate VNI %u\n", be32_to_cpu(conf->vni));
+		return -EEXIST;
 	}
 
 	return 0;
