@@ -225,6 +225,7 @@ rockchip_dp_drm_encoder_atomic_check(struct drm_encoder *encoder,
 {
 	struct rockchip_crtc_state *s = to_rockchip_crtc_state(crtc_state);
 	struct rockchip_dp_device *dp = to_dp(encoder);
+	struct drm_display_info *di = &conn_state->connector->display_info;
 	int ret;
 
 	/*
@@ -247,6 +248,9 @@ rockchip_dp_drm_encoder_atomic_check(struct drm_encoder *encoder,
 		if (ret > 0)
 			s->output_mode = ROCKCHIP_OUT_MODE_P888;
 	}
+
+	s->output_bpc = di->bpc;
+	s->output_type = DRM_MODE_CONNECTOR_eDP;
 
 	return 0;
 }
