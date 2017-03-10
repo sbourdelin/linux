@@ -276,10 +276,11 @@ static int csi_idmac_setup_channel(struct csi_priv *priv)
 	struct imx_media_video_dev *vdev = priv->vdev;
 	struct v4l2_of_endpoint *sensor_ep;
 	struct v4l2_mbus_framefmt *infmt;
-	unsigned int burst_size;
 	struct ipu_image image;
+	u32 passthrough_bits;
 	dma_addr_t phys[2];
 	bool passthrough;
+	u32 burst_size;
 	int ret;
 
 	infmt = &priv->format_mbus[CSI_SINK_PAD];
@@ -306,15 +307,38 @@ static int csi_idmac_setup_channel(struct csi_priv *priv)
 	ipu_cpmem_set_burstsize(priv->idmac_ch, burst_size);
 
 	/*
-	 * If the sensor uses 16-bit parallel CSI bus, we must handle
-	 * the data internally in the IPU as 16-bit generic, aka
-	 * passthrough mode.
+	 * Check for conditions that require the IPU to handle the
+	 * data internally as generic data, aka passthrough mode:
+	 * - raw bayer formats
+	 * - the sensor bus is 16-bit parallel
 	 */
-	passthrough = (sensor_ep->bus_type != V4L2_MBUS_CSI2 &&
-		       sensor_ep->bus.parallel.bus_width >= 16);
+	switch (image.pix.pixelformat) {
+	case V4L2_PIX_FMT_SBGGR8:
+	case V4L2_PIX_FMT_SGBRG8:
+	case V4L2_PIX_FMT_SGRBG8:
+	case V4L2_PIX_FMT_SRGGB8:
+		burst_size = 8;
+		passthrough = true;
+		passthrough_bits = 8;
+		break;
+	case V4L2_PIX_FMT_SBGGR16:
+	case V4L2_PIX_FMT_SGBRG16:
+	case V4L2_PIX_FMT_SGRBG16:
+	case V4L2_PIX_FMT_SRGGB16:
+		burst_size = 4;
+		passthrough = true;
+		passthrough_bits = 16;
+		break;
+	default:
+		passthrough = (sensor_ep->bus_type != V4L2_MBUS_CSI2 &&
+			       sensor_ep->bus.parallel.bus_width >= 16);
+		passthrough_bits = 16;
+		break;
+	}
 
 	if (passthrough)
-		ipu_cpmem_set_format_passthrough(priv->idmac_ch, 16);
+		ipu_cpmem_set_format_passthrough(priv->idmac_ch,
+						 passthrough_bits);
 
 	/*
 	 * Set the channel for the direct CSI-->memory via SMFC
@@ -725,6 +749,7 @@ static int csi_link_validate(struct v4l2_subdev *sd,
 			     struct v4l2_subdev_format *sink_fmt)
 {
 	struct csi_priv *priv = v4l2_get_subdevdata(sd);
+	const struct imx_media_pixfmt *incc;
 	struct v4l2_of_endpoint *sensor_ep;
 	struct imx_media_subdev *sensor;
 	bool is_csi2;
@@ -749,8 +774,17 @@ static int csi_link_validate(struct v4l2_subdev *sd,
 
 	priv->sensor = sensor;
 	sensor_ep = &priv->sensor->sensor_ep;
-
 	is_csi2 = (sensor_ep->bus_type == V4L2_MBUS_CSI2);
+	incc = priv->cc[CSI_SINK_PAD];
+
+	if (priv->dest != IPU_CSI_DEST_IDMAC &&
+	    (incc->bayer || (!is_csi2 &&
+			     sensor_ep->bus.parallel.bus_width >= 16))) {
+		v4l2_err(&priv->sd,
+			 "bayer/16-bit parallel buses must go to IDMAC pad\n");
+		ret = -EINVAL;
+		goto out;
+	}
 
 	if (is_csi2) {
 		int vc_num = 0;
@@ -775,7 +809,7 @@ static int csi_link_validate(struct v4l2_subdev *sd,
 
 	/* select either parallel or MIPI-CSI2 as input to CSI */
 	ipu_set_csi_src_mux(priv->ipu, priv->csi_id, is_csi2);
-
+out:
 	mutex_unlock(&priv->lock);
 	return ret;
 }
