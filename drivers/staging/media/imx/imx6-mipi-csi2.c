@@ -49,6 +49,7 @@ struct csi2_dev {
 	struct mutex lock;
 
 	struct v4l2_mbus_framefmt format_mbus;
+	struct v4l2_fract frame_interval;
 
 	int                     power_count;
 	bool                    stream_on;
@@ -487,6 +488,35 @@ out:
 	return ret;
 }
 
+static int csi2_g_frame_interval(struct v4l2_subdev *sd,
+				 struct v4l2_subdev_frame_interval *fi)
+{
+	struct csi2_dev *csi2 = sd_to_dev(sd);
+
+	mutex_lock(&csi2->lock);
+	fi->interval = csi2->frame_interval;
+	mutex_unlock(&csi2->lock);
+
+	return 0;
+}
+
+static int csi2_s_frame_interval(struct v4l2_subdev *sd,
+				 struct v4l2_subdev_frame_interval *fi)
+{
+	struct csi2_dev *csi2 = sd_to_dev(sd);
+
+	mutex_lock(&csi2->lock);
+
+	/* Output pads mirror active input pad, no limits on input pads */
+	if (fi->pad != CSI2_SINK_PAD)
+		fi->interval = csi2->frame_interval;
+
+	csi2->frame_interval = fi->interval;
+
+	mutex_unlock(&csi2->lock);
+	return 0;
+}
+
 static int csi2_link_validate(struct v4l2_subdev *sd,
 			      struct media_link *link,
 			      struct v4l2_subdev_format *source_fmt,
@@ -535,6 +565,8 @@ static struct v4l2_subdev_core_ops csi2_core_ops = {
 
 static struct v4l2_subdev_video_ops csi2_video_ops = {
 	.s_stream = csi2_s_stream,
+	.g_frame_interval = csi2_g_frame_interval,
+	.s_frame_interval = csi2_s_frame_interval,
 };
 
 static struct v4l2_subdev_pad_ops csi2_pad_ops = {
@@ -602,6 +634,10 @@ static int csi2_probe(struct platform_device *pdev)
 	strcpy(csi2->sd.name, DEVICE_NAME);
 	csi2->sd.entity.function = MEDIA_ENT_F_VID_IF_BRIDGE;
 	csi2->sd.grp_id = IMX_MEDIA_GRP_ID_CSI2;
+
+	/* init default frame interval */
+	csi2->frame_interval.numerator = 1;
+	csi2->frame_interval.denominator = 30;
 
 	ret = csi2_parse_endpoints(csi2);
 	if (ret)
