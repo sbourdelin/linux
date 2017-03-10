@@ -498,6 +498,18 @@ static struct video_device capture_videodev = {
 	.device_caps	= V4L2_CAP_VIDEO_CAPTURE | V4L2_CAP_STREAMING,
 };
 
+void imx_media_capture_device_set_format(struct imx_media_video_dev *vdev,
+					 struct v4l2_pix_format *pix)
+{
+	struct capture_priv *priv = to_capture_priv(vdev);
+
+	mutex_lock(&priv->mutex);
+	priv->vdev.fmt.fmt.pix = *pix;
+	priv->vdev.cc = imx_media_find_format(pix->pixelformat, CS_SEL_ANY);
+	mutex_unlock(&priv->mutex);
+}
+EXPORT_SYMBOL_GPL(imx_media_capture_device_set_format);
+
 struct imx_media_buffer *
 imx_media_capture_device_next_buf(struct imx_media_video_dev *vdev)
 {

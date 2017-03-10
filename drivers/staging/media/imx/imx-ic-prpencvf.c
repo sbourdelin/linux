@@ -753,35 +753,23 @@ out:
 	return ret;
 }
 
-static int prp_set_fmt(struct v4l2_subdev *sd,
-		       struct v4l2_subdev_pad_config *cfg,
-		       struct v4l2_subdev_format *sdformat)
+static void prp_try_fmt(struct prp_priv *priv,
+			struct v4l2_subdev_pad_config *cfg,
+			struct v4l2_subdev_format *sdformat,
+			const struct imx_media_pixfmt **cc)
 {
-	struct prp_priv *priv = sd_to_priv(sd);
-	const struct imx_media_pixfmt *cc;
-	struct v4l2_mbus_framefmt *infmt;
-	int ret = 0;
-	u32 code;
+	*cc = imx_media_find_ipu_format(sdformat->format.code, CS_SEL_ANY);
+	if (!*cc) {
+		u32 code;
 
-	if (sdformat->pad >= PRPENCVF_NUM_PADS)
-		return -EINVAL;
-
-	mutex_lock(&priv->lock);
-
-	if (priv->stream_on) {
-		ret = -EBUSY;
-		goto out;
-	}
-
-	cc = imx_media_find_ipu_format(sdformat->format.code, CS_SEL_ANY);
-	if (!cc) {
 		imx_media_enum_ipu_format(&code, 0, CS_SEL_ANY);
-		cc = imx_media_find_ipu_format(code, CS_SEL_ANY);
-		sdformat->format.code = cc->codes[0];
+		*cc = imx_media_find_ipu_format(code, CS_SEL_ANY);
+		sdformat->format.code = (*cc)->codes[0];
 	}
 
 	if (sdformat->pad == PRPENCVF_SRC_PAD) {
-		infmt = __prp_get_fmt(priv, cfg, PRPENCVF_SINK_PAD,
+		struct v4l2_mbus_framefmt *infmt =
+			__prp_get_fmt(priv, cfg, PRPENCVF_SINK_PAD,
 				      sdformat->which);
 
 		if (sdformat->format.field != V4L2_FIELD_NONE)
@@ -809,14 +797,60 @@ static int prp_set_fmt(struct v4l2_subdev *sd,
 				      MIN_H_SINK, MAX_H_SINK, H_ALIGN_SINK,
 				      S_ALIGN);
 	}
+}
+
+static int prp_set_fmt(struct v4l2_subdev *sd,
+		       struct v4l2_subdev_pad_config *cfg,
+		       struct v4l2_subdev_format *sdformat)
+{
+	struct prp_priv *priv = sd_to_priv(sd);
+	struct imx_media_video_dev *vdev = priv->vdev;
+	const struct imx_media_pixfmt *cc;
+	struct v4l2_pix_format vdev_fmt;
+	int ret = 0;
+
+	if (sdformat->pad >= PRPENCVF_NUM_PADS)
+		return -EINVAL;
+
+	mutex_lock(&priv->lock);
+
+	if (priv->stream_on) {
+		ret = -EBUSY;
+		goto out;
+	}
+
+	prp_try_fmt(priv, cfg, sdformat, &cc);
 
 	if (sdformat->which == V4L2_SUBDEV_FORMAT_TRY) {
 		cfg->try_fmt = sdformat->format;
-	} else {
-		priv->format_mbus[sdformat->pad] = sdformat->format;
-		priv->cc[sdformat->pad] = cc;
+		goto out;
 	}
 
+	priv->format_mbus[sdformat->pad] = sdformat->format;
+	priv->cc[sdformat->pad] = cc;
+
+	/* propagate a default format to source pad */
+	if (sdformat->pad == PRPENCVF_SINK_PAD) {
+		const struct imx_media_pixfmt *outcc;
+		struct v4l2_subdev_format format;
+
+		format.pad = PRPENCVF_SRC_PAD;
+		format.which = V4L2_SUBDEV_FORMAT_ACTIVE;
+		format.format = sdformat->format;
+		prp_try_fmt(priv, cfg, &format, &outcc);
+
+		priv->format_mbus[PRPENCVF_SRC_PAD] = format.format;
+		priv->cc[PRPENCVF_SRC_PAD] = outcc;
+	}
+
+	/* propagate output pad format to capture device */
+	imx_media_mbus_fmt_to_pix_fmt(&vdev_fmt,
+				      &priv->format_mbus[PRPENCVF_SRC_PAD],
+				      priv->cc[PRPENCVF_SRC_PAD]);
+	mutex_unlock(&priv->lock);
+	imx_media_capture_device_set_format(vdev, &vdev_fmt);
+
+	return 0;
 out:
 	mutex_unlock(&priv->lock);
 	return ret;

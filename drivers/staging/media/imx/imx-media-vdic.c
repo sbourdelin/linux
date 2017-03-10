@@ -562,31 +562,20 @@ out:
 	return ret;
 }
 
-static int vdic_set_fmt(struct v4l2_subdev *sd,
-			struct v4l2_subdev_pad_config *cfg,
-			struct v4l2_subdev_format *sdformat)
+static void vdic_try_fmt(struct vdic_priv *priv,
+			 struct v4l2_subdev_pad_config *cfg,
+			 struct v4l2_subdev_format *sdformat,
+			 const struct imx_media_pixfmt **cc)
 {
-	struct vdic_priv *priv = v4l2_get_subdevdata(sd);
-	const struct imx_media_pixfmt *cc;
 	struct v4l2_mbus_framefmt *infmt;
-	int ret = 0;
-	u32 code;
 
-	if (sdformat->pad >= VDIC_NUM_PADS)
-		return -EINVAL;
+	*cc = imx_media_find_ipu_format(sdformat->format.code, CS_SEL_YUV);
+	if (!*cc) {
+		u32 code;
 
-	mutex_lock(&priv->lock);
-
-	if (priv->stream_on) {
-		ret = -EBUSY;
-		goto out;
-	}
-
-	cc = imx_media_find_ipu_format(sdformat->format.code, CS_SEL_YUV);
-	if (!cc) {
 		imx_media_enum_ipu_format(&code, 0, CS_SEL_YUV);
-		cc = imx_media_find_ipu_format(code, CS_SEL_YUV);
-		sdformat->format.code = cc->codes[0];
+		*cc = imx_media_find_ipu_format(code, CS_SEL_YUV);
+		sdformat->format.code = (*cc)->codes[0];
 	}
 
 	switch (sdformat->pad) {
@@ -609,18 +598,51 @@ static int vdic_set_fmt(struct v4l2_subdev *sd,
 		if (!V4L2_FIELD_HAS_BOTH(sdformat->format.field))
 			sdformat->format.field = V4L2_FIELD_SEQ_TB;
 		break;
-	default:
-		ret = -EINVAL;
+	}
+}
+
+static int vdic_set_fmt(struct v4l2_subdev *sd,
+			struct v4l2_subdev_pad_config *cfg,
+			struct v4l2_subdev_format *sdformat)
+{
+	struct vdic_priv *priv = v4l2_get_subdevdata(sd);
+	const struct imx_media_pixfmt *cc;
+	int ret = 0;
+
+	if (sdformat->pad >= VDIC_NUM_PADS)
+		return -EINVAL;
+
+	mutex_lock(&priv->lock);
+
+	if (priv->stream_on) {
+		ret = -EBUSY;
 		goto out;
 	}
 
+	vdic_try_fmt(priv, cfg, sdformat, &cc);
+
 	if (sdformat->which == V4L2_SUBDEV_FORMAT_TRY) {
 		cfg->try_fmt = sdformat->format;
-	} else {
-		priv->format_mbus[sdformat->pad] = sdformat->format;
-		priv->cc[sdformat->pad] = cc;
+		goto out;
 	}
 
+	priv->format_mbus[sdformat->pad] = sdformat->format;
+	priv->cc[sdformat->pad] = cc;
+
+	/* propagate format to source pad */
+	if (sdformat->pad == VDIC_SINK_PAD_DIRECT ||
+	    sdformat->pad == VDIC_SINK_PAD_IDMAC) {
+		const struct imx_media_pixfmt *outcc;
+		struct v4l2_subdev_format format;
+
+		format.pad = VDIC_SRC_PAD_DIRECT;
+		format.which = V4L2_SUBDEV_FORMAT_ACTIVE;
+		format.format = sdformat->format;
+		vdic_try_fmt(priv, cfg, &format, &outcc);
+
+		priv->format_mbus[VDIC_SRC_PAD_DIRECT] = format.format;
+		priv->cc[VDIC_SRC_PAD_DIRECT] = outcc;
+	}
 out:
 	mutex_unlock(&priv->lock);
 	return ret;

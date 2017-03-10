@@ -986,11 +986,11 @@ __csi_get_fmt(struct csi_priv *priv, struct v4l2_subdev_pad_config *cfg,
 		return &priv->format_mbus[pad];
 }
 
-static int csi_try_crop(struct csi_priv *priv,
-			struct v4l2_rect *crop,
-			struct v4l2_subdev_pad_config *cfg,
-			struct v4l2_mbus_framefmt *infmt,
-			struct imx_media_subdev *sensor)
+static void csi_try_crop(struct csi_priv *priv,
+			 struct v4l2_rect *crop,
+			 struct v4l2_subdev_pad_config *cfg,
+			 struct v4l2_mbus_framefmt *infmt,
+			 struct imx_media_subdev *sensor)
 {
 	struct v4l2_of_endpoint *sensor_ep;
 
@@ -1019,8 +1019,6 @@ static int csi_try_crop(struct csi_priv *priv,
 		if (crop->top + crop->height > infmt->height)
 			crop->top = infmt->height - crop->height;
 	}
-
-	return 0;
 }
 
 static int csi_enum_mbus_code(struct v4l2_subdev *sd,
@@ -1092,33 +1090,16 @@ out:
 	return ret;
 }
 
-static int csi_set_fmt(struct v4l2_subdev *sd,
-		       struct v4l2_subdev_pad_config *cfg,
-		       struct v4l2_subdev_format *sdformat)
+static void csi_try_fmt(struct csi_priv *priv,
+			struct imx_media_subdev *sensor,
+			struct v4l2_subdev_pad_config *cfg,
+			struct v4l2_subdev_format *sdformat,
+			struct v4l2_rect *crop,
+			const struct imx_media_pixfmt **cc)
 {
-	struct csi_priv *priv = v4l2_get_subdevdata(sd);
-	const struct imx_media_pixfmt *cc, *incc;
+	const struct imx_media_pixfmt *incc;
 	struct v4l2_mbus_framefmt *infmt;
-	struct imx_media_subdev *sensor;
-	struct v4l2_rect crop;
-	int ret = 0;
 	u32 code;
-
-	if (sdformat->pad >= CSI_NUM_PADS)
-		return -EINVAL;
-
-	sensor = imx_media_find_sensor(priv->md, &priv->sd.entity);
-	if (IS_ERR(sensor)) {
-		v4l2_err(&priv->sd, "no sensor attached\n");
-		return PTR_ERR(sensor);
-	}
-
-	mutex_lock(&priv->lock);
-
-	if (priv->stream_on) {
-		ret = -EBUSY;
-		goto out;
-	}
 
 	switch (sdformat->pad) {
 	case CSI_SRC_PAD_DIRECT:
@@ -1140,17 +1121,17 @@ static int csi_set_fmt(struct v4l2_subdev *sd,
 
 		if (incc->bayer) {
 			sdformat->format.code = infmt->code;
-			cc = incc;
+			*cc = incc;
 		} else {
 			u32 cs_sel = (incc->cs == IPUV3_COLORSPACE_YUV) ?
 				CS_SEL_YUV : CS_SEL_RGB;
 
-			cc = imx_media_find_ipu_format(sdformat->format.code,
-						       cs_sel);
-			if (!cc) {
+			*cc = imx_media_find_ipu_format(sdformat->format.code,
+							cs_sel);
+			if (!*cc) {
 				imx_media_enum_ipu_format(&code, 0, cs_sel);
-				cc = imx_media_find_ipu_format(code, cs_sel);
-				sdformat->format.code = cc->codes[0];
+				*cc = imx_media_find_ipu_format(code, cs_sel);
+				sdformat->format.code = (*cc)->codes[0];
 			}
 		}
 
@@ -1172,39 +1153,92 @@ static int csi_set_fmt(struct v4l2_subdev *sd,
 		v4l_bound_align_image(&sdformat->format.width, MIN_W, MAX_W,
 				      W_ALIGN, &sdformat->format.height,
 				      MIN_H, MAX_H, H_ALIGN, S_ALIGN);
-		crop.left = 0;
-		crop.top = 0;
-		crop.width = sdformat->format.width;
-		crop.height = sdformat->format.height;
-		ret = csi_try_crop(priv, &crop, cfg, &sdformat->format, sensor);
-		if (ret)
-			goto out;
+		crop->left = 0;
+		crop->top = 0;
+		crop->width = sdformat->format.width;
+		crop->height = sdformat->format.height;
+		csi_try_crop(priv, crop, cfg, &sdformat->format, sensor);
 
-		cc = imx_media_find_mbus_format(sdformat->format.code,
-						CS_SEL_ANY, true);
-		if (!cc) {
+		*cc = imx_media_find_mbus_format(sdformat->format.code,
+						 CS_SEL_ANY, true);
+		if (!*cc) {
 			imx_media_enum_mbus_format(&code, 0,
 						   CS_SEL_ANY, false);
-			cc = imx_media_find_mbus_format(code,
+			*cc = imx_media_find_mbus_format(code,
 							CS_SEL_ANY, false);
-			sdformat->format.code = cc->codes[0];
+			sdformat->format.code = (*cc)->codes[0];
 		}
 		break;
-	default:
-		ret = -EINVAL;
+	}
+}
+
+static int csi_set_fmt(struct v4l2_subdev *sd,
+		       struct v4l2_subdev_pad_config *cfg,
+		       struct v4l2_subdev_format *sdformat)
+{
+	struct csi_priv *priv = v4l2_get_subdevdata(sd);
+	struct imx_media_video_dev *vdev = priv->vdev;
+	const struct imx_media_pixfmt *cc;
+	struct imx_media_subdev *sensor;
+	struct v4l2_pix_format vdev_fmt;
+	struct v4l2_rect crop;
+	int ret = 0;
+
+	if (sdformat->pad >= CSI_NUM_PADS)
+		return -EINVAL;
+
+	sensor = imx_media_find_sensor(priv->md, &priv->sd.entity);
+	if (IS_ERR(sensor)) {
+		v4l2_err(&priv->sd, "no sensor attached\n");
+		return PTR_ERR(sensor);
+	}
+
+	mutex_lock(&priv->lock);
+
+	if (priv->stream_on) {
+		ret = -EBUSY;
 		goto out;
 	}
 
+	csi_try_fmt(priv, sensor, cfg, sdformat, &crop, &cc);
+
 	if (sdformat->which == V4L2_SUBDEV_FORMAT_TRY) {
 		cfg->try_fmt = sdformat->format;
-	} else {
-		priv->format_mbus[sdformat->pad] = sdformat->format;
-		priv->cc[sdformat->pad] = cc;
-		/* Reset the crop window if this is the input pad */
-		if (sdformat->pad == CSI_SINK_PAD)
-			priv->crop = crop;
+		goto out;
 	}
 
+	priv->format_mbus[sdformat->pad] = sdformat->format;
+	priv->cc[sdformat->pad] = cc;
+
+	if (sdformat->pad == CSI_SINK_PAD) {
+		int pad;
+
+		/* reset the crop window */
+		priv->crop = crop;
+
+		/* propagate format to source pads */
+		for (pad = CSI_SINK_PAD + 1; pad < CSI_NUM_PADS; pad++) {
+			const struct imx_media_pixfmt *outcc;
+			struct v4l2_subdev_format format;
+
+			format.pad = pad;
+			format.which = V4L2_SUBDEV_FORMAT_ACTIVE;
+			format.format = sdformat->format;
+			csi_try_fmt(priv, sensor, cfg, &format, &crop, &outcc);
+
+			priv->format_mbus[pad] = format.format;
+			priv->cc[pad] = outcc;
+		}
+	}
+
+	/* propagate IDMAC output pad format to capture device */
+	imx_media_mbus_fmt_to_pix_fmt(&vdev_fmt,
+				      &priv->format_mbus[CSI_SRC_PAD_IDMAC],
+				      priv->cc[CSI_SRC_PAD_IDMAC]);
+	mutex_unlock(&priv->lock);
+	imx_media_capture_device_set_format(vdev, &vdev_fmt);
+
+	return 0;
 out:
 	mutex_unlock(&priv->lock);
 	return ret;
@@ -1295,9 +1329,7 @@ static int csi_set_selection(struct v4l2_subdev *sd,
 	}
 
 	infmt = __csi_get_fmt(priv, cfg, CSI_SINK_PAD, sel->which);
-	ret = csi_try_crop(priv, &sel->r, cfg, infmt, sensor);
-	if (ret)
-		goto out;
+	csi_try_crop(priv, &sel->r, cfg, infmt, sensor);
 
 	if (sel->which == V4L2_SUBDEV_FORMAT_TRY) {
 		cfg->try_crop = sel->r;

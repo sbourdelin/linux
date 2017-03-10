@@ -56,8 +56,7 @@ struct prp_priv {
 	/* the CSI id at link validate */
 	int csi_id;
 
-	struct v4l2_mbus_framefmt format_mbus[PRP_NUM_PADS];
-	const struct imx_media_pixfmt *cc[PRP_NUM_PADS];
+	struct v4l2_mbus_framefmt format_mbus;
 	struct v4l2_fract frame_interval;
 
 	bool stream_on; /* streaming is on */
@@ -98,7 +97,7 @@ __prp_get_fmt(struct prp_priv *priv, struct v4l2_subdev_pad_config *cfg,
 	if (which == V4L2_SUBDEV_FORMAT_TRY)
 		return v4l2_subdev_get_try_format(&ic_priv->sd, cfg, pad);
 	else
-		return &priv->format_mbus[pad];
+		return &priv->format_mbus;
 }
 
 /*
@@ -167,7 +166,7 @@ static int prp_set_fmt(struct v4l2_subdev *sd,
 		       struct v4l2_subdev_format *sdformat)
 {
 	struct prp_priv *priv = sd_to_priv(sd);
-	const struct imx_media_pixfmt *cc = NULL;
+	const struct imx_media_pixfmt *cc;
 	struct v4l2_mbus_framefmt *infmt;
 	int ret = 0;
 	u32 code;
@@ -201,17 +200,14 @@ static int prp_set_fmt(struct v4l2_subdev *sd,
 		/* Output pads mirror input pad */
 		infmt = __prp_get_fmt(priv, cfg, PRP_SINK_PAD,
 				      sdformat->which);
-		cc = imx_media_find_ipu_format(infmt->code, CS_SEL_ANY);
 		sdformat->format = *infmt;
 		break;
 	}
 
-	if (sdformat->which == V4L2_SUBDEV_FORMAT_TRY) {
+	if (sdformat->which == V4L2_SUBDEV_FORMAT_TRY)
 		cfg->try_fmt = sdformat->format;
-	} else {
-		priv->format_mbus[sdformat->pad] = sdformat->format;
-		priv->cc[sdformat->pad] = cc;
-	}
+	else
+		priv->format_mbus = sdformat->format;
 
 out:
 	mutex_unlock(&priv->lock);
@@ -427,19 +423,18 @@ static int prp_registered(struct v4l2_subdev *sd)
 	for (i = 0; i < PRP_NUM_PADS; i++) {
 		priv->pad[i].flags = (i == PRP_SINK_PAD) ?
 			MEDIA_PAD_FL_SINK : MEDIA_PAD_FL_SOURCE;
-
-		/* set a default mbus format  */
-		imx_media_enum_ipu_format(&code, 0, CS_SEL_YUV);
-		ret = imx_media_init_mbus_fmt(&priv->format_mbus[i],
-					      640, 480, code, V4L2_FIELD_NONE,
-					      &priv->cc[i]);
-		if (ret)
-			return ret;
 	}
 
 	/* init default frame interval */
 	priv->frame_interval.numerator = 1;
 	priv->frame_interval.denominator = 30;
+
+	/* set a default mbus format  */
+	imx_media_enum_ipu_format(&code, 0, CS_SEL_YUV);
+	ret = imx_media_init_mbus_fmt(&priv->format_mbus, 640, 480, code,
+				      V4L2_FIELD_NONE, NULL);
+	if (ret)
+		return ret;
 
 	return media_entity_pads_init(&sd->entity, PRP_NUM_PADS, priv->pad);
 }
