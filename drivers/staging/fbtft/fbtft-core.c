@@ -699,6 +699,8 @@ struct fb_info *fbtft_framebuffer_alloc(struct fbtft_display *display,
 	/* override driver values? */
 	if (pdata->fps)
 		fps = pdata->fps;
+	if (pdata->bpp)
+		bpp = pdata->bpp;
 	if (pdata->txbuflen)
 		txbuflen = pdata->txbuflen;
 	if (pdata->display.init_sequence)
