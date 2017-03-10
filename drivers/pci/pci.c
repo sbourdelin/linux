@@ -3363,7 +3363,7 @@ unsigned long __weak pci_address_to_pio(phys_addr_t address)
  *	Only architectures that have memory mapped IO functions defined
  *	(and the PCI_IOBASE value defined) should call this function.
  */
-int __weak pci_remap_iospace(const struct resource *res, phys_addr_t phys_addr)
+int pci_remap_iospace(const struct resource *res, phys_addr_t phys_addr)
 {
 #if defined(PCI_IOBASE) && defined(CONFIG_MMU)
 	unsigned long vaddr = (unsigned long)PCI_IOBASE + res->start;
@@ -3383,6 +3383,7 @@ int __weak pci_remap_iospace(const struct resource *res, phys_addr_t phys_addr)
 	return -ENODEV;
 #endif
 }
+EXPORT_SYMBOL(pci_remap_iospace);
 
 /**
  *	pci_unmap_iospace - Unmap the memory mapped I/O space
@@ -3400,6 +3401,7 @@ void pci_unmap_iospace(struct resource *res)
 	unmap_kernel_range(vaddr, resource_size(res));
 #endif
 }
+EXPORT_SYMBOL(pci_unmap_iospace);
 
 static void __pci_set_master(struct pci_dev *dev, bool enable)
 {
