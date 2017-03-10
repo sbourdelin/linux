@@ -316,9 +316,10 @@ our $Sparse	= qr{
 			__force|
 			__iomem|
 			__must_check|
-			__init_refok|
 			__kprobes|
 			__ref|
+			__refconst|
+			__refdata|
 			__rcu|
 			__private
 		}x;
