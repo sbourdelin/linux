@@ -16,6 +16,20 @@
 
 #include <asm/tlbflush.h>
 
+enum xsave_features {
+	XSAVE_X87,
+	XSAVE_SSE,
+	XSAVE_AVX,
+	XSAVE_MPX_BOUNDS,
+	XSAVE_MPX_CSR,
+	XSAVE_AVX512_OPMASK,
+	XSAVE_AVX512_HI256,
+	XSAVE_AVX512_ZMM_HI256,
+	XSAVE_PT,
+	XSAVE_PKU,
+	XSAVE_UNKNOWN
+};
+
 /*
  * Although we spell it out in here, the Processor Trace
  * xfeature is completely unused.  We use other mechanisms
@@ -41,6 +55,8 @@ static const char *xfeature_names[] =
  */
 u64 xfeatures_mask __read_mostly;
 
+static u64 xfeatures_disabled __initdata;
+
 static unsigned int xstate_offsets[XFEATURE_MAX] = { [ 0 ... XFEATURE_MAX - 1] = -1};
 static unsigned int xstate_sizes[XFEATURE_MAX]   = { [ 0 ... XFEATURE_MAX - 1] = -1};
 static unsigned int xstate_comp_offsets[sizeof(xfeatures_mask)*8];
@@ -51,6 +67,21 @@ static unsigned int xstate_comp_offsets[sizeof(xfeatures_mask)*8];
  * mode standard format size used for signal and ptrace frames.
  */
 unsigned int fpu_user_xstate_size;
+
+static void clear_avx512(void)
+{
+	setup_clear_cpu_cap(X86_FEATURE_AVX512F);
+	setup_clear_cpu_cap(X86_FEATURE_AVX512IFMA);
+	setup_clear_cpu_cap(X86_FEATURE_AVX512PF);
+	setup_clear_cpu_cap(X86_FEATURE_AVX512ER);
+	setup_clear_cpu_cap(X86_FEATURE_AVX512CD);
+	setup_clear_cpu_cap(X86_FEATURE_AVX512DQ);
+	setup_clear_cpu_cap(X86_FEATURE_AVX512BW);
+	setup_clear_cpu_cap(X86_FEATURE_AVX512VL);
+	setup_clear_cpu_cap(X86_FEATURE_AVX512VBMI);
+	setup_clear_cpu_cap(X86_FEATURE_AVX512_4VNNIW);
+	setup_clear_cpu_cap(X86_FEATURE_AVX512_4FMAPS);
+}
 
 /*
  * Clear all of the X86_FEATURE_* bits that are unavailable
@@ -64,17 +95,9 @@ void fpu__xstate_clear_all_cpu_caps(void)
 	setup_clear_cpu_cap(X86_FEATURE_XSAVES);
 	setup_clear_cpu_cap(X86_FEATURE_AVX);
 	setup_clear_cpu_cap(X86_FEATURE_AVX2);
-	setup_clear_cpu_cap(X86_FEATURE_AVX512F);
-	setup_clear_cpu_cap(X86_FEATURE_AVX512IFMA);
-	setup_clear_cpu_cap(X86_FEATURE_AVX512PF);
-	setup_clear_cpu_cap(X86_FEATURE_AVX512ER);
-	setup_clear_cpu_cap(X86_FEATURE_AVX512CD);
-	setup_clear_cpu_cap(X86_FEATURE_AVX512DQ);
-	setup_clear_cpu_cap(X86_FEATURE_AVX512BW);
-	setup_clear_cpu_cap(X86_FEATURE_AVX512VL);
+	clear_avx512();
 	setup_clear_cpu_cap(X86_FEATURE_MPX);
 	setup_clear_cpu_cap(X86_FEATURE_XGETBV1);
-	setup_clear_cpu_cap(X86_FEATURE_AVX512VBMI);
 	setup_clear_cpu_cap(X86_FEATURE_PKU);
 	setup_clear_cpu_cap(X86_FEATURE_AVX512_4VNNIW);
 	setup_clear_cpu_cap(X86_FEATURE_AVX512_4FMAPS);
@@ -735,6 +758,7 @@ void __init fpu__init_system_xstate(void)
 		goto out_disable;
 	}
 
+	xfeatures_mask &= ~xfeatures_disabled;
 	xfeatures_mask &= fpu__get_supported_xfeatures_mask();
 
 	/* Enable xstate instructions to be able to continue with initialization: */
@@ -1080,3 +1104,22 @@ int copyin_to_xsaves(const void *kbuf, const void __user *ubuf,
 
 	return 0;
 }
+
+static int __init parse_disable_avx512(char *str)
+{
+	xfeatures_disabled |= BIT(XSAVE_AVX512_OPMASK) |
+			      BIT(XSAVE_AVX512_HI256) |
+			      BIT(XSAVE_AVX512_ZMM_HI256);
+	clear_avx512();
+	return 0;
+}
+early_param("disable_avx512", parse_disable_avx512);
+
+static int __init parse_disable_avx(char *str)
+{
+	xfeatures_disabled |= BIT(XSAVE_AVX);
+	setup_clear_cpu_cap(X86_FEATURE_AVX);
+	setup_clear_cpu_cap(X86_FEATURE_AVX2);
+	return parse_disable_avx512(NULL);
+}
+early_param("disable_avx", parse_disable_avx);
