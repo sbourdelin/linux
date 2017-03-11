@@ -20,6 +20,18 @@ Core functionality
 .. kernel-doc:: drivers/gpu/drm/tinydrm/core/tinydrm-pipe.c
    :export:
 
+Panel
+=====
+
+.. kernel-doc:: drivers/gpu/drm/tinydrm/core/tinydrm-panel.c
+   :doc: overview
+
+.. kernel-doc:: include/drm/tinydrm/tinydrm-panel.h
+   :internal:
+
+.. kernel-doc:: drivers/gpu/drm/tinydrm/core/tinydrm-panel.c
+   :export:
+
 Additional helpers
 ==================
 
