@@ -2984,6 +2984,11 @@ static void si_apply_state_adjust_rules(struct radeon_device *rdev,
 		    (rdev->pdev->device == 0x6667)) {
 			max_sclk = 75000;
 		}
+	} else if (rdev->family == CHIP_OLAND && rdev->pdev->device == 0x6604 &&
+		   rdev->pdev->revision == 0) {
+		// Fix max_sclk and max_mclk for the Radeon R7 M270
+		max_sclk = 75000;
+		max_mclk = 80000;
 	}
 
 	if (rps->vce_active) {
