@@ -220,4 +220,5 @@ do {								\
 	if (logging_allowed && net_ratelimit())			\
 		pr_info("netlink: " fmt "\n", ##__VA_ARGS__);	\
 } while (0)
+
 #endif /* datapath.h */
