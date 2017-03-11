@@ -2775,7 +2775,7 @@ retry:
 		return 1;
 
 	/* Untapped cgroup reserves?  Don't OOM, retry. */
-	if (!sc->may_thrash) {
+	if (!sc->may_thrash && IS_ENABLED(CONFIG_MEMCG)) {
 		sc->priority = initial_priority;
 		sc->may_thrash = 1;
 		goto retry;
