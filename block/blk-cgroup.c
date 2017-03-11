@@ -1256,6 +1256,12 @@ pd_prealloc:
 		pd->plid = pol->plid;
 		if (pol->pd_init_fn)
 			pol->pd_init_fn(pd);
+
+		if (pol->pd_online_fn) {
+			spin_lock(&blkg->blkcg->lock);
+			pol->pd_online_fn(pd);
+			spin_unlock(&blkg->blkcg->lock);
+		}
 	}
 
 	__set_bit(pol->plid, q->blkcg_pols);
