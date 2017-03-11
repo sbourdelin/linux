@@ -9,27 +9,30 @@
  * (at your option) any later version.
  */
 
-#include <drm/tinydrm/ili9341.h>
-#include <drm/tinydrm/mipi-dbi.h>
-#include <drm/tinydrm/tinydrm-helpers.h>
 #include <linux/delay.h>
 #include <linux/gpio/consumer.h>
 #include <linux/module.h>
 #include <linux/property.h>
 #include <linux/regulator/consumer.h>
 #include <linux/spi/spi.h>
+
+#include <drm/tinydrm/ili9341.h>
+#include <drm/tinydrm/mipi-dbi.h>
+#include <drm/tinydrm/tinydrm-helpers.h>
+
 #include <video/mipi_display.h>
 
-static int mi0283qt_init(struct mipi_dbi *mipi)
+static int mi0283qt_prepare(struct tinydrm_panel *panel)
 {
-	struct tinydrm_device *tdev = &mipi->tinydrm;
+	struct mipi_dbi *mipi = mipi_dbi_from_panel(panel);
+	struct tinydrm_device *tdev = &panel->tinydrm;
 	struct device *dev = tdev->drm->dev;
 	u8 addr_mode;
 	int ret;
 
 	DRM_DEBUG_KMS("\n");
 
-	ret = regulator_enable(mipi->regulator);
+	ret = regulator_enable(panel->regulator);
 	if (ret) {
 		dev_err(dev, "Failed to enable regulator %d\n", ret);
 		return ret;
@@ -43,7 +46,7 @@ static int mi0283qt_init(struct mipi_dbi *mipi)
 	ret = mipi_dbi_command(mipi, MIPI_DCS_SOFT_RESET);
 	if (ret) {
 		dev_err(dev, "Error sending command %d\n", ret);
-		regulator_disable(mipi->regulator);
+		regulator_disable(panel->regulator);
 		return ret;
 	}
 
@@ -68,7 +71,7 @@ static int mi0283qt_init(struct mipi_dbi *mipi)
 	/* Memory Access Control */
 	mipi_dbi_command(mipi, MIPI_DCS_SET_PIXEL_FORMAT, 0x55);
 
-	switch (mipi->rotation) {
+	switch (panel->rotation) {
 	default:
 		addr_mode = ILI9341_MADCTL_MV | ILI9341_MADCTL_MY |
 			    ILI9341_MADCTL_MX;
@@ -113,19 +116,10 @@ static int mi0283qt_init(struct mipi_dbi *mipi)
 	return 0;
 }
 
-static void mi0283qt_fini(void *data)
-{
-	struct mipi_dbi *mipi = data;
-
-	DRM_DEBUG_KMS("\n");
-	regulator_disable(mipi->regulator);
-}
-
-static const struct drm_simple_display_pipe_funcs mi0283qt_pipe_funcs = {
-	.enable = mipi_dbi_pipe_enable,
-	.disable = mipi_dbi_pipe_disable,
-	.update = tinydrm_display_pipe_update,
-	.prepare_fb = tinydrm_display_pipe_prepare_fb,
+static const struct tinydrm_panel_funcs mi0283qt_funcs = {
+	.prepare = mi0283qt_prepare,
+	.disable = mipi_dbi_panel_disable,
+	.flush = mipi_dbi_panel_flush,
 };
 
 static const struct drm_display_mode mi0283qt_mode = {
@@ -161,6 +155,7 @@ static int mi0283qt_probe(struct spi_device *spi)
 {
 	struct device *dev = &spi->dev;
 	struct tinydrm_device *tdev;
+	struct tinydrm_panel *panel;
 	struct mipi_dbi *mipi;
 	struct gpio_desc *dc;
 	u32 rotation = 0;
@@ -170,10 +165,13 @@ static int mi0283qt_probe(struct spi_device *spi)
 	if (!mipi)
 		return -ENOMEM;
 
-	mipi->reset = devm_gpiod_get_optional(dev, "reset", GPIOD_OUT_HIGH);
-	if (IS_ERR(mipi->reset)) {
+	panel = &mipi->panel;
+	tdev = &panel->tinydrm;
+
+	panel->reset = devm_gpiod_get_optional(dev, "reset", GPIOD_OUT_HIGH);
+	if (IS_ERR(panel->reset)) {
 		dev_err(dev, "Failed to get gpio 'reset'\n");
-		return PTR_ERR(mipi->reset);
+		return PTR_ERR(panel->reset);
 	}
 
 	dc = devm_gpiod_get_optional(dev, "dc", GPIOD_OUT_LOW);
@@ -182,39 +180,26 @@ static int mi0283qt_probe(struct spi_device *spi)
 		return PTR_ERR(dc);
 	}
 
-	mipi->regulator = devm_regulator_get(dev, "power");
-	if (IS_ERR(mipi->regulator))
-		return PTR_ERR(mipi->regulator);
+	panel->regulator = devm_regulator_get(dev, "power");
+	if (IS_ERR(panel->regulator))
+		return PTR_ERR(panel->regulator);
 
-	mipi->backlight = tinydrm_of_find_backlight(dev);
-	if (IS_ERR(mipi->backlight))
-		return PTR_ERR(mipi->backlight);
+	panel->backlight = tinydrm_of_find_backlight(dev);
+	if (IS_ERR(panel->backlight))
+		return PTR_ERR(panel->backlight);
 
 	device_property_read_u32(dev, "rotation", &rotation);
 
-	ret = mipi_dbi_spi_init(spi, mipi, dc, &mi0283qt_pipe_funcs,
+	ret = mipi_dbi_spi_init(spi, mipi, dc, &mi0283qt_funcs,
 				&mi0283qt_driver, &mi0283qt_mode, rotation);
 	if (ret)
 		return ret;
-
-	ret = mi0283qt_init(mipi);
-	if (ret)
-		return ret;
-
-	/* use devres to fini after drm unregister (drv->remove is before) */
-	ret = devm_add_action(dev, mi0283qt_fini, mipi);
-	if (ret) {
-		mi0283qt_fini(mipi);
-		return ret;
-	}
-
-	tdev = &mipi->tinydrm;
 
 	ret = devm_tinydrm_register(tdev);
 	if (ret)
 		return ret;
 
-	spi_set_drvdata(spi, mipi);
+	spi_set_drvdata(spi, panel);
 
 	DRM_DEBUG_DRIVER("Initialized %s:%s @%uMHz on minor %d\n",
 			 tdev->drm->driver->name, dev_name(dev),
@@ -224,41 +209,9 @@ static int mi0283qt_probe(struct spi_device *spi)
 	return 0;
 }
 
-static void mi0283qt_shutdown(struct spi_device *spi)
-{
-	struct mipi_dbi *mipi = spi_get_drvdata(spi);
-
-	tinydrm_shutdown(&mipi->tinydrm);
-}
-
-static int __maybe_unused mi0283qt_pm_suspend(struct device *dev)
-{
-	struct mipi_dbi *mipi = dev_get_drvdata(dev);
-	int ret;
-
-	ret = tinydrm_suspend(&mipi->tinydrm);
-	if (ret)
-		return ret;
-
-	mi0283qt_fini(mipi);
-
-	return 0;
-}
-
-static int __maybe_unused mi0283qt_pm_resume(struct device *dev)
-{
-	struct mipi_dbi *mipi = dev_get_drvdata(dev);
-	int ret;
-
-	ret = mi0283qt_init(mipi);
-	if (ret)
-		return ret;
-
-	return tinydrm_resume(&mipi->tinydrm);
-}
-
 static const struct dev_pm_ops mi0283qt_pm_ops = {
-	SET_SYSTEM_SLEEP_PM_OPS(mi0283qt_pm_suspend, mi0283qt_pm_resume)
+	SET_SYSTEM_SLEEP_PM_OPS(tinydrm_panel_pm_suspend,
+				tinydrm_panel_pm_resume)
 };
 
 static struct spi_driver mi0283qt_spi_driver = {
@@ -270,7 +223,7 @@ static struct spi_driver mi0283qt_spi_driver = {
 	},
 	.id_table = mi0283qt_id,
 	.probe = mi0283qt_probe,
-	.shutdown = mi0283qt_shutdown,
+	.shutdown = tinydrm_panel_spi_shutdown,
 };
 module_spi_driver(mi0283qt_spi_driver);
 

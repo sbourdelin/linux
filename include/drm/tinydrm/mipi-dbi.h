@@ -71,12 +71,12 @@ mipi_dbi_from_panel(struct tinydrm_panel *panel)
 
 int mipi_dbi_spi_init(struct spi_device *spi, struct mipi_dbi *mipi,
 		      struct gpio_desc *dc,
-		      const struct drm_simple_display_pipe_funcs *pipe_funcs,
+		      const struct tinydrm_panel_funcs *funcs,
 		      struct drm_driver *driver,
 		      const struct drm_display_mode *mode,
 		      unsigned int rotation);
 int mipi_dbi_init(struct device *dev, struct mipi_dbi *mipi,
-		  const struct drm_simple_display_pipe_funcs *pipe_funcs,
+		  const struct tinydrm_panel_funcs *funcs,
 		  struct drm_driver *driver,
 		  const struct drm_display_mode *mode, unsigned int rotation);
 int mipi_dbi_panel_flush(struct tinydrm_panel *panel,

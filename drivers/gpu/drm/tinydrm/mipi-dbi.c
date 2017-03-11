@@ -397,7 +397,7 @@ static const uint32_t mipi_dbi_formats[] = {
  * mipi_dbi_init - MIPI DBI initialization
  * @dev: Parent device
  * @mipi: &mipi_dbi structure to initialize
- * @pipe_funcs: Display pipe functions
+ * @funcs: tinydrm panel functions
  * @driver: DRM driver
  * @mode: Display mode
  * @rotation: Initial rotation in degrees Counter Clock Wise
@@ -414,52 +414,20 @@ static const uint32_t mipi_dbi_formats[] = {
  * Zero on success, negative error code on failure.
  */
 int mipi_dbi_init(struct device *dev, struct mipi_dbi *mipi,
-		  const struct drm_simple_display_pipe_funcs *pipe_funcs,
+		  const struct tinydrm_panel_funcs *funcs,
 		  struct drm_driver *driver,
 		  const struct drm_display_mode *mode, unsigned int rotation)
 {
-	size_t bufsize = mode->vdisplay * mode->hdisplay * sizeof(u16);
-	struct tinydrm_device *tdev = &mipi->tinydrm;
 	struct tinydrm_panel *panel = &mipi->panel;
-	int ret;
 
 	if (!mipi->command)
 		return -EINVAL;
 
 	mutex_init(&mipi->cmdlock);
 
-	mipi->tx_buf = devm_kmalloc(dev, bufsize, GFP_KERNEL);
-	if (!mipi->tx_buf)
-		return -ENOMEM;
-
-	ret = devm_tinydrm_init(dev, tdev, &mipi_dbi_fb_funcs, driver);
-	if (ret)
-		return ret;
-
-	/* TODO: Maybe add DRM_MODE_CONNECTOR_SPI */
-	ret = tinydrm_display_pipe_init(tdev, pipe_funcs,
-					DRM_MODE_CONNECTOR_VIRTUAL,
-					mipi_dbi_formats,
-					ARRAY_SIZE(mipi_dbi_formats), mode,
-					rotation);
-	if (ret)
-		return ret;
-
-	tdev->drm->mode_config.preferred_depth = 16;
-	mipi->rotation = rotation;
-
-	drm_mode_config_reset(tdev->drm);
-
-	DRM_DEBUG_KMS("preferred_depth=%u, rotation = %u\n",
-		      tdev->drm->mode_config.preferred_depth, rotation);
-
-	/* transitional assignements */
-	panel->tinydrm.drm = mipi->tinydrm.drm;
-	mipi->swap_bytes = panel->swap_bytes;
-	panel->tx_buf = mipi->tx_buf;
-	panel->reset = mipi->reset;
-
-	return 0;
+	return tinydrm_panel_init(dev, panel, funcs, mipi_dbi_formats,
+				  ARRAY_SIZE(mipi_dbi_formats),
+				  driver, mode, rotation);
 }
 EXPORT_SYMBOL(mipi_dbi_init);
 
@@ -851,7 +819,7 @@ static int mipi_dbi_typec3_command(struct mipi_dbi *mipi, u8 cmd,
  * @spi: SPI device
  * @dc: D/C gpio (optional)
  * @mipi: &mipi_dbi structure to initialize
- * @pipe_funcs: Display pipe functions
+ * @funcs: tinydrm panel functions
  * @driver: DRM driver
  * @mode: Display mode
  * @rotation: Initial rotation in degrees Counter Clock Wise
@@ -873,7 +841,7 @@ static int mipi_dbi_typec3_command(struct mipi_dbi *mipi, u8 cmd,
  */
 int mipi_dbi_spi_init(struct spi_device *spi, struct mipi_dbi *mipi,
 		      struct gpio_desc *dc,
-		      const struct drm_simple_display_pipe_funcs *pipe_funcs,
+		      const struct tinydrm_panel_funcs *funcs,
 		      struct drm_driver *driver,
 		      const struct drm_display_mode *mode,
 		      unsigned int rotation)
@@ -924,7 +892,7 @@ int mipi_dbi_spi_init(struct spi_device *spi, struct mipi_dbi *mipi,
 			return -ENOMEM;
 	}
 
-	return mipi_dbi_init(dev, mipi, pipe_funcs, driver, mode, rotation);
+	return mipi_dbi_init(dev, mipi, funcs, driver, mode, rotation);
 }
 EXPORT_SYMBOL(mipi_dbi_spi_init);
 
@@ -1061,7 +1029,8 @@ static const struct drm_info_list mipi_dbi_debugfs_list[] = {
 int mipi_dbi_debugfs_init(struct drm_minor *minor)
 {
 	struct tinydrm_device *tdev = minor->dev->dev_private;
-	struct mipi_dbi *mipi = mipi_dbi_from_tinydrm(tdev);
+	struct tinydrm_panel *panel = tinydrm_to_panel(tdev);
+	struct mipi_dbi *mipi = mipi_dbi_from_panel(panel);
 	umode_t mode = S_IFREG | S_IWUSR;
 
 	if (mipi->read_commands)
