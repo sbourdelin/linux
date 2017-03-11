@@ -90,6 +90,7 @@
 #include <asm/processor.h>
 #include <asm/bugs.h>
 #include <asm/kasan.h>
+#include <asm/fpu/internal.h>
 
 #include <asm/vsyscall.h>
 #include <asm/cpu.h>
@@ -986,6 +987,8 @@ void __init setup_arch(char **cmdline_p)
 	x86_configure_nx();
 
 	parse_early_param();
+
+	fpu__init_system(&boot_cpu_data);
 
 #ifdef CONFIG_MEMORY_HOTPLUG
 	/*

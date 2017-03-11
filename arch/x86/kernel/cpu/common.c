@@ -844,7 +844,6 @@ static void __init early_identify_cpu(struct cpuinfo_x86 *c)
 	}
 
 	setup_force_cpu_cap(X86_FEATURE_ALWAYS);
-	fpu__init_system(c);
 }
 
 void __init early_cpu_init(void)
