@@ -9,14 +9,16 @@
  * (at your option) any later version.
  */
 
-#include <drm/tinydrm/mipi-dbi.h>
-#include <drm/tinydrm/tinydrm-helpers.h>
 #include <linux/debugfs.h>
 #include <linux/dma-buf.h>
 #include <linux/gpio/consumer.h>
 #include <linux/module.h>
 #include <linux/regulator/consumer.h>
 #include <linux/spi/spi.h>
+
+#include <drm/tinydrm/mipi-dbi.h>
+#include <drm/tinydrm/tinydrm-helpers.h>
+
 #include <video/mipi_display.h>
 
 #define MIPI_DBI_MAX_SPI_READ_SPEED 2000000 /* 2MHz */
@@ -283,22 +285,84 @@ void mipi_dbi_pipe_enable(struct drm_simple_display_pipe *pipe,
 }
 EXPORT_SYMBOL(mipi_dbi_pipe_enable);
 
+/**
+ * mipi_dbi_panel_flush - MIPI DBI panel flush helper
+ * @panel: tinydrm panel
+ * @fb: DRM framebuffer
+ * @rect: Clip rectangle to flush
+ *
+ * This function flushes the framebuffer changes to the display/controller.
+ * Drivers can use this as their &tinydrm_panel_funcs->flush callback.
+ *
+ * Returns:
+ * Zero on success, negative error code on failure.
+ */
+int mipi_dbi_panel_flush(struct tinydrm_panel *panel,
+			 struct drm_framebuffer *fb,
+			 struct drm_clip_rect *rect)
+{
+	struct mipi_dbi *mipi = mipi_dbi_from_panel(panel);
+	void *tr;
+
+	DRM_DEBUG("Flushing [FB:%d] x1=%u, x2=%u, y1=%u, y2=%u, swap=%u\n",
+		  fb->base.id, rect->x1, rect->x2, rect->y1, rect->y2,
+		  panel->swap_bytes);
+
+	tr = tinydrm_panel_rgb565_buf(panel, fb, rect);
+	if (IS_ERR(tr))
+		return PTR_ERR(tr);
+
+	mipi_dbi_command(mipi, MIPI_DCS_SET_COLUMN_ADDRESS,
+			 (rect->x1 >> 8) & 0xFF, rect->x1 & 0xFF,
+			 (rect->x2 >> 8) & 0xFF, (rect->x2 - 1) & 0xFF);
+	mipi_dbi_command(mipi, MIPI_DCS_SET_PAGE_ADDRESS,
+			 (rect->y1 >> 8) & 0xFF, rect->y1 & 0xFF,
+			 (rect->y2 >> 8) & 0xFF, (rect->y2 - 1) & 0xFF);
+
+	return mipi_dbi_command_buf(mipi, MIPI_DCS_WRITE_MEMORY_START, tr,
+				    (rect->x2 - rect->x1) *
+				    (rect->y2 - rect->y1) * 2);
+}
+EXPORT_SYMBOL(mipi_dbi_panel_flush);
+
 static void mipi_dbi_blank(struct mipi_dbi *mipi)
 {
-	struct drm_device *drm = mipi->tinydrm.drm;
+	struct tinydrm_panel *panel = &mipi->panel;
+	struct drm_device *drm = panel->tinydrm.drm;
 	u16 height = drm->mode_config.min_height;
 	u16 width = drm->mode_config.min_width;
 	size_t len = width * height * 2;
 
-	memset(mipi->tx_buf, 0, len);
+	memset(panel->tx_buf, 0, len);
 
 	mipi_dbi_command(mipi, MIPI_DCS_SET_COLUMN_ADDRESS, 0, 0,
 			 (width >> 8) & 0xFF, (width - 1) & 0xFF);
 	mipi_dbi_command(mipi, MIPI_DCS_SET_PAGE_ADDRESS, 0, 0,
 			 (height >> 8) & 0xFF, (height - 1) & 0xFF);
 	mipi_dbi_command_buf(mipi, MIPI_DCS_WRITE_MEMORY_START,
-			     (u8 *)mipi->tx_buf, len);
+			     panel->tx_buf, len);
 }
+
+/**
+ * mipi_dbi_panel_disable - MIPI DBI panel disable helper
+ * @panel: tinydrm panel
+ *
+ * This function disables backlight if present or if not the
+ * display memory is blanked. Drivers can use this as their
+ * &tinydrm_panel_funcs->disable callback.
+ */
+int mipi_dbi_panel_disable(struct tinydrm_panel *panel)
+{
+	struct mipi_dbi *mipi = mipi_dbi_from_panel(panel);
+
+	if (panel->backlight)
+		return tinydrm_disable_backlight(panel->backlight);
+
+	mipi_dbi_blank(mipi);
+
+	return 0;
+}
+EXPORT_SYMBOL(mipi_dbi_panel_disable);
 
 /**
  * mipi_dbi_pipe_disable - MIPI DBI pipe disable helper
@@ -356,6 +420,7 @@ int mipi_dbi_init(struct device *dev, struct mipi_dbi *mipi,
 {
 	size_t bufsize = mode->vdisplay * mode->hdisplay * sizeof(u16);
 	struct tinydrm_device *tdev = &mipi->tinydrm;
+	struct tinydrm_panel *panel = &mipi->panel;
 	int ret;
 
 	if (!mipi->command)
@@ -388,6 +453,12 @@ int mipi_dbi_init(struct device *dev, struct mipi_dbi *mipi,
 	DRM_DEBUG_KMS("preferred_depth=%u, rotation = %u\n",
 		      tdev->drm->mode_config.preferred_depth, rotation);
 
+	/* transitional assignements */
+	panel->tinydrm.drm = mipi->tinydrm.drm;
+	mipi->swap_bytes = panel->swap_bytes;
+	panel->tx_buf = mipi->tx_buf;
+	panel->reset = mipi->reset;
+
 	return 0;
 }
 EXPORT_SYMBOL(mipi_dbi_init);
@@ -400,12 +471,14 @@ EXPORT_SYMBOL(mipi_dbi_init);
  */
 void mipi_dbi_hw_reset(struct mipi_dbi *mipi)
 {
-	if (!mipi->reset)
+	struct tinydrm_panel *panel = &mipi->panel;
+
+	if (!panel->reset)
 		return;
 
-	gpiod_set_value_cansleep(mipi->reset, 0);
+	gpiod_set_value_cansleep(panel->reset, 0);
 	msleep(20);
-	gpiod_set_value_cansleep(mipi->reset, 1);
+	gpiod_set_value_cansleep(panel->reset, 1);
 	msleep(120);
 }
 EXPORT_SYMBOL(mipi_dbi_hw_reset);
@@ -764,7 +837,7 @@ static int mipi_dbi_typec3_command(struct mipi_dbi *mipi, u8 cmd,
 	if (ret || !num)
 		return ret;
 
-	if (cmd == MIPI_DCS_WRITE_MEMORY_START && !mipi->swap_bytes)
+	if (cmd == MIPI_DCS_WRITE_MEMORY_START && !mipi->panel.swap_bytes)
 		bpw = 16;
 
 	gpiod_set_value_cansleep(mipi->dc, 1);
@@ -806,6 +879,7 @@ int mipi_dbi_spi_init(struct spi_device *spi, struct mipi_dbi *mipi,
 		      unsigned int rotation)
 {
 	size_t tx_size = tinydrm_spi_max_transfer_size(spi, 0);
+	struct tinydrm_panel *panel = &mipi->panel;
 	struct device *dev = &spi->dev;
 	int ret;
 
@@ -840,8 +914,9 @@ int mipi_dbi_spi_init(struct spi_device *spi, struct mipi_dbi *mipi,
 		mipi->dc = dc;
 		if (tinydrm_machine_little_endian() &&
 		    !tinydrm_spi_bpw_supported(spi, 16))
-			mipi->swap_bytes = true;
+			panel->swap_bytes = true;
 	} else {
+		panel->always_tx_buf = true;
 		mipi->command = mipi_dbi_typec1_command;
 		mipi->tx_buf9_len = tx_size;
 		mipi->tx_buf9 = devm_kmalloc(dev, tx_size, GFP_KERNEL);

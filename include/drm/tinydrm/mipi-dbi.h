@@ -12,7 +12,7 @@
 #ifndef __LINUX_MIPI_DBI_H
 #define __LINUX_MIPI_DBI_H
 
-#include <drm/tinydrm/tinydrm.h>
+#include <drm/tinydrm/tinydrm-panel.h>
 
 struct spi_device;
 struct gpio_desc;
@@ -21,6 +21,7 @@ struct regulator;
 /**
  * struct mipi_dbi - MIPI DBI controller
  * @tinydrm: tinydrm base
+ * @panel: tinydrm panel
  * @spi: SPI device
  * @enabled: Pipeline is enabled
  * @cmdlock: Command lock
@@ -39,6 +40,7 @@ struct regulator;
  */
 struct mipi_dbi {
 	struct tinydrm_device tinydrm;
+	struct tinydrm_panel panel;
 	struct spi_device *spi;
 	bool enabled;
 	struct mutex cmdlock;
@@ -61,6 +63,12 @@ mipi_dbi_from_tinydrm(struct tinydrm_device *tdev)
 	return container_of(tdev, struct mipi_dbi, tinydrm);
 }
 
+static inline struct mipi_dbi *
+mipi_dbi_from_panel(struct tinydrm_panel *panel)
+{
+	return container_of(panel, struct mipi_dbi, panel);
+}
+
 int mipi_dbi_spi_init(struct spi_device *spi, struct mipi_dbi *mipi,
 		      struct gpio_desc *dc,
 		      const struct drm_simple_display_pipe_funcs *pipe_funcs,
@@ -71,6 +79,10 @@ int mipi_dbi_init(struct device *dev, struct mipi_dbi *mipi,
 		  const struct drm_simple_display_pipe_funcs *pipe_funcs,
 		  struct drm_driver *driver,
 		  const struct drm_display_mode *mode, unsigned int rotation);
+int mipi_dbi_panel_flush(struct tinydrm_panel *panel,
+			 struct drm_framebuffer *fb,
+			 struct drm_clip_rect *rect);
+int mipi_dbi_panel_disable(struct tinydrm_panel *panel);
 void mipi_dbi_pipe_enable(struct drm_simple_display_pipe *pipe,
 			  struct drm_crtc_state *crtc_state);
 void mipi_dbi_pipe_disable(struct drm_simple_display_pipe *pipe);
