@@ -43,6 +43,8 @@ void tinydrm_swab16(u16 *dst, void *vaddr, struct drm_framebuffer *fb,
 void tinydrm_xrgb8888_to_rgb565(u16 *dst, void *vaddr,
 				struct drm_framebuffer *fb,
 				struct drm_clip_rect *clip, bool swap);
+int tinydrm_rgb565_buf_copy(void *dst, struct drm_framebuffer *fb,
+			    struct drm_clip_rect *clip, bool swap);
 
 struct backlight_device *tinydrm_of_find_backlight(struct device *dev);
 int tinydrm_enable_backlight(struct backlight_device *backlight);
