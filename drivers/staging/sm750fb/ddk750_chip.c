@@ -309,7 +309,8 @@ int ddk750_init_hw(struct initchip_param *pInitParam)
  * M = {1,...,255}
  * N = {2,...,15}
  */
-unsigned int sm750_calc_pll_value(unsigned int request_orig, struct pll_value *pll)
+unsigned int sm750_calc_pll_value(unsigned int request_orig,
+					struct pll_value *pll)
 {
 	/*
 	 * as sm750 register definition,
