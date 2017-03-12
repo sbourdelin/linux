@@ -51,8 +51,8 @@
 /* We have included libc headers... */
 #if !defined(__KERNEL__)
 
-/* Coordinate with glibc net/if.h header. */
-#if defined(_NET_IF_H) && defined(__USE_MISC)
+/* Coordinate with libc net/if.h header. */
+#if defined(_NET_IF_H) && (!defined(__GLIBC__) || defined(__USE_MISC))
 
 /* GLIBC headers included first so don't define anything
  * that would already be defined. */
