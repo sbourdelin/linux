@@ -191,6 +191,8 @@ ifeq ("$(origin M)", "command line")
   KBUILD_EXTMOD := $(M)
 endif
 
+KBUILD_EXTMOD := $(subst $(CURDIR)/,,$(realpath $(KBUILD_EXTMOD)))
+
 # If building an external module we do not care about the all: rule
 # but instead _all depend on modules
 PHONY += all
