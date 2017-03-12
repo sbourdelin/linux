@@ -30,7 +30,6 @@ void init_mlme_ap_info(struct adapter *padapter)
 	struct sta_priv *pstapriv = &padapter->stapriv;
 	struct wlan_acl_pool *pacl_list = &pstapriv->acl_list;
 
-
 	spin_lock_init(&pmlmepriv->bcn_update_lock);
 
 	/* for ACL */
@@ -45,7 +44,7 @@ void free_mlme_ap_info(struct adapter *padapter)
 	struct sta_priv *pstapriv = &padapter->stapriv;
 	struct mlme_priv *pmlmepriv = &padapter->mlmepriv;
 	struct mlme_ext_priv *pmlmeext = &padapter->mlmeextpriv;
-	struct mlme_ext_info	*pmlmeinfo = &(pmlmeext->mlmext_info);
+	struct mlme_ext_info *pmlmeinfo = &pmlmeext->mlmext_info;
 
 	pmlmepriv->update_bcn = false;
 	pmlmeext->bstart_bss = false;
@@ -98,7 +97,7 @@ static void update_BCNTIM(struct adapter *padapter)
 			       &tmp_len, (pnetwork_mlmeext->IELength -
 					  _BEACON_IE_OFFSET_));
 		if (p)
-			offset += tmp_len+2;
+			offset += tmp_len + 2;
 
 		/* DS Parameter Set IE, len = 3 */
 		offset += 3;
@@ -120,7 +119,7 @@ static void update_BCNTIM(struct adapter *padapter)
 	}
 	*dst_ie++ = _TIM_IE_;
 
-	if ((pstapriv->tim_bitmap&0xff00) && (pstapriv->tim_bitmap&0x00fc))
+	if ((pstapriv->tim_bitmap & 0xff00) && (pstapriv->tim_bitmap & 0x00fc))
 		tim_ielen = 5;
 	else
 		tim_ielen = 4;
@@ -130,7 +129,7 @@ static void update_BCNTIM(struct adapter *padapter)
 	*dst_ie++ = 0;/* DTIM count */
 	*dst_ie++ = 1;/* DTIM period */
 
-	if (pstapriv->tim_bitmap&BIT(0))/* for bc/mc frames */
+	if (pstapriv->tim_bitmap & BIT(0))/* for bc/mc frames */
 		*dst_ie++ = BIT(0);/* bitmap ctrl */
 	else
 		*dst_ie++ = 0;
@@ -315,7 +314,6 @@ void	expire_timeout_chk(struct adapter *padapter)
 				spin_lock_bh(&pstapriv->auth_list_lock);
 			}
 		}
-
 	}
 	spin_unlock_bh(&pstapriv->auth_list_lock);
 
