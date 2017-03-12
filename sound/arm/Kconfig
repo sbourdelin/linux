@@ -2,7 +2,7 @@
 
 menuconfig SND_ARM
 	bool "ARM sound devices"
-	depends on ARM
+	depends on ARM || ARM64
 	default y
 	help
 	  Support for sound devices specific to ARM architectures.
@@ -10,6 +10,14 @@ menuconfig SND_ARM
 	  "ALSA for SoC audio support" section.
 
 if SND_ARM
+
+config SND_BCM2835_ANALOG_AUDIO
+	tristate "Analog/Headphone jack support for BCM2835"
+	depends on ARCH_BCM2835 && HAS_DMA
+	select SND_PCM
+	help
+	    Say y or m to support the analog/headphone jack
+	    for the BCM2835 as used by the Raspberry PI.
 
 config SND_ARMAACI
 	tristate "ARM PrimeCell PL041 AC Link support"
