@@ -3261,6 +3261,7 @@ M:	Thomas Gleixner <tglx@linutronix.de>
 L:	linux-kernel@vger.kernel.org
 T:	git git://git.kernel.org/pub/scm/linux/kernel/git/tip/tip.git timers/core
 S:	Supported
+F:	Documentation/devicetree/bindings/timer/
 F:	drivers/clocksource
 
 CISCO FCOE HBA DRIVER
