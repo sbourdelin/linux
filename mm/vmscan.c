@@ -184,6 +184,19 @@ static bool sane_reclaim(struct scan_control *sc)
 #endif
 	return false;
 }
+
+static bool mem_cgroup_thrashed(struct scan_control *sc)
+{
+	/*
+	 * When memcg is disabled or on legacy hierarchy, there is no cgroup
+	 * reserves memory to tap. So fake it as thrashed.
+	 */
+	if (!cgroup_subsys_enabled(memory_cgrp_subsys) ||
+	    !cgroup_subsys_on_dfl(memory_cgrp_subsys))
+		return true;
+
+	return sc->may_thrash;
+}
 #else
 static bool global_reclaim(struct scan_control *sc)
 {
@@ -191,6 +204,11 @@ static bool global_reclaim(struct scan_control *sc)
 }
 
 static bool sane_reclaim(struct scan_control *sc)
+{
+	return true;
+}
+
+static bool mem_cgroup_thrashed(struct scan_control *sc)
 {
 	return true;
 }
@@ -2775,7 +2793,7 @@ retry:
 		return 1;
 
 	/* Untapped cgroup reserves?  Don't OOM, retry. */
-	if (!sc->may_thrash) {
+	if (!mem_cgroup_thrashed(sc)) {
 		sc->priority = initial_priority;
 		sc->may_thrash = 1;
 		goto retry;
