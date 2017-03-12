@@ -22,7 +22,17 @@
 #ifdef CONFIG_SMP
 void doorbell_setup_this_cpu(void)
 {
-	unsigned long tag = mfspr(SPRN_DOORBELL_CPUTAG) & PPC_DBELL_TAG_MASK;
+	unsigned long tag;
+
+#ifdef CONFIG_PPC_BOOK3S
+	if (cpu_has_feature(CPU_FTR_HVMODE) && cpu_has_feature(CPU_FTR_ARCH_300))
+		tag = mfspr(SPRN_PIR) & 0xfffff;
+	else
+		tag = mfspr(SPRN_TIR) & 0x7f;
+
+#else
+	tag = mfspr(SPRN_PIR) & 0x3fff;
+#endif
 
 	smp_muxed_ipi_set_data(smp_processor_id(), tag);
 }
