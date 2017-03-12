@@ -5743,6 +5743,7 @@ L:	uclinux-h8-devel@lists.sourceforge.jp (moderated for non-subscribers)
 W:	http://uclinux-h8.sourceforge.jp
 T:	git git://git.sourceforge.jp/gitroot/uclinux-h8/linux.git
 S:	Maintained
+F:	Documentation/devicetree/bindings/h8300/
 F:	arch/h8300/
 F:	drivers/clocksource/h8300_*.c
 F:	drivers/clk/h8300/
