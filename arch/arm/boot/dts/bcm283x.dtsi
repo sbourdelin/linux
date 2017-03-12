@@ -335,7 +335,12 @@
 				brcm,pins = <42 43>;
 				brcm,function = <BCM2835_FSEL_ALT5>;
 			};
-		};
+
+                        analog_audio_pins: analog_audio_pins {
+                                brcm,pins = <40 45>;
+                                brcm,function = <4 4>; /* Alt0 */
+                        };
+                };
 
 		uart0: serial@7e201000 {
 			compatible = "brcm,bcm2835-pl011", "arm,pl011", "arm,primecell";
@@ -441,6 +446,17 @@
 			#pwm-cells = <2>;
 			status = "disabled";
 		};
+
+                analogaudio: analogaudio@7e20c000 {
+                        compatible = "brcm,bcm2835-analog-audio";
+                        reg = <0x7e20c000 0x28>;
+                        clocks = <&clocks BCM2835_CLOCK_PWM>;
+                        assigned-clocks = <&clocks BCM2835_CLOCK_PWM>;
+                        pinctrl-names = "default";
+                        pinctrl-0 = <&analog_audio_pins>;
+                        dmas = <&dma 5>;
+                        dma-names = "tx";
+                };
 
 		sdhci: sdhci@7e300000 {
 			compatible = "brcm,bcm2835-sdhci";
