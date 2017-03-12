@@ -821,7 +821,8 @@ __init *thermal_of_build_thermal_zone(struct device_node *np)
 	struct device_node *child = NULL, *gchild;
 	struct __thermal_zone *tz;
 	int ret, i;
-	u32 prop, coef[2];
+	u32 prop;
+	s32 coef[2];
 
 	if (!np) {
 		pr_err("no thermal zone np\n");
@@ -851,7 +852,7 @@ __init *thermal_of_build_thermal_zone(struct device_node *np)
 	 * one sensor per thermal zone. Thus, we are considering
 	 * only the first two values as slope and offset.
 	 */
-	ret = of_property_read_u32_array(np, "coefficients", coef, 2);
+	ret = of_property_read_s32_array(np, "coefficients", coef, 2);
 	if (ret == 0) {
 		tz->slope = coef[0];
 		tz->offset = coef[1];
