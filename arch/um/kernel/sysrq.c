@@ -19,7 +19,7 @@ static void _print_addr(void *data, unsigned long address, int reliable)
 {
 	pr_info(" [<%08lx>]", address);
 	pr_cont(" %s", reliable ? "" : "? ");
-	print_symbol("%s", address);
+	print_symbol(KERN_CONT "%s", address);
 	pr_cont("\n");
 }
 
