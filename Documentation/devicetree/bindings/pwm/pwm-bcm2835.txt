@@ -1,13 +1,20 @@
 BCM2835 PWM controller (Raspberry Pi controller)
 
 Required properties:
-- compatible: should be "brcm,bcm2835-pwm"
+- compatible: should be "brcm,bcm2835-pwm" or "brcm,bcm2835-analog-audio"
 - reg: physical base address and length of the controller's registers
 - clocks: This clock defines the base clock frequency of the PWM hardware
   system, the period and the duty_cycle of the PWM signal is a multiple of
   the base period.
+
+Required properties(PWM Output):
 - #pwm-cells: Should be 2. See pwm.txt in this directory for a description of
   the cells format.
+
+Required properties(Audio Output):
+- dmas: Should contain one entry pointing to the DMA channel used to
+	transfer audio data
+- dma-names:   Should contain "tx"
 
 Examples:
 
