@@ -17,9 +17,10 @@ Optional properties:
 
 Optional subnode properties:
 
-- simple-audio-card,format		: CPU/CODEC common audio format.
+- simple-audio-card,dai-format		: CPU/CODEC common audio format.
 					  "i2s", "right_j", "left_j" , "dsp_a"
 					  "dsp_b", "ac97", "pdm", "msb", "lsb"
+- simple-audio-card,format		: see simple-audio-card,dai-format
 - simple-audio-card,frame-master	: Indicates dai-link frame master.
 					  phandle to a cpu or codec subnode.
 - simple-audio-card,bitclock-master	: Indicates dai-link bit clock master.

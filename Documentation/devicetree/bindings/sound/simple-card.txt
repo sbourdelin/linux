@@ -48,7 +48,7 @@ Required dai-link subnodes:
 
 Optional dai-link subnode properties:
 
-- format				: CPU/CODEC common audio format.
+- dai-format / format			: CPU/CODEC common audio format.
 					  "i2s", "right_j", "left_j" , "dsp_a"
 					  "dsp_b", "ac97", "pdm", "msb", "lsb"
 - frame-master				: Indicates dai-link frame master.
