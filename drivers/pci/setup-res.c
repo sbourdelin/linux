@@ -383,6 +383,57 @@ int pci_reassign_resource(struct pci_dev *dev, int resno, resource_size_t addsiz
 	return 0;
 }
 
+int pci_resize_resource(struct pci_dev *dev, int resno, int size)
+{
+	struct resource *res = dev->resource + resno;
+	u32 sizes = pci_rbar_get_possible_sizes(dev, resno);
+	int old = pci_rbar_get_current_size(dev, resno);
+	u64 bytes = 1ULL << (size + 20);
+	int ret = 0;
+
+	if (!sizes)
+		return -ENOTSUPP;
+
+	if (!(sizes & (1 << size)))
+		return -EINVAL;
+
+	if (old < 0)
+		return old;
+
+	/* Make sure the resource isn't assigned before making it larger. */
+	if (resource_size(res) < bytes && res->parent) {
+		release_resource(res);
+		res->end = resource_size(res) - 1;
+		res->start = 0;
+		if (resno < PCI_BRIDGE_RESOURCES)
+			pci_update_resource(dev, resno);
+	}
+
+	ret = pci_rbar_set_size(dev, resno, size);
+	if (ret)
+		goto error_reassign;
+
+	res->end = res->start + bytes - 1;
+
+	ret = pci_reassign_bridge_resources(dev->bus->self, res->flags);
+	if (ret)
+		goto error_resize;
+
+	pci_reenable_device(dev->bus->self);
+	return 0;
+
+error_resize:
+	pci_rbar_set_size(dev, resno, old);
+	res->end = res->start + (1ULL << (old + 20)) - 1;
+
+error_reassign:
+	pci_assign_unassigned_bus_resources(dev->bus);
+	pci_setup_bridge(dev->bus);
+	pci_reenable_device(dev->bus->self);
+	return ret;
+}
+EXPORT_SYMBOL(pci_resize_resource);
+
 int pci_enable_resources(struct pci_dev *dev, int mask)
 {
 	u16 cmd, old_cmd;

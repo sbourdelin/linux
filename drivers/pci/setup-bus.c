@@ -1914,6 +1914,67 @@ enable_all:
 }
 EXPORT_SYMBOL_GPL(pci_assign_unassigned_bridge_resources);
 
+int pci_reassign_bridge_resources(struct pci_dev *bridge, unsigned long type)
+{
+	const unsigned long type_mask = IORESOURCE_IO | IORESOURCE_MEM |
+		IORESOURCE_PREFETCH | IORESOURCE_MEM_64;
+
+	struct resource saved;
+	LIST_HEAD(add_list);
+	LIST_HEAD(fail_head);
+	struct pci_dev_resource *fail_res;
+	unsigned i;
+	int ret = 0;
+
+	/* Release all children from the matching bridge resource */
+	for (i = PCI_BRIDGE_RESOURCES; i < PCI_BRIDGE_RESOURCE_END; ++i) {
+		struct resource *res = &bridge->resource[i];
+
+		if ((res->flags & type_mask) != (type & type_mask))
+			continue;
+
+		saved = *res;
+		if (res->parent) {
+			release_child_resources(res);
+			release_resource(res);
+		}
+		res->start = 0;
+		res->end = 0;
+		break;
+	}
+
+	if (i == PCI_BRIDGE_RESOURCE_END)
+		return -ENOENT;
+
+	__pci_bus_size_bridges(bridge->subordinate, &add_list);
+	__pci_bridge_assign_resources(bridge, &add_list, &fail_head);
+	BUG_ON(!list_empty(&add_list));
+
+	/* restore size and flags */
+	list_for_each_entry(fail_res, &fail_head, list) {
+		struct resource *res = fail_res->res;
+
+		res->start = fail_res->start;
+		res->end = fail_res->end;
+		res->flags = fail_res->flags;
+	}
+
+	/* Revert to the old configuration */
+	if (!list_empty(&fail_head)) {
+		struct resource *res = &bridge->resource[i];
+
+		res->start = saved.start;
+		res->end = saved.end;
+		res->flags = saved.flags;
+
+		pci_claim_resource(bridge, i);
+		ret = -ENOSPC;
+	}
+
+	free_list(&fail_head);
+	return ret;
+}
+
 void pci_assign_unassigned_bus_resources(struct pci_bus *bus)
 {
 	struct pci_dev *dev;
