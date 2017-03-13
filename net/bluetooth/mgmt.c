@@ -106,6 +106,7 @@ static const u16 mgmt_commands[] = {
 	MGMT_OP_START_LIMITED_DISCOVERY,
 	MGMT_OP_READ_EXT_INFO,
 	MGMT_OP_SET_APPEARANCE,
+	MGMT_OP_UPDATE_CONN_PARAM,
 };
 
 static const u16 mgmt_events[] = {
@@ -5462,6 +5463,69 @@ unlock:
 	return err;
 }
 
+/* This function requires the caller holds hdev->lock */
+static u8 really_update_conn_param(struct hci_dev *hdev,
+				   struct mgmt_cp_update_conn_param *param)
+{
+	struct hci_conn_params *hci_param;
+	u16 min, max, latency, timeout;
+	u8 addr_type;
+
+	if (param->addr.type == BDADDR_LE_PUBLIC)
+		addr_type = ADDR_LE_DEV_PUBLIC;
+	else if (param->addr.type == BDADDR_LE_RANDOM)
+		addr_type = ADDR_LE_DEV_RANDOM;
+	else
+		return MGMT_STATUS_INVALID_PARAMS;
+
+	min = le16_to_cpu(param->min_interval);
+	max = le16_to_cpu(param->max_interval);
+	latency = le16_to_cpu(param->latency);
+	timeout = le16_to_cpu(param->timeout);
+
+	BT_DBG("min 0x%04x max 0x%04x latency 0x%04x timeout 0x%04x",
+	       min, max, latency, timeout);
+
+	if (hci_check_conn_params(min, max, latency, timeout) < 0) {
+		BT_ERR("Ignoring invalid connection parameters");
+		return MGMT_STATUS_INVALID_PARAMS;
+	}
+
+	hci_param = hci_conn_params_add(hdev, &param->addr.bdaddr,
+	                                addr_type);
+	if (!hci_param) {
+		BT_ERR("Failed to add connection parameters");
+		return MGMT_STATUS_FAILED;
+	}
+
+	hci_param->conn_min_interval = min;
+	hci_param->conn_max_interval = max;
+	hci_param->conn_latency = latency;
+	hci_param->supervision_timeout = timeout;
+
+	return 0;
+}
+
+static int update_conn_param(struct sock *sk, struct hci_dev *hdev, void *data,
+			     u16 len)
+{
+	struct mgmt_cp_update_conn_param *cp = data;
+	u8 cmd_status;
+
+	if (!lmp_le_capable(hdev))
+		return mgmt_cmd_status(sk, hdev->id, MGMT_OP_UPDATE_CONN_PARAM,
+		                       MGMT_STATUS_NOT_SUPPORTED);
+
+	hci_dev_lock(hdev);
+
+	cmd_status = really_update_conn_param(hdev, cp);
+
+	hci_dev_unlock(hdev);
+
+	return mgmt_cmd_complete(sk, hdev->id, MGMT_OP_UPDATE_CONN_PARAM,
+	                         cmd_status, NULL, 0);
+}
+
 static int load_conn_param(struct sock *sk, struct hci_dev *hdev, void *data,
 			   u16 len)
 {
@@ -5500,47 +5564,12 @@ static int load_conn_param(struct sock *sk, struct hci_dev *hdev, void *data,
 
 	for (i = 0; i < param_count; i++) {
 		struct mgmt_conn_param *param = &cp->params[i];
-		struct hci_conn_params *hci_param;
-		u16 min, max, latency, timeout;
-		u8 addr_type;
 
 		BT_DBG("Adding %pMR (type %u)", &param->addr.bdaddr,
 		       param->addr.type);
 
-		if (param->addr.type == BDADDR_LE_PUBLIC) {
-			addr_type = ADDR_LE_DEV_PUBLIC;
-		} else if (param->addr.type == BDADDR_LE_RANDOM) {
-			addr_type = ADDR_LE_DEV_RANDOM;
-		} else {
-			BT_ERR("Ignoring invalid connection parameters");
-			continue;
-		}
-
-		min = le16_to_cpu(param->min_interval);
-		max = le16_to_cpu(param->max_interval);
-		latency = le16_to_cpu(param->latency);
-		timeout = le16_to_cpu(param->timeout);
-
-		BT_DBG("min 0x%04x max 0x%04x latency 0x%04x timeout 0x%04x",
-		       min, max, latency, timeout);
-
-		if (hci_check_conn_params(min, max, latency, timeout) < 0) {
-			BT_ERR("Ignoring invalid connection parameters");
-			continue;
-		}
-
-		hci_param = hci_conn_params_add(hdev, &param->addr.bdaddr,
-						addr_type);
-		if (!hci_param) {
-			BT_ERR("Failed to add connection parameters");
-			continue;
-		}
-
-		hci_param->conn_min_interval = min;
-		hci_param->conn_max_interval = max;
-		hci_param->conn_latency = latency;
-		hci_param->supervision_timeout = timeout;
-		hci_param->conn_config = BT_LE_CONN_CONFIG_CUSTOM_LATENCY;
+		really_update_conn_param(hdev,
+			(struct mgmt_cp_update_conn_param *)param);
 	}
 
 	hci_dev_unlock(hdev);
@@ -6539,6 +6568,7 @@ static const struct hci_mgmt_handler mgmt_handlers[] = {
 	{ read_ext_controller_info,MGMT_READ_EXT_INFO_SIZE,
 						HCI_MGMT_UNTRUSTED },
 	{ set_appearance,	   MGMT_SET_APPEARANCE_SIZE },
+	{ update_conn_param,       MGMT_UPDATE_CONN_PARAM_SIZE },
 };
 
 void mgmt_index_added(struct hci_dev *hdev)

@@ -604,6 +604,16 @@ struct mgmt_cp_set_appearance {
 } __packed;
 #define MGMT_SET_APPEARANCE_SIZE	2
 
+#define MGMT_OP_UPDATE_CONN_PARAM	0x0044
+struct mgmt_cp_update_conn_param {
+	struct mgmt_addr_info addr;
+	__le16 min_interval;
+	__le16 max_interval;
+	__le16 latency;
+	__le16 timeout;
+} __packed;
+#define MGMT_UPDATE_CONN_PARAM_SIZE	(MGMT_ADDR_INFO_SIZE + 8)
+
 #define MGMT_EV_CMD_COMPLETE		0x0001
 struct mgmt_ev_cmd_complete {
 	__le16	opcode;
