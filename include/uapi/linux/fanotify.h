@@ -15,6 +15,8 @@
 #define FAN_OPEN_PERM		0x00010000	/* File open in perm check */
 #define FAN_ACCESS_PERM		0x00020000	/* File accessed in perm check */
 
+#define FAN_MODIFY_DIR		0x00040000	/* directory changed (rename/unlink/...) */
+
 #define FAN_ONDIR		0x40000000	/* event occurred against dir */
 
 #define FAN_EVENT_ON_CHILD	0x08000000	/* interested in child events */
@@ -67,7 +69,8 @@
 #define FAN_ALL_EVENTS (FAN_ACCESS |\
 			FAN_MODIFY |\
 			FAN_CLOSE |\
-			FAN_OPEN)
+			FAN_OPEN |\
+			FAN_MODIFY_DIR)
 
 /*
  * All events which require a permission response from userspace

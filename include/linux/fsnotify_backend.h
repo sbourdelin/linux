@@ -43,6 +43,7 @@
 
 #define FS_OPEN_PERM		0x00010000	/* open event in an permission hook */
 #define FS_ACCESS_PERM		0x00020000	/* access event in a permissions hook */
+#define FS_MODIFY_DIR		0x00040000	/* directory changed (rename/unlink/...) */
 
 #define FS_EXCL_UNLINK		0x04000000	/* do not send events if object is unlinked */
 #define FS_ISDIR		0x40000000	/* event occurred against dir */

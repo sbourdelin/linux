@@ -208,6 +208,23 @@ static inline void fsnotify_modify(struct file *file)
 }
 
 /*
+ * fsnotify_modifydir - directory contents were changed
+ * (as a result of rename, creat, unlink, etc.)
+ */
+static inline void fsnotify_modify_dir(struct path *path)
+{
+	struct inode *inode = path->dentry->d_inode;
+	__u32 mask = FS_MODIFY_DIR;
+
+	if (S_ISDIR(inode->i_mode))
+		mask |= FS_ISDIR;
+	else
+		return;
+
+	fsnotify(inode, mask, path, FSNOTIFY_EVENT_PATH, NULL, 0);
+}
+
+/*
  * fsnotify_open - file was opened
  */
 static inline void fsnotify_open(struct file *file)
