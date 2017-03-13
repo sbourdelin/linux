@@ -2077,12 +2077,12 @@ int btrfs_qgroup_account_extents(struct btrfs_trans_handle *trans,
 					goto cleanup;
 			}
 			/*
-			 * Use (u64)-1 as time_seq to do special search, which
+			 * Use SEQ_NONE as time_seq to do special search, which
 			 * doesn't lock tree or delayed_refs and search current
 			 * root. It's safe inside commit_transaction().
 			 */
 			ret = btrfs_find_all_roots(trans, fs_info,
-					record->bytenr, (u64)-1, &new_roots);
+					record->bytenr, SEQ_NONE, &new_roots);
 			if (ret < 0)
 				goto cleanup;
 			if (qgroup_to_skip) {

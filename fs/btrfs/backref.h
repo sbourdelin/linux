@@ -23,6 +23,8 @@
 #include "ulist.h"
 #include "extent_io.h"
 
+#define SEQ_NONE	((u64)-1)
+
 struct inode_fs_paths {
 	struct btrfs_path		*btrfs_path;
 	struct btrfs_root		*fs_root;
