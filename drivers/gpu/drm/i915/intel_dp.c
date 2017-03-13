@@ -4209,14 +4209,10 @@ intel_dp_check_link_status(struct intel_dp *intel_dp)
 {
 	struct intel_encoder *intel_encoder = &dp_to_dig_port(intel_dp)->base;
 	struct drm_device *dev = intel_dp_to_dev(intel_dp);
-	u8 link_status[DP_LINK_STATUS_SIZE];
+	struct drm_i915_private *dev_priv = dev->dev_private;
+	u8 link_status[DP_LINK_STATUS_SIZE], retry = 1;
 
 	WARN_ON(!drm_modeset_is_locked(&dev->mode_config.connection_mutex));
-
-	if (!intel_dp_get_link_status(intel_dp, link_status)) {
-		DRM_ERROR("Failed to get link status\n");
-		return;
-	}
 
 	if (!intel_encoder->base.crtc)
 		return;
@@ -4229,13 +4225,31 @@ intel_dp_check_link_status(struct intel_dp *intel_dp)
 	if (!intel_dp->lane_count)
 		return;
 
-	/* Retrain if Channel EQ or CR not ok */
-	if (!drm_dp_channel_eq_ok(link_status, intel_dp->lane_count)) {
-		DRM_DEBUG_KMS("%s: channel EQ not ok, retraining\n",
-			      intel_encoder->base.name);
+	if (is_edp(intel_dp) && dev_priv->psr.enabled) 
+		retry = 3;
 
-		intel_dp_retrain_link(intel_dp);
+	/* Retrain if Channel EQ or CR not ok */
+	while ( retry-- ) {
+		if (!intel_dp_get_link_status(intel_dp, link_status)) {
+			DRM_ERROR("Failed to get link status\n");
+			return;
+		}
+
+		if (drm_dp_channel_eq_ok(link_status, intel_dp->lane_count))
+			return;
+
+		/*
+		 * EQ not ok may caused by fast link train while exit PSR active,
+		 * wait at least 1000 us then read it again.
+		 */
+		if (retry)
+			usleep_range(1000, 1500);
 	}
+
+	DRM_DEBUG_KMS("%s: channel EQ not ok, retraining\n",
+		intel_encoder->base.name);
+
+	intel_dp_retrain_link(intel_dp);
 }
 
 /*
