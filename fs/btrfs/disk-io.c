@@ -3592,7 +3592,7 @@ static int barrier_all_devices(struct btrfs_fs_info *info)
 
 		ret = write_dev_flush(dev, 0);
 		if (ret)
-			errors_send++;
+			return ret;
 	}
 
 	/* wait for all the barriers */
