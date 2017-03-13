@@ -516,8 +516,18 @@ static int hisilpc_probe(struct platform_device *pdev)
 
 	/*
 	 * It is time to start the children scannings....
+	 * For ACPI children, the corresponding devices will be created after
+	 * retriggering the ACPI scanning by removing the dependency blocking.
 	 */
-	if (!has_acpi_companion(dev)) {
+	if (has_acpi_companion(dev)) {
+		struct acpi_device *adev;
+
+		adev = to_acpi_device_node(dev->fwnode);
+		if (!adev)
+			ret = -ENODEV;
+		else
+			acpi_walk_dep_device_list(adev->handle);
+	} else {
 		ret = of_platform_populate(dev->of_node, NULL, NULL, dev);
 		if (ret)
 			dev_err(dev, "OF: enumerate LPC bus fail(%d)\n", ret);

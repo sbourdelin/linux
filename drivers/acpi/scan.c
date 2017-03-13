@@ -1843,6 +1843,9 @@ static void acpi_bus_attach(struct acpi_device *device)
 	if (device->handler)
 		goto ok;
 
+	if (device->dep_unmet)
+		return;
+
 	if (!device->flags.initialized) {
 		device->flags.power_manageable =
 			device->power.states[ACPI_STATE_D0].flags.valid;
