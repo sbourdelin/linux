@@ -9,6 +9,7 @@ Required properties:
 
 Optional properties:
 
+- simple-audio-card,label		: see simple-audio-card,name
 - simple-audio-card,name		: User specified audio sound card name, one string
 					  property.
 - simple-audio-card,cpu			: CPU   sub-node
