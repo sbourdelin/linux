@@ -1644,7 +1644,7 @@ static void *__vmalloc_area_node(struct vm_struct *area, gfp_t gfp_mask,
 
 		if (fatal_signal_pending(current)) {
 			area->nr_pages = i;
-			goto fail;
+			goto fail_no_warn;
 		}
 
 		if (node == NUMA_NO_NODE)
@@ -1670,6 +1670,7 @@ fail:
 	warn_alloc(gfp_mask, NULL,
 			  "vmalloc: allocation failure, allocated %ld of %ld bytes",
 			  (area->nr_pages*PAGE_SIZE), area->size);
+fail_no_warn:
 	vfree(area->addr);
 	return NULL;
 }
