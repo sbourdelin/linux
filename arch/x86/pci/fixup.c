@@ -571,3 +571,56 @@ DECLARE_PCI_FIXUP_EARLY(PCI_VENDOR_ID_INTEL, 0x2fc0, pci_invalid_bar);
 DECLARE_PCI_FIXUP_EARLY(PCI_VENDOR_ID_INTEL, 0x6f60, pci_invalid_bar);
 DECLARE_PCI_FIXUP_EARLY(PCI_VENDOR_ID_INTEL, 0x6fa0, pci_invalid_bar);
 DECLARE_PCI_FIXUP_EARLY(PCI_VENDOR_ID_INTEL, 0x6fc0, pci_invalid_bar);
+
+static void pci_amd_enable_64bit_bar(struct pci_dev *dev)
+{
+	const uint64_t size = 64ULL * 1024 * 1024 * 1024;
+	uint32_t base, limit, high;
+	struct resource *res;
+	unsigned i;
+	int r;
+
+	for (i = 0; i < 8; ++i) {
+
+		pci_read_config_dword(dev, 0x80 + i * 0x8, &base);
+		pci_read_config_dword(dev, 0x180 + i * 0x4, &high);
+
+		/* Is this slot free? */
+		if ((base & 0x3) == 0x0)
+			break;
+
+		base >>= 8;
+		base |= high << 24;
+
+		/* Abort if a slot already configures a 64bit BAR. */
+		if (base > 0x10000)
+			return;
+
+	}
+
+	if (i == 8)
+		return;
+
+	res = kzalloc(sizeof(*res), GFP_KERNEL);
+	res->flags = IORESOURCE_MEM | IORESOURCE_PREFETCH | IORESOURCE_MEM_64 |
+		IORESOURCE_WINDOW;
+	res->name = dev->bus->name;
+	r = allocate_resource(&iomem_resource, res, size, 0x100000000,
+			      0xfd00000000, size, NULL, NULL);
+	if (r) {
+		kfree(res);
+		return;
+	}
+
+	base = ((res->start >> 8) & 0xffffff00) | 0x3;
+	limit = ((res->end + 1) >> 8) & 0xffffff00;
+	high = ((res->start >> 40) & 0xff) |
+		((((res->end + 1) >> 40) & 0xff) << 16);
+
+	pci_write_config_dword(dev, 0x180 + i * 0x4, high);
+	pci_write_config_dword(dev, 0x84 + i * 0x8, limit);
+	pci_write_config_dword(dev, 0x80 + i * 0x8, base);
+
+	pci_bus_add_resource(dev->bus, res, 0);
+}
+DECLARE_PCI_FIXUP_EARLY(PCI_VENDOR_ID_AMD, 0x141b, pci_amd_enable_64bit_bar);
