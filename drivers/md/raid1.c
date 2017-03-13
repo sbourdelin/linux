@@ -938,7 +938,7 @@ static void allow_barrier(struct r1conf *conf, sector_t start_next_window,
 static void freeze_array(struct r1conf *conf, int extra)
 {
 	/* stop syncio and normal IO and wait for everything to
-	 * go quite.
+	 * go quit.
 	 * We wait until nr_pending match nr_queued+extra
 	 * This is called in the context of one normal IO request
 	 * that has failed. Thus any sync request that might be pending
