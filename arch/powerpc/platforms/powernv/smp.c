@@ -141,6 +141,7 @@ static void pnv_smp_cpu_kill_self(void)
 	unsigned int cpu;
 	unsigned long srr1, wmask;
 	u32 idle_states;
+	bool deepest_stop_found;
 
 	/* Standard hot unplug procedure */
 	local_irq_disable();
@@ -156,6 +157,7 @@ static void pnv_smp_cpu_kill_self(void)
 		wmask = SRR1_WAKEMASK_P8;
 
 	idle_states = pnv_get_supported_cpuidle_states();
+	deepest_stop_found = pnv_check_deepest_stop();
 
 	/* We don't want to take decrementer interrupts while we are offline,
 	 * so clear LPCR:PECE1. We keep PECE2 (and LPCR_PECE_HVEE on P9)
@@ -185,7 +187,11 @@ static void pnv_smp_cpu_kill_self(void)
 
 		ppc64_runlatch_off();
 
-		if (cpu_has_feature(CPU_FTR_ARCH_300)) {
+		if (cpu_has_feature(CPU_FTR_ARCH_300) && deepest_stop_found) {
+			pr_info("CPU %u offlining with psscr = 0x%016llx\n",
+				cpu, pnv_deepest_stop_psscr_val);
+			pr_info("CPU%d down paca pir %016x pir %lx\n",
+				cpu, hard_smp_processor_id(), mfspr(SPRN_PIR));
 			srr1 = power9_idle_stop(pnv_deepest_stop_psscr_val,
 						pnv_deepest_stop_psscr_mask);
 		} else if (idle_states & OPAL_PM_WINKLE_ENABLED) {

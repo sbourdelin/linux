@@ -147,7 +147,6 @@ u32 pnv_get_supported_cpuidle_states(void)
 }
 EXPORT_SYMBOL_GPL(pnv_get_supported_cpuidle_states);
 
-
 static void pnv_fastsleep_workaround_apply(void *info)
 
 {
@@ -243,6 +242,7 @@ static DEVICE_ATTR(fastsleep_workaround_applyonce, 0600,
  */
 u64 pnv_default_stop_val;
 u64 pnv_default_stop_mask;
+bool default_stop_found;
 
 /*
  * Used for ppc_md.power_save which needs a function with no parameters
@@ -264,6 +264,7 @@ u64 pnv_first_deep_stop_state = MAX_STOP_STATE;
  */
 u64 pnv_deepest_stop_psscr_val;
 u64 pnv_deepest_stop_psscr_mask;
+bool deepest_stop_found;
 
 /*
  * Power ISA 3.0 idle initialization.
@@ -352,7 +353,6 @@ static int __init pnv_power9_idle_init(struct device_node *np, u32 *flags,
 	u32 *residency_ns = NULL;
 	u64 max_residency_ns = 0;
 	int rc = 0, i;
-	bool default_stop_found = false, deepest_stop_found = false;
 
 	psscr_val = kcalloc(dt_idle_states, sizeof(*psscr_val), GFP_KERNEL);
 	psscr_mask = kcalloc(dt_idle_states, sizeof(*psscr_mask), GFP_KERNEL);
@@ -433,26 +433,34 @@ static int __init pnv_power9_idle_init(struct device_node *np, u32 *flags,
 	}
 
 	if (!default_stop_found) {
-		pnv_default_stop_val = PSSCR_HV_DEFAULT_VAL;
-		pnv_default_stop_mask = PSSCR_HV_DEFAULT_MASK;
-		pr_warn("Setting default stop psscr val=0x%016llx,mask=0x%016llx\n",
+		pr_warn("powernv:idle: Default stop not found. Disabling ppcmd.powersave\n");
+	} else {
+		pr_info("powernv:idle: Default stop: psscr = 0x%016llx,mask=0x%016llx\n",
 			pnv_default_stop_val, pnv_default_stop_mask);
 	}
 
 	if (!deepest_stop_found) {
-		pnv_deepest_stop_psscr_val = PSSCR_HV_DEFAULT_VAL;
-		pnv_deepest_stop_psscr_mask = PSSCR_HV_DEFAULT_MASK;
-		pr_warn("Setting default stop psscr val=0x%016llx,mask=0x%016llx\n",
+		pr_warn("powernv:idle: Deepest stop not found. CPU-Hotplug is affected\n");
+	} else {
+		pr_info("powernv:idle: Deepest stop: psscr = 0x%016llx,mask=0x%016llx\n",
 			pnv_deepest_stop_psscr_val,
 			pnv_deepest_stop_psscr_mask);
 	}
 
+	pr_info("powernv:idle: RL value of first deep stop = 0x%llx\n",
+		pnv_first_deep_stop_state);
 out:
 	kfree(psscr_val);
 	kfree(psscr_mask);
 	kfree(residency_ns);
 	return rc;
 }
+
+bool pnv_check_deepest_stop(void)
+{
+	return deepest_stop_found;
+}
+EXPORT_SYMBOL_GPL(pnv_check_deepest_stop);
 
 /*
  * Probe device tree for supported idle states
@@ -526,7 +534,8 @@ static int __init pnv_init_idle_states(void)
 
 	if (supported_cpuidle_states & OPAL_PM_NAP_ENABLED)
 		ppc_md.power_save = power7_idle;
-	else if (supported_cpuidle_states & OPAL_PM_STOP_INST_FAST)
+	else if ((supported_cpuidle_states & OPAL_PM_STOP_INST_FAST) &&
+		 default_stop_found)
 		ppc_md.power_save = power9_idle;
 
 out:
