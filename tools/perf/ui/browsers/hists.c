@@ -2194,6 +2194,25 @@ static inline bool is_report_browser(void *timer)
 	return timer == NULL;
 }
 
+static int get_sort_fields_str(struct hists *hists, char *buf, size_t size)
+{
+	struct perf_hpp_fmt *fmt;
+	bool first = true;
+	int ret = 0;
+
+	hists__for_each_sort_list(hists, fmt) {
+		if (first) {
+			first = false;
+			ret += scnprintf(buf + ret, size - ret, "%s", fmt->name);
+		} else {
+			ret += scnprintf(buf + ret, size - ret, ",%s", fmt->name);
+		}
+		if (size - ret <= 0)
+			break;
+	}
+	return ret;
+}
+
 static int perf_evsel_browser_title(struct hist_browser *browser,
 				char *bf, size_t size)
 {
@@ -2273,6 +2292,9 @@ static int perf_evsel_browser_title(struct hist_browser *browser,
 		if (top->zero)
 			printed += scnprintf(bf + printed, size - printed, " [z]");
 	}
+
+	get_sort_fields_str(hists, buf, sizeof(buf));
+	printed += scnprintf(bf + printed, size - printed, ", Sort by: %s", buf);
 
 	return printed;
 }
