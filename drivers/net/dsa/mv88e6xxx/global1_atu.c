@@ -49,11 +49,13 @@ int mv88e6xxx_g1_atu_set_age_time(struct mv88e6xxx_chip *chip,
 	u16 val;
 	int err;
 
-	if (msecs < min || msecs > max)
-		return -ERANGE;
-
 	/* Round to nearest multiple of coeff */
-	age_time = (msecs + coeff / 2) / coeff;
+	if (msecs < min)
+		age_time = 0x1;
+	else if (msecs > max)
+		age_time = 0xff;
+	else
+		age_time = (msecs + coeff / 2) / coeff;
 
 	err = mv88e6xxx_g1_read(chip, GLOBAL_ATU_CONTROL, &val);
 	if (err)
