@@ -180,6 +180,7 @@ err_out_free_dev:
 
 	return retval;
 }
+EXPORT_SYMBOL(w1_add_master_device);
 
 void __w1_remove_master_device(struct w1_master *dev)
 {
@@ -252,6 +253,4 @@ void w1_remove_master_device(struct w1_bus_master *bm)
 
 	__w1_remove_master_device(found);
 }
-
-EXPORT_SYMBOL(w1_add_master_device);
 EXPORT_SYMBOL(w1_remove_master_device);
