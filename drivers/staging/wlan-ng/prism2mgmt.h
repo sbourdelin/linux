@@ -63,6 +63,9 @@
 extern int prism2_reset_holdtime;
 extern int prism2_reset_settletime;
 
+#define read_u16(x) ({ u32 __r = (u32)le16_to_cpu((__force __le16)(x)); \
+			__r; })
+
 u32 prism2sta_ifstate(struct wlandevice *wlandev, u32 ifstate);
 
 void prism2sta_ev_info(struct wlandevice *wlandev,
