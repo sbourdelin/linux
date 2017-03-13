@@ -87,7 +87,7 @@ static void xhci_print_cap_regs(struct xhci_hcd *xhci)
 			(unsigned int) HCS_ERST_MAX(temp));
 
 	temp = readl(&xhci->cap_regs->hcs_params3);
-	xhci_dbg(xhci, "HCSPARAMS 3 0x%x:\n",
+	xhci_dbg(xhci, "HCSPARAMS 3: 0x%x\n",
 			(unsigned int) temp);
 	xhci_dbg(xhci, "  Worst case U1 device exit latency: %u\n",
 			(unsigned int) HCS_U1_LATENCY(temp));
