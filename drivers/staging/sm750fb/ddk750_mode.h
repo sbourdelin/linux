@@ -3,37 +3,35 @@
 
 #include "ddk750_chip.h"
 
-typedef enum _spolarity_t {
+enum _spolarity_t {
 	POS = 0, /* positive */
 	NEG, /* negative */
-}
-spolarity_t;
+};
 
-typedef struct _mode_parameter_t {
+struct _mode_parameter_t {
 	/* Horizontal timing. */
 	unsigned long horizontal_total;
 	unsigned long horizontal_display_end;
 	unsigned long horizontal_sync_start;
 	unsigned long horizontal_sync_width;
-	spolarity_t horizontal_sync_polarity;
+	enum _spolarity_t horizontal_sync_polarity;
 
 	/* Vertical timing. */
 	unsigned long vertical_total;
 	unsigned long vertical_display_end;
 	unsigned long vertical_sync_start;
 	unsigned long vertical_sync_height;
-	spolarity_t vertical_sync_polarity;
+	enum _spolarity_t vertical_sync_polarity;
 
 	/* Refresh timing. */
 	unsigned long pixel_clock;
 	unsigned long horizontal_frequency;
-	unsigned long vertical_frequency;
+	enum _spolarity_t vertical_frequency;
 
 	/* Clock Phase. This clock phase only applies to Panel. */
-	spolarity_t clock_phase_polarity;
-}
-mode_parameter_t;
+	enum _spolarity_t clock_phase_polarity;
+};
 
-int ddk750_setModeTiming(mode_parameter_t *parm, clock_type_t clock);
+int ddk750_setModeTiming(struct _mode_parameter_t *parm, clock_type_t clock);
 
 #endif
