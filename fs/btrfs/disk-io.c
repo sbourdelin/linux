@@ -3566,6 +3566,76 @@ static int write_dev_flush(struct btrfs_device *device, int wait)
 	return 0;
 }
 
+struct device_checkpoint {
+	struct list_head list;
+	struct btrfs_device *device;
+	int stat_value_checkpoint;
+};
+
+static int add_device_checkpoint(struct list_head *checkpoint,
+					struct btrfs_device *device)
+{
+	struct device_checkpoint *cdev =
+		kzalloc(sizeof(struct device_checkpoint), GFP_KERNEL);
+	if (!cdev)
+		return -ENOMEM;
+
+	list_add(&cdev->list, checkpoint);
+
+	cdev->device = device;
+	cdev->stat_value_checkpoint =
+		btrfs_dev_stat_read(device, BTRFS_DEV_STAT_FLUSH_ERRS);
+
+	return 0;
+}
+
+static void fini_devices_checkpoint(struct list_head *checkpoint)
+{
+	struct device_checkpoint *cdev;
+
+	while(!list_empty(checkpoint)) {
+		cdev = list_entry(checkpoint->next,
+				struct device_checkpoint, list);
+		list_del(&cdev->list);
+		kfree(cdev);
+	}
+}
+
+static int check_stat_flush(struct btrfs_device *dev,
+				struct list_head *checkpoint)
+{
+	int val;
+	struct device_checkpoint *cdev;
+
+	list_for_each_entry(cdev, checkpoint, list) {
+		if (cdev->device == dev) {
+			val = btrfs_dev_stat_read(dev,
+				BTRFS_DEV_STAT_FLUSH_ERRS);
+			if (cdev->stat_value_checkpoint != val)
+				return 1;
+		}
+	}
+	return 0;
+}
+
+static int check_barrier_error(struct btrfs_fs_devices *fsdevs,
+				struct list_head *checkpoint)
+{
+	int dropouts = 0;
+	struct btrfs_device *dev;
+
+	list_for_each_entry_rcu(dev, &fsdevs->devices, dev_list) {
+		if (!dev->bdev || check_stat_flush(dev, checkpoint))
+			dropouts++;
+	}
+
+	if (dropouts >
+		fsdevs->fs_info->num_tolerated_disk_barrier_failures)
+		return -EIO;
+
+	return 0;
+}
+
 /*
  * send an empty flush down to each device in parallel,
  * then wait for them
@@ -3574,8 +3644,10 @@ static int barrier_all_devices(struct btrfs_fs_info *info)
 {
 	struct list_head *head;
 	struct btrfs_device *dev;
-	int dropouts = 0;
 	int ret;
+	struct list_head checkpoint;
+
+	INIT_LIST_HEAD(&checkpoint);
 
 	/* send down all the barriers */
 	head = &info->fs_devices->devices;
@@ -3587,29 +3659,31 @@ static int barrier_all_devices(struct btrfs_fs_info *info)
 		if (!dev->in_fs_metadata || !dev->writeable)
 			continue;
 
+		add_device_checkpoint(&checkpoint, dev);
 		ret = write_dev_flush(dev, 0);
-		if (ret)
+		if (ret) {
+			fini_devices_checkpoint(&checkpoint);
 			return ret;
+		}
 	}
 
 	/* wait for all the barriers */
 	list_for_each_entry_rcu(dev, head, dev_list) {
 		if (dev->missing)
 			continue;
-		if (!dev->bdev) {
-			dropouts++;
+		if (!dev->bdev)
 			continue;
-		}
 		if (!dev->in_fs_metadata || !dev->writeable)
 			continue;
 
-		ret = write_dev_flush(dev, 1);
-		if (ret)
-			dropouts++;
+		write_dev_flush(dev, 1);
 	}
-	if (dropouts > info->num_tolerated_disk_barrier_failures)
-		return -EIO;
-	return 0;
+
+	ret = check_barrier_error(info->fs_devices, &checkpoint);
+
+	fini_devices_checkpoint(&checkpoint);
+
+	return ret;
 }
 
 int btrfs_get_num_tolerated_disk_barrier_failures(u64 flags)
