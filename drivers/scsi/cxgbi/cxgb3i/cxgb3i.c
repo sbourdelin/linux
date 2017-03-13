@@ -972,21 +972,21 @@ static int init_act_open(struct cxgbi_sock *csk)
 			      &csk->daddr.sin_addr.s_addr);
 	if (!csk->l2t) {
 		pr_err("NO l2t available.\n");
-		return -EINVAL;
+		goto err;
 	}
 	cxgbi_sock_get(csk);
 
 	csk->atid = cxgb3_alloc_atid(t3dev, &t3_client, csk);
 	if (csk->atid < 0) {
 		pr_err("NO atid available.\n");
-		goto rel_resource;
+		goto err;
 	}
 	cxgbi_sock_set_flag(csk, CTPF_HAS_ATID);
 	cxgbi_sock_get(csk);
 
 	skb = alloc_wr(sizeof(struct cpl_act_open_req), 0, GFP_KERNEL);
 	if (!skb)
-		goto rel_resource;
+		goto err;
 	skb->sk = (struct sock *)csk;
 	set_arp_failure_handler(skb, act_open_arp_failure);
 	csk->snd_win = cxgb3i_snd_win;
@@ -1008,9 +1008,7 @@ static int init_act_open(struct cxgbi_sock *csk)
 	send_act_open_req(csk, skb, csk->l2t);
 	return 0;
 
-rel_resource:
-	if (skb)
-		__kfree_skb(skb);
+err:
 	return -EINVAL;
 }
 
