@@ -86,32 +86,35 @@ union host {
 };
 
 /*
- * atomisp_kernel_malloc: chooses whether kmalloc() or vmalloc() is preferable.
+ * atomisp_kernel_malloc:
+ * allocating memory from atomisp_kernel_zalloc() without zeroing memory.
  *
  * It is also a wrap functions to pass into css framework.
  */
 void *atomisp_kernel_malloc(size_t bytes)
 {
-	/* vmalloc() is preferable if allocating more than 1 page */
-	if (bytes > PAGE_SIZE)
-		return vmalloc(bytes);
-
-	return kmalloc(bytes, GFP_KERNEL);
+	return atomisp_kernel_zalloc(bytes, false);
 }
 
 /*
- * atomisp_kernel_zalloc: chooses whether set 0 to the allocated memory.
+ * atomisp_kernel_zalloc: chooses whether set 0 to the allocated memory
+ * with k{z,m}alloc or v{z,m}alloc
  *
  * It is also a wrap functions to pass into css framework.
  */
 void *atomisp_kernel_zalloc(size_t bytes, bool zero_mem)
 {
-	void *ptr = atomisp_kernel_malloc(bytes);
+	/* vmalloc() is preferable if allocating more than 1 page */
+	if (bytes > PAGE_SIZE) {
+		if (zero_mem)
+			return vzalloc(bytes);
+		return vmalloc(bytes);
+	}
 
-	if (ptr && zero_mem)
-		memset(ptr, 0, bytes);
+	if (zero_mem)
+		return kzalloc(bytes, GFP_KERNEL);
 
-	return ptr;
+	return kmalloc(bytes, GFP_KERNEL);
 }
 
 /*
