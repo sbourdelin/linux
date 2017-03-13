@@ -183,8 +183,8 @@ static int fpga_region_get_bridges(struct fpga_region *region,
 	int i, ret;
 
 	/* If parent is a bridge, add to list */
-	ret = fpga_bridge_get_to_list(region_np->parent, region->info,
-				      &region->bridge_list);
+	ret = of_fpga_bridge_get_to_list(region_np->parent, region->info,
+					 &region->bridge_list);
 	if (ret == -EBUSY)
 		return ret;
 
@@ -207,8 +207,8 @@ static int fpga_region_get_bridges(struct fpga_region *region,
 			continue;
 
 		/* If node is a bridge, get it and add to list */
-		ret = fpga_bridge_get_to_list(br, region->info,
-					      &region->bridge_list);
+		ret = of_fpga_bridge_get_to_list(br, region->info,
+						 &region->bridge_list);
 
 		/* If any of the bridges are in use, give up */
 		if (ret == -EBUSY) {
