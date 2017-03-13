@@ -615,6 +615,35 @@ void amdgpu_gtt_location(struct amdgpu_device *adev, struct amdgpu_mc *mc)
 			mc->gtt_size >> 20, mc->gtt_start, mc->gtt_end);
 }
 
+/**
+ * amdgpu_resize_bar0 - try to resize BAR0
+ *
+ * @adev: amdgpu_device pointer
+ *
+ * Try to resize BAR0 to make all VRAM CPU accessible.
+ */
+void amdgpu_resize_bar0(struct amdgpu_device *adev)
+{
+	u32 size = max(ilog2(adev->mc.real_vram_size - 1) + 1, 20) - 20;
+	int r;
+
+	r = pci_resize_resource(adev->pdev, 0, size);
+
+	if (r == -ENOTSUPP) {
+		/* The hardware don't support the extension. */
+		return;
+
+	} else if (r == -ENOSPC) {
+		DRM_INFO("Not enoigh PCI address space for a large BAR.");
+	} else if (r) {
+		DRM_ERROR("Problem resizing BAR0 (%d).", r);
+	}
+
+	/* Reinit the doorbell mapping, it is most likely moved as well */
+	amdgpu_doorbell_fini(adev);
+	BUG_ON(amdgpu_doorbell_init(adev));
+}
+
 /*
  * GPU helpers function.
  */
