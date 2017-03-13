@@ -2753,8 +2753,6 @@ __visible void trace_hardirqs_off_caller(unsigned long ip)
 {
 	struct task_struct *curr = current;
 
-	time_hardirqs_off(CALLER_ADDR0, ip);
-
 	if (unlikely(!debug_locks || current->lockdep_recursion))
 		return;
 
@@ -2775,6 +2773,8 @@ __visible void trace_hardirqs_off_caller(unsigned long ip)
 		debug_atomic_inc(hardirqs_off_events);
 	} else
 		debug_atomic_inc(redundant_hardirqs_off);
+
+	time_hardirqs_off(CALLER_ADDR0, ip);
 }
 EXPORT_SYMBOL(trace_hardirqs_off_caller);
 
