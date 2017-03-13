@@ -372,10 +372,10 @@ static int prism2sta_mlmerequest(struct wlandevice *wlandev,
 			qualmsg->noise.status =
 			    P80211ENUM_msgitem_status_data_ok;
 
-			qualmsg->link.data = le16_to_cpu(hw->qual.cq_curr_bss);
+			qualmsg->link.data = read_u16(hw->qual.cq_curr_bss);
 			qualmsg->level.data =
-				le16_to_cpu(hw->qual.asl_curr_bss);
-			qualmsg->noise.data = le16_to_cpu(hw->qual.anl_curr_fc);
+				read_u16(hw->qual.asl_curr_bss);
+			qualmsg->noise.data = read_u16(hw->qual.anl_curr_fc);
 			qualmsg->txrate.data = hw->txrate;
 
 			break;
@@ -603,10 +603,10 @@ static int prism2sta_getcardinfo(struct wlandevice *wlandev)
 	}
 
 	/* get all the nic id fields in host byte order */
-	hw->ident_nic.id = le16_to_cpu(hw->ident_nic.id);
-	hw->ident_nic.variant = le16_to_cpu(hw->ident_nic.variant);
-	hw->ident_nic.major = le16_to_cpu(hw->ident_nic.major);
-	hw->ident_nic.minor = le16_to_cpu(hw->ident_nic.minor);
+	hw->ident_nic.id = read_u16(hw->ident_nic.id);
+	hw->ident_nic.variant = read_u16(hw->ident_nic.variant);
+	hw->ident_nic.major = read_u16(hw->ident_nic.major);
+	hw->ident_nic.minor = read_u16(hw->ident_nic.minor);
 
 	netdev_info(wlandev->netdev, "ident: nic h/w: id=0x%02x %d.%d.%d\n",
 		    hw->ident_nic.id, hw->ident_nic.major,
@@ -622,10 +622,10 @@ static int prism2sta_getcardinfo(struct wlandevice *wlandev)
 	}
 
 	/* get all the private fw id fields in host byte order */
-	hw->ident_pri_fw.id = le16_to_cpu(hw->ident_pri_fw.id);
-	hw->ident_pri_fw.variant = le16_to_cpu(hw->ident_pri_fw.variant);
-	hw->ident_pri_fw.major = le16_to_cpu(hw->ident_pri_fw.major);
-	hw->ident_pri_fw.minor = le16_to_cpu(hw->ident_pri_fw.minor);
+	hw->ident_pri_fw.id = read_u16(hw->ident_pri_fw.id);
+	hw->ident_pri_fw.variant = read_u16(hw->ident_pri_fw.variant);
+	hw->ident_pri_fw.major = read_u16(hw->ident_pri_fw.major);
+	hw->ident_pri_fw.minor = read_u16(hw->ident_pri_fw.minor);
 
 	netdev_info(wlandev->netdev, "ident: pri f/w: id=0x%02x %d.%d.%d\n",
 		    hw->ident_pri_fw.id, hw->ident_pri_fw.major,
@@ -648,10 +648,10 @@ static int prism2sta_getcardinfo(struct wlandevice *wlandev)
 	}
 
 	/* get all the station fw id fields in host byte order */
-	hw->ident_sta_fw.id = le16_to_cpu(hw->ident_sta_fw.id);
-	hw->ident_sta_fw.variant = le16_to_cpu(hw->ident_sta_fw.variant);
-	hw->ident_sta_fw.major = le16_to_cpu(hw->ident_sta_fw.major);
-	hw->ident_sta_fw.minor = le16_to_cpu(hw->ident_sta_fw.minor);
+	hw->ident_sta_fw.id = read_u16(hw->ident_sta_fw.id);
+	hw->ident_sta_fw.variant = read_u16(hw->ident_sta_fw.variant);
+	hw->ident_sta_fw.major = read_u16(hw->ident_sta_fw.major);
+	hw->ident_sta_fw.minor = read_u16(hw->ident_sta_fw.minor);
 
 	/* strip out the 'special' variant bits */
 	hw->mm_mods = hw->ident_sta_fw.variant & GENMASK(15, 14);
@@ -683,11 +683,11 @@ static int prism2sta_getcardinfo(struct wlandevice *wlandev)
 	/* get all the Compatibility range, modem interface supplier
 	 * fields in byte order
 	 */
-	hw->cap_sup_mfi.role = le16_to_cpu(hw->cap_sup_mfi.role);
-	hw->cap_sup_mfi.id = le16_to_cpu(hw->cap_sup_mfi.id);
-	hw->cap_sup_mfi.variant = le16_to_cpu(hw->cap_sup_mfi.variant);
-	hw->cap_sup_mfi.bottom = le16_to_cpu(hw->cap_sup_mfi.bottom);
-	hw->cap_sup_mfi.top = le16_to_cpu(hw->cap_sup_mfi.top);
+	hw->cap_sup_mfi.role = read_u16(hw->cap_sup_mfi.role);
+	hw->cap_sup_mfi.id = read_u16(hw->cap_sup_mfi.id);
+	hw->cap_sup_mfi.variant = read_u16(hw->cap_sup_mfi.variant);
+	hw->cap_sup_mfi.bottom = read_u16(hw->cap_sup_mfi.bottom);
+	hw->cap_sup_mfi.top = read_u16(hw->cap_sup_mfi.top);
 
 	netdev_info(wlandev->netdev,
 		    "MFI:SUP:role=0x%02x:id=0x%02x:var=0x%02x:b/t=%d/%d\n",
@@ -707,11 +707,11 @@ static int prism2sta_getcardinfo(struct wlandevice *wlandev)
 	/* get all the Compatibility range, controller interface supplier
 	 * fields in byte order
 	 */
-	hw->cap_sup_cfi.role = le16_to_cpu(hw->cap_sup_cfi.role);
-	hw->cap_sup_cfi.id = le16_to_cpu(hw->cap_sup_cfi.id);
-	hw->cap_sup_cfi.variant = le16_to_cpu(hw->cap_sup_cfi.variant);
-	hw->cap_sup_cfi.bottom = le16_to_cpu(hw->cap_sup_cfi.bottom);
-	hw->cap_sup_cfi.top = le16_to_cpu(hw->cap_sup_cfi.top);
+	hw->cap_sup_cfi.role = read_u16(hw->cap_sup_cfi.role);
+	hw->cap_sup_cfi.id = read_u16(hw->cap_sup_cfi.id);
+	hw->cap_sup_cfi.variant = read_u16(hw->cap_sup_cfi.variant);
+	hw->cap_sup_cfi.bottom = read_u16(hw->cap_sup_cfi.bottom);
+	hw->cap_sup_cfi.top = read_u16(hw->cap_sup_cfi.top);
 
 	netdev_info(wlandev->netdev,
 		    "CFI:SUP:role=0x%02x:id=0x%02x:var=0x%02x:b/t=%d/%d\n",
@@ -731,11 +731,11 @@ static int prism2sta_getcardinfo(struct wlandevice *wlandev)
 	/* get all the Compatibility range, primary firmware supplier
 	 * fields in byte order
 	 */
-	hw->cap_sup_pri.role = le16_to_cpu(hw->cap_sup_pri.role);
-	hw->cap_sup_pri.id = le16_to_cpu(hw->cap_sup_pri.id);
-	hw->cap_sup_pri.variant = le16_to_cpu(hw->cap_sup_pri.variant);
-	hw->cap_sup_pri.bottom = le16_to_cpu(hw->cap_sup_pri.bottom);
-	hw->cap_sup_pri.top = le16_to_cpu(hw->cap_sup_pri.top);
+	hw->cap_sup_pri.role = read_u16(hw->cap_sup_pri.role);
+	hw->cap_sup_pri.id = read_u16(hw->cap_sup_pri.id);
+	hw->cap_sup_pri.variant = read_u16(hw->cap_sup_pri.variant);
+	hw->cap_sup_pri.bottom = read_u16(hw->cap_sup_pri.bottom);
+	hw->cap_sup_pri.top = read_u16(hw->cap_sup_pri.top);
 
 	netdev_info(wlandev->netdev,
 		    "PRI:SUP:role=0x%02x:id=0x%02x:var=0x%02x:b/t=%d/%d\n",
@@ -755,11 +755,11 @@ static int prism2sta_getcardinfo(struct wlandevice *wlandev)
 	/* get all the Compatibility range, station firmware supplier
 	 * fields in byte order
 	 */
-	hw->cap_sup_sta.role = le16_to_cpu(hw->cap_sup_sta.role);
-	hw->cap_sup_sta.id = le16_to_cpu(hw->cap_sup_sta.id);
-	hw->cap_sup_sta.variant = le16_to_cpu(hw->cap_sup_sta.variant);
-	hw->cap_sup_sta.bottom = le16_to_cpu(hw->cap_sup_sta.bottom);
-	hw->cap_sup_sta.top = le16_to_cpu(hw->cap_sup_sta.top);
+	hw->cap_sup_sta.role = read_u16(hw->cap_sup_sta.role);
+	hw->cap_sup_sta.id = read_u16(hw->cap_sup_sta.id);
+	hw->cap_sup_sta.variant = read_u16(hw->cap_sup_sta.variant);
+	hw->cap_sup_sta.bottom = read_u16(hw->cap_sup_sta.bottom);
+	hw->cap_sup_sta.top = read_u16(hw->cap_sup_sta.top);
 
 	if (hw->cap_sup_sta.id == 0x04) {
 		netdev_info(wlandev->netdev,
@@ -787,11 +787,11 @@ static int prism2sta_getcardinfo(struct wlandevice *wlandev)
 	/* get all the Compatibility range, primary f/w actor, CFI supplier
 	 * fields in byte order
 	 */
-	hw->cap_act_pri_cfi.role = le16_to_cpu(hw->cap_act_pri_cfi.role);
-	hw->cap_act_pri_cfi.id = le16_to_cpu(hw->cap_act_pri_cfi.id);
-	hw->cap_act_pri_cfi.variant = le16_to_cpu(hw->cap_act_pri_cfi.variant);
-	hw->cap_act_pri_cfi.bottom = le16_to_cpu(hw->cap_act_pri_cfi.bottom);
-	hw->cap_act_pri_cfi.top = le16_to_cpu(hw->cap_act_pri_cfi.top);
+	hw->cap_act_pri_cfi.role = read_u16(hw->cap_act_pri_cfi.role);
+	hw->cap_act_pri_cfi.id = read_u16(hw->cap_act_pri_cfi.id);
+	hw->cap_act_pri_cfi.variant = read_u16(hw->cap_act_pri_cfi.variant);
+	hw->cap_act_pri_cfi.bottom = read_u16(hw->cap_act_pri_cfi.bottom);
+	hw->cap_act_pri_cfi.top = read_u16(hw->cap_act_pri_cfi.top);
 
 	netdev_info(wlandev->netdev,
 		    "PRI-CFI:ACT:role=0x%02x:id=0x%02x:var=0x%02x:b/t=%d/%d\n",
@@ -811,11 +811,11 @@ static int prism2sta_getcardinfo(struct wlandevice *wlandev)
 	/* get all the Compatibility range, station f/w actor, CFI supplier
 	 * fields in byte order
 	 */
-	hw->cap_act_sta_cfi.role = le16_to_cpu(hw->cap_act_sta_cfi.role);
-	hw->cap_act_sta_cfi.id = le16_to_cpu(hw->cap_act_sta_cfi.id);
-	hw->cap_act_sta_cfi.variant = le16_to_cpu(hw->cap_act_sta_cfi.variant);
-	hw->cap_act_sta_cfi.bottom = le16_to_cpu(hw->cap_act_sta_cfi.bottom);
-	hw->cap_act_sta_cfi.top = le16_to_cpu(hw->cap_act_sta_cfi.top);
+	hw->cap_act_sta_cfi.role = read_u16(hw->cap_act_sta_cfi.role);
+	hw->cap_act_sta_cfi.id = read_u16(hw->cap_act_sta_cfi.id);
+	hw->cap_act_sta_cfi.variant = read_u16(hw->cap_act_sta_cfi.variant);
+	hw->cap_act_sta_cfi.bottom = read_u16(hw->cap_act_sta_cfi.bottom);
+	hw->cap_act_sta_cfi.top = read_u16(hw->cap_act_sta_cfi.top);
 
 	netdev_info(wlandev->netdev,
 		    "STA-CFI:ACT:role=0x%02x:id=0x%02x:var=0x%02x:b/t=%d/%d\n",
@@ -835,11 +835,11 @@ static int prism2sta_getcardinfo(struct wlandevice *wlandev)
 	/* get all the Compatibility range, station f/w actor, MFI supplier
 	 * fields in byte order
 	 */
-	hw->cap_act_sta_mfi.role = le16_to_cpu(hw->cap_act_sta_mfi.role);
-	hw->cap_act_sta_mfi.id = le16_to_cpu(hw->cap_act_sta_mfi.id);
-	hw->cap_act_sta_mfi.variant = le16_to_cpu(hw->cap_act_sta_mfi.variant);
-	hw->cap_act_sta_mfi.bottom = le16_to_cpu(hw->cap_act_sta_mfi.bottom);
-	hw->cap_act_sta_mfi.top = le16_to_cpu(hw->cap_act_sta_mfi.top);
+	hw->cap_act_sta_mfi.role = read_u16(hw->cap_act_sta_mfi.role);
+	hw->cap_act_sta_mfi.id = read_u16(hw->cap_act_sta_mfi.id);
+	hw->cap_act_sta_mfi.variant = read_u16(hw->cap_act_sta_mfi.variant);
+	hw->cap_act_sta_mfi.bottom = read_u16(hw->cap_act_sta_mfi.bottom);
+	hw->cap_act_sta_mfi.top = read_u16(hw->cap_act_sta_mfi.top);
 
 	netdev_info(wlandev->netdev,
 		    "STA-MFI:ACT:role=0x%02x:id=0x%02x:var=0x%02x:b/t=%d/%d\n",
@@ -1012,7 +1012,7 @@ static void prism2sta_inf_tallies(struct wlandevice *wlandev,
 		dst = (u32 *)&hw->tallies;
 		src16 = (u16 *)&inf->info.commtallies16;
 		for (i = 0; i < cnt; i++, dst++, src16++)
-			*dst += le16_to_cpu(*src16);
+			*dst += read_u16(*src16);
 	}
 }
 
@@ -1136,7 +1136,7 @@ static void prism2sta_inf_chinforesults(struct wlandevice *wlandev,
 	unsigned int i, n;
 
 	hw->channel_info.results.scanchannels =
-	    le16_to_cpu(inf->info.chinforesult.scanchannels);
+	    read_u16(inf->info.chinforesult.scanchannels);
 
 	for (i = 0, n = 0; i < HFA384x_CHINFORESULT_MAX; i++) {
 		struct hfa384x_ch_info_result_sub *result;
@@ -1147,16 +1147,16 @@ static void prism2sta_inf_chinforesults(struct wlandevice *wlandev,
 			continue;
 
 		result = &inf->info.chinforesult.result[n];
-		chan = le16_to_cpu(result->chid) - 1;
+		chan = read_u16(result->chid) - 1;
 
 		if (chan < 0 || chan >= HFA384x_CHINFORESULT_MAX)
 			continue;
 
 		chinforesult = &hw->channel_info.results.result[chan];
 		chinforesult->chid = chan;
-		chinforesult->anl = le16_to_cpu(result->anl);
-		chinforesult->pnl = le16_to_cpu(result->pnl);
-		chinforesult->active = le16_to_cpu(result->active);
+		chinforesult->anl = read_u16(result->anl);
+		chinforesult->pnl = read_u16(result->pnl);
+		chinforesult->active = read_u16(result->active);
 
 		pr_debug("chinfo: channel %d, %s level (avg/peak)=%d/%d dB, pcf %d\n",
 			 chan + 1,
@@ -1447,7 +1447,7 @@ static void prism2sta_inf_linkstatus(struct wlandevice *wlandev,
 {
 	struct hfa384x *hw = wlandev->priv;
 
-	hw->link_status_new = le16_to_cpu(inf->info.linkstatus.linkstatus);
+	hw->link_status_new = read_u16(inf->info.linkstatus.linkstatus);
 
 	schedule_work(&hw->link_bh);
 }
@@ -1478,8 +1478,8 @@ static void prism2sta_inf_assocstatus(struct wlandevice *wlandev,
 	int i;
 
 	memcpy(&rec, &inf->info.assocstatus, sizeof(rec));
-	rec.assocstatus = le16_to_cpu(rec.assocstatus);
-	rec.reason = le16_to_cpu(rec.reason);
+	rec.assocstatus = read_u16(rec.assocstatus);
+	rec.reason = read_u16(rec.reason);
 
 	/*
 	 * Find the address in the list of authenticated stations.
@@ -1725,7 +1725,7 @@ static void prism2sta_inf_psusercnt(struct wlandevice *wlandev,
 {
 	struct hfa384x *hw = wlandev->priv;
 
-	hw->psusercount = le16_to_cpu(inf->info.psusercnt.usercnt);
+	hw->psusercount = read_u16(inf->info.psusercnt.usercnt);
 }
 
 /*
@@ -1748,7 +1748,7 @@ static void prism2sta_inf_psusercnt(struct wlandevice *wlandev,
 void prism2sta_ev_info(struct wlandevice *wlandev,
 		       struct hfa384x_inf_frame *inf)
 {
-	inf->infotype = le16_to_cpu(inf->infotype);
+	inf->infotype = read_u16(inf->infotype);
 	/* Dispatch */
 	switch (inf->infotype) {
 	case HFA384x_IT_HANDOVERADDR:
@@ -1947,9 +1947,9 @@ void prism2sta_commsqual_defer(struct work_struct *data)
 		}
 
 		pr_debug("commsqual %d %d %d\n",
-			 le16_to_cpu(hw->qual.cq_curr_bss),
-			 le16_to_cpu(hw->qual.asl_curr_bss),
-			 le16_to_cpu(hw->qual.anl_curr_fc));
+			 read_u16(hw->qual.cq_curr_bss),
+			 read_u16(hw->qual.asl_curr_bss),
+			 read_u16(hw->qual.anl_curr_fc));
 	}
 
 	/* Get the signal rate */
