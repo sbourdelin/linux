@@ -7618,7 +7618,8 @@ static int handle_vmptrld(struct kvm_vcpu *vcpu)
 		struct page *page;
 		page = nested_get_page(vcpu, vmptr);
 		if (page == NULL) {
-			nested_vmx_failInvalid(vcpu);
+			nested_vmx_failValid(vcpu,
+				VMXERR_VMPTRLD_INCORRECT_VMCS_REVISION_ID);
 			return kvm_skip_emulated_instruction(vcpu);
 		}
 		new_vmcs12 = kmap(page);
