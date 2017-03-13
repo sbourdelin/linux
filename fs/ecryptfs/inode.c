@@ -29,6 +29,8 @@
 #include <linux/dcache.h>
 #include <linux/namei.h>
 #include <linux/mount.h>
+#include <linux/path.h>
+#include <linux/fsnotify.h>
 #include <linux/fs_stack.h>
 #include <linux/slab.h>
 #include <linux/xattr.h>
@@ -144,16 +146,22 @@ static int ecryptfs_do_unlink(struct inode *dir, struct dentry *dentry,
 {
 	struct dentry *lower_dentry = ecryptfs_dentry_to_lower(dentry);
 	struct inode *lower_dir_inode = ecryptfs_inode_to_lower(dir);
+	struct vfsmount *lower_mnt = ecryptfs_dentry_to_lower_mnt(dentry);
+	struct path lower_dir_path = {lower_mnt, NULL};
 	struct dentry *lower_dir_dentry;
 	int rc;
 
 	dget(lower_dentry);
 	lower_dir_dentry = lock_parent(lower_dentry);
+	lower_dir_path.dentry = lower_dir_dentry;
 	rc = vfs_unlink(lower_dir_inode, lower_dentry, NULL);
 	if (rc) {
 		printk(KERN_ERR "Error in vfs_unlink; rc = [%d]\n", rc);
 		goto out_unlock;
 	}
+
+	fsnotify_modify_dir(&lower_dir_path);
+
 	fsstack_copy_attr_times(dir, lower_dir_inode);
 	set_nlink(inode, ecryptfs_inode_to_lower(inode)->i_nlink);
 	inode->i_ctime = dir->i_ctime;
@@ -184,9 +192,13 @@ ecryptfs_do_create(struct inode *directory_inode,
 	struct dentry *lower_dentry;
 	struct dentry *lower_dir_dentry;
 	struct inode *inode;
+	struct path lower_dir_path;
 
 	lower_dentry = ecryptfs_dentry_to_lower(ecryptfs_dentry);
 	lower_dir_dentry = lock_parent(lower_dentry);
+	lower_dir_path.dentry = lower_dir_dentry;
+	lower_dir_path.mnt = ecryptfs_dentry_to_lower_mnt(ecryptfs_dentry);
+
 	rc = vfs_create(d_inode(lower_dir_dentry), lower_dentry, mode, true);
 	if (rc) {
 		printk(KERN_ERR "%s: Failure to create dentry in lower fs; "
@@ -194,10 +206,14 @@ ecryptfs_do_create(struct inode *directory_inode,
 		inode = ERR_PTR(rc);
 		goto out_lock;
 	}
+
+	fsnotify_modify_dir(&lower_dir_path);
+
 	inode = __ecryptfs_get_inode(d_inode(lower_dentry),
 				     directory_inode->i_sb);
 	if (IS_ERR(inode)) {
 		vfs_unlink(d_inode(lower_dir_dentry), lower_dentry, NULL);
+		fsnotify_modify_dir(&lower_dir_path);
 		goto out_lock;
 	}
 	fsstack_copy_attr_times(directory_inode, d_inode(lower_dir_dentry));
@@ -432,6 +448,7 @@ static int ecryptfs_link(struct dentry *old_dentry, struct inode *dir,
 	struct dentry *lower_old_dentry;
 	struct dentry *lower_new_dentry;
 	struct dentry *lower_dir_dentry;
+	struct path lower_dir_path;
 	u64 file_size_save;
 	int rc;
 
@@ -441,10 +458,16 @@ static int ecryptfs_link(struct dentry *old_dentry, struct inode *dir,
 	dget(lower_old_dentry);
 	dget(lower_new_dentry);
 	lower_dir_dentry = lock_parent(lower_new_dentry);
+	lower_dir_path.dentry = lower_dir_dentry;
+	lower_dir_path.mnt = ecryptfs_dentry_to_lower_mnt(new_dentry);
+
 	rc = vfs_link(lower_old_dentry, d_inode(lower_dir_dentry),
 		      lower_new_dentry, NULL);
 	if (rc || d_really_is_negative(lower_new_dentry))
 		goto out_lock;
+
+	fsnotify_modify_dir(&lower_dir_path);
+
 	rc = ecryptfs_interpose(lower_new_dentry, new_dentry, dir->i_sb);
 	if (rc)
 		goto out_lock;
@@ -471,6 +494,7 @@ static int ecryptfs_symlink(struct inode *dir, struct dentry *dentry,
 	int rc;
 	struct dentry *lower_dentry;
 	struct dentry *lower_dir_dentry;
+	struct path lower_dir_path;
 	char *encoded_symname;
 	size_t encoded_symlen;
 	struct ecryptfs_mount_crypt_stat *mount_crypt_stat = NULL;
@@ -478,6 +502,9 @@ static int ecryptfs_symlink(struct inode *dir, struct dentry *dentry,
 	lower_dentry = ecryptfs_dentry_to_lower(dentry);
 	dget(lower_dentry);
 	lower_dir_dentry = lock_parent(lower_dentry);
+	lower_dir_path.dentry = lower_dir_dentry;
+	lower_dir_path.mnt = ecryptfs_dentry_to_lower_mnt(dentry);
+
 	mount_crypt_stat = &ecryptfs_superblock_to_private(
 		dir->i_sb)->mount_crypt_stat;
 	rc = ecryptfs_encrypt_and_encode_filename(&encoded_symname,
@@ -491,6 +518,9 @@ static int ecryptfs_symlink(struct inode *dir, struct dentry *dentry,
 	kfree(encoded_symname);
 	if (rc || d_really_is_negative(lower_dentry))
 		goto out_lock;
+
+	fsnotify_modify_dir(&lower_dir_path);
+
 	rc = ecryptfs_interpose(lower_dentry, dentry, dir->i_sb);
 	if (rc)
 		goto out_lock;
@@ -509,12 +539,18 @@ static int ecryptfs_mkdir(struct inode *dir, struct dentry *dentry, umode_t mode
 	int rc;
 	struct dentry *lower_dentry;
 	struct dentry *lower_dir_dentry;
+	struct path lower_dir_path;
 
 	lower_dentry = ecryptfs_dentry_to_lower(dentry);
 	lower_dir_dentry = lock_parent(lower_dentry);
+	lower_dir_path.dentry = lower_dir_dentry;
+	lower_dir_path.mnt = ecryptfs_dentry_to_lower_mnt(dentry);
 	rc = vfs_mkdir(d_inode(lower_dir_dentry), lower_dentry, mode);
 	if (rc || d_really_is_negative(lower_dentry))
 		goto out;
+
+	fsnotify_modify_dir(&lower_dir_path);
+
 	rc = ecryptfs_interpose(lower_dentry, dentry, dir->i_sb);
 	if (rc)
 		goto out;
@@ -532,16 +568,24 @@ static int ecryptfs_rmdir(struct inode *dir, struct dentry *dentry)
 {
 	struct dentry *lower_dentry;
 	struct dentry *lower_dir_dentry;
+	struct path lower_dir_path;
 	int rc;
 
 	lower_dentry = ecryptfs_dentry_to_lower(dentry);
 	dget(dentry);
 	lower_dir_dentry = lock_parent(lower_dentry);
+	lower_dir_path.dentry = lower_dir_dentry;
+	lower_dir_path.mnt = ecryptfs_dentry_to_lower_mnt(dentry);
 	dget(lower_dentry);
+
 	rc = vfs_rmdir(d_inode(lower_dir_dentry), lower_dentry);
 	dput(lower_dentry);
 	if (!rc && d_really_is_positive(dentry))
 		clear_nlink(d_inode(dentry));
+
+	if (rc)
+		fsnotify_modify_dir(&lower_dir_path);
+
 	fsstack_copy_attr_times(dir, d_inode(lower_dir_dentry));
 	set_nlink(dir, d_inode(lower_dir_dentry)->i_nlink);
 	unlock_dir(lower_dir_dentry);
@@ -557,12 +601,19 @@ ecryptfs_mknod(struct inode *dir, struct dentry *dentry, umode_t mode, dev_t dev
 	int rc;
 	struct dentry *lower_dentry;
 	struct dentry *lower_dir_dentry;
+	struct path lower_dir_path;
 
 	lower_dentry = ecryptfs_dentry_to_lower(dentry);
 	lower_dir_dentry = lock_parent(lower_dentry);
+	lower_dir_path.dentry = lower_dir_dentry;
+	lower_dir_path.mnt = ecryptfs_dentry_to_lower_mnt(dentry);
+
 	rc = vfs_mknod(d_inode(lower_dir_dentry), lower_dentry, mode, dev);
 	if (rc || d_really_is_negative(lower_dentry))
 		goto out;
+
+	fsnotify_modify_dir(&lower_dir_path);
+
 	rc = ecryptfs_interpose(lower_dentry, dentry, dir->i_sb);
 	if (rc)
 		goto out;
@@ -585,6 +636,9 @@ ecryptfs_rename(struct inode *old_dir, struct dentry *old_dentry,
 	struct dentry *lower_new_dentry;
 	struct dentry *lower_old_dir_dentry;
 	struct dentry *lower_new_dir_dentry;
+	struct vfsmount *lower_mnt;
+	struct path lower_old_dir_path;
+	struct path lower_new_dir_path;
 	struct dentry *trap = NULL;
 	struct inode *target_inode;
 
@@ -593,10 +647,15 @@ ecryptfs_rename(struct inode *old_dir, struct dentry *old_dentry,
 
 	lower_old_dentry = ecryptfs_dentry_to_lower(old_dentry);
 	lower_new_dentry = ecryptfs_dentry_to_lower(new_dentry);
+	lower_mnt = ecryptfs_dentry_to_lower_mnt(old_dentry);
 	dget(lower_old_dentry);
 	dget(lower_new_dentry);
 	lower_old_dir_dentry = dget_parent(lower_old_dentry);
 	lower_new_dir_dentry = dget_parent(lower_new_dentry);
+	lower_old_dir_path.dentry = lower_old_dir_dentry;
+	lower_old_dir_path.mnt = lower_mnt;
+	lower_new_dir_path.dentry = lower_new_dir_dentry;
+	lower_new_dir_path.mnt = lower_mnt;
 	target_inode = d_inode(new_dentry);
 	trap = lock_rename(lower_old_dir_dentry, lower_new_dir_dentry);
 	/* source should not be ancestor of target */
@@ -614,6 +673,14 @@ ecryptfs_rename(struct inode *old_dir, struct dentry *old_dentry,
 			NULL, 0);
 	if (rc)
 		goto out_lock;
+
+	/* ecryptfs does not support crossing mount boundaries, we can take
+	 * vfsmount from an arbitrary dentry.
+	 */
+	fsnotify_modify_dir(&lower_old_dir_path);
+	if (!path_equal(&lower_old_dir_path, &lower_new_dir_path))
+		fsnotify_modify_dir(&lower_new_dir_path);
+
 	if (target_inode)
 		fsstack_copy_attr_all(target_inode,
 				      ecryptfs_inode_to_lower(target_inode));

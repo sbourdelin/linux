@@ -91,6 +91,7 @@
 #include <linux/stat.h>
 #include <linux/dcache.h>
 #include <linux/namei.h>
+#include <linux/fsnotify.h>
 #include <linux/socket.h>
 #include <linux/un.h>
 #include <linux/fcntl.h>
@@ -977,6 +978,7 @@ static int unix_mknod(const char *sun_path, umode_t mode, struct path *res)
 	if (!err) {
 		err = vfs_mknod(d_inode(path.dentry), dentry, mode, 0);
 		if (!err) {
+			fsnotify_modify_dir(&path);
 			res->mnt = mntget(path.mnt);
 			res->dentry = dget(dentry);
 		}

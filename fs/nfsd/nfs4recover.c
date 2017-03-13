@@ -36,6 +36,7 @@
 #include <linux/file.h>
 #include <linux/slab.h>
 #include <linux/namei.h>
+#include <linux/fsnotify.h>
 #include <linux/sched.h>
 #include <linux/fs.h>
 #include <linux/module.h>
@@ -216,6 +217,8 @@ nfsd4_create_clid_dir(struct nfs4_client *clp)
 		 */
 		goto out_put;
 	status = vfs_mkdir(d_inode(dir), dentry, S_IRWXU);
+	if (status == 0)
+		fsnotify_modify_dir(&nn->rec_file->f_path);
 out_put:
 	dput(dentry);
 out_unlock:
@@ -338,6 +341,8 @@ nfsd4_unlink_clid_dir(char *name, int namlen, struct nfsd_net *nn)
 	if (d_really_is_negative(dentry))
 		goto out;
 	status = vfs_rmdir(d_inode(dir), dentry);
+	if (status == 0)
+		fsnotify_modify_dir(&nn->rec_file->f_path);
 out:
 	dput(dentry);
 out_unlock:
@@ -401,6 +406,8 @@ purge_old(struct dentry *parent, struct dentry *child, struct nfsd_net *nn)
 	if (status)
 		printk("failed to remove client recovery directory %pd\n",
 				child);
+	else
+		fsnotify_modify_dir(&nn->rec_file->f_path);
 	/* Keep trying, success or failure: */
 	return 0;
 }

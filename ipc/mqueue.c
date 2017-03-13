@@ -19,6 +19,7 @@
 #include <linux/file.h>
 #include <linux/mount.h>
 #include <linux/namei.h>
+#include <linux/fsnotify.h>
 #include <linux/sysctl.h>
 #include <linux/poll.h>
 #include <linux/mqueue.h>
@@ -822,6 +823,10 @@ SYSCALL_DEFINE4(mq_open, const char __user *, u_name, int, oflag, umode_t, mode,
 			filp = do_create(ipc_ns, d_inode(root),
 						&path, oflag, mode,
 						u_attr ? &attr : NULL);
+			if (!IS_ERR(filp)) {
+				struct path root_path = {mnt, mnt->mnt_root};
+				fsnotify_modify_dir(&root_path);
+			}
 		}
 	} else {
 		if (d_really_is_negative(path.dentry)) {
@@ -882,6 +887,10 @@ SYSCALL_DEFINE1(mq_unlink, const char __user *, u_name)
 	} else {
 		ihold(inode);
 		err = vfs_unlink(d_inode(dentry->d_parent), dentry, NULL);
+		if (!err) {
+			struct path path = {mnt, dentry->d_parent};
+			fsnotify_modify_dir(&path);
+		}
 	}
 	dput(dentry);
 

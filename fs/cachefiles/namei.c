@@ -313,6 +313,8 @@ static int cachefiles_bury_object(struct cachefiles_cache *cache,
 			cachefiles_io_error(cache, "Unlink security error");
 		} else {
 			ret = vfs_unlink(d_inode(dir), rep, NULL);
+			if (ret == 0)
+				fsnotify_modify_dir(&path);
 
 			if (preemptive)
 				cachefiles_mark_object_buried(cache, rep, why);
@@ -418,6 +420,10 @@ try_again:
 		if (ret != 0 && ret != -ENOMEM)
 			cachefiles_io_error(cache,
 					    "Rename failed with error %d", ret);
+		if (ret == 0) {
+			fsnotify_modify_dir(&path);
+			fsnotify_modify_dir(&path_to_graveyard);
+		}
 
 		if (preemptive)
 			cachefiles_mark_object_buried(cache, rep, why);
@@ -560,6 +566,7 @@ lookup_again:
 			cachefiles_hist(cachefiles_mkdir_histogram, start);
 			if (ret < 0)
 				goto create_error;
+			fsnotify_modify_dir(&path);
 
 			ASSERT(d_backing_inode(next));
 
@@ -589,6 +596,7 @@ lookup_again:
 			cachefiles_hist(cachefiles_create_histogram, start);
 			if (ret < 0)
 				goto create_error;
+			fsnotify_modify_dir(&path);
 
 			ASSERT(d_backing_inode(next));
 
@@ -779,6 +787,7 @@ struct dentry *cachefiles_get_directory(struct cachefiles_cache *cache,
 		ret = vfs_mkdir(d_inode(dir), subdir, 0700);
 		if (ret < 0)
 			goto mkdir_error;
+		fsnotify_modify_dir(&path);
 
 		ASSERT(d_backing_inode(subdir));
 

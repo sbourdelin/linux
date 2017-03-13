@@ -3022,8 +3022,12 @@ static int atomic_open(struct nameidata *nd, struct dentry *dentry,
 				dput(dentry);
 				dentry = file->f_path.dentry;
 			}
-			if (*opened & FILE_CREATED)
+			if (*opened & FILE_CREATED) {
+				struct path parent_path = {file->f_path.mnt,
+							dentry->d_parent};
 				fsnotify_create(dir, dentry);
+				fsnotify_modify_dir(&parent_path);
+			}
 			if (unlikely(d_is_negative(dentry))) {
 				error = -ENOENT;
 			} else {
@@ -3167,6 +3171,7 @@ no_open:
 		if (error)
 			goto out_dput;
 		fsnotify_create(dir_inode, dentry);
+		fsnotify_modify_dir(&nd->path);
 	}
 	if (unlikely(create_error) && !dentry->d_inode) {
 		error = create_error;
@@ -3730,6 +3735,7 @@ retry:
 			error = vfs_mknod(path.dentry->d_inode,dentry,mode,0);
 			break;
 	}
+	fsnotify_modify_dir(&path);
 out:
 	done_path_create(&path, dentry);
 	if (retry_estale(error, lookup_flags)) {
@@ -3787,6 +3793,8 @@ retry:
 	error = security_path_mkdir(&path, dentry, mode);
 	if (!error)
 		error = vfs_mkdir(path.dentry->d_inode, dentry, mode);
+	if (!error)
+		fsnotify_modify_dir(&path);
 	done_path_create(&path, dentry);
 	if (retry_estale(error, lookup_flags)) {
 		lookup_flags |= LOOKUP_REVAL;
@@ -3883,6 +3891,8 @@ retry:
 	if (error)
 		goto exit3;
 	error = vfs_rmdir(path.dentry->d_inode, dentry);
+	if (!error)
+		fsnotify_modify_dir(&path);
 exit3:
 	dput(dentry);
 exit2:
@@ -4007,6 +4017,8 @@ retry_deleg:
 		if (error)
 			goto exit2;
 		error = vfs_unlink(path.dentry->d_inode, dentry, &delegated_inode);
+		if (!error)
+			fsnotify_modify_dir(&path);
 exit2:
 		dput(dentry);
 	}
@@ -4098,6 +4110,8 @@ retry:
 	error = security_path_symlink(&path, dentry, from->name);
 	if (!error)
 		error = vfs_symlink(path.dentry->d_inode, dentry, from->name);
+	if (!error)
+		fsnotify_modify_dir(&path);
 	done_path_create(&path, dentry);
 	if (retry_estale(error, lookup_flags)) {
 		lookup_flags |= LOOKUP_REVAL;
@@ -4247,6 +4261,8 @@ retry:
 	if (error)
 		goto out_dput;
 	error = vfs_link(old_path.dentry, new_path.dentry->d_inode, new_dentry, &delegated_inode);
+	if (!error)
+		fsnotify_modify_dir(&new_path);
 out_dput:
 	done_path_create(&new_path, new_dentry);
 	if (delegated_inode) {
@@ -4560,6 +4576,11 @@ retry_deleg:
 	error = vfs_rename(old_path.dentry->d_inode, old_dentry,
 			   new_path.dentry->d_inode, new_dentry,
 			   &delegated_inode, flags);
+	if (error == 0) {
+		fsnotify_modify_dir(&old_path);
+		if (!path_equal(&old_path, &new_path))
+			fsnotify_modify_dir(&new_path);
+	}
 exit5:
 	dput(new_dentry);
 exit4:

@@ -364,6 +364,18 @@ out_nfserrno:
 }
 
 /*
+ * Helper to emit fsnotify modify_dir event. Call with fph locked.
+ */
+static void nfsd_fsnotify_modify_dir(struct svc_fh *fhp)
+{
+	struct path path;
+
+	path.mnt = fhp->fh_export->ex_path.mnt;
+	path.dentry = fhp->fh_dentry;
+	fsnotify_modify_dir(&path);
+}
+
+/*
  * Set various file attributes.  After this call fhp needs an fh_put.
  */
 __be32
@@ -1205,6 +1217,7 @@ nfsd_create_locked(struct svc_rqst *rqstp, struct svc_fh *fhp,
 		goto out_nfserr;
 
 	err = nfsd_create_setattr(rqstp, resfhp, iap);
+	nfsd_fsnotify_modify_dir(fhp);
 
 	/*
 	 * nfsd_create_setattr already committed the child.  Transactional
@@ -1523,8 +1536,10 @@ nfsd_symlink(struct svc_rqst *rqstp, struct svc_fh *fhp,
 
 	host_err = vfs_symlink(d_inode(dentry), dnew, path);
 	err = nfserrno(host_err);
-	if (!err)
+	if (!err) {
+		nfsd_fsnotify_modify_dir(fhp);
 		err = nfserrno(commit_metadata(fhp));
+	}
 	fh_unlock(fhp);
 
 	fh_drop_write(fhp);
@@ -1591,6 +1606,7 @@ nfsd_link(struct svc_rqst *rqstp, struct svc_fh *ffhp,
 		goto out_dput;
 	host_err = vfs_link(dold, dirp, dnew, NULL);
 	if (!host_err) {
+		nfsd_fsnotify_modify_dir(tfhp);
 		err = nfserrno(commit_metadata(ffhp));
 		if (!err)
 			err = nfserrno(commit_metadata(tfhp));
@@ -1684,6 +1700,8 @@ nfsd_rename(struct svc_rqst *rqstp, struct svc_fh *ffhp, char *fname, int flen,
 
 	host_err = vfs_rename(fdir, odentry, tdir, ndentry, NULL, 0);
 	if (!host_err) {
+		nfsd_fsnotify_modify_dir(tfhp);
+		nfsd_fsnotify_modify_dir(ffhp);
 		host_err = commit_metadata(tfhp);
 		if (!host_err)
 			host_err = commit_metadata(ffhp);
@@ -1755,8 +1773,10 @@ nfsd_unlink(struct svc_rqst *rqstp, struct svc_fh *fhp, int type,
 		host_err = vfs_unlink(dirp, rdentry, NULL);
 	else
 		host_err = vfs_rmdir(dirp, rdentry);
-	if (!host_err)
+	if (!host_err) {
+		nfsd_fsnotify_modify_dir(fhp);
 		host_err = commit_metadata(fhp);
+	}
 	dput(rdentry);
 
 out_nfserr:

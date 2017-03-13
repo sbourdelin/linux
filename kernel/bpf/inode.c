@@ -16,6 +16,7 @@
 #include <linux/major.h>
 #include <linux/mount.h>
 #include <linux/namei.h>
+#include <linux/fsnotify.h>
 #include <linux/fs.h>
 #include <linux/kdev_t.h>
 #include <linux/parser.h>
@@ -256,6 +257,8 @@ static int bpf_obj_do_pin(const struct filename *pathname, void *raw,
 
 	dentry->d_fsdata = raw;
 	ret = vfs_mknod(dir, dentry, mode, devt);
+	if (ret == 0)
+		fsnotify_modify_dir(&path);
 	dentry->d_fsdata = NULL;
 out:
 	done_path_create(&path, dentry);
