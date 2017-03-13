@@ -193,8 +193,16 @@ static void pnv_smp_cpu_kill_self(void)
 		} else if ((idle_states & OPAL_PM_SLEEP_ENABLED) ||
 			   (idle_states & OPAL_PM_SLEEP_ENABLED_ER1)) {
 			srr1 = power7_sleep();
-		} else {
+		} else if (idle_states & OPAL_PM_NAP_ENABLED) {
 			srr1 = power7_nap(1);
+		} else {
+			/* This is the fallback method. We emulate snooze */
+			while (!generic_check_cpu_restart(cpu)) {
+				HMT_low();
+				HMT_very_low();
+			}
+			srr1 = 0;
+			HMT_medium();
 		}
 
 		ppc64_runlatch_on();
