@@ -854,6 +854,11 @@ static inline void __sk_add_backlog(struct sock *sk, struct sk_buff *skb)
 	skb->next = NULL;
 }
 
+static unsigned int sk_rcvqueue_size(const struct sock *sk)
+{
+	return sk->sk_backlog.len + atomic_read(&sk->sk_rmem_alloc);
+}
+
 /*
  * Take into account size of receive queue and backlog queue
  * Do not take into account this skb truesize,
@@ -861,7 +866,7 @@ static inline void __sk_add_backlog(struct sock *sk, struct sk_buff *skb)
  */
 static inline bool sk_rcvqueues_full(const struct sock *sk, unsigned int limit)
 {
-	unsigned int qsize = sk->sk_backlog.len + atomic_read(&sk->sk_rmem_alloc);
+	unsigned int qsize = sk_rcvqueue_size(sk);
 
 	return qsize > limit;
 }
