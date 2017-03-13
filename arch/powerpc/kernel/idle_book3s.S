@@ -385,7 +385,48 @@ _GLOBAL(power9_idle_stop)
  */
 _GLOBAL(pnv_restore_hyp_resource)
 BEGIN_FTR_SECTION
-	ld	r2,PACATOC(r13);
+BEGIN_FTR_SECTION_NESTED(70)
+/* Save our LR in r17 */
+	mflr 	r17
+/*
+ * On entering certain stop states, the thread might relinquish its
+ * per-thread resources due to some reconfiguration for improved SMT
+ * performance. This would result in certain SPR context such as
+ * HSPRG0 (which contains the paca pointer) to be lost within the core.
+ *
+ * Fortunately, the PIR is invariant to thread reconfiguration. Since
+ * this thread's paca pointer is recorded in all its sibling's
+ * paca, we can correctly recover this thread's paca pointer if we
+ * know the index of this thread in the core.
+ * This index can be obtained from the lower two bits of the PIR.
+ *
+ * i.e, thread's position in the core = PIR[62:63].
+ * If this value is i, then this thread's paca is
+ * paca->thread_sibling_pacas[i].
+ */
+	mfspr	r4, SPRN_PIR
+	andi.	r4, r4, 0x3
+/*
+ * Since each entry in thread_sibling_pacas is 8 bytes
+ * we need to left-shift by 3 bits. Thus r4 = i * 8
+ */
+	sldi	r4, r4, 3
+/* Get &paca->thread_sibling_pacas[0] in r5 */
+	addi	r5, r13, PACA_SIBLING_PACA_PTRS
+/* Load paca->thread_sibling_pacas[i] into r3 */
+	ldx	r3, r4, r5
+/* Move our paca pointer to r13 */
+	mr	r13, r3
+/* Correctly set up our PACA */
+	ld	r2, PACATOC(r13)
+	ld	r1, PACAR1(r13)
+	bl	setup_paca
+/* Now we are all set! Set our LR and TOC */
+	mtlr	r17
+	ld	r2, PACATOC(r13)
+FTR_SECTION_ELSE_NESTED(70)
+	ld	r2, PACATOC(r13)
+ALT_FTR_SECTION_END_NESTED_IFSET(CPU_FTR_POWER9_DD1, 70)
 	/*
 	 * POWER ISA 3. Use PSSCR to determine if we
 	 * are waking up from deep idle state
