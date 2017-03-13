@@ -1012,6 +1012,7 @@ config PVPANIC
 config INTEL_PMC_IPC
 	tristate "Intel PMC IPC Driver"
 	depends on ACPI
+	select INTEL_SOC_PMIC_BXTWC
 	---help---
 	This driver provides support for PMC control on some Intel platforms.
 	The PMC is an ARC processor which defines IPC commands for communication
