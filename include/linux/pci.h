@@ -1965,6 +1965,9 @@ void pci_request_acs(void);
 bool pci_acs_enabled(struct pci_dev *pdev, u16 acs_flags);
 bool pci_acs_path_enabled(struct pci_dev *start,
 			  struct pci_dev *end, u16 acs_flags);
+u32 pci_rbar_get_possible_sizes(struct pci_dev *pdev, int bar);
+int pci_rbar_get_current_size(struct pci_dev *pdev, int bar);
+int pci_rbar_set_size(struct pci_dev *pdev, int bar, int size);
 
 #define PCI_VPD_LRDT			0x80	/* Large Resource Data Type */
 #define PCI_VPD_LRDT_ID(x)		((x) | PCI_VPD_LRDT)

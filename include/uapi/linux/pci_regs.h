@@ -941,9 +941,16 @@
 #define PCI_SATA_SIZEOF_LONG	16
 
 /* Resizable BARs */
+#define PCI_REBAR_CAP		4	/* capability register */
+#define  PCI_REBAR_CTRL_SIZES_MASK	(0xFFFFF << 4)	/* mask for sizes */
+#define  PCI_REBAR_CTRL_SIZES_SHIFT	4	/* shift for sizes */
 #define PCI_REBAR_CTRL		8	/* control register */
+#define  PCI_REBAR_CTRL_BAR_IDX_MASK	(7 << 0)	/* mask for bar index */
+#define  PCI_REBAR_CTRL_BAR_IDX_SHIFT	0	/* shift for bar index */
 #define  PCI_REBAR_CTRL_NBAR_MASK	(7 << 5)	/* mask for # bars */
 #define  PCI_REBAR_CTRL_NBAR_SHIFT	5	/* shift for # bars */
+#define  PCI_REBAR_CTRL_BAR_SIZE_MASK	(0x1F << 8)	/* mask for bar size */
+#define  PCI_REBAR_CTRL_BAR_SIZE_SHIFT	8	/* shift for bar size */
 
 /* Dynamic Power Allocation */
 #define PCI_DPA_CAP		4	/* capability register */

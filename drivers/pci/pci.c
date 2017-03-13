@@ -2940,6 +2940,121 @@ bool pci_acs_path_enabled(struct pci_dev *start,
 }
 
 /**
+ * pci_rbar_get_possible_sizes - get possible sizes for BAR
+ * @dev: PCI device
+ * @bar: BAR to query
+ *
+ * Get the possible sizes of a resizeable BAR as bitmask defined in the spec
+ * (bit 0=1MB, bit 19=512GB). Returns 0 if BAR isn't resizeable.
+ */
+u32 pci_rbar_get_possible_sizes(struct pci_dev *pdev, int bar)
+{
+	unsigned pos, nbars;
+	u32 ctrl, cap;
+	unsigned i;
+
+	pos = pci_find_ext_capability(pdev, PCI_EXT_CAP_ID_REBAR);
+	if (!pos)
+		return 0;
+
+	pci_read_config_dword(pdev, pos + PCI_REBAR_CTRL, &ctrl);
+	nbars = (ctrl & PCI_REBAR_CTRL_NBAR_MASK) >> PCI_REBAR_CTRL_NBAR_SHIFT;
+
+	for (i = 0; i < nbars; ++i, pos += 8) {
+		int bar_idx;
+
+		pci_read_config_dword(pdev, pos + PCI_REBAR_CTRL, &ctrl);
+		bar_idx = (ctrl & PCI_REBAR_CTRL_BAR_IDX_MASK) >>
+				PCI_REBAR_CTRL_BAR_IDX_SHIFT;
+		if (bar_idx != bar)
+			continue;
+
+		pci_read_config_dword(pdev, pos + PCI_REBAR_CAP, &cap);
+		return (cap & PCI_REBAR_CTRL_SIZES_MASK) >>
+			PCI_REBAR_CTRL_SIZES_SHIFT;
+	}
+
+	return 0;
+}
+
+/**
+ * pci_rbar_get_current_size - get the current size of a BAR
+ * @dev: PCI device
+ * @bar: BAR to set size to
+ *
+ * Read the size of a BAR from the resizeable BAR config.
+ * Returns size if found or negativ error code.
+ */
+int pci_rbar_get_current_size(struct pci_dev *pdev, int bar)
+{
+	unsigned pos, nbars;
+	u32 ctrl;
+	unsigned i;
+
+	pos = pci_find_ext_capability(pdev, PCI_EXT_CAP_ID_REBAR);
+	if (!pos)
+		return -ENOTSUPP;
+
+	pci_read_config_dword(pdev, pos + PCI_REBAR_CTRL, &ctrl);
+	nbars = (ctrl & PCI_REBAR_CTRL_NBAR_MASK) >> PCI_REBAR_CTRL_NBAR_SHIFT;
+
+	for (i = 0; i < nbars; ++i, pos += 8) {
+		int bar_idx;
+
+		pci_read_config_dword(pdev, pos + PCI_REBAR_CTRL, &ctrl);
+		bar_idx = (ctrl & PCI_REBAR_CTRL_BAR_IDX_MASK) >>
+				PCI_REBAR_CTRL_BAR_IDX_SHIFT;
+		if (bar_idx != bar)
+			continue;
+
+		return (ctrl & PCI_REBAR_CTRL_BAR_SIZE_MASK) >>
+			PCI_REBAR_CTRL_BAR_SIZE_SHIFT;
+	}
+
+	return -ENOENT;
+}
+
+/**
+ * pci_rbar_set_size - set a new size for a BAR
+ * @dev: PCI device
+ * @bar: BAR to set size to
+ * @size: new size as defined in the spec (log2(size in bytes) - 20)
+ *
+ * Set the new size of a BAR as defined in the spec (0=1MB, 19=512GB).
+ * Returns true if resizing was successful, false otherwise.
+ */
+int pci_rbar_set_size(struct pci_dev *pdev, int bar, int size)
+{
+	unsigned pos, nbars;
+	u32 ctrl;
+	unsigned i;
+
+	pos = pci_find_ext_capability(pdev, PCI_EXT_CAP_ID_REBAR);
+	if (!pos)
+		return -ENOTSUPP;
+
+	pci_read_config_dword(pdev, pos + PCI_REBAR_CTRL, &ctrl);
+	nbars = (ctrl & PCI_REBAR_CTRL_NBAR_MASK) >> PCI_REBAR_CTRL_NBAR_SHIFT;
+
+	for (i = 0; i < nbars; ++i, pos += 8) {
+		int bar_idx;
+
+		pci_read_config_dword(pdev, pos + PCI_REBAR_CTRL, &ctrl);
+		bar_idx = (ctrl & PCI_REBAR_CTRL_BAR_IDX_MASK) >>
+				PCI_REBAR_CTRL_BAR_IDX_SHIFT;
+		if (bar_idx != bar)
+			continue;
+
+		ctrl &= ~PCI_REBAR_CTRL_BAR_SIZE_MASK;
+		ctrl |= size << PCI_REBAR_CTRL_BAR_SIZE_SHIFT;
+		pci_write_config_dword(pdev, pos + PCI_REBAR_CTRL, ctrl);
+		return 0;
+	}
+
+	return -ENOENT;
+}
+
+/**
  * pci_swizzle_interrupt_pin - swizzle INTx for device behind bridge
  * @dev: the PCI device
  * @pin: the INTx pin (1=INTA, 2=INTB, 3=INTC, 4=INTD)
