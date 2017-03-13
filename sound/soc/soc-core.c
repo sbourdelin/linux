@@ -34,6 +34,7 @@
 #include <linux/ctype.h>
 #include <linux/slab.h>
 #include <linux/of.h>
+#include <linux/of_graph.h>
 #include <linux/dmi.h>
 #include <sound/core.h>
 #include <sound/jack.h>
@@ -4039,6 +4040,28 @@ unsigned int snd_soc_of_parse_daifmt(struct device_node *np,
 	return format;
 }
 EXPORT_SYMBOL_GPL(snd_soc_of_parse_daifmt);
+
+int snd_soc_get_dai_id(struct device_node *ep)
+{
+	struct device_node *node;
+	struct device_node *endpoint;
+	int i, id;
+
+	node = of_graph_get_port_parent(ep);
+
+	i = 0;
+	id = -1;
+	for_each_endpoint_of_node(node, endpoint) {
+		if (endpoint == ep)
+			id = i;
+		i++;
+	}
+	if (id < 0)
+		return -ENODEV;
+
+	return id;
+}
+EXPORT_SYMBOL_GPL(snd_soc_get_dai_id);
 
 int snd_soc_get_dai_name(struct of_phandle_args *args,
 				const char **dai_name)
