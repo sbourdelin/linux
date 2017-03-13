@@ -948,4 +948,7 @@ void l2cap_conn_put(struct l2cap_conn *conn);
 int l2cap_register_user(struct l2cap_conn *conn, struct l2cap_user *user);
 void l2cap_unregister_user(struct l2cap_conn *conn, struct l2cap_user *user);
 
+void l2cap_le_conn_req(struct l2cap_conn *conn, u8 min_interval,
+		u8 max_interval, u8 latency, u8 supv_timeout);
+
 #endif /* __L2CAP_H */
