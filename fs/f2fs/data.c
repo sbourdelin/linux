@@ -190,6 +190,9 @@ static inline void __submit_bio(struct f2fs_sb_info *sbi,
 			current->plug && (type == DATA || type == NODE))
 			blk_finish_plug(current->plug);
 
+		if (!test_opt(sbi, LFS))
+			goto submit_io;
+
 		if (type != DATA && type != NODE)
 			goto submit_io;
 
@@ -395,11 +398,12 @@ int f2fs_submit_page_mbio(struct f2fs_io_info *fio)
 		__submit_merged_bio(io);
 alloc_new:
 	if (io->bio == NULL) {
-		if ((fio->type == DATA || fio->type == NODE) &&
+		if (test_opt(sbi, LFS) &&
+			!is_read && (fio->type == DATA || fio->type == NODE) &&
 				fio->new_blkaddr & F2FS_IO_SIZE_MASK(sbi)) {
 			err = -EAGAIN;
-			if (!is_read)
-				dec_page_count(sbi, WB_DATA_TYPE(bio_page));
+			f2fs_bug_on(sbi, fio->new_blkaddr == fio->old_blkaddr);
+			dec_page_count(sbi, WB_DATA_TYPE(bio_page));
 			goto out_fail;
 		}
 		io->bio = __bio_alloc(sbi, fio->new_blkaddr,
