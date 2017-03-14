@@ -920,7 +920,7 @@ static int ks7010_sdio_probe(struct sdio_func *func,
 	struct ks_sdio_card *card;
 	struct net_device *netdev;
 	unsigned char rw_data;
-	int ret;
+	int rc;
 
 	DPRINTK(5, "ks7010_sdio_probe()\n");
 
@@ -942,29 +942,29 @@ static int ks7010_sdio_probe(struct sdio_func *func,
 	/* Issue config request to override clock rate */
 
 	/* function blocksize set */
-	ret = sdio_set_block_size(func, KS7010_IO_BLOCK_SIZE);
+	rc = sdio_set_block_size(func, KS7010_IO_BLOCK_SIZE);
 	DPRINTK(5, "multi_block=%d sdio_set_block_size()=%d %d\n",
-		func->card->cccr.multi_block, func->cur_blksize, ret);
+		func->card->cccr.multi_block, func->cur_blksize, rc);
 
 	/* Allocate the slot current */
 
 	/* function enable */
-	ret = sdio_enable_func(func);
-	DPRINTK(5, "sdio_enable_func() %d\n", ret);
-	if (ret)
+	rc = sdio_enable_func(func);
+	DPRINTK(5, "sdio_enable_func() %d\n", rc);
+	if (rc)
 		goto error_free_card;
 
 	/* interrupt disable */
-	sdio_writeb(func, 0, INT_ENABLE, &ret);
-	if (ret)
+	sdio_writeb(func, 0, INT_ENABLE, &rc);
+	if (rc)
 		goto error_free_card;
-	sdio_writeb(func, 0xff, INT_PENDING, &ret);
-	if (ret)
+	sdio_writeb(func, 0xff, INT_PENDING, &rc);
+	if (rc)
 		goto error_disable_func;
 
 	/* setup interrupt handler */
-	ret = sdio_claim_irq(func, ks_sdio_interrupt);
-	if (ret)
+	rc = sdio_claim_irq(func, ks_sdio_interrupt);
+	if (rc)
 		goto error_disable_func;
 
 	sdio_release_host(func);
@@ -1020,11 +1020,11 @@ static int ks7010_sdio_probe(struct sdio_func *func,
 	ks7010_init_defaults(priv);
 
 	/* Upload firmware */
-	ret = ks7010_upload_firmware(priv, card);	/* firmware load */
-	if (ret) {
+	rc = ks7010_upload_firmware(priv, card);	/* firmware load */
+	if (rc) {
 		dev_err(&card->func->dev,
 			"ks7010: firmware load failed !! return code = %d\n",
-			 ret);
+			rc);
 		goto error_free_read_buf;
 	}
 
@@ -1032,9 +1032,9 @@ static int ks7010_sdio_probe(struct sdio_func *func,
 	/* clear Interrupt status write (ARMtoSD_InterruptPending FN1:00_0024) */
 	rw_data = 0xff;
 	sdio_claim_host(func);
-	ret = ks7010_sdio_write(priv, INT_PENDING, &rw_data, sizeof(rw_data));
+	rc = ks7010_sdio_write(priv, INT_PENDING, &rw_data, sizeof(rw_data));
 	sdio_release_host(func);
-	if (ret)
+	if (rc)
 		DPRINTK(1, " error : INT_PENDING=%02X\n", rw_data);
 
 	DPRINTK(4, " clear Interrupt : INT_PENDING=%02X\n", rw_data);
@@ -1042,9 +1042,9 @@ static int ks7010_sdio_probe(struct sdio_func *func,
 	/* enable ks7010sdio interrupt (INT_GCR_B|INT_READ_STATUS|INT_WRITE_STATUS) */
 	rw_data = (INT_GCR_B | INT_READ_STATUS | INT_WRITE_STATUS);
 	sdio_claim_host(func);
-	ret = ks7010_sdio_write(priv, INT_ENABLE, &rw_data, sizeof(rw_data));
+	rc = ks7010_sdio_write(priv, INT_ENABLE, &rw_data, sizeof(rw_data));
 	sdio_release_host(func);
-	if (ret)
+	if (rc)
 		DPRINTK(1, " error : INT_ENABLE=%02X\n", rw_data);
 
 	DPRINTK(4, " enable Interrupt : INT_ENABLE=%02X\n", rw_data);
@@ -1059,8 +1059,8 @@ static int ks7010_sdio_probe(struct sdio_func *func,
 	INIT_DELAYED_WORK(&priv->ks_wlan_hw.rw_wq, ks7010_rw_function);
 	ks7010_card_init(priv);
 
-	ret = register_netdev(priv->net_dev);
-	if (ret)
+	rc = register_netdev(priv->net_dev);
+	if (rc)
 		goto error_free_read_buf;
 
 	return 0;
@@ -1086,7 +1086,7 @@ static int ks7010_sdio_probe(struct sdio_func *func,
 
 static void ks7010_sdio_remove(struct sdio_func *func)
 {
-	int ret;
+	int rc;
 	struct ks_sdio_card *card;
 	struct ks_wlan_private *priv;
 
@@ -1107,8 +1107,8 @@ static void ks7010_sdio_remove(struct sdio_func *func)
 
 		/* interrupt disable */
 		sdio_claim_host(func);
-		sdio_writeb(func, 0, INT_ENABLE, &ret);
-		sdio_writeb(func, 0xff, INT_PENDING, &ret);
+		sdio_writeb(func, 0, INT_ENABLE, &rc);
+		sdio_writeb(func, 0xff, INT_PENDING, &rc);
 		sdio_release_host(func);
 		DPRINTK(1, "interrupt disable\n");
 
