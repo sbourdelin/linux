@@ -305,8 +305,31 @@ EXPORT_SYMBOL_GPL(nf_ct_helper_expectfn_register);
 
 void nf_ct_helper_expectfn_unregister(struct nf_ct_helper_expectfn *n)
 {
+	struct nf_conntrack_expect *exp;
+	const struct hlist_node *next;
+	u32 i;
+
 	spin_lock_bh(&nf_conntrack_expect_lock);
 	list_del_rcu(&n->head);
+	spin_unlock_bh(&nf_conntrack_expect_lock);
+
+	/* Make sure everyone who holds the expect func already
+	 * has inserted it
+	 */
+	synchronize_rcu();
+
+	/* Get rid of expectations used the dying expectfn */
+	spin_lock_bh(&nf_conntrack_expect_lock);
+	for (i = 0; i < nf_ct_expect_hsize; i++) {
+		hlist_for_each_entry_safe(exp, next,
+					  &nf_ct_expect_hash[i], hnode) {
+			if (exp->expectfn == n->expectfn &&
+			    del_timer(&exp->timeout)) {
+				nf_ct_unlink_expect(exp);
+				nf_ct_expect_put(exp);
+			}
+		}
+	}
 	spin_unlock_bh(&nf_conntrack_expect_lock);
 }
 EXPORT_SYMBOL_GPL(nf_ct_helper_expectfn_unregister);

@@ -3156,14 +3156,17 @@ ctnetlink_create_expect(struct net *net,
 		}
 	}
 
+	rcu_read_lock();
 	exp = ctnetlink_alloc_expect(cda, ct, helper, &tuple, &mask);
 	if (IS_ERR(exp)) {
+		rcu_read_unlock();
 		err = PTR_ERR(exp);
 		goto err_ct;
 	}
 
 	err = nf_ct_expect_related_report(exp, portid, report);
 	nf_ct_expect_put(exp);
+	rcu_read_unlock();
 err_ct:
 	nf_ct_put(ct);
 	return err;
