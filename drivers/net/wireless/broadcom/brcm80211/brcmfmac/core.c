@@ -491,6 +491,7 @@ static const struct net_device_ops brcmf_netdev_ops_pri = {
 int brcmf_net_attach(struct brcmf_if *ifp, bool rtnl_locked)
 {
 	struct brcmf_pub *drvr = ifp->drvr;
+	struct wiphy *wiphy;
 	struct net_device *ndev;
 	s32 err;
 
@@ -504,8 +505,10 @@ int brcmf_net_attach(struct brcmf_if *ifp, bool rtnl_locked)
 	ndev->needed_headroom += drvr->hdrlen;
 	ndev->ethtool_ops = &brcmf_ethtool_ops;
 
-	/* set the mac address */
+	/* set the mac address & netns */
 	memcpy(ndev->dev_addr, ifp->mac_addr, ETH_ALEN);
+	wiphy = cfg_to_wiphy(drvr->config);
+	dev_net_set(ndev, wiphy_net(wiphy));
 
 	INIT_WORK(&ifp->multicast_work, _brcmf_set_multicast_list);
 	INIT_WORK(&ifp->ndoffload_work, _brcmf_update_ndtable);
