@@ -363,6 +363,15 @@ struct ahci_host_priv {
 	/* only required for per-port MSI(-X) support */
 	int			(*get_irq_vector)(struct ata_host *host,
 						  int port);
+
+	/*
+	 * Optional ahci_save_initial_config & ahci_restore_initial_config
+	 * override, if not set then default ahci_save_initial_config and
+	 * ahci_restore_initial_config in libahci.c will be used
+	 */
+	void (*save_initial_config)(struct device *dev,
+				struct ahci_host_priv *hpriv);
+	void (*restore_initial_config)(struct ata_host *host);
 };
 
 extern int ahci_ignore_sss;

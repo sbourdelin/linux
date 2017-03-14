@@ -613,7 +613,10 @@ static void ahci_pci_save_initial_config(struct pci_dev *pdev,
 			  "Disabling your PATA port. Use the boot option 'ahci.marvell_enable=0' to avoid this.\n");
 	}
 
-	ahci_save_initial_config(&pdev->dev, hpriv);
+	if (hpriv->save_initial_config == NULL)
+		ahci_save_initial_config(dev, hpriv);
+	else
+		hpriv->save_initial_config(dev, hpriv);
 }
 
 static int ahci_pci_reset_controller(struct ata_host *host)
