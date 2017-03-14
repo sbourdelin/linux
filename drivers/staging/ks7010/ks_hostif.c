@@ -101,6 +101,7 @@ int ks_wlan_do_power_save(struct ks_wlan_private *priv)
 		hostif_sme_enqueue(priv, SME_POW_MNGMT_REQUEST);
 	else
 		priv->dev_state = DEVICE_STATE_READY;
+
 	return 0;
 }
 

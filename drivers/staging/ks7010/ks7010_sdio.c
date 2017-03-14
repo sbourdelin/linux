@@ -318,8 +318,7 @@ static void tx_device_task(void *dev)
 		if (priv->dev_state >= DEVICE_STATE_BOOT) {
 			rc = write_to_device(priv, sp->sendp, sp->size);
 			if (rc) {
-				DPRINTK(1, "write_to_device error !!(%d)\n",
-					rc);
+				DPRINTK(1, "write_to_device error !(%d)\n", rc);
 				queue_delayed_work(priv->ks_wlan_hw.
 						   ks7010sdio_wq,
 						   &priv->ks_wlan_hw.rw_wq, 1);
@@ -404,9 +403,8 @@ static void ks_wlan_hw_rx(void *dev, uint16_t size)
 	}
 	rx_buffer = &priv->rx_dev.rx_dev_buff[priv->rx_dev.qtail];
 
-	rc =
-	    ks7010_sdio_read(priv, DATA_WINDOW, &rx_buffer->data[0],
-			     hif_align_size(size));
+	rc = ks7010_sdio_read(priv, DATA_WINDOW, &rx_buffer->data[0],
+			      hif_align_size(size));
 	if (rc)
 		return;
 
@@ -420,9 +418,8 @@ static void ks_wlan_hw_rx(void *dev, uint16_t size)
 #endif
 		/* rx_status update */
 		read_status = READ_STATUS_IDLE;
-		rc =
-		    ks7010_sdio_write(priv, READ_STATUS, &read_status,
-				      sizeof(read_status));
+		rc = ks7010_sdio_write(priv, READ_STATUS, &read_status,
+				       sizeof(read_status));
 		if (rc)
 			DPRINTK(1, " error : READ_STATUS=%02X\n", read_status);
 
@@ -1021,8 +1018,7 @@ static int ks7010_sdio_probe(struct sdio_func *func,
 	rc = ks7010_upload_firmware(priv, card);	/* firmware load */
 	if (rc) {
 		dev_err(&card->func->dev,
-			"ks7010: firmware load failed !! return code = %d\n",
-			rc);
+			"ks7010: firmware load failed! return code = %d\n", rc);
 		goto err_free_read_buf;
 	}
 
