@@ -639,7 +639,7 @@ void kvm_ioapic_destroy(struct kvm *kvm)
 	kfree(ioapic);
 }
 
-int kvm_get_ioapic(struct kvm *kvm, struct kvm_ioapic_state *state)
+void kvm_get_ioapic(struct kvm *kvm, struct kvm_ioapic_state *state)
 {
 	struct kvm_ioapic *ioapic = kvm->arch.vioapic;
 
@@ -647,10 +647,9 @@ int kvm_get_ioapic(struct kvm *kvm, struct kvm_ioapic_state *state)
 	memcpy(state, ioapic, sizeof(struct kvm_ioapic_state));
 	state->irr &= ~ioapic->irr_delivered;
 	spin_unlock(&ioapic->lock);
-	return 0;
 }
 
-int kvm_set_ioapic(struct kvm *kvm, struct kvm_ioapic_state *state)
+void kvm_set_ioapic(struct kvm *kvm, struct kvm_ioapic_state *state)
 {
 	struct kvm_ioapic *ioapic = kvm->arch.vioapic;
 
@@ -661,5 +660,4 @@ int kvm_set_ioapic(struct kvm *kvm, struct kvm_ioapic_state *state)
 	kvm_vcpu_request_scan_ioapic(kvm);
 	kvm_ioapic_inject_all(ioapic, state->irr);
 	spin_unlock(&ioapic->lock);
-	return 0;
 }
