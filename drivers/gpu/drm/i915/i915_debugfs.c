@@ -4136,8 +4136,12 @@ i915_wedged_set(void *data, u64 val)
 	if (i915_reset_in_progress(&dev_priv->gpu_error))
 		return -EAGAIN;
 
+	intel_runtime_pm_get(dev_priv);
+
 	i915_handle_error(dev_priv, val,
 			  "Manually setting wedged to %llu", val);
+
+	intel_runtime_pm_put(dev_priv);
 
 	return 0;
 }
