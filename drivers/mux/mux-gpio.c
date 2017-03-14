@@ -63,8 +63,8 @@ static int mux_gpio_probe(struct platform_device *pdev)
 
 	mux_chip = devm_mux_chip_alloc(dev, 1, sizeof(*mux_gpio) +
 				       pins * sizeof(*mux_gpio->val));
-	if (!mux_chip)
-		return -ENOMEM;
+	if (IS_ERR(mux_chip))
+		return PTR_ERR(mux_chip);
 
 	mux_gpio = mux_chip_priv(mux_chip);
 	mux_gpio->val = (int *)(mux_gpio + 1);

@@ -167,9 +167,9 @@ struct mux_chip *devm_mux_chip_alloc(struct device *dev,
 		return ERR_PTR(-ENOMEM);
 
 	mux_chip = mux_chip_alloc(dev, controllers, sizeof_priv);
-	if (IS_ERR(mux_chip)) {
+	if (!mux_chip) {
 		devres_free(ptr);
-		return mux_chip;
+		return ERR_PTR(-ENOMEM);
 	}
 
 	*ptr = mux_chip;

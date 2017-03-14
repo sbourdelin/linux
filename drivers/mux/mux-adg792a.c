@@ -65,8 +65,8 @@ static int adg792a_probe(struct i2c_client *i2c,
 		return -EINVAL;
 
 	mux_chip = devm_mux_chip_alloc(dev, cells ? 3 : 1, 0);
-	if (!mux_chip)
-		return -ENOMEM;
+	if (IS_ERR(mux_chip))
+		return PTR_ERR(mux_chip);
 
 	mux_chip->ops = &adg792a_ops;
 
