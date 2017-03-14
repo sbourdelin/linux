@@ -30,4 +30,13 @@ config SW_SYNC
 	  WARNING: improper use of this can result in deadlocking kernel
 	  drivers from userspace. Intended for test and debug only.
 
+config DMA_BUF_TEST
+	bool "Test module for dma-buf"
+	default n
+	---help---
+	  A test module to validate dma_buf APIs. This should not be
+	  enabled for general use.
+
+	  Say N here unless you know you want this.
+
 endmenu
