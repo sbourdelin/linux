@@ -167,6 +167,8 @@ struct bcm2835_audio_driver {
 	enum snd_bcm2835_route route;
 };
 
+#if defined(CONFIG_SND_BCM2835_TRADITIONAL_ALSA)
+
 static int bcm2835_audio_alsa_newpcm(struct bcm2835_chip *chip,
 				     const char *name,
 				     enum snd_bcm2835_route route,
@@ -197,6 +199,10 @@ static struct bcm2835_audio_driver bcm2835_audio_alsa = {
 	.newctl = snd_bcm2835_new_ctl,
 };
 
+#endif
+
+#if defined(CONFIG_SND_BCM2835_HDMI_AUDIO)
+
 static struct bcm2835_audio_driver bcm2835_audio_hdmi = {
 	.driver = {
 		.name = "bcm2835_hdmi",
@@ -209,6 +215,10 @@ static struct bcm2835_audio_driver bcm2835_audio_hdmi = {
 	.newctl = snd_bcm2835_new_hdmi_ctl,
 	.route = AUDIO_DEST_HDMI
 };
+
+#endif
+
+#if defined(CONFIG_SND_BCM2835_HEADPHONE_AUDIO)
 
 static struct bcm2835_audio_driver bcm2835_audio_headphones = {
 	.driver = {
@@ -223,10 +233,18 @@ static struct bcm2835_audio_driver bcm2835_audio_headphones = {
 	.route = AUDIO_DEST_HEADPHONES
 };
 
+#endif
+
 static struct bcm2835_audio_driver *children_devices[] = {
+#if defined(CONFIG_SND_BCM2835_HDMI_AUDIO)
 	&bcm2835_audio_hdmi,
+#endif
+#if defined(CONFIG_SND_BCM2835_HEADPHONE_AUDIO)
 	&bcm2835_audio_headphones,
+#endif
+#if defined(CONFIG_SND_BCM2835_TRADITIONAL_ALSA)
 	&bcm2835_audio_alsa,
+#endif
 };
 
 static int snd_add_child_device(struct device *device,

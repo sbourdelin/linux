@@ -6,3 +6,29 @@ config SND_BCM2835
         help
           Say Y or M if you want to support BCM2835 built in audio
 
+if SND_BCM2835
+
+config SND_BCM2835_TRADITIONAL_ALSA
+	bool "Traditional bcm2835 ALSA"
+	default y
+	help
+	   BCM2835 Audio supports a virtual card for each available
+	   output. This may not be compatible with some
+	   distributions, so this option adds a virtual card that
+	   works like the traditional version.
+
+config SND_BCM2835_HDMI_AUDIO
+	bool "HDMI Audio"
+	help
+	   BCM2835 Audio supports a virtual card for each available
+	   output.  This option adds a virtual card specifically
+	   for the HDMI output.
+
+config SND_BCM2835_HEADPHONE_AUDIO
+	bool "Headphone Audio"
+	help
+	   BCM2835 Audio supports a virtual card for each available
+	   output.  This option adds a virtual card specifically
+	   for the Headphone jack.
+
+endif
