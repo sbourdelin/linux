@@ -2803,6 +2803,11 @@ static int perf_evsel__hists_browse(struct perf_evsel *evsel, int nr_events,
 	if (browser == NULL)
 		return -1;
 
+	/* setup elide in case we are siwtching to another event in by tab */
+	perf_hpp__set_elide(HISTC_DSO, hists->dso_filter);
+	perf_hpp__set_elide(HISTC_SOCKET, hists->socket_filter);
+	perf_hpp__set_elide(HISTC_THREAD, hists->thread_filter);
+
 	/* reset abort key so that it can get Ctrl-C as a key */
 	SLang_reset_tty();
 	SLang_init_tty(0, 0, 0);
