@@ -196,7 +196,7 @@ static void test_abba_work(struct work_struct *work)
 
 static int test_abba(bool resolve)
 {
-	struct test_abba abba;
+	struct test_abba abba = { 0 };
 	struct ww_acquire_ctx ctx;
 	int err, ret;
 
