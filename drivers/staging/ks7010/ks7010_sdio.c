@@ -89,7 +89,7 @@ static int ks7010_sdio_write(struct ks_wlan_private *priv, unsigned int address,
 static void ks_wlan_hw_sleep_doze_request(struct ks_wlan_private *priv)
 {
 	unsigned char rw_data;
-	int retval;
+	int rc;
 
 	DPRINTK(4, "\n");
 
@@ -98,9 +98,9 @@ static void ks_wlan_hw_sleep_doze_request(struct ks_wlan_private *priv)
 
 	if (atomic_read(&priv->sleepstatus.status) == 0) {
 		rw_data = GCR_B_DOZE;
-		retval =
+		rc =
 		    ks7010_sdio_write(priv, GCR_B, &rw_data, sizeof(rw_data));
-		if (retval) {
+		if (rc) {
 			DPRINTK(1, " error : GCR_B=%02X\n", rw_data);
 			goto out;
 		}
@@ -119,7 +119,7 @@ static void ks_wlan_hw_sleep_doze_request(struct ks_wlan_private *priv)
 static void ks_wlan_hw_sleep_wakeup_request(struct ks_wlan_private *priv)
 {
 	unsigned char rw_data;
-	int retval;
+	int rc;
 
 	DPRINTK(4, "\n");
 
@@ -128,9 +128,9 @@ static void ks_wlan_hw_sleep_wakeup_request(struct ks_wlan_private *priv)
 
 	if (atomic_read(&priv->sleepstatus.status) == 1) {
 		rw_data = WAKEUP_REQ;
-		retval =
+		rc =
 		    ks7010_sdio_write(priv, WAKEUP, &rw_data, sizeof(rw_data));
-		if (retval) {
+		if (rc) {
 			DPRINTK(1, " error : WAKEUP=%02X\n", rw_data);
 			goto out;
 		}
@@ -149,14 +149,14 @@ static void ks_wlan_hw_sleep_wakeup_request(struct ks_wlan_private *priv)
 void ks_wlan_hw_wakeup_request(struct ks_wlan_private *priv)
 {
 	unsigned char rw_data;
-	int retval;
+	int rc;
 
 	DPRINTK(4, "\n");
 	if (atomic_read(&priv->psstatus.status) == PS_SNOOZE) {
 		rw_data = WAKEUP_REQ;
-		retval =
+		rc =
 		    ks7010_sdio_write(priv, WAKEUP, &rw_data, sizeof(rw_data));
-		if (retval)
+		if (rc)
 			DPRINTK(1, " error : WAKEUP=%02X\n", rw_data);
 
 		DPRINTK(4, "wake up : WAKEUP=%02X\n", rw_data);
@@ -171,7 +171,7 @@ void ks_wlan_hw_wakeup_request(struct ks_wlan_private *priv)
 static int _ks_wlan_hw_power_save(struct ks_wlan_private *priv)
 {
 	unsigned char rw_data;
-	int retval;
+	int rc;
 
 	if (priv->reg.powermgt == POWMGT_ACTIVE_MODE)
 		return 0;
@@ -195,9 +195,9 @@ static int _ks_wlan_hw_power_save(struct ks_wlan_private *priv)
 	if (!atomic_read(&priv->psstatus.confirm_wait) &&
 		!atomic_read(&priv->psstatus.snooze_guard) &&
 		!cnt_txqbody(priv)) {
-		retval = ks7010_sdio_read(priv, INT_PENDING, &rw_data,
+		rc = ks7010_sdio_read(priv, INT_PENDING, &rw_data,
 					  sizeof(rw_data));
-		if (retval) {
+		if (rc) {
 			DPRINTK(1, " error : INT_PENDING=%02X\n", rw_data);
 			queue_delayed_work(priv->ks_wlan_hw.ks7010sdio_wq,
 					   &priv->ks_wlan_hw.rw_wq, 1);
@@ -205,9 +205,9 @@ static int _ks_wlan_hw_power_save(struct ks_wlan_private *priv)
 		}
 		if (!rw_data) {
 			rw_data = GCR_B_DOZE;
-			retval = ks7010_sdio_write(priv, GCR_B, &rw_data,
+			rc = ks7010_sdio_write(priv, GCR_B, &rw_data,
 						   sizeof(rw_data));
-			if (retval) {
+			if (rc) {
 				DPRINTK(1, " error : GCR_B=%02X\n", rw_data);
 				queue_delayed_work(priv->ks_wlan_hw.ks7010sdio_wq,
 						   &priv->ks_wlan_hw.rw_wq, 1);
@@ -291,7 +291,7 @@ static int write_to_device(struct ks_wlan_private *priv, unsigned char *buffer,
 
 	rc = ks7010_sdio_write(priv, DATA_WINDOW, buffer, size);
 	if (rc) {
-		DPRINTK(1, " write error : retval=%d\n", rc);
+		DPRINTK(1, " write error : rc=%d\n", rc);
 		return rc;
 	}
 
@@ -388,7 +388,7 @@ static void rx_event_task(unsigned long dev)
 static void ks_wlan_hw_rx(void *dev, uint16_t size)
 {
 	struct ks_wlan_private *priv = (struct ks_wlan_private *)dev;
-	int retval;
+	int rc;
 	struct rx_device_buffer *rx_buffer;
 	struct hostif_hdr *hdr;
 	unsigned char read_status;
@@ -404,10 +404,10 @@ static void ks_wlan_hw_rx(void *dev, uint16_t size)
 	}
 	rx_buffer = &priv->rx_dev.rx_dev_buff[priv->rx_dev.qtail];
 
-	retval =
+	rc =
 	    ks7010_sdio_read(priv, DATA_WINDOW, &rx_buffer->data[0],
 			     hif_align_size(size));
-	if (retval)
+	if (rc)
 		goto error_out;
 
 	/* length check */
@@ -420,10 +420,10 @@ static void ks_wlan_hw_rx(void *dev, uint16_t size)
 #endif
 		/* rx_status update */
 		read_status = READ_STATUS_IDLE;
-		retval =
+		rc =
 		    ks7010_sdio_write(priv, READ_STATUS, &read_status,
 				      sizeof(read_status));
-		if (retval)
+		if (rc)
 			DPRINTK(1, " error : READ_STATUS=%02X\n", read_status);
 
 		goto error_out;
@@ -436,10 +436,10 @@ static void ks_wlan_hw_rx(void *dev, uint16_t size)
 
 	/* read status update */
 	read_status = READ_STATUS_IDLE;
-	retval =
+	rc =
 	    ks7010_sdio_write(priv, READ_STATUS, &read_status,
 			      sizeof(read_status));
-	if (retval)
+	if (rc)
 		DPRINTK(1, " error : READ_STATUS=%02X\n", read_status);
 
 	DPRINTK(4, "READ_STATUS=%02X\n", read_status);
@@ -463,7 +463,7 @@ static void ks7010_rw_function(struct work_struct *work)
 	struct hw_info_t *hw;
 	struct ks_wlan_private *priv;
 	unsigned char rw_data;
-	int retval;
+	int rc;
 
 	hw = container_of(work, struct hw_info_t, rw_wq.work);
 	priv = container_of(hw, struct ks_wlan_private, ks_wlan_hw);
@@ -512,9 +512,9 @@ static void ks7010_rw_function(struct work_struct *work)
 	}
 
 	/* read (WriteStatus/ReadDataSize FN1:00_0014) */
-	retval =
+	rc =
 	    ks7010_sdio_read(priv, WSTATUS_RSIZE, &rw_data, sizeof(rw_data));
-	if (retval) {
+	if (rc) {
 		DPRINTK(1, " error : WSTATUS_RSIZE=%02X psstatus=%d\n", rw_data,
 			atomic_read(&priv->psstatus.status));
 		goto err_out;
@@ -536,7 +536,7 @@ static void ks7010_rw_function(struct work_struct *work)
 
 static void ks_sdio_interrupt(struct sdio_func *func)
 {
-	int retval;
+	int rc;
 	struct ks_sdio_card *card;
 	struct ks_wlan_private *priv;
 	unsigned char status, rsize, rw_data;
@@ -546,11 +546,11 @@ static void ks_sdio_interrupt(struct sdio_func *func)
 	DPRINTK(4, "\n");
 
 	if (priv->dev_state >= DEVICE_STATE_BOOT) {
-		retval =
+		rc =
 		    ks7010_sdio_read(priv, INT_PENDING, &status,
 				     sizeof(status));
-		if (retval) {
-			DPRINTK(1, "read INT_PENDING Failed!!(%d)\n", retval);
+		if (rc) {
+			DPRINTK(1, "read INT_PENDING Failed!!(%d)\n", rc);
 			goto intr_out;
 		}
 		DPRINTK(4, "INT_PENDING=%02X\n", rw_data);
@@ -562,10 +562,10 @@ static void ks_sdio_interrupt(struct sdio_func *func)
 		/* bit2 -> Read Status Busy  */
 		if (status & INT_GCR_B
 		    || atomic_read(&priv->psstatus.status) == PS_SNOOZE) {
-			retval =
+			rc =
 			    ks7010_sdio_read(priv, GCR_B, &rw_data,
 					     sizeof(rw_data));
-			if (retval) {
+			if (rc) {
 				DPRINTK(1, " error : GCR_B=%02X\n", rw_data);
 				goto intr_out;
 			}
@@ -583,10 +583,10 @@ static void ks_sdio_interrupt(struct sdio_func *func)
 
 		do {
 			/* read (WriteStatus/ReadDataSize FN1:00_0014) */
-			retval =
+			rc =
 			    ks7010_sdio_read(priv, WSTATUS_RSIZE, &rw_data,
 					     sizeof(rw_data));
-			if (retval) {
+			if (rc) {
 				DPRINTK(1, " error : WSTATUS_RSIZE=%02X\n",
 					rw_data);
 				goto intr_out;
@@ -603,14 +603,14 @@ static void ks_sdio_interrupt(struct sdio_func *func)
 				    && !cnt_txqbody(priv)) {
 					/* dummy write for interrupt clear */
 					rw_data = 0;
-					retval =
+					rc =
 					    ks7010_sdio_write(priv, DATA_WINDOW,
 							      &rw_data,
 							      sizeof(rw_data));
-					if (retval) {
+					if (rc) {
 						DPRINTK(1,
 							"write DATA_WINDOW Failed!!(%d)\n",
-							retval);
+							rc);
 					}
 					status &= ~INT_WRITE_STATUS;
 				} else {
