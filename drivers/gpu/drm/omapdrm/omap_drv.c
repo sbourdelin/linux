@@ -275,7 +275,8 @@ cleanup:
 	return r;
 }
 
-static int omap_modeset_create_crtc(struct drm_device *dev, int id,
+static int omap_modeset_create_crtc(struct drm_device *dev,
+				    int crtc_id, int plane_id,
 				    enum omap_channel channel,
 				    u32 possible_crtcs)
 {
@@ -283,18 +284,18 @@ static int omap_modeset_create_crtc(struct drm_device *dev, int id,
 	struct drm_plane *plane;
 	struct drm_crtc *crtc;
 
-	plane = omap_plane_init(dev, id, DRM_PLANE_TYPE_PRIMARY,
+	plane = omap_plane_init(dev, plane_id, DRM_PLANE_TYPE_PRIMARY,
 		possible_crtcs);
 	if (IS_ERR(plane))
 		return PTR_ERR(plane);
 
-	crtc = omap_crtc_init(dev, plane, channel, id);
+	crtc = omap_crtc_init(dev, plane, channel, crtc_id);
 
 	BUG_ON(priv->num_crtcs >= ARRAY_SIZE(priv->crtcs));
-	priv->crtcs[id] = crtc;
+	priv->crtcs[crtc_id] = crtc;
 	priv->num_crtcs++;
 
-	priv->planes[id] = plane;
+	priv->planes[plane_id] = plane;
 	priv->num_planes++;
 
 	return 0;
@@ -318,7 +319,7 @@ static int omap_modeset_init(struct drm_device *dev)
 	int num_ovls = dss_feat_get_num_ovls();
 	int num_mgrs = dss_feat_get_num_mgrs();
 	int num_crtcs = 0;
-	int i, id = 0;
+	int i, crtc_id = 0, plane_id = 0;
 	int ret;
 	u32 possible_crtcs_for_planes;
 
@@ -382,7 +383,7 @@ static int omap_modeset_init(struct drm_device *dev)
 		 * create, let's not try to create a crtc for this
 		 * panel/encoder and onwards.
 		 */
-		if (id == num_crtcs)
+		if (crtc_id == num_crtcs)
 			continue;
 
 		/*
@@ -401,8 +402,8 @@ static int omap_modeset_init(struct drm_device *dev)
 		 * allocated crtc, we create a new crtc for it
 		 */
 		if (!channel_used(dev, channel)) {
-			ret = omap_modeset_create_crtc(dev, id, channel,
-				possible_crtcs_for_planes);
+			ret = omap_modeset_create_crtc(dev, crtc_id, plane_id,
+				channel, possible_crtcs_for_planes);
 			if (ret < 0) {
 				dev_err(dev->dev,
 					"could not create CRTC (channel %u)\n",
@@ -410,17 +411,18 @@ static int omap_modeset_init(struct drm_device *dev)
 				return ret;
 			}
 
-			id++;
+			crtc_id++;
+			plane_id++;
 		}
 	}
 
 	/*
 	 * Create normal planes for the remaining overlays:
 	 */
-	for (; id < num_ovls; id++) {
+	for (; plane_id < num_ovls; plane_id++) {
 		struct drm_plane *plane;
 
-		plane = omap_plane_init(dev, id, DRM_PLANE_TYPE_OVERLAY,
+		plane = omap_plane_init(dev, plane_id, DRM_PLANE_TYPE_OVERLAY,
 			possible_crtcs_for_planes);
 		if (IS_ERR(plane))
 			return PTR_ERR(plane);
@@ -438,6 +440,7 @@ static int omap_modeset_init(struct drm_device *dev)
 		struct omap_dss_device *dssdev =
 					omap_encoder_get_dssdev(encoder);
 		struct omap_dss_device *output;
+		int id;
 
 		output = omapdss_find_output_from_display(dssdev);
 
