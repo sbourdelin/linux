@@ -274,22 +274,22 @@ static int ion_system_heap_debug_show(struct ion_heap *heap, struct seq_file *s,
 		pool = sys_heap->uncached_pools[i];
 
 		seq_printf(s, "%d order %u highmem pages uncached %lu total\n",
-			   pool->high_count, pool->order,
-			   (PAGE_SIZE << pool->order) * pool->high_count);
+			   atomic_read(&pool->high_count), pool->order,
+			   (PAGE_SIZE << pool->order) * atomic_read(&pool->high_count));
 		seq_printf(s, "%d order %u lowmem pages uncached %lu total\n",
-			   pool->low_count, pool->order,
-			   (PAGE_SIZE << pool->order) * pool->low_count);
+			   atomic_read(&pool->low_count), pool->order,
+			   (PAGE_SIZE << pool->order) * atomic_read(&pool->low_count));
 	}
 
 	for (i = 0; i < NUM_ORDERS; i++) {
 		pool = sys_heap->cached_pools[i];
 
 		seq_printf(s, "%d order %u highmem pages cached %lu total\n",
-			   pool->high_count, pool->order,
-			   (PAGE_SIZE << pool->order) * pool->high_count);
+			   atomic_read(&pool->high_count), pool->order,
+			   (PAGE_SIZE << pool->order) * atomic_read(&pool->high_count));
 		seq_printf(s, "%d order %u lowmem pages cached %lu total\n",
-			   pool->low_count, pool->order,
-			   (PAGE_SIZE << pool->order) * pool->low_count);
+			   atomic_read(&pool->low_count), pool->order,
+			   (PAGE_SIZE << pool->order) * atomic_read(&pool->low_count));
 	}
 	return 0;
 }
