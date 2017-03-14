@@ -439,6 +439,7 @@ struct clk_hw *clk_hw_register_divider_table(struct device *dev,
 		spinlock_t *lock);
 void clk_unregister_divider(struct clk *clk);
 void clk_hw_unregister_divider(struct clk_hw *hw);
+void of_divider_clk_setup(struct device_node *node);
 
 /**
  * struct clk_mux - multiplexer clock
