@@ -617,10 +617,10 @@ EXPORT_SYMBOL_GPL(clk_hw_unregister_divider);
 
 
 #ifdef CONFIG_OF
-struct clk_div_table *of_clk_get_div_table(struct device_node *node)
+static struct clk_div_table *of_clk_get_div_table(struct device_node *node)
 {
 	int i;
-	u32 table_size;
+	unsigned int table_size;
 	struct clk_div_table *table;
 	const __be32 *tablespec;
 	u32 val;
@@ -634,7 +634,8 @@ struct clk_div_table *of_clk_get_div_table(struct device_node *node)
 
 	table = kzalloc(sizeof(struct clk_div_table) * table_size, GFP_KERNEL);
 	if (!table) {
-		pr_err("%s: unable to allocate memory for %s table\n", __func__, node->name);
+		pr_err("%s: unable to allocate memory for %s table\n", __func__,
+		       node->name);
 		return NULL;
 	}
 
@@ -653,7 +654,7 @@ struct clk_div_table *of_clk_get_div_table(struct device_node *node)
  */
 void of_divider_clk_setup(struct device_node *node)
 {
-	struct clk *clk;
+	struct clk_hw *hw;
 	const char *clk_name = node->name;
 	void __iomem *reg;
 	const char *parent_name;
@@ -673,7 +674,8 @@ void of_divider_clk_setup(struct device_node *node)
 	}
 
 	if (of_property_read_u32(node, "bit-mask", &mask)) {
-		pr_err("%s: missing bit-mask property for %s\n", __func__, node->name);
+		pr_err("%s: missing bit-mask property for %s\n", __func__,
+		       node->name);
 		return;
 	}
 
@@ -699,11 +701,11 @@ void of_divider_clk_setup(struct device_node *node)
 	if (IS_ERR(table))
 		return;
 
-	clk = _register_divider(NULL, clk_name, parent_name, 0, reg, shift,
+	hw = _register_divider(NULL, clk_name, parent_name, 0, reg, shift,
 			mask, clk_divider_flags, table, NULL);
 
-	if (!IS_ERR(clk))
-		of_clk_add_provider(node, of_clk_src_simple_get, clk);
+	if (!IS_ERR(hw))
+		of_clk_add_provider(node, of_clk_src_simple_get, hw->clk);
 }
 EXPORT_SYMBOL_GPL(of_divider_clk_setup);
 CLK_OF_DECLARE(divider_clk, "divider-clock", of_divider_clk_setup);
