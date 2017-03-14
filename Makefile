@@ -631,7 +631,11 @@ KBUILD_CFLAGS	+= $(call cc-option,-fno-delete-null-pointer-checks,)
 KBUILD_CFLAGS	+= $(call cc-disable-warning,frame-address,)
 
 ifdef CONFIG_LD_DEAD_CODE_DATA_ELIMINATION
+ifdef CONFIG_FUNCTION_TRACER
+KBUILD_CFLAGS	+= $(call cc-ifversion, -ge,0409,$(call cc-option,-ffunction-sections,))
+else
 KBUILD_CFLAGS	+= $(call cc-option,-ffunction-sections,)
+endif
 KBUILD_CFLAGS	+= $(call cc-option,-fdata-sections,)
 endif
 
