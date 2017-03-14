@@ -341,7 +341,7 @@ int ks_wlan_hw_tx(struct ks_wlan_private *priv, void *p, unsigned long size,
 		  void (*complete_handler)(void *arg1, void *arg2),
 		  void *arg1, void *arg2)
 {
-	int result = 0;
+	int result;
 	struct hostif_hdr *hdr;
 
 	hdr = (struct hostif_hdr *)p;

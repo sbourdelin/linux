@@ -3289,7 +3289,7 @@ static const struct iw_handler_def ks_wlan_handler_def = {
 static int ks_wlan_netdev_ioctl(struct net_device *dev, struct ifreq *rq,
 				int cmd)
 {
-	int rc = 0;
+	int rc;
 	struct iwreq *wrq = (struct iwreq *)rq;
 
 	switch (cmd) {
@@ -3351,7 +3351,7 @@ static
 int ks_wlan_start_xmit(struct sk_buff *skb, struct net_device *dev)
 {
 	struct ks_wlan_private *priv = netdev_priv(dev);
-	int rc = 0;
+	int rc;
 
 	DPRINTK(3, "in_interrupt()=%ld\n", in_interrupt());
 
