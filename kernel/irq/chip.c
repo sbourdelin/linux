@@ -348,9 +348,11 @@ void handle_nested_irq(unsigned int irq)
 	irqd_set(&desc->irq_data, IRQD_IRQ_INPROGRESS);
 	raw_spin_unlock_irq(&desc->lock);
 
-	action_ret = action->thread_fn(action->irq, action->dev_id);
-	if (!noirqdebug)
-		note_interrupt(desc, action_ret);
+	for_each_action_of_desc(desc, action) {
+		action_ret = action->thread_fn(action->irq, action->dev_id);
+		if (!noirqdebug)
+			note_interrupt(desc, action_ret);
+	}
 
 	raw_spin_lock_irq(&desc->lock);
 	irqd_clear(&desc->irq_data, IRQD_IRQ_INPROGRESS);
