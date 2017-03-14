@@ -94,6 +94,7 @@ static struct property * __init of_pdt_build_one_prop(phandle node, char *prev,
 {
 	static struct property *tmp = NULL;
 	struct property *p;
+	char *s;
 	int err;
 
 	if (tmp) {
@@ -109,8 +110,8 @@ static struct property * __init of_pdt_build_one_prop(phandle node, char *prev,
 	if (special_name) {
 		strcpy(p->name, special_name);
 		p->length = special_len;
-		p->value = prom_early_alloc(special_len);
-		memcpy(p->value, special_val, special_len);
+		p->value = s = prom_early_alloc(special_len);
+		memcpy(s, special_val, special_len);
 	} else {
 		err = of_pdt_prom_ops->nextprop(node, prev, p->name);
 		if (err) {
@@ -123,12 +124,12 @@ static struct property * __init of_pdt_build_one_prop(phandle node, char *prev,
 		} else {
 			int len;
 
-			p->value = prom_early_alloc(p->length + 1);
+			p->value = s = prom_early_alloc(p->length + 1);
 			len = of_pdt_prom_ops->getproperty(node, p->name,
 					p->value, p->length);
 			if (len <= 0)
 				p->length = 0;
-			((unsigned char *)p->value)[p->length] = '\0';
+			s[p->length] = '\0';
 		}
 	}
 	return p;

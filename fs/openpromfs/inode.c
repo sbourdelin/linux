@@ -65,7 +65,7 @@ static int is_string(unsigned char *p, int len)
 static int property_show(struct seq_file *f, void *v)
 {
 	struct property *prop = f->private;
-	void *pval;
+	const void *pval;
 	int len;
 
 	len = prop->length;
