@@ -722,7 +722,8 @@ static int wm8960_hw_params(struct snd_pcm_substream *substream,
 	bool tx = substream->stream == SNDRV_PCM_STREAM_PLAYBACK;
 	int i;
 
-	wm8960->bclk = snd_soc_params_to_bclk(params);
+	wm8960->bclk = params_physical_width(params) *
+		params_channels(params) * params_rate(params);
 	if (params_channels(params) == 1)
 		wm8960->bclk *= 2;
 
