@@ -320,7 +320,7 @@ static int omap_modeset_init(struct drm_device *dev)
 	int num_crtcs = 0;
 	int i, id = 0;
 	int ret;
-	u32 possible_crtcs;
+	u32 possible_crtcs_for_planes;
 
 	drm_mode_config_init(dev);
 
@@ -338,7 +338,8 @@ static int omap_modeset_init(struct drm_device *dev)
 			num_crtcs++;
 
 	num_crtcs = min3(num_crtcs, num_mgrs, num_ovls);
-	possible_crtcs = (1 << num_crtcs) - 1;
+	/* All planes can be put to any CRTC */
+	possible_crtcs_for_planes = (1 << num_crtcs) - 1;
 
 	dssdev = NULL;
 
@@ -401,7 +402,7 @@ static int omap_modeset_init(struct drm_device *dev)
 		 */
 		if (!channel_used(dev, channel)) {
 			ret = omap_modeset_create_crtc(dev, id, channel,
-				possible_crtcs);
+				possible_crtcs_for_planes);
 			if (ret < 0) {
 				dev_err(dev->dev,
 					"could not create CRTC (channel %u)\n",
@@ -420,7 +421,7 @@ static int omap_modeset_init(struct drm_device *dev)
 		struct drm_plane *plane;
 
 		plane = omap_plane_init(dev, id, DRM_PLANE_TYPE_OVERLAY,
-			possible_crtcs);
+			possible_crtcs_for_planes);
 		if (IS_ERR(plane))
 			return PTR_ERR(plane);
 
