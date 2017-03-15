@@ -13,6 +13,9 @@ endif
 
 CFLAGS_REMOVE_return_address.o = -pg
 
+ccflags-y              += -fno-function-sections -fno-data-sections
+subdir-ccflags-y       += -fno-function-sections -fno-data-sections
+
 # Object file lists.
 
 obj-y		:= elf.o entry-common.o irq.o opcodes.o \
