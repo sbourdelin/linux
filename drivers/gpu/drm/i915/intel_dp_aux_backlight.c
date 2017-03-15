@@ -111,12 +111,58 @@ intel_dp_aux_set_dynamic_backlight_percent(struct intel_dp *intel_dp,
 			  dbc, sizeof(dbc));
 }
 
+/*
+ * Set PWM Frequency divider to match desired frequency in vbt.
+ * The PWM Frequency is calculated as 27Mhz / (F x P).
+ * - Where F = PWM Frequency Pre-Divider value programmed by field 7:0 of the
+ *             EDP_BACKLIGHT_FREQ_SET register (DPCD Address 00728h)
+ * - Where P = 2^Pn, where Pn is the value programmed by field 4:0 of the
+ *             EDP_PWMGEN_BIT_COUNT register (DPCD Address 00724h)
+ */
+static void intel_dp_aux_set_pwm_freq(struct intel_connector *connector) {
+	struct drm_i915_private *dev_priv = to_i915(connector->base.dev);
+	struct intel_dp *intel_dp = enc_to_intel_dp(&connector->encoder->base);
+	int freq, fxp, f;
+	u8 pn, pn_min, pn_max;
+
+	/* Find desired value of (F x P)
+	 * Note that, if F x P is out of supported range, the maximum value or
+	 * minimum value will applied automatically. So no need to check that.
+	 */
+	freq = dev_priv->vbt.backlight.pwm_freq_hz;
+	fxp = DP_EDP_BACKLIGHT_FREQ_BASE / freq;
+
+	/* Use lowest possible value of Pn to try to make F to be between 1 and
+	 * 255 while still in the range Pn_min and Pn_max
+	 */
+	if (!drm_dp_dpcd_readb(&intel_dp->aux,
+			       DP_EDP_PWMGEN_BIT_COUNT_CAP_MIN, &pn_min)) {
+		return;
+	}
+	if (!drm_dp_dpcd_readb(&intel_dp->aux,
+			       DP_EDP_PWMGEN_BIT_COUNT_CAP_MAX, &pn_max)) {
+		return;
+	}
+	pn_min &= DP_EDP_PWMGEN_BIT_COUNT_MASK;
+	pn_max &= DP_EDP_PWMGEN_BIT_COUNT_MASK;
+	f = fxp / (1 << pn_min);
+	for (pn = pn_min; pn < pn_max && f > 255; pn++, f /= 2);
+
+	/* Cap F to be in the range between 1 and 255. */
+	f = min(f, 255);
+	f = max(f, 1);
+
+	drm_dp_dpcd_writeb(&intel_dp->aux, DP_EDP_PWMGEN_BIT_COUNT, pn);
+	drm_dp_dpcd_writeb(&intel_dp->aux, DP_EDP_BACKLIGHT_FREQ_SET, (u8) f);
+}
+
 static void intel_dp_aux_enable_backlight(struct intel_connector *connector)
 {
 	struct intel_dp *intel_dp = enc_to_intel_dp(&connector->encoder->base);
 	uint8_t dpcd_buf = 0;
 	uint8_t new_dpcd_buf = 0;
 	uint8_t edp_backlight_mode = 0;
+	bool freq_cap;
 
 	set_aux_backlight_enable(intel_dp, true);
 
@@ -147,10 +193,18 @@ static void intel_dp_aux_enable_backlight(struct intel_connector *connector)
 		intel_dp_aux_set_dynamic_backlight_percent(intel_dp, 0, 100);
 	}
 
+	freq_cap = intel_dp->edp_dpcd[2] & DP_EDP_BACKLIGHT_FREQ_AUX_SET_CAP;
+	if (freq_cap)
+		new_dpcd_buf |= DP_EDP_BACKLIGHT_FREQ_AUX_SET_ENABLE;
+
 	if (new_dpcd_buf != dpcd_buf) {
 		drm_dp_dpcd_writeb(&intel_dp->aux,
 			DP_EDP_BACKLIGHT_MODE_SET_REGISTER, new_dpcd_buf);
 	}
+
+	if (freq_cap)
+		intel_dp_aux_set_pwm_freq(connector);
+
 	intel_dp_aux_set_backlight(connector, connector->panel.backlight.level);
 }
 
