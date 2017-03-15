@@ -903,6 +903,7 @@ out_unlock:
 	 * of rtnl_lock(), but PHY_HALTED shall guarantee phy_change()
 	 * will not reenable interrupts.
 	 */
+	phy_trigger_machine(phydev, true);
 }
 EXPORT_SYMBOL(phy_stop);
 
