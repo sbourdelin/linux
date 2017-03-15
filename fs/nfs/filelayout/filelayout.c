@@ -378,6 +378,7 @@ static int filelayout_commit_done_cb(struct rpc_task *task,
 	switch (err) {
 	case -NFS4ERR_RESET_TO_MDS:
 		pnfs_generic_prepare_to_resend_writes(data);
+		pnfs_set_lo_fail(data->lseg);
 		return -EAGAIN;
 	case -EAGAIN:
 		rpc_restart_call_prepare(task);
