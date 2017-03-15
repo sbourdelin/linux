@@ -684,6 +684,30 @@
 		interrupts = <GIC_SPI 66 IRQ_TYPE_LEVEL_HIGH>;
 	};
 
+	i2s0: i2s0@ff890000 {
+		compatible = "rockchip,rk3368-i2s", "rockchip,rk3066-i2s";
+		reg = <0x0 0xff890000 0x0 0x1000>;
+		interrupts = <GIC_SPI 40 IRQ_TYPE_LEVEL_HIGH>;
+		dmas = <&dmac_bus 6>, <&dmac_bus 7>;
+		dma-names = "tx", "rx";
+		clock-names = "i2s_clk", "i2s_hclk";
+		clocks = <&cru SCLK_I2S_2CH>, <&cru HCLK_I2S_2CH>;
+		status = "disabled";
+	};
+
+	i2s1: i2s1@ff898000 {
+		compatible = "rockchip,rk3368-i2s", "rockchip,rk3066-i2s";
+		reg = <0x0 0xff898000 0x0 0x1000>;
+		interrupts = <GIC_SPI 53 IRQ_TYPE_LEVEL_HIGH>;
+		dmas = <&dmac_bus 0>, <&dmac_bus 1>;
+		dma-names = "tx", "rx";
+		clock-names = "i2s_clk", "i2s_hclk";
+		clocks = <&cru SCLK_I2S_8CH>, <&cru HCLK_I2S_8CH>;
+		pinctrl-names = "default";
+		pinctrl-0 = <&i2s1>;
+		status = "disabled";
+	};
+
 	gic: interrupt-controller@ffb71000 {
 		compatible = "arm,gic-400";
 		interrupt-controller;
@@ -883,6 +907,20 @@
 			i2c5_xfer: i2c5-xfer {
 				rockchip,pins = <3 26 RK_FUNC_2 &pcfg_pull_none>,
 						<3 27 RK_FUNC_2 &pcfg_pull_none>;
+			};
+		};
+
+		i2s {
+			i2s1: i2s1 {
+				rockchip,pins = <2 12 RK_FUNC_1 &pcfg_pull_none>,
+						<2 13 RK_FUNC_1 &pcfg_pull_none>,
+						<2 14 RK_FUNC_1 &pcfg_pull_none>,
+						<2 15 RK_FUNC_1 &pcfg_pull_none>,
+						<2 16 RK_FUNC_1 &pcfg_pull_none>,
+						<2 17 RK_FUNC_1 &pcfg_pull_none>,
+						<2 18 RK_FUNC_1 &pcfg_pull_none>,
+						<2 19 RK_FUNC_1 &pcfg_pull_none>,
+						<2 20 RK_FUNC_1 &pcfg_pull_none>;
 			};
 		};
 
