@@ -95,6 +95,7 @@ intel_dp_aux_set_backlight(struct intel_connector *connector, u32 level)
 		DRM_DEBUG_KMS("Failed to write aux backlight level\n");
 		return;
 	}
+	connector->panel.backlight.level = level;
 }
 
 /*
@@ -150,6 +151,7 @@ static void intel_dp_aux_enable_backlight(struct intel_connector *connector)
 		drm_dp_dpcd_writeb(&intel_dp->aux,
 			DP_EDP_BACKLIGHT_MODE_SET_REGISTER, new_dpcd_buf);
 	}
+	intel_dp_aux_set_backlight(connector, connector->panel.backlight.level);
 }
 
 static void intel_dp_aux_disable_backlight(struct intel_connector *connector)
