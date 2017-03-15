@@ -207,6 +207,10 @@ static int filelayout_async_handle_error(struct rpc_task *task,
 		/* fall through */
 	default:
 reset:
+		if (clp->cl_exchange_flags & EXCHGID4_FLAG_USE_PNFS_MDS &&
+			clp->cl_exchange_flags & EXCHGID4_FLAG_USE_PNFS_DS &&
+			clp->cl_clientid == mds_client->cl_clientid)
+			return task->tk_status;
 		dprintk("%s Retry through MDS. Error %d\n", __func__,
 			task->tk_status);
 		return -NFS4ERR_RESET_TO_MDS;
@@ -384,9 +388,10 @@ static int filelayout_commit_done_cb(struct rpc_task *task,
 		return -EAGAIN;
 	}
 
-	pnfs_set_layoutcommit(data->inode, data->lseg, data->lwb);
+	if (!err)
+		pnfs_set_layoutcommit(data->inode, data->lseg, data->lwb);
 
-	return 0;
+	return err;
 }
 
 static void filelayout_write_prepare(struct rpc_task *task, void *data)
