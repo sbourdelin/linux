@@ -441,7 +441,8 @@ static int smsm_get_size_info(struct qcom_smsm *smsm)
 	info = qcom_smem_get(QCOM_SMEM_HOST_ANY, SMEM_SMSM_SIZE_INFO, &size);
 	if (PTR_ERR(info) == -EPROBE_DEFER) {
 		return PTR_ERR(info);
-	} else if (PTR_ERR(info) == -ENOENT || size != sizeof(*info)) {
+	} else if (PTR_ERR(info) == -ENOENT ||
+			(!IS_ERR(info) && size != sizeof(*info))) {
 		dev_warn(smsm->dev, "no smsm size info, using defaults\n");
 		smsm->num_entries = SMSM_DEFAULT_NUM_ENTRIES;
 		smsm->num_hosts = SMSM_DEFAULT_NUM_HOSTS;
