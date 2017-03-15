@@ -245,7 +245,7 @@ static int dsps_check_status(struct musb *musb, void *unused)
 		dsps_mod_timer_optional(glue);
 		break;
 	case OTG_STATE_A_WAIT_BCON:
-		musb_writeb(musb->mregs, MUSB_DEVCTL, 0);
+		musb_writeb(musb->mregs, MUSB_DEVCTL, MUSB_DEVCTL_SESSION);
 		skip_session = 1;
 		/* fall */
 
