@@ -61,7 +61,7 @@ struct i915_params i915 __read_mostly = {
 	.guc_log_level = -1,
 	.enable_dp_mst = true,
 	.inject_load_failure = 0,
-	.enable_dpcd_backlight = false,
+	.enable_dpcd_backlight = 0,
 	.enable_gvt = false,
 };
 
@@ -236,9 +236,9 @@ MODULE_PARM_DESC(enable_dp_mst,
 module_param_named_unsafe(inject_load_failure, i915.inject_load_failure, uint, 0400);
 MODULE_PARM_DESC(inject_load_failure,
 	"Force an error after a number of failure check points (0:disabled (default), N:force failure at the Nth failure check point)");
-module_param_named(enable_dpcd_backlight, i915.enable_dpcd_backlight, bool, 0600);
+module_param_named(enable_dpcd_backlight, i915.enable_dpcd_backlight, int, 0600);
 MODULE_PARM_DESC(enable_dpcd_backlight,
-	"Enable support for DPCD backlight control (default:false)");
+	"Enable support for DPCD backlight control (0:disable (default), 1:prefer PWM pin, 2: prefer DPCD)");
 
 module_param_named(enable_gvt, i915.enable_gvt, bool, 0400);
 MODULE_PARM_DESC(enable_gvt,
