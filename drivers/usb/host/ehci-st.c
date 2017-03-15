@@ -210,18 +210,14 @@ static int st_ehci_platform_probe(struct platform_device *dev)
 		devm_reset_control_get_optional_shared(&dev->dev, "power");
 	if (IS_ERR(priv->pwr)) {
 		err = PTR_ERR(priv->pwr);
-		if (err == -EPROBE_DEFER)
-			goto err_put_clks;
-		priv->pwr = NULL;
+		goto err_put_clks;
 	}
 
 	priv->rst =
 		devm_reset_control_get_optional_shared(&dev->dev, "softreset");
 	if (IS_ERR(priv->rst)) {
 		err = PTR_ERR(priv->rst);
-		if (err == -EPROBE_DEFER)
-			goto err_put_clks;
-		priv->rst = NULL;
+		goto err_put_clks;
 	}
 
 	if (pdata->power_on) {
