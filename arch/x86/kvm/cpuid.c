@@ -594,6 +594,9 @@ static inline int __do_cpuid_ent(struct kvm_cpuid_entry2 *entry, u32 function,
 		if (sched_info_on())
 			entry->eax |= (1 << KVM_FEATURE_STEAL_TIME);
 
+		if (kvm_mwait_in_guest())
+			entry->eax |= (1 << KVM_FEATURE_MWAIT);
+
 		entry->ebx = 0;
 		entry->ecx = 0;
 		entry->edx = 0;

@@ -1,6 +1,7 @@
 #ifndef ARCH_X86_KVM_X86_H
 #define ARCH_X86_KVM_X86_H
 
+#include <asm/processor.h>
 #include <linux/kvm_host.h>
 #include <asm/pvclock.h>
 #include "kvm_cache_regs.h"
@@ -211,5 +212,29 @@ static inline u64 nsec_to_cycles(struct kvm_vcpu *vcpu, u64 nsec)
 	    n = __quot;						\
 	    __rem;						\
 	 })
+
+static bool kvm_mwait_in_guest(void)
+{
+	unsigned int eax, ebx, ecx;
+
+	if (!cpu_has(&boot_cpu_data, X86_FEATURE_MWAIT))
+		return -ENODEV;
+
+	if (boot_cpu_data.x86_vendor != X86_VENDOR_INTEL)
+		return -ENODEV;
+
+	/*
+	 * Intel CPUs without CPUID5_ECX_INTERRUPT_BREAK are problematic as
+	 * they would allow guest to stop the CPU completely by disabling
+	 * interrupts then invoking MWAIT.
+	 */
+	if (boot_cpu_data.cpuid_level < CPUID_MWAIT_LEAF)
+		return -ENODEV;
+
+	cpuid(CPUID_MWAIT_LEAF, &eax, &ebx, &ecx, &mwait_substates);
+
+	if (!(ecx & CPUID5_ECX_INTERRUPT_BREAK))
+		return -ENODEV;
+}
 
 #endif
