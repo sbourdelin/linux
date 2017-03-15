@@ -298,8 +298,16 @@ static bool ilk_fbc_is_active(struct drm_i915_private *dev_priv)
 static void gen7_fbc_activate(struct drm_i915_private *dev_priv)
 {
 	struct intel_fbc_reg_params *params = &dev_priv->fbc.params;
+	struct intel_fbc_state_cache *cache = &dev_priv->fbc.state_cache;
 	u32 dpfc_ctl;
 	int threshold = dev_priv->fbc.threshold;
+
+	if (INTEL_GEN(dev_priv) >= 9 &&
+	    i915_gem_object_get_tiling(cache->vma->obj) != I915_TILING_X) {
+		int cfb_stride = DIV_ROUND_UP(cache->plane.src_w,
+					      (32 * threshold)) * 8;
+		I915_WRITE(FBC_YSTRIDE, FBC_STRIDE_OVERRIDE | cfb_stride);
+	}
 
 	dpfc_ctl = 0;
 	if (IS_IVYBRIDGE(dev_priv))
