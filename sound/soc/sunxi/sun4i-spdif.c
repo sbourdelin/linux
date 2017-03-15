@@ -521,13 +521,12 @@ static int sun4i_spdif_probe(struct platform_device *pdev)
 
 	if (quirks->has_reset) {
 		host->rst = devm_reset_control_get_optional(&pdev->dev, NULL);
-		if (IS_ERR(host->rst) && PTR_ERR(host->rst) == -EPROBE_DEFER) {
-			ret = -EPROBE_DEFER;
+		if (IS_ERR(host->rst)) {
+			ret = PTR_ERR(host->rst);
 			dev_err(&pdev->dev, "Failed to get reset: %d\n", ret);
 			return ret;
 		}
-		if (!IS_ERR(host->rst))
-			reset_control_deassert(host->rst);
+		reset_control_deassert(host->rst);
 	}
 
 	ret = devm_snd_soc_register_component(&pdev->dev,
