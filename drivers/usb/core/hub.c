@@ -1066,6 +1066,19 @@ static void hub_activate(struct usb_hub *hub, enum hub_activation_type type)
 
 		portstatus = portchange = 0;
 		status = hub_port_status(hub, port1, &portstatus, &portchange);
+		if (status) {
+			u16 hubstatus;
+
+			ret = usb_get_status(hdev, USB_RECIP_DEVICE, 0,
+					     &hubstatus);
+			if (ret < 0) {
+				dev_err(&hdev->dev,
+					"Failed to read hub status (%d)\n",
+					ret);
+				goto abort;
+			}
+		}
+
 		if (udev || (portstatus & USB_PORT_STAT_CONNECTION))
 			dev_dbg(&port_dev->dev, "status %04x change %04x\n",
 					portstatus, portchange);
@@ -1198,7 +1211,7 @@ static void hub_activate(struct usb_hub *hub, enum hub_activation_type type)
 
 	/* Scan all ports that need attention */
 	kick_hub_wq(hub);
-
+abort:
 	if (type == HUB_INIT2 || type == HUB_INIT3) {
 		/* Allow autosuspend if it was suppressed */
  disconnected:
