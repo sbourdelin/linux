@@ -439,7 +439,9 @@ static int smsm_get_size_info(struct qcom_smsm *smsm)
 	} *info;
 
 	info = qcom_smem_get(QCOM_SMEM_HOST_ANY, SMEM_SMSM_SIZE_INFO, &size);
-	if (PTR_ERR(info) == -ENOENT || size != sizeof(*info)) {
+	if (PTR_ERR(info) == -EPROBE_DEFER) {
+		return PTR_ERR(info);
+	} else if (PTR_ERR(info) == -ENOENT || size != sizeof(*info)) {
 		dev_warn(smsm->dev, "no smsm size info, using defaults\n");
 		smsm->num_entries = SMSM_DEFAULT_NUM_ENTRIES;
 		smsm->num_hosts = SMSM_DEFAULT_NUM_HOSTS;
@@ -515,7 +517,9 @@ static int qcom_smsm_probe(struct platform_device *pdev)
 	/* Acquire the main SMSM state vector */
 	ret = qcom_smem_alloc(QCOM_SMEM_HOST_ANY, SMEM_SMSM_SHARED_STATE,
 			      smsm->num_entries * sizeof(u32));
-	if (ret < 0 && ret != -EEXIST) {
+	if (ret == -EPROBE_DEFER) {
+		return ret;
+	} else if (ret < 0 && ret != -EEXIST) {
 		dev_err(&pdev->dev, "unable to allocate shared state entry\n");
 		return ret;
 	}
