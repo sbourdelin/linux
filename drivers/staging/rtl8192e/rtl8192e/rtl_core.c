@@ -2294,17 +2294,20 @@ static int _rtl92e_ioctl(struct net_device *dev, struct ifreq *rq, int cmd)
 
 		if (ipw->cmd == IEEE_CMD_SET_ENCRYPTION) {
 			if (ipw->u.crypt.set_tx) {
-				if (strcmp(ipw->u.crypt.alg, "CCMP") == 0)
+				if (strcmp(ipw->u.crypt.alg, "CCMP") == 0) {
 					ieee->pairwise_key_type = KEY_TYPE_CCMP;
-				else if (strcmp(ipw->u.crypt.alg, "TKIP") == 0)
+				} else if (strcmp(ipw->u.crypt.alg,
+								"TKIP") == 0) {
 					ieee->pairwise_key_type = KEY_TYPE_TKIP;
-				else if (strcmp(ipw->u.crypt.alg, "WEP") == 0) {
-					if (ipw->u.crypt.key_len == 13)
+				} else if (strcmp(ipw->u.crypt.alg,
+								"WEP") == 0) {
+					if (ipw->u.crypt.key_len == 13) {
 						ieee->pairwise_key_type =
 							 KEY_TYPE_WEP104;
-					else if (ipw->u.crypt.key_len == 5)
+					} else if (ipw->u.crypt.key_len == 5) {
 						ieee->pairwise_key_type =
 							 KEY_TYPE_WEP40;
+					}
 				} else {
 					ieee->pairwise_key_type = KEY_TYPE_NA;
 				}
@@ -2346,20 +2349,23 @@ static int _rtl92e_ioctl(struct net_device *dev, struct ifreq *rq, int cmd)
 
 			} else {
 				memcpy((u8 *)key, ipw->u.crypt.key, 16);
-				if (strcmp(ipw->u.crypt.alg, "CCMP") == 0)
+				if (strcmp(ipw->u.crypt.alg, "CCMP") == 0) {
 					ieee->group_key_type = KEY_TYPE_CCMP;
-				else if (strcmp(ipw->u.crypt.alg, "TKIP") == 0)
+				} else if (strcmp(ipw->u.crypt.alg,
+								"TKIP") == 0) {
 					ieee->group_key_type = KEY_TYPE_TKIP;
-				else if (strcmp(ipw->u.crypt.alg, "WEP") == 0) {
-					if (ipw->u.crypt.key_len == 13)
+				} else if (strcmp(ipw->u.crypt.alg,
+								"WEP") == 0) {
+					if (ipw->u.crypt.key_len == 13) {
 						ieee->group_key_type =
 							 KEY_TYPE_WEP104;
-					else if (ipw->u.crypt.key_len == 5)
+					} else if (ipw->u.crypt.key_len == 5) {
 						ieee->group_key_type =
 							 KEY_TYPE_WEP40;
-				} else
+					}
+				} else {
 					ieee->group_key_type = KEY_TYPE_NA;
-
+				}
 				if (ieee->group_key_type) {
 					rtl92e_set_swcam(dev, ipw->u.crypt.idx,
 							 ipw->u.crypt.idx,
