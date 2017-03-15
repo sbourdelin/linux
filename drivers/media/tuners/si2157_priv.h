@@ -30,6 +30,7 @@ struct si2157_dev {
 	u8 chiptype;
 	u8 if_port;
 	u32 if_frequency;
+	u32 chip_id;
 	struct delayed_work stat_work;
 
 #if defined(CONFIG_MEDIA_CONTROLLER)
@@ -42,6 +43,12 @@ struct si2157_dev {
 
 #define SI2157_CHIPTYPE_SI2157 0
 #define SI2157_CHIPTYPE_SI2146 1
+
+#define SI2158_A20 ('A' << 24 | 58 << 16 | '2' << 8 | '0' << 0)
+#define SI2148_A20 ('A' << 24 | 48 << 16 | '2' << 8 | '0' << 0)
+#define SI2157_A30 ('A' << 24 | 57 << 16 | '3' << 8 | '0' << 0)
+#define SI2147_A30 ('A' << 24 | 47 << 16 | '3' << 8 | '0' << 0)
+#define SI2146_A10 ('A' << 24 | 46 << 16 | '1' << 8 | '0' << 0)
 
 /* firmware command struct */
 #define SI2157_ARGLEN      30
