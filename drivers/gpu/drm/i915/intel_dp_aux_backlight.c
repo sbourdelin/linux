@@ -101,15 +101,32 @@ static void intel_dp_aux_enable_backlight(struct intel_connector *connector)
 {
 	struct intel_dp *intel_dp = enc_to_intel_dp(&connector->encoder->base);
 	uint8_t dpcd_buf = 0;
+	uint8_t edp_backlight_mode = 0;
 
 	set_aux_backlight_enable(intel_dp, true);
 
-	if ((drm_dp_dpcd_readb(&intel_dp->aux,
-			       DP_EDP_BACKLIGHT_MODE_SET_REGISTER, &dpcd_buf) == 1) &&
-	    ((dpcd_buf & DP_EDP_BACKLIGHT_CONTROL_MODE_MASK) ==
-	     DP_EDP_BACKLIGHT_CONTROL_MODE_PRESET))
-		drm_dp_dpcd_writeb(&intel_dp->aux, DP_EDP_BACKLIGHT_MODE_SET_REGISTER,
-				   (dpcd_buf | DP_EDP_BACKLIGHT_CONTROL_MODE_DPCD));
+	if (!drm_dp_dpcd_readb(&intel_dp->aux,
+			       DP_EDP_BACKLIGHT_MODE_SET_REGISTER, &dpcd_buf)) {
+		return;
+	}
+
+	edp_backlight_mode = dpcd_buf & DP_EDP_BACKLIGHT_CONTROL_MODE_MASK;
+
+	switch (edp_backlight_mode) {
+	case DP_EDP_BACKLIGHT_CONTROL_MODE_PWM:
+	case DP_EDP_BACKLIGHT_CONTROL_MODE_PRESET:
+	case DP_EDP_BACKLIGHT_CONTROL_MODE_PRODUCT:
+		dpcd_buf &= ~DP_EDP_BACKLIGHT_CONTROL_MODE_MASK;
+		dpcd_buf |= DP_EDP_BACKLIGHT_CONTROL_MODE_DPCD;
+		drm_dp_dpcd_writeb(&intel_dp->aux,
+			DP_EDP_BACKLIGHT_MODE_SET_REGISTER, dpcd_buf);
+		break;
+
+	/* Do nothing when it is already DPCD mode */
+	case DP_EDP_BACKLIGHT_CONTROL_MODE_DPCD:
+	default:
+		break;
+	}
 }
 
 static void intel_dp_aux_disable_backlight(struct intel_connector *connector)
