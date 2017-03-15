@@ -1947,7 +1947,6 @@ static int __init wbsd_drv_init(void)
 
 	pr_info(DRIVER_NAME
 		": Winbond W83L51xD SD/MMC card interface driver\n");
-	pr_info(DRIVER_NAME ": Copyright(c) Pierre Ossman\n");
 
 #ifdef CONFIG_PNP
 
