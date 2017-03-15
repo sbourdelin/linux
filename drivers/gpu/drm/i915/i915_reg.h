@@ -2506,6 +2506,8 @@ enum skl_disp_power_wells {
 #define  BDW_FBC_COMPRESSION_MASK	0xfff
 
 #define FBC_LL_SIZE		(1536)
+#define FBC_YSTRIDE		_MMIO(0x4208c)
+#define   FBC_STRIDE_OVERRIDE	(1<<13)
 
 #define FBC_LLC_READ_CTRL	_MMIO(0x9044)
 #define   FBC_LLC_FULLY_OPEN	(1<<30)
