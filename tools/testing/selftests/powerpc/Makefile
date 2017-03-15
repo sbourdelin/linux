@@ -1,7 +1,7 @@
 # Makefile for powerpc selftests
 
 # ARCH can be overridden by the user for cross compiling
-ARCH ?= $(shell uname -m)
+ARCH ?= $(shell uname -m 2>/dev/null || echo not)
 ARCH := $(shell echo $(ARCH) | sed -e s/ppc.*/powerpc/)
 
 ifeq ($(ARCH),powerpc)
