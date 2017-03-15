@@ -97,10 +97,24 @@ intel_dp_aux_set_backlight(struct intel_connector *connector, u32 level)
 	}
 }
 
+/*
+ * Set minimum / maximum dynamic brightness percentage. This value is expressed
+ * as the percentage of normal brightness in 5% increments.
+ */
+static void
+intel_dp_aux_set_dynamic_backlight_percent(struct intel_dp *intel_dp,
+                                           u32 min, u32 max)
+{
+	u8 dbc[] = { DIV_ROUND_CLOSEST(min, 5), DIV_ROUND_CLOSEST(max, 5) };
+	drm_dp_dpcd_write(&intel_dp->aux, DP_EDP_DBC_MINIMUM_BRIGHTNESS_SET,
+			  dbc, sizeof(dbc));
+}
+
 static void intel_dp_aux_enable_backlight(struct intel_connector *connector)
 {
 	struct intel_dp *intel_dp = enc_to_intel_dp(&connector->encoder->base);
 	uint8_t dpcd_buf = 0;
+	uint8_t new_dpcd_buf = 0;
 	uint8_t edp_backlight_mode = 0;
 
 	set_aux_backlight_enable(intel_dp, true);
@@ -110,22 +124,31 @@ static void intel_dp_aux_enable_backlight(struct intel_connector *connector)
 		return;
 	}
 
+	new_dpcd_buf = dpcd_buf;
 	edp_backlight_mode = dpcd_buf & DP_EDP_BACKLIGHT_CONTROL_MODE_MASK;
 
 	switch (edp_backlight_mode) {
 	case DP_EDP_BACKLIGHT_CONTROL_MODE_PWM:
 	case DP_EDP_BACKLIGHT_CONTROL_MODE_PRESET:
 	case DP_EDP_BACKLIGHT_CONTROL_MODE_PRODUCT:
-		dpcd_buf &= ~DP_EDP_BACKLIGHT_CONTROL_MODE_MASK;
-		dpcd_buf |= DP_EDP_BACKLIGHT_CONTROL_MODE_DPCD;
-		drm_dp_dpcd_writeb(&intel_dp->aux,
-			DP_EDP_BACKLIGHT_MODE_SET_REGISTER, dpcd_buf);
+		new_dpcd_buf &= ~DP_EDP_BACKLIGHT_CONTROL_MODE_MASK;
+		new_dpcd_buf |= DP_EDP_BACKLIGHT_CONTROL_MODE_DPCD;
 		break;
 
 	/* Do nothing when it is already DPCD mode */
 	case DP_EDP_BACKLIGHT_CONTROL_MODE_DPCD:
 	default:
 		break;
+	}
+
+	if (intel_dp->edp_dpcd[2] & DP_EDP_DYNAMIC_BACKLIGHT_CAP) {
+		new_dpcd_buf |= DP_EDP_DYNAMIC_BACKLIGHT_ENABLE;
+		intel_dp_aux_set_dynamic_backlight_percent(intel_dp, 0, 100);
+	}
+
+	if (new_dpcd_buf != dpcd_buf) {
+		drm_dp_dpcd_writeb(&intel_dp->aux,
+			DP_EDP_BACKLIGHT_MODE_SET_REGISTER, new_dpcd_buf);
 	}
 }
 
