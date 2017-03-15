@@ -5603,7 +5603,6 @@ static int __init nf_tables_module_init(void)
 	if (err < 0)
 		goto err3;
 
-	pr_info("nf_tables: (c) 2007-2009 Patrick McHardy <kaber@trash.net>\n");
 	return register_pernet_subsys(&nf_tables_net_ops);
 err3:
 	nf_tables_core_module_exit();
