@@ -141,12 +141,10 @@ static int phy_meson8b_usb2_power_on(struct phy *phy)
 	struct phy_meson8b_usb2_priv *priv = phy_get_drvdata(phy);
 	int ret;
 
-	if (!IS_ERR_OR_NULL(priv->reset)) {
-		ret = reset_control_reset(priv->reset);
-		if (ret) {
-			dev_err(&phy->dev, "Failed to trigger USB reset\n");
-			return ret;
-		}
+	ret = reset_control_reset(priv->reset);
+	if (ret) {
+		dev_err(&phy->dev, "Failed to trigger USB reset\n");
+		return ret;
 	}
 
 	ret = clk_prepare_enable(priv->clk_usb_general);
@@ -241,7 +239,7 @@ static int phy_meson8b_usb2_probe(struct platform_device *pdev)
 		return PTR_ERR(priv->clk_usb);
 
 	priv->reset = devm_reset_control_get_optional_shared(&pdev->dev, NULL);
-	if (PTR_ERR(priv->reset) == -EPROBE_DEFER)
+	if (IS_ERR(priv->reset))
 		return PTR_ERR(priv->reset);
 
 	priv->dr_mode = of_usb_get_dr_mode_by_phy(pdev->dev.of_node, -1);
