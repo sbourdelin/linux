@@ -205,7 +205,7 @@ nfnl_cthelper_create(const struct nlattr * const tb[],
 	struct nf_conntrack_helper *helper;
 	int ret;
 
-	if (!tb[NFCTH_TUPLE] || !tb[NFCTH_POLICY] || !tb[NFCTH_PRIV_DATA_LEN])
+	if (!tb[NFCTH_POLICY] || !tb[NFCTH_PRIV_DATA_LEN])
 		return -EINVAL;
 
 	helper = kzalloc(sizeof(struct nf_conntrack_helper), GFP_KERNEL);
