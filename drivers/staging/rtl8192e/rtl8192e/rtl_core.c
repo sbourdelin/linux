@@ -218,7 +218,7 @@ bool rtl92e_set_rf_state(struct net_device *dev,
 				else
 					priv->blinked_ingpio = false;
 				rtllib_MgntDisconnect(priv->rtllib,
-						      WLAN_REASON_DISASSOC_STA_HAS_LEFT);
+					WLAN_REASON_DISASSOC_STA_HAS_LEFT);
 			}
 		}
 		if ((ChangeSource == RF_CHANGE_BY_HW) && !priv->bHwRadioOff)
@@ -1796,7 +1796,7 @@ static short _rtl92e_alloc_rx_ring(struct net_device *dev)
 
 	for (rx_queue_idx = 0; rx_queue_idx < MAX_RX_QUEUE; rx_queue_idx++) {
 		priv->rx_ring[rx_queue_idx] = pci_zalloc_consistent(priv->pdev,
-					      sizeof(*priv->rx_ring[rx_queue_idx]) * priv->rxringcount,
+		sizeof(*priv->rx_ring[rx_queue_idx]) * priv->rxringcount,
 					      &priv->rx_ring_dma[rx_queue_idx]);
 		if (!priv->rx_ring[rx_queue_idx] ||
 		    (unsigned long)priv->rx_ring[rx_queue_idx] & 0xFF) {
@@ -2272,7 +2272,8 @@ static int _rtl92e_ioctl(struct net_device *dev, struct ifreq *rq, int cmd)
 	int ret = -1;
 	struct rtllib_device *ieee = priv->rtllib;
 	u32 key[4];
-	const u8 broadcast_addr[ETH_ALEN] = {0xff, 0xff, 0xff, 0xff, 0xff, 0xff};
+	const u8 broadcast_addr[ETH_ALEN] = {0xff, 0xff, 0xff, 0xff, 0xff,
+									0xff};
 	struct iw_point *p = &wrq->u.data;
 	struct ieee_param *ipw = NULL;
 
@@ -2309,14 +2310,15 @@ static int _rtl92e_ioctl(struct net_device *dev, struct ifreq *rq, int cmd)
 				}
 
 				if (ieee->pairwise_key_type) {
-					if (is_zero_ether_addr(ieee->ap_mac_addr))
+					if (is_zero_ether_addr(
+							ieee->ap_mac_addr))
 						ieee->iw_mode = IW_MODE_ADHOC;
 					memcpy((u8 *)key, ipw->u.crypt.key, 16);
 					rtl92e_enable_hw_security_config(dev);
 					rtl92e_set_swcam(dev, 4,
 							 ipw->u.crypt.idx,
-							 ieee->pairwise_key_type,
-							 (u8 *)ieee->ap_mac_addr,
+							ieee->pairwise_key_type,
+							(u8 *)ieee->ap_mac_addr,
 							 0, key, 0);
 					rtl92e_set_key(dev, 4, ipw->u.crypt.idx,
 						       ieee->pairwise_key_type,
@@ -2324,17 +2326,17 @@ static int _rtl92e_ioctl(struct net_device *dev, struct ifreq *rq, int cmd)
 						       0, key);
 					if (ieee->iw_mode == IW_MODE_ADHOC) {
 						rtl92e_set_swcam(dev,
-								 ipw->u.crypt.idx,
-								 ipw->u.crypt.idx,
-								 ieee->pairwise_key_type,
-								 (u8 *)ieee->ap_mac_addr,
-								 0, key, 0);
+							ipw->u.crypt.idx,
+							ipw->u.crypt.idx,
+							ieee->pairwise_key_type,
+							(u8 *)ieee->ap_mac_addr,
+								0, key, 0);
 						rtl92e_set_key(dev,
 							       ipw->u.crypt.idx,
 							       ipw->u.crypt.idx,
-							       ieee->pairwise_key_type,
-							       (u8 *)ieee->ap_mac_addr,
-							       0, key);
+							ieee->pairwise_key_type,
+							(u8 *)ieee->ap_mac_addr,
+									0, key);
 					}
 				}
 				if ((ieee->pairwise_key_type == KEY_TYPE_CCMP)
