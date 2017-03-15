@@ -1902,20 +1902,25 @@ static int __add_preferred_console(char *name, int idx, char *options,
 	int i;
 
 	/*
-	 *	See if this tty is not yet registered, and
-	 *	if we have a slot free.
+	 * Don't check if the console has already been registered, because it is
+	 * pointless.  After all, we can not check if two entries refer to
+	 * the same console if one is matched with console->match(), and another
+	 * by name/index:
+	 *
+	 *	pl011,mmio,0x87e024000000,115200 -- added from SPCR
+	 *	ttyAMA0 -- added from command line
+	 *
+	 * Also this allows to maintain an invariant that will help to find if
+	 * the matching console is preferred, see register_console():
+	 *
+	 *	The last non-braille console is always the preferred one.
 	 */
-	for (i = 0, c = console_cmdline;
-	     i < MAX_CMDLINECONSOLES && c->name[0];
-	     i++, c++) {
-		if (strcmp(c->name, name) == 0 && c->index == idx) {
-			if (!brl_options)
-				preferred_console = i;
-			return 0;
-		}
-	}
+	for (i = 0; i < MAX_CMDLINECONSOLES; i++)
+		if (!console_cmdline[i].name[0])
+			break;
 	if (i == MAX_CMDLINECONSOLES)
 		return -E2BIG;
+	c = console_cmdline + i;
 	if (!brl_options)
 		preferred_console = i;
 	strlcpy(c->name, name, sizeof(c->name));
@@ -2457,12 +2462,20 @@ void register_console(struct console *newcon)
 	}
 
 	/*
-	 *	See if this console matches one we selected on
-	 *	the command line.
+	 * See if this console matches one we selected on the command line.
+	 *
+	 * The console_cmdline array is traversed in the reverse order because
+	 * we want to be sure that if this console is preferred then it will be
+	 * the first matching entry.  We use the invariant that is maintained in
+	 * __add_preferred_console().
 	 */
-	for (i = 0, c = console_cmdline;
-	     i < MAX_CMDLINECONSOLES && c->name[0];
-	     i++, c++) {
+	for (i = MAX_CMDLINECONSOLES - 1; i >= 0; i--) {
+
+		if (!console_cmdline[i].name[0])
+			continue;
+
+		c = console_cmdline + i;
+
 		if (!newcon->match ||
 		    newcon->match(newcon, c->name, c->index, c->options) != 0) {
 			/* default matching */
