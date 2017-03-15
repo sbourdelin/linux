@@ -132,23 +132,23 @@ lockdep_count_backward_deps(struct lock_class *class)
  * and we want to avoid too much cache bouncing.
  */
 struct lockdep_stats {
-	int	chain_lookup_hits;
-	int	chain_lookup_misses;
-	int	hardirqs_on_events;
-	int	hardirqs_off_events;
-	int	redundant_hardirqs_on;
-	int	redundant_hardirqs_off;
-	int	softirqs_on_events;
-	int	softirqs_off_events;
-	int	redundant_softirqs_on;
-	int	redundant_softirqs_off;
-	int	nr_unused_locks;
-	int	nr_cyclic_checks;
-	int	nr_cyclic_check_recursions;
-	int	nr_find_usage_forwards_checks;
-	int	nr_find_usage_forwards_recursions;
-	int	nr_find_usage_backwards_checks;
-	int	nr_find_usage_backwards_recursions;
+	unsigned long	chain_lookup_hits;
+	unsigned long	chain_lookup_misses;
+	unsigned long	hardirqs_on_events;
+	unsigned long	hardirqs_off_events;
+	unsigned long	redundant_hardirqs_on;
+	unsigned long	redundant_hardirqs_off;
+	unsigned long	softirqs_on_events;
+	unsigned long	softirqs_off_events;
+	unsigned long	redundant_softirqs_on;
+	unsigned long	redundant_softirqs_off;
+	unsigned long	nr_unused_locks;
+	unsigned long	nr_cyclic_checks;
+	unsigned long	nr_cyclic_check_recursions;
+	unsigned long	nr_find_usage_forwards_checks;
+	unsigned long	nr_find_usage_forwards_recursions;
+	unsigned long	nr_find_usage_backwards_checks;
+	unsigned long	nr_find_usage_backwards_recursions;
 };
 
 DECLARE_PER_CPU(struct lockdep_stats, lockdep_stats);
