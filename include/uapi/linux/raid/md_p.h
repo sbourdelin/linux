@@ -1,15 +1,15 @@
 /*
    md_p.h : physical layout of Linux RAID devices
           Copyright (C) 1996-98 Ingo Molnar, Gadi Oxman
-	  
+
    This program is free software; you can redistribute it and/or modify
    it under the terms of the GNU General Public License as published by
    the Free Software Foundation; either version 2, or (at your option)
    any later version.
-   
+
    You should have received a copy of the GNU General Public License
    (for example /usr/src/linux/COPYING); if not, write to the Free
-   Software Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.  
+   Software Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
 */
 
 #ifndef _MD_P_H
@@ -115,6 +115,11 @@ typedef struct mdp_device_descriptor_s {
 
 #define	MD_SB_CLUSTERED		5 /* MD is clustered */
 #define	MD_SB_BITMAP_PRESENT	8 /* bitmap may be present nearby */
+#define	MD_SB_HAS_JOURNAL	9
+#define	MD_SB_JOURNAL_REMOVABLE	10 /* journal _feature_ can be removed,
+				    * which means the journal is either
+				    * missing or Faulty
+				    */
 
 /*
  * Notes:

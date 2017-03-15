@@ -5804,6 +5804,25 @@ static void autorun_devices(int part)
 }
 #endif /* !MODULE */
 
+/*
+ * the journal _feature_ is removable when:
+ * the array has journal support &&
+ *    (journal is missing || journal is faulty)
+ */
+static bool journal_removable(struct mddev *mddev)
+{
+	struct md_rdev *rdev;
+
+	if (!test_bit(MD_HAS_JOURNAL, &mddev->flags))
+		return false;
+
+	rdev_for_each_rcu(rdev, mddev)
+		if (test_bit(Journal, &rdev->flags) &&
+		    !test_bit(Faulty, &rdev->flags))
+		    return false;
+	return true;
+}
+
 static int get_version(void __user *arg)
 {
 	mdu_version_t ver;
@@ -5861,6 +5880,10 @@ static int get_array_info(struct mddev *mddev, void __user *arg)
 		info.state |= (1<<MD_SB_BITMAP_PRESENT);
 	if (mddev_is_clustered(mddev))
 		info.state |= (1<<MD_SB_CLUSTERED);
+	if (test_bit(MD_HAS_JOURNAL, &mddev->flags))
+		info.state |= (1<<MD_SB_HAS_JOURNAL);
+	if (journal_removable(mddev))
+		info.state |= (1<<MD_SB_JOURNAL_REMOVABLE);
 	info.active_disks  = insync;
 	info.working_disks = working;
 	info.failed_disks  = failed;
@@ -6524,6 +6547,10 @@ static int update_array_info(struct mddev *mddev, mdu_array_info_t *info)
 	/* calculate expected state,ignoring low bits */
 	if (mddev->bitmap && mddev->bitmap_info.offset)
 		state |= (1 << MD_SB_BITMAP_PRESENT);
+	if (test_bit(MD_HAS_JOURNAL, &mddev->flags))
+		state |= (1 << MD_SB_HAS_JOURNAL);
+	if (journal_removable(mddev))
+		state |= (1 << MD_SB_JOURNAL_REMOVABLE);
 
 	if (mddev->major_version != info->major_version ||
 	    mddev->minor_version != info->minor_version ||
@@ -6533,8 +6560,11 @@ static int update_array_info(struct mddev *mddev, mdu_array_info_t *info)
 /*	    mddev->layout        != info->layout        || */
 	    mddev->persistent	 != !info->not_persistent ||
 	    mddev->chunk_sectors != info->chunk_size >> 9 ||
-	    /* ignore bottom 8 bits of state, and allow SB_BITMAP_PRESENT to change */
-	    ((state^info->state) & 0xfffffe00)
+	    /*
+	     * ignore bottom 8 bits of state, and allow SB_BITMAP_PRESENT
+	     * and SB_HAS_JOURNAL to change
+	     */
+	    ((state^info->state) & 0xfffffc00)
 		)
 		return -EINVAL;
 	/* Check there is only one change */
@@ -6545,6 +6575,8 @@ static int update_array_info(struct mddev *mddev, mdu_array_info_t *info)
 	if (mddev->layout != info->layout)
 		cnt++;
 	if ((state ^ info->state) & (1<<MD_SB_BITMAP_PRESENT))
+		cnt++;
+	if ((state ^ info->state) & (1<<MD_SB_HAS_JOURNAL))
 		cnt++;
 	if (cnt == 0)
 		return 0;
@@ -6635,6 +6667,14 @@ static int update_array_info(struct mddev *mddev, mdu_array_info_t *info)
 			mddev->bitmap_info.offset = 0;
 		}
 	}
+	if ((state ^ info->state) & (1<<MD_SB_HAS_JOURNAL)) {
+		if (!journal_removable(mddev)) {
+			rv = -EINVAL;
+			goto err;
+		}
+		clear_bit(MD_HAS_JOURNAL,  &mddev->flags);
+	}
+
 	md_update_sb(mddev, 1);
 	return rv;
 err:
