@@ -18,11 +18,9 @@
  * this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-#include <linux/backlight.h>
 #include <linux/gpio/consumer.h>
 #include <linux/module.h>
 #include <linux/of.h>
-#include <linux/regulator/consumer.h>
 
 #include <drm/drmP.h>
 #include <drm/drm_crtc.h>
@@ -31,16 +29,16 @@
 
 #include <video/mipi_display.h>
 
+#include "panel-common.h"
+
 struct sharp_nt_panel {
 	struct drm_panel base;
+	struct panel_common common;
 	struct mipi_dsi_device *dsi;
 
-	struct backlight_device *backlight;
-	struct regulator *supply;
 	struct gpio_desc *reset_gpio;
 
 	bool prepared;
-	bool enabled;
 
 	const struct drm_display_mode *mode;
 };
@@ -114,17 +112,7 @@ static int sharp_nt_panel_disable(struct drm_panel *panel)
 {
 	struct sharp_nt_panel *sharp_nt = to_sharp_nt_panel(panel);
 
-	if (!sharp_nt->enabled)
-		return 0;
-
-	if (sharp_nt->backlight) {
-		sharp_nt->backlight->props.power = FB_BLANK_POWERDOWN;
-		backlight_update_status(sharp_nt->backlight);
-	}
-
-	sharp_nt->enabled = false;
-
-	return 0;
+	return panel_common_disable(&sharp_nt->common, 0);
 }
 
 static int sharp_nt_panel_unprepare(struct drm_panel *panel)
@@ -141,7 +129,10 @@ static int sharp_nt_panel_unprepare(struct drm_panel *panel)
 		return ret;
 	}
 
-	regulator_disable(sharp_nt->supply);
+	ret = panel_common_unprepare(&sharp_nt->common, 0);
+	if (ret < 0)
+		dev_err(panel->dev, "failed common unprepare: %d\n", ret);
+
 	if (sharp_nt->reset_gpio)
 		gpiod_set_value(sharp_nt->reset_gpio, 0);
 
@@ -158,11 +149,9 @@ static int sharp_nt_panel_prepare(struct drm_panel *panel)
 	if (sharp_nt->prepared)
 		return 0;
 
-	ret = regulator_enable(sharp_nt->supply);
+	ret = panel_common_prepare(&sharp_nt->common, 20);
 	if (ret < 0)
 		return ret;
-
-	msleep(20);
 
 	if (sharp_nt->reset_gpio) {
 		gpiod_set_value(sharp_nt->reset_gpio, 1);
@@ -190,7 +179,7 @@ static int sharp_nt_panel_prepare(struct drm_panel *panel)
 	return 0;
 
 poweroff:
-	regulator_disable(sharp_nt->supply);
+	panel_common_unprepare(&sharp_nt->common, 0);
 	if (sharp_nt->reset_gpio)
 		gpiod_set_value(sharp_nt->reset_gpio, 0);
 	return ret;
@@ -200,17 +189,7 @@ static int sharp_nt_panel_enable(struct drm_panel *panel)
 {
 	struct sharp_nt_panel *sharp_nt = to_sharp_nt_panel(panel);
 
-	if (sharp_nt->enabled)
-		return 0;
-
-	if (sharp_nt->backlight) {
-		sharp_nt->backlight->props.power = FB_BLANK_UNBLANK;
-		backlight_update_status(sharp_nt->backlight);
-	}
-
-	sharp_nt->enabled = true;
-
-	return 0;
+	return panel_common_enable(&sharp_nt->common, 0);
 }
 
 static const struct drm_display_mode default_mode = {
@@ -259,14 +238,14 @@ static const struct drm_panel_funcs sharp_nt_panel_funcs = {
 static int sharp_nt_panel_add(struct sharp_nt_panel *sharp_nt)
 {
 	struct device *dev = &sharp_nt->dsi->dev;
-	struct device_node *np;
 	int ret;
 
 	sharp_nt->mode = &default_mode;
 
-	sharp_nt->supply = devm_regulator_get(dev, "avdd");
-	if (IS_ERR(sharp_nt->supply))
-		return PTR_ERR(sharp_nt->supply);
+	ret = panel_common_init(dev, &sharp_nt->common, "avdd", "",
+				"backlight");
+	if (ret < 0)
+		return ret;
 
 	sharp_nt->reset_gpio = devm_gpiod_get(dev, "reset", GPIOD_OUT_LOW);
 	if (IS_ERR(sharp_nt->reset_gpio)) {
@@ -277,28 +256,18 @@ static int sharp_nt_panel_add(struct sharp_nt_panel *sharp_nt)
 		gpiod_set_value(sharp_nt->reset_gpio, 0);
 	}
 
-	np = of_parse_phandle(dev->of_node, "backlight", 0);
-	if (np) {
-		sharp_nt->backlight = of_find_backlight_by_node(np);
-		of_node_put(np);
-
-		if (!sharp_nt->backlight)
-			return -EPROBE_DEFER;
-	}
-
 	drm_panel_init(&sharp_nt->base);
 	sharp_nt->base.funcs = &sharp_nt_panel_funcs;
 	sharp_nt->base.dev = &sharp_nt->dsi->dev;
 
 	ret = drm_panel_add(&sharp_nt->base);
 	if (ret < 0)
-		goto put_backlight;
+		goto err_common;
 
 	return 0;
 
-put_backlight:
-	if (sharp_nt->backlight)
-		put_device(&sharp_nt->backlight->dev);
+err_common:
+	panel_common_fini(&sharp_nt->common);
 
 	return ret;
 }
@@ -308,8 +277,7 @@ static void sharp_nt_panel_del(struct sharp_nt_panel *sharp_nt)
 	if (sharp_nt->base.dev)
 		drm_panel_remove(&sharp_nt->base);
 
-	if (sharp_nt->backlight)
-		put_device(&sharp_nt->backlight->dev);
+	panel_common_fini(&sharp_nt->common);
 }
 
 static int sharp_nt_panel_probe(struct mipi_dsi_device *dsi)
