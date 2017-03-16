@@ -1151,6 +1151,8 @@ static void stage2_wp_range(struct kvm *kvm, phys_addr_t addr, phys_addr_t end)
 	pgd_t *pgd;
 	phys_addr_t next;
 
+	assert_spin_locked(&kvm->mmu_lock);
+
 	pgd = kvm->arch.pgd + stage2_pgd_index(addr);
 	do {
 		/*
@@ -1160,8 +1162,7 @@ static void stage2_wp_range(struct kvm *kvm, phys_addr_t addr, phys_addr_t end)
 		 * CONFIG_LOCKDEP. Additionally, holding the lock too long
 		 * will also starve other vCPUs.
 		 */
-		if (need_resched() || spin_needbreak(&kvm->mmu_lock))
-			cond_resched_lock(&kvm->mmu_lock);
+		cond_resched_lock(&kvm->mmu_lock);
 
 		next = stage2_pgd_addr_end(addr, end);
 		if (stage2_pgd_present(*pgd))
