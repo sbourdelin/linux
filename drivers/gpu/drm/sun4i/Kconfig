@@ -12,3 +12,12 @@ config DRM_SUN4I
 	  Choose this option if you have an Allwinner SoC with a
 	  Display Engine. If M is selected the module will be called
 	  sun4i-drm.
+
+config DRM_SUN4I_DE2
+	bool "Support Display Engine 2.0"
+	depends on DRM_SUN4I
+	default MACH_SUN8I
+	select SUN8I_DE2_CCU
+	help
+	  Choose this option if you have an Allwinner SoC with a
+	  "Display Engine 2.0".

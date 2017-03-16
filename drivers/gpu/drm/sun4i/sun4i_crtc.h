@@ -18,6 +18,7 @@ struct sun4i_crtc {
 	struct drm_pending_vblank_event	*event;
 
 	struct sun4i_backend		*backend;
+	struct sun8i_mixer		*mixer;
 	struct sun4i_tcon		*tcon;
 	struct sun4i_layer		**layers;
 };
@@ -29,6 +30,7 @@ static inline struct sun4i_crtc *drm_crtc_to_sun4i_crtc(struct drm_crtc *crtc)
 
 struct sun4i_crtc *sun4i_crtc_init(struct drm_device *drm,
 				   struct sun4i_backend *backend,
+				   struct sun8i_mixer *mixer,
 				   struct sun4i_tcon *tcon);
 
 #endif /* _SUN4I_CRTC_H_ */

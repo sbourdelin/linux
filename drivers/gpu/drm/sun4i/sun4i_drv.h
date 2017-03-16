@@ -18,6 +18,7 @@
 
 struct sun4i_drv {
 	struct sun4i_backend	*backend;
+	struct sun8i_mixer	*mixer;
 	struct sun4i_tcon	*tcon;
 
 	struct drm_fbdev_cma	*fbdev;

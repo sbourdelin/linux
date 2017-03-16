@@ -26,8 +26,8 @@
 #include <video/videomode.h>
 
 #include "sun4i_backend.h"
+#include "sun8i_mixer.h"
 #include "sun4i_crtc.h"
-#include "sun4i_drv.h"
 #include "sun4i_layer.h"
 #include "sun4i_tcon.h"
 
@@ -56,7 +56,10 @@ static void sun4i_crtc_atomic_flush(struct drm_crtc *crtc,
 
 	DRM_DEBUG_DRIVER("Committing plane changes\n");
 
-	sun4i_backend_commit(scrtc->backend);
+	if (scrtc->backend)
+		sun4i_backend_commit(scrtc->backend);
+	else if (scrtc->mixer)
+		sun8i_mixer_commit(scrtc->mixer);
 
 	if (event) {
 		crtc->state->event = NULL;
@@ -136,6 +139,7 @@ static const struct drm_crtc_funcs sun4i_crtc_funcs = {
 
 struct sun4i_crtc *sun4i_crtc_init(struct drm_device *drm,
 				   struct sun4i_backend *backend,
+				   struct sun8i_mixer *mixer,
 				   struct sun4i_tcon *tcon)
 {
 	struct sun4i_crtc *scrtc;
@@ -146,10 +150,14 @@ struct sun4i_crtc *sun4i_crtc_init(struct drm_device *drm,
 	if (!scrtc)
 		return ERR_PTR(-ENOMEM);
 	scrtc->backend = backend;
+	scrtc->mixer = mixer;
 	scrtc->tcon = tcon;
 
 	/* Create our layers */
-	scrtc->layers = sun4i_layers_init(drm, scrtc->backend);
+	if (backend)
+		scrtc->layers = sun4i_layers_init(drm, backend);
+	else if (mixer)
+		scrtc->layers = sun8i_layers_init(drm, mixer);
 	if (IS_ERR(scrtc->layers)) {
 		dev_err(drm->dev, "Couldn't create the planes\n");
 		return NULL;

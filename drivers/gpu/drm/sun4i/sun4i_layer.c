@@ -16,49 +16,63 @@
 #include <drm/drmP.h>
 
 #include "sun4i_backend.h"
+#include "sun8i_mixer.h"
 #include "sun4i_layer.h"
 
 struct sun4i_plane_desc {
 	       enum drm_plane_type     type;
+	       /* Pipe is not used in sun8i-mixer */
 	       u8                      pipe;
 	       const uint32_t          *formats;
 	       uint32_t                nformats;
 };
 
-static int sun4i_backend_layer_atomic_check(struct drm_plane *plane,
+static int sun4i_layer_atomic_check(struct drm_plane *plane,
 					    struct drm_plane_state *state)
 {
 	return 0;
 }
 
-static void sun4i_backend_layer_atomic_disable(struct drm_plane *plane,
+static void sun4i_layer_atomic_disable(struct drm_plane *plane,
 					       struct drm_plane_state *old_state)
 {
 	struct sun4i_layer *layer = plane_to_sun4i_layer(plane);
 	struct sun4i_backend *backend = layer->backend;
+	struct sun8i_mixer *mixer = layer->mixer;
 
-	sun4i_backend_layer_enable(backend, layer->id, false);
+	if (backend)
+		sun4i_backend_layer_enable(backend, layer->id, false);
+	else if (mixer)
+		sun8i_mixer_layer_enable(mixer, layer->id, false);
 }
 
-static void sun4i_backend_layer_atomic_update(struct drm_plane *plane,
+static void sun4i_layer_atomic_update(struct drm_plane *plane,
 					      struct drm_plane_state *old_state)
 {
 	struct sun4i_layer *layer = plane_to_sun4i_layer(plane);
 	struct sun4i_backend *backend = layer->backend;
+	struct sun8i_mixer *mixer = layer->mixer;
 
-	sun4i_backend_update_layer_coord(backend, layer->id, plane);
-	sun4i_backend_update_layer_formats(backend, layer->id, plane);
-	sun4i_backend_update_layer_buffer(backend, layer->id, plane);
-	sun4i_backend_layer_enable(backend, layer->id, true);
+	if (backend) {
+		sun4i_backend_update_layer_coord(backend, layer->id, plane);
+		sun4i_backend_update_layer_formats(backend, layer->id, plane);
+		sun4i_backend_update_layer_buffer(backend, layer->id, plane);
+		sun4i_backend_layer_enable(backend, layer->id, true);
+	} else if (mixer) {
+		sun8i_mixer_update_layer_coord(mixer, layer->id, plane);
+		sun8i_mixer_update_layer_formats(mixer, layer->id, plane);
+		sun8i_mixer_update_layer_buffer(mixer, layer->id, plane);
+		sun8i_mixer_layer_enable(mixer, layer->id, true);
+	}
 }
 
-static struct drm_plane_helper_funcs sun4i_backend_layer_helper_funcs = {
-	.atomic_check	= sun4i_backend_layer_atomic_check,
-	.atomic_disable	= sun4i_backend_layer_atomic_disable,
-	.atomic_update	= sun4i_backend_layer_atomic_update,
+static struct drm_plane_helper_funcs sun4i_layer_helper_funcs = {
+	.atomic_check	= sun4i_layer_atomic_check,
+	.atomic_disable	= sun4i_layer_atomic_disable,
+	.atomic_update	= sun4i_layer_atomic_update,
 };
 
-static const struct drm_plane_funcs sun4i_backend_layer_funcs = {
+static const struct drm_plane_funcs sun4i_layer_funcs = {
 	.atomic_destroy_state	= drm_atomic_helper_plane_destroy_state,
 	.atomic_duplicate_state	= drm_atomic_helper_plane_duplicate_state,
 	.destroy		= drm_plane_cleanup,
@@ -85,6 +99,12 @@ static const uint32_t sun4i_backend_layer_formats_overlay[] = {
 	DRM_FORMAT_XRGB8888,
 };
 
+static const uint32_t sun8i_mixer_layer_formats[] = {
+	DRM_FORMAT_ARGB8888,
+	DRM_FORMAT_RGB888,
+	DRM_FORMAT_XRGB8888,
+};
+
 static const struct sun4i_plane_desc sun4i_backend_planes[] = {
 	{
 		.type = DRM_PLANE_TYPE_PRIMARY,
@@ -100,8 +120,18 @@ static const struct sun4i_plane_desc sun4i_backend_planes[] = {
 	},
 };
 
+static const struct sun4i_plane_desc sun8i_mixer_planes[] = {
+	{
+		.type = DRM_PLANE_TYPE_PRIMARY,
+		.formats = sun8i_mixer_layer_formats,
+		.nformats = ARRAY_SIZE(sun8i_mixer_layer_formats),
+	},
+	/* TODO: add support for more planes */
+};
+
 static struct sun4i_layer *sun4i_layer_init_one(struct drm_device *drm,
 						struct sun4i_backend *backend,
+						struct sun8i_mixer *mixer,
 						const struct sun4i_plane_desc *plane)
 {
 	struct sun4i_layer *layer;
@@ -113,7 +143,7 @@ static struct sun4i_layer *sun4i_layer_init_one(struct drm_device *drm,
 
 	/* possible crtcs are set later */
 	ret = drm_universal_plane_init(drm, &layer->plane, 0,
-				       &sun4i_backend_layer_funcs,
+				       &sun4i_layer_funcs,
 				       plane->formats, plane->nformats,
 				       plane->type, NULL);
 	if (ret) {
@@ -122,8 +152,9 @@ static struct sun4i_layer *sun4i_layer_init_one(struct drm_device *drm,
 	}
 
 	drm_plane_helper_add(&layer->plane,
-			     &sun4i_backend_layer_helper_funcs);
+			     &sun4i_layer_helper_funcs);
 	layer->backend = backend;
+	layer->mixer = mixer;
 
 	return layer;
 }
@@ -164,7 +195,7 @@ struct sun4i_layer **sun4i_layers_init(struct drm_device *drm,
 		const struct sun4i_plane_desc *plane = &sun4i_backend_planes[i];
 		struct sun4i_layer *layer;
 
-		layer = sun4i_layer_init_one(drm, backend, plane);
+		layer = sun4i_layer_init_one(drm, backend, NULL, plane);
 		if (IS_ERR(layer)) {
 			dev_err(drm->dev, "Couldn't initialize %s plane\n",
 				i ? "overlay" : "primary");
@@ -176,6 +207,35 @@ struct sun4i_layer **sun4i_layers_init(struct drm_device *drm,
 		regmap_update_bits(backend->regs, SUN4I_BACKEND_ATTCTL_REG0(i),
 				   SUN4I_BACKEND_ATTCTL_REG0_LAY_PIPESEL_MASK,
 				   SUN4I_BACKEND_ATTCTL_REG0_LAY_PIPESEL(plane->pipe));
+
+		layer->id = i;
+		layers[i] = layer;
+	};
+
+	return layers;
+}
+
+struct sun4i_layer **sun8i_layers_init(struct drm_device *drm,
+				       struct sun8i_mixer *mixer)
+{
+	struct sun4i_layer **layers;
+	int i;
+
+	layers = devm_kcalloc(drm->dev, ARRAY_SIZE(sun8i_mixer_planes) + 1,
+			      sizeof(**layers), GFP_KERNEL);
+	if (!layers)
+		return ERR_PTR(-ENOMEM);
+
+	for (i = 0; i < ARRAY_SIZE(sun8i_mixer_planes); i++) {
+		const struct sun4i_plane_desc *plane = &sun8i_mixer_planes[i];
+		struct sun4i_layer *layer = layers[i];
+
+		layer = sun4i_layer_init_one(drm, NULL, mixer, plane);
+		if (IS_ERR(layer)) {
+			dev_err(drm->dev, "Couldn't initialize %s plane\n",
+				i ? "overlay" : "primary");
+			return ERR_CAST(layer);
+		};
 
 		layer->id = i;
 		layers[i] = layer;

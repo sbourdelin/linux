@@ -17,6 +17,7 @@ struct sun4i_layer {
 	struct drm_plane	plane;
 	struct sun4i_drv	*drv;
 	struct sun4i_backend	*backend;
+	struct sun8i_mixer	*mixer;
 	int			id;
 };
 
@@ -28,5 +29,7 @@ plane_to_sun4i_layer(struct drm_plane *plane)
 
 struct sun4i_layer **sun4i_layers_init(struct drm_device *drm,
 				       struct sun4i_backend *backend);
+struct sun4i_layer **sun8i_layers_init(struct drm_device *drm,
+				       struct sun8i_mixer *mixer);
 
 #endif /* _SUN4I_LAYER_H_ */
