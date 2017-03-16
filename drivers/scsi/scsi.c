@@ -640,9 +640,11 @@ EXPORT_SYMBOL(__scsi_iterate_devices);
  * @data:	Opaque passed to each function call.
  * @fn:		Function to call on each device
  *
- * This traverses over each device of @starget.  The devices have
- * a reference that must be released by scsi_host_put when breaking
- * out of the loop.
+ * This traverses over each device of @starget except the devices that are in
+ * state SDEV_DEL or SDEV_CANCEL. The devices have a reference that must be
+ * released by scsi_device_put() when breaking out of the loop. If the LLD
+ * associated with the devices is being unloaded, @fn is not called for any
+ * device.
  */
 void starget_for_each_device(struct scsi_target *starget, void *data,
 		     void (*fn)(struct scsi_device *, void *))
@@ -657,6 +659,50 @@ void starget_for_each_device(struct scsi_target *starget, void *data,
 	}
 }
 EXPORT_SYMBOL(starget_for_each_device);
+
+/**
+ * scsi_device_get_any() - get a reference to @sdev even if it is being deleted
+ *
+ * See also scsi_device_get().
+ */
+static int scsi_device_get_any(struct scsi_device *sdev)
+{
+	return get_device(&sdev->sdev_gendev) ? 0 : -ENXIO;
+}
+
+/**
+ * scsi_device_put_any() - drop a reference obtained by scsi_device_get_any()
+ *
+ * See also scsi_device_put().
+ */
+static void scsi_device_put_any(struct scsi_device *sdev)
+{
+	put_device(&sdev->sdev_gendev);
+}
+
+/**
+ * starget_for_all_devices - helper to walk all devices of a target
+ * @starget:	target whose devices we want to iterate over.
+ * @data:	Pointer passed to each function call.
+ * @fn:		Function to call on each device
+ *
+ * This traverses over each device of @starget, including the devices in state
+ * SDEV_DEL or SDEV_ANY. The devices have a reference that must be released by
+ * scsi_device_put_any() when breaking out of the loop.
+ */
+void starget_for_all_devices(struct scsi_target *starget, void *data,
+			     void (*fn)(struct scsi_device *, void *))
+{
+	struct Scsi_Host *shost = dev_to_shost(starget->dev.parent);
+	struct scsi_device *sdev;
+
+	shost_for_all_devices(sdev, shost, scsi_device_get_any,
+			      scsi_device_put_any)
+		if (sdev->channel == starget->channel &&
+		    sdev->id == starget->id)
+			fn(sdev, data);
+}
+EXPORT_SYMBOL(starget_for_all_devices);
 
 /**
  * __starget_for_each_device - helper to walk all devices of a target (UNLOCKED)

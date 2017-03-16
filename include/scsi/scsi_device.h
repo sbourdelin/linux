@@ -328,6 +328,8 @@ extern struct scsi_device *__scsi_device_lookup_by_target(struct scsi_target *,
 							  u64);
 extern void starget_for_each_device(struct scsi_target *, void *,
 		     void (*fn)(struct scsi_device *, void *));
+extern void starget_for_all_devices(struct scsi_target *, void *,
+				    void (*fn)(struct scsi_device *, void *));
 extern void __starget_for_each_device(struct scsi_target *, void *,
 				      void (*fn)(struct scsi_device *,
 						 void *));
@@ -339,6 +341,22 @@ extern struct scsi_device *__scsi_iterate_devices(struct Scsi_Host *,
 					void (*put)(struct scsi_device *));
 
 /**
+ * shost_for_all_devices - iterate over all devices of a host
+ * @sdev: the &struct scsi_device to use as a cursor
+ * @shost: the &struct scsi_host to iterate over
+ * @get: function that obtains a reference to a device and returns 0 upon
+ *       success
+ * @put: function that drops a device reference.
+ *
+ * Iterator that returns each device attached to @shost.  This loop
+ * takes a reference on each device and releases it at the end.  If
+ * you break out of the loop, you must call @put(sdev).
+ */
+#define shost_for_all_devices(sdev, shost, get, put)			\
+	for ((sdev) = NULL; ((sdev) = __scsi_iterate_devices((shost), (sdev), \
+	     (get), (put))) != NULL; )
+
+/**
  * shost_for_each_device - iterate over all devices of a host
  * @sdev: the &struct scsi_device to use as a cursor
  * @shost: the &struct scsi_host to iterate over
@@ -348,8 +366,8 @@ extern struct scsi_device *__scsi_iterate_devices(struct Scsi_Host *,
  * you break out of the loop, you must call scsi_device_put(sdev).
  */
 #define shost_for_each_device(sdev, shost)			\
-	for ((sdev) = NULL; ((sdev) = __scsi_iterate_devices((shost), (sdev), \
-	     scsi_device_get, scsi_device_put)) != NULL; )
+	shost_for_all_devices((sdev), (shost), scsi_device_get,	\
+			      scsi_device_put)
 
 /**
  * __shost_for_each_device - iterate over all devices of a host (UNLOCKED)
