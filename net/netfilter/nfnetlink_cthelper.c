@@ -214,7 +214,7 @@ nfnl_cthelper_create(const struct nlattr * const tb[],
 
 	ret = nfnl_cthelper_parse_expect_policy(helper, tb[NFCTH_POLICY]);
 	if (ret < 0)
-		goto err;
+		goto err1;
 
 	strncpy(helper->name, nla_data(tb[NFCTH_NAME]), NF_CT_HELPER_NAME_LEN);
 	helper->data_len = ntohl(nla_get_be32(tb[NFCTH_PRIV_DATA_LEN]));
@@ -245,10 +245,12 @@ nfnl_cthelper_create(const struct nlattr * const tb[],
 
 	ret = nf_conntrack_helper_register(helper);
 	if (ret < 0)
-		goto err;
+		goto err2;
 
 	return 0;
-err:
+err2:
+	kfree(helper->expect_policy);
+err1:
 	kfree(helper);
 	return ret;
 }
