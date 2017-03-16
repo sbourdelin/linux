@@ -1331,9 +1331,10 @@ int drm_fb_helper_check_var(struct fb_var_screeninfo *var,
 	 * Changes struct fb_var_screeninfo are currently not pushed back
 	 * to KMS, hence fail if different settings are requested.
 	 */
-	if (var->bits_per_pixel != fb->format->cpp[0] * 8 ||
-	    var->xres != fb->width || var->yres != fb->height ||
-	    var->xres_virtual != fb->width || var->yres_virtual != fb->height) {
+	if ((info->flags & FBINFO_MISC_USEREVENT) &&
+	    (var->bits_per_pixel != fb->format->cpp[0] * 8 ||
+	     var->xres != fb->width || var->yres != fb->height ||
+	     var->xres_virtual != fb->width || var->yres_virtual != fb->height)) {
 		DRM_DEBUG("fb userspace requested width/height/bpp different than current fb "
 			  "request %dx%d-%d (virtual %dx%d) > %dx%d-%d\n",
 			  var->xres, var->yres, var->bits_per_pixel,
