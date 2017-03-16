@@ -4540,40 +4540,41 @@ void show_free_areas(unsigned int filter, nodemask_t *nodemask)
 		       " inactive_anon:%lukB"
 		       " active_file:%lukB"
 		       " inactive_file:%lukB"
-		       " unevictable:%lukB"
-		       " isolated(anon):%lukB"
-		       " isolated(file):%lukB"
-		       " mapped:%lukB"
-		       " dirty:%lukB"
-		       " writeback:%lukB"
-		       " shmem:%lukB"
-#ifdef CONFIG_TRANSPARENT_HUGEPAGE
-		       " shmem_thp: %lukB"
-		       " shmem_pmdmapped: %lukB"
-		       " anon_thp: %lukB"
-#endif
-		       " writeback_tmp:%lukB"
-		       " unstable:%lukB"
-		       " all_unreclaimable? %s"
-		       "\n",
+		       " unevictable:%lukB",
 		       pgdat->node_id,
 		       K(node_page_state(pgdat, NR_ACTIVE_ANON)),
 		       K(node_page_state(pgdat, NR_INACTIVE_ANON)),
 		       K(node_page_state(pgdat, NR_ACTIVE_FILE)),
 		       K(node_page_state(pgdat, NR_INACTIVE_FILE)),
-		       K(node_page_state(pgdat, NR_UNEVICTABLE)),
+		       K(node_page_state(pgdat, NR_UNEVICTABLE)));
+		printk(KERN_CONT
+		       " isolated(anon):%lukB"
+		       " isolated(file):%lukB"
+		       " mapped:%lukB"
+		       " dirty:%lukB"
+		       " writeback:%lukB"
+		       " shmem:%lukB",
 		       K(node_page_state(pgdat, NR_ISOLATED_ANON)),
 		       K(node_page_state(pgdat, NR_ISOLATED_FILE)),
 		       K(node_page_state(pgdat, NR_FILE_MAPPED)),
 		       K(node_page_state(pgdat, NR_FILE_DIRTY)),
 		       K(node_page_state(pgdat, NR_WRITEBACK)),
+		       K(node_page_state(pgdat, NR_SHMEM)));
 #ifdef CONFIG_TRANSPARENT_HUGEPAGE
+		printk(KERN_CONT
+		       " shmem_thp: %lukB"
+		       " shmem_pmdmapped: %lukB"
+		       " anon_thp: %lukB",
 		       K(node_page_state(pgdat, NR_SHMEM_THPS) * HPAGE_PMD_NR),
 		       K(node_page_state(pgdat, NR_SHMEM_PMDMAPPED)
 			 * HPAGE_PMD_NR),
-		       K(node_page_state(pgdat, NR_ANON_THPS) * HPAGE_PMD_NR),
+		       K(node_page_state(pgdat, NR_ANON_THPS) * HPAGE_PMD_NR));
 #endif
-		       K(node_page_state(pgdat, NR_SHMEM)),
+		printk(KERN_CONT
+		       " writeback_tmp:%lukB"
+		       " unstable:%lukB"
+		       " all_unreclaimable? %s"
+		       "\n",
 		       K(node_page_state(pgdat, NR_WRITEBACK_TEMP)),
 		       K(node_page_state(pgdat, NR_UNSTABLE_NFS)),
 		       pgdat->kswapd_failures >= MAX_RECLAIM_RETRIES ?
