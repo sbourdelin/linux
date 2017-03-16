@@ -21,12 +21,9 @@
  * DEALINGS IN THE SOFTWARE.
  */
 
-#include <linux/backlight.h>
-#include <linux/gpio/consumer.h>
 #include <linux/module.h>
 #include <linux/of_platform.h>
 #include <linux/platform_device.h>
-#include <linux/regulator/consumer.h>
 
 #include <drm/drmP.h>
 #include <drm/drm_crtc.h>
@@ -35,6 +32,8 @@
 
 #include <video/display_timing.h>
 #include <video/videomode.h>
+
+#include "panel-common.h"
 
 struct panel_desc {
 	const struct drm_display_mode *modes;
@@ -77,13 +76,13 @@ struct panel_desc {
 
 struct panel_simple {
 	struct drm_panel base;
+	struct panel_common common;
+
 	bool prepared;
 	bool enabled;
 
 	const struct panel_desc *desc;
 
-	struct backlight_device *backlight;
-	struct regulator *supply;
 	struct i2c_adapter *ddc;
 
 	struct gpio_desc *enable_gpio;
@@ -163,87 +162,28 @@ static int panel_simple_disable(struct drm_panel *panel)
 {
 	struct panel_simple *p = to_panel_simple(panel);
 
-	if (!p->enabled)
-		return 0;
-
-	if (p->backlight) {
-		p->backlight->props.power = FB_BLANK_POWERDOWN;
-		p->backlight->props.state |= BL_CORE_FBBLANK;
-		backlight_update_status(p->backlight);
-	}
-
-	if (p->desc->delay.disable)
-		msleep(p->desc->delay.disable);
-
-	p->enabled = false;
-
-	return 0;
+	return panel_common_disable(&p->common, p->desc->delay.disable);
 }
 
 static int panel_simple_unprepare(struct drm_panel *panel)
 {
 	struct panel_simple *p = to_panel_simple(panel);
 
-	if (!p->prepared)
-		return 0;
-
-	if (p->enable_gpio)
-		gpiod_set_value_cansleep(p->enable_gpio, 0);
-
-	regulator_disable(p->supply);
-
-	if (p->desc->delay.unprepare)
-		msleep(p->desc->delay.unprepare);
-
-	p->prepared = false;
-
-	return 0;
+	return panel_common_unprepare(&p->common, p->desc->delay.unprepare);
 }
 
 static int panel_simple_prepare(struct drm_panel *panel)
 {
 	struct panel_simple *p = to_panel_simple(panel);
-	int err;
 
-	if (p->prepared)
-		return 0;
-
-	err = regulator_enable(p->supply);
-	if (err < 0) {
-		dev_err(panel->dev, "failed to enable supply: %d\n", err);
-		return err;
-	}
-
-	if (p->enable_gpio)
-		gpiod_set_value_cansleep(p->enable_gpio, 1);
-
-	if (p->desc->delay.prepare)
-		msleep(p->desc->delay.prepare);
-
-	p->prepared = true;
-
-	return 0;
+	return panel_common_prepare(&p->common, p->desc->delay.prepare);
 }
 
 static int panel_simple_enable(struct drm_panel *panel)
 {
 	struct panel_simple *p = to_panel_simple(panel);
 
-	if (p->enabled)
-		return 0;
-
-	if (p->desc->delay.enable)
-		msleep(p->desc->delay.enable);
-
-	if (p->backlight) {
-		p->backlight->props.state &= ~BL_CORE_FBBLANK;
-		p->backlight->props.power = FB_BLANK_UNBLANK;
-		backlight_update_status(p->backlight);
-	}
-
-	p->enabled = true;
-
-	return 0;
+	return panel_common_enable(&p->common, p->desc->delay.enable);
 }
 
 static int panel_simple_get_modes(struct drm_panel *panel)
@@ -295,7 +235,7 @@ static const struct drm_panel_funcs panel_simple_funcs = {
 
 static int panel_simple_probe(struct device *dev, const struct panel_desc *desc)
 {
-	struct device_node *backlight, *ddc;
+	struct device_node *ddc;
 	struct panel_simple *panel;
 	int err;
 
@@ -303,30 +243,12 @@ static int panel_simple_probe(struct device *dev, const struct panel_desc *desc)
 	if (!panel)
 		return -ENOMEM;
 
-	panel->enabled = false;
-	panel->prepared = false;
 	panel->desc = desc;
 
-	panel->supply = devm_regulator_get(dev, "power");
-	if (IS_ERR(panel->supply))
-		return PTR_ERR(panel->supply);
-
-	panel->enable_gpio = devm_gpiod_get_optional(dev, "enable",
-						     GPIOD_OUT_LOW);
-	if (IS_ERR(panel->enable_gpio)) {
-		err = PTR_ERR(panel->enable_gpio);
-		dev_err(dev, "failed to request GPIO: %d\n", err);
+	err = panel_common_init(dev, &panel->common, "supply", "gpio",
+				"backlight");
+	if (err)
 		return err;
-	}
-
-	backlight = of_parse_phandle(dev->of_node, "backlight", 0);
-	if (backlight) {
-		panel->backlight = of_find_backlight_by_node(backlight);
-		of_node_put(backlight);
-
-		if (!panel->backlight)
-			return -EPROBE_DEFER;
-	}
 
 	ddc = of_parse_phandle(dev->of_node, "ddc-i2c-bus", 0);
 	if (ddc) {
@@ -335,7 +257,7 @@ static int panel_simple_probe(struct device *dev, const struct panel_desc *desc)
 
 		if (!panel->ddc) {
 			err = -EPROBE_DEFER;
-			goto free_backlight;
+			goto free_common;
 		}
 	}
 
@@ -354,9 +276,8 @@ static int panel_simple_probe(struct device *dev, const struct panel_desc *desc)
 free_ddc:
 	if (panel->ddc)
 		put_device(&panel->ddc->dev);
-free_backlight:
-	if (panel->backlight)
-		put_device(&panel->backlight->dev);
+free_common:
+	panel_common_fini(&panel->common);
 
 	return err;
 }
@@ -373,8 +294,7 @@ static int panel_simple_remove(struct device *dev)
 	if (panel->ddc)
 		put_device(&panel->ddc->dev);
 
-	if (panel->backlight)
-		put_device(&panel->backlight->dev);
+	panel_common_fini(&panel->common);
 
 	return 0;
 }
