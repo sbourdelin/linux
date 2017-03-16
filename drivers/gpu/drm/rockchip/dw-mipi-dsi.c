@@ -1227,15 +1227,13 @@ static int dw_mipi_dsi_bind(struct device *dev, struct device *master,
 		clk_disable_unprepare(dsi->pclk);
 	}
 
-	dsi->phy_cfg_clk = devm_clk_get(dev, "phy_cfg");
-	if (IS_ERR(dsi->phy_cfg_clk)) {
-		ret = PTR_ERR(dsi->phy_cfg_clk);
-		if (ret != -ENOENT) {
+	if (pdata == &rk3399_mipi_dsi_drv_data) {
+		dsi->phy_cfg_clk = devm_clk_get(dev, "phy_cfg");
+		if (IS_ERR(dsi->phy_cfg_clk)) {
+			ret = PTR_ERR(dsi->phy_cfg_clk);
 			dev_err(dev, "Unable to get phy_cfg_clk: %d\n", ret);
 			return ret;
 		}
-		dsi->phy_cfg_clk = NULL;
-		dev_dbg(dev, "have not phy_cfg_clk\n");
 	}
 
 	ret = clk_prepare_enable(dsi->pllref_clk);
