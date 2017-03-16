@@ -3071,21 +3071,37 @@ device_unblock(struct scsi_device *sdev, void *data)
 	scsi_internal_device_unblock(sdev, *(enum scsi_device_state *)data);
 }
 
+/**
+ * target_unblock() - unblock all devices associated with a SCSI target
+ *
+ * Notes:
+ * - Do not use scsi_device_get() nor any of the macros that use this
+ *   function from inside scsi_target_block() because otherwise this function
+ *   won't have any effect when called while the SCSI LLD is being unloaded.
+ * - Do not hold the host lock around the device_unblock() calls because at
+ *   least for blk-sq the block layer queue lock is the outer lock and the
+ *   SCSI host lock is the inner lock.
+ */
 static int
 target_unblock(struct device *dev, void *data)
 {
 	if (scsi_is_target_device(dev))
-		starget_for_each_device(to_scsi_target(dev), data,
+		starget_for_all_devices(to_scsi_target(dev), data,
 					device_unblock);
 	return 0;
 }
 
+/**
+ * scsi_target_unblock() - unblock all devices associated with a SCSI target
+ * @dev: Either a pointer to the dev member of struct scsi_target or a pointer
+ *	to the shost_gendev member of struct Scsi_Host.
+ * @new_state: New SCSI device state.
+ */
 void
 scsi_target_unblock(struct device *dev, enum scsi_device_state new_state)
 {
 	if (scsi_is_target_device(dev))
-		starget_for_each_device(to_scsi_target(dev), &new_state,
-					device_unblock);
+		target_unblock(dev, &new_state);
 	else
 		device_for_each_child(dev, &new_state, target_unblock);
 }
