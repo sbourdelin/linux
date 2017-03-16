@@ -334,7 +334,9 @@ extern void __starget_for_each_device(struct scsi_target *, void *,
 
 /* only exposed to implement shost_for_each_device */
 extern struct scsi_device *__scsi_iterate_devices(struct Scsi_Host *,
-						  struct scsi_device *);
+					struct scsi_device *,
+					int (*get)(struct scsi_device *),
+					void (*put)(struct scsi_device *));
 
 /**
  * shost_for_each_device - iterate over all devices of a host
@@ -345,10 +347,9 @@ extern struct scsi_device *__scsi_iterate_devices(struct Scsi_Host *,
  * takes a reference on each device and releases it at the end.  If
  * you break out of the loop, you must call scsi_device_put(sdev).
  */
-#define shost_for_each_device(sdev, shost) \
-	for ((sdev) = __scsi_iterate_devices((shost), NULL); \
-	     (sdev); \
-	     (sdev) = __scsi_iterate_devices((shost), (sdev)))
+#define shost_for_each_device(sdev, shost)			\
+	for ((sdev) = NULL; ((sdev) = __scsi_iterate_devices((shost), (sdev), \
+	     scsi_device_get, scsi_device_put)) != NULL; )
 
 /**
  * __shost_for_each_device - iterate over all devices of a host (UNLOCKED)

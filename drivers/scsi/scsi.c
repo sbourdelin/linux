@@ -609,7 +609,9 @@ EXPORT_SYMBOL(scsi_device_put);
 
 /* helper for shost_for_each_device, see that for documentation */
 struct scsi_device *__scsi_iterate_devices(struct Scsi_Host *shost,
-					   struct scsi_device *prev)
+					   struct scsi_device *prev,
+					   int (*get)(struct scsi_device *),
+					   void (*put)(struct scsi_device *))
 {
 	struct list_head *list = (prev ? &prev->siblings : &shost->__devices);
 	struct scsi_device *next = NULL;
@@ -619,7 +621,7 @@ struct scsi_device *__scsi_iterate_devices(struct Scsi_Host *shost,
 	while (list->next != &shost->__devices) {
 		next = list_entry(list->next, struct scsi_device, siblings);
 		/* skip devices that we can't get a reference to */
-		if (!scsi_device_get(next))
+		if (!get(next))
 			break;
 		next = NULL;
 		list = list->next;
@@ -627,7 +629,7 @@ struct scsi_device *__scsi_iterate_devices(struct Scsi_Host *shost,
 	spin_unlock_irqrestore(shost->host_lock, flags);
 
 	if (prev)
-		scsi_device_put(prev);
+		put(prev);
 	return next;
 }
 EXPORT_SYMBOL(__scsi_iterate_devices);
