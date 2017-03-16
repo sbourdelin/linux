@@ -73,6 +73,7 @@ config DRM_PANEL_SHARP_LQ101R1SX01
 	depends on OF
 	depends on DRM_MIPI_DSI
 	depends on BACKLIGHT_CLASS_DEVICE
+	select DRM_PANEL_COMMON
 	help
 	  Say Y here if you want to enable support for Sharp LQ101R1SX01
 	  TFT-LCD modules. The panel has a 2560x1600 resolution and uses

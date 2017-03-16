@@ -6,11 +6,8 @@
  * published by the Free Software Foundation.
  */
 
-#include <linux/backlight.h>
-#include <linux/gpio/consumer.h>
 #include <linux/module.h>
 #include <linux/of.h>
-#include <linux/regulator/consumer.h>
 
 #include <drm/drmP.h>
 #include <drm/drm_crtc.h>
@@ -19,17 +16,17 @@
 
 #include <video/mipi_display.h>
 
+#include "panel-common.h"
+
 struct sharp_panel {
 	struct drm_panel base;
+	struct panel_common common;
+
 	/* the datasheet refers to them as DSI-LINK1 and DSI-LINK2 */
 	struct mipi_dsi_device *link1;
 	struct mipi_dsi_device *link2;
 
-	struct backlight_device *backlight;
-	struct regulator *supply;
-
 	bool prepared;
-	bool enabled;
 
 	const struct drm_display_mode *mode;
 };
@@ -93,17 +90,7 @@ static int sharp_panel_disable(struct drm_panel *panel)
 {
 	struct sharp_panel *sharp = to_sharp_panel(panel);
 
-	if (!sharp->enabled)
-		return 0;
-
-	if (sharp->backlight) {
-		sharp->backlight->props.power = FB_BLANK_POWERDOWN;
-		backlight_update_status(sharp->backlight);
-	}
-
-	sharp->enabled = false;
-
-	return 0;
+	return panel_common_disable(&sharp->common, 0);
 }
 
 static int sharp_panel_unprepare(struct drm_panel *panel)
@@ -126,11 +113,13 @@ static int sharp_panel_unprepare(struct drm_panel *panel)
 
 	msleep(120);
 
-	regulator_disable(sharp->supply);
+	err = panel_common_unprepare(&sharp->common, 0);
+	if (err < 0)
+		dev_err(panel->dev, "failed common unprepare: %d\n", err);
 
 	sharp->prepared = false;
 
-	return 0;
+	return err;
 }
 
 static int sharp_setup_symmetrical_split(struct mipi_dsi_device *left,
@@ -176,17 +165,15 @@ static int sharp_panel_prepare(struct drm_panel *panel)
 	if (sharp->prepared)
 		return 0;
 
-	err = regulator_enable(sharp->supply);
-	if (err < 0)
-		return err;
-
 	/*
 	 * According to the datasheet, the panel needs around 10 ms to fully
 	 * power up. At least another 120 ms is required before exiting sleep
 	 * mode to make sure the panel is ready. Throw in another 20 ms for
 	 * good measure.
 	 */
-	msleep(150);
+	err = panel_common_prepare(&sharp->common, 150);
+	if (err < 0)
+		return err;
 
 	err = mipi_dsi_dcs_exit_sleep_mode(sharp->link1);
 	if (err < 0) {
@@ -252,7 +239,7 @@ static int sharp_panel_prepare(struct drm_panel *panel)
 	return 0;
 
 poweroff:
-	regulator_disable(sharp->supply);
+	panel_common_unprepare(&sharp->common, 0);
 	return err;
 }
 
@@ -260,17 +247,7 @@ static int sharp_panel_enable(struct drm_panel *panel)
 {
 	struct sharp_panel *sharp = to_sharp_panel(panel);
 
-	if (sharp->enabled)
-		return 0;
-
-	if (sharp->backlight) {
-		sharp->backlight->props.power = FB_BLANK_UNBLANK;
-		backlight_update_status(sharp->backlight);
-	}
-
-	sharp->enabled = true;
-
-	return 0;
+	return panel_common_enable(&sharp->common, 0);
 }
 
 static const struct drm_display_mode default_mode = {
@@ -324,23 +301,15 @@ MODULE_DEVICE_TABLE(of, sharp_of_match);
 
 static int sharp_panel_add(struct sharp_panel *sharp)
 {
-	struct device_node *np;
 	int err;
 
 	sharp->mode = &default_mode;
+	sharp->prepared = false;
 
-	sharp->supply = devm_regulator_get(&sharp->link1->dev, "power");
-	if (IS_ERR(sharp->supply))
-		return PTR_ERR(sharp->supply);
-
-	np = of_parse_phandle(sharp->link1->dev.of_node, "backlight", 0);
-	if (np) {
-		sharp->backlight = of_find_backlight_by_node(np);
-		of_node_put(np);
-
-		if (!sharp->backlight)
-			return -EPROBE_DEFER;
-	}
+	err = panel_common_init(&sharp->link1->dev, &sharp->common, "supply",
+				"gpio", "backlight");
+	if (err < 0)
+		return err;
 
 	drm_panel_init(&sharp->base);
 	sharp->base.funcs = &sharp_panel_funcs;
@@ -348,13 +317,12 @@ static int sharp_panel_add(struct sharp_panel *sharp)
 
 	err = drm_panel_add(&sharp->base);
 	if (err < 0)
-		goto put_backlight;
+		goto err_panel;
 
 	return 0;
 
-put_backlight:
-	if (sharp->backlight)
-		put_device(&sharp->backlight->dev);
+err_panel:
+	panel_common_fini(&sharp->common);
 
 	return err;
 }
@@ -364,8 +332,7 @@ static void sharp_panel_del(struct sharp_panel *sharp)
 	if (sharp->base.dev)
 		drm_panel_remove(&sharp->base);
 
-	if (sharp->backlight)
-		put_device(&sharp->backlight->dev);
+	panel_common_fini(&sharp->common);
 
 	if (sharp->link2)
 		put_device(&sharp->link2->dev);
