@@ -4540,20 +4540,23 @@ void show_free_areas(unsigned int filter, nodemask_t *nodemask)
 		       " inactive_anon:%lukB"
 		       " active_file:%lukB"
 		       " inactive_file:%lukB"
-		       " unevictable:%lukB",
+		       " unevictable:%lukB"
+		       "\n",
 		       pgdat->node_id,
 		       K(node_page_state(pgdat, NR_ACTIVE_ANON)),
 		       K(node_page_state(pgdat, NR_INACTIVE_ANON)),
 		       K(node_page_state(pgdat, NR_ACTIVE_FILE)),
 		       K(node_page_state(pgdat, NR_INACTIVE_FILE)),
 		       K(node_page_state(pgdat, NR_UNEVICTABLE)));
-		printk(KERN_CONT
+		printk("Node %d"
 		       " isolated(anon):%lukB"
 		       " isolated(file):%lukB"
 		       " mapped:%lukB"
 		       " dirty:%lukB"
 		       " writeback:%lukB"
-		       " shmem:%lukB",
+		       " shmem:%lukB"
+		       "\n",
+		       pgdat->node_id,
 		       K(node_page_state(pgdat, NR_ISOLATED_ANON)),
 		       K(node_page_state(pgdat, NR_ISOLATED_FILE)),
 		       K(node_page_state(pgdat, NR_FILE_MAPPED)),
@@ -4561,20 +4564,23 @@ void show_free_areas(unsigned int filter, nodemask_t *nodemask)
 		       K(node_page_state(pgdat, NR_WRITEBACK)),
 		       K(node_page_state(pgdat, NR_SHMEM)));
 #ifdef CONFIG_TRANSPARENT_HUGEPAGE
-		printk(KERN_CONT
+		printk("Node %d"
 		       " shmem_thp: %lukB"
 		       " shmem_pmdmapped: %lukB"
-		       " anon_thp: %lukB",
+		       " anon_thp: %lukB"
+		       "\n",
+		       pgdat->node_id,
 		       K(node_page_state(pgdat, NR_SHMEM_THPS) * HPAGE_PMD_NR),
 		       K(node_page_state(pgdat, NR_SHMEM_PMDMAPPED)
 			 * HPAGE_PMD_NR),
 		       K(node_page_state(pgdat, NR_ANON_THPS) * HPAGE_PMD_NR));
 #endif
-		printk(KERN_CONT
+		printk("Node %d"
 		       " writeback_tmp:%lukB"
 		       " unstable:%lukB"
 		       " all_unreclaimable? %s"
 		       "\n",
+		       pgdat->node_id,
 		       K(node_page_state(pgdat, NR_WRITEBACK_TEMP)),
 		       K(node_page_state(pgdat, NR_UNSTABLE_NFS)),
 		       pgdat->kswapd_failures >= MAX_RECLAIM_RETRIES ?
