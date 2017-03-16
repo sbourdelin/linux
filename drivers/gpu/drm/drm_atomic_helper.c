@@ -2040,7 +2040,7 @@ void drm_atomic_helper_swap_state(struct drm_atomic_state *state,
 		new_crtc_state->state = NULL;
 
 		state->crtcs[i].state = old_crtc_state;
-		crtc->state = new_crtc_state;
+		rcu_assign_pointer(crtc->state, new_crtc_state);
 
 		if (state->crtcs[i].commit) {
 			spin_lock(&crtc->commit_lock);

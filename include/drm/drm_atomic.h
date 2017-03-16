@@ -28,6 +28,8 @@
 #ifndef DRM_ATOMIC_H_
 #define DRM_ATOMIC_H_
 
+#include <linux/rcupdate.h>
+
 #include <drm/drm_crtc.h>
 
 /**
@@ -188,6 +190,9 @@ struct drm_atomic_state {
 	 * commit without blocking.
 	 */
 	struct work_struct commit_work;
+
+	/* private: */
+	struct rcu_head rhead;
 };
 
 void __drm_crtc_commit_free(struct kref *kref);

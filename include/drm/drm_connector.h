@@ -603,7 +603,6 @@ struct drm_cmdline_mode {
  * @bad_edid_counter: track sinks that give us an EDID with invalid checksum
  * @edid_corrupt: indicates whether the last read EDID was corrupt
  * @debugfs_entry: debugfs directory for this connector
- * @state: current atomic state for this connector
  * @has_tile: is this connector connected to a tiled monitor
  * @tile_group: tile group for the connected monitor
  * @tile_is_single_monitor: whether the tile is one monitor housing
@@ -771,6 +770,18 @@ struct drm_connector {
 
 	struct dentry *debugfs_entry;
 
+	/**
+	 * @state:
+	 *
+	 * Current atomic state for this connector.  Note that this is protected
+	 * by @mutex, but also by RCU (for the mode validation code, which needs
+	 * to peek at this with only hold &drm_mode_config.mutex).
+	 *
+	 * FIXME:
+	 *
+	 * This isn't annoted with __rcu because fixing up all the drivers is a
+	 * massive amount of work.
+	 */
 	struct drm_connector_state *state;
 
 	/* DisplayID bits */

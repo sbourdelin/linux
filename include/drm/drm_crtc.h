@@ -744,7 +744,14 @@ struct drm_crtc {
 	/**
 	 * @state:
 	 *
-	 * Current atomic state for this CRTC.
+	 * Current atomic state for this CRTC. Note that this is protected by
+	 * @mutex, but also by RCU (for the vblank code, which needs to peek at
+	 * this from interrupt context).
+	 *
+	 * FIXME:
+	 *
+	 * This isn't annoted with __rcu because fixing up all the drivers is a
+	 * massive amount of work.
 	 */
 	struct drm_crtc_state *state;
 

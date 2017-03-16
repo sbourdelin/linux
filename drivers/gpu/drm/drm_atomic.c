@@ -213,16 +213,10 @@ void drm_atomic_state_clear(struct drm_atomic_state *state)
 }
 EXPORT_SYMBOL(drm_atomic_state_clear);
 
-/**
- * __drm_atomic_state_free - free all memory for an atomic state
- * @ref: This atomic state to deallocate
- *
- * This frees all memory associated with an atomic state, including all the
- * per-object state for planes, crtcs and connectors.
- */
-void __drm_atomic_state_free(struct kref *ref)
+void ___drm_atomic_state_free(struct rcu_head *rhead)
 {
-	struct drm_atomic_state *state = container_of(ref, typeof(*state), ref);
+	struct drm_atomic_state *state =
+		container_of(rhead, typeof(*state), rhead);
 	struct drm_mode_config *config = &state->dev->mode_config;
 
 	drm_atomic_state_clear(state);
@@ -235,6 +229,20 @@ void __drm_atomic_state_free(struct kref *ref)
 		drm_atomic_state_default_release(state);
 		kfree(state);
 	}
+}
+
+/**
+ * __drm_atomic_state_free - free all memory for an atomic state
+ * @ref: This atomic state to deallocate
+ *
+ * This frees all memory associated with an atomic state, including all the
+ * per-object state for planes, crtcs and connectors.
+ */
+void __drm_atomic_state_free(struct kref *ref)
+{
+	struct drm_atomic_state *state = container_of(ref, typeof(*state), ref);
+
+	call_rcu(&state->rhead, ___drm_atomic_state_free);
 }
 EXPORT_SYMBOL(__drm_atomic_state_free);
 
