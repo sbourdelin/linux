@@ -680,3 +680,10 @@ __be32 nfs4_callback_notify_lock(struct cb_notify_lock_args *args, void *dummy,
 	return htonl(NFS4_OK);
 }
 #endif /* CONFIG_NFS_V4_1 */
+#ifdef CONFIG_NFS_V4_2
+__be32 nfs4_callback_offload(struct cb_offloadargs *args, void *dummy,
+				struct cb_process_state *cps)
+{
+	return 0;
+}
+#endif /* CONFIG_NFS_V4_2 */
