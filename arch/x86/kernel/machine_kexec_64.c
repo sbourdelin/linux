@@ -112,14 +112,40 @@ static int init_pgtable(struct kimage *image, unsigned long start_pgtable)
 
 	level4p = (pgd_t *)__va(start_pgtable);
 	clear_page(level4p);
-	for (i = 0; i < nr_pfn_mapped; i++) {
-		mstart = pfn_mapped[i].start << PAGE_SHIFT;
-		mend   = pfn_mapped[i].end << PAGE_SHIFT;
 
+	if (image->type == KEXEC_TYPE_CRASH) {
+		/* Always map the ISA range */
 		result = kernel_ident_mapping_init(&info,
-						 level4p, mstart, mend);
+				level4p, 0, ISA_END_ADDRESS);
 		if (result)
 			return result;
+
+		/* crashk_low_res may not be initialized when reaching here */
+		if (crashk_low_res.end) {
+			mstart = crashk_low_res.start;
+			mend = crashk_low_res.end + 1;
+			result = kernel_ident_mapping_init(&info,
+					level4p, mstart, mend);
+			if (result)
+				return result;
+		}
+
+		mstart = crashk_res.start;
+		mend = crashk_res.end + 1;
+		result = kernel_ident_mapping_init(&info,
+				level4p, mstart, mend);
+		if (result)
+			return result;
+	} else {
+		for (i = 0; i < nr_pfn_mapped; i++) {
+			mstart = pfn_mapped[i].start << PAGE_SHIFT;
+			mend   = pfn_mapped[i].end << PAGE_SHIFT;
+
+			result = kernel_ident_mapping_init(&info,
+					 level4p, mstart, mend);
+			if (result)
+				return result;
+		}
 	}
 
 	/*
