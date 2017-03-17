@@ -7574,6 +7574,7 @@ struct rpc_procinfo	nfs4_procedures[] = {
 	PROC(CLONE,		enc_clone,		dec_clone),
 	PROC(COPY,		enc_copy,		dec_copy),
 	PROC(OFFLOAD_STATUS,	enc_offload_status,	dec_offload_status),
+	PROC(OFFLOAD_CANCEL,    enc_offload_cancel,     dec_offload_cancel),
 #endif /* CONFIG_NFS_V4_2 */
 };
 
