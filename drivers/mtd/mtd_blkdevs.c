@@ -192,7 +192,7 @@ static int blktrans_open(struct block_device *bdev, fmode_t mode)
 	if (!dev)
 		return -ERESTARTSYS; /* FIXME: busy loop! -arnd*/
 
-	mutex_lock(&mtd_table_mutex);
+	mtd_table_mutex_lock();
 	mutex_lock(&dev->lock);
 
 	if (dev->open)
@@ -218,7 +218,7 @@ static int blktrans_open(struct block_device *bdev, fmode_t mode)
 unlock:
 	dev->open++;
 	mutex_unlock(&dev->lock);
-	mutex_unlock(&mtd_table_mutex);
+	mtd_table_mutex_unlock();
 	blktrans_dev_put(dev);
 	return ret;
 
@@ -229,7 +229,7 @@ error_put:
 	module_put(dev->tr->owner);
 	kref_put(&dev->ref, blktrans_dev_release);
 	mutex_unlock(&dev->lock);
-	mutex_unlock(&mtd_table_mutex);
+	mtd_table_mutex_unlock();
 	blktrans_dev_put(dev);
 	return ret;
 }
@@ -241,7 +241,7 @@ static void blktrans_release(struct gendisk *disk, fmode_t mode)
 	if (!dev)
 		return;
 
-	mutex_lock(&mtd_table_mutex);
+	mtd_table_mutex_lock();
 	mutex_lock(&dev->lock);
 
 	if (--dev->open)
@@ -257,7 +257,7 @@ static void blktrans_release(struct gendisk *disk, fmode_t mode)
 	}
 unlock:
 	mutex_unlock(&dev->lock);
-	mutex_unlock(&mtd_table_mutex);
+	mtd_table_mutex_unlock();
 	blktrans_dev_put(dev);
 }
 
@@ -324,10 +324,7 @@ int add_mtd_blktrans_dev(struct mtd_blktrans_dev *new)
 	struct gendisk *gd;
 	int ret;
 
-	if (mutex_trylock(&mtd_table_mutex)) {
-		mutex_unlock(&mtd_table_mutex);
-		BUG();
-	}
+	mtd_table_assert_mutex_locked();
 
 	mutex_lock(&blktrans_ref_mutex);
 	list_for_each_entry(d, &tr->devs, list) {
@@ -456,11 +453,7 @@ int del_mtd_blktrans_dev(struct mtd_blktrans_dev *old)
 {
 	unsigned long flags;
 
-	if (mutex_trylock(&mtd_table_mutex)) {
-		mutex_unlock(&mtd_table_mutex);
-		BUG();
-	}
-
+	mtd_table_assert_mutex_locked();
 	if (old->disk_attributes)
 		sysfs_remove_group(&disk_to_dev(old->disk)->kobj,
 						old->disk_attributes);
@@ -532,13 +525,13 @@ int register_mtd_blktrans(struct mtd_blktrans_ops *tr)
 		register_mtd_user(&blktrans_notifier);
 
 
-	mutex_lock(&mtd_table_mutex);
+	mtd_table_mutex_lock();
 
 	ret = register_blkdev(tr->major, tr->name);
 	if (ret < 0) {
 		printk(KERN_WARNING "Unable to register %s block device on major %d: %d\n",
 		       tr->name, tr->major, ret);
-		mutex_unlock(&mtd_table_mutex);
+		mtd_table_mutex_unlock();
 		return ret;
 	}
 
@@ -554,7 +547,7 @@ int register_mtd_blktrans(struct mtd_blktrans_ops *tr)
 		if (mtd->type != MTD_ABSENT)
 			tr->add_mtd(tr, mtd);
 
-	mutex_unlock(&mtd_table_mutex);
+	mtd_table_mutex_unlock();
 	return 0;
 }
 
@@ -562,7 +555,7 @@ int deregister_mtd_blktrans(struct mtd_blktrans_ops *tr)
 {
 	struct mtd_blktrans_dev *dev, *next;
 
-	mutex_lock(&mtd_table_mutex);
+	mtd_table_mutex_lock();
 
 	/* Remove it from the list of active majors */
 	list_del(&tr->list);
@@ -571,7 +564,7 @@ int deregister_mtd_blktrans(struct mtd_blktrans_ops *tr)
 		tr->remove_dev(dev);
 
 	unregister_blkdev(tr->major, tr->name);
-	mutex_unlock(&mtd_table_mutex);
+	mtd_table_mutex_unlock();
 
 	BUG_ON(!list_empty(&tr->devs));
 	return 0;
