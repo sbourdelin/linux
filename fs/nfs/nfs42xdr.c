@@ -158,7 +158,7 @@ static void encode_copy(struct xdr_stream *xdr,
 	encode_uint64(xdr, args->count);
 
 	encode_uint32(xdr, 1); /* consecutive = true */
-	encode_uint32(xdr, 1); /* synchronous = true */
+	encode_uint32(xdr, 0); /* synchronous = false */
 	encode_uint32(xdr, 0); /* src server list */
 }
 

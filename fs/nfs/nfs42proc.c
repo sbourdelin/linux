@@ -129,6 +129,38 @@ out_unlock:
 	return err;
 }
 
+static int handle_async_copy(struct nfs42_copy_res *res,
+			     struct nfs_server *server,
+			     struct file *src,
+			     struct file *dst,
+			     nfs4_stateid *src_stateid,
+			     uint64_t *ret_count)
+{
+	struct nfs4_copy_state *copy;
+	int status;
+
+	copy = kzalloc(sizeof(struct nfs4_copy_state), GFP_NOFS);
+	if (!copy)
+		return -ENOMEM;
+	memcpy(&copy->stateid, &res->write_res.stateid, NFS4_STATEID_SIZE);
+	init_completion(&copy->completion);
+
+	spin_lock(&server->nfs_client->cl_lock);
+	list_add_tail(&copy->copies, &server->ss_copies);
+	spin_unlock(&server->nfs_client->cl_lock);
+
+	wait_for_completion_interruptible(&copy->completion);
+	spin_lock(&server->nfs_client->cl_lock);
+	list_del_init(&copy->copies);
+	spin_unlock(&server->nfs_client->cl_lock);
+	*ret_count = copy->count;
+	status = -copy->error;
+	if (copy->count && copy->verf.committed != NFS_FILE_SYNC)
+		status = nfs_commit_file(dst, &copy->verf.verifier);
+	kfree(copy);
+	return status;
+}
+
 static ssize_t _nfs42_proc_copy(struct file *src,
 				struct nfs_lock_context *src_lock,
 				struct file *dst,
@@ -147,6 +179,7 @@ static ssize_t _nfs42_proc_copy(struct file *src,
 	loff_t pos_dst = args->dst_pos;
 	size_t count = args->count;
 	int status;
+	uint64_t ret_count;
 
 	status = nfs4_set_rw_stateid(&args->src_stateid, src_lock->open_context,
 				     src_lock, FMODE_READ);
@@ -174,16 +207,21 @@ static ssize_t _nfs42_proc_copy(struct file *src,
 	if (status)
 		return status;
 
-	if (res->write_res.verifier.committed != NFS_FILE_SYNC) {
+	ret_count = res->write_res.count;
+	if (!res->synchronous) {
+		status = handle_async_copy(res, server, src, dst,
+				&args->src_stateid, &ret_count);
+		if (status)
+			return status;
+	} else if (res->write_res.verifier.committed != NFS_FILE_SYNC) {
 		status = nfs_commit_file(dst, &res->write_res.verifier.verifier);
 		if (status)
 			return status;
 	}
 
-	truncate_pagecache_range(dst_inode, pos_dst,
-				 pos_dst + res->write_res.count);
+	truncate_pagecache_range(dst_inode, pos_dst, pos_dst + ret_count);
 
-	return res->write_res.count;
+	return ret_count;
 }
 
 ssize_t nfs42_proc_copy(struct file *src, loff_t pos_src,
