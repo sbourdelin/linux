@@ -802,16 +802,16 @@ static inline void *phys_to_virt(unsigned long address)
 /**
  * DOC: ioremap() and ioremap_*() variants
  *
- * If you have an IOMMU your architecture is expected to have both ioremap()
+ * If you have an MMU your architecture is expected to have both ioremap()
  * and iounmap() implemented otherwise the asm-generic helpers will provide a
  * direct mapping.
  *
- * There are ioremap_*() call variants, if you have no IOMMU we naturally will
+ * There are ioremap_*() call variants, if you have no MMU we naturally will
  * default to direct mapping for all of them, you can override these defaults.
- * If you have an IOMMU you are highly encouraged to provide your own
+ * If you have an MMU you are highly encouraged to provide your own
  * ioremap variant implementation as there currently is no safe architecture
  * agnostic default. To avoid possible improper behaviour default asm-generic
- * ioremap_*() variants all return NULL when an IOMMU is available. If you've
+ * ioremap_*() variants all return NULL when an MMU is available. If you've
  * defined your own ioremap_*() variant you must then declare your own
  * ioremap_*() variant as defined to itself to avoid the default NULL return.
  */
