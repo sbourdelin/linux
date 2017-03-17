@@ -68,6 +68,8 @@
 #include <linux/io.h>			/* For inb/outb/... */
 #include <linux/platform_data/itco_wdt.h>
 
+#include <asm/intel_pmc_ipc.h>
+
 #include "iTCO_vendor.h"
 
 /* Address definitions for the TCO */
@@ -94,12 +96,6 @@ struct iTCO_wdt_private {
 	unsigned int iTCO_version;
 	struct resource *tco_res;
 	struct resource *smi_res;
-	/*
-	 * NO_REBOOT flag is Memory-Mapped GCS register bit 5 (TCO version 2),
-	 * or memory-mapped PMC register bit 4 (TCO version 3).
-	 */
-	struct resource *gcs_pmc_res;
-	unsigned long __iomem *gcs_pmc;
 	/* the lock for io operations */
 	spinlock_t io_lock;
 	/* the PCI-device */
@@ -176,9 +172,9 @@ static void iTCO_wdt_set_NO_REBOOT_bit(struct iTCO_wdt_private *p)
 
 	/* Set the NO_REBOOT bit: this disables reboots */
 	if (p->iTCO_version >= 2) {
-		val32 = readl(p->gcs_pmc);
+		val32 = intel_pmc_gcr_read(PMC_GCR_PMC_CFG_REG);
 		val32 |= no_reboot_bit(p);
-		writel(val32, p->gcs_pmc);
+		intel_pmc_gcr_write(PMC_GCR_PMC_CFG_REG, val32);
 	} else if (p->iTCO_version == 1) {
 		pci_read_config_dword(p->pci_dev, 0xd4, &val32);
 		val32 |= no_reboot_bit(p);
@@ -193,11 +189,11 @@ static int iTCO_wdt_unset_NO_REBOOT_bit(struct iTCO_wdt_private *p)
 
 	/* Unset the NO_REBOOT bit: this enables reboots */
 	if (p->iTCO_version >= 2) {
-		val32 = readl(p->gcs_pmc);
+		val32 = intel_pmc_gcr_read(PMC_GCR_PMC_CFG_REG);
 		val32 &= ~enable_bit;
-		writel(val32, p->gcs_pmc);
+		intel_pmc_gcr_write(PMC_GCR_PMC_CFG_REG, val32);
 
-		val32 = readl(p->gcs_pmc);
+		val32 = intel_pmc_gcr_read(PMC_GCR_PMC_CFG_REG);
 	} else if (p->iTCO_version == 1) {
 		pci_read_config_dword(p->pci_dev, 0xd4, &val32);
 		val32 &= ~enable_bit;
@@ -427,19 +423,6 @@ static int iTCO_wdt_probe(struct platform_device *pdev)
 
 	p->iTCO_version = pdata->version;
 	p->pci_dev = to_pci_dev(dev->parent);
-
-	/*
-	 * Get the Memory-Mapped GCS or PMC register, we need it for the
-	 * NO_REBOOT flag (TCO v2 and v3).
-	 */
-	if (p->iTCO_version >= 2) {
-		p->gcs_pmc_res = platform_get_resource(pdev,
-						       IORESOURCE_MEM,
-						       ICH_RES_MEM_GCS_PMC);
-		p->gcs_pmc = devm_ioremap_resource(dev, p->gcs_pmc_res);
-		if (IS_ERR(p->gcs_pmc))
-			return PTR_ERR(p->gcs_pmc);
-	}
 
 	/* Check chipset's NO_REBOOT bit */
 	if (iTCO_wdt_unset_NO_REBOOT_bit(p) &&
