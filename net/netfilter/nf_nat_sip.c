@@ -48,7 +48,7 @@ static unsigned int mangle_packet(struct sk_buff *skb, unsigned int protoff,
 		if (!__nf_nat_mangle_tcp_packet(skb, ct, ctinfo,
 						protoff, matchoff, matchlen,
 						buffer, buflen, false))
-			return 0;
+			return NF_DROP;
 	} else {
 		baseoff = protoff + sizeof(struct udphdr);
 		matchoff += dataoff - baseoff;
@@ -56,13 +56,13 @@ static unsigned int mangle_packet(struct sk_buff *skb, unsigned int protoff,
 		if (!nf_nat_mangle_udp_packet(skb, ct, ctinfo,
 					      protoff, matchoff, matchlen,
 					      buffer, buflen))
-			return 0;
+			return NF_DROP;
 	}
 
 	/* Reload data pointer and adjust datalen value */
 	*dptr = skb->data + dataoff;
 	*datalen += buflen - matchlen;
-	return 1;
+	return NF_ACCEPT;
 }
 
 static int sip_sprintf_addr(const struct nf_conn *ct, char *buffer,
