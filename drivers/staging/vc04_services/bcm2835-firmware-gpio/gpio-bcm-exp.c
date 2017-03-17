@@ -259,6 +259,7 @@ static int brcmexp_gpio_remove(struct platform_device *pdev)
 }
 
 static const struct of_device_id __maybe_unused brcmexp_gpio_ids[] = {
+	{ .compatible = "brcm,bcm2835-firmware-gpio" },
 	{ .compatible = "brcm,bcm2835-expgpio" },
 	{ }
 };
