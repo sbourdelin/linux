@@ -154,8 +154,6 @@ struct bq24190_dev_info {
 	struct bq24190_platform_data	*pdata;
 	char				model_name[I2C_NAME_SIZE];
 	kernel_ulong_t			model;
-	unsigned int			gpio_int;
-	unsigned int			irq;
 	struct mutex			f_reg_lock;
 	u8				f_reg;
 	u8				ss_reg;
@@ -1296,56 +1294,11 @@ out:
 	return ret;
 }
 
-#ifdef CONFIG_OF
-static int bq24190_setup_dt(struct bq24190_dev_info *bdi)
-{
-	bdi->irq = irq_of_parse_and_map(bdi->dev->of_node, 0);
-	if (bdi->irq <= 0)
-		return -1;
-
-	return 0;
-}
-#else
-static int bq24190_setup_dt(struct bq24190_dev_info *bdi)
-{
-	return -1;
-}
-#endif
-
-static int bq24190_setup_pdata(struct bq24190_dev_info *bdi,
-		struct bq24190_platform_data *pdata)
-{
-	int ret;
-
-	if (!gpio_is_valid(pdata->gpio_int))
-		return -1;
-
-	ret = gpio_request(pdata->gpio_int, dev_name(bdi->dev));
-	if (ret < 0)
-		return -1;
-
-	ret = gpio_direction_input(pdata->gpio_int);
-	if (ret < 0)
-		goto out;
-
-	bdi->irq = gpio_to_irq(pdata->gpio_int);
-	if (!bdi->irq)
-		goto out;
-
-	bdi->gpio_int = pdata->gpio_int;
-	return 0;
-
-out:
-	gpio_free(pdata->gpio_int);
-	return -1;
-}
-
 static int bq24190_probe(struct i2c_client *client,
 		const struct i2c_device_id *id)
 {
 	struct i2c_adapter *adapter = to_i2c_adapter(client->dev.parent);
 	struct device *dev = &client->dev;
-	struct bq24190_platform_data *pdata = client->dev.platform_data;
 	struct power_supply_config charger_cfg = {}, battery_cfg = {};
 	struct bq24190_dev_info *bdi;
 	int ret;
@@ -1372,12 +1325,7 @@ static int bq24190_probe(struct i2c_client *client,
 
 	i2c_set_clientdata(client, bdi);
 
-	if (dev->of_node)
-		ret = bq24190_setup_dt(bdi);
-	else
-		ret = bq24190_setup_pdata(bdi, pdata);
-
-	if (ret) {
+	if (!client->irq) {
 		dev_err(dev, "Can't get irq info\n");
 		return -EINVAL;
 	}
@@ -1417,7 +1365,7 @@ static int bq24190_probe(struct i2c_client *client,
 		goto out3;
 	}
 
-	ret = devm_request_threaded_irq(dev, bdi->irq, NULL,
+	ret = devm_request_threaded_irq(dev, client->irq, NULL,
 			bq24190_irq_handler_thread,
 			IRQF_TRIGGER_FALLING | IRQF_ONESHOT,
 			"bq24190-charger", bdi);
@@ -1439,8 +1387,6 @@ out2:
 
 out1:
 	pm_runtime_disable(dev);
-	if (bdi->gpio_int)
-		gpio_free(bdi->gpio_int);
 	return ret;
 }
 
@@ -1456,9 +1402,6 @@ static int bq24190_remove(struct i2c_client *client)
 	power_supply_unregister(bdi->battery);
 	power_supply_unregister(bdi->charger);
 	pm_runtime_disable(bdi->dev);
-
-	if (bdi->gpio_int)
-		gpio_free(bdi->gpio_int);
 
 	return 0;
 }
