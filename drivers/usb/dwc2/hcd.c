@@ -2602,6 +2602,17 @@ static int dwc2_alloc_dma_aligned_buffer(struct urb *urb, gfp_t mem_flags)
 	kmalloc_size = urb->transfer_buffer_length +
 		sizeof(struct dma_aligned_buffer) + DWC2_USB_DMA_ALIGN - 1;
 
+	{
+		static DEFINE_RATELIMIT_STATE(rs,
+					      DEFAULT_RATELIMIT_INTERVAL,
+					      DEFAULT_RATELIMIT_BURST);
+		if (__ratelimit(&rs)) {
+			pr_info("%s: creating a DMA-aligned buffer with size %d:\n",
+				 __func__, kmalloc_size);
+			dump_stack();
+		}
+	}
+
 	kmalloc_ptr = kmalloc(kmalloc_size, mem_flags);
 	if (!kmalloc_ptr)
 		return -ENOMEM;
