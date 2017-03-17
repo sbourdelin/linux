@@ -500,9 +500,12 @@ void blk_set_queue_dying(struct request_queue *q)
 	queue_flag_set(QUEUE_FLAG_DYING, q);
 	spin_unlock_irq(q->queue_lock);
 
-	if (q->mq_ops)
+	if (q->mq_ops) {
 		blk_mq_wake_waiters(q);
-	else {
+
+		/* block new I/O coming */
+		blk_mq_freeze_queue_start(q);
+	} else {
 		struct request_list *rl;
 
 		spin_lock_irq(q->queue_lock);
