@@ -178,7 +178,8 @@ static int handle_async_copy(struct nfs42_copy_res *res,
 	}
 out:
 	*ret_count = copy->count;
-	status = -copy->error;
+	if (copy->count < 0 || copy->error == ENOSPC)
+		status = -copy->error;
 	if (copy->count && copy->verf.committed != NFS_FILE_SYNC)
 		status = nfs_commit_file(dst, &copy->verf.verifier);
 	kfree(copy);
