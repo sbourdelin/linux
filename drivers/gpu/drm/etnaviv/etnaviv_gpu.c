@@ -1047,7 +1047,7 @@ static const struct dma_fence_ops etnaviv_fence_ops = {
 	.release = etnaviv_fence_release,
 };
 
-static struct dma_fence *etnaviv_gpu_fence_alloc(struct etnaviv_gpu *gpu)
+struct dma_fence *etnaviv_gpu_fence_alloc(struct etnaviv_gpu *gpu)
 {
 	struct etnaviv_fence *f;
 
@@ -1290,7 +1290,6 @@ void etnaviv_gpu_pm_put(struct etnaviv_gpu *gpu)
 int etnaviv_gpu_submit(struct etnaviv_gpu *gpu,
 	struct etnaviv_gem_submit *submit, struct etnaviv_cmdbuf *cmdbuf)
 {
-	struct dma_fence *fence;
 	unsigned int event, i;
 	int ret;
 
@@ -1314,18 +1313,10 @@ int etnaviv_gpu_submit(struct etnaviv_gpu *gpu,
 		goto out_pm_put;
 	}
 
-	fence = etnaviv_gpu_fence_alloc(gpu);
-	if (!fence) {
-		event_free(gpu, event);
-		ret = -ENOMEM;
-		goto out_pm_put;
-	}
-
 	mutex_lock(&gpu->lock);
 
-	gpu->event[event].fence = fence;
-	submit->fence = fence->seqno;
-	gpu->active_fence = submit->fence;
+	gpu->event[event].fence = submit->fence;
+	gpu->active_fence = submit->fence->seqno;
 
 	if (gpu->lastctx != cmdbuf->ctx) {
 		gpu->mmu->need_flush = true;
@@ -1335,7 +1326,7 @@ int etnaviv_gpu_submit(struct etnaviv_gpu *gpu,
 
 	etnaviv_buffer_queue(gpu, event, cmdbuf);
 
-	cmdbuf->fence = fence;
+	cmdbuf->fence = submit->fence;
 	list_add_tail(&cmdbuf->node, &gpu->active_cmd_list);
 
 	/* We're committed to adding this command buffer, hold a PM reference */
@@ -1351,10 +1342,10 @@ int etnaviv_gpu_submit(struct etnaviv_gpu *gpu,
 
 		if (submit->bos[i].flags & ETNA_SUBMIT_BO_WRITE)
 			reservation_object_add_excl_fence(etnaviv_obj->resv,
-							  fence);
+							  submit->fence);
 		else
 			reservation_object_add_shared_fence(etnaviv_obj->resv,
-							    fence);
+							    submit->fence);
 	}
 	cmdbuf->nr_bos = submit->nr_bos;
 	hangcheck_timer_reset(gpu);

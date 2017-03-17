@@ -431,11 +431,17 @@ int etnaviv_ioctl_gem_submit(struct drm_device *dev, void *data,
 	memcpy(cmdbuf->vaddr, stream, args->stream_size);
 	cmdbuf->user_size = ALIGN(args->stream_size, 8);
 
+	submit->fence = etnaviv_gpu_fence_alloc(gpu);
+	if (!submit->fence) {
+		ret = -ENOMEM;
+		goto out;
+	}
+
 	ret = etnaviv_gpu_submit(gpu, submit, cmdbuf);
 	if (ret == 0)
 		cmdbuf = NULL;
 
-	args->fence = submit->fence;
+	args->fence = submit->fence->seqno;
 
 out:
 	submit_unpin_objects(submit);
