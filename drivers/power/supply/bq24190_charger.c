@@ -1103,6 +1103,13 @@ static int bq24190_battery_get_property(struct power_supply *psy,
 		val->intval = POWER_SUPPLY_TECHNOLOGY_UNKNOWN;
 		ret = 0;
 		break;
+	case POWER_SUPPLY_PROP_VOLTAGE_MAX_DESIGN:
+		/*
+		 * Report charger configured voltage as max design voltage,
+		 * not entirely correct, but userspace needs something here.
+		 */
+		ret = bq24190_charger_get_voltage(bdi, val);
+		break;
 	case POWER_SUPPLY_PROP_TEMP_ALERT_MAX:
 		ret = bq24190_battery_get_temp_alert_max(bdi, val);
 		break;
@@ -1169,6 +1176,7 @@ static enum power_supply_property bq24190_battery_properties[] = {
 	POWER_SUPPLY_PROP_HEALTH,
 	POWER_SUPPLY_PROP_ONLINE,
 	POWER_SUPPLY_PROP_TECHNOLOGY,
+	POWER_SUPPLY_PROP_VOLTAGE_MAX_DESIGN,
 	POWER_SUPPLY_PROP_TEMP_ALERT_MAX,
 	POWER_SUPPLY_PROP_SCOPE,
 	/* Begin of extended battery properties */
@@ -1186,7 +1194,7 @@ static const struct power_supply_desc bq24190_battery_desc = {
 	.name			= "bq24190-battery",
 	.type			= POWER_SUPPLY_TYPE_BATTERY,
 	.properties		= bq24190_battery_properties,
-	.num_properties		= 6,
+	.num_properties		= 7,
 	.get_property		= bq24190_battery_get_property,
 	.set_property		= bq24190_battery_set_property,
 	.property_is_writeable	= bq24190_battery_property_is_writeable,
