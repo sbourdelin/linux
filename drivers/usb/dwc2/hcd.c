@@ -572,20 +572,26 @@ u32 dwc2_calc_frame_interval(struct dwc2_hsotg *hsotg)
 void dwc2_read_packet(struct dwc2_hsotg *hsotg, u8 *dest, u16 bytes)
 {
 	u32 __iomem *fifo = hsotg->regs + HCFIFO(0);
-	u32 *data_buf = (u32 *)dest;
-	int word_count = (bytes + 3) / 4;
-	int i;
-
-	/*
-	 * Todo: Account for the case where dest is not dword aligned. This
-	 * requires reading data from the FIFO into a u32 temp buffer, then
-	 * moving it into the data buffer.
-	 */
+	u32 *data_buf = (u32 *)dest, tmp;
+	int word_count = bytes >> 2;
+	int i, j;
 
 	dev_vdbg(hsotg->dev, "%s(%p,%p,%d)\n", __func__, hsotg, dest, bytes);
 
 	for (i = 0; i < word_count; i++, data_buf++)
 		*data_buf = dwc2_readl(fifo);
+
+	/* Handle the case where the buffer is not dword-aligned */
+	if (bytes & 0x3) {
+		u8 *buf = (u8 *)data_buf;
+
+		tmp = dwc2_readl(fifo);
+
+		i <<= 2;
+		for (j = 0; i < bytes; j++, i++, dest++)
+			*buf = tmp >> (8 * j);
+	}
+
 }
 
 /**
@@ -2594,8 +2600,9 @@ static int dwc2_alloc_dma_aligned_buffer(struct urb *urb, gfp_t mem_flags)
 	size_t kmalloc_size;
 
 	if (urb->num_sgs || urb->sg ||
-	    urb->transfer_buffer_length == 0 ||
-	    !((uintptr_t)urb->transfer_buffer & (DWC2_USB_DMA_ALIGN - 1)))
+	    urb->transfer_buffer_length == 0 || (
+	    !((uintptr_t)urb->transfer_buffer & (DWC2_USB_DMA_ALIGN - 1)) &&
+	    !((uintptr_t)(urb->transfer_buffer + urb->transfer_buffer_length) & (DWC2_USB_DMA_ALIGN - 1))))
 		return 0;
 
 	/* Allocate a buffer with enough padding for alignment */
