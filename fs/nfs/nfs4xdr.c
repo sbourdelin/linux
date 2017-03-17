@@ -7573,6 +7573,7 @@ struct rpc_procinfo	nfs4_procedures[] = {
 	PROC(LAYOUTSTATS,	enc_layoutstats,	dec_layoutstats),
 	PROC(CLONE,		enc_clone,		dec_clone),
 	PROC(COPY,		enc_copy,		dec_copy),
+	PROC(OFFLOAD_STATUS,	enc_offload_status,	dec_offload_status),
 #endif /* CONFIG_NFS_V4_2 */
 };
 
