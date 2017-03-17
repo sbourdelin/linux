@@ -204,6 +204,7 @@ static ssize_t _nfs42_proc_copy(struct file *src,
 	size_t count = args->count;
 	int status;
 	uint64_t ret_count;
+	bool sync = false;
 
 	status = nfs4_set_rw_stateid(&args->src_stateid, src_lock->open_context,
 				     src_lock, FMODE_READ);
@@ -224,6 +225,7 @@ static ssize_t _nfs42_proc_copy(struct file *src,
 	if (status)
 		return status;
 
+	args->sync = sync;
 	status = nfs4_call_sync(server->client, server, &msg,
 				&args->seq_args, &res->seq_res, 0);
 	switch (status) {
