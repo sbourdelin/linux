@@ -23,6 +23,10 @@
 #define IPC_ERR_EMSECURITY		6
 #define IPC_ERR_UNSIGNEDKERNEL		7
 
+/* GCR reg offsets from gcr base*/
+#define PMC_GCR_PRSTS_REG		0x00
+#define PMC_GCR_PMC_CFG_REG		0x08
+
 #if IS_ENABLED(CONFIG_INTEL_PMC_IPC)
 
 int intel_pmc_ipc_simple_command(int cmd, int sub);
@@ -31,6 +35,8 @@ int intel_pmc_ipc_raw_cmd(u32 cmd, u32 sub, u8 *in, u32 inlen,
 int intel_pmc_ipc_command(u32 cmd, u32 sub, u8 *in, u32 inlen,
 		u32 *out, u32 outlen);
 int intel_pmc_s0ix_counter_read(u64 *data);
+u32 intel_pmc_gcr_read(u32 offset);
+void intel_pmc_gcr_write(u32 offset, u32 data);
 
 #else
 
@@ -54,6 +60,16 @@ static inline int intel_pmc_ipc_command(u32 cmd, u32 sub, u8 *in, u32 inlen,
 static inline int intel_pmc_s0ix_counter_read(u64 *data)
 {
 	return -EINVAL;
+}
+
+static inline u32 intel_pmc_gcr_read(u32 offset)
+{
+	return -EINVAL;
+}
+
+static inline void intel_pmc_gcr_write(u32 offset, u32 data)
+{
+	return;
 }
 
 #endif /*CONFIG_INTEL_PMC_IPC*/

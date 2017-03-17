@@ -127,6 +127,7 @@ static struct intel_pmc_ipc_dev {
 
 	/* gcr */
 	resource_size_t gcr_base;
+	void __iomem *gcr_mem_base;
 	int gcr_size;
 	bool has_gcr_regs;
 
@@ -198,6 +199,18 @@ static inline u64 gcr_data_readq(u32 offset)
 {
 	return readq(ipcdev.ipc_base + offset);
 }
+
+u32 intel_pmc_gcr_read(u32 offset)
+{
+	return readl(ipcdev.gcr_mem_base + offset);
+}
+EXPORT_SYMBOL_GPL(intel_pmc_gcr_read);
+
+void intel_pmc_gcr_write(u32 offset, u32 data)
+{
+	writel(data, ipcdev.gcr_mem_base + offset);
+}
+EXPORT_SYMBOL_GPL(intel_pmc_gcr_write);
 
 static int intel_pmc_ipc_check_status(void)
 {
@@ -747,6 +760,7 @@ static int ipc_plat_get_res(struct platform_device *pdev)
 	ipcdev.ipc_base = addr;
 
 	ipcdev.gcr_base = res->start + PLAT_RESOURCE_GCR_OFFSET;
+	ipcdev.gcr_mem_base = addr + PLAT_RESOURCE_GCR_OFFSET;
 	ipcdev.gcr_size = PLAT_RESOURCE_GCR_SIZE;
 	dev_info(&pdev->dev, "ipc res: %pR\n", res);
 
