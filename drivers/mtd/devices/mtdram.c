@@ -58,6 +58,10 @@ static int ram_erase(struct mtd_info *mtd, struct erase_info *instr)
 {
 	if (check_offs_len(mtd, instr->addr, instr->len))
 		return -EINVAL;
+	if (mtd->size < (instr->len + instr->addr) || instr->addr < 0
+		       	|| instr->len < 0)
+		return -EINVAL;
+
 	memset((char *)mtd->priv + instr->addr, 0xff, instr->len);
 	instr->state = MTD_ERASE_DONE;
 	mtd_erase_callback(instr);
@@ -67,6 +71,9 @@ static int ram_erase(struct mtd_info *mtd, struct erase_info *instr)
 static int ram_point(struct mtd_info *mtd, loff_t from, size_t len,
 		size_t *retlen, void **virt, resource_size_t *phys)
 {
+	if (mtd->size < (len + from) || from < 0 || len < 0)
+		return -EINVAL;
+
 	*virt = mtd->priv + from;
 	*retlen = len;
 	return 0;
@@ -74,6 +81,9 @@ static int ram_point(struct mtd_info *mtd, loff_t from, size_t len,
 
 static int ram_unpoint(struct mtd_info *mtd, loff_t from, size_t len)
 {
+	if (mtd->size < (len + from) || from < 0 || len < 0)
+		return -EINVAL;
+
 	return 0;
 }
 
@@ -93,6 +103,9 @@ static unsigned long ram_get_unmapped_area(struct mtd_info *mtd,
 static int ram_read(struct mtd_info *mtd, loff_t from, size_t len,
 		size_t *retlen, u_char *buf)
 {
+	if (mtd->size < (len + from) || from < 0 || len < 0)
+		return -EINVAL;
+
 	memcpy(buf, mtd->priv + from, len);
 	*retlen = len;
 	return 0;
@@ -101,6 +114,9 @@ static int ram_read(struct mtd_info *mtd, loff_t from, size_t len,
 static int ram_write(struct mtd_info *mtd, loff_t to, size_t len,
 		size_t *retlen, const u_char *buf)
 {
+	if (mtd->size < (len + to) || to < 0 || len < 0)
+		return -EINVAL;
+
 	memcpy((char *)mtd->priv + to, buf, len);
 	*retlen = len;
 	return 0;
