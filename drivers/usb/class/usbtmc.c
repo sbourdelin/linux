@@ -1469,8 +1469,10 @@ static int usbtmc_probe(struct usb_interface *intf,
 	if (data->iin_ep_present) {
 		/* allocate int urb */
 		data->iin_urb = usb_alloc_urb(0, GFP_KERNEL);
-		if (!data->iin_urb)
-			goto error_register;
+		if (!data->iin_urb) {
+			retcode = -ENOMEM;
+			goto err_alloc_urb;
+		}
 
 		/* Protect interrupt in endpoint data until iin_urb is freed */
 		kref_get(&data->kref);
@@ -1478,8 +1480,10 @@ static int usbtmc_probe(struct usb_interface *intf,
 		/* allocate buffer for interrupt in */
 		data->iin_buffer = kmalloc(data->iin_wMaxPacketSize,
 					GFP_KERNEL);
-		if (!data->iin_buffer)
-			goto error_register;
+		if (!data->iin_buffer) {
+			retcode = -ENOMEM;
+			goto err_data;
+		}
 
 		/* fill interrupt urb */
 		usb_fill_int_urb(data->iin_urb, data->usb_dev,
@@ -1491,7 +1495,7 @@ static int usbtmc_probe(struct usb_interface *intf,
 		retcode = usb_submit_urb(data->iin_urb, GFP_KERNEL);
 		if (retcode) {
 			dev_err(&intf->dev, "Failed to submit iin_urb\n");
-			goto error_register;
+			goto err_data;
 		}
 	}
 
@@ -1502,16 +1506,18 @@ static int usbtmc_probe(struct usb_interface *intf,
 		dev_err(&intf->dev, "Not able to get a minor"
 			" (base %u, slice default): %d\n", USBTMC_MINOR_BASE,
 			retcode);
-		goto error_register;
+		goto err_register;
 	}
 	dev_dbg(&intf->dev, "Using minor number %d\n", intf->minor);
 
 	return 0;
 
-error_register:
-	sysfs_remove_group(&intf->dev.kobj, &capability_attr_grp);
+err_register:
 	sysfs_remove_group(&intf->dev.kobj, &data_attr_grp);
+err_data:
 	usbtmc_free_int(data);
+err_alloc_urb:
+	sysfs_remove_group(&intf->dev.kobj, &capability_attr_grp);
 	kref_put(&data->kref, usbtmc_delete);
 	return retcode;
 }
