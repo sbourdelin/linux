@@ -1,0 +1,11 @@
+Device-Tree bindings for dmic codec
+
+Required properties:
+	- compatible: should be "dmic-codec".
+
+Example node:
+
+	dmic_audio: dmic_audio@0 {
+		compatible = "dmic-codec";
+		status = "okay";
+	};
