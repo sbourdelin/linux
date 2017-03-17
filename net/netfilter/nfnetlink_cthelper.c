@@ -612,6 +612,8 @@ static int nfnl_cthelper_del(struct net *net, struct sock *nfnl,
 
 			found = true;
 			nf_conntrack_helper_unregister(cur);
+			kfree(cur->expect_policy);
+			kfree(cur);
 		}
 	}
 	/* Make sure we return success if we flush and there is no helpers */
