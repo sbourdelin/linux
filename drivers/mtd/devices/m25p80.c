@@ -186,6 +186,83 @@ static ssize_t m25p80_read(struct spi_nor *nor, loff_t from, size_t len,
 	return ret;
 }
 
+static ssize_t m25p80_read_xfer(struct spi_nor *nor,
+				struct spi_nor_xfer_cfg *cfg,
+				u8 *buf, size_t len)
+{
+	struct m25p *flash = nor->priv;
+	struct spi_device *spi = flash->spi;
+	struct spi_transfer t[2] = {};
+	struct spi_message m;
+	unsigned int dummy = cfg->dummy_cycles;
+	ssize_t ret;
+
+	/* convert the dummy cycles to the number of bytes */
+	dummy /= 8;
+
+	spi_message_init(&m);
+
+	flash->command[0] = cfg->cmd;
+	m25p_addr2cmd(cfg->addr, cfg->addr_width, flash->command);
+
+	t[0].tx_buf = flash->command;
+	t[0].len = m25p_cmdsz(cfg->addr_width) + dummy;
+	spi_message_add_tail(&t[0], &m);
+
+	t[1].rx_buf = buf;
+	t[1].rx_nbits = m25p80_rx_nbits(cfg->mode);
+	t[1].len = len;
+	spi_message_add_tail(&t[1], &m);
+
+	ret = spi_sync(spi, &m);
+	if (ret)
+		return ret;
+
+	ret = m.actual_length - m25p_cmdsz(cfg->addr_width) - dummy;
+	if (ret < 0)
+		return -EIO;
+	return ret;
+}
+
+static ssize_t m25p80_write_xfer(struct spi_nor *nor,
+				 struct spi_nor_xfer_cfg *cfg,
+				 u8 *buf, size_t len)
+{
+	struct m25p *flash = nor->priv;
+	struct spi_device *spi = flash->spi;
+	struct spi_transfer t[2] = {};
+	struct spi_message m;
+	unsigned int dummy = cfg->dummy_cycles;
+	ssize_t ret;
+
+	/* convert the dummy cycles to the number of bytes */
+	dummy /= 8;
+
+	spi_message_init(&m);
+
+	flash->command[0] = cfg->cmd;
+	m25p_addr2cmd(cfg->addr, cfg->addr_width, flash->command);
+
+	t[0].tx_buf = flash->command;
+	t[0].len = m25p_cmdsz(cfg->addr_width) + dummy;
+	spi_message_add_tail(&t[0], &m);
+
+	if (len) {
+		t[1].tx_buf = buf;
+		t[1].len = len;
+		spi_message_add_tail(&t[1], &m);
+	}
+
+	ret = spi_sync(spi, &m);
+	if (ret)
+		return ret;
+
+	ret = m.actual_length - m25p_cmdsz(cfg->addr_width) - dummy;
+	if (ret < 0)
+		return -EIO;
+	return ret;
+}
+
 /*
  * board specific setup should have ensured the SPI clock used here
  * matches what the READ command supports, at least until this driver
@@ -213,6 +290,8 @@ static int m25p_probe(struct spi_device *spi)
 	nor->write = m25p80_write;
 	nor->write_reg = m25p80_write_reg;
 	nor->read_reg = m25p80_read_reg;
+	nor->read_xfer = m25p80_read_xfer;
+	nor->write_xfer = m25p80_write_xfer;
 
 	nor->dev = &spi->dev;
 	spi_nor_set_flash_node(nor, spi->dev.of_node);
