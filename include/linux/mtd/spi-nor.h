@@ -186,6 +186,14 @@ enum spi_nor_option_flags {
  * @flags:		flag options for the current SPI-NOR (SNOR_F_*)
  * @cfg:		used by the read_xfer/write_xfer
  * @cmd_buf:		used by the write_reg
+ * @otp_size:		size of OTP bank in bytes
+ * @n_otps:		number of OTP banks
+ * @otp_start_addr:	starting address of OTP
+ * @otp_addr_offset:	difference between consecutive OTP banks
+ * @otp_erase_opcode:	the opcode for erasing a OTP bank
+ * @otp_read_opcode:	the read opcode for OTP
+ * @otp_program_opcode:	the program opcode for OTP
+ * @otp_read_dummy:	the dummy needed by the read operation for OTP
  * @prepare:		[OPTIONAL] do some preparations for the
  *			read/write/erase/lock/unlock operations
  * @unprepare:		[OPTIONAL] do some post work after the
@@ -220,6 +228,15 @@ struct spi_nor {
 	u32			flags;
 	struct spi_nor_xfer_cfg	cfg;
 	u8			cmd_buf[SPI_NOR_MAX_CMD_SIZE];
+	unsigned int		otp_size;
+	u16			n_otps;
+	loff_t			otp_start_addr;
+	loff_t			otp_addr_offset;
+	u8			otp_erase_opcode;
+	u8			otp_read_opcode;
+	u8			otp_program_opcode;
+	u8			otp_read_dummy;
+
 
 	int (*prepare)(struct spi_nor *nor, enum spi_nor_ops ops);
 	void (*unprepare)(struct spi_nor *nor, enum spi_nor_ops ops);
