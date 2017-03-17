@@ -27,6 +27,7 @@
 #include <media/v4l2-common.h>
 #include <linux/delay.h>
 
+#include "interface/vchiq_arm/vchiq_connected.h"
 #include "mmal-common.h"
 #include "mmal-encodings.h"
 #include "mmal-vchiq.h"
@@ -1586,7 +1587,7 @@ static int set_camera_parameters(struct vchiq_mmal_instance *instance,
 #define MAX_SUPPORTED_ENCODINGS 20
 
 /* MMAL instance and component init */
-static int __init mmal_init(struct bm2835_mmal_dev *dev)
+static int mmal_init(struct bm2835_mmal_dev *dev)
 {
 	int ret;
 	struct mmal_es_format_local *format;
@@ -1890,7 +1891,7 @@ static struct v4l2_format default_v4l2_format = {
 	.fmt.pix.sizeimage = 1024 * 768,
 };
 
-static int __init bm2835_mmal_init(void)
+static int bcm2835_mmal_init(void)
 {
 	int ret;
 	struct bm2835_mmal_dev *dev;
@@ -2010,7 +2011,7 @@ cleanup_gdev:
 	return ret;
 }
 
-static void __exit bm2835_mmal_exit(void)
+static void bcm2835_mmal_exit(void)
 {
 	int camera;
 	struct vchiq_mmal_instance *instance = gdev[0]->instance;
@@ -2022,5 +2023,34 @@ static void __exit bm2835_mmal_exit(void)
 	vchiq_mmal_finalise(instance);
 }
 
-module_init(bm2835_mmal_init);
-module_exit(bm2835_mmal_exit);
+static bool connected;
+
+static void bcm2835_connected(void)
+{
+	int ret;
+
+	ret = bcm2835_mmal_init();
+	if (!ret)
+		return;
+
+	connected = true;
+}
+
+static int __init bcm2835_camera_init(void)
+{
+	vchiq_add_connected_callback(bcm2835_connected);
+	return 0;
+}
+
+static void __exit bcm2835_camera_exit(void)
+{
+	vchiq_remove_connected_callback(bcm2835_connected);
+
+	if (!connected)
+		return;
+
+	bcm2835_mmal_exit();
+}
+
+module_init(bcm2835_camera_init);
+module_exit(bcm2835_camera_exit);
