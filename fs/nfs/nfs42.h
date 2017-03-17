@@ -19,5 +19,6 @@ loff_t nfs42_proc_llseek(struct file *, loff_t, int);
 int nfs42_proc_layoutstats_generic(struct nfs_server *,
 				   struct nfs42_layoutstat_data *);
 int nfs42_proc_clone(struct file *, struct file *, loff_t, loff_t, loff_t);
-
+int nfs42_proc_offload_status(struct file *, nfs4_stateid *,
+			      struct nfs42_offload_status_res *);
 #endif /* __LINUX_FS_NFS_NFS4_2_H */

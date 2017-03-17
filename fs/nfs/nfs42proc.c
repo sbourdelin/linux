@@ -254,6 +254,48 @@ out_put_src_lock:
 	return err;
 }
 
+int _nfs42_proc_offload_status(struct file *dst, nfs4_stateid *stateid,
+				struct nfs42_offload_status_res *res)
+{
+	struct nfs42_offload_status_args args;
+	struct nfs_server *dst_server = NFS_SERVER(file_inode(dst));
+	struct rpc_message msg = {
+		.rpc_proc = &nfs4_procedures[NFSPROC4_CLNT_OFFLOAD_STATUS],
+		.rpc_resp = res,
+	};
+	int status;
+
+	args.osa_src_fh = NFS_FH(file_inode(dst));
+	memcpy(&args.osa_stateid, stateid, sizeof(args.osa_stateid));
+	msg.rpc_argp = &args;
+	status = nfs4_call_sync(dst_server->client, dst_server, &msg,
+				&args.osa_seq_args, &res->osr_seq_res, 0);
+	if (status == -ENOTSUPP)
+		dst_server->caps &= ~NFS_CAP_OFFLOAD_STATUS;
+
+	return status;
+}
+
+int nfs42_proc_offload_status(struct file *dst, nfs4_stateid *stateid,
+				struct nfs42_offload_status_res *res)
+{
+	struct nfs_server *dst_server = NFS_SERVER(file_inode(dst));
+	struct nfs4_exception exception = { };
+	int status;
+
+	if (!(dst_server->caps & NFS_CAP_OFFLOAD_STATUS))
+		return -EOPNOTSUPP;
+
+	do {
+		status = _nfs42_proc_offload_status(dst, stateid, res);
+		if (status == -ENOTSUPP)
+			return -EOPNOTSUPP;
+		status = nfs4_handle_exception(dst_server, status, &exception);
+	} while (exception.retry);
+
+	return status;
+}
+
 static loff_t _nfs42_proc_llseek(struct file *filep,
 		struct nfs_lock_context *lock, loff_t offset, int whence)
 {
