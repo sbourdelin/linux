@@ -94,6 +94,21 @@ void vchiq_add_connected_callback(VCHIQ_CONNECTED_CALLBACK_T callback)
 	mutex_unlock(&g_connected_mutex);
 }
 
+void vchiq_remove_connected_callback(VCHIQ_CONNECTED_CALLBACK_T callback)
+{
+	int i;
+
+	connected_init();
+
+	mutex_lock(&g_connected_mutex);
+
+	for (i = 0; i <  g_num_deferred_callbacks; i++)
+		if (g_deferred_callback[i] == callback)
+			g_deferred_callback[i] = NULL;
+
+	mutex_unlock(&g_connected_mutex);
+}
+
 /****************************************************************************
 *
 * This function is called by the vchiq stack once it has been connected to
@@ -110,8 +125,12 @@ void vchiq_call_connected_callbacks(void)
 	if (mutex_lock_killable(&g_connected_mutex) != 0)
 		return;
 
-	for (i = 0; i <  g_num_deferred_callbacks; i++)
-		g_deferred_callback[i]();
+	for (i = 0; i <  g_num_deferred_callbacks; i++) {
+		if (g_deferred_callback[i])
+			g_deferred_callback[i]();
+
+		g_deferred_callback[i] = NULL;
+	}
 
 	g_num_deferred_callbacks = 0;
 	g_connected = 1;
