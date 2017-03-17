@@ -225,10 +225,17 @@ static ssize_t _nfs42_proc_copy(struct file *src,
 	if (status)
 		return status;
 
+retry:
 	args->sync = sync;
 	status = nfs4_call_sync(server->client, server, &msg,
 				&args->seq_args, &res->seq_res, 0);
 	switch (status) {
+	case -NFS4ERR_OFFLOAD_NO_REQS:
+		if (!sync) {
+			sync = true;
+			goto retry;
+		}
+		break;
 	case -ENOTSUPP:
 		server->caps &= ~NFS_CAP_COPY;
 		break;
