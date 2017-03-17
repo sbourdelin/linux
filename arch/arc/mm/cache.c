@@ -997,8 +997,8 @@ noinline void __init arc_ioc_setup(void)
 {
 	unsigned int ap_sz;
 
-	/* Flush + invalidate + disable L1 dcache */
-	__dc_disable();
+	/* Flush + invalidate L1 dcache */
+	__dc_entire_op(OP_FLUSH_N_INV);
 
 	/* Flush + invalidate SLC */
 	if (read_aux_reg(ARC_REG_SLC_BCR))
