@@ -137,15 +137,32 @@ static int handle_async_copy(struct nfs42_copy_res *res,
 			     uint64_t *ret_count)
 {
 	struct nfs4_copy_state *copy;
-	int status;
+	int status = NFS4_OK;
+	bool found_pending = false;
+
+	spin_lock(&server->nfs_client->cl_lock);
+	list_for_each_entry(copy, &server->nfs_client->pending_cb_stateids,
+				copies) {
+		if (memcmp(&res->write_res.stateid, &copy->stateid,
+				NFS4_STATEID_SIZE))
+			continue;
+		found_pending = true;
+		list_del(&copy->copies);
+		break;
+	}
+	if (found_pending) {
+		spin_unlock(&server->nfs_client->cl_lock);
+		goto out;
+	}
 
 	copy = kzalloc(sizeof(struct nfs4_copy_state), GFP_NOFS);
-	if (!copy)
+	if (!copy) {
+		spin_unlock(&server->nfs_client->cl_lock);
 		return -ENOMEM;
+	}
 	memcpy(&copy->stateid, &res->write_res.stateid, NFS4_STATEID_SIZE);
 	init_completion(&copy->completion);
 
-	spin_lock(&server->nfs_client->cl_lock);
 	list_add_tail(&copy->copies, &server->ss_copies);
 	spin_unlock(&server->nfs_client->cl_lock);
 
@@ -153,6 +170,7 @@ static int handle_async_copy(struct nfs42_copy_res *res,
 	spin_lock(&server->nfs_client->cl_lock);
 	list_del_init(&copy->copies);
 	spin_unlock(&server->nfs_client->cl_lock);
+out:
 	*ret_count = copy->count;
 	status = -copy->error;
 	if (copy->count && copy->verf.committed != NFS_FILE_SYNC)
