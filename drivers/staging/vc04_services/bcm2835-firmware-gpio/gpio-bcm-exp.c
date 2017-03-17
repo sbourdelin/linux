@@ -43,6 +43,13 @@ struct gpio_get_set_state {
 	u32 gpio, state;
 };
 
+enum rpi_firmware_gpio_property_tag {
+	RPI_FIRMWARE_GET_GPIO_STATE =                         0x00030041,
+	RPI_FIRMWARE_SET_GPIO_STATE =                         0x00038041,
+	RPI_FIRMWARE_GET_GPIO_CONFIG =                        0x00030043,
+	RPI_FIRMWARE_SET_GPIO_CONFIG =                        0x00038043,
+};
+
 static int brcmexp_gpio_get_polarity(struct gpio_chip *gc, unsigned int off)
 {
 	struct brcmexp_gpio *gpio;
