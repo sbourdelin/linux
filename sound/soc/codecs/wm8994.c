@@ -2389,6 +2389,7 @@ static int wm8994_set_dai_sysclk(struct snd_soc_dai *dai,
 
 	switch (clk_id) {
 	case WM8994_SYSCLK_MCLK1:
+	default:
 		wm8994->sysclk[dai->id - 1] = WM8994_SYSCLK_MCLK1;
 		wm8994->mclk[0] = freq;
 		dev_dbg(dai->dev, "AIF%d using MCLK1 at %uHz\n",
@@ -2431,9 +2432,6 @@ static int wm8994_set_dai_sysclk(struct snd_soc_dai *dai,
 			snd_soc_update_bits(codec, WM8994_POWER_MANAGEMENT_2,
 					    WM8994_OPCLK_ENA, 0);
 		}
-
-	default:
-		return -EINVAL;
 	}
 
 	configure_clock(codec);
