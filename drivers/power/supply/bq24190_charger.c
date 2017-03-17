@@ -504,11 +504,32 @@ static int bq24190_set_mode_host(struct bq24190_dev_info *bdi)
 
 static int bq24190_register_reset(struct bq24190_dev_info *bdi)
 {
-	int ret, limit = 100;
+	int ret, voltage, limit = 100;
 	u8 v;
 
-	if (bdi->pdata && bdi->pdata->no_register_reset)
-		return 0;
+	if (bdi->pdata && bdi->pdata->no_register_reset) {
+		/*
+		 * We've been asked to keep the firmware settings as is, but
+		 * some firmwares set really too high voltages (e.g. 4.384V).
+		 * New LiHV (High Voltage) batteries may be charged upto 4.35V
+		 * but that significantly impacts their lifetime, limit
+		 * charging to 4.304V for safety and lifetime reasons.
+		 */
+		ret = bq24190_get_field_val(bdi, BQ24190_REG_CVC,
+			BQ24190_REG_CVC_VREG_MASK, BQ24190_REG_CVC_VREG_SHIFT,
+			bq24190_cvc_vreg_values,
+			ARRAY_SIZE(bq24190_cvc_vreg_values), &voltage);
+		if (ret < 0)
+			return ret;
+
+		if (voltage <= 4304000)
+			return 0;
+
+		return bq24190_set_field_val(bdi, BQ24190_REG_CVC,
+			BQ24190_REG_CVC_VREG_MASK, BQ24190_REG_CVC_VREG_SHIFT,
+			bq24190_cvc_vreg_values,
+			ARRAY_SIZE(bq24190_cvc_vreg_values), 4304000);
+	}
 
 	/* Reset the registers */
 	ret = bq24190_write_mask(bdi, BQ24190_REG_POC,
