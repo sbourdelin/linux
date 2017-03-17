@@ -205,8 +205,8 @@ static inline void omap_gpio_dbck_disable(struct gpio_bank *bank)
  * @offset: the gpio number on this @bank
  * @debounce: debounce time to use
  *
- * OMAP's debounce time is in 31us steps
- *   <debounce time> = (GPIO_DEBOUNCINGTIME[7:0].DEBOUNCETIME + 1) x 31
+ * OMAP's debounce time is in 1/DBCK steps
+ *   <debounce time> = (GPIO_DEBOUNCINGTIME[7:0].DEBOUNCETIME + 1) / DBCK
  * so we need to convert and round up to the closest unit.
  *
  * Return: 0 on success, negative error otherwise.
@@ -223,7 +223,9 @@ static int omap2_set_gpio_debounce(struct gpio_bank *bank, unsigned offset,
 		return -ENOTSUPP;
 
 	if (enable) {
-		debounce = DIV_ROUND_UP(debounce, 31) - 1;
+		u64 tmp = (u64)debounce * clk_get_rate(bank->dbck);
+
+		debounce = DIV_ROUND_UP_ULL(tmp, 1000000) - 1;
 		if ((debounce & OMAP4_GPIO_DEBOUNCINGTIME_MASK) != debounce)
 			return -EINVAL;
 	}
