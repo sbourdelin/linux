@@ -2093,6 +2093,15 @@ void usb_disconnect(struct usb_device **pdev)
 	 * so that the hardware is now fully quiesced.
 	 */
 	dev_dbg(&udev->dev, "unregistering device\n");
+
+	/*
+	 * Disable autosuspend before disabling the device, and make sure
+	 * that autosuspend doesn't touch it while it is in the process
+	 * of being deleted.
+	 */
+	usb_disable_autosuspend(udev);
+	pm_runtime_barrier(&udev->dev);
+
 	usb_disable_device(udev, 0);
 	usb_hcd_synchronize_unlinks(udev);
 
