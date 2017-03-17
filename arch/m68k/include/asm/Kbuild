@@ -9,6 +9,7 @@ generic-y += futex.h
 generic-y += hw_irq.h
 generic-y += ioctl.h
 generic-y += ipcbuf.h
+generic-y += ipv6.h
 generic-y += irq_regs.h
 generic-y += irq_work.h
 generic-y += kdebug.h

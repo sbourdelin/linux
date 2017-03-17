@@ -12,6 +12,7 @@ generic-y += fcntl.h
 generic-y += hw_irq.h
 generic-y += ioctl.h
 generic-y += ioctls.h
+generic-y += ipv6.h
 generic-y += ipcbuf.h
 generic-y += irq_regs.h
 generic-y += local.h

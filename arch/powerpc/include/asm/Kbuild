@@ -1,6 +1,7 @@
 generic-y += clkdev.h
 generic-y += div64.h
 generic-y += export.h
+generic-y += ipv6.h
 generic-y += irq_regs.h
 generic-y += irq_work.h
 generic-y += local64.h
