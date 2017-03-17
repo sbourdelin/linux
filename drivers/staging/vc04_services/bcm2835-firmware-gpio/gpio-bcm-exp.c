@@ -23,12 +23,15 @@
 #include <soc/bcm2835/raspberrypi-firmware.h>
 
 #define MODULE_NAME "brcmexp-gpio"
-#define NUM_GPIO 8
+#define DEFAULT_NUM_GPIO 8
+#define DEFAULT_GPIO_BASE 128
+#define DEFAULT_FIRMWARE_GPIO_BASE 128
 
 struct brcmexp_gpio {
 	struct gpio_chip gc;
 	struct device *dev;
 	struct rpi_firmware *fw;
+	u32 firmware_gpio_base;
 };
 
 struct gpio_set_config {
@@ -58,7 +61,7 @@ static int brcmexp_gpio_get_polarity(struct gpio_chip *gc, unsigned int off)
 
 	gpio = container_of(gc, struct brcmexp_gpio, gc);
 
-	get.gpio = off + gpio->gc.base;	/* GPIO to update */
+	get.gpio = off + gpio->firmware_gpio_base;
 
 	ret = rpi_firmware_property(gpio->fw, RPI_FIRMWARE_GET_GPIO_CONFIG,
 				    &get, sizeof(get));
@@ -78,7 +81,7 @@ static int brcmexp_gpio_dir_in(struct gpio_chip *gc, unsigned int off)
 
 	gpio = container_of(gc, struct brcmexp_gpio, gc);
 
-	set_in.gpio = off + gpio->gc.base;	/* GPIO to update */
+	set_in.gpio = off + gpio->firmware_gpio_base;
 	set_in.direction = 0;		/* Input */
 	set_in.polarity = brcmexp_gpio_get_polarity(gc, off);
 					/* Retain existing setting */
@@ -105,7 +108,7 @@ static int brcmexp_gpio_dir_out(struct gpio_chip *gc, unsigned int off, int val)
 
 	gpio = container_of(gc, struct brcmexp_gpio, gc);
 
-	set_out.gpio = off + gpio->gc.base;	/* GPIO to update */
+	set_out.gpio = off + gpio->firmware_gpio_base;
 	set_out.direction = 1;		/* Output */
 	set_out.polarity = brcmexp_gpio_get_polarity(gc, off);
 					/* Retain existing setting */
@@ -131,7 +134,7 @@ static int brcmexp_gpio_get_direction(struct gpio_chip *gc, unsigned int off)
 
 	gpio = container_of(gc, struct brcmexp_gpio, gc);
 
-	get.gpio = off + gpio->gc.base;	/* GPIO to update */
+	get.gpio = off + gpio->firmware_gpio_base;
 
 	ret = rpi_firmware_property(gpio->fw, RPI_FIRMWARE_GET_GPIO_CONFIG,
 				    &get, sizeof(get));
@@ -151,7 +154,7 @@ static int brcmexp_gpio_get(struct gpio_chip *gc, unsigned int off)
 
 	gpio = container_of(gc, struct brcmexp_gpio, gc);
 
-	get.gpio = off + gpio->gc.base;	/* GPIO to update */
+	get.gpio = off + gpio->firmware_gpio_base;
 	get.state = 0;		/* storage for returned value */
 
 	ret = rpi_firmware_property(gpio->fw, RPI_FIRMWARE_GET_GPIO_STATE,
@@ -172,9 +175,7 @@ static void brcmexp_gpio_set(struct gpio_chip *gc, unsigned int off, int val)
 
 	gpio = container_of(gc, struct brcmexp_gpio, gc);
 
-	off += gpio->gc.base;
-
-	set.gpio = off + gpio->gc.base;	/* GPIO to update */
+	set.gpio = off + gpio->firmware_gpio_base;
 	set.state = val;	/* Output state */
 
 	ret = rpi_firmware_property(gpio->fw, RPI_FIRMWARE_SET_GPIO_STATE,
@@ -212,8 +213,8 @@ static int brcmexp_gpio_probe(struct platform_device *pdev)
 	ucb->gc.label = MODULE_NAME;
 	ucb->gc.owner = THIS_MODULE;
 	ucb->gc.of_node = np;
-	ucb->gc.base = 128;
-	ucb->gc.ngpio = NUM_GPIO;
+	ucb->gc.base = DEFAULT_GPIO_BASE;
+	ucb->gc.ngpio = DEFAULT_NUM_GPIO;
 
 	ucb->gc.direction_input = brcmexp_gpio_dir_in;
 	ucb->gc.direction_output = brcmexp_gpio_dir_out;
@@ -221,6 +222,23 @@ static int brcmexp_gpio_probe(struct platform_device *pdev)
 	ucb->gc.get = brcmexp_gpio_get;
 	ucb->gc.set = brcmexp_gpio_set;
 	ucb->gc.can_sleep = true;
+
+	ucb->firmware_gpio_base = DEFAULT_FIRMWARE_GPIO_BASE;
+
+	err = of_property_read_u16(dev->of_node, "number-gpios",
+				   &ucb->gc.ngpio);
+	if (err)
+		dev_dbg(dev, "Failed to get DT property number-gpio");
+
+	err = of_property_read_u32(dev->of_node, "gpio-base",
+				   &ucb->gc.base);
+	if (err)
+		dev_dbg(dev, "Failed to get DT property gpio-base");
+
+	err = of_property_read_u32(dev->of_node, "firmware-gpio-base",
+				   &ucb->firmware_gpio_base);
+	if (err)
+		dev_dbg(dev, "Failed to get DT property firmware-gpio-base");
 
 	err = gpiochip_add(&ucb->gc);
 	if (err)
