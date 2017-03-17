@@ -1,0 +1,40 @@
+STMicroelectronics audio DFSDM DT bindings
+
+This driver supports audio PDM microphone capture through Digital Filter format
+Sigma Delta modulators (DFSDM).
+
+Required properties:
+  - compatible: "st,stm32h7-adfsdm".
+
+  - #sound-dai-cells : Must be equal to 0
+
+  - io-channels : phandle to iio dfsdm instance node.
+
+
+Example of a simple sound card using audio DFSDM node.
+
+	dmic0: dmic_@0 {
+		compatible = "dmic-codec";
+		#sound-dai-cells = <0>;
+	};
+
+	asoc-pdm@0 {
+		compatible = "st,stm32h7-adfsdm";
+		#sound-dai-cells = <0>;
+		io-channels = <&dfsdm_adc0 0>;
+	};
+
+	sound_dfsdm_pdm {
+ 		compatible = "simple-audio-card";
+ 		simple-audio-card,name = "dfsdm_pdm";
+
+ 		dfsdm0_mic0: simple-audio-card,dai-link@0 {
+ 			format = "pdm";
+ 			cpu {
+ 				sound-dai = <&asoc_pdm1>;
+ 			};
+ 			dmic0_codec: codec {
+ 				sound-dai = <&dmic0>;
+ 			};
+ 		};
+	};
