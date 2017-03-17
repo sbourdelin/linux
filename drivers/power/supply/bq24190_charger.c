@@ -1111,7 +1111,10 @@ static int bq24190_battery_get_property(struct power_supply *psy,
 		ret = 0;
 		break;
 	default:
-		ret = -ENODATA;
+		if (bdi->pdata && bdi->pdata->get_ext_bat_property)
+			ret = bdi->pdata->get_ext_bat_property(psp, val);
+		else
+			ret = -ENODATA;
 	}
 
 	pm_runtime_put_sync(bdi->dev);
@@ -1168,9 +1171,28 @@ static enum power_supply_property bq24190_battery_properties[] = {
 	POWER_SUPPLY_PROP_TECHNOLOGY,
 	POWER_SUPPLY_PROP_TEMP_ALERT_MAX,
 	POWER_SUPPLY_PROP_SCOPE,
+	/* Begin of extended battery properties */
+	POWER_SUPPLY_PROP_VOLTAGE_NOW,
+	POWER_SUPPLY_PROP_VOLTAGE_AVG,
+	POWER_SUPPLY_PROP_VOLTAGE_OCV,
+	POWER_SUPPLY_PROP_CURRENT_NOW,
+	POWER_SUPPLY_PROP_CURRENT_AVG,
+	POWER_SUPPLY_PROP_CHARGE_FULL_DESIGN,
+	POWER_SUPPLY_PROP_CHARGE_FULL,
+	POWER_SUPPLY_PROP_CHARGE_NOW,
 };
 
 static const struct power_supply_desc bq24190_battery_desc = {
+	.name			= "bq24190-battery",
+	.type			= POWER_SUPPLY_TYPE_BATTERY,
+	.properties		= bq24190_battery_properties,
+	.num_properties		= 6,
+	.get_property		= bq24190_battery_get_property,
+	.set_property		= bq24190_battery_set_property,
+	.property_is_writeable	= bq24190_battery_property_is_writeable,
+};
+
+static const struct power_supply_desc bq24190_ext_battery_desc = {
 	.name			= "bq24190-battery",
 	.type			= POWER_SUPPLY_TYPE_BATTERY,
 	.properties		= bq24190_battery_properties,
@@ -1336,6 +1358,15 @@ static int bq24190_probe(struct i2c_client *client,
 		return -EINVAL;
 	}
 
+	if (bdi->pdata && bdi->pdata->get_ext_bat_property) {
+		union power_supply_propval val;
+
+		/* Check external fuel gauge is ready */
+		ret = bdi->pdata->get_ext_bat_property(0, &val);
+		if (ret == -ENXIO)
+			return -EPROBE_DEFER;
+	}
+
 	pm_runtime_enable(dev);
 	pm_runtime_resume(dev);
 
@@ -1357,8 +1388,12 @@ static int bq24190_probe(struct i2c_client *client,
 	}
 
 	battery_cfg.drv_data = bdi;
-	bdi->battery = power_supply_register(dev, &bq24190_battery_desc,
-						&battery_cfg);
+	if (bdi->pdata && bdi->pdata->get_ext_bat_property)
+		bdi->battery = power_supply_register(dev,
+				    &bq24190_ext_battery_desc, &battery_cfg);
+	else
+		bdi->battery = power_supply_register(dev,
+				    &bq24190_battery_desc, &battery_cfg);
 	if (IS_ERR(bdi->battery)) {
 		dev_err(dev, "Can't register battery\n");
 		ret = PTR_ERR(bdi->battery);

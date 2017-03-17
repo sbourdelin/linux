@@ -9,8 +9,12 @@
 #ifndef _BQ24190_CHARGER_H_
 #define _BQ24190_CHARGER_H_
 
+#include <linux/power_supply.h>
+
 struct bq24190_platform_data {
 	bool no_register_reset;
+	int (*get_ext_bat_property)(enum power_supply_property prop,
+				    union power_supply_propval *val);
 };
 
 #endif
