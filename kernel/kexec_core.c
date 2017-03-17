@@ -38,6 +38,7 @@
 #include <linux/syscore_ops.h>
 #include <linux/compiler.h>
 #include <linux/hugetlb.h>
+#include <linux/crc32.h>
 
 #include <asm/page.h>
 #include <asm/sections.h>
@@ -53,9 +54,10 @@ note_buf_t __percpu *crash_notes;
 
 /* vmcoreinfo stuff */
 static unsigned char vmcoreinfo_data[VMCOREINFO_BYTES];
-u32 vmcoreinfo_note[VMCOREINFO_NOTE_SIZE/4];
+static u32 vmcoreinfo_sig;
 size_t vmcoreinfo_size;
 size_t vmcoreinfo_max_size = sizeof(vmcoreinfo_data);
+u32 vmcoreinfo_note[VMCOREINFO_NOTE_SIZE/4];
 
 /* Flag to indicate we are going to kexec a new kernel */
 bool kexec_in_progress = false;
@@ -1367,12 +1369,6 @@ static void update_vmcoreinfo_note(void)
 	final_note(buf);
 }
 
-void crash_save_vmcoreinfo(void)
-{
-	vmcoreinfo_append_str("CRASHTIME=%ld\n", get_seconds());
-	update_vmcoreinfo_note();
-}
-
 void vmcoreinfo_append_str(const char *fmt, ...)
 {
 	va_list args;
@@ -1402,7 +1398,7 @@ phys_addr_t __weak paddr_vmcoreinfo_note(void)
 	return __pa_symbol((unsigned long)(char *)&vmcoreinfo_note);
 }
 
-static int __init crash_save_vmcoreinfo_init(void)
+static void do_crash_save_vmcoreinfo_init(void)
 {
 	VMCOREINFO_OSRELEASE(init_uts_ns.name.release);
 	VMCOREINFO_PAGESIZE(PAGE_SIZE);
@@ -1474,6 +1470,37 @@ static int __init crash_save_vmcoreinfo_init(void)
 #endif
 
 	arch_crash_save_vmcoreinfo();
+}
+
+static u32 crash_calc_vmcoreinfo_sig(void)
+{
+	return crc32(~0, vmcoreinfo_data, vmcoreinfo_size);
+}
+
+static bool crash_verify_vmcoreinfo(void)
+{
+	if (crash_calc_vmcoreinfo_sig() == vmcoreinfo_sig)
+		return true;
+
+	return false;
+}
+
+void crash_save_vmcoreinfo(void)
+{
+	/* Re-save if verification fails */
+	if (!crash_verify_vmcoreinfo()) {
+		vmcoreinfo_size = 0;
+		do_crash_save_vmcoreinfo_init();
+	}
+
+	vmcoreinfo_append_str("CRASHTIME=%ld\n", get_seconds());
+	update_vmcoreinfo_note();
+}
+
+static int __init crash_save_vmcoreinfo_init(void)
+{
+	do_crash_save_vmcoreinfo_init();
+	vmcoreinfo_sig = crash_calc_vmcoreinfo_sig();
 	update_vmcoreinfo_note();
 
 	return 0;

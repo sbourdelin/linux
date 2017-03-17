@@ -4,6 +4,7 @@
 
 config KEXEC_CORE
 	bool
+	select CRC32
 
 config HAVE_IMA_KEXEC
 	bool
