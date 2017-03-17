@@ -39,5 +39,5 @@ obj-$(CONFIG_WILC1000)		+= wilc1000/
 obj-$(CONFIG_MOST)		+= most/
 obj-$(CONFIG_KS7010)		+= ks7010/
 obj-$(CONFIG_GREYBUS)		+= greybus/
-obj-$(CONFIG_BCM2835_VCHIQ)	+= vc04_services/
+obj-$(CONFIG_BCM_VIDEOCORE)	+= vc04_services/
 
