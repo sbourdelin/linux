@@ -304,9 +304,8 @@ static int nfnl_cthelper_new(struct net *net, struct sock *nfnl,
 	if (ret < 0)
 		return ret;
 
-	rcu_read_lock();
 	for (i = 0; i < nf_ct_helper_hsize && !helper; i++) {
-		hlist_for_each_entry_rcu(cur, &nf_ct_helper_hash[i], hnode) {
+		hlist_for_each_entry(cur, &nf_ct_helper_hash[i], hnode) {
 
 			/* skip non-userspace conntrack helpers. */
 			if (!(cur->flags & NF_CT_HELPER_F_USERSPACE))
@@ -328,16 +327,12 @@ static int nfnl_cthelper_new(struct net *net, struct sock *nfnl,
 			break;
 		}
 	}
-	rcu_read_unlock();
 
 	if (helper == NULL)
 		ret = nfnl_cthelper_create(tb, &tuple);
 	else
 		ret = nfnl_cthelper_update(tb, helper);
-
-	return ret;
 err:
-	rcu_read_unlock();
 	return ret;
 }
 
