@@ -206,7 +206,9 @@ struct mem_cgroup {
 	bool		oom_lock;
 	int		under_oom;
 
-	int	swappiness;
+	int		swappiness;
+	int		priority;
+
 	/* OOM-Killer disable */
 	int		oom_kill_disable;
 
@@ -487,6 +489,16 @@ static inline bool task_in_memcg_oom(struct task_struct *p)
 
 bool mem_cgroup_oom_synchronize(bool wait);
 
+static inline int mem_cgroup_priority(struct mem_cgroup *memcg)
+{
+	/* root ? */
+	if (mem_cgroup_disabled() || !memcg->css.parent)
+		return 0;
+
+	return memcg->priority;
+}
+
+
 #ifdef CONFIG_MEMCG_SWAP
 extern int do_swap_account;
 #endif
@@ -766,6 +778,12 @@ static inline
 void mem_cgroup_count_vm_event(struct mm_struct *mm, enum vm_event_item idx)
 {
 }
+
+static inline int mem_cgroup_priority(struct mem_cgroup *memcg)
+{
+	return 0;
+}
+
 #endif /* CONFIG_MEMCG */
 
 #ifdef CONFIG_CGROUP_WRITEBACK

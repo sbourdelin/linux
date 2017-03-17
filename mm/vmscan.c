@@ -2116,6 +2116,7 @@ static void get_scan_count(struct lruvec *lruvec, struct mem_cgroup *memcg,
 			   unsigned long *lru_pages)
 {
 	int swappiness = mem_cgroup_swappiness(memcg);
+	int priority = mem_cgroup_priority(memcg);
 	struct zone_reclaim_stat *reclaim_stat = &lruvec->reclaim_stat;
 	u64 fraction[2];
 	u64 denominator = 0;	/* gcc */
@@ -2287,7 +2288,7 @@ out:
 			unsigned long scan;
 
 			size = lruvec_lru_size(lruvec, lru, sc->reclaim_idx);
-			scan = size >> sc->priority;
+			scan = size >> (sc->priority + priority);
 
 			if (!scan && pass && force_scan)
 				scan = min(size, SWAP_CLUSTER_MAX);

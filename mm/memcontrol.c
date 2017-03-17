@@ -81,6 +81,8 @@ struct mem_cgroup *root_mem_cgroup __read_mostly;
 
 #define MEM_CGROUP_RECLAIM_RETRIES	5
 
+#define MEM_CGROUP_PRIORITY_MAX	10
+
 /* Socket memory accounting disabled? */
 static bool cgroup_memory_nosocket;
 
@@ -241,6 +243,7 @@ enum res_type {
 	_OOM_TYPE,
 	_KMEM,
 	_TCP,
+	_PRIO,
 };
 
 #define MEMFILE_PRIVATE(x, val)	((x) << 16 | (val))
@@ -841,6 +844,10 @@ struct mem_cgroup *mem_cgroup_iter(struct mem_cgroup *root,
 		 * and kicking, and don't take an extra reference.
 		 */
 		memcg = mem_cgroup_from_css(css);
+
+		if (reclaim && reclaim->priority &&
+		    (DEF_PRIORITY - memcg->priority) < reclaim->priority)
+			continue;
 
 		if (css == &root->css)
 			break;
@@ -2773,6 +2780,7 @@ enum {
 	RES_MAX_USAGE,
 	RES_FAILCNT,
 	RES_SOFT_LIMIT,
+	RES_PRIORITY,
 };
 
 static u64 mem_cgroup_read_u64(struct cgroup_subsys_state *css,
@@ -2783,6 +2791,7 @@ static u64 mem_cgroup_read_u64(struct cgroup_subsys_state *css,
 
 	switch (MEMFILE_TYPE(cft->private)) {
 	case _MEM:
+	case _PRIO:
 		counter = &memcg->memory;
 		break;
 	case _MEMSWAP:
@@ -2813,6 +2822,8 @@ static u64 mem_cgroup_read_u64(struct cgroup_subsys_state *css,
 		return counter->failcnt;
 	case RES_SOFT_LIMIT:
 		return (u64)memcg->soft_limit * PAGE_SIZE;
+	case RES_PRIORITY:
+		return (u64)memcg->priority;
 	default:
 		BUG();
 	}
@@ -2964,6 +2975,22 @@ static int memcg_update_tcp_limit(struct mem_cgroup *memcg, unsigned long limit)
 out:
 	mutex_unlock(&memcg_limit_mutex);
 	return ret;
+}
+
+static ssize_t mem_cgroup_update_prio(struct kernfs_open_file *of,
+				      char *buf, size_t nbytes, loff_t off)
+{
+	struct mem_cgroup *memcg = mem_cgroup_from_css(of_css(of));
+	unsigned long long prio = -1;
+
+	buf = strstrip(buf);
+	prio = memparse(buf, NULL);
+
+	if (prio >= 0 && prio <= MEM_CGROUP_PRIORITY_MAX) {
+		memcg->priority = (int)prio;
+		return nbytes;
+	}
+	return -EINVAL;
 }
 
 /*
@@ -3937,6 +3964,12 @@ static struct cftype mem_cgroup_legacy_files[] = {
 		.name = "failcnt",
 		.private = MEMFILE_PRIVATE(_MEM, RES_FAILCNT),
 		.write = mem_cgroup_reset,
+		.read_u64 = mem_cgroup_read_u64,
+	},
+	{
+		.name = "priority",
+		.private = MEMFILE_PRIVATE(_PRIO, RES_PRIORITY),
+		.write = mem_cgroup_update_prio,
 		.read_u64 = mem_cgroup_read_u64,
 	},
 	{
