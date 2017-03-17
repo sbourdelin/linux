@@ -2401,12 +2401,12 @@ static int crypt_ctr_optional(struct dm_target *ti, unsigned int argc, char **ar
 		else if (!strcasecmp(opt_string, "submit_from_crypt_cpus"))
 			set_bit(DM_CRYPT_NO_OFFLOAD, &cc->flags);
 		else if (sscanf(opt_string, "integrity:%u:", &val) == 1) {
-			cc->on_disk_tag_size = val;
-			sval = strchr(opt_string + strlen("integrity:"), ':') + 1;
-			if (val == 0 || val > MAX_TAG_SIZE || !sval) {
+			if (val == 0 || val > MAX_TAG_SIZE) {
 				ti->error = "Invalid integrity arguments";
 				return -EINVAL;
 			}
+			cc->on_disk_tag_size = val;
+			sval = strchr(opt_string + strlen("integrity:"), ':') + 1;
 			if (!strcasecmp(sval, "aead")) {
 				set_bit(CRYPT_MODE_INTEGRITY_AEAD, &cc->cipher_flags);
 			} else  if (!strncasecmp(sval, "hmac(", strlen("hmac("))) {
