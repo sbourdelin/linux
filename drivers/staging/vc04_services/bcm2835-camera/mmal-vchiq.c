@@ -1450,23 +1450,24 @@ static int port_parameter_get(struct vchiq_mmal_instance *instance,
 	 * port_parameter_get_reply.size includes the header,
 	 * whilst *value_size doesn't.
 	 */
-	reply_size = rmsg->u.port_parameter_get_reply.size - (2 * sizeof(u32));
 
-	if (ret || (reply_size > *value_size)) {
-		/* Copy only as much as we have space for
-		 * but report true size of parameter
-		 */
-		memcpy(value, &rmsg->u.port_parameter_get_reply.value,
-		       *value_size);
-	} else
-		memcpy(value, &rmsg->u.port_parameter_get_reply.value,
-		       reply_size);
+	if (WARN_ON(rmsg->u.port_parameter_get_reply.size < 8))
+		reply_size = 0;
+	else
+		reply_size = rmsg->u.port_parameter_get_reply.size - 8;
 
 	/*
-	 * Return amount of data copied if big enough,
-	 * or wanted if not big enough.
+	 * The API for port_parameter_get() requires that the
+	 * filled length is returned, or if insufficient space
+	 * that the required space is returned.
+	 *
+	 * See Commit: 95452744c5ebcaa0f5d4eaff7313b2b4cd51bd9f
+	 * https://github.com/raspberrypi/linux
 	 */
-	*value_size = reply_size;
+
+	memcpy(value, &rmsg->u.port_parameter_get_reply.value,
+	       min(*value_size, reply_size));
+	*value_size = max(reply_size, *value_size);
 
 	pr_debug("%s:result:%d component:0x%x port:%d parameter:%d\n", __func__,
 	        ret, port->component->handle, port->handle, parameter_id);
