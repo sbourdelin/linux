@@ -100,6 +100,8 @@ struct iTCO_wdt_private {
 	 */
 	struct resource *gcs_pmc_res;
 	unsigned long __iomem *gcs_pmc;
+	/* pmc specific api to update noreboot flag */
+	int (*update_noreboot_flag)(bool status);
 	/* the lock for io operations */
 	spinlock_t io_lock;
 	/* the PCI-device */
@@ -176,9 +178,13 @@ static void iTCO_wdt_set_NO_REBOOT_bit(struct iTCO_wdt_private *p)
 
 	/* Set the NO_REBOOT bit: this disables reboots */
 	if (p->iTCO_version >= 2) {
-		val32 = readl(p->gcs_pmc);
-		val32 |= no_reboot_bit(p);
-		writel(val32, p->gcs_pmc);
+		if (p->update_noreboot_flag)
+			p->update_noreboot_flag(1);
+		else {
+			val32 = readl(p->gcs_pmc);
+			val32 |= no_reboot_bit(p);
+			writel(val32, p->gcs_pmc);
+		}
 	} else if (p->iTCO_version == 1) {
 		pci_read_config_dword(p->pci_dev, 0xd4, &val32);
 		val32 |= no_reboot_bit(p);
@@ -193,11 +199,14 @@ static int iTCO_wdt_unset_NO_REBOOT_bit(struct iTCO_wdt_private *p)
 
 	/* Unset the NO_REBOOT bit: this enables reboots */
 	if (p->iTCO_version >= 2) {
-		val32 = readl(p->gcs_pmc);
-		val32 &= ~enable_bit;
-		writel(val32, p->gcs_pmc);
-
-		val32 = readl(p->gcs_pmc);
+		if (p->update_noreboot_flag)
+			return p->update_noreboot_flag(0);
+		else {
+			val32 = readl(p->gcs_pmc);
+			val32 &= ~enable_bit;
+			writel(val32, p->gcs_pmc);
+			val32 = readl(p->gcs_pmc);
+		}
 	} else if (p->iTCO_version == 1) {
 		pci_read_config_dword(p->pci_dev, 0xd4, &val32);
 		val32 &= ~enable_bit;
@@ -426,13 +435,14 @@ static int iTCO_wdt_probe(struct platform_device *pdev)
 		return -ENODEV;
 
 	p->iTCO_version = pdata->version;
+	p->update_noreboot_flag = pdata->update_noreboot_flag;
 	p->pci_dev = to_pci_dev(dev->parent);
 
 	/*
 	 * Get the Memory-Mapped GCS or PMC register, we need it for the
 	 * NO_REBOOT flag (TCO v2 and v3).
 	 */
-	if (p->iTCO_version >= 2) {
+	if (p->iTCO_version >= 2 && !p->update_noreboot_flag) {
 		p->gcs_pmc_res = platform_get_resource(pdev,
 						       IORESOURCE_MEM,
 						       ICH_RES_MEM_GCS_PMC);
