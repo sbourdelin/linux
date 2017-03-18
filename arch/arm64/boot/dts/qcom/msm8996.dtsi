@@ -261,6 +261,8 @@
 	firmware {
 		scm {
 			compatible = "qcom,scm-msm8996";
+
+			qcom,dload-mode-addr = <0x0 0x7b3000>;
 		};
 	};
 
