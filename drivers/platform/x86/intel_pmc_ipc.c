@@ -127,6 +127,7 @@ static struct intel_pmc_ipc_dev {
 
 	/* gcr */
 	resource_size_t gcr_base;
+	void __iomem *gcr_mem_base;
 	int gcr_size;
 	bool has_gcr_regs;
 
@@ -198,6 +199,60 @@ static inline u64 gcr_data_readq(u32 offset)
 {
 	return readq(ipcdev.ipc_base + offset);
 }
+
+int intel_pmc_gcr_read(u32 offset, u32 *data)
+{
+	if (!ipcdev.has_gcr_regs)
+		return -EACCES;
+
+	if (offset > PLAT_RESOURCE_GCR_SIZE)
+		return -EINVAL;
+
+	*data = readl(ipcdev.gcr_mem_base + offset);
+
+	return 0;
+}
+EXPORT_SYMBOL_GPL(intel_pmc_gcr_read);
+
+int intel_pmc_gcr_write(u32 offset, u32 data)
+{
+	if (!ipcdev.has_gcr_regs)
+		return -EACCES;
+
+	if (offset > PLAT_RESOURCE_GCR_SIZE)
+		return -EINVAL;
+
+	writel(data, ipcdev.gcr_mem_base + offset);
+
+	return 0;
+}
+EXPORT_SYMBOL_GPL(intel_pmc_gcr_write);
+
+int intel_pmc_gcr_update(u32 offset, u32 mask, u32 val)
+{
+	u32 orig, tmp;
+
+	if (!ipcdev.has_gcr_regs)
+		return -EACCES;
+
+	if (offset > PLAT_RESOURCE_GCR_SIZE)
+		return -EINVAL;
+
+	orig = readl(ipcdev.gcr_mem_base + offset);
+
+	tmp = orig & ~mask;
+	tmp |= val & mask;
+
+	writel(tmp, ipcdev.gcr_mem_base + offset);
+
+	tmp = readl(ipcdev.gcr_mem_base + offset);
+
+	if ((tmp & mask) != (val & mask))
+		return -EIO;
+
+	return 0;
+}
+EXPORT_SYMBOL_GPL(intel_pmc_gcr_update);
 
 static int intel_pmc_ipc_check_status(void)
 {
@@ -747,6 +802,7 @@ static int ipc_plat_get_res(struct platform_device *pdev)
 	ipcdev.ipc_base = addr;
 
 	ipcdev.gcr_base = res->start + PLAT_RESOURCE_GCR_OFFSET;
+	ipcdev.gcr_mem_base = addr + PLAT_RESOURCE_GCR_OFFSET;
 	ipcdev.gcr_size = PLAT_RESOURCE_GCR_SIZE;
 	dev_info(&pdev->dev, "ipc res: %pR\n", res);
 
