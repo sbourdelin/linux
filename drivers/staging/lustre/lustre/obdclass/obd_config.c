@@ -995,26 +995,42 @@ out:
 }
 EXPORT_SYMBOL(class_process_config);
 
-int class_process_proc_param(char *prefix, struct lprocfs_vars *lvars,
-			     struct lustre_cfg *lcfg, void *data)
+static int class_find_write_attr(struct kobject *kobj, char *name, int namelen,
+				 char *val, int vallen)
 {
-	struct lprocfs_vars *var;
-	struct file fakefile;
-	struct seq_file fake_seqfile;
+	struct attribute *attr;
+	struct kobj_type *kt = get_ktype(kobj);
+	int i;
+
+	/* Empty object? */
+	if (!kt || !kt->default_attrs)
+		return -ENOENT;
+
+	for (i = 0; (attr = kt->default_attrs[i]) != NULL; i++) {
+		if (!strncmp(attr->name, name, namelen) &&
+		    namelen == strlen(attr->name)) {
+			if (kt->sysfs_ops && kt->sysfs_ops->store)
+				return kt->sysfs_ops->store(kobj, attr, val,
+							    vallen);
+			return -EINVAL;
+		}
+	}
+
+	return -ENOENT;
+}
+
+int class_process_attr_param(char *prefix, struct kobject *kobj,
+			     struct lustre_cfg *lcfg)
+{
 	char *key, *sval;
 	int i, keylen, vallen;
-	int matched = 0, j = 0;
 	int rc = 0;
-	int skip = 0;
 
 	if (lcfg->lcfg_command != LCFG_PARAM) {
 		CERROR("Unknown command: %d\n", lcfg->lcfg_command);
 		return -EINVAL;
 	}
 
-	/* fake a seq file so that var->fops->write can work... */
-	fakefile.private_data = &fake_seqfile;
-	fake_seqfile.private = data;
 	/* e.g. tunefs.lustre --param mdt.group_upcall=foo /r/tmp/lustre-mdt
 	 * or   lctl conf_param lustre-MDT0000.mdt.group_upcall=bar
 	 * or   lctl conf_param lustre-OST0000.osc.max_dirty_mb=36
@@ -1038,39 +1054,16 @@ int class_process_proc_param(char *prefix, struct lprocfs_vars *lvars,
 		keylen = sval - key;
 		sval++;
 		vallen = strlen(sval);
-		matched = 0;
-		j = 0;
-		/* Search proc entries */
-		while (lvars[j].name) {
-			var = &lvars[j];
-			if (!class_match_param(key, var->name, NULL) &&
-			    keylen == strlen(var->name)) {
-				matched++;
-				rc = -EROFS;
-				if (var->fops && var->fops->write) {
-					mm_segment_t oldfs;
+		rc = class_find_write_attr(kobj, key, keylen, sval, vallen);
 
-					oldfs = get_fs();
-					set_fs(KERNEL_DS);
-					rc = var->fops->write(&fakefile,
-						(const char __user *)sval,
-								vallen, NULL);
-					set_fs(oldfs);
-				}
-				break;
-			}
-			j++;
-		}
-		if (!matched) {
+		if (rc == -ENOENT) {
 			CERROR("%.*s: %s unknown param %s\n",
 			       (int)strlen(prefix) - 1, prefix,
 			       (char *)lustre_cfg_string(lcfg, 0), key);
 			/* rc = -EINVAL;	continue parsing other params */
-			skip++;
 		} else if (rc < 0) {
-			CERROR("%s: error writing proc entry '%s': rc = %d\n",
-			       prefix, var->name, rc);
-			rc = 0;
+			CERROR("%s: error writing proc entry '%.*s': rc = %d\n",
+			       prefix, keylen, key, rc);
 		} else {
 			CDEBUG(D_CONFIG, "%s.%.*s: Set parameter %.*s=%s\n",
 			       lustre_cfg_string(lcfg, 0),
@@ -1079,13 +1072,10 @@ int class_process_proc_param(char *prefix, struct lprocfs_vars *lvars,
 		}
 	}
 
-	if (rc > 0)
-		rc = 0;
-	if (!rc && skip)
-		rc = skip;
-	return rc;
+	/* Even if we did not find anything to write to, keep processing */
+	return 0;
 }
-EXPORT_SYMBOL(class_process_proc_param);
+EXPORT_SYMBOL(class_process_attr_param);
 
 /** Parse a configuration llog, doing various manipulations on them
  * for various reasons, (modifications for compatibility, skip obsolete

@@ -926,8 +926,7 @@ int lov_process_config_base(struct obd_device *obd, struct lustre_cfg *lcfg,
 
 		lprocfs_lov_init_vars(&lvars);
 
-		rc = class_process_proc_param(PARAM_LOV, lvars.obd_vars,
-					      lcfg, obd);
+		rc = class_process_attr_param(PARAM_LOV, &obd->obd_kobj, lcfg);
 		if (rc > 0)
 			rc = 0;
 		goto out;

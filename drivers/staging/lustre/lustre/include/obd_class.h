@@ -114,8 +114,8 @@ typedef int (*llog_cb_t)(const struct lu_env *, struct llog_handle *,
 			 struct llog_rec_hdr *, void *);
 /* obd_config.c */
 int class_process_config(struct lustre_cfg *lcfg);
-int class_process_proc_param(char *prefix, struct lprocfs_vars *lvars,
-			     struct lustre_cfg *lcfg, void *data);
+int class_process_attr_param(char *prefix, struct kobject *kobj,
+			     struct lustre_cfg *lcfg);
 struct obd_device *class_incref(struct obd_device *obd,
 				const char *scope, const void *source);
 void class_decref(struct obd_device *obd,

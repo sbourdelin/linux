@@ -2670,8 +2670,7 @@ static int mdc_process_config(struct obd_device *obd, u32 len, void *buf)
 	lprocfs_mdc_init_vars(&lvars);
 	switch (lcfg->lcfg_command) {
 	default:
-		rc = class_process_proc_param(PARAM_MDC, lvars.obd_vars,
-					      lcfg, obd);
+		rc = class_process_attr_param(PARAM_MDC, &obd->obd_kobj, lcfg);
 		if (rc > 0)
 			rc = 0;
 		break;

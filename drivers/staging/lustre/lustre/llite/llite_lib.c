@@ -2259,7 +2259,7 @@ out_statfs:
 int ll_process_config(struct lustre_cfg *lcfg)
 {
 	char *ptr;
-	void *sb;
+	struct super_block *sb;
 	struct lprocfs_static_vars lvars;
 	unsigned long x;
 	int rc = 0;
@@ -2273,15 +2273,15 @@ int ll_process_config(struct lustre_cfg *lcfg)
 	rc = kstrtoul(ptr, 16, &x);
 	if (rc != 0)
 		return -EINVAL;
-	sb = (void *)x;
+	sb = (struct super_block *)x;
 	/* This better be a real Lustre superblock! */
-	LASSERT(s2lsi((struct super_block *)sb)->lsi_lmd->lmd_magic == LMD_MAGIC);
+	LASSERT(s2lsi(sb)->lsi_lmd->lmd_magic == LMD_MAGIC);
 
 	/* Note we have not called client_common_fill_super yet, so
 	 * proc fns must be able to handle that!
 	 */
-	rc = class_process_proc_param(PARAM_LLITE, lvars.obd_vars,
-				      lcfg, sb);
+	rc = class_process_attr_param(PARAM_LLITE, &ll_s2sbi(sb)->ll_kobj,
+				      lcfg);
 	if (rc > 0)
 		rc = 0;
 	return rc;
