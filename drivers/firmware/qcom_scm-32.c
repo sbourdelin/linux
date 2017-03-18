@@ -578,3 +578,14 @@ int __qcom_scm_set_remote_state(struct device *dev, u32 state, u32 id)
 
 	return ret ? : le32_to_cpu(scm_ret);
 }
+
+int __qcom_scm_io_readl(struct device *dev, phys_addr_t addr)
+{
+	return qcom_scm_call_atomic1(QCOM_SCM_SVC_IO, QCOM_SCM_IO_READ, addr);
+}
+
+int __qcom_scm_io_writel(struct device *dev, phys_addr_t addr, unsigned int val)
+{
+	return qcom_scm_call_atomic2(QCOM_SCM_SVC_IO, QCOM_SCM_IO_WRITE,
+				     addr, val);
+}
