@@ -58,6 +58,17 @@ xfs_zero_range(
 	xfs_off_t		count,
 	bool			*did_zero)
 {
+	/*
+	 * Avoid doing I/O beyond eof - it's not necessary
+	 * since nothing can read beyond eof.  The space will
+	 * be zeroed when the file is extended anyway.
+	 */
+	if (pos >= XFS_ISIZE(ip))
+		return 0;
+
+	if ((pos + count) >= XFS_ISIZE(ip))
+		count = XFS_ISIZE(ip) - pos - 1;
+
 	return iomap_zero_range(VFS_I(ip), pos, count, NULL, &xfs_iomap_ops);
 }
 
