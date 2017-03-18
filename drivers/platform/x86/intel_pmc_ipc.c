@@ -126,7 +126,6 @@ static struct intel_pmc_ipc_dev {
 	struct platform_device *tco_dev;
 
 	/* gcr */
-	resource_size_t gcr_base;
 	void __iomem *gcr_mem_base;
 	int gcr_size;
 	bool has_gcr_regs;
@@ -253,6 +252,15 @@ int intel_pmc_gcr_update(u32 offset, u32 mask, u32 val)
 	return 0;
 }
 EXPORT_SYMBOL_GPL(intel_pmc_gcr_update);
+
+static int update_noreboot_bit(bool status)
+{
+	if (status)
+		return intel_pmc_gcr_update(PMC_GCR_PMC_CFG_REG, BIT(4),
+					    BIT(4));
+	else
+		return intel_pmc_gcr_update(PMC_GCR_PMC_CFG_REG, BIT(4), 0);
+}
 
 static int intel_pmc_ipc_check_status(void)
 {
@@ -571,15 +579,12 @@ static struct resource tco_res[] = {
 	{
 		.flags = IORESOURCE_IO,
 	},
-	/* GCS */
-	{
-		.flags = IORESOURCE_MEM,
-	},
 };
 
 static struct itco_wdt_platform_data tco_info = {
 	.name = "Apollo Lake SoC",
 	.version = 5,
+	.update_noreboot_flag = update_noreboot_bit,
 };
 
 #define TELEMETRY_RESOURCE_PUNIT_SSRAM	0
@@ -635,10 +640,6 @@ static int ipc_create_tco_device(void)
 	res = tco_res + TCO_RESOURCE_SMI_EN_IO;
 	res->start = ipcdev.acpi_io_base + SMI_EN_OFFSET;
 	res->end = res->start + SMI_EN_SIZE - 1;
-
-	res = tco_res + TCO_RESOURCE_GCR_MEM;
-	res->start = ipcdev.gcr_base + TCO_PMC_OFFSET;
-	res->end = res->start + TCO_PMC_SIZE - 1;
 
 	pdev = platform_device_register_full(&pdevinfo);
 	if (IS_ERR(pdev))
@@ -801,7 +802,6 @@ static int ipc_plat_get_res(struct platform_device *pdev)
 	}
 	ipcdev.ipc_base = addr;
 
-	ipcdev.gcr_base = res->start + PLAT_RESOURCE_GCR_OFFSET;
 	ipcdev.gcr_mem_base = addr + PLAT_RESOURCE_GCR_OFFSET;
 	ipcdev.gcr_size = PLAT_RESOURCE_GCR_SIZE;
 	dev_info(&pdev->dev, "ipc res: %pR\n", res);
