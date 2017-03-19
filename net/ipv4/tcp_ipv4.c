@@ -1805,9 +1805,11 @@ static struct timewait_sock_ops tcp_timewait_sock_ops = {
 void inet_sk_rx_dst_set(struct sock *sk, const struct sk_buff *skb)
 {
 	struct dst_entry *dst = skb_dst(skb);
+	struct dst_entry *old;
 
 	if (dst && dst_hold_safe(dst)) {
-		sk->sk_rx_dst = dst;
+		old = xchg(&sk->sk_rx_dst, dst);
+		dst_release(old);
 		inet_sk(sk)->rx_dst_ifindex = skb->skb_iif;
 	}
 }
