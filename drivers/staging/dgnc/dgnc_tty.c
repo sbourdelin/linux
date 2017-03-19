@@ -1863,13 +1863,13 @@ static void dgnc_tty_send_xchar(struct tty_struct *tty, char c)
 	if (!bd || bd->magic != DGNC_BOARD_MAGIC)
 		return;
 
-	dev_dbg(tty->dev, "dgnc_tty_send_xchar start\n");
+	dev_dbg(tty->dev, "%s start\n", __func__);
 
 	spin_lock_irqsave(&ch->ch_lock, flags);
 	bd->bd_ops->send_immediate_char(ch, c);
 	spin_unlock_irqrestore(&ch->ch_lock, flags);
 
-	dev_dbg(tty->dev, "dgnc_tty_send_xchar finish\n");
+	dev_dbg(tty->dev, "%s finish\n", __func__);
 }
 
 /* Return modem signals to ld. */
