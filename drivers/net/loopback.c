@@ -150,7 +150,7 @@ static void loopback_dev_free(struct net_device *dev)
 
 static const struct net_device_ops loopback_ops = {
 	.ndo_init      = loopback_dev_init,
-	.ndo_start_xmit= loopback_xmit,
+	.ndo_start_xmit = loopback_xmit,
 	.ndo_get_stats64 = loopback_get_stats64,
 	.ndo_set_mac_address = eth_mac_addr,
 };
