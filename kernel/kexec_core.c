@@ -486,6 +486,45 @@ struct page *kimage_alloc_control_pages(struct kimage *image,
 	return pages;
 }
 
+int kimage_crash_copy_vmcoreinfo(struct kimage *image)
+{
+	struct page *vmcoreinfo_page;
+	void *safecopy;
+
+	WARN_ON(image->type != KEXEC_TYPE_CRASH);
+
+	if (!vmcoreinfo_size) {
+		pr_err("empty vmcoreinfo data\n");
+		return -ENOMEM;
+	}
+
+	/*
+	 * For kdump, allocate one vmcoreinfo safe copy from the
+	 * crash memory. as we have arch_kexec_protect_crashkres()
+	 * after kexec syscall, we naturally protect it from write
+	 * (even read) access under kernel direct mapping. But on
+	 * the other hand, we still need to operate it when crash
+	 * happens to generate vmcoreinfo note, hereby we rely on
+	 * vmap for this purpose.
+	 */
+	vmcoreinfo_page = kimage_alloc_control_pages(image, 0);
+	if (!vmcoreinfo_page) {
+		pr_err("could not allocate vmcoreinfo buffer\n");
+		return -ENOMEM;
+	}
+	safecopy = vmap(&vmcoreinfo_page, 1, VM_MAP, PAGE_KERNEL);
+	if (!safecopy) {
+		pr_err("cound not vmap vmcoreinfo buffer\n");
+		return -ENOMEM;
+	}
+
+	memcpy(safecopy, vmcoreinfo_data, vmcoreinfo_size);
+	image->vmcoreinfo_data_copy = safecopy;
+	image->vmcoreinfo_size_copy = vmcoreinfo_size;
+
+	return 0;
+}
+
 static int kimage_add_entry(struct kimage *image, kimage_entry_t entry)
 {
 	if (*image->entry != 0)
@@ -602,6 +641,9 @@ void kimage_free(struct kimage *image)
 	 */
 	if (image->file_mode)
 		kimage_file_post_load_cleanup(image);
+
+	if (image->vmcoreinfo_data_copy)
+		vunmap(image->vmcoreinfo_data_copy);
 
 	kfree(image);
 }
@@ -1370,6 +1412,16 @@ void crash_save_vmcoreinfo(void)
 {
 	if (!vmcoreinfo_note)
 		return;
+	/*
+	 * Always use the safe copy to generate vmcoreinfo note.
+	 * Check kexec_crash_image, fadump does not use kexec.
+	 */
+	if (kexec_crash_image &&
+	    kexec_crash_image->vmcoreinfo_data_copy &&
+	    kexec_crash_image->vmcoreinfo_size_copy) {
+		vmcoreinfo_data = kexec_crash_image->vmcoreinfo_data_copy;
+		vmcoreinfo_size = kexec_crash_image->vmcoreinfo_size_copy;
+	}
 
 	vmcoreinfo_append_str("CRASHTIME=%ld\n", get_seconds());
 	update_vmcoreinfo_note();

@@ -187,6 +187,8 @@ struct kimage {
 	unsigned long start;
 	struct page *control_code_page;
 	struct page *swap_page;
+	void *vmcoreinfo_data_copy; /* locates in the crash memory */
+	size_t vmcoreinfo_size_copy;
 
 	unsigned long nr_segments;
 	struct kexec_segment segment[KEXEC_SEGMENT_MAX];
@@ -243,6 +245,7 @@ extern asmlinkage long sys_kexec_load(unsigned long entry,
 extern int kernel_kexec(void);
 extern struct page *kimage_alloc_control_pages(struct kimage *image,
 						unsigned int order);
+extern int kimage_crash_copy_vmcoreinfo(struct kimage *image);
 extern int kexec_load_purgatory(struct kimage *image, unsigned long min,
 				unsigned long max, int top_down,
 				unsigned long *load_addr);

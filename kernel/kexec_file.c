@@ -244,6 +244,9 @@ kimage_file_alloc_init(struct kimage **rimage, int kernel_fd,
 			pr_err("Could not allocate swap buffer\n");
 			goto out_free_control_pages;
 		}
+	} else {
+		if (kimage_crash_copy_vmcoreinfo(image) < 0)
+			goto out_free_post_load_bufs;
 	}
 
 	*rimage = image;
