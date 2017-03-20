@@ -48,7 +48,7 @@ static inline bool i915_mmio_reg_valid(i915_reg_t reg)
 	return !i915_mmio_reg_equal(reg, INVALID_MMIO_REG);
 }
 
-#define _PICK(__index, ...) (((const u32 []){ __VA_ARGS__ })[__index])
+#define _PICK(__index, ...) ({static const u32 __arr[] = { __VA_ARGS__ }; __arr[__index];})
 
 #define _PIPE(pipe, a, b) ((a) + (pipe)*((b)-(a)))
 #define _MMIO_PIPE(pipe, a, b) _MMIO(_PIPE(pipe, a, b))
@@ -2659,10 +2659,10 @@ enum skl_disp_power_wells {
 /*
  * Clock control & power management
  */
-#define _DPLL_A (dev_priv->info.display_mmio_offset + 0x6014)
-#define _DPLL_B (dev_priv->info.display_mmio_offset + 0x6018)
-#define _CHV_DPLL_C (dev_priv->info.display_mmio_offset + 0x6030)
-#define DPLL(pipe) _MMIO_PIPE3((pipe), _DPLL_A, _DPLL_B, _CHV_DPLL_C)
+#define _DPLL_A			0x6014
+#define _DPLL_B			0x6018
+#define _CHV_DPLL_C		0x6030
+#define DPLL(pipe) _MMIO(dev_priv->info.display_mmio_offset + _PIPE3((pipe), _DPLL_A, _DPLL_B, _CHV_DPLL_C))
 
 #define VGA0	_MMIO(0x6000)
 #define VGA1	_MMIO(0x6004)
@@ -2758,10 +2758,10 @@ enum skl_disp_power_wells {
 #define   SDVO_MULTIPLIER_SHIFT_HIRES		4
 #define   SDVO_MULTIPLIER_SHIFT_VGA		0
 
-#define _DPLL_A_MD (dev_priv->info.display_mmio_offset + 0x601c)
-#define _DPLL_B_MD (dev_priv->info.display_mmio_offset + 0x6020)
-#define _CHV_DPLL_C_MD (dev_priv->info.display_mmio_offset + 0x603c)
-#define DPLL_MD(pipe) _MMIO_PIPE3((pipe), _DPLL_A_MD, _DPLL_B_MD, _CHV_DPLL_C_MD)
+#define _DPLL_A_MD				0x601c
+#define _DPLL_B_MD				0x6020
+#define _CHV_DPLL_C_MD				0x603c
+#define DPLL_MD(pipe) _MMIO(dev_priv->info.display_mmio_offset + _PIPE3((pipe), _DPLL_A_MD, _DPLL_B_MD, _CHV_DPLL_C_MD))
 
 /*
  * UDI pixel divider, controlling how many pixels are stuffed into a packet.
