@@ -260,7 +260,7 @@ int mbox_send_message(struct mbox_chan *chan, void *mssg)
 
 	msg_submit(chan);
 
-	if (chan->cl->tx_block && chan->active_req) {
+	if (chan->cl->tx_block && t >= 0) {
 		unsigned long wait;
 		int ret;
 
