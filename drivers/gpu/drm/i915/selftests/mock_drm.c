@@ -32,15 +32,15 @@ static inline struct inode fake_inode(struct drm_i915_private *i915)
 struct drm_file *mock_file(struct drm_i915_private *i915)
 {
 	struct inode inode = fake_inode(i915);
-	struct file filp = {};
+	struct file *filp = kzalloc(sizeof(struct file), GFP_KERNEL);
 	struct drm_file *file;
 	int err;
 
-	err = drm_open(&inode, &filp);
+	err = drm_open(&inode, filp);
 	if (unlikely(err))
 		return ERR_PTR(err);
 
-	file = filp.private_data;
+	file = filp->private_data;
 	file->authenticated = true;
 	return file;
 }
@@ -48,7 +48,9 @@ struct drm_file *mock_file(struct drm_i915_private *i915)
 void mock_file_free(struct drm_i915_private *i915, struct drm_file *file)
 {
 	struct inode inode = fake_inode(i915);
-	struct file filp = { .private_data = file };
+	struct file *filp = file->filp;
 
-	drm_release(&inode, &filp);
+	drm_release(&inode, filp);
+
+	kfree(filp);
 }
