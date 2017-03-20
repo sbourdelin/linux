@@ -359,11 +359,6 @@ static int stmmac_ethtool_get_link_ksettings(struct net_device *dev,
 		       __func__, dev->name);
 		return -ENODEV;
 	}
-	if (!netif_running(dev)) {
-		pr_err("%s: interface is disabled: we cannot track "
-		"link speed / duplex setting\n", dev->name);
-		return -EBUSY;
-	}
 	rc = phy_ethtool_ksettings_get(phy, cmd);
 	return rc;
 }
@@ -418,13 +413,6 @@ static void stmmac_ethtool_setmsglevel(struct net_device *dev, u32 level)
 	struct stmmac_priv *priv = netdev_priv(dev);
 	priv->msg_enable = level;
 
-}
-
-static int stmmac_check_if_running(struct net_device *dev)
-{
-	if (!netif_running(dev))
-		return -EBUSY;
-	return 0;
 }
 
 static int stmmac_ethtool_get_regs_len(struct net_device *dev)
@@ -846,7 +834,6 @@ static int stmmac_set_tunable(struct net_device *dev,
 }
 
 static const struct ethtool_ops stmmac_ethtool_ops = {
-	.begin = stmmac_check_if_running,
 	.get_drvinfo = stmmac_ethtool_getdrvinfo,
 	.get_msglevel = stmmac_ethtool_getmsglevel,
 	.set_msglevel = stmmac_ethtool_setmsglevel,

@@ -1883,20 +1883,6 @@ static int stmmac_open(struct net_device *dev)
 	struct stmmac_priv *priv = netdev_priv(dev);
 	int ret;
 
-	stmmac_check_ether_addr(priv);
-
-	if (priv->hw->pcs != STMMAC_PCS_RGMII &&
-	    priv->hw->pcs != STMMAC_PCS_TBI &&
-	    priv->hw->pcs != STMMAC_PCS_RTBI) {
-		ret = stmmac_init_phy(dev);
-		if (ret) {
-			netdev_err(priv->dev,
-				   "%s: Cannot attach to PHY (error: %d)\n",
-				   __func__, ret);
-			return ret;
-		}
-	}
-
 	/* Extra statistics */
 	memset(&priv->xstats, 0, sizeof(struct stmmac_extra_stats));
 	priv->xstats.threshold = tc;
@@ -1982,9 +1968,6 @@ irq_error:
 init_error:
 	free_dma_desc_resources(priv);
 dma_desc_error:
-	if (dev->phydev)
-		phy_disconnect(dev->phydev);
-
 	return ret;
 }
 
@@ -2001,11 +1984,8 @@ static int stmmac_release(struct net_device *dev)
 	if (priv->eee_enabled)
 		del_timer_sync(&priv->eee_ctrl_timer);
 
-	/* Stop and disconnect the PHY */
-	if (dev->phydev) {
+	if (dev->phydev)
 		phy_stop(dev->phydev);
-		phy_disconnect(dev->phydev);
-	}
 
 	netif_stop_queue(dev);
 
@@ -3446,6 +3426,7 @@ int stmmac_dvr_probe(struct device *device,
 		priv->clk_csr = priv->plat->clk_csr;
 
 	stmmac_check_pcs_mode(priv);
+	stmmac_check_ether_addr(priv);
 
 	if (priv->hw->pcs != STMMAC_PCS_RGMII  &&
 	    priv->hw->pcs != STMMAC_PCS_TBI &&
@@ -3457,6 +3438,13 @@ int stmmac_dvr_probe(struct device *device,
 				"%s: MDIO bus (id: %d) registration failed",
 				__func__, priv->plat->bus_id);
 			goto error_mdio_register;
+		}
+		ret = stmmac_init_phy(ndev);
+		if (ret) {
+			dev_err(priv->device,
+				"%s: Cannot attach to PHY (error: %d)\n",
+				__func__, ret);
+			goto error_init_phy;
 		}
 	}
 
@@ -3470,6 +3458,11 @@ int stmmac_dvr_probe(struct device *device,
 	return ret;
 
 error_netdev_register:
+	if (priv->hw->pcs != STMMAC_PCS_RGMII &&
+	    priv->hw->pcs != STMMAC_PCS_TBI &&
+	    priv->hw->pcs != STMMAC_PCS_RTBI)
+		phy_disconnect(ndev->phydev);
+error_init_phy:
 	if (priv->hw->pcs != STMMAC_PCS_RGMII &&
 	    priv->hw->pcs != STMMAC_PCS_TBI &&
 	    priv->hw->pcs != STMMAC_PCS_RTBI)
