@@ -1314,6 +1314,17 @@ xfs_free_file_space(
 	}
 
 	/*
+	 * Avoid doing I/O beyond eof - it's not necessary
+	 * since nothing can read beyond eof.  The space will
+	 * be zeroed when the file is extended anyway.
+	 */
+	if (offset >= XFS_ISIZE(ip))
+		return 0;
+
+	if ((offset + len) >= XFS_ISIZE(ip))
+		len = XFS_ISIZE(ip) - offset - 1;
+
+	/*
 	 * Now that we've unmap all full blocks we'll have to zero out any
 	 * partial block at the beginning and/or end.  xfs_zero_range is
 	 * smart enough to skip any holes, including those we just created.
