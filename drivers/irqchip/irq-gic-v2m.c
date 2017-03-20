@@ -26,6 +26,7 @@
 #include <linux/slab.h>
 #include <linux/spinlock.h>
 #include <linux/irqchip/arm-gic.h>
+#include <linux/irqchip/arm-gic-common.h>
 
 /*
 * MSI_TYPER:
@@ -388,6 +389,36 @@ static struct of_device_id gicv2m_device_id[] = {
 	{},
 };
 
+static int __init giv2m_of_init_one(struct device_node *child, bool force)
+{
+	u32 spi_start = 0, nr_spis = 0;
+	struct resource res;
+	int ret;
+
+	if (!of_find_property(child, "msi-controller", NULL))
+		return force ? -EINVAL : 0;
+
+	ret = of_address_to_resource(child, 0, &res);
+	if (ret) {
+		pr_err("Failed to allocate v2m resource\n");
+		return ret;
+	}
+
+	if (!of_property_read_u32(child, "arm,msi-base-spi",
+				  &spi_start) &&
+	    !of_property_read_u32(child, "arm,msi-num-spis", &nr_spis))
+		if (!force)
+			pr_info("DT overriding V2M MSI_TYPER (base:%u, num:%u)\n",
+				spi_start, nr_spis);
+
+	if (force && !nr_spis) {
+		pr_err("Can't emulate v2m without num-spis\n");
+		return -EINVAL;
+	}
+
+	return gicv2m_init_one(&child->fwnode, spi_start, nr_spis, &res);
+}
+
 static int __init gicv2m_of_init(struct fwnode_handle *parent_handle,
 				 struct irq_domain *parent)
 {
@@ -397,25 +428,7 @@ static int __init gicv2m_of_init(struct fwnode_handle *parent_handle,
 
 	for (child = of_find_matching_node(node, gicv2m_device_id); child;
 	     child = of_find_matching_node(child, gicv2m_device_id)) {
-		u32 spi_start = 0, nr_spis = 0;
-		struct resource res;
-
-		if (!of_find_property(child, "msi-controller", NULL))
-			continue;
-
-		ret = of_address_to_resource(child, 0, &res);
-		if (ret) {
-			pr_err("Failed to allocate v2m resource.\n");
-			break;
-		}
-
-		if (!of_property_read_u32(child, "arm,msi-base-spi",
-					  &spi_start) &&
-		    !of_property_read_u32(child, "arm,msi-num-spis", &nr_spis))
-			pr_info("DT overriding V2M MSI_TYPER (base:%u, num:%u)\n",
-				spi_start, nr_spis);
-
-		ret = gicv2m_init_one(&child->fwnode, spi_start, nr_spis, &res);
+		ret = giv2m_of_init_one(child, false);
 		if (ret) {
 			of_node_put(child);
 			break;
@@ -517,6 +530,21 @@ static int __init gicv2m_acpi_init(struct irq_domain *parent)
 	return -EINVAL;
 }
 #endif /* CONFIG_ACPI */
+
+int __init gicv2m_init_gicv3(struct fwnode_handle *handle,
+			     struct irq_domain *parent)
+{
+	int ret;
+	struct device_node *node = to_of_node(handle);
+
+	ret = giv2m_of_init_one(node, true);
+	if (!ret)
+		ret = gicv2m_allocate_domains(parent);
+	if (ret)
+		gicv2m_teardown();
+
+	return ret;
+}
 
 int __init gicv2m_init(struct fwnode_handle *parent_handle,
 		       struct irq_domain *parent)
