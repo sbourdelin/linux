@@ -66,7 +66,7 @@ static const struct x86_cpu_id vmx_cpu_id[] = {
 MODULE_DEVICE_TABLE(x86cpu, vmx_cpu_id);
 
 static bool __read_mostly enable_vpid = 1;
-module_param_named(vpid, enable_vpid, bool, 0444);
+module_param_named(vpid, enable_vpid, bool, S_IRUGO);
 
 static bool __read_mostly flexpriority_enabled = 1;
 module_param_named(flexpriority, flexpriority_enabled, bool, S_IRUGO);
