@@ -267,10 +267,11 @@ int free_swap_slot(swp_entry_t entry)
 {
 	struct swap_slots_cache *cache;
 
-	BUG_ON(!swap_slot_cache_initialized);
+	if (unlikely(!use_swap_slot_cache))
+		swapcache_free_entries(&entry, 1);
 
 	cache = &get_cpu_var(swp_slots);
-	if (use_swap_slot_cache && cache->slots_ret) {
+	if (cache->slots_ret) {
 		spin_lock_irq(&cache->free_lock);
 		/* Swap slots cache may be deactivated before acquiring lock */
 		if (!use_swap_slot_cache) {
