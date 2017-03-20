@@ -111,6 +111,7 @@
 #define ESR_ELx_COND_MASK	(UL(0xF) << ESR_ELx_COND_SHIFT)
 #define ESR_ELx_WFx_ISS_WFE	(UL(1) << 0)
 #define ESR_ELx_xVC_IMM_MASK	((1UL << 16) - 1)
+#define VSESR_ELx_IDS_ISS_MASK    ((1UL << 25) - 1)
 
 /* ESR value templates for specific events */
 

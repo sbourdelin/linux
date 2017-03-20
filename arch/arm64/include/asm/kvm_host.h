@@ -87,6 +87,10 @@ struct kvm_mmu_memory_cache {
 };
 
 struct kvm_vcpu_fault_info {
+#ifdef CONFIG_HAS_RAS_EXTENSION
+	/* Virtual SError Exception Syndrome Register */
+	u32 vsesr_el2;
+#endif
 	u32 esr_el2;		/* Hyp Syndrom Register */
 	u64 far_el2;		/* Hyp Fault Address Register */
 	u64 hpfar_el2;		/* Hyp IPA Fault Address Register */

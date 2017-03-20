@@ -242,4 +242,14 @@ void kvm_inject_undefined(struct kvm_vcpu *vcpu)
 void kvm_inject_vabt(struct kvm_vcpu *vcpu)
 {
 	vcpu_set_hcr(vcpu, vcpu_get_hcr(vcpu) | HCR_VSE);
+#ifdef CONFIG_HAS_RAS_EXTENSION
+	/* If virtual System Error or Asynchronous Abort is set. set
+	 * the virtual exception syndrome information
+	 */
+	kvm_vcpu_set_vsesr(vcpu, ((kvm_vcpu_get_vsesr(vcpu)
+				& (~VSESR_ELx_IDS_ISS_MASK))
+				| (kvm_vcpu_get_hsr(vcpu)
+				& VSESR_ELx_IDS_ISS_MASK)));
+#endif
+
 }

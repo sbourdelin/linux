@@ -86,6 +86,13 @@ static void __hyp_text __activate_traps(struct kvm_vcpu *vcpu)
 		isb();
 	}
 	write_sysreg(val, hcr_el2);
+#ifdef CONFIG_HAS_RAS_EXTENSION
+	/* If virtual System Error or Asynchronous Abort is pending. set
+	 * the virtual exception syndrome information
+	 */
+	if (vcpu->arch.hcr_el2 & HCR_VSE)
+		write_sysreg(vcpu->arch.fault.vsesr_el2, vsesr_el2);
+#endif
 	/* Trap on AArch32 cp15 c15 accesses (EL1 or EL0) */
 	write_sysreg(1 << 15, hstr_el2);
 	/*
@@ -139,8 +146,14 @@ static void __hyp_text __deactivate_traps(struct kvm_vcpu *vcpu)
 	 * the crucial bit is "On taking a vSError interrupt,
 	 * HCR_EL2.VSE is cleared to 0."
 	 */
-	if (vcpu->arch.hcr_el2 & HCR_VSE)
+	if (vcpu->arch.hcr_el2 & HCR_VSE) {
 		vcpu->arch.hcr_el2 = read_sysreg(hcr_el2);
+#ifdef CONFIG_HAS_RAS_EXTENSION
+		/* set vsesr_el2[24:0] with esr_el2[24:0] */
+		kvm_vcpu_set_vsesr(vcpu, read_sysreg_el2(esr)
+					& VSESR_ELx_IDS_ISS_MASK);
+#endif
+	}
 
 	__deactivate_traps_arch()();
 	write_sysreg(0, hstr_el2);

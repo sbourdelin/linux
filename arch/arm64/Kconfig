@@ -898,6 +898,14 @@ endmenu
 
 menu "ARMv8.2 architectural features"
 
+config HAS_RAS_EXTENSION
+	bool "Support arm64 RAS extension"
+	default n
+	help
+	  Reliability, Availability, Serviceability(RAS; part of the ARMv8.2 Extensions).
+
+	  Selecting this option OS will try to recover the error that RAS hardware node detected.
+
 config ARM64_UAO
 	bool "Enable support for User Access Override (UAO)"
 	default y
