@@ -36,6 +36,9 @@
 #define RT286_VENDOR_ID 0x10ec0286
 #define RT288_VENDOR_ID 0x10ec0288
 
+#define AMP_OUT_MUTE    0xb080
+#define AMP_OUT_UNMUTE  0xb000
+
 struct rt286_priv {
 	struct reg_default *index_cache;
 	int index_cache_size;
@@ -47,6 +50,7 @@ struct rt286_priv {
 	struct delayed_work jack_detect_work;
 	int sys_clk;
 	int clk_id;
+	bool is_dell_dino;
 };
 
 static const struct reg_default rt286_index_def[] = {
@@ -472,6 +476,32 @@ static int rt286_set_dmic1_event(struct snd_soc_dapm_widget *w,
 	return 0;
 }
 
+/* Power event function to workaround headphone crack noise */
+static int rt286_hp_power_event(struct snd_soc_dapm_widget *w,
+			     struct snd_kcontrol *kcontrol, int event)
+{
+	struct snd_soc_codec *codec = snd_soc_dapm_to_codec(w->dapm);
+	struct rt286_priv *rt286 = snd_soc_codec_get_drvdata(codec);
+
+	if (!rt286->is_dell_dino)
+		return 0;
+
+	switch (event) {
+	case SND_SOC_DAPM_PRE_PMD:
+	case SND_SOC_DAPM_POST_PMD:
+	case SND_SOC_DAPM_POST_PMU:
+		snd_soc_write(codec, RT286_SET_AMP_GAIN_HPO, AMP_OUT_MUTE);
+		break;
+	case SND_SOC_DAPM_PRE_PMU:
+		snd_soc_write(codec, RT286_SET_AMP_GAIN_HPO, AMP_OUT_UNMUTE);
+		break;
+	default:
+		return 0;
+	}
+
+	return 0;
+}
+
 static int rt286_ldo2_event(struct snd_soc_dapm_widget *w,
 			     struct snd_kcontrol *kcontrol, int event)
 {
@@ -578,7 +608,9 @@ static const struct snd_soc_dapm_widget rt286_dapm_widgets[] = {
 	SND_SOC_DAPM_MUX("HPO Mux", SND_SOC_NOPM, 0, 0, &rt286_hpo_mux),
 
 	SND_SOC_DAPM_SUPPLY("HP Power", RT286_SET_PIN_HPO,
-		RT286_SET_PIN_SFT, 0, NULL, 0),
+		RT286_SET_PIN_SFT, 0, rt286_hp_power_event,
+		SND_SOC_DAPM_PRE_PMD | SND_SOC_DAPM_PRE_PMU |
+		SND_SOC_DAPM_POST_PMU | SND_SOC_DAPM_POST_PMD),
 
 	/* Output Mixer */
 	SND_SOC_DAPM_MIXER("Front", RT286_SET_POWER(RT286_DAC_OUT1), 0, 1,
@@ -1175,8 +1207,10 @@ static int rt286_i2c_probe(struct i2c_client *i2c,
 	if (pdata)
 		rt286->pdata = *pdata;
 
+	rt286->is_dell_dino = dmi_check_system(dmi_dell_dino);
+
 	if (dmi_check_system(force_combo_jack_table) ||
-		dmi_check_system(dmi_dell_dino))
+		rt286->is_dell_dino)
 		rt286->pdata.cbj_en = true;
 
 	regmap_write(rt286->regmap, RT286_SET_AUDIO_POWER, AC_PWRST_D3);
@@ -1192,6 +1226,11 @@ static int rt286_i2c_probe(struct i2c_client *i2c,
 		regmap_update_bits(rt286->regmap,
 					RT286_CBJ_CTRL1, 0xf000, 0xb000);
 	} else {
+		/* Fix headphone click noise */
+		if (rt286->is_dell_dino)
+			regmap_write(rt286->regmap,
+					RT286_MIC1_DET_CTRL, 0x0020);
+
 		regmap_update_bits(rt286->regmap,
 					RT286_CBJ_CTRL1, 0xf000, 0x5000);
 	}
@@ -1215,7 +1254,7 @@ static int rt286_i2c_probe(struct i2c_client *i2c,
 	regmap_update_bits(rt286->regmap, RT286_DEPOP_CTRL3, 0xf777, 0x4737);
 	regmap_update_bits(rt286->regmap, RT286_DEPOP_CTRL4, 0x00ff, 0x003f);
 
-	if (dmi_check_system(dmi_dell_dino)) {
+	if (rt286->is_dell_dino) {
 		regmap_update_bits(rt286->regmap,
 			RT286_SET_GPIO_MASK, 0x40, 0x40);
 		regmap_update_bits(rt286->regmap,
@@ -1224,6 +1263,9 @@ static int rt286_i2c_probe(struct i2c_client *i2c,
 			RT286_SET_GPIO_DATA, 0x40, 0x40);
 		regmap_update_bits(rt286->regmap,
 			RT286_GPIO_CTRL, 0xc, 0x8);
+		/* Workaound headphone crack noise when probing */
+		regmap_write(rt286->regmap, RT286_SET_AMP_GAIN_HPO,
+				AMP_OUT_MUTE);
 	}
 
 	if (rt286->i2c->irq) {
