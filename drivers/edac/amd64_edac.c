@@ -2447,24 +2447,6 @@ static inline void decode_bus_error(int node_id, struct mce *m)
 	__log_ecc_error(mci, &err, ecc_type);
 }
 
-/*
- * To find the UMC channel represented by this bank we need to match on its
- * instance_id. The instance_id of a bank is held in the lower 32 bits of its
- * IPID.
- */
-static int find_umc_channel(struct amd64_pvt *pvt, struct mce *m)
-{
-	u32 umc_instance_id[] = {0x50f00, 0x150f00};
-	u32 instance_id = m->ipid & GENMASK(31, 0);
-	int i, channel = -1;
-
-	for (i = 0; i < ARRAY_SIZE(umc_instance_id); i++)
-		if (umc_instance_id[i] == instance_id)
-			channel = i;
-
-	return channel;
-}
-
 static void decode_umc_error(int node_id, struct mce *m)
 {
 	u8 ecc_type = (m->status >> 45) & 0x3;
@@ -2484,7 +2466,7 @@ static void decode_umc_error(int node_id, struct mce *m)
 	if (m->status & MCI_STATUS_DEFERRED)
 		ecc_type = 3;
 
-	err.channel = find_umc_channel(pvt, m);
+	err.channel = find_umc_channel(m);
 	if (err.channel < 0) {
 		err.err_code = ERR_CHANNEL;
 		goto log_error;

@@ -755,6 +755,27 @@ out_err:
 }
 EXPORT_SYMBOL_GPL(umc_normaddr_to_sysaddr);
 
+/*
+ * To find the UMC channel represented by this bank we need to match on its
+ * instance_id. The instance_id of a bank is held in the lower 32 bits of its
+ * IPID.
+ */
+int find_umc_channel(struct mce *m)
+{
+	u32 umc_instance_id[] = {0x50f00, 0x150f00};
+	u32 instance_id = m->ipid & GENMASK(31, 0);
+	int i, channel = -EINVAL;
+
+	if (smca_banks[m->bank].hwid &&
+	    smca_banks[m->bank].hwid->bank_type == SMCA_UMC)
+		for (i = 0; i < ARRAY_SIZE(umc_instance_id); i++)
+			if (umc_instance_id[i] == instance_id)
+				channel = i;
+
+	return channel;
+}
+EXPORT_SYMBOL_GPL(find_umc_channel);
+
 static void
 __log_error(unsigned int bank, bool deferred_err, bool threshold_err, u64 misc)
 {
