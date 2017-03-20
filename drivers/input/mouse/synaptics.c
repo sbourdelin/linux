@@ -171,6 +171,13 @@ static const char * const smbus_pnp_ids[] = {
 	NULL
 };
 
+/* This list has been kindly provided by Synaptics. */
+static const char * const forcepad_pnp_ids[] = {
+	"SYN300D",
+	"SYN3014",
+	NULL
+};
+
 /*
  * Send a command to the synpatics touchpad by special commands
  */
@@ -491,13 +498,6 @@ static const struct min_max_quirk min_max_pnpid_table[] = {
 		1264, 5675, 1171, 4688
 	},
 	{ }
-};
-
-/* This list has been kindly provided by Synaptics. */
-static const char * const forcepad_pnp_ids[] = {
-	"SYN300D",
-	"SYN3014",
-	NULL
 };
 
 /*****************************************************************************
@@ -1708,10 +1708,13 @@ static int synaptics_create_intertouch(struct psmouse *psmouse,
 				!!SYN_CAP_EXT_BUTTONS_STICK(info->ext_cap_10),
 		},
 	};
-	const struct i2c_board_info intertouch_board = {
+	struct i2c_board_info intertouch_board = {
 		I2C_BOARD_INFO("rmi4_smbus", 0x2c),
 		.flags = I2C_CLIENT_HOST_NOTIFY,
 	};
+
+	if (psmouse_matches_pnp_id(psmouse, forcepad_pnp_ids))
+		intertouch_board.addr = 0x20;
 
 	return psmouse_smbus_init(psmouse, &intertouch_board,
 				  &pdata, sizeof(pdata),
@@ -1733,8 +1736,10 @@ static int synaptics_setup_intertouch(struct psmouse *psmouse,
 
 	if (synaptics_intertouch == SYNAPTICS_INTERTOUCH_NOT_SET) {
 		if (!psmouse_matches_pnp_id(psmouse, topbuttonpad_pnp_ids) &&
-		    !psmouse_matches_pnp_id(psmouse, smbus_pnp_ids))
+		    !psmouse_matches_pnp_id(psmouse, smbus_pnp_ids) &&
+		    !psmouse_matches_pnp_id(psmouse, forcepad_pnp_ids)) {
 			return -ENXIO;
+		}
 	}
 
 	psmouse_info(psmouse, "Trying to set up SMBus access\n");
