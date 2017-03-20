@@ -2,6 +2,7 @@
 #define __LINUX_BQ27X00_BATTERY_H__
 
 enum bq27xxx_chip {
+	/* categories; index for bq27xxx_regs[] */
 	BQ27000 = 1, /* bq27000, bq27200 */
 	BQ27010, /* bq27010, bq27210 */
 	BQ2750X, /* bq27500 deprecated alias */
@@ -18,6 +19,16 @@ enum bq27xxx_chip {
 	BQ27541, /* bq27541, bq27542, bq27546, bq27742 */
 	BQ27545, /* bq27545 */
 	BQ27421, /* bq27421, bq27425, bq27441, bq27621 */
+
+	/* members of categories; translate these to category in _setup() */
+	BQ2752X, /* deprecated alias */
+	BQ27531,
+	BQ27542,
+	BQ27546,
+	BQ27742,
+	BQ27425,
+	BQ27441,
+	BQ27621,
 };
 
 /**

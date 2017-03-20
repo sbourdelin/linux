@@ -1391,6 +1391,33 @@ int bq27xxx_battery_setup(struct bq27xxx_device_info *di)
 	struct power_supply_desc *psy_desc;
 	struct power_supply_config psy_cfg = { .drv_data = di, };
 
+	switch(di->chip) {
+	case BQ27000:
+	case BQ27010:
+	case BQ2750X:
+	case BQ2751X:
+	case BQ27500:
+	case BQ27510G1:
+	case BQ27510G2:
+	case BQ27510G3:
+	case BQ27520G1:
+	case BQ27520G2:
+	case BQ27520G3:
+	case BQ27520G4:
+	case BQ27530:
+	case BQ27541:
+	case BQ27545:
+	case BQ27421: break;
+	case BQ2752X: di->chip = BQ2751X; break;
+	case BQ27531: di->chip = BQ27530; break;
+	case BQ27542: di->chip = BQ27541; break;
+	case BQ27546: di->chip = BQ27541; break;
+	case BQ27742: di->chip = BQ27541; break;
+	case BQ27425: di->chip = BQ27421; break;
+	case BQ27441: di->chip = BQ27421; break;
+	case BQ27621: di->chip = BQ27421; break;
+	}
+
 	INIT_DELAYED_WORK(&di->work, bq27xxx_battery_poll);
 	mutex_init(&di->lock);
 	di->regs = bq27xxx_regs[di->chip];
