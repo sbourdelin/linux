@@ -964,6 +964,16 @@ void enic_reset_addr_lists(struct enic *enic)
 	enic->flags = 0;
 }
 
+static int enic_set_perm_mac_addr(struct net_device *netdev, char *addr)
+{
+	if (!is_valid_ether_addr(addr) && !is_zero_ether_addr(addr))
+		return -EADDRNOTAVAIL;
+
+	memcpy(netdev->perm_addr, addr, netdev->addr_len);
+
+	return 0;
+}
+
 static int enic_set_mac_addr(struct net_device *netdev, char *addr)
 {
 	struct enic *enic = netdev_priv(netdev);
@@ -2867,6 +2877,14 @@ static int enic_probe(struct pci_dev *pdev, const struct pci_device_id *ent)
 	(void)enic_change_mtu(netdev, enic->port_mtu);
 
 	err = enic_set_mac_addr(netdev, enic->mac_addr);
+	if (err) {
+		dev_err(dev, "Invalid MAC address, aborting\n");
+		goto err_out_dev_deinit;
+	}
+
+	/* Store off permanent MAC address
+	 */
+	err = enic_set_perm_mac_addr(netdev, enic->mac_addr);
 	if (err) {
 		dev_err(dev, "Invalid MAC address, aborting\n");
 		goto err_out_dev_deinit;
