@@ -807,6 +807,41 @@ static inline int bq27xxx_read(struct bq27xxx_device_info *di, int reg_index,
 	return ret;
 }
 
+static inline int bq27xxx_write(struct bq27xxx_device_info *di, int reg_index,
+				u16 value, bool single)
+{
+	int ret;
+
+	if (!di || di->regs[reg_index] == INVALID_REG_ADDR)
+		return -EINVAL;
+
+	ret = di->bus.write(di, di->regs[reg_index], value, single);
+	if (ret < 0)
+		dev_dbg(di->dev, "failed to write register 0x%02x (index %d)\n",
+			di->regs[reg_index], reg_index);
+
+	return ret;
+}
+
+static inline int bq27xxx_xfer(struct bq27xxx_device_info *di,
+			       struct bq27xxx_dm_buf *buf, bool read)
+{
+	int ret;
+	int (*xfer)(struct bq27xxx_device_info*, u8, u8*, int) =
+		read ? di->bus.read_bulk : di->bus.write_bulk;
+
+	if (!di || di->regs[BQ27XXX_DM_DATA] == INVALID_REG_ADDR)
+		return -EINVAL;
+
+	ret = xfer(di, di->regs[BQ27XXX_DM_DATA], buf->a, BQ27XXX_DM_SZ);
+	if (ret < 0)
+		dev_dbg(di->dev, "failed to %s_bulk register 0x%02x (index %d)\n",
+			read ? "read" : "write",
+			di->regs[BQ27XXX_DM_DATA], BQ27XXX_DM_DATA);
+
+	return ret;
+}
+
 /*
  * Return the battery State-of-Charge
  * Or < 0 if something fails.
