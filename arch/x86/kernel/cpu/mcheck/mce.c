@@ -546,19 +546,49 @@ static void mce_report_event(struct pt_regs *regs)
  * be somewhat complicated (e.g. segment offset would require an instruction
  * parser). So only support physical addresses up to page granuality for now.
  */
-static int mce_usable_address(struct mce *m)
+static int mce_usable_address_intel(struct mce *m, unsigned long *pfn)
 {
-	if (!(m->status & MCI_STATUS_MISCV) || !(m->status & MCI_STATUS_ADDRV))
+	if (!(m->status & MCI_STATUS_MISCV))
 		return 0;
-
-	/* Checks after this one are Intel-specific: */
-	if (boot_cpu_data.x86_vendor != X86_VENDOR_INTEL)
-		return 1;
-
 	if (MCI_MISC_ADDR_LSB(m->misc) > PAGE_SHIFT)
 		return 0;
 	if (MCI_MISC_ADDR_MODE(m->misc) != MCI_MISC_ADDR_PHYS)
 		return 0;
+
+	*pfn = m->addr >> PAGE_SHIFT;
+	return 1;
+}
+
+/* Only support this on SMCA systems and errors logged from a UMC. */
+static int mce_usable_address_amd(struct mce *m, unsigned long *pfn)
+{
+	u8 umc;
+	u16 nid = cpu_to_node(m->extcpu);
+	u64 addr;
+
+	if (!mce_flags.smca)
+		return 0;
+
+	umc = find_umc_channel(m);
+
+	if (umc < 0 || umc_normaddr_to_sysaddr(m->addr, nid, umc, &addr))
+		return 0;
+
+	*pfn = addr >> PAGE_SHIFT;
+	return 1;
+}
+
+static int mce_usable_address(struct mce *m, unsigned long *pfn)
+{
+	if (!(m->status & MCI_STATUS_ADDRV))
+		return 0;
+
+	if (boot_cpu_data.x86_vendor == X86_VENDOR_INTEL)
+		return mce_usable_address_intel(m, pfn);
+
+	if (boot_cpu_data.x86_vendor == X86_VENDOR_AMD)
+		return mce_usable_address_amd(m, pfn);
+
 	return 1;
 }
 
@@ -566,15 +596,13 @@ static int srao_decode_notifier(struct notifier_block *nb, unsigned long val,
 				void *data)
 {
 	struct mce *mce = (struct mce *)data;
-	unsigned long pfn;
+	unsigned long pfn = 0;
 
 	if (!mce)
 		return NOTIFY_DONE;
 
-	if (mce_usable_address(mce) && (mce->severity == MCE_AO_SEVERITY)) {
-		pfn = mce->addr >> PAGE_SHIFT;
+	if ((mce->severity == MCE_AO_SEVERITY) && mce_usable_address(mce, &pfn))
 		memory_failure(pfn, MCE_VECTOR, 0);
-	}
 
 	return NOTIFY_OK;
 }
@@ -749,7 +777,7 @@ bool machine_check_poll(enum mcp_flags flags, mce_banks_t *b)
 		 */
 		if (!(flags & MCP_DONTLOG) && !mca_cfg.dont_log_ce)
 			mce_log(&m);
-		else if (mce_usable_address(&m)) {
+		else if (mce_usable_address(&m, NULL)) {
 			/*
 			 * Although we skipped logging this, we still want
 			 * to take action. Add to the pool so the registered
