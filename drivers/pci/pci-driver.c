@@ -405,11 +405,18 @@ static int pci_device_probe(struct device *dev)
 		return error;
 
 	pci_dev_get(pci_dev);
-	error = __pci_device_probe(drv, pci_dev);
-	if (error) {
-		pcibios_free_irq(pci_dev);
-		pci_dev_put(pci_dev);
+#ifdef CONFIG_PCI_IOV
+	if (!pci_dev->is_virtfn ||
+	    (pci_dev->is_virtfn && pci_dev->physfn->sriov->probe_vfs)) {
+#endif
+		error = __pci_device_probe(drv, pci_dev);
+		if (error) {
+			pcibios_free_irq(pci_dev);
+			pci_dev_put(pci_dev);
+		}
+#ifdef CONFIG_PCI_IOV
 	}
+#endif
 
 	return error;
 }
