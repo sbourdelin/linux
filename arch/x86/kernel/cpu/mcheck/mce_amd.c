@@ -28,6 +28,8 @@
 #include <asm/msr.h>
 #include <asm/trace/irq_vectors.h>
 
+#include "mce-internal.h"
+
 #define NR_BLOCKS         5
 #define THRESHOLD_MAX     0xFFF
 #define INT_TYPE_APIC     0x00020000
@@ -801,6 +803,8 @@ __log_error(unsigned int bank, bool deferred_err, bool threshold_err, u64 misc)
 	m.status = status;
 	m.bank   = bank;
 	m.tsc	 = rdtsc();
+
+	m.severity = mce_severity(&m, mca_cfg.tolerant, NULL, false);
 
 	if (threshold_err)
 		m.misc = misc;

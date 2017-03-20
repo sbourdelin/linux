@@ -278,8 +278,12 @@ static int mce_severity_amd(struct mce *m, int tolerant, char **msg, bool is_exc
 	 * deferred error: poll handler catches these and adds to mce_ring so
 	 * memory-failure can take recovery actions.
 	 */
-	if (m->status & MCI_STATUS_DEFERRED)
+	if (m->status & MCI_STATUS_DEFERRED) {
+		if (mce_flags.smca)
+			return MCE_AO_SEVERITY;
+
 		return MCE_DEFERRED_SEVERITY;
+	}
 
 	/*
 	 * corrected error: poll handler catches these and passes responsibility
