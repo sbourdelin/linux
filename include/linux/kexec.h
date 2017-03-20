@@ -315,7 +315,7 @@ extern struct resource crashk_res;
 extern struct resource crashk_low_res;
 typedef u32 note_buf_t[KEXEC_NOTE_BYTES/4];
 extern note_buf_t __percpu *crash_notes;
-extern u32 vmcoreinfo_note[VMCOREINFO_NOTE_SIZE/4];
+extern u32 *vmcoreinfo_note;
 extern size_t vmcoreinfo_size;
 extern size_t vmcoreinfo_max_size;
 
