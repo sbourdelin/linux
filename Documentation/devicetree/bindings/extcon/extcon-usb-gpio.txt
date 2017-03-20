@@ -9,6 +9,9 @@ Required properties:
 Either one of id-gpio or vbus-gpio must be present. Both can be present as well.
 - id-gpio: gpio for USB ID pin. See gpio binding.
 - vbus-gpio: gpio for USB VBUS pin.
+- extcon-gpio,level-trigger: Boolean, set this gpio's interrupt flag to
+level trigger. If not specified defaults to false, gpio's interrupt flag
+defaults to edge trigger.
 
 Example: Examples of extcon-usb-gpio node in dra7-evm.dts as listed below:
 	extcon_usb1 {
