@@ -54,7 +54,6 @@ note_buf_t __percpu *crash_notes;
 /* vmcoreinfo stuff */
 static unsigned char *vmcoreinfo_data;
 size_t vmcoreinfo_size;
-size_t vmcoreinfo_max_size = VMCOREINFO_BYTES;
 u32 *vmcoreinfo_note;
 
 /* Flag to indicate we are going to kexec a new kernel */
@@ -1386,7 +1385,7 @@ void vmcoreinfo_append_str(const char *fmt, ...)
 	r = vscnprintf(buf, sizeof(buf), fmt, args);
 	va_end(args);
 
-	r = min(r, vmcoreinfo_max_size - vmcoreinfo_size);
+	r = min(r, VMCOREINFO_BYTES - vmcoreinfo_size);
 
 	memcpy(&vmcoreinfo_data[vmcoreinfo_size], buf, r);
 

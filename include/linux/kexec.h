@@ -317,7 +317,6 @@ typedef u32 note_buf_t[KEXEC_NOTE_BYTES/4];
 extern note_buf_t __percpu *crash_notes;
 extern u32 *vmcoreinfo_note;
 extern size_t vmcoreinfo_size;
-extern size_t vmcoreinfo_max_size;
 
 /* flag to track if kexec reboot is in progress */
 extern bool kexec_in_progress;
