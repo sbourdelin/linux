@@ -251,7 +251,7 @@ static void tinydrm_unregister(struct tinydrm_device *tdev)
 {
 	struct drm_fbdev_cma *fbdev_cma = tdev->fbdev_cma;
 
-	drm_crtc_force_disable_all(tdev->drm);
+	drm_atomic_helper_shutdown(tdev->drm);
 	/* don't restore fbdev in lastclose, keep pipeline disabled */
 	tdev->fbdev_cma = NULL;
 	drm_dev_unregister(tdev->drm);
@@ -302,7 +302,7 @@ EXPORT_SYMBOL(devm_tinydrm_register);
  */
 void tinydrm_shutdown(struct tinydrm_device *tdev)
 {
-	drm_crtc_force_disable_all(tdev->drm);
+	drm_atomic_helper_shutdown(tdev->drm);
 }
 EXPORT_SYMBOL(tinydrm_shutdown);
 
