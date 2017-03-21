@@ -626,7 +626,7 @@ int nf_nat_l4proto_register(u8 l3proto, const struct nf_nat_l4proto *l4proto)
 	if (nf_nat_l4protos[l3proto] == NULL) {
 		l4protos = kmalloc(IPPROTO_MAX * sizeof(struct nf_nat_l4proto *),
 				   GFP_KERNEL);
-		if (l4protos == NULL) {
+		if (!l4protos) {
 			ret = -ENOMEM;
 			goto out;
 		}

@@ -358,7 +358,7 @@ int nf_ct_l4proto_register_one(struct nf_conntrack_l4proto *l4proto)
 		proto_array = kmalloc(MAX_NF_CT_PROTO *
 				      sizeof(struct nf_conntrack_l4proto *),
 				      GFP_KERNEL);
-		if (proto_array == NULL) {
+		if (!proto_array) {
 			ret = -ENOMEM;
 			goto out_unlock;
 		}

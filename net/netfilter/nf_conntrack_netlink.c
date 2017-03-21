@@ -779,7 +779,7 @@ ctnetlink_alloc_filter(const struct nlattr * const cda[])
 	struct ctnetlink_filter *filter;
 
 	filter = kzalloc(sizeof(*filter), GFP_KERNEL);
-	if (filter == NULL)
+	if (!filter)
 		return ERR_PTR(-ENOMEM);
 
 	filter->mark.val = ntohl(nla_get_be32(cda[CTA_MARK]));
