@@ -117,7 +117,7 @@ static struct nft_trans *nft_trans_alloc_gfp(const struct nft_ctx *ctx,
 	struct nft_trans *trans;
 
 	trans = kzalloc(sizeof(struct nft_trans) + size, gfp);
-	if (trans == NULL)
+	if (!trans)
 		return NULL;
 
 	trans->msg_type = msg_type;
@@ -720,7 +720,7 @@ static int nf_tables_newtable(struct net *net, struct sock *nlsk,
 
 	err = -ENOMEM;
 	table = kzalloc(sizeof(*table), GFP_KERNEL);
-	if (table == NULL)
+	if (!table)
 		goto err2;
 
 	nla_strlcpy(table->name, name, NFT_TABLE_MAXNAMELEN);
@@ -1478,7 +1478,7 @@ static int nf_tables_newchain(struct net *net, struct sock *nlsk,
 			return err;
 
 		basechain = kzalloc(sizeof(*basechain), GFP_KERNEL);
-		if (basechain == NULL) {
+		if (!basechain) {
 			nft_chain_release_hook(&hook);
 			return -ENOMEM;
 		}
@@ -1526,7 +1526,7 @@ static int nf_tables_newchain(struct net *net, struct sock *nlsk,
 		basechain->policy = policy;
 	} else {
 		chain = kzalloc(sizeof(*chain), GFP_KERNEL);
-		if (chain == NULL)
+		if (!chain)
 			return -ENOMEM;
 	}
 
@@ -1800,7 +1800,7 @@ struct nft_expr *nft_expr_init(const struct nft_ctx *ctx,
 
 	err = -ENOMEM;
 	expr = kzalloc(info.ops->size, GFP_KERNEL);
-	if (expr == NULL)
+	if (!expr)
 		goto err2;
 
 	err = nf_tables_newexpr(ctx, &info, expr);
@@ -2214,7 +2214,7 @@ static int nf_tables_newrule(struct net *net, struct sock *nlsk,
 
 	err = -ENOMEM;
 	rule = kzalloc(sizeof(*rule) + size + usize, GFP_KERNEL);
-	if (rule == NULL)
+	if (!rule)
 		goto err1;
 
 	nft_activate_next(net, rule);
@@ -2810,7 +2810,7 @@ static int nf_tables_getset(struct net *net, struct sock *nlsk,
 		struct nft_ctx *ctx_dump;
 
 		ctx_dump = kmalloc(sizeof(*ctx_dump), GFP_KERNEL);
-		if (ctx_dump == NULL)
+		if (!ctx_dump)
 			return -ENOMEM;
 
 		*ctx_dump = ctx;
@@ -3014,7 +3014,7 @@ static int nf_tables_newset(struct net *net, struct sock *nlsk,
 
 	err = -ENOMEM;
 	set = kzalloc(sizeof(*set) + size + udlen, GFP_KERNEL);
-	if (set == NULL)
+	if (!set)
 		goto err1;
 
 	nla_strlcpy(name, nla[NFTA_SET_NAME], sizeof(set->name));
@@ -3541,7 +3541,7 @@ void *nft_set_elem_init(const struct nft_set *set,
 	void *elem;
 
 	elem = kzalloc(set->ops->elemsize + tmpl->len, gfp);
-	if (elem == NULL)
+	if (!elem)
 		return NULL;
 
 	ext = nft_set_elem_ext(set, elem);
@@ -3995,7 +3995,7 @@ struct nft_set_gc_batch *nft_set_gc_batch_alloc(const struct nft_set *set,
 	struct nft_set_gc_batch *gcb;
 
 	gcb = kzalloc(sizeof(*gcb), gfp);
-	if (gcb == NULL)
+	if (!gcb)
 		return gcb;
 	gcb->head.set = set;
 	return gcb;
@@ -4081,7 +4081,7 @@ static struct nft_object *nft_obj_init(const struct nft_object_type *type,
 
 	err = -ENOMEM;
 	obj = kzalloc(sizeof(struct nft_object) + type->size, GFP_KERNEL);
-	if (obj == NULL)
+	if (!obj)
 		goto err1;
 
 	err = type->init((const struct nlattr * const *)tb, obj);
@@ -5563,7 +5563,7 @@ static int __init nf_tables_module_init(void)
 
 	info = kmalloc(sizeof(struct nft_expr_info) * NFT_RULE_MAXEXPRS,
 		       GFP_KERNEL);
-	if (info == NULL) {
+	if (!info) {
 		err = -ENOMEM;
 		goto err1;
 	}
