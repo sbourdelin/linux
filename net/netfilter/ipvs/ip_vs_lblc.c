@@ -352,7 +352,7 @@ static int ip_vs_lblc_init_svc(struct ip_vs_service *svc)
 	 *    Allocate the ip_vs_lblc_table for this service
 	 */
 	tbl = kmalloc(sizeof(*tbl), GFP_KERNEL);
-	if (tbl == NULL)
+	if (!tbl)
 		return -ENOMEM;
 
 	svc->sched_data = tbl;

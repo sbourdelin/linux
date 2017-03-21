@@ -159,7 +159,7 @@ static int ip_vs_dh_init_svc(struct ip_vs_service *svc)
 
 	/* allocate the DH table for this service */
 	s = kzalloc(sizeof(struct ip_vs_dh_state), GFP_KERNEL);
-	if (s == NULL)
+	if (!s)
 		return -ENOMEM;
 
 	svc->sched_data = s;

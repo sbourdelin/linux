@@ -113,7 +113,7 @@ static void ip_vs_dest_set_insert(struct ip_vs_dest_set *set,
 	}
 
 	e = kmalloc(sizeof(*e), GFP_ATOMIC);
-	if (e == NULL)
+	if (!e)
 		return;
 
 	ip_vs_dest_hold(dest);
@@ -515,7 +515,7 @@ static int ip_vs_lblcr_init_svc(struct ip_vs_service *svc)
 	 *    Allocate the ip_vs_lblcr_table for this service
 	 */
 	tbl = kmalloc(sizeof(*tbl), GFP_KERNEL);
-	if (tbl == NULL)
+	if (!tbl)
 		return -ENOMEM;
 
 	svc->sched_data = tbl;

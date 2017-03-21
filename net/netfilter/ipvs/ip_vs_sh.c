@@ -235,7 +235,7 @@ static int ip_vs_sh_init_svc(struct ip_vs_service *svc)
 
 	/* allocate the SH table for this service */
 	s = kzalloc(sizeof(struct ip_vs_sh_state), GFP_KERNEL);
-	if (s == NULL)
+	if (!s)
 		return -ENOMEM;
 
 	svc->sched_data = s;
