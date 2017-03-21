@@ -21,6 +21,8 @@
 #include "dwc-xlgmac.h"
 #include "dwc-xlgmac-reg.h"
 
+MODULE_LICENSE("Dual BSD/GPL");
+
 static int debug = -1;
 module_param(debug, int, 0644);
 MODULE_PARM_DESC(debug, "DWC ethernet debug level (0=none,...,16=all)");
