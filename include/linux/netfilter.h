@@ -39,6 +39,15 @@ static inline void nf_inet_addr_mask(const union nf_inet_addr *a1,
 	result->all[3] = a1->all[3] & mask->all[3];
 }
 
+static inline void nf_inet_addr_mask_inplace(union nf_inet_addr *a1,
+					     const union nf_inet_addr *mask)
+{
+	a1->all[0] &= mask->all[0];
+	a1->all[1] &= mask->all[1];
+	a1->all[2] &= mask->all[2];
+	a1->all[3] &= mask->all[3];
+}
+
 int netfilter_init(void);
 
 struct sk_buff;
