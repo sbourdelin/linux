@@ -1567,10 +1567,6 @@ static int clk_core_set_rate_nolock(struct clk_core *core,
 	if (!core)
 		return 0;
 
-	/* bail early if nothing to do */
-	if (rate == clk_core_get_rate_nolock(core))
-		return 0;
-
 	if ((core->flags & CLK_SET_RATE_GATE) && core->prepare_count)
 		return -EBUSY;
 
@@ -1619,16 +1615,21 @@ static int clk_core_set_rate_nolock(struct clk_core *core,
  */
 int clk_set_rate(struct clk *clk, unsigned long rate)
 {
-	int ret;
+	int ret = 0;
 
 	if (!clk)
-		return 0;
+		return ret;
 
 	/* prevent racing with updates to the clock topology */
 	clk_prepare_lock();
 
+	/* bail early if nothing to do */
+	if (rate == clk_core_get_rate_nolock(clk->core))
+		goto out;
+
 	ret = clk_core_set_rate_nolock(clk->core, rate);
 
+out:
 	clk_prepare_unlock();
 
 	return ret;
