@@ -936,10 +936,16 @@ static const char * const wm5102_supplies[] = {
 	"CPVDD",
 	"SPKVDDL",
 	"SPKVDDR",
+	"MICBIAS1",
+	"MICBIAS2",
+	"MICBIAS3",
 };
 
 static const struct mfd_cell wm5102_devs[] = {
 	{ .name = "arizona-micsupp" },
+	{ .name = "arizona-micbias", .id = 1 },
+	{ .name = "arizona-micbias", .id = 2 },
+	{ .name = "arizona-micbias", .id = 3 },
 	{ .name = "arizona-gpio" },
 	{
 		.name = "arizona-extcon",
@@ -957,6 +963,9 @@ static const struct mfd_cell wm5102_devs[] = {
 
 static const struct mfd_cell wm5110_devs[] = {
 	{ .name = "arizona-micsupp" },
+	{ .name = "arizona-micbias", .id = 1 },
+	{ .name = "arizona-micbias", .id = 2 },
+	{ .name = "arizona-micbias", .id = 3 },
 	{ .name = "arizona-gpio" },
 	{
 		.name = "arizona-extcon",
@@ -976,9 +985,13 @@ static const char * const cs47l24_supplies[] = {
 	"MICVDD",
 	"CPVDD",
 	"SPKVDD",
+	"MICBIAS1",
+	"MICBIAS2",
 };
 
 static const struct mfd_cell cs47l24_devs[] = {
+	{ .name = "arizona-micbias", .id = 1 },
+	{ .name = "arizona-micbias", .id = 2 },
 	{ .name = "arizona-gpio" },
 	{ .name = "arizona-haptics" },
 	{ .name = "arizona-pwm" },
@@ -994,10 +1007,16 @@ static const char * const wm8997_supplies[] = {
 	"DBVDD2",
 	"CPVDD",
 	"SPKVDD",
+	"MICBIAS1",
+	"MICBIAS2",
+	"MICBIAS3",
 };
 
 static const struct mfd_cell wm8997_devs[] = {
 	{ .name = "arizona-micsupp" },
+	{ .name = "arizona-micbias", .id = 1 },
+	{ .name = "arizona-micbias", .id = 2 },
+	{ .name = "arizona-micbias", .id = 3 },
 	{ .name = "arizona-gpio" },
 	{
 		.name = "arizona-extcon",
@@ -1015,6 +1034,9 @@ static const struct mfd_cell wm8997_devs[] = {
 
 static const struct mfd_cell wm8998_devs[] = {
 	{ .name = "arizona-micsupp" },
+	{ .name = "arizona-micbias", .id = 1 },
+	{ .name = "arizona-micbias", .id = 2 },
+	{ .name = "arizona-micbias", .id = 3 },
 	{ .name = "arizona-gpio" },
 	{
 		.name = "arizona-extcon",
@@ -1402,40 +1424,6 @@ int arizona_dev_init(struct arizona *arizona)
 			arizona->pdata.clk32k_src);
 		ret = -EINVAL;
 		goto err_reset;
-	}
-
-	for (i = 0; i < ARIZONA_MAX_MICBIAS; i++) {
-		if (!arizona->pdata.micbias[i].mV &&
-		    !arizona->pdata.micbias[i].bypass)
-			continue;
-
-		/* Apply default for bypass mode */
-		if (!arizona->pdata.micbias[i].mV)
-			arizona->pdata.micbias[i].mV = 2800;
-
-		val = (arizona->pdata.micbias[i].mV - 1500) / 100;
-
-		val <<= ARIZONA_MICB1_LVL_SHIFT;
-
-		if (arizona->pdata.micbias[i].ext_cap)
-			val |= ARIZONA_MICB1_EXT_CAP;
-
-		if (arizona->pdata.micbias[i].discharge)
-			val |= ARIZONA_MICB1_DISCH;
-
-		if (arizona->pdata.micbias[i].soft_start)
-			val |= ARIZONA_MICB1_RATE;
-
-		if (arizona->pdata.micbias[i].bypass)
-			val |= ARIZONA_MICB1_BYPASS;
-
-		regmap_update_bits(arizona->regmap,
-				   ARIZONA_MIC_BIAS_CTRL_1 + i,
-				   ARIZONA_MICB1_LVL_MASK |
-				   ARIZONA_MICB1_EXT_CAP |
-				   ARIZONA_MICB1_DISCH |
-				   ARIZONA_MICB1_BYPASS |
-				   ARIZONA_MICB1_RATE, val);
 	}
 
 	for (i = 0; i < ARIZONA_MAX_INPUT; i++) {
