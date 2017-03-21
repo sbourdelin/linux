@@ -185,16 +185,29 @@ static int hi655x_regulator_probe(struct platform_device *pdev)
 	struct hi655x_pmic *pmic;
 	struct regulator_config config = { };
 	struct regulator_dev *rdev;
+	struct device *parent = pdev->dev.parent;
 
-	pmic = dev_get_drvdata(pdev->dev.parent);
+	if (!parent) {
+		dev_err(&pdev->dev, "no regulator parent node\n");
+		return -ENODEV;
+	}
+
+	pmic = dev_get_drvdata(parent);
 	if (!pmic) {
 		dev_err(&pdev->dev, "no pmic in the regulator parent node\n");
 		return -ENODEV;
 	}
 
+	if (!try_module_get(parent->driver->owner)) {
+		dev_err(&pdev->dev, "unable to get parent module\n");
+		return -ENODEV;
+	}
+
 	regulator = devm_kzalloc(&pdev->dev, sizeof(*regulator), GFP_KERNEL);
-	if (!regulator)
+	if (!regulator)	{
+		module_put(parent->driver->owner);
 		return -ENOMEM;
+	}
 
 	platform_set_drvdata(pdev, regulator);
 
@@ -214,11 +227,20 @@ static int hi655x_regulator_probe(struct platform_device *pdev)
 	return 0;
 }
 
+static int hi655x_regulator_remove(struct platform_device *pdev)
+{
+	struct device *parent = pdev->dev.parent;
+
+	module_put(parent->driver->owner);
+	return 0;
+}
+
 static struct platform_driver hi655x_regulator_driver = {
 	.driver = {
 		.name	= "hi655x-regulator",
 	},
 	.probe	= hi655x_regulator_probe,
+	.remove = hi655x_regulator_remove
 };
 module_platform_driver(hi655x_regulator_driver);
 
