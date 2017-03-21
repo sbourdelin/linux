@@ -95,7 +95,7 @@ static int tee_tg_check(const struct xt_tgchk_param *par)
 			return -EINVAL;
 
 		priv = kzalloc(sizeof(*priv), GFP_KERNEL);
-		if (priv == NULL)
+		if (!priv)
 			return -ENOMEM;
 
 		priv->tginfo  = info;
