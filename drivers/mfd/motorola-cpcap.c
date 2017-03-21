@@ -32,6 +32,31 @@ struct cpcap_ddata {
 	struct regmap *regmap;
 };
 
+static int cpcap_sense_irq(struct regmap *regmap, int irq)
+{
+	int reg = CPCAP_REG_INTS1 + (irq / 16) * 4;
+	int mask = 1 << (irq % 16);
+	int err, val;
+
+	if (irq < 0 || irq > 64)
+		return -EINVAL;
+
+	err = regmap_read(regmap, reg, &val);
+	if (err)
+		return err;
+
+	return !!(val & mask);
+}
+
+int cpcap_sense_virq(struct regmap *regmap, int virq)
+{
+	struct regmap_irq_chip_data *d = irq_get_chip_data(virq);
+	int base = regmap_irq_chip_get_base(d);
+
+	return cpcap_sense_irq(regmap, virq - base);
+}
+EXPORT_SYMBOL_GPL(cpcap_sense_virq);
+
 static int cpcap_check_revision(struct cpcap_ddata *cpcap)
 {
 	u16 vendor, rev;
