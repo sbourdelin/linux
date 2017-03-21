@@ -10,6 +10,7 @@
 #include <linux/efi.h>
 #include <linux/errno.h>
 #include <linux/fb.h>
+#include <linux/pci.h>
 #include <linux/platform_device.h>
 #include <linux/screen_info.h>
 #include <video/vga.h>
@@ -143,6 +144,9 @@ static struct attribute *efifb_attrs[] = {
 };
 ATTRIBUTE_GROUPS(efifb);
 
+static bool pci_bar_found;	/* did we find a BAR matching the efifb base? */
+static bool pci_bar_disabled;	/* was it disabled? */
+
 static int efifb_probe(struct platform_device *dev)
 {
 	struct fb_info *info;
@@ -152,7 +156,7 @@ static int efifb_probe(struct platform_device *dev)
 	unsigned int size_total;
 	char *option = NULL;
 
-	if (screen_info.orig_video_isVGA != VIDEO_TYPE_EFI)
+	if (screen_info.orig_video_isVGA != VIDEO_TYPE_EFI || pci_bar_disabled)
 		return -ENODEV;
 
 	if (fb_get_options("efifb", &option))
@@ -360,3 +364,55 @@ static struct platform_driver efifb_driver = {
 };
 
 builtin_platform_driver(efifb_driver);
+
+static void claim_efifb_bar(struct pci_dev *dev, int idx)
+{
+	u16 word;
+
+	pci_bar_found = true;
+
+	if (pci_claim_resource(dev, idx)) {
+		pci_bar_disabled = true;
+		dev_err(&dev->dev, "BAR %d: failed to claim efifb BAR\n", idx);
+		return;
+	}
+
+	pci_read_config_word(dev, PCI_COMMAND, &word);
+	if (!(word & PCI_COMMAND_MEMORY)) {
+		pci_bar_disabled = true;
+		dev_err(&dev->dev,
+			"BAR %d: efifb BAR has memory decoding disabled!\n", idx);
+		return;
+	}
+
+	dev_info(&dev->dev, "BAR %d: claimed for efifb\n", idx);
+}
+
+static void efifb_fixup_resources(struct pci_dev *dev)
+{
+	u64 base = screen_info.lfb_base;
+	u64 size = screen_info.lfb_size;
+	int i;
+
+	if (pci_bar_found || screen_info.orig_video_isVGA != VIDEO_TYPE_EFI)
+		return;
+
+	if (screen_info.capabilities & VIDEO_CAPABILITY_64BIT_BASE)
+		base |= (u64)screen_info.ext_lfb_base << 32;
+
+	if (!base)
+		return;
+
+	for (i = 0; i < PCI_STD_RESOURCE_END; i++) {
+		struct resource *res = &dev->resource[i];
+
+		if (!(res->flags & IORESOURCE_MEM))
+			continue;
+
+		if (res->start <= base && res->end >= base + size - 1) {
+			claim_efifb_bar(dev, i);
+			break;
+		}
+	}
+}
+DECLARE_PCI_FIXUP_HEADER(PCI_ANY_ID, PCI_ANY_ID, efifb_fixup_resources);
