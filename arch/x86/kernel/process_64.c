@@ -484,6 +484,8 @@ void set_personality_64bit(void)
 	clear_thread_flag(TIF_IA32);
 	clear_thread_flag(TIF_ADDR32);
 	clear_thread_flag(TIF_X32);
+	/* Drop x32 syscall bit, so in_compat_syscall() will return false. */
+	task_pt_regs(current)->orig_ax &= ~__X32_SYSCALL_BIT;
 
 	/* Ensure the corresponding mm is not marked. */
 	if (current->mm)
@@ -510,8 +512,14 @@ void set_personality_ia32(bool x32)
 		if (current->mm)
 			current->mm->context.ia32_compat = TIF_X32;
 		current->personality &= ~READ_IMPLIES_EXEC;
-		/* in_compat_syscall() uses the presence of the x32
-		   syscall bit flag to determine compat status */
+		/*
+		 * in_compat_syscall() uses the presence of the x32
+		 * syscall bit flag to determine compat status.
+		 * On the bitness of syscall relies x86 mmap() code,
+		 * so set x32 syscall bit right here to make
+		 * in_compat_syscall() work during exec().
+		 */
+		task_pt_regs(current)->orig_ax |= __X32_SYSCALL_BIT;
 		current->thread.status &= ~TS_COMPAT;
 	} else {
 		set_thread_flag(TIF_IA32);
