@@ -76,7 +76,8 @@ static struct crypto_alg *__crypto_alg_lookup(const char *name, u32 type,
 		    ((struct crypto_larval *)q)->mask != mask)
 			continue;
 
-		exact = !strcmp(q->cra_driver_name, name);
+		exact = (strlen(name) == strlen(q->cra_driver_name)) &&
+				!strcmp(q->cra_driver_name, name);
 		fuzzy = !strcmp(q->cra_name, name);
 		if (!exact && !(fuzzy && q->cra_priority > best))
 			continue;
