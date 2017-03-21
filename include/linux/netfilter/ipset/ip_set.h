@@ -69,6 +69,7 @@ enum ip_set_extension {
 #define SET_WITH_COMMENT(s)	((s)->extensions & IPSET_EXT_COMMENT)
 #define SET_WITH_SKBINFO(s)	((s)->extensions & IPSET_EXT_SKBINFO)
 #define SET_WITH_FORCEADD(s)	((s)->flags & IPSET_CREATE_FLAG_FORCEADD)
+#define SET_WITH_NETMASK(s)	((s)->flags & IPSET_CREATE_FLAG_NETMASK)
 
 /* Extension id, in size order */
 enum ip_set_ext_id {
@@ -292,6 +293,8 @@ ip_set_put_flags(struct sk_buff *skb, struct ip_set *set)
 		cadt_flags |= IPSET_FLAG_WITH_SKBINFO;
 	if (SET_WITH_FORCEADD(set))
 		cadt_flags |= IPSET_FLAG_WITH_FORCEADD;
+	if (SET_WITH_NETMASK(set))
+		cadt_flags |= IPSET_FLAG_WITH_NETMASK;
 
 	if (!cadt_flags)
 		return 0;

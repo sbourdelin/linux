@@ -166,6 +166,41 @@ htable_bits(u32 hashsize)
 #define NLEN			0
 #endif /* IP_SET_HASH_WITH_NETS */
 
+#ifdef IP_SET_HASH_WITH_NETMASK
+const static union nf_inet_addr onesmask = {
+	.all[0] = 0xffffffff,
+	.all[1] = 0xffffffff,
+	.all[2] = 0xffffffff,
+	.all[3] = 0xffffffff
+};
+const static union nf_inet_addr zeromask;
+
+struct ipset_netmask {
+	u8 cidr;
+	union nf_inet_addr mask;
+};
+
+static void
+ip_set_cidr_to_mask(union nf_inet_addr *addr, uint8_t cidr, uint8_t family)
+{
+	uint8_t i;
+	uint8_t addrsize = (family == NFPROTO_IPV4) ? 1 : 4;
+
+	for (i=0; i < addrsize; i++) {
+		if (!cidr) {
+			addr->all[i] = 0;
+		} else if (cidr >= 32) {
+			addr->all[i] = 0xffffffff;
+			cidr -= 32;
+		} else {
+			addr->all[i] = htonl(~((1 << (32 - cidr)) - 1));
+			break;
+		}
+	}
+}
+
+#endif
+
 #endif /* _IP_SET_HASH_GEN_H */
 
 #ifndef MTYPE
@@ -289,7 +324,7 @@ struct htype {
 	u8 ahash_max;		/* max elements in an array block */
 #endif
 #ifdef IP_SET_HASH_WITH_NETMASK
-	u8 netmask;		/* netmask value for subnets to store */
+	struct ipset_netmask netmask;
 #endif
 	struct mtype_elem next; /* temporary storage for uadd */
 #ifdef IP_SET_HASH_WITH_NETS
@@ -449,7 +484,8 @@ mtype_same_set(const struct ip_set *a, const struct ip_set *b)
 	return x->maxelem == y->maxelem &&
 	       a->timeout == b->timeout &&
 #ifdef IP_SET_HASH_WITH_NETMASK
-	       x->netmask == y->netmask &&
+		nf_inet_addr_cmp(&x->netmask.mask, &y->netmask.mask) &&
+		x->netmask.cidr == y->netmask.cidr &&
 #endif
 #ifdef IP_SET_HASH_WITH_MARKMASK
 	       x->markmask == y->markmask &&
@@ -1061,9 +1097,20 @@ mtype_head(struct ip_set *set, struct sk_buff *skb)
 	    nla_put_net32(skb, IPSET_ATTR_MAXELEM, htonl(h->maxelem)))
 		goto nla_put_failure;
 #ifdef IP_SET_HASH_WITH_NETMASK
-	if (h->netmask != HOST_MASK &&
-	    nla_put_u8(skb, IPSET_ATTR_NETMASK, h->netmask))
-		goto nla_put_failure;
+	if (!nf_inet_addr_cmp(&onesmask, &h->netmask.mask)) {
+		if (SET_WITH_NETMASK(set)) {
+			if (set->family == NFPROTO_IPV4) {
+				if (nla_put_ipaddr4(skb, IPSET_ATTR_NETMASK_MASK, h->netmask.mask.ip))
+					goto nla_put_failure;
+			} else if (set->family == NFPROTO_IPV6) {
+				if (nla_put_ipaddr6(skb, IPSET_ATTR_NETMASK_MASK, &h->netmask.mask.in6))
+					goto nla_put_failure;
+			}
+		}
+
+		if (nla_put_u8(skb, IPSET_ATTR_NETMASK, h->netmask.cidr))
+			goto nla_put_failure;
+	}
 #endif
 #ifdef IP_SET_HASH_WITH_MARKMASK
 	if (nla_put_u32(skb, IPSET_ATTR_MARKMASK, h->markmask))
@@ -1220,7 +1267,9 @@ IPSET_TOKEN(HTYPE, _create)(struct net *net, struct ip_set *set,
 #endif
 	u8 hbits;
 #ifdef IP_SET_HASH_WITH_NETMASK
-	u8 netmask;
+	union nf_inet_addr netmask = onesmask;
+	int ret = 0;
+	u8 cidr = 0;
 #endif
 	size_t hsize;
 	struct htype *h;
@@ -1254,15 +1303,32 @@ IPSET_TOKEN(HTYPE, _create)(struct net *net, struct ip_set *set,
 #endif
 
 #ifdef IP_SET_HASH_WITH_NETMASK
-	netmask = set->family == NFPROTO_IPV4 ? 32 : 128;
 	if (tb[IPSET_ATTR_NETMASK]) {
-		netmask = nla_get_u8(tb[IPSET_ATTR_NETMASK]);
+		cidr = nla_get_u8(tb[IPSET_ATTR_NETMASK]);
+		if ((set->family == NFPROTO_IPV4 && cidr > 32) ||
+		    (set->family == NFPROTO_IPV6 && cidr > 128))
+			return -IPSET_ERR_INVALID_NETMASK;
 
-		if ((set->family == NFPROTO_IPV4 && netmask > 32) ||
-		    (set->family == NFPROTO_IPV6 && netmask > 128) ||
-		    netmask == 0)
+	}
+	if (tb[IPSET_ATTR_NETMASK_MASK]) {
+		if (set->family == NFPROTO_IPV4) {
+			ret = ip_set_get_ipaddr4(tb[IPSET_ATTR_NETMASK_MASK], &netmask.ip);
+			if (ret || !netmask.ip)
+				return -IPSET_ERR_INVALID_NETMASK;
+		} else if (set->family == NFPROTO_IPV6) {
+			ret = ip_set_get_ipaddr6(tb[IPSET_ATTR_NETMASK_MASK], &netmask);
+			if (ret || ipv6_addr_any(&netmask.in6))
+				return -IPSET_ERR_INVALID_NETMASK;
+		}
+		if (nf_inet_addr_cmp(&netmask, &zeromask))
 			return -IPSET_ERR_INVALID_NETMASK;
 	}
+
+	/* For backwards compatibility, we'll convert the cidr to a mask if
+	 * userspace didn't give us one.
+	 */
+	if (cidr && nf_inet_addr_cmp(&netmask, &onesmask))
+		ip_set_cidr_to_mask(&netmask, cidr, set->family);
 #endif
 
 	if (tb[IPSET_ATTR_HASHSIZE]) {
@@ -1292,7 +1358,8 @@ IPSET_TOKEN(HTYPE, _create)(struct net *net, struct ip_set *set,
 	}
 	h->maxelem = maxelem;
 #ifdef IP_SET_HASH_WITH_NETMASK
-	h->netmask = netmask;
+	h->netmask.mask = netmask;
+	h->netmask.cidr = cidr;
 #endif
 #ifdef IP_SET_HASH_WITH_MARKMASK
 	h->markmask = markmask;

@@ -374,6 +374,8 @@ ip_set_elem_len(struct ip_set *set, struct nlattr *tb[], size_t len,
 		cadt_flags = ip_set_get_h32(tb[IPSET_ATTR_CADT_FLAGS]);
 	if (cadt_flags & IPSET_FLAG_WITH_FORCEADD)
 		set->flags |= IPSET_CREATE_FLAG_FORCEADD;
+	if (cadt_flags & IPSET_FLAG_WITH_NETMASK)
+		set->flags |= IPSET_CREATE_FLAG_NETMASK;
 	if (!align)
 		align = 1;
 	for (id = 0; id < IPSET_EXT_ID_MAX; id++) {
