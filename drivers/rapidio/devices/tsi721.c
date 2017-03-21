@@ -37,9 +37,10 @@
 #include "tsi721.h"
 
 #ifdef DEBUG
-u32 dbg_level;
-module_param(dbg_level, uint, S_IWUSR | S_IRUGO);
-MODULE_PARM_DESC(dbg_level, "Debugging output level (default 0 = none)");
+u32 tsi721_dbg_level;
+module_param(tsi721_dbg_level, uint, S_IWUSR | S_IRUGO);
+MODULE_PARM_DESC(tsi721_dbg_level,
+		  "Debugging output level (default 0 = none)");
 #endif
 
 static int pcie_mrrs = -1;
