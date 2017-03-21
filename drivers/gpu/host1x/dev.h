@@ -17,8 +17,8 @@
 #ifndef HOST1X_DEV_H
 #define HOST1X_DEV_H
 
-#include <linux/platform_device.h>
 #include <linux/device.h>
+#include <linux/platform_device.h>
 
 #include "channel.h"
 #include "syncpt.h"
