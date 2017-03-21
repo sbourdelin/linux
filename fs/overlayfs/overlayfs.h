@@ -40,7 +40,7 @@ static inline int ovl_do_unlink(struct inode *dir, struct dentry *dentry)
 static inline int ovl_do_link(struct dentry *old_dentry, struct inode *dir,
 			      struct dentry *new_dentry, bool debug)
 {
-	int err = vfs_link(old_dentry, dir, new_dentry, NULL);
+	int err = vfs_link(old_dentry, dir, new_dentry, NULL, 0);
 	if (debug) {
 		pr_debug("link(%pd2, %pd2) = %i\n",
 			 old_dentry, new_dentry, err);
