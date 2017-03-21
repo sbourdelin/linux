@@ -42,6 +42,7 @@
  * @buf_lock:		mutex to protect tx and rx
  * @tx:			transmit buffer
  * @rx:			receive buffer
+ * @lock		protect sensor state
  **/
 struct ade7759_state {
 	struct spi_device	*us;
