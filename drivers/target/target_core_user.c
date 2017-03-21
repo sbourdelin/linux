@@ -1174,7 +1174,8 @@ static ssize_t tcmu_cmd_time_out_show(struct config_item *item, char *page)
 	struct tcmu_dev *udev = container_of(da->da_dev,
 					struct tcmu_dev, se_dev);
 
-	return snprintf(page, PAGE_SIZE, "%lu\n", udev->cmd_time_out / MSEC_PER_SEC);
+	return snprintf(page, PAGE_SIZE, "%lu\n", (!udev->cmd_time_out) ? 0 :
+			udev->cmd_time_out / MSEC_PER_SEC);
 }
 
 static ssize_t tcmu_cmd_time_out_store(struct config_item *item, const char *page,
@@ -1195,11 +1196,6 @@ static ssize_t tcmu_cmd_time_out_store(struct config_item *item, const char *pag
 	ret = kstrtou32(page, 0, &val);
 	if (ret < 0)
 		return ret;
-
-	if (!val) {
-		pr_err("Illegal value for cmd_time_out\n");
-		return -EINVAL;
-	}
 
 	udev->cmd_time_out = val * MSEC_PER_SEC;
 	return count;
