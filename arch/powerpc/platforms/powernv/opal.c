@@ -595,6 +595,87 @@ static void opal_export_symmap(void)
 		pr_warn("Error %d creating OPAL symbols file\n", rc);
 }
 
+static ssize_t export_attr_read(struct file *fp, struct kobject *kobj,
+			     struct bin_attribute *bin_attr, char *buf,
+			     loff_t off, size_t count)
+{
+	return memory_read_from_buffer(buf, count, &off, bin_attr->private,
+				       bin_attr->size);
+}
+
+static struct bin_attribute *exported_attrs;
+static char **attr_name;
+/*
+ * opal_export_attrs: creates a sysfs node for each property listed in
+ * the device-tree under /ibm,opal/firmware/exports/
+ * All new sysfs nodes are created under /opal/exports/.
+ * This allows for reserved memory regions (e.g. HDAT) to be read.
+ * The new sysfs nodes are only readable by root.
+ */
+static void opal_export_attrs(void)
+{
+	/* /sys/firmware/opal/exports */
+	struct kobject *opal_export_kobj;
+
+	struct bin_attribute *attr_tmp;
+	const __be64 *syms;
+	unsigned int size;
+	struct device_node *fw;
+	struct property *prop;
+	int rc;
+	int attr_count = 0;
+	int n = 0;
+	
+	/* Create new 'exports' directory */
+	opal_export_kobj = kobject_create_and_add("exports", opal_kobj);
+	if (!opal_export_kobj) {
+		pr_warn("kobject_create_and_add opal_exports failed\n");
+		return;
+	}
+
+	fw = of_find_node_by_path("/ibm,opal/firmware/exports");
+	if (!fw)
+		return;
+
+	for (prop = fw->properties; prop != NULL; prop = prop->next)
+		attr_count++;
+
+	if (attr_count > 2) {
+		exported_attrs = kzalloc(sizeof(exported_attrs)*(attr_count-2),
+				GFP_KERNEL);
+		attr_name = kzalloc(sizeof(char *)*(attr_count-2), GFP_KERNEL);
+	}
+
+	for_each_property_of_node(fw, prop) {
+		
+		attr_name[n] = kstrdup(prop->name, GFP_KERNEL);
+		syms = of_get_property(fw, attr_name[n], &size);
+
+		if (!strcmp(attr_name[n], "name") ||
+				!strcmp(attr_name[n], "phandle"))
+			continue;
+
+		if (!syms || size != 2 * sizeof(__be64))
+			continue;
+
+		attr_tmp = &exported_attrs[n];
+		attr_tmp->attr.name = attr_name[n];
+		attr_tmp->attr.mode = 0400;
+		attr_tmp->read = export_attr_read;
+		attr_tmp->private = __va(be64_to_cpu(syms[0]));
+		attr_tmp->size = be64_to_cpu(syms[1]);
+
+		rc = sysfs_create_bin_file(opal_export_kobj, attr_tmp);
+		if (rc)
+			pr_warn("Error %d creating OPAL sysfs exports/%s file\n",
+					rc, attr_name[n]);
+		n++;
+	}
+
+	of_node_put(fw);
+
+}
+
 static void __init opal_dump_region_init(void)
 {
 	void *addr;
@@ -732,6 +813,9 @@ static int __init opal_init(void)
 		/* Setup message log sysfs interface. */
 		opal_msglog_sysfs_init();
 	}
+
+	/* Export all properties */
+	opal_export_attrs();
 
 	/* Initialize platform devices: IPMI backend, PRD & flash interface */
 	opal_pdev_init("ibm,opal-ipmi");
