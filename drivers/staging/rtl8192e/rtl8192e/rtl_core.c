@@ -969,7 +969,7 @@ static void _rtl92e_init_priv_variable(struct net_device *dev)
 
 	priv->card_type = PCI;
 
-	priv->pFirmware = vzalloc(sizeof(struct rt_firmware));
+	priv->pFirmware = vzalloc(sizeof(*priv->pFirmware));
 	if (!priv->pFirmware)
 		return;
 
