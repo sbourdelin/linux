@@ -232,7 +232,7 @@ static int nfnl_err_add(struct list_head *list, struct nlmsghdr *nlh, int err)
 	struct nfnl_err *nfnl_err;
 
 	nfnl_err = kmalloc(sizeof(struct nfnl_err), GFP_KERNEL);
-	if (nfnl_err == NULL)
+	if (!nfnl_err)
 		return -ENOMEM;
 
 	nfnl_err->nlh = nlh;
