@@ -161,6 +161,8 @@ static void blk_mq_debugfs_tags_show(struct seq_file *m,
 {
 	seq_printf(m, "nr_tags=%u\n", tags->nr_tags);
 	seq_printf(m, "nr_reserved_tags=%u\n", tags->nr_reserved_tags);
+	seq_printf(m, "starved_count=%u\n", tags->starved_count);
+	seq_printf(m, "failed_count=%u\n", tags->failed_count);
 	seq_printf(m, "active_queues=%d\n",
 		   atomic_read(&tags->active_queues));
 
@@ -190,6 +192,18 @@ out:
 	return res;
 }
 
+static ssize_t hctx_tags_write(struct file *file, const char __user *buf,
+				size_t count, loff_t *ppos)
+{
+	struct seq_file *m = file->private_data;
+	struct blk_mq_hw_ctx *hctx = m->private;
+	struct blk_mq_tags *tags = hctx->tags;
+
+	tags->starved_count = 0;
+	tags->failed_count = 0;
+	return count;
+}
+
 static int hctx_tags_open(struct inode *inode, struct file *file)
 {
 	return single_open(file, hctx_tags_show, inode->i_private);
@@ -198,6 +212,7 @@ static int hctx_tags_open(struct inode *inode, struct file *file)
 static const struct file_operations hctx_tags_fops = {
 	.open		= hctx_tags_open,
 	.read		= seq_read,
+	.write		= hctx_tags_write,
 	.llseek		= seq_lseek,
 	.release	= single_release,
 };

@@ -10,6 +10,9 @@ struct blk_mq_tags {
 	unsigned int nr_tags;
 	unsigned int nr_reserved_tags;
 
+	unsigned int starved_count;
+	unsigned int failed_count;
+
 	atomic_t active_queues;
 
 	struct sbitmap_queue bitmap_tags;

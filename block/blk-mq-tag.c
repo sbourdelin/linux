@@ -125,9 +125,10 @@ unsigned int blk_mq_get_tag(struct blk_mq_alloc_data *data)
 	if (tag != -1)
 		goto found_tag;
 
-	if (data->flags & BLK_MQ_REQ_NOWAIT)
+	if (data->flags & BLK_MQ_REQ_NOWAIT) {
+		tags->failed_count++;
 		return BLK_MQ_TAG_FAIL;
-
+	}
 	ws = bt_wait_ptr(bt, data->hctx);
 	drop_ctx = data->ctx == NULL;
 	do {
@@ -152,6 +153,7 @@ unsigned int blk_mq_get_tag(struct blk_mq_alloc_data *data)
 		if (tag != -1)
 			break;
 
+		tags->starved_count++;
 		if (data->ctx)
 			blk_mq_put_ctx(data->ctx);
 
