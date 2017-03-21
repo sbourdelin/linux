@@ -246,6 +246,7 @@ static long native_hpte_insert(unsigned long hpte_group, unsigned long vpn,
 
 	__asm__ __volatile__ ("ptesync" : : : "memory");
 
+	BUILD_BUG_ON(H_PAGE_F_SECOND != (1ul  << (H_PAGE_F_GIX_SHIFT + 3)));
 	return i | (!!(vflags & HPTE_V_SECONDARY) << 3);
 }
 
