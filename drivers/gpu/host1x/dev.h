@@ -19,6 +19,7 @@
 
 #include <linux/device.h>
 #include <linux/platform_device.h>
+#include <linux/reset.h>
 
 #include "channel.h"
 #include "syncpt.h"
@@ -107,6 +108,7 @@ struct host1x {
 	struct host1x_syncpt_base *bases;
 	struct device *dev;
 	struct clk *clk;
+	struct reset_control *rst;
 
 	struct mutex intr_mutex;
 	int intr_syncpt_irq;
