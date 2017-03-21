@@ -184,3 +184,4 @@ module_platform_driver(hi655x_pmic_driver);
 MODULE_AUTHOR("Chen Feng <puck.chen@hisilicon.com>");
 MODULE_DESCRIPTION("Hisilicon hi655x PMIC driver");
 MODULE_LICENSE("GPL v2");
+MODULE_SOFTDEP("post: hi655x-regulator");
