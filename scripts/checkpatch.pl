@@ -2134,6 +2134,7 @@ sub process {
 	my $signoff = 0;
 	my $is_patch = 0;
 	my $in_header_lines = $file ? 0 : 1;
+	my $found_spam_header = 0;
 	my $in_commit_log = 0;		#Scanning lines before patch
 	my $has_commit_log = 0;		#Encountered lines before patch
 	my $commit_log_possible_stack_dump = 0;
@@ -2278,6 +2279,12 @@ sub process {
 		$sline =~ s/$;/ /g;	#with comments as spaces
 
 		my $rawline = $rawlines[$linenr - 1];
+
+#if we encounter a spamassassin mail header, mark it
+		if ($in_header_lines == 1 && $line =~ /^X-Spam-Report:/) {
+			#mail header found, this needs to be flagged
+			$found_spam_header = 1;
+		}
 
 #extract the line range in the file after the patch is applied
 		if (!$in_commit_log &&
@@ -2627,9 +2634,15 @@ sub process {
 
 # Check if it's the start of a commit log
 # (not a header line and we haven't seen the patch filename)
+		if ($in_header_lines && $found_spam_header && $line =~ /^[\n\r]*$/) {
+			# we are now past the header info that could be confusing
+			$found_spam_header = 0;
+		}
+
 		if ($in_header_lines && $realfile =~ /^$/ &&
 		    !($rawline =~ /^\s+\S/ ||
-		      $rawline =~ /^(commit\b|from\b|[\w-]+:).*$/i)) {
+		      $rawline =~ /^(commit\b|from\b|[\w-]+:).*$/i) &&
+		    !$found_spam_header) {
 			$in_header_lines = 0;
 			$in_commit_log = 1;
 			$has_commit_log = 1;
