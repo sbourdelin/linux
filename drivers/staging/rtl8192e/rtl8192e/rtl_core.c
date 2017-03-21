@@ -971,8 +971,8 @@ static void _rtl92e_init_priv_variable(struct net_device *dev)
 
 	priv->pFirmware = vzalloc(sizeof(struct rt_firmware));
 	if (!priv->pFirmware)
-		netdev_err(dev,
-			   "rtl8192e: Unable to allocate space for firmware\n");
+		return;
+
 	skb_queue_head_init(&priv->skb_queue);
 
 	for (i = 0; i < MAX_QUEUE_SIZE; i++)
