@@ -847,6 +847,42 @@ static void __init early_identify_cpu(struct cpuinfo_x86 *c)
 	fpu__init_system(c);
 }
 
+/*
+ * Returns x86_vendor early, before other platform data structures being
+ * initialized.
+ */
+int get_x86_vendor_early(void)
+{
+	int x86_vendor = X86_VENDOR_UNKNOWN;
+	const struct cpu_dev *const *cdev;
+	char vendor_str[16];
+	int count = 0;
+
+	cpuid(0, (unsigned int *)&vendor_str[12],
+	      (unsigned int *)&vendor_str[0],
+	      (unsigned int *)&vendor_str[8],
+	      (unsigned int *)&vendor_str[4]);
+	vendor_str[12] = '\0';
+
+	for (cdev = __x86_cpu_dev_start; cdev < __x86_cpu_dev_end; cdev++) {
+		const struct cpu_dev *cpudev = *cdev;
+		const char *str1 = cpudev->c_ident[0];
+		const char *str2 = cpudev->c_ident[1];
+
+		if (count == X86_VENDOR_NUM)
+			break;
+
+		if ((!strcmp(vendor_str, str1)) ||
+		    (str2 && !strcmp(vendor_str, str2))) {
+			x86_vendor = cpudev->c_x86_vendor;
+			break;
+		}
+		count++;
+	}
+
+	return x86_vendor;
+}
+
 void __init early_cpu_init(void)
 {
 	const struct cpu_dev *const *cdev;
