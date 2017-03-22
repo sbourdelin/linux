@@ -630,6 +630,10 @@ int phy_start_aneg(struct phy_device *phydev)
 
 out_unlock:
 	mutex_unlock(&phydev->lock);
+	if (!err && phy_interrupt_is_valid(phydev))
+		queue_delayed_work(system_power_efficient_wq,
+				   &phydev->state_queue, HZ);
+
 	return err;
 }
 EXPORT_SYMBOL(phy_start_aneg);
