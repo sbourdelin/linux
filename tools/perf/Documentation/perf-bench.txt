@@ -206,6 +206,9 @@ Suite for evaluating futex lock_pi calls.
 *mutex*::
 Suite for evaluating futex calls for implementing userspace mutexes.
 
+*rwlock*::
+Suite for evaluating futex calls for implementing userspace rwlocks.
+
 SEE ALSO
 --------
 linkperf:perf[1]

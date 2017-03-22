@@ -64,6 +64,7 @@ static struct bench futex_benchmarks[] = {
 	/* pi-futexes */
 	{ "lock-pi",	"Benchmark for futex lock_pi calls",            bench_futex_lock_pi	},
 	{ "mutex",	"Benchmark for mutex locks using futexes",	bench_futex_mutex	},
+	{ "rwlock",	"Benchmark for rwlocks using futexes",		bench_futex_rwlock	},
 	{ "all",	"Run all futex benchmarks",			NULL			},
 	{ NULL,		NULL,						NULL			}
 };
