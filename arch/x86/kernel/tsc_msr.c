@@ -62,22 +62,20 @@ static int match_cpu(u8 family, u8 model)
 #define id_to_freq(cpu_index, freq_id) \
 	(freq_desc_tables[cpu_index].freqs[freq_id])
 
-/*
- * MSR-based CPU/TSC frequency discovery for certain CPUs.
- *
- * Set global "lapic_timer_frequency" to bus_clock_cycles/jiffy
- * Return processor base frequency in KHz, or 0 on failure.
- */
-unsigned long cpu_khz_from_msr(void)
+ /*
+  * Get CPU/TSC frequency early in boot.
+  * Set global "lapic_timer_frequency" to bus_clock_cycles/jiffy
+  * Return processor base frequency in KHz, or 0 on failure.
+  */
+unsigned long cpu_khz_from_msr_early(int vendor, int family, int model)
 {
 	u32 lo, hi, ratio, freq_id, freq;
-	unsigned long res;
 	int cpu_index;
 
-	if (boot_cpu_data.x86_vendor != X86_VENDOR_INTEL)
+	if (vendor != X86_VENDOR_INTEL)
 		return 0;
 
-	cpu_index = match_cpu(boot_cpu_data.x86, boot_cpu_data.x86_model);
+	cpu_index = match_cpu(family, model);
 	if (cpu_index < 0)
 		return 0;
 
@@ -94,12 +92,26 @@ unsigned long cpu_khz_from_msr(void)
 	freq_id = lo & 0x7;
 	freq = id_to_freq(cpu_index, freq_id);
 
-	/* TSC frequency = maximum resolved freq * maximum resolved bus ratio */
-	res = freq * ratio;
-
 #ifdef CONFIG_X86_LOCAL_APIC
 	lapic_timer_frequency = (freq * 1000) / HZ;
 #endif
+
+	/* TSC frequency = maximum resolved freq * maximum resolved bus ratio */
+	return freq * ratio;
+}
+
+/*
+ * MSR-based CPU/TSC frequency discovery for certain CPUs.
+ */
+unsigned long cpu_khz_from_msr(void)
+{
+	unsigned long res;
+
+	res = cpu_khz_from_msr_early(boot_cpu_data.x86_vendor,
+				     boot_cpu_data.x86,
+				     boot_cpu_data.x86_model);
+	if (res ==  0)
+		return 0;
 
 	/*
 	 * TSC frequency determined by MSR is always considered "known"
