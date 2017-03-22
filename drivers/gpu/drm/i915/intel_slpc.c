@@ -411,6 +411,18 @@ static void host2guc_slpc_query_task_state(struct drm_i915_private *dev_priv)
 	host2guc_slpc(dev_priv, &data, 4);
 }
 
+static void host2guc_slpc_shutdown(struct drm_i915_private *dev_priv)
+{
+	struct slpc_event_input data = {0};
+	u32 shared_data_gtt_offset = guc_ggtt_offset(dev_priv->guc.slpc.vma);
+
+	data.header.value = SLPC_EVENT(SLPC_EVENT_SHUTDOWN, 2);
+	data.args[0] = shared_data_gtt_offset;
+	data.args[1] = 0;
+
+	host2guc_slpc(dev_priv, &data, 4);
+}
+
 void intel_slpc_query_task_state(struct drm_i915_private *dev_priv)
 {
 	if (dev_priv->guc.slpc.active)
@@ -556,4 +568,6 @@ void intel_slpc_enable(struct drm_i915_private *dev_priv)
 
 void intel_slpc_disable(struct drm_i915_private *dev_priv)
 {
+	host2guc_slpc_shutdown(dev_priv);
+	dev_priv->guc.slpc.active = false;
 }
