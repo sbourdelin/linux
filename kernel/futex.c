@@ -71,6 +71,7 @@
 #include <linux/freezer.h>
 #include <linux/bootmem.h>
 #include <linux/fault-inject.h>
+#include <linux/osq_lock.h>
 
 #include <asm/futex.h>
 
@@ -241,6 +242,16 @@ struct futex_state {
 	atomic_t refcount;
 
 	u32 handoff_pid;			/* For TP futexes only */
+
+	/*
+	 * To improve reader throughput in TP futexes, all the readers
+	 * in the mutex queue are grouped together. The first reader in the
+	 * queue will set first_reader, then the rest of the readers will
+	 * spin on the first reader via the OSQ without actually entering
+	 * the mutex queue.
+	 */
+	struct optimistic_spin_queue reader_osq;
+	struct task_struct *first_reader;
 
 	enum futex_type type;
 	union futex_key key;
@@ -3403,14 +3414,21 @@ void exit_robust_list(struct task_struct *curr)
  *		   0 - steals the lock
  *		   1 - top waiter (mutex owner) acquires the lock
  *		   2 - handed off the lock
- * 2) bits 08-15: reserved
- * 3) bits 15-30: how many times the task has slept or yield to scheduler
+ * 2) bit  08:	  1 if reader spins alone		(shared lock only)
+ *    bit  09:	  1 if reader is a spin group leader	(shared lock only)
+ *    bits 10-16: reserved
+ * 3) bits 16-30: how many times the task has slept or yield to scheduler
  *		  in futex_spin_on_owner().
  */
 #define TP_LOCK_STOLEN		0
 #define TP_LOCK_ACQUIRED	1
 #define TP_LOCK_HANDOFF		2
+
+#define TP_READER_ALONE		1
+#define TP_READER_GROUP		2
+
 #define TP_STATUS_SLEEP(val, sleep)	((val)|((sleep) << 16))
+#define TP_STATUS_ALONE(val, alone)	((val)|((alone) << 8))
 
 /**
  * lookup_futex_state - Looking up the futex state structure.
@@ -3452,6 +3470,7 @@ lookup_futex_state(struct futex_hash_bucket *hb, union futex_key *key,
 	state = alloc_futex_state();
 	state->type = TYPE_TP;
 	state->key = *key;
+	osq_lock_init(&state->reader_osq);
 	list_add(&state->fs_list, &hb->fs_head);
 	WARN_ON(atomic_read(&state->refcount) != 1);
 
@@ -3930,6 +3949,105 @@ retry:
 	return (ret < 0) ? ret : TP_STATUS_SLEEP(ret, nsleep);
 }
 
+/**
+ * futex_spin_on_reader - Optimistically spin on first reader
+ * @uaddr:	   futex address
+ * @pfirst:	   pointer to first reader
+ * @state:	   futex state object
+ * @timeout:	   hrtimer_sleeper structure
+ * @prefer_reader: prefer reader if set
+ *
+ * Reader performance will depend on the placement of readers within the
+ * mutex queue. For a queue of 4 readers and 4 writers, for example, the
+ * optimal placement will be either RRRRWWWW or WWWWRRRR. A worse case will
+ * be RWRWRWRW.
+ *
+ * One way to avoid the worst case scenario is to gather all the readers
+ * together as a single unit and place it into the mutex queue. This is done
+ * by having the first reader puts its task structure into state->first_reader
+ * and the rest of the readers optimistically spin on it instead of entering
+ * the mutex queue.
+ *
+ * On prefer-reader mode, the OSQ lock holder will attempt to grab the shared
+ * lock irrespective of the position of the first reader. Otherwise, it will
+ * only grab the lock when the first reader is the serializaton mutex owner.
+ *
+ * On exit from this function, the reader would have
+ *  1) acquired a read lock on the futex;
+ *  2) become the first reader and goes into the mutex queue; or
+ *  3) seen the first reader slept and needs to go into the mutex queue alone.
+ *
+ * Any fault on accessing the futex will cause it to return 0 and goes into
+ * the mutex queue.
+ *
+ * Return:  > 0 - acquired the read lock
+ *	   <= 0 - need to goes into the mutex queue
+ */
+static int futex_spin_on_reader(u32 __user *uaddr, struct task_struct **pfirst,
+				struct futex_state *state,
+				struct hrtimer_sleeper *timeout,
+				u32 prefer_reader)
+{
+	struct task_struct *first_reader;
+	int ret = 0;
+
+	preempt_disable();
+
+retry:
+	first_reader = READ_ONCE(state->first_reader);
+	if (!first_reader)
+		first_reader = cmpxchg(&state->first_reader, NULL, current);
+	if (!first_reader)
+		goto out;	/* Became the first reader */
+
+	if (!osq_lock(&state->reader_osq))
+		goto reschedule;
+
+	rcu_read_lock();
+	for (;;) {
+		u32 uval;
+
+		if (!state->handoff_pid && (prefer_reader ||
+		   (first_reader == READ_ONCE(state->mutex_owner)))) {
+			ret = futex_trylock_preempt_disabled(uaddr,
+						FUTEX_SHARED, &uval, false);
+			/*
+			 * Return if lock acquired or an error happened
+			 */
+			if (ret)
+				break;
+		}
+
+		/*
+		 * Reread the first reader value again.
+		 */
+		first_reader = READ_ONCE(state->first_reader);
+		if (!first_reader)
+			first_reader = cmpxchg(&state->first_reader, NULL,
+						current);
+		if (!first_reader || !first_reader->on_cpu)
+			break;
+
+		if (need_resched()) {
+			rcu_read_unlock();
+			osq_unlock(&state->reader_osq);
+			goto reschedule;
+		}
+
+		cpu_relax();
+	}
+	rcu_read_unlock();
+	osq_unlock(&state->reader_osq);
+out:
+	*pfirst = first_reader;
+	preempt_enable();
+	return ret;
+
+reschedule:
+	schedule_preempt_disabled();
+	goto retry;
+}
+
 /*
  * Userspace tried a 0 -> TID atomic transition of the futex value
  * and failed. The kernel side here does the whole locking operation.
@@ -3956,9 +4074,11 @@ static noinline int futex_lock(u32 __user *uaddr, unsigned int flags,
 {
 	struct hrtimer_sleeper timeout, *to;
 	struct futex_hash_bucket *hb;
+	struct task_struct *first_reader = NULL;
 	union futex_key key = FUTEX_KEY_INIT;
 	struct futex_state *state;
 	u32 uval, vpid = shared ? FUTEX_SHARED : task_pid_vnr(current);
+	int alone = 0;
 	int ret;
 
 	/*
@@ -4023,6 +4143,17 @@ static noinline int futex_lock(u32 __user *uaddr, unsigned int flags,
 		hrtimer_start_expires(&to->timer, HRTIMER_MODE_ABS);
 
 	/*
+	 * Spin on the first reader and return if we acquired the read lock.
+	 */
+	if (shared) {
+		int rspin_ret = futex_spin_on_reader(uaddr, &first_reader,
+					state, to, flags & FLAGS_TP_PREADER);
+		if (rspin_ret > 0)
+			goto out_put_state_key;
+		alone = first_reader ? TP_READER_ALONE : TP_READER_GROUP;
+	}
+
+	/*
 	 * Acquiring the serialization mutex.
 	 *
 	 * If we got a signal or has some other error, we need to abort
@@ -4052,6 +4183,12 @@ static noinline int futex_lock(u32 __user *uaddr, unsigned int flags,
 	mutex_unlock(&state->mutex);
 
 out_put_state_key:
+	/*
+	 * We will be the first reader if (first_reader == NULL).
+	 */
+	if (shared && !first_reader)
+		WRITE_ONCE(state->first_reader, NULL);
+
 	if (!put_futex_state_unlocked(state)) {
 		/*
 		 * May need to free the futex state object and so must be
@@ -4068,7 +4205,7 @@ out:
 		hrtimer_cancel(&to->timer);
 		destroy_hrtimer_on_stack(&to->timer);
 	}
-	return ret;
+	return (ret < 0) ? ret : TP_STATUS_ALONE(ret, alone);
 }
 
 /*
