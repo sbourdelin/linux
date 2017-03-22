@@ -2847,7 +2847,7 @@ static int __init osc_init(void)
 	register_shrinker(&osc_cache_shrinker);
 
 	/* This is obviously too much memory, only prevent overflow here */
-	if (osc_reqpool_mem_max >= 1 << 12 || osc_reqpool_mem_max == 0) {
+	if (osc_reqpool_mem_max >= BIT(12) || osc_reqpool_mem_max == 0) {
 		rc = -EINVAL;
 		goto out_type;
 	}

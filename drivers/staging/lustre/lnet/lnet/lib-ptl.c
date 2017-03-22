@@ -332,7 +332,7 @@ lnet_mt_test_exhausted(struct lnet_match_table *mtable, int pos)
 	LASSERT(pos <= LNET_MT_HASH_IGNORE);
 	/* mtable::mt_mhash[pos] is marked as exhausted or not */
 	bmap = &mtable->mt_exhausted[pos >> LNET_MT_BITS_U64];
-	pos &= (1 << LNET_MT_BITS_U64) - 1;
+	pos &= (BIT(LNET_MT_BITS_U64)) - 1;
 
 	return (*bmap & (1ULL << pos));
 }
@@ -347,7 +347,7 @@ lnet_mt_set_exhausted(struct lnet_match_table *mtable, int pos, int exhausted)
 
 	/* set mtable::mt_mhash[pos] as exhausted/non-exhausted */
 	bmap = &mtable->mt_exhausted[pos >> LNET_MT_BITS_U64];
-	pos &= (1 << LNET_MT_BITS_U64) - 1;
+	pos &= (BIT(LNET_MT_BITS_U64)) - 1;
 
 	if (!exhausted)
 		*bmap &= ~(1ULL << pos);

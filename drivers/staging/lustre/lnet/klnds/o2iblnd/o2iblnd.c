@@ -2241,7 +2241,7 @@ static int kiblnd_hdev_get_attr(struct kib_hca_dev *hdev)
 	 * matching that of the native system
 	 */
 	hdev->ibh_page_shift = PAGE_SHIFT;
-	hdev->ibh_page_size  = 1 << PAGE_SHIFT;
+	hdev->ibh_page_size  = BIT(PAGE_SHIFT);
 	hdev->ibh_page_mask  = ~((__u64)hdev->ibh_page_size - 1);
 
 	hdev->ibh_mr_size = hdev->ibh_ibdev->attrs.max_mr_size;

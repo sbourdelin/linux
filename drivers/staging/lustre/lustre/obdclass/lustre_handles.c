@@ -49,7 +49,7 @@ static struct handle_bucket {
 	struct list_head	head;
 } *handle_hash;
 
-#define HANDLE_HASH_SIZE (1 << 16)
+#define HANDLE_HASH_SIZE (BIT(16))
 #define HANDLE_HASH_MASK (HANDLE_HASH_SIZE - 1)
 
 /*
