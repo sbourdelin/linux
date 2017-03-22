@@ -467,6 +467,7 @@ const char *intel_slpc_get_state_str(enum slpc_global_state state)
 	else
 		return "unknown";
 }
+
 bool intel_slpc_get_status(struct drm_i915_private *dev_priv)
 {
 	struct slpc_shared_data data;
@@ -479,6 +480,12 @@ bool intel_slpc_get_status(struct drm_i915_private *dev_priv)
 	switch (data.global_state) {
 	case SLPC_GLOBAL_STATE_RUNNING:
 		/* Capture required state from SLPC here */
+		dev_priv->guc.slpc.max_unslice_freq =
+				data.task_state_data.max_unslice_freq *
+				GEN9_FREQ_SCALER;
+		dev_priv->guc.slpc.min_unslice_freq =
+				data.task_state_data.min_unslice_freq *
+				GEN9_FREQ_SCALER;
 		ret = true;
 		break;
 	case SLPC_GLOBAL_STATE_ERROR:
@@ -513,6 +520,54 @@ void intel_slpc_save_default_rps(struct drm_i915_private *dev_priv)
 static void intel_slpc_restore_default_rps(struct drm_i915_private *dev_priv)
 {
 	I915_WRITE(GEN6_RP_CONTROL, dev_priv->guc.slpc.rp_control);
+}
+
+/*
+ * TODO: Add separate interfaces to set Max/Min Slice frequency.
+ * Since currently both slice and unslice are configured to same
+ * frequencies these unified interface relying on Unslice frequencies
+ * should be sufficient. These functions take frequency opcode as input.
+ */
+int intel_slpc_max_freq_set(struct drm_i915_private *dev_priv, u32 val)
+{
+	if (val < dev_priv->rps.min_freq ||
+	    val > dev_priv->rps.max_freq ||
+	    val < dev_priv->guc.slpc.min_unslice_freq)
+		return -EINVAL;
+
+	intel_slpc_set_param(dev_priv,
+			     SLPC_PARAM_GLOBAL_MAX_GT_UNSLICE_FREQ_MHZ,
+			     intel_gpu_freq(dev_priv, val));
+	intel_slpc_set_param(dev_priv,
+			     SLPC_PARAM_GLOBAL_MAX_GT_SLICE_FREQ_MHZ,
+			     intel_gpu_freq(dev_priv, val));
+
+	intel_slpc_enable(dev_priv);
+
+	dev_priv->guc.slpc.max_unslice_freq = val;
+
+	return 0;
+}
+
+int intel_slpc_min_freq_set(struct drm_i915_private *dev_priv, u32 val)
+{
+	if (val < dev_priv->rps.min_freq ||
+	    val > dev_priv->rps.max_freq ||
+	    val > dev_priv->guc.slpc.max_unslice_freq)
+		return -EINVAL;
+
+	intel_slpc_set_param(dev_priv,
+			     SLPC_PARAM_GLOBAL_MIN_GT_UNSLICE_FREQ_MHZ,
+			     intel_gpu_freq(dev_priv, val));
+	intel_slpc_set_param(dev_priv,
+			     SLPC_PARAM_GLOBAL_MIN_GT_SLICE_FREQ_MHZ,
+			     intel_gpu_freq(dev_priv, val));
+
+	intel_slpc_enable(dev_priv);
+
+	dev_priv->guc.slpc.min_unslice_freq = val;
+
+	return 0;
 }
 
 void intel_slpc_init(struct drm_i915_private *dev_priv)

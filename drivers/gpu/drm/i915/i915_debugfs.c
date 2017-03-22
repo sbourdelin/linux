@@ -4316,7 +4316,12 @@ i915_max_freq_get(void *data, u64 *val)
 	if (INTEL_GEN(dev_priv) < 6)
 		return -ENODEV;
 
-	*val = intel_gpu_freq(dev_priv, dev_priv->rps.max_freq_softlimit);
+	if (dev_priv->guc.slpc.active)
+		*val = intel_gpu_freq(dev_priv,
+				      dev_priv->guc.slpc.max_unslice_freq);
+	else
+		*val = intel_gpu_freq(dev_priv,
+				      dev_priv->rps.max_freq_softlimit);
 	return 0;
 }
 
@@ -4332,20 +4337,32 @@ i915_max_freq_set(void *data, u64 val)
 
 	DRM_DEBUG_DRIVER("Manually setting max freq to %llu\n", val);
 
+	intel_runtime_pm_get(dev_priv);
+
 	ret = mutex_lock_interruptible(&dev_priv->rps.hw_lock);
-	if (ret)
+	if (ret) {
+		intel_runtime_pm_put(dev_priv);
 		return ret;
+	}
 
 	/*
 	 * Turbo will still be enabled, but won't go above the set value.
 	 */
 	val = intel_freq_opcode(dev_priv, val);
 
+	if (dev_priv->guc.slpc.active) {
+		ret = intel_slpc_max_freq_set(dev_priv, val);
+		mutex_unlock(&dev_priv->rps.hw_lock);
+		intel_runtime_pm_put(dev_priv);
+		return ret;
+	}
+
 	hw_max = dev_priv->rps.max_freq;
 	hw_min = dev_priv->rps.min_freq;
 
 	if (val < hw_min || val > hw_max || val < dev_priv->rps.min_freq_softlimit) {
 		mutex_unlock(&dev_priv->rps.hw_lock);
+		intel_runtime_pm_put(dev_priv);
 		return -EINVAL;
 	}
 
@@ -4355,6 +4372,8 @@ i915_max_freq_set(void *data, u64 val)
 		DRM_DEBUG_DRIVER("failed to update RPS to new softlimit\n");
 
 	mutex_unlock(&dev_priv->rps.hw_lock);
+
+	intel_runtime_pm_put(dev_priv);
 
 	return 0;
 }
@@ -4371,7 +4390,12 @@ i915_min_freq_get(void *data, u64 *val)
 	if (INTEL_GEN(dev_priv) < 6)
 		return -ENODEV;
 
-	*val = intel_gpu_freq(dev_priv, dev_priv->rps.min_freq_softlimit);
+	if (dev_priv->guc.slpc.active)
+		*val = intel_gpu_freq(dev_priv,
+				      dev_priv->guc.slpc.min_unslice_freq);
+	else
+		*val = intel_gpu_freq(dev_priv,
+				      dev_priv->rps.min_freq_softlimit);
 	return 0;
 }
 
@@ -4387,14 +4411,25 @@ i915_min_freq_set(void *data, u64 val)
 
 	DRM_DEBUG_DRIVER("Manually setting min freq to %llu\n", val);
 
+	intel_runtime_pm_get(dev_priv);
+
 	ret = mutex_lock_interruptible(&dev_priv->rps.hw_lock);
-	if (ret)
+	if (ret) {
+		intel_runtime_pm_put(dev_priv);
 		return ret;
+	}
 
 	/*
 	 * Turbo will still be enabled, but won't go below the set value.
 	 */
 	val = intel_freq_opcode(dev_priv, val);
+
+	if (dev_priv->guc.slpc.active) {
+		ret = intel_slpc_min_freq_set(dev_priv, val);
+		mutex_unlock(&dev_priv->rps.hw_lock);
+		intel_runtime_pm_put(dev_priv);
+		return ret;
+	}
 
 	hw_max = dev_priv->rps.max_freq;
 	hw_min = dev_priv->rps.min_freq;
@@ -4402,6 +4437,7 @@ i915_min_freq_set(void *data, u64 val)
 	if (val < hw_min ||
 	    val > hw_max || val > dev_priv->rps.max_freq_softlimit) {
 		mutex_unlock(&dev_priv->rps.hw_lock);
+		intel_runtime_pm_put(dev_priv);
 		return -EINVAL;
 	}
 
@@ -4411,6 +4447,8 @@ i915_min_freq_set(void *data, u64 val)
 		DRM_DEBUG_DRIVER("failed to update RPS to new softlimit\n");
 
 	mutex_unlock(&dev_priv->rps.hw_lock);
+
+	intel_runtime_pm_put(dev_priv);
 
 	return 0;
 }

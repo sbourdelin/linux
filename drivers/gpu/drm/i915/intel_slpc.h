@@ -29,6 +29,9 @@ struct intel_slpc {
 	struct i915_vma *vma;
 
 	u32 rp_control;
+	/* i915 cached SLPC frequency limits */
+	u32 min_unslice_freq;
+	u32 max_unslice_freq;
 };
 
 enum slpc_status {
@@ -252,6 +255,8 @@ void intel_slpc_read_shared_data(struct drm_i915_private *dev_priv,
 const char *intel_slpc_get_state_str(enum slpc_global_state state);
 bool intel_slpc_get_status(struct drm_i915_private *dev_priv);
 void intel_slpc_save_default_rps(struct drm_i915_private *dev_priv);
+int intel_slpc_max_freq_set(struct drm_i915_private *dev_priv, u32 val);
+int intel_slpc_min_freq_set(struct drm_i915_private *dev_priv, u32 val);
 void intel_slpc_init(struct drm_i915_private *dev_priv);
 void intel_slpc_cleanup(struct drm_i915_private *dev_priv);
 void intel_slpc_enable(struct drm_i915_private *dev_priv);
