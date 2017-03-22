@@ -260,13 +260,15 @@ static int acpi_scan_try_to_offline(struct acpi_device *device)
 static int acpi_scan_hot_remove(struct acpi_device *device)
 {
 	acpi_handle handle = device->handle;
+	struct acpi_device *child;
 	unsigned long long sta;
 	acpi_status status;
 
 	if (device->handler && device->handler->hotplug.demand_offline
 	    && !acpi_force_hot_remove) {
-		if (!acpi_scan_is_offline(device, true))
-			return -EBUSY;
+		list_for_each_entry(child, &device->children, node)
+			if (!acpi_scan_is_offline(child, false))
+				return -EBUSY;
 	} else {
 		int error = acpi_scan_try_to_offline(device);
 		if (error)
