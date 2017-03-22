@@ -26,6 +26,8 @@ struct nf_conntrack_expect {
 	/* Function to call after setup and insertion */
 	void (*expectfn)(struct nf_conn *new,
 			 struct nf_conntrack_expect *this);
+	/* The module which expectfn belongs to */
+	struct module *nat_module;
 
 	/* Helper to assign to new connection */
 	struct nf_conntrack_helper *helper;

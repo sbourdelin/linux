@@ -377,6 +377,7 @@ static unsigned int nf_nat_sip_expect(struct sk_buff *skb, unsigned int protoff,
 	exp->saved_proto.udp.port = exp->tuple.dst.u.udp.port;
 	exp->dir = !dir;
 	exp->expectfn = nf_nat_sip_expected;
+	exp->nat_module = THIS_MODULE;
 
 	for (; port != 0; port++) {
 		int ret;
@@ -562,12 +563,14 @@ static unsigned int nf_nat_sdp_media(struct sk_buff *skb, unsigned int protoff,
 	rtp_exp->saved_proto.udp.port = rtp_exp->tuple.dst.u.udp.port;
 	rtp_exp->dir = !dir;
 	rtp_exp->expectfn = nf_nat_sip_expected;
+	rtp_exp->nat_module = THIS_MODULE;
 
 	rtcp_exp->saved_addr = rtcp_exp->tuple.dst.u3;
 	rtcp_exp->tuple.dst.u3 = *rtp_addr;
 	rtcp_exp->saved_proto.udp.port = rtcp_exp->tuple.dst.u.udp.port;
 	rtcp_exp->dir = !dir;
 	rtcp_exp->expectfn = nf_nat_sip_expected;
+	rtcp_exp->nat_module = THIS_MODULE;
 
 	/* Try to get same pair of ports: if not, try to change them. */
 	for (port = ntohs(rtp_exp->tuple.dst.u.udp.port);
@@ -620,6 +623,7 @@ err1:
 
 static struct nf_ct_nat_helper sip_nat = {
 	.name		= "sip",
+	.me		= THIS_MODULE,
 	.expectfn	= nf_nat_sip_expected,
 };
 

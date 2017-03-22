@@ -66,6 +66,7 @@ int nf_conntrack_broadcast_help(struct sk_buff *skb,
 	exp->mask.src.u.udp.port  = htons(0xFFFF);
 
 	exp->expectfn             = NULL;
+	exp->nat_module           = NULL;
 	exp->flags                = NF_CT_EXPECT_PERMANENT;
 	exp->class		  = NF_CT_EXPECT_CLASS_DEFAULT;
 	exp->helper               = NULL;

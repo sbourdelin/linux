@@ -222,6 +222,7 @@ static int exp_gre(struct nf_conn *ct, __be16 callid, __be16 peer_callid)
 			  &ct->tuplehash[dir].tuple.dst.u3,
 			  IPPROTO_GRE, &peer_callid, &callid);
 	exp_orig->expectfn = pptp_expectfn;
+	exp_orig->nat_module = THIS_MODULE;
 
 	/* reply direction, PAC->PNS */
 	dir = IP_CT_DIR_REPLY;
@@ -231,6 +232,7 @@ static int exp_gre(struct nf_conn *ct, __be16 callid, __be16 peer_callid)
 			  &ct->tuplehash[dir].tuple.dst.u3,
 			  IPPROTO_GRE, &callid, &peer_callid);
 	exp_reply->expectfn = pptp_expectfn;
+	exp_reply->nat_module = THIS_MODULE;
 
 	nf_nat_pptp_exp_gre = rcu_dereference(nf_nat_pptp_hook_exp_gre);
 	if (nf_nat_pptp_exp_gre && ct->status & IPS_NAT_MASK)

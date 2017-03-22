@@ -850,6 +850,7 @@ static struct pernet_operations nf_nat_net_ops = {
 
 static struct nf_ct_nat_helper follow_master_nat = {
 	.name		= "nat-follow-master",
+	.me		= THIS_MODULE,
 	.expectfn	= nf_nat_follow_master,
 };
 

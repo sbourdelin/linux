@@ -130,6 +130,42 @@ __nf_ct_helper_find(const struct nf_conntrack_tuple *tuple)
 	return NULL;
 }
 
+static void
+nf_ct_flush_expect(const struct module *me)
+{
+	struct nf_conntrack_expect *exp;
+	const struct hlist_node *next;
+	u32 i;
+
+	if (!me)
+		return;
+
+	/* Make sure no one is still using the module unless
+	 * its a connection in the hash.
+	 */
+	synchronize_rcu();
+
+	/* Get rid of expectations */
+	spin_lock_bh(&nf_conntrack_expect_lock);
+	for (i = 0; i < nf_ct_expect_hsize; i++) {
+		hlist_for_each_entry_safe(exp, next,
+					  &nf_ct_expect_hash[i], hnode) {
+			struct nf_conn_help *master_help = nfct_help(exp->master);
+
+			if ((master_help->helper && master_help->helper->me == me) ||
+			    (exp->helper && exp->helper->me == me) ||
+			     exp->nat_module == me) {
+				/* This expect belongs to the dying module */
+				if (del_timer(&exp->timeout)) {
+					nf_ct_unlink_expect(exp);
+					nf_ct_expect_put(exp);
+				}
+			}
+		}
+	}
+	spin_unlock_bh(&nf_conntrack_expect_lock);
+}
+
 struct nf_conntrack_helper *
 __nf_conntrack_helper_find(const char *name, u16 l3num, u8 protonum)
 {
@@ -308,6 +344,8 @@ void nf_ct_nat_helper_unregister(struct nf_ct_nat_helper *n)
 	spin_lock_bh(&nf_conntrack_expect_lock);
 	list_del_rcu(&n->head);
 	spin_unlock_bh(&nf_conntrack_expect_lock);
+
+	nf_ct_flush_expect(n->me);
 }
 EXPORT_SYMBOL_GPL(nf_ct_nat_helper_unregister);
 
@@ -421,8 +459,6 @@ static void __nf_conntrack_helper_unregister(struct nf_conntrack_helper *me,
 void nf_conntrack_helper_unregister(struct nf_conntrack_helper *me)
 {
 	struct nf_conntrack_tuple_hash *h;
-	struct nf_conntrack_expect *exp;
-	const struct hlist_node *next;
 	const struct hlist_nulls_node *nn;
 	unsigned int last_hsize;
 	spinlock_t *lock;
@@ -434,28 +470,7 @@ void nf_conntrack_helper_unregister(struct nf_conntrack_helper *me)
 	nf_ct_helper_count--;
 	mutex_unlock(&nf_ct_helper_mutex);
 
-	/* Make sure every nothing is still using the helper unless its a
-	 * connection in the hash.
-	 */
-	synchronize_rcu();
-
-	/* Get rid of expectations */
-	spin_lock_bh(&nf_conntrack_expect_lock);
-	for (i = 0; i < nf_ct_expect_hsize; i++) {
-		hlist_for_each_entry_safe(exp, next,
-					  &nf_ct_expect_hash[i], hnode) {
-			struct nf_conn_help *help = nfct_help(exp->master);
-			if ((rcu_dereference_protected(
-					help->helper,
-					lockdep_is_held(&nf_conntrack_expect_lock)
-					) == me || exp->helper == me) &&
-			    del_timer(&exp->timeout)) {
-				nf_ct_unlink_expect(exp);
-				nf_ct_expect_put(exp);
-			}
-		}
-	}
-	spin_unlock_bh(&nf_conntrack_expect_lock);
+	nf_ct_flush_expect(me->me);
 
 	rtnl_lock();
 	for_each_net(net)

@@ -188,9 +188,11 @@ static int nat_rtp_rtcp(struct sk_buff *skb, struct nf_conn *ct,
 	/* Set expectations for NAT */
 	rtp_exp->saved_proto.udp.port = rtp_exp->tuple.dst.u.udp.port;
 	rtp_exp->expectfn = nf_nat_follow_master;
+	rtp_exp->nat_module = THIS_MODULE;
 	rtp_exp->dir = !dir;
 	rtcp_exp->saved_proto.udp.port = rtcp_exp->tuple.dst.u.udp.port;
 	rtcp_exp->expectfn = nf_nat_follow_master;
+	rtcp_exp->nat_module = THIS_MODULE;
 	rtcp_exp->dir = !dir;
 
 	/* Lookup existing expects */
@@ -290,6 +292,7 @@ static int nat_t120(struct sk_buff *skb, struct nf_conn *ct,
 	/* Set expectations for NAT */
 	exp->saved_proto.tcp.port = exp->tuple.dst.u.tcp.port;
 	exp->expectfn = nf_nat_follow_master;
+	exp->nat_module = THIS_MODULE;
 	exp->dir = !dir;
 
 	/* Try to get same port: if not, try to change it. */
@@ -342,6 +345,7 @@ static int nat_h245(struct sk_buff *skb, struct nf_conn *ct,
 	/* Set expectations for NAT */
 	exp->saved_proto.tcp.port = exp->tuple.dst.u.tcp.port;
 	exp->expectfn = nf_nat_follow_master;
+	exp->nat_module = THIS_MODULE;
 	exp->dir = !dir;
 
 	/* Check existing expects */
@@ -434,6 +438,7 @@ static int nat_q931(struct sk_buff *skb, struct nf_conn *ct,
 	/* Set expectations for NAT */
 	exp->saved_proto.tcp.port = exp->tuple.dst.u.tcp.port;
 	exp->expectfn = ip_nat_q931_expect;
+	exp->nat_module = THIS_MODULE;
 	exp->dir = !dir;
 
 	/* Check existing expects */
@@ -528,6 +533,7 @@ static int nat_callforwarding(struct sk_buff *skb, struct nf_conn *ct,
 	exp->tuple.dst.u3.ip = ct->tuplehash[!dir].tuple.dst.u3.ip;
 	exp->saved_proto.tcp.port = exp->tuple.dst.u.tcp.port;
 	exp->expectfn = ip_nat_callforwarding_expect;
+	exp->nat_module = THIS_MODULE;
 	exp->dir = !dir;
 
 	/* Try to get same port: if not, try to change it. */
@@ -569,11 +575,13 @@ static int nat_callforwarding(struct sk_buff *skb, struct nf_conn *ct,
 
 static struct nf_ct_nat_helper q931_nat = {
 	.name		= "Q.931",
+	.me		= THIS_MODULE,
 	.expectfn	= ip_nat_q931_expect,
 };
 
 static struct nf_ct_nat_helper callforwarding_nat = {
 	.name		= "callforwarding",
+	.me		= THIS_MODULE,
 	.expectfn	= ip_nat_callforwarding_expect,
 };
 

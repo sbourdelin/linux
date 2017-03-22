@@ -113,6 +113,7 @@ int nf_conntrack_broadcast_help(struct sk_buff *skb, unsigned int protoff,
 
 struct nf_ct_nat_helper {
 	struct list_head head;
+	struct module *me;
 	const char *name;
 	void (*expectfn)(struct nf_conn *ct, struct nf_conntrack_expect *exp);
 };

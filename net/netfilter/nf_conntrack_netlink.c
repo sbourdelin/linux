@@ -3078,8 +3078,11 @@ ctnetlink_alloc_expect(const struct nlattr * const cda[], struct nf_conn *ct,
 			goto err_out;
 		}
 		exp->expectfn = nat_helper->expectfn;
-	} else
+		exp->nat_module = nat_helper->me;
+	} else {
 		exp->expectfn = NULL;
+		exp->nat_module = NULL;
+	}
 
 	exp->class = class;
 	exp->master = ct;

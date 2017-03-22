@@ -81,6 +81,7 @@ static unsigned int nf_nat_ftp(struct sk_buff *skb,
 	/* When you see the packet, we need to NAT it the same as the
 	 * this one. */
 	exp->expectfn = nf_nat_follow_master;
+	exp->nat_module = THIS_MODULE;
 
 	/* Try to get same port: if not, try to change it. */
 	for (port = ntohs(exp->saved_proto.tcp.port); port != 0; port++) {
