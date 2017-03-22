@@ -330,11 +330,11 @@ static int atomisp_mrfld_pre_power_down(struct atomisp_device *isp)
 	 * IRQ, if so, waiting for it to be served
 	 */
 	pci_read_config_dword(dev, PCI_INTERRUPT_CTRL, &irq);
-	irq = irq & 1 << INTR_IIR;
+	irq = irq & BIT(INTR_IIR);
 	pci_write_config_dword(dev, PCI_INTERRUPT_CTRL, irq);
 
 	pci_read_config_dword(dev, PCI_INTERRUPT_CTRL, &irq);
-	if (!(irq & (1 << INTR_IIR)))
+	if (!(irq & (BIT(INTR_IIR))))
 		goto done;
 
 	atomisp_store_uint32(MRFLD_INTR_CLEAR_REG, 0xFFFFFFFF);
@@ -347,11 +347,11 @@ static int atomisp_mrfld_pre_power_down(struct atomisp_device *isp)
 		return -EAGAIN;
 	} else {
 		pci_read_config_dword(dev, PCI_INTERRUPT_CTRL, &irq);
-		irq = irq & 1 << INTR_IIR;
+		irq = irq & BIT(INTR_IIR);
 		pci_write_config_dword(dev, PCI_INTERRUPT_CTRL, irq);
 
 		pci_read_config_dword(dev, PCI_INTERRUPT_CTRL, &irq);
-		if (!(irq & (1 << INTR_IIR))) {
+		if (!(irq & (BIT(INTR_IIR)))) {
 			atomisp_store_uint32(MRFLD_INTR_ENABLE_REG, 0x0);
 			goto done;
 		}
@@ -370,7 +370,7 @@ done:
 	* HW sighting:4568410.
 	*/
 	pci_read_config_dword(dev, PCI_INTERRUPT_CTRL, &irq);
-	irq &= ~(1 << INTR_IER);
+	irq &= ~(BIT(INTR_IER));
 	pci_write_config_dword(dev, PCI_INTERRUPT_CTRL, irq);
 
 	atomisp_msi_irq_uninit(isp, dev);
@@ -388,7 +388,7 @@ done:
 void punit_ddr_dvfs_enable(bool enable)
 {
 	int reg = intel_mid_msgbus_read32(PUNIT_PORT, MRFLD_ISPSSDVFS);
-	int door_bell = 1 << 8;
+	int door_bell = BIT(8);
 	int max_wait = 30;
 
 	if (enable) {
@@ -726,9 +726,9 @@ int atomisp_csi_lane_config(struct atomisp_device *isp)
 	pci_read_config_dword(isp->pdev, MRFLD_PCI_CSI_CONTROL, &csi_control);
 	csi_control &= ~port_config_mask;
 	csi_control |= (portconfigs[i].code << MRFLD_PORT_CONFIGCODE_SHIFT)
-		| (portconfigs[i].lanes[0] ? 0 : (1 << MRFLD_PORT1_ENABLE_SHIFT))
-		| (portconfigs[i].lanes[1] ? 0 : (1 << MRFLD_PORT2_ENABLE_SHIFT))
-		| (portconfigs[i].lanes[2] ? 0 : (1 << MRFLD_PORT3_ENABLE_SHIFT))
+		| (portconfigs[i].lanes[0] ? 0 : (BIT(MRFLD_PORT1_ENABLE_SHIFT)))
+		| (portconfigs[i].lanes[1] ? 0 : (BIT(MRFLD_PORT2_ENABLE_SHIFT)))
+		| (portconfigs[i].lanes[2] ? 0 : (BIT(MRFLD_PORT3_ENABLE_SHIFT)))
 		| (((1 << portconfigs[i].lanes[0]) - 1) << MRFLD_PORT1_LANES_SHIFT)
 		| (((1 << portconfigs[i].lanes[1]) - 1) << MRFLD_PORT2_LANES_SHIFT)
 		| (((1 << portconfigs[i].lanes[2]) - 1) << port3_lanes_shift);
