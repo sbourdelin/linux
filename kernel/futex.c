@@ -197,6 +197,7 @@ int __read_mostly futex_cmpxchg_enabled;
 #define FLAGS_CLOCKRT		0x02
 #define FLAGS_HAS_TIMEOUT	0x04
 #define FLAGS_TP_USLOCK		0x08	/* Do the locking in userspace */
+#define FLAGS_TP_PREADER	0x08	/* Prefer readers */
 
 enum futex_type {
 	TYPE_PI = 0,
@@ -4004,6 +4005,20 @@ static noinline int futex_lock(u32 __user *uaddr, unsigned int flags,
 		goto out_put_state_key;
 	}
 
+	/*
+	 * For reader, we will try to steal the lock here as if it is the
+	 * top waiter without taking the serialization mutex if the handoff
+	 * PID hasn't been set and is in prefer-reader mode.
+	 */
+	if (shared && (flags & FLAGS_TP_PREADER) && !state->handoff_pid) {
+		ret = futex_trylock(uaddr, vpid, &uval, true);
+		if (ret) {
+			if (ret > 0)
+				ret = TP_LOCK_STOLEN;
+			goto out_put_state_key;
+		}
+	}
+
 	if (to)
 		hrtimer_start_expires(&to->timer, HRTIMER_MODE_ABS);
 
@@ -4219,8 +4234,9 @@ long do_futex(u32 __user *uaddr, int op, u32 val, ktime_t *timeout,
 #ifdef CONFIG_SMP
 	case FUTEX_LOCK:
 	case FUTEX_LOCK_SHARED:
-		if (val && (cmd == FUTEX_LOCK))
-			flags |= FLAGS_TP_USLOCK;
+		if (val)
+			flags |= (cmd == FUTEX_LOCK) ? FLAGS_TP_USLOCK
+						     : FLAGS_TP_PREADER;
 		return futex_lock(uaddr, flags, timeout,
 				 (cmd == FUTEX_LOCK) ? false : true);
 	case FUTEX_UNLOCK:
