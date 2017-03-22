@@ -13,6 +13,7 @@
 #include <linux/dmi.h>
 #include <linux/nls.h>
 #include <linux/dma-mapping.h>
+#include <linux/platform_device.h>
 
 #include <asm/pgtable.h>
 
@@ -1928,6 +1929,25 @@ int acpi_bus_scan(acpi_handle handle)
 EXPORT_SYMBOL(acpi_bus_scan);
 
 /**
+ * acpi_bus_trim_platform_device - Check and remove a platform device
+ *				   from a bus
+ * @dev: Platform device to check
+ * @data: pointer to the acpi_device to check dev against
+ *
+ * Checks whether the platform_device dev belongs to the acpi_device
+ * data and unregisters dev if it matches.
+ */
+static int acpi_bus_trim_platform_device(struct device *dev, void *data)
+{
+	struct acpi_device *adev = data;
+
+	if (dev->fwnode == acpi_fwnode_handle(adev))
+		platform_device_unregister(to_platform_device(dev));
+
+	return 0;
+}
+
+/**
  * acpi_bus_trim - Detach scan handlers and drivers from ACPI device objects.
  * @adev: Root of the ACPI namespace scope to walk.
  *
@@ -1950,6 +1970,12 @@ void acpi_bus_trim(struct acpi_device *adev)
 	} else {
 		device_release_driver(&adev->dev);
 	}
+
+	/* Remove platform devices from the bus */
+	if (adev->pnp.type.platform_id)
+		bus_for_each_dev(&platform_bus_type, NULL, adev,
+				 acpi_bus_trim_platform_device);
+
 	/*
 	 * Most likely, the device is going away, so put it into D3cold before
 	 * that.
