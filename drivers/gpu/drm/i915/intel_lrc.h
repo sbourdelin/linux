@@ -87,5 +87,18 @@ uint64_t intel_lr_context_descriptor(struct i915_gem_context *ctx,
 /* Execlists */
 int intel_sanitize_enable_execlists(struct drm_i915_private *dev_priv,
 				    int enable_execlists);
+static inline void
+context_status_change(struct drm_i915_gem_request *rq, unsigned long status)
+{
+	/*
+	 * Only used when GVT-g is enabled now. When GVT-g is disabled,
+	 * The compiler should eliminate this function as dead-code.
+	 */
+	if (!IS_ENABLED(CONFIG_DRM_I915_GVT))
+		return;
+
+	atomic_notifier_call_chain(&rq->engine->context_status_notifier,
+				   status, rq);
+}
 
 #endif /* _INTEL_LRC_H_ */
