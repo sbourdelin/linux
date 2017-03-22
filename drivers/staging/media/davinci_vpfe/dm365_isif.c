@@ -821,7 +821,7 @@ isif_config_dfc(struct vpfe_isif_device *isif, struct vpfe_isif_dfc *vdfc)
 
 	/* Correct whole line or partial */
 	if (vdfc->corr_whole_line)
-		val |= 1 << ISIF_VDFC_CORR_WHOLE_LN_SHIFT;
+		val |= BIT(ISIF_VDFC_CORR_WHOLE_LN_SHIFT);
 
 	/* level shift value */
 	val |= (vdfc->def_level_shift & ISIF_VDFC_LEVEL_SHFT_MASK) <<
@@ -849,7 +849,7 @@ isif_config_dfc(struct vpfe_isif_device *isif, struct vpfe_isif_dfc *vdfc)
 
 	val = isif_read(isif->isif_cfg.base_addr, DFCMEMCTL);
 	/* set DFCMARST and set DFCMWR */
-	val |= 1 << ISIF_DFCMEMCTL_DFCMARST_SHIFT;
+	val |= BIT(ISIF_DFCMEMCTL_DFCMARST_SHIFT);
 	val |= 1;
 	isif_write(isif->isif_cfg.base_addr, val, DFCMEMCTL);
 
@@ -880,7 +880,7 @@ isif_config_dfc(struct vpfe_isif_device *isif, struct vpfe_isif_dfc *vdfc)
 		}
 		val = isif_read(isif->isif_cfg.base_addr, DFCMEMCTL);
 		/* clear DFCMARST and set DFCMWR */
-		val &= ~(1 << ISIF_DFCMEMCTL_DFCMARST_SHIFT);
+		val &= ~(BIT(ISIF_DFCMEMCTL_DFCMARST_SHIFT));
 		val |= 1;
 		isif_write(isif->isif_cfg.base_addr, val, DFCMEMCTL);
 
@@ -904,10 +904,10 @@ isif_config_dfc(struct vpfe_isif_device *isif, struct vpfe_isif_dfc *vdfc)
 			   DM365_ISIF_DFCMWR_MEMORY_WRITE, DFCMEMCTL);
 	}
 	/* enable VDFC */
-	isif_merge(isif->isif_cfg.base_addr, (1 << ISIF_VDFC_EN_SHIFT),
-		   (1 << ISIF_VDFC_EN_SHIFT), DFCCTL);
+	isif_merge(isif->isif_cfg.base_addr, (BIT(ISIF_VDFC_EN_SHIFT)),
+		   (BIT(ISIF_VDFC_EN_SHIFT)), DFCCTL);
 
-	isif_merge(isif->isif_cfg.base_addr, (1 << ISIF_VDFC_EN_SHIFT),
+	isif_merge(isif->isif_cfg.base_addr, (BIT(ISIF_VDFC_EN_SHIFT)),
 		   (0 << ISIF_VDFC_EN_SHIFT), DFCCTL);
 
 	isif_write(isif->isif_cfg.base_addr, 0x6, DFCMEMCTL);
@@ -1140,7 +1140,7 @@ static int isif_config_raw(struct v4l2_subdev *sd, int mode)
 	isif_write(isif->isif_cfg.base_addr, val, CGAMMAWD);
 	/* Configure DPCM compression settings */
 	if (params->v4l2_pix_fmt == V4L2_PIX_FMT_SGRBG10DPCM8) {
-		val =  1 << ISIF_DPCM_EN_SHIFT;
+		val =  BIT(ISIF_DPCM_EN_SHIFT);
 		val |= (params->dpcm_predictor &
 			ISIF_DPCM_PREDICTOR_MASK) << ISIF_DPCM_PREDICTOR_SHIFT;
 	}
@@ -1893,7 +1893,7 @@ static const struct v4l2_ctrl_config vpfe_isif_crgain = {
 	.name = "CRGAIN",
 	.type = V4L2_CTRL_TYPE_INTEGER,
 	.min = 0,
-	.max = (1 << 12) - 1,
+	.max = (BIT(12)) - 1,
 	.step = 1,
 	.def = 0,
 };
@@ -1904,7 +1904,7 @@ static const struct v4l2_ctrl_config vpfe_isif_cgrgain = {
 	.name = "CGRGAIN",
 	.type = V4L2_CTRL_TYPE_INTEGER,
 	.min = 0,
-	.max = (1 << 12) - 1,
+	.max = (BIT(12)) - 1,
 	.step = 1,
 	.def = 0,
 };
@@ -1915,7 +1915,7 @@ static const struct v4l2_ctrl_config vpfe_isif_cgbgain = {
 	.name = "CGBGAIN",
 	.type = V4L2_CTRL_TYPE_INTEGER,
 	.min = 0,
-	.max = (1 << 12) - 1,
+	.max = (BIT(12)) - 1,
 	.step = 1,
 	.def = 0,
 };
@@ -1926,7 +1926,7 @@ static const struct v4l2_ctrl_config vpfe_isif_cbgain = {
 	.name = "CBGAIN",
 	.type = V4L2_CTRL_TYPE_INTEGER,
 	.min = 0,
-	.max = (1 << 12) - 1,
+	.max = (BIT(12)) - 1,
 	.step = 1,
 	.def = 0,
 };
@@ -1937,7 +1937,7 @@ static const struct v4l2_ctrl_config vpfe_isif_gain_offset = {
 	.name = "Gain Offset",
 	.type = V4L2_CTRL_TYPE_INTEGER,
 	.min = 0,
-	.max = (1 << 12) - 1,
+	.max = (BIT(12)) - 1,
 	.step = 1,
 	.def = 0,
 };
@@ -2044,7 +2044,7 @@ int vpfe_isif_init(struct vpfe_isif_device *isif, struct platform_device *pdev)
 	v4l2_subdev_init(sd, &isif_v4l2_ops);
 	sd->internal_ops = &isif_v4l2_internal_ops;
 	strlcpy(sd->name, "DAVINCI ISIF", sizeof(sd->name));
-	sd->grp_id = 1 << 16;	/* group ID for davinci subdevs */
+	sd->grp_id = BIT(16);	/* group ID for davinci subdevs */
 	v4l2_set_subdevdata(sd, isif);
 	sd->flags |= V4L2_SUBDEV_FL_HAS_EVENTS | V4L2_SUBDEV_FL_HAS_DEVNODE;
 	pads[ISIF_PAD_SINK].flags = MEDIA_PAD_FL_SINK;
