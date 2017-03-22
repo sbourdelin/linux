@@ -503,7 +503,7 @@ static void update_txdesc(struct xmit_frame *pxmitframe, uint *pmem, int sz)
 			switch (pattrib->encrypt) {	/*SEC_TYPE*/
 			case _WEP40_:
 			case _WEP104_:
-				ptxdesc->txdw1 |= cpu_to_le32((0x01 << 22) &
+				ptxdesc->txdw1 |= cpu_to_le32((BIT(22)) &
 						  0x00c00000);
 				/*KEY_ID when WEP is used;*/
 				ptxdesc->txdw1 |= cpu_to_le32((psecuritypriv->
