@@ -595,30 +595,6 @@ static int mdp5_get_scanoutpos(struct drm_device *dev, unsigned int pipe,
 	return ret;
 }
 
-static bool mdp5_get_vblank_timestamp(struct drm_device *dev, unsigned int pipe,
-				      int *max_error,
-				      struct timeval *vblank_time,
-				      bool in_vblank_irq)
-{
-	struct msm_drm_private *priv = dev->dev_private;
-	struct drm_crtc *crtc;
-
-	if (pipe < 0 || pipe >= priv->num_crtcs) {
-		DRM_ERROR("Invalid crtc %d\n", pipe);
-		return false;
-	}
-
-	crtc = priv->crtcs[pipe];
-	if (!crtc) {
-		DRM_ERROR("Invalid crtc %d\n", pipe);
-		return false;
-	}
-
-	return drm_calc_vbltimestamp_from_scanoutpos(dev, pipe, max_error,
-						     vblank_time, in_vblank_irq,
-						     &crtc->mode);
-}
-
 static u32 mdp5_get_vblank_counter(struct drm_device *dev, unsigned int pipe)
 {
 	struct msm_drm_private *priv = dev->dev_private;
@@ -728,7 +704,7 @@ struct msm_kms *mdp5_kms_init(struct drm_device *dev)
 	dev->mode_config.max_width = 0xffff;
 	dev->mode_config.max_height = 0xffff;
 
-	dev->driver->get_vblank_timestamp = mdp5_get_vblank_timestamp;
+	dev->driver->get_vblank_timestamp = drm_calc_vbltimestamp_from_scanoutpos;
 	dev->driver->get_scanout_position = mdp5_get_scanoutpos;
 	dev->driver->get_vblank_counter = mdp5_get_vblank_counter;
 	dev->max_vblank_count = 0xffffffff;
