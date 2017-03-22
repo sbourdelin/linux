@@ -330,6 +330,7 @@
 		interrupts = <GIC_SPI 43 IRQ_TYPE_LEVEL_HIGH>;
 		clocks = <&xin24m>, <&cru PCLK_TIMER>;
 		clock-names = "timer", "pclk";
+		clockevent;
 	};
 
 	cru: clock-controller@110e0000 {
