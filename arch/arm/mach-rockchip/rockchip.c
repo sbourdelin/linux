@@ -21,6 +21,7 @@
 #include <linux/irqchip.h>
 #include <linux/clk-provider.h>
 #include <linux/clocksource.h>
+#include <linux/clockchips.h>
 #include <linux/mfd/syscon.h>
 #include <linux/regmap.h>
 #include <asm/mach/arch.h>
@@ -55,6 +56,7 @@ static void __init rockchip_timer_init(void)
 	}
 
 	of_clk_init(NULL);
+	clockevent_probe();
 	clocksource_probe();
 }
 
