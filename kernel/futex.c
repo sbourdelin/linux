@@ -196,6 +196,7 @@ int __read_mostly futex_cmpxchg_enabled;
 #endif
 #define FLAGS_CLOCKRT		0x02
 #define FLAGS_HAS_TIMEOUT	0x04
+#define FLAGS_TP_USLOCK		0x08	/* Do the locking in userspace */
 
 enum futex_type {
 	TYPE_PI = 0,
@@ -3465,10 +3466,11 @@ static inline int put_futex_state_unlocked(struct futex_state *state)
 
 /**
  * __futex_trylock - try to lock the userspace futex word (0 => vpid).
- * @uaddr: futex address
- * @vpid:  PID of current task
- * @puval: storage location for current futex value
- * @steal: false for top waiter, true otherwise for lock stealing
+ * @uaddr:   futex address
+ * @vpid:    PID of current task
+ * @puval:   storage location for current futex value
+ * @steal:   false for top waiter, true otherwise for lock stealing
+ * @chkonly: check lock status without actual locking
  *
  * The HB fs_lock should NOT be held while calling this function.
  * The flag bits are ignored in the trylock.
@@ -3485,10 +3487,11 @@ static inline int put_futex_state_unlocked(struct futex_state *state)
  *	   TP_LOCK_HANDOFF if lock was handed off;
  *	   0 if lock acquisition failed;
  *	   -EFAULT if an error happened.
+ *	   -EAGAIN if chkonly and lock is free
  *	   *puval will contain the latest futex value when trylock fails.
  */
 static inline int __futex_trylock(u32 __user *uaddr, const u32 vpid, u32 *puval,
-				  const bool steal)
+				  const bool steal, bool chkonly)
 {
 	u32 uval, flags = 0;
 
@@ -3499,6 +3502,9 @@ static inline int __futex_trylock(u32 __user *uaddr, const u32 vpid, u32 *puval,
 
 	if (!steal && (uval & FUTEX_TID_MASK) == vpid)
 		return TP_LOCK_HANDOFF;
+
+	if (chkonly && !uval)
+		return -EAGAIN;
 
 	if (uval & FUTEX_TID_MASK)
 		return 0;	/* Trylock fails */
@@ -3512,21 +3518,23 @@ static inline int __futex_trylock(u32 __user *uaddr, const u32 vpid, u32 *puval,
 	return (*puval == uval) ? TP_LOCK_ACQUIRED : 0;
 }
 
-static int futex_trylock(u32 __user *uaddr, const u32 vpid, u32 *puval)
+static int futex_trylock(u32 __user *uaddr, const u32 vpid, u32 *puval,
+			 bool chkonly)
 {
-	return __futex_trylock(uaddr, vpid, puval, false);
+	return __futex_trylock(uaddr, vpid, puval, false, chkonly);
 }
 
 static int futex_steal_lock(u32 __user *uaddr, const u32 vpid, u32 *puval)
 {
-	return __futex_trylock(uaddr, vpid, puval, true);
+	return __futex_trylock(uaddr, vpid, puval, true, false);
 }
 
 /**
  * futex_trylock_preempt_disabled - futex_trylock with preemption disabled
- * @uaddr: futex address
- * @vpid:  PID of current task
- * @puval: storage location for current futex value
+ * @uaddr:   futex address
+ * @vpid:    PID of current task
+ * @puval:   storage location for current futex value
+ * @chkonly: check lock status without actual locking
  *
  * The preempt_disable() has similar effect as pagefault_disable(). As a
  * result, we will have to disable page fault as well and handle the case
@@ -3537,14 +3545,15 @@ static int futex_steal_lock(u32 __user *uaddr, const u32 vpid, u32 *puval)
  *	   TP_LOCK_HANDOFF if lock was handed off;
  *	   0 if lock acquisition failed;
  *	   -EFAULT if an error happened.
+ *	   -EAGAIN if chkonly and lock is free
  */
 static inline int futex_trylock_preempt_disabled(u32 __user *uaddr,
-						 const u32 vpid, u32 *puval)
+			const u32 vpid, u32 *puval, bool chkonly)
 {
 	int ret;
 
 	pagefault_disable();
-	ret = futex_trylock(uaddr, vpid, puval);
+	ret = futex_trylock(uaddr, vpid, puval, chkonly);
 	pagefault_enable();
 
 	return ret;
@@ -3584,6 +3593,7 @@ static inline int futex_set_waiters_bit(u32 __user *uaddr, u32 *puval)
  * @vpid:    PID of current task
  * @state:   futex state object
  * @timeout: hrtimer_sleeper structure
+ * @chkonly: check lock status without actual locking
  *
  * Spin on the futex word while the futex owner is active. Otherwise, set
  * the FUTEX_WAITERS bit and go to sleep.
@@ -3600,7 +3610,8 @@ static inline int futex_set_waiters_bit(u32 __user *uaddr, u32 *puval)
  */
 static int futex_spin_on_owner(u32 __user *uaddr, const u32 vpid,
 			       struct futex_state *state,
-			       struct hrtimer_sleeper *timeout)
+			       struct hrtimer_sleeper *timeout,
+			       bool chkonly)
 {
 #define OWNER_DEAD_MESSAGE					\
 	"futex: owner pid %d of TP futex 0x%lx was %s.\n"	\
@@ -3618,7 +3629,8 @@ static int futex_spin_on_owner(u32 __user *uaddr, const u32 vpid,
 	WRITE_ONCE(state->mutex_owner, current);
 retry:
 	for (;;) {
-		ret = futex_trylock_preempt_disabled(uaddr, vpid, &uval);
+		ret = futex_trylock_preempt_disabled(uaddr, vpid, &uval,
+						     chkonly);
 		if (ret)
 			break;
 
@@ -3730,7 +3742,8 @@ retry:
 		 * wakeup		sleep
 		 */
 		set_current_state(TASK_INTERRUPTIBLE);
-		ret = futex_trylock_preempt_disabled(uaddr, vpid, &uval);
+		ret = futex_trylock_preempt_disabled(uaddr, vpid, &uval,
+						     chkonly);
 		if (ret) {
 			__set_current_state(TASK_RUNNING);
 			break;
@@ -3871,9 +3884,11 @@ futex_lock(u32 __user *uaddr, unsigned int flags, ktime_t *time)
 
 	/*
 	 * As the mutex owner, we can now spin on the futex word as well as
-	 * the active-ness of the futex owner.
+	 * the active-ness of the futex owner. The spinner will return EAGAIN
+	 * without taking the lock when the userspace locking flag is set.
 	 */
-	ret = futex_spin_on_owner(uaddr, vpid, state, to);
+	ret = futex_spin_on_owner(uaddr, vpid, state, to,
+				  flags & FLAGS_TP_USLOCK);
 
 	mutex_unlock(&state->mutex);
 
@@ -4047,6 +4062,8 @@ long do_futex(u32 __user *uaddr, int op, u32 val, ktime_t *timeout,
 		return futex_requeue(uaddr, flags, uaddr2, val, val2, &val3, 1);
 #ifdef CONFIG_SMP
 	case FUTEX_LOCK:
+		if (val)
+			flags |= FLAGS_TP_USLOCK;
 		return futex_lock(uaddr, flags, timeout);
 	case FUTEX_UNLOCK:
 		return futex_unlock(uaddr, flags);
