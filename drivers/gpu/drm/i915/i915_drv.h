@@ -1372,7 +1372,12 @@ struct intel_gen6_power_mgmt {
 	struct list_head clients;
 	bool client_boost;
 
-	bool enabled;
+	/*
+	 * For platforms prior to Gen9, RPS and RC6 status is tracked through
+	 * "rps_enabled". For Gen9+, RC6 is tracked through "rc6_enabled".
+	 */
+	bool rps_enabled;
+	bool rc6_enabled;
 	struct delayed_work autoenable_work;
 	unsigned boosts;
 
@@ -2339,7 +2344,7 @@ struct drm_i915_private {
 	/* Cannot be determined by PCIID. You must always read a register. */
 	u32 edram_cap;
 
-	/* gen6+ rps state */
+	/* gen6+ rps/rc6 state */
 	struct intel_gen6_power_mgmt rps;
 
 	/* ilk-only ips/rps state. Everything in here is protected by the global
