@@ -272,6 +272,7 @@ struct pci_sriov {
 	struct pci_dev *self;	/* this PF */
 	struct mutex lock;	/* lock for setting sriov_numvfs in sysfs */
 	resource_size_t barsz[PCI_SRIOV_NUM_BARS];	/* VF BAR size */
+	bool probe_vfs;		/* control probing of VFs */
 };
 
 #ifdef CONFIG_PCI_ATS

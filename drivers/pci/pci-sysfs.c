@@ -526,10 +526,37 @@ exit:
 	return count;
 }
 
+static ssize_t sriov_probe_vfs_show(struct device *dev,
+				    struct device_attribute *attr,
+				    char *buf)
+{
+	struct pci_dev *pdev = to_pci_dev(dev);
+
+	return sprintf(buf, "%u\n", pdev->sriov->probe_vfs);
+}
+
+static ssize_t sriov_probe_vfs_store(struct device *dev,
+				     struct device_attribute *attr,
+				     const char *buf, size_t count)
+{
+	struct pci_dev *pdev = to_pci_dev(dev);
+	bool probe_vfs;
+
+	if (kstrtobool(buf, &probe_vfs) < 0)
+		return -EINVAL;
+
+	pdev->sriov->probe_vfs = probe_vfs;
+
+	return count;
+}
+
 static struct device_attribute sriov_totalvfs_attr = __ATTR_RO(sriov_totalvfs);
 static struct device_attribute sriov_numvfs_attr =
 		__ATTR(sriov_numvfs, (S_IRUGO|S_IWUSR|S_IWGRP),
 		       sriov_numvfs_show, sriov_numvfs_store);
+static struct device_attribute sriov_probe_vfs_attr =
+		__ATTR(sriov_probe_vfs, (S_IRUGO|S_IWUSR|S_IWGRP),
+		       sriov_probe_vfs_show, sriov_probe_vfs_store);
 #endif /* CONFIG_PCI_IOV */
 
 static ssize_t driver_override_store(struct device *dev,
@@ -1549,6 +1576,7 @@ static struct attribute_group pci_dev_hp_attr_group = {
 static struct attribute *sriov_dev_attrs[] = {
 	&sriov_totalvfs_attr.attr,
 	&sriov_numvfs_attr.attr,
+	&sriov_probe_vfs_attr.attr,
 	NULL,
 };
 
