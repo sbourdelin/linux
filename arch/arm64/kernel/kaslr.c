@@ -135,7 +135,7 @@ u64 __init kaslr_early_init(u64 dt_phys, u64 modulo_offset)
 	 */
 	if ((((u64)_text + offset + modulo_offset) >> SWAPPER_TABLE_SHIFT) !=
 	    (((u64)_end + offset + modulo_offset) >> SWAPPER_TABLE_SHIFT))
-		offset = (offset + (u64)(_end - _text)) & mask;
+		offset = (offset + (u64)(_end - _text) + SZ_2M) & mask;
 
 	if (IS_ENABLED(CONFIG_KASAN))
 		/*
