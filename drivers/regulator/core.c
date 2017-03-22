@@ -3453,6 +3453,54 @@ int regulator_set_load(struct regulator *regulator, int uA_load)
 }
 EXPORT_SYMBOL_GPL(regulator_set_load);
 
+static int _regulator_set_bypass(struct regulator *regulator, bool bypass)
+{
+	struct regulator_dev *rdev = regulator->rdev;
+	int output_voltage;
+	int supply_voltage;
+
+	if (bypass && !rdev->supply) {
+		rdev_err(rdev, "Refuse to set bypass on regulator with no supply!\n");
+		return -EINVAL;
+	}
+
+	/* Check that enabling bypass won't break constraints */
+	if (bypass && _regulator_is_enabled(rdev)) {
+		output_voltage = _regulator_get_voltage(rdev);
+		if (output_voltage < 0) {
+			rdev_err(rdev, "Failed to get old output voltage before"
+					" enabling bypass: %d\n", output_voltage);
+			return output_voltage;
+		}
+		supply_voltage = _regulator_get_voltage(rdev->supply->rdev);
+		if (supply_voltage < 0) {
+			rdev_err(rdev, "Failed to get supply voltage before"
+					" enabling bypass: %d\n", supply_voltage);
+			return supply_voltage;
+		}
+		if (supply_voltage < rdev->constraints->min_uV ||
+				supply_voltage > rdev->constraints->max_uV) {
+			rdev_err(rdev, "Enabling bypass would change voltage"
+					" from %duV to %duV violating"
+					" constraint range %duV to %duV\n",
+				output_voltage,
+				supply_voltage,
+				rdev->constraints->min_uV,
+				rdev->constraints->max_uV);
+			return -EINVAL;
+		}
+		rdev_dbg(rdev, "Enabling bypass would change voltage"
+				" from %duV to %duV respecting"
+				" constraint range %duV to %duV\n",
+			output_voltage,
+			supply_voltage,
+			rdev->constraints->min_uV,
+			rdev->constraints->max_uV);
+	}
+
+	return rdev->desc->ops->set_bypass(rdev, bypass);
+}
+
 /**
  * regulator_allow_bypass - allow the regulator to go into bypass mode
  *
@@ -3481,7 +3529,7 @@ int regulator_allow_bypass(struct regulator *regulator, bool enable)
 		rdev->bypass_count++;
 
 		if (rdev->bypass_count == rdev->open_count) {
-			ret = rdev->desc->ops->set_bypass(rdev, enable);
+			ret = _regulator_set_bypass(regulator, enable);
 			if (ret != 0)
 				rdev->bypass_count--;
 		}
@@ -3490,7 +3538,7 @@ int regulator_allow_bypass(struct regulator *regulator, bool enable)
 		rdev->bypass_count--;
 
 		if (rdev->bypass_count != rdev->open_count) {
-			ret = rdev->desc->ops->set_bypass(rdev, enable);
+			ret = _regulator_set_bypass(regulator, enable);
 			if (ret != 0)
 				rdev->bypass_count++;
 		}
