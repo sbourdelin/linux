@@ -824,6 +824,39 @@ static inline int get_futex_value(u32 *dest, u32 __user *from)
 /*
  * PI code:
  */
+
+/**
+ * task_pi_list_add - add futex state object to a task's pi_state_list
+ * @task : task structure
+ * @state: futex state object
+ */
+static inline void task_pi_list_add(struct task_struct *task,
+				    struct futex_state *state)
+{
+	raw_spin_lock_irq(&task->pi_lock);
+	WARN_ON(!list_empty(&state->list));
+	list_add(&state->list, &task->pi_state_list);
+	state->owner = task;
+	raw_spin_unlock_irq(&task->pi_lock);
+}
+
+/**
+ * task_pi_list_del - delete futex state object from a task's pi_state_list
+ * @state: futex state object
+ * @warn : warn if list is empty when set
+ */
+static inline void task_pi_list_del(struct futex_state *state, const bool warn)
+{
+	struct task_struct *task = state->owner;
+
+	raw_spin_lock_irq(&task->pi_lock);
+	if (warn)
+		WARN_ON(list_empty(&state->list));
+	list_del_init(&state->list);
+	state->owner = NULL;
+	raw_spin_unlock_irq(&task->pi_lock);
+}
+
 static int refill_futex_state_cache(void)
 {
 	struct futex_state *state;
@@ -876,9 +909,7 @@ static void put_futex_state(struct futex_state *state)
 	 * and has cleaned up the futex state already
 	 */
 	if (state->owner) {
-		raw_spin_lock_irq(&state->owner->pi_lock);
-		list_del_init(&state->list);
-		raw_spin_unlock_irq(&state->owner->pi_lock);
+		task_pi_list_del(state, false);
 
 		rt_mutex_proxy_unlock(&state->pi_mutex, state->owner);
 	}
@@ -2213,19 +2244,10 @@ retry:
 	 * We fixed up user space. Now we need to fix the pi_state
 	 * itself.
 	 */
-	if (pi_state->owner != NULL) {
-		raw_spin_lock_irq(&pi_state->owner->pi_lock);
-		WARN_ON(list_empty(&pi_state->list));
-		list_del_init(&pi_state->list);
-		raw_spin_unlock_irq(&pi_state->owner->pi_lock);
-	}
+	if (pi_state->owner != NULL)
+		task_pi_list_del(pi_state, true);
 
-	pi_state->owner = newowner;
-
-	raw_spin_lock_irq(&newowner->pi_lock);
-	WARN_ON(!list_empty(&pi_state->list));
-	list_add(&pi_state->list, &newowner->pi_state_list);
-	raw_spin_unlock_irq(&newowner->pi_lock);
+	task_pi_list_add(newowner, pi_state);
 	return 0;
 
 	/*
