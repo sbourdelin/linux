@@ -635,9 +635,9 @@ static unsigned int slpc_get_platform_sku(struct drm_i915_private *dev_priv)
 {
 	enum slpc_platform_sku platform_sku;
 
-	if (IS_SKL_ULX(dev_priv))
+	if (IS_SKL_ULX(dev_priv) || IS_KBL_ULX(dev_priv))
 		platform_sku = SLPC_PLATFORM_SKU_ULX;
-	else if (IS_SKL_ULT(dev_priv))
+	else if (IS_SKL_ULT(dev_priv) || IS_KBL_ULT(dev_priv))
 		platform_sku = SLPC_PLATFORM_SKU_ULT;
 	else
 		platform_sku = SLPC_PLATFORM_SKU_DT;
