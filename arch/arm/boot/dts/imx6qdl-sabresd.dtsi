@@ -182,6 +182,10 @@
 	status = "okay";
 };
 
+&gpc {
+	fsl,ldo-bypass = <1>;
+};
+
 &hdmi {
 	ddc-i2c-bus = <&i2c2>;
 	status = "okay";
@@ -546,6 +550,21 @@
 	pinctrl-names = "default";
 	pinctrl-0 = <&pinctrl_pwm1>;
 	status = "okay";
+};
+
+&reg_arm {
+       vin-supply = <&sw1a_reg>;
+       regulator-allow-bypass;
+};
+
+&reg_pu {
+       vin-supply = <&sw1c_reg>;
+       regulator-allow-bypass;
+};
+
+&reg_soc {
+       vin-supply = <&sw1c_reg>;
+       regulator-allow-bypass;
 };
 
 &snvs_poweroff {
