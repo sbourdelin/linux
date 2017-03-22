@@ -25,6 +25,8 @@
 #include <asm/msr-index.h>
 #include "i915_drv.h"
 #include "intel_uc.h"
+#include <linux/seq_file.h>
+#include <linux/debugfs.h>
 
 struct slpc_param slpc_paramlist[SLPC_MAX_PARAM] = {
 	{SLPC_PARAM_TASK_ENABLE_GTPERF, "Enable task GTPERF"},
@@ -63,6 +65,163 @@ struct slpc_param slpc_paramlist[SLPC_MAX_PARAM] = {
 				"FALSE = disable eval mode completely"},
 	{SLPC_PARAM_GLOBAL_ENABLE_BALANCER_IN_NON_GAMING_MODE,
 				"Enable IBC when non-Gaming Mode is enabled"}
+};
+
+static int slpc_param_ctl_show(struct seq_file *m, void *data)
+{
+	struct drm_i915_private *dev_priv = m->private;
+	struct intel_slpc *slpc = &dev_priv->guc.slpc;
+
+	if (!dev_priv->guc.slpc.active) {
+		seq_puts(m, "SLPC not active\n");
+		return 0;
+	}
+
+	seq_printf(m, "%s=%u, override=%s\n",
+			slpc_paramlist[slpc->debug_param_id].description,
+			slpc->debug_param_value,
+			yesno(!!slpc->debug_param_override));
+
+	return 0;
+}
+
+static int slpc_param_ctl_open(struct inode *inode, struct file *file)
+{
+	return single_open(file, slpc_param_ctl_show, inode->i_private);
+}
+
+static const char *read_token = "read", *write_token = "write",
+		  *revert_token = "revert";
+
+/*
+ * Parse SLPC parameter control strings: (Similar to Pipe CRC handling)
+ *   command: wsp* op wsp+ param id wsp+ [value] wsp*
+ *   op: "read"/"write"/"revert"
+ *   param id: slpc_param_id
+ *   value: u32 value
+ *   wsp: (#0x20 | #0x9 | #0xA)+
+ *
+ * eg.:
+ *  "read 0"		-> read SLPC_PARAM_TASK_ENABLE_GTPERF
+ *  "write 7 500"	-> set SLPC_PARAM_GLOBAL_MIN_GT_SLICE_FREQ_MHZ to 500MHz
+ *  "revert 7"		-> revert SLPC_PARAM_GLOBAL_MIN_GT_SLICE_FREQ_MHZ to
+ *			   default value.
+ */
+static int slpc_param_ctl_parse(struct drm_i915_private *dev_priv,
+				char *buf, size_t len, char **op,
+				u32 *id, u32 *value)
+{
+#define MAX_WORDS 3
+	int n_words;
+	char *words[MAX_WORDS];
+	ssize_t ret;
+
+	n_words = buffer_tokenize(buf, words, MAX_WORDS);
+	if (!(n_words == 3) && !(n_words == 2)) {
+		DRM_DEBUG_DRIVER("tokenize failed, a command is %d words\n",
+				 MAX_WORDS);
+		return -EINVAL;
+	}
+
+	if (strcmp(words[0], read_token) && strcmp(words[0], write_token) &&
+	    strcmp(words[0], revert_token)) {
+		DRM_DEBUG_DRIVER("unknown operation\n");
+		return -EINVAL;
+	}
+
+	*op = words[0];
+
+	ret = kstrtou32(words[1], 0, id);
+	if (ret)
+		return ret;
+
+	if (n_words == 3) {
+		ret = kstrtou32(words[2], 0, value);
+		if (ret)
+			return ret;
+	}
+
+	return 0;
+}
+
+static ssize_t slpc_param_ctl_write(struct file *file, const char __user *ubuf,
+				     size_t len, loff_t *offp)
+{
+	struct seq_file *m = file->private_data;
+	struct drm_i915_private *dev_priv = m->private;
+	struct intel_slpc *slpc = &dev_priv->guc.slpc;
+	char *tmpbuf, *op = NULL;
+	u32 id, value;
+	int ret;
+
+	if (len == 0)
+		return 0;
+
+	if (len > 40) {
+		DRM_DEBUG_DRIVER("expected <40 chars into slpc param control\n");
+		return -E2BIG;
+	}
+
+	tmpbuf = kmalloc(len + 1, GFP_KERNEL);
+	if (!tmpbuf)
+		return -ENOMEM;
+
+	if (copy_from_user(tmpbuf, ubuf, len)) {
+		ret = -EFAULT;
+		goto out;
+	}
+	tmpbuf[len] = '\0';
+
+	ret = slpc_param_ctl_parse(dev_priv, tmpbuf, len, &op, &id, &value);
+
+	if (id >= SLPC_MAX_PARAM) {
+		ret = -EINVAL;
+		goto out;
+	}
+
+	if (!strcmp(op, read_token)) {
+		intel_slpc_get_param(dev_priv, id,
+				     &slpc->debug_param_override,
+				     &slpc->debug_param_value);
+		slpc->debug_param_id = id;
+	} else if (!strcmp(op, write_token) || !strcmp(op, revert_token)) {
+		if ((id >= SLPC_PARAM_TASK_ENABLE_GTPERF) &&
+		    (id <= SLPC_PARAM_TASK_DISABLE_DCC)) {
+			DRM_DEBUG_DRIVER("Tasks are not controlled by "
+					 "this interface\n");
+			ret = -EINVAL;
+			goto out;
+		}
+
+		/*
+		 * After updating parameters, RESET event has to be sent to GuC
+		 * SLPC for ensuring parameters take effect.
+		 */
+		intel_runtime_pm_get(dev_priv);
+		if (!strcmp(op, write_token))
+			intel_slpc_set_param(dev_priv, id, value);
+		else if (!strcmp(op, revert_token))
+			intel_slpc_unset_param(dev_priv, id);
+		intel_slpc_enable(dev_priv);
+		intel_runtime_pm_put(dev_priv);
+	}
+
+out:
+	kfree(tmpbuf);
+	if (ret < 0)
+		return ret;
+
+	*offp += len;
+	return len;
+}
+
+const struct file_operations i915_slpc_param_ctl_fops = {
+	.owner = THIS_MODULE,
+	.open = slpc_param_ctl_open,
+	.read = seq_read,
+	.llseek = seq_lseek,
+	.release = single_release,
+	.write = slpc_param_ctl_write
 };
 
 static void host2guc_slpc(struct drm_i915_private *dev_priv,

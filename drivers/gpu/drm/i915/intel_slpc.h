@@ -32,6 +32,10 @@ struct intel_slpc {
 	/* i915 cached SLPC frequency limits */
 	u32 min_unslice_freq;
 	u32 max_unslice_freq;
+
+	u32 debug_param_id;
+	u32 debug_param_value;
+	u32 debug_param_override;
 };
 
 enum slpc_status {
@@ -240,6 +244,8 @@ extern struct slpc_param slpc_paramlist[];
 #define SLPC_PARAM_TASK_ENABLED  1
 #define SLPC_PARAM_TASK_DISABLED 2
 #define SLPC_PARAM_TASK_UNKNOWN  3
+
+extern const struct file_operations i915_slpc_param_ctl_fops;
 
 /* intel_slpc.c */
 void intel_slpc_set_param(struct drm_i915_private *dev_priv, u32 id, u32 value);

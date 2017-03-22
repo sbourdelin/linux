@@ -2392,6 +2392,23 @@ static int i915_huc_load_status_info(struct seq_file *m, void *data)
 	return 0;
 }
 
+static int i915_slpc_paramlist_info(struct seq_file *m, void *data)
+{
+	struct drm_i915_private *dev_priv = node_to_i915(m->private);
+	int i;
+
+	if (!dev_priv->guc.slpc.active) {
+		seq_puts(m, "SLPC not active\n");
+		return 0;
+	}
+
+	seq_puts(m, "Param id\tParam name\n");
+	for (i = 0; i < SLPC_MAX_PARAM; i++)
+		seq_printf(m, "%8d\t%s\n", slpc_paramlist[i].id,
+					   slpc_paramlist[i].description);
+	return 0;
+}
+
 static int i915_guc_load_status_info(struct seq_file *m, void *data)
 {
 	struct drm_i915_private *dev_priv = node_to_i915(m->private);
@@ -4812,6 +4829,7 @@ static const struct drm_info_list i915_debugfs_list[] = {
 	{"i915_guc_load_status", i915_guc_load_status_info, 0},
 	{"i915_guc_log_dump", i915_guc_log_dump, 0},
 	{"i915_huc_load_status", i915_huc_load_status_info, 0},
+	{"i915_slpc_paramlist", i915_slpc_paramlist_info, 0},
 	{"i915_frequency_info", i915_frequency_info, 0},
 	{"i915_hangcheck_info", i915_hangcheck_info, 0},
 	{"i915_drpc_info", i915_drpc_info, 0},
@@ -4874,6 +4892,7 @@ static const struct i915_debugfs_files {
 	{"i915_dp_test_type", &i915_displayport_test_type_fops},
 	{"i915_dp_test_active", &i915_displayport_test_active_fops},
 	{"i915_guc_log_control", &i915_guc_log_control_fops},
+	{"i915_slpc_param_ctl", &i915_slpc_param_ctl_fops},
 	{"i915_hpd_storm_ctl", &i915_hpd_storm_ctl_fops}
 };
 
