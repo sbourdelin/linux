@@ -10105,8 +10105,11 @@ static int prepare_vmcs02(struct kvm_vcpu *vcpu, struct vmcs12 *vmcs12,
 				  SECONDARY_EXEC_VIRTUAL_INTR_DELIVERY |
 				  SECONDARY_EXEC_APIC_REGISTER_VIRT);
 		if (nested_cpu_has(vmcs12,
-				CPU_BASED_ACTIVATE_SECONDARY_CONTROLS))
+				CPU_BASED_ACTIVATE_SECONDARY_CONTROLS)) {
 			exec_control |= vmcs12->secondary_vm_exec_control;
+			nested_ept_enabled = (vmcs12->secondary_vm_exec_control &
+					      SECONDARY_EXEC_ENABLE_EPT) != 0;
+		}
 
 		if (exec_control & SECONDARY_EXEC_VIRTUAL_INTR_DELIVERY) {
 			vmcs_write64(EOI_EXIT_BITMAP0,
@@ -10120,8 +10123,6 @@ static int prepare_vmcs02(struct kvm_vcpu *vcpu, struct vmcs12 *vmcs12,
 			vmcs_write16(GUEST_INTR_STATUS,
 				vmcs12->guest_intr_status);
 		}
-
-		nested_ept_enabled = (exec_control & SECONDARY_EXEC_ENABLE_EPT) != 0;
 
 		/*
 		 * Write an illegal value to APIC_ACCESS_ADDR. Later,
