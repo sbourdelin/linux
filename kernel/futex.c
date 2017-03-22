@@ -4298,11 +4298,9 @@ static int futex_unlock(u32 __user *uaddr, unsigned int flags,
 out_put_key:
 	put_futex_key(&key);
 	if (owner) {
-		/*
-		 * No error would have happened if owner defined.
-		 */
-		wake_up_q(&wake_q);
-		return ret ? ret : 1;
+		int cnt = wake_up_q(&wake_q);
+
+		return ret ? ret : cnt;
 	}
 
 	return ret;

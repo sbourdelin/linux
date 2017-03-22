@@ -446,9 +446,10 @@ void wake_q_add(struct wake_q_head *head, struct task_struct *task)
 	head->lastp = &node->next;
 }
 
-void wake_up_q(struct wake_q_head *head)
+int wake_up_q(struct wake_q_head *head)
 {
 	struct wake_q_node *node = head->first;
+	int wakecnt = 0;
 
 	while (node != WAKE_Q_TAIL) {
 		struct task_struct *task;
@@ -463,9 +464,10 @@ void wake_up_q(struct wake_q_head *head)
 		 * wake_up_process() implies a wmb() to pair with the queueing
 		 * in wake_q_add() so as not to miss wakeups.
 		 */
-		wake_up_process(task);
+		wakecnt += wake_up_process(task);
 		put_task_struct(task);
 	}
+	return wakecnt;
 }
 
 /*
