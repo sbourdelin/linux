@@ -47,6 +47,14 @@ config PHY_BERLIN_SATA
 	help
 	  Enable this to support the SATA PHY on Marvell Berlin SoCs.
 
+config PHY_CPCAP_USB
+	tristate "CPCAP USB PHY driver"
+	depends on USB_SUPPORT
+	select GENERIC_PHY
+	select USB_PHY
+	help
+	  Enable this for CPCAP USB to work.
+
 config ARMADA375_USBCLUSTER_PHY
 	def_bool y
 	depends on MACH_ARMADA_375 || COMPILE_TEST
