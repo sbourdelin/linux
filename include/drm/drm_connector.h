@@ -637,6 +637,7 @@ struct drm_cmdline_mode {
  * @interlace_allowed: can this connector handle interlaced modes?
  * @doublescan_allowed: can this connector handle doublescan?
  * @stereo_allowed: can this connector handle stereo modes?
+ * @hdmi2_allowed: can this connector handle HDMI 2.0+ modes?
  * @funcs: connector control functions
  * @edid_blob_ptr: DRM property containing EDID if present
  * @properties: property tracking for this connector
@@ -701,6 +702,7 @@ struct drm_connector {
 	bool interlace_allowed;
 	bool doublescan_allowed;
 	bool stereo_allowed;
+	bool hdmi2_allowed;
 	/**
 	 * @registered: Is this connector exposed (registered) with userspace?
 	 * Protected by @mutex.
