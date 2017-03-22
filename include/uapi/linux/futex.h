@@ -22,6 +22,8 @@
 #define FUTEX_CMP_REQUEUE_PI	12
 #define FUTEX_LOCK		13
 #define FUTEX_UNLOCK		14
+#define FUTEX_LOCK_SHARED	15
+#define FUTEX_UNLOCK_SHARED	16
 
 #define FUTEX_PRIVATE_FLAG	128
 #define FUTEX_CLOCK_REALTIME	256
@@ -43,6 +45,9 @@
 					 FUTEX_PRIVATE_FLAG)
 #define FUTEX_LOCK_PRIVATE	(FUTEX_LOCK | FUTEX_PRIVATE_FLAG)
 #define FUTEX_UNLOCK_PRIVATE	(FUTEX_UNLOCK | FUTEX_PRIVATE_FLAG)
+#define FUTEX_LOCK_SHARED_PRIVATE	(FUTEX_LOCK_SHARED | FUTEX_PRIVATE_FLAG)
+#define FUTEX_UNLOCK_SHARED_PRIVATE	(FUTEX_UNLOCK_SHARED | \
+					 FUTEX_PRIVATE_FLAG)
 
 /*
  * Support for robust futexes: the kernel cleans up held futexes at
@@ -111,9 +116,28 @@ struct robust_list_head {
 #define FUTEX_OWNER_DIED	0x40000000
 
 /*
- * The rest of the robust-futex field is for the TID:
+ * Shared locking bit (for readers).
+ * Robust futexes cannot be used in combination with shared locking.
+ *
+ * The FUTEX_SHARED_UNLOCK bit can be set by userspace to indicate that
+ * an shared unlock is in progress and so no shared locking is allowed
+ * within the kernel.
  */
-#define FUTEX_TID_MASK		0x3fffffff
+#define FUTEX_SHARED		0x20000000
+#define FUTEX_SHARED_UNLOCK	0x10000000
+
+/*
+ * The rest of the bits is for the TID or, in the case of readers, the
+ * shared locking bit and the numbers of active readers present. IOW, the
+ * max supported TID is actually 0x1fffffff. Only 24 bits are used for
+ * tracking the number of shared futex owners. Bits 24-27 may be used by
+ * the userspace for internal management purpose. However, a successful
+ * FUTEX_UNLOCK_SHARED futex(2) syscall will clear or alter those bits.
+ */
+#define FUTEX_TID_MASK		0x1fffffff
+#define FUTEX_SCNT_MASK		0x00ffffff	/* Shared futex owner count */
+#define FUTEX_SHARED_TID_MASK	0x3fffffff	/* FUTEX_SHARED bit + TID   */
+#define FUTEX_SHARED_SCNT_MASK	0x20ffffff	/* FUTEX_SHARED bit + count */
 
 /*
  * This limit protects against a deliberately circular list.

@@ -3191,7 +3191,7 @@ retry:
 	if (get_user(uval, uaddr))
 		return -1;
 
-	if ((uval & FUTEX_TID_MASK) == task_pid_vnr(curr)) {
+	if ((uval & FUTEX_SHARED_TID_MASK) == task_pid_vnr(curr)) {
 		/*
 		 * Ok, this dying thread is truly holding a futex
 		 * of interest. Set the OWNER_DIED bit atomically
@@ -3370,17 +3370,30 @@ void exit_robust_list(struct task_struct *curr)
  * Checks are also made in the futex_spin_on_owner() loop for dead task
  * structure or invalid pid. In both cases, the top waiter will take over
  * the ownership of the futex.
+ *
+ * TP futexes can also be used as shared lock. However TP futexes in
+ * shared locking mode cannot be used with robust futex. Userspace
+ * reader/writer locks can now be implemented with TP futexes.
  */
 
 /*
- * Timeout value for enabling lock handoff and prevent lock starvation.
+ * Timeout value for enabling lock handoff and preventing lock starvation.
  *
  * Currently, lock handoff will be enabled if the top waiter can't get the
  * futex after about 5ms. To reduce time checking overhead, it is only done
  * after every 128 spins or right after wakeup. As a result, the actual
  * elapsed time will be a bit longer than the specified value.
+ *
+ * For reader-owned futex spinning, the timeout is 50us. The timeout value
+ * will be reset whenever activities are detected in the futex value. That
+ * means any changes in the reader count. However, reader spinning will never
+ * exceed the handoff timeout plus an additionl reader spinning timeout.
  */
 #define TP_HANDOFF_TIMEOUT	5000000	/* 5ms	*/
+#define TP_RSPIN_TIMEOUT	50000	/* 50us	*/
+
+#define TP_FUTEX_SHARED_UNLOCK_READY(uval)	\
+	(((uval) & FUTEX_SHARED_SCNT_MASK) == FUTEX_SHARED)
 
 /*
  * The futex_lock() function returns the internal status of the TP futex.
@@ -3473,7 +3486,8 @@ static inline int put_futex_state_unlocked(struct futex_state *state)
  * @chkonly: check lock status without actual locking
  *
  * The HB fs_lock should NOT be held while calling this function.
- * The flag bits are ignored in the trylock.
+ * For writers, the flag bits are ignored in the trylock. The workflow is
+ * as follows:
  *
  * If !steal
  * then
@@ -3482,6 +3496,11 @@ static inline int put_futex_state_unlocked(struct futex_state *state)
  * else
  *   preserve the flag bits
  * endif
+ *
+ * For readers (vpid == FUTEX_SHARED), the workflow is a bit different as
+ * shown in the code below. Moreover, the chkonly flag does not apply to
+ * readers as acquiring a read lock here will not affect other readers
+ * trying to get the lock.
  *
  * Return: TP_LOCK_ACQUIRED if lock acquired;
  *	   TP_LOCK_HANDOFF if lock was handed off;
@@ -3498,24 +3517,66 @@ static inline int __futex_trylock(u32 __user *uaddr, const u32 vpid, u32 *puval,
 	if (unlikely(get_futex_value(puval, uaddr)))
 		return -EFAULT;
 
+	if (vpid == FUTEX_SHARED)
+		goto trylock_shared;
+
 	uval = *puval;
 
-	if (!steal && (uval & FUTEX_TID_MASK) == vpid)
+	if (!steal && (uval & FUTEX_SHARED_TID_MASK) == vpid)
 		return TP_LOCK_HANDOFF;
 
 	if (chkonly && !uval)
 		return -EAGAIN;
 
-	if (uval & FUTEX_TID_MASK)
+	if (uval & FUTEX_SHARED_TID_MASK)
 		return 0;	/* Trylock fails */
 
 	if (steal)
-		flags = (uval & ~FUTEX_TID_MASK);
+		flags = (uval & ~FUTEX_SHARED_TID_MASK);
 
 	if (unlikely(cmpxchg_futex_value(puval, uaddr, uval, vpid|flags)))
 		return -EFAULT;
 
 	return (*puval == uval) ? TP_LOCK_ACQUIRED : 0;
+
+trylock_shared:
+	for (;;) {
+		u32 new;
+
+		uval = *puval;
+
+		/*
+		 * When it is not the top waiter, fail trylock attempt whenever
+		 * any of the flag bits is set.
+		 */
+		if (steal && (uval & ~FUTEX_SHARED_TID_MASK))
+			return 0;
+
+		/*
+		 * 1. Increment the reader counts if FUTEX_SHARED bit is set
+		 *    but not the FUTEX_SHARED_UNLOCK bit; or
+		 * 2. Change 0 => FUTEX_SHARED + 1.
+		 */
+		if ((uval & (FUTEX_SHARED|FUTEX_SHARED_UNLOCK)) == FUTEX_SHARED)
+			new = uval + 1;
+		else if (!(uval & FUTEX_SHARED_TID_MASK))
+			new = uval | (FUTEX_SHARED + 1);
+		else
+			return 0;
+
+		if (unlikely(cmpxchg_futex_value(puval, uaddr, uval, new)))
+			return -EFAULT;
+
+		if (*puval == uval)
+			break;
+	}
+	/*
+	 * If the original futex value is FUTEX_SHARED, it is assumed to be
+	 * a handoff even though it can also be a reader-owned futex
+	 * decremented to 0 reader.
+	 */
+	return ((uval & FUTEX_SHARED_TID_MASK) == FUTEX_SHARED)
+		? TP_LOCK_HANDOFF : TP_LOCK_ACQUIRED;
 }
 
 static int futex_trylock(u32 __user *uaddr, const u32 vpid, u32 *puval,
@@ -3616,25 +3677,34 @@ static int futex_spin_on_owner(u32 __user *uaddr, const u32 vpid,
 #define OWNER_DEAD_MESSAGE					\
 	"futex: owner pid %d of TP futex 0x%lx was %s.\n"	\
 	"\tLock is now acquired by pid %d!\n"
+#define OWNER_DEAD_MESSAGE_BY_READER				\
+	"futex: owner pid %d of TP futex 0x%lx was %s.\n"	\
+	"\tLock is now acquired by a reader!\n"
 
 	int ret, loopcnt = 1;
 	int nsleep = 0;
+	int reader_value = 0;
 	bool handoff_set = false;
 	u32 uval;
 	u32 owner_pid = 0;
 	struct task_struct *owner_task = NULL;
 	u64 handoff_time = running_clock() + TP_HANDOFF_TIMEOUT;
+	u64 rspin_timeout = -1;
 
 	preempt_disable();
 	WRITE_ONCE(state->mutex_owner, current);
 retry:
 	for (;;) {
+		u32 new_pid;
+
 		ret = futex_trylock_preempt_disabled(uaddr, vpid, &uval,
 						     chkonly);
 		if (ret)
 			break;
 
-		if ((uval & FUTEX_TID_MASK) != owner_pid) {
+		new_pid = (uval & FUTEX_SHARED) ? FUTEX_SHARED
+						: (uval & FUTEX_TID_MASK);
+		if (new_pid != owner_pid) {
 			if (owner_task) {
 				/*
 				 * task_pi_list_del() should always be
@@ -3649,13 +3719,25 @@ retry:
 				put_task_struct(owner_task);
 			}
 
-			owner_pid  = uval & FUTEX_TID_MASK;
-			owner_task = futex_find_get_task(owner_pid);
+			/*
+			 * We need to reset the loop iteration count and
+			 * reader value for each writer=>reader ownership
+			 * transition so that we will have the right timeout
+			 * value for reader spinning.
+			 */
+			if ((owner_pid != FUTEX_SHARED) &&
+			     (new_pid == FUTEX_SHARED))
+				loopcnt = reader_value = 0;
+
+			owner_pid  = new_pid;
+			owner_task = (owner_pid == FUTEX_SHARED)
+				   ? NULL : futex_find_get_task(owner_pid);
 		}
 
-		if (unlikely(!owner_task ||
+		if (unlikely((owner_pid != FUTEX_SHARED) &&
+			    (!owner_task ||
 			    (owner_task->flags & PF_EXITING) ||
-			    (uval & FUTEX_OWNER_DIED))) {
+			    (uval & FUTEX_OWNER_DIED)))) {
 			/*
 			 * PID invalid or exiting/dead task, we can directly
 			 * grab the lock now.
@@ -3671,8 +3753,12 @@ retry:
 				continue;
 			owner_state = (owner_task || (uval & FUTEX_OWNER_DIED))
 				    ? "dead" : "invalid";
-			pr_info(OWNER_DEAD_MESSAGE, owner_pid,
-				(long)uaddr, owner_state, vpid);
+			if (vpid & FUTEX_SHARED)
+				pr_info(OWNER_DEAD_MESSAGE_BY_READER,
+					owner_pid, (long)uaddr, owner_state);
+			else
+				pr_info(OWNER_DEAD_MESSAGE, owner_pid,
+					(long)uaddr, owner_state, vpid);
 			break;
 		}
 
@@ -3700,19 +3786,75 @@ retry:
 		 * value. We also need to set the FUTEX_WAITERS bit to make
 		 * sure that futex lock holder will initiate the handoff at
 		 * unlock time.
+		 *
+		 * For reader, the handoff is done by setting just the
+		 * FUTEX_SHARED bit. The top waiter still need to increment
+		 * the reader count to get the lock.
 		 */
-		if (!handoff_set && !(loopcnt++ & 0x7f)) {
-			if (running_clock() > handoff_time) {
+		if ((!handoff_set || (reader_value >= 0)) &&
+		   !(loopcnt++ & 0x7f)) {
+			u64 curtime = running_clock();
+
+			if (!owner_task && (reader_value >= 0)) {
+				int old_count = reader_value;
+
+				/*
+				 * Reset timeout value if the old reader
+				 * count is 0 or the reader value changes and
+				 * handoff time hasn't been reached. Otherwise,
+				 * disable reader spinning if the handoff time
+				 * is reached.
+				 */
+				reader_value = (uval & FUTEX_TID_MASK);
+				if (!old_count || (!handoff_set
+					       && (reader_value != old_count)))
+					rspin_timeout = curtime +
+							TP_RSPIN_TIMEOUT;
+				else if (curtime > rspin_timeout)
+					reader_value = -1;
+			}
+			if (!handoff_set && (curtime > handoff_time)) {
 				WARN_ON(READ_ONCE(state->handoff_pid));
-				ret = futex_set_waiters_bit(uaddr, &uval);
-				if (ret)
-					break;
 				WRITE_ONCE(state->handoff_pid, vpid);
+
+				/*
+				 * Disable handoff check.
+				 */
 				handoff_set = true;
 			}
 		}
 
-		if (owner_task->on_cpu) {
+		if (handoff_set && !(uval & FUTEX_WAITERS)) {
+			/*
+			 * This is reached either as a fall through after
+			 * setting handoff_set or due to race in reader unlock
+			 * where the task is woken up without the proper
+			 * handoff. So we need to set the FUTEX_WAITERS bit
+			 * as well as ensuring that the handoff_pid is
+			 * properly set.
+			 */
+			ret = futex_set_waiters_bit(uaddr, &uval);
+			if (ret)
+				break;
+			if (!READ_ONCE(state->handoff_pid))
+				WRITE_ONCE(state->handoff_pid, vpid);
+		}
+
+		if (!owner_task) {
+			/*
+			 * For reader-owned futex, we optimistically spin
+			 * on the lock until reader spinning is disabled.
+			 *
+			 * Ideally, !owner_task <=> (uval & FUTEX_SHARED).
+			 * It is possible that there may be a mismatch here,
+			 * but it should be corrected in the next iteration
+			 * of the loop.
+			 */
+			if (reader_value >= 0) {
+				cpu_relax();
+				continue;
+			}
+		} else if (owner_task->on_cpu) {
 			cpu_relax();
 			continue;
 		}
@@ -3795,6 +3937,8 @@ retry:
  * to see if it is running. It will also spin on the futex word so as to grab
  * the lock as soon as it is free.
  *
+ * For reader, TID = FUTEX_SHARED.
+ *
  * This function is not inlined so that it can show up separately in perf
  * profile for performance analysis purpose.
  *
@@ -3806,14 +3950,14 @@ retry:
  *
  * Return: TP status code if lock acquired, < 0 if an error happens.
  */
-static noinline int
-futex_lock(u32 __user *uaddr, unsigned int flags, ktime_t *time)
+static noinline int futex_lock(u32 __user *uaddr, unsigned int flags,
+			       ktime_t *time, const bool shared)
 {
 	struct hrtimer_sleeper timeout, *to;
 	struct futex_hash_bucket *hb;
 	union futex_key key = FUTEX_KEY_INIT;
 	struct futex_state *state;
-	u32 uval, vpid = task_pid_vnr(current);
+	u32 uval, vpid = shared ? FUTEX_SHARED : task_pid_vnr(current);
 	int ret;
 
 	/*
@@ -3826,7 +3970,7 @@ futex_lock(u32 __user *uaddr, unsigned int flags, ktime_t *time)
 	/*
 	 * Detect deadlocks.
 	 */
-	if (unlikely(((uval & FUTEX_TID_MASK) == vpid) ||
+	if (unlikely((!shared && ((uval & FUTEX_TID_MASK) == vpid)) ||
 			should_fail_futex(true)))
 		return -EDEADLK;
 
@@ -3917,12 +4061,18 @@ out:
  * This is the in-kernel slowpath: we look up the futex state (if any),
  * and wakeup the mutex owner.
  *
+ * For shared unlock, userspace code must make sure that there is no
+ * racing and only one task will go into the kernel to do the unlock.
+ * The reader count shouldn't be incremented from 0 while the unlock is
+ * in progress.
+ *
  * Return: 1 if a wakeup is attempt, 0 if no task to wake,
  *	   or < 0 when an error happens.
  */
-static int futex_unlock(u32 __user *uaddr, unsigned int flags)
+static int futex_unlock(u32 __user *uaddr, unsigned int flags,
+			const bool shared)
 {
-	u32 uval, vpid = task_pid_vnr(current);
+	u32 uval, vpid = shared ? FUTEX_SHARED : task_pid_vnr(current);
 	u32 newpid = 0;
 	union futex_key key = FUTEX_KEY_INIT;
 	struct futex_hash_bucket *hb;
@@ -3934,8 +4084,12 @@ static int futex_unlock(u32 __user *uaddr, unsigned int flags)
 	if (get_futex_value(&uval, uaddr))
 		return -EFAULT;
 
-	if ((uval & FUTEX_TID_MASK) != vpid)
+	if (uval & FUTEX_SHARED) {
+		if (!shared || !TP_FUTEX_SHARED_UNLOCK_READY(uval))
+			return -EPERM;
+	} else if (shared || ((uval & FUTEX_TID_MASK) != vpid)) {
 		return -EPERM;
+	}
 
 	if (!(uval & FUTEX_WAITERS))
 		return -EINVAL;
@@ -3964,7 +4118,6 @@ static int futex_unlock(u32 __user *uaddr, unsigned int flags)
 	owner = READ_ONCE(state->mutex_owner);
 	if (owner)
 		wake_q_add(&wake_q, owner);
-
 	spin_unlock(&hb->fs_lock);
 
 	/*
@@ -3983,7 +4136,8 @@ static int futex_unlock(u32 __user *uaddr, unsigned int flags)
 		/*
 		 * The non-flag value of the futex shouldn't change
 		 */
-		if ((uval & FUTEX_TID_MASK) != vpid) {
+		if ((uval & (shared ? FUTEX_SHARED_SCNT_MASK : FUTEX_TID_MASK))
+				    != vpid) {
 			ret = -EINVAL;
 			break;
 		}
@@ -3996,7 +4150,7 @@ out_put_key:
 		 * No error would have happened if owner defined.
 		 */
 		wake_up_q(&wake_q);
-		return 1;
+		return ret ? ret : 1;
 	}
 
 	return ret;
@@ -4028,6 +4182,8 @@ long do_futex(u32 __user *uaddr, int op, u32 val, ktime_t *timeout,
 #ifdef CONFIG_SMP
 	case FUTEX_LOCK:
 	case FUTEX_UNLOCK:
+	case FUTEX_LOCK_SHARED:
+	case FUTEX_UNLOCK_SHARED:
 #endif
 		if (!futex_cmpxchg_enabled)
 			return -ENOSYS;
@@ -4062,11 +4218,15 @@ long do_futex(u32 __user *uaddr, int op, u32 val, ktime_t *timeout,
 		return futex_requeue(uaddr, flags, uaddr2, val, val2, &val3, 1);
 #ifdef CONFIG_SMP
 	case FUTEX_LOCK:
-		if (val)
+	case FUTEX_LOCK_SHARED:
+		if (val && (cmd == FUTEX_LOCK))
 			flags |= FLAGS_TP_USLOCK;
-		return futex_lock(uaddr, flags, timeout);
+		return futex_lock(uaddr, flags, timeout,
+				 (cmd == FUTEX_LOCK) ? false : true);
 	case FUTEX_UNLOCK:
-		return futex_unlock(uaddr, flags);
+	case FUTEX_UNLOCK_SHARED:
+		return futex_unlock(uaddr, flags,
+				   (cmd == FUTEX_UNLOCK) ? false : true);
 #endif
 	}
 	return -ENOSYS;
@@ -4084,6 +4244,7 @@ SYSCALL_DEFINE6(futex, u32 __user *, uaddr, int, op, u32, val,
 
 	if (utime && (cmd == FUTEX_WAIT || cmd == FUTEX_LOCK_PI ||
 		      cmd == FUTEX_WAIT_BITSET || cmd == FUTEX_LOCK ||
+		      cmd == FUTEX_LOCK_SHARED ||
 		      cmd == FUTEX_WAIT_REQUEUE_PI)) {
 		if (unlikely(should_fail_futex(!(op & FUTEX_PRIVATE_FLAG))))
 			return -EFAULT;
@@ -4093,7 +4254,8 @@ SYSCALL_DEFINE6(futex, u32 __user *, uaddr, int, op, u32, val,
 			return -EINVAL;
 
 		t = timespec_to_ktime(ts);
-		if (cmd == FUTEX_WAIT || cmd == FUTEX_LOCK)
+		if (cmd == FUTEX_WAIT || cmd == FUTEX_LOCK ||
+		    cmd == FUTEX_LOCK_SHARED)
 			t = ktime_add_safe(ktime_get(), t);
 		tp = &t;
 	}
