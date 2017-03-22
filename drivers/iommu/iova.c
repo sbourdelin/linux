@@ -127,23 +127,16 @@ __cached_rbnode_delete_update(struct iova_domain *iovad, struct iova *free)
 		*cached_node = rb_prev(&free->node);
 }
 
-/*
- * Computes the padding size required, to make the start address
- * naturally aligned on the power-of-two order of its size
- */
-static unsigned long
-iova_get_pad_size(unsigned long size, unsigned long limit_pfn)
-{
-	return (limit_pfn + 1 - size) & (__roundup_pow_of_two(size) - 1);
-}
-
 static int __alloc_and_insert_iova_range(struct iova_domain *iovad,
 		unsigned long size, unsigned long limit_pfn,
 			struct iova *new, bool size_aligned)
 {
 	struct rb_node *prev, *curr;
 	unsigned long flags;
-	unsigned long pad_size = 0;
+	unsigned long pad_mask, pad_size = 0;
+
+	if (size_aligned)
+		pad_mask = __roundup_pow_of_two(size) - 1;
 
 	/* Walk the tree backwards */
 	spin_lock_irqsave(&iovad->iova_rbtree_lock, flags);
@@ -157,8 +150,13 @@ static int __alloc_and_insert_iova_range(struct iova_domain *iovad,
 		else if (limit_pfn < curr_iova->pfn_hi)
 			goto adjust_limit_pfn;
 		else {
+			/*
+			 * Computes the padding size required, to make the start
+			 * address naturally aligned on the power-of-two order
+			 * of its size
+			 */
 			if (size_aligned)
-				pad_size = iova_get_pad_size(size, limit_pfn);
+				pad_size = (limit_pfn + 1 - size) & pad_mask;
 			if ((curr_iova->pfn_hi + size + pad_size) <= limit_pfn)
 				break;	/* found a free slot */
 		}
