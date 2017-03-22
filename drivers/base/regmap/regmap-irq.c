@@ -259,27 +259,11 @@ static const struct irq_chip regmap_irq_chip = {
 	.irq_set_wake		= regmap_irq_set_wake,
 };
 
-static irqreturn_t regmap_irq_thread(int irq, void *d)
+static int regmap_read_irq_status(struct regmap_irq_chip_data *data)
 {
-	struct regmap_irq_chip_data *data = d;
 	const struct regmap_irq_chip *chip = data->chip;
 	struct regmap *map = data->map;
 	int ret, i;
-	bool handled = false;
-	u32 reg;
-
-	if (chip->handle_pre_irq)
-		chip->handle_pre_irq(chip->irq_drv_data);
-
-	if (chip->runtime_pm) {
-		ret = pm_runtime_get_sync(map->dev);
-		if (ret < 0) {
-			dev_err(map->dev, "IRQ thread failed to resume: %d\n",
-				ret);
-			pm_runtime_put(map->dev);
-			goto exit;
-		}
-	}
 
 	/*
 	 * Read in the statuses, using a single bulk read if possible
@@ -299,7 +283,7 @@ static irqreturn_t regmap_irq_thread(int irq, void *d)
 		if (ret != 0) {
 			dev_err(map->dev, "Failed to read IRQ status: %d\n",
 				ret);
-			goto exit;
+			return ret;
 		}
 
 		for (i = 0; i < data->chip->num_regs; i++) {
@@ -315,7 +299,7 @@ static irqreturn_t regmap_irq_thread(int irq, void *d)
 				break;
 			default:
 				BUG();
-				goto exit;
+				return ret;
 			}
 		}
 
@@ -330,12 +314,20 @@ static irqreturn_t regmap_irq_thread(int irq, void *d)
 				dev_err(map->dev,
 					"Failed to read IRQ status: %d\n",
 					ret);
-				if (chip->runtime_pm)
-					pm_runtime_put(map->dev);
-				goto exit;
+				return ret;
 			}
 		}
 	}
+
+	return 0;
+}
+
+static int regmap_irq_handle_pending(struct regmap_irq_chip_data *data)
+{
+	const struct regmap_irq_chip *chip = data->chip;
+	struct regmap *map = data->map;
+	int ret, i, handled = 0;
+	u32 reg;
 
 	/*
 	 * Ignore masked IRQs and ack if we need to; we ack early so
@@ -361,14 +353,51 @@ static irqreturn_t regmap_irq_thread(int irq, void *d)
 		if (data->status_buf[chip->irqs[i].reg_offset /
 				     map->reg_stride] & chip->irqs[i].mask) {
 			handle_nested_irq(irq_find_mapping(data->domain, i));
-			handled = true;
+			handled++;
 		}
 	}
 
+	return handled;
+}
+
+static irqreturn_t regmap_irq_thread(int irq, void *d)
+{
+	struct regmap_irq_chip_data *data = d;
+	const struct regmap_irq_chip *chip = data->chip;
+	struct regmap *map = data->map;
+	int ret, handled = 0;
+
+	if (chip->handle_pre_irq)
+		chip->handle_pre_irq(chip->irq_drv_data);
+
+	if (chip->runtime_pm) {
+		ret = pm_runtime_get_sync(map->dev);
+		if (ret < 0) {
+			dev_err(map->dev, "IRQ thread failed to resume: %d\n",
+				ret);
+			goto out_runtime_put;
+		}
+	}
+
+	do {
+		ret = regmap_read_irq_status(data);
+		if (ret)
+			goto out_runtime_put;
+
+		ret = regmap_irq_handle_pending(data);
+		if (ret < 0)
+			goto out_runtime_put;
+
+		if (!ret)
+			break;
+
+		handled += ret;
+	} while (chip->handle_reread);
+
+out_runtime_put:
 	if (chip->runtime_pm)
 		pm_runtime_put(map->dev);
 
-exit:
 	if (chip->handle_post_irq)
 		chip->handle_post_irq(chip->irq_drv_data);
 
