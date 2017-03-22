@@ -156,6 +156,7 @@ asmlinkage __visible void __init x86_64_start_kernel(char * real_mode_data)
 	clear_bss();
 
 	clear_page(init_level4_pgt);
+	tsc_early_init();
 
 	kasan_early_init();
 

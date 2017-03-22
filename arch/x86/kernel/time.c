@@ -85,6 +85,7 @@ static __init void x86_late_time_init(void)
 {
 	x86_init.timers.timer_init();
 	tsc_init();
+	tsc_early_fini();
 }
 
 /*
