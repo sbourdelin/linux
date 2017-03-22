@@ -101,11 +101,21 @@ void intel_uc_init_early(struct drm_i915_private *dev_priv)
 
 void intel_uc_init_fw(struct drm_i915_private *dev_priv)
 {
+	struct intel_uc_fw *guc_fw = &dev_priv->guc.fw;
+
 	if (dev_priv->huc.fw.path)
 		intel_uc_prepare_fw(dev_priv, &dev_priv->huc.fw);
 
-	if (dev_priv->guc.fw.path)
-		intel_uc_prepare_fw(dev_priv, &dev_priv->guc.fw);
+	if (guc_fw->path) {
+		intel_uc_prepare_fw(dev_priv, guc_fw);
+
+		if (guc_fw->major_ver_found < 9) {
+			DRM_INFO("SLPC not supported with GuC firmware v%u,"
+				 " please use v9+ [" FIRMWARE_URL "].\n",
+				 guc_fw->major_ver_found);
+			i915.enable_slpc = 0;
+		}
+	}
 }
 
 int intel_uc_init_hw(struct drm_i915_private *dev_priv)

@@ -130,6 +130,8 @@ struct intel_uc_fw {
 	uint32_t ucode_offset;
 };
 
+#define FIRMWARE_URL  "https://01.org/linuxgraphics/intel-linux-graphics-firmwares"
+
 struct intel_guc_log {
 	uint32_t flags;
 	struct i915_vma *vma;
