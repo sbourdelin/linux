@@ -79,6 +79,7 @@
 #include <drm/drm_pci.h>
 #include <drm/drm_file.h>
 #include <drm/drm_debugfs.h>
+#include <drm/drm_sysfs.h>
 
 struct module;
 
@@ -571,10 +572,6 @@ int drm_invalid_op(struct drm_device *dev, void *data,
  * These are exported to drivers so that they can implement fencing using
  * DMA quiscent + idle. DMA quiescent usually requires the hardware lock.
  */
-
-			       /* sysfs support (drm_sysfs.c) */
-extern void drm_sysfs_hotplug_event(struct drm_device *dev);
-
 
 /*@}*/
 
