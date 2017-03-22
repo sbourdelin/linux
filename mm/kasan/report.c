@@ -13,6 +13,7 @@
  *
  */
 
+#include <linux/atomic.h>
 #include <linux/ftrace.h>
 #include <linux/kernel.h>
 #include <linux/mm.h>
@@ -293,12 +294,18 @@ static void kasan_report_error(struct kasan_access_info *info)
 	kasan_end_report(&flags);
 }
 
+atomic_t kasan_report_count = ATOMIC_INIT(1);
+EXPORT_SYMBOL_GPL(kasan_report_count);
+
 void kasan_report(unsigned long addr, size_t size,
 		bool is_write, unsigned long ip)
 {
 	struct kasan_access_info info;
 
 	if (likely(!kasan_report_enabled()))
+		return;
+
+	if (atomic_dec_if_positive(&kasan_report_count) < 0)
 		return;
 
 	disable_trace_on_warning();
