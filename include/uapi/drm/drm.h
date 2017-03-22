@@ -678,6 +678,13 @@ struct drm_get_cap {
  */
 #define DRM_CLIENT_CAP_ATOMIC	3
 
+/**
+ * DRM_CLIENT_CAP_HDMI2
+ *
+ * If set to 1, the DRM core will expose HDMI 2.0+ features to userspace
+ */
+#define DRM_CLIENT_CAP_HDMI2	4
+
 /** DRM_IOCTL_SET_CLIENT_CAP ioctl argument type */
 struct drm_set_client_cap {
 	__u64 capability;

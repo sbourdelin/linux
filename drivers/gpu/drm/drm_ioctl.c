@@ -318,6 +318,11 @@ drm_setclientcap(struct drm_device *dev, void *data, struct drm_file *file_priv)
 		file_priv->atomic = req->value;
 		file_priv->universal_planes = req->value;
 		break;
+	case DRM_CLIENT_CAP_HDMI2:
+		if (req->value > 1)
+			return -EINVAL;
+		file_priv->hdmi2_allowed = req->value;
+		break;
 	default:
 		return -EINVAL;
 	}

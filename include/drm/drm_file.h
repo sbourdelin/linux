@@ -192,6 +192,14 @@ struct drm_file {
 	unsigned is_master:1;
 
 	/**
+	 * @hdmi2_allowed:
+	 *
+	 * True if client understands HDMI 2.0+ features like, for example,
+	 * extended aspect ratios
+	 */
+	unsigned hdmi2_allowed:1;
+
+	/**
 	 * @master:
 	 *
 	 * Master this node is currently associated with. Only relevant if
