@@ -140,6 +140,9 @@ static void guc_params_init(struct drm_i915_private *dev_priv)
 	params[GUC_CTL_FEATURE] |= GUC_CTL_DISABLE_SCHEDULER |
 			GUC_CTL_VCS2_ENABLED;
 
+	if (i915.enable_slpc)
+		params[GUC_CTL_FEATURE] |= GUC_CTL_ENABLE_SLPC;
+
 	params[GUC_CTL_LOG_PARAMS] = guc->log.flags;
 
 	if (i915.guc_log_level >= 0) {
