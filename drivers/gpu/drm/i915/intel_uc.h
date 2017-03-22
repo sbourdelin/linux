@@ -27,6 +27,7 @@
 #include "intel_guc_fwif.h"
 #include "i915_guc_reg.h"
 #include "intel_ringbuffer.h"
+#include "intel_slpc.h"
 
 #include "i915_vma.h"
 
@@ -173,6 +174,8 @@ struct intel_guc {
 
 	uint64_t submissions[I915_NUM_ENGINES];
 	uint32_t last_seqno[I915_NUM_ENGINES];
+
+	struct intel_slpc slpc;
 
 	/* To serialize the intel_guc_send actions */
 	struct mutex send_mutex;

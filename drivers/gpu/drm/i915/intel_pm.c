@@ -5316,6 +5316,9 @@ static void vlv_set_rps_idle(struct drm_i915_private *dev_priv)
 
 void gen6_rps_busy(struct drm_i915_private *dev_priv)
 {
+	if (!dev_priv->rps.rps_enabled)
+		return;
+
 	mutex_lock(&dev_priv->rps.hw_lock);
 	if (dev_priv->rps.rps_enabled) {
 		u8 freq;
@@ -5344,6 +5347,9 @@ void gen6_rps_busy(struct drm_i915_private *dev_priv)
 
 void gen6_rps_idle(struct drm_i915_private *dev_priv)
 {
+	if (!dev_priv->rps.rps_enabled)
+		return;
+
 	/* Flush our bottom-half so that it does not race with us
 	 * setting the idle frequency and so that it is bounded by
 	 * our rpm wakeref. And then disable the interrupts to stop any
@@ -7018,6 +7024,12 @@ void intel_suspend_gt_powersave(struct drm_i915_private *dev_priv)
 		intel_runtime_pm_put(dev_priv);
 
 	/* gen6_rps_idle() will be called later to disable interrupts */
+
+	if (dev_priv->guc.slpc.active) {
+		intel_runtime_pm_get(dev_priv);
+		intel_slpc_disable(dev_priv);
+		intel_runtime_pm_put(dev_priv);
+	}
 }
 
 void intel_sanitize_gt_powersave(struct drm_i915_private *dev_priv)
@@ -7118,15 +7130,20 @@ void intel_enable_gt_powersave(struct drm_i915_private *dev_priv)
 		if (IS_GEN9_BC(dev_priv))
 			gen6_update_ring_freq(dev_priv);
 	}
-	__intel_enable_gt_powersave(dev_priv);
+
+	if (!i915.enable_slpc)
+		__intel_enable_gt_powersave(dev_priv);
 
 	mutex_unlock(&dev_priv->rps.hw_lock);
 }
 
 #define GT_POWERSAVE_ENABLED(dev_priv) \
 	(((INTEL_GEN(dev_priv) >= 9) && \
-		(READ_ONCE(dev_priv->rps.rps_enabled) && \
-		 READ_ONCE(dev_priv->rps.rc6_enabled))) || \
+		((!i915.enable_slpc && \
+		  READ_ONCE(dev_priv->rps.rps_enabled) && \
+		  READ_ONCE(dev_priv->rps.rc6_enabled)) || \
+		 (i915.enable_slpc && \
+		  READ_ONCE(dev_priv->rps.rc6_enabled)))) || \
 	 ((INTEL_GEN(dev_priv) < 9) && \
 		READ_ONCE(dev_priv->rps.rps_enabled)))
 

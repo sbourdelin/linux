@@ -443,6 +443,11 @@ void intel_guc_fini(struct drm_i915_private *dev_priv)
 	mutex_lock(&dev_priv->drm.struct_mutex);
 	i915_guc_submission_disable(dev_priv);
 	i915_guc_submission_fini(dev_priv);
+	if (i915.enable_slpc) {
+		if (dev_priv->guc.slpc.active)
+			intel_slpc_disable(dev_priv);
+		intel_slpc_cleanup(dev_priv);
+	}
 	mutex_unlock(&dev_priv->drm.struct_mutex);
 
 	obj = fetch_and_zero(&guc_fw->obj);

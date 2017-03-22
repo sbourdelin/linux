@@ -135,6 +135,9 @@ int intel_uc_init_hw(struct drm_i915_private *dev_priv)
 		ret = i915_guc_submission_init(dev_priv);
 		if (ret)
 			goto err;
+
+		if (i915.enable_slpc)
+			intel_slpc_init(dev_priv);
 	}
 
 	/* WaEnableuKernelHeaderValidFix:skl */
@@ -167,6 +170,17 @@ int intel_uc_init_hw(struct drm_i915_private *dev_priv)
 		goto err_submission;
 
 	intel_guc_auth_huc(dev_priv);
+
+	/*
+	 * SLPC is enabled by setting up the shared data structure and
+	 * sending reset event to GuC SLPC. Initial data is setup in
+	 * intel_slpc_init. Here we send the reset event. SLPC enabling
+	 * in GuC can happen in parallel in GuC with other initialization
+	 * being done in i915.
+	 */
+	if (i915.enable_slpc)
+		intel_slpc_enable(dev_priv);
+
 	if (i915.enable_guc_submission) {
 		if (i915.guc_log_level >= 0)
 			gen9_enable_guc_interrupts(dev_priv);
@@ -191,6 +205,11 @@ err_submission:
 	if (i915.enable_guc_submission)
 		i915_guc_submission_fini(dev_priv);
 
+	if (i915.enable_slpc) {
+		if (dev_priv->guc.slpc.active)
+			intel_slpc_disable(dev_priv);
+		intel_slpc_cleanup(dev_priv);
+	}
 err:
 	i915_ggtt_disable_guc(dev_priv);
 
@@ -204,6 +223,8 @@ err:
 		i915.enable_guc_submission = 0;
 		DRM_NOTE("Falling back from GuC submission to execlist mode\n");
 	}
+
+	i915.enable_slpc = 0;
 
 	return ret;
 }

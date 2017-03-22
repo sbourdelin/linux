@@ -2655,6 +2655,11 @@ static void i915_reset_and_wakeup(struct drm_i915_private *dev_priv)
 	set_bit(I915_RESET_HANDOFF, &dev_priv->gpu_error.flags);
 	wake_up_all(&dev_priv->gpu_error.wait_queue);
 
+	/*
+	 * TODO: Enable SLPC with TDR indication to SLPC in case of
+	 * Engine Reset.
+	 */
+
 	do {
 		/*
 		 * All state reset _must_ be completed before we update the
