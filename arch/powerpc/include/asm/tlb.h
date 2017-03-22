@@ -63,15 +63,21 @@ static inline void tlb_remove_check_page_size_change(struct mmu_gather *tlb,
 }
 
 #ifdef CONFIG_SMP
+/* If there is an NPU context associated with this thread it may have
+ * been active on a GPU which has issued translation requests via the
+ * nest mmu. In this case we need to do a broadcast tlb to invalidate
+ * any caches on the nest mmu. Invalidations on the GPU are handled
+ * via mmu notfiers.
+ */
 static inline int mm_is_core_local(struct mm_struct *mm)
 {
-	return cpumask_subset(mm_cpumask(mm),
+	return !mm->context.npu_context && cpumask_subset(mm_cpumask(mm),
 			      topology_sibling_cpumask(smp_processor_id()));
 }
 
 static inline int mm_is_thread_local(struct mm_struct *mm)
 {
-	return cpumask_equal(mm_cpumask(mm),
+	return !mm->context.npu_context && cpumask_equal(mm_cpumask(mm),
 			      cpumask_of(smp_processor_id()));
 }
 
