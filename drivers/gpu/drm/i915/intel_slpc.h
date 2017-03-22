@@ -246,6 +246,9 @@ extern struct slpc_param slpc_paramlist[];
 #define SLPC_PARAM_TASK_UNKNOWN  3
 
 extern const struct file_operations i915_slpc_param_ctl_fops;
+extern const struct file_operations i915_slpc_gtperf_fops;
+extern const struct file_operations i915_slpc_balancer_fops;
+extern const struct file_operations i915_slpc_dcc_fops;
 
 /* intel_slpc.c */
 void intel_slpc_set_param(struct drm_i915_private *dev_priv, u32 id, u32 value);

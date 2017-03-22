@@ -224,6 +224,189 @@ const struct file_operations i915_slpc_param_ctl_fops = {
 	.write = slpc_param_ctl_write
 };
 
+static void slpc_task_param_show(struct seq_file *m, u32 enable_id,
+				 u32 disable_id)
+{
+	struct drm_i915_private *dev_priv = m->private;
+	const char *status;
+	u64 val;
+	int ret;
+
+	ret = intel_slpc_task_status(dev_priv, &val, enable_id, disable_id);
+
+	if (ret) {
+		seq_printf(m, "error %d\n", ret);
+	} else {
+		switch (val) {
+		case SLPC_PARAM_TASK_DEFAULT:
+			status = "default\n";
+			break;
+
+		case SLPC_PARAM_TASK_ENABLED:
+			status = "enabled\n";
+			break;
+
+		case SLPC_PARAM_TASK_DISABLED:
+			status = "disabled\n";
+			break;
+
+		default:
+			status = "unknown\n";
+			break;
+		}
+
+		seq_puts(m, status);
+	}
+}
+
+static int slpc_task_param_write(struct seq_file *m, const char __user *ubuf,
+			    size_t len, u32 enable_id, u32 disable_id)
+{
+	struct drm_i915_private *dev_priv = m->private;
+	u64 val;
+	int ret = 0;
+	char buf[10];
+
+	if (len >= sizeof(buf))
+		ret = -EINVAL;
+	else if (copy_from_user(buf, ubuf, len))
+		ret = -EFAULT;
+	else
+		buf[len] = '\0';
+
+	if (!ret) {
+		if (!strncmp(buf, "default", 7))
+			val = SLPC_PARAM_TASK_DEFAULT;
+		else if (!strncmp(buf, "enabled", 7))
+			val = SLPC_PARAM_TASK_ENABLED;
+		else if (!strncmp(buf, "disabled", 8))
+			val = SLPC_PARAM_TASK_DISABLED;
+		else
+			ret = -EINVAL;
+	}
+
+	if (!ret)
+		ret = intel_slpc_task_control(dev_priv, val, enable_id,
+					      disable_id);
+
+	return ret;
+}
+
+static int slpc_gtperf_show(struct seq_file *m, void *data)
+{
+	slpc_task_param_show(m, SLPC_PARAM_TASK_ENABLE_GTPERF,
+			SLPC_PARAM_TASK_DISABLE_GTPERF);
+
+	return 0;
+}
+
+static int slpc_gtperf_open(struct inode *inode, struct file *file)
+{
+	struct drm_i915_private *dev_priv = inode->i_private;
+
+	return single_open(file, slpc_gtperf_show, dev_priv);
+}
+
+static ssize_t slpc_gtperf_write(struct file *file, const char __user *ubuf,
+			      size_t len, loff_t *offp)
+{
+	struct seq_file *m = file->private_data;
+	int ret = 0;
+
+	ret = slpc_task_param_write(m, ubuf, len, SLPC_PARAM_TASK_ENABLE_GTPERF,
+			       SLPC_PARAM_TASK_DISABLE_GTPERF);
+	if (ret)
+		return ret;
+
+	return len;
+}
+
+const struct file_operations i915_slpc_gtperf_fops = {
+	.owner	 = THIS_MODULE,
+	.open	 = slpc_gtperf_open,
+	.release = single_release,
+	.read	 = seq_read,
+	.write	 = slpc_gtperf_write,
+	.llseek	 = seq_lseek
+};
+
+static int slpc_balancer_show(struct seq_file *m, void *data)
+{
+	slpc_task_param_show(m, SLPC_PARAM_TASK_ENABLE_BALANCER,
+			SLPC_PARAM_TASK_DISABLE_BALANCER);
+
+	return 0;
+}
+
+static int slpc_balancer_open(struct inode *inode, struct file *file)
+{
+	struct drm_i915_private *dev_priv = inode->i_private;
+
+	return single_open(file, slpc_balancer_show, dev_priv);
+}
+
+static ssize_t slpc_balancer_write(struct file *file, const char __user *ubuf,
+			      size_t len, loff_t *offp)
+{
+	struct seq_file *m = file->private_data;
+	int ret = 0;
+
+	ret = slpc_task_param_write(m, ubuf, len,
+				SLPC_PARAM_TASK_ENABLE_BALANCER,
+				SLPC_PARAM_TASK_DISABLE_BALANCER);
+	if (ret)
+		return ret;
+
+	return len;
+}
+
+const struct file_operations i915_slpc_balancer_fops = {
+	.owner	 = THIS_MODULE,
+	.open	 = slpc_balancer_open,
+	.release = single_release,
+	.read	 = seq_read,
+	.write	 = slpc_balancer_write,
+	.llseek	 = seq_lseek
+};
+
+static int slpc_dcc_show(struct seq_file *m, void *data)
+{
+	slpc_task_param_show(m, SLPC_PARAM_TASK_ENABLE_DCC,
+			SLPC_PARAM_TASK_DISABLE_DCC);
+
+	return 0;
+}
+
+static int slpc_dcc_open(struct inode *inode, struct file *file)
+{
+	struct drm_i915_private *dev_priv = inode->i_private;
+
+	return single_open(file, slpc_dcc_show, dev_priv);
+}
+
+static ssize_t slpc_dcc_write(struct file *file, const char __user *ubuf,
+			      size_t len, loff_t *offp)
+{
+	struct seq_file *m = file->private_data;
+	int ret = 0;
+
+	ret = slpc_task_param_write(m, ubuf, len, SLPC_PARAM_TASK_ENABLE_DCC,
+			       SLPC_PARAM_TASK_DISABLE_DCC);
+	if (ret)
+		return ret;
+
+	return len;
+}
+
+const struct file_operations i915_slpc_dcc_fops = {
+	.owner	 = THIS_MODULE,
+	.open	 = slpc_dcc_open,
+	.release = single_release,
+	.read	 = seq_read,
+	.write	 = slpc_dcc_write,
+	.llseek	 = seq_lseek
+};
+
 static void host2guc_slpc(struct drm_i915_private *dev_priv,
 			  struct slpc_event_input *input, u32 len)
 {

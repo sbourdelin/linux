@@ -4872,6 +4872,9 @@ static const struct i915_debugfs_files {
 	const struct file_operations *fops;
 } i915_debugfs_files[] = {
 	{"i915_wedged", &i915_wedged_fops},
+	{"i915_slpc_gtperf", &i915_slpc_gtperf_fops},
+	{"i915_slpc_balancer", &i915_slpc_balancer_fops},
+	{"i915_slpc_dcc", &i915_slpc_dcc_fops},
 	{"i915_max_freq", &i915_max_freq_fops},
 	{"i915_min_freq", &i915_min_freq_fops},
 	{"i915_cache_sharing", &i915_cache_sharing_fops},
