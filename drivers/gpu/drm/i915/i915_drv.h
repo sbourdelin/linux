@@ -3630,6 +3630,7 @@ u32 i915_gem_fence_alignment(struct drm_i915_private *dev_priv, u32 size,
 int i915_debugfs_register(struct drm_i915_private *dev_priv);
 int i915_debugfs_connector_add(struct drm_connector *connector);
 void intel_display_crc_init(struct drm_i915_private *dev_priv);
+int buffer_tokenize(char *buf, char *words[], int max_words);
 #else
 static inline int i915_debugfs_register(struct drm_i915_private *dev_priv) {return 0;}
 static inline int i915_debugfs_connector_add(struct drm_connector *connector)
