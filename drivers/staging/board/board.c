@@ -25,6 +25,7 @@
 static struct device_node *irqc_node __initdata;
 static unsigned int irqc_base __initdata;
 
+#ifdef CONFIG_OF
 static bool find_by_address(u64 base_address)
 {
 	struct device_node *dn = of_find_all_nodes(NULL);
@@ -42,6 +43,12 @@ static bool find_by_address(u64 base_address)
 
 	return false;
 }
+#else
+static bool find_by_address(u64 base_address)
+{
+	return false;
+}
+#endif
 
 bool __init board_staging_dt_node_available(const struct resource *resource,
 					    unsigned int num_resources)
