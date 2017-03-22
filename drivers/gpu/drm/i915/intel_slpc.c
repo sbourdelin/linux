@@ -64,6 +64,230 @@ struct slpc_param slpc_paramlist[SLPC_MAX_PARAM] = {
 				"Enable IBC when non-Gaming Mode is enabled"}
 };
 
+static void host2guc_slpc(struct drm_i915_private *dev_priv,
+			  struct slpc_event_input *input, u32 len)
+{
+	u32 *data;
+	u32 output[SLPC_EVENT_MAX_OUTPUT_ARGS];
+	int ret = 0;
+
+	/*
+	 * We have only 15 scratch registers for communication.
+	 * the first we will use for the event ID in input and
+	 * output data. Event processing status will be present
+	 * in SOFT_SCRATCH(1) register.
+	 */
+	BUILD_BUG_ON(SLPC_EVENT_MAX_INPUT_ARGS > 14);
+	BUILD_BUG_ON(SLPC_EVENT_MAX_OUTPUT_ARGS < 1);
+	BUILD_BUG_ON(SLPC_EVENT_MAX_OUTPUT_ARGS > 14);
+
+	data = (u32 *) input;
+	data[0] = INTEL_GUC_ACTION_SLPC_REQUEST;
+	ret = __intel_guc_send(&dev_priv->guc, data, len, output);
+
+	if (ret)
+		DRM_ERROR("event 0x%x status %d\n",
+			  ((output[0] & 0xFF00) >> 8), ret);
+}
+
+void slpc_mem_set_param(struct slpc_shared_data *data,
+			      u32 id,
+			      u32 value)
+{
+	data->override_parameters_set_bits[id >> 5]
+						|= (1 << (id % 32));
+	data->override_parameters_values[id] = value;
+}
+
+void slpc_mem_unset_param(struct slpc_shared_data *data,
+				u32 id)
+{
+	data->override_parameters_set_bits[id >> 5]
+						&= (~(1 << (id % 32)));
+	data->override_parameters_values[id] = 0;
+}
+
+static void host2guc_slpc_set_param(struct drm_i915_private *dev_priv,
+				    u32 id, u32 value)
+{
+	struct slpc_event_input data = {0};
+
+	data.header.value = SLPC_EVENT(SLPC_EVENT_PARAMETER_SET, 2);
+	data.args[0] = id;
+	data.args[1] = value;
+
+	host2guc_slpc(dev_priv, &data, 4);
+}
+
+static void host2guc_slpc_unset_param(struct drm_i915_private *dev_priv,
+				      u32 id)
+{
+	struct slpc_event_input data = {0};
+
+	data.header.value = SLPC_EVENT(SLPC_EVENT_PARAMETER_UNSET, 1);
+	data.args[0] = id;
+
+	host2guc_slpc(dev_priv, &data, 3);
+}
+
+void intel_slpc_set_param(struct drm_i915_private *dev_priv,
+			  u32 id,
+			  u32 value)
+{
+	struct page *page;
+	struct slpc_shared_data *data = NULL;
+
+	WARN_ON(id >= SLPC_MAX_PARAM);
+
+	if (!dev_priv->guc.slpc.vma)
+		return;
+
+	page = i915_vma_first_page(dev_priv->guc.slpc.vma);
+	data = kmap_atomic(page);
+	slpc_mem_set_param(data, id, value);
+	kunmap_atomic(data);
+
+	host2guc_slpc_set_param(dev_priv, id, value);
+}
+
+void intel_slpc_unset_param(struct drm_i915_private *dev_priv,
+			    u32 id)
+{
+	struct page *page;
+	struct slpc_shared_data *data = NULL;
+
+	WARN_ON(id >= SLPC_MAX_PARAM);
+
+	if (!dev_priv->guc.slpc.vma)
+		return;
+
+	page = i915_vma_first_page(dev_priv->guc.slpc.vma);
+	data = kmap_atomic(page);
+	slpc_mem_unset_param(data, id);
+	kunmap_atomic(data);
+
+	host2guc_slpc_unset_param(dev_priv, id);
+}
+
+void intel_slpc_get_param(struct drm_i915_private *dev_priv,
+			  u32 id,
+			  int *overriding, u32 *value)
+{
+	struct page *page;
+	struct slpc_shared_data *data = NULL;
+	u32 bits;
+
+	WARN_ON(id >= SLPC_MAX_PARAM);
+
+	if (!dev_priv->guc.slpc.vma)
+		return;
+
+	page = i915_vma_first_page(dev_priv->guc.slpc.vma);
+	data = kmap_atomic(page);
+	if (overriding) {
+		bits = data->override_parameters_set_bits[id >> 5];
+		*overriding = (0 != (bits & (1 << (id % 32))));
+	}
+	if (value)
+		*value = data->override_parameters_values[id];
+
+	kunmap_atomic(data);
+}
+
+int slpc_mem_task_control(struct slpc_shared_data *data, u64 val,
+			  u32 enable_id, u32 disable_id)
+{
+	int ret = 0;
+
+	if (val == SLPC_PARAM_TASK_DEFAULT) {
+		/* set default */
+		slpc_mem_unset_param(data, enable_id);
+		slpc_mem_unset_param(data, disable_id);
+	} else if (val == SLPC_PARAM_TASK_ENABLED) {
+		/* set enable */
+		slpc_mem_set_param(data, enable_id, 1);
+		slpc_mem_unset_param(data, disable_id);
+	} else if (val == SLPC_PARAM_TASK_DISABLED) {
+		/* set disable */
+		slpc_mem_set_param(data, disable_id, 1);
+		slpc_mem_unset_param(data, enable_id);
+	} else {
+		ret = -EINVAL;
+	}
+
+	return ret;
+}
+
+int intel_slpc_task_control(struct drm_i915_private *dev_priv, u64 val,
+			    u32 enable_id, u32 disable_id)
+{
+	int ret = 0;
+
+	if (!dev_priv->guc.slpc.active)
+		return -ENODEV;
+
+	intel_runtime_pm_get(dev_priv);
+
+	if (val == SLPC_PARAM_TASK_DEFAULT) {
+		/* set default */
+		intel_slpc_unset_param(dev_priv, enable_id);
+		intel_slpc_unset_param(dev_priv, disable_id);
+	} else if (val == SLPC_PARAM_TASK_ENABLED) {
+		/* set enable */
+		intel_slpc_set_param(dev_priv, enable_id, 1);
+		intel_slpc_unset_param(dev_priv, disable_id);
+	} else if (val == SLPC_PARAM_TASK_DISABLED) {
+		/* set disable */
+		intel_slpc_set_param(dev_priv, disable_id, 1);
+		intel_slpc_unset_param(dev_priv, enable_id);
+	} else {
+		ret = -EINVAL;
+	}
+
+	intel_slpc_enable(dev_priv);
+	intel_runtime_pm_put(dev_priv);
+
+	return ret;
+}
+
+int intel_slpc_task_status(struct drm_i915_private *dev_priv, u64 *val,
+			   u32 enable_id, u32 disable_id)
+{
+	int override_enable, override_disable;
+	u32 value_enable, value_disable;
+	int ret = 0;
+
+	if (!dev_priv->guc.slpc.active) {
+		ret = -ENODEV;
+	} else if (val) {
+		intel_slpc_get_param(dev_priv, enable_id, &override_enable,
+				     &value_enable);
+		intel_slpc_get_param(dev_priv, disable_id, &override_disable,
+				     &value_disable);
+
+		/*
+		 * Set the output value:
+		 * 0: default
+		 * 1: enabled
+		 * 2: disabled
+		 * 3: unknown (should not happen)
+		 */
+		if (override_disable && (value_disable == 1))
+			*val = SLPC_PARAM_TASK_DISABLED;
+		else if (override_enable && (value_enable == 1))
+			*val = SLPC_PARAM_TASK_ENABLED;
+		else if (!override_enable && !override_disable)
+			*val = SLPC_PARAM_TASK_DEFAULT;
+		else
+			*val = SLPC_PARAM_TASK_UNKNOWN;
+
+	} else {
+		ret = -EINVAL;
+	}
+
+	return ret;
+}
+
 void intel_slpc_init(struct drm_i915_private *dev_priv)
 {
 }

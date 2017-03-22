@@ -236,6 +236,14 @@ extern struct slpc_param slpc_paramlist[];
 #define SLPC_PARAM_TASK_UNKNOWN  3
 
 /* intel_slpc.c */
+void intel_slpc_set_param(struct drm_i915_private *dev_priv, u32 id, u32 value);
+void intel_slpc_unset_param(struct drm_i915_private *dev_priv, u32 id);
+void intel_slpc_get_param(struct drm_i915_private *dev_priv, u32 id,
+			  int *overriding, u32 *value);
+int intel_slpc_task_control(struct drm_i915_private *dev_priv, u64 val,
+			    u32 enable_id, u32 disable_id);
+int intel_slpc_task_status(struct drm_i915_private *dev_priv, u64 *val,
+			   u32 enable_id, u32 disable_id);
 void intel_slpc_init(struct drm_i915_private *dev_priv);
 void intel_slpc_cleanup(struct drm_i915_private *dev_priv);
 void intel_slpc_enable(struct drm_i915_private *dev_priv);
