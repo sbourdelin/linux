@@ -80,6 +80,7 @@ struct videomode;
  * @MODE_ONE_SIZE: only one resolution is supported
  * @MODE_NO_REDUCED: monitor doesn't accept reduced blanking
  * @MODE_NO_STEREO: stereo modes not supported
+ * @MODE_NO_HDMI2: HDMI 2.0+ modes not supported
  * @MODE_STALE: mode has become stale
  * @MODE_BAD: unspecified reason
  * @MODE_ERROR: error condition
@@ -124,6 +125,7 @@ enum drm_mode_status {
 	MODE_ONE_SIZE,
 	MODE_NO_REDUCED,
 	MODE_NO_STEREO,
+	MODE_NO_HDMI2,
 	MODE_STALE = -3,
 	MODE_BAD = -2,
 	MODE_ERROR = -1
@@ -420,6 +422,18 @@ struct drm_display_mode {
 static inline bool drm_mode_is_stereo(const struct drm_display_mode *mode)
 {
 	return mode->flags & DRM_MODE_FLAG_3D_MASK;
+}
+
+/**
+ * drm_mode_is_hdmi2 - check for HDMI 2.0+ mode flag
+ * @mode: drm_display_mode to check
+ *
+ * Returns:
+ * True if the mode is HDMI 2.0+ mode, false if not
+ */
+static inline bool drm_mode_is_hdmi2(const struct drm_display_mode *mode)
+{
+	return mode->flags & DRM_MODE_FLAG_HDMI2;
 }
 
 struct drm_connector;

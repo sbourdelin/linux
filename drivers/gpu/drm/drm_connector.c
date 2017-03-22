@@ -1200,6 +1200,8 @@ static bool drm_mode_expose_to_userspace(const struct drm_display_mode *mode,
 	 */
 	if (!file_priv->stereo_allowed && drm_mode_is_stereo(mode))
 		return false;
+	if (!file_priv->hdmi2_allowed && drm_mode_is_hdmi2(mode))
+		return false;
 
 	return true;
 }

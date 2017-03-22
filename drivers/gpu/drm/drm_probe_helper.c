@@ -77,6 +77,10 @@ drm_mode_validate_flag(const struct drm_display_mode *mode,
 	    !(flags & DRM_MODE_FLAG_3D_MASK))
 		return MODE_NO_STEREO;
 
+	if ((mode->flags & DRM_MODE_FLAG_HDMI2) &&
+	    !(flags & DRM_MODE_FLAG_HDMI2))
+		return MODE_NO_HDMI2;
+
 	return MODE_OK;
 }
 
@@ -221,7 +225,8 @@ drm_connector_detect(struct drm_connector *connector, bool force)
  *    - drm_mode_validate_size() filters out modes larger than @maxX and @maxY
  *      (if specified)
  *    - drm_mode_validate_flag() checks the modes against basic connector
- *      capabilities (interlace_allowed,doublescan_allowed,stereo_allowed)
+ *      capabilities (interlace_allowed,doublescan_allowed,stereo_allowed,
+ *      hdmi2_allowed)
  *    - the optional &drm_connector_helper_funcs.mode_valid helper can perform
  *      driver and/or hardware specific checks
  *
@@ -336,6 +341,8 @@ int drm_helper_probe_single_connector_modes(struct drm_connector *connector,
 		mode_flags |= DRM_MODE_FLAG_DBLSCAN;
 	if (connector->stereo_allowed)
 		mode_flags |= DRM_MODE_FLAG_3D_MASK;
+	if (connector->hdmi2_allowed)
+		mode_flags |= DRM_MODE_FLAG_HDMI2;
 
 	list_for_each_entry(mode, &connector->modes, head) {
 		if (mode->status == MODE_OK)
