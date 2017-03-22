@@ -381,7 +381,7 @@ dont_put_skbuff_in_hw:
 	    (ip_hdr(skb)->version == 4) &&
 	    (ip_hdr(skb)->ihl == 5) &&
 	    ((ip_hdr(skb)->frag_off == 0) ||
-	     (ip_hdr(skb)->frag_off == htons(1 << 14))) &&
+	     (ip_hdr(skb)->frag_off == htons(BIT(14)))) &&
 	    ((ip_hdr(skb)->protocol == IPPROTO_TCP) ||
 	     (ip_hdr(skb)->protocol == IPPROTO_UDP))) {
 		/* Use hardware checksum calc */
@@ -613,7 +613,7 @@ int cvm_oct_xmit_pow(struct sk_buff *skb, struct net_device *dev)
 #endif
 		work->word2.s.is_frag = !((ip_hdr(skb)->frag_off == 0) ||
 					  (ip_hdr(skb)->frag_off ==
-					      1 << 14));
+					      BIT(14)));
 #if 0
 		/* Assume Linux is sending a good packet */
 		work->word2.s.IP_exc = 0;
