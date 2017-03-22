@@ -530,30 +530,27 @@ static struct drm_encoder *get_encoder_from_crtc(struct drm_crtc *crtc)
 	return NULL;
 }
 
-static int mdp5_get_scanoutpos(struct drm_device *dev, unsigned int pipe,
-			       unsigned int flags, int *vpos, int *hpos,
-			       ktime_t *stime, ktime_t *etime,
-			       const struct drm_display_mode *mode)
+static bool mdp5_get_scanoutpos(struct drm_device *dev, unsigned int pipe,
+				bool in_vblank_irq, int *vpos, int *hpos,
+				ktime_t *stime, ktime_t *etime,
+				const struct drm_display_mode *mode)
 {
 	struct msm_drm_private *priv = dev->dev_private;
 	struct drm_crtc *crtc;
 	struct drm_encoder *encoder;
 	int line, vsw, vbp, vactive_start, vactive_end, vfp_end;
-	int ret = 0;
 
 	crtc = priv->crtcs[pipe];
 	if (!crtc) {
 		DRM_ERROR("Invalid crtc %d\n", pipe);
-		return 0;
+		return false;
 	}
 
 	encoder = get_encoder_from_crtc(crtc);
 	if (!encoder) {
 		DRM_ERROR("no encoder found for crtc %d\n", pipe);
-		return 0;
+		return false;
 	}
-
-	ret |= DRM_SCANOUTPOS_VALID | DRM_SCANOUTPOS_ACCURATE;
 
 	vsw = mode->crtc_vsync_end - mode->crtc_vsync_start;
 	vbp = mode->crtc_vtotal - mode->crtc_vsync_end;
@@ -578,10 +575,8 @@ static int mdp5_get_scanoutpos(struct drm_device *dev, unsigned int pipe,
 
 	if (line < vactive_start) {
 		line -= vactive_start;
-		ret |= DRM_SCANOUTPOS_IN_VBLANK;
 	} else if (line > vactive_end) {
 		line = line - vfp_end - vactive_start;
-		ret |= DRM_SCANOUTPOS_IN_VBLANK;
 	} else {
 		line -= vactive_start;
 	}
@@ -592,7 +587,7 @@ static int mdp5_get_scanoutpos(struct drm_device *dev, unsigned int pipe,
 	if (etime)
 		*etime = ktime_get();
 
-	return ret;
+	return true;
 }
 
 static u32 mdp5_get_vblank_counter(struct drm_device *dev, unsigned int pipe)

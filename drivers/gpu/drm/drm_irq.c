@@ -744,13 +744,12 @@ bool drm_calc_vbltimestamp_from_scanoutpos(struct drm_device *dev,
 {
 	struct timeval tv_etime;
 	ktime_t stime, etime;
-	unsigned int vbl_status;
+	bool vbl_status;
 	struct drm_crtc *crtc;
 	const struct drm_display_mode *mode;
 	struct drm_vblank_crtc *vblank = &dev->vblank[pipe];
 	int vpos, hpos, i;
 	int delta_ns, duration_ns;
-	unsigned flags = in_vblank_irq ? DRM_CALLED_FROM_VBLIRQ : 0;
 
 	if (!drm_core_check_feature(dev, DRIVER_MODESET))
 		return false;
@@ -793,15 +792,16 @@ bool drm_calc_vbltimestamp_from_scanoutpos(struct drm_device *dev,
 		 * Get vertical and horizontal scanout position vpos, hpos,
 		 * and bounding timestamps stime, etime, pre/post query.
 		 */
-		vbl_status = dev->driver->get_scanout_position(dev, pipe, flags,
+		vbl_status = dev->driver->get_scanout_position(dev, pipe,
+							       in_vblank_irq,
 							       &vpos, &hpos,
 							       &stime, &etime,
 							       mode);
 
 		/* Return as no-op if scanout query unsupported or failed. */
-		if (!(vbl_status & DRM_SCANOUTPOS_VALID)) {
-			DRM_DEBUG("crtc %u : scanoutpos query failed [0x%x].\n",
-				  pipe, vbl_status);
+		if (!vbl_status) {
+			DRM_DEBUG("crtc %u : scanoutpos query failed.\n",
+				  pipe);
 			return false;
 		}
 
@@ -840,8 +840,8 @@ bool drm_calc_vbltimestamp_from_scanoutpos(struct drm_device *dev,
 	etime = ktime_sub_ns(etime, delta_ns);
 	*vblank_time = ktime_to_timeval(etime);
 
-	DRM_DEBUG_VBL("crtc %u : v 0x%x p(%d,%d)@ %ld.%ld -> %ld.%ld [e %d us, %d rep]\n",
-		      pipe, vbl_status, hpos, vpos,
+	DRM_DEBUG_VBL("crtc %u : v p(%d,%d)@ %ld.%ld -> %ld.%ld [e %d us, %d rep]\n",
+		      pipe, hpos, vpos,
 		      (long)tv_etime.tv_sec, (long)tv_etime.tv_usec,
 		      (long)vblank_time->tv_sec, (long)vblank_time->tv_usec,
 		      duration_ns/1000, i);
