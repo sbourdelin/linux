@@ -37,10 +37,15 @@ insert_iova_boundary(struct iova_domain *iovad)
 {
 	struct iova *iova;
 	unsigned long start_pfn_32bit = iovad->start_pfn;
+	unsigned long start_pfn_64bit = iovad->dma_32bit_pfn + 1;
 
 	iova = reserve_iova(iovad, start_pfn_32bit, start_pfn_32bit);
 	BUG_ON(!iova);
 	iovad->cached32_node = &iova->node;
+
+	iova = reserve_iova(iovad, start_pfn_64bit, start_pfn_64bit);
+	BUG_ON(!iova);
+	iovad->cached64_node = &iova->node;
 }
 
 void
@@ -62,8 +67,8 @@ init_iova_domain(struct iova_domain *iovad, unsigned long granule,
 	init_iova_rcaches(iovad);
 
 	/*
-	 * Insert boundary nodes for dma32. So cached32_node can not be NULL in
-	 * future.
+	 * Insert boundary nodes for dma32 and dma64. So cached32_node and
+	 * cached64_node can not be NULL in future.
 	 */
 	insert_iova_boundary(iovad);
 }
@@ -75,10 +80,10 @@ __get_cached_rbnode(struct iova_domain *iovad, unsigned long *limit_pfn)
 	struct rb_node *cached_node;
 	struct rb_node *next_node;
 
-	if (*limit_pfn > iovad->dma_32bit_pfn)
-		return rb_last(&iovad->rbroot);
-	else
+	if (*limit_pfn <= iovad->dma_32bit_pfn)
 		cached_node = iovad->cached32_node;
+	else
+		cached_node = iovad->cached64_node;
 
 	next_node = rb_next(cached_node);
 	if (next_node) {
@@ -94,29 +99,32 @@ static void
 __cached_rbnode_insert_update(struct iova_domain *iovad, struct iova *new)
 {
 	struct iova *cached_iova;
+	struct rb_node **cached_node;
 
-	if (new->pfn_hi > iovad->dma_32bit_pfn)
-		return;
+	if (new->pfn_hi <= iovad->dma_32bit_pfn)
+		cached_node = &iovad->cached32_node;
+	else
+		cached_node = &iovad->cached64_node;
 
-	cached_iova = rb_entry(iovad->cached32_node, struct iova, node);
+	cached_iova = rb_entry(*cached_node, struct iova, node);
 	if (new->pfn_lo <= cached_iova->pfn_lo)
-		iovad->cached32_node = rb_prev(&new->node);
+		*cached_node = rb_prev(&new->node);
 }
 
 static void
 __cached_rbnode_delete_update(struct iova_domain *iovad, struct iova *free)
 {
 	struct iova *cached_iova;
-	struct rb_node *curr;
+	struct rb_node **cached_node;
 
-	curr = iovad->cached32_node;
-	cached_iova = rb_entry(curr, struct iova, node);
+	if (free->pfn_hi <= iovad->dma_32bit_pfn)
+		cached_node = &iovad->cached32_node;
+	else
+		cached_node = &iovad->cached64_node;
 
-	if (free->pfn_lo >= cached_iova->pfn_lo) {
-		/* only cache if it's below 32bit pfn */
-		if (free->pfn_hi <= iovad->dma_32bit_pfn)
-			iovad->cached32_node = rb_prev(&free->node);
-	}
+	cached_iova = rb_entry(*cached_node, struct iova, node);
+	if (free->pfn_lo >= cached_iova->pfn_lo)
+		*cached_node = rb_prev(&free->node);
 }
 
 /*
@@ -283,7 +291,7 @@ EXPORT_SYMBOL_GPL(iova_cache_put);
  * alloc_iova - allocates an iova
  * @iovad: - iova domain in question
  * @size: - size of page frames to allocate
- * @limit_pfn: - max limit address
+ * @limit_pfn: - max limit address(included)
  * @size_aligned: - set if size_aligned address range is required
  * This function allocates an iova in the range iovad->start_pfn to limit_pfn,
  * searching top-down from limit_pfn to iovad->start_pfn. If the size_aligned
@@ -402,7 +410,7 @@ EXPORT_SYMBOL_GPL(free_iova);
  * alloc_iova_fast - allocates an iova from rcache
  * @iovad: - iova domain in question
  * @size: - size of page frames to allocate
- * @limit_pfn: - max limit address
+ * @limit_pfn: - max limit address(included)
  * This function tries to satisfy an iova allocation from the rcache,
  * and falls back to regular allocation on failure.
 */
