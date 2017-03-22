@@ -34,7 +34,7 @@ struct bio_list;
 struct blk_plug;
 struct cfs_rq;
 struct fs_struct;
-struct futex_pi_state;
+struct futex_state;
 struct io_context;
 struct mempolicy;
 struct nameidata;
@@ -871,7 +871,7 @@ struct task_struct {
 	struct compat_robust_list_head __user *compat_robust_list;
 #endif
 	struct list_head		pi_state_list;
-	struct futex_pi_state		*pi_state_cache;
+	struct futex_state		*pi_state_cache;
 #endif
 #ifdef CONFIG_PERF_EVENTS
 	struct perf_event_context	*perf_event_ctxp[perf_nr_task_contexts];
