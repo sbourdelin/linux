@@ -11,6 +11,10 @@ Required properties:
   datasheet
 - interrupts: Should contain GPC interrupt request 1
 - pu-supply: Link to the LDO regulator powering the PU power domain
+- fsl,ldo-bypass: Should be 0 or 1 to enable LDO bypass mode (default 0).
+  This is performed in cooperation with cpufreq. Some versions of uboot will
+  also look at this property and set the arm and soc regulators in bypass mode
+  before linux.
 - clocks: Clock phandles to devices in the PU power domain that need
 	  to be enabled during domain power-up for reset propagation.
 - #power-domain-cells: Should be 1, see below:

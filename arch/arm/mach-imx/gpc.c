@@ -22,6 +22,7 @@
 #include <linux/pm_domain.h>
 #include <linux/regulator/consumer.h>
 #include <linux/irqchip/arm-gic.h>
+#include <linux/cpufreq.h>
 #include "common.h"
 #include "hardware.h"
 
@@ -460,6 +461,12 @@ static int imx_gpc_probe(struct platform_device *pdev)
 	/* bail out if DT too old and doesn't provide the necessary info */
 	if (!of_property_read_bool(pdev->dev.of_node, "#power-domain-cells"))
 		return 0;
+
+	/* wait for cpufreq to initialize before using pu_reg */
+	if (IS_ENABLED(CONFIG_ARM_IMX6Q_CPUFREQ) && cpufreq_get_current_driver() == NULL) {
+		dev_dbg(&pdev->dev, "cpufreq driver not ready, retry\n");
+		return -EPROBE_DEFER;
+	}
 
 	pu_reg = devm_regulator_get_optional(&pdev->dev, "pu");
 	if (PTR_ERR(pu_reg) == -ENODEV)
