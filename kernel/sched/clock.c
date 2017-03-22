@@ -79,6 +79,15 @@ EXPORT_SYMBOL_GPL(sched_clock);
 
 __read_mostly int sched_clock_running;
 
+/*
+ * We start with sched clock early static branch enabled, and global status
+ * disabled.  Early in boot it is decided whether to enable the global
+ * status as well (set sched_clock_early_running to true), and later, when
+ * early clock is no longer needed, the static branch is disabled.
+ */
+static DEFINE_STATIC_KEY_TRUE(__use_sched_clock_early);
+static bool __read_mostly sched_clock_early_running;
+
 void sched_clock_init(void)
 {
 	sched_clock_running = 1;
@@ -187,6 +196,12 @@ void sched_clock_init_late(void)
 	 * and do the update, or both.
 	 */
 	smp_mb(); /* matches {set,clear}_sched_clock_stable() */
+
+	/*
+	 * It is guaranteed early clock is not running anymore. This function is
+	 * called from sched_init_smp(), and early clock must finish before smp.
+	 */
+	static_branch_disable(&__use_sched_clock_early);
 
 	if (__sched_clock_stable_early)
 		__set_sched_clock_stable();
@@ -320,6 +335,11 @@ u64 sched_clock_cpu(int cpu)
 	if (sched_clock_stable())
 		return sched_clock() + raw_offset;
 
+	if (static_branch_unlikely(&__use_sched_clock_early)) {
+		if (sched_clock_early_running)
+			return sched_clock_early();
+	}
+
 	if (unlikely(!sched_clock_running))
 		return 0ull;
 
@@ -378,6 +398,47 @@ void sched_clock_idle_wakeup_event(u64 delta_ns)
 	touch_softlockup_watchdog_sched();
 }
 EXPORT_SYMBOL_GPL(sched_clock_idle_wakeup_event);
+
+u64 __weak sched_clock_early(void)
+{
+	return 0;
+}
+
+/*
+ * Is called when sched_clock_early() is about to be finished, notifies sched
+ * clock that after this call sched_clock_early() can't be used.
+ *
+ * Must be called before smp_init() as sched_clock_early() is supposed to be
+ * used only during early boot, and are not guarantee to handle multi-CPU
+ * environment properly.
+ */
+void __init sched_clock_early_fini(void)
+{
+	struct sched_clock_data *scd = this_scd();
+	u64 now_early = sched_clock_early();
+	u64 now_sched = sched_clock();
+
+	/*
+	 * Set both: gtod_offset and raw_offset because we could switch to
+	 * either unstable clock or stable clock.
+	 */
+	gtod_offset = now_early - scd->tick_gtod;
+	raw_offset = now_early - now_sched;
+
+	sched_clock_early_running = false;
+}
+
+/*
+ * Notifies sched clock that early boot clocksource is available, it means that
+ * the current platform has implemented sched_clock_early().
+ *
+ * The early clock is running until we switch to a stable clock, or when we
+ * learn that the stable clock is not available.
+ */
+void __init sched_clock_early_init(void)
+{
+	sched_clock_early_running = true;
+}
 
 #else /* CONFIG_HAVE_UNSTABLE_SCHED_CLOCK */
 
