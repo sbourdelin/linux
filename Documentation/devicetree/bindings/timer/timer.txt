@@ -1,0 +1,38 @@
+
+Specifying timer information for devices
+========================================
+
+The timer can be declared via the macro:
+
+CLOCKSOURCE_OF_DECLARE(name, init) if it is a clocksource
+CLOCKEVENT_OF_DECLARE(name, init) if it is a clockevent
+
+The CLOCKSOURCE_OF_DECLARE() was introduced before the
+CLOCKEVENT_OF_DECLARE() and that resulted in some abuse where the
+clockevent and the clocksource are both initialized in the same init
+routine.
+
+With the introduction of the CLOCKEVENT_OF_DECLARE(), the driver can
+now split the clocksource and the clockevent init code. However, the
+device tree may specify a single node, so the same node will be passed
+to the clockevent/clocksource's init function, with the same base
+address. It is possible to specify an attribute to the timer's node to
+specify if it is a clocksource or a clockevent and define two timers
+node.
+
+Example:
+
+	timer: timer@98400000 {
+		compatible = "moxa,moxart-timer";
+		reg = <0x98400000 0x42>;
+		interrupts = <19 1>;
+		clocks = <&coreclk>;
+		clockevent;
+	};
+
+	timer: timer@98400010 {
+		compatible = "moxa,moxart-timer";
+		reg = <0x98400010 0x42>;
+		clocks = <&coreclk>;
+		clocksource;
+	};

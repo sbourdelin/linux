@@ -37,6 +37,13 @@ int __init clockevent_probe(void)
 
 		init_func = match->data;
 
+		/*
+		 * The device node describes a clocksource, ignore it
+		 * as we are in the clockevent init routine.
+		 */
+		if (of_property_read_bool(np, "clocksource"))
+			continue;
+
 		ret = init_func(np);
 		if (ret) {
 			pr_warn("Failed to initialize '%s' (%d)\n",
