@@ -57,3 +57,7 @@ check arch/x86/lib/memcpy_64.S        -B -I "^EXPORT_SYMBOL" -I "^#include <asm/
 check arch/x86/lib/memset_64.S        -B -I "^EXPORT_SYMBOL" -I "^#include <asm/export.h>"
 check include/uapi/asm-generic/mman.h -B -I "^#include <\(uapi/\)*asm-generic/mman-common.h>"
 check include/uapi/linux/mman.h       -B -I "^#include <\(uapi/\)*asm/mman.h>"
+
+# need to link to the latest futex.h header
+[[ -f ../../include/uapi/linux/futex.h ]] &&
+	ln -sf  ../../../../../include/uapi/linux/futex.h util/include/linux

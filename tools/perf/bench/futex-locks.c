@@ -8,12 +8,14 @@
  * indication of actual throughput of the mutex code as it may not really
  * need to call into the kernel. Therefore, 3 sets of simple mutex lock and
  * unlock functions are written to implenment a mutex lock using the
- * wait-wake (2 versions) and PI futexes respectively. These functions serve
- * as the basis for measuring the locking throughput.
+ * wait-wake, PI, GC and TP futexes respectively. These functions serve as
+ * the basis for measuring the locking throughput.
  *
- * Two sets of simple reader/writer lock and unlock functions are also
- * implemented using the wait-wake futexes as well as the Glibc rwlock
- * respectively for performance measurement purpose.
+ * Three sets of simple reader/writer lock and unlock functions are also
+ * implemented using the wait-wake and TP futexes as well as the Glibc
+ * rwlock respectively for performance measurement purpose. The TP futex
+ * writer lock/unlock functions are the same as that of the mutex functions.
+ * That is not the case for the wait-wake futexes.
  */
 
 #include <pthread.h>
@@ -50,6 +52,7 @@ enum {
 	STAT_OPS,	/* # of exclusive locking operations	*/
 	STAT_SOPS,	/* # of shared locking operations	*/
 	STAT_LOCKS,	/* # of exclusive lock slowpath count	*/
+	STAT_KLOCKS,	/* # of exclusive kernel locks		*/
 	STAT_UNLOCKS,	/* # of exclusive unlock slowpath count	*/
 	STAT_SLEEPS,	/* # of exclusive lock sleeps		*/
 	STAT_SLOCKS,	/* # of shared lock slowpath count	*/
@@ -57,6 +60,12 @@ enum {
 	STAT_SSLEEPS,	/* # of shared lock sleeps		*/
 	STAT_EAGAINS,	/* # of EAGAIN errors			*/
 	STAT_WAKEUPS,	/* # of wakeups (unlock return)		*/
+	STAT_HANDOFFS,	/* # of lock handoff (TP only)		*/
+	STAT_STEALS,	/* # of lock steals (TP only)		*/
+	STAT_SLRETRIES,	/* # of shared lock retries		*/
+	STAT_SURETRIES,	/* # of shared unlock retries		*/
+	STAT_SALONES,	/* # of shared locking alone ops	*/
+	STAT_SGROUPS,	/* # of shared locking group ops	*/
 	STAT_TIMEOUTS,	/* # of exclusive lock timeouts		*/
 	STAT_LOCKERRS,	/* # of exclusive lock errors		*/
 	STAT_UNLKERRS,	/* # of exclusive unlock errors		*/
@@ -225,7 +234,7 @@ static unsigned int rpercent = 50;	/* Reader percentage */
  */
 static const struct option mutex_options[] = {
 	OPT_INTEGER ('d', "locklat",	&locklat,  "Specify inter-locking latency (default = 1)"),
-	OPT_STRING  ('f', "ftype",	&ftype,    "type", "Specify futex type: WW, PI, GC, all (default)"),
+	OPT_STRING  ('f', "ftype",	&ftype,    "type", "Specify futex type: WW, PI, GC, TP, all (default)"),
 	OPT_INTEGER ('l', "loadlat",	&loadlat,  "Specify load latency (default = 1)"),
 	OPT_UINTEGER('r', "runtime",	&nsecs,    "Specify runtime (in seconds, default = 10s)"),
 	OPT_BOOLEAN ('S', "shared",	&fshared,  "Use shared futexes instead of private ones"),
@@ -244,7 +253,7 @@ static const char * const bench_futex_mutex_usage[] = {
 
 static const struct option rwlock_options[] = {
 	OPT_INTEGER ('d', "locklat",	&locklat,  "Specify inter-locking latency (default = 1)"),
-	OPT_STRING  ('f', "ftype",	&ftype,    "type", "Specify futex type: WW, GC, all (default)"),
+	OPT_STRING  ('f', "ftype",	&ftype,    "type", "Specify futex type: WW, TP, GC, all (default)"),
 	OPT_INTEGER ('l', "loadlat",	&loadlat,  "Specify load latency (default = 1)"),
 	OPT_UINTEGER('R', "read-%",	&rpercent, "Specify reader percentage (default 50%)"),
 	OPT_UINTEGER('r', "runtime",	&nsecs,    "Specify runtime (in seconds, default = 10s)"),
@@ -520,6 +529,78 @@ static void gc_mutex_unlock(futex_t *futex __maybe_unused,
 			    int tid __maybe_unused)
 {
 	pthread_mutex_unlock(&mutex);
+}
+
+/*
+ * TP futex lock/unlock functions
+ */
+static void tp_mutex_lock(futex_t *futex, int tid)
+{
+	futex_t val = 0;
+	int ret;
+	int uscnt = 4;	/* Do 4 userspace locks before doing kernel lock */
+
+	if (atomic_cmpxchg_acquire(futex, &val, thread_id))
+		return;
+
+	/*
+	 * Retry if an error happens
+	 */
+	stat_inc(tid, STAT_LOCKS);
+	for (;;) {
+		FUTEX_CALL(futex_lock, TIME_LOCK, futex, uscnt, ptospec, flags);
+		if (uscnt)
+			uscnt--;
+		else
+			stat_inc(tid, STAT_KLOCKS);
+
+		if (likely(ret >= 0))
+			break;
+		if (errno == EAGAIN) {
+			stat_inc(tid, STAT_EAGAINS);
+			val = 0;
+			if (atomic_cmpxchg_acquire(futex, &val, thread_id))
+				return;
+			continue;
+		}
+		if (errno == ETIMEDOUT) {
+			stat_inc(tid, STAT_TIMEOUTS);
+		} else {
+			stat_inc(tid, STAT_LOCKERRS);
+		}
+		/*
+		 * It is possible, though extremely unlikely, that a lock
+		 * handoff has happened and an error is returned. So we
+		 * need to check for that here.
+		 */
+		if ((*futex & FUTEX_SHARED_TID_MASK) == thread_id)
+			return;
+	}
+	/*
+	 * Get # of sleeps & locking method
+	 */
+	stat_add(tid, STAT_SLEEPS, ret >> 16);
+	ret &= 0xff;
+	if (!ret)
+		stat_inc(tid, STAT_STEALS);
+	else if (ret == 2)
+		stat_inc(tid, STAT_HANDOFFS);
+}
+
+static void tp_mutex_unlock(futex_t *futex, int tid)
+{
+	futex_t val = thread_id;
+	int ret;
+
+	if (atomic_cmpxchg_release(futex, &val, 0))
+		return;
+
+	stat_inc(tid, STAT_UNLOCKS);
+	FUTEX_CALL(futex_unlock, TIME_UNLK, futex, flags);
+	if (ret < 0)
+		stat_inc(tid, STAT_UNLKERRS);
+	else
+		stat_add(tid, STAT_WAKEUPS, ret);
 }
 
 /**********************[ RWLOCK lock/unlock functions ]********************/
@@ -814,6 +895,121 @@ static void ww2_read_lock(futex_t *futex __maybe_unused, int tid)
 }
 
 /*
+ * TP futex reader/writer lock/unlock functions
+ */
+#define tp_write_lock		tp_mutex_lock
+#define tp_write_unlock		tp_mutex_unlock
+#define FUTEX_FLAGS_MASK	(3UL << 30)
+
+static void tp_read_lock(futex_t *futex, int tid)
+{
+	futex_t val = 0;
+	int ret, retry = 0;
+
+	if (atomic_cmpxchg_acquire(futex, &val, FUTEX_SHARED + 1))
+		return;
+
+	for (;;) {
+		futex_t new;
+
+		/*
+		 * Try to increment the reader count only if
+		 * 1) the FUTEX_SHARED bit is set; and
+		 * 2) none of the flags bits or FUTEX_SHARED_UNLOCK is set.
+		 */
+		if (!val)
+			new = FUTEX_SHARED + 1;
+		else if ((val & FUTEX_SHARED) &&
+			!(val & (FUTEX_FLAGS_MASK|FUTEX_SHARED_UNLOCK)))
+			new = val + 1;
+		else
+			break;
+		if (atomic_cmpxchg_acquire(futex, &val, new))
+			goto out;
+		retry++;
+	}
+
+	stat_inc(tid, STAT_SLOCKS);
+	for (;;) {
+		FUTEX_CALL(futex_lock_shared, TIME_SLOCK,
+			   futex, !pwriter, ptospec, flags);
+		if (likely(ret >= 0))
+			break;
+		if (errno == ETIMEDOUT)
+			stat_inc(tid, STAT_STIMEOUTS);
+		else
+			stat_inc(tid, STAT_SLOCKERRS);
+	}
+	/*
+	 * Get # of sleeps & locking method
+	 */
+	stat_add(tid, STAT_SSLEEPS, ret >> 16);
+	if (ret & 0x100)
+		 stat_inc(tid, STAT_SALONES);	/* In alone mode */
+	if (ret & 0x200)
+		 stat_inc(tid, STAT_SGROUPS);	/* In group mode */
+
+	ret &= 0xff;
+	if (!ret)
+		stat_inc(tid, STAT_STEALS);
+	else if (ret == 2)
+		stat_inc(tid, STAT_HANDOFFS);
+out:
+	if (unlikely(retry))
+		stat_add(tid, STAT_SLRETRIES, retry);
+}
+
+static void tp_read_unlock(futex_t *futex, int tid)
+{
+	futex_t val;
+	int ret, retry = 0;
+
+	val = atomic_dec_release(futex);
+	if (!(val & FUTEX_SHARED)) {
+		fprintf(stderr,
+			"tp_read_unlock: Incorrect futex value = 0x%x\n", val);
+		exit(1);
+	}
+
+	for (;;) {
+		/*
+		 * Return if not the last reader, not in shared locking
+		 * mode or the unlock bit has been set.
+		 */
+		if ((val & (FUTEX_SCNT_MASK|FUTEX_SHARED_UNLOCK)) ||
+		   !(val & FUTEX_SHARED))
+			return;
+
+		if (val & ~FUTEX_SHARED_TID_MASK) {
+			/*
+			 * Only one task that can set the FUTEX_SHARED_UNLOCK
+			 * bit will do the unlock.
+			 */
+			if (atomic_cmpxchg_relaxed(futex, &val,
+					val|FUTEX_SHARED_UNLOCK))
+				break;
+		} else {
+			/*
+			 * Try to clear the futex.
+			 */
+			if (atomic_cmpxchg_release(futex, &val, 0))
+				goto out;
+		}
+		retry++;
+	}
+
+	stat_inc(tid, STAT_SUNLOCKS);
+	FUTEX_CALL(futex_unlock_shared, TIME_SUNLK, futex, flags);
+	if (ret < 0)
+		stat_inc(tid, STAT_SUNLKERRS);
+	else
+		stat_add(tid, STAT_WAKEUPS, ret);
+out:
+	if (unlikely(retry))
+		stat_add(tid, STAT_SURETRIES, retry);
+}
+
+/*
  * Glibc read/write lock
  */
 static void gc_write_lock(futex_t *futex __maybe_unused,
@@ -1050,6 +1246,20 @@ static int futex_mutex_type(const char **ptype)
 		}
 		pthread_mutex_init(&mutex, attr);
 		mutex_inited = true;
+	} else if (!strcasecmp(type, "TP")) {
+		*ptype = "TP";
+		mutex_lock_fn = tp_mutex_lock;
+		mutex_unlock_fn = tp_mutex_unlock;
+
+		/*
+		 * Check if TP futex is supported.
+		 */
+		futex_unlock(&global_futex, 0);
+		if (errno == ENOSYS) {
+			fprintf(stderr,
+			    "\nTP futexes are not supported by the kernel!\n");
+			return -1;
+		}
 	} else {
 		return -1;
 	}
@@ -1073,6 +1283,22 @@ static int futex_rwlock_type(const char **ptype)
 			read_unlock_fn = ww_read_unlock;
 			write_lock_fn = ww_write_lock;
 			write_unlock_fn = ww_write_unlock;
+		}
+	} else if (!strcasecmp(type, "TP")) {
+		*ptype = "TP";
+		read_lock_fn = tp_read_lock;
+		read_unlock_fn = tp_read_unlock;
+		write_lock_fn = tp_write_lock;
+		write_unlock_fn = tp_write_unlock;
+
+		/*
+		 * Check if TP futex is supported.
+		 */
+		futex_unlock(&global_futex, 0);
+		if (errno == ENOSYS) {
+			fprintf(stderr,
+			    "\nTP futexes are not supported by the kernel!\n");
+			return -1;
 		}
 	} else if (!strcasecmp(type, "GC")) {
 		pthread_rwlockattr_t *attr = NULL;
@@ -1118,6 +1344,7 @@ static void futex_test_driver(const char *futex_type,
 		[STAT_OPS]	 = "Total exclusive locking ops",
 		[STAT_SOPS]	 = "Total shared locking ops",
 		[STAT_LOCKS]	 = "Exclusive lock slowpaths",
+		[STAT_KLOCKS]	 = "Exclusive kernel locks",
 		[STAT_UNLOCKS]	 = "Exclusive unlock slowpaths",
 		[STAT_SLEEPS]	 = "Exclusive lock sleeps",
 		[STAT_SLOCKS]	 = "Shared lock slowpaths",
@@ -1125,7 +1352,13 @@ static void futex_test_driver(const char *futex_type,
 		[STAT_SSLEEPS]	 = "Shared lock sleeps",
 		[STAT_WAKEUPS]	 = "Process wakeups",
 		[STAT_EAGAINS]	 = "EAGAIN lock errors",
-		[STAT_TIMEOUTS]	 = "Exclusive lock timeouts",
+		[STAT_HANDOFFS]  = "Lock handoffs",
+		[STAT_STEALS]	 = "Lock stealings",
+		[STAT_SLRETRIES] = "Shared lock retries",
+		[STAT_SURETRIES] = "Shared unlock retries",
+		[STAT_SALONES]	 = "Shared lock ops (alone mode)",
+		[STAT_SGROUPS]	 = "Shared lock ops (group mode)",
+		[STAT_TIMEOUTS]  = "Exclusive lock timeouts",
 		[STAT_STIMEOUTS] = "Shared lock timeouts",
 		[STAT_LOCKERRS]  = "\nExclusive lock errors",
 		[STAT_UNLKERRS]  = "\nExclusive unlock errors",
@@ -1407,6 +1640,7 @@ int bench_futex_mutex(int argc, const char **argv,
 		futex_test_driver("WW", futex_mutex_type, mutex_workerfn);
 		futex_test_driver("PI", futex_mutex_type, mutex_workerfn);
 		futex_test_driver("GC", futex_mutex_type, mutex_workerfn);
+		futex_test_driver("TP", futex_mutex_type, mutex_workerfn);
 	} else {
 		futex_test_driver(ftype, futex_mutex_type, mutex_workerfn);
 	}
@@ -1433,6 +1667,7 @@ int bench_futex_rwlock(int argc, const char **argv,
 
 	if (!ftype || !strcmp(ftype, "all")) {
 		futex_test_driver("WW", futex_rwlock_type, rwlock_workerfn);
+		futex_test_driver("TP", futex_rwlock_type, rwlock_workerfn);
 		futex_test_driver("GC", futex_rwlock_type, rwlock_workerfn);
 	} else {
 		futex_test_driver(ftype, futex_rwlock_type, rwlock_workerfn);
