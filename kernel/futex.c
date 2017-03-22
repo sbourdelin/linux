@@ -4474,3 +4474,85 @@ static int __init futex_init(void)
 	return 0;
 }
 core_initcall(futex_init);
+
+#if defined(CONFIG_DEBUG_FS) && defined(CONFIG_SMP)
+/*
+ * Debug code to dump selected content of in-kernel futex hash bucket table.
+ */
+#include <linux/debugfs.h>
+
+static int futex_dump_show(struct seq_file *m, void *arg)
+{
+	struct futex_hash_bucket *hb = arg;
+	struct futex_state *state;
+	int i;
+
+	if (list_empty(&hb->fs_head))
+		return 0;
+
+	seq_printf(m, "\nHash bucket %d:\n", (int)(hb - futex_queues));
+	spin_lock(&hb->fs_lock);
+	i = 0;
+	list_for_each_entry(state, &hb->fs_head, fs_list) {
+		seq_printf(m, "  Futex state %d\n", i++);
+		if (state->owner)
+			seq_printf(m, "    owner PID = %d\n",
+				   task_pid_vnr(state->owner));
+		if (state->mutex_owner)
+			seq_printf(m, "    mutex owner PID = %d\n",
+				   task_pid_vnr(state->mutex_owner));
+		seq_printf(m, "    reference count = %d\n",
+			   atomic_read(&state->refcount));
+		seq_printf(m, "    handoff PID = %d\n", state->handoff_pid);
+	}
+	spin_unlock(&hb->fs_lock);
+	return 0;
+}
+
+static void *futex_dump_start(struct seq_file *m, loff_t *pos)
+{
+	return (*pos < futex_hashsize) ? &futex_queues[*pos] : NULL;
+}
+
+static void *futex_dump_next(struct seq_file *m, void *arg, loff_t *pos)
+{
+	(*pos)++;
+	return (*pos < futex_hashsize) ? &futex_queues[*pos] : NULL;
+}
+
+static void futex_dump_stop(struct seq_file *m, void *arg)
+{
+}
+
+static const struct seq_operations futex_dump_op = {
+	.start = futex_dump_start,
+	.next  = futex_dump_next,
+	.stop  = futex_dump_stop,
+	.show  = futex_dump_show,
+};
+
+static int futex_dump_open(struct inode *inode, struct file *file)
+{
+	return seq_open(file, &futex_dump_op);
+}
+
+static const struct file_operations fops_futex_dump = {
+	.open	 = futex_dump_open,
+	.read	 = seq_read,
+	.llseek	 = seq_lseek,
+	.release = seq_release,
+};
+
+/*
+ * Initialize debugfs for the futex hash bucket table dump.
+ */
+static int __init init_futex_dump(void)
+{
+	if (!debugfs_create_file("futex_hash_table", 0400, NULL, NULL,
+				 &fops_futex_dump))
+		return -ENOMEM;
+	return 0;
+}
+fs_initcall(init_futex_dump);
+
+#endif /* CONFIG_DEBUG_FS && CONFIG_SMP */
