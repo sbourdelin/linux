@@ -2508,7 +2508,7 @@ ctnetlink_exp_dump_expect(struct sk_buff *skb,
 	struct nlattr *nest_parms;
 	struct nf_conntrack_tuple nat_tuple = {};
 #endif
-	struct nf_ct_helper_expectfn *expfn;
+	struct nf_ct_nat_helper *nat_helper;
 
 	if (timeout < 0)
 		timeout = 0;
@@ -2557,9 +2557,9 @@ ctnetlink_exp_dump_expect(struct sk_buff *skb,
 		    nla_put_string(skb, CTA_EXPECT_HELP_NAME, helper->name))
 			goto nla_put_failure;
 	}
-	expfn = nf_ct_helper_expectfn_find_by_symbol(exp->expectfn);
-	if (expfn != NULL &&
-	    nla_put_string(skb, CTA_EXPECT_FN, expfn->name))
+	nat_helper = nf_ct_nat_helper_find_by_symbol(exp->expectfn);
+	if (!nat_helper &&
+	    nla_put_string(skb, CTA_EXPECT_FN, nat_helper->name))
 		goto nla_put_failure;
 
 	return 0;
@@ -3070,14 +3070,14 @@ ctnetlink_alloc_expect(const struct nlattr * const cda[], struct nf_conn *ct,
 	}
 	if (cda[CTA_EXPECT_FN]) {
 		const char *name = nla_data(cda[CTA_EXPECT_FN]);
-		struct nf_ct_helper_expectfn *expfn;
+		struct nf_ct_nat_helper *nat_helper;
 
-		expfn = nf_ct_helper_expectfn_find_by_name(name);
-		if (expfn == NULL) {
+		nat_helper = nf_ct_nat_helper_find_by_name(name);
+		if (!nat_helper) {
 			err = -EINVAL;
 			goto err_out;
 		}
-		exp->expectfn = expfn->expectfn;
+		exp->expectfn = nat_helper->expectfn;
 	} else
 		exp->expectfn = NULL;
 

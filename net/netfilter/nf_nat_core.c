@@ -848,7 +848,7 @@ static struct pernet_operations nf_nat_net_ops = {
 	.exit = nf_nat_net_exit,
 };
 
-static struct nf_ct_helper_expectfn follow_master_nat = {
+static struct nf_ct_nat_helper follow_master_nat = {
 	.name		= "nat-follow-master",
 	.expectfn	= nf_nat_follow_master,
 };
@@ -872,7 +872,7 @@ static int __init nf_nat_init(void)
 	if (ret < 0)
 		goto cleanup_extend;
 
-	nf_ct_helper_expectfn_register(&follow_master_nat);
+	nf_ct_nat_helper_register(&follow_master_nat);
 
 	/* Initialize fake conntrack so that NAT will skip it */
 	nf_ct_untracked_status_or(IPS_NAT_DONE_MASK);
@@ -898,7 +898,7 @@ static void __exit nf_nat_cleanup(void)
 
 	unregister_pernet_subsys(&nf_nat_net_ops);
 	nf_ct_extend_unregister(&nat_extend);
-	nf_ct_helper_expectfn_unregister(&follow_master_nat);
+	nf_ct_nat_helper_unregister(&follow_master_nat);
 	RCU_INIT_POINTER(nfnetlink_parse_nat_setup_hook, NULL);
 #ifdef CONFIG_XFRM
 	RCU_INIT_POINTER(nf_nat_decode_session_hook, NULL);

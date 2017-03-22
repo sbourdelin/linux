@@ -618,7 +618,7 @@ err1:
 	return NF_DROP;
 }
 
-static struct nf_ct_helper_expectfn sip_nat = {
+static struct nf_ct_nat_helper sip_nat = {
 	.name		= "sip",
 	.expectfn	= nf_nat_sip_expected,
 };
@@ -627,7 +627,7 @@ static void __exit nf_nat_sip_fini(void)
 {
 	RCU_INIT_POINTER(nf_nat_sip_hooks, NULL);
 
-	nf_ct_helper_expectfn_unregister(&sip_nat);
+	nf_ct_nat_helper_unregister(&sip_nat);
 	synchronize_rcu();
 }
 
@@ -645,7 +645,7 @@ static int __init nf_nat_sip_init(void)
 {
 	BUG_ON(nf_nat_sip_hooks != NULL);
 	RCU_INIT_POINTER(nf_nat_sip_hooks, &sip_hooks);
-	nf_ct_helper_expectfn_register(&sip_nat);
+	nf_ct_nat_helper_register(&sip_nat);
 	return 0;
 }
 
