@@ -1,0 +1,180 @@
+Started by: Waiman Long <longman@redhat.com>
+
+Throughput-Optimized Futexes
+----------------------------
+
+There are two main problems for a wait-wake futex (FUTEX_WAIT and
+FUTEX_WAKE) when used for creating user-space locking primitives:
+
+ 1) With a wait-wake futex, tasks waiting for a lock are put to sleep
+    in the futex queue to be woken up by the lock owner when it is done
+    with the lock. Waking up a sleeping task, however, introduces some
+    additional latency which can be large especially if the critical
+    section protected by the lock is relatively short. This may cause
+    a performance bottleneck on large systems with many CPUs running
+    applications that need a lot of inter-thread synchronization.
+
+ 2) The performance of the wait-wake futex is currently
+    spinlock-constrained.  When many threads are contending for a
+    futex in a large system with many CPUs, it is not unusual to have
+    spinlock contention accounting for more than 90% of the total
+    CPU cycles consumed at various points in time.
+
+This two problems can create performance bottlenecks with a
+futex-constrained workload especially on systems with large number
+of CPUs.
+
+The goal of the throughput-optimized (TP) futexes is maximize the
+locking throughput at the expense of fairness and deterministic
+latency. This is done by encouraging lock stealing and optimistic
+spinning on a locked futex when the futex owner is running.  This is
+the same optimistic spinning mechanism used by the kernel mutex and rw
+semaphore implementations to improve performance. Optimistic spinning
+was done without taking any lock.
+
+Lock stealing is known to be a performance enhancement technique as
+long as the safeguards are in place to make sure that there will be no
+lock starvation.  The TP futexes has a built-in lock hand-off mechanism
+to prevent lock starvation from happening as long as the underlying
+kernel mutexes that the TP futexes use have no lock starvation problem.
+
+When the top lock waiter has failed to acquire the lock within a
+certain time threshold, it will initiate the hand-off mechanism by
+forcing the unlocker to transfer the lock to itself instead of freeing
+it for others to grab. This limit the maximum latency a waiter has
+to wait.
+
+Because of optimistic spinning, the lock holders are much less likely
+to go into the kernel to wake up sleeping waiters when performing
+unlock operation. This also helps to increase throughput.
+
+The downside of this improved throughput is the increased variance
+of the actual response times of the locking operations. Some locking
+operations will be very fast, while others may be considerably slower.
+The average response time should be better than the wait-wake futexes.
+
+Performance-wise, TP futexes should be faster than wait-wake futexes
+especially if the futex locker holders do not sleep. For workload
+that does a lot of sleeping within the critical sections, the TP
+futexes may not be faster than the wait-wake futexes.
+
+Implementation
+--------------
+
+Like the PI and robust futexes, an exclusive lock acquirer has to
+atomically put its thread ID (TID) into the lower 30 bits of the
+32-bit futex which should has an original value of 0. If it succeeds,
+it will be the owner of the futex. Otherwise, it has to call into
+the kernel using the FUTEX_LOCK futex(2) syscall.
+
+  futex(uaddr, FUTEX_LOCK, uslock, timeout, NULL, 0);
+
+The two parameters that can be set are:
+ 1) uslock - return EAGAIN to perform userspace locking when set,
+    otherwise locking will be done in the kernel.
+ 2) timeout - specify the timeout value (relative to current time)
+    and ETIMEDOUT will be returned if lock cannot be acquired or
+    available within the timeout period.
+
+Userspace locking can improve throughput by reducing lock hold time,
+but it also has the risk of lock starvation. So kernel locking should
+be used after a number of userspace locking failures.
+
+Inside the kernel, a kernel mutex is used for serialization among
+the futex waiters. Only the top lock waiter which is the owner of
+the serialization mutex is allowed to continuously spin and attempt
+to acquire the lock.  Other lock waiters will have one attempt to
+steal the lock before entering the mutex queues.
+
+When the exclusive futex lock owner is no longer running, the top
+waiter will set the FUTEX_WAITERS bit before going to sleep. This is
+to make sure the futex owner will go into the kernel at unlock time
+to wake up the top waiter.
+
+The return values of the above futex locking syscall, if non-negative,
+are status code that consists of 2 fields - the lock acquisition code
+(bits 0-7) and the number of sleeps (bits 8-30) in the optimistic
+spinning loop before acquiring the futex. A negative returned value
+means an error has happened.
+
+The lock acquisition code can have the following values:
+ a) 0 - lock stolen as non-top waiter
+ b) 1 - lock acquired as the top waiter
+ c) 2 - lock explicitly handed off by the unlocker
+
+When it is time to unlock, the exclusive lock owner has to atomically
+change the futex value from its TID to 0. If that fails, it has to
+issue a FUTEX_UNLOCK futex(2) syscall to wake up the top waiter.
+
+  futex(uaddr, FUTEX_UNLOCK, 0, NULL, NULL, 0);
+
+A return value of 1 from the FUTEX_UNLOCK futex(2) syscall indicates
+a task has been woken up. The syscall returns 0 if no sleeping task
+is woken. A negative value will be returned if an error happens.
+
+The error number returned by a FUTEX_UNLOCK syscall on an empty futex
+can be used to decide if the TP futex functionality is implemented
+in the kernel. If it is present, an EPERFM error will be returned.
+Otherwise it will return ENOSYS.
+
+TP futexes require the kernel to have SMP support as well as support
+for the cmpxchg functionality. For architectures that don't support
+cmpxchg, TP futexes will not be supported as well.
+
+The exclusive locking TP futexes are orthogonal to the robust futexes
+and can be combined without problem. The TP futexes also have code
+to detect the death of an exclusive TP futex owner and handle the
+transfer of futex ownership automatically without the use of the
+robust futexes. The only case that the TP futexes cannot handle alone
+is the PID wrap-around issue where another process with the same PID
+as the real futex owner because of PID wrap-around is mis-identified
+as the owner of a futex.
+
+If a signal comes at the right instance in time, it is possible that a
+lock handoff has happened but the top waiter returns an error instead.
+So the userspace locking code will need to check for this very unlikely
+situation. It is possible for the kernel to handle this internally,
+but it will probably reduce performance. Userspace code can handle
+this more efficiently.
+
+Usage Scenario
+--------------
+
+A TP futex can be used to implement a user-space exclusive lock
+or mutex to guard a critical section which are unlikely to go to
+sleep. The waiters in a TP futex, however, will fall back to sleep in
+a wait queue if the lock owner isn't running. Therefore, it can also be
+used when the critical section is long and prone to sleeping. However,
+it may not have the performance gain when compared with a wait-wake
+futex in this case.
+
+The wait-wake futexes are more versatile as they can also be used to
+implement other locking primitives like semaphores or conditional
+variables.  So the TP futex is not a direct replacement of the
+wait-wake futex. However for userspace mutexes or rwlocks, the TP
+futex is likely a better option than the wait-wake futex.
+
+Sample Code
+-----------
+
+The following are sample code to implement simple mutex lock and
+unlock functions.
+
+__thread int thread_id;
+
+void mutex_lock(int *faddr)
+{
+	if (cmpxchg(faddr, 0, thread_id) == 0)
+		return;
+	while (futex(faddr, FUTEX_LOCK, 0, NULL, NULL, 0) > 0)
+		;
+}
+
+void mutex_unlock(int *faddr)
+{
+	int old, fval;
+
+	if (cmpxchg(faddr, thread_id, 0) == thread_id)
+		return;
+	futex(faddr, FUTEX_UNLOCK, 0, NULL, NULL, 0);
+}
