@@ -40,6 +40,7 @@
 	func(int, enable_ppgtt); \
 	func(int, enable_execlists); \
 	func(int, enable_psr); \
+	func(int, enable_slpc); \
 	func(int, disable_power_well); \
 	func(int, enable_ips); \
 	func(int, invert_brightness); \

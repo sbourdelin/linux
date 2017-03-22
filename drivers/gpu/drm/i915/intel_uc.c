@@ -56,6 +56,7 @@ void intel_uc_sanitize_options(struct drm_i915_private *dev_priv)
 
 		i915.enable_guc_loading = 0;
 		i915.enable_guc_submission = 0;
+		i915.enable_slpc = 0;
 		return;
 	}
 
@@ -79,6 +80,18 @@ void intel_uc_sanitize_options(struct drm_i915_private *dev_priv)
 	/* A negative value means "use platform default" */
 	if (i915.enable_guc_submission < 0)
 		i915.enable_guc_submission = HAS_GUC_SCHED(dev_priv);
+
+	/* slpc requires hardware support and compatible firmware */
+	if (!HAS_SLPC(dev_priv))
+		i915.enable_slpc = 0;
+
+	/* slpc requires guc loaded */
+	if (!i915.enable_guc_loading)
+		i915.enable_slpc = 0;
+
+	/* slpc requires guc submission */
+	if (!i915.enable_guc_submission)
+		i915.enable_slpc = 0;
 }
 
 void intel_uc_init_early(struct drm_i915_private *dev_priv)
