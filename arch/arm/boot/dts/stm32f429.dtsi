@@ -65,7 +65,7 @@
 			clock-frequency = <32768>;
 		};
 
-		clk-lsi {
+		clk_lsi: clk-lsi {
 			#clock-cells = <0>;
 			compatible = "fixed-clock";
 			clock-frequency = <32000>;
@@ -811,6 +811,13 @@
 			interrupts = <80>;
 			clocks = <&rcc 0 STM32F4_AHB2_CLOCK(RNG)>;
 
+		};
+
+		iwdg: iwdg@40003000 {
+			compatible = "st,stm32-iwdg";
+			reg = <0x40003000 0x400>;
+			clocks = <&clk_lsi>;
+			status = "disabled";
 		};
 	};
 };
