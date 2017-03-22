@@ -433,7 +433,7 @@ prepare_threshold_block(unsigned int bank, unsigned int block, u32 addr,
 			int offset, u32 misc_high)
 {
 	unsigned int cpu = smp_processor_id();
-	u32 smca_low, smca_high, smca_addr;
+	u32 smca_low, smca_high;
 	struct threshold_block b;
 	int new;
 
@@ -457,7 +457,29 @@ prepare_threshold_block(unsigned int bank, unsigned int block, u32 addr,
 		goto set_offset;
 	}
 
-	smca_addr = MSR_AMD64_SMCA_MCx_CONFIG(bank);
+	/* Gather LVT offset for thresholding: */
+	if (rdmsr_safe(MSR_CU_DEF_ERR, &smca_low, &smca_high))
+		goto out;
+
+	new = (smca_low & SMCA_THR_LVT_OFF) >> 12;
+
+set_offset:
+	offset = setup_APIC_mce_threshold(offset, new);
+
+	if ((offset == new) && (mce_threshold_vector != amd_threshold_interrupt))
+		mce_threshold_vector = amd_threshold_interrupt;
+
+done:
+	mce_threshold_block_init(&b, offset);
+
+out:
+	return offset;
+}
+
+static void set_smca_config(unsigned int bank)
+{
+	u32 smca_low, smca_high;
+	u32 smca_addr = MSR_AMD64_SMCA_MCx_CONFIG(bank);
 
 	if (!rdmsr_safe(smca_addr, &smca_low, &smca_high)) {
 		/*
@@ -487,24 +509,6 @@ prepare_threshold_block(unsigned int bank, unsigned int block, u32 addr,
 
 		wrmsr(smca_addr, smca_low, smca_high);
 	}
-
-	/* Gather LVT offset for thresholding: */
-	if (rdmsr_safe(MSR_CU_DEF_ERR, &smca_low, &smca_high))
-		goto out;
-
-	new = (smca_low & SMCA_THR_LVT_OFF) >> 12;
-
-set_offset:
-	offset = setup_APIC_mce_threshold(offset, new);
-
-	if ((offset == new) && (mce_threshold_vector != amd_threshold_interrupt))
-		mce_threshold_vector = amd_threshold_interrupt;
-
-done:
-	mce_threshold_block_init(&b, offset);
-
-out:
-	return offset;
 }
 
 /* cpu init entry point, called from mce.c with preempt off */
@@ -515,8 +519,10 @@ void mce_amd_feature_init(struct cpuinfo_x86 *c)
 	int offset = -1;
 
 	for (bank = 0; bank < mca_cfg.banks; ++bank) {
-		if (mce_flags.smca)
+		if (mce_flags.smca) {
 			get_smca_bank_info(bank);
+			set_smca_config(bank);
+		}
 
 		for (block = 0; block < NR_BLOCKS; ++block) {
 			address = get_block_address(cpu, address, low, high, bank, block);
