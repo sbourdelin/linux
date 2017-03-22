@@ -292,7 +292,7 @@ static void rpm_put_suppliers(struct device *dev)
 	list_for_each_entry_rcu(link, &dev->links.suppliers, c_node)
 		if (link->rpm_active &&
 		    READ_ONCE(link->status) != DL_STATE_SUPPLIER_UNBIND) {
-			pm_runtime_put(link->supplier);
+			pm_runtime_put_sync(link->supplier);
 			link->rpm_active = false;
 		}
 }
