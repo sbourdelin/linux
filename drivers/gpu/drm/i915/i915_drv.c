@@ -1011,6 +1011,8 @@ static int i915_driver_init_hw(struct drm_i915_private *dev_priv)
 
 	intel_sanitize_options(dev_priv);
 
+	intel_slpc_save_default_rps(dev_priv);
+
 	ret = i915_ggtt_probe_hw(dev_priv);
 	if (ret)
 		return ret;

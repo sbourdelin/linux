@@ -387,6 +387,122 @@ static void slpc_shared_data_init(struct drm_i915_private *dev_priv)
 	kunmap_atomic(data);
 }
 
+static void host2guc_slpc_reset(struct drm_i915_private *dev_priv)
+{
+	struct slpc_event_input data = {0};
+	u32 shared_data_gtt_offset = guc_ggtt_offset(dev_priv->guc.slpc.vma);
+
+	data.header.value = SLPC_EVENT(SLPC_EVENT_RESET, 2);
+	data.args[0] = shared_data_gtt_offset;
+	data.args[1] = 0;
+
+	host2guc_slpc(dev_priv, &data, 4);
+}
+
+static void host2guc_slpc_query_task_state(struct drm_i915_private *dev_priv)
+{
+	struct slpc_event_input data = {0};
+	u32 shared_data_gtt_offset = guc_ggtt_offset(dev_priv->guc.slpc.vma);
+
+	data.header.value = SLPC_EVENT(SLPC_EVENT_QUERY_TASK_STATE, 2);
+	data.args[0] = shared_data_gtt_offset;
+	data.args[1] = 0;
+
+	host2guc_slpc(dev_priv, &data, 4);
+}
+
+void intel_slpc_query_task_state(struct drm_i915_private *dev_priv)
+{
+	if (dev_priv->guc.slpc.active)
+		host2guc_slpc_query_task_state(dev_priv);
+}
+
+/*
+ * This function will reads the state updates from GuC SLPC into shared data
+ * by invoking H2G action. Returns current state of GuC SLPC.
+ */
+void intel_slpc_read_shared_data(struct drm_i915_private *dev_priv,
+				 struct slpc_shared_data *data)
+{
+	struct page *page;
+	void *pv = NULL;
+
+	intel_slpc_query_task_state(dev_priv);
+
+	page = i915_vma_first_page(dev_priv->guc.slpc.vma);
+	pv = kmap_atomic(page);
+
+	drm_clflush_virt_range(pv, sizeof(struct slpc_shared_data));
+	memcpy(data, pv, sizeof(struct slpc_shared_data));
+
+	kunmap_atomic(pv);
+}
+
+const char *intel_slpc_get_state_str(enum slpc_global_state state)
+{
+	if (state == SLPC_GLOBAL_STATE_NOT_RUNNING)
+		return "not running";
+	else if (state == SLPC_GLOBAL_STATE_INITIALIZING)
+		return "initializing";
+	else if (state == SLPC_GLOBAL_STATE_RESETTING)
+		return "resetting";
+	else if (state == SLPC_GLOBAL_STATE_RUNNING)
+		return "running";
+	else if (state == SLPC_GLOBAL_STATE_SHUTTING_DOWN)
+		return "shutting down";
+	else if (state == SLPC_GLOBAL_STATE_ERROR)
+		return "error";
+	else
+		return "unknown";
+}
+bool intel_slpc_get_status(struct drm_i915_private *dev_priv)
+{
+	struct slpc_shared_data data;
+	bool ret = false;
+
+	intel_slpc_read_shared_data(dev_priv, &data);
+	DRM_INFO("SLPC state: %s\n",
+		 intel_slpc_get_state_str(data.global_state));
+
+	switch (data.global_state) {
+	case SLPC_GLOBAL_STATE_RUNNING:
+		/* Capture required state from SLPC here */
+		ret = true;
+		break;
+	case SLPC_GLOBAL_STATE_ERROR:
+		DRM_ERROR("SLPC in error state.\n");
+		break;
+	case SLPC_GLOBAL_STATE_RESETTING:
+		/*
+		 * SLPC enabling in GuC should be completing fast.
+		 * If SLPC is taking time to initialize (unlikely as we are
+		 * sending reset event during GuC load itself).
+		 * TODO: Need to wait till state changes to RUNNING.
+		 */
+		ret = true;
+		DRM_ERROR("SLPC not running yet.!!!");
+		break;
+	default:
+		break;
+	}
+	return ret;
+}
+
+/*
+ * Uncore sanitize clears RPS state in Host GTPM flows set by BIOS, Save the
+ * initial BIOS programmed RPS state that is needed by SLPC and not set by SLPC.
+ * Set this state while enabling SLPC.
+ */
+void intel_slpc_save_default_rps(struct drm_i915_private *dev_priv)
+{
+	dev_priv->guc.slpc.rp_control = I915_READ(GEN6_RP_CONTROL);
+}
+
+static void intel_slpc_restore_default_rps(struct drm_i915_private *dev_priv)
+{
+	I915_WRITE(GEN6_RP_CONTROL, dev_priv->guc.slpc.rp_control);
+}
+
 void intel_slpc_init(struct drm_i915_private *dev_priv)
 {
 	struct intel_guc *guc = &dev_priv->guc;
@@ -424,6 +540,18 @@ void intel_slpc_cleanup(struct drm_i915_private *dev_priv)
 
 void intel_slpc_enable(struct drm_i915_private *dev_priv)
 {
+	struct page *page;
+	struct slpc_shared_data *data;
+
+	intel_slpc_restore_default_rps(dev_priv);
+
+	page = i915_vma_first_page(dev_priv->guc.slpc.vma);
+	data = kmap_atomic(page);
+	data->global_state = SLPC_GLOBAL_STATE_NOT_RUNNING;
+	kunmap_atomic(data);
+
+	host2guc_slpc_reset(dev_priv);
+	dev_priv->guc.slpc.active = true;
 }
 
 void intel_slpc_disable(struct drm_i915_private *dev_priv)

@@ -27,6 +27,8 @@
 struct intel_slpc {
 	bool active;
 	struct i915_vma *vma;
+
+	u32 rp_control;
 };
 
 enum slpc_status {
@@ -245,6 +247,11 @@ int intel_slpc_task_control(struct drm_i915_private *dev_priv, u64 val,
 			    u32 enable_id, u32 disable_id);
 int intel_slpc_task_status(struct drm_i915_private *dev_priv, u64 *val,
 			   u32 enable_id, u32 disable_id);
+void intel_slpc_read_shared_data(struct drm_i915_private *dev_priv,
+				struct slpc_shared_data *data);
+const char *intel_slpc_get_state_str(enum slpc_global_state state);
+bool intel_slpc_get_status(struct drm_i915_private *dev_priv);
+void intel_slpc_save_default_rps(struct drm_i915_private *dev_priv);
 void intel_slpc_init(struct drm_i915_private *dev_priv);
 void intel_slpc_cleanup(struct drm_i915_private *dev_priv);
 void intel_slpc_enable(struct drm_i915_private *dev_priv);
