@@ -1595,7 +1595,9 @@ struct resource_entry *resource_list_create_entry(struct resource *res,
 	entry = kzalloc(sizeof(*entry) + extra_size, GFP_KERNEL);
 	if (entry) {
 		INIT_LIST_HEAD(&entry->node);
-		entry->res = res ? res : &entry->__res;
+		entry->res = &entry->__res;
+		if (res)
+			entry->__res = *res;
 	}
 
 	return entry;
