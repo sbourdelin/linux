@@ -288,7 +288,7 @@ static ssize_t store_ctlr_mode(struct device *dev,
 	struct fcoe_ctlr_device *ctlr = dev_to_ctlr(dev);
 	char mode[FCOE_MAX_MODENAME_LEN + 1];
 
-	if (count > FCOE_MAX_MODENAME_LEN)
+	if (count < 1 || count > FCOE_MAX_MODENAME_LEN)
 		return -EINVAL;
 
 	strncpy(mode, buf, count);
