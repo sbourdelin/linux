@@ -466,7 +466,11 @@ static int imx_gpc_probe(struct platform_device *pdev)
 		pu_reg = NULL;
 	if (IS_ERR(pu_reg)) {
 		ret = PTR_ERR(pu_reg);
-		dev_err(&pdev->dev, "failed to get pu regulator: %d\n", ret);
+		if (ret == -EPROBE_DEFER)
+			dev_dbg(&pdev->dev, "pu regulator not ready, retry\n");
+		else
+			dev_err(&pdev->dev, "failed to get pu regulator: %d\n",
+					ret);
 		return ret;
 	}
 
