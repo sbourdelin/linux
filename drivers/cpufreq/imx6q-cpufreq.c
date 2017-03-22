@@ -162,6 +162,7 @@ static int imx6q_set_target(struct cpufreq_policy *policy, unsigned int index)
 static int imx6q_cpufreq_init(struct cpufreq_policy *policy)
 {
 	policy->clk = arm_clk;
+	policy->suspend_freq = freq_table[soc_opp_count - 1].frequency;
 	return cpufreq_generic_init(policy, freq_table, transition_latency);
 }
 
@@ -173,6 +174,7 @@ static struct cpufreq_driver imx6q_cpufreq_driver = {
 	.init = imx6q_cpufreq_init,
 	.name = "imx6q-cpufreq",
 	.attr = cpufreq_generic_attr,
+	.suspend = cpufreq_generic_suspend,
 };
 
 static int imx6q_cpufreq_probe(struct platform_device *pdev)
