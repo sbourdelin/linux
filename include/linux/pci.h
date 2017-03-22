@@ -505,6 +505,7 @@ struct pci_bus {
 	unsigned char	cur_bus_speed;	/* enum pci_bus_speed */
 #ifdef CONFIG_PCI_DOMAINS_GENERIC
 	int		domain_nr;
+	int		use_dt_domains;
 #endif
 
 	char		name[48];
@@ -1454,6 +1455,7 @@ void pci_cfg_access_unlock(struct pci_dev *dev);
  * configuration space.
  */
 #ifdef CONFIG_PCI_DOMAINS
+extern struct ida __domain_nr;
 extern int pci_domains_supported;
 int pci_get_new_domain_nr(void);
 #else
