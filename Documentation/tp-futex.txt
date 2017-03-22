@@ -80,22 +80,62 @@ Userspace locking can improve throughput by reducing lock hold time,
 but it also has the risk of lock starvation. So kernel locking should
 be used after a number of userspace locking failures.
 
-Inside the kernel, a kernel mutex is used for serialization among
-the futex waiters. Only the top lock waiter which is the owner of
-the serialization mutex is allowed to continuously spin and attempt
-to acquire the lock.  Other lock waiters will have one attempt to
-steal the lock before entering the mutex queues.
+A shared lock acquirer, on the other hand, has to do either one of
+the following 2 actions depends on the current value of the futex:
+
+ 1) If current futex value is 0, atomically put (FUTEX_SHARED + 1)
+    into the lower 30 bits of the futex.
+
+ 2) If the FUTEX_SHARED bit is set and the FUTEX_SHARED_UNLOCK bit
+    isn't, atomically increment the reader count in the lower 24 bits.
+    The other unused bits (24-27) can be used for other management purpose
+    and will be ignored by the kernel.
+
+Any failure to both of the above actions will lead to the following
+new FUTEX_LOCK_SHARED futex(2) syscall.
+
+  futex(uaddr, FUTEX_LOCK_SHARED, prefer_reader, timeout, NULL, 0);
+
+The special FUTEX_SHARED bit (bit 30) is used to distinguish between a
+shared lock and an exclusive lock. If the FUTEX_SHARED bit isn't set,
+the lower 29 bits contain the TID of the exclusive lock owner. If
+the FUTEX_SHARED bit is set, the lower 29 bits contain the number of
+tasks owning the shared lock.  Therefore, only 29 bits are allowed
+to be used by the TID.
+
+The FUTEX_SHARED_UNLOCK bit can be used by userspace to prevent racing
+and to indicate that a shared unlock is in progress as it will disable
+any shared trylock attempt in the kernel.
+
+The prefer_reader flag is used to control if the lock acquisition
+should be done in a prefer reader mode (if set) or a neutral mode
+where there is no preference to either reader or writer.
+
+Inside the kernel, a kernel mutex is used for serialization among the
+futex waiters. Only the top lock waiter which is the owner of the
+serialization mutex is allowed to continuously spin and attempt to
+acquire the lock.  Other lock waiters will have one or two attempts
+to steal the lock before entering the mutex queues.
 
 When the exclusive futex lock owner is no longer running, the top
 waiter will set the FUTEX_WAITERS bit before going to sleep. This is
 to make sure the futex owner will go into the kernel at unlock time
 to wake up the top waiter.
 
+When the futex is shared by multiple owners, there is no way to
+determine if all the shared owners are running or not. In this case,
+the top waiter will spin for a fixed amount of time if no reader
+activity is observed before giving up and going to sleep. Any change
+in the reader count will be considered reader activities and so will
+reset the timer. However, when the hand-off threshold has been reached,
+reader optimistic spinning timer reset will be disabled automatically.
+
 The return values of the above futex locking syscall, if non-negative,
-are status code that consists of 2 fields - the lock acquisition code
-(bits 0-7) and the number of sleeps (bits 8-30) in the optimistic
-spinning loop before acquiring the futex. A negative returned value
-means an error has happened.
+are status code that consists of 3 fields - the lock acquisition code
+(bits 0-7) and the number of sleeps (bits 16-30) in the optimistic
+spinning loop before acquiring the futex. Bits 8-15 are reserved
+for future extension. A negative returned value means an error has
+happened.
 
 The lock acquisition code can have the following values:
  a) 0 - lock stolen as non-top waiter
@@ -108,14 +148,21 @@ issue a FUTEX_UNLOCK futex(2) syscall to wake up the top waiter.
 
   futex(uaddr, FUTEX_UNLOCK, 0, NULL, NULL, 0);
 
-A return value of 1 from the FUTEX_UNLOCK futex(2) syscall indicates
-a task has been woken up. The syscall returns 0 if no sleeping task
-is woken. A negative value will be returned if an error happens.
+For a shared lock owner, unlock is done by atomically decrementing
+the reader count by one. If the resultant futex value has no reader
+remaining, the process has to atomically change the futex value from
+FUTEX_SHARED to 0. If that fails, it has to issue a FUTEX_UNLOCK_SHARED
+futex(2) syscall to wake up the top waiter.
 
-The error number returned by a FUTEX_UNLOCK syscall on an empty futex
-can be used to decide if the TP futex functionality is implemented
-in the kernel. If it is present, an EPERFM error will be returned.
-Otherwise it will return ENOSYS.
+A return value of 1 from the FUTEX_UNLOCK or FUTEX_UNLOCK_SHARED
+futex(2) syscall indicates a task has been woken up. The syscall
+returns 0 if no sleeping task is woken. A negative value will be
+returned if an error happens.
+
+The error number returned by a FUTEX_UNLOCK or FUTEX_UNLOCK_SHARED
+syscall on an empty futex can be used to decide if the TP futex
+functionality is implemented in the kernel. If it is present, an
+EPERFM error will be returned.  Otherwise it will return ENOSYS.
 
 TP futexes require the kernel to have SMP support as well as support
 for the cmpxchg functionality. For architectures that don't support
@@ -137,6 +184,13 @@ situation. It is possible for the kernel to handle this internally,
 but it will probably reduce performance. Userspace code can handle
 this more efficiently.
 
+Shared locking TP futexes, on the other hand, cannot be used with
+robust futexes. The unexpected death of a shared lock owner may
+leave the futex permanently in the shared state leading to deadlock
+of exclusive lock waiters. If necessary, some kind of timeout and
+userspace lock management system have to be used to resolve this
+deadlock problem.
+
 Usage Scenario
 --------------
 
@@ -148,6 +202,24 @@ used when the critical section is long and prone to sleeping. However,
 it may not have the performance gain when compared with a wait-wake
 futex in this case.
 
+A TP futex can also be used to implement a userspace reader-writer
+lock (rwlock) where the writers use the FUTEX_LOCK and FUTEX_UNLOCK
+futex(2) syscalls and the readers used the FUTEX_LOCK_SHARED and
+FUTEX_UNLOCK_SHARED futex(2) syscalls. Beside providing a better
+performance compared with wait-wake futexes, other advantages of
+using the the TP futexes for rwlocks are:
+
+ 1) The simplicity and ease of maintenance of the userspace locking
+    codes. There is only one version of rwlock using TP futex versus
+    a reader-preferring variant and/or a writer-preferring variant
+    when using the wait-wake futexes.
+
+ 2) TP futex is lock-starvation free. That may not be the case
+    with rwlocks implemented with wait-wake futexes especially the
+    reader-preferring variants where the writers can be starved of
+    the lock under certain circumstances. Some writer-preferring
+    rwlock variants may also starve readers of getting the lock.
+
 The wait-wake futexes are more versatile as they can also be used to
 implement other locking primitives like semaphores or conditional
 variables.  So the TP futex is not a direct replacement of the
@@ -157,12 +229,12 @@ futex is likely a better option than the wait-wake futex.
 Sample Code
 -----------
 
-The following are sample code to implement simple mutex lock and
-unlock functions.
+The following are sample code to implement simple mutex or writer
+lock and unlock functions.
 
 __thread int thread_id;
 
-void mutex_lock(int *faddr)
+void write_lock(int *faddr)
 {
 	if (cmpxchg(faddr, 0, thread_id) == 0)
 		return;
@@ -170,7 +242,7 @@ void mutex_lock(int *faddr)
 		;
 }
 
-void mutex_unlock(int *faddr)
+void write_unlock(int *faddr)
 {
 	int old, fval;
 
@@ -178,3 +250,61 @@ void mutex_unlock(int *faddr)
 		return;
 	futex(faddr, FUTEX_UNLOCK, 0, NULL, NULL, 0);
 }
+
+The following sample code can be used to implement shared or reader
+lock and unlock functions.
+
+void read_lock(int *faddr)
+{
+	int val = cmpxchg(faddr, 0, FUTEX_SHARED + 1);
+
+	if (!val)
+		return;
+	for (;;) {
+		int old = val, new;
+
+		if (!old)
+			new = FUTEX_SHARED + 1;
+		else if (!(old & FUTEX_SHARED) ||
+			 (old & ((~FUTEX_SHARED_TID_MASK)|
+				   FUTEX_SHARED_UNLOCK)))
+			break;
+		else
+			new = old + 1;
+		val = cmpxchg(faddr, old, new);
+		if (val == old)
+			return;
+	}
+	while (futex(faddr, FUTEX_LOCK_SHARED, ...) < 0)
+		;
+}
+
+void read_unlock(int *faddr)
+{
+	int val = xadd(faddr, -1) - 1;
+	int old;
+
+	for (;;) {
+		/*
+		 * Return if not the last reader, not in shared locking
+		 * mode or the unlock bit has been set.
+		 */
+		if (!(val & FUTEX_SHARED) ||
+		     (val & (FUTEX_SHARED_UNLOCK|FUTEX_SCNT_MASK)))
+			return;
+		if (val & ~FUTEX_SHARED_TID_MASK) {
+			old = cmpxchg(faddr, val, val|FUTEX_SHARED_UNLOCK);
+			if (old == val)
+				break;	/* Do FUTEX_UNLOCK_SHARED */
+		} else {
+			old = cmpxchg(faddr, val, 0);
+			if (old == val)
+				return;
+		}
+		val = old;
+	}
+	futex(faddr, FUTEX_UNLOCK_SHARED, ...);
+}
+
+More elaborate sample locking codes for the TP futexes are also
+available at the tools/perf/bench/futex-locks.c file.
