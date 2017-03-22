@@ -580,7 +580,7 @@ static inline int pit_expect_msb(unsigned char val, u64 *tscp, unsigned long *de
 #define MAX_QUICK_PIT_MS 50
 #define MAX_QUICK_PIT_ITERATIONS (MAX_QUICK_PIT_MS * PIT_TICK_RATE / 1000 / 256)
 
-static unsigned long quick_pit_calibrate(void)
+static unsigned long quick_pit_calibrate(bool early_boot)
 {
 	int i;
 	u64 tsc, delta;
@@ -645,7 +645,8 @@ static unsigned long quick_pit_calibrate(void)
 			goto success;
 		}
 	}
-	pr_info("Fast TSC calibration failed\n");
+	if (!early_boot)
+		pr_info("Fast TSC calibration failed\n");
 	return 0;
 
 success:
@@ -664,7 +665,8 @@ success:
 	 */
 	delta *= PIT_TICK_RATE;
 	do_div(delta, i*256*1000);
-	pr_info("Fast TSC calibration using PIT\n");
+	if (!early_boot)
+		pr_info("Fast TSC calibration using PIT\n");
 	return delta;
 }
 
@@ -764,7 +766,7 @@ unsigned long native_calibrate_cpu(void)
 		return fast_calibrate;
 
 	local_irq_save(flags);
-	fast_calibrate = quick_pit_calibrate();
+	fast_calibrate = quick_pit_calibrate(false);
 	local_irq_restore(flags);
 	if (fast_calibrate)
 		return fast_calibrate;
