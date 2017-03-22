@@ -5588,7 +5588,7 @@ int sanitize_rc6_option(struct drm_i915_private *dev_priv, int enable_rc6)
 	return INTEL_RC6_ENABLE;
 }
 
-static void gen6_init_rps_frequencies(struct drm_i915_private *dev_priv)
+void gen6_init_rps_frequencies(struct drm_i915_private *dev_priv)
 {
 	/* All of these values are in units of 50MHz */
 

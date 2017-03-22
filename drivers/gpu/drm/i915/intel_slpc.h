@@ -26,6 +26,7 @@
 
 struct intel_slpc {
 	bool active;
+	struct i915_vma *vma;
 };
 
 enum slpc_status {
