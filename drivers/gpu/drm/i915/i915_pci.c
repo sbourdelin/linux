@@ -352,6 +352,7 @@ static const struct intel_device_info intel_skylake_info = {
 	.gen = 9,
 	.has_csr = 1,
 	.has_guc = 1,
+	.has_slpc = 1,
 	.ddb_size = 896,
 };
 
@@ -361,6 +362,7 @@ static const struct intel_device_info intel_skylake_gt3_info = {
 	.gen = 9,
 	.has_csr = 1,
 	.has_guc = 1,
+	.has_slpc = 1,
 	.ddb_size = 896,
 	.ring_mask = RENDER_RING | BSD_RING | BLT_RING | VEBOX_RING | BSD2_RING,
 };
