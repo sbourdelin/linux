@@ -1006,7 +1006,7 @@ static struct task_struct * futex_find_get_task(pid_t pid)
 }
 
 /*
- * This task is holding PI mutexes at exit time => bad.
+ * This task is holding PI or TP mutexes at exit time => bad.
  * Kernel cleans up PI-state, but userspace is likely hosed.
  * (Robust-futex cleanup is separate and might save the day for userspace.)
  */
@@ -1023,12 +1023,31 @@ void exit_pi_state_list(struct task_struct *curr)
 	 * We are a ZOMBIE and nobody can enqueue itself on
 	 * pi_state_list anymore, but we have to be careful
 	 * versus waiters unqueueing themselves:
+	 *
+	 * For TP futexes, the only purpose of showing up in the
+	 * pi_state_list is for this function to wake up the serialization
+	 * mutex owner (state->mutex_owner). We don't actually need to take
+	 * the HB lock. The futex state and task struct won't go away as long
+	 * as we hold the pi_lock.
 	 */
 	raw_spin_lock_irq(&curr->pi_lock);
 	while (!list_empty(head)) {
 
 		next = head->next;
 		pi_state = list_entry(next, struct futex_state, list);
+
+		if (pi_state->type == TYPE_TP) {
+			struct task_struct *owner;
+
+			owner = READ_ONCE(pi_state->mutex_owner);
+			WARN_ON(list_empty(&pi_state->list));
+			list_del_init(&pi_state->list);
+			pi_state->owner = NULL;
+			if (owner)
+				wake_up_process(owner);
+			continue;
+		}
+
 		key = pi_state->key;
 		hb = hash_futex(&key);
 		raw_spin_unlock_irq(&curr->pi_lock);
@@ -3197,8 +3216,8 @@ retry:
 			goto retry;
 
 		/*
-		 * Wake robust non-PI futexes here. The wakeup of
-		 * PI futexes happens in exit_pi_state():
+		 * Wake robust wait-wake futexes here. The wakeup of
+		 * PI and TP futexes happens in exit_pi_state():
 		 */
 		if (!pi && (uval & FUTEX_WAITERS))
 			futex_wake(uaddr, 1, 1, FUTEX_BITSET_MATCH_ANY);
@@ -3339,6 +3358,12 @@ void exit_robust_list(struct task_struct *curr)
  * Unlike the other futexes, the futex_q structures aren't used. Instead,
  * they will queue up in the serialization mutex of the futex state container
  * queued in the hash bucket.
+ *
+ * To handle the exceptional case that the futex owner died, the robust
+ * futexes list mechanism is used to for waking up sleeping top waiter.
+ * Checks are also made in the futex_spin_on_owner() loop for dead task
+ * structure or invalid pid. In both cases, the top waiter will take over
+ * the ownership of the futex.
  */
 
 /**
@@ -3537,6 +3562,10 @@ static inline int futex_set_waiters_bit(u32 __user *uaddr, u32 *puval)
 static int futex_spin_on_owner(u32 __user *uaddr, const u32 vpid,
 			       struct futex_state *state)
 {
+#define OWNER_DEAD_MESSAGE					\
+	"futex: owner pid %d of TP futex 0x%lx was %s.\n"	\
+	"\tLock is now acquired by pid %d!\n"
+
 	int ret;
 	u32 uval;
 	u32 owner_pid = 0;
@@ -3551,11 +3580,45 @@ retry:
 			break;
 
 		if ((uval & FUTEX_TID_MASK) != owner_pid) {
-			if (owner_task)
+			if (owner_task) {
+				/*
+				 * task_pi_list_del() should always be
+				 * done before put_task_struct(). The futex
+				 * state may have been dequeued if the task
+				 * is dead.
+				 */
+				if (state->owner) {
+					WARN_ON(state->owner != owner_task);
+					task_pi_list_del(state, true);
+				}
 				put_task_struct(owner_task);
+			}
 
 			owner_pid  = uval & FUTEX_TID_MASK;
 			owner_task = futex_find_get_task(owner_pid);
+		}
+
+		if (unlikely(!owner_task ||
+			    (owner_task->flags & PF_EXITING) ||
+			    (uval & FUTEX_OWNER_DIED))) {
+			/*
+			 * PID invalid or exiting/dead task, we can directly
+			 * grab the lock now.
+			 */
+			u32 curval;
+			char *owner_state;
+
+			ret = cmpxchg_futex_value_locked(&curval, uaddr, uval,
+							 vpid);
+			if (unlikely(ret))
+				break;
+			if (curval != uval)
+				continue;
+			owner_state = (owner_task || (uval & FUTEX_OWNER_DIED))
+				    ? "dead" : "invalid";
+			pr_info(OWNER_DEAD_MESSAGE, owner_pid,
+				(long)uaddr, owner_state, vpid);
+			break;
 		}
 
 		if (need_resched()) {
@@ -3576,11 +3639,16 @@ retry:
 
 		/*
 		 * If the owner isn't active, we need to go to sleep after
-		 * making sure that the FUTEX_WAITERS bit is set.
+		 * making sure that the FUTEX_WAITERS bit is set. We also
+		 * need to put the futex state into the futex owner's
+		 * pi_state_list to prevent deadlock when the owner dies.
 		 */
 		ret = futex_set_waiters_bit(uaddr, &uval);
 		if (ret)
 			break;
+
+		if (owner_task && !state->owner)
+			task_pi_list_add(owner_task, state);
 
 		/*
 		 * Do a trylock after setting the task state to make
@@ -3617,8 +3685,13 @@ retry:
 			goto retry;
 	}
 
-	if (owner_task)
+	if (owner_task) {
+		if (state->owner)
+			task_pi_list_del(state, false);
 		put_task_struct(owner_task);
+	} else {
+		WARN_ON(state->owner);
+	}
 
 	/*
 	 * Cleanup futex state.
