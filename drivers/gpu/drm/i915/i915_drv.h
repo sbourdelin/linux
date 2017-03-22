@@ -845,6 +845,7 @@ struct intel_csr {
 	func(has_rc6p); \
 	func(has_resource_streamer); \
 	func(has_runtime_pm); \
+	func(has_slpc); \
 	func(has_snoop); \
 	func(cursor_needs_physical); \
 	func(hws_needs_physical); \
@@ -2955,6 +2956,7 @@ intel_info(const struct drm_i915_private *dev_priv)
 #define HAS_GUC_UCODE(dev_priv)	(HAS_GUC(dev_priv))
 #define HAS_GUC_SCHED(dev_priv)	(HAS_GUC(dev_priv))
 #define HAS_HUC_UCODE(dev_priv)	(HAS_GUC(dev_priv))
+#define HAS_SLPC(dev_priv)	((dev_priv)->info.has_slpc)
 
 #define HAS_RESOURCE_STREAMER(dev_priv) ((dev_priv)->info.has_resource_streamer)
 
