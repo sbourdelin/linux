@@ -60,7 +60,7 @@ int ip6_rcv_finish(struct net *net, struct sock *sk, struct sk_buff *skb)
 		const struct inet6_protocol *ipprot;
 
 		ipprot = rcu_dereference(inet6_protos[ipv6_hdr(skb)->nexthdr]);
-		if (ipprot && ipprot->early_demux)
+		if (ipprot && READ_ONCE(ipprot->early_demux))
 			ipprot->early_demux(skb);
 	}
 	if (!skb_valid_dst(skb))

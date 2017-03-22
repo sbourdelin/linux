@@ -372,4 +372,7 @@ void udp_encap_enable(void);
 #if IS_ENABLED(CONFIG_IPV6)
 void udpv6_encap_enable(void);
 #endif
+
+void udp_v4_early_demux_configure(int enable);
+void udp_v6_early_demux_configure(int enable);
 #endif	/* _UDP_H */

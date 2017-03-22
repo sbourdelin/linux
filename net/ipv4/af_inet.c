@@ -1599,7 +1599,7 @@ static const struct net_protocol igmp_protocol = {
 };
 #endif
 
-static const struct net_protocol tcp_protocol = {
+static struct net_protocol tcp_protocol = {
 	.early_demux	=	tcp_v4_early_demux,
 	.handler	=	tcp_v4_rcv,
 	.err_handler	=	tcp_v4_err,
@@ -1608,13 +1608,29 @@ static const struct net_protocol tcp_protocol = {
 	.icmp_strict_tag_validation = 1,
 };
 
-static const struct net_protocol udp_protocol = {
+static struct net_protocol udp_protocol = {
 	.early_demux =	udp_v4_early_demux,
 	.handler =	udp_rcv,
 	.err_handler =	udp_err,
 	.no_policy =	1,
 	.netns_ok =	1,
 };
+
+void tcp_v4_early_demux_configure(int enable)
+{
+	if (enable)
+		tcp_protocol.early_demux = tcp_v4_early_demux;
+	else
+		tcp_protocol.early_demux = NULL;
+}
+
+void udp_v4_early_demux_configure(int enable)
+{
+	if (enable)
+		udp_protocol.early_demux = udp_v4_early_demux;
+	else
+		udp_protocol.early_demux = NULL;
+}
 
 static const struct net_protocol icmp_protocol = {
 	.handler =	icmp_rcv,
@@ -1720,6 +1736,8 @@ static __net_init int inet_init_net(struct net *net)
 	net->ipv4.sysctl_ip_default_ttl = IPDEFTTL;
 	net->ipv4.sysctl_ip_dynaddr = 0;
 	net->ipv4.sysctl_ip_early_demux = 1;
+	net->ipv4.sysctl_udp_early_demux = 1;
+	net->ipv4.sysctl_tcp_early_demux = 1;
 #ifdef CONFIG_SYSCTL
 	net->ipv4.sysctl_ip_prot_sock = PROT_SOCK;
 #endif

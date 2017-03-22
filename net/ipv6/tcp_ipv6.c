@@ -1925,12 +1925,20 @@ struct proto tcpv6_prot = {
 	.diag_destroy		= tcp_abort,
 };
 
-static const struct inet6_protocol tcpv6_protocol = {
+static struct inet6_protocol tcpv6_protocol = {
 	.early_demux	=	tcp_v6_early_demux,
 	.handler	=	tcp_v6_rcv,
 	.err_handler	=	tcp_v6_err,
 	.flags		=	INET6_PROTO_NOPOLICY|INET6_PROTO_FINAL,
 };
+
+void tcp_v6_early_demux_configure(int enable)
+{
+	if (enable)
+		tcpv6_protocol.early_demux = tcp_v6_early_demux;
+	else
+		tcpv6_protocol.early_demux = NULL;
+}
 
 static struct inet_protosw tcpv6_protosw = {
 	.type		=	SOCK_STREAM,

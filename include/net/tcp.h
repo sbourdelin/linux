@@ -1932,4 +1932,6 @@ static inline void tcp_listendrop(const struct sock *sk)
 	__NET_INC_STATS(sock_net(sk), LINUX_MIB_LISTENDROPS);
 }
 
+void tcp_v4_early_demux_configure(int enable);
+void tcp_v6_early_demux_configure(int enable);
 #endif	/* _TCP_H */
