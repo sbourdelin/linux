@@ -181,3 +181,7 @@
 	pinctrl-names = "default";
 	status = "okay";
 };
+
+&iwdg {
+	status = "okay";
+};
