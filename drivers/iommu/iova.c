@@ -91,12 +91,16 @@ __get_cached_rbnode(struct iova_domain *iovad, unsigned long *limit_pfn)
 }
 
 static void
-__cached_rbnode_insert_update(struct iova_domain *iovad,
-	unsigned long limit_pfn, struct iova *new)
+__cached_rbnode_insert_update(struct iova_domain *iovad, struct iova *new)
 {
-	if (limit_pfn != iovad->dma_32bit_pfn)
+	struct iova *cached_iova;
+
+	if (new->pfn_hi > iovad->dma_32bit_pfn)
 		return;
-	iovad->cached32_node = &new->node;
+
+	cached_iova = rb_entry(iovad->cached32_node, struct iova, node);
+	if (new->pfn_lo <= cached_iova->pfn_lo)
+		iovad->cached32_node = rb_prev(&new->node);
 }
 
 static void
@@ -131,12 +135,10 @@ static int __alloc_and_insert_iova_range(struct iova_domain *iovad,
 {
 	struct rb_node *prev, *curr;
 	unsigned long flags;
-	unsigned long saved_pfn;
 	unsigned long pad_size = 0;
 
 	/* Walk the tree backwards */
 	spin_lock_irqsave(&iovad->iova_rbtree_lock, flags);
-	saved_pfn = limit_pfn;
 	curr = __get_cached_rbnode(iovad, &limit_pfn);
 	prev = curr;
 	while (curr) {
@@ -197,10 +199,9 @@ move_left:
 		rb_link_node(&new->node, parent, entry);
 		rb_insert_color(&new->node, &iovad->rbroot);
 	}
-	__cached_rbnode_insert_update(iovad, saved_pfn, new);
+	__cached_rbnode_insert_update(iovad, new);
 
 	spin_unlock_irqrestore(&iovad->iova_rbtree_lock, flags);
-
 
 	return 0;
 }
