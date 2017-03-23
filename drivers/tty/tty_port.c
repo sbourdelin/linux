@@ -18,27 +18,11 @@
 #include <linux/module.h>
 #include <linux/serdev.h>
 
-static int tty_port_default_receive_buf(struct tty_port *port,
+static int tty_port_default_receive_buf(struct tty_struct *tty,
 					const unsigned char *p,
 					const unsigned char *f, size_t count)
 {
-	int ret;
-	struct tty_struct *tty;
-	struct tty_ldisc *disc;
-
-	tty = READ_ONCE(port->itty);
-	if (!tty)
-		return 0;
-
-	disc = tty_ldisc_ref(tty);
-	if (!disc)
-		return 0;
-
-	ret = tty_ldisc_receive_buf(disc, p, (char *)f, count);
-
-	tty_ldisc_deref(disc);
-
-	return ret;
+	return tty_ldisc_receive_buf(tty->ldisc, p, (char *)f, count);
 }
 
 static void tty_port_default_wakeup(struct tty_port *port)

@@ -219,7 +219,7 @@ struct tty_port_operations {
 };
 
 struct tty_port_client_operations {
-	int (*receive_buf)(struct tty_port *port, const unsigned char *, const unsigned char *, size_t);
+	int (*receive_buf)(struct tty_struct *tty, const unsigned char *, const unsigned char *, size_t);
 	void (*write_wakeup)(struct tty_port *port);
 };
 

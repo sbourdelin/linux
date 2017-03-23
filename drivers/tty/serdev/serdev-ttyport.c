@@ -29,10 +29,10 @@ struct serport {
  * Callback functions from the tty port.
  */
 
-static int ttyport_receive_buf(struct tty_port *port, const unsigned char *cp,
+static int ttyport_receive_buf(struct tty_struct *tty, const unsigned char *cp,
 				const unsigned char *fp, size_t count)
 {
-	struct serdev_controller *ctrl = port->client_data;
+	struct serdev_controller *ctrl = tty->port->client_data;
 	struct serport *serport = serdev_controller_get_drvdata(ctrl);
 
 	if (!test_bit(SERPORT_ACTIVE, &serport->flags))
