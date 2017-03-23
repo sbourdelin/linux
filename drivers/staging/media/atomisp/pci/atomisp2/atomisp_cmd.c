@@ -90,10 +90,7 @@ union host {
 void *atomisp_kernel_malloc(size_t bytes)
 {
 	/* vmalloc() is preferable if allocating more than 1 page */
-	if (bytes > PAGE_SIZE)
-		return vmalloc(bytes);
-
-	return kmalloc(bytes, GFP_KERNEL);
+	return kvmalloc(bytes, GFP_KERNEL);
 }
 
 /*
@@ -118,10 +115,7 @@ void *atomisp_kernel_zalloc(size_t bytes, bool zero_mem)
 void atomisp_kernel_free(void *ptr)
 {
 	/* Verify if buffer was allocated by vmalloc() or kmalloc() */
-	if (is_vmalloc_addr(ptr))
-		vfree(ptr);
-	else
-		kfree(ptr);
+	kvfree(ptr);
 }
 
 /*
