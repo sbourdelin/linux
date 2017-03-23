@@ -134,6 +134,20 @@ static int get_nports(void)
 	return strtoul(attr_nports, NULL, 10);
 }
 
+static int get_ncontrollers(void)
+{
+	const char *attr_ncontrollers;
+
+	attr_ncontrollers = udev_device_get_sysattr_value(vhci_driver->hc_device,
+							  "ncontrollers");
+	if (!attr_ncontrollers) {
+		err("udev_device_get_sysattr_value ncontrollers failed");
+		return -1;
+	}
+
+	return strtoul(attr_ncontrollers, NULL, 10);
+}
+
 /*
  * Read the given port's record.
  *
@@ -220,8 +234,10 @@ int usbip_vhci_driver_open(void)
 	}
 
 	vhci_driver->nports = get_nports();
-
 	dbg("available ports: %d", vhci_driver->nports);
+
+	vhci_driver->ncontrollers = get_ncontrollers();
+	dbg("available controllers: %d", vhci_driver->ncontrollers);
 
 	if (refresh_imported_device_list())
 		goto err;
