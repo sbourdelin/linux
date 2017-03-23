@@ -1,0 +1,47 @@
+What:		/sys/class/leds/<led>/duration
+Date:		March 2017
+KernelVersion:	4.12
+Contact:	Bjorn Andersson <bjorn.andersson@linaro.org>
+Description:
+		Duration of one cycle through the pattern in the ramp
+		generator.
+
+What:		/sys/class/leds/<led>/oneshot
+Date:		March 2017
+KernelVersion:	4.12
+Contact:	Bjorn Andersson <bjorn.andersson@linaro.org>
+Description:
+		Stop the ramp generator after a single pass.
+
+What:		/sys/class/leds/<led>/pattern
+Date:		March 2017
+KernelVersion:	4.12
+Contact:	Bjorn Andersson <bjorn.andersson@linaro.org>
+Description:
+		Comma-separated list of duty cycle values to output from
+		the ramp generator. Values should be in the range of 0
+		to 511.
+
+What:		/sys/class/leds/<led>/pause_lo
+What:		/sys/class/leds/<led>/pause_hi
+Date:		March 2017
+KernelVersion:	4.12
+Contact:	Bjorn Andersson <bjorn.andersson@linaro.org>
+Description:
+		Pause time, in milliseconds, before and after one run
+		over the pattern.
+
+What:		/sys/class/leds/<led>/ping_pong
+Date:		March 2017
+KernelVersion:	4.12
+Contact:	Bjorn Andersson <bjorn.andersson@linaro.org>
+Description:
+		Reverse direction when the ramp generator reaches the
+		end of the pattern, rather than wrapping to the start.
+
+What:		/sys/class/leds/<led>/reverse
+Date:		March 2017
+KernelVersion:	4.12
+Contact:	Bjorn Andersson <bjorn.andersson@linaro.org>
+Description:
+		Run the ramp generator backwards over the pattern.
