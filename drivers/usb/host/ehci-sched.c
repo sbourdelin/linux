@@ -1754,8 +1754,9 @@ itd_link(struct ehci_hcd *ehci, unsigned frame, struct ehci_itd *itd)
 	itd->hw_next = *hw_p;
 	prev->itd = itd;
 	itd->frame = frame;
-	wmb();
 	*hw_p = cpu_to_hc32(ehci, itd->itd_dma | Q_TYPE_ITD);
+	/* make sure host see periodic frame change before scheduling */
+	wmb();
 }
 
 /* fit urb's itds into the selected schedule slot; activate as needed */
@@ -2157,8 +2158,9 @@ sitd_link(struct ehci_hcd *ehci, unsigned frame, struct ehci_sitd *sitd)
 	sitd->hw_next = ehci->periodic[frame];
 	ehci->pshadow[frame].sitd = sitd;
 	sitd->frame = frame;
-	wmb();
 	ehci->periodic[frame] = cpu_to_hc32(ehci, sitd->sitd_dma | Q_TYPE_SITD);
+	/* make sure host see periodic frame change before scheduling */
+	wmb();
 }
 
 /* fit urb's sitds into the selected schedule slot; activate as needed */
