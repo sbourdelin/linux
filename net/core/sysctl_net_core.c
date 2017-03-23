@@ -27,6 +27,9 @@ static int one = 1;
 static int min_sndbuf = SOCK_MIN_SNDBUF;
 static int min_rcvbuf = SOCK_MIN_RCVBUF;
 static int max_skb_frags = MAX_SKB_FRAGS;
+#ifdef CONFIG_NET_RX_BUSY_POLL
+static int max_busy_poll = MAX_BUSY_POLL;
+#endif
 
 static int net_msg_warn;	/* Unused, but still a sysctl */
 
@@ -408,14 +411,18 @@ static struct ctl_table net_core_table[] = {
 		.data		= &sysctl_net_busy_poll,
 		.maxlen		= sizeof(unsigned int),
 		.mode		= 0644,
-		.proc_handler	= proc_dointvec
+		.proc_handler	= proc_dointvec_minmax,
+		.extra1		= &zero,
+		.extra2		= &max_busy_poll,
 	},
 	{
 		.procname	= "busy_read",
 		.data		= &sysctl_net_busy_read,
 		.maxlen		= sizeof(unsigned int),
 		.mode		= 0644,
-		.proc_handler	= proc_dointvec
+		.proc_handler	= proc_dointvec_minmax,
+		.extra1		= &zero,
+		.extra2		= &max_busy_poll,
 	},
 #endif
 #ifdef CONFIG_NET_SCHED
