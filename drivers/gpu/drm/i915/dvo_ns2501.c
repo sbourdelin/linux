@@ -558,20 +558,20 @@ static void ns2501_mode_set(struct intel_dvo_device *dvo,
 	     mode->hdisplay, mode->htotal, mode->vdisplay, mode->vtotal);
 
 	DRM_DEBUG_KMS("Detailed requested mode settings are:\n"
-			"clock		: %d kHz\n"
-			"hdisplay	: %d\n"
-			"hblank start	: %d\n"
-			"hblank end	: %d\n"
-			"hsync start	: %d\n"
-			"hsync end	: %d\n"
-			"htotal		: %d\n"
-			"hskew		: %d\n"
-			"vdisplay	: %d\n"
-			"vblank start	: %d\n"
-			"hblank end	: %d\n"
-			"vsync start	: %d\n"
-			"vsync end	: %d\n"
-			"vtotal		: %d\n",
+			"clock        : %d kHz\n"
+			"hdisplay     : %d\n"
+			"hblank start : %d\n"
+			"hblank end   : %d\n"
+			"hsync start  : %d\n"
+			"hsync end    : %d\n"
+			"htotal       : %d\n"
+			"hskew        : %d\n"
+			"vdisplay     : %d\n"
+			"vblank start : %d\n"
+			"hblank end   : %d\n"
+			"vsync start  : %d\n"
+			"vsync end    : %d\n"
+			"vtotal       : %d\n",
 			adjusted_mode->crtc_clock,
 			adjusted_mode->crtc_hdisplay,
 			adjusted_mode->crtc_hblank_start,
