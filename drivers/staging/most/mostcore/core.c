@@ -341,8 +341,8 @@ static ssize_t show_channel_starving(struct most_c_obj *c,
 	return snprintf(buf, PAGE_SIZE, "%d\n", c->is_starving);
 }
 
-#define create_show_channel_attribute(val) \
-	static MOST_CHNL_ATTR(val, 0444, show_##val, NULL)
+#define(create_show_channel_attribute(val)          \
+	static MOST_CHNL_ATTR(val, 0444, show_##val, NULL))
 
 create_show_channel_attribute(available_directions);
 create_show_channel_attribute(available_datatypes);
@@ -493,8 +493,8 @@ static ssize_t store_set_packets_per_xact(struct most_c_obj *c,
 	return count;
 }
 
-#define create_channel_attribute(value) \
-	static MOST_CHNL_ATTR(value, 0644, show_##value, store_##value)
+#define(create_channel_attribute(value) \
+	static MOST_CHNL_ATTR(value, 0644, show_##value, store_##value))
 
 create_channel_attribute(set_buffer_size);
 create_channel_attribute(set_number_of_buffers);
@@ -687,8 +687,8 @@ static ssize_t show_interface(struct most_inst_obj *instance_obj,
 	return snprintf(buf, PAGE_SIZE, "unknown\n");
 }
 
-#define create_inst_attribute(value) \
-	static MOST_INST_ATTR(value, 0444, show_##value, NULL)
+#define(create_inst_attribute(value) \
+	static MOST_INST_ATTR(value, 0444, show_##value, NULL))
 
 create_inst_attribute(description);
 create_inst_attribute(interface);
