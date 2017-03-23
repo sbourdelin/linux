@@ -71,6 +71,15 @@ enum hwsim_tx_control_flags {
  * @HWSIM_CMD_DEL_RADIO: destroy a radio, reply is multicasted
  * @HWSIM_CMD_GET_RADIO: fetch information about existing radios, uses:
  *	%HWSIM_ATTR_RADIO_ID
+ * @HWSIM_CMD_NOTIFY_CH_CHANGE: notify user-space about channel-change.  This is
+ *	designed to help the user-space app better emulate radio hardware.
+ *	This command uses:
+ *	%HWSIM_ATTR_FREQ # Notify current operating center frequency.
+ *	%HWSIM_ATTR_CH_FREQ1 # Configured center-freq-1.
+ *	%HWSIM_ATTR_CH_FREQ2 # Configured center-freq-2.
+ *	%HWSIM_ATTR_CH_WIDTH # Configured channel width.
+ *	%HWSIM_ATTR_ADDR_TRANSMITTER # ID which radio we are notifying about.
+ *	%HWSIM_ATTR_ADDR_ID # Numeric Radio ID.
  * @__HWSIM_CMD_MAX: enum limit
  */
 enum {
@@ -81,6 +90,7 @@ enum {
 	HWSIM_CMD_NEW_RADIO,
 	HWSIM_CMD_DEL_RADIO,
 	HWSIM_CMD_GET_RADIO,
+	HWSIM_CMD_NOTIFY_CH_CHANGE,
 	__HWSIM_CMD_MAX,
 };
 #define HWSIM_CMD_MAX (_HWSIM_CMD_MAX - 1)
@@ -123,6 +133,9 @@ enum {
  * @HWSIM_ATTR_RADIO_NAME: Name of radio, e.g. phy666
  * @HWSIM_ATTR_NO_VIF:  Do not create vif (wlanX) when creating radio.
  * @HWSIM_ATTR_FREQ: Frequency at which packet is transmitted or received.
+ * @HWSIM_ATTR_CENTER_FREQ1: Configured center-freq-1.
+ * @HWSIM_ATTR_CENTER_FREQ2: Configured center-freq-2.  Not reported if value is zero.
+ * @HWSIM_ATTR_CH_WIDTH: Configured channel width.
  * @__HWSIM_ATTR_MAX: enum limit
  */
 
@@ -149,6 +162,9 @@ enum {
 	HWSIM_ATTR_NO_VIF,
 	HWSIM_ATTR_FREQ,
 	HWSIM_ATTR_PAD,
+	HWSIM_ATTR_CENTER_FREQ1,
+	HWSIM_ATTR_CENTER_FREQ2,
+	HWSIM_ATTR_CH_WIDTH,
 	__HWSIM_ATTR_MAX,
 };
 #define HWSIM_ATTR_MAX (__HWSIM_ATTR_MAX - 1)

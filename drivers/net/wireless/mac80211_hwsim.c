@@ -533,6 +533,10 @@ struct mac80211_hwsim_data {
 		      ARRAY_SIZE(hwsim_channels_5ghz)];
 
 	struct ieee80211_channel *channel;
+	enum nl80211_chan_width ch_width;
+	u32 center_freq1;
+	u32 center_freq2;
+
 	u64 beacon_int	/* beacon interval in us */;
 	unsigned int rx_filter;
 	bool started, idle, scanning;
@@ -1002,6 +1006,65 @@ static int hwsim_unicast_netgroup(struct mac80211_hwsim_data *data,
 		nlmsg_free(skb);
 
 	return res;
+}
+
+static void mac80211_hwsim_check_nl_notify(struct mac80211_hwsim_data *data)
+{
+	struct sk_buff *skb;
+	u32 center_freq = 0;
+	u32 _portid;
+	void *msg_head;
+
+	/* wmediumd mode check */
+	_portid = READ_ONCE(data->wmediumd);
+
+	if (!_portid)
+		return;
+
+	skb = genlmsg_new(GENLMSG_DEFAULT_SIZE, GFP_ATOMIC);
+	if (!skb)
+		goto err_print;
+
+	msg_head = genlmsg_put(skb, 0, 0, &hwsim_genl_family, 0,
+			       HWSIM_CMD_NOTIFY_CH_CHANGE);
+	if (!msg_head) {
+		pr_debug("mac80211_hwsim: problem with msg_head, notify-ch-change\n");
+		goto nla_put_failure;
+	}
+
+	if (nla_put_u32(skb, HWSIM_ATTR_RADIO_ID, data->idx))
+		goto nla_put_failure;
+
+	if (nla_put(skb, HWSIM_ATTR_ADDR_TRANSMITTER,
+		    ETH_ALEN, data->addresses[1].addr))
+		goto nla_put_failure;
+
+	if (data->channel)
+		center_freq = data->channel->center_freq;
+
+	if (nla_put_u32(skb, HWSIM_ATTR_FREQ, center_freq))
+		goto nla_put_failure;
+
+	if (nla_put_u32(skb, HWSIM_ATTR_CENTER_FREQ1, data->center_freq1))
+		goto nla_put_failure;
+
+	if (data->center_freq2)
+		if (nla_put_u32(skb, HWSIM_ATTR_CENTER_FREQ2, data->center_freq2))
+			goto nla_put_failure;
+
+	if (nla_put_u32(skb, HWSIM_ATTR_CH_WIDTH, data->ch_width))
+		goto nla_put_failure;
+
+	genlmsg_end(skb, msg_head);
+	if (genlmsg_unicast(&init_net, skb, _portid))
+		goto err_print;
+
+	return;
+
+nla_put_failure:
+	nlmsg_free(skb);
+err_print:
+	pr_debug("mac80211_hwsim: error occurred in %s\n", __func__);
 }
 
 static void mac80211_hwsim_tx_frame_nl(struct ieee80211_hw *hw,
@@ -1631,6 +1694,11 @@ static int mac80211_hwsim_config(struct ieee80211_hw *hw, u32 changed)
 	} else {
 		data->channel = conf->chandef.chan;
 	}
+
+	data->ch_width = conf->chandef.width;
+	data->center_freq1 = conf->chandef.center_freq1;
+	data->center_freq2 = conf->chandef.center_freq2;
+
 	mutex_unlock(&data->mutex);
 
 	data->power_level = conf->power_level;
@@ -1645,6 +1713,8 @@ static int mac80211_hwsim_config(struct ieee80211_hw *hw, u32 changed)
 				      ns_to_ktime(until_tbtt * 1000),
 				      HRTIMER_MODE_REL);
 	}
+
+	mac80211_hwsim_check_nl_notify(data);
 
 	return 0;
 }
