@@ -1237,6 +1237,20 @@ static void coherent_cache_guest_page(struct kvm_vcpu *vcpu, kvm_pfn_t pfn,
 	__coherent_cache_guest_page(vcpu, pfn, size);
 }
 
+static void kvm_send_hwpoison_signal(unsigned long address,
+					struct task_struct *tsk)
+{
+	siginfo_t info;
+
+	info.si_signo	= SIGBUS;
+	info.si_errno	= 0;
+	info.si_code	= BUS_MCEERR_AR;
+	info.si_addr	= (void __user *)address;
+	info.si_addr_lsb = PAGE_SHIFT;
+
+	send_sig_info(SIGBUS, &info, tsk);
+}
+
 static int user_mem_abort(struct kvm_vcpu *vcpu, phys_addr_t fault_ipa,
 			  struct kvm_memory_slot *memslot, unsigned long hva,
 			  unsigned long fault_status)
@@ -1308,6 +1322,12 @@ static int user_mem_abort(struct kvm_vcpu *vcpu, phys_addr_t fault_ipa,
 	pfn = gfn_to_pfn_prot(kvm, gfn, write_fault, &writable);
 	if (is_error_noslot_pfn(pfn))
 		return -EFAULT;
+
+	if (is_error_hwpoison_pfn(pfn)) {
+		kvm_send_hwpoison_signal(kvm_vcpu_gfn_to_hva(vcpu, gfn),
+								current);
+		return -EFAULT;
+	}
 
 	if (kvm_is_device_pfn(pfn)) {
 		mem_type = PAGE_S2_DEVICE;

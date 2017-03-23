@@ -90,6 +90,11 @@ static inline bool is_noslot_pfn(kvm_pfn_t pfn)
 {
 	return pfn == KVM_PFN_NOSLOT;
 }
+/* hwpoison pfn indicates that it needs to send SIGBUS */
+static inline bool is_error_hwpoison_pfn(kvm_pfn_t pfn)
+{
+	return pfn == KVM_PFN_ERR_HWPOISON;
+}
 
 /*
  * architectures with KVM_HVA_ERR_BAD other than PAGE_OFFSET (e.g. s390)
