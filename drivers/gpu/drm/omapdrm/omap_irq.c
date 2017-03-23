@@ -298,8 +298,9 @@ void omap_drm_irq_uninstall(struct drm_device *dev)
 		for (i = 0; i < dev->num_crtcs; i++) {
 			wake_up(&dev->vblank[i].queue);
 			dev->vblank[i].enabled = false;
-			dev->vblank[i].last =
-				dev->driver->get_vblank_counter(dev, i);
+			if (dev->driver->get_vblank_counter)
+				dev->vblank[i].last =
+					dev->driver->get_vblank_counter(dev, i);
 		}
 		spin_unlock_irqrestore(&dev->vbl_lock, irqflags);
 	}
