@@ -103,7 +103,7 @@ static inline int irqchip_kernel(struct kvm *kvm)
 
 static inline int irqchip_in_kernel(struct kvm *kvm)
 {
-	bool ret = kvm->arch.irqchip_mode != KVM_IRQCHIP_NONE;
+	bool ret = kvm->arch.irqchip_mode > KVM_IRQCHIP_INIT_IN_PROGRESS;
 
 	/* Matches with wmb after initializing kvm->irq_routing. */
 	smp_rmb();
