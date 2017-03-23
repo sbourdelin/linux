@@ -149,6 +149,13 @@ choice
 
 	  If in doubt, select 'gzip'
 
+config KERNEL_RAW
+	bool "RAW"
+	help
+	  No compression. It creates much bigger kernel and uses much more
+	  space (disk/memory) than other choices. It can be useful when
+	  decompression speed is the most concern while space is not a problem.
+
 config KERNEL_GZIP
 	bool "Gzip"
 	depends on HAVE_KERNEL_GZIP

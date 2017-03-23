@@ -51,6 +51,20 @@ static char *vidmem;
 static int vidport;
 static int lines, cols;
 
+#ifdef CONFIG_KERNEL_RAW
+#include <linux/decompress/mm.h>
+static int __decompress(unsigned char *buf, long len,
+			long (*fill)(void*, unsigned long),
+			long (*flush)(void*, unsigned long),
+			unsigned char *outbuf, long olen,
+			long *pos,
+			void (*error)(char *x))
+{
+	memcpy(outbuf, buf, olen);
+	return 0;
+}
+#endif
+
 #ifdef CONFIG_KERNEL_GZIP
 #include "../../../../lib/decompress_inflate.c"
 #endif
