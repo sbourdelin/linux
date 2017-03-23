@@ -294,6 +294,40 @@ bad_key:
 	return ret;
 }
 
+static int proc_tcp_early_demux(struct ctl_table *table, int write,
+				void __user *buffer, size_t *lenp, loff_t *ppos)
+{
+	int ret = 0;
+
+	ret = proc_dointvec(table, write, buffer, lenp, ppos);
+
+	if (write && !ret) {
+		int enabled = init_net.ipv4.sysctl_tcp_early_demux;
+
+		tcp_v4_early_demux_configure(enabled);
+		tcp_v6_early_demux_configure(enabled);
+	}
+
+	return ret;
+}
+
+static int proc_udp_early_demux(struct ctl_table *table, int write,
+				void __user *buffer, size_t *lenp, loff_t *ppos)
+{
+	int ret = 0;
+
+	ret = proc_dointvec(table, write, buffer, lenp, ppos);
+
+	if (write && !ret) {
+		int enabled = init_net.ipv4.sysctl_udp_early_demux;
+
+		udp_v4_early_demux_configure(enabled);
+		udp_v6_early_demux_configure(enabled);
+	}
+
+	return ret;
+}
+
 static struct ctl_table ipv4_table[] = {
 	{
 		.procname	= "tcp_timestamps",
@@ -748,6 +782,20 @@ static struct ctl_table ipv4_net_table[] = {
 		.maxlen		= sizeof(int),
 		.mode		= 0644,
 		.proc_handler	= proc_dointvec
+	},
+	{
+		.procname       = "udp_early_demux",
+		.data           = &init_net.ipv4.sysctl_udp_early_demux,
+		.maxlen         = sizeof(int),
+		.mode           = 0644,
+		.proc_handler   = proc_udp_early_demux
+	},
+	{
+		.procname       = "tcp_early_demux",
+		.data           = &init_net.ipv4.sysctl_tcp_early_demux,
+		.maxlen         = sizeof(int),
+		.mode           = 0644,
+		.proc_handler   = proc_tcp_early_demux
 	},
 	{
 		.procname	= "ip_default_ttl",
