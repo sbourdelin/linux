@@ -1389,7 +1389,6 @@ static struct notifier_block pnd2_mce_dec = {
 	.notifier_call	= pnd2_mce_check_error,
 };
 
-#ifdef CONFIG_EDAC_DEBUG
 /*
  * Write an address to this file to exercise the address decode
  * logic in this driver.
@@ -1435,7 +1434,6 @@ static void teardown_pnd2_debug(void)
 {
 	debugfs_remove_recursive(pnd2_test);
 }
-#endif
 
 static int pnd2_probe(void)
 {
@@ -1518,7 +1516,8 @@ static int __init pnd2_init(void)
 		return -ENODEV;
 
 	mce_register_decode_chain(&pnd2_mce_dec);
-	setup_pnd2_debug();
+	if (IS_ENABLED(CONFIG_EDAC_DEBUG))
+		setup_pnd2_debug();
 
 	return 0;
 }
@@ -1526,7 +1525,8 @@ static int __init pnd2_init(void)
 static void __exit pnd2_exit(void)
 {
 	edac_dbg(2, "\n");
-	teardown_pnd2_debug();
+	if (IS_ENABLED(CONFIG_EDAC_DEBUG))
+		teardown_pnd2_debug();
 	mce_unregister_decode_chain(&pnd2_mce_dec);
 	pnd2_remove();
 }
