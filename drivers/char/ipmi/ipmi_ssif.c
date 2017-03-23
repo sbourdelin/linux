@@ -899,6 +899,22 @@ static void msg_written_handler(struct ssif_info *ssif_info, int result,
 			left = 32;
 		/* Length byte. */
 		ssif_info->multi_data[ssif_info->multi_pos] = left;
+
+		rv = ssif_i2c_send(ssif_info, msg_written_handler,
+				  I2C_SMBUS_WRITE,
+				  SSIF_IPMI_MULTI_PART_REQUEST_MIDDLE,
+				  ssif_info->multi_data + ssif_info->multi_pos,
+				  I2C_SMBUS_BLOCK_DATA);
+
+		if (rv < 0) {
+			/* request failed, just return the error. */
+			ssif_inc_stat(ssif_info, send_errors);
+
+			if (ssif_info->ssif_debug & SSIF_DEBUG_MSG)
+				pr_info("Error from i2c_non_blocking_op(3)\n");
+			msg_done_handler(ssif_info, -EIO, NULL, 0);
+		}
+
 		ssif_info->multi_pos += left;
 		if (left < 32)
 			/*
@@ -908,20 +924,6 @@ static void msg_written_handler(struct ssif_info *ssif_info, int result,
 			 * zero bytes.
 			 */
 			ssif_info->multi_data = NULL;
-
-		rv = ssif_i2c_send(ssif_info, msg_written_handler,
-				  I2C_SMBUS_WRITE,
-				  SSIF_IPMI_MULTI_PART_REQUEST_MIDDLE,
-				  ssif_info->multi_data + ssif_info->multi_pos,
-				  I2C_SMBUS_BLOCK_DATA);
-		if (rv < 0) {
-			/* request failed, just return the error. */
-			ssif_inc_stat(ssif_info, send_errors);
-
-			if (ssif_info->ssif_debug & SSIF_DEBUG_MSG)
-				pr_info("Error from i2c_non_blocking_op(3)\n");
-			msg_done_handler(ssif_info, -EIO, NULL, 0);
-		}
 	} else {
 		/* Ready to request the result. */
 		unsigned long oflags, *flags;
