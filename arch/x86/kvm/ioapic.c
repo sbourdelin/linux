@@ -642,8 +642,6 @@ void kvm_ioapic_destroy(struct kvm *kvm)
 int kvm_get_ioapic(struct kvm *kvm, struct kvm_ioapic_state *state)
 {
 	struct kvm_ioapic *ioapic = kvm->arch.vioapic;
-	if (!ioapic)
-		return -EINVAL;
 
 	spin_lock(&ioapic->lock);
 	memcpy(state, ioapic, sizeof(struct kvm_ioapic_state));
@@ -655,8 +653,6 @@ int kvm_get_ioapic(struct kvm *kvm, struct kvm_ioapic_state *state)
 int kvm_set_ioapic(struct kvm *kvm, struct kvm_ioapic_state *state)
 {
 	struct kvm_ioapic *ioapic = kvm->arch.vioapic;
-	if (!ioapic)
-		return -EINVAL;
 
 	spin_lock(&ioapic->lock);
 	memcpy(ioapic, state, sizeof(struct kvm_ioapic_state));
