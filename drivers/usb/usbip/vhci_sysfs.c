@@ -146,6 +146,16 @@ static ssize_t nports_show(struct device *dev, struct device_attribute *attr,
 }
 static DEVICE_ATTR_RO(nports);
 
+static ssize_t ncontrollers_show(struct device *dev, struct device_attribute *attr,
+			   char *out)
+{
+	char *s = out;
+
+	out += sprintf(out, "%d\n", vhci_num_controllers);
+	return out - s;
+}
+static DEVICE_ATTR_RO(ncontrollers);
+
 /* Sysfs entry to shutdown a virtual connection */
 static int vhci_port_disconnect(struct vhci_hcd *vhci, __u32 rhport)
 {
@@ -404,11 +414,12 @@ int vhci_init_attr_group(void)
 		return ret;
 	}
 	*attrs = &dev_attr_nports.attr;
-	*(attrs + 1) = &dev_attr_detach.attr;
-	*(attrs + 2) = &dev_attr_attach.attr;
-	*(attrs + 3) = &dev_attr_usbip_debug.attr;
+	*(attrs + 1) = &dev_attr_ncontrollers.attr;
+	*(attrs + 2) = &dev_attr_detach.attr;
+	*(attrs + 3) = &dev_attr_attach.attr;
+	*(attrs + 4) = &dev_attr_usbip_debug.attr;
 	for (i = 0; i < vhci_num_controllers; i++)
-		*(attrs + i + 4) = &((status_attrs + i)->attr.attr);
+		*(attrs + i + 5) = &((status_attrs + i)->attr.attr);
 	vhci_attr_group.attrs = attrs;
 	return 0;
 }
