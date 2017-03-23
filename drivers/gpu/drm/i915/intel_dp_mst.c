@@ -75,7 +75,8 @@ static bool intel_dp_mst_compute_config(struct intel_encoder *encoder,
 	intel_link_compute_m_n(bpp, lane_count,
 			       adjusted_mode->crtc_clock,
 			       pipe_config->port_clock,
-			       &pipe_config->dp_m_n);
+			       &pipe_config->dp_m_n,
+			       false);
 
 	pipe_config->dp_m_n.tu = slots;
 

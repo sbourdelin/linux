@@ -1624,6 +1624,8 @@ intel_dp_compute_config(struct intel_encoder *encoder,
 	int common_rates[DP_MAX_SUPPORTED_RATES] = {};
 	int common_len;
 	uint8_t link_bw, rate_select;
+	char id[6];
+	bool reduced_n = false;
 
 	common_len = intel_dp_common_rates(intel_dp, common_rates);
 
@@ -1750,10 +1752,17 @@ found:
 	DRM_DEBUG_KMS("DP link bw required %i available %i\n",
 		      mode_rate, link_avail);
 
+	/* Quirk to detect DP->HDMI converter */
+	drm_dp_downstream_id(&intel_dp->aux, id);
+	if (!strncmp(id , "7737" ,4)) {
+	      reduced_n = true;
+	}
+
 	intel_link_compute_m_n(bpp, lane_count,
 			       adjusted_mode->crtc_clock,
 			       pipe_config->port_clock,
-			       &pipe_config->dp_m_n);
+			       &pipe_config->dp_m_n,
+			       reduced_n);
 
 	if (intel_connector->panel.downclock_mode != NULL &&
 		dev_priv->drrs.type == SEAMLESS_DRRS_SUPPORT) {
@@ -1761,7 +1770,8 @@ found:
 			intel_link_compute_m_n(bpp, lane_count,
 				intel_connector->panel.downclock_mode->clock,
 				pipe_config->port_clock,
-				&pipe_config->dp_m2_n2);
+				&pipe_config->dp_m2_n2,
+				reduced_n);
 	}
 
 	/*

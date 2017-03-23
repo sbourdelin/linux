@@ -4869,6 +4869,8 @@ enum {
 
 #define  DATA_LINK_M_N_MASK	(0xffffff)
 #define  DATA_LINK_N_MAX	(0x800000)
+/* Maximum N value useable on some DP->HDMI converters */
+#define  DATA_LINK_REDUCED_N_MAX (0x80000)
 
 #define _PIPEA_DATA_N_G4X	0x70054
 #define _PIPEB_DATA_N_G4X	0x71054
