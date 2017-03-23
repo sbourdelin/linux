@@ -2,7 +2,10 @@
 # Makefile for the kernel serial device drivers.
 #
 
+serial_core-$(CONFIG_TTY) := fulltty_serial.o
+serial_core-$(CONFIG_MINITTY_SERIAL) := minitty_serial.o
 obj-$(CONFIG_SERIAL_CORE) += serial_core.o
+
 obj-$(CONFIG_SERIAL_21285) += 21285.o
 
 obj-$(CONFIG_SERIAL_EARLYCON) += earlycon.o
