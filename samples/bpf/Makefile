@@ -34,6 +34,7 @@ hostprogs-y += sampleip
 hostprogs-y += tc_l2_redirect
 hostprogs-y += lwt_len_hist
 hostprogs-y += xdp_tx_iptunnel
+hostprogs-y += per_socket_stats_example
 
 # Libbpf dependencies
 LIBBPF := ../../tools/lib/bpf/bpf.o
@@ -72,6 +73,7 @@ sampleip-objs := bpf_load.o $(LIBBPF) sampleip_user.o
 tc_l2_redirect-objs := bpf_load.o $(LIBBPF) tc_l2_redirect_user.o
 lwt_len_hist-objs := bpf_load.o $(LIBBPF) lwt_len_hist_user.o
 xdp_tx_iptunnel-objs := bpf_load.o $(LIBBPF) xdp_tx_iptunnel_user.o
+per_socket_stats_example-objs := $(LIBBPF) cookie_uid_helper_example.o
 
 # Tell kbuild to always build the programs
 always := $(hostprogs-y)
@@ -105,6 +107,7 @@ always += trace_event_kern.o
 always += sampleip_kern.o
 always += lwt_len_hist_kern.o
 always += xdp_tx_iptunnel_kern.o
+always += cookie_uid_helper_example.o
 
 HOSTCFLAGS += -I$(objtree)/usr/include
 HOSTCFLAGS += -I$(srctree)/tools/lib/
