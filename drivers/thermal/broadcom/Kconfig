@@ -1,0 +1,7 @@
+config BCM_NS_THERMAL
+	tristate "Northstar thermal driver"
+	depends on ARCH_BCM_IPROC || COMPILE_TEST
+	help
+	  Northstar's DMU (Device Management Unit) block contains a thermal
+	  sensor that allows checking CPU temperature. This driver provides
+	  support for it.
