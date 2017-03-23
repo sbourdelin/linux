@@ -11,6 +11,7 @@
 
 #define pr_fmt(fmt) "kasan test: %s " fmt, __func__
 
+#include <linux/atomic.h>
 #include <linux/delay.h>
 #include <linux/kernel.h>
 #include <linux/mman.h>
@@ -20,6 +21,8 @@
 #include <linux/string.h>
 #include <linux/uaccess.h>
 #include <linux/module.h>
+
+extern atomic_t kasan_report_count;
 
 /*
  * Note: test functions are marked noinline so that their names appear in
@@ -474,6 +477,9 @@ static noinline void __init use_after_scope_test(void)
 
 static int __init kmalloc_tests_init(void)
 {
+	/* Rise reports limit high enough to see all the following bugs */
+	atomic_add(100, &kasan_report_count);
+
 	kmalloc_oob_right();
 	kmalloc_oob_left();
 	kmalloc_node_oob_right();
@@ -499,6 +505,12 @@ static int __init kmalloc_tests_init(void)
 	ksize_unpoisons_memory();
 	copy_user_test();
 	use_after_scope_test();
+
+	/*
+	 * kasan is unreliable now, disable reports if
+	 * we are in single shot mode
+	 */
+	atomic_sub(100, &kasan_report_count);
 	return -EAGAIN;
 }
 

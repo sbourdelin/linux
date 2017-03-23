@@ -13,7 +13,9 @@
  *
  */
 
+#include <linux/atomic.h>
 #include <linux/ftrace.h>
+#include <linux/init.h>
 #include <linux/kernel.h>
 #include <linux/mm.h>
 #include <linux/printk.h>
@@ -291,6 +293,22 @@ static void kasan_report_error(struct kasan_access_info *info)
 	}
 
 	kasan_end_report(&flags);
+}
+
+atomic_t kasan_report_count = ATOMIC_INIT(1);
+EXPORT_SYMBOL_GPL(kasan_report_count);
+
+static int __init kasan_set_multi_shot(char *str)
+{
+	atomic_set(&kasan_report_count, 1000000000);
+	return 1;
+}
+__setup("kasan_multi_shot", kasan_set_multi_shot);
+
+static inline bool kasan_report_enabled(void)
+{
+	return !current->kasan_depth &&
+		(atomic_dec_if_positive(&kasan_report_count) >= 0);
 }
 
 void kasan_report(unsigned long addr, size_t size,
