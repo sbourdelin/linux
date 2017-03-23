@@ -22,6 +22,14 @@
 #ifndef	__LINUX_USB_USBNET_H
 #define	__LINUX_USB_USBNET_H
 
+struct usbnet_stats64 {
+	struct u64_stats_sync	syncp;
+	u64			rx_packets;
+	u64			rx_bytes;
+	u64			tx_packets;
+	u64			tx_bytes;
+};
+
 /* interface from usbnet core to each USB networking link we handle */
 struct usbnet {
 	/* housekeeping */
@@ -63,6 +71,8 @@ struct usbnet {
 	struct mutex		interrupt_mutex;
 	struct usb_anchor	deferred;
 	struct tasklet_struct	bh;
+
+	struct usbnet_stats64	stats;
 
 	struct work_struct	kevent;
 	unsigned long		flags;
@@ -265,6 +275,8 @@ extern int usbnet_get_settings(struct net_device *net,
 			       struct ethtool_cmd *cmd);
 extern int usbnet_set_settings(struct net_device *net,
 			       struct ethtool_cmd *cmd);
+extern void usbnet_get_stats64(struct net_device *dev,
+			       struct rtnl_link_stats64 *stats);
 extern u32 usbnet_get_link(struct net_device *net);
 extern u32 usbnet_get_msglevel(struct net_device *);
 extern void usbnet_set_msglevel(struct net_device *, u32);
