@@ -572,6 +572,9 @@ void choose_random_location(unsigned long input,
 		return;
 	}
 
+	if (IS_ENABLED(CONFIG_X86_32) && IS_ENABLED(CONFIG_HIBERNATION))
+		warn("KASLR active: hibernation disabled on 32-bit x86.");
+
 	boot_params->hdr.loadflags |= KASLR_FLAG;
 
 	/* Prepare to add new identity pagetables on demand. */

@@ -1725,6 +1725,11 @@
 			kernel and module base offset ASLR (Address Space
 			Layout Randomization).
 
+			On 32-bit x86 with CONFIG_HIBERNATION, hibernation
+			is disabled if KASLR is enabled. If "nokaslr" is
+			specified, KASLR will be diabled and hibernation
+			will be enabled.
+
 	keepinitrd	[HW,ARM]
 
 	kernelcore=	[KNL,X86,IA-64,PPC]
