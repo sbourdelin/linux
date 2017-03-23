@@ -643,7 +643,7 @@ void kvm_ioapic_destroy(struct kvm *kvm)
 
 int kvm_get_ioapic(struct kvm *kvm, struct kvm_ioapic_state *state)
 {
-	struct kvm_ioapic *ioapic = ioapic_irqchip(kvm);
+	struct kvm_ioapic *ioapic = kvm->arch.vioapic;
 	if (!ioapic)
 		return -EINVAL;
 
@@ -656,7 +656,7 @@ int kvm_get_ioapic(struct kvm *kvm, struct kvm_ioapic_state *state)
 
 int kvm_set_ioapic(struct kvm *kvm, struct kvm_ioapic_state *state)
 {
-	struct kvm_ioapic *ioapic = ioapic_irqchip(kvm);
+	struct kvm_ioapic *ioapic = kvm->arch.vioapic;
 	if (!ioapic)
 		return -EINVAL;
 
