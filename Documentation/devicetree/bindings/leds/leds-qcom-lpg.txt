@@ -1,0 +1,194 @@
+Binding for Qualcomm Light Pulse Generator
+
+The Qualcomm Light Pulse Generator consists of three different hardware blocks;
+a ramp generator with lookup table, the light pulse generator and a three
+channel current sink. These blocks are found in a wide range of Qualcomm PMICs.
+Each of these are described individually below.
+
+= Lookup Table (LUT)
+
+- compatible:
+	Usage: required
+	Value type: <stringlist>
+	Definition: must be "qcom,spmi-lpg-lut"
+
+- reg:
+	Usage: required
+	Value type: <prop-encoded-array>
+	Definition: base address of the LUT block
+
+- qcom,lut-size:
+	Usage: required
+	Value type: <u32>
+	Definition: number of elements available in the lookup table
+
+= Light Pulse Generator (LPG)
+The Light Pulse Generator can operate either as a standard PWM controller or in
+a more advanced lookup-table based mode. These are described separately below.
+
+- compatible:
+	Usage: required
+	Value type: <stringlist>
+	Definition: must be "qcom,spmi-lpg"
+
+- reg:
+	Usage: required
+	Value type: <prop-encoded-array>
+	Definition: base address of the LPG block
+
+== PWM mode
+
+- #pwm-cells:
+	Usage: required
+	Value type: <u32>
+	Definition: must be 1
+
+== Lookup-table mode
+
+- cell-index:
+	Usage: required, when referencing a LUT
+	Value type: <u32>
+	Definition: id of the LPG, used to associate the LPG with a particular
+		    ramp generator in the LUT block
+
+- default-state:
+	Usage: optional
+	Value type: <string>
+	Definition: default state, as defined in common.txt
+
+- label:
+	Usage: optional
+	Value type: <string>
+	Definition: label of the LED, as defined in common.txt
+
+- linux,default-trigger:
+	Usage: optional
+	Value type: <string>
+	Definition: default trigger, as defined in common.txt
+
+- qcom,tri-led:
+	Usage: optional
+	Value type: <prop-encoded-array>
+	Definition: a phandle of a TRILED node and a single u32 denoting which
+		    output channel to control
+
+- qcom,lut:
+	Usage: optional
+	Value type: <prop-encoded-array>
+	Definition: phandle of a LUT node
+
+- qcom,dtest:
+	Usage: optional
+	Value type: <prop-encoded-array>
+	Definition: configures the output into an internal test line of the
+		    pmic. A first u32 defines which test line to use and the
+		    second cell configures how the value should be outputed
+		    (available lines and configuration differs between PMICs)
+
+- qcom,pattern:
+	Usage: optional
+	Value type: <u16-list>
+	Definition: list of 16 bit duty cycle values to make up the pattern to
+		    be programmed into the LUT. Values should be in the range
+		    [0,512).
+
+- qcom,pattern-length-ms:
+	Usage: optional
+	Value type: <u32>
+	Definition: duration, in milliseconds, of the ramp generator running
+		    one pass over the defined pattern
+
+- qcom,pattern-pause-lo-ms:
+	Usage: optional
+	Value type: <u32>
+	Definition: duration, in milliseconds, for the ramp generator to pause
+		    before iterating over the pattern
+
+- qcom,pattern-pause-hi-ms:
+	Usage: optional
+	Value type: <u32>
+	Definition: duration, in milliseconds, for the ramp generator to pause
+		    after iterating over the pattern
+
+- qcom,pattern-ping-pong:
+	Usage: optional
+	Value type: <boolean>
+	Definition: denotes that the ramp generator should reverse direction
+		    when reaching the end of the pattern, instead of wrapping
+		    to the beginning
+
+- qcom,pattern-oneshot:
+	Usage: optional
+	Value type: <boolean>
+	Definition: denotes that the ramp generator should stop after a single
+		    pass over the pattern
+
+- qcom,pattern-reverse:
+	Usage: optional
+	Value type: <boolean>
+	Definition: denotes that the ramp generator should operate backwards
+		    over the pattern
+
+= LED Current Sink (TRILED)
+
+- compatible:
+	Usage: required
+	Value type: <stringlist>
+	Definition: must be "qcom,spmi-tri-led"
+
+- reg:
+	Usage: required
+	Value type: <prop-encoded-array>
+	Definition: base address of the TRILED block
+
+- qcom,power-source:
+	Usage: required
+	Value type: <u32>
+	Definition: power-source used to drive the output, as defined in the
+		    datasheet
+
+= EXAMPLE:
+The following example defines a single output of the PMI8994, sinking current
+into a LED in a natural pulsating pattern:
+
+&spmi_bus {
+	pmic@3 {
+		compatible = "qcom,pmi8994", "qcom,spmi-pmic";
+		reg = <0x3 SPMI_USID>;
+		#address-cells = <1>;
+		#size-cells = <0>;
+
+		pmi8994_lpg_lut: lpg-lut@b000 {
+			compatible = "qcom,spmi-lpg-lut";
+			reg = <0xb000>;
+
+			qcom,lut-size = <24>;
+		};
+
+		lpg@b200 {
+			compatible = "qcom,spmi-lpg";
+			reg = <0xb200>;
+
+			cell-index = <2>;
+
+			label = "lpg:green:user0";
+
+			qcom,tri-led = <&pmi8994_tri_led 1>;
+			qcom,lut = <&pmi8994_lpg_lut>;
+
+			qcom,pattern = /bits/ 16 <9 20 42 86 158 256 353
+						  425 469 491 502 507>;
+			qcom,pattern-length-ms = <1337>;
+			qcom,pattern-ping-pong;
+
+			default-state = "on";
+		};
+
+		pmi8994_tri_led: tri-led@d000 {
+			compatible = "qcom,spmi-tri-led";
+			reg = <0xd000>;
+
+			qcom,power-source = <1>;
+		};
+	};
+};
