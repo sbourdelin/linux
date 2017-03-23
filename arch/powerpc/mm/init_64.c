@@ -133,7 +133,7 @@ static __meminit struct vmemmap_backing * vmemmap_list_alloc(int node)
 
 	/* allocate a page when required and hand out chunks */
 	if (!num_left) {
-		next = vmemmap_alloc_block(PAGE_SIZE, node);
+		next = vmemmap_alloc_block(PAGE_SIZE, node, true);
 		if (unlikely(!next)) {
 			WARN_ON(1);
 			return NULL;
@@ -181,7 +181,7 @@ int __meminit vmemmap_populate(unsigned long start, unsigned long end, int node)
 		if (vmemmap_populated(start, page_size))
 			continue;
 
-		p = vmemmap_alloc_block(page_size, node);
+		p = vmemmap_alloc_block(page_size, node, true);
 		if (!p)
 			return -ENOMEM;
 

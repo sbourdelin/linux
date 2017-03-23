@@ -39,16 +39,27 @@
 static void * __ref __earlyonly_bootmem_alloc(int node,
 				unsigned long size,
 				unsigned long align,
-				unsigned long goal)
+				unsigned long goal,
+				bool zero)
 {
-	return memblock_virt_alloc_try_nid(size, align, goal,
-					    BOOTMEM_ALLOC_ACCESSIBLE, node);
+	void *mem = memblock_virt_alloc_try_nid_raw(size, align, goal,
+						    BOOTMEM_ALLOC_ACCESSIBLE,
+						    node);
+	if (!mem) {
+		panic("%s: Failed to allocate %lu bytes align=0x%lx nid=%d from=0x%lx\n",
+		      __func__, size, align, node, goal);
+		return NULL;
+	}
+
+	if (zero)
+		memset(mem, 0, size);
+	return mem;
 }
 
 static void *vmemmap_buf;
 static void *vmemmap_buf_end;
 
-void * __meminit vmemmap_alloc_block(unsigned long size, int node)
+void * __meminit vmemmap_alloc_block(unsigned long size, int node, bool zero)
 {
 	/* If the main allocator is up use that, fallback to bootmem. */
 	if (slab_is_available()) {
@@ -67,23 +78,26 @@ void * __meminit vmemmap_alloc_block(unsigned long size, int node)
 		return NULL;
 	} else
 		return __earlyonly_bootmem_alloc(node, size, size,
-				__pa(MAX_DMA_ADDRESS));
+				__pa(MAX_DMA_ADDRESS), zero);
 }
 
 /* need to make sure size is all the same during early stage */
-static void * __meminit alloc_block_buf(unsigned long size, int node)
+static void * __meminit alloc_block_buf(unsigned long size, int node, bool zero)
 {
 	void *ptr;
 
 	if (!vmemmap_buf)
-		return vmemmap_alloc_block(size, node);
+		return vmemmap_alloc_block(size, node, zero);
 
 	/* take the from buf */
 	ptr = (void *)ALIGN((unsigned long)vmemmap_buf, size);
 	if (ptr + size > vmemmap_buf_end)
-		return vmemmap_alloc_block(size, node);
+		return vmemmap_alloc_block(size, node, zero);
 
 	vmemmap_buf = ptr + size;
+
+	if (zero)
+		memset(ptr, 0, size);
 
 	return ptr;
 }
@@ -152,11 +166,11 @@ static void * __meminit altmap_alloc_block_buf(unsigned long size,
 
 /* need to make sure size is all the same during early stage */
 void * __meminit __vmemmap_alloc_block_buf(unsigned long size, int node,
-		struct vmem_altmap *altmap)
+		struct vmem_altmap *altmap, bool zero)
 {
 	if (altmap)
 		return altmap_alloc_block_buf(size, altmap);
-	return alloc_block_buf(size, node);
+	return alloc_block_buf(size, node, zero);
 }
 
 void __meminit vmemmap_verify(pte_t *pte, int node,
@@ -175,7 +189,7 @@ pte_t * __meminit vmemmap_pte_populate(pmd_t *pmd, unsigned long addr, int node)
 	pte_t *pte = pte_offset_kernel(pmd, addr);
 	if (pte_none(*pte)) {
 		pte_t entry;
-		void *p = alloc_block_buf(PAGE_SIZE, node);
+		void *p = alloc_block_buf(PAGE_SIZE, node, true);
 		if (!p)
 			return NULL;
 		entry = pfn_pte(__pa(p) >> PAGE_SHIFT, PAGE_KERNEL);
@@ -188,7 +202,7 @@ pmd_t * __meminit vmemmap_pmd_populate(pud_t *pud, unsigned long addr, int node)
 {
 	pmd_t *pmd = pmd_offset(pud, addr);
 	if (pmd_none(*pmd)) {
-		void *p = vmemmap_alloc_block(PAGE_SIZE, node);
+		void *p = vmemmap_alloc_block(PAGE_SIZE, node, true);
 		if (!p)
 			return NULL;
 		pmd_populate_kernel(&init_mm, pmd, p);
@@ -200,7 +214,7 @@ pud_t * __meminit vmemmap_pud_populate(p4d_t *p4d, unsigned long addr, int node)
 {
 	pud_t *pud = pud_offset(p4d, addr);
 	if (pud_none(*pud)) {
-		void *p = vmemmap_alloc_block(PAGE_SIZE, node);
+		void *p = vmemmap_alloc_block(PAGE_SIZE, node, true);
 		if (!p)
 			return NULL;
 		pud_populate(&init_mm, pud, p);
@@ -212,7 +226,7 @@ p4d_t * __meminit vmemmap_p4d_populate(pgd_t *pgd, unsigned long addr, int node)
 {
 	p4d_t *p4d = p4d_offset(pgd, addr);
 	if (p4d_none(*p4d)) {
-		void *p = vmemmap_alloc_block(PAGE_SIZE, node);
+		void *p = vmemmap_alloc_block(PAGE_SIZE, node, true);
 		if (!p)
 			return NULL;
 		p4d_populate(&init_mm, p4d, p);
@@ -224,7 +238,7 @@ pgd_t * __meminit vmemmap_pgd_populate(unsigned long addr, int node)
 {
 	pgd_t *pgd = pgd_offset_k(addr);
 	if (pgd_none(*pgd)) {
-		void *p = vmemmap_alloc_block(PAGE_SIZE, node);
+		void *p = vmemmap_alloc_block(PAGE_SIZE, node, true);
 		if (!p)
 			return NULL;
 		pgd_populate(&init_mm, pgd, p);
@@ -290,8 +304,8 @@ void __init sparse_mem_maps_populate_node(struct page **map_map,
 	void *vmemmap_buf_start;
 
 	size = ALIGN(size, PMD_SIZE);
-	vmemmap_buf_start = __earlyonly_bootmem_alloc(nodeid, size * map_count,
-			 PMD_SIZE, __pa(MAX_DMA_ADDRESS));
+	vmemmap_buf_start = __earlyonly_bootmem_alloc(nodeid, size
+			* map_count, PMD_SIZE, __pa(MAX_DMA_ADDRESS), false);
 
 	if (vmemmap_buf_start) {
 		vmemmap_buf = vmemmap_buf_start;
