@@ -3074,6 +3074,7 @@ static int hwsim_cloned_frame_received_nl(struct sk_buff *skb_2,
 	int frame_data_len;
 	void *frame_data;
 	struct sk_buff *skb = NULL;
+	int rv = -EINVAL;
 
 	if (!info->attrs[HWSIM_ATTR_ADDR_RECEIVER] ||
 	    !info->attrs[HWSIM_ATTR_FRAME] ||
@@ -3087,25 +3088,6 @@ static int hwsim_cloned_frame_received_nl(struct sk_buff *skb_2,
 	dst = (void *)nla_data(info->attrs[HWSIM_ATTR_ADDR_RECEIVER]);
 	frame_data_len = nla_len(info->attrs[HWSIM_ATTR_FRAME]);
 	frame_data = (void *)nla_data(info->attrs[HWSIM_ATTR_FRAME]);
-
-	/* Allocate new skb here */
-	skb = alloc_skb(frame_data_len, GFP_KERNEL);
-	if (skb == NULL) {
-		if (hwsim_ratelimit())
-			printk(KERN_DEBUG " hwsim rx-nl: skb alloc failed, len: %d\n",
-			       frame_data_len);
-		goto out;
-	}
-
-	if (frame_data_len > IEEE80211_MAX_DATA_LEN) {
-		if (hwsim_ratelimit())
-			printk(KERN_DEBUG " hwsim rx-nl: data lenth error: %d  max: %d\n",
-			       frame_data_len, IEEE80211_MAX_DATA_LEN);
-		goto out;
-	}
-
-	/* Copy the data */
-	memcpy(skb_put(skb, frame_data_len), frame_data, frame_data_len);
 
 	data2 = get_hwsim_data_ref_from_addr(dst);
 
@@ -3135,8 +3117,29 @@ static int hwsim_cloned_frame_received_nl(struct sk_buff *skb_2,
 		if (((cnt++ & 0x3FF) == 0x3FF) && hwsim_ratelimit())
 			printk(KERN_DEBUG " hwsim rx-nl: radio %pM idle: %d or not started: %d cnt: %d\n",
 			       dst, data2->idle, !data2->started, cnt);
+		rv = -ENETDOWN;
 		goto out;
 	}
+
+	if (frame_data_len > IEEE80211_MAX_DATA_LEN) {
+		if (hwsim_ratelimit())
+			printk(KERN_DEBUG " hwsim rx-nl: data lenth error: %d  max: %d\n",
+			       frame_data_len, IEEE80211_MAX_DATA_LEN);
+		goto out;
+	}
+
+
+	/* Allocate new skb here */
+	skb = alloc_skb(frame_data_len, GFP_KERNEL);
+	if (skb == NULL) {
+		if (hwsim_ratelimit())
+			printk(KERN_DEBUG " hwsim rx-nl: skb alloc failed, len: %d\n",
+			       frame_data_len);
+		goto out;
+	}
+
+	/* Copy the data */
+	memcpy(skb_put(skb, frame_data_len), frame_data, frame_data_len);
 
 	/* A frame is received from user space */
 	memset(&rx_status, 0, sizeof(rx_status));
