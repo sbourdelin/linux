@@ -1966,7 +1966,7 @@ qla2x00_handle_dif_error(srb_t *sp, struct sts_entry_24xx *sts24)
 				return 1;
 			}
 
-			spt = page_address(sg_page(sg)) + sg->offset;
+			spt = sg_virt(sg);
 			spt += j;
 
 			spt->app_tag = 0xffff;
