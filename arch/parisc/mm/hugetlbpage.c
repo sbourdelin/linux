@@ -69,7 +69,7 @@ pte_t *huge_pte_alloc(struct mm_struct *mm,
 	return pte;
 }
 
-pte_t *huge_pte_offset(struct mm_struct *mm, unsigned long addr)
+pte_t *huge_pte_offset(struct mm_struct *mm, unsigned long addr, struct hstate *h)
 {
 	pgd_t *pgd;
 	pud_t *pud;
