@@ -46,7 +46,11 @@
 #define WMI_READY_TIMEOUT (5 * HZ)
 #define ATH10K_FLUSH_TIMEOUT_HZ (5 * HZ)
 #define ATH10K_CONNECTION_LOSS_HZ (3 * HZ)
+#ifdef CONFIG_ATH10K_LICENSED_CHAN
+#define ATH10K_NUM_CHANS 47
+#else
 #define ATH10K_NUM_CHANS 40
+#endif
 
 /* Antenna noise floor */
 #define ATH10K_DEFAULT_NOISE_FLOOR -95
