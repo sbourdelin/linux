@@ -28,6 +28,11 @@
 
 static DEFINE_RWLOCK(proc_subdir_lock);
 
+struct proc_fs_info *proc_sb(struct super_block *sb)
+{
+	return sb->s_fs_info;
+}
+
 static int proc_match(unsigned int len, const char *name, struct proc_dir_entry *de)
 {
 	if (len < de->namelen)

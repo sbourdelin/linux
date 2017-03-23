@@ -15,6 +15,7 @@
 #include <linux/init.h>
 #include <linux/sched.h>
 #include <linux/sched/stat.h>
+#include <linux/slab.h>
 #include <linux/module.h>
 #include <linux/bitops.h>
 #include <linux/user_namespace.h>
@@ -26,12 +27,13 @@
 #include "internal.h"
 
 enum {
-	Opt_gid, Opt_hidepid, Opt_err,
+	Opt_gid, Opt_hidepid, Opt_version ,Opt_err,
 };
 
 static const match_table_t tokens = {
 	{Opt_hidepid, "hidepid=%u"},
 	{Opt_gid, "gid=%u"},
+	{Opt_version, "version=%u"},
 	{Opt_err, NULL},
 };
 
@@ -67,6 +69,8 @@ int proc_parse_options(char *options, struct pid_namespace *pid)
 			}
 			pid->hide_pid = option;
 			break;
+		case Opt_version:
+			break;
 		default:
 			pr_err("proc: unrecognized mount option \"%s\" "
 			       "or missing value\n", p);
@@ -77,40 +81,205 @@ int proc_parse_options(char *options, struct pid_namespace *pid)
 	return 1;
 }
 
+struct proc_options {
+	int version;	/* version field auto set to 1 to not break userspace */
+	kgid_t pid_gid;
+	int hide_pid;
+};
+
+int proc_parse_early_options(char *options, void *holder,
+			     struct proc_options *fs_options)
+{
+	char *p, *opts, *orig;
+	substring_t args[MAX_OPT_ARGS];
+	int option, ret = 0;
+
+	if (!options)
+		return 0;
+
+	opts = kstrdup(options, GFP_KERNEL);
+	if (!opts)
+		return -ENOMEM;
+
+	orig = opts;
+
+	while ((p = strsep(&opts, ",")) != NULL) {
+		int token;
+		if (!*p)
+			continue;
+
+		token = match_token(p, tokens, args);
+		switch (token) {
+		case Opt_version:
+			if (match_int(&args[0], &option)) {
+				ret = -EINVAL;
+				goto out;
+			}
+			if (option < 1 || option > 2) {
+				pr_err("proc: version value must be 1 or 2.\n");
+				ret = -EINVAL;
+				goto out;
+			}
+			fs_options->version = option;
+			break;
+		case Opt_gid:
+			if (match_int(&args[0], &option)) {
+				ret = -EINVAL;
+				goto out;
+			}
+			fs_options->pid_gid = make_kgid(current_user_ns(), option);
+			break;
+		case Opt_hidepid:
+			if (match_int(&args[0], &option)) {
+				ret = -EINVAL;
+				goto out;
+			}
+			if (option < 0 || option > 2) {
+				pr_err("proc: hidepid value must be between 0 and 2.\n");
+				ret = -EINVAL;
+				goto out;
+			}
+			fs_options->hide_pid = option;
+			break;
+		case Opt_err:
+			/*
+			 * pr_err("proc: unrecognized mount option \"%s\" ", p);
+			 * ret = -EINVAL;
+			 * goto out;
+			 */
+		default:
+			break;
+		}
+	}
+
+out:
+	kfree(orig);
+	return ret;
+}
+
+static int proc_test_super(struct super_block *s, void *data)
+{
+	int ret = 0;
+	struct proc_fs_info *p = data;
+	struct proc_fs_info *fs_info = proc_sb(s);
+
+	if (p->version == 1 && p->pid_ns == fs_info->pid_ns)
+		ret = 1;
+	/*
+	if (p->version == 2 && p->pid_ns == fs_info->pid_ns &&
+	    p->hide_pid == fs_info->hide_pid &&
+	    gid_eq(p->pid_gid, fs_info->pid_gid))
+		ret = 1;
+	*/
+	return ret;
+}
+
+static int proc_set_super(struct super_block *sb, void *data)
+{
+	sb->s_fs_info = data;
+	return set_anon_super(sb, NULL);
+}
+
 int proc_remount(struct super_block *sb, int *flags, char *data)
 {
-	struct pid_namespace *pid = sb->s_fs_info;
+	int error;
+	struct proc_fs_info *fs_info = proc_sb(sb);
+	struct pid_namespace *pid = fs_info->pid_ns;
+	struct proc_options fs_options = { 1, GLOBAL_ROOT_GID, 0 };
 
 	sync_filesystem(sb);
-	return !proc_parse_options(data, pid);
+	error = proc_parse_early_options(data, sb->s_type, &fs_options);
+	if (error < 0)
+		return error;
+
+	if (fs_options.version == 1) {
+		error = proc_parse_options(data, pid);
+		if (!error)
+			return -EINVAL;
+	}
+
+	fs_info->version = fs_options.version;
+	fs_info->pid_gid = fs_options.pid_gid;
+	fs_info->hide_pid = fs_options.hide_pid;
+
+	return 0;
 }
 
 static struct dentry *proc_mount(struct file_system_type *fs_type,
 	int flags, const char *dev_name, void *data)
 {
 	struct pid_namespace *ns;
+	struct super_block *sb;
+	struct proc_fs_info *fs_info = NULL;
+	struct proc_options fs_options = { 1, GLOBAL_ROOT_GID, 0 };
+	int error = 0;
+
+	if (!(flags & MS_KERNMOUNT)) {
+		if (!ns_capable(current_user_ns(), CAP_SYS_ADMIN))
+			return ERR_PTR(-EPERM);
+
+
+		error = proc_parse_early_options(data, fs_type, &fs_options);
+		if (error)
+			return ERR_PTR(error);
+	}
+
+	fs_info = kzalloc(sizeof(struct proc_fs_info), GFP_NOFS);
+	if (!fs_info)
+		return ERR_PTR(-ENOMEM);
+
+	fs_info->version = fs_options.version;
+	fs_info->pid_gid = fs_options.pid_gid;
+	fs_info->hide_pid = fs_options.hide_pid;
 
 	if (flags & MS_KERNMOUNT) {
 		ns = data;
 		data = NULL;
+		fs_info->version = 1; /* Lets restore this */
 	} else {
 		ns = task_active_pid_ns(current);
 	}
 
-	return mount_ns(fs_type, flags, data, ns, ns->user_ns, proc_fill_super);
+	fs_info->pid_ns = ns;
+
+	sb = sget_userns(fs_type, proc_test_super, proc_set_super, flags,
+			 ns->user_ns, fs_info);
+	if (IS_ERR(sb)) {
+		error = PTR_ERR(sb);
+		goto error_fs_info;
+	}
+
+	if (sb->s_root) {
+		kfree(fs_info);
+	} else {
+		error = proc_fill_super(sb, data, flags & MS_SILENT ? 1 : 0);
+		if (error) {
+			deactivate_locked_super(sb);
+			goto error_fs_info;
+		}
+
+		sb->s_flags |= MS_ACTIVE;
+	}
+
+	return dget(sb->s_root);
+
+error_fs_info:
+	kfree(fs_info);
+	return ERR_PTR(error);
 }
 
 static void proc_kill_sb(struct super_block *sb)
 {
-	struct pid_namespace *ns;
+	struct proc_fs_info *fs_info = proc_sb(sb);
+	struct pid_namespace *ns = (struct pid_namespace *)fs_info->pid_ns;
 
-	ns = (struct pid_namespace *)sb->s_fs_info;
 	if (ns->proc_self)
 		dput(ns->proc_self);
 	if (ns->proc_thread_self)
 		dput(ns->proc_thread_self);
 	kill_anon_super(sb);
 	put_pid_ns(ns);
+	kfree(fs_info);
 }
 
 static struct file_system_type proc_fs_type = {
