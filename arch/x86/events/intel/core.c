@@ -3595,6 +3595,52 @@ static struct attribute *hsw_events_attrs[] = {
 	NULL
 };
 
+static ssize_t freeze_on_smi_show(struct device *cdev,
+				  struct device_attribute *attr,
+				  char *buf)
+{
+	return sprintf(buf, "%d\n", x86_pmu.attr_freeze_on_smi);
+}
+
+static ssize_t freeze_on_smi_store(struct device *cdev,
+				   struct device_attribute *attr,
+				   const char *buf, size_t count)
+{
+	unsigned long val;
+	u64 debugctlmsr;
+	ssize_t ret;
+	int cpu;
+
+	ret = kstrtoul(buf, 0, &val);
+	if (ret)
+		return ret;
+
+	if (val > 1)
+		return -EINVAL;
+
+	if (x86_pmu.attr_freeze_on_smi == val)
+		return count;
+
+	for_each_possible_cpu(cpu) {
+		rdmsrl_on_cpu(cpu, MSR_IA32_DEBUGCTLMSR, &debugctlmsr);
+		if (val)
+			wrmsrl_on_cpu(cpu, MSR_IA32_DEBUGCTLMSR, debugctlmsr | DEBUGCTLMSR_FREEZE_WHILE_SMM);
+		else
+			wrmsrl_on_cpu(cpu, MSR_IA32_DEBUGCTLMSR, debugctlmsr & ~DEBUGCTLMSR_FREEZE_WHILE_SMM);
+	}
+
+	x86_pmu.attr_freeze_on_smi = val;
+
+	return count;
+}
+
+static DEVICE_ATTR_RW(freeze_on_smi);
+
+static struct attribute *intel_pmu_attrs[] = {
+	&dev_attr_freeze_on_smi.attr,
+	NULL,
+};
+
 __init int intel_pmu_init(void)
 {
 	union cpuid10_edx edx;
@@ -3641,6 +3687,8 @@ __init int intel_pmu_init(void)
 
 	x86_pmu.max_pebs_events		= min_t(unsigned, MAX_PEBS_EVENTS, x86_pmu.num_counters);
 
+
+	x86_pmu.attrs			= intel_pmu_attrs;
 	/*
 	 * Quirk: v2 perfmon does not report fixed-purpose events, so
 	 * assume at least 3 events, when not running in a hypervisor:
