@@ -1339,9 +1339,9 @@ static int kvmgt_guest_init(struct mdev_device *mdev)
 
 static bool kvmgt_guest_exit(struct kvmgt_guest_info *info)
 {
-	struct intel_vgpu *vgpu = info->vgpu;
-
 	if (!info) {
+		struct intel_vgpu *vgpu = NULL;
+
 		gvt_vgpu_err("kvmgt_guest_info invalid\n");
 		return false;
 	}
