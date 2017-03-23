@@ -5853,8 +5853,6 @@ static void qlt_abort_work(struct qla_tgt *tgt,
 	return;
 
 out_term2:
-	if (sess)
-		ha->tgt.tgt_ops->put_sess(sess);
 	spin_unlock_irqrestore(&ha->tgt.sess_lock, flags2);
 
 out_term:
