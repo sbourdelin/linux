@@ -86,6 +86,21 @@ static const struct ieee80211_channel ath9k_5ghz_chantable[] = {
 	CHAN5G(5785, 35), /* Channel 157 */
 	CHAN5G(5805, 36), /* Channel 161 */
 	CHAN5G(5825, 37), /* Channel 165 */
+
+#ifdef CONFIG_ATH9K_LICENSED_CHAN
+	/* 4.9Ghz channels, public safety channels, license is required in US
+	 * and most other regulatory domains!
+	 */
+	/* 802.11j 4.9 GHz (20 MHz) */
+	CHAN5G(4920, 38), /* channel 184 */
+	CHAN5G(4940, 39), /* channel 188 */
+	CHAN5G(4960, 40), /* channel 192 */
+	CHAN5G(4980, 41), /* channel 196 */
+	/* 802.11j 5.030 - 5.080 GHz (20 MHz) */
+	CHAN5G(5040, 42), /* channel 8 */
+	CHAN5G(5060, 43), /* channel 12 */
+	CHAN5G(5080, 44), /* channel 16 */
+#endif
 };
 
 /* Atheros hardware rate code addition for short premble */

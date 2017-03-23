@@ -73,7 +73,11 @@
 
 #define ATH9K_RSSI_BAD			-128
 
+#ifdef CONFIG_ATH9K_LICENSED_CHAN
+#define ATH9K_NUM_CHANNELS	45
+#else
 #define ATH9K_NUM_CHANNELS	38
+#endif
 
 /* Register read/write primitives */
 #define REG_WRITE(_ah, _reg, _val) \
