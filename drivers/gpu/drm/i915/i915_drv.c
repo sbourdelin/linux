@@ -592,6 +592,8 @@ static int i915_load_modeset_init(struct drm_device *dev)
 	intel_update_rawclk(dev_priv);
 
 	intel_power_domains_init_hw(dev_priv, false);
+	/* Enable the INIT power domain wells for HW initialization. */
+	intel_display_set_init_power(dev_priv, true);
 
 	intel_csr_ucode_init(dev_priv);
 
@@ -1559,6 +1561,8 @@ static int i915_drm_suspend_late(struct drm_device *dev, bool hibernation)
 		if (!fw_csr)
 			intel_power_domains_init_hw(dev_priv, true);
 
+		intel_display_set_init_power(dev_priv, true);
+
 		goto out;
 	}
 
@@ -1768,6 +1772,8 @@ static int i915_drm_resume_early(struct drm_device *dev)
 	if (IS_GEN9_LP(dev_priv) ||
 	    !(dev_priv->suspended_to_idle && dev_priv->csr.dmc_payload))
 		intel_power_domains_init_hw(dev_priv, true);
+	/* Enable the INIT power domain wells for HW initialization. */
+	intel_display_set_init_power(dev_priv, true);
 
 	i915_gem_sanitize(dev_priv);
 

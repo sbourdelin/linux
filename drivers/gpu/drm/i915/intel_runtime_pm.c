@@ -2715,8 +2715,6 @@ void intel_power_domains_init_hw(struct drm_i915_private *dev_priv, bool resume)
 		mutex_unlock(&power_domains->lock);
 	}
 
-	/* For now, we need the power well to be always enabled. */
-	intel_display_set_init_power(dev_priv, true);
 	/* Disable power support if the user asked so. */
 	if (!i915.disable_power_well)
 		intel_display_power_get(dev_priv, POWER_DOMAIN_INIT);
