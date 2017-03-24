@@ -17,25 +17,28 @@
 
 #include "pci.h"
 
-void pci_add_resource_offset(struct list_head *resources, struct resource *res,
-			     resource_size_t offset)
+struct resource_entry *pci_add_resource_offset(struct list_head *resources,
+					       struct resource *res,
+					       resource_size_t offset)
 {
 	struct resource_entry *entry;
 
 	entry = resource_list_create_entry(res, 0);
 	if (!entry) {
 		printk(KERN_ERR "PCI: can't add host bridge window %pR\n", res);
-		return;
+		return NULL;
 	}
 
 	entry->offset = offset;
 	resource_list_add_tail(entry, resources);
+	return entry;
 }
 EXPORT_SYMBOL(pci_add_resource_offset);
 
-void pci_add_resource(struct list_head *resources, struct resource *res)
+struct resource_entry *pci_add_resource(struct list_head *resources,
+					struct resource *res)
 {
-	pci_add_resource_offset(resources, res, 0);
+	return pci_add_resource_offset(resources, res, 0);
 }
 EXPORT_SYMBOL(pci_add_resource);
 

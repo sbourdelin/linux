@@ -1167,9 +1167,11 @@ void pci_release_selected_regions(struct pci_dev *, int);
 /* drivers/pci/bus.c */
 struct pci_bus *pci_bus_get(struct pci_bus *bus);
 void pci_bus_put(struct pci_bus *bus);
-void pci_add_resource(struct list_head *resources, struct resource *res);
-void pci_add_resource_offset(struct list_head *resources, struct resource *res,
-			     resource_size_t offset);
+struct resource_entry *pci_add_resource(struct list_head *resources,
+					struct resource *res);
+struct resource_entry *pci_add_resource_offset(struct list_head *resources,
+					       struct resource *res,
+					       resource_size_t offset);
 void pci_free_resource_list(struct list_head *resources);
 void pci_bus_add_resource(struct pci_bus *bus, struct resource *res,
 			  unsigned int flags);
