@@ -138,18 +138,18 @@ static int round_event_name_len(struct fsnotify_event *fsn_event)
  *
  * Called with the group->notification_lock held.
  */
-static struct fsnotify_event *get_one_event(struct fsnotify_group *group,
+static struct fsnotify_event *get_one_event(struct list_head *notification_list,
 					    size_t count)
 {
 	size_t event_size = sizeof(struct inotify_event);
 	struct fsnotify_event *event;
 
-	if (fsnotify_notify_queue_is_empty(group))
+	if (list_empty(notification_list))
 		return NULL;
 
-	event = fsnotify_peek_first_event(group);
+	event = fsnotify_list_peek_first_event(notification_list);
 
-	pr_debug("%s: group=%p event=%p\n", __func__, group, event);
+	pr_debug("%s: event=%p\n", __func__, event);
 
 	event_size += round_event_name_len(event);
 	if (event_size > count)
@@ -157,7 +157,7 @@ static struct fsnotify_event *get_one_event(struct fsnotify_group *group,
 
 	/* held the notification_lock the whole time, so this is the
 	 * same event we peeked above */
-	fsnotify_remove_first_event(group);
+	fsnotify_list_remove_first_event(notification_list);
 
 	return event;
 }
@@ -234,7 +234,7 @@ static ssize_t inotify_read(struct file *file, char __user *buf,
 	add_wait_queue(&group->notification_waitq, &wait);
 	while (1) {
 		spin_lock(&group->notification_lock);
-		kevent = get_one_event(group, count);
+		kevent = get_one_event(&group->notification_list, count);
 		spin_unlock(&group->notification_lock);
 
 		pr_debug("%s: group=%p kevent=%p\n", __func__, group, kevent);
