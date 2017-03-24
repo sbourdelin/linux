@@ -21,14 +21,14 @@ ENTRY(memset)
 UNWIND( .fnstart         )
 	ands	r3, r0, #3		@ 1 unaligned?
 	mov	ip, r0			@ preserve r0 as return value
+	orr	r1, r1, r1, lsl #8
 	bne	6f			@ 1
 /*
  * we know that the pointer in ip is aligned to a word boundary.
  */
-1:	orr	r1, r1, r1, lsl #8
-	orr	r1, r1, r1, lsl #16
+1:	orr	r1, r1, r1, lsl #16
 	mov	r3, r1
-	cmp	r2, #16
+7:	cmp	r2, #16
 	blt	4f
 
 #if ! CALGN(1)+0
@@ -41,7 +41,7 @@ UNWIND( .fnend              )
 UNWIND( .fnstart            )
 UNWIND( .save {r8, lr}      )
 	mov	r8, r1
-	mov	lr, r1
+	mov	lr, r3
 
 2:	subs	r2, r2, #64
 	stmgeia	ip!, {r1, r3, r8, lr}	@ 64 bytes at a time.
@@ -73,11 +73,11 @@ UNWIND( .fnend                 )
 UNWIND( .fnstart               )
 UNWIND( .save {r4-r8, lr}      )
 	mov	r4, r1
-	mov	r5, r1
+	mov	r5, r3
 	mov	r6, r1
-	mov	r7, r1
+	mov	r7, r3
 	mov	r8, r1
-	mov	lr, r1
+	mov	lr, r3
 
 	cmp	r2, #96
 	tstgt	ip, #31
@@ -114,12 +114,13 @@ UNWIND( .fnstart            )
 	tst	r2, #4
 	strne	r1, [ip], #4
 /*
- * When we get here, we've got less than 4 bytes to zero.  We
+ * When we get here, we've got less than 4 bytes to set.  We
  * may have an unaligned pointer as well.
  */
 5:	tst	r2, #2
+	movne	r3, r1, lsr #8		@ the top half of a 16-bit pattern
 	strneb	r1, [ip], #1
-	strneb	r1, [ip], #1
+	strneb	r3, [ip], #1
 	tst	r2, #1
 	strneb	r1, [ip], #1
 	ret	lr
@@ -135,3 +136,28 @@ UNWIND( .fnstart            )
 UNWIND( .fnend   )
 ENDPROC(memset)
 ENDPROC(mmioset)
+
+ENTRY(__memset16)
+UNWIND( .fnstart         )
+	tst	r0, #2			@ pointer unaligned?
+	mov	ip, r0			@ preserve r0 as return value
+	beq	1b			@ jump into the middle of memset
+	subs	r2, r2, #2		@ cope with n == 0
+	movge	r3, r1, lsr #8		@ r3 = r1 >> 8
+	strgeb	r1, [ip], #1		@ *ip = r1
+	strgeb	r3, [ip], #1		@ *ip = r3
+	bgt	1b			@ back into memset if n > 0
+	ret	lr			@ otherwise return
+UNWIND( .fnend   )
+ENDPROC(__memset16)
+ENTRY(__memset32)
+UNWIND( .fnstart         )
+	mov	r3, r1			@ copy r1 to r3 and fall into memset64
+UNWIND( .fnend   )
+ENDPROC(__memset32)
+ENTRY(__memset64)
+UNWIND( .fnstart         )
+	mov	ip, r0			@ preserve r0 as return value
+	b	7b			@ jump into the middle of memset
+UNWIND( .fnend   )
+ENDPROC(__memset64)
