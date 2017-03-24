@@ -518,7 +518,19 @@ retry:
 	hlist_add_head(&s->s_instances, &type->fs_supers);
 	spin_unlock(&sb_lock);
 	get_filesystem(type);
-	register_shrinker(&s->s_shrink);
+	err = register_shrinker(&s->s_shrink);
+	if (err) {
+		spin_lock(&sb_lock);
+		list_del(&s->s_list);
+		hlist_del(&s->s_instances);
+		spin_unlock(&sb_lock);
+
+		up_write(&s->s_umount);
+		destroy_super(s);
+		put_filesystem(type);
+		return ERR_PTR(err);
+	}
+
 	return s;
 }
 
