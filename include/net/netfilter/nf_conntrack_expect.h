@@ -71,6 +71,7 @@ struct nf_conntrack_expect_policy {
 };
 
 #define NF_CT_EXPECT_CLASS_DEFAULT	0
+#define NF_CT_EXPECT_MAX_CNT		U8_MAX
 
 int nf_conntrack_expect_pernet_init(struct net *net);
 void nf_conntrack_expect_pernet_fini(struct net *net);
