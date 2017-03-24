@@ -1217,12 +1217,15 @@ static void bq24190_check_status(struct bq24190_dev_info *bdi)
 	} while (f_reg && ++i < 2);
 
 	if (f_reg != bdi->f_reg) {
-		dev_info(bdi->dev,
-			"Fault: boost %d, charge %d, battery %d, ntc %d\n",
-			!!(f_reg & BQ24190_REG_F_BOOST_FAULT_MASK),
-			!!(f_reg & BQ24190_REG_F_CHRG_FAULT_MASK),
-			!!(f_reg & BQ24190_REG_F_BAT_FAULT_MASK),
-			!!(f_reg & BQ24190_REG_F_NTC_FAULT_MASK));
+		if (f_reg && ((ss_reg & BQ24190_REG_SS_PG_STAT_MASK) ||
+		    f_reg != (1 << BQ24190_REG_F_CHRG_FAULT_SHIFT)))
+			/* omit over/under voltage fault after disconnect */
+			dev_warn(bdi->dev,
+				"Fault: boost %d, charge %d, battery %d, ntc %d\n",
+				!!(f_reg & BQ24190_REG_F_BOOST_FAULT_MASK),
+				!!(f_reg & BQ24190_REG_F_CHRG_FAULT_MASK),
+				!!(f_reg & BQ24190_REG_F_BAT_FAULT_MASK),
+				!!(f_reg & BQ24190_REG_F_NTC_FAULT_MASK));
 
 		mutex_lock(&bdi->f_reg_lock);
 		if ((bdi->f_reg & battery_mask_f) != (f_reg & battery_mask_f))
