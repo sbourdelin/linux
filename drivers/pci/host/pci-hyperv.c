@@ -897,9 +897,13 @@ static void hv_compose_msi_msg(struct irq_data *data, struct msi_msg *msg)
 	 * processors because Hyper-V only supports 64 in a guest.
 	 */
 	affinity = irq_data_get_affinity_mask(data);
-	for_each_cpu_and(cpu, affinity, cpu_online_mask) {
-		int_pkt->int_desc.cpu_mask |=
-			(1ULL << vmbus_cpu_number_to_vp_number(cpu));
+	if (cpumask_weight(affinity) >= 32) {
+		int_pkt->int_desc.cpu_mask = -1ULL;
+	} else {
+		for_each_cpu_and(cpu, affinity, cpu_online_mask) {
+			int_pkt->int_desc.cpu_mask |=
+				(1ULL << vmbus_cpu_number_to_vp_number(cpu));
+		}
 	}
 
 	ret = vmbus_sendpacket(hpdev->hbus->hdev->channel, int_pkt,
