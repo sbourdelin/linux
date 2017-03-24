@@ -2541,7 +2541,8 @@ int __meminit vmemmap_populate(unsigned long vstart, unsigned long vend,
 		pmd = pmd_offset(pud, vstart);
 		pte = pmd_val(*pmd);
 		if (!(pte & _PAGE_VALID)) {
-			void *block = vmemmap_alloc_block(PMD_SIZE, node);
+			void *block = vmemmap_alloc_block(PMD_SIZE, node,
+							  true);
 
 			if (!block)
 				return -ENOMEM;

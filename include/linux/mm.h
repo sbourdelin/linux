@@ -2434,13 +2434,13 @@ p4d_t *vmemmap_p4d_populate(pgd_t *pgd, unsigned long addr, int node);
 pud_t *vmemmap_pud_populate(p4d_t *p4d, unsigned long addr, int node);
 pmd_t *vmemmap_pmd_populate(pud_t *pud, unsigned long addr, int node);
 pte_t *vmemmap_pte_populate(pmd_t *pmd, unsigned long addr, int node);
-void *vmemmap_alloc_block(unsigned long size, int node);
+void *vmemmap_alloc_block(unsigned long size, int node, bool zero);
 struct vmem_altmap;
 void *__vmemmap_alloc_block_buf(unsigned long size, int node,
-		struct vmem_altmap *altmap);
+		struct vmem_altmap *altmap, bool zero);
 static inline void *vmemmap_alloc_block_buf(unsigned long size, int node)
 {
-	return __vmemmap_alloc_block_buf(size, node, NULL);
+	return __vmemmap_alloc_block_buf(size, node, NULL, true);
 }
 
 void vmemmap_verify(pte_t *, int, unsigned long, unsigned long);

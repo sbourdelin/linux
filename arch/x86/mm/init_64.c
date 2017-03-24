@@ -1176,7 +1176,8 @@ static int __meminit vmemmap_populate_hugepages(unsigned long start,
 		if (pmd_none(*pmd)) {
 			void *p;
 
-			p = __vmemmap_alloc_block_buf(PMD_SIZE, node, altmap);
+			p = __vmemmap_alloc_block_buf(PMD_SIZE, node, altmap,
+						      true);
 			if (p) {
 				pte_t entry;
 
