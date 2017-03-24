@@ -36,6 +36,7 @@ static void fsnotify_final_destroy_group(struct fsnotify_group *group)
 	if (group->ops->free_group_priv)
 		group->ops->free_group_priv(group);
 
+	mutex_destroy(&group->mark_mutex);
 	kfree(group);
 }
 
