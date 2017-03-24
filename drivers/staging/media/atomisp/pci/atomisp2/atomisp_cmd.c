@@ -194,7 +194,7 @@ static int write_target_freq_to_hw(struct atomisp_device *isp,
 	if (isp_sspm1 & ISP_FREQ_VALID_MASK) {
 		dev_dbg(isp->dev, "clearing ISPSSPM1 valid bit.\n");
 		intel_mid_msgbus_write32(PUNIT_PORT, ISPSSPM1,
-				    isp_sspm1 & ~(1 << ISP_FREQ_VALID_OFFSET));
+				    isp_sspm1 & ~BIT(ISP_FREQ_VALID_OFFSET));
 	}
 
 	ratio = (2 * isp->hpll_freq + new_freq / 2) / new_freq - 1;
@@ -207,7 +207,7 @@ static int write_target_freq_to_hw(struct atomisp_device *isp,
 		intel_mid_msgbus_write32(PUNIT_PORT, ISPSSPM1,
 				   isp_sspm1
 				   | ratio << ISP_REQ_FREQ_OFFSET
-				   | 1 << ISP_FREQ_VALID_OFFSET
+				   | BIT(ISP_FREQ_VALID_OFFSET)
 				   | guar_ratio << ISP_REQ_GUAR_FREQ_OFFSET);
 
 		isp_sspm1 = intel_mid_msgbus_read32(PUNIT_PORT, ISPSSPM1);
@@ -417,10 +417,10 @@ void atomisp_msi_irq_init(struct atomisp_device *isp, struct pci_dev *dev)
 	u16 msg16;
 
 	pci_read_config_dword(dev, PCI_MSI_CAPID, &msg32);
-	msg32 |= 1 << MSI_ENABLE_BIT;
+	msg32 |= BIT(MSI_ENABLE_BIT);
 	pci_write_config_dword(dev, PCI_MSI_CAPID, msg32);
 
-	msg32 = (1 << INTR_IER) | (1 << INTR_IIR);
+	msg32 = BIT(INTR_IER) | BIT(INTR_IIR);
 	pci_write_config_dword(dev, PCI_INTERRUPT_CTRL, msg32);
 
 	pci_read_config_word(dev, PCI_COMMAND, &msg16);
@@ -435,7 +435,7 @@ void atomisp_msi_irq_uninit(struct atomisp_device *isp, struct pci_dev *dev)
 	u16 msg16;
 
 	pci_read_config_dword(dev, PCI_MSI_CAPID, &msg32);
-	msg32 &=  ~(1 << MSI_ENABLE_BIT);
+	msg32 &=  ~BIT(MSI_ENABLE_BIT);
 	pci_write_config_dword(dev, PCI_MSI_CAPID, msg32);
 
 	msg32 = 0x0;
@@ -536,7 +536,7 @@ static void clear_irq_reg(struct atomisp_device *isp)
 {
 	u32 msg_ret;
 	pci_read_config_dword(isp->pdev, PCI_INTERRUPT_CTRL, &msg_ret);
-	msg_ret |= 1 << INTR_IIR;
+	msg_ret |= BIT(INTR_IIR);
 	pci_write_config_dword(isp->pdev, PCI_INTERRUPT_CTRL, msg_ret);
 }
 
