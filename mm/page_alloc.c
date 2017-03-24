@@ -2511,9 +2511,8 @@ void mark_free_pages(struct zone *zone)
 				&zone->free_area[order].free_list[t], lru) {
 			unsigned long i;
 
-			pfn = page_to_pfn(page);
 			for (i = 0; i < (1UL << order); i++)
-				swsusp_set_page_free(pfn_to_page(pfn + i));
+				swsusp_set_page_free(nth_page(page, i));
 		}
 	}
 	spin_unlock_irqrestore(&zone->lock, flags);
