@@ -2152,6 +2152,7 @@ struct drm_i915_private {
 	struct intel_uncore uncore;
 
 	struct i915_virtual_gpu vgpu;
+	bool run_on_qemu;
 
 	struct intel_gvt *gvt;
 
