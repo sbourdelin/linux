@@ -17,15 +17,46 @@
 
 / {
 	model = "OnRISC Baltos iR 5221";
+
+	leds {
+		pinctrl-names = "default";
+		pinctrl-0 = <&user_leds>;
+
+		compatible = "gpio-leds";
+
+		power {
+			label = "onrisc:red:power";
+			linux,default-trigger = "default-on";
+			gpios = <&gpio3 0 GPIO_ACTIVE_LOW>;
+			default-state = "on";
+		};
+		wlan {
+			label = "onrisc:blue:wlan";
+			gpios = <&gpio0 16 GPIO_ACTIVE_HIGH>;
+			default-state = "off";
+		};
+		app {
+			label = "onrisc:green:app";
+			gpios = <&gpio0 17 GPIO_ACTIVE_HIGH>;
+			default-state = "off";
+		};
+	};
 };
 
 &am33xx_pinmux {
+	user_leds: pinmux_user_leds {
+		pinctrl-single,pins = <
+			AM33XX_IOPAD(0x908, PIN_OUTPUT_PULLDOWN | MUX_MODE7)	/* mii1_col.gpio3_0 PWR LED */
+			AM33XX_IOPAD(0x91c, PIN_OUTPUT_PULLDOWN | MUX_MODE7)	/* mii1_txd3.gpio0_16 WLAN LED */
+			AM33XX_IOPAD(0x920, PIN_OUTPUT_PULLDOWN | MUX_MODE7)	/* mii1_txd2.gpio0_17 APP LED */
+		>;
+	};
+
 	tca6416_pins: pinmux_tca6416_pins {
 		pinctrl-single,pins = <
 			AM33XX_IOPAD(0x9b4, PIN_INPUT_PULLUP | MUX_MODE7)      /* xdma_event_intr1.gpio0[20] tca6416 stuff */
 		>;
 	};
-
 
 	dcan1_pins: pinmux_dcan1_pins {
 		pinctrl-single,pins = <
@@ -61,7 +92,6 @@
 			AM33XX_IOPAD(0x9a0, PIN_INPUT_PULLUP | MUX_MODE7)      /* mcasp0_aclkr.gpio3[18], INPUT_PULLDOWN | MODE7 */
 		>;
 	};
-
 };
 
 &uart1 {
