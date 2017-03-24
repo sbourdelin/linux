@@ -313,8 +313,12 @@ extern int fsnotify_add_event(struct fsnotify_group *group,
 extern bool fsnotify_notify_queue_is_empty(struct fsnotify_group *group);
 /* return, but do not dequeue the first event on the notification queue */
 extern struct fsnotify_event *fsnotify_peek_first_event(struct fsnotify_group *group);
+/* return, but do not dequeue the first event on the notification list */
+extern struct fsnotify_event *fsnotify_list_peek_first_event(struct list_head *notification_list);
 /* return AND dequeue the first event on the notification queue */
 extern struct fsnotify_event *fsnotify_remove_first_event(struct fsnotify_group *group);
+/* return AND dequeue the first event on the notification list */
+extern struct fsnotify_event *fsnotify_list_remove_first_event(struct list_head *notification_list);
 
 /* functions used to manipulate the marks attached to inodes */
 

@@ -144,24 +144,41 @@ queue:
  * Remove and return the first event from the notification list.  It is the
  * responsibility of the caller to destroy the obtained event
  */
-struct fsnotify_event *fsnotify_remove_first_event(struct fsnotify_group *group)
+struct fsnotify_event *
+__fsnotify_remove_first_event(struct list_head *notification_list)
 {
 	struct fsnotify_event *event;
 
-	assert_spin_locked(&group->notification_lock);
-
-	pr_debug("%s: group=%p\n", __func__, group);
-
-	event = list_first_entry(&group->notification_list,
+	event = list_first_entry(notification_list,
 				 struct fsnotify_event, list);
 	/*
 	 * We need to init list head for the case of overflow event so that
 	 * check in fsnotify_add_event() works
 	 */
 	list_del_init(&event->list);
-	group->q_len--;
 
 	return event;
+}
+
+struct fsnotify_event *fsnotify_remove_first_event(struct fsnotify_group *group)
+{
+	struct list_head *notification_list = &group->notification_list;
+
+	assert_spin_locked(&group->notification_lock);
+
+	pr_debug("%s: group=%p\n", __func__, group);
+
+	group->q_len--;
+	return __fsnotify_remove_first_event(notification_list);
+}
+
+/*
+ * Note this version doesn't update the queue depth counter.
+ */
+struct fsnotify_event *
+fsnotify_list_remove_first_event(struct list_head *notification_list)
+{
+	return __fsnotify_remove_first_event(notification_list);
 }
 
 /*
@@ -173,6 +190,13 @@ struct fsnotify_event *fsnotify_peek_first_event(struct fsnotify_group *group)
 	assert_spin_locked(&group->notification_lock);
 
 	return list_first_entry(&group->notification_list,
+				struct fsnotify_event, list);
+}
+
+struct fsnotify_event *
+fsnotify_list_peek_first_event(struct list_head *notification_list)
+{
+	return list_first_entry(notification_list,
 				struct fsnotify_event, list);
 }
 
