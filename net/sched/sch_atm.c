@@ -560,6 +560,9 @@ static void atm_tc_destroy(struct Qdisc *sch)
 	struct atm_flow_data *flow, *tmp;
 
 	pr_debug("atm_tc_destroy(sch %p,[qdisc %p])\n", sch, p);
+
+	tcf_destroy_chain(&p->link.filter_list);
+
 	list_for_each_entry(flow, &p->flows, list)
 		tcf_destroy_chain(&flow->filter_list);
 
