@@ -15610,9 +15610,6 @@ intel_modeset_setup_hw_state(struct drm_device *dev)
 		if (WARN_ON(put_domains))
 			modeset_put_power_domains(dev_priv, put_domains);
 	}
-	intel_display_set_init_power(dev_priv, false);
-
-	intel_power_domains_verify_state(dev_priv);
 
 	intel_fbc_init_pipe_state(dev_priv);
 }

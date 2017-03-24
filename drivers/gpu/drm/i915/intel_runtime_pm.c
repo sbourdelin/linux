@@ -270,6 +270,13 @@ void intel_display_set_init_power(struct drm_i915_private *dev_priv,
 		intel_display_power_put(dev_priv, POWER_DOMAIN_INIT);
 
 	dev_priv->power_domains.init_power_on = enable;
+
+	if (!enable)
+		/*
+		 * By this point all enabled power wells must have a reference
+		 * and all unneeded power wells must be disabled; verify this.
+		 */
+		intel_power_domains_verify_state(dev_priv);
 }
 
 /*

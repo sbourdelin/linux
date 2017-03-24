@@ -609,6 +609,8 @@ static int i915_load_modeset_init(struct drm_device *dev)
 	if (ret)
 		goto cleanup_irq;
 
+	intel_display_set_init_power(dev_priv, false);
+
 	intel_uc_init_fw(dev_priv);
 
 	ret = i915_gem_init(dev_priv);
@@ -1669,6 +1671,8 @@ static int i915_drm_resume(struct drm_device *dev)
 	intel_dp_mst_resume(dev);
 
 	intel_display_resume(dev);
+
+	intel_display_set_init_power(dev_priv, false);
 
 	drm_kms_helper_poll_enable(dev);
 
