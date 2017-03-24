@@ -81,9 +81,7 @@ enum hmm_bo_type {
 	HMM_BO_PRIVATE,
 	HMM_BO_SHARE,
 	HMM_BO_USER,
-#ifdef CONFIG_ION
 	HMM_BO_ION,
-#endif
 	HMM_BO_LAST,
 };
 
