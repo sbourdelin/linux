@@ -2641,6 +2641,7 @@ static void async_scrub_parity(struct btrfs_raid_bio *rbio)
 
 void raid56_parity_submit_scrub_rbio(struct btrfs_raid_bio *rbio)
 {
+	rbio->generic_bio_cnt = 1;
 	if (!lock_stripe_add(rbio))
 		async_scrub_parity(rbio);
 }
@@ -2693,6 +2694,7 @@ static void async_missing_raid56(struct btrfs_raid_bio *rbio)
 
 void raid56_submit_missing_rbio(struct btrfs_raid_bio *rbio)
 {
+	rbio->generic_bio_cnt = 1;
 	if (!lock_stripe_add(rbio))
 		async_missing_raid56(rbio);
 }
