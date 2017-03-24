@@ -802,3 +802,10 @@ int unit_number__scnprintf(char *buf, size_t size, u64 n)
 
 	return scnprintf(buf, size, "%" PRIu64 "%c", n, unit[i]);
 }
+
+int perf_st;
+
+void perf_set_singlethreaded(void)
+{
+	perf_st = 1;
+}

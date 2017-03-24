@@ -77,4 +77,7 @@ struct record_opts {
 struct option;
 extern const char * const *record_usage;
 extern struct option *record_options;
+extern int perf_st;
+extern void perf_set_singlethreaded(void);
+
 #endif

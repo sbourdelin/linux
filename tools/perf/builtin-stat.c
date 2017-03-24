@@ -2393,6 +2393,8 @@ int cmd_stat(int argc, const char **argv, const char *prefix __maybe_unused)
 
 	setlocale(LC_ALL, "");
 
+	perf_set_singlethreaded();
+
 	evsel_list = perf_evlist__new();
 	if (evsel_list == NULL)
 		return -ENOMEM;

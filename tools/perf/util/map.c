@@ -1,3 +1,4 @@
+#include "perf.h"
 #include "symbol.h"
 #include <errno.h>
 #include <inttypes.h>
@@ -825,7 +826,8 @@ struct map *maps__find(struct maps *maps, u64 ip)
 	struct rb_node **p, *parent = NULL;
 	struct map *m;
 
-	pthread_rwlock_rdlock(&maps->lock);
+	if (!perf_st)
+		pthread_rwlock_rdlock(&maps->lock);
 
 	p = &maps->entries.rb_node;
 	while (*p != NULL) {
@@ -841,7 +843,8 @@ struct map *maps__find(struct maps *maps, u64 ip)
 
 	m = NULL;
 out:
-	pthread_rwlock_unlock(&maps->lock);
+	if (!perf_st)
+		pthread_rwlock_unlock(&maps->lock);
 	return m;
 }
 
