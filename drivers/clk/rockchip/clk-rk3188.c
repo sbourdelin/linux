@@ -850,6 +850,15 @@ static void __init rk3188a_clk_init(struct device_node *np)
 			__func__);
 	}
 
+	/* limit i2s0_pre max rate */
+	clk1 = __clk_lookup("aclk_cpu_pre");
+	clk2 = __clk_lookup("i2s0_pre");
+	if (clk1 && clk2) {
+		rate = clk_get_rate(clk1);
+		clk_set_max_rate(clk2, rate);
+		clk_set_rate(clk2, rate);
+	}
+
 	rockchip_clk_protect_critical(rk3188_critical_clocks,
 				      ARRAY_SIZE(rk3188_critical_clocks));
 	rockchip_clk_of_add_provider(np, ctx);
