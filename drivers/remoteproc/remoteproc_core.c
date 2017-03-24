@@ -882,6 +882,9 @@ static void rproc_resource_cleanup(struct rproc *rproc)
 	/* clean up remote vdev entries */
 	list_for_each_entry_safe(rvdev, rvtmp, &rproc->rvdevs, node)
 		kref_put(&rvdev->refcount, rproc_vdev_release);
+
+	/* Release declared DMA memory */
+	dma_release_declared_memory(dev->parent);
 }
 
 /*
