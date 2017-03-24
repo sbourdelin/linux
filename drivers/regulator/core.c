@@ -2487,6 +2487,10 @@ static int _regulator_list_voltage(struct regulator *regulator,
 		if (lock)
 			mutex_unlock(&rdev->mutex);
 	} else if (rdev->supply) {
+		// Limit propagation of parent values to switch regulators
+		if (ops->get_voltage || ops->get_voltage_sel)
+			return -EINVAL;
+
 		ret = _regulator_list_voltage(rdev->supply, selector, lock);
 	} else {
 		return -EINVAL;
@@ -2540,11 +2544,16 @@ EXPORT_SYMBOL_GPL(regulator_is_enabled);
 int regulator_count_voltages(struct regulator *regulator)
 {
 	struct regulator_dev	*rdev = regulator->rdev;
+	const struct regulator_ops *ops = rdev->desc->ops;
 
 	if (rdev->desc->n_voltages)
 		return rdev->desc->n_voltages;
 
 	if (!rdev->supply)
+		return -EINVAL;
+
+	// Limit propagation of parent value to switch regulators
+	if (ops->get_voltage || ops->get_voltage_sel || ops->list_voltage)
 		return -EINVAL;
 
 	return regulator_count_voltages(rdev->supply);
