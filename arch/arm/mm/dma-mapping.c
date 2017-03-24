@@ -1720,7 +1720,7 @@ static int __map_sg_chunk(struct device *dev, struct scatterlist *sg,
 	if (iova == DMA_ERROR_CODE)
 		return -ENOMEM;
 
-	for (count = 0, s = sg; count < (size >> PAGE_SHIFT); s = sg_next(s)) {
+	for_each_sg(sg, s, size >> PAGE_SHIFT, count) {
 		phys_addr_t phys = page_to_phys(sg_page(s));
 		unsigned int len = PAGE_ALIGN(s->offset + s->length);
 
