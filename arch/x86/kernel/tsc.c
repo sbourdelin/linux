@@ -25,9 +25,12 @@
 #include <asm/geode.h>
 #include <asm/apic.h>
 #include <asm/intel-family.h>
+#include <asm/cpu.h>
 
 /* CPUID 15H TSC/Crystal ratio, plus optionally Crystal Hz */
 #define CPUID_TSC_LEAF		0x15
+
+static struct cyc2ns_data __read_mostly cyc2ns_early;
 
 unsigned int __read_mostly cpu_khz;	/* TSC clocks / usec, not used here */
 EXPORT_SYMBOL(cpu_khz);
@@ -290,6 +293,16 @@ done:
 	sched_clock_idle_wakeup_event(0);
 	local_irq_restore(flags);
 }
+
+u64 sched_clock_early(void)
+{
+	u64 ns;
+
+	ns = mul_u64_u32_shr(rdtsc(), cyc2ns_early.cyc2ns_mul,
+			     cyc2ns_early.cyc2ns_shift);
+	return ns + cyc2ns_early.cyc2ns_offset;
+}
+
 /*
  * Scheduler clock - returns current time in nanosec units.
  */
@@ -1362,6 +1375,120 @@ static int __init init_tsc_clocksource(void)
  * is fully initialized, which may occur at fs_initcall time.
  */
 device_initcall(init_tsc_clocksource);
+
+#ifdef CONFIG_X86_TSC
+
+/* Determine if tsc is invariant early in boot */
+static bool __init tsc_invariant_early(void)
+{
+	unsigned int ext_cpuid_level, tsc_flag;
+
+	/* Get extended CPUID level */
+	ext_cpuid_level = cpuid_eax(0x80000000);
+	if (ext_cpuid_level < 0x80000007)
+		return false;
+
+	/* get field with invariant TSC flag */
+	tsc_flag = cpuid_edx(0x80000007);
+	if (!(tsc_flag & (1 << 8)))
+		return false;
+
+	return true;
+}
+
+/* Returns true if TSC was adjusted by BIOS. */
+static __init bool
+tsc_adjusted_early(int cpuid_level)
+{
+	u64 adjusted = 0;
+
+	/*  IA32_TSC_ADJUST MSR is bit 1 in ebx register of level 7 cpuid */
+	if (cpuid_level > 6 && (cpuid_ebx(7) & (1 << 1)))
+		rdmsrl(MSR_IA32_TSC_ADJUST, adjusted);
+
+	return (adjusted != 0);
+}
+
+/*
+ * Determine if we can use TSC early in boot. On larger machines early boot can
+ * take a significant amount of time, therefore, for observability reasons, and
+ * also to avoid regressions it is important to have timestamps during the whole
+ * boot process.
+ */
+void __init tsc_early_init(void)
+{
+	int vendor, model, family, cpuid_level;
+	unsigned int sig, khz;
+	u64 tsc_now;
+
+	/*
+	 * Should we disable early timestamps on platforms without invariant
+	 * TSC?
+	 *
+	 * On the one hand invariant TSC guarantees, that early timestamps run
+	 * only on the latest hardware (Nehalem and later), but on the other
+	 * hand accuracy wise, non-invariant timestamps should be OK,
+	 * because during early boot power management features are not used.
+	 * ---
+	 * For now we disable invariant TSC for early boot.
+	 */
+	if (!tsc_invariant_early())
+		return;
+
+	cpuid_level = cpuid_eax(0);
+	sig = cpuid_eax(1);
+	model = x86_model(sig);
+	family = x86_family(sig);
+	vendor = get_x86_vendor_early();
+
+	if (tsc_adjusted_early(cpuid_level))
+		return;
+
+	/*
+	 * Try several methods to get TSC frequency, if fail, return false
+	 * otherwise setup mult and shift values to convert ticks to nanoseconds
+	 * efficiently.
+	 */
+	khz = 0;
+	if (vendor == X86_VENDOR_INTEL && cpuid_level >= CPUID_TSC_LEAF)
+		khz = calibrate_tsc_early(model);
+
+	if (khz == 0)
+		khz = cpu_khz_from_cpuid_early(vendor, cpuid_level);
+
+	if (khz == 0)
+		khz = cpu_khz_from_msr_early(vendor, family, model);
+
+	if (khz == 0)
+		khz = quick_pit_calibrate(true);
+
+	if (khz == 0)
+		return;
+
+	tsc_now = rdtsc();
+	clocks_calc_mult_shift(&cyc2ns_early.cyc2ns_mul,
+			       &cyc2ns_early.cyc2ns_shift,
+			       khz, NSEC_PER_MSEC, 0);
+	cyc2ns_early.cyc2ns_offset = -sched_clock_early();
+	sched_clock_early_init();
+}
+
+void __init tsc_early_fini(void)
+{
+	unsigned long long t;
+	unsigned long r;
+
+	/* We did not have early sched clock if multiplier is 0 */
+	if (cyc2ns_early.cyc2ns_mul == 0)
+		return;
+
+	t = -cyc2ns_early.cyc2ns_offset;
+	r = do_div(t, NSEC_PER_SEC);
+
+	sched_clock_early_fini();
+	pr_info("sched clock early is finished, offset [%lld.%09lds]\n", t, r);
+}
+#endif /* CONFIG_X86_TSC */
 
 void __init tsc_init(void)
 {
