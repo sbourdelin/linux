@@ -230,6 +230,7 @@ static ssize_t inotify_read(struct file *file, char __user *buf,
 	start = buf;
 	group = file->private_data;
 
+	mutex_lock(&group->inotify_data.consumer_mutex);
 	add_wait_queue(&group->notification_waitq, &wait);
 	while (1) {
 		spin_lock(&group->notification_lock);
@@ -264,6 +265,7 @@ static ssize_t inotify_read(struct file *file, char __user *buf,
 		wait_woken(&wait, TASK_INTERRUPTIBLE, MAX_SCHEDULE_TIMEOUT);
 	}
 	remove_wait_queue(&group->notification_waitq, &wait);
+	mutex_unlock(&group->inotify_data.consumer_mutex);
 
 	if (start != buf && ret != -EFAULT)
 		ret = buf - start;
@@ -649,6 +651,8 @@ static struct fsnotify_group *inotify_new_group(unsigned int max_events)
 	oevent->name_len = 0;
 
 	group->max_events = max_events;
+
+	mutex_init(&group->inotify_data.consumer_mutex);
 
 	spin_lock_init(&group->inotify_data.idr_lock);
 	idr_init(&group->inotify_data.idr);

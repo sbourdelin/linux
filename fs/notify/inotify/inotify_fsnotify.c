@@ -168,6 +168,7 @@ static void inotify_free_group_priv(struct fsnotify_group *group)
 	idr_destroy(&group->inotify_data.idr);
 	if (group->inotify_data.ucounts)
 		dec_inotify_instances(group->inotify_data.ucounts);
+	mutex_destroy(&group->inotify_data.consumer_mutex);
 }
 
 static void inotify_free_event(struct fsnotify_event *fsn_event)

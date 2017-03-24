@@ -172,6 +172,9 @@ struct fsnotify_group {
 			spinlock_t	idr_lock;
 			struct idr      idr;
 			struct ucounts *ucounts;
+			struct mutex	consumer_mutex; /* Prevent out of order
+							 * delivery of events
+							 * to threaded consumers */
 		} inotify_data;
 #endif
 #ifdef CONFIG_FANOTIFY
