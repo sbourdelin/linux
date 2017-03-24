@@ -1,23 +1,24 @@
+CFLAGS += -O2 -g -std=gnu99 -Wall
+CFLAGS += -I../../../../include/uapi/ -I../../../../include/
+CFLAGS += $(shell pkg-config --cflags mount)
+LDLIBS += $(shell pkg-config --libs mount)
 
 TEST_PROGS := gpio-mockup.sh
-TEST_FILES := gpio-mockup-sysfs.sh $(BINARIES)
-BINARIES := gpio-mockup-chardev
+TEST_PROGS_EXTENDED := gpio-mockup-chardev
+TEST_FILES := gpio-mockup-sysfs.sh
+
+GPIODIR := ../../../gpio
+GPIOOBJ := gpio-utils.o
 
 include ../lib.mk
 
-all: $(BINARIES)
+all: $(TEST_PROGS_EXTENDED)
 
 clean:
-	$(RM) $(BINARIES)
+	$(RM) $(TEST_PROGS_EXTENDED)
+	$(MAKE) -C $(GPIODIR) clean
 
-CFLAGS += -O2 -g -std=gnu99 -Wall -I../../../../usr/include/
-LDLIBS += -lmount -I/usr/include/libmount
+$(TEST_PROGS_EXTENDED): $(GPIODIR)/$(GPIOOBJ)
 
-$(BINARIES): ../../../gpio/gpio-utils.o ../../../../usr/include/linux/gpio.h
-
-../../../gpio/gpio-utils.o:
-	make ARCH=$(ARCH) CROSS_COMPILE=$(CROSS_COMPILE) -C ../../../gpio
-
-../../../../usr/include/linux/gpio.h:
-	make -C ../../../.. headers_install INSTALL_HDR_PATH=$(shell pwd)/../../../../usr/
-
+$(GPIODIR)/$(GPIOOBJ):
+	$(MAKE) -C $(GPIODIR)
