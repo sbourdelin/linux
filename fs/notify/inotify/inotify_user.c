@@ -224,22 +224,27 @@ static ssize_t inotify_read(struct file *file, char __user *buf,
 	struct fsnotify_group *group;
 	struct fsnotify_event *kevent;
 	char __user *start;
-	int ret;
+	int ret, consumed = 0;
 	DEFINE_WAIT_FUNC(wait, woken_wake_function);
+	LIST_HEAD(tmp_list);
 
 	start = buf;
 	group = file->private_data;
 
 	mutex_lock(&group->inotify_data.consumer_mutex);
 	add_wait_queue(&group->notification_waitq, &wait);
+
+	spin_lock(&group->notification_lock);
+	list_splice_init(&group->notification_list, &tmp_list);
+	spin_unlock(&group->notification_lock);
+
 	while (1) {
-		spin_lock(&group->notification_lock);
-		kevent = get_one_event(&group->notification_list, count);
-		spin_unlock(&group->notification_lock);
+		kevent = get_one_event(&tmp_list, count);
 
 		pr_debug("%s: group=%p kevent=%p\n", __func__, group, kevent);
 
 		if (kevent) {
+			consumed++;
 			ret = PTR_ERR(kevent);
 			if (IS_ERR(kevent))
 				break;
@@ -262,8 +267,23 @@ static ssize_t inotify_read(struct file *file, char __user *buf,
 		if (start != buf)
 			break;
 
+		spin_lock(&group->notification_lock);
+		list_splice_init(&tmp_list, &group->notification_list);
+		group->q_len -= consumed;
+		consumed = 0;
+		spin_unlock(&group->notification_lock);
+
 		wait_woken(&wait, TASK_INTERRUPTIBLE, MAX_SCHEDULE_TIMEOUT);
+
+		spin_lock(&group->notification_lock);
+		list_splice_init(&group->notification_list, &tmp_list);
+		spin_unlock(&group->notification_lock);
 	}
+	spin_lock(&group->notification_lock);
+	list_splice(&tmp_list, &group->notification_list);
+	group->q_len -= consumed;
+	spin_unlock(&group->notification_lock);
+
 	remove_wait_queue(&group->notification_waitq, &wait);
 	mutex_unlock(&group->inotify_data.consumer_mutex);
 
