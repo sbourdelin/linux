@@ -90,3 +90,10 @@ config DEBUG_PAGE_REF
 	  careful when enabling this feature because it adds about 30 KB to the
 	  kernel code.  However the runtime performance overhead is virtually
 	  nil until the tracepoints are actually enabled.
+
+config VMALLOC_MEMORY_LEAK
+	bool "Enable to check memory leaks by modules"
+	default n
+	---help---
+	  This is a feature to check if any module has allocated memory using vmalloc
+	  but getting unloaded without doing vfree.

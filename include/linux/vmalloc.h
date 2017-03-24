@@ -29,6 +29,8 @@ struct notifier_block;		/* in notifier.h */
 #define IOREMAP_MAX_ORDER	(7 + PAGE_SHIFT)	/* 128 pages */
 #endif
 
+#define VM_VM_AREA  0x04
+
 struct vm_struct {
 	struct vm_struct	*next;
 	void			*addr;
