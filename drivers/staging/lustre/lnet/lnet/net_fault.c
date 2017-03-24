@@ -997,11 +997,6 @@ lnet_fault_ctl(int opc, struct libcfs_ioctl_data *data)
 int
 lnet_fault_init(void)
 {
-	BUILD_BUG_ON(LNET_PUT_BIT != 1 << LNET_MSG_PUT);
-	BUILD_BUG_ON(LNET_ACK_BIT != 1 << LNET_MSG_ACK);
-	BUILD_BUG_ON(LNET_GET_BIT != 1 << LNET_MSG_GET);
-	BUILD_BUG_ON(LNET_REPLY_BIT != 1 << LNET_MSG_REPLY);
-
 	mutex_init(&delay_dd.dd_mutex);
 	spin_lock_init(&delay_dd.dd_lock);
 	init_waitqueue_head(&delay_dd.dd_waitq);
