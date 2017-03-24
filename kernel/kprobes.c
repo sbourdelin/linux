@@ -1395,7 +1395,7 @@ static kprobe_opcode_t *_kprobe_addr(kprobe_opcode_t *addr,
 			const char *symbol_name, unsigned int offset)
 {
 	if ((symbol_name && addr) || (!symbol_name && !addr))
-		goto invalid;
+		return ERR_PTR(-EINVAL);
 
 	if (symbol_name) {
 		kprobe_lookup_name(symbol_name, addr);
@@ -1403,12 +1403,7 @@ static kprobe_opcode_t *_kprobe_addr(kprobe_opcode_t *addr,
 			return ERR_PTR(-ENOENT);
 	}
 
-	addr = (kprobe_opcode_t *)(((char *)addr) + offset);
-	if (addr)
-		return addr;
-
-invalid:
-	return ERR_PTR(-EINVAL);
+	return (kprobe_opcode_t *)(((char *)addr) + offset);
 }
 
 static kprobe_opcode_t *kprobe_addr(struct kprobe *p)
