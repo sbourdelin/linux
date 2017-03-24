@@ -409,8 +409,8 @@ int i915_gem_init_stolen(struct drm_i915_private *dev_priv)
 
 	mutex_init(&dev_priv->mm.stolen_lock);
 
-	if (intel_vgpu_active(dev_priv)) {
-		DRM_INFO("iGVT-g active, disabling use of stolen memory\n");
+	if (dev_priv->run_on_qemu) {
+		DRM_INFO("Run on qemu, disabling use of stolen memory\n");
 		return 0;
 	}
 
