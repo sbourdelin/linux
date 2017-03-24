@@ -9,6 +9,7 @@
 #include <linux/interrupt.h>
 #include <linux/stacktrace.h>
 #include <linux/fault-inject.h>
+#include <linux/uaccess.h>
 
 /*
  * setup_fault_attr() is a helper function for various __setup handlers, so it
@@ -107,6 +108,12 @@ static inline bool fail_stacktrace(struct fault_attr *attr)
 
 bool should_fail(struct fault_attr *attr, ssize_t size)
 {
+	if (in_task() && current->fail_nth) {
+		if (--current->fail_nth == 0)
+			goto fail;
+		return false;
+	}
+
 	/* No need to check any other properties if the probability is 0 */
 	if (attr->probability == 0)
 		return false;
@@ -134,6 +141,7 @@ bool should_fail(struct fault_attr *attr, ssize_t size)
 	if (!fail_stacktrace(attr))
 		return false;
 
+fail:
 	fail_dump(attr);
 
 	if (atomic_read(&attr->times) != -1)
@@ -242,5 +250,46 @@ fail:
 	return ERR_PTR(-ENOMEM);
 }
 EXPORT_SYMBOL_GPL(fault_create_debugfs_attr);
+
+static ssize_t once_write(struct file *file, const char __user *buf, size_t len,
+			  loff_t *offset)
+{
+	int err, n;
+
+	err = kstrtoint_from_user(buf, len, 10, &n);
+	if (err)
+		return err;
+	if (n < 0 || n == INT_MAX)
+		return -EINVAL;
+	current->fail_nth = n + 1;
+	return len;
+}
+
+static ssize_t once_read(struct file *file, char __user *buf, size_t len,
+			 loff_t *offset)
+{
+	int err;
+
+	if (len < 1)
+		return -EINVAL;
+	err = put_user((char)(current->fail_nth ? 'N' : 'Y'), buf);
+	if (err)
+		return err;
+	current->fail_nth = 0;
+	return 1;
+}
+
+static const struct file_operations once_fops = {
+	.write = once_write,
+	.read = once_read,
+};
+
+static int __init init_fault(void)
+{
+	if (!debugfs_create_file("fail_once", 0600, NULL, NULL, &once_fops))
+		return -ENOMEM;
+	return 0;
+}
+late_initcall(init_fault);
 
 #endif /* CONFIG_FAULT_INJECTION_DEBUG_FS */
