@@ -330,6 +330,11 @@ void usbnet_skb_return (struct usbnet *dev, struct sk_buff *skb)
 	dev->net->stats.rx_packets++;
 	dev->net->stats.rx_bytes += skb->len;
 
+	u64_stats_update_begin(&dev->stats.syncp);
+	dev->stats.rx_packets++;
+	dev->stats.rx_bytes += skb->len;
+	u64_stats_update_end(&dev->stats.syncp);
+
 	netif_dbg(dev, rx_status, dev->net, "< rx, len %zu, type 0x%x\n",
 		  skb->len + sizeof (struct ethhdr), skb->protocol);
 	memset (skb->cb, 0, sizeof (struct skb_data));
@@ -981,6 +986,23 @@ int usbnet_set_link_ksettings(struct net_device *net,
 }
 EXPORT_SYMBOL_GPL(usbnet_set_link_ksettings);
 
+void usbnet_get_stats64(struct net_device *net, struct rtnl_link_stats64 *stats)
+{
+	struct usbnet *dev = netdev_priv(net);
+	unsigned int start;
+
+	netdev_stats_to_stats64(stats, &net->stats);
+
+	do {
+		start = u64_stats_fetch_begin_irq(&dev->stats.syncp);
+		stats->rx_packets = dev->stats.rx_packets;
+		stats->rx_bytes = dev->stats.rx_bytes;
+		stats->tx_packets = dev->stats.tx_packets;
+		stats->tx_bytes = dev->stats.tx_bytes;
+	} while (u64_stats_fetch_retry_irq(&dev->stats.syncp, start));
+}
+EXPORT_SYMBOL_GPL(usbnet_get_stats64);
+
 u32 usbnet_get_link (struct net_device *net)
 {
 	struct usbnet *dev = netdev_priv(net);
@@ -1214,6 +1236,11 @@ static void tx_complete (struct urb *urb)
 	if (urb->status == 0) {
 		dev->net->stats.tx_packets += entry->packets;
 		dev->net->stats.tx_bytes += entry->length;
+
+		u64_stats_update_begin(&dev->stats.syncp);
+		dev->stats.tx_packets += entry->packets;
+		dev->stats.tx_bytes += entry->length;
+		u64_stats_update_end(&dev->stats.syncp);
 	} else {
 		dev->net->stats.tx_errors++;
 
@@ -1658,6 +1685,7 @@ usbnet_probe (struct usb_interface *udev, const struct usb_device_id *prod)
 	init_timer (&dev->delay);
 	mutex_init (&dev->phy_mutex);
 	mutex_init(&dev->interrupt_mutex);
+	u64_stats_init(&dev->stats.syncp);
 	dev->interrupt_count = 0;
 
 	dev->net = net;

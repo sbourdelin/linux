@@ -251,6 +251,7 @@ static const struct net_device_ops qmi_wwan_netdev_ops = {
 	.ndo_change_mtu		= usbnet_change_mtu,
 	.ndo_set_mac_address	= qmi_wwan_mac_addr,
 	.ndo_validate_addr	= eth_validate_addr,
+	.ndo_get_stats64	= usbnet_get_stats64,
 };
 
 /* using a counter to merge subdriver requests with our own into a
