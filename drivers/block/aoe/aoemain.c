@@ -28,10 +28,8 @@ discover_timer(ulong vp)
 
 	switch (vp) {
 	case TINIT:
-		init_timer(&t);
+		setup_timer(&t, discover_timer, TRUN);
 		spin_lock_init(&lock);
-		t.data = TRUN;
-		t.function = discover_timer;
 		die = 0;
 	case TRUN:
 		spin_lock_irqsave(&lock, flags);
