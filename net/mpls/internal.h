@@ -123,8 +123,8 @@ struct mpls_route { /* next hop label forwarding entry */
 	u8			rt_payload_type;
 	u8			rt_max_alen;
 	u8			rt_ttl_propagate;
-	unsigned int		rt_nhn;
-	unsigned int		rt_nhn_alive;
+	u8			rt_nhn;
+	u8			rt_nhn_alive;
 	struct mpls_nh		rt_nh[0];
 };
 
