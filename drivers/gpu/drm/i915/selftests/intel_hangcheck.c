@@ -323,6 +323,56 @@ static int igt_global_reset(void *arg)
 	return err;
 }
 
+static int igt_reset_engine(void *arg)
+{
+	struct drm_i915_private *i915 = arg;
+	struct intel_engine_cs *engine;
+	enum intel_engine_id id;
+	unsigned int reset_count, reset_engine_count;
+	int err = 0;
+
+	/* Check that we can issue a global GPU and engine reset */
+
+	if (!intel_has_gpu_reset(i915))
+		return 0;
+
+	if (!intel_has_reset_engine(i915))
+		return 0;
+
+	set_bit(I915_RESET_BACKOFF, &i915->gpu_error.flags);
+	mutex_lock(&i915->drm.struct_mutex);
+
+	for_each_engine(engine, i915, id) {
+		reset_count = i915_reset_count(&i915->gpu_error);
+		reset_engine_count = i915_reset_engine_count(&i915->gpu_error,
+							     engine);
+
+		set_bit(I915_RESET_HANDOFF, &i915->gpu_error.flags);
+		i915_reset(i915, intel_engine_flag(engine));
+		GEM_BUG_ON(test_bit(I915_RESET_HANDOFF, &i915->gpu_error.flags));
+
+		if (i915_reset_count(&i915->gpu_error) != reset_count) {
+			pr_err("Full GPU reset recorded! (engine reset expected)\n");
+			err = -EINVAL;
+			break;
+		}
+
+		if (i915_reset_engine_count(&i915->gpu_error, engine) ==
+		    reset_engine_count) {
+			pr_err("No %s engine reset recorded!\n", engine->name);
+			err = -EINVAL;
+			break;
+		}
+	}
+	mutex_unlock(&i915->drm.struct_mutex);
+
+	clear_bit(I915_RESET_BACKOFF, &i915->gpu_error.flags);
+	if (i915_terminally_wedged(&i915->gpu_error))
+		err = -EIO;
+
+	return err;
+}
+
 static u32 fake_hangcheck(struct drm_i915_gem_request *rq)
 {
 	u32 reset_count;
@@ -527,13 +577,107 @@ unlock:
 	return err;
 }
 
+static int igt_render_engine_reset_fallback(void *arg)
+{
+	struct drm_i915_private *i915 = arg;
+	struct intel_engine_cs *engine = i915->engine[RCS];
+	struct hang h;
+	struct drm_i915_gem_request *rq;
+	unsigned int reset_count, reset_engine_count;
+	int err = 0;
+
+	/* Check that we can issue a global GPU and engine reset */
+
+	if (!intel_has_gpu_reset(i915))
+		return 0;
+
+	if (!intel_has_reset_engine(i915))
+		return 0;
+
+	set_bit(I915_RESET_BACKOFF, &i915->gpu_error.flags);
+	mutex_lock(&i915->drm.struct_mutex);
+
+	err = hang_init(&h, i915);
+	if (err)
+		goto unlock;
+
+	rq = hang_create_request(&h, engine, i915->kernel_context);
+	if (IS_ERR(rq)) {
+		err = PTR_ERR(rq);
+		goto fini;
+	}
+
+	i915_gem_request_get(rq);
+	__i915_add_request(rq, true);
+
+	/* make reset engine fail */
+	rq->fence.error = -EIO;
+
+	if (!wait_for_hang(&h, rq)) {
+		pr_err("Failed to start request %x\n", rq->fence.seqno);
+		err = -EIO;
+		goto fini;
+	}
+
+	reset_engine_count = i915_reset_engine_count(&i915->gpu_error, engine);
+	reset_count = fake_hangcheck(rq);
+
+	i915_reset(i915, intel_engine_flag(engine));
+	GEM_BUG_ON(test_bit(I915_RESET_HANDOFF, &i915->gpu_error.flags));
+
+	if (i915_reset_engine_count(&i915->gpu_error, engine) !=
+	    reset_engine_count) {
+		pr_err("render engine reset recorded! (full reset expected)\n");
+		err = -EINVAL;
+		goto fini;
+	}
+
+	if (i915_reset_count(&i915->gpu_error) == reset_count) {
+		pr_err("No full GPU reset recorded!\n");
+		err = -EINVAL;
+		goto fini;
+	}
+
+	/*
+	 * by using fence.error = -EIO, full reset sets the wedged flag, do one
+	 * more full reset to re-enable the hw.
+	 */
+	if (i915_terminally_wedged(&i915->gpu_error)) {
+		rq->fence.error = 0;
+
+		set_bit(I915_RESET_HANDOFF, &i915->gpu_error.flags);
+		i915_reset(i915, ALL_ENGINES);
+		GEM_BUG_ON(test_bit(I915_RESET_HANDOFF,
+				    &i915->gpu_error.flags));
+
+		if (i915_reset_count(&i915->gpu_error) == reset_count) {
+			pr_err("No full GPU reset recorded!\n");
+			err = -EINVAL;
+			goto fini;
+		}
+	}
+
+fini:
+	hang_fini(&h);
+unlock:
+	mutex_unlock(&i915->drm.struct_mutex);
+	clear_bit(I915_RESET_BACKOFF, &i915->gpu_error.flags);
+
+	if (i915_terminally_wedged(&i915->gpu_error))
+		return -EIO;
+
+	return err;
+}
+
 int intel_hangcheck_live_selftests(struct drm_i915_private *i915)
 {
 	static const struct i915_subtest tests[] = {
 		SUBTEST(igt_hang_sanitycheck),
 		SUBTEST(igt_global_reset),
+		SUBTEST(igt_reset_engine),
 		SUBTEST(igt_wait_reset),
 		SUBTEST(igt_reset_queue),
+		SUBTEST(igt_render_engine_reset_fallback),
 	};
 
 	if (!intel_has_gpu_reset(i915))
