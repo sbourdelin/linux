@@ -3043,6 +3043,7 @@ extern void i915_reset(struct drm_i915_private *dev_priv, u32 engine_mask);
 extern bool intel_has_reset_engine(struct drm_i915_private *dev_priv);
 extern int intel_request_reset_engine(struct intel_engine_cs *engine);
 extern void intel_unrequest_reset_engine(struct intel_engine_cs *engine);
+extern int i915_guc_request_engine_reset(struct intel_engine_cs *engine);
 extern int intel_guc_reset(struct drm_i915_private *dev_priv);
 extern void intel_engine_init_hangcheck(struct intel_engine_cs *engine);
 extern void intel_hangcheck_init(struct drm_i915_private *dev_priv);
