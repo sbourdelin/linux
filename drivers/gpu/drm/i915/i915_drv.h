@@ -1623,6 +1623,9 @@ struct i915_gpu_error {
 	 * inspect the bit and do the reset directly, otherwise the worker
 	 * waits for the struct_mutex.
 	 *
+	 * #I915_RESET_WATCHDOG - When hw detects a hang before us, we can use
+	 * I915_RESET_WATCHDOG to report the hang detection cause accurately.
+	 *
 	 * #I915_WEDGED - If reset fails and we can no longer use the GPU,
 	 * we set the #I915_WEDGED bit. Prior to command submission, e.g.
 	 * i915_gem_request_alloc(), this bit is checked and the sequence
@@ -1631,6 +1634,7 @@ struct i915_gpu_error {
 	unsigned long flags;
 #define I915_RESET_BACKOFF	0
 #define I915_RESET_HANDOFF	1
+#define I915_RESET_WATCHDOG	2
 #define I915_WEDGED		(BITS_PER_LONG - 1)
 
 	/* if available, engine-specific reset is tried before full gpu reset */
