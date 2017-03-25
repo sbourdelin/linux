@@ -119,6 +119,7 @@ static void guc_params_init(struct drm_i915_private *dev_priv)
 {
 	struct intel_guc *guc = &dev_priv->guc;
 	u32 params[GUC_CTL_MAX_DWORDS];
+	struct i915_gem_context *ctx;
 	int i;
 
 	memset(&params, 0, sizeof(params));
@@ -166,6 +167,13 @@ static void guc_params_init(struct drm_i915_private *dev_priv)
 		/* Unmask this bit to enable the GuC's internal scheduler */
 		params[GUC_CTL_FEATURE] &= ~GUC_CTL_DISABLE_SCHEDULER;
 	}
+
+	/*
+	 * For watchdog / media reset, GuC must know the address of the shared
+	 * data page, which is the first page of the default context.
+	 */
+	ctx = dev_priv->kernel_context;
+	params[GUC_CTL_SHARED_DATA] = i915_ggtt_offset(ctx->engine[RCS].state);
 
 	I915_WRITE(SOFT_SCRATCH(0), 0);
 
