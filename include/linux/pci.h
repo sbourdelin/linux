@@ -1396,8 +1396,10 @@ extern bool pcie_ports_auto;
 
 #ifdef CONFIG_PCIEASPM
 bool pcie_aspm_support_enabled(void);
+int pci_aspm_init(struct pci_dev *pdev);
 #else
 static inline bool pcie_aspm_support_enabled(void) { return false; }
+static inline int pci_aspm_init(struct pci_dev *pdev) { return -ENODEV; }
 #endif
 
 #ifdef CONFIG_PCIEAER
