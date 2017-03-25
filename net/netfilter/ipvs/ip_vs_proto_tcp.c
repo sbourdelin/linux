@@ -487,7 +487,7 @@ static struct tcp_states_t tcp_states_dos [] = {
 
 static void tcp_timeout_change(struct ip_vs_proto_data *pd, int flags)
 {
-	int on = (flags & 1);		/* secure_tcp */
+	int on = flags & 1;		/* secure_tcp */
 
 	/*
 	** FIXME: change secure_tcp to independent sysctl var
