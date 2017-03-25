@@ -1464,7 +1464,7 @@ out_quotactl:
 	case LL_IOC_FID2MDTIDX: {
 		struct obd_export *exp = ll_i2mdexp(inode);
 		struct lu_fid fid;
-		__u32 index;
+		__u32 __user index;
 
 		if (copy_from_user(&fid, (const struct lu_fid __user *)arg,
 				   sizeof(fid)))
