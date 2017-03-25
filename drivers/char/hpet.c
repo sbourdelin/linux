@@ -490,7 +490,7 @@ static int hpet_ioctl_ieon(struct hpet_dev *devp)
 		irq_flags = devp->hd_flags & HPET_SHARED_IRQ ? IRQF_SHARED : 0;
 		if (request_irq(irq, hpet_interrupt, irq_flags,
 				devp->hd_name, (void *)devp)) {
-			printk(KERN_ERR "hpet: IRQ %d is not free\n", irq);
+			pr_err("hpet: IRQ %d is not free\n", irq);
 			irq = 0;
 		}
 	}
@@ -840,8 +840,7 @@ int hpet_alloc(struct hpet_data *hdp)
 	 * ACPI has also reported, then we catch it here.
 	 */
 	if (hpet_is_known(hdp)) {
-		printk(KERN_DEBUG "%s: duplicate HPET ignored\n",
-			__func__);
+		pr_debug("%s: duplicate HPET ignored\n", __func__);
 		return 0;
 	}
 
@@ -869,8 +868,7 @@ int hpet_alloc(struct hpet_data *hdp)
 	ntimer = ((cap & HPET_NUM_TIM_CAP_MASK) >> HPET_NUM_TIM_CAP_SHIFT) + 1;
 
 	if (hpetp->hp_ntimer != ntimer) {
-		printk(KERN_WARNING "hpet: number irqs doesn't agree"
-		       " with number of timers\n");
+		pr_warn("hpet: number irqs doesn't agree with number of timers\n");
 		kfree(hpetp);
 		return -ENODEV;
 	}
@@ -889,7 +887,7 @@ int hpet_alloc(struct hpet_data *hdp)
 	do_div(temp, period);
 	hpetp->hp_tick_freq = temp; /* ticks per second */
 
-	printk(KERN_INFO "hpet%d: at MMIO 0x%lx, IRQ%s",
+	pr_info("hpet%d: at MMIO 0x%lx, IRQ%s",
 		hpetp->hp_which, hdp->hd_phys_address,
 		hpetp->hp_ntimer > 1 ? "s" : "");
 	for (i = 0; i < hpetp->hp_ntimer; i++)
@@ -898,8 +896,7 @@ int hpet_alloc(struct hpet_data *hdp)
 
 	temp = hpetp->hp_tick_freq;
 	remainder = do_div(temp, 1000000);
-	printk(KERN_INFO
-		"hpet%u: %u comparators, %d-bit %u.%06u MHz counter\n",
+	pr_info("hpet%u: %u comparators, %d-bit %u.%06u MHz counter\n",
 		hpetp->hp_which, hpetp->hp_ntimer,
 		cap & HPET_COUNTER_SIZE_MASK ? 64 : 32,
 		(unsigned)temp, remainder);
@@ -1019,7 +1016,7 @@ static int hpet_acpi_add(struct acpi_device *device)
 	if (!data.hd_address || !data.hd_nirqs) {
 		if (data.hd_address)
 			iounmap(data.hd_address);
-		printk("%s: no address or irqs in _CRS\n", __func__);
+		pr_err("%s: no address or irqs in _CRS\n", __func__);
 		return -ENODEV;
 	}
 
