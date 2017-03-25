@@ -947,6 +947,21 @@ void pcie_aspm_exit_link_state(struct pci_dev *pdev)
 	struct pci_dev *parent = pdev->bus->self;
 	struct pcie_link_state *link, *root, *parent_link;
 
+	if (pdev->has_secondary_link) {
+		link = pdev->link_state;
+		down_read(&pci_bus_sem);
+		mutex_lock(&aspm_lock);
+
+		list_del(&link->sibling);
+		list_del(&link->link);
+
+		/* Clock PM is for endpoint device */
+		free_link_state(link);
+		mutex_unlock(&aspm_lock);
+		up_read(&pci_bus_sem);
+		return;
+	}
+
 	if (!parent || !parent->link_state)
 		return;
 
@@ -965,11 +980,6 @@ void pcie_aspm_exit_link_state(struct pci_dev *pdev)
 
 	/* All functions are removed, so just disable ASPM for the link */
 	pcie_config_aspm_link(link, 0);
-	list_del(&link->sibling);
-	list_del(&link->link);
-	/* Clock PM is for endpoint device */
-	free_link_state(link);
-
 	/* Recheck latencies and configure upstream links */
 	if (parent_link) {
 		pcie_update_aspm_capable(root);
