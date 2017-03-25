@@ -139,10 +139,8 @@ void of_dma_configure(struct device *dev, struct device_node *np)
 	 * Limit coherent and dma mask based on size and default mask
 	 * set by the driver.
 	 */
-	dev->coherent_dma_mask = min(dev->coherent_dma_mask,
-				     DMA_BIT_MASK(ilog2(dma_addr + size)));
-	*dev->dma_mask = min((*dev->dma_mask),
-			     DMA_BIT_MASK(ilog2(dma_addr + size)));
+	dev->coherent_dma_mask = DMA_BIT_MASK(ilog2(dma_addr + size));
+	*dev->dma_mask = dev->coherent_dma_mask;
 
 	coherent = of_dma_is_coherent(np);
 	dev_dbg(dev, "device is%sdma coherent\n",

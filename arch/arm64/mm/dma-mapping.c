@@ -564,6 +564,7 @@ static void flush_page(struct device *dev, const void *virt, phys_addr_t phys)
 	__dma_flush_area(virt, PAGE_SIZE);
 }
 
+
 static void *__iommu_alloc_attrs(struct device *dev, size_t size,
 				 dma_addr_t *handle, gfp_t gfp,
 				 unsigned long attrs)
@@ -828,6 +829,20 @@ static void __iommu_unmap_sg_attrs(struct device *dev,
 	iommu_dma_unmap_sg(dev, sgl, nelems, dir, attrs);
 }
 
+static int __iommu_set_dma_mask(struct device *dev, u64 mask)
+{
+	/* device is not DMA capable */
+	if (!dev->dma_mask)
+		return -EIO;
+
+	if (mask > dev->archdata.parent_dma_mask)
+		mask = dev->archdata.parent_dma_mask;
+
+	*dev->dma_mask = mask;
+
+	return 0;
+}
+
 static const struct dma_map_ops iommu_dma_ops = {
 	.alloc = __iommu_alloc_attrs,
 	.free = __iommu_free_attrs,
@@ -844,7 +859,20 @@ static const struct dma_map_ops iommu_dma_ops = {
 	.map_resource = iommu_dma_map_resource,
 	.unmap_resource = iommu_dma_unmap_resource,
 	.mapping_error = iommu_dma_mapping_error,
+	.set_dma_mask = __iommu_set_dma_mask,
 };
+
+int dma_set_coherent_mask(struct device *dev, u64 mask)
+{
+	if (get_dma_ops(dev) == &iommu_dma_ops &&
+	    mask > dev->archdata.parent_dma_mask)
+		mask = dev->archdata.parent_dma_mask;
+
+	dev->coherent_dma_mask = mask;
+	return 0;
+}
+EXPORT_SYMBOL(dma_set_coherent_mask);
+
 
 /*
  * TODO: Right now __iommu_setup_dma_ops() gets called too early to do
@@ -1007,6 +1035,8 @@ void arch_setup_dma_ops(struct device *dev, u64 dma_base, u64 size,
 {
 	if (!dev->dma_ops)
 		dev->dma_ops = &swiotlb_dma_ops;
+
+	dev->archdata.parent_dma_mask = size - 1;
 
 	dev->archdata.dma_coherent = coherent;
 	__iommu_setup_dma_ops(dev, dma_base, size, iommu);
