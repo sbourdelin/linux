@@ -76,10 +76,16 @@ static inline void of_pci_check_probe_only(void) { }
 int of_pci_get_host_bridge_resources(struct device_node *dev,
 			unsigned char busno, unsigned char bus_max,
 			struct list_head *resources, resource_size_t *io_base);
+int of_pci_get_dma_ranges(struct device_node *np, u64 *dma_addr, u64 *paddr, u64 *size);
 #else
 static inline int of_pci_get_host_bridge_resources(struct device_node *dev,
 			unsigned char busno, unsigned char bus_max,
 			struct list_head *resources, resource_size_t *io_base)
+{
+	return -EINVAL;
+}
+
+static inline int of_pci_get_dma_ranges(struct device_node *np, u64 *dma_addr, u64 *paddr, u64 *size)
 {
 	return -EINVAL;
 }
