@@ -983,6 +983,8 @@ static int i2c_device_probe(struct device *dev)
 	if (!client)
 		return 0;
 
+	driver = to_i2c_driver(dev->driver);
+
 	if (!client->irq) {
 		int irq = -ENOENT;
 
@@ -992,9 +994,11 @@ static int i2c_device_probe(struct device *dev)
 		} else if (dev->of_node) {
 			irq = of_irq_get_byname(dev->of_node, "irq");
 			if (irq == -EINVAL || irq == -ENODATA)
-				irq = of_irq_get(dev->of_node, 0);
+				irq = of_irq_get(dev->of_node,
+						 driver->irq_index);
 		} else if (ACPI_COMPANION(dev)) {
-			irq = acpi_dev_gpio_irq_get(ACPI_COMPANION(dev), 0);
+			irq = acpi_dev_gpio_irq_get(ACPI_COMPANION(dev),
+						    driver->irq_index);
 		}
 		if (irq == -EPROBE_DEFER)
 			return irq;
@@ -1004,8 +1008,6 @@ static int i2c_device_probe(struct device *dev)
 
 		client->irq = irq;
 	}
-
-	driver = to_i2c_driver(dev->driver);
 
 	/*
 	 * An I2C ID table is not mandatory, if and only if, a suitable Device
