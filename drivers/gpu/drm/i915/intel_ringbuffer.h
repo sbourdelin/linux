@@ -438,6 +438,22 @@ intel_engine_flag(const struct intel_engine_cs *engine)
 	return 1 << engine->id;
 }
 
+/* works only for engine_mask with 1 engine bit set */
+static inline unsigned
+intel_engineid_from_flag(unsigned engine_mask)
+{
+	unsigned engine_id = 0;
+
+	GEM_BUG_ON(engine_mask & (engine_mask - 1));
+
+	while (engine_mask >>= 1)
+		engine_id++;
+
+	GEM_BUG_ON(engine_id >= I915_NUM_ENGINES);
+
+	return engine_id;
+}
+
 static inline void
 intel_flush_status_page(struct intel_engine_cs *engine, int reg)
 {

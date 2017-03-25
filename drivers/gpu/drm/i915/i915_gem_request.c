@@ -1016,7 +1016,8 @@ static bool __i915_wait_request_check_and_reset(struct drm_i915_gem_request *req
 		return false;
 
 	__set_current_state(TASK_RUNNING);
-	i915_reset(request->i915);
+	i915_reset(request->i915,
+		   request->i915->gpu_error.reset_engine_mask);
 	return true;
 }
 

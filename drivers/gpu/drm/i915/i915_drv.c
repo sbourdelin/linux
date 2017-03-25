@@ -1794,7 +1794,7 @@ static int i915_resume_switcheroo(struct drm_device *dev)
 }
 
 /**
- * i915_reset - reset chip after a hang
+ * i915_reset_chip - reset chip after a hang
  * @dev_priv: device private to reset
  *
  * Reset the chip.  Useful if a hang is detected. Marks the device as wedged
@@ -1810,7 +1810,7 @@ static int i915_resume_switcheroo(struct drm_device *dev)
  *   - re-init interrupt state
  *   - re-init display
  */
-void i915_reset(struct drm_i915_private *dev_priv)
+void i915_reset_chip(struct drm_i915_private *dev_priv)
 {
 	struct i915_gpu_error *error = &dev_priv->gpu_error;
 	int ret;
@@ -1820,6 +1820,8 @@ void i915_reset(struct drm_i915_private *dev_priv)
 
 	if (!test_bit(I915_RESET_HANDOFF, &error->flags))
 		return;
+
+	DRM_DEBUG_DRIVER("resetting chip\n");
 
 	/* Clear any previous failed attempts at recovery. Time to try again. */
 	if (!i915_gem_unset_wedged(dev_priv))
@@ -1882,6 +1884,49 @@ wakeup:
 error:
 	i915_gem_set_wedged(dev_priv);
 	goto finish;
+}
+
+/**
+ * i915_reset_engine - reset GPU engine to recover from a hang
+ * @engine: engine to reset
+ *
+ * Reset a specific GPU engine. Useful if a hang is detected.
+ * Returns zero on successful reset or otherwise an error code.
+ */
+int i915_reset_engine(struct intel_engine_cs *engine)
+{
+	/* FIXME: replace me with engine reset sequence */
+	return -ENODEV;
+}
+
+/**
+ * i915_reset - start either engine or full GPU reset to recover from a hang
+ * @dev_priv: device private
+ * @engine_mask: mask representing engines that are hung
+ *
+ * Wrapper function to initiate a GPU reset. When platform supports it, attempt
+ * to reset the hung engine only. If engine reset fails (or is not supported),
+ * reset the full GPU. If more than one engine is hung, the speed gains of
+ * reset_engine are negligible, thus promote to full reset.
+ *
+ * Caller must hold the struct_mutex.
+ */
+void i915_reset(struct drm_i915_private *dev_priv, u32 engine_mask)
+{
+	/* try engine reset first */
+	if (intel_has_reset_engine(dev_priv) &&
+	    !(engine_mask & (engine_mask - 1))) {
+		struct intel_engine_cs *engine =
+			dev_priv->engine[intel_engineid_from_flag(engine_mask)];
+
+		if (i915_reset_engine(engine))
+			goto reset_chip;
+
+		return;
+	}
+
+reset_chip:
+	i915_reset_chip(dev_priv);
 }
 
 static int i915_pm_suspend(struct device *kdev)

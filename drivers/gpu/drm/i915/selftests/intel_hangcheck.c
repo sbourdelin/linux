@@ -307,7 +307,7 @@ static int igt_global_reset(void *arg)
 	mutex_lock(&i915->drm.struct_mutex);
 	reset_count = i915_reset_count(&i915->gpu_error);
 
-	i915_reset(i915);
+	i915_reset(i915, ALL_ENGINES);
 
 	if (i915_reset_count(&i915->gpu_error) == reset_count) {
 		pr_err("No GPU reset recorded!\n");
@@ -472,7 +472,7 @@ static int igt_reset_queue(void *arg)
 
 			reset_count = fake_hangcheck(prev);
 
-			i915_reset(i915);
+			i915_reset(i915, ALL_ENGINES);
 
 			GEM_BUG_ON(test_bit(I915_RESET_HANDOFF,
 					    &i915->gpu_error.flags));

@@ -832,6 +832,7 @@ struct intel_csr {
 	func(has_ddi); \
 	func(has_decoupled_mmio); \
 	func(has_dp_mst); \
+	func(has_reset_engine); \
 	func(has_fbc); \
 	func(has_fpga_dbg); \
 	func(has_full_ppgtt); \
@@ -1630,6 +1631,9 @@ struct i915_gpu_error {
 #define I915_RESET_BACKOFF	0
 #define I915_RESET_HANDOFF	1
 #define I915_WEDGED		(BITS_PER_LONG - 1)
+
+	/* if available, engine-specific reset is tried before full gpu reset */
+	u32 reset_engine_mask;
 
 	/**
 	 * Waitqueue to signal when a hang is detected. Used to for waiters
@@ -3033,7 +3037,8 @@ extern int i915_driver_load(struct pci_dev *pdev,
 extern void i915_driver_unload(struct drm_device *dev);
 extern int intel_gpu_reset(struct drm_i915_private *dev_priv, u32 engine_mask);
 extern bool intel_has_gpu_reset(struct drm_i915_private *dev_priv);
-extern void i915_reset(struct drm_i915_private *dev_priv);
+extern void i915_reset(struct drm_i915_private *dev_priv, u32 engine_mask);
+extern bool intel_has_reset_engine(struct drm_i915_private *dev_priv);
 extern int intel_guc_reset(struct drm_i915_private *dev_priv);
 extern void intel_engine_init_hangcheck(struct intel_engine_cs *engine);
 extern void intel_hangcheck_init(struct drm_i915_private *dev_priv);
