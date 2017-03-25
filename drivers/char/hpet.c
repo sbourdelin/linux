@@ -50,7 +50,6 @@
 
 #define HPET_RANGE_SIZE		1024	/* from HPET spec */
 
-
 /* WARNING -- don't get confused.  These macros are never used
  * to write the (single) counter, and rarely to read it.
  * They're badly named; to fix, someday.
@@ -82,6 +81,7 @@ static struct clocksource clocksource_hpet = {
 	.mask		= CLOCKSOURCE_MASK(64),
 	.flags		= CLOCK_SOURCE_IS_CONTINUOUS,
 };
+
 static struct clocksource *hpet_clocksource;
 #endif
 
@@ -280,7 +280,7 @@ static int hpet_open(struct inode *inode, struct file *file)
 }
 
 static ssize_t
-hpet_read(struct file *file, char __user *buf, size_t count, loff_t * ppos)
+hpet_read(struct file *file, char __user *buf, size_t count, loff_t *ppos)
 {
 	DECLARE_WAITQUEUE(wait, current);
 	unsigned long data;
@@ -326,7 +326,7 @@ out:
 	return retval;
 }
 
-static unsigned int hpet_poll(struct file *file, poll_table * wait)
+static unsigned int hpet_poll(struct file *file, poll_table *wait)
 {
 	unsigned long v;
 	struct hpet_dev *devp;
@@ -686,6 +686,7 @@ hpet_compat_ioctl(struct file *file, unsigned int cmd, unsigned long arg)
 
 	if ((cmd == HPET_INFO) && !err) {
 		struct compat_hpet_info __user *u = compat_ptr(arg);
+
 		if (put_user(info.hi_ireqfreq, &u->hi_ireqfreq) ||
 		    put_user(info.hi_flags, &u->hi_flags) ||
 		    put_user(info.hi_hpet, &u->hi_hpet) ||
@@ -901,7 +902,7 @@ int hpet_alloc(struct hpet_data *hdp)
 		"hpet%u: %u comparators, %d-bit %u.%06u MHz counter\n",
 		hpetp->hp_which, hpetp->hp_ntimer,
 		cap & HPET_COUNTER_SIZE_MASK ? 64 : 32,
-		(unsigned) temp, remainder);
+		(unsigned)temp, remainder);
 
 	mcfg = readq(&hpet->hpet_config);
 	if ((mcfg & HPET_ENABLE_CNF_MASK) == 0) {
