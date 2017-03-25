@@ -123,22 +123,6 @@ static struct hpets *hpets;
 #define	HPET_PERIODIC		0x0004
 #define	HPET_SHARED_IRQ		0x0008
 
-
-#ifndef readq
-static inline unsigned long long readq(void __iomem *addr)
-{
-	return readl(addr) | (((unsigned long long)readl(addr + 4)) << 32LL);
-}
-#endif
-
-#ifndef writeq
-static inline void writeq(unsigned long long v, void __iomem *addr)
-{
-	writel(v & 0xffffffff, addr);
-	writel(v >> 32, addr + 4);
-}
-#endif
-
 static irqreturn_t hpet_interrupt(int irq, void *data)
 {
 	struct hpet_dev *devp;
