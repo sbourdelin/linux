@@ -1177,7 +1177,7 @@ complete:
 	return timeout;
 }
 
-static void engine_retire_requests(struct intel_engine_cs *engine)
+void engine_retire_requests(struct intel_engine_cs *engine)
 {
 	struct drm_i915_gem_request *request, *next;
 	u32 seqno = intel_engine_get_seqno(engine);

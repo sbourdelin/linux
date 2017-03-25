@@ -2741,14 +2741,15 @@ static bool engine_stalled(struct intel_engine_cs *engine)
 	return true;
 }
 
-int i915_gem_reset_prepare(struct drm_i915_private *dev_priv)
+int i915_gem_reset_prepare(struct drm_i915_private *dev_priv,
+			   unsigned int engine_mask)
 {
 	struct intel_engine_cs *engine;
-	enum intel_engine_id id;
+	unsigned int tmp;
 	int err = 0;
 
 	/* Ensure irq handler finishes, and not run again. */
-	for_each_engine(engine, dev_priv, id) {
+	for_each_engine_masked(engine, dev_priv, engine_mask, tmp) {
 		struct drm_i915_gem_request *request;
 
 		/* Prevent the signaler thread from updating the request
@@ -2868,7 +2869,7 @@ static bool i915_gem_reset_request(struct drm_i915_gem_request *request)
 	return guilty;
 }
 
-static void i915_gem_reset_engine(struct intel_engine_cs *engine)
+void i915_gem_reset_engine(struct intel_engine_cs *engine)
 {
 	struct drm_i915_gem_request *request;
 
@@ -2914,14 +2915,15 @@ void i915_gem_reset(struct drm_i915_private *dev_priv)
 	}
 }
 
-void i915_gem_reset_finish(struct drm_i915_private *dev_priv)
+void i915_gem_reset_finish(struct drm_i915_private *dev_priv,
+			   unsigned int engine_mask)
 {
 	struct intel_engine_cs *engine;
-	enum intel_engine_id id;
+	unsigned int tmp;
 
 	lockdep_assert_held(&dev_priv->drm.struct_mutex);
 
-	for_each_engine(engine, dev_priv, id) {
+	for_each_engine_masked(engine, dev_priv, engine_mask, tmp) {
 		tasklet_enable(&engine->irq_tasklet);
 		kthread_unpark(engine->breadcrumbs.signaler);
 	}
