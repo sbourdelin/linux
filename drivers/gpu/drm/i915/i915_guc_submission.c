@@ -1017,6 +1017,22 @@ static void guc_policies_init(struct guc_policies *policies)
 	policies->is_valid = 1;
 }
 
+/*
+ * In this macro it is highly unlikely to exceed max value but even if we did
+ * it is not an error so just throw a warning and continue. Only side effect
+ * in continuing further means some registers won't be added to save/restore
+ * list.
+ */
+#define GUC_ADD_MMIO_REG_ADS(node, reg_addr, _flags)			\
+	do {								\
+		u32 __count = node->number_of_registers;		\
+		if (WARN_ON(__count >= GUC_REGSET_MAX_REGISTERS))	\
+			continue;					\
+		node->registers[__count].offset = reg_addr.reg;		\
+		node->registers[__count].flags = (_flags);		\
+		node->number_of_registers++;				\
+	} while (0)
+
 static int guc_ads_create(struct intel_guc *guc)
 {
 	struct drm_i915_private *dev_priv = guc_to_i915(guc);
@@ -1049,10 +1065,42 @@ static int guc_ads_create(struct intel_guc *guc)
 
 	/* MMIO reg state */
 	for_each_engine(engine, dev_priv, id) {
+		u32 flags;
+		struct guc_mmio_regset *eng_reg =
+			&blob->reg_state.engine_reg[engine->guc_id];
+
+		/*
+		 * Provide a list of registers to be saved/restored during gpu
+		 * reset. This is mainly required for Media reset (aka watchdog
+		 * timeout) which is completely under the control of GuC
+		 * (resubmission of hung workload is handled inside GuC).
+		 */
+		flags = GUC_REGSET_POWERCYCLE |
+			GUC_REGSET_ENGINERESET |
+			GUC_REGSET_SAVE_CURRENT_VALUE;
+
+		GUC_ADD_MMIO_REG_ADS(eng_reg, RING_HEAD(engine->mmio_base),
+				     flags);
+
+		GUC_ADD_MMIO_REG_ADS(eng_reg, RING_TAIL(engine->mmio_base),
+				     flags);
+
+		GUC_ADD_MMIO_REG_ADS(eng_reg, RING_HWS_PGA(engine->mmio_base),
+				     flags);
+
+		GUC_ADD_MMIO_REG_ADS(eng_reg, RING_MODE_GEN7(engine),
+				     (flags | GUC_REGSET_MASKED));
+
+		GUC_ADD_MMIO_REG_ADS(eng_reg, RING_IMR(engine->mmio_base),
+				     flags);
+
+		DRM_DEBUG_DRIVER("%s register save/restore count: %u\n",
+				 engine->name, eng_reg->number_of_registers);
+
+		 /* Nothing to be white listed for now. */
 		blob->reg_state.white_list[engine->guc_id].mmio_start =
 			engine->mmio_base + GUC_MMIO_WHITE_LIST_START;
 
-		/* Nothing to be saved or restored for now. */
 		blob->reg_state.white_list[engine->guc_id].count = 0;
 	}
 
