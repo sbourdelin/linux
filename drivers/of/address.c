@@ -836,9 +836,6 @@ int of_dma_get_range(struct device_node *np, u64 *dma_addr, u64 *paddr, u64 *siz
 	while (1) {
 		naddr = of_n_addr_cells(node);
 		nsize = of_n_size_cells(node);
-		node = of_get_next_parent(node);
-		if (!node)
-			break;
 
 		ranges = of_get_property(node, "dma-ranges", &len);
 
@@ -851,6 +848,10 @@ int of_dma_get_range(struct device_node *np, u64 *dma_addr, u64 *paddr, u64 *siz
 		 * DMA is supported
 		 */
 		if (!ranges)
+			break;
+
+		node = of_get_next_parent(node);
+		if (!node)
 			break;
 	}
 
