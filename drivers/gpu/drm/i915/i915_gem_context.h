@@ -250,6 +250,26 @@ static inline bool i915_gem_context_is_kernel(struct i915_gem_context *ctx)
 	return !ctx->file_priv;
 }
 
+/*
+ * Timestamp timer resolution = 0.080 uSec,
+ * or 12500000 counts per second, or ~12 counts per microsecond.
+ */
+#define TIMESTAMP_CNTS_PER_USEC 12
+static inline u32 watchdog_to_us(u32 value_in_clock_counts)
+{
+	return (value_in_clock_counts) / (TIMESTAMP_CNTS_PER_USEC);
+}
+
+static inline u32 watchdog_to_clock_counts(u64 value_in_us)
+{
+	u64 threshold = (value_in_us) * (TIMESTAMP_CNTS_PER_USEC);
+
+	if (GEM_WARN_ON(overflows_type(threshold, u32)))
+		return 0;
+
+	return threshold;
+}
+
 /* i915_gem_context.c */
 int __must_check i915_gem_context_init(struct drm_i915_private *dev_priv);
 void i915_gem_context_lost(struct drm_i915_private *dev_priv);

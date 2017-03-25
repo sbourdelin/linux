@@ -388,9 +388,10 @@ static void error_print_context(struct drm_i915_error_state_buf *m,
 				const char *header,
 				const struct drm_i915_error_context *ctx)
 {
-	err_printf(m, "%s%s[%d] user_handle %d hw_id %d, ban score %d guilty %d active %d\n",
+	err_printf(m, "%s%s[%d] user_handle %d hw_id %d, ban score %d guilty %d active %d, watchdog %dus\n",
 		   header, ctx->comm, ctx->pid, ctx->handle, ctx->hw_id,
-		   ctx->ban_score, ctx->guilty, ctx->active);
+		   ctx->ban_score, ctx->guilty, ctx->active,
+		   watchdog_to_us(ctx->watchdog_threshold));
 }
 
 static void error_print_engine(struct drm_i915_error_state_buf *m,
@@ -1328,7 +1329,8 @@ static void error_record_engine_execlists(struct intel_engine_cs *engine,
 }
 
 static void record_context(struct drm_i915_error_context *e,
-			   struct i915_gem_context *ctx)
+			   struct i915_gem_context *ctx,
+			   u32 engine_id)
 {
 	if (ctx->pid) {
 		struct task_struct *task;
@@ -1347,6 +1349,7 @@ static void record_context(struct drm_i915_error_context *e,
 	e->ban_score = ctx->ban_score;
 	e->guilty = ctx->guilty_count;
 	e->active = ctx->active_count;
+	e->watchdog_threshold =	ctx->engine[engine_id].watchdog_threshold;
 }
 
 static void i915_gem_record_rings(struct drm_i915_private *dev_priv,
@@ -1381,7 +1384,7 @@ static void i915_gem_record_rings(struct drm_i915_private *dev_priv,
 			ee->vm = request->ctx->ppgtt ?
 				&request->ctx->ppgtt->base : &ggtt->base;
 
-			record_context(&ee->context, request->ctx);
+			record_context(&ee->context, request->ctx, engine->id);
 
 			/* We need to copy these to an anonymous buffer
 			 * as the simplest method to avoid being overwritten

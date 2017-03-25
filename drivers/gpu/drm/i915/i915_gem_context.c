@@ -422,6 +422,78 @@ out:
 	return ctx;
 }
 
+/* Return the timer count threshold in microseconds. */
+int i915_gem_context_get_watchdog(struct i915_gem_context *ctx,
+				  struct drm_i915_gem_context_param *args)
+{
+	struct drm_i915_private *dev_priv = ctx->i915;
+	struct intel_engine_cs *engine;
+	enum intel_engine_id id;
+	u32 threshold_in_us[I915_NUM_ENGINES];
+
+	if (!dev_priv->engine[VCS]->emit_start_watchdog)
+		return -ENODEV;
+
+	for_each_engine(engine, dev_priv, id) {
+		struct intel_context *ce = &ctx->engine[id];
+
+		threshold_in_us[id] = watchdog_to_us(ce->watchdog_threshold);
+	}
+
+	mutex_unlock(&dev_priv->drm.struct_mutex);
+	if (__copy_to_user(u64_to_user_ptr(args->value),
+			   &threshold_in_us,
+			   sizeof(threshold_in_us))) {
+		mutex_lock(&dev_priv->drm.struct_mutex);
+		return -EFAULT;
+	}
+	mutex_lock(&dev_priv->drm.struct_mutex);
+	args->size = sizeof(threshold_in_us);
+
+	return 0;
+}
+
+/*
+ * Based on time out value in microseconds (us) calculate
+ * timer count thresholds needed based on core frequency.
+ * Watchdog can be disabled by setting it to 0.
+ */
+int i915_gem_context_set_watchdog(struct i915_gem_context *ctx,
+				  struct drm_i915_gem_context_param *args)
+{
+	struct drm_i915_private *dev_priv = ctx->i915;
+	struct intel_engine_cs *engine;
+	enum intel_engine_id id;
+	u32 threshold_in_us[I915_NUM_ENGINES];
+
+	if (!dev_priv->engine[VCS]->emit_start_watchdog)
+		return -ENODEV;
+	else if (args->size < sizeof(threshold_in_us))
+		return -EINVAL;
+
+	mutex_unlock(&dev_priv->drm.struct_mutex);
+	if (copy_from_user(&threshold_in_us,
+			   u64_to_user_ptr(args->value),
+			   sizeof(threshold_in_us))) {
+		mutex_lock(&dev_priv->drm.struct_mutex);
+		return -EFAULT;
+	}
+	mutex_lock(&dev_priv->drm.struct_mutex);
+
+	/* not supported in blitter engine */
+	if (threshold_in_us[BCS] != 0)
+		return -EINVAL;
+
+	for_each_engine(engine, dev_priv, id) {
+		struct intel_context *ce = &ctx->engine[id];
+
+		ce->watchdog_threshold =
+			watchdog_to_clock_counts((u64)threshold_in_us[id]);
+	}
+
+	return 0;
+}
+
 int i915_gem_context_init(struct drm_i915_private *dev_priv)
 {
 	struct i915_gem_context *ctx;
@@ -1061,6 +1133,9 @@ int i915_gem_context_getparam_ioctl(struct drm_device *dev, void *data,
 	case I915_CONTEXT_PARAM_BANNABLE:
 		args->value = i915_gem_context_is_bannable(ctx);
 		break;
+	case I915_CONTEXT_PARAM_WATCHDOG:
+		ret = i915_gem_context_get_watchdog(ctx, args);
+		break;
 	default:
 		ret = -EINVAL;
 		break;
@@ -1117,6 +1192,9 @@ int i915_gem_context_setparam_ioctl(struct drm_device *dev, void *data,
 			i915_gem_context_set_bannable(ctx);
 		else
 			i915_gem_context_clear_bannable(ctx);
+		break;
+	case I915_CONTEXT_PARAM_WATCHDOG:
+		ret = i915_gem_context_set_watchdog(ctx, args);
 		break;
 	default:
 		ret = -EINVAL;

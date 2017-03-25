@@ -1496,7 +1496,7 @@ static int gen8_emit_flush_render(struct drm_i915_gem_request *request,
 	return 0;
 }
 
-#define GEN8_WATCHDOG_1000US 0x2ee0 //XXX: Temp, replace with helper function
+#define GEN8_WATCHDOG_1000US watchdog_to_clock_counts(1000)
 static void gen8_watchdog_irq_handler(unsigned long data)
 {
 	struct intel_engine_cs *engine = (struct intel_engine_cs *)data;
