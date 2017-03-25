@@ -24,11 +24,6 @@
 #include <net/nexthop.h>
 #include "internal.h"
 
-/* put a reasonable limit on the number of labels
- * we will accept from userspace
- */
-#define MAX_NEW_LABELS 12
-
 /* Maximum number of labels to look ahead at when selecting a path of
  * a multipath route
  */
