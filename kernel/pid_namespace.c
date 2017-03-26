@@ -75,7 +75,8 @@ err_alloc:
 
 static void proc_cleanup_work(struct work_struct *work)
 {
-	struct pid_namespace *ns = container_of(work, struct pid_namespace, proc_work);
+	struct pid_namespace *ns = container_of(work, struct pid_namespace,
+						proc_work);
 	pid_ns_release_proc(ns);
 }
 
