@@ -658,29 +658,46 @@ static void execlists_submit_request(struct drm_i915_gem_request *request)
 	spin_unlock_irqrestore(&engine->timeline->lock, flags);
 }
 
-static struct intel_engine_cs *
-pt_lock_engine(struct i915_priotree *pt, struct intel_engine_cs *locked)
+static inline struct intel_engine_cs *
+pt_lock_engine(struct i915_priotree *pt, unsigned long *locked)
 {
-	struct intel_engine_cs *engine;
+	struct intel_engine_cs *engine =
+		container_of(pt, struct drm_i915_gem_request, priotree)->engine;
 
-	engine = container_of(pt,
-			      struct drm_i915_gem_request,
-			      priotree)->engine;
-	if (engine != locked) {
-		if (locked)
-			spin_unlock_irq(&locked->timeline->lock);
-		spin_lock_irq(&engine->timeline->lock);
-	}
+	/* Locking the engines in a random order will rightfully trigger a
+	 * spasm in lockdep. However, we can ignore lockdep (by marking each
+	 * as a seperate nesting) so long as we never nest the
+	 * engine->timeline->lock elsewhere. Also the number of nesting
+	 * subclasses is severely limited (7) which is going to cause an
+	 * issue at some point.
+	 * BUILD_BUG_ON(I915_NUM_ENGINES >= MAX_LOCKDEP_SUBCLASSES);
+	 */
+	if (!__test_and_set_bit(engine->id, locked))
+		spin_lock_nested(&engine->timeline->lock,
+				 hweight_long(*locked));
 
 	return engine;
 }
 
+static void
+unlock_engines(struct drm_i915_private *i915, unsigned long locked)
+{
+	struct intel_engine_cs *engine;
+	unsigned long tmp;
+
+	for_each_engine_masked(engine, i915, locked, tmp)
+		spin_unlock(&engine->timeline->lock);
+}
+
 static void execlists_schedule(struct drm_i915_gem_request *request, int prio)
 {
-	struct intel_engine_cs *engine = NULL;
+	struct intel_engine_cs *engine;
 	struct i915_dependency *dep, *p;
 	struct i915_dependency stack;
+	unsigned long locked = 0;
 	LIST_HEAD(dfs);
+
+	BUILD_BUG_ON(I915_NUM_ENGINES > BITS_PER_LONG);
 
 	if (prio <= READ_ONCE(request->priotree.priority))
 		return;
@@ -690,6 +707,9 @@ static void execlists_schedule(struct drm_i915_gem_request *request, int prio)
 
 	stack.signaler = &request->priotree;
 	list_add(&stack.dfs_link, &dfs);
+
+	GEM_BUG_ON(irqs_disabled());
+	local_irq_disable();
 
 	/* Recursively bump all dependent priorities to match the new request.
 	 *
@@ -719,7 +739,7 @@ static void execlists_schedule(struct drm_i915_gem_request *request, int prio)
 		if (!RB_EMPTY_NODE(&pt->node))
 			continue;
 
-		engine = pt_lock_engine(pt, engine);
+		engine = pt_lock_engine(pt, &locked);
 
 		/* If it is not already in the rbtree, we can update the
 		 * priority inplace and skip over it (and its dependencies)
@@ -737,7 +757,7 @@ static void execlists_schedule(struct drm_i915_gem_request *request, int prio)
 
 		INIT_LIST_HEAD(&dep->dfs_link);
 
-		engine = pt_lock_engine(pt, engine);
+		engine = pt_lock_engine(pt, &locked);
 
 		if (prio <= pt->priority)
 			continue;
@@ -750,8 +770,8 @@ static void execlists_schedule(struct drm_i915_gem_request *request, int prio)
 			engine->execlist_first = &pt->node;
 	}
 
-	if (engine)
-		spin_unlock_irq(&engine->timeline->lock);
+	unlock_engines(request->i915, locked);
+	local_irq_enable();
 
 	/* XXX Do we need to preempt to make room for us and our deps? */
 }
