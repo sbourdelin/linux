@@ -770,11 +770,13 @@ void ipoib_create_debug_files(struct net_device *dev);
 void ipoib_delete_debug_files(struct net_device *dev);
 int ipoib_register_debugfs(void);
 void ipoib_unregister_debugfs(void);
+void ipoib_debugfs_rename(struct net_device *dev);
 #else
 static inline void ipoib_create_debug_files(struct net_device *dev) { }
 static inline void ipoib_delete_debug_files(struct net_device *dev) { }
 static inline int ipoib_register_debugfs(void) { return 0; }
 static inline void ipoib_unregister_debugfs(void) { }
+static void ipoib_debugfs_rename(struct net_device *dev) { }
 #endif
 
 #define ipoib_printk(level, priv, format, arg...)	\
