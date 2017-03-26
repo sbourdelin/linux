@@ -228,11 +228,11 @@ void zap_pid_ns_processes(struct pid_namespace *pid_ns)
 	 * to exit.
 	 *
 	 * Note:  This signals each threads in the namespace - even those that
-	 * 	  belong to the same thread group, To avoid this, we would have
-	 * 	  to walk the entire tasklist looking a processes in this
-	 * 	  namespace, but that could be unnecessarily expensive if the
-	 * 	  pid namespace has just a few processes. Or we need to
-	 * 	  maintain a tasklist for each pid namespace.
+	 *	  belong to the same thread group, To avoid this, we would have
+	 *	  to walk the entire tasklist looking a processes in this
+	 *	  namespace, but that could be unnecessarily expensive if the
+	 *	  pid namespace has just a few processes. Or we need to
+	 *	  maintain a tasklist for each pid namespace.
 	 *
 	 */
 	read_lock(&tasklist_lock);
