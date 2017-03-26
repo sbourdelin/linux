@@ -22,6 +22,7 @@
 #include <asm/page.h>
 #include <asm/hvcall.h>
 #include <asm/firmware.h>
+#include <asm/prom.h>
 
 
 #define MODULE_VERS "1.0"
@@ -38,7 +39,6 @@ static int sysfs_entries;
 static u32 cpu_to_drc_index(int cpu)
 {
 	struct device_node *dn = NULL;
-	const int *indexes;
 	int i;
 	int rc = 1;
 	u32 ret = 0;
@@ -46,18 +46,65 @@ static u32 cpu_to_drc_index(int cpu)
 	dn = of_find_node_by_path("/cpus");
 	if (dn == NULL)
 		goto err;
-	indexes = of_get_property(dn, "ibm,drc-indexes", NULL);
-	if (indexes == NULL)
-		goto err_of_node_put;
+
 	/* Convert logical cpu number to core number */
 	i = cpu_core_index_of_thread(cpu);
-	/*
-	 * The first element indexes[0] is the number of drc_indexes
-	 * returned in the list.  Hence i+1 will get the drc_index
-	 * corresponding to core number i.
-	 */
-	WARN_ON(i > indexes[0]);
-	ret = indexes[i + 1];
+
+	if (firmware_has_feature(FW_FEATURE_DRC_INFO)) {
+		struct property *info = NULL;
+		int j, check_val = i;
+		u32 num_set_entries;
+		u32 drc_index_start = 0;
+		u32 last_drc_index = 0;
+		u32 num_sequential_elems = 0;
+		u32 sequential_inc = 0;
+		char *dtype;
+		char *dname;
+		void *value;
+
+		info = of_find_property(dn, "ibm,drc-info", NULL);
+		if (info == NULL)
+			goto err_of_node_put;
+
+		value = info->value;
+		value = (void *)of_prop_next_u32(info, value, &num_set_entries);
+		if (!value)
+			goto err_of_node_put;
+
+		for (j = 0; j < num_set_entries; j++) {
+
+			of_one_drc_info(&info, &value, &dtype, &dname,
+					&drc_index_start,
+					&num_sequential_elems,
+					&sequential_inc, &last_drc_index);
+			if (strcmp(dtype, "CPU"))
+				goto err;
+
+			if (check_val < last_drc_index)
+				break;
+
+			WARN_ON(((check_val-drc_index_start)%
+					sequential_inc) != 0);
+		}
+		WARN_ON((num_sequential_elems == 0) || (sequential_inc == 0));
+
+		ret = last_drc_index + (check_val*sequential_inc);
+	} else {
+		const __be32 *indexes;
+
+		indexes = of_get_property(dn, "ibm,drc-indexes", NULL);
+		if (indexes == NULL)
+			goto err_of_node_put;
+
+		/*
+		 * The first element indexes[0] is the number of drc_indexes
+		 * returned in the list.  Hence i+1 will get the drc_index
+		 * corresponding to core number i.
+		 */
+		WARN_ON(i > indexes[0]);
+		ret = indexes[i + 1];
+	}
+
 	rc = 0;
 
 err_of_node_put:
@@ -72,34 +119,85 @@ static int drc_index_to_cpu(u32 drc_index)
 {
 	struct device_node *dn = NULL;
 	const int *indexes;
-	int i, cpu = 0;
+	int thread = 0, cpu = 0;
 	int rc = 1;
 
 	dn = of_find_node_by_path("/cpus");
 	if (dn == NULL)
 		goto err;
-	indexes = of_get_property(dn, "ibm,drc-indexes", NULL);
-	if (indexes == NULL)
-		goto err_of_node_put;
-	/*
-	 * First element in the array is the number of drc_indexes
-	 * returned.  Search through the list to find the matching
-	 * drc_index and get the core number
-	 */
-	for (i = 0; i < indexes[0]; i++) {
-		if (indexes[i + 1] == drc_index)
+
+	if (firmware_has_feature(FW_FEATURE_DRC_INFO)) {
+		struct property *info = NULL;
+		int j;
+		u32 num_set_entries;
+		u32 drc_index_start = 0;
+		u32 last_drc_index = 0;
+		u32 num_sequential_elems = 0;
+		u32 sequential_inc = 0;
+		char *dtype, *dname;
+		void *value;
+
+		info = of_find_property(dn, "ibm,drc-info", NULL);
+		if (info == NULL)
+			goto err_of_node_put;
+
+		value = info->value;
+		value = (void *)of_prop_next_u32(info, value, &num_set_entries);
+		if (!value)
+			goto err_of_node_put;
+
+		for (j = 0; j < num_set_entries; j++) {
+
+			of_one_drc_info(&info, &value, &dtype, &dname,
+					&drc_index_start,
+					&num_sequential_elems,
+					&sequential_inc, &last_drc_index);
+			if (strcmp(dtype, "CPU"))
+				goto err;
+
+			WARN_ON(drc_index < drc_index_start);
+			WARN_ON(((drc_index-drc_index_start)%
+					sequential_inc) != 0);
+
+			if (drc_index > last_drc_index) {
+				cpu += ((last_drc_index-drc_index_start)/
+					sequential_inc);
+				continue;
+			} else {
+				cpu += ((drc_index-drc_index_start)/
+					sequential_inc);
+			}
+
+			thread = cpu_first_thread_of_core(cpu);
+			rc = 0;
 			break;
+		}
+	} else {
+		unsigned long int i;
+
+		indexes = of_get_property(dn, "ibm,drc-indexes", NULL);
+		if (indexes == NULL)
+			goto err_of_node_put;
+		/*
+		 * First element in the array is the number of drc_indexes
+		 * returned.  Search through the list to find the matching
+		 * drc_index and get the core number
+		 */
+		for (i = 0; i < indexes[0]; i++) {
+			if (indexes[i + 1] == drc_index)
+				break;
+		}
+		/* Convert core number to logical cpu number */
+		thread = cpu_first_thread_of_core(i);
+		rc = 0;
 	}
-	/* Convert core number to logical cpu number */
-	cpu = cpu_first_thread_of_core(i);
-	rc = 0;
 
 err_of_node_put:
 	of_node_put(dn);
 err:
 	if (rc)
 		printk(KERN_WARNING "drc_index_to_cpu(%d) failed", drc_index);
-	return cpu;
+	return thread;
 }
 
 /*

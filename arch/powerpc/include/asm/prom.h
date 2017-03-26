@@ -96,6 +96,13 @@ struct of_drconf_cell {
 #define DRCONF_MEM_AI_INVALID	0x00000040
 #define DRCONF_MEM_RESERVED	0x00000080
 
+extern int of_one_drc_info(struct property **prop, void **curval,
+			char **dtype, char **dname,
+			u32 *drc_index_start_p,
+			u32 *num_sequential_elems_p,
+			u32 *sequential_inc_p,
+			u32 *last_drc_index_p);
+
 /*
  * There are two methods for telling firmware what our capabilities are.
  * Newer machines have an "ibm,client-architecture-support" method on the
