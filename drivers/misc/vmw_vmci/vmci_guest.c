@@ -464,7 +464,6 @@ static int vmci_guest_probe_device(struct pci_dev *pdev,
 	}
 
 	vmci_dev->dev = &pdev->dev;
-	vmci_dev->exclusive_vectors = false;
 	vmci_dev->iobase = iobase;
 
 	tasklet_init(&vmci_dev->datagram_tasklet,
@@ -564,16 +563,11 @@ static int vmci_guest_probe_device(struct pci_dev *pdev,
 	 * Enable interrupts.  Try MSI-X first, then MSI, and then fallback on
 	 * legacy interrupts.
 	 */
-	error = pci_alloc_irq_vectors(pdev, VMCI_MAX_INTRS, VMCI_MAX_INTRS,
-			PCI_IRQ_MSIX);
-	if (error) {
-		error = pci_alloc_irq_vectors(pdev, 1, 1,
-				PCI_IRQ_MSIX | PCI_IRQ_MSI | PCI_IRQ_LEGACY);
-		if (error)
-			goto err_remove_bitmap;
-	} else {
-		vmci_dev->exclusive_vectors = true;
-	}
+	error = pci_alloc_irq_vectors(pdev, 1, VMCI_MAX_INTRS,
+			PCI_IRQ_MSIX | PCI_IRQ_MSI | PCI_IRQ_LEGACY);
+	if (error < 0)
+		goto err_remove_bitmap;
+	vmci_dev->exclusive_vectors = error == VMCI_MAX_INTRS;
 
 	/*
 	 * Request IRQ for legacy or MSI interrupts, or for first
