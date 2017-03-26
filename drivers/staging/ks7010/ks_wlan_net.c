@@ -1830,18 +1830,17 @@ static int ks_wlan_set_encode_ext(struct net_device *dev,
 		if (enc->key_len == 32) {
 			memcpy(&priv->wpa.key[index].key_val[0],
 			       &enc->key[0], enc->key_len - 16);
-			priv->wpa.key[index].key_len =
-				enc->key_len - 16;
+			priv->wpa.key[index].key_len = enc->key_len - 16;
 			if (priv->wpa.key_mgmt_suite == 4) {	/* WPA_NONE */
-				memcpy(&priv->wpa.key[index].
-				       tx_mic_key[0], &enc->key[16], 8);
-				memcpy(&priv->wpa.key[index].
-				       rx_mic_key[0], &enc->key[16], 8);
+				memcpy(&priv->wpa.key[index].tx_mic_key[0],
+				       &enc->key[16], 8);
+				memcpy(&priv->wpa.key[index].rx_mic_key[0],
+				       &enc->key[16], 8);
 			} else {
-				memcpy(&priv->wpa.key[index].
-				       tx_mic_key[0], &enc->key[16], 8);
-				memcpy(&priv->wpa.key[index].
-				       rx_mic_key[0], &enc->key[24], 8);
+				memcpy(&priv->wpa.key[index].tx_mic_key[0],
+				       &enc->key[16], 8);
+				memcpy(&priv->wpa.key[index].rx_mic_key[0],
+				       &enc->key[24], 8);
 			}
 			commit |= (SME_WEP_VAL1 << index);
 		}
