@@ -5899,10 +5899,11 @@ EXPORT_SYMBOL_GPL(qeth_core_get_drvinfo);
 /* Autoneg and full-duplex are supported and advertized uncondionally.	     */
 /* Always advertize and support all speeds up to specified, and only one     */
 /* specified port type.							     */
-static void qeth_set_ecmd_adv_sup(struct ethtool_cmd *ecmd,
+static void qeth_set_ecmd_adv_sup(struct ethtool_link_ksettings *ecmd,
 				int maxspeed, int porttype)
 {
 	int port_sup, port_adv, spd_sup, spd_adv;
+	u32 supported, advertising;
 
 	switch (porttype) {
 	case PORT_TP:
@@ -5944,12 +5945,17 @@ static void qeth_set_ecmd_adv_sup(struct ethtool_cmd *ecmd,
 		spd_adv = ADVERTISED_10baseT_Half | ADVERTISED_10baseT_Full;
 		WARN_ON_ONCE(1);
 	}
-	ecmd->advertising = ADVERTISED_Autoneg | port_adv | spd_adv;
-	ecmd->supported = SUPPORTED_Autoneg | port_sup | spd_sup;
+	advertising = ADVERTISED_Autoneg | port_adv | spd_adv;
+	supported = SUPPORTED_Autoneg | port_sup | spd_sup;
+
+	ethtool_convert_legacy_u32_to_link_mode(ecmd->link_modes.supported,
+						supported);
+	ethtool_convert_legacy_u32_to_link_mode(ecmd->link_modes.advertising,
+						advertising);
 }
 
-int qeth_core_ethtool_get_settings(struct net_device *netdev,
-					struct ethtool_cmd *ecmd)
+int qeth_core_ethtool_get_link_ksettings(struct net_device *netdev,
+					 struct ethtool_link_ksettings *ecmd)
 {
 	struct qeth_card *card = netdev->ml_priv;
 	enum qeth_link_types link_type;
@@ -5962,37 +5968,36 @@ int qeth_core_ethtool_get_settings(struct net_device *netdev,
 	else
 		link_type = card->info.link_type;
 
-	ecmd->transceiver = XCVR_INTERNAL;
-	ecmd->duplex = DUPLEX_FULL;
-	ecmd->autoneg = AUTONEG_ENABLE;
+	ecmd->base.duplex = DUPLEX_FULL;
+	ecmd->base.autoneg = AUTONEG_ENABLE;
 
 	switch (link_type) {
 	case QETH_LINK_TYPE_FAST_ETH:
 	case QETH_LINK_TYPE_LANE_ETH100:
 		qeth_set_ecmd_adv_sup(ecmd, SPEED_100, PORT_TP);
 		speed = SPEED_100;
-		ecmd->port = PORT_TP;
+		ecmd->base.port = PORT_TP;
 		break;
 
 	case QETH_LINK_TYPE_GBIT_ETH:
 	case QETH_LINK_TYPE_LANE_ETH1000:
 		qeth_set_ecmd_adv_sup(ecmd, SPEED_1000, PORT_FIBRE);
 		speed = SPEED_1000;
-		ecmd->port = PORT_FIBRE;
+		ecmd->base.port = PORT_FIBRE;
 		break;
 
 	case QETH_LINK_TYPE_10GBIT_ETH:
 		qeth_set_ecmd_adv_sup(ecmd, SPEED_10000, PORT_FIBRE);
 		speed = SPEED_10000;
-		ecmd->port = PORT_FIBRE;
+		ecmd->base.port = PORT_FIBRE;
 		break;
 
 	default:
 		qeth_set_ecmd_adv_sup(ecmd, SPEED_10, PORT_TP);
 		speed = SPEED_10;
-		ecmd->port = PORT_TP;
+		ecmd->base.port = PORT_TP;
 	}
-	ethtool_cmd_speed_set(ecmd, speed);
+	ecmd->base.speed = speed;
 
 	/* Check if we can obtain more accurate information.	 */
 	/* If QUERY_CARD_INFO command is not supported or fails, */
@@ -6018,26 +6023,26 @@ int qeth_core_ethtool_get_settings(struct net_device *netdev,
 	case CARD_INFO_TYPE_1G_COPPER_A:
 	case CARD_INFO_TYPE_1G_COPPER_B:
 		qeth_set_ecmd_adv_sup(ecmd, SPEED_1000, PORT_TP);
-		ecmd->port = PORT_TP;
+		ecmd->base.port = PORT_TP;
 		break;
 	case CARD_INFO_TYPE_1G_FIBRE_A:
 	case CARD_INFO_TYPE_1G_FIBRE_B:
 		qeth_set_ecmd_adv_sup(ecmd, SPEED_1000, PORT_FIBRE);
-		ecmd->port = PORT_FIBRE;
+		ecmd->base.port = PORT_FIBRE;
 		break;
 	case CARD_INFO_TYPE_10G_FIBRE_A:
 	case CARD_INFO_TYPE_10G_FIBRE_B:
 		qeth_set_ecmd_adv_sup(ecmd, SPEED_10000, PORT_FIBRE);
-		ecmd->port = PORT_FIBRE;
+		ecmd->base.port = PORT_FIBRE;
 		break;
 	}
 
 	switch (carrier_info.port_mode) {
 	case CARD_INFO_PORTM_FULLDUPLEX:
-		ecmd->duplex = DUPLEX_FULL;
+		ecmd->base.duplex = DUPLEX_FULL;
 		break;
 	case CARD_INFO_PORTM_HALFDUPLEX:
-		ecmd->duplex = DUPLEX_HALF;
+		ecmd->base.duplex = DUPLEX_HALF;
 		break;
 	}
 
@@ -6055,11 +6060,11 @@ int qeth_core_ethtool_get_settings(struct net_device *netdev,
 		speed = SPEED_10000;
 		break;
 	}
-	ethtool_cmd_speed_set(ecmd, speed);
+	ecmd->base.speed = speed;
 
 	return 0;
 }
-EXPORT_SYMBOL_GPL(qeth_core_ethtool_get_settings);
+EXPORT_SYMBOL_GPL(qeth_core_ethtool_get_link_ksettings);
 
 /* Callback to handle checksum offload command reply from OSA card.
  * Verify that required features have been enabled on the card.
