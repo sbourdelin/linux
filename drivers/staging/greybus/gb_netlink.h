@@ -29,6 +29,7 @@ enum {
 enum {
 	GB_NL_C_UNSPEC,
 	GB_NL_C_MSG,
+	GB_NL_C_HD_RESET,
 	__GB_NL_C_MAX,
 };
 
