@@ -990,19 +990,13 @@ static int aaci_probe(struct amba_device *dev,
 	struct aaci *aaci;
 	int ret, i;
 
-	ret = amba_request_regions(dev, NULL);
-	if (ret)
-		return ret;
-
 	aaci = aaci_init_card(dev);
-	if (!aaci) {
-		ret = -ENOMEM;
-		goto out;
-	}
+	if (!aaci)
+		return -ENOMEM;
 
-	aaci->base = ioremap(dev->res.start, resource_size(&dev->res));
-	if (!aaci->base) {
-		ret = -ENOMEM;
+	aaci->base = devm_ioremap_resource(&dev->dev, &dev->res);
+	if (IS_ERR(aaci->base)) {
+		ret = PTR_ERR(aaci->base);
 		goto out;
 	}
 
@@ -1064,9 +1058,7 @@ static int aaci_probe(struct amba_device *dev,
 	}
 
  out:
-	if (aaci)
-		snd_card_free(aaci->card);
-	amba_release_regions(dev);
+	snd_card_free(aaci->card);
 	return ret;
 }
 
@@ -1079,7 +1071,6 @@ static int aaci_remove(struct amba_device *dev)
 		writel(0, aaci->base + AACI_MAINCR);
 
 		snd_card_free(card);
-		amba_release_regions(dev);
 	}
 
 	return 0;
