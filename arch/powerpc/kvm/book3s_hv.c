@@ -3913,6 +3913,10 @@ static int kvmppc_radix_possible(void)
 static int kvmppc_book3s_init_hv(void)
 {
 	int r;
+#ifdef CONFIG_SMP
+	unsigned long xics_phys;
+#endif
+
 	/*
 	 * FIXME!! Do we need to check on all cpus ?
 	 */
@@ -3930,7 +3934,11 @@ static int kvmppc_book3s_init_hv(void)
 	 * indirectly, via OPAL.
 	 */
 #ifdef CONFIG_SMP
-	if (!get_paca()->kvm_hstate.xics_phys) {
+	preempt_disable();
+	xics_phys = get_paca()->kvm_hstate.xics_phys;
+	preempt_enable();
+
+	if (!xics_phys) {
 		struct device_node *np;
 
 		np = of_find_compatible_node(NULL, NULL, "ibm,opal-intc");
