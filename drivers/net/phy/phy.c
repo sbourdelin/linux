@@ -1251,7 +1251,7 @@ int phy_init_eee(struct phy_device *phydev, bool clk_stop_enable)
 		if (!phy_check_valid(phydev->speed, phydev->duplex, lp & adv))
 			goto eee_exit_err;
 
-		if (clk_stop_enable) {
+		if (clk_stop_enable && phydev->clk_stop_cap) {
 			/* Configure the PHY to stop receiving xMII
 			 * clock while it is signaling LPI.
 			 */
