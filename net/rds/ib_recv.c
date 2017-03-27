@@ -1023,7 +1023,6 @@ int rds_ib_recv_path(struct rds_conn_path *cp)
 {
 	struct rds_connection *conn = cp->cp_conn;
 	struct rds_ib_connection *ic = conn->c_transport_data;
-	int ret = 0;
 
 	rdsdebug("conn %p\n", conn);
 	if (rds_conn_up(conn)) {
@@ -1031,7 +1030,7 @@ int rds_ib_recv_path(struct rds_conn_path *cp)
 		rds_ib_recv_refill(conn, 0, GFP_KERNEL);
 	}
 
-	return ret;
+	return 0;
 }
 
 int rds_ib_recv_init(void)
