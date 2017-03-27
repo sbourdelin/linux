@@ -220,11 +220,11 @@ static int write_target_freq_to_hw(struct atomisp_device *isp,
 			timeout--;
 		}
 
-		if (timeout != 0)
+		if (!(isp_sspm1 & ISP_FREQ_VALID_MASK))
 			break;
 	}
 
-	if (timeout == 0) {
+	if (isp_sspm1 & ISP_FREQ_VALID_MASK) {
 		dev_err(isp->dev, "DFS failed due to HW error.\n");
 		return -EINVAL;
 	}
@@ -238,7 +238,7 @@ static int write_target_freq_to_hw(struct atomisp_device *isp,
 		udelay(100);
 		timeout--;
 	}
-	if (timeout == 0) {
+	if ((isp_sspm1 >> ISP_FREQ_STAT_OFFSET) != ratio) {
 		dev_err(isp->dev, "DFS target freq is rejected by HW.\n");
 		return -EINVAL;
 	}
