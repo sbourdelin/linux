@@ -37,8 +37,13 @@ __exynos_iommu_release_mapping(struct exynos_drm_private *priv)
 static inline int __exynos_iommu_attach(struct exynos_drm_private *priv,
 					struct device *dev)
 {
-	if (dev->archdata.mapping)
+	struct dma_iommu_mapping *mapping = to_dma_iommu_mapping(dev);
+
+	/* release device from the default DMA-IOMMU mapping */
+	if (mapping) {
 		arm_iommu_detach_device(dev);
+		arm_iommu_release_mapping(mapping);
+	}
 
 	return arm_iommu_attach_device(dev, priv->mapping);
 }
