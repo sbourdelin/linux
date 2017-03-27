@@ -534,7 +534,7 @@ err_release_host:
 
 static void ks_sdio_interrupt(struct sdio_func *func)
 {
-	int retval;
+	int ret;
 	struct ks_sdio_card *card;
 	struct ks_wlan_private *priv;
 	unsigned char status, rsize, rw_data;
@@ -544,11 +544,10 @@ static void ks_sdio_interrupt(struct sdio_func *func)
 	DPRINTK(4, "\n");
 
 	if (priv->dev_state >= DEVICE_STATE_BOOT) {
-		retval =
-		    ks7010_sdio_read(priv, INT_PENDING, &status,
-				     sizeof(status));
-		if (retval) {
-			DPRINTK(1, "read INT_PENDING Failed!!(%d)\n", retval);
+		ret = ks7010_sdio_read(priv, INT_PENDING, &status,
+				       sizeof(status));
+		if (ret) {
+			DPRINTK(1, "read INT_PENDING Failed!!(%d)\n", ret);
 			goto queue_delayed_work;
 		}
 		DPRINTK(4, "INT_PENDING=%02X\n", rw_data);
@@ -560,10 +559,9 @@ static void ks_sdio_interrupt(struct sdio_func *func)
 		/* bit2 -> Read Status Busy  */
 		if (status & INT_GCR_B ||
 		    atomic_read(&priv->psstatus.status) == PS_SNOOZE) {
-			retval =
-			    ks7010_sdio_read(priv, GCR_B, &rw_data,
-					     sizeof(rw_data));
-			if (retval) {
+			ret = ks7010_sdio_read(priv, GCR_B, &rw_data,
+					       sizeof(rw_data));
+			if (ret) {
 				DPRINTK(1, " error : GCR_B=%02X\n", rw_data);
 				goto queue_delayed_work;
 			}
@@ -581,10 +579,9 @@ static void ks_sdio_interrupt(struct sdio_func *func)
 
 		do {
 			/* read (WriteStatus/ReadDataSize FN1:00_0014) */
-			retval =
-			    ks7010_sdio_read(priv, WSTATUS_RSIZE, &rw_data,
-					     sizeof(rw_data));
-			if (retval) {
+			ret = ks7010_sdio_read(priv, WSTATUS_RSIZE, &rw_data,
+					       sizeof(rw_data));
+			if (ret) {
 				DPRINTK(1, " error : WSTATUS_RSIZE=%02X\n",
 					rw_data);
 				goto queue_delayed_work;
