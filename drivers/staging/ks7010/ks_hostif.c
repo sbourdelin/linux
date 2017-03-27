@@ -1128,13 +1128,6 @@ int hostif_data_request(struct ks_wlan_private *priv, struct sk_buff *skb)
 	int ret;
 	int no_key;
 
-	skb_len = skb->len;
-	if (skb_len > ETH_FRAME_LEN) {
-		DPRINTK(1, "bad length skb_len=%d\n", skb_len);
-		ret = -EOVERFLOW;
-		goto err_kfree_skb;
-	}
-
 	if (((priv->connect_status & CONNECT_STATUS_MASK) == DISCONNECT_STATUS) ||
 	    (priv->connect_status & FORCE_DISCONNECT) ||
 	    priv->wpa.mic_failure.stop) {
@@ -1145,6 +1138,13 @@ int hostif_data_request(struct ks_wlan_private *priv, struct sk_buff *skb)
 			dev_kfree_skb(skb);
 
 		return 0;
+	}
+
+	skb_len = skb->len;
+	if (skb_len > ETH_FRAME_LEN) {
+		DPRINTK(1, "bad length skb_len=%d\n", skb_len);
+		ret = -EOVERFLOW;
+		goto err_kfree_skb;
 	}
 
 	/* for PowerSave */
