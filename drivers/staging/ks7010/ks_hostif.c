@@ -1154,7 +1154,7 @@ int hostif_data_request(struct ks_wlan_private *priv, struct sk_buff *skb)
 	}
 
 	DPRINTK(4, "skb_buff length=%d\n", skb_len);
-	pp = kmalloc(hif_align_size(sizeof(*pp) + 6 + skb_len + MICHAEL_MIC_LEN),
+	pp = kmalloc(hif_align_size(sizeof(*pp) + ETH_ALEN + skb_len + MICHAEL_MIC_LEN),
 		     KS_WLAN_MEM_FLAG);
 
 	if (!pp) {
