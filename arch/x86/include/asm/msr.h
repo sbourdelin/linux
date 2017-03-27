@@ -25,6 +25,7 @@ struct msr_info {
 	struct msr reg;
 	struct msr *msrs;
 	int err;
+	u8 bit;
 };
 
 struct msr_regs_info {
@@ -289,6 +290,10 @@ int msr_set_bit(u32 msr, u8 bit);
 int msr_clear_bit(u32 msr, u8 bit);
 
 #ifdef CONFIG_SMP
+int msr_set_bit_on_cpu(unsigned int cpu, u32 msr, u8 bit);
+int msr_clear_bit_on_cpu(unsigned int cpu, u32 msr, u8 bit);
+void msr_set_bit_on_cpus(const struct cpumask *mask, u32 msr, u8 bit);
+void msr_clear_bit_on_cpus(const struct cpumask *mask, u32 msr, u8 bit);
 int rdmsr_on_cpu(unsigned int cpu, u32 msr_no, u32 *l, u32 *h);
 int wrmsr_on_cpu(unsigned int cpu, u32 msr_no, u32 l, u32 h);
 int rdmsrl_on_cpu(unsigned int cpu, u32 msr_no, u64 *q);
@@ -302,6 +307,26 @@ int wrmsrl_safe_on_cpu(unsigned int cpu, u32 msr_no, u64 q);
 int rdmsr_safe_regs_on_cpu(unsigned int cpu, u32 regs[8]);
 int wrmsr_safe_regs_on_cpu(unsigned int cpu, u32 regs[8]);
 #else  /*  CONFIG_SMP  */
+static inline int msr_set_bit_on_cpu(unsigned int cpu, u32 msr, u8 bit)
+{
+	return msr_set_bit(msr, bit);
+}
+
+static inline int msr_clear_bit_on_cpu(unsigned int cpu, u32 msr, u8 bit)
+{
+	return msr_clear_bit(msr, bit);
+}
+
+static inline void msr_set_bit_on_cpus(const struct cpumask *mask, u32 msr, u8 bit)
+{
+	msr_set_bit(msr, bit);
+}
+
+static inline void msr_clear_bit_on_cpus(const struct cpumask *mask, u32 msr, u8 bit)
+{
+	msr_clear_bit(msr, bit);
+}
+
 static inline int rdmsr_on_cpu(unsigned int cpu, u32 msr_no, u32 *l, u32 *h)
 {
 	rdmsr(msr_no, *l, *h);

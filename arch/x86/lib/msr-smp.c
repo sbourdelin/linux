@@ -3,6 +3,82 @@
 #include <linux/smp.h>
 #include <asm/msr.h>
 
+static void __msr_set_bit_on_cpu(void *info)
+{
+	struct msr_info *bit_info = info;
+
+	msr_set_bit(bit_info->msr_no, bit_info->bit);
+}
+
+static void __msr_clear_bit_on_cpu(void *info)
+{
+	struct msr_info *bit_info = info;
+
+	msr_clear_bit(bit_info->msr_no, bit_info->bit);
+}
+
+int msr_set_bit_on_cpu(unsigned int cpu, u32 msr, u8 bit)
+{
+	struct msr_info info;
+	int err;
+
+	info.msr_no = msr;
+	info.bit = bit;
+
+	err = smp_call_function_single(cpu, __msr_set_bit_on_cpu, &info, 1);
+
+	return err;
+}
+EXPORT_SYMBOL(msr_set_bit_on_cpu);
+
+int msr_clear_bit_on_cpu(unsigned int cpu, u32 msr, u8 bit)
+{
+	struct msr_info info;
+	int err;
+
+	info.msr_no = msr;
+	info.bit = bit;
+
+	err = smp_call_function_single(cpu, __msr_clear_bit_on_cpu, &info, 1);
+
+	return err;
+}
+EXPORT_SYMBOL(msr_clear_bit_on_cpu);
+
+void msr_set_bit_on_cpus(const struct cpumask *mask, u32 msr, u8 bit)
+{
+	struct msr_info info;
+	int this_cpu;
+
+	info.msr_no = msr;
+	info.bit = bit;
+
+	this_cpu = get_cpu();
+	if (cpumask_test_cpu(this_cpu, mask))
+		__msr_set_bit_on_cpu(&info);
+
+	smp_call_function_many(mask, __msr_set_bit_on_cpu, &info, 1);
+	put_cpu();
+}
+EXPORT_SYMBOL(msr_set_bit_on_cpus);
+
+void msr_clear_bit_on_cpus(const struct cpumask *mask, u32 msr, u8 bit)
+{
+	struct msr_info info;
+	int this_cpu;
+
+	info.msr_no = msr;
+	info.bit = bit;
+
+	this_cpu = get_cpu();
+	if (cpumask_test_cpu(this_cpu, mask))
+		__msr_clear_bit_on_cpu(&info);
+
+	smp_call_function_many(mask, __msr_clear_bit_on_cpu, &info, 1);
+	put_cpu();
+}
+EXPORT_SYMBOL(msr_clear_bit_on_cpus);
+
 static void __rdmsr_on_cpu(void *info)
 {
 	struct msr_info *rv = info;
