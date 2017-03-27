@@ -4134,7 +4134,7 @@ static struct file *__shmem_file_setup(const char *name, loff_t size,
 				       unsigned long flags, unsigned int i_flags)
 {
 	struct file *res;
-	struct inode *inode;
+	struct inode *inode = NULL;
 	struct path path;
 	struct super_block *sb;
 	struct qstr this;
@@ -4162,7 +4162,7 @@ static struct file *__shmem_file_setup(const char *name, loff_t size,
 	res = ERR_PTR(-ENOSPC);
 	inode = shmem_get_inode(sb, NULL, S_IFREG | S_IRWXUGO, 0, flags);
 	if (!inode)
-		goto put_memory;
+		goto put_path;
 
 	inode->i_flags |= i_flags;
 	d_instantiate(path.dentry, inode);
@@ -4170,19 +4170,22 @@ static struct file *__shmem_file_setup(const char *name, loff_t size,
 	clear_nlink(inode);	/* It is unlinked */
 	res = ERR_PTR(ramfs_nommu_expand_for_mapping(inode, size));
 	if (IS_ERR(res))
-		goto put_path;
+		goto put_inode;
 
 	res = alloc_file(&path, FMODE_WRITE | FMODE_READ,
 		  &shmem_file_operations);
 	if (IS_ERR(res))
-		goto put_path;
+		goto put_inode;
 
 	return res;
 
-put_memory:
-	shmem_unacct_size(flags, size);
+put_inode:
+	iput(inode);
 put_path:
 	path_put(&path);
+put_memory:
+	if (!inode)
+		shmem_unacct_size(flags, size);
 	return res;
 }
 
