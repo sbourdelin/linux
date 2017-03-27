@@ -1,0 +1,37 @@
+GPIO Driver for XRA1403 16-BIT GPIO Expander With Reset Input from EXAR
+
+The XRA1403 is an 16-bit GPIO expander with an SPI interface. Features available:
+	- Individually programmable inputs:
+		- Internal pull-up resistors
+		- Polarity inversion
+		- Individual interrupt enable
+		- Rising edge and/or Falling edge interrupt
+		- Input filter
+	- Individually programmable outputs
+		- Output Level Control
+		- Output Three-State Control
+
+Properties
+----------
+Check documentation for SPI and GPIO controllers regarding properties needed to configure the node.
+
+	- compatible = "exar,xra1403".
+	- reg = SPI id of the device.
+	- gpio-controller: mark the node as gpio.
+
+Optional properties:
+-------------------
+	- reset-gpios: in case available used to control the device reset line.
+
+Example
+--------
+
+	gpioxra0: gpio@2 {
+		compatible = "exar,xra1403";
+		reg = <2>;
+		gpio-controller;
+		#gpio-cells = <2>;
+		reset-gpios = <&gpio3 6 GPIO_ACTIVE_LOW>;
+		spi-max-frequency = <1000000>;
+		status = "okay";
+	};
