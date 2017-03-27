@@ -569,10 +569,8 @@ static void ks_sdio_interrupt(struct sdio_func *func)
 		}
 		/* DPRINTK(1, "GCR_B=%02X\n", rw_data); */
 		if (rw_data == GCR_B_ACTIVE) {
-			if (atomic_read(&priv->psstatus.status) ==
-				PS_SNOOZE) {
-				atomic_set(&priv->psstatus.status,
-					   PS_WAKEUP);
+			if (atomic_read(&priv->psstatus.status) == PS_SNOOZE) {
+				atomic_set(&priv->psstatus.status, PS_WAKEUP);
 				priv->wakeup_count = 0;
 			}
 			complete(&priv->psstatus.wakeup_wait);
@@ -590,19 +588,15 @@ static void ks_sdio_interrupt(struct sdio_func *func)
 		}
 		DPRINTK(4, "WSTATUS_RSIZE=%02X\n", rw_data);
 		rsize = rw_data & RSIZE_MASK;
-		if (rsize != 0) {	/* Read schedule */
-			ks_wlan_hw_rx((void *)priv,
-				      (uint16_t)(rsize << 4));
-		}
+		if (rsize != 0)	/* Read schedule */
+			ks_wlan_hw_rx((void *)priv, (uint16_t)(rsize << 4));
+
 		if (rw_data & WSTATUS_MASK) {
 			if (atomic_read(&priv->psstatus.status) == PS_SNOOZE) {
 				if (cnt_txqbody(priv)) {
 					ks_wlan_hw_wakeup_request(priv);
-					queue_delayed_work
-						(priv->ks_wlan_hw.
-							ks7010sdio_wq,
-							&priv->ks_wlan_hw.
-							rw_wq, 1);
+					queue_delayed_work(priv->ks_wlan_hw.ks7010sdio_wq,
+							   &priv->ks_wlan_hw.rw_wq, 1);
 					return;
 				}
 			} else {
