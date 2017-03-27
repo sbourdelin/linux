@@ -43,6 +43,12 @@ See the top-level tools/testing/selftests/Makefile for the list of all
 possible targets.
 
 
+Building individual test case of a subset
+=========================================
+You could build the individual test case in subset if subset supported:
+  $  make -C tools/testing/selftests/x86 ldt_gdt_32
+
+
 Running the full range hotplug selftests
 ========================================
 

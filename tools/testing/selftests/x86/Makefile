@@ -17,8 +17,8 @@ TARGETS_C_64BIT_ALL := $(TARGETS_C_BOTHBITS) $(TARGETS_C_64BIT_ONLY)
 BINARIES_32 := $(TARGETS_C_32BIT_ALL:%=%_32)
 BINARIES_64 := $(TARGETS_C_64BIT_ALL:%=%_64)
 
-BINARIES_32 := $(patsubst %,$(OUTPUT)/%,$(BINARIES_32))
-BINARIES_64 := $(patsubst %,$(OUTPUT)/%,$(BINARIES_64))
+BINARIES_32_FULL_PATH := $(patsubst %,$(OUTPUT)/%,$(BINARIES_32))
+BINARIES_64_FULL_PATH := $(patsubst %,$(OUTPUT)/%,$(BINARIES_64))
 
 CFLAGS := -O2 -g -std=gnu99 -pthread -Wall
 
@@ -28,25 +28,29 @@ CAN_BUILD_X86_64 := $(shell ./check_cc.sh $(CC) trivial_64bit_program.c)
 
 ifeq ($(CAN_BUILD_I386),1)
 all: all_32
-TEST_PROGS += $(BINARIES_32)
+TEST_PROGS += $(BINARIES_32_FULL_PATH)
 endif
 
 ifeq ($(CAN_BUILD_X86_64),1)
 all: all_64
-TEST_PROGS += $(BINARIES_64)
+TEST_PROGS += $(BINARIES_64_FULL_PATH)
 endif
 
-all_32: $(BINARIES_32)
+all_32: $(BINARIES_32_FULL_PATH)
 
-all_64: $(BINARIES_64)
+all_64: $(BINARIES_64_FULL_PATH)
 
 clean:
-	$(RM) $(BINARIES_32) $(BINARIES_64)
+	$(RM) $(BINARIES_32_FULL_PATH) $(BINARIES_64_FULL_PATH)
 
-$(BINARIES_32): $(OUTPUT)/%_32: %.c
+$(BINARIES_32): %_32: $(OUTPUT)/%_32
+
+$(BINARIES_64): %_64: $(OUTPUT)/%_64
+
+$(BINARIES_32_FULL_PATH): $(OUTPUT)/%_32: %.c
 	$(CC) -m32 -o $@ $(CFLAGS) $(EXTRA_CFLAGS) $^ -lrt -ldl -lm
 
-$(BINARIES_64): $(OUTPUT)/%_64: %.c
+$(BINARIES_64_FULL_PATH): $(OUTPUT)/%_64: %.c
 	$(CC) -m64 -o $@ $(CFLAGS) $(EXTRA_CFLAGS) $^ -lrt -ldl
 
 # x86_64 users should be encouraged to install 32-bit libraries
@@ -77,3 +81,4 @@ $(OUTPUT)/test_syscall_vdso_32: thunks_32.S
 # state.
 $(OUTPUT)/check_initial_reg_state_32: CFLAGS += -Wl,-ereal_start -static
 $(OUTPUT)/check_initial_reg_state_64: CFLAGS += -Wl,-ereal_start -static
+
