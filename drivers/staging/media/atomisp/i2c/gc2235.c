@@ -55,7 +55,7 @@ static int gc2235_read_reg(struct i2c_client *client,
 		return -EINVAL;
 	}
 
-	memset(msg, 0 , sizeof(msg));
+	memset(msg, 0, sizeof(msg));
 
 	msg[0].addr = client->addr;
 	msg[0].flags = 0;
@@ -354,6 +354,7 @@ static long __gc2235_set_exposure(struct v4l2_subdev *sd, int coarse_itg,
 	u16 coarse_integration = (u16)coarse_itg;
 	int ret = 0;
 	u16 expo_coarse_h, expo_coarse_l, gain_val = 0xF0, gain_val2 = 0xF0;
+
 	expo_coarse_h = coarse_integration >> 8;
 	expo_coarse_l = coarse_integration & 0xff;
 
@@ -405,6 +406,7 @@ static long gc2235_s_exposure(struct v4l2_subdev *sd,
 	/* we should not accept the invalid value below. */
 	if (gain == 0) {
 		struct i2c_client *client = v4l2_get_subdevdata(sd);
+
 		v4l2_err(client, "%s: invalid value\n", __func__);
 		return -EINVAL;
 	}
@@ -746,12 +748,13 @@ static int startup(struct v4l2_subdev *sd)
 	struct gc2235_device *dev = to_gc2235_sensor(sd);
 	struct i2c_client *client = v4l2_get_subdevdata(sd);
 	int ret = 0;
+
 	if (is_init == 0) {
 		/* force gc2235 to do a reset in res change, otherwise it
-		* can not output normal after switching res. and it is not
-		* necessary for first time run up after power on, for the sack
-		* of performance
-		*/
+		 * can not output normal after switching res. and it is not
+		 * necessary for first time run up after power on, for the sack
+		 * of performance
+		 */
 		power_down(sd);
 		power_up(sd);
 		gc2235_write_reg_array(client, gc2235_init_settings);
@@ -880,6 +883,7 @@ static int gc2235_s_stream(struct v4l2_subdev *sd, int enable)
 	struct gc2235_device *dev = to_gc2235_sensor(sd);
 	struct i2c_client *client = v4l2_get_subdevdata(sd);
 	int ret;
+
 	mutex_lock(&dev->input_lock);
 
 	if (enable)
@@ -994,6 +998,7 @@ static int gc2235_s_parm(struct v4l2_subdev *sd,
 			struct v4l2_streamparm *param)
 {
 	struct gc2235_device *dev = to_gc2235_sensor(sd);
+
 	dev->run_mode = param->parm.capture.capturemode;
 
 	mutex_lock(&dev->input_lock);
@@ -1099,6 +1104,7 @@ static int gc2235_remove(struct i2c_client *client)
 {
 	struct v4l2_subdev *sd = i2c_get_clientdata(client);
 	struct gc2235_device *dev = to_gc2235_sensor(sd);
+
 	dev_dbg(&client->dev, "gc2235_remove...\n");
 
 	if (dev->platform_data->platform_deinit)
