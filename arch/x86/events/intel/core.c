@@ -3141,6 +3141,11 @@ static void intel_pmu_cpu_starting(int cpu)
 
 	cpuc->lbr_sel = NULL;
 
+	if (x86_pmu.attr_freeze_on_smi)
+		msr_set_bit_on_cpu(cpu, MSR_IA32_DEBUGCTLMSR, DEBUGCTLMSR_FREEZE_WHILE_SMM_BIT);
+	else
+		msr_clear_bit_on_cpu(cpu, MSR_IA32_DEBUGCTLMSR, DEBUGCTLMSR_FREEZE_WHILE_SMM_BIT);
+
 	if (!cpuc->shared_regs)
 		return;
 
@@ -3559,6 +3564,47 @@ static struct attribute *hsw_events_attrs[] = {
 	NULL
 };
 
+static ssize_t freeze_on_smi_show(struct device *cdev,
+				  struct device_attribute *attr,
+				  char *buf)
+{
+	return sprintf(buf, "%d\n", x86_pmu.attr_freeze_on_smi);
+}
+
+static ssize_t freeze_on_smi_store(struct device *cdev,
+				   struct device_attribute *attr,
+				   const char *buf, size_t count)
+{
+	unsigned long val;
+	ssize_t ret;
+
+	ret = kstrtoul(buf, 0, &val);
+	if (ret)
+		return ret;
+
+	if (val > 1)
+		return -EINVAL;
+
+	if (x86_pmu.attr_freeze_on_smi == val)
+		return count;
+
+	if (val)
+		msr_set_bit_on_cpus(cpu_possible_mask, MSR_IA32_DEBUGCTLMSR, DEBUGCTLMSR_FREEZE_WHILE_SMM_BIT);
+	else
+		msr_clear_bit_on_cpus(cpu_possible_mask, MSR_IA32_DEBUGCTLMSR, DEBUGCTLMSR_FREEZE_WHILE_SMM_BIT);
+
+	x86_pmu.attr_freeze_on_smi = val;
+
+	return count;
+}
+
+static DEVICE_ATTR_RW(freeze_on_smi);
+
+static struct attribute *intel_pmu_attrs[] = {
+	&dev_attr_freeze_on_smi.attr,
+	NULL,
+};
+
 __init int intel_pmu_init(void)
 {
 	union cpuid10_edx edx;
@@ -3605,6 +3651,8 @@ __init int intel_pmu_init(void)
 
 	x86_pmu.max_pebs_events		= min_t(unsigned, MAX_PEBS_EVENTS, x86_pmu.num_counters);
 
+
+	x86_pmu.attrs			= intel_pmu_attrs;
 	/*
 	 * Quirk: v2 perfmon does not report fixed-purpose events, so
 	 * assume at least 3 events, when not running in a hypervisor:
