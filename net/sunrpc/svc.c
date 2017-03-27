@@ -441,18 +441,13 @@ __svc_create(struct svc_program *prog, unsigned int bufsize, int npools,
 	serv->sv_ops = ops;
 	xdrsize = 0;
 	while (prog) {
-		prog->pg_lovers = prog->pg_nvers-1;
 		for (vers=0; vers<prog->pg_nvers ; vers++)
-			if (prog->pg_vers[vers]) {
-				prog->pg_hivers = vers;
-				if (prog->pg_lovers > vers)
-					prog->pg_lovers = vers;
-				if (prog->pg_vers[vers]->vs_xdrsize > xdrsize)
-					xdrsize = prog->pg_vers[vers]->vs_xdrsize;
-			}
+			if (prog->pg_vers[vers] &&
+			    prog->pg_vers[vers]->vs_xdrsize > xdrsize)
+				xdrsize = prog->pg_vers[vers]->vs_xdrsize;
 		prog = prog->pg_next;
 	}
-	serv->sv_xdrsize   = xdrsize;
+	serv->sv_xdrsize = xdrsize;
 	INIT_LIST_HEAD(&serv->sv_tempsocks);
 	INIT_LIST_HEAD(&serv->sv_permsocks);
 	init_timer(&serv->sv_temptimer);
@@ -1086,6 +1081,36 @@ void svc_printk(struct svc_rqst *rqstp, const char *fmt, ...)
 static __printf(2,3) void svc_printk(struct svc_rqst *rqstp, const char *fmt, ...) {}
 #endif
 
+static void
+svc_set_prog_mismatch(struct svc_rqst *rqstp, struct svc_program *prog,
+		      struct kvec *resv)
+{
+	unsigned int vers, hi = 0, lo = prog->pg_nvers - 1;
+	struct svc_version *versp;
+
+	for (vers = 0; vers < prog->pg_nvers ; vers++) {
+		versp = prog->pg_vers[vers];
+		if (!versp)
+			continue;
+
+		/*
+		 * Don't report this version if it needs congestion control
+		 * and the xprt doesn't provide it.
+		 */
+		if (versp->vs_need_cong_ctrl &&
+		    !test_bit(XPT_CONG_CTRL, &rqstp->rq_xprt->xpt_flags))
+			continue;
+
+		hi = vers;
+		if (lo > vers)
+			lo = vers;
+	}
+
+	svc_putnl(resv, RPC_PROG_MISMATCH);
+	svc_putnl(resv, lo);
+	svc_putnl(resv, hi);
+}
+
 /*
  * Common routine for processing the RPC request.
  */
@@ -1315,9 +1340,7 @@ err_bad_vers:
 		       vers, prog, progp->pg_name);
 
 	serv->sv_stats->rpcbadfmt++;
-	svc_putnl(resv, RPC_PROG_MISMATCH);
-	svc_putnl(resv, progp->pg_lovers);
-	svc_putnl(resv, progp->pg_hivers);
+	svc_set_prog_mismatch(rqstp, progp, resv);
 	goto sendit;
 
 err_bad_proc:
