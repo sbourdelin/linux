@@ -477,15 +477,12 @@ static int mmc_davinci_start_dma_transfer(struct mmc_davinci_host *host,
 	int mask = rw_threshold - 1;
 	int ret = 0;
 
-	host->sg_len = dma_map_sg(mmc_dev(host->mmc), data->sg, data->sg_len,
-				  mmc_get_dma_dir(data));
+	host->sg_len = mmc_dma_map_sg(mmc_dev(host->mmc), data);
 
 	/* no individual DMA segment should need a partial FIFO */
 	for (i = 0; i < host->sg_len; i++) {
 		if (sg_dma_len(data->sg + i) & mask) {
-			dma_unmap_sg(mmc_dev(host->mmc),
-				     data->sg, data->sg_len,
-				     mmc_get_dma_dir(data));
+			mmc_dma_unmap_sg(mmc_dev(host->mmc), data);
 			return -1;
 		}
 	}
@@ -797,8 +794,7 @@ mmc_davinci_xfer_done(struct mmc_davinci_host *host, struct mmc_data *data)
 	if (host->do_dma) {
 		davinci_abort_dma(host);
 
-		dma_unmap_sg(mmc_dev(host->mmc), data->sg, data->sg_len,
-			     mmc_get_dma_dir(data));
+		mmc_dma_unmap_sg(mmc_dev(host->mmc), data);
 		host->do_dma = false;
 	}
 	host->data_dir = DAVINCI_MMC_DATADIR_NONE;

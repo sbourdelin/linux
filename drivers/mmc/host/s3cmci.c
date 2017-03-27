@@ -1092,8 +1092,7 @@ static int s3cmci_prepare_dma(struct s3cmci_host *host, struct mmc_data *data)
 	else
 		conf.direction = DMA_MEM_TO_DEV;
 
-	dma_map_sg(mmc_dev(host->mmc), data->sg, data->sg_len,
-		   mmc_get_dma_dir(data));
+	mmc_dma_map_sg(mmc_dev(host->mmc), data);
 
 	dmaengine_slave_config(host->dma, &conf);
 	desc = dmaengine_prep_slave_sg(host->dma, data->sg, data->sg_len,
@@ -1109,8 +1108,7 @@ static int s3cmci_prepare_dma(struct s3cmci_host *host, struct mmc_data *data)
 	return 0;
 
 unmap_exit:
-	dma_unmap_sg(mmc_dev(host->mmc), data->sg, data->sg_len,
-		     mmc_get_dma_dir(data));
+	mmc_dma_unmap_sg(mmc_dev(host->mmc), data);
 	return -ENOMEM;
 }
 

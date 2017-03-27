@@ -952,9 +952,7 @@ static void atmci_pdc_cleanup(struct atmel_mci *host)
 	struct mmc_data         *data = host->data;
 
 	if (data)
-		dma_unmap_sg(&host->pdev->dev,
-				data->sg, data->sg_len,
-				mmc_get_dma_dir(data));
+		mmc_dma_unmap_sg(&host->pdev->dev, data);
 }
 
 /*
@@ -990,9 +988,7 @@ static void atmci_dma_cleanup(struct atmel_mci *host)
 	struct mmc_data                 *data = host->data;
 
 	if (data)
-		dma_unmap_sg(host->dma.chan->device->dev,
-				data->sg, data->sg_len,
-				mmc_get_dma_dir(data));
+		mmc_dma_unmap_sg(host->dma.chan->device->dev, data);
 }
 
 /*
@@ -1117,8 +1113,7 @@ atmci_prepare_data_pdc(struct atmel_mci *host, struct mmc_data *data)
 
 	/* Configure PDC */
 	host->data_size = data->blocks * data->blksz;
-	sg_len = dma_map_sg(&host->pdev->dev, data->sg, data->sg_len,
-			    mmc_get_dma_dir(data));
+	sg_len = mmc_dma_map_sg(&host->pdev->dev, data);
 
 	if ((!host->caps.has_rwproof)
 	    && (host->data->flags & MMC_DATA_WRITE)) {
@@ -1192,8 +1187,7 @@ atmci_prepare_data_dma(struct atmel_mci *host, struct mmc_data *data)
 		atmci_writel(host, ATMCI_DMA, ATMCI_DMA_CHKSIZE(maxburst) |
 			ATMCI_DMAEN);
 
-	sglen = dma_map_sg(chan->device->dev, data->sg,
-			data->sg_len, mmc_get_dma_dir(data));
+	sglen = mmc_dma_map_sg(chan->device->dev, data);
 
 	dmaengine_slave_config(chan, &host->dma_conf);
 	desc = dmaengine_prep_slave_sg(chan,
@@ -1208,8 +1202,7 @@ atmci_prepare_data_dma(struct atmel_mci *host, struct mmc_data *data)
 
 	return iflags;
 unmap_exit:
-	dma_unmap_sg(chan->device->dev, data->sg, data->sg_len,
-		     mmc_get_dma_dir(data));
+	mmc_dma_unmap_sg(chan->device->dev, data);
 	return -ENOMEM;
 }
 

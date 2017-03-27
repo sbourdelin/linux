@@ -475,8 +475,7 @@ static void msdc_prepare_data(struct msdc_host *host, struct mmc_request *mrq)
 
 	if (!(data->host_cookie & MSDC_PREPARE_FLAG)) {
 		data->host_cookie |= MSDC_PREPARE_FLAG;
-		data->sg_count = dma_map_sg(host->dev, data->sg, data->sg_len,
-					    mmc_get_dma_dir(data));
+		data->sg_count = mmc_dma_map_sg(host->dev, data);
 	}
 }
 
@@ -488,8 +487,7 @@ static void msdc_unprepare_data(struct msdc_host *host, struct mmc_request *mrq)
 		return;
 
 	if (data->host_cookie & MSDC_PREPARE_FLAG) {
-		dma_unmap_sg(host->dev, data->sg, data->sg_len,
-			     mmc_get_dma_dir(data));
+		mmc_dma_unmap_sg(host->dev, data);
 		data->host_cookie &= ~MSDC_PREPARE_FLAG;
 	}
 }

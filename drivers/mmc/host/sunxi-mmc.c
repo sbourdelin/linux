@@ -391,8 +391,7 @@ static int sunxi_mmc_map_dma(struct sunxi_mmc_host *host,
 	u32 i, dma_len;
 	struct scatterlist *sg;
 
-	dma_len = dma_map_sg(mmc_dev(host->mmc), data->sg, data->sg_len,
-			     mmc_get_dma_dir(data));
+	dma_len = mmc_dma_map_sg(mmc_dev(host->mmc), data);
 	if (dma_len == 0) {
 		dev_err(mmc_dev(host->mmc), "dma_map_sg failed\n");
 		return -ENOMEM;
@@ -542,8 +541,7 @@ static irqreturn_t sunxi_mmc_finalize_request(struct sunxi_mmc_host *host)
 		mmc_writel(host, REG_GCTRL, rval);
 		rval |= SDXC_FIFO_RESET;
 		mmc_writel(host, REG_GCTRL, rval);
-		dma_unmap_sg(mmc_dev(host->mmc), data->sg, data->sg_len,
-			     mmc_get_dma_dir(data));
+		mmc_dma_unmap_sg(mmc_dev(host->mmc), data);
 	}
 
 	mmc_writel(host, REG_RINTR, 0xffff);
@@ -1013,8 +1011,7 @@ static void sunxi_mmc_request(struct mmc_host *mmc, struct mmc_request *mrq)
 		spin_unlock_irqrestore(&host->lock, iflags);
 
 		if (data)
-			dma_unmap_sg(mmc_dev(mmc), data->sg, data->sg_len,
-				     mmc_get_dma_dir(data));
+			mmc_dma_unmap_sg(mmc_dev(mmc), data);
 
 		dev_err(mmc_dev(mmc), "request already pending\n");
 		mrq->cmd->error = -EBUSY;

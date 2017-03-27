@@ -1044,10 +1044,7 @@ static void omap_hsmmc_dma_cleanup(struct omap_hsmmc_host *host, int errno)
 		struct dma_chan *chan = omap_hsmmc_get_dma_chan(host, host->data);
 
 		dmaengine_terminate_all(chan);
-		dma_unmap_sg(chan->device->dev,
-			host->data->sg, host->data->sg_len,
-			mmc_get_dma_dir(host->data));
-
+		mmc_dma_unmap_sg(chan->device->dev, host->data);
 		host->data->host_cookie = 0;
 	}
 	host->data = NULL;
@@ -1339,9 +1336,7 @@ static void omap_hsmmc_dma_callback(void *param)
 	data = host->mrq->data;
 	chan = omap_hsmmc_get_dma_chan(host, data);
 	if (!data->host_cookie)
-		dma_unmap_sg(chan->device->dev,
-			     data->sg, data->sg_len,
-			     mmc_get_dma_dir(data));
+		mmc_dma_unmap_sg(chan->device->dev, data);
 
 	req_in_progress = host->req_in_progress;
 	host->dma_ch = -1;
@@ -1373,9 +1368,7 @@ static int omap_hsmmc_pre_dma_transfer(struct omap_hsmmc_host *host,
 
 	/* Check if next job is already prepared */
 	if (next || data->host_cookie != host->next_data.cookie) {
-		dma_len = dma_map_sg(chan->device->dev, data->sg, data->sg_len,
-				     mmc_get_dma_dir(data));
-
+		dma_len = mmc_dma_map_sg(chan->device->dev, data);
 	} else {
 		dma_len = host->next_data.dma_len;
 		host->next_data.dma_len = 0;
@@ -1559,8 +1552,7 @@ static void omap_hsmmc_post_req(struct mmc_host *mmc, struct mmc_request *mrq,
 	if (host->use_dma && data->host_cookie) {
 		struct dma_chan *c = omap_hsmmc_get_dma_chan(host, data);
 
-		dma_unmap_sg(c->device->dev, data->sg, data->sg_len,
-			     mmc_get_dma_dir(data));
+		mmc_dma_unmap_sg(c->device->dev, data);
 		data->host_cookie = 0;
 	}
 }

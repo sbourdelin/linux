@@ -404,17 +404,14 @@ static void
 mmc_omap_release_dma(struct mmc_omap_host *host, struct mmc_data *data,
 		     int abort)
 {
-	enum dma_data_direction dma_data_dir;
 	struct device *dev = mmc_dev(host->mmc);
 	struct dma_chan *c;
 
-	if (data->flags & MMC_DATA_WRITE) {
-		dma_data_dir = DMA_TO_DEVICE;
+	if (data->flags & MMC_DATA_WRITE)
 		c = host->dma_tx;
-	} else {
-		dma_data_dir = DMA_FROM_DEVICE;
+	else
 		c = host->dma_rx;
-	}
+
 	if (c) {
 		if (data->error) {
 			dmaengine_terminate_all(c);
@@ -423,7 +420,7 @@ mmc_omap_release_dma(struct mmc_omap_host *host, struct mmc_data *data,
 		}
 		dev = c->device->dev;
 	}
-	dma_unmap_sg(dev, data->sg, host->sg_len, dma_data_dir);
+	mmc_dma_unmap_sg(dev, data);
 }
 
 static void mmc_omap_send_stop_work(struct work_struct *work)
@@ -981,7 +978,6 @@ mmc_omap_prepare_data(struct mmc_omap_host *host, struct mmc_request *req)
 
 	host->sg_idx = 0;
 	if (use_dma) {
-		enum dma_data_direction dma_data_dir;
 		struct dma_async_tx_descriptor *tx;
 		struct dma_chan *c;
 		u32 burst, *bp;
@@ -1003,12 +999,10 @@ mmc_omap_prepare_data(struct mmc_omap_host *host, struct mmc_request *req)
 			c = host->dma_tx;
 			bp = &host->dma_tx_burst;
 			buf = 0x0f80 | (burst - 1) << 0;
-			dma_data_dir = DMA_TO_DEVICE;
 		} else {
 			c = host->dma_rx;
 			bp = &host->dma_rx_burst;
 			buf = 0x800f | (burst - 1) << 8;
-			dma_data_dir = DMA_FROM_DEVICE;
 		}
 
 		if (!c)
@@ -1033,8 +1027,7 @@ mmc_omap_prepare_data(struct mmc_omap_host *host, struct mmc_request *req)
 			*bp = burst;
 		}
 
-		host->sg_len = dma_map_sg(c->device->dev, data->sg, sg_len,
-					  dma_data_dir);
+		host->sg_len = mmc_dma_map_sg(c->device->dev, data);
 		if (host->sg_len == 0)
 			goto use_pio;
 

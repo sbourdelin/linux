@@ -522,8 +522,7 @@ static void mmci_dma_unmap(struct mmci_host *host, struct mmc_data *data)
 	else
 		chan = host->dma_tx_channel;
 
-	dma_unmap_sg(chan->device->dev, data->sg, data->sg_len,
-		     mmc_get_dma_dir(data));
+	mmc_dma_unmap_sg(chan->device->dev, data);
 }
 
 static void mmci_dma_finalize(struct mmci_host *host, struct mmc_data *data)
@@ -606,8 +605,7 @@ static int __mmci_dma_prep_data(struct mmci_host *host, struct mmc_data *data,
 		return -EINVAL;
 
 	device = chan->device;
-	nr_sg = dma_map_sg(device->dev, data->sg, data->sg_len,
-			   mmc_get_dma_dir(data));
+	nr_sg = mmc_dma_map_sg(device->dev, data);
 	if (nr_sg == 0)
 		return -EINVAL;
 
@@ -626,8 +624,7 @@ static int __mmci_dma_prep_data(struct mmci_host *host, struct mmc_data *data,
 	return 0;
 
  unmap_exit:
-	dma_unmap_sg(device->dev, data->sg, data->sg_len,
-		     mmc_get_dma_dir(data));
+	mmc_dma_unmap_sg(device->dev, data);
 	return -ENOMEM;
 }
 

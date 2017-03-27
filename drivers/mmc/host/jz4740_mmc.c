@@ -210,9 +210,8 @@ static void jz4740_mmc_dma_unmap(struct jz4740_mmc_host *host,
 				 struct mmc_data *data)
 {
 	struct dma_chan *chan = jz4740_mmc_get_dma_chan(host, data);
-	enum dma_data_direction dir = mmc_get_dma_dir(data);
 
-	dma_unmap_sg(chan->device->dev, data->sg, data->sg_len, dir);
+	mmc_dma_unmap_sg(chan->device->dev, data);
 }
 
 /* Prepares DMA data for current/next transfer, returns non-zero on failure */
@@ -222,7 +221,6 @@ static int jz4740_mmc_prepare_dma_data(struct jz4740_mmc_host *host,
 				       struct dma_chan *chan)
 {
 	struct jz4740_mmc_host_next *next_data = &host->next_data;
-	enum dma_data_direction dir = mmc_get_dma_dir(data);
 	int sg_len;
 
 	if (!next && data->host_cookie &&
@@ -237,11 +235,7 @@ static int jz4740_mmc_prepare_dma_data(struct jz4740_mmc_host *host,
 
 	/* Check if next job is already prepared */
 	if (next || data->host_cookie != host->next_data.cookie) {
-		sg_len = dma_map_sg(chan->device->dev,
-				    data->sg,
-				    data->sg_len,
-				    dir);
-
+		sg_len = mmc_dma_map_sg(chan->device->dev, data);
 	} else {
 		sg_len = next_data->sg_len;
 		next_data->sg_len = 0;

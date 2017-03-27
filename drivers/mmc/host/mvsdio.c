@@ -126,9 +126,7 @@ static int mvsd_setup_data(struct mvsd_host *host, struct mmc_data *data)
 	} else {
 		dma_addr_t phys_addr;
 
-		host->sg_frags = dma_map_sg(mmc_dev(host->mmc),
-					    data->sg, data->sg_len,
-					    mmc_get_dma_dir(data));
+		host->sg_frags = mmc_dma_map_sg(mmc_dev(host->mmc), data);
 		phys_addr = sg_dma_address(data->sg);
 		mvsd_write(MVSD_SYS_ADDR_LOW, (u32)phys_addr & 0xffff);
 		mvsd_write(MVSD_SYS_ADDR_HI,  (u32)phys_addr >> 16);
@@ -293,8 +291,7 @@ static u32 mvsd_finish_data(struct mvsd_host *host, struct mmc_data *data,
 		host->pio_ptr = NULL;
 		host->pio_size = 0;
 	} else {
-		dma_unmap_sg(mmc_dev(host->mmc), data->sg, host->sg_frags,
-			     mmc_get_dma_dir(data));
+		mmc_dma_unmap_sg(mmc_dev(host->mmc), data);
 	}
 
 	if (err_status & MVSD_ERR_DATA_TIMEOUT)

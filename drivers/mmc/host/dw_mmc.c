@@ -436,10 +436,7 @@ static void dw_mci_dma_cleanup(struct dw_mci *host)
 	struct mmc_data *data = host->data;
 
 	if (data && data->host_cookie == COOKIE_MAPPED) {
-		dma_unmap_sg(host->dev,
-			     data->sg,
-			     data->sg_len,
-			     mmc_get_dma_dir(data));
+		mmc_dma_unmap_sg(host->dev, data);
 		data->host_cookie = COOKIE_UNMAPPED;
 	}
 }
@@ -892,10 +889,7 @@ static int dw_mci_pre_dma_transfer(struct dw_mci *host,
 			return -EINVAL;
 	}
 
-	sg_len = dma_map_sg(host->dev,
-			    data->sg,
-			    data->sg_len,
-			    mmc_get_dma_dir(data));
+	sg_len = mmc_dma_map_sg(host->dev, data);
 	if (sg_len == 0)
 		return -EINVAL;
 
@@ -932,10 +926,7 @@ static void dw_mci_post_req(struct mmc_host *mmc,
 		return;
 
 	if (data->host_cookie != COOKIE_UNMAPPED)
-		dma_unmap_sg(slot->host->dev,
-			     data->sg,
-			     data->sg_len,
-			     mmc_get_dma_dir(data));
+		mmc_dma_unmap_sg(slot->host->dev, data);
 	data->host_cookie = COOKIE_UNMAPPED;
 }
 

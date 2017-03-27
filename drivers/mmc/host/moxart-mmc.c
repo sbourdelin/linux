@@ -272,9 +272,7 @@ static void moxart_transfer_dma(struct mmc_data *data, struct moxart_host *host)
 		dir_slave = DMA_DEV_TO_MEM;
 	}
 
-	len = dma_map_sg(dma_chan->device->dev, data->sg,
-			 data->sg_len, mmc_get_dma_dir(data));
-
+	len = mmc_dma_map_sg(dma_chan->device->dev, data);
 	if (len > 0) {
 		desc = dmaengine_prep_slave_sg(dma_chan, data->sg,
 					       len, dir_slave,
@@ -297,9 +295,7 @@ static void moxart_transfer_dma(struct mmc_data *data, struct moxart_host *host)
 	dma_time = wait_for_completion_interruptible_timeout(
 		   &host->dma_complete, host->timeout);
 
-	dma_unmap_sg(dma_chan->device->dev,
-		     data->sg, data->sg_len,
-		     mmc_get_dma_dir(data));
+	mmc_dma_unmap_sg(dma_chan->device->dev, data);
 }
 
 
