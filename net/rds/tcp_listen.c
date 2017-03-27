@@ -196,6 +196,7 @@ int rds_tcp_accept_one(struct socket *sock)
 rst_nsk:
 	/* reset the newly returned accept sock and bail */
 	kernel_sock_shutdown(new_sock, SHUT_RDWR);
+	rds_conn_destroy(conn);
 	ret = 0;
 out:
 	if (rs_tcp)
