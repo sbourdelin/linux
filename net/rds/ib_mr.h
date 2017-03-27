@@ -125,8 +125,6 @@ void rds_ib_mr_exit(void);
 void __rds_ib_teardown_mr(struct rds_ib_mr *);
 void rds_ib_teardown_mr(struct rds_ib_mr *);
 struct rds_ib_mr *rds_ib_alloc_fmr(struct rds_ib_device *, int);
-struct rds_ib_mr *rds_ib_reuse_mr(struct rds_ib_mr_pool *);
-int rds_ib_flush_mr_pool(struct rds_ib_mr_pool *, int, struct rds_ib_mr **);
 struct rds_ib_mr *rds_ib_reg_fmr(struct rds_ib_device *, struct scatterlist *,
 				 unsigned long, u32 *);
 struct rds_ib_mr *rds_ib_try_reuse_ibmr(struct rds_ib_mr_pool *);

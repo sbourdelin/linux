@@ -179,7 +179,7 @@ void rds_ib_get_mr_info(struct rds_ib_device *rds_ibdev, struct rds_info_rdma_co
 	iinfo->rdma_mr_size = pool_1m->fmr_attr.max_pages;
 }
 
-struct rds_ib_mr *rds_ib_reuse_mr(struct rds_ib_mr_pool *pool)
+static struct rds_ib_mr *rds_ib_reuse_mr(struct rds_ib_mr_pool *pool)
 {
 	struct rds_ib_mr *ibmr = NULL;
 	struct llist_node *ret;
@@ -336,8 +336,8 @@ static void list_to_llist_nodes(struct rds_ib_mr_pool *pool,
  * If the number of MRs allocated exceeds the limit, we also try
  * to free as many MRs as needed to get back to this limit.
  */
-int rds_ib_flush_mr_pool(struct rds_ib_mr_pool *pool,
-			 int free_all, struct rds_ib_mr **ibmr_ret)
+static void rds_ib_flush_mr_pool(struct rds_ib_mr_pool *pool,
+				 int free_all, struct rds_ib_mr **ibmr_ret)
 {
 	struct rds_ib_mr *ibmr;
 	struct llist_node *clean_nodes;
@@ -358,7 +358,7 @@ int rds_ib_flush_mr_pool(struct rds_ib_mr_pool *pool,
 			if (ibmr) {
 				*ibmr_ret = ibmr;
 				finish_wait(&pool->flush_wait, &wait);
-				goto out_nolock;
+				return;
 			}
 
 			prepare_to_wait(&pool->flush_wait, &wait,
@@ -370,7 +370,7 @@ int rds_ib_flush_mr_pool(struct rds_ib_mr_pool *pool,
 			if (ibmr) {
 				*ibmr_ret = ibmr;
 				finish_wait(&pool->flush_wait, &wait);
-				goto out_nolock;
+				return;
 			}
 		}
 		finish_wait(&pool->flush_wait, &wait);
@@ -433,8 +433,6 @@ out:
 	mutex_unlock(&pool->flush_lock);
 	if (waitqueue_active(&pool->flush_wait))
 		wake_up(&pool->flush_wait);
-out_nolock:
-	return 0;
 }
 
 struct rds_ib_mr *rds_ib_try_reuse_ibmr(struct rds_ib_mr_pool *pool)
