@@ -253,6 +253,8 @@ static int __rds_rdma_map(struct rds_sock *rs, struct rds_get_mr_args *args,
 	sg = kcalloc(nents, sizeof(*sg), GFP_KERNEL);
 	if (!sg) {
 		ret = -ENOMEM;
+		for (i = 0; i < nents; i++)
+			put_page(pages[i]);
 		goto out;
 	}
 	WARN_ON(!nents);
@@ -293,6 +295,11 @@ static int __rds_rdma_map(struct rds_sock *rs, struct rds_get_mr_args *args,
 		*cookie_ret = cookie;
 
 	if (args->cookie_addr && put_user(cookie, (u64 __user *)(unsigned long) args->cookie_addr)) {
+		for (i = 0; i < nents; i++)
+			put_page(sg_page(&sg[i]));
+		kfree(sg);
+		mr->r_trans->free_mr(mr->r_trans_private, 1);
+		mr->r_trans_private = NULL;
 		ret = -EFAULT;
 		goto out;
 	}
