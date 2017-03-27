@@ -837,6 +837,21 @@ static int phy_poll_reset(struct phy_device *phydev)
 	return 0;
 }
 
+static void phy_read_clock_stop_capable(struct phy_device *phydev)
+{
+	int ret;
+
+	/* Read if the PHY supports stopping its clocks (reg 3.1) */
+	ret = phy_read_mmd_indirect(phydev, MDIO_MMD_PCS, MDIO_STAT1,
+			            phydev->addr);
+	if (ret < 0)
+		return;
+
+	/* Do not make this fatal */
+	if (ret & MDIO_STAT1_CLOCK_STOP_CAPABLE)
+		phydev->clk_stop_cap = true;
+}
+
 int phy_init_hw(struct phy_device *phydev)
 {
 	int ret = 0;
@@ -856,7 +871,13 @@ int phy_init_hw(struct phy_device *phydev)
 	if (ret < 0)
 		return ret;
 
-	return phydev->drv->config_init(phydev);
+	ret = phydev->drv->config_init(phydev);
+	if (ret < 0)
+		return ret;
+
+	phy_read_clock_stop_capable(phydev);
+
+	return 0;
 }
 EXPORT_SYMBOL(phy_init_hw);
 
