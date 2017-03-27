@@ -60,6 +60,7 @@ struct bio {
 	struct cgroup_subsys_state *bi_css;
 #ifdef CONFIG_BLK_DEV_THROTTLING_LOW
 	void			*bi_cg_private;
+	u64			bi_throtl_stat;
 #endif
 #endif
 	union {

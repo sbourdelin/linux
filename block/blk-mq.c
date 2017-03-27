@@ -434,6 +434,8 @@ static void blk_mq_ipi_complete_request(struct request *rq)
 
 static void blk_mq_stat_add(struct request *rq)
 {
+	blk_throtl_finish_request(rq);
+
 	if (rq->rq_flags & RQF_STATS) {
 		blk_mq_poll_stats_start(rq->q);
 		blk_stat_add(rq);
@@ -486,6 +488,8 @@ void blk_mq_start_request(struct request *rq)
 	blk_mq_sched_started_request(rq);
 
 	trace_block_rq_issue(q, rq);
+
+	blk_throtl_start_request(rq);
 
 	if (test_bit(QUEUE_FLAG_STATS, &q->queue_flags)) {
 		blk_stat_set_issue_time(&rq->issue_stat);

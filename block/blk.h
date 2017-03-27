@@ -331,8 +331,12 @@ extern ssize_t blk_throtl_sample_time_show(struct request_queue *q, char *page);
 extern ssize_t blk_throtl_sample_time_store(struct request_queue *q,
 	const char *page, size_t count);
 extern void blk_throtl_bio_endio(struct bio *bio);
+extern void blk_throtl_start_request(struct request *rq);
+extern void blk_throtl_finish_request(struct request *rq);
 #else
 static inline void blk_throtl_bio_endio(struct bio *bio) { }
+static inline void blk_throtl_start_request(struct request *rq) { }
+static inline void blk_throtl_finish_request(struct request *rq) { }
 #endif
 
 #endif /* BLK_INTERNAL_H */

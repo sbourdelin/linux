@@ -204,6 +204,9 @@ struct request {
 	struct request_list *rl;		/* rl this rq is alloced from */
 	unsigned long long start_time_ns;
 	unsigned long long io_start_time_ns;    /* when passed to hardware */
+#ifdef CONFIG_BLK_DEV_THROTTLING_LOW
+	u64 throtl_stat;
+#endif
 #endif
 	/* Number of scatter-gather DMA addr+len pairs after
 	 * physical address coalescing is performed.

@@ -2482,6 +2482,8 @@ void blk_start_request(struct request *req)
 {
 	blk_dequeue_request(req);
 
+	blk_throtl_start_request(req);
+
 	if (test_bit(QUEUE_FLAG_STATS, &req->q->queue_flags)) {
 		blk_stat_set_issue_time(&req->issue_stat);
 		req->rq_flags |= RQF_STATS;
@@ -2702,6 +2704,8 @@ EXPORT_SYMBOL_GPL(blk_unprep_request);
 void blk_finish_request(struct request *req, int error)
 {
 	struct request_queue *q = req->q;
+
+	blk_throtl_finish_request(req);
 
 	if (req->rq_flags & RQF_STATS)
 		blk_stat_add(req);
