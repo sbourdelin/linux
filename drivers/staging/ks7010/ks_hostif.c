@@ -1147,8 +1147,8 @@ int hostif_data_request(struct ks_wlan_private *priv, struct sk_buff *skb)
 		goto err_kfree_skb;
 	}
 
-	/* for PowerSave */
-	if (atomic_read(&priv->psstatus.status) == PS_SNOOZE) {	/* power save wakeup */
+	/* power save wakeup */
+	if (atomic_read(&priv->psstatus.status) == PS_SNOOZE) {
 		if (!netif_queue_stopped(priv->net_dev))
 			netif_stop_queue(priv->net_dev);
 	}
@@ -1178,15 +1178,14 @@ int hostif_data_request(struct ks_wlan_private *priv, struct sk_buff *skb)
 	}
 
 	/* MAC address copy */
-	memcpy(p, buffer, ETH_ALEN * 2);	/* DST/SRC MAC address */
+	memcpy(p, buffer, ETH_ALEN * 2);
 	p += ETH_ALEN * 2;
 	buffer += ETH_ALEN * 2;
 	length -= ETH_ALEN * 2;
+
 	/* EtherType/Length check */
 	if (*(buffer + 1) + (*buffer << MICHAEL_MIC_LEN) > 1500) {
-		/* ProtocolEAP = *(buffer+1) + (*buffer << 8); */
-		/* DPRINTK(2, "Send [SNAP]Type %x\n",ProtocolEAP); */
-		/* SAP/CTL/OUI(6 byte) add */
+		/* SAP/CTL/OUI (6 bytes) add */
 		*p++ = 0xAA;	/* DSAP */
 		*p++ = 0xAA;	/* SSAP */
 		*p++ = 0x03;	/* CTL */
@@ -1196,7 +1195,6 @@ int hostif_data_request(struct ks_wlan_private *priv, struct sk_buff *skb)
 		skb_len += 6;
 	} else {
 		DPRINTK(4, "DIX\n");
-		/* Length(2 byte) delete */
 		buffer += 2;
 		length -= 2;
 		skb_len -= 2;
@@ -1227,7 +1225,7 @@ int hostif_data_request(struct ks_wlan_private *priv, struct sk_buff *skb)
 
 	if (priv->wpa.rsn_enabled && priv->wpa.key[0].key_len) {
 		if (eth_proto == ETHER_PROTOCOL_TYPE_EAP && no_key) {
-			pp->auth_type = cpu_to_le16((uint16_t)TYPE_AUTH);	/* no encryption */
+			pp->auth_type = cpu_to_le16((uint16_t)TYPE_AUTH);
 		} else {
 			if (priv->wpa.pairwise_suite == IW_AUTH_CIPHER_TKIP) {
 				MichaelMICFunction(&michael_mic,
