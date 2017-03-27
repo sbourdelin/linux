@@ -1127,6 +1127,7 @@ int hostif_data_request(struct ks_wlan_private *priv, struct sk_buff *skb)
 	struct ethhdr *eth;
 	int ret;
 	int no_key;
+	size_t size;
 
 	if (((priv->connect_status & CONNECT_STATUS_MASK) == DISCONNECT_STATUS) ||
 	    (priv->connect_status & FORCE_DISCONNECT) ||
@@ -1154,9 +1155,8 @@ int hostif_data_request(struct ks_wlan_private *priv, struct sk_buff *skb)
 	}
 
 	DPRINTK(4, "skb_buff length=%d\n", skb_len);
-	pp = kmalloc(hif_align_size(sizeof(*pp) + ETH_ALEN + skb_len + MICHAEL_MIC_LEN),
-		     KS_WLAN_MEM_FLAG);
-
+	size = sizeof(*pp) + ETH_ALEN + skb_len + MICHAEL_MIC_LEN;
+	pp = kmalloc(hif_align_size(size), KS_WLAN_MEM_FLAG);
 	if (!pp) {
 		DPRINTK(3, "allocate memory failed..\n");
 		ret = -ENOMEM;
@@ -1255,9 +1255,8 @@ int hostif_data_request(struct ks_wlan_private *priv, struct sk_buff *skb)
 	}
 
 	/* header value set */
-	pp->header.size =
-	    cpu_to_le16((uint16_t)
-			(sizeof(*pp) - sizeof(pp->header.size) + skb_len));
+	size = sizeof(*pp) - sizeof(pp->header.size) + skb_len;
+	pp->header.size = cpu_to_le16((uint16_t)size);
 	pp->header.event = cpu_to_le16((uint16_t)HIF_DATA_REQ);
 
 	/* tx request */
