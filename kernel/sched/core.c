@@ -5908,8 +5908,8 @@ void __init sched_init_smp(void)
 	mutex_unlock(&sched_domains_mutex);
 
 	/* Move init over to a non-isolated CPU */
-	if (set_cpus_allowed_ptr(current, non_isolated_cpus) < 0)
-		BUG();
+	BUG_ON(set_cpus_allowed_ptr(current, non_isolated_cpus) < 0);
+
 	sched_init_granularity();
 	free_cpumask_var(non_isolated_cpus);
 
