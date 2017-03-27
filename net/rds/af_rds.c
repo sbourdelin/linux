@@ -658,9 +658,7 @@ static int rds_init(void)
 	ret = rds_sysctl_init();
 	if (ret)
 		goto out_threads;
-	ret = rds_stats_init();
-	if (ret)
-		goto out_sysctl;
+	rds_stats_init();
 	ret = proto_register(&rds_proto, 1);
 	if (ret)
 		goto out_stats;
@@ -677,7 +675,6 @@ out_proto:
 	proto_unregister(&rds_proto);
 out_stats:
 	rds_stats_exit();
-out_sysctl:
 	rds_sysctl_exit();
 out_threads:
 	rds_threads_exit();
