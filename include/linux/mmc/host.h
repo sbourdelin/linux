@@ -17,7 +17,7 @@
 #include <linux/mmc/core.h>
 #include <linux/mmc/card.h>
 #include <linux/mmc/pm.h>
-#include <linux/dma-direction.h>
+#include <linux/dma-mapping.h>
 
 struct mmc_ios {
 	unsigned int	clock;			/* clock rate */
@@ -503,6 +503,16 @@ static inline bool mmc_can_retune(struct mmc_host *host)
 static inline enum dma_data_direction mmc_get_dma_dir(struct mmc_data *data)
 {
 	return data->flags & MMC_DATA_WRITE ? DMA_TO_DEVICE : DMA_FROM_DEVICE;
+}
+
+static inline int mmc_dma_map_sg(struct device *dev, struct mmc_data *data)
+{
+	return dma_map_sg(dev, data->sg, data->sg_len, mmc_get_dma_dir(data));
+}
+
+static inline void mmc_dma_unmap_sg(struct device *dev, struct mmc_data *data)
+{
+	dma_unmap_sg(dev, data->sg, data->sg_len, mmc_get_dma_dir(data));
 }
 
 int mmc_send_tuning(struct mmc_host *host, u32 opcode, int *cmd_error);
