@@ -259,6 +259,34 @@ static const struct file_operations ipoib_path_fops = {
 	.release = seq_release
 };
 
+void ipoib_debugfs_rename(struct net_device *dev)
+{
+	struct ipoib_dev_priv *priv = netdev_priv(dev);
+	char name[IFNAMSIZ + sizeof "_path"];
+
+	if (!ipoib_root)
+		return;
+
+	if (priv->mcg_dentry) {
+		snprintf(name, sizeof(name), "%s_mcg", dev->name);
+		priv->mcg_dentry = debugfs_rename(ipoib_root, priv->mcg_dentry,
+						  ipoib_root, name);
+		if (!priv->mcg_dentry)
+			ipoib_warn(priv, "failed to rename debug file %s to %s\n",
+				   priv->mcg_dentry->d_iname, name);
+	}
+
+	if (priv->path_dentry) {
+		snprintf(name, sizeof(name), "%s_path", dev->name);
+		priv->path_dentry = debugfs_rename(ipoib_root,
+						   priv->path_dentry,
+						   ipoib_root, name);
+		if (!priv->path_dentry)
+			ipoib_warn(priv, "failed to rename debug file %s to %s\n",
+				   priv->mcg_dentry->d_iname, name);
+	}
+}
+
 void ipoib_create_debug_files(struct net_device *dev)
 {
 	struct ipoib_dev_priv *priv = netdev_priv(dev);
