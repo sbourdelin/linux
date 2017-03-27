@@ -1178,10 +1178,10 @@ int hostif_data_request(struct ks_wlan_private *priv, struct sk_buff *skb)
 	}
 
 	/* MAC address copy */
-	memcpy(p, buffer, 12);	/* DST/SRC MAC address */
-	p += 12;
-	buffer += 12;
-	length -= 12;
+	memcpy(p, buffer, ETH_ALEN * 2);	/* DST/SRC MAC address */
+	p += ETH_ALEN * 2;
+	buffer += ETH_ALEN * 2;
+	length -= ETH_ALEN * 2;
 	/* EtherType/Length check */
 	if (*(buffer + 1) + (*buffer << MICHAEL_MIC_LEN) > 1500) {
 		/* ProtocolEAP = *(buffer+1) + (*buffer << 8); */
