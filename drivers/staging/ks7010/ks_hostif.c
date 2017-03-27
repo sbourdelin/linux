@@ -1126,6 +1126,7 @@ int hostif_data_request(struct ks_wlan_private *priv, struct sk_buff *skb)
 	struct wpa_eapol_key *eap_key;
 	struct ethhdr *eth;
 	int ret;
+	int no_key;
 
 	skb_len = skb->len;
 	if (skb_len > ETH_FRAME_LEN) {
@@ -1134,9 +1135,9 @@ int hostif_data_request(struct ks_wlan_private *priv, struct sk_buff *skb)
 		goto err_kfree_skb;
 	}
 
-	if (((priv->connect_status & CONNECT_STATUS_MASK) == DISCONNECT_STATUS)
-	    || (priv->connect_status & FORCE_DISCONNECT)
-	    || priv->wpa.mic_failure.stop) {
+	if (((priv->connect_status & CONNECT_STATUS_MASK) == DISCONNECT_STATUS) ||
+	    (priv->connect_status & FORCE_DISCONNECT) ||
+	    priv->wpa.mic_failure.stop) {
 		DPRINTK(3, " DISCONNECT\n");
 		if (netif_queue_stopped(priv->net_dev))
 			netif_wake_queue(priv->net_dev);
@@ -1211,8 +1212,8 @@ int hostif_data_request(struct ks_wlan_private *priv, struct sk_buff *skb)
 	eth_proto = ntohs(eth_hdr->h_proto);
 
 	/* for MIC FAILURE REPORT check */
-	if (eth_proto == ETHER_PROTOCOL_TYPE_EAP
-	    && priv->wpa.mic_failure.failure > 0) {
+	if (eth_proto == ETHER_PROTOCOL_TYPE_EAP &&
+	    priv->wpa.mic_failure.failure > 0) {
 		aa1x_hdr = (struct ieee802_1x_hdr *)(eth_hdr + 1);
 		if (aa1x_hdr->type == IEEE802_1X_TYPE_EAPOL_KEY) {
 			eap_key = (struct wpa_eapol_key *)(aa1x_hdr + 1);
@@ -1220,11 +1221,12 @@ int hostif_data_request(struct ks_wlan_private *priv, struct sk_buff *skb)
 		}
 	}
 
+	no_key = priv->wpa.key[1].key_len == 0 &&
+		priv->wpa.key[2].key_len == 0 &&
+		priv->wpa.key[3].key_len == 0;
+
 	if (priv->wpa.rsn_enabled && priv->wpa.key[0].key_len) {
-		if (eth_proto == ETHER_PROTOCOL_TYPE_EAP
-		    && !(priv->wpa.key[1].key_len)
-		    && !(priv->wpa.key[2].key_len)
-		    && !(priv->wpa.key[3].key_len)) {
+		if (eth_proto == ETHER_PROTOCOL_TYPE_EAP && no_key) {
 			pp->auth_type = cpu_to_le16((uint16_t)TYPE_AUTH);	/* no encryption */
 		} else {
 			if (priv->wpa.pairwise_suite == IW_AUTH_CIPHER_TKIP) {
@@ -1264,10 +1266,10 @@ int hostif_data_request(struct ks_wlan_private *priv, struct sk_buff *skb)
 			  (void *)skb);
 
 	/* MIC FAILURE REPORT check */
-	if (eth_proto == ETHER_PROTOCOL_TYPE_EAP
-	    && priv->wpa.mic_failure.failure > 0) {
-		if (keyinfo & WPA_KEY_INFO_ERROR
-		    && keyinfo & WPA_KEY_INFO_REQUEST) {
+	if (eth_proto == ETHER_PROTOCOL_TYPE_EAP &&
+	    priv->wpa.mic_failure.failure > 0) {
+		if (keyinfo & WPA_KEY_INFO_ERROR &&
+		    keyinfo & WPA_KEY_INFO_REQUEST) {
 			DPRINTK(3, " MIC ERROR Report SET : %04X\n", keyinfo);
 			hostif_sme_enqueue(priv, SME_MIC_FAILURE_REQUEST);
 		}
