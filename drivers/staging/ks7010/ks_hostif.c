@@ -1154,7 +1154,7 @@ int hostif_data_request(struct ks_wlan_private *priv, struct sk_buff *skb)
 	}
 
 	DPRINTK(4, "skb_buff length=%d\n", skb_len);
-	pp = kmalloc(hif_align_size(sizeof(*pp) + 6 + skb_len + 8),
+	pp = kmalloc(hif_align_size(sizeof(*pp) + 6 + skb_len + MICHAEL_MIC_LEN),
 		     KS_WLAN_MEM_FLAG);
 
 	if (!pp) {
@@ -1183,7 +1183,7 @@ int hostif_data_request(struct ks_wlan_private *priv, struct sk_buff *skb)
 	buffer += 12;
 	length -= 12;
 	/* EtherType/Length check */
-	if (*(buffer + 1) + (*buffer << 8) > 1500) {
+	if (*(buffer + 1) + (*buffer << MICHAEL_MIC_LEN) > 1500) {
 		/* ProtocolEAP = *(buffer+1) + (*buffer << 8); */
 		/* DPRINTK(2, "Send [SNAP]Type %x\n",ProtocolEAP); */
 		/* SAP/CTL/OUI(6 byte) add */
@@ -1236,10 +1236,10 @@ int hostif_data_request(struct ks_wlan_private *priv, struct sk_buff *skb)
 						   (int)skb_len,
 						   (uint8_t)0,	/* priority */
 						   (uint8_t *)michael_mic.Result);
-				memcpy(p, michael_mic.Result, 8);
-				length += 8;
-				skb_len += 8;
-				p += 8;
+				memcpy(p, michael_mic.Result, MICHAEL_MIC_LEN);
+				length += MICHAEL_MIC_LEN;
+				skb_len += MICHAEL_MIC_LEN;
+				p += MICHAEL_MIC_LEN;
 				pp->auth_type =
 				    cpu_to_le16((uint16_t)TYPE_DATA);
 

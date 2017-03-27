@@ -9,6 +9,8 @@
  *   published by the Free Software Foundation.
  */
 
+#define MICHAEL_MIC_LEN 8
+
 /* MichaelMIC routine define */
 struct michael_mic_t {
 	u32 K0;	// Key
