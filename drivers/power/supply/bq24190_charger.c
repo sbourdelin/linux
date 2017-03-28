@@ -1278,12 +1278,13 @@ static void bq24190_check_status(struct bq24190_dev_info *bdi)
 static irqreturn_t bq24190_irq_handler_thread(int irq, void *data)
 {
 	struct bq24190_dev_info *bdi = data;
-	int ret;
+	int error;
 
 	bdi->irq_event = true;
-	ret = pm_runtime_get_sync(bdi->dev);
-	if (ret < 0) {
-		dev_warn(bdi->dev, "pm_runtime_get failed: %i\n", ret);
+	error = pm_runtime_get_sync(bdi->dev);
+	if (error < 0) {
+		dev_warn(bdi->dev, "pm_runtime_get failed: %i\n", error);
+		pm_runtime_put_noidle(bdi->dev);
 		return IRQ_NONE;
 	}
 	bq24190_check_status(bdi);
@@ -1447,13 +1448,15 @@ static int bq24190_probe(struct i2c_client *client,
 	pm_runtime_use_autosuspend(dev);
 	pm_runtime_set_autosuspend_delay(dev, 600);
 	ret = pm_runtime_get_sync(dev);
-	if (ret < 0)
-		goto out1;
+	if (ret < 0) {
+		dev_err(dev, "pm_runtime_get failed: %i\n", ret);
+		goto out_pmrt;
+	}
 
 	ret = bq24190_hw_init(bdi);
 	if (ret < 0) {
 		dev_err(dev, "Hardware init failed\n");
-		goto out2;
+		goto out_pmrt;
 	}
 
 	charger_cfg.drv_data = bdi;
@@ -1464,7 +1467,7 @@ static int bq24190_probe(struct i2c_client *client,
 	if (IS_ERR(bdi->charger)) {
 		dev_err(dev, "Can't register charger\n");
 		ret = PTR_ERR(bdi->charger);
-		goto out2;
+		goto out_pmrt;
 	}
 
 	battery_cfg.drv_data = bdi;
@@ -1473,13 +1476,13 @@ static int bq24190_probe(struct i2c_client *client,
 	if (IS_ERR(bdi->battery)) {
 		dev_err(dev, "Can't register battery\n");
 		ret = PTR_ERR(bdi->battery);
-		goto out3;
+		goto out_charger;
 	}
 
 	ret = bq24190_sysfs_create_group(bdi);
 	if (ret) {
 		dev_err(dev, "Can't create sysfs entries\n");
-		goto out4;
+		goto out_battery;
 	}
 
 	bdi->initialized = true;
@@ -1490,7 +1493,7 @@ static int bq24190_probe(struct i2c_client *client,
 			"bq24190-charger", bdi);
 	if (ret < 0) {
 		dev_err(dev, "Can't set up irq handler\n");
-		goto out5;
+		goto out_sysfs;
 	}
 
 	if (bdi->extcon) {
@@ -1498,8 +1501,10 @@ static int bq24190_probe(struct i2c_client *client,
 		bdi->extcon_nb.notifier_call = bq24190_extcon_event;
 		ret = devm_extcon_register_notifier(dev, bdi->extcon, -1,
 						    &bdi->extcon_nb);
-		if (ret)
-			goto out5;
+		if (ret) {
+			dev_err(dev, "Can't register extcon\n");
+			goto out_sysfs;
+		}
 
 		/* Sync initial cable state */
 		queue_delayed_work(system_wq, &bdi->extcon_work, 0);
@@ -1512,19 +1517,17 @@ static int bq24190_probe(struct i2c_client *client,
 
 	return 0;
 
-out5:
+out_sysfs:
 	bq24190_sysfs_remove_group(bdi);
 
-out4:
+out_battery:
 	power_supply_unregister(bdi->battery);
 
-out3:
+out_charger:
 	power_supply_unregister(bdi->charger);
 
-out2:
+out_pmrt:
 	pm_runtime_put_sync(dev);
-
-out1:
 	pm_runtime_dont_use_autosuspend(dev);
 	pm_runtime_disable(dev);
 	return ret;
