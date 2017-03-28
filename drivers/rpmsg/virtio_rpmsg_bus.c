@@ -909,6 +909,27 @@ out:
 	return ret;
 }
 
+static void virtio_rpmsg_set_config(struct virtio_device *vdev)
+{
+	struct virtio_rpmsg_cfg virtio_cfg;
+	struct virtproc_info *vrp = vdev->priv;
+
+	/* fill virtio_cfg struct */
+	memset(&virtio_cfg, 0, sizeof(virtio_cfg));
+	virtio_cfg.id = VIRTIO_ID_RPMSG;
+	/*
+	 * IOMMU not managed at the time being, set device address to (-1)
+	 * meaning any address value.
+	 */
+	virtio_cfg.da = -1;
+	virtio_cfg.pa =	vrp->bufs_dma;
+	virtio_cfg.len = vrp->num_bufs * vrp->buf_size;
+	virtio_cfg.buf_size = vrp->buf_size;
+
+	vdev->config->set(vdev, RPMSG_CONFIG_OFFSET, &virtio_cfg,
+			  sizeof(virtio_cfg));
+}
+
 static int rpmsg_probe(struct virtio_device *vdev)
 {
 	vq_callback_t *vq_cbs[] = { rpmsg_recv_done, rpmsg_xmit_done };
@@ -919,6 +940,7 @@ static int rpmsg_probe(struct virtio_device *vdev)
 	int err = 0, i;
 	size_t total_buf_space;
 	bool notify;
+	bool has_cfg = false;
 
 	vrp = kzalloc(sizeof(*vrp), GFP_KERNEL);
 	if (!vrp)
@@ -958,6 +980,9 @@ static int rpmsg_probe(struct virtio_device *vdev)
 	if (err < 0)
 		goto free_vrp;
 
+	if (err)
+		has_cfg = true;
+
 	total_buf_space = vrp->num_bufs * vrp->buf_size;
 
 	/* allocate coherent memory for the buffers */
@@ -977,6 +1002,10 @@ static int rpmsg_probe(struct virtio_device *vdev)
 
 	/* and half is dedicated for TX */
 	vrp->sbufs = bufs_va + total_buf_space / 2;
+
+	/* Notify configuration to coprocessor */
+	if (has_cfg)
+		virtio_rpmsg_set_config(vdev);
 
 	/* set up the receive buffers */
 	for (i = 0; i < vrp->num_bufs / 2; i++) {
