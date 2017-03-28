@@ -489,6 +489,7 @@ static int hci_uart_tty_open(struct tty_struct *tty)
 	INIT_WORK(&hu->write_work, hci_uart_write_work);
 
 	rwlock_init(&hu->proto_lock);
+	mutex_init(&hu->ioctl_mutex);
 
 	/* Flush any pending characters in the driver */
 	tty_driver_flush_buffer(tty);
@@ -531,10 +532,12 @@ static void hci_uart_tty_close(struct tty_struct *tty)
 		hu->proto->close(hu);
 	}
 
+	mutex_lock(&hu->ioctl_mutex);
 	/* Detach from the tty */
 	tty->disc_data = NULL;
 
 	clear_bit(HCI_UART_PROTO_SET, &hu->flags);
+	mutex_unlock(&hu->ioctl_mutex);
 
 	if (test_and_clear_bit(HCI_UART_REGISTERED, &hu->flags)) {
 		hci_uart_flush(hdev);
@@ -745,6 +748,7 @@ static int hci_uart_tty_ioctl(struct tty_struct *tty, struct file *file,
 	if (!hu)
 		return -EBADF;
 
+	mutex_lock(&hu->ioctl_mutex);
 	switch (cmd) {
 	case HCIUARTSETPROTO:
 		if (!test_and_set_bit(HCI_UART_PROTO_SET, &hu->flags)) {
@@ -784,6 +788,7 @@ static int hci_uart_tty_ioctl(struct tty_struct *tty, struct file *file,
 		err = n_tty_ioctl_helper(tty, file, cmd, arg);
 		break;
 	}
+	mutex_unlock(&hu->ioctl_mutex);
 
 	return err;
 }

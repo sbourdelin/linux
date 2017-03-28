@@ -91,6 +91,8 @@ struct hci_uart {
 	struct sk_buff		*tx_skb;
 	unsigned long		tx_state;
 
+	struct mutex		ioctl_mutex;
+
 	unsigned int init_speed;
 	unsigned int oper_speed;
 };
