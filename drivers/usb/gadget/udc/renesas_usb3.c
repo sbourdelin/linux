@@ -570,9 +570,26 @@ static void usb3_mode_a_host(struct renesas_usb3 *usb3)
 	usb3_set_bit(usb3, DRD_CON_VBOUT, USB3_DRD_CON);
 }
 
+static void usb3_mode_a_peri(struct renesas_usb3 *usb3)
+{
+	unsigned long flags;
+
+	spin_lock_irqsave(&usb3->lock, flags);
+	usb3_set_bit(usb3, DRD_CON_PERI_CON, USB3_DRD_CON);
+	usb3_set_bit(usb3, DRD_CON_VBOUT, USB3_DRD_CON);
+	usb3_check_vbus(usb3);
+	spin_unlock_irqrestore(&usb3->lock, flags);
+}
+
 static void usb3_mode_b_peri(struct renesas_usb3 *usb3)
 {
 	usb3_set_bit(usb3, DRD_CON_PERI_CON, USB3_DRD_CON);
+	usb3_clear_bit(usb3, DRD_CON_VBOUT, USB3_DRD_CON);
+}
+
+static void usb3_mode_b_host(struct renesas_usb3 *usb3)
+{
+	usb3_clear_bit(usb3, DRD_CON_PERI_CON, USB3_DRD_CON);
 	usb3_clear_bit(usb3, DRD_CON_VBOUT, USB3_DRD_CON);
 }
 
@@ -1865,8 +1882,30 @@ static ssize_t role_store(struct device *dev, struct device_attribute *attr,
 		usb3->forced_b_device = true;
 		renesas_usb3_init_forced_b_device(usb3);
 	} else {
+		bool new_mode_is_host;
+
 		usb3->forced_b_device = false;
-		return -EINVAL;
+		if (!strncmp(buf, "host", strlen("host")))
+			new_mode_is_host = true;
+		else if (!strncmp(buf, "peripheral", strlen("peripheral")))
+			new_mode_is_host = false;
+		else
+			return -EINVAL;
+
+		if (new_mode_is_host == usb3_is_host(usb3))
+			return -EINVAL;
+
+		if (new_mode_is_host) {
+			if (usb3_is_a_device(usb3))
+				usb3_mode_a_host(usb3);
+			else
+				usb3_mode_b_host(usb3);
+		} else {
+			if (usb3_is_a_device(usb3))
+				usb3_mode_a_peri(usb3);
+			else
+				usb3_mode_b_peri(usb3);
+		}
 	}
 
 	return count;
