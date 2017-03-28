@@ -71,7 +71,7 @@ static inline int mk_pid(struct pid_namespace *pid_ns,
 struct pid_namespace init_pid_ns = {
 	.kref = KREF_INIT(2),
 	.pidmap = {
-		[ 0 ... PIDMAP_ENTRIES-1] = { ATOMIC_INIT(BITS_PER_PAGE), NULL }
+		[0 ... PIDMAP_ENTRIES-1] = { ATOMIC_INIT(BITS_PER_PAGE), NULL }
 	},
 	.last_pid = 0,
 	.nr_hashed = PIDNS_HASH_ADDING,
