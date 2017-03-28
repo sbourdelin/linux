@@ -291,7 +291,6 @@ void zap_pid_ns_processes(struct pid_namespace *pid_ns)
 		current->signal->group_exit_code = pid_ns->reboot;
 
 	acct_exit_ns(pid_ns);
-	return;
 }
 
 #ifdef CONFIG_CHECKPOINT_RESTORE
