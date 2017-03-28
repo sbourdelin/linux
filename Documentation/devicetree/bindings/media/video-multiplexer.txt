@@ -1,0 +1,59 @@
+Video Multiplexer
+=================
+
+Video multiplexers allow to select between multiple input ports. Video received
+on the active input port is passed through to the output port. Muxes described
+by this binding may be controlled by a syscon register bitfield or by a GPIO.
+
+Required properties:
+- compatible : should be "video-multiplexer"
+- reg: should be register base of the register containing the control bitfield
+- bit-mask: bitmask of the control bitfield in the control register
+- bit-shift: bit offset of the control bitfield in the control register
+- gpios: alternatively to reg, bit-mask, and bit-shift, a single GPIO phandle
+  may be given to switch between two inputs
+- #address-cells: should be <1>
+- #size-cells: should be <0>
+- port@*: at least three port nodes containing endpoints connecting to the
+  source and sink devices according to of_graph bindings. The last port is
+  the output port, all others are inputs.
+
+Example:
+
+syscon {
+	compatible = "syscon", "simple-mfd";
+
+	mux {
+		compatible = "video-multiplexer";
+		/* Single bit (1 << 19) in syscon register 0x04: */
+		reg = <0x04>;
+		bit-mask = <1>;
+		bit-shift = <19>;
+		#address-cells = <1>;
+		#size-cells = <0>;
+
+		port@0 {
+			reg = <0>;
+
+			mux_in0: endpoint {
+				remote-endpoint = <&video_source0_out>;
+			};
+		};
+
+		port@1 {
+			reg = <1>;
+
+			mux_in1: endpoint {
+				remote-endpoint = <&video_source1_out>;
+			};
+		};
+
+		port@2 {
+			reg = <2>;
+
+			mux_out: endpoint {
+				remote-endpoint = <&capture_interface_in>;
+			};
+		};
+	};
+};
