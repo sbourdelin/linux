@@ -428,24 +428,24 @@ struct ccp_dma_info {
 	unsigned int offset;
 	unsigned int length;
 	enum dma_data_direction dir;
-};
+} __packed __aligned(4);
 
 struct ccp_dm_workarea {
 	struct device *dev;
 	struct dma_pool *dma_pool;
-	unsigned int length;
 
 	u8 *address;
 	struct ccp_dma_info dma;
+	unsigned int length;
 };
 
 struct ccp_sg_workarea {
 	struct scatterlist *sg;
 	int nents;
+	unsigned int dma_count;
 
 	struct scatterlist *dma_sg;
 	struct device *dma_dev;
-	unsigned int dma_count;
 	enum dma_data_direction dma_dir;
 
 	unsigned int sg_used;
