@@ -3049,18 +3049,8 @@ ctnetlink_alloc_expect(const struct nlattr * const cda[], struct nf_conn *ct,
 
 	help = nfct_help(ct);
 	if (!help) {
-		if (!cda[CTA_EXPECT_TIMEOUT]) {
-			err = -EINVAL;
-			goto err_out;
-		}
-		exp->timeout.expires =
-		  jiffies + ntohl(nla_get_be32(cda[CTA_EXPECT_TIMEOUT])) * HZ;
-
-		exp->flags = NF_CT_EXPECT_USERSPACE;
-		if (cda[CTA_EXPECT_FLAGS]) {
-			exp->flags |=
-				ntohl(nla_get_be32(cda[CTA_EXPECT_FLAGS]));
-		}
+		err = -EOPNOTSUPP;
+		goto err_out;
 	} else {
 		if (cda[CTA_EXPECT_FLAGS]) {
 			exp->flags = ntohl(nla_get_be32(cda[CTA_EXPECT_FLAGS]));
