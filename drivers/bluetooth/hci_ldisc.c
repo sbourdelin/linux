@@ -229,10 +229,6 @@ static int hci_uart_flush(struct hci_dev *hdev)
 
 	BT_DBG("hdev %p tty %p", hdev, tty);
 
-	if (hu->tx_skb) {
-		kfree_skb(hu->tx_skb); hu->tx_skb = NULL;
-	}
-
 	/* Flush any pending characters in the driver and discipline. */
 	tty_ldisc_flush(tty);
 	tty_driver_flush_buffer(tty);
@@ -490,6 +486,7 @@ static void hci_uart_tty_close(struct tty_struct *tty)
 {
 	struct hci_uart *hu = tty->disc_data;
 	struct hci_dev *hdev;
+	struct sk_buff *temp_skb;
 
 	BT_DBG("tty %p", tty);
 
@@ -520,6 +517,12 @@ static void hci_uart_tty_close(struct tty_struct *tty)
 		hci_uart_close(hdev);
 		hu->hdev = NULL;
 		hci_free_dev(hdev);
+	}
+
+	if (hu->tx_skb) {
+		temp_skb = hu->tx_skb;
+		hu->tx_skb = NULL;
+		kfree_skb(temp_skb);
 	}
 
 	kfree(hu);
