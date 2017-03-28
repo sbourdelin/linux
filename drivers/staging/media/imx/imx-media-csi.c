@@ -9,6 +9,7 @@
  * the Free Software Foundation; either version 2 of the License, or
  * (at your option) any later version.
  */
+#include <linux/delay.h>
 #include <linux/gcd.h>
 #include <linux/interrupt.h>
 #include <linux/module.h>
@@ -591,11 +592,31 @@ static int csi_setup(struct csi_priv *priv)
 
 static int csi_start(struct csi_priv *priv)
 {
+	u32 bad_frames = 0;
 	int ret;
 
 	if (!priv->sensor) {
 		v4l2_err(&priv->sd, "no sensor attached\n");
 		return -EINVAL;
+	}
+
+	ret = v4l2_subdev_call(priv->sensor->sd, sensor,
+			       g_skip_frames, &bad_frames);
+	if (!ret && bad_frames) {
+		struct v4l2_fract *fi = &priv->frame_interval;
+		u32 delay_usec;
+
+		/*
+		 * This sensor has bad frames when it is turned on,
+		 * add a delay to avoid them before enabling the CSI
+		 * hardware. Especially for sensors with a bt.656 interface,
+		 * any shifts in the SAV/EAV sync codes will cause the CSI
+		 * to lose vert/horiz sync.
+		 */
+		delay_usec = DIV_ROUND_UP_ULL(
+			(u64)USEC_PER_SEC * fi->numerator * bad_frames,
+			fi->denominator);
+		usleep_range(delay_usec, delay_usec + 1000);
 	}
 
 	if (priv->dest == IPU_CSI_DEST_IDMAC) {
