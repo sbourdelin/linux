@@ -225,27 +225,29 @@ static int brcmstb_gisb_arb_decode_addr(struct brcmstb_gisb_arb_device *gdev,
 static int brcmstb_bus_error_handler(unsigned long addr, unsigned int fsr,
 				     struct pt_regs *regs)
 {
-	int ret = 0;
 	struct brcmstb_gisb_arb_device *gdev;
 
 	/* iterate over each GISB arb registered handlers */
 	list_for_each_entry(gdev, &brcmstb_gisb_arb_device_list, next)
-		ret |= brcmstb_gisb_arb_decode_addr(gdev, "bus error");
+		brcmstb_gisb_arb_decode_addr(gdev, "bus error");
+
+#if !defined(CONFIG_ARM_LPAE)
 	/*
 	 * If it was an imprecise abort, then we need to correct the
 	 * return address to be _after_ the instruction.
 	*/
 	if (fsr & (1 << 10))
 		regs->ARM_pc += 4;
+#endif
 
-	return ret;
+	/* Always report unhandled exception */
+	return 1;
 }
 #endif
 
 #ifdef CONFIG_MIPS
 static int brcmstb_bus_error_handler(struct pt_regs *regs, int is_fixup)
 {
-	int ret = 0;
 	struct brcmstb_gisb_arb_device *gdev;
 	u32 cap_status;
 
@@ -258,7 +260,7 @@ static int brcmstb_bus_error_handler(struct pt_regs *regs, int is_fixup)
 			goto out;
 		}
 
-		ret |= brcmstb_gisb_arb_decode_addr(gdev, "bus error");
+		brcmstb_gisb_arb_decode_addr(gdev, "bus error");
 	}
 out:
 	return is_fixup ? MIPS_BE_FIXUP : MIPS_BE_FATAL;
@@ -379,9 +381,16 @@ static int __init brcmstb_gisb_arb_probe(struct platform_device *pdev)
 	list_add_tail(&gdev->next, &brcmstb_gisb_arb_device_list);
 
 #ifdef CONFIG_ARM
+#ifdef CONFIG_ARM_LPAE
+	hook_fault_code(16, brcmstb_bus_error_handler, SIGBUS, 0,
+			"synchronous external abort");
+	hook_fault_code(17, brcmstb_bus_error_handler, SIGBUS, 0,
+			"asynchronous external abort");
+#else
 	hook_fault_code(22, brcmstb_bus_error_handler, SIGBUS, 0,
 			"imprecise external abort");
 #endif
+#endif /* CONFIG_ARM */
 #ifdef CONFIG_MIPS
 	board_be_handler = brcmstb_bus_error_handler;
 #endif
