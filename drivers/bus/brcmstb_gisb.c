@@ -30,6 +30,11 @@
 #include <asm/signal.h>
 #endif
 
+#ifdef CONFIG_ARM64
+#include <asm/signal.h>
+#include <asm/system_misc.h>
+#endif
+
 #ifdef CONFIG_MIPS
 #include <asm/traps.h>
 #endif
@@ -225,7 +230,7 @@ static int brcmstb_gisb_arb_decode_addr(struct brcmstb_gisb_arb_device *gdev,
 	return 0;
 }
 
-#ifdef CONFIG_ARM
+#if defined(CONFIG_ARM) || defined(CONFIG_ARM64)
 static int brcmstb_bus_error_handler(unsigned long addr, unsigned int fsr,
 				     struct pt_regs *regs)
 {
@@ -235,7 +240,7 @@ static int brcmstb_bus_error_handler(unsigned long addr, unsigned int fsr,
 	list_for_each_entry(gdev, &brcmstb_gisb_arb_device_list, next)
 		brcmstb_gisb_arb_decode_addr(gdev, "bus error");
 
-#if !defined(CONFIG_ARM_LPAE)
+#if defined(CONFIG_ARM) && !defined(CONFIG_ARM_LPAE)
 	/*
 	 * If it was an imprecise abort, then we need to correct the
 	 * return address to be _after_ the instruction.
@@ -247,7 +252,7 @@ static int brcmstb_bus_error_handler(unsigned long addr, unsigned int fsr,
 	/* Always report unhandled exception */
 	return 1;
 }
-#endif
+#endif /* CONFIG_ARM || CONFIG_ARM64 */
 
 #ifdef CONFIG_MIPS
 static int brcmstb_bus_error_handler(struct pt_regs *regs, int is_fixup)
@@ -395,6 +400,10 @@ static int __init brcmstb_gisb_arb_probe(struct platform_device *pdev)
 			"imprecise external abort");
 #endif
 #endif /* CONFIG_ARM */
+#ifdef CONFIG_ARM64
+	hook_fault_code(16, brcmstb_bus_error_handler, SIGBUS, 0,
+			"synchronous external abort");
+#endif
 #ifdef CONFIG_MIPS
 	board_be_handler = brcmstb_bus_error_handler;
 #endif
