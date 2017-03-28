@@ -15,3 +15,9 @@ Optional subnodes:
     Documentation/devicetree/bindings/regulator/regulator.txt
   - micvdd : Initial data for the MICVDD regulator, as covered in
     Documentation/devicetree/bindings/regulator/regulator.txt
+
+  - MICBIASx : Initial data for the MICBIAS regulators, as covered in
+    Documentation/devicetree/bindings/regulator/regulator.txt but the
+    following additional properties are also supported:
+      - wlf,ext-cap : Specifies if the MICBIAS has external decoupling
+        capacitors attached.
