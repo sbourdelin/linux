@@ -377,24 +377,6 @@ static void execlists_submit_ports(struct intel_engine_cs *engine)
 	writel(lower_32_bits(desc[0]), elsp);
 }
 
-static bool ctx_single_port_submission(const struct i915_gem_context *ctx)
-{
-	return (IS_ENABLED(CONFIG_DRM_I915_GVT) &&
-		i915_gem_context_force_single_submission(ctx));
-}
-
-static bool can_merge_ctx(const struct i915_gem_context *prev,
-			  const struct i915_gem_context *next)
-{
-	if (prev != next)
-		return false;
-
-	if (ctx_single_port_submission(prev))
-		return false;
-
-	return true;
-}
-
 static void execlists_dequeue(struct intel_engine_cs *engine)
 {
 	struct drm_i915_gem_request *last;
@@ -462,7 +444,8 @@ static void execlists_dequeue(struct intel_engine_cs *engine)
 		 * request, and so we never need to tell the hardware about
 		 * the first.
 		 */
-		if (last && !can_merge_ctx(cursor->ctx, last->ctx)) {
+		if (last &&
+			!i915_gem_context_can_merge(last->ctx, cursor->ctx)) {
 			/* If we are on the second port and cannot combine
 			 * this request with the last, then we are done.
 			 */
@@ -475,8 +458,8 @@ static void execlists_dequeue(struct intel_engine_cs *engine)
 			 * context (even though a different request) to
 			 * the second port.
 			 */
-			if (ctx_single_port_submission(last->ctx) ||
-			    ctx_single_port_submission(cursor->ctx))
+			if (i915_gem_context_single_port_submit(last->ctx) ||
+			    i915_gem_context_single_port_submit(cursor->ctx))
 				break;
 
 			GEM_BUG_ON(last->ctx == cursor->ctx);
