@@ -606,6 +606,8 @@ static void __i915_guc_submit(struct drm_i915_gem_request *rq)
 	unsigned long flags;
 	int b_ret;
 
+	intel_gvt_notify_context_status(rq, INTEL_CONTEXT_SCHEDULE_IN);
+
 	/* WA to flush out the pending GMADR writes to ring buffer. */
 	if (i915_vma_is_map_and_fenceable(rq->ring->vma))
 		POSTING_READ_FW(GUC_STATUS);
@@ -725,6 +727,8 @@ static void i915_guc_irq_handler(unsigned long data)
 		rq = port[0].request;
 		while (rq && i915_gem_request_completed(rq)) {
 			trace_i915_gem_request_out(rq);
+			intel_gvt_notify_context_status(rq,
+					INTEL_CONTEXT_SCHEDULE_OUT);
 			i915_gem_request_put(rq);
 			port[0].request = port[1].request;
 			port[1].request = NULL;

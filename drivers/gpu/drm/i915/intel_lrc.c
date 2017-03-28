@@ -295,21 +295,6 @@ uint64_t intel_lr_context_descriptor(struct i915_gem_context *ctx,
 	return ctx->engine[engine->id].lrc_desc;
 }
 
-static inline void
-execlists_context_status_change(struct drm_i915_gem_request *rq,
-				unsigned long status)
-{
-	/*
-	 * Only used when GVT-g is enabled now. When GVT-g is disabled,
-	 * The compiler should eliminate this function as dead-code.
-	 */
-	if (!IS_ENABLED(CONFIG_DRM_I915_GVT))
-		return;
-
-	atomic_notifier_call_chain(&rq->engine->context_status_notifier,
-				   status, rq);
-}
-
 static void
 execlists_update_context_pdps(struct i915_hw_ppgtt *ppgtt, u32 *reg_state)
 {
@@ -350,7 +335,7 @@ static void execlists_submit_ports(struct intel_engine_cs *engine)
 
 	GEM_BUG_ON(port[0].count > 1);
 	if (!port[0].count)
-		execlists_context_status_change(port[0].request,
+		intel_gvt_notify_context_status(port[0].request,
 						INTEL_CONTEXT_SCHEDULE_IN);
 	desc[0] = execlists_update_context(port[0].request);
 	GEM_DEBUG_EXEC(port[0].context_id = upper_32_bits(desc[0]));
@@ -358,7 +343,7 @@ static void execlists_submit_ports(struct intel_engine_cs *engine)
 
 	if (port[1].request) {
 		GEM_BUG_ON(port[1].count);
-		execlists_context_status_change(port[1].request,
+		intel_gvt_notify_context_status(port[1].request,
 						INTEL_CONTEXT_SCHEDULE_IN);
 		desc[1] = execlists_update_context(port[1].request);
 		GEM_DEBUG_EXEC(port[1].context_id = upper_32_bits(desc[1]));
@@ -572,7 +557,7 @@ static void intel_lrc_irq_handler(unsigned long data)
 			if (--port[0].count == 0) {
 				GEM_BUG_ON(status & GEN8_CTX_STATUS_PREEMPTED);
 				GEM_BUG_ON(!i915_gem_request_completed(port[0].request));
-				execlists_context_status_change(port[0].request,
+				intel_gvt_notify_context_status(port[0].request,
 								INTEL_CONTEXT_SCHEDULE_OUT);
 
 				trace_i915_gem_request_out(port[0].request);

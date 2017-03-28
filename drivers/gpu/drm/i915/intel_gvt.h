@@ -38,6 +38,13 @@ intel_gvt_context_single_port_submit(const struct i915_gem_context *ctx)
 {
 	return i915_gem_context_force_single_submission(ctx);
 }
+static inline void
+intel_gvt_notify_context_status(struct drm_i915_gem_request *rq,
+				unsigned long status)
+{
+	atomic_notifier_call_chain(&rq->engine->context_status_notifier,
+				   status, rq);
+}
 #else
 static inline int intel_gvt_init(struct drm_i915_private *dev_priv)
 {
@@ -50,6 +57,11 @@ static inline bool
 intel_gvt_context_single_port_submit(const struct i915_gem_context *ctx)
 {
 	return false;
+}
+static inline void
+intel_gvt_notify_context_status(struct drm_i915_gem_request *rq,
+				unsigned long status)
+{
 }
 #endif
 
