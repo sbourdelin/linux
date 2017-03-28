@@ -32,12 +32,25 @@ void intel_gvt_cleanup(struct drm_i915_private *dev_priv);
 int intel_gvt_init_device(struct drm_i915_private *dev_priv);
 void intel_gvt_clean_device(struct drm_i915_private *dev_priv);
 int intel_gvt_init_host(void);
+
+static inline void
+intel_gvt_notify_context_status(struct drm_i915_gem_request *rq,
+				unsigned long status)
+{
+	atomic_notifier_call_chain(&rq->engine->context_status_notifier,
+				   status, rq);
+}
 #else
 static inline int intel_gvt_init(struct drm_i915_private *dev_priv)
 {
 	return 0;
 }
 static inline void intel_gvt_cleanup(struct drm_i915_private *dev_priv)
+{
+}
+static inline void
+intel_gvt_notify_context_status(struct drm_i915_gem_request *rq,
+				unsigned long status)
 {
 }
 #endif
