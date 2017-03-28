@@ -2924,6 +2924,7 @@ void i915_gem_reset_finish(struct drm_i915_private *dev_priv)
 	for_each_engine(engine, dev_priv, id) {
 		tasklet_enable(&engine->irq_tasklet);
 		kthread_unpark(engine->breadcrumbs.signaler);
+		tasklet_hi_schedule(&engine->irq_tasklet);
 	}
 }
 

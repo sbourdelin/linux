@@ -377,6 +377,22 @@ static void execlists_submit_ports(struct intel_engine_cs *engine)
 	writel(lower_32_bits(desc[0]), elsp);
 }
 
+static void execlists_clear_ports(struct intel_engine_cs *engine)
+{
+	struct execlist_port *port = engine->execlist_port;
+	struct drm_i915_gem_request *rq;
+
+	rq = port->request;
+	while (rq) {
+		i915_gem_request_put(rq);
+		memset(port, 0, sizeof(*port));
+		if (port != engine->execlist_port)
+			break;
+		port++;
+		rq = port->request;
+	}
+}
+
 static bool ctx_single_port_submission(const struct i915_gem_context *ctx)
 {
 	return (IS_ENABLED(CONFIG_DRM_I915_GVT) &&
@@ -502,11 +518,6 @@ static void execlists_dequeue(struct intel_engine_cs *engine)
 
 	if (submit)
 		execlists_submit_ports(engine);
-}
-
-static bool execlists_elsp_idle(struct intel_engine_cs *engine)
-{
-	return !engine->execlist_port[0].request;
 }
 
 static bool execlists_elsp_ready(const struct intel_engine_cs *engine)
@@ -895,6 +906,25 @@ err:
 	return ret;
 }
 
+static void intel_lr_resubmit_requests(struct intel_engine_cs *engine)
+{
+	struct drm_i915_gem_request *rq, *prev;
+
+	lockdep_assert_held(&engine->timeline->lock);
+
+	list_for_each_entry_safe_reverse(rq, prev,
+					 &engine->timeline->requests, link) {
+		if (!i915_gem_request_completed(rq)) {
+			__i915_gem_request_unsubmit(rq);
+			trace_i915_gem_request_out(rq);
+			if (insert_request(&rq->priotree,
+					   &engine->execlist_queue, true))
+				engine->execlist_first = &rq->priotree.node;
+		} else
+			break;
+	}
+}
+
 /*
  * In this WA we need to set GEN8_L3SQCREG4[21:21] and reset it after
  * PIPE_CONTROL instruction. This is required for the flush to happen correctly
@@ -1160,11 +1190,6 @@ static int intel_init_workaround_bb(struct intel_engine_cs *engine)
 	return ret;
 }
 
-static u32 port_seqno(struct execlist_port *port)
-{
-	return port->request ? port->request->global_seqno : 0;
-}
-
 static int gen8_init_common_ring(struct intel_engine_cs *engine)
 {
 	struct drm_i915_private *dev_priv = engine->i915;
@@ -1185,18 +1210,6 @@ static int gen8_init_common_ring(struct intel_engine_cs *engine)
 	POSTING_READ(RING_HWS_PGA(engine->mmio_base));
 
 	DRM_DEBUG_DRIVER("Execlists enabled for %s\n", engine->name);
-
-	/* After a GPU reset, we may have requests to replay */
-	clear_bit(ENGINE_IRQ_EXECLIST, &engine->irq_posted);
-	if (!i915.enable_guc_submission && !execlists_elsp_idle(engine)) {
-		DRM_DEBUG_DRIVER("Restarting %s from requests [0x%x, 0x%x]\n",
-				 engine->name,
-				 port_seqno(&engine->execlist_port[0]),
-				 port_seqno(&engine->execlist_port[1]));
-		engine->execlist_port[0].count = 0;
-		engine->execlist_port[1].count = 0;
-		execlists_submit_ports(engine);
-	}
 
 	return 0;
 }
@@ -1237,10 +1250,10 @@ static int gen9_init_render_ring(struct intel_engine_cs *engine)
 static void reset_common_ring(struct intel_engine_cs *engine,
 			      struct drm_i915_gem_request *request)
 {
-	struct execlist_port *port = engine->execlist_port;
 	struct intel_context *ce;
+	unsigned long flags;
 
-	/* If the request was innocent, we leave the request in the ELSP
+	/* If the request was innocent, we leave the request intact
 	 * and will try to replay it on restarting. The context image may
 	 * have been corrupted by the reset, in which case we may have
 	 * to service a new GPU hang, but more likely we can continue on
@@ -1250,42 +1263,42 @@ static void reset_common_ring(struct intel_engine_cs *engine,
 	 * and have to at least restore the RING register in the context
 	 * image back to the expected values to skip over the guilty request.
 	 */
-	if (!request || request->fence.error != -EIO)
-		return;
+	if (request && request->fence.error == -EIO) {
+		/* We want a simple context + ring to execute the breadcrumb
+		 * update. We cannot rely on the context being intact across
+		 * the GPU hang, so clear it and rebuild just what we need for
+		 * the breadcrumb. All pending requests for this context will
+		 * be zapped, and any future request will be after userspace
+		 * has had the opportunity to recreate its own state.
+		 */
+		ce = &request->ctx->engine[engine->id];
+		execlists_init_reg_state(ce->lrc_reg_state,
+					 request->ctx, engine, ce->ring);
 
-	/* We want a simple context + ring to execute the breadcrumb update.
-	 * We cannot rely on the context being intact across the GPU hang,
-	 * so clear it and rebuild just what we need for the breadcrumb.
-	 * All pending requests for this context will be zapped, and any
-	 * future request will be after userspace has had the opportunity
-	 * to recreate its own state.
-	 */
-	ce = &request->ctx->engine[engine->id];
-	execlists_init_reg_state(ce->lrc_reg_state,
-				 request->ctx, engine, ce->ring);
 
-	/* Move the RING_HEAD onto the breadcrumb, past the hanging batch */
-	ce->lrc_reg_state[CTX_RING_BUFFER_START+1] =
-		i915_ggtt_offset(ce->ring->vma);
-	ce->lrc_reg_state[CTX_RING_HEAD+1] = request->postfix;
+		/* Move the RING_HEAD onto the breadcrumb,
+		 * past the hanging batch */
+		ce->lrc_reg_state[CTX_RING_BUFFER_START+1] =
+			i915_ggtt_offset(ce->ring->vma);
+		ce->lrc_reg_state[CTX_RING_HEAD+1] = request->postfix;
 
-	request->ring->head = request->postfix;
-	intel_ring_update_space(request->ring);
+		request->ring->head = request->postfix;
+		intel_ring_update_space(request->ring);
 
-	/* Catch up with any missed context-switch interrupts */
-	if (request->ctx != port[0].request->ctx) {
-		i915_gem_request_put(port[0].request);
-		port[0] = port[1];
-		memset(&port[1], 0, sizeof(port[1]));
+		/* Reset WaIdleLiteRestore:bdw,skl as well */
+		request->tail =
+			intel_ring_wrap(request->ring,
+					request->wa_tail -
+					WA_TAIL_DWORDS * sizeof(u32));
+		assert_ring_tail_valid(request->ring, request->tail);
 	}
 
-	GEM_BUG_ON(request->ctx != port[0].request->ctx);
+	spin_lock_irqsave(&engine->timeline->lock, flags);
+	intel_lr_resubmit_requests(engine);
+	spin_unlock_irqrestore(&engine->timeline->lock, flags);
 
-	/* Reset WaIdleLiteRestore:bdw,skl as well */
-	request->tail =
-		intel_ring_wrap(request->ring,
-				request->wa_tail - WA_TAIL_DWORDS*sizeof(u32));
-	assert_ring_tail_valid(request->ring, request->tail);
+	execlists_clear_ports(engine);
+	clear_bit(ENGINE_IRQ_EXECLIST, &engine->irq_posted);
 }
 
 static int intel_logical_ring_emit_pdps(struct drm_i915_gem_request *req)

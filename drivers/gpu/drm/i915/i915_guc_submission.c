@@ -1245,24 +1245,12 @@ int i915_guc_submission_enable(struct drm_i915_private *dev_priv)
 	guc_interrupts_capture(dev_priv);
 
 	for_each_engine(engine, dev_priv, id) {
-		const int wqi_size = sizeof(struct guc_wq_item);
-		struct drm_i915_gem_request *rq;
-
 		/* The tasklet was initialised by execlists, and may be in
 		 * a state of flux (across a reset) and so we just want to
 		 * take over the callback without changing any other state
 		 * in the tasklet.
 		 */
 		engine->irq_tasklet.func = i915_guc_irq_handler;
-		clear_bit(ENGINE_IRQ_EXECLIST, &engine->irq_posted);
-
-		/* Replay the current set of previously submitted requests */
-		spin_lock_irq(&engine->timeline->lock);
-		list_for_each_entry(rq, &engine->timeline->requests, link) {
-			guc_client_update_wq_rsvd(client, wqi_size);
-			__i915_guc_submit(rq);
-		}
-		spin_unlock_irq(&engine->timeline->lock);
 	}
 
 	return 0;
