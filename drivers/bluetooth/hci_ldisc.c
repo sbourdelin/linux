@@ -500,20 +500,17 @@ static void hci_uart_tty_close(struct tty_struct *tty)
 		return;
 
 	hdev = hu->hdev;
-	if (hdev)
+	if (test_bit(HCI_UART_REGISTERED, &hu->flags))
 		hci_uart_close(hdev);
 
 	cancel_work_sync(&hu->write_work);
 
-	if (hdev) {
-		if (test_bit(HCI_UART_REGISTERED, &hu->flags))
-			/* Note hci_unregister_dev() may try to send a
-			 * HCI RESET command. If the transmission fails then
-			 * hci_unregister_dev() waits HCI_CMD_TIMEOUT
-			 * (2) seconds for the timeout to occur.
-			 */
-			hci_unregister_dev(hdev);
-	}
+	if (test_bit(HCI_UART_REGISTERED, &hu->flags))
+		/* Note hci_unregister_dev() may try to send a HCI RESET
+		 * command. If the transmission fails then hci_unregister_dev()
+		 * waits HCI_CMD_TIMEOUT (2) seconds for the timeout to occur.
+		 */
+		hci_unregister_dev(hdev);
 
 	if (test_bit(HCI_UART_PROTO_READY, &hu->flags)) {
 		clear_bit(HCI_UART_PROTO_READY, &hu->flags);
