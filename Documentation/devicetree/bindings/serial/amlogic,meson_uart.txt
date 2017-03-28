@@ -1,0 +1,25 @@
+* Amlogic Meson UART, used in multiple SoCs (e.g. S905, s905X, ...)
+
+Required properties:
+- compatible	: "amlogic,meson-uart"
+- reg		: offset and length of the register set for the device.
+- interrupts	: device interrupt
+- clocks	: the baud rate clock for the UART and optionally the core clock for the none AO uarts
+e.g.
+uart_A: serial@84c0 {
+	compatible = "amlogic,meson-uart";
+	reg = <0x0 0x84c0 0x0 0x14>;
+	pinctrl-0 = <&uart_a_pins &uart_a_cts_rts_pins>;
+	interrupts = <GIC_SPI 26 IRQ_TYPE_EDGE_RISING>;
+	clocks = <&xtal>, <&clkc CLKID_UART0>;
+	clock-names = "xtal", "core";
+	status = "ok";
+};
+
+Note: Each port should have an alias correctly numbered in "aliases" node.
+
+e.g.
+aliases {
+	serial0 = &uart_AO;
+	serial1 = &uart_A;
+};
