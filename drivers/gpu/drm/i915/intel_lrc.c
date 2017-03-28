@@ -488,7 +488,6 @@ static void execlists_dequeue(struct intel_engine_cs *engine)
 		rb = rb_next(rb);
 		rb_erase(&cursor->priotree.node, &engine->execlist_queue);
 		RB_CLEAR_NODE(&cursor->priotree.node);
-		cursor->priotree.priority = INT_MAX;
 
 		__i915_gem_request_submit(cursor);
 		trace_i915_gem_request_in(cursor, port - engine->execlist_port);

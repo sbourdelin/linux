@@ -692,7 +692,6 @@ static bool i915_guc_dequeue(struct intel_engine_cs *engine)
 		rb = rb_next(rb);
 		rb_erase(&rq->priotree.node, &engine->execlist_queue);
 		RB_CLEAR_NODE(&rq->priotree.node);
-		rq->priotree.priority = INT_MAX;
 
 		i915_guc_submit(rq);
 		trace_i915_gem_request_in(rq, port - engine->execlist_port);
