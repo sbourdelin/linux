@@ -1,6 +1,7 @@
 config CRYPTO_DEV_CCP_DD
 	tristate "Cryptographic Coprocessor device driver"
 	depends on CRYPTO_DEV_CCP
+	depends on !CPU_BIG_ENDIAN || BROKEN
 	default m
 	select HW_RANDOM
 	select DMA_ENGINE
