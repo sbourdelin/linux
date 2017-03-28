@@ -282,6 +282,7 @@ static struct trace_kprobe *alloc_trace_kprobe(const char *group,
 					     void *addr,
 					     const char *symbol,
 					     unsigned long offs,
+					     int maxactive,
 					     int nargs, bool is_return)
 {
 	struct trace_kprobe *tk;
@@ -308,6 +309,8 @@ static struct trace_kprobe *alloc_trace_kprobe(const char *group,
 		tk->rp.handler = kretprobe_dispatcher;
 	else
 		tk->rp.kp.pre_handler = kprobe_dispatcher;
+
+	tk->rp.maxactive = maxactive;
 
 	if (!event || !is_good_name(event)) {
 		ret = -EINVAL;
@@ -598,8 +601,10 @@ static int create_trace_kprobe(int argc, char **argv)
 {
 	/*
 	 * Argument syntax:
-	 *  - Add kprobe: p[:[GRP/]EVENT] [MOD:]KSYM[+OFFS]|KADDR [FETCHARGS]
-	 *  - Add kretprobe: r[:[GRP/]EVENT] [MOD:]KSYM[+0] [FETCHARGS]
+	 *  - Add kprobe:
+	 *      p[:[GRP/]EVENT] [MOD:]KSYM[+OFFS]|KADDR [FETCHARGS]
+	 *  - Add kretprobe:
+	 *      r[MAXACTIVE][:[GRP/]EVENT] [MOD:]KSYM[+0] [FETCHARGS]
 	 * Fetch args:
 	 *  $retval	: fetch return value
 	 *  $stack	: fetch stack address
@@ -619,6 +624,7 @@ static int create_trace_kprobe(int argc, char **argv)
 	int i, ret = 0;
 	bool is_return = false, is_delete = false;
 	char *symbol = NULL, *event = NULL, *group = NULL;
+	int maxactive = 0;
 	char *arg;
 	unsigned long offset = 0;
 	void *addr = NULL;
@@ -637,8 +643,26 @@ static int create_trace_kprobe(int argc, char **argv)
 		return -EINVAL;
 	}
 
-	if (argv[0][1] == ':') {
+	if (is_return && isdigit(argv[0][1]) && strchr(&argv[0][1], ':')) {
+		event = strchr(&argv[0][1], ':') + 1;
+		event[-1] = '\0';
+		ret = kstrtouint(&argv[0][1], 0, &maxactive);
+		if (ret) {
+			pr_info("Failed to parse maxactive.\n");
+			return ret;
+		}
+		/* kretprobes instances are iterated over via a list. The
+		 * maximum should stay reasonable.
+		 */
+		if (maxactive > 1024) {
+			pr_info("Maxactive is too big.\n");
+			return -EINVAL;
+		}
+	} else if (argv[0][1] == ':') {
 		event = &argv[0][2];
+	}
+
+	if (event) {
 		if (strchr(event, '/')) {
 			group = event;
 			event = strchr(group, '/') + 1;
@@ -718,8 +742,8 @@ static int create_trace_kprobe(int argc, char **argv)
 				 is_return ? 'r' : 'p', addr);
 		event = buf;
 	}
-	tk = alloc_trace_kprobe(group, event, addr, symbol, offset, argc,
-			       is_return);
+	tk = alloc_trace_kprobe(group, event, addr, symbol, offset, maxactive,
+			       argc, is_return);
 	if (IS_ERR(tk)) {
 		pr_info("Failed to allocate trace_probe.(%d)\n",
 			(int)PTR_ERR(tk));
