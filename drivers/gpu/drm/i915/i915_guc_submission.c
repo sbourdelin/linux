@@ -407,11 +407,11 @@ static void guc_stage_desc_fini(struct intel_guc *guc,
 }
 
 /**
- * i915_guc_wq_reserve() - reserve space in the GuC's workqueue
- * @request:	request associated with the commands
+ * guc_wq_reserve() - reserve space in the GuC's workqueue
+ * @client:	GuC client used for submission
  *
  * Return:	0 if space is available
- *		-EAGAIN if space is not currently available
+ *		-ENOSPC if space is not currently available
  *
  * This function must be called (and must return 0) before a request
  * is submitted to the GuC via i915_guc_submit() below. Once a result
@@ -419,18 +419,17 @@ static void guc_stage_desc_fini(struct intel_guc *guc,
  * call to submit().
  *
  * Reservation allows the caller to determine in advance that space
- * will be available for the next submission before committing resources
- * to it, and helps avoid late failures with complicated recovery paths.
+ * will be available for the next submission.
  */
-int i915_guc_wq_reserve(struct drm_i915_gem_request *request)
+static int guc_wq_reserve(struct i915_guc_client *client)
 {
 	const size_t wqi_size = sizeof(struct guc_wq_item);
-	struct i915_guc_client *client = request->i915->guc.execbuf_client;
 	struct guc_process_desc *desc = __get_process_desc(client);
 	u32 freespace;
 	int ret;
 
-	spin_lock_irq(&client->wq_lock);
+	spin_lock(&client->wq_lock);
+
 	freespace = CIRC_SPACE(client->wq_tail, desc->head, client->wq_size);
 	freespace -= client->wq_rsvd;
 	if (likely(freespace >= wqi_size)) {
@@ -438,29 +437,12 @@ int i915_guc_wq_reserve(struct drm_i915_gem_request *request)
 		ret = 0;
 	} else {
 		client->no_wq_space++;
-		ret = -EAGAIN;
+		ret = -ENOSPC;
 	}
-	spin_unlock_irq(&client->wq_lock);
+
+	spin_unlock(&client->wq_lock);
 
 	return ret;
-}
-
-static void guc_client_update_wq_rsvd(struct i915_guc_client *client, int size)
-{
-	unsigned long flags;
-
-	spin_lock_irqsave(&client->wq_lock, flags);
-	client->wq_rsvd += size;
-	spin_unlock_irqrestore(&client->wq_lock, flags);
-}
-
-void i915_guc_wq_unreserve(struct drm_i915_gem_request *request)
-{
-	const int wqi_size = sizeof(struct guc_wq_item);
-	struct i915_guc_client *client = request->i915->guc.execbuf_client;
-
-	GEM_BUG_ON(READ_ONCE(client->wq_rsvd) < wqi_size);
-	guc_client_update_wq_rsvd(client, -wqi_size);
 }
 
 /* Construct a Work Item and append it to the GuC's Work Queue */
@@ -475,7 +457,9 @@ static void guc_wq_item_append(struct i915_guc_client *client,
 	struct guc_wq_item *wqi;
 	u32 freespace, tail, wq_off;
 
-	/* Free space is guaranteed, see i915_guc_wq_reserve() above */
+	lockdep_assert_held(&client->wq_lock);
+
+	/* Free space is guaranteed, see guc_wq_reserve() above */
 	freespace = CIRC_SPACE(client->wq_tail, desc->head, client->wq_size);
 	GEM_BUG_ON(freespace < wqi_size);
 
@@ -526,6 +510,7 @@ static void guc_reset_wq(struct i915_guc_client *client)
 	desc->tail = 0;
 
 	client->wq_tail = 0;
+	client->wq_rsvd = 0;
 }
 
 static int guc_ring_doorbell(struct i915_guc_client *client)
@@ -585,7 +570,7 @@ static int guc_ring_doorbell(struct i915_guc_client *client)
  * __i915_guc_submit() - Submit commands through GuC
  * @rq:		request associated with the commands
  *
- * The caller must have already called i915_guc_wq_reserve() above with
+ * The caller must have already called guc_wq_reserve() above with
  * a result of 0 (success), guaranteeing that there is space in the work
  * queue for the new request, so enqueuing the item cannot fail.
  *
@@ -603,14 +588,13 @@ static void __i915_guc_submit(struct drm_i915_gem_request *rq)
 	unsigned int engine_id = engine->id;
 	struct intel_guc *guc = &rq->i915->guc;
 	struct i915_guc_client *client = guc->execbuf_client;
-	unsigned long flags;
 	int b_ret;
 
 	/* WA to flush out the pending GMADR writes to ring buffer. */
 	if (i915_vma_is_map_and_fenceable(rq->ring->vma))
 		POSTING_READ_FW(GUC_STATUS);
 
-	spin_lock_irqsave(&client->wq_lock, flags);
+	spin_lock(&client->wq_lock);
 
 	guc_wq_item_append(client, rq);
 	b_ret = guc_ring_doorbell(client);
@@ -623,7 +607,7 @@ static void __i915_guc_submit(struct drm_i915_gem_request *rq)
 	guc->submissions[engine_id] += 1;
 	guc->last_seqno[engine_id] = rq->global_seqno;
 
-	spin_unlock_irqrestore(&client->wq_lock, flags);
+	spin_unlock(&client->wq_lock);
 }
 
 static void i915_guc_submit(struct drm_i915_gem_request *rq)
@@ -659,6 +643,7 @@ static bool i915_guc_dequeue(struct intel_engine_cs *engine)
 {
 	struct execlist_port *port = engine->execlist_port;
 	struct drm_i915_gem_request *last = port[0].request;
+	struct i915_guc_client *client = engine->i915->guc.execbuf_client;
 	struct rb_node *rb;
 	bool submit = false;
 
@@ -679,6 +664,9 @@ static bool i915_guc_dequeue(struct intel_engine_cs *engine)
 	while (rb) {
 		struct drm_i915_gem_request *rq =
 			rb_entry(rb, typeof(*rq), priotree.node);
+
+		if (guc_wq_reserve(client) != 0)
+			break;
 
 		if (last && rq->ctx != last->ctx) {
 			if (port != engine->execlist_port)
