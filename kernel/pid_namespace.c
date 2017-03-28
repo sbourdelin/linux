@@ -75,7 +75,9 @@ err_alloc:
 
 static void proc_cleanup_work(struct work_struct *work)
 {
-	struct pid_namespace *ns = container_of(work, struct pid_namespace, proc_work);
+	struct pid_namespace *ns = container_of(work,
+						struct pid_namespace,
+						proc_work);
 	pid_ns_release_proc(ns);
 }
 
@@ -89,7 +91,8 @@ static struct ucounts *inc_pid_namespaces(struct user_namespace *ns)
 
 static void dec_pid_namespaces(struct ucounts *ucounts)
 {
-	dec_ucount(ucounts, UCOUNT_PID_NAMESPACES);
+	dec_ucount(ucounts,
+		   UCOUNT_PID_NAMESPACES);
 }
 
 static struct pid_namespace *create_pid_namespace(struct user_namespace *user_ns,

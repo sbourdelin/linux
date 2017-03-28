@@ -439,7 +439,9 @@ struct task_struct *pid_task(struct pid *pid, enum pid_type type)
 		first = rcu_dereference_check(hlist_first_rcu(&pid->tasks[type]),
 					      lockdep_tasklist_lock_is_held());
 		if (first)
-			result = hlist_entry(first, struct task_struct, pids[(type)].node);
+			result = hlist_entry(first,
+					     struct task_struct,
+					     pids[(type)].node);
 	}
 	return result;
 }
