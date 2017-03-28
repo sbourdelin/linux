@@ -4197,6 +4197,9 @@ static int packet_set_ring(struct sock *sk, union tpacket_req_u *req_u,
 			goto out;
 		if (unlikely(req->tp_frame_size == 0))
 			goto out;
+		if (unlikely((u64)req->tp_block_size * req->tp_block_nr >
+					UINT_MAX))
+			goto out;
 
 		if (unlikely(!PAGE_ALIGNED(req->tp_block_size)))
 			goto out;
