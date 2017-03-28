@@ -689,12 +689,13 @@ static struct mt9m114_res_struct *mt9m114_to_res(u32 w, u32 h)
 	return &mt9m114_res[index];
 }
 
-static int mt9m114_res2size(unsigned int res, int *h_size, int *v_size)
+static int mt9m114_res2size(struct v4l2_subdev *sd, int *h_size, int *v_size)
 {
+	struct mt9m114_device *dev = to_mt9m114_sensor(sd);
 	unsigned short hsize;
 	unsigned short vsize;
 
-	switch (res) {
+	switch (dev->res) {
 	case MT9M114_RES_736P:
 		hsize = MT9M114_RES_736P_SIZE_H;
 		vsize = MT9M114_RES_736P_SIZE_V;
@@ -708,7 +709,8 @@ static int mt9m114_res2size(unsigned int res, int *h_size, int *v_size)
 		vsize = MT9M114_RES_960P_SIZE_V;
 		break;
 	default:
-		WARN(1, "%s: Resolution 0x%08x unknown\n", __func__, res);
+		v4l2_err(sd, "%s: Resolution 0x%08x unknown\n", __func__,
+			 dev->res);
 		return -EINVAL;
 	}
 
@@ -820,7 +822,7 @@ static int mt9m114_get_fmt(struct v4l2_subdev *sd,
 		return -EINVAL;
 	fmt->code = MEDIA_BUS_FMT_SGRBG10_1X10;
 
-	ret = mt9m114_res2size(dev->res, &width, &height);
+	ret = mt9m114_res2size(sd, &width, &height);
 	if (ret)
 		return ret;
 	fmt->width = width;
@@ -1192,7 +1194,7 @@ static int mt9m114_s_exposure_selection(struct v4l2_subdev *sd,
 	grid_right = sel->r.left + sel->r.width - 1;
 	grid_bottom = sel->r.top + sel->r.height - 1;
 
-	ret = mt9m114_res2size(dev->res, &width, &height);
+	ret = mt9m114_res2size(sd, &width, &height);
 	if (ret)
 		return ret;
 
