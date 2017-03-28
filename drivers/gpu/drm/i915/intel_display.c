@@ -13024,6 +13024,10 @@ static int intel_atomic_commit(struct drm_device *dev,
 	struct drm_i915_private *dev_priv = to_i915(dev);
 	int ret = 0;
 
+	ret = drm_atomic_helper_setup_commit(state, nonblock);
+	if (ret)
+		return ret;
+
 	/*
 	 * The intel_legacy_cursor_update() fast path takes care
 	 * of avoiding the vblank waits for simple cursor
@@ -13031,13 +13035,17 @@ static int intel_atomic_commit(struct drm_device *dev,
 	 * we want to perform the vblank waits so that watermark
 	 * updates happen during the correct frames. Gen9+ have
 	 * double buffered watermarks and so shouldn't need this.
+	 *
+	 * Do this after drm_atomic_helper_setup_commit() because
+	 * we still want to skip the fb cleanup waits from the
+	 * atomic helper. Although that does risk yanking the
+	 * mapping from under the display engine.
+	 *
+	 * FIXME doing watermarks and fb cleanup from a vblank worker
+	 * (assuming we had any) would solve these problems.
 	 */
 	if (INTEL_GEN(dev_priv) < 9)
 		state->legacy_cursor_update = false;
-
-	ret = drm_atomic_helper_setup_commit(state, nonblock);
-	if (ret)
-		return ret;
 
 	drm_atomic_state_get(state);
 	i915_sw_fence_init(&intel_state->commit_ready,
