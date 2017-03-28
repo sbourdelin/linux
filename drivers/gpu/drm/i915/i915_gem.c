@@ -4250,7 +4250,19 @@ static void __i915_gem_free_objects(struct drm_i915_private *i915,
 {
 	struct drm_i915_gem_object *obj, *on;
 
-	mutex_lock(&i915->drm.struct_mutex);
+	if (!mutex_trylock(&i915->drm.struct_mutex)) {
+		/* If we fail to acquire the struct_mutex, put back the
+		 * freed list and we will try again in the future. By
+		 * rescheduling the task we prevent us from blocking
+		 * the worker indefinitely on a prolonged wait for
+		 * struct_mutex.
+		 */
+		if (llist_add_batch(llist_reverse_order(freed), freed,
+				    &i915->mm.free_list))
+			schedule_work(&i915->mm.free_work);
+		return;
+	}
+
 	intel_runtime_pm_get(i915);
 	llist_for_each_entry(obj, freed, freed) {
 		struct i915_vma *vma, *vn;
