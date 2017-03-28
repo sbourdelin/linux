@@ -611,12 +611,15 @@ static void intel_lrc_irq_handler(unsigned long data)
 	intel_uncore_forcewake_put(dev_priv, engine->fw_domains);
 }
 
-static bool insert_request(struct i915_priotree *pt, struct rb_root *root)
+static bool insert_request(struct i915_priotree *pt, struct rb_root *root,
+			   bool reinsert)
 {
 	struct rb_node **p, *rb;
 	bool first = true;
 
-	/* most positive priority is scheduled first, equal priorities fifo */
+	/* most positive priority is scheduled first,
+	 * equal priorities - fifo, except when we're reinserting - lifo
+	 */
 	rb = NULL;
 	p = &root->rb_node;
 	while (*p) {
@@ -624,7 +627,8 @@ static bool insert_request(struct i915_priotree *pt, struct rb_root *root)
 
 		rb = *p;
 		pos = rb_entry(rb, typeof(*pos), node);
-		if (pt->priority > pos->priority) {
+		if ((pt->priority > pos->priority) ||
+		    ((pt->priority == pos->priority) && reinsert)) {
 			p = &rb->rb_left;
 		} else {
 			p = &rb->rb_right;
@@ -645,7 +649,8 @@ static void execlists_submit_request(struct drm_i915_gem_request *request)
 	/* Will be called from irq-context when using foreign fences. */
 	spin_lock_irqsave(&engine->timeline->lock, flags);
 
-	if (insert_request(&request->priotree, &engine->execlist_queue)) {
+	if (insert_request(&request->priotree,
+			   &engine->execlist_queue, false)) {
 		engine->execlist_first = &request->priotree.node;
 		if (execlists_elsp_ready(engine))
 			tasklet_hi_schedule(&engine->irq_tasklet);
@@ -742,7 +747,7 @@ static void execlists_schedule(struct drm_i915_gem_request *request, int prio)
 
 		pt->priority = prio;
 		rb_erase(&pt->node, &engine->execlist_queue);
-		if (insert_request(pt, &engine->execlist_queue))
+		if (insert_request(pt, &engine->execlist_queue, false))
 			engine->execlist_first = &pt->node;
 	}
 
