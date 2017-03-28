@@ -67,26 +67,18 @@ struct imx_media_fim {
 };
 
 static void update_fim_nominal(struct imx_media_fim *fim,
-			       struct imx_media_subdev *sensor)
+			       const struct v4l2_fract *fi)
 {
-	struct v4l2_streamparm parm;
-	struct v4l2_fract tpf;
-	int ret;
-
-	parm.type = V4L2_BUF_TYPE_VIDEO_CAPTURE;
-	ret = v4l2_subdev_call(sensor->sd, video, g_parm, &parm);
-	tpf = parm.parm.capture.timeperframe;
-
-	if (ret || tpf.denominator == 0) {
-		dev_dbg(fim->sd->dev, "no tpf from sensor, FIM disabled\n");
+	if (fi->denominator == 0) {
+		dev_dbg(fim->sd->dev, "no frame interval, FIM disabled\n");
 		fim->enabled = false;
 		return;
 	}
 
-	fim->nominal = DIV_ROUND_CLOSEST(1000 * 1000 * tpf.numerator,
-					 tpf.denominator);
+	fim->nominal = DIV_ROUND_CLOSEST_ULL(1000000ULL * (u64)fi->numerator,
+					     fi->denominator);
 
-	dev_dbg(fim->sd->dev, "sensor FI=%lu usec\n", fim->nominal);
+	dev_dbg(fim->sd->dev, "FI=%lu usec\n", fim->nominal);
 }
 
 static void reset_fim(struct imx_media_fim *fim, bool curval)
@@ -130,8 +122,8 @@ static void send_fim_event(struct imx_media_fim *fim, unsigned long error)
 
 /*
  * Monitor an averaged frame interval. If the average deviates too much
- * from the sensor's nominal frame rate, send the frame interval error
- * event. The frame intervals are averaged in order to quiet noise from
+ * from the nominal frame rate, send the frame interval error event. The
+ * frame intervals are averaged in order to quiet noise from
  * (presumably random) interrupt latency.
  */
 static void frame_interval_monitor(struct imx_media_fim *fim,
@@ -422,12 +414,12 @@ EXPORT_SYMBOL_GPL(imx_media_fim_set_power);
 
 /* Called by the subdev in its s_stream callback */
 int imx_media_fim_set_stream(struct imx_media_fim *fim,
-			     struct imx_media_subdev *sensor,
+			     const struct v4l2_fract *fi,
 			     bool on)
 {
 	if (on) {
 		reset_fim(fim, true);
-		update_fim_nominal(fim, sensor);
+		update_fim_nominal(fim, fi);
 
 		if (fim->icap_channel >= 0)
 			fim_acquire_first_ts(fim);
