@@ -100,27 +100,27 @@ static s32 vmci_transport_error_to_vsock_error(s32 vmci_error)
 
 	switch (vmci_error) {
 	case VMCI_ERROR_NO_MEM:
-		err = ENOMEM;
+		err = -ENOMEM;
 		break;
 	case VMCI_ERROR_DUPLICATE_ENTRY:
 	case VMCI_ERROR_ALREADY_EXISTS:
-		err = EADDRINUSE;
+		err = -EADDRINUSE;
 		break;
 	case VMCI_ERROR_NO_ACCESS:
-		err = EPERM;
+		err = -EPERM;
 		break;
 	case VMCI_ERROR_NO_RESOURCES:
-		err = ENOBUFS;
+		err = -ENOBUFS;
 		break;
 	case VMCI_ERROR_INVALID_RESOURCE:
-		err = EHOSTUNREACH;
+		err = -EHOSTUNREACH;
 		break;
 	case VMCI_ERROR_INVALID_ARGS:
 	default:
-		err = EINVAL;
+		err = -EINVAL;
 	}
 
-	return err > 0 ? -err : err;
+	return err;
 }
 
 static u32 vmci_transport_peer_rid(u32 peer_cid)
