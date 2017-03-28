@@ -2285,6 +2285,78 @@ int of_genpd_parse_idle_states(struct device_node *dn,
 	return 0;
 }
 EXPORT_SYMBOL_GPL(of_genpd_parse_idle_states);
+
+static struct generic_pm_domain *genpd_get(struct device_node *np, int index)
+{
+	struct of_phandle_args genpdspec;
+	struct generic_pm_domain *genpd;
+	int ret;
+
+	if (index < 0)
+		return ERR_PTR(-EINVAL);
+
+	ret = of_parse_phandle_with_args(np, "power-domains",
+					 "#power-domain-cells", index,
+					 &genpdspec);
+	if (ret)
+		return ERR_PTR(ret);
+
+	mutex_lock(&gpd_list_lock);
+
+	genpd = genpd_get_from_provider(&genpdspec);
+	of_node_put(genpdspec.np);
+
+	if (!IS_ERR(genpd)) {
+		genpd_lock(genpd);
+		genpd->device_count++;
+		genpd->suspended_count++;
+		genpd_unlock(genpd);
+	}
+
+	mutex_unlock(&gpd_list_lock);
+
+	return genpd;
+}
+
+/**
+ * of_genpd_get() - Get a PM domain by index using a device node
+ * @np: pointer to PM domain consumer node
+ * @index: index reference for a PM domain in the consumer node
+ *
+ * This function parses the 'power-domains' property using the index
+ * provided to look up a PM domain from the registered list of PM domain
+ * providers.
+ */
+struct generic_pm_domain *of_genpd_get(struct device_node *np, int index)
+{
+	return genpd_get(np, index);
+}
+EXPORT_SYMBOL(of_genpd_get);
+
+/**
+ * of_genpd_get_by_name() - Get a PM domain by name using a device node
+ * @np: pointer to PM domain consumer node
+ * @name: name reference for a PM domain in the consumer node
+ *
+ * This function parses the 'power-domains' and 'power-domain-names'
+ * properties, and uses them to look up a PM domain from the registered
+ * list of PM domain providers.
+ */
+struct generic_pm_domain *of_genpd_get_by_name(struct device_node *np,
+					       const char *name)
+{
+	int index;
+
+	if (!np || !name)
+		return ERR_PTR(-EINVAL);
+
+	index = of_property_match_string(np, "power-domain-names", name);
+	if (index < 0)
+		return ERR_PTR(index);
+
+	return genpd_get(np, index);
+}
+EXPORT_SYMBOL(of_genpd_get_by_name);
 #endif /* CONFIG_PM_GENERIC_DOMAINS_OF */
 
 
