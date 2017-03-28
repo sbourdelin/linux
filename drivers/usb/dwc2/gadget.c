@@ -1384,6 +1384,11 @@ static int dwc2_hsotg_ep_queue(struct usb_ep *ep, struct usb_request *req,
 		return 0;
 	}
 
+	/* Change EP direction if status phase request is after data out */
+	if (!hs_ep->index && !req->length && !hs_ep->dir_in &&
+	    (hs->ep0_state == DWC2_EP0_DATA_OUT))
+		hs_ep->dir_in = 1;
+
 	if (first) {
 		if (!hs_ep->isochronous) {
 			dwc2_hsotg_start_req(hs, hs_ep, hs_req, false);
@@ -2342,14 +2347,6 @@ static void dwc2_hsotg_handle_outdone(struct dwc2_hsotg *hsotg, int epnum)
 		 */
 	}
 
-	/* DDMA IN status phase will start from StsPhseRcvd interrupt */
-	if (!using_desc_dma(hsotg) && epnum == 0 &&
-	    hsotg->ep0_state == DWC2_EP0_DATA_OUT) {
-		/* Move to STATUS IN */
-		dwc2_hsotg_ep0_zlp(hsotg, true);
-		return;
-	}
-
 	/*
 	 * Slave mode OUT transfers do not go through XferComplete so
 	 * adjust the ISOC parity here.
@@ -3012,13 +3009,8 @@ static void dwc2_hsotg_epint(struct dwc2_hsotg *hsotg, unsigned int idx,
 		}
 	}
 
-	if (ints & DXEPINT_STSPHSERCVD) {
+	if (ints & DXEPINT_STSPHSERCVD)
 		dev_dbg(hsotg->dev, "%s: StsPhseRcvd\n", __func__);
-
-		/* Move to STATUS IN for DDMA */
-		if (using_desc_dma(hsotg))
-			dwc2_hsotg_ep0_zlp(hsotg, true);
-	}
 
 	if (ints & DXEPINT_BACK2BACKSETUP)
 		dev_dbg(hsotg->dev, "%s: B2BSetup/INEPNakEff\n", __func__);
