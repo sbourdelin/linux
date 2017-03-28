@@ -260,6 +260,20 @@ void liquidio_link_ctrl_cmd_completion(void *nctrl_ptr)
 		netif_info(lio, probe, lio->netdev, "Set RX/TX flow control parameters\n");
 		break;
 
+	case OCTNET_CMD_PKT_STEERING_ENABLE:
+		netif_info(lio, probe, lio->netdev,
+			   "%s Packet Steering Enabled\n", netdev->name);
+		lio_set_priv_flag(lio->oct_dev, OCT_PRIV_FLAG_PKT_STEERING,
+				  true);
+		break;
+
+	case OCTNET_CMD_PKT_STEERING_DISABLE:
+		netif_info(lio, probe, lio->netdev,
+			   "%s Packet Steering Disabled\n", netdev->name);
+		lio_set_priv_flag(lio->oct_dev, OCT_PRIV_FLAG_PKT_STEERING,
+				  false);
+		break;
+
 	default:
 		dev_err(&oct->pci_dev->dev, "%s Unknown cmd %d\n", __func__,
 			nctrl->ncmd.s.cmd);

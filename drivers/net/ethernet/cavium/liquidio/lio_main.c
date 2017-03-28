@@ -4165,6 +4165,10 @@ static int setup_nic_devices(struct octeon_device *octeon_dev)
 			liquidio_set_feature(netdev,
 					     OCTNET_CMD_VERBOSE_ENABLE, 0);
 
+		if (OCTEON_CN23XX_PF(octeon_dev))
+			liquidio_set_feature(netdev,
+					     OCTNET_CMD_PKT_STEERING_ENABLE, 0);
+
 		if (setup_link_status_change_wq(netdev))
 			goto setup_nic_dev_fail;
 

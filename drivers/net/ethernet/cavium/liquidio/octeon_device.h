@@ -803,9 +803,9 @@ void octeon_free_ioq_vector(struct octeon_device *oct);
 int octeon_allocate_ioq_vector(struct octeon_device  *oct);
 void lio_enable_irq(struct octeon_droq *droq, struct octeon_instr_queue *iq);
 
-/* LiquidIO driver pivate flags */
+/* LiquidIO driver private flags */
 enum {
-	OCT_PRIV_FLAG_TX_BYTES = 0, /* Tx interrupts by pending byte count */
+	OCT_PRIV_FLAG_PKT_STEERING,
 };
 
 #define OCT_PRIV_FLAG_DEFAULT 0x0

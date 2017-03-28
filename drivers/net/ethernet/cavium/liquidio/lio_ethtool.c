@@ -215,6 +215,7 @@ static const char oct_droq_stats_strings[][ETH_GSTRING_LEN] = {
 
 /* LiquidIO driver private flags */
 static const char oct_priv_flags_strings[][ETH_GSTRING_LEN] = {
+	"pkt_steering",
 };
 
 #define OCTNIC_NCMD_AUTONEG_ON  0x1
@@ -2560,6 +2561,18 @@ static void lio_get_regs(struct net_device *dev,
 	}
 }
 
+void lio_set_pkt_steering(struct net_device *netdev, bool flag)
+{
+	int cmd;
+
+	if (flag)
+		cmd = OCTNET_CMD_PKT_STEERING_ENABLE;
+	else
+		cmd = OCTNET_CMD_PKT_STEERING_DISABLE;
+
+	liquidio_set_feature(netdev, cmd, 0);
+}
+
 static u32 lio_get_priv_flags(struct net_device *netdev)
 {
 	struct lio *lio = GET_LIO(netdev);
@@ -2569,11 +2582,8 @@ static u32 lio_get_priv_flags(struct net_device *netdev)
 
 static int lio_set_priv_flags(struct net_device *netdev, u32 flags)
 {
-	struct lio *lio = GET_LIO(netdev);
-	bool intr_by_tx_bytes = !!(flags & (0x1 << OCT_PRIV_FLAG_TX_BYTES));
-
-	lio_set_priv_flag(lio->oct_dev, OCT_PRIV_FLAG_TX_BYTES,
-			  intr_by_tx_bytes);
+	lio_set_pkt_steering(netdev, !!(flags &
+					(0x1 << OCT_PRIV_FLAG_PKT_STEERING)));
 	return 0;
 }
 

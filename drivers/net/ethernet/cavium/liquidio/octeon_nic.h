@@ -203,8 +203,8 @@ octnet_prepare_pci_cmd_o3(struct octeon_device *oct,
 	}
 
 	pki_ih3->w       = 1;
-	pki_ih3->raw     = 1;
-	pki_ih3->utag    = 1;
+	pki_ih3->raw     = 0;
+	pki_ih3->utag    = 0;
 	pki_ih3->utt     = 1;
 	pki_ih3->uqpg    = oct->instr_queue[setup->s.iq_no]->txpciq.s.use_qpg;
 
@@ -217,8 +217,8 @@ octnet_prepare_pci_cmd_o3(struct octeon_device *oct,
 
 	pki_ih3->tagtype = ORDERED_TAG;
 	pki_ih3->qpg     = oct->instr_queue[setup->s.iq_no]->txpciq.s.qpg;
-	pki_ih3->pm      = 0x7; /*0x7 - meant for Parse nothing, uninterpreted*/
-	pki_ih3->sl      = 8;   /* sl will be sizeof(pki_ih3)*/
+	pki_ih3->pm      = 0x0; /* parse from L2 */
+	pki_ih3->sl      = ih3->fsz;
 
 	irh = (struct octeon_instr_irh *)&cmd->cmd3.irh;
 
