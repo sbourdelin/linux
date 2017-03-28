@@ -1348,8 +1348,7 @@ cfs_hash_lookup(struct cfs_hash *hs, const void *key)
 EXPORT_SYMBOL(cfs_hash_lookup);
 
 static void
-cfs_hash_for_each_enter(struct cfs_hash *hs)
-{
+cfs_hash_for_each_enter(struct cfs_hash *hs) {
 	LASSERT(!cfs_hash_is_exiting(hs));
 
 	if (!cfs_hash_with_rehash(hs))
@@ -1375,8 +1374,7 @@ cfs_hash_for_each_enter(struct cfs_hash *hs)
 }
 
 static void
-cfs_hash_for_each_exit(struct cfs_hash *hs)
-{
+cfs_hash_for_each_exit(struct cfs_hash *hs) {
 	int remained;
 	int bits;
 
@@ -1407,8 +1405,7 @@ cfs_hash_for_each_exit(struct cfs_hash *hs)
  */
 static u64
 cfs_hash_for_each_tight(struct cfs_hash *hs, cfs_hash_for_each_cb_t func,
-			void *data, int remove_safe)
-{
+			void *data, int remove_safe) {
 	struct hlist_node *hnode;
 	struct hlist_node *pos;
 	struct cfs_hash_bd bd;
@@ -1465,8 +1462,7 @@ struct cfs_hash_cond_arg {
 
 static int
 cfs_hash_cond_del_locked(struct cfs_hash *hs, struct cfs_hash_bd *bd,
-			 struct hlist_node *hnode, void *data)
-{
+			 struct hlist_node *hnode, void *data) {
 	struct cfs_hash_cond_arg *cond = data;
 
 	if (cond->func(cfs_hash_object(hs, hnode), cond->arg))
@@ -1480,8 +1476,8 @@ cfs_hash_cond_del_locked(struct cfs_hash *hs, struct cfs_hash_bd *bd,
  * any object be reference.
  */
 void
-cfs_hash_cond_del(struct cfs_hash *hs, cfs_hash_cond_opt_cb_t func, void *data)
-{
+cfs_hash_cond_del(struct cfs_hash *hs, cfs_hash_cond_opt_cb_t func,
+		void *data) {
 	struct cfs_hash_cond_arg arg = {
 		.func	= func,
 		.arg	= data,
@@ -1493,31 +1489,27 @@ EXPORT_SYMBOL(cfs_hash_cond_del);
 
 void
 cfs_hash_for_each(struct cfs_hash *hs, cfs_hash_for_each_cb_t func,
-		  void *data)
-{
+		  void *data) {
 	cfs_hash_for_each_tight(hs, func, data, 0);
 }
 EXPORT_SYMBOL(cfs_hash_for_each);
 
 void
 cfs_hash_for_each_safe(struct cfs_hash *hs, cfs_hash_for_each_cb_t func,
-		       void *data)
-{
+		       void *data) {
 	cfs_hash_for_each_tight(hs, func, data, 1);
 }
 EXPORT_SYMBOL(cfs_hash_for_each_safe);
 
 static int
 cfs_hash_peek(struct cfs_hash *hs, struct cfs_hash_bd *bd,
-	      struct hlist_node *hnode, void *data)
-{
+	      struct hlist_node *hnode, void *data) {
 	*(int *)data = 0;
 	return 1; /* return 1 to break the loop */
 }
 
 int
-cfs_hash_is_empty(struct cfs_hash *hs)
-{
+cfs_hash_is_empty(struct cfs_hash *hs) {
 	int empty = 1;
 
 	cfs_hash_for_each_tight(hs, cfs_hash_peek, &empty, 0);
@@ -1526,8 +1518,7 @@ cfs_hash_is_empty(struct cfs_hash *hs)
 EXPORT_SYMBOL(cfs_hash_is_empty);
 
 u64
-cfs_hash_size_get(struct cfs_hash *hs)
-{
+cfs_hash_size_get(struct cfs_hash *hs) {
 	return cfs_hash_with_counter(hs) ?
 	       atomic_read(&hs->hs_count) :
 	       cfs_hash_for_each_tight(hs, NULL, NULL, 0);
@@ -1551,8 +1542,7 @@ EXPORT_SYMBOL(cfs_hash_size_get);
  */
 static int
 cfs_hash_for_each_relax(struct cfs_hash *hs, cfs_hash_for_each_cb_t func,
-			void *data, int start)
-{
+			void *data, int start) {
 	struct hlist_node *hnode;
 	struct hlist_node *tmp;
 	struct cfs_hash_bd bd;
@@ -1629,8 +1619,7 @@ again:
 
 int
 cfs_hash_for_each_nolock(struct cfs_hash *hs, cfs_hash_for_each_cb_t func,
-			 void *data, int start)
-{
+			 void *data, int start) {
 	if (cfs_hash_with_no_lock(hs) ||
 	    cfs_hash_with_rehash_key(hs) ||
 	    !cfs_hash_with_no_itemref(hs))
@@ -1661,8 +1650,7 @@ EXPORT_SYMBOL(cfs_hash_for_each_nolock);
  */
 int
 cfs_hash_for_each_empty(struct cfs_hash *hs, cfs_hash_for_each_cb_t func,
-			void *data)
-{
+			void *data) {
 	unsigned int i = 0;
 
 	if (cfs_hash_with_no_lock(hs))
@@ -1718,8 +1706,7 @@ EXPORT_SYMBOL(cfs_hash_hlist_for_each);
  */
 void
 cfs_hash_for_each_key(struct cfs_hash *hs, const void *key,
-		      cfs_hash_for_each_cb_t func, void *data)
-{
+		      cfs_hash_for_each_cb_t func, void *data) {
 	struct hlist_node *hnode;
 	struct cfs_hash_bd bds[2];
 	unsigned int i;
