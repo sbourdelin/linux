@@ -875,6 +875,45 @@ out:
 	return ret;
 }
 
+static int prp_enum_frame_size(struct v4l2_subdev *sd,
+			       struct v4l2_subdev_pad_config *cfg,
+			       struct v4l2_subdev_frame_size_enum *fse)
+{
+	struct prp_priv *priv = sd_to_priv(sd);
+	struct v4l2_subdev_format format = {0};
+	const struct imx_media_pixfmt *cc;
+	int ret = 0;
+
+	if (fse->pad >= PRPENCVF_NUM_PADS || fse->index != 0)
+		return -EINVAL;
+
+	mutex_lock(&priv->lock);
+
+	format.pad = fse->pad;
+	format.which = fse->which;
+	format.format.code = fse->code;
+	format.format.width = 1;
+	format.format.height = 1;
+	prp_try_fmt(priv, cfg, &format, &cc);
+	fse->min_width = format.format.width;
+	fse->min_height = format.format.height;
+
+	if (format.format.code != fse->code) {
+		ret = -EINVAL;
+		goto out;
+	}
+
+	format.format.code = fse->code;
+	format.format.width = -1;
+	format.format.height = -1;
+	prp_try_fmt(priv, cfg, &format, &cc);
+	fse->max_width = format.format.width;
+	fse->max_height = format.format.height;
+out:
+	mutex_unlock(&priv->lock);
+	return ret;
+}
+
 static int prp_link_setup(struct media_entity *entity,
 			  const struct media_pad *local,
 			  const struct media_pad *remote, u32 flags)
@@ -1125,6 +1164,7 @@ static void prp_unregistered(struct v4l2_subdev *sd)
 
 static struct v4l2_subdev_pad_ops prp_pad_ops = {
 	.enum_mbus_code = prp_enum_mbus_code,
+	.enum_frame_size = prp_enum_frame_size,
 	.get_fmt = prp_get_fmt,
 	.set_fmt = prp_set_fmt,
 	.link_validate = prp_link_validate,
