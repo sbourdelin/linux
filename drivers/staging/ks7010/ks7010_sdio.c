@@ -1095,7 +1095,6 @@ static void ks7010_sdio_remove(struct sdio_func *func)
 	DPRINTK(1, "ks7010_sdio_remove()\n");
 
 	card = sdio_get_drvdata(func);
-
 	if (!card)
 		return;
 
@@ -1148,10 +1147,8 @@ out:
 	sdio_release_host(func);
 
 	sdio_set_drvdata(func, NULL);
-
 	kfree(card);
 	DPRINTK(1, "kfree()\n");
-
 	DPRINTK(5, " Bye !!\n");
 }
 
