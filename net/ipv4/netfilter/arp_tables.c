@@ -310,7 +310,7 @@ static int mark_source_chains(const struct xt_table_info *newinfo,
 	for (hook = 0; hook < NF_ARP_NUMHOOKS; hook++) {
 		unsigned int pos = newinfo->hook_entry[hook];
 		struct arpt_entry *e
-			= (struct arpt_entry *)(entry0 + pos);
+			= (entry0 + pos);
 
 		if (!(valid_hooks & (1 << hook)))
 			continue;
@@ -354,14 +354,12 @@ static int mark_source_chains(const struct xt_table_info *newinfo,
 					if (pos == oldpos)
 						goto next;
 
-					e = (struct arpt_entry *)
-						(entry0 + pos);
+					e = (entry0 + pos);
 				} while (oldpos == pos + e->next_offset);
 
 				/* Move along one */
 				size = e->next_offset;
-				e = (struct arpt_entry *)
-					(entry0 + pos + size);
+				e = (entry0 + pos + size);
 				if (pos + size >= newinfo->size)
 					return 0;
 				e->counters.pcnt = pos;
@@ -376,16 +374,14 @@ static int mark_source_chains(const struct xt_table_info *newinfo,
 					if (!xt_find_jump_offset(offsets, newpos,
 								 newinfo->number))
 						return 0;
-					e = (struct arpt_entry *)
-						(entry0 + newpos);
+					e = (entry0 + newpos);
 				} else {
 					/* ... this is a fallthru */
 					newpos = pos + e->next_offset;
 					if (newpos >= newinfo->size)
 						return 0;
 				}
-				e = (struct arpt_entry *)
-					(entry0 + newpos);
+				e = (entry0 + newpos);
 				e->counters.pcnt = pos;
 				pos = newpos;
 			}
@@ -681,7 +677,7 @@ static int copy_entries_to_user(unsigned int total_size,
 	for (off = 0, num = 0; off < total_size; off += e->next_offset, num++){
 		const struct xt_entry_target *t;
 
-		e = (struct arpt_entry *)(loc_cpu_entry + off);
+		e = (loc_cpu_entry + off);
 		if (copy_to_user(userptr + off, e, sizeof(*e))) {
 			ret = -EFAULT;
 			goto free_counters;
@@ -1128,7 +1124,7 @@ compat_copy_entry_from_user(struct compat_arpt_entry *e, void **dstptr,
 	int h;
 
 	origsize = *size;
-	de = (struct arpt_entry *)*dstptr;
+	de = *dstptr;
 	memcpy(de, e, sizeof(struct arpt_entry));
 	memcpy(&de->counters, &e->counters, sizeof(e->counters));
 
@@ -1322,7 +1318,7 @@ static int compat_copy_entry_to_user(struct arpt_entry *e, void __user **dstptr,
 	int ret;
 
 	origsize = *size;
-	ce = (struct compat_arpt_entry __user *)*dstptr;
+	ce = *dstptr;
 	if (copy_to_user(ce, e, sizeof(struct arpt_entry)) != 0 ||
 	    copy_to_user(&ce->counters, &counters[i],
 	    sizeof(counters[i])) != 0)
