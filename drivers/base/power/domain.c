@@ -303,6 +303,9 @@ static int genpd_power_off(struct generic_pm_domain *genpd, bool one_dev_on,
 	if (atomic_read(&genpd->sd_count) > 0)
 		return -EBUSY;
 
+	if (genpd->device_count > genpd->suspended_count)
+		return -EBUSY;
+
 	list_for_each_entry(pdd, &genpd->dev_list, list_node) {
 		enum pm_qos_flags_status stat;
 
@@ -1568,6 +1571,117 @@ int pm_genpd_remove(struct generic_pm_domain *genpd)
 }
 EXPORT_SYMBOL_GPL(pm_genpd_remove);
 
+/**
+ * pm_genpd_get - Get a generic I/O PM domain by name
+ * @name: Name of the PM domain.
+ *
+ * Look-ups a PM domain by name. If found, increment the device
+ * count for PM domain to ensure that the PM domain cannot be
+ * removed, increment the suspended count so that it can still
+ * be turned off (when not in-use) and return a pointer to its
+ * generic_pm_domain structure. If not found return ERR_PTR().
+ */
+struct generic_pm_domain *pm_genpd_get(const char *name)
+{
+	struct generic_pm_domain *gpd, *genpd = ERR_PTR(-EEXIST);
+
+	if (!name)
+		return ERR_PTR(-EINVAL);
+
+	mutex_lock(&gpd_list_lock);
+	list_for_each_entry(gpd, &gpd_list, gpd_list_node) {
+		if (!strcmp(gpd->name, name)) {
+			genpd_lock(gpd);
+			gpd->device_count++;
+			gpd->suspended_count++;
+			genpd_unlock(gpd);
+			genpd = gpd;
+			break;
+		}
+	}
+	mutex_unlock(&gpd_list_lock);
+
+	return genpd;
+}
+EXPORT_SYMBOL(pm_genpd_get);
+
+/**
+ * pm_genpd_put - Put a generic I/O PM domain
+ * @genpd: Pointer to a PM domain.
+ */
+void pm_genpd_put(struct generic_pm_domain *genpd)
+{
+	if (!genpd)
+		return;
+
+	genpd_lock(genpd);
+
+	if (WARN_ON(!genpd->device_count || !genpd->suspended_count))
+		goto out;
+
+	genpd->suspended_count--;
+	genpd->device_count--;
+
+out:
+	genpd_unlock(genpd);
+}
+EXPORT_SYMBOL(pm_genpd_put);
+
+/**
+ * pm_genpd_poweron - Power on a generic I/O PM domain
+ * @genpd: Pointer to a PM domain.
+ *
+ * Powers on a PM domain, if not already on, and decrements the
+ * 'suspended_count' to prevent the PM domain from being powered off.
+ */
+int pm_genpd_poweron(struct generic_pm_domain *genpd)
+{
+	if (!genpd)
+		return -EINVAL;
+
+	genpd_lock(genpd);
+
+	if (WARN_ON(!genpd->suspended_count))
+		goto out;
+
+	genpd->suspended_count--;
+	genpd_sync_power_on(genpd, true, 0);
+
+out:
+	genpd_unlock(genpd);
+
+	return 0;
+}
+EXPORT_SYMBOL_GPL(pm_genpd_poweron);
+
+/**
+ * pm_genpd_poweroff - Power off a generic I/O PM domain
+ * @genpd: Pointer to a PM domain.
+ *
+ * Increments the 'suspended_count' for a PM domain and if the
+ * 'suspended_count' equals the 'device_count' then will power
+ * off the PM domain.
+ */
+int pm_genpd_poweroff(struct generic_pm_domain *genpd)
+{
+	if (!genpd)
+		return -EINVAL;
+
+	genpd_lock(genpd);
+
+	if (WARN_ON(genpd->suspended_count >= genpd->device_count))
+		goto out;
+
+	genpd->suspended_count++;
+	genpd_sync_power_off(genpd, false, 0);
+
+out:
+	genpd_unlock(genpd);
+
+	return 0;
+}
+EXPORT_SYMBOL_GPL(pm_genpd_poweroff);
+
 #ifdef CONFIG_PM_GENERIC_DOMAINS_OF
 
 typedef struct generic_pm_domain *(*genpd_xlate_t)(struct of_phandle_args *args,
@@ -2171,7 +2285,6 @@ int of_genpd_parse_idle_states(struct device_node *dn,
 	return 0;
 }
 EXPORT_SYMBOL_GPL(of_genpd_parse_idle_states);
-
 #endif /* CONFIG_PM_GENERIC_DOMAINS_OF */
 
 
@@ -2223,7 +2336,7 @@ static int pm_genpd_summary_one(struct seq_file *s,
 	const char *kobj_path;
 	struct gpd_link *link;
 	char state[16];
-	int ret;
+	int ret, count;
 
 	ret = genpd_lock_interruptible(genpd);
 	if (ret)
@@ -2250,6 +2363,8 @@ static int pm_genpd_summary_one(struct seq_file *s,
 			seq_puts(s, ", ");
 	}
 
+	count = genpd->device_count;
+
 	list_for_each_entry(pm_data, &genpd->dev_list, list_node) {
 		kobj_path = kobject_get_path(&pm_data->dev->kobj,
 				genpd_is_irq_safe(genpd) ?
@@ -2260,7 +2375,11 @@ static int pm_genpd_summary_one(struct seq_file *s,
 		seq_printf(s, "\n    %-50s  ", kobj_path);
 		rtpm_status_str(s, pm_data->dev);
 		kfree(kobj_path);
+		count--;
 	}
+
+	if (count > 0)
+		seq_printf(s, "\n    unknown (%d)", count);
 
 	seq_puts(s, "\n");
 exit:
