@@ -895,19 +895,20 @@ int __detach_context(struct cxl_context *ctx);
  * plpar_hcall9() in hvCall.S
  * As a consequence:
  * - we don't need to do any endianness conversion
- * - the pid and tid are an exception. They are 32-bit values returned in
- *   the same 64-bit register. So we do need to worry about byte ordering.
+ * - the pid (reserved0) and tid (reserved1) are an exception. They are
+ *   32-bit values returned in the same 64-bit register. So we do need
+ *   to worry about byte ordering.
  */
 struct cxl_irq_info {
 	u64 dsisr;
 	u64 dar;
 	u64 dsr;
 #ifndef CONFIG_CPU_LITTLE_ENDIAN
-	u32 pid;
-	u32 tid;
+	u32 reserved0;
+	u32 reserved1;
 #else
-	u32 tid;
-	u32 pid;
+	u32 reserved1;
+	u32 reserved0;
 #endif
 	u64 afu_err;
 	u64 errstat;
