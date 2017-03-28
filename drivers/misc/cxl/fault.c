@@ -230,12 +230,14 @@ void cxl_handle_fault(struct work_struct *fault_work)
 		}
 	}
 
-	if (dsisr & CXL_PSL_DSISR_An_DS)
-		cxl_handle_segment_miss(ctx, mm, dar);
-	else if (dsisr & CXL_PSL_DSISR_An_DM)
-		cxl_handle_page_fault(ctx, mm, dsisr, dar);
-	else
-		WARN(1, "cxl_handle_fault has nothing to handle\n");
+	if (cxl_is_psl8(ctx->afu)) {
+		if (dsisr & CXL_PSL_DSISR_An_DS)
+			cxl_handle_segment_miss(ctx, mm, dar);
+		else if (dsisr & CXL_PSL_DSISR_An_DM)
+			cxl_handle_page_fault(ctx, mm, dsisr, dar);
+		else
+			WARN(1, "cxl_handle_fault has nothing to handle\n");
+	}
 
 	if (mm)
 		mmput(mm);
