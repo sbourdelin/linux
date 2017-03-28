@@ -4188,8 +4188,16 @@ static int packet_set_ring(struct sock *sk, union tpacket_req_u *req_u,
 		}
 
 		err = -EINVAL;
-		if (unlikely((int)req->tp_block_size <= 0))
+
+		if (unlikely(req->tp_block_size > INT_MAX))
 			goto out;
+		if (unlikely(req->tp_block_size == 0))
+			goto out;
+		if (unlikely(req->tp_frame_size > req->tp_block_size))
+			goto out;
+		if (unlikely(req->tp_frame_size == 0))
+			goto out;
+
 		if (unlikely(!PAGE_ALIGNED(req->tp_block_size)))
 			goto out;
 		if (po->tp_version >= TPACKET_V3 &&
@@ -4203,8 +4211,6 @@ static int packet_set_ring(struct sock *sk, union tpacket_req_u *req_u,
 			goto out;
 
 		rb->frames_per_block = req->tp_block_size / req->tp_frame_size;
-		if (unlikely(rb->frames_per_block == 0))
-			goto out;
 		if (unlikely((rb->frames_per_block * req->tp_block_nr) !=
 					req->tp_frame_nr))
 			goto out;
