@@ -269,6 +269,7 @@ struct renesas_usb3 {
 	u8 ep0_buf[USB3_EP0_BUF_SIZE];
 	bool softconnect;
 	bool workaround_for_vbus;
+	bool forced_b_device;
 };
 
 #define gadget_to_renesas_usb3(_gadget)	\
@@ -352,6 +353,11 @@ static void usb3_disable_pipe_irq(struct renesas_usb3 *usb3, int num)
 	usb3_clear_bit(usb3, USB_INT_2_PIPE(num), USB3_USB_INT_ENA_2);
 }
 
+static bool usb3_is_host(struct renesas_usb3 *usb3)
+{
+	return !(usb3_read(usb3, USB3_DRD_CON) & DRD_CON_PERI_CON);
+}
+
 static void usb3_init_axi_bridge(struct renesas_usb3 *usb3)
 {
 	/* Set AXI_INT */
@@ -362,10 +368,6 @@ static void usb3_init_axi_bridge(struct renesas_usb3 *usb3)
 
 static void usb3_init_epc_registers(struct renesas_usb3 *usb3)
 {
-	/* FIXME: How to change host / peripheral mode as well? */
-	usb3_set_bit(usb3, DRD_CON_PERI_CON, USB3_DRD_CON);
-	usb3_clear_bit(usb3, DRD_CON_VBOUT, USB3_DRD_CON);
-
 	usb3_write(usb3, ~0, USB3_USB_INT_STA_1);
 	usb3_enable_irq_1(usb3, USB_INT_1_VBUS_CNG);
 }
@@ -538,6 +540,12 @@ static void usb3_check_vbus(struct renesas_usb3 *usb3)
 	}
 }
 
+static void usb3_mode_b_peri(struct renesas_usb3 *usb3)
+{
+	usb3_set_bit(usb3, DRD_CON_PERI_CON, USB3_DRD_CON);
+	usb3_clear_bit(usb3, DRD_CON_VBOUT, USB3_DRD_CON);
+}
+
 static void renesas_usb3_init_controller(struct renesas_usb3 *usb3)
 {
 	usb3_init_axi_bridge(usb3);
@@ -554,6 +562,16 @@ static void renesas_usb3_stop_controller(struct renesas_usb3 *usb3)
 	usb3_write(usb3, 0, USB3_USB_INT_ENA_1);
 	usb3_write(usb3, 0, USB3_USB_INT_ENA_2);
 	usb3_write(usb3, 0, USB3_AXI_INT_ENA);
+}
+
+static void renesas_usb3_init_forced_b_device(struct renesas_usb3 *usb3)
+{
+	unsigned long flags;
+
+	spin_lock_irqsave(&usb3->lock, flags);
+	usb3_mode_b_peri(usb3);
+	renesas_usb3_init_controller(usb3);
+	spin_unlock_irqrestore(&usb3->lock, flags);
 }
 
 static void usb3_irq_epc_int_1_pll_wakeup(struct renesas_usb3 *usb3)
@@ -1756,6 +1774,47 @@ static const struct usb_gadget_ops renesas_usb3_gadget_ops = {
 	.set_selfpowered	= renesas_usb3_set_selfpowered,
 };
 
+static const char *usb3_get_role_string(struct renesas_usb3 *usb3)
+{
+	if (usb3->forced_b_device)
+		return "b-device";
+	else if (usb3_is_host(usb3))
+		return "host";
+	else
+		return "peripheral";
+}
+
+static ssize_t role_store(struct device *dev, struct device_attribute *attr,
+			  const char *buf, size_t count)
+{
+	struct renesas_usb3 *usb3 = dev_get_drvdata(dev);
+
+	if (!usb3->driver)
+		return -ENODEV;
+
+	if (!strncmp(buf, "b-device", strlen("b-device"))) {
+		usb3->forced_b_device = true;
+		renesas_usb3_init_forced_b_device(usb3);
+	} else {
+		usb3->forced_b_device = false;
+		return -EINVAL;
+	}
+
+	return count;
+}
+
+static ssize_t role_show(struct device *dev, struct device_attribute *attr,
+			 char *buf)
+{
+	struct renesas_usb3 *usb3 = dev_get_drvdata(dev);
+
+	if (!usb3->driver)
+		return -ENODEV;
+
+	return sprintf(buf, "%s\n", usb3_get_role_string(usb3));
+}
+static DEVICE_ATTR_RW(role);
+
 /*------- platform_driver ------------------------------------------------*/
 static int renesas_usb3_remove(struct platform_device *pdev)
 {
@@ -1946,6 +2005,10 @@ static int renesas_usb3_probe(struct platform_device *pdev)
 	if (ret < 0)
 		goto err_add_udc;
 
+	ret = device_create_file(&pdev->dev, &dev_attr_role);
+	if (ret < 0)
+		goto err_dev_create;
+
 	usb3->workaround_for_vbus = priv->workaround_for_vbus;
 
 	pm_runtime_enable(&pdev->dev);
@@ -1954,6 +2017,9 @@ static int renesas_usb3_probe(struct platform_device *pdev)
 	dev_info(&pdev->dev, "probed\n");
 
 	return 0;
+
+err_dev_create:
+	usb_del_gadget_udc(&usb3->gadget);
 
 err_add_udc:
 	__renesas_usb3_ep_free_request(usb3->ep0_req);
