@@ -171,6 +171,23 @@ void v4l_disable_media_source(struct video_device *vdev);
  */
 int v4l_vb2q_enable_media_source(struct vb2_queue *q);
 
+/**
+ * v4l2_pipeline_inherit_controls - Add the v4l2 controls from all
+ *				    subdev entities in a pipeline to
+ *				    the given video device.
+ * @vfd: the video device
+ * @start_entity: Starting entity
+ *
+ * This function is intended to be called from the link_notify callback,
+ * which holds the media graph mutex lock. __v4l2_pipeline_inherit_controls
+ * is provided (which does not acquire the lock) for this purpose.
+ * v4l2_pipeline_inherit_controls is also provided for use in other
+ * locations where the graph mutex is not held.
+ */
+int __v4l2_pipeline_inherit_controls(struct video_device *vfd,
+				     struct media_entity *start_entity);
+int v4l2_pipeline_inherit_controls(struct video_device *vfd,
+				   struct media_entity *start_entity);
 
 /**
  * v4l2_pipeline_pm_use - Update the use count of an entity
@@ -227,6 +244,20 @@ static inline void v4l_disable_media_source(struct video_device *vdev)
 }
 
 static inline int v4l_vb2q_enable_media_source(struct vb2_queue *q)
+{
+	return 0;
+}
+
+static inline int __v4l2_pipeline_inherit_controls(
+	struct video_device *vfd,
+	struct media_entity *start_entity)
+{
+	return 0;
+}
+
+static inline int v4l2_pipeline_inherit_controls(
+	struct video_device *vfd,
+	struct media_entity *start_entity)
 {
 	return 0;
 }
