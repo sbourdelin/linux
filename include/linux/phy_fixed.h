@@ -26,6 +26,7 @@ extern int fixed_phy_set_link_update(struct phy_device *phydev,
 extern int fixed_phy_update_state(struct phy_device *phydev,
 			   const struct fixed_phy_status *status,
 			   const struct fixed_phy_status *changed);
+extern struct device *platform_fmb_bus_get(void);
 #else
 static inline int fixed_phy_add(unsigned int irq, int phy_id,
 				struct fixed_phy_status *status,
