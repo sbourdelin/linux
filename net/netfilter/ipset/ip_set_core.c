@@ -571,7 +571,7 @@ ip_set_test(ip_set_id_t index, const struct sk_buff *skb,
 	}
 
 	/* Convert error codes to nomatch */
-	return (ret < 0 ? 0 : ret);
+	return max(0, ret);
 }
 EXPORT_SYMBOL_GPL(ip_set_test);
 
