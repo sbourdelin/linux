@@ -8070,6 +8070,7 @@ void kvm_arch_sync_events(struct kvm *kvm)
 	cancel_delayed_work_sync(&kvm->arch.kvmclock_update_work);
 	kvm_free_all_assigned_devices(kvm);
 	kvm_free_pit(kvm);
+	kvm_page_track_cleanup(kvm);
 }
 
 int __x86_set_memory_region(struct kvm *kvm, int id, gpa_t gpa, u32 size)
