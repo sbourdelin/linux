@@ -2011,6 +2011,16 @@ int genpd_dev_pm_attach(struct device *dev)
 	if (dev->pm_domain)
 		return -EEXIST;
 
+	/*
+	 * If there are more than one PM domain defined for a device,
+	 * then these need to be manually controlled by the driver
+	 * that device, because the genpd core cannot bind a device
+	 * with more than one PM domain.
+	 */
+	if (of_count_phandle_with_args(dev->of_node, "power-domains",
+				       "#power-domain-cells") > 1)
+		return 0;
+
 	ret = of_parse_phandle_with_args(dev->of_node, "power-domains",
 					"#power-domain-cells", 0, &pd_args);
 	if (ret < 0) {
