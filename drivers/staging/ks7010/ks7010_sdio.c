@@ -1067,6 +1067,7 @@ static void ks7010_sdio_remove(struct sdio_func *func)
 	int ret;
 	struct ks_sdio_card *card;
 	struct ks_wlan_private *priv;
+	struct net_device *netdev;
 
 	DPRINTK(1, "ks7010_sdio_remove()\n");
 
@@ -1077,60 +1078,62 @@ static void ks7010_sdio_remove(struct sdio_func *func)
 
 	DPRINTK(1, "priv = card->priv\n");
 	priv = card->priv;
-	if (priv) {
-		struct net_device *netdev = priv->net_dev;
+	if (!priv)
+		goto out;
 
-		ks_wlan_net_stop(netdev);
-		DPRINTK(1, "ks_wlan_net_stop\n");
+	netdev = priv->net_dev;
 
-		/* interrupt disable */
+	ks_wlan_net_stop(netdev);
+	DPRINTK(1, "ks_wlan_net_stop\n");
+
+	/* interrupt disable */
+	sdio_claim_host(func);
+	sdio_writeb(func, 0, INT_ENABLE, &ret);
+	sdio_writeb(func, 0xff, INT_PENDING, &ret);
+	sdio_release_host(func);
+	DPRINTK(1, "interrupt disable\n");
+
+	/* send stop request to MAC */
+	{
+		struct hostif_stop_request_t *pp;
+
+		pp = kzalloc(hif_align_size(sizeof(*pp)), GFP_KERNEL);
+		if (!pp) {
+			DPRINTK(3, "allocate memory failed..\n");
+			return;	/* to do goto ni suru */
+		}
+		pp->header.size =
+			cpu_to_le16((uint16_t)
+				(sizeof(*pp) -
+					sizeof(pp->header.size)));
+		pp->header.event = cpu_to_le16((uint16_t)HIF_STOP_REQ);
+
 		sdio_claim_host(func);
-		sdio_writeb(func, 0, INT_ENABLE, &ret);
-		sdio_writeb(func, 0xff, INT_PENDING, &ret);
+		write_to_device(priv, (unsigned char *)pp,
+				hif_align_size(sizeof(*pp)));
 		sdio_release_host(func);
-		DPRINTK(1, "interrupt disable\n");
-
-		/* send stop request to MAC */
-		{
-			struct hostif_stop_request_t *pp;
-
-			pp = kzalloc(hif_align_size(sizeof(*pp)), GFP_KERNEL);
-			if (!pp) {
-				DPRINTK(3, "allocate memory failed..\n");
-				return;	/* to do goto ni suru */
-			}
-			pp->header.size =
-			    cpu_to_le16((uint16_t)
-					(sizeof(*pp) -
-					 sizeof(pp->header.size)));
-			pp->header.event = cpu_to_le16((uint16_t)HIF_STOP_REQ);
-
-			sdio_claim_host(func);
-			write_to_device(priv, (unsigned char *)pp,
-					hif_align_size(sizeof(*pp)));
-			sdio_release_host(func);
-			kfree(pp);
-		}
-		DPRINTK(1, "STOP Req\n");
-
-		if (priv->ks_wlan_hw.ks7010sdio_wq) {
-			flush_workqueue(priv->ks_wlan_hw.ks7010sdio_wq);
-			destroy_workqueue(priv->ks_wlan_hw.ks7010sdio_wq);
-		}
-		DPRINTK(1,
-			"destroy_workqueue(priv->ks_wlan_hw.ks7010sdio_wq);\n");
-
-		hostif_exit(priv);
-		DPRINTK(1, "hostif_exit\n");
-
-		unregister_netdev(netdev);
-
-		trx_device_exit(priv);
-		kfree(priv->ks_wlan_hw.read_buf);
-		free_netdev(priv->net_dev);
-		card->priv = NULL;
+		kfree(pp);
 	}
+	DPRINTK(1, "STOP Req\n");
 
+	if (priv->ks_wlan_hw.ks7010sdio_wq) {
+		flush_workqueue(priv->ks_wlan_hw.ks7010sdio_wq);
+		destroy_workqueue(priv->ks_wlan_hw.ks7010sdio_wq);
+	}
+	DPRINTK(1,
+		"destroy_workqueue(priv->ks_wlan_hw.ks7010sdio_wq);\n");
+
+	hostif_exit(priv);
+	DPRINTK(1, "hostif_exit\n");
+
+	unregister_netdev(netdev);
+
+	trx_device_exit(priv);
+	kfree(priv->ks_wlan_hw.read_buf);
+	free_netdev(priv->net_dev);
+	card->priv = NULL;
+
+out:
 	sdio_claim_host(func);
 	sdio_release_irq(func);
 	DPRINTK(1, "sdio_release_irq()\n");
