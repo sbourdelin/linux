@@ -65,9 +65,9 @@ socket_match(const struct sk_buff *skb, struct xt_action_param *par,
 		/* Ignore sockets listening on INADDR_ANY,
 		 * unless XT_SOCKET_NOWILDCARD is set
 		 */
-		wildcard = (!(info->flags & XT_SOCKET_NOWILDCARD) &&
+		wildcard = !(info->flags & XT_SOCKET_NOWILDCARD) &&
 			    sk_fullsock(sk) &&
-			    inet_sk(sk)->inet_rcv_saddr == 0);
+			    inet_sk(sk)->inet_rcv_saddr == 0;
 
 		/* Ignore non-transparent sockets,
 		 * if XT_SOCKET_TRANSPARENT is used
@@ -122,9 +122,9 @@ socket_mt6_v1_v2_v3(const struct sk_buff *skb, struct xt_action_param *par)
 		/* Ignore sockets listening on INADDR_ANY
 		 * unless XT_SOCKET_NOWILDCARD is set
 		 */
-		wildcard = (!(info->flags & XT_SOCKET_NOWILDCARD) &&
+		wildcard = !(info->flags & XT_SOCKET_NOWILDCARD) &&
 			    sk_fullsock(sk) &&
-			    ipv6_addr_any(&sk->sk_v6_rcv_saddr));
+			    ipv6_addr_any(&sk->sk_v6_rcv_saddr);
 
 		/* Ignore non-transparent sockets,
 		 * if XT_SOCKET_TRANSPARENT is used

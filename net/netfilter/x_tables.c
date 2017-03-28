@@ -506,7 +506,7 @@ static int xt_check_entry_match(const char *match, const char *target,
 			return -EINVAL;
 
 		length -= pos->u.match_size;
-		pos = ((void *)((char *)(pos) + (pos)->u.match_size));
+		pos = (void *)((char *)(pos) + (pos)->u.match_size);
 	} while (length > 0);
 
 	return 0;

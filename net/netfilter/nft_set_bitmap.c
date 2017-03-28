@@ -47,7 +47,7 @@ struct nft_bitmap {
 
 static inline void nft_bitmap_location(u32 key, u32 *idx, u32 *off)
 {
-	u32 k = (key << 1);
+	u32 k = key << 1;
 
 	*idx = k / BITS_PER_BYTE;
 	*off = k % BITS_PER_BYTE;
