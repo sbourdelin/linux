@@ -493,9 +493,6 @@ static void hci_uart_tty_close(struct tty_struct *tty)
 
 	BT_DBG("tty %p", tty);
 
-	/* Detach from the tty */
-	tty->disc_data = NULL;
-
 	if (!hu)
 		return;
 
@@ -516,6 +513,9 @@ static void hci_uart_tty_close(struct tty_struct *tty)
 		clear_bit(HCI_UART_PROTO_READY, &hu->flags);
 		hu->proto->close(hu);
 	}
+
+	/* Detach from the tty */
+	tty->disc_data = NULL;
 
 	clear_bit(HCI_UART_PROTO_SET, &hu->flags);
 
