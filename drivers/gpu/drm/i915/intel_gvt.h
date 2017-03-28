@@ -32,6 +32,12 @@ void intel_gvt_cleanup(struct drm_i915_private *dev_priv);
 int intel_gvt_init_device(struct drm_i915_private *dev_priv);
 void intel_gvt_clean_device(struct drm_i915_private *dev_priv);
 int intel_gvt_init_host(void);
+
+static inline bool
+intel_gvt_context_single_port_submit(const struct i915_gem_context *ctx)
+{
+	return i915_gem_context_force_single_submission(ctx);
+}
 #else
 static inline int intel_gvt_init(struct drm_i915_private *dev_priv)
 {
@@ -39,6 +45,11 @@ static inline int intel_gvt_init(struct drm_i915_private *dev_priv)
 }
 static inline void intel_gvt_cleanup(struct drm_i915_private *dev_priv)
 {
+}
+static inline bool
+intel_gvt_context_single_port_submit(const struct i915_gem_context *ctx)
+{
+	return false;
 }
 #endif
 

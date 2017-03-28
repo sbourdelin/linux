@@ -680,8 +680,13 @@ static bool i915_guc_dequeue(struct intel_engine_cs *engine)
 		struct drm_i915_gem_request *rq =
 			rb_entry(rb, typeof(*rq), priotree.node);
 
-		if (last && rq->ctx != last->ctx) {
+		if (last && ((last->ctx != rq->ctx) ||
+			intel_gvt_context_single_port_submit(last->ctx))) {
 			if (port != engine->execlist_port)
+				break;
+
+			if (intel_gvt_context_single_port_submit(last->ctx) ||
+				intel_gvt_context_single_port_submit(rq->ctx))
 				break;
 
 			i915_gem_request_assign(&port->request, last);
