@@ -4491,7 +4491,8 @@ int __init cgroup_init(void)
 	struct cgroup_subsys *ss;
 	int ssid;
 
-	BUILD_BUG_ON(CGROUP_SUBSYS_COUNT > 16);
+	BUILD_BUG_ON(CGROUP_SUBSYS_COUNT > (sizeof(cgroup_disable_mask) * __CHAR_BIT__));
+
 	BUG_ON(percpu_init_rwsem(&cgroup_threadgroup_rwsem));
 	BUG_ON(cgroup_init_cftypes(NULL, cgroup_base_files));
 	BUG_ON(cgroup_init_cftypes(NULL, cgroup1_base_files));
