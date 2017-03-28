@@ -493,7 +493,7 @@ static struct fault_info {
 	int	sig;
 	int	code;
 	const char *name;
-} fault_info[] = {
+} fault_info[] __ro_after_init = {
 	{ do_bad,		SIGBUS,  0,		"ttbr address size fault"	},
 	{ do_bad,		SIGBUS,  0,		"level 1 address size fault"	},
 	{ do_bad,		SIGBUS,  0,		"level 2 address size fault"	},
