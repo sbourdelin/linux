@@ -244,8 +244,7 @@ static int hci_uart_close(struct hci_dev *hdev)
 {
 	BT_DBG("hdev %p", hdev);
 
-	hci_uart_flush(hdev);
-	hdev->flush = NULL;
+	/* Nothing to do for UART driver */
 	return 0;
 }
 
@@ -514,7 +513,7 @@ static void hci_uart_tty_close(struct tty_struct *tty)
 	clear_bit(HCI_UART_PROTO_SET, &hu->flags);
 
 	if (test_and_clear_bit(HCI_UART_REGISTERED, &hu->flags)) {
-		hci_uart_close(hdev);
+		hci_uart_flush(hdev);
 		hu->hdev = NULL;
 		hci_free_dev(hdev);
 	}
