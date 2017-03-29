@@ -71,10 +71,10 @@
  * an issue. The upper bound isn't an issue with existing technologies.
  */
 #define BW_SCALE 24
-#define BW_UNIT (1 << BW_SCALE)
+#define BW_UNIT BIT(BW_SCALE)
 
 #define BBR_SCALE 8	/* scaling factor for fractions in BBR (e.g. gains) */
-#define BBR_UNIT (1 << BBR_SCALE)
+#define BBR_UNIT BIT(BBR_SCALE)
 
 /* BBR has the following modes for deciding how fast to send: */
 enum bbr_mode {
