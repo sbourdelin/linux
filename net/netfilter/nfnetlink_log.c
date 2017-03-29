@@ -685,9 +685,9 @@ nfulnl_log_packet(struct net *net,
 		size += nla_total_size(sizeof(u_int32_t));
 	if (inst->flags & NFULNL_CFG_F_CONNTRACK) {
 		nfnl_ct = rcu_dereference(nfnl_ct_hook);
-		if (nfnl_ct != NULL) {
+		if (nfnl_ct) {
 			ct = nfnl_ct->get_ct(skb, &ctinfo);
-			if (ct != NULL)
+			if (ct)
 				size += nfnl_ct->build_size(ct);
 		}
 	}
@@ -870,7 +870,7 @@ static int nfulnl_recv_config(struct net *net, struct sock *ctnl,
 		}
 	}
 
-	if (cmd != NULL) {
+	if (cmd) {
 		switch (cmd->command) {
 		case NFULNL_CFG_CMD_BIND:
 			if (inst) {

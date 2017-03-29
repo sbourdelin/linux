@@ -193,7 +193,7 @@ dsthash_alloc_init(struct xt_hashlimit_htable *ht,
 	 * hashtable, double check if this packet lost race.
 	 */
 	ent = dsthash_find(ht, dst);
-	if (ent != NULL) {
+	if (ent) {
 		spin_unlock(&ht->lock);
 		*race = true;
 		return ent;
@@ -368,7 +368,7 @@ static void htable_remove_proc_entry(struct xt_hashlimit_htable *hinfo)
 	else
 		parent = hashlimit_net->ip6t_hashlimit;
 
-	if (parent != NULL)
+	if (parent)
 		remove_proc_entry(hinfo->name, parent);
 }
 

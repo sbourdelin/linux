@@ -97,7 +97,7 @@ static int nft_lookup_init(const struct nft_ctx *ctx,
 		}
 	}
 
-	if (tb[NFTA_LOOKUP_DREG] != NULL) {
+	if (tb[NFTA_LOOKUP_DREG]) {
 		if (priv->invert)
 			return -EINVAL;
 		if (!(set->flags & NFT_SET_MAP))

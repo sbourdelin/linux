@@ -64,11 +64,11 @@ static u_int32_t tcpmss_reverse_mtu(struct net *net,
 	}
 	rcu_read_lock();
 	ai = nf_get_afinfo(family);
-	if (ai != NULL)
+	if (ai)
 		ai->route(net, (struct dst_entry **)&rt, &fl, false);
 	rcu_read_unlock();
 
-	if (rt != NULL) {
+	if (rt) {
 		mtu = dst_mtu(&rt->dst);
 		dst_release(&rt->dst);
 	}

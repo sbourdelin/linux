@@ -983,7 +983,7 @@ ip_vs_add_dest(struct ip_vs_service *svc, struct ip_vs_dest_user_kern *udest)
 	dest = ip_vs_lookup_dest(svc, udest->af, &daddr, dport);
 	rcu_read_unlock();
 
-	if (dest != NULL) {
+	if (dest) {
 		IP_VS_DBG(1, "%s(): dest already exists\n", __func__);
 		return -EEXIST;
 	}
@@ -994,7 +994,7 @@ ip_vs_add_dest(struct ip_vs_service *svc, struct ip_vs_dest_user_kern *udest)
 	 */
 	dest = ip_vs_trash_get_dest(svc, udest->af, &daddr, dport);
 
-	if (dest != NULL) {
+	if (dest) {
 		IP_VS_DBG_BUF(3, "Get destination %s:%u from trash, "
 			      "dest->refcnt=%d, service %u/%s:%u\n",
 			      IP_VS_DBG_ADDR(udest->af, &daddr), ntohs(dport),
@@ -1299,7 +1299,7 @@ ip_vs_add_service(struct netns_ipvs *ipvs, struct ip_vs_service_user_kern *u,
 
 
  out_err:
-	if (svc != NULL) {
+	if (svc) {
 		ip_vs_unbind_scheduler(svc, sched);
 		ip_vs_service_free(svc);
 	}
@@ -2453,7 +2453,7 @@ do_ip_vs_set_ctl(struct sock *sk, int cmd, void __user *user, unsigned int len)
 
 	switch (cmd) {
 	case IP_VS_SO_SET_ADD:
-		if (svc != NULL)
+		if (svc)
 			ret = -EEXIST;
 		else
 			ret = ip_vs_add_service(ipvs, &usvc, &svc);

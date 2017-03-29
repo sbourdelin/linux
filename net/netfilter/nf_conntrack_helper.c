@@ -224,9 +224,9 @@ int __nf_ct_try_assign_helper(struct nf_conn *ct, struct nf_conn *tmpl,
 	if (test_bit(IPS_HELPER_BIT, &ct->status))
 		return 0;
 
-	if (tmpl != NULL) {
+	if (tmpl) {
 		help = nfct_help(tmpl);
-		if (help != NULL) {
+		if (help) {
 			helper = help->helper;
 			set_bit(IPS_HELPER_BIT, &ct->status);
 		}

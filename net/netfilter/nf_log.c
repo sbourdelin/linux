@@ -226,7 +226,7 @@ void nf_log_packet(struct net *net,
 	const struct nf_logger *logger;
 
 	rcu_read_lock();
-	if (loginfo != NULL)
+	if (loginfo)
 		logger = rcu_dereference(loggers[pf][loginfo->type]);
 	else
 		logger = rcu_dereference(net->nf.nf_loggers[pf]);
