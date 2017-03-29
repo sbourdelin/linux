@@ -3254,6 +3254,16 @@ out_drop:
 	return NETDEV_TX_OK;
 }
 
+static inline struct i40e_ring *i40e_get_txq(struct i40e_vsi *vsi,
+					     struct sk_buff *skb)
+{
+	unsigned int txq = skb->queue_mapping;
+
+	if (txq >= vsi->num_queue_pairs)
+		txq = txq % vsi->num_queue_pairs;
+
+	return vsi->tx_rings[txq];
+}
 /**
  * i40e_lan_xmit_frame - Selects the correct VSI and Tx queue to send buffer
  * @skb:    send buffer
@@ -3265,7 +3275,6 @@ netdev_tx_t i40e_lan_xmit_frame(struct sk_buff *skb, struct net_device *netdev)
 {
 	struct i40e_netdev_priv *np = netdev_priv(netdev);
 	struct i40e_vsi *vsi = np->vsi;
-	struct i40e_ring *tx_ring = vsi->tx_rings[skb->queue_mapping];
 
 	/* hardware can't handle really short frames, hardware padding works
 	 * beyond this point
@@ -3273,7 +3282,7 @@ netdev_tx_t i40e_lan_xmit_frame(struct sk_buff *skb, struct net_device *netdev)
 	if (skb_put_padto(skb, I40E_MIN_TX_LEN))
 		return NETDEV_TX_OK;
 
-	return i40e_xmit_frame_ring(skb, tx_ring);
+	return i40e_xmit_frame_ring(skb, i40e_get_txq(vsi, skb));
 }
 
 /**
