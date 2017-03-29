@@ -29,6 +29,18 @@
 			reg = <0xbf000000 0x01000000>; /* 16M */
 		};
 	};
+
+	gpio-fsi {
+		compatible = "fsi-master-gpio", "fsi-master";
+
+		status = "okay";
+
+		clock-gpios = <&gpio ASPEED_GPIO(AA, 0) GPIO_ACTIVE_HIGH>;
+		data-gpios = <&gpio ASPEED_GPIO(AA, 2) GPIO_ACTIVE_HIGH>;
+		mux-gpios = <&gpio ASPEED_GPIO(A, 6) GPIO_ACTIVE_HIGH>;
+		enable-gpios = <&gpio ASPEED_GPIO(D, 0) GPIO_ACTIVE_HIGH>;
+		trans-gpios = <&gpio ASPEED_GPIO(R, 2) GPIO_ACTIVE_HIGH>;
+	};
 };
 
 &uart5 {
