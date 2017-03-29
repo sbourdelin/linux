@@ -1154,9 +1154,9 @@ void __init sync_Arb_IDs(void)
 }
 
 /*
- * An initial setup of the virtual wire mode.
+ * Setup the through-local-APIC virtual wire mode.
  */
-void __init init_bsp_APIC(void)
+void apic_virture_wire_mode_setup(void)
 {
 	unsigned int value;
 

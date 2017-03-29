@@ -127,6 +127,7 @@ extern void disconnect_bsp_APIC(int virt_wire_setup);
 extern void disable_local_APIC(void);
 extern void lapic_shutdown(void);
 extern void sync_Arb_IDs(void);
+extern void apic_virture_wire_mode_setup(void);
 extern void init_bsp_APIC(void);
 extern void setup_local_APIC(void);
 extern void init_apic_mappings(void);
@@ -170,6 +171,7 @@ static inline void disable_local_APIC(void) { }
 # define setup_boot_APIC_clock x86_init_noop
 # define setup_secondary_APIC_clock x86_init_noop
 static inline void lapic_update_tsc_freq(void) { }
+static inline void apic_virture_wire_mode_setup(void) {}
 #endif /* !CONFIG_X86_LOCAL_APIC */
 
 #ifdef CONFIG_X86_X2APIC
