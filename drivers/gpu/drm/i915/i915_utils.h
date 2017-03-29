@@ -92,4 +92,9 @@
 	__T;								\
 })
 
+#define u64_to_ptr(T, x) ({						\
+	typecheck(u64, x);						\
+	(T *)(uintptr_t)(x);						\
+})
+
 #endif /* !__I915_UTILS_H */
