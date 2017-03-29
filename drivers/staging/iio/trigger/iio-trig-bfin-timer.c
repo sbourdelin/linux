@@ -211,8 +211,9 @@ static int iio_bfin_tmr_trigger_probe(struct platform_device *pdev)
 	if (ret)
 		goto out;
 
-	ret = request_irq(st->irq, iio_bfin_tmr_trigger_isr,
-			  0, st->trig->name, st);
+	ret = devm_request_irq(&pdev->dev,
+			       st->irq, iio_bfin_tmr_trigger_isr,
+			       0, st->trig->name, st);
 	if (ret) {
 		dev_err(&pdev->dev,
 			"request IRQ-%d failed", st->irq);
@@ -256,7 +257,6 @@ static int iio_bfin_tmr_trigger_probe(struct platform_device *pdev)
 
 	return 0;
 out_free_irq:
-	free_irq(st->irq, st);
 out1:
 	iio_trigger_unregister(st->trig);
 out:
@@ -271,7 +271,6 @@ static int iio_bfin_tmr_trigger_remove(struct platform_device *pdev)
 	disable_gptimers(st->t->bit);
 	if (st->output_enable)
 		peripheral_free(st->t->pin);
-	free_irq(st->irq, st);
 	iio_trigger_unregister(st->trig);
 	iio_trigger_free(st->trig);
 
