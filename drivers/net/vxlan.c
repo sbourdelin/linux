@@ -1504,19 +1504,42 @@ out:
 
 #if IS_ENABLED(CONFIG_IPV6)
 static struct sk_buff *vxlan_na_create(struct sk_buff *request,
-	struct neighbour *n, bool isrouter)
+				       struct ipv6hdr *ip6h, struct nd_msg *ns,
+				       struct neighbour *n, bool isrouter)
 {
 	struct net_device *dev = request->dev;
 	struct sk_buff *reply;
-	struct nd_msg *ns, *na;
+	struct nd_msg *na;
 	struct ipv6hdr *pip6;
-	u8 *daddr;
+	u8 *daddr, _daddr[ETH_ALEN];
 	int na_olen = 8; /* opt hdr + ETH_ALEN for target */
-	int ns_olen;
-	int i, len;
+	int len, remaining, offset;
 
 	if (dev == NULL)
 		return NULL;
+
+	/* Destination address is the "source link-layer address"
+	 * option if present and valid or the source Ethernet
+	 * address */
+	daddr = eth_hdr(request)->h_source;
+	remaining = htons(ip6h->payload_len) - sizeof(*ns);
+	offset = skb_network_offset(request) + sizeof(*ip6h) + sizeof(*ns);
+	while (remaining > sizeof(struct nd_opt_hdr)) {
+		struct nd_opt_hdr *ohdr, _ohdr;
+		ohdr = skb_header_pointer(request, offset, sizeof(_ohdr), &_ohdr);
+		if (!ohdr || !(len = ohdr->nd_opt_len<<3) || len > remaining)
+			return NULL;
+		if (ohdr->nd_opt_type == ND_OPT_SOURCE_LL_ADDR &&
+		    len == na_olen) {
+			daddr = skb_header_pointer(request, offset + sizeof(_ohdr),
+						   sizeof(_daddr), _daddr);
+			if (!daddr)
+				return NULL;
+			break;
+		}
+		remaining -= len;
+		offset += len;
+	}
 
 	len = LL_RESERVED_SPACE(dev) + sizeof(struct ipv6hdr) +
 		sizeof(*na) + na_olen + dev->needed_tailroom;
@@ -1530,16 +1553,6 @@ static struct sk_buff *vxlan_na_create(struct sk_buff *request,
 	skb_push(reply, sizeof(struct ethhdr));
 	skb_reset_mac_header(reply);
 
-	ns = (struct nd_msg *)skb_transport_header(request);
-
-	daddr = eth_hdr(request)->h_source;
-	ns_olen = request->len - skb_transport_offset(request) - sizeof(*ns);
-	for (i = 0; i < ns_olen-1; i += (ns->opt[i+1]<<3)) {
-		if (ns->opt[i] == ND_OPT_SOURCE_LL_ADDR) {
-			daddr = ns->opt + i + sizeof(struct nd_opt_hdr);
-			break;
-		}
-	}
 
 	/* Ethernet header */
 	ether_addr_copy(eth_hdr(reply)->h_dest, daddr);
@@ -1556,10 +1569,10 @@ static struct sk_buff *vxlan_na_create(struct sk_buff *request,
 	pip6 = ipv6_hdr(reply);
 	memset(pip6, 0, sizeof(struct ipv6hdr));
 	pip6->version = 6;
-	pip6->priority = ipv6_hdr(request)->priority;
+	pip6->priority = ip6h->priority;
 	pip6->nexthdr = IPPROTO_ICMPV6;
 	pip6->hop_limit = 255;
-	pip6->daddr = ipv6_hdr(request)->saddr;
+	pip6->daddr = ip6h->saddr;
 	pip6->saddr = *(struct in6_addr *)n->primary_key;
 
 	skb_pull(reply, sizeof(struct ipv6hdr));
@@ -1591,11 +1604,11 @@ static struct sk_buff *vxlan_na_create(struct sk_buff *request,
 	return reply;
 }
 
-static int neigh_reduce(struct net_device *dev, struct sk_buff *skb, __be32 vni)
+static int neigh_reduce(struct net_device *dev, struct sk_buff *skb,
+			struct ipv6hdr *iphdr, struct nd_msg *msg,
+			__be32 vni)
 {
 	struct vxlan_dev *vxlan = netdev_priv(dev);
-	struct nd_msg *msg;
-	const struct ipv6hdr *iphdr;
 	const struct in6_addr *daddr;
 	struct neighbour *n;
 	struct inet6_dev *in6_dev;
@@ -1604,13 +1617,7 @@ static int neigh_reduce(struct net_device *dev, struct sk_buff *skb, __be32 vni)
 	if (!in6_dev)
 		goto out;
 
-	iphdr = ipv6_hdr(skb);
 	daddr = &iphdr->daddr;
-
-	msg = (struct nd_msg *)skb_transport_header(skb);
-	if (msg->icmph.icmp6_code != 0 ||
-	    msg->icmph.icmp6_type != NDISC_NEIGHBOUR_SOLICITATION)
-		goto out;
 
 	if (ipv6_addr_loopback(daddr) ||
 	    ipv6_addr_is_multicast(&msg->target))
@@ -1634,7 +1641,7 @@ static int neigh_reduce(struct net_device *dev, struct sk_buff *skb, __be32 vni)
 			goto out;
 		}
 
-		reply = vxlan_na_create(skb, n,
+		reply = vxlan_na_create(skb, iphdr, msg, n,
 					!!(f ? f->flags & NTF_ROUTER : 0));
 
 		neigh_release(n);
@@ -2242,16 +2249,20 @@ static netdev_tx_t vxlan_xmit(struct sk_buff *skb, struct net_device *dev)
 		if (ntohs(eth->h_proto) == ETH_P_ARP)
 			return arp_reduce(dev, skb, vni);
 #if IS_ENABLED(CONFIG_IPV6)
-		else if (ntohs(eth->h_proto) == ETH_P_IPV6 &&
-			 pskb_may_pull(skb, sizeof(struct ipv6hdr)
-				       + sizeof(struct nd_msg)) &&
-			 ipv6_hdr(skb)->nexthdr == IPPROTO_ICMPV6) {
-				struct nd_msg *msg;
-
-				msg = (struct nd_msg *)skb_transport_header(skb);
-				if (msg->icmph.icmp6_code == 0 &&
-				    msg->icmph.icmp6_type == NDISC_NEIGHBOUR_SOLICITATION)
-					return neigh_reduce(dev, skb, vni);
+		else if (ntohs(eth->h_proto) == ETH_P_IPV6) {
+			struct ipv6hdr *hdr, _hdr;
+			struct nd_msg *msg, _msg;
+			if ((hdr = skb_header_pointer(skb,
+						      skb_network_offset(skb),
+						      sizeof(_hdr), &_hdr)) &&
+			    hdr->nexthdr == IPPROTO_ICMPV6 &&
+			    (msg = skb_header_pointer(skb,
+						      skb_network_offset(skb) +
+						      sizeof(_hdr),
+						      sizeof(_msg), &_msg)) &&
+			    msg->icmph.icmp6_code == 0 &&
+			    msg->icmph.icmp6_type == NDISC_NEIGHBOUR_SOLICITATION)
+				return neigh_reduce(dev, skb, hdr, msg, vni);
 		}
 #endif
 	}
