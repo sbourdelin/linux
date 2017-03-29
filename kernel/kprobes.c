@@ -1942,6 +1942,9 @@ int register_kretprobe(struct kretprobe *rp)
 	rp->kp.break_handler = NULL;
 
 	/* Pre-allocate memory for max kretprobe instances */
+	if (rp->maxactive > KRETPROBE_MAXACTIVE_ALLOC)
+		return -E2BIG;
+
 	if (rp->maxactive <= 0) {
 #ifdef CONFIG_PREEMPT
 		rp->maxactive = max_t(unsigned int, 10, 2*num_possible_cpus());
