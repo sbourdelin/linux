@@ -39,7 +39,7 @@ static int st_sensors_i2c_read_byte(struct st_sensor_transfer_buffer *tb,
 	*res_byte = err & 0xff;
 
 st_accel_i2c_read_byte_error:
-	return err < 0 ? err : 0;
+	return min(err, 0);
 }
 
 static int st_sensors_i2c_read_multiple_byte(
