@@ -271,6 +271,13 @@ static int max77843_muic_get_cable_type(struct max77843_muic_info *info,
 		} else {
 			*attached = true;
 			switch (adc) {
+			case MAX77843_MUIC_ADC_RESERVED_ACC_1:
+			case MAX77843_MUIC_ADC_RESERVED_ACC_2:
+			case MAX77843_MUIC_ADC_RESERVED_ACC_3:
+			case MAX77843_MUIC_ADC_RESERVED_ACC_4:
+			case MAX77843_MUIC_ADC_RESERVED_ACC_5:
+				info->prev_chg_type = MAX77843_MUIC_CHG_NONE;
+				break;
 			case MAX77843_MUIC_ADC_GROUND:
 				info->prev_chg_type = MAX77843_MUIC_CHG_GND;
 				break;
@@ -403,6 +410,11 @@ static int max77843_muic_adc_handler(struct max77843_muic_info *info)
 
 	switch (cable_type) {
 	case MAX77843_MUIC_ADC_GROUND:
+	case MAX77843_MUIC_ADC_RESERVED_ACC_1:
+	case MAX77843_MUIC_ADC_RESERVED_ACC_2:
+	case MAX77843_MUIC_ADC_RESERVED_ACC_3:
+	case MAX77843_MUIC_ADC_RESERVED_ACC_4:
+	case MAX77843_MUIC_ADC_RESERVED_ACC_5:
 		ret = max77843_muic_adc_gnd_handler(info);
 		if (ret < 0)
 			return ret;
@@ -427,11 +439,6 @@ static int max77843_muic_adc_handler(struct max77843_muic_info *info)
 	case MAX77843_MUIC_ADC_REMOTE_S10_BUTTON:
 	case MAX77843_MUIC_ADC_REMOTE_S11_BUTTON:
 	case MAX77843_MUIC_ADC_REMOTE_S12_BUTTON:
-	case MAX77843_MUIC_ADC_RESERVED_ACC_1:
-	case MAX77843_MUIC_ADC_RESERVED_ACC_2:
-	case MAX77843_MUIC_ADC_RESERVED_ACC_3:
-	case MAX77843_MUIC_ADC_RESERVED_ACC_4:
-	case MAX77843_MUIC_ADC_RESERVED_ACC_5:
 	case MAX77843_MUIC_ADC_AUDIO_DEVICE_TYPE2:
 	case MAX77843_MUIC_ADC_PHONE_POWERED_DEV:
 	case MAX77843_MUIC_ADC_TTY_CONVERTER:
