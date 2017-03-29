@@ -264,37 +264,20 @@ static int max77843_muic_get_cable_type(struct max77843_muic_info *info,
 		chg_type = info->status[MAX77843_MUIC_STATUS2] &
 				MAX77843_MUIC_STATUS2_CHGTYP_MASK;
 
-		/* Check GROUND accessory with charger cable */
-		if (adc == MAX77843_MUIC_ADC_GROUND) {
-			if (chg_type == MAX77843_MUIC_CHG_NONE) {
-				/*
-				 * The following state when charger cable is
-				 * disconnected but the GROUND accessory still
-				 * connected.
-				 */
-				*attached = false;
-				cable_type = info->prev_chg_type;
-				info->prev_chg_type = MAX77843_MUIC_CHG_NONE;
-			} else {
-
-				/*
-				 * The following state when charger cable is
-				 * connected on the GROUND accessory.
-				 */
-				*attached = true;
-				cable_type = MAX77843_MUIC_CHG_GND;
-				info->prev_chg_type = MAX77843_MUIC_CHG_GND;
-			}
-			break;
-		}
-
 		if (chg_type == MAX77843_MUIC_CHG_NONE) {
 			*attached = false;
 			cable_type = info->prev_chg_type;
 			info->prev_chg_type = MAX77843_MUIC_CHG_NONE;
 		} else {
 			*attached = true;
-			cable_type = info->prev_chg_type = chg_type;
+			switch (adc) {
+			case MAX77843_MUIC_ADC_GROUND:
+				info->prev_chg_type = MAX77843_MUIC_CHG_GND;
+				break;
+			default:
+				info->prev_chg_type = chg_type;
+			}
+			cable_type = info->prev_chg_type;
 		}
 		break;
 	case MAX77843_CABLE_GROUP_ADC_GND:
