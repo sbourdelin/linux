@@ -908,6 +908,7 @@ static int amdgpu_cs_ib_fill(struct amdgpu_device *adev,
 			struct amdgpu_bo *aobj = NULL;
 			uint64_t offset;
 			uint8_t *kptr;
+			uint64_t it_last;
 
 			m = amdgpu_cs_find_mapping(parser, chunk_ib->va_start,
 						   &aobj);
@@ -916,8 +917,9 @@ static int amdgpu_cs_ib_fill(struct amdgpu_device *adev,
 				return -EINVAL;
 			}
 
+			it_last = m->it.last;
 			if ((chunk_ib->va_start + chunk_ib->ib_bytes) >
-			    (m->it.last + 1) * AMDGPU_GPU_PAGE_SIZE) {
+			    (it_last + 1) * AMDGPU_GPU_PAGE_SIZE) {
 				DRM_ERROR("IB va_start+ib_bytes is invalid\n");
 				return -EINVAL;
 			}
