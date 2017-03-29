@@ -16,7 +16,9 @@
 #include <drm/drmP.h>
 
 #include "sun4i_backend.h"
+#include "sun4i_crtc.h"
 #include "sun4i_layer.h"
+#include "sunxi_layer.h"
 
 struct sun4i_plane_desc {
 	       enum drm_plane_type     type;
@@ -100,6 +102,17 @@ static const struct sun4i_plane_desc sun4i_backend_planes[] = {
 	},
 };
 
+static struct drm_plane *sun4i_layer_get_plane(void *layer)
+{
+	struct sun4i_layer *sun4i_layer = layer;
+
+	return &sun4i_layer->plane;
+}
+
+static const struct sunxi_layer_ops layer_ops = {
+	.get_plane = sun4i_layer_get_plane,
+};
+
 static struct sun4i_layer *sun4i_layer_init_one(struct drm_device *drm,
 						struct sun4i_backend *backend,
 						const struct sun4i_plane_desc *plane)
@@ -129,9 +142,10 @@ static struct sun4i_layer *sun4i_layer_init_one(struct drm_device *drm,
 }
 
 struct sun4i_layer **sun4i_layers_init(struct drm_device *drm,
-				       struct sun4i_backend *backend)
+				       struct sun4i_crtc *crtc)
 {
 	struct sun4i_layer **layers;
+	struct sun4i_backend *backend = crtc->backend;
 	int i;
 
 	layers = devm_kcalloc(drm->dev, ARRAY_SIZE(sun4i_backend_planes) + 1,
@@ -180,6 +194,9 @@ struct sun4i_layer **sun4i_layers_init(struct drm_device *drm,
 		layer->id = i;
 		layers[i] = layer;
 	};
+
+	/* Assign layer ops to the CRTC */
+	crtc->layer_ops = &layer_ops;
 
 	return layers;
 }

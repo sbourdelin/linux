@@ -29,6 +29,7 @@
 #include "sun4i_crtc.h"
 #include "sun4i_drv.h"
 #include "sun4i_layer.h"
+#include "sunxi_layer.h"
 #include "sun4i_tcon.h"
 
 static void sun4i_crtc_atomic_begin(struct drm_crtc *crtc,
@@ -149,7 +150,7 @@ struct sun4i_crtc *sun4i_crtc_init(struct drm_device *drm,
 	scrtc->tcon = tcon;
 
 	/* Create our layers */
-	scrtc->layers = sun4i_layers_init(drm, scrtc->backend);
+	scrtc->layers = (void **)sun4i_layers_init(drm, scrtc);
 	if (IS_ERR(scrtc->layers)) {
 		dev_err(drm->dev, "Couldn't create the planes\n");
 		return NULL;
@@ -157,14 +158,15 @@ struct sun4i_crtc *sun4i_crtc_init(struct drm_device *drm,
 
 	/* find primary and cursor planes for drm_crtc_init_with_planes */
 	for (i = 0; scrtc->layers[i]; i++) {
-		struct sun4i_layer *layer = scrtc->layers[i];
+		void *layer = scrtc->layers[i];
+		struct drm_plane *plane = scrtc->layer_ops->get_plane(layer);
 
-		switch (layer->plane.type) {
+		switch (plane->type) {
 		case DRM_PLANE_TYPE_PRIMARY:
-			primary = &layer->plane;
+			primary = plane;
 			break;
 		case DRM_PLANE_TYPE_CURSOR:
-			cursor = &layer->plane;
+			cursor = plane;
 			break;
 		default:
 			break;
@@ -190,10 +192,11 @@ struct sun4i_crtc *sun4i_crtc_init(struct drm_device *drm,
 	/* Set possible_crtcs to this crtc for overlay planes */
 	for (i = 0; scrtc->layers[i]; i++) {
 		uint32_t possible_crtcs = BIT(drm_crtc_index(&scrtc->crtc));
-		struct sun4i_layer *layer = scrtc->layers[i];
+		void *layer = scrtc->layers[i];
+		struct drm_plane *plane = scrtc->layer_ops->get_plane(layer);
 
-		if (layer->plane.type == DRM_PLANE_TYPE_OVERLAY)
-			layer->plane.possible_crtcs = possible_crtcs;
+		if (plane->type == DRM_PLANE_TYPE_OVERLAY)
+			plane->possible_crtcs = possible_crtcs;
 	}
 
 	return scrtc;

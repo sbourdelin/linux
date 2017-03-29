@@ -27,6 +27,6 @@ plane_to_sun4i_layer(struct drm_plane *plane)
 }
 
 struct sun4i_layer **sun4i_layers_init(struct drm_device *drm,
-				       struct sun4i_backend *backend);
+				       struct sun4i_crtc *crtc);
 
 #endif /* _SUN4I_LAYER_H_ */
