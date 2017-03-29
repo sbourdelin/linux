@@ -2403,7 +2403,7 @@ EXPORT_SYMBOL_GPL(vbin_printf);
  * return is greater than or equal to @size, the resulting
  * string is truncated.
  */
-int bstr_printf(char *buf, size_t size, const char *fmt, const u32 *bin_buf)
+__unverified_nocapture(3) int bstr_printf(char *buf, size_t size, const char *fmt, const u32 *bin_buf)
 {
 	struct printf_spec spec = {0};
 	char *str, *end;
