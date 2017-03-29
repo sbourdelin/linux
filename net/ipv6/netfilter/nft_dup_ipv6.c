@@ -38,7 +38,7 @@ static int nft_dup_ipv6_init(const struct nft_ctx *ctx,
 	struct nft_dup_ipv6 *priv = nft_expr_priv(expr);
 	int err;
 
-	if (tb[NFTA_DUP_SREG_ADDR] == NULL)
+	if (!tb[NFTA_DUP_SREG_ADDR])
 		return -EINVAL;
 
 	priv->sreg_addr = nft_parse_register(tb[NFTA_DUP_SREG_ADDR]);

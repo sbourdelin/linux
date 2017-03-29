@@ -44,7 +44,7 @@ const struct tcphdr *nf_reject_ip6_tcphdr_get(struct sk_buff *oldskb,
 
 	otcph = skb_header_pointer(oldskb, tcphoff, sizeof(struct tcphdr),
 				   otcph);
-	if (otcph == NULL)
+	if (!otcph)
 		return NULL;
 
 	/* No RST for RST. */

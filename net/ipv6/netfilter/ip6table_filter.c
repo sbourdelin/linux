@@ -56,7 +56,7 @@ static int __net_init ip6table_filter_table_init(struct net *net)
 		return 0;
 
 	repl = ip6t_alloc_initial_table(&packet_filter);
-	if (repl == NULL)
+	if (!repl)
 		return -ENOMEM;
 	/* Entry 1 is the FORWARD hook */
 	((struct ip6t_standard *)repl->entries)[1].target.verdict =

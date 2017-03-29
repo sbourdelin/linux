@@ -53,7 +53,7 @@ static bool ah_mt6(const struct sk_buff *skb, struct xt_action_param *par)
 	}
 
 	ah = skb_header_pointer(skb, ptr, sizeof(_ah), &_ah);
-	if (ah == NULL) {
+	if (!ah) {
 		par->hotdrop = true;
 		return false;
 	}

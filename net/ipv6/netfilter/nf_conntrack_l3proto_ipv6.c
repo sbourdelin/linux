@@ -49,7 +49,7 @@ static bool ipv6_pkt_to_tuple(const struct sk_buff *skb, unsigned int nhoff,
 
 	ap = skb_header_pointer(skb, nhoff + offsetof(struct ipv6hdr, saddr),
 				sizeof(_addrs), _addrs);
-	if (ap == NULL)
+	if (!ap)
 		return false;
 
 	memcpy(tuple->src.u3.ip6, ap, sizeof(tuple->src.u3.ip6));

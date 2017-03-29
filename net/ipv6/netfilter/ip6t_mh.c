@@ -43,7 +43,7 @@ static bool mh_mt6(const struct sk_buff *skb, struct xt_action_param *par)
 		return false;
 
 	mh = skb_header_pointer(skb, par->thoff, sizeof(_mh), &_mh);
-	if (mh == NULL) {
+	if (!mh) {
 		/* We've been asked to examine this packet, and we
 		   can't.  Hence, no choice but to drop. */
 		pr_debug("Dropping evil MH tinygram.\n");

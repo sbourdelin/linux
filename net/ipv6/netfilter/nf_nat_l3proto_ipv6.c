@@ -278,7 +278,7 @@ nf_nat_ipv6_fn(void *priv, struct sk_buff *skb,
 		return NF_ACCEPT;
 
 	nat = nf_ct_nat_ext_add(ct);
-	if (nat == NULL)
+	if (!nat)
 		return NF_ACCEPT;
 
 	switch (ctinfo) {

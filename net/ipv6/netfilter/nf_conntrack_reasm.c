@@ -102,7 +102,7 @@ static int nf_ct_frag6_sysctl_register(struct net *net)
 	if (!net_eq(net, &init_net)) {
 		table = kmemdup(table, sizeof(nf_ct_frag6_sysctl_table),
 				GFP_KERNEL);
-		if (table == NULL)
+		if (!table)
 			goto err_alloc;
 
 		table[0].data = &net->nf_frag.frags.timeout;
@@ -114,7 +114,7 @@ static int nf_ct_frag6_sysctl_register(struct net *net)
 	}
 
 	hdr = register_net_sysctl(net, "net/netfilter", table);
-	if (hdr == NULL)
+	if (!hdr)
 		goto err_reg;
 
 	net->nf_frag.sysctl.frags_hdr = hdr;
@@ -408,7 +408,7 @@ nf_ct_frag6_reasm(struct frag_queue *fq, struct sk_buff *prev,  struct net_devic
 		int i, plen = 0;
 
 		clone = alloc_skb(0, GFP_ATOMIC);
-		if (clone == NULL)
+		if (!clone)
 			return false;
 
 		clone->next = head->next;
@@ -592,7 +592,7 @@ int nf_ct_frag6_gather(struct net *net, struct sk_buff *skb, u32 user)
 	skb_orphan(skb);
 	fq = fq_find(net, fhdr->identification, user, &hdr->saddr, &hdr->daddr,
 		     skb->dev ? skb->dev->ifindex : 0, ip6_frag_ecn(hdr));
-	if (fq == NULL) {
+	if (!fq) {
 		pr_debug("Can't find and can't create new queue\n");
 		return -ENOMEM;
 	}

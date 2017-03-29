@@ -51,7 +51,7 @@ frag_mt6(const struct sk_buff *skb, struct xt_action_param *par)
 	}
 
 	fh = skb_header_pointer(skb, ptr, sizeof(_frag), &_frag);
-	if (fh == NULL) {
+	if (!fh) {
 		par->hotdrop = true;
 		return false;
 	}

@@ -70,7 +70,7 @@ hbh_mt6(const struct sk_buff *skb, struct xt_action_param *par)
 	}
 
 	oh = skb_header_pointer(skb, ptr, sizeof(_optsh), &_optsh);
-	if (oh == NULL) {
+	if (!oh) {
 		par->hotdrop = true;
 		return false;
 	}
@@ -107,7 +107,7 @@ hbh_mt6(const struct sk_buff *skb, struct xt_action_param *par)
 				break;
 			tp = skb_header_pointer(skb, ptr, sizeof(_opttype),
 						&_opttype);
-			if (tp == NULL)
+			if (!tp)
 				break;
 
 			/* Type check */
@@ -128,7 +128,7 @@ hbh_mt6(const struct sk_buff *skb, struct xt_action_param *par)
 				lp = skb_header_pointer(skb, ptr + 1,
 							sizeof(_optlen),
 							&_optlen);
-				if (lp == NULL)
+				if (!lp)
 					break;
 				spec_len = optinfo->opts[temp] & 0x00FF;
 

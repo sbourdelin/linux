@@ -57,7 +57,7 @@ static bool rt_mt6(const struct sk_buff *skb, struct xt_action_param *par)
 	}
 
 	rh = skb_header_pointer(skb, ptr, sizeof(_route), &_route);
-	if (rh == NULL) {
+	if (!rh) {
 		par->hotdrop = true;
 		return false;
 	}
