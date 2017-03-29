@@ -74,6 +74,17 @@ amdgpu_gem_prime_import_sg_table(struct drm_device *dev,
 	if (ret)
 		return ERR_PTR(ret);
 
+	/* Imported bo must be pinned to GTT, as moving it breaks sharing */
+	ret = amdgpu_bo_reserve(bo, false);
+	if (ret)
+		return ERR_PTR(ret);
+
+	ret = amdgpu_bo_pin(bo, AMDGPU_GEM_DOMAIN_GTT, NULL);
+	if (ret)
+		return ERR_PTR(ret);
+
+	amdgpu_bo_unreserve(bo);
+
 	bo->prime_shared_count = 1;
 	return &bo->gem_base;
 }
