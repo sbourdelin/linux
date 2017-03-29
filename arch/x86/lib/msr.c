@@ -58,7 +58,7 @@ int msr_write(u32 msr, struct msr *m)
 	return wrmsrl_safe(msr, m->q);
 }
 
-static inline int __flip_bit(u32 msr, u8 bit, bool set)
+int msr_flip_bit(u32 msr, u8 bit, bool set)
 {
 	struct msr m, m1;
 	int err = -EINVAL;
@@ -85,6 +85,7 @@ static inline int __flip_bit(u32 msr, u8 bit, bool set)
 
 	return 1;
 }
+EXPORT_SYMBOL_GPL(msr_flip_bit);
 
 /**
  * Set @bit in a MSR @msr.
@@ -96,7 +97,7 @@ static inline int __flip_bit(u32 msr, u8 bit, bool set)
  */
 int msr_set_bit(u32 msr, u8 bit)
 {
-	return __flip_bit(msr, bit, true);
+	return msr_flip_bit(msr, bit, true);
 }
 
 /**
@@ -109,7 +110,7 @@ int msr_set_bit(u32 msr, u8 bit)
  */
 int msr_clear_bit(u32 msr, u8 bit)
 {
-	return __flip_bit(msr, bit, false);
+	return msr_flip_bit(msr, bit, false);
 }
 
 #ifdef CONFIG_TRACEPOINTS
