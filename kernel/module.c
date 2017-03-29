@@ -2096,9 +2096,31 @@ void __weak module_arch_freeing_init(struct module *mod)
 {
 }
 
+static void check_memory_leak(struct module *mod)
+{
+	struct vmap_area *va;
+
+	rcu_read_lock();
+	list_for_each_entry_rcu(va, &vmap_area_list, list) {
+		if (!(va->flags & VM_VM_AREA))
+			continue;
+		if ((mod->core_layout.base < va->vm->caller) &&
+			(mod->core_layout.base + mod->core_layout.size) > va->vm->caller) {
+			pr_err("Module [%s] is getting unloaded before doing vfree\n", mod->name);
+			pr_err("Memory still allocated: addr:0x%lx - 0x%lx, pages %u\n",
+				va->va_start, va->va_end, va->vm->nr_pages);
+			pr_err("Allocating function %pS\n", va->vm->caller);
+		}
+
+	}
+	rcu_read_unlock();
+}
+
 /* Free a module, remove from lists, etc. */
 static void free_module(struct module *mod)
 {
+	check_memory_leak(mod);
+
 	trace_module_free(mod);
 
 	mod_sysfs_teardown(mod);
