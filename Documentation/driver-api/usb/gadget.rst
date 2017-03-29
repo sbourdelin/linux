@@ -356,21 +356,6 @@ At this writing, a few of the current gadget drivers have been converted
 to this framework. Near-term plans include converting all of them,
 except for "gadgetfs".
 
-.. kernel-doc:: drivers/usb/gadget/function/f_acm.c
-   :export:
-
-.. kernel-doc:: drivers/usb/gadget/function/f_ecm.c
-   :export:
-
-.. kernel-doc:: drivers/usb/gadget/function/f_subset.c
-   :export:
-
-.. kernel-doc:: drivers/usb/gadget/function/f_obex.c
-   :export:
-
-.. kernel-doc:: drivers/usb/gadget/function/f_serial.c
-   :export:
-
 Peripheral Controller Drivers
 =============================
 
