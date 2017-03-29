@@ -286,6 +286,10 @@ nouveau_user_framebuffer_create(struct drm_device *dev,
 		return ERR_PTR(-ENOENT);
 	nvbo = nouveau_gem_object(gem);
 
+	/* Handle is an imported dma-buf, so cannot be migrated to VRAM */
+	if (gem->import_attach)
+		return ERR_PTR(-EINVAL);
+
 	ret = nouveau_framebuffer_new(dev, mode_cmd, nvbo, &fb);
 	if (ret == 0)
 		return &fb->base;
