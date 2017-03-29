@@ -1207,6 +1207,13 @@ int i915_guc_submission_enable(struct drm_i915_private *dev_priv)
 	enum intel_engine_id id;
 	int err;
 
+	/* Don't start the guc if the driver is wedged - we won't be using
+	 * the gpu anyway until after the wedged status is cleared and we
+	 * do a restrt of the device.
+	 */
+	if (i915_terminally_wedged(&dev_priv->gpu_error))
+		return -EIO;
+
 	if (!client) {
 		client = guc_client_alloc(dev_priv,
 					  INTEL_INFO(dev_priv)->ring_mask,
