@@ -826,6 +826,16 @@ static struct pcie_link_state *alloc_pcie_link_state(struct pci_dev *pdev)
 	return link;
 }
 
+static int pci_aspm_init_downstream(struct pci_dev *pdev)
+{
+	return 0;
+}
+
+static int pci_aspm_init_upstream(struct pci_dev *pdev)
+{
+	return 0;
+}
+
 /*
  * pci_aspm_init: Initiate PCI express link state.
  * It is called from device_add for every single pci device.
@@ -833,7 +843,10 @@ static struct pcie_link_state *alloc_pcie_link_state(struct pci_dev *pdev)
  */
 int pci_aspm_init(struct pci_dev *pdev)
 {
-	return 0;
+	if (!pdev->has_secondary_link)
+		return pci_aspm_init_downstream(pdev);
+
+	return pci_aspm_init_upstream(pdev);
 }
 
 /*
