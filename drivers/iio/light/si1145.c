@@ -557,7 +557,7 @@ static int si1145_set_chlist(struct iio_dev *indio_dev, unsigned long scan_mask)
 	data->scan_mask = scan_mask;
 	ret = si1145_param_set(data, SI1145_PARAM_CHLIST, reg);
 
-	return ret < 0 ? ret : 0;
+	return min(ret, 0);
 }
 
 static int si1145_measure(struct iio_dev *indio_dev,
