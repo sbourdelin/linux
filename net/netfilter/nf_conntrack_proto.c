@@ -307,7 +307,7 @@ int nf_ct_l4proto_register_sysctl(struct net *net,
 	int err = 0;
 
 #ifdef CONFIG_SYSCTL
-	if (pn->ctl_table != NULL) {
+	if (pn->ctl_table) {
 		err = nf_ct_register_sysctl(net,
 					    &pn->ctl_table_header,
 					    "net/netfilter",
@@ -329,7 +329,7 @@ void nf_ct_l4proto_unregister_sysctl(struct net *net,
 				     struct nf_conntrack_l4proto *l4proto)
 {
 #ifdef CONFIG_SYSCTL
-	if (pn->ctl_table_header != NULL)
+	if (pn->ctl_table_header)
 		nf_ct_unregister_sysctl(&pn->ctl_table_header,
 					&pn->ctl_table,
 					pn->users);

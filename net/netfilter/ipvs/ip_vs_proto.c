@@ -53,7 +53,7 @@ static int __used __init register_ip_vs_protocol(struct ip_vs_protocol *pp)
 	pp->next = ip_vs_proto_table[hash];
 	ip_vs_proto_table[hash] = pp;
 
-	if (pp->init != NULL)
+	if (pp->init)
 		pp->init(pp);
 
 	return 0;
@@ -77,7 +77,7 @@ register_ip_vs_proto_netns(struct netns_ipvs *ipvs, struct ip_vs_protocol *pp)
 	ipvs->proto_data_table[hash] = pd;
 	atomic_set(&pd->appcnt, 0);	/* Init app counter */
 
-	if (pp->init_netns != NULL) {
+	if (pp->init_netns) {
 		int ret = pp->init_netns(ipvs, pd);
 		if (ret) {
 			/* unlink an free proto data */
@@ -102,7 +102,7 @@ static int unregister_ip_vs_protocol(struct ip_vs_protocol *pp)
 	for (; *pp_p; pp_p = &(*pp_p)->next) {
 		if (*pp_p == pp) {
 			*pp_p = pp->next;
-			if (pp->exit != NULL)
+			if (pp->exit)
 				pp->exit(pp);
 			return 0;
 		}
@@ -124,7 +124,7 @@ unregister_ip_vs_proto_netns(struct netns_ipvs *ipvs, struct ip_vs_proto_data *p
 	for (; *pd_p; pd_p = &(*pd_p)->next) {
 		if (*pd_p == pd) {
 			*pd_p = pd->next;
-			if (pd->pp->exit_netns != NULL)
+			if (pd->pp->exit_netns)
 				pd->pp->exit_netns(ipvs, pd);
 			kfree(pd);
 			return 0;

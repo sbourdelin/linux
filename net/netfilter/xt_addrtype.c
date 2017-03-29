@@ -50,7 +50,7 @@ static u32 match_lookup_rt6(struct net *net, const struct net_device *dev,
 	rcu_read_lock();
 
 	afinfo = nf_get_afinfo(NFPROTO_IPV6);
-	if (afinfo != NULL) {
+	if (afinfo) {
 		const struct nf_ipv6_ops *v6ops;
 
 		if (dev && (mask & XT_ADDRTYPE_LOCAL)) {

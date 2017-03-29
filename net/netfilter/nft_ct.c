@@ -378,7 +378,7 @@ static int nft_ct_get_init(const struct nft_ctx *ctx,
 	priv->dir = IP_CT_DIR_MAX;
 	switch (priv->key) {
 	case NFT_CT_DIRECTION:
-		if (tb[NFTA_CT_DIRECTION] != NULL)
+		if (tb[NFTA_CT_DIRECTION])
 			return -EINVAL;
 		len = sizeof(u8);
 		break;
@@ -391,19 +391,19 @@ static int nft_ct_get_init(const struct nft_ctx *ctx,
 	case NFT_CT_SECMARK:
 #endif
 	case NFT_CT_EXPIRATION:
-		if (tb[NFTA_CT_DIRECTION] != NULL)
+		if (tb[NFTA_CT_DIRECTION])
 			return -EINVAL;
 		len = sizeof(u32);
 		break;
 #ifdef CONFIG_NF_CONNTRACK_LABELS
 	case NFT_CT_LABELS:
-		if (tb[NFTA_CT_DIRECTION] != NULL)
+		if (tb[NFTA_CT_DIRECTION])
 			return -EINVAL;
 		len = NF_CT_LABELS_MAX_SIZE;
 		break;
 #endif
 	case NFT_CT_HELPER:
-		if (tb[NFTA_CT_DIRECTION] != NULL)
+		if (tb[NFTA_CT_DIRECTION])
 			return -EINVAL;
 		len = NF_CT_HELPER_NAME_LEN;
 		break;
@@ -454,7 +454,7 @@ static int nft_ct_get_init(const struct nft_ctx *ctx,
 		return -EOPNOTSUPP;
 	}
 
-	if (tb[NFTA_CT_DIRECTION] != NULL) {
+	if (tb[NFTA_CT_DIRECTION]) {
 		priv->dir = nla_get_u8(tb[NFTA_CT_DIRECTION]);
 		switch (priv->dir) {
 		case IP_CT_DIR_ORIGINAL:
