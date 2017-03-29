@@ -606,8 +606,8 @@ static s32 ap1302_try_mbus_fmt_locked(struct v4l2_subdev *sd,
 
 
 static int ap1302_get_fmt(struct v4l2_subdev *sd,
-	                 struct v4l2_subdev_pad_config *cfg,
-					 struct v4l2_subdev_format *format)
+			  struct v4l2_subdev_pad_config *cfg,
+			  struct v4l2_subdev_format *format)
 
 {
     struct v4l2_mbus_framefmt *fmt = &format->format;
