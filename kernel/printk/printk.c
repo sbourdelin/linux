@@ -2741,8 +2741,16 @@ static void wake_up_klogd_work_func(struct irq_work *irq_work)
 		 * If trylock fails, someone else is doing the printing.
 		 * PRINTK_PENDING_OUTPUT bit is cleared by console_unlock().
 		 */
-		if (console_trylock())
-			console_unlock();
+		if (printk_kthread_enabled()) {
+			wake_up_process(printk_kthread);
+		} else {
+			/*
+			 * If trylock fails, someone else is doing the
+			 * printing
+			 */
+			if (console_trylock())
+				console_unlock();
+		}
 	}
 
 	if (test_and_clear_bit(PRINTK_PENDING_WAKEUP, &printk_pending))
