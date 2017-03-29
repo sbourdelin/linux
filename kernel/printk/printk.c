@@ -455,7 +455,7 @@ static struct task_struct *printk_kthread __read_mostly;
 static atomic_t printk_emergency __read_mostly;
 /*
  * Disable printk_kthread permanently. Unlike `oops_in_progress'
- * it doesn't go back to 0.
+ * it doesn't go back to 0 (unless enforced by user-space).
  */
 static bool printk_kthread_disabled __read_mostly;
 
@@ -482,6 +482,24 @@ void printk_emergency_end(void)
 {
 	atomic_dec(&printk_emergency);
 }
+
+static int printk_kthread_disabled_set(const char *val,
+					const struct kernel_param *kp)
+{
+	return param_set_bool(val, kp);
+}
+
+static const struct kernel_param_ops printk_kthread_disabled_ops = {
+	.set = printk_kthread_disabled_set,
+	.get = param_get_bool,
+};
+
+module_param_cb(emergency_mode,
+		&printk_kthread_disabled_ops,
+		&printk_kthread_disabled,
+		0644);
+MODULE_PARM_DESC(emergency_mode,
+		"don't offload message printing to printk kthread");
 
 /* Return log buffer address */
 char *log_buf_addr_get(void)
