@@ -3127,6 +3127,13 @@ err:
 	return -ENOMEM;
 }
 
+static void flip_smm_bit(void *data)
+{
+	int val = *(int *)data;
+
+	msr_flip_bit(MSR_IA32_DEBUGCTLMSR, DEBUGCTLMSR_FREEZE_WHILE_SMM_BIT, (bool)val);
+}
+
 static void intel_pmu_cpu_starting(int cpu)
 {
 	struct cpu_hw_events *cpuc = &per_cpu(cpu_hw_events, cpu);
@@ -3140,6 +3147,8 @@ static void intel_pmu_cpu_starting(int cpu)
 	intel_pmu_lbr_reset();
 
 	cpuc->lbr_sel = NULL;
+
+	flip_smm_bit(&x86_pmu.attr_freeze_on_smi);
 
 	if (!cpuc->shared_regs)
 		return;
@@ -3559,6 +3568,55 @@ static struct attribute *hsw_events_attrs[] = {
 	NULL
 };
 
+static ssize_t freeze_on_smi_show(struct device *cdev,
+				  struct device_attribute *attr,
+				  char *buf)
+{
+	return sprintf(buf, "%d\n", x86_pmu.attr_freeze_on_smi);
+}
+
+static DEFINE_MUTEX(freeze_on_smi_mutex);
+
+static ssize_t freeze_on_smi_store(struct device *cdev,
+				   struct device_attribute *attr,
+				   const char *buf, size_t count)
+{
+	unsigned long val;
+	ssize_t ret;
+
+	ret = kstrtoul(buf, 0, &val);
+	if (ret)
+		return ret;
+
+	if (val > 1)
+		return -EINVAL;
+
+	if (x86_pmu.attr_freeze_on_smi == val)
+		return count;
+
+	mutex_lock(&freeze_on_smi_mutex);
+
+	get_online_cpus();
+
+	flip_smm_bit(&val);
+	smp_call_function(flip_smm_bit, &val, 1);
+
+	put_online_cpus();
+
+	x86_pmu.attr_freeze_on_smi = val;
+
+	mutex_unlock(&freeze_on_smi_mutex);
+
+	return count;
+}
+
+static DEVICE_ATTR_RW(freeze_on_smi);
+
+static struct attribute *intel_pmu_attrs[] = {
+	&dev_attr_freeze_on_smi.attr,
+	NULL,
+};
+
 __init int intel_pmu_init(void)
 {
 	union cpuid10_edx edx;
@@ -3605,6 +3663,8 @@ __init int intel_pmu_init(void)
 
 	x86_pmu.max_pebs_events		= min_t(unsigned, MAX_PEBS_EVENTS, x86_pmu.num_counters);
 
+
+	x86_pmu.attrs			= intel_pmu_attrs;
 	/*
 	 * Quirk: v2 perfmon does not report fixed-purpose events, so
 	 * assume at least 3 events, when not running in a hypervisor:
