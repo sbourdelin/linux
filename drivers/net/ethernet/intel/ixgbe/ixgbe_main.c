@@ -8400,29 +8400,31 @@ out_drop:
 	return NETDEV_TX_OK;
 }
 
-static netdev_tx_t __ixgbe_xmit_frame(struct sk_buff *skb,
-				      struct net_device *netdev,
-				      struct ixgbe_ring *ring)
+static inline struct ixgbe_ring *ixgbe_get_txq(struct ixgbe_adapter *adapter,
+					       struct sk_buff *skb)
 {
-	struct ixgbe_adapter *adapter = netdev_priv(netdev);
-	struct ixgbe_ring *tx_ring;
+	unsigned int txq = skb->queue_mapping;
 
-	/*
-	 * The minimum packet size for olinfo paylen is 17 so pad the skb
-	 * in order to meet this minimum size requirement.
-	 */
-	if (skb_put_padto(skb, 17))
-		return NETDEV_TX_OK;
+	if (txq >= adapter->num_tx_queues)
+		txq = txq % adapter->num_tx_queues;
 
-	tx_ring = ring ? ring : adapter->tx_ring[skb->queue_mapping];
-
-	return ixgbe_xmit_frame_ring(skb, adapter, tx_ring);
+	return adapter->tx_ring[txq];
 }
 
 static netdev_tx_t ixgbe_xmit_frame(struct sk_buff *skb,
 				    struct net_device *netdev)
 {
-	return __ixgbe_xmit_frame(skb, netdev, NULL);
+	struct ixgbe_adapter *adapter = netdev_priv(netdev);
+
+	/* The minimum packet size for olinfo paylen is 17 so pad the skb
+	 * in order to meet this minimum size requirement.
+	 */
+	if (skb_put_padto(skb, 17))
+		return NETDEV_TX_OK;
+
+	return ixgbe_xmit_frame_ring(skb,
+				     adapter,
+				     ixgbe_get_txq(adapter, skb));
 }
 
 /**
