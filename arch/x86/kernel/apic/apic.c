@@ -1157,6 +1157,7 @@ enum apic_bsp_mode {
 	APIC_BSP_MODEL_PIC = 0,
 	APIC_BSP_MODEL_VIRTUAL_WIRE,
 	APIC_BSP_MODEL_SYMMETRIC_IO,
+	APIC_BSP_MODEL_SYMMETRIC_IO_NO_ROUTING,
 	APIC_BSP_MODEL_COUNT
 };
 
@@ -1207,7 +1208,29 @@ static int __init apic_bsp_mode_check(void)
 
 	/* Other checks of ACPI options will be done in each setup function */
 
+#ifdef CONFIG_SMP
+	if (read_apic_id() != boot_cpu_physical_apicid) {
+		pr_info("Boot APIC ID in local APIC unexpected (%d vs %d)",
+			read_apic_id(), boot_cpu_physical_apicid);
+
+		disable_ioapic_support();
+		/*Do nothing, just switch back to PIC here */
+		return APIC_BSP_MODEL_PIC;
+	}
+
+	/*
+	 * If SMP should be disabled, then really disable it!
+	 * No need setup apic routing ?
+	 */
+	if (!setup_max_cpus) {
+		pr_info("SMP mode deactivated\n");
+		return APIC_BSP_MODEL_SYMMETRIC_IO_NO_ROUTING;
+	}
+
 	return APIC_BSP_MODEL_SYMMETRIC_IO;
+#else
+	return APIC_BSP_MODEL_PIC;
+#endif
 }
 
 /*
@@ -1271,6 +1294,12 @@ void __init init_bsp_APIC(void)
 		return;
 	case APIC_BSP_MODEL_SYMMETRIC_IO:
 		pr_info("switch to symmectic I/O model.\n");
+		default_setup_apic_routing();
+		apic_bsp_setup(false);
+		return;
+	case APIC_BSP_MODEL_SYMMETRIC_IO_NO_ROUTING:
+		pr_info("switch to symmectic I/O model with no apic routing.\n");
+		apic_bsp_setup(false);
 		return;
 	}
 }
@@ -2325,7 +2354,7 @@ static void __init apic_bsp_up_setup(void)
 }
 
 /* Setup local APIC timer and get the Id*/
-static int __init apic_bsp_timer_setup(void)
+int __init apic_bsp_timer_setup(void)
 {
 	int id;
 
@@ -2350,10 +2379,8 @@ static int __init apic_bsp_timer_setup(void)
  * Returns:
  * apic_id of BSP APIC
  */
-int __init apic_bsp_setup(bool upmode)
+void __init apic_bsp_setup(bool upmode)
 {
-	int id;
-
 	connect_bsp_APIC();
 	if (upmode)
 		apic_bsp_up_setup();
@@ -2363,9 +2390,6 @@ int __init apic_bsp_setup(bool upmode)
 	end_local_APIC_setup();
 	irq_remap_enable_fault_handling();
 	setup_IO_APIC();
-
-	id = apic_bsp_timer_setup();
-	return id;
 }
 
 /*
@@ -2404,6 +2428,7 @@ int __init APIC_init_uniprocessor(void)
 
 	default_setup_apic_routing();
 	apic_bsp_setup(true);
+	apic_bsp_timer_setup();
 	return 0;
 }
 
