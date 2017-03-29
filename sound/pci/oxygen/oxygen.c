@@ -110,6 +110,7 @@ static const struct pci_device_id oxygen_ids[] = {
 	{ OXYGEN_PCI_SUBID(0x1a58, 0x0910), .driver_data = MODEL_CMEDIA_REF },
 	/* Asus Xonar DG */
 	{ OXYGEN_PCI_SUBID(0x1043, 0x8467), .driver_data = MODEL_XONAR_DG },
+	{ OXYGEN_PCI_SUBID(0x1043, 0x855e), .driver_data = MODEL_XONAR_DG },
 	/* Asus Xonar DGX */
 	{ OXYGEN_PCI_SUBID(0x1043, 0x8521), .driver_data = MODEL_XONAR_DGX },
 	/* PCI 2.0 HD Audio */
