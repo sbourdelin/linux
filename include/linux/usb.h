@@ -1373,6 +1373,24 @@ typedef void (*usb_complete_t)(struct urb *);
  * capable, assign NULL to it, so that usbmon knows not to use the value.
  * The setup_packet must always be set, so it cannot be located in highmem.
  *
+ * .. note::
+ *
+ *   Several host drivers require that the @transfer_buffer to be aligned
+ *   with the CPU word size (e. g. DWORD for 32 bits, QDWORD for 64 bits).
+ *   It is up to USB drivers should ensure that they'll only pass buffers
+ *   with such alignments.
+ *
+ *   Please also notice that, due to such restriction, the host driver
+ *   may also override PAD bytes at the end of the @transfer_buffer, up to the
+ *   size of the CPU word.
+ *
+ *   Please notice that ancillary routines that start URB transfers, like
+ *   usb_control_msg() also have such restriction.
+ *
+ *   Such word alignment condition is normally ensured if the buffer is
+ *   allocated with kmalloc(), but this may not be the case if the driver
+ *   allocates a bigger buffer and point to a random place inside it.
+ *
  * Initialization:
  *
  * All URBs submitted must initialize the dev, pipe, transfer_flags (may be
