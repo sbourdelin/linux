@@ -19,7 +19,7 @@
 #define _ISP_CAPTURE_BITS_PER_ELEM                32  /* only for data, not SOP */						           
 #define _ISP_CAPTURE_BYTES_PER_ELEM               (_ISP_CAPTURE_BITS_PER_ELEM/8	)				           
 #define _ISP_CAPTURE_BYTES_PER_WORD               32		/* 256/8 */	
-#define _ISP_CAPTURE_ELEM_PER_WORD                _ISP_CAPTURE_BYTES_PER_WORD / _ISP_CAPTURE_BYTES_PER_ELEM		           
+#define _ISP_CAPTURE_ELEM_PER_WORD                (_ISP_CAPTURE_BYTES_PER_WORD / _ISP_CAPTURE_BYTES_PER_ELEM)         
 
 //#define CAPT_RCV_ACK                              1
 //#define CAPT_WRT_ACK                              2               
