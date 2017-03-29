@@ -1415,6 +1415,9 @@ repeat:
 		goto out;
 	}
 
+	/* A frequent cause for EAGAIN are currently unavailable client pages */
+	flush_workqueue(eb->i915->mm.userptr_wq);
+
 	ret = i915_mutex_lock_interruptible(dev);
 	if (ret) {
 		mutex_lock(&dev->struct_mutex);
