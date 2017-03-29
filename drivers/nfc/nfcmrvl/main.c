@@ -124,10 +124,9 @@ struct nfcmrvl_private *nfcmrvl_nci_register_dev(enum nfcmrvl_phy phy,
 	memcpy(&priv->config, pdata, sizeof(*pdata));
 
 	if (priv->config.reset_n_io) {
-		rc = devm_gpio_request_one(dev,
-					   priv->config.reset_n_io,
-					   GPIOF_OUT_INIT_LOW,
-					   "nfcmrvl_reset_n");
+		rc = gpio_request_one(priv->config.reset_n_io,
+				      GPIOF_OUT_INIT_LOW,
+				      "nfcmrvl_reset_n");
 		if (rc < 0)
 			nfc_err(dev, "failed to request reset_n io\n");
 	}
@@ -195,7 +194,7 @@ void nfcmrvl_nci_unregister_dev(struct nfcmrvl_private *priv)
 	nfcmrvl_fw_dnld_deinit(priv);
 
 	if (priv->config.reset_n_io)
-		devm_gpio_free(priv->dev, priv->config.reset_n_io);
+		gpio_free(priv->config.reset_n_io);
 
 	nci_unregister_device(ndev);
 	nci_free_device(ndev);
