@@ -2796,6 +2796,25 @@ static int printk_kthread_func(void *data)
 	return 0;
 }
 
+/*
+ * Init printk kthread at late_initcall stage, after core/arch/device/etc.
+ * initialization.
+ */
+static int __init init_printk_kthread(void)
+{
+	struct task_struct *thread;
+
+	thread = kthread_run(printk_kthread_func, NULL, "printk");
+	if (IS_ERR(thread)) {
+		pr_err("printk: unable to create printing thread\n");
+		return PTR_ERR(thread);
+	}
+
+	printk_kthread = thread;
+	return 0;
+}
+late_initcall(init_printk_kthread);
+
 void wake_up_klogd(void)
 {
 	preempt_disable();
