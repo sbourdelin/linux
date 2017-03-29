@@ -1496,6 +1496,8 @@ int kernel_kexec(void)
 		goto Unlock;
 	}
 
+	printk_emergency_begin();
+
 #ifdef CONFIG_KEXEC_JUMP
 	if (kexec_image->preserve_context) {
 		lock_system_sleep();
@@ -1564,6 +1566,8 @@ int kernel_kexec(void)
 		unlock_system_sleep();
 	}
 #endif
+
+	printk_emergency_end();
 
  Unlock:
 	mutex_unlock(&kexec_mutex);
