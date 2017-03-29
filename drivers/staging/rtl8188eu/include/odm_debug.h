@@ -86,11 +86,13 @@
 #endif
 
 #define ODM_RT_TRACE(pDM_Odm, comp, level, fmt)				\
-	if (((comp) & pDM_Odm->DebugComponents) &&			\
-	    (level <= pDM_Odm->DebugLevel)) {				\
-		pr_info("[ODM-8188E] ");				\
-		RT_PRINTK fmt;						\
-	}
+	do {								\
+		if (((comp) & pDM_Odm->DebugComponents) &&		\
+		    (level <= pDM_Odm->DebugLevel)) {			\
+			pr_info("[ODM-8188E] ");			\
+			RT_PRINTK fmt;					\
+		}							\
+	} while (0)
 
 #define ODM_RT_ASSERT(pDM_Odm, expr, fmt)				\
 	if (!(expr)) {							\
