@@ -3221,7 +3221,7 @@ i915_gem_wait_ioctl(struct drm_device *dev, void *data, struct drm_file *file)
 	ktime_t start;
 	long ret;
 
-	if (args->flags != 0)
+	if (args->flags & ~(I915_WAIT_READ_ONLY))
 		return -EINVAL;
 
 	obj = i915_gem_object_lookup(file, args->bo_handle);
@@ -3231,7 +3231,8 @@ i915_gem_wait_ioctl(struct drm_device *dev, void *data, struct drm_file *file)
 	start = ktime_get();
 
 	ret = i915_gem_object_wait(obj,
-				   I915_WAIT_INTERRUPTIBLE | I915_WAIT_ALL,
+				   I915_WAIT_INTERRUPTIBLE |
+				   (args->flags & I915_WAIT_READ_ONLY ? 0 : I915_WAIT_ALL),
 				   to_wait_timeout(args->timeout_ns),
 				   to_rps_client(file));
 
