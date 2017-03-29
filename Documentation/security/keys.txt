@@ -820,8 +820,8 @@ The keyctl syscall functions are:
      immediately, though they are still visible in /proc/keys until deleted
      (they're marked with an 'i' flag).
 
-     A process must have search permission on the key for this function to be
-     successful.
+     A process must have Search and Setattr permission on the key for this
+     function to be successful.
 
  (*) Compute a Diffie-Hellman shared secret or public key
 

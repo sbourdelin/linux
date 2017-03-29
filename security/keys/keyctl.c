@@ -397,7 +397,7 @@ error:
 /*
  * Invalidate a key.
  *
- * The key must be grant the caller Invalidate permission for this to work.
+ * The key must grant the caller Search and Setattr permission for this to work.
  * The key and any links to the key will be automatically garbage collected
  * immediately.
  *
@@ -413,7 +413,7 @@ long keyctl_invalidate_key(key_serial_t id)
 
 	kenter("%d", id);
 
-	key_ref = lookup_user_key(id, 0, KEY_NEED_SEARCH);
+	key_ref = lookup_user_key(id, 0, KEY_NEED_SEARCH | KEY_NEED_SETATTR);
 	if (IS_ERR(key_ref)) {
 		ret = PTR_ERR(key_ref);
 
