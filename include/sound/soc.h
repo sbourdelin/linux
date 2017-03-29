@@ -1104,8 +1104,6 @@ struct snd_soc_card {
 	struct mutex mutex;
 	struct mutex dapm_mutex;
 
-	bool instantiated;
-
 	int (*probe)(struct snd_soc_card *card);
 	int (*late_probe)(struct snd_soc_card *card);
 	int (*remove)(struct snd_soc_card *card);
@@ -1195,6 +1193,10 @@ struct snd_soc_card {
 	u32 pop_time;
 
 	void *drvdata;
+
+	/* bit field */
+	u32 instantiated:1;
+	u32 dirty:1;
 };
 
 /* SoC machine DAI configuration, glues a codec and cpu DAI together */

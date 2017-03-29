@@ -2881,7 +2881,15 @@ int snd_soc_unregister_card(struct snd_soc_card *card)
 {
 	if (card->instantiated) {
 		card->instantiated = false;
-		snd_soc_dapm_shutdown(card);
+		if (!card->dirty) {
+			/*
+			 * In case of unbind, CPU/Codec/Platform component can
+			 * be unbinded *before* Card unbind. In such case
+			 * (= card->dirty) Card connected DAPMs are already
+			 * doesn't exist.
+			 */
+			snd_soc_dapm_shutdown(card);
+		}
 		soc_cleanup_card_resources(card);
 		dev_dbg(card->dev, "ASoC: Unregistered card '%s'\n", card->name);
 	}
@@ -3235,6 +3243,8 @@ static void snd_soc_component_cleanup(struct snd_soc_component *component)
 
 static void snd_soc_component_del_unlocked(struct snd_soc_component *component)
 {
+	if (component->card)
+		component->card->dirty = 1;
 	list_del(&component->list);
 }
 

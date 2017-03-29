@@ -455,6 +455,16 @@ static int soc_pcm_open(struct snd_pcm_substream *substream)
 	const char *codec_dai_name = "multicodec";
 	int i, ret = 0;
 
+	if (rtd->card->dirty) {
+		/*
+		 * In case of unbind, each CPU/Codec/Platform component can
+		 * be unbinded randomly. In such case (= card->dirty)
+		 * Sound Card is no longer safety. Don't open it.
+		 */
+		dev_warn(cpu_dai->dev, "Sound SoC Card is dirty, Recheck your system\n");
+		return -ENXIO;
+	}
+
 	pinctrl_pm_select_default_state(cpu_dai->dev);
 	for (i = 0; i < rtd->num_codecs; i++)
 		pinctrl_pm_select_default_state(rtd->codec_dais[i]->dev);
@@ -2576,6 +2586,16 @@ static int dpcm_fe_dai_open(struct snd_pcm_substream *fe_substream)
 	struct snd_soc_dapm_widget_list *list;
 	int ret;
 	int stream = fe_substream->stream;
+
+	if (fe->card->dirty) {
+		/*
+		 * In case of unbind, each CPU/Codec/Platform component can
+		 * be unbinded randomly. In such case (= card->dirty)
+		 * Sound Card is no longer safety. Don't open it.
+		 */
+		dev_warn(fe->dev, "Sound SoC Card is dirty, Recheck your system\n");
+		return -ENXIO;
+	}
 
 	mutex_lock_nested(&fe->card->mutex, SND_SOC_CARD_CLASS_RUNTIME);
 	fe->dpcm[stream].runtime = fe_substream->runtime;
