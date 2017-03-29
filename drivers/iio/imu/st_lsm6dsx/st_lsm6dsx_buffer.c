@@ -203,7 +203,7 @@ int st_lsm6dsx_update_watermark(struct st_lsm6dsx_sensor *sensor, u16 watermark)
 out:
 	mutex_unlock(&hw->lock);
 
-	return err < 0 ? err : 0;
+	return min(err, 0);
 }
 
 /**
