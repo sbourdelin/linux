@@ -1183,17 +1183,10 @@ static __init void disable_smp(void)
 	cpumask_set_cpu(0, topology_core_cpumask(0));
 }
 
-enum {
-	SMP_OK,
-	SMP_NO_CONFIG,
-	SMP_NO_APIC,
-	SMP_FORCE_UP,
-};
-
 /*
  * Various sanity checks.
  */
-static int __init smp_sanity_check(unsigned max_cpus)
+static void __init smp_sanity_check(void)
 {
 	preempt_disable();
 
@@ -1231,16 +1224,6 @@ static int __init smp_sanity_check(unsigned max_cpus)
 	}
 
 	/*
-	 * If we couldn't find an SMP configuration at boot time,
-	 * get out of here now!
-	 */
-	if (!smp_found_config && !acpi_lapic) {
-		preempt_enable();
-		pr_notice("SMP motherboard not detected\n");
-		return SMP_NO_CONFIG;
-	}
-
-	/*
 	 * Should not be necessary because the MP table should list the boot
 	 * CPU too, but we do it for the sake of robustness anyway.
 	 */
@@ -1251,28 +1234,6 @@ static int __init smp_sanity_check(unsigned max_cpus)
 	}
 	preempt_enable();
 
-	/*
-	 * If we couldn't find a local APIC, then get out of here now!
-	 */
-	if (APIC_INTEGRATED(boot_cpu_apic_version) &&
-	    !boot_cpu_has(X86_FEATURE_APIC)) {
-		if (!disable_apic) {
-			pr_err("BIOS bug, local APIC #%d not detected!...\n",
-				boot_cpu_physical_apicid);
-			pr_err("... forcing use of dummy APIC emulation (tell your hw vendor)\n");
-		}
-		return SMP_NO_APIC;
-	}
-
-	/*
-	 * If SMP should be disabled, then really disable it!
-	 */
-	if (!max_cpus) {
-		pr_info("SMP mode deactivated\n");
-		return SMP_FORCE_UP;
-	}
-
-	return SMP_OK;
 }
 
 static void __init smp_cpu_index_default(void)
@@ -1321,20 +1282,13 @@ void __init native_smp_prepare_cpus(unsigned int max_cpus)
 
 	set_cpu_sibling_map(0);
 
-	switch (smp_sanity_check(max_cpus)) {
-	case SMP_NO_CONFIG:
-		disable_smp();
-		if (APIC_init_uniprocessor())
-			pr_notice("Local APIC not detected. Using dummy APIC emulation.\n");
-		return;
-	case SMP_NO_APIC:
+	smp_sanity_check();
+
+	if (disable_smp_by_APIC) {
+		if (disable_smp_by_APIC == 2)
+			apic_bsp_timer_setup();
 		disable_smp();
 		return;
-	case SMP_FORCE_UP:
-		disable_smp();
-		return;
-	case SMP_OK:
-		break;
 	}
 
 	cpu0_logical_apicid = apic_bsp_timer_setup();

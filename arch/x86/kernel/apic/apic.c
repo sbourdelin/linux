@@ -169,6 +169,9 @@ __setup("apicpmtimer", setup_apicpmtimer);
 
 unsigned long mp_lapic_addr;
 int disable_apic;
+/* disable smp flag according to APIC configuration */
+int disable_smp_by_APIC;
+
 /* Disable local APIC timer from the kernel commandline or via dmi quirk */
 static int disable_apic_timer __initdata;
 /* Local APIC timer works in C2 */
@@ -1157,13 +1160,13 @@ enum apic_bsp_mode {
 	APIC_BSP_MODEL_PIC = 0,
 	APIC_BSP_MODEL_VIRTUAL_WIRE,
 	APIC_BSP_MODEL_SYMMETRIC_IO,
+	APIC_BSP_MODEL_SYMMETRIC_IO_NO_CONFIG,
 	APIC_BSP_MODEL_SYMMETRIC_IO_NO_ROUTING,
 	APIC_BSP_MODEL_COUNT
 };
 
-static int __init apic_bsp_mode_check(void)
+static int __init apic_bsp_mode_check(int *upmode)
 {
-
 	/* Check kernel option */
 	if (disable_apic) {
 		pr_info("APIC disabled by kernel option\n");
@@ -1200,8 +1203,11 @@ static int __init apic_bsp_mode_check(void)
 		disable_ioapic_support();
 
 		/* Check local APIC, if SMP_NO_CONFIG */
-		if (!acpi_lapic)
-			pr_info("SMP motherboard not detected\n");
+		if (!acpi_lapic) {
+			*upmode = true;
+			pr_info("SMP motherboard not detected.\n");
+			return APIC_BSP_MODEL_SYMMETRIC_IO_NO_CONFIG;
+		}
 
 		return APIC_BSP_MODEL_VIRTUAL_WIRE;
 	}
@@ -1229,7 +1235,13 @@ static int __init apic_bsp_mode_check(void)
 
 	return APIC_BSP_MODEL_SYMMETRIC_IO;
 #else
-	return APIC_BSP_MODEL_PIC;
+#ifdef CONFIG_UP_LATE_INIT
+		/* In UP system, If it supports late init */
+		*upmode = true;
+		return APIC_BSP_MODEL_SYMMETRIC_IO;
+#else
+		return APIC_BSP_MODEL_PIC;
+#endif
 #endif
 }
 
@@ -1285,9 +1297,12 @@ void apic_virture_wire_mode_setup(void)
 /* init the interrupt routing model for the BSP */
 void __init init_bsp_APIC(void)
 {
-	switch (apic_bsp_mode_check()) {
+	int upmode = false;
+
+	switch (apic_bsp_mode_check(&upmode)) {
 	case APIC_BSP_MODEL_PIC:
 		pr_info("Keep in PIC mode(8259)\n");
+		disable_smp_by_APIC = 1;
 		return;
 	case APIC_BSP_MODEL_VIRTUAL_WIRE:
 		pr_info("switch to virtual wire model.\n");
@@ -1295,13 +1310,17 @@ void __init init_bsp_APIC(void)
 	case APIC_BSP_MODEL_SYMMETRIC_IO:
 		pr_info("switch to symmectic I/O model.\n");
 		default_setup_apic_routing();
-		apic_bsp_setup(false);
-		return;
+		break;
+	case APIC_BSP_MODEL_SYMMETRIC_IO_NO_CONFIG:
+		pr_info("switch to symmectic I/O model with no SMP config.\n");
+		disable_smp_by_APIC = 2;
+		default_setup_apic_routing();
+		break;
 	case APIC_BSP_MODEL_SYMMETRIC_IO_NO_ROUTING:
 		pr_info("switch to symmectic I/O model with no apic routing.\n");
-		apic_bsp_setup(false);
-		return;
+		break;
 	}
+	apic_bsp_setup(upmode);
 }
 
 static void lapic_setup_esr(void)
@@ -2392,50 +2411,10 @@ void __init apic_bsp_setup(bool upmode)
 	setup_IO_APIC();
 }
 
-/*
- * This initializes the IO-APIC and APIC hardware if this is
- * a UP kernel.
- */
-int __init APIC_init_uniprocessor(void)
-{
-	if (disable_apic) {
-		pr_info("Apic disabled\n");
-		return -1;
-	}
-#ifdef CONFIG_X86_64
-	if (!boot_cpu_has(X86_FEATURE_APIC)) {
-		disable_apic = 1;
-		pr_info("Apic disabled by BIOS\n");
-		return -1;
-	}
-#else
-	if (!smp_found_config && !boot_cpu_has(X86_FEATURE_APIC))
-		return -1;
-
-	/*
-	 * Complain if the BIOS pretends there is one.
-	 */
-	if (!boot_cpu_has(X86_FEATURE_APIC) &&
-	    APIC_INTEGRATED(boot_cpu_apic_version)) {
-		pr_err("BIOS bug, local APIC 0x%x not detected!...\n",
-			boot_cpu_physical_apicid);
-		return -1;
-	}
-#endif
-
-	if (!smp_found_config)
-		disable_ioapic_support();
-
-	default_setup_apic_routing();
-	apic_bsp_setup(true);
-	apic_bsp_timer_setup();
-	return 0;
-}
-
 #ifdef CONFIG_UP_LATE_INIT
 void __init up_late_init(void)
 {
-	APIC_init_uniprocessor();
+	apic_bsp_timer_setup();
 }
 #endif
 

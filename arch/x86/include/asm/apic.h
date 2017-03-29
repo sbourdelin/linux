@@ -55,6 +55,8 @@ extern unsigned int lapic_timer_frequency;
 
 #ifdef CONFIG_SMP
 extern void __inquire_remote_apic(int apicid);
+extern int disable_smp_by_APIC;
+
 #else /* CONFIG_SMP */
 static inline void __inquire_remote_apic(int apicid)
 {
