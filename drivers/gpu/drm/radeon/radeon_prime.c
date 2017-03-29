@@ -73,6 +73,16 @@ struct drm_gem_object *radeon_gem_prime_import_sg_table(struct drm_device *dev,
 	if (ret)
 		return ERR_PTR(ret);
 
+	ret = radeon_bo_reserve(bo, false);
+	if (ret)
+		return ERR_PTR(ret);
+
+	ret = radeon_bo_pin(bo, RADEON_GEM_DOMAIN_GTT, NULL);
+	radeon_bo_unreserve(bo);
+
+	if (ret)
+		return ERR_PTR(ret);
+
 	mutex_lock(&rdev->gem.mutex);
 	list_add_tail(&bo->list, &rdev->gem.objects);
 	mutex_unlock(&rdev->gem.mutex);
