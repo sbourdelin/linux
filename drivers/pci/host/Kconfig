@@ -285,6 +285,13 @@ config PCIE_ROCKCHIP
 	  There is 1 internal PCIe port available to support GEN2 with
 	  4 slots.
 
+config PCIE_TANGO
+	tristate "Tango PCIe controller"
+	depends on ARCH_TANGO && PCI_MSI && OF
+	select PCI_HOST_COMMON
+	help
+	  Say Y here to enable PCIe controller support on Tango SoC.
+
 config VMD
 	depends on PCI_MSI && X86_64
 	tristate "Intel Volume Management Device Driver"
