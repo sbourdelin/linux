@@ -1612,6 +1612,7 @@ static int i915_suspend_switcheroo(struct drm_device *dev, pm_message_t state)
 static int i915_drm_resume(struct drm_device *dev)
 {
 	struct drm_i915_private *dev_priv = to_i915(dev);
+	int mst_pending;
 	int ret;
 
 	disable_rpm_wakeref_asserts(dev_priv);
@@ -1661,9 +1662,11 @@ static int i915_drm_resume(struct drm_device *dev)
 		dev_priv->display.hpd_irq_setup(dev_priv);
 	spin_unlock_irq(&dev_priv->irq_lock);
 
-	intel_dp_mst_resume(dev);
+	mst_pending = intel_dp_mst_resume(dev);
 
 	intel_display_resume(dev);
+
+	intel_dp_mst_resume_post(dev, mst_pending);
 
 	drm_kms_helper_poll_enable(dev);
 

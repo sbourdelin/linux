@@ -6142,9 +6142,10 @@ void intel_dp_mst_suspend(struct drm_device *dev)
 	}
 }
 
-void intel_dp_mst_resume(struct drm_device *dev)
+int intel_dp_mst_resume(struct drm_device *dev)
 {
 	struct drm_i915_private *dev_priv = to_i915(dev);
+	int pending = 0;
 	int i;
 
 	for (i = 0; i < I915_MAX_PORTS; i++) {
@@ -6156,6 +6157,23 @@ void intel_dp_mst_resume(struct drm_device *dev)
 
 		ret = drm_dp_mst_topology_mgr_resume(&intel_dig_port->dp.mst_mgr);
 		if (ret)
+			pending |= 1 << i;
+	}
+
+	return pending;
+}
+
+void intel_dp_mst_resume_post(struct drm_device *dev, int pending)
+{
+	struct drm_i915_private *dev_priv = to_i915(dev);
+	int i;
+
+	for (i = 0; i < I915_MAX_PORTS; i++) {
+		struct intel_digital_port *intel_dig_port =
+			dev_priv->hotplug.irq_port[i];
+		if (!intel_dig_port || !intel_dig_port->dp.can_mst)
+			continue;
+		if (pending & (1 << i))
 			intel_dp_check_mst_status(&intel_dig_port->dp);
 	}
 }
