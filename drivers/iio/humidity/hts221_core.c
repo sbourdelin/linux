@@ -206,7 +206,7 @@ int hts221_config_drdy(struct hts221_hw *hw, bool enable)
 	err = hts221_write_with_mask(hw, HTS221_REG_CNTRL3_ADDR,
 				     HTS221_DRDY_MASK, val);
 
-	return err < 0 ? err : 0;
+	return min(err, 0);
 }
 
 static int hts221_update_odr(struct hts221_hw *hw, u8 odr)
