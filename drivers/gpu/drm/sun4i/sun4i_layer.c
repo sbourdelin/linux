@@ -141,11 +141,10 @@ static struct sun4i_layer *sun4i_layer_init_one(struct drm_device *drm,
 	return layer;
 }
 
-struct sun4i_layer **sun4i_layers_init(struct drm_device *drm,
-				       struct sun4i_crtc *crtc)
+void **sun4i_layers_init(struct drm_device *drm, struct sun4i_crtc *crtc)
 {
 	struct sun4i_layer **layers;
-	struct sun4i_backend *backend = crtc->backend;
+	struct sun4i_backend *backend = crtc->mixer;
 	int i;
 
 	layers = devm_kcalloc(drm->dev, ARRAY_SIZE(sun4i_backend_planes) + 1,
@@ -198,5 +197,5 @@ struct sun4i_layer **sun4i_layers_init(struct drm_device *drm,
 	/* Assign layer ops to the CRTC */
 	crtc->layer_ops = &layer_ops;
 
-	return layers;
+	return (void **)layers;
 }

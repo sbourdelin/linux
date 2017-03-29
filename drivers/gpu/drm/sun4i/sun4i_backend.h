@@ -151,11 +151,6 @@ struct sun4i_backend {
 	struct reset_control	*sat_reset;
 };
 
-void sun4i_backend_apply_color_correction(struct sun4i_backend *backend);
-void sun4i_backend_disable_color_correction(struct sun4i_backend *backend);
-
-void sun4i_backend_commit(struct sun4i_backend *backend);
-
 void sun4i_backend_layer_enable(struct sun4i_backend *backend,
 				int layer, bool enable);
 int sun4i_backend_update_layer_coord(struct sun4i_backend *backend,

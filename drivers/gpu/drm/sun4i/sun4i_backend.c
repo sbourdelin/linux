@@ -23,6 +23,8 @@
 
 #include "sun4i_backend.h"
 #include "sun4i_drv.h"
+#include "sun4i_layer.h"
+#include "sunxi_mixer.h"
 
 static const u32 sunxi_rgb2yuv_coef[12] = {
 	0x00000107, 0x00000204, 0x00000064, 0x00000108,
@@ -30,9 +32,10 @@ static const u32 sunxi_rgb2yuv_coef[12] = {
 	0x000001c1, 0x00003e88, 0x00003fb8, 0x00000808
 };
 
-void sun4i_backend_apply_color_correction(struct sun4i_backend *backend)
+static void sun4i_backend_apply_color_correction(void *mixer)
 {
 	int i;
+	struct sun4i_backend *backend = mixer;
 
 	DRM_DEBUG_DRIVER("Applying RGB to YUV color correction\n");
 
@@ -44,27 +47,28 @@ void sun4i_backend_apply_color_correction(struct sun4i_backend *backend)
 		regmap_write(backend->regs, SUN4I_BACKEND_OCRCOEF_REG(i),
 			     sunxi_rgb2yuv_coef[i]);
 }
-EXPORT_SYMBOL(sun4i_backend_apply_color_correction);
 
-void sun4i_backend_disable_color_correction(struct sun4i_backend *backend)
+static void sun4i_backend_disable_color_correction(void *mixer)
 {
+	struct sun4i_backend *backend = mixer;
+
 	DRM_DEBUG_DRIVER("Disabling color correction\n");
 
 	/* Disable color correction */
 	regmap_update_bits(backend->regs, SUN4I_BACKEND_OCCTL_REG,
 			   SUN4I_BACKEND_OCCTL_ENABLE, 0);
 }
-EXPORT_SYMBOL(sun4i_backend_disable_color_correction);
 
-void sun4i_backend_commit(struct sun4i_backend *backend)
+static void sun4i_backend_commit(void *mixer)
 {
+	struct sun4i_backend *backend = mixer;
+
 	DRM_DEBUG_DRIVER("Committing changes\n");
 
 	regmap_write(backend->regs, SUN4I_BACKEND_REGBUFFCTL_REG,
 		     SUN4I_BACKEND_REGBUFFCTL_AUTOLOAD_DIS |
 		     SUN4I_BACKEND_REGBUFFCTL_LOADCTL);
 }
-EXPORT_SYMBOL(sun4i_backend_commit);
 
 void sun4i_backend_layer_enable(struct sun4i_backend *backend,
 				int layer, bool enable)
@@ -288,6 +292,13 @@ static int sun4i_backend_free_sat(struct device *dev) {
 	return 0;
 }
 
+static const struct sunxi_mixer_ops sun4i_backend_mixer_ops = {
+	.apply_color_correction = sun4i_backend_apply_color_correction,
+	.disable_color_correction = sun4i_backend_disable_color_correction,
+	.commit = sun4i_backend_commit,
+	.layers_init = sun4i_layers_init,
+};
+
 static struct regmap_config sun4i_backend_regmap_config = {
 	.reg_bits	= 32,
 	.val_bits	= 32,
@@ -310,7 +321,8 @@ static int sun4i_backend_bind(struct device *dev, struct device *master,
 	if (!backend)
 		return -ENOMEM;
 	dev_set_drvdata(dev, backend);
-	drv->backend = backend;
+	drv->mixer = backend;
+	drv->mixer_ops = &sun4i_backend_mixer_ops;
 
 	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
 	regs = devm_ioremap_resource(dev, res);
