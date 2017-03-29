@@ -762,7 +762,7 @@ static int bma180_probe(struct i2c_client *client,
 			goto err_trigger_free;
 	}
 
-	ret = iio_triggered_buffer_setup(indio_dev, NULL,
+	ret = iio_triggered_buffer_setup(indio_dev, iio_pollfunc_store_time,
 			bma180_trigger_handler, NULL);
 	if (ret < 0) {
 		dev_err(&client->dev, "unable to setup iio triggered buffer\n");
