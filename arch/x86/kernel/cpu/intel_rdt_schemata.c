@@ -132,7 +132,8 @@ static int update_domains(struct rdt_resource *r, int closid)
 }
 
 ssize_t rdtgroup_schemata_write(struct kernfs_open_file *of,
-				char *buf, size_t nbytes, loff_t off)
+				char *buf, size_t nbytes, loff_t off,
+				unsigned long flags)
 {
 	struct rdtgroup *rdtgrp;
 	struct rdt_resource *r;
@@ -224,7 +225,8 @@ static void show_doms(struct seq_file *s, struct rdt_resource *r, int closid)
 }
 
 int rdtgroup_schemata_show(struct kernfs_open_file *of,
-			   struct seq_file *s, void *v)
+			   struct seq_file *s, void *v,
+			   unsigned long flags __maybe_unused)
 {
 	struct rdtgroup *rdtgrp;
 	struct rdt_resource *r;

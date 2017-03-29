@@ -37,6 +37,9 @@ struct rdtgroup {
 /* rdtgroup.flags */
 #define	RDT_DELETED		1
 
+/* rftype.flags */
+#define RFTYPE_FLAGS_CPUS_LIST	1
+
 /* List of all resource groups */
 extern struct list_head rdt_all_groups;
 
@@ -54,16 +57,19 @@ struct rftype {
 	char			*name;
 	umode_t			mode;
 	struct kernfs_ops	*kf_ops;
+	unsigned long		flags;
 
 	int (*seq_show)(struct kernfs_open_file *of,
-			struct seq_file *sf, void *v);
+			struct seq_file *sf, void *v,
+			unsigned long flags);
 	/*
 	 * write() is the generic write callback which maps directly to
 	 * kernfs write operation and overrides all other operations.
 	 * Maximum write size is determined by ->max_write_len.
 	 */
 	ssize_t (*write)(struct kernfs_open_file *of,
-			 char *buf, size_t nbytes, loff_t off);
+			 char *buf, size_t nbytes, loff_t off,
+			 unsigned long flags);
 };
 
 /**
@@ -179,9 +185,11 @@ void rdt_cbm_update(void *arg);
 struct rdtgroup *rdtgroup_kn_lock_live(struct kernfs_node *kn);
 void rdtgroup_kn_unlock(struct kernfs_node *kn);
 ssize_t rdtgroup_schemata_write(struct kernfs_open_file *of,
-				char *buf, size_t nbytes, loff_t off);
+				char *buf, size_t nbytes, loff_t off,
+				unsigned long flags);
 int rdtgroup_schemata_show(struct kernfs_open_file *of,
-			   struct seq_file *s, void *v);
+			   struct seq_file *s, void *v,
+			   unsigned long flags);
 
 /*
  * intel_rdt_sched_in() - Writes the task's CLOSid to IA32_PQR_MSR

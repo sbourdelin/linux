@@ -153,7 +153,7 @@ static int rdtgroup_seqfile_show(struct seq_file *m, void *arg)
 	struct rftype *rft = of->kn->priv;
 
 	if (rft->seq_show)
-		return rft->seq_show(of, m, arg);
+		return rft->seq_show(of, m, arg, rft->flags);
 	return 0;
 }
 
@@ -163,7 +163,7 @@ static ssize_t rdtgroup_file_write(struct kernfs_open_file *of, char *buf,
 	struct rftype *rft = of->kn->priv;
 
 	if (rft->write)
-		return rft->write(of, buf, nbytes, off);
+		return rft->write(of, buf, nbytes, off, rft->flags);
 
 	return -EINVAL;
 }
@@ -175,15 +175,17 @@ static struct kernfs_ops rdtgroup_kf_single_ops = {
 };
 
 static int rdtgroup_cpus_show(struct kernfs_open_file *of,
-			      struct seq_file *s, void *v)
+			      struct seq_file *s, void *v,
+			      unsigned long flags)
 {
+	const char *fmt = flags & RFTYPE_FLAGS_CPUS_LIST ? "%*pbl\n" : "%*pb\n";
 	struct rdtgroup *rdtgrp;
 	int ret = 0;
 
 	rdtgrp = rdtgroup_kn_lock_live(of->kn);
 
 	if (rdtgrp)
-		seq_printf(s, "%*pb\n", cpumask_pr_args(&rdtgrp->cpu_mask));
+		seq_printf(s, fmt, cpumask_pr_args(&rdtgrp->cpu_mask));
 	else
 		ret = -ENOENT;
 	rdtgroup_kn_unlock(of->kn);
@@ -230,7 +232,8 @@ rdt_update_closid(const struct cpumask *cpu_mask, int *closid)
 }
 
 static ssize_t rdtgroup_cpus_write(struct kernfs_open_file *of,
-				   char *buf, size_t nbytes, loff_t off)
+				   char *buf, size_t nbytes, loff_t off,
+				   unsigned long flags)
 {
 	cpumask_var_t tmpmask, newmask;
 	struct rdtgroup *rdtgrp, *r;
@@ -252,7 +255,11 @@ static ssize_t rdtgroup_cpus_write(struct kernfs_open_file *of,
 		goto unlock;
 	}
 
-	ret = cpumask_parse(buf, newmask);
+	if (flags & RFTYPE_FLAGS_CPUS_LIST)
+		ret = cpulist_parse(buf, newmask);
+	else
+		ret = cpumask_parse(buf, newmask);
+
 	if (ret)
 		goto unlock;
 
@@ -415,7 +422,8 @@ static int rdtgroup_move_task(pid_t pid, struct rdtgroup *rdtgrp,
 }
 
 static ssize_t rdtgroup_tasks_write(struct kernfs_open_file *of,
-				    char *buf, size_t nbytes, loff_t off)
+				    char *buf, size_t nbytes, loff_t off,
+				    unsigned long flags __maybe_unused)
 {
 	struct rdtgroup *rdtgrp;
 	int ret = 0;
@@ -448,7 +456,8 @@ static void show_rdt_tasks(struct rdtgroup *r, struct seq_file *s)
 }
 
 static int rdtgroup_tasks_show(struct kernfs_open_file *of,
-			       struct seq_file *s, void *v)
+			       struct seq_file *s, void *v,
+			       unsigned long flags)
 {
 	struct rdtgroup *rdtgrp;
 	int ret = 0;
@@ -473,6 +482,14 @@ static struct rftype rdtgroup_base_files[] = {
 		.seq_show	= rdtgroup_cpus_show,
 	},
 	{
+		.name		= "cpus_list",
+		.mode		= 0644,
+		.kf_ops		= &rdtgroup_kf_single_ops,
+		.write		= rdtgroup_cpus_write,
+		.seq_show	= rdtgroup_cpus_show,
+		.flags		= RFTYPE_FLAGS_CPUS_LIST,
+	},
+	{
 		.name		= "tasks",
 		.mode		= 0644,
 		.kf_ops		= &rdtgroup_kf_single_ops,
@@ -489,7 +506,8 @@ static struct rftype rdtgroup_base_files[] = {
 };
 
 static int rdt_num_closids_show(struct kernfs_open_file *of,
-				struct seq_file *seq, void *v)
+				struct seq_file *seq, void *v,
+				unsigned long flags __maybe_unused)
 {
 	struct rdt_resource *r = of->kn->parent->priv;
 
@@ -499,7 +517,8 @@ static int rdt_num_closids_show(struct kernfs_open_file *of,
 }
 
 static int rdt_cbm_mask_show(struct kernfs_open_file *of,
-			     struct seq_file *seq, void *v)
+			     struct seq_file *seq, void *v,
+			     unsigned long flags __maybe_unused)
 {
 	struct rdt_resource *r = of->kn->parent->priv;
 
@@ -509,7 +528,8 @@ static int rdt_cbm_mask_show(struct kernfs_open_file *of,
 }
 
 static int rdt_min_cbm_bits_show(struct kernfs_open_file *of,
-			     struct seq_file *seq, void *v)
+				 struct seq_file *seq, void *v,
+				 unsigned long flags __maybe_unused)
 {
 	struct rdt_resource *r = of->kn->parent->priv;
 
