@@ -13,6 +13,7 @@
  * LCR is written whilst busy.  If it is, then a busy detect interrupt is
  * raised, the LCR needs to be rewritten and the uart status register read.
  */
+#include <linux/bitops.h>
 #include <linux/device.h>
 #include <linux/io.h>
 #include <linux/module.h>
@@ -39,16 +40,16 @@
 
 /* Component Parameter Register bits */
 #define DW_UART_CPR_ABP_DATA_WIDTH	(3 << 0)
-#define DW_UART_CPR_AFCE_MODE		(1 << 4)
-#define DW_UART_CPR_THRE_MODE		(1 << 5)
-#define DW_UART_CPR_SIR_MODE		(1 << 6)
-#define DW_UART_CPR_SIR_LP_MODE		(1 << 7)
-#define DW_UART_CPR_ADDITIONAL_FEATURES	(1 << 8)
-#define DW_UART_CPR_FIFO_ACCESS		(1 << 9)
-#define DW_UART_CPR_FIFO_STAT		(1 << 10)
-#define DW_UART_CPR_SHADOW		(1 << 11)
-#define DW_UART_CPR_ENCODED_PARMS	(1 << 12)
-#define DW_UART_CPR_DMA_EXTRA		(1 << 13)
+#define DW_UART_CPR_AFCE_MODE		BIT(4)
+#define DW_UART_CPR_THRE_MODE		BIT(5)
+#define DW_UART_CPR_SIR_MODE		BIT(6)
+#define DW_UART_CPR_SIR_LP_MODE		BIT(7)
+#define DW_UART_CPR_ADDITIONAL_FEATURES	BIT(8)
+#define DW_UART_CPR_FIFO_ACCESS		BIT(9)
+#define DW_UART_CPR_FIFO_STAT		BIT(10)
+#define DW_UART_CPR_SHADOW		BIT(11)
+#define DW_UART_CPR_ENCODED_PARMS	BIT(12)
+#define DW_UART_CPR_DMA_EXTRA		BIT(13)
 #define DW_UART_CPR_FIFO_MODE		(0xff << 16)
 /* Helper for fifo size calculation */
 #define DW_UART_CPR_FIFO_SIZE(a)	(((a >> 16) & 0xff) * 16)
@@ -217,12 +218,12 @@ static int dw8250_handle_irq(struct uart_port *p)
 	 * This problem has only been observed so far when not in DMA mode
 	 * so we limit the workaround only to non-DMA mode.
 	 */
-	if (!up->dma && ((iir & 0x3f) == UART_IIR_RX_TIMEOUT)) {
+	if (!up->dma && ((iir & UART_IIR_RX_TIMEOUT) == UART_IIR_RX_TIMEOUT)) {
 		spin_lock_irqsave(&p->lock, flags);
 		status = p->serial_in(p, UART_LSR);
 
 		if (!(status & (UART_LSR_DR | UART_LSR_BI)))
-			(void) p->serial_in(p, UART_RX);
+			(void)p->serial_in(p, UART_RX);
 
 		spin_unlock_irqrestore(&p->lock, flags);
 	}
