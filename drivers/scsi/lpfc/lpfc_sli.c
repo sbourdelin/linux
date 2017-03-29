@@ -13759,7 +13759,9 @@ lpfc_sli4_queue_free(struct lpfc_queue *queue)
 		kfree(queue->rqbp);
 	}
 	kfree(queue->pring);
+	queue->pring = NULL;
 	kfree(queue);
+	queue = NULL;
 	return;
 }
 
