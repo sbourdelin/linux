@@ -6156,6 +6156,7 @@ void intel_dp_mst_resume(struct drm_device *dev)
 
 		ret = drm_dp_mst_topology_mgr_resume(&intel_dig_port->dp.mst_mgr);
 		if (ret)
-			intel_dp_check_mst_status(&intel_dig_port->dp);
+			DRM_DEBUG_KMS("DP MST resume failed for port-%c\n",
+				      port_name(intel_dig_port->port));
 	}
 }
