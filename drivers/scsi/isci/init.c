@@ -267,15 +267,22 @@ static int isci_register_sas_ha(struct isci_host *isci_host)
 static void isci_unregister(struct isci_host *isci_host)
 {
 	struct Scsi_Host *shost;
+	unsigned long flags;
 
 	if (!isci_host)
 		return;
 
 	shost = to_shost(isci_host);
-	scsi_remove_host(shost);
+
+	spin_lock_irqsave(shost->host_lock, flags);
+	if (scsi_host_set_state(shost, SHOST_CANCEL))
+		WARN_ON(scsi_host_set_state(shost, SHOST_CANCEL_RECOVERY));
+	spin_unlock_irqrestore(shost->host_lock, flags);
+
 	sas_unregister_ha(&isci_host->sas_ha);
 
 	sas_remove_host(shost);
+	scsi_remove_host(shost);
 	scsi_host_put(shost);
 }
 
