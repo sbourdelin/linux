@@ -2324,6 +2324,25 @@ static void __init apic_bsp_up_setup(void)
 	physid_set_mask_of_physid(boot_cpu_physical_apicid, &phys_cpu_present_map);
 }
 
+/* Setup local APIC timer and get the Id*/
+static int __init apic_bsp_timer_setup(void)
+{
+	int id;
+
+	if (x2apic_mode)
+		id = apic_read(APIC_LDR);
+	else
+		id = GET_APIC_LOGICAL_ID(apic_read(APIC_LDR));
+
+	if (!skip_ioapic_setup && nr_ioapics && nr_legacy_irqs())
+		check_timer();
+
+	/* Setup local timer */
+	x86_init.timers.setup_percpu_clockev();
+
+	return id;
+}
+
 /**
  * apic_bsp_setup - Setup function for local apic and io-apic
  * @upmode:		Force UP mode (for APIC_init_uniprocessor)
@@ -2340,17 +2359,12 @@ int __init apic_bsp_setup(bool upmode)
 		apic_bsp_up_setup();
 	setup_local_APIC();
 
-	if (x2apic_mode)
-		id = apic_read(APIC_LDR);
-	else
-		id = GET_APIC_LOGICAL_ID(apic_read(APIC_LDR));
-
 	enable_IO_APIC();
 	end_local_APIC_setup();
 	irq_remap_enable_fault_handling();
 	setup_IO_APIC();
-	/* Setup local timer */
-	x86_init.timers.setup_percpu_clockev();
+
+	id = apic_bsp_timer_setup();
 	return id;
 }
 

@@ -2047,7 +2047,7 @@ static int mp_alloc_timer_irq(int ioapic, int pin)
  *
  * FIXME: really need to revamp this for all platforms.
  */
-static inline void __init check_timer(void)
+void __init check_timer(void)
 {
 	struct irq_data *irq_data = irq_get_irq_data(0);
 	struct mp_chip_data *data = irq_data->chip_data;
@@ -2278,8 +2278,6 @@ void __init setup_IO_APIC(void)
 	sync_Arb_IDs();
 	setup_IO_APIC_irqs();
 	init_IO_APIC_traps();
-	if (nr_legacy_irqs())
-		check_timer();
 
 	ioapic_initialized = 1;
 }

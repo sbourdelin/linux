@@ -189,6 +189,7 @@ static inline unsigned int io_apic_read(unsigned int apic, unsigned int reg)
 	return x86_io_apic_ops.read(apic, reg);
 }
 
+extern void check_timer(void);
 extern void setup_IO_APIC(void);
 extern void enable_IO_APIC(void);
 extern void disable_IO_APIC(void);
@@ -230,6 +231,7 @@ static inline void io_apic_init_mappings(void) { }
 #define native_io_apic_read		NULL
 #define native_disable_io_apic		NULL
 
+static inline void check_timer(void) { }
 static inline void setup_IO_APIC(void) { }
 static inline void enable_IO_APIC(void) { }
 static inline void setup_ioapic_dest(void) { }
