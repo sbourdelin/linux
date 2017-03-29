@@ -382,9 +382,13 @@ void sas_unregister_dev(struct asd_sas_port *port, struct domain_device *dev)
 	}
 
 	if (!test_and_set_bit(SAS_DEV_DESTROY, &dev->state)) {
+		struct sas_discovery *disc = &dev->port->disc;
+		struct sas_work *sw = &disc->disc_work[DISCE_DESTRUCT].work;
+
 		sas_rphy_unlink(dev->rphy);
 		list_move_tail(&dev->disco_list_node, &port->destroy_list);
 		sas_discover_event(dev->port, DISCE_DESTRUCT);
+		flush_work(&sw->work);
 	}
 }
 
