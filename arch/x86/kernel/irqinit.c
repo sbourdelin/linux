@@ -197,4 +197,7 @@ void __init native_init_IRQ(void)
 #ifdef CONFIG_X86_32
 	irq_ctx_init(smp_processor_id());
 #endif
+
+	/* init the IRQ Mode for BSP */
+	init_bsp_APIC();
 }

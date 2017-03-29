@@ -1153,6 +1153,63 @@ void __init sync_Arb_IDs(void)
 			APIC_INT_LEVELTRIG | APIC_DM_INIT);
 }
 
+enum apic_bsp_mode {
+	APIC_BSP_MODEL_PIC = 0,
+	APIC_BSP_MODEL_VIRTUAL_WIRE,
+	APIC_BSP_MODEL_SYMMETRIC_IO,
+	APIC_BSP_MODEL_COUNT
+};
+
+static int __init apic_bsp_mode_check(void)
+{
+
+	/* Check kernel option */
+	if (disable_apic) {
+		pr_info("APIC disabled by kernel option\n");
+		return APIC_BSP_MODEL_PIC;
+	}
+	/* Check BOIS */
+#ifdef CONFIG_X86_64
+	/* On 64-bit, The APIC is integrated, So, must have APIC feature */
+	if (!boot_cpu_has(X86_FEATURE_APIC)) {
+		disable_apic = 1;
+		pr_info("Apic disabled by BIOS\n");
+		return APIC_BSP_MODEL_PIC;
+	}
+#else
+	if (!boot_cpu_has(X86_FEATURE_APIC) &&
+		APIC_INTEGRATED(boot_cpu_apic_version)) {
+		pr_err("BIOS bug, local APIC #%d not detected!...\n",
+			boot_cpu_physical_apicid);
+		pr_err("... forcing use of dummy APIC emulation (tell your hw vendor)\n");
+		return APIC_BSP_MODEL_PIC;
+	}
+#endif
+	/*
+	 * Check MP table, if neither an integrated nor a separate chip
+	 * doesn't exist.
+	 */
+	if (!boot_cpu_has(X86_FEATURE_APIC) && !smp_found_config) {
+		pr_info("BOIS don't support APIC, and no SMP configuration.\n");
+		return APIC_BSP_MODEL_PIC;
+	}
+
+	/* Check MP table, ps: if the virtual wire has been setup */
+	if (!smp_found_config) {
+		disable_ioapic_support();
+
+		/* Check local APIC, if SMP_NO_CONFIG */
+		if (!acpi_lapic)
+			pr_info("SMP motherboard not detected\n");
+
+		return APIC_BSP_MODEL_VIRTUAL_WIRE;
+	}
+
+	/* Other checks of ACPI options will be done in each setup function */
+
+	return APIC_BSP_MODEL_SYMMETRIC_IO;
+}
+
 /*
  * Setup the through-local-APIC virtual wire mode.
  */
@@ -1200,6 +1257,22 @@ void apic_virture_wire_mode_setup(void)
 	if (apic_extnmi == APIC_EXTNMI_NONE)
 		value |= APIC_LVT_MASKED;
 	apic_write(APIC_LVT1, value);
+}
+
+/* init the interrupt routing model for the BSP */
+void __init init_bsp_APIC(void)
+{
+	switch (apic_bsp_mode_check()) {
+	case APIC_BSP_MODEL_PIC:
+		pr_info("Keep in PIC mode(8259)\n");
+		return;
+	case APIC_BSP_MODEL_VIRTUAL_WIRE:
+		pr_info("switch to virtual wire model.\n");
+		return;
+	case APIC_BSP_MODEL_SYMMETRIC_IO:
+		pr_info("switch to symmectic I/O model.\n");
+		return;
+	}
 }
 
 static void lapic_setup_esr(void)
