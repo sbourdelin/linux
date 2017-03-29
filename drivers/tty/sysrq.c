@@ -49,6 +49,7 @@
 #include <linux/syscalls.h>
 #include <linux/of.h>
 #include <linux/rcupdate.h>
+#include <linux/console.h>
 
 #include <asm/ptrace.h>
 #include <asm/irq_regs.h>
@@ -239,6 +240,7 @@ static DECLARE_WORK(sysrq_showallcpus, sysrq_showregs_othercpus);
 
 static void sysrq_handle_showallcpus(int key)
 {
+	printk_emergency_begin();
 	/*
 	 * Fall back to the workqueue based printing if the
 	 * backtrace printing did not succeed or the
@@ -253,6 +255,7 @@ static void sysrq_handle_showallcpus(int key)
 		}
 		schedule_work(&sysrq_showallcpus);
 	}
+	printk_emergency_end();
 }
 
 static struct sysrq_key_op sysrq_showallcpus_op = {
@@ -279,8 +282,10 @@ static struct sysrq_key_op sysrq_showregs_op = {
 
 static void sysrq_handle_showstate(int key)
 {
+	printk_emergency_begin();
 	show_state();
 	show_workqueue_state();
+	printk_emergency_end();
 }
 static struct sysrq_key_op sysrq_showstate_op = {
 	.handler	= sysrq_handle_showstate,
@@ -291,7 +296,9 @@ static struct sysrq_key_op sysrq_showstate_op = {
 
 static void sysrq_handle_showstate_blocked(int key)
 {
+	printk_emergency_begin();
 	show_state_filter(TASK_UNINTERRUPTIBLE);
+	printk_emergency_end();
 }
 static struct sysrq_key_op sysrq_showstate_blocked_op = {
 	.handler	= sysrq_handle_showstate_blocked,
