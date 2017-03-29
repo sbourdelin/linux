@@ -1589,7 +1589,7 @@ void vfree(const void *addr)
 
 	if (!addr)
 		return;
-	if (unlikely(in_interrupt()))
+	if (!preemptible() || rcu_preempt_depth())
 		__vfree_deferred(addr);
 	else
 		__vunmap(addr, 1);
