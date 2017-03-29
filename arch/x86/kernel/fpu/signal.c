@@ -56,7 +56,7 @@ static inline int check_for_xstate(struct fxregs_state __user *buf,
 static inline int save_fsave_header(struct task_struct *tsk, void __user *buf)
 {
 	if (use_fxsr()) {
-		struct xregs_state *xsave = &tsk->thread.fpu.state.xsave;
+		struct xregs_state *xsave = &tsk->thread.fpu.state->xsave;
 		struct user_i387_ia32_struct env;
 		struct _fpstate_32 __user *fp = buf;
 
@@ -155,7 +155,7 @@ static inline int copy_fpregs_to_sigframe(struct xregs_state __user *buf)
  */
 int copy_fpstate_to_sigframe(void __user *buf, void __user *buf_fx, int size)
 {
-	struct xregs_state *xsave = &current->thread.fpu.state.xsave;
+	struct xregs_state *xsave = &current->thread.fpu.state->xsave;
 	struct task_struct *tsk = current;
 	int ia32_fxstate = (buf != buf_fx);
 
@@ -209,7 +209,7 @@ sanitize_restored_xstate(struct task_struct *tsk,
 			 struct user_i387_ia32_struct *ia32_env,
 			 u64 xfeatures, int fx_only)
 {
-	struct xregs_state *xsave = &tsk->thread.fpu.state.xsave;
+	struct xregs_state *xsave = &tsk->thread.fpu.state->xsave;
 	struct xstate_header *header = &xsave->header;
 
 	if (use_xsave()) {
@@ -325,14 +325,14 @@ static int __fpu__restore_sig(void __user *buf, void __user *buf_fx, int size)
 
 		if (using_compacted_format()) {
 			err = copyin_to_xsaves(NULL, buf_fx,
-					       &fpu->state.xsave);
+					       &fpu->state->xsave);
 		} else {
-			err = __copy_from_user(&fpu->state.xsave,
+			err = __copy_from_user(&fpu->state->xsave,
 					       buf_fx, state_size);
 		}
 
 		if (err || __copy_from_user(&env, buf, sizeof(env))) {
-			fpstate_init(&fpu->state);
+			fpstate_init(fpu->state);
 			trace_x86_fpu_init_state(fpu);
 			err = -1;
 		} else {

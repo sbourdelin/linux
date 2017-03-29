@@ -20,8 +20,8 @@
 #include <linux/dmi.h>
 #include <linux/utsname.h>
 #include <linux/stackprotector.h>
-#include <linux/tick.h>
 #include <linux/cpuidle.h>
+#include <linux/kthread.h>
 #include <trace/events/power.h>
 #include <linux/hw_breakpoint.h>
 #include <asm/cpu.h>
@@ -72,18 +72,38 @@ EXPORT_PER_CPU_SYMBOL(cpu_tss);
 DEFINE_PER_CPU(bool, __tss_limit_invalid);
 EXPORT_PER_CPU_SYMBOL_GPL(__tss_limit_invalid);
 
+struct kmem_cache *fpregs_state_cachep;
+EXPORT_SYMBOL(fpregs_state_cachep);
+
+void __init arch_task_cache_init(void)
+{
+	/* create a slab on which fpregs_states can be allocated */
+	fpregs_state_cachep = kmem_cache_create("fpregs_state",
+				fpu_kernel_xstate_size,
+				ARCH_MIN_TASKALIGN, SLAB_PANIC | SLAB_NOTRACK,
+				NULL);
+}
+
 /*
  * this gets called so that we can store lazy state into memory and copy the
  * current task into the new thread.
  */
 int arch_dup_task_struct(struct task_struct *dst, struct task_struct *src)
 {
-	memcpy(dst, src, arch_task_struct_size);
+	*dst = *src;
 #ifdef CONFIG_VM86
 	dst->thread.vm86 = NULL;
 #endif
+	dst->thread.fpu.state = kmem_cache_alloc_node(fpregs_state_cachep,
+					GFP_KERNEL, tsk_fork_get_node(src));
 
 	return fpu__copy(&dst->thread.fpu, &src->thread.fpu);
+}
+
+void arch_release_task_struct(struct task_struct *tsk)
+{
+	kmem_cache_free(fpregs_state_cachep, tsk->thread.fpu.state);
+	tsk->thread.fpu.state = NULL;
 }
 
 /*

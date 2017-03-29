@@ -1042,8 +1042,9 @@ struct task_struct {
 	struct thread_struct		thread;
 
 	/*
-	 * WARNING: on x86, 'thread_struct' contains a variable-sized
-	 * structure.  It *MUST* be at the end of 'task_struct'.
+	 * WARNING: Under CONFIG_ARCH_WANTS_DYNAMIC_TASK_STRUCT,
+	 * 'thread_struct' contains a variable-sized structure.
+	 * It *MUST* be at the end of 'task_struct'.
 	 *
 	 * Do not put anything below here!
 	 */

@@ -330,11 +330,7 @@ struct fpu {
 	 * copy. If the task context-switches away then they get
 	 * saved here and represent the FPU state.
 	 */
-	union fpregs_state		state;
-	/*
-	 * WARNING: 'state' is dynamically-sized.  Do not put
-	 * anything after it here.
-	 */
+	union fpregs_state		*state;
 };
 
 #endif /* _ASM_X86_FPU_H */

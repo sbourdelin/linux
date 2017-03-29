@@ -447,6 +447,8 @@ struct thread_struct {
 	unsigned long gs;
 #endif
 
+	/* Floating point and extended processor state */
+	struct fpu		fpu;
 	/* Save middle states of ptrace breakpoints */
 	struct perf_event	*ptrace_bps[HBP_NUM];
 	/* Debug status used for traps, single steps, etc... */
@@ -471,13 +473,6 @@ struct thread_struct {
 
 	unsigned int		sig_on_uaccess_err:1;
 	unsigned int		uaccess_err:1;	/* uaccess failed */
-
-	/* Floating point and extended processor state */
-	struct fpu		fpu;
-	/*
-	 * WARNING: 'fpu' is dynamically-sized.  It *MUST* be at
-	 * the end.
-	 */
 };
 
 /*
@@ -807,6 +802,7 @@ static inline void spin_lock_prefetch(const void *x)
 	.sysenter_cs		= __KERNEL_CS,				  \
 	.io_bitmap_ptr		= NULL,					  \
 	.addr_limit		= KERNEL_DS,				  \
+	.fpu.state		= &init_fpregs_state,			  \
 }
 
 /*

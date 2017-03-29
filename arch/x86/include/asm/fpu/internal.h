@@ -196,9 +196,9 @@ static inline int copy_user_to_fregs(struct fregs_state __user *fx)
 static inline void copy_fxregs_to_kernel(struct fpu *fpu)
 {
 	if (IS_ENABLED(CONFIG_X86_32))
-		asm volatile( "fxsave %[fx]" : [fx] "=m" (fpu->state.fxsave));
+		asm volatile( "fxsave %[fx]" : [fx] "=m" (fpu->state->fxsave));
 	else if (IS_ENABLED(CONFIG_AS_FXSAVEQ))
-		asm volatile("fxsaveq %[fx]" : [fx] "=m" (fpu->state.fxsave));
+		asm volatile("fxsaveq %[fx]" : [fx] "=m" (fpu->state->fxsave));
 	else {
 		/* Using "rex64; fxsave %0" is broken because, if the memory
 		 * operand uses any extended registers for addressing, a second
@@ -215,15 +215,15 @@ static inline void copy_fxregs_to_kernel(struct fpu *fpu)
 		 * an extended register is needed for addressing (fix submitted
 		 * to mainline 2005-11-21).
 		 *
-		 *  asm volatile("rex64/fxsave %0" : "=m" (fpu->state.fxsave));
+		 *  asm volatile("rex64/fxsave %0" : "=m" (fpu->state->fxsave));
 		 *
 		 * This, however, we can work around by forcing the compiler to
 		 * select an addressing mode that doesn't require extended
 		 * registers.
 		 */
 		asm volatile( "rex64/fxsave (%[fx])"
-			     : "=m" (fpu->state.fxsave)
-			     : [fx] "R" (&fpu->state.fxsave));
+			     : "=m" (fpu->state->fxsave)
+			     : [fx] "R" (&fpu->state->fxsave));
 	}
 }
 
@@ -432,7 +432,7 @@ static inline int copy_user_to_xregs(struct xregs_state __user *buf, u64 mask)
 static inline int copy_fpregs_to_fpstate(struct fpu *fpu)
 {
 	if (likely(use_xsave())) {
-		copy_xregs_to_kernel(&fpu->state.xsave);
+		copy_xregs_to_kernel(&fpu->state->xsave);
 		return 1;
 	}
 
@@ -445,7 +445,7 @@ static inline int copy_fpregs_to_fpstate(struct fpu *fpu)
 	 * Legacy FPU register saving, FNSAVE always clears FPU registers,
 	 * so we have to mark them inactive:
 	 */
-	asm volatile("fnsave %[fp]; fwait" : [fp] "=m" (fpu->state.fsave));
+	asm volatile("fnsave %[fp]; fwait" : [fp] "=m" (fpu->state->fsave));
 
 	return 0;
 }
@@ -599,7 +599,7 @@ static inline void switch_fpu_finish(struct fpu *new_fpu, int cpu)
 
 	if (preload) {
 		if (!fpregs_state_valid(new_fpu, cpu))
-			copy_kernel_to_fpregs(&new_fpu->state);
+			copy_kernel_to_fpregs(new_fpu->state);
 		fpregs_activate(new_fpu);
 	}
 }
