@@ -502,6 +502,7 @@ int hibernation_restore(int platform_mode)
 {
 	int error;
 
+	printk_emergency_begin();
 	pm_prepare_console();
 	suspend_console();
 	pm_restrict_gfp_mask();
@@ -519,6 +520,7 @@ int hibernation_restore(int platform_mode)
 	pm_restore_gfp_mask();
 	resume_console();
 	pm_restore_console();
+	printk_emergency_end();
 	return error;
 }
 
@@ -542,6 +544,7 @@ int hibernation_platform_enter(void)
 		goto Close;
 
 	entering_platform_hibernation = true;
+	printk_emergency_begin();
 	suspend_console();
 	error = dpm_suspend_start(PMSG_HIBERNATE);
 	if (error) {
@@ -589,6 +592,7 @@ int hibernation_platform_enter(void)
 	entering_platform_hibernation = false;
 	dpm_resume_end(PMSG_RESTORE);
 	resume_console();
+	printk_emergency_end();
 
  Close:
 	hibernation_ops->end();
@@ -692,6 +696,7 @@ int hibernate(void)
 		goto Unlock;
 	}
 
+	printk_emergency_begin();
 	pm_prepare_console();
 	error = __pm_notifier_call_chain(PM_HIBERNATION_PREPARE, -1, &nr_calls);
 	if (error) {
@@ -759,6 +764,7 @@ int hibernate(void)
  Exit:
 	__pm_notifier_call_chain(PM_POST_HIBERNATION, nr_calls, NULL);
 	pm_restore_console();
+	printk_emergency_end();
 	atomic_inc(&snapshot_device_available);
  Unlock:
 	unlock_system_sleep();
@@ -868,6 +874,7 @@ static int software_resume(void)
 		goto Unlock;
 	}
 
+	printk_emergency_begin();
 	pm_prepare_console();
 	error = __pm_notifier_call_chain(PM_RESTORE_PREPARE, -1, &nr_calls);
 	if (error) {
@@ -884,6 +891,7 @@ static int software_resume(void)
  Finish:
 	__pm_notifier_call_chain(PM_POST_RESTORE, nr_calls, NULL);
 	pm_restore_console();
+	printk_emergency_end();
 	atomic_inc(&snapshot_device_available);
 	/* For success case, the suspend path will release the lock */
  Unlock:

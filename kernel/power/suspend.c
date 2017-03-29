@@ -433,6 +433,7 @@ int suspend_devices_and_enter(suspend_state_t state)
 	if (!sleep_state_supported(state))
 		return -ENOSYS;
 
+	printk_emergency_begin();
 	error = platform_suspend_begin(state);
 	if (error)
 		goto Close;
@@ -462,6 +463,7 @@ int suspend_devices_and_enter(suspend_state_t state)
 
  Close:
 	platform_resume_end(state);
+	printk_emergency_end();
 	return error;
 
  Recover_platform:
@@ -520,6 +522,7 @@ static int enter_state(suspend_state_t state)
 #endif
 
 	pr_debug("PM: Preparing system for sleep (%s)\n", pm_states[state]);
+	printk_emergency_begin();
 	pm_suspend_clear_flags();
 	error = suspend_prepare(state);
 	if (error)
@@ -537,6 +540,7 @@ static int enter_state(suspend_state_t state)
  Finish:
 	pr_debug("PM: Finishing wakeup.\n");
 	suspend_finish();
+	printk_emergency_end();
  Unlock:
 	mutex_unlock(&pm_mutex);
 	return error;
