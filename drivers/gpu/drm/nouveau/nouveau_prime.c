@@ -76,6 +76,8 @@ struct drm_gem_object *nouveau_gem_prime_import_sg_table(struct drm_device *dev,
 		return ERR_PTR(ret);
 
 	nvbo->valid_domains = NOUVEAU_GEM_DOMAIN_GART;
+	/* pin imported buffer to GTT */
+	nouveau_bo_pin(nvbo, TTM_PL_FLAG_TT, false);
 
 	/* Initialize the embedded gem-object. We return a single gem-reference
 	 * to the caller, instead of a normal nouveau_bo ttm reference. */
