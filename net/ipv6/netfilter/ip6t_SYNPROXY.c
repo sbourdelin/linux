@@ -58,7 +58,8 @@ synproxy_send_tcp(struct net *net,
 	fl6.daddr = niph->daddr;
 	fl6.fl6_sport = nth->source;
 	fl6.fl6_dport = nth->dest;
-	security_skb_classify_flow((struct sk_buff *)skb, flowi6_to_flowi(&fl6));
+	security_skb_classify_flow((struct sk_buff *)skb,
+				   flowi6_to_flowi(&fl6));
 	dst = ip6_route_output(net, NULL, &fl6);
 	if (dst->error) {
 		dst_release(dst);

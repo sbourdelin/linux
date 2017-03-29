@@ -81,12 +81,14 @@ ip6_packet_match(const struct sk_buff *skb,
 					 &ip6info->dst)))
 		return false;
 
-	ret = ifname_compare_aligned(indev, ip6info->iniface, ip6info->iniface_mask);
+	ret = ifname_compare_aligned(indev, ip6info->iniface,
+				     ip6info->iniface_mask);
 
 	if (NF_INVF(ip6info, IP6T_INV_VIA_IN, ret != 0))
 		return false;
 
-	ret = ifname_compare_aligned(outdev, ip6info->outiface, ip6info->outiface_mask);
+	ret = ifname_compare_aligned(outdev, ip6info->outiface,
+				     ip6info->outiface_mask);
 
 	if (NF_INVF(ip6info, IP6T_INV_VIA_OUT, ret != 0))
 		return false;
