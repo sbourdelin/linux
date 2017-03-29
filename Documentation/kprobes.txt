@@ -131,11 +131,13 @@ kretprobe, then sets the saved instruction pointer to the saved return
 address, and that's where execution resumes upon return from the trap.
 
 While the probed function is executing, its return address is
-stored in an object of type kretprobe_instance.  Before calling
-register_kretprobe(), the user sets the maxactive field of the
-kretprobe struct to specify how many instances of the specified
-function can be probed simultaneously.  register_kretprobe()
-pre-allocates the indicated number of kretprobe_instance objects.
+stored in an object of type kretprobe_instance. Usually, this
+kretprobe_instance will be allocated dynamically.
+Since the dynamic allocation can cause mis-hit of other probes
+on memory allocation path, user can set maxactive field for pooling
+pre-allocated instances before calling register_kretprobe().
+This maxactive indicates how many instances of the specified
+function can be probed simultaneously.
 
 For example, if the function is non-recursive and is called with a
 spinlock held, maxactive = 1 should be enough.  If the function is
@@ -144,11 +146,14 @@ or preemption), NR_CPUS should be enough.  If maxactive <= 0, it is
 set to a default value.  If CONFIG_PREEMPT is enabled, the default
 is max(10, 2*NR_CPUS).  Otherwise, the default is NR_CPUS.
 
-It's not a disaster if you set maxactive too low; you'll just miss
-some probes.  In the kretprobe struct, the nmissed field is set to
-zero when the return probe is registered, and is incremented every
-time the probed function is entered but there is no kretprobe_instance
-object available for establishing the return probe.
+It's not a disaster if you set maxactive too low; you'll just see
+some probes on memory allocation path missed if it exists.
+
+In the kretprobe struct, the nmissed field is set to zero when the
+return probe is registered, and is incremented every time the probed
+function is entered but there is no kretprobe_instance object available
+and it fails to allocate new one, or hit the upper limit of maxactive
+(KRETPROBE_MAXACTIVE_ALLOC, currently it is 4096.)
 
 1.3.2 Kretprobe entry-handler
 

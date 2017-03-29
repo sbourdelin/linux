@@ -192,6 +192,8 @@ struct kretprobe {
 	struct hlist_head free_instances;
 	raw_spinlock_t lock;
 };
+/* Upper limit of maxactive for dynamic allocation */
+#define KRETPROBE_MAXACTIVE_ALLOC 4096
 
 struct kretprobe_instance {
 	struct hlist_node hlist;

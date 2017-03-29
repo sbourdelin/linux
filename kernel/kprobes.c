@@ -57,7 +57,6 @@
 #define KPROBE_HASH_BITS 6
 #define KPROBE_TABLE_SIZE (1 << KPROBE_HASH_BITS)
 
-
 /*
  * Some oddball architectures like 64bit powerpc have function descriptors
  * so this must be overridable.
@@ -1824,6 +1823,30 @@ void unregister_jprobes(struct jprobe **jps, int num)
 EXPORT_SYMBOL_GPL(unregister_jprobes);
 
 #ifdef CONFIG_KRETPROBES
+
+/* Try to use free instance first, if failed, try to allocate new instance */
+struct kretprobe_instance *kretprobe_alloc_instance(struct kretprobe *rp)
+{
+	struct kretprobe_instance *ri = NULL;
+	unsigned long flags = 0;
+
+	raw_spin_lock_irqsave(&rp->lock, flags);
+	if (!hlist_empty(&rp->free_instances)) {
+		ri = hlist_entry(rp->free_instances.first,
+				struct kretprobe_instance, hlist);
+		hlist_del(&ri->hlist);
+	}
+	raw_spin_unlock_irqrestore(&rp->lock, flags);
+
+	/* Populate max active instance if possible */
+	if (!ri && rp->maxactive < KRETPROBE_MAXACTIVE_ALLOC) {
+		ri = kmalloc(sizeof(*ri) + rp->data_size, GFP_ATOMIC);
+		if (ri)
+			rp->maxactive++;
+	}
+
+	return ri;
+}
 /*
  * This kprobe pre_handler is registered with every kretprobe. When probe
  * hits it will set up the return probe.
@@ -1846,14 +1869,8 @@ static int pre_handler_kretprobe(struct kprobe *p, struct pt_regs *regs)
 	}
 
 	/* TODO: consider to only swap the RA after the last pre_handler fired */
-	hash = hash_ptr(current, KPROBE_HASH_BITS);
-	raw_spin_lock_irqsave(&rp->lock, flags);
-	if (!hlist_empty(&rp->free_instances)) {
-		ri = hlist_entry(rp->free_instances.first,
-				struct kretprobe_instance, hlist);
-		hlist_del(&ri->hlist);
-		raw_spin_unlock_irqrestore(&rp->lock, flags);
-
+	ri = kretprobe_alloc_instance(rp);
+	if (ri) {
 		ri->rp = rp;
 		ri->task = current;
 
@@ -1868,13 +1885,13 @@ static int pre_handler_kretprobe(struct kprobe *p, struct pt_regs *regs)
 
 		/* XXX(hch): why is there no hlist_move_head? */
 		INIT_HLIST_NODE(&ri->hlist);
+		hash = hash_ptr(current, KPROBE_HASH_BITS);
 		kretprobe_table_lock(hash, &flags);
 		hlist_add_head(&ri->hlist, &kretprobe_inst_table[hash]);
 		kretprobe_table_unlock(hash, &flags);
-	} else {
+	} else
 		rp->nmissed++;
-		raw_spin_unlock_irqrestore(&rp->lock, flags);
-	}
+
 	return 0;
 }
 NOKPROBE_SYMBOL(pre_handler_kretprobe);
