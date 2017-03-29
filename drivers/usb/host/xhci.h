@@ -1758,6 +1758,7 @@ struct xhci_hcd {
 	struct dma_pool	*segment_pool;
 	struct dma_pool	*small_streams_pool;
 	struct dma_pool	*medium_streams_pool;
+	struct dma_pool	*scratchpad_pool;
 
 	/* Host controller watchdog timer structures */
 	unsigned int		xhc_state;

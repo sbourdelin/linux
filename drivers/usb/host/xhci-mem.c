@@ -1710,12 +1710,18 @@ static int scratchpad_alloc(struct xhci_hcd *xhci, gfp_t flags)
 		goto fail_sp3;
 
 	xhci->dcbaa->dev_context_ptrs[0] = cpu_to_le64(xhci->scratchpad->sp_dma);
+
+	xhci->scratchpad_pool = dma_pool_create("xhci scratchpad buffer pool",
+			dev, xhci->page_size,
+			xhci->page_size, xhci->page_size);
+	if (!xhci->scratchpad_pool)
+		goto fail_sp4;
+
 	for (i = 0; i < num_sp; i++) {
 		dma_addr_t dma;
-		void *buf = dma_alloc_coherent(dev, xhci->page_size, &dma,
-				flags);
+		void *buf = dma_pool_zalloc(xhci->scratchpad_pool, flags, &dma);
 		if (!buf)
-			goto fail_sp4;
+			goto fail_sp5;
 
 		xhci->scratchpad->sp_array[i] = dma;
 		xhci->scratchpad->sp_buffers[i] = buf;
@@ -1723,13 +1729,15 @@ static int scratchpad_alloc(struct xhci_hcd *xhci, gfp_t flags)
 
 	return 0;
 
- fail_sp4:
+ fail_sp5:
 	for (i = i - 1; i >= 0; i--) {
-		dma_free_coherent(dev, xhci->page_size,
+		dma_pool_free(xhci->scratchpad_pool,
 				    xhci->scratchpad->sp_buffers[i],
 				    xhci->scratchpad->sp_array[i]);
 	}
+	dma_pool_destroy(xhci->scratchpad_pool);
 
+ fail_sp4:
 	kfree(xhci->scratchpad->sp_buffers);
 
  fail_sp3:
@@ -1757,10 +1765,11 @@ static void scratchpad_free(struct xhci_hcd *xhci)
 	num_sp = HCS_MAX_SCRATCHPAD(xhci->hcs_params2);
 
 	for (i = 0; i < num_sp; i++) {
-		dma_free_coherent(dev, xhci->page_size,
+		dma_pool_free(xhci->scratchpad_pool,
 				    xhci->scratchpad->sp_buffers[i],
 				    xhci->scratchpad->sp_array[i]);
 	}
+	dma_pool_destroy(xhci->scratchpad_pool);
 	kfree(xhci->scratchpad->sp_buffers);
 	dma_free_coherent(dev, num_sp * sizeof(u64),
 			    xhci->scratchpad->sp_array,
