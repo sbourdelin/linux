@@ -9,6 +9,7 @@
 #include <linux/module.h>
 #include <linux/mod_devicetable.h>
 #include <linux/slab.h>
+#include <linux/of_pci.h>
 
 #include <asm/errno.h>
 #include "of_private.h"
@@ -89,6 +90,8 @@ void of_dma_configure(struct device *dev, struct device_node *np)
 	bool coherent;
 	unsigned long offset;
 	const struct iommu_ops *iommu;
+	struct resource_entry *window;
+	LIST_HEAD(res);
 
 	/*
 	 * Set default coherent_dma_mask to 32 bit.  Drivers are expected to
@@ -104,7 +107,24 @@ void of_dma_configure(struct device *dev, struct device_node *np)
 	if (!dev->dma_mask)
 		dev->dma_mask = &dev->coherent_dma_mask;
 
-	ret = of_dma_get_range(np, &dma_addr, &paddr, &size);
+	if (dev_is_pci(dev)) {
+		size = 0;
+		ret = of_pci_get_dma_ranges(np, &res);
+		if (!ret) {
+			resource_list_for_each_entry(window, &res) {
+				struct resource *res_dma = window->res;
+				if (size < resource_size(res_dma)) {
+					dma_addr = res_dma->start - window->offset;
+					paddr = res_dma->start;
+					size = resource_size(res_dma);
+				}
+			}
+		}
+		pci_free_resource_list(&res);
+	}
+	else
+		ret = of_dma_get_range(np, &dma_addr, &paddr, &size);
+
 	if (ret < 0) {
 		dma_addr = offset = 0;
 		size = dev->coherent_dma_mask + 1;
