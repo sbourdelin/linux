@@ -487,7 +487,7 @@ static void xgpu_vi_mailbox_flr_work(struct work_struct *work)
 
 	r = xgpu_vi_poll_msg(adev, IDH_FLR_NOTIFICATION_CMPL);
 	if (r)
-		DRM_ERROR("failed to get flr cmpl msg from hypervior.\n");
+		DRM_ERROR("failed to get flr cmpl msg from hypervisor.\n");
 
 	/* TODO: need to restore gfx states */
 }
