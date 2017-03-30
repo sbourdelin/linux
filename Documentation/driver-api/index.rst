@@ -26,7 +26,7 @@ available subsections can be seen below.
    regulator
    iio/index
    input
-   usb
+   usb/index
    spi
    i2c
    hsi
