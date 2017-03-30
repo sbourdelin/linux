@@ -112,6 +112,9 @@ at index zero, incrementing by one until the driver returns ``EINVAL``.
     :stub-columns: 0
     :widths:       3 1 4
 
+    * - ``V4L2_INPUT_TYPE_DEFAULT``
+      - 0
+      - This is the default value returned when no input is supported.
     * - ``V4L2_INPUT_TYPE_TUNER``
       - 1
       - This input uses a tuner (RF demodulator).
