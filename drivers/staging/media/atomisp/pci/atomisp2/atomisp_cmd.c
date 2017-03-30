@@ -255,14 +255,17 @@ int atomisp_freq_scaling(struct atomisp_device *isp,
 	struct atomisp_freq_scaling_rule curr_rules;
 	int i, ret;
 	unsigned short fps = 0;
+	unsigned short masked_dev = 0;
 
 	if (isp->sw_contex.power_state != ATOM_ISP_POWER_UP) {
 		dev_err(isp->dev, "DFS cannot proceed due to no power.\n");
 		return -EINVAL;
 	}
 
-	if ((isp->pdev->device & ATOMISP_PCI_DEVICE_SOC_MASK) ==
-		ATOMISP_PCI_DEVICE_SOC_CHT && ATOMISP_USE_YUVPP(asd))
+	masked_dev = isp->pdev->device & ATOMISP_PCI_DEVICE_SOC_MASK;
+
+	if (masked_dev == ATOMISP_PCI_DEVICE_SOC_CHT &&
+	    ATOMISP_USE_YUVPP(asd))
 		isp->dfs = &dfs_config_cht_soc;
 
 	if (isp->dfs->lowest_freq == 0 || isp->dfs->max_freq_at_vmin == 0 ||
