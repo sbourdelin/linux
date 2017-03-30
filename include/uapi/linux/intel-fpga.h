@@ -113,6 +113,43 @@ struct fpga_port_region_info {
 
 #define FPGA_PORT_GET_REGION_INFO	_IO(FPGA_MAGIC, PORT_BASE + 2)
 
+/**
+ * FPGA_PORT_DMA_MAP - _IOWR(FPGA_MAGIC, PORT_BASE + 3,
+ *						struct fpga_port_dma_map)
+ *
+ * Map the dma memory per user_addr and length which are provided by caller.
+ * Driver fills the iova in provided struct afu_port_dma_map.
+ * This interface only accepts page-size aligned user memory for dma mapping.
+ * Return: 0 on success, -errno on failure.
+ */
+struct fpga_port_dma_map {
+	/* Input */
+	__u32 argsz;		/* Structure length */
+	__u32 flags;		/* Zero for now */
+	__u64 user_addr;        /* Process virtual address */
+	__u64 length;           /* Length of mapping (bytes)*/
+	/* Output */
+	__u64 iova;             /* IO virtual address */
+};
+
+#define FPGA_PORT_DMA_MAP	_IO(FPGA_MAGIC, PORT_BASE + 3)
+
+/**
+ * FPGA_PORT_DMA_UNMAP - _IOW(FPGA_MAGIC, PORT_BASE + 4,
+ *						struct fpga_port_dma_unmap)
+ *
+ * Unmap the dma memory per iova provided by caller.
+ * Return: 0 on success, -errno on failure.
+ */
+struct fpga_port_dma_unmap {
+	/* Input */
+	__u32 argsz;		/* Structure length */
+	__u32 flags;		/* Zero for now */
+	__u64 iova;		/* IO virtual address */
+};
+
+#define FPGA_PORT_DMA_UNMAP	_IO(FPGA_MAGIC, PORT_BASE + 4)
+
 /* IOCTLs for FME file descriptor */
 
 /**
