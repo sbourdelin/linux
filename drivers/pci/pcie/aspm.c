@@ -422,20 +422,6 @@ static void pcie_aspm_check_latency(struct pci_dev *endpoint)
 	}
 }
 
-/*
- * The L1 PM substate capability is only implemented in function 0 in a
- * multi function device.
- */
-static struct pci_dev *pci_function_0(struct pci_bus *linkbus)
-{
-	struct pci_dev *child;
-
-	list_for_each_entry(child, &linkbus->devices, bus_list)
-		if (PCI_FUNC(child->devfn) == 0)
-			return child;
-	return NULL;
-}
-
 /* Calculate L1.2 PM substate timing parameters */
 static void aspm_calc_l1ss_info(struct pcie_link_state *link,
 				struct aspm_register_info *upreg,
@@ -798,7 +784,6 @@ static struct pcie_link_state *alloc_pcie_link_state(struct pci_dev *pdev)
 	INIT_LIST_HEAD(&link->children);
 	INIT_LIST_HEAD(&link->link);
 	link->pdev = pdev;
-	link->downstream = pci_function_0(pdev->subordinate);
 
 	/*
 	 * Root Ports and PCI/PCI-X to PCIe Bridges are roots of PCIe
@@ -828,11 +813,33 @@ static struct pcie_link_state *alloc_pcie_link_state(struct pci_dev *pdev)
 
 static int pci_aspm_init_downstream(struct pci_dev *pdev)
 {
+	struct pcie_link_state *link;
+	struct pci_dev *parent;
+
+	/*
+	 * The L1 PM substate capability is only implemented in function 0 in a
+	 * multi function device.
+	 */
+	if (PCI_FUNC(pdev->devfn) != 0)
+		return -EINVAL;
+
+	parent = pdev->bus->self;
+	if (!parent)
+		return -EINVAL;
+
+	link = parent->link_state;
+	link->downstream = pdev;
 	return 0;
 }
 
 static int pci_aspm_init_upstream(struct pci_dev *pdev)
 {
+	struct pcie_link_state *link;
+
+	link = alloc_pcie_link_state(pdev);
+	if (!link)
+		return -ENOMEM;
+
 	return 0;
 }
 
@@ -843,6 +850,17 @@ static int pci_aspm_init_upstream(struct pci_dev *pdev)
  */
 int pci_aspm_init(struct pci_dev *pdev)
 {
+	if (!aspm_support_enabled)
+		return 0;
+
+	if (!pci_is_pcie(pdev))
+		return -EINVAL;
+
+	/* VIA has a strange chipset, root port is under a bridge */
+	if (pci_pcie_type(pdev) == PCI_EXP_TYPE_ROOT_PORT &&
+	    pdev->bus->self)
+		return 0;
+
 	if (!pdev->has_secondary_link)
 		return pci_aspm_init_downstream(pdev);
 
@@ -859,33 +877,16 @@ void pcie_aspm_init_link_state(struct pci_dev *pdev)
 	struct pcie_link_state *link;
 	int blacklist = !!pcie_aspm_sanity_check(pdev);
 
-	if (!aspm_support_enabled)
+	if (!pdev->link_state)
 		return;
 
-	if (pdev->link_state)
-		return;
-
-	/*
-	 * We allocate pcie_link_state for the component on the upstream
-	 * end of a Link, so there's nothing to do unless this device has a
-	 * Link on its secondary side.
-	 */
-	if (!pdev->has_secondary_link)
-		return;
-
-	/* VIA has a strange chipset, root port is under a bridge */
-	if (pci_pcie_type(pdev) == PCI_EXP_TYPE_ROOT_PORT &&
-	    pdev->bus->self)
-		return;
-
+	link = pdev->link_state;
 	down_read(&pci_bus_sem);
 	if (list_empty(&pdev->subordinate->devices))
 		goto out;
 
 	mutex_lock(&aspm_lock);
-	link = alloc_pcie_link_state(pdev);
-	if (!link)
-		goto unlock;
+
 	/*
 	 * Setup initial ASPM state. Note that we need to configure
 	 * upstream links also because capable state of them can be
@@ -910,7 +911,6 @@ void pcie_aspm_init_link_state(struct pci_dev *pdev)
 		pcie_set_clkpm(link, policy_to_clkpm_state(link));
 	}
 
-unlock:
 	mutex_unlock(&aspm_lock);
 out:
 	up_read(&pci_bus_sem);
