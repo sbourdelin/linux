@@ -2573,6 +2573,33 @@ struct mutex *v4l2_ioctl_get_lock(struct video_device *vdev, unsigned cmd)
 	return vdev->lock;
 }
 
+int v4l2_ioctl_enum_input_default(struct file *file, void *priv,
+				  struct v4l2_input *i)
+{
+	if (i->index > 0)
+		return -EINVAL;
+
+	memset(i, 0, sizeof(*i));
+	i->type = V4L2_INPUT_TYPE_DEFAULT;
+	strlcpy(i->name, "Default", sizeof(i->name));
+
+	return 0;
+}
+EXPORT_SYMBOL(v4l2_ioctl_enum_input_default);
+
+int v4l2_ioctl_g_input_default(struct file *file, void *priv, unsigned int *i)
+{
+	*i = 0;
+	return 0;
+}
+EXPORT_SYMBOL(v4l2_ioctl_g_input_default);
+
+int v4l2_ioctl_s_input_default(struct file *file, void *priv, unsigned int i)
+{
+	return i ? -EINVAL : 0;
+}
+EXPORT_SYMBOL(v4l2_ioctl_s_input_default);
+
 /* Common ioctl debug function. This function can be used by
    external ioctl messages as well as internal V4L ioctl */
 void v4l_printk_ioctl(const char *prefix, unsigned int cmd)

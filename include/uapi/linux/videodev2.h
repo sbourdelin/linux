@@ -1477,6 +1477,7 @@ struct v4l2_input {
 };
 
 /*  Values for the 'type' field */
+#define V4L2_INPUT_TYPE_DEFAULT		0
 #define V4L2_INPUT_TYPE_TUNER		1
 #define V4L2_INPUT_TYPE_CAMERA		2
 #define V4L2_INPUT_TYPE_TOUCH		3

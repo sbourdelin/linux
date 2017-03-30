@@ -652,6 +652,32 @@ struct video_device;
  */
 struct mutex *v4l2_ioctl_get_lock(struct video_device *vdev, unsigned int cmd);
 
+
+/**
+ * v4l2_ioctl_enum_input_default - v4l2 ioctl helper for VIDIOC_ENUM_INPUT ioctl
+ *
+ * Plug this function in vidioc_enum_input field of the struct v4l2_ioctl_ops to
+ * enumerate a single input as V4L2_INPUT_TYPE_DEFAULT
+ */
+int v4l2_ioctl_enum_input_default(struct file *file, void *priv,
+				  struct v4l2_input *i);
+
+/**
+ * v4l2_ioctl_g_input_default - v4l2 ioctl helper for VIDIOC_G_INPUT ioctl
+ *
+ * Plug this function in vidioc_g_input field of the struct v4l2_ioctl_ops
+ * when using v4l2_ioctl_enum_input_default
+ */
+int v4l2_ioctl_g_input_default(struct file *file, void *priv, unsigned int *i);
+
+/**
+ * v4l2_ioctl_s_input_default - v4l2 ioctl helper for VIDIOC_S_INPUT ioctl
+ *
+ * Plug this function in vidioc_s_input field of the struct v4l2_ioctl_ops
+ * when using v4l2_ioctl_enum_input_default
+ */
+int v4l2_ioctl_s_input_default(struct file *file, void *priv, unsigned int i);
+
 /* names for fancy debug output */
 extern const char *v4l2_field_names[];
 extern const char *v4l2_type_names[];
