@@ -631,8 +631,7 @@ static int mwifiex_init_sdio_ioport(struct mwifiex_adapter *adapter)
 	else
 		return -1;
 cont:
-	mwifiex_dbg(adapter, INFO,
-		    "info: SDIO FUNC1 IO port: %#x\n", adapter->ioport);
+	pr_info("info: SDIO FUNC1 IO port: %#x\n", adapter->ioport);
 
 	/* Set Host interrupt reset to read to clear */
 	if (!mwifiex_read_reg(adapter, card->reg->host_int_rsr_reg, &reg))
