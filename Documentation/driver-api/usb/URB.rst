@@ -271,6 +271,18 @@ If you specify your own start frame, make sure it's several frames in advance
 of the current frame.  You might want this model if you're synchronizing
 ISO data with some other event stream.
 
+ .. warning::
+
+   Several host drivers have a 32-bits or 64-bits DMA transfer word size,
+   with usually matches the CPU word. Due to such restriction, you should
+   warrant that the @transfer_buffer is DWORD aligned, on 32 bits system, or
+   QDWORD aligned, on 64 bits system. You should also ensure that the
+   buffer has enough space for PAD bits.
+
+   This condition is satisfied if you pass a buffer directly allocated by
+   kmalloc(), but this may not be the case if the driver allocates a bigger
+   buffer and point to a random place inside it.
+
 
 How to start interrupt (INT) transfers?
 =======================================

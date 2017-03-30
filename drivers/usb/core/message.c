@@ -128,6 +128,21 @@ static int usb_internal_control_msg(struct usb_device *usb_dev,
  * make sure your disconnect() method can wait for it to complete. Since you
  * don't have a handle on the URB used, you can't cancel the request.
  *
+ * .. note::
+ *
+ *   Several host drivers require that the @data buffer to be aligned
+ *   with the CPU word size (e. g. DWORD for 32 bits, QDWORD for 64 bits).
+ *   It is up to USB drivers should ensure that they'll only pass buffers
+ *   with such alignments.
+ *
+ *   Please also notice that, due to such restriction, the host driver
+ *   may also override PAD bytes at the end of the @data buffer, up to the
+ *   size of the CPU word.
+ *
+ *   Such word alignment condition is normally ensured if the buffer is
+ *   allocated with kmalloc(), but this may not be the case if the driver
+ *   allocates a bigger buffer and point to a random place inside it.
+ *
  * Return: If successful, the number of bytes transferred. Otherwise, a negative
  * error number.
  */
