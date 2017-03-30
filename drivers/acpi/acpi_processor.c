@@ -570,7 +570,17 @@ static struct acpi_scan_handler processor_handler = {
 static int acpi_processor_container_attach(struct acpi_device *dev,
 					   const struct acpi_device_id *id)
 {
+	if (dev->status.present && dev->status.functional &&
+		dev->status.enabled && dev->status.show_in_ui)
+		acpi_lpi_sysfs_init(dev->handle,
+				(struct acpi_lpi_sysfs_data **)&dev->driver_data);
 	return 1;
+}
+
+static void acpi_processor_container_detach(struct acpi_device *dev)
+{
+	if (dev->driver_data)
+		acpi_lpi_sysfs_exit((struct acpi_lpi_sysfs_data *)dev->driver_data);
 }
 
 static const struct acpi_device_id processor_container_ids[] = {
@@ -581,6 +591,7 @@ static const struct acpi_device_id processor_container_ids[] = {
 static struct acpi_scan_handler processor_container_handler = {
 	.ids = processor_container_ids,
 	.attach = acpi_processor_container_attach,
+	.detach = acpi_processor_container_detach,
 };
 
 /* The number of the unique processor IDs */
