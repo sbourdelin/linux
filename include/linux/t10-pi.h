@@ -24,6 +24,9 @@ enum t10_dif_type {
 	T10_PI_TYPE3_PROTECTION = 0x3,
 };
 
+static const __be16 T10_APP_ESCAPE = (__force __be16) 0xffff;
+static const __be32 T10_REF_ESCAPE = (__force __be32) 0xffffffff;
+
 /*
  * T10 Protection Information tuple.
  */

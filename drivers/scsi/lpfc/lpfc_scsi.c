@@ -2934,8 +2934,8 @@ lpfc_calc_bg_err(struct lpfc_hba *phba, struct lpfc_scsi_buf *lpfc_cmd)
 				 * First check to see if a protection data
 				 * check is valid
 				 */
-				if ((src->ref_tag == 0xffffffff) ||
-				    (src->app_tag == 0xffff)) {
+				if ((src->ref_tag == T10_REF_ESCAPE) ||
+				    (src->app_tag == T10_APP_ESCAPE)) {
 					start_ref_tag++;
 					goto skipit;
 				}
