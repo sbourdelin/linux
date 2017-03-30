@@ -12,6 +12,12 @@ config FPGA
 	  manager drivers.
 
 if FPGA
+config FPGA_DEVICE
+	tristate "FPGA Device Framework"
+	help
+	  Say Y here if you want support for FPGA Devices from the kernel.
+	  The FPGA Device Framework adds a FPGA device class and provide
+	  interfaces to create FPGA devices.
 
 config FPGA_REGION
 	tristate "FPGA Region"
