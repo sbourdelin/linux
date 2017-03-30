@@ -741,6 +741,10 @@ static inline void update_mmu_cache(struct vm_area_struct *vma,
 #define kc_vaddr_to_offset(v)	((v) & ~VA_START)
 #define kc_offset_to_vaddr(o)	((o) | VA_START)
 
+unsigned long __arch_rare_write_begin(void);
+unsigned long __arch_rare_write_end(void);
+void __arch_rare_write_memcpy(void *dst, const void *src, __kernel_size_t len);
+
 #endif /* !__ASSEMBLY__ */
 
 #endif /* __ASM_PGTABLE_H */

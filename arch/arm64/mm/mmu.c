@@ -570,6 +570,105 @@ static void __init map_kernel(pgd_t *pgd)
 	kasan_copy_shadow(pgd);
 }
 
+struct mm_struct rare_write_mm = {
+	.mm_rb		= RB_ROOT,
+	.mm_users	= ATOMIC_INIT(2),
+	.mm_count	= ATOMIC_INIT(1),
+	.mmap_sem	= __RWSEM_INITIALIZER(rare_write_mm.mmap_sem),
+	.page_table_lock= __SPIN_LOCK_UNLOCKED(rare_write_mm.page_table_lock),
+	.mmlist		= LIST_HEAD_INIT(rare_write_mm.mmlist),
+};
+
+#ifdef CONFIG_ARM64_PTDUMP_DEBUGFS
+#include <asm/ptdump.h>
+
+static struct ptdump_info rare_write_ptdump_info = {
+	.mm		= &rare_write_mm,
+	.markers	= (struct addr_marker[]){
+		{ 0,		"rare-write start" },
+		{ TASK_SIZE_64,	"rare-write end" }
+	},
+	.base_addr	= 0,
+};
+
+static int __init ptdump_init(void)
+{
+	return ptdump_debugfs_register(&rare_write_ptdump_info,
+				       "rare_write_page_tables");
+}
+device_initcall(ptdump_init);
+
+#endif
+
+__always_inline unsigned long __arch_rare_write_begin(void)
+{
+	struct mm_struct *mm = &rare_write_mm;
+
+	preempt_disable();
+
+	__switch_mm(mm);
+
+	if (system_uses_ttbr0_pan()) {
+		update_saved_ttbr0(current, mm);
+		cpu_switch_mm(mm->pgd, mm);
+	}
+
+	return 0;
+}
+
+__always_inline unsigned long __arch_rare_write_end(void)
+{
+	struct mm_struct *mm = current->active_mm;
+
+	__switch_mm(mm);
+
+	if (system_uses_ttbr0_pan()) {
+		cpu_set_reserved_ttbr0();
+		if (mm != &init_mm)
+			update_saved_ttbr0(current, mm);
+	}
+
+	preempt_enable_no_resched();
+
+	return 0;
+}
+
+static unsigned long rodata_rw_alias_start __ro_after_init = TASK_SIZE_64 / 4;
+
+__always_inline void __arch_rare_write_memcpy(void *dst, const void *src,
+					      __kernel_size_t len)
+{
+	unsigned long __dst = (unsigned long)dst;
+
+	__dst -= (unsigned long)__start_rodata;
+	__dst += rodata_rw_alias_start;
+
+	memcpy((void *)__dst, src, len);
+}
+
+void __init rare_write_init(void)
+{
+	phys_addr_t pgd_phys = early_pgtable_alloc();
+	pgd_t *pgd = (pgd_t *)__phys_to_virt(pgd_phys);
+	phys_addr_t pa_start = __pa_symbol(__start_rodata);
+	unsigned long size = __end_rodata - __start_rodata;
+
+	BUG_ON(!PAGE_ALIGNED(pa_start));
+	BUG_ON(!PAGE_ALIGNED(size));
+
+	rodata_rw_alias_start += kaslr_offset();
+
+	BUG_ON(rodata_rw_alias_start + size > TASK_SIZE_64);
+
+	rare_write_mm.pgd = pgd;
+	init_new_context(NULL, &rare_write_mm);
+
+	__create_pgd_mapping(pgd,
+			     pa_start, rodata_rw_alias_start, size,
+			     __pgprot(pgprot_val(PAGE_KERNEL) | PTE_NG),
+			     early_pgtable_alloc, debug_pagealloc_enabled());
+}
+
 /*
  * paging_init() sets up the page tables, initialises the zone memory
  * maps and sets up the zero page.
@@ -603,6 +702,8 @@ void __init paging_init(void)
 	 */
 	memblock_free(__pa_symbol(swapper_pg_dir) + PAGE_SIZE,
 		      SWAPPER_DIR_SIZE - PAGE_SIZE);
+
+	rare_write_init();
 }
 
 /*
