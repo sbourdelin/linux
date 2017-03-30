@@ -36,6 +36,12 @@
 
 #include <scsi/scsi_transport_sas.h>
 
+static bool power_status_on_probe;	/* default: false, 0. */
+module_param(power_status_on_probe, bool, 0644);
+MODULE_PARM_DESC(power_status_on_probe, "get power status of SES device slots "
+					"(enclosure components) at probe time "
+					"(warning: may delay total probe time)");
+
 struct ses_device {
 	unsigned char *page1;
 	unsigned char *page1_types;
@@ -548,7 +554,8 @@ static void ses_enclosure_data_process(struct enclosure_device *edev,
 					ecomp = &edev->component[components++];
 
 				if (!IS_ERR(ecomp)) {
-					ses_get_power_status(edev, ecomp);
+					if (power_status_on_probe)
+						ses_get_power_status(edev, ecomp);
 					if (addl_desc_ptr)
 						ses_process_descriptor(
 							ecomp,
