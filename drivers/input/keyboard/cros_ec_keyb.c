@@ -286,6 +286,9 @@ static int cros_ec_keyb_work(struct notifier_block *nb,
 		return NOTIFY_DONE;
 	}
 
+	if (device_may_wakeup(ckdev->dev))
+		pm_wakeup_event(ckdev->dev, 0);
+
 	return NOTIFY_OK;
 }
 
@@ -629,6 +632,12 @@ static int cros_ec_keyb_probe(struct platform_device *pdev)
 					       &ckdev->notifier);
 	if (err) {
 		dev_err(dev, "cannot register notifier: %d\n", err);
+		return err;
+	}
+
+	err = device_init_wakeup(dev, 1);
+	if (err) {
+		dev_err(dev, "cannot init wakeup: %d\n", err);
 		return err;
 	}
 
