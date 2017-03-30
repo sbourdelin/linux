@@ -383,6 +383,8 @@ static int set_lcd_level(int level)
 		return -ENODEV;
 	}
 
+	fujitsu_bl->brightness_level = level;
+
 	return 0;
 }
 
