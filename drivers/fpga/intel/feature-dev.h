@@ -207,11 +207,19 @@ struct feature_port_stp {
 
 #pragma pack()
 
+struct feature_driver {
+	const char *name;
+	struct feature_ops *ops;
+};
+
 struct feature {
 	const char *name;
 	int resource_index;
 	void __iomem *ioaddr;
+	struct feature_ops *ops;
 };
+
+#define DEV_STATUS_IN_USE	0
 
 struct feature_platform_data {
 	/* list the feature dev to cci_drvdata->port_dev_list. */
@@ -220,12 +228,47 @@ struct feature_platform_data {
 	struct cdev cdev;
 	struct platform_device *dev;
 	unsigned int disable_count;	/* count for port disable */
+	unsigned long dev_status;
+
+	void *private;			/* ptr to feature dev private data */
 
 	struct platform_device *(*fpga_for_each_port)(struct platform_device *,
 			void *, int (*match)(struct platform_device *, void *));
 
 	int num;			/* number of features */
 	struct feature features[0];
+};
+
+static inline int feature_dev_use_begin(struct feature_platform_data *pdata)
+{
+	/* Test and set IN_USE flags to ensure file is exclusively used */
+	if (test_and_set_bit_lock(DEV_STATUS_IN_USE, &pdata->dev_status))
+		return -EBUSY;
+
+	return 0;
+}
+
+static inline void feature_dev_use_end(struct feature_platform_data *pdata)
+{
+	clear_bit_unlock(DEV_STATUS_IN_USE, &pdata->dev_status);
+}
+
+static inline void
+fpga_pdata_set_private(struct feature_platform_data *pdata, void *private)
+{
+	pdata->private = private;
+}
+
+static inline void *fpga_pdata_get_private(struct feature_platform_data *pdata)
+{
+	return pdata->private;
+}
+
+struct feature_ops {
+	int (*init)(struct platform_device *pdev, struct feature *feature);
+	void (*uinit)(struct platform_device *pdev, struct feature *feature);
+	long (*ioctl)(struct platform_device *pdev, struct feature *feature,
+				unsigned int cmd, unsigned long arg);
 };
 
 enum fme_feature_id {
@@ -260,6 +303,10 @@ void feature_platform_data_add(struct feature_platform_data *pdata,
 int feature_platform_data_size(int num);
 struct feature_platform_data *
 feature_platform_data_alloc_and_init(struct platform_device *dev, int num);
+
+void fpga_dev_feature_uinit(struct platform_device *pdev);
+int fpga_dev_feature_init(struct platform_device *pdev,
+			  struct feature_driver *feature_drvs);
 
 enum fpga_devt_type {
 	FPGA_DEVT_FME,
@@ -330,6 +377,15 @@ static inline int fpga_port_reset(struct platform_device *pdev)
 	return ret;
 }
 
+static inline
+struct platform_device *fpga_inode_to_feature_dev(struct inode *inode)
+{
+	struct feature_platform_data *pdata;
+
+	pdata = container_of(inode->i_cdev, struct feature_platform_data, cdev);
+	return pdata->dev;
+}
+
 static inline void __iomem *
 get_feature_ioaddr_by_index(struct device *dev, int index)
 {
@@ -338,11 +394,26 @@ get_feature_ioaddr_by_index(struct device *dev, int index)
 	return pdata->features[index].ioaddr;
 }
 
+static inline bool is_feature_present(struct device *dev, int index)
+{
+	return !!get_feature_ioaddr_by_index(dev, index);
+}
+
 static inline struct device *
 fpga_feature_dev_to_pcidev(struct platform_device *dev)
 {
 	return dev->dev.parent->parent;
 }
+
+static inline struct device *
+fpga_pdata_to_pcidev(struct feature_platform_data *pdata)
+{
+	return fpga_feature_dev_to_pcidev(pdata->dev);
+}
+
+#define fpga_dev_for_each_feature(pdata, feature)			    \
+	for ((feature) = (pdata)->features;				    \
+	   (feature) < (pdata)->features + (pdata)->num; (feature)++)
 
 /*
  * Wait register's _field to be changed to the given value (_expect's _field)

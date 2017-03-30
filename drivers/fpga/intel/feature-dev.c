@@ -59,6 +59,72 @@ int port_feature_num(void)
 	return PORT_FEATURE_ID_MAX;
 }
 
+int fme_feature_to_resource_index(int feature_id)
+{
+	WARN_ON(feature_id >= FME_FEATURE_ID_MAX);
+	return feature_id;
+}
+
+void fpga_dev_feature_uinit(struct platform_device *pdev)
+{
+	struct feature *feature;
+	struct feature_platform_data *pdata = dev_get_platdata(&pdev->dev);
+
+	fpga_dev_for_each_feature(pdata, feature)
+		if (feature->ops) {
+			feature->ops->uinit(pdev, feature);
+			feature->ops = NULL;
+		}
+}
+EXPORT_SYMBOL_GPL(fpga_dev_feature_uinit);
+
+static int
+feature_instance_init(struct platform_device *pdev,
+		      struct feature_platform_data *pdata,
+		      struct feature *feature, struct feature_driver *drv)
+{
+	int ret;
+
+	WARN_ON(!feature->ioaddr);
+
+	ret = drv->ops->init(pdev, feature);
+	if (ret)
+		return ret;
+
+	feature->ops = drv->ops;
+	return ret;
+}
+
+int fpga_dev_feature_init(struct platform_device *pdev,
+			  struct feature_driver *feature_drvs)
+{
+	struct feature *feature;
+	struct feature_driver *drv = feature_drvs;
+	struct feature_platform_data *pdata = dev_get_platdata(&pdev->dev);
+	int ret;
+
+	while (drv->ops) {
+		fpga_dev_for_each_feature(pdata, feature) {
+			/* skip the feature which is not initialized. */
+			if (!feature->name)
+				continue;
+
+			if (!strcmp(drv->name, feature->name)) {
+				ret = feature_instance_init(pdev, pdata,
+							    feature, drv);
+				if (ret)
+					goto exit;
+			}
+		}
+		drv++;
+	}
+	return 0;
+exit:
+	fpga_dev_feature_uinit(pdev);
+	return ret;
+}
+EXPORT_SYMBOL_GPL(fpga_dev_feature_init);
+
 struct fpga_chardev_info {
 	const char *name;
 	dev_t devt;
