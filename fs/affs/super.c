@@ -46,9 +46,14 @@ static void
 affs_put_super(struct super_block *sb)
 {
 	struct affs_sb_info *sbi = AFFS_SB(sb);
-	pr_debug("%s()\n", __func__);
 
+	pr_debug("%s()\n", __func__);
 	cancel_delayed_work_sync(&sbi->sb_work);
+	affs_free_bitmap(sb);
+	affs_brelse(sbi->s_root_bh);
+	kfree(sbi->s_prefix);
+	mutex_destroy(&sbi->s_bmlock);
+	kfree(sbi);
 }
 
 static int
@@ -604,24 +609,11 @@ static struct dentry *affs_mount(struct file_system_type *fs_type,
 	return mount_bdev(fs_type, flags, dev_name, data, affs_fill_super);
 }
 
-static void affs_kill_sb(struct super_block *sb)
-{
-	struct affs_sb_info *sbi = AFFS_SB(sb);
-	kill_block_super(sb);
-	if (sbi) {
-		affs_free_bitmap(sb);
-		affs_brelse(sbi->s_root_bh);
-		kfree(sbi->s_prefix);
-		mutex_destroy(&sbi->s_bmlock);
-		kfree(sbi);
-	}
-}
-
 static struct file_system_type affs_fs_type = {
 	.owner		= THIS_MODULE,
 	.name		= "affs",
 	.mount		= affs_mount,
-	.kill_sb	= affs_kill_sb,
+	.kill_sb	= kill_block_super,
 	.fs_flags	= FS_REQUIRES_DEV,
 };
 MODULE_ALIAS_FS("affs");
