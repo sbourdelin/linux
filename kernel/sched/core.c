@@ -6147,11 +6147,11 @@ void __init sched_init(void)
 }
 
 #ifdef CONFIG_DEBUG_ATOMIC_SLEEP
-static inline int preempt_count_equals(int preempt_offset)
+static inline int preempt_count_safe(int preempt_offset)
 {
 	int nested = preempt_count() + rcu_preempt_depth();
 
-	return (nested == preempt_offset);
+	return (nested >= preempt_offset);
 }
 
 void __might_sleep(const char *file, int line, int preempt_offset)
@@ -6182,7 +6182,7 @@ void ___might_sleep(const char *file, int line, int preempt_offset)
 	/* WARN_ON_ONCE() by default, no rate limit required: */
 	rcu_sleep_check();
 
-	if ((preempt_count_equals(preempt_offset) && !irqs_disabled() &&
+	if ((preempt_count_safe(preempt_offset) && !irqs_disabled() &&
 	     !is_idle_task(current)) ||
 	    system_state != SYSTEM_RUNNING || oops_in_progress)
 		return;
@@ -6208,7 +6208,7 @@ void ___might_sleep(const char *file, int line, int preempt_offset)
 	if (irqs_disabled())
 		print_irqtrace_events(current);
 	if (IS_ENABLED(CONFIG_DEBUG_PREEMPT)
-	    && !preempt_count_equals(preempt_offset)) {
+	    && !preempt_count_safe(preempt_offset)) {
 		pr_err("Preemption disabled at:");
 		print_ip_sym(preempt_disable_ip);
 		pr_cont("\n");
