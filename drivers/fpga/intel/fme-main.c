@@ -23,15 +23,70 @@
 
 #include "feature-dev.h"
 
+static ssize_t ports_num_show(struct device *dev,
+			      struct device_attribute *attr, char *buf)
+{
+	struct feature_fme_header *fme_hdr
+		= get_feature_ioaddr_by_index(dev, FME_FEATURE_ID_HEADER);
+	struct feature_fme_capability fme_capability;
+
+	fme_capability.csr = readq(&fme_hdr->capability);
+
+	return scnprintf(buf, PAGE_SIZE, "%d\n", fme_capability.num_ports);
+}
+static DEVICE_ATTR_RO(ports_num);
+
+static ssize_t bitstream_id_show(struct device *dev,
+				 struct device_attribute *attr, char *buf)
+{
+	struct feature_fme_header *fme_hdr
+		= get_feature_ioaddr_by_index(dev, FME_FEATURE_ID_HEADER);
+	u64 bitstream_id = readq(&fme_hdr->bitstream_id);
+
+	return scnprintf(buf, PAGE_SIZE, "0x%llx\n",
+				(unsigned long long)bitstream_id);
+}
+static DEVICE_ATTR_RO(bitstream_id);
+
+static ssize_t bitstream_metadata_show(struct device *dev,
+				       struct device_attribute *attr, char *buf)
+{
+	struct feature_fme_header *fme_hdr
+		= get_feature_ioaddr_by_index(dev, FME_FEATURE_ID_HEADER);
+	u64 bitstream_md = readq(&fme_hdr->bitstream_md);
+
+	return scnprintf(buf, PAGE_SIZE, "0x%llx\n",
+				(unsigned long long)bitstream_md);
+}
+static DEVICE_ATTR_RO(bitstream_metadata);
+
+static const struct attribute *fme_hdr_attrs[] = {
+	&dev_attr_ports_num.attr,
+	&dev_attr_bitstream_id.attr,
+	&dev_attr_bitstream_metadata.attr,
+	NULL,
+};
+
 static int fme_hdr_init(struct platform_device *pdev, struct feature *feature)
 {
+	struct feature_fme_header *fme_hdr = feature->ioaddr;
+	int ret;
+
 	dev_dbg(&pdev->dev, "FME HDR Init.\n");
+	dev_dbg(&pdev->dev, "FME cap %llx.\n",
+				(unsigned long long)fme_hdr->capability.csr);
+
+	ret = sysfs_create_files(&pdev->dev.kobj, fme_hdr_attrs);
+	if (ret)
+		return ret;
+
 	return 0;
 }
 
 static void fme_hdr_uinit(struct platform_device *pdev, struct feature *feature)
 {
 	dev_dbg(&pdev->dev, "FME HDR UInit.\n");
+	sysfs_remove_files(&pdev->dev.kobj, fme_hdr_attrs);
 }
 
 struct feature_ops fme_hdr_ops = {

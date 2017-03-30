@@ -124,6 +124,9 @@ struct feature_fme_header {
 	u64 rsvd[2];
 	struct feature_fme_capability capability;
 	struct feature_fme_port port[MAX_FPGA_PORT_NUM];
+	u64 rsvd1;
+	u64 bitstream_id;
+	u64 bitstream_md;
 };
 
 /* FME Thermal Sub Feature Register Set */
