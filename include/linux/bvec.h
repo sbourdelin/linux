@@ -70,8 +70,7 @@ static inline void bvec_iter_advance(const struct bio_vec *bv,
 				     struct bvec_iter *iter,
 				     unsigned bytes)
 {
-	WARN_ONCE(bytes > iter->bi_size,
-		  "Attempted to advance past end of bvec iter\n");
+	BUG_ON(bytes > iter->bi_size);
 
 	while (bytes) {
 		unsigned iter_len = bvec_iter_len(bv, *iter);
