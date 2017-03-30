@@ -7239,6 +7239,11 @@ static void perf_log_throttle(struct perf_event *event, int enable)
 	perf_output_end(&handle);
 }
 
+void perf_event_itrace_started(struct perf_event *event)
+{
+	event->attach_state |= PERF_ATTACH_ITRACE;
+}
+
 static void perf_log_itrace_start(struct perf_event *event)
 {
 	struct perf_output_handle handle;
@@ -7254,7 +7259,7 @@ static void perf_log_itrace_start(struct perf_event *event)
 		event = event->parent;
 
 	if (!(event->pmu->capabilities & PERF_PMU_CAP_ITRACE) ||
-	    event->hw.itrace_started)
+	    event->attach_state & PERF_ATTACH_ITRACE)
 		return;
 
 	rec.header.type	= PERF_RECORD_ITRACE_START;
