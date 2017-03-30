@@ -195,18 +195,34 @@ static int goodix_get_cfg_len(u16 id)
 
 static int goodix_ts_read_input_report(struct goodix_ts_data *ts, u8 *data)
 {
+	unsigned int timeout = 100;
 	int touch_num;
 	int error;
 
-	error = goodix_i2c_read(ts->client, GOODIX_READ_COOR_ADDR, data,
+	/* The 'buffer status' bit, which indicates that the data is valid, is
+	 * not set as soon as the interrupt is raised, but slightly after.
+	 */
+	do {
+		error = goodix_i2c_read(ts->client, GOODIX_READ_COOR_ADDR, data,
 				GOODIX_CONTACT_SIZE + 1);
-	if (error) {
-		dev_err(&ts->client->dev, "I2C transfer error: %d\n", error);
-		return error;
-	}
+		if (error) {
+			dev_err(&ts->client->dev, "I2C transfer error: %d\n",
+					error);
+			return error;
+		}
 
-	if (!(data[0] & 0x80))
-		return -EAGAIN;
+		if (data[0] & 0x80)
+			break;
+
+		usleep_range(100, 200);
+	} while (--timeout);
+
+	if (!timeout) {
+		/* The Goodix panel will send spurious interrupts after a
+		 * 'finger up' event, which will always cause a timeout.
+		 */
+		return 0;
+	}
 
 	touch_num = data[0] & 0x0f;
 	if (touch_num > ts->max_touch_num)
