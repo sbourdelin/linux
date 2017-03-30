@@ -23,6 +23,7 @@
 #include <linux/intel-fpga.h>
 
 #include "feature-dev.h"
+#include "fme.h"
 
 static ssize_t ports_num_show(struct device *dev,
 			      struct device_attribute *attr, char *buf)
@@ -99,6 +100,10 @@ static struct feature_driver fme_feature_drvs[] = {
 	{
 		.name = FME_FEATURE_HEADER,
 		.ops = &fme_hdr_ops,
+	},
+	{
+		.name = FME_FEATURE_PR_MGMT,
+		.ops = &pr_mgmt_ops,
 	},
 	{
 		.ops = NULL,
@@ -182,13 +187,47 @@ static const struct file_operations fme_fops = {
 	.unlocked_ioctl = fme_ioctl,
 };
 
+static int fme_dev_init(struct platform_device *pdev)
+{
+	struct feature_platform_data *pdata = dev_get_platdata(&pdev->dev);
+	struct fpga_fme *fme;
+
+	fme = devm_kzalloc(&pdev->dev, sizeof(*fme), GFP_KERNEL);
+	if (!fme)
+		return -ENOMEM;
+
+	fme->pdata = pdata;
+
+	mutex_lock(&pdata->lock);
+	fpga_pdata_set_private(pdata, fme);
+	mutex_unlock(&pdata->lock);
+	return 0;
+}
+
+static void fme_dev_destroy(struct platform_device *pdev)
+{
+	struct feature_platform_data *pdata = dev_get_platdata(&pdev->dev);
+	struct fpga_fme *fme;
+
+	mutex_lock(&pdata->lock);
+	fme = fpga_pdata_get_private(pdata);
+	fpga_pdata_set_private(pdata, NULL);
+	mutex_unlock(&pdata->lock);
+
+	devm_kfree(&pdev->dev, fme);
+}
+
 static int fme_probe(struct platform_device *pdev)
 {
 	int ret;
 
-	ret = fpga_dev_feature_init(pdev, fme_feature_drvs);
+	ret = fme_dev_init(pdev);
 	if (ret)
 		goto exit;
+
+	ret = fpga_dev_feature_init(pdev, fme_feature_drvs);
+	if (ret)
+		goto dev_destroy;
 
 	ret = fpga_register_dev_ops(pdev, &fme_fops, THIS_MODULE);
 	if (ret)
@@ -198,6 +237,8 @@ static int fme_probe(struct platform_device *pdev)
 
 feature_uinit:
 	fpga_dev_feature_uinit(pdev);
+dev_destroy:
+	fme_dev_destroy(pdev);
 exit:
 	return ret;
 }
@@ -206,6 +247,7 @@ static int fme_remove(struct platform_device *pdev)
 {
 	fpga_dev_feature_uinit(pdev);
 	fpga_unregister_dev_ops(pdev);
+	fme_dev_destroy(pdev);
 	return 0;
 }
 

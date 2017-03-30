@@ -150,8 +150,66 @@ struct feature_fme_err {
 };
 
 /* FME Partial Reconfiguration Sub Feature Register Set */
+/* FME PR Control Register */
+struct feature_fme_pr_ctl {
+	union {
+		u64 csr;
+		struct {
+			u8  pr_reset:1;		/* Reset PR Engine */
+			u8  rsvdz1:3;
+			u8  pr_reset_ack:1;	/* Reset PR Engine Ack */
+			u8  rsvdz2:3;
+			u8  pr_regionid:2;	/* PR Region ID */
+			u8  rsvdz3:2;
+			u8  pr_start_req:1;	/* PR Start Request */
+			u8  pr_push_complete:1;	/* PR Data push complete */
+			u8  pr_kind:1;		/* Load Customer or Intel GBS */
+			u32 rsvdz4:17;
+			u32 config_data;
+		};
+	};
+};
+
+/* FME PR Status Register */
+struct feature_fme_pr_status {
+	union {
+		u64 csr;
+		struct {
+			u16 pr_credit:9;	/* Number of PR Credits */
+			u8  rsvdz1:7;
+			u8  pr_status:1;	/* PR Operation status */
+			u8  rsvdz2:3;
+			u8  pr_ctrlr_status:3;	/* Controller status */
+			u8  rsvdz3:1;
+			u8  pr_host_status:4;	/* PR Host status */
+			u64 rsvdz4:36;
+		};
+	};
+};
+
+/* FME PR Data Register */
+struct feature_fme_pr_data {
+	union {
+		u64 csr;
+		struct {
+			/* PR data from the raw-binary file */
+			u32 pr_data_raw;
+			u32 rsvd;
+		};
+	};
+};
+
 struct feature_fme_pr {
 	struct feature_header header;
+	struct feature_fme_pr_ctl control;
+	struct feature_fme_pr_status status;
+	struct feature_fme_pr_data data;
+	u64 error;
+
+	u64 rsvd[16];
+
+	u64 intfc_id_l;		/* PR interface Id Low */
+	u64 intfc_id_h;		/* PR interface Id High */
 };
 
 /* PORT Header Register Set */
