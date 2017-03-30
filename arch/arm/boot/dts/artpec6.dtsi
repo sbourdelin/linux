@@ -181,6 +181,85 @@
 		status = "disabled";
 	};
 
+	pinctrl: pinctrl@f801d000 {
+		compatible = "axis,artpec6-pinctrl";
+		reg = <0xf801d000 0x400>;
+
+		pinctrl_uart0: uart0grp {
+			function = "uart0";
+			groups = "uart0grp1";
+			bias-pull-up;
+		};
+		pinctrl_uart1: uart1grp {
+			function = "uart1";
+			groups = "uart1grp0";
+			bias-pull-up;
+		};
+		pinctrl_uart2: uart2grp {
+			function = "uart2";
+			groups = "uart2grp1";
+			bias-pull-up;
+		};
+		pinctrl_uart3: uart3grp {
+			function = "uart3";
+			groups = "uart3grp0";
+			bias-pull-up;
+		};
+		pinctrl_uart4: uart4grp {
+			function = "uart4";
+			groups = "uart4grp0";
+			bias-pull-up;
+		};
+		pinctrl_uart5: uart5grp {
+			function = "uart5";
+			groups = "uart5grp0";
+			bias-pull-up;
+		};
+		pinctrl_i2c1: i2c1grp {
+			function = "i2c1";
+			groups = "i2c1grp0";
+			bias-pull-up;
+		};
+		pinctrl_i2c2: i2c2grp {
+			function = "i2c2";
+			groups = "i2c2grp0";
+			bias-pull-up;
+		};
+		pinctrl_i2c3: i2c3grp {
+			function = "i2c3";
+			groups = "i2c3grp0";
+			bias-pull-up;
+		};
+		pinctrl_i2s0: i2s0grp {
+			function = "i2s0";
+			groups = "i2s0grp0";
+			bias-pull-up;
+		};
+		pinctrl_i2s1: i2s1grp {
+			function = "i2s1";
+			groups = "i2s1grp0";
+			bias-pull-up;
+		};
+		pinctrl_spi0: spi0grp {
+			function = "spi0";
+			groups = "spi0grp0";
+			bias-pull-up;
+		};
+		pinctrl_spi1: spi1grp {
+			function = "spi1";
+			groups = "spi1grp0";
+			bias-pull-up;
+		};
+		pinctrl_sdio0: sdio0grp {
+			function = "sdio0";
+			groups = "sdio0grp0";
+		};
+		pinctrl_sdio1: sdio1grp {
+			function = "sdio1";
+			groups = "sdio1grp0";
+		};
+	};
+
 	amba@0 {
 		compatible = "simple-bus";
 		#address-cells = <0x1>;
@@ -214,6 +293,8 @@
 			clocks = <&clkctrl ARTPEC6_CLK_UART_REFCLK>,
 				<&clkctrl ARTPEC6_CLK_UART_PCLK>;
 			clock-names = "uart_clk", "apb_pclk";
+			pinctrl-names = "default";
+			pinctrl-0 = <&pinctrl_uart0>;
 			status = "disabled";
 		};
 		uart1: serial@f8037000 {
@@ -223,6 +304,8 @@
 			clocks = <&clkctrl ARTPEC6_CLK_UART_REFCLK>,
 				<&clkctrl ARTPEC6_CLK_UART_PCLK>;
 			clock-names = "uart_clk", "apb_pclk";
+			pinctrl-names = "default";
+			pinctrl-0 = <&pinctrl_uart1>;
 			status = "disabled";
 		};
 		uart2: serial@f8038000 {
@@ -232,6 +315,8 @@
 			clocks = <&clkctrl ARTPEC6_CLK_UART_REFCLK>,
 				<&clkctrl ARTPEC6_CLK_UART_PCLK>;
 			clock-names = "uart_clk", "apb_pclk";
+			pinctrl-names = "default";
+			pinctrl-0 = <&pinctrl_uart2>;
 			status = "disabled";
 		};
 		uart3: serial@f8039000 {
@@ -241,6 +326,8 @@
 			clocks = <&clkctrl ARTPEC6_CLK_UART_REFCLK>,
 				<&clkctrl ARTPEC6_CLK_UART_PCLK>;
 			clock-names = "uart_clk", "apb_pclk";
+			pinctrl-names = "default";
+			pinctrl-0 = <&pinctrl_uart3>;
 			status = "disabled";
 		};
 	};
