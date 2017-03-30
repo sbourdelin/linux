@@ -285,6 +285,8 @@ struct mwifiex_pcie_device {
 	struct memory_type_mapping *mem_type_mapping_tbl;
 	u8 num_mem_types;
 	bool can_ext_scan;
+	u8 flr_support;
+	char *wifi_fw_name;
 };
 
 static const struct mwifiex_pcie_device mwifiex_pcie8766 = {
@@ -293,6 +295,7 @@ static const struct mwifiex_pcie_device mwifiex_pcie8766 = {
 	.tx_buf_size = MWIFIEX_TX_DATA_BUF_SIZE_2K,
 	.can_dump_fw = false,
 	.can_ext_scan = true,
+	.flr_support = 0,
 };
 
 static const struct mwifiex_pcie_device mwifiex_pcie8897 = {
@@ -303,6 +306,7 @@ static const struct mwifiex_pcie_device mwifiex_pcie8897 = {
 	.mem_type_mapping_tbl = mem_type_mapping_tbl_w8897,
 	.num_mem_types = ARRAY_SIZE(mem_type_mapping_tbl_w8897),
 	.can_ext_scan = true,
+	.flr_support = 0,
 };
 
 static const struct mwifiex_pcie_device mwifiex_pcie8997 = {
@@ -313,6 +317,8 @@ static const struct mwifiex_pcie_device mwifiex_pcie8997 = {
 	.mem_type_mapping_tbl = mem_type_mapping_tbl_w8997,
 	.num_mem_types = ARRAY_SIZE(mem_type_mapping_tbl_w8997),
 	.can_ext_scan = true,
+	.flr_support = 1,
+	.wifi_fw_name = "mrvl/pcie8997_wlan_v4.bin",
 };
 
 struct mwifiex_evt_buf_desc {

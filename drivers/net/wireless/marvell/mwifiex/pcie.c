@@ -351,6 +351,12 @@ static void mwifiex_pcie_reset_notify(struct pci_dev *pdev, bool prepare)
 	struct pcie_service_card *card = pci_get_drvdata(pdev);
 	struct mwifiex_adapter *adapter = card->adapter;
 
+	if (!card->pcie.flr_support) {
+		pr_err("%s: FLR disabled in current chipset\n", __func__);
+		return;
+	}
+
+	adapter = card->adapter;
 	if (!adapter) {
 		dev_err(&pdev->dev, "%s: adapter structure is not valid\n",
 			__func__);
@@ -3047,7 +3053,7 @@ static void mwifiex_pcie_up_dev(struct mwifiex_adapter *adapter)
 	 * during pcie FLR, so that bluetooth part of firmware which is
 	 * already running doesn't get affected.
 	 */
-	strcpy(adapter->fw_name, PCIE8997_DEFAULT_WIFIFW_NAME);
+	strcpy(adapter->fw_name, card->pcie.wifi_fw_name);
 
 	/* tx_buf_size might be changed to 3584 by firmware during
 	 * data transfer, we should reset it to default size.
