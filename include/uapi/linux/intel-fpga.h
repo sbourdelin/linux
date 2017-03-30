@@ -66,6 +66,53 @@
 
 #define FPGA_PORT_RESET		_IO(FPGA_MAGIC, PORT_BASE + 0)
 
+/**
+ * FPGA_PORT_GET_INFO - _IOR(FPGA_MAGIC, PORT_BASE + 1, struct fpga_port_info)
+ *
+ * Retrieve information about the fpga port.
+ * Driver fills the info in provided struct fpga_port_info.
+ * Return: 0 on success, -errno on failure.
+ */
+struct fpga_port_info {
+	/* Input */
+	__u32 argsz;		/* Structure length */
+	/* Output */
+	__u32 flags;		/* Zero for now */
+	__u32 num_regions;	/* The number of supported regions */
+	__u32 num_umsgs;	/* The number of allocated umsgs */
+};
+
+#define FPGA_PORT_GET_INFO	_IO(FPGA_MAGIC, PORT_BASE + 1)
+
+/**
+ * FPGA_PORT_GET_REGION_INFO - _IOWR(FPGA_MAGIC, PORT_BASE + 2,
+ *						struct fpga_port_region_info)
+ *
+ * Retrieve information about a device region.
+ * Caller provides struct fpga_port_region_info with index value set.
+ * Driver returns the region info in other fields.
+ * Return: 0 on success, -errno on failure.
+ */
+struct fpga_port_region_info {
+	/* input */
+	__u32 argsz;		/* Structure length */
+	/* Output */
+	__u32 flags;		/* Access permission */
+#define FPGA_REGION_READ	(1 << 0)	/* Region is readable */
+#define FPGA_REGION_WRITE	(1 << 1)	/* Region is writable */
+#define FPGA_REGION_MMAP	(1 << 2)	/* Can be mmaped to userspace */
+	/* Input */
+	__u32 index;		/* Region index */
+#define FPGA_PORT_INDEX_UAFU	0		/* User AFU */
+#define FPGA_PORT_INDEX_STP	1		/* Signal Tap */
+	__u32 padding;
+	/* Output */
+	__u64 size;		/* Region size (bytes) */
+	__u64 offset;		/* Region offset from start of device fd */
+};
+
+#define FPGA_PORT_GET_REGION_INFO	_IO(FPGA_MAGIC, PORT_BASE + 2)
+
 /* IOCTLs for FME file descriptor */
 
 /**
