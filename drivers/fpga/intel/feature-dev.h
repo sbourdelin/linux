@@ -221,6 +221,9 @@ struct feature_platform_data {
 	struct platform_device *dev;
 	unsigned int disable_count;	/* count for port disable */
 
+	struct platform_device *(*fpga_for_each_port)(struct platform_device *,
+			void *, int (*match)(struct platform_device *, void *));
+
 	int num;			/* number of features */
 	struct feature features[0];
 };
@@ -333,6 +336,12 @@ get_feature_ioaddr_by_index(struct device *dev, int index)
 	struct feature_platform_data *pdata = dev_get_platdata(dev);
 
 	return pdata->features[index].ioaddr;
+}
+
+static inline struct device *
+fpga_feature_dev_to_pcidev(struct platform_device *dev)
+{
+	return dev->dev.parent->parent;
 }
 
 /*

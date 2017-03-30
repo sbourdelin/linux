@@ -211,6 +211,27 @@ static int parse_switch_to(struct build_feature_devs_info *binfo, int bar)
 	return parse_start_from(binfo, bar);
 }
 
+static struct platform_device *fpga_for_each_port(struct platform_device *pdev,
+		     void *data, int (*match)(struct platform_device *, void *))
+{
+	struct device *pci_dev = fpga_feature_dev_to_pcidev(pdev);
+	struct cci_drvdata *drvdata = dev_get_drvdata(pci_dev);
+	struct feature_platform_data *pdata;
+	struct platform_device *port_dev;
+
+	mutex_lock(&drvdata->lock);
+	list_for_each_entry(pdata, &drvdata->port_dev_list, node) {
+		port_dev = pdata->dev;
+
+		if (match(port_dev, data) && get_device(&port_dev->dev))
+			goto exit;
+	}
+	port_dev = NULL;
+exit:
+	mutex_unlock(&drvdata->lock);
+	return port_dev;
+}
+
 static struct build_feature_devs_info *
 build_info_alloc_and_init(struct pci_dev *pdev)
 {
@@ -311,6 +332,9 @@ build_info_create_dev(struct build_feature_devs_info *binfo,
 	pdata = feature_platform_data_alloc_and_init(fdev, feature_nr);
 	if (!pdata)
 		return -ENOMEM;
+
+	if (type == FME_ID)
+		pdata->fpga_for_each_port = fpga_for_each_port;
 
 	/*
 	 * the count should be initialized to 0 to make sure
