@@ -25,6 +25,10 @@ static inline const char *sst_acpi_find_name_from_hid(const u8 hid[ACPI_ID_LEN])
 }
 #endif
 
+/* acpi mach match */
+acpi_status sst_acpi_mach_match(acpi_handle handle, u32 level,
+					void *context, void **ret);
+
 /* acpi match */
 struct sst_acpi_mach *sst_acpi_find_machine(struct sst_acpi_mach *machines);
 

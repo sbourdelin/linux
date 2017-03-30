@@ -49,7 +49,7 @@ const char *sst_acpi_find_name_from_hid(const u8 hid[ACPI_ID_LEN])
 }
 EXPORT_SYMBOL_GPL(sst_acpi_find_name_from_hid);
 
-static acpi_status sst_acpi_mach_match(acpi_handle handle, u32 level,
+acpi_status sst_acpi_mach_match(acpi_handle handle, u32 level,
 				       void *context, void **ret)
 {
 	unsigned long long sta;
@@ -62,6 +62,7 @@ static acpi_status sst_acpi_mach_match(acpi_handle handle, u32 level,
 
 	return AE_OK;
 }
+EXPORT_SYMBOL_GPL(sst_acpi_mach_match);
 
 struct sst_acpi_mach *sst_acpi_find_machine(struct sst_acpi_mach *machines)
 {
