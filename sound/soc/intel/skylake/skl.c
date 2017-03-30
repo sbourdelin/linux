@@ -390,6 +390,10 @@ static int skl_machine_device_register(struct skl *skl, void *driver_data)
 		dev_err(bus->dev, "No matching machine driver found\n");
 		return -ENODEV;
 	}
+
+	if (mach->machine_quirk)
+		mach = mach->machine_quirk(mach);
+
 	skl->fw_name = mach->fw_filename;
 
 	pdev = platform_device_alloc(mach->drv_name, -1);
@@ -816,10 +820,26 @@ static struct sst_acpi_mach sst_bxtp_devdata[] = {
 	{ "DLGS7219", "bxt_da7219_max98357a_i2s", "intel/dsp_fw_bxtn.bin", NULL, NULL, NULL },
 };
 
+static struct sst_acpi_mach sst_poppy_mach = {
+	 "MX98927", "kbl_rt5663_m98927", "intel/dsp_fw_kbl.bin", NULL, NULL, &skl_dmic_data };
+
+static struct sst_acpi_mach *kbl_quirk(void *arg)
+{
+	bool found = false;
+	struct sst_acpi_mach *mach = arg;
+
+	if (ACPI_SUCCESS(acpi_get_devices("MX98927", sst_acpi_mach_match,
+					&found, NULL)) && found)
+		return &sst_poppy_mach;
+	else
+		return mach;
+}
+
 static struct sst_acpi_mach sst_kbl_devdata[] = {
 	{ "INT343A", "kbl_alc286s_i2s", "intel/dsp_fw_kbl.bin", NULL, NULL, NULL },
 	{ "INT343B", "kbl_n88l25_s4567", "intel/dsp_fw_kbl.bin", NULL, NULL, &skl_dmic_data },
 	{ "MX98357A", "kbl_n88l25_m98357a", "intel/dsp_fw_kbl.bin", NULL, NULL, &skl_dmic_data },
+	{ "10EC5663", "kbl_rt5663_m98927", "intel/dsp_fw_kbl.bin", NULL, kbl_quirk, &skl_dmic_data },
 	{}
 };
 
