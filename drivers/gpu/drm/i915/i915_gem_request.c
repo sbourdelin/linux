@@ -1193,6 +1193,8 @@ static void engine_retire_requests(struct intel_engine_cs *engine)
 	u32 seqno = intel_engine_get_seqno(engine);
 	LIST_HEAD(retire);
 
+	GEM_BUG_ON(!i915_seqno_passed(intel_engine_last_submit(engine), seqno));
+
 	spin_lock_irq(&engine->timeline->lock);
 	list_for_each_entry_safe(request, next,
 				 &engine->timeline->requests, link) {
