@@ -55,6 +55,7 @@
 #include <linux/net_tstamp.h>
 #include <linux/ptp_clock_kernel.h>
 #include <net/devlink.h>
+#include <net/dst_metadata.h>
 
 #include "i40e_type.h"
 #include "i40e_prototype.h"
@@ -320,6 +321,8 @@ struct i40e_flex_pit {
 	u8 pit_index;
 };
 
+#define I40E_MAIN_VSI_PORT_ID	(1 << 15)
+
 enum i40e_port_netdev_type {
 	I40E_PORT_NETDEV_PF,
 	I40E_PORT_NETDEV_VF
@@ -328,6 +331,7 @@ enum i40e_port_netdev_type {
 /* Port representor netdev private structure */
 struct i40e_port_netdev_priv {
 	enum i40e_port_netdev_type type;	/* type - PF or VF */
+	struct metadata_dst *dst;		/* port id */
 	void *f;				/* ptr to PF or VF struct */
 };
 
