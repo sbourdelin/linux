@@ -67,15 +67,14 @@ END_FTR_SECTION(0, 1);						\
 	OPAL_BRANCH(opal_tracepoint_entry) \
 	mfcr	r11;			\
 	stw	r11,8(r1);		\
-	li	r11,0;			\
-	ori	r11,r11,MSR_EE;		\
 	std	r12,PACASAVEDMSR(r13);	\
-	andc	r12,r12,r11;		\
-	mtmsrd	r12,1;			\
 	LOAD_REG_ADDR(r11,opal_return);	\
 	mtlr	r11;			\
-	li	r11,MSR_DR|MSR_IR|MSR_LE;\
+	lis	r11,MSR_EE@h;		\
+	ori	r11,r11,MSR_DR|MSR_IR|MSR_LE;\
 	andc	r12,r12,r11;		\
+	li	r11,0;			\
+	mtmsrd	r11,1; /* EE=0 RI=0 */	\
 	mtspr	SPRN_HSRR1,r12;		\
 	LOAD_REG_ADDR(r11,opal);	\
 	ld	r12,8(r11);		\
@@ -95,9 +94,11 @@ opal_return:
 	lwz	r4,8(r1);
 	ld	r5,PPC_LR_STKOFF(r1);
 	ld	r6,PACASAVEDMSR(r13);
+	mtcr	r4;
+	li	r4,0;
+	mtmsrd	r4,1; /* EE=0 RI=0 */
 	mtspr	SPRN_SRR0,r5;
 	mtspr	SPRN_SRR1,r6;
-	mtcr	r4;
 	rfid
 
 opal_real_call:
@@ -108,6 +109,8 @@ opal_real_call:
 	mtlr	r11
 	li	r11,MSR_LE
 	andc	r12,r12,r11
+	li	r11,0;
+	mtmsrd	r11,1; /* EE=0 RI=0 */
 	mtspr	SPRN_HSRR1,r12
 	LOAD_REG_ADDR(r11,opal)
 	ld	r12,8(r11)
