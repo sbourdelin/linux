@@ -223,6 +223,7 @@ static void intel_detect_pch(struct drm_i915_private *dev_priv)
 					    PCI_SUBVENDOR_ID_REDHAT_QUMRANET &&
 				    pch->subsystem_device ==
 					    PCI_SUBDEVICE_ID_QEMU)) {
+				dev_priv->run_on_qemu = true;
 				dev_priv->pch_type =
 					intel_virt_detect_pch(dev_priv);
 			} else
