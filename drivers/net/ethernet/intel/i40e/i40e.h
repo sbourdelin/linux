@@ -328,8 +328,18 @@ enum i40e_port_netdev_type {
 	I40E_PORT_NETDEV_VF
 };
 
+struct port_netdev_pcpu_stats {
+	u64			tx_packets;
+	u64			tx_bytes;
+	u64			tx_drops;
+	u64			rx_packets;
+	u64			rx_bytes;
+	struct u64_stats_sync	syncp;
+};
+
 /* Port representor netdev private structure */
 struct i40e_port_netdev_priv {
+	struct port_netdev_pcpu_stats __percpu *stats;
 	enum i40e_port_netdev_type type;	/* type - PF or VF */
 	struct metadata_dst *dst;		/* port id */
 	void *f;				/* ptr to PF or VF struct */
