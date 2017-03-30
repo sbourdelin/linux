@@ -32,4 +32,13 @@ config INTEL_FPGA_FME
 	  all FPGA platform level management features. There shall be 1
 	  FME per Intel FPGA.
 
+config INTEL_FPGA_AFU
+	tristate "Intel FPGA AFU Driver"
+	depends on INTEL_FPGA_PCI
+	help
+	  This is the driver for FPGA Accelerated Function Unit (AFU) which
+	  implements AFU and Port management features. A User AFU connects
+	  to the FPGA infrastructure via a Port. There may be more than 1
+	  Port/AFU per Intel FPGA.
+
 endif
