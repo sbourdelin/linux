@@ -276,7 +276,11 @@ build_info_create_dev(struct build_feature_devs_info *binfo,
 	struct platform_device *fdev;
 	struct resource *res;
 	struct feature_platform_data *pdata;
+	enum fpga_devt_type devt_type = FPGA_DEVT_FME;
 	int ret;
+
+	if (type == PORT_ID)
+		devt_type = FPGA_DEVT_PORT;
 
 	/* we will create a new device, commit current device first */
 	ret = build_info_commit_dev(binfo);
@@ -296,6 +300,7 @@ build_info_create_dev(struct build_feature_devs_info *binfo,
 		return fdev->id;
 
 	fdev->dev.parent = &binfo->parent_dev->dev;
+	fdev->dev.devt = fpga_get_devt(devt_type, fdev->id);
 
 	/*
 	 * we need not care the memory which is associated with the
@@ -945,16 +950,27 @@ static int __init ccidrv_init(void)
 
 	fpga_ids_init();
 
+	ret = fpga_chardev_init();
+	if (ret)
+		goto exit_ids;
+
 	ret = pci_register_driver(&cci_pci_driver);
 	if (ret)
-		fpga_ids_destroy();
+		goto exit_chardev;
 
+	return 0;
+
+exit_chardev:
+	fpga_chardev_uinit();
+exit_ids:
+	fpga_ids_destroy();
 	return ret;
 }
 
 static void __exit ccidrv_exit(void)
 {
 	pci_unregister_driver(&cci_pci_driver);
+	fpga_chardev_uinit();
 	fpga_ids_destroy();
 }
 

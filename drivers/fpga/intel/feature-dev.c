@@ -59,6 +59,82 @@ int port_feature_num(void)
 	return PORT_FEATURE_ID_MAX;
 }
 
+struct fpga_chardev_info {
+	const char *name;
+	dev_t devt;
+};
+
+/* indexed by enum fpga_devt_type */
+struct fpga_chardev_info fpga_chrdevs[] = {
+	{.name = FPGA_FEATURE_DEV_FME},		/* FPGA_DEVT_FME */
+	{.name = FPGA_FEATURE_DEV_PORT},	/* FPGA_DEVT_AFU */
+};
+
+void fpga_chardev_uinit(void)
+{
+	int i;
+
+	for (i = 0; i < FPGA_DEVT_MAX; i++)
+		if (MAJOR(fpga_chrdevs[i].devt)) {
+			unregister_chrdev_region(fpga_chrdevs[i].devt,
+						 MINORMASK);
+			fpga_chrdevs[i].devt = MKDEV(0, 0);
+		}
+}
+
+int fpga_chardev_init(void)
+{
+	int i, ret;
+
+	for (i = 0; i < FPGA_DEVT_MAX; i++) {
+		ret = alloc_chrdev_region(&fpga_chrdevs[i].devt, 0, MINORMASK,
+					  fpga_chrdevs[i].name);
+		if (ret)
+			goto exit;
+	}
+
+	return 0;
+
+exit:
+	fpga_chardev_uinit();
+	return ret;
+}
+
+dev_t fpga_get_devt(enum fpga_devt_type type, int id)
+{
+	WARN_ON(type >= FPGA_DEVT_MAX);
+
+	return MKDEV(MAJOR(fpga_chrdevs[type].devt), id);
+}
+
+int fpga_register_dev_ops(struct platform_device *pdev,
+			  const struct file_operations *fops,
+			  struct module *owner)
+{
+	struct feature_platform_data *pdata = dev_get_platdata(&pdev->dev);
+
+	cdev_init(&pdata->cdev, fops);
+	pdata->cdev.owner = owner;
+
+	/*
+	 * set parent to the feature device so that its refcount is
+	 * decreased after the last refcount of cdev is gone, that
+	 * makes sure the feature device is valid during device
+	 * file's life-cycle.
+	 */
+	pdata->cdev.kobj.parent = &pdev->dev.kobj;
+	return cdev_add(&pdata->cdev, pdev->dev.devt, 1);
+}
+EXPORT_SYMBOL_GPL(fpga_register_dev_ops);
+
+void fpga_unregister_dev_ops(struct platform_device *pdev)
+{
+	struct feature_platform_data *pdata = dev_get_platdata(&pdev->dev);
+
+	cdev_del(&pdata->cdev);
+}
+EXPORT_SYMBOL_GPL(fpga_unregister_dev_ops);
+
 int fpga_port_id(struct platform_device *pdev)
 {
 	struct feature_port_header *port_hdr;

@@ -19,6 +19,7 @@
 #define __INTEL_FPGA_FEATURE_H
 
 #include <linux/fs.h>
+#include <linux/cdev.h>
 #include <linux/pci.h>
 #include <linux/uuid.h>
 #include <linux/delay.h>
@@ -216,6 +217,7 @@ struct feature_platform_data {
 	/* list the feature dev to cci_drvdata->port_dev_list. */
 	struct list_head node;
 	struct mutex lock;
+	struct cdev cdev;
 	struct platform_device *dev;
 	unsigned int disable_count;	/* count for port disable */
 
@@ -255,6 +257,20 @@ void feature_platform_data_add(struct feature_platform_data *pdata,
 int feature_platform_data_size(int num);
 struct feature_platform_data *
 feature_platform_data_alloc_and_init(struct platform_device *dev, int num);
+
+enum fpga_devt_type {
+	FPGA_DEVT_FME,
+	FPGA_DEVT_PORT,
+	FPGA_DEVT_MAX,
+};
+
+void fpga_chardev_uinit(void);
+int fpga_chardev_init(void);
+dev_t fpga_get_devt(enum fpga_devt_type type, int id);
+int fpga_register_dev_ops(struct platform_device *pdev,
+			  const struct file_operations *fops,
+			  struct module *owner);
+void fpga_unregister_dev_ops(struct platform_device *pdev);
 
 int fpga_port_id(struct platform_device *pdev);
 
