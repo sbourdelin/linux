@@ -876,6 +876,7 @@ int drm_mode_page_flip_ioctl(struct drm_device *dev,
 		ret = drm_event_reserve_init(dev, file_priv, &e->base, &e->event.base);
 		if (ret) {
 			kfree(e);
+			e = NULL;
 			goto out;
 		}
 	}
