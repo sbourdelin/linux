@@ -369,6 +369,13 @@ static int mt8173_nor_write_reg(struct spi_nor *nor, u8 opcode, u8 *buf,
 		/* We only handle 1 byte */
 		ret = mt8173_nor_wr_sr(mt8173_nor, *buf);
 		break;
+	case SPINOR_OP_EN4B:
+		/* Set nor controller to 4-byte address mode,
+		 * and simultaneously set nor flash.
+		 * This case should cooperate with default operation.
+		 */
+		writeb(readb(mt8173_nor->base + MTK_NOR_DUAL_REG) | 0x10,
+				mt8173_nor->base + MTK_NOR_DUAL_REG);
 	default:
 		ret = mt8173_nor_do_tx_rx(mt8173_nor, opcode, buf, len, NULL, 0);
 		if (ret)
