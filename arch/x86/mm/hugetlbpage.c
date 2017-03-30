@@ -31,7 +31,7 @@ follow_huge_addr(struct mm_struct *mm, unsigned long address, int write)
 	if (!vma || !is_vm_hugetlb_page(vma))
 		return ERR_PTR(-EINVAL);
 
-	pte = huge_pte_offset(mm, address);
+	pte = huge_pte_offset(mm, address, hstate_vma(vma));
 
 	/* hugetlb should be locked, and hence, prefaulted */
 	WARN_ON(!pte || pte_none(*pte));

@@ -185,7 +185,7 @@ static int walk_hugetlb_range(unsigned long addr, unsigned long end,
 
 	do {
 		next = hugetlb_entry_end(h, addr, end);
-		pte = huge_pte_offset(walk->mm, addr & hmask);
+		pte = huge_pte_offset(walk->mm, addr & hmask, h);
 		if (pte && walk->hugetlb_entry)
 			err = walk->hugetlb_entry(pte, hmask, addr, next, walk);
 		if (err)
