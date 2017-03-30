@@ -82,7 +82,8 @@ Pad-level Formats
 .. note::
 
     For the purpose of this section, the term *format* means the
-    combination of media bus data format, frame width and frame height.
+    combination of media bus data format, frame width and frame height,
+    unless otherwise noted.
 
 Image formats are typically negotiated on video capture and output
 devices using the format and
@@ -120,7 +121,9 @@ can expose pad-level image format configuration to applications. When
 they do, applications can use the
 :ref:`VIDIOC_SUBDEV_G_FMT <VIDIOC_SUBDEV_G_FMT>` and
 :ref:`VIDIOC_SUBDEV_S_FMT <VIDIOC_SUBDEV_G_FMT>` ioctls. to
-negotiate formats on a per-pad basis.
+negotiate formats on a per-pad basis. Note that when those ioctls are
+called with or return the field order set to ``V4L2_FIELD_ALTERNATE``,
+the format contains the field height, which is half the frame height.
 
 Applications are responsible for configuring coherent parameters on the
 whole pipeline and making sure that connected pads have compatible
@@ -379,7 +382,10 @@ is supported by the hardware.
    pad for further processing.
 
 2. Sink pad actual crop selection. The sink pad crop defines the crop
-   performed to the sink pad format.
+   performed to the sink pad format. The crop rectangle always refers to
+   the frame size, even if the sink pad format has field order set to
+   ``V4L2_FIELD_ALTERNATE`` and the actual processed images are only
+   field sized.
 
 3. Sink pad actual compose selection. The size of the sink pad compose
    rectangle defines the scaling ratio compared to the size of the sink
@@ -393,7 +399,9 @@ is supported by the hardware.
 5. Source pad format. The source pad format defines the output pixel
    format of the subdev, as well as the other parameters with the
    exception of the image width and height. Width and height are defined
-   by the size of the source pad actual crop selection.
+   by the size of the source pad actual crop selection. If the source pad
+   format has field order set to ``V4L2_FIELD_ALTERNATE``, the source pad
+   field height is half the source pad crop selection height.
 
 Accessing any of the above rectangles not supported by the subdev will
 return ``EINVAL``. Any rectangle referring to a previous unsupported

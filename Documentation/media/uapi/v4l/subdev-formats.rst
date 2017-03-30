@@ -19,7 +19,8 @@ Media Bus Formats
       - Image width, in pixels.
     * - __u32
       - ``height``
-      - Image height, in pixels.
+      - Image height, in pixels. This is the field height for
+        ``V4L2_FIELD_ALTERNATE`` field order, or the frame height otherwise.
     * - __u32
       - ``code``
       - Format code, from enum

@@ -45,6 +45,8 @@ function of the crop API, and more, are supported by the selections API.
 See :ref:`subdev` for more information on how each selection target
 affects the image processing pipeline inside the subdevice.
 
+Note that selection rectangles always refer to frame sizes, not field sizes.
+
 
 Types of selection targets
 --------------------------

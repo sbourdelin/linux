@@ -55,6 +55,10 @@ maximum values. Applications must use the
 :ref:`VIDIOC_SUBDEV_S_FMT <VIDIOC_SUBDEV_G_FMT>` ioctl to try the
 sub-device for an exact supported frame size.
 
+Note that if ``V4L2_FIELD_ALTERNATE`` field order is chosen in the
+:ref:`VIDIOC_SUBDEV_S_FMT <VIDIOC_SUBDEV_G_FMT>` ioctls, those take
+the field size, which is only half the height of the frame size.
+
 Available frame sizes may depend on the current 'try' formats at other
 pads of the sub-device, as well as on the current active links and the
 current values of V4L2 controls. See
