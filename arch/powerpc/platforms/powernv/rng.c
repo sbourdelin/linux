@@ -8,6 +8,7 @@
  */
 
 #define pr_fmt(fmt)	"powernv-rng: " fmt
+#define DARN_ERR 0xFFFFFFFFFFFFFFFFul
 
 #include <linux/kernel.h>
 #include <linux/of.h>
@@ -16,6 +17,7 @@
 #include <linux/slab.h>
 #include <linux/smp.h>
 #include <asm/archrandom.h>
+#include <asm/cputable.h>
 #include <asm/io.h>
 #include <asm/prom.h>
 #include <asm/machdep.h>
@@ -65,6 +67,22 @@ int powernv_get_random_real_mode(unsigned long *v)
 	*v = rng_whiten(rng, in_rm64(rng->regs_real));
 
 	return 1;
+}
+
+int powernv_get_random_darn(unsigned long *v)
+{
+	int n = 0;
+	unsigned long val;
+
+	do {
+		/* Using DARN with L=1 - conditioned random number */
+		asm (PPC_DARN(%0, 1)"\n" : "=r"(val) :);
+		n++;
+	} while (val == DARN_ERR && n < 10);
+
+	*v = val;
+
+	return (val == DARN_ERR) ? 0 : 1;
 }
 
 int powernv_get_random_long(unsigned long *v)
@@ -128,7 +146,10 @@ static __init int rng_create(struct device_node *dn)
 
 	pr_info_once("Registering arch random hook.\n");
 
-	ppc_md.get_random_seed = powernv_get_random_long;
+	if (cpu_has_feature(CPU_FTR_ARCH_300))
+		ppc_md.get_random_seed = powernv_get_random_darn;
+	else
+		ppc_md.get_random_seed = powernv_get_random_long;
 
 	return 0;
 }
