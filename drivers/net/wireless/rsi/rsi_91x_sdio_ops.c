@@ -18,47 +18,7 @@
 #include <linux/firmware.h>
 #include "rsi_sdio.h"
 #include "rsi_common.h"
-
-/**
- * rsi_sdio_master_access_msword() - This function sets the AHB master access
- *				     MS word in the SDIO slave registers.
- * @adapter: Pointer to the adapter structure.
- * @ms_word: ms word need to be initialized.
- *
- * Return: status: 0 on success, -1 on failure.
- */
-static int rsi_sdio_master_access_msword(struct rsi_hw *adapter,
-					 u16 ms_word)
-{
-	u8 byte;
-	u8 function = 0;
-	int status = 0;
-
-	byte = (u8)(ms_word & 0x00FF);
-
-	rsi_dbg(INIT_ZONE,
-		"%s: MASTER_ACCESS_MSBYTE:0x%x\n", __func__, byte);
-
-	status = rsi_sdio_write_register(adapter,
-					 function,
-					 SDIO_MASTER_ACCESS_MSBYTE,
-					 &byte);
-	if (status) {
-		rsi_dbg(ERR_ZONE,
-			"%s: fail to access MASTER_ACCESS_MSBYTE\n",
-			__func__);
-		return -1;
-	}
-
-	byte = (u8)(ms_word >> 8);
-
-	rsi_dbg(INIT_ZONE, "%s:MASTER_ACCESS_LSBYTE:0x%x\n", __func__, byte);
-	status = rsi_sdio_write_register(adapter,
-					 function,
-					 SDIO_MASTER_ACCESS_LSBYTE,
-					 &byte);
-	return status;
-}
+#include "rsi_hal.h"
 
 /**
  * rsi_copy_to_card() - This function includes the actual funtionality of
