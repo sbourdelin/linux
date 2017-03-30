@@ -1,0 +1,27 @@
+menuconfig INTEL_FPGA
+	tristate "Intel(R) FPGA support"
+	depends on FPGA_DEVICE
+	help
+	  Select this option to enable driver support for Intel(R)
+	  Field-Programmable Gate Array (FPGA) solutions. This driver
+	  provides interfaces for userspace applications to configure,
+	  enumerate, open, and access FPGA accelerators on platforms
+	  equipped with Intel(R) FPGA solutions and enables system
+	  level management functions such as FPGA reconfiguration,
+	  power management, and virtualization.
+
+	  Say Y if your platform has this technology. Say N if unsure.
+
+if INTEL_FPGA
+
+config INTEL_FPGA_PCI
+	tristate "Intel FPGA PCIe Driver"
+	depends on PCI
+	help
+	  This is the driver for the PCIe device which locates between
+	  CPU and Accelerated Function Units (AFUs) and allows them to
+	  communicate with each other.
+
+	  To compile this as a module, choose M here.
+
+endif

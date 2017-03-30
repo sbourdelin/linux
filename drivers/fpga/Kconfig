@@ -69,6 +69,8 @@ config ALTERA_FREEZE_BRIDGE
 	  isolate one region of the FPGA from the busses while that
 	  region is being reprogrammed.
 
+source "drivers/fpga/intel/Kconfig"
+
 endif # FPGA
 
 endmenu
