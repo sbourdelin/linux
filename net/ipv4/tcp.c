@@ -456,6 +456,8 @@ unsigned int tcp_poll(struct file *file, struct socket *sock, poll_table *wait)
 
 	sock_poll_wait(file, sk_sleep(sk), wait);
 
+	/* This barrier is coupled with smp_wmb() in tcp_reset() */
+	smp_rmb();
 	state = sk_state_load(sk);
 	if (state == TCP_LISTEN)
 		return inet_csk_listen_poll(sk);
@@ -540,8 +542,6 @@ unsigned int tcp_poll(struct file *file, struct socket *sock, poll_table *wait)
 		 */
 		mask |= POLLOUT | POLLWRNORM;
 	}
-	/* This barrier is coupled with smp_wmb() in tcp_reset() */
-	smp_rmb();
 	if (sk->sk_err || !skb_queue_empty(&sk->sk_error_queue))
 		mask |= POLLERR;
 
@@ -3291,6 +3291,9 @@ void tcp_done(struct sock *sk)
 		reqsk_fastopen_remove(sk, req, false);
 
 	sk->sk_shutdown = SHUTDOWN_MASK;
+
+	/* This barrier is coupled with smp_rmb() in tcp_poll() */
+	smp_wmb();
 
 	if (!sock_flag(sk, SOCK_DEAD))
 		sk->sk_state_change(sk);
