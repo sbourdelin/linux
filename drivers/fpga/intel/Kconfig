@@ -24,4 +24,12 @@ config INTEL_FPGA_PCI
 
 	  To compile this as a module, choose M here.
 
+config INTEL_FPGA_FME
+	tristate "Intel FPGA FME Driver"
+	depends on INTEL_FPGA_PCI
+	help
+	  This is the driver for FPGA Management Engine which implements
+	  all FPGA platform level management features. There shall be 1
+	  FME per Intel FPGA.
+
 endif
