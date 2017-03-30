@@ -836,6 +836,22 @@ struct drm_connector_helper_funcs {
 	 */
 	struct drm_encoder *(*atomic_best_encoder)(struct drm_connector *connector,
 						   struct drm_connector_state *connector_state);
+
+	/**
+	 * @atomic_release:
+	 *
+	 * This function is conditionally called to release shared resources
+	 * when the attached CRTC's mode changes or it's connectors change or
+	 * becomes inactive. It is called before the corresponding
+	 * &drm_crtc_helper_funcs.atomic_check or
+	 * &drm_crtc_helper_funcs.mode_fixup hooks are called.
+	 *
+	 * NOTE:
+	 *
+	 * This function is called in the check phase of an atomic update.
+	 */
+	void (*atomic_release)(struct drm_connector *connector,
+			       struct drm_connector_state *connector_state);
 };
 
 /**
