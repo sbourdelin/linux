@@ -161,8 +161,8 @@ xen_copy_pss_data(struct acpi_processor *_pr,
 	}
 	return dst_states;
 }
-static int xen_copy_psd_data(struct acpi_processor *_pr,
-			     struct xen_processor_performance *dst)
+static void xen_copy_psd_data(struct acpi_processor *_pr,
+			      struct xen_processor_performance *dst)
 {
 	struct acpi_psd_package *pdomain;
 
@@ -189,10 +189,9 @@ static int xen_copy_psd_data(struct acpi_processor *_pr,
 
 	}
 	memcpy(&(dst->domain_info), pdomain, sizeof(struct acpi_psd_package));
-	return 0;
 }
-static int xen_copy_pct_data(struct acpi_pct_register *pct,
-			     struct xen_pct_register *dst_pct)
+static void xen_copy_pct_data(struct acpi_pct_register *pct,
+			      struct xen_pct_register *dst_pct)
 {
 	/* It would be nice if you could just do 'memcpy(pct, dst_pct') but
 	 * sadly the Xen structure did not have the proper padding so the
@@ -205,7 +204,6 @@ static int xen_copy_pct_data(struct acpi_pct_register *pct,
 	dst_pct->bit_offset = pct->bit_offset;
 	dst_pct->reserved = pct->reserved;
 	dst_pct->address = pct->address;
-	return 0;
 }
 static int push_pxx_to_hypervisor(struct acpi_processor *_pr)
 {
@@ -233,8 +231,8 @@ static int push_pxx_to_hypervisor(struct acpi_processor *_pr)
 		set_xen_guest_handle(dst_perf->states, dst_states);
 		dst_perf->flags |= XEN_PX_PSS;
 	}
-	if (!xen_copy_psd_data(_pr, dst_perf))
-		dst_perf->flags |= XEN_PX_PSD;
+	xen_copy_psd_data(_pr, dst_perf);
+	dst_perf->flags |= XEN_PX_PSD;
 
 	if (dst_perf->flags != (XEN_PX_PSD | XEN_PX_PSS | XEN_PX_PCT | XEN_PX_PPC)) {
 		pr_warn("ACPI CPU%u missing some P-state data (%x), skipping\n",
