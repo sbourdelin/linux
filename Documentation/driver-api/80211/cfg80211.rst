@@ -346,3 +346,8 @@ Test mode
 
 .. kernel-doc:: include/net/cfg80211.h
    :functions: cfg80211_testmode_event
+
+Remaining functions
+===================
+.. kernel-doc:: include/net/cfg80211.h
+   :unused-functions:
