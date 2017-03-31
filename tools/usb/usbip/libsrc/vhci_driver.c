@@ -7,6 +7,7 @@
 #include <limits.h>
 #include <netdb.h>
 #include <libudev.h>
+#include <dirent.h>
 #include "sysfs_utils.h"
 
 #undef  PROGNAME
@@ -134,6 +135,33 @@ static int get_nports(void)
 	return (int)strtoul(attr_nports, NULL, 10);
 }
 
+static int vhci_hcd_filter(const struct dirent *dirent)
+{
+	return strcmp(dirent->d_name, "vhci_hcd") >= 0 ? 1: 0;
+}
+
+static int get_ncontrollers(void)
+{
+	struct dirent **namelist;
+	struct udev_device *platform;
+	int n;
+
+	platform = udev_device_get_parent(vhci_driver->hc_device);
+	if (platform == NULL)
+		return -1;
+
+	n = scandir(udev_device_get_syspath(platform), &namelist, vhci_hcd_filter, NULL);
+	if (n < 0)
+		err("scandir failed");
+	else {
+		for (int i = 0; i < n; i++)
+			free(namelist[i]);
+		free(namelist);
+	}
+
+	return n;
+}
+
 /*
  * Read the given port's record.
  *
@@ -220,8 +248,10 @@ int usbip_vhci_driver_open(void)
 	}
 
 	vhci_driver->nports = get_nports();
-
 	dbg("available ports: %d", vhci_driver->nports);
+
+	vhci_driver->ncontrollers = get_ncontrollers();
+	dbg("available controllers: %d", vhci_driver->ncontrollers);
 
 	if (refresh_imported_device_list())
 		goto err;
