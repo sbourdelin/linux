@@ -283,8 +283,8 @@ static int upload_pm_data(struct acpi_processor *_pr)
 	if (_pr->flags.power)
 		err = push_cxx_to_hypervisor(_pr);
 
-	if (_pr->performance && _pr->performance->states)
-		err |= push_pxx_to_hypervisor(_pr);
+	if (!err && _pr->performance && _pr->performance->states)
+		err = push_pxx_to_hypervisor(_pr);
 
 	mutex_unlock(&acpi_ids_mutex);
 	return err;
