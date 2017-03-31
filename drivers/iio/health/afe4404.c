@@ -170,57 +170,6 @@ static const struct afe440x_val_table afe4404_cap_table[] = {
 };
 AFE440X_TABLE_ATTR(in_intensity_capacitance_available, afe4404_cap_table);
 
-static ssize_t afe440x_show_register(struct device *dev,
-				     struct device_attribute *attr,
-				     char *buf)
-{
-	struct iio_dev *indio_dev = dev_to_iio_dev(dev);
-	struct afe4404_data *afe = iio_priv(indio_dev);
-	struct afe440x_attr *afe440x_attr = to_afe440x_attr(attr);
-	unsigned int reg_val;
-	int vals[2];
-	int ret;
-
-	ret = regmap_field_read(afe->fields[afe440x_attr->field], &reg_val);
-	if (ret)
-		return ret;
-
-	if (reg_val >= afe440x_attr->table_size)
-		return -EINVAL;
-
-	vals[0] = afe440x_attr->val_table[reg_val].integer;
-	vals[1] = afe440x_attr->val_table[reg_val].fract;
-
-	return iio_format_value(buf, IIO_VAL_INT_PLUS_MICRO, 2, vals);
-}
-
-static ssize_t afe440x_store_register(struct device *dev,
-				      struct device_attribute *attr,
-				      const char *buf, size_t count)
-{
-	struct iio_dev *indio_dev = dev_to_iio_dev(dev);
-	struct afe4404_data *afe = iio_priv(indio_dev);
-	struct afe440x_attr *afe440x_attr = to_afe440x_attr(attr);
-	int val, integer, fract, ret;
-
-	ret = iio_str_to_fixpoint(buf, 100000, &integer, &fract);
-	if (ret)
-		return ret;
-
-	for (val = 0; val < afe440x_attr->table_size; val++)
-		if (afe440x_attr->val_table[val].integer == integer &&
-		    afe440x_attr->val_table[val].fract == fract)
-			break;
-	if (val == afe440x_attr->table_size)
-		return -EINVAL;
-
-	ret = regmap_field_write(afe->fields[afe440x_attr->field], val);
-	if (ret)
-		return ret;
-
-	return count;
-}
-
 static AFE440X_ATTR(in_intensity1_resistance, F_TIA_GAIN_SEP, afe4404_res_table);
 static AFE440X_ATTR(in_intensity1_capacitance, F_TIA_CF_SEP, afe4404_cap_table);
 
