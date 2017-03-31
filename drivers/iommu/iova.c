@@ -50,7 +50,7 @@ insert_iova_boundary(struct iova_domain *iovad)
 
 void
 init_iova_domain(struct iova_domain *iovad, unsigned long granule,
-	unsigned long start_pfn, unsigned long pfn_32bit)
+	unsigned long start_pfn)
 {
 	/*
 	 * IOVA granularity will normally be equal to the smallest
@@ -63,7 +63,7 @@ init_iova_domain(struct iova_domain *iovad, unsigned long granule,
 	iovad->rbroot = RB_ROOT;
 	iovad->granule = granule;
 	iovad->start_pfn = start_pfn;
-	iovad->dma_32bit_pfn = pfn_32bit;
+	iovad->dma_32bit_pfn = DMA_BIT_MASK(32) >> ilog2(granule);
 	init_iova_rcaches(iovad);
 
 	/*
