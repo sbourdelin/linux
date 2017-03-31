@@ -93,6 +93,9 @@
 		CCSR_SSI_SIER_TLS_EN | CCSR_SSI_SIER_TFS_EN | \
 		CCSR_SSI_SIER_TUE0_EN | CCSR_SSI_SIER_TFRC_EN)
 
+#define FSLSSI_SSIEN_WORKAROUND (CCSR_SSI_SCR_SSIEN | CCSR_SSI_SCR_TE | \
+				 CCSR_SSI_SCR_RE)
+
 enum fsl_ssi_type {
 	FSL_SSI_MCP8610,
 	FSL_SSI_MX21,
@@ -559,7 +562,8 @@ config_done:
 			int i;
 			int max_loop = 100;
 			regmap_update_bits(regs, CCSR_SSI_SCR,
-					CCSR_SSI_SCR_SSIEN, CCSR_SSI_SCR_SSIEN);
+					   FSLSSI_SSIEN_WORKAROUND,
+					   FSLSSI_SSIEN_WORKAROUND);
 			for (i = 0; i < max_loop; i++) {
 				u32 sfcsr;
 				regmap_read(regs, CCSR_SSI_SFCSR, &sfcsr);
@@ -650,8 +654,7 @@ static void fsl_ssi_setup_ac97(struct fsl_ssi_private *ssi_private)
 	 * codec before a stream is started.
 	 */
 	regmap_update_bits(regs, CCSR_SSI_SCR,
-			CCSR_SSI_SCR_SSIEN | CCSR_SSI_SCR_TE | CCSR_SSI_SCR_RE,
-			CCSR_SSI_SCR_SSIEN | CCSR_SSI_SCR_TE | CCSR_SSI_SCR_RE);
+			   FSLSSI_SSIEN_WORKAROUND, FSLSSI_SSIEN_WORKAROUND);
 
 	regmap_write(regs, CCSR_SSI_SOR, CCSR_SSI_SOR_WAIT(3));
 }
