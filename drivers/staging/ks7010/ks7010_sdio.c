@@ -683,6 +683,8 @@ static int ks7010_sdio_data_compare(struct ks_wlan_private *priv, u32 address,
 	int ret;
 	unsigned char *read_buf;
 
+	BUG_ON(size > ROM_BUFF_SIZE);
+
 	read_buf = kmalloc(ROM_BUFF_SIZE, GFP_KERNEL);
 	if (!read_buf)
 		return -ENOMEM;
