@@ -49,6 +49,9 @@
 #include <linux/memblock.h>
 #include <linux/seq_file.h>
 #include <linux/crash_dump.h>
+#ifdef CONFIG_KEXEC_CORE
+#include <linux/kexec.h>
+#endif
 
 #include <trace/events/xen.h>
 
@@ -2903,3 +2906,13 @@ int xen_unmap_domain_gfn_range(struct vm_area_struct *vma,
 	return -EINVAL;
 }
 EXPORT_SYMBOL_GPL(xen_unmap_domain_gfn_range);
+
+#ifdef CONFIG_KEXEC_CORE
+phys_addr_t paddr_vmcoreinfo_note(void)
+{
+	if (xen_pv_domain())
+		return virt_to_machine(&vmcoreinfo_note).maddr;
+	else
+		return __pa_symbol(&vmcoreinfo_note);
+}
+#endif /* CONFIG_KEXEC_CORE */
