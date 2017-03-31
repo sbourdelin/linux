@@ -47,6 +47,7 @@
 
 #define KVM_REQ_PAUSE		8
 #define KVM_REQ_POWER_OFF	9
+#define KVM_REQ_IRQ_PENDING	10
 
 u32 *kvm_vcpu_reg(struct kvm_vcpu *vcpu, u8 reg_num, u32 mode);
 int __attribute_const__ kvm_target_cpu(void);

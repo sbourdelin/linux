@@ -95,6 +95,7 @@ static void kvm_timer_inject_irq_work(struct work_struct *work)
 	 * If the vcpu is blocked we want to wake it up so that it will see
 	 * the timer has expired when entering the guest.
 	 */
+	kvm_make_request(KVM_REQ_IRQ_PENDING, vcpu);
 	kvm_vcpu_kick(vcpu);
 }
 

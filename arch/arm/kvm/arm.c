@@ -768,6 +768,7 @@ static int vcpu_interrupt_line(struct kvm_vcpu *vcpu, int number, bool level)
 	 * trigger a world-switch round on the running physical CPU to set the
 	 * virtual IRQ/FIQ fields in the HCR appropriately.
 	 */
+	kvm_make_request(KVM_REQ_IRQ_PENDING, vcpu);
 	kvm_vcpu_kick(vcpu);
 
 	return 0;

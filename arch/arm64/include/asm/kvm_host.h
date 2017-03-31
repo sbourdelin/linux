@@ -44,6 +44,7 @@
 
 #define KVM_REQ_PAUSE		8
 #define KVM_REQ_POWER_OFF	9
+#define KVM_REQ_IRQ_PENDING	10
 
 int __attribute_const__ kvm_target_cpu(void);
 int kvm_reset_vcpu(struct kvm_vcpu *vcpu);

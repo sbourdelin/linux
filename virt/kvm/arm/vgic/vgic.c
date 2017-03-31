@@ -283,8 +283,10 @@ retry:
 		 * won't see this one until it exits for some other
 		 * reason.
 		 */
-		if (vcpu)
+		if (vcpu) {
+			kvm_make_request(KVM_REQ_IRQ_PENDING, vcpu);
 			kvm_vcpu_kick(vcpu);
+		}
 		return false;
 	}
 
@@ -330,6 +332,7 @@ retry:
 	spin_unlock(&irq->irq_lock);
 	spin_unlock(&vcpu->arch.vgic_cpu.ap_list_lock);
 
+	kvm_make_request(KVM_REQ_IRQ_PENDING, vcpu);
 	kvm_vcpu_kick(vcpu);
 
 	return true;
@@ -654,6 +657,9 @@ void kvm_vgic_flush_hwstate(struct kvm_vcpu *vcpu)
 	spin_lock(&vcpu->arch.vgic_cpu.ap_list_lock);
 	vgic_flush_lr_state(vcpu);
 	spin_unlock(&vcpu->arch.vgic_cpu.ap_list_lock);
+
+	/* The GIC is now ready to deliver the IRQ. */
+	clear_bit(KVM_REQ_IRQ_PENDING, &vcpu->requests);
 }
 
 int kvm_vgic_vcpu_pending_irq(struct kvm_vcpu *vcpu)
@@ -691,8 +697,10 @@ void vgic_kick_vcpus(struct kvm *kvm)
 	 * a good kick...
 	 */
 	kvm_for_each_vcpu(c, vcpu, kvm) {
-		if (kvm_vgic_vcpu_pending_irq(vcpu))
+		if (kvm_vgic_vcpu_pending_irq(vcpu)) {
+			kvm_make_request(KVM_REQ_IRQ_PENDING, vcpu);
 			kvm_vcpu_kick(vcpu);
+		}
 	}
 }
 
