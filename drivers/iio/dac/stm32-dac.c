@@ -41,10 +41,14 @@
 /**
  * struct stm32_dac - private data of DAC driver
  * @common:		reference to DAC common data
+ * @wave:		waveform generator
+ * @mamp:		waveform mask/amplitude
  * @swtrig:		Using software trigger
  */
 struct stm32_dac {
 	struct stm32_dac_common *common;
+	u32 wave;
+	u32 mamp;
 	bool swtrig;
 };
 
@@ -157,12 +161,41 @@ static int stm32_dac_is_enabled(struct stm32_dac *dac, int channel)
 	return !!en;
 }
 
+static int stm32_dac_wavegen(struct stm32_dac *dac, int channel)
+{
+	struct regmap *regmap = dac->common->regmap;
+	u32 mask, val;
+
+	if (channel == STM32_DAC_CHANNEL_1) {
+		val = FIELD_PREP(STM32_DAC_CR_WAVE1, dac->wave) |
+			FIELD_PREP(STM32_DAC_CR_MAMP1, dac->mamp);
+		mask = STM32_DAC_CR_WAVE1 | STM32_DAC_CR_MAMP1;
+	} else {
+		val = FIELD_PREP(STM32_DAC_CR_WAVE2, dac->wave) |
+			FIELD_PREP(STM32_DAC_CR_MAMP2, dac->mamp);
+		mask = STM32_DAC_CR_WAVE2 | STM32_DAC_CR_MAMP2;
+	}
+
+	return regmap_update_bits(regmap, STM32_DAC_CR, mask, val);
+}
+
 static int stm32_dac_enable(struct iio_dev *indio_dev, int channel)
 {
 	struct stm32_dac *dac = iio_priv(indio_dev);
 	u32 en = (channel == STM32_DAC_CHANNEL_1) ?
 		STM32_DAC_CR_EN1 : STM32_DAC_CR_EN2;
 	int ret;
+
+	if (dac->wave && !indio_dev->trig) {
+		dev_err(&indio_dev->dev, "Wavegen requires a trigger\n");
+		return -EINVAL;
+	}
+
+	ret = stm32_dac_wavegen(dac, channel);
+	if (ret < 0) {
+		dev_err(&indio_dev->dev, "Wavegen setup failed\n");
+		return ret;
+	}
 
 	ret = stm32_dac_set_trig(dac, indio_dev->trig, channel);
 	if (ret < 0) {
@@ -291,6 +324,96 @@ static const struct iio_info stm32_dac_iio_info = {
 	.driver_module = THIS_MODULE,
 };
 
+/* waveform generator wave selection */
+static const char * const stm32_dac_wave_desc[] = {
+	"none",
+	"noise",
+	"triangle",
+};
+
+static int stm32_dac_set_wave(struct iio_dev *indio_dev,
+			      const struct iio_chan_spec *chan,
+			      unsigned int type)
+{
+	struct stm32_dac *dac = iio_priv(indio_dev);
+
+	if (stm32_dac_is_enabled(dac, chan->channel))
+		return -EBUSY;
+	dac->wave = type;
+
+	return 0;
+}
+
+static int stm32_dac_get_wave(struct iio_dev *indio_dev,
+			      const struct iio_chan_spec *chan)
+{
+	struct stm32_dac *dac = iio_priv(indio_dev);
+
+	return dac->wave;
+}
+
+static const struct iio_enum stm32_dac_wave_enum = {
+	.items = stm32_dac_wave_desc,
+	.num_items = ARRAY_SIZE(stm32_dac_wave_desc),
+	.get = stm32_dac_get_wave,
+	.set = stm32_dac_set_wave,
+};
+
+/*
+ * waveform generator mask/amplitude selection:
+ * - noise: LFSR mask (linear feedback shift register, umasks bit 0, [1:0]...)
+ * - triangle: amplitude (equal to 1, 3, 5, 7... 4095)
+ */
+static const char * const stm32_dac_mamp_desc[] = {
+	"0", "1", "2", "3", "4", "5", "6", "7", "8", "9", "10", "11",
+};
+
+static int stm32_dac_set_mamp(struct iio_dev *indio_dev,
+			      const struct iio_chan_spec *chan,
+			      unsigned int type)
+{
+	struct stm32_dac *dac = iio_priv(indio_dev);
+
+	if (stm32_dac_is_enabled(dac, chan->channel))
+		return -EBUSY;
+	dac->mamp = type;
+
+	return 0;
+}
+
+static int  stm32_dac_get_mamp(struct iio_dev *indio_dev,
+			       const struct iio_chan_spec *chan)
+{
+	struct stm32_dac *dac = iio_priv(indio_dev);
+
+	return dac->mamp;
+}
+
+static const struct iio_enum stm32_dac_mamp_enum = {
+	.items = stm32_dac_mamp_desc,
+	.num_items = ARRAY_SIZE(stm32_dac_mamp_desc),
+	.get = stm32_dac_get_mamp,
+	.set = stm32_dac_set_mamp,
+};
+
+static const struct iio_chan_spec_ext_info stm32_dac_ext_info[] = {
+	IIO_ENUM("wave", IIO_SHARED_BY_ALL, &stm32_dac_wave_enum),
+	{
+		.name = "wave_available",
+		.shared = IIO_SHARED_BY_ALL,
+		.read = iio_enum_available_read,
+		.private = (uintptr_t)&stm32_dac_wave_enum,
+	},
+	IIO_ENUM("mamp", IIO_SHARED_BY_ALL, &stm32_dac_mamp_enum),
+	{
+		.name = "mamp_available",
+		.shared = IIO_SHARED_BY_ALL,
+		.read = iio_enum_available_read,
+		.private = (uintptr_t)&stm32_dac_mamp_enum,
+	},
+	{},
+};
+
 #define STM32_DAC_CHANNEL(chan, name) {		\
 	.type = IIO_VOLTAGE,			\
 	.indexed = 1,				\
@@ -306,6 +429,7 @@ static const struct iio_info stm32_dac_iio_info = {
 		.storagebits = 16,		\
 	},					\
 	.datasheet_name = name,			\
+	.ext_info = stm32_dac_ext_info		\
 }
 
 static const struct iio_chan_spec stm32_dac_channels[] = {

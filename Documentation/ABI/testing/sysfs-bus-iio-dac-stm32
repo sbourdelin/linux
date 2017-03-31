@@ -1,0 +1,32 @@
+What:		/sys/bus/iio/devices/iio:deviceX/wave
+What:		/sys/bus/iio/devices/iio:deviceX/wave_available
+KernelVersion:	4.12
+Contact:	fabrice.gasnier@st.com
+Description:
+		List and/or select waveform generation provided by STM32 DAC:
+		- "none": (default) means normal DAC operations
+		- "noise": select noise waveform
+		- "triangle": select triangle waveform
+		Note: when waveform generator is used, writing _raw sysfs entry
+		adds a DC offset to generated waveform. Reading it reports
+		current output value.
+
+What:		/sys/bus/iio/devices/iio:deviceX/mamp
+What:		/sys/bus/iio/devices/iio:deviceX/mamp_available
+KernelVersion:	4.12
+Contact:	fabrice.gasnier@st.com
+Description:
+		List and select mask/amplitude used for noise/triangle waveform
+		generator, which are:
+		- "0": unmask bit 0 of LFSR / triangle amplitude equal to 1
+		- "1": unmask bit [1:0] of LFSR / triangle amplitude equal to 3
+		- "2": unmask bit [2:0] of LFSR / triangle amplitude equal to 7
+		- "3": unmask bit [3:0] of LFSR / triangle amplitude equal to 15
+		- "4": unmask bit [4:0] of LFSR / triangle amplitude equal to 31
+		- "5": unmask bit [5:0] of LFSR / triangle amplitude equal to 63
+		- "6": unmask bit [6:0] of LFSR / triangle amplitude equal to 127
+		- "7": unmask bit [7:0] of LFSR / triangle amplitude equal to 255
+		- "8": unmask bit [8:0] of LFSR / triangle amplitude equal to 511
+		- "9": unmask bit [9:0] of LFSR / triangle amplitude equal to 1023
+		- "10": unmask bit [10:0] of LFSR / triangle amplitude equal to 2047
+		- "11": unmask bit [11:0] of LFSR / triangle amplitude equal to 4095
