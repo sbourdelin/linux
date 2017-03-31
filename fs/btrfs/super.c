@@ -555,11 +555,13 @@ int btrfs_parse_options(struct btrfs_root *root, char *options,
 		case Opt_ssd:
 			btrfs_set_and_info(info, SSD,
 					   "use ssd allocation scheme");
+			btrfs_clear_opt(info->mount_opt, NOSSD);
 			break;
 		case Opt_ssd_spread:
 			btrfs_set_and_info(info, SSD_SPREAD,
 					   "use spread ssd allocation scheme");
 			btrfs_set_opt(info->mount_opt, SSD);
+			btrfs_clear_opt(info->mount_opt, NOSSD);
 			break;
 		case Opt_nossd:
 			btrfs_set_and_info(info, NOSSD,
