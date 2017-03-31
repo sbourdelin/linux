@@ -600,6 +600,7 @@ static int meson_uart_probe(struct platform_device *pdev)
 	struct resource *res_mem, *res_irq;
 	struct uart_port *port;
 	struct clk *clk;
+	struct clk *core_clk;
 	int ret = 0;
 
 	if (pdev->dev.of_node)
@@ -624,6 +625,15 @@ static int meson_uart_probe(struct platform_device *pdev)
 	port = devm_kzalloc(&pdev->dev, sizeof(struct uart_port), GFP_KERNEL);
 	if (!port)
 		return -ENOMEM;
+
+	core_clk = devm_clk_get(&pdev->dev, "core");
+	if (!IS_ERR(core_clk)) {
+		ret = clk_prepare_enable(core_clk);
+		if (ret) {
+			dev_err(&pdev->dev, "couldn't enable clkc\n");
+			return ret;
+		}
+	}
 
 	clk = clk_get(&pdev->dev, NULL);
 	if (IS_ERR(clk))
