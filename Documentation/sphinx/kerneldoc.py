@@ -41,6 +41,9 @@ from sphinx.ext.autodoc import AutodocReporter
 
 __version__  = '1.0'
 
+# per-file list
+_used_fns = {}
+
 class KernelDocDirective(Directive):
     """Extract kernel-doc comments from the specified file"""
     required_argument = 1
@@ -50,6 +53,7 @@ class KernelDocDirective(Directive):
         'functions': directives.unchanged_required,
         'export': directives.unchanged,
         'internal': directives.unchanged,
+        'unused-functions': directives.unchanged,
     }
     has_content = False
 
@@ -59,6 +63,10 @@ class KernelDocDirective(Directive):
 
         filename = env.config.kerneldoc_srctree + '/' + self.arguments[0]
         export_file_patterns = []
+
+        if not filename in _used_fns:
+            _used_fns[filename] = []
+        _used_fns_this_file = _used_fns[filename]
 
         # Tell sphinx of the dependency
         env.note_dependency(os.path.abspath(filename))
@@ -73,10 +81,16 @@ class KernelDocDirective(Directive):
             cmd += ['-internal']
             export_file_patterns = str(self.options.get('internal')).split()
         elif 'doc' in self.options:
-            cmd += ['-function', str(self.options.get('doc'))]
+            f = str(self.options.get('doc'))
+            cmd += ['-function', f]
+            _used_fns_this_file.append(f)
+        elif 'unused-functions' in self.options:
+            for f in _used_fns_this_file:
+                cmd += ['-nofunction', f]
         elif 'functions' in self.options:
             for f in str(self.options.get('functions')).split():
                 cmd += ['-function', f]
+                _used_fns_this_file.append(f)
 
         for pattern in export_file_patterns:
             for f in glob.glob(env.config.kerneldoc_srctree + '/' + pattern):
