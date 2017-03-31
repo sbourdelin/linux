@@ -74,6 +74,7 @@
 #endif
 
 #ifdef CONFIG_ACPI_DEBUG
+#define ACPI_DEBUG_OUTPUT
 #define ACPI_MUTEX_DEBUG
 #endif
 
