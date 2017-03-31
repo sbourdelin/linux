@@ -36,8 +36,6 @@ err:
 	return NULL;
 }
 
-
-
 static int parse_status(const char *value)
 {
 	int ret = 0;
