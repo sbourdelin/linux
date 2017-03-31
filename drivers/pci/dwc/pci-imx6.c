@@ -725,6 +725,7 @@ static struct platform_driver imx6_pcie_driver = {
 	.driver = {
 		.name	= "imx6q-pcie",
 		.of_match_table = imx6_pcie_of_match,
+		.suppress_bind_attrs = true,
 	},
 	.shutdown = imx6_pcie_shutdown,
 };
