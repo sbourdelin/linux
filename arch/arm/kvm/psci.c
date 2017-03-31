@@ -88,7 +88,8 @@ static unsigned long kvm_psci_vcpu_on(struct kvm_vcpu *source_vcpu)
 	 */
 	if (!vcpu)
 		return PSCI_RET_INVALID_PARAMS;
-	if (!test_bit(KVM_REQ_POWER_OFF, &vcpu->requests)) {
+
+	if (!test_and_clear_bit(KVM_REQ_POWER_OFF, &vcpu->requests)) {
 		if (kvm_psci_version(source_vcpu) != KVM_ARM_PSCI_0_1)
 			return PSCI_RET_ALREADY_ON;
 		else
@@ -116,7 +117,6 @@ static unsigned long kvm_psci_vcpu_on(struct kvm_vcpu *source_vcpu)
 	 * the general puspose registers are undefined upon CPU_ON.
 	 */
 	vcpu_set_reg(vcpu, 0, context_id);
-	clear_bit(KVM_REQ_POWER_OFF, &vcpu->requests);
 
 	wq = kvm_arch_vcpu_wq(vcpu);
 	swake_up(wq);
