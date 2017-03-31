@@ -228,7 +228,7 @@ static int adis16201_read_raw(struct iio_dev *indio_dev,
 		if (ret)
 			return ret;
 		val16 &= (1 << bits) - 1;
-		val16 = (s16)(val16 << (16 - bits)) >> (16 - bits);
+		val16 = val16 << (16 - bits) >> (16 - bits);
 		*val = val16;
 		return IIO_VAL_INT;
 	}

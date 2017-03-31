@@ -211,7 +211,7 @@ static int adis16203_read_raw(struct iio_dev *indio_dev,
 			return ret;
 		}
 		val16 &= (1 << bits) - 1;
-		val16 = (s16)(val16 << (16 - bits)) >> (16 - bits);
+		val16 = val16 << (16 - bits) >> (16 - bits);
 		*val = val16;
 		mutex_unlock(&indio_dev->mlock);
 		return IIO_VAL_INT;
