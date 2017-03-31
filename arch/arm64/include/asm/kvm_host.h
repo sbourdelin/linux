@@ -198,6 +198,9 @@ typedef struct kvm_cpu_context kvm_cpu_context_t;
 struct kvm_vcpu_arch {
 	struct kvm_cpu_context ctxt;
 
+	/* vcpu MPIDR */
+	u64 vmpidr_el2;
+
 	/* HYP configuration */
 	u64 hcr_el2;
 	u32 mdcr_el2;

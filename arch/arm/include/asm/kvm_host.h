@@ -151,6 +151,9 @@ struct kvm_vcpu_arch {
 	/* The CPU type we expose to the VM */
 	u32 midr;
 
+	/* vcpu MPIDR */
+	u32 vmpidr;
+
 	/* HYP trapping configuration */
 	u32 hcr;
 

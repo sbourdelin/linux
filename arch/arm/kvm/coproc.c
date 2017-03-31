@@ -101,14 +101,18 @@ int kvm_handle_cp14_access(struct kvm_vcpu *vcpu, struct kvm_run *run)
 
 static void reset_mpidr(struct kvm_vcpu *vcpu, const struct coproc_reg *r)
 {
-	/*
-	 * Compute guest MPIDR. We build a virtual cluster out of the
-	 * vcpu_id, but we read the 'U' bit from the underlying
-	 * hardware directly.
-	 */
-	vcpu_cp15(vcpu, c0_MPIDR) = ((read_cpuid_mpidr() & MPIDR_SMP_BITMASK) |
-				     ((vcpu->vcpu_id >> 2) << MPIDR_LEVEL_BITS) |
-				     (vcpu->vcpu_id & 3));
+	if (!vcpu->arch.vmpidr) {
+		/*
+		 * Compute guest MPIDR. We build a virtual cluster out of the
+		 * vcpu_id, but we read the 'U' bit from the underlying
+		 * hardware directly.
+		 */
+		u32 mpidr = ((read_cpuid_mpidr() & MPIDR_SMP_BITMASK) |
+			     ((vcpu->vcpu_id >> 2) << MPIDR_LEVEL_BITS) |
+			     (vcpu->vcpu_id & 3));
+		vcpu->arch.vmpidr = mpidr;
+	}
+	vcpu_cp15(vcpu, c0_MPIDR) = vcpu->arch.vmpidr;
 }
 
 /* TRM entries A7:4.3.31 A15:4.3.28 - RO WI */
