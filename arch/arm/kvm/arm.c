@@ -94,6 +94,18 @@ struct kvm_vcpu * __percpu *kvm_get_running_vcpus(void)
 
 int kvm_arch_vcpu_should_kick(struct kvm_vcpu *vcpu)
 {
+	/*
+	 * If we return true from this function, then it means the vcpu is
+	 * either in guest mode, or has already indicated that it's in guest
+	 * mode. The indication is done by setting ->mode to IN_GUEST_MODE,
+	 * and must be done before the final kvm_request_pending() read. It's
+	 * important that the observability of that order be enforced and that
+	 * the request receiving CPU can observe any new request before the
+	 * requester issues a kick. Thus, the general barrier below pairs with
+	 * the general barrier in kvm_arch_vcpu_ioctl_run() which divides the
+	 * write to ->mode and the final request pending read.
+	 */
+	smp_mb();
 	return kvm_vcpu_exiting_guest_mode(vcpu) == IN_GUEST_MODE;
 }
 
@@ -404,7 +416,8 @@ int kvm_arch_vcpu_ioctl_set_mpstate(struct kvm_vcpu *vcpu,
 int kvm_arch_vcpu_runnable(struct kvm_vcpu *v)
 {
 	return ((!!v->arch.irq_lines || kvm_vgic_vcpu_pending_irq(v))
-		&& !v->arch.power_off && !v->arch.pause);
+		&& !v->arch.power_off
+		&& !test_bit(KVM_REQ_PAUSE, &v->requests));
 }
 
 /* Just ensure a guest exit from a particular CPU */
@@ -535,17 +548,12 @@ bool kvm_arch_intc_initialized(struct kvm *kvm)
 
 void kvm_arm_halt_guest(struct kvm *kvm)
 {
-	int i;
-	struct kvm_vcpu *vcpu;
-
-	kvm_for_each_vcpu(i, vcpu, kvm)
-		vcpu->arch.pause = true;
-	kvm_make_all_cpus_request(kvm, KVM_REQ_VCPU_EXIT);
+	kvm_make_all_cpus_request(kvm, KVM_REQ_PAUSE);
 }
 
 void kvm_arm_halt_vcpu(struct kvm_vcpu *vcpu)
 {
-	vcpu->arch.pause = true;
+	set_bit(KVM_REQ_PAUSE, &vcpu->requests);
 	kvm_vcpu_kick(vcpu);
 }
 
@@ -553,7 +561,7 @@ void kvm_arm_resume_vcpu(struct kvm_vcpu *vcpu)
 {
 	struct swait_queue_head *wq = kvm_arch_vcpu_wq(vcpu);
 
-	vcpu->arch.pause = false;
+	clear_bit(KVM_REQ_PAUSE, &vcpu->requests);
 	swake_up(wq);
 }
 
@@ -571,7 +579,7 @@ static void vcpu_sleep(struct kvm_vcpu *vcpu)
 	struct swait_queue_head *wq = kvm_arch_vcpu_wq(vcpu);
 
 	swait_event_interruptible(*wq, ((!vcpu->arch.power_off) &&
-				       (!vcpu->arch.pause)));
+		(!test_bit(KVM_REQ_PAUSE, &vcpu->requests))));
 }
 
 static int kvm_vcpu_initialized(struct kvm_vcpu *vcpu)
@@ -624,7 +632,7 @@ int kvm_arch_vcpu_ioctl_run(struct kvm_vcpu *vcpu, struct kvm_run *run)
 
 		update_vttbr(vcpu->kvm);
 
-		if (vcpu->arch.power_off || vcpu->arch.pause)
+		if (vcpu->arch.power_off || test_bit(KVM_REQ_PAUSE, &vcpu->requests))
 			vcpu_sleep(vcpu);
 
 		/*
@@ -647,8 +655,18 @@ int kvm_arch_vcpu_ioctl_run(struct kvm_vcpu *vcpu, struct kvm_run *run)
 			run->exit_reason = KVM_EXIT_INTR;
 		}
 
+		/*
+		 * Indicate we're in guest mode now, before doing a final
+		 * check for pending vcpu requests. The general barrier
+		 * pairs with the one in kvm_arch_vcpu_should_kick().
+		 * Please see the comment there for more details.
+		 */
+		WRITE_ONCE(vcpu->mode, IN_GUEST_MODE);
+		smp_mb();
+
 		if (ret <= 0 || need_new_vmid_gen(vcpu->kvm) ||
-			vcpu->arch.power_off || vcpu->arch.pause) {
+			vcpu->arch.power_off || kvm_request_pending(vcpu)) {
+			WRITE_ONCE(vcpu->mode, OUTSIDE_GUEST_MODE);
 			local_irq_enable();
 			kvm_pmu_sync_hwstate(vcpu);
 			kvm_timer_sync_hwstate(vcpu);
@@ -664,11 +682,10 @@ int kvm_arch_vcpu_ioctl_run(struct kvm_vcpu *vcpu, struct kvm_run *run)
 		 */
 		trace_kvm_entry(*vcpu_pc(vcpu));
 		guest_enter_irqoff();
-		vcpu->mode = IN_GUEST_MODE;
 
 		ret = kvm_call_hyp(__kvm_vcpu_run, vcpu);
 
-		vcpu->mode = OUTSIDE_GUEST_MODE;
+		WRITE_ONCE(vcpu->mode, OUTSIDE_GUEST_MODE);
 		vcpu->stat.exits++;
 		/*
 		 * Back from guest

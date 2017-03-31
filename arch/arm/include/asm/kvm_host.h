@@ -45,7 +45,7 @@
 #define KVM_MAX_VCPUS VGIC_V2_MAX_CPUS
 #endif
 
-#define KVM_REQ_VCPU_EXIT	8
+#define KVM_REQ_PAUSE		8
 
 u32 *kvm_vcpu_reg(struct kvm_vcpu *vcpu, u8 reg_num, u32 mode);
 int __attribute_const__ kvm_target_cpu(void);
@@ -172,9 +172,6 @@ struct kvm_vcpu_arch {
 
 	/* vcpu power-off state */
 	bool power_off;
-
-	 /* Don't run the guest (internal implementation need) */
-	bool pause;
 
 	/* IO related fields */
 	struct kvm_decode mmio_decode;
