@@ -43,6 +43,7 @@
 #define KVM_VCPU_MAX_FEATURES 4
 
 #define KVM_REQ_PAUSE		8
+#define KVM_REQ_POWER_OFF	9
 
 int __attribute_const__ kvm_target_cpu(void);
 int kvm_reset_vcpu(struct kvm_vcpu *vcpu);
@@ -252,9 +253,6 @@ struct kvm_vcpu_arch {
 	struct {
 		u32	mdscr_el1;
 	} guest_debug_preserved;
-
-	/* vcpu power-off state */
-	bool power_off;
 
 	/* IO related fields */
 	struct kvm_decode mmio_decode;

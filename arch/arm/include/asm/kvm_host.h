@@ -46,6 +46,7 @@
 #endif
 
 #define KVM_REQ_PAUSE		8
+#define KVM_REQ_POWER_OFF	9
 
 u32 *kvm_vcpu_reg(struct kvm_vcpu *vcpu, u8 reg_num, u32 mode);
 int __attribute_const__ kvm_target_cpu(void);
@@ -169,9 +170,6 @@ struct kvm_vcpu_arch {
 	 * Anything that is not used directly from assembly code goes
 	 * here.
 	 */
-
-	/* vcpu power-off state */
-	bool power_off;
 
 	/* IO related fields */
 	struct kvm_decode mmio_decode;

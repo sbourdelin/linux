@@ -381,7 +381,7 @@ void kvm_arch_vcpu_put(struct kvm_vcpu *vcpu)
 int kvm_arch_vcpu_ioctl_get_mpstate(struct kvm_vcpu *vcpu,
 				    struct kvm_mp_state *mp_state)
 {
-	if (vcpu->arch.power_off)
+	if (test_bit(KVM_REQ_POWER_OFF, &vcpu->requests))
 		mp_state->mp_state = KVM_MP_STATE_STOPPED;
 	else
 		mp_state->mp_state = KVM_MP_STATE_RUNNABLE;
@@ -394,10 +394,10 @@ int kvm_arch_vcpu_ioctl_set_mpstate(struct kvm_vcpu *vcpu,
 {
 	switch (mp_state->mp_state) {
 	case KVM_MP_STATE_RUNNABLE:
-		vcpu->arch.power_off = false;
+		clear_bit(KVM_REQ_POWER_OFF, &vcpu->requests);
 		break;
 	case KVM_MP_STATE_STOPPED:
-		vcpu->arch.power_off = true;
+		set_bit(KVM_REQ_POWER_OFF, &vcpu->requests);
 		break;
 	default:
 		return -EINVAL;
@@ -415,9 +415,9 @@ int kvm_arch_vcpu_ioctl_set_mpstate(struct kvm_vcpu *vcpu,
  */
 int kvm_arch_vcpu_runnable(struct kvm_vcpu *v)
 {
-	return ((!!v->arch.irq_lines || kvm_vgic_vcpu_pending_irq(v))
-		&& !v->arch.power_off
-		&& !test_bit(KVM_REQ_PAUSE, &v->requests));
+	return (!!v->arch.irq_lines || kvm_vgic_vcpu_pending_irq(v)) &&
+		!test_bit(KVM_REQ_POWER_OFF, &v->requests) &&
+		!test_bit(KVM_REQ_PAUSE, &v->requests);
 }
 
 /* Just ensure a guest exit from a particular CPU */
@@ -578,8 +578,9 @@ static void vcpu_sleep(struct kvm_vcpu *vcpu)
 {
 	struct swait_queue_head *wq = kvm_arch_vcpu_wq(vcpu);
 
-	swait_event_interruptible(*wq, ((!vcpu->arch.power_off) &&
-		(!test_bit(KVM_REQ_PAUSE, &vcpu->requests))));
+	swait_event_interruptible(*wq,
+		!test_bit(KVM_REQ_POWER_OFF, &vcpu->requests) &&
+		!test_bit(KVM_REQ_PAUSE, &vcpu->requests));
 }
 
 static int kvm_vcpu_initialized(struct kvm_vcpu *vcpu)
@@ -632,8 +633,11 @@ int kvm_arch_vcpu_ioctl_run(struct kvm_vcpu *vcpu, struct kvm_run *run)
 
 		update_vttbr(vcpu->kvm);
 
-		if (vcpu->arch.power_off || test_bit(KVM_REQ_PAUSE, &vcpu->requests))
-			vcpu_sleep(vcpu);
+		if (kvm_request_pending(vcpu)) {
+			if (test_bit(KVM_REQ_POWER_OFF, &vcpu->requests) ||
+			    test_bit(KVM_REQ_PAUSE, &vcpu->requests))
+				vcpu_sleep(vcpu);
+		}
 
 		/*
 		 * Preparing the interrupts to be injected also
@@ -664,8 +668,8 @@ int kvm_arch_vcpu_ioctl_run(struct kvm_vcpu *vcpu, struct kvm_run *run)
 		WRITE_ONCE(vcpu->mode, IN_GUEST_MODE);
 		smp_mb();
 
-		if (ret <= 0 || need_new_vmid_gen(vcpu->kvm) ||
-			vcpu->arch.power_off || kvm_request_pending(vcpu)) {
+		if (ret <= 0 || need_new_vmid_gen(vcpu->kvm)
+		    || kvm_request_pending(vcpu)) {
 			WRITE_ONCE(vcpu->mode, OUTSIDE_GUEST_MODE);
 			local_irq_enable();
 			kvm_pmu_sync_hwstate(vcpu);
@@ -892,9 +896,9 @@ static int kvm_arch_vcpu_ioctl_vcpu_init(struct kvm_vcpu *vcpu,
 	 * Handle the "start in power-off" case.
 	 */
 	if (test_bit(KVM_ARM_VCPU_POWER_OFF, vcpu->arch.features))
-		vcpu->arch.power_off = true;
+		set_bit(KVM_REQ_POWER_OFF, &vcpu->requests);
 	else
-		vcpu->arch.power_off = false;
+		clear_bit(KVM_REQ_POWER_OFF, &vcpu->requests);
 
 	return 0;
 }
