@@ -948,25 +948,41 @@ static int omap_iommu_probe(struct platform_device *pdev)
 	pm_runtime_irq_safe(obj->dev);
 	pm_runtime_enable(obj->dev);
 
+	obj->group = iommu_group_alloc();
+	if (IS_ERR(obj->group))
+		return PTR_ERR(obj->group);
+
 	err = iommu_device_sysfs_add(&obj->iommu, obj->dev, NULL, obj->name);
 	if (err)
-		return err;
+		goto out_group;
 
 	iommu_device_set_ops(&obj->iommu, &omap_iommu_ops);
 
 	err = iommu_device_register(&obj->iommu);
 	if (err)
-		return err;
+		goto out_sysfs;
 
 	omap_iommu_debugfs_add(obj);
 
 	dev_info(&pdev->dev, "%s registered\n", obj->name);
+
 	return 0;
+
+out_sysfs:
+	iommu_device_sysfs_remove(&obj->iommu);
+
+out_group:
+	iommu_group_put(obj->group);
+
+	return err;
 }
 
 static int omap_iommu_remove(struct platform_device *pdev)
 {
 	struct omap_iommu *obj = platform_get_drvdata(pdev);
+
+	iommu_group_put(obj->group);
+	obj->group = NULL;
 
 	iommu_device_sysfs_remove(&obj->iommu);
 	iommu_device_unregister(&obj->iommu);
@@ -1217,6 +1233,7 @@ static phys_addr_t omap_iommu_iova_to_phys(struct iommu_domain *domain,
 static int omap_iommu_add_device(struct device *dev)
 {
 	struct omap_iommu_arch_data *arch_data;
+	struct iommu_group *group;
 	struct omap_iommu *iommu;
 	struct device_node *np;
 	struct platform_device *pdev;
@@ -1262,6 +1279,15 @@ static int omap_iommu_add_device(struct device *dev)
 	arch_data->iommu_dev = iommu;
 	dev->archdata.iommu = arch_data;
 
+	/*
+	 * IOMMU group initialization calls into omap_device_group, which needs
+	 * a valid dev->archdata.iommu pointer
+	 */
+	group = iommu_group_get_for_dev(dev);
+	if (IS_ERR(group))
+		return PTR_ERR(group);
+	iommu_group_put(group);
+
 	of_node_put(np);
 
 	return 0;
@@ -1275,10 +1301,22 @@ static void omap_iommu_remove_device(struct device *dev)
 		return;
 
 	iommu_device_unlink(&arch_data->iommu_dev->iommu, dev);
+	iommu_group_remove_device(dev);
 
 	dev->archdata.iommu = NULL;
 	kfree(arch_data);
 
+}
+
+static struct iommu_group *omap_device_group(struct device *dev)
+{
+	struct omap_iommu_arch_data *arch_data = dev->archdata.iommu;
+	struct iommu_group *group = NULL;
+
+	if (arch_data->iommu_dev)
+		group = arch_data->iommu_dev->group;
+
+	return group;
 }
 
 static const struct iommu_ops omap_iommu_ops = {
@@ -1292,6 +1330,7 @@ static const struct iommu_ops omap_iommu_ops = {
 	.iova_to_phys	= omap_iommu_iova_to_phys,
 	.add_device	= omap_iommu_add_device,
 	.remove_device	= omap_iommu_remove_device,
+	.device_group	= omap_device_group,
 	.pgsize_bitmap	= OMAP_IOMMU_PGSIZES,
 };
 
