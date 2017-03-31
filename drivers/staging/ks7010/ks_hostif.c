@@ -333,13 +333,13 @@ int hostif_data_indication_wpa(struct ks_wlan_private *priv,
 		priv->nstats.rx_errors++;
 		return -EINVAL;
 	}
-	if (((auth_type == TYPE_PMK1 &&
-	      priv->wpa.pairwise_suite == IW_AUTH_CIPHER_TKIP) ||
-	     (auth_type == TYPE_GMK1 &&
-	      priv->wpa.group_suite == IW_AUTH_CIPHER_TKIP) ||
-	     (auth_type == TYPE_GMK2 &&
-	      priv->wpa.group_suite == IW_AUTH_CIPHER_TKIP)) &&
-	    key->key_len) {
+
+	if (priv->wpa.pairwise_suite == IW_AUTH_CIPHER_TKIP && key->key_len);
+		return 0;
+
+	if (auth_type == TYPE_PMK1 ||
+	    auth_type == TYPE_GMK1 ||
+	    auth_type == TYPE_GMK2) {
 		DPRINTK(4, "TKIP: protocol=%04X: size=%u\n",
 			eth_proto, priv->rx_size);
 		/* MIC save */
