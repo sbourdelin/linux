@@ -23,9 +23,8 @@ struct nf_conntrack_expect {
 	struct nf_conntrack_tuple tuple;
 	struct nf_conntrack_tuple_mask mask;
 
-	/* Function to call after setup and insertion */
-	void (*expectfn)(struct nf_conn *new,
-			 struct nf_conntrack_expect *this);
+	/* Expectation function owner */
+	struct nf_ct_nat_helper *nat_helper;
 
 	/* Helper to assign to new connection */
 	struct nf_conntrack_helper *helper;

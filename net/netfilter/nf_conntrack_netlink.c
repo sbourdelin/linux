@@ -2508,7 +2508,6 @@ ctnetlink_exp_dump_expect(struct sk_buff *skb,
 	struct nlattr *nest_parms;
 	struct nf_conntrack_tuple nat_tuple = {};
 #endif
-	struct nf_ct_nat_helper *nat_helper;
 
 	if (timeout < 0)
 		timeout = 0;
@@ -2557,9 +2556,9 @@ ctnetlink_exp_dump_expect(struct sk_buff *skb,
 		    nla_put_string(skb, CTA_EXPECT_HELP_NAME, helper->name))
 			goto nla_put_failure;
 	}
-	nat_helper = nf_ct_nat_helper_find_by_symbol(exp->expectfn);
-	if (!nat_helper &&
-	    nla_put_string(skb, CTA_EXPECT_FN, nat_helper->name))
+
+	if (!exp->nat_helper &&
+	    nla_put_string(skb, CTA_EXPECT_FN, exp->nat_helper->name))
 		goto nla_put_failure;
 
 	return 0;
@@ -3077,9 +3076,10 @@ ctnetlink_alloc_expect(const struct nlattr * const cda[], struct nf_conn *ct,
 			err = -EINVAL;
 			goto err_out;
 		}
-		exp->expectfn = nat_helper->expectfn;
-	} else
-		exp->expectfn = NULL;
+		exp->nat_helper = nat_helper;
+	} else {
+		exp->nat_helper = NULL;
+	}
 
 	exp->class = class;
 	exp->master = ct;

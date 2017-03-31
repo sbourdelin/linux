@@ -1233,8 +1233,8 @@ init_conntrack(struct net *net, struct nf_conn *tmpl,
 	local_bh_enable();
 
 	if (exp) {
-		if (exp->expectfn)
-			exp->expectfn(ct, exp);
+		if (exp->nat_helper)
+			exp->nat_helper->expectfn(ct, exp);
 		nf_ct_expect_put(exp);
 	}
 
