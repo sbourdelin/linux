@@ -320,7 +320,7 @@ typedef u64 acpi_physical_address;
 
 /*
  * All ACPICA external functions that are available to the rest of the kernel
- * are tagged with thes macros which can be defined as appropriate for the host.
+ * are tagged with these macros which can be defined as appropriate for the host.
  *
  * Notes:
  * ACPI_EXPORT_SYMBOL_INIT is used for initialization and termination
@@ -770,7 +770,7 @@ typedef u32 acpi_event_status;
  *   |  | | |  +-- Type of dispatch:to method, handler, notify, or none
  *   |  | | +----- Interrupt type: edge or level triggered
  *   |  | +------- Is a Wake GPE
- *   |  +--------- Is GPE masked by the software GPE masking machanism
+ *   |  +--------- Is GPE masked by the software GPE masking mechanism
  *   +------------ <Reserved>
  */
 #define ACPI_GPE_DISPATCH_NONE          (u8) 0x00
