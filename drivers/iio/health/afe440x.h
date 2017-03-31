@@ -88,56 +88,11 @@
 #define AFE440X_CONTROL0_WRITE		0x0
 #define AFE440X_CONTROL0_READ		0x1
 
-#define AFE440X_INTENSITY_CHAN(_index, _mask)			\
-	{							\
-		.type = IIO_INTENSITY,				\
-		.channel = _index,				\
-		.address = _index,				\
-		.scan_index = _index,				\
-		.scan_type = {					\
-				.sign = 's',			\
-				.realbits = 24,			\
-				.storagebits = 32,		\
-				.endianness = IIO_CPU,		\
-		},						\
-		.info_mask_separate = BIT(IIO_CHAN_INFO_RAW) |	\
-			_mask,					\
-		.indexed = true,				\
-	}
-
-#define AFE440X_CURRENT_CHAN(_index)				\
-	{							\
-		.type = IIO_CURRENT,				\
-		.channel = _index,				\
-		.address = _index,				\
-		.scan_index = -1,				\
-		.info_mask_separate = BIT(IIO_CHAN_INFO_RAW) |	\
-			BIT(IIO_CHAN_INFO_SCALE),		\
-		.indexed = true,				\
-		.output = true,					\
-	}
-
 struct afe440x_val_table {
 	int integer;
 	int fract;
 };
 
-#define AFE440X_TABLE_ATTR(_name, _table)				\
-static ssize_t _name ## _show(struct device *dev,			\
-			      struct device_attribute *attr, char *buf)	\
-{									\
-	ssize_t len = 0;						\
-	int i;								\
-									\
-	for (i = 0; i < ARRAY_SIZE(_table); i++)			\
-		len += scnprintf(buf + len, PAGE_SIZE - len, "%d.%06u ", \
-				 _table[i].integer,			\
-				 _table[i].fract);			\
-									\
-	buf[len - 1] = '\n';						\
-									\
-	return len;							\
-}									\
 static DEVICE_ATTR_RO(_name)
 
 struct afe440x_attr {
@@ -146,18 +101,5 @@ struct afe440x_attr {
 	const struct afe440x_val_table *val_table;
 	unsigned int table_size;
 };
-
-#define to_afe440x_attr(_dev_attr)				\
-	container_of(_dev_attr, struct afe440x_attr, dev_attr)
-
-#define AFE440X_ATTR(_name, _field, _table)			\
-	struct afe440x_attr afe440x_attr_##_name = {		\
-		.dev_attr = __ATTR(_name, (S_IRUGO | S_IWUSR),	\
-				   afe440x_show_register,	\
-				   afe440x_store_register),	\
-		.field = _field,				\
-		.val_table = _table,				\
-		.table_size = ARRAY_SIZE(_table),		\
-	}
 
 #endif /* _AFE440X_H */
