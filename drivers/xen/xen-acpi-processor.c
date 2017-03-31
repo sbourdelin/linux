@@ -54,7 +54,7 @@ static unsigned long *acpi_id_present;
 /* And if there is an _CST definition (or a PBLK) for the ACPI IDs */
 static unsigned long *acpi_id_cst_present;
 
-static int push_cxx_to_hypervisor(struct acpi_processor *_pr)
+static void push_cxx_to_hypervisor(struct acpi_processor *_pr)
 {
 	struct xen_platform_op op = {
 		.cmd			= XENPF_set_processor_pminfo,
@@ -70,7 +70,7 @@ static int push_cxx_to_hypervisor(struct acpi_processor *_pr)
 	dst_cx_states = kcalloc(_pr->power.count,
 				sizeof(struct xen_processor_cx), GFP_KERNEL);
 	if (!dst_cx_states)
-		return -ENOMEM;
+		return;
 
 	for (ok = 0, i = 1; i <= _pr->power.count; i++) {
 		cx = &_pr->power.states[i];
@@ -104,7 +104,7 @@ static int push_cxx_to_hypervisor(struct acpi_processor *_pr)
 	if (!ok) {
 		pr_debug("No _Cx for ACPI CPU %u\n", _pr->acpi_id);
 		kfree(dst_cx_states);
-		return -EINVAL;
+		return;
 	}
 	op.u.set_pminfo.power.count = ok;
 	op.u.set_pminfo.power.flags.bm_control = _pr->flags.bm_control;
@@ -135,8 +135,6 @@ static int push_cxx_to_hypervisor(struct acpi_processor *_pr)
 		       ret, _pr->acpi_id);
 
 	kfree(dst_cx_states);
-
-	return ret;
 }
 static struct xen_processor_px *
 xen_copy_pss_data(struct acpi_processor *_pr,
@@ -161,8 +159,8 @@ xen_copy_pss_data(struct acpi_processor *_pr,
 	}
 	return dst_states;
 }
-static int xen_copy_psd_data(struct acpi_processor *_pr,
-			     struct xen_processor_performance *dst)
+static void xen_copy_psd_data(struct acpi_processor *_pr,
+			      struct xen_processor_performance *dst)
 {
 	struct acpi_psd_package *pdomain;
 
@@ -189,10 +187,9 @@ static int xen_copy_psd_data(struct acpi_processor *_pr,
 
 	}
 	memcpy(&(dst->domain_info), pdomain, sizeof(struct acpi_psd_package));
-	return 0;
 }
-static int xen_copy_pct_data(struct acpi_pct_register *pct,
-			     struct xen_pct_register *dst_pct)
+static void xen_copy_pct_data(struct acpi_pct_register *pct,
+			      struct xen_pct_register *dst_pct)
 {
 	/* It would be nice if you could just do 'memcpy(pct, dst_pct') but
 	 * sadly the Xen structure did not have the proper padding so the
@@ -205,9 +202,8 @@ static int xen_copy_pct_data(struct acpi_pct_register *pct,
 	dst_pct->bit_offset = pct->bit_offset;
 	dst_pct->reserved = pct->reserved;
 	dst_pct->address = pct->address;
-	return 0;
 }
-static int push_pxx_to_hypervisor(struct acpi_processor *_pr)
+static void push_pxx_to_hypervisor(struct acpi_processor *_pr)
 {
 	int ret = 0;
 	struct xen_platform_op op = {
@@ -233,13 +229,12 @@ static int push_pxx_to_hypervisor(struct acpi_processor *_pr)
 		set_xen_guest_handle(dst_perf->states, dst_states);
 		dst_perf->flags |= XEN_PX_PSS;
 	}
-	if (!xen_copy_psd_data(_pr, dst_perf))
-		dst_perf->flags |= XEN_PX_PSD;
+	xen_copy_psd_data(_pr, dst_perf);
+	dst_perf->flags |= XEN_PX_PSD;
 
 	if (dst_perf->flags != (XEN_PX_PSD | XEN_PX_PSS | XEN_PX_PCT | XEN_PX_PPC)) {
 		pr_warn("ACPI CPU%u missing some P-state data (%x), skipping\n",
 			_pr->acpi_id, dst_perf->flags);
-		ret = -ENODEV;
 		goto err_free;
 	}
 
@@ -268,26 +263,18 @@ static int push_pxx_to_hypervisor(struct acpi_processor *_pr)
 err_free:
 	if (!IS_ERR_OR_NULL(dst_states))
 		kfree(dst_states);
-
-	return ret;
 }
-static int upload_pm_data(struct acpi_processor *_pr)
+static void upload_pm_data(struct acpi_processor *_pr)
 {
-	int err = 0;
-
 	mutex_lock(&acpi_ids_mutex);
-	if (__test_and_set_bit(_pr->acpi_id, acpi_ids_done)) {
-		mutex_unlock(&acpi_ids_mutex);
-		return -EBUSY;
+	if (!__test_and_set_bit(_pr->acpi_id, acpi_ids_done)) {
+		if (_pr->flags.power)
+			push_cxx_to_hypervisor(_pr);
+
+		if (_pr->performance && _pr->performance->states)
+			push_pxx_to_hypervisor(_pr);
 	}
-	if (_pr->flags.power)
-		err = push_cxx_to_hypervisor(_pr);
-
-	if (_pr->performance && _pr->performance->states)
-		err |= push_pxx_to_hypervisor(_pr);
-
 	mutex_unlock(&acpi_ids_mutex);
-	return err;
 }
 static unsigned int __init get_max_acpi_id(void)
 {
@@ -417,7 +404,7 @@ upload:
 			pr_backup->acpi_id = i;
 			/* Mask out C-states if there are no _CST or PBLK */
 			pr_backup->flags.power = test_bit(i, acpi_id_cst_present);
-			(void)upload_pm_data(pr_backup);
+			upload_pm_data(pr_backup);
 		}
 	}
 
@@ -457,7 +444,7 @@ static int xen_upload_processor_pm_data(void)
 			if (pr_backup)
 				memcpy(pr_backup, _pr, sizeof(struct acpi_processor));
 		}
-		(void)upload_pm_data(_pr);
+		upload_pm_data(_pr);
 	}
 
 	rc = check_acpi_ids(pr_backup);
