@@ -18,6 +18,7 @@
 #define pr_fmt(fmt) KBUILD_MODNAME ": " fmt
 
 #include <asm/cacheflush.h>
+#include <linux/atomic.h>
 #include <linux/fdtable.h>
 #include <linux/file.h>
 #include <linux/freezer.h>
@@ -347,10 +348,13 @@ struct binder_proc {
 	wait_queue_head_t wait;
 	struct binder_stats stats;
 	struct list_head delivered_death;
+
 	int max_threads;
 	int requested_threads;
 	int requested_threads_started;
 	int ready_threads;
+	struct mutex threads_lock;
+
 	long default_priority;
 	struct dentry *debugfs_entry;
 	struct binder_context *context;
@@ -369,7 +373,7 @@ struct binder_thread {
 	struct binder_proc *proc;
 	struct rb_node rb_node;
 	int pid;
-	int looper;
+	atomic_t looper;
 	struct binder_transaction *transaction_stack;
 	struct list_head todo;
 	uint32_t return_error; /* Write failed, return error code in read buf */
@@ -456,6 +460,15 @@ static inline void binder_lock(const char *tag)
 	trace_binder_lock(tag);
 	mutex_lock(&binder_main_lock);
 	trace_binder_locked(tag);
+}
+
+static inline int __must_check binder_lock_interruptible(const char *tag)
+{
+	trace_binder_lock(tag);
+	if (mutex_lock_interruptible(&binder_main_lock))
+		return -ERESTARTSYS;
+	trace_binder_locked(tag);
+	return 0;
 }
 
 static inline void binder_unlock(const char *tag)
@@ -2450,39 +2463,41 @@ static int binder_thread_write(struct binder_proc *proc,
 		}
 
 		case BC_REGISTER_LOOPER:
+			mutex_lock(&proc->threads_lock);
 			binder_debug(BINDER_DEBUG_THREADS,
 				     "%d:%d BC_REGISTER_LOOPER\n",
 				     proc->pid, thread->pid);
-			if (thread->looper & BINDER_LOOPER_STATE_ENTERED) {
-				thread->looper |= BINDER_LOOPER_STATE_INVALID;
+			if (atomic_read(&thread->looper) & BINDER_LOOPER_STATE_ENTERED) {
+				atomic_or(BINDER_LOOPER_STATE_INVALID, &thread->looper);
 				binder_user_error("%d:%d ERROR: BC_REGISTER_LOOPER called after BC_ENTER_LOOPER\n",
 					proc->pid, thread->pid);
 			} else if (proc->requested_threads == 0) {
-				thread->looper |= BINDER_LOOPER_STATE_INVALID;
+				atomic_or(BINDER_LOOPER_STATE_INVALID, &thread->looper);
 				binder_user_error("%d:%d ERROR: BC_REGISTER_LOOPER called without request\n",
 					proc->pid, thread->pid);
 			} else {
 				proc->requested_threads--;
 				proc->requested_threads_started++;
 			}
-			thread->looper |= BINDER_LOOPER_STATE_REGISTERED;
+			atomic_or(BINDER_LOOPER_STATE_REGISTERED, &thread->looper);
+			mutex_unlock(&proc->threads_lock);
 			break;
 		case BC_ENTER_LOOPER:
 			binder_debug(BINDER_DEBUG_THREADS,
 				     "%d:%d BC_ENTER_LOOPER\n",
 				     proc->pid, thread->pid);
-			if (thread->looper & BINDER_LOOPER_STATE_REGISTERED) {
-				thread->looper |= BINDER_LOOPER_STATE_INVALID;
+			if (atomic_read(&thread->looper) & BINDER_LOOPER_STATE_REGISTERED) {
+				atomic_or(BINDER_LOOPER_STATE_INVALID, &thread->looper);
 				binder_user_error("%d:%d ERROR: BC_ENTER_LOOPER called after BC_REGISTER_LOOPER\n",
 					proc->pid, thread->pid);
 			}
-			thread->looper |= BINDER_LOOPER_STATE_ENTERED;
+			atomic_or(BINDER_LOOPER_STATE_ENTERED, &thread->looper);
 			break;
 		case BC_EXIT_LOOPER:
 			binder_debug(BINDER_DEBUG_THREADS,
 				     "%d:%d BC_EXIT_LOOPER\n",
 				     proc->pid, thread->pid);
-			thread->looper |= BINDER_LOOPER_STATE_EXITED;
+			atomic_or(BINDER_LOOPER_STATE_EXITED, &thread->looper);
 			break;
 
 		case BC_REQUEST_DEATH_NOTIFICATION:
@@ -2538,7 +2553,7 @@ static int binder_thread_write(struct binder_proc *proc,
 				ref->death = death;
 				if (ref->node->proc == NULL) {
 					ref->death->work.type = BINDER_WORK_DEAD_BINDER;
-					if (thread->looper & (BINDER_LOOPER_STATE_REGISTERED | BINDER_LOOPER_STATE_ENTERED)) {
+					if (atomic_read(&thread->looper) & (BINDER_LOOPER_STATE_REGISTERED | BINDER_LOOPER_STATE_ENTERED)) {
 						list_add_tail(&ref->death->work.entry, &thread->todo);
 					} else {
 						list_add_tail(&ref->death->work.entry, &proc->todo);
@@ -2562,7 +2577,7 @@ static int binder_thread_write(struct binder_proc *proc,
 				ref->death = NULL;
 				if (list_empty(&death->work.entry)) {
 					death->work.type = BINDER_WORK_CLEAR_DEATH_NOTIFICATION;
-					if (thread->looper & (BINDER_LOOPER_STATE_REGISTERED | BINDER_LOOPER_STATE_ENTERED)) {
+					if (atomic_read(&thread->looper) & (BINDER_LOOPER_STATE_REGISTERED | BINDER_LOOPER_STATE_ENTERED)) {
 						list_add_tail(&death->work.entry, &thread->todo);
 					} else {
 						list_add_tail(&death->work.entry, &proc->todo);
@@ -2604,7 +2619,7 @@ static int binder_thread_write(struct binder_proc *proc,
 			list_del_init(&death->work.entry);
 			if (death->work.type == BINDER_WORK_DEAD_BINDER_AND_CLEAR) {
 				death->work.type = BINDER_WORK_CLEAR_DEATH_NOTIFICATION;
-				if (thread->looper & (BINDER_LOOPER_STATE_REGISTERED | BINDER_LOOPER_STATE_ENTERED)) {
+				if (atomic_read(&thread->looper) & (BINDER_LOOPER_STATE_REGISTERED | BINDER_LOOPER_STATE_ENTERED)) {
 					list_add_tail(&death->work.entry, &thread->todo);
 				} else {
 					list_add_tail(&death->work.entry, &proc->todo);
@@ -2638,19 +2653,20 @@ static int binder_has_proc_work(struct binder_proc *proc,
 				struct binder_thread *thread)
 {
 	return !list_empty(&proc->todo) ||
-		(thread->looper & BINDER_LOOPER_STATE_NEED_RETURN);
+		(atomic_read(&thread->looper) & BINDER_LOOPER_STATE_NEED_RETURN);
 }
 
 static int binder_has_thread_work(struct binder_thread *thread)
 {
 	return !list_empty(&thread->todo) || thread->return_error != BR_OK ||
-		(thread->looper & BINDER_LOOPER_STATE_NEED_RETURN);
+		(atomic_read(&thread->looper) & BINDER_LOOPER_STATE_NEED_RETURN);
 }
 
 static int binder_thread_read(struct binder_proc *proc,
 			      struct binder_thread *thread,
 			      binder_uintptr_t binder_buffer, size_t size,
-			      binder_size_t *consumed, int non_block)
+			      binder_size_t *consumed, int non_block,
+			      bool *locked)
 {
 	void __user *buffer = (void __user *)(uintptr_t)binder_buffer;
 	void __user *ptr = buffer + *consumed;
@@ -2687,21 +2703,24 @@ retry:
 		goto done;
 	}
 
-
-	thread->looper |= BINDER_LOOPER_STATE_WAITING;
+	atomic_or(BINDER_LOOPER_STATE_WAITING, &thread->looper);
+	mutex_lock(&proc->threads_lock);
 	if (wait_for_proc_work)
 		proc->ready_threads++;
+	mutex_unlock(&proc->threads_lock);
 
 	binder_unlock(__func__);
+	*locked = false;
 
 	trace_binder_wait_for_work(wait_for_proc_work,
 				   !!thread->transaction_stack,
 				   !list_empty(&thread->todo));
 	if (wait_for_proc_work) {
-		if (!(thread->looper & (BINDER_LOOPER_STATE_REGISTERED |
-					BINDER_LOOPER_STATE_ENTERED))) {
+		if (!(atomic_read(&thread->looper) & (BINDER_LOOPER_STATE_REGISTERED |
+						      BINDER_LOOPER_STATE_ENTERED))) {
 			binder_user_error("%d:%d ERROR: Thread waiting for process work before calling BC_REGISTER_LOOPER or BC_ENTER_LOOPER (state %x)\n",
-				proc->pid, thread->pid, thread->looper);
+				proc->pid, thread->pid,
+				atomic_read(&thread->looper));
 			wait_event_interruptible(binder_user_error_wait,
 						 binder_stop_on_user_error < 2);
 		}
@@ -2719,14 +2738,23 @@ retry:
 			ret = wait_event_freezable(thread->wait, binder_has_thread_work(thread));
 	}
 
-	binder_lock(__func__);
-
+	/*
+	 * Update these _without_ grabbing the binder lock since we might be
+	 * about to return an error.
+	 */
+	mutex_lock(&proc->threads_lock);
 	if (wait_for_proc_work)
 		proc->ready_threads--;
-	thread->looper &= ~BINDER_LOOPER_STATE_WAITING;
+	mutex_unlock(&proc->threads_lock);
+	atomic_and(~BINDER_LOOPER_STATE_WAITING, &thread->looper);
 
 	if (ret)
 		return ret;
+
+	ret = binder_lock_interruptible(__func__);
+	if (ret)
+		return ret;
+	*locked = true;
 
 	while (1) {
 		uint32_t cmd;
@@ -2743,7 +2771,7 @@ retry:
 		} else {
 			/* no data added */
 			if (ptr - buffer == 4 &&
-			    !(thread->looper & BINDER_LOOPER_STATE_NEED_RETURN))
+			    !(atomic_read(&thread->looper) & BINDER_LOOPER_STATE_NEED_RETURN))
 				goto retry;
 			break;
 		}
@@ -2957,19 +2985,23 @@ retry:
 done:
 
 	*consumed = ptr - buffer;
+	mutex_lock(&proc->threads_lock);
 	if (proc->requested_threads + proc->ready_threads == 0 &&
 	    proc->requested_threads_started < proc->max_threads &&
-	    (thread->looper & (BINDER_LOOPER_STATE_REGISTERED |
+	    (atomic_read(&thread->looper) & (BINDER_LOOPER_STATE_REGISTERED |
 	     BINDER_LOOPER_STATE_ENTERED)) /* the user-space code fails to */
 	     /*spawn a new thread if we leave this out */) {
 		proc->requested_threads++;
 		binder_debug(BINDER_DEBUG_THREADS,
 			     "%d:%d BR_SPAWN_LOOPER\n",
 			     proc->pid, thread->pid);
-		if (put_user(BR_SPAWN_LOOPER, (uint32_t __user *)buffer))
+		if (put_user(BR_SPAWN_LOOPER, (uint32_t __user *)buffer)) {
+			mutex_unlock(&proc->threads_lock);
 			return -EFAULT;
+		}
 		binder_stat_br(proc, thread, BR_SPAWN_LOOPER);
 	}
+	mutex_unlock(&proc->threads_lock);
 	return 0;
 }
 
@@ -3051,7 +3083,7 @@ static struct binder_thread *binder_get_thread(struct binder_proc *proc)
 		INIT_LIST_HEAD(&thread->todo);
 		rb_link_node(&thread->rb_node, parent, p);
 		rb_insert_color(&thread->rb_node, &proc->threads);
-		thread->looper |= BINDER_LOOPER_STATE_NEED_RETURN;
+		atomic_or(BINDER_LOOPER_STATE_NEED_RETURN, &thread->looper);
 		thread->return_error = BR_OK;
 		thread->return_error2 = BR_OK;
 	}
@@ -3133,7 +3165,8 @@ static unsigned int binder_poll(struct file *filp,
 
 static int binder_ioctl_write_read(struct file *filp,
 				unsigned int cmd, unsigned long arg,
-				struct binder_thread *thread)
+				struct binder_thread *thread,
+				bool *locked)
 {
 	int ret = 0;
 	struct binder_proc *proc = filp->private_data;
@@ -3172,7 +3205,7 @@ static int binder_ioctl_write_read(struct file *filp,
 		ret = binder_thread_read(proc, thread, bwr.read_buffer,
 					 bwr.read_size,
 					 &bwr.read_consumed,
-					 filp->f_flags & O_NONBLOCK);
+					 filp->f_flags & O_NONBLOCK, locked);
 		trace_binder_read_done(ret);
 		if (!list_empty(&proc->todo))
 			wake_up_interruptible(&proc->wait);
@@ -3243,6 +3276,7 @@ static long binder_ioctl(struct file *filp, unsigned int cmd, unsigned long arg)
 	struct binder_thread *thread;
 	unsigned int size = _IOC_SIZE(cmd);
 	void __user *ubuf = (void __user *)arg;
+	bool locked;
 
 	/*pr_info("binder_ioctl: %d:%d %x %lx\n",
 			proc->pid, current->pid, cmd, arg);*/
@@ -3258,6 +3292,7 @@ static long binder_ioctl(struct file *filp, unsigned int cmd, unsigned long arg)
 		goto err_unlocked;
 
 	binder_lock(__func__);
+	locked = true;
 	thread = binder_get_thread(proc);
 	if (thread == NULL) {
 		ret = -ENOMEM;
@@ -3266,15 +3301,18 @@ static long binder_ioctl(struct file *filp, unsigned int cmd, unsigned long arg)
 
 	switch (cmd) {
 	case BINDER_WRITE_READ:
-		ret = binder_ioctl_write_read(filp, cmd, arg, thread);
+		ret = binder_ioctl_write_read(filp, cmd, arg, thread, &locked);
 		if (ret)
 			goto err;
 		break;
 	case BINDER_SET_MAX_THREADS:
+		mutex_lock(&proc->threads_lock);
 		if (copy_from_user(&proc->max_threads, ubuf, sizeof(proc->max_threads))) {
 			ret = -EINVAL;
+			mutex_unlock(&proc->threads_lock);
 			goto err;
 		}
+		mutex_unlock(&proc->threads_lock);
 		break;
 	case BINDER_SET_CONTEXT_MGR:
 		ret = binder_ioctl_set_ctx_mgr(filp);
@@ -3308,8 +3346,9 @@ static long binder_ioctl(struct file *filp, unsigned int cmd, unsigned long arg)
 	ret = 0;
 err:
 	if (thread)
-		thread->looper &= ~BINDER_LOOPER_STATE_NEED_RETURN;
-	binder_unlock(__func__);
+		atomic_and(~BINDER_LOOPER_STATE_NEED_RETURN, &thread->looper);
+	if (locked)
+		binder_unlock(__func__);
 	wait_event_interruptible(binder_user_error_wait, binder_stop_on_user_error < 2);
 	if (ret && ret != -ERESTARTSYS)
 		pr_info("%d:%d ioctl %x %lx returned %d\n", proc->pid, current->pid, cmd, arg, ret);
@@ -3473,6 +3512,7 @@ static int binder_open(struct inode *nodp, struct file *filp)
 	binder_dev = container_of(filp->private_data, struct binder_device,
 				  miscdev);
 	proc->context = &binder_dev->context;
+	mutex_init(&proc->threads_lock);
 
 	binder_lock(__func__);
 
@@ -3521,8 +3561,9 @@ static void binder_deferred_flush(struct binder_proc *proc)
 	for (n = rb_first(&proc->threads); n != NULL; n = rb_next(n)) {
 		struct binder_thread *thread = rb_entry(n, struct binder_thread, rb_node);
 
-		thread->looper |= BINDER_LOOPER_STATE_NEED_RETURN;
-		if (thread->looper & BINDER_LOOPER_STATE_WAITING) {
+		atomic_or(BINDER_LOOPER_STATE_NEED_RETURN, &thread->looper);
+		if (atomic_read(&thread->looper) &
+		    BINDER_LOOPER_STATE_WAITING) {
 			wake_up_interruptible(&thread->wait);
 			wake_count++;
 		}
@@ -3827,7 +3868,8 @@ static void print_binder_thread(struct seq_file *m,
 	size_t start_pos = m->count;
 	size_t header_pos;
 
-	seq_printf(m, "  thread %d: l %02x\n", thread->pid, thread->looper);
+	seq_printf(m, "  thread %d: l %02x\n", thread->pid,
+		   atomic_read(&thread->looper));
 	header_pos = m->count;
 	t = thread->transaction_stack;
 	while (t) {
@@ -4019,6 +4061,8 @@ static void print_binder_proc_stats(struct seq_file *m,
 	struct rb_node *n;
 	int count, strong, weak;
 
+	mutex_lock(&proc->threads_lock);
+
 	seq_printf(m, "proc %d\n", proc->pid);
 	seq_printf(m, "context %s\n", proc->context->name);
 	count = 0;
@@ -4064,6 +4108,8 @@ static void print_binder_proc_stats(struct seq_file *m,
 	seq_printf(m, "  pending transactions: %d\n", count);
 
 	print_binder_stats(m, "  ", &proc->stats);
+
+	mutex_unlock(&proc->threads_lock);
 }
 
 
