@@ -524,3 +524,18 @@
 &vpu {
 	compatible = "amlogic,meson-gxbb-vpu", "amlogic,meson-gx-vpu";
 };
+
+&uart_A {
+	clocks = <&xtal>, <&clkc CLKID_UART0>;
+	clock-names = "xtal", "core";
+};
+
+&uart_B {
+	clocks = <&xtal>, <&clkc CLKID_UART1>;
+	clock-names = "xtal", "core";
+};
+
+&uart_C {
+	clocks = <&xtal>, <&clkc CLKID_UART2>;
+	clock-names = "xtal", "core";
+};
