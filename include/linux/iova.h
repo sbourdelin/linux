@@ -40,10 +40,11 @@ struct iova_rcache {
 struct iova_domain {
 	spinlock_t	iova_rbtree_lock; /* Lock to protect update of rbtree */
 	struct rb_root	rbroot;		/* iova domain rbtree root */
-	struct rb_node	*cached32_node; /* Save last alloced node */
+	struct rb_node	*cached32_node; /* Save last alloced node, 32bits */
+	struct rb_node	*cached64_node; /* Save last alloced node, 64bits */
 	unsigned long	granule;	/* pfn granularity for this domain */
 	unsigned long	start_pfn;	/* Lower limit for this domain */
-	unsigned long	dma_32bit_pfn;
+	unsigned long	dma_32bit_pfn;	/* max dma32 limit address(included) */
 	struct iova_rcache rcaches[IOVA_RANGE_CACHE_MAX_SIZE];	/* IOVA range caches */
 };
 
