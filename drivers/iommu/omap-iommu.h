@@ -80,8 +80,8 @@ struct omap_iommu {
  * utilize omap-specific plumbing anymore.
  */
 struct omap_iommu_arch_data {
-	const char *name;
 	struct omap_iommu *iommu_dev;
+	struct omap_iommu_domain *domain;
 };
 
 struct cr_regs {
