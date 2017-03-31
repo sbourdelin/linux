@@ -33,6 +33,7 @@ static void nf_nat_sip_expected(struct nf_conn *ct,
 
 static struct nf_ct_nat_helper sip_nat = {
 	.name		= "sip",
+	.me		= THIS_MODULE,
 	.expectfn	= nf_nat_sip_expected,
 };
 

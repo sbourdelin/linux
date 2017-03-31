@@ -416,6 +416,14 @@ static inline int __nf_ct_expect_check(struct nf_conntrack_expect *expect)
 		ret = -ESHUTDOWN;
 		goto out;
 	}
+
+	/* Make sure the helper and nat_helper belong to the same module */
+	if (expect->helper && expect->nat_helper &&
+	    expect->helper->me != expect->nat_helper->me) {
+		ret = -EINVAL;
+		goto out;
+	}
+
 	h = nf_ct_expect_dst_hash(net, &expect->tuple);
 	hlist_for_each_entry_safe(i, next, &nf_ct_expect_hash[h], hnode) {
 		if (expect_matches(i, expect)) {

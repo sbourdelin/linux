@@ -28,6 +28,7 @@ MODULE_ALIAS("ip_nat_irc");
 
 static struct nf_ct_nat_helper irc_nat = {
 	.name = "irc_nat",
+	.me = THIS_MODULE,
 	.expectfn = nf_nat_follow_master,
 };
 
