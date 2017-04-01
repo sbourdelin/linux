@@ -711,6 +711,8 @@ static void forget_original_parent(struct task_struct *father,
  */
 static void exit_notify(struct task_struct *tsk, int group_dead)
 {
+	struct sighand_struct *sighand = tsk->sighand;
+	struct signal_struct *signal = tsk->signal;
 	bool autoreap;
 	struct task_struct *p, *n;
 	LIST_HEAD(dead);
@@ -738,9 +740,12 @@ static void exit_notify(struct task_struct *tsk, int group_dead)
 	if (tsk->exit_state == EXIT_DEAD)
 		list_add(&tsk->ptrace_entry, &dead);
 
-	/* mt-exec, de_thread() is waiting for group leader */
-	if (unlikely(tsk->signal->notify_count < 0))
-		wake_up_process(tsk->signal->group_exit_task);
+	spin_lock(&sighand->siglock);
+	/* mt-exec, de_thread is waiting for threads to exit */
+	if (signal->notify_count < 0 && !++signal->notify_count)
+		wake_up_process(signal->group_exit_task);
+
+	spin_unlock(&sighand->siglock);
 	write_unlock_irq(&tasklist_lock);
 
 	list_for_each_entry_safe(p, n, &dead, ptrace_entry) {
@@ -974,7 +979,7 @@ do_group_exit(int exit_code)
 		else {
 			sig->group_exit_code = exit_code;
 			sig->flags = SIGNAL_GROUP_EXIT;
-			zap_other_threads(current);
+			zap_other_threads(current, 0);
 		}
 		spin_unlock_irq(&sighand->siglock);
 	}

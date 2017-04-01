@@ -1196,7 +1196,7 @@ force_sig_info(int sig, struct siginfo *info, struct task_struct *t)
 /*
  * Nuke all other threads in the group.
  */
-int zap_other_threads(struct task_struct *p)
+int zap_other_threads(struct task_struct *p, int do_count)
 {
 	struct task_struct *t = p;
 	int count = 0;
@@ -1205,13 +1205,17 @@ int zap_other_threads(struct task_struct *p)
 
 	while_each_thread(p, t) {
 		task_clear_jobctl_pending(t, JOBCTL_PENDING_MASK);
-		count++;
+		if (do_count > 0)
+			count++;
 
 		/* Don't bother with already dead threads */
 		if (t->exit_state)
 			continue;
 		sigaddset(&t->pending.signal, SIGKILL);
 		signal_wake_up(t, 1);
+
+		if (do_count < 0)
+			count--;
 	}
 
 	return count;

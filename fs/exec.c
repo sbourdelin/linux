@@ -1052,6 +1052,7 @@ static int de_thread(struct task_struct *tsk)
 	struct signal_struct *sig = tsk->signal;
 	struct sighand_struct *oldsighand = tsk->sighand;
 	spinlock_t *lock = &oldsighand->siglock;
+	bool may_hang;
 
 	if (thread_group_empty(tsk))
 		goto no_thread_group;
@@ -1069,9 +1070,10 @@ static int de_thread(struct task_struct *tsk)
 		return -EAGAIN;
 	}
 
+	may_hang = atomic_read(&oldsighand->count) != 1;
 	sig->group_exit_task = tsk;
-	sig->notify_count = zap_other_threads(tsk);
-	if (!thread_group_leader(tsk))
+	sig->notify_count = zap_other_threads(tsk, may_hang ? 1 : -1);
+	if (may_hang && !thread_group_leader(tsk))
 		sig->notify_count--;
 
 	while (sig->notify_count) {
@@ -1092,9 +1094,10 @@ static int de_thread(struct task_struct *tsk)
 	if (!thread_group_leader(tsk)) {
 		struct task_struct *leader = tsk->group_leader;
 
-		for (;;) {
-			cgroup_threadgroup_change_begin(tsk);
-			write_lock_irq(&tasklist_lock);
+		cgroup_threadgroup_change_begin(tsk);
+		write_lock_irq(&tasklist_lock);
+
+		for (;may_hang;) {
 			/*
 			 * Do this under tasklist_lock to ensure that
 			 * exit_notify() can't miss ->group_exit_task
@@ -1108,6 +1111,8 @@ static int de_thread(struct task_struct *tsk)
 			schedule();
 			if (unlikely(__fatal_signal_pending(tsk)))
 				goto killed;
+			cgroup_threadgroup_change_begin(tsk);
+			write_lock_irq(&tasklist_lock);
 		}
 
 		/*
