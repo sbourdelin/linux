@@ -1,0 +1,19 @@
+* Device tree bindings for Nokia Retu and Tahvo multi-function device
+
+Retu and Tahvo are a multi-function devices found on Nokia Internet
+Tablets (770, N800 and N810).
+
+Required properties:
+- compatible:		"nokia,retu-mfd" or "nokia,tahvo-mfd"
+- reg:			Specifies the I2C slave address of the ASIC chip
+
+Example:
+
+i2c0 {
+	retu_mfd: retu@1 {
+		compatible = "nokia,retu-mfd";
+		interrupt-parent = <&gpio4>;
+		interrupts = <12 IRQ_TYPE_EDGE_RISING>;
+		reg = <0x1>;
+	};
+};
