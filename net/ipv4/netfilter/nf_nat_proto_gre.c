@@ -142,9 +142,3 @@ static void __exit nf_nat_proto_gre_fini(void)
 
 module_init(nf_nat_proto_gre_init);
 module_exit(nf_nat_proto_gre_fini);
-
-void nf_nat_need_gre(void)
-{
-	return;
-}
-EXPORT_SYMBOL_GPL(nf_nat_need_gre);
