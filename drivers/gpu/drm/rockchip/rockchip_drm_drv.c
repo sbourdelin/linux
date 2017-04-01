@@ -244,11 +244,13 @@ static void rockchip_drm_unbind(struct device *dev)
 	struct drm_device *drm_dev = dev_get_drvdata(dev);
 
 	rockchip_drm_fbdev_fini(drm_dev);
-	drm_vblank_cleanup(drm_dev);
 	drm_kms_helper_poll_fini(drm_dev);
+
+	drm_vblank_cleanup(drm_dev);
 	component_unbind_all(dev, drm_dev);
-	rockchip_iommu_cleanup(drm_dev);
 	drm_mode_config_cleanup(drm_dev);
+	rockchip_iommu_cleanup(drm_dev);
+
 	drm_dev->dev_private = NULL;
 	drm_dev_unregister(drm_dev);
 	drm_dev_unref(drm_dev);
