@@ -69,6 +69,12 @@ config MQ_IOSCHED_DEADLINE
 	---help---
 	  MQ version of the deadline IO scheduler.
 
+config MQ_IOSCHED_RED
+	tristate "Random early detection I/O scheduler"
+	default y
+	---help---
+	  Block I/O adaptation of the RED active queue management algorithm.
+
 endmenu
 
 endif
