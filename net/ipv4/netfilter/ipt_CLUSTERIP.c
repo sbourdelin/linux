@@ -329,7 +329,7 @@ clusterip_tg(struct sk_buff *skb, const struct xt_action_param *par)
 	 * that the ->target() function isn't called after ->destroy() */
 
 	ct = nf_ct_get(skb, &ctinfo);
-	if (ct == NULL)
+	if (!ct)
 		return NF_DROP;
 
 	/* special case: ICMP error handling. conntrack distinguishes between

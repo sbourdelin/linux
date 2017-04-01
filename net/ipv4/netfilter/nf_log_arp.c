@@ -52,7 +52,7 @@ static void dump_arp_packet(struct nf_log_buf *m,
 	struct arppayload _arpp;
 
 	ah = skb_header_pointer(skb, 0, sizeof(_arph), &_arph);
-	if (ah == NULL) {
+	if (!ah) {
 		nf_log_buf_add(m, "TRUNCATED");
 		return;
 	}
@@ -68,7 +68,7 @@ static void dump_arp_packet(struct nf_log_buf *m,
 		return;
 
 	ap = skb_header_pointer(skb, sizeof(_arph), sizeof(_arpp), &_arpp);
-	if (ap == NULL) {
+	if (!ap) {
 		nf_log_buf_add(m, " INCOMPLETE [%zu bytes]",
 			       skb->len - sizeof(_arph));
 		return;

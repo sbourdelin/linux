@@ -62,7 +62,7 @@ EXPORT_SYMBOL_GPL(nft_af_ipv4);
 static int nf_tables_ipv4_init_net(struct net *net)
 {
 	net->nft.ipv4 = kmalloc(sizeof(struct nft_af_info), GFP_KERNEL);
-	if (net->nft.ipv4 == NULL)
+	if (!net->nft.ipv4)
 		return -ENOMEM;
 
 	memcpy(net->nft.ipv4, &nft_af_ipv4, sizeof(nft_af_ipv4));

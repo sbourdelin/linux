@@ -36,7 +36,7 @@ static bool icmp_pkt_to_tuple(const struct sk_buff *skb, unsigned int dataoff,
 	struct icmphdr _hdr;
 
 	hp = skb_header_pointer(skb, dataoff, sizeof(_hdr), &_hdr);
-	if (hp == NULL)
+	if (!hp)
 		return false;
 
 	tuple->dst.u.icmp.type = hp->type;
@@ -187,7 +187,7 @@ icmp_error(struct net *net, struct nf_conn *tmpl,
 
 	/* Not enough header? */
 	icmph = skb_header_pointer(skb, ip_hdrlen(skb), sizeof(_ih), &_ih);
-	if (icmph == NULL) {
+	if (!icmph) {
 		if (LOG_INVALID(net, IPPROTO_ICMP))
 			nf_log_packet(net, PF_INET, 0, skb, NULL, NULL,
 				      NULL, "nf_ct_icmp: short packet ");

@@ -84,7 +84,7 @@ synproxy_send_client_synack(struct net *net,
 	tcp_hdr_size = sizeof(*nth) + synproxy_options_size(opts);
 	nskb = alloc_skb(sizeof(*niph) + tcp_hdr_size + MAX_TCP_HEADER,
 			 GFP_ATOMIC);
-	if (nskb == NULL)
+	if (!nskb)
 		return;
 	skb_reserve(nskb, MAX_TCP_HEADER);
 
@@ -126,7 +126,7 @@ synproxy_send_server_syn(struct net *net,
 	tcp_hdr_size = sizeof(*nth) + synproxy_options_size(opts);
 	nskb = alloc_skb(sizeof(*niph) + tcp_hdr_size + MAX_TCP_HEADER,
 			 GFP_ATOMIC);
-	if (nskb == NULL)
+	if (!nskb)
 		return;
 	skb_reserve(nskb, MAX_TCP_HEADER);
 
@@ -171,7 +171,7 @@ synproxy_send_server_ack(struct net *net,
 	tcp_hdr_size = sizeof(*nth) + synproxy_options_size(opts);
 	nskb = alloc_skb(sizeof(*niph) + tcp_hdr_size + MAX_TCP_HEADER,
 			 GFP_ATOMIC);
-	if (nskb == NULL)
+	if (!nskb)
 		return;
 	skb_reserve(nskb, MAX_TCP_HEADER);
 
@@ -209,7 +209,7 @@ synproxy_send_client_ack(struct net *net,
 	tcp_hdr_size = sizeof(*nth) + synproxy_options_size(opts);
 	nskb = alloc_skb(sizeof(*niph) + tcp_hdr_size + MAX_TCP_HEADER,
 			 GFP_ATOMIC);
-	if (nskb == NULL)
+	if (!nskb)
 		return;
 	skb_reserve(nskb, MAX_TCP_HEADER);
 
@@ -271,7 +271,7 @@ synproxy_tg4(struct sk_buff *skb, const struct xt_action_param *par)
 		return NF_DROP;
 
 	th = skb_header_pointer(skb, par->thoff, sizeof(_th), &_th);
-	if (th == NULL)
+	if (!th)
 		return NF_DROP;
 
 	if (!synproxy_parse_options(skb, par->thoff, th, &opts))
@@ -319,11 +319,11 @@ static unsigned int ipv4_synproxy_hook(void *priv,
 	unsigned int thoff;
 
 	ct = nf_ct_get(skb, &ctinfo);
-	if (ct == NULL)
+	if (!ct)
 		return NF_ACCEPT;
 
 	synproxy = nfct_synproxy(ct);
-	if (synproxy == NULL)
+	if (!synproxy)
 		return NF_ACCEPT;
 
 	if (nf_is_loopback_packet(skb))
@@ -331,7 +331,7 @@ static unsigned int ipv4_synproxy_hook(void *priv,
 
 	thoff = ip_hdrlen(skb);
 	th = skb_header_pointer(skb, thoff, sizeof(_th), &_th);
-	if (th == NULL)
+	if (!th)
 		return NF_DROP;
 
 	state = &ct->proto.tcp;

@@ -32,7 +32,7 @@ extract_icmp4_fields(const struct sk_buff *skb, u8 *protocol,
 
 	icmph = skb_header_pointer(skb, outside_hdrlen,
 				   sizeof(_icmph), &_icmph);
-	if (icmph == NULL)
+	if (!icmph)
 		return 1;
 
 	switch (icmph->type) {
@@ -49,7 +49,7 @@ extract_icmp4_fields(const struct sk_buff *skb, u8 *protocol,
 	inside_iph = skb_header_pointer(skb, outside_hdrlen +
 					sizeof(struct icmphdr),
 					sizeof(_inside_iph), &_inside_iph);
-	if (inside_iph == NULL)
+	if (!inside_iph)
 		return 1;
 
 	if (inside_iph->protocol != IPPROTO_TCP &&
@@ -60,7 +60,7 @@ extract_icmp4_fields(const struct sk_buff *skb, u8 *protocol,
 				   sizeof(struct icmphdr) +
 				   (inside_iph->ihl << 2),
 				   sizeof(_ports), &_ports);
-	if (ports == NULL)
+	if (!ports)
 		return 1;
 
 	/* the inside IP packet is the one quoted from our side, thus
@@ -112,7 +112,7 @@ struct sock *nf_sk_lookup_slow_v4(struct net *net, const struct sk_buff *skb,
 
 		hp = skb_header_pointer(skb, ip_hdrlen(skb),
 					sizeof(_hdr), &_hdr);
-		if (hp == NULL)
+		if (!hp)
 			return NULL;
 
 		protocol = iph->protocol;

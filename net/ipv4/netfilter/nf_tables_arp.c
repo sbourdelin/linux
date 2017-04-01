@@ -41,7 +41,7 @@ static struct nft_af_info nft_af_arp __read_mostly = {
 static int nf_tables_arp_init_net(struct net *net)
 {
 	net->nft.arp = kmalloc(sizeof(struct nft_af_info), GFP_KERNEL);
-	if (net->nft.arp== NULL)
+	if (!net->nft.arp)
 		return -ENOMEM;
 
 	memcpy(net->nft.arp, &nft_af_arp, sizeof(nft_af_arp));

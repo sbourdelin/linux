@@ -62,7 +62,7 @@ static int __net_init iptable_filter_table_init(struct net *net)
 		return 0;
 
 	repl = ipt_alloc_initial_table(&packet_filter);
-	if (repl == NULL)
+	if (!repl)
 		return -ENOMEM;
 	/* Entry 1 is the FORWARD hook */
 	((struct ipt_standard *)repl->entries)[1].target.verdict =

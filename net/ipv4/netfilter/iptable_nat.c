@@ -107,7 +107,7 @@ static int __net_init iptable_nat_table_init(struct net *net)
 		return 0;
 
 	repl = ipt_alloc_initial_table(&nf_nat_ipv4_table);
-	if (repl == NULL)
+	if (!repl)
 		return -ENOMEM;
 	ret = ipt_register_table(net, &nf_nat_ipv4_table, repl,
 				 nf_nat_ipv4_ops, &net->ipv4.nat_table);

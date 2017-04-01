@@ -63,7 +63,7 @@ static int __net_init iptable_security_table_init(struct net *net)
 		return 0;
 
 	repl = ipt_alloc_initial_table(&security_table);
-	if (repl == NULL)
+	if (!repl)
 		return -ENOMEM;
 	ret = ipt_register_table(net, &security_table, repl, sectbl_ops,
 				 &net->ipv4.iptable_security);
