@@ -181,6 +181,14 @@ struct drm_file {
 	unsigned atomic:1;
 
 	/**
+	 * @atomic_rmfb:
+	 *
+	 * True if client wants new semantics for rmfb, ie. simply dropping
+	 * refcnt without tearing down the display.
+	 */
+	unsigned atomic_rmfb:1;
+
+	/**
 	 * @is_master:
 	 *
 	 * This client is the creator of @master. Protected by struct

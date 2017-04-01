@@ -383,7 +383,7 @@ int drm_mode_rmfb(struct drm_device *dev,
 	 * so run this in a separate stack as there's no way to correctly
 	 * handle this after the fb is already removed from the lookup table.
 	 */
-	if (drm_framebuffer_read_refcount(fb) > 1) {
+	if (drm_framebuffer_read_refcount(fb) > 1 && !file_priv->atomic_rmfb) {
 		struct drm_mode_rmfb_work arg;
 
 		INIT_WORK_ONSTACK(&arg.work, drm_mode_rmfb_work_fn);

@@ -678,6 +678,13 @@ struct drm_get_cap {
  */
 #define DRM_CLIENT_CAP_ATOMIC	3
 
+/**
+ * DRM_CLIENT_CAP_ATOMIC_RMFB
+ *
+ * If set to 1, the DRM core will not shutdown display pipe on rmfb ioctl.
+ */
+#define DRM_CLIENT_CAP_ATOMIC_RMFB	4
+
 /** DRM_IOCTL_SET_CLIENT_CAP ioctl argument type */
 struct drm_set_client_cap {
 	__u64 capability;
