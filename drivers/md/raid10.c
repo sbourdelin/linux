@@ -3531,7 +3531,6 @@ static int run(struct mddev *mddev)
 	struct md_rdev *rdev;
 	sector_t size;
 	sector_t min_offset_diff = 0;
-	int first = 1;
 	bool discard_supported = false;
 
 	if (mddev->private == NULL) {
@@ -3587,8 +3586,7 @@ static int run(struct mddev *mddev)
 			diff = -diff;
 		if (diff < 0)
 			diff = 0;
-		if (first || diff < min_offset_diff)
-			min_offset_diff = diff;
+		min_offset_diff = diff;
 
 		if (mddev->gendisk)
 			disk_stack_limits(mddev->gendisk, rdev->bdev,
@@ -3973,7 +3971,6 @@ static int raid10_start_reshape(struct mddev *mddev)
 
 	unsigned long before_length, after_length;
 	sector_t min_offset_diff = 0;
-	int first = 1;
 	struct geom new;
 	struct r10conf *conf = mddev->private;
 	struct md_rdev *rdev;
@@ -4002,8 +3999,7 @@ static int raid10_start_reshape(struct mddev *mddev)
 				diff = -diff;
 			if (diff < 0)
 				diff = 0;
-			if (first || diff < min_offset_diff)
-				min_offset_diff = diff;
+			min_offset_diff = diff;
 		}
 	}
 
