@@ -266,7 +266,7 @@ config FM10K
 	  will be called fm10k.  MSI-X interrupt support is required
 
 config IXGBE_ALLOW_RELAXED_ORDER
-	bool "Intel(R) 10GbE PCI Express adapters Enable Relaxed Ordering" if SPARC
-	default y if SPARC
+	bool "Intel(R) 10GbE PCI Express adapters Enable Relaxed Ordering" if (SPARC || ARM64)
+	default y if (SPARC || ARM64)
 
 endif # NET_VENDOR_INTEL
