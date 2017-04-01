@@ -56,6 +56,7 @@
 #include <linux/property.h>
 #include <linux/rwsem.h>
 #include <linux/slab.h>
+#include <asm/unaligned.h>
 
 #include "i2c-core.h"
 
@@ -2788,7 +2789,7 @@ EXPORT_SYMBOL(i2c_transfer);
  *
  * Returns negative errno, or else the number of bytes written.
  */
-int i2c_master_send(const struct i2c_client *client, const char *buf, int count)
+int i2c_master_send(const struct i2c_client *client, const void *buf, int count)
 {
 	int ret;
 	struct i2c_adapter *adap = client->adapter;
@@ -2797,7 +2798,7 @@ int i2c_master_send(const struct i2c_client *client, const char *buf, int count)
 	msg.addr = client->addr;
 	msg.flags = client->flags & I2C_M_TEN;
 	msg.len = count;
-	msg.buf = (char *)buf;
+	msg.buf = (u8 *)buf; /* cast away const */
 
 	ret = i2c_transfer(adap, &msg, 1);
 
@@ -2817,7 +2818,7 @@ EXPORT_SYMBOL(i2c_master_send);
  *
  * Returns negative errno, or else the number of bytes read.
  */
-int i2c_master_recv(const struct i2c_client *client, char *buf, int count)
+int i2c_master_recv(const struct i2c_client *client, void *buf, int count)
 {
 	struct i2c_adapter *adap = client->adapter;
 	struct i2c_msg msg;
@@ -3261,7 +3262,7 @@ EXPORT_SYMBOL(i2c_smbus_write_word_data);
  * mechanism (I2C_M_RECV_LEN) which may not be implemented.
  */
 s32 i2c_smbus_read_block_data(const struct i2c_client *client, u8 command,
-			      u8 *values)
+			      void *values)
 {
 	union i2c_smbus_data data;
 	int status;
@@ -3288,7 +3289,7 @@ EXPORT_SYMBOL(i2c_smbus_read_block_data);
  * else zero on success.
  */
 s32 i2c_smbus_write_block_data(const struct i2c_client *client, u8 command,
-			       u8 length, const u8 *values)
+			       u8 length, const void *values)
 {
 	union i2c_smbus_data data;
 
@@ -3304,7 +3305,7 @@ EXPORT_SYMBOL(i2c_smbus_write_block_data);
 
 /* Returns the number of read bytes */
 s32 i2c_smbus_read_i2c_block_data(const struct i2c_client *client, u8 command,
-				  u8 length, u8 *values)
+				  u8 length, void *values)
 {
 	union i2c_smbus_data data;
 	int status;
@@ -3324,7 +3325,7 @@ s32 i2c_smbus_read_i2c_block_data(const struct i2c_client *client, u8 command,
 EXPORT_SYMBOL(i2c_smbus_read_i2c_block_data);
 
 s32 i2c_smbus_write_i2c_block_data(const struct i2c_client *client, u8 command,
-				   u8 length, const u8 *values)
+				   u8 length, const void *values)
 {
 	union i2c_smbus_data data;
 
@@ -3604,7 +3605,8 @@ EXPORT_SYMBOL(i2c_smbus_xfer);
  * transfer.
  */
 s32 i2c_smbus_read_i2c_block_data_or_emulated(const struct i2c_client *client,
-					      u8 command, u8 length, u8 *values)
+					      u8 command, u8 length,
+					      void *values)
 {
 	u8 i = 0;
 	int status;
@@ -3623,8 +3625,7 @@ s32 i2c_smbus_read_i2c_block_data_or_emulated(const struct i2c_client *client,
 			status = i2c_smbus_read_word_data(client, command + i);
 			if (status < 0)
 				return status;
-			values[i] = status & 0xff;
-			values[i + 1] = status >> 8;
+			put_unaligned_le16(status, values + i);
 			i += 2;
 		}
 	}
@@ -3633,7 +3634,7 @@ s32 i2c_smbus_read_i2c_block_data_or_emulated(const struct i2c_client *client,
 		status = i2c_smbus_read_byte_data(client, command + i);
 		if (status < 0)
 			return status;
-		values[i] = status;
+		*((u8 *)values + i) = status;
 		i++;
 	}
 

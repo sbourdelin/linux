@@ -62,9 +62,9 @@ struct property_entry;
  * transmit an arbitrary number of messages without interruption.
  * @count must be be less than 64k since msg.len is u16.
  */
-extern int i2c_master_send(const struct i2c_client *client, const char *buf,
+extern int i2c_master_send(const struct i2c_client *client, const void *buf,
 			   int count);
-extern int i2c_master_recv(const struct i2c_client *client, char *buf,
+extern int i2c_master_recv(const struct i2c_client *client, void *buf,
 			   int count);
 
 /* Transfer num messages.
@@ -115,18 +115,19 @@ i2c_smbus_write_word_swapped(const struct i2c_client *client,
 
 /* Returns the number of read bytes */
 extern s32 i2c_smbus_read_block_data(const struct i2c_client *client,
-				     u8 command, u8 *values);
+				     u8 command, void *values);
 extern s32 i2c_smbus_write_block_data(const struct i2c_client *client,
-				      u8 command, u8 length, const u8 *values);
+				      u8 command, u8 length,
+				      const void *values);
 /* Returns the number of read bytes */
 extern s32 i2c_smbus_read_i2c_block_data(const struct i2c_client *client,
-					 u8 command, u8 length, u8 *values);
+					 u8 command, u8 length, void *values);
 extern s32 i2c_smbus_write_i2c_block_data(const struct i2c_client *client,
 					  u8 command, u8 length,
-					  const u8 *values);
+					  const void *values);
 extern s32
 i2c_smbus_read_i2c_block_data_or_emulated(const struct i2c_client *client,
-					  u8 command, u8 length, u8 *values);
+					  u8 command, u8 length, void *values);
 #endif /* I2C */
 
 enum i2c_alert_protocol {
