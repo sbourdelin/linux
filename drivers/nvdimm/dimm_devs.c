@@ -503,10 +503,8 @@ static int blk_dpa_busy(struct device *dev, void *data)
 			&& info->res->end <= map_end) {
 		info->busy -= nd_mapping->start - info->res->start;
 		return 0;
-	} else {
-		info->busy -= nd_mapping->size;
-		return 0;
 	}
+	return 0;
 }
 
 /**
