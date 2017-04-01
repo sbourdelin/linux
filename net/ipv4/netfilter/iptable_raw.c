@@ -46,7 +46,7 @@ static int __net_init iptable_raw_table_init(struct net *net)
 		return 0;
 
 	repl = ipt_alloc_initial_table(&packet_raw);
-	if (repl == NULL)
+	if (!repl)
 		return -ENOMEM;
 	ret = ipt_register_table(net, &packet_raw, repl, rawtable_ops,
 				 &net->ipv4.iptable_raw);

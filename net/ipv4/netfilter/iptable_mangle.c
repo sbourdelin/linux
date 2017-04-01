@@ -100,7 +100,7 @@ static int __net_init iptable_mangle_table_init(struct net *net)
 		return 0;
 
 	repl = ipt_alloc_initial_table(&packet_mangler);
-	if (repl == NULL)
+	if (!repl)
 		return -ENOMEM;
 	ret = ipt_register_table(net, &packet_mangler, repl, mangle_ops,
 				 &net->ipv4.iptable_mangle);

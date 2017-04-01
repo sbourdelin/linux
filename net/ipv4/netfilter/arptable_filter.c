@@ -47,7 +47,7 @@ static int __net_init arptable_filter_table_init(struct net *net)
 		return 0;
 
 	repl = arpt_alloc_initial_table(&packet_filter);
-	if (repl == NULL)
+	if (!repl)
 		return -ENOMEM;
 	err = arpt_register_table(net, &packet_filter, repl, arpfilter_ops,
 				  &net->ipv4.arptable_filter);

@@ -273,7 +273,7 @@ static unsigned char asn1_eoc_decode(struct asn1_ctx *ctx, unsigned char *eoc)
 {
 	unsigned char ch;
 
-	if (eoc == NULL) {
+	if (!eoc) {
 		if (!asn1_octet_decode(ctx, &ch))
 			return 0;
 
@@ -401,7 +401,7 @@ static unsigned char asn1_octets_decode(struct asn1_ctx *ctx,
 	*len = 0;
 
 	*octets = kmalloc(eoc - ctx->pointer, GFP_ATOMIC);
-	if (*octets == NULL)
+	if (!*octets)
 		return 0;
 
 	ptr = *octets;
@@ -449,7 +449,7 @@ static unsigned char asn1_oid_decode(struct asn1_ctx *ctx,
 		return 0;
 
 	*oid = kmalloc(size * sizeof(unsigned long), GFP_ATOMIC);
-	if (*oid == NULL)
+	if (!*oid)
 		return 0;
 
 	optr = *oid;
@@ -721,7 +721,7 @@ static unsigned char snmp_object_decode(struct asn1_ctx *ctx,
 			return 0;
 		}
 		*obj = kmalloc(sizeof(struct snmp_object) + len, GFP_ATOMIC);
-		if (*obj == NULL) {
+		if (!*obj) {
 			kfree(id);
 			return 0;
 		}
@@ -734,7 +734,7 @@ static unsigned char snmp_object_decode(struct asn1_ctx *ctx,
 			return 0;
 		}
 		*obj = kmalloc(sizeof(struct snmp_object) + len, GFP_ATOMIC);
-		if (*obj == NULL) {
+		if (!*obj) {
 			kfree(p);
 			kfree(id);
 			return 0;
@@ -748,7 +748,7 @@ static unsigned char snmp_object_decode(struct asn1_ctx *ctx,
 	case SNMP_ENDOFMIBVIEW:
 		len = 0;
 		*obj = kmalloc(sizeof(struct snmp_object), GFP_ATOMIC);
-		if (*obj == NULL) {
+		if (!*obj) {
 			kfree(id);
 			return 0;
 		}
@@ -766,7 +766,7 @@ static unsigned char snmp_object_decode(struct asn1_ctx *ctx,
 		}
 		len *= sizeof(unsigned long);
 		*obj = kmalloc(sizeof(struct snmp_object) + len, GFP_ATOMIC);
-		if (*obj == NULL) {
+		if (!*obj) {
 			kfree(lp);
 			kfree(id);
 			return 0;
@@ -785,7 +785,7 @@ static unsigned char snmp_object_decode(struct asn1_ctx *ctx,
 			return 0;
 		}
 		*obj = kmalloc(sizeof(struct snmp_object) + len, GFP_ATOMIC);
-		if (*obj == NULL) {
+		if (!*obj) {
 			kfree(p);
 			kfree(id);
 			return 0;
@@ -802,7 +802,7 @@ static unsigned char snmp_object_decode(struct asn1_ctx *ctx,
 			return 0;
 		}
 		*obj = kmalloc(sizeof(struct snmp_object) + len, GFP_ATOMIC);
-		if (*obj == NULL) {
+		if (!*obj) {
 			kfree(id);
 			return 0;
 		}
@@ -1034,7 +1034,7 @@ static int snmp_parse_mangle(unsigned char *msg,
 		return 0;
 	if (cls != ASN1_UNI || con != ASN1_PRI || tag != ASN1_INT)
 		return 0;
-	if (!asn1_uint_decode (&ctx, end, &vers))
+	if (!asn1_uint_decode(&ctx, end, &vers))
 		return 0;
 	if (debug > 1)
 		pr_debug("bsalg: snmp version: %u\n", vers + 1);
@@ -1044,7 +1044,7 @@ static int snmp_parse_mangle(unsigned char *msg,
 	/*
 	 * Community.
 	 */
-	if (!asn1_header_decode (&ctx, &end, &cls, &con, &tag))
+	if (!asn1_header_decode(&ctx, &end, &cls, &con, &tag))
 		return 0;
 	if (cls != ASN1_UNI || con != ASN1_PRI || tag != ASN1_OTS)
 		return 0;

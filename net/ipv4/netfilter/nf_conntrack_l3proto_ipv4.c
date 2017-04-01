@@ -45,7 +45,7 @@ static bool ipv4_pkt_to_tuple(const struct sk_buff *skb, unsigned int nhoff,
 	__be32 _addrs[2];
 	ap = skb_header_pointer(skb, nhoff + offsetof(struct iphdr, saddr),
 				sizeof(u_int32_t) * 2, _addrs);
-	if (ap == NULL)
+	if (!ap)
 		return false;
 
 	tuple->src.u3.ip = ap[0];
@@ -77,7 +77,7 @@ static int ipv4_get_l4proto(const struct sk_buff *skb, unsigned int nhoff,
 	struct iphdr _iph;
 
 	iph = skb_header_pointer(skb, nhoff, sizeof(_iph), &_iph);
-	if (iph == NULL)
+	if (!iph)
 		return -NF_ACCEPT;
 
 	/* Conntrack defragments packets, we might still see fragments

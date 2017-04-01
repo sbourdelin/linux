@@ -49,7 +49,7 @@ static void dump_ipv4_packet(struct nf_log_buf *m,
 		logflags = NF_LOG_DEFAULT_MASK;
 
 	ih = skb_header_pointer(skb, iphoff, sizeof(_iph), &_iph);
-	if (ih == NULL) {
+	if (!ih) {
 		nf_log_buf_add(m, "TRUNCATED");
 		return;
 	}
@@ -85,7 +85,7 @@ static void dump_ipv4_packet(struct nf_log_buf *m,
 		optsize = ih->ihl * 4 - sizeof(struct iphdr);
 		op = skb_header_pointer(skb, iphoff+sizeof(_iph),
 					optsize, _opt);
-		if (op == NULL) {
+		if (!op) {
 			nf_log_buf_add(m, "TRUNCATED");
 			return;
 		}
@@ -141,7 +141,7 @@ static void dump_ipv4_packet(struct nf_log_buf *m,
 		/* Max length: 25 "INCOMPLETE [65535 bytes] " */
 		ich = skb_header_pointer(skb, iphoff + ih->ihl * 4,
 					 sizeof(_icmph), &_icmph);
-		if (ich == NULL) {
+		if (!ich) {
 			nf_log_buf_add(m, "INCOMPLETE [%u bytes] ",
 				       skb->len - iphoff - ih->ihl*4);
 			break;
@@ -211,7 +211,7 @@ static void dump_ipv4_packet(struct nf_log_buf *m,
 		/* Max length: 25 "INCOMPLETE [65535 bytes] " */
 		ah = skb_header_pointer(skb, iphoff+ih->ihl*4,
 					sizeof(_ahdr), &_ahdr);
-		if (ah == NULL) {
+		if (!ah) {
 			nf_log_buf_add(m, "INCOMPLETE [%u bytes] ",
 				       skb->len - iphoff - ih->ihl*4);
 			break;
@@ -234,7 +234,7 @@ static void dump_ipv4_packet(struct nf_log_buf *m,
 		/* Max length: 25 "INCOMPLETE [65535 bytes] " */
 		eh = skb_header_pointer(skb, iphoff+ih->ihl*4,
 					sizeof(_esph), &_esph);
-		if (eh == NULL) {
+		if (!eh) {
 			nf_log_buf_add(m, "INCOMPLETE [%u bytes] ",
 				       skb->len - iphoff - ih->ihl*4);
 			break;
