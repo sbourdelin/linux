@@ -142,6 +142,8 @@ struct nlm_rqst {
 	struct nlm_block *	a_block;
 	unsigned int		a_retries;	/* Retry count */
 	u8			a_owner[NLMCLNT_OHSIZE];
+	const struct nlmclnt_operations * nlmclnt_ops;
+	void * callback_data;
 };
 
 /*

@@ -18,6 +18,7 @@
 
 /* Dummy declarations */
 struct svc_rqst;
+struct rpc_task;
 
 /*
  * This is the set of functions for lockd->nfsd communication
@@ -52,8 +53,14 @@ struct nlmclnt_initdata {
 extern struct nlm_host *nlmclnt_init(const struct nlmclnt_initdata *nlm_init);
 extern void	nlmclnt_done(struct nlm_host *host);
 
-extern int	nlmclnt_proc(struct nlm_host *host, int cmd,
-					struct file_lock *fl);
+struct nlmclnt_operations {
+	void (*nlmclnt_alloc_call)(void *);
+	bool (*nlmclnt_unlock_prepare)(struct rpc_task*, void *);
+	void (*nlmclnt_release_call)(void *);
+};
+
+extern int	nlmclnt_proc(struct nlm_host *host, int cmd, struct file_lock *fl,
+	const struct nlmclnt_operations *nlmclnt_ops, void *data);
 extern int	lockd_up(struct net *net);
 extern void	lockd_down(struct net *net);
 
