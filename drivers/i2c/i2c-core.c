@@ -2805,7 +2805,10 @@ int i2c_master_send(const struct i2c_client *client, const char *buf, int count)
 	 * If everything went ok (i.e. 1 msg transmitted), return #bytes
 	 * transmitted, else error code.
 	 */
-	return (ret == 1) ? count : ret;
+	if (likely(ret == 1))
+		return count;
+
+	return ret < 0 ? ret : -EIO;
 }
 EXPORT_SYMBOL(i2c_master_send);
 
@@ -2835,7 +2838,10 @@ int i2c_master_recv(const struct i2c_client *client, char *buf, int count)
 	 * If everything went ok (i.e. 1 msg received), return #bytes received,
 	 * else error code.
 	 */
-	return (ret == 1) ? count : ret;
+	if (likely(ret == 1))
+		return count;
+
+	return ret < 0 ? ret : -EIO;
 }
 EXPORT_SYMBOL(i2c_master_recv);
 
