@@ -8404,6 +8404,12 @@ F:	include/linux/cciss*.h
 F:	include/uapi/linux/cciss*.h
 F:	Documentation/scsi/smartpqi.txt
 
+MINI TTY SUBSTITUTION FOR SERIAL PORTS
+M:	Nicolas Pitre <nico@linaro.org>
+L:	linux-serial@vger.kernel.org
+S:	Maintained
+F:	drivers/tty/serial/minitty_serial.c
+
 MN88472 MEDIA DRIVER
 M:	Antti Palosaari <crope@iki.fi>
 L:	linux-media@vger.kernel.org
@@ -12737,7 +12743,7 @@ S:	Supported
 T:	git git://git.kernel.org/pub/scm/linux/kernel/git/gregkh/tty.git
 F:	Documentation/serial/
 F:	drivers/tty/
-F:	drivers/tty/serial/serial_core.c
+F:	drivers/tty/serial/fulltty_serial.c
 F:	include/linux/serial_core.h
 F:	include/linux/serial.h
 F:	include/linux/tty.h

@@ -13,6 +13,8 @@ extern int tty_prepare_flip_string(struct tty_port *port,
 extern void tty_flip_buffer_push(struct tty_port *port);
 void tty_schedule_flip(struct tty_port *port);
 
+#ifndef CONFIG_MINITTY_SERIAL
+
 static inline int tty_insert_flip_char(struct tty_port *port,
 					unsigned char ch, char flag)
 {
@@ -34,6 +36,13 @@ static inline int tty_insert_flip_string(struct tty_port *port,
 {
 	return tty_insert_flip_string_fixed_flag(port, chars, TTY_NORMAL, size);
 }
+
+#else
+extern int tty_insert_flip_char(struct tty_port *port, unsigned char ch,
+				char flag);
+extern int tty_insert_flip_string(struct tty_port *port,
+				  const unsigned char *chars, size_t size);
+#endif
 
 extern void tty_buffer_lock_exclusive(struct tty_port *port);
 extern void tty_buffer_unlock_exclusive(struct tty_port *port);

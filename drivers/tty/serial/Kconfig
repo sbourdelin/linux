@@ -2,7 +2,17 @@
 # Serial device configuration
 #
 
-if TTY
+config MINITTY_SERIAL
+	bool "Enable mini TTY for serial ports"
+	depends on !TTY
+	default y
+	help
+	  This enables a much smaller TTY implementation that only supports
+	  serial ports in a limited capacity. This is however sufficient for
+	  many embedded use cases that use serial ports mainly as a debug
+	  console where the saving in kernel code size is welcome.
+
+if TTY || MINITTY_SERIAL
 
 menu "Serial drivers"
 	depends on HAS_IOMEM
