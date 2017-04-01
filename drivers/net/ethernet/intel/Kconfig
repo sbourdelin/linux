@@ -264,4 +264,8 @@ config FM10K
 	  To compile this driver as a module, choose M here. The module
 	  will be called fm10k.  MSI-X interrupt support is required
 
+config IXGBE_ALLOW_RELAXED_ORDER
+	bool "Intel(R) 10GbE PCI Express adapters Enable Relaxed Ordering" if SPARC
+	default y if SPARC
+
 endif # NET_VENDOR_INTEL
