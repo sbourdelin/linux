@@ -109,7 +109,7 @@ static int __net_init ip6table_nat_table_init(struct net *net)
 		return 0;
 
 	repl = ip6t_alloc_initial_table(&nf_nat_ipv6_table);
-	if (repl == NULL)
+	if (!repl)
 		return -ENOMEM;
 	ret = ip6t_register_table(net, &nf_nat_ipv6_table, repl,
 				  nf_nat_ipv6_ops, &net->ipv6.ip6table_nat);

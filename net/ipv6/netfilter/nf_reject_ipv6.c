@@ -44,7 +44,7 @@ const struct tcphdr *nf_reject_ip6_tcphdr_get(struct sk_buff *oldskb,
 
 	otcph = skb_header_pointer(oldskb, tcphoff, sizeof(struct tcphdr),
 				   otcph);
-	if (otcph == NULL)
+	if (!otcph)
 		return NULL;
 
 	/* No RST for RST. */
@@ -241,7 +241,7 @@ void nf_send_unreach6(struct net *net, struct sk_buff *skb_in,
 	if (!reject6_csum_ok(skb_in, hooknum))
 		return;
 
-	if (hooknum == NF_INET_LOCAL_OUT && skb_in->dev == NULL)
+	if (hooknum == NF_INET_LOCAL_OUT && !skb_in->dev)
 		skb_in->dev = net->loopback_dev;
 
 	icmpv6_send(skb_in, ICMPV6_DEST_UNREACH, code, 0);

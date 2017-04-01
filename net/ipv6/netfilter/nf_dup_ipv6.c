@@ -53,7 +53,7 @@ void nf_dup_ipv6(struct net *net, struct sk_buff *skb, unsigned int hooknum,
 	if (this_cpu_read(nf_skb_duplicated))
 		return;
 	skb = pskb_copy(skb, GFP_ATOMIC);
-	if (skb == NULL)
+	if (!skb)
 		return;
 
 #if IS_ENABLED(CONFIG_NF_CONNTRACK)

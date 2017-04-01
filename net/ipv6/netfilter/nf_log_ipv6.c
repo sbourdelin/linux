@@ -55,7 +55,7 @@ static void dump_ipv6_packet(struct nf_log_buf *m,
 		logflags = NF_LOG_DEFAULT_MASK;
 
 	ih = skb_header_pointer(skb, ip6hoff, sizeof(_ip6h), &_ip6h);
-	if (ih == NULL) {
+	if (!ih) {
 		nf_log_buf_add(m, "TRUNCATED");
 		return;
 	}
@@ -78,7 +78,7 @@ static void dump_ipv6_packet(struct nf_log_buf *m,
 		const struct ipv6_opt_hdr *hp;
 
 		hp = skb_header_pointer(skb, ptr, sizeof(_hdr), &_hdr);
-		if (hp == NULL) {
+		if (!hp) {
 			nf_log_buf_add(m, "TRUNCATED");
 			return;
 		}
@@ -95,7 +95,7 @@ static void dump_ipv6_packet(struct nf_log_buf *m,
 			nf_log_buf_add(m, "FRAG:");
 			fh = skb_header_pointer(skb, ptr, sizeof(_fhdr),
 						&_fhdr);
-			if (fh == NULL) {
+			if (!fh) {
 				nf_log_buf_add(m, "TRUNCATED ");
 				return;
 			}
@@ -143,7 +143,7 @@ static void dump_ipv6_packet(struct nf_log_buf *m,
 
 				ah = skb_header_pointer(skb, ptr, sizeof(_ahdr),
 							&_ahdr);
-				if (ah == NULL) {
+				if (!ah) {
 					/*
 					 * Max length: 26 "INCOMPLETE [65535
 					 *  bytes] )"
@@ -178,7 +178,7 @@ static void dump_ipv6_packet(struct nf_log_buf *m,
 				 */
 				eh = skb_header_pointer(skb, ptr, sizeof(_esph),
 							&_esph);
-				if (eh == NULL) {
+				if (!eh) {
 					nf_log_buf_add(m, "INCOMPLETE [%u bytes] )",
 						       skb->len - ptr);
 					return;
@@ -224,7 +224,7 @@ static void dump_ipv6_packet(struct nf_log_buf *m,
 
 		/* Max length: 25 "INCOMPLETE [65535 bytes] " */
 		ic = skb_header_pointer(skb, ptr, sizeof(_icmp6h), &_icmp6h);
-		if (ic == NULL) {
+		if (!ic) {
 			nf_log_buf_add(m, "INCOMPLETE [%u bytes] ",
 				       skb->len - ptr);
 			return;

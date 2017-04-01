@@ -43,7 +43,7 @@ static bool icmpv6_pkt_to_tuple(const struct sk_buff *skb,
 	struct icmp6hdr _hdr;
 
 	hp = skb_header_pointer(skb, dataoff, sizeof(_hdr), &_hdr);
-	if (hp == NULL)
+	if (!hp)
 		return false;
 	tuple->dst.u.icmp.type = hp->icmp6_type;
 	tuple->src.u.icmp.id = hp->icmp6_identifier;
@@ -203,7 +203,7 @@ icmpv6_error(struct net *net, struct nf_conn *tmpl,
 	int type;
 
 	icmp6h = skb_header_pointer(skb, dataoff, sizeof(_ih), &_ih);
-	if (icmp6h == NULL) {
+	if (!icmp6h) {
 		if (LOG_INVALID(net, IPPROTO_ICMPV6))
 			nf_log_packet(net, PF_INET6, 0, skb, NULL, NULL, NULL,
 			      "nf_ct_icmpv6: short packet ");
