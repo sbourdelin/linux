@@ -571,7 +571,9 @@ config_done:
 					"Timeout waiting TX FIFO filling\n");
 			}
 		}
-		regmap_update_bits(regs, CCSR_SSI_SCR, vals->scr, vals->scr);
+		regmap_update_bits(regs, CCSR_SSI_SCR,
+			CCSR_SSI_SCR_SSIEN | CCSR_SSI_SCR_TE | CCSR_SSI_SCR_RE,
+			CCSR_SSI_SCR_SSIEN | CCSR_SSI_SCR_TE | CCSR_SSI_SCR_RE);
 	}
 }
 
