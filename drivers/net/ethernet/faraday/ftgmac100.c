@@ -77,7 +77,8 @@ struct ftgmac100 {
 	struct mii_bus *mii_bus;
 
 	/* Link management */
-	int old_speed;
+	int cur_speed;
+	int cur_duplex;
 	bool use_ncsi;
 
 	/* Misc */
@@ -210,16 +211,15 @@ static void ftgmac100_init_hw(struct ftgmac100 *priv)
 				 FTGMAC100_MACCR_RXDMA_EN	| \
 				 FTGMAC100_MACCR_TXMAC_EN	| \
 				 FTGMAC100_MACCR_RXMAC_EN	| \
-				 FTGMAC100_MACCR_FULLDUP	| \
 				 FTGMAC100_MACCR_CRC_APD	| \
 				 FTGMAC100_MACCR_RX_RUNT	| \
 				 FTGMAC100_MACCR_RX_BROADPKT)
 
-static void ftgmac100_start_hw(struct ftgmac100 *priv, int speed)
+static void ftgmac100_start_hw(struct ftgmac100 *priv)
 {
 	int maccr = MACCR_ENABLE_ALL;
 
-	switch (speed) {
+	switch (priv->cur_speed) {
 	default:
 	case 10:
 		break;
@@ -232,6 +232,9 @@ static void ftgmac100_start_hw(struct ftgmac100 *priv, int speed)
 		maccr |= FTGMAC100_MACCR_GIGA_MODE;
 		break;
 	}
+
+	if (priv->cur_duplex == DUPLEX_FULL)
+		maccr |= FTGMAC100_MACCR_FULLDUP;
 
 	iowrite32(maccr, priv->base + FTGMAC100_OFFSET_MACCR);
 }
@@ -852,12 +855,33 @@ static void ftgmac100_adjust_link(struct net_device *netdev)
 {
 	struct ftgmac100 *priv = netdev_priv(netdev);
 	struct phy_device *phydev = netdev->phydev;
+	int new_speed;
 	int ier;
 
-	if (phydev->speed == priv->old_speed)
+	/* We store "no link" as speed 0 */
+	if (!phydev->link)
+		new_speed = 0;
+	else
+		new_speed = phydev->speed;
+
+	if (phydev->speed == priv->cur_speed &&
+	    phydev->duplex == priv->cur_duplex)
 		return;
 
-	priv->old_speed = phydev->speed;
+	if (new_speed) {
+		netdev_info(netdev, "Link up at %d Mbit/s %s duplex\n",
+			    new_speed,
+			    phydev->duplex == DUPLEX_FULL ? "full" : "half");
+	} else if (priv->cur_speed) {
+		/* No link, just return. Leave the HW alone so it can
+		 * continue draining the tx ring.
+		 */
+		netdev_info(netdev, "Link down\n");
+		return;
+	}
+
+	priv->cur_speed = new_speed;
+	priv->cur_duplex = phydev->duplex;
 
 	ier = ioread32(priv->base + FTGMAC100_OFFSET_IER);
 
@@ -869,7 +893,7 @@ static void ftgmac100_adjust_link(struct net_device *netdev)
 
 	netif_start_queue(netdev);
 	ftgmac100_init_hw(priv);
-	ftgmac100_start_hw(priv, phydev->speed);
+	ftgmac100_start_hw(priv);
 
 	/* re-enable interrupts */
 	iowrite32(ier, priv->base + FTGMAC100_OFFSET_IER);
@@ -1089,6 +1113,20 @@ static int ftgmac100_open(struct net_device *netdev)
 		goto err_irq;
 	}
 
+	/* When using NC-SI we force the speed to 100Mbit/s full duplex,
+	 *
+	 * Otherwise we leave it set to 0 (no link), the link
+	 * message from the PHY layer will handle setting it up to
+	 * something else if needed.
+	 */
+	if (priv->use_ncsi) {
+		priv->cur_duplex = DUPLEX_FULL;
+		priv->cur_speed = SPEED_100;
+	} else {
+		priv->cur_duplex = 0;
+		priv->cur_speed = 0;
+	}
+
 	priv->rx_pointer = 0;
 	priv->tx_clean_pointer = 0;
 	priv->tx_pointer = 0;
@@ -1099,7 +1137,7 @@ static int ftgmac100_open(struct net_device *netdev)
 		goto err_hw;
 
 	ftgmac100_init_hw(priv);
-	ftgmac100_start_hw(priv, priv->use_ncsi ? 100 : 10);
+	ftgmac100_start_hw(priv);
 
 	/* Clear stale interrupts */
 	status = ioread32(priv->base + FTGMAC100_OFFSET_ISR);
