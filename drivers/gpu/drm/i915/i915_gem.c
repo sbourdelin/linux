@@ -4558,6 +4558,9 @@ static int __i915_gem_restart_engines(void *data)
 			return err;
 	}
 
+	/* Small piece of magic to stablize resets of an active GPU */
+	msleep(1);
+
 	return 0;
 }
 
