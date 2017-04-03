@@ -82,14 +82,24 @@ int asoc_simple_card_parse_card_name(struct snd_soc_card *card,
 				     char *prefix)
 {
 	char prop[128];
+	char *names[] = {
+		"label", "name"
+	};
+	int i;
 	int ret;
 
-	snprintf(prop, sizeof(prop), "%sname", prefix);
+	if (!prefix)
+		prefix = "";
 
 	/* Parse the card name from DT */
-	ret = snd_soc_of_parse_card_name(card, prop);
-	if (ret < 0)
-		return ret;
+	for (i = 0; i < ARRAY_SIZE(names); i++) {
+		snprintf(prop, sizeof(prop), "%s%s", prefix, names[i]);
+		ret = snd_soc_of_parse_card_name(card, prop);
+		if (ret < 0)
+			return ret;
+		if (card->name)
+			break;
+	}
 
 	if (!card->name && card->dai_link)
 		card->name = card->dai_link->name;
