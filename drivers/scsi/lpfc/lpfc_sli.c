@@ -13758,7 +13758,14 @@ lpfc_sli4_queue_free(struct lpfc_queue *queue)
 		lpfc_free_rq_buffer(queue->phba, queue);
 		kfree(queue->rqbp);
 	}
-	kfree(queue->pring);
+
+	/*
+	 * The WQs/CQs' pring is bound (same pointer).
+	 * So free it only once, and not again on WQ.
+	 */
+	if (queue->type != LPFC_WQ)
+		kfree(queue->pring);
+
 	kfree(queue);
 	return;
 }
