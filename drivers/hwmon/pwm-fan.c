@@ -302,37 +302,6 @@ static int pwm_fan_remove(struct platform_device *pdev)
 	return 0;
 }
 
-#ifdef CONFIG_PM_SLEEP
-static int pwm_fan_suspend(struct device *dev)
-{
-	struct pwm_fan_ctx *ctx = dev_get_drvdata(dev);
-
-	if (ctx->pwm_value)
-		pwm_disable(ctx->pwm);
-	return 0;
-}
-
-static int pwm_fan_resume(struct device *dev)
-{
-	struct pwm_fan_ctx *ctx = dev_get_drvdata(dev);
-	struct pwm_args pargs;
-	unsigned long duty;
-	int ret;
-
-	if (ctx->pwm_value == 0)
-		return 0;
-
-	pwm_get_args(ctx->pwm, &pargs);
-	duty = DIV_ROUND_UP(ctx->pwm_value * (pargs.period - 1), MAX_PWM);
-	ret = pwm_config(ctx->pwm, duty, pargs.period);
-	if (ret)
-		return ret;
-	return pwm_enable(ctx->pwm);
-}
-#endif
-
-static SIMPLE_DEV_PM_OPS(pwm_fan_pm, pwm_fan_suspend, pwm_fan_resume);
-
 static const struct of_device_id of_pwm_fan_match[] = {
 	{ .compatible = "pwm-fan", },
 	{},
@@ -344,7 +313,6 @@ static struct platform_driver pwm_fan_driver = {
 	.remove		= pwm_fan_remove,
 	.driver	= {
 		.name		= "pwm-fan",
-		.pm		= &pwm_fan_pm,
 		.of_match_table	= of_pwm_fan_match,
 	},
 };
