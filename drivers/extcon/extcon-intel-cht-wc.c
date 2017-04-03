@@ -252,7 +252,7 @@ static int cht_wc_extcon_sw_control(struct cht_wc_extcon_data *ext, bool enable)
 	val = enable ? mask : 0;
 	ret = regmap_update_bits(ext->regmap, CHT_WC_CHGRCTRL0, mask, val);
 	if (ret)
-		dev_err(ext->dev, "Failed setting sw control: %d\n", ret);
+		dev_err(ext->dev, "Error setting sw control: %d\n", ret);
 
 	return ret;
 }
@@ -288,7 +288,7 @@ static int cht_wc_extcon_probe(struct platform_device *pdev)
 	/* Register extcon device */
 	ret = devm_extcon_dev_register(ext->dev, ext->edev);
 	if (ret) {
-		dev_err(ext->dev, "Failed to register extcon device\n");
+		dev_err(ext->dev, "Error registering extcon device: %d\n", ret);
 		goto disable_sw_control;
 	}
 
@@ -301,7 +301,7 @@ static int cht_wc_extcon_probe(struct platform_device *pdev)
 	ret = devm_request_threaded_irq(ext->dev, irq, NULL, cht_wc_extcon_isr,
 					IRQF_ONESHOT, pdev->name, ext);
 	if (ret) {
-		dev_err(ext->dev, "Failed to request interrupt\n");
+		dev_err(ext->dev, "Error requesting interrupt: %d\n", ret);
 		goto disable_sw_control;
 	}
 
@@ -310,7 +310,7 @@ static int cht_wc_extcon_probe(struct platform_device *pdev)
 			   (int)~(CHT_WC_PWRSRC_VBUS | CHT_WC_PWRSRC_ID_GND |
 				  CHT_WC_PWRSRC_ID_FLOAT));
 	if (ret) {
-		dev_err(ext->dev, "Failed to write the irq-mask: %d\n", ret);
+		dev_err(ext->dev, "Error writing irq-mask: %d\n", ret);
 		goto disable_sw_control;
 	}
 
