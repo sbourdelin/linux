@@ -107,8 +107,6 @@ static void mdp5_plane_install_properties(struct drm_plane *plane,
 				create_enum, name##_prop_enum_list, \
 				ARRAY_SIZE(name##_prop_enum_list))
 
-	INSTALL_RANGE_PROPERTY(zpos, ZPOS, 1, 255, 1);
-
 	mdp5_plane_install_rotation_property(dev, plane);
 
 #undef INSTALL_RANGE_PROPERTY
