@@ -21,8 +21,10 @@
 #define IMC_MAX_CHIPS			32
 #define IMC_MAX_PMUS			32
 #define IMC_MAX_PMU_NAME_LEN		256
+#define IMC_MAX_CORES			32
 
 #define IMC_NEST_MAX_PAGES		16
+#define IMC_CORE_COUNTER_MEM		8192
 
 #define IMC_DTB_COMPAT			"ibm,opal-in-memory-counters"
 #define IMC_DTB_NEST_COMPAT		"ibm,imc-counters-nest"
@@ -68,4 +70,5 @@ struct imc_pmu {
 #define IMC_DOMAIN_UNKNOWN	-1
 
 int imc_get_domain(struct device_node *pmu_dev);
+void core_imc_disable(void);
 #endif /* PPC_POWERNV_IMC_PMU_DEF_H */

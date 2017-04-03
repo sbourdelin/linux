@@ -192,12 +192,12 @@ static int imc_events_node_parser(struct device_node *dev,
 				kfree(events[idx].ev_value);
 				continue;
 			}
+			idx++;
 			/*
 			 * If the common scale and unit properties available,
 			 * then, assign them to this event
 			 */
 			if (event_scale) {
-				idx++;
 				ret = set_event_property(event_scale, "scale",
 							 &events[idx],
 							 ev_name);
@@ -211,8 +211,8 @@ static int imc_events_node_parser(struct device_node *dev,
 							 ev_name);
 				if (ret)
 					continue;
+				idx++;
 			}
-			idx++;
 		} else if (strncmp(pp->name, "unit", 4) == 0) {
 			ret = set_event_property(pp, "unit", &events[idx],
 						 ev_name);
@@ -537,6 +537,14 @@ err:
 	return -ENODEV;
 }
 
+static void opal_imc_counters_shutdown(struct platform_device *pdev)
+{
+#ifdef CONFIG_PERF_EVENTS
+	/* Disable the IMC Core functions */
+	core_imc_disable();
+#endif
+}
+
 static const struct of_device_id opal_imc_match[] = {
 	{ .compatible = IMC_DTB_COMPAT },
 	{},
@@ -548,6 +556,7 @@ static struct platform_driver opal_imc_driver = {
 		.of_match_table = opal_imc_match,
 	},
 	.probe = opal_imc_counters_probe,
+	.shutdown = opal_imc_counters_shutdown,
 };
 
 MODULE_DEVICE_TABLE(of, opal_imc_match);
