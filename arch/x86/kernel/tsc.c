@@ -26,7 +26,7 @@
 #include <asm/apic.h>
 #include <asm/intel-family.h>
 
-unsigned int __read_mostly cpu_khz;	/* TSC clocks / usec, not used here */
+unsigned int __read_mostly cpu_khz;	/* TSC clocks / msec, not used here */
 EXPORT_SYMBOL(cpu_khz);
 
 unsigned int __read_mostly tsc_khz;
@@ -37,9 +37,11 @@ EXPORT_SYMBOL(tsc_khz);
  */
 static int __read_mostly tsc_unstable;
 
-/* native_sched_clock() is called before tsc_init(), so
-   we must start with the TSC soft disabled to prevent
-   erroneous rdtsc usage on !boot_cpu_has(X86_FEATURE_TSC) processors */
+/*
+ * native_sched_clock() is called before tsc_init(), so
+ * we must start with the TSC soft disabled to prevent
+ * erroneous rdtsc usage on !boot_cpu_has(X86_FEATURE_TSC) processors
+ */
 static int __read_mostly tsc_disabled = -1;
 
 static DEFINE_STATIC_KEY_FALSE(__use_tsc);
@@ -159,7 +161,7 @@ static void cyc2ns_write_end(int cpu, struct cyc2ns_data *data)
 	 */
 	smp_wmb();
 
-	ACCESS_ONCE(c2n->head) = data;
+	WRITE_ONCE(c2n->head, data);
 }
 
 /*
@@ -320,8 +322,10 @@ u64 native_sched_clock_from_tsc(u64 tsc)
 	return cycles_2_ns(tsc);
 }
 
-/* We need to define a real function for sched_clock, to override the
-   weak default version */
+/*
+ * We need to define a real function for sched_clock, to override the
+ * weak default version
+ */
 #ifdef CONFIG_PARAVIRT
 unsigned long long sched_clock(void)
 {
@@ -831,7 +835,7 @@ unsigned long native_calibrate_cpu(void)
 		else
 			tsc2 = calc_pmtimer_ref(tsc2, ref1, ref2);
 
-		tsc_ref_min = min(tsc_ref_min, (unsigned long) tsc2);
+		tsc_ref_min = min_t(unsigned long, tsc_ref_min, tsc2);
 
 		/* Check the reference deviation */
 		delta = ((u64) tsc_pit_min) * 100;
@@ -933,7 +937,6 @@ int recalibrate_cpu_khz(void)
 	return -ENODEV;
 #endif
 }
-
 EXPORT_SYMBOL(recalibrate_cpu_khz);
 
 
@@ -1160,7 +1163,6 @@ void mark_tsc_unstable(char *reason)
 		clocksource_tsc.rating = 0;
 	}
 }
-
 EXPORT_SYMBOL_GPL(mark_tsc_unstable);
 
 static void __init check_system_tsc_reliable(void)
