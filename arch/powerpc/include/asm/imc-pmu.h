@@ -65,4 +65,5 @@ struct imc_pmu {
 #define IMC_DOMAIN_NEST		1
 #define IMC_DOMAIN_UNKNOWN	-1
 
+int imc_get_domain(struct device_node *pmu_dev);
 #endif /* PPC_POWERNV_IMC_PMU_DEF_H */
