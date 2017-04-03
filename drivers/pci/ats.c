@@ -17,9 +17,17 @@
 
 #include "pci.h"
 
+static const struct pci_device_id broken_ats_tbl[] = {
+	{ PCI_DEVICE(PCI_VENDOR_ID_AMD, 0x98e4) }, /* AMD Stoney GPU part */
+	{ 0 }
+};
+
 void pci_ats_init(struct pci_dev *dev)
 {
 	int pos;
+
+	if (pci_match_id(broken_ats_tbl, dev))
+		return;
 
 	pos = pci_find_ext_capability(dev, PCI_EXT_CAP_ID_ATS);
 	if (!pos)
