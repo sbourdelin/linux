@@ -308,6 +308,7 @@ struct bio_integrity_payload {
 	struct bio		*bip_bio;	/* parent bio */
 
 	struct bvec_iter	bip_iter;
+	struct bvec_iter	bip_verify_iter;/* saved orig data iterator */
 
 	bio_end_io_t		*bip_end_io;	/* saved I/O completion fn */
 

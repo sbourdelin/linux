@@ -238,10 +238,10 @@ static int bio_integrity_process(struct bio *bio,
 
 	iter.disk_name = bio->bi_bdev->bd_disk->disk_name;
 	iter.interval = 1 << bi->interval_exp;
-	iter.seed = bip_get_seed(bip);
+	iter.seed = bip->bip_verify_iter.bi_sector;
 	iter.prot_buf = prot_buf;
 
-	bio_for_each_segment(bv, bio, bviter) {
+	__bio_for_each_segment(bv, bio, bviter, bip->bip_verify_iter) {
 		void *kaddr = kmap_atomic(bv.bv_page);
 
 		iter.data_buf = kaddr + bv.bv_offset;
@@ -310,6 +310,7 @@ int bio_integrity_prep(struct bio *bio)
 	bip->bip_flags |= BIP_BLOCK_INTEGRITY;
 	bip->bip_iter.bi_size = len;
 	bip_set_seed(bip, bio->bi_iter.bi_sector);
+	bip->bip_verify_iter = bio->bi_iter;
 
 	if (bi->flags & BLK_INTEGRITY_IP_CHECKSUM)
 		bip->bip_flags |= BIP_IP_CHECKSUM;
@@ -476,6 +477,7 @@ int bio_integrity_clone(struct bio *bio, struct bio *bio_src,
 
 	bip->bip_vcnt = bip_src->bip_vcnt;
 	bip->bip_iter = bip_src->bip_iter;
+	bip->bip_verify_iter = bip_src->bip_verify_iter;
 
 	return 0;
 }
