@@ -1102,7 +1102,7 @@ static int clone_bio(struct dm_target_io *tio, struct bio *bio,
 	clone->bi_iter.bi_size = to_bytes(len);
 
 	if (bio_integrity(bio))
-		bio_integrity_trim(clone, 0, len);
+		bio_integrity_trim(clone, len);
 
 	return 0;
 }
