@@ -1,4 +1,4 @@
-HOSTARCH := $(shell uname -m | sed -e s/i.86/x86/ -e s/x86_64/x86/ \
+purify-arch = $(shell echo $1 | sed -e s/i.86/x86/ -e s/x86_64/x86/ \
                                   -e s/sun4u/sparc/ -e s/sparc64/sparc/ \
                                   -e /arm64/!s/arm.*/arm/ -e s/sa110/arm/ \
                                   -e s/s390x/s390/ -e s/parisc64/parisc/ \
@@ -6,8 +6,12 @@ HOSTARCH := $(shell uname -m | sed -e s/i.86/x86/ -e s/x86_64/x86/ \
                                   -e s/sh[234].*/sh/ -e s/aarch64.*/arm64/ \
                                   -e s/tile.*/tile/ )
 
+HOSTARCH := $(call purify-arch,$(shell uname -m))
+
 ifndef ARCH
 ARCH := $(HOSTARCH)
+else
+ARCH := $(call purify-arch,$(ARCH))
 endif
 
 SRCARCH := $(ARCH)
