@@ -60,7 +60,7 @@ static DEFINE_MUTEX(misc_mtx);
  * Assigned numbers, used for dynamic minors
  */
 #define DYNAMIC_MINORS 64 /* like dynamic majors */
-static DECLARE_BITMAP(misc_minors, DYNAMIC_MINORS);
+static DEFINE_IDA(misc_minors_ida);
 
 #ifdef CONFIG_PROC_FS
 static void *misc_seq_start(struct seq_file *seq, loff_t *pos)
@@ -193,14 +193,18 @@ int misc_register(struct miscdevice *misc)
 	mutex_lock(&misc_mtx);
 
 	if (is_dynamic) {
-		int i = find_first_zero_bit(misc_minors, DYNAMIC_MINORS);
+		int i = ida_simple_get(&misc_minors_ida, 0,
+				       DYNAMIC_MINORS, GFP_KERNEL);
 
 		if (i >= DYNAMIC_MINORS) {
 			err = -EBUSY;
 			goto out;
-		}
+		} else if (i < 0) {
+			err = i;
+			goto out;
+		} else {
 		misc->minor = DYNAMIC_MINORS - i - 1;
-		set_bit(i, misc_minors);
+		}
 	} else {
 		struct miscdevice *c;
 
@@ -222,7 +226,7 @@ int misc_register(struct miscdevice *misc)
 			int i = DYNAMIC_MINORS - misc->minor - 1;
 
 			if (i < DYNAMIC_MINORS && i >= 0)
-				clear_bit(i, misc_minors);
+				ida_simple_remove(&misc_minors_ida, i);
 			misc->minor = MISC_DYNAMIC_MINOR;
 		}
 		err = PTR_ERR(misc->this_device);
@@ -258,7 +262,7 @@ void misc_deregister(struct miscdevice *misc)
 	list_del(&misc->list);
 	device_destroy(misc_class, MKDEV(MISC_MAJOR, misc->minor));
 	if (i < DYNAMIC_MINORS && i >= 0)
-		clear_bit(i, misc_minors);
+		ida_simple_remove(&misc_minors_ida, i);
 	mutex_unlock(&misc_mtx);
 }
 
