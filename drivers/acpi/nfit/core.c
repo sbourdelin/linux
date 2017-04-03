@@ -2833,8 +2833,10 @@ static int acpi_nfit_add(struct acpi_device *adev)
 	sz = tbl->length;
 
 	acpi_desc = devm_kzalloc(dev, sizeof(*acpi_desc), GFP_KERNEL);
-	if (!acpi_desc)
-		return -ENOMEM;
+	if (!acpi_desc) {
+		rc = -ENOMEM;
+		goto out;
+	}
 	acpi_nfit_desc_init(acpi_desc, &adev->dev);
 
 	/* Save the acpi header for exporting the revision via sysfs */
@@ -2857,6 +2859,8 @@ static int acpi_nfit_add(struct acpi_device *adev)
 		rc = acpi_nfit_init(acpi_desc, (void *) tbl
 				+ sizeof(struct acpi_table_nfit),
 				sz - sizeof(struct acpi_table_nfit));
+out:
+	acpi_put_table(tbl);
 	return rc;
 }
 
