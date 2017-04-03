@@ -279,6 +279,9 @@ bool usb_amd_prefetch_quirk(void)
 }
 EXPORT_SYMBOL_GPL(usb_amd_prefetch_quirk);
 
+DEFINE_MUTEX(sb800_mutex);
+EXPORT_SYMBOL_GPL(sb800_mutex);
+
 /*
  * The hardware normally enables the A-link power management feature, which
  * lets the system lower the power consumption in idle states.
@@ -314,11 +317,13 @@ static void usb_amd_quirk_pll(int disable)
 	if (amd_chipset.sb_type.gen == AMD_CHIPSET_SB800 ||
 			amd_chipset.sb_type.gen == AMD_CHIPSET_HUDSON2 ||
 			amd_chipset.sb_type.gen == AMD_CHIPSET_BOLTON) {
+		mutex_lock(&sb800_mutex);
 		outb_p(AB_REG_BAR_LOW, 0xcd6);
 		addr_low = inb_p(0xcd7);
 		outb_p(AB_REG_BAR_HIGH, 0xcd6);
 		addr_high = inb_p(0xcd7);
 		addr = addr_high << 8 | addr_low;
+		mutex_unlock(&sb800_mutex);
 
 		outl_p(0x30, AB_INDX(addr));
 		outl_p(0x40, AB_DATA(addr));
