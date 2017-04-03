@@ -780,7 +780,7 @@ out:
 	return dentry;
 }
 
-static int reset_all_cbms(struct rdt_resource *r)
+static int reset_all_ctrls(struct rdt_resource *r, u32 closid, u32 count)
 {
 	struct msr_param msr_param;
 	cpumask_var_t cpu_mask;
@@ -791,8 +791,8 @@ static int reset_all_cbms(struct rdt_resource *r)
 		return -ENOMEM;
 
 	msr_param.res = r;
-	msr_param.low = 0;
-	msr_param.high = r->num_closid;
+	msr_param.low = closid;
+	msr_param.high = closid + count;
 
 	/*
 	 * Disable resource control for this resource by setting all
@@ -802,7 +802,7 @@ static int reset_all_cbms(struct rdt_resource *r)
 	list_for_each_entry(d, &r->domains, list) {
 		cpumask_set_cpu(cpumask_any(&d->cpu_mask), cpu_mask);
 
-		for (i = 0; i < r->num_closid; i++)
+		for (i = closid; i < closid + count; i++)
 			d->cbm[i] = r->max_cbm;
 	}
 	cpu = get_cpu();
@@ -896,7 +896,7 @@ static void rdt_kill_sb(struct super_block *sb)
 
 	/*Put everything back to default values. */
 	for_each_enabled_rdt_resource(r)
-		reset_all_cbms(r);
+		reset_all_ctrls(r, 0, r->num_closid);
 	cdp_disable();
 	rmdir_all_sub();
 	static_branch_disable(&rdt_enable_key);
@@ -991,6 +991,7 @@ static int rdtgroup_rmdir(struct kernfs_node *kn)
 {
 	int ret, cpu, closid = rdtgroup_default.closid;
 	struct rdtgroup *rdtgrp;
+	struct rdt_resource *r;
 	cpumask_var_t tmpmask;
 
 	if (!zalloc_cpumask_var(&tmpmask, GFP_KERNEL))
@@ -1018,6 +1019,13 @@ static int rdtgroup_rmdir(struct kernfs_node *kn)
 	 */
 	cpumask_or(tmpmask, tmpmask, &rdtgrp->cpu_mask);
 	rdt_update_closid(tmpmask, NULL);
+
+	/*
+	 * Put domain control values back to default for the
+	 * rdtgrp thats being removed.
+	 */
+	for_each_enabled_rdt_resource(r)
+		reset_all_ctrls(r, rdtgrp->closid, 1);
 
 	rdtgrp->flags = RDT_DELETED;
 	closid_free(rdtgrp->closid);
