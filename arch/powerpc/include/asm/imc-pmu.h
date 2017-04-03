@@ -25,11 +25,15 @@
 
 #define IMC_NEST_MAX_PAGES		16
 #define IMC_CORE_COUNTER_MEM		8192
+#define IMC_THREAD_COUNTER_MEM		8192
 
 #define IMC_DTB_COMPAT			"ibm,opal-in-memory-counters"
 #define IMC_DTB_NEST_COMPAT		"ibm,imc-counters-nest"
 #define IMC_DTB_CORE_COMPAT		"ibm,imc-counters-core"
 #define IMC_DTB_THREAD_COMPAT		"ibm,imc-counters-thread"
+
+#define THREAD_IMC_LDBAR_MASK           0x0003ffffffffe000
+#define THREAD_IMC_ENABLE               0x8000000000000000
 
 /*
  * Structure to hold per chip specific memory address
@@ -73,4 +77,5 @@ struct imc_pmu {
 
 int imc_get_domain(struct device_node *pmu_dev);
 void core_imc_disable(void);
+void thread_imc_disable(void);
 #endif /* PPC_POWERNV_IMC_PMU_DEF_H */

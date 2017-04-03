@@ -549,6 +549,9 @@ static void opal_imc_counters_shutdown(struct platform_device *pdev)
 #ifdef CONFIG_PERF_EVENTS
 	/* Disable the IMC Core functions */
 	core_imc_disable();
+
+	/* Disable the IMC Thread functions */
+	thread_imc_disable();
 #endif
 }
 
