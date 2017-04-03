@@ -29,6 +29,7 @@
 #define IMC_DTB_COMPAT			"ibm,opal-in-memory-counters"
 #define IMC_DTB_NEST_COMPAT		"ibm,imc-counters-nest"
 #define IMC_DTB_CORE_COMPAT		"ibm,imc-counters-core"
+#define IMC_DTB_THREAD_COMPAT		"ibm,imc-counters-thread"
 
 /*
  * Structure to hold per chip specific memory address
@@ -67,6 +68,7 @@ struct imc_pmu {
  */
 #define IMC_DOMAIN_NEST		1
 #define IMC_DOMAIN_CORE		2
+#define IMC_DOMAIN_THREAD	3
 #define IMC_DOMAIN_UNKNOWN	-1
 
 int imc_get_domain(struct device_node *pmu_dev);

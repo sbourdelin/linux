@@ -40,6 +40,7 @@ extern int init_imc_pmu(struct imc_events *events,
 			int idx, struct imc_pmu *pmu_ptr);
 u64 nest_max_offset;
 u64 core_max_offset;
+u64 thread_max_offset;
 
 static int imc_event_info(char *name, struct imc_events *events)
 {
@@ -86,6 +87,10 @@ static void update_max_value(u32 value, int pmu_domain)
 	case IMC_DOMAIN_CORE:
 		if (core_max_offset < value)
 			core_max_offset = value;
+		break;
+	case IMC_DOMAIN_THREAD:
+		if (thread_max_offset < value)
+			thread_max_offset = value;
 		break;
 	default:
 		/* Unknown domain, return */
@@ -240,6 +245,8 @@ int imc_get_domain(struct device_node *pmu_dev)
 		return IMC_DOMAIN_NEST;
 	if (of_device_is_compatible(pmu_dev, IMC_DTB_CORE_COMPAT))
 		return IMC_DOMAIN_CORE;
+	if (of_device_is_compatible(pmu_dev, IMC_DTB_THREAD_COMPAT))
+		return IMC_DOMAIN_THREAD;
 	else
 		return IMC_DOMAIN_UNKNOWN;
 }
@@ -278,7 +285,7 @@ static void imc_free_events(struct imc_events *events, int nr_entries)
 /*
  * imc_pmu_create : Takes the parent device which is the pmu unit and a
  *                  pmu_index as the inputs.
- * Allocates memory for the pmu, sets up its domain (NEST or CORE), and
+ * Allocates memory for the pmu, sets up its domain (NEST/CORE/THREAD), and
  * allocates memory for the events supported by this pmu. Assigns a name for
  * the pmu. Calls imc_events_node_parser() to setup the individual events.
  * If everything goes fine, it calls, init_imc_pmu() to setup the pmu device
