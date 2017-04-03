@@ -119,12 +119,18 @@ nfs4_ff_alloc_deviceid_node(struct nfs_server *server, struct pnfs_device *pdev,
 		if (ds_versions[i].wsize > NFS_MAX_FILE_IO_SIZE)
 			ds_versions[i].wsize = NFS_MAX_FILE_IO_SIZE;
 
-		if (ds_versions[i].version != 3 || ds_versions[i].minor_version != 0) {
-			dprintk("%s: [%d] unsupported ds version %d-%d\n", __func__,
-				i, ds_versions[i].version,
-				ds_versions[i].minor_version);
-			ret = -EPROTONOSUPPORT;
-			goto out_err_drain_dsaddrs;
+		/* check for valid major minor combination */
+		switch (ds_versions[i].version * 100 + ds_versions[i].minor_version) {
+			case 300: /* v3   */
+			case 400: /* v4.0 */
+			case 401: /* v4.1 */
+				break;
+			default:
+				dprintk("%s: [%d] unsupported ds version %d-%d\n", __func__,
+					i, ds_versions[i].version,
+					ds_versions[i].minor_version);
+				ret = -EPROTONOSUPPORT;
+				goto out_err_drain_dsaddrs;
 		}
 
 		dprintk("%s: [%d] vers %u minor_ver %u rsize %u wsize %u coupled %d\n",
