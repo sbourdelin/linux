@@ -27,6 +27,7 @@
 #include <linux/log2.h>
 #include <linux/slab.h>
 #include <linux/module.h>
+#include <linux/vmalloc.h>
 #include <asm/unaligned.h>
 #include <net/tcp.h>
 #include <scsi/scsi_cmnd.h>
@@ -2522,6 +2523,7 @@ int
 iscsi_pool_init(struct iscsi_pool *q, int max, void ***items, int item_size)
 {
 	int i, num_arrays = 1;
+	int alloc_size;
 
 	memset(q, 0, sizeof(*q));
 
@@ -2531,7 +2533,13 @@ iscsi_pool_init(struct iscsi_pool *q, int max, void ***items, int item_size)
 	 * the array. */
 	if (items)
 		num_arrays++;
-	q->pool = kzalloc(num_arrays * max * sizeof(void*), GFP_KERNEL);
+
+	alloc_size = num_arrays * max * sizeof(void *);
+	if (alloc_size > PAGE_SIZE) {
+		q->pool = vzalloc(alloc_size);
+		q->is_pool_vmalloc = true;
+	} else
+		q->pool = kzalloc(alloc_size, GFP_KERNEL);
 	if (q->pool == NULL)
 		return -ENOMEM;
 
@@ -2565,7 +2573,10 @@ void iscsi_pool_free(struct iscsi_pool *q)
 
 	for (i = 0; i < q->max; i++)
 		kfree(q->pool[i]);
-	kfree(q->pool);
+	if (q->is_pool_vmalloc)
+		vfree(q->pool);
+	else
+		kfree(q->pool);
 }
 EXPORT_SYMBOL_GPL(iscsi_pool_free);
 

@@ -257,6 +257,7 @@ struct iscsi_pool {
 	struct kfifo		queue;		/* FIFO Queue */
 	void			**pool;		/* Pool of elements */
 	int			max;		/* Max number of elements */
+	bool			is_pool_vmalloc;
 };
 
 /* Session's states */
