@@ -137,6 +137,9 @@ void vp_del_vqs(struct virtio_device *vdev)
 		kfree(vp_dev->msix_vector_map);
 	}
 
+	/* free the shared virtuqueue irq if we don't use per-vq irqs */
+	if (vp_dev->shared_vq_vec)
+		free_irq(pci_irq_vector(vp_dev->pci_dev, 1), vp_dev);
 	free_irq(pci_irq_vector(vp_dev->pci_dev, 0), vp_dev);
 	pci_free_irq_vectors(vp_dev->pci_dev);
 }
@@ -147,10 +150,10 @@ static int vp_find_vqs_msix(struct virtio_device *vdev, unsigned nvqs,
 {
 	struct virtio_pci_device *vp_dev = to_vp_device(vdev);
 	const char *name = dev_name(&vp_dev->vdev.dev);
-	int i, j, err = -ENOMEM, allocated_vectors, nvectors;
+	struct pci_dev *pdev = vp_dev->pci_dev;
+	int i, err = -ENOMEM, nvectors;
 	unsigned flags = PCI_IRQ_MSIX;
-	bool shared = false;
-	u16 msix_vec;
+	u16 msix_vec = 0;
 
 	if (desc) {
 		flags |= PCI_IRQ_AFFINITY;
@@ -162,19 +165,18 @@ static int vp_find_vqs_msix(struct virtio_device *vdev, unsigned nvqs,
 		if (callbacks[i])
 			nvectors++;
 
-	/* Try one vector per queue first. */
-	err = pci_alloc_irq_vectors_affinity(vp_dev->pci_dev, nvectors,
-			nvectors, flags, desc);
+	/* Try one vector for config and one per queue first. */
+	err = pci_alloc_irq_vectors_affinity(pdev, nvectors, nvectors, flags,
+			desc);
 	if (err < 0) {
 		/* Fallback to one vector for config, one shared for queues. */
-		shared = true;
-		err = pci_alloc_irq_vectors(vp_dev->pci_dev, 2, 2,
+		nvectors = 2;
+		vp_dev->shared_vq_vec = true;
+		err = pci_alloc_irq_vectors(pdev, nvectors, nvectors,
 				PCI_IRQ_MSIX);
 		if (err < 0)
 			return err;
 	}
-	if (err < 0)
-		return err;
 
 	vp_dev->msix_vectors = nvectors;
 	vp_dev->msix_names = kmalloc_array(nvectors,
@@ -194,79 +196,99 @@ static int vp_find_vqs_msix(struct virtio_device *vdev, unsigned nvqs,
 	}
 
 	/* Set the vector used for configuration */
-	snprintf(vp_dev->msix_names[0], sizeof(*vp_dev->msix_names),
+	snprintf(vp_dev->msix_names[msix_vec], sizeof(*vp_dev->msix_names),
 		 "%s-config", name);
-	err = request_irq(pci_irq_vector(vp_dev->pci_dev, 0), vp_config_changed,
-			0, vp_dev->msix_names[0], vp_dev);
+	err = request_irq(pci_irq_vector(pdev, msix_vec), vp_config_changed, 0,
+			  vp_dev->msix_names[msix_vec], vp_dev);
 	if (err)
 		goto out_free_msix_affinity_masks;
 
 	/* Verify we had enough resources to assign the vector */
-	if (vp_dev->config_vector(vp_dev, 0) == VIRTIO_MSI_NO_VECTOR) {
+	if (vp_dev->config_vector(vp_dev, msix_vec) == VIRTIO_MSI_NO_VECTOR) {
 		err = -EBUSY;
 		goto out_free_config_irq;
 	}
 
-	vp_dev->msix_vector_map = kmalloc_array(nvqs,
-			sizeof(*vp_dev->msix_vector_map), GFP_KERNEL);
-	if (!vp_dev->msix_vector_map)
-		goto out_disable_config_irq;
+	msix_vec++;
 
-	allocated_vectors = j = 1; /* vector 0 is the config interrupt */
-	for (i = 0; i < nvqs; ++i) {
-		if (!names[i]) {
-			vqs[i] = NULL;
-			continue;
+	/*
+	 * Use a different vector for each queue if they are available,
+	 * else share the same vector for all VQs.
+	 */
+	if (vp_dev->shared_vq_vec) {
+		snprintf(vp_dev->msix_names[msix_vec],
+			 sizeof(vp_dev->msix_names[msix_vec]),
+			 "%s-virtqueues", name);
+		err = request_irq(pci_irq_vector(pdev, msix_vec),
+				vp_vring_interrupt, 0,
+				vp_dev->msix_names[msix_vec], vp_dev);
+		if (err)
+			goto out_disable_config_irq;
+
+		for (i = 0; i < nvqs; ++i) {
+			if (!names[i]) {
+				vqs[i] = NULL;
+				continue;
+			}
+
+			vqs[i] = vp_dev->setup_vq(vp_dev, i, callbacks[i],
+					names[i], callbacks[i] ?
+					msix_vec : VIRTIO_MSI_NO_VECTOR);
+			if (IS_ERR(vqs[i])) {
+				err = PTR_ERR(vqs[i]);
+				goto out_remove_vqs;
+			}
 		}
+	} else {
+		vp_dev->msix_vector_map = kmalloc_array(nvqs,
+				sizeof(*vp_dev->msix_vector_map), GFP_KERNEL);
+		if (!vp_dev->msix_vector_map)
+			goto out_disable_config_irq;
 
-		if (callbacks[i])
-			msix_vec = allocated_vectors;
-		else
-			msix_vec = VIRTIO_MSI_NO_VECTOR;
+		for (i = 0; i < nvqs; ++i) {
+			if (!names[i]) {
+				vqs[i] = NULL;
+				continue;
+			}
 
-		vqs[i] = vp_dev->setup_vq(vp_dev, i, callbacks[i], names[i],
-				msix_vec);
-		if (IS_ERR(vqs[i])) {
-			err = PTR_ERR(vqs[i]);
-			goto out_remove_vqs;
-		}
-
-		if (msix_vec == VIRTIO_MSI_NO_VECTOR) {
-			vp_dev->msix_vector_map[i] = VIRTIO_MSI_NO_VECTOR;
-			continue;
-		}
-
-		snprintf(vp_dev->msix_names[j],
-			 sizeof(*vp_dev->msix_names), "%s-%s",
-			 dev_name(&vp_dev->vdev.dev), names[i]);
-		err = request_irq(pci_irq_vector(vp_dev->pci_dev, msix_vec),
-				  vring_interrupt, IRQF_SHARED,
-				  vp_dev->msix_names[j], vqs[i]);
-		if (err) {
 			/* don't free this irq on error */
 			vp_dev->msix_vector_map[i] = VIRTIO_MSI_NO_VECTOR;
-			goto out_remove_vqs;
-		}
-		vp_dev->msix_vector_map[i] = msix_vec;
-		j++;
 
-		/*
-		 * Use a different vector for each queue if they are available,
-		 * else share the same vector for all VQs.
-		 */
-		if (!shared)
-			allocated_vectors++;
+			vqs[i] = vp_dev->setup_vq(vp_dev, i, callbacks[i],
+					names[i], callbacks[i] ?
+					msix_vec : VIRTIO_MSI_NO_VECTOR);
+			if (IS_ERR(vqs[i])) {
+				err = PTR_ERR(vqs[i]);
+				goto out_remove_vqs;
+			}
+
+			if (!callbacks[i])
+				continue;
+
+			snprintf(vp_dev->msix_names[msix_vec],
+				 sizeof(*vp_dev->msix_names), "%s-%s",
+				 dev_name(&vp_dev->vdev.dev), names[i]);
+			err = request_irq(pci_irq_vector(pdev, msix_vec),
+					  vring_interrupt, IRQF_SHARED,
+					  vp_dev->msix_names[msix_vec],
+					  vqs[i]);
+			if (err)
+				goto out_remove_vqs;
+			vp_dev->msix_vector_map[i] = msix_vec++;
+		}
 	}
 
 	return 0;
 
 out_remove_vqs:
 	vp_remove_vqs(vdev);
+	if (vp_dev->shared_vq_vec)
+		free_irq(pci_irq_vector(pdev, 1), vp_dev);
 	kfree(vp_dev->msix_vector_map);
 out_disable_config_irq:
 	vp_dev->config_vector(vp_dev, VIRTIO_MSI_NO_VECTOR);
 out_free_config_irq:
-	free_irq(pci_irq_vector(vp_dev->pci_dev, 0), vp_dev);
+	free_irq(pci_irq_vector(pdev, 0), vp_dev);
 out_free_msix_affinity_masks:
 	for (i = 0; i < nvectors; i++) {
 		if (vp_dev->msix_affinity_masks[i])
@@ -276,7 +298,7 @@ out_free_msix_affinity_masks:
 out_free_msix_names:
 	kfree(vp_dev->msix_names);
 out_free_irq_vectors:
-	pci_free_irq_vectors(vp_dev->pci_dev);
+	pci_free_irq_vectors(pdev);
 	return err;
 }
 
@@ -346,7 +368,7 @@ int vp_set_vq_affinity(struct virtqueue *vq, int cpu)
 	if (!vq->callback)
 		return -EINVAL;
 
-	if (vp_dev->pci_dev->msix_enabled) {
+	if (vp_dev->msix_vector_map) {
 		int vec = vp_dev->msix_vector_map[vq->index];
 		struct cpumask *mask = vp_dev->msix_affinity_masks[vec];
 		unsigned int irq = pci_irq_vector(vp_dev->pci_dev, vec);

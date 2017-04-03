@@ -72,6 +72,7 @@ struct virtio_pci_device {
 	int msix_vectors;
 	/* Map of per-VQ MSI-X vectors, may be NULL */
 	unsigned *msix_vector_map;
+	bool shared_vq_vec;
 
 	struct virtqueue *(*setup_vq)(struct virtio_pci_device *vp_dev,
 				      unsigned idx,
