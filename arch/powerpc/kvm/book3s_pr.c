@@ -27,6 +27,7 @@
 #include <asm/reg.h>
 #include <asm/cputable.h>
 #include <asm/cacheflush.h>
+#include <asm/disassemble.h>
 #include <asm/tlbflush.h>
 #include <linux/uaccess.h>
 #include <asm/io.h>
@@ -830,6 +831,31 @@ static void kvmppc_emulate_fac(struct kvm_vcpu *vcpu, ulong fac)
 	}
 }
 
+static void kvmppc_handle_fac_not_enabled(struct kvm_vcpu *vcpu, ulong fac)
+{
+	enum emulation_result er;
+	u32 inst;
+
+	if (kvmppc_get_msr(vcpu) & MSR_PR) {
+		kvmppc_trigger_fac_interrupt(vcpu, fac);
+		return;
+	}
+
+	er = kvmppc_get_last_inst(vcpu, INST_GENERIC, &inst);
+	if (er != EMULATE_DONE)
+		return;
+
+	if (get_op(inst) == 31 && (get_xop(inst) == OP_31_XOP_MTSPR ||
+				   get_xop(inst) == OP_31_XOP_MFSPR)) {
+		/* mtspr and mfspr are treated as NOP for unsupported SPRs */
+		kvmppc_set_pc(vcpu, kvmppc_get_pc(vcpu) + 4);
+		pr_debug_ratelimited("%s: write/read of disabled SPR: %d\n",
+				     __func__, get_sprn(inst));
+	} else {
+		kvmppc_trigger_fac_interrupt(vcpu, fac);
+	}
+}
+
 /* Enable facilities (TAR, EBB, DSCR) for the guest */
 static int kvmppc_handle_fac(struct kvm_vcpu *vcpu, ulong fac)
 {
@@ -855,7 +881,7 @@ static int kvmppc_handle_fac(struct kvm_vcpu *vcpu, ulong fac)
 
 	if (!guest_fac_enabled) {
 		/* Facility not enabled by the guest */
-		kvmppc_trigger_fac_interrupt(vcpu, fac);
+		kvmppc_handle_fac_not_enabled(vcpu, fac);
 		return RESUME_GUEST;
 	}
 
