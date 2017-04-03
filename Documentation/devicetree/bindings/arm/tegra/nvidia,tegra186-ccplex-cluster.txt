@@ -1,0 +1,22 @@
+NVIDIA Tegra CCPLEX_CLUSTER area
+
+Required properties:
+- compatible: Should contain one of the following:
+  - "nvidia,tegra186-ccplex-cluster": for Tegra186
+- reg: Must contain an (offset, length) pair of the register set for each
+  entry in reg-names.
+- reg-names: Must include the following entries:
+  - "a57": Public aperture for A57 CPU cluster
+  - "denver": Public aperture for Denver CPU cluster
+- nvidia,bpmp: Phandle to BPMP device that can be queried for OPP tables
+
+Example:
+
+	ccplex@e000000 {
+		compatible = "nvidia,tegra186-ccplex-cluster";
+		reg = <0x0 0x0e060000 0x0 0x1000>,
+		      <0x0 0x0e070000 0x0 0x1000>;
+		reg-names = "a57", "denver";
+
+		nvidia,bpmp = <&bpmp>;
+	};
