@@ -327,19 +327,54 @@ static ssize_t dwc3_mode_write(struct file *file,
 		return -EFAULT;
 
 	if (!strncmp(buf, "host", 4))
-		mode |= DWC3_GCTL_PRTCAP_HOST;
+		mode = DWC3_GCTL_PRTCAP_HOST;
 
 	if (!strncmp(buf, "device", 6))
-		mode |= DWC3_GCTL_PRTCAP_DEVICE;
+		mode = DWC3_GCTL_PRTCAP_DEVICE;
 
 	if (!strncmp(buf, "otg", 3))
-		mode |= DWC3_GCTL_PRTCAP_OTG;
+		mode = DWC3_GCTL_PRTCAP_OTG;
 
-	if (mode) {
-		spin_lock_irqsave(&dwc->lock, flags);
-		dwc3_set_mode(dwc, mode);
-		spin_unlock_irqrestore(&dwc->lock, flags);
+	if (!mode)
+		return -EINVAL;
+
+	if (mode == dwc->current_dr_role)
+		goto exit;
+
+	/* prevent role switching if we're not dual-role */
+	if (dwc->dr_mode != USB_DR_MODE_OTG)
+		return -EINVAL;
+
+	/* stop old role */
+	switch (dwc->current_dr_role) {
+	case DWC3_GCTL_PRTCAP_HOST:
+		dwc3_host_exit(dwc);
+		break;
+	case DWC3_GCTL_PRTCAP_DEVICE:
+		usb_del_gadget_udc(&dwc->gadget);
+		break;
+	default:
+		break;
 	}
+
+	/* switch PRTCAP mode. updates current_dr_role */
+	spin_lock_irqsave(&dwc->lock, flags);
+	dwc3_set_mode(dwc, mode);
+	spin_unlock_irqrestore(&dwc->lock, flags);
+
+	/* start new role */
+	switch (dwc->current_dr_role) {
+	case DWC3_GCTL_PRTCAP_HOST:
+		dwc3_host_init(dwc);
+		break;
+	case DWC3_GCTL_PRTCAP_DEVICE:
+		dwc3_event_buffers_setup(dwc);
+		usb_add_gadget_udc(dwc->dev, &dwc->gadget);
+		break;
+	default:
+		break;
+	}
+exit:
 	return count;
 }
 
