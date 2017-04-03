@@ -2730,19 +2730,14 @@ static int __must_check submit_one_bio(struct bio *bio, int mirror_num,
 				       unsigned long bio_flags)
 {
 	int ret = 0;
-	struct bio_vec *bvec = bio->bi_io_vec + bio->bi_vcnt - 1;
-	struct page *page = bvec->bv_page;
 	struct extent_io_tree *tree = bio->bi_private;
-	u64 start;
-
-	start = page_offset(page) + bvec->bv_offset;
 
 	bio->bi_private = NULL;
 	bio_get(bio);
 
 	if (tree->ops)
 		ret = tree->ops->submit_bio_hook(page->mapping->host, bio,
-					   mirror_num, bio_flags, start);
+					   mirror_num, bio_flags, 0);
 	else
 		btrfsic_submit_bio(bio);
 
