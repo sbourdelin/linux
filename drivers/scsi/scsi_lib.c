@@ -961,6 +961,19 @@ void scsi_io_completion(struct scsi_cmnd *cmd, unsigned int good_bytes)
 			/* See SSC3rXX or current. */
 			action = ACTION_FAIL;
 			break;
+		case MEDIUM_ERROR:
+			if (sshdr.asc == 0x11) {
+				/* Handle unrecovered read error */
+				switch (sshdr.ascq) {
+				case 0x00: /* URE */
+				case 0x04: /* URE auto reallocate failed */
+				case 0x0B: /* URE recommend reassignment*/
+				case 0x0C: /* URE recommend rewrite the data */
+					action = ACTION_FAIL;
+					error = -EILSEQ;
+					break;
+				}
+			}
 		default:
 			action = ACTION_FAIL;
 			break;
