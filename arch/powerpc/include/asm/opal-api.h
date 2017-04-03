@@ -168,7 +168,8 @@
 #define OPAL_INT_SET_MFRR			125
 #define OPAL_PCI_TCE_KILL			126
 #define OPAL_NMMU_SET_PTCR			127
-#define OPAL_LAST				127
+#define OPAL_NEST_IMC_COUNTERS_CONTROL		149
+#define OPAL_LAST				149
 
 /* Device tree flags */
 
@@ -926,6 +927,16 @@ enum {
 	OPAL_PCI_TCE_KILL_PAGES,
 	OPAL_PCI_TCE_KILL_PE,
 	OPAL_PCI_TCE_KILL_ALL,
+};
+
+/* Operation argument to OPAL_NEST_IMC_COUNTERS_CONTROL */
+enum {
+	OPAL_NEST_IMC_PRODUCTION_MODE = 1,
+};
+
+enum {
+	OPAL_NEST_IMC_STOP,
+	OPAL_NEST_IMC_START,
 };
 
 #endif /* __ASSEMBLY__ */
