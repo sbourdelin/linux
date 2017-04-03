@@ -331,9 +331,6 @@ struct reset_control *__of_reset_control_get(struct device_node *node,
 	int rstc_id;
 	int ret;
 
-	if (!node)
-		return ERR_PTR(-EINVAL);
-
 	if (id) {
 		index = of_property_match_string(node,
 						 "reset-names", id);
