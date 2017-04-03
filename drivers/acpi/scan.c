@@ -134,7 +134,6 @@ bool acpi_scan_is_offline(struct acpi_device *adev, bool uevent)
 				kobject_uevent(&pn->dev->kobj, KOBJ_CHANGE);
 
 			offline = false;
-			break;
 		}
 
 	mutex_unlock(&adev->physical_node_lock);

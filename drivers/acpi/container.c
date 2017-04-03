@@ -43,13 +43,14 @@ static int acpi_container_offline(struct container_dev *cdev)
 {
 	struct acpi_device *adev = ACPI_COMPANION(&cdev->dev);
 	struct acpi_device *child;
+	int ret = 0;
 
 	/* Check all of the dependent devices' physical companions. */
 	list_for_each_entry(child, &adev->children, node)
 		if (!acpi_scan_is_offline(child, false))
-			return -EBUSY;
+			ret = -EBUSY;
 
-	return 0;
+	return ret;
 }
 
 static void acpi_container_release(struct device *dev)
