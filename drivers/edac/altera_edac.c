@@ -1023,13 +1023,30 @@ out:
 	return ret;
 }
 
+static int invalid_model(void)
+{
+	struct device_node *np = of_find_node_by_path("/");
+	const char *model = of_get_property(np, "model", NULL);
+
+	of_node_put(np);
+	if (!model || strncmp(model, "Altera SOCFPGA Arria 10", 23) != 0)
+		return -ENODEV;
+
+	return 0;
+}
+
 static int validate_parent_available(struct device_node *np);
 static const struct of_device_id altr_edac_a10_device_of_match[];
 static int __init __maybe_unused altr_init_a10_ecc_device_type(char *compat)
 {
 	int irq;
-	struct device_node *child, *np = of_find_compatible_node(NULL, NULL,
-					"altr,socfpga-a10-ecc-manager");
+	struct device_node *child, *np;
+
+	if (invalid_model())
+		return -ENODEV;
+
+	np = of_find_compatible_node(NULL, NULL,
+				     "altr,socfpga-a10-ecc-manager");
 	if (!np) {
 		edac_printk(KERN_ERR, EDAC_DEVICE, "ECC Manager not found\n");
 		return -ENODEV;
@@ -1545,8 +1562,12 @@ static const struct edac_device_prv_data a10_sdmmceccb_data = {
 static int __init socfpga_init_sdmmc_ecc(void)
 {
 	int rc = -ENODEV;
-	struct device_node *child = of_find_compatible_node(NULL, NULL,
-						"altr,socfpga-sdmmc-ecc");
+	struct device_node *child;
+
+	if (invalid_model())
+		return -ENODEV;
+
+	child = of_find_compatible_node(NULL, NULL, "altr,socfpga-sdmmc-ecc");
 	if (!child) {
 		edac_printk(KERN_WARNING, EDAC_DEVICE, "SDMMC node not found\n");
 		return -ENODEV;
