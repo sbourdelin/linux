@@ -168,8 +168,12 @@ static inline void bio_advance_iter(struct bio *bio, struct bvec_iter *iter,
 
 	if (bio_no_advance_iter(bio))
 		iter->bi_size -= bytes;
-	else
-		bvec_iter_advance(bio->bi_io_vec, iter, bytes);
+	else {
+		int err;
+		err = bvec_iter_advance(bio->bi_io_vec, iter, bytes);
+		if (unlikely(err))
+			bio->bi_error = err;
+	}
 }
 
 #define __bio_for_each_segment(bvl, bio, iter, start)			\
