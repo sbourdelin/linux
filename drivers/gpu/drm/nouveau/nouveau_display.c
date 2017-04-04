@@ -156,28 +156,6 @@ nouveau_display_scanoutpos(struct drm_device *dev, unsigned int pipe,
 	return 0;
 }
 
-bool
-nouveau_display_vblstamp(struct drm_device *dev, unsigned int pipe,
-			 int *max_error, struct timeval *time, bool in_vblank_irq)
-{
-	struct drm_crtc *crtc;
-
-	list_for_each_entry(crtc, &dev->mode_config.crtc_list, head) {
-		if (nouveau_crtc(crtc)->index == pipe) {
-			struct drm_display_mode *mode;
-			if (drm_drv_uses_atomic_modeset(dev))
-				mode = &crtc->state->adjusted_mode;
-			else
-				mode = &crtc->hwmode;
-			return drm_calc_vbltimestamp_from_scanoutpos(dev,
-					pipe, max_error, time, in_vblank_irq,
-					mode);
-		}
-	}
-
-	return false;
-}
-
 static void
 nouveau_display_vblank_fini(struct drm_device *dev)
 {

@@ -116,10 +116,6 @@ int radeon_resume_kms(struct drm_device *dev, bool resume, bool fbcon);
 u32 radeon_get_vblank_counter_kms(struct drm_device *dev, unsigned int pipe);
 int radeon_enable_vblank_kms(struct drm_device *dev, unsigned int pipe);
 void radeon_disable_vblank_kms(struct drm_device *dev, unsigned int pipe);
-bool radeon_get_vblank_timestamp_kms(struct drm_device *dev, unsigned int pipe,
-				     int *max_error,
-				     struct timeval *vblank_time,
-				     bool in_vblank_irq);
 void radeon_driver_irq_preinstall_kms(struct drm_device *dev);
 int radeon_driver_irq_postinstall_kms(struct drm_device *dev);
 void radeon_driver_irq_uninstall_kms(struct drm_device *dev);
@@ -546,7 +542,7 @@ static struct drm_driver kms_driver = {
 	.get_vblank_counter = radeon_get_vblank_counter_kms,
 	.enable_vblank = radeon_enable_vblank_kms,
 	.disable_vblank = radeon_disable_vblank_kms,
-	.get_vblank_timestamp = radeon_get_vblank_timestamp_kms,
+	.get_vblank_timestamp = drm_calc_vbltimestamp_from_scanoutpos,
 	.get_scanout_position = radeon_get_crtc_scanoutpos,
 	.irq_preinstall = radeon_driver_irq_preinstall_kms,
 	.irq_postinstall = radeon_driver_irq_postinstall_kms,
