@@ -2151,7 +2151,7 @@ again:
 	 * counters from the GLOBAL_STATUS mask and we always process PEBS
 	 * events via drain_pebs().
 	 */
-	status &= ~cpuc->pebs_enabled;
+	status &= ~(cpuc->pebs_enabled & ((1ULL << MAX_PEBS_EVENTS) - 1));
 
 	/*
 	 * PEBS overflow sets bit 62 in the global status register
