@@ -148,6 +148,7 @@ struct console {
 	void	*data;
 	struct	 console *next;
 	int	maxlevel;
+	struct kobject *kobj;
 };
 
 /*
