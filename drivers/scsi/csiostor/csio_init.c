@@ -461,8 +461,7 @@ csio_config_queues(struct csio_hw *hw)
 	return 0;
 
 intr_disable:
-	csio_intr_disable(hw, false);
-
+	csio_intr_disable(hw);
 	return -EINVAL;
 }
 
@@ -575,7 +574,8 @@ err:
 static void
 csio_hw_free(struct csio_hw *hw)
 {
-	csio_intr_disable(hw, true);
+	csio_free_irqs(hw);
+	csio_intr_disable(hw);
 	csio_hw_exit_workers(hw);
 	csio_hw_exit(hw);
 	iounmap(hw->regstart);
@@ -1068,7 +1068,8 @@ csio_pci_error_detected(struct pci_dev *pdev, pci_channel_state_t state)
 	spin_unlock_irq(&hw->lock);
 	csio_lnodes_unblock_request(hw);
 	csio_lnodes_exit(hw, 0);
-	csio_intr_disable(hw, true);
+	csio_free_irqs(hw);
+	csio_intr_disable(hw);
 	pci_disable_device(pdev);
 	return state == pci_channel_io_perm_failure ?
 		PCI_ERS_RESULT_DISCONNECT : PCI_ERS_RESULT_NEED_RESET;
