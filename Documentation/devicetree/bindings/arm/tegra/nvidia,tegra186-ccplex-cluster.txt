@@ -1,0 +1,17 @@
+NVIDIA Tegra CCPLEX_CLUSTER area
+
+Required properties:
+- compatible: Should contain one of the following:
+  - "nvidia,tegra186-ccplex-cluster": for Tegra186
+- reg: Must contain an (offset, length) pair of the device's MMIO
+  register area
+- nvidia,bpmp: phandle to BPMP device that can be queried for OPP tables
+
+Example:
+
+	ccplex@e000000 {
+		compatible = "nvidia,tegra186-ccplex-cluster";
+		reg = <0x0 0x0e000000 0x0 0x3fffff>,
+
+		nvidia,bpmp = <&bpmp>;
+	};
