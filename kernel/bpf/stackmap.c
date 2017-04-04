@@ -273,14 +273,9 @@ static const struct bpf_map_ops stack_map_ops = {
 	.map_delete_elem = stack_map_delete_elem,
 };
 
-static struct bpf_map_type_list stack_map_type __ro_after_init = {
-	.ops = &stack_map_ops,
-	.type = BPF_MAP_TYPE_STACK_TRACE,
-};
-
 static int __init register_stack_map(void)
 {
-	bpf_register_map_type(&stack_map_type);
+	bpf_register_map_type(BPF_MAP_TYPE_STACK_TRACE, &stack_map_ops);
 	return 0;
 }
 late_initcall(register_stack_map);

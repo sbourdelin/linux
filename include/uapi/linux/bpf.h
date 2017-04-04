@@ -96,6 +96,8 @@ enum bpf_map_type {
 	BPF_MAP_TYPE_LRU_HASH,
 	BPF_MAP_TYPE_LRU_PERCPU_HASH,
 	BPF_MAP_TYPE_LPM_TRIE,
+
+	NUM_BPF_MAP_TYPES,
 };
 
 enum bpf_prog_type {

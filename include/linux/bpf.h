@@ -51,12 +51,6 @@ struct bpf_map {
 	atomic_t usercnt;
 };
 
-struct bpf_map_type_list {
-	struct list_head list_node;
-	const struct bpf_map_ops *ops;
-	enum bpf_map_type type;
-};
-
 /* function argument constraints */
 enum bpf_arg_type {
 	ARG_DONTCARE = 0,	/* unused argument in helper function */
@@ -230,7 +224,8 @@ DECLARE_PER_CPU(int, bpf_prog_active);
 
 void bpf_register_prog_type(enum bpf_prog_type type,
 			    const struct bpf_verifier_ops *ops);
-void bpf_register_map_type(struct bpf_map_type_list *tl);
+void bpf_register_map_type(enum bpf_map_type type,
+			   const struct bpf_map_ops *ops);
 
 struct bpf_prog *bpf_prog_get(u32 ufd);
 struct bpf_prog *bpf_prog_get_type(u32 ufd, enum bpf_prog_type type);

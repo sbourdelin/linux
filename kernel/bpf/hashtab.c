@@ -1062,11 +1062,6 @@ static const struct bpf_map_ops htab_ops = {
 	.map_delete_elem = htab_map_delete_elem,
 };
 
-static struct bpf_map_type_list htab_type __ro_after_init = {
-	.ops = &htab_ops,
-	.type = BPF_MAP_TYPE_HASH,
-};
-
 static const struct bpf_map_ops htab_lru_ops = {
 	.map_alloc = htab_map_alloc,
 	.map_free = htab_map_free,
@@ -1074,11 +1069,6 @@ static const struct bpf_map_ops htab_lru_ops = {
 	.map_lookup_elem = htab_lru_map_lookup_elem,
 	.map_update_elem = htab_lru_map_update_elem,
 	.map_delete_elem = htab_lru_map_delete_elem,
-};
-
-static struct bpf_map_type_list htab_lru_type __ro_after_init = {
-	.ops = &htab_lru_ops,
-	.type = BPF_MAP_TYPE_LRU_HASH,
 };
 
 /* Called from eBPF program */
@@ -1163,11 +1153,6 @@ static const struct bpf_map_ops htab_percpu_ops = {
 	.map_delete_elem = htab_map_delete_elem,
 };
 
-static struct bpf_map_type_list htab_percpu_type __ro_after_init = {
-	.ops = &htab_percpu_ops,
-	.type = BPF_MAP_TYPE_PERCPU_HASH,
-};
-
 static const struct bpf_map_ops htab_lru_percpu_ops = {
 	.map_alloc = htab_map_alloc,
 	.map_free = htab_map_free,
@@ -1177,17 +1162,13 @@ static const struct bpf_map_ops htab_lru_percpu_ops = {
 	.map_delete_elem = htab_lru_map_delete_elem,
 };
 
-static struct bpf_map_type_list htab_lru_percpu_type __ro_after_init = {
-	.ops = &htab_lru_percpu_ops,
-	.type = BPF_MAP_TYPE_LRU_PERCPU_HASH,
-};
-
 static int __init register_htab_map(void)
 {
-	bpf_register_map_type(&htab_type);
-	bpf_register_map_type(&htab_percpu_type);
-	bpf_register_map_type(&htab_lru_type);
-	bpf_register_map_type(&htab_lru_percpu_type);
+	bpf_register_map_type(BPF_MAP_TYPE_HASH, &htab_ops);
+	bpf_register_map_type(BPF_MAP_TYPE_PERCPU_HASH, &htab_percpu_ops);
+	bpf_register_map_type(BPF_MAP_TYPE_LRU_HASH, &htab_lru_ops);
+	bpf_register_map_type(BPF_MAP_TYPE_LRU_PERCPU_HASH,
+			      &htab_lru_percpu_ops);
 	return 0;
 }
 late_initcall(register_htab_map);

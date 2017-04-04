@@ -514,14 +514,9 @@ static const struct bpf_map_ops trie_ops = {
 	.map_delete_elem = trie_delete_elem,
 };
 
-static struct bpf_map_type_list trie_type __ro_after_init = {
-	.ops = &trie_ops,
-	.type = BPF_MAP_TYPE_LPM_TRIE,
-};
-
 static int __init register_trie_map(void)
 {
-	bpf_register_map_type(&trie_type);
+	bpf_register_map_type(BPF_MAP_TYPE_LPM_TRIE, &trie_ops);
 	return 0;
 }
 late_initcall(register_trie_map);
