@@ -3108,16 +3108,14 @@ static void stmmac_set_rx_mode(struct net_device *dev)
  */
 static int stmmac_change_mtu(struct net_device *dev, int new_mtu)
 {
-	struct stmmac_priv *priv = netdev_priv(dev);
-
-	if (netif_running(dev)) {
-		netdev_err(priv->dev, "must be stopped to change its MTU\n");
-		return -EBUSY;
-	}
-
 	dev->mtu = new_mtu;
 
 	netdev_update_features(dev);
+
+	if (netif_running(dev)) {
+		stmmac_release(dev);
+		stmmac_open(dev);
+	}
 
 	return 0;
 }
