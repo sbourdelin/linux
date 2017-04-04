@@ -355,29 +355,30 @@ static int aac_rx_check_health(struct aac_dev *dev)
 
 		if (likely((status & 0xFF000000L) == 0xBC000000L))
 			return (status >> 16) & 0xFF;
-		buffer = pci_alloc_consistent(dev->pdev, 512, &baddr);
+		buffer = aac_pci_alloc_consistent(dev->pdev, 512, &baddr);
 		ret = -2;
 		if (unlikely(buffer == NULL))
 			return ret;
-		post = pci_alloc_consistent(dev->pdev,
+		post = aac_pci_alloc_consistent(dev->pdev,
 		  sizeof(struct POSTSTATUS), &paddr);
 		if (unlikely(post == NULL)) {
-			pci_free_consistent(dev->pdev, 512, buffer, baddr);
+			aac_pci_free_consistent(dev->pdev, 512, buffer, baddr);
 			return ret;
 		}
 		memset(buffer, 0, 512);
+		memset(post, 0, sizeof(struct POSTSTATUS));
 		post->Post_Command = cpu_to_le32(COMMAND_POST_RESULTS);
 		post->Post_Address = cpu_to_le32(baddr);
 		rx_writel(dev, MUnit.IMRx[0], paddr);
 		rx_sync_cmd(dev, COMMAND_POST_RESULTS, baddr, 0, 0, 0, 0, 0,
 		  NULL, NULL, NULL, NULL, NULL);
-		pci_free_consistent(dev->pdev, sizeof(struct POSTSTATUS),
+		aac_pci_free_consistent(dev->pdev, sizeof(struct POSTSTATUS),
 		  post, paddr);
 		if (likely((buffer[0] == '0') && ((buffer[1] == 'x') || (buffer[1] == 'X')))) {
 			ret = (hex_to_bin(buffer[2]) << 4) +
 				hex_to_bin(buffer[3]);
 		}
-		pci_free_consistent(dev->pdev, 512, buffer, baddr);
+		aac_pci_free_consistent(dev->pdev, 512, buffer, baddr);
 		return ret;
 	}
 	/*

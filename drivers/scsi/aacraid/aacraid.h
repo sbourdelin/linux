@@ -2692,4 +2692,26 @@ extern int update_interval;
 extern int check_interval;
 extern int aac_check_reset;
 extern int aac_fib_dump;
+#if defined(CONFIG_ARM64)
+static inline void *
+aac_pci_alloc_consistent(struct pci_dev *hwdev, size_t size,
+		     dma_addr_t *dma_handle) {
+	return dma_alloc_coherent(hwdev == NULL ? NULL : &hwdev->dev,
+				  size,
+				  dma_handle,
+				  GFP_KERNEL);
+}
+#else
+static inline void *
+aac_pci_alloc_consistent(struct pci_dev *hwdev, size_t size,
+		     dma_addr_t *dma_handle) {
+	return pci_alloc_consistent(hwdev, size, dma_handle);
+}
+#endif
+static inline void
+aac_pci_free_consistent(struct pci_dev *hwdev, size_t size,
+			void *vaddr, dma_addr_t dma_handle)
+{
+	pci_free_consistent(hwdev, size, vaddr, dma_handle);
+}
 #endif
