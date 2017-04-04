@@ -1562,7 +1562,7 @@ SYSCALL_DEFINE3(syslog, int, type, char __user *, buf, int, len)
  * The console_lock must be held.
  */
 static void call_console_drivers(const char *ext_text, size_t ext_len,
-				 const char *text, size_t len)
+				 const char *text, size_t len, int level)
 {
 	struct console *con;
 
@@ -1580,6 +1580,8 @@ static void call_console_drivers(const char *ext_text, size_t ext_len,
 			continue;
 		if (!cpu_online(smp_processor_id()) &&
 		    !(con->flags & CON_ANYTIME))
+			continue;
+		if (level > con->maxlevel)
 			continue;
 		if (con->flags & CON_EXTENDED)
 			con->write(con, ext_text, ext_len);
@@ -1869,7 +1871,7 @@ static ssize_t msg_print_ext_body(char *buf, size_t size,
 				  char *dict, size_t dict_len,
 				  char *text, size_t text_len) { return 0; }
 static void call_console_drivers(const char *ext_text, size_t ext_len,
-				 const char *text, size_t len) {}
+				 const char *text, size_t len, int level) {}
 static size_t msg_print_text(const struct printk_log *msg,
 			     bool syslog, char *buf, size_t size) { return 0; }
 static bool suppress_message_printing(int level) { return false; }
@@ -2238,7 +2240,7 @@ skip:
 		raw_spin_unlock(&logbuf_lock);
 
 		stop_critical_timings();	/* don't trace print latency */
-		call_console_drivers(ext_text, ext_len, text, len);
+		call_console_drivers(ext_text, ext_len, text, len, msg->level);
 		start_critical_timings();
 		printk_safe_exit_irqrestore(flags);
 
@@ -2502,6 +2504,11 @@ void register_console(struct console *newcon)
 	 */
 	if (bcon && ((newcon->flags & (CON_CONSDEV | CON_BOOT)) == CON_CONSDEV))
 		newcon->flags &= ~CON_PRINTBUFFER;
+
+	/*
+	 * By default, the per-console loglevel filter permits all messages.
+	 */
+	newcon->maxlevel = LOGLEVEL_DEBUG;
 
 	/*
 	 *	Put this console in the list - keep the
