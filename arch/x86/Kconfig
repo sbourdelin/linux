@@ -2789,6 +2789,17 @@ config X86_DMA_REMAP
 
 source "net/Kconfig"
 
+config EBPF_JIT_HASH_OUTPUT
+	def_bool y
+	depends on HAVE_EBPF_JIT
+	depends on BPF_JIT
+	select CRYPTO_SHA256
+	---help---
+	  Enables a double check of the JIT's output after it is marked read-only to
+	  ensure that it matches what the JIT generated.
+
+	  Note, only applies when /proc/sys/net/core/bpf_jit_harden > 0.
+
 source "drivers/Kconfig"
 
 source "drivers/firmware/Kconfig"
