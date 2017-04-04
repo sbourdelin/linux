@@ -942,7 +942,9 @@ static int btt_rw_integrity(struct btt *btt, struct bio_integrity_payload *bip,
 
 		len -= cur_len;
 		meta_nsoff += cur_len;
-		bvec_iter_advance(bip->bip_vec, &bip->bip_iter, cur_len);
+		ret = bvec_iter_advance(bip->bip_vec, &bip->bip_iter, cur_len);
+		if (ret)
+			return ret;
 	}
 
 	return ret;
