@@ -49,10 +49,11 @@ struct pn533_i2c_phy {
 
 static int pn533_i2c_send_ack(struct pn533 *dev, gfp_t flags)
 {
+	static const u8 ack[6] = {0x00, 0x00, 0xff, 0x00, 0xff, 0x00};
+	/* spec 6.2.1.3:  Preamble, SoPC (2), ACK Code (2), Postamble */
+
 	struct pn533_i2c_phy *phy = dev->phy;
 	struct i2c_client *client = phy->i2c_dev;
-	u8 ack[6] = {0x00, 0x00, 0xff, 0x00, 0xff, 0x00};
-	/* spec 6.2.1.3:  Preamble, SoPC (2), ACK Code (2), Postamble */
 	int rc;
 
 	rc = i2c_master_send(client, ack, 6);
