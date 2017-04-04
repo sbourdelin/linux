@@ -15,7 +15,7 @@ struct scsi_driver {
 	int (*init_command)(struct scsi_cmnd *);
 	void (*uninit_command)(struct scsi_cmnd *);
 	int (*done)(struct scsi_cmnd *);
-	int (*eh_action)(struct scsi_cmnd *, int);
+	int (*eh_action)(struct scsi_cmnd *, int, bool);
 };
 #define to_scsi_driver(drv) \
 	container_of((drv), struct scsi_driver, gendrv)
