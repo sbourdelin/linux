@@ -169,12 +169,6 @@ struct bpf_verifier_ops {
 				  struct bpf_prog *prog);
 };
 
-struct bpf_prog_type_list {
-	struct list_head list_node;
-	const struct bpf_verifier_ops *ops;
-	enum bpf_prog_type type;
-};
-
 struct bpf_prog_aux {
 	atomic_t refcnt;
 	u32 used_map_cnt;
@@ -234,7 +228,8 @@ u64 bpf_event_output(struct bpf_map *map, u64 flags, void *meta, u64 meta_size,
 #ifdef CONFIG_BPF_SYSCALL
 DECLARE_PER_CPU(int, bpf_prog_active);
 
-void bpf_register_prog_type(struct bpf_prog_type_list *tl);
+void bpf_register_prog_type(enum bpf_prog_type type,
+			    const struct bpf_verifier_ops *ops);
 void bpf_register_map_type(struct bpf_map_type_list *tl);
 
 struct bpf_prog *bpf_prog_get(u32 ufd);
@@ -295,7 +290,8 @@ static inline void bpf_long_memcpy(void *dst, const void *src, u32 size)
 /* verify correctness of eBPF program */
 int bpf_check(struct bpf_prog **fp, union bpf_attr *attr);
 #else
-static inline void bpf_register_prog_type(struct bpf_prog_type_list *tl)
+static inline void bpf_register_prog_type(enum bpf_prog_type type,
+					  const struct bpf_verifier_ops *ops)
 {
 }
 

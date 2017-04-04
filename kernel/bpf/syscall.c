@@ -564,26 +564,26 @@ err_put:
 	return err;
 }
 
-static LIST_HEAD(bpf_prog_types);
+static const struct bpf_verifier_ops *
+bpf_prog_types[NUM_BPF_PROG_TYPES] __ro_after_init;
 
 static int find_prog_type(enum bpf_prog_type type, struct bpf_prog *prog)
 {
-	struct bpf_prog_type_list *tl;
+	if (type >= NUM_BPF_PROG_TYPES || !bpf_prog_types[type])
+		return -EINVAL;
 
-	list_for_each_entry(tl, &bpf_prog_types, list_node) {
-		if (tl->type == type) {
-			prog->aux->ops = tl->ops;
-			prog->type = type;
-			return 0;
-		}
-	}
-
-	return -EINVAL;
+	prog->aux->ops = bpf_prog_types[type];
+	prog->type = type;
+	return 0;
 }
 
-void bpf_register_prog_type(struct bpf_prog_type_list *tl)
+void __init bpf_register_prog_type(enum bpf_prog_type type,
+				   const struct bpf_verifier_ops *ops)
 {
-	list_add(&tl->list_node, &bpf_prog_types);
+	if (WARN_ON(bpf_prog_types[type]))
+		return;
+
+	bpf_prog_types[type] = ops;
 }
 
 /* fixup insn->imm field of bpf_call instructions:

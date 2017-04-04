@@ -506,11 +506,6 @@ static const struct bpf_verifier_ops kprobe_prog_ops = {
 	.is_valid_access = kprobe_prog_is_valid_access,
 };
 
-static struct bpf_prog_type_list kprobe_tl __ro_after_init = {
-	.ops	= &kprobe_prog_ops,
-	.type	= BPF_PROG_TYPE_KPROBE,
-};
-
 BPF_CALL_5(bpf_perf_event_output_tp, void *, tp_buff, struct bpf_map *, map,
 	   u64, flags, void *, data, u64, size)
 {
@@ -589,11 +584,6 @@ static const struct bpf_verifier_ops tracepoint_prog_ops = {
 	.is_valid_access = tp_prog_is_valid_access,
 };
 
-static struct bpf_prog_type_list tracepoint_tl __ro_after_init = {
-	.ops	= &tracepoint_prog_ops,
-	.type	= BPF_PROG_TYPE_TRACEPOINT,
-};
-
 static bool pe_prog_is_valid_access(int off, int size, enum bpf_access_type type,
 				    enum bpf_reg_type *reg_type)
 {
@@ -648,16 +638,11 @@ static const struct bpf_verifier_ops perf_event_prog_ops = {
 	.convert_ctx_access	= pe_prog_convert_ctx_access,
 };
 
-static struct bpf_prog_type_list perf_event_tl __ro_after_init = {
-	.ops	= &perf_event_prog_ops,
-	.type	= BPF_PROG_TYPE_PERF_EVENT,
-};
-
 static int __init register_kprobe_prog_ops(void)
 {
-	bpf_register_prog_type(&kprobe_tl);
-	bpf_register_prog_type(&tracepoint_tl);
-	bpf_register_prog_type(&perf_event_tl);
+	bpf_register_prog_type(BPF_PROG_TYPE_KPROBE, &kprobe_prog_ops);
+	bpf_register_prog_type(BPF_PROG_TYPE_TRACEPOINT, &tracepoint_prog_ops);
+	bpf_register_prog_type(BPF_PROG_TYPE_PERF_EVENT, &perf_event_prog_ops);
 	return 0;
 }
 late_initcall(register_kprobe_prog_ops);
