@@ -14,6 +14,7 @@
 struct itco_wdt_platform_data {
 	char name[32];
 	unsigned int version;
+	int (*update_noreboot_flag)(bool status);
 };
 
 #endif /* _ITCO_WDT_H_ */
