@@ -457,6 +457,11 @@ struct scsi_host_template {
 	unsigned no_async_abort:1;
 
 	/*
+	 * True if the host supports a host-wide tagspace
+	 */
+	unsigned host_tagset:1;
+
+	/*
 	 * Countdown for host blocking with no commands outstanding.
 	 */
 	unsigned int max_host_blocked;
