@@ -692,100 +692,6 @@ static void ipoib_stop_ah(struct net_device *dev)
 	ipoib_flush_ah(dev);
 }
 
-void ipoib_ib_tx_timer_func(unsigned long ctx)
-{
-	drain_tx_cq((struct net_device *)ctx);
-}
-
-int ipoib_ib_dev_open(struct net_device *dev)
-{
-	struct ipoib_dev_priv *priv = netdev_priv(dev);
-	int ret;
-
-	ipoib_pkey_dev_check_presence(dev);
-
-	if (!test_bit(IPOIB_PKEY_ASSIGNED, &priv->flags)) {
-		ipoib_warn(priv, "P_Key 0x%04x is %s\n", priv->pkey,
-			   (!(priv->pkey & 0x7fff) ? "Invalid" : "not found"));
-		return -1;
-	}
-
-	ret = ipoib_init_qp(dev);
-	if (ret) {
-		ipoib_warn(priv, "ipoib_init_qp returned %d\n", ret);
-		return -1;
-	}
-
-	ret = ipoib_ib_post_receives(dev);
-	if (ret) {
-		ipoib_warn(priv, "ipoib_ib_post_receives returned %d\n", ret);
-		goto dev_stop;
-	}
-
-	ret = ipoib_cm_dev_open(dev);
-	if (ret) {
-		ipoib_warn(priv, "ipoib_cm_dev_open returned %d\n", ret);
-		goto dev_stop;
-	}
-
-	clear_bit(IPOIB_STOP_REAPER, &priv->flags);
-	queue_delayed_work(priv->wq, &priv->ah_reap_task,
-			   round_jiffies_relative(HZ));
-
-	if (!test_and_set_bit(IPOIB_FLAG_INITIALIZED, &priv->flags))
-		napi_enable(&priv->napi);
-
-	return 0;
-dev_stop:
-	if (!test_and_set_bit(IPOIB_FLAG_INITIALIZED, &priv->flags))
-		napi_enable(&priv->napi);
-	ipoib_ib_dev_stop(dev);
-	return -1;
-}
-
-void ipoib_pkey_dev_check_presence(struct net_device *dev)
-{
-	struct ipoib_dev_priv *priv = netdev_priv(dev);
-
-	if (!(priv->pkey & 0x7fff) ||
-	    ib_find_pkey(priv->ca, priv->port, priv->pkey,
-			 &priv->pkey_index))
-		clear_bit(IPOIB_PKEY_ASSIGNED, &priv->flags);
-	else
-		set_bit(IPOIB_PKEY_ASSIGNED, &priv->flags);
-}
-
-void ipoib_ib_dev_up(struct net_device *dev)
-{
-	struct ipoib_dev_priv *priv = netdev_priv(dev);
-
-	ipoib_pkey_dev_check_presence(dev);
-
-	if (!test_bit(IPOIB_PKEY_ASSIGNED, &priv->flags)) {
-		ipoib_dbg(priv, "PKEY is not assigned.\n");
-		return;
-	}
-
-	set_bit(IPOIB_FLAG_OPER_UP, &priv->flags);
-
-	ipoib_mcast_start_thread(dev);
-}
-
-void ipoib_ib_dev_down(struct net_device *dev)
-{
-	struct ipoib_dev_priv *priv = netdev_priv(dev);
-
-	ipoib_dbg(priv, "downing ib_dev\n");
-
-	clear_bit(IPOIB_FLAG_OPER_UP, &priv->flags);
-	netif_carrier_off(dev);
-
-	ipoib_mcast_stop_thread(dev);
-	ipoib_mcast_dev_flush(dev);
-
-	ipoib_flush_paths(dev);
-}
-
 static int recvs_pending(struct net_device *dev)
 {
 	struct ipoib_dev_priv *priv = netdev_priv(dev);
@@ -799,46 +705,7 @@ static int recvs_pending(struct net_device *dev)
 	return pending;
 }
 
-void ipoib_drain_cq(struct net_device *dev)
-{
-	struct ipoib_dev_priv *priv = netdev_priv(dev);
-	int i, n;
-
-	/*
-	 * We call completion handling routines that expect to be
-	 * called from the BH-disabled NAPI poll context, so disable
-	 * BHs here too.
-	 */
-	local_bh_disable();
-
-	do {
-		n = ib_poll_cq(priv->recv_cq, IPOIB_NUM_WC, priv->ibwc);
-		for (i = 0; i < n; ++i) {
-			/*
-			 * Convert any successful completions to flush
-			 * errors to avoid passing packets up the
-			 * stack after bringing the device down.
-			 */
-			if (priv->ibwc[i].status == IB_WC_SUCCESS)
-				priv->ibwc[i].status = IB_WC_WR_FLUSH_ERR;
-
-			if (priv->ibwc[i].wr_id & IPOIB_OP_RECV) {
-				if (priv->ibwc[i].wr_id & IPOIB_OP_CM)
-					ipoib_cm_handle_rx_wc(dev, priv->ibwc + i);
-				else
-					ipoib_ib_handle_rx_wc(dev, priv->ibwc + i);
-			} else
-				ipoib_cm_handle_tx_wc(dev, priv->ibwc + i);
-		}
-	} while (n == IPOIB_NUM_WC);
-
-	while (poll_tx(priv))
-		; /* nothing */
-
-	local_bh_enable();
-}
-
-void ipoib_ib_dev_stop(struct net_device *dev)
+int ipoib_ib_dev_stop_default(struct net_device *dev)
 {
 	struct ipoib_dev_priv *priv = netdev_priv(dev);
 	struct ib_qp_attr qp_attr;
@@ -908,9 +775,168 @@ timeout:
 	if (ib_modify_qp(priv->qp, &qp_attr, IB_QP_STATE))
 		ipoib_warn(priv, "Failed to modify QP to RESET state\n");
 
+	ib_req_notify_cq(priv->recv_cq, IB_CQ_NEXT_COMP);
+
+	return 0;
+}
+
+int ipoib_ib_dev_stop(struct net_device *dev)
+{
+	ipoib_ib_dev_stop_default(dev);
+
 	ipoib_flush_ah(dev);
 
-	ib_req_notify_cq(priv->recv_cq, IB_CQ_NEXT_COMP);
+	return 0;
+}
+
+void ipoib_ib_tx_timer_func(unsigned long ctx)
+{
+	drain_tx_cq((struct net_device *)ctx);
+}
+
+int ipoib_ib_dev_open_default(struct net_device *dev)
+{
+	struct ipoib_dev_priv *priv = netdev_priv(dev);
+	int ret;
+
+	ret = ipoib_init_qp(dev);
+	if (ret) {
+		ipoib_warn(priv, "ipoib_init_qp returned %d\n", ret);
+		return -1;
+	}
+
+	ret = ipoib_ib_post_receives(dev);
+	if (ret) {
+		ipoib_warn(priv, "ipoib_ib_post_receives returned %d\n", ret);
+		goto dev_stop;
+	}
+
+	ret = ipoib_cm_dev_open(dev);
+	if (ret) {
+		ipoib_warn(priv, "ipoib_cm_dev_open returned %d\n", ret);
+		goto dev_stop;
+	}
+
+	if (!test_and_set_bit(IPOIB_FLAG_INITIALIZED, &priv->flags))
+		napi_enable(&priv->napi);
+
+	return 0;
+dev_stop:
+	if (!test_and_set_bit(IPOIB_FLAG_INITIALIZED, &priv->flags))
+		napi_enable(&priv->napi);
+	ipoib_ib_dev_stop(dev);
+	return -1;
+}
+
+int ipoib_ib_dev_open(struct net_device *dev)
+{
+	struct ipoib_dev_priv *priv = netdev_priv(dev);
+
+	ipoib_pkey_dev_check_presence(dev);
+
+	if (!test_bit(IPOIB_PKEY_ASSIGNED, &priv->flags)) {
+		ipoib_warn(priv, "P_Key 0x%04x is %s\n", priv->pkey,
+			   (!(priv->pkey & 0x7fff) ? "Invalid" : "not found"));
+		return -1;
+	}
+
+	clear_bit(IPOIB_STOP_REAPER, &priv->flags);
+	queue_delayed_work(priv->wq, &priv->ah_reap_task,
+			   round_jiffies_relative(HZ));
+
+	if (ipoib_ib_dev_open_default(dev)) {
+		pr_warn("%s: Failed to open dev\n", dev->name);
+		goto stop_ah_reap;
+	}
+
+	return 0;
+
+stop_ah_reap:
+	set_bit(IPOIB_STOP_REAPER, &priv->flags);
+	cancel_delayed_work(&priv->ah_reap_task);
+	return -1;
+}
+
+void ipoib_pkey_dev_check_presence(struct net_device *dev)
+{
+	struct ipoib_dev_priv *priv = netdev_priv(dev);
+
+	if (!(priv->pkey & 0x7fff) ||
+	    ib_find_pkey(priv->ca, priv->port, priv->pkey,
+			 &priv->pkey_index))
+		clear_bit(IPOIB_PKEY_ASSIGNED, &priv->flags);
+	else
+		set_bit(IPOIB_PKEY_ASSIGNED, &priv->flags);
+}
+
+void ipoib_ib_dev_up(struct net_device *dev)
+{
+	struct ipoib_dev_priv *priv = netdev_priv(dev);
+
+	ipoib_pkey_dev_check_presence(dev);
+
+	if (!test_bit(IPOIB_PKEY_ASSIGNED, &priv->flags)) {
+		ipoib_dbg(priv, "PKEY is not assigned.\n");
+		return;
+	}
+
+	set_bit(IPOIB_FLAG_OPER_UP, &priv->flags);
+
+	ipoib_mcast_start_thread(dev);
+}
+
+void ipoib_ib_dev_down(struct net_device *dev)
+{
+	struct ipoib_dev_priv *priv = netdev_priv(dev);
+
+	ipoib_dbg(priv, "downing ib_dev\n");
+
+	clear_bit(IPOIB_FLAG_OPER_UP, &priv->flags);
+	netif_carrier_off(dev);
+
+	ipoib_mcast_stop_thread(dev);
+	ipoib_mcast_dev_flush(dev);
+
+	ipoib_flush_paths(dev);
+}
+
+void ipoib_drain_cq(struct net_device *dev)
+{
+	struct ipoib_dev_priv *priv = netdev_priv(dev);
+	int i, n;
+
+	/*
+	 * We call completion handling routines that expect to be
+	 * called from the BH-disabled NAPI poll context, so disable
+	 * BHs here too.
+	 */
+	local_bh_disable();
+
+	do {
+		n = ib_poll_cq(priv->recv_cq, IPOIB_NUM_WC, priv->ibwc);
+		for (i = 0; i < n; ++i) {
+			/*
+			 * Convert any successful completions to flush
+			 * errors to avoid passing packets up the
+			 * stack after bringing the device down.
+			 */
+			if (priv->ibwc[i].status == IB_WC_SUCCESS)
+				priv->ibwc[i].status = IB_WC_WR_FLUSH_ERR;
+
+			if (priv->ibwc[i].wr_id & IPOIB_OP_RECV) {
+				if (priv->ibwc[i].wr_id & IPOIB_OP_CM)
+					ipoib_cm_handle_rx_wc(dev, priv->ibwc + i);
+				else
+					ipoib_ib_handle_rx_wc(dev, priv->ibwc + i);
+			} else
+				ipoib_cm_handle_tx_wc(dev, priv->ibwc + i);
+		}
+	} while (n == IPOIB_NUM_WC);
+
+	while (poll_tx(priv))
+		; /* nothing */
+
+	local_bh_enable();
 }
 
 /*
