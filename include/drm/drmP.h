@@ -81,6 +81,7 @@
 #include <drm/drm_debugfs.h>
 #include <drm/drm_ioctl.h>
 #include <drm/drm_sysfs.h>
+#include <drm/drm_ioctl.h>
 
 struct module;
 
