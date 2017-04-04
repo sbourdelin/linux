@@ -534,15 +534,17 @@ static void i40e_client_release(struct i40e_client *client)
 static void i40e_client_prepare(struct i40e_client *client)
 {
 	struct i40e_device *ldev;
-	struct i40e_pf *pf;
 
 	mutex_lock(&i40e_device_mutex);
 	list_for_each_entry(ldev, &i40e_devices, list) {
-		pf = ldev->pf;
-		i40e_client_add_instance(pf);
-		/* Start the client subtask */
-		pf->flags |= I40E_FLAG_SERVICE_CLIENT_REQUESTED;
-		i40e_service_event_schedule(pf);
+		struct i40e_pf *pf = ldev->pf;
+
+		if (pf->hw.mac.type == I40E_MAC_X722) {
+			i40e_client_add_instance(pf);
+			/* Start the client subtask */
+			pf->flags |= I40E_FLAG_SERVICE_CLIENT_REQUESTED;
+			i40e_service_event_schedule(pf);
+		}
 	}
 	mutex_unlock(&i40e_device_mutex);
 }
