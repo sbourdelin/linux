@@ -39,9 +39,9 @@ static bool intel_dp_mst_compute_config(struct intel_encoder *encoder,
 	struct intel_dp *intel_dp = &intel_dig_port->dp;
 	struct intel_connector *connector =
 		to_intel_connector(conn_state->connector);
-	struct drm_atomic_state *state;
+	struct drm_atomic_state *state = pipe_config->base.state;
 	int bpp;
-	int lane_count, slots;
+	int lane_count, slots = 0;
 	const struct drm_display_mode *adjusted_mode = &pipe_config->base.adjusted_mode;
 	int mst_pbn;
 
@@ -57,30 +57,63 @@ static bool intel_dp_mst_compute_config(struct intel_encoder *encoder,
 	 * seem to suggest we should do otherwise.
 	 */
 	lane_count = drm_dp_max_lane_count(intel_dp->dpcd);
-
 	pipe_config->lane_count = lane_count;
 
 	pipe_config->pipe_bpp = bpp;
 	pipe_config->port_clock = intel_dp_max_link_rate(intel_dp);
 
-	state = pipe_config->base.state;
-
 	if (drm_dp_mst_port_has_audio(&intel_dp->mst_mgr, connector->port))
 		pipe_config->has_audio = true;
-	mst_pbn = drm_dp_calc_pbn_mode(adjusted_mode->crtc_clock, bpp);
 
+	mst_pbn = drm_dp_calc_pbn_mode(adjusted_mode->crtc_clock, bpp);
 	pipe_config->pbn = mst_pbn;
-	slots = drm_dp_find_vcpi_slots(&intel_dp->mst_mgr, mst_pbn);
 
 	intel_link_compute_m_n(bpp, lane_count,
 			       adjusted_mode->crtc_clock,
 			       pipe_config->port_clock,
 			       &pipe_config->dp_m_n);
 
+	if (pipe_config->base.active) {
+		slots = drm_dp_atomic_find_vcpi_slots(state, &intel_dp->mst_mgr,
+					      connector->port, mst_pbn);
+		if (slots < 0) {
+			DRM_DEBUG_KMS("failed finding vcpi slots:%d\n", slots);
+			return false;
+		}
+	}
 	pipe_config->dp_m_n.tu = slots;
 
 	return true;
+}
 
+static int intel_dp_mst_atomic_release(struct drm_connector *connector,
+					struct drm_connector_state *conn_state)
+{
+	struct intel_dp_mst_encoder *intel_mst;
+	struct drm_dp_mst_topology_mgr *mgr;
+	struct drm_encoder *encoder;
+	struct intel_connector *intel_connector = to_intel_connector(connector);
+	struct drm_atomic_state *state = conn_state->state;
+	struct drm_crtc *old_crtc = connector->state->crtc;
+	struct intel_crtc_state *old_crtc_state =
+		to_intel_crtc_state(old_crtc->state);
+	int slots;
+	int ret = 0;
+
+	encoder = connector->state->best_encoder;
+	intel_mst = enc_to_mst(encoder);
+	mgr = &intel_mst->primary->dp.mst_mgr;
+
+	slots = old_crtc_state->dp_m_n.tu;
+	if (slots > 0) {
+		ret = drm_dp_atomic_release_vcpi_slots(state, mgr,
+					 intel_connector->port, slots);
+		if (ret)
+			DRM_DEBUG_KMS("failed releasing %d vcpi slots:%d\n", slots, ret);
+		else
+			old_crtc_state->dp_m_n.tu = 0;
+	}
+	return ret;
 }
 
 static void intel_mst_disable_dp(struct intel_encoder *encoder,
@@ -387,6 +420,7 @@ static const struct drm_connector_helper_funcs intel_dp_mst_connector_helper_fun
 	.mode_valid = intel_dp_mst_mode_valid,
 	.atomic_best_encoder = intel_mst_atomic_best_encoder,
 	.best_encoder = intel_mst_best_encoder,
+	.atomic_release = intel_dp_mst_atomic_release,
 };
 
 static void intel_dp_mst_encoder_destroy(struct drm_encoder *encoder)
