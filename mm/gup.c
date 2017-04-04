@@ -382,6 +382,13 @@ struct page *follow_page_mask(struct vm_area_struct *vma,
 	if (pgd_none(*pgd) || unlikely(pgd_bad(*pgd)))
 		return no_page_table(vma, flags);
 
+	if (pgd_huge(*pgd)) {
+		page = follow_huge_pgd(mm, address, pgd, flags);
+		if (page)
+			return page;
+		return no_page_table(vma, flags);
+	}
+
 	if (is_hugepd(__hugepd(pgd_val(*pgd)))) {
 		page = follow_huge_pd(vma, address,
 				      __hugepd(pgd_val(*pgd)), flags,
