@@ -51,6 +51,10 @@ static char *vidmem;
 static int vidport;
 static int lines, cols;
 
+#ifdef CONFIG_KERNEL_RAW
+#include <linux/decompress/mm.h>
+#endif
+
 #ifdef CONFIG_KERNEL_GZIP
 #include "../../../../lib/decompress_inflate.c"
 #endif
@@ -265,7 +269,7 @@ static inline void handle_relocations(void *output, unsigned long output_len,
 { }
 #endif
 
-static void parse_elf(void *output)
+static void parse_elf(void* buf, void *output)
 {
 #ifdef CONFIG_X86_64
 	Elf64_Ehdr ehdr;
@@ -277,7 +281,7 @@ static void parse_elf(void *output)
 	void *dest;
 	int i;
 
-	memcpy(&ehdr, output, sizeof(ehdr));
+	memcpy(&ehdr, buf, sizeof(ehdr));
 	if (ehdr.e_ident[EI_MAG0] != ELFMAG0 ||
 	   ehdr.e_ident[EI_MAG1] != ELFMAG1 ||
 	   ehdr.e_ident[EI_MAG2] != ELFMAG2 ||
@@ -292,7 +296,7 @@ static void parse_elf(void *output)
 	if (!phdrs)
 		error("Failed to allocate space for phdrs");
 
-	memcpy(phdrs, output + ehdr.e_phoff, sizeof(*phdrs) * ehdr.e_phnum);
+	memcpy(phdrs, buf + ehdr.e_phoff, sizeof(*phdrs) * ehdr.e_phnum);
 
 	for (i = 0; i < ehdr.e_phnum; i++) {
 		phdr = &phdrs[i];
@@ -305,7 +309,7 @@ static void parse_elf(void *output)
 #else
 			dest = (void *)(phdr->p_paddr);
 #endif
-			memmove(dest, output + phdr->p_offset, phdr->p_filesz);
+			memmove(dest, buf + phdr->p_offset, phdr->p_filesz);
 			break;
 		default: /* Ignore other PT_* */ break;
 		}
@@ -401,10 +405,14 @@ asmlinkage __visible void *extract_kernel(void *rmode, memptr heap,
 		error("Destination virtual address changed when not relocatable");
 #endif
 
+#ifdef CONFIG_KERNEL_RAW
+	parse_elf(input_data, output);
+#else
 	debug_putstr("\nDecompressing Linux... ");
 	__decompress(input_data, input_len, NULL, NULL, output, output_len,
 			NULL, error);
-	parse_elf(output);
+	parse_elf(output, output);
+#endif
 	handle_relocations(output, output_len, virt_addr);
 	debug_putstr("done.\nBooting the kernel.\n");
 	return output;
