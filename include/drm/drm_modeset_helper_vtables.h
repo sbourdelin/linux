@@ -754,6 +754,30 @@ struct drm_connector_helper_funcs {
 	int (*get_modes)(struct drm_connector *connector);
 
 	/**
+	 * @detect_ctx:
+	 *
+	 * Check to see if anything is attached to the connector. The parameter
+	 * force is set to false whilst polling, true when checking the
+	 * connector due to a user request. force can be used by the driver to
+	 * avoid expensive, destructive operations during automated probing.
+	 *
+	 * This callback is optional, if not implemented the connector will be
+	 * considered as always being attached.
+	 *
+	 * This is the atomic version of &drm_connector_funcs.detect.
+	 *
+	 * ctx is always set, and connection_mutex is always locked.
+	 *
+	 * RETURNS:
+	 *
+	 * drm_connector_status indicating the connector's status,
+	 * or the error code returned by drm_modeset_lock (-EDEADLK).
+	 */
+	int (*detect_ctx)(struct drm_connector *connector,
+			  struct drm_modeset_acquire_ctx *ctx,
+			  bool force);
+
+	/**
 	 * @mode_valid:
 	 *
 	 * Callback to validate a mode for a connector, irrespective of the

@@ -4566,8 +4566,9 @@ intel_dp_unset_edid(struct intel_dp *intel_dp)
 	intel_dp->has_audio = false;
 }
 
-static enum drm_connector_status
-intel_dp_long_pulse(struct intel_connector *intel_connector)
+static int
+intel_dp_long_pulse(struct intel_connector *intel_connector,
+		    struct drm_modeset_acquire_ctx *ctx)
 {
 	struct drm_connector *connector = &intel_connector->base;
 	struct intel_dp *intel_dp = intel_attached_dp(connector);
@@ -4635,14 +4636,7 @@ intel_dp_long_pulse(struct intel_connector *intel_connector)
 		status = connector_status_disconnected;
 		goto out;
 	} else if (connector->status == connector_status_connected) {
-		/*
-		 * If display was connected already and is still connected
-		 * check links status, there has been known issues of
-		 * link loss triggerring long pulse!!!!
-		 */
-		drm_modeset_lock(&dev->mode_config.connection_mutex, NULL);
 		intel_dp_check_link_status(intel_dp);
-		drm_modeset_unlock(&dev->mode_config.connection_mutex);
 		goto out;
 	}
 
@@ -4682,18 +4676,20 @@ out:
 	return status;
 }
 
-static enum drm_connector_status
-intel_dp_detect(struct drm_connector *connector, bool force)
+static int
+intel_dp_detect(struct drm_connector *connector,
+		struct drm_modeset_acquire_ctx *ctx,
+		bool force)
 {
 	struct intel_dp *intel_dp = intel_attached_dp(connector);
-	enum drm_connector_status status = connector->status;
+	int status = connector->status;
 
 	DRM_DEBUG_KMS("[CONNECTOR:%d:%s]\n",
 		      connector->base.id, connector->name);
 
 	/* If full detect is not performed yet, do a full detect */
 	if (!intel_dp->detect_done)
-		status = intel_dp_long_pulse(intel_dp->attached_connector);
+		status = intel_dp_long_pulse(intel_dp->attached_connector, ctx);
 
 	intel_dp->detect_done = false;
 
@@ -5014,7 +5010,6 @@ void intel_dp_encoder_reset(struct drm_encoder *encoder)
 
 static const struct drm_connector_funcs intel_dp_connector_funcs = {
 	.dpms = drm_atomic_helper_connector_dpms,
-	.detect = intel_dp_detect,
 	.force = intel_dp_force,
 	.fill_modes = drm_helper_probe_single_connector_modes,
 	.set_property = intel_dp_set_property,
@@ -5027,6 +5022,7 @@ static const struct drm_connector_funcs intel_dp_connector_funcs = {
 };
 
 static const struct drm_connector_helper_funcs intel_dp_connector_helper_funcs = {
+	.detect_ctx = intel_dp_detect,
 	.get_modes = intel_dp_get_modes,
 	.mode_valid = intel_dp_mode_valid,
 };
