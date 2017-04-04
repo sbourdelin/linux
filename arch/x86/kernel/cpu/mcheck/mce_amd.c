@@ -472,20 +472,6 @@ prepare_threshold_block(unsigned int bank, unsigned int block, u32 addr,
 		smca_high |= BIT(0);
 
 		/*
-		 * SMCA logs Deferred Error information in MCA_DE{STAT,ADDR}
-		 * registers with the option of additionally logging to
-		 * MCA_{STATUS,ADDR} if MCA_CONFIG[LogDeferredInMcaStat] is set.
-		 *
-		 * This bit is usually set by BIOS to retain the old behavior
-		 * for OSes that don't use the new registers. Linux supports the
-		 * new registers so let's disable that additional logging here.
-		 *
-		 * MCA_CONFIG[LogDeferredInMcaStat] is bit 34 (bit 2 in the high
-		 * portion of the MSR).
-		 */
-		smca_high &= ~BIT(2);
-
-		/*
 		 * SMCA sets the Deferred Error Interrupt type per bank.
 		 *
 		 * MCA_CONFIG[DeferredIntTypeSupported] is bit 5, and tells us
@@ -756,19 +742,10 @@ out_err:
 EXPORT_SYMBOL_GPL(umc_normaddr_to_sysaddr);
 
 static void
-__log_error(unsigned int bank, bool deferred_err, bool threshold_err, u64 misc)
+__log_error(unsigned int bank, u32 msr_status, u32 msr_addr, u64 misc)
 {
-	u32 msr_status = msr_ops.status(bank);
-	u32 msr_addr = msr_ops.addr(bank);
 	struct mce m;
 	u64 status;
-
-	WARN_ON_ONCE(deferred_err && threshold_err);
-
-	if (deferred_err && mce_flags.smca) {
-		msr_status = MSR_AMD64_SMCA_MCx_DESTAT(bank);
-		msr_addr = MSR_AMD64_SMCA_MCx_DEADDR(bank);
-	}
 
 	rdmsrl(msr_status, status);
 
@@ -778,11 +755,9 @@ __log_error(unsigned int bank, bool deferred_err, bool threshold_err, u64 misc)
 	mce_setup(&m);
 
 	m.status = status;
+	m.misc   = misc;
 	m.bank   = bank;
 	m.tsc	 = rdtsc();
-
-	if (threshold_err)
-		m.misc = misc;
 
 	if (m.status & MCI_STATUS_ADDRV) {
 		rdmsrl(msr_addr, m.addr);
@@ -810,6 +785,20 @@ __log_error(unsigned int bank, bool deferred_err, bool threshold_err, u64 misc)
 	wrmsrl(msr_status, 0);
 }
 
+static void __log_error_deferred(unsigned int bank, bool use_smca_destat)
+{
+	u32 msr_status	= use_smca_destat ? MSR_AMD64_SMCA_MCx_DESTAT(bank) :
+					    msr_ops.status(bank);
+	u32 msr_addr	= use_smca_destat ? MSR_AMD64_SMCA_MCx_DEADDR(bank) :
+					    msr_ops.addr(bank);
+
+	__log_error(bank, msr_status, msr_addr, 0);
+
+	/* We should still clear MCA_DESTAT even if we used MCA_STATUS. */
+	if (mce_flags.smca && !use_smca_destat)
+		wrmsrl(MSR_AMD64_SMCA_MCx_DESTAT(bank), 0);
+}
+
 static inline void __smp_deferred_error_interrupt(void)
 {
 	inc_irq_stat(irq_deferred_error_count);
@@ -832,25 +821,29 @@ asmlinkage __visible void __irq_entry smp_trace_deferred_error_interrupt(void)
 	exiting_ack_irq();
 }
 
+static inline bool is_deferred_error(u64 status)
+{
+	return ((status & MCI_STATUS_VAL) && (status & MCI_STATUS_DEFERRED));
+}
+
 /* APIC interrupt handler for deferred errors */
 static void amd_deferred_error_interrupt(void)
 {
 	unsigned int bank;
-	u32 msr_status;
 	u64 status;
 
 	for (bank = 0; bank < mca_cfg.banks; ++bank) {
-		msr_status = (mce_flags.smca) ? MSR_AMD64_SMCA_MCx_DESTAT(bank)
-					      : msr_ops.status(bank);
+		rdmsrl(msr_ops.status(bank), status);
 
-		rdmsrl(msr_status, status);
+		if (is_deferred_error(status)) {
+			__log_error_deferred(bank, false);
 
-		if (!(status & MCI_STATUS_VAL) ||
-		    !(status & MCI_STATUS_DEFERRED))
-			continue;
+		} else if (mce_flags.smca) {
+			rdmsrl(MSR_AMD64_SMCA_MCx_DESTAT(bank), status);
 
-		__log_error(bank, true, false, 0);
-		break;
+			if (is_deferred_error(status))
+				__log_error_deferred(bank, true);
+		}
 	}
 }
 
@@ -904,7 +897,7 @@ static void amd_threshold_interrupt(void)
 	return;
 
 log:
-	__log_error(bank, false, true, ((u64)high << 32) | low);
+	__log_error(bank, msr_ops.status(bank), msr_ops.addr(bank), ((u64)high << 32) | low);
 
 	/* Reset threshold block after logging error. */
 	memset(&tr, 0, sizeof(tr));
