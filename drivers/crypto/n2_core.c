@@ -1642,7 +1642,7 @@ static int spu_queue_register(struct spu_queue *p, unsigned long q_type)
 	if (!alloc_cpumask_var(&old_allowed, GFP_KERNEL))
 		return -ENOMEM;
 
-	cpumask_copy(old_allowed, &current->cpus_allowed);
+	cpumask_copy(old_allowed, &current->cpus_mask);
 
 	set_cpus_allowed_ptr(current, &p->sharing);
 

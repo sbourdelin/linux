@@ -918,7 +918,7 @@ static int acpi_processor_get_throttling(struct acpi_processor *pr)
 	/*
 	 * Migrate task to the cpu pointed by pr.
 	 */
-	cpumask_copy(saved_mask, &current->cpus_allowed);
+	cpumask_copy(saved_mask, &current->cpus_mask);
 	/* FIXME: use work_on_cpu() */
 	if (set_cpus_allowed_ptr(current, cpumask_of(pr->id))) {
 		/* Can't migrate to the target pr->id CPU. Exit */

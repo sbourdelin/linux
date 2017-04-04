@@ -360,7 +360,7 @@ static int cache_add_dev(unsigned int cpu)
 	if (all_cpu_cache_info[cpu].kobj.parent)
 		return 0;
 
-	oldmask = current->cpus_allowed;
+	oldmask = current->cpus_mask;
 	retval = set_cpus_allowed_ptr(current, cpumask_of(cpu));
 	if (unlikely(retval))
 		return retval;

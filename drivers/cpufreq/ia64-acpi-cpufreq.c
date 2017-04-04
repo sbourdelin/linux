@@ -110,7 +110,7 @@ processor_get_freq (
 
 	pr_debug("processor_get_freq\n");
 
-	saved_mask = current->cpus_allowed;
+	saved_mask = current->cpus_mask;
 	set_cpus_allowed_ptr(current, cpumask_of(cpu));
 	if (smp_processor_id() != cpu)
 		goto migrate_end;
@@ -146,7 +146,7 @@ processor_set_freq (
 
 	pr_debug("processor_set_freq\n");
 
-	saved_mask = current->cpus_allowed;
+	saved_mask = current->cpus_mask;
 	set_cpus_allowed_ptr(current, cpumask_of(policy->cpu));
 	if (smp_processor_id() != policy->cpu) {
 		retval = -EAGAIN;

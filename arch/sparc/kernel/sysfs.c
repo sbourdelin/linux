@@ -106,7 +106,7 @@ static unsigned long run_on_cpu(unsigned long cpu,
 	cpumask_t old_affinity;
 	unsigned long ret;
 
-	cpumask_copy(&old_affinity, &current->cpus_allowed);
+	cpumask_copy(&old_affinity, &current->cpus_mask);
 	/* should return -EINVAL to userspace */
 	if (set_cpus_allowed_ptr(current, cpumask_of(cpu)))
 		return 0;
