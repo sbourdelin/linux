@@ -202,9 +202,6 @@ will require extra work due to the application tag.
       added.  It is up to the caller to ensure that the bio does not
       change while I/O is in progress.
 
-      bio_integrity_prep() should only be called if
-      bio_integrity_enabled() returned 1.
-
 
 5.3 PASSING EXISTING INTEGRITY METADATA
 
