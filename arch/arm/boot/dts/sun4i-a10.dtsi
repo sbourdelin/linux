@@ -1329,5 +1329,13 @@
 			#size-cells = <0>;
 		};
 
+		can0: can@01c2bc00 {
+			compatible = "allwinner,sun4i-a10-can";
+			reg = <0x01c2bc00 0x400>;
+			interrupts = <26>;
+			clocks = <&apb1_gates 4>;
+			status = "disabled";
+		};
+
 	};
 };
