@@ -2061,6 +2061,10 @@ static bool __blk_mq_alloc_rq_map(struct blk_mq_tag_set *set, int hctx_idx)
 {
 	int ret = 0;
 
+	if ((set->flags & BLK_MQ_F_GLOBAL_TAGS) && hctx_idx != 0) {
+		set->tags[hctx_idx] = set->tags[0];
+		return true;
+	}
 	set->tags[hctx_idx] = blk_mq_alloc_rq_map(set, hctx_idx,
 					set->queue_depth, set->reserved_tags);
 	if (!set->tags[hctx_idx])
@@ -2080,8 +2084,10 @@ static void blk_mq_free_map_and_requests(struct blk_mq_tag_set *set,
 					 unsigned int hctx_idx)
 {
 	if (set->tags[hctx_idx]) {
-		blk_mq_free_rqs(set, set->tags[hctx_idx], hctx_idx);
-		blk_mq_free_rq_map(set->tags[hctx_idx]);
+		if (!(set->flags & BLK_MQ_F_GLOBAL_TAGS) || hctx_idx == 0) {
+			blk_mq_free_rqs(set, set->tags[hctx_idx], hctx_idx);
+			blk_mq_free_rq_map(set->tags[hctx_idx]);
+		}
 		set->tags[hctx_idx] = NULL;
 	}
 }
