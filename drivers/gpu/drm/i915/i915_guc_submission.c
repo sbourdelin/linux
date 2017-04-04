@@ -658,7 +658,7 @@ static void nested_enable_signaling(struct drm_i915_gem_request *rq)
 static bool i915_guc_dequeue(struct intel_engine_cs *engine)
 {
 	struct execlist_port *port = engine->execlist_port;
-	struct drm_i915_gem_request *last = port[0].request;
+	struct drm_i915_gem_request *last = port[0].request_count;
 	struct rb_node *rb;
 	bool submit = false;
 
@@ -672,7 +672,7 @@ static bool i915_guc_dequeue(struct intel_engine_cs *engine)
 			if (port != engine->execlist_port)
 				break;
 
-			i915_gem_request_assign(&port->request, last);
+			i915_gem_request_assign(&port->request_count, last);
 			nested_enable_signaling(last);
 			port++;
 		}
@@ -688,7 +688,7 @@ static bool i915_guc_dequeue(struct intel_engine_cs *engine)
 		submit = true;
 	}
 	if (submit) {
-		i915_gem_request_assign(&port->request, last);
+		i915_gem_request_assign(&port->request_count, last);
 		nested_enable_signaling(last);
 		engine->execlist_first = rb;
 	}
@@ -705,17 +705,19 @@ static void i915_guc_irq_handler(unsigned long data)
 	bool submit;
 
 	do {
-		rq = port[0].request;
+		rq = port[0].request_count;
 		while (rq && i915_gem_request_completed(rq)) {
 			trace_i915_gem_request_out(rq);
 			i915_gem_request_put(rq);
-			port[0].request = port[1].request;
-			port[1].request = NULL;
-			rq = port[0].request;
+
+			port[0].request_count = port[1].request_count;
+			port[1].request_count = NULL;
+
+			rq = port[0].request_count;
 		}
 
 		submit = false;
-		if (!port[1].request)
+		if (!port[1].request_count)
 			submit = i915_guc_dequeue(engine);
 	} while (submit);
 }

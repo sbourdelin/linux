@@ -342,39 +342,32 @@ static u64 execlists_update_context(struct drm_i915_gem_request *rq)
 
 static void execlists_submit_ports(struct intel_engine_cs *engine)
 {
-	struct drm_i915_private *dev_priv = engine->i915;
 	struct execlist_port *port = engine->execlist_port;
 	u32 __iomem *elsp =
-		dev_priv->regs + i915_mmio_reg_offset(RING_ELSP(engine));
-	u64 desc[2];
+		engine->i915->regs + i915_mmio_reg_offset(RING_ELSP(engine));
+	unsigned int n;
 
-	GEM_BUG_ON(port[0].count > 1);
-	if (!port[0].count)
-		execlists_context_status_change(port[0].request,
-						INTEL_CONTEXT_SCHEDULE_IN);
-	desc[0] = execlists_update_context(port[0].request);
-	GEM_DEBUG_EXEC(port[0].context_id = upper_32_bits(desc[0]));
-	port[0].count++;
+	for (n = ARRAY_SIZE(engine->execlist_port); n--; ) {
+		struct drm_i915_gem_request *rq;
+		unsigned int count;
+		u64 desc;
 
-	if (port[1].request) {
-		GEM_BUG_ON(port[1].count);
-		execlists_context_status_change(port[1].request,
-						INTEL_CONTEXT_SCHEDULE_IN);
-		desc[1] = execlists_update_context(port[1].request);
-		GEM_DEBUG_EXEC(port[1].context_id = upper_32_bits(desc[1]));
-		port[1].count = 1;
-	} else {
-		desc[1] = 0;
+		rq = port_unpack(&port[n], &count);
+		if (rq) {
+			GEM_BUG_ON(count > !n);
+			if (!count++)
+				execlists_context_status_change(rq, INTEL_CONTEXT_SCHEDULE_IN);
+			port[n].request_count = port_pack(rq, count);
+			desc = execlists_update_context(rq);
+			GEM_DEBUG_EXEC(port[n].context_id = upper_32_bits(desc));
+		} else {
+			GEM_BUG_ON(!n);
+			desc = 0;
+		}
+
+		writel(upper_32_bits(desc), elsp);
+		writel(lower_32_bits(desc), elsp);
 	}
-	GEM_BUG_ON(desc[0] == desc[1]);
-
-	/* You must always write both descriptors in the order below. */
-	writel(upper_32_bits(desc[1]), elsp);
-	writel(lower_32_bits(desc[1]), elsp);
-
-	writel(upper_32_bits(desc[0]), elsp);
-	/* The context is automatically loaded after the following */
-	writel(lower_32_bits(desc[0]), elsp);
 }
 
 static bool ctx_single_port_submission(const struct i915_gem_context *ctx)
@@ -395,6 +388,18 @@ static bool can_merge_ctx(const struct i915_gem_context *prev,
 	return true;
 }
 
+static void port_assign(struct execlist_port *port,
+			struct drm_i915_gem_request *rq)
+{
+	GEM_BUG_ON(rq == port_request(port));
+
+	if (port->request_count)
+		i915_gem_request_put(port_request(port));
+
+	port->request_count =
+		port_pack(i915_gem_request_get(rq), port_count(port));
+}
+
 static void execlists_dequeue(struct intel_engine_cs *engine)
 {
 	struct drm_i915_gem_request *last;
@@ -402,7 +407,7 @@ static void execlists_dequeue(struct intel_engine_cs *engine)
 	struct rb_node *rb;
 	bool submit = false;
 
-	last = port->request;
+	last = port_request(port);
 	if (last)
 		/* WaIdleLiteRestore:bdw,skl
 		 * Apply the wa NOOPs to prevent ring:HEAD == req:TAIL
@@ -412,7 +417,7 @@ static void execlists_dequeue(struct intel_engine_cs *engine)
 		 */
 		last->tail = last->wa_tail;
 
-	GEM_BUG_ON(port[1].request);
+	GEM_BUG_ON(port[1].request_count);
 
 	/* Hardware submission is through 2 ports. Conceptually each port
 	 * has a (RING_START, RING_HEAD, RING_TAIL) tuple. RING_START is
@@ -469,7 +474,8 @@ static void execlists_dequeue(struct intel_engine_cs *engine)
 
 			GEM_BUG_ON(last->ctx == cursor->ctx);
 
-			i915_gem_request_assign(&port->request, last);
+			if (submit)
+				port_assign(port, last);
 			port++;
 		}
 
@@ -484,7 +490,7 @@ static void execlists_dequeue(struct intel_engine_cs *engine)
 		submit = true;
 	}
 	if (submit) {
-		i915_gem_request_assign(&port->request, last);
+		port_assign(port, last);
 		engine->execlist_first = rb;
 	}
 	spin_unlock_irq(&engine->timeline->lock);
@@ -495,14 +501,14 @@ static void execlists_dequeue(struct intel_engine_cs *engine)
 
 static bool execlists_elsp_idle(struct intel_engine_cs *engine)
 {
-	return !engine->execlist_port[0].request;
+	return !port_count(&engine->execlist_port[0]);
 }
 
 static bool execlists_elsp_ready(const struct intel_engine_cs *engine)
 {
 	const struct execlist_port *port = engine->execlist_port;
 
-	return port[0].count + port[1].count < 2;
+	return port_count(&port[0]) + port_count(&port[1]) < 2;
 }
 
 /*
@@ -543,7 +549,9 @@ static void intel_lrc_irq_handler(unsigned long data)
 		tail = GEN8_CSB_WRITE_PTR(head);
 		head = GEN8_CSB_READ_PTR(head);
 		while (head != tail) {
+			struct drm_i915_gem_request *rq;
 			unsigned int status;
+			unsigned int count;
 
 			if (++head == GEN8_CSB_ENTRIES)
 				head = 0;
@@ -573,20 +581,24 @@ static void intel_lrc_irq_handler(unsigned long data)
 			GEM_DEBUG_BUG_ON(readl(buf + 2 * head + 1) !=
 					 port[0].context_id);
 
-			GEM_BUG_ON(port[0].count == 0);
-			if (--port[0].count == 0) {
+			rq = port_unpack(&port[0], &count);
+			GEM_BUG_ON(count == 0);
+			if (--count == 0) {
 				GEM_BUG_ON(status & GEN8_CTX_STATUS_PREEMPTED);
-				GEM_BUG_ON(!i915_gem_request_completed(port[0].request));
-				execlists_context_status_change(port[0].request,
-								INTEL_CONTEXT_SCHEDULE_OUT);
+				GEM_BUG_ON(!i915_gem_request_completed(rq));
+				execlists_context_status_change(rq, INTEL_CONTEXT_SCHEDULE_OUT);
 
-				trace_i915_gem_request_out(port[0].request);
-				i915_gem_request_put(port[0].request);
+				trace_i915_gem_request_out(rq);
+				i915_gem_request_put(rq);
+
 				port[0] = port[1];
 				memset(&port[1], 0, sizeof(port[1]));
+			} else {
+				port[0].request_count = port_pack(rq, count);
 			}
 
-			GEM_BUG_ON(port[0].count == 0 &&
+			/* After the final element, the hw should be idle */
+			GEM_BUG_ON(port_count(&port[0]) == 0 &&
 				   !(status & GEN8_CTX_STATUS_ACTIVE_IDLE));
 		}
 
@@ -1139,11 +1151,6 @@ static int intel_init_workaround_bb(struct intel_engine_cs *engine)
 	return ret;
 }
 
-static u32 port_seqno(struct execlist_port *port)
-{
-	return port->request ? port->request->global_seqno : 0;
-}
-
 static int gen8_init_common_ring(struct intel_engine_cs *engine)
 {
 	struct drm_i915_private *dev_priv = engine->i915;
@@ -1168,12 +1175,22 @@ static int gen8_init_common_ring(struct intel_engine_cs *engine)
 	/* After a GPU reset, we may have requests to replay */
 	clear_bit(ENGINE_IRQ_EXECLIST, &engine->irq_posted);
 	if (!i915.enable_guc_submission && !execlists_elsp_idle(engine)) {
-		DRM_DEBUG_DRIVER("Restarting %s from requests [0x%x, 0x%x]\n",
-				 engine->name,
-				 port_seqno(&engine->execlist_port[0]),
-				 port_seqno(&engine->execlist_port[1]));
-		engine->execlist_port[0].count = 0;
-		engine->execlist_port[1].count = 0;
+		struct execlist_port *port = engine->execlist_port;
+		unsigned int n;
+
+		for (n = 0; n < ARRAY_SIZE(engine->execlist_port); n++) {
+			if (!port[n].request_count)
+				break;
+
+			DRM_DEBUG_DRIVER("Restarting %s from 0x%x [%d]\n",
+					 engine->name,
+					 port_request(&port[n])->global_seqno,
+					 n);
+
+			/* Discard the current inflight count */
+			port[n].request_count = port_request(&port[n]);
+		}
+
 		execlists_submit_ports(engine);
 	}
 
@@ -1252,13 +1269,13 @@ static void reset_common_ring(struct intel_engine_cs *engine,
 	intel_ring_update_space(request->ring);
 
 	/* Catch up with any missed context-switch interrupts */
-	if (request->ctx != port[0].request->ctx) {
-		i915_gem_request_put(port[0].request);
+	if (request->ctx != port_request(&port[0])->ctx) {
+		i915_gem_request_put(port_request(&port[0]));
 		port[0] = port[1];
 		memset(&port[1], 0, sizeof(port[1]));
 	}
 
-	GEM_BUG_ON(request->ctx != port[0].request->ctx);
+	GEM_BUG_ON(request->ctx != port_request(&port[0])->ctx);
 
 	/* Reset WaIdleLiteRestore:bdw,skl as well */
 	request->tail =
