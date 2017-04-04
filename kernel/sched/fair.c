@@ -1666,6 +1666,10 @@ static void task_numa_find_cpu(struct task_numa_env *env,
 		if (!cpumask_test_cpu(cpu, &env->p->cpus_allowed))
 			continue;
 
+		/* Skip isolated cpus */
+		if (cpumask_test_cpu(cpu, cpu_isolated_map))
+			continue;
+
 		env->dst_cpu = cpu;
 		task_numa_compare(env, taskimp, groupimp);
 	}
