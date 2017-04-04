@@ -359,8 +359,7 @@ void ptlrpc_invalidate_import(struct obd_import *imp)
 
 				CERROR("%s: Unregistering RPCs found (%d). Network is sluggish? Waiting them to error out.\n",
 				       cli_tgt,
-				       atomic_read(&imp->
-						   imp_unregistering));
+				       atomic_read(&imp->imp_unregistering));
 			}
 			spin_unlock(&imp->imp_lock);
 		}

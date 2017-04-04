@@ -1768,8 +1768,7 @@ static int mgc_process_config(struct obd_device *obd, u32 len, void *buf)
 
 		rc = mgc_process_log(obd, cld);
 		if (rc == 0 && cld->cld_recover) {
-			if (OCD_HAS_FLAG(&obd->u.cli.cl_import->
-					 imp_connect_data, IMP_RECOV)) {
+			if (OCD_HAS_FLAG(&obd->u.cli.cl_import->imp_connect_data, IMP_RECOV)) {
 				rc = mgc_process_log(obd, cld->cld_recover);
 			} else {
 				struct config_llog_data *cir;
