@@ -207,6 +207,8 @@ struct rsi_hw *rsi_91x_init(void)
 		common = adapter->priv;
 		common->priv = adapter;
 	}
+	adapter->device_model = RSI_DEV_9113;
+	common->coex_mode = 1; /* Wi-Fi only mode */
 
 	for (ii = 0; ii < NUM_SOFT_QUEUES; ii++)
 		skb_queue_head_init(&common->tx_queue[ii]);
