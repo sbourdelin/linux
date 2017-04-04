@@ -860,6 +860,11 @@ static int bpf_prog_load(union bpf_attr *attr)
 
 	bpf_prog_kallsyms_add(prog);
 	trace_bpf_prog_load(prog, err);
+	if (type != BPF_PROG_TYPE_SOCKET_FILTER && !is_gpl && !(err < 0)) {
+		if (!test_taint(TAINT_PROPRIETARY_MODULE))
+			pr_warn("bpf license '%s' taints kernel.\n", license);
+		add_taint(TAINT_PROPRIETARY_MODULE, LOCKDEP_STILL_OK);
+	}
 	return err;
 
 free_used_maps:
