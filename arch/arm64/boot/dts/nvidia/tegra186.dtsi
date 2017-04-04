@@ -347,6 +347,13 @@
 		reg-names = "pmc", "wake", "aotag", "scratch";
 	};
 
+	ccplex@e000000 {
+		compatible = "nvidia,tegra186-ccplex-cluster";
+		reg = <0x0 0x0e000000 0x0 0x3fffff>;
+
+		nvidia,bpmp = <&bpmp>;
+	};
+
 	sysram@30000000 {
 		compatible = "nvidia,tegra186-sysram", "mmio-sram";
 		reg = <0x0 0x30000000 0x0 0x50000>;
