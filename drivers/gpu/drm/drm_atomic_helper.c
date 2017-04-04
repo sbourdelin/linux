@@ -586,6 +586,28 @@ drm_atomic_helper_check_modeset(struct drm_device *dev,
 		}
 	}
 
+	for_each_oldnew_connector_in_state(state, connector, old_connector_state, new_connector_state, i) {
+		const struct drm_connector_helper_funcs *conn_funcs;
+		struct drm_crtc_state *crtc_state;
+
+		conn_funcs = connector->helper_private;
+		if (!conn_funcs->atomic_release)
+			continue;
+
+		if (!old_connector_state->crtc)
+			continue;
+
+		crtc_state = drm_atomic_get_existing_crtc_state(state, old_connector_state->crtc);
+
+		if (crtc_state->connectors_changed ||
+		    crtc_state->mode_changed ||
+		    (crtc_state->active_changed && !crtc_state->active)) {
+			ret = conn_funcs->atomic_release(connector, new_connector_state);
+			if (ret != 0)
+				return ret;
+		}
+	}
+
 	return mode_fixup(state);
 }
 EXPORT_SYMBOL(drm_atomic_helper_check_modeset);
