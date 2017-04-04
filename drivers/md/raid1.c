@@ -1986,11 +1986,13 @@ static int fix_sync_read_error(struct r1bio *r1_bio)
 		/* Don't try recovering from here - just fail it
 		 * ... unless it is the last working device of course */
 		md_error(mddev, rdev);
-		if (test_bit(Faulty, &rdev->flags))
+		if (test_bit(Faulty, &rdev->flags)) {
 			/* Don't try to read from here, but make sure
 			 * put_buf does it's thing
 			 */
 			bio->bi_end_io = end_sync_write;
+			bio->bi_next = NULL;
+		}
 	}
 
 	while(sectors) {
