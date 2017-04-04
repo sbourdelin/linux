@@ -115,11 +115,9 @@ static int scsi_host_eh_past_deadline(struct Scsi_Host *shost)
  * scmd_eh_abort_handler - Handle command aborts
  * @work:	command to be aborted.
  */
-void
-scmd_eh_abort_handler(struct work_struct *work)
+int
+scmd_eh_abort_handler(struct scsi_cmnd *scmd)
 {
-	struct scsi_cmnd *scmd =
-		container_of(work, struct scsi_cmnd, abort_work.work);
 	struct scsi_device *sdev = scmd->device;
 	int rtn;
 
@@ -127,42 +125,40 @@ scmd_eh_abort_handler(struct work_struct *work)
 		SCSI_LOG_ERROR_RECOVERY(3,
 			scmd_printk(KERN_INFO, scmd,
 				    "eh timeout, not aborting\n"));
-	} else {
-		SCSI_LOG_ERROR_RECOVERY(3,
-			scmd_printk(KERN_INFO, scmd,
-				    "aborting command\n"));
-		rtn = scsi_try_to_abort_cmd(sdev->host->hostt, scmd);
-		if (rtn == SUCCESS) {
-			set_host_byte(scmd, DID_TIME_OUT);
-			if (scsi_host_eh_past_deadline(sdev->host)) {
-				SCSI_LOG_ERROR_RECOVERY(3,
-					scmd_printk(KERN_INFO, scmd,
-						    "eh timeout, not retrying "
-						    "aborted command\n"));
-			} else if (!scsi_noretry_cmd(scmd) &&
-			    (++scmd->retries <= scmd->allowed)) {
-				SCSI_LOG_ERROR_RECOVERY(3,
-					scmd_printk(KERN_WARNING, scmd,
-						    "retry aborted command\n"));
-				scsi_queue_insert(scmd, SCSI_MLQUEUE_EH_RETRY);
-				return;
-			} else {
-				SCSI_LOG_ERROR_RECOVERY(3,
-					scmd_printk(KERN_WARNING, scmd,
-						    "finish aborted command\n"));
-				scsi_finish_command(scmd);
-				return;
-			}
-		} else {
+		return FAILED;
+	}
+	SCSI_LOG_ERROR_RECOVERY(3,
+		scmd_printk(KERN_INFO, scmd,
+			    "aborting command\n"));
+	rtn = scsi_try_to_abort_cmd(sdev->host->hostt, scmd);
+	if (rtn == SUCCESS) {
+		set_host_byte(scmd, DID_TIME_OUT);
+		if (scsi_host_eh_past_deadline(sdev->host)) {
 			SCSI_LOG_ERROR_RECOVERY(3,
 				scmd_printk(KERN_INFO, scmd,
-					    "cmd abort %s\n",
-					    (rtn == FAST_IO_FAIL) ?
-					    "not send" : "failed"));
+					    "eh timeout, not retrying "
+					    "aborted command\n"));
+			rtn = FAILED;
+		} else if (!scsi_noretry_cmd(scmd) &&
+			   (++scmd->retries <= scmd->allowed)) {
+			SCSI_LOG_ERROR_RECOVERY(3,
+				scmd_printk(KERN_WARNING, scmd,
+					    "retry aborted command\n"));
+			scsi_queue_insert(scmd, SCSI_MLQUEUE_EH_RETRY);
+		} else {
+			SCSI_LOG_ERROR_RECOVERY(3,
+				scmd_printk(KERN_WARNING, scmd,
+					    "finish aborted command\n"));
+			scsi_finish_command(scmd);
 		}
+		return rtn;
 	}
-
-	scsi_eh_scmd_add(scmd);
+	SCSI_LOG_ERROR_RECOVERY(3,
+		scmd_printk(KERN_INFO, scmd,
+			    "cmd abort %s\n",
+			    (rtn == FAST_IO_FAIL) ?
+			    "not send" : "failed"));
+	return rtn;
 }
 
 /**
@@ -185,7 +181,6 @@ scsi_abort_command(struct scsi_cmnd *scmd)
 		SCSI_LOG_ERROR_RECOVERY(3,
 			scmd_printk(KERN_INFO, scmd,
 				    "previous abort failed\n"));
-		BUG_ON(delayed_work_pending(&scmd->abort_work));
 		return FAILED;
 	}
 
@@ -197,8 +192,7 @@ scsi_abort_command(struct scsi_cmnd *scmd)
 	scmd->eh_eflags |= SCSI_EH_ABORT_SCHEDULED;
 	SCSI_LOG_ERROR_RECOVERY(3,
 		scmd_printk(KERN_INFO, scmd, "abort scheduled\n"));
-	queue_delayed_work(shost->tmf_work_q, &scmd->abort_work, HZ / 100);
-	return SUCCESS;
+	return scmd_eh_abort_handler(scmd);
 }
 
 /**
@@ -271,10 +265,14 @@ enum blk_eh_timer_return scsi_times_out(struct request *req)
 		rtn = host->hostt->eh_timed_out(scmd);
 
 	if (rtn == BLK_EH_NOT_HANDLED) {
-		if (scsi_abort_command(scmd) != SUCCESS) {
+		int ret;
+
+		ret = scsi_abort_command(scmd);
+		if (ret == FAILED) {
 			set_host_byte(scmd, DID_TIME_OUT);
 			scsi_eh_scmd_add(scmd);
-		}
+		} else if (ret == FAST_IO_FAIL)
+			rtn = BLK_EH_RESET_TIMER;
 	}
 
 	return rtn;
