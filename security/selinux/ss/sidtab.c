@@ -36,7 +36,7 @@ int sidtab_insert(struct sidtab *s, u32 sid, struct context *context)
 	struct sidtab_node *prev, *cur, *newnode;
 
 	if (!s)
-		return -ENOMEM;
+		return -EINVAL;
 
 	hvalue = SIDTAB_HASH(sid);
 	prev = NULL;
