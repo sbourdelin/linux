@@ -2329,7 +2329,7 @@ static int check_ld_abs(struct bpf_verifier_env *env, struct bpf_insn *insn)
 		return err;
 
 	if (regs[BPF_REG_6].type != PTR_TO_CTX) {
-		verbose("at the time of BPF_LD_ABS|IND R6 != pointer to skb\n");
+		verbose("at the time of BPF_LD_ABS|IND R6 != pointer to ctx\n");
 		return -EINVAL;
 	}
 
