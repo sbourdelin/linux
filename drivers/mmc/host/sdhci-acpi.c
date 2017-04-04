@@ -83,6 +83,8 @@ struct sdhci_acpi_host {
 	bool				use_runtime_pm;
 };
 
+static int fix_up_power = 1;
+
 static inline bool sdhci_acpi_flag(struct sdhci_acpi_host *c, unsigned int flag)
 {
 	return c->slot && (c->slot->flags & flag);
@@ -393,10 +395,12 @@ static int sdhci_acpi_probe(struct platform_device *pdev)
 		return -ENODEV;
 
 	/* Power on the SDHCI controller and its children */
-	acpi_device_fix_up_power(device);
-	list_for_each_entry(child, &device->children, node)
-		if (child->status.present && child->status.enabled)
-			acpi_device_fix_up_power(child);
+	if (fix_up_power) {
+		acpi_device_fix_up_power(device);
+		list_for_each_entry(child, &device->children, node)
+			if (child->status.present && child->status.enabled)
+				acpi_device_fix_up_power(child);
+	}
 
 	if (sdhci_acpi_byt_defer(dev))
 		return -EPROBE_DEFER;
@@ -573,6 +577,10 @@ static struct platform_driver sdhci_acpi_driver = {
 };
 
 module_platform_driver(sdhci_acpi_driver);
+
+module_param(fix_up_power, int, 0444);
+MODULE_PARM_DESC(fix_up_power,
+		 "Call acpi_device_fix_up_power on sdio host and its children");
 
 MODULE_DESCRIPTION("Secure Digital Host Controller Interface ACPI driver");
 MODULE_AUTHOR("Adrian Hunter");
