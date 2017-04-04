@@ -96,9 +96,8 @@ static const struct dmi_system_id silead_ts_dmi_table[] = {
 	{ },
 };
 
-static void silead_ts_dmi_add_props(struct device *dev)
+static void silead_ts_dmi_add_props(struct i2c_client *client)
 {
-	struct i2c_client *client = to_i2c_client(dev);
 	const struct dmi_system_id *dmi_id;
 	const struct silead_ts_dmi_data *ts_data;
 	int error;
@@ -108,11 +107,13 @@ static void silead_ts_dmi_add_props(struct device *dev)
 		return;
 
 	ts_data = dmi_id->driver_data;
-	if (has_acpi_companion(dev) &&
+	if (has_acpi_companion(&client->dev) &&
 	    !strncmp(ts_data->acpi_name, client->name, I2C_NAME_SIZE)) {
-		error = device_add_properties(dev, ts_data->properties);
+		error = device_add_properties(&client->dev,
+					      ts_data->properties);
 		if (error)
-			dev_err(dev, "failed to add properties: %d\n", error);
+			dev_err(&client->dev,
+				"failed to add properties: %d\n", error);
 	}
 }
 
@@ -120,10 +121,13 @@ static int silead_ts_dmi_notifier_call(struct notifier_block *nb,
 				       unsigned long action, void *data)
 {
 	struct device *dev = data;
+	struct i2c_client *client;
 
 	switch (action) {
 	case BUS_NOTIFY_ADD_DEVICE:
-		silead_ts_dmi_add_props(dev);
+		client = i2c_verify_client(dev);
+		if (client)
+			silead_ts_dmi_add_props(client);
 		break;
 
 	default:
