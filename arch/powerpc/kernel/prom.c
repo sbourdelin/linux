@@ -58,6 +58,7 @@
 #include <asm/debug.h>
 #include <asm/epapr_hcalls.h>
 #include <asm/firmware.h>
+#include <asm/cpufeatures.h>
 
 #include <mm/mmu_decl.h>
 
@@ -70,6 +71,7 @@
 #ifdef CONFIG_PPC64
 int __initdata iommu_is_off;
 int __initdata iommu_force_on;
+int __initdata has_cpufeatures_node = 0;
 unsigned long tce_alloc_start, tce_alloc_end;
 u64 ppc64_rma_size;
 #endif
@@ -300,6 +302,255 @@ static void __init check_cpu_feature_properties(unsigned long node)
 	}
 }
 
+#define CPUFT_WARN(str, name) printk(KERN_WARNING "WARNING: /cpus/features/%s dt:%s\n", name, str)
+
+static int nr_dt_cpu_features;
+static struct dt_cpu_feature *dt_cpu_features;
+
+static int __init process_cpufeatures_node(unsigned long node,
+					  const char *uname, int i)
+{
+	const __be32 *prop;
+	struct dt_cpu_feature *f;
+	int len;
+
+	f = &dt_cpu_features[i];
+	memset(f, 0, sizeof(struct dt_cpu_feature));
+
+	f->node = node;
+
+	f->name = uname;
+
+	prop = of_get_flat_dt_prop(node, "isa", &len);
+	if (!prop) {
+		CPUFT_WARN("missing isa property", uname);
+		return 0;
+	}
+	f->isa = be32_to_cpup(prop);
+
+	prop = of_get_flat_dt_prop(node, "usable-mask", &len);
+	if (!prop) {
+		CPUFT_WARN("missing usable-mask property", uname);
+		return 0;
+	}
+	f->usable_mask = be32_to_cpup(prop);
+
+	prop = of_get_flat_dt_prop(node, "hv-support", &len);
+	if (prop)
+		f->hv_support = be32_to_cpup(prop);
+	prop = of_get_flat_dt_prop(node, "os-support", &len);
+	if (prop)
+		f->os_support = be32_to_cpup(prop);
+
+	prop = of_get_flat_dt_prop(node, "hfscr-bit-nr", &len);
+	if (prop)
+		f->hfscr_bit_nr = be32_to_cpup(prop);
+	else
+		f->hfscr_bit_nr = -1;
+	prop = of_get_flat_dt_prop(node, "fscr-bit-nr", &len);
+	if (prop)
+		f->fscr_bit_nr = be32_to_cpup(prop);
+	else
+		f->fscr_bit_nr = -1;
+	prop = of_get_flat_dt_prop(node, "hwcap-bit-nr", &len);
+	if (prop)
+		f->hwcap_bit_nr = be32_to_cpup(prop);
+	else
+		f->hwcap_bit_nr = -1;
+
+	if (f->usable_mask & USABLE_HV) {
+		if (!(mfmsr() & MSR_HV)) {
+			CPUFT_WARN("HV feature passed to guest\n", uname);
+			return 0;
+		}
+
+		if (!f->hv_support && f->hfscr_bit_nr != -1) {
+			CPUFT_WARN("unwanted hfscr_bit_nr\n", uname);
+			return 0;
+		}
+
+		if (f->hv_support == HV_SUPPORT_HFSCR) {
+			if (f->hfscr_bit_nr == -1) {
+				CPUFT_WARN("missing hfscr_bit_nr\n", uname);
+				return 0;
+			}
+		}
+	} else {
+		if (f->hv_support != HV_SUPPORT_NONE || f->hfscr_bit_nr != -1) {
+			CPUFT_WARN("unwanted hv_support/hfscr_bit_nr\n", uname);
+			return 0;
+		}
+	}
+
+	if (f->usable_mask & USABLE_OS) {
+		if (!f->os_support && f->fscr_bit_nr != -1) {
+			CPUFT_WARN("unwanted fscr_bit_nr\n", uname);
+			return 0;
+		}
+
+		if (f->os_support == OS_SUPPORT_FSCR) {
+			if (f->fscr_bit_nr == -1) {
+				CPUFT_WARN("missing fscr_bit_nr\n", uname);
+				return 0;
+			}
+		}
+	} else {
+		if (f->os_support != OS_SUPPORT_NONE || f->fscr_bit_nr != -1) {
+			CPUFT_WARN("unwanted os_support/fscr_bit_nr\n", uname);
+			return 0;
+		}
+	}
+
+	if (!(f->usable_mask & USABLE_PR)) {
+		if (f->hwcap_bit_nr != -1) {
+			CPUFT_WARN("unwanted hwcap_bit_nr\n", uname);
+			return 0;
+		}
+	}
+
+	/* Do all the independent features in the first pass */
+	if (!of_get_flat_dt_prop(node, "dependencies", &len)) {
+		if (cpufeatures_process_feature(f))
+			f->enabled = 1;
+		else
+			f->disabled = 1;
+	}
+
+	return 0;
+}
+
+static void __init cpufeatures_deps_enable(struct dt_cpu_feature *f)
+{
+	const __be32 *prop;
+	int len;
+	int nr_deps;
+	int i;
+
+	if (f->enabled || f->disabled)
+		return;
+
+	prop = of_get_flat_dt_prop(f->node, "dependencies", &len);
+	if (!prop) {
+		CPUFT_WARN("missing dependencies property", f->name);
+		return;
+	}
+
+	nr_deps = len / sizeof(int);
+
+	for (i = 0; i < nr_deps; i++) {
+		unsigned long phandle = be32_to_cpu(prop[i]);
+		int j;
+
+		for (j = 0; j < nr_dt_cpu_features; j++) {
+			struct dt_cpu_feature *d = &dt_cpu_features[j];
+
+			if (of_get_flat_dt_phandle(d->node) == phandle) {
+				cpufeatures_deps_enable(d);
+				if (d->disabled) {
+					f->disabled = 1;
+					return;
+				}
+			}
+		}
+	}
+
+	if (cpufeatures_process_feature(f))
+		f->enabled = 1;
+	else
+		f->disabled = 1;
+}
+
+static int __init scan_cpufeatures_subnodes(unsigned long node,
+					  const char *uname,
+					  void *data)
+{
+	int *count = data;
+
+	process_cpufeatures_node(node, uname, *count);
+
+	(*count)++;
+
+	return 0;
+}
+
+static int __init count_cpufeatures_subnodes(unsigned long node,
+					  const char *uname,
+					  void *data)
+{
+	int *count = data;
+
+	(*count)++;
+
+	return 0;
+}
+
+static int __init early_init_dt_scan_cpufeatures(unsigned long node,
+					  const char *uname, int depth,
+					  void *data)
+{
+	const char *type = of_get_flat_dt_prop(node, "device_type", NULL);
+	const __be32 *prop;
+	int count, i;
+	u32 isa;
+
+	/* We are scanning "features" nodes only */
+	if (type == NULL || strcmp(type, "cpu-features") != 0)
+		return 0;
+
+	prop = of_get_flat_dt_prop(node, "isa", NULL);
+	if (!prop) {
+		printk("cpu-features node has missing property \"isa\"\n");
+		return 0;
+	}
+
+	isa = be32_to_cpup(prop);
+
+	has_cpufeatures_node = 1;
+
+	/* Count and allocate space for cpu features */
+	of_scan_flat_dt_subnodes(node, count_cpufeatures_subnodes,
+						&nr_dt_cpu_features);
+	dt_cpu_features = __va(
+		memblock_alloc(sizeof(struct dt_cpu_feature)*
+				nr_dt_cpu_features, PAGE_SIZE));
+
+	cpufeatures_setup_start(isa);
+
+	/* Scan nodes into dt_cpu_features and enable those without deps  */
+	count = 0;
+	of_scan_flat_dt_subnodes(node, scan_cpufeatures_subnodes, &count);
+
+	/* Recursive enable remaining features with dependencies */
+	for (i = 0; i < nr_dt_cpu_features; i++) {
+		struct dt_cpu_feature *f = &dt_cpu_features[i];
+
+		cpufeatures_deps_enable(f);
+	}
+
+	cpufeatures_setup_finished();
+
+	memblock_free(__pa(dt_cpu_features),
+			sizeof(struct dt_cpu_feature)*nr_dt_cpu_features);
+
+	return 0;
+}
+
+static int __init early_init_dt_scan_cpufeatures_exists(unsigned long node,
+					  const char *uname, int depth,
+					  void *data)
+{
+	const char *type = of_get_flat_dt_prop(node, "device_type", NULL);
+	int *exists = data;
+
+	/* We are scanning "features" nodes only */
+	if (type == NULL || strcmp(type, "cpu-features") != 0)
+		return 0;
+
+	*exists = 1;
+
+	return 0;
+}
+
 static int __init early_init_dt_scan_cpus(unsigned long node,
 					  const char *uname, int depth,
 					  void *data)
@@ -377,22 +628,32 @@ static int __init early_init_dt_scan_cpus(unsigned long node,
 	 * uses the 0x0f000002 PVR value; in POWER5+ mode
 	 * it uses 0x0f000001.
 	 */
-	prop = of_get_flat_dt_prop(node, "cpu-version", NULL);
-	if (prop && (be32_to_cpup(prop) & 0xff000000) == 0x0f000000)
-		identify_cpu(0, be32_to_cpup(prop));
+	if (!has_cpufeatures_node) {
+		prop = of_get_flat_dt_prop(node, "cpu-version", NULL);
+		if (prop && (be32_to_cpup(prop) & 0xff000000) == 0x0f000000)
+			identify_cpu(0, be32_to_cpup(prop));
+		identical_pvr_fixup(node);
 
-	identical_pvr_fixup(node);
-
-	check_cpu_feature_properties(node);
-	check_cpu_pa_features(node);
-	init_mmu_slb_size(node);
+		check_cpu_feature_properties(node);
+		check_cpu_pa_features(node);
 
 #ifdef CONFIG_PPC64
-	if (nthreads > 1)
-		cur_cpu_spec->cpu_features |= CPU_FTR_SMT;
-	else
-		cur_cpu_spec->cpu_features &= ~CPU_FTR_SMT;
+		if (nthreads > 1)
+			cur_cpu_spec->cpu_features |= CPU_FTR_SMT;
+		else
+			cur_cpu_spec->cpu_features &= ~CPU_FTR_SMT;
 #endif
+	} else {
+		strcpy(cur_cpu_spec->cpu_name, uname);
+#ifdef CONFIG_PPC64
+		if (nthreads == 1)
+			cur_cpu_spec->cpu_features &= ~CPU_FTR_SMT;
+#endif
+	}
+
+
+	init_mmu_slb_size(node);
+
 	return 0;
 }
 
@@ -648,6 +909,16 @@ static void __init early_reserve_mem(void)
 #endif
 }
 
+/*
+ * Does the /cpus/features/ node exist?
+ */
+int __init early_init_devtree_check_cpu_features_exists(void)
+{
+	int exists = 0;
+	of_scan_flat_dt(early_init_dt_scan_cpufeatures_exists, &exists);
+	return exists;
+}
+
 void __init early_init_devtree(void *params)
 {
 	phys_addr_t limit;
@@ -721,6 +992,8 @@ void __init early_init_devtree(void *params)
 	allocate_pacas();
 
 	DBG("Scanning CPUs ...\n");
+
+	of_scan_flat_dt(early_init_dt_scan_cpufeatures, NULL);
 
 	/* Retrieve CPU related informations from the flat tree
 	 * (altivec support, boot CPU ID, ...)

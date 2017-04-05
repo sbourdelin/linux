@@ -49,6 +49,7 @@
 #include <asm/paca.h>
 #include <asm/time.h>
 #include <asm/cputable.h>
+#include <asm/cpufeatures.h>
 #include <asm/sections.h>
 #include <asm/btext.h>
 #include <asm/nvram.h>
@@ -262,11 +263,22 @@ static void cpu_ready_for_interrupts(void)
 void __init early_setup(unsigned long dt_ptr)
 {
 	static __initdata struct paca_struct boot_paca;
+	int cpufeatures = 0;
 
 	/* -------- printk is _NOT_ safe to use here ! ------- */
 
-	/* Identify CPU type */
-	identify_cpu(0, mfspr(SPRN_PVR));
+#ifdef CONFIG_PPC_BOOK3S_64
+	/* Setup flat device-tree pointer */
+	initial_boot_params = __va(dt_ptr);
+	if (early_init_devtree_check_cpu_features_exists()) {
+		cpufeatures = 1;
+		cpufeatures_setup_cpu();
+	} else
+#endif
+	{
+		/* Legacy table-based approach when /cpus/features is missing */
+		identify_cpu(0, mfspr(SPRN_PVR));
+	}
 
 	/* Assume we're on cpu 0 for now. Don't write to the paca yet! */
 	initialise_paca(&boot_paca, 0);
@@ -279,6 +291,8 @@ void __init early_setup(unsigned long dt_ptr)
 	udbg_early_init();
 
  	DBG(" -> early_setup(), dt_ptr: 0x%lx\n", dt_ptr);
+
+	printk("cpufeatures:%d\n", cpufeatures);
 
 	/*
 	 * Do early initialization using the flattened device
@@ -531,6 +545,9 @@ void __init initialize_cache_info(void)
 	/* For use by binfmt_elf */
 	dcache_bsize = ppc64_caches.l1d.block_size;
 	icache_bsize = ppc64_caches.l1i.block_size;
+
+	cur_cpu_spec->dcache_bsize = dcache_bsize;
+	cur_cpu_spec->icache_bsize = icache_bsize;
 
 	DBG(" <- initialize_cache_info()\n");
 }

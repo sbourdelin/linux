@@ -1,0 +1,264 @@
+powerpc cpu features binding
+============================
+
+The device tree describes supported CPU features as nodes containing
+compatibility and enablement information as properties.
+
+The binding specifies features common to all CPUs in the system.
+Heterogeneous CPU features are not supported at present (such could be added
+by providing nodes with additional features and linking those to particular
+CPUs).
+
+This binding is intended to provide fine grained control of CPU features at
+all levels of the stack (firmware, hypervisor, OS, userspace), with the
+ability for new CPU features to be used by some components without all
+components being upgraded (e.g., a new floating point instruction could be
+used by userspace math library without upgrading kernel and hypervisor).
+
+The binding is passed to the hypervisor by firmware. The hypervisor must
+remove any features that require hypervisor enablement but that it does not
+enable. It must remove any features that depend on removed features. It may
+pass remaining features usable to the OS and PR to guests, depending on
+configuration policy (not specified here).
+
+The modified binding is passed to the guest by hypervisor, with HV bit
+cleared from the usable-mask and the hv-support and hfscr-bit properties
+removed. The guest must similarly rmeove features that require OS enablement
+that it does not enable. The OS may pass PR usable features to userspace via
+ELF AUX vectors AT_HWCAP, AT_HWCAP2, AT_HWCAP3, etc., or use some other
+method (outside the scope of this specification).
+
+The binding will specify a "base" level of features that will be present
+when the cpu features binding exists. Additional features will be explicitly
+specified.
+
+/cpus/features node binding
+---------------------------
+
+Node: features
+
+Description: Container of CPU feature nodes.
+
+The node name must be "features" and it must be a child of the node "/cpus".
+
+The node is optional but should be provided by new firmware.
+
+Each child node of cpufeatures represents an architected CPU feature (e.g.,
+a new set of vector instructions) or an important CPU performance
+characteristic (e.g., fast unaligned memory operations). The specification
+of each feature (instructions, registers, exceptions, etc.) will be
+documented with device tree bindings.
+
+As a rough guide, features should be based on functional groups of changes,
+those that share common enablement requirements, that share particular
+registers or functionality. For example, "POWER9" would be too general, and
+a new feature for every instruction would be too specific. The "summary of
+changes" preface in Power ISA specification is a good guideline for the
+architected features.
+
+Features should be "positive" where possible. For example the presence of a
+feature node should indicate the presence of a new CPU feature (e.g., a
+new instruction or register). An errata workaround for example would then
+remove that feature from the device tree to disable it. "Negative" features
+may be unavoidable in some cases.
+
+Properties:
+
+- device_type
+  Usage: required
+  Value type: string
+  Definition: "cpu-features"
+
+- isa
+  Usage: required
+  Value type: <u32>
+  Definition:
+
+  isa that the CPU is currently running in. This provides instruction set
+  compatibility, less the individual feature nodes. For example, an ISA v3.0
+  implementation that lacks the "transactional-memory" cpufeature node
+  should not use transactional memory facilities.
+
+  Value corresponds to the "Power ISA Version" multiplied by 1000.
+  For example, <3000> corresponds to Version 3.0, <2070> to Version 2.07.
+  The minor digit is available for revisions.
+
+/cpus/features/feature node bindings
+------------------------------------
+
+Node: A string describing an architected CPU feature, e.g., "vsx".
+
+Description: An architected feature supported by the CPUs.
+
+The name of the node will follow a convention such that software will
+match known features by a string comparison with the node name. Presence
+of the node indicates the feature is available to use (XXX: could
+advertise all supported by hardware, with disabled/enabled status
+property).
+
+The name of the child node corresponds to the name of the feature.
+Software will detect known features by string matching.
+
+Properties:
+
+- isa
+  Usage: required
+  Value type: <u32>
+  Definition:
+
+  First level of the Power ISA that the feature appears in.
+  Software should filter out features when constraining the
+  environment to a particular ISA version.
+
+  Value is defined similarly to /cpus/features/isa
+
+- usable-mask
+  Usage: required
+  Value type: <u32> bit mask
+  Definition:
+              Bit numbers are LSB0
+              bit 0 - PR (problem state / user mode)
+              bit 1 - OS (privileged state)
+              bit 2 - HV (hypervisor state)
+              All other bits reserved and should be zero.
+
+  This property describes the privilege levels and/or software components
+  that can use the feature.
+
+  If bit 0 is set, then the hwcap-bit-nr property will exist.
+
+  Reserved bits must be treated as the feature being unsupported.
+
+- hv-support
+  Usage: optional
+  Value type: <u32>
+  Definition:
+              1 -  Custom
+              2 -  HFSCR
+              Other values reserved.
+
+  This property describes the HV privilege state support required to
+  enable the feature. If the property does not exist then no support is
+  required.
+
+  If the value of this property is 1, then the hypervisor must have
+  explicit support for this feature.
+
+  If the value of this property is 2, then the hfscr-bit-nr property
+  will exist.
+
+  Reserved values must be treated as the feature being unsupported.
+
+- os-support
+  Usage: optional
+  Value type: <u32>
+  Definition:
+              1 -  Custom
+              2 -  FSCR
+              Other values reserved.
+
+  This property describes the OS privilege state support required to
+  enable the feature. If the property does not exist then no support is
+  required.
+
+  If the value of this property is 1, then the operating system must
+  have explicit support for this feature.
+
+  If the value of this property is 2, then the fscr-bit-nr property will
+  exist.
+
+  Reserved values must be treated as the feature being unsupported.
+
+- hfscr-bit-nr
+  Usage: optional
+  Value type: <u32>
+  Definition: HFSCR bit position (LSB0)
+
+  This property exists when the hv-support property value is 2. This
+  property describes the bit number in the HFSCR register that the
+  hypervisor must set in order to enable this feature.
+
+- fscr-bit-nr
+  Usage: optional
+  Value type: <u32>
+  Definition: FSCR bit position (LSB0)
+
+  This property exists when the os-support property value is 2. This
+  property describes the bit number in the FSCR register that the
+  operating system must set in order to enable this feature.
+
+- hwcap-bit-nr
+  Usage: optional
+  Value type: <u32>
+  Definition: AUX vector bit position (LSB0)
+
+  This property may exist when the usable-mask property value has bit 0
+  (PR) set. This property describes the bit number that should be set in
+  the ELF AUX hardware capability vectors in order to advertise this
+  feature to userspace. Bits 0-31 correspond to bits 0-31 in AT_HWCAP
+  vector. Bits 32-63 correspond to 0-31 in AT_HWCAP2 vector, and so on.
+  Missing AT_HWCAPx vectors implies that the feature is not enabled or
+  can not be advertised. Operating systems may provide a number of
+  unassigned hardware capability bits to allow for new features to be
+  advertised.
+
+  Some properties representing features created before this binding are
+  advertised to userspace without a one-to-one hwcap bit number may not
+  specify this bit. Operating system will handle those bits specifically.
+  All new features usable by userspace will have a hwcap-bit-nr property.
+
+- dependencies
+  Usage: optional
+  Value type: <prop-encoded-array>
+  Definition:
+
+  If this property exists then it is a list of phandles to cpu feature
+  nodes that must be enabled for this feature to be enabled.
+
+
+Example
+-------
+
+	/cpus/features {
+		device_type = "cpu-features";
+
+		isa = <3020>;
+
+		darn {
+			isa = <3000>;
+			usable-mask = <1 | 2 | 4>;
+			hwcap-bit-nr = <xx>;
+		};
+
+		scv {
+			isa = <3000>;
+			usable-mask = <1 | 2>;
+			os-support = <1>;
+			hwcap-bit-nr = <xx>;
+		};
+
+		stop {
+			isa = <3000>;
+			usable-mask = <2 | 4>;
+			hv-support = <1>;
+			os-support = <1>;
+		};
+
+		vsx2 (hypothetical) {
+			isa = <3010>;
+			usable-mask = <1 | 2 | 4>;
+			hv-support = <1>;
+			os-support = <1>;
+			hwcap-bit-nr = <xx>;
+		};
+
+		vsx2-newinsns {
+			isa = <3020>;
+			usable-mask = <1 | 2 | 4>;
+			os-support = <2>;
+			fscr-bit-nr = <xx>;
+			hwcap-bit-nr = <xx>;
+			dependencies = <&vsx2>;
+		};
+
+	};

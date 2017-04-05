@@ -23,7 +23,9 @@
 #include <asm/mmu.h>
 #include <asm/setup.h>
 
-struct cpu_spec* cur_cpu_spec = NULL;
+static struct cpu_spec the_cpu_spec __read_mostly;
+
+struct cpu_spec* cur_cpu_spec __read_mostly = NULL;
 EXPORT_SYMBOL(cur_cpu_spec);
 
 /* The platform string corresponding to the real PVR */
@@ -2179,7 +2181,15 @@ static struct cpu_spec __initdata cpu_specs[] = {
 #endif /* CONFIG_E500 */
 };
 
-static struct cpu_spec the_cpu_spec;
+void __init set_cur_cpu_spec(struct cpu_spec *s)
+{
+	struct cpu_spec *t = &the_cpu_spec;
+
+	t = PTRRELOC(t);
+	*t = *s;
+
+	*PTRRELOC(&cur_cpu_spec) = &the_cpu_spec;
+}
 
 static struct cpu_spec * __init setup_cpu_spec(unsigned long offset,
 					       struct cpu_spec *s)
