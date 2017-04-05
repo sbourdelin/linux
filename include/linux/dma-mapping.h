@@ -70,6 +70,12 @@
 #define DMA_ATTR_PRIVILEGED		(1UL << 9)
 
 /*
+ * DMA_ATTR_DEV_COHERENT_NOPAGE: This is a hint to the DMA-mapping sub-system
+ * that this memory isn't backed by struct page.
+ */
+#define DMA_ATTR_DEV_COHERENT_NOPAGE	(1UL << 10)
+
+/*
  * A dma_addr_t can hold any valid DMA or bus address for the platform.
  * It can be given to a device to use as a DMA source or target.  A CPU cannot
  * reference a dma_addr_t directly because there may be translation between
@@ -160,6 +166,8 @@ static inline int is_device_dma_capable(struct device *dev)
  */
 int dma_alloc_from_coherent(struct device *dev, ssize_t size,
 				       dma_addr_t *dma_handle, void **ret);
+bool dma_check_dev_coherent(struct device *dev, dma_addr_t dma_handle,
+				void *vaddr);
 int dma_release_from_coherent(struct device *dev, int order, void *vaddr);
 
 int dma_mmap_from_coherent(struct device *dev, struct vm_area_struct *vma,

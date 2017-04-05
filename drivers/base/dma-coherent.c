@@ -209,6 +209,31 @@ err:
 EXPORT_SYMBOL(dma_alloc_from_coherent);
 
 /**
+ * dma_check_dev_coherent() - checks if memory is from the device coherent area
+ *
+ * @dev:	device whose coherent area is checked to validate memory
+ * @dma_handle:	dma handle associated with the allocated memory
+ * @vaddr:	the virtual address to the allocated area.
+ *
+ * Returns true if memory does belong to the per-device cohrent area.
+ * false otherwise.
+ */
+bool dma_check_dev_coherent(struct device *dev, dma_addr_t dma_handle,
+				void *vaddr)
+{
+	struct dma_coherent_mem *mem = dev ? dev->dma_mem : NULL;
+
+	if (mem && vaddr >= mem->virt_base &&
+	    vaddr < (mem->virt_base + (mem->size << PAGE_SHIFT)) &&
+	    dma_handle >= mem->device_base &&
+	    dma_handle < (mem->device_base + (mem->size << PAGE_SHIFT)))
+		return true;
+
+	return false;
+}
+EXPORT_SYMBOL(dma_check_dev_coherent);
+
+/**
  * dma_release_from_coherent() - try to free the memory allocated from per-device coherent memory pool
  * @dev:	device from which the memory was allocated
  * @order:	the order of pages allocated

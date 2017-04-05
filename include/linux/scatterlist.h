@@ -18,6 +18,7 @@ struct scatterlist {
 #ifdef CONFIG_NEED_SG_DMA_LENGTH
 	unsigned int	dma_length;
 #endif
+	unsigned long	dma_attrs;
 };
 
 /*

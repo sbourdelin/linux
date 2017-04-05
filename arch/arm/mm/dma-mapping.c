@@ -939,13 +939,28 @@ int arm_dma_get_sgtable(struct device *dev, struct sg_table *sgt,
 		 void *cpu_addr, dma_addr_t handle, size_t size,
 		 unsigned long attrs)
 {
-	struct page *page = pfn_to_page(dma_to_pfn(dev, handle));
+	unsigned long pfn = dma_to_pfn(dev, handle);
+	struct page *page;
 	int ret;
+
+	/* If the PFN is not valid, we do not have a struct page. */
+	if (!pfn_valid(pfn)) {
+		/* If memory is from per-device coherent area, use cpu_addr */
+		if (attrs & DMA_ATTR_DEV_COHERENT_NOPAGE)
+			page = cpu_addr;
+		else
+			return -ENXIO;
+	} else
+		page = pfn_to_page(pfn);
 
 	ret = sg_alloc_table(sgt, 1, GFP_KERNEL);
 	if (unlikely(ret))
 		return ret;
 
+	if (attrs & DMA_ATTR_DEV_COHERENT_NOPAGE)
+		sgt->sgl->dma_address = handle;
+
+	sgt->sgl->dma_attrs = attrs;
 	sg_set_page(sgt->sgl, page, PAGE_ALIGN(size), 0);
 	return 0;
 }
@@ -1080,10 +1095,17 @@ int arm_dma_map_sg(struct device *dev, struct scatterlist *sg, int nents,
 #ifdef CONFIG_NEED_SG_DMA_LENGTH
 		s->dma_length = s->length;
 #endif
-		s->dma_address = ops->map_page(dev, sg_page(s), s->offset,
+		/*
+		 * there is no struct page for this DMA buffer.
+		 * s->dma_address is the handle
+		 */
+		if (!(s->dma_attrs & DMA_ATTR_DEV_COHERENT_NOPAGE)) {
+			s->dma_address = ops->map_page(dev, sg_page(s),
+						s->offset,
 						s->length, dir, attrs);
-		if (dma_mapping_error(dev, s->dma_address))
-			goto bad_mapping;
+			if (dma_mapping_error(dev, s->dma_address))
+				goto bad_mapping;
+		}
 	}
 	return nents;
 
@@ -1112,7 +1134,9 @@ void arm_dma_unmap_sg(struct device *dev, struct scatterlist *sg, int nents,
 	int i;
 
 	for_each_sg(sg, s, nents, i)
-		ops->unmap_page(dev, sg_dma_address(s), sg_dma_len(s), dir, attrs);
+		if (!(s->dma_attrs & DMA_ATTR_DEV_COHERENT_NOPAGE))
+			ops->unmap_page(dev, sg_dma_address(s),
+					sg_dma_len(s), dir, attrs);
 }
 
 /**

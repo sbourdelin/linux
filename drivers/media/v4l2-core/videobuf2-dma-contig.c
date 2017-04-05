@@ -161,6 +161,9 @@ static void *vb2_dc_alloc(struct device *dev, unsigned long attrs,
 	if ((buf->attrs & DMA_ATTR_NO_KERNEL_MAPPING) == 0)
 		buf->vaddr = buf->cookie;
 
+	if (dma_check_dev_coherent(dev, buf->dma_addr, buf->cookie))
+		buf->attrs |= DMA_ATTR_DEV_COHERENT_NOPAGE;
+
 	/* Prevent the device from being released while the buffer is used */
 	buf->dev = get_device(dev);
 	buf->size = size;
@@ -248,6 +251,9 @@ static int vb2_dc_dmabuf_ops_attach(struct dma_buf *dbuf, struct device *dev,
 	rd = buf->sgt_base->sgl;
 	wr = sgt->sgl;
 	for (i = 0; i < sgt->orig_nents; ++i) {
+		if (rd->dma_attrs & DMA_ATTR_DEV_COHERENT_NOPAGE)
+			wr->dma_address = rd->dma_address;
+		wr->dma_attrs = rd->dma_attrs;
 		sg_set_page(wr, sg_page(rd), rd->length, rd->offset);
 		rd = sg_next(rd);
 		wr = sg_next(wr);
