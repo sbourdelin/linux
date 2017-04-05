@@ -19,6 +19,19 @@ Required properties:
 - reset-names: Must include the following entries:
   - pwm
 
+Optional properties:
+============================
+In some of the interface like PWM based regualator device, it is required
+to configure the pins diffrently in different states, specially in suspend
+state of the system. The configuration of pin is provided via the pinctrl
+DT node as detailed in the pinctrl DT binding document
+	Documentation/devicetree/bindings/pinctrl/pinctrl-bindings.txt
+
+The PWM node will have following optional properties.
+pinctrl-names:	Pin state names. Must be "suspend" and "resume".
+pinctrl-0:	Node handle of the suspend state configuration of pins.
+pinctrl-1:	Node handle of the resume state configuration of pins.
+
 Example:
 
 	pwm: pwm@7000a000 {
@@ -28,4 +41,34 @@ Example:
 		clocks = <&tegra_car 17>;
 		resets = <&tegra_car 17>;
 		reset-names = "pwm";
+	};
+
+
+Example with the pin configuration for suspend and resume:
+=========================================================
+Here Pin PE7 is used as PWM.
+
+#include <dt-bindings/pinctrl/pinctrl-tegra.h>
+
+	pinmux@70000868 {
+		pwm_suspend: pwm_suspend_state {
+                        pe7 {
+                                nvidia,pins = "pe7";
+                                nvidia,tristate = <TEGRA_PIN_DISABLE>;
+			};
+		};
+
+		pwm_resume: pwm_resume_state {
+                        pe7 {
+                                nvidia,pins = "pe7";
+                                nvidia,tristate = <TEGRA_PIN_DISABLE>;
+			};
+		};
+	};
+
+	pwm@7000a000 {
+		/* Mandatory pwm properties */
+		pinctrl-names = "suspend", "resume";
+		pinctrl-0 = <&pwm_suspend>;
+		pinctrl-1 = <&pwm_resume>;
 	};
