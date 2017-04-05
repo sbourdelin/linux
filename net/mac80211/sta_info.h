@@ -390,6 +390,14 @@ struct ieee80211_sta_rx_stats {
 };
 
 /**
+ * The bandwidth threshold below which the per-station CoDel parameters will be
+ * scaled to be more lenient (to prevent starvation of slow stations). This
+ * value will be scaled by the number of active stations when it is being
+ * applied.
+ */
+#define STA_SLOW_THRESHOLD 6000 /* 6 Mbps */
+
+/**
  * struct sta_info - STA information
  *
  * This structure collects information about a station that
@@ -442,6 +450,7 @@ struct ieee80211_sta_rx_stats {
  * @known_smps_mode: the smps_mode the client thinks we are in. Relevant for
  *	AP only.
  * @cipher_scheme: optional cipher scheme for this station
+ * @cparams: CoDel parameters for this station.
  * @reserved_tid: reserved TID (if any, otherwise IEEE80211_TID_UNRESERVED)
  * @fast_tx: TX fastpath information
  * @fast_rx: RX fastpath information
@@ -544,6 +553,8 @@ struct sta_info {
 
 	enum ieee80211_smps_mode known_smps_mode;
 	const struct ieee80211_cipher_scheme *cipher_scheme;
+
+	struct codel_params cparams;
 
 	u8 reserved_tid;
 
@@ -713,6 +724,7 @@ void sta_set_rate_info_tx(struct sta_info *sta,
 void sta_set_sinfo(struct sta_info *sta, struct station_info *sinfo);
 
 u32 sta_get_expected_throughput(struct sta_info *sta);
+void sta_update_codel_params(struct sta_info *sta, u32 thr);
 
 void ieee80211_sta_expire(struct ieee80211_sub_if_data *sdata,
 			  unsigned long exp_time);
