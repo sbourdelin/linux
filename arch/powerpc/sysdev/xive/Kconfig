@@ -1,0 +1,7 @@
+config PPC_XIVE
+       def_bool n
+       select PPC_SMP_MUXED_IPI
+       select HARDIRQS_SW_RESEND
+
+config PPC_XIVE_NATIVE
+       def_bool n
