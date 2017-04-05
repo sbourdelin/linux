@@ -54,14 +54,6 @@
 #include "fsl_ssi.h"
 #include "imx-pcm.h"
 
-/**
- * FSLSSI_I2S_RATES: sample rates supported by the I2S
- *
- * This driver currently only supports the SSI running in I2S slave mode,
- * which means the codec determines the sample rate.  Therefore, we tell
- * ALSA that we support all rates and let the codec driver decide what rates
- * are really supported.
- */
 #define FSLSSI_I2S_RATES SNDRV_PCM_RATE_CONTINUOUS
 
 /**
