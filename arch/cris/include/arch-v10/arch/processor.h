@@ -7,9 +7,6 @@
  */
 #define current_text_addr() ({void *pc; __asm__ ("move.d $pc,%0" : "=rm" (pc)); pc; })
 
-/* CRIS has no problems with write protection */
-#define wp_works_ok 1
-
 /* CRIS thread_struct. this really has nothing to do with the processor itself, since
  * CRIS does not do any hardware task-switching, but it's here for legacy reasons.
  * The thread_struct here is used when task-switching using _resume defined in entry.S.
