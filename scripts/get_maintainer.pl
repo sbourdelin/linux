@@ -193,24 +193,26 @@ if (-f $conf) {
 }
 
 my @ignore_emails = ();
-my $ignore_file = which_conf(".get_maintainer.ignore");
-if (-f $ignore_file) {
-    open(my $ignore, '<', "$ignore_file")
-	or warn "$P: Can't find a readable .get_maintainer.ignore file $!\n";
-    while (<$ignore>) {
-	my $line = $_;
+my @ignore_files = which_confs(".get_maintainer.ignore");
+foreach my $ignore_file (@ignore_files) {
+    if (-f $ignore_file) {
+	open(my $ignore, '<', "$ignore_file")
+	    or warn "$P: Can't find a readable .get_maintainer.ignore file $!\n";
+	while (<$ignore>) {
+	    my $line = $_;
 
-	$line =~ s/\s*\n?$//;
-	$line =~ s/^\s*//;
-	$line =~ s/\s+$//;
-	$line =~ s/#.*$//;
+	    $line =~ s/\s*\n?$//;
+	    $line =~ s/^\s*//;
+	    $line =~ s/\s+$//;
+	    $line =~ s/#.*$//;
 
-	next if ($line =~ m/^\s*$/);
-	if (rfc822_valid($line)) {
-	    push(@ignore_emails, $line);
+	    next if ($line =~ m/^\s*$/);
+	    if (rfc822_valid($line)) {
+		push(@ignore_emails, $line);
+	    }
 	}
+	close($ignore);
     }
-    close($ignore);
 }
 
 if (!GetOptions(
@@ -1237,13 +1239,24 @@ sub which {
     return "";
 }
 
-sub which_conf {
+sub which_confs {
     my ($conf) = @_;
+    my @confs = ();
 
     foreach my $path (split(/:/, ".:$ENV{HOME}:.scripts")) {
 	if (-e "$path/$conf") {
-	    return "$path/$conf";
+	    push(@confs, "$path/$conf");
 	}
+    }
+
+    return @confs;
+}
+
+sub which_conf {
+    my @confs = which_confs(@_);
+
+    if (@confs) {
+	return $confs[0];
     }
 
     return "";
