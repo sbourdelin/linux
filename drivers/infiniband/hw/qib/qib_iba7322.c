@@ -6442,12 +6442,15 @@ static int qib_init_7322_variables(struct qib_devdata *dd)
 	sbufcnt = dd->piobcnt2k + dd->piobcnt4k +
 		NUM_VL15_BUFS + BITS_PER_LONG - 1;
 	sbufcnt /= BITS_PER_LONG;
-	dd->cspec->sendchkenable = kmalloc(sbufcnt *
-		sizeof(*dd->cspec->sendchkenable), GFP_KERNEL);
-	dd->cspec->sendgrhchk = kmalloc(sbufcnt *
-		sizeof(*dd->cspec->sendgrhchk), GFP_KERNEL);
-	dd->cspec->sendibchk = kmalloc(sbufcnt *
-		sizeof(*dd->cspec->sendibchk), GFP_KERNEL);
+	dd->cspec->sendchkenable = kmalloc_array(sbufcnt,
+						 sizeof(*dd->cspec->sendchkenable),
+						 GFP_KERNEL);
+	dd->cspec->sendgrhchk = kmalloc_array(sbufcnt,
+					      sizeof(*dd->cspec->sendgrhchk),
+					      GFP_KERNEL);
+	dd->cspec->sendibchk = kmalloc_array(sbufcnt,
+					     sizeof(*dd->cspec->sendibchk),
+					     GFP_KERNEL);
 	if (!dd->cspec->sendchkenable || !dd->cspec->sendgrhchk ||
 		!dd->cspec->sendibchk) {
 		ret = -ENOMEM;
