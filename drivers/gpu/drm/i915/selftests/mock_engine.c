@@ -141,7 +141,7 @@ struct intel_engine_cs *mock_engine(struct drm_i915_private *i915,
 
 	/* minimal engine setup for requests */
 	engine->base.i915 = i915;
-	engine->base.name = name;
+	strncpy(engine->base.name, name, sizeof(engine->base.name) - 1);
 	engine->base.id = id++;
 	engine->base.status_page.page_addr = (void *)(engine + 1);
 
