@@ -20,6 +20,10 @@ libphy-$(CONFIG_LED_TRIGGER_PHY)	+= phy_led_triggers.o
 
 obj-$(CONFIG_PHYLIB)		+= libphy.o
 
+lan9303-objs-y := lan9303-core.o
+lan9303-objs-$(CONFIG_SMSC_LAN9303_I2C) += lan9303_i2c.o
+lan9303-objs := $(lan9303-objs-y)
+
 obj-$(CONFIG_MDIO_BCM_IPROC)	+= mdio-bcm-iproc.o
 obj-$(CONFIG_MDIO_BCM_UNIMAC)	+= mdio-bcm-unimac.o
 obj-$(CONFIG_MDIO_BITBANG)	+= mdio-bitbang.o
@@ -65,6 +69,7 @@ obj-$(CONFIG_NATIONAL_PHY)	+= national.o
 obj-$(CONFIG_QSEMI_PHY)		+= qsemi.o
 obj-$(CONFIG_REALTEK_PHY)	+= realtek.o
 obj-$(CONFIG_SMSC_PHY)		+= smsc.o
+obj-$(CONFIG_SMSC_LAN9303)	+= lan9303.o
 obj-$(CONFIG_STE10XP)		+= ste10Xp.o
 obj-$(CONFIG_TERANETICS_PHY)	+= teranetics.o
 obj-$(CONFIG_VITESSE_PHY)	+= vitesse.o

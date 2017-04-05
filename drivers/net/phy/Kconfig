@@ -355,3 +355,20 @@ endif # PHYLIB
 config MICREL_KS8995MA
 	tristate "Micrel KS8995MA 5-ports 10/100 managed Ethernet switch"
 	depends on SPI
+
+config SMSC_LAN9303
+	tristate "SMSC LAN9303 3-ports 10/100 ethernet switch"
+	depends on NET_DSA
+	select NET_DSA_TAG_LAN9303
+	help
+	  This module provides a driver for SMSC LAN9303 3 port ethernet
+	  switch.
+
+config SMSC_LAN9303_I2C
+	bool "I2C managed mode"
+	depends on SMSC_LAN9303
+	depends on I2C && OF
+	select REGMAP_I2C
+	help
+	  Provide access functions if the SMSC LAN9303 is configured for I2C
+	  managed mode.

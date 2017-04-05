@@ -1,0 +1,74 @@
+SMSC/MicroChip LAN9303 three port ethernet switch
+-------------------------------------------------
+
+Required properties:
+
+- compatible: should be "smsc,lan9303"
+- #size-cells: must be 0
+- #address-cells: must be 1
+
+Optional properties:
+
+- phy-reset-gpios: GPIO to be used to reset the whole device, always low active
+- phy-reset-duration: reset duration, defaults to 200 ms
+
+Subnodes:
+
+The integrated switch subnode should be specified according to the binding
+described in dsa/dsa.txt. The CPU port of this switch is always port 0.
+
+Example:
+
+I2C managed mode:
+
+	master: masterdevice@X {
+		phy-handle = <&ethphy>;
+		status = "okay";
+
+		mdio {
+			#address-cells = <1>;
+			#size-cells = <0>;
+
+			ethphy: ethernet-phy@0 {
+				compatible = "ethernet-phy-ieee802.3-c22";
+				reg = <0>;
+				max-speed = <100>;
+			};
+		};
+
+	};
+
+	switch: switch@a {
+		compatible = "smsc,lan9303";
+		reg = <0xa>;
+		status = "okay";
+		interrupts-extended = <&gpio2 7 IRQ_TYPE_LEVEL_LOW>;
+		phy-reset-gpios = <&gpio7 6 GPIO_ACTIVE_LOW>;
+		phy-reset-duration = <200>;
+
+		dsa,member = <0 0>;
+
+		ports {
+			#address-cells = <1>;
+			#size-cells = <0>;
+
+			port@0 { /* RMII fixed link to master */
+				reg = <0>;
+				label = "cpu";
+				ethernet = <&master>;
+				max-speed = <100>;
+			};
+
+			port@1 { /* external port 1 */
+				compatible = "ethernet-phy-ieee802.3-c22";
+				reg = <1>;
+				label = "lan1;
+			};
+
+			port@2 { /* external port 2 */
+				compatible = "ethernet-phy-ieee802.3-c22";
+				reg = <2>;
+				label = "lan2";
+			};
+		};
+	};
