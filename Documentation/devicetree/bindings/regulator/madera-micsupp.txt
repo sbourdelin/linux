@@ -1,0 +1,27 @@
+Cirrus Logic Madera class audio codecs mic supply regulator driver
+
+Only required if the codec has an internal mic supply regulator.
+This is a subnode of the parent mfd node.
+
+See also the core bindings for the parent MFD driver:
+See Documentation/devicetree/bindings/mfd/madera.txt
+
+Required properties:
+  - compatible :  must be "cirrus,madera-micsupp"
+
+Optional subnodes:
+  Standard regulator bindings as described in bindings/regulator/regulator.txt
+
+Example:
+
+codec: cs47l85@0 {
+	compatible = "cirrus,cs47l85";
+
+	micvdd {
+		compatible = "cirrus,madera-micsupp";
+		regulator-min-microvolt = <900000>;
+		regulator-max-microvolt = <3300000>;
+		regulator-allow-bypass = <1>;
+	};
+};
+
