@@ -19,6 +19,14 @@
 #include <xen/xen-ops.h>
 #include <asm/xen/xen-ops.h>
 
+static void xen_efi_reset_system(int reset_type,
+				 efi_status_t status,
+				 unsigned long data_size,
+				 efi_char16_t *data)
+{
+	/* NOP implementation, reset will fallback on an alternative method */
+}
+
 /* Set XEN EFI runtime services function pointers. Other fields of struct efi,
  * e.g. efi.systab, will be set like normal EFI.
  */
@@ -35,6 +43,6 @@ void __init xen_efi_runtime_setup(void)
 	efi.update_capsule           = xen_efi_update_capsule;
 	efi.query_capsule_caps       = xen_efi_query_capsule_caps;
 	efi.get_next_high_mono_count = xen_efi_get_next_high_mono_count;
-	efi.reset_system             = NULL; /* Functionality provided by Xen. */
+	efi.reset_system             = xen_efi_reset_system;
 }
 EXPORT_SYMBOL_GPL(xen_efi_runtime_setup);
