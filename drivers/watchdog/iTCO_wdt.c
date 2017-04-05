@@ -106,6 +106,8 @@ struct iTCO_wdt_private {
 	struct pci_dev *pci_dev;
 	/* whether or not the watchdog has been suspended */
 	bool suspended;
+	/* no reboot API private data */
+	void *no_reboot_priv;
 	/* no reboot update function pointer */
 	int (*update_no_reboot_bit)(void *p, bool set);
 };
@@ -225,6 +227,8 @@ void iTCO_wdt_no_reboot_bit_setup(struct iTCO_wdt_private *p)
 		p->update_no_reboot_bit = update_no_reboot_bit_pci;
 	else
 		p->update_no_reboot_bit = update_no_reboot_bit_def;
+
+	p->no_reboot_priv = p;
 }
 
 static int iTCO_wdt_start(struct watchdog_device *wd_dev)
@@ -237,7 +241,7 @@ static int iTCO_wdt_start(struct watchdog_device *wd_dev)
 	iTCO_vendor_pre_start(p->smi_res, wd_dev->timeout);
 
 	/* disable chipset's NO_REBOOT bit */
-	if (p->update_no_reboot_bit(p, false)) {
+	if (p->update_no_reboot_bit(p->no_reboot_priv, false)) {
 		spin_unlock(&p->io_lock);
 		pr_err("failed to reset NO_REBOOT flag, reboot disabled by hardware/BIOS\n");
 		return -EIO;
@@ -278,7 +282,7 @@ static int iTCO_wdt_stop(struct watchdog_device *wd_dev)
 	val = inw(TCO1_CNT(p));
 
 	/* Set the NO_REBOOT bit to prevent later reboots, just for sure */
-	p->update_no_reboot_bit(p, true);
+	p->update_no_reboot_bit(p->no_reboot_priv, true);
 
 	spin_unlock(&p->io_lock);
 
@@ -442,14 +446,18 @@ static int iTCO_wdt_probe(struct platform_device *pdev)
 
 	p->iTCO_version = pdata->version;
 	p->pci_dev = to_pci_dev(dev->parent);
+	p->no_reboot_priv = pdata->no_reboot_priv;
 
-	iTCO_wdt_no_reboot_bit_setup(p);
+	if (pdata->update_no_reboot_bit)
+		p->update_no_reboot_bit = pdata->update_no_reboot_bit;
+	else
+		iTCO_wdt_no_reboot_bit_setup(p);
 
 	/*
 	 * Get the Memory-Mapped GCS or PMC register, we need it for the
 	 * NO_REBOOT flag (TCO v2 and v3).
 	 */
-	if (p->iTCO_version >= 2) {
+	if (p->iTCO_version >= 2 && !pdata->update_no_reboot_bit) {
 		p->gcs_pmc_res = platform_get_resource(pdev,
 						       IORESOURCE_MEM,
 						       ICH_RES_MEM_GCS_PMC);
@@ -459,14 +467,14 @@ static int iTCO_wdt_probe(struct platform_device *pdev)
 	}
 
 	/* Check chipset's NO_REBOOT bit */
-	if (p->update_no_reboot_bit(p, false) &&
+	if (p->update_no_reboot_bit(p->no_reboot_priv, false) &&
 	    iTCO_vendor_check_noreboot_on()) {
 		pr_info("unable to reset NO_REBOOT flag, device disabled by hardware/BIOS\n");
 		return -ENODEV;	/* Cannot reset NO_REBOOT bit */
 	}
 
 	/* Set the NO_REBOOT bit to prevent later reboots, just for sure */
-	p->update_no_reboot_bit(p, true);
+	p->update_no_reboot_bit(p->no_reboot_priv, true);
 
 	/* The TCO logic uses the TCO_EN bit in the SMI_EN register */
 	if (!devm_request_region(dev, p->smi_res->start,
