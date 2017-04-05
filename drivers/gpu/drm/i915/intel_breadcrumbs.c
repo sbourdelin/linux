@@ -27,6 +27,23 @@
 
 #include "i915_drv.h"
 
+#ifdef CONFIG_SMP
+#define task_asleep(tsk) (!(tsk)->on_cpu)
+#else
+#define task_asleep(tsk) ((tsk) != current)
+#endif
+
+static inline bool __wake_up_sleeper(struct task_struct *tsk)
+{
+	/* Be careful not to report a successful wakeup if the waiter is
+	 * currently processing the seqno, where it will have already
+	 * called set_task_state(TASK_INTERRUPTIBLE). We first check whether
+	 * the task is currently asleep before calling ttwu, and then we
+	 * only report success if we were the ones to then trigger the wakeup.
+	 */
+	return task_asleep(tsk) && wake_up_process(tsk);
+}
+
 static unsigned int __intel_breadcrumbs_wakeup(struct intel_breadcrumbs *b)
 {
 	struct intel_wait *wait;
@@ -37,7 +54,7 @@ static unsigned int __intel_breadcrumbs_wakeup(struct intel_breadcrumbs *b)
 	wait = b->irq_wait;
 	if (wait) {
 		result = ENGINE_WAKEUP_WAITER;
-		if (wake_up_process(wait->tsk))
+		if (__wake_up_sleeper(wait->tsk))
 			result |= ENGINE_WAKEUP_ASLEEP;
 	}
 
@@ -198,7 +215,7 @@ void intel_engine_disarm_breadcrumbs(struct intel_engine_cs *engine)
 
 	rbtree_postorder_for_each_entry_safe(wait, n, &b->waiters, node) {
 		RB_CLEAR_NODE(&wait->node);
-		if (wake_up_process(wait->tsk) && wait == first)
+		if (__wake_up_sleeper(wait->tsk) && wait == first)
 			missed_breadcrumb(engine);
 	}
 	b->waiters = RB_ROOT;
