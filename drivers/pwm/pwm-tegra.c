@@ -29,6 +29,7 @@
 #include <linux/of_device.h>
 #include <linux/pwm.h>
 #include <linux/platform_device.h>
+#include <linux/pinctrl/consumer.h>
 #include <linux/slab.h>
 #include <linux/reset.h>
 
@@ -52,6 +53,9 @@ struct tegra_pwm_chip {
 	void __iomem *regs;
 
 	const struct tegra_pwm_soc *soc;
+	struct pinctrl		*pinctrl;
+	struct pinctrl_state	*suspend_state;
+	struct pinctrl_state	*resume_state;
 };
 
 static inline struct tegra_pwm_chip *to_tegra_pwm_chip(struct pwm_chip *chip)
@@ -215,6 +219,27 @@ static int tegra_pwm_probe(struct platform_device *pdev)
 	pwm->chip.base = -1;
 	pwm->chip.npwm = pwm->soc->num_channels;
 
+	pwm->pinctrl = devm_pinctrl_get(&pdev->dev);
+	if (!IS_ERR(pwm->pinctrl)) {
+		pwm->suspend_state = pinctrl_lookup_state(pwm->pinctrl,
+							  "suspend");
+		if (IS_ERR(pwm->suspend_state)) {
+			/* Ignore error other than PROBE_DEFER */
+			ret = PTR_ERR(pwm->suspend_state);
+			if (ret == -EPROBE_DEFER)
+				return ret;
+		}
+
+		pwm->resume_state = pinctrl_lookup_state(pwm->pinctrl,
+							 "resume");
+		if (IS_ERR(pwm->resume_state)) {
+			/* Ignore error other than PROBE_DEFER */
+			ret = PTR_ERR(pwm->resume_state);
+			if (ret == -EPROBE_DEFER)
+				return ret;
+		}
+	}
+
 	ret = pwmchip_add(&pwm->chip);
 	if (ret < 0) {
 		dev_err(&pdev->dev, "pwmchip_add() failed: %d\n", ret);
@@ -256,6 +281,42 @@ static int tegra_pwm_remove(struct platform_device *pdev)
 	return pwmchip_remove(&pc->chip);
 }
 
+#ifdef CONFIG_PM_SLEEP
+static int tegra_pwm_suspend(struct device *dev)
+{
+	struct tegra_pwm_chip *pc = dev_get_drvdata(dev);
+	int ret;
+
+	if (IS_ERR(pc->pinctrl) || IS_ERR(pc->suspend_state))
+		return 0;
+
+	ret = pinctrl_select_state(pc->pinctrl, pc->suspend_state);
+	if (ret < 0) {
+		dev_err(dev, "Failed to set pin into suspend state:%d\n", ret);
+		return ret;
+	}
+
+	return 0;
+}
+
+static int tegra_pwm_resume(struct device *dev)
+{
+	struct tegra_pwm_chip *pc = dev_get_drvdata(dev);
+	int ret;
+
+	if (IS_ERR(pc->pinctrl) || IS_ERR(pc->resume_state))
+		return 0;
+
+	ret = pinctrl_select_state(pc->pinctrl, pc->resume_state);
+	if (ret < 0) {
+		dev_err(dev, "Failed to set pin into resume state:%d\n", ret);
+		return ret;
+	}
+
+	return 0;
+}
+#endif
+
 static const struct tegra_pwm_soc tegra20_pwm_soc = {
 	.num_channels = 4,
 };
@@ -272,10 +333,15 @@ static const struct of_device_id tegra_pwm_of_match[] = {
 
 MODULE_DEVICE_TABLE(of, tegra_pwm_of_match);
 
+static const struct dev_pm_ops tegra_pwm_pm_ops = {
+	SET_SYSTEM_SLEEP_PM_OPS(tegra_pwm_suspend, tegra_pwm_resume)
+};
+
 static struct platform_driver tegra_pwm_driver = {
 	.driver = {
 		.name = "tegra-pwm",
 		.of_match_table = tegra_pwm_of_match,
+		.pm = &tegra_pwm_pm_ops,
 	},
 	.probe = tegra_pwm_probe,
 	.remove = tegra_pwm_remove,
