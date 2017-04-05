@@ -19,6 +19,7 @@
 #include <linux/sram.h>
 
 #include <asm/cacheflush.h>
+#include <asm/fncpy.h>
 
 #include "sram.h"
 
@@ -93,7 +94,7 @@ int sram_exec_copy(struct gen_pool *pool, void *dst, void *src,
 	set_memory_nx((unsigned long)base, pages);
 	set_memory_rw((unsigned long)base, pages);
 
-	memcpy(dst, src, size);
+	fncpy(dst, src, size);
 
 	set_memory_ro((unsigned long)base, pages);
 	set_memory_x((unsigned long)base, pages);
