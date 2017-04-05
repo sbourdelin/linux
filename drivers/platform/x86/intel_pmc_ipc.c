@@ -112,6 +112,13 @@
 #define TCO_PMC_OFFSET			0x8
 #define TCO_PMC_SIZE			0x4
 
+/* PMC register bit definitions */
+
+/* PMC_CFG_REG bit masks */
+#define PMC_CFG_NO_REBOOT_MASK		BIT(4)
+#define PMC_CFG_NO_REBOOT_ENABLE	BIT(4)
+#define PMC_CFG_NO_REBOOT_DISABLE	0
+
 static struct intel_pmc_ipc_dev {
 	struct device *dev;
 	void __iomem *ipc_base;
@@ -126,8 +133,6 @@ static struct intel_pmc_ipc_dev {
 	struct platform_device *tco_dev;
 
 	/* gcr */
-	resource_size_t gcr_base;
-	int gcr_size;
 	void __iomem *gcr_mem_base;
 	bool has_gcr_regs;
 
@@ -312,6 +317,18 @@ gcr_ipc_unlock:
 	return ret;
 }
 EXPORT_SYMBOL_GPL(intel_pmc_gcr_update);
+
+static int update_no_reboot_bit(void *priv, bool set)
+{
+	if (set)
+		return intel_pmc_gcr_update(PMC_GCR_PMC_CFG_REG,
+					    PMC_CFG_NO_REBOOT_MASK,
+					    PMC_CFG_NO_REBOOT_ENABLE);
+
+	return intel_pmc_gcr_update(PMC_GCR_PMC_CFG_REG,
+				    PMC_CFG_NO_REBOOT_MASK,
+				    PMC_CFG_NO_REBOOT_DISABLE);
+}
 
 static int intel_pmc_ipc_check_status(void)
 {
@@ -630,15 +647,13 @@ static struct resource tco_res[] = {
 	{
 		.flags = IORESOURCE_IO,
 	},
-	/* GCS */
-	{
-		.flags = IORESOURCE_MEM,
-	},
 };
 
 static struct itco_wdt_platform_data tco_info = {
 	.name = "Apollo Lake SoC",
 	.version = 5,
+	.no_reboot_priv = &ipcdev,
+	.update_no_reboot_bit = update_no_reboot_bit,
 };
 
 #define TELEMETRY_RESOURCE_PUNIT_SSRAM	0
@@ -694,10 +709,6 @@ static int ipc_create_tco_device(void)
 	res = tco_res + TCO_RESOURCE_SMI_EN_IO;
 	res->start = ipcdev.acpi_io_base + SMI_EN_OFFSET;
 	res->end = res->start + SMI_EN_SIZE - 1;
-
-	res = tco_res + TCO_RESOURCE_GCR_MEM;
-	res->start = ipcdev.gcr_base + TCO_PMC_OFFSET;
-	res->end = res->start + TCO_PMC_SIZE - 1;
 
 	pdev = platform_device_register_full(&pdevinfo);
 	if (IS_ERR(pdev))
@@ -860,9 +871,7 @@ static int ipc_plat_get_res(struct platform_device *pdev)
 	}
 	ipcdev.ipc_base = addr;
 
-	ipcdev.gcr_base = res->start + PLAT_RESOURCE_GCR_OFFSET;
 	ipcdev.gcr_mem_base = addr + PLAT_RESOURCE_GCR_OFFSET;
-	ipcdev.gcr_size = PLAT_RESOURCE_GCR_SIZE;
 	dev_info(&pdev->dev, "ipc res: %pR\n", res);
 
 	ipcdev.telem_res_inval = 0;
