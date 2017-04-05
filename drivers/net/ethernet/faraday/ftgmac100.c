@@ -55,7 +55,6 @@ struct ftgmac100_descs {
 struct ftgmac100 {
 	struct resource *res;
 	void __iomem *base;
-	int irq;
 
 	struct ftgmac100_descs *descs;
 	dma_addr_t descs_dma_addr;
@@ -1119,9 +1118,9 @@ static int ftgmac100_open(struct net_device *netdev)
 		goto err_alloc;
 	}
 
-	err = request_irq(priv->irq, ftgmac100_interrupt, 0, netdev->name, netdev);
+	err = request_irq(netdev->irq, ftgmac100_interrupt, 0, netdev->name, netdev);
 	if (err) {
-		netdev_err(netdev, "failed to request irq %d\n", priv->irq);
+		netdev_err(netdev, "failed to request irq %d\n", netdev->irq);
 		goto err_irq;
 	}
 
@@ -1168,7 +1167,7 @@ err_ncsi:
 	netif_stop_queue(netdev);
 	iowrite32(0, priv->base + FTGMAC100_OFFSET_IER);
 err_hw:
-	free_irq(priv->irq, netdev);
+	free_irq(netdev->irq, netdev);
 err_irq:
 	ftgmac100_free_buffers(priv);
 err_alloc:
@@ -1194,7 +1193,7 @@ static int ftgmac100_stop(struct net_device *netdev)
 		ncsi_stop_dev(priv->ndev);
 
 	ftgmac100_stop_hw(priv);
-	free_irq(priv->irq, netdev);
+	free_irq(netdev->irq, netdev);
 	ftgmac100_free_buffers(priv);
 
 	return 0;
@@ -1381,7 +1380,7 @@ static int ftgmac100_probe(struct platform_device *pdev)
 		goto err_ioremap;
 	}
 
-	priv->irq = irq;
+	netdev->irq = irq;
 
 	/* MAC address from chip or random one */
 	ftgmac100_setup_mac(priv);
@@ -1438,7 +1437,7 @@ static int ftgmac100_probe(struct platform_device *pdev)
 		goto err_register_netdev;
 	}
 
-	netdev_info(netdev, "irq %d, mapped at %p\n", priv->irq, priv->base);
+	netdev_info(netdev, "irq %d, mapped at %p\n", netdev->irq, priv->base);
 
 	return 0;
 
