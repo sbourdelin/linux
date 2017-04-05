@@ -1678,11 +1678,15 @@ int aac_issue_bmic_identify(struct aac_dev *dev, u32 bus, u32 target)
 			sizeof(struct sgentry) + sizeof(struct sgentry64);
 	datasize = sizeof(struct aac_ciss_identify_pd);
 
-	identify_resp =  pci_alloc_consistent(dev->pdev, datasize, &addr);
+	identify_resp = dma_alloc_coherent(&dev->pdev->dev,
+					   datasize,
+					   &addr,
+					   GFP_KERNEL);
 
 	if (!identify_resp)
 		goto fib_free_ptr;
 
+	memset(identify_resp, 0, datasize);
 	vbus = (u32)le16_to_cpu(dev->supplement_adapter_info.virt_device_bus);
 	vid = (u32)le16_to_cpu(dev->supplement_adapter_info.virt_device_target);
 
@@ -1720,7 +1724,10 @@ int aac_issue_bmic_identify(struct aac_dev *dev, u32 bus, u32 target)
 		dev->hba_map[bus][target].qd_limit =
 			identify_resp->current_queue_depth_limit;
 
-	pci_free_consistent(dev->pdev, datasize, (void *)identify_resp, addr);
+	dma_free_coherent(&dev->pdev->dev,
+			  datasize,
+			  identify_resp,
+			  addr);
 
 	aac_fib_complete(fibptr);
 
@@ -1814,14 +1821,17 @@ int aac_report_phys_luns(struct aac_dev *dev, struct fib *fibptr, int rescan)
 	datasize = sizeof(struct aac_ciss_phys_luns_resp)
 			+ (AAC_MAX_TARGETS - 1) * sizeof(struct _ciss_lun);
 
-	phys_luns = (struct aac_ciss_phys_luns_resp *) pci_alloc_consistent(
-			dev->pdev, datasize, &addr);
+	phys_luns = dma_alloc_coherent(&dev->pdev->dev,
+				       datasize,
+				       &addr,
+				       GFP_KERNEL);
 
 	if (phys_luns == NULL) {
 		rcode = -ENOMEM;
 		goto err_out;
 	}
 
+	memset(phys_luns, 0, datasize);
 	vbus = (u32) le16_to_cpu(
 			dev->supplement_adapter_info.virt_device_bus);
 	vid = (u32) le16_to_cpu(
@@ -1861,7 +1871,10 @@ int aac_report_phys_luns(struct aac_dev *dev, struct fib *fibptr, int rescan)
 		aac_update_hba_map(dev, phys_luns, rescan);
 	}
 
-	pci_free_consistent(dev->pdev, datasize, (void *) phys_luns, addr);
+	dma_free_coherent(&dev->pdev->dev,
+			  datasize,
+			  phys_luns,
+			  addr);
 err_out:
 	return rcode;
 }
