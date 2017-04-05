@@ -258,15 +258,15 @@ int qib_init_pportdata(struct qib_pportdata *ppd, struct qib_devdata *dd,
 
 	ppd->cc_max_table_entries =
 		ppd->cc_supported_table_entries/IB_CCT_ENTRIES;
-
-	size = IB_CC_TABLE_CAP_DEFAULT * sizeof(struct ib_cc_table_entry)
-		* IB_CCT_ENTRIES;
-	ppd->ccti_entries = kzalloc(size, GFP_KERNEL);
+	ppd->ccti_entries = kcalloc(IB_CC_TABLE_CAP_DEFAULT * IB_CCT_ENTRIES,
+				    sizeof(*ppd->ccti_entries),
+				    GFP_KERNEL);
 	if (!ppd->ccti_entries)
 		goto bail;
 
-	size = IB_CC_CCS_ENTRIES * sizeof(struct ib_cc_congestion_entry);
-	ppd->congestion_entries = kzalloc(size, GFP_KERNEL);
+	ppd->congestion_entries = kcalloc(IB_CC_CCS_ENTRIES,
+					  sizeof(*ppd->congestion_entries),
+					  GFP_KERNEL);
 	if (!ppd->congestion_entries)
 		goto bail_1;
 
