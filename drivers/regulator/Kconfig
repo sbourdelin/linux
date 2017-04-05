@@ -368,6 +368,14 @@ config REGULATOR_LTC3676
 	  This enables support for the LTC3676
 	  8-output regulators controlled via I2C.
 
+config REGULATOR_MADERA_LDO1
+	tristate "Cirrus Logic Madera codecs LDO1 regulator"
+	depends on MFD_MADERA
+	help
+	  If you want to use the internal LDO1 regulator on CS47L85 and WM1840
+	  to supply DCVDD you must include this driver. If you are using an
+	  external DCVDD regulator you do not need this driver.
+
 config REGULATOR_MAX14577
 	tristate "Maxim 14577/77836 regulator"
 	depends on MFD_MAX14577

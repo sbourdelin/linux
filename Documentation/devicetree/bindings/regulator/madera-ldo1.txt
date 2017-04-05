@@ -1,0 +1,29 @@
+Cirrus Logic Madera class audio codecs LDO1 regulator driver
+
+Only required if you are using the codec internal LDO1 regulator.
+This is a subnode of the parent mfd node.
+
+See also the core bindings for the parent MFD driver:
+See Documentation/devicetree/bindings/mfd/madera.txt
+
+Required properties:
+  - compatible :  must be "cirrus,madera-ldo1"
+  - LDOVDD-supply : Power supply for the LDO1 regulator.
+
+  - enable-gpio	: GPIO to use to enable/disable the regulator.
+    As defined in bindings/gpio.txt.
+
+Optional subnodes:
+  Standard regulator bindings as described in bindings/regulator/regulator.txt
+
+Example:
+
+codec: cs47l85@0 {
+	compatible = "cirrus,cs47l85";
+
+	ldo1 {
+		compatible = "cirrus,madera-ldo1";
+		LDOVDD-supply = <&pmic_vdd1>;
+		enable-gpio = <&gpio 0>;
+	};
+};
