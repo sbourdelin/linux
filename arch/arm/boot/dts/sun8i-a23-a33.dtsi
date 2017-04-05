@@ -495,6 +495,7 @@
 
 			assigned-clocks = <&ccu CLK_GPU>;
 			assigned-clock-rates = <384000000>;
+			#cooling-cells = <2>;
 		};
 
 		gic: interrupt-controller@01c81000 {
