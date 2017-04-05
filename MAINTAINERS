@@ -3251,6 +3251,7 @@ W:	https://github.com/CirrusLogic/linux-drivers/wiki
 S:	Supported
 F:	Documentation/devicetree/bindings/interrupt-controller/cirrus,madera.txt
 F:	Documentation/devicetree/bindings/mfd/madera.txt
+F:	Documentation/devicetree/bindings/pinctrl/cirrus,madera-pinctrl.txt
 F:	Documentation/devicetree/bindings/regulator/madera*
 F:	include/linux/irqchip/irq-madera*
 F:	include/linux/mfd/madera/*
@@ -3258,6 +3259,7 @@ F:	include/linux/regulator/madera*
 F:	drivers/irqchip/irq-madera*
 F:	drivers/mfd/madera*
 F:	drivers/mfd/cs47l*
+F:	drivers/pinctrl/pinctrl-madera*
 F:	drivers/regulator/madera*
 
 CLEANCACHE API
