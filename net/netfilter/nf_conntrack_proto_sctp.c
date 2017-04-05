@@ -432,7 +432,7 @@ out:
 
 /* Called when a new connection for this protocol found. */
 static bool sctp_new(struct nf_conn *ct, const struct sk_buff *skb,
-		     unsigned int dataoff, unsigned int *timeouts)
+		     unsigned int dataoff)
 {
 	enum sctp_conntrack new_state;
 	const struct sctphdr *sh;

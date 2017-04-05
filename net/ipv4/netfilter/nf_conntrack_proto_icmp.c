@@ -105,7 +105,7 @@ static int icmp_packet(struct nf_conn *ct,
 
 /* Called when a new connection for this protocol found. */
 static bool icmp_new(struct nf_conn *ct, const struct sk_buff *skb,
-		     unsigned int dataoff, unsigned int *timeouts)
+		     unsigned int dataoff)
 {
 	static const u_int8_t valid_new[] = {
 		[ICMP_ECHO] = 1,

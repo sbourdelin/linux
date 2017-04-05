@@ -1145,7 +1145,6 @@ init_conntrack(struct net *net, struct nf_conn *tmpl,
 	const struct nf_conntrack_zone *zone;
 	struct nf_conn_timeout *timeout_ext;
 	struct nf_conntrack_zone tmp;
-	unsigned int *timeouts;
 
 	if (!nf_ct_invert_tuple(&repl_tuple, tuple, l3proto, l4proto)) {
 		pr_debug("Can't invert tuple.\n");
@@ -1163,21 +1162,13 @@ init_conntrack(struct net *net, struct nf_conn *tmpl,
 		return ERR_PTR(-ENOMEM);
 	}
 
-	timeout_ext = tmpl ? nf_ct_timeout_find(tmpl) : NULL;
-	if (timeout_ext) {
-		timeouts = nf_ct_timeout_data(timeout_ext);
-		if (unlikely(!timeouts))
-			timeouts = l4proto->get_timeouts(net);
-	} else {
-		timeouts = l4proto->get_timeouts(net);
-	}
-
-	if (!l4proto->new(ct, skb, dataoff, timeouts)) {
+	if (!l4proto->new(ct, skb, dataoff)) {
 		nf_conntrack_free(ct);
 		pr_debug("can't track with proto module\n");
 		return NULL;
 	}
 
+	timeout_ext = tmpl ? nf_ct_timeout_find(tmpl) : NULL;
 	if (timeout_ext)
 		nf_ct_timeout_ext_add(ct, rcu_dereference(timeout_ext->timeout),
 				      GFP_ATOMIC);

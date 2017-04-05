@@ -1098,7 +1098,7 @@ static int tcp_packet(struct nf_conn *ct,
 
 /* Called when a new connection for this protocol found. */
 static bool tcp_new(struct nf_conn *ct, const struct sk_buff *skb,
-		    unsigned int dataoff, unsigned int *timeouts)
+		    unsigned int dataoff)
 {
 	enum tcp_conntrack new_state;
 	const struct tcphdr *th;

@@ -412,7 +412,7 @@ static bool dccp_invert_tuple(struct nf_conntrack_tuple *inv,
 }
 
 static bool dccp_new(struct nf_conn *ct, const struct sk_buff *skb,
-		     unsigned int dataoff, unsigned int *timeouts)
+		     unsigned int dataoff)
 {
 	struct net *net = nf_ct_net(ct);
 	struct nf_dccp_net *dn;

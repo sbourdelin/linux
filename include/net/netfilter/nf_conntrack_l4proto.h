@@ -49,7 +49,7 @@ struct nf_conntrack_l4proto {
 	/* Called when a new connection for this protocol found;
 	 * returns TRUE if it's OK.  If so, packet() called next. */
 	bool (*new)(struct nf_conn *ct, const struct sk_buff *skb,
-		    unsigned int dataoff, unsigned int *timeouts);
+		    unsigned int dataoff);
 
 	/* Called when a conntrack entry is destroyed */
 	void (*destroy)(struct nf_conn *ct);
