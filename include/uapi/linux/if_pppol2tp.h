@@ -73,6 +73,8 @@ struct pppol2tpv3in6_addr {
 	struct sockaddr_in6 addr;	/* IP address and port to send to */
 };
 
+#define SOL_PPPOL2TP 273
+
 /* Socket options:
  * DEBUG	- bitmask of debug message categories
  * SENDSEQ	- 0 => don't send packets with sequence numbers
