@@ -246,6 +246,19 @@ static inline bool i915_gem_context_is_kernel(struct i915_gem_context *ctx)
 	return !ctx->file_priv;
 }
 
+static inline bool
+i915_gem_context_can_merge(const struct i915_gem_context *prev,
+		const struct i915_gem_context *next)
+{
+	if (prev != next)
+		return false;
+
+	if (i915_gem_context_force_single_submission(prev))
+		return false;
+
+	return true;
+}
+
 /* i915_gem_context.c */
 int __must_check i915_gem_context_init(struct drm_i915_private *dev_priv);
 void i915_gem_context_lost(struct drm_i915_private *dev_priv);
