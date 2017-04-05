@@ -1,0 +1,31 @@
+Cirrus Logic Madera class audio codec IRQ driver
+
+The IRQ properties are members of the parent MFD node.
+
+See also the core bindings for the parent MFD driver:
+See Documentation/devicetree/bindings/mfd/madera.txt
+
+Required properties:
+  - interrupt-controller : Madera class devices contain interrupt controllers
+    and may provide interrupt services to other devices.
+
+  - #interrupt-cells: the number of cells to describe an IRQ, this should be 2.
+    The first cell is the IRQ number.
+    The second cell is the flags, encoded as the trigger masks from
+    bindings/interrupt-controller/interrupts.txt
+
+  - interrupts : The interrupt line the /IRQ signal for the device is
+    connected to.
+
+  - interrupt-parent : The parent interrupt controller.
+
+Example:
+
+codec: cs47l85@0 {
+	compatible = "cirrus,cs47l85";
+
+	interrupt-controller;
+	#interrupt-cells = <2>;
+	interrupts = <&host_irq1>;
+	interrupt-parent = <&gic>;
+};
