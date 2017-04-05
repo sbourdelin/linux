@@ -85,4 +85,7 @@ extern const struct dsa_device_ops brcm_netdev_ops;
 /* tag_qca.c */
 extern const struct dsa_device_ops qca_netdev_ops;
 
+/* tag_lan9303.c */
+extern const struct dsa_device_ops lan9303_netdev_ops;
+
 #endif

@@ -31,4 +31,7 @@ config NET_DSA_TAG_TRAILER
 config NET_DSA_TAG_QCA
 	bool
 
+config NET_DSA_TAG_LAN9303
+	bool
+
 endif
