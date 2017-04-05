@@ -372,3 +372,11 @@ config SMSC_LAN9303_I2C
 	help
 	  Provide access functions if the SMSC LAN9303 is configured for I2C
 	  managed mode.
+
+config SMSC_LAN9303_MDIO
+	bool "MDIO managed mode"
+	depends on SMSC_LAN9303
+	depends on OF_MDIO
+	help
+	  Provide access functions if the SMSC LAN9303 is configured for MDIO
+	  managed mode.

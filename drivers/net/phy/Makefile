@@ -22,6 +22,7 @@ obj-$(CONFIG_PHYLIB)		+= libphy.o
 
 lan9303-objs-y := lan9303-core.o
 lan9303-objs-$(CONFIG_SMSC_LAN9303_I2C) += lan9303_i2c.o
+lan9303-objs-$(CONFIG_SMSC_LAN9303_MDIO) += lan9303_mdio.o
 lan9303-objs := $(lan9303-objs-y)
 
 obj-$(CONFIG_MDIO_BCM_IPROC)	+= mdio-bcm-iproc.o
