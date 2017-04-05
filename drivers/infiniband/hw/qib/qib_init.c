@@ -222,8 +222,6 @@ struct qib_ctxtdata *qib_create_ctxtdata(struct qib_pportdata *ppd, u32 ctxt,
 int qib_init_pportdata(struct qib_pportdata *ppd, struct qib_devdata *dd,
 			u8 hw_pidx, u8 port)
 {
-	int size;
-
 	ppd->dd = dd;
 	ppd->hw_pidx = hw_pidx;
 	ppd->port = port; /* IB port number, not index */
@@ -270,13 +268,14 @@ int qib_init_pportdata(struct qib_pportdata *ppd, struct qib_devdata *dd,
 	if (!ppd->congestion_entries)
 		goto bail_1;
 
-	size = sizeof(struct cc_table_shadow);
-	ppd->ccti_entries_shadow = kzalloc(size, GFP_KERNEL);
+	ppd->ccti_entries_shadow = kzalloc(sizeof(*ppd->ccti_entries_shadow),
+					   GFP_KERNEL);
 	if (!ppd->ccti_entries_shadow)
 		goto bail_2;
 
-	size = sizeof(struct ib_cc_congestion_setting_attr);
-	ppd->congestion_entries_shadow = kzalloc(size, GFP_KERNEL);
+	ppd->congestion_entries_shadow = kzalloc(sizeof(*ppd
+							->congestion_entries_shadow),
+						 GFP_KERNEL);
 	if (!ppd->congestion_entries_shadow)
 		goto bail_3;
 
