@@ -4207,6 +4207,14 @@ F:	drivers/gpu/drm/panel/
 F:	include/drm/drm_panel.h
 F:	Documentation/devicetree/bindings/display/panel/
 
+DRM LVDS PANEL DRIVER
+M:	Laurent Pinchart <laurent.pinchart@ideasonboard.com>
+L:	dri-devel@lists.freedesktop.org
+T:	git git://people.freedesktop.org/~airlied/linux
+S:	Maintained
+F:	drivers/gpu/drm/panel/panel-lvds.c
+F:	Documentation/devicetree/bindings/display/panel/panel-lvds.txt
+
 INTEL DRM DRIVERS (excluding Poulsbo, Moorestown and derivative chipsets)
 M:	Daniel Vetter <daniel.vetter@intel.com>
 M:	Jani Nikula <jani.nikula@linux.intel.com>
