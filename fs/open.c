@@ -859,6 +859,15 @@ int vfs_open(const struct path *path, struct file *file,
 	if (IS_ERR(dentry))
 		return PTR_ERR(dentry);
 
+	/* Check append-only open flags also against real inode */
+	if (dentry != path->dentry && IS_APPEND(d_backing_inode(dentry))) {
+		if  ((file->f_flags & O_ACCMODE) != O_RDONLY &&
+		     !(file->f_flags & O_APPEND))
+			return -EPERM;
+		if (file->f_flags & O_TRUNC)
+			return -EPERM;
+	}
+
 	file->f_path = *path;
 	return do_dentry_open(file, d_backing_inode(dentry), NULL, cred);
 }
