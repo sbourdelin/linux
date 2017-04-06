@@ -21,7 +21,7 @@
 #include <linux/platform_device.h>
 #include <linux/pm_runtime.h>
 
-#include <media/v4l2-of.h>
+#include <media/v4l2-fwnode.h>
 
 #include "rcar-vin.h"
 
@@ -118,10 +118,10 @@ static int rvin_digitial_parse_v4l2(struct rvin_dev *vin,
 				    struct device_node *ep,
 				    struct v4l2_mbus_config *mbus_cfg)
 {
-	struct v4l2_of_endpoint v4l2_ep;
+	struct v4l2_fwnode_endpoint v4l2_ep;
 	int ret;
 
-	ret = v4l2_of_parse_endpoint(ep, &v4l2_ep);
+	ret = v4l2_fwnode_endpoint_parse(of_fwnode_handle(ep), &v4l2_ep);
 	if (ret) {
 		vin_err(vin, "Could not parse v4l2 endpoint\n");
 		return -EINVAL;
