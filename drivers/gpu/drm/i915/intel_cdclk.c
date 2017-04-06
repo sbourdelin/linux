@@ -1777,7 +1777,7 @@ static int intel_max_pixel_rate(struct drm_atomic_state *state)
 
 		pixel_rate = crtc_state->pixel_rate;
 
-		if (IS_BROADWELL(dev_priv) || IS_GEN9(dev_priv))
+		if (IS_BROADWELL(dev_priv) || INTEL_GEN(dev_priv) >= 9)
 			pixel_rate =
 				bdw_adjust_min_pipe_pixel_rate(crtc_state,
 							       pixel_rate);
