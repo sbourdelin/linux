@@ -3076,6 +3076,9 @@ static bool skl_needs_memory_bw_wa(struct intel_atomic_state *state)
 	if (IS_GEN9_BC(dev_priv) || IS_BROXTON(dev_priv))
 		return true;
 
+	if (IS_CNL_REVID(dev_priv, CNL_REVID_A0, CNL_REVID_A0))
+		return true;
+
 	return false;
 }
 
@@ -3871,7 +3874,9 @@ static int skl_compute_plane_wm(const struct drm_i915_private *dev_priv,
 	res_lines = DIV_ROUND_UP(selected_result.val,
 				 plane_blocks_per_line.val);
 
-	if (level >= 1 && level <= 7) {
+	if ((IS_GEN9(dev_priv) ||
+	     IS_CNL_REVID(dev_priv, CNL_REVID_A0, CNL_REVID_A0)) &&
+	    level >= 1 && level <= 7) {
 		if (y_tiled) {
 			res_blocks += fixed_16_16_to_u32_round_up(y_tile_minimum);
 			res_lines += y_min_scanlines;
