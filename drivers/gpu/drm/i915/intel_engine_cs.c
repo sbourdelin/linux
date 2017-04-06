@@ -71,7 +71,7 @@ static const struct engine_info {
 		.init_legacy = intel_init_bsd_ring_buffer,
 	},
 	[VCS2] = {
-		.name = "vcs2",
+		.name = "vcs",
 		.hw_id = VCS2_HW,
 		.exec_id = I915_EXEC_BSD,
 		.class = VIDEO_DECODE_CLASS,
@@ -100,6 +100,7 @@ intel_engine_setup(struct drm_i915_private *dev_priv,
 {
 	const struct engine_info *info = &intel_engines[id];
 	struct intel_engine_cs *engine;
+	char instance[3] = "";
 
 	GEM_BUG_ON(dev_priv->engine[id]);
 	engine = kzalloc(sizeof(*engine), GFP_KERNEL);
@@ -108,7 +109,8 @@ intel_engine_setup(struct drm_i915_private *dev_priv,
 
 	engine->id = id;
 	engine->i915 = dev_priv;
-	engine->name = info->name;
+	snprintf(instance, sizeof(instance), "%u", info->instance);
+	snprintf(engine->name, sizeof(engine->name), "%s%s", info->name, instance);
 	engine->exec_id = info->exec_id;
 	engine->hw_id = engine->guc_id = info->hw_id;
 	engine->mmio_base = info->mmio_base;
