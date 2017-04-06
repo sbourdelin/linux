@@ -3517,9 +3517,6 @@ static void btrfs_dev_issue_flush(struct work_struct *work)
  */
 static int write_dev_flush(struct btrfs_device *device, int wait)
 {
-	if (device->nobarriers)
-		return 0;
-
 	if (wait) {
 		int ret;
 
