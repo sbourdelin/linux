@@ -1247,6 +1247,18 @@ static u32 bxt_hz_to_pwm(struct intel_connector *connector, u32 pwm_freq_hz)
 }
 
 /*
+ * CNP: PWM clock frequency is 19.2 MHz or 24 MHz.
+ *      Value is found in SFUSE_STRAP.
+ *      PWM increment = 1
+ */
+static u32 cnp_hz_to_pwm(struct intel_connector *connector, u32 pwm_freq_hz)
+{
+	struct drm_i915_private *dev_priv = to_i915(connector->base.dev);
+
+	return DIV_ROUND_CLOSEST(KHz(dev_priv->rawclk_freq), pwm_freq_hz);
+}
+
+/*
  * SPT: This value represents the period of the PWM stream in clock periods
  * multiplied by 16 (default increment) or 128 (alternate increment selected in
  * SCHICKEN_1 bit 0). PWM clock is 24 MHz.
@@ -1742,13 +1754,16 @@ intel_panel_init_backlight_funcs(struct intel_panel *panel)
 	    intel_dsi_dcs_init_backlight_funcs(connector) == 0)
 		return;
 
-	if (IS_GEN9_LP(dev_priv)) {
+	if (IS_GEN9_LP(dev_priv) || HAS_PCH_CNP(dev_priv)) {
 		panel->backlight.setup = bxt_setup_backlight;
 		panel->backlight.enable = bxt_enable_backlight;
 		panel->backlight.disable = bxt_disable_backlight;
 		panel->backlight.set = bxt_set_backlight;
 		panel->backlight.get = bxt_get_backlight;
-		panel->backlight.hz_to_pwm = bxt_hz_to_pwm;
+		if (IS_GEN9_LP(dev_priv))
+			panel->backlight.hz_to_pwm = bxt_hz_to_pwm;
+		else
+			panel->backlight.hz_to_pwm = cnp_hz_to_pwm;
 	} else if (HAS_PCH_LPT(dev_priv) || HAS_PCH_SPT(dev_priv) ||
 		   HAS_PCH_KBP(dev_priv)) {
 		panel->backlight.setup = lpt_setup_backlight;
