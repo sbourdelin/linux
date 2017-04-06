@@ -541,13 +541,15 @@ struct uvc_streaming {
 	} clock;
 };
 
+#define UVC_DEVICE_NAME_SIZE	64
+
 struct uvc_device {
 	struct usb_device *udev;
 	struct usb_interface *intf;
 	unsigned long warnings;
 	__u32 quirks;
 	int intfnum;
-	char name[32];
+	char name[UVC_DEVICE_NAME_SIZE];
 
 	struct mutex lock;		/* Protects users */
 	unsigned int users;

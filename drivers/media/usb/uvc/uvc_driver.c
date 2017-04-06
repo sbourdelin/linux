@@ -1998,6 +1998,8 @@ static int uvc_probe(struct usb_interface *intf,
 {
 	struct usb_device *udev = interface_to_usbdev(intf);
 	struct uvc_device *dev;
+	char additional_name_buf[UVC_DEVICE_NAME_SIZE];
+	const char *additional_name = NULL;
 	int ret;
 
 	if (id->idVendor && id->idProduct)
@@ -2025,13 +2027,40 @@ static int uvc_probe(struct usb_interface *intf,
 	dev->quirks = (uvc_quirks_param == -1)
 		    ? id->driver_info : uvc_quirks_param;
 
-	if (udev->product != NULL)
-		strlcpy(dev->name, udev->product, sizeof dev->name);
-	else
-		snprintf(dev->name, sizeof dev->name,
-			"UVC Camera (%04x:%04x)",
-			le16_to_cpu(udev->descriptor.idVendor),
-			le16_to_cpu(udev->descriptor.idProduct));
+	/*
+	 * Add iFunction or iInterface to names when available as additional
+	 * distinguishers between interfaces. iFunction is prioritized over
+	 * iInterface which matches Windows behavior at the point of writing.
+	 */
+	if (intf->intf_assoc && intf->intf_assoc->iFunction != 0) {
+		usb_string(udev, intf->intf_assoc->iFunction,
+			   additional_name_buf, sizeof(additional_name_buf));
+		additional_name = additional_name_buf;
+	} else if (intf->cur_altsetting->desc.iInterface != 0) {
+		usb_string(udev, intf->cur_altsetting->desc.iInterface,
+			   additional_name_buf, sizeof(additional_name_buf));
+		additional_name = additional_name_buf;
+	}
+
+	if (additional_name) {
+		if (udev->product) {
+			snprintf(dev->name, sizeof(dev->name), "%s: %s",
+				 udev->product, additional_name);
+		} else {
+			snprintf(dev->name, sizeof(dev->name),
+				 "UVC Camera: %s (%04x:%04x)",
+				 additional_name,
+				 le16_to_cpu(udev->descriptor.idVendor),
+				 le16_to_cpu(udev->descriptor.idProduct));
+		}
+	} else if (udev->product) {
+		strlcpy(dev->name, udev->product, sizeof(dev->name));
+	} else {
+		snprintf(dev->name, sizeof(dev->name),
+			 "UVC Camera (%04x:%04x)",
+			 le16_to_cpu(udev->descriptor.idVendor),
+			 le16_to_cpu(udev->descriptor.idProduct));
+	}
 
 	/* Parse the Video Class control descriptor. */
 	if (uvc_parse_control(dev) < 0) {
