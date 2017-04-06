@@ -141,6 +141,7 @@ extern int nfs_page_group_lock(struct nfs_page *, bool);
 extern void nfs_page_group_lock_wait(struct nfs_page *);
 extern void nfs_page_group_unlock(struct nfs_page *);
 extern bool nfs_page_group_sync_on_bit(struct nfs_page *, unsigned int);
+extern bool nfs_async_iocounter_wait(struct rpc_task *, void *);
 
 /*
  * Lock the page of an asynchronous request
