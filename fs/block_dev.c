@@ -2075,7 +2075,7 @@ static long blkdev_fallocate(struct file *file, int mode, loff_t start,
 {
 	struct block_device *bdev = I_BDEV(bdev_file_inode(file));
 	struct request_queue *q = bdev_get_queue(bdev);
-	struct address_space *mapping;
+	struct address_space *mapping = bdev->bd_inode->i_mapping;
 	loff_t end = start + len - 1;
 	loff_t isize;
 	int error;
@@ -2102,13 +2102,10 @@ static long blkdev_fallocate(struct file *file, int mode, loff_t start,
 	if ((start | len) & (bdev_logical_block_size(bdev) - 1))
 		return -EINVAL;
 
-	/* Invalidate the page cache, including dirty pages. */
-	mapping = bdev->bd_inode->i_mapping;
-	truncate_inode_pages_range(mapping, start, end);
-
 	switch (mode) {
 	case FALLOC_FL_ZERO_RANGE:
 	case FALLOC_FL_ZERO_RANGE | FALLOC_FL_KEEP_SIZE:
+		truncate_inode_pages_range(mapping, start, end);
 		error = blkdev_issue_zeroout(bdev, start >> 9, len >> 9,
 					    GFP_KERNEL, false);
 		break;
@@ -2116,12 +2113,14 @@ static long blkdev_fallocate(struct file *file, int mode, loff_t start,
 		/* Only punch if the device can do zeroing discard. */
 		if (!blk_queue_discard(q) || !q->limits.discard_zeroes_data)
 			return -EOPNOTSUPP;
+		truncate_inode_pages_range(mapping, start, end);
 		error = blkdev_issue_discard(bdev, start >> 9, len >> 9,
 					     GFP_KERNEL, 0);
 		break;
 	case FALLOC_FL_PUNCH_HOLE | FALLOC_FL_KEEP_SIZE | FALLOC_FL_NO_HIDE_STALE:
 		if (!blk_queue_discard(q))
 			return -EOPNOTSUPP;
+		truncate_inode_pages_range(mapping, start, end);
 		error = blkdev_issue_discard(bdev, start >> 9, len >> 9,
 					     GFP_KERNEL, 0);
 		break;
