@@ -177,6 +177,7 @@ struct hdmi_spec {
 	bool i915_bound; /* was i915 bound in this driver? */
 
 	struct hdac_chmap chmap;
+	hda_nid_t vendor_nid;
 };
 
 #ifdef CONFIG_SND_HDA_I915
@@ -2381,14 +2382,15 @@ static void intel_haswell_enable_all_pins(struct hda_codec *codec,
 					  bool update_tree)
 {
 	unsigned int vendor_param;
+	struct hdmi_spec *spec = codec->spec;
 
-	vendor_param = snd_hda_codec_read(codec, INTEL_VENDOR_NID, 0,
+	vendor_param = snd_hda_codec_read(codec, spec->vendor_nid, 0,
 				INTEL_GET_VENDOR_VERB, 0);
 	if (vendor_param == -1 || vendor_param & INTEL_EN_ALL_PIN_CVTS)
 		return;
 
 	vendor_param |= INTEL_EN_ALL_PIN_CVTS;
-	vendor_param = snd_hda_codec_read(codec, INTEL_VENDOR_NID, 0,
+	vendor_param = snd_hda_codec_read(codec, spec->vendor_nid, 0,
 				INTEL_SET_VENDOR_VERB, vendor_param);
 	if (vendor_param == -1)
 		return;
@@ -2400,8 +2402,9 @@ static void intel_haswell_enable_all_pins(struct hda_codec *codec,
 static void intel_haswell_fixup_enable_dp12(struct hda_codec *codec)
 {
 	unsigned int vendor_param;
+	struct hdmi_spec *spec = codec->spec;
 
-	vendor_param = snd_hda_codec_read(codec, INTEL_VENDOR_NID, 0,
+	vendor_param = snd_hda_codec_read(codec, spec->vendor_nid, 0,
 				INTEL_GET_VENDOR_VERB, 0);
 	if (vendor_param == -1 || vendor_param & INTEL_EN_DP12)
 		return;
@@ -2409,7 +2412,7 @@ static void intel_haswell_fixup_enable_dp12(struct hda_codec *codec)
 	/* enable DP1.2 mode */
 	vendor_param |= INTEL_EN_DP12;
 	snd_hdac_regmap_add_vendor_verb(&codec->core, INTEL_SET_VENDOR_VERB);
-	snd_hda_codec_write_cache(codec, INTEL_VENDOR_NID, 0,
+	snd_hda_codec_write_cache(codec, spec->vendor_nid, 0,
 				INTEL_SET_VENDOR_VERB, vendor_param);
 }
 
@@ -2502,22 +2505,11 @@ static void i915_pin_cvt_fixup(struct hda_codec *codec,
 	}
 }
 
-/* Intel Haswell and onwards; audio component with eld notifier */
-static int patch_i915_hsw_hdmi(struct hda_codec *codec)
+static int intel_haswell_common_init(struct hda_codec *codec)
 {
-	struct hdmi_spec *spec;
+	struct hdmi_spec *spec = codec->spec;
 	int err;
 
-	/* HSW+ requires i915 binding */
-	if (!codec->bus->core.audio_component) {
-		codec_info(codec, "No i915 binding for Intel HDMI/DP codec\n");
-		return -ENODEV;
-	}
-
-	err = alloc_generic_hdmi(codec);
-	if (err < 0)
-		return err;
-	spec = codec->spec;
 	codec->dp_mst = true;
 	spec->dyn_pcm_assign = true;
 
@@ -2546,6 +2538,28 @@ static int patch_i915_hsw_hdmi(struct hda_codec *codec)
 	generic_hdmi_init_per_pins(codec);
 	register_i915_notifier(codec);
 	return 0;
+}
+
+/* Intel Haswell and onwards; audio component with eld notifier */
+static int patch_i915_hsw_hdmi(struct hda_codec *codec)
+{
+	struct hdmi_spec *spec;
+	int err;
+
+	/* HSW+ requires i915 binding */
+	if (!codec->bus->core.audio_component) {
+		codec_info(codec, "No i915 binding for Intel HDMI/DP codec\n");
+		return -ENODEV;
+	}
+
+	err = alloc_generic_hdmi(codec);
+	if (err < 0)
+		return err;
+
+	spec = codec->spec;
+	spec->vendor_nid = INTEL_VENDOR_NID;
+
+	return intel_haswell_common_init(codec);
 }
 
 /* Intel Baytrail and Braswell; with eld notifier */
