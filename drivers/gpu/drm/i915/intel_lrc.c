@@ -1389,7 +1389,7 @@ static int gen8_emit_flush_render(struct drm_i915_gem_request *request,
 	struct intel_engine_cs *engine = request->engine;
 	u32 scratch_addr =
 		i915_ggtt_offset(engine->scratch) + 2 * CACHELINE_BYTES;
-	bool vf_flush_wa = false, dc_flush_wa = false;
+	bool vf_flush_wa = false, dc_flush_wa = false, rt_flush_wa = false;
 	u32 *cs, flags = 0;
 	int len;
 
@@ -1400,6 +1400,15 @@ static int gen8_emit_flush_render(struct drm_i915_gem_request *request,
 		flags |= PIPE_CONTROL_DEPTH_CACHE_FLUSH;
 		flags |= PIPE_CONTROL_DC_FLUSH_ENABLE;
 		flags |= PIPE_CONTROL_FLUSH_ENABLE;
+
+		/*
+		 * "Before sending a PIPE_CONTROL command with bit 12 set, SW
+		 * must issue another PIPE_CONTROL with Render Target Cache
+		 * Flush Enable (bit 12) = 0 and Pipe Control Flush Enable (bit
+		 * 7) = 1."
+		 */
+		if (IS_GEN10(request->i915))
+			rt_flush_wa = true;
 	}
 
 	if (mode & EMIT_INVALIDATE) {
@@ -1426,7 +1435,7 @@ static int gen8_emit_flush_render(struct drm_i915_gem_request *request,
 
 	len = 6;
 
-	if (vf_flush_wa)
+	if (vf_flush_wa || rt_flush_wa)
 		len += 6;
 
 	if (dc_flush_wa)
@@ -1436,8 +1445,10 @@ static int gen8_emit_flush_render(struct drm_i915_gem_request *request,
 	if (IS_ERR(cs))
 		return PTR_ERR(cs);
 
-	if (vf_flush_wa)
-		cs = gen8_emit_pipe_control(cs, 0, 0);
+	if (vf_flush_wa || rt_flush_wa) {
+		u32 pc_flags = rt_flush_wa ? PIPE_CONTROL_FLUSH_ENABLE : 0;
+		cs = gen8_emit_pipe_control(cs, pc_flags, 0);
+	}
 
 	if (dc_flush_wa)
 		cs = gen8_emit_pipe_control(cs, PIPE_CONTROL_DC_FLUSH_ENABLE,
