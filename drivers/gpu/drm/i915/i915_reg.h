@@ -2515,6 +2515,11 @@ enum skl_disp_power_wells {
 #define   GEN9_F2_SS_DIS_SHIFT		20
 #define   GEN9_F2_SS_DIS_MASK		(0xf << GEN9_F2_SS_DIS_SHIFT)
 
+#define   GEN10_F2_S_ENA_SHIFT		22
+#define   GEN10_F2_S_ENA_MASK		(0x7 << GEN10_F2_S_ENA_SHIFT)
+#define   GEN10_F2_SS_DIS_SHIFT		18
+#define   GEN10_F2_SS_DIS_MASK		(0x7 << GEN10_F2_SS_DIS_SHIFT)
+
 #define GEN8_EU_DISABLE0		_MMIO(0x9134)
 #define   GEN8_EU_DIS0_S0_MASK		0xffffff
 #define   GEN8_EU_DIS0_S1_SHIFT		24
@@ -2529,6 +2534,22 @@ enum skl_disp_power_wells {
 #define   GEN8_EU_DIS2_S2_MASK		0xff
 
 #define GEN9_EU_DISABLE(slice)		_MMIO(0x9134 + (slice)*0x4)
+
+#define GEN10_EU_DIS0_S0_SHIFT		0
+#define GEN10_EU_DIS0_S0_MASK		(0xff << GEN10_EU_DIS0_S0_SHIFT)
+#define GEN10_EU_DIS0_S1_SHIFT		8
+#define GEN10_EU_DIS0_S1_MASK		(0xff << GEN10_EU_DIS0_S1_SHIFT)
+#define GEN10_EU_DIS0_S2_SHIFT		16
+#define GEN10_EU_DIS0_S2_MASK		(0xff << GEN10_EU_DIS0_S2_SHIFT)
+#define GEN10_EU_DIS1_S0_SHIFT		24
+#define GEN10_EU_DIS1_S0_MASK		(0xff << GEN10_EU_DIS1_S0_SHIFT)
+#define GEN10_EU_DIS1_S1_SHIFT		0
+#define GEN10_EU_DIS1_S1_MASK		(0xff << GEN10_EU_DIS1_S1_SHIFT)
+#define GEN10_EU_DIS2_S0_SHIFT		8
+#define GEN10_EU_DIS2_S0_MASK		(0xff << GEN10_EU_DIS2_S0_SHIFT)
+#define GEN10_EU_DIS2_S1_SHIFT		16
+#define GEN10_EU_DIS2_S1_MASK		(0xff << GEN10_EU_DIS2_S1_SHIFT)
+/* Spec defines more, but they can't be valid */
 
 #define GEN6_BSD_SLEEP_PSMI_CONTROL	_MMIO(0x12050)
 #define   GEN6_BSD_SLEEP_MSG_DISABLE	(1 << 0)

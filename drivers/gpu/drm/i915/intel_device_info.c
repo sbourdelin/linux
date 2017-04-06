@@ -81,6 +81,47 @@ void intel_device_info_dump(struct drm_i915_private *dev_priv)
 #undef PRINT_FLAG
 }
 
+static void gen10_sseu_info_init(struct drm_i915_private *dev_priv)
+{
+	struct sseu_dev_info *sseu = &mkwrite_device_info(dev_priv)->sseu;
+	const u32 fuse2 = I915_READ(GEN8_FUSE2);
+	u32 temp, i, j;
+
+	sseu->slice_mask = (fuse2 & GEN10_F2_S_ENA_MASK) >> GEN10_F2_S_ENA_SHIFT;
+	sseu->subslice_mask = (1 << 3) - 1;
+	sseu->subslice_mask &= ~((fuse2 & GEN10_F2_SS_DIS_MASK) >>
+				 GEN10_F2_SS_DIS_SHIFT);
+
+	temp = I915_READ(GEN8_EU_DISABLE0);
+	sseu->per_subslice_eu_disable_mask[0][0] =
+		(temp & GEN10_EU_DIS0_S0_MASK) >> GEN10_EU_DIS0_S0_SHIFT;
+	sseu->per_subslice_eu_disable_mask[0][1] =
+		(temp & GEN10_EU_DIS0_S1_MASK) >> GEN10_EU_DIS0_S1_SHIFT;
+	sseu->per_subslice_eu_disable_mask[0][2] =
+		(temp & GEN10_EU_DIS0_S2_MASK) >> GEN10_EU_DIS0_S2_SHIFT;
+	sseu->per_subslice_eu_disable_mask[1][0] =
+		(temp & GEN10_EU_DIS1_S0_MASK) >> GEN10_EU_DIS1_S0_SHIFT;
+
+	temp = I915_READ(GEN8_EU_DISABLE1);
+	sseu->per_subslice_eu_disable_mask[1][1] =
+		(temp & GEN10_EU_DIS1_S1_MASK) >> GEN10_EU_DIS1_S1_SHIFT;
+	sseu->per_subslice_eu_disable_mask[2][0] =
+		(temp & GEN10_EU_DIS2_S0_MASK) >> GEN10_EU_DIS2_S0_SHIFT;
+	sseu->per_subslice_eu_disable_mask[2][1] =
+		(temp & GEN10_EU_DIS2_S1_MASK) >> GEN10_EU_DIS2_S1_SHIFT;
+
+	for (i = 0; i < 3; i++)
+		for (j = 0; j < 3; j++)
+			sseu->eu_total +=
+				hweight8(~sseu->per_subslice_eu_disable_mask[i][j]);
+
+	/* On CNL, I cannot find any restrictions on power gating. */
+	sseu->has_slice_pg = 1;
+	sseu->has_subslice_pg = 1;
+	sseu->has_eu_pg = 1;
+}
+
+
 static void cherryview_sseu_info_init(struct drm_i915_private *dev_priv)
 {
 	struct sseu_dev_info *sseu = &mkwrite_device_info(dev_priv)->sseu;
@@ -408,8 +449,10 @@ void intel_device_info_runtime_init(struct drm_i915_private *dev_priv)
 		cherryview_sseu_info_init(dev_priv);
 	else if (IS_BROADWELL(dev_priv))
 		broadwell_sseu_info_init(dev_priv);
-	else if (INTEL_INFO(dev_priv)->gen >= 9)
+	else if (INTEL_INFO(dev_priv)->gen == 9)
 		gen9_sseu_info_init(dev_priv);
+	else if (INTEL_INFO(dev_priv)->gen >= 10)
+		gen10_sseu_info_init(dev_priv);
 
 	info->has_snoop = !info->has_llc;
 
