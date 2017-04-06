@@ -193,6 +193,16 @@ struct intel_engine_cs {
 	enum intel_engine_id id;
 	unsigned int exec_id;
 	unsigned int hw_id;
+
+	enum intel_engine_class {
+		RENDER_CLASS = 0,
+		VIDEO_DECODE_CLASS = 1,
+		VIDEO_ENHANCEMENT_CLASS = 2,
+		COPY_ENGINE_CLASS = 3,
+		OTHER_CLASS = 4
+	} class;
+	u8 instance;
+
 	unsigned int guc_id;
 	u32		mmio_base;
 	unsigned int irq_shift;
