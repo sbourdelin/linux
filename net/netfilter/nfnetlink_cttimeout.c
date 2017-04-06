@@ -50,7 +50,7 @@ static int
 ctnl_timeout_parse_policy(void *timeouts, struct nf_conntrack_l4proto *l4proto,
 			  struct net *net, const struct nlattr *attr)
 {
-	int ret = 0;
+	int ret = -EOPNOTSUPP;
 
 	if (likely(l4proto->ctnl_timeout.nlattr_to_obj)) {
 		struct nlattr *tb[l4proto->ctnl_timeout.nlattr_max+1];
