@@ -1197,8 +1197,12 @@ void tick_setup_sched_timer(void)
 	/* Get the next period (per-CPU) */
 	hrtimer_set_expires(&ts->sched_timer, tick_init_jiffy_update());
 
-	/* Offset the tick to avert jiffies_lock contention. */
-	if (sched_skew_tick) {
+	/*
+	 * Offset the tick to avert jiffies_lock contention, and all ticks
+	 * alignment in order that the vtime sampling does not end up "in
+	 * phase" with the jiffies incrementing.
+	 */
+	if (sched_skew_tick || tick_nohz_full_enabled()) {
 		u64 offset = ktime_to_ns(tick_period) >> 1;
 		do_div(offset, num_possible_cpus());
 		offset *= smp_processor_id();
