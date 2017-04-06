@@ -934,6 +934,7 @@ int of_dma_get_range(struct device_node *np, u64 *dma_addr, u64 *paddr, u64 *siz
 	int len, naddr, nsize, pna;
 	int ret = 0;
 	u64 dmaaddr;
+	u64 tmp_size;
 
 	if (!node)
 		return -EINVAL;
@@ -985,7 +986,16 @@ int of_dma_get_range(struct device_node *np, u64 *dma_addr, u64 *paddr, u64 *siz
 	}
 	*dma_addr = dmaaddr;
 
-	*size = of_read_number(ranges + naddr + pna, nsize);
+	tmp_size = of_read_number(ranges + naddr + pna, nsize);
+
+	/* check if mask specified instead of size */
+	if (tmp_size & 1) {
+		pr_debug("invalid dma-range size in node: %s\n", np->full_name);
+		ret = -EINVAL;
+		goto out;
+	}
+
+	*size = tmp_size;
 
 	pr_debug("dma_addr(%llx) cpu_addr(%llx) size(%llx)\n",
 		 *dma_addr, *paddr, *size);
