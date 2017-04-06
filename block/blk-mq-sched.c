@@ -202,7 +202,7 @@ void blk_mq_sched_dispatch_requests(struct blk_mq_hw_ctx *hctx)
 	 * needing a restart in that case.
 	 */
 	if (!list_empty(&rq_list)) {
-		blk_mq_sched_mark_restart_hctx(hctx);
+		blk_mq_sched_mark_restart_queue(hctx);
 		did_work = blk_mq_dispatch_rq_list(hctx, &rq_list);
 	} else if (!has_sched_dispatch) {
 		blk_mq_flush_busy_ctxs(hctx, &rq_list);
