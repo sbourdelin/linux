@@ -1400,6 +1400,16 @@ void bxt_uninit_cdclk(struct drm_i915_private *dev_priv)
 	bxt_set_cdclk(dev_priv, &cdclk_state);
 }
 
+static int cnl_calc_cdclk(int max_pixclk)
+{
+	if (max_pixclk > 336000)
+		return 528000;
+	else if (max_pixclk > 168000)
+		return 336000;
+	else
+		return 168000;
+}
+
 static void cnl_cdclk_pll_update(struct drm_i915_private *dev_priv,
 				 struct intel_cdclk_state *cdclk_state)
 {
@@ -1640,7 +1650,7 @@ void cnl_init_cdclk(struct drm_i915_private *dev_priv)
 
 	cdclk_state = dev_priv->cdclk.hw;
 
-	cdclk_state.cdclk = 168000;
+	cdclk_state.cdclk = cnl_calc_cdclk(0);
 	cdclk_state.vco = cnl_cdclk_pll_vco(dev_priv, cdclk_state.cdclk);
 
 	cnl_set_cdclk(dev_priv, &cdclk_state);
@@ -1928,6 +1938,40 @@ static int bxt_modeset_calc_cdclk(struct drm_atomic_state *state)
 	return 0;
 }
 
+static int cnl_modeset_calc_cdclk(struct drm_atomic_state *state)
+{
+	struct drm_i915_private *dev_priv = to_i915(state->dev);
+	struct intel_atomic_state *intel_state =
+		to_intel_atomic_state(state);
+	int max_pixclk = intel_max_pixel_rate(state);
+	int cdclk, vco;
+
+	cdclk = cnl_calc_cdclk(max_pixclk);
+	vco = cnl_cdclk_pll_vco(dev_priv, cdclk);
+
+	if (cdclk > dev_priv->max_cdclk_freq) {
+		DRM_DEBUG_KMS("requested cdclk (%d kHz) exceeds max (%d kHz)\n",
+			      cdclk, dev_priv->max_cdclk_freq);
+		return -EINVAL;
+	}
+
+	intel_state->cdclk.logical.vco = vco;
+	intel_state->cdclk.logical.cdclk = cdclk;
+
+	if (!intel_state->active_crtcs) {
+		cdclk = cnl_calc_cdclk(0);
+		vco = cnl_cdclk_pll_vco(dev_priv, cdclk);
+
+		intel_state->cdclk.actual.vco = vco;
+		intel_state->cdclk.actual.cdclk = cdclk;
+	} else {
+		intel_state->cdclk.actual =
+			intel_state->cdclk.logical;
+	}
+
+	return 0;
+}
+
 static int intel_compute_max_dotclk(struct drm_i915_private *dev_priv)
 {
 	int max_cdclk_freq = dev_priv->max_cdclk_freq;
@@ -1959,7 +2003,9 @@ static int intel_compute_max_dotclk(struct drm_i915_private *dev_priv)
  */
 void intel_update_max_cdclk(struct drm_i915_private *dev_priv)
 {
-	if (IS_GEN9_BC(dev_priv)) {
+	if (IS_CANNONLAKE(dev_priv)) {
+		dev_priv->max_cdclk_freq = 528000;
+	} else if (IS_GEN9_BC(dev_priv)) {
 		u32 limit = I915_READ(SKL_DFSM) & SKL_DFSM_CDCLK_LIMIT_MASK;
 		int max_cdclk, vco;
 
@@ -2158,6 +2204,10 @@ void intel_init_cdclk_hooks(struct drm_i915_private *dev_priv)
 		dev_priv->display.set_cdclk = skl_set_cdclk;
 		dev_priv->display.modeset_calc_cdclk =
 			skl_modeset_calc_cdclk;
+	} else if (IS_CANNONLAKE(dev_priv)) {
+		dev_priv->display.set_cdclk = cnl_set_cdclk;
+		dev_priv->display.modeset_calc_cdclk =
+			cnl_modeset_calc_cdclk;
 	}
 
 	if (IS_CANNONLAKE(dev_priv))
