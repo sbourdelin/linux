@@ -46,6 +46,8 @@ char *disk_name(struct gendisk *hd, int partno, char *buf)
 
 const char *bdevname(struct block_device *bdev, char *buf)
 {
+	if (unlikely(!bdev))
+		return snprintf(buf, BDEVNAME_SIZE, "unknown-block(null)");
 	return disk_name(bdev->bd_disk, bdev->bd_part->partno, buf);
 }
 
