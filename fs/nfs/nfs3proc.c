@@ -865,12 +865,48 @@ static void nfs3_proc_commit_setup(struct nfs_commit_data *data, struct rpc_mess
 	msg->rpc_proc = &nfs3_procedures[NFS3PROC_COMMIT];
 }
 
+void nfs3_nlm_alloc_call(void *data)
+{
+	struct nfs_lock_context *l_ctx = data;
+	nfs_get_lock_context(l_ctx->open_context);
+}
+
+void nfs3_nlm_release_call(void *data)
+{
+	struct nfs_lock_context *l_ctx = data;
+	nfs_put_lock_context(l_ctx);
+}
+
+const struct nlmclnt_operations nlmclnt_fl_close_lock_ops = {
+	.nlmclnt_alloc_call = nfs3_nlm_alloc_call,
+	.nlmclnt_unlock_prepare = nfs_async_iocounter_wait,
+	.nlmclnt_release_call = nfs3_nlm_release_call,
+};
+
 static int
 nfs3_proc_lock(struct file *filp, int cmd, struct file_lock *fl)
 {
 	struct inode *inode = file_inode(filp);
+	struct nfs_lock_context *l_ctx = NULL;
+	const struct nlmclnt_operations *nlmclnt_ops = NULL;
+	int status;
 
-	return nlmclnt_proc(NFS_SERVER(inode)->nlm_host, cmd, fl, NULL, NULL);
+	if (fl->fl_flags & FL_CLOSE) {
+		l_ctx = nfs_get_lock_context(nfs_file_open_context(filp));
+		if (IS_ERR(l_ctx)) {
+			l_ctx = NULL;
+		} else {
+			set_bit(NFS_CONTEXT_UNLOCK, &l_ctx->open_context->flags);
+			nlmclnt_ops = &nlmclnt_fl_close_lock_ops;
+		}
+	}
+
+	status = nlmclnt_proc(NFS_SERVER(inode)->nlm_host, cmd, fl,
+				nlmclnt_ops, l_ctx);
+	if (l_ctx)
+		nfs_put_lock_context(l_ctx);
+
+	return status;
 }
 
 static int nfs3_have_delegation(struct inode *inode, fmode_t flags)
