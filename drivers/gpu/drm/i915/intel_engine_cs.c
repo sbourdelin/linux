@@ -26,71 +26,83 @@
 #include "intel_ringbuffer.h"
 #include "intel_lrc.h"
 
-static const struct engine_info {
+struct engine_class_info {
 	const char *name;
 	unsigned int exec_id;
+	int (*init_legacy)(struct intel_engine_cs *engine);
+	int (*init_execlists)(struct intel_engine_cs *engine);
+};
+
+static const struct engine_class_info intel_engine_classes[] = {
+	[RENDER_CLASS] = {
+		.name = "rcs",
+		.exec_id = I915_EXEC_RENDER,
+		.init_execlists = logical_render_ring_init,
+		.init_legacy = intel_init_render_ring_buffer,
+	},
+	[COPY_ENGINE_CLASS] = {
+		.name = "bcs",
+		.exec_id = I915_EXEC_BLT,
+		.init_execlists = logical_xcs_ring_init,
+		.init_legacy = intel_init_blt_ring_buffer,
+	},
+	[VIDEO_DECODE_CLASS] = {
+		.name = "vcs",
+		.exec_id = I915_EXEC_BSD,
+		.init_execlists = logical_xcs_ring_init,
+		.init_legacy = intel_init_bsd_ring_buffer,
+	},
+	[VIDEO_ENHANCEMENT_CLASS] = {
+		.name = "vecs",
+		.exec_id = I915_EXEC_VEBOX,
+		.init_execlists = logical_xcs_ring_init,
+		.init_legacy = intel_init_vebox_ring_buffer,
+	},
+};
+
+struct engine_info {
 	unsigned int hw_id;
 	enum intel_engine_class class;
 	u8 instance;
 	u32 mmio_base;
 	unsigned irq_shift;
-	int (*init_legacy)(struct intel_engine_cs *engine);
-	int (*init_execlists)(struct intel_engine_cs *engine);
-} intel_engines[] = {
+};
+
+static const struct engine_info intel_engines[] = {
 	[RCS] = {
-		.name = "rcs",
 		.hw_id = RCS_HW,
-		.exec_id = I915_EXEC_RENDER,
 		.class = RENDER_CLASS,
 		.instance = 0,
 		.mmio_base = RENDER_RING_BASE,
 		.irq_shift = GEN8_RCS_IRQ_SHIFT,
-		.init_execlists = logical_render_ring_init,
-		.init_legacy = intel_init_render_ring_buffer,
 	},
 	[BCS] = {
-		.name = "bcs",
 		.hw_id = BCS_HW,
-		.exec_id = I915_EXEC_BLT,
 		.class = COPY_ENGINE_CLASS,
 		.instance = 0,
 		.mmio_base = BLT_RING_BASE,
 		.irq_shift = GEN8_BCS_IRQ_SHIFT,
-		.init_execlists = logical_xcs_ring_init,
-		.init_legacy = intel_init_blt_ring_buffer,
 	},
 	[VCS] = {
-		.name = "vcs",
 		.hw_id = VCS_HW,
-		.exec_id = I915_EXEC_BSD,
 		.class = VIDEO_DECODE_CLASS,
 		.instance = 0,
 		.mmio_base = GEN6_BSD_RING_BASE,
 		.irq_shift = GEN8_VCS1_IRQ_SHIFT,
-		.init_execlists = logical_xcs_ring_init,
-		.init_legacy = intel_init_bsd_ring_buffer,
 	},
 	[VCS2] = {
-		.name = "vcs",
 		.hw_id = VCS2_HW,
-		.exec_id = I915_EXEC_BSD,
 		.class = VIDEO_DECODE_CLASS,
 		.instance = 1,
 		.mmio_base = GEN8_BSD2_RING_BASE,
 		.irq_shift = GEN8_VCS2_IRQ_SHIFT,
-		.init_execlists = logical_xcs_ring_init,
-		.init_legacy = intel_init_bsd_ring_buffer,
 	},
 	[VECS] = {
-		.name = "vecs",
 		.hw_id = VECS_HW,
-		.exec_id = I915_EXEC_VEBOX,
 		.class = VIDEO_ENHANCEMENT_CLASS,
 		.instance = 0,
 		.mmio_base = VEBOX_RING_BASE,
 		.irq_shift = GEN8_VECS_IRQ_SHIFT,
-		.init_execlists = logical_xcs_ring_init,
-		.init_legacy = intel_init_vebox_ring_buffer,
 	},
 };
 
@@ -99,6 +111,8 @@ intel_engine_setup(struct drm_i915_private *dev_priv,
 		   enum intel_engine_id id)
 {
 	const struct engine_info *info = &intel_engines[id];
+	const struct engine_class_info *class_info =
+				&intel_engine_classes[info->class];
 	struct intel_engine_cs *engine;
 	char instance[3] = "";
 
@@ -110,8 +124,8 @@ intel_engine_setup(struct drm_i915_private *dev_priv,
 	engine->id = id;
 	engine->i915 = dev_priv;
 	snprintf(instance, sizeof(instance), "%u", info->instance);
-	snprintf(engine->name, sizeof(engine->name), "%s%s", info->name, instance);
-	engine->exec_id = info->exec_id;
+	snprintf(engine->name, sizeof(engine->name), "%s%s", class_info->name, instance);
+	engine->exec_id = class_info->exec_id;
 	engine->hw_id = engine->guc_id = info->hw_id;
 	engine->mmio_base = info->mmio_base;
 	engine->irq_shift = info->irq_shift;
@@ -191,12 +205,14 @@ int intel_engines_init(struct drm_i915_private *dev_priv)
 	int err = 0;
 
 	for_each_engine(engine, dev_priv, id) {
+		const struct engine_class_info *class_info =
+					&intel_engine_classes[engine->class];
 		int (*init)(struct intel_engine_cs *engine);
 
 		if (i915.enable_execlists)
-			init = intel_engines[id].init_execlists;
+			init = class_info->init_execlists;
 		else
-			init = intel_engines[id].init_legacy;
+			init = class_info->init_legacy;
 		if (!init) {
 			kfree(engine);
 			dev_priv->engine[id] = NULL;
