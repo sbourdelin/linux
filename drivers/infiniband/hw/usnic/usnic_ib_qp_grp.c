@@ -545,8 +545,8 @@ alloc_res_chunk_list(struct usnic_vnic *vnic,
 		/* Do Nothing */
 	}
 
-	res_chunk_list = kzalloc(sizeof(*res_chunk_list)*(res_lst_sz+1),
-					GFP_ATOMIC);
+	res_chunk_list = kcalloc(res_lst_sz + 1, sizeof(*res_chunk_list),
+				 GFP_ATOMIC);
 	if (!res_chunk_list)
 		return ERR_PTR(-ENOMEM);
 
