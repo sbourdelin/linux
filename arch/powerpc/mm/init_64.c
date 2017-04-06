@@ -104,11 +104,15 @@ static unsigned long __meminit vmemmap_section_start(unsigned long page)
  */
 static int __meminit vmemmap_populated(unsigned long start, int page_size)
 {
-	unsigned long end = start + page_size;
-	start = (unsigned long)(pfn_to_page(vmemmap_section_start(start)));
+	unsigned long end, section_start;
 
-	for (; start < end; start += (PAGES_PER_SECTION * sizeof(struct page)))
-		if (pfn_valid(page_to_pfn((struct page *)start)))
+	end = start + page_size;
+	section_start = (unsigned long)(pfn_to_page
+					(vmemmap_section_start(start)));
+
+	for (; section_start < end; section_start
+				+= (PAGES_PER_SECTION * sizeof(struct page)))
+		if (pfn_valid(page_to_pfn((struct page *)section_start)))
 			return 1;
 
 	return 0;
