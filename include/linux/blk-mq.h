@@ -152,6 +152,12 @@ struct blk_mq_ops {
 #ifdef CONFIG_BLK_DEBUG_FS
 	/*
 	 * Used by the debugfs implementation to show driver-specific
+	 * information about a request queue.
+	 */
+	void (*show_q)(struct seq_file *m, struct request_queue *q);
+
+	/*
+	 * Used by the debugfs implementation to show driver-specific
 	 * information about a request.
 	 */
 	void (*show_rq)(struct seq_file *m, struct request *rq);

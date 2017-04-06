@@ -81,9 +81,12 @@ static const char *const blk_queue_flag_name[] = {
 static int queue_state_show(void *data, struct seq_file *m)
 {
 	struct request_queue *q = data;
+	const struct blk_mq_ops *const mq_ops = q->mq_ops;
 
 	blk_flags_show(m, q->queue_flags, blk_queue_flag_name,
 		       ARRAY_SIZE(blk_queue_flag_name));
+	if (mq_ops->show_q)
+		mq_ops->show_q(m, q);
 	seq_puts(m, "\n");
 	return 0;
 }
