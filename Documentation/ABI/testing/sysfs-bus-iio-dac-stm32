@@ -1,0 +1,16 @@
+What:		/sys/bus/iio/devices/iio:deviceX/out_voltageY_wavetype
+What:		/sys/bus/iio/devices/iio:deviceX/out_voltage_wavetype_available
+KernelVersion:	4.12
+Contact:	fabrice.gasnier@st.com
+Description:
+		List and/or select waveform generation provided by STM32 DAC:
+		- "flat": waveform generator disabled (default)
+		- "noise": select noise waveform
+		- "triangle": select triangle waveform
+
+What:		/sys/bus/iio/devices/iio:deviceX/out_voltageY_amplitude
+What:		/sys/bus/iio/devices/iio:deviceX/out_voltage_amplitude_available
+KernelVersion:	4.12
+Contact:	fabrice.gasnier@st.com
+Description:
+		List and/or select amplitude used for waveform generator
