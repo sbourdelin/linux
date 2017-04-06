@@ -150,9 +150,12 @@ static void nlmclnt_release_lockargs(struct nlm_rqst *req)
  * @host: address of a valid nlm_host context representing the NLM server
  * @cmd: fcntl-style file lock operation to perform
  * @fl: address of arguments for the lock operation
+ * @nlmclnt_ops: operations to call back out of nlm
+ * @data: address of data to be sent along with callback
  *
  */
-int nlmclnt_proc(struct nlm_host *host, int cmd, struct file_lock *fl)
+int nlmclnt_proc(struct nlm_host *host, int cmd, struct file_lock *fl,
+		const struct nlmclnt_operations *nlmclnt_ops, void *data)
 {
 	struct nlm_rqst		*call;
 	int			status;
@@ -160,6 +163,9 @@ int nlmclnt_proc(struct nlm_host *host, int cmd, struct file_lock *fl)
 	call = nlm_alloc_call(host);
 	if (call == NULL)
 		return -ENOMEM;
+
+	if (nlmclnt_ops && nlmclnt_ops->nlmclnt_alloc_call)
+		nlmclnt_ops->nlmclnt_alloc_call(data);
 
 	nlmclnt_locks_init_private(fl, host);
 	if (!fl->fl_u.nfs_fl.owner) {
@@ -169,6 +175,8 @@ int nlmclnt_proc(struct nlm_host *host, int cmd, struct file_lock *fl)
 	}
 	/* Set up the argument struct */
 	nlmclnt_setlockargs(call, fl);
+	call->nlmclnt_ops = nlmclnt_ops;
+	call->callback_data = data;
 
 	if (IS_SETLK(cmd) || IS_SETLKW(cmd)) {
 		if (fl->fl_type != F_UNLCK) {
@@ -216,6 +224,8 @@ void nlmclnt_release_call(struct nlm_rqst *call)
 {
 	if (!atomic_dec_and_test(&call->a_count))
 		return;
+	if (call->nlmclnt_ops && call->nlmclnt_ops->nlmclnt_release_call)
+		call->nlmclnt_ops->nlmclnt_release_call(call->callback_data);
 	nlmclnt_release_host(call->a_host);
 	nlmclnt_release_lockargs(call);
 	kfree(call);
@@ -687,6 +697,19 @@ out:
 	return status;
 }
 
+static void nlmclnt_unlock_prepare(struct rpc_task *task, void *data)
+{
+	struct nlm_rqst	*req = data;
+	const struct nlmclnt_operations *nlmclnt_ops = req->nlmclnt_ops;
+	bool defer_call = false;
+
+	if (nlmclnt_ops && nlmclnt_ops->nlmclnt_unlock_prepare)
+		defer_call = nlmclnt_ops->nlmclnt_unlock_prepare(task, req->callback_data);
+
+	if (!defer_call)
+		rpc_call_start(task);
+}
+
 static void nlmclnt_unlock_callback(struct rpc_task *task, void *data)
 {
 	struct nlm_rqst	*req = data;
@@ -720,6 +743,7 @@ die:
 }
 
 static const struct rpc_call_ops nlmclnt_unlock_ops = {
+	.rpc_call_prepare = nlmclnt_unlock_prepare,
 	.rpc_call_done = nlmclnt_unlock_callback,
 	.rpc_release = nlmclnt_rpc_release,
 };
