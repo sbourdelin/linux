@@ -288,6 +288,9 @@ config STM32_DAC
 	tristate "STMicroelectronics STM32 DAC"
 	depends on (ARCH_STM32 && OF) || COMPILE_TEST
 	depends on REGULATOR
+	select IIO_TRIGGERED_EVENT
+	select IIO_STM32_TIMER_TRIGGER
+	select MFD_STM32_TIMERS
 	select STM32_DAC_CORE
 	help
 	  Say yes here to build support for STMicroelectronics STM32 Digital
