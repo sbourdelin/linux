@@ -4357,6 +4357,105 @@ static struct extent_map *get_extent_skip_holes(struct inode *inode,
 	return NULL;
 }
 
+/*
+ * To cache previous fiemap extent
+ *
+ * Will be used for merging fiemap extent
+ */
+struct fiemap_cache {
+	bool cached;
+	u64 offset;
+	u64 phys;
+	u64 len;
+	u32 flags;
+};
+
+/*
+ * Helper to submit fiemap extent.
+ *
+ * Will try to merge current fiemap extent specified by @offset, @phys,
+ * @len and @flags with cached one.
+ * And only when we fails to merge, cached one will be submitted as
+ * fiemap extent.
+ *
+ * Return 0 if merged or submitted.
+ * Return <0 for error.
+ */
+static int submit_fiemap_extent(struct fiemap_extent_info *fieinfo,
+				struct fiemap_cache *cache,
+				u64 offset, u64 phys, u64 len, u32 flags)
+{
+	int ret;
+
+	if (!cache->cached) {
+assign:
+		cache->cached = true;
+		cache->offset = offset;
+		cache->phys = phys;
+		cache->len = len;
+		cache->flags = flags;
+		return 0;
+	}
+
+	/*
+	 * Sanity check, extent_fiemap() should have ensured that new
+	 * fiemap extent won't overlap with cahced one.
+	 * NOTE: Physical address can overlap, due to compression
+	 */
+	WARN_ON(cache->offset + cache->len > offset);
+
+	/*
+	 * Only merge fiemap extents if
+	 * 1) Their logical addresses are continuous
+	 *
+	 * 2) Their physical addresses are continuous
+	 *    So truly compressed (physical size smaller than logical size)
+	 *    extents won't get merged with each other
+	 *
+	 * 3) Share same flags except FIEMAP_EXTENT_LAST
+	 *    So regular extent won't get merged with prealloc extent
+	 *
+	 * 4) Merged result is no larger than BTRFS_MAX_EXTENT_SIZE
+	 */
+	if (cache->offset + cache->len  == offset &&
+	    cache->phys + cache->len == phys  &&
+	    cache->len + len <= BTRFS_MAX_EXTENT_SIZE &&
+	    (cache->flags & ~FIEMAP_EXTENT_LAST) ==
+			(flags & ~FIEMAP_EXTENT_LAST)) {
+		cache->len += len;
+		cache->flags |= flags;
+		return 0;
+	}
+
+	/* Not mergeable, need to submit cached one */
+	ret = fiemap_fill_next_extent(fieinfo, cache->offset, cache->phys,
+				      cache->len, cache->flags);
+	if (ret < 0)
+		return ret;
+	/*
+	 * Last fiemap extent will not be submitted here, but in
+	 * finish_fiemap_extent()
+	 */
+	WARN_ON(ret > 0);
+	goto assign;
+}
+
+/*
+ * Submit the last cached fiemap extent.
+ */
+static int finish_fiemap_extent(struct fiemap_extent_info *fieinfo,
+				struct fiemap_cache *cache)
+{
+	int ret;
+
+	if (!cache->cached)
+		return 0;
+	ret = fiemap_fill_next_extent(fieinfo, cache->offset, cache->phys,
+				      cache->len, cache->flags);
+	cache->cached = false;
+	return ret;
+}
+
 int extent_fiemap(struct inode *inode, struct fiemap_extent_info *fieinfo,
 		__u64 start, __u64 len, get_extent_t *get_extent)
 {
@@ -4374,6 +4473,7 @@ int extent_fiemap(struct inode *inode, struct fiemap_extent_info *fieinfo,
 	struct extent_state *cached_state = NULL;
 	struct btrfs_path *path;
 	struct btrfs_root *root = BTRFS_I(inode)->root;
+	struct fiemap_cache cache = { 0 };
 	int end = 0;
 	u64 em_start = 0;
 	u64 em_len = 0;
@@ -4538,15 +4638,14 @@ int extent_fiemap(struct inode *inode, struct fiemap_extent_info *fieinfo,
 			flags |= FIEMAP_EXTENT_LAST;
 			end = 1;
 		}
-		ret = fiemap_fill_next_extent(fieinfo, em_start, disko,
-					      em_len, flags);
-		if (ret) {
-			if (ret == 1)
-				ret = 0;
+		ret = submit_fiemap_extent(fieinfo, &cache, em_start, disko,
+					   em_len, flags);
+		if (ret)
 			goto out_free;
-		}
 	}
 out_free:
+	if (!ret)
+		ret = finish_fiemap_extent(fieinfo, &cache);
 	free_extent_map(em);
 out:
 	btrfs_free_path(path);
