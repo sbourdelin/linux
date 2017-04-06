@@ -29,6 +29,7 @@
 #include <linux/rwlock.h>
 #include <linux/mutex.h>
 #include <linux/rwsem.h>
+#include <linux/range_rwlock.h>
 #include <linux/smp.h>
 #include <linux/interrupt.h>
 #include <linux/sched.h>
@@ -89,13 +90,13 @@ static void lock_torture_cleanup(void);
  */
 struct lock_torture_ops {
 	void (*init)(void);
-	int (*writelock)(void);
+	int (*writelock)(void *arg);
 	void (*write_delay)(struct torture_random_state *trsp);
 	void (*task_boost)(struct torture_random_state *trsp);
-	void (*writeunlock)(void);
-	int (*readlock)(void);
+	void (*writeunlock)(void *arg);
+	int (*readlock)(void *arg);
 	void (*read_delay)(struct torture_random_state *trsp);
-	void (*readunlock)(void);
+	void (*readunlock)(void *arg);
 
 	unsigned long flags; /* for irq spinlocks */
 	const char *name;
@@ -117,7 +118,7 @@ static struct lock_torture_cxt cxt = { 0, 0, false,
  * Definitions for lock torture testing.
  */
 
-static int torture_lock_busted_write_lock(void)
+static int torture_lock_busted_write_lock(void *arg)
 {
 	return 0;  /* BUGGY, do not use in real life!!! */
 }
@@ -136,7 +137,7 @@ static void torture_lock_busted_write_delay(struct torture_random_state *trsp)
 #endif
 }
 
-static void torture_lock_busted_write_unlock(void)
+static void torture_lock_busted_write_unlock(void *arg)
 {
 	  /* BUGGY, do not use in real life!!! */
 }
@@ -159,7 +160,8 @@ static struct lock_torture_ops lock_busted_ops = {
 
 static DEFINE_SPINLOCK(torture_spinlock);
 
-static int torture_spin_lock_write_lock(void) __acquires(torture_spinlock)
+static int torture_spin_lock_write_lock(void *arg)
+	__acquires(torture_spinlock)
 {
 	spin_lock(&torture_spinlock);
 	return 0;
@@ -185,7 +187,8 @@ static void torture_spin_lock_write_delay(struct torture_random_state *trsp)
 #endif
 }
 
-static void torture_spin_lock_write_unlock(void) __releases(torture_spinlock)
+static void torture_spin_lock_write_unlock(void *arg)
+	__releases(torture_spinlock)
 {
 	spin_unlock(&torture_spinlock);
 }
@@ -201,8 +204,8 @@ static struct lock_torture_ops spin_lock_ops = {
 	.name		= "spin_lock"
 };
 
-static int torture_spin_lock_write_lock_irq(void)
-__acquires(torture_spinlock)
+static int torture_spin_lock_write_lock_irq(void *arg)
+	__acquires(torture_spinlock)
 {
 	unsigned long flags;
 
@@ -211,7 +214,7 @@ __acquires(torture_spinlock)
 	return 0;
 }
 
-static void torture_lock_spin_write_unlock_irq(void)
+static void torture_lock_spin_write_unlock_irq(void *arg)
 __releases(torture_spinlock)
 {
 	spin_unlock_irqrestore(&torture_spinlock, cxt.cur_ops->flags);
@@ -230,7 +233,8 @@ static struct lock_torture_ops spin_lock_irq_ops = {
 
 static DEFINE_RWLOCK(torture_rwlock);
 
-static int torture_rwlock_write_lock(void) __acquires(torture_rwlock)
+static int torture_rwlock_write_lock(void *arg)
+	__acquires(torture_rwlock)
 {
 	write_lock(&torture_rwlock);
 	return 0;
@@ -251,12 +255,14 @@ static void torture_rwlock_write_delay(struct torture_random_state *trsp)
 		udelay(shortdelay_us);
 }
 
-static void torture_rwlock_write_unlock(void) __releases(torture_rwlock)
+static void torture_rwlock_write_unlock(void *arg)
+	__releases(torture_rwlock)
 {
 	write_unlock(&torture_rwlock);
 }
 
-static int torture_rwlock_read_lock(void) __acquires(torture_rwlock)
+static int torture_rwlock_read_lock(void *arg)
+	__acquires(torture_rwlock)
 {
 	read_lock(&torture_rwlock);
 	return 0;
@@ -277,7 +283,8 @@ static void torture_rwlock_read_delay(struct torture_random_state *trsp)
 		udelay(shortdelay_us);
 }
 
-static void torture_rwlock_read_unlock(void) __releases(torture_rwlock)
+static void torture_rwlock_read_unlock(void *arg)
+	__releases(torture_rwlock)
 {
 	read_unlock(&torture_rwlock);
 }
@@ -293,7 +300,8 @@ static struct lock_torture_ops rw_lock_ops = {
 	.name		= "rw_lock"
 };
 
-static int torture_rwlock_write_lock_irq(void) __acquires(torture_rwlock)
+static int torture_rwlock_write_lock_irq(void *arg)
+	__acquires(torture_rwlock)
 {
 	unsigned long flags;
 
@@ -302,13 +310,14 @@ static int torture_rwlock_write_lock_irq(void) __acquires(torture_rwlock)
 	return 0;
 }
 
-static void torture_rwlock_write_unlock_irq(void)
-__releases(torture_rwlock)
+static void torture_rwlock_write_unlock_irq(void *arg)
+	__releases(torture_rwlock)
 {
 	write_unlock_irqrestore(&torture_rwlock, cxt.cur_ops->flags);
 }
 
-static int torture_rwlock_read_lock_irq(void) __acquires(torture_rwlock)
+static int torture_rwlock_read_lock_irq(void *arg)
+	__acquires(torture_rwlock)
 {
 	unsigned long flags;
 
@@ -317,8 +326,8 @@ static int torture_rwlock_read_lock_irq(void) __acquires(torture_rwlock)
 	return 0;
 }
 
-static void torture_rwlock_read_unlock_irq(void)
-__releases(torture_rwlock)
+static void torture_rwlock_read_unlock_irq(void *arg)
+	__releases(torture_rwlock)
 {
 	read_unlock_irqrestore(&torture_rwlock, cxt.cur_ops->flags);
 }
@@ -336,7 +345,8 @@ static struct lock_torture_ops rw_lock_irq_ops = {
 
 static DEFINE_MUTEX(torture_mutex);
 
-static int torture_mutex_lock(void) __acquires(torture_mutex)
+static int torture_mutex_lock(void *arg)
+	__acquires(torture_mutex)
 {
 	mutex_lock(&torture_mutex);
 	return 0;
@@ -358,7 +368,8 @@ static void torture_mutex_delay(struct torture_random_state *trsp)
 #endif
 }
 
-static void torture_mutex_unlock(void) __releases(torture_mutex)
+static void torture_mutex_unlock(void *arg)
+	__releases(torture_mutex)
 {
 	mutex_unlock(&torture_mutex);
 }
@@ -380,7 +391,7 @@ static DEFINE_WW_MUTEX(torture_ww_mutex_0, &torture_ww_class);
 static DEFINE_WW_MUTEX(torture_ww_mutex_1, &torture_ww_class);
 static DEFINE_WW_MUTEX(torture_ww_mutex_2, &torture_ww_class);
 
-static int torture_ww_mutex_lock(void)
+static int torture_ww_mutex_lock(void *arg)
 __acquires(torture_ww_mutex_0)
 __acquires(torture_ww_mutex_1)
 __acquires(torture_ww_mutex_2)
@@ -425,7 +436,7 @@ __acquires(torture_ww_mutex_2)
 	return 0;
 }
 
-static void torture_ww_mutex_unlock(void)
+static void torture_ww_mutex_unlock(void *arg)
 __releases(torture_ww_mutex_0)
 __releases(torture_ww_mutex_1)
 __releases(torture_ww_mutex_2)
@@ -449,7 +460,8 @@ static struct lock_torture_ops ww_mutex_lock_ops = {
 #ifdef CONFIG_RT_MUTEXES
 static DEFINE_RT_MUTEX(torture_rtmutex);
 
-static int torture_rtmutex_lock(void) __acquires(torture_rtmutex)
+static int torture_rtmutex_lock(void *arg)
+	__acquires(torture_rtmutex)
 {
 	rt_mutex_lock(&torture_rtmutex);
 	return 0;
@@ -513,7 +525,8 @@ static void torture_rtmutex_delay(struct torture_random_state *trsp)
 #endif
 }
 
-static void torture_rtmutex_unlock(void) __releases(torture_rtmutex)
+static void torture_rtmutex_unlock(void *arg)
+	__releases(torture_rtmutex)
 {
 	rt_mutex_unlock(&torture_rtmutex);
 }
@@ -531,7 +544,8 @@ static struct lock_torture_ops rtmutex_lock_ops = {
 #endif
 
 static DECLARE_RWSEM(torture_rwsem);
-static int torture_rwsem_down_write(void) __acquires(torture_rwsem)
+static int torture_rwsem_down_write(void *arg)
+	__acquires(torture_rwsem)
 {
 	down_write(&torture_rwsem);
 	return 0;
@@ -553,12 +567,14 @@ static void torture_rwsem_write_delay(struct torture_random_state *trsp)
 #endif
 }
 
-static void torture_rwsem_up_write(void) __releases(torture_rwsem)
+static void torture_rwsem_up_write(void *arg)
+	__releases(torture_rwsem)
 {
 	up_write(&torture_rwsem);
 }
 
-static int torture_rwsem_down_read(void) __acquires(torture_rwsem)
+static int torture_rwsem_down_read(void *arg)
+	__acquires(torture_rwsem)
 {
 	down_read(&torture_rwsem);
 	return 0;
@@ -580,7 +596,8 @@ static void torture_rwsem_read_delay(struct torture_random_state *trsp)
 #endif
 }
 
-static void torture_rwsem_up_read(void) __releases(torture_rwsem)
+static void torture_rwsem_up_read(void *arg)
+	__releases(torture_rwsem)
 {
 	up_read(&torture_rwsem);
 }
@@ -596,6 +613,70 @@ static struct lock_torture_ops rwsem_lock_ops = {
 	.name		= "rwsem_lock"
 };
 
+/*
+ * Lock torturing starts here, and is slightly different than other locks
+ * in that it expects the range to lock to be passed as well as the actual
+ * lock itself.
+ */
+#define locktorture_is_range_lock(type) (!strncmp(type, "range_rwlock", 12))
+
+struct locktorture_range {
+	unsigned long start;
+	unsigned long end;
+	struct range_rwlock lock;
+};
+
+#define RANGE_POOL_SIZE (1UL << 12)
+struct locktorture_range *range_pool = NULL;
+
+static DEFINE_RANGE_RWLOCK_TREE(torture_range_rwlock);
+
+static int torture_range_rwlock_read_lock(void *arg)
+	__acquires(torture_range_rwlock)
+{
+	struct range_rwlock *range = (struct range_rwlock *) arg;
+
+	range_read_lock(&torture_range_rwlock, range);
+	return 0;
+}
+
+static void torture_range_rwlock_read_unlock(void *arg)
+	__releases(torture_range_rwlock)
+{
+	struct range_rwlock *range = (struct range_rwlock *) arg;
+
+	range_read_unlock(&torture_range_rwlock, range);
+}
+
+static int torture_range_rwlock_write_lock(void *arg)
+	__acquires(torture_rwrange_lock)
+{
+	struct range_rwlock *range = (struct range_rwlock *) arg;
+
+	range_write_lock(&torture_range_rwlock, range);
+	return 0;
+}
+
+static void torture_range_rwlock_write_unlock(void *arg)
+	__releases(torture_range_rwlock)
+{
+	struct range_rwlock *range = (struct range_rwlock *) arg;
+
+	range_write_unlock(&torture_range_rwlock, range);
+}
+
+static struct lock_torture_ops range_rwlock_ops = {
+	.writelock	= torture_range_rwlock_write_lock,
+	.write_delay	= torture_rwsem_write_delay,
+	.task_boost     = torture_boost_dummy,
+	.writeunlock	= torture_range_rwlock_write_unlock,
+
+	.readlock       = torture_range_rwlock_read_lock,
+	.read_delay	= torture_rwsem_read_delay,
+	.readunlock     = torture_range_rwlock_read_unlock,
+	.name		= "range_rwlock"
+};
+
 #include <linux/percpu-rwsem.h>
 static struct percpu_rw_semaphore pcpu_rwsem;
 
@@ -604,24 +685,28 @@ void torture_percpu_rwsem_init(void)
 	BUG_ON(percpu_init_rwsem(&pcpu_rwsem));
 }
 
-static int torture_percpu_rwsem_down_write(void) __acquires(pcpu_rwsem)
+static int torture_percpu_rwsem_down_write(void *arg)
+	__acquires(pcpu_rwsem)
 {
 	percpu_down_write(&pcpu_rwsem);
 	return 0;
 }
 
-static void torture_percpu_rwsem_up_write(void) __releases(pcpu_rwsem)
+static void torture_percpu_rwsem_up_write(void *arg)
+	__releases(pcpu_rwsem)
 {
 	percpu_up_write(&pcpu_rwsem);
 }
 
-static int torture_percpu_rwsem_down_read(void) __acquires(pcpu_rwsem)
+static int torture_percpu_rwsem_down_read(void *arg)
+	__acquires(pcpu_rwsem)
 {
 	percpu_down_read(&pcpu_rwsem);
 	return 0;
 }
 
-static void torture_percpu_rwsem_up_read(void) __releases(pcpu_rwsem)
+static void torture_percpu_rwsem_up_read(void *arg)
+	__releases(pcpu_rwsem)
 {
 	percpu_up_read(&pcpu_rwsem);
 }
@@ -638,6 +723,17 @@ static struct lock_torture_ops percpu_rwsem_lock_ops = {
 	.name		= "percpu_rwsem_lock"
 };
 
+static void mkrandom_range(struct range_rwlock *range,
+			   struct torture_random_state *trsp)
+{
+	unsigned long start, last;
+
+	last = (torture_random(trsp) >> 4) % (RANGE_POOL_SIZE + 1);
+	start = (torture_random(trsp) >> 4) % (last + 1);
+
+	range_rwlock_init(range, start, last);
+}
+
 /*
  * Lock torture writer kthread.  Repeatedly acquires and releases
  * the lock, checking for duplicate acquisitions.
@@ -646,26 +742,38 @@ static int lock_torture_writer(void *arg)
 {
 	struct lock_stress_stats *lwsp = arg;
 	static DEFINE_TORTURE_RANDOM(rand);
+	bool is_range = locktorture_is_range_lock(torture_type);
 
 	VERBOSE_TOROUT_STRING("lock_torture_writer task started");
 	set_user_nice(current, MAX_NICE);
 
 	do {
+		struct range_rwlock range;
+
 		if ((torture_random(&rand) & 0xfffff) == 0)
 			schedule_timeout_uninterruptible(1);
 
+		if (is_range)
+			mkrandom_range(&range, &rand);
+
 		cxt.cur_ops->task_boost(&rand);
-		cxt.cur_ops->writelock();
-		if (WARN_ON_ONCE(lock_is_write_held))
-			lwsp->n_lock_fail++;
-		lock_is_write_held = 1;
-		if (WARN_ON_ONCE(lock_is_read_held))
-			lwsp->n_lock_fail++; /* rare, but... */
+		cxt.cur_ops->writelock(&range);
+
+		if (!is_range) {
+			if (WARN_ON_ONCE(lock_is_write_held))
+				lwsp->n_lock_fail++;
+			if (WARN_ON_ONCE(lock_is_read_held))
+				lwsp->n_lock_fail++; /* rare, but... */
+
+			lock_is_write_held = true;
+		}
 
 		lwsp->n_lock_acquired++;
 		cxt.cur_ops->write_delay(&rand);
-		lock_is_write_held = 0;
-		cxt.cur_ops->writeunlock();
+
+		if (!is_range)
+			lock_is_write_held = false;
+		cxt.cur_ops->writeunlock(&range);
 
 		stutter_wait("lock_torture_writer");
 	} while (!torture_must_stop());
@@ -683,26 +791,40 @@ static int lock_torture_reader(void *arg)
 {
 	struct lock_stress_stats *lrsp = arg;
 	static DEFINE_TORTURE_RANDOM(rand);
+	bool is_range = locktorture_is_range_lock(torture_type);
 
 	VERBOSE_TOROUT_STRING("lock_torture_reader task started");
 	set_user_nice(current, MAX_NICE);
 
 	do {
+		struct range_rwlock range;
+
 		if ((torture_random(&rand) & 0xfffff) == 0)
 			schedule_timeout_uninterruptible(1);
 
-		cxt.cur_ops->readlock();
-		lock_is_read_held = 1;
-		if (WARN_ON_ONCE(lock_is_write_held))
-			lrsp->n_lock_fail++; /* rare, but... */
+		if (is_range)
+			mkrandom_range(&range, &rand);
+
+		cxt.cur_ops->readlock(&range);
+
+		if (!is_range) {
+			if (WARN_ON_ONCE(lock_is_write_held))
+				lrsp->n_lock_fail++; /* rare, but... */
+
+			lock_is_read_held = 1;
+		}
 
 		lrsp->n_lock_acquired++;
 		cxt.cur_ops->read_delay(&rand);
-		lock_is_read_held = 0;
-		cxt.cur_ops->readunlock();
+
+		if (!is_range)
+			lock_is_read_held = 0;
+
+		cxt.cur_ops->readunlock(&range);
 
 		stutter_wait("lock_torture_reader");
 	} while (!torture_must_stop());
+
 	torture_kthread_stopping("lock_torture_reader");
 	return 0;
 }
@@ -876,6 +998,7 @@ static int __init lock_torture_init(void)
 #endif
 		&rwsem_lock_ops,
 		&percpu_rwsem_lock_ops,
+		&range_rwlock_ops,
 	};
 
 	if (!torture_init_begin(torture_type, verbose, &torture_runnable))
