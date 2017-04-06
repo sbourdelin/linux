@@ -101,6 +101,7 @@ static void queue_process(struct work_struct *work)
 		container_of(work, struct netpoll_info, tx_work.work);
 	struct sk_buff *skb;
 	unsigned long flags;
+	u16 q_index;
 
 	while ((skb = skb_dequeue(&npinfo->txq))) {
 		struct net_device *dev = skb->dev;
@@ -117,6 +118,12 @@ static void queue_process(struct work_struct *work)
 		HARD_TX_LOCK(dev, txq, smp_processor_id());
 		if (netif_xmit_frozen_or_stopped(txq) ||
 		    netpoll_start_xmit(skb, dev, txq) != NETDEV_TX_OK) {
+			/* check if skb->queue_mapping has changed */
+			q_index = skb_get_queue_mapping(skb);
+			if (unlikely(q_index >= dev->real_num_tx_queues)) {
+				q_index = q_index % dev->real_num_tx_queues;
+				skb_set_queue_mapping(skb, q_index);
+			}
 			skb_queue_head(&npinfo->txq, skb);
 			HARD_TX_UNLOCK(dev, txq);
 			local_irq_restore(flags);
