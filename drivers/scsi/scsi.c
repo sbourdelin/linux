@@ -115,8 +115,6 @@ void scsi_put_command(struct scsi_cmnd *cmd)
 	BUG_ON(list_empty(&cmd->list));
 	list_del_init(&cmd->list);
 	spin_unlock_irqrestore(&cmd->device->list_lock, flags);
-
-	BUG_ON(delayed_work_pending(&cmd->abort_work));
 }
 
 #ifdef CONFIG_SCSI_LOGGING
