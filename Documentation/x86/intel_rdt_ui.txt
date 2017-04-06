@@ -206,12 +206,12 @@ Next we make a resource group for our real time cores and give
 it access to the "top" 50% of the cache on socket 0.
 
 # mkdir p0
-# echo "L3:0=ffc00;" > p0/schemata
+# echo "L3:0=ffc00" > p0/schemata
 
 Finally we move core 4-7 over to the new group and make sure that the
 kernel and the tasks running there get 50% of the cache.
 
-# echo C0 > p0/cpus
+# echo F0 > p0/cpus
 
 4) Locking between applications
 
