@@ -124,8 +124,9 @@ struct btrfs_device {
 
 	/* for sending down flush barriers */
 	int nobarriers;
-	struct bio *flush_bio;
 	struct completion flush_wait;
+	struct work_struct flush_work;
+	int last_flush_error;
 
 	/* per-device scrub information */
 	struct scrub_ctx *scrub_device;
