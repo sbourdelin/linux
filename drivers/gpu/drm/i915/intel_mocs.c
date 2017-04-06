@@ -178,7 +178,7 @@ static bool get_mocs_settings(struct drm_i915_private *dev_priv,
 {
 	bool result = false;
 
-	if (IS_GEN9_BC(dev_priv)) {
+	if (IS_GEN9_BC(dev_priv) || IS_CANNONLAKE(dev_priv)) {
 		table->size  = ARRAY_SIZE(skylake_mocs_table);
 		table->table = skylake_mocs_table;
 		result = true;
@@ -191,8 +191,8 @@ static bool get_mocs_settings(struct drm_i915_private *dev_priv,
 			  "Platform that should have a MOCS table does not.\n");
 	}
 
-	/* WaDisableSkipCaching:skl,bxt,kbl,glk */
-	if (IS_GEN9(dev_priv)) {
+	/* WaDisableSkipCaching:skl,bxt,kbl,glk,cnl */
+	if (IS_GEN9(dev_priv) || IS_CANNONLAKE(dev_priv)) {
 		int i;
 
 		for (i = 0; i < table->size; i++)
