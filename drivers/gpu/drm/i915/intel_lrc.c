@@ -138,6 +138,7 @@
 #include "i915_drv.h"
 #include "intel_mocs.h"
 
+#define GEN10_LR_CONTEXT_RENDER_SIZE ((1 + 33) * PAGE_SIZE)
 #define GEN9_LR_CONTEXT_RENDER_SIZE (22 * PAGE_SIZE)
 #define GEN8_LR_CONTEXT_RENDER_SIZE (20 * PAGE_SIZE)
 #define GEN8_LR_CONTEXT_OTHER_SIZE (2 * PAGE_SIZE)
@@ -1930,10 +1931,19 @@ uint32_t intel_lr_context_size(struct intel_engine_cs *engine)
 
 	switch (engine->id) {
 	case RCS:
-		if (INTEL_GEN(engine->i915) >= 9)
+		switch (INTEL_GEN(engine->i915)) {
+		default:
+			DRM_ERROR("Unknown context size for GEN\n");
+		case 10:
+			ret = GEN10_LR_CONTEXT_RENDER_SIZE;
+			break;
+		case 9:
 			ret = GEN9_LR_CONTEXT_RENDER_SIZE;
-		else
+			break;
+		case 8:
 			ret = GEN8_LR_CONTEXT_RENDER_SIZE;
+			break;
+		}
 		break;
 	case VCS:
 	case BCS:
