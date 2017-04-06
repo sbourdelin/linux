@@ -329,12 +329,19 @@ static struct drm_driver vgem_driver = {
 };
 
 static struct drm_device *vgem_device;
+static struct platform_device *vgem_pdev;
 
 static int __init vgem_init(void)
 {
 	int ret;
 
-	vgem_device = drm_dev_alloc(&vgem_driver, NULL);
+	vgem_pdev = platform_device_register_simple("vgem", -1, NULL, 0);
+	if (IS_ERR(vgem_pdev))
+		return PTR_ERR(vgem_pdev);
+
+	dma_coerce_mask_and_coherent(&vgem_pdev->dev, DMA_BIT_MASK(64));
+
+	vgem_device = drm_dev_alloc(&vgem_driver, &vgem_pdev->dev);
 	if (IS_ERR(vgem_device)) {
 		ret = PTR_ERR(vgem_device);
 		goto out;
@@ -349,6 +356,8 @@ static int __init vgem_init(void)
 out_unref:
 	drm_dev_unref(vgem_device);
 out:
+	platform_device_unregister(vgem_pdev);
+
 	return ret;
 }
 
@@ -356,6 +365,7 @@ static void __exit vgem_exit(void)
 {
 	drm_dev_unregister(vgem_device);
 	drm_dev_unref(vgem_device);
+	platform_device_unregister(vgem_pdev);
 }
 
 module_init(vgem_init);
