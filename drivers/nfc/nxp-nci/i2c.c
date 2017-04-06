@@ -36,7 +36,6 @@
 #include <linux/of_gpio.h>
 #include <linux/of_irq.h>
 #include <linux/platform_data/nxp-nci.h>
-#include <linux/unaligned/access_ok.h>
 
 #include <net/nfc/nfc.h>
 
@@ -127,7 +126,7 @@ static int nxp_nci_i2c_fw_read(struct nxp_nci_i2c_phy *phy,
 		goto fw_read_exit;
 	}
 
-	frame_len = (get_unaligned_be16(&header) & NXP_NCI_FW_FRAME_LEN_MASK) +
+	frame_len = (be16_to_cpu(header) & NXP_NCI_FW_FRAME_LEN_MASK) +
 		    NXP_NCI_FW_CRC_LEN;
 
 	*skb = alloc_skb(NXP_NCI_FW_HDR_LEN + frame_len, GFP_KERNEL);
