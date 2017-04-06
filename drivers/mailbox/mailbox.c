@@ -40,7 +40,7 @@ static int add_to_rbuf(struct mbox_chan *chan, void *mssg)
 	}
 
 	idx = chan->msg_free;
-	chan->msg_data[idx] = mssg;
+	chan->msg_data[idx].msg_data = mssg;
 	chan->msg_count++;
 
 	if (idx == MBOX_TX_QUEUE_LEN - 1)
@@ -62,24 +62,25 @@ static void msg_submit(struct mbox_chan *chan)
 
 	spin_lock_irqsave(&chan->lock, flags);
 
-	if (!chan->msg_count || chan->active_req)
+	if (!chan->msg_count || chan->active_req >= 0)
 		goto exit;
 
 	count = chan->msg_count;
 	idx = chan->msg_free;
+
 	if (idx >= count)
 		idx -= count;
 	else
 		idx += MBOX_TX_QUEUE_LEN - count;
 
-	data = chan->msg_data[idx];
+	data = chan->msg_data[idx].msg_data;
 
 	if (chan->cl->tx_prepare)
 		chan->cl->tx_prepare(chan->cl, data);
 	/* Try to submit a message to the MBOX controller */
 	err = chan->mbox->ops->send_data(chan, data);
 	if (!err) {
-		chan->active_req = data;
+		chan->active_req = idx;
 		chan->msg_count--;
 	}
 exit:
@@ -93,11 +94,15 @@ exit:
 static void tx_tick(struct mbox_chan *chan, int r)
 {
 	unsigned long flags;
-	void *mssg;
+	void *mssg = NULL;
+	int idx = -1;
 
 	spin_lock_irqsave(&chan->lock, flags);
-	mssg = chan->active_req;
-	chan->active_req = NULL;
+	if (chan->active_req >= 0) {
+		mssg = chan->msg_data[chan->active_req].msg_data;
+		idx = chan->active_req;
+		chan->active_req = -1;
+	}
 	spin_unlock_irqrestore(&chan->lock, flags);
 
 	/* Submit next message */
@@ -107,8 +112,9 @@ static void tx_tick(struct mbox_chan *chan, int r)
 	if (mssg && chan->cl->tx_done)
 		chan->cl->tx_done(chan->cl, mssg, r);
 
-	if (chan->cl->tx_block)
-		complete(&chan->tx_complete);
+	if (chan->cl->tx_block && idx >= 0
+			&& !completion_done(&chan->msg_data[idx].tx_complete))
+		complete(&chan->msg_data[idx].tx_complete);
 }
 
 static enum hrtimer_restart txdone_hrtimer(struct hrtimer *hrtimer)
@@ -121,7 +127,7 @@ static enum hrtimer_restart txdone_hrtimer(struct hrtimer *hrtimer)
 	for (i = 0; i < mbox->num_chans; i++) {
 		struct mbox_chan *chan = &mbox->chans[i];
 
-		if (chan->active_req && chan->cl) {
+		if ((chan->active_req >= 0) && chan->cl) {
 			txdone = chan->mbox->ops->last_tx_done(chan);
 			if (txdone)
 				tx_tick(chan, 0);
@@ -260,7 +266,7 @@ int mbox_send_message(struct mbox_chan *chan, void *mssg)
 
 	msg_submit(chan);
 
-	if (chan->cl->tx_block && chan->active_req) {
+	if (chan->cl->tx_block) {
 		unsigned long wait;
 		int ret;
 
@@ -269,7 +275,8 @@ int mbox_send_message(struct mbox_chan *chan, void *mssg)
 		else
 			wait = msecs_to_jiffies(chan->cl->tx_tout);
 
-		ret = wait_for_completion_timeout(&chan->tx_complete, wait);
+		reinit_completion(&chan->msg_data[t].tx_complete);
+		ret = wait_for_completion_timeout(&chan->msg_data[t].tx_complete, wait);
 		if (ret == 0) {
 			t = -EIO;
 			tx_tick(chan, -EIO);
@@ -304,7 +311,7 @@ struct mbox_chan *mbox_request_channel(struct mbox_client *cl, int index)
 	struct of_phandle_args spec;
 	struct mbox_chan *chan;
 	unsigned long flags;
-	int ret;
+	int ret, i;
 
 	if (!dev || !dev->of_node) {
 		pr_debug("%s: No owner device node\n", __func__);
@@ -343,9 +350,10 @@ struct mbox_chan *mbox_request_channel(struct mbox_client *cl, int index)
 	spin_lock_irqsave(&chan->lock, flags);
 	chan->msg_free = 0;
 	chan->msg_count = 0;
-	chan->active_req = NULL;
+	chan->active_req = -1;
 	chan->cl = cl;
-	init_completion(&chan->tx_complete);
+	for (i = 0; i < MBOX_TX_QUEUE_LEN; i++)
+		init_completion(&chan->msg_data[i].tx_complete);
 
 	if (chan->txdone_method	== TXDONE_BY_POLL && cl->knows_txdone)
 		chan->txdone_method |= TXDONE_BY_ACK;
@@ -410,7 +418,7 @@ void mbox_free_channel(struct mbox_chan *chan)
 	/* The queued TX requests are simply aborted, no callbacks are made */
 	spin_lock_irqsave(&chan->lock, flags);
 	chan->cl = NULL;
-	chan->active_req = NULL;
+	chan->active_req = -1;
 	if (chan->txdone_method == (TXDONE_BY_POLL | TXDONE_BY_ACK))
 		chan->txdone_method = TXDONE_BY_POLL;
 

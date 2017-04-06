@@ -243,6 +243,7 @@ struct mbox_chan *pcc_mbox_request_channel(struct mbox_client *cl,
 	struct device *dev = pcc_mbox_ctrl.dev;
 	struct mbox_chan *chan;
 	unsigned long flags;
+	int i;
 
 	/*
 	 * Each PCC Subspace is a Mailbox Channel.
@@ -261,9 +262,11 @@ struct mbox_chan *pcc_mbox_request_channel(struct mbox_client *cl,
 	spin_lock_irqsave(&chan->lock, flags);
 	chan->msg_free = 0;
 	chan->msg_count = 0;
-	chan->active_req = NULL;
+	chan->active_req = -1;
 	chan->cl = cl;
-	init_completion(&chan->tx_complete);
+
+	for (i = 0; i < MBOX_TX_QUEUE_LEN; i++)
+		init_completion(&chan->msg_data[i].tx_complete);
 
 	if (chan->txdone_method == TXDONE_BY_POLL && cl->knows_txdone)
 		chan->txdone_method |= TXDONE_BY_ACK;
@@ -311,7 +314,8 @@ void pcc_mbox_free_channel(struct mbox_chan *chan)
 
 	spin_lock_irqsave(&chan->lock, flags);
 	chan->cl = NULL;
-	chan->active_req = NULL;
+	chan->active_req = -1;
+
 	if (chan->txdone_method == (TXDONE_BY_POLL | TXDONE_BY_ACK))
 		chan->txdone_method = TXDONE_BY_POLL;
 
