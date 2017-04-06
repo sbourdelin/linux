@@ -42,6 +42,7 @@
 #include <linux/file.h>
 #include <linux/sched.h>
 #include <linux/mount.h>
+#include <linux/range_rwlock.h>
 #include "../include/lustre/ll_fiemap.h"
 #include "../include/lustre/lustre_ioctl.h"
 #include "../include/lustre_swab.h"
@@ -1055,7 +1056,7 @@ ll_file_io_generic(const struct lu_env *env, struct vvp_io_args *args,
 	struct ll_inode_info *lli = ll_i2info(file_inode(file));
 	struct ll_file_data  *fd  = LUSTRE_FPRIVATE(file);
 	struct vvp_io *vio = vvp_env_io(env);
-	struct range_lock range;
+	struct range_rwlock range;
 	struct cl_io	 *io;
 	ssize_t result = 0;
 	int rc = 0;
@@ -1072,9 +1073,9 @@ restart:
 		bool range_locked = false;
 
 		if (file->f_flags & O_APPEND)
-			range_lock_init(&range, 0, LUSTRE_EOF);
+			range_rwlock_init(&range, 0, LUSTRE_EOF);
 		else
-			range_lock_init(&range, *ppos, *ppos + count - 1);
+			range_rwlock_init(&range, *ppos, *ppos + count - 1);
 
 		vio->vui_fd  = LUSTRE_FPRIVATE(file);
 		vio->vui_iter = args->u.normal.via_iter;
@@ -1087,10 +1088,9 @@ restart:
 		if (((iot == CIT_WRITE) ||
 		     (iot == CIT_READ && (file->f_flags & O_DIRECT))) &&
 		    !(vio->vui_fd->fd_flags & LL_FILE_GROUP_LOCKED)) {
-			CDEBUG(D_VFSTRACE, "Range lock [%llu, %llu]\n",
-			       range.rl_node.in_extent.start,
-			       range.rl_node.in_extent.end);
-			rc = range_lock(&lli->lli_write_tree, &range);
+			CDEBUG(D_VFSTRACE, "Range lock [%lu, %lu]\n",
+			       range.node.start, range.node.last);
+			rc = range_write_lock_interruptible(&lli->lli_write_tree, &range);
 			if (rc < 0)
 				goto out;
 
@@ -1100,10 +1100,9 @@ restart:
 		rc = cl_io_loop(env, io);
 		ll_cl_remove(file, env);
 		if (range_locked) {
-			CDEBUG(D_VFSTRACE, "Range unlock [%llu, %llu]\n",
-			       range.rl_node.in_extent.start,
-			       range.rl_node.in_extent.end);
-			range_unlock(&lli->lli_write_tree, &range);
+			CDEBUG(D_VFSTRACE, "Range unlock [%lu, %lu]\n",
+			       range.node.start, range.node.last);
+			range_write_unlock(&lli->lli_write_tree, &range);
 		}
 	} else {
 		/* cl_io_rw_init() handled IO */

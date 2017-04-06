@@ -40,6 +40,7 @@
 #include <linux/statfs.h>
 #include <linux/types.h>
 #include <linux/mm.h>
+#include <linux/range_rwlock.h>
 
 #include "../include/lustre/lustre_ioctl.h"
 #include "../include/lustre_ha.h"
@@ -853,7 +854,7 @@ void ll_lli_init(struct ll_inode_info *lli)
 		mutex_init(&lli->lli_size_mutex);
 		lli->lli_symlink_name = NULL;
 		init_rwsem(&lli->lli_trunc_sem);
-		range_lock_tree_init(&lli->lli_write_tree);
+		range_rwlock_tree_init(&lli->lli_write_tree);
 		init_rwsem(&lli->lli_glimpse_sem);
 		lli->lli_glimpse_time = 0;
 		INIT_LIST_HEAD(&lli->lli_agl_list);

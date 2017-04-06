@@ -49,8 +49,8 @@
 #include <linux/namei.h>
 #include <linux/xattr.h>
 #include <linux/posix_acl_xattr.h>
+#include <linux/range_rwlock.h>
 #include "vvp_internal.h"
-#include "range_lock.h"
 
 #ifndef FMODE_EXEC
 #define FMODE_EXEC 0
@@ -193,7 +193,7 @@ struct ll_inode_info {
 			 * }
 			 */
 			struct rw_semaphore		lli_trunc_sem;
-			struct range_lock_tree		lli_write_tree;
+			struct range_rwlock_tree	lli_write_tree;
 
 			struct rw_semaphore		lli_glimpse_sem;
 			unsigned long			lli_glimpse_time;
