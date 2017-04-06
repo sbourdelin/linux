@@ -14,6 +14,7 @@
 #include <linux/list.h>
 #include <linux/module.h>
 #include <linux/mutex.h>
+#include <linux/of.h>
 #include <linux/platform_device.h>
 #include <linux/slab.h>
 #include <linux/types.h>
@@ -40,15 +41,34 @@ static bool match_devname(struct v4l2_subdev *sd,
 	return !strcmp(asd->match.device_name.name, dev_name(sd->dev));
 }
 
+static bool fwnode_cmp(struct fwnode_handle *one,
+		       struct fwnode_handle *theother)
+{
+	if (!one || !theother)
+		return false;
+
+	if (one->type != theother->type)
+		return false;
+
+	if (is_of_node(one))
+		return !of_node_cmp(of_node_full_name(to_of_node(one)),
+				    of_node_full_name(to_of_node(theother)));
+	else
+		return one == theother;
+}
+
 static bool match_of(struct v4l2_subdev *sd, struct v4l2_async_subdev *asd)
 {
-	return !of_node_cmp(of_node_full_name(sd->of_node),
-			    of_node_full_name(asd->match.of.node));
+	return fwnode_cmp(sd->of_node ?
+			  of_fwnode_handle(sd->of_node) : sd->fwnode,
+			  of_fwnode_handle(asd->match.of.node));
 }
 
 static bool match_fwnode(struct v4l2_subdev *sd, struct v4l2_async_subdev *asd)
 {
-	return sd->fwnode == asd->match.fwnode.fwn;
+	return fwnode_cmp(sd->of_node ?
+			  of_fwnode_handle(sd->of_node) : sd->fwnode,
+					   asd->match.fwnode.fwn);
 }
 
 static bool match_custom(struct v4l2_subdev *sd, struct v4l2_async_subdev *asd)
