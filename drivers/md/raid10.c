@@ -3598,6 +3598,7 @@ static int run(struct mddev *mddev)
 
 		if (blk_queue_discard(bdev_get_queue(rdev->bdev)))
 			discard_supported = true;
+		first = 0;
 	}
 
 	if (mddev->queue) {
@@ -4005,6 +4006,7 @@ static int raid10_start_reshape(struct mddev *mddev)
 			if (first || diff < min_offset_diff)
 				min_offset_diff = diff;
 		}
+		first = 0;
 	}
 
 	if (max(before_length, after_length) > min_offset_diff)
