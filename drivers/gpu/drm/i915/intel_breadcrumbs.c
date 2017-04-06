@@ -27,6 +27,12 @@
 
 #include "i915_drv.h"
 
+#ifdef CONFIG_SMP
+#define task_asleep(tsk) (!(tsk)->on_cpu)
+#else
+#define task_asleep(tsk) ((tsk) != current)
+#endif
+
 static unsigned int __intel_breadcrumbs_wakeup(struct intel_breadcrumbs *b)
 {
 	struct intel_wait *wait;
@@ -37,8 +43,16 @@ static unsigned int __intel_breadcrumbs_wakeup(struct intel_breadcrumbs *b)
 	wait = b->irq_wait;
 	if (wait) {
 		result = ENGINE_WAKEUP_WAITER;
-		if (wake_up_process(wait->tsk))
+
+		/* Be careful not to report a successful wakeup if the waiter
+		 * is currently processing the seqno, where it will have
+		 * already called set_task_state(TASK_INTERRUPTIBLE).
+		 */
+		if (task_asleep(wait->tsk))
 			result |= ENGINE_WAKEUP_ASLEEP;
+
+		if (wake_up_process(wait->tsk))
+			result |= ENGINE_WAKEUP_SUCCESS;
 	}
 
 	return result;
@@ -98,7 +112,7 @@ static void intel_breadcrumbs_hangcheck(unsigned long data)
 	 * but we still have a waiter. Assuming all batches complete within
 	 * DRM_I915_HANGCHECK_JIFFIES [1.5s]!
 	 */
-	if (intel_engine_wakeup(engine) & ENGINE_WAKEUP_ASLEEP) {
+	if (intel_engine_wakeup(engine) == ENGINE_WAKEUP) {
 		missed_breadcrumb(engine);
 		mod_timer(&engine->breadcrumbs.fake_irq, jiffies + 1);
 	} else {

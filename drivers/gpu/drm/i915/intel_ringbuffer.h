@@ -663,6 +663,10 @@ static inline bool intel_engine_has_waiter(const struct intel_engine_cs *engine)
 unsigned int intel_engine_wakeup(struct intel_engine_cs *engine);
 #define ENGINE_WAKEUP_WAITER BIT(0)
 #define ENGINE_WAKEUP_ASLEEP BIT(1)
+#define ENGINE_WAKEUP_SUCCESS BIT(2)
+#define ENGINE_WAKEUP (ENGINE_WAKEUP_WAITER | \
+		       ENGINE_WAKEUP_ASLEEP | \
+		       ENGINE_WAKEUP_SUCCESS)
 
 void __intel_engine_disarm_breadcrumbs(struct intel_engine_cs *engine);
 void intel_engine_disarm_breadcrumbs(struct intel_engine_cs *engine);
