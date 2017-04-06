@@ -19,13 +19,14 @@
 #include <linux/interrupt.h>
 #include <linux/kernel.h>
 #include <linux/module.h>
+#include <linux/of_graph.h>
 #include <linux/platform_device.h>
 #include <linux/pm_runtime.h>
 #include <linux/slab.h>
 
 #include <media/soc_camera.h>
 #include <media/drv-intf/soc_mediabus.h>
-#include <media/v4l2-of.h>
+#include <media/v4l2-fwnode.h>
 #include <media/videobuf2-dma-contig.h>
 
 #include "atmel-isi.h"
@@ -974,7 +975,7 @@ static int atmel_isi_parse_dt(struct atmel_isi *isi,
 			struct platform_device *pdev)
 {
 	struct device_node *np= pdev->dev.of_node;
-	struct v4l2_of_endpoint ep;
+	struct v4l2_fwnode_endpoint ep;
 	int err;
 
 	/* Default settings for ISI */
@@ -987,7 +988,7 @@ static int atmel_isi_parse_dt(struct atmel_isi *isi,
 		return -EINVAL;
 	}
 
-	err = v4l2_of_parse_endpoint(np, &ep);
+	err = v4l2_fwnode_endpoint_parse(of_fwnode_handle(np), &ep);
 	of_node_put(np);
 	if (err) {
 		dev_err(&pdev->dev, "Could not parse the endpoint\n");

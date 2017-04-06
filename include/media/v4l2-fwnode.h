@@ -17,10 +17,10 @@
 #ifndef _V4L2_FWNODE_H
 #define _V4L2_FWNODE_H
 
+#include <linux/errno.h>
+#include <linux/fwnode.h>
 #include <linux/list.h>
 #include <linux/types.h>
-#include <linux/errno.h>
-#include <linux/of_graph.h>
 
 #include <media/v4l2-mediabus.h>
 
