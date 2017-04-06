@@ -165,7 +165,6 @@ COMPAT_SYSCALL_DEFINE2(truncate, const char __user *, path, compat_off_t, length
 static long do_sys_ftruncate(unsigned int fd, loff_t length, int small)
 {
 	struct inode *inode;
-	struct dentry *dentry;
 	struct fd f;
 	int error;
 
@@ -181,8 +180,7 @@ static long do_sys_ftruncate(unsigned int fd, loff_t length, int small)
 	if (f.file->f_flags & O_LARGEFILE)
 		small = 0;
 
-	dentry = f.file->f_path.dentry;
-	inode = dentry->d_inode;
+	inode = file_inode(f.file);
 	error = -EINVAL;
 	if (!S_ISREG(inode->i_mode) || !(f.file->f_mode & FMODE_WRITE))
 		goto out_putf;
@@ -197,11 +195,12 @@ static long do_sys_ftruncate(unsigned int fd, loff_t length, int small)
 		goto out_putf;
 
 	file_start_write(f.file);
-	error = locks_verify_truncate(inode, f.file, length);
+	error = locks_verify_truncate(locks_inode(f.file), f.file, length);
 	if (!error)
 		error = security_path_truncate(&f.file->f_path);
 	if (!error)
-		error = do_truncate(dentry, length, ATTR_MTIME|ATTR_CTIME, f.file);
+		error = do_truncate(f.file->f_path.dentry, length,
+				    ATTR_MTIME|ATTR_CTIME, f.file);
 	file_end_write(f.file);
 out_putf:
 	fdput(f);
