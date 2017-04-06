@@ -434,6 +434,12 @@ static ssize_t iio_trigger_write_current(struct device *dev,
 			goto out_trigger_put;
 	}
 
+	if (indio_dev->info->set_trigger) {
+		ret = indio_dev->info->set_trigger(indio_dev, trig);
+		if (ret)
+			goto out_trigger_put;
+	}
+
 	indio_dev->trig = trig;
 
 	if (oldtrig) {
