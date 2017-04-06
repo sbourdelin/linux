@@ -1355,8 +1355,12 @@ lookup_bh_lru(struct block_device *bdev, sector_t block, unsigned size)
 struct buffer_head *
 __find_get_block(struct block_device *bdev, sector_t block, unsigned size)
 {
-	struct buffer_head *bh = lookup_bh_lru(bdev, block, size);
+	struct buffer_head *bh;
 
+	if (WARN_ON_ONCE(!bdev))
+		return NULL;
+
+	bh = lookup_bh_lru(bdev, block, size);
 	if (bh == NULL) {
 		/* __find_get_block_slow will mark the page accessed */
 		bh = __find_get_block_slow(bdev, block);
@@ -3099,11 +3103,18 @@ static int submit_bh_wbc(int op, int op_flags, struct buffer_head *bh,
 {
 	struct bio *bio;
 
-	BUG_ON(!buffer_locked(bh));
-	BUG_ON(!buffer_mapped(bh));
 	BUG_ON(!bh->b_end_io);
-	BUG_ON(buffer_delay(bh));
-	BUG_ON(buffer_unwritten(bh));
+
+	if (WARN_ON_ONCE(!buffer_locked(bh)))
+		goto bad_bh;
+	if (WARN_ON_ONCE(buffer_delay(bh)))
+		goto bad_bh;
+	if (WARN_ON_ONCE(buffer_unwritten(bh)))
+		goto bad_bh;
+	if (unlikely(!buffer_mapped(bh))) {
+		buffer_io_error(bh, ", bh not mapped");
+		goto bad_bh;
+	}
 
 	/*
 	 * Only clear out a write error when rewriting
@@ -3143,6 +3154,9 @@ static int submit_bh_wbc(int op, int op_flags, struct buffer_head *bh,
 
 	submit_bio(bio);
 	return 0;
+bad_bh:
+	bh->b_end_io(bh, 0);
+	return -EIO;
 }
 
 int _submit_bh(int op, int op_flags, struct buffer_head *bh,
