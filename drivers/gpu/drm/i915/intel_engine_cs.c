@@ -959,6 +959,10 @@ static int cnl_init_workarounds(struct intel_engine_cs *engine)
 	WA_SET_BIT_MASKED(COMMON_SLICE_CHICKEN2,
 			  GEN8_SBE_DISABLE_REPLAY_BUF_OPTIMIZATION);
 
+	/* WaDisableEnhancedSBEVertexCaching:cnl */
+	WA_SET_BIT_MASKED(COMMON_SLICE_CHICKEN2,
+			  GEN8_CSC2_SBE_VUE_CACHE_CONSERVATIVE);
+
 	/* WaInPlaceDecompressionHang:cnl */
 	WA_SET_BIT(GEN9_GAMT_ECO_REG_RW_IA,
 		   GAMT_ECO_ENABLE_IN_PLACE_DECOMPRESS);
