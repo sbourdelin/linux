@@ -5,6 +5,7 @@
  */
 
 #include "dm-core.h"
+#include "dm-debugfs.h"
 #include "dm-rq.h"
 
 #include <linux/elevator.h> /* for rq_end_sector() */
@@ -772,6 +773,9 @@ static const struct blk_mq_ops dm_mq_ops = {
 	.queue_rq = dm_mq_queue_rq,
 	.complete = dm_softirq_done,
 	.init_request = dm_mq_init_request,
+#ifdef CONFIG_BLK_DEBUG_FS
+	.show_q = dm_mq_show_q,
+#endif
 };
 
 int dm_mq_init_request_queue(struct mapped_device *md, struct dm_table *t)
