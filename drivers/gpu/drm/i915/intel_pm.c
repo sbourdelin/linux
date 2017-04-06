@@ -7489,6 +7489,9 @@ static void cannonlake_init_clock_gating(struct drm_i915_private *dev_priv)
 {
 	gen9_init_clock_gating(dev_priv);
 
+	I915_WRITE(_3D_CHICKEN3,
+		   _MASKED_BIT_ENABLE(_3D_CHICKEN3_AA_LINE_QUALITY_FIX_ENABLE));
+
 	/* WaDisableGamClockGating:cnl (pre-prod) */
 	if (IS_CNL_REVID(dev_priv, CNL_REVID_A0, CNL_REVID_A0))
 	        I915_WRITE(GEN6_UCGCTL1, I915_READ(GEN6_UCGCTL1) |
