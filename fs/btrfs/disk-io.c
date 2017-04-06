@@ -3538,6 +3538,23 @@ static int write_dev_flush(struct btrfs_device *device, int wait)
 	return 0;
 }
 
+static int check_barrier_error(struct btrfs_fs_devices *fsdevs)
+{
+	int dropouts = 0;
+	struct btrfs_device *dev;
+
+	list_for_each_entry_rcu(dev, &fsdevs->devices, dev_list) {
+		if (!dev->bdev || dev->last_flush_error)
+			dropouts++;
+	}
+
+	if (dropouts >
+		fsdevs->fs_info->num_tolerated_disk_barrier_failures)
+		return -EIO;
+
+	return 0;
+}
+
 /*
  * send an empty flush down to each device in parallel,
  * then wait for them
@@ -3575,8 +3592,19 @@ static int barrier_all_devices(struct btrfs_fs_info *info)
 		if (write_dev_flush(dev, 1))
 			dropouts++;
 	}
-	if (dropouts > info->num_tolerated_disk_barrier_failures)
-		return -EIO;
+
+	/*
+	 * A slight optimization, we check for dropouts here which avoids
+	 * a dev list loop when disks are healthy.
+	 */
+	if (dropouts) {
+		/*
+		 * As we need holistic view of the failed disks, so
+		 * error checking is pushed to a separate loop.
+		 */
+		return check_barrier_error(info->fs_devices);
+	}
+
 	return 0;
 }
 
