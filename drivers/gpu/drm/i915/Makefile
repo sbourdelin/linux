@@ -66,7 +66,8 @@ i915-y += intel_uc.o \
 i915-y += intel_renderstate_gen6.o \
 	  intel_renderstate_gen7.o \
 	  intel_renderstate_gen8.o \
-	  intel_renderstate_gen9.o
+	  intel_renderstate_gen9.o \
+	  intel_renderstate_gen10.o
 
 # modesetting core code
 i915-y += intel_audio.o \

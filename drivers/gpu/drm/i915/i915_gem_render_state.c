@@ -49,6 +49,8 @@ render_state_get_rodata(const struct intel_engine_cs *engine)
 		return &gen8_null_state;
 	case 9:
 		return &gen9_null_state;
+	case 10:
+		return &gen10_null_state;
 	}
 
 	return NULL;
