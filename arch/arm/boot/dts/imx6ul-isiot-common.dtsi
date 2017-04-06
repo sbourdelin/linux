@@ -41,6 +41,16 @@
  */
 
 &i2c1 {
+	sgtl5000: codec@a {
+		compatible = "fsl,sgtl5000";
+		reg = <0x0a>;
+		clocks = <&clks IMX6UL_CLK_OSC>;
+		clock-names = "mclk";
+		VDDA-supply = <&reg_3p3v>;
+		VDDIO-supply = <&reg_3p3v>;
+		VDDD-supply = <&reg_1p8v>;
+	};
+
 	stmpe811: gpio-expander@44 {
 		compatible = "st,stmpe811";
 		reg = <0x44>;
