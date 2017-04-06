@@ -81,7 +81,16 @@ int raw_pci_write(unsigned int domain, unsigned int bus,
 
 int pcibus_to_node(struct pci_bus *bus)
 {
-	return dev_to_node(&bus->dev);
+	struct pci_config_window *cfg = bus->sysdata;
+	struct acpi_device *adev = NULL;
+	struct device *dev;
+
+	if (!acpi_disabled)
+		adev = to_acpi_device(cfg->parent);
+
+	dev = adev ? &adev->dev : &bus->dev;
+
+	return dev_to_node(dev);
 }
 EXPORT_SYMBOL(pcibus_to_node);
 
@@ -185,6 +194,8 @@ struct pci_bus *pci_acpi_scan_root(struct acpi_pci_root *root)
 	struct acpi_pci_generic_root_info *ri;
 	struct pci_bus *bus, *child;
 	struct acpi_pci_root_ops *root_ops;
+
+	set_dev_node(&root->device->dev, node);
 
 	ri = kzalloc_node(sizeof(*ri), GFP_KERNEL, node);
 	if (!ri)
