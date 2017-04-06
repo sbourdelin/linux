@@ -87,7 +87,7 @@ exit:
 
 	if (!err && (chan->txdone_method & TXDONE_BY_POLL))
 		/* kick start the timer immediately to avoid delays */
-		hrtimer_start(&chan->mbox->poll_hrt, 0, HRTIMER_MODE_REL);
+		hrtimer_start(&chan->poll_hrt, 0, HRTIMER_MODE_REL);
 }
 
 static void tx_tick(struct mbox_chan *chan, int r)
@@ -113,25 +113,21 @@ static void tx_tick(struct mbox_chan *chan, int r)
 
 static enum hrtimer_restart txdone_hrtimer(struct hrtimer *hrtimer)
 {
-	struct mbox_controller *mbox =
-		container_of(hrtimer, struct mbox_controller, poll_hrt);
+	struct mbox_chan *chan =
+		container_of(hrtimer, struct mbox_chan, poll_hrt);
 	bool txdone, resched = false;
-	int i;
 
-	for (i = 0; i < mbox->num_chans; i++) {
-		struct mbox_chan *chan = &mbox->chans[i];
-
-		if (chan->active_req && chan->cl) {
-			txdone = chan->mbox->ops->last_tx_done(chan);
-			if (txdone)
-				tx_tick(chan, 0);
-			else
-				resched = true;
-		}
+	if (chan->cl) {
+		txdone = chan->mbox->ops->last_tx_done(chan);
+		if (txdone)
+			tx_tick(chan, 0);
+		else
+			resched = true;
 	}
 
 	if (resched) {
-		hrtimer_forward_now(hrtimer, ms_to_ktime(mbox->txpoll_period));
+		hrtimer_forward_now(hrtimer,
+				ms_to_ktime(chan->mbox->txpoll_period));
 		return HRTIMER_RESTART;
 	}
 	return HRTIMER_NORESTART;
@@ -350,6 +346,12 @@ struct mbox_chan *mbox_request_channel(struct mbox_client *cl, int index)
 	if (chan->txdone_method	== TXDONE_BY_POLL && cl->knows_txdone)
 		chan->txdone_method |= TXDONE_BY_ACK;
 
+	if (chan->txdone_method == TXDONE_BY_POLL) {
+		hrtimer_init(&chan->poll_hrt, CLOCK_MONOTONIC,
+			     HRTIMER_MODE_REL);
+		chan->poll_hrt.function = txdone_hrtimer;
+	}
+
 	spin_unlock_irqrestore(&chan->lock, flags);
 
 	ret = chan->mbox->ops->startup(chan);
@@ -411,6 +413,10 @@ void mbox_free_channel(struct mbox_chan *chan)
 	spin_lock_irqsave(&chan->lock, flags);
 	chan->cl = NULL;
 	chan->active_req = NULL;
+
+	if (chan->txdone_method == TXDONE_BY_POLL)
+		hrtimer_cancel(&chan->poll_hrt);
+
 	if (chan->txdone_method == (TXDONE_BY_POLL | TXDONE_BY_ACK))
 		chan->txdone_method = TXDONE_BY_POLL;
 
@@ -452,12 +458,6 @@ int mbox_controller_register(struct mbox_controller *mbox)
 	else /* It has to be ACK then */
 		txdone = TXDONE_BY_ACK;
 
-	if (txdone == TXDONE_BY_POLL) {
-		hrtimer_init(&mbox->poll_hrt, CLOCK_MONOTONIC,
-			     HRTIMER_MODE_REL);
-		mbox->poll_hrt.function = txdone_hrtimer;
-	}
-
 	for (i = 0; i < mbox->num_chans; i++) {
 		struct mbox_chan *chan = &mbox->chans[i];
 
@@ -495,9 +495,6 @@ void mbox_controller_unregister(struct mbox_controller *mbox)
 
 	for (i = 0; i < mbox->num_chans; i++)
 		mbox_free_channel(&mbox->chans[i]);
-
-	if (mbox->txdone_poll)
-		hrtimer_cancel(&mbox->poll_hrt);
 
 	mutex_unlock(&con_mutex);
 }

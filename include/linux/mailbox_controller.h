@@ -82,7 +82,6 @@ struct mbox_controller {
 	struct mbox_chan *(*of_xlate)(struct mbox_controller *mbox,
 				      const struct of_phandle_args *sp);
 	/* Internal to API */
-	struct hrtimer poll_hrt;
 	struct list_head node;
 };
 
@@ -123,6 +122,7 @@ struct mbox_chan {
 	unsigned msg_count, msg_free;
 	void *msg_data[MBOX_TX_QUEUE_LEN];
 	spinlock_t lock; /* Serialise access to the channel */
+	struct hrtimer poll_hrt;
 	void *con_priv;
 };
 
