@@ -120,6 +120,8 @@
 #define MWIFIEX_SLEEP_COOKIE_SIZE			4
 #define MWIFIEX_MAX_DELAY_COUNT				100
 
+#define MWIFIEX_PCIE_FLR_HAPPENS 0xFEDCBABA
+
 struct mwifiex_pcie_card_reg {
 	u16 cmd_addr_lo;
 	u16 cmd_addr_hi;
