@@ -242,6 +242,9 @@ static bool remove_migration_pte(struct page *page, struct vm_area_struct *vma,
 			pte = swp_entry_to_pte(entry);
 			if (pte_swp_soft_dirty(*pvmw.pte))
 				pte = pte_mksoft_dirty(pte);
+		} else if (is_device_cache_coherent_page(new)) {
+			pte = pte_mkdevmap(pte);
+			flush_dcache_page(new);
 		} else
 			flush_dcache_page(new);
 		set_pte_at(vma->vm_mm, pvmw.address, pvmw.pte, pte);
@@ -2301,7 +2304,8 @@ static bool migrate_vma_check_page(struct page *page)
 
 	/* Page from ZONE_DEVICE have one extra reference */
 	if (is_zone_device_page(page)) {
-		if (is_device_unaddressable_page(page)) {
+		if (is_device_unaddressable_page(page) ||
+		    is_device_cache_coherent_page(page)) {
 			extra++;
 		} else
 			/* Other ZONE_DEVICE memory type are not supported */
@@ -2618,6 +2622,12 @@ static void migrate_vma_pages(struct migrate_vma *migrate)
 					migrate->src[i] &= ~MIGRATE_PFN_MIGRATE;
 					continue;
 				}
+			} else if (is_device_cache_coherent_page(newpage)) {
+				/*
+				 * Anything can be migrated to a device cache
+				 * coherent page.
+				 */
+				continue;
 			} else {
 				/*
 				 * Other types of ZONE_DEVICE page are not

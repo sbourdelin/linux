@@ -121,6 +121,7 @@ retry:
 			page = pte_page(pte);
 		else
 			goto no_page;
+		pgmap = get_dev_pagemap(pte_pfn(pte), NULL);
 	} else if (unlikely(!page)) {
 		if (flags & FOLL_DUMP) {
 			/* Avoid special (like zero) pages in core dumps */

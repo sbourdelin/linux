@@ -744,6 +744,15 @@ config DEVICE_UNADDRESSABLE
 	  i.e., memory that is only accessible from the device (or group of
 	  devices).
 
+config DEVICE_CACHE_COHERENT
+	bool "Cache coherent device memory (GPU memory, ...)"
+	depends on ZONE_DEVICE
+
+	help
+	  Allow to create struct page for cache-coherent device memory
+	  which is only do-able with advance system bus like CAPI or
+	  CCIX.
+
 config FRAME_VECTOR
 	bool
 

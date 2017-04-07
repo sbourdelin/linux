@@ -36,11 +36,19 @@ struct resource;
  * page must be treated as an opaque object, rather than a "normal" struct page.
  * A more complete discussion of unaddressable memory may be found in
  * include/linux/hmm.h and Documentation/vm/hmm.txt.
+ *
+ * MEMORY_DEVICE_CACHE_COHERENT:
+ * Device memory that is cache coherent from device and CPU point of view. This
+ * is use on platform that have an advance system bus (like CAPI or CCIX). A
+ * driver can hotplug the device memory using ZONE_DEVICE and with that memory
+ * type. Any page of a process can be migrated to such memory. However no one
+ * should be allow to pin such memory so that it can always be evicted.
  */
 enum memory_type {
 	MEMORY_NORMAL = 0,
 	MEMORY_DEVICE_PERSISTENT,
 	MEMORY_DEVICE_UNADDRESSABLE,
+	MEMORY_DEVICE_CACHE_COHERENT,
 };
 
 #ifdef CONFIG_MEMORY_HOTPLUG

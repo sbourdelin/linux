@@ -41,6 +41,8 @@ static inline struct vmem_altmap *to_vmem_altmap(unsigned long memmap_start)
  *   page_fault()
  *   page_free()
  *
+ * For MEMORY_DEVICE_CACHE_COHERENT only the page_free() callback matter.
+ *
  * Additional notes about MEMORY_DEVICE_UNADDRESSABLE may be found in
  * include/linux/hmm.h and Documentation/vm/hmm.txt. There is also a brief
  * explanation in include/linux/memory_hotplug.h.
@@ -99,11 +101,25 @@ void *devm_memremap_pages(struct device *dev, struct resource *res,
 		struct percpu_ref *ref, struct vmem_altmap *altmap);
 struct dev_pagemap *find_dev_pagemap(resource_size_t phys);
 
+static inline bool is_device_persistent_page(const struct page *page)
+{
+	/* See MEMORY_DEVICE_UNADDRESSABLE in include/linux/memory_hotplug.h */
+	return ((page_zonenum(page) == ZONE_DEVICE) &&
+		(page->pgmap->type == MEMORY_DEVICE_PERSISTENT));
+}
+
 static inline bool is_device_unaddressable_page(const struct page *page)
 {
 	/* See MEMORY_DEVICE_UNADDRESSABLE in include/linux/memory_hotplug.h */
 	return ((page_zonenum(page) == ZONE_DEVICE) &&
 		(page->pgmap->type == MEMORY_DEVICE_UNADDRESSABLE));
+}
+
+static inline bool is_device_cache_coherent_page(const struct page *page)
+{
+	/* See MEMORY_DEVICE_UNADDRESSABLE in include/linux/memory_hotplug.h */
+	return ((page_zonenum(page) == ZONE_DEVICE) &&
+		(page->pgmap->type == MEMORY_DEVICE_CACHE_COHERENT));
 }
 #else
 static inline void *devm_memremap_pages(struct device *dev,
@@ -124,7 +140,17 @@ static inline struct dev_pagemap *find_dev_pagemap(resource_size_t phys)
 	return NULL;
 }
 
+static inline bool is_device_persistent_page(const struct page *page)
+{
+	return false;
+}
+
 static inline bool is_device_unaddressable_page(const struct page *page)
+{
+	return false;
+}
+
+static inline bool is_device_cache_coherent_page(const struct page *page)
 {
 	return false;
 }

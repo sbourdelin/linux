@@ -983,6 +983,24 @@ copy_one_pte(struct mm_struct *dst_mm, struct mm_struct *src_mm,
 		get_page(page);
 		page_dup_rmap(page, false);
 		rss[mm_counter(page)]++;
+	} else if (pte_devmap(pte)) {
+		struct dev_pagemap *pgmap = NULL;
+
+		page = pte_page(pte);
+
+		/*
+		 * Cache coherent device memory behave like regular page and
+		 * not like persistent memory page. For more informations see
+		 * MEMORY_DEVICE_CACHE_COHERENT in memory_hotplug.h
+		 */
+		if (is_device_cache_coherent_page(page)) {
+			pgmap = get_dev_pagemap(pte_pfn(pte), NULL);
+			if (pgmap) {
+				get_page(page);
+				page_dup_rmap(page, false);
+				rss[mm_counter(page)]++;
+			}
+		}
 	}
 
 out_set_pte:
