@@ -174,6 +174,8 @@ enum perf_branch_sample_type_shift {
 	PERF_SAMPLE_BRANCH_NO_FLAGS_SHIFT	= 14, /* no flags */
 	PERF_SAMPLE_BRANCH_NO_CYCLES_SHIFT	= 15, /* no cycles */
 
+	PERF_SAMPLE_BRANCH_TYPE_SAVE_SHIFT	= 16, /* save branch type */
+
 	PERF_SAMPLE_BRANCH_MAX_SHIFT		/* non-ABI */
 };
 
@@ -198,7 +200,36 @@ enum perf_branch_sample_type {
 	PERF_SAMPLE_BRANCH_NO_FLAGS	= 1U << PERF_SAMPLE_BRANCH_NO_FLAGS_SHIFT,
 	PERF_SAMPLE_BRANCH_NO_CYCLES	= 1U << PERF_SAMPLE_BRANCH_NO_CYCLES_SHIFT,
 
+	PERF_SAMPLE_BRANCH_TYPE_SAVE	=
+		1U << PERF_SAMPLE_BRANCH_TYPE_SAVE_SHIFT,
+
 	PERF_SAMPLE_BRANCH_MAX		= 1U << PERF_SAMPLE_BRANCH_MAX_SHIFT,
+};
+
+/*
+ * Common flow change classification
+ */
+enum {
+	PERF_BR_NONE		= 0,	/* unknown */
+	PERF_BR_JCC_FWD		= 1,	/* conditional forward jump */
+	PERF_BR_JCC_BWD		= 2,	/* conditional backward jump */
+	PERF_BR_JMP		= 3,	/* jump */
+	PERF_BR_IND_JMP		= 4,	/* indirect jump */
+	PERF_BR_CALL		= 5,	/* call */
+	PERF_BR_IND_CALL	= 6,	/* indirect call */
+	PERF_BR_RET		= 7,	/* return */
+	PERF_BR_SYSCALL		= 8,	/* syscall */
+	PERF_BR_SYSRET		= 9,	/* syscall return */
+	PERF_BR_IRQ		= 10,	/* hw interrupt/trap/fault */
+	PERF_BR_INT		= 11,	/* sw interrupt */
+	PERF_BR_IRET		= 12,	/* return from interrupt */
+	PERF_BR_FAR_BRANCH	= 13,	/* others not generic branch type */
+};
+
+enum {
+	PERF_BR_CROSS_NONE	= 0,	/* branch not cross an area */
+	PERF_BR_CROSS_4K	= 1,	/* branch cross 4K */
+	PERF_BR_CROSS_2M	= 2,	/* branch cross 2MB */
 };
 
 #define PERF_SAMPLE_BRANCH_PLM_ALL \
@@ -999,6 +1030,8 @@ union perf_mem_data_src {
  *     in_tx: running in a hardware transaction
  *     abort: aborting a hardware transaction
  *    cycles: cycles from last branch (or 0 if not supported)
+ *      type: branch type
+ *     cross: branch cross 4K or 2MB area
  */
 struct perf_branch_entry {
 	__u64	from;
@@ -1008,7 +1041,9 @@ struct perf_branch_entry {
 		in_tx:1,    /* in transaction */
 		abort:1,    /* transaction abort */
 		cycles:16,  /* cycle count to last branch */
-		reserved:44;
+		type:4,     /* branch type */
+		cross:2,    /* branch cross 4K or 2MB area */
+		reserved:38;
 };
 
 #endif /* _UAPI_LINUX_PERF_EVENT_H */
