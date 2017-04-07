@@ -2486,6 +2486,8 @@ liquidio_vlan_rx_add_vid(struct net_device *netdev,
 	struct lio *lio = GET_LIO(netdev);
 	struct octeon_device *oct = lio->oct_dev;
 	struct octnic_ctrl_pkt nctrl;
+	struct completion compl;
+	u16 response_code;
 	int ret = 0;
 
 	memset(&nctrl, 0, sizeof(struct octnic_ctrl_pkt));
@@ -2497,14 +2499,25 @@ liquidio_vlan_rx_add_vid(struct net_device *netdev,
 	nctrl.wait_time = 100;
 	nctrl.netpndev = (u64)netdev;
 	nctrl.cb_fn = liquidio_link_ctrl_cmd_completion;
+	init_completion(&compl);
+	nctrl.completion = &compl;
+	nctrl.response_code = &response_code;
 
 	ret = octnet_send_nic_ctrl_pkt(lio->oct_dev, &nctrl);
 	if (ret < 0) {
 		dev_err(&oct->pci_dev->dev, "Add VLAN filter failed in core (ret: 0x%x)\n",
 			ret);
+		return -EIO;
 	}
 
-	return ret;
+	if (!wait_for_completion_timeout(&compl,
+					 msecs_to_jiffies(nctrl.wait_time)))
+		return -EPERM;
+
+	if (READ_ONCE(response_code))
+		return -EPERM;
+
+	return 0;
 }
 
 static int
@@ -2549,6 +2562,8 @@ static int liquidio_set_rxcsum_command(struct net_device *netdev, int command,
 	struct octnic_ctrl_pkt nctrl;
 	int ret = 0;
 
+	memset(&nctrl, 0, sizeof(struct octnic_ctrl_pkt));
+
 	nctrl.ncmd.u64 = 0;
 	nctrl.ncmd.s.cmd = command;
 	nctrl.ncmd.s.param1 = rx_cmd;
@@ -2580,6 +2595,8 @@ static int liquidio_vxlan_port_command(struct net_device *netdev, int command,
 	struct octeon_device *oct = lio->oct_dev;
 	struct octnic_ctrl_pkt nctrl;
 	int ret = 0;
+
+	memset(&nctrl, 0, sizeof(struct octnic_ctrl_pkt));
 
 	nctrl.ncmd.u64 = 0;
 	nctrl.ncmd.s.cmd = command;
