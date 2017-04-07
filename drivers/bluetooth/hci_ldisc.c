@@ -518,8 +518,6 @@ static void hci_uart_tty_close(struct tty_struct *tty)
 
 	hdev = hu->hdev;
 
-	cancel_work_sync(&hu->write_work);
-
 	if (test_bit(HCI_UART_REGISTERED, &hu->flags)) {
 		/* Note hci_unregister_dev() may try to send a HCI RESET
 		 * command. If the transmission fails then hci_unregister_dev()
@@ -533,6 +531,7 @@ static void hci_uart_tty_close(struct tty_struct *tty)
 		clear_bit(HCI_UART_PROTO_READY, &hu->flags);
 		write_unlock_irqrestore(&hu->proto_lock, flags);
 
+		cancel_work_sync(&hu->write_work);
 		hu->proto->close(hu);
 	}
 
