@@ -1123,6 +1123,8 @@ int drm_atomic_connector_set_property(struct drm_connector *connector,
 		 */
 		if (state->link_status != DRM_LINK_STATUS_GOOD)
 			state->link_status = val;
+	} else if (property == config->hdmi_output_property) {
+		state->hdmi_output = val;
 	} else if (connector->funcs->atomic_set_property) {
 		return connector->funcs->atomic_set_property(connector,
 				state, property, val);
