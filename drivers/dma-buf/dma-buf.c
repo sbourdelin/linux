@@ -124,6 +124,92 @@ static loff_t dma_buf_llseek(struct file *file, loff_t offset, int whence)
 	return base + offset;
 }
 
+static ssize_t dma_buf_read(struct file *file,
+			    char __user *ubuf, size_t remain,
+			    loff_t *offset)
+{
+	struct dma_buf *dmabuf = file->private_data;
+	unsigned long idx;
+	unsigned int start;
+	size_t written;
+
+	if (!is_dma_buf_file(file))
+		return -EBADF;
+
+	written = 0;
+	idx = *offset >> PAGE_SHIFT;
+	start = offset_in_page(*offset);
+	while (remain) {
+		unsigned int len = min_t(size_t, remain, PAGE_SIZE - start);
+		unsigned int copied;
+		void *vaddr;
+
+		vaddr = dma_buf_kmap(dmabuf, idx);
+		if (!vaddr)
+			return written ?: -EIO;
+
+		copied = copy_to_user(vaddr, ubuf, len);
+		dma_buf_kunmap(dmabuf, idx, vaddr);
+
+		written += copied ?: len;
+		if (copied) {
+			*offset += copied;
+			return written ?: -EFAULT;
+		}
+
+		remain -= len;
+		*offset += len;
+		ubuf += len;
+		start = 0;
+		idx++;
+	}
+
+	return written;
+}
+
+static ssize_t dma_buf_write(struct file *file,
+			     const char __user *ubuf, size_t remain,
+			     loff_t *offset)
+{
+	struct dma_buf *dmabuf = file->private_data;
+	unsigned long idx;
+	unsigned int start;
+	size_t written;
+
+	if (!is_dma_buf_file(file))
+		return -EBADF;
+
+	written = 0;
+	idx = *offset >> PAGE_SHIFT;
+	start = offset_in_page(*offset);
+	while (remain) {
+		unsigned int len = min_t(size_t, remain, PAGE_SIZE - start);
+		unsigned int copied;
+		void *vaddr;
+
+		vaddr = dma_buf_kmap(dmabuf, idx);
+		if (!vaddr)
+			return written ?: -EIO;
+
+		copied = copy_from_user(vaddr, ubuf, len);
+		dma_buf_kunmap(dmabuf, idx, vaddr);
+
+		written += copied ?: len;
+		if (copied) {
+			*offset += copied;
+			return written ?: -EFAULT;
+		}
+
+		remain -= len;
+		*offset += len;
+		ubuf += len;
+		start = 0;
+		idx++;
+	}
+
+	return written;
+}
+
 /**
  * DOC: fence polling
  *
@@ -323,6 +409,8 @@ static const struct file_operations dma_buf_fops = {
 	.release	= dma_buf_release,
 	.mmap		= dma_buf_mmap_internal,
 	.llseek		= dma_buf_llseek,
+	.read		= dma_buf_read,
+	.write		= dma_buf_write,
 	.poll		= dma_buf_poll,
 	.unlocked_ioctl	= dma_buf_ioctl,
 #ifdef CONFIG_COMPAT
