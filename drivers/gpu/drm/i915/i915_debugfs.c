@@ -4812,6 +4812,41 @@ static const struct drm_info_list i915_debugfs_list[] = {
 	{"i915_drrs_status", i915_drrs_status, 0},
 	{"i915_rps_boost_info", i915_rps_boost_info, 0},
 };
+
+static int
+i915_slice_enabled_get(void *data, u64 *val)
+{
+	struct drm_i915_private *dev_priv = data;
+
+	*val = INTEL_INFO(dev_priv)->sseu.slice_enabled;
+	return 0;
+}
+
+/* Changes to slice number done via this interface will effect
+ * any lrc created after the write and will not affect
+ * older ones.
+ */
+static int
+i915_slice_enabled_set(void *data, u64 val)
+{
+	struct drm_i915_private *dev_priv = data;
+	struct intel_device_info *info;
+
+	info = mkwrite_device_info(dev_priv);
+	if (!IS_SKYLAKE(dev_priv) || !info->sseu.has_slice_pg)
+		return -EINVAL;
+
+	if (val > hweight8(info->sseu.slice_mask))
+		return -EINVAL;
+
+	info->sseu.slice_enabled = val;
+	return 0;
+}
+
+DEFINE_SIMPLE_ATTRIBUTE(i915_slice_enabled_fops,
+			i915_slice_enabled_get, i915_slice_enabled_set,
+			"%llu\n");
+
 #define I915_DEBUGFS_ENTRIES ARRAY_SIZE(i915_debugfs_list)
 
 static const struct i915_debugfs_files {
@@ -4839,7 +4874,8 @@ static const struct i915_debugfs_files {
 	{"i915_dp_test_type", &i915_displayport_test_type_fops},
 	{"i915_dp_test_active", &i915_displayport_test_active_fops},
 	{"i915_guc_log_control", &i915_guc_log_control_fops},
-	{"i915_hpd_storm_ctl", &i915_hpd_storm_ctl_fops}
+	{"i915_hpd_storm_ctl", &i915_hpd_storm_ctl_fops},
+	{"i915_slice_enabled", &i915_slice_enabled_fops}
 };
 
 int i915_debugfs_register(struct drm_i915_private *dev_priv)

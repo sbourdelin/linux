@@ -852,6 +852,7 @@ struct sseu_dev_info {
 	u8 has_slice_pg:1;
 	u8 has_subslice_pg:1;
 	u8 has_eu_pg:1;
+	u8 slice_enabled;
 };
 
 static inline unsigned int sseu_subslice_total(const struct sseu_dev_info *sseu)
