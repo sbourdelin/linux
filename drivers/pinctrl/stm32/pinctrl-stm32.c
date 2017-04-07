@@ -207,12 +207,35 @@ static const struct gpio_chip stm32_gpio_template = {
 	.to_irq			= stm32_gpio_to_irq,
 };
 
+static int stm32_gpio_irq_request_resources(struct irq_data *irq_data)
+{
+	struct stm32_gpio_bank *bank = irq_data->domain->host_data;
+	u32 ret;
+
+	if (!gpiochip_is_requested(&bank->gpio_chip, irq_data->hwirq)) {
+		ret = stm32_gpio_request(&bank->gpio_chip, irq_data->hwirq);
+		if (ret)
+			return ret;
+	}
+
+	return stm32_gpio_direction_input(&bank->gpio_chip, irq_data->hwirq);
+}
+
+static void stm32_gpio_irq_release_resources(struct irq_data *irq_data)
+{
+	struct stm32_gpio_bank *bank = irq_data->domain->host_data;
+
+	stm32_gpio_free(&bank->gpio_chip, irq_data->hwirq);
+}
+
 static struct irq_chip stm32_gpio_irq_chip = {
 	.name           = "stm32gpio",
 	.irq_eoi	= irq_chip_eoi_parent,
 	.irq_mask       = irq_chip_mask_parent,
 	.irq_unmask     = irq_chip_unmask_parent,
 	.irq_set_type   = irq_chip_set_type_parent,
+	.irq_request_resources = stm32_gpio_irq_request_resources,
+	.irq_release_resources = stm32_gpio_irq_release_resources,
 };
 
 static int stm32_gpio_domain_translate(struct irq_domain *d,
