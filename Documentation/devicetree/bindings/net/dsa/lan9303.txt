@@ -62,3 +62,7 @@ I2C managed mode:
 			};
 		};
 	};
+
+MDIO managed mode:
+
+	*TODO*
