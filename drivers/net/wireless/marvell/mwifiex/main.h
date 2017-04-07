@@ -164,6 +164,8 @@ enum {
 /* Address alignment */
 #define MWIFIEX_ALIGN_ADDR(p, a) (((long)(p) + (a) - 1) & ~((a) - 1))
 
+#define MWIFIEX_LOG_LEN 120
+
 /**
  *enum mwifiex_debug_level  -  marvell wifi debug level
  */
