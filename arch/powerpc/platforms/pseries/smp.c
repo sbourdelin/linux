@@ -200,7 +200,12 @@ static __init void pSeries_smp_probe(void)
 {
 	xics_smp_probe();
 
-	if (cpu_has_feature(CPU_FTR_DBELL)) {
+	/*
+	 * POWER9 can not use msgsndp doorbells for IPI because thread
+	 * siblings do not necessarily run on physical cores at the same
+	 * time. This could be enabled for pHyp.
+	 */
+	if (cpu_has_feature(CPU_FTR_DBELL) && !cpu_has_feature(CPU_FTR_ARCH_300)) {
 		xics_cause_ipi = smp_ops->cause_ipi;
 		smp_ops->cause_ipi = pSeries_cause_ipi_mux;
 	}
