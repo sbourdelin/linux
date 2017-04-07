@@ -1285,9 +1285,6 @@ static int rtnl_fill_link_event(struct sk_buff *skb, unsigned long event)
 	case NETDEV_REBOOT:
 		rtnl_event = IFLA_EVENT_REBOOT;
 		break;
-	case NETDEV_CHANGEADDR:
-		rtnl_event = IFLA_EVENT_CHANGE_ADDR;
-		break;
 	case NETDEV_CHANGENAME:
 		rtnl_event = IFLA_EVENT_CHANGE_NAME;
 		break;
@@ -4182,7 +4179,6 @@ static int rtnetlink_event(struct notifier_block *this, unsigned long event, voi
 
 	switch (event) {
 	case NETDEV_REBOOT:
-	case NETDEV_CHANGEADDR:
 	case NETDEV_CHANGENAME:
 	case NETDEV_FEAT_CHANGE:
 	case NETDEV_BONDING_FAILOVER:
