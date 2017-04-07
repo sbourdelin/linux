@@ -368,7 +368,7 @@ isert_device_get(struct rdma_cm_id *cma_id)
 		}
 	}
 
-	device = kzalloc(sizeof(struct isert_device), GFP_KERNEL);
+	device = kzalloc(sizeof(*device), GFP_KERNEL);
 	if (!device) {
 		mutex_unlock(&device_list_mutex);
 		return ERR_PTR(-ENOMEM);
@@ -516,7 +516,7 @@ isert_connect_request(struct rdma_cm_id *cma_id, struct rdma_cm_event *event)
 	isert_dbg("cma_id: %p, portal: %p\n",
 		 cma_id, cma_id->context);
 
-	isert_conn = kzalloc(sizeof(struct isert_conn), GFP_KERNEL);
+	isert_conn = kzalloc(sizeof(*isert_conn), GFP_KERNEL);
 	if (!isert_conn)
 		return -ENOMEM;
 
@@ -2306,7 +2306,7 @@ isert_setup_np(struct iscsi_np *np,
 	struct rdma_cm_id *isert_lid;
 	int ret;
 
-	isert_np = kzalloc(sizeof(struct isert_np), GFP_KERNEL);
+	isert_np = kzalloc(sizeof(*isert_np), GFP_KERNEL);
 	if (!isert_np)
 		return -ENOMEM;
 
