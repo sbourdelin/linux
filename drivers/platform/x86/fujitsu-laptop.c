@@ -787,22 +787,20 @@ static struct led_classdev eco_led = {
 
 static int acpi_fujitsu_laptop_leds_register(struct acpi_device *device)
 {
-	int result = 0;
+	int result;
 
 	if (call_fext_func(FUNC_LEDS, 0x0, 0x0, 0x0) & LOGOLAMP_POWERON) {
 		result = devm_led_classdev_register(&device->dev,
 						    &logolamp_led);
 		if (result)
-			pr_err("Could not register LED handler for logo lamp, error %i\n",
-			       result);
+			return result;
 	}
 
 	if ((call_fext_func(FUNC_LEDS, 0x0, 0x0, 0x0) & KEYBOARD_LAMPS) &&
 	    (call_fext_func(FUNC_BUTTONS, 0x0, 0x0, 0x0) == 0x0)) {
 		result = devm_led_classdev_register(&device->dev, &kblamps_led);
 		if (result)
-			pr_err("Could not register LED handler for keyboard lamps, error %i\n",
-			       result);
+			return result;
 	}
 
 	/*
@@ -814,8 +812,7 @@ static int acpi_fujitsu_laptop_leds_register(struct acpi_device *device)
 	if (call_fext_func(FUNC_BUTTONS, 0x0, 0x0, 0x0) & BIT(24)) {
 		result = devm_led_classdev_register(&device->dev, &radio_led);
 		if (result)
-			pr_err("Could not register LED handler for radio LED, error %i\n",
-			       result);
+			return result;
 	}
 
 	/* Support for eco led is not always signaled in bit corresponding
@@ -827,11 +824,10 @@ static int acpi_fujitsu_laptop_leds_register(struct acpi_device *device)
 	    (call_fext_func(FUNC_LEDS, 0x2, ECO_LED, 0x0) != UNSUPPORTED_CMD)) {
 		result = devm_led_classdev_register(&device->dev, &eco_led);
 		if (result)
-			pr_err("Could not register LED handler for eco LED, error %i\n",
-			       result);
+			return result;
 	}
 
-	return result;
+	return 0;
 }
 
 static int acpi_fujitsu_laptop_add(struct acpi_device *device)
