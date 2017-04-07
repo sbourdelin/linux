@@ -627,7 +627,7 @@ static int sleep_thread(struct fsg_common *common, bool can_freeze)
 	}
 	__set_current_state(TASK_RUNNING);
 	common->thread_wakeup_needed = 0;
-	smp_rmb();	/* ensure the latest bh->state is visible */
+	smp_mb();	/* ensure the latest bh->state is visible */
 	return rc;
 }
 
