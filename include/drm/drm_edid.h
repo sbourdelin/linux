@@ -213,6 +213,11 @@ struct detailed_timing {
 #define DRM_EDID_HDMI_DC_30               (1 << 4)
 #define DRM_EDID_HDMI_DC_Y444             (1 << 3)
 
+/* YCBCR 420 deep color modes */
+#define DRM_EDID_YCBCR420_DC_48		  (1 << 6)
+#define DRM_EDID_YCBCR420_DC_36		  (1 << 5)
+#define DRM_EDID_YCBCR420_DC_30		  (1 << 4)
+
 /* ELD Header Block */
 #define DRM_ELD_HEADER_BLOCK_SIZE	4
 
