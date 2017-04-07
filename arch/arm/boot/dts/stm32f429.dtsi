@@ -47,7 +47,7 @@
 
 #include "skeleton.dtsi"
 #include "armv7-m.dtsi"
-#include <dt-bindings/pinctrl/stm32f429-pinfunc.h>
+#include <dt-bindings/pinctrl/stm32f4-pinfunc.h>
 #include <dt-bindings/clock/stm32fx-clock.h>
 #include <dt-bindings/mfd/stm32f4-rcc.h>
 
@@ -642,44 +642,44 @@
 
 			usart1_pins_a: usart1@0 {
 				pins1 {
-					pinmux = <STM32F429_PA9_FUNC_USART1_TX>;
+					pinmux = <STM32F4_PA9_FUNC_USART1_TX>;
 					bias-disable;
 					drive-push-pull;
 					slew-rate = <0>;
 				};
 				pins2 {
-					pinmux = <STM32F429_PA10_FUNC_USART1_RX>;
+					pinmux = <STM32F4_PA10_FUNC_USART1_RX>;
 					bias-disable;
 				};
 			};
 
 			usart3_pins_a: usart3@0 {
 				pins1 {
-					pinmux = <STM32F429_PB10_FUNC_USART3_TX>;
+					pinmux = <STM32F4_PB10_FUNC_USART3_TX>;
 					bias-disable;
 					drive-push-pull;
 					slew-rate = <0>;
 				};
 				pins2 {
-					pinmux = <STM32F429_PB11_FUNC_USART3_RX>;
+					pinmux = <STM32F4_PB11_FUNC_USART3_RX>;
 					bias-disable;
 				};
 			};
 
 			usbotg_hs_pins_a: usbotg_hs@0 {
 				pins {
-					pinmux = <STM32F429_PH4_FUNC_OTG_HS_ULPI_NXT>,
-						 <STM32F429_PI11_FUNC_OTG_HS_ULPI_DIR>,
-						 <STM32F429_PC0_FUNC_OTG_HS_ULPI_STP>,
-						 <STM32F429_PA5_FUNC_OTG_HS_ULPI_CK>,
-						 <STM32F429_PA3_FUNC_OTG_HS_ULPI_D0>,
-						 <STM32F429_PB0_FUNC_OTG_HS_ULPI_D1>,
-						 <STM32F429_PB1_FUNC_OTG_HS_ULPI_D2>,
-						 <STM32F429_PB10_FUNC_OTG_HS_ULPI_D3>,
-						 <STM32F429_PB11_FUNC_OTG_HS_ULPI_D4>,
-						 <STM32F429_PB12_FUNC_OTG_HS_ULPI_D5>,
-						 <STM32F429_PB13_FUNC_OTG_HS_ULPI_D6>,
-						 <STM32F429_PB5_FUNC_OTG_HS_ULPI_D7>;
+					pinmux = <STM32F4_PH4_FUNC_OTG_HS_ULPI_NXT>,
+						 <STM32F4_PI11_FUNC_OTG_HS_ULPI_DIR>,
+						 <STM32F4_PC0_FUNC_OTG_HS_ULPI_STP>,
+						 <STM32F4_PA5_FUNC_OTG_HS_ULPI_CK>,
+						 <STM32F4_PA3_FUNC_OTG_HS_ULPI_D0>,
+						 <STM32F4_PB0_FUNC_OTG_HS_ULPI_D1>,
+						 <STM32F4_PB1_FUNC_OTG_HS_ULPI_D2>,
+						 <STM32F4_PB10_FUNC_OTG_HS_ULPI_D3>,
+						 <STM32F4_PB11_FUNC_OTG_HS_ULPI_D4>,
+						 <STM32F4_PB12_FUNC_OTG_HS_ULPI_D5>,
+						 <STM32F4_PB13_FUNC_OTG_HS_ULPI_D6>,
+						 <STM32F4_PB5_FUNC_OTG_HS_ULPI_D7>;
 					bias-disable;
 					drive-push-pull;
 					slew-rate = <2>;
@@ -688,49 +688,49 @@
 
 			ethernet_mii: mii@0 {
 				pins {
-					pinmux = <STM32F429_PG13_FUNC_ETH_MII_TXD0_ETH_RMII_TXD0>,
-						 <STM32F429_PG14_FUNC_ETH_MII_TXD1_ETH_RMII_TXD1>,
-						 <STM32F429_PC2_FUNC_ETH_MII_TXD2>,
-						 <STM32F429_PB8_FUNC_ETH_MII_TXD3>,
-						 <STM32F429_PC3_FUNC_ETH_MII_TX_CLK>,
-						 <STM32F429_PG11_FUNC_ETH_MII_TX_EN_ETH_RMII_TX_EN>,
-						 <STM32F429_PA2_FUNC_ETH_MDIO>,
-						 <STM32F429_PC1_FUNC_ETH_MDC>,
-						 <STM32F429_PA1_FUNC_ETH_MII_RX_CLK_ETH_RMII_REF_CLK>,
-						 <STM32F429_PA7_FUNC_ETH_MII_RX_DV_ETH_RMII_CRS_DV>,
-						 <STM32F429_PC4_FUNC_ETH_MII_RXD0_ETH_RMII_RXD0>,
-						 <STM32F429_PC5_FUNC_ETH_MII_RXD1_ETH_RMII_RXD1>,
-						 <STM32F429_PH6_FUNC_ETH_MII_RXD2>,
-						 <STM32F429_PH7_FUNC_ETH_MII_RXD3>;
+					pinmux = <STM32F4_PG13_FUNC_ETH_MII_TXD0_ETH_RMII_TXD0>,
+						 <STM32F4_PG14_FUNC_ETH_MII_TXD1_ETH_RMII_TXD1>,
+						 <STM32F4_PC2_FUNC_ETH_MII_TXD2>,
+						 <STM32F4_PB8_FUNC_ETH_MII_TXD3>,
+						 <STM32F4_PC3_FUNC_ETH_MII_TX_CLK>,
+						 <STM32F4_PG11_FUNC_ETH_MII_TX_EN_ETH_RMII_TX_EN>,
+						 <STM32F4_PA2_FUNC_ETH_MDIO>,
+						 <STM32F4_PC1_FUNC_ETH_MDC>,
+						 <STM32F4_PA1_FUNC_ETH_MII_RX_CLK_ETH_RMII_REF_CLK>,
+						 <STM32F4_PA7_FUNC_ETH_MII_RX_DV_ETH_RMII_CRS_DV>,
+						 <STM32F4_PC4_FUNC_ETH_MII_RXD0_ETH_RMII_RXD0>,
+						 <STM32F4_PC5_FUNC_ETH_MII_RXD1_ETH_RMII_RXD1>,
+						 <STM32F4_PH6_FUNC_ETH_MII_RXD2>,
+						 <STM32F4_PH7_FUNC_ETH_MII_RXD3>;
 					slew-rate = <2>;
 				};
 			};
 
 			adc3_in8_pin: adc@200 {
 				pins {
-					pinmux = <STM32F429_PF10_FUNC_ANALOG>;
+					pinmux = <STM32F4_PF10_FUNC_ANALOG>;
 				};
 			};
 
 			pwm1_pins: pwm@1 {
 				pins {
-					pinmux = <STM32F429_PA8_FUNC_TIM1_CH1>,
-						 <STM32F429_PB13_FUNC_TIM1_CH1N>,
-						 <STM32F429_PB12_FUNC_TIM1_BKIN>;
+					pinmux = <STM32F4_PA8_FUNC_TIM1_CH1>,
+						 <STM32F4_PB13_FUNC_TIM1_CH1N>,
+						 <STM32F4_PB12_FUNC_TIM1_BKIN>;
 				};
 			};
 
 			pwm3_pins: pwm@3 {
 				pins {
-					pinmux = <STM32F429_PB4_FUNC_TIM3_CH1>,
-						 <STM32F429_PB5_FUNC_TIM3_CH2>;
+					pinmux = <STM32F4_PB4_FUNC_TIM3_CH1>,
+						 <STM32F4_PB5_FUNC_TIM3_CH2>;
 				};
 			};
 
 			i2c1_pins: i2c1@0 {
 				pins {
-					pinmux = <STM32F429_PB9_FUNC_I2C1_SDA>,
-						 <STM32F429_PB6_FUNC_I2C1_SCL>;
+					pinmux = <STM32F4_PB9_FUNC_I2C1_SDA>,
+						 <STM32F4_PB6_FUNC_I2C1_SCL>;
 					bias-disable;
 					drive-open-drain;
 					slew-rate = <3>;
