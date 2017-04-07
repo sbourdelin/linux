@@ -25,6 +25,7 @@
 #include <scsi/scsi_dh.h>
 #include <linux/atomic.h>
 #include <linux/blk-mq.h>
+#include <linux/seq_file.h>
 
 #define DM_MSG_PREFIX "multipath"
 #define DM_PG_INIT_DELAY_MSECS 2000
@@ -1935,6 +1936,52 @@ static int multipath_busy(struct dm_target *ti)
 	return busy;
 }
 
+static const char *const mp_flag_name[] = {
+	[ MPATHF_QUEUE_IO ]			= "QUEUE_IO",
+	[ MPATHF_QUEUE_IF_NO_PATH ]		= "QUEUE_IF_NO_PATH",
+	[ MPATHF_SAVED_QUEUE_IF_NO_PATH ]	= "SAVED_QUEUE_IF_NO_PATH",
+	[ MPATHF_RETAIN_ATTACHED_HW_HANDLER ]	= "RETAIN_ATTACHED_HW_HANDLER",
+	[ MPATHF_PG_INIT_DISABLED ]		= "PG_INIT_DISABLED",
+	[ MPATHF_PG_INIT_REQUIRED ]		= "PG_INIT_REQUIRED",
+	[ MPATHF_PG_INIT_DELAY_RETRY ]		= "PG_INIT_DELAY_RETRY",
+};
+
+static void multipath_show(struct seq_file *s, struct dm_target *ti)
+{
+	struct multipath *m = ti->private;
+	struct priority_group *pg;
+	struct pgpath *pgpath;
+	struct request_queue *q;
+	unsigned int i, j;
+
+	seq_printf(s, ", pg_init_in_progress=%d, nr_valid_paths=%d, flags=",
+		   atomic_read(&m->pg_init_in_progress),
+		   atomic_read(&m->nr_valid_paths));
+	for (i = 0; i < sizeof(m->flags) * BITS_PER_BYTE; i++) {
+		if (!(m->flags & BIT(i)))
+			continue;
+		if (i < ARRAY_SIZE(mp_flag_name) && mp_flag_name[i])
+			seq_printf(s, " %s", mp_flag_name[i]);
+		else
+			seq_printf(s, " %d", i);
+	}
+	seq_printf(s, ", paths:");
+	i = 0;
+	list_for_each_entry(pg, &m->priority_groups, list) {
+		j = 0;
+		list_for_each_entry(pgpath, &pg->pgpaths, list) {
+			q = bdev_get_queue(pgpath->path.dev->bdev);
+			seq_printf(s, " [%d:%d] active=%d busy=%d", i, j++,
+				   pgpath->is_active, pgpath_busy(pgpath));
+			if (blk_queue_dying(q))
+				seq_puts(s, " dying");
+			if (blk_queue_dead(q))
+				seq_puts(s, " dead");
+		}
+		i++;
+	}
+}
+
 /*-----------------------------------------------------------------
  * Module setup
  *---------------------------------------------------------------*/
@@ -1958,6 +2005,7 @@ static struct target_type multipath_target = {
 	.prepare_ioctl = multipath_prepare_ioctl,
 	.iterate_devices = multipath_iterate_devices,
 	.busy = multipath_busy,
+	.show = multipath_show,
 };
 
 static int __init dm_multipath_init(void)

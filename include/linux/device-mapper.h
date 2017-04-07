@@ -181,6 +181,7 @@ struct target_type {
 	dm_iterate_devices_fn iterate_devices;
 	dm_io_hints_fn io_hints;
 	dm_dax_direct_access_fn direct_access;
+	void (*show)(struct seq_file *m, struct dm_target *ti);
 
 	/* For internal device-mapper use. */
 	struct list_head list;

@@ -16,6 +16,7 @@ static const char *const md_flag_name[] = {
 void dm_mq_show_q(struct seq_file *m, struct request_queue *q)
 {
 	struct mapped_device *md = q->queuedata;
+	struct target_type *tt = dm_get_immutable_target_type(md);
 	unsigned int i;
 
 	for (i = 0; i < sizeof(md->flags) * BITS_PER_BYTE; i++) {
@@ -26,5 +27,7 @@ void dm_mq_show_q(struct seq_file *m, struct request_queue *q)
 		else
 			seq_printf(m, " %d", i);
 	}
+	if (tt->show)
+		tt->show(m, md->immutable_target);
 }
 
