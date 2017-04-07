@@ -422,7 +422,7 @@ int iser_send_command(struct iscsi_conn *conn,
 		return 0;
 
 send_command_error:
-	iser_err("conn %p failed task->itt %d err %d\n",conn, task->itt, err);
+	iser_err("conn %p failed task->itt %d err %d\n", conn, task->itt, err);
 	return err;
 }
 
@@ -448,7 +448,7 @@ int iser_send_data_out(struct iscsi_conn *conn,
 	buf_offset   = ntohl(hdr->offset);
 
 	iser_dbg("%s itt %d dseg_len %d offset %d\n",
-		 __func__,(int)itt,(int)data_seg_len,(int)buf_offset);
+		 __func__, (int)itt, (int)data_seg_len, (int)buf_offset);
 
 	tx_desc = kmem_cache_zalloc(ig.desc_cache, GFP_ATOMIC);
 	if (tx_desc == NULL) {
@@ -553,7 +553,7 @@ int iser_send_control(struct iscsi_conn *conn,
 		return 0;
 
 send_control_error:
-	iser_err("conn %p failed err %d\n",conn, err);
+	iser_err("conn %p failed err %d\n", conn, err);
 	return err;
 }
 
