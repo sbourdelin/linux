@@ -2777,6 +2777,7 @@ add_detailed_modes(struct drm_connector *connector, struct edid *edid,
 #define VENDOR_BLOCK    0x03
 #define SPEAKER_BLOCK	0x04
 #define VIDEO_CAPABILITY_BLOCK	0x07
+#define VIDEO_DATA_BLOCK_420	0x0E
 #define EDID_BASIC_AUDIO	(1 << 6)
 #define EDID_CEA_YCRCB444	(1 << 5)
 #define EDID_CEA_YCRCB422	(1 << 4)
@@ -3278,6 +3279,32 @@ static int add_3d_struct_modes(struct drm_connector *connector, u16 structure,
 	return modes;
 }
 
+/* Modes which can be supported in ycbcr 420 format only */
+static int do_420_vdb_modes(struct drm_connector *connector, const u8 *svds,
+		u8 svds_len)
+{
+	int modes = 0, i;
+	struct drm_device *dev = connector->dev;
+	struct drm_display_mode *newmode;
+	struct drm_display_info *info = &connector->display_info;
+
+	for (i = 0; i < svds_len; i++) {
+		u8 vic = svds[i] & 0x7f;
+
+		newmode = drm_mode_duplicate(dev, &edid_cea_modes[vic]);
+		if (!newmode)
+			break;
+
+		newmode->flags |= DRM_MODE_FLAG_420_ONLY;
+		drm_mode_probed_add(connector, newmode);
+		modes++;
+	}
+
+	if (modes > 0)
+		info->color_formats |= DRM_COLOR_FORMAT_YCRCB420;
+	return modes;
+}
+
 /*
  * do_hdmi_vsdb_modes - Parse the HDMI Vendor Specific data block
  * @connector: connector corresponding to the HDMI sink
@@ -3434,6 +3461,12 @@ cea_db_tag(const u8 *db)
 }
 
 static int
+cea_db_extended_tag(const u8 *db)
+{
+	return db[1];
+}
+
+static int
 cea_revision(const u8 *cea)
 {
 	return cea[1];
@@ -3482,6 +3515,17 @@ static bool cea_db_is_hdmi_forum_vsdb(const u8 *db)
 	return oui == HDMI_FORUM_IEEE_OUI;
 }
 
+static bool cea_db_is_hdmi_vdb420(const u8 *db)
+{
+	if (cea_db_tag(db) != VIDEO_CAPABILITY_BLOCK)
+		return false;
+
+	if (cea_db_extended_tag(db) != VIDEO_DATA_BLOCK_420)
+		return false;
+
+	return true;
+}
+
 #define for_each_cea_db(cea, i, start, end) \
 	for ((i) = (start); (i) < (end) && (i) + cea_db_payload_len(&(cea)[(i)]) < (end); (i) += cea_db_payload_len(&(cea)[(i)]) + 1)
 
@@ -3507,10 +3551,16 @@ add_cea_modes(struct drm_connector *connector, struct edid *edid)
 				video = db + 1;
 				video_len = dbl;
 				modes += do_cea_modes(connector, video, dbl);
-			}
-			else if (cea_db_is_hdmi_vsdb(db)) {
+			} else if (cea_db_is_hdmi_vsdb(db)) {
 				hdmi = db;
 				hdmi_len = dbl;
+			} else if (cea_db_is_hdmi_vdb420(db)) {
+				const u8 *vdb420 = &db[2];
+				u8 vdb420_len = dbl - 1;
+
+				/* Add 4:2:0(only) modes present in EDID */
+				modes += do_420_vdb_modes(connector, vdb420,
+							  vdb420_len);
 			}
 		}
 	}
