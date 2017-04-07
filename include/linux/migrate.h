@@ -141,7 +141,8 @@ static inline int migrate_misplaced_transhuge_page(struct mm_struct *mm,
 #define MIGRATE_PFN_WRITE	(1UL << 3)
 #define MIGRATE_PFN_DEVICE	(1UL << 4)
 #define MIGRATE_PFN_ERROR	(1UL << 5)
-#define MIGRATE_PFN_SHIFT	6
+#define MIGRATE_PFN_LRU		(1UL << 6)
+#define MIGRATE_PFN_SHIFT	7
 
 static inline struct page *migrate_pfn_to_page(unsigned long mpfn)
 {
@@ -155,8 +156,10 @@ static inline unsigned long migrate_pfn(unsigned long pfn)
 	return (pfn << MIGRATE_PFN_SHIFT) | MIGRATE_PFN_VALID;
 }
 
+struct migrate_dma_ctx;
+
 /*
- * struct migrate_vma_ops - migrate operation callback
+ * struct migrate_dma_ops - migrate operation callback
  *
  * @alloc_and_copy: alloc destination memory and copy source memory to it
  * @finalize_and_map: allow caller to map the successfully migrated pages
@@ -212,28 +215,25 @@ static inline unsigned long migrate_pfn(unsigned long pfn)
  * THE finalize_and_map() CALLBACK MUST NOT CHANGE ANY OF THE SRC OR DST ARRAY
  * ENTRIES OR BAD THINGS WILL HAPPEN !
  */
-struct migrate_vma_ops {
-	void (*alloc_and_copy)(struct vm_area_struct *vma,
-			       const unsigned long *src,
-			       unsigned long *dst,
-			       unsigned long start,
-			       unsigned long end,
-			       void *private);
-	void (*finalize_and_map)(struct vm_area_struct *vma,
-				 const unsigned long *src,
-				 const unsigned long *dst,
-				 unsigned long start,
-				 unsigned long end,
-				 void *private);
+struct migrate_dma_ops {
+	void (*alloc_and_copy)(struct migrate_dma_ctx *ctx);
+	void (*finalize_and_map)(struct migrate_dma_ctx *ctx);
 };
 
-int migrate_vma(const struct migrate_vma_ops *ops,
+struct migrate_dma_ctx {
+	const struct migrate_dma_ops	*ops;
+	unsigned long			*dst;
+	unsigned long			*src;
+	unsigned long			cpages;
+	unsigned long			npages;
+};
+
+int migrate_vma(struct migrate_dma_ctx *ctx,
 		struct vm_area_struct *vma,
 		unsigned long start,
-		unsigned long end,
-		unsigned long *src,
-		unsigned long *dst,
-		void *private);
+		unsigned long end);
+int migrate_dma(struct migrate_dma_ctx *migrate_ctx);
+
 
 #endif /* CONFIG_MIGRATION */
 

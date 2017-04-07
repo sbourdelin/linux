@@ -1131,14 +1131,11 @@ EXPORT_SYMBOL(hmm_devmem_remove);
  * hmm_devmem_fault_range() - migrate back a virtual range of memory
  *
  * @devmem: hmm_devmem struct use to track and manage the ZONE_DEVICE memory
+ * @migrate_ctx: migrate context structure
  * @vma: virtual memory area containing the range to be migrated
- * @ops: migration callback for allocating destination memory and copying
- * @src: array of unsigned long containing source pfns
- * @dst: array of unsigned long containing destination pfns
  * @start: start address of the range to migrate (inclusive)
  * @addr: fault address (must be inside the range)
  * @end: end address of the range to migrate (exclusive)
- * @private: pointer passed back to each of the callback
  * Returns: 0 on success, VM_FAULT_SIGBUS on error
  *
  * This is a wrapper around migrate_vma() which checks the migration status
@@ -1149,16 +1146,15 @@ EXPORT_SYMBOL(hmm_devmem_remove);
  * This is a helper intendend to be used by the ZONE_DEVICE fault handler.
  */
 int hmm_devmem_fault_range(struct hmm_devmem *devmem,
+			   struct migrate_dma_ctx *migrate_ctx,
 			   struct vm_area_struct *vma,
-			   const struct migrate_vma_ops *ops,
-			   unsigned long *src,
-			   unsigned long *dst,
 			   unsigned long start,
 			   unsigned long addr,
-			   unsigned long end,
-			   void *private)
+			   unsigned long end)
 {
-	if (migrate_vma(ops, vma, start, end, src, dst, private))
+	unsigned long *dst = migrate_ctx->dst;
+
+	if (migrate_vma(migrate_ctx, vma, start, end))
 		return VM_FAULT_SIGBUS;
 
 	if (dst[(addr - start) >> PAGE_SHIFT] & MIGRATE_PFN_ERROR)

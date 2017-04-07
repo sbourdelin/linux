@@ -398,14 +398,11 @@ struct hmm_devmem *hmm_devmem_add_resource(const struct hmm_devmem_ops *ops,
 void hmm_devmem_remove(struct hmm_devmem *devmem);
 
 int hmm_devmem_fault_range(struct hmm_devmem *devmem,
+			   struct migrate_dma_ctx *migrate_ctx,
 			   struct vm_area_struct *vma,
-			   const struct migrate_vma_ops *ops,
-			   unsigned long *src,
-			   unsigned long *dst,
 			   unsigned long start,
 			   unsigned long addr,
-			   unsigned long end,
-			   void *private);
+			   unsigned long end);
 
 /*
  * hmm_devmem_page_set_drvdata - set per-page driver data field
