@@ -49,11 +49,6 @@ static void pnv_smp_setup_cpu(int cpu)
 {
 	if (cpu != boot_cpuid)
 		xics_setup_cpu();
-
-#ifdef CONFIG_PPC_DOORBELL
-	if (cpu_has_feature(CPU_FTR_DBELL))
-		doorbell_setup_this_cpu();
-#endif
 }
 
 static int pnv_smp_kick_cpu(int nr)
@@ -252,10 +247,28 @@ static int pnv_cpu_bootable(unsigned int nr)
 	return smp_generic_cpu_bootable(nr);
 }
 
+static void pnv_cause_ipi(int cpu)
+{
+	if (try_core_doorbell_cause_ipi(cpu))
+		return;
+	icp_ops->cause_ipi(cpu);
+}
+
+static __init void pnv_smp_probe(void)
+{
+	xics_smp_probe();
+
+	if (cpu_has_feature(CPU_FTR_DBELL) && !cpu_has_feature(CPU_FTR_ARCH_300)) {
+		smp_ops->cause_ipi = pnv_cause_ipi;
+	} else {
+		smp_ops->cause_ipi = icp_ops->cause_ipi;
+	}
+}
+
 static struct smp_ops_t pnv_smp_ops = {
-	.message_pass	= smp_muxed_ipi_message_pass,
-	.cause_ipi	= NULL,	/* Filled at runtime by xics_smp_probe() */
-	.probe		= xics_smp_probe,
+	.message_pass	= NULL, /* Use smp_muxed_ipi_message_pass */
+	.cause_ipi	= NULL,	/* Filled at runtime by pnv_smp_probe() */
+	.probe		= pnv_smp_probe,
 	.kick_cpu	= pnv_smp_kick_cpu,
 	.setup_cpu	= pnv_smp_setup_cpu,
 	.cpu_bootable	= pnv_cpu_bootable,
