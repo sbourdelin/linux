@@ -494,3 +494,58 @@ int cros_ec_get_next_event(struct cros_ec_device *ec_dev)
 		return get_keyboard_state_event(ec_dev);
 }
 EXPORT_SYMBOL(cros_ec_get_next_event);
+
+static int __cros_ec_read_mapped_mem(struct cros_ec_device *ec, uint8_t offset,
+				     void *buf, size_t size)
+{
+	int ret;
+	struct ec_params_read_memmap *params;
+	struct cros_ec_command *msg;
+
+	msg = kzalloc(sizeof(*msg) + max(sizeof(*params), size), GFP_KERNEL);
+	if (!msg)
+		return -ENOMEM;
+
+	msg->version = 0;
+	msg->command = EC_CMD_READ_MEMMAP;
+	msg->insize = size;
+	msg->outsize = sizeof(*params);
+
+	params = (struct ec_params_read_memmap *)msg->data;
+	params->offset = offset;
+	params->size = size;
+
+	ret = cros_ec_cmd_xfer(ec, msg);
+	if (ret < 0 || msg->result != EC_RES_SUCCESS) {
+		dev_warn(ec->dev, "cannot read mapped reg: %d/%d\n",
+			 ret, msg->result);
+		goto out_free;
+	}
+
+	memcpy(buf, msg->data, size);
+
+out_free:
+	kfree(msg);
+	return ret;
+}
+
+int cros_ec_read_mapped_mem32(struct cros_ec_device *ec, const uint8_t offset,
+			      uint32_t *data)
+{
+	return __cros_ec_read_mapped_mem(ec, offset, data, sizeof(*data));
+}
+EXPORT_SYMBOL_GPL(cros_ec_read_mapped_mem32);
+
+int cros_ec_read_mapped_mem16(struct cros_ec_device *ec, const uint8_t offset,
+			      uint16_t *data)
+{
+	return __cros_ec_read_mapped_mem(ec, offset, data, sizeof(*data));
+}
+EXPORT_SYMBOL_GPL(cros_ec_read_mapped_mem16);
+
+int cros_ec_read_mapped_mem8(struct cros_ec_device *ec, const uint8_t offset,
+			     uint8_t *data)
+{
+	return __cros_ec_read_mapped_mem(ec, offset, data, sizeof(*data));
+}
+EXPORT_SYMBOL_GPL(cros_ec_read_mapped_mem8);

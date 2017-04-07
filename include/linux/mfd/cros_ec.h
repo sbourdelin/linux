@@ -190,6 +190,45 @@ struct cros_ec_dev {
 };
 
 /**
+ * cros_ec_read_mapped_mem8 - Read mapped memory in the ChromeOS EC
+ *
+ * This can be called by drivers to access the mapped memory in the EC
+ *
+ * @ec_dev: Device to read from
+ * @offset: Offset to read
+ * @data: Return data
+ * @return: 0 if Ok, -ve on error
+ */
+int cros_ec_read_mapped_mem8(struct cros_ec_device *ec, const uint8_t offset,
+			     uint8_t *data);
+
+/**
+ * cros_ec_read_mapped_mem16 - Read mapped memory in the ChromeOS EC
+ *
+ * This can be called by drivers to access the mapped memory in the EC
+ *
+ * @ec_dev: Device to read from
+ * @offset: Offset to read
+ * @data: Return data
+ * @return: 0 if Ok, -ve on error
+ */
+int cros_ec_read_mapped_mem16(struct cros_ec_device *ec, const uint8_t offset,
+			      uint16_t *data);
+
+/**
+ * cros_ec_read_mapped_mem32 - Read mapped memory in the ChromeOS EC
+ *
+ * This can be called by drivers to access the mapped memory in the EC
+ *
+ * @ec_dev: Device to read from
+ * @offset: Offset to read
+ * @data: Return data
+ * @return: 0 if Ok, -ve on error
+ */
+int cros_ec_read_mapped_mem32(struct cros_ec_device *ec, const uint8_t offset,
+			      uint32_t *data);
+
+/**
  * cros_ec_suspend - Handle a suspend operation for the ChromeOS EC device
  *
  * This can be called by drivers to handle a suspend event.
