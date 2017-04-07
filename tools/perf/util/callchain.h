@@ -106,6 +106,25 @@ struct callchain_param {
 extern struct callchain_param callchain_param;
 extern struct callchain_param callchain_param_default;
 
+enum {
+	BR_IDX_JCC_FWD		= 0,
+	BR_IDX_JCC_BWD		= 1,
+	BR_IDX_JMP		= 2,
+	BR_IDX_IND_JMP		= 3,
+	BR_IDX_CALL		= 4,
+	BR_IDX_IND_CALL		= 5,
+	BR_IDX_RET		= 6,
+	BR_IDX_SYSCALL		= 7,
+	BR_IDX_SYSRET		= 8,
+	BR_IDX_IRQ		= 9,
+	BR_IDX_INT		= 10,
+	BR_IDX_IRET		= 11,
+	BR_IDX_FAR_BRANCH	= 12,
+	BR_IDX_CROSS_4K		= 13,
+	BR_IDX_CROSS_2M		= 14,
+	BR_IDX_MAX,
+};
+
 struct callchain_list {
 	u64			ip;
 	struct map_symbol	ms;
@@ -119,6 +138,7 @@ struct callchain_list {
 	u64			cycles_count;
 	u64			iter_count;
 	u64			samples_count;
+	int			brtype_count[BR_IDX_MAX];
 	char		       *srcline;
 	struct list_head	list;
 };
