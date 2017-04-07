@@ -1732,7 +1732,7 @@ make_rpcs(struct drm_i915_private *dev_priv)
 	 * No explicit RPCS request is needed to ensure full
 	 * slice/subslice/EU enablement prior to Gen9.
 	*/
-	if (INTEL_GEN(dev_priv) < 9)
+	if (INTEL_GEN(dev_priv) < 8)
 		return 0;
 
 	/*
@@ -1743,7 +1743,7 @@ make_rpcs(struct drm_i915_private *dev_priv)
 	*/
 	if (INTEL_INFO(dev_priv)->sseu.has_slice_pg) {
 		rpcs |= GEN8_RPCS_S_CNT_ENABLE;
-		rpcs |= hweight8(INTEL_INFO(dev_priv)->sseu.slice_mask) <<
+		rpcs |= INTEL_INFO(dev_priv)->sseu.slice_enabled <<
 			GEN8_RPCS_S_CNT_SHIFT;
 		rpcs |= GEN8_RPCS_ENABLE;
 	}
