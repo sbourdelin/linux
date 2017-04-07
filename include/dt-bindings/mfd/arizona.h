@@ -77,6 +77,9 @@
 #define ARIZONA_GP_INPUT               (ARIZONA_GP_FN_GPIO | \
 					ARIZONA_GPN_DIR)
 
+/* Flags for the GPIO driver properties */
+#define ARIZONA_GP_MAINTAIN 0x80000000
+
 #define ARIZONA_32KZ_MCLK1 1
 #define ARIZONA_32KZ_MCLK2 2
 #define ARIZONA_32KZ_NONE  3
