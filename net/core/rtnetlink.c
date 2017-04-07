@@ -1318,9 +1318,6 @@ static int rtnl_fill_link_event(struct sk_buff *skb, unsigned long event)
 	case NETDEV_CHANGELOWERSTATE:
 		rtnl_event = IFLA_EVENT_CHANGE_LOWER_STATE;
 		break;
-	case NETDEV_UDP_TUNNEL_PUSH_INFO:
-		rtnl_event = IFLA_EVENT_UDP_TUNNEL_PUSH_INFO;
-		break;
 	case NETDEV_CHANGE_TX_QUEUE_LEN:
 		rtnl_event = IFLA_EVENT_CHANGE_TX_QUEUE_LEN;
 		break;
@@ -4196,7 +4193,6 @@ static int rtnetlink_event(struct notifier_block *this, unsigned long event, voi
 	case NETDEV_CHANGEINFODATA:
 	case NETDEV_PRECHANGEUPPER:
 	case NETDEV_CHANGELOWERSTATE:
-	case NETDEV_UDP_TUNNEL_PUSH_INFO:
 	case NETDEV_CHANGE_TX_QUEUE_LEN:
 		rtmsg_ifinfo_event(RTM_NEWLINK, dev, 0, event, GFP_KERNEL);
 		break;
