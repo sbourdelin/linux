@@ -2568,8 +2568,7 @@ static int i915_guc_log_dump(struct seq_file *m, void *data)
 
 static int i915_guc_log_control_get(void *data, u64 *val)
 {
-	struct drm_device *dev = data;
-	struct drm_i915_private *dev_priv = to_i915(dev);
+	struct drm_i915_private *dev_priv = data;
 
 	if (!dev_priv->guc.log.vma)
 		return -EINVAL;
@@ -2581,8 +2580,7 @@ static int i915_guc_log_control_get(void *data, u64 *val)
 
 static int i915_guc_log_control_set(void *data, u64 val)
 {
-	struct drm_device *dev = data;
-	struct drm_i915_private *dev_priv = to_i915(dev);
+	struct drm_i915_private *dev_priv = data;
 	int ret;
 
 	if (!dev_priv->guc.log.vma)
