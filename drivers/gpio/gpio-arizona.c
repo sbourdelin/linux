@@ -23,15 +23,27 @@
 #include <linux/mfd/arizona/pdata.h>
 #include <linux/mfd/arizona/registers.h>
 
+#define ARIZONA_GP_STATE_OUTPUT   0x00000001
+
 struct arizona_gpio {
 	struct arizona *arizona;
 	struct gpio_chip gpio_chip;
+	int status[ARIZONA_MAX_GPIO];
 };
 
 static int arizona_gpio_direction_in(struct gpio_chip *chip, unsigned offset)
 {
 	struct arizona_gpio *arizona_gpio = gpiochip_get_data(chip);
 	struct arizona *arizona = arizona_gpio->arizona;
+	int status = arizona_gpio->status[offset];
+
+	status &= (ARIZONA_GP_MAINTAIN | ARIZONA_GP_STATE_OUTPUT);
+	if (status == (ARIZONA_GP_MAINTAIN | ARIZONA_GP_STATE_OUTPUT)) {
+		arizona_gpio->status[offset] &= ~ARIZONA_GP_STATE_OUTPUT;
+
+		pm_runtime_mark_last_busy(chip->parent);
+		pm_runtime_put_autosuspend(chip->parent);
+	}
 
 	return regmap_update_bits(arizona->regmap, ARIZONA_GPIO1_CTRL + offset,
 				  ARIZONA_GPN_DIR, ARIZONA_GPN_DIR);
@@ -71,12 +83,48 @@ static void arizona_gpio_set(struct gpio_chip *chip, unsigned offset, int value)
 {
 	struct arizona_gpio *arizona_gpio = gpiochip_get_data(chip);
 	struct arizona *arizona = arizona_gpio->arizona;
+	int status = arizona_gpio->status[offset];
+	int ret;
+
+	status &= (ARIZONA_GP_MAINTAIN | ARIZONA_GP_STATE_OUTPUT);
+	if (status == ARIZONA_GP_MAINTAIN) {
+		arizona_gpio->status[offset] |= ARIZONA_GP_STATE_OUTPUT;
+
+		ret = pm_runtime_get_sync(chip->parent);
+		if (ret < 0) {
+			dev_err(chip->parent, "Failed to resume: %d\n", ret);
+			return ret;
+		}
+	}
 
 	if (value)
 		value = ARIZONA_GPN_LVL;
 
 	regmap_update_bits(arizona->regmap, ARIZONA_GPIO1_CTRL + offset,
 			   ARIZONA_GPN_LVL, value);
+}
+
+static int arizona_gpio_of_xlate(struct gpio_chip *chip,
+				 const struct of_phandle_args *gpiospec,
+				 u32 *flags)
+{
+	struct arizona_gpio *arizona_gpio = gpiochip_get_data(chip);
+	u32 offset = gpiospec->args[0];
+	u32 bits = gpiospec->args[1];
+
+	if (gpiospec->args_count < chip->of_gpio_n_cells)
+		return -EINVAL;
+
+	if (offset >= chip->ngpio)
+		return -EINVAL;
+
+	if (flags)
+		*flags = bits & ~ARIZONA_GP_MAINTAIN;
+
+	if (bits & ARIZONA_GP_MAINTAIN)
+		arizona_gpio->status[offset] |= ARIZONA_GP_MAINTAIN;
+
+	return offset;
 }
 
 static const struct gpio_chip template_chip = {
@@ -87,6 +135,8 @@ static const struct gpio_chip template_chip = {
 	.direction_output	= arizona_gpio_direction_out,
 	.set			= arizona_gpio_set,
 	.can_sleep		= true,
+	.of_xlate		= arizona_gpio_of_xlate,
+	.of_gpio_n_cells	= 2,
 };
 
 static int arizona_gpio_probe(struct platform_device *pdev)
@@ -131,6 +181,8 @@ static int arizona_gpio_probe(struct platform_device *pdev)
 		arizona_gpio->gpio_chip.base = pdata->gpio_base;
 	else
 		arizona_gpio->gpio_chip.base = -1;
+
+	pm_runtime_enable(&pdev->dev);
 
 	ret = devm_gpiochip_add_data(&pdev->dev, &arizona_gpio->gpio_chip,
 				     arizona_gpio);
