@@ -1026,8 +1026,8 @@ _base_interrupt(int irq, void *bus_id)
 				ioc->reply_free[ioc->reply_free_host_index] =
 				    cpu_to_le32(reply);
 				wmb();
-				writel(ioc->reply_free_host_index,
-				    &ioc->chip->ReplyFreeHostIndex);
+				writel_relaxed(ioc->reply_free_host_index,
+					       &ioc->chip->ReplyFreeHostIndex);
 			}
 		}
 
@@ -1076,8 +1076,8 @@ _base_interrupt(int irq, void *bus_id)
 
 	wmb();
 	if (ioc->is_warpdrive) {
-		writel(reply_q->reply_post_host_index,
-		ioc->reply_post_host_index[msix_index]);
+		writel_relaxed(reply_q->reply_post_host_index,
+			       ioc->reply_post_host_index[msix_index]);
 		atomic_dec(&reply_q->busy);
 		return IRQ_HANDLED;
 	}
@@ -1098,13 +1098,14 @@ _base_interrupt(int irq, void *bus_id)
 	 * value in MSIxIndex field.
 	 */
 	if (ioc->combined_reply_queue)
-		writel(reply_q->reply_post_host_index | ((msix_index  & 7) <<
-			MPI2_RPHI_MSIX_INDEX_SHIFT),
-			ioc->replyPostRegisterIndex[msix_index/8]);
+		writel_relaxed(reply_q->reply_post_host_index |
+			       ((msix_index  & 7) <<
+			       MPI2_RPHI_MSIX_INDEX_SHIFT),
+			       ioc->replyPostRegisterIndex[msix_index/8]);
 	else
-		writel(reply_q->reply_post_host_index | (msix_index <<
-			MPI2_RPHI_MSIX_INDEX_SHIFT),
-			&ioc->chip->ReplyPostHostIndex);
+		writel_relaxed(reply_q->reply_post_host_index |
+			       (msix_index << MPI2_RPHI_MSIX_INDEX_SHIFT),
+			       &ioc->chip->ReplyPostHostIndex);
 	atomic_dec(&reply_q->busy);
 	return IRQ_HANDLED;
 }
