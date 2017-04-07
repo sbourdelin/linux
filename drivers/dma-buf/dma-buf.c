@@ -100,28 +100,104 @@ static int dma_buf_mmap_internal(struct file *file, struct vm_area_struct *vma)
 
 static loff_t dma_buf_llseek(struct file *file, loff_t offset, int whence)
 {
-	struct dma_buf *dmabuf;
-	loff_t base;
+	struct dma_buf *dmabuf = file->private_data;
 
 	if (!is_dma_buf_file(file))
 		return -EBADF;
 
-	dmabuf = file->private_data;
+	return fixed_size_llseek(file, offset, whence, dmabuf->size);
+}
 
-	/* only support discovering the end of the buffer,
-	   but also allow SEEK_SET to maintain the idiomatic
-	   SEEK_END(0), SEEK_CUR(0) pattern */
-	if (whence == SEEK_END)
-		base = dmabuf->size;
-	else if (whence == SEEK_SET)
-		base = 0;
-	else
-		return -EINVAL;
+static ssize_t dma_buf_read(struct file *file,
+			    char __user *ubuf, size_t remain,
+			    loff_t *offset)
+{
+	struct dma_buf *dmabuf = file->private_data;
+	unsigned long idx;
+	unsigned int start;
+	size_t total;
 
-	if (offset != 0)
-		return -EINVAL;
+	if (!is_dma_buf_file(file))
+		return -EBADF;
 
-	return base + offset;
+	total = 0;
+	idx = *offset >> PAGE_SHIFT;
+	start = offset_in_page(*offset);
+	while (remain) {
+		unsigned int len = min_t(size_t, remain, PAGE_SIZE - start);
+		unsigned int copied;
+		void *vaddr;
+
+		if (*offset >= dmabuf->size)
+			return total;
+
+		vaddr = dma_buf_kmap(dmabuf, idx);
+		if (!vaddr)
+			return total ?: -EIO;
+
+		copied = copy_to_user(ubuf, vaddr + start, len);
+		dma_buf_kunmap(dmabuf, idx, vaddr);
+
+		total += copied ?: len;
+		if (copied) {
+			*offset += copied;
+			return total ?: -EFAULT;
+		}
+
+		remain -= len;
+		*offset += len;
+		ubuf += len;
+		start = 0;
+		idx++;
+	}
+
+	return total;
+}
+
+static ssize_t dma_buf_write(struct file *file,
+			     const char __user *ubuf, size_t remain,
+			     loff_t *offset)
+{
+	struct dma_buf *dmabuf = file->private_data;
+	unsigned long idx;
+	unsigned int start;
+	size_t total;
+
+	if (!is_dma_buf_file(file))
+		return -EBADF;
+
+	total = 0;
+	idx = *offset >> PAGE_SHIFT;
+	start = offset_in_page(*offset);
+	while (remain) {
+		unsigned int len = min_t(size_t, remain, PAGE_SIZE - start);
+		unsigned int copied;
+		void *vaddr;
+
+		if (*offset >= dmabuf->size)
+			return total;
+
+		vaddr = dma_buf_kmap(dmabuf, idx);
+		if (!vaddr)
+			return total ?: -EIO;
+
+		copied = copy_from_user(vaddr + start, ubuf, len);
+		dma_buf_kunmap(dmabuf, idx, vaddr);
+
+		total += copied ?: len;
+		if (copied) {
+			*offset += copied;
+			return total ?: -EFAULT;
+		}
+
+		remain -= len;
+		*offset += len;
+		ubuf += len;
+		start = 0;
+		idx++;
+	}
+
+	return total;
 }
 
 /**
@@ -323,6 +399,8 @@ static const struct file_operations dma_buf_fops = {
 	.release	= dma_buf_release,
 	.mmap		= dma_buf_mmap_internal,
 	.llseek		= dma_buf_llseek,
+	.read		= dma_buf_read,
+	.write		= dma_buf_write,
 	.poll		= dma_buf_poll,
 	.unlocked_ioctl	= dma_buf_ioctl,
 #ifdef CONFIG_COMPAT
