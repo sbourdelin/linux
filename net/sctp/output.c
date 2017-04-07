@@ -534,10 +534,11 @@ merge:
 		struct sctphdr *sh =
 			(struct sctphdr *)skb_transport_header(head);
 
+		skb_set_crc32c_ipsummed(head, CHECKSUM_NONE);
 		sh->checksum = sctp_compute_cksum(head, 0);
 	} else {
 chksum:
-		head->ip_summed = CHECKSUM_PARTIAL;
+		skb_set_crc32c_ipsummed(head, CHECKSUM_PARTIAL);
 		head->csum_start = skb_transport_header(head) - head->head;
 		head->csum_offset = offsetof(struct sctphdr, checksum);
 	}

@@ -34,7 +34,7 @@
 
 static __le32 sctp_gso_make_checksum(struct sk_buff *skb)
 {
-	skb->ip_summed = CHECKSUM_NONE;
+	skb_set_crc32c_ipsummed(skb, CHECKSUM_NONE);
 	return sctp_compute_cksum(skb, skb_transport_offset(skb));
 }
 
