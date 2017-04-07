@@ -1165,11 +1165,15 @@ static int br_dev_newlink(struct net *src_net, struct net_device *dev,
 		spin_unlock_bh(&br->lock);
 	}
 
-	err = br_changelink(dev, tb, data);
+	err = register_netdevice(dev);
 	if (err)
 		return err;
 
-	return register_netdevice(dev);
+	err = br_changelink(dev, tb, data);
+	if (err)
+		netdev_err(dev, "Failed to configure bridge device\n");
+
+	return 0;
 }
 
 static size_t br_get_size(const struct net_device *brdev)
