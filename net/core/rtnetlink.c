@@ -1285,9 +1285,6 @@ static int rtnl_fill_link_event(struct sk_buff *skb, unsigned long event)
 	case NETDEV_REBOOT:
 		rtnl_event = IFLA_EVENT_REBOOT;
 		break;
-	case NETDEV_CHANGEMTU:
-		rtnl_event = IFLA_EVENT_CHANGE_MTU;
-		break;
 	case NETDEV_CHANGEADDR:
 		rtnl_event = IFLA_EVENT_CHANGE_ADDR;
 		break;
@@ -1311,9 +1308,6 @@ static int rtnl_fill_link_event(struct sk_buff *skb, unsigned long event)
 		break;
 	case NETDEV_RESEND_IGMP:
 		rtnl_event = IFLA_EVENT_RESEND_IGMP;
-		break;
-	case NETDEV_PRECHANGEMTU:
-		rtnl_event = IFLA_EVENT_PRE_CHANGE_MTU;
 		break;
 	case NETDEV_CHANGEINFODATA:
 		rtnl_event = IFLA_EVENT_CHANGE_INFO_DATA;
@@ -4191,7 +4185,6 @@ static int rtnetlink_event(struct notifier_block *this, unsigned long event, voi
 
 	switch (event) {
 	case NETDEV_REBOOT:
-	case NETDEV_CHANGEMTU:
 	case NETDEV_CHANGEADDR:
 	case NETDEV_CHANGENAME:
 	case NETDEV_FEAT_CHANGE:
@@ -4200,7 +4193,6 @@ static int rtnetlink_event(struct notifier_block *this, unsigned long event, voi
 	case NETDEV_NOTIFY_PEERS:
 	case NETDEV_CHANGEUPPER:
 	case NETDEV_RESEND_IGMP:
-	case NETDEV_PRECHANGEMTU:
 	case NETDEV_CHANGEINFODATA:
 	case NETDEV_PRECHANGEUPPER:
 	case NETDEV_CHANGELOWERSTATE:
