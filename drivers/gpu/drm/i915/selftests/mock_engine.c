@@ -140,7 +140,8 @@ struct intel_engine_cs *mock_engine(struct drm_i915_private *i915,
 
 	/* minimal engine setup for requests */
 	engine->base.i915 = i915;
-	engine->base.name = name;
+	WARN_ON(snprintf(engine->base.name, sizeof(engine->base.name), "%s",
+			 name) > sizeof(engine->base.name));
 	engine->base.id = id++;
 	engine->base.status_page.page_addr = (void *)(engine + 1);
 
