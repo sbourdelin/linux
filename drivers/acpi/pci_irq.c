@@ -160,6 +160,8 @@ static int acpi_pci_irq_check_entry(acpi_handle handle, struct pci_dev *dev,
 	struct acpi_prt_entry *entry;
 
 	if (((prt->address >> 16) & 0xffff) != device ||
+	    ((prt->address & 0xffff) != 0xffff &&
+	     (prt->address & 0xffff) != PCI_FUNC(dev->devfn)) ||
 	    prt->pin + 1 != pin)
 		return -ENODEV;
 
