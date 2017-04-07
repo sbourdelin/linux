@@ -249,6 +249,7 @@ static int pnv_cpu_bootable(unsigned int nr)
 
 static void pnv_cause_ipi(int cpu)
 {
+	/* Pre-POWER9 has only core-local dbell IPIs. Must fall back to IC. */
 	if (try_core_doorbell_cause_ipi(cpu))
 		return;
 	icp_ops->cause_ipi(cpu);
@@ -258,8 +259,11 @@ static __init void pnv_smp_probe(void)
 {
 	xics_smp_probe();
 
-	if (cpu_has_feature(CPU_FTR_DBELL) && !cpu_has_feature(CPU_FTR_ARCH_300)) {
-		smp_ops->cause_ipi = pnv_cause_ipi;
+	if (cpu_has_feature(CPU_FTR_DBELL)) {
+		if (cpu_has_feature(CPU_FTR_ARCH_300))
+			smp_ops->cause_ipi = global_doorbell_cause_ipi;
+		else
+			smp_ops->cause_ipi = pnv_cause_ipi;
 	} else {
 		smp_ops->cause_ipi = icp_ops->cause_ipi;
 	}

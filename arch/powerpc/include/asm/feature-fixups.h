@@ -66,7 +66,14 @@ label##5:							\
 #define END_FTR_SECTION(msk, val)		\
 	END_FTR_SECTION_NESTED(msk, val, 97)
 
+#define END_FTR_SECTION_NESTED_IFSET(msk, label) \
+	END_FTR_SECTION_NESTED((msk), (msk), label)
+
 #define END_FTR_SECTION_IFSET(msk)	END_FTR_SECTION((msk), (msk))
+
+#define END_FTR_SECTION_NESTED_IFCLR(msk, label) \
+	END_FTR_SECTION_NESTED((msk), 0, label)
+
 #define END_FTR_SECTION_IFCLR(msk)	END_FTR_SECTION((msk), 0)
 
 /* CPU feature sections with alternatives, use BEGIN_FTR_SECTION to start */
@@ -153,11 +160,24 @@ label##5:							\
 	section_else "; "					\
 	stringify_in_c(ALT_FTR_SECTION_END((msk), (val)))
 
+#define ASM_FTR_IF_NESTED(section_if, section_else, msk, val, label)	\
+	stringify_in_c(BEGIN_FTR_SECTION_NESTED(label))		\
+	section_if "; "						\
+	stringify_in_c(FTR_SECTION_ELSE_NESTED(label))		\
+	section_else "; "					\
+	stringify_in_c(ALT_FTR_SECTION_END_NESTED((msk), (val), label))
+
 #define ASM_FTR_IFSET(section_if, section_else, msk)	\
 	ASM_FTR_IF(section_if, section_else, (msk), (msk))
 
+#define ASM_FTR_IFSET_NESTED(section_if, section_else, msk, label)	\
+	ASM_FTR_IF(section_if, section_else, (msk), (msk), label)
+
 #define ASM_FTR_IFCLR(section_if, section_else, msk)	\
 	ASM_FTR_IF(section_if, section_else, (msk), 0)
+
+#define ASM_FTR_IFCLR_NESTED(section_if, section_else, msk, label)	\
+	ASM_FTR_IF(section_if, section_else, (msk), 0, label)
 
 #define ASM_MMU_FTR_IF(section_if, section_else, msk, val)	\
 	stringify_in_c(BEGIN_MMU_FTR_SECTION)			\

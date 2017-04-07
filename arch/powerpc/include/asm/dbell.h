@@ -51,6 +51,14 @@ static inline void ppc_msgsnd_sync(void)
 /* sync after taking message interrupt */
 static inline void ppc_msgsync(void)
 {
+	/* sync is not required when taking messages from the same core */
+	if (cpu_has_feature(CPU_FTR_ARCH_300) && cpu_has_feature(CPU_FTR_HVMODE)) {
+		unsigned long reg;
+		__asm__ __volatile__ (ASM_FTR_IFCLR(
+			PPC_MSGSYNC " ; lwsync",
+			PPC_DARN(%0, 2) " ; lwsync",
+			%1) : "=r" (reg) : "i" (CPU_FTR_POWER9_DD1) : "memory");
+	}
 }
 
 #else /* CONFIG_PPC_BOOK3S */
