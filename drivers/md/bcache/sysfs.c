@@ -248,7 +248,7 @@ STORE(__cached_dev)
 		bch_write_bdev_super(dc, NULL);
 		if (dc->disk.c) {
 			memcpy(dc->disk.c->uuids[dc->disk.id].label,
-			       buf, SB_LABEL_SIZE);
+			       dc->sb.label, strlen(dc->sb.label));
 			bch_uuid_write(dc->disk.c);
 		}
 		env = kzalloc(sizeof(struct kobj_uevent_env), GFP_KERNEL);
