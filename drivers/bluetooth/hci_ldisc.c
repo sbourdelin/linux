@@ -520,8 +520,6 @@ static void hci_uart_tty_close(struct tty_struct *tty)
 		return;
 
 	hdev = hu->hdev;
-	if (test_bit(HCI_UART_REGISTERED, &hu->flags))
-		hci_uart_close(hdev);
 
 	cancel_work_sync(&hu->write_work);
 
@@ -544,6 +542,7 @@ static void hci_uart_tty_close(struct tty_struct *tty)
 	clear_bit(HCI_UART_PROTO_SET, &hu->flags);
 
 	if (test_and_clear_bit(HCI_UART_REGISTERED, &hu->flags)) {
+		hci_uart_close(hdev);
 		hu->hdev = NULL;
 		hci_free_dev(hdev);
 	}
