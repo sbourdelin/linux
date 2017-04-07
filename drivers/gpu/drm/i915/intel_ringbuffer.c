@@ -540,7 +540,7 @@ static int init_ring_common(struct intel_engine_cs *engine)
 	/* If the head is still not zero, the ring is dead */
 	if (intel_wait_for_register_fw(dev_priv, RING_CTL(engine->mmio_base),
 				       RING_VALID, RING_VALID,
-				       50)) {
+				       true, 50)) {
 		DRM_ERROR("%s initialization failed "
 			  "ctl %08x (valid? %d) head %08x [%08x] tail %08x [%08x] start %08x [expected %08x]\n",
 			  engine->name,
@@ -1733,7 +1733,7 @@ static void gen6_bsd_submit_request(struct drm_i915_gem_request *request)
 				       GEN6_BSD_SLEEP_PSMI_CONTROL,
 				       GEN6_BSD_SLEEP_INDICATOR,
 				       0,
-				       50))
+				       true, 50))
 		DRM_ERROR("timed out waiting for the BSD ring to wake up\n");
 
 	/* Now that the ring is fully powered up, update the tail */

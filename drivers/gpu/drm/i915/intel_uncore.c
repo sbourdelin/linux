@@ -1537,7 +1537,7 @@ static int gen6_hw_domain_reset(struct drm_i915_private *dev_priv,
 	/* Spin waiting for the device to ack the reset requests */
 	return intel_wait_for_register_fw(dev_priv,
 					  GEN6_GDRST, hw_domain_mask, 0,
-					  500);
+					  true, 500);
 }
 
 /**
@@ -1590,6 +1590,7 @@ static int gen6_reset_engines(struct drm_i915_private *dev_priv,
  * @reg: the register to read
  * @mask: mask to apply to register value
  * @value: expected value
+ * @is_fast: hint that it is expected to be a fast match
  * @timeout_ms: timeout in millisecond
  *
  * This routine waits until the target register @reg contains the expected
@@ -1610,10 +1611,15 @@ int intel_wait_for_register_fw(struct drm_i915_private *dev_priv,
 			       i915_reg_t reg,
 			       const u32 mask,
 			       const u32 value,
+			       bool is_fast,
 			       const unsigned int timeout_ms)
 {
 #define done ((I915_READ_FW(reg) & mask) == value)
-	int ret = wait_for_us(done, 2);
+	int ret;
+	if (is_fast)
+		ret = wait_for_us(done, 2);
+	else
+		ret = wait_for_us(done, 10);
 	if (ret)
 		ret = wait_for(done, timeout_ms);
 	return ret;
@@ -1670,7 +1676,7 @@ static int gen8_request_engine_reset(struct intel_engine_cs *engine)
 					 RING_RESET_CTL(engine->mmio_base),
 					 RESET_CTL_READY_TO_RESET,
 					 RESET_CTL_READY_TO_RESET,
-					 700);
+					 true, 700);
 	if (ret)
 		DRM_ERROR("%s: reset request timeout\n", engine->name);
 
