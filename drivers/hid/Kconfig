@@ -990,6 +990,12 @@ config HID_ALPS
 	Say Y here if you have a Alps touchpads over i2c-hid or usbhid
 	and want support for its special functionalities.
 
+config HID_TOPAZ
+	tristate "Topaz signature pad HID support"
+	depends on USB_HID && FB
+	---help---
+	Support for Topaz signature pads that communicate over USB HID.
+
 endmenu
 
 endif # HID

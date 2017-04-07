@@ -12582,6 +12582,11 @@ T:	quilt http://svn.sourceforge.jp/svnroot/tomoyo/trunk/2.5.x/tomoyo-lsm/patches
 S:	Maintained
 F:	security/tomoyo/
 
+TOPAZ SIGNATURE PAD DRIVER
+M:	Alyssa Rosenzweig <alyssa@rosenzweig.io>
+S:	Odd Fixes
+F:	drivers/hid/hid-topaz.c
+
 TOPSTAR LAPTOP EXTRAS DRIVER
 M:	Herton Ronaldo Krzesinski <herton@canonical.com>
 L:	platform-driver-x86@vger.kernel.org
