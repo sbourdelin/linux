@@ -1263,6 +1263,14 @@ config SENSORS_PCF8591
 	  These devices are hard to detect and rarely found on mainstream
 	  hardware.  If unsure, say N.
 
+config SENSORS_CROS_EC
+	tristate "ChromeOS EC hwmon"
+	depends on MFD_CROS_EC
+	help
+	  If you say yes here you get hwmon support that will expose the
+	  ChromeOS internal sensors for fanspeed and temperature to the
+	  Linux hwmon subsystem.
+
 source drivers/hwmon/pmbus/Kconfig
 
 config SENSORS_PWM_FAN
