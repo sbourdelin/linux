@@ -1884,7 +1884,8 @@ static u8 intel_hdmi_ddc_pin(struct drm_i915_private *dev_priv,
 		&dev_priv->vbt.ddi_port_info[port];
 	u8 ddc_pin;
 
-	if (info->alternate_ddc_pin) {
+	if (info->alternate_ddc_pin &&
+	    !IS_CNL_REVID(dev_priv, CNL_REVID_B0, CNL_REVID_B0)) {
 		DRM_DEBUG_KMS("Using DDC pin 0x%x for port %c (VBT)\n",
 			      info->alternate_ddc_pin, port_name(port));
 		return info->alternate_ddc_pin;
