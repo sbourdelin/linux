@@ -136,6 +136,7 @@ struct drm_scdc {
 struct drm_hdmi_info {
 	/** @scdc: sink's scdc support and capabilities */
 	struct drm_scdc scdc;
+	u64 ycbcr420_vcb_map;
 };
 
 /**
