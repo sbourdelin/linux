@@ -361,11 +361,17 @@ static int cttimeout_del_timeout(struct net *net, struct sock *ctnl,
 	char *name;
 
 	if (!cda[CTA_TIMEOUT_NAME]) {
-		list_for_each_entry_safe(cur, tmp, &net->nfct_timeout_list,
-					 head)
-			ctnl_timeout_try_del(net, cur);
+		int cur_ret;
 
-		return 0;
+		ret = 0;
+		list_for_each_entry_safe(cur, tmp, &net->nfct_timeout_list,
+					 head) {
+			cur_ret = ctnl_timeout_try_del(net, cur);
+			if (cur_ret && !ret)
+				ret = cur_ret;
+		}
+
+		return ret;
 	}
 	name = nla_data(cda[CTA_TIMEOUT_NAME]);
 
@@ -374,9 +380,6 @@ static int cttimeout_del_timeout(struct net *net, struct sock *ctnl,
 			continue;
 
 		ret = ctnl_timeout_try_del(net, cur);
-		if (ret < 0)
-			return ret;
-
 		break;
 	}
 	return ret;
