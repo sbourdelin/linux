@@ -172,6 +172,7 @@ struct ibmvscsis_cmd {
 	unsigned char sense_buf[TRANSPORT_SENSE_BUFFER];
 	u64 init_time;
 #define CMD_FAST_FAIL	BIT(0)
+#define CMD_ABORTED	BIT(1)
 	u32 flags;
 	char type;
 };

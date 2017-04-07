@@ -1170,6 +1170,7 @@ static struct ibmvscsis_cmd *ibmvscsis_get_free_cmd(struct scsi_info *vscsi)
 		cmd = list_first_entry_or_null(&vscsi->free_cmd,
 					       struct ibmvscsis_cmd, list);
 		if (cmd) {
+			cmd->flags &= ~(CMD_ABORTED);
 			list_del(&cmd->list);
 			cmd->iue = iue;
 			cmd->type = UNSET_TYPE;
@@ -1759,33 +1760,41 @@ static void ibmvscsis_send_messages(struct scsi_info *vscsi)
 
 	if (!(vscsi->flags & RESPONSE_Q_DOWN)) {
 		list_for_each_entry_safe(cmd, nxt, &vscsi->waiting_rsp, list) {
-			iue = cmd->iue;
-
-			crq->valid = VALID_CMD_RESP_EL;
-			crq->format = cmd->rsp.format;
-
-			if (cmd->flags & CMD_FAST_FAIL)
-				crq->status = VIOSRP_ADAPTER_FAIL;
-
-			crq->IU_length = cpu_to_be16(cmd->rsp.len);
-
-			rc = h_send_crq(vscsi->dma_dev->unit_address,
-					be64_to_cpu(msg_hi),
-					be64_to_cpu(cmd->rsp.tag));
-
-			pr_debug("send_messages: cmd %p, tag 0x%llx, rc %ld\n",
-				 cmd, be64_to_cpu(cmd->rsp.tag), rc);
-
-			/* if all ok free up the command element resources */
-			if (rc == H_SUCCESS) {
-				/* some movement has occurred */
-				vscsi->rsp_q_timer.timer_pops = 0;
+			/*
+			 * If an Abort flag is set then dont send response
+			 */
+			if (cmd->flags & CMD_ABORTED) {
 				list_del(&cmd->list);
-
 				ibmvscsis_free_cmd_resources(vscsi, cmd);
 			} else {
-				srp_snd_msg_failed(vscsi, rc);
-				break;
+				iue = cmd->iue;
+
+				crq->valid = VALID_CMD_RESP_EL;
+				crq->format = cmd->rsp.format;
+
+				if (cmd->flags & CMD_FAST_FAIL)
+					crq->status = VIOSRP_ADAPTER_FAIL;
+
+				crq->IU_length = cpu_to_be16(cmd->rsp.len);
+
+				rc = h_send_crq(vscsi->dma_dev->unit_address,
+						be64_to_cpu(msg_hi),
+						be64_to_cpu(cmd->rsp.tag));
+
+				pr_debug("send_messages: cmd %p, tag 0x%llx, rc %ld\n",
+					 cmd, be64_to_cpu(cmd->rsp.tag), rc);
+
+				/* if all ok free up the command element resources */
+				if (rc == H_SUCCESS) {
+					/* some movement has occurred */
+					vscsi->rsp_q_timer.timer_pops = 0;
+					list_del(&cmd->list);
+
+					ibmvscsis_free_cmd_resources(vscsi, cmd);
+				} else {
+					srp_snd_msg_failed(vscsi, rc);
+					break;
+				}
 			}
 		}
 
@@ -3579,8 +3588,14 @@ static int ibmvscsis_write_pending(struct se_cmd *se_cmd)
 {
 	struct ibmvscsis_cmd *cmd = container_of(se_cmd, struct ibmvscsis_cmd,
 						 se_cmd);
+	struct scsi_info *vscsi = cmd->adapter;
 	struct iu_entry *iue = cmd->iue;
 	int rc;
+
+	if ((vscsi->flags & (CLIENT_FAILED | RESPONSE_Q_DOWN))) {
+		pr_err("write_pending failed since: %d\n", vscsi->flags);
+		return -EIO;
+	}
 
 	rc = srp_transfer_data(cmd, &vio_iu(iue)->srp.cmd, ibmvscsis_rdma,
 			       1, 1);
@@ -3672,7 +3687,10 @@ static void ibmvscsis_queue_tm_rsp(struct se_cmd *se_cmd)
 
 static void ibmvscsis_aborted_task(struct se_cmd *se_cmd)
 {
-	/* TBD: What (if anything) should we do here? */
+	struct ibmvscsis_cmd *cmd = container_of(se_cmd, struct ibmvscsis_cmd,
+						 se_cmd);
+
+	cmd->flags |= CMD_ABORTED;
 	pr_debug("ibmvscsis_aborted_task %p\n", se_cmd);
 }
 
