@@ -1432,15 +1432,16 @@ static void tm_unavailable(struct pt_regs *regs)
 void facility_unavailable_exception(struct pt_regs *regs)
 {
 	static char *facility_strings[] = {
-		[FSCR_FP_LG] = "FPU",
-		[FSCR_VECVSX_LG] = "VMX/VSX",
-		[FSCR_DSCR_LG] = "DSCR",
-		[FSCR_PM_LG] = "PMU SPRs",
-		[FSCR_BHRB_LG] = "BHRB",
-		[FSCR_TM_LG] = "TM",
-		[FSCR_EBB_LG] = "EBB",
-		[FSCR_TAR_LG] = "TAR",
-		[FSCR_MSGP_LG] = "MSGP",
+		[FSCR_FP_LG]		= "FPU",
+		[FSCR_VECVSX_LG]	= "VMX/VSX",
+		[FSCR_DSCR_LG]		= "DSCR",
+		[FSCR_PM_LG]		= "PMU SPRs",
+		[FSCR_BHRB_LG]		= "BHRB",
+		[FSCR_TM_LG]		= "TM",
+		[FSCR_EBB_LG]		= "EBB",
+		[FSCR_TAR_LG]		= "TAR",
+		[FSCR_MSGP_LG]		= "MSGP",
+		[FSCR_SCV_LG]		= "SCV",
 	};
 	char *facility = "unknown";
 	u64 value;
