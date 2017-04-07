@@ -1303,9 +1303,6 @@ static int rtnl_fill_link_event(struct sk_buff *skb, unsigned long event)
 	case NETDEV_RESEND_IGMP:
 		rtnl_event = IFLA_EVENT_RESEND_IGMP;
 		break;
-	case NETDEV_PRECHANGEUPPER:
-		rtnl_event = IFLA_EVENT_PRE_CHANGE_UPPER;
-		break;
 	case NETDEV_CHANGELOWERSTATE:
 		rtnl_event = IFLA_EVENT_CHANGE_LOWER_STATE;
 		break;
@@ -4179,7 +4176,6 @@ static int rtnetlink_event(struct notifier_block *this, unsigned long event, voi
 	case NETDEV_NOTIFY_PEERS:
 	case NETDEV_CHANGEUPPER:
 	case NETDEV_RESEND_IGMP:
-	case NETDEV_PRECHANGEUPPER:
 	case NETDEV_CHANGELOWERSTATE:
 	case NETDEV_CHANGE_TX_QUEUE_LEN:
 		rtmsg_ifinfo_event(RTM_NEWLINK, dev, 0, event, GFP_KERNEL);
