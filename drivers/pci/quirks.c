@@ -4633,3 +4633,22 @@ DECLARE_PCI_FIXUP_EARLY(PCI_VENDOR_ID_INTEL, 0x2030, quirk_no_aersid);
 DECLARE_PCI_FIXUP_EARLY(PCI_VENDOR_ID_INTEL, 0x2031, quirk_no_aersid);
 DECLARE_PCI_FIXUP_EARLY(PCI_VENDOR_ID_INTEL, 0x2032, quirk_no_aersid);
 DECLARE_PCI_FIXUP_EARLY(PCI_VENDOR_ID_INTEL, 0x2033, quirk_no_aersid);
+
+#ifdef CONFIG_PCI_ATS
+/*
+ * Some devices have a broken ATS implementation causing IOMMU stalls.
+ * Don't use ATS for those devices.
+ */
+static void quirk_disable_ats(struct pci_dev *pdev)
+{
+	/*
+	 * Set pdev->ats_cap = 0 to make pci_enable_ats() bail out
+	 * early.
+	 */
+	dev_info(&pdev->dev, "QUIRK: Disabling ATS");
+	pdev->ats_cap = 0;
+}
+
+/* AMD Stoney platform GPU */
+DECLARE_PCI_FIXUP_FINAL(PCI_VENDOR_ID_ATI, 0x98e4, quirk_disable_ats);
+#endif /* CONFIG_PCI_ATS */
