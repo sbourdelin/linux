@@ -226,8 +226,9 @@ static int ipoib_change_mtu(struct net_device *dev, int new_mtu)
 	priv->admin_mtu = new_mtu;
 
 	if (priv->mcast_mtu < priv->admin_mtu)
-		ipoib_dbg(priv, "MTU must be smaller than the underlying "
-				"link layer MTU - 4 (%u)\n", priv->mcast_mtu);
+		ipoib_dbg(priv,
+			  "MTU must be smaller than the underlying link layer MTU - 4 (%u)\n",
+			  priv->mcast_mtu);
 
 	dev->mtu = min(priv->mcast_mtu, priv->admin_mtu);
 
@@ -480,8 +481,8 @@ int ipoib_set_mode(struct net_device *dev, const char *buf)
 	/* flush paths if we switch modes so that connections are restarted */
 	if (IPOIB_CM_SUPPORTED(dev->dev_addr) && !strcmp(buf, "connected\n")) {
 		set_bit(IPOIB_FLAG_ADMIN_CM, &priv->flags);
-		ipoib_warn(priv, "enabling connected mode "
-			   "will cause multicast packet drops\n");
+		ipoib_warn(priv,
+			   "enabling connected mode will cause multicast packet drops\n");
 		netdev_update_features(dev);
 		dev_set_mtu(dev, ipoib_cm_max_mtu(dev));
 		rtnl_unlock();
@@ -1855,8 +1856,8 @@ void ipoib_set_umcast(struct net_device *ndev, int umcast_val)
 
 	if (umcast_val > 0) {
 		set_bit(IPOIB_FLAG_UMCAST, &priv->flags);
-		ipoib_warn(priv, "ignoring multicast groups joined directly "
-				"by userspace\n");
+		ipoib_warn(priv,
+			   "ignoring multicast groups joined directly by userspace\n");
 	} else
 		clear_bit(IPOIB_FLAG_UMCAST, &priv->flags);
 }
