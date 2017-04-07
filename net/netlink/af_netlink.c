@@ -85,6 +85,7 @@ struct listeners {
 #define NETLINK_F_RECV_NO_ENOBUFS	0x8
 #define NETLINK_F_LISTEN_ALL_NSID	0x10
 #define NETLINK_F_CAP_ACK		0x20
+#define NETLINK_F_EXT_ACK		0x40
 
 static inline int netlink_is_kernel(struct sock *sk)
 {
@@ -1660,6 +1661,13 @@ static int netlink_setsockopt(struct socket *sock, int level, int optname,
 			nlk->flags &= ~NETLINK_F_CAP_ACK;
 		err = 0;
 		break;
+	case NETLINK_EXT_ACK:
+		if (val)
+			nlk->flags |= NETLINK_F_EXT_ACK;
+		else
+			nlk->flags &= ~NETLINK_F_EXT_ACK;
+		err = 0;
+		break;
 	default:
 		err = -ENOPROTOOPT;
 	}
@@ -1739,6 +1747,16 @@ static int netlink_getsockopt(struct socket *sock, int level, int optname,
 			return -EINVAL;
 		len = sizeof(int);
 		val = nlk->flags & NETLINK_F_CAP_ACK ? 1 : 0;
+		if (put_user(len, optlen) ||
+		    put_user(val, optval))
+			return -EFAULT;
+		err = 0;
+		break;
+	case NETLINK_EXT_ACK:
+		if (len < sizeof(int))
+			return -EINVAL;
+		len = sizeof(int);
+		val = nlk->flags & NETLINK_F_EXT_ACK ? 1 : 0;
 		if (put_user(len, optlen) ||
 		    put_user(val, optval))
 			return -EFAULT;
@@ -2275,7 +2293,8 @@ error_free:
 }
 EXPORT_SYMBOL(__netlink_dump_start);
 
-void netlink_ack(struct sk_buff *in_skb, struct nlmsghdr *nlh, int err)
+void netlink_ack(struct sk_buff *in_skb, struct nlmsghdr *nlh, int err,
+		 const struct netlink_ext_err *exterr)
 {
 	struct sk_buff *skb;
 	struct nlmsghdr *rep;
@@ -2284,10 +2303,22 @@ void netlink_ack(struct sk_buff *in_skb, struct nlmsghdr *nlh, int err)
 	struct netlink_sock *nlk = nlk_sk(NETLINK_CB(in_skb).sk);
 
 	/* Error messages get the original request appened, unless the user
-	 * requests to cap the error message.
+	 * requests to cap the error message, and get extra error data if
+	 * requested.
 	 */
-	if (!(nlk->flags & NETLINK_F_CAP_ACK) && err)
-		payload += nlmsg_len(nlh);
+	if (err) {
+		if (!(nlk->flags & NETLINK_F_CAP_ACK))
+			payload += nlmsg_len(nlh);
+		if (nlk->flags & NETLINK_F_EXT_ACK) {
+			if (exterr && exterr->msg)
+				payload +=
+					nla_total_size(strlen(exterr->msg) + 1);
+			if (exterr && exterr->msg_offset)
+				payload += nla_total_size(sizeof(u32));
+			if (exterr && exterr->attr)
+				payload += nla_total_size(sizeof(u16));
+		}
+	}
 
 	skb = nlmsg_new(payload, GFP_KERNEL);
 	if (!skb) {
@@ -2309,13 +2340,28 @@ void netlink_ack(struct sk_buff *in_skb, struct nlmsghdr *nlh, int err)
 	errmsg = nlmsg_data(rep);
 	errmsg->error = err;
 	memcpy(&errmsg->msg, nlh, payload > sizeof(*errmsg) ? nlh->nlmsg_len : sizeof(*nlh));
+
+	if (nlk->flags & NETLINK_F_EXT_ACK) {
+		if (exterr && exterr->msg)
+			WARN_ON(nla_put_string(skb, NLMSGERR_ATTR_MSG,
+					       exterr->msg));
+		if (exterr && exterr->msg_offset)
+			WARN_ON(nla_put_u32(skb, NLMSGERR_ATTR_OFFS,
+					    exterr->msg_offset));
+		if (exterr && exterr->attr)
+			WARN_ON(nla_put_u16(skb, NLMSGERR_ATTR_ATTR,
+					    exterr->attr));
+	}
+
 	netlink_unicast(in_skb->sk, skb, NETLINK_CB(in_skb).portid, MSG_DONTWAIT);
 }
 EXPORT_SYMBOL(netlink_ack);
 
 int netlink_rcv_skb(struct sk_buff *skb, int (*cb)(struct sk_buff *,
-						     struct nlmsghdr *))
+						   struct nlmsghdr *,
+						   struct netlink_ext_err *))
 {
+	struct netlink_ext_err exterr = {};
 	struct nlmsghdr *nlh;
 	int err;
 
@@ -2336,13 +2382,13 @@ int netlink_rcv_skb(struct sk_buff *skb, int (*cb)(struct sk_buff *,
 		if (nlh->nlmsg_type < NLMSG_MIN_TYPE)
 			goto ack;
 
-		err = cb(skb, nlh);
+		err = cb(skb, nlh, &exterr);
 		if (err == -EINTR)
 			goto skip;
 
 ack:
 		if (nlh->nlmsg_flags & NLM_F_ACK || err)
-			netlink_ack(skb, nlh, err);
+			netlink_ack(skb, nlh, err, &exterr);
 
 skip:
 		msglen = NLMSG_ALIGN(nlh->nlmsg_len);

@@ -62,11 +62,19 @@ netlink_kernel_create(struct net *net, int unit, struct netlink_kernel_cfg *cfg)
 	return __netlink_kernel_create(net, unit, THIS_MODULE, cfg);
 }
 
+struct netlink_ext_err {
+	const char *msg;
+	u32 ext_code;
+	u32 msg_offset;
+	u16 attr;
+};
+
 extern void netlink_kernel_release(struct sock *sk);
 extern int __netlink_change_ngroups(struct sock *sk, unsigned int groups);
 extern int netlink_change_ngroups(struct sock *sk, unsigned int groups);
 extern void __netlink_clear_multicast_users(struct sock *sk, unsigned int group);
-extern void netlink_ack(struct sk_buff *in_skb, struct nlmsghdr *nlh, int err);
+extern void netlink_ack(struct sk_buff *in_skb, struct nlmsghdr *nlh, int err,
+			const struct netlink_ext_err *exterr);
 extern int netlink_has_listeners(struct sock *sk, unsigned int group);
 
 extern int netlink_unicast(struct sock *ssk, struct sk_buff *skb, __u32 portid, int nonblock);

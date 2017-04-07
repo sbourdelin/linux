@@ -146,7 +146,8 @@ nla_put_failure:
 }
 EXPORT_SYMBOL(ibnl_put_attr);
 
-static int ibnl_rcv_msg(struct sk_buff *skb, struct nlmsghdr *nlh)
+static int ibnl_rcv_msg(struct sk_buff *skb, struct nlmsghdr *nlh,
+			struct netlink_ext_err *exterr)
 {
 	struct ibnl_client *client;
 	int type = nlh->nlmsg_type;

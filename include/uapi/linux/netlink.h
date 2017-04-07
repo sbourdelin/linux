@@ -101,6 +101,31 @@ struct nlmsghdr {
 struct nlmsgerr {
 	int		error;
 	struct nlmsghdr msg;
+	/*
+	 * followed by the message contents unless NETLINK_CAP_ACK was set,
+	 * message length is aligned with NLMSG_ALIGN()
+	 */
+	/*
+	 * followed by TLVs defined in enum nlmsgerr_attrs
+	 * if NETLINK_EXT_ACK was set
+	 */
+};
+
+/**
+ * enum nlmsgerr_attrs - netlink error message attributes
+ * @NLMSGERR_ATTR_UNUSED: unused
+ * @NLMSGERR_ATTR_MSG: error message string (string)
+ * @NLMSGERR_ATTR_OFFS: error offset in the original message (u32)
+ * @NLMSGERR_ATTR_CODE: extended per-subsystem error code (u32)
+ * @NLMSGERR_ATTR_ATTR: top-level attribute that caused the error
+ *	(or is missing, u16)
+ */
+enum nlmsgerr_attrs {
+	NLMSGERR_ATTR_UNUSED,
+	NLMSGERR_ATTR_MSG,
+	NLMSGERR_ATTR_OFFS,
+	NLMSGERR_ATTR_CODE,
+	NLMSGERR_ATTR_ATTR,
 };
 
 #define NETLINK_ADD_MEMBERSHIP		1
@@ -115,6 +140,7 @@ struct nlmsgerr {
 #define NETLINK_LISTEN_ALL_NSID		8
 #define NETLINK_LIST_MEMBERSHIPS	9
 #define NETLINK_CAP_ACK			10
+#define NETLINK_EXT_ACK			11
 
 struct nl_pktinfo {
 	__u32	group;
