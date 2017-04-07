@@ -514,8 +514,7 @@ struct ipoib_path *__path_find(struct net_device *dev, void *gid)
 		path = rb_entry(n, struct ipoib_path, rb_node);
 
 		ret = memcmp(gid, path->pathrec.dgid.raw,
-			     sizeof (union ib_gid));
-
+			     sizeof(union ib_gid));
 		if (ret < 0)
 			n = n->rb_left;
 		else if (ret > 0)
@@ -540,7 +539,7 @@ static int __path_add(struct net_device *dev, struct ipoib_path *path)
 		tpath = rb_entry(pn, struct ipoib_path, rb_node);
 
 		ret = memcmp(path->pathrec.dgid.raw, tpath->pathrec.dgid.raw,
-			     sizeof (union ib_gid));
+			     sizeof(union ib_gid));
 		if (ret < 0)
 			n = &pn->rb_left;
 		else if (ret > 0)
@@ -611,7 +610,7 @@ int ipoib_path_iter_next(struct ipoib_path_iter *iter)
 		path = rb_entry(n, struct ipoib_path, rb_node);
 
 		if (memcmp(iter->path.pathrec.dgid.raw, path->pathrec.dgid.raw,
-			   sizeof (union ib_gid)) < 0) {
+			   sizeof(union ib_gid)) < 0) {
 			iter->path = *path;
 			ret = 0;
 			break;
@@ -874,7 +873,7 @@ static struct ipoib_path *path_rec_create(struct net_device *dev, void *gid)
 
 	INIT_LIST_HEAD(&path->neigh_list);
 
-	memcpy(path->pathrec.dgid.raw, gid, sizeof (union ib_gid));
+	memcpy(path->pathrec.dgid.raw, gid, sizeof(union ib_gid));
 	path->pathrec.sgid	    = priv->local_gid;
 	path->pathrec.pkey	    = cpu_to_be16(priv->pkey);
 	path->pathrec.numb_path     = 1;
@@ -1541,7 +1540,8 @@ void ipoib_del_neighs_by_gid(struct net_device *dev, u8 *gid)
 		while ((neigh = rcu_dereference_protected(*np,
 							  lockdep_is_held(&priv->lock))) != NULL) {
 			/* delete neighs belong to this parent */
-			if (!memcmp(gid, neigh->daddr + 4, sizeof (union ib_gid))) {
+			if (!memcmp(gid, neigh->daddr + 4,
+				    sizeof(union ib_gid))) {
 				rcu_assign_pointer(*np,
 						   rcu_dereference_protected(neigh->hnext,
 									     lockdep_is_held(&priv->lock)));
@@ -2060,7 +2060,8 @@ static struct net_device *ipoib_add_port(const char *format,
 		       hca->name, port, result);
 		goto device_init_failed;
 	} else
-		memcpy(priv->dev->dev_addr + 4, priv->local_gid.raw, sizeof (union ib_gid));
+		memcpy(priv->dev->dev_addr + 4, priv->local_gid.raw,
+		       sizeof(union ib_gid));
 	set_bit(IPOIB_FLAG_DEV_ADDR_SET, &priv->flags);
 
 	result = ipoib_dev_init(priv->dev, hca, port);
