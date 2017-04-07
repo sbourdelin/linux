@@ -84,6 +84,7 @@ struct nlattr **genl_family_attrbuf(const struct genl_family *family);
  * @attrs: netlink attributes
  * @_net: network namespace
  * @user_ptr: user pointers
+ * @exterr: extended error report struct
  */
 struct genl_info {
 	u32			snd_seq;
@@ -94,6 +95,7 @@ struct genl_info {
 	struct nlattr **	attrs;
 	possible_net_t		_net;
 	void *			user_ptr[2];
+	struct netlink_ext_err *exterr;
 };
 
 static inline struct net *genl_info_net(struct genl_info *info)
@@ -104,6 +106,31 @@ static inline struct net *genl_info_net(struct genl_info *info)
 static inline void genl_info_net_set(struct genl_info *info, struct net *net)
 {
 	write_pnet(&info->_net, net);
+}
+
+static inline int genl_err_str(struct genl_info *info, int err,
+			       const char *msg)
+{
+	info->exterr->msg = msg;
+
+	return err;
+}
+
+static inline int genl_err_attr(struct genl_info *info, int err,
+				u16 attr)
+{
+	info->exterr->attr = attr;
+
+	return err;
+}
+
+static inline int genl_err_str_attr(struct genl_info *info, int err,
+				    const char *msg, u16 attr)
+{
+	info->exterr->msg = msg;
+	info->exterr->attr = attr;
+
+	return err;
 }
 
 /**
