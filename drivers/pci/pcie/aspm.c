@@ -505,8 +505,10 @@ static void pcie_aspm_cap_init(struct pcie_link_state *link, int blacklist)
 	 */
 	if (dwreg.support & upreg.support & PCIE_LINK_STATE_L0S)
 		link->aspm_support |= ASPM_STATE_L0S;
-	if (dwreg.enabled & PCIE_LINK_STATE_L0S)
+	if (dwreg.enabled & PCIE_LINK_STATE_L0S) {
 		link->aspm_enabled |= ASPM_STATE_L0S_UP;
+		link->aspm_default |= ASPM_STATE_L0S_UP;
+	}
 	if (upreg.enabled & PCIE_LINK_STATE_L0S)
 		link->aspm_enabled |= ASPM_STATE_L0S_DW;
 	link->latency_up.l0s = calc_l0s_latency(upreg.latency_encoding_l0s);
@@ -541,9 +543,6 @@ static void pcie_aspm_cap_init(struct pcie_link_state *link, int blacklist)
 
 	if (link->aspm_support & ASPM_STATE_L1SS)
 		aspm_calc_l1ss_info(link, &upreg, &dwreg);
-
-	/* Save default state */
-	link->aspm_default = link->aspm_enabled;
 
 	/* Setup initial capable state. Will be updated later */
 	link->aspm_capable = link->aspm_support;
@@ -835,10 +834,37 @@ static int pci_aspm_init_downstream(struct pci_dev *pdev)
 static int pci_aspm_init_upstream(struct pci_dev *pdev)
 {
 	struct pcie_link_state *link;
+	struct aspm_register_info upreg;
+	u16 lnk_status;
+	bool ret;
 
 	link = alloc_pcie_link_state(pdev);
 	if (!link)
 		return -ENOMEM;
+
+	pcie_capability_read_word(pdev, PCI_EXP_LNKSTA, &lnk_status);
+	ret = !!(lnk_status & PCI_EXP_LNKSTA_DLLLA);
+
+	if (ret) {
+		pcie_get_aspm_reg(pdev, &upreg);
+		if (upreg.enabled & PCIE_LINK_STATE_L0S)
+			link->aspm_default |= ASPM_STATE_L0S_DW;
+		if (upreg.enabled & PCIE_LINK_STATE_L1)
+			link->aspm_default |= ASPM_STATE_L1;
+		if (upreg.l1ss_ctl1 & PCI_L1SS_CTL1_ASPM_L1_1)
+			link->aspm_default |= ASPM_STATE_L1_1;
+		if (upreg.l1ss_ctl1 & PCI_L1SS_CTL1_ASPM_L1_2)
+			link->aspm_default |= ASPM_STATE_L1_2;
+		if (upreg.l1ss_ctl1 & PCI_L1SS_CTL1_PCIPM_L1_1)
+			link->aspm_default |= ASPM_STATE_L1_1_PCIPM;
+		if (upreg.l1ss_ctl1 & PCI_L1SS_CTL1_PCIPM_L1_2)
+			link->aspm_default |= ASPM_STATE_L1_2_PCIPM;
+	} else {
+		if (!pci_find_ext_capability(pdev, PCI_EXT_CAP_ID_L1SS))
+			link->aspm_default = ASPM_STATE_L0S | ASPM_STATE_L1;
+		else
+			link->aspm_default = ASPM_STATE_ALL;
+	}
 
 	return 0;
 }
