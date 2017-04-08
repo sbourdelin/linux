@@ -606,6 +606,7 @@ i915_gem_request_alloc(struct intel_engine_cs *engine,
 
 	i915_priotree_init(&req->priotree);
 
+	INIT_RADIX_TREE(&req->waits, GFP_KERNEL);
 	INIT_LIST_HEAD(&req->active_list);
 	req->i915 = dev_priv;
 	req->engine = engine;
@@ -722,6 +723,27 @@ i915_gem_request_await_dma_fence(struct drm_i915_gem_request *req,
 
 	if (test_bit(DMA_FENCE_FLAG_SIGNALED_BIT, &fence->flags))
 		return 0;
+
+	/* Squash repeated waits to the same timelines, picking the latest */
+	if (fence->context != DMA_FENCE_NO_CONTEXT) {
+		void __rcu **slot;
+
+		slot = radix_tree_lookup_slot(&req->waits, fence->context);
+		if (!slot) {
+			ret = radix_tree_insert(&req->waits,
+						fence->context, fence);
+			if (ret)
+				return ret;
+		} else {
+			struct dma_fence *old =
+				rcu_dereference_protected(*slot, true);
+
+			if (!dma_fence_is_later(fence, old))
+				return 0;
+
+			radix_tree_replace_slot(&req->waits, slot, fence);
+		}
+	}
 
 	if (dma_fence_is_i915(fence))
 		return i915_gem_request_await_request(req, to_request(fence));
@@ -843,6 +865,15 @@ static void i915_gem_mark_busy(const struct intel_engine_cs *engine)
 			   round_jiffies_up_relative(HZ));
 }
 
+static void free_radixtree(struct radix_tree_root *root)
+{
+	struct radix_tree_iter iter;
+	void __rcu **slot;
+
+	radix_tree_for_each_slot(slot, root, &iter, 0)
+		radix_tree_iter_delete(root, &iter, slot);
+}
+
 /*
  * NB: This function is not allowed to fail. Doing so would mean the the
  * request is not being tracked for completion but the work itself is
@@ -943,6 +974,8 @@ void __i915_add_request(struct drm_i915_gem_request *request, bool flush_caches)
 	local_bh_disable();
 	i915_sw_fence_commit(&request->submit);
 	local_bh_enable(); /* Kick the execlists tasklet if just scheduled */
+
+	free_radixtree(&request->waits);
 }
 
 static unsigned long local_clock_us(unsigned int *cpu)

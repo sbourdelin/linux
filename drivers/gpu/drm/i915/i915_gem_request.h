@@ -137,6 +137,8 @@ struct drm_i915_gem_request {
 	struct i915_priotree priotree;
 	struct i915_dependency dep;
 
+	struct radix_tree_root waits;
+
 	/** GEM sequence number associated with this request on the
 	 * global execution timeline. It is zero when the request is not
 	 * on the HW queue (i.e. not on the engine timeline list).
