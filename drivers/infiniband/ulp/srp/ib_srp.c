@@ -1628,7 +1628,7 @@ static int srp_map_data(struct scsi_cmnd *scmnd, struct srp_rdma_ch *ch,
 	u8 fmt;
 
 	if (!scsi_sglist(scmnd) || scmnd->sc_data_direction == DMA_NONE)
-		return sizeof (struct srp_cmd);
+		return sizeof(struct srp_cmd);
 
 	if (scmnd->sc_data_direction != DMA_FROM_DEVICE &&
 	    scmnd->sc_data_direction != DMA_TO_DEVICE) {
@@ -1649,7 +1649,7 @@ static int srp_map_data(struct scsi_cmnd *scmnd, struct srp_rdma_ch *ch,
 		return -EIO;
 
 	fmt = SRP_DATA_DESC_DIRECT;
-	len = sizeof (struct srp_cmd) +	sizeof (struct srp_direct_buf);
+	len = sizeof(struct srp_cmd) + sizeof(struct srp_direct_buf);
 
 	if (count == 1 && (pd->flags & IB_PD_UNSAFE_GLOBAL_RKEY)) {
 		/*
@@ -1722,15 +1722,15 @@ static int srp_map_data(struct scsi_cmnd *scmnd, struct srp_rdma_ch *ch,
 	}
 
 	count = min(state.ndesc, target->cmd_sg_cnt);
-	table_len = state.ndesc * sizeof (struct srp_direct_buf);
+	table_len = state.ndesc * sizeof(struct srp_direct_buf);
 	idb_len = sizeof(struct srp_indirect_buf) + table_len;
 
 	fmt = SRP_DATA_DESC_INDIRECT;
-	len = sizeof(struct srp_cmd) + sizeof (struct srp_indirect_buf);
-	len += count * sizeof (struct srp_direct_buf);
+	len = sizeof(struct srp_cmd) + sizeof(struct srp_indirect_buf);
+	len += count * sizeof(struct srp_direct_buf);
 
 	memcpy(indirect_hdr->desc_list, req->indirect_desc,
-	       count * sizeof (struct srp_direct_buf));
+	       count * sizeof(struct srp_direct_buf));
 
 	if (!(pd->flags & IB_PD_UNSAFE_GLOBAL_RKEY)) {
 		ret = srp_map_idb(ch, req, state.gen.next, state.gen.end,
@@ -3300,7 +3300,7 @@ static ssize_t srp_create_target(struct device *dev,
 	bool multich = false;
 
 	target_host = scsi_host_alloc(&srp_template,
-				      sizeof (struct srp_target_port));
+				      sizeof(struct srp_target_port));
 	if (!target_host)
 		return -ENOMEM;
 
@@ -3383,10 +3383,10 @@ static ssize_t srp_create_target(struct device *dev,
 	target->mr_pool_size = target->scsi_host->can_queue * mr_per_cmd;
 	target->mr_per_cmd = mr_per_cmd;
 	target->indirect_size = target->sg_tablesize *
-				sizeof (struct srp_direct_buf);
-	target->max_iu_len = sizeof (struct srp_cmd) +
-			     sizeof (struct srp_indirect_buf) +
-			     target->cmd_sg_cnt * sizeof (struct srp_direct_buf);
+				sizeof(struct srp_direct_buf);
+	target->max_iu_len = sizeof(struct srp_cmd) +
+			     sizeof(struct srp_indirect_buf) +
+			     target->cmd_sg_cnt * sizeof(struct srp_direct_buf);
 
 	INIT_WORK(&target->tl_err_work, srp_tl_err_work);
 	INIT_WORK(&target->remove_work, srp_remove_work);
