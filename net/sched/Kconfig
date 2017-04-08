@@ -820,6 +820,37 @@ config NET_CLS_IND
 	  classification based on the incoming device. This option is
 	  likely to disappear in favour of the metadata ematch.
 
+choice
+	prompt "Default queuing discipline"
+	default DEFAULT_PFIFO
+	help
+	  Select the queueing discipline that will be used by default
+	  for all network devices.
+
+	config DEFAULT_FQ
+		bool "Fair Queue" if NET_SCH_FQ
+
+	config DEFAULT_FQ_CODEL
+		bool "Fair Queue Controlled Delay (FQ_CODEL)" if NET_SCH_FQ_CODEL
+
+	config DEFAULT_CODEL
+		bool "Controlled Delay (CODEL)" if NET_SCH_CODEL
+
+	config DEFAULT_SFQ
+		bool "Stochastic Fair Queue (SFQ)" if NET_SCH_SFQ
+
+	config DEFAULT_PFIFO
+		bool "Priority FIFO"
+endchoice
+
+config DEFAULT_NET_SCH
+	string
+	default "pfifo" if DEFAULT_PFIFO
+	default "fq" if DEFAULT_FQ
+	default "fq_codel" if DEFAULT_FQ_CODEL
+	default "sfq" if DEFAULT_SFQ
+	default "pfifo"
+
 endif # NET_SCHED
 
 config NET_SCH_FIFO
