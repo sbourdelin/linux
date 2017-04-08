@@ -36,8 +36,10 @@ EXPORT_TRACEPOINT_SYMBOL(dma_fence_enable_signal);
  * fence context, this allows checking if fences belong to the same
  * context or not. One device can have multiple separate contexts,
  * and they're used if some engine can run independently of another.
+ *
+ * 0 is excluded and treated as a special DMA_FENCE_NO_CONTEXT.
  */
-static atomic64_t dma_fence_context_counter = ATOMIC64_INIT(0);
+static atomic64_t dma_fence_context_counter = ATOMIC64_INIT(1);
 
 /**
  * dma_fence_context_alloc - allocate an array of fence contexts
