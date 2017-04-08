@@ -2407,7 +2407,7 @@ static inline void __scrub_mark_bitmap(struct scrub_parity *sparity,
 
 	start -= sparity->logic_start;
 	start = div64_u64_rem(start, sparity->stripe_len, &offset);
-	offset /= sectorsize;
+	do_div(offset, sectorsize);
 	nsectors = (int)len / sectorsize;
 
 	if (offset + nsectors <= sparity->nsectors) {
