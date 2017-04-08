@@ -553,12 +553,17 @@ void tmio_mmc_do_data_irq(struct tmio_mmc_host *host)
 	}
 
 	if (stop) {
+		static unsigned int induce_cnt = 0;
+
 		if (stop->opcode != MMC_STOP_TRANSMISSION || stop->arg)
 			dev_err(&host->pdev->dev, "unsupported stop: CMD%u,0x%x. We did CMD12,0\n",
 				stop->opcode, stop->arg);
 
 		/* fill in response from auto CMD12 */
 		stop->resp[0] = sd_ctrl_read16_and_16_as_32(host, CTL_RESPONSE);
+
+		if (induce_cnt++ % 100 == 0)
+			stop->resp[0] |= R1_CARD_ECC_FAILED;
 
 		sd_ctrl_write16(host, CTL_STOP_INTERNAL_ACTION, 0);
 	}
