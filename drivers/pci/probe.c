@@ -1868,6 +1868,9 @@ static void pci_init_capabilities(struct pci_dev *dev)
 
 	/* Advanced Error Reporting */
 	pci_aer_init(dev);
+
+	/* Active State Power Management */
+	pci_aspm_init(dev);
 }
 
 /*
