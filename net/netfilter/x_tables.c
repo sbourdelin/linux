@@ -459,7 +459,7 @@ int xt_check_match(struct xt_mtchk_param *par,
 		       par->match->proto);
 		return -EINVAL;
 	}
-	if (par->match->checkentry != NULL) {
+	if (par->match->checkentry) {
 		ret = par->match->checkentry(par);
 		if (ret < 0)
 			return ret;
@@ -842,7 +842,7 @@ int xt_check_target(struct xt_tgchk_param *par,
 		       par->target->proto);
 		return -EINVAL;
 	}
-	if (par->target->checkentry != NULL) {
+	if (par->target->checkentry) {
 		ret = par->target->checkentry(par);
 		if (ret < 0)
 			return ret;
@@ -1023,7 +1023,7 @@ void xt_free_table_info(struct xt_table_info *info)
 {
 	int cpu;
 
-	if (info->jumpstack != NULL) {
+	if (info->jumpstack) {
 		for_each_possible_cpu(cpu)
 			kvfree(info->jumpstack[cpu]);
 		kvfree(info->jumpstack);
@@ -1401,7 +1401,7 @@ static void *xt_mttg_seq_next(struct seq_file *seq, void *v, loff_t *ppos,
 		return NULL;
 	}
 
-	if (ppos != NULL)
+	if (ppos)
 		++*ppos;
 	return trav;
 }

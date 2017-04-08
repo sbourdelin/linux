@@ -408,8 +408,8 @@ nft_payload_select_ops(const struct nft_ctx *ctx,
 		return ERR_PTR(-EOPNOTSUPP);
 	}
 
-	if (tb[NFTA_PAYLOAD_SREG] != NULL) {
-		if (tb[NFTA_PAYLOAD_DREG] != NULL)
+	if (tb[NFTA_PAYLOAD_SREG]) {
+		if (tb[NFTA_PAYLOAD_DREG])
 			return ERR_PTR(-EINVAL);
 		return &nft_payload_set_ops;
 	}

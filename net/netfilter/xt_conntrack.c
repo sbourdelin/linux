@@ -181,7 +181,7 @@ conntrack_mt(const struct sk_buff *skb, struct xt_action_param *par,
 		statebit = XT_CONNTRACK_STATE_INVALID;
 
 	if (info->match_flags & XT_CONNTRACK_STATE) {
-		if (ct != NULL) {
+		if (ct) {
 			if (test_bit(IPS_SRC_NAT_BIT, &ct->status))
 				statebit |= XT_CONNTRACK_STATE_SNAT;
 			if (test_bit(IPS_DST_NAT_BIT, &ct->status))

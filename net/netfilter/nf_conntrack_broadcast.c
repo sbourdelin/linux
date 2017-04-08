@@ -42,7 +42,7 @@ int nf_conntrack_broadcast_help(struct sk_buff *skb,
 
 	rcu_read_lock();
 	in_dev = __in_dev_get_rcu(rt->dst.dev);
-	if (in_dev != NULL) {
+	if (in_dev) {
 		for_primary_ifa(in_dev) {
 			if (ifa->ifa_broadcast == iph->daddr) {
 				mask = ifa->ifa_mask;

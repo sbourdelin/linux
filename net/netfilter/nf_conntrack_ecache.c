@@ -266,7 +266,7 @@ int nf_conntrack_register_notifier(struct net *net,
 	mutex_lock(&nf_ct_ecache_mutex);
 	notify = rcu_dereference_protected(net->ct.nf_conntrack_event_cb,
 					   lockdep_is_held(&nf_ct_ecache_mutex));
-	if (notify != NULL) {
+	if (notify) {
 		ret = -EBUSY;
 		goto out_unlock;
 	}
@@ -302,7 +302,7 @@ int nf_ct_expect_register_notifier(struct net *net,
 	mutex_lock(&nf_ct_ecache_mutex);
 	notify = rcu_dereference_protected(net->ct.nf_expect_event_cb,
 					   lockdep_is_held(&nf_ct_ecache_mutex));
-	if (notify != NULL) {
+	if (notify) {
 		ret = -EBUSY;
 		goto out_unlock;
 	}

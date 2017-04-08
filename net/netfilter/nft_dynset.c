@@ -85,7 +85,7 @@ static void nft_dynset_eval(const struct nft_expr *expr,
 		} else if (sexpr == NULL)
 			goto out;
 
-		if (sexpr != NULL)
+		if (sexpr)
 			sexpr->ops->eval(sexpr, regs, pkt);
 
 		if (priv->invert)
@@ -157,7 +157,7 @@ static int nft_dynset_init(const struct nft_ctx *ctx,
 	}
 
 	timeout = 0;
-	if (tb[NFTA_DYNSET_TIMEOUT] != NULL) {
+	if (tb[NFTA_DYNSET_TIMEOUT]) {
 		if (!(set->flags & NFT_SET_TIMEOUT))
 			return -EINVAL;
 		timeout = msecs_to_jiffies(be64_to_cpu(nla_get_be64(
@@ -169,7 +169,7 @@ static int nft_dynset_init(const struct nft_ctx *ctx,
 	if (err < 0)
 		return err;
 
-	if (tb[NFTA_DYNSET_SREG_DATA] != NULL) {
+	if (tb[NFTA_DYNSET_SREG_DATA]) {
 		if (!(set->flags & NFT_SET_MAP))
 			return -EINVAL;
 		if (set->dtype == NFT_DATA_VERDICT)
@@ -182,7 +182,7 @@ static int nft_dynset_init(const struct nft_ctx *ctx,
 	} else if (set->flags & NFT_SET_MAP)
 		return -EINVAL;
 
-	if (tb[NFTA_DYNSET_EXPR] != NULL) {
+	if (tb[NFTA_DYNSET_EXPR]) {
 		if (!(set->flags & NFT_SET_EVAL))
 			return -EINVAL;
 		if (!(set->flags & NFT_SET_ANONYMOUS))
@@ -202,7 +202,7 @@ static int nft_dynset_init(const struct nft_ctx *ctx,
 	nft_set_ext_add_length(&priv->tmpl, NFT_SET_EXT_KEY, set->klen);
 	if (set->flags & NFT_SET_MAP)
 		nft_set_ext_add_length(&priv->tmpl, NFT_SET_EXT_DATA, set->dlen);
-	if (priv->expr != NULL)
+	if (priv->expr)
 		nft_set_ext_add_length(&priv->tmpl, NFT_SET_EXT_EXPR,
 				       priv->expr->ops->size);
 	if (set->flags & NFT_SET_TIMEOUT) {
@@ -220,7 +220,7 @@ static int nft_dynset_init(const struct nft_ctx *ctx,
 	return 0;
 
 err1:
-	if (priv->expr != NULL)
+	if (priv->expr)
 		nft_expr_destroy(ctx, priv->expr);
 	return err;
 }
@@ -231,7 +231,7 @@ static void nft_dynset_destroy(const struct nft_ctx *ctx,
 	struct nft_dynset *priv = nft_expr_priv(expr);
 
 	nf_tables_unbind_set(ctx, priv->set, &priv->binding);
-	if (priv->expr != NULL)
+	if (priv->expr)
 		nft_expr_destroy(ctx, priv->expr);
 }
 

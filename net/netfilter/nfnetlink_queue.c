@@ -422,9 +422,9 @@ nfqnl_build_packet_message(struct net *net, struct nfqnl_instance *queue,
 	nfnl_ct = rcu_dereference(nfnl_ct_hook);
 
 	if (queue->flags & NFQA_CFG_F_CONNTRACK) {
-		if (nfnl_ct != NULL) {
+		if (nfnl_ct) {
 			ct = nfnl_ct->get_ct(entskb, &ctinfo);
-			if (ct != NULL)
+			if (ct)
 				size += nfnl_ct->build_size(ct);
 		}
 	}
@@ -1166,7 +1166,7 @@ static int nfqnl_recv_verdict(struct net *net, struct sock *ctnl,
 	nfnl_ct = rcu_dereference(nfnl_ct_hook);
 
 	if (nfqa[NFQA_CT]) {
-		if (nfnl_ct != NULL)
+		if (nfnl_ct)
 			ct = nfqnl_ct_parse(nfnl_ct, nlh, nfqa, entry, &ctinfo);
 	}
 
@@ -1275,7 +1275,7 @@ static int nfqnl_recv_config(struct net *net, struct sock *ctnl,
 		goto err_out_unlock;
 	}
 
-	if (cmd != NULL) {
+	if (cmd) {
 		switch (cmd->command) {
 		case NFQNL_CFG_CMD_BIND:
 			if (queue) {

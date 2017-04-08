@@ -374,7 +374,7 @@ static int recent_mt_check(const struct xt_mtchk_param *par,
 
 	mutex_lock(&recent_mutex);
 	t = recent_table_lookup(recent_net, info->name);
-	if (t != NULL) {
+	if (t) {
 		if (nstamp_mask > t->nstamps_max_mask) {
 			spin_lock_bh(&recent_lock);
 			recent_table_flush(t);
@@ -461,7 +461,7 @@ static void recent_mt_destroy(const struct xt_mtdtor_param *par)
 		list_del(&t->list);
 		spin_unlock_bh(&recent_lock);
 #ifdef CONFIG_PROC_FS
-		if (recent_net->xt_recent != NULL)
+		if (recent_net->xt_recent)
 			remove_proc_entry(t->name, recent_net->xt_recent);
 #endif
 		recent_table_flush(t);
@@ -596,7 +596,7 @@ recent_mt_proc_write(struct file *file, const char __user *input,
 
 	++c;
 	--size;
-	if (strnchr(c, size, ':') != NULL) {
+	if (strnchr(c, size, ':')) {
 		family = NFPROTO_IPV6;
 		succ   = in6_pton(c, size, (void *)&addr, '\n', NULL);
 	} else {

@@ -60,14 +60,14 @@ static int nft_log_init(const struct nft_ctx *ctx,
 	if (tb[NFTA_LOG_LEVEL] != NULL &&
 	    tb[NFTA_LOG_GROUP] != NULL)
 		return -EINVAL;
-	if (tb[NFTA_LOG_GROUP] != NULL) {
+	if (tb[NFTA_LOG_GROUP]) {
 		li->type = NF_LOG_TYPE_ULOG;
-		if (tb[NFTA_LOG_FLAGS] != NULL)
+		if (tb[NFTA_LOG_FLAGS])
 			return -EINVAL;
 	}
 
 	nla = tb[NFTA_LOG_PREFIX];
-	if (nla != NULL) {
+	if (nla) {
 		priv->prefix = kmalloc(nla_len(nla) + 1, GFP_KERNEL);
 		if (priv->prefix == NULL)
 			return -ENOMEM;
@@ -78,7 +78,7 @@ static int nft_log_init(const struct nft_ctx *ctx,
 
 	switch (li->type) {
 	case NF_LOG_TYPE_LOG:
-		if (tb[NFTA_LOG_LEVEL] != NULL) {
+		if (tb[NFTA_LOG_LEVEL]) {
 			li->u.log.level =
 				ntohl(nla_get_be32(tb[NFTA_LOG_LEVEL]));
 		} else {
@@ -89,7 +89,7 @@ static int nft_log_init(const struct nft_ctx *ctx,
 			goto err1;
 		}
 
-		if (tb[NFTA_LOG_FLAGS] != NULL) {
+		if (tb[NFTA_LOG_FLAGS]) {
 			li->u.log.logflags =
 				ntohl(nla_get_be32(tb[NFTA_LOG_FLAGS]));
 			if (li->u.log.logflags & ~NF_LOG_MASK) {
@@ -100,12 +100,12 @@ static int nft_log_init(const struct nft_ctx *ctx,
 		break;
 	case NF_LOG_TYPE_ULOG:
 		li->u.ulog.group = ntohs(nla_get_be16(tb[NFTA_LOG_GROUP]));
-		if (tb[NFTA_LOG_SNAPLEN] != NULL) {
+		if (tb[NFTA_LOG_SNAPLEN]) {
 			li->u.ulog.flags |= NF_LOG_F_COPY_LEN;
 			li->u.ulog.copy_len =
 				ntohl(nla_get_be32(tb[NFTA_LOG_SNAPLEN]));
 		}
-		if (tb[NFTA_LOG_QTHRESHOLD] != NULL) {
+		if (tb[NFTA_LOG_QTHRESHOLD]) {
 			li->u.ulog.qthreshold =
 				ntohs(nla_get_be16(tb[NFTA_LOG_QTHRESHOLD]));
 		}

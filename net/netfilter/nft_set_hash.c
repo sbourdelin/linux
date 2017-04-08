@@ -83,7 +83,7 @@ static bool nft_hash_lookup(const struct net *net, const struct nft_set *set,
 	};
 
 	he = rhashtable_lookup_fast(&priv->ht, &arg, nft_hash_params);
-	if (he != NULL)
+	if (he)
 		*ext = &he->ext;
 
 	return !!he;
@@ -106,7 +106,7 @@ static bool nft_hash_update(struct nft_set *set, const u32 *key,
 	};
 
 	he = rhashtable_lookup_fast(&priv->ht, &arg, nft_hash_params);
-	if (he != NULL)
+	if (he)
 		goto out;
 
 	he = new(set, expr, regs);

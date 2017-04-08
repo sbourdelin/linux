@@ -328,7 +328,7 @@ connlimit_mt(const struct sk_buff *skb, struct xt_action_param *par)
 	unsigned int connections;
 
 	ct = nf_ct_get(skb, &ctinfo);
-	if (ct != NULL) {
+	if (ct) {
 		tuple_ptr = &ct->tuplehash[IP_CT_DIR_ORIGINAL].tuple;
 		zone = nf_ct_zone(ct);
 	} else if (!nf_ct_get_tuplepr(skb, skb_network_offset(skb),
