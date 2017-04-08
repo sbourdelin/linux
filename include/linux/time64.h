@@ -43,6 +43,10 @@ struct itimerspec64 {
 #define KTIME_MAX			((s64)~((u64)1 << 63))
 #define KTIME_SEC_MAX			(KTIME_MAX / NSEC_PER_SEC)
 
+/* Timestamps on boundary */
+#define Y2038_EXPIRY_TIMESTAMP		S32_MAX /* 2147483647 */
+#define Y2106_EXPIRY_TIMESTAMP		U32_MAX /* 4294967295 */
+
 #if __BITS_PER_LONG == 64
 
 static inline struct timespec timespec64_to_timespec(const struct timespec64 ts64)

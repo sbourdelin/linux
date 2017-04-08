@@ -1192,6 +1192,14 @@
 			can be changed at run time by the max_graph_depth file
 			in the tracefs tracing directory. default: 0 (no limit)
 
+	fstimestampcheck
+			Enable checking of max filesystem time supported
+			at mount time. The value is checked against y2038
+			date: Mon Jan 18 19:14:07 PST 2038. The option
+			disables rw mount of filesystems that are not able
+			to represent times beyond y2038 time mentioned above.
+			This check is off by default.
+
 	gamecon.map[2|3]=
 			[HW,JOY] Multisystem joystick and NES/SNES/PSX pad
 			support via parallel port (up to 5 devices per port)
