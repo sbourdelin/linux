@@ -436,7 +436,7 @@ ip_vs_service_find(struct netns_ipvs *ipvs, int af, __u32 fwmark, __u16 protocol
 		svc = __ip_vs_service_find(ipvs, af, protocol, vaddr, FTPPORT);
 	}
 
-	if (svc == NULL
+	if (!svc
 	    && atomic_read(&ipvs->nullsvc_counter)) {
 		/*
 		 * Check if the catch-all port (port zero) exists
@@ -910,7 +910,7 @@ ip_vs_new_dest(struct ip_vs_service *svc, struct ip_vs_dest_user_kern *udest,
 	}
 
 	dest = kzalloc(sizeof(struct ip_vs_dest), GFP_KERNEL);
-	if (dest == NULL)
+	if (!dest)
 		return -ENOMEM;
 
 	dest->stats.cpustats = alloc_percpu(struct ip_vs_cpu_stats);
@@ -983,7 +983,7 @@ ip_vs_add_dest(struct ip_vs_service *svc, struct ip_vs_dest_user_kern *udest)
 	dest = ip_vs_lookup_dest(svc, udest->af, &daddr, dport);
 	rcu_read_unlock();
 
-	if (dest != NULL) {
+	if (dest) {
 		IP_VS_DBG(1, "%s(): dest already exists\n", __func__);
 		return -EEXIST;
 	}
@@ -994,7 +994,7 @@ ip_vs_add_dest(struct ip_vs_service *svc, struct ip_vs_dest_user_kern *udest)
 	 */
 	dest = ip_vs_trash_get_dest(svc, udest->af, &daddr, dport);
 
-	if (dest != NULL) {
+	if (dest) {
 		IP_VS_DBG_BUF(3, "Get destination %s:%u from trash, "
 			      "dest->refcnt=%d, service %u/%s:%u\n",
 			      IP_VS_DBG_ADDR(udest->af, &daddr), ntohs(dport),
@@ -1047,7 +1047,7 @@ ip_vs_edit_dest(struct ip_vs_service *svc, struct ip_vs_dest_user_kern *udest)
 	dest = ip_vs_lookup_dest(svc, udest->af, &daddr, dport);
 	rcu_read_unlock();
 
-	if (dest == NULL) {
+	if (!dest) {
 		IP_VS_DBG(1, "%s(): dest doesn't exist\n", __func__);
 		return -ENOENT;
 	}
@@ -1129,7 +1129,7 @@ ip_vs_del_dest(struct ip_vs_service *svc, struct ip_vs_dest_user_kern *udest)
 	dest = ip_vs_lookup_dest(svc, udest->af, &udest->addr, dport);
 	rcu_read_unlock();
 
-	if (dest == NULL) {
+	if (!dest) {
 		IP_VS_DBG(1, "%s(): destination not found!\n", __func__);
 		return -ENOENT;
 	}
@@ -1208,7 +1208,7 @@ ip_vs_add_service(struct netns_ipvs *ipvs, struct ip_vs_service_user_kern *u,
 
 	if (u->pe_name && *u->pe_name) {
 		pe = ip_vs_pe_getbyname(u->pe_name);
-		if (pe == NULL) {
+		if (!pe) {
 			pr_info("persistence engine module ip_vs_pe_%s "
 				"not found\n", u->pe_name);
 			ret = -ENOENT;
@@ -1228,7 +1228,7 @@ ip_vs_add_service(struct netns_ipvs *ipvs, struct ip_vs_service_user_kern *u,
 #endif
 
 	svc = kzalloc(sizeof(struct ip_vs_service), GFP_KERNEL);
-	if (svc == NULL) {
+	if (!svc) {
 		IP_VS_DBG(1, "%s(): no memory\n", __func__);
 		ret = -ENOMEM;
 		goto out_err;
@@ -1299,7 +1299,7 @@ ip_vs_add_service(struct netns_ipvs *ipvs, struct ip_vs_service_user_kern *u,
 
 
  out_err:
-	if (svc != NULL) {
+	if (svc) {
 		ip_vs_unbind_scheduler(svc, sched);
 		ip_vs_service_free(svc);
 	}
@@ -1339,7 +1339,7 @@ ip_vs_edit_service(struct ip_vs_service *svc, struct ip_vs_service_user_kern *u)
 
 	if (u->pe_name && *u->pe_name) {
 		pe = ip_vs_pe_getbyname(u->pe_name);
-		if (pe == NULL) {
+		if (!pe) {
 			pr_info("persistence engine module ip_vs_pe_%s "
 				"not found\n", u->pe_name);
 			ret = -ENOENT;
@@ -1476,7 +1476,7 @@ static void ip_vs_unlink_service(struct ip_vs_service *svc, bool cleanup)
  */
 static int ip_vs_del_service(struct ip_vs_service *svc)
 {
-	if (svc == NULL)
+	if (!svc)
 		return -EEXIST;
 	ip_vs_unlink_service(svc, false);
 
@@ -2446,14 +2446,14 @@ do_ip_vs_set_ctl(struct sock *sk, int cmd, void __user *user, unsigned int len)
 	rcu_read_unlock();
 
 	if (cmd != IP_VS_SO_SET_ADD
-	    && (svc == NULL || svc->protocol != usvc.protocol)) {
+	    && (!svc || svc->protocol != usvc.protocol)) {
 		ret = -ESRCH;
 		goto out_unlock;
 	}
 
 	switch (cmd) {
 	case IP_VS_SO_SET_ADD:
-		if (svc != NULL)
+		if (svc)
 			ret = -EEXIST;
 		else
 			ret = ip_vs_add_service(ipvs, &usvc, &svc);
@@ -3088,7 +3088,7 @@ static int ip_vs_genl_parse_service(struct netns_ipvs *ipvs,
 	struct ip_vs_service *svc;
 
 	/* Parse mandatory identifying service fields first */
-	if (nla == NULL ||
+	if (!nla ||
 	    nla_parse_nested(attrs, IPVS_SVC_ATTR_MAX, nla, ip_vs_svc_policy))
 		return -EINVAL;
 
@@ -3287,7 +3287,7 @@ static int ip_vs_genl_parse_dest(struct ip_vs_dest_user_kern *udest,
 	struct nlattr *nla_addr_family;
 
 	/* Parse mandatory identifying destination fields first */
-	if (nla == NULL ||
+	if (!nla ||
 	    nla_parse_nested(attrs, IPVS_DEST_ATTR_MAX, nla, ip_vs_dest_policy))
 		return -EINVAL;
 
@@ -3582,7 +3582,7 @@ static int ip_vs_genl_set_cmd(struct sk_buff *skb, struct genl_info *info)
 		goto out;
 
 	/* Unless we're adding a new service, the service must already exist */
-	if ((cmd != IPVS_CMD_NEW_SERVICE) && (svc == NULL)) {
+	if ((cmd != IPVS_CMD_NEW_SERVICE) && (!svc)) {
 		ret = -ESRCH;
 		goto out;
 	}
@@ -3633,7 +3633,7 @@ static int ip_vs_genl_set_cmd(struct sk_buff *skb, struct genl_info *info)
 
 	switch (cmd) {
 	case IPVS_CMD_NEW_SERVICE:
-		if (svc == NULL)
+		if (!svc)
 			ret = ip_vs_add_service(ipvs, &usvc, &svc);
 		else
 			ret = -EEXIST;
@@ -3695,7 +3695,7 @@ static int ip_vs_genl_get_cmd(struct sk_buff *skb, struct genl_info *info)
 	mutex_lock(&__ip_vs_mutex);
 
 	reply = genlmsg_put_reply(msg, info, &ip_vs_genl_family, 0, reply_cmd);
-	if (reply == NULL)
+	if (!reply)
 		goto nla_put_failure;
 
 	switch (cmd) {
@@ -3902,7 +3902,7 @@ static int __net_init ip_vs_control_net_init_sysctl(struct netns_ipvs *ipvs)
 
 	if (!net_eq(net, &init_net)) {
 		tbl = kmemdup(vs_vars, sizeof(vs_vars), GFP_KERNEL);
-		if (tbl == NULL)
+		if (!tbl)
 			return -ENOMEM;
 
 		/* Don't export sysctls to unprivileged users */
@@ -3960,7 +3960,7 @@ static int __net_init ip_vs_control_net_init_sysctl(struct netns_ipvs *ipvs)
 	tbl[idx++].data = &ipvs->sysctl_ignore_tunneled;
 
 	ipvs->sysctl_hdr = register_net_sysctl(net, "net/ipv4/vs", tbl);
-	if (ipvs->sysctl_hdr == NULL) {
+	if (!ipvs->sysctl_hdr) {
 		if (!net_eq(net, &init_net))
 			kfree(tbl);
 		return -ENOMEM;
