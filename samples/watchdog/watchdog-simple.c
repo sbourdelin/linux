@@ -7,6 +7,7 @@ int main(void)
 {
 	int fd = open("/dev/watchdog", O_WRONLY);
 	int ret = 0;
+
 	if (fd == -1) {
 		perror("watchdog");
 		exit(EXIT_FAILURE);
