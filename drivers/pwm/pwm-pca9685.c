@@ -79,7 +79,6 @@
 struct pca9685 {
 	struct pwm_chip chip;
 	struct regmap *regmap;
-	int active_cnt;
 	int duty_ns;
 	int period_ns;
 #if IS_ENABLED(CONFIG_GPIOLIB)
@@ -407,20 +406,7 @@ static int pca9685_pwm_request(struct pwm_chip *chip, struct pwm_device *pwm)
 	if (pca9685_pwm_is_gpio(pca, pwm))
 		return -EBUSY;
 
-	if (pca->active_cnt++ == 0)
-		return regmap_update_bits(pca->regmap, PCA9685_MODE1,
-					  MODE1_SLEEP, 0x0);
-
 	return 0;
-}
-
-static void pca9685_pwm_free(struct pwm_chip *chip, struct pwm_device *pwm)
-{
-	struct pca9685 *pca = to_pca(chip);
-
-	if (--pca->active_cnt == 0)
-		regmap_update_bits(pca->regmap, PCA9685_MODE1, MODE1_SLEEP,
-				   MODE1_SLEEP);
 }
 
 static const struct pwm_ops pca9685_pwm_ops = {
@@ -428,7 +414,6 @@ static const struct pwm_ops pca9685_pwm_ops = {
 	.disable = pca9685_pwm_disable,
 	.config = pca9685_pwm_config,
 	.request = pca9685_pwm_request,
-	.free = pca9685_pwm_free,
 	.owner = THIS_MODULE,
 };
 
@@ -479,6 +464,9 @@ static int pca9685_pwm_probe(struct i2c_client *client,
 	/* clear all "full off" bits */
 	regmap_write(pca->regmap, PCA9685_ALL_LED_OFF_L, 0);
 	regmap_write(pca->regmap, PCA9685_ALL_LED_OFF_H, 0);
+	/* clear the "sleep" bit */
+	regmap_update_bits(pca->regmap, PCA9685_MODE1,
+					  MODE1_SLEEP, 0x0);
 
 	pca->chip.ops = &pca9685_pwm_ops;
 	/* add an extra channel for ALL_LED */
