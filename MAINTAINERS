@@ -11326,6 +11326,13 @@ T:	git git://git.kernel.org/pub/scm/linux/kernel/git/kees/linux.git yama/tip
 S:	Supported
 F:	security/yama/
 
+MODAUTORESTRICT SECURITY MODULE
+M:	Djalal Harouni <tixxdz@gmail.com>
+L:	kernel-hardening@lists.openwall.com
+L:	linux-security-module@vger.kernel.org
+S:	Supported
+F:	security/modautorestrict/
+
 SENSABLE PHANTOM
 M:	Jiri Slaby <jirislaby@gmail.com>
 S:	Maintained

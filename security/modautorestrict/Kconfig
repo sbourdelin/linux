@@ -1,0 +1,15 @@
+config SECURITY_MODAUTORESTRICT
+	bool "Automatic Module Loading Restriction"
+	depends on SECURITY
+	default n
+	help
+	  This selects ModAutoRestrict Linux Security Module which applies
+          restrictions on automatic module loading operations. If this
+          option is selected, a request to use a kernel feature that is
+          implemented by an unloaded module will first have to satisfy the
+          access rules of MODAUTORESTRICT. Furthermore, this allows system
+          administrators or sandbox mechanisms to prevent loading unneeded
+          modules.
+          Further information can be found in Documentation/security/ModAutoRestrict.txt.
+
+	  If you are unsure how to answer this question, answer N.

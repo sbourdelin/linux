@@ -1950,6 +1950,11 @@ void __init loadpin_add_hooks(void);
 #else
 static inline void loadpin_add_hooks(void) { };
 #endif
+#ifdef CONFIG_SECURITY_MODAUTORESTRICT
+extern void modautorestrict_init(void);
+#else
+static inline void __init modautorestrict_init(void) { }
+#endif
 
 /*
  * Per "struct task_struct" security blob is managed using index numbers.
