@@ -395,6 +395,9 @@ int check_irq_vectors_for_cpu_disable(void)
 		    !cpumask_subset(&affinity_new, &online_new))
 			this_count++;
 	}
+	/* No need to check any further. */
+	if (!this_count)
+		return 0;
 
 	count = 0;
 	for_each_online_cpu(cpu) {
