@@ -1892,6 +1892,7 @@ struct net_device {
 	struct lock_class_key	*qdisc_tx_busylock;
 	struct lock_class_key	*qdisc_running_key;
 	bool			proto_down;
+	struct bpf_prog		*xdp_prog;
 };
 #define to_net_dev(d) container_of(d, struct net_device, dev)
 
