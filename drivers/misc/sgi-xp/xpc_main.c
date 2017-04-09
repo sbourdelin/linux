@@ -931,10 +931,9 @@ xpc_setup_partitions(void)
 		part->act_state = XPC_P_AS_INACTIVE;
 		XPC_SET_REASON(part, 0, 0);
 
-		init_timer(&part->disengage_timer);
-		part->disengage_timer.function =
-		    xpc_timeout_partition_disengage;
-		part->disengage_timer.data = (unsigned long)part;
+		setup_timer(&part->disengage_timer,
+			    xpc_timeout_partition_disengage,
+			    (unsigned long)part);
 
 		part->setup_state = XPC_P_SS_UNSET;
 		init_waitqueue_head(&part->teardown_wq);
