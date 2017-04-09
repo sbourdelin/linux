@@ -24,6 +24,8 @@ xconfig: $(obj)/qconf
 gconfig: $(obj)/gconf
 	$< $(silent) $(Kconfig)
 
+$(obj)/mconf: $(obj)/dochecklxdialog
+
 menuconfig: $(obj)/mconf
 	$< $(silent) $(Kconfig)
 
