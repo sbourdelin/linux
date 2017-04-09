@@ -616,6 +616,10 @@ int tty_ldisc_reinit(struct tty_struct *tty, int disc)
 	if (IS_ERR(ld))
 		return PTR_ERR(ld);
 
+	/*
+	 * Avoid racing set_ldisc or tty_ldisc_release
+	 */
+	tty_ldisc_lock(tty, MAX_SCHEDULE_TIMEOUT);
 	if (tty->ldisc) {
 		tty_ldisc_close(tty, tty->ldisc);
 		tty_ldisc_put(tty->ldisc);
@@ -629,6 +633,7 @@ int tty_ldisc_reinit(struct tty_struct *tty, int disc)
 		tty_ldisc_put(tty->ldisc);
 		tty->ldisc = NULL;
 	}
+	tty_ldisc_unlock(tty);
 	return retval;
 }
 
@@ -672,22 +677,18 @@ void tty_ldisc_hangup(struct tty_struct *tty, bool reinit)
 	/*
 	 * Shutdown the current line discipline, and reset it to
 	 * N_TTY if need be.
-	 *
-	 * Avoid racing set_ldisc or tty_ldisc_release
 	 */
-	tty_ldisc_lock(tty, MAX_SCHEDULE_TIMEOUT);
-
 	if (tty->driver->flags & TTY_DRIVER_RESET_TERMIOS)
 		tty_reset_termios(tty);
 
-	if (tty->ldisc) {
-		if (reinit) {
-			if (tty_ldisc_reinit(tty, tty->termios.c_line) < 0)
-				tty_ldisc_reinit(tty, N_TTY);
-		} else
-			tty_ldisc_kill(tty);
+	if (reinit) {
+		if (tty_ldisc_reinit(tty, tty->termios.c_line) < 0)
+			tty_ldisc_reinit(tty, N_TTY);
+	} else {
+		tty_ldisc_lock(tty, MAX_SCHEDULE_TIMEOUT);
+		tty_ldisc_kill(tty);
+		tty_ldisc_unlock(tty);
 	}
-	tty_ldisc_unlock(tty);
 }
 
 /**
