@@ -211,8 +211,13 @@ static u16 netvsc_select_queue(struct net_device *ndev, struct sk_buff *skb,
 	int q_idx = sk_tx_queue_get(sk);
 
 	if (q_idx < 0 || skb->ooo_okay || q_idx >= num_tx_queues) {
-		u16 hash = __skb_tx_hash(ndev, skb, VRSS_SEND_TAB_SIZE);
+		u16 hash;
 		int new_idx;
+
+		if (sk)
+			skb_set_hash_from_sk(skb, sk);
+
+		hash = __skb_tx_hash(ndev, skb, VRSS_SEND_TAB_SIZE);
 
 		new_idx = net_device_ctx->tx_send_table[hash] % num_tx_queues;
 
