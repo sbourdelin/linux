@@ -650,6 +650,8 @@ static void tcp_keepalive_timer (unsigned long data)
 				tcp_time_wait(sk, TCP_FIN_WAIT2, tmo);
 				goto out;
 			}
+		} else {
+			NET_INC_STATS(sock_net(sk), LINUX_MIB_TCPABORTONLINGER);
 		}
 		tcp_send_active_reset(sk, GFP_ATOMIC);
 		goto death;
