@@ -1248,9 +1248,8 @@ static int s5p_mfc_probe(struct platform_device *pdev)
 	dev->hw_lock = 0;
 	INIT_WORK(&dev->watchdog_work, s5p_mfc_watchdog_worker);
 	atomic_set(&dev->watchdog_cnt, 0);
-	init_timer(&dev->watchdog_timer);
-	dev->watchdog_timer.data = (unsigned long)dev;
-	dev->watchdog_timer.function = s5p_mfc_watchdog;
+	setup_timer(&dev->watchdog_timer, s5p_mfc_watchdog,
+		    (unsigned long)dev);
 
 	/* Initialize HW ops and commands based on MFC version */
 	s5p_mfc_init_hw_ops(dev);
