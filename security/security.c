@@ -32,6 +32,7 @@
 /* Maximum number of letters for an LSM name string */
 #define SECURITY_NAME_MAX	10
 
+static u16 lsm_max_per_task_blob_index __ro_after_init;
 struct security_hook_heads security_hook_heads __lsm_ro_after_init;
 char *lsm_names;
 /* Boot-time LSM user choice */
@@ -75,6 +76,15 @@ int __init security_init(void)
 	 */
 	do_security_initcalls();
 
+	/*
+	 * Allocate per "struct task_struct" blob for initial task.
+	 * Initialization is done later by each module which needs it.
+	 */
+	if (lsm_max_per_task_blob_index)
+		current->security = kcalloc(lsm_max_per_task_blob_index,
+					    sizeof(unsigned long),
+					    GFP_KERNEL | __GFP_NOFAIL);
+
 	return 0;
 }
 
@@ -85,6 +95,15 @@ static int __init choose_lsm(char *str)
 	return 1;
 }
 __setup("security=", choose_lsm);
+
+u16 __init security_reserve_task_blob_index(const u16 size)
+{
+	const u16 index = lsm_max_per_task_blob_index;
+	u16 requested = DIV_ROUND_UP(size, sizeof(unsigned long));
+
+	lsm_max_per_task_blob_index += requested;
+	return index;
+}
 
 static int lsm_append(char *new, char **result)
 {
@@ -939,12 +958,28 @@ int security_task_create(unsigned long clone_flags)
 
 int security_task_alloc(struct task_struct *task, unsigned long clone_flags)
 {
-	return call_int_hook(task_alloc, 0, task, clone_flags);
+	int rc;
+	const unsigned long index = lsm_max_per_task_blob_index;
+
+	if (index) {
+		task->security = kcalloc(index, sizeof(unsigned long),
+					 GFP_KERNEL);
+		if (unlikely(!task->security))
+			return -ENOMEM;
+	}
+	rc = call_int_hook(task_alloc, 0, task, clone_flags);
+	if (unlikely(rc))
+		security_task_free(task);
+	return rc;
 }
 
 void security_task_free(struct task_struct *task)
 {
 	call_void_hook(task_free, task);
+	if (lsm_max_per_task_blob_index) {
+		kfree(task->security);
+		task->security = NULL;
+	}
 }
 
 int security_cred_alloc_blank(struct cred *cred, gfp_t gfp)

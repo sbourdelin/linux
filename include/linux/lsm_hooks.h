@@ -27,6 +27,7 @@
 #include <linux/security.h>
 #include <linux/init.h>
 #include <linux/rculist.h>
+#include <linux/sched.h> /* "struct task_struct" */
 
 /**
  * Security hooks for program execution operations.
@@ -536,7 +537,10 @@
  * @task_alloc:
  *	@task task being allocated.
  *	@clone_flags contains the flags indicating what should be shared.
- *	Handle allocation of task-related resources.
+ *	Handle allocation of task-related resources. Note that task_free is
+ *	called even if task_alloc failed. This means that all task_free users
+ *	have to be prepared for task_free being called without corresponding
+ *	task_alloc call.
  *	Returns a zero on success, negative values on failure.
  * @task_free:
  *	@task task about to be freed.
@@ -1946,5 +1950,35 @@ void __init loadpin_add_hooks(void);
 #else
 static inline void loadpin_add_hooks(void) { };
 #endif
+
+/*
+ * Per "struct task_struct" security blob is managed using index numbers.
+ *
+ * Any user who wants to use per "struct task_struct" security blob reserves an
+ * index number using security_reserve_task_blob_index() before calling
+ * security_add_hooks().
+ *
+ * security_reserve_task_blob_index() returns an index number which has to be
+ * passed to task_security() by that user when fetching security blob of given
+ * "struct task_struct" for that user.
+ *
+ * Security blob for newly allocated "struct task_struct" is allocated and
+ * initialized with 0 inside security_task_alloc(), before calling each user's
+ * task_alloc hook. Be careful with task_free hook, for security_task_free()
+ * can be called when calling each user's task_alloc hook failed.
+ *
+ * Note that security_reserve_task_blob_index() uses "u16". It is not a good
+ * idea to directly reserve large amount. Sum of reserved amount by all users
+ * should be less than PAGE_SIZE bytes, for per "struct task_struct" security
+ * blob is allocated for each "struct task_struct" using kcalloc().
+ */
+extern u16 __init security_reserve_task_blob_index(const u16 size);
+static inline void *task_security(const struct task_struct *task,
+				  const u16 index)
+{
+	unsigned long *p = task->security;
+
+	return p + index;
+}
 
 #endif /* ! __LINUX_LSM_HOOKS_H */
