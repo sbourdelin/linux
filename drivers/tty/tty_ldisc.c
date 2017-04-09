@@ -770,7 +770,9 @@ void tty_ldisc_init(struct tty_struct *tty)
  */
 void tty_ldisc_deinit(struct tty_struct *tty)
 {
+	tty_ldisc_lock(tty, MAX_SCHEDULE_TIMEOUT);
 	if (tty->ldisc)
 		tty_ldisc_put(tty->ldisc);
 	tty->ldisc = NULL;
+	tty_ldisc_unlock(tty);
 }
