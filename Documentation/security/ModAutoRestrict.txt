@@ -1,0 +1,77 @@
+ModAutoRestrict is a Linux Security Module that applies restrictions on
+automatic module loading operations. This is selectable at build-time
+with CONFIG_SECURITY_MODAUTORESTRICT, and can be controlled at run-time
+through sysctls in /proc/sys/kernel/modautorestrict/autoload or as a
+per-process setting via a prctl() interface.
+
+===========================================
+
+A userspace request to use a kernel feature that is implemented by modules
+that are not loaded may trigger the module auto-load feature to load
+these modules in order to satisfy userspace. However as today's Linux use
+cases cover embedded systems to containers where applications are running
+in their own separate environments, reducing or preventing operations
+that may affect external environments is an important constraint.
+Therefore, we need a way to control if automatic module loading is
+allowed or which applications are allowed to trigger the module
+auto-load feature.
+
+The ModAutoRestrict LSM allows system administrators or sandbox
+mechanisms to control the module auto-load feature and prevent loading
+unneeded modules or abuse the interface.
+
+The settings can be applied globally using a sysctl interface which
+completes the core kernel interface "modules_disable".
+
+The feature is also available as a prctl() interface. This allows to
+apply restrictions when sandboxing processes. On embedded Linux systems,
+or containers where only some containers/processes should have the
+right privileges to load modules, this allows to restrict those
+processes from inserting modules. Only privileged processes can be
+allowed to perform so. A more restrictive access can be applied where
+the module autoload feature is completely disabled.
+In this schema the access rules are per-process and inherited by
+children created by fork(2) and clone(2), and preserved across execve(2).
+
+Interface:
+
+*) The per-process prctl() settings are:
+
+ prctl(PR_MOD_AUTO_RESTRICT_OPTS, PR_SET_MOD_AUTO_RESTRICT, value, 0, 0)
+
+ Where value means:
+
+ 0 - Classic module auto-load permissions, nothing changes.
+
+ 1 - The current process must have CAP_SYS_MODULE to be able to
+     auto-load modules. CAP_NET_ADMIN should allow to auto-load
+     modules with a 'netdev-%s' alias.
+
+ 2 - Current process can not auto-load modules. Once set, this prctl
+     value can not be changed.
+
+ The per-process value may only be increased, never decreased, thus ensuring
+ that once applied, processes can never relaxe their setting.
+
+*) The global sysctl setting can be set by writting an integer value to
+   '/proc/sys/kernel/modautorestrict/autoload'
+
+ The valid values are:
+
+ 0 - Classic module auto-load permissions, nothing changes.
+
+ 1 - Processes must have CAP_SYS_MODULE to be able to auto-load modules.
+     CAP_NET_ADMIN should allow to auto-load modules with a 'netdev-%s'
+     alias.
+
+ 2 - Processes can not auto-load modules. Once set, this sysctl value
+     can not be changed.
+
+*) Access rules:
+   First the prctl() settings are checked, if the access is not denied
+   then the global sysctl settings are checked.
+
+
+The original idea and inspiration is from grsecurity 'GRKERNSEC_MODHARDEN'.
+
+==========================================================================
