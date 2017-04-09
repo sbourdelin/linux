@@ -37,6 +37,9 @@ struct rdtgroup {
 /* rdtgroup.flags */
 #define	RDT_DELETED		1
 
+/* rftype.flags */
+#define RFTYPE_FLAGS_CPUS_LIST	1
+
 /* List of all resource groups */
 extern struct list_head rdt_all_groups;
 
@@ -54,6 +57,7 @@ struct rftype {
 	char			*name;
 	umode_t			mode;
 	struct kernfs_ops	*kf_ops;
+	unsigned long		flags;
 
 	int (*seq_show)(struct kernfs_open_file *of,
 			struct seq_file *sf, void *v);
