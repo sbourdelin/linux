@@ -664,6 +664,7 @@ static int ibmvnic_open(struct net_device *netdev)
 
 	netif_tx_start_all_queues(netdev);
 	adapter->is_closed = false;
+	adapter->is_up = true;
 
 	return 0;
 
@@ -857,18 +858,19 @@ static int ibmvnic_xmit(struct sk_buff *skb, struct net_device *netdev)
 	int index = 0;
 	int ret = 0;
 
+	if (adapter->migrated || !adapter->is_up) {
+		tx_send_failed++;
+		tx_dropped++;
+		ret = NETDEV_TX_BUSY;
+		goto out;
+	}
+
 	tx_pool = &adapter->tx_pool[queue_num];
 	tx_scrq = adapter->tx_scrq[queue_num];
 	txq = netdev_get_tx_queue(netdev, skb_get_queue_mapping(skb));
 	handle_array = (u64 *)((u8 *)(adapter->login_rsp_buf) +
 				   be32_to_cpu(adapter->login_rsp_buf->
 					       off_txsubm_subcrqs));
-	if (adapter->migrated) {
-		tx_send_failed++;
-		tx_dropped++;
-		ret = NETDEV_TX_BUSY;
-		goto out;
-	}
 
 	index = tx_pool->free_map[tx_pool->consumer_index];
 	offset = index * adapter->req_mtu;
@@ -2913,11 +2915,13 @@ static void ibmvnic_handle_crq(union ibmvnic_crq *crq,
 		if (gen_crq->cmd == IBMVNIC_PARTITION_MIGRATED) {
 			dev_info(dev, "Re-enabling adapter\n");
 			adapter->migrated = true;
+			adapter->is_up = false;
 			schedule_work(&adapter->ibmvnic_xport);
 		} else if (gen_crq->cmd == IBMVNIC_DEVICE_FAILOVER) {
 			dev_info(dev, "Backing device failover detected\n");
 			netif_carrier_off(netdev);
 			adapter->failover = true;
+			adapter->is_up = false;
 		} else {
 			/* The adapter lost the connection */
 			dev_err(dev, "Virtual Adapter failed (rc=%d)\n",
