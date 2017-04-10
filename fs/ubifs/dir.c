@@ -111,14 +111,6 @@ struct inode *ubifs_new_inode(struct ubifs_info *c, struct inode *dir,
 	if (!inode)
 		return ERR_PTR(-ENOMEM);
 
-	/*
-	 * Set 'S_NOCMTIME' to prevent VFS form updating [mc]time of inodes and
-	 * marking them dirty in file write path (see 'file_update_time()').
-	 * UBIFS has to fully control "clean <-> dirty" transitions of inodes
-	 * to make budgeting work.
-	 */
-	inode->i_flags |= S_NOCMTIME;
-
 	inode_init_owner(inode, dir, mode);
 	inode->i_mtime = inode->i_atime = inode->i_ctime =
 			 ubifs_current_time(inode);

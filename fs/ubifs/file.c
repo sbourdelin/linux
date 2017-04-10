@@ -1391,6 +1391,8 @@ int ubifs_update_time(struct inode *inode, struct timespec *time,
 		return err;
 
 	mutex_lock(&ui->ui_mutex);
+	if (flags & S_VERSION)
+		inode_inc_iversion(inode);
 	if (flags & S_ATIME)
 		inode->i_atime = *time;
 	if (flags & S_CTIME)
