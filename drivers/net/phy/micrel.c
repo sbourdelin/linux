@@ -574,7 +574,6 @@ static int ksz9031_config_init(struct phy_device *phydev)
 				MII_KSZ9031RN_TX_DATA_PAD_SKEW, 4,
 				tx_data_skews, 4);
 	}
-
 	return ksz9031_center_flp_timing(phydev);
 }
 
@@ -653,12 +652,18 @@ ksz9021_wr_mmd_phyreg(struct phy_device *phydev, int devad, u16 regnum, u16 val)
 
 static int kszphy_get_sset_count(struct phy_device *phydev)
 {
+	if (!phydev->priv)
+		return -EOPNOTSUPP;
+
 	return ARRAY_SIZE(kszphy_hw_stats);
 }
 
 static void kszphy_get_strings(struct phy_device *phydev, u8 *data)
 {
 	int i;
+
+	if (!phydev->priv)
+		return;
 
 	for (i = 0; i < ARRAY_SIZE(kszphy_hw_stats); i++) {
 		memcpy(data + i * ETH_GSTRING_LEN,
@@ -692,6 +697,9 @@ static void kszphy_get_stats(struct phy_device *phydev,
 			     struct ethtool_stats *stats, u64 *data)
 {
 	int i;
+
+	if (!phydev->priv)
+		return;
 
 	for (i = 0; i < ARRAY_SIZE(kszphy_hw_stats); i++)
 		data[i] = kszphy_get_stat(phydev, i);
