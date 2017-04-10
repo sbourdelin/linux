@@ -293,11 +293,11 @@ static int __init misc_init(void)
 
 	err = -EIO;
 	if (register_chrdev(MISC_MAJOR, "misc", &misc_fops))
-		goto fail_printk;
+		goto fail_print;
 	misc_class->devnode = misc_devnode;
 	return 0;
 
-fail_printk:
+fail_print:
 	pr_err("unable to get major %d for misc devices\n", MISC_MAJOR);
 	class_destroy(misc_class);
 fail_remove:
