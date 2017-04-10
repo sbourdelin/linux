@@ -198,6 +198,7 @@ struct host_if_msg {
 	union message_body body;
 	struct wilc_vif *vif;
 	struct work_struct work;
+	void *drv_handler;
 };
 
 struct join_bss_param {
@@ -334,14 +335,43 @@ static void handle_set_wfi_drv_handler(struct wilc_vif *vif,
 {
 	int ret = 0;
 	struct wid wid;
+	u8 *currbyte;
+	struct host_if_drv *hif_drv = NULL;
+	int driver_handler_id = 0;
+
+	if (!vif->hif_drv)
+		return;
+
+	if (!hif_drv_handler)
+		return;
+
+	hif_drv	= vif->hif_drv;
+
+	u8 *buffer = kzalloc(DRV_HANDLER_SIZE, GFP_ATOMIC);
+
+	if (hif_drv)
+		driver_handler_id = hif_drv->driver_handler_id;
+	else
+		driver_handler_id = 0;
+
+	currbyte = buffer;
+	*currbyte = driver_handler_id & DRV_HANDLER_MASK;
+	currbyte++;
+	*currbyte = (u32)0 & DRV_HANDLER_MASK;
+	currbyte++;
+	*currbyte = (u32)0 & DRV_HANDLER_MASK;
+	currbyte++;
+	*currbyte = (u32)0 & DRV_HANDLER_MASK;
+	currbyte++;
+	*currbyte = (hif_drv_handler->name | (hif_drv_handler->mode << 1));
 
 	wid.id = (u16)WID_SET_DRV_HANDLER;
 	wid.type = WID_STR;
-	wid.val = (s8 *)hif_drv_handler;
-	wid.size = sizeof(*hif_drv_handler);
+	wid.val = (s8 *)buffer;
+	wid.size = DRV_HANDLER_SIZE;
 
 	ret = wilc_send_config_pkt(vif, SET_CFG, &wid, 1,
-				   hif_drv_handler->handler);
+				   driver_handler_id);
 
 	if (!hif_drv_handler->handler)
 		complete(&hif_driver_comp);
@@ -2403,9 +2433,9 @@ static void Handle_SetMulticastFilter(struct wilc_vif *vif,
 
 	pu8CurrByte = wid.val;
 	*pu8CurrByte++ = (strHostIfSetMulti->enabled & 0xFF);
-	*pu8CurrByte++ = 0;
-	*pu8CurrByte++ = 0;
-	*pu8CurrByte++ = 0;
+	*pu8CurrByte++ = ((strHostIfSetMulti->enabled >> 8) & 0xFF);
+	*pu8CurrByte++ = ((strHostIfSetMulti->enabled >> 16) & 0xFF);
+	*pu8CurrByte++ = ((strHostIfSetMulti->enabled >> 24) & 0xFF);
 
 	*pu8CurrByte++ = (strHostIfSetMulti->cnt & 0xFF);
 	*pu8CurrByte++ = ((strHostIfSetMulti->cnt >> 8) & 0xFF);
@@ -3099,7 +3129,8 @@ int wilc_set_mac_chnl_num(struct wilc_vif *vif, u8 channel)
 	return 0;
 }
 
-int wilc_set_wfi_drv_handler(struct wilc_vif *vif, int index, u8 mac_idx)
+int wilc_set_wfi_drv_handler(struct wilc_vif *vif, int index, u8 mode, char
+			     *ifname)
 {
 	int result = 0;
 	struct host_if_msg msg;
@@ -3107,8 +3138,13 @@ int wilc_set_wfi_drv_handler(struct wilc_vif *vif, int index, u8 mac_idx)
 	memset(&msg, 0, sizeof(struct host_if_msg));
 	msg.id = HOST_IF_MSG_SET_WFIDRV_HANDLER;
 	msg.body.drv.handler = index;
-	msg.body.drv.mac_idx = mac_idx;
+	msg.body.drv.mode = mode;
 	msg.vif = vif;
+
+	if (!memcmp(ifname, "wlan0", 5))
+		msg.body.drv.name = 1;
+	else if (!memcmp(ifname, "p2p0", 4))
+		msg.body.drv.name = 0;
 
 	result = wilc_enqueue_cmd(&msg);
 	if (result) {
@@ -3330,6 +3366,7 @@ int wilc_init(struct net_device *dev, struct host_if_drv **hif_drv_handler)
 	for (i = 0; i < wilc->vif_num; i++)
 		if (dev == wilc->vif[i]->ndev) {
 			wilc->vif[i]->hif_drv = hif_drv;
+			hif_drv->driver_handler_id = i + 1;
 			break;
 		}
 
@@ -3403,7 +3440,7 @@ int wilc_deinit(struct wilc_vif *vif)
 	del_timer_sync(&periodic_rssi);
 	del_timer_sync(&hif_drv->remain_on_ch_timer);
 
-	wilc_set_wfi_drv_handler(vif, 0, 0);
+	wilc_set_wfi_drv_handler(vif, 0, 0, 0);
 	wait_for_completion(&hif_driver_comp);
 
 	if (hif_drv->usr_scan_req.scan_result) {
