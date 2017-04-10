@@ -1908,8 +1908,10 @@ populate_lr_context(struct i915_gem_context *ctx,
 }
 
 /**
- * intel_lr_context_size() - return the size of the context for an engine
- * @engine: which engine to find the context size for
+ * intel_lr_class_context_size() - return the size of the context for a given
+ * engine class
+ * @dev_priv: i915 device private
+ * @class: which engine class to find the context size for
  *
  * Each engine may require a different amount of space for a context image,
  * so when allocating (or copying) an image, this function can be used to
@@ -1921,25 +1923,32 @@ populate_lr_context(struct i915_gem_context *ctx,
  * in LRC mode, but does not include the "shared data page" used with
  * GuC submission. The caller should account for this if using the GuC.
  */
-uint32_t intel_lr_context_size(struct intel_engine_cs *engine)
+uint32_t intel_lr_class_context_size(struct drm_i915_private *dev_priv, u8 class)
 {
 	int ret = 0;
 
-	WARN_ON(INTEL_GEN(engine->i915) < 8);
+	WARN_ON(INTEL_GEN(dev_priv) < 8);
 
-	switch (engine->id) {
-	case RCS:
-		if (INTEL_GEN(engine->i915) >= 9)
+	switch (class) {
+	case RENDER_CLASS:
+		switch (INTEL_GEN(dev_priv)) {
+		default:
+			MISSING_CASE(INTEL_GEN(dev_priv));
+		case 9:
 			ret = GEN9_LR_CONTEXT_RENDER_SIZE;
-		else
+			break;
+		case 8:
 			ret = GEN8_LR_CONTEXT_RENDER_SIZE;
+			break;
+		}
 		break;
-	case VCS:
-	case BCS:
-	case VECS:
-	case VCS2:
+	case VIDEO_DECODE_CLASS:
+	case VIDEO_ENHANCEMENT_CLASS:
+	case COPY_ENGINE_CLASS:
 		ret = GEN8_LR_CONTEXT_OTHER_SIZE;
 		break;
+	default:
+		MISSING_CASE(class);
 	}
 
 	return ret;
