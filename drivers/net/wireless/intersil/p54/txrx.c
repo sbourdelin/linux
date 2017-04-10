@@ -503,7 +503,9 @@ static void p54_rx_eeprom_readback(struct p54_common *priv,
 
 	priv->eeprom = NULL;
 	tmp = p54_find_and_unlink_skb(priv, hdr->req_id);
-	dev_kfree_skb_any(tmp);
+	if (unlikely(!tmp))
+		dev_kfree_skb_any(tmp);
+
 	complete(&priv->eeprom_comp);
 }
 
@@ -597,7 +599,9 @@ static void p54_rx_stats(struct p54_common *priv, struct sk_buff *skb)
 	}
 
 	tmp = p54_find_and_unlink_skb(priv, hdr->req_id);
-	dev_kfree_skb_any(tmp);
+	if (unlikely(!tmp))
+		dev_kfree_skb_any(tmp);
+
 	complete(&priv->stat_comp);
 }
 
