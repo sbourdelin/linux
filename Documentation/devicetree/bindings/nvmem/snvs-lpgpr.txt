@@ -1,0 +1,15 @@
+Device tree bindings for Low Power General Purpose Register found in i.MX6Q/D
+Secure Non-Volatile Storage.
+
+Required properties:
+- compatible: should be one of
+	"fsl,imx6q-snvs-lpgpr" (i.MX6Q/D/DL/S).
+- offset: Should contain the offset relative to syscon parent node.
+- regmap: Should contain a phandle pointing to syscon.
+
+Example:
+	snvs_lpgpr: snvs-lpgpr {
+		compatible = "fsl,imx6q-snvs-lpgpr";
+		regmap = <&snvs>;
+		offset = <0x68>;
+	};
