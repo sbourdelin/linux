@@ -237,7 +237,7 @@ int ks_wlan_hw_power_save(struct ks_wlan_private *priv)
 
 static int enqueue_txdev(struct ks_wlan_private *priv, unsigned char *p,
 			 unsigned long size,
-			 void (*complete_handler)(void *arg1, void *arg2),
+			 void (*complete_handler)(void *, void *),
 			 void *arg1, void *arg2)
 {
 	struct tx_device_buffer *sp;
@@ -337,7 +337,7 @@ static void tx_device_task(struct ks_wlan_private *priv)
 }
 
 int ks_wlan_hw_tx(struct ks_wlan_private *priv, void *p, unsigned long size,
-		  void (*complete_handler)(void *arg1, void *arg2),
+		  void (*complete_handler)(void *, void *),
 		  void *arg1, void *arg2)
 {
 	int result = 0;
