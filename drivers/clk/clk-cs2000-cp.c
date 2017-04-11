@@ -42,6 +42,8 @@
 /* DEVICE_CFG1 */
 #define RSEL(x)		(((x) & 0x3) << 3)
 #define RSEL_MASK	RSEL(0x3)
+#define AUXOUTSRC(x)	(((x) & 0x3) << 1)
+#define AUXOUTSRC_MASK	AUXOUTSRC(0x3)
 #define ENDEV1		(0x1)
 
 /* DEVICE_CFG2 */
@@ -54,6 +56,8 @@
 #define ENDEV2		(0x1)
 
 /* FUNC_CFG1 */
+#define AUXLOCKCFG(x)	(((x) & 0x1) << 6)
+#define AUXLOCKCFG_MASK	AUXLOCKCFG(1)
 #define REFCLKDIV(x)	(((x) & 0x3) << 3)
 #define REFCLKDIV_MASK	REFCLKDIV(0x3)
 
@@ -66,11 +70,20 @@
 #define REF_CLK	1
 #define CLK_MAX 2
 
+enum auxoutsrc {
+	AUXSRC_REFCLK = 0,
+	AUXSRC_CLKIN,
+	AUXSRC_PLLCLKOUT,
+	AUXSRC_PUSHPULL,
+	AUXSRC_OPENDRAIN,
+};
+
 struct cs2000_priv {
 	struct clk_hw hw;
 	struct i2c_client *client;
 	struct clk *clk_in;
 	struct clk *ref_clk;
+	enum auxoutsrc auxoutsrc;
 
 	/* suspend/resume */
 	unsigned long saved_rate;
@@ -111,14 +124,36 @@ static int cs2000_bset(struct cs2000_priv *priv, u8 addr, u8 mask, u8 val)
 static int cs2000_enable_dev_config(struct cs2000_priv *priv, bool enable)
 {
 	int ret;
+	u8 dcfg1, fcfg1;
 
-	ret = cs2000_bset(priv, DEVICE_CFG1, ENDEV1,
-			  enable ? ENDEV1 : 0);
+	dcfg1 = 0;
+	fcfg1 = 0;
+	if (enable)
+		dcfg1 |= ENDEV1;
+	switch (priv->auxoutsrc) {
+	case AUXSRC_REFCLK:
+	case AUXSRC_CLKIN:
+	case AUXSRC_PLLCLKOUT:
+		dcfg1 |= AUXOUTSRC(priv->auxoutsrc);
+		break;
+	case AUXSRC_OPENDRAIN:
+		fcfg1 |= AUXLOCKCFG(1);
+		/* fall though */
+	case AUXSRC_PUSHPULL:
+		dcfg1 |= AUXOUTSRC(3);
+		break;
+	}
+
+	ret = cs2000_bset(priv, DEVICE_CFG1, (AUXOUTSRC_MASK | ENDEV1), dcfg1);
 	if (ret < 0)
 		return ret;
 
 	ret = cs2000_bset(priv, GLOBAL_CFG,  ENDEV2,
 			  enable ? ENDEV2 : 0);
+	if (ret < 0)
+		return ret;
+
+	ret = cs2000_bset(priv, FUNC_CFG1, AUXLOCKCFG_MASK, fcfg1);
 	if (ret < 0)
 		return ret;
 
@@ -479,6 +514,38 @@ static int cs2000_remove(struct i2c_client *client)
 	return 0;
 }
 
+static void cs2000_of_parse(struct cs2000_priv *priv)
+{
+	struct device *dev = priv_to_dev(priv);
+	struct device_node *np = dev->of_node;
+	const char *auxoutsrc;
+
+	auxoutsrc = of_get_property(np, "auxoutsrc", NULL);
+
+	if (auxoutsrc) {
+		int i;
+		struct {
+			char *name;
+			enum auxoutsrc val;
+		} of_table[] = {
+			{"refclk",	AUXSRC_REFCLK},
+			{"clk_in",	AUXSRC_CLKIN},
+			{"pllclkout",	AUXSRC_PLLCLKOUT},
+			{"push-pull",	AUXSRC_PUSHPULL},
+			{"open-drain",	AUXSRC_OPENDRAIN},
+		};
+
+		for (i = 0; i < ARRAY_SIZE(of_table); i++) {
+			if (strcmp(of_table[i].name, auxoutsrc) == 0) {
+				priv->auxoutsrc = of_table[i].val;
+				dev_dbg(dev, "%s was selected\n",
+					of_table[i].name);
+				break;
+			}
+		}
+	}
+}
+
 static int cs2000_probe(struct i2c_client *client,
 			const struct i2c_device_id *id)
 {
@@ -492,6 +559,8 @@ static int cs2000_probe(struct i2c_client *client,
 
 	priv->client = client;
 	i2c_set_clientdata(client, priv);
+
+	cs2000_of_parse(priv);
 
 	ret = cs2000_clk_get(priv);
 	if (ret < 0)

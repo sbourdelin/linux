@@ -8,6 +8,15 @@ Required properties:
 - clock-names:		CLK_IN : clk_in, XTI/REF_CLK : ref_clk
 - #clock-cells:		must be <0>
 
+Option properties:
+
+- auxoutsrc:		select AUX_OUT source from these.
+				refclk:		Timing Reference Clock
+				clk_in:		Frequency Reference Clock
+				pllclkout:	PLL Clock Output
+				push-pull:	PLL Lock/Unlock Indication
+				open-drain:	PLL Lock/Unlock Indication
+
 Example:
 
 &i2c2 {
