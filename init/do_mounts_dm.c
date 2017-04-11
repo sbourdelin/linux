@@ -187,8 +187,7 @@ static char * __init dm_parse_device(struct dm_device *dev, char *str)
 	if (opt.delim == DM_FIELD_SEP[0]) {
 		if (!get_dm_option(&opt, DM_LINE_SEP))
 			return NULL;
-		if (kstrtoul(opt.start, 10, &dev->num_targets))
-			dev->num_targets = 1;
+		dev->num_targets = simple_strtoul(opt.start, NULL, 10);
 	} else {
 		dev->num_targets = 1;
 	}
@@ -214,7 +213,7 @@ static char * __init dm_parse_targets(struct dm_device *dev, char *str)
 	 */
 	opt.next = str;
 	for (i = 0; i < num_targets; i++) {
-		*target = kzalloc(sizeof(*target), GFP_KERNEL);
+		*target = kzalloc(sizeof(struct dm_setup_target), GFP_KERNEL);
 		if (!*target) {
 			DMERR("failed to allocate memory for target %s<%ld>",
 			      dev->name, i);
@@ -227,18 +226,14 @@ static char * __init dm_parse_targets(struct dm_device *dev, char *str)
 			      " for target %s<%ld>", dev->name, i);
 			goto parse_fail;
 		}
-
-		if (kstrtoull(opt.start, 10, &(*target)->begin))
-			goto parse_fail;
+		(*target)->begin = simple_strtoull(opt.start, NULL, 10);
 
 		if (!get_dm_option(&opt, DM_FIELD_SEP)) {
 			DMERR("failed to parse length for target %s<%ld>",
 			      dev->name, i);
 			goto parse_fail;
 		}
-
-		if (kstrtoull(opt.start, 10, &(*target)->length))
-			goto parse_fail;
+		(*target)->length = simple_strtoull(opt.start, NULL, 10);
 
 		if (get_dm_option(&opt, DM_FIELD_SEP))
 			(*target)->type = kstrndup(opt.start, opt.len,
@@ -328,8 +323,7 @@ static int __init dm_setup(char *str)
 	if (!get_dm_option(&opt, DM_FIELD_SEP))
 		goto parse_fail;
 	if (isdigit(opt.start[0])) {	/* Optional number field */
-		if (kstrtoul(opt.start, 10, &num_devices))
-			num_devices = 1;
+		num_devices = simple_strtoul(opt.start, NULL, 10);
 		str = opt.next;
 	} else {
 		num_devices = 1;
