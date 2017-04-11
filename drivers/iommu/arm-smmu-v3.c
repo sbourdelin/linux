@@ -415,6 +415,9 @@
 #define ARM_SMMU_PAGE0_REGS_ONLY(s)		\
 	((s)->options & ARM_SMMU_OPT_PAGE0_REGS_ONLY)
 
+#define ARM_SMMU_USE_SHARED_IRQS(s)		\
+	((s)->options & ARM_SMMU_OPT_USE_SHARED_IRQS)
+
 static bool disable_bypass;
 module_param_named(disable_bypass, disable_bypass, bool, S_IRUGO);
 MODULE_PARM_DESC(disable_bypass,
@@ -601,6 +604,7 @@ struct arm_smmu_device {
 
 #define ARM_SMMU_OPT_SKIP_PREFETCH	(1 << 0)
 #define ARM_SMMU_OPT_PAGE0_REGS_ONLY    (1 << 1)
+#define ARM_SMMU_OPT_USE_SHARED_IRQS    (1 << 2)
 	u32				options;
 
 	struct arm_smmu_cmdq		cmdq;
@@ -668,6 +672,7 @@ struct arm_smmu_option_prop {
 static struct arm_smmu_option_prop arm_smmu_options[] = {
 	{ ARM_SMMU_OPT_SKIP_PREFETCH, "hisilicon,broken-prefetch-cmd" },
 	{ ARM_SMMU_OPT_PAGE0_REGS_ONLY, "cavium-cn99xx,broken-page1-regspace"},
+	{ ARM_SMMU_OPT_USE_SHARED_IRQS, "cavium-cn99xx,broken-unique-irqlines"},
 	{ 0, NULL},
 };
 
@@ -2237,6 +2242,7 @@ static int arm_smmu_setup_irqs(struct arm_smmu_device *smmu)
 {
 	int ret, irq;
 	u32 irqen_flags = IRQ_CTRL_EVTQ_IRQEN | IRQ_CTRL_GERROR_IRQEN;
+	u32 irqflags = IRQF_ONESHOT | IRQF_SHARED;
 
 	/* Disable IRQs first */
 	ret = arm_smmu_write_reg_sync(smmu, 0, ARM_SMMU_IRQ_CTRL,
@@ -2251,9 +2257,11 @@ static int arm_smmu_setup_irqs(struct arm_smmu_device *smmu)
 	/* Request interrupt lines */
 	irq = smmu->evtq.q.irq;
 	if (irq) {
+		if (!ARM_SMMU_USE_SHARED_IRQS(smmu))
+			irqflags = IRQF_ONESHOT;
 		ret = devm_request_threaded_irq(smmu->dev, irq, NULL,
 						arm_smmu_evtq_thread,
-						IRQF_ONESHOT,
+						irqflags,
 						"arm-smmu-v3-evtq", smmu);
 		if (ret < 0)
 			dev_warn(smmu->dev, "failed to enable evtq irq\n");
@@ -2261,8 +2269,10 @@ static int arm_smmu_setup_irqs(struct arm_smmu_device *smmu)
 
 	irq = smmu->cmdq.q.irq;
 	if (irq) {
+		if (!ARM_SMMU_USE_SHARED_IRQS(smmu))
+			irqflags = 0;
 		ret = devm_request_irq(smmu->dev, irq,
-				       arm_smmu_cmdq_sync_handler, 0,
+				       arm_smmu_cmdq_sync_handler, irqflags,
 				       "arm-smmu-v3-cmdq-sync", smmu);
 		if (ret < 0)
 			dev_warn(smmu->dev, "failed to enable cmdq-sync irq\n");
@@ -2270,8 +2280,10 @@ static int arm_smmu_setup_irqs(struct arm_smmu_device *smmu)
 
 	irq = smmu->gerr_irq;
 	if (irq) {
+		if (!ARM_SMMU_USE_SHARED_IRQS(smmu))
+			irqflags = 0;
 		ret = devm_request_irq(smmu->dev, irq, arm_smmu_gerror_handler,
-				       0, "arm-smmu-v3-gerror", smmu);
+				       irqflags, "arm-smmu-v3-gerror", smmu);
 		if (ret < 0)
 			dev_warn(smmu->dev, "failed to enable gerror irq\n");
 	}
