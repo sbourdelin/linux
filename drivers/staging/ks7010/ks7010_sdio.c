@@ -1023,7 +1023,6 @@ static int send_stop_request(struct sdio_func *func)
 	return 0;
 }
 
-
 static void ks7010_sdio_remove(struct sdio_func *func)
 {
 	int ret;
