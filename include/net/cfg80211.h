@@ -2856,6 +2856,10 @@ struct cfg80211_nan_func {
  *	All other parameters must be ignored.
  *
  * @set_multicast_to_unicast: configure multicast to unicast conversion for BSS
+ * @set_btcoex: Use this callback to call driver API when user wants to
+ *	enable/disable btcoex and use this callback to set wlan high priority
+ *	over bluetooth. When BTCOEX enabled, the high priority wlan frames
+ *	will have more priority than BT.
  */
 struct cfg80211_ops {
 	int	(*suspend)(struct wiphy *wiphy, struct cfg80211_wowlan *wow);
@@ -3144,6 +3148,8 @@ struct cfg80211_ops {
 	int	(*set_multicast_to_unicast)(struct wiphy *wiphy,
 					    struct net_device *dev,
 					    const bool enabled);
+	int     (*set_btcoex)(struct wiphy *wiphy, bool enabled,
+			      u32 btcoex_priority);
 };
 
 /*

@@ -944,6 +944,8 @@
  *	BSS selection. This command can be issued only while connected and it
  *	does not result in a change for the current association. Currently,
  *	only the %NL80211_ATTR_IE data is used and updated with this command.
+ * @NL80211_CMD_SET_BTCOEX: Enable/Disable btcoex using %NL80211_ATTR_BTCOEX_OP
+ *	and set/modify btcoex priority using %NL80211_ATTR_BTCOEX_PRIORITY.
  *
  * @NL80211_CMD_MAX: highest used command number
  * @__NL80211_CMD_AFTER_LAST: internal use
@@ -1143,6 +1145,8 @@ enum nl80211_commands {
 	NL80211_CMD_SET_MULTICAST_TO_UNICAST,
 
 	NL80211_CMD_UPDATE_CONNECT_PARAMS,
+
+	NL80211_CMD_SET_BTCOEX,
 
 	/* add new commands above here */
 
@@ -2081,6 +2085,16 @@ enum nl80211_commands {
  * @NL80211_ATTR_PMK: PMK for the PMKSA identified by %NL80211_ATTR_PMKID.
  *	This is used with @NL80211_CMD_SET_PMKSA.
  *
+ * @NL80211_ATTR_BTCOEX_OP: u8 attribute for driver supporting
+ *	the btcoex feature. When used with %NL80211_CMD_SET_BTCOEX it contains
+ *	either 0 for disable or 1 for enable btcoex.
+ *
+ * @NL80211_ATTR_BTCOEX_PRIORITY: This is for the driver which support
+ *	btcoex priority feature. It used with %NL80211_CMD_SET_BTCOEX.
+ *	This will have u32 BITMAP value which represents
+ *	frame(bk, be, vi, vo, mgmt, beacon) type and that will have more
+ *	priority than a BT traffic.
+ *
  * @NUM_NL80211_ATTR: total number of nl80211_attrs available
  * @NL80211_ATTR_MAX: highest attribute number currently defined
  * @__NL80211_ATTR_AFTER_LAST: internal use
@@ -2499,6 +2513,9 @@ enum nl80211_attrs {
 	NL80211_ATTR_FILS_CACHE_ID,
 
 	NL80211_ATTR_PMK,
+
+	NL80211_ATTR_BTCOEX_OP,
+	NL80211_ATTR_BTCOEX_PRIORITY,
 
 	/* add attributes here, update the policy in nl80211.c */
 
@@ -4838,6 +4855,8 @@ enum nl80211_feature_flags {
  *	RSSI threshold values to monitor rather than exactly one threshold.
  * @NL80211_EXT_FEATURE_FILS_SK_OFFLOAD: Driver SME supports FILS shared key
  *	authentication with %NL80211_CMD_CONNECT.
+ * @NL80211_EXT_FEATURE_BTCOEX_PRIORITY: Driver supports btcoex priority
+ *	feature with %NL80211_ATTR_BTCOEX_PRIORITY.
  *
  * @NUM_NL80211_EXT_FEATURES: number of extended features.
  * @MAX_NL80211_EXT_FEATURES: highest extended feature index.
@@ -4858,6 +4877,7 @@ enum nl80211_ext_feature_index {
 	NL80211_EXT_FEATURE_SCHED_SCAN_RELATIVE_RSSI,
 	NL80211_EXT_FEATURE_CQM_RSSI_LIST,
 	NL80211_EXT_FEATURE_FILS_SK_OFFLOAD,
+	NL80211_EXT_FEATURE_BTCOEX_PRIORITY,
 
 	/* add new features before the definition below */
 	NUM_NL80211_EXT_FEATURES,
@@ -5338,5 +5358,35 @@ enum nl80211_nan_match_attributes {
 	NUM_NL80211_NAN_MATCH_ATTR,
 	NL80211_NAN_MATCH_ATTR_MAX = NUM_NL80211_NAN_MATCH_ATTR - 1
 };
+
+/**
+ * enum nl80211_btcoex_priority - btcoex priority supported frame types and
+ *	its bitmap values.
+ * @NL80211_BTCOEX_SUPPORTS_BE_PREF - wlan Best effort frame takes more
+ *	priority than BT traffic.
+ * @NL80211_BTCOEX_SUPPORTS_BK_PREF - wlan Background frame takes more
+ *	priority than BT traffic.
+ * @NL80211_BTCOEX_SUPPORTS_VI_PREF - wlan Video frame takes more priority
+ *	than BT traffic.
+ * @NL80211_BTCOEX_SUPPORTS_VO_PREF - wlan Voice frame takes more priority
+ *	than BT traffic.
+ * @NL80211_BTCOEX_SUPPORTS_BEACON_PREF - wlan BEACON frame takes more
+ *	priority than  BT traffic.
+ * @NL80211_BTCOEX_SUPPORTS_MGMT_PREF - wlan Management frame takes more
+ *	priority than BT traffic.
+ * @NL80211_BTCOEX_SUPPORTS_MAX_PREF - MAX supported value for btcoex
+ *	priority feature.
+ */
+
+enum nl80211_btcoex_priority {
+	NL80211_BTCOEX_SUPPORTS_BE_PREF		= 1 << 0,
+	NL80211_BTCOEX_SUPPORTS_BK_PREF		= 1 << 1,
+	NL80211_BTCOEX_SUPPORTS_VI_PREF		= 1 << 2,
+	NL80211_BTCOEX_SUPPORTS_VO_PREF		= 1 << 3,
+	NL80211_BTCOEX_SUPPORTS_BEACON_PREF	= 1 << 4,
+	NL80211_BTCOEX_SUPPORTS_MGMT_PREF	= 1 << 5,
+	NL80211_BTCOEX_SUPPORTS_MAX_PREF	= (1 << 6) - 1,
+};
+
 
 #endif /* __LINUX_NL80211_H */

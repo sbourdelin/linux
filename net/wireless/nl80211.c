@@ -419,6 +419,8 @@ static const struct nla_policy nl80211_policy[NUM_NL80211_ATTR] = {
 					.len = FILS_ERP_MAX_RRK_LEN },
 	[NL80211_ATTR_FILS_CACHE_ID] = { .len = 2 },
 	[NL80211_ATTR_PMK] = { .type = NLA_BINARY, .len = PMK_MAX_LEN },
+	[NL80211_ATTR_BTCOEX_OP] = { .type = NLA_U8 },
+	[NL80211_ATTR_BTCOEX_PRIORITY] = { .type = NLA_U32 },
 };
 
 /* policy for the key attributes */
@@ -12184,6 +12186,41 @@ static int nl80211_set_multicast_to_unicast(struct sk_buff *skb,
 	return rdev_set_multicast_to_unicast(rdev, dev, enabled);
 }
 
+static int nl80211_set_btcoex(struct sk_buff *skb, struct genl_info *info)
+{
+	struct cfg80211_registered_device *rdev = info->user_ptr[0];
+	struct wiphy *wiphy = &rdev->wiphy;
+	u8 val = 0;
+	u32 btcoex_priority = 0;
+
+	if (!rdev->ops->set_btcoex)
+		return -ENOTSUPP;
+
+	if (!(info->attrs[NL80211_ATTR_BTCOEX_OP]))
+		goto set_btcoex;
+
+	if (info->attrs[NL80211_ATTR_BTCOEX_OP])
+		val = nla_get_u8(info->attrs[NL80211_ATTR_BTCOEX_OP]);
+
+	if (val > 1)
+		return -EINVAL;
+
+	if (info->attrs[NL80211_ATTR_BTCOEX_PRIORITY]) {
+		if (!wiphy_ext_feature_isset(wiphy,
+					NL80211_EXT_FEATURE_BTCOEX_PRIORITY))
+			return -EOPNOTSUPP;
+
+		btcoex_priority =
+		nla_get_u32(info->attrs[NL80211_ATTR_BTCOEX_PRIORITY]);
+
+		if (btcoex_priority > NL80211_BTCOEX_SUPPORTS_MAX_PREF)
+			return -E2BIG;
+	}
+
+set_btcoex:
+	return rdev_set_btcoex(rdev, val, btcoex_priority);
+}
+
 #define NL80211_FLAG_NEED_WIPHY		0x01
 #define NL80211_FLAG_NEED_NETDEV	0x02
 #define NL80211_FLAG_NEED_RTNL		0x04
@@ -13057,6 +13094,14 @@ static const struct genl_ops nl80211_ops[] = {
 		.policy = nl80211_policy,
 		.flags = GENL_UNS_ADMIN_PERM,
 		.internal_flags = NL80211_FLAG_NEED_NETDEV |
+				  NL80211_FLAG_NEED_RTNL,
+	},
+	{
+		.cmd = NL80211_CMD_SET_BTCOEX,
+		.doit = nl80211_set_btcoex,
+		.policy = nl80211_policy,
+		.flags = GENL_UNS_ADMIN_PERM,
+		.internal_flags = NL80211_FLAG_NEED_WIPHY |
 				  NL80211_FLAG_NEED_RTNL,
 	},
 };
