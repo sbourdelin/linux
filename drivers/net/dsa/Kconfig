@@ -51,4 +51,12 @@ config NET_DSA_SMSC_LAN9303_I2C
 	  Enable access functions if the SMSC/Microchip LAN9303 is configured
 	  for I2C managed mode.
 
+config NET_DSA_SMSC_LAN9303_MDIO
+	bool "MDIO managed mode"
+	depends on NET_DSA_SMSC_LAN9303
+	depends on OF_MDIO
+	---help---
+	  Enable access functions if the SMSC/Microchip LAN9303 is configured
+	  for MDIO managed mode.
+
 endmenu
