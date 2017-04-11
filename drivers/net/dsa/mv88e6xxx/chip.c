@@ -4209,6 +4209,7 @@ static enum dsa_tag_protocol mv88e6xxx_get_tag_protocol(struct dsa_switch *ds)
 	return chip->info->tag_protocol;
 }
 
+#ifdef CONFIG_NET_DSA_LEGACY
 static const char *mv88e6xxx_drv_probe(struct device *dsa_dev,
 				       struct device *host_dev, int sw_addr,
 				       void **priv)
@@ -4256,6 +4257,7 @@ free:
 
 	return NULL;
 }
+#endif /* CONFIG_NET_DSA_LEGACY */
 
 static int mv88e6xxx_port_mdb_prepare(struct dsa_switch *ds, int port,
 				      const struct switchdev_obj_port_mdb *mdb,
@@ -4310,7 +4312,9 @@ static int mv88e6xxx_port_mdb_dump(struct dsa_switch *ds, int port,
 }
 
 static const struct dsa_switch_ops mv88e6xxx_switch_ops = {
+#ifdef CONFIG_NET_DSA_LEGACY
 	.probe			= mv88e6xxx_drv_probe,
+#endif /* CONFIG_NET_DSA_LEGACY */
 	.get_tag_protocol	= mv88e6xxx_get_tag_protocol,
 	.setup			= mv88e6xxx_setup,
 	.set_addr		= mv88e6xxx_set_addr,
@@ -4347,9 +4351,11 @@ static const struct dsa_switch_ops mv88e6xxx_switch_ops = {
 	.crosschip_bridge_leave	= mv88e6xxx_crosschip_bridge_leave,
 };
 
+#ifdef CONFIG_NET_DSA_LEGACY
 static struct dsa_switch_driver mv88e6xxx_switch_drv = {
 	.ops			= &mv88e6xxx_switch_ops,
 };
+#endif /* CONFIG_NET_DSA_LEGACY */
 
 static int mv88e6xxx_register_switch(struct mv88e6xxx_chip *chip)
 {
@@ -4507,6 +4513,7 @@ static struct mdio_driver mv88e6xxx_driver = {
 	},
 };
 
+#ifdef CONFIG_NET_DSA_LEGACY
 static int __init mv88e6xxx_init(void)
 {
 	register_switch_driver(&mv88e6xxx_switch_drv);
@@ -4520,6 +4527,9 @@ static void __exit mv88e6xxx_cleanup(void)
 	unregister_switch_driver(&mv88e6xxx_switch_drv);
 }
 module_exit(mv88e6xxx_cleanup);
+#else
+mdio_module_driver(mv88e6xxx_driver);
+#endif /* CONFIG_NET_DSA_LEGACY */
 
 MODULE_AUTHOR("Lennert Buytenhek <buytenh@wantstofly.org>");
 MODULE_DESCRIPTION("Driver for Marvell 88E6XXX ethernet switch chips");

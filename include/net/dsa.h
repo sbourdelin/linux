@@ -304,9 +304,11 @@ struct dsa_switch_ops {
 	/*
 	 * Probing and setup.
 	 */
+#ifdef CONFIG_NET_DSA_LEGACY
 	const char	*(*probe)(struct device *dsa_dev,
 				  struct device *host_dev, int sw_addr,
 				  void **priv);
+#endif /* CONFIG_NET_DSA_LEGACY */
 
 	enum dsa_tag_protocol (*get_tag_protocol)(struct dsa_switch *ds);
 
@@ -472,9 +474,12 @@ struct dsa_switch_driver {
 	const struct dsa_switch_ops *ops;
 };
 
+#ifdef CONFIG_NET_DSA_LEGACY
 void register_switch_driver(struct dsa_switch_driver *type);
 void unregister_switch_driver(struct dsa_switch_driver *type);
 struct mii_bus *dsa_host_dev_to_mii_bus(struct device *dev);
+#endif /* CONFIG_NET_DSA_LEGACY */
+
 struct net_device *dsa_dev_to_net_device(struct device *dev);
 
 static inline bool dsa_uses_tagged_protocol(struct dsa_switch_tree *dst)

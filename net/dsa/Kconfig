@@ -15,6 +15,14 @@ config NET_DSA
 
 if NET_DSA
 
+config NET_DSA_LEGACY
+	bool "Legacy DSA support"
+	default y
+	depends on NET_DSA
+	---help---
+	  Say Y if you want to enable legacy support for DSA, where switches
+	  are not considered true Linux bus devices.
+
 # tagging formats
 config NET_DSA_TAG_BRCM
 	bool
