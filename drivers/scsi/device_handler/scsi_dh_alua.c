@@ -688,6 +688,7 @@ static int alua_rtpg(struct scsi_device *sdev, struct alua_port_group *pg)
 				if ((tmp_pg == pg) ||
 				    !(tmp_pg->flags & ALUA_PG_RUNNING)) {
 					struct alua_dh_data *h;
+					struct scsi_device *tmp_pg_sdev = NULL;
 
 					tmp_pg->state = desc[0] & 0x0f;
 					tmp_pg->pref = desc[0] >> 7;
@@ -697,6 +698,17 @@ static int alua_rtpg(struct scsi_device *sdev, struct alua_port_group *pg)
 						/* h->sdev should always be valid */
 						BUG_ON(!h->sdev);
 						h->sdev->access_state = desc[0];
+
+						/*
+						 * If tmp_pg is not the running pg, and its worker
+						 * is not running, tmp_pg->rtpg_sdev might be NULL.
+						 * Use another/one associated scsi_device to print
+						 * its RTPG information.
+						 */
+						if ((tmp_pg != pg) && !tmp_pg_sdev) {
+							tmp_pg_sdev = h->sdev;
+							alua_rtpg_print(tmp_pg_sdev, tmp_pg, NULL);
+						}
 					}
 					rcu_read_unlock();
 				}
