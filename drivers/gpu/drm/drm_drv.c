@@ -357,12 +357,9 @@ EXPORT_SYMBOL(drm_put_dev);
 
 void drm_unplug_dev(struct drm_device *dev)
 {
-	/* for a USB device */
-	drm_dev_unregister(dev);
-
 	mutex_lock(&drm_global_mutex);
 
-	drm_device_set_unplugged(dev);
+	drm_device_set_plug_state(dev, false);
 
 	if (dev->open_count == 0) {
 		drm_put_dev(dev);
@@ -787,6 +784,8 @@ int drm_dev_register(struct drm_device *dev, unsigned long flags)
 	if (drm_core_check_feature(dev, DRIVER_MODESET))
 		drm_modeset_register_all(dev);
 
+	drm_device_set_plug_state(dev, true);
+
 	ret = 0;
 
 	DRM_INFO("Initialized %s %d.%d.%d %s for %s on minor %d\n",
@@ -826,6 +825,7 @@ void drm_dev_unregister(struct drm_device *dev)
 	drm_lastclose(dev);
 
 	dev->registered = false;
+	drm_unplug_dev(dev);
 
 	if (drm_core_check_feature(dev, DRIVER_MODESET))
 		drm_modeset_unregister_all(dev);
