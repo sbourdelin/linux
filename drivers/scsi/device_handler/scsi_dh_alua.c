@@ -523,6 +523,37 @@ static int alua_tur(struct scsi_device *sdev)
 }
 
 /*
+ * alua_rtpg_print - Print REPORT TARGET GROUP STATES information
+ * @sdev: the device evaluated (or associated with this port group).
+ * @pg: the port group the information is associated with.
+ * @valid_states: pointer to valid_states value.
+ *                (optional; e.g., obtained via another port group)
+ *
+ * Must be called with pg->lock held.
+ */
+static void alua_rtpg_print(struct scsi_device *sdev, struct alua_port_group *pg,
+			    int *valid_states)
+{
+	if (valid_states)
+		sdev_printk(KERN_INFO, sdev,
+		    "%s: port group %02x state %c %s supports %c%c%c%c%c%c%c\n",
+		    ALUA_DH_NAME, pg->group_id, print_alua_state(pg->state),
+		    pg->pref ? "preferred" : "non-preferred",
+		    (*valid_states) & TPGS_SUPPORT_TRANSITION ? 'T' : 't',
+		    (*valid_states) & TPGS_SUPPORT_OFFLINE ? 'O' : 'o',
+		    (*valid_states) & TPGS_SUPPORT_LBA_DEPENDENT ? 'L' : 'l',
+		    (*valid_states) & TPGS_SUPPORT_UNAVAILABLE ? 'U' : 'u',
+		    (*valid_states) & TPGS_SUPPORT_STANDBY ? 'S' : 's',
+		    (*valid_states) & TPGS_SUPPORT_NONOPTIMIZED ? 'N' : 'n',
+		    (*valid_states) & TPGS_SUPPORT_OPTIMIZED  ?  'A' : 'a');
+	else
+		sdev_printk(KERN_INFO, sdev,
+		    "%s: port group %02x state %c %s\n",
+		    ALUA_DH_NAME, pg->group_id, print_alua_state(pg->state),
+		    pg->pref ? "preferred" : "non-preferred");
+}
+
+/*
  * alua_rtpg - Evaluate REPORT TARGET GROUP STATES
  * @sdev: the device to be evaluated.
  *
@@ -679,17 +710,7 @@ static int alua_rtpg(struct scsi_device *sdev, struct alua_port_group *pg)
 	}
 
 	spin_lock_irqsave(&pg->lock, flags);
-	sdev_printk(KERN_INFO, sdev,
-		    "%s: port group %02x state %c %s supports %c%c%c%c%c%c%c\n",
-		    ALUA_DH_NAME, pg->group_id, print_alua_state(pg->state),
-		    pg->pref ? "preferred" : "non-preferred",
-		    valid_states&TPGS_SUPPORT_TRANSITION?'T':'t',
-		    valid_states&TPGS_SUPPORT_OFFLINE?'O':'o',
-		    valid_states&TPGS_SUPPORT_LBA_DEPENDENT?'L':'l',
-		    valid_states&TPGS_SUPPORT_UNAVAILABLE?'U':'u',
-		    valid_states&TPGS_SUPPORT_STANDBY?'S':'s',
-		    valid_states&TPGS_SUPPORT_NONOPTIMIZED?'N':'n',
-		    valid_states&TPGS_SUPPORT_OPTIMIZED?'A':'a');
+	alua_rtpg_print(sdev, pg, &valid_states);
 
 	switch (pg->state) {
 	case SCSI_ACCESS_STATE_TRANSITIONING:
