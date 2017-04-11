@@ -238,6 +238,19 @@ static int keyzero(struct btree_geo *geo, unsigned long *key)
 	return 1;
 }
 
+static int getpos(struct btree_geo *geo, unsigned long *node,
+		unsigned long *key)
+{
+	int i;
+
+	for (i = 0; i < geo->no_pairs; i++) {
+		if (keycmp(geo, node, i, key) <= 0)
+			break;
+	}
+	return i;
+}
+
+
 void *btree_lookup(struct btree_head *head, struct btree_geo *geo,
 		unsigned long *key)
 {
@@ -248,9 +261,7 @@ void *btree_lookup(struct btree_head *head, struct btree_geo *geo,
 		return NULL;
 
 	for ( ; height > 1; height--) {
-		for (i = 0; i < geo->no_pairs; i++)
-			if (keycmp(geo, node, i, key) <= 0)
-				break;
+		i = getpos(geo, node, key);
 		if (i == geo->no_pairs)
 			return NULL;
 		node = bval(geo, node, i);
@@ -278,9 +289,7 @@ int btree_update(struct btree_head *head, struct btree_geo *geo,
 		return -ENOENT;
 
 	for ( ; height > 1; height--) {
-		for (i = 0; i < geo->no_pairs; i++)
-			if (keycmp(geo, node, i, key) <= 0)
-				break;
+		i = getpos(geo, node, key);
 		if (i == geo->no_pairs)
 			return -ENOENT;
 		node = bval(geo, node, i);
@@ -326,9 +335,7 @@ retry:
 
 	node = head->node;
 	for (height = head->height ; height > 1; height--) {
-		for (i = 0; i < geo->no_pairs; i++)
-			if (keycmp(geo, node, i, key) <= 0)
-				break;
+		i = getpos(geo, node, key);
 		if (i == geo->no_pairs)
 			goto miss;
 		oldnode = node;
@@ -360,18 +367,6 @@ miss:
 }
 EXPORT_SYMBOL_GPL(btree_get_prev);
 
-static int getpos(struct btree_geo *geo, unsigned long *node,
-		unsigned long *key)
-{
-	int i;
-
-	for (i = 0; i < geo->no_pairs; i++) {
-		if (keycmp(geo, node, i, key) <= 0)
-			break;
-	}
-	return i;
-}
-
 static int getfill(struct btree_geo *geo, unsigned long *node, int start)
 {
 	int i;
@@ -392,9 +387,7 @@ static unsigned long *find_level(struct btree_head *head, struct btree_geo *geo,
 	int i, height;
 
 	for (height = head->height; height > level; height--) {
-		for (i = 0; i < geo->no_pairs; i++)
-			if (keycmp(geo, node, i, key) <= 0)
-				break;
+		i = getpos(geo, node, key);
 
 		if ((i == geo->no_pairs) || !bval(geo, node, i)) {
 			/* right-most key is too large, update it */
