@@ -1104,6 +1104,8 @@ static void do_attr_changes(struct inode *inode, const struct iattr *attr)
 			mode &= ~S_ISGID;
 		inode->i_mode = mode;
 	}
+	if (IS_I_VERSION(inode))
+		inode_inc_iversion(inode);
 }
 
 /**
@@ -1401,6 +1403,9 @@ int ubifs_update_time(struct inode *inode, struct timespec *time,
 	if (!(inode->i_sb->s_flags & MS_LAZYTIME))
 		iflags |= I_DIRTY_SYNC;
 
+	if (IS_I_VERSION(inode))
+		inode_inc_iversion(inode);
+
 	release = ui->dirty;
 	__mark_inode_dirty(inode, iflags);
 	mutex_unlock(&ui->ui_mutex);
@@ -1435,6 +1440,8 @@ static int update_mctime(struct inode *inode)
 
 		mutex_lock(&ui->ui_mutex);
 		inode->i_mtime = inode->i_ctime = ubifs_current_time(inode);
+		if (IS_I_VERSION(inode))
+			inode_inc_iversion(inode);
 		release = ui->dirty;
 		mark_inode_dirty_sync(inode);
 		mutex_unlock(&ui->ui_mutex);
@@ -1580,6 +1587,8 @@ static int ubifs_vm_page_mkwrite(struct vm_fault *vmf)
 
 		mutex_lock(&ui->ui_mutex);
 		inode->i_mtime = inode->i_ctime = ubifs_current_time(inode);
+		if (IS_I_VERSION(inode))
+			inode_inc_iversion(inode);
 		release = ui->dirty;
 		mark_inode_dirty_sync(inode);
 		mutex_unlock(&ui->ui_mutex);
