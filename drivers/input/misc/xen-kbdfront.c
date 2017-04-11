@@ -41,6 +41,12 @@ struct xenkbd_info {
 	char phys[32];
 };
 
+enum { KPARAM_WIDTH, KPARAM_HEIGHT, KPARAM_CNT };
+static int size[KPARAM_CNT] = { XENFB_WIDTH, XENFB_HEIGHT };
+module_param_array(size, int, NULL, 0444);
+MODULE_PARM_DESC(size,
+	"Pointing device width, height in pixels (default 800,600)");
+
 static int xenkbd_remove(struct xenbus_device *);
 static int xenkbd_connect_backend(struct xenbus_device *, struct xenkbd_info *);
 static void xenkbd_disconnect_backend(struct xenkbd_info *);
@@ -174,8 +180,8 @@ static int xenkbd_probe(struct xenbus_device *dev,
 
 	if (abs) {
 		__set_bit(EV_ABS, ptr->evbit);
-		input_set_abs_params(ptr, ABS_X, 0, XENFB_WIDTH, 0, 0);
-		input_set_abs_params(ptr, ABS_Y, 0, XENFB_HEIGHT, 0, 0);
+		input_set_abs_params(ptr, ABS_X, 0, size[KPARAM_WIDTH], 0, 0);
+		input_set_abs_params(ptr, ABS_Y, 0, size[KPARAM_HEIGHT], 0, 0);
 	} else {
 		input_set_capability(ptr, EV_REL, REL_X);
 		input_set_capability(ptr, EV_REL, REL_Y);
@@ -344,12 +350,16 @@ InitWait:
 
 		/* Set input abs params to match backend screen res */
 		if (xenbus_scanf(XBT_NIL, info->xbdev->otherend,
-				 "width", "%d", &val) > 0)
+				 "width", "%d", &val) > 0) {
 			input_set_abs_params(info->ptr, ABS_X, 0, val, 0, 0);
+			size[KPARAM_WIDTH] = val;
+		}
 
 		if (xenbus_scanf(XBT_NIL, info->xbdev->otherend,
-				 "height", "%d", &val) > 0)
+				 "height", "%d", &val) > 0) {
 			input_set_abs_params(info->ptr, ABS_Y, 0, val, 0, 0);
+			size[KPARAM_HEIGHT] = val;
+		}
 
 		break;
 
