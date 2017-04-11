@@ -79,6 +79,7 @@
 #include <linux/bitops.h>
 #include <termios.h>
 #include "strlist.h"
+#include "../perf.h"
 
 extern const char *graph_line;
 extern const char *graph_dotted_line;
@@ -379,5 +380,21 @@ struct inline_node {
 
 struct inline_node *dso__parse_addr_inlines(struct dso *dso, u64 addr);
 void inline_node__delete(struct inline_node *node);
+
+struct branch_type_stat {
+	u64 counts[PERF_BR_MAX];
+	u64 jcc_fwd;
+	u64 jcc_bwd;
+	u64 cross_4k;
+	u64 cross_2m;
+};
+
+struct branch_flags;
+
+void branch_type_count(struct branch_type_stat *stat,
+		       struct branch_flags *flags,
+		       u64 from, u64 to);
+
+const char *branch_type_name(int type);
 
 #endif /* GIT_COMPAT_UTIL_H */
