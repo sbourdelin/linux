@@ -487,6 +487,8 @@ struct stmmac_ops {
 	/* RX Queues Routing */
 	void (*rx_queue_routing)(struct mac_device_info *hw, u8 packet,
 				 u32 queue);
+	/* Enable TX drop */
+	void (*enable_tx_drop)(struct mac_device_info *hw);
 	/* Program RX Algorithms */
 	void (*prog_mtl_rx_algorithms)(struct mac_device_info *hw, u32 rx_alg);
 	/* Program TX Algorithms */

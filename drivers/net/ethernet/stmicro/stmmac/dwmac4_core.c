@@ -142,6 +142,17 @@ static void dwmac4_tx_queue_routing(struct mac_device_info *hw,
 	writel(value, ioaddr + GMAC_RXQ_CTRL1);
 }
 
+static void dwmac4_enable_tx_drop(struct mac_device_info *hw)
+{
+	void __iomem *ioaddr = hw->pcsr;
+	u32 value = readl(ioaddr + MTL_OPERATION_MODE);
+
+	value &= ~MTL_OPERATION_DTXSTS;
+	value |= MTL_OPERATION_DTXSTS;
+
+	writel(value, ioaddr + MTL_OPERATION_MODE);
+}
+
 static void dwmac4_prog_mtl_rx_algorithms(struct mac_device_info *hw,
 					  u32 rx_alg)
 {
@@ -675,6 +686,7 @@ static const struct stmmac_ops dwmac4_ops = {
 	.rx_queue_prio = dwmac4_rx_queue_priority,
 	.tx_queue_prio = dwmac4_tx_queue_priority,
 	.rx_queue_routing = dwmac4_tx_queue_routing,
+	.enable_tx_drop = dwmac4_enable_tx_drop,
 	.prog_mtl_rx_algorithms = dwmac4_prog_mtl_rx_algorithms,
 	.prog_mtl_tx_algorithms = dwmac4_prog_mtl_tx_algorithms,
 	.set_mtl_tx_queue_weight = dwmac4_set_mtl_tx_queue_weight,
@@ -706,6 +718,7 @@ static const struct stmmac_ops dwmac410_ops = {
 	.rx_queue_prio = dwmac4_rx_queue_priority,
 	.tx_queue_prio = dwmac4_tx_queue_priority,
 	.rx_queue_routing = dwmac4_tx_queue_routing,
+	.enable_tx_drop = dwmac4_enable_tx_drop,
 	.prog_mtl_rx_algorithms = dwmac4_prog_mtl_rx_algorithms,
 	.prog_mtl_tx_algorithms = dwmac4_prog_mtl_tx_algorithms,
 	.set_mtl_tx_queue_weight = dwmac4_set_mtl_tx_queue_weight,

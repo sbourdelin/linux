@@ -202,6 +202,7 @@ enum power_event {
 #define MTL_OPERATION_RAA		BIT(2)
 #define MTL_OPERATION_RAA_SP		(0x0 << 2)
 #define MTL_OPERATION_RAA_WSP		(0x1 << 2)
+#define MTL_OPERATION_DTXSTS		BIT(1)
 
 #define MTL_INT_STATUS			0x00000c20
 #define MTL_INT_QX(x)			BIT(x)

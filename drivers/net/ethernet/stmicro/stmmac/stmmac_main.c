@@ -2368,6 +2368,9 @@ static void stmmac_mtl_configuration(struct stmmac_priv *priv)
 	u32 rx_queues_count = priv->plat->rx_queues_to_use;
 	u32 tx_queues_count = priv->plat->tx_queues_to_use;
 
+	if (priv->plat->drop_tx_status)
+		priv->hw->mac->enable_tx_drop(priv->hw);
+
 	if (tx_queues_count > 1 && priv->hw->mac->set_mtl_tx_queue_weight)
 		stmmac_set_tx_queue_weight(priv);
 
