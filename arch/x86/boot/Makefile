@@ -76,8 +76,18 @@ quiet_cmd_image = BUILD   $@
 cmd_image = $(obj)/tools/build $(obj)/setup.bin $(obj)/vmlinux.bin \
 			       $(obj)/zoffset.h $@
 
+cmd_efiversion = scripts/efiversion.pl \
+			--major-os=$(CONFIG_EFI_MAJOR_OS_VERSION) \
+			--minor-os=$(CONFIG_EFI_MINOR_OS_VERSION) \
+			--major-image=$(CONFIG_EFI_MAJOR_IMAGE_VERSION) \
+			--minor-image=$(CONFIG_EFI_MINOR_IMAGE_VERSION) \
+			$@
+
 $(obj)/bzImage: $(obj)/setup.bin $(obj)/vmlinux.bin $(obj)/tools/build FORCE
 	$(call if_changed,image)
+ifeq ($(CONFIG_EFI_STUB),y)
+	$(call if_changed,efiversion,$@)
+endif
 	@echo 'Kernel: $@ is ready' ' (#'`cat .version`')'
 
 OBJCOPYFLAGS_vmlinux.bin := -O binary -R .note -R .comment -S
