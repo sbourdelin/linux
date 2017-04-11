@@ -1,5 +1,5 @@
 CC = $(CROSS_COMPILE)gcc
-CFLAGS += -Wall -g -D_GNU_SOURCE
+CFLAGS += -Wall -g -D_GNU_SOURCE -I$(INSTALL_HDR_PATH)/include
 
 BINDIR=usr/bin
 INSTALL_PROGRAM=install -m 755 -p
