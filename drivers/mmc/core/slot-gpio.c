@@ -162,6 +162,9 @@ void mmc_gpio_set_cd_isr(struct mmc_host *host,
 {
 	struct mmc_gpio *ctx = host->slot.handler_priv;
 
+	if (!ctx->cd_gpio)
+		return;
+
 	WARN_ON(ctx->cd_gpio_isr);
 	ctx->cd_gpio_isr = isr;
 }
