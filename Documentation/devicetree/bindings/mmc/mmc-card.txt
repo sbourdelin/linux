@@ -12,6 +12,10 @@ Required properties:
 Optional properties:
 -broken-hpi : Use this to indicate that the mmc-card has a broken hpi
               implementation, and that hpi should not be used
+-enable-hw-reset : some eMMC devices have disabled the hw reset functionality
+                   (RST_N_FUNCTION) by default. By adding this property the
+                   host will enable it during initialization. This will set
+                   RST_N_FUNCTION to 0x1 (permanently enabled).
 
 Example:
 

@@ -1522,8 +1522,15 @@ static int mmc_init_card(struct mmc_host *host, u32 ocr,
 	int err;
 	u32 cid[4];
 	u32 rocr;
+	struct device_node *np;
+	bool enable_rst_n = false;
 
 	WARN_ON(!host->claimed);
+
+	np = mmc_of_find_child_device(host, 0);
+	if (np && of_device_is_compatible(np, "mmc-card"))
+		enable_rst_n = of_property_read_bool(np, "enable-hw-reset");
+	of_node_put(np);
 
 	/* Set correct bus mode for MMC before attempting init */
 	if (!mmc_host_is_spi(host))
@@ -1817,6 +1824,22 @@ static int mmc_init_card(struct mmc_host *host, u32 ocr,
 		} else {
 			card->ext_csd.packed_event_en = 1;
 		}
+	}
+
+	/*
+	 * enable RST_N if requested (and rst_n_function is not set)
+	 * This is needed because some eMMC chips disable this function by
+	 * default.
+	 */
+	if (enable_rst_n &&
+	    !(card->ext_csd.rst_n_function & EXT_CSD_RST_N_EN_MASK)) {
+		err = mmc_switch(card, EXT_CSD_CMD_SET_NORMAL,
+				 EXT_CSD_RST_N_FUNCTION, EXT_CSD_RST_N_ENABLED,
+				 card->ext_csd.generic_cmd6_time);
+		card->ext_csd.rst_n_function = EXT_CSD_RST_N_ENABLED;
+		if (err && err != -EBADMSG)
+			pr_warn("%s: Enabling RST_N feature failed\n",
+				mmc_hostname(card->host));
 	}
 
 	if (!oldcard)
