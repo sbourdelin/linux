@@ -1880,6 +1880,31 @@ error:
 	goto finish;
 }
 
+static int i915_pm_prepare(struct device *kdev)
+{
+	/*
+	 * Get a reference to disable the direct complete optimization. This
+	 * is needed, since we have a suspend sequence specific to system
+	 * suspend (that is different from runtime suspend) and because we
+	 * need to provide power to the sound driver while its system suspend
+	 * handler is running. This is not possible with the optimization in
+	 * effect, when the i915 runtime PM is disabled for the whole duration
+	 * of the suspend sequence if the device was already runtime
+	 * suspended at the beginning of the sequence. In this case the i915
+	 * suspend/resume hooks would be also skipped (besides its prepare and
+	 * complete hooks).
+	 */
+	intel_runtime_pm_get(kdev_to_i915(kdev));
+
+	return 0;
+}
+
+static void i915_pm_complete(struct device *kdev)
+{
+	/* Put the ref taken in the prepare step. */
+	intel_runtime_pm_put(kdev_to_i915(kdev));
+}
+
 static int i915_pm_suspend(struct device *kdev)
 {
 	struct pci_dev *pdev = to_pci_dev(kdev);
@@ -2507,6 +2532,13 @@ static int intel_runtime_resume(struct device *kdev)
 }
 
 const struct dev_pm_ops i915_pm_ops = {
+	/*
+	 * Handlers called as the first and last step during the S0ix, S3 and
+	 * S4 power sequences.
+	 */
+	.prepare = i915_pm_prepare,
+	.complete = i915_pm_complete,
+
 	/*
 	 * S0ix (via system suspend) and S3 event handlers [PMSG_SUSPEND,
 	 * PMSG_RESUME]
