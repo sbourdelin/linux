@@ -415,14 +415,15 @@ static void kvm_ioapic_eoi_inject_work(struct work_struct *work)
 #define IOAPIC_SUCCESSIVE_IRQ_MAX_COUNT 10000
 
 static void __kvm_ioapic_update_eoi(struct kvm_vcpu *vcpu,
-			struct kvm_ioapic *ioapic, int vector, int trigger_mode)
+			struct kvm_ioapic *ioapic, int vector, int trigger_mode,
+			bool directed)
 {
 	struct dest_map *dest_map = &ioapic->rtc_status.dest_map;
 	struct kvm_lapic *apic = vcpu->arch.apic;
 	int i;
 
 	/* RTC special handling */
-	if (test_bit(vcpu->vcpu_id, dest_map->map) &&
+	if (!directed && test_bit(vcpu->vcpu_id, dest_map->map) &&
 	    vector == dest_map->vectors[vcpu->vcpu_id])
 		rtc_irq_eoi(ioapic, vcpu);
 
@@ -432,21 +433,23 @@ static void __kvm_ioapic_update_eoi(struct kvm_vcpu *vcpu,
 		if (ent->fields.vector != vector)
 			continue;
 
-		/*
-		 * We are dropping lock while calling ack notifiers because ack
-		 * notifier callbacks for assigned devices call into IOAPIC
-		 * recursively. Since remote_irr is cleared only after call
-		 * to notifiers if the same vector will be delivered while lock
-		 * is dropped it will be put into irr and will be delivered
-		 * after ack notifier returns.
-		 */
-		spin_unlock(&ioapic->lock);
-		kvm_notify_acked_irq(ioapic->kvm, KVM_IRQCHIP_IOAPIC, i);
-		spin_lock(&ioapic->lock);
+		if (!directed) {
+			/*
+			 * We are dropping lock while calling ack notifiers because ack
+			 * notifier callbacks for assigned devices call into IOAPIC
+			 * recursively. Since remote_irr is cleared only after call
+			 * to notifiers if the same vector will be delivered while lock
+			 * is dropped it will be put into irr and will be delivered
+			 * after ack notifier returns.
+			 */
+			spin_unlock(&ioapic->lock);
+			kvm_notify_acked_irq(ioapic->kvm, KVM_IRQCHIP_IOAPIC, i);
+			spin_lock(&ioapic->lock);
 
-		if (trigger_mode != IOAPIC_LEVEL_TRIG ||
-		    kvm_lapic_get_reg(apic, APIC_SPIV) & APIC_SPIV_DIRECTED_EOI)
-			continue;
+			if (trigger_mode != IOAPIC_LEVEL_TRIG ||
+			    kvm_lapic_get_reg(apic, APIC_SPIV) & APIC_SPIV_DIRECTED_EOI)
+				continue;
+		}
 
 		ASSERT(ent->fields.trig_mode == IOAPIC_LEVEL_TRIG);
 		ent->fields.remote_irr = 0;
@@ -478,7 +481,7 @@ void kvm_ioapic_update_eoi(struct kvm_vcpu *vcpu, int vector, int trigger_mode)
 	struct kvm_ioapic *ioapic = vcpu->kvm->arch.vioapic;
 
 	spin_lock(&ioapic->lock);
-	__kvm_ioapic_update_eoi(vcpu, ioapic, vector, trigger_mode);
+	__kvm_ioapic_update_eoi(vcpu, ioapic, vector, trigger_mode, false);
 	spin_unlock(&ioapic->lock);
 }
 
@@ -540,6 +543,7 @@ static int ioapic_mmio_write(struct kvm_vcpu *vcpu, struct kvm_io_device *this,
 				 gpa_t addr, int len, const void *val)
 {
 	struct kvm_ioapic *ioapic = to_ioapic(this);
+	struct kvm_lapic *apic = vcpu->arch.apic;
 	u32 data;
 	if (!ioapic_in_range(ioapic, addr))
 		return -EOPNOTSUPP;
@@ -573,6 +577,12 @@ static int ioapic_mmio_write(struct kvm_vcpu *vcpu, struct kvm_io_device *this,
 
 	case IOAPIC_REG_WINDOW:
 		ioapic_write_indirect(ioapic, data);
+		break;
+
+	case IOAPIC_REG_EOI:
+		if (kvm_lapic_get_reg(apic, APIC_SPIV) & APIC_SPIV_DIRECTED_EOI)
+			__kvm_ioapic_update_eoi(vcpu, ioapic, data,
+						IOAPIC_LEVEL_TRIG, true);
 		break;
 
 	default:
