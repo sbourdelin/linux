@@ -996,6 +996,7 @@ void irq_chip_enable_parent(struct irq_data *data)
 	else
 		data->chip->irq_unmask(data);
 }
+EXPORT_SYMBOL_GPL(irq_chip_enable_parent);
 
 /**
  * irq_chip_disable_parent - Disable the parent interrupt (defaults to mask if
@@ -1010,6 +1011,7 @@ void irq_chip_disable_parent(struct irq_data *data)
 	else
 		data->chip->irq_mask(data);
 }
+EXPORT_SYMBOL_GPL(irq_chip_disable_parent);
 
 /**
  * irq_chip_ack_parent - Acknowledge the parent interrupt
@@ -1072,6 +1074,7 @@ int irq_chip_set_affinity_parent(struct irq_data *data,
 
 	return -ENOSYS;
 }
+EXPORT_SYMBOL_GPL(irq_chip_set_affinity_parent);
 
 /**
  * irq_chip_set_type_parent - Set IRQ type on the parent interrupt
