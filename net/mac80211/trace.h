@@ -742,6 +742,26 @@ DEFINE_EVENT(local_u32_evt, drv_set_rts_threshold,
 	TP_ARGS(local, value)
 );
 
+TRACE_EVENT(drv_set_btcoex,
+	TP_PROTO(struct ieee80211_local *local, bool enabled,
+		 u32 btcoex_priority),
+	TP_ARGS(local, enabled, btcoex_priority),
+	TP_STRUCT__entry(
+		LOCAL_ENTRY
+		__field(bool, enabled)
+		__field(u32, btcoex_priority)
+	),
+	TP_fast_assign(
+		LOCAL_ASSIGN;
+		__entry->enabled = enabled;
+		__entry->btcoex_priority = btcoex_priority;
+	),
+	TP_printk(
+		LOCAL_PR_FMT " enabled:%d btcoex_priority :%u",
+		LOCAL_PR_ARG, __entry->enabled, __entry->btcoex_priority
+	)
+);
+
 TRACE_EVENT(drv_set_coverage_class,
 	TP_PROTO(struct ieee80211_local *local, s16 value),
 

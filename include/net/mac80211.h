@@ -3453,6 +3453,9 @@ enum ieee80211_reconfig_type {
  * @del_nan_func: Remove a NAN function. The driver must call
  *	ieee80211_nan_func_terminated() with
  *	NL80211_NAN_FUNC_TERM_REASON_USER_REQUEST reason code upon removal.
+ * @set_btcoex: Called when BTCOEX is enabled/disabled, use
+ *     this callback to enable or disable btcoex and use this callback to
+ *     set btcoex_priority. BTCOEX should be enabled to set this priority.
  */
 struct ieee80211_ops {
 	void (*tx)(struct ieee80211_hw *hw,
@@ -3734,6 +3737,8 @@ struct ieee80211_ops {
 	void (*del_nan_func)(struct ieee80211_hw *hw,
 			    struct ieee80211_vif *vif,
 			    u8 instance_id);
+	int (*set_btcoex)(struct ieee80211_hw *hw, bool enabled,
+			  u32 btcoex_priority);
 };
 
 /**
