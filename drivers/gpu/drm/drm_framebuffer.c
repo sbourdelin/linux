@@ -584,6 +584,11 @@ void drm_fb_release(struct drm_file *priv)
 {
 	struct drm_framebuffer *fb, *tfb;
 	struct drm_mode_rmfb_work arg;
+	struct drm_minor *minor = priv->minor;
+	struct drm_device *dev = minor->dev;
+
+	if (WARN_ON(!dev->mode_config.num_fb && !list_empty(&priv->fbs)))
+		return;
 
 	INIT_LIST_HEAD(&arg.fbs);
 
