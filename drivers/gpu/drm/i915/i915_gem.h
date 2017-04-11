@@ -42,6 +42,15 @@
 #define GEM_DEBUG_BUG_ON(expr)
 #endif
 
+#define GEM_MAYBE_BUILD_BUG_ON(expr) \
+	do { \
+		if (__builtin_constant_p((expr))) \
+			BUILD_BUG_ON(expr); \
+		else \
+			GEM_BUG_ON(expr); \
+	} while (0)
+
+
 #define I915_NUM_ENGINES 5
 
 #endif /* __I915_GEM_H__ */
