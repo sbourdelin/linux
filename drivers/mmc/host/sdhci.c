@@ -2777,6 +2777,16 @@ out:
 	return result;
 }
 
+static irqreturn_t sdhci_cd_irq(int irq, void *dev_id)
+{
+	struct mmc_host *mmc = dev_id;
+	struct sdhci_host *host = mmc_priv(mmc);
+
+	mmc->ops->card_event(mmc);
+	mmc_detect_change(host->mmc, msecs_to_jiffies(200));
+	return IRQ_HANDLED;
+}
+
 static irqreturn_t sdhci_thread_irq(int irq, void *dev_id)
 {
 	struct sdhci_host *host = dev_id;
@@ -3616,6 +3626,8 @@ int __sdhci_add_host(struct sdhci_host *host)
 	init_waitqueue_head(&host->buf_ready_int);
 
 	sdhci_init(host, 0);
+
+	mmc_gpio_set_cd_isr(mmc, sdhci_cd_irq);
 
 	ret = request_threaded_irq(host->irq, sdhci_irq, sdhci_thread_irq,
 				   IRQF_SHARED,	mmc_hostname(mmc), host);
