@@ -554,6 +554,17 @@ static void alua_rtpg_print(struct scsi_device *sdev, struct alua_port_group *pg
 }
 
 /*
+ * alua_state_remains - Whether a RTPG state remains the same across 2 values.
+ * @state: the state value to check for.
+ * @old_state: the old state value.
+ * @new_state: the new state value.
+ */
+static bool alua_state_remains(int state, int old_state, int new_state)
+{
+	return ((old_state == state) && (new_state == state));
+}
+
+/*
  * alua_rtpg - Evaluate REPORT TARGET GROUP STATES
  * @sdev: the device to be evaluated.
  *
@@ -571,6 +582,7 @@ static int alua_rtpg(struct scsi_device *sdev, struct alua_port_group *pg)
 	unsigned int tpg_desc_tbl_off;
 	unsigned char orig_transition_tmo;
 	unsigned long flags;
+	int orig_state;
 
 	if (!pg->expiry) {
 		unsigned long transition_tmo = ALUA_FAILOVER_TIMEOUT * HZ;
@@ -656,6 +668,8 @@ static int alua_rtpg(struct scsi_device *sdev, struct alua_port_group *pg)
 		goto retry;
 	}
 
+	orig_state = pg->state;
+
 	orig_transition_tmo = pg->transition_tmo;
 	if ((buff[4] & RTPG_FMT_MASK) == RTPG_FMT_EXT_HDR && buff[5] != 0)
 		pg->transition_tmo = buff[5];
@@ -689,6 +703,7 @@ static int alua_rtpg(struct scsi_device *sdev, struct alua_port_group *pg)
 				    !(tmp_pg->flags & ALUA_PG_RUNNING)) {
 					struct alua_dh_data *h;
 					struct scsi_device *tmp_pg_sdev = NULL;
+					int tmp_pg_orig_state = tmp_pg->state;
 
 					tmp_pg->state = desc[0] & 0x0f;
 					tmp_pg->pref = desc[0] >> 7;
@@ -704,8 +719,11 @@ static int alua_rtpg(struct scsi_device *sdev, struct alua_port_group *pg)
 						 * is not running, tmp_pg->rtpg_sdev might be NULL.
 						 * Use another/one associated scsi_device to print
 						 * its RTPG information.
+						 * Don't print it if state remains 'unavailable'.
 						 */
-						if ((tmp_pg != pg) && !tmp_pg_sdev) {
+						if ((tmp_pg != pg) && !tmp_pg_sdev &&
+						    !alua_state_remains(SCSI_ACCESS_STATE_UNAVAILABLE,
+									tmp_pg_orig_state, tmp_pg->state)) {
 							tmp_pg_sdev = h->sdev;
 							alua_rtpg_print(tmp_pg_sdev, tmp_pg, NULL);
 						}
@@ -722,7 +740,11 @@ static int alua_rtpg(struct scsi_device *sdev, struct alua_port_group *pg)
 	}
 
 	spin_lock_irqsave(&pg->lock, flags);
-	alua_rtpg_print(sdev, pg, &valid_states);
+
+	/* Print RTPG information (except if state remains 'unavailable'). */
+	if (likely(!alua_state_remains(SCSI_ACCESS_STATE_UNAVAILABLE,
+					orig_state, pg->state)))
+		alua_rtpg_print(sdev, pg, &valid_states);
 
 	switch (pg->state) {
 	case SCSI_ACCESS_STATE_TRANSITIONING:
