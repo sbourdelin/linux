@@ -24,8 +24,10 @@
 
 /* Read Status Register */
 #define READ_STATUS		0x000000
-#define READ_STATUS_BUSY	0
-#define READ_STATUS_IDLE	1
+enum read_status_type {
+	READ_STATUS_BUSY,
+	READ_STATUS_IDLE
+};
 
 /* Read Index Register */
 #define READ_INDEX		0x000004
@@ -35,8 +37,10 @@
 
 /* Write Status Register */
 #define WRITE_STATUS		0x00000C
-#define WRITE_STATUS_BUSY	0
-#define WRITE_STATUS_IDLE	1
+enum write_status_type {
+	WRITE_STATUS_BUSY,
+	WRITE_STATUS_IDLE
+};
 
 /* Write Index Register */
 #define WRITE_INDEX		0x000010
@@ -64,14 +68,18 @@
 
 /* General Communication Register A */
 #define GCR_A			0x000028
-#define GCR_A_INIT		0
-#define GCR_A_REMAP		1
-#define GCR_A_RUN		2
+enum gen_com_reg_a {
+	GCR_A_INIT,
+	GCR_A_REMAP,
+	GCR_A_RUN
+};
 
 /* General Communication Register B */
 #define GCR_B			0x00002C
-#define GCR_B_ACTIVE		0
-#define GCR_B_DOZE		1
+enum gen_com_reg_b {
+	GCR_B_ACTIVE,
+	GCR_B_DOZE
+};
 
 /* Wakeup Register */
 /* #define WAKEUP			0x008104 */
