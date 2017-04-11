@@ -182,12 +182,12 @@ static int goldfish_tty_create_driver(void)
 
 	goldfish_ttys = kcalloc(goldfish_tty_line_count, sizeof(*goldfish_ttys),
 				GFP_KERNEL);
-	if (goldfish_ttys == NULL) {
+	if (!goldfish_ttys) {
 		ret = -ENOMEM;
 		goto err_alloc_goldfish_ttys_failed;
 	}
 	tty = alloc_tty_driver(goldfish_tty_line_count);
-	if (tty == NULL) {
+	if (!tty) {
 		ret = -ENOMEM;
 		goto err_alloc_tty_driver_failed;
 	}
@@ -235,15 +235,15 @@ static int goldfish_tty_probe(struct platform_device *pdev)
 	unsigned int line;
 
 	r = platform_get_resource(pdev, IORESOURCE_MEM, 0);
-	if (r == NULL)
+	if (!r)
 		return -EINVAL;
 
 	base = ioremap(r->start, 0x1000);
-	if (base == NULL)
+	if (!base)
 		pr_err("goldfish_tty: unable to remap base\n");
 
 	r = platform_get_resource(pdev, IORESOURCE_IRQ, 0);
-	if (r == NULL)
+	if (!r)
 		goto err_unmap;
 
 	irq = r->start;
