@@ -100,6 +100,7 @@ endchoice
 config SQUASHFS_XATTR
 	bool "Squashfs XATTR support"
 	depends on SQUASHFS
+	depends on XATTR_SYSCALLS
 	help
 	  Saying Y here includes support for extended attributes (xattrs).
 	  Xattrs are name:value pairs associated with inodes by

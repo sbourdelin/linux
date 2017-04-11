@@ -28,6 +28,7 @@ config EVM_ATTR_FSUUID
 config EVM_EXTRA_SMACK_XATTRS
 	bool "Additional SMACK xattrs"
 	depends on EVM && SECURITY_SMACK
+	depends on XATTR_SYSCALLS
 	default n
 	help
 	  Include additional SMACK xattrs for HMAC calculation.

@@ -173,6 +173,7 @@ config TMPFS_POSIX_ACL
 config TMPFS_XATTR
 	bool "Tmpfs extended attributes"
 	depends on TMPFS
+	depends on XATTR_SYSCALLS
 	default n
 	help
 	  Extended attributes are name:value pairs associated with inodes by

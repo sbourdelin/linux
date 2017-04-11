@@ -1460,6 +1460,17 @@ config SYSCTL_SYSCALL
 
 	  If unsure say N here.
 
+config XATTR_SYSCALLS
+	bool "Support for the xattr family of syscalls" if EXPERT
+	default y
+	help
+	  The xattr family of syscalls are used to access extended file
+	  attributes from userspace. If you are using a filesystem or
+	  userspace that does not use or require the system calls, they
+	  can be compiled out.
+
+	  If unsure say Y here.
+
 config POSIX_TIMERS
 	bool "Posix Clocks & timers" if EXPERT
 	default y

@@ -32,6 +32,7 @@ config F2FS_STAT_FS
 config F2FS_FS_XATTR
 	bool "F2FS extended attributes"
 	depends on F2FS_FS
+	depends on XATTR_SYSCALLS
 	default y
 	help
 	  Extended attributes are name:value pairs associated with inodes by
