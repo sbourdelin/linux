@@ -184,7 +184,7 @@ long mm_iommu_get(struct mm_struct *mm, unsigned long ua, unsigned long entries,
 		 * of the CMA zone if possible. NOTE: faulting in + migration
 		 * can be expensive. Batching can be considered later
 		 */
-		if (is_migrate_cma_page(page)) {
+		if (is_zone_cma(page_zone(page))) {
 			if (mm_iommu_move_page_from_cma(page))
 				goto populate;
 			if (1 != get_user_pages_fast(ua + (i << PAGE_SHIFT),
