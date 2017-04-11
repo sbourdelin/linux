@@ -34,4 +34,21 @@ config NET_DSA_QCA8K
 	  This enables support for the Qualcomm Atheros QCA8K Ethernet
 	  switch chips.
 
+menuconfig NET_DSA_SMSC_LAN9303
+	tristate "SMSC/Microchip LAN9303 3-ports 10/100 ethernet switch"
+	depends on NET_DSA
+	select NET_DSA_TAG_LAN9303
+	---help---
+	  This enables support for the SMSC/Microchip LAN9303 3 port ethernet
+	  switch chips.
+
+config NET_DSA_SMSC_LAN9303_I2C
+	bool "I2C managed mode"
+	depends on NET_DSA_SMSC_LAN9303
+	depends on I2C && OF
+	select REGMAP_I2C
+	---help---
+	  Enable access functions if the SMSC/Microchip LAN9303 is configured
+	  for I2C managed mode.
+
 endmenu
