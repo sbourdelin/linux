@@ -582,18 +582,23 @@ void blk_queue_bypass_end(struct request_queue *q)
 }
 EXPORT_SYMBOL_GPL(blk_queue_bypass_end);
 
+/**
+ * blk_set_queue_dying - prevent queueing of new requests
+ * @q: request queue
+ *
+ * The first step is to set the "dying" flag. After this flag has been set,
+ * call blk_freeze_queue(). blk_freeze_queue() kills .q_usage_counter. That in
+ * turn causes blk_queue_enter() to check the dying flag. Call
+ * blk_freeze_queue() instead of blk_freeze_queue_wait() to ensure that no
+ * requests get queued on a dead queue.
+ */
 void blk_set_queue_dying(struct request_queue *q)
 {
 	spin_lock_irq(q->queue_lock);
 	queue_flag_set(QUEUE_FLAG_DYING, q);
 	spin_unlock_irq(q->queue_lock);
 
-	/*
-	 * When queue DYING flag is set, we need to block new req
-	 * entering queue, so we call blk_freeze_queue_start() to
-	 * prevent I/O from crossing blk_queue_enter().
-	 */
-	blk_freeze_queue_start(q);
+	blk_freeze_queue(q);
 
 	if (q->mq_ops)
 		blk_mq_wake_waiters(q);

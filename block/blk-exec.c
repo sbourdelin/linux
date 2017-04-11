@@ -57,10 +57,12 @@ void blk_execute_rq_nowait(struct request_queue *q, struct gendisk *bd_disk,
 	rq->end_io = done;
 
 	/*
-	 * don't check dying flag for MQ because the request won't
-	 * be reused after dying flag is set
+	 * blk_set_queue_dying() must be called before transitioning a queue
+	 * into the "dead" state to guarantee that blk_execute_rq_nowait()
+	 * won't attempt to queue a request on a "dead" blk-mq queue.
 	 */
 	if (q->mq_ops) {
+		WARN_ON_ONCE(blk_queue_dead(q));
 		blk_mq_sched_insert_request(rq, at_head, true, false, false);
 		return;
 	}
