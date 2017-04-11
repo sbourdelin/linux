@@ -1,5 +1,5 @@
 /*
- * Microchip AR1021 driver for I2C
+ * Microchip AR1020 and AR1021 driver for I2C
  *
  * Author: Christian Gmeiner <christian.gmeiner@gmail.com>
  *
@@ -22,6 +22,11 @@ struct ar1021_i2c {
 	struct i2c_client *client;
 	struct input_dev *input;
 	u8 data[AR1021_TOCUH_PKG_SIZE];
+};
+
+enum {
+	ar1021,
+	ar1020,
 };
 
 static irqreturn_t ar1021_i2c_irq(int irq, void *dev_id)
@@ -151,13 +156,15 @@ static int __maybe_unused ar1021_i2c_resume(struct device *dev)
 static SIMPLE_DEV_PM_OPS(ar1021_i2c_pm, ar1021_i2c_suspend, ar1021_i2c_resume);
 
 static const struct i2c_device_id ar1021_i2c_id[] = {
-	{ "MICROCHIP_AR1021_I2C", 0 },
+	{ "MICROCHIP_AR1021_I2C", ar1021 },
+	{ "MICROCHIP_AR1020_I2C", ar1020 },
 	{ },
 };
 MODULE_DEVICE_TABLE(i2c, ar1021_i2c_id);
 
 static const struct of_device_id ar1021_i2c_of_match[] = {
 	{ .compatible = "microchip,ar1021-i2c", },
+	{ .compatible = "microchip,ar1020-i2c", },
 	{ }
 };
 MODULE_DEVICE_TABLE(of, ar1021_i2c_of_match);
@@ -175,5 +182,5 @@ static struct i2c_driver ar1021_i2c_driver = {
 module_i2c_driver(ar1021_i2c_driver);
 
 MODULE_AUTHOR("Christian Gmeiner <christian.gmeiner@gmail.com>");
-MODULE_DESCRIPTION("Microchip AR1021 I2C Driver");
+MODULE_DESCRIPTION("Microchip AR1020 and AR1021 I2C Driver");
 MODULE_LICENSE("GPL");
