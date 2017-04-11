@@ -29,6 +29,8 @@
 #include "otg.h"
 #include "otg_fsm.h"
 
+extern void ci_hdrc_otg_fsm_restart(struct ci_hdrc *);
+
 /* control endpoint description */
 static const struct usb_endpoint_descriptor
 ctrl_endpt_out_desc = {
@@ -1866,6 +1868,7 @@ static irqreturn_t udc_irq(struct ci_hdrc *ci)
 				ci->driver->suspend(&ci->gadget);
 				usb_gadget_set_state(&ci->gadget,
 						USB_STATE_SUSPENDED);
+				ci_hdrc_otg_fsm_restart(ci);
 				spin_lock(&ci->lock);
 			}
 		}

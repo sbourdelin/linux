@@ -16,7 +16,7 @@
 #include "udc.h"
 #include "bits.h"
 #include "otg.h"
-
+extern void ci_hdrc_otg_fsm_restart(struct ci_hdrc *);
 /**
  * ci_device_show: prints information about device capabilities and status
  */
@@ -325,6 +325,14 @@ static ssize_t ci_role_write(struct file *file, const char __user *ubuf,
 	ci_role_stop(ci);
 	ret = ci_role_start(ci, role);
 	enable_irq(ci->irq);
+
+	/* REVISIT - Avoid repeated FSM restart*/
+
+	if (role == CI_ROLE_GADGET) {
+		ci_hdrc_otg_fsm_restart(ci);
+		usb_gadget_connect(&ci->gadget);
+	}
+
 	pm_runtime_put_sync(ci->dev);
 
 	return ret ? ret : count;
