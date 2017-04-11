@@ -291,7 +291,7 @@ config ARCH_ENABLE_HUGEPAGE_MIGRATION
 
 config HMM
 	bool
-	depends on MMU && 64BIT
+	depends on MMU && 64BIT && MEMORY_HOTREMOVE && MEMORY_HOTPLUG
 	help
 	  HMM provides a set of helpers to share a virtual address
 	  space between CPU and a device, so that the device can access any valid
@@ -305,7 +305,7 @@ config HMM
 
 config HMM_MIRROR
 	bool "HMM mirror CPU page table into a device page table"
-	depends on MMU && 64BIT
+	depends on MMU && 64BIT && MEMORY_HOTREMOVE && MEMORY_HOTPLUG
 	select HMM
 	select MMU_NOTIFIER
 	help
@@ -317,7 +317,7 @@ config HMM_MIRROR
 
 config HMM_DEVMEM
 	bool "HMM device memory helpers (to leverage ZONE_DEVICE)"
-	depends on MMU && 64BIT
+	depends on MMU && 64BIT && MEMORY_HOTREMOVE && MEMORY_HOTPLUG
 	select HMM
 	help
 	  HMM devmem is a set of helper routines to leverage the ZONE_DEVICE
