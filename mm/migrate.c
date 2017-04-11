@@ -2753,9 +2753,9 @@ int migrate_vma(const struct migrate_vma_ops *ops,
 	/* Sanity check the arguments */
 	start &= PAGE_MASK;
 	end &= PAGE_MASK;
-	if (is_vm_hugetlb_page(vma) || (vma->vm_flags & VM_SPECIAL))
-		return -EINVAL;
 	if (!vma || !ops || !src || !dst || start >= end)
+		return -EINVAL;
+	if (is_vm_hugetlb_page(vma) || (vma->vm_flags & VM_SPECIAL))
 		return -EINVAL;
 	if (start < vma->vm_start || start >= vma->vm_end)
 		return -EINVAL;
