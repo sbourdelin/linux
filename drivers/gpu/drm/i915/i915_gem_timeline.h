@@ -76,7 +76,7 @@ struct intel_timeline {
 	struct i915_gem_active last_request;
 
 	struct seqmap sync;
-	u32 sync_seqno[I915_NUM_ENGINES];
+	u32 global_sync[I915_NUM_ENGINES];
 
 	struct i915_gem_timeline *common;
 };
