@@ -655,7 +655,6 @@ static int timb_probe(struct pci_dev *dev,
 	struct timberdale_device *priv;
 	int err, i;
 	resource_size_t mapbase;
-	struct msix_entry *msix_entries = NULL;
 	u8 ip_setup;
 
 	priv = kzalloc(sizeof(*priv), GFP_KERNEL);
@@ -707,20 +706,13 @@ static int timb_probe(struct pci_dev *dev,
 		goto err_config;
 	}
 
-	msix_entries = kzalloc(TIMBERDALE_NR_IRQS * sizeof(*msix_entries),
-		GFP_KERNEL);
-	if (!msix_entries)
-		goto err_config;
-
-	for (i = 0; i < TIMBERDALE_NR_IRQS; i++)
-		msix_entries[i].entry = i;
-
-	err = pci_enable_msix_exact(dev, msix_entries, TIMBERDALE_NR_IRQS);
-	if (err) {
+	err = pci_alloc_irq_vectors(dev, TIMBERDALE_NR_IRQS, TIMBERDALE_NR_IRQS,
+			PCI_IRQ_MSIX);
+	if (err < 0) {
 		dev_err(&dev->dev,
 			"MSI-X init failed: %d, expected entries: %d\n",
 			err, TIMBERDALE_NR_IRQS);
-		goto err_msix;
+		goto err_config;
 	}
 
 	err = device_create_file(&dev->dev, &dev_attr_fw_ver);
@@ -733,7 +725,7 @@ static int timb_probe(struct pci_dev *dev,
 	/* update IRQ offsets in I2C board info */
 	for (i = 0; i < ARRAY_SIZE(timberdale_i2c_board_info); i++)
 		timberdale_i2c_board_info[i].irq =
-			msix_entries[timberdale_i2c_board_info[i].irq].vector;
+			pci_irq_vector(dev, timberdale_i2c_board_info[i].irq);
 
 	/* Update the SPI configuration depending on the HW (8 or 16 bit) */
 	if (priv->fw.config & TIMB_HW_CONFIG_SPI_8BIT) {
@@ -756,25 +748,25 @@ static int timb_probe(struct pci_dev *dev,
 		err = mfd_add_devices(&dev->dev, -1,
 			timberdale_cells_bar0_cfg0,
 			ARRAY_SIZE(timberdale_cells_bar0_cfg0),
-			&dev->resource[0], msix_entries[0].vector, NULL);
+			&dev->resource[0], pci_irq_vector(dev, 0), NULL);
 		break;
 	case TIMB_HW_VER1:
 		err = mfd_add_devices(&dev->dev, -1,
 			timberdale_cells_bar0_cfg1,
 			ARRAY_SIZE(timberdale_cells_bar0_cfg1),
-			&dev->resource[0], msix_entries[0].vector, NULL);
+			&dev->resource[0], pci_irq_vector(dev, 0), NULL);
 		break;
 	case TIMB_HW_VER2:
 		err = mfd_add_devices(&dev->dev, -1,
 			timberdale_cells_bar0_cfg2,
 			ARRAY_SIZE(timberdale_cells_bar0_cfg2),
-			&dev->resource[0], msix_entries[0].vector, NULL);
+			&dev->resource[0], pci_irq_vector(dev, 0), NULL);
 		break;
 	case TIMB_HW_VER3:
 		err = mfd_add_devices(&dev->dev, -1,
 			timberdale_cells_bar0_cfg3,
 			ARRAY_SIZE(timberdale_cells_bar0_cfg3),
-			&dev->resource[0], msix_entries[0].vector, NULL);
+			&dev->resource[0], pci_irq_vector(dev, 0), NULL);
 		break;
 	default:
 		dev_err(&dev->dev, "Uknown IP setup: %d.%d.%d\n",
@@ -790,7 +782,7 @@ static int timb_probe(struct pci_dev *dev,
 
 	err = mfd_add_devices(&dev->dev, 0,
 		timberdale_cells_bar1, ARRAY_SIZE(timberdale_cells_bar1),
-		&dev->resource[1], msix_entries[0].vector, NULL);
+		&dev->resource[1], pci_irq_vector(dev, 0), NULL);
 	if (err) {
 		dev_err(&dev->dev, "mfd_add_devices failed: %d\n", err);
 		goto err_mfd2;
@@ -801,14 +793,13 @@ static int timb_probe(struct pci_dev *dev,
 		((priv->fw.config & TIMB_HW_VER_MASK) == TIMB_HW_VER3)) {
 		err = mfd_add_devices(&dev->dev, 1, timberdale_cells_bar2,
 			ARRAY_SIZE(timberdale_cells_bar2),
-			&dev->resource[2], msix_entries[0].vector, NULL);
+			&dev->resource[2], pci_irq_vector(dev, 0), NULL);
 		if (err) {
 			dev_err(&dev->dev, "mfd_add_devices failed: %d\n", err);
 			goto err_mfd2;
 		}
 	}
 
-	kfree(msix_entries);
 
 	dev_info(&dev->dev,
 		"Found Timberdale Card. Rev: %d.%d, HW config: 0x%02x\n",
@@ -821,9 +812,7 @@ err_mfd2:
 err_mfd:
 	device_remove_file(&dev->dev, &dev_attr_fw_ver);
 err_create_file:
-	pci_disable_msix(dev);
-err_msix:
-	kfree(msix_entries);
+	pci_free_irq_vectors(dev);
 err_config:
 	iounmap(priv->ctl_membase);
 err_ioremap:
@@ -846,7 +835,7 @@ static void timb_remove(struct pci_dev *dev)
 	iounmap(priv->ctl_membase);
 	release_mem_region(priv->ctl_mapbase, CHIPCTLSIZE);
 
-	pci_disable_msix(dev);
+	pci_free_irq_vectors(dev);
 	pci_disable_device(dev);
 	kfree(priv);
 }
