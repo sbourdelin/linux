@@ -52,6 +52,20 @@
 
 #define MAX_SLOTS			8
 
+#define SDHCI_PCI_DEVICE(vend, dev, cfg) \
+	.vendor = (vend), .device = (dev), \
+	.subvendor = PCI_ANY_ID, .subdevice = PCI_ANY_ID, \
+	.driver_data = (kernel_ulong_t)&(cfg)
+
+#define SDHCI_PCI_DEVICE_SUB(vend, dev, subvend, subdev, cfg) \
+	.vendor = (vend), .device = (dev), \
+	.subvendor = (subvend), .subdevice = (subdev), \
+	.driver_data = (kernel_ulong_t)&(cfg)
+
+#define SDHCI_PCI_DEVICE_CLASS(vend, dev, cl, cl_msk, cfg) \
+	SDHCI_PCI_DEVICE(vend, dev, cfg), \
+	.class = (cl), .class_mask = (cl_msk)
+
 struct sdhci_pci_chip;
 struct sdhci_pci_slot;
 
