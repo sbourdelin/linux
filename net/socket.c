@@ -668,7 +668,8 @@ static bool skb_is_err_queue(const struct sk_buff *skb)
 void __sock_recv_timestamp(struct msghdr *msg, struct sock *sk,
 	struct sk_buff *skb)
 {
-	int need_software_tstamp = sock_flag(sk, SOCK_RCVTSTAMP);
+	int need_software_tstamp = sock_flag(sk, SOCK_RCVTSTAMP) &&
+				   !skb_is_err_queue(skb);
 	struct scm_timestamping tss;
 	struct scm_ts_pktinfo ts_pktinfo;
 	int empty = 1;
