@@ -28,6 +28,7 @@
 #include <linux/kernel.h>
 #include <linux/pm_qos.h>
 #include <linux/idr.h>
+#include <linux/version.h>
 
 #include <asm/intel-mid.h>
 #include "../../include/asm/intel_mid_pcihelpers.h"
