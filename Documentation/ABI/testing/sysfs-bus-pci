@@ -301,3 +301,21 @@ Contact:	Emil Velikov <emil.l.velikov@gmail.com>
 Description:
 		This file contains the revision field of the the PCI device.
 		The value comes from device config space. The file is read only.
+
+What:		/sys/bus/pci/devices/.../sriov_drivers_autoprobe
+Date:		April 2017
+Contact:	Bodong Wang<bodong@mellanox.com>
+Description:
+		This file appears when a physical PCIe device supports SR-IOV.
+		Userspace applications can read and write to this file to
+		determine and control the enablement(1/y/Y) or disablement
+		(0/n/N) of probing Virtual Functions (VFs) by a compatible
+		driver on host side. The default value is 1(enabled) which means
+		VFs will be probed and bound to a compatible driver on the host
+		side if SR-IOV is enabled. A typical use case is writing 0 to
+		this file to disable SR-IOV drivers auto probe, then admin from
+		host is able to assign the newly created VFs to virtual machines
+		directly after SR-IOV is enabled. Note that, changing this file
+		will not affect VFs which are already probed by host. In this
+		scenario, the user must first disable SR-IOV, make the change,
+		then resume SR-IOV.
