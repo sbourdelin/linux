@@ -11036,10 +11036,123 @@ static int i40e_port_netdev_stop(struct net_device *dev)
 	return err;
 }
 
+/**
+ * i40e_port_netdev_get_stats64
+ * @dev: network interface device structure
+ * @stats: netlink stats structure
+ *
+ * Fills the hw statistics from the VSI corresponding to the associated port
+ * netdev
+ **/
+static void
+i40e_port_netdev_get_stats64(struct net_device *netdev,
+			     struct rtnl_link_stats64 *stats)
+{
+	struct i40e_port_netdev_priv *priv = netdev_priv(netdev);
+	struct i40e_vf *vf;
+	struct i40e_pf *pf;
+	struct i40e_vsi *vsi;
+	struct i40e_eth_stats *estats;
+
+	switch (priv->type) {
+	case I40E_PORT_NETDEV_VF:
+		vf = (struct i40e_vf *)priv->f;
+		pf = vf->pf;
+		vsi = pf->vsi[vf->lan_vsi_idx];
+		break;
+	case I40E_PORT_NETDEV_PF:
+		pf = (struct i40e_pf *)priv->f;
+		vsi = pf->vsi[pf->lan_vsi];
+		break;
+	default:
+		return;
+	}
+
+	i40e_update_stats(vsi);
+	estats = &vsi->eth_stats;
+
+	/* TX and RX stats are flipped as we are returning the stats as seen
+	 * at the switch port corresponding to the VF.
+	 */
+	stats->rx_packets = estats->tx_unicast + estats->tx_multicast +
+			    estats->tx_broadcast;
+	stats->tx_packets = estats->rx_unicast + estats->rx_multicast +
+			    estats->rx_broadcast;
+	stats->rx_bytes = estats->tx_bytes;
+	stats->tx_bytes = estats->rx_bytes;
+	stats->rx_dropped = estats->tx_discards;
+	stats->tx_dropped = estats->rx_discards;
+}
+
+/**
+ * i40e_port_netdev_get_cpu_hit_stats64
+ * @dev: network interface device structure
+ * @stats: netlink stats structure
+ *
+ * stats are filled from the priv structure. correspond to the packets
+ * that are seen by the cpu and sent/received via port netdev.
+ **/
+static int
+i40e_port_netdev_get_cpu_hit_stats64(const struct net_device *dev,
+				     struct rtnl_link_stats64 *stats)
+{
+	struct i40e_port_netdev_priv *priv = netdev_priv(dev);
+	int i;
+
+	for_each_possible_cpu(i) {
+		struct port_netdev_pcpu_stats *port_netdev_stats;
+		u64 tbytes, tpkts, tdrops, rbytes, rpkts;
+		unsigned int start;
+
+		port_netdev_stats = per_cpu_ptr(priv->stats, i);
+		do {
+			start = u64_stats_fetch_begin_irq(&port_netdev_stats->syncp);
+			tbytes = port_netdev_stats->tx_bytes;
+			tpkts = port_netdev_stats->tx_packets;
+			tdrops = port_netdev_stats->tx_drops;
+			rbytes = port_netdev_stats->rx_bytes;
+			rpkts = port_netdev_stats->rx_packets;
+		} while (u64_stats_fetch_retry_irq(&port_netdev_stats->syncp, start));
+		stats->tx_bytes += tbytes;
+		stats->tx_packets += tpkts;
+		stats->tx_dropped += tdrops;
+		stats->rx_bytes += rbytes;
+		stats->rx_packets += rpkts;
+	}
+
+	return 0;
+}
+
+static bool
+i40e_port_netdev_has_offload_stats(const struct net_device *dev, int attr_id)
+{
+	switch (attr_id) {
+	case IFLA_OFFLOAD_XSTATS_CPU_HIT:
+		return true;
+	}
+
+	return false;
+}
+
+static int
+i40e_port_netdev_get_offload_stats(int attr_id, const struct net_device *dev,
+				   void *sp)
+{
+	switch (attr_id) {
+	case IFLA_OFFLOAD_XSTATS_CPU_HIT:
+		return i40e_port_netdev_get_cpu_hit_stats64(dev, sp);
+	}
+
+	return -EINVAL;
+}
+
 static const struct net_device_ops i40e_port_netdev_ops = {
 	.ndo_open		= i40e_port_netdev_open,
 	.ndo_stop		= i40e_port_netdev_stop,
 	.ndo_start_xmit		= i40e_port_netdev_start_xmit,
+	.ndo_get_stats64	= i40e_port_netdev_get_stats64,
+	.ndo_has_offload_stats	= i40e_port_netdev_has_offload_stats,
+	.ndo_get_offload_stats	= i40e_port_netdev_get_offload_stats,
 };
 
 /**
@@ -11112,6 +11225,16 @@ int i40e_alloc_port_netdev(void *f, enum i40e_port_netdev_type type)
 		return -EINVAL;
 	}
 
+	priv->stats = netdev_alloc_pcpu_stats(struct port_netdev_pcpu_stats);
+	if (!priv->stats) {
+		dev_err(&pf->pdev->dev,
+			"alloc_pcpu_stats failed for port netdev: %s\n",
+			port_netdev->name);
+		dst_release((struct dst_entry *)priv->dst);
+		free_netdev(port_netdev);
+		return -ENOMEM;
+	}
+
 	port_netdev->netdev_ops = &i40e_port_netdev_ops;
 	eth_hw_addr_random(port_netdev);
 
@@ -11179,6 +11302,7 @@ void i40e_free_port_netdev(void *f, enum i40e_port_netdev_type type)
 			 pf->port_netdev->name);
 		priv = netdev_priv(pf->port_netdev);
 		dst_release((struct dst_entry *)priv->dst);
+		free_percpu(priv->stats);
 		unregister_netdev(pf->port_netdev);
 		free_netdev(pf->port_netdev);
 		pf->port_netdev = NULL;
@@ -11198,6 +11322,7 @@ void i40e_free_port_netdev(void *f, enum i40e_port_netdev_type type)
 			 vf->port_netdev->name);
 		priv = netdev_priv(vf->port_netdev);
 		dst_release((struct dst_entry *)priv->dst);
+		free_percpu(priv->stats);
 		unregister_netdev(vf->port_netdev);
 		free_netdev(vf->port_netdev);
 		vf->port_netdev = NULL;

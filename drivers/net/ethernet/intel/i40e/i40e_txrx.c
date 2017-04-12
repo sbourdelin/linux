@@ -1318,7 +1318,9 @@ static bool i40e_alloc_mapped_page(struct i40e_ring *rx_ring,
 static void i40e_handle_lpbk_skb(struct i40e_ring *rx_ring, struct sk_buff *skb)
 {
 	struct i40e_q_vector *q_vector = rx_ring->q_vector;
+	struct port_netdev_pcpu_stats *port_netdev_stats;
 	struct i40e_pf *pf = rx_ring->vsi->back;
+	struct i40e_port_netdev_priv *priv;
 	struct sk_buff *nskb;
 	struct i40e_vf *vf;
 	struct ethhdr *eth;
@@ -1343,6 +1345,12 @@ static void i40e_handle_lpbk_skb(struct i40e_ring *rx_ring, struct sk_buff *skb)
 				break;
 			nskb->offload_fwd_mark = 1;
 			nskb->dev = vf->port_netdev;
+			priv = netdev_priv(vf->port_netdev);
+			port_netdev_stats = this_cpu_ptr(priv->stats);
+			u64_stats_update_begin(&port_netdev_stats->syncp);
+			port_netdev_stats->rx_packets++;
+			port_netdev_stats->rx_bytes += nskb->len;
+			u64_stats_update_end(&port_netdev_stats->syncp);
 			napi_gro_receive(&q_vector->napi, nskb);
 			break;
 		}
@@ -3335,6 +3343,7 @@ netdev_tx_t i40e_port_netdev_start_xmit(struct sk_buff *skb,
 	struct i40e_vsi *vsi;
 	struct i40e_pf *pf;
 	struct i40e_vf *vf;
+	int ret;
 
 	switch (priv->type) {
 	case I40E_PORT_NETDEV_VF:
@@ -3354,5 +3363,18 @@ netdev_tx_t i40e_port_netdev_start_xmit(struct sk_buff *skb,
 	skb_dst_set(skb, &priv->dst->dst);
 	skb->dev = vsi->netdev;
 
-	return dev_queue_xmit(skb);
+	ret = dev_queue_xmit(skb);
+	if (likely(ret == NET_XMIT_SUCCESS || ret == NET_XMIT_CN)) {
+		struct port_netdev_pcpu_stats *port_netdev_stats;
+
+		port_netdev_stats = this_cpu_ptr(priv->stats);
+		u64_stats_update_begin(&port_netdev_stats->syncp);
+		port_netdev_stats->tx_packets++;
+		port_netdev_stats->tx_bytes += skb->len;
+		u64_stats_update_end(&port_netdev_stats->syncp);
+	} else {
+		this_cpu_inc(priv->stats->tx_drops);
+	}
+
+	return ret;
 }
