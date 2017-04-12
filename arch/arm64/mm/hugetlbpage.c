@@ -143,15 +143,24 @@ pte_t *huge_pte_offset(struct mm_struct *mm, unsigned long addr)
 	pr_debug("%s: addr:0x%lx pgd:%p\n", __func__, addr, pgd);
 	if (!pgd_present(*pgd))
 		return NULL;
-	pud = pud_offset(pgd, addr);
-	if (!pud_present(*pud))
-		return NULL;
 
-	if (pud_huge(*pud))
+	pud = pud_offset(pgd, addr);
+	/*
+	 * In case of HW Poisoning, a hugepage pud/pmd can contain
+	 * poisoned entries. Poisoned entries are marked as swap
+	 * entries.
+	 *
+	 * For puds/pmds that are not present, check to see if it
+	 * could be a swap entry (!present and !none).
+	 */
+	if ((!pte_present(pud_pte(*pud)) && !pud_none(*pud)) || pud_huge(*pud))
 		return (pte_t *)pud;
+
 	pmd = pmd_offset(pud, addr);
-	if (!pmd_present(*pmd))
+	if (pmd_none(*pmd))
 		return NULL;
+	if (!pmd_present(*pmd) && !pmd_none(*pmd))
+		return (pte_t *)pmd;
 
 	if (pte_cont(pmd_pte(*pmd))) {
 		pmd = pmd_offset(
@@ -160,6 +169,7 @@ pte_t *huge_pte_offset(struct mm_struct *mm, unsigned long addr)
 	}
 	if (pmd_huge(*pmd))
 		return (pte_t *)pmd;
+
 	pte = pte_offset_kernel(pmd, addr);
 	if (pte_present(*pte) && pte_cont(*pte)) {
 		pte = pte_offset_kernel(
