@@ -4841,6 +4841,32 @@ static int i40e_vsi_configure_bw_alloc(struct i40e_vsi *vsi, u8 enabled_tc,
 	return 0;
 }
 
+static int i40e_switchdev_pf_attr_get(struct net_device *dev,
+				      struct switchdev_attr *attr)
+{
+	struct i40e_netdev_priv *np = netdev_priv(dev);
+	struct i40e_vsi *vsi = np->vsi;
+	struct i40e_pf *pf = vsi->back;
+
+	if (pf->eswitch_mode == DEVLINK_ESWITCH_MODE_LEGACY)
+		return -EOPNOTSUPP;
+
+	switch (attr->id) {
+	case SWITCHDEV_ATTR_ID_PORT_PARENT_ID:
+		attr->u.ppid.id_len = ETH_ALEN;
+		ether_addr_copy(attr->u.ppid.id, dev->dev_addr);
+		break;
+	default:
+		return -EOPNOTSUPP;
+	}
+
+	return 0;
+}
+
+static const struct switchdev_ops i40e_switchdev_pf_ops = {
+	.switchdev_port_attr_get	= i40e_switchdev_pf_attr_get,
+};
+
 /**
  * i40e_vsi_config_netdev_tc - Setup the netdev TC configuration
  * @vsi: the VSI being configured
@@ -9401,6 +9427,9 @@ static int i40e_config_netdev(struct i40e_vsi *vsi)
 	netdev->netdev_ops = &i40e_netdev_ops;
 	netdev->watchdog_timeo = 5 * HZ;
 	i40e_set_ethtool_ops(netdev);
+#ifdef CONFIG_NET_SWITCHDEV
+	netdev->switchdev_ops = &i40e_switchdev_pf_ops;
+#endif
 
 	/* MTU range: 68 - 9706 */
 	netdev->min_mtu = ETH_MIN_MTU;
@@ -11146,6 +11175,32 @@ i40e_port_netdev_get_offload_stats(int attr_id, const struct net_device *dev,
 	return -EINVAL;
 }
 
+static int
+i40e_port_netdev_get_phys_port_name(struct net_device *dev, char *buf,
+				    size_t len)
+{
+	struct i40e_port_netdev_priv *priv = netdev_priv(dev);
+	struct i40e_vf *vf;
+	int ret;
+
+	switch (priv->type) {
+	case I40E_PORT_NETDEV_VF:
+		vf = (struct i40e_vf *)priv->f;
+		ret = snprintf(buf, len, "%d", vf->vf_id);
+		break;
+	case I40E_PORT_NETDEV_PF:
+		ret = snprintf(buf, len, "%d", I40E_MAIN_VSI_PORT_ID);
+		break;
+	default:
+		return -EOPNOTSUPP;
+	}
+
+	if (ret >= len)
+		return -EOPNOTSUPP;
+
+	return 0;
+}
+
 static const struct net_device_ops i40e_port_netdev_ops = {
 	.ndo_open		= i40e_port_netdev_open,
 	.ndo_stop		= i40e_port_netdev_stop,
@@ -11153,6 +11208,44 @@ static const struct net_device_ops i40e_port_netdev_ops = {
 	.ndo_get_stats64	= i40e_port_netdev_get_stats64,
 	.ndo_has_offload_stats	= i40e_port_netdev_has_offload_stats,
 	.ndo_get_offload_stats	= i40e_port_netdev_get_offload_stats,
+	.ndo_get_phys_port_name	= i40e_port_netdev_get_phys_port_name,
+};
+
+static int i40e_switchdev_port_attr_get(struct net_device *dev,
+					struct switchdev_attr *attr)
+{
+	struct i40e_port_netdev_priv *priv = netdev_priv(dev);
+	struct i40e_vsi *vsi;
+	struct i40e_pf *pf;
+	struct i40e_vf *vf;
+
+	switch (priv->type) {
+	case I40E_PORT_NETDEV_VF:
+		vf = (struct i40e_vf *)priv->f;
+		pf = vf->pf;
+		break;
+	case I40E_PORT_NETDEV_PF:
+		pf = (struct i40e_pf *)priv->f;
+		break;
+	default:
+		return -EOPNOTSUPP;
+	}
+
+	vsi = pf->vsi[pf->lan_vsi];
+	switch (attr->id) {
+	case SWITCHDEV_ATTR_ID_PORT_PARENT_ID:
+		attr->u.ppid.id_len = ETH_ALEN;
+		ether_addr_copy(attr->u.ppid.id, vsi->netdev->dev_addr);
+		break;
+	default:
+		return -EOPNOTSUPP;
+	}
+
+	return 0;
+}
+
+static const struct switchdev_ops i40e_switchdev_port_ops = {
+	.switchdev_port_attr_get	= i40e_switchdev_port_attr_get,
 };
 
 /**
@@ -11237,6 +11330,10 @@ int i40e_alloc_port_netdev(void *f, enum i40e_port_netdev_type type)
 
 	port_netdev->netdev_ops = &i40e_port_netdev_ops;
 	eth_hw_addr_random(port_netdev);
+
+#ifdef CONFIG_NET_SWITCHDEV
+	port_netdev->switchdev_ops = &i40e_switchdev_port_ops;
+#endif
 
 	netif_carrier_off(port_netdev);
 	netif_tx_stop_all_queues(port_netdev);
