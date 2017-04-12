@@ -163,11 +163,11 @@ static void igb_ptp_write_i210(struct igb_adapter *adapter,
  * In addition, here have extended the system time with an overflow
  * counter in software.
  **/
-static void igb_ptp_systim_to_hwtstamp(struct igb_adapter *adapter,
-				       struct skb_shared_hwtstamps *hwtstamps,
-				       u64 systim)
+static ktime_t igb_ptp_systim_to_hwtstamp(struct igb_adapter *adapter,
+					  u64 systim)
 {
 	unsigned long flags;
+	ktime_t hwtstamp = 0;
 	u64 ns;
 
 	switch (adapter->hw.mac.type) {
@@ -181,19 +181,18 @@ static void igb_ptp_systim_to_hwtstamp(struct igb_adapter *adapter,
 
 		spin_unlock_irqrestore(&adapter->tmreg_lock, flags);
 
-		memset(hwtstamps, 0, sizeof(*hwtstamps));
-		hwtstamps->hwtstamp = ns_to_ktime(ns);
+		hwtstamp = ns_to_ktime(ns);
 		break;
 	case e1000_i210:
 	case e1000_i211:
-		memset(hwtstamps, 0, sizeof(*hwtstamps));
 		/* Upper 32 bits contain s, lower 32 bits contain ns. */
-		hwtstamps->hwtstamp = ktime_set(systim >> 32,
-						systim & 0xFFFFFFFF);
+		hwtstamp = ktime_set(systim >> 32, systim & 0xFFFFFFFF);
 		break;
 	default:
 		break;
 	}
+
+	return hwtstamp;
 }
 
 /* PTP clock operations */
@@ -729,7 +728,7 @@ static void igb_ptp_tx_hwtstamp(struct igb_adapter *adapter)
 	regval = rd32(E1000_TXSTMPL);
 	regval |= (u64)rd32(E1000_TXSTMPH) << 32;
 
-	igb_ptp_systim_to_hwtstamp(adapter, &shhwtstamps, regval);
+	shhwtstamps.hwtstamp = igb_ptp_systim_to_hwtstamp(adapter, regval);
 	/* adjust timestamp for the TX latency based on link speed */
 	if (adapter->hw.mac.type == e1000_i210) {
 		switch (adapter->link_speed) {
@@ -764,19 +763,19 @@ static void igb_ptp_tx_hwtstamp(struct igb_adapter *adapter)
  * incoming frame.  The value is stored in little endian format starting on
  * byte 8.
  **/
-void igb_ptp_rx_pktstamp(struct igb_q_vector *q_vector, void *va,
-			 struct sk_buff *skb)
+ktime_t igb_ptp_rx_pktstamp(struct igb_q_vector *q_vector, void *va,
+			    struct sk_buff *skb)
 {
 	__le64 *regval = (__le64 *)va;
 	struct igb_adapter *adapter = q_vector->adapter;
+	ktime_t hwtstamp;
 	int adjust = 0;
 
 	/* The timestamp is recorded in little endian format.
 	 * DWORD: 0        1        2        3
 	 * Field: Reserved Reserved SYSTIML  SYSTIMH
 	 */
-	igb_ptp_systim_to_hwtstamp(adapter, skb_hwtstamps(skb),
-				   le64_to_cpu(regval[1]));
+	hwtstamp = igb_ptp_systim_to_hwtstamp(adapter, le64_to_cpu(regval[1]));
 
 	/* adjust timestamp for the RX latency based on link speed */
 	if (adapter->hw.mac.type == e1000_i210) {
@@ -792,8 +791,8 @@ void igb_ptp_rx_pktstamp(struct igb_q_vector *q_vector, void *va,
 			break;
 		}
 	}
-	skb_hwtstamps(skb)->hwtstamp =
-		ktime_sub_ns(skb_hwtstamps(skb)->hwtstamp, adjust);
+
+	return ktime_sub_ns(hwtstamp, adjust);
 }
 
 /**
@@ -804,11 +803,12 @@ void igb_ptp_rx_pktstamp(struct igb_q_vector *q_vector, void *va,
  * This function is meant to retrieve a timestamp from the internal registers
  * of the adapter and store it in the skb.
  **/
-void igb_ptp_rx_rgtstamp(struct igb_q_vector *q_vector,
-			 struct sk_buff *skb)
+ktime_t igb_ptp_rx_rgtstamp(struct igb_q_vector *q_vector,
+			    struct sk_buff *skb)
 {
 	struct igb_adapter *adapter = q_vector->adapter;
 	struct e1000_hw *hw = &adapter->hw;
+	ktime_t hwtstamp;
 	u64 regval;
 	int adjust = 0;
 
@@ -823,12 +823,12 @@ void igb_ptp_rx_rgtstamp(struct igb_q_vector *q_vector,
 	 * can turn into a skb_shared_hwtstamps.
 	 */
 	if (!(rd32(E1000_TSYNCRXCTL) & E1000_TSYNCRXCTL_VALID))
-		return;
+		return 0;
 
 	regval = rd32(E1000_RXSTMPL);
 	regval |= (u64)rd32(E1000_RXSTMPH) << 32;
 
-	igb_ptp_systim_to_hwtstamp(adapter, skb_hwtstamps(skb), regval);
+	hwtstamp = igb_ptp_systim_to_hwtstamp(adapter, regval);
 
 	/* adjust timestamp for the RX latency based on link speed */
 	if (adapter->hw.mac.type == e1000_i210) {
@@ -844,13 +844,13 @@ void igb_ptp_rx_rgtstamp(struct igb_q_vector *q_vector,
 			break;
 		}
 	}
-	skb_hwtstamps(skb)->hwtstamp =
-		ktime_sub_ns(skb_hwtstamps(skb)->hwtstamp, adjust);
 
 	/* Update the last_rx_timestamp timer in order to enable watchdog check
 	 * for error case of latched timestamp on a dropped packet.
 	 */
 	adapter->last_rx_timestamp = jiffies;
+
+	return ktime_sub_ns(hwtstamp, adjust);
 }
 
 /**

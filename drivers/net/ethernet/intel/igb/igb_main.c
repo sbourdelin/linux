@@ -6990,9 +6990,14 @@ static struct sk_buff *igb_construct_skb(struct igb_ring *rx_ring,
 		return NULL;
 
 	if (unlikely(igb_test_staterr(rx_desc, E1000_RXDADV_STAT_TSIP))) {
-		igb_ptp_rx_pktstamp(rx_ring->q_vector, va, skb);
+		ktime_t hwtstamp;
+
+		hwtstamp = igb_ptp_rx_pktstamp(rx_ring->q_vector, va, skb);
 		va += IGB_TS_HDR_LEN;
 		size -= IGB_TS_HDR_LEN;
+		/* FIXME: is size the L2 size of the packet? */
+		skb_hw_timestamp(skb, hwtstamp, rx_ring->netdev->ifindex,
+				 size);
 	}
 
 	/* Determine available headroom for copy */
@@ -7052,8 +7057,12 @@ static struct sk_buff *igb_build_skb(struct igb_ring *rx_ring,
 
 	/* pull timestamp out of packet data */
 	if (igb_test_staterr(rx_desc, E1000_RXDADV_STAT_TSIP)) {
-		igb_ptp_rx_pktstamp(rx_ring->q_vector, skb->data, skb);
+		ktime_t hwtstamp;
+
+		hwtstamp = igb_ptp_rx_pktstamp(rx_ring->q_vector, va, skb);
 		__skb_pull(skb, IGB_TS_HDR_LEN);
+		skb_hw_timestamp(skb, hwtstamp, rx_ring->netdev->ifindex,
+				 skb->len);
 	}
 
 	/* update buffer offset */
@@ -7199,8 +7208,12 @@ static void igb_process_skb_fields(struct igb_ring *rx_ring,
 	igb_rx_checksum(rx_ring, rx_desc, skb);
 
 	if (igb_test_staterr(rx_desc, E1000_RXDADV_STAT_TS) &&
-	    !igb_test_staterr(rx_desc, E1000_RXDADV_STAT_TSIP))
-		igb_ptp_rx_rgtstamp(rx_ring->q_vector, skb);
+	    !igb_test_staterr(rx_desc, E1000_RXDADV_STAT_TSIP)) {
+		ktime_t hwtstamp;
+
+		hwtstamp = igb_ptp_rx_rgtstamp(rx_ring->q_vector, skb);
+		skb_hw_timestamp(skb, hwtstamp, dev->ifindex, skb->len);
+	}
 
 	if ((dev->features & NETIF_F_HW_VLAN_CTAG_RX) &&
 	    igb_test_staterr(rx_desc, E1000_RXD_STAT_VP)) {

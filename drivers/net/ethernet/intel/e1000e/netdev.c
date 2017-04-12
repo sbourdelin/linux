@@ -508,9 +508,8 @@ static int e1000_desc_unused(struct e1000_ring *ring)
  * value involves reading two 32 bit registers. The first read latches the
  * value.
  **/
-static void e1000e_systim_to_hwtstamp(struct e1000_adapter *adapter,
-				      struct skb_shared_hwtstamps *hwtstamps,
-				      u64 systim)
+static ktime_t e1000e_systim_to_hwtstamp(struct e1000_adapter *adapter,
+					 u64 systim)
 {
 	u64 ns;
 	unsigned long flags;
@@ -519,8 +518,7 @@ static void e1000e_systim_to_hwtstamp(struct e1000_adapter *adapter,
 	ns = timecounter_cyc2time(&adapter->tc, systim);
 	spin_unlock_irqrestore(&adapter->systim_lock, flags);
 
-	memset(hwtstamps, 0, sizeof(*hwtstamps));
-	hwtstamps->hwtstamp = ns_to_ktime(ns);
+	return ns_to_ktime(ns);
 }
 
 /**
@@ -553,7 +551,8 @@ static void e1000e_rx_hwtstamp(struct e1000_adapter *adapter, u32 status,
 	 */
 	rxstmp = (u64)er32(RXSTMPL);
 	rxstmp |= (u64)er32(RXSTMPH) << 32;
-	e1000e_systim_to_hwtstamp(adapter, skb_hwtstamps(skb), rxstmp);
+	skb_hw_timestamp(skb, e1000e_systim_to_hwtstamp(adapter, rxstmp),
+			 adapter->netdev->ifindex, skb->len);
 
 	adapter->flags2 &= ~FLAG2_CHECK_RX_HWTSTAMP;
 }
@@ -1188,7 +1187,8 @@ static void e1000e_tx_hwtstamp_work(struct work_struct *work)
 		txstmp = er32(TXSTMPL);
 		txstmp |= (u64)er32(TXSTMPH) << 32;
 
-		e1000e_systim_to_hwtstamp(adapter, &shhwtstamps, txstmp);
+		shhwtstamps.hwtstamp =
+			e1000e_systim_to_hwtstamp(adapter, txstmp);
 
 		skb_tstamp_tx(adapter->tx_hwtstamp_skb, &shhwtstamps);
 		dev_kfree_skb_any(adapter->tx_hwtstamp_skb);
