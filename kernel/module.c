@@ -299,6 +299,7 @@ int unregister_module_notifier(struct notifier_block *nb)
 EXPORT_SYMBOL(unregister_module_notifier);
 
 struct load_info {
+	char *name;
 	Elf_Ehdr *hdr;
 	unsigned long len;
 	Elf_Shdr *sechdrs;
@@ -1297,12 +1298,12 @@ static int check_version(const struct load_info *info,
 	}
 
 	/* Broken toolchain. Warn once, then let it go.. */
-	pr_warn_once("%s: no symbol version for %s\n", mod->name, symname);
+	pr_warn_once("%s: no symbol version for %s\n", info->name, symname);
 	return 1;
 
 bad_version:
 	pr_warn("%s: disagrees about version of symbol %s\n",
-	       mod->name, symname);
+	       info->name, symname);
 	return 0;
 }
 
@@ -2892,9 +2893,15 @@ static int rewrite_section_headers(struct load_info *info, int flags)
 		info->index.vers = 0; /* Pretend no __versions section! */
 	else
 		info->index.vers = find_sec(info, "__versions");
-	info->index.info = find_sec(info, ".modinfo");
-	info->sechdrs[info->index.info].sh_flags &= ~(unsigned long)SHF_ALLOC;
 	info->sechdrs[info->index.vers].sh_flags &= ~(unsigned long)SHF_ALLOC;
+
+	info->index.info = find_sec(info, ".modinfo");
+	if (!info->index.info)
+		info->name = "unknown";
+	else
+		info->name = get_modinfo(info, "name");
+	info->sechdrs[info->index.info].sh_flags &= ~(unsigned long)SHF_ALLOC;
+
 	return 0;
 }
 
@@ -2934,14 +2941,14 @@ static struct module *setup_load_info(struct load_info *info, int flags)
 
 	info->index.mod = find_sec(info, ".gnu.linkonce.this_module");
 	if (!info->index.mod) {
-		pr_warn("No module found in object\n");
+		pr_warn("%s: No module found in object\n", info->name);
 		return ERR_PTR(-ENOEXEC);
 	}
 	/* This is temporary: point mod into copy of data. */
 	mod = (void *)info->sechdrs[info->index.mod].sh_addr;
 
 	if (info->index.sym == 0) {
-		pr_warn("%s: module has no symbols (stripped?)\n", mod->name);
+		pr_warn("%s: module has no symbols (stripped?)\n", info->name);
 		return ERR_PTR(-ENOEXEC);
 	}
 
@@ -2969,7 +2976,7 @@ static int check_modinfo(struct module *mod, struct load_info *info, int flags)
 			return err;
 	} else if (!same_magic(modmagic, vermagic, info->index.vers)) {
 		pr_err("%s: version magic '%s' should be '%s'\n",
-		       mod->name, modmagic, vermagic);
+		       info->name, modmagic, vermagic);
 		return -ENOEXEC;
 	}
 
@@ -3622,7 +3629,7 @@ static int load_module(struct load_info *info, const char __user *uargs,
 	if (!mod->sig_ok) {
 		pr_notice_once("%s: module verification failed: signature "
 			       "and/or required key missing - tainting "
-			       "kernel\n", mod->name);
+			       "kernel\n", info->name);
 		add_taint_module(mod, TAINT_UNSIGNED_MODULE, LOCKDEP_STILL_OK);
 	}
 #endif
