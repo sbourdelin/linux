@@ -412,6 +412,9 @@ typedef struct drm_i915_irq_wait {
  */
 #define I915_PARAM_HAS_EXEC_FENCE	 44
 
+/* Query the mask of slices available for this system */
+#define I915_PARAM_SLICE_MASK		 45
+
 typedef struct drm_i915_getparam {
 	__s32 param;
 	/*
