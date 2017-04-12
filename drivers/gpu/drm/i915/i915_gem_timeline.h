@@ -26,10 +26,29 @@
 #define I915_GEM_TIMELINE_H
 
 #include <linux/list.h>
+#include <linux/radix-tree.h>
 
+#include "i915_utils.h"
 #include "i915_gem_request.h"
 
 struct i915_gem_timeline;
+
+#define NSEQMAP 16
+
+struct seqmap_layer {
+	u64 prefix;
+	unsigned int height;
+	unsigned int bitmap;
+	struct seqmap_layer *parent;
+	void *slot[NSEQMAP];
+};
+
+struct seqmap {
+	struct seqmap_layer *hint;
+	struct seqmap_layer *top;
+	struct seqmap_layer *freed;
+#define SEQMAP_COUNT_BITS 2
+};
 
 struct intel_timeline {
 	u64 fence_context;
@@ -55,6 +74,8 @@ struct intel_timeline {
 	 * struct_mutex.
 	 */
 	struct i915_gem_active last_request;
+
+	struct seqmap sync;
 	u32 sync_seqno[I915_NUM_ENGINES];
 
 	struct i915_gem_timeline *common;
@@ -74,5 +95,18 @@ int i915_gem_timeline_init(struct drm_i915_private *i915,
 			   const char *name);
 int i915_gem_timeline_init__global(struct drm_i915_private *i915);
 void i915_gem_timeline_fini(struct i915_gem_timeline *tl);
+
+bool intel_timeline_sync_get(struct intel_timeline *tl, u64 id, u32 seqno);
+
+int __intel_timeline_sync_reserve(struct intel_timeline *tl);
+static inline int intel_timeline_sync_reserve(struct intel_timeline *tl)
+{
+	if (likely(ptr_unmask_bits(tl->sync.freed, SEQMAP_COUNT_BITS) == 2))
+		return 0;
+
+	return __intel_timeline_sync_reserve(tl);
+}
+
+void intel_timeline_sync_set(struct intel_timeline *tl, u64 id, u32 seqno);
 
 #endif

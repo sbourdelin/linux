@@ -714,9 +714,7 @@ int
 i915_gem_request_await_dma_fence(struct drm_i915_gem_request *req,
 				 struct dma_fence *fence)
 {
-	struct dma_fence_array *array;
 	int ret;
-	int i;
 
 	if (test_bit(DMA_FENCE_FLAG_SIGNALED_BIT, &fence->flags))
 		return 0;
@@ -728,38 +726,58 @@ i915_gem_request_await_dma_fence(struct drm_i915_gem_request *req,
 	if (fence->context == req->fence.context)
 		return 0;
 
-	if (dma_fence_is_i915(fence))
-		return i915_gem_request_await_request(req, to_request(fence));
+	/* Squash repeated waits to the same timelines, picking the latest */
+	if (fence->context != req->i915->mm.unordered_timeline) {
+		if (intel_timeline_sync_get(req->timeline,
+					    fence->context,
+					    fence->seqno))
+			return 0;
 
-	if (!dma_fence_is_array(fence)) {
+		ret = intel_timeline_sync_reserve(req->timeline);
+		if (unlikely(ret))
+			return ret;
+	}
+
+	if (dma_fence_is_i915(fence)) {
+		ret = i915_gem_request_await_request(req, to_request(fence));
+		if (ret < 0)
+			return ret;
+	} else if (!dma_fence_is_array(fence)) {
 		ret = i915_sw_fence_await_dma_fence(&req->submit,
 						    fence, I915_FENCE_TIMEOUT,
 						    GFP_KERNEL);
-		return ret < 0 ? ret : 0;
-	}
-
-	/* Note that if the fence-array was created in signal-on-any mode,
-	 * we should *not* decompose it into its individual fences. However,
-	 * we don't currently store which mode the fence-array is operating
-	 * in. Fortunately, the only user of signal-on-any is private to
-	 * amdgpu and we should not see any incoming fence-array from
-	 * sync-file being in signal-on-any mode.
-	 */
-
-	array = to_dma_fence_array(fence);
-	for (i = 0; i < array->num_fences; i++) {
-		struct dma_fence *child = array->fences[i];
-
-		if (dma_fence_is_i915(child))
-			ret = i915_gem_request_await_request(req,
-							     to_request(child));
-		else
-			ret = i915_sw_fence_await_dma_fence(&req->submit,
-							    child, I915_FENCE_TIMEOUT,
-							    GFP_KERNEL);
 		if (ret < 0)
 			return ret;
+	} else {
+		struct dma_fence_array *array = to_dma_fence_array(fence);
+		int i;
+
+		/* Note that if the fence-array was created in signal-on-any mode,
+		 * we should *not* decompose it into its individual fences. However,
+		 * we don't currently store which mode the fence-array is operating
+		 * in. Fortunately, the only user of signal-on-any is private to
+		 * amdgpu and we should not see any incoming fence-array from
+		 * sync-file being in signal-on-any mode.
+		 */
+
+		for (i = 0; i < array->num_fences; i++) {
+			struct dma_fence *child = array->fences[i];
+
+			if (dma_fence_is_i915(child))
+				ret = i915_gem_request_await_request(req,
+								     to_request(child));
+			else
+				ret = i915_sw_fence_await_dma_fence(&req->submit,
+								    child, I915_FENCE_TIMEOUT,
+								    GFP_KERNEL);
+			if (ret < 0)
+				return ret;
+		}
 	}
+
+	if (fence->context != req->i915->mm.unordered_timeline)
+		intel_timeline_sync_set(req->timeline,
+					fence->context, fence->seqno);
 
 	return 0;
 }
