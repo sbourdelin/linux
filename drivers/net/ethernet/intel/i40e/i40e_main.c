@@ -5295,7 +5295,8 @@ static int i40e_up_complete(struct i40e_vsi *vsi)
 	i40e_vsi_enable_irq(vsi);
 
 	if ((pf->hw.phy.link_info.link_info & I40E_AQ_LINK_UP) &&
-	    (vsi->netdev)) {
+	    (vsi->netdev) && (!pf->port_netdev ||
+			      (pf->port_netdev->flags & IFF_UP))) {
 		i40e_print_link_message(vsi, true);
 		netif_tx_start_all_queues(vsi->netdev);
 		netif_carrier_on(vsi->netdev);
@@ -5497,6 +5498,9 @@ int i40e_open(struct net_device *netdev)
 
 	udp_tunnel_get_rx_info(netdev);
 
+	if (pf->port_netdev)
+		netif_carrier_on(pf->port_netdev);
+
 	return 0;
 }
 
@@ -5648,8 +5652,12 @@ int i40e_close(struct net_device *netdev)
 {
 	struct i40e_netdev_priv *np = netdev_priv(netdev);
 	struct i40e_vsi *vsi = np->vsi;
+	struct i40e_pf *pf = vsi->back;
 
 	i40e_vsi_close(vsi);
+
+	if (pf->port_netdev)
+		netif_carrier_off(pf->port_netdev);
 
 	return 0;
 }
@@ -6164,10 +6172,15 @@ static void i40e_vsi_link_event(struct i40e_vsi *vsi, bool link_up)
 
 	switch (vsi->type) {
 	case I40E_VSI_MAIN:
+	{
+		struct i40e_pf *pf = vsi->back;
+		struct net_device *port_netdev = pf->port_netdev;
+
 		if (!vsi->netdev || !vsi->netdev_registered)
 			break;
 
-		if (link_up) {
+		if (link_up && (!port_netdev ||
+				(port_netdev->flags & IFF_UP))) {
 			netif_carrier_on(vsi->netdev);
 			netif_tx_wake_all_queues(vsi->netdev);
 		} else {
@@ -6175,7 +6188,7 @@ static void i40e_vsi_link_event(struct i40e_vsi *vsi, bool link_up)
 			netif_tx_stop_all_queues(vsi->netdev);
 		}
 		break;
-
+	}
 	case I40E_VSI_SRIOV:
 	case I40E_VSI_VMDQ2:
 	case I40E_VSI_CTRL:
@@ -10949,7 +10962,35 @@ static const struct devlink_ops i40e_devlink_ops = {
  **/
 static int i40e_port_netdev_open(struct net_device *dev)
 {
-	return 0;
+	struct i40e_port_netdev_priv *priv = netdev_priv(dev);
+	struct i40e_pf *pf;
+	struct i40e_vf *vf;
+	struct i40e_vsi *vsi;
+	int err = 0;
+
+	switch (priv->type) {
+	case I40E_PORT_NETDEV_VF:
+		vf = (struct i40e_vf *)priv->f;
+		vf->link_forced = true;
+		vf->link_up = true;
+		i40e_vc_notify_vf_link_state(vf);
+		break;
+	case I40E_PORT_NETDEV_PF:
+		pf = (struct i40e_pf *)priv->f;
+		vsi = pf->vsi[pf->lan_vsi];
+		if (pf->hw.phy.link_info.link_info & I40E_AQ_LINK_UP) {
+			netif_carrier_on(vsi->netdev);
+			netif_tx_start_all_queues(vsi->netdev);
+		} else {
+			err = -ENETDOWN;
+		}
+		break;
+	default:
+		err = -EINVAL;
+		break;
+	}
+
+	return err;
 }
 
 /**
@@ -10960,7 +11001,31 @@ static int i40e_port_netdev_open(struct net_device *dev)
  **/
 static int i40e_port_netdev_stop(struct net_device *dev)
 {
-	return 0;
+	struct i40e_port_netdev_priv *priv = netdev_priv(dev);
+	struct i40e_pf *pf;
+	struct i40e_vf *vf;
+	struct i40e_vsi *vsi;
+	int err = 0;
+
+	switch (priv->type) {
+	case I40E_PORT_NETDEV_VF:
+		vf = (struct i40e_vf *)priv->f;
+		vf->link_forced = true;
+		vf->link_up = false;
+		i40e_vc_notify_vf_link_state(vf);
+		break;
+	case I40E_PORT_NETDEV_PF:
+		pf = (struct i40e_pf *)priv->f;
+		vsi = pf->vsi[pf->lan_vsi];
+		netif_carrier_off(vsi->netdev);
+		netif_tx_stop_all_queues(vsi->netdev);
+		break;
+	default:
+		err = -EINVAL;
+		break;
+	}
+
+	return err;
 }
 
 static const struct net_device_ops i40e_port_netdev_ops = {
@@ -11048,6 +11113,26 @@ int i40e_alloc_port_netdev(void *f, enum i40e_port_netdev_type type)
 		 ((type == I40E_PORT_NETDEV_PF) ? "PF" : "VF"),
 		 port_netdev->name);
 
+	switch (type) {
+	case I40E_PORT_NETDEV_PF:
+		/* Reset PF link as we are changing the mode to 'switchdev'.
+		 * Port netdev needs to be brought up to enable VF link.
+		 */
+		netif_carrier_off(vsi->netdev);
+		netif_tx_stop_all_queues(vsi->netdev);
+		if (pf->hw.phy.link_info.link_info & I40E_AQ_LINK_UP)
+			netif_carrier_on(port_netdev);
+		break;
+	case I40E_PORT_NETDEV_VF:
+		/* Reset VF link as we are changing the mode to 'switchdev'.
+		 * Port netdev needs to be brought up to enable VF link.
+		 */
+		vf->link_forced = true;
+		vf->link_up = false;
+		i40e_vc_notify_vf_link_state(vf);
+		break;
+	}
+
 	return 0;
 }
 
@@ -11062,10 +11147,12 @@ void i40e_free_port_netdev(void *f, enum i40e_port_netdev_type type)
 {
 	struct i40e_pf *pf;
 	struct i40e_vf *vf;
+	struct i40e_vsi *vsi;
 
 	switch (type) {
 	case I40E_PORT_NETDEV_PF:
 		pf = (struct i40e_pf *)f;
+		vsi = pf->vsi[pf->lan_vsi];
 
 		if (!pf->port_netdev)
 			return;
@@ -11074,6 +11161,11 @@ void i40e_free_port_netdev(void *f, enum i40e_port_netdev_type type)
 		unregister_netdev(pf->port_netdev);
 		free_netdev(pf->port_netdev);
 		pf->port_netdev = NULL;
+		/* In legacy mode, PF link is not controlled by Port netdev */
+		if (pf->hw.phy.link_info.link_info & I40E_AQ_LINK_UP) {
+			netif_carrier_on(vsi->netdev);
+			netif_tx_start_all_queues(vsi->netdev);
+		}
 		break;
 	case I40E_PORT_NETDEV_VF:
 		vf = (struct i40e_vf *)f;
@@ -11086,6 +11178,10 @@ void i40e_free_port_netdev(void *f, enum i40e_port_netdev_type type)
 		unregister_netdev(vf->port_netdev);
 		free_netdev(vf->port_netdev);
 		vf->port_netdev = NULL;
+
+		/* In legacy mode, VF link is not controlled by Port netdev */
+		vf->link_forced = false;
+		i40e_vc_notify_vf_link_state(vf);
 		break;
 	default:
 		break;

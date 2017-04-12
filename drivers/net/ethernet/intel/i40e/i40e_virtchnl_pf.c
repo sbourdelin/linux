@@ -68,7 +68,7 @@ static void i40e_vc_vf_broadcast(struct i40e_pf *pf,
  *
  * send a link status message to a single VF
  **/
-static void i40e_vc_notify_vf_link_state(struct i40e_vf *vf)
+void i40e_vc_notify_vf_link_state(struct i40e_vf *vf)
 {
 	struct i40e_virtchnl_pf_event pfe;
 	struct i40e_pf *pf = vf->pf;
@@ -1805,6 +1805,10 @@ static int i40e_vc_enable_queues_msg(struct i40e_vf *vf, u8 *msg, u16 msglen)
 
 	if (i40e_vsi_start_rings(pf->vsi[vf->lan_vsi_idx]))
 		aq_ret = I40E_ERR_TIMEOUT;
+
+	if ((aq_ret == 0) && vf->port_netdev)
+		netif_carrier_on(vf->port_netdev);
+
 error_param:
 	/* send the response to the VF */
 	return i40e_vc_send_resp_to_vf(vf, I40E_VIRTCHNL_OP_ENABLE_QUEUES,
@@ -1843,6 +1847,9 @@ static int i40e_vc_disable_queues_msg(struct i40e_vf *vf, u8 *msg, u16 msglen)
 	}
 
 	i40e_vsi_stop_rings(pf->vsi[vf->lan_vsi_idx]);
+
+	if ((aq_ret == 0) && vf->port_netdev)
+		netif_carrier_off(vf->port_netdev);
 
 error_param:
 	/* send the response to the VF */
@@ -3080,6 +3087,7 @@ int i40e_ndo_set_vf_link_state(struct net_device *netdev, int vf_id, int link)
 	struct i40e_pf *pf = np->vsi->back;
 	struct i40e_virtchnl_pf_event pfe;
 	struct i40e_hw *hw = &pf->hw;
+	struct net_device *port_netdev;
 	struct i40e_vf *vf;
 	int abs_vf_id;
 	int ret = 0;
@@ -3121,6 +3129,17 @@ int i40e_ndo_set_vf_link_state(struct net_device *netdev, int vf_id, int link)
 		ret = -EINVAL;
 		goto error_out;
 	}
+
+	port_netdev = vf->port_netdev;
+	if (port_netdev) {
+		unsigned int flags = port_netdev->flags;
+
+		if (vf->link_up)
+			dev_change_flags(port_netdev, flags | IFF_UP);
+		else
+			dev_change_flags(port_netdev, flags & ~IFF_UP);
+	}
+
 	/* Notify the VF of its new link state */
 	i40e_aq_send_msg_to_vf(hw, abs_vf_id, I40E_VIRTCHNL_OP_EVENT,
 			       0, (u8 *)&pfe, sizeof(pfe), NULL);
