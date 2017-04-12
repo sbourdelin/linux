@@ -326,6 +326,7 @@ static void handle_critical_trips(struct thermal_zone_device *tz,
 				  int trip, enum thermal_trip_type trip_type)
 {
 	int trip_temp;
+	static bool power_off_triggered;
 
 	tz->ops->get_trip_temp(tz, trip, &trip_temp);
 
@@ -338,11 +339,12 @@ static void handle_critical_trips(struct thermal_zone_device *tz,
 	if (tz->ops->notify)
 		tz->ops->notify(tz, trip, trip_type);
 
-	if (trip_type == THERMAL_TRIP_CRITICAL) {
+	if (trip_type == THERMAL_TRIP_CRITICAL && !power_off_triggered) {
 		dev_emerg(&tz->device,
 			  "critical temperature reached(%d C),shutting down\n",
 			  tz->temperature / 1000);
 		orderly_poweroff(true);
+		power_off_triggered = true;
 	}
 }
 
