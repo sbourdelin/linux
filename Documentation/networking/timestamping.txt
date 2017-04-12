@@ -201,6 +201,12 @@ SOF_TIMESTAMPING_OPT_PKTINFO:
   this information, it will be attached in struct scm_ts_pktinfo as
   a separate control message of type SCM_TIMESTAMPING_PKTINFO.
 
+SOF_TIMESTAMPING_OPT_MULTIMSG:
+
+  Allow outgoing packets to be looped multiple times to the socket's
+  error queue in order to receive both software and hardware transmit
+  timestamps.
+
 New applications are encouraged to pass SOF_TIMESTAMPING_OPT_ID to
 disambiguate timestamps and SOF_TIMESTAMPING_OPT_TSONLY to operate
 regardless of the setting of sysctl net.core.tstamp_allow_data.
@@ -320,8 +326,10 @@ struct scm_timestamping {
 };
 
 The structure can return up to three timestamps. This is a legacy
-feature. Only one field is non-zero at any time. Most timestamps
-are passed in ts[0]. Hardware timestamps are passed in ts[2].
+feature. Most timestamps are passed in ts[0]. Hardware timestamps
+are passed in ts[2]. Incoming packets may have timestamps in both
+ts[0] and ts[2], but for outgoing packets only one field is non-zero
+at any time.
 
 ts[1] used to hold hardware timestamps converted to system time.
 Instead, expose the hardware clock device on the NIC directly as
