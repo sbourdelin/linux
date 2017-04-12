@@ -5498,8 +5498,10 @@ int i40e_open(struct net_device *netdev)
 
 	udp_tunnel_get_rx_info(netdev);
 
-	if (pf->port_netdev)
+	if (pf->port_netdev) {
 		netif_carrier_on(pf->port_netdev);
+		netif_tx_start_all_queues(pf->port_netdev);
+	}
 
 	return 0;
 }
@@ -5656,8 +5658,10 @@ int i40e_close(struct net_device *netdev)
 
 	i40e_vsi_close(vsi);
 
-	if (pf->port_netdev)
+	if (pf->port_netdev) {
 		netif_carrier_off(pf->port_netdev);
+		netif_tx_stop_all_queues(pf->port_netdev);
+	}
 
 	return 0;
 }
@@ -10907,6 +10911,7 @@ static int i40e_devlink_eswitch_mode_get(struct devlink *devlink, u16 *mode)
 static int i40e_devlink_eswitch_mode_set(struct devlink *devlink, u16 mode)
 {
 	struct i40e_pf *pf = devlink_priv(devlink);
+	struct i40e_vsi *vsi = pf->vsi[pf->lan_vsi];
 	struct i40e_vf *vf;
 	int i, j, err = 0;
 
@@ -10921,6 +10926,8 @@ static int i40e_devlink_eswitch_mode_set(struct devlink *devlink, u16 mode)
 		}
 		i40e_free_port_netdev(pf, I40E_PORT_NETDEV_PF);
 		pf->eswitch_mode = mode;
+		vsi->netdev->priv_flags |=
+			(IFF_XMIT_DST_RELEASE | IFF_XMIT_DST_RELEASE_PERM);
 		break;
 	case DEVLINK_ESWITCH_MODE_SWITCHDEV:
 		err = i40e_alloc_port_netdev(pf, I40E_PORT_NETDEV_PF);
@@ -10940,6 +10947,7 @@ static int i40e_devlink_eswitch_mode_set(struct devlink *devlink, u16 mode)
 			}
 		}
 		pf->eswitch_mode = mode;
+		netif_keep_dst(vsi->netdev);
 		break;
 	default:
 		err = -EOPNOTSUPP;
@@ -11031,6 +11039,7 @@ static int i40e_port_netdev_stop(struct net_device *dev)
 static const struct net_device_ops i40e_port_netdev_ops = {
 	.ndo_open		= i40e_port_netdev_open,
 	.ndo_stop		= i40e_port_netdev_stop,
+	.ndo_start_xmit		= i40e_port_netdev_start_xmit,
 };
 
 /**
@@ -11069,6 +11078,10 @@ int i40e_alloc_port_netdev(void *f, enum i40e_port_netdev_type type)
 		priv = netdev_priv(port_netdev);
 		priv->f = pf;
 		priv->type = I40E_PORT_NETDEV_PF;
+		priv->dst = metadata_dst_alloc(0, METADATA_HW_PORT_MUX,
+					       GFP_KERNEL);
+		priv->dst->u.port_info.lower_dev = vsi->netdev;
+		priv->dst->u.port_info.port_id = I40E_MAIN_VSI_PORT_ID;
 		break;
 	case I40E_PORT_NETDEV_VF:
 		vf = (struct i40e_vf *)f;
@@ -11090,6 +11103,10 @@ int i40e_alloc_port_netdev(void *f, enum i40e_port_netdev_type type)
 		priv = netdev_priv(port_netdev);
 		priv->f = vf;
 		priv->type = I40E_PORT_NETDEV_VF;
+		priv->dst = metadata_dst_alloc(0, METADATA_HW_PORT_MUX,
+					       GFP_KERNEL);
+		priv->dst->u.port_info.lower_dev = vsi->netdev;
+		priv->dst->u.port_info.port_id = vf->vf_id;
 		break;
 	default:
 		return -EINVAL;
@@ -11105,6 +11122,7 @@ int i40e_alloc_port_netdev(void *f, enum i40e_port_netdev_type type)
 	if (err) {
 		dev_err(&pf->pdev->dev, "register_netdev failed for port netdev: %s\n",
 			port_netdev->name);
+		dst_release((struct dst_entry *)priv->dst);
 		free_netdev(port_netdev);
 		return err;
 	}
@@ -11145,6 +11163,7 @@ int i40e_alloc_port_netdev(void *f, enum i40e_port_netdev_type type)
  **/
 void i40e_free_port_netdev(void *f, enum i40e_port_netdev_type type)
 {
+	struct i40e_port_netdev_priv *priv;
 	struct i40e_pf *pf;
 	struct i40e_vf *vf;
 	struct i40e_vsi *vsi;
@@ -11158,6 +11177,8 @@ void i40e_free_port_netdev(void *f, enum i40e_port_netdev_type type)
 			return;
 		dev_info(&pf->pdev->dev, "Freeing PF Port representor %s\n",
 			 pf->port_netdev->name);
+		priv = netdev_priv(pf->port_netdev);
+		dst_release((struct dst_entry *)priv->dst);
 		unregister_netdev(pf->port_netdev);
 		free_netdev(pf->port_netdev);
 		pf->port_netdev = NULL;
@@ -11175,6 +11196,8 @@ void i40e_free_port_netdev(void *f, enum i40e_port_netdev_type type)
 			return;
 		dev_info(&pf->pdev->dev, "Freeing VF Port representor %s\n",
 			 vf->port_netdev->name);
+		priv = netdev_priv(vf->port_netdev);
+		dst_release((struct dst_entry *)priv->dst);
 		unregister_netdev(vf->port_netdev);
 		free_netdev(vf->port_netdev);
 		vf->port_netdev = NULL;

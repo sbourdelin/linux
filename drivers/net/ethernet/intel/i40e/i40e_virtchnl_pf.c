@@ -1806,8 +1806,10 @@ static int i40e_vc_enable_queues_msg(struct i40e_vf *vf, u8 *msg, u16 msglen)
 	if (i40e_vsi_start_rings(pf->vsi[vf->lan_vsi_idx]))
 		aq_ret = I40E_ERR_TIMEOUT;
 
-	if ((aq_ret == 0) && vf->port_netdev)
+	if ((aq_ret == 0) && vf->port_netdev) {
 		netif_carrier_on(vf->port_netdev);
+		netif_tx_start_all_queues(vf->port_netdev);
+	}
 
 error_param:
 	/* send the response to the VF */
@@ -1848,8 +1850,10 @@ static int i40e_vc_disable_queues_msg(struct i40e_vf *vf, u8 *msg, u16 msglen)
 
 	i40e_vsi_stop_rings(pf->vsi[vf->lan_vsi_idx]);
 
-	if ((aq_ret == 0) && vf->port_netdev)
+	if ((aq_ret == 0) && vf->port_netdev) {
+		netif_tx_stop_all_queues(vf->port_netdev);
 		netif_carrier_off(vf->port_netdev);
+	}
 
 error_param:
 	/* send the response to the VF */
