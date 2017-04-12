@@ -608,15 +608,19 @@ struct tc_action *tcf_action_init_1(struct net *net, struct nlattr *nla,
 		int cklen = nla_len(tb[TCA_ACT_COOKIE]);
 
 		if (cklen > TC_COOKIE_MAX_SIZE) {
-			err = -EINVAL;
 			tcf_hash_release(a, bind);
-			goto err_mod;
+			if (err != ACT_P_CREATED)
+				module_put(a_o->owner);
+			err = -EINVAL;
+			goto err_out;
 		}
 
 		if (nla_memdup_cookie(a, tb) < 0) {
-			err = -ENOMEM;
 			tcf_hash_release(a, bind);
-			goto err_mod;
+			if (err != ACT_P_CREATED)
+				module_put(a_o->owner);
+			err = -ENOMEM;
+			goto err_out;
 		}
 	}
 
