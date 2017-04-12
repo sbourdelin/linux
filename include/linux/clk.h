@@ -278,9 +278,23 @@ struct clk *clk_get(struct device *dev, const char *id);
  *
  * clk_bulk_get should not be called from within interrupt context.
  */
-
 int __must_check clk_bulk_get(struct device *dev, int num_clks,
 			      struct clk_bulk_data *clks);
+
+/**
+ * devm_clk_bulk_get - managed get multiple clk consumers
+ * @dev: device for clock "consumer"
+ * @num_clks: the number of clk_bulk_data
+ * @clks: the clk_bulk_data table of consumer
+ *
+ * Return 0 on success, an errno on failure.
+ *
+ * This helper function allows drivers to get several regulator
+ * consumers in one operation with management, the clks will
+ * automatically be freed when the device is unbound.
+ */
+int __must_check devm_clk_bulk_get(struct device *dev, int num_clks,
+				   struct clk_bulk_data *clks);
 
 /**
  * devm_clk_get - lookup and obtain a managed reference to a clock producer.
@@ -550,6 +564,12 @@ static inline int clk_bulk_get(struct device *dev, int num_clks,
 }
 
 static inline struct clk *devm_clk_get(struct device *dev, const char *id)
+{
+	return NULL;
+}
+
+static inline int devm_clk_bulk_get(struct device *dev, int num_clks,
+				    struct clk_bulk_data *clks)
 {
 	return NULL;
 }
