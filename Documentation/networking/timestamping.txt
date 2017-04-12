@@ -193,6 +193,14 @@ SOF_TIMESTAMPING_OPT_STATS:
   the transmit timestamps, such as how long a certain block of
   data was limited by peer's receiver window.
 
+SOF_TIMESTAMPING_OPT_PKTINFO:
+
+  Optional information about timestamped packets. It includes the
+  index of the real interface which received or transmitted the
+  packet and its length at layer 2. If the device driver provides
+  this information, it will be attached in struct scm_ts_pktinfo as
+  a separate control message of type SCM_TIMESTAMPING_PKTINFO.
+
 New applications are encouraged to pass SOF_TIMESTAMPING_OPT_ID to
 disambiguate timestamps and SOF_TIMESTAMPING_OPT_TSONLY to operate
 regardless of the setting of sysctl net.core.tstamp_allow_data.

@@ -3888,10 +3888,16 @@ void __skb_tstamp_tx(struct sk_buff *orig_skb,
 		skb_shinfo(skb)->tskey = skb_shinfo(orig_skb)->tskey;
 	}
 
-	if (hwtstamps)
-		*skb_hwtstamps(skb) = *hwtstamps;
-	else
+	if (hwtstamps) {
+		skb_hwtstamps(skb)->hwtstamp = hwtstamps->hwtstamp;
+		if (sk->sk_tsflags & SOF_TIMESTAMPING_OPT_PKTINFO) {
+			skb_hwtstamps(skb)->if_index = orig_skb->dev->ifindex;
+			skb_hwtstamps(skb)->pkt_length = orig_skb->mac_len +
+							 orig_skb->len;
+		}
+	} else {
 		skb->tstamp = ktime_get_real();
+	}
 
 	__skb_complete_tx_timestamp(skb, sk, tstype, opt_stats);
 }

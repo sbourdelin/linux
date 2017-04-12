@@ -43,4 +43,12 @@ enum {
 	SCM_TSTAMP_ACK,		/* data acknowledged by peer */
 };
 
+/**
+ *	struct scm_ts_pktinfo - information about HW-timestamped packets
+ */
+struct scm_ts_pktinfo {
+	int if_index;
+	int pkt_length;
+};
+
 #endif /* _UAPI_LINUX_ERRQUEUE_H */

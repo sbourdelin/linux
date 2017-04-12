@@ -670,6 +670,7 @@ void __sock_recv_timestamp(struct msghdr *msg, struct sock *sk,
 {
 	int need_software_tstamp = sock_flag(sk, SOCK_RCVTSTAMP);
 	struct scm_timestamping tss;
+	struct scm_ts_pktinfo ts_pktinfo;
 	int empty = 1;
 	struct skb_shared_hwtstamps *shhwtstamps =
 		skb_hwtstamps(skb);
@@ -699,8 +700,16 @@ void __sock_recv_timestamp(struct msghdr *msg, struct sock *sk,
 		empty = 0;
 	if (shhwtstamps &&
 	    (sk->sk_tsflags & SOF_TIMESTAMPING_RAW_HARDWARE) &&
-	    ktime_to_timespec_cond(shhwtstamps->hwtstamp, tss.ts + 2))
+	    ktime_to_timespec_cond(shhwtstamps->hwtstamp, tss.ts + 2)) {
+		if (sk->sk_tsflags & SOF_TIMESTAMPING_OPT_PKTINFO &&
+		    shhwtstamps->if_index) {
+			ts_pktinfo.if_index = shhwtstamps->if_index;
+			ts_pktinfo.pkt_length = shhwtstamps->pkt_length;
+			put_cmsg(msg, SOL_SOCKET, SCM_TIMESTAMPING_PKTINFO,
+				 sizeof(ts_pktinfo), &ts_pktinfo);
+		}
 		empty = 0;
+	}
 	if (!empty) {
 		put_cmsg(msg, SOL_SOCKET,
 			 SCM_TIMESTAMPING, sizeof(tss), &tss);
