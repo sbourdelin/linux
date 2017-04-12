@@ -223,6 +223,11 @@ static void intel_detect_pch(struct drm_i915_private *dev_priv)
 					    PCI_SUBVENDOR_ID_REDHAT_QUMRANET &&
 				    pch->subsystem_device ==
 					    PCI_SUBDEVICE_ID_QEMU)) {
+				/*
+				 * P2X is used for VMware, exclude it
+				 */
+				if (id != INTEL_PCH_P2X_DEVICE_ID_TYPE)
+					dev_priv->run_on_qemu = true;
 				dev_priv->pch_type =
 					intel_virt_detect_pch(dev_priv);
 			} else
