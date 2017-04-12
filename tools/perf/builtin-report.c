@@ -987,12 +987,15 @@ repeat:
 	else
 		use_browser = 0;
 
-	if (setup_sorting(session->evlist) < 0) {
+	ret = setup_sorting(session->evlist);
+	if (ret < 0) {
 		if (sort_order)
 			parse_options_usage(report_usage, options, "s", 1);
 		if (field_order)
 			parse_options_usage(sort_order ? NULL : report_usage,
 					    options, "F", 1);
+		if (!sort_order && !field_order)
+			pr_err("Couldn't setup sort order. Is .perfconfig correct?\n");
 		goto error;
 	}
 
