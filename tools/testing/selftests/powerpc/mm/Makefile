@@ -1,7 +1,7 @@
 noarg:
 	$(MAKE) -C ../
 
-TEST_GEN_PROGS := hugetlb_vs_thp_test subpage_prot prot_sao
+TEST_GEN_PROGS := hugetlb_vs_thp_test subpage_prot prot_sao vaddr
 TEST_GEN_FILES := tempfile
 
 include ../../lib.mk
