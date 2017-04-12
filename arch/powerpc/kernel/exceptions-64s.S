@@ -718,9 +718,21 @@ hardware_interrupt_hv:
 		_MASKABLE_EXCEPTION_PSERIES(0x500, hardware_interrupt_common,
 					    EXC_HV, SOFTEN_TEST_HV)
 	FTR_SECTION_ELSE
+		/*
+		 * The POWER9 XIVE interrupt controller should be configured
+		 * to send all interrupts to the host as HVI, even with the
+		 * OPAL XICS emulation, so HVMODE should never see a 0x500
+		 * interrupt. However we catch it in case of a bug.
+		 *
+		 * POWER9 sets the LPES0 LPCR bit in the host, which
+		 * delivers external interrupts to SRR[01] with MSR_HV
+		 * unchanged (intended for guest delivery), so these need
+		 * to be caught as EXC_STD interrupts in the host.
+		 */
 		_MASKABLE_EXCEPTION_PSERIES(0x500, hardware_interrupt_common,
 					    EXC_STD, SOFTEN_TEST_PR)
-	ALT_FTR_SECTION_END_IFSET(CPU_FTR_HVMODE | CPU_FTR_ARCH_206)
+	ALT_FTR_SECTION_END(CPU_FTR_HVMODE|CPU_FTR_ARCH_206|CPU_FTR_ARCH_300,
+			    CPU_FTR_HVMODE|CPU_FTR_ARCH_206)
 EXC_REAL_END(hardware_interrupt, 0x500, 0x100)
 
 EXC_VIRT_BEGIN(hardware_interrupt, 0x4500, 0x100)
@@ -730,13 +742,21 @@ hardware_interrupt_relon_hv:
 		_MASKABLE_RELON_EXCEPTION_PSERIES(0x500, hardware_interrupt_common, EXC_HV, SOFTEN_TEST_HV)
 	FTR_SECTION_ELSE
 		_MASKABLE_RELON_EXCEPTION_PSERIES(0x500, hardware_interrupt_common, EXC_STD, SOFTEN_TEST_PR)
-	ALT_FTR_SECTION_END_IFSET(CPU_FTR_HVMODE)
+	ALT_FTR_SECTION_END(CPU_FTR_HVMODE|CPU_FTR_ARCH_206|CPU_FTR_ARCH_300,
+			    CPU_FTR_HVMODE|CPU_FTR_ARCH_206)
 EXC_VIRT_END(hardware_interrupt, 0x4500, 0x100)
 
 TRAMP_KVM(PACA_EXGEN, 0x500)
 TRAMP_KVM_HV(PACA_EXGEN, 0x500)
-EXC_COMMON_ASYNC(hardware_interrupt_common, 0x500, do_IRQ)
 
+EXC_COMMON_BEGIN(hardware_interrupt_common)
+BEGIN_FTR_SECTION
+	/* See POWER9 comment above */
+	b	unknown_host_ee_common
+END_FTR_SECTION_IFSET(CPU_FTR_HVMODE | CPU_FTR_ARCH_300)
+	STD_EXCEPTION_COMMON_ASYNC(0x500, hardware_interrupt_common, do_IRQ)
+
+EXC_COMMON_ASYNC(unknown_host_ee_common, 0x500, unknown_exception)
 
 EXC_REAL(alignment, 0x600, 0x100)
 EXC_VIRT(alignment, 0x4600, 0x100, 0x600)
