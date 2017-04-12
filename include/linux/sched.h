@@ -1456,6 +1456,14 @@ static inline int test_tsk_need_resched(struct task_struct *tsk)
 	return unlikely(test_tsk_thread_flag(tsk,TIF_NEED_RESCHED));
 }
 
+#if defined(CONFIG_TRACING) && defined(CONFIG_SCHEDSTATS)
+int schedstat_tracepoint_reg(void);
+void schedstat_tracepoint_unreg(void);
+#else
+static inline int schedstat_tracepoint_reg(void) { return 0; }
+static inline void schedstat_tracepoint_unreg(void) { }
+#endif
+
 /*
  * cond_resched() and cond_resched_lock(): latency reduction via
  * explicit rescheduling in places that are safe. The return

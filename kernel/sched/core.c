@@ -2267,6 +2267,8 @@ int sysctl_numa_balancing(struct ctl_table *table, int write,
 
 DEFINE_STATIC_KEY_FALSE(sched_schedstats);
 static bool __initdata __sched_schedstats = false;
+static int schedstat_tracepoint_ref;
+static bool schedstat_save_state;
 
 static void set_schedstats(bool enabled)
 {
@@ -2274,6 +2276,32 @@ static void set_schedstats(bool enabled)
 		static_branch_enable(&sched_schedstats);
 	else
 		static_branch_disable(&sched_schedstats);
+}
+
+/*
+ * schedstat_tracepoint_reg() and unreg() are called by the tracepoint
+ * regfunc/unregfunc functions. They are protected by the tracepoint mutex.
+ *     See kernel/tracepoint.c:tracepoint_add_func().
+ *
+ * The modifications to schedstat_tracepoint_ref and schedstat_save_state
+ * are only done under that mutex, and do not need further protection.
+ */
+int schedstat_tracepoint_reg(void)
+{
+	if (!schedstat_tracepoint_ref) {
+		schedstat_save_state = schedstat_enabled();
+		if (!schedstat_save_state)
+			set_schedstats(true);
+	}
+	schedstat_tracepoint_ref++;
+}
+
+void schedstat_tracepoint_unreg(void)
+{
+	schedstat_tracepoint_ref--;
+	if (schedstat_tracepoint_ref || schedstat_save_state)
+		return;
+	set_schedstats(false);
 }
 
 void force_schedstat_enabled(void)

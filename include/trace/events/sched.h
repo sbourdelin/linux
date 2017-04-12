@@ -346,32 +346,36 @@ DECLARE_EVENT_CLASS(sched_stat_template,
  * Tracepoint for accounting wait time (time the task is runnable
  * but not actually running due to scheduler contention).
  */
-DEFINE_EVENT(sched_stat_template, sched_stat_wait,
+DEFINE_EVENT_FN(sched_stat_template, sched_stat_wait,
 	     TP_PROTO(struct task_struct *tsk, u64 delay),
-	     TP_ARGS(tsk, delay));
+	     TP_ARGS(tsk, delay), schedstat_tracepoint_reg,
+	     schedstat_tracepoint_unreg);
 
 /*
  * Tracepoint for accounting sleep time (time the task is not runnable,
  * including iowait, see below).
  */
-DEFINE_EVENT(sched_stat_template, sched_stat_sleep,
+DEFINE_EVENT_FN(sched_stat_template, sched_stat_sleep,
 	     TP_PROTO(struct task_struct *tsk, u64 delay),
-	     TP_ARGS(tsk, delay));
+	     TP_ARGS(tsk, delay), schedstat_tracepoint_reg,
+	     schedstat_tracepoint_unreg);
 
 /*
  * Tracepoint for accounting iowait time (time the task is not runnable
  * due to waiting on IO to complete).
  */
-DEFINE_EVENT(sched_stat_template, sched_stat_iowait,
+DEFINE_EVENT_FN(sched_stat_template, sched_stat_iowait,
 	     TP_PROTO(struct task_struct *tsk, u64 delay),
-	     TP_ARGS(tsk, delay));
+	     TP_ARGS(tsk, delay), schedstat_tracepoint_reg,
+	     schedstat_tracepoint_unreg);
 
 /*
  * Tracepoint for accounting blocked time (time the task is in uninterruptible).
  */
-DEFINE_EVENT(sched_stat_template, sched_stat_blocked,
+DEFINE_EVENT_FN(sched_stat_template, sched_stat_blocked,
 	     TP_PROTO(struct task_struct *tsk, u64 delay),
-	     TP_ARGS(tsk, delay));
+	     TP_ARGS(tsk, delay), schedstat_tracepoint_reg,
+	     schedstat_tracepoint_unreg);
 
 /*
  * Tracepoint for accounting runtime (time the task is executing
@@ -403,9 +407,10 @@ DECLARE_EVENT_CLASS(sched_stat_runtime,
 			(unsigned long long)__entry->vruntime)
 );
 
-DEFINE_EVENT(sched_stat_runtime, sched_stat_runtime,
+DEFINE_EVENT_FN(sched_stat_runtime, sched_stat_runtime,
 	     TP_PROTO(struct task_struct *tsk, u64 runtime, u64 vruntime),
-	     TP_ARGS(tsk, runtime, vruntime));
+	     TP_ARGS(tsk, runtime, vruntime), schedstat_tracepoint_reg,
+	     schedstat_tracepoint_unreg);
 
 /*
  * Tracepoint for showing priority inheritance modifying a tasks
