@@ -1262,7 +1262,7 @@ void __init vmalloc_init(void)
 	/* Import existing vmlist entries. */
 	for (tmp = vmlist; tmp; tmp = tmp->next) {
 		va = kzalloc(sizeof(struct vmap_area), GFP_NOWAIT);
-		va->flags = VM_VM_AREA;
+		va->flags = VM_VM_AREA | VM_STATIC;
 		va->va_start = (unsigned long)tmp->addr;
 		va->va_end = va->va_start + tmp->size;
 		va->vm = tmp;
@@ -1480,7 +1480,7 @@ struct vm_struct *remove_vm_area(const void *addr)
 	might_sleep();
 
 	va = find_vmap_area((unsigned long)addr);
-	if (va && va->flags & VM_VM_AREA) {
+	if (va && va->flags & VM_VM_AREA && likely(!(va->flags & VM_STATIC))) {
 		struct vm_struct *vm = va->vm;
 
 		spin_lock(&vmap_area_lock);
@@ -1510,7 +1510,7 @@ static void __vunmap(const void *addr, int deallocate_pages)
 
 	area = remove_vm_area(addr);
 	if (unlikely(!area)) {
-		WARN(1, KERN_ERR "Trying to vfree() nonexistent vm area (%p)\n",
+		WARN(1, KERN_ERR "Trying to vfree() nonexistent or static vm area (%p)\n",
 				addr);
 		return;
 	}
@@ -2707,6 +2707,9 @@ static int s_show(struct seq_file *m, void *p)
 
 	if (v->phys_addr)
 		seq_printf(m, " phys=%pa", &v->phys_addr);
+
+	if (v->flags & VM_STATIC)
+		seq_puts(m, " static");
 
 	if (v->flags & VM_IOREMAP)
 		seq_puts(m, " ioremap");
