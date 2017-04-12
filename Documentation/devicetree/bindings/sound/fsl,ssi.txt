@@ -20,12 +20,6 @@ Required properties:
                     have.
 - interrupt-parent: The phandle for the interrupt controller that
                     services interrupts for this device.
-- fsl,playback-dma: Phandle to a node for the DMA channel to use for
-                    playback of audio.  This is typically dictated by SOC
-                    design.  See the notes below.
-- fsl,capture-dma:  Phandle to a node for the DMA channel to use for
-                    capture (recording) of audio.  This is typically dictated
-                    by SOC design.  See the notes below.
 - fsl,fifo-depth:   The number of elements in the transmit and receive FIFOs.
                     This number is the maximum allowed value for SFCSR[TFWM0].
  - clocks:          "ipg" - Required clock for the SSI unit
@@ -61,6 +55,14 @@ Optional properties:
                     be connected together, and SRFS and STFS be connected
                     together.  This would still allow different sample sizes,
                     but not different sample rates.
+- fsl,playback-dma: Phandle to a node for the DMA channel to use for
+                    playback of audio.  This is typically dictated by SOC
+                    design.  See the notes below.
+		    Only used on Power Architecture.
+- fsl,capture-dma:  Phandle to a node for the DMA channel to use for
+                    capture (recording) of audio.  This is typically dictated
+                    by SOC design.  See the notes below.
+		    Only used on Power Architecture.
 
 Child 'codec' node required properties:
 - compatible:       Compatible list, contains the name of the codec
