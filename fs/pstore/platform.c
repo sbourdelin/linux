@@ -44,6 +44,7 @@
 #include <linux/hardirq.h>
 #include <linux/jiffies.h>
 #include <linux/workqueue.h>
+#include <linux/time.h>
 
 #include "internal.h"
 
@@ -471,6 +472,28 @@ static size_t copy_kmsg_to_buffer(int hsize, size_t len)
 }
 
 /*
+ * description: It fills buffer with current time(in ISO 8601 standard)
+ * @param : buffer needs to be filled.
+ * @param : size of buffer.
+ * return : void
+ */
+static void get_curr_time(char *loc_time, int time_buf_size)
+{
+	struct timeval now;
+	struct tm tm_val;
+
+	if (!loc_time)
+		return;
+
+	do_gettimeofday(&now);
+	time_to_tm(now.tv_sec, 0, &tm_val);
+
+	snprintf(loc_time, time_buf_size - 1, "%.4d-%.2d-%.2dT%.2d:%.2d:%.2dZ",
+		(int)(1900 + tm_val.tm_year), tm_val.tm_mon + 1,
+		tm_val.tm_mday, tm_val.tm_hour, tm_val.tm_min, tm_val.tm_sec);
+}
+
+/*
  * callback from kmsg_dump. (s2,l2) has the most recently
  * written bytes, older bytes are in (s1,l1). Save as much
  * as we can from the end of the buffer.
@@ -485,6 +508,7 @@ static void pstore_dump(struct kmsg_dumper *dumper,
 	unsigned long	flags = 0;
 	int		is_locked;
 	int		ret;
+	char loc_time[32];
 
 	why = get_reason_str(reason);
 
@@ -516,7 +540,10 @@ static void pstore_dump(struct kmsg_dumper *dumper,
 			size = psinfo->bufsize;
 		}
 
-		hsize = sprintf(dst, "%s#%d Part%u\n", why, oopscount, part);
+		memset(loc_time, 0, sizeof(loc_time));
+		get_curr_time(loc_time, sizeof(loc_time));
+		hsize = sprintf(dst, "%s#%d Part%u [%s]\n", why, oopscount,
+				part, loc_time);
 		size -= hsize;
 
 		if (!kmsg_dump_get_buffer(dumper, true, dst + hsize,
