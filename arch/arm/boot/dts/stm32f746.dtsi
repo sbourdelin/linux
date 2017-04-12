@@ -287,6 +287,18 @@
 					bias-disable;
 				};
 			};
+			usart1_pins_pa9_pa10: usart1@1 {
+				pins1 {
+					pinmux = <STM32F746_PA9_FUNC_USART1_TX>;
+					bias-disable;
+					drive-push-pull;
+					slew-rate = <0>;
+				};
+				pins2 {
+					pinmux = <STM32F746_PA10_FUNC_USART1_RX>;
+					bias-disable;
+				};
+			};
 		};
 
 		rcc: rcc@40023800 {
