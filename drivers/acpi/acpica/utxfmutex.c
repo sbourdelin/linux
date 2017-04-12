@@ -150,6 +150,7 @@ acpi_acquire_mutex(acpi_handle handle, acpi_string pathname, u16 timeout)
 	status = acpi_os_acquire_mutex(mutex_obj->mutex.os_mutex, timeout);
 	return (status);
 }
+ACPI_EXPORT_SYMBOL(acpi_acquire_mutex)
 
 /*******************************************************************************
  *
@@ -185,3 +186,4 @@ acpi_status acpi_release_mutex(acpi_handle handle, acpi_string pathname)
 	acpi_os_release_mutex(mutex_obj->mutex.os_mutex);
 	return (AE_OK);
 }
+ACPI_EXPORT_SYMBOL(acpi_release_mutex)
