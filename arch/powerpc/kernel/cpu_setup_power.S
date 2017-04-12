@@ -29,7 +29,7 @@ _GLOBAL(__setup_cpu_power7)
 	li	r0,0
 	mtspr	SPRN_LPID,r0
 	mfspr	r3,SPRN_LPCR
-	bl	__init_LPCR
+	bl	__init_LPCR_ISA206
 	bl	__init_tlb_power7
 	mtlr	r11
 	blr
@@ -42,7 +42,7 @@ _GLOBAL(__restore_cpu_power7)
 	li	r0,0
 	mtspr	SPRN_LPID,r0
 	mfspr	r3,SPRN_LPCR
-	bl	__init_LPCR
+	bl	__init_LPCR_ISA206
 	bl	__init_tlb_power7
 	mtlr	r11
 	blr
@@ -59,7 +59,7 @@ _GLOBAL(__setup_cpu_power8)
 	mtspr	SPRN_LPID,r0
 	mfspr	r3,SPRN_LPCR
 	ori	r3, r3, LPCR_PECEDH
-	bl	__init_LPCR
+	bl	__init_LPCR_ISA206
 	bl	__init_HFSCR
 	bl	__init_tlb_power8
 	bl	__init_PMU_HV
@@ -80,7 +80,7 @@ _GLOBAL(__restore_cpu_power8)
 	mtspr	SPRN_LPID,r0
 	mfspr   r3,SPRN_LPCR
 	ori	r3, r3, LPCR_PECEDH
-	bl	__init_LPCR
+	bl	__init_LPCR_ISA206
 	bl	__init_HFSCR
 	bl	__init_tlb_power8
 	bl	__init_PMU_HV
@@ -103,7 +103,7 @@ _GLOBAL(__setup_cpu_power9)
 	or	r3, r3, r4
 	LOAD_REG_IMMEDIATE(r4, LPCR_UPRT | LPCR_HR)
 	andc	r3, r3, r4
-	bl	__init_LPCR
+	bl	__init_LPCR_ISA300
 	bl	__init_HFSCR
 	bl	__init_tlb_power9
 	bl	__init_PMU_HV
@@ -126,7 +126,7 @@ _GLOBAL(__restore_cpu_power9)
 	or	r3, r3, r4
 	LOAD_REG_IMMEDIATE(r4, LPCR_UPRT | LPCR_HR)
 	andc	r3, r3, r4
-	bl	__init_LPCR
+	bl	__init_LPCR_ISA300
 	bl	__init_HFSCR
 	bl	__init_tlb_power9
 	bl	__init_PMU_HV
@@ -144,7 +144,7 @@ __init_hvmode_206:
 	std	r5,CPU_SPEC_FEATURES(r4)
 	blr
 
-__init_LPCR:
+__init_LPCR_ISA206:
 	/* Setup a sane LPCR:
 	 *   Called with initial LPCR in R3
 	 *
@@ -157,6 +157,11 @@ __init_LPCR:
 	 *
 	 * Other bits untouched for now
 	 */
+	li	r5,0x10
+	rldimi	r3,r5, LPCR_VRMASD_SH, 64-LPCR_VRMASD_SH-5
+
+	/* POWER9 has no VRMASD */
+__init_LPCR_ISA300:
 	li	r5,1
 	rldimi	r3,r5, LPCR_LPES_SH, 64-LPCR_LPES_SH-2
 	ori	r3,r3,(LPCR_PECE0|LPCR_PECE1|LPCR_PECE2)
@@ -165,8 +170,6 @@ __init_LPCR:
 	clrrdi	r3,r3,1		/* clear HDICE */
 	li	r5,4
 	rldimi	r3,r5, LPCR_VC_SH, 0
-	li	r5,0x10
-	rldimi	r3,r5, LPCR_VRMASD_SH, 64-LPCR_VRMASD_SH-5
 	mtspr	SPRN_LPCR,r3
 	isync
 	blr
