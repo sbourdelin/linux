@@ -4522,9 +4522,9 @@ static int drm_parse_tiled_block(struct drm_connector *connector,
 	tg = drm_mode_get_tile_group(connector->dev, tile->topology_id);
 	if (!tg) {
 		tg = drm_mode_create_tile_group(connector->dev, tile->topology_id);
+		if (IS_ERR(tg))
+			return PTR_ERR(tg);
 	}
-	if (!tg)
-		return -ENOMEM;
 
 	if (connector->tile_group != tg) {
 		/* if we haven't got a pointer,
