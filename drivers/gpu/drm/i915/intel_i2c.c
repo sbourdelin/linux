@@ -297,9 +297,7 @@ gmbus_wait_idle(struct drm_i915_private *dev_priv)
 	add_wait_queue(&dev_priv->gmbus_wait_queue, &wait);
 	I915_WRITE_FW(GMBUS4, irq_enable);
 
-	ret = intel_wait_for_register_fw(dev_priv,
-					 GMBUS2, GMBUS_ACTIVE, 0,
-					 10);
+	ret = intel_wait_for_register(dev_priv, GMBUS2, GMBUS_ACTIVE, 0, 10);
 
 	I915_WRITE_FW(GMBUS4, 0);
 	remove_wait_queue(&dev_priv->gmbus_wait_queue, &wait);

@@ -88,7 +88,6 @@
 	int cpu, ret, timeout = (US) * 1000; \
 	u64 base; \
 	_WAIT_FOR_ATOMIC_CHECK(ATOMIC); \
-	BUILD_BUG_ON((US) > 50000); \
 	if (!(ATOMIC)) { \
 		preempt_disable(); \
 		cpu = smp_processor_id(); \
@@ -130,8 +129,21 @@
 	ret__; \
 })
 
-#define wait_for_atomic(COND, MS)	_wait_for_atomic((COND), (MS) * 1000, 1)
-#define wait_for_atomic_us(COND, US)	_wait_for_atomic((COND), (US), 1)
+#define wait_for_atomic(COND, MS) \
+({ \
+	int ret__; \
+	BUILD_BUG_ON((MS) > 50); \
+	ret__ = _wait_for_atomic((COND), (MS) * 1000, 1); \
+	ret__; \
+})
+
+#define wait_for_atomic_us(COND, US) \
+({ \
+	int ret__; \
+	BUILD_BUG_ON((US) > 50000); \
+	ret__ = _wait_for_atomic((COND), (US), 1); \
+	ret__; \
+})
 
 #define KHz(x) (1000 * (x))
 #define MHz(x) KHz(1000 * (x))

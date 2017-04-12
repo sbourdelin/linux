@@ -3083,27 +3083,68 @@ u64 intel_uncore_edram_size(struct drm_i915_private *dev_priv);
 
 void assert_forcewakes_inactive(struct drm_i915_private *dev_priv);
 
-int intel_wait_for_register(struct drm_i915_private *dev_priv,
-			    i915_reg_t reg,
-			    u32 mask,
-			    u32 value,
-			    unsigned int timeout_ms);
-int __intel_wait_for_register_fw(struct drm_i915_private *dev_priv,
-				 i915_reg_t reg,
-				 u32 mask,
-				 u32 value,
-				 unsigned int fast_timeout_us,
-				 unsigned int slow_timeout_ms,
-				 u32 *out_value);
-static inline
-int intel_wait_for_register_fw(struct drm_i915_private *dev_priv,
+int __intel_wait_for_register(struct drm_i915_private *dev_priv,
+			      i915_reg_t reg,
+			      u32 mask,
+			      u32 value,
+			      unsigned int fast_timeout_us,
+			      unsigned int slow_timeout_ms,
+			      u32 *out_value);
+
+/**
+ * intel_wait_for_register - wait until register matches expected state
+ * @dev_priv: the i915 device
+ * @reg: the register to read
+ * @mask: mask to apply to register value
+ * @value: expected value
+ * @timeout_ms: timeout in millisecond
+ *
+ * This routine waits until the target register @reg contains the expected
+ * @value after applying the @mask, i.e. it waits until ::
+ *
+ *     (I915_READ(reg) & mask) == value
+ *
+ * Otherwise, the wait will timeout after @timeout_ms milliseconds.
+ *
+ * Returns 0 if the register matches the desired condition, or -ETIMEOUT.
+ */
+static inline int
+intel_wait_for_register(struct drm_i915_private *dev_priv,
+			i915_reg_t reg,
+			u32 mask,
+			u32 value,
+			unsigned int timeout_ms)
+{
+	return __intel_wait_for_register(dev_priv, reg, mask, value,
+					 2, timeout_ms, NULL);
+}
+
+/**
+ * intel_wait_for_register_atomic - wait until register matches expected state
+ * @dev_priv: the i915 device
+ * @reg: the register to read
+ * @mask: mask to apply to register value
+ * @value: expected value
+ * @timeout_us: timeout in microsecond
+ *
+ * This routine waits until the target register @reg contains the expected
+ * @value after applying the @mask, i.e. it waits until ::
+ *
+ *     (I915_READ(reg) & mask) == value
+ *
+ * The wait is done with busy-looping.
+ *
+ * Returns 0 if the register matches the desired condition, or -ETIMEOUT.
+ */
+static inline int
+intel_wait_for_register_atomic(struct drm_i915_private *dev_priv,
 			       i915_reg_t reg,
 			       u32 mask,
 			       u32 value,
-			       unsigned int timeout_ms)
+			       unsigned int timeout_us)
 {
-	return __intel_wait_for_register_fw(dev_priv, reg, mask, value,
-					    2, timeout_ms, NULL);
+	return __intel_wait_for_register(dev_priv, reg, mask, value,
+					 timeout_us, 0, NULL);
 }
 
 static inline bool intel_gvt_active(struct drm_i915_private *dev_priv)

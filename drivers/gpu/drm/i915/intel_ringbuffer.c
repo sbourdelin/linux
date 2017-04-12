@@ -1729,11 +1729,10 @@ static void gen6_bsd_submit_request(struct drm_i915_gem_request *request)
 	I915_WRITE64_FW(GEN6_BSD_RNCID, 0x0);
 
 	/* Wait for the ring not to be idle, i.e. for it to wake up. */
-	if (__intel_wait_for_register_fw(dev_priv,
-					 GEN6_BSD_SLEEP_PSMI_CONTROL,
-					 GEN6_BSD_SLEEP_INDICATOR,
-					 0,
-					 1000, 0, NULL))
+	if (intel_wait_for_register_atomic(dev_priv,
+					   GEN6_BSD_SLEEP_PSMI_CONTROL,
+					   GEN6_BSD_SLEEP_INDICATOR, 0,
+					   1000))
 		DRM_ERROR("timed out waiting for the BSD ring to wake up\n");
 
 	/* Now that the ring is fully powered up, update the tail */

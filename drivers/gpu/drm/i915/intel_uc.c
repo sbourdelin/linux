@@ -389,11 +389,11 @@ int intel_guc_send_mmio(struct intel_guc *guc, const u32 *action, u32 len)
 	 * No GuC command should ever take longer than 10ms.
 	 * Fast commands should still complete in 10us.
 	 */
-	ret = __intel_wait_for_register_fw(dev_priv,
-					   SOFT_SCRATCH(0),
-					   INTEL_GUC_RECV_MASK,
-					   INTEL_GUC_RECV_MASK,
-					   10, 10, &status);
+	ret = __intel_wait_for_register(dev_priv,
+					SOFT_SCRATCH(0),
+					INTEL_GUC_RECV_MASK,
+					INTEL_GUC_RECV_MASK,
+					10, 10, &status);
 	if (status != INTEL_GUC_STATUS_SUCCESS) {
 		/*
 		 * Either the GuC explicitly returned an error (which
