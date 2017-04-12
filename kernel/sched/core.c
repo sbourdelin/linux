@@ -3502,6 +3502,13 @@ asmlinkage __visible void __sched schedule(void)
 }
 EXPORT_SYMBOL(schedule);
 
+void __sched schedule_idle(void)
+{
+	do {
+		__schedule(false);
+	} while (need_resched());
+}
+
 #ifdef CONFIG_CONTEXT_TRACKING
 asmlinkage __visible void __sched schedule_user(void)
 {
