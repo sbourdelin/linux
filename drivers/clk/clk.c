@@ -520,6 +520,23 @@ void clk_unprepare(struct clk *clk)
 }
 EXPORT_SYMBOL_GPL(clk_unprepare);
 
+/**
+ * clk_bulk_unprepare - undo preparation of a bulk of clock sources
+ * @num_clks: the number of clk_bulk_data
+ * @clks: the clk_bulk_data table being ungated
+ *
+ * clk_bulk_unprepare may sleep, which differentiates it from clk_bulk_disable.
+ * Returns 0 on success, -EERROR otherwise.
+ */
+void clk_bulk_unprepare(int num_clks, struct clk_bulk_data *clks)
+{
+	int i;
+
+	for (i = 0; i < num_clks; i++)
+		clk_unprepare(clks[i].clk);
+}
+EXPORT_SYMBOL_GPL(clk_bulk_unprepare);
+
 static int clk_core_prepare(struct clk_core *core)
 {
 	int ret = 0;
@@ -584,6 +601,38 @@ int clk_prepare(struct clk *clk)
 }
 EXPORT_SYMBOL_GPL(clk_prepare);
 
+/**
+ * clk_bulk_prepare - prepare a bulk of clocks
+ * @num_clks: the number of clk_bulk_data
+ * @clks: the clk_bulk_data table being ungated
+ *
+ * clk_bulk_prepare may sleep, which differentiates it from clk_bulk_enable.
+ * Returns 0 on success, -EERROR otherwise.
+ */
+
+int __must_check clk_bulk_prepare(int num_clks, struct clk_bulk_data *clks)
+{
+	int ret;
+	int i;
+
+	for (i = 0; i < num_clks; i++) {
+		ret = clk_prepare(clks[i].clk);
+		if (ret) {
+			pr_err("Failed to prepare clk '%s': %d\n",
+				clks[i].id, ret);
+			goto err;
+		}
+	}
+
+	return 0;
+
+err:
+	while (--i >= 0)
+		clk_unprepare(clks[i].clk);
+
+	return  ret;
+}
+
 static void clk_core_disable(struct clk_core *core)
 {
 	lockdep_assert_held(&enable_lock);
@@ -639,6 +688,24 @@ void clk_disable(struct clk *clk)
 	clk_core_disable_lock(clk->core);
 }
 EXPORT_SYMBOL_GPL(clk_disable);
+
+/**
+ * clk_bulk_disable - gate a bulk of clocks
+ * @num_clks: the number of clk_bulk_data
+ * @clks: the clk_bulk_data table being ungated
+ *
+ * clk_bulk_disable must not sleep, which differentiates it from
+ * clk_bulk_unprepare. clk_bulk_disable must be called before
+ * clk_bulk_unprepare.
+ */
+void clk_bulk_disable(int num_clks, struct clk_bulk_data *clks)
+{
+	int i;
+
+	for (i = 0; i < num_clks; i++)
+		clk_disable(clks[i].clk);
+}
+EXPORT_SYMBOL_GPL(clk_bulk_disable);
 
 static int clk_core_enable(struct clk_core *core)
 {
@@ -708,6 +775,38 @@ int clk_enable(struct clk *clk)
 	return clk_core_enable_lock(clk->core);
 }
 EXPORT_SYMBOL_GPL(clk_enable);
+
+/**
+ * clk_bulk_enable - ungate a bulk of clocks
+ * @num_clks: the number of clk_bulk_data
+ * @clks: the clk_bulk_data table being ungated
+ *
+ * clk_bulk_enable must not sleep
+ * Returns 0 on success, -EERROR otherwise.
+ */
+int clk_bulk_enable(int num_clks, struct clk_bulk_data *clks)
+{
+	int ret;
+	int i;
+
+	for (i = 0; i < num_clks; i++) {
+		ret = clk_enable(clks[i].clk);
+		if (ret) {
+			pr_err("Failed to enable clk '%s': %d\n",
+				clks[i].id, ret);
+			goto err;
+		}
+	}
+
+	return 0;
+
+err:
+	while (--i >= 0)
+		clk_put(clks[i].clk);
+
+	return  ret;
+}
+EXPORT_SYMBOL_GPL(clk_bulk_enable);
 
 static int clk_core_prepare_enable(struct clk_core *core)
 {

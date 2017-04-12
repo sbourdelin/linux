@@ -209,11 +209,53 @@ struct clk *clk_get(struct device *dev, const char *con_id)
 }
 EXPORT_SYMBOL(clk_get);
 
+int clk_bulk_get(struct device *dev, int num_clks,
+		 struct clk_bulk_data *clks)
+{
+	int ret;
+	int i;
+
+	for (i = 0; i < num_clks; i++)
+		clks[i].clk = NULL;
+
+	for (i = 0; i < num_clks; i++) {
+		clks[i].clk = clk_get(dev, clks[i].id);
+		if (IS_ERR(clks[i].clk)) {
+			ret = PTR_ERR(clks[i].clk);
+			dev_err(dev, "Failed to get clk '%s': %d\n",
+				clks[i].id, ret);
+			clks[i].clk = NULL;
+			goto err;
+		}
+
+	}
+
+	return 0;
+
+err:
+	while (--i >= 0)
+		clk_put(clks[i].clk);
+
+	return ret;
+}
+EXPORT_SYMBOL(clk_bulk_get);
+
 void clk_put(struct clk *clk)
 {
 	__clk_put(clk);
 }
 EXPORT_SYMBOL(clk_put);
+
+void clk_bulk_put(int num_clks, struct clk_bulk_data *clks)
+{
+	int i;
+
+	for (i = 0; i < num_clks; i++) {
+		clk_put(clks[i].clk);
+		clks[i].clk = NULL;
+	}
+}
+EXPORT_SYMBOL_GPL(clk_bulk_put);
 
 static void __clkdev_add(struct clk_lookup *cl)
 {
