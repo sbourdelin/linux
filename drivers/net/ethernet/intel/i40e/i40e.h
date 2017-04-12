@@ -320,6 +320,17 @@ struct i40e_flex_pit {
 	u8 pit_index;
 };
 
+enum i40e_port_netdev_type {
+	I40E_PORT_NETDEV_PF,
+	I40E_PORT_NETDEV_VF
+};
+
+/* Port representor netdev private structure */
+struct i40e_port_netdev_priv {
+	enum i40e_port_netdev_type type;	/* type - PF or VF */
+	void *f;				/* ptr to PF or VF struct */
+};
+
 /* struct that defines the Ethernet device */
 struct i40e_pf {
 	struct pci_dev *pdev;
@@ -327,6 +338,12 @@ struct i40e_pf {
 	unsigned long state;
 	struct msix_entry *msix_entries;
 	bool fc_autoneg_status;
+
+	/* PF Port representor netdev that allows control and configuration of
+	 * PFs when they are moved to a different namespace. Enables returning
+	 * PF stats, configuring/monitoring link state, fdb/vlans, filters etc.
+	 */
+	struct net_device *port_netdev;
 
 	u16 eeprom_version;
 	u16 num_vmdq_vsis;         /* num vmdq vsis this PF has set up */
@@ -977,4 +994,6 @@ i40e_status i40e_get_npar_bw_setting(struct i40e_pf *pf);
 i40e_status i40e_set_npar_bw_setting(struct i40e_pf *pf);
 i40e_status i40e_commit_npar_bw_setting(struct i40e_pf *pf);
 void i40e_print_link_message(struct i40e_vsi *vsi, bool isup);
+int i40e_alloc_port_netdev(void *f, enum i40e_port_netdev_type type);
+void i40e_free_port_netdev(void *f, enum i40e_port_netdev_type type);
 #endif /* _I40E_H_ */

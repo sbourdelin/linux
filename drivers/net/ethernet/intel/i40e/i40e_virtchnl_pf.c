@@ -1081,6 +1081,9 @@ void i40e_free_vfs(struct i40e_pf *pf)
 			i40e_free_vf_res(&pf->vf[i]);
 		/* disable qp mappings */
 		i40e_disable_vf_mappings(&pf->vf[i]);
+
+		if (pf->eswitch_mode == DEVLINK_ESWITCH_MODE_SWITCHDEV)
+			i40e_free_port_netdev(&pf->vf[i], I40E_PORT_NETDEV_VF);
 	}
 
 	kfree(pf->vf);
@@ -1148,6 +1151,12 @@ int i40e_alloc_vfs(struct i40e_pf *pf, u16 num_alloc_vfs)
 		/* VF resources get allocated during reset */
 		i40e_reset_vf(&vfs[i], false);
 
+		if (pf->eswitch_mode == DEVLINK_ESWITCH_MODE_SWITCHDEV) {
+			ret = i40e_alloc_port_netdev(&vfs[i],
+						     I40E_PORT_NETDEV_VF);
+			if (ret)
+				goto err_alloc;
+		}
 	}
 	pf->num_alloc_vfs = num_alloc_vfs;
 

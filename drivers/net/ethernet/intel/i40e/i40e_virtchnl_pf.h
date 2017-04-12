@@ -76,6 +76,12 @@ enum i40e_vf_capabilities {
 struct i40e_vf {
 	struct i40e_pf *pf;
 
+	/* VF Port representor netdev that allows control and configuration
+	 * of VFs from the host. Enables returning VF stats, configuring link
+	 * state, mtu, fdb/vlans, filters etc.
+	 */
+	struct net_device *port_netdev;
+
 	/* VF id in the PF space */
 	s16 vf_id;
 	/* all VF vsis connect to the same parent */

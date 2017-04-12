@@ -10022,6 +10022,11 @@ struct i40e_vsi *i40e_vsi_setup(struct i40e_pf *pf, u8 type,
 					 ret);
 			}
 		}
+		if (pf->eswitch_mode == DEVLINK_ESWITCH_MODE_SWITCHDEV) {
+			ret = i40e_alloc_port_netdev(pf, I40E_PORT_NETDEV_PF);
+			if (ret)
+				goto err_port_netdev;
+		}
 	case I40E_VSI_VMDQ2:
 		ret = i40e_config_netdev(vsi);
 		if (ret)
@@ -10074,6 +10079,9 @@ err_msix:
 		vsi->netdev = NULL;
 	}
 err_netdev:
+	if (pf->port_netdev)
+		i40e_free_port_netdev(pf, I40E_PORT_NETDEV_PF);
+err_port_netdev:
 	i40e_aq_delete_element(&pf->hw, vsi->seid, NULL);
 err_vsi:
 	i40e_vsi_clear(vsi);
@@ -10886,13 +10894,38 @@ static int i40e_devlink_eswitch_mode_get(struct devlink *devlink, u16 *mode)
 static int i40e_devlink_eswitch_mode_set(struct devlink *devlink, u16 mode)
 {
 	struct i40e_pf *pf = devlink_priv(devlink);
-	int err = 0;
+	struct i40e_vf *vf;
+	int i, j, err = 0;
 
 	if (mode == pf->eswitch_mode)
 		goto done;
 
 	switch (mode) {
 	case DEVLINK_ESWITCH_MODE_LEGACY:
+		for (i = 0; i < pf->num_alloc_vfs; i++) {
+			vf = &pf->vf[i];
+			i40e_free_port_netdev(vf, I40E_PORT_NETDEV_VF);
+		}
+		i40e_free_port_netdev(pf, I40E_PORT_NETDEV_PF);
+		pf->eswitch_mode = mode;
+		break;
+	case DEVLINK_ESWITCH_MODE_SWITCHDEV:
+		err = i40e_alloc_port_netdev(pf, I40E_PORT_NETDEV_PF);
+		if (err)
+			goto done;
+		for (i = 0; i < pf->num_alloc_vfs; i++) {
+			vf = &pf->vf[i];
+			err = i40e_alloc_port_netdev(vf, I40E_PORT_NETDEV_VF);
+			if (err) {
+				for (j = 0; j < i; j++) {
+					vf = &pf->vf[j];
+					i40e_free_port_netdev(vf,
+							I40E_PORT_NETDEV_VF);
+				}
+				i40e_free_port_netdev(pf, I40E_PORT_NETDEV_PF);
+				goto done;
+			}
+		}
 		pf->eswitch_mode = mode;
 		break;
 	default:
@@ -10907,6 +10940,157 @@ static const struct devlink_ops i40e_devlink_ops = {
 	.eswitch_mode_get = i40e_devlink_eswitch_mode_get,
 	.eswitch_mode_set = i40e_devlink_eswitch_mode_set,
 };
+
+/**
+ * i40e_port_netdev_open
+ * @dev: network interface device structure
+ *
+ * Called when port netdevice is brought up.
+ **/
+static int i40e_port_netdev_open(struct net_device *dev)
+{
+	return 0;
+}
+
+/**
+ * i40e_port_netdev_stop
+ * @dev: network interface device structure
+ *
+ * Called when port netdevice is brought down.
+ **/
+static int i40e_port_netdev_stop(struct net_device *dev)
+{
+	return 0;
+}
+
+static const struct net_device_ops i40e_port_netdev_ops = {
+	.ndo_open		= i40e_port_netdev_open,
+	.ndo_stop		= i40e_port_netdev_stop,
+};
+
+/**
+ * i40e_alloc_port_netdev
+ * @f: pointer to the PF or VF structure
+ * @type: port netdev type
+ *
+ * Create Port representor netdev
+ **/
+int i40e_alloc_port_netdev(void *f, enum i40e_port_netdev_type type)
+{
+	struct net_device *port_netdev;
+	char netdev_name[IFNAMSIZ];
+	struct i40e_port_netdev_priv *priv;
+	struct i40e_pf *pf;
+	struct i40e_vf *vf;
+	struct i40e_vsi *vsi;
+	int err;
+
+	switch (type) {
+	case I40E_PORT_NETDEV_PF:
+		pf = (struct i40e_pf *)f;
+		vsi = pf->vsi[pf->lan_vsi];
+
+		snprintf(netdev_name, IFNAMSIZ, "%s-pf", vsi->netdev->name);
+		port_netdev = alloc_netdev(sizeof(struct i40e_port_netdev_priv),
+					   netdev_name, NET_NAME_UNKNOWN,
+					   ether_setup);
+		if (!port_netdev) {
+			dev_err(&pf->pdev->dev,
+				"alloc_netdev failed for PF:%s port netdev\n",
+				vsi->netdev->name);
+			return -ENOMEM;
+		}
+		pf->port_netdev = port_netdev;
+		priv = netdev_priv(port_netdev);
+		priv->f = pf;
+		priv->type = I40E_PORT_NETDEV_PF;
+		break;
+	case I40E_PORT_NETDEV_VF:
+		vf = (struct i40e_vf *)f;
+		pf = vf->pf;
+		vsi = pf->vsi[pf->lan_vsi];
+
+		snprintf(netdev_name, IFNAMSIZ, "%s-vf%d", vsi->netdev->name,
+			 vf->vf_id);
+		port_netdev = alloc_netdev(sizeof(struct i40e_port_netdev_priv),
+					   netdev_name, NET_NAME_UNKNOWN,
+					   ether_setup);
+		if (!port_netdev) {
+			dev_err(&pf->pdev->dev,
+				"alloc_netdev failed for VF%d port netdev\n",
+				vf->vf_id);
+			return -ENOMEM;
+		}
+		vf->port_netdev = port_netdev;
+		priv = netdev_priv(port_netdev);
+		priv->f = vf;
+		priv->type = I40E_PORT_NETDEV_VF;
+		break;
+	default:
+		return -EINVAL;
+	}
+
+	port_netdev->netdev_ops = &i40e_port_netdev_ops;
+	eth_hw_addr_random(port_netdev);
+
+	netif_carrier_off(port_netdev);
+	netif_tx_stop_all_queues(port_netdev);
+
+	err = register_netdev(port_netdev);
+	if (err) {
+		dev_err(&pf->pdev->dev, "register_netdev failed for port netdev: %s\n",
+			port_netdev->name);
+		free_netdev(port_netdev);
+		return err;
+	}
+
+	dev_info(&pf->pdev->dev, "%s Port representor %s created\n",
+		 ((type == I40E_PORT_NETDEV_PF) ? "PF" : "VF"),
+		 port_netdev->name);
+
+	return 0;
+}
+
+/**
+ * i40e_free_port_netdev
+ * @pf: pointer to the PF or VF structure
+ * @type: port netdev type
+ *
+ * Free Port representor netdev
+ **/
+void i40e_free_port_netdev(void *f, enum i40e_port_netdev_type type)
+{
+	struct i40e_pf *pf;
+	struct i40e_vf *vf;
+
+	switch (type) {
+	case I40E_PORT_NETDEV_PF:
+		pf = (struct i40e_pf *)f;
+
+		if (!pf->port_netdev)
+			return;
+		dev_info(&pf->pdev->dev, "Freeing PF Port representor %s\n",
+			 pf->port_netdev->name);
+		unregister_netdev(pf->port_netdev);
+		free_netdev(pf->port_netdev);
+		pf->port_netdev = NULL;
+		break;
+	case I40E_PORT_NETDEV_VF:
+		vf = (struct i40e_vf *)f;
+		pf = vf->pf;
+
+		if (!vf->port_netdev)
+			return;
+		dev_info(&pf->pdev->dev, "Freeing VF Port representor %s\n",
+			 vf->port_netdev->name);
+		unregister_netdev(vf->port_netdev);
+		free_netdev(vf->port_netdev);
+		vf->port_netdev = NULL;
+		break;
+	default:
+		break;
+	}
+}
 
 /**
  * i40e_probe - Device initialization routine
@@ -11510,6 +11694,7 @@ static void i40e_remove(struct pci_dev *pdev)
 			i40e_switch_branch_release(pf->veb[i]);
 	}
 
+	i40e_free_port_netdev(pf, I40E_PORT_NETDEV_PF);
 	/* Now we can shutdown the PF's VSI, just before we kill
 	 * adminq and hmc.
 	 */
