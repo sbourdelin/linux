@@ -48,8 +48,8 @@
 #ifndef _UAPI_LIBC_COMPAT_H
 #define _UAPI_LIBC_COMPAT_H
 
-/* We have included glibc headers... */
-#if defined(__GLIBC__)
+/* We have included libc headers... */
+#if !defined(__KERNEL__)
 
 /* Coordinate with glibc net/if.h header. */
 #if defined(_NET_IF_H) && defined(__USE_MISC)
@@ -168,7 +168,7 @@
 /* If we did not see any headers from any supported C libraries,
  * or we are being included in the kernel, then define everything
  * that we need. */
-#else /* !defined(__GLIBC__) */
+#else /* defined(__KERNEL__) */
 
 /* Definitions for if.h */
 #define __UAPI_DEF_IF_IFCONF 1
@@ -208,6 +208,6 @@
 /* Definitions for xattr.h */
 #define __UAPI_DEF_XATTR		1
 
-#endif /* __GLIBC__ */
+#endif /* __KERNEL__ */
 
 #endif /* _UAPI_LIBC_COMPAT_H */
