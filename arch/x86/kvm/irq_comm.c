@@ -60,7 +60,7 @@ int kvm_irq_delivery_to_apic(struct kvm *kvm, struct kvm_lapic *src,
 {
 	int i, r = -1;
 	struct kvm_vcpu *vcpu, *lowest = NULL;
-	unsigned long dest_vcpu_bitmap[BITS_TO_LONGS(KVM_MAX_VCPUS)];
+	unsigned long dest_vcpu_bitmap[BITS_TO_LONGS(kvm->max_vcpus)];
 	unsigned int dest_vcpus = 0;
 
 	if (irq->dest_mode == 0 && irq->dest_id == 0xff &&
@@ -101,7 +101,7 @@ int kvm_irq_delivery_to_apic(struct kvm *kvm, struct kvm_lapic *src,
 
 	if (dest_vcpus != 0) {
 		int idx = kvm_vector_to_index(irq->vector, dest_vcpus,
-					dest_vcpu_bitmap, KVM_MAX_VCPUS);
+					dest_vcpu_bitmap, kvm->max_vcpus);
 
 		lowest = kvm_get_vcpu(kvm, idx);
 	}
