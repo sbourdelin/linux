@@ -477,27 +477,31 @@ enum s_alloc {
 };
 
 /*
- * Build an iteration mask that can exclude certain CPUs from the upwards
- * domain traversal.
+ * An overlap sched group may not be present in all CPUs that compose the
+ * group. So build the mask, marking all the group CPUs where it is present.
  *
  * Asymmetric node setups can result in situations where the domain tree is of
  * unequal depth, make sure to skip domains that already cover the entire
  * range.
- *
- * In that case build_sched_domains() will have terminated the iteration early
- * and our sibling sd spans will be empty. Domains should always include the
- * CPU they're built on, so check that.
  */
 static void build_group_mask(struct sched_domain *sd, struct sched_group *sg)
 {
-	const struct cpumask *span = sched_domain_span(sd);
+	const struct cpumask *sg_span = sched_group_cpus(sg);
 	struct sd_data *sdd = sd->private;
 	struct sched_domain *sibling;
 	int i;
 
-	for_each_cpu(i, span) {
+	for_each_cpu(i, sg_span) {
 		sibling = *per_cpu_ptr(sdd->sd, i);
-		if (!cpumask_test_cpu(i, sched_domain_span(sibling)))
+
+		/*
+		 * Asymmetric node setups: skip domains that are already
+		 * done.
+		 */
+		if (!sibling->groups)
+			continue;
+
+		if (!cpumask_equal(sg_span, sched_group_cpus(sibling->groups)))
 			continue;
 
 		cpumask_set_cpu(i, sched_group_mask(sg));
@@ -512,6 +516,28 @@ int group_balance_cpu(struct sched_group *sg)
 {
 	return cpumask_first_and(sched_group_cpus(sg), sched_group_mask(sg));
 }
+
+/*
+ * Find the group balance cpu when the group mask is not available yet.
+ */
+static int find_group_balance_cpu(struct sched_domain *sd,
+				  struct sched_group *sg)
+{
+	const struct cpumask *sg_span = sched_group_cpus(sg);
+	struct sd_data *sdd = sd->private;
+	struct sched_domain *sibling;
+	int i;
+
+	for_each_cpu(i, sg_span) {
+		sibling = *per_cpu_ptr(sdd->sd, i);
+		if (cpumask_equal(sg_span, sched_group_cpus(sibling->groups)))
+			return i;
+	}
+
+	WARN(1, "group balance cpu not found.");
+	return 0;
+}
+
 
 static struct sched_group *
 build_group_from_child_sched_domain(struct sched_domain *sd, int cpu)
@@ -554,6 +580,19 @@ static void init_overlap_sched_group(struct sched_domain *sd,
 	sg->sgc->min_capacity = SCHED_CAPACITY_SCALE;
 }
 
+static void init_overlap_sched_groups(struct sched_domain *sd)
+{
+	struct sched_group *sg = sd->groups;
+	int cpu;
+
+	do {
+		cpu = find_group_balance_cpu(sd, sg);
+		init_overlap_sched_group(sd, sg, cpu);
+
+		sg = sg->next;
+	} while (sg != sd->groups);
+}
+
 static int
 build_overlap_sched_groups(struct sched_domain *sd, int cpu)
 {
@@ -567,8 +606,6 @@ build_overlap_sched_groups(struct sched_domain *sd, int cpu)
 	sg = build_group_from_child_sched_domain(sd, cpu);
 	if (!sg)
 		return -ENOMEM;
-
-	init_overlap_sched_group(sd, sg, cpu);
 
 	sd->groups = sg;
 	last = sg;
@@ -584,7 +621,12 @@ build_overlap_sched_groups(struct sched_domain *sd, int cpu)
 
 		sibling = *per_cpu_ptr(sdd->sd, i);
 
-		/* See the comment near build_group_mask(). */
+		/*
+		 * In Asymmetric node setups, build_sched_domains() will have
+		 * terminated the iteration early and our sibling sd spans will
+		 * be empty. Domains should always include the CPU they're
+		 * built on, so check that.
+		 */
 		if (!cpumask_test_cpu(i, sched_domain_span(sibling)))
 			continue;
 
@@ -594,8 +636,6 @@ build_overlap_sched_groups(struct sched_domain *sd, int cpu)
 
 		sg_span = sched_group_cpus(sg);
 		cpumask_or(covered, covered, sg_span);
-
-		init_overlap_sched_group(sd, sg, i);
 
 		last->next = sg;
 		last = sg;
@@ -1446,6 +1486,14 @@ build_sched_domains(const struct cpumask *cpu_map, struct sched_domain_attr *att
 				if (build_sched_groups(sd, i))
 					goto error;
 			}
+		}
+	}
+
+	/* Init overlap groups */
+	for_each_cpu(i, cpu_map) {
+		for (sd = *per_cpu_ptr(d.sd, i); sd; sd = sd->parent) {
+			if (sd->flags & SD_OVERLAP)
+				init_overlap_sched_groups(sd);
 		}
 	}
 
