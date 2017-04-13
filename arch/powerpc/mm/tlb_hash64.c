@@ -93,12 +93,17 @@ void hpte_need_flush(struct mm_struct *mm, unsigned long addr,
 
 	/*
 	 * Check if we have an active batch on this CPU. If not, just
-	 * flush now and return. For now, we don global invalidates
-	 * in that case, might be worth testing the mm cpu mask though
-	 * and decide to use local invalidates instead...
+	 * flush now and return.
 	 */
 	if (!batch->active) {
-		flush_hash_page(vpn, rpte, psize, ssize, 0);
+		const struct cpumask *tmp;
+		int local = 0;
+
+		tmp = cpumask_of(smp_processor_id());
+		if (cpumask_equal(mm_cpumask(mm), tmp))
+			local = 1;
+
+		flush_hash_page(vpn, rpte, psize, ssize, local);
 		put_cpu_var(ppc64_tlb_batch);
 		return;
 	}
