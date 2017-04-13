@@ -1,0 +1,56 @@
+MMIO bitfield-based multiplexer controller bindings
+
+Define a syscon bitfield to be used to control a multiplexer. The parent
+device tree node must be a syscon node to provide register access.
+
+Required properties:
+- compatible : "gpio-mux"
+- reg : register base of the register containing the control bitfield
+- bit-mask : bitmask of the control bitfield in the control register
+- bit-shift : bit offset of the control bitfield in the control register
+- #mux-control-cells : <0>
+* Standard mux-controller bindings as decribed in mux-controller.txt
+
+Optional properties:
+- idle-state : if present, the state the mux will have when idle. The
+	       special state MUX_IDLE_AS_IS is the default.
+
+The multiplexer state is defined as the value of the bitfield described
+by the reg, bit-mask, and bit-shift properties, accessed through the parent
+syscon.
+
+Example:
+
+	syscon {
+		compatible = "syscon";
+
+		mux: mux-controller@3 {
+			compatible = "mmio-mux";
+			reg = <0x3>;
+			bit-mask = <0x1>;
+			bit-shift = <5>;
+			#mux-control-cells = <0>;
+		};
+	};
+
+	video-mux {
+		compatible = "video-mux";
+		mux-controls = <&mux>;
+
+		ports {
+			/* input 0 */
+			port@0 {
+				reg = <0>;
+			};
+
+			/* input 1 */
+			port@1 {
+				reg = <1>;
+			};
+
+			/* output */
+			port@2 {
+				reg = <2>;
+			};
+		};
+	};
