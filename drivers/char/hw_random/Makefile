@@ -1,7 +1,6 @@
 #
 # Makefile for HW Random Number Generator (RNG) device drivers.
 #
-
 obj-$(CONFIG_HW_RANDOM) += rng-core.o
 rng-core-y := core.o
 obj-$(CONFIG_HW_RANDOM_TIMERIOMEM) += timeriomem-rng.o
@@ -36,3 +35,4 @@ obj-$(CONFIG_HW_RANDOM_STM32) += stm32-rng.o
 obj-$(CONFIG_HW_RANDOM_PIC32) += pic32-rng.o
 obj-$(CONFIG_HW_RANDOM_MESON) += meson-rng.o
 obj-$(CONFIG_HW_RANDOM_CAVIUM) += cavium-rng.o cavium-rng-vf.o
+obj-$(CONFIG_HW_RANDOM_MTK)	+= mtk-rng.o
