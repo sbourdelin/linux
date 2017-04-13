@@ -129,10 +129,10 @@ extra_header_fields:
 	.quad	0				// ImageBase
 	.long	0x1000				// SectionAlignment
 	.long	PECOFF_FILE_ALIGNMENT		// FileAlignment
-	.short	0				// MajorOperatingSystemVersion
-	.short	0				// MinorOperatingSystemVersion
-	.short	0				// MajorImageVersion
-	.short	0				// MinorImageVersion
+	.short	CONFIG_EFI_MAJOR_OS		// MajorOperatingSystemVersion
+	.short	CONFIG_EFI_MINOR_OS		// MinorOperatingSystemVersion
+	.short	CONFIG_EFI_MAJOR_IMAGE		// MajorImageVersion
+	.short	CONFIG_EFI_MINOR_IMAGE		// MinorImageVersion
 	.short	0				// MajorSubsystemVersion
 	.short	0				// MinorSubsystemVersion
 	.long	0				// Win32VersionValue

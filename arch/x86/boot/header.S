@@ -156,10 +156,10 @@ extra_header_fields:
 #endif
 	.long	0x20				# SectionAlignment
 	.long	0x20				# FileAlignment
-	.word	0				# MajorOperatingSystemVersion
-	.word	0				# MinorOperatingSystemVersion
-	.word	0				# MajorImageVersion
-	.word	0				# MinorImageVersion
+	.word	CONFIG_EFI_MAJOR_OS		# MajorOperatingSystemVersion
+	.word	CONFIG_EFI_MINOR_OS		# MinorOperatingSystemVersion
+	.word	CONFIG_EFI_MAJOR_IMAGE		# MajorImageVersion
+	.word	CONFIG_EFI_MINOR_IMAGE		# MinorImageVersion
 	.word	0				# MajorSubsystemVersion
 	.word	0				# MinorSubsystemVersion
 	.long	0				# Win32VersionValue

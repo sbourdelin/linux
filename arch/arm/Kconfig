@@ -2090,6 +2090,30 @@ config EFI
 	  is only useful for kernels that may run on systems that have
 	  UEFI firmware.
 
+config EFI_MAJOR_OS
+	hex "EFI Major OS Version"
+	range 0x0 0xFFFF
+	default "0x0"
+	depends on EFI_STUB
+
+config EFI_MINOR_OS
+	hex "EFI Minor OS Version"
+	range 0x0 0xFFFF
+	default "0x0"
+	depends on EFI_STUB
+
+config EFI_MAJOR_IMAGE
+	hex "EFI Major Image Version"
+	range 0x0 0xFFFF
+	default "0x0"
+	depends on EFI_STUB
+
+config EFI_MINOR_IMAGE
+	hex "EFI Minor Image Version"
+	range 0x0 0xFFFF
+	default "0x0"
+	depends on EFI_STUB
+
 endmenu
 
 menu "CPU Power Management"
