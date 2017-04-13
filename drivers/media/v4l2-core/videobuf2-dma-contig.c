@@ -120,7 +120,7 @@ static void vb2_dc_prepare(void *buf_priv)
 	 * DMABUF exporter will flush the cache for us; only USERPTR
 	 * and MMAP buffers with non-coherent memory will be flushed.
 	 */
-	if (buf->attrs & DMA_ATTR_NON_CONSISTENT)
+	if (buf->attrs & DMA_ATTR_NON_CONSISTENT && !WARN_ON_ONCE(!sgt))
 		dma_sync_sg_for_device(buf->dev, sgt->sgl, sgt->orig_nents,
 				       buf->dma_dir);
 }
@@ -134,7 +134,7 @@ static void vb2_dc_finish(void *buf_priv)
 	 * DMABUF exporter will flush the cache for us; only USERPTR
 	 * and MMAP buffers with non-coherent memory will be flushed.
 	 */
-	if (buf->attrs & DMA_ATTR_NON_CONSISTENT)
+	if (buf->attrs & DMA_ATTR_NON_CONSISTENT && !WARN_ON_ONCE(!sgt))
 		dma_sync_sg_for_cpu(buf->dev, sgt->sgl, sgt->orig_nents,
 				    buf->dma_dir);
 }
@@ -380,7 +380,7 @@ static int vb2_dc_dmabuf_ops_begin_cpu_access(struct dma_buf *dbuf,
 	 * DMABUF exporter will flush the cache for us; only USERPTR
 	 * and MMAP buffers with non-coherent memory will be flushed.
 	 */
-	if (buf->attrs & DMA_ATTR_NON_CONSISTENT)
+	if (buf->attrs & DMA_ATTR_NON_CONSISTENT && !WARN_ON_ONCE(!sgt))
 		dma_sync_sg_for_cpu(buf->dev, sgt->sgl, sgt->nents,
 				    buf->dma_dir);
 
@@ -397,7 +397,7 @@ static int vb2_dc_dmabuf_ops_end_cpu_access(struct dma_buf *dbuf,
 	 * DMABUF exporter will flush the cache for us; only USERPTR
 	 * and MMAP buffers with non-coherent memory will be flushed.
 	 */
-	if (buf->attrs & DMA_ATTR_NON_CONSISTENT)
+	if (buf->attrs & DMA_ATTR_NON_CONSISTENT && !WARN_ON_ONCE(!sgt))
 		dma_sync_sg_for_device(buf->dev, sgt->sgl, sgt->nents,
 				       buf->dma_dir);
 
