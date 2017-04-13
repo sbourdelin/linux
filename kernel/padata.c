@@ -5,6 +5,7 @@
  *
  * Copyright (C) 2008, 2009 secunet Security Networks AG
  * Copyright (C) 2008, 2009 Steffen Klassert <steffen.klassert@secunet.com>
+ * Copyright (C) 2016, 2017 Jason A. Donenfeld <Jason@zx2c4.com>
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms and conditions of the GNU General Public License,
@@ -31,8 +32,6 @@
 #include <linux/sysfs.h>
 #include <linux/rcupdate.h>
 #include <linux/module.h>
-
-#define MAX_OBJ_NUM 1000
 
 static int padata_index_to_cpu(struct parallel_data *pd, int cpu_index)
 {
@@ -122,7 +121,7 @@ int padata_do_parallel(struct padata_instance *pinst,
 	if ((pinst->flags & PADATA_RESET))
 		goto out;
 
-	if (atomic_read(&pd->refcnt) >= MAX_OBJ_NUM)
+	if (unlikely(atomic_read(&pd->refcnt) == INT_MAX))
 		goto out;
 
 	err = 0;
@@ -1025,6 +1024,21 @@ void padata_free(struct padata_instance *pinst)
 	kobject_put(&pinst->kobj);
 }
 EXPORT_SYMBOL(padata_free);
+
+/**
+ * padata_queue_len - retreive the number of in progress jobs
+ *
+ * @padata_inst: padata instance from which to read the queue size
+ */
+int padata_queue_len(struct padata_instance *pinst)
+{
+	int len;
+	rcu_read_lock_bh();
+	len = atomic_read(&rcu_dereference_bh(pinst->pd)->refcnt);
+	rcu_read_unlock_bh();
+	return len;
+}
+EXPORT_SYMBOL(padata_queue_len);
 
 #ifdef CONFIG_HOTPLUG_CPU
 

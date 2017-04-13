@@ -70,6 +70,8 @@ struct pcrypt_aead_ctx {
 	unsigned int cb_cpu;
 };
 
+#define MAX_OBJ_NUM 1000
+
 static int pcrypt_do_parallel(struct padata_priv *padata, unsigned int *cb_cpu,
 			      struct padata_pcrypt *pcrypt)
 {
@@ -77,6 +79,9 @@ static int pcrypt_do_parallel(struct padata_priv *padata, unsigned int *cb_cpu,
 	struct pcrypt_cpumask *cpumask;
 
 	cpu = *cb_cpu;
+
+	if (padata_queue_len(pcrypt->pinst) >= MAX_OBJ_NUM)
+		return -EBUSY;
 
 	rcu_read_lock_bh();
 	cpumask = rcu_dereference_bh(pcrypt->cb_cpumask);

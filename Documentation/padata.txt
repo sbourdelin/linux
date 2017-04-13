@@ -158,3 +158,11 @@ when a padata instance is no longer needed:
 This function will busy-wait while any remaining tasks are completed, so it
 might be best not to call it while there is work outstanding.  Shutting
 down the workqueue, if necessary, should be done separately.
+
+While you cannot have more than 2^31-1 taks submitted at the same time, this
+maximum is well above what you might actually want to be submitted. Thus,
+callers are encouraged to determine their maximum latency/memory/throughput
+constraints, and limit calls to padata_do_parallel() based on the current
+queue length, which can be determined with:
+
+    int padata_queue_len(struct padata_instance *pinst);
