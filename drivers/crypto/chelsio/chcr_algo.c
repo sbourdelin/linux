@@ -2351,7 +2351,7 @@ static int chcr_authenc_setkey(struct crypto_aead *authenc, const u8 *key,
 	}
 out:
 	aeadctx->enckey_len = 0;
-	if (base_hash)
+	if (!IS_ERR_OR_NULL(base_hash))
 		chcr_free_shash(base_hash);
 	return -EINVAL;
 }
