@@ -46,16 +46,16 @@ struct vb2_threadio_data;
 
 /**
  * struct vb2_mem_ops - memory handling/memory allocator operations
- * @alloc:	allocate video memory and, optionally, allocator private data,
- *		return ERR_PTR() on failure or a pointer to allocator private,
- *		per-buffer data on success; the returned private structure
- *		will then be passed as @buf_priv argument to other ops in this
- *		structure. Additional gfp_flags to use when allocating the
- *		are also passed to this operation. These flags are from the
- *		gfp_flags field of vb2_queue.
- * @put:	inform the allocator that the buffer will no longer be used;
- *		usually will result in the allocator freeing the buffer (if
- *		no other users of this buffer are present); the @buf_priv
+ * @alloc:	allocate video memory for an MMAP buffer and, optionally,
+ *		allocator private data, return ERR_PTR() on failure or a pointer
+ *		to allocator private, per-buffer data on success; the returned
+ *		private structure will then be passed as @buf_priv argument to
+ *		other ops in this structure. Additional gfp_flags to use when
+ *		allocating the memory are also passed to this operation. These
+ *		flags are from the gfp_flags field of vb2_queue.
+ * @put:	inform the allocator that the MMAP buffer will no longer be
+ *		used; usually will result in the allocator freeing the buffer
+ *		(if no other users of this buffer are present); the @buf_priv
  *		argument is the allocator private per-buffer structure
  *		previously returned from the alloc callback.
  * @get_dmabuf: acquire userspace memory for a hardware operation; used for
