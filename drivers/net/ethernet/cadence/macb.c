@@ -826,6 +826,15 @@ static void macb_tx_interrupt(struct macb_queue *queue)
 
 			/* First, update TX stats if needed */
 			if (skb) {
+#ifdef CONFIG_MACB_USE_HWSTAMP
+				if (gem_ptp_do_txstamp(queue, skb, desc) == 0) {
+					/* skb now belongs to timestamp buffer
+					 * and will be removed later
+					 */
+					tx_skb->skb = NULL;
+					schedule_work(&queue->tx_ts_task);
+				}
+#endif
 				netdev_vdbg(bp->dev, "skb %u (data %p) TX complete\n",
 					    macb_tx_ring_wrap(bp, tail),
 					    skb->data);
@@ -991,6 +1000,10 @@ static int gem_rx(struct macb *bp, int budget)
 
 		bp->dev->stats.rx_packets++;
 		bp->dev->stats.rx_bytes += skb->len;
+
+#ifdef CONFIG_MACB_USE_HWSTAMP
+		gem_ptp_do_rxstamp(bp, skb, desc);
+#endif
 
 #if defined(DEBUG) && defined(VERBOSE_DEBUG)
 		netdev_vdbg(bp->dev, "received skb of length %u, csum: %08x\n",
@@ -1313,6 +1326,11 @@ static irqreturn_t macb_interrupt(int irq, void *dev_id)
 			if (bp->caps & MACB_CAPS_ISR_CLEAR_ON_WRITE)
 				queue_writel(queue, ISR, MACB_BIT(HRESP));
 		}
+
+#ifdef CONFIG_MACB_USE_HWSTAMP
+		if (status & MACB_PTP_INT_MASK)
+			macb_ptp_int(queue, status);
+#endif
 
 		status = queue_readl(queue, ISR);
 	}
@@ -1643,8 +1661,10 @@ static int macb_start_xmit(struct sk_buff *skb, struct net_device *dev)
 
 	/* Make newly initialized descriptor visible to hardware */
 	wmb();
-
-	skb_tx_timestamp(skb);
+#ifdef CONFIG_MACB_USE_HWSTAMP
+	if (!bp->ptp_hw_support)
+#endif
+		skb_tx_timestamp(skb);
 
 	macb_writel(bp, NCR, macb_readl(bp, NCR) | MACB_BIT(TSTART));
 
@@ -2502,6 +2522,71 @@ static int macb_set_ringparam(struct net_device *netdev,
 	return 0;
 }
 
+#ifdef CONFIG_MACB_USE_HWSTAMP
+static unsigned int gem_get_tsu_rate(struct macb *bp)
+{
+	struct clk *tsu_clk;
+	unsigned int tsu_rate;
+
+	tsu_clk = devm_clk_get(&bp->pdev->dev, "tsu_clk");
+	if (!IS_ERR(tsu_clk))
+		tsu_rate = clk_get_rate(tsu_clk);
+	/* try pclk instead */
+	else if (!IS_ERR(bp->pclk)) {
+		tsu_clk = bp->pclk;
+		tsu_rate = clk_get_rate(tsu_clk);
+	} else
+		return -ENOTSUPP;
+	return tsu_rate;
+}
+
+static s32 gem_get_ptp_max_adj(void)
+{
+	return 64E6;
+}
+
+static int gem_get_ts_info(struct net_device *dev,
+			   struct ethtool_ts_info *info)
+{
+	struct macb *bp = netdev_priv(dev);
+
+	ethtool_op_get_ts_info(dev, info);
+	if (!bp->ptp_hw_support)
+		return 0;
+
+	info->so_timestamping =
+		SOF_TIMESTAMPING_TX_SOFTWARE |
+		SOF_TIMESTAMPING_RX_SOFTWARE |
+		SOF_TIMESTAMPING_SOFTWARE |
+		SOF_TIMESTAMPING_TX_HARDWARE |
+		SOF_TIMESTAMPING_RX_HARDWARE |
+		SOF_TIMESTAMPING_RAW_HARDWARE;
+	info->tx_types =
+		(1 << HWTSTAMP_TX_ONESTEP_SYNC) |
+		(1 << HWTSTAMP_TX_OFF) |
+		(1 << HWTSTAMP_TX_ON);
+	info->rx_filters =
+		(1 << HWTSTAMP_FILTER_NONE) |
+		(1 << HWTSTAMP_FILTER_ALL);
+	info->phc_index = -1;
+
+	if (bp->ptp_clock)
+		info->phc_index = ptp_clock_index(bp->ptp_clock);
+
+	return 0;
+}
+
+static struct macb_ptp_info gem_ptp_info = {
+	.ptp_init	 = gem_ptp_init,
+	.ptp_remove	 = gem_ptp_remove,
+	.get_ptp_max_adj = gem_get_ptp_max_adj,
+	.get_tsu_rate	 = gem_get_tsu_rate,
+	.get_ts_info	 = gem_get_ts_info,
+	.get_hwtst	 = gem_get_hwtst,
+	.set_hwtst	 = gem_set_hwtst,
+};
+#endif
+
 static int macb_get_ts_info(struct net_device *netdev,
 			    struct ethtool_ts_info *info)
 {
@@ -2642,8 +2727,8 @@ static void macb_configure_caps(struct macb *bp,
 			if (!GEM_BFEXT(TSU, gem_readl(bp, DCFG5)))
 				pr_err("GEM doesn't support hardware ptp.\n");
 			else {
-				pr_emerg("rozieblo: ptp_hw_support = true");
 				bp->ptp_hw_support = true;
+				bp->ptp_info = &gem_ptp_info;
 			}
 		}
 #endif
@@ -3252,7 +3337,9 @@ static const struct macb_config np4_config = {
 };
 
 static const struct macb_config zynqmp_config = {
-	.caps = MACB_CAPS_GIGABIT_MODE_AVAILABLE | MACB_CAPS_JUMBO,
+	.caps = MACB_CAPS_GIGABIT_MODE_AVAILABLE |
+			MACB_CAPS_JUMBO |
+			MACB_CAPS_GEM_HAS_PTP,
 	.dma_burst_length = 16,
 	.clk_init = macb_clk_init,
 	.init = macb_init,
@@ -3286,7 +3373,9 @@ MODULE_DEVICE_TABLE(of, macb_dt_ids);
 #endif /* CONFIG_OF */
 
 static const struct macb_config default_gem_config = {
-	.caps = MACB_CAPS_GIGABIT_MODE_AVAILABLE | MACB_CAPS_JUMBO,
+	.caps = MACB_CAPS_GIGABIT_MODE_AVAILABLE |
+			MACB_CAPS_JUMBO |
+			MACB_CAPS_GEM_HAS_PTP,
 	.dma_burst_length = 16,
 	.clk_init = macb_clk_init,
 	.init = macb_init,
