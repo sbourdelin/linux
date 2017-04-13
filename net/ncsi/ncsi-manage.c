@@ -530,6 +530,9 @@ static void ncsi_request_timeout(unsigned long data)
 	struct ncsi_request *nr = (struct ncsi_request *)data;
 	struct ncsi_dev_priv *ndp = nr->ndp;
 	unsigned long flags;
+#ifdef CONFIG_NET_NCSI_DEBUG
+	struct ncsi_pkt_hdr *hdr;
+#endif
 
 	/* If the request already had associated response,
 	 * let the response handler to release it.
@@ -541,6 +544,11 @@ static void ncsi_request_timeout(unsigned long data)
 		return;
 	}
 	spin_unlock_irqrestore(&ndp->lock, flags);
+
+#ifdef CONFIG_NET_NCSI_DEBUG
+	hdr = (struct ncsi_pkt_hdr *)skb_network_header(nr->cmd);
+	ndp->stats.cmd[hdr->type][NCSI_PKT_STAT_TIMEOUT]++;
+#endif
 
 	/* Release the request */
 	ncsi_free_request(nr);

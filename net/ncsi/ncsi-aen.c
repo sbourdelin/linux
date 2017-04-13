@@ -206,16 +206,29 @@ int ncsi_aen_handler(struct ncsi_dev_priv *ndp, struct sk_buff *skb)
 	}
 
 	if (!nah) {
+#ifdef CONFIG_NET_NCSI_DEBUG
+		ndp->stats.aen[h->type][NCSI_PKT_STAT_ERROR]++;
+#endif
 		netdev_warn(ndp->ndev.dev, "Invalid AEN (0x%x) received\n",
 			    h->type);
 		return -ENOENT;
 	}
 
 	ret = ncsi_validate_aen_pkt(h, nah->payload);
-	if (ret)
+	if (ret) {
+#ifdef CONFIG_NET_NCSI_DEBUG
+		ndp->stats.aen[h->type][NCSI_PKT_STAT_ERROR]++;
+#endif
 		goto out;
+	}
 
 	ret = nah->handler(ndp, h);
+#ifdef CONFIG_NET_NCSI_DEBUG
+	if (ret)
+		ndp->stats.aen[h->type][NCSI_PKT_STAT_ERROR]++;
+	else
+		ndp->stats.aen[h->type][NCSI_PKT_STAT_OK]++;
+#endif
 out:
 	consume_skb(skb);
 	return ret;
