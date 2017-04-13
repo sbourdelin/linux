@@ -3259,6 +3259,34 @@ Otherwise, if the MCE is a corrected error, KVM will just
 store it in the corresponding bank (provided this bank is
 not holding a previously reported uncorrected error).
 
+
+4.107 KVM_CREATE_VM2
+
+Capability: KVM_CAP_CONFIGURABLE_MAX_VCPUS
+Architectures: all
+Type: system ioctl
+Parameters: struct kvm_vm_config
+Returns: a VM fd that can be used to control the new virtual machine,
+         -E2BIG if the value of max_vcpus is not supported
+
+This is an extension of KVM_CREATE_VM that allows the user to pass more
+information through
+
+struct kvm_vm_config {
+	__u64 type;
+	__u32 max_vcpus;
+	__u8 reserved[52];
+};
+
+type is the argument to KVM_CREATE_VM
+
+max_vcpus is the desired maximal number of VCPUs, it must not exceed the value
+returned by KVM_CAP_CONFIGURABLE_MAX_VCPUS.  Value of 0 treated as if userspace
+passed the value returned by KVM_CAP_MAX_VCPU instead.
+
+reserved is must be 0.
+
+
 5. The kvm_run structure
 ------------------------
 

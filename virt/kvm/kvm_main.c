@@ -629,11 +629,20 @@ static inline void kvm_free_vm(struct kvm *kvm)
 	kfree(kvm);
 }
 
-static struct kvm *kvm_create_vm(unsigned long type)
+static struct kvm *kvm_create_vm(struct kvm_vm_config *vm_config)
 {
 	int r, i;
-	struct kvm *kvm = kvm_alloc_vm(KVM_MAX_VCPUS);
+	struct kvm *kvm;
 
+	if (!KVM_CONFIGURABLE_MAX_VCPUS && vm_config->max_vcpus)
+		return ERR_PTR(-EINVAL);
+	if (vm_config->max_vcpus > KVM_CONFIGURABLE_MAX_VCPUS)
+		return ERR_PTR(-E2BIG);
+
+	if (!vm_config->max_vcpus)
+		vm_config->max_vcpus = KVM_MAX_VCPUS;
+
+	kvm = kvm_alloc_vm(vm_config->max_vcpus);
 	if (!kvm)
 		return ERR_PTR(-ENOMEM);
 
@@ -647,7 +656,7 @@ static struct kvm *kvm_create_vm(unsigned long type)
 	refcount_set(&kvm->users_count, 1);
 	INIT_LIST_HEAD(&kvm->devices);
 
-	r = kvm_arch_init_vm(kvm, type);
+	r = kvm_arch_init_vm(kvm, vm_config->type);
 	if (r)
 		goto out_err_no_disable;
 
@@ -2957,6 +2966,8 @@ static long kvm_vm_ioctl_check_extension_generic(struct kvm *kvm, long arg)
 #endif
 	case KVM_CAP_MAX_VCPU_ID:
 		return KVM_MAX_VCPU_ID;
+	case KVM_CAP_CONFIGURABLE_MAX_VCPUS:
+		return KVM_CONFIGURABLE_MAX_VCPUS;
 	default:
 		break;
 	}
@@ -3179,13 +3190,13 @@ static struct file_operations kvm_vm_fops = {
 	.llseek		= noop_llseek,
 };
 
-static int kvm_dev_ioctl_create_vm(unsigned long type)
+static int kvm_dev_ioctl_create_vm(struct kvm_vm_config *vm_config)
 {
 	int r;
 	struct kvm *kvm;
 	struct file *file;
 
-	kvm = kvm_create_vm(type);
+	kvm = kvm_create_vm(vm_config);
 	if (IS_ERR(kvm))
 		return PTR_ERR(kvm);
 #ifdef CONFIG_KVM_MMIO
@@ -3220,6 +3231,7 @@ static int kvm_dev_ioctl_create_vm(unsigned long type)
 static long kvm_dev_ioctl(struct file *filp,
 			  unsigned int ioctl, unsigned long arg)
 {
+	void __user *argp = (void __user *)arg;
 	long r = -EINVAL;
 
 	switch (ioctl) {
@@ -3228,9 +3240,28 @@ static long kvm_dev_ioctl(struct file *filp,
 			goto out;
 		r = KVM_API_VERSION;
 		break;
-	case KVM_CREATE_VM:
-		r = kvm_dev_ioctl_create_vm(arg);
+	case KVM_CREATE_VM: {
+		struct kvm_vm_config vm_config = {.type = arg};
+
+		r = kvm_dev_ioctl_create_vm(&vm_config);
 		break;
+	}
+	case KVM_CREATE_VM2: {
+		struct kvm_vm_config vm_config, check_reserved = {};
+
+		r = -EFAULT;
+		if (copy_from_user(&vm_config, argp, sizeof vm_config))
+			goto out;
+
+		r = -EINVAL;
+		check_reserved.type = vm_config.type;
+		check_reserved.max_vcpus = vm_config.max_vcpus;
+		if (memcmp(&vm_config, &check_reserved, sizeof check_reserved))
+			goto out;
+
+		r = kvm_dev_ioctl_create_vm(&vm_config);
+		break;
+	}
 	case KVM_CHECK_EXTENSION:
 		r = kvm_vm_ioctl_check_extension_generic(NULL, arg);
 		break;

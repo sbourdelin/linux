@@ -39,6 +39,9 @@
 #ifndef KVM_MAX_VCPU_ID
 #define KVM_MAX_VCPU_ID KVM_MAX_VCPUS
 #endif
+#ifndef KVM_CONFIGURABLE_MAX_VCPUS
+#define KVM_CONFIGURABLE_MAX_VCPUS 0U
+#endif
 
 /*
  * The bit 16 ~ bit 31 of kvm_memory_region::flags are internally used

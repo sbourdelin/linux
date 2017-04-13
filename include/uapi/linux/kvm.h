@@ -83,6 +83,12 @@ struct kvm_debug_guest {
 
 /* *** End of deprecated interfaces *** */
 
+/* for KVM_CREATE_VM2 */
+struct kvm_vm_config {
+	__u64 type;
+	__u32 max_vcpus;
+	__u8 reserved[52];
+};
 
 /* for KVM_CREATE_MEMORY_REGION */
 struct kvm_memory_region {
@@ -713,6 +719,7 @@ struct kvm_ppc_resize_hpt {
  */
 #define KVM_GET_API_VERSION       _IO(KVMIO,   0x00)
 #define KVM_CREATE_VM             _IO(KVMIO,   0x01) /* returns a VM fd */
+#define KVM_CREATE_VM2            _IOR(KVMIO,  0x01, struct kvm_vm_config)
 #define KVM_GET_MSR_INDEX_LIST    _IOWR(KVMIO, 0x02, struct kvm_msr_list)
 
 #define KVM_S390_ENABLE_SIE       _IO(KVMIO,   0x06)
@@ -892,6 +899,7 @@ struct kvm_ppc_resize_hpt {
 #define KVM_CAP_MIPS_64BIT 139
 #define KVM_CAP_S390_GS 140
 #define KVM_CAP_S390_AIS 141
+#define KVM_CAP_CONFIGURABLE_MAX_VCPUS 142
 
 #ifdef KVM_CAP_IRQ_ROUTING
 
