@@ -31,6 +31,8 @@
 	compatible = "nokia,omap3-n900", "ti,omap3430", "ti,omap3";
 
 	aliases {
+		display0 = &lcd;
+		display1 = &tv;
 		i2c0;
 		i2c1 = &i2c1;
 		i2c2 = &i2c2;
@@ -880,7 +882,7 @@
 		ti,esd-recovery-timeout-ms = <8000>;
 	};
 
-	acx565akm@2 {
+	lcd: acx565akm@2 {
 		compatible = "sony,acx565akm";
 		spi-max-frequency = <6000000>;
 		reg = <2>;
