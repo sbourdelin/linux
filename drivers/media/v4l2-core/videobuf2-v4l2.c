@@ -499,8 +499,11 @@ int vb2_prepare_buf(struct vb2_queue *q, struct v4l2_buffer *b)
 	}
 
 	ret = vb2_queue_or_prepare_buf(q, b, "prepare_buf");
+	if (ret)
+		return ret;
 
-	return ret ? ret : vb2_core_prepare_buf(q, b->index, b);
+	return vb2_core_prepare_buf(q, b->index, b,
+				    b->flags & V4L2_BUF_FLAG_NO_CACHE_SYNC);
 }
 EXPORT_SYMBOL_GPL(vb2_prepare_buf);
 
@@ -565,7 +568,11 @@ int vb2_qbuf(struct vb2_queue *q, struct v4l2_buffer *b)
 	}
 
 	ret = vb2_queue_or_prepare_buf(q, b, "qbuf");
-	return ret ? ret : vb2_core_qbuf(q, b->index, b);
+	if (ret)
+		return ret;
+
+	return vb2_core_qbuf(q, b->index, b,
+			     b->flags & V4L2_BUF_FLAG_NO_CACHE_SYNC);
 }
 EXPORT_SYMBOL_GPL(vb2_qbuf);
 
@@ -583,7 +590,8 @@ int vb2_dqbuf(struct vb2_queue *q, struct v4l2_buffer *b, bool nonblocking)
 		return -EINVAL;
 	}
 
-	ret = vb2_core_dqbuf(q, NULL, b, nonblocking);
+	ret = vb2_core_dqbuf(q, NULL, b, nonblocking,
+			     b->flags & V4L2_BUF_FLAG_NO_CACHE_SYNC);
 
 	/*
 	 *  After calling the VIDIOC_DQBUF V4L2_BUF_FLAG_DONE must be

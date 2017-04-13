@@ -189,6 +189,28 @@ static void __vb2_queue_cancel(struct vb2_queue *q);
 static void __enqueue_in_driver(struct vb2_buffer *vb);
 
 /**
+ * __mem_prepare_planes() - call finish mem op for all planes of the buffer
+ */
+static void __mem_prepare_planes(struct vb2_buffer *vb)
+{
+	unsigned int plane;
+
+	for (plane = 0; plane < vb->num_planes; ++plane)
+		call_void_memop(vb, prepare, vb->planes[plane].mem_priv);
+}
+
+/**
+ * __mem_finish_planes() - call finish mem op for all planes of the buffer
+ */
+static void __mem_finish_planes(struct vb2_buffer *vb)
+{
+	unsigned int plane;
+
+	for (plane = 0; plane < vb->num_planes; ++plane)
+		call_void_memop(vb, finish, vb->planes[plane].mem_priv);
+}
+
+/**
  * __vb2_buf_mem_alloc() - allocate video memory for the given buffer
  */
 static int __vb2_buf_mem_alloc(struct vb2_buffer *vb)
@@ -953,20 +975,29 @@ EXPORT_SYMBOL_GPL(vb2_discard_done);
 /**
  * __prepare_mmap() - prepare an MMAP buffer
  */
-static int __prepare_mmap(struct vb2_buffer *vb, const void *pb)
+static int __prepare_mmap(struct vb2_buffer *vb, const void *pb,
+			  bool no_cache_sync)
 {
-	int ret = 0;
+	int ret;
 
-	if (pb)
+	if (pb) {
 		ret = call_bufop(vb->vb2_queue, fill_vb2_buffer,
 				 vb, pb, vb->planes);
-	return ret ? ret : call_vb_qop(vb, buf_prepare, vb);
+		if (ret)
+			return ret;
+	}
+
+	if (!no_cache_sync)
+		__mem_prepare_planes(vb);
+
+	return call_vb_qop(vb, buf_prepare, vb);
 }
 
 /**
  * __prepare_userptr() - prepare a USERPTR buffer
  */
-static int __prepare_userptr(struct vb2_buffer *vb, const void *pb)
+static int __prepare_userptr(struct vb2_buffer *vb, const void *pb,
+			     bool no_cache_sync)
 {
 	struct vb2_plane planes[VB2_MAX_PLANES];
 	struct vb2_queue *q = vb->vb2_queue;
@@ -1057,6 +1088,11 @@ static int __prepare_userptr(struct vb2_buffer *vb, const void *pb)
 			dprintk(1, "buffer initialization failed\n");
 			goto err;
 		}
+
+		/* This is new buffer memory --- always synchronise cache. */
+		__mem_prepare_planes(vb);
+	} else if (!no_cache_sync) {
+		__mem_prepare_planes(vb);
 	}
 
 	ret = call_vb_qop(vb, buf_prepare, vb);
@@ -1084,7 +1120,8 @@ err:
 /**
  * __prepare_dmabuf() - prepare a DMABUF buffer
  */
-static int __prepare_dmabuf(struct vb2_buffer *vb, const void *pb)
+static int __prepare_dmabuf(struct vb2_buffer *vb, const void *pb,
+			    bool no_cache_sync)
 {
 	struct vb2_plane planes[VB2_MAX_PLANES];
 	struct vb2_queue *q = vb->vb2_queue;
@@ -1199,6 +1236,11 @@ static int __prepare_dmabuf(struct vb2_buffer *vb, const void *pb)
 			dprintk(1, "buffer initialization failed\n");
 			goto err;
 		}
+
+		/* This is new buffer memory --- always synchronise cache. */
+		__mem_prepare_planes(vb);
+	} else if (!no_cache_sync) {
+		__mem_prepare_planes(vb);
 	}
 
 	ret = call_vb_qop(vb, buf_prepare, vb);
@@ -1231,10 +1273,10 @@ static void __enqueue_in_driver(struct vb2_buffer *vb)
 	call_void_vb_qop(vb, buf_queue, vb);
 }
 
-static int __buf_prepare(struct vb2_buffer *vb, const void *pb)
+static int __buf_prepare(struct vb2_buffer *vb, const void *pb,
+			 bool no_cache_sync)
 {
 	struct vb2_queue *q = vb->vb2_queue;
-	unsigned int plane;
 	int ret;
 
 	if (q->error) {
@@ -1246,13 +1288,13 @@ static int __buf_prepare(struct vb2_buffer *vb, const void *pb)
 
 	switch (q->memory) {
 	case VB2_MEMORY_MMAP:
-		ret = __prepare_mmap(vb, pb);
+		ret = __prepare_mmap(vb, pb, no_cache_sync);
 		break;
 	case VB2_MEMORY_USERPTR:
-		ret = __prepare_userptr(vb, pb);
+		ret = __prepare_userptr(vb, pb, no_cache_sync);
 		break;
 	case VB2_MEMORY_DMABUF:
-		ret = __prepare_dmabuf(vb, pb);
+		ret = __prepare_dmabuf(vb, pb, no_cache_sync);
 		break;
 	default:
 		WARN(1, "Invalid queue type\n");
@@ -1265,16 +1307,13 @@ static int __buf_prepare(struct vb2_buffer *vb, const void *pb)
 		return ret;
 	}
 
-	/* sync buffers */
-	for (plane = 0; plane < vb->num_planes; ++plane)
-		call_void_memop(vb, prepare, vb->planes[plane].mem_priv);
-
 	vb->state = VB2_BUF_STATE_PREPARED;
 
 	return 0;
 }
 
-int vb2_core_prepare_buf(struct vb2_queue *q, unsigned int index, void *pb)
+int vb2_core_prepare_buf(struct vb2_queue *q, unsigned int index, void *pb,
+			 bool no_cache_sync)
 {
 	struct vb2_buffer *vb;
 	int ret;
@@ -1286,7 +1325,7 @@ int vb2_core_prepare_buf(struct vb2_queue *q, unsigned int index, void *pb)
 		return -EINVAL;
 	}
 
-	ret = __buf_prepare(vb, pb);
+	ret = __buf_prepare(vb, pb, no_cache_sync);
 	if (ret)
 		return ret;
 
@@ -1362,7 +1401,8 @@ static int vb2_start_streaming(struct vb2_queue *q)
 	return ret;
 }
 
-int vb2_core_qbuf(struct vb2_queue *q, unsigned int index, void *pb)
+int vb2_core_qbuf(struct vb2_queue *q, unsigned int index, void *pb,
+		  bool no_cache_sync)
 {
 	struct vb2_buffer *vb;
 	int ret;
@@ -1371,7 +1411,7 @@ int vb2_core_qbuf(struct vb2_queue *q, unsigned int index, void *pb)
 
 	switch (vb->state) {
 	case VB2_BUF_STATE_DEQUEUED:
-		ret = __buf_prepare(vb, pb);
+		ret = __buf_prepare(vb, pb, no_cache_sync);
 		if (ret)
 			return ret;
 		break;
@@ -1557,7 +1597,7 @@ EXPORT_SYMBOL_GPL(vb2_wait_for_all_buffers);
 /**
  * __vb2_dqbuf() - bring back the buffer to the DEQUEUED state
  */
-static void __vb2_dqbuf(struct vb2_buffer *vb)
+static void __vb2_dqbuf(struct vb2_buffer *vb, bool no_cache_sync)
 {
 	struct vb2_queue *q = vb->vb2_queue;
 	unsigned int i;
@@ -1568,9 +1608,8 @@ static void __vb2_dqbuf(struct vb2_buffer *vb)
 
 	vb->state = VB2_BUF_STATE_DEQUEUED;
 
-	/* sync buffers */
-	for (i = 0; i < vb->num_planes; ++i)
-		call_void_memop(vb, finish, vb->planes[i].mem_priv);
+	if (!no_cache_sync)
+		__mem_finish_planes(vb);
 
 	/* unmap DMABUF buffer */
 	if (q->memory == VB2_MEMORY_DMABUF)
@@ -1583,7 +1622,7 @@ static void __vb2_dqbuf(struct vb2_buffer *vb)
 }
 
 int vb2_core_dqbuf(struct vb2_queue *q, unsigned int *pindex, void *pb,
-		   bool nonblocking)
+		   bool nonblocking, bool no_cache_sync)
 {
 	struct vb2_buffer *vb = NULL;
 	int ret;
@@ -1620,7 +1659,7 @@ int vb2_core_dqbuf(struct vb2_queue *q, unsigned int *pindex, void *pb,
 	trace_vb2_dqbuf(q, vb);
 
 	/* go back to dequeued state */
-	__vb2_dqbuf(vb);
+	__vb2_dqbuf(vb, no_cache_sync);
 
 	dprintk(1, "dqbuf of buffer %d, with state %d\n",
 			vb->index, vb->state);
@@ -1694,7 +1733,7 @@ static void __vb2_queue_cancel(struct vb2_queue *q)
 			vb->state = VB2_BUF_STATE_PREPARED;
 			call_void_vb_qop(vb, buf_finish, vb);
 		}
-		__vb2_dqbuf(vb);
+		__vb2_dqbuf(vb, false);
 	}
 }
 
@@ -2242,7 +2281,7 @@ static int __vb2_init_fileio(struct vb2_queue *q, int read)
 		 * Queue all buffers.
 		 */
 		for (i = 0; i < q->num_buffers; i++) {
-			ret = vb2_core_qbuf(q, i, NULL);
+			ret = vb2_core_qbuf(q, i, NULL, false);
 			if (ret)
 				goto err_reqbufs;
 			fileio->bufs[i].queued = 1;
@@ -2345,7 +2384,7 @@ static size_t __vb2_perform_fileio(struct vb2_queue *q, char __user *data, size_
 		/*
 		 * Call vb2_dqbuf to get buffer back.
 		 */
-		ret = vb2_core_dqbuf(q, &index, NULL, nonblock);
+		ret = vb2_core_dqbuf(q, &index, NULL, nonblock, false);
 		dprintk(5, "vb2_dqbuf result: %d\n", ret);
 		if (ret)
 			return ret;
@@ -2421,7 +2460,7 @@ static size_t __vb2_perform_fileio(struct vb2_queue *q, char __user *data, size_
 
 		if (copy_timestamp)
 			b->timestamp = ktime_get_ns();
-		ret = vb2_core_qbuf(q, index, NULL);
+		ret = vb2_core_qbuf(q, index, NULL, false);
 		dprintk(5, "vb2_dbuf result: %d\n", ret);
 		if (ret)
 			return ret;
@@ -2507,7 +2546,7 @@ static int vb2_thread(void *data)
 		} else {
 			call_void_qop(q, wait_finish, q);
 			if (!threadio->stop)
-				ret = vb2_core_dqbuf(q, &index, NULL, 0);
+				ret = vb2_core_dqbuf(q, &index, NULL, 0, false);
 			call_void_qop(q, wait_prepare, q);
 			dprintk(5, "file io: vb2_dqbuf result: %d\n", ret);
 			if (!ret)
@@ -2524,7 +2563,7 @@ static int vb2_thread(void *data)
 		if (copy_timestamp)
 			vb->timestamp = ktime_get_ns();;
 		if (!threadio->stop)
-			ret = vb2_core_qbuf(q, vb->index, NULL);
+			ret = vb2_core_qbuf(q, vb->index, NULL, false);
 		call_void_qop(q, wait_prepare, q);
 		if (ret || threadio->stop)
 			break;

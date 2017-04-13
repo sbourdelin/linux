@@ -83,10 +83,14 @@ struct vb2_threadio_data;
  *		dmabuf.
  * @unmap_dmabuf: releases access control to the dmabuf - allocator is notified
  *		  that this driver is done using the dmabuf for now.
- * @prepare:	called every time the buffer is passed from userspace to the
- *		driver, useful for cache synchronisation, optional.
- * @finish:	called every time the buffer is passed back from the driver
- *		to the userspace, also optional.
+ * @prepare:	Called on the plane when the buffer ownership is passed from
+ *		the user space to the kernel and the plane must be cache
+ *		syncronised. The V4L2_BUF_FLAG_NO_CACHE_SYNC buffer flag may
+ *		be used to skip this call. Optional.
+ * @finish:	Called on the plane when the buffer ownership is passed from
+ *		the kernel to the user space and the plane must be cache
+ *		syncronised. The V4L2_BUF_FLAG_NO_CACHE_SYNC buffer flag may
+ *		be used to skip this call. Optional.
  * @vaddr:	return a kernel virtual address to a given memory buffer
  *		associated with the passed private structure or NULL if no
  *		such mapping exists.
@@ -696,6 +700,7 @@ int vb2_core_create_bufs(struct vb2_queue *q, enum vb2_memory memory,
  * @index:	id number of the buffer
  * @pb:		buffer structure passed from userspace to vidioc_prepare_buf
  *		handler in driver
+ * @no_cache_sync if true, skip cache synchronization
  *
  * Should be called from vidioc_prepare_buf ioctl handler of a driver.
  * The passed buffer should have been verified.
@@ -705,7 +710,8 @@ int vb2_core_create_bufs(struct vb2_queue *q, enum vb2_memory memory,
  * The return values from this function are intended to be directly returned
  * from vidioc_prepare_buf handler in driver.
  */
-int vb2_core_prepare_buf(struct vb2_queue *q, unsigned int index, void *pb);
+int vb2_core_prepare_buf(struct vb2_queue *q, unsigned int index, void *pb,
+			 bool no_cache_sync);
 
 /**
  * vb2_core_qbuf() - Queue a buffer from userspace
@@ -714,6 +720,7 @@ int vb2_core_prepare_buf(struct vb2_queue *q, unsigned int index, void *pb);
  * @index:	id number of the buffer
  * @pb:		buffer structure passed from userspace to vidioc_qbuf handler
  *		in driver
+ * @no_cache_sync if true, skip cache synchronization
  *
  * Should be called from vidioc_qbuf ioctl handler of a driver.
  * The passed buffer should have been verified.
@@ -728,7 +735,8 @@ int vb2_core_prepare_buf(struct vb2_queue *q, unsigned int index, void *pb);
  * The return values from this function are intended to be directly returned
  * from vidioc_qbuf handler in driver.
  */
-int vb2_core_qbuf(struct vb2_queue *q, unsigned int index, void *pb);
+int vb2_core_qbuf(struct vb2_queue *q, unsigned int index, void *pb,
+		  bool no_cache_sync);
 
 /**
  * vb2_core_dqbuf() - Dequeue a buffer to the userspace
@@ -739,6 +747,7 @@ int vb2_core_qbuf(struct vb2_queue *q, unsigned int index, void *pb);
  * @nonblocking: if true, this call will not sleep waiting for a buffer if no
  *		 buffers ready for dequeuing are present. Normally the driver
  *		 would be passing (file->f_flags & O_NONBLOCK) here
+ * @no_cache_sync if true, skip cache synchronization
  *
  * Should be called from vidioc_dqbuf ioctl handler of a driver.
  * The passed buffer should have been verified.
@@ -755,7 +764,7 @@ int vb2_core_qbuf(struct vb2_queue *q, unsigned int index, void *pb);
  * from vidioc_dqbuf handler in driver.
  */
 int vb2_core_dqbuf(struct vb2_queue *q, unsigned int *pindex, void *pb,
-		   bool nonblocking);
+		   bool nonblocking, bool no_cache_sync);
 
 int vb2_core_streamon(struct vb2_queue *q, unsigned int type);
 int vb2_core_streamoff(struct vb2_queue *q, unsigned int type);
