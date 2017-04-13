@@ -590,9 +590,7 @@ static int imx_pinctrl_parse_functions(struct device_node *np,
 
 	for_each_child_of_node(np, child) {
 		func->group_names[i] = child->name;
-
-		grp = devm_kzalloc(info->dev, sizeof(struct group_desc),
-				   GFP_KERNEL);
+		grp = devm_kzalloc(info->dev, sizeof(*grp), GFP_KERNEL);
 		if (!grp)
 			return -ENOMEM;
 
