@@ -437,23 +437,17 @@ Buffer Flags
 	:ref:`VIDIOC_PREPARE_BUF <VIDIOC_QBUF>`,
 	:ref:`VIDIOC_QBUF` or
 	:ref:`VIDIOC_DQBUF <VIDIOC_QBUF>` ioctl is called.
-    * .. _`V4L2-BUF-FLAG-NO-CACHE-INVALIDATE`:
+    * .. _`V4L2-BUF-FLAG-NO-CACHE-SYNC`:
 
-      - ``V4L2_BUF_FLAG_NO_CACHE_INVALIDATE``
+      - ``V4L2_BUF_FLAG_NO_CACHE_SYNC``
       - 0x00000800
-      - Caches do not have to be invalidated for this buffer. Typically
-	applications shall use this flag if the data captured in the
-	buffer is not going to be touched by the CPU, instead the buffer
-	will, probably, be passed on to a DMA-capable hardware unit for
-	further processing or output.
-    * .. _`V4L2-BUF-FLAG-NO-CACHE-CLEAN`:
-
-      - ``V4L2_BUF_FLAG_NO_CACHE_CLEAN``
-      - 0x00001000
-      - Caches do not have to be cleaned for this buffer. Typically
-	applications shall use this flag for output buffers if the data in
-	this buffer has not been created by the CPU but by some
-	DMA-capable unit, in which case caches have not been used.
+      - Do not perform CPU cache synchronisation operations when the buffer is
+	queued or dequeued. The user is responsible for the correct use of
+	this flag. It should be only used when the buffer is not accessed
+	using the CPU, e.g. the buffer is written to by a hardware block and
+	then read by another one, in which case the flag should be set in both
+	:ref:`VIDIOC_QBUF` and :ref:`VIDIOC_DQBUF` ioctls. The flag has no
+	effect on some devices / architectures.
     * .. _`V4L2-BUF-FLAG-LAST`:
 
       - ``V4L2_BUF_FLAG_LAST``
