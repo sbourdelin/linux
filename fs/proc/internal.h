@@ -205,6 +205,7 @@ void set_proc_pid_nlink(void);
 extern struct inode *proc_get_inode(struct super_block *, struct proc_dir_entry *);
 extern int proc_fill_super(struct super_block *, void *data, int flags);
 extern void proc_entry_rundown(struct proc_dir_entry *);
+extern bool proc_entry_is_removing(struct proc_dir_entry *de);
 
 /*
  * proc_namespaces.c

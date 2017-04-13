@@ -171,6 +171,11 @@ static void close_pdeo(struct proc_dir_entry *pde, struct pde_opener *pdeo)
 	}
 }
 
+bool proc_entry_is_removing(struct proc_dir_entry *de)
+{
+	return (atomic_read(&de->in_use) == BIAS);
+}
+
 void proc_entry_rundown(struct proc_dir_entry *de)
 {
 	DECLARE_COMPLETION_ONSTACK(c);

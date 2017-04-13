@@ -23,10 +23,18 @@
 #include <linux/spinlock.h>
 #include <linux/completion.h>
 #include <linux/uaccess.h>
+#include <linux/namei.h>
 
 #include "internal.h"
 
+static int proc_dentry_revalidate(struct dentry *dentry, unsigned int flags);
+
 static DEFINE_RWLOCK(proc_subdir_lock);
+
+static const struct dentry_operations proc_dentry_operations = {
+	.d_revalidate = proc_dentry_revalidate,
+	.d_delete = always_delete_dentry,
+};
 
 static int proc_match(unsigned int len, const char *name, struct proc_dir_entry *de)
 {
@@ -223,6 +231,17 @@ void proc_free_inum(unsigned int inum)
 	spin_unlock_irqrestore(&proc_inum_lock, flags);
 }
 
+static int proc_dentry_revalidate(struct dentry *dentry, unsigned int flags)
+{
+	struct proc_dir_entry *de;
+
+	if (flags & LOOKUP_RCU)
+		return -ECHILD;
+
+	de = PDE(d_inode(dentry));
+	return !proc_entry_is_removing(de);
+}
+
 /*
  * Don't create negative dentries here, return -ENOENT by hand
  * instead.
@@ -240,7 +259,7 @@ struct dentry *proc_lookup_de(struct proc_dir_entry *de, struct inode *dir,
 		inode = proc_get_inode(dir->i_sb, de);
 		if (!inode)
 			return ERR_PTR(-ENOMEM);
-		d_set_d_op(dentry, &simple_dentry_operations);
+		d_set_d_op(dentry, &proc_dentry_operations);
 		d_add(dentry, inode);
 		return NULL;
 	}
