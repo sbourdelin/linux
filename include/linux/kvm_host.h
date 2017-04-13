@@ -377,16 +377,20 @@ struct kvm {
 	struct kvm_memslots *memslots[KVM_ADDRESS_SPACE_NUM];
 	struct srcu_struct srcu;
 	struct srcu_struct irq_srcu;
-	struct kvm_vcpu *vcpus[KVM_MAX_VCPUS];
+	struct kvm_vcpu **vcpus;
 
 	/*
 	 * created_vcpus is protected by kvm->lock, and is incremented
 	 * at the beginning of KVM_CREATE_VCPU.  online_vcpus is only
 	 * incremented after storing the kvm_vcpu pointer in vcpus,
 	 * and is accessed atomically.
+	 * max_vcpus is the size of vcpus array and can be changed only before
+	 * any vcpu is created.  Updates to max_vcpus are protected by
+	 * kvm->lock.
 	 */
 	atomic_t online_vcpus;
 	int created_vcpus;
+	int max_vcpus;
 	int last_boosted_vcpu;
 	struct list_head vm_list;
 	struct mutex lock;
@@ -480,7 +484,7 @@ static inline struct kvm_vcpu *kvm_get_vcpu_by_id(struct kvm *kvm, int id)
 
 	if (id < 0)
 		return NULL;
-	if (id < KVM_MAX_VCPUS)
+	if (id < kvm->max_vcpus)
 		vcpu = kvm_get_vcpu(kvm, id);
 	if (vcpu && vcpu->vcpu_id == id)
 		return vcpu;

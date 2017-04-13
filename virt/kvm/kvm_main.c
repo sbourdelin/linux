@@ -604,20 +604,35 @@ static int kvm_create_vm_debugfs(struct kvm *kvm, int fd)
 	return 0;
 }
 
-static inline struct kvm *kvm_alloc_vm(void)
+static inline struct kvm *kvm_alloc_vm(size_t max_vcpus)
 {
-	return kzalloc(sizeof(struct kvm), GFP_KERNEL);
+	struct kvm *kvm;
+
+	kvm = kzalloc(sizeof(struct kvm), GFP_KERNEL);
+	if (!kvm)
+		return NULL;
+
+	kvm->vcpus = kvm_kvzalloc(sizeof(*kvm->vcpus) * max_vcpus);
+	if (!kvm->vcpus) {
+		kfree(kvm);
+		return NULL;
+	}
+	kvm->max_vcpus = max_vcpus;
+
+	return kvm;
 }
 
 static inline void kvm_free_vm(struct kvm *kvm)
 {
+	if (kvm)
+		kvfree(kvm->vcpus);
 	kfree(kvm);
 }
 
 static struct kvm *kvm_create_vm(unsigned long type)
 {
 	int r, i;
-	struct kvm *kvm = kvm_alloc_vm();
+	struct kvm *kvm = kvm_alloc_vm(KVM_MAX_VCPUS);
 
 	if (!kvm)
 		return ERR_PTR(-ENOMEM);
@@ -2445,7 +2460,7 @@ static int kvm_vm_ioctl_create_vcpu(struct kvm *kvm, u32 id)
 		return -EINVAL;
 
 	mutex_lock(&kvm->lock);
-	if (kvm->created_vcpus == KVM_MAX_VCPUS) {
+	if (kvm->created_vcpus == kvm->max_vcpus) {
 		mutex_unlock(&kvm->lock);
 		return -EINVAL;
 	}
