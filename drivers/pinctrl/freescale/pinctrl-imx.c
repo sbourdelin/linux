@@ -509,10 +509,10 @@ static int imx_pinctrl_parse_groups(struct device_node *np,
 	}
 
 	grp->num_pins = size / pin_size;
-	grp->data = devm_kzalloc(info->dev, grp->num_pins *
+	grp->data = devm_kcalloc(info->dev, grp->num_pins,
 				 sizeof(struct imx_pin), GFP_KERNEL);
-	grp->pins = devm_kzalloc(info->dev, grp->num_pins *
-				 sizeof(unsigned int), GFP_KERNEL);
+	grp->pins = devm_kcalloc(info->dev, grp->num_pins,
+				 sizeof(*grp->pins), GFP_KERNEL);
 	if (!grp->pins || !grp->data)
 		return -ENOMEM;
 
@@ -581,9 +581,10 @@ static int imx_pinctrl_parse_functions(struct device_node *np,
 		dev_err(info->dev, "no groups defined in %s\n", np->full_name);
 		return -EINVAL;
 	}
-	func->group_names = devm_kzalloc(info->dev,
-					 func->num_group_names *
-					 sizeof(char *), GFP_KERNEL);
+	func->group_names = devm_kcalloc(info->dev,
+					 func->num_group_names,
+					 sizeof(*func->group_names),
+					 GFP_KERNEL);
 
 	for_each_child_of_node(np, child) {
 		func->group_names[i] = child->name;
