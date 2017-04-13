@@ -66,35 +66,19 @@ static uint32_t get_cell_size(const void *fdt)
 	return cell_size;
 }
 
-static void merge_fdt_bootargs(void *fdt, const char *fdt_cmdline)
+static void merge_fdt_bootargs(void *fdt, const char *cmdline)
 {
-	char cmdline[COMMAND_LINE_SIZE];
 	const char *fdt_bootargs;
-	char *ptr = cmdline;
+	int offset = node_offset(fdt, "/chosen");
 	int len = 0;
 
-	/* copy the fdt command line into the buffer */
-	fdt_bootargs = getprop(fdt, "/chosen", "bootargs", &len);
-	if (fdt_bootargs)
-		if (len < COMMAND_LINE_SIZE) {
-			memcpy(ptr, fdt_bootargs, len);
-			/* len is the length of the string
-			 * including the NULL terminator */
-			ptr += len - 1;
-		}
-
-	/* and append the ATAG_CMDLINE */
-	if (fdt_cmdline) {
-		len = strlen(fdt_cmdline);
-		if (ptr - cmdline + len + 2 < COMMAND_LINE_SIZE) {
-			*ptr++ = ' ';
-			memcpy(ptr, fdt_cmdline, len);
-			ptr += len;
-		}
+	/* get the ftd command line length */
+	fdt_bootargs = fdt_getprop(fdt, offset, "bootargs", &len);
+	/* append the ATAG_CMDLINE if its not too big */
+	if (cmdline && ((len + strlen(cmdline)) < (COMMAND_LINE_SIZE - 2))) {
+		fdt_appendprop_string(fdt, offset, "bootargs", " ");
+		fdt_appendprop_string(fdt, offset, "bootargs", cmdline);
 	}
-	*ptr = '\0';
-
-	setprop_string(fdt, "/chosen", "bootargs", cmdline);
 }
 
 /*
