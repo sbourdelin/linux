@@ -183,11 +183,16 @@ static void ncsi_channel_monitor(unsigned long data)
 	monitor_state = nc->monitor.state;
 	spin_unlock_irqrestore(&nc->lock, flags);
 
-	if (!enabled || chained)
+	if (!enabled || chained) {
+		ncsi_stop_channel_monitor(nc);
 		return;
+	}
+
 	if (state != NCSI_CHANNEL_INACTIVE &&
-	    state != NCSI_CHANNEL_ACTIVE)
+	    state != NCSI_CHANNEL_ACTIVE) {
+		ncsi_stop_channel_monitor(nc);
 		return;
+	}
 
 	switch (monitor_state) {
 	case NCSI_CHANNEL_MONITOR_START:
@@ -199,6 +204,7 @@ static void ncsi_channel_monitor(unsigned long data)
 		nca.req_flags = 0;
 		ret = ncsi_xmit_cmd(&nca);
 		if (ret) {
+			ncsi_stop_channel_monitor(nc);
 			netdev_err(ndp->ndev.dev, "Error %d sending GLS\n",
 				   ret);
 			return;
@@ -217,6 +223,8 @@ static void ncsi_channel_monitor(unsigned long data)
 		spin_lock_irqsave(&nc->lock, flags);
 		nc->state = NCSI_CHANNEL_INVISIBLE;
 		spin_unlock_irqrestore(&nc->lock, flags);
+
+		ncsi_stop_channel_monitor(nc);
 
 		spin_lock_irqsave(&ndp->lock, flags);
 		nc->state = NCSI_CHANNEL_INACTIVE;
@@ -257,6 +265,10 @@ void ncsi_stop_channel_monitor(struct ncsi_channel *nc)
 	nc->monitor.enabled = false;
 	spin_unlock_irqrestore(&nc->lock, flags);
 
+	/* The timer isn't in pending state if we're deleting the timer
+	 * in its handler. del_timer_sync() can detect it and just does
+	 * nothing.
+	 */
 	del_timer_sync(&nc->monitor.timer);
 }
 
