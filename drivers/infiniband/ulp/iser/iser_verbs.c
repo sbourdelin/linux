@@ -242,15 +242,9 @@ iser_alloc_reg_res(struct iser_device *device,
 		   unsigned int size)
 {
 	struct ib_device *ib_dev = device->ib_device;
-	enum ib_mr_type mr_type;
 	int ret;
 
-	if (ib_dev->attrs.device_cap_flags & IB_DEVICE_SG_GAPS_REG)
-		mr_type = IB_MR_TYPE_SG_GAPS;
-	else
-		mr_type = IB_MR_TYPE_MEM_REG;
-
-	res->mr = ib_alloc_mr(pd, mr_type, size);
+	res->mr = ib_alloc_mr(pd, ib_get_sg_mr_type(ib_dev), size);
 	if (IS_ERR(res->mr)) {
 		ret = PTR_ERR(res->mr);
 		iser_err("Failed to allocate ib_fast_reg_mr err=%d\n", ret);
