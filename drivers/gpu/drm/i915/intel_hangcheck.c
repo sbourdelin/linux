@@ -429,13 +429,13 @@ static void i915_hangcheck_elapsed(struct work_struct *work)
 	int busy_count = 0;
 
 	if (!i915.enable_hangcheck)
-		return;
+		goto disarm_hangcheck;
 
 	if (!READ_ONCE(dev_priv->gt.awake))
-		return;
+		goto disarm_hangcheck;
 
 	if (i915_terminally_wedged(&dev_priv->gpu_error))
-		return;
+		goto disarm_hangcheck;
 
 	/* As enabling the GPU requires fairly extensive mmio access,
 	 * periodically arm the mmio checker to see if we are triggering
@@ -466,8 +466,14 @@ static void i915_hangcheck_elapsed(struct work_struct *work)
 		hangcheck_declare_hang(dev_priv, hung, stuck);
 
 	/* Reset timer in case GPU hangs without another request being added */
-	if (busy_count)
+	if (busy_count) {
 		i915_queue_hangcheck(dev_priv);
+		return;
+	}
+
+disarm_hangcheck:
+	for_each_engine(engine, dev_priv, id)
+		intel_engine_init_hangcheck(engine);
 }
 
 void intel_engine_init_hangcheck(struct intel_engine_cs *engine)
