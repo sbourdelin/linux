@@ -283,6 +283,16 @@ struct ncsi_dev_priv {
 	struct packet_type  ptype;           /* NCSI packet Rx handler     */
 	struct list_head    node;            /* Form NCSI device list      */
 #ifdef CONFIG_NET_NCSI_DEBUG
+	struct {
+		struct dentry  *dentry;
+#define NCSI_PKT_STAT_OK	0
+#define NCSI_PKT_STAT_TIMEOUT	1
+#define NCSI_PKT_STAT_ERROR	2
+#define NCSI_PKT_STAT_MAX	3
+		unsigned long  cmd[128][NCSI_PKT_STAT_MAX];
+		unsigned long  rsp[128][NCSI_PKT_STAT_MAX];
+		unsigned long  aen[256][NCSI_PKT_STAT_MAX];
+	} stats;
 	struct dentry       *dentry;         /* Procfs directory           */
 #endif
 };
