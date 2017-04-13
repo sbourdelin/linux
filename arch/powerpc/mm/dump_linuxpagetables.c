@@ -252,7 +252,11 @@ static void dump_addr(struct pg_state *st, unsigned long addr)
 	const char *unit = units;
 	unsigned long delta;
 
+#ifdef CONFIG_PPC32
+	seq_printf(st->seq, "0x%08lx-0x%08lx   ", st->start_address, addr - 1);
+#else
 	seq_printf(st->seq, "0x%016lx-0x%016lx   ", st->start_address, addr-1);
+#endif
 	delta = (addr - st->start_address) >> 10;
 	/* Work out what appropriate unit to use */
 	while (!(delta & 1023) && unit[1]) {
