@@ -19,12 +19,12 @@
  */
 #include <linux/mm.h>
 #include <linux/hmm.h>
+#include <linux/init.h>
 #include <linux/rmap.h>
 #include <linux/swap.h>
 #include <linux/slab.h>
 #include <linux/sched.h>
 #include <linux/mmzone.h>
-#include <linux/module.h>
 #include <linux/pagemap.h>
 #include <linux/swapops.h>
 #include <linux/hugetlb.h>
@@ -1192,14 +1192,5 @@ static int __init hmm_init(void)
 	}
 	return 0;
 }
-
-static void __exit hmm_exit(void)
-{
-	unregister_chrdev_region(hmm_device_devt, HMM_DEVICE_MAX);
-	class_destroy(hmm_device_class);
-}
-
-module_init(hmm_init);
-module_exit(hmm_exit);
-MODULE_LICENSE("GPL");
+device_initcall(hmm_init);
 #endif /* IS_ENABLED(CONFIG_HMM_DEVMEM) */
