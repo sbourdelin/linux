@@ -98,7 +98,7 @@ static int imx_dt_node_to_map(struct pinctrl_dev *pctldev,
 			map_num++;
 	}
 
-	new_map = kmalloc(sizeof(struct pinctrl_map) * map_num, GFP_KERNEL);
+	new_map = kmalloc_array(map_num, sizeof(*new_map), GFP_KERNEL);
 	if (!new_map)
 		return -ENOMEM;
 
