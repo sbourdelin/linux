@@ -30,8 +30,9 @@
 #include <linux/hugetlb.h>
 #include <linux/memremap.h>
 #include <linux/mmu_notifier.h>
+#include <linux/memory_hotplug.h>
 
-#define SECTION_SIZE (1UL << PA_SECTION_SHIFT)
+#define PA_SECTION_SIZE (1UL << PA_SECTION_SHIFT)
 
 static const struct mmu_notifier_ops hmm_mmu_notifier_ops;
 
@@ -781,18 +782,17 @@ static void hmm_devmem_free(struct page *page, void *data)
 
 static DEFINE_MUTEX(hmm_devmem_lock);
 static RADIX_TREE(hmm_devmem_radix, GFP_KERNEL);
-#define SECTION_SIZE (1UL << PA_SECTION_SHIFT)
 
 static void hmm_devmem_radix_release(struct resource *resource)
 {
 	resource_size_t key, align_start, align_size, align_end;
 
-	align_start = resource->start & ~(SECTION_SIZE - 1);
-	align_size = ALIGN(resource_size(resource), SECTION_SIZE);
+	align_start = resource->start & ~(PA_SECTION_SIZE - 1);
+	align_size = ALIGN(resource_size(resource), PA_SECTION_SIZE);
 	align_end = align_start + align_size - 1;
 
 	mutex_lock(&hmm_devmem_lock);
-	for (key = resource->start; key <= resource->end; key += SECTION_SIZE)
+	for (key = resource->start; key <= resource->end; key += PA_SECTION_SIZE)
 		radix_tree_delete(&hmm_devmem_radix, key >> PA_SECTION_SHIFT);
 	mutex_unlock(&hmm_devmem_lock);
 }
@@ -809,12 +809,14 @@ static void hmm_devmem_release(struct device *dev, void *data)
 	}
 
 	/* pages are dead and unused, undo the arch mapping */
-	align_start = resource->start & ~(SECTION_SIZE - 1);
-	align_size = ALIGN(resource_size(resource), SECTION_SIZE);
+	align_start = resource->start & ~(PA_SECTION_SIZE - 1);
+	align_size = ALIGN(resource_size(resource), PA_SECTION_SIZE);
 
+#ifdef CONFIG_MEMORY_HOTREMOVE
 	mem_hotplug_begin();
 	arch_remove_memory(align_start, align_size, devmem->pagemap.type);
 	mem_hotplug_done();
+#endif
 
 	untrack_pfn(NULL, PHYS_PFN(align_start), align_size);
 	hmm_devmem_radix_release(resource);
@@ -835,10 +837,10 @@ static int hmm_devmem_pages_create(struct hmm_devmem *devmem)
 	int ret, nid, is_ram;
 	unsigned long pfn;
 
-	align_start = devmem->resource->start & ~(SECTION_SIZE - 1);
+	align_start = devmem->resource->start & ~(PA_SECTION_SIZE - 1);
 	align_size = ALIGN(devmem->resource->start +
 			   resource_size(devmem->resource),
-			   SECTION_SIZE) - align_start;
+			   PA_SECTION_SIZE) - align_start;
 
 	is_ram = region_intersects(align_start, align_size,
 				   IORESOURCE_SYSTEM_RAM,
@@ -861,7 +863,7 @@ static int hmm_devmem_pages_create(struct hmm_devmem *devmem)
 
 	mutex_lock(&hmm_devmem_lock);
 	align_end = align_start + align_size - 1;
-	for (key = align_start; key <= align_end; key += SECTION_SIZE) {
+	for (key = align_start; key <= align_end; key += PA_SECTION_SIZE) {
 		struct hmm_devmem *dup;
 
 		rcu_read_lock();
@@ -979,7 +981,7 @@ struct hmm_devmem *hmm_devmem_add(const struct hmm_devmem_ops *ops,
 	if (ret)
 		goto error_devm_add_action;
 
-	size = ALIGN(size, SECTION_SIZE);
+	size = ALIGN(size, PA_SECTION_SIZE);
 	addr = (iomem_resource.end + 1ULL) - size;
 
 	/*
