@@ -96,7 +96,7 @@ static int slice_area_is_free(struct mm_struct *mm, unsigned long addr,
 {
 	struct vm_area_struct *vma;
 
-	if ((mm->task_size - len) < addr)
+	if ((mm->addr_limit - len) < addr)
 		return 0;
 	vma = find_vma(mm, addr);
 	return (!vma || (addr + len) <= vma->vm_start);
@@ -133,7 +133,7 @@ static void slice_mask_for_free(struct mm_struct *mm, struct slice_mask *ret)
 		if (!slice_low_has_vma(mm, i))
 			ret->low_slices |= 1u << i;
 
-	if (mm->task_size <= SLICE_LOW_TOP)
+	if (mm->addr_limit <= SLICE_LOW_TOP)
 		return;
 
 	for (i = 0; i < GET_HIGH_SLICE_INDEX(mm->context.addr_limit); i++)
@@ -444,20 +444,20 @@ unsigned long slice_get_unmapped_area(unsigned long addr, unsigned long len,
 	bitmap_zero(compat_mask.high_slices, SLICE_NUM_HIGH);
 
 	/* Sanity checks */
-	BUG_ON(mm->task_size == 0);
+	BUG_ON(mm->addr_limit == 0);
 	VM_BUG_ON(radix_enabled());
 
 	slice_dbg("slice_get_unmapped_area(mm=%p, psize=%d...\n", mm, psize);
 	slice_dbg(" addr=%lx, len=%lx, flags=%lx, topdown=%d\n",
 		  addr, len, flags, topdown);
 
-	if (len > mm->task_size)
+	if (len > mm->addr_limit)
 		return -ENOMEM;
 	if (len & ((1ul << pshift) - 1))
 		return -EINVAL;
 	if (fixed && (addr & ((1ul << pshift) - 1)))
 		return -EINVAL;
-	if (fixed && addr > (mm->task_size - len))
+	if (fixed && addr > (mm->addr_limit - len))
 		return -ENOMEM;
 
 	/* If hint, make sure it matches our alignment restrictions */
@@ -465,7 +465,7 @@ unsigned long slice_get_unmapped_area(unsigned long addr, unsigned long len,
 		addr = _ALIGN_UP(addr, 1ul << pshift);
 		slice_dbg(" aligned addr=%lx\n", addr);
 		/* Ignore hint if it's too large or overlaps a VMA */
-		if (addr > mm->task_size - len ||
+		if (addr > mm->addr_limit - len ||
 		    !slice_area_is_free(mm, addr, len))
 			addr = 0;
 	}
