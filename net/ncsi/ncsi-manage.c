@@ -322,6 +322,8 @@ struct ncsi_channel *ncsi_add_channel(struct ncsi_package *np, unsigned char id)
 	np->channel_num++;
 	spin_unlock_irqrestore(&np->lock, flags);
 
+	ncsi_channel_init_debug(nc);
+
 	return nc;
 }
 
@@ -331,6 +333,8 @@ static void ncsi_remove_channel(struct ncsi_channel *nc)
 	struct ncsi_channel_filter *ncf;
 	unsigned long flags;
 	int i;
+
+	ncsi_channel_release_debug(nc);
 
 	/* Release filters */
 	spin_lock_irqsave(&nc->lock, flags);
@@ -396,6 +400,8 @@ struct ncsi_package *ncsi_add_package(struct ncsi_dev_priv *ndp,
 	ndp->package_num++;
 	spin_unlock_irqrestore(&ndp->lock, flags);
 
+	ncsi_package_init_debug(np);
+
 	return np;
 }
 
@@ -408,6 +414,8 @@ void ncsi_remove_package(struct ncsi_package *np)
 	/* Release all child channels */
 	list_for_each_entry_safe(nc, tmp, &np->channels, node)
 		ncsi_remove_channel(nc);
+
+	ncsi_package_release_debug(np);
 
 	/* Remove and free package */
 	spin_lock_irqsave(&ndp->lock, flags);
@@ -1280,6 +1288,13 @@ int ncsi_start_dev(struct ncsi_dev *nd)
 		return -ENOTTY;
 
 	if (!(ndp->flags & NCSI_DEV_PROBED)) {
+		/* The debugging functionality should have been initialized
+		 * when registerring the NCSI device. As the network device
+		 * name isn't available that time, we have to delay the work
+		 * to here.
+		 */
+		ncsi_dev_init_debug(ndp);
+
 		nd->state = ncsi_dev_state_probe;
 		schedule_work(&ndp->work);
 		return 0;
@@ -1329,6 +1344,7 @@ void ncsi_unregister_dev(struct ncsi_dev *nd)
 	struct ncsi_package *np, *tmp;
 	unsigned long flags;
 
+	ncsi_dev_release_debug(ndp);
 	dev_remove_pack(&ndp->ptype);
 
 	list_for_each_entry_safe(np, tmp, &ndp->packages, node)
