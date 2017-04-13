@@ -41,6 +41,9 @@
 
 struct tegra_pwm_soc {
 	unsigned int num_channels;
+
+	/* Maximum IP frequency for given SoCs */
+	unsigned long max_frequency;
 };
 
 struct tegra_pwm_chip {
@@ -204,6 +207,24 @@ static int tegra_pwm_probe(struct platform_device *pdev)
 	/* Read PWM clock rate from source */
 	pwm->clk_rate = clk_get_rate(pwm->clk);
 
+	/* Make sure clock source freqeuncy must less than IP supported */
+	if (pwm->soc->max_frequency &&
+	    (pwm->soc->max_frequency < pwm->clk_rate)) {
+		ret = clk_set_rate(pwm->clk, pwm->soc->max_frequency);
+		if (ret < 0) {
+			dev_err(&pdev->dev, "Failed to set max frequency: %d\n",
+				ret);
+			return ret;
+		}
+
+		/*
+		 * The requested and configured frequency may differ due to
+		 * clock register resolutions. Get the configured frequency
+		 * so that PWM period can be calculated more accurately.
+		 */
+		 pwm->clk_rate = clk_get_rate(pwm->clk);
+	}
+
 	pwm->rst = devm_reset_control_get(&pdev->dev, "pwm");
 	if (IS_ERR(pwm->rst)) {
 		ret = PTR_ERR(pwm->rst);
@@ -275,12 +296,19 @@ static const struct tegra_pwm_soc tegra20_pwm_soc = {
 	.num_channels = 4,
 };
 
+static const struct tegra_pwm_soc tegra210_pwm_soc = {
+	.num_channels = 4,
+	.max_frequency = 38400000UL, /* 38.4MHz */
+};
+
 static const struct tegra_pwm_soc tegra186_pwm_soc = {
 	.num_channels = 1,
+	.max_frequency = 102000000UL, /* 102MHz */
 };
 
 static const struct of_device_id tegra_pwm_of_match[] = {
 	{ .compatible = "nvidia,tegra20-pwm", .data = &tegra20_pwm_soc },
+	{ .compatible = "nvidia,tegra210-pwm", .data = &tegra210_pwm_soc },
 	{ .compatible = "nvidia,tegra186-pwm", .data = &tegra186_pwm_soc },
 	{ }
 };
