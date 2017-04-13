@@ -287,8 +287,8 @@ static int nvme_rdma_reinit_request(void *data, struct request *rq)
 
 	ib_dereg_mr(req->mr);
 
-	req->mr = ib_alloc_mr(dev->pd, IB_MR_TYPE_MEM_REG,
-			ctrl->max_fr_pages);
+	req->mr = ib_alloc_mr(dev->pd, ib_get_sg_mr_type(dev->dev),
+			      ctrl->max_fr_pages);
 	if (IS_ERR(req->mr)) {
 		ret = PTR_ERR(req->mr);
 		req->mr = NULL;
@@ -341,8 +341,8 @@ static int __nvme_rdma_init_request(struct nvme_rdma_ctrl *ctrl,
 	if (ret)
 		return ret;
 
-	req->mr = ib_alloc_mr(dev->pd, IB_MR_TYPE_MEM_REG,
-			ctrl->max_fr_pages);
+	req->mr = ib_alloc_mr(dev->pd, ib_get_sg_mr_type(ibdev),
+			      ctrl->max_fr_pages);
 	if (IS_ERR(req->mr)) {
 		ret = PTR_ERR(req->mr);
 		goto out_free_qe;
@@ -1601,6 +1601,9 @@ static int nvme_rdma_configure_admin_queue(struct nvme_rdma_ctrl *ctrl)
 
 	ctrl->ctrl.sqsize =
 		min_t(int, NVME_CAP_MQES(ctrl->cap) + 1, ctrl->ctrl.sqsize);
+
+	if (ctrl->device->dev->attrs.device_cap_flags & IB_DEVICE_SG_GAPS_REG)
+		ctrl->ctrl.sg_gaps_support = true;
 
 	error = nvme_enable_ctrl(&ctrl->ctrl, ctrl->cap);
 	if (error)
