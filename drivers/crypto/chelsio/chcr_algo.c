@@ -2294,7 +2294,7 @@ static int chcr_authenc_setkey(struct crypto_aead *authenc, const u8 *key,
 			    aeadctx->enckey_len << 3);
 
 	base_hash  = chcr_alloc_shash(max_authsize);
-	if (IS_ERR(base_hash)) {
+	if (IS_ERR_OR_NULL(base_hash)) {
 		pr_err("chcr : Base driver cannot be loaded\n");
 		goto out;
 	}
