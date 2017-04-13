@@ -14,7 +14,7 @@
  * as published by the Free Software Foundation; version 2
  * of the License.
  */
-#include <linux/debugfs.h>
+#include <asm/debugfs.h>
 #include <linux/fs.h>
 #include <linux/io.h>
 #include <linux/mm.h>
@@ -462,8 +462,8 @@ static int ptdump_init(void)
 
 	populate_markers();
 	build_pgtable_complete_mask();
-	debugfs_file = debugfs_create_file("kernel_pagetables", 0400, NULL,
-			NULL, &ptdump_fops);
+	debugfs_file = debugfs_create_file("kernel_pagetables", 0400,
+			powerpc_debugfs_root, NULL, &ptdump_fops);
 	return debugfs_file ? 0 : -ENOMEM;
 }
 device_initcall(ptdump_init);
