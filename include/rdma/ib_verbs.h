@@ -3375,6 +3375,23 @@ ib_map_mr_sg_zbva(struct ib_mr *mr, struct scatterlist *sg, int sg_nents,
 int ib_sg_to_pages(struct ib_mr *mr, struct scatterlist *sgl, int sg_nents,
 		unsigned int *sg_offset, int (*set_page)(struct ib_mr *, u64));
 
+/**
+ * ib_get_sg_mr_type() - check if the device support arbitrary
+ *                       sg mapping and return a suitable mr type.
+ * @device: The device on which to check support.
+ *
+ * Return: IB_MR_TYPE_SG_GAPS if the device support.
+ *         Otherwise, return IB_MR_TYPE_MEM_REG.
+ */
+static inline enum ib_mr_type ib_get_sg_mr_type(struct ib_device *device)
+{
+	if (device->attrs.device_cap_flags & IB_DEVICE_SG_GAPS_REG)
+		return IB_MR_TYPE_SG_GAPS;
+	else
+		return IB_MR_TYPE_MEM_REG;
+
+}
+
 void ib_drain_rq(struct ib_qp *qp);
 void ib_drain_sq(struct ib_qp *qp);
 void ib_drain_qp(struct ib_qp *qp);
