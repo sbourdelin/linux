@@ -323,12 +323,54 @@ static void handle_non_critical_trips(struct thermal_zone_device *tz,
 		       def_governor->throttle(tz, trip);
 }
 
+/**
+ * emergency_poweroff_func - emergency poweroff work after a known delay
+ * @work: work_struct associated with the emergency poweroff function
+ *
+ * This function is called in very critical situations to force
+ * a kernel poweroff after a configurable timeout value.
+ */
+static void emergency_poweroff_func(struct work_struct *work)
+{
+	/*
+	 * We have reached here after the emergency thermal shutdown
+	 * Waiting period has expired. This means orderly_poweroff has
+	 * not been able to shut off the system for some reason.
+	 * Try to shut down the system immediately using kernel_power_off
+	 * if populated
+	 */
+	pr_warn("Attempting kernel_power_off\n");
+	kernel_power_off();
+
+	/*
+	 * Worst of the worst case trigger emergency restart
+	 */
+	pr_warn("kernel_power_off has failed! Attempting emergency_restart\n");
+	emergency_restart();
+}
+
+static DECLARE_DELAYED_WORK(emergency_poweroff_work, emergency_poweroff_func);
+
+/**
+ * emergency_poweroff - Trigger an emergency system poweroff
+ *
+ * This may be called from any critical situation to trigger a system shutdown
+ * after a known period of time. By default the delay is 0 millisecond
+ */
+void thermal_emergency_poweroff(void)
+{
+	schedule_delayed_work(&emergency_poweroff_work,
+			      msecs_to_jiffies(CONFIG_THERMAL_EMERGENCY_POWEROFF_DELAY_MS));
+}
+
 static void handle_critical_trips(struct thermal_zone_device *tz,
 				  int trip, enum thermal_trip_type trip_type)
 {
 	int trip_temp;
 	static bool power_off_triggered;
+	static struct mutex poweroff_lock;
 
+	mutex_init(&poweroff_lock);
 	tz->ops->get_trip_temp(tz, trip, &trip_temp);
 
 	/* If we have not crossed the trip_temp, we do not care. */
@@ -345,6 +387,11 @@ static void handle_critical_trips(struct thermal_zone_device *tz,
 			  "critical temperature reached(%d C),shutting down\n",
 			  tz->temperature / 1000);
 		mutex_lock(&poweroff_lock);
+		/*
+		 * Queue a backup emergency shutdown in the event of
+		 * orderly_poweroff failure.
+		 */
+		thermal_emergency_poweroff();
 		orderly_poweroff(true);
 		power_off_triggered = true;
 		mutex_unlock(&poweroff_lock);
