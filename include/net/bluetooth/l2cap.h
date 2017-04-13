@@ -654,6 +654,8 @@ struct l2cap_conn {
 	struct mutex		chan_lock;
 	struct kref		ref;
 	struct list_head	users;
+
+	struct l2cap_conn_param_update_req conn_param_req;
 };
 
 struct l2cap_user {

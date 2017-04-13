@@ -1489,6 +1489,14 @@ void l2cap_le_conn_update_req(struct l2cap_conn *conn, u8 min_interval,
 {
 	struct l2cap_conn_param_update_req req;
 
+	/* set temporary parameters in case of a successful
+	 * response from the peer device
+	 */
+	conn->conn_param_req.min = min_interval;
+	conn->conn_param_req.max = max_interval;
+	conn->conn_param_req.latency = latency;
+	conn->conn_param_req.to_multiplier = supv_timeout;
+
 	req.min = cpu_to_le16(min_interval);
 	req.max = cpu_to_le16(max_interval);
 	req.latency = cpu_to_le16(latency);
@@ -5251,6 +5259,44 @@ static inline int l2cap_conn_param_update_req(struct l2cap_conn *conn,
 	return 0;
 }
 
+static inline int l2cap_conn_param_update_rsp(struct l2cap_conn *conn,
+					      struct l2cap_cmd_hdr *cmd,
+					      u16 cmd_len, u8 *data)
+{
+	struct hci_conn *hcon = conn->hcon;
+	struct l2cap_conn_param_update_rsp *rsp;
+	u8 result;
+
+	if (hcon->role != HCI_ROLE_SLAVE)
+		return -EINVAL;
+
+	if (cmd_len != sizeof(struct l2cap_conn_param_update_rsp))
+		return -EPROTO;
+
+	rsp = (struct l2cap_conn_param_update_rsp *)data;
+	result = le16_to_cpu(rsp->result);
+
+	BT_DBG("result 0x%4.4x", result);
+
+	if (result == 0) {
+		u8 store_hint;
+
+		store_hint =
+			hci_le_conn_update(hcon,
+					   conn->conn_param_req.min,
+					   conn->conn_param_req.max,
+					   conn->conn_param_req.latency,
+					   conn->conn_param_req.to_multiplier);
+		mgmt_new_conn_param(hcon->hdev, &hcon->dst, hcon->dst_type,
+				    store_hint, conn->conn_param_req.min,
+				    conn->conn_param_req.max,
+				    conn->conn_param_req.latency,
+				    conn->conn_param_req.to_multiplier);
+	}
+
+	return 0;
+}
+
 static int l2cap_le_connect_rsp(struct l2cap_conn *conn,
 				struct l2cap_cmd_hdr *cmd, u16 cmd_len,
 				u8 *data)
@@ -5633,6 +5679,7 @@ static inline int l2cap_le_sig_cmd(struct l2cap_conn *conn,
 		break;
 
 	case L2CAP_CONN_PARAM_UPDATE_RSP:
+		err = l2cap_conn_param_update_rsp(conn, cmd, cmd_len, data);
 		break;
 
 	case L2CAP_LE_CONN_RSP:
