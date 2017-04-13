@@ -11,12 +11,12 @@
  */
 
 #include <linux/dma-buf.h>
+#include <linux/dma-mapping.h>
 #include <linux/module.h>
 #include <linux/refcount.h>
 #include <linux/scatterlist.h>
 #include <linux/sched.h>
 #include <linux/slab.h>
-#include <linux/dma-mapping.h>
 
 #include <media/videobuf2-v4l2.h>
 #include <media/videobuf2-dma-contig.h>
@@ -116,12 +116,13 @@ static void vb2_dc_prepare(void *buf_priv)
 	struct vb2_dc_buf *buf = buf_priv;
 	struct sg_table *sgt = buf->dma_sgt;
 
-	/* DMABUF exporter will flush the cache for us */
-	if (!buf->vec)
-		return;
-
-	dma_sync_sg_for_device(buf->dev, sgt->sgl, sgt->orig_nents,
-			       buf->dma_dir);
+	/*
+	 * DMABUF exporter will flush the cache for us; only USERPTR
+	 * and MMAP buffers with non-coherent memory will be flushed.
+	 */
+	if (buf->attrs & DMA_ATTR_NON_CONSISTENT)
+		dma_sync_sg_for_device(buf->dev, sgt->sgl, sgt->orig_nents,
+				       buf->dma_dir);
 }
 
 static void vb2_dc_finish(void *buf_priv)
@@ -129,11 +130,13 @@ static void vb2_dc_finish(void *buf_priv)
 	struct vb2_dc_buf *buf = buf_priv;
 	struct sg_table *sgt = buf->dma_sgt;
 
-	/* DMABUF exporter will flush the cache for us */
-	if (!buf->vec)
-		return;
-
-	dma_sync_sg_for_cpu(buf->dev, sgt->sgl, sgt->orig_nents, buf->dma_dir);
+	/*
+	 * DMABUF exporter will flush the cache for us; only USERPTR
+	 * and MMAP buffers with non-coherent memory will be flushed.
+	 */
+	if (buf->attrs & DMA_ATTR_NON_CONSISTENT)
+		dma_sync_sg_for_cpu(buf->dev, sgt->sgl, sgt->orig_nents,
+				    buf->dma_dir);
 }
 
 /*********************************************/
@@ -172,9 +175,9 @@ static void *vb2_dc_alloc(struct device *dev, unsigned long attrs,
 
 	buf->attrs = attrs;
 	buf->cookie = dma_alloc_attrs(dev, size, &buf->dma_addr,
-					GFP_KERNEL | gfp_flags, buf->attrs);
+				      GFP_KERNEL | gfp_flags, buf->attrs);
 	if (!buf->cookie) {
-		dev_err(dev, "dma_alloc_coherent of size %ld failed\n", size);
+		dev_err(dev, "dma_alloc_attrs of size %ld failed\n", size);
 		kfree(buf);
 		return ERR_PTR(-ENOMEM);
 	}
@@ -186,6 +189,14 @@ static void *vb2_dc_alloc(struct device *dev, unsigned long attrs,
 	buf->dev = get_device(dev);
 	buf->size = size;
 	buf->dma_dir = dma_dir;
+
+	buf->dma_sgt = vb2_dc_get_base_sgt(buf);
+	if (!buf->dma_sgt) {
+		dma_free_attrs(dev, size, buf->cookie, buf->dma_addr,
+			       buf->attrs);
+		put_device(dev);
+		return ERR_PTR(-ENOMEM);
+	}
 
 	buf->handler.refcount = &buf->refcount;
 	buf->handler.put = vb2_dc_put;
@@ -359,6 +370,40 @@ static void *vb2_dc_dmabuf_ops_kmap(struct dma_buf *dbuf, unsigned long pgnum)
 	return buf->vaddr ? buf->vaddr + pgnum * PAGE_SIZE : NULL;
 }
 
+static int vb2_dc_dmabuf_ops_begin_cpu_access(struct dma_buf *dbuf,
+					      enum dma_data_direction direction)
+{
+	struct vb2_dc_buf *buf = dbuf->priv;
+	struct sg_table *sgt = buf->dma_sgt;
+
+	/*
+	 * DMABUF exporter will flush the cache for us; only USERPTR
+	 * and MMAP buffers with non-coherent memory will be flushed.
+	 */
+	if (buf->attrs & DMA_ATTR_NON_CONSISTENT)
+		dma_sync_sg_for_cpu(buf->dev, sgt->sgl, sgt->nents,
+				    buf->dma_dir);
+
+	return 0;
+}
+
+static int vb2_dc_dmabuf_ops_end_cpu_access(struct dma_buf *dbuf,
+					    enum dma_data_direction direction)
+{
+	struct vb2_dc_buf *buf = dbuf->priv;
+	struct sg_table *sgt = buf->dma_sgt;
+
+	/*
+	 * DMABUF exporter will flush the cache for us; only USERPTR
+	 * and MMAP buffers with non-coherent memory will be flushed.
+	 */
+	if (buf->attrs & DMA_ATTR_NON_CONSISTENT)
+		dma_sync_sg_for_device(buf->dev, sgt->sgl, sgt->nents,
+				       buf->dma_dir);
+
+	return 0;
+}
+
 static void *vb2_dc_dmabuf_ops_vmap(struct dma_buf *dbuf)
 {
 	struct vb2_dc_buf *buf = dbuf->priv;
@@ -379,6 +424,8 @@ static struct dma_buf_ops vb2_dc_dmabuf_ops = {
 	.unmap_dma_buf = vb2_dc_dmabuf_ops_unmap,
 	.kmap = vb2_dc_dmabuf_ops_kmap,
 	.kmap_atomic = vb2_dc_dmabuf_ops_kmap,
+	.begin_cpu_access = vb2_dc_dmabuf_ops_begin_cpu_access,
+	.end_cpu_access = vb2_dc_dmabuf_ops_end_cpu_access,
 	.vmap = vb2_dc_dmabuf_ops_vmap,
 	.mmap = vb2_dc_dmabuf_ops_mmap,
 	.release = vb2_dc_dmabuf_ops_release,
@@ -424,11 +471,12 @@ static void vb2_dc_put_userptr(void *buf_priv)
 
 	if (sgt) {
 		/*
-		 * No need to sync to CPU, it's already synced to the CPU
-		 * since the finish() memop will have been called before this.
+		 * Don't ask to skip cache sync in case if the user
+		 * did ask to skip cache flush the last time the
+		 * buffer was dequeued.
 		 */
 		dma_unmap_sg_attrs(buf->dev, sgt->sgl, sgt->orig_nents,
-				   buf->dma_dir, DMA_ATTR_SKIP_CPU_SYNC);
+				   buf->dma_dir, buf->attrs);
 		pages = frame_vector_pages(buf->vec);
 		/* sgt should exist only if vector contains pages... */
 		BUG_ON(IS_ERR(pages));
@@ -505,6 +553,7 @@ static void *vb2_dc_get_userptr(struct device *dev, unsigned long vaddr,
 
 	buf->dev = dev;
 	buf->dma_dir = dma_dir;
+	buf->attrs = attrs;
 
 	offset = vaddr & ~PAGE_MASK;
 	vec = vb2_create_framevec(vaddr, size, dma_dir == DMA_FROM_DEVICE);
@@ -544,11 +593,10 @@ static void *vb2_dc_get_userptr(struct device *dev, unsigned long vaddr,
 	}
 
 	/*
-	 * No need to sync to the device, this will happen later when the
-	 * prepare() memop is called.
+	 * Sync the cache now; the user might not ever ask for it.
 	 */
 	sgt->nents = dma_map_sg_attrs(buf->dev, sgt->sgl, sgt->orig_nents,
-				      buf->dma_dir, DMA_ATTR_SKIP_CPU_SYNC);
+				      buf->dma_dir, buf->attrs);
 	if (sgt->nents <= 0) {
 		pr_err("failed to map scatterlist\n");
 		ret = -EIO;
@@ -572,7 +620,7 @@ out:
 
 fail_map_sg:
 	dma_unmap_sg_attrs(buf->dev, sgt->sgl, sgt->orig_nents,
-			   buf->dma_dir, DMA_ATTR_SKIP_CPU_SYNC);
+			   buf->dma_dir, buf->attrs);
 
 fail_sgt_init:
 	sg_free_table(sgt);
