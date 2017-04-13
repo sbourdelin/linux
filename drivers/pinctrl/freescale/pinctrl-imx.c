@@ -585,6 +585,8 @@ static int imx_pinctrl_parse_functions(struct device_node *np,
 					 func->num_group_names,
 					 sizeof(*func->group_names),
 					 GFP_KERNEL);
+	if (!func->group_names)
+		return -ENOMEM;
 
 	for_each_child_of_node(np, child) {
 		func->group_names[i] = child->name;
