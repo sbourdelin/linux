@@ -548,6 +548,9 @@ static void ncsi_request_timeout(unsigned long data)
 #ifdef CONFIG_NET_NCSI_DEBUG
 	hdr = (struct ncsi_pkt_hdr *)skb_network_header(nr->cmd);
 	ndp->stats.cmd[hdr->type][NCSI_PKT_STAT_TIMEOUT]++;
+
+	if ((nr->flags & NCSI_REQ_FLAG_DEBUG) && ndp->pkt.req == nr->id)
+		ncsi_dev_reset_pkt_debug(ndp, NULL, -ETIMEDOUT);
 #endif
 
 	/* Release the request */

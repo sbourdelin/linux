@@ -221,6 +221,9 @@ struct ncsi_request {
 	bool                 used;    /* Request that has been assigned  */
 	unsigned int         flags;   /* NCSI request property           */
 #define NCSI_REQ_FLAG_EVENT_DRIVEN	1
+#ifdef CONFIG_NET_NCSI_DEBUG
+#define NCSI_REQ_FLAG_DEBUG		2
+#endif
 	struct ncsi_dev_priv *ndp;    /* Associated NCSI device          */
 	struct sk_buff       *cmd;    /* Associated NCSI command packet  */
 	struct sk_buff       *rsp;    /* Associated NCSI response packet */
@@ -283,6 +286,14 @@ struct ncsi_dev_priv {
 	struct packet_type  ptype;           /* NCSI packet Rx handler     */
 	struct list_head    node;            /* Form NCSI device list      */
 #ifdef CONFIG_NET_NCSI_DEBUG
+	struct {
+		struct proc_dir_entry *pde;
+		unsigned int          req;
+#define NCSI_PKT_REQ_FREE	0
+#define NCSI_PKT_REQ_BUSY	0xFFFFFFFF
+		int                   errno;
+		struct sk_buff        *rsp;
+	} pkt;
 	struct {
 		struct proc_dir_entry *pde;
 #define NCSI_PKT_STAT_OK	0
@@ -364,6 +375,8 @@ int ncsi_package_init_debug(struct ncsi_package *np);
 void ncsi_package_release_debug(struct ncsi_package *np);
 int ncsi_channel_init_debug(struct ncsi_channel *nc);
 void ncsi_channel_release_debug(struct ncsi_channel *nc);
+void ncsi_dev_reset_pkt_debug(struct ncsi_dev_priv *ndp,
+			      struct sk_buff *skb, int errno);
 #else
 static inline int ncsi_dev_init_debug(struct ncsi_dev_priv *ndp)
 {
