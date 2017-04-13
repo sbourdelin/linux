@@ -365,6 +365,11 @@ int ncsi_xmit_cmd(struct ncsi_cmd_arg *nca)
 	nr->enabled = true;
 	mod_timer(&nr->timer, jiffies + 1 * HZ);
 
+#ifdef CONFIG_NET_NCSI_DEBUG
+	if (nr->flags & NCSI_REQ_FLAG_DEBUG)
+		nca->ndp->pkt.req = nr->id;
+#endif
+
 	/* Send NCSI packet */
 	skb_get(nr->cmd);
 	ret = dev_queue_xmit(nr->cmd);

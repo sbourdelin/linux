@@ -1036,17 +1036,29 @@ int ncsi_rcv_rsp(struct sk_buff *skb, struct net_device *dev,
 	if (ret) {
 #ifdef CONFIG_NET_NCSI_DEBUG
 		ndp->stats.rsp[hdr->type - 0x80][NCSI_PKT_STAT_ERROR]++;
+		if ((nr->flags & NCSI_REQ_FLAG_DEBUG) &&
+		    (nr->id == ndp->pkt.req))
+			ncsi_dev_reset_pkt_debug(ndp, NULL, -EINVAL);
 #endif
 		goto out;
 	}
 
 	/* Process the packet */
-	ret = nrh->handler(nr);
 #ifdef CONFIG_NET_NCSI_DEBUG
+	if ((nr->flags & NCSI_REQ_FLAG_DEBUG) &&
+	    (nr->id == ndp->pkt.req)) {
+		ncsi_dev_reset_pkt_debug(ndp, nr->rsp, 0);
+		nr->rsp = NULL;
+		goto out;
+	}
+
+	ret = nrh->handler(nr);
 	if (ret)
 		ndp->stats.rsp[hdr->type - 0x80][NCSI_PKT_STAT_ERROR]++;
 	else
 		ndp->stats.rsp[hdr->type - 0x80][NCSI_PKT_STAT_OK]++;
+#else
+	ret = nrh->handler(nr);
 #endif
 out:
 	ncsi_free_request(nr);
