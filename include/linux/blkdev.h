@@ -1677,11 +1677,14 @@ static inline bool bio_will_gap(struct request_queue *q, struct bio *prev,
 {
 	if (bio_has_data(prev) && queue_virt_boundary(q)) {
 		struct bio_vec pb, nb;
+		bool offset;
 
 		bio_get_last_bvec(prev, &pb);
 		bio_get_first_bvec(next, &nb);
 
-		if (!bios_segs_mergeable(q, prev, &pb, &nb))
+		offset = pb.bv_offset || nb.bv_offset;
+
+		if (offset || !bios_segs_mergeable(q, prev, &pb, &nb))
 			return __bvec_gap_to_prev(q, &pb, nb.bv_offset);
 	}
 
