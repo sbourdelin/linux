@@ -16,6 +16,7 @@ etc.
    README
    kernel-parameters
    devices
+   abi
 
 Here is a set of documents aimed at users who are trying to track down
 problems and bugs in particular.
