@@ -476,6 +476,12 @@ static void spi_dev_set_name(struct spi_device *spi)
 		return;
 	}
 
+	if (spi->slave_mode) {
+		dev_set_name(&spi->dev, "%s-slv",
+			     dev_name(&spi->master->dev));
+		return;
+	}
+
 	dev_set_name(&spi->dev, "%s.%u", dev_name(&spi->master->dev),
 		     spi->chip_select);
 }
@@ -484,6 +490,9 @@ static int spi_dev_check(struct device *dev, void *data)
 {
 	struct spi_device *spi = to_spi_device(dev);
 	struct spi_device *new_spi = data;
+
+	if (spi->slave_mode)
+		return 0;
 
 	if (spi->master == new_spi->master &&
 	    spi->chip_select == new_spi->chip_select)
@@ -524,6 +533,9 @@ int spi_add_device(struct spi_device *spi)
 	 */
 	mutex_lock(&spi_add_lock);
 
+	if (spi->slave_mode)
+		goto setup_spi;
+
 	status = bus_for_each_dev(&spi_bus_type, NULL, spi, spi_dev_check);
 	if (status) {
 		dev_err(dev, "chipselect %d already in use\n",
@@ -534,6 +546,7 @@ int spi_add_device(struct spi_device *spi)
 	if (master->cs_gpios)
 		spi->cs_gpio = master->cs_gpios[spi->chip_select];
 
+setup_spi:
 	/* Drivers may modify this initial i/o setup, but will
 	 * normally rely on the device being setup.  Devices
 	 * using SPI_CS_HIGH can't coexist well otherwise...
@@ -1535,6 +1548,14 @@ static int of_spi_parse_dt(struct spi_master *master, struct spi_device *spi,
 	u32 value;
 	int rc;
 
+	if (of_find_property(nc, "spi-slave", NULL)) {
+		if (!spi_controller_has_slavemode(master))
+			return -EINVAL;
+
+		spi->slave_mode = 1;
+		return 0;
+	}
+
 	/* Device address */
 	rc = of_property_read_u32(nc, "reg", &value);
 	if (rc) {
@@ -1985,7 +2006,7 @@ int spi_register_master(struct spi_master *master)
 	status = device_add(&master->dev);
 	if (status < 0)
 		goto done;
-	dev_dbg(dev, "registered master %s%s\n", dev_name(&master->dev),
+	dev_dbg(dev, "registered controller %s%s\n", dev_name(&master->dev),
 			dynamic ? " (dynamic)" : "");
 
 	/* If we're using a queued driver, start the queue */

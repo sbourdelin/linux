@@ -116,6 +116,8 @@ void spi_statistics_add_transfer_stats(struct spi_statistics *stats,
  *	This may be changed by the device's driver, or left at the
  *	default (0) indicating protocol words are eight bit bytes.
  *	The spi_transfer.bits_per_word can override this for each transfer.
+ * @slave_mode: indicates whether SPI controller works in master mode
+ *	or slave mode to transfer data with external spi devices.
  * @irq: Negative, or the number passed to request_irq() to receive
  *	interrupts from this device.
  * @controller_state: Controller's runtime state
@@ -145,6 +147,7 @@ struct spi_device {
 	u8			chip_select;
 	u8			bits_per_word;
 	u16			mode;
+	u8			slave_mode;
 #define	SPI_CPHA	0x01			/* clock phase */
 #define	SPI_CPOL	0x02			/* clock polarity */
 #define	SPI_MODE_0	(0|0)			/* (original MicroWire) */
@@ -373,6 +376,7 @@ static inline void spi_unregister_driver(struct spi_driver *sdrv)
  *                    transfer_one callback.
  * @handle_err: the subsystem calls the driver to handle an error that occurs
  *		in the generic implementation of transfer_one_message().
+ * @has_slavemode: checks whether SPI Controller supports slave mode or not.
  * @unprepare_message: undo any work done by prepare_message().
  * @spi_flash_read: to support spi-controller hardwares that provide
  *                  accelerated interface to read from flash devices.
@@ -550,6 +554,7 @@ struct spi_master {
 			    struct spi_transfer *transfer);
 	void (*handle_err)(struct spi_master *master,
 			   struct spi_message *message);
+	bool (*has_slavemode)(struct spi_master *master);
 
 	/* gpio chip select */
 	int			*cs_gpios;
@@ -589,6 +594,16 @@ static inline void spi_master_put(struct spi_master *master)
 {
 	if (master)
 		put_device(&master->dev);
+}
+
+
+static inline bool spi_controller_has_slavemode(struct spi_master *master)
+{
+#ifdef CONFIG_SPI_SLAVE
+	if (master->has_slavemode)
+		return master->has_slavemode(master);
+#endif
+	return false;
 }
 
 /* PM calls that need to be issued by the driver */

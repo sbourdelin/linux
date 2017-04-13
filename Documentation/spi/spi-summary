@@ -62,9 +62,8 @@ chips described as using "three wire" signaling: SCK, data, nCSx.
 (That data line is sometimes called MOMI or SISO.)
 
 Microcontrollers often support both master and slave sides of the SPI
-protocol.  This document (and Linux) currently only supports the master
-side of SPI interactions.
-
+protocol.  This document (and Linux) supports both the master and slave
+sides of SPI interactions.
 
 Who uses it?  On what kinds of systems?
 ---------------------------------------
@@ -154,9 +153,8 @@ control audio interfaces, present touchscreen sensors as input interfaces,
 or monitor temperature and voltage levels during industrial processing.
 And those might all be sharing the same controller driver.
 
-A "struct spi_device" encapsulates the master-side interface between
-those two types of driver.  At this writing, Linux has no slave side
-programming interface.
+A "struct spi_device" encapsulates the controller-side interface between
+those two types of drivers.
 
 There is a minimal core of SPI programming interfaces, focussing on
 using the driver model to connect controller and protocol drivers using
@@ -168,10 +166,19 @@ shows up in sysfs in several locations:
    /sys/devices/.../CTLR/spiB.C ... spi_device on bus "B",
 	chipselect C, accessed through CTLR.
 
+   /sys/devices/.../CTLR/spiB-slv ... SPI bus "B" controller itself as a
+	spi_device works in slave mode, accessed through CTRL.
+
    /sys/bus/spi/devices/spiB.C ... symlink to that physical
    	.../CTLR/spiB.C device
 
+   /sys/bus/spi/devices/spiB-slv ... symlink to that physical
+	.../CTLR/spiB-slv device
+
    /sys/devices/.../CTLR/spiB.C/modalias ... identifies the driver
+	that should be used with this device (for hotplug/coldplug)
+
+   /sys/devices/.../CTLR/spiB-slv/modalias ... identifies the driver
 	that should be used with this device (for hotplug/coldplug)
 
    /sys/bus/spi/drivers/D ... driver for one or more spi*.* devices
