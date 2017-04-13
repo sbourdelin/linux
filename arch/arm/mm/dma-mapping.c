@@ -954,9 +954,14 @@ int arm_dma_get_sgtable(struct device *dev, struct sg_table *sgt,
 	struct page *page;
 	int ret;
 
-	/* If the PFN is not valid, we do not have a struct page */
-	if (!pfn_valid(pfn))
-		return -ENXIO;
+	/*
+	 * If the PFN is not valid, we do not have a struct page
+	 * As this check can pass even for memory obtained through
+	 * the coherent allocator, do an additional check to determine
+	 * if this is coherent DMA memory.
+	 */
+	if (!pfn_valid(pfn) && dma_check_dev_coherent(dev, handle, cpu_addr))
+		return -EINVAL;
 
 	page = pfn_to_page(pfn);
 

@@ -160,6 +160,8 @@ static inline int is_device_dma_capable(struct device *dev)
  */
 int dma_alloc_from_coherent(struct device *dev, ssize_t size,
 				       dma_addr_t *dma_handle, void **ret);
+bool dma_check_dev_coherent(struct device *dev, dma_addr_t dma_handle,
+				void *vaddr);
 int dma_release_from_coherent(struct device *dev, int order, void *vaddr);
 
 int dma_mmap_from_coherent(struct device *dev, struct vm_area_struct *vma,
