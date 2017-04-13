@@ -127,6 +127,16 @@ int iommu_get_msi_cookie(struct iommu_domain *domain, dma_addr_t base)
 
 	cookie->msi_iova = base;
 	domain->iova_cookie = cookie;
+
+	/*
+	 * Setup granule for compatibility with __iommu_dma_{alloc/free} and
+	 * add a compile time check to ensure that writing granule won't
+	 * clobber msi_iova.
+	 */
+	cookie->iovad.granule = cookie_msi_granule(cookie);
+	BUILD_BUG_ON(offsetof(struct iova_domain, granule) <
+			sizeof(cookie->msi_iova));
+
 	return 0;
 }
 EXPORT_SYMBOL(iommu_get_msi_cookie);
