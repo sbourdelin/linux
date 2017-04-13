@@ -443,7 +443,7 @@ static void imx_pinconf_group_dbg_show(struct pinctrl_dev *pctldev,
 	if (group > pctldev->num_groups)
 		return;
 
-	seq_printf(s, "\n");
+	seq_putc(s, '\n');
 	grp = pinctrl_generic_get_group(pctldev, group);
 	if (!grp)
 		return;
