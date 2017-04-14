@@ -217,6 +217,7 @@ struct msm_otg {
 
 	struct msm_usb_cable vbus;
 	struct msm_usb_cable id;
+	struct extcon_dev *edev;
 
 	struct gpio_desc *switch_gpio;
 	struct notifier_block reboot;
@@ -246,6 +247,13 @@ enum vdd_levels {
 	VDD_LEVEL_NONE = 0,
 	VDD_LEVEL_MIN,
 	VDD_LEVEL_MAX,
+};
+
+static const unsigned int msm_extcon_cables[] = {
+	EXTCON_CHG_USB_SDP,
+	EXTCON_CHG_USB_DCP,
+	EXTCON_CHG_USB_CDP,
+	EXTCON_NONE,
 };
 
 static int msm_hsusb_init_vddcx(struct msm_otg *motg, int init)
@@ -834,6 +842,21 @@ skip_phy_resume:
 
 static void msm_otg_notify_charger(struct msm_otg *motg, unsigned mA)
 {
+	const unsigned int extcon_cables[][2] = {
+		{ EXTCON_CHG_USB_SDP, USB_SDP_CHARGER },
+		{ EXTCON_CHG_USB_DCP, USB_DCP_CHARGER },
+		{ EXTCON_CHG_USB_CDP, USB_CDP_CHARGER },
+	};
+	int i;
+
+	for (i = 0; i < ARRAY_SIZE(extcon_cables); i++) {
+		unsigned int cable = extcon_cables[i][0];
+		unsigned int chg_type = extcon_cables[i][1];
+
+		extcon_set_cable_state_(motg->edev, cable,
+				motg->chg_type == chg_type);
+	}
+
 	if (motg->cur_power == mA)
 		return;
 
@@ -1875,6 +1898,21 @@ static int msm_otg_probe(struct platform_device *pdev)
 		if (!np)
 			return -ENXIO;
 		ret = msm_otg_read_dt(pdev, motg);
+		if (ret)
+			return ret;
+	}
+
+	/*
+	 * Documentation in extcon.h states that EXTCONG_CHG_USB_SDP should
+	 * always appear together with EXTCON_USB, so register extcon cables
+	 * only if we successfully got the vbus extcon.
+	 */
+	if (!IS_ERR(motg->vbus.extcon)) {
+		motg->edev = devm_extcon_dev_allocate(&pdev->dev, msm_extcon_cables);
+		if (IS_ERR(motg->edev))
+			return PTR_ERR(motg->edev);
+
+		ret = devm_extcon_dev_register(&pdev->dev, motg->edev);
 		if (ret)
 			return ret;
 	}
