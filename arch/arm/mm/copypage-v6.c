@@ -20,10 +20,6 @@
 
 #include "mm.h"
 
-#if SHMLBA > 16384
-#error FIX ME
-#endif
-
 static DEFINE_RAW_SPINLOCK(v6_lock);
 
 /*
@@ -129,6 +125,7 @@ struct cpu_user_fns v6_user_fns __initdata = {
 
 static int __init v6_userpage_init(void)
 {
+	WARN_ON(SHMLBA > 16384);
 	if (cache_is_vipt_aliasing()) {
 		cpu_user.cpu_clear_user_highpage = v6_clear_user_highpage_aliasing;
 		cpu_user.cpu_copy_user_highpage = v6_copy_user_highpage_aliasing;
