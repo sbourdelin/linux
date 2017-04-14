@@ -304,6 +304,11 @@ static void ctnl_untimeout(struct net *net, struct ctnl_timeout *timeout)
 	spinlock_t *lock;
 	int i, cpu;
 
+	/* Make sure the conntrack using the timeout already in the unconfirmed
+	 * list or in the hash table.
+	 */
+	synchronize_rcu();
+
 	for_each_possible_cpu(cpu) {
 		struct ct_pcpu *pcpu = per_cpu_ptr(net->ct.pcpu_lists, cpu);
 
