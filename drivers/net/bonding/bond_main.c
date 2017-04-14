@@ -1177,6 +1177,9 @@ static rx_handler_result_t bond_handle_frame(struct sk_buff **pskb)
 		}
 	}
 
+	/* link-local packets should not be passed to master interface */
+	if (is_link_local_ether_addr(eth_hdr(skb)->h_dest))
+		return RX_HANDLER_PASS;
 	if (bond_should_deliver_exact_match(skb, slave, bond))
 		return RX_HANDLER_EXACT;
 
