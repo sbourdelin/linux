@@ -1743,7 +1743,7 @@ int nfs_commit_file(struct file *file, struct nfs_write_verifier *verf)
 	if (ret > 0)
 		ret = 0;
 
-	nfs_free_request(req);
+	nfs_release_request(req);
 out_put:
 	put_nfs_open_context(open);
 	return ret;
