@@ -52,7 +52,7 @@ static int ncsi_validate_rsp_pkt(struct ncsi_request *nr,
 
 	checksum = ncsi_calculate_checksum((unsigned char *)h,
 					   sizeof(*h) + payload - 4);
-	if (*pchecksum != htonl(checksum))
+	if (*pchecksum != ntohl(checksum))
 		return -EINVAL;
 
 	return 0;
