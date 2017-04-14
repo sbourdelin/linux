@@ -1,15 +1,11 @@
-menu "Android"
-
-config ANDROID
+menuconfig ANDROID
 	bool "Android Drivers"
 	---help---
 	  Enable support for various drivers needed on the Android platform
 
-if ANDROID
-
 config ANDROID_BINDER_IPC
 	bool "Android Binder IPC Driver"
-	depends on MMU
+	depends on ANDROID && MMU
 	default n
 	---help---
 	  Binder is used in Android for both communication between processes,
@@ -43,7 +39,3 @@ config ANDROID_BINDER_IPC_32BIT
 	  earlier).
 
 	  Note that enabling this will break newer Android user-space.
-
-endif # if ANDROID
-
-endmenu
