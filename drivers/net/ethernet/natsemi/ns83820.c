@@ -534,14 +534,19 @@ static inline int ns83820_add_rx_skb(struct ns83820 *dev, struct sk_buff *skb)
 		);
 #endif
 
+	buf = pci_map_single(dev->pci_dev, skb->data,
+			     REAL_RX_BUF_SIZE, PCI_DMA_FROMDEVICE);
+	if (pci_dma_mapping_error(dev->pci_dev, buf)) {
+		kfree_skb(skb);
+		return 1;
+	}
+
 	sg = dev->rx_info.descs + (next_empty * DESC_SIZE);
 	BUG_ON(NULL != dev->rx_info.skbs[next_empty]);
 	dev->rx_info.skbs[next_empty] = skb;
 
 	dev->rx_info.next_empty = (next_empty + 1) % NR_RX_DESC;
 	cmdsts = REAL_RX_BUF_SIZE | CMDSTS_INTR;
-	buf = pci_map_single(dev->pci_dev, skb->data,
-			     REAL_RX_BUF_SIZE, PCI_DMA_FROMDEVICE);
 	build_rx_desc(dev, sg, 0, buf, cmdsts, 0);
 	/* update link of previous rx */
 	if (likely(next_empty != dev->rx_info.next_rx))
@@ -1136,6 +1141,10 @@ again:
 	if (nr_frags)
 		len -= skb->data_len;
 	buf = pci_map_single(dev->pci_dev, skb->data, len, PCI_DMA_TODEVICE);
+	if (pci_dma_mapping_error(dev->pci_dev, buf)) {
+		dev_kfree_skb_any(skb);
+		return NETDEV_TX_OK;
+	}
 
 	first_desc = dev->tx_descs + (free_idx * DESC_SIZE);
 
