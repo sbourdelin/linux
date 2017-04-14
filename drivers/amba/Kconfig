@@ -1,14 +1,8 @@
-config ARM_AMBA
-	bool
-
-if ARM_AMBA
-
-config TEGRA_AHB
-	bool
+menuconfig TEGRA_AHB
+	bool "NVIDIA Tegra AHB"
+	depends on ARCH_TEGRA
 	default y if ARCH_TEGRA
 	help
 	  Adds AHB configuration functionality for NVIDIA Tegra SoCs,
 	  which controls AHB bus master arbitration and some performance
 	  parameters (priority, prefetch size).
-
-endif
