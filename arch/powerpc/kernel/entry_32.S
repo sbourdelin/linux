@@ -141,7 +141,6 @@ transfer_to_handler:
 	stw	r2,GPR2(r11)
 	stw	r12,_NIP(r11)
 	stw	r9,_MSR(r11)
-	andi.	r2,r9,MSR_PR
 	mfctr	r12
 	mfspr	r2,SPRN_XER
 	stw	r12,_CTR(r11)
