@@ -49,7 +49,7 @@ static struct rb_entry *__lookup_rb_tree_slow(struct rb_root *root,
 	return NULL;
 }
 
-static struct rb_entry *__lookup_rb_tree(struct rb_root *root,
+struct rb_entry *__lookup_rb_tree(struct rb_root *root,
 				struct rb_entry *cached_re, unsigned int ofs)
 {
 	struct rb_entry *re;
@@ -61,7 +61,7 @@ static struct rb_entry *__lookup_rb_tree(struct rb_root *root,
 	return re;
 }
 
-static struct rb_node **__lookup_rb_tree_for_insert(struct f2fs_sb_info *sbi,
+struct rb_node **__lookup_rb_tree_for_insert(struct f2fs_sb_info *sbi,
 				struct rb_root *root, struct rb_node **parent,
 				unsigned int ofs)
 {
@@ -92,7 +92,7 @@ static struct rb_node **__lookup_rb_tree_for_insert(struct f2fs_sb_info *sbi,
  * in order to simpfy the insertion after.
  * tree must stay unchanged between lookup and insertion.
  */
-static struct rb_entry *__lookup_rb_tree_ret(struct rb_root *root,
+struct rb_entry *__lookup_rb_tree_ret(struct rb_root *root,
 				struct rb_entry *cached_re,
 				unsigned int ofs,
 				struct rb_entry **prev_entry,
