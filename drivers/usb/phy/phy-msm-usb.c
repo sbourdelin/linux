@@ -1409,9 +1409,9 @@ static void msm_otg_sm_work(struct work_struct *w)
 				pm_runtime_put_sync(otg->usb_phy->dev);
 				msm_otg_reset(otg->usb_phy);
 			}
-			msm_otg_notify_charger(motg, 0);
 			motg->chg_state = USB_CHG_STATE_UNDEFINED;
 			motg->chg_type = USB_INVALID_CHARGER;
+			msm_otg_notify_charger(motg, 0);
 		}
 
 		if (otg->state == OTG_STATE_B_IDLE)
@@ -1421,10 +1421,10 @@ static void msm_otg_sm_work(struct work_struct *w)
 		dev_dbg(otg->usb_phy->dev, "OTG_STATE_B_PERIPHERAL state\n");
 		if (!test_bit(B_SESS_VLD, &motg->inputs) ||
 				!test_bit(ID, &motg->inputs)) {
-			msm_otg_notify_charger(motg, 0);
-			msm_otg_start_peripheral(otg->usb_phy, 0);
 			motg->chg_state = USB_CHG_STATE_UNDEFINED;
 			motg->chg_type = USB_INVALID_CHARGER;
+			msm_otg_notify_charger(motg, 0);
+			msm_otg_start_peripheral(otg->usb_phy, 0);
 			otg->state = OTG_STATE_B_IDLE;
 			msm_otg_reset(otg->usb_phy);
 			schedule_work(w);
