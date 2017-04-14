@@ -360,6 +360,26 @@ get_pteptr(struct mm_struct *mm, unsigned long addr, pte_t **ptep, pmd_t **pmdp)
         return(retval);
 }
 
+void remap_init_ram(void)
+{
+	unsigned long start = (unsigned long)_sinittext & PAGE_MASK;
+	unsigned long end = (unsigned long)_einittext;
+	unsigned long va;
+
+	for (va = start; va < end; va += PAGE_SIZE) {
+		pte_t *kpte;
+		pmd_t *kpmd;
+		pte_t pte = pfn_pte(__pa(va) >> PAGE_SHIFT, PAGE_KERNEL);
+
+		if (!get_pteptr(&init_mm, va, &kpte, &kpmd))
+			continue;
+		__set_pte_at(&init_mm, va, kpte, pte, 0);
+		wmb();
+		pte_unmap(kpte);
+	}
+	flush_tlb_kernel_range(start, end);
+}
+
 #ifdef CONFIG_DEBUG_PAGEALLOC
 
 static int __change_page_attr(struct page *page, pgprot_t prot)
