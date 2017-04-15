@@ -85,14 +85,17 @@ static int rn5t618_regulator_probe(struct platform_device *pdev)
 	struct regulator_config config = { };
 	struct regulator_dev *rdev;
 	struct regulator_desc *regulators;
+	int num_regulators;
 	int i;
 
 	switch (rn5t618->variant) {
 	case RN5T567:
 		regulators = rn5t567_regulators;
+		num_regulators = ARRAY_SIZE(rn5t567_regulators);
 		break;
 	case RN5T618:
 		regulators = rn5t618_regulators;
+		num_regulators = ARRAY_SIZE(rn5t618_regulators);
 		break;
 	default:
 		return -EINVAL;
@@ -101,10 +104,7 @@ static int rn5t618_regulator_probe(struct platform_device *pdev)
 	config.dev = pdev->dev.parent;
 	config.regmap = rn5t618->regmap;
 
-	for (i = 0; i < RN5T618_REG_NUM; i++) {
-		if (!regulators[i].name)
-			continue;
-
+	for (i = 0; i < num_regulators; i++) {
 		rdev = devm_regulator_register(&pdev->dev,
 					       &regulators[i],
 					       &config);
