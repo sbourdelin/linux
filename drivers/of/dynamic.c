@@ -218,19 +218,6 @@ int of_property_notify(int action, struct device_node *np,
 
 void __of_attach_node(struct device_node *np)
 {
-	const __be32 *phandle;
-	int sz;
-
-	np->name = __of_get_property(np, "name", NULL) ? : "<NULL>";
-	np->type = __of_get_property(np, "device_type", NULL) ? : "<NULL>";
-
-	phandle = __of_get_property(np, "phandle", &sz);
-	if (!phandle)
-		phandle = __of_get_property(np, "linux,phandle", &sz);
-	if (IS_ENABLED(CONFIG_PPC_PSERIES) && !phandle)
-		phandle = __of_get_property(np, "ibm,phandle", &sz);
-	np->phandle = (phandle && (sz >= 4)) ? be32_to_cpup(phandle) : 0;
-
 	np->child = NULL;
 	np->sibling = np->parent->child;
 	np->parent->child = np;
@@ -244,9 +231,21 @@ int of_attach_node(struct device_node *np)
 {
 	struct of_reconfig_data rd;
 	unsigned long flags;
+	const __be32 *phandle;
+	int sz;
 
 	memset(&rd, 0, sizeof(rd));
 	rd.dn = np;
+
+	np->name = __of_get_property(np, "name", NULL) ? : "<NULL>";
+	np->type = __of_get_property(np, "device_type", NULL) ? : "<NULL>";
+
+	phandle = __of_get_property(np, "phandle", &sz);
+	if (!phandle)
+		phandle = __of_get_property(np, "linux,phandle", &sz);
+	if (IS_ENABLED(CONFIG_PPC_PSERIES) && !phandle)
+		phandle = __of_get_property(np, "ibm,phandle", &sz);
+	np->phandle = (phandle && (sz >= 4)) ? be32_to_cpup(phandle) : 0;
 
 	mutex_lock(&of_mutex);
 	raw_spin_lock_irqsave(&devtree_lock, flags);
@@ -441,6 +440,10 @@ struct device_node *__of_node_dup(const struct device_node *np, const char *fmt,
 			}
 		}
 	}
+
+	node->name = __of_get_property(node, "name", NULL) ? : "<NULL>";
+	node->type = __of_get_property(node, "device_type", NULL) ? : "<NULL>";
+
 	return node;
 
  err_prop:
