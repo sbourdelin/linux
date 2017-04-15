@@ -1855,7 +1855,7 @@ static int f2fs_ioc_gc(struct file *filp, unsigned long arg)
 		mutex_lock(&sbi->gc_mutex);
 	}
 
-	ret = f2fs_gc(sbi, sync, true);
+	ret = f2fs_gc(sbi, sync, true, 0);
 out:
 	mnt_drop_write_file(filp);
 	return ret;
@@ -2211,6 +2211,56 @@ err_out:
 	return err;
 }
 
+static int f2fs_ioc_flush_device(struct file *filp, unsigned long arg)
+{
+	struct inode *inode = file_inode(filp);
+	struct f2fs_sb_info *sbi = F2FS_I_SB(inode);
+	unsigned int start_segno = 0, end_segno = 0;
+	__u32 dev_num;
+	int ret;
+
+	if (!capable(CAP_SYS_ADMIN))
+		return -EPERM;
+
+	if (get_user(dev_num, (__u32 __user *)arg))
+		return -EFAULT;
+
+	if (f2fs_readonly(sbi->sb))
+		return -EROFS;
+
+	if (sbi->s_ndevs <= 1 || sbi->s_ndevs - 1 <= dev_num) {
+		f2fs_msg(sbi->sb, KERN_WARNING, "Can't flush %u in %d\n",
+				dev_num, sbi->s_ndevs);
+		return -EINVAL;
+	}
+
+	ret = mnt_want_write_file(filp);
+	if (ret)
+		return ret;
+
+	if (FDEV(dev_num).start_blk != 0)
+		start_segno = GET_SEGNO(sbi, FDEV(dev_num).start_blk);
+	end_segno = GET_SEGNO(sbi, FDEV(dev_num).end_blk);
+
+	while (start_segno++ < end_segno) {
+		if (!mutex_trylock(&sbi->gc_mutex)) {
+			ret = -EBUSY;
+			goto out;
+		}
+		sbi->last_victim[GC_CB] = end_segno + 1;
+		sbi->last_victim[GC_GREEDY] = end_segno + 1;
+		sbi->last_victim[ALLOC_NEXT] = end_segno + 1;
+		ret = f2fs_gc(sbi, true, true, start_segno);
+		sbi->last_victim[ALLOC_NEXT] = 0;
+		if (ret == -EAGAIN)
+			ret = 0;
+	}
+out:
+	mnt_drop_write_file(filp);
+	return ret;
+}
+
+
 long f2fs_ioctl(struct file *filp, unsigned int cmd, unsigned long arg)
 {
 	switch (cmd) {
@@ -2248,6 +2298,8 @@ long f2fs_ioctl(struct file *filp, unsigned int cmd, unsigned long arg)
 		return f2fs_ioc_defragment(filp, arg);
 	case F2FS_IOC_MOVE_RANGE:
 		return f2fs_ioc_move_range(filp, arg);
+	case F2FS_IOC_FLUSH_DEVICE:
+		return f2fs_ioc_flush_device(filp, arg);
 	default:
 		return -ENOTTY;
 	}
