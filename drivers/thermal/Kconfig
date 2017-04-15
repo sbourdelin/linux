@@ -15,6 +15,21 @@ menuconfig THERMAL
 
 if THERMAL
 
+config THERMAL_EMERGENCY_POWEROFF_DELAY_MS
+	int "Emergency poweroff delay in milli-seconds"
+	depends on THERMAL
+	default 0
+	help
+	  The number of milliseconds to delay before emergency
+	  poweroff kicks in. The delay should be carefully profiled
+	  so as to give adequate time for orderly_poweroff(). In case
+	  of failure of an orderly_poweroff() the emergency poweroff
+	  kicks in after the delay has elapsed and shuts down the system.
+
+	  If set to 0 emergency poweroff will not be supported. So a carefully
+	  profiled non-zero positive value is a must for emergerncy poweroff to be
+	  triggered.
+
 config THERMAL_HWMON
 	bool
 	prompt "Expose thermal sensors as hwmon device"
