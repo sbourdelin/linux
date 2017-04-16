@@ -306,20 +306,6 @@ __ca8_errata:
 	orreq	r0, r0, #(1 << 6)		@ set IBE to 1
 	mcreq	p15, 0, r0, c1, c0, 1		@ write aux control register
 #endif
-#ifdef CONFIG_ARM_ERRATA_458693
-	teq	r6, #0x20			@ only present in r2p0
-	mrceq	p15, 0, r0, c1, c0, 1		@ read aux control register
-	orreq	r0, r0, #(1 << 5)		@ set L1NEON to 1
-	orreq	r0, r0, #(1 << 9)		@ set PLDNOP to 1
-	mcreq	p15, 0, r0, c1, c0, 1		@ write aux control register
-#endif
-#ifdef CONFIG_ARM_ERRATA_460075
-	teq	r6, #0x20			@ only present in r2p0
-	mrceq	p15, 1, r0, c9, c0, 2		@ read L2 cache aux ctrl register
-	tsteq	r0, #1 << 22
-	orreq	r0, r0, #(1 << 22)		@ set the Write Allocate disable bit
-	mcreq	p15, 1, r0, c9, c0, 2		@ write the L2 cache aux ctrl register
-#endif
 	b	__errata_finish
 
 __ca9_errata:
