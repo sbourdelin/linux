@@ -115,7 +115,7 @@ static int aspeed_wdt_restart(struct watchdog_device *wdd,
 
 	aspeed_wdt_enable(wdt, 128 * WDT_RATE_1MHZ / 1000);
 
-	mdelay(1000);
+	msleep(1000);
 
 	return 0;
 }
