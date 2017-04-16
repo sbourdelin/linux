@@ -304,7 +304,8 @@ static int pwm_backlight_probe(struct platform_device *pdev)
 	 * early. Leave the decision of the initial backlight state for later.
 	 */
 	if (pb->enable_gpio &&
-	    gpiod_get_direction(pb->enable_gpio) == GPIOF_DIR_IN)
+	   (gpiod_get_direction(pb->enable_gpio) == GPIOF_DIR_IN ||
+	    gpiod_get_value(pb->enable_gpio) != 0))
 		gpiod_direction_output(pb->enable_gpio, 1);
 
 	pb->power_supply = devm_regulator_get(&pdev->dev, "power");
