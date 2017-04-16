@@ -1116,7 +1116,8 @@ check_loop_fn(struct Qdisc *q, unsigned long cl, struct qdisc_walker *w)
  * Delete/get qdisc.
  */
 
-static int tc_get_qdisc(struct sk_buff *skb, struct nlmsghdr *n)
+static int tc_get_qdisc(struct sk_buff *skb, struct nlmsghdr *n,
+			struct netlink_ext_ack *extack)
 {
 	struct net *net = sock_net(skb->sk);
 	struct tcmsg *tcm = nlmsg_data(n);
@@ -1131,7 +1132,7 @@ static int tc_get_qdisc(struct sk_buff *skb, struct nlmsghdr *n)
 	    !netlink_ns_capable(skb, net->user_ns, CAP_NET_ADMIN))
 		return -EPERM;
 
-	err = nlmsg_parse(n, sizeof(*tcm), tca, TCA_MAX, NULL, NULL);
+	err = nlmsg_parse(n, sizeof(*tcm), tca, TCA_MAX, NULL, extack);
 	if (err < 0)
 		return err;
 
@@ -1185,7 +1186,8 @@ static int tc_get_qdisc(struct sk_buff *skb, struct nlmsghdr *n)
  * Create/change qdisc.
  */
 
-static int tc_modify_qdisc(struct sk_buff *skb, struct nlmsghdr *n)
+static int tc_modify_qdisc(struct sk_buff *skb, struct nlmsghdr *n,
+			   struct netlink_ext_ack *extack)
 {
 	struct net *net = sock_net(skb->sk);
 	struct tcmsg *tcm;
@@ -1200,7 +1202,7 @@ static int tc_modify_qdisc(struct sk_buff *skb, struct nlmsghdr *n)
 
 replay:
 	/* Reinit, just in case something touches this. */
-	err = nlmsg_parse(n, sizeof(*tcm), tca, TCA_MAX, NULL, NULL);
+	err = nlmsg_parse(n, sizeof(*tcm), tca, TCA_MAX, NULL, extack);
 	if (err < 0)
 		return err;
 
@@ -1558,7 +1560,8 @@ done:
 
 
 
-static int tc_ctl_tclass(struct sk_buff *skb, struct nlmsghdr *n)
+static int tc_ctl_tclass(struct sk_buff *skb, struct nlmsghdr *n,
+			 struct netlink_ext_ack *extack)
 {
 	struct net *net = sock_net(skb->sk);
 	struct tcmsg *tcm = nlmsg_data(n);
@@ -1577,7 +1580,7 @@ static int tc_ctl_tclass(struct sk_buff *skb, struct nlmsghdr *n)
 	    !netlink_ns_capable(skb, net->user_ns, CAP_NET_ADMIN))
 		return -EPERM;
 
-	err = nlmsg_parse(n, sizeof(*tcm), tca, TCA_MAX, NULL, NULL);
+	err = nlmsg_parse(n, sizeof(*tcm), tca, TCA_MAX, NULL, extack);
 	if (err < 0)
 		return err;
 
