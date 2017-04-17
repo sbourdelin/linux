@@ -2543,9 +2543,147 @@ struct popup_action {
 	struct thread 		*thread;
 	struct map_symbol 	ms;
 	int			socket;
+	bool                    context_annotate;
 
 	int (*fn)(struct hist_browser *browser, struct popup_action *act);
 };
+
+static int copy_call_list_entry(struct list_head *callchain,
+				struct callchain_list *call)
+{
+	struct call_list_entry *entry = zalloc(sizeof(*entry));
+
+	if (!entry) {
+		perror("not enough memory to scan callchains");
+		return -1;
+	}
+
+	entry->ip = entry->sym_start = call->ip;
+	if (call->ms.sym != NULL)
+		entry->sym_start = call->ms.sym->start;
+
+	list_add_tail(&entry->list, callchain);
+
+	return 0;
+}
+
+static int __hist_browser_build_callchain(struct list_head *callchain,
+					  struct rb_root *root,
+					  struct callchain_list *target)
+{
+	struct callchain_node *tmp_node;
+	struct rb_node *node;
+	struct callchain_list *call;
+	struct call_list_entry *new_call, *tmp;
+
+	node = rb_first(root);
+
+	while (node) {
+		char folded_sign = ' ';
+		size_t added_count = 0;
+
+		tmp_node = rb_entry(node, struct callchain_node, rb_node);
+
+		/*
+		 * If the callchain display mode is "flat", the list
+		 * "parent_val" may contain the entries in common.
+		 */
+
+		list_for_each_entry(call, &tmp_node->parent_val, list) {
+
+			/*
+			 * If we have not found the highlighted callchain
+			 * entry...
+			 */
+
+			if (target == call)
+				return 0;
+
+			/*
+			 * ...we need to keep the current element: the next
+			 * one could be the right one and we need to build a
+			 * callchain.
+			 */
+
+			if (copy_call_list_entry(callchain, call) < 0)
+				return -1;
+
+			added_count++;
+		}
+
+		/*
+		 * If the callchain display mode is "graph", "fractal" or even
+		 * "flat", the callchain entries (the last one for "flat" are in
+		 * the list "val".
+		 */
+
+		list_for_each_entry(call, &tmp_node->val, list) {
+
+			/*
+			 * If we have not found the highlighted callchain
+			 * entry...
+			 */
+
+			if (target == call)
+				return 0;
+
+			/*
+			 * ...we need to keep the current element: the next
+			 * one could be the right one and we need to build a
+			 * callchain.
+			 */
+
+			if (copy_call_list_entry(callchain, call) < 0)
+				return -1;
+
+			added_count++;
+
+			/*
+			 * If we meet the folded sign '+' (and if the current
+			 * element does not match), there is no need to go
+			 * further, the callchain elements below cannot be the
+			 * ones we are looking for.
+			 */
+
+			folded_sign = callchain_list__folded(call);
+			if (folded_sign == '+')
+				break;
+		}
+
+		/*
+		 * If the last scanned entry is unfolded, the callchain element
+		 * we are looking for may be behing; so, let's scan its tree of
+		 * callchain nodes.
+		 */
+
+		if (folded_sign == '-' &&
+		    __hist_browser_build_callchain(callchain,
+						   &tmp_node->rb_root,
+						   target) == 0)
+			return 0;
+
+		/*
+		 * Nothing was found, let's remove the scanned callchain
+		 * elements...
+		 */
+
+		list_for_each_entry_safe_reverse(new_call, tmp,
+						 callchain, list) {
+
+			if (added_count == 0)
+				break;
+
+			list_del(&new_call->list);
+			free(new_call);
+			added_count--;
+		}
+
+		/* ...and go to the next one. */
+		node = rb_next(node);
+	}
+
+	return -1;
+}
 
 static int
 do_annotate(struct hist_browser *browser, struct popup_action *act)
@@ -2553,7 +2691,9 @@ do_annotate(struct hist_browser *browser, struct popup_action *act)
 	struct perf_evsel *evsel;
 	struct annotation *notes;
 	struct hist_entry *he;
-	int err;
+	struct map_symbol *ms;
+	struct callchain_list *target;
+	int err, old_idx;
 
 	if (!objdump_path && perf_env__lookup_objdump(browser->env))
 		return 0;
@@ -2562,9 +2702,48 @@ do_annotate(struct hist_browser *browser, struct popup_action *act)
 	if (!notes->src)
 		return 0;
 
-	evsel = hists_to_evsel(browser->hists);
-	err = map_symbol__tui_annotate(&act->ms, evsel, browser->hbt);
 	he = hist_browser__selected_entry(browser);
+
+	ms = browser->selection;
+	target = container_of(ms, struct callchain_list, ms);
+
+	evsel = hists_to_evsel(browser->hists);
+	if (act->context_annotate && browser->selection != &he->ms) {
+		struct list_head callchain;
+
+		/*
+		 * Build the callchain which corresponds to the selected entry
+		 * in the browser in order to...
+		 */
+
+		INIT_LIST_HEAD(&callchain);
+		err = __hist_browser_build_callchain(&callchain,
+						     &he->sorted_chain, target);
+		if (err < 0)
+			return -1;
+
+		/*
+		 * ...select the histogram which callchain matches ours and copy
+		 * it into a fake evsel slot (the last one); then...
+		 */
+
+		err =  symbol_cxt__copy_hist(act->ms.sym,
+					     evsel->idx, &callchain);
+		if (err < 0)
+			return -1;
+
+		/* ...we just need to trick the current evsel index so as
+		 * display the copied annotation histogram.
+		 */
+
+		old_idx = evsel->idx;
+		evsel->idx = notes->src->nr_histograms - 1;
+		err = map_symbol__tui_annotate(&act->ms, evsel, browser->hbt);
+		evsel->idx = old_idx;
+
+	} else
+		err = map_symbol__tui_annotate(&act->ms, evsel, browser->hbt);
+
 	/*
 	 * offer option to annotate the other branch source or target
 	 * (if they exists) when returning from annotate
@@ -2939,6 +3118,7 @@ static int perf_evsel__hists_browse(struct perf_evsel *evsel, int nr_events,
 	"ENTER         Zoom into DSO/Threads & Annotate current symbol\n" \
 	"ESC           Zoom out\n"					\
 	"a             Annotate current symbol\n"			\
+	"A             Annotate current symbol (callchain-specific)\n"	\
 	"C             Collapse all callchains\n"			\
 	"d             Zoom into current DSO\n"				\
 	"E             Expand all callchains\n"				\
@@ -3014,6 +3194,7 @@ static int perf_evsel__hists_browse(struct perf_evsel *evsel, int nr_events,
 			 */
 			goto out_free_stack;
 		case 'a':
+		case 'A':
 			if (!hists__has(hists, sym)) {
 				ui_browser__warning(&browser->b, delay_secs * 2,
 			"Annotation is only available for symbolic views, "
@@ -3028,6 +3209,7 @@ static int perf_evsel__hists_browse(struct perf_evsel *evsel, int nr_events,
 
 			actions->ms.map = browser->selection->map;
 			actions->ms.sym = browser->selection->sym;
+			actions->context_annotate = key == 'A';
 			do_annotate(browser, actions);
 			continue;
 		case 'P':
