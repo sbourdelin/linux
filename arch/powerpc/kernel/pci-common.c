@@ -232,6 +232,14 @@ void pcibios_reset_secondary_bus(struct pci_dev *dev)
 	pci_reset_secondary_bus(dev);
 }
 
+resource_size_t pcibios_default_alignment(struct pci_dev *pdev)
+{
+	if (ppc_md.pcibios_default_alignment)
+		return ppc_md.pcibios_default_alignment(pdev);
+
+	return 0;
+}
+
 #ifdef CONFIG_PCI_IOV
 resource_size_t pcibios_iov_resource_alignment(struct pci_dev *pdev, int resno)
 {
