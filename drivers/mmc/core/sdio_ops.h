@@ -31,5 +31,15 @@ static inline bool mmc_is_io_op(u32 opcode)
 	return opcode == SD_IO_RW_DIRECT || opcode == SD_IO_RW_EXTENDED;
 }
 
+static inline bool mmc_is_io_bypass(u32 opcode, u32 arg)
+{
+	u32 addr;
+
+	addr = (arg >> 9) & 0x1FFFF;
+
+	return ((opcode == SD_IO_RW_DIRECT) &&
+		(addr == SDIO_CCCR_ABORT || addr == SDIO_CCCR_SUSPEND));
+}
+
 #endif
 
