@@ -20,6 +20,7 @@
 #include "helpers/bitmask.h"
 
 #define LINE_LEN 10
+static struct cpupower_topology cpu_top;
 
 static unsigned int count_cpus(void)
 {
@@ -509,6 +510,7 @@ int cmd_freq_info(int argc, char **argv)
 	unsigned int cpu = 0;
 	unsigned int human = 0;
 	int output_param = 0;
+	unsigned int nr_cpus = 0;
 
 	do {
 		ret = getopt_long(argc, argv, "oefwldpgrasmybn", info_opts,
@@ -572,9 +574,14 @@ int cmd_freq_info(int argc, char **argv)
 
 	ret = 0;
 
-	/* Default is: show output of CPU 0 only */
+	/* Show output of available online CPU */
+	nr_cpus = get_cpu_topology(&cpu_top);
+	for (cpu = 0; cpu < nr_cpus; cpu++) {
+		if (sysfs_is_cpu_online(cpu) == 1)
+			break;
+	}
 	if (bitmask_isallclear(cpus_chosen))
-		bitmask_setbit(cpus_chosen, 0);
+		bitmask_setbit(cpus_chosen, cpu);
 
 	switch (output_param) {
 	case -1:

@@ -20,6 +20,7 @@
 #include "helpers/bitmask.h"
 
 #define LINE_LEN 10
+static struct cpupower_topology cpu_top;
 
 static void cpuidle_cpu_output(unsigned int cpu, int verbose)
 {
@@ -140,6 +141,7 @@ int cmd_idle_info(int argc, char **argv)
 	extern int optind, opterr, optopt;
 	int ret = 0, cont = 1, output_param = 0, verbose = 1;
 	unsigned int cpu = 0;
+	unsigned int nr_cpus = 0;
 
 	do {
 		ret = getopt_long(argc, argv, "os", info_opts, NULL);
@@ -177,9 +179,14 @@ int cmd_idle_info(int argc, char **argv)
 		cpuidle_exit(EXIT_FAILURE);
 	}
 
-	/* Default is: show output of CPU 0 only */
+	/* Show output of available online CPU */
+	nr_cpus = get_cpu_topology(&cpu_top);
+	for (cpu = 0; cpu < nr_cpus; cpu++) {
+		if (sysfs_is_cpu_online(cpu) == 1)
+			break;
+	}
 	if (bitmask_isallclear(cpus_chosen))
-		bitmask_setbit(cpus_chosen, 0);
+		bitmask_setbit(cpus_chosen, cpu);
 
 	if (output_param == 0)
 		cpuidle_general_output();
