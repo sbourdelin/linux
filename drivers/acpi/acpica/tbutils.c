@@ -141,7 +141,7 @@ void acpi_tb_check_dsdt_header(void)
  *
  * FUNCTION:    acpi_tb_copy_dsdt
  *
- * PARAMETERS:  table_desc          - Installed table to copy
+ * PARAMETERS:  table_index         - Index of installed table to copy
  *
  * RETURN:      None
  *
@@ -239,7 +239,7 @@ acpi_tb_get_root_table_entry(u8 *table_entry, u32 table_entry_size)
  *
  * FUNCTION:    acpi_tb_parse_root_table
  *
- * PARAMETERS:  rsdp                    - Pointer to the RSDP
+ * PARAMETERS:  rsdp_address            - Pointer to the RSDP
  *
  * RETURN:      Status
  *
