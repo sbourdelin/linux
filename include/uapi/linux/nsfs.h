@@ -17,4 +17,13 @@
 /* Execute namespace-specific ioctl */
 #define NS_SPECIFIC_IOC		_IO(NSIO, 0x5)
 
+struct pidns_ioc_req {
+/* Set vector of last pids in namespace hierarchy */
+#define PIDNS_REQ_SET_LAST_PID_VEC	0x1
+	unsigned int req;
+	void __user *data;
+	unsigned int data_size;
+	char std_fields[0];
+};
+
 #endif /* __LINUX_NSFS_H */

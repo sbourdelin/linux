@@ -21,6 +21,8 @@
 #include <linux/export.h>
 #include <linux/sched/task.h>
 #include <linux/sched/signal.h>
+#include <linux/vmalloc.h>
+#include <uapi/linux/nsfs.h>
 
 struct pid_cache {
 	int nr_ids;
@@ -428,6 +430,91 @@ static struct ns_common *pidns_get_parent(struct ns_common *ns)
 	return &get_pid_ns(pid_ns)->ns;
 }
 
+#ifdef CONFIG_CHECKPOINT_RESTORE
+static long set_last_pid_vec(struct pid_namespace *pid_ns,
+			     struct pidns_ioc_req *req)
+{
+	char *str, *p;
+	int ret = 0;
+	pid_t pid;
+
+	read_lock(&tasklist_lock);
+	if (!pid_ns->child_reaper)
+		ret = -EINVAL;
+	read_unlock(&tasklist_lock);
+	if (ret)
+		return ret;
+
+	if (req->data_size >= PAGE_SIZE)
+		return -EINVAL;
+	str = vmalloc(req->data_size + 1);
+	if (!str)
+		return -ENOMEM;
+	if (copy_from_user(str, req->data, req->data_size)) {
+		ret = -EFAULT;
+		goto out_vfree;
+	}
+	str[req->data_size] = '\0';
+
+	p = str;
+	while (p && *p != '\0') {
+		if (!ns_capable(pid_ns->user_ns, CAP_SYS_ADMIN)) {
+			ret = -EPERM;
+			goto out_vfree;
+		}
+
+		if (sscanf(p, "%d", &pid) != 1 || pid < 0 || pid > pid_max) {
+			ret = -EINVAL;
+			goto out_vfree;
+		}
+
+		/* Write directly: see the comment in pid_ns_ctl_handler() */
+		pid_ns->last_pid = pid;
+
+		p = strchr(p, ':');
+		pid_ns = pid_ns->parent;
+		if (p) {
+			if (!pid_ns) {
+				ret = -EINVAL;
+				goto out_vfree;
+			}
+			p++;
+		}
+	}
+
+	ret = 0;
+out_vfree:
+	vfree(str);
+	return ret;
+}
+#else	/* CONFIG_CHECKPOINT_RESTORE */
+static long set_last_pid_vec(struct pid_namespace *pid_ns,
+			     struct pidns_ioc_req *req)
+{
+	return -ENOTTY;
+}
+#endif	/* CONFIG_CHECKPOINT_RESTORE */
+
+static long pidns_ioctl(struct ns_common *ns, unsigned long arg)
+{
+	struct pid_namespace *pid_ns = to_pid_ns(ns);
+	struct pidns_ioc_req user_req;
+	int ret;
+
+	ret = copy_from_user(&user_req, (void *)arg,
+			     offsetof(struct pidns_ioc_req, std_fields));
+	if (ret)
+		return ret;
+
+	switch (user_req.req) {
+	case PIDNS_REQ_SET_LAST_PID_VEC:
+		return set_last_pid_vec(pid_ns, &user_req);
+	default:
+		return -ENOTTY;
+	}
+	return 0;
+}
+
 static struct user_namespace *pidns_owner(struct ns_common *ns)
 {
 	return to_pid_ns(ns)->user_ns;
@@ -441,6 +528,7 @@ const struct proc_ns_operations pidns_operations = {
 	.install	= pidns_install,
 	.owner		= pidns_owner,
 	.get_parent	= pidns_get_parent,
+	.ns_ioctl	= pidns_ioctl,
 };
 
 static __init int pid_namespaces_init(void)
