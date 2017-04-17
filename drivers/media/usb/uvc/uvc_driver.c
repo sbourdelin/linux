@@ -2013,6 +2013,7 @@ static int uvc_probe(struct usb_interface *intf,
 {
 	struct usb_device *udev = interface_to_usbdev(intf);
 	struct uvc_device *dev;
+	int additional_name;
 	int ret;
 
 	if (id->idVendor && id->idProduct)
@@ -2040,13 +2041,35 @@ static int uvc_probe(struct usb_interface *intf,
 	dev->quirks = (uvc_quirks_param == -1)
 		    ? id->driver_info : uvc_quirks_param;
 
-	if (udev->product != NULL)
-		strlcpy(dev->name, udev->product, sizeof dev->name);
-	else
-		snprintf(dev->name, sizeof dev->name,
-			"UVC Camera (%04x:%04x)",
-			le16_to_cpu(udev->descriptor.idVendor),
-			le16_to_cpu(udev->descriptor.idProduct));
+	strlcpy(dev->name, udev->product ? udev->product : "UVC Camera",
+		sizeof(dev->name));
+
+	/*
+	 * Add iFunction or iInterface to names when available as additional
+	 * distinguishers between interfaces. iFunction is prioritized over
+	 * iInterface which matches Windows behavior at the point of writing.
+	 */
+	additional_name = intf->cur_altsetting->desc.iInterface;
+	if (intf->intf_assoc && intf->intf_assoc->iFunction != 0)
+		additional_name = intf->intf_assoc->iFunction;
+	if (additional_name != 0) {
+		size_t len;
+
+		strlcat(dev->name, ": ", sizeof(dev->name));
+		len = strlen(dev->name);
+		usb_string(udev, additional_name, dev->name + len,
+			   sizeof(dev->name) - len);
+	}
+
+	/* Append descriptors to unknown UVC products. */
+	if (!udev->product) {
+		size_t len = strlen(dev->name);
+
+		snprintf(dev->name + len, sizeof(dev->name) - len,
+			 " (%04x:%04x)",
+			 le16_to_cpu(udev->descriptor.idVendor),
+			 le16_to_cpu(udev->descriptor.idProduct));
+	}
 
 	/* Parse the Video Class control descriptor. */
 	if (uvc_parse_control(dev) < 0) {

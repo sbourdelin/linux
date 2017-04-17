@@ -556,7 +556,7 @@ struct uvc_device {
 	unsigned long warnings;
 	__u32 quirks;
 	int intfnum;
-	char name[32];
+	char name[64];
 
 	struct mutex lock;		/* Protects users */
 	unsigned int users;
