@@ -1877,6 +1877,8 @@ static void uvc_unregister_video(struct uvc_device *dev)
 		if (!video_is_registered(&stream->vdev))
 			continue;
 
+		uvc_video_enable(stream, 0);
+
 		video_unregister_device(&stream->vdev);
 
 		uvc_debugfs_cleanup_stream(stream);
