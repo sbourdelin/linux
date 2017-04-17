@@ -408,6 +408,11 @@ extern const char *scsi_device_state_name(enum scsi_device_state);
 extern int scsi_is_sdev_device(const struct device *);
 extern int scsi_is_target_device(const struct device *);
 extern void scsi_sanitize_inquiry_string(unsigned char *s, int len);
+extern int scsi_execute_async(const struct scsi_device *sdev,
+		struct gendisk *disk, const unsigned char *cmd,
+		int data_direction, void *buffer, unsigned bufflen,
+		int timeout, int retries, u64 flags, req_flags_t rq_flags,
+			      rq_end_io_fn *done);
 extern int scsi_execute(struct scsi_device *sdev, const unsigned char *cmd,
 			int data_direction, void *buffer, unsigned bufflen,
 			unsigned char *sense, struct scsi_sense_hdr *sshdr,
