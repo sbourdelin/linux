@@ -245,11 +245,12 @@ int hidma_mgmt_init_sys(struct hidma_mgmt_dev *mdev)
 {
 	unsigned int i;
 	int rc;
-	int required;
 	struct kobject *chanops;
 
-	required = sizeof(*mdev->chroots) * mdev->dma_channels;
-	mdev->chroots = devm_kmalloc(&mdev->pdev->dev, required, GFP_KERNEL);
+	mdev->chroots = devm_kmalloc_array(&mdev->pdev->dev,
+					   mdev->dma_channels,
+					   sizeof(*mdev->chroots),
+					   GFP_KERNEL);
 	if (!mdev->chroots)
 		return -ENOMEM;
 
