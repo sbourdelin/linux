@@ -84,6 +84,18 @@ struct sym_hist {
 	u64		addr[0];
 };
 
+struct call_list_entry {
+	u64    ip;
+	u64    sym_start;
+	struct list_head list;
+};
+
+struct cxt_hist_entry {
+	struct list_head list;
+	struct list_head callchain;
+	struct sym_hist histograms[0];
+};
+
 struct cyc_hist {
 	u64	start;
 	u64	cycles;
@@ -127,6 +139,7 @@ struct annotated_source {
 	int    		   nr_histograms;
 	size_t		   sizeof_sym_hist;
 	struct cyc_hist	   *cycles_hist;
+	struct list_head   context_hists;
 	struct sym_hist	   histograms[0];
 };
 
@@ -155,8 +168,14 @@ int addr_map_symbol__account_cycles(struct addr_map_symbol *ams,
 
 int hist_entry__inc_addr_samples(struct hist_entry *he, int evidx, u64 addr);
 
+int hist_entry_cxt__inc_addr_samples(struct hist_entry *he, int evidx, u64 ip,
+				     struct callchain_cursor *cursor);
+
 int symbol__alloc_hist(struct symbol *sym);
 void symbol__annotate_zero_histograms(struct symbol *sym);
+
+int symbol_cxt__copy_hist(struct symbol *sym,
+			  int evidx, struct list_head *callchain);
 
 int symbol__disassemble(struct symbol *sym, struct map *map, const char *arch_name, size_t privsize);
 

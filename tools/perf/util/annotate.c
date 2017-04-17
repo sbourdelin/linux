@@ -18,6 +18,7 @@
 #include "annotate.h"
 #include "evsel.h"
 #include "block-range.h"
+#include "callchain.h"
 #include "arch/common.h"
 #include <regex.h>
 #include <pthread.h>
@@ -554,7 +555,7 @@ int symbol__alloc_hist(struct symbol *sym)
 {
 	struct annotation *notes = symbol__annotation(sym);
 	const size_t size = symbol__size(sym);
-	size_t sizeof_sym_hist;
+	size_t sizeof_sym_hist, nr_sym_hist;
 
 	/* Check for overflow when calculating sizeof_sym_hist */
 	if (size > (SIZE_MAX - sizeof(struct sym_hist)) / sizeof(u64))
@@ -567,12 +568,17 @@ int symbol__alloc_hist(struct symbol *sym)
 				/ symbol_conf.nr_events)
 		return -1;
 
-	notes->src = zalloc(sizeof(*notes->src) + symbol_conf.nr_events * sizeof_sym_hist);
+	/* Allocate 1 histogram per event and 1 more for context annotation */
+	nr_sym_hist = symbol_conf.nr_events + 1;
+
+	notes->src = zalloc(sizeof(*notes->src) +
+			    nr_sym_hist * sizeof_sym_hist);
 	if (notes->src == NULL)
 		return -1;
 	notes->src->sizeof_sym_hist = sizeof_sym_hist;
-	notes->src->nr_histograms   = symbol_conf.nr_events;
+	notes->src->nr_histograms   = nr_sym_hist;
 	INIT_LIST_HEAD(&notes->src->source);
+	INIT_LIST_HEAD(&notes->src->context_hists);
 	return 0;
 }
 
@@ -591,11 +597,18 @@ static int symbol__alloc_hist_cycles(struct symbol *sym)
 void symbol__annotate_zero_histograms(struct symbol *sym)
 {
 	struct annotation *notes = symbol__annotation(sym);
+	struct cxt_hist_entry *hist_entry;
 
 	pthread_mutex_lock(&notes->lock);
 	if (notes->src != NULL) {
 		memset(notes->src->histograms, 0,
 		       notes->src->nr_histograms * notes->src->sizeof_sym_hist);
+
+		list_for_each_entry(hist_entry,
+				    &notes->src->context_hists, list) {
+			list_del(&hist_entry->list);
+			free(hist_entry);
+		}
 		if (notes->src->cycles_hist)
 			memset(notes->src->cycles_hist, 0,
 				symbol__size(sym) * sizeof(struct cyc_hist));
@@ -681,6 +694,7 @@ static struct annotation *symbol__get_annotation(struct symbol *sym, bool cycles
 		if (symbol__alloc_hist_cycles(sym) < 0)
 			return NULL;
 	}
+
 	return notes;
 }
 
@@ -695,6 +709,281 @@ static int symbol__inc_addr_samples(struct symbol *sym, struct map *map,
 	if (notes == NULL)
 		return -ENOMEM;
 	return __symbol__inc_addr_samples(sym, map, notes, evidx, addr);
+}
+
+static bool __symbol_cxt__cmp_call_cursor(struct cxt_hist_entry *hist_entry,
+					  struct callchain_cursor *cursor)
+{
+	struct callchain_cursor_node *node;
+	struct call_list_entry *entry;
+	u64 match_count = 0;
+
+	callchain_cursor_commit(cursor);
+
+	/*
+	 * One element of the callchain cursor cannot be matched: the last
+	 * element (or first according to the order) which corresponds to the
+	 * real sampled address; so, let's skip it (if need be) and...
+	 */
+	if (callchain_param.order == ORDER_CALLEE)
+		callchain_cursor_advance(cursor);
+
+	/* ...consider it has matched */
+	match_count++;
+
+	list_for_each_entry(entry, &hist_entry->callchain, list) {
+
+		node = callchain_cursor_current(cursor);
+		if (node == NULL)
+			break;
+
+		if (entry->ip == node->ip)
+			match_count++;
+
+		callchain_cursor_advance(cursor);
+	}
+
+	return match_count == cursor->nr;
+}
+
+static int __symbol_cxt__copy_call_cursor(struct cxt_hist_entry *hist_entry,
+					  struct callchain_cursor *cursor)
+{
+	struct callchain_cursor_node *node;
+	struct call_list_entry *entry, *n;
+
+	callchain_cursor_commit(cursor);
+	node = callchain_cursor_current(cursor);
+
+	/*
+	 * For each entry in the callchain cursor, we need to copy 2 fields: the
+	 * text addresses and the symbol in which the address is located...
+	 */
+	while (node) {
+		entry = zalloc(sizeof(*entry));
+		if (entry == NULL)
+			goto error;
+
+		/* ...each address composes a unique key for the callchain ...*/
+		entry->ip = node->ip;
+
+		/* ... the symbol is only useful because the hist_entry's sorted
+		 * callchain does not provide all the addresses.
+		 */
+		entry->sym_start =
+			(node->sym != NULL) ? node->sym->start : node->ip;
+
+		list_add_tail(&entry->list, &hist_entry->callchain);
+
+		callchain_cursor_advance(cursor);
+		node = callchain_cursor_current(cursor);
+	}
+
+	/*
+	 * One element of the callchain cursor should not be copied: the last
+	 * element (or first according to the order) which corresponds to the
+	 * real sampled address; so, let's deleted it from the linked list.
+	 */
+	if (!list_empty(&hist_entry->callchain)) {
+		entry = (callchain_param.order == ORDER_CALLEE) ?
+			list_first_entry(&hist_entry->callchain,
+					 struct call_list_entry, list) :
+			list_last_entry(&hist_entry->callchain,
+					struct call_list_entry, list);
+		list_del(&entry->list);
+		free(entry);
+	}
+
+	return 0;
+
+error:
+
+	list_for_each_entry_safe(entry, n, &hist_entry->callchain, list) {
+		list_del(&entry->list);
+		free(entry);
+	}
+
+	return -ENOMEM;
+}
+
+static struct sym_hist *__symbol_cxt__get_hists(struct annotation *notes,
+						int evidx,
+						struct callchain_cursor *cursor)
+{
+	struct cxt_hist_entry *hist_entry;
+	size_t sizeof_hists;
+
+	/*
+	 * Try to find a contextual histogram (an instance with the same
+	 * callchain)...
+	 */
+	list_for_each_entry(hist_entry, &notes->src->context_hists, list) {
+		if (__symbol_cxt__cmp_call_cursor(hist_entry, cursor))
+			goto return_selection;
+	}
+
+	/* ...if none was found, let's create a new one... */
+	sizeof_hists = notes->src->sizeof_sym_hist * notes->src->nr_histograms;
+	hist_entry = zalloc(sizeof(*hist_entry) + sizeof_hists);
+	if (hist_entry == NULL)
+		return NULL;
+
+	/* ...and copy the callchain from the callchain cursor */
+	INIT_LIST_HEAD(&hist_entry->callchain);
+	if (__symbol_cxt__copy_call_cursor(hist_entry, cursor) < 0) {
+		free(hist_entry);
+		return NULL;
+	}
+
+	list_add(&hist_entry->list, &notes->src->context_hists);
+
+return_selection:
+
+	return (((void *)&hist_entry->histograms) +
+		(notes->src->sizeof_sym_hist * evidx));
+}
+
+static int __symbol_cxt__inc_addr_samples(struct symbol *sym,
+					  struct map *map,
+					  struct annotation *notes,
+					  int evidx, u64 addr,
+					  struct callchain_cursor *cursor)
+{
+	unsigned long offset;
+	struct sym_hist *h;
+
+	pr_debug3("%s: addr=%#" PRIx64 "\n",
+		  __func__, map->unmap_ip(map, addr));
+
+	if ((addr < sym->start || addr >= sym->end) &&
+	    (addr != sym->end || sym->start != sym->end)) {
+		pr_debug("%s(%d): ERANGE! sym->name=%s, start=%#" PRIx64
+			 ", addr=%#" PRIx64 ", end=%#" PRIx64 "\n",
+			 __func__, __LINE__,
+			 sym->name, sym->start, addr, sym->end);
+		return -ERANGE;
+	}
+
+	offset = addr - sym->start;
+	h = __symbol_cxt__get_hists(notes, evidx, cursor);
+	h->sum++;
+	h->addr[offset]++;
+
+	pr_debug3("%#" PRIx64 " %s: period++ [addr: %#" PRIx64 ", %#" PRIx64
+		  ", evidx=%d] => %" PRIu64 "\n", sym->start, sym->name,
+		  addr, addr - sym->start, evidx, h->addr[offset]);
+	return 0;
+}
+
+static int symbol_cxt__inc_addr_samples(struct symbol *sym, struct map *map,
+					int evidx, u64 addr,
+					struct callchain_cursor *cursor)
+{
+	struct annotation *notes;
+
+	if (sym == NULL)
+		return 0;
+	notes = symbol__get_annotation(sym, false);
+	if (notes == NULL)
+		return -ENOMEM;
+	return __symbol_cxt__inc_addr_samples(sym, map, notes,
+					      evidx, addr, cursor);
+}
+
+static bool  __symbol_cxt__cmp_callchain(struct list_head *left_callchain,
+					 struct list_head *right_callchain)
+{
+	struct call_list_entry *left_entry, *right_entry;
+	u64 total_count = 0, match_count = 0;
+
+	right_entry =
+		list_first_entry_or_null(right_callchain,
+					 struct call_list_entry, list);
+
+	/*
+	 * This function compares two callchains (of contextual histograms); so,
+	 * we need to simultaneously go through both callchains and compare
+	 * their entries against each other.
+	 */
+	list_for_each_entry(left_entry, left_callchain, list) {
+
+		if (total_count != match_count)
+			break;
+
+		total_count++;
+
+		if (right_entry == NULL)
+			continue;
+
+		/*
+		 * The right callchain was generated by scanning the elements in
+		 * hist_entry->sorted_chain (used for results display); in case
+		 * of fork, the hold ip address is not correct; so, we have to
+		 * check symbol start addresses.
+		 */
+		if (left_entry->ip == right_entry->ip)
+			match_count++;
+		else if (left_entry->sym_start == right_entry->sym_start)
+			match_count++;
+
+		if (list_is_last(&right_entry->list, right_callchain))
+			right_entry = NULL;
+		else
+			right_entry = list_next_entry(right_entry, list);
+	}
+
+	/*
+	 * We consider that 2 empty callchains are not equal (just because the
+	 * right callchain cannot be empty; this point might/must be flawed.
+	 */
+	return total_count > 0 &&
+		right_entry == NULL && match_count == total_count;
+}
+
+int symbol_cxt__copy_hist(struct symbol *sym, int evidx,
+			  struct list_head *ref_callchain)
+{
+	struct annotation *notes;
+	struct cxt_hist_entry *hist_entry;
+	struct sym_hist *src_hist, *dst_hist;
+	int last_hist_idx;
+
+	/*
+	 * Each per-symbol annotation structure contains per-callchain
+	 * histograms...
+	 */
+	notes = symbol__get_annotation(sym, false);
+	if (notes == NULL)
+		return -ENOENT;
+
+	/*
+	 * ...we need to find the histogram which corresponds to the reference
+	 * callchain passed as argument...
+	 */
+	list_for_each_entry(hist_entry, &notes->src->context_hists, list) {
+
+		if (__symbol_cxt__cmp_callchain(&hist_entry->callchain,
+						ref_callchain)) {
+			goto copy_selection;
+		}
+	}
+
+	return -ENOENT;
+
+copy_selection:
+
+	last_hist_idx = notes->src->nr_histograms - 1;
+
+	/*
+	 * ...and copy it so that it will be displayed as annotation of the
+	 * disassembled symbol code.
+	 */
+	dst_hist = annotation__histogram(notes, last_hist_idx);
+	src_hist = (((void *)&hist_entry->histograms) +
+		    (notes->src->sizeof_sym_hist * evidx));
+	memcpy(dst_hist, src_hist, notes->src->sizeof_sym_hist);
+
+	return 0;
 }
 
 static int symbol__account_cycles(u64 addr, u64 start,
@@ -766,6 +1055,19 @@ int addr_map_symbol__inc_samples(struct addr_map_symbol *ams, int evidx)
 int hist_entry__inc_addr_samples(struct hist_entry *he, int evidx, u64 ip)
 {
 	return symbol__inc_addr_samples(he->ms.sym, he->ms.map, evidx, ip);
+}
+
+int hist_entry_cxt__inc_addr_samples(struct hist_entry *he, int evidx, u64 ip,
+				     struct callchain_cursor *cursor)
+{
+	/* Unlike hist_entry_inc_addr_samples which updates a per-symbol
+	 * histogram for code annotation display, this function works with many
+	 * per-symbol histograms: one for every different callchain recorded.
+	 * The interest is to have different annotations according to the
+	 * callchain context.
+	 */
+	return symbol_cxt__inc_addr_samples(he->ms.sym,
+					    he->ms.map, evidx, ip, cursor);
 }
 
 static void disasm_line__init_ins(struct disasm_line *dl, struct arch *arch, struct map *map)
