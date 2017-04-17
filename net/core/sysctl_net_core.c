@@ -452,6 +452,13 @@ static struct ctl_table net_core_table[] = {
 		.extra1		= &one,
 		.extra2		= &max_skb_frags,
 	},
+	{
+		.procname	= "netdev_budget_jiffies",
+		.data		= &netdev_budget_jiffies,
+		.maxlen		= sizeof(int),
+		.mode		= 0644,
+		.proc_handler	= proc_dointvec
+	},
 	{ }
 };
 
