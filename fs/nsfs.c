@@ -185,6 +185,10 @@ static long ns_ioctl(struct file *filp, unsigned int ioctl,
 		argp = (uid_t __user *) arg;
 		uid = from_kuid_munged(current_user_ns(), user_ns->owner);
 		return put_user(uid, argp);
+	case NS_SPECIFIC_IOC:
+		if (!ns->ops->ns_ioctl)
+			return -ENOTTY;
+		return ns->ops->ns_ioctl(ns, arg);
 	default:
 		return -ENOTTY;
 	}

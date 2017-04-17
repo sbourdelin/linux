@@ -20,6 +20,7 @@ struct proc_ns_operations {
 	int (*install)(struct nsproxy *nsproxy, struct ns_common *ns);
 	struct user_namespace *(*owner)(struct ns_common *ns);
 	struct ns_common *(*get_parent)(struct ns_common *ns);
+	long (*ns_ioctl)(struct ns_common *ns, unsigned long arg);
 };
 
 extern const struct proc_ns_operations netns_operations;

@@ -14,5 +14,7 @@
 #define NS_GET_NSTYPE		_IO(NSIO, 0x3)
 /* Get owner UID (in the caller's user namespace) for a user namespace */
 #define NS_GET_OWNER_UID	_IO(NSIO, 0x4)
+/* Execute namespace-specific ioctl */
+#define NS_SPECIFIC_IOC		_IO(NSIO, 0x5)
 
 #endif /* __LINUX_NSFS_H */
