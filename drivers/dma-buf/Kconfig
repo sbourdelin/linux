@@ -1,8 +1,10 @@
-menu "DMABUF options"
+menuconfig DMABUF
+	bool "DMABUF options"
 
 config SYNC_FILE
 	bool "Explicit Synchronization Framework"
 	default n
+	depends on DMABUF
 	select ANON_INODES
 	select DMA_SHARED_BUFFER
 	---help---
@@ -20,6 +22,7 @@ config SYNC_FILE
 config SW_SYNC
 	bool "Sync File Validation Framework"
 	default n
+	depends on DMABUF
 	depends on SYNC_FILE
 	depends on DEBUG_FS
 	---help---
@@ -29,5 +32,3 @@ config SW_SYNC
 
 	  WARNING: improper use of this can result in deadlocking kernel
 	  drivers from userspace. Intended for test and debug only.
-
-endmenu

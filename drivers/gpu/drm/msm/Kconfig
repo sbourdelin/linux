@@ -12,6 +12,7 @@ config DRM_MSM
 	select TMPFS
 	select QCOM_SCM
 	select SND_SOC_HDMI_CODEC if SND_SOC
+	select DMABUF
 	select SYNC_FILE
 	default y
 	help
