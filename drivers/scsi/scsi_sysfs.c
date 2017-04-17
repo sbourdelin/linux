@@ -1299,6 +1299,15 @@ void __scsi_remove_device(struct scsi_device *sdev)
 	 * device.
 	 */
 	scsi_device_set_state(sdev, SDEV_DEL);
+	/*
+	 * Since scsi_target_unblock() is a no-op after unloading of the SCSI
+	 * LLD has started, explicitly restart the queue. Do this after the
+	 * device state has been changed into SDEV_DEL because
+	 * scsi_prep_state_check() returns BLKPREP_KILL for the SDEV_DEL state
+	 * Do this before calling blk_cleanup_queue() to avoid that that
+	 * function encounters a stopped queue.
+	 */
+	scsi_start_queue(sdev);
 	blk_cleanup_queue(sdev->request_queue);
 	cancel_work_sync(&sdev->requeue_work);
 
