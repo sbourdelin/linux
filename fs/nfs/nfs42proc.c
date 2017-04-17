@@ -174,12 +174,6 @@ static ssize_t _nfs42_proc_copy(struct file *src,
 	if (status)
 		return status;
 
-	if (res->write_res.verifier.committed != NFS_FILE_SYNC) {
-		status = nfs_commit_file(dst, &res->write_res.verifier.verifier);
-		if (status)
-			return status;
-	}
-
 	truncate_pagecache_range(dst_inode, pos_dst,
 				 pos_dst + res->write_res.count);
 
