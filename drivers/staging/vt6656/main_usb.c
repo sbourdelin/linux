@@ -414,7 +414,7 @@ static void usb_device_reset(struct vnt_private *priv)
 	status = usb_reset_device(priv->usb);
 	if (status)
 		dev_warn(&priv->usb->dev,
-			 "usb_device_reset fail status=%d\n", status);
+			 "%s fail status=%d\n", __func__, status);
 }
 
 static void vnt_free_int_bufs(struct vnt_private *priv)
