@@ -136,6 +136,14 @@ static int hist_iter__report_callback(struct hist_entry_iter *iter,
 		if (single)
 			err = hist_entry__inc_addr_samples(he, evsel->idx,
 							   al->addr);
+		if (err == 0) {
+			struct callchain_cursor *cursor = &callchain_cursor;
+
+			err = hist_entry_cxt__inc_addr_samples(he,
+							       evsel->idx,
+							       al->addr,
+							       cursor);
+		}
 	} else {
 		err = hist_entry__inc_addr_samples(he, evsel->idx, al->addr);
 	}
