@@ -873,6 +873,16 @@
 #define	FIC_VID			0x1457
 #define	FIC_NEO1973_DEBUG_PID	0x5118
 
+/*
+ * Microsemi/Arrow SF2PLUS Dev Kit
+ *
+ * This board has an FT4232 on it which provides four UART ports.
+ * UART 0 is used by the FlashPro5 programmer, UART 2 is connected
+ * to the UART of an CortexM3 SoC-FPGA on the board.
+ */
+#define ACTEL_VID				0x1514
+#define MICROSEMI_ARROW_SF2PLUS_BOARD_PID	0x2008
+
 /* Olimex */
 #define OLIMEX_VID			0x15BA
 #define OLIMEX_ARM_USB_OCD_PID		0x0003
