@@ -335,7 +335,9 @@ static int pxamci_cmd_done(struct pxamci_host *host, unsigned int stat)
 
 	pxamci_disable_irq(host, END_CMD_RES);
 	if (host->data && !cmd->error) {
-		pxamci_enable_irq(host, DATA_TRAN_DONE);
+		if (host->data->flags & MMC_DATA_READ)
+			pxamci_enable_irq(host, DATA_TRAN_DONE);
+
 		/*
 		 * workaround for erratum #91, if doing write
 		 * enable DMA late
@@ -585,6 +587,9 @@ static void pxamci_dma_irq(void *param)
 
 	if (likely(status == DMA_COMPLETE)) {
 		writel(BUF_PART_FULL, host->base + MMC_PRTBUF);
+
+		/* NOTICE pxamci_irq() is dependent on pxamci_dma_irq() */
+		pxamci_enable_irq(host, DATA_TRAN_DONE);
 	} else {
 		pr_err("%s: Invalid DMA status %i\n", mmc_hostname(host->mmc),
 			status);
