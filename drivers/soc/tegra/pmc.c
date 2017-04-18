@@ -124,8 +124,7 @@ struct tegra_powergate {
 	unsigned int id;
 	struct clk **clks;
 	unsigned int num_clks;
-	struct reset_control **resets;
-	unsigned int num_resets;
+	struct reset_control_array *resets;
 };
 
 struct tegra_io_pad_soc {
@@ -348,32 +347,14 @@ out:
 	return err;
 }
 
-static int tegra_powergate_reset_assert(struct tegra_powergate *pg)
+static inline int tegra_powergate_reset_assert(struct tegra_powergate *pg)
 {
-	unsigned int i;
-	int err;
-
-	for (i = 0; i < pg->num_resets; i++) {
-		err = reset_control_assert(pg->resets[i]);
-		if (err)
-			return err;
-	}
-
-	return 0;
+	return reset_control_array_assert(pg->resets);
 }
 
-static int tegra_powergate_reset_deassert(struct tegra_powergate *pg)
+static inline int tegra_powergate_reset_deassert(struct tegra_powergate *pg)
 {
-	unsigned int i;
-	int err;
-
-	for (i = 0; i < pg->num_resets; i++) {
-		err = reset_control_deassert(pg->resets[i]);
-		if (err)
-			return err;
-	}
-
-	return 0;
+	return reset_control_array_deassert(pg->resets);
 }
 
 static int tegra_powergate_power_up(struct tegra_powergate *pg,
@@ -558,6 +539,7 @@ int tegra_powergate_sequence_power_up(unsigned int id, struct clk *clk,
 				      struct reset_control *rst)
 {
 	struct tegra_powergate pg;
+	struct reset_control_array *resets;
 	int err;
 
 	if (!tegra_powergate_is_available(id))
@@ -566,12 +548,25 @@ int tegra_powergate_sequence_power_up(unsigned int id, struct clk *clk,
 	pg.id = id;
 	pg.clks = &clk;
 	pg.num_clks = 1;
-	pg.resets = &rst;
-	pg.num_resets = 1;
+
+	resets = kzalloc(sizeof(*resets) + sizeof(resets->rstc[0]) * 1,
+			 GFP_KERNEL);
+	if (!resets)
+		return -ENOMEM;
+
+	resets->rstc[0] = rst;
+	pg.resets = resets;
 
 	err = tegra_powergate_power_up(&pg, false);
-	if (err)
+	if (err) {
 		pr_err("failed to turn on partition %d: %d\n", id, err);
+		goto free_reset;
+	}
+
+	return 0;
+
+free_reset:
+	kfree(resets);
 
 	return err;
 }
@@ -755,45 +750,26 @@ err:
 static int tegra_powergate_of_get_resets(struct tegra_powergate *pg,
 					 struct device_node *np, bool off)
 {
-	struct reset_control *rst;
-	unsigned int i, count;
 	int err;
 
-	count = of_count_phandle_with_args(np, "resets", "#reset-cells");
-	if (count == 0)
-		return -ENODEV;
-
-	pg->resets = kcalloc(count, sizeof(rst), GFP_KERNEL);
-	if (!pg->resets)
-		return -ENOMEM;
-
-	for (i = 0; i < count; i++) {
-		pg->resets[i] = of_reset_control_get_by_index(np, i);
-		if (IS_ERR(pg->resets[i])) {
-			err = PTR_ERR(pg->resets[i]);
-			goto error;
-		}
-
-		if (off)
-			err = reset_control_assert(pg->resets[i]);
-		else
-			err = reset_control_deassert(pg->resets[i]);
-
-		if (err) {
-			reset_control_put(pg->resets[i]);
-			goto error;
-		}
+	pg->resets = of_reset_control_array_get_exclusive(np);
+	if (IS_ERR(pg->resets)) {
+		pr_err("failed to get device resets\n");
+		return PTR_ERR(pg->resets);
 	}
 
-	pg->num_resets = count;
+	if (off)
+		err = reset_control_array_assert(pg->resets);
+	else
+		err = reset_control_array_deassert(pg->resets);
+
+	if (err)
+		goto put_reset;
 
 	return 0;
 
-error:
-	while (i--)
-		reset_control_put(pg->resets[i]);
-
-	kfree(pg->resets);
+put_reset:
+	reset_control_array_put(pg->resets);
 
 	return err;
 }
@@ -885,10 +861,7 @@ remove_genpd:
 	pm_genpd_remove(&pg->genpd);
 
 remove_resets:
-	while (pg->num_resets--)
-		reset_control_put(pg->resets[pg->num_resets]);
-
-	kfree(pg->resets);
+	reset_control_array_put(pg->resets);
 
 remove_clks:
 	while (pg->num_clks--)
