@@ -825,14 +825,14 @@ static int acpi_battery_print_info(struct seq_file *seq, int result)
 	if (!acpi_battery_present(battery))
 		goto end;
 	if (battery->design_capacity == ACPI_BATTERY_VALUE_UNKNOWN)
-		seq_printf(seq, "design capacity:         unknown\n");
+		seq_puts(seq, "design capacity:         unknown\n");
 	else
 		seq_printf(seq, "design capacity:         %d %sh\n",
 			   battery->design_capacity,
 			   acpi_battery_units(battery));
 
 	if (battery->full_charge_capacity == ACPI_BATTERY_VALUE_UNKNOWN)
-		seq_printf(seq, "last full capacity:      unknown\n");
+		seq_puts(seq, "last full capacity:      unknown\n");
 	else
 		seq_printf(seq, "last full capacity:      %d %sh\n",
 			   battery->full_charge_capacity,
@@ -842,7 +842,7 @@ static int acpi_battery_print_info(struct seq_file *seq, int result)
 		   (!battery->technology)?"non-":"");
 
 	if (battery->design_voltage == ACPI_BATTERY_VALUE_UNKNOWN)
-		seq_printf(seq, "design voltage:          unknown\n");
+		seq_puts(seq, "design voltage:          unknown\n");
 	else
 		seq_printf(seq, "design voltage:          %d mV\n",
 			   battery->design_voltage);
@@ -865,7 +865,7 @@ static int acpi_battery_print_info(struct seq_file *seq, int result)
 	seq_printf(seq, "OEM info:                %s\n", battery->oem_info);
       end:
 	if (result)
-		seq_printf(seq, "ERROR: Unable to read battery info\n");
+		seq_puts(seq, "ERROR: Unable to read battery info\n");
 	return result;
 }
 
@@ -884,34 +884,34 @@ static int acpi_battery_print_state(struct seq_file *seq, int result)
 	seq_printf(seq, "capacity state:          %s\n",
 			(battery->state & 0x04) ? "critical" : "ok");
 	if ((battery->state & 0x01) && (battery->state & 0x02))
-		seq_printf(seq,
-			   "charging state:          charging/discharging\n");
+		seq_puts(seq,
+			 "charging state:          charging/discharging\n");
 	else if (battery->state & 0x01)
-		seq_printf(seq, "charging state:          discharging\n");
+		seq_puts(seq, "charging state:          discharging\n");
 	else if (battery->state & 0x02)
-		seq_printf(seq, "charging state:          charging\n");
+		seq_puts(seq, "charging state:          charging\n");
 	else
-		seq_printf(seq, "charging state:          charged\n");
+		seq_puts(seq, "charging state:          charged\n");
 
 	if (battery->rate_now == ACPI_BATTERY_VALUE_UNKNOWN)
-		seq_printf(seq, "present rate:            unknown\n");
+		seq_puts(seq, "present rate:            unknown\n");
 	else
 		seq_printf(seq, "present rate:            %d %s\n",
 			   battery->rate_now, acpi_battery_units(battery));
 
 	if (battery->capacity_now == ACPI_BATTERY_VALUE_UNKNOWN)
-		seq_printf(seq, "remaining capacity:      unknown\n");
+		seq_puts(seq, "remaining capacity:      unknown\n");
 	else
 		seq_printf(seq, "remaining capacity:      %d %sh\n",
 			   battery->capacity_now, acpi_battery_units(battery));
 	if (battery->voltage_now == ACPI_BATTERY_VALUE_UNKNOWN)
-		seq_printf(seq, "present voltage:         unknown\n");
+		seq_puts(seq, "present voltage:         unknown\n");
 	else
 		seq_printf(seq, "present voltage:         %d mV\n",
 			   battery->voltage_now);
       end:
 	if (result)
-		seq_printf(seq, "ERROR: Unable to read battery state\n");
+		seq_puts(seq, "ERROR: Unable to read battery state\n");
 
 	return result;
 }
@@ -924,18 +924,18 @@ static int acpi_battery_print_alarm(struct seq_file *seq, int result)
 		goto end;
 
 	if (!acpi_battery_present(battery)) {
-		seq_printf(seq, "present:                 no\n");
+		seq_puts(seq, "present:                 no\n");
 		goto end;
 	}
-	seq_printf(seq, "alarm:                   ");
+	seq_puts(seq, "alarm:                   ");
 	if (!battery->alarm)
-		seq_printf(seq, "unsupported\n");
+		seq_puts(seq, "unsupported\n");
 	else
 		seq_printf(seq, "%u %sh\n", battery->alarm,
 				acpi_battery_units(battery));
       end:
 	if (result)
-		seq_printf(seq, "ERROR: Unable to read battery alarm\n");
+		seq_puts(seq, "ERROR: Unable to read battery alarm\n");
 	return result;
 }
 
