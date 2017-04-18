@@ -1,0 +1,68 @@
+DDR PHY Front End (DPFE) for Broadcom STB
+=========================================
+
+DPFE and the DPFE firmware provide an interface for the host CPU to
+communicate with the DCPU, which resides inside the DDR PHY.
+
+There are three memory regions for interacting with the DCPU.
+
+The DCPU Register Space
+-----------------------
+
+Required properties:
+  - compatible: must be one of brcm,bcm7271-dpfe-cpu, brcm,dpfe-cpu-v12.0.0.0
+    or brcm,dpfe-cpu
+  - reg: must reference the start address and length of the DCPU register
+    space
+
+Optional properties:
+  - cell-index: the index of the DPFE instance; will default to 0 if not set
+
+Example:
+	dpfe_cpu0: dpfe-cpu@f1132000 {
+		compatible = "brcm,bcm7271-dpfe-cpu",
+			"brcm,dpfe-cpu-v12.0.0.0",
+			"brcm,dpfe-cpu";
+		reg = <0xf1132000 0x180>;
+		cell-index = <0>;
+	};
+
+The DCPU Data Memory Space
+--------------------------
+
+Required properties:
+  - compatible: must be one of brcm,bcm7271-dpfe-dmem, brcm,dpfe-dmem-v12.0.0.0
+    or brcm,dpfe-dmem
+  - reg: must reference the start address and length of the DCPU DMEM space
+
+Optional properties:
+  - cell-index: the index of the DPFE instance; will default to 0 if not set
+
+Example:
+	dpfe_dmem0: dpfe-dmem@f1134000 {
+		compatible = "brcm,bcm7271-dpfe-dmem",
+			"brcm,dpfe-dmem-v12.0.0.0",
+			"brcm,dpfe-dmem";
+		reg = <0xf1134000 0x1000>;
+		cell-index = <0>;
+	};
+
+The DCPU Instruction Memory Space
+---------------------------------
+
+Required properties:
+  - compatible: must be one of brcm,bcm7271-dpfe-imem, brcm,dpfe-imem-v12.0.0.0
+    or brcm,dpfe-imem
+  - reg: must reference the start address and length of the DCPU IMEM space
+
+Optional properties:
+  - cell-index: the index of the DPFE instance; will default to 0 if not set
+
+Example:
+	dpfe_imem0: dpfe-imem@f1138000 {
+		compatible = "brcm,bcm7271-dpfe-imem",
+			"brcm,dpfe-imem-v12.0.0.0",
+			"brcm,dpfe-imem";
+		reg = <0xf1138000 0x4000>;
+		cell-index = <0>;
+	};
