@@ -2793,47 +2793,56 @@ static bool engine_stalled(struct intel_engine_cs *engine)
 	return true;
 }
 
-int i915_gem_reset_prepare(struct drm_i915_private *dev_priv)
+/* Ensure irq handler finishes, and not run again. */
+int i915_gem_reset_prepare_engine(struct intel_engine_cs *engine)
 {
-	struct intel_engine_cs *engine;
-	enum intel_engine_id id;
+	struct drm_i915_gem_request *request;
 	int err = 0;
 
-	/* Ensure irq handler finishes, and not run again. */
-	for_each_engine(engine, dev_priv, id) {
-		struct drm_i915_gem_request *request;
 
-		/* Prevent the signaler thread from updating the request
-		 * state (by calling dma_fence_signal) as we are processing
-		 * the reset. The write from the GPU of the seqno is
-		 * asynchronous and the signaler thread may see a different
-		 * value to us and declare the request complete, even though
-		 * the reset routine have picked that request as the active
-		 * (incomplete) request. This conflict is not handled
-		 * gracefully!
-		 */
-		kthread_park(engine->breadcrumbs.signaler);
+	/* Prevent the signaler thread from updating the request
+	 * state (by calling dma_fence_signal) as we are processing
+	 * the reset. The write from the GPU of the seqno is
+	 * asynchronous and the signaler thread may see a different
+	 * value to us and declare the request complete, even though
+	 * the reset routine have picked that request as the active
+	 * (incomplete) request. This conflict is not handled
+	 * gracefully!
+	 */
+	kthread_park(engine->breadcrumbs.signaler);
 
-		/* Prevent request submission to the hardware until we have
-		 * completed the reset in i915_gem_reset_finish(). If a request
-		 * is completed by one engine, it may then queue a request
-		 * to a second via its engine->irq_tasklet *just* as we are
-		 * calling engine->init_hw() and also writing the ELSP.
-		 * Turning off the engine->irq_tasklet until the reset is over
-		 * prevents the race.
-		 */
-		tasklet_kill(&engine->irq_tasklet);
-		tasklet_disable(&engine->irq_tasklet);
+	/* Prevent request submission to the hardware until we have
+	 * completed the reset in i915_gem_reset_finish(). If a request
+	 * is completed by one engine, it may then queue a request
+	 * to a second via its engine->irq_tasklet *just* as we are
+	 * calling engine->init_hw() and also writing the ELSP.
+	 * Turning off the engine->irq_tasklet until the reset is over
+	 * prevents the race.
+	 */
+	tasklet_kill(&engine->irq_tasklet);
+	tasklet_disable(&engine->irq_tasklet);
 
-		if (engine->irq_seqno_barrier)
-			engine->irq_seqno_barrier(engine);
+	if (engine->irq_seqno_barrier)
+		engine->irq_seqno_barrier(engine);
 
-		if (engine_stalled(engine)) {
-			request = i915_gem_find_active_request(engine);
-			if (request && request->fence.error == -EIO)
-				err = -EIO; /* Previous reset failed! */
-		}
+	if (engine_stalled(engine)) {
+		request = i915_gem_find_active_request(engine);
+		if (request && request->fence.error == -EIO)
+			err = -EIO; /* Previous reset failed! */
 	}
+
+	return err;
+}
+
+int i915_gem_reset_prepare(struct drm_i915_private *dev_priv,
+			   unsigned int engine_mask)
+{
+	struct intel_engine_cs *engine;
+	unsigned int tmp;
+	int err = 0;
+
+	for_each_engine_masked(engine, dev_priv, engine_mask, tmp)
+		err = i915_gem_reset_prepare_engine(engine);
 
 	i915_gem_revoke_fences(dev_priv);
 
@@ -2920,7 +2929,7 @@ static bool i915_gem_reset_request(struct drm_i915_gem_request *request)
 	return guilty;
 }
 
-static void i915_gem_reset_engine(struct intel_engine_cs *engine)
+void i915_gem_reset_engine(struct intel_engine_cs *engine)
 {
 	struct drm_i915_gem_request *request;
 
@@ -2966,16 +2975,22 @@ void i915_gem_reset(struct drm_i915_private *dev_priv)
 	}
 }
 
-void i915_gem_reset_finish(struct drm_i915_private *dev_priv)
+void i915_gem_reset_finish_engine(struct intel_engine_cs *engine)
+{
+	tasklet_enable(&engine->irq_tasklet);
+	kthread_unpark(engine->breadcrumbs.signaler);
+}
+
+void i915_gem_reset_finish(struct drm_i915_private *dev_priv,
+			   unsigned int engine_mask)
 {
 	struct intel_engine_cs *engine;
-	enum intel_engine_id id;
+	unsigned int tmp;
 
 	lockdep_assert_held(&dev_priv->drm.struct_mutex);
 
-	for_each_engine(engine, dev_priv, id) {
-		tasklet_enable(&engine->irq_tasklet);
-		kthread_unpark(engine->breadcrumbs.signaler);
+	for_each_engine_masked(engine, dev_priv, engine_mask, tmp) {
+		i915_gem_reset_finish_engine(engine);
 	}
 }
 
