@@ -30,6 +30,7 @@ Optional properties:
 - mediatek,hs400-cmd-resp-sel-rising:  HS400 command response sample selection
 				       If present,HS400 command responses are sampled on rising edges.
 				       If not present,HS400 command responses are sampled on falling edges.
+- mediatek,clk-pad-delay: clock pad delay setting
 
 Examples:
 mmc0: mmc@11230000 {
@@ -50,4 +51,5 @@ mmc0: mmc@11230000 {
 	mediatek,hs200-cmd-int-delay = <26>;
 	mediatek,hs400-cmd-int-delay = <14>;
 	mediatek,hs400-cmd-resp-sel-rising;
+	mediatek,clk-pad-delay = <5>;
 };
