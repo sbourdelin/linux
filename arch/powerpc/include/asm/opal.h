@@ -227,6 +227,18 @@ int64_t opal_pci_tce_kill(uint64_t phb_id, uint32_t kill_type,
 			  uint64_t dma_addr, uint32_t npages);
 int64_t opal_nmmu_set_ptcr(uint64_t chip_id, uint64_t ptcr);
 
+/*
+ * OPAL_NEST_IMC_COUNTERS_CONTROL:
+ * mode -- Target mode for the microcode to operation, currently only
+ *	   "PRODUCTION_MODE" is supported, but in-plan to support other modes
+ *	   like "DEBUG" mode specific to nest units.
+ *
+ * value1, value2, value3 -- Based on mode parameter, input values for these
+ *              will differ. These are documented in detail in OPAL-API docs.
+ */
+int64_t opal_nest_imc_counters_control(uint64_t mode, uint64_t value1,
+				uint64_t value2, uint64_t value3);
+
 /* Internal functions */
 extern int early_init_dt_scan_opal(unsigned long node, const char *uname,
 				   int depth, void *data);
