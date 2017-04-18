@@ -301,7 +301,6 @@ static int acpi_fan_get_fps(struct acpi_device *device)
 	fan->fps = devm_kcalloc(&device->dev, fan->fps_count, sizeof(*fan->fps),
 				GFP_KERNEL);
 	if (!fan->fps) {
-		dev_err(&device->dev, "Not enough memory\n");
 		status = -ENOMEM;
 		goto err;
 	}
@@ -334,10 +333,9 @@ static int acpi_fan_probe(struct platform_device *pdev)
 	char *name;
 
 	fan = devm_kzalloc(&pdev->dev, sizeof(*fan), GFP_KERNEL);
-	if (!fan) {
-		dev_err(&device->dev, "No memory for fan\n");
+	if (!fan)
 		return -ENOMEM;
-	}
+
 	device->driver_data = fan;
 	platform_set_drvdata(pdev, fan);
 
