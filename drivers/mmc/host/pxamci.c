@@ -354,6 +354,8 @@ static int pxamci_data_done(struct pxamci_host *host, unsigned int stat)
 	struct mmc_data *data = host->data;
 	struct dma_chan *chan;
 
+	pxamci_disable_irq(host, DATA_TRAN_DONE);
+
 	if (!data) {
 		pr_err("%s: Missing data structure\n",
 			mmc_hostname(host->mmc));
@@ -388,8 +390,6 @@ static int pxamci_data_done(struct pxamci_host *host, unsigned int stat)
 		data->bytes_xfered = data->blocks * data->blksz;
 	else
 		data->bytes_xfered = 0;
-
-	pxamci_disable_irq(host, DATA_TRAN_DONE);
 
 	host->data = NULL;
 	if (host->mrq->stop) {
