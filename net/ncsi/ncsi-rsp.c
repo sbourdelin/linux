@@ -1029,10 +1029,19 @@ int ncsi_rcv_rsp(struct sk_buff *skb, struct net_device *dev,
 	ret = ncsi_validate_rsp_pkt(nr, payload);
 	if (ret) {
 		ncsi_dev_update_stats(ndp, hdr->type, 0, NCSI_PKT_STAT_ERROR);
+		if (ncsi_dev_is_debug_pkt(ndp, nr))
+			ncsi_dev_reset_debug_pkt(ndp, NULL, -EINVAL);
 		goto out;
 	}
 
 	/* Process the packet */
+	if (ncsi_dev_is_debug_pkt(ndp, nr)) {
+		ncsi_dev_update_stats(ndp, hdr->type, 0, NCSI_PKT_STAT_OK);
+		ncsi_dev_reset_debug_pkt(ndp, nr->rsp, 0);
+		nr->rsp = NULL;
+		goto out;
+	}
+
 	ret = nrh->handler(nr);
 	if (ret)
 		ncsi_dev_update_stats(ndp, hdr->type, 0, NCSI_PKT_STAT_ERROR);

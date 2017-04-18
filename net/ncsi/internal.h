@@ -221,6 +221,9 @@ struct ncsi_request {
 	bool                 used;    /* Request that has been assigned  */
 	unsigned int         flags;   /* NCSI request property           */
 #define NCSI_REQ_FLAG_EVENT_DRIVEN	1
+#ifdef CONFIG_NET_NCSI_DEBUG
+#define NCSI_REQ_FLAG_DEBUG		2
+#endif
 	struct ncsi_dev_priv *ndp;    /* Associated NCSI device          */
 	struct sk_buff       *cmd;    /* Associated NCSI command packet  */
 	struct sk_buff       *rsp;    /* Associated NCSI response packet */
@@ -293,6 +296,14 @@ struct ncsi_dev_priv {
 		unsigned long  rsp[128][NCSI_PKT_STAT_MAX];
 		unsigned long  aen[256][NCSI_PKT_STAT_MAX];
 	} stats;
+	struct {
+		struct dentry  *dentry;
+		unsigned int   req;
+#define NCSI_PKT_REQ_FREE	0
+#define NCSI_PKT_REQ_BUSY	0xFFFFFFFF
+		int            errno;
+		struct sk_buff *rsp;
+	} pkt;
 	struct dentry       *dentry;         /* Procfs directory           */
 #endif
 };
@@ -361,6 +372,22 @@ int ncsi_aen_handler(struct ncsi_dev_priv *ndp, struct sk_buff *skb);
 int ncsi_dev_init_debug(struct ncsi_dev_priv *ndp);
 void ncsi_dev_update_stats(struct ncsi_dev_priv *ndp,
 			   int type, int subtype, int errno);
+
+static inline bool ncsi_dev_is_debug_pkt(struct ncsi_dev_priv *ndp,
+					 struct ncsi_request *nr)
+{
+	return ((nr->flags & NCSI_REQ_FLAG_DEBUG) && ndp->pkt.req == nr->id);
+}
+
+static inline void ncsi_dev_set_debug_pkt(struct ncsi_dev_priv *ndp,
+					  struct ncsi_request *nr)
+{
+	if (nr->flags & NCSI_REQ_FLAG_DEBUG)
+		ndp->pkt.req = nr->id;
+}
+
+void ncsi_dev_reset_debug_pkt(struct ncsi_dev_priv *ndp,
+			      struct sk_buff *skb, int errno);
 void ncsi_dev_release_debug(struct ncsi_dev_priv *ndp);
 int ncsi_package_init_debug(struct ncsi_package *np);
 void ncsi_package_release_debug(struct ncsi_package *np);
@@ -374,6 +401,22 @@ static inline int ncsi_dev_init_debug(struct ncsi_dev_priv *ndp)
 
 static inline void ncsi_dev_update_stats(struct ncsi_dev_priv *ndp,
 					 int type, int subtype, int errno)
+{
+}
+
+static inline bool ncsi_dev_is_debug_pkt(struct ncsi_dev_priv *ndp,
+					 struct ncsi_request *nr)
+{
+	return false;
+}
+
+static inline void ncsi_dev_set_debug_pkt(struct ncsi_dev_priv *ndp,
+					  struct ncsi_request *nr)
+{
+}
+
+static inline void ncsi_dev_reset_debug_pkt(struct ncsi_dev_priv *ndp,
+					    struct sk_buff *skb, int errno)
 {
 }
 
