@@ -92,14 +92,42 @@ static int process_sdio_pending_irqs(struct mmc_host *host)
 	return ret;
 }
 
+static void __sdio_run_irqs(struct mmc_host *host)
+{
+	host->sdio_irq_pending = true;
+	process_sdio_pending_irqs(host);
+}
+
 void sdio_run_irqs(struct mmc_host *host)
 {
 	mmc_claim_host(host);
-	host->sdio_irq_pending = true;
-	process_sdio_pending_irqs(host);
+	__sdio_run_irqs(host);
 	mmc_release_host(host);
 }
 EXPORT_SYMBOL_GPL(sdio_run_irqs);
+
+void sdio_irq_work(struct work_struct *work)
+{
+	struct mmc_host *host =
+		container_of(work, struct mmc_host, sdio_irq_work);
+
+	mmc_claim_host(host);
+	__sdio_run_irqs(host);
+	if (host->ops->ack_sdio_irq)
+		host->ops->ack_sdio_irq(host);
+	mmc_release_host(host);
+}
+
+void sdio_signal_irq(struct mmc_host *host)
+{
+	/*
+	 * The system_freezable_wq helps us to avoid processing IRQs while being
+	 * system PM suspended. Instead these IRQs becomes deferred and managed
+	 * when userspace is unfrozen.
+	 */
+	queue_work(system_freezable_wq, &host->sdio_irq_work);
+}
+EXPORT_SYMBOL_GPL(sdio_signal_irq);
 
 static int sdio_irq_thread(void *_host)
 {
