@@ -573,3 +573,44 @@ dma_fence_init(struct dma_fence *fence, const struct dma_fence_ops *ops,
 	trace_dma_fence_init(fence);
 }
 EXPORT_SYMBOL(dma_fence_init);
+
+/**
+ * dma_fence_put - decreases refcount of the fence
+ * @fence:      [in]    fence to reduce refcount of
+ */
+void dma_fence_put(struct dma_fence *fence)
+{
+	if (fence)
+		kref_put(&fence->refcount, dma_fence_release);
+}
+EXPORT_SYMBOL(dma_fence_put);
+
+/**
+ * dma_fence_get - increases refcount of the fence
+ * @fence:      [in]    fence to increase refcount of
+ *
+ * Returns the same fence, with refcount increased by 1.
+ */
+struct dma_fence *dma_fence_get(struct dma_fence *fence)
+{
+	if (fence)
+		kref_get(&fence->refcount);
+	return fence;
+}
+EXPORT_SYMBOL(dma_fence_get);
+
+/**
+ * dma_fence_get_rcu - get a fence from a reservation_object_list with
+ *                     rcu read lock
+ * @fence:      [in]    fence to increase refcount of
+ *
+ * Function returns NULL if no refcount could be obtained, or the fence.
+ */
+struct dma_fence *dma_fence_get_rcu(struct dma_fence *fence)
+{
+	if (kref_get_unless_zero(&fence->refcount))
+		return fence;
+	else
+		return NULL;
+}
+EXPORT_SYMBOL(dma_fence_get_rcu);

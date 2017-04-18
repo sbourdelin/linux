@@ -185,43 +185,9 @@ void dma_fence_init(struct dma_fence *fence, const struct dma_fence_ops *ops,
 void dma_fence_release(struct kref *kref);
 void dma_fence_free(struct dma_fence *fence);
 
-/**
- * dma_fence_put - decreases refcount of the fence
- * @fence:	[in]	fence to reduce refcount of
- */
-static inline void dma_fence_put(struct dma_fence *fence)
-{
-	if (fence)
-		kref_put(&fence->refcount, dma_fence_release);
-}
-
-/**
- * dma_fence_get - increases refcount of the fence
- * @fence:	[in]	fence to increase refcount of
- *
- * Returns the same fence, with refcount increased by 1.
- */
-static inline struct dma_fence *dma_fence_get(struct dma_fence *fence)
-{
-	if (fence)
-		kref_get(&fence->refcount);
-	return fence;
-}
-
-/**
- * dma_fence_get_rcu - get a fence from a reservation_object_list with
- *                     rcu read lock
- * @fence:	[in]	fence to increase refcount of
- *
- * Function returns NULL if no refcount could be obtained, or the fence.
- */
-static inline struct dma_fence *dma_fence_get_rcu(struct dma_fence *fence)
-{
-	if (kref_get_unless_zero(&fence->refcount))
-		return fence;
-	else
-		return NULL;
-}
+void dma_fence_put(struct dma_fence *fence);
+struct dma_fence *dma_fence_get(struct dma_fence *fence);
+struct dma_fence *dma_fence_get_rcu(struct dma_fence *fence);
 
 /**
  * dma_fence_get_rcu_safe  - acquire a reference to an RCU tracked fence
