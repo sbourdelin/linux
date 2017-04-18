@@ -3547,6 +3547,9 @@ i915_gem_context_lookup_timeline(struct i915_gem_context *ctx,
 int i915_perf_open_ioctl(struct drm_device *dev, void *data,
 			 struct drm_file *file);
 
+int i915_gem_engine_info_ioctl(struct drm_device *dev, void *data,
+			       struct drm_file *file);
+
 /* i915_gem_evict.c */
 int __must_check i915_gem_evict_something(struct i915_address_space *vm,
 					  u64 min_size, u64 alignment,

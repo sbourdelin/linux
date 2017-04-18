@@ -260,6 +260,7 @@ typedef struct _drm_i915_sarea {
 #define DRM_I915_GEM_CONTEXT_GETPARAM	0x34
 #define DRM_I915_GEM_CONTEXT_SETPARAM	0x35
 #define DRM_I915_PERF_OPEN		0x36
+#define DRM_I915_GEM_ENGINE_INFO	0x37
 
 #define DRM_IOCTL_I915_INIT		DRM_IOW( DRM_COMMAND_BASE + DRM_I915_INIT, drm_i915_init_t)
 #define DRM_IOCTL_I915_FLUSH		DRM_IO ( DRM_COMMAND_BASE + DRM_I915_FLUSH)
@@ -315,6 +316,7 @@ typedef struct _drm_i915_sarea {
 #define DRM_IOCTL_I915_GEM_CONTEXT_GETPARAM	DRM_IOWR (DRM_COMMAND_BASE + DRM_I915_GEM_CONTEXT_GETPARAM, struct drm_i915_gem_context_param)
 #define DRM_IOCTL_I915_GEM_CONTEXT_SETPARAM	DRM_IOWR (DRM_COMMAND_BASE + DRM_I915_GEM_CONTEXT_SETPARAM, struct drm_i915_gem_context_param)
 #define DRM_IOCTL_I915_PERF_OPEN	DRM_IOW(DRM_COMMAND_BASE + DRM_I915_PERF_OPEN, struct drm_i915_perf_open_param)
+#define DRM_IOCTL_I915_GEM_ENGINE_INFO	DRM_IOWR(DRM_COMMAND_BASE + DRM_I915_GEM_ENGINE_INFO, struct drm_i915_gem_engine_info)
 
 /* Allow drivers to submit batchbuffers directly to hardware, relying
  * on the security mechanisms provided by hardware.
@@ -1437,6 +1439,44 @@ enum drm_i915_perf_record_type {
 	DRM_I915_PERF_RECORD_OA_BUFFER_LOST = 3,
 
 	DRM_I915_PERF_RECORD_MAX /* non-ABI */
+};
+
+enum drm_i915_gem_engine_class {
+	DRM_I915_ENGINE_CLASS_OTHER = 0,
+	DRM_I915_ENGINE_CLASS_RENDER = 1,
+	DRM_I915_ENGINE_CLASS_COPY = 2,
+	DRM_I915_ENGINE_CLASS_VIDEO_DECODE = 3,
+	DRM_I915_ENGINE_CLASS_VIDEO_ENHANCE = 4,
+	DRM_I915_ENGINE_CLASS_MAX /* non-ABI */
+};
+
+struct drm_i915_engine_info {
+	/** Engine instance number. */
+	__u32	instance;
+	__u32	rsvd;
+
+	/** Engine specific info. */
+#define DRM_I915_ENGINE_HAS_HEVC	BIT(0)
+	__u64 info;
+};
+
+struct drm_i915_gem_engine_info {
+	/** in: Engine class to probe (enum drm_i915_gem_engine_class). */
+	__u32 engine_class;
+
+	/** out: Actual number of hardware engines. */
+	__u32 num_engines;
+
+	/**
+	 * in: Number of struct drm_i915_engine_ifo entries in the provided
+	 * info array.
+	 */
+	__u32 info_size;
+	__u32 rsvd;
+
+	/** in/out: Pointer to array of struct i915_engine_info elements. */
+	__u64 info_ptr;
+
 };
 
 #if defined(__cplusplus)

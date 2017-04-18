@@ -25,6 +25,7 @@
 #include "i915_drv.h"
 #include "intel_ringbuffer.h"
 #include "intel_lrc.h"
+#include <uapi/drm/i915_drm.h>
 
 struct engine_class_info {
 	const char *name;
@@ -1187,6 +1188,64 @@ void intel_engines_reset_default_submission(struct drm_i915_private *i915)
 
 	for_each_engine(engine, i915, id)
 		engine->set_default_submission(engine);
+}
+
+u8 user_class_map[DRM_I915_ENGINE_CLASS_MAX] = {
+	[DRM_I915_ENGINE_CLASS_OTHER] = OTHER_CLASS,
+	[DRM_I915_ENGINE_CLASS_RENDER] = RENDER_CLASS,
+	[DRM_I915_ENGINE_CLASS_COPY] = COPY_ENGINE_CLASS,
+	[DRM_I915_ENGINE_CLASS_VIDEO_DECODE] = VIDEO_DECODE_CLASS,
+	[DRM_I915_ENGINE_CLASS_VIDEO_ENHANCE] = VIDEO_ENHANCEMENT_CLASS,
+};
+
+int i915_gem_engine_info_ioctl(struct drm_device *dev, void *data,
+			       struct drm_file *file)
+{
+	struct drm_i915_private *i915 = to_i915(dev);
+	struct drm_i915_gem_engine_info *args = data;
+	enum drm_i915_gem_engine_class engine_class = args->engine_class;
+	struct drm_i915_engine_info __user *user_info =
+					u64_to_user_ptr(args->info_ptr);
+	struct drm_i915_engine_info info;
+	struct intel_engine_cs *engine;
+	enum intel_engine_id id;
+	u8 class;
+
+	if (args->rsvd)
+		return -EINVAL;
+
+	switch (engine_class) {
+	case DRM_I915_ENGINE_CLASS_OTHER:
+	case DRM_I915_ENGINE_CLASS_RENDER:
+	case DRM_I915_ENGINE_CLASS_COPY:
+	case DRM_I915_ENGINE_CLASS_VIDEO_DECODE:
+	case DRM_I915_ENGINE_CLASS_VIDEO_ENHANCE:
+		if (engine_class >= DRM_I915_ENGINE_CLASS_MAX)
+			return -EINVAL;
+		class = user_class_map[engine_class];
+		break;
+	default:
+		return -EINVAL;
+	};
+
+	args->num_engines = 0;
+	for_each_engine(engine, i915, id) {
+		if (class != engine->class)
+			continue;
+
+		if (++args->num_engines > args->info_size)
+			continue;
+
+		memset(&info, 0, sizeof(info));
+		info.instance = engine->instance;
+		if (INTEL_GEN(i915) > 8 && id == VCS)
+			info.info = DRM_I915_ENGINE_HAS_HEVC;
+
+		if (copy_to_user(user_info++, &info, sizeof(info)))
+			return -EFAULT;
+	}
+
+	return 0;
 }
 
 #if IS_ENABLED(CONFIG_DRM_I915_SELFTEST)
