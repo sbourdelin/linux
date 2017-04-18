@@ -998,6 +998,7 @@ int ncsi_rcv_rsp(struct sk_buff *skb, struct net_device *dev,
 	}
 
 	if (!nrh) {
+		ncsi_dev_update_stats(ndp, hdr->type, 0, NCSI_PKT_STAT_ERROR);
 		netdev_err(nd->dev, "Received unrecognized packet (0x%x)\n",
 			   hdr->type);
 		return -ENOENT;
@@ -1007,12 +1008,14 @@ int ncsi_rcv_rsp(struct sk_buff *skb, struct net_device *dev,
 	spin_lock_irqsave(&ndp->lock, flags);
 	nr = &ndp->requests[hdr->id];
 	if (!nr->used) {
+		ncsi_dev_update_stats(ndp, hdr->type, 0, NCSI_PKT_STAT_TIMEOUT);
 		spin_unlock_irqrestore(&ndp->lock, flags);
 		return -ENODEV;
 	}
 
 	nr->rsp = skb;
 	if (!nr->enabled) {
+		ncsi_dev_update_stats(ndp, hdr->type, 0, NCSI_PKT_STAT_TIMEOUT);
 		spin_unlock_irqrestore(&ndp->lock, flags);
 		ret = -ENOENT;
 		goto out;
@@ -1024,11 +1027,17 @@ int ncsi_rcv_rsp(struct sk_buff *skb, struct net_device *dev,
 	if (payload < 0)
 		payload = ntohs(hdr->length);
 	ret = ncsi_validate_rsp_pkt(nr, payload);
-	if (ret)
+	if (ret) {
+		ncsi_dev_update_stats(ndp, hdr->type, 0, NCSI_PKT_STAT_ERROR);
 		goto out;
+	}
 
 	/* Process the packet */
 	ret = nrh->handler(nr);
+	if (ret)
+		ncsi_dev_update_stats(ndp, hdr->type, 0, NCSI_PKT_STAT_ERROR);
+	else
+		ncsi_dev_update_stats(ndp, hdr->type, 0, NCSI_PKT_STAT_OK);
 out:
 	ncsi_free_request(nr);
 	return ret;

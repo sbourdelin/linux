@@ -282,7 +282,17 @@ struct ncsi_dev_priv {
 	struct work_struct  work;            /* For channel management     */
 	struct packet_type  ptype;           /* NCSI packet Rx handler     */
 	struct list_head    node;            /* Form NCSI device list      */
+#define NCSI_PKT_STAT_OK	0
+#define NCSI_PKT_STAT_TIMEOUT	1
+#define NCSI_PKT_STAT_ERROR	2
+#define NCSI_PKT_STAT_MAX	3
 #ifdef CONFIG_NET_NCSI_DEBUG
+	struct {
+		struct dentry  *dentry;
+		unsigned long  cmd[128][NCSI_PKT_STAT_MAX];
+		unsigned long  rsp[128][NCSI_PKT_STAT_MAX];
+		unsigned long  aen[256][NCSI_PKT_STAT_MAX];
+	} stats;
 	struct dentry       *dentry;         /* Procfs directory           */
 #endif
 };
@@ -349,6 +359,8 @@ int ncsi_aen_handler(struct ncsi_dev_priv *ndp, struct sk_buff *skb);
 /* Debugging functionality */
 #ifdef CONFIG_NET_NCSI_DEBUG
 int ncsi_dev_init_debug(struct ncsi_dev_priv *ndp);
+void ncsi_dev_update_stats(struct ncsi_dev_priv *ndp,
+			   int type, int subtype, int errno);
 void ncsi_dev_release_debug(struct ncsi_dev_priv *ndp);
 int ncsi_package_init_debug(struct ncsi_package *np);
 void ncsi_package_release_debug(struct ncsi_package *np);
@@ -358,6 +370,11 @@ void ncsi_channel_release_debug(struct ncsi_channel *nc);
 static inline int ncsi_dev_init_debug(struct ncsi_dev_priv *ndp)
 {
 	return -ENOTTY;
+}
+
+static inline void ncsi_dev_update_stats(struct ncsi_dev_priv *ndp,
+					 int type, int subtype, int errno)
+{
 }
 
 static inline void ncsi_dev_release_debug(struct ncsi_dev_priv *ndp)
