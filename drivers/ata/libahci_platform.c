@@ -350,7 +350,7 @@ struct ahci_host_priv *ahci_platform_get_resources(struct platform_device *pdev)
 	struct ahci_host_priv *hpriv;
 	struct clk *clk;
 	struct device_node *child;
-	int i, sz, enabled_ports = 0, rc = -ENOMEM, child_nodes;
+	int i, enabled_ports = 0, rc = -ENOMEM, child_nodes;
 	u32 mask_port_map = 0;
 
 	if (!devres_open_group(dev, NULL, GFP_KERNEL))
@@ -402,8 +402,8 @@ struct ahci_host_priv *ahci_platform_get_resources(struct platform_device *pdev)
 	if (!child_nodes)
 		hpriv->nports = 1;
 
-	sz = hpriv->nports * sizeof(*hpriv->phys);
-	hpriv->phys = devm_kzalloc(dev, sz, GFP_KERNEL);
+	hpriv->phys = devm_kcalloc(dev, hpriv->nports, sizeof(*hpriv->phys),
+				   GFP_KERNEL);
 	if (!hpriv->phys) {
 		rc = -ENOMEM;
 		goto err_out;
