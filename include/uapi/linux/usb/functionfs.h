@@ -269,8 +269,7 @@ struct usb_functionfs_event {
 
 /*
  * Returns reverse mapping of an interface.  Called on EP0.  If there
- * is no such interface returns -EDOM.  If function is not active
- * returns -ENODEV.
+ * is no such interface returns -EDOM.
  */
 #define	FUNCTIONFS_INTERFACE_REVMAP	_IO('g', 128)
 
