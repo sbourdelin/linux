@@ -1218,7 +1218,6 @@ static int af9015_rc_query(struct dvb_usb_device *d)
 
 	/* Only process key if canary killed */
 	if (buf[16] != 0xff && buf[0] != 0x01) {
-		enum rc_type proto;
 		dev_dbg(&d->udev->dev, "%s: key pressed %*ph\n",
 				__func__, 4, buf + 12);
 
@@ -1229,28 +1228,11 @@ static int af9015_rc_query(struct dvb_usb_device *d)
 
 		/* Remember this key */
 		memcpy(state->rc_last, &buf[12], 4);
-		if (buf[14] == (u8) ~buf[15]) {
-			if (buf[12] == (u8) ~buf[13]) {
-				/* NEC */
-				state->rc_keycode = RC_SCANCODE_NEC(buf[12],
-								    buf[14]);
-				proto = RC_TYPE_NEC;
-			} else {
-				/* NEC extended*/
-				state->rc_keycode = RC_SCANCODE_NECX(buf[12] << 8 |
-								     buf[13],
-								     buf[14]);
-				proto = RC_TYPE_NECX;
-			}
-		} else {
-			/* 32 bit NEC */
-			state->rc_keycode = RC_SCANCODE_NEC32(buf[12] << 24 |
-							      buf[13] << 16 |
-							      buf[14] << 8  |
-							      buf[15]);
-			proto = RC_TYPE_NEC32;
-		}
-		rc_keydown(d->rc_dev, proto, state->rc_keycode, 0);
+		state->rc_keycode = RC_SCANCODE_NEC32(buf[12] << 24 |
+						      buf[13] << 16 |
+						      buf[14] << 8  |
+						      buf[15]);
+		rc_keydown(d->rc_dev, RC_TYPE_NEC, state->rc_keycode, 0);
 	} else {
 		dev_dbg(&d->udev->dev, "%s: no key press\n", __func__);
 		/* Invalidate last keypress */
@@ -1317,7 +1299,7 @@ static int af9015_get_rc_config(struct dvb_usb_device *d, struct dvb_usb_rc *rc)
 	if (!rc->map_name)
 		rc->map_name = RC_MAP_EMPTY;
 
-	rc->allowed_protos = RC_BIT_NEC | RC_BIT_NECX | RC_BIT_NEC32;
+	rc->allowed_protos = RC_BIT_NEC;
 	rc->query = af9015_rc_query;
 	rc->interval = 500;
 

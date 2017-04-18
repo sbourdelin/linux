@@ -49,9 +49,7 @@ static int ir_nec_decode(struct rc_dev *dev, struct ir_raw_event ev)
 {
 	struct nec_dec *data = &dev->raw->nec;
 	u32 scancode;
-	enum rc_type rc_type;
 	u8 address, not_address, command, not_command;
-	bool send_32bits = false;
 
 	if (!is_timing_event(ev)) {
 		if (ev.reset)
@@ -161,39 +159,14 @@ static int ir_nec_decode(struct rc_dev *dev, struct ir_raw_event ev)
 		command	    = bitrev8((data->bits >>  8) & 0xff);
 		not_command = bitrev8((data->bits >>  0) & 0xff);
 
-		if ((command ^ not_command) != 0xff) {
-			IR_dprintk(1, "NEC checksum error: received 0x%08x\n",
-				   data->bits);
-			send_32bits = true;
-		}
-
-		if (send_32bits) {
-			/* NEC transport, but modified protocol, used by at
-			 * least Apple and TiVo remotes */
-			scancode = not_address << 24 |
-				address     << 16 |
-				not_command <<  8 |
-				command;
-			IR_dprintk(1, "NEC (modified) scancode 0x%08x\n", scancode);
-			rc_type = RC_TYPE_NEC32;
-		} else if ((address ^ not_address) != 0xff) {
-			/* Extended NEC */
-			scancode = address     << 16 |
-				   not_address <<  8 |
-				   command;
-			IR_dprintk(1, "NEC (Ext) scancode 0x%06x\n", scancode);
-			rc_type = RC_TYPE_NECX;
-		} else {
-			/* Normal NEC */
-			scancode = address << 8 | command;
-			IR_dprintk(1, "NEC scancode 0x%04x\n", scancode);
-			rc_type = RC_TYPE_NEC;
-		}
+		scancode = RC_SCANCODE_NEC32(address << 24 | not_address << 16 |
+					     command << 8  | not_command);
+		IR_dprintk(1, "NEC scancode 0x%08x\n", scancode);
 
 		if (data->is_nec_x)
 			data->necx_repeat = true;
 
-		rc_keydown(dev, rc_type, scancode, 0);
+		rc_keydown(dev, RC_TYPE_NEC, scancode, 0);
 		data->state = STATE_INACTIVE;
 		return 0;
 	}
@@ -214,27 +187,11 @@ static u32 ir_nec_scancode_to_raw(enum rc_type protocol, u32 scancode)
 {
 	unsigned int addr, addr_inv, data, data_inv;
 
-	data = scancode & 0xff;
-
-	if (protocol == RC_TYPE_NEC32) {
-		/* 32-bit NEC (used by Apple and TiVo remotes) */
-		/* scan encoding: aaAAddDD */
-		addr_inv   = (scancode >> 24) & 0xff;
-		addr       = (scancode >> 16) & 0xff;
-		data_inv   = (scancode >>  8) & 0xff;
-	} else if (protocol == RC_TYPE_NECX) {
-		/* Extended NEC */
-		/* scan encoding AAaaDD */
-		addr       = (scancode >> 16) & 0xff;
-		addr_inv   = (scancode >>  8) & 0xff;
-		data_inv   = data ^ 0xff;
-	} else {
-		/* Normal NEC */
-		/* scan encoding: AADD */
-		addr       = (scancode >>  8) & 0xff;
-		addr_inv   = addr ^ 0xff;
-		data_inv   = data ^ 0xff;
-	}
+	/* 32-bit NEC, scan encoding: aaAAddDD */
+	addr_inv   = (scancode >> 24) & 0xff;
+	addr       = (scancode >> 16) & 0xff;
+	data_inv   = (scancode >>  8) & 0xff;
+	data       = (scancode >>  0) & 0xff;
 
 	/* raw encoding: ddDDaaAA */
 	return data_inv << 24 |
@@ -285,7 +242,7 @@ static int ir_nec_encode(enum rc_type protocol, u32 scancode,
 }
 
 static struct ir_raw_handler nec_handler = {
-	.protocols	= RC_BIT_NEC | RC_BIT_NECX | RC_BIT_NEC32,
+	.protocols	= RC_BIT_NEC,
 	.decode		= ir_nec_decode,
 	.encode		= ir_nec_encode,
 };

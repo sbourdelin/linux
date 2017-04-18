@@ -24,8 +24,6 @@
  * @RC_TYPE_SONY15: Sony 15 bit protocol
  * @RC_TYPE_SONY20: Sony 20 bit protocol
  * @RC_TYPE_NEC: NEC protocol
- * @RC_TYPE_NECX: Extended NEC protocol
- * @RC_TYPE_NEC32: NEC 32 bit protocol
  * @RC_TYPE_SANYO: Sanyo protocol
  * @RC_TYPE_MCIR2_KBD: RC6-ish MCE keyboard
  * @RC_TYPE_MCIR2_MSE: RC6-ish MCE mouse
@@ -49,21 +47,20 @@ enum rc_type {
 	RC_TYPE_SONY15		= 7,
 	RC_TYPE_SONY20		= 8,
 	RC_TYPE_NEC		= 9,
-	RC_TYPE_NECX		= 10,
-	RC_TYPE_NEC32		= 11,
-	RC_TYPE_SANYO		= 12,
-	RC_TYPE_MCIR2_KBD	= 13,
-	RC_TYPE_MCIR2_MSE	= 14,
-	RC_TYPE_RC6_0		= 15,
-	RC_TYPE_RC6_6A_20	= 16,
-	RC_TYPE_RC6_6A_24	= 17,
-	RC_TYPE_RC6_6A_32	= 18,
-	RC_TYPE_RC6_MCE		= 19,
-	RC_TYPE_SHARP		= 20,
-	RC_TYPE_XMP		= 21,
-	RC_TYPE_CEC		= 22,
+	RC_TYPE_SANYO		= 10,
+	RC_TYPE_MCIR2_KBD	= 11,
+	RC_TYPE_MCIR2_MSE	= 12,
+	RC_TYPE_RC6_0		= 13,
+	RC_TYPE_RC6_6A_20	= 14,
+	RC_TYPE_RC6_6A_24	= 15,
+	RC_TYPE_RC6_6A_32	= 16,
+	RC_TYPE_RC6_MCE		= 17,
+	RC_TYPE_SHARP		= 18,
+	RC_TYPE_XMP		= 19,
+	RC_TYPE_CEC		= 20,
 };
 
+#define rc_bitmap_to_type(x) (fls64(x) - 1)
 #define RC_BIT_NONE		0ULL
 #define RC_BIT_UNKNOWN		BIT_ULL(RC_TYPE_UNKNOWN)
 #define RC_BIT_OTHER		BIT_ULL(RC_TYPE_OTHER)
@@ -75,8 +72,6 @@ enum rc_type {
 #define RC_BIT_SONY15		BIT_ULL(RC_TYPE_SONY15)
 #define RC_BIT_SONY20		BIT_ULL(RC_TYPE_SONY20)
 #define RC_BIT_NEC		BIT_ULL(RC_TYPE_NEC)
-#define RC_BIT_NECX		BIT_ULL(RC_TYPE_NECX)
-#define RC_BIT_NEC32		BIT_ULL(RC_TYPE_NEC32)
 #define RC_BIT_SANYO		BIT_ULL(RC_TYPE_SANYO)
 #define RC_BIT_MCIR2_KBD	BIT_ULL(RC_TYPE_MCIR2_KBD)
 #define RC_BIT_MCIR2_MSE	BIT_ULL(RC_TYPE_MCIR2_MSE)
@@ -93,7 +88,7 @@ enum rc_type {
 			 RC_BIT_RC5 | RC_BIT_RC5X_20 | RC_BIT_RC5_SZ | \
 			 RC_BIT_JVC | \
 			 RC_BIT_SONY12 | RC_BIT_SONY15 | RC_BIT_SONY20 | \
-			 RC_BIT_NEC | RC_BIT_NECX | RC_BIT_NEC32 | \
+			 RC_BIT_NEC | \
 			 RC_BIT_SANYO | \
 			 RC_BIT_MCIR2_KBD | RC_BIT_MCIR2_MSE | \
 			 RC_BIT_RC6_0 | RC_BIT_RC6_6A_20 | RC_BIT_RC6_6A_24 | \
@@ -104,7 +99,7 @@ enum rc_type {
 			(RC_BIT_RC5 | RC_BIT_RC5X_20 | RC_BIT_RC5_SZ | \
 			 RC_BIT_JVC | \
 			 RC_BIT_SONY12 | RC_BIT_SONY15 | RC_BIT_SONY20 | \
-			 RC_BIT_NEC | RC_BIT_NECX | RC_BIT_NEC32 | \
+			 RC_BIT_NEC | \
 			 RC_BIT_SANYO | RC_BIT_MCIR2_KBD | RC_BIT_MCIR2_MSE | \
 			 RC_BIT_RC6_0 | RC_BIT_RC6_6A_20 | RC_BIT_RC6_6A_24 | \
 			 RC_BIT_RC6_6A_32 | RC_BIT_RC6_MCE | RC_BIT_SHARP | \
@@ -114,7 +109,7 @@ enum rc_type {
 			(RC_BIT_RC5 | RC_BIT_RC5X_20 | RC_BIT_RC5_SZ | \
 			 RC_BIT_JVC | \
 			 RC_BIT_SONY12 | RC_BIT_SONY15 | RC_BIT_SONY20 | \
-			 RC_BIT_NEC | RC_BIT_NECX | RC_BIT_NEC32 | \
+			 RC_BIT_NEC | \
 			 RC_BIT_SANYO | RC_BIT_MCIR2_KBD | RC_BIT_MCIR2_MSE | \
 			 RC_BIT_RC6_0 | RC_BIT_RC6_6A_20 | RC_BIT_RC6_6A_24 | \
 			 RC_BIT_RC6_6A_32 | RC_BIT_RC6_MCE | \
@@ -122,13 +117,20 @@ enum rc_type {
 
 #define RC_SCANCODE_UNKNOWN(x)			(x)
 #define RC_SCANCODE_OTHER(x)			(x)
-#define RC_SCANCODE_NEC(addr, cmd)		(((addr) << 8) | (cmd))
-#define RC_SCANCODE_NECX(addr, cmd)		(((addr) << 8) | (cmd))
-#define RC_SCANCODE_NEC32(data)			((data) & 0xffffffff)
 #define RC_SCANCODE_RC5(sys, cmd)		(((sys) << 8) | (cmd))
 #define RC_SCANCODE_RC5_SZ(sys, cmd)		(((sys) << 8) | (cmd))
 #define RC_SCANCODE_RC6_0(sys, cmd)		(((sys) << 8) | (cmd))
 #define RC_SCANCODE_RC6_6A(vendor, sys, cmd)	(((vendor) << 16) | ((sys) << 8) | (cmd))
+#define RC_SCANCODE_NEC(addr, cmd)  \
+	((((addr)  & 0xff) << 24) | \
+	 ((~(addr) & 0xff) << 16) | \
+	 (((cmd)   & 0xff) << 8 ) | \
+	 ((~(cmd)  & 0xff) << 0 ))
+#define RC_SCANCODE_NECX(addr, cmd)   \
+	((((addr) & 0xffff) << 16) | \
+	 (((cmd)  & 0x00ff) << 8)  | \
+	 ((~(cmd) & 0x00ff) << 0))
+#define RC_SCANCODE_NEC32(data) ((data) & 0xffffffff)
 
 /**
  * struct rc_map_table - represents a scancode/keycode pair
