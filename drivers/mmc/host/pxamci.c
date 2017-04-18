@@ -354,13 +354,22 @@ static int pxamci_data_done(struct pxamci_host *host, unsigned int stat)
 	struct mmc_data *data = host->data;
 	struct dma_chan *chan;
 
-	if (!data)
+	if (!data) {
+		pr_err("%s: Missing data structure\n",
+			mmc_hostname(host->mmc));
 		return 0;
+	}
 
 	if (data->flags & MMC_DATA_READ)
 		chan = host->dma_chan_rx;
-	else
+	else if (data->flags & MMC_DATA_WRITE)
 		chan = host->dma_chan_tx;
+	else {
+		pr_err("%s: Unknown data direction, flags=%08x\n",
+			mmc_hostname(host->mmc), data->flags);
+		return 0;
+	}
+
 	dma_unmap_sg(chan->device->dev,
 		     data->sg, data->sg_len, host->dma_dir);
 
@@ -558,21 +567,27 @@ static void pxamci_dma_irq(void *param)
 
 	spin_lock_irqsave(&host->lock, flags);
 
-	if (!host->data)
+	if (!host->data) {
+		pr_err("%s: Missing data structure\n",
+			mmc_hostname(host->mmc));
 		goto out_unlock;
+	}
 
-	if (host->data->flags & MMC_DATA_READ)
-		chan = host->dma_chan_rx;
-	else
-		chan = host->dma_chan_tx;
+	if (!(host->data->flags & MMC_DATA_WRITE)) {
+		pr_err("%s: DMA callback is only for tx channel, flags=%x\n",
+			mmc_hostname(host->mmc), host->data->flags);
+		goto out_unlock;
+	}
+
+	chan = host->dma_chan_tx;
 
 	status = dmaengine_tx_status(chan, host->dma_cookie, &state);
 
 	if (likely(status == DMA_COMPLETE)) {
 		writel(BUF_PART_FULL, host->base + MMC_PRTBUF);
 	} else {
-		pr_err("%s: DMA error on %s channel\n", mmc_hostname(host->mmc),
-			host->data->flags & MMC_DATA_READ ? "rx" : "tx");
+		pr_err("%s: Invalid DMA status %i\n", mmc_hostname(host->mmc),
+			status);
 		host->data->error = -EIO;
 		pxamci_data_done(host, 0);
 	}
