@@ -42,6 +42,8 @@
 #include <asm/pgtable.h>
 #include <asm/tlbflush.h>
 
+#include <acpi/ghes.h>
+
 struct fault_info {
 	int	(*fn)(unsigned long addr, unsigned int esr,
 		      struct pt_regs *regs);
@@ -517,6 +519,17 @@ static int do_sea(unsigned long addr, unsigned int esr, struct pt_regs *regs)
 	inf = esr_to_fault_info(esr);
 	pr_err("Synchronous External Abort: %s (0x%08x) at 0x%016lx\n",
 		inf->name, esr, addr);
+
+	/*
+	 * Synchronous aborts may interrupt code which had interrupts masked.
+	 * Before calling out into the wider kernel tell the interested
+	 * subsystems.
+	 */
+	if (IS_ENABLED(CONFIG_ACPI_APEI_SEA)) {
+		nmi_enter();
+		ghes_notify_sea();
+		nmi_exit();
+	}
 
 	info.si_signo = SIGBUS;
 	info.si_errno = 0;
