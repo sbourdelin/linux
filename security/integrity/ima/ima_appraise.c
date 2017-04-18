@@ -9,12 +9,15 @@
  * the Free Software Foundation, version 2 of the License.
  */
 #include <linux/module.h>
+#include <linux/module_signature.h>
 #include <linux/file.h>
 #include <linux/fs.h>
 #include <linux/xattr.h>
 #include <linux/magic.h>
 #include <linux/ima.h>
 #include <linux/evm.h>
+#include <keys/asymmetric-type.h>
+#include <crypto/pkcs7.h>
 
 #include "ima.h"
 
@@ -177,6 +180,85 @@ int ima_read_xattr(struct dentry *dentry,
 	return ret;
 }
 
+#ifdef CONFIG_IMA_APPRAISE_APPENDED_SIG
+void ima_read_appended_sig(const void *buf, loff_t *buf_len,
+			  struct evm_ima_xattr_data **xattr_value,
+			  int *xattr_len)
+{
+	const size_t marker_len = sizeof(MODULE_SIG_STRING) - 1;
+	const struct public_key_signature *pks;
+	const struct module_signature *sig;
+	struct signature_v2_hdr *hdr;
+	struct pkcs7_message *pkcs7;
+	int i, hdr_len;
+	loff_t file_len = *buf_len;
+	size_t sig_len;
+	const void *p;
+
+	if (file_len <= marker_len + sizeof(*sig))
+		return;
+
+	p = buf + file_len - marker_len;
+	if (memcmp(p, MODULE_SIG_STRING, marker_len))
+		return;
+
+	file_len -= marker_len;
+	sig = (const struct module_signature *) (p - sizeof(*sig));
+
+	if (validate_module_signature(sig, file_len))
+		return;
+
+	sig_len = be32_to_cpu(sig->sig_len);
+	file_len -= sig_len + sizeof(*sig);
+
+	pkcs7 = pkcs7_parse_message(buf + file_len, sig_len);
+	if (IS_ERR(pkcs7))
+		return;
+
+	if (pkcs7_verify(pkcs7, VERIFYING_KEXEC_CMS_SIGNATURE))
+		goto out;
+
+	pks = pkcs7_get_message_sig(pkcs7);
+	if (!pks)
+		goto out;
+
+	/* IMA only supports RSA keys. */
+	if (strcmp(pks->pkey_algo, "rsa"))
+		goto out;
+
+	if (!pks->auth_ids[0])
+		goto out;
+
+	for (i = 0; i < HASH_ALGO__LAST; i++)
+		if (!strcmp(hash_algo_name[i], pks->hash_algo))
+			break;
+
+	if (i == HASH_ALGO__LAST)
+		goto out;
+
+	hdr_len = sizeof(*hdr) + pks->s_size;
+	hdr = kmalloc(hdr_len, GFP_KERNEL);
+	if (!hdr)
+		goto out;
+
+	hdr->type = EVM_IMA_XATTR_DIGSIG;
+	hdr->version = 2;
+	hdr->hash_algo = i;
+	memcpy(hdr->sig, pks->s, pks->s_size);
+	hdr->sig_size = cpu_to_be16(pks->s_size);
+
+	p = pks->auth_ids[0]->data + pks->auth_ids[0]->len - sizeof(hdr->keyid);
+	memcpy(&hdr->keyid, p, sizeof(hdr->keyid));
+
+	*xattr_value = (typeof(*xattr_value)) hdr;
+	*xattr_len = hdr_len;
+	*buf_len = file_len;
+
+ out:
+	pkcs7_free_message(pkcs7);
+}
+#endif /* CONFIG_IMA_APPRAISE_APPENDED_SIG */
+
 /*
  * ima_appraise_measurement - appraise file measurement
  *
@@ -205,7 +287,7 @@ int ima_appraise_measurement(enum ima_hooks func,
 		if (rc && rc != -ENODATA)
 			goto out;
 
-		cause = iint->flags & IMA_DIGSIG_REQUIRED ?
+		cause = iint->flags & IMA_DIGSIG_REQUIRED_MASK ?
 				"IMA-signature-required" : "missing-hash";
 		status = INTEGRITY_NOLABEL;
 		if (opened & FILE_CREATED) {

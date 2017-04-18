@@ -420,6 +420,19 @@ int pkcs7_verify(struct pkcs7_message *pkcs7,
 			return -EKEYREJECTED;
 		}
 		break;
+	case VERIFYING_KEXEC_CMS_SIGNATURE:
+		/* Shipping certificates in the CMS message is not allowed. */
+		if (pkcs7->certs) {
+			pr_warn("Signature isn't allowed to contain certificates.\n");
+			return -EBADMSG;
+		}
+
+		/* Shipping CRLs in the CMS message is not allowed. */
+		if (pkcs7->crl) {
+			pr_warn("Signature isn't allowed to contain CRLs.\n");
+			return -EBADMSG;
+		}
+		break;
 	default:
 		return -EINVAL;
 	}

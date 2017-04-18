@@ -777,8 +777,15 @@ static int ima_parse_rule(char *rule, struct ima_rule_entry *entry)
 			}
 
 			ima_log_string(ab, "appraise_type", args[0].from);
-			if ((strcmp(args[0].from, "imasig")) == 0)
+			if (!strcmp(args[0].from, "imasig"))
 				entry->flags |= IMA_DIGSIG_REQUIRED;
+#ifdef CONFIG_IMA_APPRAISE_APPENDED_SIG
+			else if (!strcmp(args[0].from, "appended_imasig"))
+				entry->flags |= IMA_APPENDED_DIGSIG_REQUIRED;
+			else if (!strcmp(args[0].from, "appended_imasig|imasig"))
+				entry->flags |= IMA_DIGSIG_REQUIRED
+						| IMA_APPENDED_DIGSIG_REQUIRED;
+#endif /* CONFIG_IMA_APPRAISE_APPENDED_SIG */
 			else
 				result = -EINVAL;
 			break;
@@ -884,19 +891,7 @@ void ima_delete_rules(void)
 	}
 }
 
-#ifdef	CONFIG_IMA_READ_POLICY
-enum {
-	mask_exec = 0, mask_write, mask_read, mask_append
-};
-
-static const char *const mask_tokens[] = {
-	"MAY_EXEC",
-	"MAY_WRITE",
-	"MAY_READ",
-	"MAY_APPEND"
-};
-
-static const char *const func_tokens[] = {
+const char *const func_tokens[] = {
 	NULL,
 	"FILE_CHECK",
 	"MMAP_CHECK",
@@ -907,6 +902,18 @@ static const char *const func_tokens[] = {
 	"KEXEC_KERNEL_CHECK",
 	"KEXEC_INITRAMFS_CHECK",
 	"POLICY_CHECK"
+};
+
+#ifdef	CONFIG_IMA_READ_POLICY
+enum {
+	mask_exec = 0, mask_write, mask_read, mask_append
+};
+
+static const char *const mask_tokens[] = {
+	"MAY_EXEC",
+	"MAY_WRITE",
+	"MAY_READ",
+	"MAY_APPEND"
 };
 
 void *ima_policy_start(struct seq_file *m, loff_t *pos)
@@ -1062,7 +1069,13 @@ int ima_policy_show(struct seq_file *m, void *v)
 			}
 		}
 	}
-	if (entry->flags & IMA_DIGSIG_REQUIRED)
+	if ((entry->flags & IMA_DIGSIG_REQUIRED_MASK) == IMA_DIGSIG_REQUIRED_MASK)
+#ifdef CONFIG_IMA_APPRAISE_APPENDED_SIG
+		seq_puts(m, "appraise_type=appended_imasig|imasig ");
+	else if (entry->flags & IMA_APPENDED_DIGSIG_REQUIRED)
+		seq_puts(m, "appraise_type=appended_imasig ");
+	else if (entry->flags & IMA_DIGSIG_REQUIRED)
+#endif /* CONFIG_IMA_APPRAISE_APPENDED_SIG */
 		seq_puts(m, "appraise_type=imasig ");
 	if (entry->flags & IMA_PERMIT_DIRECTIO)
 		seq_puts(m, "permit_directio ");

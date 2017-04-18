@@ -185,6 +185,8 @@ enum ima_hooks {
 	MAX_CHECK
 };
 
+extern const char *const func_tokens[];
+
 /* LIM API function definitions */
 int ima_get_action(struct inode *inode, int mask,
 		   enum ima_hooks func, int *pcr);
@@ -242,6 +244,12 @@ enum hash_algo ima_get_hash_algo(struct evm_ima_xattr_data *xattr_value,
 				 int xattr_len);
 int ima_read_xattr(struct dentry *dentry,
 		   struct evm_ima_xattr_data **xattr_value);
+
+#ifdef CONFIG_IMA_APPRAISE_APPENDED_SIG
+void ima_read_appended_sig(const void *buf, loff_t *buf_len,
+			  struct evm_ima_xattr_data **xattr_value,
+			  int *xattr_len);
+#endif
 
 #else
 static inline int ima_appraise_measurement(enum ima_hooks func,

@@ -16,6 +16,9 @@
  *	implements the IMA hooks: ima_bprm_check, ima_file_mmap,
  *	and ima_file_check.
  */
+
+#define pr_fmt(fmt) KBUILD_MODNAME ": " fmt
+
 #include <linux/module.h>
 #include <linux/file.h>
 #include <linux/binfmts.h>
@@ -228,9 +231,30 @@ static int process_measurement(struct file *file, char *buf, loff_t size,
 
 	template_desc = ima_template_desc_current();
 	if ((action & IMA_APPRAISE_SUBMASK) ||
-		    strcmp(template_desc->name, IMA_TEMPLATE_IMA_NAME) != 0)
-		/* read 'security.ima' */
-		xattr_len = ima_read_xattr(file_dentry(file), &xattr_value);
+		    strcmp(template_desc->name, IMA_TEMPLATE_IMA_NAME) != 0) {
+#ifdef CONFIG_IMA_APPRAISE_APPENDED_SIG
+		unsigned long digsig_req;
+
+		if (iint->flags & IMA_APPENDED_DIGSIG_REQUIRED) {
+			if (!buf || !size)
+				pr_err("%s doesn't support appended_imasig\n",
+				       func_tokens[func]);
+			else
+				ima_read_appended_sig(buf, &size, &xattr_value,
+						      &xattr_len);
+		}
+
+		/*
+		 * Don't try to read the xattr if we require an appended
+		 * signature but failed to get one.
+		 */
+		digsig_req = iint->flags & IMA_DIGSIG_REQUIRED_MASK;
+		if (!xattr_len && digsig_req != IMA_APPENDED_DIGSIG_REQUIRED)
+#endif /* CONFIG_IMA_APPRAISE_APPENDED_SIG */
+			/* read 'security.ima' */
+			xattr_len = ima_read_xattr(file_dentry(file),
+						   &xattr_value);
+	}
 
 	hash_algo = ima_get_hash_algo(xattr_value, xattr_len);
 
