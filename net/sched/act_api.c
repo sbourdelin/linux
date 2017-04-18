@@ -604,28 +604,30 @@ struct tc_action *tcf_action_init_1(struct net *net, struct nlattr *nla,
 	if (err < 0)
 		goto err_mod;
 
+	/* The module count should only go up when a brand new policy was
+	 * created, if it exists and is only bound to in a_o->init() then
+	 * ACT_P_CREATED is not returned (a zero is), and we need to roll back
+	 * the bump caused by tc_lookup_action_n().
+	 */
+	if (err != ACT_P_CREATED)
+		module_put(a_o->owner);
+
 	if (name == NULL && tb[TCA_ACT_COOKIE]) {
 		int cklen = nla_len(tb[TCA_ACT_COOKIE]);
 
 		if (cklen > TC_COOKIE_MAX_SIZE) {
 			err = -EINVAL;
 			tcf_hash_release(a, bind);
-			goto err_mod;
+			goto err_out;
 		}
 
 		if (nla_memdup_cookie(a, tb) < 0) {
 			err = -ENOMEM;
 			tcf_hash_release(a, bind);
-			goto err_mod;
+			goto err_out;
 		}
 	}
 
-	/* module count goes up only when brand new policy is created
-	 * if it exists and is only bound to in a_o->init() then
-	 * ACT_P_CREATED is not returned (a zero is).
-	 */
-	if (err != ACT_P_CREATED)
-		module_put(a_o->owner);
 
 	return a;
 
