@@ -99,6 +99,6 @@ static inline void *acpi_hest_get_payload(struct acpi_hest_generic_data *gdata)
 	return gdata + 1;
 }
 
-void ghes_notify_sea(void);
+int ghes_notify_sea(void);
 
 #endif /* GHES_H */
