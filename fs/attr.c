@@ -222,7 +222,7 @@ int notify_change(struct dentry * dentry, struct iattr * attr, struct inode **de
 	 */
 	if (ia_valid & ATTR_TOUCH) {
 		if (IS_IMMUTABLE(inode))
-			return -EPERM;
+			return -EACCES;
 
 		if (!inode_owner_or_capable(inode)) {
 			error = inode_permission(inode, MAY_WRITE);
