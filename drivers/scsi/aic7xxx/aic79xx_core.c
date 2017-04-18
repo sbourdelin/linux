@@ -10077,7 +10077,6 @@ ahd_write_seeprom(struct ahd_softc *ahd, uint16_t *buf,
 	int   retval;
 
 	AHD_ASSERT_MODES(ahd, AHD_MODE_SCSI_MSK, AHD_MODE_SCSI_MSK);
-	error = ENOENT;
 
 	/* Place the chip into write-enable mode */
 	ahd_outb(ahd, SEEADR, SEEOP_EWEN_ADDR);
