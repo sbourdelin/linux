@@ -195,6 +195,8 @@ struct intel_guc {
 	DECLARE_BITMAP(doorbell_bitmap, GUC_NUM_DOORBELLS);
 	uint32_t db_cacheline;		/* Cyclic counter mod pagesize	*/
 
+	uint32_t shared_data_offset;	/* First page of default ctx */
+
 	/* Action status & statistics */
 	uint64_t action_count;		/* Total commands issued	*/
 	uint32_t action_cmd;		/* Last command word		*/
