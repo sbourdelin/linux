@@ -1257,8 +1257,8 @@ static inline int ext4_match(struct ext4_filename *fname,
 			int ret;
 			if (de->name_len < 16)
 				return 0;
-			ret = memcmp(de->name + de->name_len - 16,
-				     fname->crypto_buf.name + 8, 16);
+			ret = memcmp(de->name + de->name_len - 32,
+				     fname->crypto_buf.name + 8, 32);
 			return (ret == 0) ? 1 : 0;
 		}
 		name = fname->crypto_buf.name;
