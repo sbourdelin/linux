@@ -1997,9 +1997,8 @@ static void regulator_ena_gpio_free(struct regulator_dev *rdev)
 				kfree(pin);
 				rdev->ena_pin = NULL;
 				return;
-			} else {
-				pin->request_count--;
 			}
+			pin->request_count--;
 		}
 	}
 }
