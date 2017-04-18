@@ -977,6 +977,7 @@ struct i915_gpu_state {
 		enum intel_engine_hangcheck_action hangcheck_action;
 		struct i915_address_space *vm;
 		int num_requests;
+		u32 reset_count;
 
 		/* position of active request inside the ring */
 		u32 rq_head, rq_post, rq_tail;
@@ -1614,6 +1615,7 @@ struct i915_gpu_error {
 
 	/* if available, engine-specific reset is tried before full gpu reset */
 	u32 reset_engine_mask;
+	u32 reset_engine_count[I915_NUM_ENGINES];
 
 	/**
 	 * Waitqueue to signal when a hang is detected. Used to for waiters
@@ -3435,6 +3437,12 @@ static inline bool i915_reset_backoff_or_wedged(struct i915_gpu_error *error)
 static inline u32 i915_reset_count(struct i915_gpu_error *error)
 {
 	return READ_ONCE(error->reset_count);
+}
+
+static inline u32 i915_reset_engine_count(struct i915_gpu_error *error,
+					  struct intel_engine_cs *engine)
+{
+	return READ_ONCE(error->reset_engine_count[engine->id]);
 }
 
 int i915_gem_reset_prepare_engine(struct intel_engine_cs *engine);
