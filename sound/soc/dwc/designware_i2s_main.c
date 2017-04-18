@@ -1,7 +1,7 @@
 /*
  * ALSA SoC Synopsys I2S Audio Layer
  *
- * sound/soc/dwc/designware_i2s.c
+ * sound/soc/dwc/designware_i2s_main.c
  *
  * Copyright (C) 2010 ST Microelectronics
  * Rajeev Kumar <rajeevkumar.linux@gmail.com>

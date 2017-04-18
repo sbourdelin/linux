@@ -1,7 +1,7 @@
 /*
  * ALSA SoC Synopsys PIO PCM for I2S driver
  *
- * sound/soc/dwc/designware_pcm.c
+ * sound/soc/dwc/designware_i2s_pcm.c
  *
  * Copyright (C) 2016 Synopsys
  * Jose Abreu <joabreu@synopsys.com>
