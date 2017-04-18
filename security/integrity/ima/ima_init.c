@@ -25,7 +25,7 @@
 #include "ima.h"
 
 /* name for boot aggregate entry */
-static const char *boot_aggregate_name = "boot_aggregate";
+static const char boot_aggregate_name[] = "boot_aggregate";
 int ima_used_chip;
 
 /* Add the boot aggregate to the IMA measurement list and extend

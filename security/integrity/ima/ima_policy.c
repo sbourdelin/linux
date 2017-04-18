@@ -889,7 +889,7 @@ enum {
 	mask_exec = 0, mask_write, mask_read, mask_append
 };
 
-static char *mask_tokens[] = {
+static const char *const mask_tokens[] = {
 	"MAY_EXEC",
 	"MAY_WRITE",
 	"MAY_READ",
@@ -903,7 +903,7 @@ enum {
 	func_policy
 };
 
-static char *func_tokens[] = {
+static const char *const func_tokens[] = {
 	"FILE_CHECK",
 	"MMAP_CHECK",
 	"BPRM_CHECK",
