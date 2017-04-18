@@ -2645,11 +2645,32 @@ static void i915_reset_and_wakeup(struct drm_i915_private *dev_priv)
 	char *error_event[] = { I915_ERROR_UEVENT "=1", NULL };
 	char *reset_event[] = { I915_RESET_UEVENT "=1", NULL };
 	char *reset_done_event[] = { I915_ERROR_UEVENT "=0", NULL };
+	u32 engine_mask = dev_priv->gpu_error.reset_engine_mask;
 
 	kobject_uevent_env(kobj, KOBJ_CHANGE, error_event);
 
-	DRM_DEBUG_DRIVER("resetting chip\n");
+	/*
+	 * This event needs to be sent before performing gpu reset. When
+	 * engine resets are supported we iterate through all engines and
+	 * reset hung engines individually. To keep the event dispatch
+	 * mechanism consistent with full gpu reset, this is only sent once
+	 * even when multiple engines are hung. It is also safe to move this
+	 * here because when we are in this function, we will definitely
+	 * perform gpu reset.
+	 */
 	kobject_uevent_env(kobj, KOBJ_CHANGE, reset_event);
+
+	/* try engine reset first, and continue if fails; look mom, no mutex! */
+	if (intel_has_reset_engine(dev_priv) && !(engine_mask & (engine_mask - 1))) {
+		struct intel_engine_cs *engine =
+			dev_priv->engine[intel_engineid_from_flag(engine_mask)];
+
+		if (i915_reset_engine(engine) == 0)
+			goto finish;
+
+		DRM_ERROR("reset %s failed, promoting to full gpu reset\n",
+			  engine->name);
+	}
 
 	intel_prepare_reset(dev_priv);
 
@@ -2680,6 +2701,7 @@ static void i915_reset_and_wakeup(struct drm_i915_private *dev_priv)
 		kobject_uevent_env(kobj,
 				   KOBJ_CHANGE, reset_done_event);
 
+finish:
 	/*
 	 * Note: The wake_up also serves as a memory barrier so that
 	 * waiters see the updated value of the dev_priv->gpu_error.
@@ -2780,6 +2802,12 @@ void i915_handle_error(struct drm_i915_private *dev_priv,
 	if (test_and_set_bit(I915_RESET_BACKOFF,
 			     &dev_priv->gpu_error.flags))
 		goto out;
+
+	/*
+	 * Save which engines need reset; if engine support is available,
+	 * we can just reset the hung engines.
+	 */
+	dev_priv->gpu_error.reset_engine_mask = engine_mask;
 
 	i915_reset_and_wakeup(dev_priv);
 
