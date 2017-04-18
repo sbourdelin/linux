@@ -92,4 +92,7 @@ struct imc_pmu {
 #define IMC_DOMAIN_NEST		1
 #define IMC_DOMAIN_UNKNOWN	-1
 
+extern struct perchip_nest_info nest_perchip_info[IMC_MAX_CHIPS];
+extern struct imc_pmu *per_nest_pmu_arr[IMC_MAX_PMUS];
+extern int __init init_imc_pmu(struct imc_events *events,int idx, struct imc_pmu *pmu_ptr);
 #endif /* PPC_POWERNV_IMC_PMU_DEF_H */
