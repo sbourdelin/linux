@@ -29,12 +29,38 @@
 #include <linux/of.h>
 #include <linux/of_platform.h>
 #include <linux/pm_runtime.h>
+#include <linux/reset.h>
 
 struct dwc3_of_simple {
 	struct device		*dev;
 	struct clk		**clks;
 	int			num_clocks;
+	struct reset_control_array *resets;
 };
+
+static int dwc3_of_simple_reset_init(struct dwc3_of_simple *simple)
+{
+	struct device		*dev = simple->dev;
+	int			ret;
+
+	simple->resets = of_reset_control_array_get_exclusive(dev->of_node);
+	if (IS_ERR(simple->resets)) {
+		ret = PTR_ERR(simple->resets);
+		if (ret == -ENOENT)
+			/* not all controllers required resets */
+			return 0;
+		dev_err(dev, "failed to get device resets\n");
+		return ret;
+	}
+
+	ret = reset_control_array_deassert(simple->resets);
+	if (ret) {
+		reset_control_array_put(simple->resets);
+		return ret;
+	}
+
+	return 0;
+}
 
 static int dwc3_of_simple_clk_init(struct dwc3_of_simple *simple, int count)
 {
@@ -100,12 +126,19 @@ static int dwc3_of_simple_probe(struct platform_device *pdev)
 	if (ret)
 		return ret;
 
+	ret = dwc3_of_simple_reset_init(simple);
+	if (ret)
+		return ret;
+
 	ret = of_platform_populate(np, NULL, NULL, dev);
 	if (ret) {
 		for (i = 0; i < simple->num_clocks; i++) {
 			clk_disable_unprepare(simple->clks[i]);
 			clk_put(simple->clks[i]);
 		}
+
+		reset_control_array_assert(simple->resets);
+		reset_control_array_put(simple->resets);
 
 		return ret;
 	}
@@ -127,6 +160,9 @@ static int dwc3_of_simple_remove(struct platform_device *pdev)
 		clk_disable_unprepare(simple->clks[i]);
 		clk_put(simple->clks[i]);
 	}
+
+	reset_control_array_assert(simple->resets);
+	reset_control_array_put(simple->resets);
 
 	of_platform_depopulate(dev);
 
