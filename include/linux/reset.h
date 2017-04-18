@@ -24,6 +24,7 @@ struct reset_control *__devm_reset_control_get(struct device *dev,
 				     bool optional);
 
 int __must_check device_reset(struct device *dev);
+int of_reset_control_get_count(struct device_node *node);
 
 static inline int device_reset_optional(struct device *dev)
 {
@@ -87,6 +88,11 @@ static inline struct reset_control *__devm_reset_control_get(
 					int index, bool shared, bool optional)
 {
 	return optional ? NULL : ERR_PTR(-ENOTSUPP);
+}
+
+static inline int of_reset_control_get_count(struct device_node *node)
+{
+	return -ENOTSUPP;
 }
 
 #endif /* CONFIG_RESET_CONTROLLER */
