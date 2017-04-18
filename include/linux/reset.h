@@ -5,6 +5,11 @@
 
 struct reset_control;
 
+struct reset_control_array {
+	unsigned int num_rstcs;
+	struct reset_control *rstc[];
+};
+
 #ifdef CONFIG_RESET_CONTROLLER
 
 int reset_control_reset(struct reset_control *rstc);
@@ -25,6 +30,14 @@ struct reset_control *__devm_reset_control_get(struct device *dev,
 
 int __must_check device_reset(struct device *dev);
 int of_reset_control_get_count(struct device_node *node);
+
+int reset_control_array_assert(struct reset_control_array *resets);
+int reset_control_array_deassert(struct reset_control_array *resets);
+struct reset_control_array *devm_reset_control_array_get(struct device *dev,
+						bool shared, bool optional);
+struct reset_control_array *of_reset_control_array_get(struct device_node *np,
+						bool shared, bool optional);
+void reset_control_array_put(struct reset_control_array *resets);
 
 static inline int device_reset_optional(struct device *dev)
 {
@@ -93,6 +106,35 @@ static inline struct reset_control *__devm_reset_control_get(
 static inline int of_reset_control_get_count(struct device_node *node)
 {
 	return -ENOTSUPP;
+}
+
+static inline
+int reset_control_array_assert(struct reset_control_array *resets)
+{
+	return 0;
+}
+
+static inline
+int reset_control_array_deassert(struct reset_control_array *resets)
+{
+	return 0;
+}
+
+static inline struct reset_control_array *
+devm_reset_control_array_get(struct device *dev, bool shared, bool optional)
+{
+	return optional ? NULL : ERR_PTR(-ENOTSUPP);
+}
+
+static inline struct reset_control_array *
+of_reset_control_array_get(struct device_node *np, bool shared, bool optional)
+{
+	return optional ? NULL : ERR_PTR(-ENOTSUPP);
+}
+
+static inline
+void reset_control_array_put(struct reset_control_array *resets)
+{
 }
 
 #endif /* CONFIG_RESET_CONTROLLER */
@@ -379,5 +421,56 @@ static inline struct reset_control *devm_reset_control_get_by_index(
 				struct device *dev, int index)
 {
 	return devm_reset_control_get_exclusive_by_index(dev, index);
+}
+
+/*
+ * APIs to manage a list of reset controllers
+ */
+static inline struct reset_control_array *
+devm_reset_control_array_get_exclusive(struct device *dev)
+{
+	return devm_reset_control_array_get(dev, false, false);
+}
+
+static inline struct reset_control_array *
+devm_reset_control_array_get_shared(struct device *dev)
+{
+	return devm_reset_control_array_get(dev, true, false);
+}
+
+static inline struct reset_control_array *
+devm_reset_control_array_get_optional_exclusive(struct device *dev)
+{
+	return devm_reset_control_array_get(dev, false, true);
+}
+
+static inline struct reset_control_array *
+devm_reset_control_array_get_optional_shared(struct device *dev)
+{
+	return devm_reset_control_array_get(dev, true, true);
+}
+
+static inline struct reset_control_array *
+of_reset_control_array_get_exclusive(struct device_node *node)
+{
+	return of_reset_control_array_get(node, false, false);
+}
+
+static inline struct reset_control_array *
+of_reset_control_array_get_shared(struct device_node *node)
+{
+	return of_reset_control_array_get(node, true, false);
+}
+
+static inline struct reset_control_array *
+of_reset_control_array_get_optional_exclusive(struct device_node *node)
+{
+	return of_reset_control_array_get(node, false, true);
+}
+
+static inline struct reset_control_array *
+of_reset_control_array_get_optional_shared(struct device_node *node)
+{
+	return of_reset_control_array_get(node, true, true);
 }
 #endif
