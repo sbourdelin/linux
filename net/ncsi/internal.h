@@ -198,6 +198,9 @@ struct ncsi_channel {
 	} monitor;
 	struct list_head            node;
 	struct list_head            link;
+#ifdef CONFIG_NET_NCSI_DEBUG
+	struct dentry               *dentry;    /* Debugfs directory    */
+#endif
 };
 
 struct ncsi_package {
@@ -208,6 +211,9 @@ struct ncsi_package {
 	unsigned int         channel_num; /* Number of channels     */
 	struct list_head     channels;    /* List of chanels        */
 	struct list_head     node;        /* Form list of packages  */
+#ifdef CONFIG_NET_NCSI_DEBUG
+	struct dentry        *dentry;     /* Debugfs directory       */
+#endif
 };
 
 struct ncsi_request {
@@ -276,6 +282,9 @@ struct ncsi_dev_priv {
 	struct work_struct  work;            /* For channel management     */
 	struct packet_type  ptype;           /* NCSI packet Rx handler     */
 	struct list_head    node;            /* Form NCSI device list      */
+#ifdef CONFIG_NET_NCSI_DEBUG
+	struct dentry       *dentry;         /* Procfs directory           */
+#endif
 };
 
 struct ncsi_cmd_arg {
@@ -337,4 +346,40 @@ int ncsi_rcv_rsp(struct sk_buff *skb, struct net_device *dev,
 		 struct packet_type *pt, struct net_device *orig_dev);
 int ncsi_aen_handler(struct ncsi_dev_priv *ndp, struct sk_buff *skb);
 
+/* Debugging functionality */
+#ifdef CONFIG_NET_NCSI_DEBUG
+int ncsi_dev_init_debug(struct ncsi_dev_priv *ndp);
+void ncsi_dev_release_debug(struct ncsi_dev_priv *ndp);
+int ncsi_package_init_debug(struct ncsi_package *np);
+void ncsi_package_release_debug(struct ncsi_package *np);
+int ncsi_channel_init_debug(struct ncsi_channel *nc);
+void ncsi_channel_release_debug(struct ncsi_channel *nc);
+#else
+static inline int ncsi_dev_init_debug(struct ncsi_dev_priv *ndp)
+{
+	return -ENOTTY;
+}
+
+static inline void ncsi_dev_release_debug(struct ncsi_dev_priv *ndp)
+{
+}
+
+static inline int ncsi_package_init_debug(struct ncsi_package *np)
+{
+	return -ENOTTY;
+}
+
+static inline void ncsi_package_release_debug(struct ncsi_package *np)
+{
+}
+
+static inline int ncsi_channel_init_debug(struct ncsi_channel *nc)
+{
+	return -ENOTTY;
+}
+
+static inline void ncsi_channel_release_debug(struct ncsi_channel *nc)
+{
+}
+#endif /* CONFIG_NET_NCSI_DEBUG */
 #endif /* __NCSI_INTERNAL_H__ */
