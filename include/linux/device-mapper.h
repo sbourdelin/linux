@@ -472,6 +472,11 @@ void dm_table_set_type(struct dm_table *t, unsigned type);
 int dm_table_complete(struct dm_table *t);
 
 /*
+ * Destroy the table when finished.
+ */
+void dm_table_destroy(struct dm_table *t);
+
+/*
  * Target may require that it is never sent I/O larger than len.
  */
 int __must_check dm_set_target_max_io_len(struct dm_target *ti, sector_t len);
@@ -507,6 +512,14 @@ void dm_table_run_md_queue_async(struct dm_table *t);
  */
 struct dm_table *dm_swap_table(struct mapped_device *md,
 			       struct dm_table *t);
+
+unsigned dm_table_get_type(struct dm_table *t);
+
+void dm_lock_md_type(struct mapped_device *md);
+void dm_unlock_md_type(struct mapped_device *md);
+void dm_set_md_type(struct mapped_device *md, unsigned type);
+unsigned dm_get_md_type(struct mapped_device *md);
+int dm_setup_md_queue(struct mapped_device *md, struct dm_table *t);
 
 /*
  * A wrapper around vmalloc.
