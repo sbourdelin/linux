@@ -18,6 +18,7 @@ TEST_GEN_FILES += userfaultfd
 TEST_GEN_FILES += userfaultfd_hugetlb
 TEST_GEN_FILES += userfaultfd_shmem
 TEST_GEN_FILES += mlock-random-test
+TEST_GEN_FILES += virtual_address_range
 
 TEST_PROGS := run_vmtests
 
