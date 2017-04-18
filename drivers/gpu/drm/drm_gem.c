@@ -1004,3 +1004,38 @@ int drm_gem_mmap(struct file *filp, struct vm_area_struct *vma)
 	return ret;
 }
 EXPORT_SYMBOL(drm_gem_mmap);
+
+/**
+ * drm_gem_object_reference - acquire a GEM BO reference
+ * @obj: GEM buffer object
+ *
+ * This acquires additional reference to @obj. It is illegal to call this
+ * without already holding a reference. No locks required.
+ */
+void drm_gem_object_reference(struct drm_gem_object *obj)
+{
+	kref_get(&obj->refcount);
+}
+EXPORT_SYMBOL(drm_gem_object_reference);
+
+/**
+ * __drm_gem_object_unreference - raw function to release a GEM BO reference
+ * @obj: GEM buffer object
+ *
+ * This function is meant to be used by drivers which are not encumbered with
+ * &drm_device.struct_mutex legacy locking and which are using the
+ * gem_free_object_unlocked callback. It avoids all the locking checks and
+ * locking overhead of drm_gem_object_unreference() and
+ * drm_gem_object_unreference_unlocked().
+ *
+ * Drivers should never call this directly in their code. Instead they should
+ * wrap it up into a ``driver_gem_object_unreference(struct driver_gem_object
+ * *obj)`` wrapper function, and use that. Shared code should never call this,
+ * to avoid breaking drivers by accident which still depend upon
+ * &drm_device.struct_mutex locking.
+ */
+void __drm_gem_object_unreference(struct drm_gem_object *obj)
+{
+	kref_put(&obj->refcount, drm_gem_object_free);
+}
+EXPORT_SYMBOL(__drm_gem_object_unreference);

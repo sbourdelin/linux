@@ -192,59 +192,17 @@ struct drm_atomic_state {
 
 void __drm_crtc_commit_free(struct kref *kref);
 
-/**
- * drm_crtc_commit_get - acquire a reference to the CRTC commit
- * @commit: CRTC commit
- *
- * Increases the reference of @commit.
- */
-static inline void drm_crtc_commit_get(struct drm_crtc_commit *commit)
-{
-	kref_get(&commit->ref);
-}
-
-/**
- * drm_crtc_commit_put - release a reference to the CRTC commmit
- * @commit: CRTC commit
- *
- * This releases a reference to @commit which is freed after removing the
- * final reference. No locking required and callable from any context.
- */
-static inline void drm_crtc_commit_put(struct drm_crtc_commit *commit)
-{
-	kref_put(&commit->ref, __drm_crtc_commit_free);
-}
+void drm_crtc_commit_get(struct drm_crtc_commit *commit);
+void drm_crtc_commit_put(struct drm_crtc_commit *commit);
 
 struct drm_atomic_state * __must_check
 drm_atomic_state_alloc(struct drm_device *dev);
 void drm_atomic_state_clear(struct drm_atomic_state *state);
 
-/**
- * drm_atomic_state_get - acquire a reference to the atomic state
- * @state: The atomic state
- *
- * Returns a new reference to the @state
- */
-static inline struct drm_atomic_state *
-drm_atomic_state_get(struct drm_atomic_state *state)
-{
-	kref_get(&state->ref);
-	return state;
-}
-
 void __drm_atomic_state_free(struct kref *ref);
 
-/**
- * drm_atomic_state_put - release a reference to the atomic state
- * @state: The atomic state
- *
- * This releases a reference to @state which is freed after removing the
- * final reference. No locking required and callable from any context.
- */
-static inline void drm_atomic_state_put(struct drm_atomic_state *state)
-{
-	kref_put(&state->ref, __drm_atomic_state_free);
-}
+struct drm_atomic_state *drm_atomic_state_get(struct drm_atomic_state *state);
+void drm_atomic_state_put(struct drm_atomic_state *state);
 
 int  __must_check
 drm_atomic_state_init(struct drm_device *dev, struct drm_atomic_state *state);

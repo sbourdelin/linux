@@ -837,3 +837,15 @@ int drm_framebuffer_plane_height(int height,
 	return height / fb->format->vsub;
 }
 EXPORT_SYMBOL(drm_framebuffer_plane_height);
+
+/**
+ * drm_framebuffer_read_refcount - read the framebuffer reference count.
+ * @fb: framebuffer
+ *
+ * This functions returns the framebuffer's reference count.
+ */
+uint32_t drm_framebuffer_read_refcount(struct drm_framebuffer *fb)
+{
+	return kref_read(&fb->base.refcount);
+}
+EXPORT_SYMBOL(drm_framebuffer_read_refcount);
