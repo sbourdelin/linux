@@ -23,7 +23,7 @@ acpi_system_wakeup_device_seq_show(struct seq_file *seq, void *offset)
 {
 	struct list_head *node, *next;
 
-	seq_printf(seq, "Device\tS-state\t  Status   Sysfs node\n");
+	seq_puts(seq, "Device\tS-state\t  Status   Sysfs node\n");
 
 	mutex_lock(&acpi_device_lock);
 	list_for_each_safe(node, next, &acpi_wakeup_device_list) {
@@ -55,7 +55,7 @@ acpi_system_wakeup_device_seq_show(struct seq_file *seq, void *offset)
 
 				if (&entry->node !=
 						dev->physical_node_list.next)
-					seq_printf(seq, "\t\t");
+					seq_puts(seq, "\t\t");
 
 				seq_printf(seq, "%c%-8s  %s:%s\n",
 					dev->wakeup.flags.run_wake ? '*' : ' ',
