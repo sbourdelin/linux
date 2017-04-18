@@ -235,7 +235,7 @@ static void pxamci_setup_data(struct pxamci_host *host, struct mmc_data *data)
 		return;
 	}
 
-	if (!(data->flags & MMC_DATA_READ)) {
+	if (data->flags & MMC_DATA_WRITE) {
 		tx->callback = pxamci_dma_irq;
 		tx->callback_param = host;
 	}
