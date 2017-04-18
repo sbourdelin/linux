@@ -28,6 +28,10 @@ static void set_aux_backlight_enable(struct intel_dp *intel_dp, bool enable)
 {
 	uint8_t reg_val = 0;
 
+	/* Early return when display use other mechanism to enable backlight. */
+	if (!(intel_dp->edp_dpcd[1] & DP_EDP_BACKLIGHT_AUX_ENABLE_CAP))
+		return;
+
 	if (drm_dp_dpcd_readb(&intel_dp->aux, DP_EDP_DISPLAY_CONTROL_REGISTER,
 			      &reg_val) < 0) {
 		DRM_DEBUG_KMS("Failed to read DPCD register 0x%x\n",
@@ -138,26 +142,35 @@ static bool
 intel_dp_aux_display_control_capable(struct intel_connector *connector)
 {
 	struct intel_dp *intel_dp = enc_to_intel_dp(&connector->encoder->base);
+	bool supported;
 
 	/* Check the  eDP Display control capabilities registers to determine if
 	 * the panel can support backlight control over the aux channel
 	 */
-	if (intel_dp->edp_dpcd[1] & DP_EDP_TCON_BACKLIGHT_ADJUSTMENT_CAP &&
-	    (intel_dp->edp_dpcd[1] & DP_EDP_BACKLIGHT_AUX_ENABLE_CAP) &&
-	    !((intel_dp->edp_dpcd[1] & DP_EDP_BACKLIGHT_PIN_ENABLE_CAP) ||
-	      (intel_dp->edp_dpcd[2] & DP_EDP_BACKLIGHT_BRIGHTNESS_PWM_PIN_CAP))) {
-		DRM_DEBUG_KMS("AUX Backlight Control Supported!\n");
-		return true;
+	switch (i915.enable_dpcd_backlight) {
+	case 1: /* prefer PWM pin */
+		supported = (intel_dp->edp_dpcd[1] & DP_EDP_TCON_BACKLIGHT_ADJUSTMENT_CAP) &&
+			    (intel_dp->edp_dpcd[1] & DP_EDP_BACKLIGHT_AUX_ENABLE_CAP) &&
+			    !(intel_dp->edp_dpcd[1] & DP_EDP_BACKLIGHT_PIN_ENABLE_CAP) &&
+			    !(intel_dp->edp_dpcd[2] & DP_EDP_BACKLIGHT_BRIGHTNESS_PWM_PIN_CAP);
+		break;
+	case 2: /* prefer DPCD */
+		supported = (intel_dp->edp_dpcd[1] & DP_EDP_TCON_BACKLIGHT_ADJUSTMENT_CAP) &&
+			    (intel_dp->edp_dpcd[2] & DP_EDP_BACKLIGHT_BRIGHTNESS_AUX_SET_CAP);
+		break;
+	default:
+		supported = false;
 	}
-	return false;
+
+	if (supported)
+		DRM_DEBUG_KMS("AUX Backlight Control Supported!\n");
+
+	return supported;
 }
 
 int intel_dp_aux_init_backlight_funcs(struct intel_connector *intel_connector)
 {
 	struct intel_panel *panel = &intel_connector->panel;
-
-	if (!i915.enable_dpcd_backlight)
-		return -ENODEV;
 
 	if (!intel_dp_aux_display_control_capable(intel_connector))
 		return -ENODEV;
