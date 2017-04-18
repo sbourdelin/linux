@@ -16,6 +16,9 @@
 
 #include "of_private.h"
 
+#define CREATE_TRACE_POINTS
+#include <trace/events/of.h>
+
 /**
  * of_node_get() - Increment refcount of a node
  * @node:	Node to inc refcount, NULL is supported to simplify writing of
@@ -25,8 +28,10 @@
  */
 struct device_node *of_node_get(struct device_node *node)
 {
-	if (node)
+	if (node) {
 		kobject_get(&node->kobj);
+		trace_of_node_get(refcount_read(&node->kobj.kref.refcount), node->full_name);
+	}
 	return node;
 }
 EXPORT_SYMBOL(of_node_get);
@@ -38,8 +43,10 @@ EXPORT_SYMBOL(of_node_get);
  */
 void of_node_put(struct device_node *node)
 {
-	if (node)
+	if (node) {
+		trace_of_node_put(refcount_read(&node->kobj.kref.refcount) - 1, node->full_name);
 		kobject_put(&node->kobj);
+	}
 }
 EXPORT_SYMBOL(of_node_put);
 
@@ -92,24 +99,9 @@ const char *action_names[] = {
 int of_reconfig_notify(unsigned long action, struct of_reconfig_data *p)
 {
 	int rc;
-#ifdef DEBUG
-	struct of_reconfig_data *pr = p;
 
-	switch (action) {
-	case OF_RECONFIG_ATTACH_NODE:
-	case OF_RECONFIG_DETACH_NODE:
-		pr_debug("notify %-15s %s\n", action_names[action],
-			pr->dn->full_name);
-		break;
-	case OF_RECONFIG_ADD_PROPERTY:
-	case OF_RECONFIG_REMOVE_PROPERTY:
-	case OF_RECONFIG_UPDATE_PROPERTY:
-		pr_debug("notify %-15s %s:%s\n", action_names[action],
-			pr->dn->full_name, pr->prop->name);
-		break;
+	trace_of_reconfig_notify(action, p);
 
-	}
-#endif
 	rc = blocking_notifier_call_chain(&of_reconfig_chain, action, p);
 	return notifier_to_errno(rc);
 }
@@ -325,6 +317,8 @@ void of_node_release(struct kobject *kobj)
 {
 	struct device_node *node = kobj_to_device_node(kobj);
 	struct property *prop = node->properties;
+
+	trace_of_node_release(node);
 
 	/* We should never be releasing nodes that haven't been detached. */
 	if (!of_node_check_flag(node, OF_DETACHED)) {
