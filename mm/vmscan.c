@@ -2160,26 +2160,31 @@ static void get_scan_count(struct lruvec *lruvec, struct mem_cgroup *memcg,
 	 * anon pages.  Try to detect this based on file LRU size.
 	 */
 	if (global_reclaim(sc)) {
-		unsigned long pgdatfile;
-		unsigned long pgdatfree;
-		int z;
-		unsigned long total_high_wmark = 0;
+		anon = lruvec_lru_size(lruvec, LRU_ACTIVE_ANON, sc->reclaim_idx) +
+		       lruvec_lru_size(lruvec, LRU_INACTIVE_ANON, sc->reclaim_idx);
+		if (likely(anon >= SWAP_CLUSTER_MAX)) {
+			unsigned long total_high_wmark = 0;
+			unsigned long pgdatfile;
+			unsigned long pgdatfree;
+			int z;
 
-		pgdatfree = sum_zone_node_page_state(pgdat->node_id, NR_FREE_PAGES);
-		pgdatfile = node_page_state(pgdat, NR_ACTIVE_FILE) +
-			   node_page_state(pgdat, NR_INACTIVE_FILE);
+			pgdatfree = sum_zone_node_page_state(pgdat->node_id,
+							     NR_FREE_PAGES);
+			pgdatfile = node_page_state(pgdat, NR_ACTIVE_FILE) +
+				    node_page_state(pgdat, NR_INACTIVE_FILE);
 
-		for (z = 0; z < MAX_NR_ZONES; z++) {
-			struct zone *zone = &pgdat->node_zones[z];
-			if (!managed_zone(zone))
-				continue;
+			for (z = 0; z < MAX_NR_ZONES; z++) {
+				struct zone *zone = &pgdat->node_zones[z];
+				if (!managed_zone(zone))
+					continue;
 
-			total_high_wmark += high_wmark_pages(zone);
-		}
+				total_high_wmark += high_wmark_pages(zone);
+			}
 
-		if (unlikely(pgdatfile + pgdatfree <= total_high_wmark)) {
-			scan_balance = SCAN_ANON;
-			goto out;
+			if (unlikely(pgdatfile + pgdatfree <= total_high_wmark)) {
+				scan_balance = SCAN_ANON;
+				goto out;
+			}
 		}
 	}
 
