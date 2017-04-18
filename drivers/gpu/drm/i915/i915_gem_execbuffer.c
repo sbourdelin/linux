@@ -1153,6 +1153,10 @@ i915_gem_check_execbuffer(struct drm_i915_gem_execbuffer2 *exec)
 	if (exec->flags & __I915_EXEC_UNKNOWN_FLAGS)
 		return false;
 
+	if ((exec->flags & I915_EXEC_CLASS_INSTANCE) &&
+	    (exec->flags & I915_EXEC_RING_MASK))
+		return false;
+
 	/* Kernel clipping was a DRI1 misfeature */
 	if (exec->num_cliprects || exec->cliprects_ptr)
 		return false;
@@ -1492,6 +1496,35 @@ gen8_dispatch_bsd_engine(struct drm_i915_private *dev_priv,
 	return file_priv->bsd_engine;
 }
 
+extern u8 user_class_map[DRM_I915_ENGINE_CLASS_MAX];
+
+static struct intel_engine_cs *
+eb_select_engine_class_instance(struct drm_i915_private *i915,
+				struct drm_i915_gem_execbuffer2 *args)
+{
+	struct intel_engine_cs *engine;
+	enum intel_engine_id id;
+	u16 class_instance;
+	u8 user_class, class, instance;
+
+	class_instance = (args->flags & I915_EXEC_CLASS_INSTANCE_MASK) >>
+			 I915_EXEC_CLASS_INSTANCE_SHIFT;
+
+	user_class = class_instance >> 8;
+	instance = class_instance & 0xff;
+
+	if (user_class >= DRM_I915_ENGINE_CLASS_MAX)
+		return NULL;
+	class = user_class_map[user_class];
+
+	for_each_engine(engine, i915, id) {
+		if (engine->class == class && engine->instance == instance)
+			return engine;
+	}
+
+	return NULL;
+}
+
 #define I915_USER_RINGS (4)
 
 static const enum intel_engine_id user_ring_map[I915_USER_RINGS + 1] = {
@@ -1509,6 +1542,9 @@ eb_select_engine(struct drm_i915_private *dev_priv,
 {
 	unsigned int user_ring_id = args->flags & I915_EXEC_RING_MASK;
 	struct intel_engine_cs *engine;
+
+	if (args->flags & I915_EXEC_CLASS_INSTANCE)
+		return eb_select_engine_class_instance(dev_priv, args);
 
 	if (user_ring_id > I915_USER_RINGS) {
 		DRM_DEBUG("execbuf with unknown ring: %u\n", user_ring_id);
