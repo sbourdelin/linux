@@ -132,6 +132,7 @@
 #define SCLK_RMII_SRC			166
 #define SCLK_PCIEPHY_REF100M		167
 #define SCLK_DDRC			168
+#define SCLK_TESTCLKOUT1		169
 
 #define DCLK_VOP0			180
 #define DCLK_VOP1			181
