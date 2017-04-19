@@ -73,12 +73,8 @@ static inline int notify_page_fault(struct pt_regs *regs)
  * Check whether the instruction at regs->nip is a store using
  * an update addressing form which will update r1.
  */
-static int store_updates_sp(struct pt_regs *regs)
+static int store_updates_sp(unsigned int inst)
 {
-	unsigned int inst;
-
-	if (get_user(inst, (unsigned int __user *)regs->nip))
-		return 0;
 	/* check for 1 in the rA field */
 	if (((inst >> 16) & 0x1f) != 1)
 		return 0;
@@ -207,7 +203,8 @@ int do_page_fault(struct pt_regs *regs, unsigned long address,
 	int trap = TRAP(regs);
  	int is_exec = trap == 0x400;
 	int fault;
-	int rc = 0, store_update_sp = 0;
+	int rc = 0;
+	unsigned int inst = 0;
 
 #if !(defined(CONFIG_4xx) || defined(CONFIG_BOOKE))
 	/*
@@ -288,7 +285,7 @@ int do_page_fault(struct pt_regs *regs, unsigned long address,
 	 * mmap_sem held
 	 */
 	if (is_write && user_mode(regs))
-		store_update_sp = store_updates_sp(regs);
+		__get_user(inst, (unsigned int __user *)regs->nip);
 
 	if (user_mode(regs))
 		flags |= FAULT_FLAG_USER;
@@ -358,7 +355,7 @@ retry:
 		 * between the last mapped region and the stack will
 		 * expand the stack rather than segfaulting.
 		 */
-		if (address + 2048 < uregs->gpr[1] && !store_update_sp)
+		if (address + 2048 < uregs->gpr[1] && !store_updates_sp(inst))
 			goto bad_area;
 	}
 	if (expand_stack(vma, address))
