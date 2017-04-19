@@ -2916,12 +2916,15 @@ ___update_load_avg(u64 now, int cpu, struct sched_avg *sa,
 	/*
 	 * Step 2: update *_avg.
 	 */
-	sa->load_avg = div_u64(sa->load_sum, LOAD_AVG_MAX);
+	sa->load_avg = div_u64((sa->load_sum - sa->period_contrib * weight),
+					(LOAD_AVG_MAX - 1024));
 	if (cfs_rq) {
 		cfs_rq->runnable_load_avg =
-			div_u64(cfs_rq->runnable_load_sum, LOAD_AVG_MAX);
+			div_u64((cfs_rq->runnable_load_sum - sa->period_contrib * weight),
+					(LOAD_AVG_MAX - 1024));
 	}
-	sa->util_avg = sa->util_sum / LOAD_AVG_MAX;
+	sa->util_avg = (sa->util_sum - (running * sa->period_contrib << SCHED_CAPACITY_SHIFT)) /
+					(LOAD_AVG_MAX - 1024);
 
 	return 1;
 }
