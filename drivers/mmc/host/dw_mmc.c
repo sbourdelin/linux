@@ -39,6 +39,7 @@
 #include <linux/of.h>
 #include <linux/of_gpio.h>
 #include <linux/mmc/slot-gpio.h>
+#include <linux/pm_runtime.h>
 
 #include "dw_mmc.h"
 
@@ -1664,8 +1665,15 @@ static void __dw_mci_enable_sdio_irq(struct dw_mci_slot *slot, int enb)
 static void dw_mci_enable_sdio_irq(struct mmc_host *mmc, int enb)
 {
 	struct dw_mci_slot *slot = mmc_priv(mmc);
+	struct dw_mci *host = slot->host;
 
 	__dw_mci_enable_sdio_irq(slot, enb);
+
+	/* Avoid runtime suspending the device when SDIO IRQ is enabled */
+	if (enb)
+		pm_runtime_get_noresume(host->dev);
+	else
+		pm_runtime_put_noidle(host->dev);
 }
 
 static void dw_mci_ack_sdio_irq(struct mmc_host *mmc)
