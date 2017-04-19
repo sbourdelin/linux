@@ -2185,7 +2185,10 @@ static int intel_cpufreq_target(struct cpufreq_policy *policy,
 {
 	struct cpudata *cpu = all_cpu_data[policy->cpu];
 	struct cpufreq_freqs freqs;
-	int target_pstate;
+	struct sample *sample;
+	int target_pstate, from;
+	u64 time;
+	bool sample_taken;
 
 	update_turbo_state();
 
@@ -2205,12 +2208,32 @@ static int intel_cpufreq_target(struct cpufreq_policy *policy,
 		break;
 	}
 	target_pstate = intel_pstate_prepare_request(cpu, target_pstate);
+
+	from = cpu->pstate.current_pstate;
+	time = ktime_get();
+	sample_taken = intel_pstate_sample(cpu, time);
+
 	if (target_pstate != cpu->pstate.current_pstate) {
 		cpu->pstate.current_pstate = target_pstate;
 		wrmsrl_on_cpu(policy->cpu, MSR_IA32_PERF_CTL,
 			      pstate_funcs.get_val(cpu, target_pstate));
 	}
 	freqs.new = target_pstate * cpu->pstate.scaling;
+
+	if (sample_taken) {
+		intel_pstate_calc_avg_perf(cpu);
+		sample = &cpu->sample;
+		trace_pstate_sample(0,
+		0,
+		from,
+		cpu->pstate.current_pstate,
+		sample->mperf,
+		sample->aperf,
+		sample->tsc,
+		get_avg_frequency(cpu),
+		fp_toint(cpu->iowait_boost * 100));
+	}
+
 	cpufreq_freq_transition_end(policy, &freqs, false);
 
 	return 0;
@@ -2220,13 +2243,36 @@ static unsigned int intel_cpufreq_fast_switch(struct cpufreq_policy *policy,
 					      unsigned int target_freq)
 {
 	struct cpudata *cpu = all_cpu_data[policy->cpu];
-	int target_pstate;
+	struct sample *sample;
+	int target_pstate, from;
+	u64 time;
+	bool sample_taken;
 
 	update_turbo_state();
 
 	target_pstate = DIV_ROUND_UP(target_freq, cpu->pstate.scaling);
 	target_pstate = intel_pstate_prepare_request(cpu, target_pstate);
+
+	from = cpu->pstate.current_pstate;
+	time = ktime_get();
+	sample_taken = intel_pstate_sample(cpu, time);
+
 	intel_pstate_update_pstate(cpu, target_pstate);
+
+	if (sample_taken) {
+		intel_pstate_calc_avg_perf(cpu);
+		sample = &cpu->sample;
+		trace_pstate_sample(100,
+		0,
+		from,
+		cpu->pstate.current_pstate,
+		sample->mperf,
+		sample->aperf,
+		sample->tsc,
+		get_avg_frequency(cpu),
+		fp_toint(cpu->iowait_boost * 100));
+	}
+
 	return target_pstate * cpu->pstate.scaling;
 }
 
