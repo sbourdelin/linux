@@ -609,6 +609,11 @@ struct task_struct {
 
 	struct restart_block		restart_block;
 
+#ifdef CONFIG_MODULES
+	/* per-task modules autoload access */
+	unsigned			modules_autoload:2;
+#endif
+
 	pid_t				pid;
 	pid_t				tgid;
 

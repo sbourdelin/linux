@@ -13,6 +13,7 @@
 #include <linux/kmod.h>
 #include <linux/init.h>
 #include <linux/elf.h>
+#include <linux/sched.h>
 #include <linux/stringify.h>
 #include <linux/kobject.h>
 #include <linux/moduleparam.h>
@@ -505,7 +506,33 @@ bool is_module_address(unsigned long addr);
 bool is_module_percpu_address(unsigned long addr);
 bool is_module_text_address(unsigned long addr);
 
-int modules_autoload_access(char *kmod_name);
+int modules_autoload_access(struct task_struct *task, char *kmod_name);
+
+/* Sets task's modules_autoload */
+static inline int task_set_modules_autoload(struct task_struct *task,
+					    unsigned long value)
+{
+	if (value > MODULES_AUTOLOAD_DISABLED)
+		return -EINVAL;
+	else if (task->modules_autoload > value)
+		return -EPERM;
+	else if (task->modules_autoload < value)
+		task->modules_autoload = value;
+
+	return 0;
+}
+
+/* Returns task's modules_autoload */
+static inline void task_copy_modules_autoload(struct task_struct *dest,
+					      struct task_struct *src)
+{
+	dest->modules_autoload = src->modules_autoload;
+}
+
+static inline int task_modules_autoload(struct task_struct *task)
+{
+	return task->modules_autoload;
+}
 
 static inline bool within_module_core(unsigned long addr,
 				      const struct module *mod)
@@ -651,9 +678,26 @@ static inline bool is_livepatch_module(struct module *mod)
 
 #else /* !CONFIG_MODULES... */
 
-static inline int modules_autoload_access(char *kmod_name)
+static inline int modules_autoload_access(struct task_struct *task,
+					  char *kmod_name)
 {
 	return 0;
+}
+
+static inline int task_set_modules_autoload(struct task_struct *task,
+					    unsigned long value)
+{
+	return -ENOSYS;
+}
+
+static inline void task_copy_modules_autoload(struct task_struct *dest,
+					      struct task_struct *src)
+{
+}
+
+static inline int task_modules_autoload(struct task_struct *task)
+{
+	return -ENOSYS;
 }
 
 static inline struct module *__module_address(unsigned long addr)

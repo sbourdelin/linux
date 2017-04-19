@@ -1,0 +1,49 @@
+A request to a kernel feature that is implemented by a module that is
+not loaded may trigger the module auto-load feature, allowing to
+transparently satisfy userspace. In this case an implicit kernel module
+load operation happens.
+
+Usually to load or unload a kernel module, an explicit operation happens
+where programs are required to have some capabilities in order to perform
+such operations. However, with the implicit module loading, no
+capabilities are required, anyone who is able to request a certain kernel
+feature, may also implicitly load its corresponding kernel module. This
+operation can be abused by unprivileged users to expose kernel interfaces
+that maybe privileged users did not want to be made available for various
+reasons: resources, bugs, vulnerabilties, etc. The DCCP vulnerability is
+(CVE-2017-6074) is one real example.
+
+The new per-task "modules_autoload" flag, is a new way to restrict
+automatic module loading, preventing the kernel from exposing more of
+its interface. This particularly useful for containers and sandboxes
+where sandboxed processes should affect the rest of the system.
+
+Any task can set "modules_autoload". Once set, this setting is inherited
+across fork, clone and execve. With "modules_autoload" set, automatic
+module loading will have first to satisfy the per-task access permissions
+before attempting to implicitly load the module. For example, automatic
+loading of modules that contain bugs or vulnerabilities can be
+restricted and imprivileged users can no longer abuse such interfaces.
+
+To set modules_autoload, use prctl(PR_SET_MODULES_AUTOLOAD, value, 0, 0, 0).
+
+When value is (0), the default, automatic modules loading is allowed.
+
+When value is (1), task must have CAP_SYS_MODULE to be able to trigger a
+module auto-load operation, or CAP_NET_ADMIN for modules with a
+'netdev-%s' alias.
+
+When value is (2), automatic modules loading is disabled for the current
+task.
+
+The 'modules_autoload' value may only be increased, never decreased, thus
+ensuring that once applied, processes can never relax their setting.
+
+When a request to a kernel module is denied, the module name with the
+corresponding process name and its pid are logged. Administrators can use
+such information to explicitly load the appropriate modules.
+
+Please note that even if the per-task "modules_autoload" value allows to
+auto-load the corresponding module, automatic module loading may still
+fail due to the global "modules_autoload" sysctl. For more details please
+see "modules_autoload" in Documentation/sysctl/kernel.txt

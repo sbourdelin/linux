@@ -866,7 +866,7 @@ static inline int security_task_create(unsigned long clone_flags)
 static inline int security_task_alloc(struct task_struct *task,
 				      unsigned long clone_flags)
 {
-	return 0;
+	return cap_task_alloc(task, clone_flags);
 }
 
 static inline void security_task_free(struct task_struct *task)

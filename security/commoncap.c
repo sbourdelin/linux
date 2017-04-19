@@ -886,6 +886,40 @@ static int cap_prctl_drop(unsigned long cap)
 	return commit_creds(new);
 }
 
+static int pr_set_mod_autoload(unsigned long arg2, unsigned long arg3,
+			       unsigned long arg4, unsigned long arg5)
+{
+	if (arg3 || arg4 || arg5)
+		return -EINVAL;
+
+	return task_set_modules_autoload(current, arg2);
+}
+
+static inline int pr_get_mod_autoload(unsigned long arg2, unsigned long arg3,
+				      unsigned long arg4, unsigned long arg5)
+{
+	if (arg2 || arg3 || arg4 || arg5)
+		return -EINVAL;
+
+	return task_modules_autoload(current);
+}
+
+/**
+ * cap_task_alloc - Implement process context allocation for this security module
+ * @task: task being allocated
+ * @clone_flags: contains the clone flags indicating what should be shared.
+ *
+ * Allocate or initialize the task context for this security module.
+ *
+ * Returns 0.
+ */
+int cap_task_alloc(struct task_struct *task, unsigned long clone_flags)
+{
+	task_copy_modules_autoload(task, current);
+
+	return 0;
+}
+
 /**
  * cap_task_prctl - Implement process control functions for this security module
  * @option: The process control function requested
@@ -1015,6 +1049,11 @@ int cap_task_prctl(int option, unsigned long arg2, unsigned long arg3,
 				cap_lower(new->cap_ambient, arg3);
 			return commit_creds(new);
 		}
+	case PR_SET_MODULES_AUTOLOAD:
+		return pr_set_mod_autoload(arg2, arg3, arg4, arg5);
+
+	case PR_GET_MODULES_AUTOLOAD:
+		return pr_get_mod_autoload(arg2, arg3, arg4, arg5);
 
 	default:
 		/* No functionality available - continue with default */
@@ -1070,19 +1109,19 @@ int cap_mmap_file(struct file *file, unsigned long reqprot,
 }
 
 /**
- * cap_kernel_module_request - Determine whether a module auto-load is permitted
+ * cap_kernel_module_request - Determine whether current task is allowed to
+ *			       automatically load the specified module.
  * @kmod_name: The module name
  *
- * Determine whether a module should be automatically loaded due to a request
- * by the current task. Returns 0 if the module request should be allowed
- * -EPERM if not.
+ * Determine whether current task is allowed to automatically load the module.
+ * Returns 0 if current task is allowed to auto-load the module, -EPERM if not.
  */
 int cap_kernel_module_request(char *kmod_name)
 {
 	int ret;
 	char comm[sizeof(current->comm)];
 
-	ret = modules_autoload_access(kmod_name);
+	ret = modules_autoload_access(current, kmod_name);
 	if (ret < 0)
 		pr_notice_ratelimited(
 			"Automatic module loading of %.64s by \"%s\"[%d] was denied\n",
@@ -1106,6 +1145,7 @@ struct security_hook_list capability_hooks[] __lsm_ro_after_init = {
 	LSM_HOOK_INIT(inode_killpriv, cap_inode_killpriv),
 	LSM_HOOK_INIT(mmap_addr, cap_mmap_addr),
 	LSM_HOOK_INIT(mmap_file, cap_mmap_file),
+	LSM_HOOK_INIT(task_alloc, cap_task_alloc),
 	LSM_HOOK_INIT(task_fix_setuid, cap_task_fix_setuid),
 	LSM_HOOK_INIT(task_prctl, cap_task_prctl),
 	LSM_HOOK_INIT(task_setscheduler, cap_task_setscheduler),

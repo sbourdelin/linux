@@ -4292,19 +4292,24 @@ static int modules_autoload_privileged_access(const char *name)
 }
 
 /**
- * modules_autoload_access - Determine whether a module auto-load is permitted
+ * modules_autoload_access - Determine whether the task is allowed to perform a
+ *			     module auto-load request
+ * @task: The task performing the request
  * @kmod_name: The module name
  *
- * Determine whether a module should be automatically loaded or not. The check
- * uses the sysctl "modules_autoload" value.
+ * Determine whether the task is allowed to perform a module auto-load request.
+ * This checks the per-task "modules_autoload" flag, if the access is not denied,
+ * then the global sysctl "modules_autoload" is evaluated.
  *
  * Returns 0 if the module request is allowed or -EPERM if not.
  */
-int modules_autoload_access(char *kmod_name)
+int modules_autoload_access(struct task_struct *task, char *kmod_name)
 {
-	if (modules_autoload == MODULES_AUTOLOAD_ALLOWED)
+	unsigned int autoload = max_t(unsigned int,
+				      modules_autoload, task->modules_autoload);
+	if (autoload == MODULES_AUTOLOAD_ALLOWED)
 		return 0;
-	else if (modules_autoload == MODULES_AUTOLOAD_PRIVILEGED)
+	else if (autoload == MODULES_AUTOLOAD_PRIVILEGED)
 		return modules_autoload_privileged_access(kmod_name);
 
 	/* MODULES_AUTOLOAD_DISABLED */
