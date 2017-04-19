@@ -1382,6 +1382,28 @@ bool within_kprobe_blacklist(unsigned long addr)
 	return false;
 }
 
+bool is_valid_kprobe_symbol_name(const char *name)
+{
+	size_t sym_len;
+	char *s;
+
+	s = strchr(name, ':');
+	if (s) {
+		sym_len = strnlen(s+1, KSYM_NAME_LEN);
+		if (sym_len <= 0 || sym_len >= KSYM_NAME_LEN)
+			return false;
+		sym_len = (size_t)(s - name);
+		if (sym_len <= 0 || sym_len >= MODULE_NAME_LEN)
+			return false;
+	} else {
+		sym_len = strnlen(name, MODULE_NAME_LEN);
+		if (sym_len <= 0 || sym_len >= MODULE_NAME_LEN)
+			return false;
+	}
+
+	return true;
+}
+
 /*
  * If we have a symbol_name argument, look it up and add the offset field
  * to it. This way, we can specify a relative address to a symbol.
@@ -1397,6 +1419,8 @@ static kprobe_opcode_t *kprobe_addr(struct kprobe *p)
 		goto invalid;
 
 	if (p->symbol_name) {
+		if (!is_valid_kprobe_symbol_name(p->symbol_name))
+			return ERR_PTR(-EINVAL);
 		addr = kprobe_lookup_name(p->symbol_name, p->offset);
 		if (!addr)
 			return ERR_PTR(-ENOENT);

@@ -704,6 +704,10 @@ static int create_trace_kprobe(int argc, char **argv)
 			pr_info("Return probe must be used without offset.\n");
 			return -EINVAL;
 		}
+		if (!is_valid_kprobe_symbol_name(symbol)) {
+			pr_info("Symbol name is too long.\n");
+			return -EINVAL;
+		}
 	}
 	argc -= 2; argv += 2;
 

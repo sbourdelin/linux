@@ -405,6 +405,7 @@ int disable_kprobe(struct kprobe *kp);
 int enable_kprobe(struct kprobe *kp);
 
 void dump_kprobe(struct kprobe *kp);
+bool is_valid_kprobe_symbol_name(const char *name);
 
 #else /* !CONFIG_KPROBES: */
 
