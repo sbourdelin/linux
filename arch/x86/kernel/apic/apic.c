@@ -1263,6 +1263,22 @@ void __init apic_virtual_wire_mode_setup(void)
 	apic_write(APIC_LVT1, value);
 }
 
+/* Init the interrupt delivery mode for the BSP */
+void __init init_interrupt_mode(void)
+{
+	switch (apic_bsp_mode_check()) {
+	case APIC_PIC:
+		pr_info("Keep in PIC mode(8259)\n");
+		return;
+	case APIC_VIRTUAL_WIRE:
+		pr_info("Switch to virtual wire mode\n");
+		return;
+	case APIC_SYMMETRIC_IO:
+		pr_info("Switch to symmectic I/O mode\n");
+		return;
+	}
+}
+
 static void lapic_setup_esr(void)
 {
 	unsigned int oldvalue, value, maxlvt;
