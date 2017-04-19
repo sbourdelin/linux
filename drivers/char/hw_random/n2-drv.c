@@ -723,16 +723,16 @@ static int n2rng_probe(struct platform_device *op)
 		if (sun4v_hvapi_register(HV_GRP_RNG,
 					 np->hvapi_major,
 					 &np->hvapi_minor)) {
-			dev_err(&op->dev, "Cannot register suitable "
-				"HVAPI version.\n");
+			dev_err(&op->dev,
+				"Cannot register suitable HVAPI version.\n");
 			goto out;
 		}
 	}
 
 	if (np->flags & N2RNG_FLAG_MULTI) {
 		if (np->hvapi_major < 2) {
-			dev_err(&op->dev, "multi-unit-capable RNG requires "
-				"HVAPI major version 2 or later, got %lu\n",
+			dev_err(&op->dev,
+				"multi-unit-capable RNG requires HVAPI major version 2 or later, got %lu\n",
 				np->hvapi_major);
 			goto out_hvapi_unregister;
 		}
