@@ -22,6 +22,7 @@
 #include "sort.h"
 #include "machine.h"
 #include "callchain.h"
+#include "branch.h"
 
 __thread struct callchain_cursor callchain_cursor;
 
@@ -467,6 +468,11 @@ fill_node(struct callchain_node *node, struct callchain_cursor *cursor)
 			call->cycles_count = cursor_node->branch_flags.cycles;
 			call->iter_count = cursor_node->nr_loop_iter;
 			call->samples_count = cursor_node->samples;
+
+			branch_type_count(&call->brtype_stat,
+					  &cursor_node->branch_flags,
+					  cursor_node->branch_from,
+					  cursor_node->ip);
 		}
 
 		list_add_tail(&call->list, &node->val);
@@ -579,6 +585,11 @@ static enum match_result match_chain(struct callchain_cursor_node *node,
 			cnode->cycles_count += node->branch_flags.cycles;
 			cnode->iter_count += node->nr_loop_iter;
 			cnode->samples_count += node->samples;
+
+			branch_type_count(&cnode->brtype_stat,
+					  &node->branch_flags,
+					  node->branch_from,
+					  node->ip);
 		}
 
 		return MATCH_EQ;
@@ -813,7 +824,7 @@ merge_chain_branch(struct callchain_cursor *cursor,
 	list_for_each_entry_safe(list, next_list, &src->val, list) {
 		callchain_cursor_append(cursor, list->ip,
 					list->ms.map, list->ms.sym,
-					false, NULL, 0, 0);
+					false, NULL, 0, 0, 0);
 		list_del(&list->list);
 		map__zput(list->ms.map);
 		free(list);
@@ -853,7 +864,7 @@ int callchain_merge(struct callchain_cursor *cursor,
 int callchain_cursor_append(struct callchain_cursor *cursor,
 			    u64 ip, struct map *map, struct symbol *sym,
 			    bool branch, struct branch_flags *flags,
-			    int nr_loop_iter, int samples)
+			    int nr_loop_iter, int samples, u64 branch_from)
 {
 	struct callchain_cursor_node *node = *cursor->last;
 
@@ -877,6 +888,7 @@ int callchain_cursor_append(struct callchain_cursor *cursor,
 		memcpy(&node->branch_flags, flags,
 			sizeof(struct branch_flags));
 
+	node->branch_from = branch_from;
 	cursor->nr++;
 
 	cursor->last = &node->next;
@@ -1129,16 +1141,73 @@ static int count_float_printf(int index, const char *str, float value,
 	return printed;
 }
 
+static int count_str_printf(int index, const char *str,
+	char *bf, int bfsize)
+{
+	int printed;
+
+	printed = scnprintf(bf, bfsize,
+		"%s%s",
+		(index) ? " " : " (", str);
+
+	return printed;
+}
+
+static int branch_type_str(struct branch_type_stat *stat,
+			   char *bf, int bfsize)
+{
+	int i, j = 0, printed = 0;
+	u64 total = 0;
+
+	for (i = 0; i < PERF_BR_MAX; i++)
+		total += stat->counts[i];
+
+	if (total == 0)
+		return 0;
+
+	if (stat->jcc_fwd > 0)
+		printed += count_str_printf(j++, "JCC forward",
+				bf + printed, bfsize - printed);
+
+	if (stat->jcc_bwd > 0)
+		printed += count_str_printf(j++, "JCC backward",
+				bf + printed, bfsize - printed);
+
+	for (i = 0; i < PERF_BR_MAX; i++) {
+		if (i == PERF_BR_JCC)
+			continue;
+
+		if (stat->counts[i] > 0)
+			printed += count_str_printf(j++, branch_type_name(i),
+					bf + printed, bfsize - printed);
+	}
+
+	if (stat->cross_4k > 0)
+		printed += count_str_printf(j++, "CROSS_4K",
+				bf + printed, bfsize - printed);
+
+	if (stat->cross_2m > 0)
+		printed += count_str_printf(j++, "CROSS_2M",
+				bf + printed, bfsize - printed);
+
+	return printed;
+}
+
 static int counts_str_build(char *bf, int bfsize,
 			     u64 branch_count, u64 predicted_count,
 			     u64 abort_count, u64 cycles_count,
-			     u64 iter_count, u64 samples_count)
+			     u64 iter_count, u64 samples_count,
+			     struct branch_type_stat *brtype_stat)
 {
 	u64 cycles;
 	int printed = 0, i = 0;
 
 	if (branch_count == 0)
 		return scnprintf(bf, bfsize, " (calltrace)");
+
+	printed = branch_type_str(brtype_stat, bf, bfsize);
+	if (printed)
+		i++;
 
 	cycles = cycles_count / branch_count;
 	if (cycles)
@@ -1171,13 +1240,14 @@ static int counts_str_build(char *bf, int bfsize,
 static int callchain_counts_printf(FILE *fp, char *bf, int bfsize,
 				   u64 branch_count, u64 predicted_count,
 				   u64 abort_count, u64 cycles_count,
-				   u64 iter_count, u64 samples_count)
+				   u64 iter_count, u64 samples_count,
+				   struct branch_type_stat *brtype_stat)
 {
-	char str[128];
+	char str[256];
 
 	counts_str_build(str, sizeof(str), branch_count,
 			 predicted_count, abort_count, cycles_count,
-			 iter_count, samples_count);
+			 iter_count, samples_count, brtype_stat);
 
 	if (fp)
 		return fprintf(fp, "%s", str);
@@ -1209,7 +1279,8 @@ int callchain_list_counts__printf_value(struct callchain_node *node,
 
 	return callchain_counts_printf(fp, bf, bfsize, branch_count,
 				       predicted_count, abort_count,
-				       cycles_count, iter_count, samples_count);
+				       cycles_count, iter_count, samples_count,
+				       &clist->brtype_stat);
 }
 
 static void free_callchain_node(struct callchain_node *node)
@@ -1334,7 +1405,8 @@ int callchain_cursor__copy(struct callchain_cursor *dst,
 
 		rc = callchain_cursor_append(dst, node->ip, node->map, node->sym,
 					     node->branch, &node->branch_flags,
-					     node->nr_loop_iter, node->samples);
+					     node->nr_loop_iter, node->samples,
+					     node->branch_from);
 		if (rc)
 			break;
 
