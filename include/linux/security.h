@@ -96,6 +96,7 @@ extern int cap_task_setscheduler(struct task_struct *p);
 extern int cap_task_setioprio(struct task_struct *p, int ioprio);
 extern int cap_task_setnice(struct task_struct *p, int nice);
 extern int cap_vm_enough_memory(struct mm_struct *mm, long pages);
+extern int cap_kernel_module_request(char *kmod_name);
 
 struct msghdr;
 struct sk_buff;
@@ -904,7 +905,7 @@ static inline int security_kernel_create_files_as(struct cred *cred,
 
 static inline int security_kernel_module_request(char *kmod_name)
 {
-	return 0;
+	return cap_kernel_module_request(kmod_name);
 }
 
 static inline int security_kernel_read_file(struct file *file,

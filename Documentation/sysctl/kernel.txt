@@ -43,6 +43,7 @@ show up in /proc/sys/kernel:
 - l2cr                        [ PPC only ]
 - modprobe                    ==> Documentation/debugging-modules.txt
 - modules_disabled
+- modules_autoload
 - msg_next_id		      [ sysv ipc ]
 - msgmax
 - msgmnb
@@ -408,6 +409,28 @@ in an otherwise modular kernel.  This toggle defaults to off
 (0), but can be set true (1).  Once true, modules can be
 neither loaded nor unloaded, and the toggle cannot be set back
 to false.  Generally used with the "kexec_load_disabled" toggle.
+
+==============================================================
+
+modules_autoload:
+
+A sysctl to control if modules auto-load feature is allowed or not.
+This sysctl complements "modules_disabled" which is for all module
+operations where this flag applies only to automatic module loading.
+Automatic module loading happens when programs request a kernel feature
+that is implemented by an unloaded module, the kernel automatically
+runs the program pointed by "modprobe" sysctl in order to load the
+corresponding module.
+
+When modules_autoload is set to (0), the default, there are no
+restrictions.
+
+When modules_autoload is set to (1), processes must have CAP_SYS_MODULE
+to be able to trigger a module auto-load operation, or CAP_NET_ADMIN
+for modules with a 'netdev-%s' alias.
+
+When modules_autoload is set to (2), automatic module loading is
+disabled for all. Once set, this value can not be changed.
 
 ==============================================================
 

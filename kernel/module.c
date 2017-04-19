@@ -279,6 +279,8 @@ module_param(sig_enforce, bool_enable_only, 0644);
 
 /* Block module loading/unloading? */
 int modules_disabled = 0;
+int modules_autoload = MODULES_AUTOLOAD_ALLOWED;
+const int modules_autoload_max = MODULES_AUTOLOAD_DISABLED;
 core_param(nomodule, modules_disabled, bint, 0);
 
 /* Waiting for a module to finish initializing? */
@@ -4274,6 +4276,40 @@ struct module *__module_text_address(unsigned long addr)
 	return mod;
 }
 EXPORT_SYMBOL_GPL(__module_text_address);
+
+/*
+ * Return 0 if CAP_SYS_MODULE or if CAP_NET_ADMIN and the module is
+ * with a 'netdev-%s' alias. Otherwise -EPERM is returned.
+ */
+static int modules_autoload_privileged_access(const char *name)
+{
+	if (capable(CAP_SYS_MODULE))
+		return 0;
+	else if (name && strstr(name, "netdev-") && capable(CAP_NET_ADMIN))
+		return 0;
+
+	return -EPERM;
+}
+
+/**
+ * modules_autoload_access - Determine whether a module auto-load is permitted
+ * @kmod_name: The module name
+ *
+ * Determine whether a module should be automatically loaded or not. The check
+ * uses the sysctl "modules_autoload" value.
+ *
+ * Returns 0 if the module request is allowed or -EPERM if not.
+ */
+int modules_autoload_access(char *kmod_name)
+{
+	if (modules_autoload == MODULES_AUTOLOAD_ALLOWED)
+		return 0;
+	else if (modules_autoload == MODULES_AUTOLOAD_PRIVILEGED)
+		return modules_autoload_privileged_access(kmod_name);
+
+	/* MODULES_AUTOLOAD_DISABLED */
+	return -EPERM;
+}
 
 /* Don't grab lock, we're oopsing. */
 void print_modules(void)

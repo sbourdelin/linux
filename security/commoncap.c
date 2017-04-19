@@ -1069,6 +1069,28 @@ int cap_mmap_file(struct file *file, unsigned long reqprot,
 	return 0;
 }
 
+/**
+ * cap_kernel_module_request - Determine whether a module auto-load is permitted
+ * @kmod_name: The module name
+ *
+ * Determine whether a module should be automatically loaded due to a request
+ * by the current task. Returns 0 if the module request should be allowed
+ * -EPERM if not.
+ */
+int cap_kernel_module_request(char *kmod_name)
+{
+	int ret;
+	char comm[sizeof(current->comm)];
+
+	ret = modules_autoload_access(kmod_name);
+	if (ret < 0)
+		pr_notice_ratelimited(
+			"Automatic module loading of %.64s by \"%s\"[%d] was denied\n",
+			kmod_name, get_task_comm(comm, current), current->pid);
+
+	return ret;
+}
+
 #ifdef CONFIG_SECURITY
 
 struct security_hook_list capability_hooks[] __lsm_ro_after_init = {
@@ -1090,6 +1112,7 @@ struct security_hook_list capability_hooks[] __lsm_ro_after_init = {
 	LSM_HOOK_INIT(task_setioprio, cap_task_setioprio),
 	LSM_HOOK_INIT(task_setnice, cap_task_setnice),
 	LSM_HOOK_INIT(vm_enough_memory, cap_vm_enough_memory),
+	LSM_HOOK_INIT(kernel_module_request, cap_kernel_module_request),
 };
 
 void __init capability_add_hooks(void)
