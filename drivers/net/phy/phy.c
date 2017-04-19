@@ -1203,6 +1203,18 @@ void phy_state_machine(struct work_struct *work)
 	if (phydev->irq == PHY_POLL)
 		queue_delayed_work(system_power_efficient_wq, &phydev->state_queue,
 				   PHY_STATE_TIME * HZ);
+
+	/* Re-schedule a PHY state machine to check PHY status because
+	 * negotiation already done and aneg interrupt may not be generated.
+	 */
+	if (needs_aneg && (phydev->irq > 0) && (phydev->state == PHY_AN)) {
+		err = phy_aneg_done(phydev);
+		if (err > 0)
+			queue_delayed_work(system_power_efficient_wq,
+					   &phydev->state_queue, 0);
+		if (err < 0)
+			phy_error(phydev);
+	}
 }
 
 /**
