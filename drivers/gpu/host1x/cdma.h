@@ -43,6 +43,7 @@ struct host1x_job;
 
 struct push_buffer {
 	void *mapped;			/* mapped pushbuffer memory */
+	dma_addr_t alloc;		/* device address in root domain */
 	dma_addr_t dma;			/* device address of pushbuffer */
 	phys_addr_t phys;		/* physical address of pushbuffer */
 	u32 fence;			/* index we've written */
