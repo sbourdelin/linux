@@ -78,4 +78,20 @@ static inline unsigned long srcu_batches_completed(struct srcu_struct *sp)
 	return 0;
 }
 
+#ifdef CONFIG_RCU_TORTURE_TEST
+static inline void srcutorture_get_gp_data(enum rcutorture_type test_type,
+					   struct srcu_struct *sp, int *flags,
+					   unsigned long *gpnum,
+					   unsigned long *completed)
+{
+	if (test_type != SRCU_FLAVOR)
+		return;
+	*flags = 0;
+	*completed = rcu_seq_ctr(sp->srcu_gp_seq);
+	*gpnum = *completed;
+	if (rcu_segcblist_ready_cbs(&sp->srcu_cblist))
+		(*gpnum)++;
+}
+#endif /* #ifdef CONFIG_RCU_TORTURE_TEST */
+
 #endif
