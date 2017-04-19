@@ -1193,7 +1193,7 @@ enum {
 /*
  * Various sanity checks.
  */
-static int __init smp_sanity_check(unsigned max_cpus)
+static void __init smp_sanity_check(void)
 {
 	preempt_disable();
 
@@ -1231,16 +1231,6 @@ static int __init smp_sanity_check(unsigned max_cpus)
 	}
 
 	/*
-	 * If we couldn't find an SMP configuration at boot time,
-	 * get out of here now!
-	 */
-	if (!smp_found_config && !acpi_lapic) {
-		preempt_enable();
-		pr_notice("SMP motherboard not detected\n");
-		return SMP_NO_CONFIG;
-	}
-
-	/*
 	 * Should not be necessary because the MP table should list the boot
 	 * CPU too, but we do it for the sake of robustness anyway.
 	 */
@@ -1250,29 +1240,6 @@ static int __init smp_sanity_check(unsigned max_cpus)
 		physid_set(hard_smp_processor_id(), phys_cpu_present_map);
 	}
 	preempt_enable();
-
-	/*
-	 * If we couldn't find a local APIC, then get out of here now!
-	 */
-	if (APIC_INTEGRATED(boot_cpu_apic_version) &&
-	    !boot_cpu_has(X86_FEATURE_APIC)) {
-		if (!disable_apic) {
-			pr_err("BIOS bug, local APIC #%d not detected!...\n",
-				boot_cpu_physical_apicid);
-			pr_err("... forcing use of dummy APIC emulation (tell your hw vendor)\n");
-		}
-		return SMP_NO_APIC;
-	}
-
-	/*
-	 * If SMP should be disabled, then really disable it!
-	 */
-	if (!max_cpus) {
-		pr_info("SMP mode deactivated\n");
-		return SMP_FORCE_UP;
-	}
-
-	return SMP_OK;
 }
 
 static void __init smp_cpu_index_default(void)
@@ -1320,18 +1287,17 @@ void __init native_smp_prepare_cpus(unsigned int max_cpus)
 	set_sched_topology(x86_topology);
 
 	set_cpu_sibling_map(0);
+	smp_sanity_check();
 
-	switch (smp_sanity_check(max_cpus)) {
-	case SMP_NO_CONFIG:
+	switch (apic_interrupt_mode) {
+	case APIC_PIC:
 		disable_smp();
 		return;
-	case SMP_NO_APIC:
+	case APIC_SYMMETRIC_IO_NO_CONFIG:
 		disable_smp();
+		x86_init.timers.setup_percpu_clockev();
 		return;
-	case SMP_FORCE_UP:
-		disable_smp();
-		return;
-	case SMP_OK:
+	default:
 		break;
 	}
 

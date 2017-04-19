@@ -53,6 +53,15 @@ extern int local_apic_timer_c2_ok;
 extern int disable_apic;
 extern unsigned int lapic_timer_frequency;
 
+extern enum apic_interrupt_mode_id apic_interrupt_mode;
+enum apic_interrupt_mode_id {
+	APIC_PIC = 0,
+	APIC_VIRTUAL_WIRE,
+	APIC_SYMMETRIC_IO,
+	APIC_SYMMETRIC_IO_NO_CONFIG,
+	APIC_SYMMETRIC_IO_NO_ROUTING
+};
+
 #ifdef CONFIG_SMP
 extern void __inquire_remote_apic(int apicid);
 #else /* CONFIG_SMP */
