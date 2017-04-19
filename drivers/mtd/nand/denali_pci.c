@@ -19,6 +19,9 @@
 
 #define DENALI_NAND_NAME    "denali-nand-pci"
 
+#define INTEL_CE4100	1
+#define INTEL_MRST	2
+
 /* List of platforms this NAND controller has be integrated into */
 static const struct pci_device_id denali_pci_ids[] = {
 	{ PCI_VDEVICE(INTEL, 0x0701), INTEL_CE4100 },
@@ -26,6 +29,10 @@ static const struct pci_device_id denali_pci_ids[] = {
 	{ /* end: all zeroes */ }
 };
 MODULE_DEVICE_TABLE(pci, denali_pci_ids);
+
+static const struct nand_ecc_setting denali_pci_avail_ecc_settings[] = {
+	{512, 8}, {512, 15}, {/* sentinel */}
+};
 
 static int denali_pci_probe(struct pci_dev *dev, const struct pci_device_id *id)
 {
@@ -45,13 +52,11 @@ static int denali_pci_probe(struct pci_dev *dev, const struct pci_device_id *id)
 	}
 
 	if (id->driver_data == INTEL_CE4100) {
-		denali->platform = INTEL_CE4100;
 		mem_base = pci_resource_start(dev, 0);
 		mem_len = pci_resource_len(dev, 1);
 		csr_base = pci_resource_start(dev, 1);
 		csr_len = pci_resource_len(dev, 1);
 	} else {
-		denali->platform = INTEL_MRST;
 		csr_base = pci_resource_start(dev, 0);
 		csr_len = pci_resource_len(dev, 0);
 		mem_base = pci_resource_start(dev, 1);
@@ -65,6 +70,8 @@ static int denali_pci_probe(struct pci_dev *dev, const struct pci_device_id *id)
 	pci_set_master(dev);
 	denali->dev = &dev->dev;
 	denali->irq = dev->irq;
+	denali->clk_x_rate = 200000000;		/* 200 MHz */
+	denali->avail_ecc_settings = denali_pci_avail_ecc_settings;
 
 	ret = pci_request_regions(dev, DENALI_NAND_NAME);
 	if (ret) {
