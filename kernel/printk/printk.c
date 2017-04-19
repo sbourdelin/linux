@@ -1244,7 +1244,7 @@ static size_t msg_print_text(const struct printk_log *msg, enum log_flags prev,
 
 		if (buf) {
 			if (print_prefix(msg, syslog, NULL) +
-			    text_len + 1 >= size - len)
+			    text_len + 1 > size - len)
 				break;
 
 			if (prefix)
