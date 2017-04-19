@@ -21,6 +21,7 @@
 #include <asm/timer.h>
 #include <asm/hpet.h>
 #include <asm/time.h>
+#include <asm/apic.h>
 
 #ifdef CONFIG_X86_64
 __visible volatile unsigned long jiffies __cacheline_aligned = INITIAL_JIFFIES;
@@ -84,6 +85,13 @@ void __init hpet_time_init(void)
 static __init void x86_late_time_init(void)
 {
 	x86_init.timers.timer_init();
+
+	/*
+	 * After PIT/HPET timers init, select and setup
+	 * the final interrupt mode for delivering IRQs.
+	 */
+	init_interrupt_mode();
+
 	tsc_init();
 }
 
