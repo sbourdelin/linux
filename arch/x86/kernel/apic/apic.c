@@ -1228,9 +1228,12 @@ static int __init apic_bsp_mode_check(int *upmode)
 		pr_info("SMP mode deactivated\n");
 		return APIC_SYMMETRIC_IO_NO_ROUTING;
 	}
+#else
+	/* UP_LATE_INIT is true */
+	*upmode = true;
 #endif
-
 	return APIC_SYMMETRIC_IO;
+
 }
 
 /*
@@ -2379,51 +2382,11 @@ void __init apic_bsp_setup(bool upmode)
 	setup_IO_APIC();
 }
 
-/*
- * This initializes the IO-APIC and APIC hardware if this is
- * a UP kernel.
- */
-int __init APIC_init_uniprocessor(void)
-{
-	if (disable_apic) {
-		pr_info("Apic disabled\n");
-		return -1;
-	}
-#ifdef CONFIG_X86_64
-	if (!boot_cpu_has(X86_FEATURE_APIC)) {
-		disable_apic = 1;
-		pr_info("Apic disabled by BIOS\n");
-		return -1;
-	}
-#else
-	if (!smp_found_config && !boot_cpu_has(X86_FEATURE_APIC))
-		return -1;
-
-	/*
-	 * Complain if the BIOS pretends there is one.
-	 */
-	if (!boot_cpu_has(X86_FEATURE_APIC) &&
-	    APIC_INTEGRATED(boot_cpu_apic_version)) {
-		pr_err("BIOS bug, local APIC 0x%x not detected!...\n",
-			boot_cpu_physical_apicid);
-		return -1;
-	}
-#endif
-
-	if (!smp_found_config)
-		disable_ioapic_support();
-
-	default_setup_apic_routing();
-	apic_bsp_setup(true);
-	/* Setup local timer */
-	x86_init.timers.setup_percpu_clockev();
-	return 0;
-}
-
 #ifdef CONFIG_UP_LATE_INIT
 void __init up_late_init(void)
 {
-	APIC_init_uniprocessor();
+	/* Setup local APIC timer */
+	x86_init.timers.setup_percpu_clockev();
 }
 #endif
 
