@@ -121,7 +121,9 @@
     If kgdb supports it for the architecture you are using, you can
     use hardware breakpoints if you desire to run with the
     CONFIG_STRICT_KERNEL_RWX option turned on, else you need to turn off
-    this option.
+    this option. In most architectures, this option is not selectable.
+    For this situation, it can be turned off by adding a runtime parameter
+    'rodata=off'.
     </para>
     <para>
     Next you should choose one of more I/O drivers to interconnect
