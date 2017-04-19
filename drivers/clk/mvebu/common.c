@@ -44,7 +44,7 @@ static struct clk_onecell_data clk_data;
  */
 u32 kirkwood_fix_sscg_deviation(u32 system_clk)
 {
-	struct device_node *sscg_np = NULL;
+	struct device_node *sscg_np;
 	void __iomem *sscg_map;
 	u32 sscg_reg;
 	s32 low_bound, high_bound;
