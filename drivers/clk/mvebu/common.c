@@ -51,13 +51,13 @@ u32 kirkwood_fix_sscg_deviation(u32 system_clk)
 	u64 freq_swing_half;
 
 	sscg_np = of_find_node_by_name(NULL, "sscg");
-	if (sscg_np == NULL) {
+	if (!sscg_np) {
 		pr_err("cannot get SSCG register node\n");
 		return system_clk;
 	}
 
 	sscg_map = of_iomap(sscg_np, 0);
-	if (sscg_map == NULL) {
+	if (!sscg_map) {
 		pr_err("cannot map SSCG register\n");
 		goto out;
 	}
