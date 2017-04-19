@@ -138,7 +138,9 @@ enum {
  */
 enum {
 	GC_CB = 0,
-	GC_GREEDY
+	GC_GREEDY,
+	ALLOC_NEXT,
+	FLUSH_DEVICE,
 };
 
 /*

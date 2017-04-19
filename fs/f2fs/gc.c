@@ -84,7 +84,7 @@ static int gc_thread_func(void *data)
 		stat_inc_bggc_count(sbi);
 
 		/* if return value is not zero, no victim was selected */
-		if (f2fs_gc(sbi, test_opt(sbi, FORCE_FG_GC), true))
+		if (f2fs_gc(sbi, test_opt(sbi, FORCE_FG_GC), true, NULL_SEGNO))
 			wait_ms = gc_th->no_gc_sleep_time;
 
 		trace_f2fs_background_gc(sbi->sb, wait_ms,
@@ -307,6 +307,14 @@ static int get_victim_by_default(struct f2fs_sb_info *sbi,
 
 	p.min_segno = NULL_SEGNO;
 	p.min_cost = get_max_cost(sbi, &p);
+
+	if (*result != NULL_SEGNO) {
+		if (IS_DATASEG(get_seg_entry(sbi, *result)->type) &&
+			get_valid_blocks(sbi, *result, false) &&
+			!sec_usage_check(sbi, GET_SEC_FROM_SEG(sbi, *result)))
+			p.min_segno = *result;
+		goto out;
+	}
 
 	if (p.max_search == 0)
 		goto out;
@@ -912,7 +920,6 @@ static int do_garbage_collect(struct f2fs_sb_info *sbi,
 		 *   - mutex_lock(sentry_lock)     - change_curseg()
 		 *                                  - lock_page(sum_page)
 		 */
-
 		if (type == SUM_TYPE_NODE)
 			gc_node_segment(sbi, sum->entries, segno, gc_type);
 		else
@@ -939,9 +946,9 @@ next:
 	return sec_freed;
 }
 
-int f2fs_gc(struct f2fs_sb_info *sbi, bool sync, bool background)
+int f2fs_gc(struct f2fs_sb_info *sbi, bool sync,
+			bool background, unsigned int segno)
 {
-	unsigned int segno;
 	int gc_type = sync ? FG_GC : BG_GC;
 	int sec_freed = 0;
 	int ret = -EINVAL;
@@ -990,8 +997,10 @@ gc_more:
 		sbi->cur_victim_sec = NULL_SEGNO;
 
 	if (!sync) {
-		if (has_not_enough_free_secs(sbi, sec_freed, 0))
+		if (has_not_enough_free_secs(sbi, sec_freed, 0)) {
+			segno = NULL_SEGNO;
 			goto gc_more;
+		}
 
 		if (gc_type == FG_GC)
 			ret = write_checkpoint(sbi, &cpc);
