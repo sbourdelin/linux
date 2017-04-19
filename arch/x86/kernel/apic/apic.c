@@ -1065,7 +1065,6 @@ void clear_local_APIC(void)
 		if (maxlvt > 3)
 			/* Clear ESR due to Pentium errata 3AP and 11AP */
 			apic_write(APIC_ESR, 0);
-		apic_read(APIC_ESR);
 	}
 }
 
