@@ -25,7 +25,7 @@
  *   LAN9215, LAN9216, LAN9217, LAN9218
  *   LAN9210, LAN9211
  *   LAN9220, LAN9221
- *   LAN89218
+ *   LAN89218,LAN9250
  *
  */
 
@@ -103,6 +103,9 @@ struct smsc911x_data {
 
 	/* used to decide which workarounds apply */
 	unsigned int generation;
+
+	/* used to decide which sub generation product work arounds to apply */
+	unsigned int sub_generation;
 
 	/* device configuration (copied from platform_data during probe) */
 	struct smsc911x_platform_config config;
@@ -1450,6 +1453,8 @@ static int smsc911x_soft_reset(struct smsc911x_data *pdata)
 	unsigned int timeout;
 	unsigned int temp;
 	int ret;
+	unsigned int reset_offset = HW_CFG;
+	unsigned int reset_mask = HW_CFG_SRST_;
 
 	/*
 	 * Make sure to power-up the PHY chip before doing a reset, otherwise
@@ -1476,15 +1481,23 @@ static int smsc911x_soft_reset(struct smsc911x_data *pdata)
 		}
 	}
 
+	if (pdata->sub_generation) {
+		/* special reset for  LAN9250 */
+		reset_offset = RESET_CTL;
+		reset_mask = RESET_CTL_DIGITAL_RST_;
+	}
+
 	/* Reset the LAN911x */
-	smsc911x_reg_write(pdata, HW_CFG, HW_CFG_SRST_);
+	smsc911x_reg_write(pdata, reset_offset, reset_mask);
+
+	/* verify reset bit is cleared */
 	timeout = 10;
 	do {
 		udelay(10);
-		temp = smsc911x_reg_read(pdata, HW_CFG);
-	} while ((--timeout) && (temp & HW_CFG_SRST_));
+		temp = smsc911x_reg_read(pdata, reset_offset);
+	} while ((--timeout) && (temp & reset_mask));
 
-	if (unlikely(temp & HW_CFG_SRST_)) {
+	if (unlikely(temp & reset_mask)) {
 		SMSC_WARN(pdata, drv, "Failed to complete reset");
 		return -EIO;
 	}
@@ -2251,6 +2264,9 @@ static int smsc911x_init(struct net_device *dev)
 	/* Default generation to zero (all workarounds apply) */
 	pdata->generation = 0;
 
+	/* Default sub_generation to zero */
+	pdata->sub_generation = 0;
+
 	pdata->idrev = smsc911x_reg_read(pdata, ID_REV);
 	switch (pdata->idrev & 0xFFFF0000) {
 	case 0x01180000:
@@ -2276,6 +2292,12 @@ static int smsc911x_init(struct net_device *dev)
 	case 0x92210000:
 		/* LAN9210/LAN9211/LAN9220/LAN9221 */
 		pdata->generation = 4;
+		break;
+
+	case 0x92500000:
+		/* LAN9250 */
+		pdata->generation = 4;
+		pdata->sub_generation = 1;
 		break;
 
 	default:

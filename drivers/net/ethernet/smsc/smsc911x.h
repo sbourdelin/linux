@@ -303,6 +303,9 @@
 #define E2P_DATA_EEPROM_DATA_		0x000000FF
 #define LAN_REGISTER_EXTENT		0x00000100
 
+#define RESET_CTL			0x1F8
+#define RESET_CTL_DIGITAL_RST_		0x00000001
+
 /*
  * MAC Control and Status Register (Indirect Address)
  * Offset (through the MAC_CSR CMD and DATA port)
