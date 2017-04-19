@@ -142,6 +142,9 @@ int usb_gen_phy_init(struct usb_phy *phy)
 	struct usb_phy_generic *nop = dev_get_drvdata(phy->dev);
 	int ret;
 
+	if (nop->init_done)
+		return 0;
+
 	if (!IS_ERR(nop->vcc)) {
 		if (regulator_enable(nop->vcc))
 			dev_err(phy->dev, "Failed to enable power\n");
@@ -154,6 +157,8 @@ int usb_gen_phy_init(struct usb_phy *phy)
 	}
 
 	nop_reset(nop);
+
+	nop->init_done = true;
 
 	return 0;
 }
@@ -207,18 +212,29 @@ static int nop_set_host(struct usb_otg *otg, struct usb_bus *host)
 	otg->host = host;
 	return 0;
 }
+int smsc_usb3315_init(struct usb_phy_generic *nop)
+{
+	/*
+	 * If the gpio for controlling reset state is not available, try again
+	 * later
+	 */
+	if(!nop->gpiod_reset)
+		return -EPROBE_DEFER;
+
+	return usb_gen_phy_init(&nop->phy);
+}
 
 int usb_phy_gen_create_phy(struct device *dev, struct usb_phy_generic *nop,
 		struct usb_phy_generic_platform_data *pdata)
 {
+	struct device_node *node = NULL;
 	enum usb_phy_type type = USB_PHY_TYPE_USB2;
 	int err = 0;
-
 	u32 clk_rate = 0;
 	bool needs_vcc = false;
 
 	if (dev->of_node) {
-		struct device_node *node = dev->of_node;
+		node = dev->of_node;
 
 		if (of_property_read_u32(node, "clock-frequency", &clk_rate))
 			clk_rate = 0;
@@ -295,6 +311,12 @@ int usb_phy_gen_create_phy(struct device *dev, struct usb_phy_generic *nop,
 	nop->phy.otg->set_host		= nop_set_host;
 	nop->phy.otg->set_peripheral	= nop_set_peripheral;
 
+	if(node && of_device_is_compatible(node, "smsc,usb3315")) {
+		err = smsc_usb3315_init(nop);
+		if (err)
+			return err;
+	}
+
 	return 0;
 }
 EXPORT_SYMBOL_GPL(usb_phy_gen_create_phy);
@@ -308,6 +330,10 @@ static int usb_phy_generic_probe(struct platform_device *pdev)
 	nop = devm_kzalloc(dev, sizeof(*nop), GFP_KERNEL);
 	if (!nop)
 		return -ENOMEM;
+
+	platform_set_drvdata(pdev, nop);
+
+	nop->init_done = false;
 
 	err = usb_phy_gen_create_phy(dev, nop, dev_get_platdata(&pdev->dev));
 	if (err)
@@ -337,8 +363,6 @@ static int usb_phy_generic_probe(struct platform_device *pdev)
 		return err;
 	}
 
-	platform_set_drvdata(pdev, nop);
-
 	return 0;
 }
 
@@ -353,6 +377,7 @@ static int usb_phy_generic_remove(struct platform_device *pdev)
 
 static const struct of_device_id nop_xceiv_dt_ids[] = {
 	{ .compatible = "usb-nop-xceiv" },
+	{ .compatible = "smsc,usb3315" },
 	{ }
 };
 
