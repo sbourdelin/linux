@@ -818,7 +818,7 @@ out_free:
 static void skl_shutdown(struct pci_dev *pci)
 {
 	struct hdac_ext_bus *ebus = pci_get_drvdata(pci);
-	struct hdac_bus *bus = ebus_to_hbus(ebus);
+	struct hdac_bus *bus;
 	struct hdac_stream *s;
 	struct hdac_ext_stream *stream;
 	struct skl *skl;
@@ -826,6 +826,7 @@ static void skl_shutdown(struct pci_dev *pci)
 	if (ebus == NULL)
 		return;
 
+	bus = ebus_to_hbus(ebus);
 	skl = ebus_to_skl(ebus);
 
 	if (skl->init_failed)
