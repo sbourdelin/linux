@@ -535,6 +535,25 @@ static struct attribute_group armv8_pmuv3_format_attr_group = {
 	.attrs = armv8_pmuv3_format_attrs,
 };
 
+static ssize_t armv8_pmuv3_exclude_hv_show(struct device *dev,
+				     struct device_attribute *attr, char *buf)
+{
+	return sprintf(buf, "%d\n", is_kernel_in_hyp_mode() ? 1 : 0);
+}
+
+static struct device_attribute armv8_pmuv3_exclude_hv_attr =
+		__ATTR(exclude_hv, 0444, armv8_pmuv3_exclude_hv_show, NULL);
+
+static struct attribute *armv8_pmuv3_attrs[] = {
+	&armv8_pmuv3_exclude_hv_attr.attr,
+	NULL,
+};
+
+static struct attribute_group armv8_pmuv3_attr_group = {
+	.name = "attr",
+	.attrs = armv8_pmuv3_attrs,
+};
+
 /*
  * Perf Events' indices
  */
@@ -871,14 +890,13 @@ static int armv8pmu_set_event_filter(struct hw_perf_event *event,
 
 	if (attr->exclude_idle)
 		return -EPERM;
-	if (is_kernel_in_hyp_mode() &&
-	    attr->exclude_kernel != attr->exclude_hv)
-		return -EINVAL;
+	if (is_kernel_in_hyp_mode() && !attr->exclude_kernel)
+		config_base |= ARMV8_PMU_INCLUDE_EL2;
 	if (attr->exclude_user)
 		config_base |= ARMV8_PMU_EXCLUDE_EL0;
 	if (!is_kernel_in_hyp_mode() && attr->exclude_kernel)
 		config_base |= ARMV8_PMU_EXCLUDE_EL1;
-	if (!attr->exclude_hv)
+	if (!is_kernel_in_hyp_mode() && !attr->exclude_hv)
 		config_base |= ARMV8_PMU_INCLUDE_EL2;
 
 	/*
@@ -1008,6 +1026,8 @@ static int armv8_pmuv3_init(struct arm_pmu *cpu_pmu)
 		&armv8_pmuv3_events_attr_group;
 	cpu_pmu->attr_groups[ARMPMU_ATTR_GROUP_FORMATS] =
 		&armv8_pmuv3_format_attr_group;
+	cpu_pmu->attr_groups[ARMPMU_ATTR_GROUP_ATTR] =
+		&armv8_pmuv3_attr_group;
 	return armv8pmu_probe_pmu(cpu_pmu);
 }
 
