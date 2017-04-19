@@ -1608,6 +1608,18 @@ static int __init notimercheck(char *s)
 __setup("no_timer_check", notimercheck);
 
 /*
+ * The loops_per_jiffy is not be set, udelay() or mdelay() cannot
+ * be called here.
+ * Set 16GHZ(loops_per_jiffy almost is 2**24) as the maximum threshold
+ * of CPU frequency. Exceed the threshold indicates the timer interrupt
+ * doesn't work.
+ *
+ * FIXME: Explore a new way to check the timer interrupt work.
+ */
+
+#define MAX_BAND 24
+
+/*
  * There is a nasty bug in some older SMP boards, their mptable lies
  * about the timer IRQ. We do the following to work around the situation:
  *
@@ -1617,28 +1629,51 @@ __setup("no_timer_check", notimercheck);
  */
 static int __init timer_irq_works(void)
 {
-	unsigned long t1 = jiffies;
+	unsigned long ticks;
 	unsigned long flags;
+	/* Set up approx 2 Bo*oMips to start */
+	int band = 11;
+	int loop_times;
 
 	if (no_timer_check)
 		return 1;
 
 	local_save_flags(flags);
 	local_irq_enable();
-	/* Let ten ticks pass... */
-	mdelay((10 * 1000) / HZ);
-	local_irq_restore(flags);
+	/*
+	 * Estimate the loops in (1,2] jiffies.
+	 *
+	 * After the loops (2**12+2**13+...+2**MAX_BAND) times,
+	 * if time_before(jiffies, ticks + 2) is also n, That the
+	 * timer interrupt did not work, return 0.
+	 */
+	ticks = jiffies;
+	do {
+		if (band++ == MAX_BAND) {
+			local_irq_restore(flags);
+			return 0;
+		}
+
+		__delay(1 << band);
+	} while (time_before(jiffies, ticks + 2));
 
 	/*
 	 * Expect a few ticks at least, to be sure some possible
 	 * glue logic does not lock up after one or two first
 	 * ticks in a non-ExtINT mode.  Also the local APIC
-	 * might have cached one ExtINT interrupt.  Finally, at
+	 * might have cached one ExtINT interrupt. Finally, at
 	 * least one tick may be lost due to delays.
+	 *
+	 * As 2**12+2**13+...+2**band < 2**(1 + band),
+	 * it certainly delayed for more than 4 ticks.
 	 */
+	for (loop_times = 0; loop_times < 4; loop_times++)
+		__delay(1 << (1 + band));
+
+	local_irq_restore(flags);
 
 	/* jiffies wrap? */
-	if (time_after(jiffies, t1 + 4))
+	if (time_after(jiffies, ticks + 4))
 		return 1;
 	return 0;
 }
