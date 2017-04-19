@@ -1157,6 +1157,63 @@ void __init sync_Arb_IDs(void)
 			APIC_INT_LEVELTRIG | APIC_DM_INIT);
 }
 
+enum apic_interrupt_mode {
+	APIC_PIC = 0,
+	APIC_VIRTUAL_WIRE,
+	APIC_SYMMETRIC_IO,
+	APIC_MODE_COUNT
+};
+
+static int __init apic_bsp_mode_check(void)
+{
+
+	/* Check kernel option */
+	if (disable_apic) {
+		pr_info("APIC disabled via kernel command line\n");
+		return APIC_PIC;
+	}
+	/* Check BIOS */
+#ifdef CONFIG_X86_64
+	/* On 64-bit, The APIC is integrated, So, must have APIC feature */
+	if (!boot_cpu_has(X86_FEATURE_APIC)) {
+		disable_apic = 1;
+		pr_info("APIC disabled by BIOS\n");
+		return APIC_PIC;
+	}
+#else
+	if (!boot_cpu_has(X86_FEATURE_APIC) &&
+		APIC_INTEGRATED(boot_cpu_apic_version)) {
+		disable_apic = 1;
+		pr_err(FW_BUG "Local APIC %d not detected, force emulation\n",
+				       boot_cpu_physical_apicid);
+		return APIC_PIC;
+	}
+#endif
+	/*
+	 * Check MP table, if neither an integrated nor a separate chip
+	 * doesn't exist.
+	 */
+	if (!boot_cpu_has(X86_FEATURE_APIC) && !smp_found_config) {
+		pr_info("BIOS don't support APIC, and no SMP configuration\n");
+		return APIC_PIC;
+	}
+
+	/* Check MP table, if it is the virtual wire */
+	if (!smp_found_config) {
+		disable_ioapic_support();
+
+		/* Check local APIC, if there is no SMP motherboard */
+		if (!acpi_lapic)
+			pr_info("SMP motherboard not detected\n");
+
+		return APIC_VIRTUAL_WIRE;
+	}
+
+	/* Other checks of ACPI options will be done in each setup function */
+
+	return APIC_SYMMETRIC_IO;
+}
+
 /*
  * Setup the through-local-APIC virtual wire mode.
  */
