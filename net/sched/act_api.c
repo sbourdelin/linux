@@ -84,11 +84,12 @@ static int tcf_dump_walker(struct tcf_hashinfo *hinfo, struct sk_buff *skb,
 {
 	int err = 0, index = -1, i = 0, s_i = 0, n_i = 0;
 	unsigned short act_flags = cb->args[2];
+	unsigned long jiffy_filter = cb->args[3];
 	struct nlattr *nest;
 
 	spin_lock_bh(&hinfo->lock);
 
-	s_i = cb->args[0];
+	s_i = cb->args[4];
 
 	for (i = 0; i < (hinfo->hmask + 1); i++) {
 		struct hlist_head *head;
@@ -99,6 +100,11 @@ static int tcf_dump_walker(struct tcf_hashinfo *hinfo, struct sk_buff *skb,
 		hlist_for_each_entry_rcu(p, head, tcfa_head) {
 			index++;
 			if (index < s_i)
+				continue;
+
+			if (jiffy_filter &&
+			    time_after(jiffy_filter,
+				       (unsigned long)p->tcfa_tm.lastuse))
 				continue;
 
 			nest = nla_nest_start(skb, n_i);
@@ -118,6 +124,9 @@ static int tcf_dump_walker(struct tcf_hashinfo *hinfo, struct sk_buff *skb,
 		}
 	}
 done:
+	if (index > 0)
+		cb->args[4] = index + 1;
+
 	spin_unlock_bh(&hinfo->lock);
 	if (n_i) {
 		cb->args[0] += n_i;
@@ -1000,6 +1009,7 @@ static int tcf_action_add(struct net *net, struct nlattr *nla,
 
 static const struct nla_policy tcaa_policy[TCAA_MAX + 1] = {
 	[TCAA_ACT_FLAGS]      = { .type = NLA_U32 },
+	[TCAA_ACT_TIME_FILTER]      = { .type = NLA_U32 },
 };
 
 static int tc_ctl_action(struct sk_buff *skb, struct nlmsghdr *n,
@@ -1090,12 +1100,13 @@ static int tc_dump_action(struct sk_buff *skb, struct netlink_callback *cb)
 	struct tcamsg *t = (struct tcamsg *) nlmsg_data(cb->nlh);
 	struct nlattr *kind = NULL;
 	u32 act_flags = 0;
+	u32 msecs_filter = 0;
+	unsigned long jiffy_wanted = 0;
 
 	ret = nlmsg_parse(cb->nlh, sizeof(struct tcamsg), tcaa, TCAA_MAX,
 			  tcaa_policy, NULL);
 	if (ret < 0)
 		return ret;
-
 
 	kind = find_dump_kind(tcaa);
 	if (kind == NULL) {
@@ -1110,12 +1121,22 @@ static int tc_dump_action(struct sk_buff *skb, struct netlink_callback *cb)
 	if (tcaa[TCAA_ACT_FLAGS])
 		act_flags = nla_get_u32(tcaa[TCAA_ACT_FLAGS]);
 
+	if (tcaa[TCAA_ACT_TIME_FILTER])
+		msecs_filter = nla_get_u32(tcaa[TCAA_ACT_TIME_FILTER]);
+
 	nlh = nlmsg_put(skb, NETLINK_CB(cb->skb).portid, cb->nlh->nlmsg_seq,
 			cb->nlh->nlmsg_type, sizeof(*t), 0);
 	if (!nlh)
 		goto out_module_put;
 
+	if (msecs_filter) {
+		unsigned long jiffy_msecs = msecs_to_jiffies(msecs_filter);
+
+		jiffy_wanted = jiffies - jiffy_msecs;
+	}
+
 	cb->args[2] = act_flags;
+	cb->args[3] = jiffy_wanted;
 
 	t = nlmsg_data(nlh);
 	t->tca_family = AF_UNSPEC;
