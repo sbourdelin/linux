@@ -69,24 +69,23 @@ kprobe_opcode_t *kprobe_lookup_name(const char *name, unsigned int offset)
 		modsym++;
 		if (*modsym != '\0' && *modsym != '.') {
 			/* Convert to <module:.symbol> */
-			strncpy(dot_name, name, modsym - name);
+			memcpy(dot_name, name, modsym - name);
 			dot_name[modsym - name] = '.';
 			dot_name[modsym - name + 1] = '\0';
-			strncat(dot_name, modsym,
-				sizeof(dot_name) - (modsym - name) - 2);
+			strlcat(dot_name, modsym, sizeof(dot_name));
 			dot_appended = true;
 		} else {
 			dot_name[0] = '\0';
-			strncat(dot_name, name, sizeof(dot_name) - 1);
+			strlcat(dot_name, name, sizeof(dot_name));
 		}
 	} else if (name[0] != '.') {
 		dot_name[0] = '.';
 		dot_name[1] = '\0';
-		strncat(dot_name, name, KSYM_NAME_LEN - 2);
+		strlcat(dot_name, name, sizeof(dot_name));
 		dot_appended = true;
 	} else {
 		dot_name[0] = '\0';
-		strncat(dot_name, name, KSYM_NAME_LEN - 1);
+		strlcat(dot_name, name, sizeof(dot_name));
 	}
 	addr = (kprobe_opcode_t *)kallsyms_lookup_name(dot_name);
 	if (!addr && dot_appended) {
