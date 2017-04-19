@@ -2748,6 +2748,8 @@ mlx5e_get_stats(struct net_device *dev, struct rtnl_link_stats64 *stats)
 	struct mlx5e_vport_stats *vstats = &priv->stats.vport;
 	struct mlx5e_pport_stats *pstats = &priv->stats.pport;
 
+	mutex_lock(&priv->state_lock);
+
 	if (mlx5e_is_uplink_rep(priv)) {
 		stats->rx_packets = PPORT_802_3_GET(pstats, a_frames_received_ok);
 		stats->rx_bytes   = PPORT_802_3_GET(pstats, a_octets_received_ok);
@@ -2783,6 +2785,7 @@ mlx5e_get_stats(struct net_device *dev, struct rtnl_link_stats64 *stats)
 	stats->multicast =
 		VPORT_COUNTER_GET(vstats, received_eth_multicast.packets);
 
+	mutex_unlock(&priv->state_lock);
 }
 
 static void mlx5e_set_rx_mode(struct net_device *dev)

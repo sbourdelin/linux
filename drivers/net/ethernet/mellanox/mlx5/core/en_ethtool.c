@@ -313,7 +313,6 @@ static void mlx5e_get_ethtool_stats(struct net_device *dev,
 	mutex_lock(&priv->state_lock);
 	if (test_bit(MLX5E_STATE_OPENED, &priv->state))
 		mlx5e_update_stats(priv);
-	mutex_unlock(&priv->state_lock);
 
 	for (i = 0; i < NUM_SW_COUNTERS; i++)
 		data[idx++] = MLX5E_READ_CTR64_CPU(&priv->stats.sw,
@@ -378,8 +377,10 @@ static void mlx5e_get_ethtool_stats(struct net_device *dev,
 		data[idx++] = MLX5E_READ_CTR64_CPU(mlx5_priv->pme_stats.error_counters,
 						   mlx5e_pme_error_desc, i);
 
-	if (!test_bit(MLX5E_STATE_OPENED, &priv->state))
+	if (!test_bit(MLX5E_STATE_OPENED, &priv->state)) {
+		mutex_unlock(&priv->state_lock);
 		return;
+	}
 
 	/* per channel counters */
 	for (i = 0; i < priv->params.num_channels; i++)
@@ -393,6 +394,8 @@ static void mlx5e_get_ethtool_stats(struct net_device *dev,
 			for (j = 0; j < NUM_SQ_STATS; j++)
 				data[idx++] = MLX5E_READ_CTR64_CPU(&priv->channel[i]->sq[tc].stats,
 								   sq_stats_desc, j);
+
+	mutex_unlock(&priv->state_lock);
 }
 
 static u32 mlx5e_rx_wqes_to_packets(struct mlx5e_priv *priv, int rq_wq_type,
