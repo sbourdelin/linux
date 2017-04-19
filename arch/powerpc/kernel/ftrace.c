@@ -526,7 +526,9 @@ void ftrace_replace_code(int enable)
  */
 void arch_ftrace_update_code(int command)
 {
+	set_kernel_text_rw();
 	ftrace_modify_all_code(command);
+	set_kernel_text_ro();
 }
 
 int __init ftrace_dyn_arch_init(void)

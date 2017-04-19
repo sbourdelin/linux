@@ -41,6 +41,7 @@ unsigned long ioremap_bot;
 EXPORT_SYMBOL(ioremap_bot);	/* aka VMALLOC_END */
 
 extern char etext[], _stext[], _sinittext[], _einittext[];
+extern char __start_rodata[], __init_begin[];
 
 __ref pte_t *pte_alloc_one_kernel(struct mm_struct *mm, unsigned long address)
 {
@@ -374,6 +375,41 @@ void remap_init_ram(void)
 
 	change_page_attr(page, numpages, PAGE_KERNEL);
 }
+
+#ifdef CONFIG_DEBUG_RODATA
+void set_kernel_text_rw(void)
+{
+	struct page *page = virt_to_page(_stext);
+	unsigned long numpages = PFN_UP((unsigned long)etext) -
+				 PFN_DOWN((unsigned long)_stext);
+
+	change_page_attr(page, numpages, PAGE_KERNEL_X);
+}
+
+void set_kernel_text_ro(void)
+{
+	struct page *page = virt_to_page(_stext);
+	unsigned long numpages = PFN_UP((unsigned long)etext) -
+				 PFN_DOWN((unsigned long)_stext);
+
+	change_page_attr(page, numpages, PAGE_KERNEL_ROX);
+}
+
+void mark_rodata_ro(void)
+{
+	/*
+	 * mark .rodata as read only. Use __init_begin rather than __end_rodata
+	 * to cover NOTES and EXCEPTION_TABLE.
+	 */
+	struct page *page = virt_to_page(__start_rodata);
+	unsigned long numpages = PFN_UP((unsigned long)__init_begin) -
+				 PFN_DOWN((unsigned long)__start_rodata);
+
+	set_kernel_text_ro();
+
+	change_page_attr(page, numpages, PAGE_KERNEL_RO);
+}
+#endif
 
 #ifdef CONFIG_DEBUG_PAGEALLOC
 void __kernel_map_pages(struct page *page, int numpages, int enable)
