@@ -1,0 +1,59 @@
+Introduction
+
+This document describes a new type of node called N_COHERENT_MEMORY.
+This memory is cache coherent with system memory and we would like
+this to show up as a NUMA node, however there are certain algorithms
+that might not be currently suitable for N_COHERENT_MEMORY
+
+1. AutoNUMA balancing
+2. kswapd reclaim
+
+The reason for exposing this device memory as NUMA is to simplify
+the programming model, where memory allocation via malloc() or
+mmap() for example would seamlessly work across both kinds of
+memory. Since we expect the size of device memory to be smaller
+than system RAM, we would like to control the allocation of such
+memory. The proposed mechanism reuses nodemasks and explicit
+specification of the coherent node in the nodemask for allocation
+from device memory. This implementation also allows for kernel
+level allocation via __GFP_THISNODE and existing techniques
+such as page migration to work.
+
+Assumptions:
+
+1. Nodes with N_COHERENT_MEMORY don't have CPUs on them, so
+effectively they are CPUless memory nodes
+2. Nodes with N_COHERENT_MEMORY are marked as movable_nodes.
+Slub allocations from these nodes will fail otherwise.
+
+Implementation Details
+
+A new node state N_COHERENT_MEMORY is created. Each architecture
+can then mark devices as being N_COHERENT_MEMORY and the implementation
+makes sure this node set is disjoint from the N_MEMORY node state
+nodes. A typical node zonelist (FALLBACK) with N_COHERENT_MEMORY would
+be:
+
+Assuming we have 2 nodes and 1 coherent memory node
+
+Node1:	Node 1 --> Node 2
+
+Node2:	Node 2 --> Node 1
+
+Node3:	Node 3 --> Node 2 --> Node 1
+
+This effectively means that allocations that have Node 1 and Node 2
+in the nodemask will not allocate from Node 3. Allocations with __GFP_THISNODE
+use the NOFALLBACK list and should allocate from Node 3, if it
+is specified.  Since Node 3 has no CPUs, we don't expect any default
+allocations occurring from it.
+
+However to support allocation from the coherent node, changes have been
+made to mempolicy, specifically policy_nodemask() and policy_zonelist()
+such that
+
+1. MPOL_BIND with the coherent node (Node 3 in the above example) will
+not filter out N_COHERENT_MEMORY if any of the nodes in the nodemask
+is in N_COHERENT_MEMORY
+2. MPOL_PREFERRED will use the FALLBACK list of the coherent node (Node 3)
+if a policy that specifies a preference to it is used.

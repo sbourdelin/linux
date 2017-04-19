@@ -6,6 +6,8 @@ balance
 	- various information on memory balancing.
 cleancache.txt
 	- Intro to cleancache and page-granularity victim cache.
+coherent-memory.txt
+	- Introduction to coherent memory handling (N_COHERENT_MEMORY)
 frontswap.txt
 	- Outline frontswap, part of the transcendent memory frontend.
 highmem.txt
