@@ -173,13 +173,13 @@ static void __init of_cpu_clk_setup(struct device_node *node)
 	int ncpus = 0;
 	struct device_node *dn;
 
-	if (clock_complex_base == NULL) {
+	if (!clock_complex_base) {
 		pr_err("%s: clock-complex base register not set\n",
 			__func__);
 		return;
 	}
 
-	if (pmu_dfs_base == NULL)
+	if (!pmu_dfs_base)
 		pr_warn("%s: pmu-dfs base register not set, dynamic frequency scaling not available\n",
 			__func__);
 
