@@ -73,8 +73,12 @@ module_param(report_key_events, int, 0644);
 MODULE_PARM_DESC(report_key_events,
 	"0: none, 1: output changes, 2: brightness changes, 3: all");
 
-static bool device_id_scheme = false;
-module_param(device_id_scheme, bool, 0444);
+/*
+ * Whether the struct acpi_video_device_attrib::device_id_scheme bit should be
+ * assumed even if not actually set.
+ */
+static bool force_device_id_scheme = false;
+module_param(force_device_id_scheme, bool, 0444);
 
 static bool only_lcd = false;
 module_param(only_lcd, bool, 0444);
@@ -387,9 +391,9 @@ static int video_disable_backlight_sysfs_if(
 	return 0;
 }
 
-static int video_set_device_id_scheme(const struct dmi_system_id *d)
+static int video_set_force_device_id_scheme(const struct dmi_system_id *d)
 {
-	device_id_scheme = true;
+	force_device_id_scheme = true;
 	return 0;
 }
 
@@ -491,7 +495,7 @@ static struct dmi_system_id video_dmi_table[] = {
 	 */
 	{
 	 /* https://bugzilla.kernel.org/show_bug.cgi?id=104121 */
-	 .callback = video_set_device_id_scheme,
+	 .callback = video_set_force_device_id_scheme,
 	 .ident = "ESPRIMO Mobile M9410",
 	 .matches = {
 		DMI_MATCH(DMI_SYS_VENDOR, "FUJITSU SIEMENS"),
@@ -1111,7 +1115,7 @@ acpi_video_bus_get_one_device(struct acpi_device *device,
 
 	attribute = acpi_video_get_device_attr(video, device_id);
 
-	if (attribute && (attribute->device_id_scheme || device_id_scheme)) {
+	if (attribute && (attribute->device_id_scheme || force_device_id_scheme)) {
 		switch (attribute->display_type) {
 		case ACPI_VIDEO_DISPLAY_CRT:
 			data->flags.crt = 1;
