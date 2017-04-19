@@ -272,9 +272,9 @@ The fields are in this order:
 	- counter value
 	- unit of the counter value or empty
 	- event name
+	- optional variance if multiple values are collected with -r
 	- run time of counter
 	- percentage of measurement time the counter was running
-	- optional variance if multiple values are collected with -r
 	- optional metric value
 	- optional unit of metric
 
