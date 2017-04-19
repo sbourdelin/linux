@@ -174,7 +174,7 @@ unlock:
 
 static void mlx5e_update_sw_counters(struct mlx5e_priv *priv)
 {
-	struct mlx5e_sw_stats *s = &priv->stats.sw;
+	struct mlx5e_sw_stats temp, *s = &temp;
 	struct mlx5e_rq_stats *rq_stats;
 	struct mlx5e_sq_stats *sq_stats;
 	u64 tx_offload_none = 0;
@@ -229,12 +229,14 @@ static void mlx5e_update_sw_counters(struct mlx5e_priv *priv)
 	s->link_down_events_phy = MLX5_GET(ppcnt_reg,
 				priv->stats.pport.phy_counters,
 				counter_set.phys_layer_cntrs.link_down_events);
+	memcpy(&priv->stats.sw, s, sizeof(*s));
 }
 
 static void mlx5e_update_vport_counters(struct mlx5e_priv *priv)
 {
+	struct mlx5e_vport_stats temp;
 	int outlen = MLX5_ST_SZ_BYTES(query_vport_counter_out);
-	u32 *out = (u32 *)priv->stats.vport.query_vport_out;
+	u32 *out = (u32 *)temp.query_vport_out;
 	u32 in[MLX5_ST_SZ_DW(query_vport_counter_in)] = {0};
 	struct mlx5_core_dev *mdev = priv->mdev;
 
@@ -245,6 +247,7 @@ static void mlx5e_update_vport_counters(struct mlx5e_priv *priv)
 
 	memset(out, 0, outlen);
 	mlx5_cmd_exec(mdev, in, sizeof(in), out, outlen);
+	memcpy(priv->stats.vport.query_vport_out, out, outlen);
 }
 
 static void mlx5e_update_pport_counters(struct mlx5e_priv *priv)
