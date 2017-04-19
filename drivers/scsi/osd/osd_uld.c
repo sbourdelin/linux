@@ -454,7 +454,8 @@ static int osd_probe(struct device *dev)
 	/* hold one more reference to the scsi_device that will get released
 	 * in __release, in case a logout is happening while fs is mounted
 	 */
-	scsi_device_get(scsi_device);
+	if (scsi_device_get(scsi_device))
+		goto err_retract_minor;
 	osd_dev_init(&oud->od, scsi_device);
 
 	/* allocate a disk and set it up */
