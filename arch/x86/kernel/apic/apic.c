@@ -1229,55 +1229,6 @@ static int __init apic_bsp_mode_check(int *upmode)
 
 }
 
-/*
- * Setup the through-local-APIC virtual wire mode.
- */
-void __init apic_virtual_wire_mode_setup(void)
-{
-	unsigned int value;
-
-	/*
-	 * Don't do the setup now if we have a SMP BIOS as the
-	 * through-I/O-APIC virtual wire mode might be active.
-	 */
-	if (smp_found_config || !boot_cpu_has(X86_FEATURE_APIC))
-		return;
-
-	/*
-	 * Do not trust the local APIC being empty at bootup.
-	 */
-	clear_local_APIC();
-
-	/*
-	 * Enable APIC.
-	 */
-	value = apic_read(APIC_SPIV);
-	value &= ~APIC_VECTOR_MASK;
-	value |= APIC_SPIV_APIC_ENABLED;
-
-#ifdef CONFIG_X86_32
-	/* This bit is reserved on P4/Xeon and should be cleared */
-	if ((boot_cpu_data.x86_vendor == X86_VENDOR_INTEL) &&
-	    (boot_cpu_data.x86 == 15))
-		value &= ~APIC_SPIV_FOCUS_DISABLED;
-	else
-#endif
-		value |= APIC_SPIV_FOCUS_DISABLED;
-	value |= SPURIOUS_APIC_VECTOR;
-	apic_write(APIC_SPIV, value);
-
-	/*
-	 * Set up the virtual wire mode.
-	 */
-	apic_write(APIC_LVT0, APIC_DM_EXTINT);
-	value = APIC_DM_NMI;
-	if (!lapic_is_integrated())		/* 82489DX */
-		value |= APIC_LVT_LEVEL_TRIGGER;
-	if (apic_extnmi == APIC_EXTNMI_NONE)
-		value |= APIC_LVT_MASKED;
-	apic_write(APIC_LVT1, value);
-}
-
 /* Init the interrupt delivery mode for the BSP */
 void __init init_interrupt_mode(void)
 {
@@ -1290,6 +1241,7 @@ void __init init_interrupt_mode(void)
 		return;
 	case APIC_VIRTUAL_WIRE:
 		pr_info("Switch to virtual wire mode\n");
+		default_setup_apic_routing();
 		break;
 	case APIC_SYMMETRIC_IO:
 		pr_info("Switch to symmectic I/O mode\n");
