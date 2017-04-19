@@ -112,8 +112,8 @@ static const struct host1x_bo_ops tegra_bo_ops = {
 	.unpin = tegra_bo_unpin,
 	.mmap = tegra_bo_mmap,
 	.munmap = tegra_bo_munmap,
-	.kmap = tegra_bo_kmap,
-	.kunmap = tegra_bo_kunmap,
+	.map = tegra_bo_kmap,
+	.unmap = tegra_bo_kunmap,
 };
 
 static int tegra_bo_iommu_map(struct tegra_drm *tegra, struct tegra_bo *bo)
