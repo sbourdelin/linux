@@ -132,6 +132,16 @@ int acpi_bus_get_status(struct acpi_device *device)
 }
 EXPORT_SYMBOL(acpi_bus_get_status);
 
+void acpi_set_device_status(struct acpi_device *adev, u32 sta)
+{
+	u32 *status = (u32 *)&adev->status;
+
+	if (acpi_device_always_present(adev))
+		*status = ACPI_STA_DEFAULT;
+	else
+		*status = sta;
+}
+
 void acpi_bus_private_data_handler(acpi_handle handle,
 				   void *context)
 {
