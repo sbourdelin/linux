@@ -23,6 +23,8 @@
 #include <linux/mfd/syscon.h>
 #include <linux/module.h>
 #include <linux/of_device.h>
+#include <linux/mmc/host.h>
+#include <linux/mmc/slot-gpio.h>
 #include <linux/phy/phy.h>
 #include <linux/pm_runtime.h>
 #include <linux/regmap.h>
@@ -709,6 +711,11 @@ static int sdhci_arasan_probe(struct platform_device *pdev)
 	ret = sdhci_add_host(host);
 	if (ret)
 		goto err_add_host;
+
+	if (mmc_card_is_removable(host->mmc) &&
+	    mmc_gpio_get_cd(host->mmc) < 0) {
+		host->mmc->caps |= MMC_CAP_NEEDS_POLL;
+	}
 
 	pm_runtime_put(&pdev->dev);
 	return 0;
