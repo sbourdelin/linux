@@ -6,8 +6,8 @@
  * published by the Free Software Foundation.
  */
 
-#include "drmP.h"
-#include "drm_gem_cma_helper.h"
+#include <drm/drmP.h>
+#include <drm/drm_gem_cma_helper.h>
 
 #include <drm/drm_encoder.h>
 
