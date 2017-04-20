@@ -220,6 +220,21 @@ struct exynos_drm_private {
 	u32			pending;
 	spinlock_t		lock;
 	wait_queue_head_t	wait;
+
+	/* for pp api */
+	int num_pp;
+	struct list_head pp_list;
+
+	struct drm_property *pp_src_fb;
+	struct drm_property *pp_src_x;
+	struct drm_property *pp_src_y;
+	struct drm_property *pp_src_w;
+	struct drm_property *pp_src_h;
+	struct drm_property *pp_dst_fb;
+	struct drm_property *pp_dst_x;
+	struct drm_property *pp_dst_y;
+	struct drm_property *pp_dst_w;
+	struct drm_property *pp_dst_h;
 };
 
 static inline struct device *to_dma_dev(struct drm_device *dev)

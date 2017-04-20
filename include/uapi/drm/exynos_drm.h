@@ -300,6 +300,46 @@ struct drm_exynos_ipp_cmd_ctrl {
 	__u32	ctrl;
 };
 
+struct drm_exynos_pp_get_res {
+	__u64 pp_id_ptr;
+	__u32 count_pps;
+};
+
+struct drm_exynos_pp_get {
+	__u32 pp_id;
+	__u32 capabilities;
+
+	__u32 src_format_count;
+	__u32 dst_format_count;
+	__u64 src_format_type_ptr;
+	__u64 dst_format_type_ptr;
+};
+
+#define DRM_EXYNOS_OBJECT_PP 0x88888888
+
+#define DRM_EXYNOS_PP_CAP_CROP		0x01
+#define DRM_EXYNOS_PP_CAP_ROTATE	0x02
+#define DRM_EXYNOS_PP_CAP_SCALE		0x04
+#define DRM_EXYNOS_PP_CAP_CONVERT	0x08
+#define DRM_EXYNOS_PP_CAP_FB_MODIFIERS	0x1000
+
+#define DRM_EXYNOS_PP_FLAG_EVENT	0x01
+#define DRM_EXYNOS_PP_FLAG_TEST_ONLY	0x02
+#define DRM_EXYNOS_PP_FLAG_NONBLOCK	0x04
+
+#define DRM_EXYNOS_PP_FLAGS (DRM_EXYNOS_PP_FLAG_EVENT |\
+		DRM_EXYNOS_PP_FLAG_TEST_ONLY | DRM_EXYNOS_PP_FLAG_NONBLOCK)
+
+struct drm_exynos_pp_commit {
+	__u32 pp_id;
+	__u32 flags;
+	__u32 count_props;
+	__u64 props_ptr;
+	__u64 prop_values_ptr;
+	__u64 reserved;
+	__u64 user_data;
+};
+
 #define DRM_EXYNOS_GEM_CREATE		0x00
 #define DRM_EXYNOS_GEM_MAP		0x01
 /* Reserved 0x03 ~ 0x05 for exynos specific gem ioctl */
@@ -316,6 +356,10 @@ struct drm_exynos_ipp_cmd_ctrl {
 #define DRM_EXYNOS_IPP_SET_PROPERTY	0x31
 #define DRM_EXYNOS_IPP_QUEUE_BUF	0x32
 #define DRM_EXYNOS_IPP_CMD_CTRL	0x33
+
+#define DRM_EXYNOS_PP_GET_RESOURCES	0x40
+#define DRM_EXYNOS_PP_GET		0x41
+#define DRM_EXYNOS_PP_COMMIT		0x42
 
 #define DRM_IOCTL_EXYNOS_GEM_CREATE		DRM_IOWR(DRM_COMMAND_BASE + \
 		DRM_EXYNOS_GEM_CREATE, struct drm_exynos_gem_create)
@@ -343,9 +387,17 @@ struct drm_exynos_ipp_cmd_ctrl {
 #define DRM_IOCTL_EXYNOS_IPP_CMD_CTRL		DRM_IOWR(DRM_COMMAND_BASE + \
 		DRM_EXYNOS_IPP_CMD_CTRL, struct drm_exynos_ipp_cmd_ctrl)
 
+#define DRM_IOCTL_EXYNOS_PP_GET_RESOURCES	DRM_IOWR(DRM_COMMAND_BASE + \
+		DRM_EXYNOS_PP_GET_RESOURCES, struct drm_exynos_pp_get_res)
+#define DRM_IOCTL_EXYNOS_PP_GET			DRM_IOWR(DRM_COMMAND_BASE + \
+		DRM_EXYNOS_PP_GET, struct drm_exynos_pp_get)
+#define DRM_IOCTL_EXYNOS_PP_COMMIT		DRM_IOWR(DRM_COMMAND_BASE + \
+		DRM_EXYNOS_PP_COMMIT, struct drm_exynos_pp_commit)
+
 /* EXYNOS specific events */
 #define DRM_EXYNOS_G2D_EVENT		0x80000000
 #define DRM_EXYNOS_IPP_EVENT		0x80000001
+#define DRM_EXYNOS_PP_EVENT		0x80000002
 
 struct drm_exynos_g2d_event {
 	struct drm_event	base;
@@ -364,6 +416,16 @@ struct drm_exynos_ipp_event {
 	__u32			prop_id;
 	__u32			reserved;
 	__u32			buf_id[EXYNOS_DRM_OPS_MAX];
+};
+
+struct drm_exynos_pp_event {
+	struct drm_event	base;
+	__u64			user_data;
+	__u32			tv_sec;
+	__u32			tv_usec;
+	__u32			pp_id;
+	__u32			sequence;
+	__u64			reserved;
 };
 
 #if defined(__cplusplus)

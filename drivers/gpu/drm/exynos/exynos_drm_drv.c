@@ -26,6 +26,7 @@
 #include "exynos_drm_fb.h"
 #include "exynos_drm_gem.h"
 #include "exynos_drm_plane.h"
+#include "exynos_drm_pp.h"
 #include "exynos_drm_vidi.h"
 #include "exynos_drm_g2d.h"
 #include "exynos_drm_ipp.h"
@@ -127,6 +128,12 @@ static const struct drm_ioctl_desc exynos_ioctls[] = {
 	DRM_IOCTL_DEF_DRV(EXYNOS_IPP_QUEUE_BUF, exynos_drm_ipp_queue_buf,
 			DRM_AUTH | DRM_RENDER_ALLOW),
 	DRM_IOCTL_DEF_DRV(EXYNOS_IPP_CMD_CTRL, exynos_drm_ipp_cmd_ctrl,
+			DRM_AUTH | DRM_RENDER_ALLOW),
+	DRM_IOCTL_DEF_DRV(EXYNOS_PP_GET_RESOURCES, exynos_drm_pp_get_res,
+			DRM_AUTH | DRM_RENDER_ALLOW),
+	DRM_IOCTL_DEF_DRV(EXYNOS_PP_GET, exynos_drm_pp_get,
+			DRM_AUTH | DRM_RENDER_ALLOW),
+	DRM_IOCTL_DEF_DRV(EXYNOS_PP_COMMIT, exynos_drm_pp_commit,
 			DRM_AUTH | DRM_RENDER_ALLOW),
 };
 
@@ -360,6 +367,7 @@ static int exynos_drm_bind(struct device *dev)
 	drm_mode_config_init(drm);
 
 	exynos_drm_mode_config_init(drm);
+	exynos_drm_pp_init(drm);
 
 	/* setup possible_clones. */
 	cnt = 0;
