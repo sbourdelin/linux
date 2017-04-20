@@ -54,6 +54,8 @@
 #include <asm/unaligned.h>
 
 #include "orangefs-dev-proto.h"
+#include "protocol.h"
+#include "orangefs-debug.h"
 
 #ifdef ORANGEFS_KERNEL_DEBUG
 #define ORANGEFS_DEFAULT_OP_TIMEOUT_SECS       10
