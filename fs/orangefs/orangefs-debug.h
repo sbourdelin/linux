@@ -12,6 +12,7 @@
 #ifndef __ORANGEFS_DEBUG_H
 #define __ORANGEFS_DEBUG_H
 
+#include "orangefs-kernel.h"
 #ifdef __KERNEL__
 #include <linux/types.h>
 #else
@@ -86,7 +87,7 @@ static struct __keyword_mask_s s_kmod_keyword_mask_map[] = {
 	{"all", GOSSIP_MAX_DEBUG}
 };
 
-static const int num_kmod_keyword_mask_map = (int)
-	(sizeof(s_kmod_keyword_mask_map) / sizeof(struct __keyword_mask_s));
+static const int num_kmod_keyword_mask_map = ARRAY_SIZE(
+	s_kmod_keyword_mask_map);
 
 #endif /* __ORANGEFS_DEBUG_H */
