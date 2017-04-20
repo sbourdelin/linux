@@ -134,11 +134,21 @@ all the CPUs in the same socket.
 This example measures memory bandwidth every second
 on the first memory controller on socket 0 of a Intel Xeon system
 
-  perf stat -C 0 -a uncore_imc_0/cas_count_read/,uncore_imc_0/cas_count_write/ -I 1000 ...
+  perf stat -C 0 -e uncore_imc_0/cas_count_read/,uncore_imc_0/cas_count_write/ -I 1000 ...
 
 Each memory controller has its own PMU.  Measuring the complete system
 bandwidth would require specifying all imc PMUs (see perf list output),
 and adding the values together.
+
+perf supports wildcard matches on uncore PMUs. All "imc" boxes can be
+specified with
+
+  perf stat ... -e uncore_imc/cas_count_read/ -I 1000
+
+and perf will automatically measure all "imc" PMUs and sum them together.
+For the special case of a uncore prefix this can be also shortened to
+
+  perf stat ... -e imc/cas_count_read/ -I 1000
 
 This example measures the combined core power every second
 
