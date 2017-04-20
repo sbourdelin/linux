@@ -152,6 +152,13 @@ struct drm_property {
 	 *     properties. This is generally used to expose probe state to
 	 *     usersapce, e.g. the EDID, or the connector path property on DP
 	 *     MST sinks.
+	 *
+	 * DRM_MODE_PROP_VENDOR
+	 *     Set for vendor specific properties, for non-modeset vendor
+	 *     specific objects, which can be accessed by
+	 *     DRM_IOCTL_MODE_GETPROPERTY and DRM_IOCTL_MODE_OBJ_GETPROPERTIES,
+	 *     properties are not exposed to legacy userspace.
+	 *
 	 */
 	uint32_t flags;
 

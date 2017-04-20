@@ -322,6 +322,7 @@ struct drm_mode_get_connector {
  * witout being aware that this could be triggering a lengthy modeset.
  */
 #define DRM_MODE_PROP_ATOMIC        0x80000000
+#define DRM_MODE_PROP_VENDOR        0x40000000
 
 struct drm_mode_property_enum {
 	__u64 value;

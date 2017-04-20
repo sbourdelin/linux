@@ -268,12 +268,13 @@ int drm_object_property_get_value(struct drm_mode_object *obj,
 {
 	int i;
 
-	/* read-only properties bypass atomic mechanism and still store
-	 * their value in obj->properties->values[].. mostly to avoid
-	 * having to deal w/ EDID and similar props in atomic paths:
+	/* custom vendor or read-only properties bypass atomic mechanism
+	 * and still store their value in obj->properties->values[].. mostly
+	 * to avoid having to deal w/ EDID and similar props in atomic paths:
 	 */
 	if (drm_drv_uses_atomic_modeset(property->dev) &&
-			!(property->flags & DRM_MODE_PROP_IMMUTABLE))
+			!(property->flags &
+			  (DRM_MODE_PROP_IMMUTABLE | DRM_MODE_PROP_VENDOR)))
 		return drm_atomic_get_property(obj, property, val);
 
 	for (i = 0; i < obj->properties->count; i++) {

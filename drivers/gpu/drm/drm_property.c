@@ -318,7 +318,7 @@ struct drm_property *drm_property_create_object(struct drm_device *dev,
 
 	flags |= DRM_MODE_PROP_OBJECT;
 
-	if (WARN_ON(!(flags & DRM_MODE_PROP_ATOMIC)))
+	if (WARN_ON(!(flags & (DRM_MODE_PROP_ATOMIC | DRM_MODE_PROP_VENDOR))))
 		return NULL;
 
 	property = drm_property_create(dev, flags, name, 1);
