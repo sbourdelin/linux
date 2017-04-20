@@ -1140,7 +1140,7 @@ static int si5351_dt_parse(struct i2c_client *client,
 	int num = 0;
 	u32 val;
 
-	if (np == NULL)
+	if (!np)
 		return 0;
 
 	pdata = devm_kzalloc(&client->dev, sizeof(*pdata), GFP_KERNEL);
