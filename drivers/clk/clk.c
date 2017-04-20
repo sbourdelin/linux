@@ -2032,9 +2032,9 @@ static int clk_summary_show(struct seq_file *s, void *data)
 	struct clk_core *c;
 	struct hlist_head **lists = (struct hlist_head **)s->private;
 
-	seq_puts(s, "   clock                         enable_cnt  prepare_cnt        rate   accuracy   phase\n");
-	seq_puts(s, "----------------------------------------------------------------------------------------\n");
-
+	seq_puts(s,
+		 "   clock                         enable_cnt  prepare_cnt        rate   accuracy   phase\n"
+		 "----------------------------------------------------------------------------------------\n");
 	clk_prepare_lock();
 
 	for (; *lists; lists++)
