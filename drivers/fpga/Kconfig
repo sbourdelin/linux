@@ -26,6 +26,13 @@ config FPGA_MGR_ICE40_SPI
 	help
 	  FPGA manager driver support for Lattice iCE40 FPGAs over SPI.
 
+config FPGA_MGR_ALTERA_CVP
+	tristate "Altera Arria/Cyclone/Stratix CvP FPGA Manager"
+	depends on PCI
+	help
+	  FPGA manager driver support for Altera FPGAs using the
+	  CvP interface over PCIe.
+
 config FPGA_MGR_SOCFPGA
 	tristate "Altera SOCFPGA FPGA Manager"
 	depends on ARCH_SOCFPGA || COMPILE_TEST
