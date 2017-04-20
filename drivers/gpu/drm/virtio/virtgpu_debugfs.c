@@ -25,7 +25,7 @@
 
 #include <linux/debugfs.h>
 
-#include "drmP.h"
+#include <drm/drmP.h>
 #include "virtgpu_drv.h"
 
 static int

@@ -28,7 +28,7 @@
 #include <drm/drmP.h>
 #include "virtgpu_drv.h"
 #include <drm/virtgpu_drm.h>
-#include "ttm/ttm_execbuf_util.h"
+#include <drm/ttm/ttm_execbuf_util.h>
 
 static void convert_to_hw_box(struct virtio_gpu_box *dst,
 			      const struct drm_virtgpu_3d_box *src)
