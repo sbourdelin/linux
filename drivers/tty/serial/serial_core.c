@@ -44,6 +44,32 @@
  */
 static DEFINE_MUTEX(port_mutex);
 
+#ifdef CONFIG_SERIAL_DYNAMIC_MINORS
+/* List of uarts to allow for allocation of dynamic minor ranges*/
+LIST_HEAD(dynamic_uarts);
+DEFINE_MUTEX(dynamic_uarts_mutex);
+
+static void
+uart_setup_major_minor(struct uart_driver *drv)
+{
+	int start = 0;
+	struct uart_driver *d;
+
+	drv->major = LOW_DENSITY_UART_MAJOR;
+	mutex_lock(&dynamic_uarts_mutex);
+
+	list_for_each_entry(d, &dynamic_uarts, dynamic_uarts) {
+		if (start + drv->nr < d->minor)
+			break;
+		start = d->minor + d->nr;
+	}
+	list_add_tail(&drv->dynamic_uarts, &d->dynamic_uarts);
+	drv->minor = start;
+
+	mutex_unlock(&dynamic_uarts_mutex);
+}
+#endif
+
 /*
  * lockdep: port->lock is initialized in two places, but we
  *          want only one lock-class:
@@ -2449,6 +2475,11 @@ int uart_register_driver(struct uart_driver *drv)
 
 	BUG_ON(drv->state);
 
+#ifdef CONFIG_SERIAL_DYNAMIC_MINORS
+	INIT_LIST_HEAD(&drv->dynamic_uarts);
+	uart_setup_major_minor(drv);
+#endif
+
 	/*
 	 * Maybe we should be using a slab cache for this, especially if
 	 * we have a large number of ports to handle.
@@ -2518,6 +2549,13 @@ void uart_unregister_driver(struct uart_driver *drv)
 	put_tty_driver(p);
 	for (i = 0; i < drv->nr; i++)
 		tty_port_destroy(&drv->state[i].port);
+
+#ifdef CONFIG_SERIAL_DYNAMIC_MINORS
+	mutex_lock(&dynamic_uarts_mutex);
+	list_del(&drv->dynamic_uarts);
+	mutex_unlock(&dynamic_uarts_mutex);
+#endif
+
 	kfree(drv->state);
 	drv->state = NULL;
 	drv->tty_driver = NULL;

@@ -31,6 +31,8 @@
 #include <linux/sysrq.h>
 #include <uapi/linux/serial_core.h>
 
+#define LOW_DENSITY_UART_MAJOR 204
+
 #ifdef CONFIG_SERIAL_CORE_CONSOLE
 #define uart_console(port) \
 	((port)->cons && (port)->cons->index == (port)->line)
@@ -314,6 +316,10 @@ struct uart_driver {
 	 */
 	struct uart_state	*state;
 	struct tty_driver	*tty_driver;
+
+#ifdef CONFIG_SERIAL_DYNAMIC_MINORS
+	struct list_head	dynamic_uarts;
+#endif
 };
 
 void uart_write_wakeup(struct uart_port *port);

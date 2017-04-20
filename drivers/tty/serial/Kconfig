@@ -7,6 +7,16 @@ if TTY
 menu "Serial drivers"
 	depends on HAS_IOMEM
 
+config SERIAL_DYNAMIC_MINORS
+	bool "Dynamic serial minors allocation"
+	help
+	  If you say Y here the serial subsystem will use dynamic minors for all
+	  serial devices, using the Low density serial port major. Note that
+	  this requires the system to a non-static /dev to support a getty on
+	  serial console.
+
+	  If you are unsure about this, say N here.
+
 config SERIAL_EARLYCON
 	bool
 	help
