@@ -3565,7 +3565,6 @@ static int pci_probe(struct pci_dev *dev,
 	u32 bus_options, max_receive, link_speed, version;
 	u64 guid;
 	int i, err;
-	size_t size;
 
 	if (dev->vendor == PCI_VENDOR_ID_PINNACLE_SYSTEMS) {
 		dev_err(&dev->dev, "Pinnacle MovieBoard is not yet supported\n");
@@ -3671,9 +3670,9 @@ static int pci_probe(struct pci_dev *dev,
 	reg_write(ohci, OHCI1394_IsoRecvIntMaskClear, ~0);
 	ohci->ir_context_mask = ohci->ir_context_support;
 	ohci->n_ir = hweight32(ohci->ir_context_mask);
-	size = sizeof(struct iso_context) * ohci->n_ir;
-	ohci->ir_context_list = kzalloc(size, GFP_KERNEL);
-
+	ohci->ir_context_list = kcalloc(ohci->n_ir,
+					sizeof(*ohci->ir_context_list),
+					GFP_KERNEL);
 	reg_write(ohci, OHCI1394_IsoXmitIntMaskSet, ~0);
 	ohci->it_context_support = reg_read(ohci, OHCI1394_IsoXmitIntMaskSet);
 	/* JMicron JMB38x often shows 0 at first read, just ignore it */
@@ -3684,9 +3683,9 @@ static int pci_probe(struct pci_dev *dev,
 	reg_write(ohci, OHCI1394_IsoXmitIntMaskClear, ~0);
 	ohci->it_context_mask = ohci->it_context_support;
 	ohci->n_it = hweight32(ohci->it_context_mask);
-	size = sizeof(struct iso_context) * ohci->n_it;
-	ohci->it_context_list = kzalloc(size, GFP_KERNEL);
-
+	ohci->it_context_list = kcalloc(ohci->n_it,
+					sizeof(*ohci->it_context_list),
+					GFP_KERNEL);
 	if (ohci->it_context_list == NULL || ohci->ir_context_list == NULL) {
 		err = -ENOMEM;
 		goto fail_contexts;
