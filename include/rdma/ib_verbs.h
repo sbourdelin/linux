@@ -1658,10 +1658,12 @@ enum ib_flow_spec_type {
 	/* L4 headers*/
 	IB_FLOW_SPEC_TCP		= 0x40,
 	IB_FLOW_SPEC_UDP		= 0x41,
+	IB_FLOW_SPEC_ESP		= 0x42,
 	IB_FLOW_SPEC_VXLAN_TUNNEL	= 0x50,
 	IB_FLOW_SPEC_INNER		= 0x100,
 	/* Actions */
 	IB_FLOW_SPEC_ACTION_TAG         = 0x1000,
+	IB_FLOW_SPEC_ACTION_ESP_AES_GCM         = 0x1001,
 };
 #define IB_FLOW_SPEC_LAYER_MASK	0xF0
 #define IB_FLOW_SPEC_SUPPORT_LAYERS 8
@@ -1770,6 +1772,20 @@ struct ib_flow_spec_tcp_udp {
 	struct ib_flow_tcp_udp_filter mask;
 };
 
+struct ib_flow_esp_filter {
+		__be32	spi;
+		__be32  seq;
+		/* Must be last */
+		u8	real_sz[0];
+};
+
+struct ib_flow_spec_esp {
+	u32                           type;
+	u16			      size;
+	struct ib_flow_esp_filter     val;
+	struct ib_flow_esp_filter     mask;
+};
+
 struct ib_flow_tunnel_filter {
 	__be32	tunnel_id;
 	u8	real_sz[0];
@@ -1791,6 +1807,16 @@ struct ib_flow_spec_action_tag {
 	u32                           tag_id;
 };
 
+struct ib_flow_spec_action_esp_aes_gcm {
+	enum ib_flow_spec_type	      type;
+	u16			      size;
+	__u8                          key[32];
+	__u8                          key_length; /* 16, 24 or 32 bytes */
+	__u8                          salt[4]; /* salt according to RFC4106 */
+	__u8                          seqiv_salt[8];
+	__u8			      seq_hi[4];
+};
+
 union ib_flow_spec {
 	struct {
 		u32			type;
@@ -1802,7 +1828,9 @@ union ib_flow_spec {
 	struct ib_flow_spec_tcp_udp	tcp_udp;
 	struct ib_flow_spec_ipv6        ipv6;
 	struct ib_flow_spec_tunnel      tunnel;
+	struct ib_flow_spec_esp		esp;
 	struct ib_flow_spec_action_tag  flow_tag;
+	struct ib_flow_spec_action_esp_aes_gcm  esp_aes_gcm;
 };
 
 struct ib_flow_attr {
