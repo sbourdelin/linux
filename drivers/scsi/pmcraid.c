@@ -2411,7 +2411,10 @@ static int pmcraid_reset_reload(
 		scsi_unblock_requests(pinstance->host);
 		if (pinstance->ioa_state == target_state)
 			reset = 0;
+		spin_lock_irqsave(pinstance->host->host_lock, lock_flags);
 	}
+
+	spin_unlock_irqrestore(pinstance->host->host_lock, lock_flags);
 
 	return reset;
 }
