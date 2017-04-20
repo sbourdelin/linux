@@ -26,7 +26,7 @@ static int nfit_handle_mce(struct notifier_block *nb, unsigned long val,
 	struct nfit_spa *nfit_spa;
 
 	/* We only care about memory errors */
-	if (!(mce->status & MCACOD))
+	if (!(mce->status & 0xef80) == BIT(7))
 		return NOTIFY_DONE;
 
 	/*
