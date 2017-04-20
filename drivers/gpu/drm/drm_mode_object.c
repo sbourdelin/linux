@@ -73,6 +73,7 @@ int drm_mode_object_add(struct drm_device *dev,
 {
 	return __drm_mode_object_add(dev, obj, obj_type, true, NULL);
 }
+EXPORT_SYMBOL(drm_mode_object_add);
 
 void drm_mode_object_register(struct drm_device *dev,
 			      struct drm_mode_object *obj)
@@ -103,6 +104,7 @@ void drm_mode_object_unregister(struct drm_device *dev,
 	}
 	mutex_unlock(&dev->mode_config.idr_mutex);
 }
+EXPORT_SYMBOL(drm_mode_object_unregister);
 
 struct drm_mode_object *__drm_mode_object_find(struct drm_device *dev,
 					       uint32_t id, uint32_t type)

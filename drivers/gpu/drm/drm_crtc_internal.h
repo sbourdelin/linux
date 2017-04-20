@@ -101,14 +101,10 @@ int drm_mode_destroyblob_ioctl(struct drm_device *dev,
 int __drm_mode_object_add(struct drm_device *dev, struct drm_mode_object *obj,
 			  uint32_t obj_type, bool register_obj,
 			  void (*obj_free_cb)(struct kref *kref));
-int drm_mode_object_add(struct drm_device *dev, struct drm_mode_object *obj,
-			uint32_t obj_type);
 void drm_mode_object_register(struct drm_device *dev,
 			      struct drm_mode_object *obj);
 struct drm_mode_object *__drm_mode_object_find(struct drm_device *dev,
 					       uint32_t id, uint32_t type);
-void drm_mode_object_unregister(struct drm_device *dev,
-				struct drm_mode_object *object);
 int drm_mode_object_get_properties(struct drm_mode_object *obj, bool atomic,
 				   uint32_t __user *prop_ptr,
 				   uint64_t __user *prop_values,

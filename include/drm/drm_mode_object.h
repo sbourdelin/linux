@@ -112,6 +112,12 @@ struct drm_object_properties {
 		return "(unknown)";				\
 	}
 
+int drm_mode_object_add(struct drm_device *dev,
+			struct drm_mode_object *obj, uint32_t obj_type);
+
+void drm_mode_object_unregister(struct drm_device *dev,
+				struct drm_mode_object *object);
+
 struct drm_mode_object *drm_mode_object_find(struct drm_device *dev,
 					     uint32_t id, uint32_t type);
 void drm_mode_object_get(struct drm_mode_object *obj);
