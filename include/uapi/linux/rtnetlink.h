@@ -674,10 +674,27 @@ struct tcamsg {
 	unsigned char	tca__pad1;
 	unsigned short	tca__pad2;
 };
+
+enum {
+	TCAA_UNSPEC,
+	TCAA_ACT_TAB,
+#define TCA_ACT_TAB TCAA_ACT_TAB
+	TCAA_ACT_FLAGS,
+	TCAA_ACT_COUNT,
+	__TCAA_MAX,
+#define	TCAA_MAX (__TCAA_MAX - 1)
+};
+
 #define TA_RTA(r)  ((struct rtattr*)(((char*)(r)) + NLMSG_ALIGN(sizeof(struct tcamsg))))
 #define TA_PAYLOAD(n) NLMSG_PAYLOAD(n,sizeof(struct tcamsg))
-#define TCA_ACT_TAB 1 /* attr type must be >=1 */	
-#define TCAA_MAX 1
+/* tcamsg flags stored in attribute TCAA_ACT_FLAGS
+ *
+ * ACT_LARGE_DUMP_ON user->kernel to request for larger than TCA_ACT_MAX_PRIO
+ * actions in a dump. All dump responses will contain the number of actions
+ * being dumped stored in for user app's consumption in TCAA_ACT_COUNT
+ *
+ */
+#define ACT_LARGE_DUMP_ON		BIT(0)
 
 /* New extended info filters for IFLA_EXT_MASK */
 #define RTEXT_FILTER_VF		(1 << 0)
