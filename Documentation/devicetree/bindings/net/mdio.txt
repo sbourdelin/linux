@@ -1,0 +1,20 @@
+Common MDIO bus properties.
+
+These are generic properties that can apply to any MDIO bus.
+
+Optional properties:
+- reset-gpios: List of one or more GPIOs that control the RESET lines
+  of the PHYs on that MDIO bus.
+- reset-delay-us: RESET pulse width as per PHY datasheet.
+
+Example :
+
+	davinci_mdio: ethernet@0x5c030000 {
+		compatible = "ti,davinci_mdio";
+		ti,hwmods = "davinci_mdio";
+		reg = <0x5c030000 0x1000>;
+		#address-cells = <1>;
+		#size-cells = <0>;
+		reset-gpios = <&gpio2 5 GPIO_ACTIVE_LOW>;
+		reset-delay-us = <2>;   /* PHY datasheet states 1uS min */
+	};
