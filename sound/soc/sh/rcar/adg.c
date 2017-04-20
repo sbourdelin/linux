@@ -425,8 +425,7 @@ static void rsnd_adg_get_clkin(struct rsnd_priv *priv,
 		dev_dbg(dev, "clk %d : %p : %ld\n", i, clk, clk_get_rate(clk));
 }
 
-static void rsnd_adg_get_clkout(struct rsnd_priv *priv,
-				struct rsnd_adg *adg)
+static int rsnd_adg_get_clkout(struct rsnd_priv *priv, struct rsnd_adg *adg)
 {
 	struct clk *clk;
 	struct device *dev = rsnd_priv_to_dev(priv);
@@ -459,7 +458,10 @@ static void rsnd_adg_get_clkout(struct rsnd_priv *priv,
 	 * ADG supports BRRA/BRRB output only
 	 * this means all clkout0/1/2/3 will be same rate
 	 */
-	prop = of_find_property(np, "clock-frequency", NULL);;
+	prop = of_find_property(np, "clock-frequency", NULL);
+	if (!prop)
+		return -EINVAL;
+
 	req_size = prop->length / sizeof(u32);
 
 	of_property_read_u32_array(np, "clock-frequency", req_rate, req_size);
@@ -568,6 +570,7 @@ static void rsnd_adg_get_clkout(struct rsnd_priv *priv,
 		dev_dbg(dev, "clkout %d : %p : %ld\n", i, clk, clk_get_rate(clk));
 	dev_dbg(dev, "BRGCKR = 0x%08x, BRRA/BRRB = 0x%x/0x%x\n",
 		ckr, rbga, rbgb);
+	return 0;
 }
 
 int rsnd_adg_probe(struct rsnd_priv *priv)
@@ -589,7 +592,9 @@ int rsnd_adg_probe(struct rsnd_priv *priv)
 		return ret;
 
 	rsnd_adg_get_clkin(priv, adg);
-	rsnd_adg_get_clkout(priv, adg);
+	ret = rsnd_adg_get_clkout(priv, adg);
+	if (ret)
+		return ret;
 
 	if (of_get_property(np, "clkout-lr-asynchronous", NULL))
 		adg->flags = LRCLK_ASYNC;
