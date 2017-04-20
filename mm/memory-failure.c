@@ -530,6 +530,7 @@ static const char * const action_page_types[] = {
 static int delete_from_lru_cache(struct page *p)
 {
 	if (!isolate_lru_page(p)) {
+		memcg_kmem_uncharge(p, 0);
 		/*
 		 * Clear sensible page flags, so that the buddy system won't
 		 * complain when the page is unpoison-and-freed.
