@@ -1691,7 +1691,7 @@ int __init acpi_ec_dsdt_probe(void)
 	 * At this point, the GPE is not fully initialized, so do not to
 	 * handle the events.
 	 */
-	ret = acpi_config_boot_ec(ec, ec->handle, false, false);
+	ret = acpi_config_boot_ec(boot_ec, boot_ec->handle, false, false);
 error:
 	if (ret)
 		acpi_ec_free(ec);
