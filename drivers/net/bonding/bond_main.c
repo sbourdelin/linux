@@ -399,8 +399,6 @@ static void bond_update_speed_duplex(struct slave *slave)
 
 	slave->speed = ecmd.base.speed;
 	slave->duplex = ecmd.base.duplex;
-
-	return;
 }
 
 const char *bond_slave_link_status(s8 link)
