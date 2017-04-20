@@ -366,6 +366,30 @@ extern const char *ceph_mds_op_name(int op);
 #define CEPH_READDIR_FRAG_COMPLETE	(1<<8)
 #define CEPH_READDIR_HASH_ORDER		(1<<9)
 
+/*
+ * open request flags
+ */
+#define CEPH_O_RDONLY		00000000
+#define CEPH_O_WRONLY		00000001
+#define CEPH_O_RDWR		00000002
+#define CEPH_O_CREAT		00000100
+#define CEPH_O_EXCL		00000200
+#define CEPH_O_NOCTTY		00000400
+#define CEPH_O_TRUNC		00001000
+#define CEPH_O_APPEND		00002000
+#define CEPH_O_NONBLOCK		00004000
+#define CEPH_O_DSYNC		00010000
+#define CEPH_FASYNC		00020000
+#define CEPH_O_DIRECT		00040000
+#define CEPH_O_LARGEFILE	00100000
+#define CEPH_O_DIRECTORY	00200000
+#define CEPH_O_NOFOLLOW		00400000
+#define CEPH_O_NOATIME		01000000
+#define CEPH_O_CLOEXEC		02000000
+#define CEPH___O_SYNC		04000000
+#define CEPH_O_PATH		010000000
+#define CEPH___O_TMPFILE	020000000
+
 union ceph_mds_request_args {
 	struct {
 		__le32 mask;                 /* CEPH_CAP_* */

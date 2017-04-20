@@ -103,6 +103,49 @@ fail:
 	return ERR_PTR(ret);
 }
 
+static u32 ceph_flags_sys2wire(u32 flags)
+{
+	u32 wire_flags = 0;
+
+	switch (flags & O_ACCMODE) {
+	case O_RDONLY:
+		wire_flags |= CEPH_O_RDONLY;
+		break;
+	case O_WRONLY:
+		wire_flags |= CEPH_O_WRONLY;
+		break;
+	case O_RDWR:
+		wire_flags |= CEPH_O_RDWR;
+		break;
+	}
+	flags &= ~O_ACCMODE;
+
+#define ceph_sys2wire(a) if (flags & a) { wire_flags |= CEPH_##a; flags &= ~a; }
+
+	ceph_sys2wire(O_CREAT);
+	ceph_sys2wire(O_NOCTTY);
+	ceph_sys2wire(O_TRUNC);
+	ceph_sys2wire(O_APPEND);
+	ceph_sys2wire(O_NONBLOCK);
+	ceph_sys2wire(O_DSYNC);
+	ceph_sys2wire(FASYNC);
+	ceph_sys2wire(O_DIRECT);
+	ceph_sys2wire(O_LARGEFILE);
+	ceph_sys2wire(O_DIRECTORY);
+	ceph_sys2wire(O_NOFOLLOW);
+	ceph_sys2wire(O_NOATIME);
+	ceph_sys2wire(O_CLOEXEC);
+	ceph_sys2wire(__O_SYNC);
+	ceph_sys2wire(O_PATH);
+	ceph_sys2wire(__O_TMPFILE);
+
+#undef ceph_sys2wire
+
+	WARN_ONCE(flags, "Found unknown open flags: %x", flags);
+
+	return wire_flags;
+}
+
 /*
  * Prepare an open request.  Preallocate ceph_cap to avoid an
  * inopportune ENOMEM later.
@@ -123,7 +166,7 @@ prepare_open_request(struct super_block *sb, int flags, int create_mode)
 	if (IS_ERR(req))
 		goto out;
 	req->r_fmode = ceph_flags_to_mode(flags);
-	req->r_args.open.flags = cpu_to_le32(flags);
+	req->r_args.open.flags = ceph_flags_sys2wire(cpu_to_le32(flags));
 	req->r_args.open.mode = cpu_to_le32(create_mode);
 out:
 	return req;
