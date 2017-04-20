@@ -22,8 +22,11 @@
 #include <linux/init.h>
 #include <linux/delay.h>
 #include <linux/device.h>
+#include <linux/gpio.h>
+#include <linux/gpio/consumer.h>
 #include <linux/of_device.h>
 #include <linux/of_mdio.h>
+#include <linux/of_gpio.h>
 #include <linux/netdevice.h>
 #include <linux/etherdevice.h>
 #include <linux/skbuff.h>
@@ -337,6 +340,7 @@ int __mdiobus_register(struct mii_bus *bus, struct module *owner)
 {
 	struct mdio_device *mdiodev;
 	int i, err;
+	struct gpio_desc *gpiod;
 
 	if (NULL == bus || NULL == bus->name ||
 	    NULL == bus->read || NULL == bus->write)
@@ -362,6 +366,24 @@ int __mdiobus_register(struct mii_bus *bus, struct module *owner)
 
 	if (bus->reset)
 		bus->reset(bus);
+
+	/* de-assert bus level PHY GPIO resets */
+	for (i = 0; i < bus->num_reset_gpios; i++) {
+		gpiod = devm_gpiod_get_index(&bus->dev, "reset", i,
+					     GPIOD_OUT_LOW);
+		if (IS_ERR(gpiod)) {
+			err = PTR_ERR(gpiod);
+			if (err != -ENOENT) {
+				pr_err("mii_bus %s couldn't get reset GPIO\n",
+				       bus->id);
+				return err;
+			}
+		} else {
+			gpiod_set_value_cansleep(gpiod, 1);
+			udelay(bus->reset_delay_us);
+			gpiod_set_value_cansleep(gpiod, 0);
+		}
+	}
 
 	for (i = 0; i < PHY_MAX_ADDR; i++) {
 		if ((bus->phy_mask & (1 << i)) == 0) {
