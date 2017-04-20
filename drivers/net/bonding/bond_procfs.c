@@ -173,7 +173,11 @@ static void bond_info_show_slave(struct seq_file *seq,
 	if (slave->speed == SPEED_UNKNOWN)
 		seq_printf(seq, "Speed: %s\n", "Unknown");
 	else
-		seq_printf(seq, "Speed: %d Mbps\n", slave->speed);
+		seq_printf(seq, "Speed: %d%sbps\n",
+			   slave->speed > 1000 ?
+			   slave->speed / 1000 : slave->speed,
+			   slave->speed > 1000 ?
+			   (slave->speed % 1000 ? ".5 G" : " G") : " M");
 
 	if (slave->duplex == DUPLEX_UNKNOWN)
 		seq_printf(seq, "Duplex: %s\n", "Unknown");

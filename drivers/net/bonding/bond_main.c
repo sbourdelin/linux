@@ -2158,9 +2158,13 @@ static void bond_miimon_commit(struct bonding *bond)
 				bond_set_backup_slave(slave);
 			}
 
-			netdev_info(bond->dev, "link status definitely up for interface %s, %u Mbps %s duplex\n",
+			netdev_info(bond->dev, "link status definitely up for interface %s, %u%sbps %s duplex\n",
 				    slave->dev->name,
-				    slave->speed == SPEED_UNKNOWN ? 0 : slave->speed,
+				    slave->speed == SPEED_UNKNOWN ? 0 :
+				    (slave->speed > 1000 ?
+				    slave->speed / 1000 : slave->speed),
+				    slave->speed > 1000 ?
+				    slave->speed % 1000 ? ".5 G" : " G" : " M",
 				    slave->duplex ? "full" : "half");
 
 			/* notify ad that the link status has changed */
