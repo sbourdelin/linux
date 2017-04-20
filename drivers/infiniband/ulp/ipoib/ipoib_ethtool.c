@@ -155,7 +155,58 @@ static int ipoib_get_sset_count(struct net_device __always_unused *dev,
 	return -EOPNOTSUPP;
 }
 
+static int ipoib_get_settings(struct net_device *netdev,
+			       struct ethtool_cmd *ecmd)
+{
+	struct ipoib_dev_priv *priv = netdev_priv(netdev);
+	struct ib_port_attr attr;
+	u32 speed;
+	int ret;
+
+	if (!netif_carrier_ok(netdev)) {
+		ethtool_cmd_speed_set(ecmd, SPEED_UNKNOWN);
+		ecmd->duplex = DUPLEX_UNKNOWN;
+		return 0;
+	}
+
+	ret = ib_query_port(priv->ca, priv->port, &attr);
+	if (ret)
+		return ret;
+
+	switch (attr.active_speed) {
+	case IB_SPEED_DDR:
+		speed = 5000; /* in deci-Mb/sec */
+		break;
+	case IB_SPEED_QDR:
+		speed = 10000;
+		break;
+	case IB_SPEED_FDR10:
+		speed = 10000;
+		break;
+	case IB_SPEED_FDR:
+		speed = 14000;
+		break;
+	case IB_SPEED_EDR:
+		speed = 25000;
+		break;
+	case IB_SPEED_SDR:
+	default:
+		speed = 2500;
+		break;
+	}
+
+	speed *= ib_width_enum_to_int(attr.active_width);
+	if (speed < 0)
+		return -EINVAL;
+
+	ethtool_cmd_speed_set(ecmd, speed);
+	ecmd->duplex = DUPLEX_FULL;
+
+	return 0;
+}
+
 static const struct ethtool_ops ipoib_ethtool_ops = {
+	.get_settings		= ipoib_get_settings,
 	.get_drvinfo		= ipoib_get_drvinfo,
 	.get_coalesce		= ipoib_get_coalesce,
 	.set_coalesce		= ipoib_set_coalesce,
