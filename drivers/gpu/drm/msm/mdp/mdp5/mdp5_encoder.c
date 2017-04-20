@@ -18,8 +18,8 @@
 
 #include "mdp5_kms.h"
 
-#include "drm_crtc.h"
-#include "drm_crtc_helper.h"
+#include <drm/drm_crtc.h>
+#include <drm/drm_crtc_helper.h>
 
 static struct mdp5_kms *get_kms(struct drm_encoder *encoder)
 {

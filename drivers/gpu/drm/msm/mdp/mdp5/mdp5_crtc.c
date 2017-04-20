@@ -20,9 +20,9 @@
 
 #include <linux/sort.h>
 #include <drm/drm_mode.h>
-#include "drm_crtc.h"
-#include "drm_crtc_helper.h"
-#include "drm_flip_work.h"
+#include <drm/drm_crtc.h>
+#include <drm/drm_crtc_helper.h>
+#include <drm/drm_flip_work.h>
 
 #define CURSOR_WIDTH	64
 #define CURSOR_HEIGHT	64

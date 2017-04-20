@@ -19,8 +19,8 @@
 #include <linux/kernel.h>
 #include <linux/platform_device.h>
 
-#include "drm_crtc.h"
-#include "drm_dp_helper.h"
+#include <drm/drm_crtc.h>
+#include <drm/drm_dp_helper.h>
 #include "msm_drv.h"
 
 #define edp_read(offset) msm_readl((offset))

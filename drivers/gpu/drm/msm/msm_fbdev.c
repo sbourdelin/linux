@@ -17,7 +17,7 @@
 
 #include "msm_drv.h"
 
-#include "drm_crtc.h"
+#include <drm/drm_crtc.h>
 #include "drm_fb_helper.h"
 #include "msm_gem.h"
 

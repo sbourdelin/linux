@@ -18,9 +18,9 @@
 #include "mdp4_kms.h"
 
 #include <drm/drm_mode.h>
-#include "drm_crtc.h"
-#include "drm_crtc_helper.h"
-#include "drm_flip_work.h"
+#include <drm/drm_crtc.h>
+#include <drm/drm_crtc_helper.h>
+#include <drm/drm_flip_work.h>
 
 struct mdp4_crtc {
 	struct drm_crtc base;

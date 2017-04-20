@@ -23,7 +23,7 @@
 #include "mdp/mdp_kms.h"
 #include "mdp4.xml.h"
 
-#include "drm_panel.h"
+#include <drm/drm_panel.h>
 
 struct mdp4_kms {
 	struct mdp_kms base;

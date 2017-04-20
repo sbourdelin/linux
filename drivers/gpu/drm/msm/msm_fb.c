@@ -18,8 +18,8 @@
 #include "msm_drv.h"
 #include "msm_kms.h"
 
-#include "drm_crtc.h"
-#include "drm_crtc_helper.h"
+#include <drm/drm_crtc.h>
+#include <drm/drm_crtc_helper.h>
 
 struct msm_framebuffer {
 	struct drm_framebuffer base;
