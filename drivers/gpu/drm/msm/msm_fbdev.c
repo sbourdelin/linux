@@ -18,7 +18,7 @@
 #include "msm_drv.h"
 
 #include <drm/drm_crtc.h>
-#include "drm_fb_helper.h"
+#include <drm/drm_fb_helper.h>
 #include "msm_gem.h"
 
 extern int msm_gem_mmap_obj(struct drm_gem_object *obj,
