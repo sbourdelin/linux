@@ -27,7 +27,7 @@
  */
 #include <drm/drmP.h>
 #include "ast_drv.h"
-#include <ttm/ttm_page_alloc.h>
+#include <drm/ttm/ttm_page_alloc.h>
 
 static inline struct ast_private *
 ast_bdev(struct ttm_bo_device *bd)
