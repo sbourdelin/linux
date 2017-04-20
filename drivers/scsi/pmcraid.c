@@ -3325,7 +3325,7 @@ static struct pmcraid_sglist *pmcraid_alloc_sglist(int buflen)
  */
 static int pmcraid_copy_sglist(
 	struct pmcraid_sglist *sglist,
-	unsigned long buffer,
+	void __user *buffer,
 	u32 len,
 	int direction
 )
@@ -3346,11 +3346,9 @@ static int pmcraid_copy_sglist(
 
 		kaddr = kmap(page);
 		if (direction == DMA_TO_DEVICE)
-			rc = __copy_from_user(kaddr,
-					      (void *)buffer,
-					      bsize_elem);
+			rc = __copy_from_user(kaddr, buffer, bsize_elem);
 		else
-			rc = __copy_to_user((void *)buffer, kaddr, bsize_elem);
+			rc = __copy_to_user(buffer, kaddr, bsize_elem);
 
 		kunmap(page);
 
@@ -3368,13 +3366,9 @@ static int pmcraid_copy_sglist(
 		kaddr = kmap(page);
 
 		if (direction == DMA_TO_DEVICE)
-			rc = __copy_from_user(kaddr,
-					      (void *)buffer,
-					      len % bsize_elem);
+			rc = __copy_from_user(kaddr, buffer, len % bsize_elem);
 		else
-			rc = __copy_to_user((void *)buffer,
-					    kaddr,
-					    len % bsize_elem);
+			rc = __copy_to_user(buffer, kaddr, len % bsize_elem);
 
 		kunmap(page);
 
@@ -3652,17 +3646,17 @@ static long pmcraid_ioctl_passthrough(
 	struct pmcraid_instance *pinstance,
 	unsigned int ioctl_cmd,
 	unsigned int buflen,
-	unsigned long arg
+	void __user *arg
 )
 {
 	struct pmcraid_passthrough_ioctl_buffer *buffer;
 	struct pmcraid_ioarcb *ioarcb;
 	struct pmcraid_cmd *cmd;
 	struct pmcraid_cmd *cancel_cmd;
-	unsigned long request_buffer;
+	void __user *request_buffer;
 	unsigned long request_offset;
 	unsigned long lock_flags;
-	void *ioasa;
+	void __user *ioasa;
 	u32 ioasc;
 	int request_size;
 	int buffer_size;
@@ -3701,13 +3695,10 @@ static long pmcraid_ioctl_passthrough(
 
 	request_buffer = arg + request_offset;
 
-	rc = __copy_from_user(buffer,
-			     (struct pmcraid_passthrough_ioctl_buffer *) arg,
+	rc = __copy_from_user(buffer, arg,
 			     sizeof(struct pmcraid_passthrough_ioctl_buffer));
 
-	ioasa =
-	(void *)(arg +
-		offsetof(struct pmcraid_passthrough_ioctl_buffer, ioasa));
+	ioasa = arg + offsetof(struct pmcraid_passthrough_ioctl_buffer, ioasa);
 
 	if (rc) {
 		pmcraid_err("ioctl: can't copy passthrough buffer\n");
@@ -4021,6 +4012,7 @@ static long pmcraid_chr_ioctl(
 {
 	struct pmcraid_instance *pinstance = NULL;
 	struct pmcraid_ioctl_header *hdr = NULL;
+	void __user *argp = (void __user *)arg;
 	int retval = -ENOTTY;
 
 	hdr = kmalloc(sizeof(struct pmcraid_ioctl_header), GFP_KERNEL);
@@ -4030,7 +4022,7 @@ static long pmcraid_chr_ioctl(
 		return -ENOMEM;
 	}
 
-	retval = pmcraid_check_ioctl_buffer(cmd, (void *)arg, hdr);
+	retval = pmcraid_check_ioctl_buffer(cmd, argp, hdr);
 
 	if (retval) {
 		pmcraid_info("chr_ioctl: header check failed\n");
@@ -4055,10 +4047,8 @@ static long pmcraid_chr_ioctl(
 		if (cmd == PMCRAID_IOCTL_DOWNLOAD_MICROCODE)
 			scsi_block_requests(pinstance->host);
 
-		retval = pmcraid_ioctl_passthrough(pinstance,
-						   cmd,
-						   hdr->buffer_length,
-						   arg);
+		retval = pmcraid_ioctl_passthrough(pinstance, cmd,
+						   hdr->buffer_length, argp);
 
 		if (cmd == PMCRAID_IOCTL_DOWNLOAD_MICROCODE)
 			scsi_unblock_requests(pinstance->host);
@@ -4066,10 +4056,8 @@ static long pmcraid_chr_ioctl(
 
 	case PMCRAID_DRIVER_IOCTL:
 		arg += sizeof(struct pmcraid_ioctl_header);
-		retval = pmcraid_ioctl_driver(pinstance,
-					      cmd,
-					      hdr->buffer_length,
-					      (void __user *)arg);
+		retval = pmcraid_ioctl_driver(pinstance, cmd,
+					      hdr->buffer_length, argp);
 		break;
 
 	default:
