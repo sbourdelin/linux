@@ -285,6 +285,14 @@ config PCIE_ROCKCHIP
 	  There is 1 internal PCIe port available to support GEN2 with
 	  4 slots.
 
+config PCIE_TANGO
+	bool "Tango PCIe controller"
+	depends on ARCH_TANGO && PCI_MSI && OF
+	select PCI_HOST_COMMON
+	help
+	  Say Y here to enable PCIe controller support for Sigma Designs
+	  Tango systems, such as SMP8759 and later chips.
+
 config VMD
 	depends on PCI_MSI && X86_64
 	tristate "Intel Volume Management Device Driver"

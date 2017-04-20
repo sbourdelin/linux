@@ -1,0 +1,32 @@
+Sigma Designs Tango PCIe controller
+
+Required properties:
+
+- compatible: "sigma,smp8759-pcie"
+- reg: address/size of PCI configuration space, address/size of register area
+- device_type: "pci"
+- #size-cells: <2>
+- #address-cells: <3>
+- #interrupt-cells: <1>
+- ranges: translation from system to bus addresses
+- interrupts: spec for misc interrupts, spec for MSI
+- msi-controller
+
+http://elinux.org/Device_Tree_Usage#PCI_Address_Translation
+http://elinux.org/Device_Tree_Usage#Advanced_Interrupt_Mapping
+
+Example:
+
+	pcie@2e000 {
+		compatible = "sigma,smp8759-pcie";
+		reg = <0x50000000 SZ_4M>, <0x2e000 0x100>;
+		device_type = "pci";
+		#size-cells = <2>;
+		#address-cells = <3>;
+		#interrupt-cells = <1>;
+		ranges = <0x02000000 0x0 0x00400000  0x50400000  0x0 SZ_60M>;
+		msi-controller;
+		interrupts =
+			<54 IRQ_TYPE_LEVEL_HIGH>, /* misc interrupts */
+			<55 IRQ_TYPE_LEVEL_HIGH>; /* MSI */
+	};
