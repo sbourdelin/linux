@@ -7127,8 +7127,10 @@ M:	Shuah Khan <shuahkh@osg.samsung.com>
 M:	Shuah Khan <shuah@kernel.org>
 L:	linux-kselftest@vger.kernel.org
 T:	git git://git.kernel.org/pub/scm/shuah/linux-kselftest
+B:	https://bugzilla.kernel.org
 S:	Maintained
 F:	tools/testing/selftests
+F:	Documentation/kselftest.txt
 
 KERNEL VIRTUAL MACHINE (KVM)
 M:	Paolo Bonzini <pbonzini@redhat.com>
@@ -13033,6 +13035,8 @@ M:	Valentina Manea <valentina.manea.m@gmail.com>
 M:	Shuah Khan <shuahkh@osg.samsung.com>
 M:	Shuah Khan <shuah@kernel.org>
 L:	linux-usb@vger.kernel.org
+T:	git git://git.kernel.org/pub/scm/linux/kernel/git/gregkh/usb.git
+B:	https://bugzilla.kernel.org
 S:	Maintained
 F:	Documentation/usb/usbip_protocol.txt
 F:	drivers/usb/usbip/
