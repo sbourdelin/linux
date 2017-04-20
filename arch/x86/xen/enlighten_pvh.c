@@ -33,7 +33,6 @@ static void xen_pvh_arch_setup(void)
 static void __init init_pvh_bootparams(void)
 {
 	struct xen_memory_map memmap;
-	unsigned int i;
 	int rc;
 
 	memset(&pvh_bootparams, 0, sizeof(pvh_bootparams));
@@ -60,12 +59,7 @@ static void __init init_pvh_bootparams(void)
 	sanitize_e820_map(pvh_bootparams.e820_map,
 			  ARRAY_SIZE(pvh_bootparams.e820_map),
 			  &memmap.nr_entries);
-
 	pvh_bootparams.e820_entries = memmap.nr_entries;
-	for (i = 0; i < pvh_bootparams.e820_entries; i++)
-		e820_add_region(pvh_bootparams.e820_map[i].addr,
-				pvh_bootparams.e820_map[i].size,
-				pvh_bootparams.e820_map[i].type);
 
 	pvh_bootparams.hdr.cmd_line_ptr =
 		pvh_start_info.cmdline_paddr;
