@@ -424,6 +424,7 @@ struct kvm {
 	struct mmu_notifier mmu_notifier;
 	unsigned long mmu_notifier_seq;
 	long mmu_notifier_count;
+	struct rcu_head mmu_notifier_rcu;
 #endif
 	long tlbs_dirty;
 	struct list_head devices;
