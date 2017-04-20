@@ -28,7 +28,7 @@
 
 #include "qxl_drv.h"
 #include "qxl_object.h"
-#include "drm_crtc_helper.h"
+#include <drm/drm_crtc_helper.h>
 #include <drm/drm_plane_helper.h>
 #include <drm/drm_atomic_helper.h>
 #include <drm/drm_atomic.h>
