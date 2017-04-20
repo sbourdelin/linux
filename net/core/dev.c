@@ -4533,9 +4533,6 @@ static enum gro_result dev_gro_receive(struct napi_struct *napi, struct sk_buff 
 	if (!(skb->dev->features & NETIF_F_GRO))
 		goto normal;
 
-	if (skb->csum_bad)
-		goto normal;
-
 	gro_list_prepare(napi, skb);
 
 	rcu_read_lock();
@@ -4595,11 +4592,12 @@ static enum gro_result dev_gro_receive(struct napi_struct *napi, struct sk_buff 
 		napi->gro_count--;
 	}
 
+	if (NAPI_GRO_CB(skb)->flush)
+		goto normal;
+
 	if (same_flow)
 		goto ok;
 
-	if (NAPI_GRO_CB(skb)->flush)
-		goto normal;
 
 	if (unlikely(napi->gro_count >= MAX_GRO_SKBS)) {
 		struct sk_buff *nskb = napi->gro_list;
