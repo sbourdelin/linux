@@ -1597,13 +1597,12 @@ static int soft_offline_huge_page(struct page *page, int flags)
 			ret = -EIO;
 	} else {
 		/* overcommit hugetlb page will be freed to buddy */
+		SetPageHWPoison(page);
+		num_poisoned_pages_inc();
+
 		if (PageHuge(page)) {
-			set_page_hwpoison_huge_page(hpage);
 			dequeue_hwpoisoned_huge_page(hpage);
-			num_poisoned_pages_add(1 << compound_order(hpage));
-		} else {
-			SetPageHWPoison(page);
-			num_poisoned_pages_inc();
+			dissolve_free_huge_page(hpage);
 		}
 	}
 	return ret;

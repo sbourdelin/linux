@@ -1444,7 +1444,7 @@ static int free_pool_huge_page(struct hstate *h, nodemask_t *nodes_allowed,
  * number of free hugepages would be reduced below the number of reserved
  * hugepages.
  */
-static int dissolve_free_huge_page(struct page *page)
+int dissolve_free_huge_page(struct page *page)
 {
 	int rc = 0;
 
