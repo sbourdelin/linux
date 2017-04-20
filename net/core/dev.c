@@ -140,6 +140,7 @@
 #include <linux/hrtimer.h>
 #include <linux/netfilter_ingress.h>
 #include <linux/crash_dump.h>
+#include <linux/sctp.h>
 
 #include "net-sysfs.h"
 
@@ -2605,6 +2606,45 @@ out:
 	return ret;
 }
 EXPORT_SYMBOL(skb_checksum_help);
+
+int skb_crc32c_csum_help(struct sk_buff *skb)
+{
+	__le32 crc32c_csum;
+	int ret = 0, offset;
+
+	if (skb->ip_summed != CHECKSUM_PARTIAL)
+		goto out;
+
+	if (unlikely(skb_is_gso(skb)))
+		goto out;
+
+	/* Before computing a checksum, we should make sure no frag could
+	 * be modified by an external entity : checksum could be wrong.
+	 */
+	if (unlikely(skb_has_shared_frag(skb))) {
+		ret = __skb_linearize(skb);
+		if (ret)
+			goto out;
+	}
+
+	offset = skb_checksum_start_offset(skb);
+	crc32c_csum = cpu_to_le32(~__skb_checksum(skb, offset,
+						  skb->len - offset, ~(__u32)0,
+						  crc32c_csum_stub));
+	offset += offsetof(struct sctphdr, checksum);
+	BUG_ON(offset >= skb_headlen(skb));
+
+	if (skb_cloned(skb) &&
+	    !skb_clone_writable(skb, offset + sizeof(__le32))) {
+		ret = pskb_expand_head(skb, 0, 0, GFP_ATOMIC);
+		if (ret)
+			goto out;
+	}
+	*(__le32 *)(skb->data + offset) = crc32c_csum;
+	skb->ip_summed = CHECKSUM_NONE;
+out:
+	return ret;
+}
 
 __be16 skb_network_protocol(struct sk_buff *skb, int *depth)
 {
