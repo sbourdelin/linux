@@ -229,7 +229,12 @@ int nf_nat_icmpv6_reply_translation(struct sk_buff *skb,
 		return 0;
 
 	if (skb->ip_summed != CHECKSUM_PARTIAL) {
-		struct ipv6hdr *ipv6h = ipv6_hdr(skb);
+		struct ipv6hdr *ipv6h;
+
+		if (!skb_make_writable(skb, skb->len))
+			return 0;
+
+		ipv6h = ipv6_hdr(skb);
 		inside = (void *)skb->data + hdrlen;
 		inside->icmp6.icmp6_cksum = 0;
 		inside->icmp6.icmp6_cksum =
