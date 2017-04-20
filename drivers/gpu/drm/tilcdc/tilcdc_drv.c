@@ -29,7 +29,7 @@
 #include "tilcdc_panel.h"
 #include "tilcdc_external.h"
 
-#include "drm_fb_helper.h"
+#include <drm/drm_fb_helper.h>
 
 static LIST_HEAD(module_list);
 
