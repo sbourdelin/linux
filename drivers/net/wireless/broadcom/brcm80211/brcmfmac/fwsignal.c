@@ -877,12 +877,15 @@ static void brcmf_fws_cleanup(struct brcmf_fws_info *fws, int ifidx)
 	brcmf_fws_hanger_cleanup(fws, matchfn, ifidx);
 }
 
-static u8 brcmf_fws_hdrpush(struct brcmf_fws_info *fws, struct sk_buff *skb)
+static int brcmf_fws_hdrpush(struct brcmf_fws_info *fws, struct sk_buff *skb,
+			     u8 *offset)
 {
 	struct brcmf_fws_mac_descriptor *entry = brcmf_skbcb(skb)->mac;
 	u8 *wlh;
 	u16 data_offset = 0;
 	u8 fillers;
+	int err;
+
 	__le32 pkttag = cpu_to_le32(brcmf_skbcb(skb)->htod);
 	__le16 pktseq = cpu_to_le16(brcmf_skbcb(skb)->htod_seq);
 
@@ -898,6 +901,11 @@ static u8 brcmf_fws_hdrpush(struct brcmf_fws_info *fws, struct sk_buff *skb)
 	data_offset += 2 + BRCMF_FWS_TYPE_PKTTAG_LEN;
 	fillers = round_up(data_offset, 4) - data_offset;
 	data_offset += fillers;
+
+	err = skb_cow_head(skb, data_offset);
+
+	if (err)
+		return err;
 
 	skb_push(skb, data_offset);
 	wlh = skb->data;
@@ -926,7 +934,9 @@ static u8 brcmf_fws_hdrpush(struct brcmf_fws_info *fws, struct sk_buff *skb)
 	if (fillers)
 		memset(wlh, BRCMF_FWS_TYPE_FILLER, fillers);
 
-	return (u8)(data_offset >> 2);
+	*offset = (u8)(data_offset >> 2);
+
+	return 0;
 }
 
 static bool brcmf_fws_tim_update(struct brcmf_fws_info *fws,
@@ -966,7 +976,8 @@ static bool brcmf_fws_tim_update(struct brcmf_fws_info *fws,
 		skcb->state = BRCMF_FWS_SKBSTATE_TIM;
 		skcb->htod = 0;
 		skcb->htod_seq = 0;
-		data_offset = brcmf_fws_hdrpush(fws, skb);
+		if (brcmf_fws_hdrpush(fws, skb, &data_offset))
+			return false;
 		ifidx = brcmf_skb_if_flags_get_field(skb, INDEX);
 		brcmf_fws_unlock(fws);
 		err = brcmf_proto_txdata(fws->drvr, ifidx, data_offset, skb);
@@ -1945,12 +1956,13 @@ void brcmf_fws_hdrpull(struct brcmf_if *ifp, s16 siglen, struct sk_buff *skb)
 		fws->stats.header_only_pkt++;
 }
 
-static u8 brcmf_fws_precommit_skb(struct brcmf_fws_info *fws, int fifo,
-				   struct sk_buff *p)
+static int brcmf_fws_precommit_skb(struct brcmf_fws_info *fws, int fifo,
+				   struct sk_buff *p, u8 *offset)
 {
 	struct brcmf_skbuff_cb *skcb = brcmf_skbcb(p);
 	struct brcmf_fws_mac_descriptor *entry = skcb->mac;
 	u8 flags;
+	int err;
 
 	if (skcb->state != BRCMF_FWS_SKBSTATE_SUPPRESSED)
 		brcmf_skb_htod_tag_set_field(p, GENERATION, entry->generation);
@@ -1963,7 +1975,10 @@ static u8 brcmf_fws_precommit_skb(struct brcmf_fws_info *fws, int fifo,
 		flags |= BRCMF_FWS_HTOD_FLAG_PKT_REQUESTED;
 	}
 	brcmf_skb_htod_tag_set_field(p, FLAGS, flags);
-	return brcmf_fws_hdrpush(fws, p);
+
+	err = brcmf_fws_hdrpush(fws, p, offset);
+
+	return err;
 }
 
 static void brcmf_fws_rollback_toq(struct brcmf_fws_info *fws,
@@ -2039,7 +2054,9 @@ static int brcmf_fws_commit_skb(struct brcmf_fws_info *fws, int fifo,
 	if (IS_ERR(entry))
 		return PTR_ERR(entry);
 
-	data_offset = brcmf_fws_precommit_skb(fws, fifo, skb);
+	if (!brcmf_fws_precommit_skb(fws, fifo, skb, &data_offset))
+		return PTR_ERR(entry);
+
 	entry->transit_count++;
 	if (entry->suppressed)
 		entry->suppr_transit_count++;
@@ -2100,6 +2117,7 @@ int brcmf_fws_process_skb(struct brcmf_if *ifp, struct sk_buff *skb)
 	int rc = 0;
 
 	brcmf_dbg(DATA, "tx proto=0x%X\n", ntohs(eh->h_proto));
+
 	/* determine the priority */
 	if ((skb->priority == 0) || (skb->priority > 7))
 		skb->priority = cfg80211_classify8021d(skb, NULL);

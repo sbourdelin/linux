@@ -2717,7 +2717,7 @@ static bool brcmf_sdio_prec_enq(struct pktq *q, struct sk_buff *pkt, int prec)
 
 static int brcmf_sdio_bus_txdata(struct device *dev, struct sk_buff *pkt)
 {
-	int ret = -EBADE;
+	int ret = -EBADE, err;
 	uint prec;
 	struct brcmf_bus *bus_if = dev_get_drvdata(dev);
 	struct brcmf_sdio_dev *sdiodev = bus_if->bus_priv.sdio;
@@ -2726,6 +2726,11 @@ static int brcmf_sdio_bus_txdata(struct device *dev, struct sk_buff *pkt)
 	brcmf_dbg(TRACE, "Enter: pkt: data %p len %d\n", pkt->data, pkt->len);
 	if (sdiodev->state != BRCMF_SDIOD_DATA)
 		return -EIO;
+
+	err = skb_cow_head(pkt, bus->tx_hdrlen);
+
+	if (err)
+		return err;
 
 	/* Add space for the header */
 	skb_push(pkt, bus->tx_hdrlen);

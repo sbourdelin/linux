@@ -249,13 +249,18 @@ done:
 	return ret;
 }
 
-static void
+static int
 brcmf_proto_bcdc_hdrpush(struct brcmf_pub *drvr, int ifidx, u8 offset,
 			 struct sk_buff *pktbuf)
 {
 	struct brcmf_proto_bcdc_header *h;
+	int err;
 
 	brcmf_dbg(BCDC, "Enter\n");
+
+	err = skb_cow_head(pktbuf, BCDC_HEADER_LEN);
+	if (err)
+		return err;
 
 	/* Push BDC header used to convey priority for buses that don't */
 	skb_push(pktbuf, BCDC_HEADER_LEN);
@@ -271,6 +276,8 @@ brcmf_proto_bcdc_hdrpush(struct brcmf_pub *drvr, int ifidx, u8 offset,
 	h->data_offset = offset;
 	BCDC_SET_IF_IDX(h, ifidx);
 	trace_brcmf_bcdchdr(pktbuf->data);
+
+	return 0;
 }
 
 static int
@@ -330,7 +337,11 @@ static int
 brcmf_proto_bcdc_txdata(struct brcmf_pub *drvr, int ifidx, u8 offset,
 			struct sk_buff *pktbuf)
 {
-	brcmf_proto_bcdc_hdrpush(drvr, ifidx, offset, pktbuf);
+	int err = brcmf_proto_bcdc_hdrpush(drvr, ifidx, offset, pktbuf);
+
+	if (err)
+		return err;
+
 	return brcmf_bus_txdata(drvr->bus_if, pktbuf);
 }
 
