@@ -106,7 +106,6 @@ config DRM_EXYNOS_FIMC
 
 config DRM_EXYNOS_ROTATOR
 	bool "Rotator"
-	depends on DRM_EXYNOS_IPP
 	help
 	  Choose this option if you want to use Exynos Rotator for DRM.
 
