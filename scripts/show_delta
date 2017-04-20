@@ -46,8 +46,8 @@ def get_time(line):
 		raise ValueError
 
 	# split on closing bracket
-	(time_str, rest) = string.split(line[1:],']',1)
-	time = string.atof(time_str)
+	(time_str, rest) = line[1:].split(']',1)
+	time = float(time_str)
 
 	#print "time=", time
 	return (time, rest)
