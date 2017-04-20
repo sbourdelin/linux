@@ -27,7 +27,7 @@
  */
 #include <drm/drmP.h>
 #include "mgag200_drv.h"
-#include <ttm/ttm_page_alloc.h>
+#include <drm/ttm/ttm_page_alloc.h>
 
 static inline struct mga_device *
 mgag200_bdev(struct ttm_bo_device *bd)
