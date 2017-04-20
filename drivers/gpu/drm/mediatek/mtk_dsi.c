@@ -902,7 +902,7 @@ static void mtk_dsi_wait_for_idle(struct mtk_dsi *dsi)
 {
 	u32 timeout_ms = 500000; /* total 1s ~ 2s timeout */
 
-	while (timeout_ms--) {
+	while (--timeout_ms) {
 		if (!(readl(dsi->regs + DSI_INTSTA) & DSI_BUSY))
 			break;
 
