@@ -33,8 +33,12 @@
 
 /*
  * 32-bit misaligned trap handler (c) 1998 San Mehat (CCC) -July 1998
- * /proc/sys/debug/alignment, modified and integrated into
- * Linux 2.1 by Russell King
+ * /proc/cpu/alignment, modified and integrated into Linux 2.1 by Russell King
+ * Note:
+ *     The path name may be different for very old versions of Linux,
+ *     i.e, /proc/sys/debug/alignment for Linux 2.1.
+ *     This was relocated because it was in conflict with sysctl(/proc/sys/)
+ *     and it doesn't contain sysctl information.
  *
  * Speed optimisations and better fault handling by Russell King.
  *
@@ -985,10 +989,8 @@ static int __init noalign_setup(char *__unused)
 __setup("noalign", noalign_setup);
 
 /*
- * This needs to be done after sysctl_init, otherwise sys/ will be
- * overwritten.  Actually, this shouldn't be in sys/ at all since
- * it isn't a sysctl, and it doesn't contain sysctl information.
- * We now locate it in /proc/cpu/alignment instead.
+ * Refer to Documentation/arm/mem_alignment for
+ * usage of /proc/cpu/alignment.
  */
 static int __init alignment_init(void)
 {
