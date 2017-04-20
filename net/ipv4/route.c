@@ -2125,6 +2125,14 @@ static struct rtable *__mkroute_output(const struct fib_result *res,
 		fi = NULL;
 	}
 
+	/* If the flag to skip the nh oif check is set then the output
+	 * device may not match the nh device, so cannot use or add to
+	 * cache in that case.
+	 */
+	if (unlikely(fl4->flowi4_flags & FLOWI_FLAG_SKIP_NH_OIF &&
+		     FIB_RES_NH(*res).nh_dev != dev_out))
+		do_cache = false;
+
 	fnhe = NULL;
 	do_cache &= fi != NULL;
 	if (do_cache) {
