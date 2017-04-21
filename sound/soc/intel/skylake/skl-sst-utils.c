@@ -189,7 +189,7 @@ int skl_get_pvt_id(struct skl_sst *ctx, uuid_le *uuid_mod, int instance_id)
 	int pvt_id;
 
 	list_for_each_entry(module, &ctx->uuid_list, list) {
-		if (uuid_le_cmp(*uuid_mod, module->uuid) == 0) {
+		if (uuid_le_cmp_p(uuid_mod, module->uuid) == 0) {
 
 			pvt_id = skl_pvtid_128(module);
 			if (pvt_id >= 0) {
@@ -218,7 +218,7 @@ int skl_put_pvt_id(struct skl_sst *ctx, uuid_le *uuid_mod, int *pvt_id)
 	struct uuid_module *module;
 
 	list_for_each_entry(module, &ctx->uuid_list, list) {
-		if (uuid_le_cmp(*uuid_mod, module->uuid) == 0) {
+		if (uuid_le_cmp_p(uuid_mod, module->uuid) == 0) {
 
 			if (*pvt_id != 0)
 				i = (*pvt_id) / 64;
