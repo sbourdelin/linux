@@ -138,8 +138,7 @@ int ishtp_fw_cl_by_uuid(struct ishtp_device *dev, const uuid_le *uuid)
 	int i, res = -ENOENT;
 
 	for (i = 0; i < dev->fw_clients_num; ++i) {
-		if (uuid_le_cmp(*uuid, dev->fw_clients[i].props.protocol_name)
-				== 0) {
+		if (!uuid_le_cmp_p(uuid, dev->fw_clients[i].props.protocol_name)) {
 			res = i;
 			break;
 		}
