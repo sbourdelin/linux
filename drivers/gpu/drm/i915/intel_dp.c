@@ -4579,6 +4579,9 @@ intel_dp_long_pulse(struct intel_connector *intel_connector)
 
 	WARN_ON(!drm_modeset_is_locked(&connector->dev->mode_config.connection_mutex));
 
+	if (intel_shared_digital_port_in_use(connector))
+		return connector_status_disconnected;
+
 	intel_display_power_get(to_i915(dev), intel_dp->aux_power_domain);
 
 	/* Can't disconnect eDP, but you can close the lid... */
