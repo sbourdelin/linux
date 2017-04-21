@@ -58,6 +58,26 @@ static inline int uuid_be_cmp(const uuid_be u1, const uuid_be u2)
 	return memcmp(&u1, &u2, sizeof(uuid_be));
 }
 
+static inline int uuid_le_cmp_p(const uuid_le *pu1, const uuid_le u2)
+{
+	return memcmp(pu1, &u2, sizeof(uuid_le));
+}
+
+static inline int uuid_be_cmp_p(const uuid_be *pu1, const uuid_be u2)
+{
+	return memcmp(pu1, &u2, sizeof(uuid_be));
+}
+
+static inline int uuid_le_cmp_pp(const uuid_le *pu1, const uuid_le *pu2)
+{
+	return memcmp(pu1, pu2, sizeof(uuid_le));
+}
+
+static inline int uuid_be_cmp_pp(const uuid_be *pu1, const uuid_be *pu2)
+{
+	return memcmp(pu1, pu2, sizeof(uuid_be));
+}
+
 void generate_random_uuid(unsigned char uuid[16]);
 
 extern void uuid_le_gen(uuid_le *u);
