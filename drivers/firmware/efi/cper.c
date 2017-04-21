@@ -402,14 +402,14 @@ static void cper_estatus_print_section(
 		printk("%s""fru_text: %.20s\n", pfx, gdata->fru_text);
 
 	snprintf(newpfx, sizeof(newpfx), "%s%s", pfx, INDENT_SP);
-	if (!uuid_le_cmp(*sec_type, CPER_SEC_PROC_GENERIC)) {
+	if (!uuid_le_cmp_p(sec_type, CPER_SEC_PROC_GENERIC)) {
 		struct cper_sec_proc_generic *proc_err = (void *)(gdata + 1);
 		printk("%s""section_type: general processor error\n", newpfx);
 		if (gdata->error_data_length >= sizeof(*proc_err))
 			cper_print_proc_generic(newpfx, proc_err);
 		else
 			goto err_section_too_small;
-	} else if (!uuid_le_cmp(*sec_type, CPER_SEC_PLATFORM_MEM)) {
+	} else if (!uuid_le_cmp_p(sec_type, CPER_SEC_PLATFORM_MEM)) {
 		struct cper_sec_mem_err *mem_err = (void *)(gdata + 1);
 		printk("%s""section_type: memory error\n", newpfx);
 		if (gdata->error_data_length >=
@@ -418,7 +418,7 @@ static void cper_estatus_print_section(
 				       gdata->error_data_length);
 		else
 			goto err_section_too_small;
-	} else if (!uuid_le_cmp(*sec_type, CPER_SEC_PCIE)) {
+	} else if (!uuid_le_cmp_p(sec_type, CPER_SEC_PCIE)) {
 		struct cper_sec_pcie *pcie = (void *)(gdata + 1);
 		printk("%s""section_type: PCIe error\n", newpfx);
 		if (gdata->error_data_length >= sizeof(*pcie))
