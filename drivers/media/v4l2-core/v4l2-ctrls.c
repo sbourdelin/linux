@@ -760,6 +760,13 @@ const char *v4l2_ctrl_get_name(u32 id)
 	case V4L2_CID_MPEG_VIDEO_MV_V_SEARCH_RANGE:		return "Vertical MV Search Range";
 	case V4L2_CID_MPEG_VIDEO_REPEAT_SEQ_HEADER:		return "Repeat Sequence Header";
 	case V4L2_CID_MPEG_VIDEO_FORCE_KEY_FRAME:		return "Force Key Frame";
+	/* parsed MPEG-2 controls */
+	case V4L2_CID_MPEG_VIDEO_MPEG2_SEQ_HDR:			return "MPEG-2 Sequence Header";
+	case V4L2_CID_MPEG_VIDEO_MPEG2_SEQ_EXT:			return "MPEG-2 Sequence Extension";
+	case V4L2_CID_MPEG_VIDEO_MPEG2_SEQ_DISPLAY_EXT:		return "MPEG-2 Sequence Display Extension";
+	case V4L2_CID_MPEG_VIDEO_MPEG2_SEQ_MATRIX_EXT:		return "MPEG-2 Sequence Quantization Matrix";
+	case V4L2_CID_MPEG_VIDEO_MPEG2_PIC_HDR:			return "MPEG-2 Picture Header";
+	case V4L2_CID_MPEG_VIDEO_MPEG2_PIC_EXT:			return "MPEG-2 Picture Extension";
 
 	/* VPX controls */
 	case V4L2_CID_MPEG_VIDEO_VPX_NUM_PARTITIONS:		return "VPX Number of Partitions";
@@ -1150,6 +1157,24 @@ void v4l2_ctrl_fill(u32 id, const char **name, enum v4l2_ctrl_type *type,
 	case V4L2_CID_RDS_TX_ALT_FREQS:
 		*type = V4L2_CTRL_TYPE_U32;
 		break;
+	case V4L2_CID_MPEG_VIDEO_MPEG2_SEQ_HDR:
+		*type = V4L2_CTRL_TYPE_MPEG2_SEQ_HDR;
+		break;
+	case V4L2_CID_MPEG_VIDEO_MPEG2_SEQ_EXT:
+		*type = V4L2_CTRL_TYPE_MPEG2_SEQ_EXT;
+		break;
+	case V4L2_CID_MPEG_VIDEO_MPEG2_SEQ_DISPLAY_EXT:
+		*type = V4L2_CTRL_TYPE_MPEG2_SEQ_DISPLAY_EXT;
+		break;
+	case V4L2_CID_MPEG_VIDEO_MPEG2_SEQ_MATRIX_EXT:
+		*type = V4L2_CTRL_TYPE_MPEG2_SEQ_MATRIX_EXT;
+		break;
+	case V4L2_CID_MPEG_VIDEO_MPEG2_PIC_HDR:
+		*type = V4L2_CTRL_TYPE_MPEG2_PIC_HDR;
+		break;
+	case V4L2_CID_MPEG_VIDEO_MPEG2_PIC_EXT:
+		*type = V4L2_CTRL_TYPE_MPEG2_PIC_EXT;
+		break;
 	default:
 		*type = V4L2_CTRL_TYPE_INTEGER;
 		break;
@@ -1458,6 +1483,14 @@ static int std_validate(const struct v4l2_ctrl *ctrl, u32 idx,
 			return -ERANGE;
 		if ((len - (u32)ctrl->minimum) % (u32)ctrl->step)
 			return -ERANGE;
+		return 0;
+
+	case V4L2_CTRL_TYPE_MPEG2_SEQ_HDR:
+	case V4L2_CTRL_TYPE_MPEG2_SEQ_EXT:
+	case V4L2_CTRL_TYPE_MPEG2_SEQ_DISPLAY_EXT:
+	case V4L2_CTRL_TYPE_MPEG2_SEQ_MATRIX_EXT:
+	case V4L2_CTRL_TYPE_MPEG2_PIC_HDR:
+	case V4L2_CTRL_TYPE_MPEG2_PIC_EXT:
 		return 0;
 
 	default:
@@ -1978,6 +2011,26 @@ static struct v4l2_ctrl *v4l2_ctrl_new(struct v4l2_ctrl_handler *hdl,
 		break;
 	case V4L2_CTRL_TYPE_U32:
 		elem_size = sizeof(u32);
+		break;
+	case V4L2_CTRL_TYPE_MPEG2_SEQ_HDR:
+		elem_size = sizeof(struct v4l2_mpeg_video_mpeg2_seq_hdr);
+		break;
+	case V4L2_CTRL_TYPE_MPEG2_SEQ_EXT:
+		elem_size = sizeof(struct v4l2_mpeg_video_mpeg2_seq_ext);
+		break;
+	case V4L2_CTRL_TYPE_MPEG2_SEQ_DISPLAY_EXT:
+		elem_size =
+			sizeof(struct v4l2_mpeg_video_mpeg2_seq_display_ext);
+		break;
+	case V4L2_CTRL_TYPE_MPEG2_SEQ_MATRIX_EXT:
+		elem_size =
+			sizeof(struct v4l2_mpeg_video_mpeg2_seq_matrix_ext);
+		break;
+	case V4L2_CTRL_TYPE_MPEG2_PIC_HDR:
+		elem_size = sizeof(struct v4l2_mpeg_video_mpeg2_pic_hdr);
+		break;
+	case V4L2_CTRL_TYPE_MPEG2_PIC_EXT:
+		elem_size = sizeof(struct v4l2_mpeg_video_mpeg2_pic_ext);
 		break;
 	default:
 		if (type < V4L2_CTRL_COMPOUND_TYPES)
