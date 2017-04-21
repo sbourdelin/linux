@@ -394,10 +394,41 @@ static int ni_set_max_freq(struct sdhci_pci_slot *slot)
 
 	return 0;
 }
+
+static bool __sdhci_pci_child_has_s4w(struct acpi_device *child)
+{
+	acpi_handle handle = child->handle;
+	unsigned long long ret;
+
+	return ACPI_SUCCESS(acpi_evaluate_integer(handle, "_S4W", NULL, &ret));
+}
+
+static bool sdhci_pci_child_has_s4w(struct sdhci_pci_slot *slot)
+{
+	struct acpi_device *adev = ACPI_COMPANION(&slot->chip->pdev->dev);
+	struct acpi_device *child;
+	bool child_has_s4w = false;
+
+	if (!adev)
+		return false;
+
+	list_for_each_entry(child, &adev->children, node)
+		if (child->status.present && child->status.enabled) {
+			if (__sdhci_pci_child_has_s4w(child))
+				child_has_s4w = true;
+		}
+
+	return child_has_s4w;
+}
 #else
 static inline int ni_set_max_freq(struct sdhci_pci_slot *slot)
 {
 	return 0;
+}
+
+static bool sdhci_pci_child_has_s4w(struct sdhci_pci_slot *slot)
+{
+	return false;
 }
 #endif
 
@@ -1885,6 +1916,9 @@ static struct sdhci_pci_slot *sdhci_pci_probe_slot(
 	}
 
 	host->ioaddr = pcim_iomap_table(pdev)[bar];
+
+	if (sdhci_pci_child_has_s4w(slot))
+		host->mmc->caps2 |= MMC_CAP2_NO_SDIO_RESET;
 
 	if (chip->fixes && chip->fixes->probe_slot) {
 		ret = chip->fixes->probe_slot(slot);
