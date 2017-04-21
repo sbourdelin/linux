@@ -416,7 +416,7 @@ void mei_cl_bus_dev_fixup(struct mei_cl_device *cldev)
 
 		f = &mei_fixups[i];
 		if (uuid_le_cmp(f->uuid, MEI_UUID_ANY) == 0 ||
-		    uuid_le_cmp(f->uuid, *uuid) == 0)
+		    uuid_le_cmp_p(uuid, f->uuid) == 0)
 			f->hook(cldev);
 	}
 }

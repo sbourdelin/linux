@@ -615,7 +615,7 @@ struct mei_cl_device_id *mei_cl_device_find(struct mei_cl_device *cldev,
 
 	id = cldrv->id_table;
 	while (uuid_le_cmp(NULL_UUID_LE, id->uuid)) {
-		if (!uuid_le_cmp(*uuid, id->uuid)) {
+		if (!uuid_le_cmp_p(uuid, id->uuid)) {
 			match = true;
 
 			if (cldev->name[0])

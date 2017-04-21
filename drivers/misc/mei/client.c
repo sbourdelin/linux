@@ -148,7 +148,7 @@ static struct mei_me_client *__mei_me_cl_by_uuid(struct mei_device *dev,
 
 	list_for_each_entry(me_cl, &dev->me_clients, list) {
 		pn = &me_cl->props.protocol_name;
-		if (uuid_le_cmp(*uuid, *pn) == 0)
+		if (uuid_le_cmp_pp(uuid, pn) == 0)
 			return mei_me_cl_get(me_cl);
 	}
 
@@ -228,7 +228,7 @@ static struct mei_me_client *__mei_me_cl_by_uuid_id(struct mei_device *dev,
 
 	list_for_each_entry(me_cl, &dev->me_clients, list) {
 		pn = &me_cl->props.protocol_name;
-		if (uuid_le_cmp(*uuid, *pn) == 0 &&
+		if (uuid_le_cmp_pp(uuid, pn) == 0 &&
 		    me_cl->client_id == client_id)
 			return mei_me_cl_get(me_cl);
 	}
