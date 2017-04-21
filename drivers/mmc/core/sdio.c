@@ -1110,6 +1110,8 @@ int mmc_attach_sdio(struct mmc_host *host)
 		if (err)
 			goto remove;
 
+		pm_runtime_get_noresume(&card->dev);
+
 		/*
 		 * Enable runtime PM for this card
 		 */
@@ -1129,7 +1131,7 @@ int mmc_attach_sdio(struct mmc_host *host)
 	for (i = 0; i < funcs; i++, card->sdio_funcs++) {
 		err = sdio_init_func(host->card, i + 1);
 		if (err)
-			goto remove;
+			goto remove_get;
 
 		/*
 		 * Enable Runtime PM for this func (if supported)
@@ -1156,6 +1158,10 @@ int mmc_attach_sdio(struct mmc_host *host)
 	}
 
 	mmc_claim_host(host);
+
+	if (host->caps & MMC_CAP_POWER_OFF_CARD)
+		pm_runtime_put(&card->dev);
+
 	return 0;
 
 
@@ -1163,6 +1169,9 @@ remove_added:
 	/* Remove without lock if the device has been added. */
 	mmc_sdio_remove(host);
 	mmc_claim_host(host);
+remove_get:
+	if (host->caps & MMC_CAP_POWER_OFF_CARD)
+		pm_runtime_put(&card->dev);
 remove:
 	/* And with lock if it hasn't been added. */
 	mmc_release_host(host);
