@@ -151,4 +151,10 @@ static struct platform_driver ged_driver = {
 		.acpi_match_table = ACPI_PTR(ged_acpi_ids),
 	},
 };
-builtin_platform_driver(ged_driver);
+
+static __init int ged_init(void)
+{
+	return platform_driver_register(&ged_driver);
+}
+
+late_initcall(ged_init);
