@@ -6,6 +6,18 @@ Required Properties:
              Should be <0> for the USB charger and <1> for the AC adapter.
 -interrupt-names: Should be "USB" and "AC"
 
+Optional properties:
+-charge-voltage-microvolt: set the charge voltage. The value can be: 4100000,
+	4150000, 4200000, 4250000; default: 4100000
+
+-charge-current-microamp: set the charging current. The value can be: 300000,
+	400000, 500000, 700000; default: 500000
+
+-ti,ntc-type: set the NTC type for battery temperature measurement. The value
+	must be 0 or 1, where:
+	  0 – 100k (curve 1, B = 3960)
+	  1 – 10k  (curve 2, B = 3480) (default)
+
 This node is a subnode of the tps65217 PMIC.
 
 Example:
@@ -14,4 +26,7 @@ Example:
 		compatible = "ti,tps65217-charger";
 		interrupts = <0>, <1>;
 		interrupt-names = "USB", "AC";
+		charge-voltage-microvolt = <4100000>;
+		charge-current-microamp = <500000>;
+		ti,ntc-type = <1>;
 	};
