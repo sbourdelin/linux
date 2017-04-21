@@ -3271,14 +3271,16 @@ static void addrconf_gre_config(struct net_device *dev)
 static int fixup_permanent_addr(struct inet6_dev *idev,
 				struct inet6_ifaddr *ifp)
 {
-	if (!ifp->rt) {
-		struct rt6_info *rt;
+	if (!ifp->rt || !atomic_read(&ifp->rt->rt6i_ref)) {
+		struct rt6_info *rt, *prev;
 
 		rt = addrconf_dst_alloc(idev, &ifp->addr, false);
 		if (unlikely(IS_ERR(rt)))
 			return PTR_ERR(rt);
 
-		ifp->rt = rt;
+		prev = cmpxchg(&ifp->rt, ifp->rt, rt);
+		if (prev)
+			ip6_rt_put(prev);
 	}
 
 	if (!(ifp->flags & IFA_F_NOPREFIXROUTE)) {
