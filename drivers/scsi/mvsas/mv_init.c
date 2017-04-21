@@ -634,17 +634,19 @@ static void mvs_pci_remove(struct pci_dev *pdev)
 	unsigned short core_nr, i = 0;
 	struct sas_ha_struct *sha = pci_get_drvdata(pdev);
 	struct mvs_info *mvi = NULL;
+	struct Scsi_Host *shost;
 
 	core_nr = ((struct mvs_prv_info *)sha->lldd_ha)->n_host;
 	mvi = ((struct mvs_prv_info *)sha->lldd_ha)->mvi[0];
+	shost = mvi->shost;
 
 #ifdef CONFIG_SCSI_MVSAS_TASKLET
 	tasklet_kill(&((struct mvs_prv_info *)sha->lldd_ha)->mv_tasklet);
 #endif
 
-	scsi_remove_host(mvi->shost);
 	sas_unregister_ha(sha);
-	sas_remove_host(mvi->shost);
+	sas_remove_host(shost);
+	scsi_remove_host(shost);
 
 	MVS_CHIP_DISP->interrupt_disable(mvi);
 	free_irq(mvi->pdev->irq, sha);
