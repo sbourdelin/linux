@@ -8,6 +8,7 @@
 #define DELTA_H
 
 #include <linux/rpmsg.h>
+#include <media/v4l2-ctrls.h>
 #include <media/v4l2-device.h>
 #include <media/v4l2-mem2mem.h>
 
@@ -86,6 +87,19 @@ struct delta_streaminfo {
 #define DELTA_STREAMINFO_FLAG_OTHER		0x0004
 
 /*
+ * struct delta_meta - access unit metadata structure.
+ *
+ * @cid:	control identifier for this meta
+ * @p:		pointer to control data
+ */
+struct delta_meta {
+	u32 cid;
+	void *p;
+};
+
+#define DELTA_MAX_METAS 20
+
+/*
  * struct delta_au - access unit structure.
  *
  * @vbuf:	video buffer information for V4L2
@@ -106,6 +120,8 @@ struct delta_au {
 	dma_addr_t paddr;
 	u32 flags;
 	u64 dts;
+	struct delta_meta metas[DELTA_MAX_METAS];
+	unsigned int nb_of_metas;
 };
 
 /*
@@ -229,6 +245,9 @@ struct delta_ctx;
  * @name:		name of this decoder
  * @streamformat:	input stream format that this decoder support
  * @pixelformat:	pixel format of decoded frame that this decoder support
+ * @meta_cids:		(optional) meta control identifiers if decoder needs
+ *			additional parsing metadata to be able to decode
+ * @nb_of_metas:	(optional) nb of meta controls
  * @max_width:		(optional) maximum width that can decode this decoder
  *			if not set, maximum width is DELTA_MAX_WIDTH
  * @max_height:		(optional) maximum height that can decode this decoder
@@ -251,6 +270,8 @@ struct delta_dec {
 	const char *name;
 	u32 streamformat;
 	u32 pixelformat;
+	const u32 *meta_cids;
+	unsigned int nb_of_metas;
 	u32 max_width;
 	u32 max_height;
 	bool pm;
@@ -396,11 +417,17 @@ struct delta_dec {
 
 struct delta_dev;
 
+#define DELTA_MAX_CTRLS  (DELTA_MAX_DECODERS * DELTA_MAX_METAS)
+
 /*
  * struct delta_ctx - instance structure.
  *
  * @flags:		validity of fields (streaminfo)
  * @fh:			V4L2 file handle
+ * @ctrl_handler:	controls handler
+ * @metas:		set of parsing metadata required to
+ *			decode the current access unit
+ * @nb_of_metas:	number of metatada
  * @dev:		device context
  * @dec:		selected decoder context for this instance
  * @ipc_ctx:		context of IPC communication with firmware
@@ -433,6 +460,9 @@ struct delta_dev;
 struct delta_ctx {
 	u32 flags;
 	struct v4l2_fh fh;
+	struct v4l2_ctrl_handler ctrl_handler;
+	struct delta_meta metas[DELTA_MAX_METAS];
+	unsigned int nb_of_metas;
 	struct delta_dev *dev;
 	const struct delta_dec *dec;
 	struct delta_ipc_ctx ipc_ctx;
@@ -483,6 +513,8 @@ struct delta_ctx {
  * @nb_of_pixelformats:	number of supported umcompressed video formats
  * @streamformats:	supported compressed video formats
  * @nb_of_streamformats:number of supported compressed video formats
+ * @cids:		set of all control identifiers used by device
+ * @nb_of_ctrls:	overall number of controls used by device
  * @instance_id:	rolling counter identifying an instance (debug purpose)
  * @work_queue:		decoding job work queue
  * @rpmsg_driver:	rpmsg IPC driver
@@ -504,6 +536,8 @@ struct delta_dev {
 	u32 nb_of_pixelformats;
 	u32 streamformats[DELTA_MAX_FORMATS];
 	u32 nb_of_streamformats;
+	u32 cids[DELTA_MAX_CTRLS];
+	u32 nb_of_ctrls;
 	u8 instance_id;
 	struct workqueue_struct *work_queue;
 	struct rpmsg_driver rpmsg_driver;
