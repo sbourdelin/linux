@@ -5292,6 +5292,7 @@ struct cgroup_subsys memory_cgrp_subsys = {
 	.dfl_cftypes = memory_files,
 	.legacy_cftypes = mem_cgroup_legacy_files,
 	.early_init = 0,
+	.sep_res_domain = true,
 };
 
 /**

@@ -61,6 +61,11 @@
 
 #define CGROUP_FILE_NAME_MAX		(MAX_CGROUP_TYPE_NAMELEN +	\
 					 MAX_CFTYPE_NAME + 2)
+/*
+ * Reserved cgroup directory name for resource domain controllers. Users
+ * are not allowed to create child cgroup of that name.
+ */
+#define CGROUP_SELF	"cgroup.self"
 
 /*
  * cgroup_mutex is the master lock.  Any modification to cgroup or its
@@ -164,6 +169,12 @@ static u16 cgrp_dfl_implicit_ss_mask;
 
 /* some controllers can be threaded on the default hierarchy */
 static u16 cgrp_dfl_threaded_ss_mask;
+
+/*
+ * Some controllers need separate resource domain on thread root of the
+ * default hierarchy
+ */
+static u16 cgrp_dfl_rdomain_ss_mask;
 
 /* The list of hierarchy roots */
 LIST_HEAD(cgroup_roots);
@@ -337,7 +348,9 @@ static u16 cgroup_control(struct cgroup *cgrp)
 	if (parent) {
 		u16 ss_mask = parent->subtree_control;
 
-		if (cgroup_is_threaded(cgrp))
+		if (cgrp->flags & CGRP_RESOURCE_DOMAIN)
+			ss_mask &= cgrp_dfl_rdomain_ss_mask;
+		else if (cgroup_is_threaded(cgrp))
 			ss_mask &= cgrp_dfl_threaded_ss_mask;
 		return ss_mask;
 	}
@@ -356,7 +369,9 @@ static u16 cgroup_ss_mask(struct cgroup *cgrp)
 	if (parent) {
 		u16 ss_mask = parent->subtree_ss_mask;
 
-		if (cgroup_is_threaded(cgrp))
+		if (cgrp->flags & CGRP_RESOURCE_DOMAIN)
+			ss_mask &= cgrp_dfl_rdomain_ss_mask;
+		else if (cgroup_is_threaded(cgrp))
 			ss_mask &= cgrp_dfl_threaded_ss_mask;
 		return ss_mask;
 	}
@@ -413,6 +428,18 @@ static struct cgroup_subsys_state *cgroup_e_css(struct cgroup *cgrp,
 			return NULL;
 	}
 
+	/*
+	 * On a thread root with a resource domain, use the css in the
+	 * resource domain, if enabled.
+	 */
+	if (cgrp->resource_domain &&
+	   (cgroup_ss_mask(cgrp->resource_domain) & (1 << ss->id))) {
+		struct cgroup_subsys_state *css;
+
+		css = cgroup_css(cgrp->resource_domain, ss);
+		if (css)
+			return css;
+	}
 	return cgroup_css(cgrp, ss);
 }
 
@@ -3039,8 +3066,21 @@ static int cgroup_enable_threaded(struct cgroup *cgrp)
 		goto setup_child;
 
 	/*
+	 * Create a resource domain child cgroup, if necessary.
+	 * Update the css association if controllers are enabled in
+	 * the resource domain child cgroup.
+	 */
+	if (cgrp->root->subsys_mask & cgrp_dfl_rdomain_ss_mask) {
+		cgroup_mkdir(cgrp->kn, NULL, 0755);
+		if (cgrp->resource_domain &&
+		    cgroup_ss_mask(cgrp->resource_domain))
+			cgroup_update_dfl_csses(cgrp);
+	}
+
+	/*
 	 * For the parent cgroup, we need to find all csets which need
-	 * ->proc_cset updated
+	 * ->proc_cset updated. The updated csets will also pick up the
+	 * new resource domain css'es along the way.
 	 */
 	spin_lock_irq(&css_set_lock);
 	list_for_each_entry(link, &cgrp->cset_links, cset_link) {
@@ -3132,6 +3172,7 @@ static int cgroup_disable_threaded(struct cgroup *cgrp)
 {
 	struct cgrp_cset_link *link;
 	struct cgroup *parent = cgroup_parent(cgrp);
+	struct cgroup *rdomain = NULL;
 
 	lockdep_assert_held(&cgroup_mutex);
 
@@ -3182,6 +3223,8 @@ static int cgroup_disable_threaded(struct cgroup *cgrp)
 	/*
 	 * Check remaining threaded children count to see if the threaded
 	 * csets of the parent need to be removed and ->proc_cset reset.
+	 * If valid css'es are present in the resource domain cgroup, we
+	 * need to migrate the csets away from those css'es.
 	 */
 	spin_lock_irq(&css_set_lock);
 
@@ -3189,6 +3232,14 @@ static int cgroup_disable_threaded(struct cgroup *cgrp)
 		goto out_unlock;	/* still have threaded children left */
 
 	cgrp = parent;
+
+	/*
+	 * Prepare to remove the resource domain child cgroup.
+	 */
+	rdomain = cgrp->resource_domain;
+	if (rdomain)
+		cgrp->resource_domain = NULL;
+
 	list_for_each_entry(link, &cgrp->cset_links, cset_link) {
 		struct css_set *cset = link->cset;
 
@@ -3214,6 +3265,16 @@ static int cgroup_disable_threaded(struct cgroup *cgrp)
 out_unlock:
 	spin_unlock_irq(&css_set_lock);
 
+	if (rdomain) {
+		/*
+		 * Update the css association if controllers are enabled
+		 * in the resource domain child cgroup before destroying
+		 * that resource domain.
+		 */
+		if (cgroup_ss_mask(rdomain))
+			cgroup_update_dfl_csses(cgrp);
+		cgroup_destroy_locked(rdomain);
+	}
 	return 0;
 }
 
@@ -4660,20 +4721,40 @@ int cgroup_mkdir(struct kernfs_node *parent_kn, const char *name, umode_t mode)
 {
 	struct cgroup *parent, *cgrp;
 	struct kernfs_node *kn;
+	bool create_self = (name == NULL);
 	int ret;
 
-	/* do not accept '\n' to prevent making /proc/<pid>/cgroup unparsable */
-	if (strchr(name, '\n'))
-		return -EINVAL;
+	/*
+	 * Do not accept '\n' to prevent making /proc/<pid>/cgroup unparsable.
+	 * The reserved resource domain directory name cannot be used. A NULL
+	 * name parameter, however, is used internally to create that
+	 * resource domain directory. A sub-directory cannot be created
+	 * under a resource domain directory.
+	 */
+	if (create_self) {
+		name = CGROUP_SELF;
+		parent = parent_kn->priv;
+	} else {
+		if (strchr(name, '\n') || !strcmp(name, CGROUP_SELF))
+			return -EINVAL;
 
-	parent = cgroup_kn_lock_live(parent_kn, false);
-	if (!parent)
-		return -ENODEV;
+		parent = cgroup_kn_lock_live(parent_kn, false);
+		if (!parent)
+			return -ENODEV;
+		if (parent->flags & CGRP_RESOURCE_DOMAIN) {
+			ret = -EINVAL;
+			goto out_unlock;
+		}
+	}
 
 	cgrp = cgroup_create(parent);
 	if (IS_ERR(cgrp)) {
 		ret = PTR_ERR(cgrp);
 		goto out_unlock;
+	}
+	if (create_self) {
+		parent->resource_domain = cgrp;
+		cgrp->flags |= CGRP_RESOURCE_DOMAIN;
 	}
 
 	/* create the directory */
@@ -4694,9 +4775,11 @@ int cgroup_mkdir(struct kernfs_node *parent_kn, const char *name, umode_t mode)
 	if (ret)
 		goto out_destroy;
 
-	ret = css_populate_dir(&cgrp->self);
-	if (ret)
-		goto out_destroy;
+	if (!create_self) {
+		ret = css_populate_dir(&cgrp->self);
+		if (ret)
+			goto out_destroy;
+	}
 
 	ret = cgroup_apply_control_enable(cgrp);
 	if (ret)
@@ -4713,7 +4796,8 @@ int cgroup_mkdir(struct kernfs_node *parent_kn, const char *name, umode_t mode)
 out_destroy:
 	cgroup_destroy_locked(cgrp);
 out_unlock:
-	cgroup_kn_unlock(parent_kn);
+	if (!create_self)
+		cgroup_kn_unlock(parent_kn);
 	return ret;
 }
 
@@ -4883,7 +4967,15 @@ int cgroup_rmdir(struct kernfs_node *kn)
 	if (!cgrp)
 		return 0;
 
-	ret = cgroup_destroy_locked(cgrp);
+	/*
+	 * A resource domain cgroup cannot be removed directly by users.
+	 * It can only be done internally when its parent directory is
+	 * no longer a thread root.
+	 */
+	if (cgrp->flags & CGRP_RESOURCE_DOMAIN)
+		ret = -EINVAL;
+	else
+		ret = cgroup_destroy_locked(cgrp);
 
 	if (!ret)
 		trace_cgroup_rmdir(cgrp);
@@ -5070,6 +5162,8 @@ int __init cgroup_init(void)
 
 		if (ss->threaded)
 			cgrp_dfl_threaded_ss_mask |= 1 << ss->id;
+		if (ss->sep_res_domain)
+			cgrp_dfl_rdomain_ss_mask |= 1 << ss->id;
 
 		if (ss->dfl_cftypes == ss->legacy_cftypes) {
 			WARN_ON(cgroup_add_cftypes(ss, ss->dfl_cftypes));

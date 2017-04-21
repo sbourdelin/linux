@@ -393,6 +393,26 @@ cgroup must create children and transfer all its processes to the
 children before enabling controllers in its "cgroup.subtree_control"
 file.
 
+2-4-4. Resource Domain Controllers
+
+As internal processes are allowed in a threaded subtree, a non-threaded
+controller at a thread root cgroup has to properly manage resource
+competition between internal processes and other child non-threaded
+cgroups. However, a controller can specify that it wants to have
+separate resource domain to manage the resources of the processes in
+the threaded subtree instead of each process individually. In this
+case, a "cgroup.self" directory will be created at the thread root
+to hold the resource control knobs for the processes in the threaded
+subtree as if those internal processes are all under the cgroup.self
+child cgroup for resource tracking and controlling purpose.
+
+The "cgroup.self" directory is a special directory which cannot
+be created or deleted directly. No sub-directory can be created
+under it and special files like "cgroup.procs" are not present so
+tasks cannot be moved directly into it.  It is created when a cgroup
+becomes the thread root and have controllers that request separate
+resource domains. It will be removed when that cgroup is not a thread
+root anymore.
 
 2-5. Delegation
 

@@ -65,6 +65,7 @@ enum {
 enum {
 	CGRP_ROOT_NOPREFIX	= (1 << 1), /* mounted subsystems have no named prefix */
 	CGRP_ROOT_XATTR		= (1 << 2), /* supports extended attributes */
+	CGRP_RESOURCE_DOMAIN	= (1 << 3), /* thread root resource domain */
 };
 
 /* cftype->flags */
@@ -293,6 +294,9 @@ struct cgroup {
 
 	struct cgroup_root *root;
 
+	/* Pointer to separate resource domain for thread root */
+	struct cgroup *resource_domain;
+
 	/*
 	 * List of cgrp_cset_links pointing at css_sets with tasks in this
 	 * cgroup.  Protected by css_set_lock.
@@ -514,6 +518,17 @@ struct cgroup_subsys {
 	 * threaded.  implicit && !threaded is not supported.
 	 */
 	bool threaded:1;
+
+	/*
+	 * If %true, the controller will need a separate resource domain in
+	 * a thread root to avoid internal processes associated with the
+	 * threaded subtree to compete with other child cgroups. This is done
+	 * by having a separate set of knobs in the cgroup.self directory.
+	 * These knobs will control how much resources are allocated to the
+	 * processes in the threaded subtree. Only !thread controllers should
+	 * have this flag turned on.
+	 */
+	bool sep_res_domain:1;
 
 	/*
 	 * If %false, this subsystem is properly hierarchical -

@@ -269,10 +269,16 @@ static struct cftype debug_files[] =  {
 	{ }	/* terminate */
 };
 
+/*
+ * Normally, threaded & sep_res_domain are mutually exclusive.
+ * Both are enabled here in the debug controller to enable better internal
+ * status tracking.
+ */
 struct cgroup_subsys debug_cgrp_subsys = {
 	.css_alloc	= debug_css_alloc,
 	.css_free	= debug_css_free,
 	.legacy_cftypes	= debug_files,
 	.dfl_cftypes	= debug_files,
 	.threaded	= true,
+	.sep_res_domain = true,
 };
