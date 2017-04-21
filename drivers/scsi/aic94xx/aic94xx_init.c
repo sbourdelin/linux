@@ -701,13 +701,14 @@ static int asd_register_sas_ha(struct asd_ha_struct *asd_ha)
 
 static int asd_unregister_sas_ha(struct asd_ha_struct *asd_ha)
 {
+	struct Scsi_Host *shost = asd_ha->sas_ha.core.shost;
 	int err;
 
-	scsi_remove_host(asd_ha->sas_ha.core.shost);
 	err = sas_unregister_ha(&asd_ha->sas_ha);
 
-	sas_remove_host(asd_ha->sas_ha.core.shost);
-	scsi_host_put(asd_ha->sas_ha.core.shost);
+	sas_remove_host(shost);
+	scsi_remove_host(shost);
+	scsi_host_put(shost);
 
 	kfree(asd_ha->sas_ha.sas_phy);
 	kfree(asd_ha->sas_ha.sas_port);
