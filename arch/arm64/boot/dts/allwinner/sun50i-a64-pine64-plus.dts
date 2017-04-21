@@ -48,3 +48,7 @@
 
 	/* TODO: Camera, Ethernet PHY, touchscreen, etc. */
 };
+
+&ext_phy {
+	realtek,disable-rx-delay;
+};
