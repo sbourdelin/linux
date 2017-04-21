@@ -610,7 +610,7 @@ static int scsi_sdev_check_buf_bit(const char *buf)
 			return 1;
 		else if (buf[0] == '0')
 			return 0;
-		else 
+		else
 			return -EINVAL;
 	} else
 		return -EINVAL;
@@ -774,7 +774,7 @@ store_queue_type_field(struct device *dev, struct device_attribute *attr,
 
 	if (!sdev->tagged_supported)
 		return -EINVAL;
-		
+
 	sdev_printk(KERN_INFO, sdev,
 		    "ignoring write to deprecated queue_type attribute");
 	return count;
@@ -1302,8 +1302,11 @@ void __scsi_remove_device(struct scsi_device *sdev)
 	blk_cleanup_queue(sdev->request_queue);
 	cancel_work_sync(&sdev->requeue_work);
 
-	if (sdev->host->hostt->slave_destroy)
+	if (sdev->host->hostt->slave_destroy) {
+		mutex_lock(&sdev->host->scan_mutex);
 		sdev->host->hostt->slave_destroy(sdev);
+		mutex_unlock(&sdev->host->scan_mutex);
+	}
 	transport_destroy_device(dev);
 
 	/*
@@ -1322,11 +1325,7 @@ void __scsi_remove_device(struct scsi_device *sdev)
  **/
 void scsi_remove_device(struct scsi_device *sdev)
 {
-	struct Scsi_Host *shost = sdev->host;
-
-	mutex_lock(&shost->scan_mutex);
 	__scsi_remove_device(sdev);
-	mutex_unlock(&shost->scan_mutex);
 }
 EXPORT_SYMBOL(scsi_remove_device);
 
