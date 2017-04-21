@@ -702,7 +702,7 @@ int wm8960_configure_pll(struct snd_soc_codec *codec, int freq_in,
 	bclk = wm8960->bclk;
 	lrclk = wm8960->lrclk;
 
-	*bclk_idx = -1;
+	best_freq_out = -EINVAL;
 
 	for (i = 0; i < ARRAY_SIZE(sysclk_divs); ++i) {
 		if (sysclk_divs[i] == -1)
@@ -731,10 +731,7 @@ int wm8960_configure_pll(struct snd_soc_codec *codec, int freq_in,
 			break;
 	}
 
-	if (*bclk_idx != -1)
-		wm8960_set_pll(codec, freq_in, best_freq_out);
-
-	return *bclk_idx;
+	return best_freq_out;
 }
 static int wm8960_configure_clocking(struct snd_soc_codec *codec)
 {
@@ -783,11 +780,12 @@ static int wm8960_configure_clocking(struct snd_soc_codec *codec)
 		}
 	}
 
-	ret = wm8960_configure_pll(codec, freq_in, &i, &j, &k);
-	if (ret < 0) {
+	freq_out = wm8960_configure_pll(codec, freq_in, &i, &j, &k);
+	if (freq_out < 0) {
 		dev_err(codec->dev, "failed to configure clock via PLL\n");
-		return -EINVAL;
+		return freq_out;
 	}
+	wm8960_set_pll(codec, freq_in, freq_out);
 
 configure_clock:
 	/* configure sysclk clock */
