@@ -681,6 +681,7 @@ enum {
 #define TCA_ACT_TAB TCA_ROOT_TAB
 	TCA_ROOT_FLAGS,
 	TCA_ROOT_COUNT,
+	TCA_ROOT_TIME_DELTA, /* in msecs */
 	__TCA_ROOT_MAX,
 #define	TCA_ROOT_MAX (__TCA_ROOT_MAX - 1)
 };
