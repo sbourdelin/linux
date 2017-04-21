@@ -3209,6 +3209,7 @@ enum nl80211_reg_rule_attr {
  *	BSS-es in the specified band is to be adjusted before doing
  *	RSSI-based BSS selection. The attribute value is a packed structure
  *	value as specified by &struct nl80211_bss_select_rssi_adjust.
+ * @NL80211_SCHED_SCAN_MATCH_ATTR_BSSID: BSSID to be used for matching.
  * @NL80211_SCHED_SCAN_MATCH_ATTR_MAX: highest scheduled scan filter
  *	attribute number currently defined
  * @__NL80211_SCHED_SCAN_MATCH_ATTR_AFTER_LAST: internal use
@@ -3220,6 +3221,7 @@ enum nl80211_sched_scan_match_attr {
 	NL80211_SCHED_SCAN_MATCH_ATTR_RSSI,
 	NL80211_SCHED_SCAN_MATCH_ATTR_RELATIVE_RSSI,
 	NL80211_SCHED_SCAN_MATCH_ATTR_RSSI_ADJUST,
+	NL80211_SCHED_SCAN_MATCH_ATTR_BSSID,
 
 	/* keep last */
 	__NL80211_SCHED_SCAN_MATCH_ATTR_AFTER_LAST,
