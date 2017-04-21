@@ -1787,9 +1787,9 @@ int hisi_sas_remove(struct platform_device *pdev)
 	struct hisi_hba *hisi_hba = sha->lldd_ha;
 	struct Scsi_Host *shost = sha->core.shost;
 
-	scsi_remove_host(sha->core.shost);
 	sas_unregister_ha(sha);
-	sas_remove_host(sha->core.shost);
+	sas_remove_host(shost);
+	scsi_remove_host(shost);
 
 	hisi_sas_free(hisi_hba);
 	kfree(shost);
