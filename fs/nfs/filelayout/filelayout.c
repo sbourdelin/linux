@@ -924,8 +924,6 @@ fl_pnfs_update_layout(struct inode *ino,
 	if (status)
 		lseg = ERR_PTR(status);
 out:
-	if (IS_ERR(lseg))
-		pnfs_put_lseg(lseg);
 	return lseg;
 }
 
