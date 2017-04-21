@@ -1607,7 +1607,7 @@ static int mlx4_ib_alloc_pv_bufs(struct mlx4_ib_demux_pv_ctx *ctx,
 		return -ENOMEM;
 
 	tun_qp->tx_ring = kcalloc(MLX4_NUM_TUNNEL_BUFS,
-				  sizeof (struct mlx4_ib_tun_tx_buf),
+				  sizeof(*tun_qp->tx_ring),
 				  GFP_KERNEL);
 	if (!tun_qp->tx_ring) {
 		kfree(tun_qp->ring);
@@ -1948,7 +1948,7 @@ static int alloc_pv_object(struct mlx4_ib_dev *dev, int slave, int port,
 	struct mlx4_ib_demux_pv_ctx *ctx;
 
 	*ret_ctx = NULL;
-	ctx = kzalloc(sizeof (struct mlx4_ib_demux_pv_ctx), GFP_KERNEL);
+	ctx = kzalloc(sizeof(*ctx), GFP_KERNEL);
 	if (!ctx)
 		return -ENOMEM;
 
@@ -2150,7 +2150,7 @@ static int mlx4_ib_alloc_demux_ctx(struct mlx4_ib_dev *dev,
 	int i;
 
 	ctx->tun = kcalloc(dev->dev->caps.sqp_demux,
-			   sizeof (struct mlx4_ib_demux_pv_ctx *), GFP_KERNEL);
+			   sizeof(*ctx->tun), GFP_KERNEL);
 	if (!ctx->tun)
 		return -ENOMEM;
 
