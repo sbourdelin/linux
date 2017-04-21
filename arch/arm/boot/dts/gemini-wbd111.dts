@@ -98,5 +98,13 @@
 				read-only;
 			};
 		};
+
+		usb@68000000 {
+			status = "okay";
+		};
+
+		usb@69000000 {
+			status = "okay";
+		};
 	};
 };

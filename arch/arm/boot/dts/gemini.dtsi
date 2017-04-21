@@ -152,5 +152,27 @@
 				#interrupt-cells = <1>;
 			};
 		};
+
+		usb@68000000 {
+			compatible = "cortina,gemini-usb", "faraday,fotg210";
+			reg = <0x68000000 0x1000>;
+			interrupts = <10 IRQ_TYPE_LEVEL_HIGH>;
+			resets = <&rcon 8>;
+			clocks = <&gcc GEMINI_CLK_GATE_USB0>;
+			clock-names = "PCLK";
+			syscon = <&syscon>;
+			status = "disabled";
+		};
+
+		usb@69000000 {
+			compatible = "cortina,gemini-usb", "faraday,fotg210";
+			reg = <0x69000000 0x1000>;
+			interrupts = <11 IRQ_TYPE_LEVEL_HIGH>;
+			resets = <&rcon 9>;
+			clocks = <&gcc GEMINI_CLK_GATE_USB1>;
+			clock-names = "PCLK";
+			syscon = <&syscon>;
+			status = "disabled";
+		};
 	};
 };

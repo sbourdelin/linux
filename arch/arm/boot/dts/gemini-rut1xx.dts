@@ -61,5 +61,13 @@
 			reg = <0x30000000 0x00800000>;
 			/* TODO: add flash partitions here */
 		};
+
+		usb@68000000 {
+			status = "okay";
+		};
+
+		usb@69000000 {
+			status = "okay";
+		};
 	};
 };
