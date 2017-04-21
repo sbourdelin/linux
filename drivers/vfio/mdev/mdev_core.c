@@ -75,7 +75,7 @@ static int _find_mdev_device(struct device *dev, void *data)
 
 	mdev = to_mdev_device(dev);
 
-	if (uuid_le_cmp(mdev->uuid, *(uuid_le *)data) == 0)
+	if (uuid_le_cmp_p(data, mdev->uuid) == 0)
 		return 1;
 
 	return 0;
