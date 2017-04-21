@@ -4421,11 +4421,9 @@ static int _dwc2_hcd_suspend(struct usb_hcd *hcd)
 	}
 
 	/* Ask phy to be suspended */
-	if (!IS_ERR_OR_NULL(hsotg->uphy)) {
-		spin_unlock_irqrestore(&hsotg->lock, flags);
-		usb_phy_set_suspend(hsotg->uphy, true);
-		spin_lock_irqsave(&hsotg->lock, flags);
-	}
+	spin_unlock_irqrestore(&hsotg->lock, flags);
+	usb_phy_set_suspend(hsotg->uphy, true);
+	spin_lock_irqsave(&hsotg->lock, flags);
 
 	/* After entering hibernation, hardware is no more accessible */
 	clear_bit(HCD_FLAG_HW_ACCESSIBLE, &hcd->flags);
@@ -4465,11 +4463,9 @@ static int _dwc2_hcd_resume(struct usb_hcd *hcd)
 	 * This must not be spinlocked since duration
 	 * of this call is unknown.
 	 */
-	if (!IS_ERR_OR_NULL(hsotg->uphy)) {
-		spin_unlock_irqrestore(&hsotg->lock, flags);
-		usb_phy_set_suspend(hsotg->uphy, false);
-		spin_lock_irqsave(&hsotg->lock, flags);
-	}
+	spin_unlock_irqrestore(&hsotg->lock, flags);
+	usb_phy_set_suspend(hsotg->uphy, false);
+	spin_lock_irqsave(&hsotg->lock, flags);
 
 	/* Exit hibernation */
 	ret = dwc2_exit_hibernation(hsotg, true);
@@ -5249,8 +5245,7 @@ int dwc2_hcd_init(struct dwc2_hsotg *hsotg)
 	/* Don't support SG list at this point */
 	hcd->self.sg_tablesize = 0;
 
-	if (!IS_ERR_OR_NULL(hsotg->uphy))
-		otg_set_host(hsotg->uphy->otg, &hcd->self);
+	otg_set_host(hsotg->uphy->otg, &hcd->self);
 
 	/*
 	 * Finish generic HCD initialization and start the HCD. This function
@@ -5306,8 +5301,7 @@ void dwc2_hcd_remove(struct dwc2_hsotg *hsotg)
 		return;
 	}
 
-	if (!IS_ERR_OR_NULL(hsotg->uphy))
-		otg_set_host(hsotg->uphy->otg, NULL);
+	otg_set_host(hsotg->uphy->otg, NULL);
 
 	usb_remove_hcd(hcd);
 	hsotg->priv = NULL;

@@ -4279,8 +4279,7 @@ static int dwc2_hsotg_udc_start(struct usb_gadget *gadget,
 			goto err;
 	}
 
-	if (!IS_ERR_OR_NULL(hsotg->uphy))
-		otg_set_peripheral(hsotg->uphy->otg, &hsotg->gadget);
+	otg_set_peripheral(hsotg->uphy->otg, &hsotg->gadget);
 
 	spin_lock_irqsave(&hsotg->lock, flags);
 	if (dwc2_hw_is_device(hsotg)) {
@@ -4332,8 +4331,7 @@ static int dwc2_hsotg_udc_stop(struct usb_gadget *gadget)
 
 	spin_unlock_irqrestore(&hsotg->lock, flags);
 
-	if (!IS_ERR_OR_NULL(hsotg->uphy))
-		otg_set_peripheral(hsotg->uphy->otg, NULL);
+	otg_set_peripheral(hsotg->uphy->otg, NULL);
 
 	if (hsotg->dr_mode == USB_DR_MODE_PERIPHERAL)
 		dwc2_lowlevel_hw_disable(hsotg);
@@ -4431,7 +4429,7 @@ static int dwc2_hsotg_vbus_draw(struct usb_gadget *gadget, unsigned int mA)
 {
 	struct dwc2_hsotg *hsotg = to_hsotg(gadget);
 
-	if (IS_ERR_OR_NULL(hsotg->uphy))
+	if (hsotg->uphy)
 		return -ENOTSUPP;
 	return usb_phy_set_power(hsotg->uphy, mA);
 }

@@ -451,8 +451,7 @@ static void dwc2_handle_usb_suspend_intr(struct dwc2_hsotg *hsotg)
 			udelay(100);
 
 			/* Ask phy to be suspended */
-			if (!IS_ERR_OR_NULL(hsotg->uphy))
-				usb_phy_set_suspend(hsotg->uphy, true);
+			usb_phy_set_suspend(hsotg->uphy, true);
 skip_power_saving:
 			/*
 			 * Change to L2 (suspend) state before releasing
