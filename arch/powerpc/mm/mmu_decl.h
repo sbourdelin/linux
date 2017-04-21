@@ -95,6 +95,7 @@ extern void _tlbia(void);
 
 extern void mapin_ram(void);
 extern int map_page(unsigned long va, phys_addr_t pa, int flags);
+void remap_init_ram(void);
 extern void setbat(int index, unsigned long virt, phys_addr_t phys,
 		   unsigned int size, pgprot_t prot);
 
@@ -106,6 +107,8 @@ struct hash_pte;
 extern struct hash_pte *Hash, *Hash_end;
 extern unsigned long Hash_size, Hash_mask;
 
+#else
+static inline void remap_init_ram(void) {}
 #endif /* CONFIG_PPC32 */
 
 extern unsigned long ioremap_bot;
