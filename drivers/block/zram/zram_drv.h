@@ -134,7 +134,12 @@ struct zram {
 	 * zram is claimed so open request will be failed
 	 */
 	bool claim; /* Protected by bdev->bd_mutex */
+	bool use_dedup;
 };
 
+static inline bool zram_dedup_enabled(struct zram *zram)
+{
+	return zram->use_dedup;
+}
 void zram_entry_free(struct zram *zram, struct zram_entry *entry);
 #endif
