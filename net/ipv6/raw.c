@@ -174,7 +174,7 @@ static bool ipv6_raw_deliver(struct sk_buff *skb, int nexthdr)
 	read_lock(&raw_v6_hashinfo.lock);
 	sk = sk_head(&raw_v6_hashinfo.ht[hash]);
 
-	if (!sk)
+	if (!sk || !(skb->len))
 		goto out;
 
 	net = dev_net(skb->dev);
