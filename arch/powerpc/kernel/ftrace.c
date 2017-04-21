@@ -46,6 +46,7 @@ static int
 ftrace_modify_code(unsigned long ip, unsigned int old, unsigned int new)
 {
 	unsigned int replaced;
+	int err;
 
 	/*
 	 * Note:
@@ -67,10 +68,11 @@ ftrace_modify_code(unsigned long ip, unsigned int old, unsigned int new)
 	}
 
 	/* replace the text with the new text */
-	if (patch_instruction((unsigned int *)ip, new))
-		return -EPERM;
+	set_kernel_text_rw(ip);
+	err = patch_instruction((unsigned int *)ip, new);
+	set_kernel_text_ro(ip);
 
-	return 0;
+	return err ? -EPERM : 0;
 }
 
 /*
