@@ -2331,6 +2331,9 @@ out:
 
 static bool qgroup_check_limits(const struct btrfs_qgroup *qg, u64 num_bytes)
 {
+	if (capable(CAP_SYS_RESOURCE))
+		return true;
+
 	if ((qg->lim_flags & BTRFS_QGROUP_LIMIT_MAX_RFER) &&
 	    qg->reserved + (s64)qg->rfer + num_bytes > qg->max_rfer)
 		return false;
