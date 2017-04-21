@@ -50,6 +50,7 @@ enum sensors {
 	TEMP,
 	POWER_SUPPLY,
 	POWER_INPUT,
+	CURRENT,
 	MAX_SENSOR_TYPE,
 };
 
@@ -65,7 +66,8 @@ static struct sensor_group {
 	{"fan", "ibm,opal-sensor-cooling-fan"},
 	{"temp", "ibm,opal-sensor-amb-temp"},
 	{"in", "ibm,opal-sensor-power-supply"},
-	{"power", "ibm,opal-sensor-power"}
+	{"power", "ibm,opal-sensor-power"},
+	{"curr"}, /* Follows newer device tree compatible ibm,opal-sensor */
 };
 
 struct sensor_data {
@@ -287,6 +289,7 @@ static int populate_attr_groups(struct platform_device *pdev)
 	opal = of_find_node_by_path("/ibm,opal/sensors");
 	for_each_child_of_node(opal, np) {
 		const char *label;
+		int len;
 
 		if (np->name == NULL)
 			continue;
@@ -298,9 +301,13 @@ static int populate_attr_groups(struct platform_device *pdev)
 		sensor_groups[type].attr_count++;
 
 		/*
-		 * add a new attribute for labels
+		 * add attributes for labels, min and max
 		 */
 		if (!of_property_read_string(np, "label", &label))
+			sensor_groups[type].attr_count++;
+		if (of_find_property(np, "sensor-data-min", &len))
+			sensor_groups[type].attr_count++;
+		if (of_find_property(np, "sensor-data-max", &len))
 			sensor_groups[type].attr_count++;
 	}
 
@@ -425,6 +432,50 @@ static int create_device_attrs(struct platform_device *pdev)
 
 			create_hwmon_attr(&sdata[count], "label", show_label);
 
+			pgroups[type]->attrs[sensor_groups[type].attr_count++] =
+				&sdata[count++].dev_attr.attr;
+		}
+
+		if (!of_property_read_u32(np, "sensor-data-max", &sensor_id)) {
+			switch (type) {
+			case POWER_INPUT:
+				attr_name = "input_highest";
+				break;
+			case TEMP:
+				attr_name = "max";
+				break;
+			default:
+				attr_name = "highest";
+				break;
+			}
+
+			sdata[count].id = sensor_id;
+			sdata[count].type = type;
+			sdata[count].hwmon_index = sdata[count - 1].hwmon_index;
+			create_hwmon_attr(&sdata[count], attr_name,
+					  show_sensor);
+			pgroups[type]->attrs[sensor_groups[type].attr_count++] =
+				&sdata[count++].dev_attr.attr;
+		}
+
+		if (!of_property_read_u32(np, "sensor-data-min", &sensor_id)) {
+			switch (type) {
+			case POWER_INPUT:
+				attr_name = "input_lowest";
+				break;
+			case TEMP:
+				attr_name = "min";
+				break;
+			default:
+				attr_name = "lowest";
+				break;
+			}
+
+			sdata[count].id = sensor_id;
+			sdata[count].type = type;
+			sdata[count].hwmon_index = sdata[count - 1].hwmon_index;
+			create_hwmon_attr(&sdata[count], attr_name,
+					  show_sensor);
 			pgroups[type]->attrs[sensor_groups[type].attr_count++] =
 				&sdata[count++].dev_attr.attr;
 		}
