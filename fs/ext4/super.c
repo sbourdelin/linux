@@ -5379,8 +5379,10 @@ static int ext4_quota_on(struct super_block *sb, int type, int format_id,
 
 		inode_lock(inode);
 		handle = ext4_journal_start(inode, EXT4_HT_QUOTA, 1);
-		if (IS_ERR(handle))
+		if (IS_ERR(handle)) {
+			err = PTR_ERR(handle);
 			goto unlock_inode;
+		}
 		EXT4_I(inode)->i_flags |= EXT4_NOATIME_FL | EXT4_IMMUTABLE_FL;
 		inode_set_flags(inode, S_NOATIME | S_IMMUTABLE,
 				S_NOATIME | S_IMMUTABLE);
@@ -5480,8 +5482,10 @@ static int ext4_quota_off(struct super_block *sb, int type)
 	/* Update modification times of quota files when userspace can
 	 * start looking at them */
 	handle = ext4_journal_start(inode, EXT4_HT_QUOTA, 1);
-	if (IS_ERR(handle))
+	if (IS_ERR(handle)) {
+		err = PTR_ERR(handle);
 		goto out_unlock;
+	}
 	EXT4_I(inode)->i_flags &= ~(EXT4_NOATIME_FL | EXT4_IMMUTABLE_FL);
 	inode_set_flags(inode, 0, S_NOATIME | S_IMMUTABLE);
 	inode->i_mtime = inode->i_ctime = current_time(inode);
