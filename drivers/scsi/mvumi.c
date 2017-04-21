@@ -232,11 +232,14 @@ static int mvumi_make_sgl(struct mvumi_hba *mhba, struct scsi_cmnd *scmd,
 			sgd_inc(mhba, m_sg);
 		}
 	} else {
-		scmd->SCp.dma_handle = scsi_bufflen(scmd) ?
-			pci_map_single(mhba->pdev, scsi_sglist(scmd),
-				scsi_bufflen(scmd),
-				(int) scmd->sc_data_direction)
-			: 0;
+		if (!scsi_bufflen(scmd))
+			return -1;
+		scmd->SCp.dma_handle = pci_map_single(mhba->pdev,
+						scsi_sglist(scmd),
+						scsi_bufflen(scmd),
+						(int) scmd->sc_data_direction);
+		if (pci_dma_mapping_error(mhba->pdev, scmd->SCp.dma_handle))
+			return -1;
 		busaddr = scmd->SCp.dma_handle;
 		m_sg->baseaddr_l = cpu_to_le32(lower_32_bits(busaddr));
 		m_sg->baseaddr_h = cpu_to_le32(upper_32_bits(busaddr));
