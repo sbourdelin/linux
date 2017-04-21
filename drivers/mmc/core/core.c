@@ -2636,8 +2636,12 @@ static int mmc_rescan_try_freq(struct mmc_host *host, unsigned freq)
 	 * if the card is being re-initialized, just send it.  CMD52
 	 * should be ignored by SD/eMMC cards.
 	 * Skip it if we already know that we do not support SDIO commands
+	 * Also skip it if we know this host controller has a SDIO card that
+	 * needs to be able to restore from hibernation without losing the card
+	 * state e.g. an SDIO wifi card supporting WOWLAN.
 	 */
-	if (!(host->caps2 & MMC_CAP2_NO_SDIO))
+	if (!(host->caps2 & MMC_CAP2_NO_SDIO) &&
+	    !(host->caps2 & MMC_CAP2_NO_SDIO_RESET))
 		sdio_reset(host);
 
 	mmc_go_idle(host);
