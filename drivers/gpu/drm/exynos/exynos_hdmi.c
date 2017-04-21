@@ -40,7 +40,7 @@
 #include <linux/component.h>
 #include <linux/mfd/syscon.h>
 #include <linux/regmap.h>
-
+#include <sound/hdmi-codec.h>
 #include <drm/exynos_drm.h>
 
 #include "exynos_drm_drv.h"
@@ -110,13 +110,23 @@ struct hdmi_driver_data {
 	struct string_array_spec clk_muxes;
 };
 
+struct hdmi_audio {
+	struct platform_device *pdev;
+	struct hdmi_audio_infoframe infoframe;
+	unsigned int sample_rate;
+	unsigned int sample_width;
+	u8 enable;
+};
+
 struct hdmi_context {
 	struct drm_encoder		encoder;
 	struct device			*dev;
 	struct drm_device		*drm_dev;
 	struct drm_connector		connector;
+	struct hdmi_audio		audio;
 	bool				powered;
 	bool				dvi_mode;
+	struct mutex			mutex;
 	struct delayed_work		hotplug_work;
 	struct drm_display_mode		current_mode;
 	const struct hdmi_driver_data	*drv_data;
@@ -766,6 +776,22 @@ static int hdmi_clk_set_parents(struct hdmi_context *hdata, bool to_phy)
 	return ret;
 }
 
+static int hdmi_audio_infoframe_apply(struct hdmi_context *hdata)
+{
+	struct hdmi_audio_infoframe *infoframe = &hdata->audio.infoframe;
+	u8 buf[HDMI_INFOFRAME_SIZE(AUDIO)];
+	int len;
+
+	len = hdmi_audio_infoframe_pack(infoframe, buf, sizeof(buf));
+	if (len < 0)
+		return len;
+
+	hdmi_reg_writeb(hdata, HDMI_AUI_CON, HDMI_AUI_CON_EVERY_VSYNC);
+	hdmi_reg_write_buf(hdata, HDMI_AUI_HEADER0, buf, len);
+
+	return 0;
+}
+
 static void hdmi_reg_infoframes(struct hdmi_context *hdata)
 {
 	union hdmi_infoframe frm;
@@ -803,15 +829,7 @@ static void hdmi_reg_infoframes(struct hdmi_context *hdata)
 		hdmi_reg_write_buf(hdata, HDMI_VSI_DATA(0), buf + 3, ret - 3);
 	}
 
-	ret = hdmi_audio_infoframe_init(&frm.audio);
-	if (!ret) {
-		frm.audio.channels = 2;
-		ret = hdmi_audio_infoframe_pack(&frm.audio, buf, sizeof(buf));
-	}
-	if (ret > 0) {
-		hdmi_reg_writeb(hdata, HDMI_AUI_CON, HDMI_AUI_CON_EVERY_VSYNC);
-		hdmi_reg_write_buf(hdata, HDMI_AUI_HEADER0, buf, ret);
-	}
+	hdmi_audio_infoframe_apply(hdata);
 }
 
 static enum drm_connector_status hdmi_detect(struct drm_connector *connector,
@@ -993,23 +1011,18 @@ static void hdmi_reg_acr(struct hdmi_context *hdata, u32 freq)
 	hdmi_reg_writeb(hdata, HDMI_ACR_CON, 4);
 }
 
-static void hdmi_audio_init(struct hdmi_context *hdata)
+static void hdmi_audio_config(struct hdmi_context *hdata)
 {
-	u32 sample_rate, bits_per_sample;
-	u32 data_num, bit_ch, sample_frq;
-	u32 val;
+	u32 data_num, sample_freq, val;
+	u32 bit_ch = 1;
 
-	sample_rate = 44100;
-	bits_per_sample = 16;
 
-	switch (bits_per_sample) {
+	switch (hdata->audio.sample_width) {
 	case 20:
 		data_num = 2;
-		bit_ch = 1;
 		break;
 	case 24:
 		data_num = 3;
-		bit_ch = 1;
 		break;
 	default:
 		data_num = 1;
@@ -1017,7 +1030,7 @@ static void hdmi_audio_init(struct hdmi_context *hdata)
 		break;
 	}
 
-	hdmi_reg_acr(hdata, sample_rate);
+	hdmi_reg_acr(hdata, hdata->audio.sample_rate);
 
 	hdmi_reg_writeb(hdata, HDMI_I2S_MUX_CON, HDMI_I2S_IN_DISABLE
 				| HDMI_I2S_AUD_I2S | HDMI_I2S_CUV_I2S_ENABLE
@@ -1028,10 +1041,21 @@ static void hdmi_audio_init(struct hdmi_context *hdata)
 
 	hdmi_reg_writeb(hdata, HDMI_I2S_MUX_CUV, HDMI_I2S_CUV_RL_EN);
 
-	sample_frq = (sample_rate == 44100) ? 0 :
-			(sample_rate == 48000) ? 2 :
-			(sample_rate == 32000) ? 3 :
-			(sample_rate == 96000) ? 0xa : 0x0;
+	switch(hdata->audio.sample_rate) {
+	case 32000:
+		sample_freq = 0x3;
+		break;
+	case 48000:
+		sample_freq = 0x2;
+		break;
+	case 96000:
+		sample_freq = 0xa;
+		break;
+	case 44100:
+	default:
+		sample_freq = 0;
+		break;
+	}
 
 	hdmi_reg_writeb(hdata, HDMI_I2S_CLK_CON, HDMI_I2S_CLK_DIS);
 	hdmi_reg_writeb(hdata, HDMI_I2S_CLK_CON, HDMI_I2S_CLK_EN);
@@ -1065,7 +1089,7 @@ static void hdmi_audio_init(struct hdmi_context *hdata)
 	hdmi_reg_writeb(hdata, HDMI_I2S_CH_ST_1, HDMI_I2S_CD_PLAYER);
 	hdmi_reg_writeb(hdata, HDMI_I2S_CH_ST_2, HDMI_I2S_SET_SOURCE_NUM(0));
 	hdmi_reg_writeb(hdata, HDMI_I2S_CH_ST_3, HDMI_I2S_CLK_ACCUR_LEVEL_2
-			| HDMI_I2S_SET_SMP_FREQ(sample_frq));
+			| HDMI_I2S_SET_SMP_FREQ(sample_freq));
 	hdmi_reg_writeb(hdata, HDMI_I2S_CH_ST_4,
 			HDMI_I2S_ORG_SMP_FREQ_44_1
 			| HDMI_I2S_WORD_LEN_MAX24_24BITS
@@ -1074,13 +1098,15 @@ static void hdmi_audio_init(struct hdmi_context *hdata)
 	hdmi_reg_writeb(hdata, HDMI_I2S_CH_ST_CON, HDMI_I2S_CH_STATUS_RELOAD);
 }
 
-static void hdmi_audio_control(struct hdmi_context *hdata, bool onoff)
+static void hdmi_audio_control(struct hdmi_context *hdata)
 {
+	bool enable = hdata->audio.enable;
+
 	if (hdata->dvi_mode)
 		return;
 
-	hdmi_reg_writeb(hdata, HDMI_AUI_CON, onoff ? 2 : 0);
-	hdmi_reg_writemask(hdata, HDMI_CON_0, onoff ?
+	hdmi_reg_writeb(hdata, HDMI_AUI_CON, enable ? 2 : 0);
+	hdmi_reg_writemask(hdata, HDMI_CON_0, enable ?
 			HDMI_ASP_EN : HDMI_ASP_DIS, HDMI_ASP_MASK);
 }
 
@@ -1400,9 +1426,9 @@ static void hdmi_conf_apply(struct hdmi_context *hdata)
 {
 	hdmi_start(hdata, false);
 	hdmi_conf_init(hdata);
-	hdmi_audio_init(hdata);
+	hdmi_audio_config(hdata);
 	hdmi_mode_apply(hdata);
-	hdmi_audio_control(hdata, true);
+	hdmi_audio_control(hdata);
 }
 
 static void hdmi_mode_set(struct drm_encoder *encoder,
@@ -1476,8 +1502,12 @@ static void hdmi_enable(struct drm_encoder *encoder)
 {
 	struct hdmi_context *hdata = encoder_to_hdmi(encoder);
 
+	mutex_lock(&hdata->mutex);
+
 	hdmiphy_enable(hdata);
 	hdmi_conf_apply(hdata);
+
+	mutex_unlock(&hdata->mutex);
 }
 
 static void hdmi_disable(struct drm_encoder *encoder)
@@ -1485,6 +1515,8 @@ static void hdmi_disable(struct drm_encoder *encoder)
 	struct hdmi_context *hdata = encoder_to_hdmi(encoder);
 	struct drm_crtc *crtc = encoder->crtc;
 	const struct drm_crtc_helper_funcs *funcs = NULL;
+
+	mutex_lock(&hdata->mutex);
 
 	if (!hdata->powered)
 		return;
@@ -1506,6 +1538,8 @@ static void hdmi_disable(struct drm_encoder *encoder)
 	cancel_delayed_work(&hdata->hotplug_work);
 
 	hdmiphy_disable(hdata);
+
+	mutex_unlock(&hdata->mutex);
 }
 
 static const struct drm_encoder_helper_funcs exynos_hdmi_encoder_helper_funcs = {
@@ -1518,6 +1552,109 @@ static const struct drm_encoder_helper_funcs exynos_hdmi_encoder_helper_funcs = 
 static const struct drm_encoder_funcs exynos_hdmi_encoder_funcs = {
 	.destroy = drm_encoder_cleanup,
 };
+
+static void hdmi_audio_shutdown(struct device *dev, void *data)
+{
+	struct hdmi_context *hdata = dev_get_drvdata(dev);
+
+	mutex_lock(&hdata->mutex);
+
+	hdata->audio.enable = false;
+
+	if (hdata->powered)
+		hdmi_audio_control(hdata);
+
+	mutex_unlock(&hdata->mutex);
+}
+
+static int hdmi_audio_hw_params(struct device *dev, void *data,
+				struct hdmi_codec_daifmt *daifmt,
+				struct hdmi_codec_params *params)
+{
+	struct hdmi_context *hdata = dev_get_drvdata(dev);
+
+	if (daifmt->fmt != HDMI_I2S || daifmt->bit_clk_inv ||
+	    daifmt->frame_clk_inv || daifmt->bit_clk_master ||
+	    daifmt->frame_clk_master) {
+		dev_err(dev, "%s: Bad flags %d %d %d %d\n", __func__,
+			daifmt->bit_clk_inv, daifmt->frame_clk_inv,
+			daifmt->bit_clk_master,
+			daifmt->frame_clk_master);
+		return -EINVAL;
+	}
+
+	mutex_lock(&hdata->mutex);
+
+	hdata->audio.sample_rate = params->sample_rate;
+	hdata->audio.sample_width = params->sample_width;
+	hdata->audio.infoframe = params->cea;
+
+	if (hdata->powered) {
+		hdmi_audio_config(hdata);
+		hdmi_audio_infoframe_apply(hdata);
+	}
+
+	mutex_unlock(&hdata->mutex);
+
+	return 0;
+}
+
+static int hdmi_audio_digital_mute(struct device *dev, void *data, bool mute)
+{
+	struct hdmi_context *hdata = dev_get_drvdata(dev);
+
+	mutex_lock(&hdata->mutex);
+
+	hdata->audio.enable = !mute;
+
+	if (hdata->powered)
+		hdmi_audio_control(hdata);
+
+	mutex_unlock(&hdata->mutex);
+
+	return 0;
+}
+
+static int hdmi_audio_get_eld(struct device *dev, void *data, uint8_t *buf,
+			      size_t len)
+{
+	struct hdmi_context *hdata = dev_get_drvdata(dev);
+	struct drm_connector *connector = &hdata->connector;
+
+	memcpy(buf, connector->eld, min(sizeof(connector->eld), len));
+
+	return 0;
+}
+
+static const struct hdmi_codec_ops audio_codec_ops = {
+	.hw_params = hdmi_audio_hw_params,
+	.audio_shutdown = hdmi_audio_shutdown,
+	.digital_mute = hdmi_audio_digital_mute,
+	.get_eld = hdmi_audio_get_eld,
+};
+
+static int hdmi_register_audio_device(struct hdmi_context *hdata)
+{
+	struct hdmi_codec_pdata codec_data = {
+		.ops = &audio_codec_ops,
+		.max_i2s_channels = 6,
+		.i2s = 1,
+	};
+
+	hdata->audio.pdev = platform_device_register_data(
+		hdata->dev, HDMI_CODEC_DRV_NAME, PLATFORM_DEVID_AUTO,
+		&codec_data, sizeof(codec_data));
+
+	if (IS_ERR(hdata->audio.pdev))
+		return PTR_ERR(hdata->audio.pdev);
+
+	return 0;
+}
+
+static void hdmi_unregister_audio_device(struct hdmi_context *hdata)
+{
+	platform_device_unregister(hdata->audio.pdev);
+}
 
 static void hdmi_hotplug_work_func(struct work_struct *work)
 {
@@ -1703,6 +1840,7 @@ static int hdmi_bind(struct device *dev, struct device *master, void *data)
 	struct drm_device *drm_dev = data;
 	struct hdmi_context *hdata = dev_get_drvdata(dev);
 	struct drm_encoder *encoder = &hdata->encoder;
+	struct hdmi_audio_infoframe *audio_infoframe = &hdata->audio.infoframe;
 	int ret, pipe;
 
 	hdata->drm_dev = drm_dev;
@@ -1719,6 +1857,12 @@ static int hdmi_bind(struct device *dev, struct device *master, void *data)
 	encoder->possible_crtcs = 1 << pipe;
 
 	DRM_DEBUG_KMS("possible_crtcs = 0x%x\n", encoder->possible_crtcs);
+
+	hdmi_audio_infoframe_init(audio_infoframe);
+	audio_infoframe->coding_type = HDMI_AUDIO_CODING_TYPE_STREAM;
+	audio_infoframe->sample_size = HDMI_AUDIO_SAMPLE_SIZE_STREAM;
+	audio_infoframe->sample_frequency = HDMI_AUDIO_SAMPLE_FREQUENCY_STREAM;
+	audio_infoframe->channels = 2;
 
 	drm_encoder_init(drm_dev, encoder, &exynos_hdmi_encoder_funcs,
 			 DRM_MODE_ENCODER_TMDS, NULL);
@@ -1822,10 +1966,10 @@ static int hdmi_probe(struct platform_device *pdev)
 		return -ENOMEM;
 
 	hdata->drv_data = of_device_get_match_data(dev);
-
 	platform_set_drvdata(pdev, hdata);
-
 	hdata->dev = dev;
+
+	mutex_init(&hdata->mutex);
 
 	ret = hdmi_resources_init(hdata);
 	if (ret) {
@@ -1880,11 +2024,18 @@ static int hdmi_probe(struct platform_device *pdev)
 
 	pm_runtime_enable(dev);
 
-	ret = component_add(&pdev->dev, &hdmi_component_ops);
+	ret = hdmi_register_audio_device(hdata);
 	if (ret)
 		goto err_disable_pm_runtime;
 
+	ret = component_add(&pdev->dev, &hdmi_component_ops);
+	if (ret)
+		goto err_unregister_audio;
+
 	return ret;
+
+err_unregister_audio:
+	hdmi_unregister_audio_device(hdata);
 
 err_disable_pm_runtime:
 	pm_runtime_disable(dev);
@@ -1906,6 +2057,7 @@ static int hdmi_remove(struct platform_device *pdev)
 
 	cancel_delayed_work_sync(&hdata->hotplug_work);
 
+	hdmi_unregister_audio_device(hdata);
 	component_del(&pdev->dev, &hdmi_component_ops);
 
 	pm_runtime_disable(&pdev->dev);
@@ -1920,6 +2072,8 @@ static int hdmi_remove(struct platform_device *pdev)
 		iounmap(hdata->regs_hdmiphy);
 
 	put_device(&hdata->ddc_adpt->dev);
+
+	mutex_destroy(&hdata->mutex);
 
 	return 0;
 }
