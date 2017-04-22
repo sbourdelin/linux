@@ -1092,14 +1092,14 @@ static int ocrdma_mbx_cmd(struct ocrdma_dev *dev, struct ocrdma_mqe *mqe)
 	if (cqe_status || ext_status) {
 		pr_err("%s() cqe_status=0x%x, ext_status=0x%x,",
 		       __func__, cqe_status, ext_status);
-		if (rsp) {
+		if (rsp)
 			/* This is for embedded cmds. */
 			pr_err("opcode=0x%x, subsystem=0x%x\n",
 			       (rsp->subsys_op & OCRDMA_MBX_RSP_OPCODE_MASK) >>
 				OCRDMA_MBX_RSP_OPCODE_SHIFT,
 				(rsp->subsys_op & OCRDMA_MBX_RSP_SUBSYS_MASK) >>
 				OCRDMA_MBX_RSP_SUBSYS_SHIFT);
-		}
+
 		status = ocrdma_get_mbx_cqe_errno(cqe_status);
 		goto mbx_err;
 	}
@@ -1600,10 +1600,9 @@ void ocrdma_alloc_pd_pool(struct ocrdma_dev *dev)
 		return;
 
 	status = ocrdma_mbx_alloc_pd_range(dev);
-	if (status) {
+	if (status)
 		pr_err("%s(%d) Unable to initialize PD pool, using default.\n",
 			 __func__, dev->id);
-	}
 }
 
 static void ocrdma_free_pd_pool(struct ocrdma_dev *dev)
@@ -2997,11 +2996,10 @@ static int ocrdma_parse_dcbxcfg_rsp(struct ocrdma_dev *dev, int ptype,
 					goto out;
 				}
 			}
-			if (slindx == OCRDMA_MAX_SERVICE_LEVEL_INDEX) {
+			if (slindx == OCRDMA_MAX_SERVICE_LEVEL_INDEX)
 				pr_info("%s ocrdma%d application priority not set for 0x%x protocol\n",
 					dev_name(&dev->nic_info.pdev->dev),
 					dev->id, proto);
-			}
 		}
 	}
 
@@ -3158,16 +3156,17 @@ static int ocrdma_modify_eqd(struct ocrdma_dev *dev, struct ocrdma_eq *eq,
 			     int num)
 {
 	int num_eqs, i = 0;
-	if (num > 8) {
+
+	if (num > 8)
 		while (num) {
 			num_eqs = min(num, 8);
 			ocrdma_mbx_modify_eqd(dev, &eq[i], num_eqs);
 			i += num_eqs;
 			num -= num_eqs;
 		}
-	} else {
+	else
 		ocrdma_mbx_modify_eqd(dev, eq, num);
-	}
+
 	return 0;
 }
 

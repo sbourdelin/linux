@@ -504,10 +504,10 @@ static int ocrdma_dealloc_ucontext_pd(struct ocrdma_ucontext *uctx)
 	struct ocrdma_pd *pd = uctx->cntxt_pd;
 	struct ocrdma_dev *dev = get_ocrdma_dev(pd->ibpd.device);
 
-	if (uctx->pd_in_use) {
+	if (uctx->pd_in_use)
 		pr_err("%s(%d) Freeing in use pdid=0x%x.\n",
 		       __func__, dev->id, pd->id);
-	}
+
 	uctx->cntxt_pd = NULL;
 	(void)_ocrdma_dealloc_pd(dev, pd);
 	return 0;
@@ -741,11 +741,10 @@ pd_mapping:
 	return &pd->ibpd;
 
 err:
-	if (is_uctx_pd) {
+	if (is_uctx_pd)
 		ocrdma_release_ucontext_pd(uctx);
-	} else {
+	else
 		status = _ocrdma_dealloc_pd(dev, pd);
-	}
 exit:
 	return ERR_PTR(status);
 }
@@ -1022,10 +1021,10 @@ int ocrdma_dereg_mr(struct ib_mr *ib_mr)
 	kfree(mr);
 
 	/* Don't stop cleanup, in case FW is unresponsive */
-	if (dev->mqe_ctx.fw_error_state) {
+	if (dev->mqe_ctx.fw_error_state)
 		pr_err("%s(%d) fw not responding.\n",
 		       __func__, dev->id);
-	}
+
 	return 0;
 }
 
@@ -1417,10 +1416,10 @@ struct ib_qp *ocrdma_create_qp(struct ib_pd *ibpd,
 		goto gen_err;
 
 	memset(&ureq, 0, sizeof(ureq));
-	if (udata) {
+	if (udata)
 		if (ib_copy_from_udata(&ureq, udata, sizeof(ureq)))
 			return ERR_PTR(-EFAULT);
-	}
+
 	qp = kzalloc(sizeof(*qp), GFP_KERNEL);
 	if (!qp) {
 		status = -ENOMEM;
@@ -2835,15 +2834,11 @@ static bool ocrdma_poll_rcqe(struct ocrdma_qp *qp, struct ocrdma_cqe *cqe,
 	bool expand = false;
 
 	ibwc->wc_flags = 0;
-	if (qp->qp_type == IB_QPT_UD || qp->qp_type == IB_QPT_GSI) {
-		status = (le32_to_cpu(cqe->flags_status_srcqpn) &
-					OCRDMA_CQE_UD_STATUS_MASK) >>
-					OCRDMA_CQE_UD_STATUS_SHIFT;
-	} else {
-		status = (le32_to_cpu(cqe->flags_status_srcqpn) &
-			     OCRDMA_CQE_STATUS_MASK) >> OCRDMA_CQE_STATUS_SHIFT;
-	}
-
+	status = (qp->qp_type == IB_QPT_UD || qp->qp_type == IB_QPT_GSI)
+		 ? ((le32_to_cpu(cqe->flags_status_srcqpn) &
+		    OCRDMA_CQE_UD_STATUS_MASK) >> OCRDMA_CQE_UD_STATUS_SHIFT)
+		 : ((le32_to_cpu(cqe->flags_status_srcqpn) &
+		    OCRDMA_CQE_STATUS_MASK) >> OCRDMA_CQE_STATUS_SHIFT);
 	if (status == OCRDMA_CQE_SUCCESS) {
 		*polled = true;
 		ocrdma_poll_success_rcqe(qp, cqe, ibwc);
@@ -2891,13 +2886,9 @@ static int ocrdma_poll_hwcq(struct ocrdma_cq *cq, int num_entries,
 		qp = dev->qp_tbl[qpn];
 		BUG_ON(qp == NULL);
 
-		if (is_cqe_for_sq(cqe)) {
-			expand = ocrdma_poll_scqe(qp, cqe, ibwc, &polled,
-						  &stop);
-		} else {
-			expand = ocrdma_poll_rcqe(qp, cqe, ibwc, &polled,
-						  &stop);
-		}
+		expand = is_cqe_for_sq(cqe)
+			 ? ocrdma_poll_scqe(qp, cqe, ibwc, &polled, &stop)
+			 : ocrdma_poll_rcqe(qp, cqe, ibwc, &polled, &stop);
 		if (expand)
 			goto expand_cqe;
 		if (stop)
