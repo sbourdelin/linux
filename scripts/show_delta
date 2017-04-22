@@ -20,7 +20,8 @@ have time data prefixed because the CONFIG_PRINTK_TIME option is set, or
 the kernel command line option "time" is specified. When run with no
 options, the time information is converted to show the time delta between
 each printk line and the next.  When run with the '-b' option, all times
-are relative to a single (base) point in time.
+are relative to a single (base) point in time. The '-r' option is optional
+and can be used to round the calculated delta times.
 
 Options:
   -h            Show this usage help.
@@ -29,6 +30,10 @@ Options:
 		If it is a string, the first message line
 		which matches (at the beginning of the
 		line) is used as the time reference.
+  -r <round_us>	Specify a a rounding time (in us) for all
+		delta timestamps.
+		All delta timestamps will be rounded to the
+		nearest 'round_us' microsecond
 
 ex: $ dmesg >timefile
     $ show_delta -b NET4 timefile
@@ -52,13 +57,23 @@ def get_time(line):
 	#print "time=", time
 	return (time, rest)
 
+# Round delta to the nearest micro second specified by the rounding_time_us
+# argument
+def round_delta_ts(delta, rounding_time_us):
+	div_floor = (delta * 1E6) // rounding_time_us
+	delta_floor = rounding_time_us / 1E6 * div_floor
+	delta_modulo_us = (delta - delta_floor) * 1E6
+	if (delta_modulo_us - rounding_time_us / 2) < 0:
+		return delta_floor
+	else:
+		return delta_floor + rounding_time_us / 1E6
 
 # average line looks like:
 # [    0.084282] VFS: Mounted root (romfs filesystem) readonly
 # time data is expressed in seconds.useconds,
 # convert_line adds a delta for each line
 last_time = 0.0
-def convert_line(line, base_time):
+def convert_line(line, base_time, rounding_time_us):
 	global last_time
 
 	try:
@@ -75,14 +90,20 @@ def convert_line(line, base_time):
 		delta = time - last_time
 		last_time = time
 
+	if rounding_time_us:
+		delta = round_delta_ts(delta, rounding_time_us)
+
 	return ("[%5.6f < %5.6f >]" % (time, delta)) + rest
 
 def main():
 	base_str = ""
+	rounding_str = ""
 	filein = ""
 	for arg in sys.argv[1:]:
 		if arg=="-b":
 			base_str = sys.argv[sys.argv.index("-b")+1]
+		elif arg=="-r":
+			rounding_str = sys.argv[sys.argv.index("-r")+1]
 		elif arg=="-h":
 			usage()
 		else:
@@ -122,7 +143,16 @@ def main():
 	else:
 		base_time = 0.0
 
+	if rounding_str:
+		try:
+			rounding_time_us = int(rounding_str)
+		except:
+			print ('Bad -r option: "%s"' % rounding_str)
+			sys.exit(1)
+	else:
+		rounding_time_us = 0
+
 	for line in lines:
-		print (convert_line(line, base_time),)
+		print (convert_line(line, base_time, rounding_time_us),)
 
 main()
