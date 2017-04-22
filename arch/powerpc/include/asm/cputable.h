@@ -62,6 +62,12 @@ struct cpu_spec {
 	unsigned int	cpu_user_features2;	/* Userland features v2 */
 	unsigned int	mmu_features;		/* MMU features */
 
+	/* Number of sets/congruence classes for tlbiel IS!=0 invalidation */
+	/* For POWER7 and later Book3s CPUs */
+	unsigned int	tlb_sets;		/* set to current MMU mode */
+	unsigned int	tlb_sets_hash;
+	unsigned int	tlb_sets_radix;
+
 	/* cache line sizes */
 	unsigned int	icache_bsize;
 	unsigned int	dcache_bsize;
@@ -106,12 +112,6 @@ struct cpu_spec {
 	 * called in real mode to handle SLB and TLB errors.
 	 */
 	long		(*machine_check_early)(struct pt_regs *regs);
-
-	/*
-	 * Processor specific routine to flush tlbs.
-	 */
-	void		(*flush_tlb)(unsigned int action);
-
 };
 
 extern struct cpu_spec		*cur_cpu_spec;
@@ -130,7 +130,7 @@ extern void cpu_feature_keys_init(void);
 static inline void cpu_feature_keys_init(void) { }
 #endif
 
-/* TLB flush actions. Used as argument to cpu_spec.flush_tlb() hook */
+/* TLB flush actions. Used as argument to machine_check_flush_tlb() */
 enum {
 	TLB_INVAL_SCOPE_GLOBAL = 0,	/* invalidate all TLBs */
 	TLB_INVAL_SCOPE_LPID = 1,	/* invalidate TLBs for current LPID */

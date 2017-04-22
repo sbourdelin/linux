@@ -236,8 +236,27 @@ static void __init init_mmu_slb_size(unsigned long node)
 	if (slb_size_ptr)
 		mmu_slb_size = be32_to_cpup(slb_size_ptr);
 }
+static void __init init_mmu_tlb_sets_hash(unsigned long node)
+{
+	const __be32 *ptr;
+
+	ptr = of_get_flat_dt_prop(node, "ibm,tlbiel-congruence-classes-hash", NULL);
+	if (ptr)
+		cur_cpu_spec->tlb_sets_hash = be32_to_cpup(ptr);
+}
+
+static void __init init_mmu_tlb_sets_radix(unsigned long node)
+{
+	const __be32 *ptr;
+
+	ptr = of_get_flat_dt_prop(node, "ibm,tlbiel-congruence-classes-radix", NULL);
+	if (ptr)
+		cur_cpu_spec->tlb_sets_radix = be32_to_cpup(ptr);
+}
 #else
 #define init_mmu_slb_size(node) do { } while(0)
+#define init_mmu_hash_sets(node) do { } while(0)
+#define init_mmu_radix_sets(node) do { } while(0)
 #endif
 
 static struct feature_property {
@@ -385,6 +404,8 @@ static int __init early_init_dt_scan_cpus(unsigned long node,
 	check_cpu_feature_properties(node);
 	check_cpu_pa_features(node);
 	init_mmu_slb_size(node);
+	init_mmu_tlb_sets_hash(node);
+	init_mmu_tlb_sets_radix(node);
 
 #ifdef CONFIG_PPC64
 	if (nthreads > 1)

@@ -211,4 +211,9 @@ extern void machine_check_print_event_info(struct machine_check_event *evt,
 					   bool user_mode);
 extern uint64_t get_mce_fault_addr(struct machine_check_event *evt);
 
+/*
+ * TLB flush for POWER7 and later
+ */
+extern void machine_check_flush_tlb(unsigned int action);
+
 #endif /* __ASM_PPC64_MCE_H__ */

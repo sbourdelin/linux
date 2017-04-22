@@ -38,15 +38,16 @@ static inline void __tlbiel_pid(unsigned long pid, int set,
 		     : : "r"(rb), "i"(r), "i"(prs), "i"(ric), "r"(rs) : "memory");
 }
 
-/*
- * We use 128 set in radix mode and 256 set in hpt mode.
- */
 static inline void _tlbiel_pid(unsigned long pid, unsigned long ric)
 {
 	int set;
 
 	asm volatile("ptesync": : :"memory");
-	for (set = 0; set < POWER9_TLB_SETS_RADIX ; set++) {
+	/*
+	 * tlbiel with IS != 0 operates on a specified congruence class,
+	 * requiring a loop to invalidate the entire TLB (see ISA).
+	 */
+	for (set = 0; set < cur_cpu_spec->tlb_sets; set++) {
 		__tlbiel_pid(pid, set, ric);
 	}
 	asm volatile("ptesync": : :"memory");

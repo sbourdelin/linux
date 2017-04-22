@@ -406,9 +406,15 @@ void __init mmu_early_init_devtree(void)
 	if (!(mfmsr() & MSR_HV))
 		early_check_vec5();
 
-	if (early_radix_enabled())
+	if (early_radix_enabled()) {
+		cur_cpu_spec->tlb_sets = cur_cpu_spec->tlb_sets_radix;
 		radix__early_init_devtree();
-	else
+	} else {
+		cur_cpu_spec->tlb_sets = cur_cpu_spec->tlb_sets_hash;
 		hash__early_init_devtree();
+	}
+	/* This should not happen, but fall back to 1 set */
+	if (!cur_cpu_spec->tlb_sets)
+		cur_cpu_spec->tlb_sets = 1;
 }
 #endif /* CONFIG_PPC_STD_MMU_64 */

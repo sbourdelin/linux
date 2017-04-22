@@ -28,7 +28,13 @@
 #include <asm/mce.h>
 #include <asm/machdep.h>
 
-static void flush_tlb_206(unsigned int num_sets, unsigned int action)
+/*
+ * Generic routine to flush TLB on POWER7 and later processors.
+ *
+ * action => TLB_INVAL_SCOPE_GLOBAL:  Invalidate all TLBs.
+ *	     TLB_INVAL_SCOPE_LPID: Invalidate TLB for current LPID.
+ */
+void machine_check_flush_tlb(unsigned int action)
 {
 	unsigned long rb;
 	unsigned int i;
@@ -46,42 +52,12 @@ static void flush_tlb_206(unsigned int num_sets, unsigned int action)
 	}
 
 	asm volatile("ptesync" : : : "memory");
-	for (i = 0; i < num_sets; i++) {
+	for (i = 0; i < cur_cpu_spec->tlb_sets; i++) {
 		asm volatile("tlbiel %0" : : "r" (rb));
 		rb += 1 << TLBIEL_INVAL_SET_SHIFT;
 	}
 	asm volatile("ptesync" : : : "memory");
 }
-
-/*
- * Generic routines to flush TLB on POWER processors. These routines
- * are used as flush_tlb hook in the cpu_spec.
- *
- * action => TLB_INVAL_SCOPE_GLOBAL:  Invalidate all TLBs.
- *	     TLB_INVAL_SCOPE_LPID: Invalidate TLB for current LPID.
- */
-void __flush_tlb_power7(unsigned int action)
-{
-	flush_tlb_206(POWER7_TLB_SETS, action);
-}
-
-void __flush_tlb_power8(unsigned int action)
-{
-	flush_tlb_206(POWER8_TLB_SETS, action);
-}
-
-void __flush_tlb_power9(unsigned int action)
-{
-	unsigned int num_sets;
-
-	if (radix_enabled())
-		num_sets = POWER9_TLB_SETS_RADIX;
-	else
-		num_sets = POWER9_TLB_SETS_HASH;
-
-	flush_tlb_206(num_sets, action);
-}
-
 
 /* flush SLBs and reload */
 #ifdef CONFIG_PPC_STD_MMU_64
@@ -142,10 +118,8 @@ static int mce_flush(int what)
 		return 1;
 	}
 	if (what == MCE_FLUSH_TLB) {
-		if (cur_cpu_spec && cur_cpu_spec->flush_tlb) {
-			cur_cpu_spec->flush_tlb(TLB_INVAL_SCOPE_GLOBAL);
-			return 1;
-		}
+		machine_check_flush_tlb(TLB_INVAL_SCOPE_GLOBAL);
+		return 1;
 	}
 
 	return 0;
