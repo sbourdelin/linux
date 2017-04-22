@@ -193,6 +193,8 @@ static int check_erased_page(struct nand_chip *chip, u8 *buf)
 						  chip->ecc.strength);
 		if (res < 0)
 			mtd->ecc_stats.failed++;
+		else
+			mtd->ecc_stats.corrected += res;
 
 		bitflips = max(res, bitflips);
 		buf += pkt_size;
