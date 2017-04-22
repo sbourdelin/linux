@@ -1216,10 +1216,10 @@ static int s3c24xx_dma_probe(struct platform_device *pdev)
 	if (IS_ERR(s3cdma->base))
 		return PTR_ERR(s3cdma->base);
 
-	s3cdma->phy_chans = devm_kzalloc(&pdev->dev,
-					      sizeof(struct s3c24xx_dma_phy) *
-							pdata->num_phy_channels,
-					      GFP_KERNEL);
+	s3cdma->phy_chans = devm_kcalloc(&pdev->dev,
+					 pdata->num_phy_channels,
+					 sizeof(*s3cdma->phy_chans),
+					 GFP_KERNEL);
 	if (!s3cdma->phy_chans)
 		return -ENOMEM;
 
