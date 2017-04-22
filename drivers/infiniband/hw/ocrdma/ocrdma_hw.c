@@ -2894,9 +2894,8 @@ static int ocrdma_mbx_get_dcbx_config(struct ocrdma_dev *dev, u32 ptype,
 	int status;
 	dma_addr_t pa;
 	struct ocrdma_mqe cmd;
-
-	struct ocrdma_get_dcbx_cfg_req *req = NULL;
-	struct ocrdma_get_dcbx_cfg_rsp *rsp = NULL;
+	struct ocrdma_get_dcbx_cfg_req *req;
+	struct ocrdma_get_dcbx_cfg_rsp *rsp;
 	struct pci_dev *pdev = dev->nic_info.pdev;
 	struct ocrdma_mqe_sge *mqe_sge = cmd.u.nonemb_req.sge;
 
