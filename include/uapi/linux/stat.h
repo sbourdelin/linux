@@ -48,11 +48,7 @@
  * tv_sec holds the number of seconds before (negative) or after (positive)
  * 00:00:00 1st January 1970 UTC.
  *
- * tv_nsec holds a number of nanoseconds before (0..-999,999,999 if tv_sec is
- * negative) or after (0..999,999,999 if tv_sec is positive) the tv_sec time.
- *
- * Note that if both tv_sec and tv_nsec are non-zero, then the two values must
- * either be both positive or both negative.
+ * tv_nsec holds a number of nanoseconds (0..999,999,999) after the tv_sec time.
  *
  * __reserved is held in case we need a yet finer resolution.
  */
