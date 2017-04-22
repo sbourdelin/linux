@@ -8,6 +8,7 @@
 #include <linux/pci.h>	/* for scatterlist macros */
 #include <linux/usb.h>
 #include <linux/module.h>
+#include <linux/sched/task_stack.h> /* for object_is_on_stack */
 #include <linux/slab.h>
 #include <linux/mm.h>
 #include <linux/timer.h>
@@ -49,6 +50,8 @@ static int usb_start_wait_urb(struct urb *urb, int timeout, int *actual_length)
 	struct api_context ctx;
 	unsigned long expire;
 	int retval;
+
+	WARN_ON(object_is_on_stack(urb->transfer_buffer));
 
 	init_completion(&ctx.done);
 	urb->context = &ctx;
