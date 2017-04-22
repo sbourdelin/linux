@@ -24,7 +24,14 @@ void func(struct fbtft_par *par, int len, ...)                                \
 			buf[i] = (type)va_arg(args, unsigned int);            \
 		}                                                             \
 		va_end(args);                                                 \
-		fbtft_par_dbg_hex(DEBUG_WRITE_REGISTER, par, par->info->device, type, buf, len, "%s: ", __func__);   \
+		fbtft_par_dbg_hex(DEBUG_WRITE_REGISTER,			      \
+				  par,					      \
+				  par->info->device,			      \
+				  type,					      \
+				  buf,					      \
+				  len,					      \
+				  "%s: ",				      \
+				  __func__);				      \
 	}                                                                     \
 									      \
 	va_start(args, len);                                                  \
@@ -41,7 +48,10 @@ void func(struct fbtft_par *par, int len, ...)                                \
 	ret = par->fbtftops.write(par, par->buf, sizeof(type) + offset);      \
 	if (ret < 0) {                                                        \
 		va_end(args);                                                 \
-		dev_err(par->info->device, "%s: write() failed and returned %d\n", __func__, ret); \
+		dev_err(par->info->device,				      \
+			"%s: write() failed and returned %d\n",		      \
+			__func__,					      \
+			ret);						      \
 		return;                                                       \
 	}                                                                     \
 	len--;                                                                \
@@ -60,17 +70,20 @@ void func(struct fbtft_par *par, int len, ...)                                \
 					  len * (sizeof(type) + offset));     \
 		if (ret < 0) {                                                \
 			va_end(args);                                         \
-			dev_err(par->info->device, "%s: write() failed and returned %d\n", __func__, ret); \
+			dev_err(par->info->device,			      \
+				"%s: write() failed and returned %d\n",	      \
+				__func__,				      \
+				ret);					      \
 			return;                                               \
 		}                                                             \
 	}                                                                     \
 	va_end(args);                                                         \
 }                                                                             \
-EXPORT_SYMBOL(func);
+EXPORT_SYMBOL(func)
 
-define_fbtft_write_reg(fbtft_write_reg8_bus8, u8, )
-define_fbtft_write_reg(fbtft_write_reg16_bus8, u16, cpu_to_be16)
-define_fbtft_write_reg(fbtft_write_reg16_bus16, u16, )
+define_fbtft_write_reg(fbtft_write_reg8_bus8, u8, );
+define_fbtft_write_reg(fbtft_write_reg16_bus8, u16, cpu_to_be16);
+define_fbtft_write_reg(fbtft_write_reg16_bus16, u16, );
 
 void fbtft_write_reg8_bus9(struct fbtft_par *par, int len, ...)
 {
