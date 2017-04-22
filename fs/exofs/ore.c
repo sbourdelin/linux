@@ -68,7 +68,7 @@ int ore_verify_layout(unsigned total_comps, struct ore_layout *layout)
 	}
 	if (0 != (layout->stripe_unit & ~PAGE_MASK)) {
 		ORE_ERR("Stripe Unit(0x%llx)"
-			  " must be Multples of PAGE_SIZE(0x%lx)\n",
+			  " must be multiples of PAGE_SIZE(0x%lx)\n",
 			  _LLU(layout->stripe_unit), PAGE_SIZE);
 		return -EINVAL;
 	}
