@@ -3022,10 +3022,8 @@ struct ib_mr *ocrdma_alloc_mr(struct ib_pd *ibpd,
 		return ERR_PTR(-ENOMEM);
 
 	mr->pages = kcalloc(max_num_sg, sizeof(*mr->pages), GFP_KERNEL);
-	if (!mr->pages) {
-		status = -ENOMEM;
+	if (!mr->pages)
 		goto pl_err;
-	}
 
 	status = ocrdma_get_pbl_info(dev, mr, max_num_sg);
 	if (status)
