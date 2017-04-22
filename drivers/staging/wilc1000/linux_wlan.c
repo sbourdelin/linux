@@ -890,12 +890,12 @@ int wilc_mac_open(struct net_device *ndev)
 				if (memcmp(wl->vif[i ^ 1]->bssid,
 					   wl->vif[i ^ 1]->src_addr, 6))
 					wilc_set_wfi_drv_handler(vif,
-							 wilc_get_vif_idx(vif),
-							 0);
+					                         wilc_get_vif_idx(vif),
+					                         0);
 				else
 					wilc_set_wfi_drv_handler(vif,
-							 wilc_get_vif_idx(vif),
-							 1);
+					                         wilc_get_vif_idx(vif),
+					                         1);
 			}
 			wilc_set_operation_mode(vif, vif->iftype);
 
