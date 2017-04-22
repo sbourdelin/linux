@@ -304,10 +304,9 @@ static struct ocrdma_dev *ocrdma_add(struct be_dev_info *dev_info)
 	struct ocrdma_dev *dev;
 
 	dev = (struct ocrdma_dev *)ib_alloc_device(sizeof(*dev));
-	if (!dev) {
-		pr_err("Unable to allocate ib device\n");
+	if (!dev)
 		return NULL;
-	}
+
 	dev->mbx_cmd = kzalloc(sizeof(struct ocrdma_mqe_emb_cmd), GFP_KERNEL);
 	if (!dev->mbx_cmd)
 		goto idr_err;
