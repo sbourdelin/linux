@@ -2648,7 +2648,7 @@ static int gdth_fill_raw_cmd(gdth_ha_str *ha, Scsi_Cmnd *scp, u8 b)
 
     } else {
         page = virt_to_page(scp->sense_buffer);
-        offset = (unsigned long)scp->sense_buffer & ~PAGE_MASK;
+	offset = offset_in_page(scp->sense_buffer);
         sense_paddr = pci_map_page(ha->pdev,page,offset,
                                    16,PCI_DMA_FROMDEVICE);
 
