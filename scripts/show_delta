@@ -34,6 +34,7 @@ Options:
 		delta timestamps.
 		All delta timestamps will be rounded to the
 		nearest 'round_us' microsecond
+  --delta-only	Add only delta time stamps to the output.
 
 ex: $ dmesg >timefile
     $ show_delta -b NET4 timefile
@@ -73,7 +74,7 @@ def round_delta_ts(delta, rounding_time_us):
 # time data is expressed in seconds.useconds,
 # convert_line adds a delta for each line
 last_time = 0.0
-def convert_line(line, base_time, rounding_time_us):
+def convert_line(line, base_time, rounding_time_us, delta_only):
 	global last_time
 
 	try:
@@ -93,17 +94,23 @@ def convert_line(line, base_time, rounding_time_us):
 	if rounding_time_us:
 		delta = round_delta_ts(delta, rounding_time_us)
 
-	return ("[%5.6f < %5.6f >]" % (time, delta)) + rest
+	if delta_only:
+		return ("[%5.6f]" % delta) + rest
+	else:
+		return ("[%5.6f < %5.6f >]" % (time, delta)) + rest
 
 def main():
 	base_str = ""
 	rounding_str = ""
+	delta_only = False
 	filein = ""
 	for arg in sys.argv[1:]:
 		if arg=="-b":
 			base_str = sys.argv[sys.argv.index("-b")+1]
 		elif arg=="-r":
 			rounding_str = sys.argv[sys.argv.index("-r")+1]
+		elif arg=="--delta-only":
+			delta_only = True
 		elif arg=="-h":
 			usage()
 		else:
@@ -153,6 +160,6 @@ def main():
 		rounding_time_us = 0
 
 	for line in lines:
-		print (convert_line(line, base_time, rounding_time_us),)
+		print (convert_line(line, base_time, rounding_time_us, delta_only),)
 
 main()
