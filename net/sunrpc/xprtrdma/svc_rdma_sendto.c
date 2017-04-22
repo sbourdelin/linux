@@ -306,12 +306,11 @@ static int svc_rdma_dma_map_buf(struct svcxprt_rdma *rdma,
 				unsigned char *base,
 				unsigned int len)
 {
-	unsigned long offset = (unsigned long)base & ~PAGE_MASK;
 	struct ib_device *dev = rdma->sc_cm_id->device;
 	dma_addr_t dma_addr;
 
 	dma_addr = ib_dma_map_page(dev, virt_to_page(base),
-				   offset, len, DMA_TO_DEVICE);
+				   offset_in_page(base), len, DMA_TO_DEVICE);
 	if (ib_dma_mapping_error(dev, dma_addr))
 		return -EIO;
 
