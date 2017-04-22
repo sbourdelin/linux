@@ -267,7 +267,7 @@ static int ocrdma_add_mmap(struct ocrdma_ucontext *uctx, u64 phy_addr,
 	struct ocrdma_mm *mm;
 
 	mm = kzalloc(sizeof(*mm), GFP_KERNEL);
-	if (mm == NULL)
+	if (!mm)
 		return -ENOMEM;
 	mm->key.phy_addr = phy_addr;
 	mm->key.len = len;
@@ -1194,7 +1194,7 @@ static int ocrdma_add_qpn_map(struct ocrdma_dev *dev, struct ocrdma_qp *qp)
 {
 	int status = -EINVAL;
 
-	if (qp->id < OCRDMA_MAX_QP && dev->qp_tbl[qp->id] == NULL) {
+	if (qp->id < OCRDMA_MAX_QP && !dev->qp_tbl[qp->id]) {
 		dev->qp_tbl[qp->id] = qp;
 		status = 0;
 	}
@@ -1362,11 +1362,11 @@ static int ocrdma_alloc_wr_id_tbl(struct ocrdma_qp *qp)
 {
 	qp->wqe_wr_id_tbl = kcalloc(qp->sq.max_cnt, sizeof(*qp->wqe_wr_id_tbl),
 				    GFP_KERNEL);
-	if (qp->wqe_wr_id_tbl == NULL)
+	if (!qp->wqe_wr_id_tbl)
 		return -ENOMEM;
 	qp->rqe_wr_id_tbl = kcalloc(qp->rq.max_cnt, sizeof(*qp->rqe_wr_id_tbl),
 				    GFP_KERNEL);
-	if (qp->rqe_wr_id_tbl == NULL)
+	if (!qp->rqe_wr_id_tbl)
 		return -ENOMEM;
 
 	return 0;
@@ -1426,7 +1426,7 @@ struct ib_qp *ocrdma_create_qp(struct ib_pd *ibpd,
 		goto gen_err;
 	}
 	ocrdma_set_qp_init_params(qp, pd, attrs);
-	if (udata == NULL)
+	if (!udata)
 		qp->cap_flags |= (OCRDMA_QP_MW_BIND | OCRDMA_QP_LKEY0 |
 					OCRDMA_QP_FAST_REG);
 
@@ -1438,7 +1438,7 @@ struct ib_qp *ocrdma_create_qp(struct ib_pd *ibpd,
 		goto mbx_err;
 
 	/* user space QP's wr_id table are managed in library */
-	if (udata == NULL) {
+	if (!udata) {
 		status = ocrdma_alloc_wr_id_tbl(qp);
 		if (status)
 			goto map_err;
@@ -1899,11 +1899,11 @@ struct ib_srq *ocrdma_create_srq(struct ib_pd *ibpd,
 	if (status)
 		goto err;
 
-	if (udata == NULL) {
+	if (!udata) {
 		srq->rqe_wr_id_tbl = kcalloc(srq->rq.max_cnt,
 					     sizeof(*srq->rqe_wr_id_tbl),
 					     GFP_KERNEL);
-		if (srq->rqe_wr_id_tbl == NULL)
+		if (!srq->rqe_wr_id_tbl)
 			goto arm_err;
 
 		srq->bit_fields_len = (srq->rq.max_cnt / 32) +
@@ -1911,7 +1911,7 @@ struct ib_srq *ocrdma_create_srq(struct ib_pd *ibpd,
 		srq->idx_bit_fields = kmalloc_array(srq->bit_fields_len,
 						    sizeof(*srq->idx_bit_fields),
 						    GFP_KERNEL);
-		if (srq->idx_bit_fields == NULL)
+		if (!srq->idx_bit_fields)
 			goto arm_err;
 		memset(srq->idx_bit_fields, 0xff,
 		       srq->bit_fields_len * sizeof(*srq->idx_bit_fields));
@@ -2885,7 +2885,7 @@ static int ocrdma_poll_hwcq(struct ocrdma_cq *cq, int num_entries,
 		if (qpn == 0)
 			goto skip_cqe;
 		qp = dev->qp_tbl[qpn];
-		BUG_ON(qp == NULL);
+		BUG_ON(!qp);
 
 		expand = is_cqe_for_sq(cqe)
 			 ? ocrdma_poll_scqe(qp, cqe, ibwc, &polled, &stop)

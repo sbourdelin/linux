@@ -238,7 +238,7 @@ static int ocrdma_alloc_resources(struct ocrdma_dev *dev)
 
 	dev->stag_arr = kcalloc(OCRDMA_MAX_STAG, sizeof(*dev->stag_arr),
 				GFP_KERNEL);
-	if (dev->stag_arr == NULL)
+	if (!dev->stag_arr)
 		goto alloc_err;
 
 	ocrdma_alloc_pd_pool(dev);

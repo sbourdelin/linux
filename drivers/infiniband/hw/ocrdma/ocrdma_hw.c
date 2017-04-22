@@ -665,7 +665,7 @@ static void ocrdma_process_qpcat_error(struct ocrdma_dev *dev,
 	enum ib_qp_state new_ib_qps = IB_QPS_ERR;
 	enum ib_qp_state old_ib_qps;
 
-	if (qp == NULL)
+	if (!qp)
 		BUG();
 	ocrdma_qp_state_change(qp, new_ib_qps, &old_ib_qps);
 }
@@ -693,7 +693,7 @@ static void ocrdma_dispatch_ibevent(struct ocrdma_dev *dev,
 	if (cqe->qpvalid_qpid & OCRDMA_AE_MCQE_QPVALID) {
 		if (qpid < dev->attr.max_qp)
 			qp = dev->qp_tbl[qpid];
-		if (qp == NULL) {
+		if (!qp) {
 			pr_err("ocrdma%d:Async event - qpid %u is not valid\n",
 			       dev->id, qpid);
 			return;
@@ -703,7 +703,7 @@ static void ocrdma_dispatch_ibevent(struct ocrdma_dev *dev,
 	if (cqe->cqvalid_cqid & OCRDMA_AE_MCQE_CQVALID) {
 		if (cqid < dev->attr.max_cq)
 			cq = dev->cq_tbl[cqid];
-		if (cq == NULL) {
+		if (!cq) {
 			pr_err("ocrdma%d:Async event - cqid %u is not valid\n",
 			       dev->id, cqid);
 			return;
@@ -882,7 +882,7 @@ static int ocrdma_mq_cq_handler(struct ocrdma_dev *dev, u16 cq_id)
 
 	while (1) {
 		cqe = ocrdma_get_mcqe(dev);
-		if (cqe == NULL)
+		if (!cqe)
 			break;
 		ocrdma_le32_to_cpu(cqe, sizeof(*cqe));
 		cqe_popped += 1;
@@ -948,7 +948,7 @@ static void ocrdma_qp_buddy_cq_handler(struct ocrdma_dev *dev,
 	 * false - Check for RQ CQ
 	 */
 	bcq = _ocrdma_qp_buddy_cq_handler(dev, cq, true);
-	if (bcq == NULL)
+	if (!bcq)
 		bcq = _ocrdma_qp_buddy_cq_handler(dev, cq, false);
 	spin_unlock_irqrestore(&dev->flush_q_lock, flags);
 
@@ -969,7 +969,7 @@ static void ocrdma_qp_cq_handler(struct ocrdma_dev *dev, u16 cq_idx)
 		BUG();
 
 	cq = dev->cq_tbl[cq_idx];
-	if (cq == NULL)
+	if (!cq)
 		return;
 
 	if (cq->ibcq.comp_handler) {
@@ -1289,7 +1289,7 @@ int ocrdma_mbx_rdma_stats(struct ocrdma_dev *dev, bool reset)
 	int status;
 
 	old_stats = kmalloc(sizeof(*old_stats), GFP_KERNEL);
-	if (old_stats == NULL)
+	if (!old_stats)
 		return -ENOMEM;
 
 	memset(mqe, 0, sizeof(*mqe));
@@ -1676,12 +1676,12 @@ static int ocrdma_mbx_create_ah_tbl(struct ocrdma_dev *dev)
 	dev->av_tbl.pbl.va = dma_alloc_coherent(&pdev->dev, PAGE_SIZE,
 						&dev->av_tbl.pbl.pa,
 						GFP_KERNEL);
-	if (dev->av_tbl.pbl.va == NULL)
+	if (!dev->av_tbl.pbl.va)
 		goto mem_err;
 
 	dev->av_tbl.va = dma_alloc_coherent(&pdev->dev, dev->av_tbl.size,
 					    &pa, GFP_KERNEL);
-	if (dev->av_tbl.va == NULL)
+	if (!dev->av_tbl.va)
 		goto mem_err_ah;
 	dev->av_tbl.pa = pa;
 	dev->av_tbl.num_ah = max_ah;
@@ -1722,7 +1722,7 @@ static void ocrdma_mbx_delete_ah_tbl(struct ocrdma_dev *dev)
 	struct ocrdma_delete_ah_tbl *cmd;
 	struct pci_dev *pdev = dev->nic_info.pdev;
 
-	if (dev->av_tbl.va == NULL)
+	if (!dev->av_tbl.va)
 		return;
 
 	cmd = ocrdma_init_emb_mqe(OCRDMA_CMD_DELETE_AH_TBL, sizeof(*cmd));
