@@ -886,7 +886,7 @@ static int zx_dma_remove(struct platform_device *op)
 	struct zx_dma_chan *c, *cn;
 	struct zx_dma_dev *d = platform_get_drvdata(op);
 
-	/* explictly free the irq */
+	/* explicitly free the irq */
 	devm_free_irq(&op->dev, d->irq, d);
 
 	dma_async_device_unregister(&d->slave);
