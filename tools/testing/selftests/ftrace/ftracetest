@@ -152,6 +152,10 @@ testcase() { # testfile
   prlog -n "[$CASENO]$desc"
 }
 
+test_on_instance() { # testfile
+  grep -q "^#[ \t]*flags:.*instance" $1
+}
+
 eval_result() { # sigval
   case $1 in
     $PASS)
@@ -264,6 +268,21 @@ run_test() { # testfile
 # Main loop
 for t in $TEST_CASES; do
   run_test $t
+done
+
+# Test on instance loop
+FIRST_INSTANCE=0
+for t in $TEST_CASES; do
+  test_on_instance $t || continue
+  if [ $FIRST_INSTANCE -eq 0 ]; then
+    FIRST_INSTANCE=1
+    echo "Running tests in a tracing instance:"
+  fi
+  SAVED_TRACING_DIR=$TRACING_DIR
+  export TRACING_DIR=`mktemp -d $TRACING_DIR/instances/ftracetest.XXXXXX`
+  run_test $t
+  rmdir $TRACING_DIR
+  TRACING_DIR=$SAVED_TRACING_DIR
 done
 
 prlog ""
