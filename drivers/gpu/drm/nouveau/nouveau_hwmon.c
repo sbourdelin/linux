@@ -1,5 +1,6 @@
 /*
- * Copyright 2010 Red Hat Inc.
+ * Copyright 2010 Red Hat Inc. (Ben Skeggs)
+ * Copyright 2017 Oscar Salvador
  *
  * Permission is hereby granted, free of charge, to any person obtaining a
  * copy of this software and associated documentation files (the "Software"),
@@ -19,7 +20,6 @@
  * ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
  * OTHER DEALINGS IN THE SOFTWARE.
  *
- * Authors: Ben Skeggs
  */
 
 #ifdef CONFIG_ACPI
@@ -56,7 +56,7 @@ nouveau_hwmon_show_temp1_auto_point1_pwm(struct device *d,
 {
 	return snprintf(buf, PAGE_SIZE, "%d\n", 100);
 }
-static SENSOR_DEVICE_ATTR(temp1_auto_point1_pwm, S_IRUGO,
+static SENSOR_DEVICE_ATTR(temp1_auto_point1_pwm, 0444,
 			  nouveau_hwmon_show_temp1_auto_point1_pwm, NULL, 0);
 
 static ssize_t
@@ -88,7 +88,7 @@ nouveau_hwmon_set_temp1_auto_point1_temp(struct device *d,
 
 	return count;
 }
-static SENSOR_DEVICE_ATTR(temp1_auto_point1_temp, S_IRUGO | S_IWUSR,
+static SENSOR_DEVICE_ATTR(temp1_auto_point1_temp, 0644,
 			  nouveau_hwmon_temp1_auto_point1_temp,
 			  nouveau_hwmon_set_temp1_auto_point1_temp, 0);
 
@@ -121,7 +121,7 @@ nouveau_hwmon_set_temp1_auto_point1_temp_hyst(struct device *d,
 
 	return count;
 }
-static SENSOR_DEVICE_ATTR(temp1_auto_point1_temp_hyst, S_IRUGO | S_IWUSR,
+static SENSOR_DEVICE_ATTR(temp1_auto_point1_temp_hyst, 0644,
 			  nouveau_hwmon_temp1_auto_point1_temp_hyst,
 			  nouveau_hwmon_set_temp1_auto_point1_temp_hyst, 0);
 
@@ -255,7 +255,7 @@ nouveau_hwmon_set_pwm1_min(struct device *d, struct device_attribute *a,
 	return count;
 }
 
-static SENSOR_DEVICE_ATTR(pwm1_min, S_IRUGO | S_IWUSR,
+static SENSOR_DEVICE_ATTR(pwm1_min, 0644,
 			  nouveau_hwmon_get_pwm1_min,
 			  nouveau_hwmon_set_pwm1_min, 0);
 
@@ -295,7 +295,7 @@ nouveau_hwmon_set_pwm1_max(struct device *d, struct device_attribute *a,
 	return count;
 }
 
-static SENSOR_DEVICE_ATTR(pwm1_max, S_IRUGO | S_IWUSR,
+static SENSOR_DEVICE_ATTR(pwm1_max, 0644,
 			  nouveau_hwmon_get_pwm1_max,
 			  nouveau_hwmon_set_pwm1_max, 0);
 
