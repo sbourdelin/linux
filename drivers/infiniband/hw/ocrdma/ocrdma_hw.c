@@ -352,7 +352,7 @@ static void *ocrdma_init_emb_mqe(u8 opcode, u32 cmd_len)
 {
 	struct ocrdma_mqe *mqe;
 
-	mqe = kzalloc(sizeof(struct ocrdma_mqe), GFP_KERNEL);
+	mqe = kzalloc(sizeof(*mqe), GFP_KERNEL);
 	if (!mqe)
 		return NULL;
 	mqe->hdr.spcl_sge_cnt_emb |=
@@ -890,7 +890,7 @@ static int ocrdma_mq_cq_handler(struct ocrdma_dev *dev, u16 cq_id)
 			ocrdma_process_acqe(dev, cqe);
 		else if (cqe->valid_ae_cmpl_cons & OCRDMA_MCQE_CMPL_MASK)
 			ocrdma_process_mcqe(dev, cqe);
-		memset(cqe, 0, sizeof(struct ocrdma_mcqe));
+		memset(cqe, 0, sizeof(*cqe));
 		ocrdma_mcq_inc_tail(dev);
 	}
 	ocrdma_ring_cq_db(dev, dev->mq.cq.id, true, false, cqe_popped);
@@ -1302,7 +1302,7 @@ int ocrdma_mbx_rdma_stats(struct ocrdma_dev *dev, bool reset)
 	mqe->u.nonemb_req.sge[0].len = dev->stats_mem.size;
 
 	/* Cache the old stats */
-	memcpy(old_stats, req, sizeof(struct ocrdma_rdma_stats_resp));
+	memcpy(old_stats, req, sizeof(*old_stats));
 	memset(req, 0, dev->stats_mem.size);
 
 	ocrdma_init_mch((struct ocrdma_mbx_hdr *)req,
@@ -1315,7 +1315,7 @@ int ocrdma_mbx_rdma_stats(struct ocrdma_dev *dev, bool reset)
 	status = ocrdma_nonemb_mbx_cmd(dev, mqe, dev->stats_mem.va);
 	if (status)
 		/* Copy from cache, if mbox fails */
-		memcpy(req, old_stats, sizeof(struct ocrdma_rdma_stats_resp));
+		memcpy(req, old_stats, sizeof(*old_stats));
 	else
 		ocrdma_le32_to_cpu(req, dev->stats_mem.size);
 
@@ -1331,7 +1331,7 @@ static int ocrdma_mbx_get_ctrl_attribs(struct ocrdma_dev *dev)
 	struct ocrdma_get_ctrl_attribs_rsp *ctrl_attr_rsp;
 	struct mgmt_hba_attribs *hba_attribs;
 
-	mqe = kzalloc(sizeof(struct ocrdma_mqe), GFP_KERNEL);
+	mqe = kzalloc(sizeof(*mqe), GFP_KERNEL);
 	if (!mqe)
 		return status;
 
@@ -1595,8 +1595,7 @@ void ocrdma_alloc_pd_pool(struct ocrdma_dev *dev)
 {
 	int status;
 
-	dev->pd_mgr = kzalloc(sizeof(struct ocrdma_pd_resource_mgr),
-			      GFP_KERNEL);
+	dev->pd_mgr = kzalloc(sizeof(*dev->pd_mgr), GFP_KERNEL);
 	if (!dev->pd_mgr)
 		return;
 
@@ -2487,7 +2486,7 @@ int ocrdma_mbx_query_qp(struct ocrdma_dev *dev, struct ocrdma_qp *qp,
 	if (status)
 		goto mbx_err;
 	rsp = (struct ocrdma_query_qp_rsp *)cmd;
-	memcpy(param, &rsp->params, sizeof(struct ocrdma_qp_params));
+	memcpy(param, &rsp->params, sizeof(*param));
 mbx_err:
 	kfree(cmd);
 	return status;
@@ -2901,9 +2900,8 @@ static int ocrdma_mbx_get_dcbx_config(struct ocrdma_dev *dev, u32 ptype,
 	struct pci_dev *pdev = dev->nic_info.pdev;
 	struct ocrdma_mqe_sge *mqe_sge = cmd.u.nonemb_req.sge;
 
-	memset(&cmd, 0, sizeof(struct ocrdma_mqe));
-	cmd.hdr.pyld_len = max_t (u32, sizeof(struct ocrdma_get_dcbx_cfg_rsp),
-					sizeof(struct ocrdma_get_dcbx_cfg_req));
+	memset(&cmd, 0, sizeof(cmd));
+	cmd.hdr.pyld_len = max_t(u32, sizeof(*rsp), sizeof(*req));
 	req = dma_alloc_coherent(&pdev->dev, cmd.hdr.pyld_len, &pa, GFP_KERNEL);
 	if (!req) {
 		status = -ENOMEM;
@@ -2915,8 +2913,7 @@ static int ocrdma_mbx_get_dcbx_config(struct ocrdma_dev *dev, u32 ptype,
 	mqe_sge->pa_lo = (u32) (pa & 0xFFFFFFFFUL);
 	mqe_sge->pa_hi = (u32) upper_32_bits(pa);
 	mqe_sge->len = cmd.hdr.pyld_len;
-
-	memset(req, 0, sizeof(struct ocrdma_get_dcbx_cfg_req));
+	memset(req, 0, sizeof(*req));
 	ocrdma_init_mch(&req->hdr, OCRDMA_CMD_GET_DCBX_CONFIG,
 			OCRDMA_SUBSYS_DCBX, cmd.hdr.pyld_len);
 	req->param_type = ptype;
@@ -2926,9 +2923,8 @@ static int ocrdma_mbx_get_dcbx_config(struct ocrdma_dev *dev, u32 ptype,
 		goto mbx_err;
 
 	rsp = (struct ocrdma_get_dcbx_cfg_rsp *)req;
-	ocrdma_le32_to_cpu(rsp, sizeof(struct ocrdma_get_dcbx_cfg_rsp));
-	memcpy(dcbxcfg, &rsp->cfg, sizeof(struct ocrdma_dcbx_cfg));
-
+	ocrdma_le32_to_cpu(rsp, sizeof(*rsp));
+	memcpy(dcbxcfg, &rsp->cfg, sizeof(*dcbxcfg));
 mbx_err:
 	dma_free_coherent(&pdev->dev, cmd.hdr.pyld_len, req, pa);
 mem_err:

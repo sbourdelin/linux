@@ -1914,7 +1914,7 @@ struct ib_srq *ocrdma_create_srq(struct ib_pd *ibpd,
 		if (srq->idx_bit_fields == NULL)
 			goto arm_err;
 		memset(srq->idx_bit_fields, 0xff,
-		       srq->bit_fields_len * sizeof(u32));
+		       srq->bit_fields_len * sizeof(*srq->idx_bit_fields));
 	}
 
 	if (init_attr->attr.srq_limit) {
@@ -3029,7 +3029,7 @@ struct ib_mr *ocrdma_alloc_mr(struct ib_pd *ibpd,
 	if (!mr)
 		return ERR_PTR(-ENOMEM);
 
-	mr->pages = kcalloc(max_num_sg, sizeof(u64), GFP_KERNEL);
+	mr->pages = kcalloc(max_num_sg, sizeof(*mr->pages), GFP_KERNEL);
 	if (!mr->pages) {
 		status = -ENOMEM;
 		goto pl_err;

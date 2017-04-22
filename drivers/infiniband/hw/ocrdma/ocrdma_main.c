@@ -303,7 +303,7 @@ static struct ocrdma_dev *ocrdma_add(struct be_dev_info *dev_info)
 	u8 lstate = 0;
 	struct ocrdma_dev *dev;
 
-	dev = (struct ocrdma_dev *)ib_alloc_device(sizeof(struct ocrdma_dev));
+	dev = (struct ocrdma_dev *)ib_alloc_device(sizeof(*dev));
 	if (!dev) {
 		pr_err("Unable to allocate ib device\n");
 		return NULL;
