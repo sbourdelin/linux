@@ -3447,7 +3447,7 @@ static int bcmgenet_probe(struct platform_device *pdev)
 	priv->irq0 = platform_get_irq(pdev, 0);
 	priv->irq1 = platform_get_irq(pdev, 1);
 	priv->wol_irq = platform_get_irq(pdev, 2);
-	if (!priv->irq0 || !priv->irq1) {
+	if (priv->irq0 < 0 || priv->irq1 < 0) {
 		dev_err(&pdev->dev, "can't find IRQs\n");
 		err = -EINVAL;
 		goto err;
