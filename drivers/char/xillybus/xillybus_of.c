@@ -137,6 +137,8 @@ static int xilly_drv_probe(struct platform_device *op)
 	dev_set_drvdata(dev, endpoint);
 
 	rc = of_address_to_resource(dev->of_node, 0, &res);
+	if (rc < 0)
+		return rc;
 	endpoint->registers = devm_ioremap_resource(dev, &res);
 
 	if (IS_ERR(endpoint->registers))
