@@ -83,6 +83,8 @@ static int intel_soc_pmic_i2c_probe(struct i2c_client *i2c,
 	dev_set_drvdata(dev, pmic);
 
 	pmic->regmap = devm_regmap_init_i2c(i2c, config->regmap_config);
+	if (IS_ERR(pmic->regmap))
+		return PTR_ERR(pmic->regmap);
 
 	/*
 	 * On some boards the PMIC interrupt may come from a GPIO line. Try to
