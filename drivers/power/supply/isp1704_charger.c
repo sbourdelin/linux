@@ -418,6 +418,8 @@ static int isp1704_charger_probe(struct platform_device *pdev)
 
 		pdata = devm_kzalloc(&pdev->dev,
 			sizeof(struct isp1704_charger_data), GFP_KERNEL);
+		if (!pdata)
+			return -ENOMEM;
 		pdata->enable_gpio = gpio;
 
 		dev_info(&pdev->dev, "init gpio %d\n", pdata->enable_gpio);
