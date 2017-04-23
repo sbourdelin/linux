@@ -452,10 +452,14 @@ static irqreturn_t bfin_mac_wake_interrupt(int irq, void *dev_id)
 static void bfin_mac_ethtool_getdrvinfo(struct net_device *dev,
 					struct ethtool_drvinfo *info)
 {
-	strlcpy(info->driver, KBUILD_MODNAME, sizeof(info->driver));
-	strlcpy(info->version, DRV_VERSION, sizeof(info->version));
-	strlcpy(info->fw_version, "N/A", sizeof(info->fw_version));
-	strlcpy(info->bus_info, dev_name(&dev->dev), sizeof(info->bus_info));
+	strlcpy(info->driver, KBUILD_MODNAME, FIELD_SIZEOF(
+		struct ethtool_drvinfo, driver));
+	strlcpy(info->version, DRV_VERSION, FIELD_SIZEOF(
+		struct ethtool_drvinfo, version));
+	strlcpy(info->fw_version, "N/A", FIELD_SIZEOF(
+		struct ethtool_drvinfo, fw_version));
+	strlcpy(info->bus_info, dev_name(&dev->dev), FIELD_SIZEOF(
+		struct ethtool_drvinfo, bus_info));
 }
 
 static void bfin_mac_ethtool_getwol(struct net_device *dev,
@@ -785,7 +789,7 @@ static int bfin_mac_hwtstamp_get(struct net_device *netdev,
 	struct bfin_mac_local *lp = netdev_priv(netdev);
 
 	return copy_to_user(ifr->ifr_data, &lp->stamp_cfg,
-			    sizeof(lp->stamp_cfg)) ?
+			    FILD_SIZEOF(struct bfin_mac_local, stamp_cfg)) ?
 		-EFAULT : 0;
 }
 
