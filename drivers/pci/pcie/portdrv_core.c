@@ -103,6 +103,8 @@ static int pcie_port_enable_msix(struct pci_dev *dev, int *irqs, int mask)
 		 * interrupt message."
 		 */
 		pos = pci_find_ext_capability(dev, PCI_EXT_CAP_ID_ERR);
+		if (!pos)
+			goto out_free_irqs;
 		pci_read_config_dword(dev, pos + PCI_ERR_ROOT_STATUS, &reg32);
 		entry = reg32 >> 27;
 		if (entry >= nr_entries)
