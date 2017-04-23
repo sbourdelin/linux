@@ -13,6 +13,7 @@ Linux Input Subsystem userspace API
    :numbered:
 
    input
+   uinput
    event-codes
    multi-touch-protocol
    gamepad
