@@ -2666,6 +2666,7 @@ struct tty_struct *alloc_tty_struct(struct tty_driver *driver, int idx)
 	tty->index = idx;
 	tty_line_name(driver, idx, tty->name);
 	tty->dev = tty_get_device(tty);
+	tty->owner_user_ns = current_user_ns();
 
 	return tty;
 }
