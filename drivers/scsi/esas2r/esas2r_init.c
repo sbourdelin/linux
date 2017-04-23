@@ -728,6 +728,8 @@ int esas2r_resume(struct pci_dev *pdev)
 	esas2r_log_dev(ESAS2R_LOG_INFO, &(pdev->dev),
 		       "pci_enable_device() called");
 	rez = pci_enable_device(pdev);
+	if (rez)
+		goto error_exit;
 	pci_set_master(pdev);
 
 	if (!a) {
