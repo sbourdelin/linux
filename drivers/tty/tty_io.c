@@ -161,6 +161,7 @@ static void release_tty(struct tty_struct *tty, int idx);
  *	@tty: tty struct to free
  *
  *	Free the write buffers, tty queue and tty memory itself.
+ *	Decrement the owner_user_ns count.
  *
  *	Locking: none. Must be called after tty is definitely unused
  */
@@ -171,6 +172,7 @@ static void free_tty_struct(struct tty_struct *tty)
 	put_device(tty->dev);
 	kfree(tty->write_buf);
 	tty->magic = 0xDEADDEAD;
+	atomic_dec(&tty->owner_user_ns->count);
 	kfree(tty);
 }
 
@@ -2666,6 +2668,8 @@ struct tty_struct *alloc_tty_struct(struct tty_driver *driver, int idx)
 	tty->index = idx;
 	tty_line_name(driver, idx, tty->name);
 	tty->dev = tty_get_device(tty);
+	tty->owner_user_ns = current_user_ns();
+	atomic_inc(&tty->owner_user_ns->count);
 
 	return tty;
 }
