@@ -39,12 +39,15 @@
  */
 #define LEGACY_REQUEST_SIZE 200
 
-static int __intel_ring_space(int head, int tail, int size)
+static unsigned int __intel_ring_space(unsigned int head,
+				       unsigned int tail,
+				       unsigned int size)
 {
-	int space = head - tail;
-	if (space <= 0)
-		space += size;
-	return space - I915_RING_FREE_SPACE;
+	/* "If the Ring Buffer Head Pointer and the Tail Pointer are on the
+	 * same cacheline, the Head Pointer must not be greater than the Tail
+	 * Pointer."
+	 */
+	return (round_down(head, CACHELINE_BYTES) - tail - 8) & (size - 1);
 }
 
 void intel_ring_update_space(struct intel_ring *ring)
@@ -1625,12 +1628,9 @@ static int wait_for_space(struct drm_i915_gem_request *req, int bytes)
 	GEM_BUG_ON(!req->reserved_space);
 
 	list_for_each_entry(target, &ring->request_list, ring_link) {
-		unsigned space;
-
 		/* Would completion of this request free enough space? */
-		space = __intel_ring_space(target->postfix, ring->emit,
-					   ring->size);
-		if (space >= bytes)
+		if (bytes <= __intel_ring_space(target->postfix,
+						ring->emit, ring->size))
 			break;
 	}
 
