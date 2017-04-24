@@ -822,8 +822,8 @@ static int mv_hash_setkey(struct crypto_ahash *tfm, const u8 * key,
 		memcpy(opad, ipad, bs);
 
 		for (i = 0; i < bs; i++) {
-			ipad[i] ^= 0x36;
-			opad[i] ^= 0x5c;
+			ipad[i] ^= HMAC_IPAD_VALUE;
+			opad[i] ^= HMAC_OPAD_VALUE;
 		}
 
 		rc = crypto_shash_init(shash) ? :
