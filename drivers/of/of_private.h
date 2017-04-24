@@ -55,6 +55,8 @@ static inline int of_property_notify(int action, struct device_node *np,
 }
 #endif /* CONFIG_OF_DYNAMIC */
 
+extern void unittest_set_ot_base_root(struct device_node *dn);
+
 /**
  * General utilities for working with live trees.
  *

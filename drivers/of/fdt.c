@@ -31,6 +31,8 @@
 #include <asm/setup.h>  /* for COMMAND_LINE_SIZE */
 #include <asm/page.h>
 
+#include "of_private.h"
+
 /*
  * of_fdt_limit_memory - limit the number of regions in the /memory node
  * @limit: maximum entries
@@ -1253,11 +1255,54 @@ bool __init early_init_dt_scan(void *params)
  */
 void __init unflatten_device_tree(void)
 {
+#ifdef CONFIG_OF_UNITTEST
+	extern uint8_t __dtb_ot_base_begin[];
+	extern uint8_t __dtb_ot_base_end[];
+	struct device_node *ot_base_root;
+	void *ot_base;
+	u32 data_size;
+	u32 size;
+#endif
+
 	__unflatten_device_tree(initial_boot_params, NULL, &of_root,
 				early_init_dt_alloc_memory_arch, false);
 
 	/* Get pointer to "/chosen" and "/aliases" nodes for use everywhere */
 	of_alias_scan(early_init_dt_alloc_memory_arch);
+
+#ifdef CONFIG_OF_UNITTEST
+	/*
+	 * Base device tree for the overlay unittest.
+	 * Do as much as possible the same way as done for the normal FDT.
+	 * Have to stop before resolving phandles, because that uses kmalloc.
+	 */
+
+	data_size = __dtb_ot_base_end - __dtb_ot_base_begin;
+	if (!data_size) {
+		pr_err("No __dtb_ot_base_begin to attach\n");
+		return;
+	}
+
+	size = fdt_totalsize(__dtb_ot_base_begin);
+	if (size != data_size) {
+		pr_err("__dtb_ot_base_begin header totalsize != actual size");
+		return;
+	}
+
+	ot_base = early_init_dt_alloc_memory_arch(size,
+					     roundup_pow_of_two(FDT_V17_SIZE));
+	if (!ot_base) {
+		pr_err("alloc of ot_base failed");
+		return;
+	}
+
+	memcpy(ot_base, __dtb_ot_base_begin, size);
+
+	__unflatten_device_tree(ot_base, NULL, &ot_base_root,
+				early_init_dt_alloc_memory_arch, true);
+
+	unittest_set_ot_base_root(ot_base_root);
+#endif
 }
 
 /**
