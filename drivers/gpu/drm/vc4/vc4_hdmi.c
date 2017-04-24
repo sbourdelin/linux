@@ -42,16 +42,16 @@
  * encoder block has CEC support.
  */
 
-#include "drm_atomic_helper.h"
-#include "drm_crtc_helper.h"
-#include "drm_edid.h"
-#include "linux/clk.h"
-#include "linux/component.h"
-#include "linux/i2c.h"
-#include "linux/of_address.h"
-#include "linux/of_gpio.h"
-#include "linux/of_platform.h"
-#include "linux/rational.h"
+#include <drm/drm_atomic_helper.h>
+#include <drm/drm_crtc_helper.h>
+#include <drm/drm_edid.h>
+#include <linux/clk.h>
+#include <linux/component.h>
+#include <linux/i2c.h>
+#include <linux/of_address.h>
+#include <linux/of_gpio.h>
+#include <linux/of_platform.h>
+#include <linux/rational.h>
 #include "sound/dmaengine_pcm.h"
 #include "sound/pcm_drm_eld.h"
 #include "sound/pcm_params.h"
