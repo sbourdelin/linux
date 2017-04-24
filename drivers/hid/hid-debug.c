@@ -499,7 +499,7 @@ char *hid_resolv_usage(unsigned usage, struct seq_file *f) {
 		len++;
 	}
 	else {
-		seq_printf(f, ".");
+		seq_putc(f, '.');
 	}
 	for (p = hid_usage_table; p->description; p++)
 		if (p->page == (usage >> 16)) {
@@ -550,7 +550,8 @@ void hid_dump_field(struct hid_field *field, int n, struct seq_file *f) {
 	}
 	tab(n, f); seq_printf(f, "Usage(%d)\n", field->maxusage);
 	for (j = 0; j < field->maxusage; j++) {
-		tab(n+2, f); hid_resolv_usage(field->usage[j].hid, f); seq_printf(f, "\n");
+		tab(n + 2, f); hid_resolv_usage(field->usage[j].hid, f);
+		seq_putc(f, '\n');
 	}
 	if (field->logical_minimum != field->logical_maximum) {
 		tab(n, f); seq_printf(f, "Logical Minimum(%d)\n", field->logical_minimum);
@@ -594,7 +595,7 @@ void hid_dump_field(struct hid_field *field, int n, struct seq_file *f) {
 				data >>= 4;
 				if (nibble != 0) {
 					if(earlier_unit++ > 0)
-						seq_printf(f, "*");
+						seq_putc(f, '*');
 					seq_printf(f, "%s", units[sys][i]);
 					if(nibble != 1) {
 						/* This is a _signed_ nibble(!) */
@@ -1039,7 +1040,7 @@ static void hid_dump_input_mapping(struct hid_device *hid, struct seq_file *f)
 					hid_resolv_usage(usage->hid, f);
 					seq_printf(f, " ---> ");
 					hid_resolv_event(usage->type, usage->code, f);
-					seq_printf(f, "\n");
+					seq_putc(f, '\n');
 				}
 			}
 		}
@@ -1066,7 +1067,7 @@ static int hid_debug_rdesc_show(struct seq_file *f, void *p)
 
 	/* dump parsed data and input mappings */
 	hid_dump_device(hdev, f);
-	seq_printf(f, "\n");
+	seq_putc(f, '\n');
 	hid_dump_input_mapping(hdev, f);
 
 	return 0;
