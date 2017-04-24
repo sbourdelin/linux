@@ -197,7 +197,7 @@ static netdev_tx_t brcmf_netdev_start_xmit(struct sk_buff *skb,
 	int ret;
 	struct brcmf_if *ifp = netdev_priv(ndev);
 	struct brcmf_pub *drvr = ifp->drvr;
-	struct ethhdr *eh = (struct ethhdr *)(skb->data);
+	struct ethhdr *eh;
 
 	brcmf_dbg(DATA, "Enter, bsscfgidx=%d\n", ifp->bsscfgidx);
 
@@ -227,6 +227,8 @@ static netdev_tx_t brcmf_netdev_start_xmit(struct sk_buff *skb,
 			goto done;
 		}
 	}
+
+	eh = (struct ethhdr *)(skb->data);
 
 	/* validate length for ether packet */
 	if (skb->len < sizeof(*eh)) {
