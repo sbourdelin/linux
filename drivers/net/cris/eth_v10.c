@@ -44,7 +44,7 @@
  * io regions, irqs and dma channels
  */
 
-static const char* cardname = "ETRAX 100LX built-in ethernet controller";
+static const char cardname[] = "ETRAX 100LX built-in ethernet controller";
 
 /* A default ethernet address. Highlevel SW will set the real one later */
 
