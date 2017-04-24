@@ -25,6 +25,7 @@
 #include <linux/async.h>
 #include <linux/pm_runtime.h>
 #include <linux/pinctrl/devinfo.h>
+#include <linux/platform_device.h>
 
 #include "base.h"
 #include "power/power.h"
@@ -749,13 +750,14 @@ static int __driver_attach(struct device *dev, void *data)
 		return ret;
 	} /* ret > 0 means positive match */
 
-	if (dev->parent)	/* Needed for USB */
+	if (dev->parent &&
+		(dev->bus != &platform_bus_type))	/* Needed for USB */
 		device_lock(dev->parent);
 	device_lock(dev);
 	if (!dev->driver)
 		driver_probe_device(drv, dev);
 	device_unlock(dev);
-	if (dev->parent)
+	if (dev->parent && (dev->bus != &platform_bus_type))
 		device_unlock(dev->parent);
 
 	return 0;
