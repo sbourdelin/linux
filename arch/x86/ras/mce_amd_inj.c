@@ -463,6 +463,8 @@ static int __init init_mce_inject(void)
 			goto err_dfs_add;
 	}
 
+	mce_setup(&i_mce);
+
 	return 0;
 
 err_dfs_add:
