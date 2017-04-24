@@ -34,6 +34,7 @@
 #include <asm/fixmap.h>
 #include <asm/io.h>
 #include <asm/setup.h>
+#include <asm/sections.h>
 
 #include "mmu_decl.h"
 
@@ -374,6 +375,51 @@ void remap_init_ram(void)
 
 	change_page_attr(page, numpages, PAGE_KERNEL);
 }
+
+#ifdef CONFIG_DEBUG_RODATA
+static bool kernel_set_to_readonly __read_mostly;
+
+void set_kernel_text_rw(unsigned long addr)
+{
+	if (!kernel_set_to_readonly)
+		return;
+
+	if (core_kernel_text(addr))
+		change_page_attr(virt_to_page(addr), 1, PAGE_KERNEL_X);
+}
+
+void set_kernel_text_ro(unsigned long addr)
+{
+	if (!kernel_set_to_readonly)
+		return;
+
+	if (core_kernel_text(addr))
+		change_page_attr(virt_to_page(addr), 1, PAGE_KERNEL_ROX);
+}
+
+void mark_rodata_ro(void)
+{
+	struct page *page;
+	unsigned long numpages;
+
+	page = virt_to_page(_stext);
+	numpages = PFN_UP((unsigned long)_etext) -
+		   PFN_DOWN((unsigned long)_stext);
+
+	change_page_attr(page, numpages, PAGE_KERNEL_ROX);
+	/*
+	 * mark .rodata as read only. Use __init_begin rather than __end_rodata
+	 * to cover NOTES and EXCEPTION_TABLE.
+	 */
+	page = virt_to_page(__start_rodata);
+	numpages = PFN_UP((unsigned long)__init_begin) -
+		   PFN_DOWN((unsigned long)__start_rodata);
+
+	change_page_attr(page, numpages, PAGE_KERNEL_RO);
+
+	kernel_set_to_readonly = true;
+}
+#endif
 
 #ifdef CONFIG_DEBUG_PAGEALLOC
 void __kernel_map_pages(struct page *page, int numpages, int enable)

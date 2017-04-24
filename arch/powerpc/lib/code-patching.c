@@ -17,12 +17,21 @@
 #include <linux/uaccess.h>
 #include <linux/kprobes.h>
 
+static DEFINE_SPINLOCK(patch_lock);
 
 int patch_instruction(unsigned int *addr, unsigned int instr)
 {
 	int err;
+	unsigned long flags;
 
+	spin_lock_irqsave(&patch_lock, flags);
+
+	set_kernel_text_rw((unsigned long)addr);
 	__put_user_size(instr, addr, 4, err);
+	set_kernel_text_ro((unsigned long)addr);
+
+	spin_unlock_irqrestore(&patch_lock, flags);
+
 	if (err)
 		return err;
 	asm ("dcbst 0, %0; sync; icbi 0,%0; sync; isync" : : "r" (addr));
