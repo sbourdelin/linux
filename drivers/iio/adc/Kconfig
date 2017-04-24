@@ -692,6 +692,18 @@ config TI_ADC128S052
 	  This driver can also be built as a module. If so, the module will be
 	  called ti-adc128s052.
 
+config TI_ADC1x8S102
+	tristate "Texas Instruments ADC1x8S102 driver"
+	depends on SPI
+	select IIO_BUFFER
+	select IIO_TRIGGERED_BUFFER
+	help
+	  Say yes here to build support for Texas Instruments ADC1x8S102 ADC.
+	  Provides direct access via sysfs.
+
+	  To compile this driver as a module, choose M here: the module will
+	  be called ti-adc1x8s102
+
 config TI_ADC161S626
 	tristate "Texas Instruments ADC161S626 1-channel differential ADC"
 	depends on SPI
