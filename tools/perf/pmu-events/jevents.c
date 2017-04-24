@@ -198,7 +198,7 @@ static struct map {
 	{ "QPI LL", "uncore_qpi" },
 	{ "SBO", "uncore_sbox" },
 	{ "iMPH-U", "uncore_arb" },
-	{}
+	{ NULL, NULL}
 };
 
 static const char *field_to_perf(struct map *table, char *map, jsmntok_t *val)
