@@ -17,11 +17,13 @@
 
 #include <linux/types.h>
 #include <linux/jump_label.h>
+#include <linux/irqchip/arm-gic-v3.h>
 
 #include <asm/kvm_asm.h>
 #include <asm/kvm_emulate.h>
 #include <asm/kvm_hyp.h>
 #include <asm/fpsimd.h>
+#include <asm/cpufeature.h>
 
 static bool __hyp_text __fpsimd_enabled_nvhe(void)
 {
@@ -166,6 +168,13 @@ static void __hyp_text __vgic_save_state(struct kvm_vcpu *vcpu)
 		__vgic_v2_save_state(vcpu);
 
 	write_sysreg(read_sysreg(hcr_el2) & ~HCR_INT_OVERRIDE, hcr_el2);
+
+#ifdef CONFIG_CAVIUM_ERRATUM_30115
+	if (cpus_have_const_cap(ARM64_WORKAROUND_CAVIUM_30115)) {
+		gic_write_grpen1(0);
+		gic_write_grpen1(1);
+	}
+#endif
 }
 
 static void __hyp_text __vgic_restore_state(struct kvm_vcpu *vcpu)
