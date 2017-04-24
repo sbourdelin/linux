@@ -66,6 +66,26 @@ static int dma_noop_supported(struct device *dev, u64 mask)
 	return 1;
 }
 
+static int dma_noop_mmap(struct device *dev, struct vm_area_struct *vma,
+			 void *cpu_addr, dma_addr_t dma_addr, size_t size,
+			 unsigned long attrs)
+{
+	unsigned long user_count = vma_pages(vma);
+	unsigned long count = PAGE_ALIGN(size) >> PAGE_SHIFT;
+	unsigned long pfn = page_to_pfn(virt_to_page(cpu_addr));
+	unsigned long off = vma->vm_pgoff;
+	int ret = -ENXIO;
+
+	if (off < count && user_count <= (count - off)) {
+		ret = remap_pfn_range(vma, vma->vm_start,
+				      pfn + off,
+				      user_count << PAGE_SHIFT,
+				      vma->vm_page_prot);
+	}
+
+	return ret;
+}
+
 const struct dma_map_ops dma_noop_ops = {
 	.alloc			= dma_noop_alloc,
 	.free			= dma_noop_free,
@@ -73,6 +93,7 @@ const struct dma_map_ops dma_noop_ops = {
 	.map_sg			= dma_noop_map_sg,
 	.mapping_error		= dma_noop_mapping_error,
 	.dma_supported		= dma_noop_supported,
+	.mmap			= dma_noop_mmap,
 };
 
 EXPORT_SYMBOL(dma_noop_ops);
