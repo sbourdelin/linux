@@ -1,0 +1,52 @@
+Hi all,
+
+I wanted to send this design in a separate thread, but then I realized we can use this thread itself as many of the
+stakeholders are already active here.
+
+As you all know, we will be dealing with the complex situations of blending of two(or more) different buffers
+in the pipeline, which are in different format and different color space.
+(PS: This ascii block design is best visible in a widescreen monitor, or in HTML page)
+
+=====================================================================================================================================================
+
+	   property 1 = CSC	       property 2 = Degamma	 property 3 = Gamut	     property 4 = palette
+          +------------------+        +-------------------+      +------------------+       +-------------------+  RGB REC 2020 buffer
+YUV       |color space       |        |Linearizion        |      |Gamut mapping     |       |Non-Linearizion    +-------------------+
+REC709--> |conversion        +------->+(Degamma)          +----->+(REC709->REC2020) +-------+(Gamma)            |                   |
+          |(YUV->RGB)        |        |                   |      |                  |       |                   |            +------v---------------+
+          +------------------+        +-------------------+      +------------------+       +-------------------+            |                      |
+                                                                                                                             |                      |
+                                                                                                                             | Blending unit        |
+                                                                                                                             |                      |------> blended output
+RGB REC 2020 buffer (Bypass everything)                                                                                      |                      |
+  +--------------------------------------------------------------------------------------------------------------------->    |                      |
+                                                                                                                             |                      |
+                                                                                                                             +----------------------+
+=====================================================================================================================================================
+
+This is a design proposal of a blending pipeline, using a sequence of plane level DRM properties.
+The description of the block is:
+- Input buffers are two different streams for example
+	- YCBCR buffer in REC709 colorspace
+	- RGB buffer in BT2020 colorspace
+- Aim is to make bending accurate by providing similar input to the blending unit (same in format as well as color space).
+- Every block here represents a plane level DRM property, with specific task to do.
+	- first block is CSC property, which is for conversion from YCBCR->RGB only (This doesnt do gamut mapping)
+	- second block is the property which will linearize the input, a degamma kind of property
+	- third block is a Gamut mapping proprty, which will do a gamut conversion (ex 709->2020)
+	- forth block is a Non-Linearizion block, which will apply back the curve (like Gamma) required
+	- The output of this pipeline is a RGB buffer in REC2020 color space
+	- Any driver can map its HW's plane level color correction capabilities to these properties.
+	- Once blending is done, driver can apply any post blending CRTC level color property, to:
+		- Change output type (ex. changing RGB->YUV using CRTC level CSC property)
+		- Apply a curve on the blended output (using CRTC level gamma/LUT property)
+
+- Important points:
+	- The sequence of the properties has to be fixed (almost in this order), considering the linear data requirement of Gamut mapping
+	- The color space of blending needs to be decided in the userspace, by UI manager, with some policies like (examples):
+		- If any of the buffer is REC2020, all buffers should be converted into 2020, before blending.
+		- Always blend in Higher/Wider color space.
+		- Always blend in RGB.
+
+- Opens:
+	- Is there a need to communicate HW's capabilities to UI manager/userspace ?
