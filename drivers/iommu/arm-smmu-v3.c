@@ -407,7 +407,7 @@
 #define PRIQ_1_ADDR_MASK		0xfffffffffffffUL
 
 /* High-level queue structures */
-#define ARM_SMMU_POLL_TIMEOUT_US	100
+#define ARM_SMMU_POLL_TIMEOUT_US	500
 
 #define MSI_IOVA_BASE			0x8000000
 #define MSI_IOVA_LENGTH			0x100000
