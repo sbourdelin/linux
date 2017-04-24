@@ -101,11 +101,15 @@ enum ovl_path_type ovl_update_type(struct dentry *dentry, bool is_dir)
 	if (oe->__upperdentry) {
 		type |= __OVL_PATH_UPPER;
 		/*
-		 * Non-dir dentry can hold lower dentry from before
-		 * copy-up.
+		 * oe->numlower implies a copy up, but copy up does not imply
+		 * oe->numlower.  It can also be set on lookup when detecting
+		 * an overlay.fh xattr on a non-dir that cannot be followed.
 		 */
-		if (oe->numlower && is_dir)
-			type |= __OVL_PATH_MERGE;
+		if (oe->numlower) {
+			type |= __OVL_PATH_COPYUP;
+			if (is_dir)
+				type |= __OVL_PATH_MERGE;
+		}
 	} else {
 		if (oe->numlower > 1)
 			type |= __OVL_PATH_MERGE;
