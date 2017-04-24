@@ -62,6 +62,7 @@ static inline int of_property_notify(int action, struct device_node *np,
  * without taking node references, so you either have to
  * own the devtree lock or work on detached trees only.
  */
+struct property *__of_prop_alloc(char *name, void *value, int len, gfp_t allocflags);
 struct property *__of_prop_dup(const struct property *prop, gfp_t allocflags);
 __printf(2, 3) struct device_node *__of_node_dup(const struct device_node *np, const char *fmt, ...);
 
@@ -70,6 +71,8 @@ extern const void *__of_get_property(const struct device_node *np,
 extern int __of_add_property(struct device_node *np, struct property *prop);
 extern int __of_add_property_sysfs(struct device_node *np,
 		struct property *prop);
+extern struct property *__of_find_property(const struct device_node *np,
+					   const char *name, int *lenp);
 extern int __of_remove_property(struct device_node *np, struct property *prop);
 extern void __of_remove_property_sysfs(struct device_node *np,
 		struct property *prop);

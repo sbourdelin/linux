@@ -20,6 +20,8 @@
 #include <linux/errno.h>
 #include <linux/slab.h>
 
+#include "of_private.h"
+
 /* illegal phandle value (set when unresolved) */
 #define OF_PHANDLE_ILLEGAL	0xdeadbeef
 
@@ -67,36 +69,43 @@ static phandle live_tree_max_phandle(void)
 	return phandle;
 }
 
-static void adjust_overlay_phandles(struct device_node *overlay,
+static int adjust_overlay_phandles(struct device_node *overlay,
 		int phandle_delta)
 {
 	struct device_node *child;
+	struct property *newprop;
 	struct property *prop;
 	phandle phandle;
+	int ret;
 
-	/* adjust node's phandle in node */
-	if (overlay->phandle != 0 && overlay->phandle != OF_PHANDLE_ILLEGAL)
+	if (overlay->phandle != 0 && overlay->phandle != OF_PHANDLE_ILLEGAL) {
+
 		overlay->phandle += phandle_delta;
 
-	/* copy adjusted phandle into *phandle properties */
-	for_each_property_of_node(overlay, prop) {
+		phandle = cpu_to_be32(overlay->phandle);
 
-		if (of_prop_cmp(prop->name, "phandle") &&
-		    of_prop_cmp(prop->name, "linux,phandle"))
-			continue;
+		prop = __of_find_property(overlay, "phandle", NULL);
+		newprop = __of_prop_alloc(prop->name, &phandle, sizeof(phandle),
+					  GFP_KERNEL);
+		if (!newprop)
+			return -ENOMEM;
+		__of_update_property(overlay, newprop, &prop);
 
-		if (prop->length < 4)
-			continue;
-
-		phandle = be32_to_cpup(prop->value);
-		if (phandle == OF_PHANDLE_ILLEGAL)
-			continue;
-
-		*(uint32_t *)prop->value = cpu_to_be32(overlay->phandle);
+		prop = __of_find_property(overlay, "linux,phandle", NULL);
+		newprop = __of_prop_alloc(prop->name, &phandle, sizeof(phandle),
+					  GFP_KERNEL);
+		if (!newprop)
+			return -ENOMEM;
+		__of_update_property(overlay, newprop, &prop);
 	}
 
-	for_each_child_of_node(overlay, child)
-		adjust_overlay_phandles(child, phandle_delta);
+	for_each_child_of_node(overlay, child) {
+		ret = adjust_overlay_phandles(child, phandle_delta);
+		if (ret)
+			return ret;
+	}
+
+	return 0;
 }
 
 static int update_usages_of_a_phandle_reference(struct device_node *overlay,
@@ -306,7 +315,9 @@ int of_resolve_phandles(struct device_node *overlay)
 	}
 
 	phandle_delta = live_tree_max_phandle() + 1;
-	adjust_overlay_phandles(overlay, phandle_delta);
+	err = adjust_overlay_phandles(overlay, phandle_delta);
+	if (err)
+		goto out;
 
 	for_each_child_of_node(overlay, local_fixups)
 		if (!of_node_cmp(local_fixups->name, "__local_fixups__"))

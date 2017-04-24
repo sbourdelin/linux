@@ -354,17 +354,17 @@ void of_node_release(struct kobject *kobj)
 }
 
 /**
- * __of_prop_dup - Copy a property dynamically.
+ * __of_prop_alloc - Create a property dynamically.
  * @prop:	Property to copy
  * @allocflags:	Allocation flags (typically pass GFP_KERNEL)
  *
- * Copy a property by dynamically allocating the memory of both the
+ * Create a property by dynamically allocating the memory of both the
  * property structure and the property name & contents. The property's
  * flags have the OF_DYNAMIC bit set so that we can differentiate between
  * dynamically allocated properties and not.
  * Returns the newly allocated property or NULL on out of memory error.
  */
-struct property *__of_prop_dup(const struct property *prop, gfp_t allocflags)
+struct property *__of_prop_alloc(char *name, void *value, int len, gfp_t allocflags)
 {
 	struct property *new;
 
@@ -378,9 +378,9 @@ struct property *__of_prop_dup(const struct property *prop, gfp_t allocflags)
 	 * of zero bytes. We do this to work around the use
 	 * of of_get_property() calls on boolean values.
 	 */
-	new->name = kstrdup(prop->name, allocflags);
-	new->value = kmemdup(prop->value, prop->length, allocflags);
-	new->length = prop->length;
+	new->name = kstrdup(name, allocflags);
+	new->value = kmemdup(value, len, allocflags);
+	new->length = len;
 	if (!new->name || !new->value)
 		goto err_free;
 
@@ -394,6 +394,22 @@ struct property *__of_prop_dup(const struct property *prop, gfp_t allocflags)
 	kfree(new->value);
 	kfree(new);
 	return NULL;
+}
+
+/**
+ * __of_prop_dup - Copy a property dynamically.
+ * @prop:	Property to copy
+ * @allocflags:	Allocation flags (typically pass GFP_KERNEL)
+ *
+ * Copy a property by dynamically allocating the memory of both the
+ * property structure and the property name & contents. The property's
+ * flags have the OF_DYNAMIC bit set so that we can differentiate between
+ * dynamically allocated properties and not.
+ * Returns the newly allocated property or NULL on out of memory error.
+ */
+struct property *__of_prop_dup(const struct property *prop, gfp_t allocflags)
+{
+	return __of_prop_alloc(prop->name, prop->value, prop->length, allocflags);
 }
 
 /**

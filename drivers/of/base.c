@@ -220,8 +220,8 @@ void __init of_core_init(void)
 		proc_symlink("device-tree", NULL, "/sys/firmware/devicetree/base");
 }
 
-static struct property *__of_find_property(const struct device_node *np,
-					   const char *name, int *lenp)
+struct property *__of_find_property(const struct device_node *np,
+				    const char *name, int *lenp)
 {
 	struct property *pp;
 
