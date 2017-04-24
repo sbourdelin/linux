@@ -131,9 +131,9 @@
 /* Device controlling the backlight and associated keys */
 struct fujitsu_bl {
 	acpi_handle handle;
+	acpi_handle fext_handle;
 	struct input_dev *input;
 	char phys[32];
-	struct backlight_device *bl_device;
 	unsigned int max_brightness;
 	unsigned int brightness_level;
 };
@@ -290,10 +290,12 @@ static int bl_get_brightness(struct backlight_device *b)
 
 static int bl_update_status(struct backlight_device *b)
 {
-	if (b->props.power == FB_BLANK_POWERDOWN)
-		fext_backlight(fujitsu_laptop->handle, 0x1, 0x4, 0x3);
-	else
-		fext_backlight(fujitsu_laptop->handle, 0x1, 0x4, 0x0);
+	if (fujitsu_bl->fext_handle) {
+		if (b->props.power == FB_BLANK_POWERDOWN)
+			fext_backlight(fujitsu_bl->fext_handle, 0x1, 0x4, 0x3);
+		else
+			fext_backlight(fujitsu_bl->fext_handle, 0x1, 0x4, 0x0);
+	}
 
 	return set_lcd_level(b->props.brightness);
 }
@@ -397,6 +399,7 @@ static int fujitsu_backlight_register(struct acpi_device *device)
 		.type = BACKLIGHT_PLATFORM
 	};
 	struct backlight_device *bd;
+	acpi_status status;
 
 	bd = devm_backlight_device_register(&device->dev, "fujitsu-laptop",
 					    &device->dev, NULL,
@@ -404,7 +407,10 @@ static int fujitsu_backlight_register(struct acpi_device *device)
 	if (IS_ERR(bd))
 		return PTR_ERR(bd);
 
-	fujitsu_bl->bl_device = bd;
+	status = acpi_get_handle(NULL, "\\_SB.FEXT", &fujitsu_bl->fext_handle);
+	if (ACPI_SUCCESS(status) &&
+	    fext_backlight(fujitsu_bl->fext_handle, 0x2, 0x4, 0x0) == 3)
+		bd->props.power = FB_BLANK_POWERDOWN;
 
 	return 0;
 }
@@ -860,15 +866,6 @@ static int acpi_fujitsu_laptop_add(struct acpi_device *device)
 	/* Suspect this is a keymap of the application panel, print it */
 	pr_info("BTNI: [0x%x]\n", fext_buttons(fujitsu_laptop->handle,
 					       0x0, 0x0, 0x0));
-
-	/* Sync backlight power status */
-	if (fujitsu_bl->bl_device &&
-	    acpi_video_get_backlight_type() == acpi_backlight_vendor) {
-		if (fext_backlight(fujitsu_laptop->handle, 0x2, 0x4, 0x0) == 3)
-			fujitsu_bl->bl_device->props.power = FB_BLANK_POWERDOWN;
-		else
-			fujitsu_bl->bl_device->props.power = FB_BLANK_UNBLANK;
-	}
 
 	error = acpi_fujitsu_laptop_leds_register(device);
 	if (error)
