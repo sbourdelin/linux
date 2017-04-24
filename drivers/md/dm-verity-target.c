@@ -16,6 +16,7 @@
 
 #include "dm-verity.h"
 #include "dm-verity-fec.h"
+#include "dm.h"
 
 #include <linux/module.h>
 #include <linux/reboot.h>
@@ -61,6 +62,9 @@ struct dm_verity_prefetch_work {
 struct buffer_aux {
 	int hash_verified;
 };
+
+static void verity_submit_prefetch(struct dm_verity *v,
+		struct dm_verity_io *io);
 
 /*
  * Initialize struct buffer_aux for a freshly created buffer.
@@ -462,12 +466,35 @@ static void verity_finish_io(struct dm_verity_io *io, int error)
 	struct dm_verity *v = io->v;
 	struct bio *bio = dm_bio_from_per_bio_data(io, v->ti->per_io_data_size);
 
-	bio->bi_end_io = io->orig_bi_end_io;
-	bio->bi_error = error;
+	if (v->mode == DM_VERITY_MODE_EIO) {
+		bio->bi_end_io = io->orig_bi_end_io;
+		bio->bi_error = error;
+	}
 
 	verity_fec_finish_io(io);
 
-	bio_endio(bio);
+	if (v->mode == DM_VERITY_MODE_EIO) {
+		bio_endio(bio);
+	} else {
+		struct dm_target_io *tio = container_of(bio,
+				struct dm_target_io, clone);
+		struct dm_io *dmio = tio->io;
+		struct bio *ori_bio = dm_io_get_bio(dmio);
+		struct bio_vec *bv;
+		int i;
+
+		bio_put(bio);
+		free_io(dm_io_get_md(dmio), dmio);
+
+		bio_for_each_segment_all(bv, ori_bio, i) {
+			struct page *page = bv->bv_page;
+
+			put_page(page);
+		}
+
+		bio_put(ori_bio);
+
+	}
 }
 
 static void verity_work(struct work_struct *w)
@@ -484,6 +511,28 @@ static void verity_end_io(struct bio *bio)
 	if (bio->bi_error && !verity_fec_is_enabled(io->v)) {
 		verity_finish_io(io, bio->bi_error);
 		return;
+	}
+
+	if (io->v->mode != DM_VERITY_MODE_EIO) {
+		struct dm_target_io *tio = container_of(bio,
+				struct dm_target_io, clone);
+		struct bio *ori_bio = dm_io_get_bio(tio->io);
+		struct bio_vec *bv;
+		int i;
+
+		bio_for_each_segment_all(bv, ori_bio, i) {
+			struct page *page = bv->bv_page;
+
+			get_page(page);
+		}
+
+		bio_get(ori_bio);
+		bio_get(bio);
+
+		bio->bi_end_io = io->orig_bi_end_io;
+		bio_endio(bio);
+
+		verity_submit_prefetch(io->v, io);
 	}
 
 	INIT_WORK(&io->work, verity_work);
@@ -586,7 +635,8 @@ static int verity_map(struct dm_target *ti, struct bio *bio)
 
 	verity_fec_init_io(io);
 
-	verity_submit_prefetch(v, io);
+	if (v->mode == DM_VERITY_MODE_EIO)
+		verity_submit_prefetch(v, io);
 
 	generic_make_request(bio);
 

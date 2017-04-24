@@ -213,4 +213,8 @@ void dm_free_md_mempools(struct dm_md_mempools *pools);
  */
 unsigned dm_get_reserved_bio_based_ios(void);
 
+struct bio *dm_io_get_bio(struct dm_io *io);
+struct mapped_device *dm_io_get_md(struct dm_io *io);
+void free_io(struct mapped_device *md, struct dm_io *io);
+
 #endif

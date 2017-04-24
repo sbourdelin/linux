@@ -164,6 +164,18 @@ static unsigned dm_get_numa_node(void)
 					 DM_NUMA_NODE, num_online_nodes() - 1);
 }
 
+struct bio *dm_io_get_bio(struct dm_io *io)
+{
+	return io->bio;
+}
+EXPORT_SYMBOL(dm_io_get_bio);
+
+struct mapped_device *dm_io_get_md(struct dm_io *io)
+{
+	return io->md;
+}
+EXPORT_SYMBOL(dm_io_get_md);
+
 static int __init local_init(void)
 {
 	int r = -ENOMEM;
@@ -489,7 +501,7 @@ static struct dm_io *alloc_io(struct mapped_device *md)
 	return mempool_alloc(md->io_pool, GFP_NOIO);
 }
 
-static void free_io(struct mapped_device *md, struct dm_io *io)
+void free_io(struct mapped_device *md, struct dm_io *io)
 {
 	mempool_free(io, md->io_pool);
 }
@@ -796,7 +808,8 @@ static void dec_pending(struct dm_io *io, int error)
 		io_error = io->error;
 		bio = io->bio;
 		end_io_acct(io);
-		free_io(md, io);
+		if (atomic_read(&bio->__bi_cnt) <= 1)
+			free_io(md, io);
 
 		if (io_error == DM_ENDIO_REQUEUE)
 			return;
