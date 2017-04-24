@@ -225,15 +225,16 @@ static int ovl_lookup_single(struct dentry *base, struct ovl_lookup_data *d,
 		goto put_and_out;
 	}
 	if (!d_can_lookup(this)) {
-		d->stop = true;
-		if (d->is_dir)
+		if (d->is_dir) {
+			d->stop = true;
 			goto put_and_out;
-		goto out;
-	}
-	d->is_dir = true;
-	if (!d->last && ovl_is_opaquedir(this)) {
-		d->stop = d->opaque = true;
-		goto out;
+		}
+	} else {
+		d->is_dir = true;
+		if (!d->last && ovl_is_opaquedir(this)) {
+			d->stop = d->opaque = true;
+			goto out;
+		}
 	}
 	if (d->last)
 		goto out;
@@ -247,6 +248,9 @@ static int ovl_lookup_single(struct dentry *base, struct ovl_lookup_data *d,
 		if (err)
 			goto out_err;
 	}
+	/* No redirect for non-dir means pure upper */
+	if (!d->is_dir)
+		d->stop = !d->fh && !d->redirect;
 out:
 	*ret = this;
 	return 0;
@@ -385,11 +389,11 @@ struct dentry *ovl_lookup(struct inode *dir, struct dentry *dentry,
 	}
 
 	/*
-	 * For now we only support lower by fh in single layer, because
-	 * fallback from lookup by fh to lookup by path in mid layers for
-	 * merge directory is not yet implemented.
+	 * For now we only support lookup by fh in single layer for directory,
+	 * because fallback from lookup by fh to lookup by path in mid layers
+	 * for merge directory is not yet implemented.
 	 */
-	if (!ofs->redirect_fh || ofs->numlower > 1) {
+	if (!ofs->redirect_fh || (d.is_dir && ofs->numlower > 1)) {
 		kfree(d.fh);
 		d.fh = NULL;
 	}
@@ -402,7 +406,6 @@ struct dentry *ovl_lookup(struct inode *dir, struct dentry *dentry,
 			goto out_put_upper;
 	}
 
-	/* Try to lookup lower layers by file handle */
 	d.by_path = false;
 	for (i = 0; !d.stop && d.fh && i < roe->numlower; i++) {
 		struct path lowerpath = poe->lowerstack[i];
@@ -446,7 +449,8 @@ struct dentry *ovl_lookup(struct inode *dir, struct dentry *dentry,
 		stack[ctr].mnt = lowerpath.mnt;
 		ctr++;
 
-		if (d.stop)
+		/* Do not follow non-dir copy up origin more than once */
+		if (d.stop || !d.is_dir)
 			break;
 
 		if (d.redirect && d.redirect[0] == '/' && poe != roe) {
