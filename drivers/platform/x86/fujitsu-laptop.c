@@ -130,7 +130,7 @@
 
 /* Device controlling the backlight and associated keys */
 struct fujitsu_bl {
-	acpi_handle acpi_handle;
+	acpi_handle handle;
 	struct input_dev *input;
 	char phys[32];
 	struct backlight_device *bl_device;
@@ -144,7 +144,7 @@ static bool disable_brightness_adjust;
 
 /* Device used to access hotkeys and other features on the laptop */
 struct fujitsu_laptop {
-	acpi_handle acpi_handle;
+	acpi_handle handle;
 	struct acpi_device *dev;
 	struct input_dev *input;
 	char phys[32];
@@ -175,7 +175,7 @@ static int call_fext_func(int func, int op, int feature, int state)
 	unsigned long long value;
 	acpi_status status;
 
-	status = acpi_evaluate_integer(fujitsu_laptop->acpi_handle, "FUNC",
+	status = acpi_evaluate_integer(fujitsu_laptop->handle, "FUNC",
 				       &arg_list, &value);
 	if (ACPI_FAILURE(status)) {
 		vdbg_printk(FUJLAPTOP_DBG_ERROR, "Failed to evaluate FUNC\n");
@@ -216,7 +216,7 @@ static int set_lcd_level(int level)
 
 	switch (use_alt_lcd_levels) {
 	case -1:
-		if (acpi_has_method(fujitsu_bl->acpi_handle, "SBL2"))
+		if (acpi_has_method(fujitsu_bl->handle, "SBL2"))
 			method = "SBL2";
 		else
 			method = "SBLL";
@@ -235,8 +235,7 @@ static int set_lcd_level(int level)
 	if (level < 0 || level >= fujitsu_bl->max_brightness)
 		return -EINVAL;
 
-	status = acpi_execute_simple_method(fujitsu_bl->acpi_handle, method,
-					    level);
+	status = acpi_execute_simple_method(fujitsu_bl->handle, method, level);
 	if (ACPI_FAILURE(status)) {
 		vdbg_printk(FUJLAPTOP_DBG_ERROR, "Failed to evaluate %s\n",
 			    method);
@@ -255,7 +254,7 @@ static int get_lcd_level(void)
 
 	vdbg_printk(FUJLAPTOP_DBG_TRACE, "get lcd level via GBLL\n");
 
-	status = acpi_evaluate_integer(fujitsu_bl->acpi_handle, "GBLL", NULL,
+	status = acpi_evaluate_integer(fujitsu_bl->handle, "GBLL", NULL,
 				       &state);
 	if (ACPI_FAILURE(status))
 		return 0;
@@ -272,7 +271,7 @@ static int get_max_brightness(void)
 
 	vdbg_printk(FUJLAPTOP_DBG_TRACE, "get max lcd level via RBLL\n");
 
-	status = acpi_evaluate_integer(fujitsu_bl->acpi_handle, "RBLL", NULL,
+	status = acpi_evaluate_integer(fujitsu_bl->handle, "RBLL", NULL,
 				       &state);
 	if (ACPI_FAILURE(status))
 		return -1;
@@ -421,7 +420,7 @@ static int acpi_fujitsu_bl_add(struct acpi_device *device)
 	if (!device)
 		return -EINVAL;
 
-	fujitsu_bl->acpi_handle = device->handle;
+	fujitsu_bl->handle = device->handle;
 	sprintf(acpi_device_name(device), "%s", ACPI_FUJITSU_BL_DEVICE_NAME);
 	sprintf(acpi_device_class(device), "%s", ACPI_FUJITSU_CLASS);
 	device->driver_data = fujitsu_bl;
@@ -430,7 +429,7 @@ static int acpi_fujitsu_bl_add(struct acpi_device *device)
 	if (error)
 		return error;
 
-	error = acpi_bus_update_power(fujitsu_bl->acpi_handle, &state);
+	error = acpi_bus_update_power(fujitsu_bl->handle, &state);
 	if (error) {
 		pr_err("Error reading power state\n");
 		return error;
@@ -791,7 +790,7 @@ static int acpi_fujitsu_laptop_add(struct acpi_device *device)
 	if (!device)
 		return -EINVAL;
 
-	fujitsu_laptop->acpi_handle = device->handle;
+	fujitsu_laptop->handle = device->handle;
 	sprintf(acpi_device_name(device), "%s",
 		ACPI_FUJITSU_LAPTOP_DEVICE_NAME);
 	sprintf(acpi_device_class(device), "%s", ACPI_FUJITSU_CLASS);
@@ -810,7 +809,7 @@ static int acpi_fujitsu_laptop_add(struct acpi_device *device)
 	if (error)
 		goto err_free_fifo;
 
-	error = acpi_bus_update_power(fujitsu_laptop->acpi_handle, &state);
+	error = acpi_bus_update_power(fujitsu_laptop->handle, &state);
 	if (error) {
 		pr_err("Error reading power state\n");
 		goto err_free_fifo;
