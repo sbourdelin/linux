@@ -4159,6 +4159,10 @@ static int handle_exit(struct kvm_vcpu *vcpu)
 
 	vcpu->arch.gpa_available = (exit_code == SVM_EXIT_NPF);
 
+	/* On #NPF, exit_info_2 contain a valid GPA */
+	if (vcpu->arch.gpa_available)
+		vcpu->arch.gpa_val = svm->vmcb->control.exit_info_2;
+
 	if (!is_cr_intercept(svm, INTERCEPT_CR0_WRITE))
 		vcpu->arch.cr0 = svm->vmcb->save.cr0;
 	if (npt_enabled)

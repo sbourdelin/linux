@@ -4633,17 +4633,15 @@ static int emulator_read_write_onepage(unsigned long addr, void *val,
 	 * occurred.
 	 */
 	if (vcpu->arch.gpa_available &&
-	    emulator_can_use_gpa(ctxt) &&
-	    vcpu_is_mmio_gpa(vcpu, addr, exception->address, write) &&
-	    (addr & ~PAGE_MASK) == (exception->address & ~PAGE_MASK)) {
+		emulator_can_use_gpa(ctxt) &&
+		(addr & ~PAGE_MASK) == (exception->address & ~PAGE_MASK)) {
 		gpa = exception->address;
-		goto mmio;
+		ret = vcpu_is_mmio_gpa(vcpu, addr, gpa, write);
+	} else {
+		ret = vcpu_mmio_gva_to_gpa(vcpu, addr, &gpa, exception, write);
+		if (ret < 0)
+			return X86EMUL_PROPAGATE_FAULT;
 	}
-
-	ret = vcpu_mmio_gva_to_gpa(vcpu, addr, &gpa, exception, write);
-
-	if (ret < 0)
-		return X86EMUL_PROPAGATE_FAULT;
 
 	/* For APIC access vmexit */
 	if (ret)
@@ -5655,8 +5653,14 @@ int x86_emulate_instruction(struct kvm_vcpu *vcpu,
 	}
 
 restart:
-	/* Save the faulting GPA (cr2) in the address field */
-	ctxt->exception.address = cr2;
+	/*
+	 * Save the faulting GPA (cr2) in the address field
+	 * NOTE: If gpa_available is set then gpa_val will contain a valid GPA
+	 */
+	if (vcpu->arch.gpa_available)
+		ctxt->exception.address = vcpu->arch.gpa_val;
+	else
+		ctxt->exception.address = cr2;
 
 	r = x86_emulate_insn(ctxt);
 
