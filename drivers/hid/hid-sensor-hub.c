@@ -675,7 +675,7 @@ static int sensor_hub_probe(struct hid_device *hdev,
 			       dev_cnt,
 			       sizeof(*sd->hid_sensor_hub_client_devs),
 			       GFP_KERNEL);
-	if (sd->hid_sensor_hub_client_devs == NULL) {
+	if (!sd->hid_sensor_hub_client_devs) {
 		ret = -ENOMEM;
 		goto err_stop_hw;
 	}
@@ -711,7 +711,7 @@ static int sensor_hub_probe(struct hid_device *hdev,
 			name = devm_kasprintf(&hdev->dev, GFP_KERNEL,
 					      "HID-SENSOR-%x",
 					      collection->usage);
-			if (name == NULL) {
+			if (!name) {
 				hid_err(hdev, "Failed MFD device name\n");
 				ret = -ENOMEM;
 				goto err_stop_hw;
