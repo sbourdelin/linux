@@ -20,6 +20,7 @@
 #include <linux/namei.h>
 #include <linux/fdtable.h>
 #include <linux/ratelimit.h>
+#include <linux/exportfs.h>
 #include "overlayfs.h"
 #include "ovl_entry.h"
 
@@ -232,6 +233,95 @@ int ovl_set_attr(struct dentry *upperdentry, struct kstat *stat)
 	return err;
 }
 
+static struct ovl_fh *ovl_get_fh(struct dentry *lower)
+{
+	const struct export_operations *nop = lower->d_sb->s_export_op;
+	struct ovl_fh *fh;
+	int fh_type, fh_len, dwords;
+	void *buf = NULL;
+	void *ret = NULL;
+	int buflen = MAX_HANDLE_SZ;
+	int err;
+
+	/* Do not encode file handle if we cannot decode it later */
+	err = -EOPNOTSUPP;
+	if (!nop || !nop->fh_to_dentry)
+		goto out_err;
+
+	err = -ENOMEM;
+	buf = kmalloc(buflen, GFP_TEMPORARY);
+	if (!buf)
+		goto out_err;
+
+	fh = buf;
+	dwords = (buflen - offsetof(struct ovl_fh, fid)) >> 2;
+	fh_type = exportfs_encode_fh(lower,
+				     (struct fid *)fh->fid,
+				     &dwords, 0);
+	fh_len = (dwords << 2) + offsetof(struct ovl_fh, fid);
+
+	err = -EOVERFLOW;
+	if (fh_len > buflen || fh_type <= 0 || fh_type == FILEID_INVALID)
+		goto out_err;
+
+	fh->version = OVL_FH_VERSION;
+	fh->magic = OVL_FH_MAGIC;
+	fh->type = fh_type;
+	fh->len = fh_len;
+
+	err = -ENOMEM;
+	ret = kmalloc(fh_len, GFP_KERNEL);
+	if (!ret)
+		goto out_err;
+
+	memcpy(ret, buf, fh_len);
+
+	kfree(buf);
+	return ret;
+
+out_err:
+	pr_warn_ratelimited("overlay: failed to get redirect fh (%i)\n", err);
+	kfree(buf);
+	kfree(ret);
+	return ERR_PTR(err);
+}
+
+static struct ovl_fh null_fh = {
+	.version = OVL_FH_VERSION,
+	.magic = OVL_FH_MAGIC,
+	.type = FILEID_INVALID,
+	.len = sizeof(struct ovl_fh),
+};
+
+static int ovl_set_lower_fh(struct dentry *dentry, struct dentry *upper)
+{
+	int err;
+	const struct ovl_fh *fh = NULL;
+
+	if (ovl_redirect_fh(dentry->d_sb))
+		fh = ovl_get_fh(ovl_dentry_lower(dentry));
+	/*
+	 * On failure to encode lower fh, store an invalid 'null' fh, so
+	 * we can always use the overlay.fh xattr to distignuish between
+	 * a copy up and a pure upper inode.  If lower fs does not support
+	 * encoding fh, don't try to encode again.
+	 */
+	err = PTR_ERR(fh);
+	if (IS_ERR_OR_NULL(fh)) {
+		if (err == -EOPNOTSUPP) {
+			pr_warn("overlay: file handle not supported by lower - turning off redirect_fh\n");
+			ovl_clear_redirect_fh(dentry->d_sb);
+		}
+		fh = &null_fh;
+	}
+
+	err = ovl_do_setxattr(upper, OVL_XATTR_FH, fh, fh->len, 0);
+
+	if (fh != &null_fh)
+		kfree(fh);
+	return err;
+}
+
 static int ovl_copy_up_locked(struct dentry *workdir, struct dentry *upperdir,
 			      struct dentry *dentry, struct path *lowerpath,
 			      struct kstat *stat, const char *link,
@@ -313,6 +403,14 @@ static int ovl_copy_up_locked(struct dentry *workdir, struct dentry *upperdir,
 	inode_lock(temp->d_inode);
 	err = ovl_set_attr(temp, stat);
 	inode_unlock(temp->d_inode);
+	if (err)
+		goto out_cleanup;
+
+	/*
+	 * Store file handle of lower inode in upper inode xattr to
+	 * allow lookup of the copy up origin inode.
+	 */
+	err = ovl_set_lower_fh(dentry, temp);
 	if (err)
 		goto out_cleanup;
 
