@@ -795,6 +795,13 @@ static bool ovl_type_merge_or_lower(struct dentry *dentry)
 	return OVL_TYPE_MERGE(type) || !OVL_TYPE_UPPER(type);
 }
 
+static bool ovl_type_copyup(struct dentry *dentry)
+{
+	enum ovl_path_type type = ovl_path_type(dentry);
+
+	return OVL_TYPE_COPYUP(type);
+}
+
 static bool ovl_can_move(struct dentry *dentry)
 {
 	return ovl_redirect_dir(dentry->d_sb) ||
@@ -1022,6 +1029,8 @@ static int ovl_rename(struct inode *olddir, struct dentry *old,
 			err = ovl_set_opaque(old, olddentry);
 		if (err)
 			goto out_dput;
+	} else if (ovl_type_copyup(old)) {
+		err = ovl_set_redirect(old, samedir);
 	}
 	if (!overwrite && new_is_dir) {
 		if (ovl_type_merge_or_lower(new))
@@ -1030,6 +1039,8 @@ static int ovl_rename(struct inode *olddir, struct dentry *old,
 			err = ovl_set_opaque(new, newdentry);
 		if (err)
 			goto out_dput;
+	} else if (!overwrite && ovl_type_copyup(new)) {
+		err = ovl_set_redirect(new, samedir);
 	}
 
 	err = ovl_do_rename(old_upperdir->d_inode, olddentry,
