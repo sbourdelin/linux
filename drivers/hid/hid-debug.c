@@ -535,18 +535,18 @@ void hid_dump_field(struct hid_field *field, int n, struct seq_file *f) {
 
 	if (field->physical) {
 		tab(n, f);
-		seq_printf(f, "Physical(");
-		hid_resolv_usage(field->physical, f); seq_printf(f, ")\n");
+		seq_puts(f, "Physical(");
+		hid_resolv_usage(field->physical, f); seq_puts(f, ")\n");
 	}
 	if (field->logical) {
 		tab(n, f);
-		seq_printf(f, "Logical(");
-		hid_resolv_usage(field->logical, f); seq_printf(f, ")\n");
+		seq_puts(f, "Logical(");
+		hid_resolv_usage(field->logical, f); seq_puts(f, ")\n");
 	}
 	if (field->application) {
 		tab(n, f);
-		seq_printf(f, "Application(");
-		hid_resolv_usage(field->application, f); seq_printf(f, ")\n");
+		seq_puts(f, "Application(");
+		hid_resolv_usage(field->application, f); seq_puts(f, ")\n");
 	}
 	tab(n, f); seq_printf(f, "Usage(%d)\n", field->maxusage);
 	for (j = 0; j < field->maxusage; j++) {
@@ -583,7 +583,7 @@ void hid_dump_field(struct hid_field *field, int n, struct seq_file *f) {
 		data >>= 4;
 
 		if(sys > 4) {
-			tab(n, f); seq_printf(f, "Unit(Invalid)\n");
+			tab(n, f); seq_puts(f, "Unit(Invalid)\n");
 		}
 		else {
 			int earlier_unit = 0;
@@ -607,14 +607,14 @@ void hid_dump_field(struct hid_field *field, int n, struct seq_file *f) {
 					}
 				}
 			}
-			seq_printf(f, ")\n");
+			seq_puts(f, ")\n");
 		}
 	}
 	tab(n, f); seq_printf(f, "Report Size(%u)\n", field->report_size);
 	tab(n, f); seq_printf(f, "Report Count(%u)\n", field->report_count);
 	tab(n, f); seq_printf(f, "Report Offset(%u)\n", field->report_offset);
 
-	tab(n, f); seq_printf(f, "Flags( ");
+	tab(n, f); seq_puts(f, "Flags( ");
 	j = field->flags;
 	seq_printf(f, "%s", HID_MAIN_ITEM_CONSTANT & j ? "Constant " : "");
 	seq_printf(f, "%s", HID_MAIN_ITEM_VARIABLE & j ? "Variable " : "Array ");
@@ -625,7 +625,7 @@ void hid_dump_field(struct hid_field *field, int n, struct seq_file *f) {
 	seq_printf(f, "%s", HID_MAIN_ITEM_NULL_STATE & j ? "NullState " : "");
 	seq_printf(f, "%s", HID_MAIN_ITEM_VOLATILE & j ? "Volatile " : "");
 	seq_printf(f, "%s", HID_MAIN_ITEM_BUFFERED_BYTE & j ? "BufferedByte " : "");
-	seq_printf(f, ")\n");
+	seq_puts(f, ")\n");
 }
 EXPORT_SYMBOL_GPL(hid_dump_field);
 
@@ -1038,7 +1038,7 @@ static void hid_dump_input_mapping(struct hid_device *hid, struct seq_file *f)
 				for ( j = 0; j < report->field[i]->maxusage; j++) {
 					usage = report->field[i]->usage + j;
 					hid_resolv_usage(usage->hid, f);
-					seq_printf(f, " ---> ");
+					seq_puts(f, " ---> ");
 					hid_resolv_event(usage->type, usage->code, f);
 					seq_putc(f, '\n');
 				}
@@ -1063,7 +1063,7 @@ static int hid_debug_rdesc_show(struct seq_file *f, void *p)
 	/* dump HID report descriptor */
 	for (i = 0; i < rsize; i++)
 		seq_printf(f, "%02x ", rdesc[i]);
-	seq_printf(f, "\n\n");
+	seq_puts(f, "\n\n");
 
 	/* dump parsed data and input mappings */
 	hid_dump_device(hdev, f);
