@@ -471,6 +471,7 @@ static void kvm_mmu_notifier_release(struct mmu_notifier *mn,
 	idx = srcu_read_lock(&kvm->srcu);
 	kvm_arch_flush_shadow_all(kvm);
 	srcu_read_unlock(&kvm->srcu, idx);
+	kvm_put_kvm(kvm);
 }
 
 static const struct mmu_notifier_ops kvm_mmu_notifier_ops = {
@@ -486,8 +487,46 @@ static const struct mmu_notifier_ops kvm_mmu_notifier_ops = {
 
 static int kvm_init_mmu_notifier(struct kvm *kvm)
 {
+	int rc;
 	kvm->mmu_notifier.ops = &kvm_mmu_notifier_ops;
-	return mmu_notifier_register(&kvm->mmu_notifier, current->mm);
+	rc = mmu_notifier_register(&kvm->mmu_notifier, current->mm);
+	/*
+	 * We hold a reference to KVM here to make sure that the KVM
+	 * doesn't get free'd before ops->release() completes.
+	 */
+	if (!rc)
+		kvm_get_kvm(kvm);
+	return rc;
+}
+
+static void kvm_free_vm_rcu(struct rcu_head *rcu)
+{
+	struct kvm *kvm = container_of(rcu, struct kvm, mmu_notifier_rcu);
+	kvm_arch_free_vm(kvm);
+}
+
+static void kvm_flush_shadow_mmu(struct kvm *kvm)
+{
+	/*
+	 * We hold a reference to kvm instance for mmu_notifier and is
+	 * only released when ops->release() is called via exit_mmap path.
+	 * So, when we reach here ops->release() has been called already, which
+	 * flushes the shadow page tables. Hence there is no need to call the
+	 * release() again when we unregister the notifier. However, we need
+	 * to delay freeing up the kvm until the release() completes, since
+	 * we could reach here via :
+	 *  kvm_mmu_notifier_release() -> kvm_put_kvm() -> kvm_destroy_vm()
+	 */
+	mmu_notifier_unregister_no_release(&kvm->mmu_notifier, kvm->mm);
+}
+
+static void kvm_free_vm(struct kvm *kvm)
+{
+	/*
+	 * Wait until the mmu_notifier has finished the release().
+	 * See comments above in kvm_flush_shadow_mmu.
+	 */
+	mmu_notifier_call_srcu(&kvm->mmu_notifier_rcu, kvm_free_vm_rcu);
 }
 
 #else  /* !(CONFIG_MMU_NOTIFIER && KVM_ARCH_WANT_MMU_NOTIFIER) */
@@ -495,6 +534,16 @@ static int kvm_init_mmu_notifier(struct kvm *kvm)
 static int kvm_init_mmu_notifier(struct kvm *kvm)
 {
 	return 0;
+}
+
+static void kvm_flush_shadow_mmu(struct kvm *kvm)
+{
+	kvm_arch_flush_shadow_all(kvm);
+}
+
+static void kvm_free_vm(struct kvm *kvm)
+{
+	kvm_arch_free_vm(kvm);
 }
 
 #endif /* CONFIG_MMU_NOTIFIER && KVM_ARCH_WANT_MMU_NOTIFIER */
@@ -733,18 +782,14 @@ static void kvm_destroy_vm(struct kvm *kvm)
 		kvm->buses[i] = NULL;
 	}
 	kvm_coalesced_mmio_free(kvm);
-#if defined(CONFIG_MMU_NOTIFIER) && defined(KVM_ARCH_WANT_MMU_NOTIFIER)
-	mmu_notifier_unregister(&kvm->mmu_notifier, kvm->mm);
-#else
-	kvm_arch_flush_shadow_all(kvm);
-#endif
+	kvm_flush_shadow_mmu(kvm);
 	kvm_arch_destroy_vm(kvm);
 	kvm_destroy_devices(kvm);
 	for (i = 0; i < KVM_ADDRESS_SPACE_NUM; i++)
 		kvm_free_memslots(kvm, kvm->memslots[i]);
 	cleanup_srcu_struct(&kvm->irq_srcu);
 	cleanup_srcu_struct(&kvm->srcu);
-	kvm_arch_free_vm(kvm);
+	kvm_free_vm(kvm);
 	preempt_notifier_dec();
 	hardware_disable_all();
 	mmdrop(mm);
