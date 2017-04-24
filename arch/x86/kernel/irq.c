@@ -481,13 +481,14 @@ void fixup_irqs(void)
 		if (!irqd_can_move_in_process_context(data) && chip->irq_mask)
 			chip->irq_mask(data);
 
-		if (chip->irq_set_affinity) {
-			ret = chip->irq_set_affinity(data, affinity, true);
-			if (ret == -ENOSPC)
+		ret = irq_set_affinity_locked(data, affinity, true);
+		if (ret) {
+			if (ret == -ENOSPC) {
 				pr_crit("IRQ %d set affinity failed because there are no available vectors.  The device assigned to this IRQ is unstable.\n", irq);
-		} else {
-			if (!(warned++))
-				set_affinity = 0;
+			} else {
+				if (!(warned++))
+					set_affinity = 0;
+			}
 		}
 
 		/*
