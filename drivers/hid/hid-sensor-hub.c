@@ -640,10 +640,8 @@ static int sensor_hub_probe(struct hid_device *hdev,
 	struct hid_sensor_hub_device *collection_hsdev = NULL;
 
 	sd = devm_kzalloc(&hdev->dev, sizeof(*sd), GFP_KERNEL);
-	if (!sd) {
-		hid_err(hdev, "cannot allocate Sensor data\n");
+	if (!sd)
 		return -ENOMEM;
-	}
 
 	hid_set_drvdata(hdev, sd);
 	sd->quirks = id->driver_data;
@@ -678,7 +676,6 @@ static int sensor_hub_probe(struct hid_device *hdev,
 			       sizeof(*sd->hid_sensor_hub_client_devs),
 			       GFP_KERNEL);
 	if (sd->hid_sensor_hub_client_devs == NULL) {
-		hid_err(hdev, "Failed to allocate memory for mfd cells\n");
 		ret = -ENOMEM;
 		goto err_stop_hw;
 	}
@@ -692,7 +689,6 @@ static int sensor_hub_probe(struct hid_device *hdev,
 			hsdev = devm_kzalloc(&hdev->dev, sizeof(*hsdev),
 					     GFP_KERNEL);
 			if (!hsdev) {
-				hid_err(hdev, "cannot allocate hid_sensor_hub_device\n");
 				ret = -ENOMEM;
 				goto err_stop_hw;
 			}
