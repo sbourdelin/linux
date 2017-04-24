@@ -19,6 +19,7 @@
 
 #include <linux/init.h>
 #include <linux/module.h>
+#include <linux/moduleparam.h>
 #include <linux/platform_device.h>
 #include <linux/acpi.h>
 #include <linux/device.h>
@@ -58,6 +59,9 @@ struct byt_rt5640_private {
 };
 
 static unsigned long byt_rt5640_quirk = BYT_RT5640_MCLK_EN;
+static unsigned int quirk_override;
+module_param_named(quirk, quirk_override, int, 0444);
+MODULE_PARM_DESC(quirk, "Board-specific quirk override");
 
 static void log_quirks(struct device *dev)
 {
@@ -621,7 +625,7 @@ static struct snd_soc_dai_link byt_rt5640_dais[] = {
 		.codec_dai_name = "snd-soc-dummy-dai",
 		.codec_name = "snd-soc-dummy",
 		.platform_name = "sst-mfld-platform",
-		.ignore_suspend = 1,
+		.nonatomic = true,
 		.dynamic = 1,
 		.dpcm_playback = 1,
 		.dpcm_capture = 1,
@@ -634,7 +638,6 @@ static struct snd_soc_dai_link byt_rt5640_dais[] = {
 		.codec_dai_name = "snd-soc-dummy-dai",
 		.codec_name = "snd-soc-dummy",
 		.platform_name = "sst-mfld-platform",
-		.ignore_suspend = 1,
 		.nonatomic = true,
 		.dynamic = 1,
 		.dpcm_playback = 1,
@@ -661,6 +664,7 @@ static struct snd_soc_dai_link byt_rt5640_dais[] = {
 						| SND_SOC_DAIFMT_CBS_CFS,
 		.be_hw_params_fixup = byt_rt5640_codec_fixup,
 		.ignore_suspend = 1,
+		.nonatomic = true,
 		.dpcm_playback = 1,
 		.dpcm_capture = 1,
 		.init = byt_rt5640_init,
@@ -806,6 +810,11 @@ static int snd_byt_rt5640_mc_probe(struct platform_device *pdev)
 
 	/* check quirks before creating card */
 	dmi_check_system(byt_rt5640_quirk_table);
+	if (quirk_override) {
+		dev_info(&pdev->dev, "Overriding quirk %0x => 0x%x\n",
+			 (unsigned int)byt_rt5640_quirk, quirk_override);
+		byt_rt5640_quirk = quirk_override;
+	}
 	log_quirks(&pdev->dev);
 
 	if ((byt_rt5640_quirk & BYT_RT5640_SSP2_AIF2) ||
