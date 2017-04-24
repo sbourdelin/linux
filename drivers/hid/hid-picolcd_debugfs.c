@@ -33,9 +33,9 @@
 static int picolcd_debug_reset_show(struct seq_file *f, void *p)
 {
 	if (picolcd_fbinfo((struct picolcd_data *)f->private))
-		seq_printf(f, "all fb\n");
+		seq_puts(f, "all fb\n");
 	else
-		seq_printf(f, "all\n");
+		seq_puts(f, "all\n");
 	return 0;
 }
 
