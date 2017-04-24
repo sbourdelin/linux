@@ -308,8 +308,8 @@ static int ccp_sha_setkey(struct crypto_ahash *tfm, const u8 *key,
 	}
 
 	for (i = 0; i < block_size; i++) {
-		ctx->u.sha.ipad[i] = ctx->u.sha.key[i] ^ 0x36;
-		ctx->u.sha.opad[i] = ctx->u.sha.key[i] ^ 0x5c;
+		ctx->u.sha.ipad[i] = ctx->u.sha.key[i] ^ HMAC_IPAD_VALUE;
+		ctx->u.sha.opad[i] = ctx->u.sha.key[i] ^ HMAC_OPAD_VALUE;
 	}
 
 	sg_init_one(&ctx->u.sha.opad_sg, ctx->u.sha.opad, block_size);
