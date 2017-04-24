@@ -1,5 +1,7 @@
 #define  _XOPEN_SOURCE 500	/* needed for nftw() */
+#ifndef  _GNU_SOURCE
 #define  _GNU_SOURCE		/* needed for asprintf() */
+#endif
 
 /* Parse event JSON files */
 
