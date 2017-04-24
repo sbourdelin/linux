@@ -144,6 +144,11 @@ struct gpio_desc *devm_fwnode_get_index_gpiod_from_child(struct device *dev,
 						enum gpiod_flags flags,
 						const char *label);
 
+struct gpiod_lookup_table;
+
+void gpiod_add_lookup_table(struct gpiod_lookup_table *table);
+void gpiod_remove_lookup_table(struct gpiod_lookup_table *table);
+
 #else /* CONFIG_GPIOLIB */
 
 static inline int gpiod_count(struct device *dev, const char *con_id)
@@ -433,6 +438,16 @@ struct gpio_desc *devm_fwnode_get_index_gpiod_from_child(struct device *dev,
 						const char *label)
 {
 	return ERR_PTR(-ENOSYS);
+}
+
+struct gpiod_lookup_table;
+
+static inline void gpiod_add_lookup_table(struct gpiod_lookup_table *table)
+{
+}
+
+static inline void gpiod_remove_lookup_table(struct gpiod_lookup_table *table)
+{
 }
 
 #endif /* CONFIG_GPIOLIB */
