@@ -835,16 +835,18 @@ void stage2_unmap_vm(struct kvm *kvm)
  */
 void kvm_free_stage2_pgd(struct kvm *kvm)
 {
-	if (kvm->arch.pgd == NULL)
-		return;
+	void *pgd = NULL;
 
 	spin_lock(&kvm->mmu_lock);
-	unmap_stage2_range(kvm, 0, KVM_PHYS_SIZE);
+	if (kvm->arch.pgd) {
+		unmap_stage2_range(kvm, 0, KVM_PHYS_SIZE);
+		pgd = kvm->arch.pgd;
+		kvm->arch.pgd = NULL;
+	}
 	spin_unlock(&kvm->mmu_lock);
-
 	/* Free the HW pgd, one page at a time */
-	free_pages_exact(kvm->arch.pgd, S2_PGD_SIZE);
-	kvm->arch.pgd = NULL;
+	if (pgd)
+		free_pages_exact(pgd, S2_PGD_SIZE);
 }
 
 static pud_t *stage2_get_pud(struct kvm *kvm, struct kvm_mmu_memory_cache *cache,
