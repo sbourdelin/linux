@@ -249,9 +249,8 @@ static struct dentry *ubifs_lookup(struct inode *dir, struct dentry *dentry,
 		goto out_fname;
 	}
 
-	if (nm.hash) {
+	if (fname_name(&nm) == NULL) {
 		ubifs_assert(fname_len(&nm) == 0);
-		ubifs_assert(fname_name(&nm) == NULL);
 		dent_key_init_hash(c, &key, dir->i_ino, nm.hash);
 		err = ubifs_tnc_lookup_dh(c, &key, dent, nm.minor_hash);
 	} else {
