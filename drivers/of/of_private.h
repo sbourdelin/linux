@@ -55,6 +55,17 @@ static inline int of_property_notify(int action, struct device_node *np,
 }
 #endif /* CONFIG_OF_DYNAMIC */
 
+#ifdef CONFIG_OF_UNITTEST
+extern void __init unittest_unflatten_overlay_base(void);
+extern void *__unflatten_device_tree(const void *blob,
+			      struct device_node *dad,
+			      struct device_node **mynodes,
+			      void *(*dt_alloc)(u64 size, u64 align),
+			      bool detached);
+#else
+static inline void unittest_unflatten_overlay_base(void) {};
+#endif
+
 /**
  * General utilities for working with live trees.
  *
