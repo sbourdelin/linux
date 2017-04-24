@@ -20,7 +20,7 @@ static inline const struct dma_map_ops *__generic_dma_ops(struct device *dev)
 {
 	if (dev && dev->dma_ops)
 		return dev->dma_ops;
-	return &arm_dma_ops;
+	return IS_ENABLED(CONFIG_MMU) ? &arm_dma_ops : &dma_noop_ops;
 }
 
 static inline const struct dma_map_ops *get_arch_dma_ops(struct bus_type *bus)
