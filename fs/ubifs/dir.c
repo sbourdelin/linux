@@ -1341,6 +1341,12 @@ static int do_rename(struct inode *old_dir, struct dentry *old_dentry,
 	if (unlink)
 		ubifs_assert(inode_is_locked(new_inode));
 
+	if ((ubifs_crypt_is_encrypted(old_dir) &&
+	     !fscrypt_has_encryption_key(old_dir)) ||
+	    (ubifs_crypt_is_encrypted(new_dir) &&
+	     !fscrypt_has_encryption_key(new_dir)))
+		return -ENOKEY;
+
 	if (old_dir != new_dir) {
 		if (ubifs_crypt_is_encrypted(new_dir) &&
 		    !fscrypt_has_permitted_context(new_dir, old_inode))
@@ -1564,6 +1570,12 @@ static int ubifs_xrename(struct inode *old_dir, struct dentry *old_dentry,
 	struct fscrypt_name fst_nm, snd_nm;
 
 	ubifs_assert(fst_inode && snd_inode);
+
+	if ((ubifs_crypt_is_encrypted(old_dir) &&
+	     !fscrypt_has_encryption_key(old_dir)) ||
+	    (ubifs_crypt_is_encrypted(new_dir) &&
+	     !fscrypt_has_encryption_key(new_dir)))
+		return -ENOKEY;
 
 	if ((ubifs_crypt_is_encrypted(old_dir) ||
 	    ubifs_crypt_is_encrypted(new_dir)) &&
