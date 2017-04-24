@@ -635,6 +635,7 @@ static void fujitsu_laptop_platform_remove(void)
 static int logolamp_set(struct led_classdev *cdev,
 			enum led_brightness brightness)
 {
+	acpi_handle handle = to_acpi_device(cdev->dev->parent)->handle;
 	int poweron = FUNC_LED_ON, always = FUNC_LED_ON;
 	int ret;
 
@@ -644,136 +645,120 @@ static int logolamp_set(struct led_classdev *cdev,
 	if (brightness < LED_FULL)
 		always = FUNC_LED_OFF;
 
-	ret = fext_leds(fujitsu_laptop->handle, 0x1, LOGOLAMP_POWERON, poweron);
+	ret = fext_leds(handle, 0x1, LOGOLAMP_POWERON, poweron);
 	if (ret < 0)
 		return ret;
 
-	return fext_leds(fujitsu_laptop->handle, 0x1, LOGOLAMP_ALWAYS, always);
+	return fext_leds(handle, 0x1, LOGOLAMP_ALWAYS, always);
 }
 
 static enum led_brightness logolamp_get(struct led_classdev *cdev)
 {
+	acpi_handle handle = to_acpi_device(cdev->dev->parent)->handle;
 	int ret;
 
-	ret = fext_leds(fujitsu_laptop->handle, 0x2, LOGOLAMP_ALWAYS, 0x0);
+	ret = fext_leds(handle, 0x2, LOGOLAMP_ALWAYS, 0x0);
 	if (ret == FUNC_LED_ON)
 		return LED_FULL;
 
-	ret = fext_leds(fujitsu_laptop->handle, 0x2, LOGOLAMP_POWERON, 0x0);
+	ret = fext_leds(handle, 0x2, LOGOLAMP_POWERON, 0x0);
 	if (ret == FUNC_LED_ON)
 		return LED_HALF;
 
 	return LED_OFF;
 }
 
-static struct led_classdev logolamp_led = {
-	.name = "fujitsu::logolamp",
-	.brightness_set_blocking = logolamp_set,
-	.brightness_get = logolamp_get
-};
-
 static int kblamps_set(struct led_classdev *cdev,
 		       enum led_brightness brightness)
 {
+	acpi_handle handle = to_acpi_device(cdev->dev->parent)->handle;
+
 	if (brightness >= LED_FULL)
-		return fext_leds(fujitsu_laptop->handle, 0x1, KEYBOARD_LAMPS,
-				 FUNC_LED_ON);
+		return fext_leds(handle, 0x1, KEYBOARD_LAMPS, FUNC_LED_ON);
 	else
-		return fext_leds(fujitsu_laptop->handle, 0x1, KEYBOARD_LAMPS,
-				 FUNC_LED_OFF);
+		return fext_leds(handle, 0x1, KEYBOARD_LAMPS, FUNC_LED_OFF);
 }
 
 static enum led_brightness kblamps_get(struct led_classdev *cdev)
 {
+	acpi_handle handle = to_acpi_device(cdev->dev->parent)->handle;
 	enum led_brightness brightness = LED_OFF;
 
-	if (fext_leds(fujitsu_laptop->handle,
-		      0x2, KEYBOARD_LAMPS, 0x0) == FUNC_LED_ON)
+	if (fext_leds(handle, 0x2, KEYBOARD_LAMPS, 0x0) == FUNC_LED_ON)
 		brightness = LED_FULL;
 
 	return brightness;
 }
-
-static struct led_classdev kblamps_led = {
-	.name = "fujitsu::kblamps",
-	.brightness_set_blocking = kblamps_set,
-	.brightness_get = kblamps_get
-};
 
 static int radio_led_set(struct led_classdev *cdev,
 			 enum led_brightness brightness)
 {
+	acpi_handle handle = to_acpi_device(cdev->dev->parent)->handle;
+
 	if (brightness >= LED_FULL)
-		return fext_flags(fujitsu_laptop->handle, 0x5, RADIO_LED_ON,
-				  RADIO_LED_ON);
+		return fext_flags(handle, 0x5, RADIO_LED_ON, RADIO_LED_ON);
 	else
-		return fext_flags(fujitsu_laptop->handle, 0x5, RADIO_LED_ON,
-				  0x0);
+		return fext_flags(handle, 0x5, RADIO_LED_ON, 0x0);
 }
 
 static enum led_brightness radio_led_get(struct led_classdev *cdev)
 {
+	acpi_handle handle = to_acpi_device(cdev->dev->parent)->handle;
 	enum led_brightness brightness = LED_OFF;
 
-	if (fext_flags(fujitsu_laptop->handle, 0x4, 0x0, 0x0) & RADIO_LED_ON)
+	if (fext_flags(handle, 0x4, 0x0, 0x0) & RADIO_LED_ON)
 		brightness = LED_FULL;
 
 	return brightness;
 }
-
-static struct led_classdev radio_led = {
-	.name = "fujitsu::radio_led",
-	.brightness_set_blocking = radio_led_set,
-	.brightness_get = radio_led_get,
-	.default_trigger = "rfkill-any"
-};
 
 static int eco_led_set(struct led_classdev *cdev,
 		       enum led_brightness brightness)
 {
+	acpi_handle handle = to_acpi_device(cdev->dev->parent)->handle;
 	int curr;
 
-	curr = fext_leds(fujitsu_laptop->handle, 0x2, ECO_LED, 0x0);
+	curr = fext_leds(handle, 0x2, ECO_LED, 0x0);
 	if (brightness >= LED_FULL)
-		return fext_leds(fujitsu_laptop->handle, 0x1, ECO_LED,
-				 curr | ECO_LED_ON);
+		return fext_leds(handle, 0x1, ECO_LED, curr | ECO_LED_ON);
 	else
-		return fext_leds(fujitsu_laptop->handle, 0x1, ECO_LED,
-				 curr & ~ECO_LED_ON);
+		return fext_leds(handle, 0x1, ECO_LED, curr & ~ECO_LED_ON);
 }
 
 static enum led_brightness eco_led_get(struct led_classdev *cdev)
 {
+	acpi_handle handle = to_acpi_device(cdev->dev->parent)->handle;
 	enum led_brightness brightness = LED_OFF;
 
-	if (fext_leds(fujitsu_laptop->handle, 0x2, ECO_LED, 0x0) & ECO_LED_ON)
+	if (fext_leds(handle, 0x2, ECO_LED, 0x0) & ECO_LED_ON)
 		brightness = LED_FULL;
 
 	return brightness;
 }
 
-static struct led_classdev eco_led = {
-	.name = "fujitsu::eco_led",
-	.brightness_set_blocking = eco_led_set,
-	.brightness_get = eco_led_get
-};
-
 static int acpi_fujitsu_laptop_leds_register(struct acpi_device *device)
 {
+	struct fujitsu_laptop *priv = acpi_driver_data(device);
+	struct led_classdev *led;
 	int result;
 
-	if (fext_leds(fujitsu_laptop->handle,
-		      0x0, 0x0, 0x0) & LOGOLAMP_POWERON) {
-		result = devm_led_classdev_register(&device->dev,
-						    &logolamp_led);
+	if (fext_leds(priv->handle, 0x0, 0x0, 0x0) & LOGOLAMP_POWERON) {
+		led = devm_kzalloc(&device->dev, sizeof(*led), GFP_KERNEL);
+		led->name = "fujitsu::logolamp";
+		led->brightness_set_blocking = logolamp_set;
+		led->brightness_get = logolamp_get;
+		result = devm_led_classdev_register(&device->dev, led);
 		if (result)
 			return result;
 	}
 
-	if ((fext_leds(fujitsu_laptop->handle,
-		       0x0, 0x0, 0x0) & KEYBOARD_LAMPS) &&
-	    (fext_buttons(fujitsu_laptop->handle, 0x0, 0x0, 0x0) == 0x0)) {
-		result = devm_led_classdev_register(&device->dev, &kblamps_led);
+	if ((fext_leds(priv->handle, 0x0, 0x0, 0x0) & KEYBOARD_LAMPS) &&
+	    (fext_buttons(priv->handle, 0x0, 0x0, 0x0) == 0x0)) {
+		led = devm_kzalloc(&device->dev, sizeof(*led), GFP_KERNEL);
+		led->name = "fujitsu::kblamps";
+		led->brightness_set_blocking = kblamps_set;
+		led->brightness_get = kblamps_get;
+		result = devm_led_classdev_register(&device->dev, led);
 		if (result)
 			return result;
 	}
@@ -784,8 +769,13 @@ static int acpi_fujitsu_laptop_leds_register(struct acpi_device *device)
 	 * to also have an RF LED.  Therefore use bit 24 as an indicator
 	 * that an RF LED is present.
 	 */
-	if (fext_buttons(fujitsu_laptop->handle, 0x0, 0x0, 0x0) & BIT(24)) {
-		result = devm_led_classdev_register(&device->dev, &radio_led);
+	if (fext_buttons(priv->handle, 0x0, 0x0, 0x0) & BIT(24)) {
+		led = devm_kzalloc(&device->dev, sizeof(*led), GFP_KERNEL);
+		led->name = "fujitsu::radio_led";
+		led->brightness_set_blocking = radio_led_set;
+		led->brightness_get = radio_led_get;
+		led->default_trigger = "rfkill-any";
+		result = devm_led_classdev_register(&device->dev, led);
 		if (result)
 			return result;
 	}
@@ -795,10 +785,13 @@ static int acpi_fujitsu_laptop_leds_register(struct acpi_device *device)
 	 * bit 14 seems to indicate presence of said led as well.
 	 * Confirm by testing the status.
 	 */
-	if ((fext_leds(fujitsu_laptop->handle, 0x0, 0x0, 0x0) & BIT(14)) &&
-	    (fext_leds(fujitsu_laptop->handle,
-		       0x2, ECO_LED, 0x0) != UNSUPPORTED_CMD)) {
-		result = devm_led_classdev_register(&device->dev, &eco_led);
+	if ((fext_leds(priv->handle, 0x0, 0x0, 0x0) & BIT(14)) &&
+	    (fext_leds(priv->handle, 0x2, ECO_LED, 0x0) != UNSUPPORTED_CMD)) {
+		led = devm_kzalloc(&device->dev, sizeof(*led), GFP_KERNEL);
+		led->name = "fujitsu::eco_led";
+		led->brightness_set_blocking = eco_led_set;
+		led->brightness_get = eco_led_get;
+		result = devm_led_classdev_register(&device->dev, led);
 		if (result)
 			return result;
 	}
