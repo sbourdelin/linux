@@ -148,6 +148,7 @@
 #define EM28178_BOARD_PLEX_PX_BCUD                98
 #define EM28174_BOARD_HAUPPAUGE_WINTV_DUALHD_DVB  99
 #define EM28174_BOARD_HAUPPAUGE_WINTV_DUALHD_01595 100
+#define EM2884_BOARD_TERRATEC_H6		  101
 
 /* Limits minimum and default number of buffers */
 #define EM28XX_MIN_BUF 4
@@ -440,7 +441,8 @@ struct em28xx_board {
 	int vchannels;
 	int tuner_type;
 	int tuner_addr;
-	unsigned def_i2c_bus;	/* Default I2C bus */
+	unsigned def_i2c_bus;		/* Default I2C bus */
+	unsigned eeprom_i2c_bus;	/* EEPROM I2C bus */
 
 	/* i2c flags */
 	unsigned int tda9887_conf;
@@ -643,6 +645,7 @@ struct em28xx {
 
 	unsigned char eeprom_addrwidth_16bit:1;
 	unsigned def_i2c_bus;	/* Default I2C bus */
+	unsigned eeprom_i2c_bus;/* EEPROM I2C bus */
 	unsigned cur_i2c_bus;	/* Current I2C bus */
 	struct rt_mutex i2c_bus_lock;
 

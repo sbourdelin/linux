@@ -665,8 +665,6 @@ static int em28xx_i2c_eeprom(struct em28xx *dev, unsigned bus,
 	*eedata = NULL;
 	*eedata_len = 0;
 
-	/* EEPROM is always on i2c bus 0 on all known devices. */
-
 	dev->i2c_client[bus].addr = 0xa0 >> 1;
 
 	/* Check if board has eeprom */
@@ -975,8 +973,7 @@ int em28xx_i2c_register(struct em28xx *dev, unsigned bus,
 	dev->i2c_client[bus] = em28xx_client_template;
 	dev->i2c_client[bus].adapter = &dev->i2c_adap[bus];
 
-	/* Up to now, all eeproms are at bus 0 */
-	if (!bus) {
+	if (bus == dev->eeprom_i2c_bus) {
 		retval = em28xx_i2c_eeprom(dev, bus, &dev->eedata, &dev->eedata_len);
 		if ((retval < 0) && (retval != -ENODEV)) {
 			dev_err(&dev->intf->dev,
