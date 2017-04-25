@@ -1491,6 +1491,33 @@ out:
 	return retval;
 }
 
+/*
+ * Callback function called indirectly by scsi_end_request() after the
+ * SYNCHRONIZE CACHE command has finished.
+ */
+static void sd_sync_cache_done(struct request *rq, int e)
+{
+	struct request_queue *q = rq->q;
+
+	__blk_put_request(q, rq);
+}
+
+/*
+ * Issue a SYNCHRONIZE CACHE command asynchronously. Since blk_cleanup_queue()
+ * waits for all commands to finish, __scsi_remove_device() will wait for the
+ * SYNCHRONIZE CACHE command to finish.
+ */
+static int sd_sync_cache_async(struct scsi_disk *sdkp)
+{
+	const struct scsi_device *sdp = sdkp->device;
+	const int timeout = sdp->request_queue->rq_timeout *
+			    SD_FLUSH_TIMEOUT_MULTIPLIER;
+	const unsigned char cmd[10] = { SYNCHRONIZE_CACHE };
+
+	return scsi_execute_async(sdp, NULL, cmd, DMA_NONE, NULL, 0, timeout,
+				  SD_MAX_RETRIES, 0, 0, sd_sync_cache_done);
+}
+
 static int sd_sync_cache(struct scsi_disk *sdkp)
 {
 	int retries, res;
@@ -3349,13 +3376,15 @@ static int sd_start_stop_device(struct scsi_disk *sdkp, int start)
 }
 
 /*
- * Send a SYNCHRONIZE CACHE instruction down to the device through
- * the normal SCSI command structure.  Wait for the command to
- * complete.
+ * Send a SYNCHRONIZE CACHE instruction down to the device through the normal
+ * SCSI command structure. When stopping the disk, wait for the command to
+ * complete. When not stopping the disk, the blk_cleanup_queue() call in
+ * __scsi_remove_device() will wait for this command to complete.
  */
 static void sd_shutdown(struct device *dev)
 {
 	struct scsi_disk *sdkp = dev_get_drvdata(dev);
+	bool stop_disk;
 
 	if (!sdkp)
 		return;         /* this can happen */
@@ -3363,12 +3392,18 @@ static void sd_shutdown(struct device *dev)
 	if (pm_runtime_suspended(dev))
 		return;
 
+	stop_disk = system_state != SYSTEM_RESTART &&
+		sdkp->device->manage_start_stop;
+
 	if (sdkp->WCE && sdkp->media_present) {
 		sd_printk(KERN_NOTICE, sdkp, "Synchronizing SCSI cache\n");
-		sd_sync_cache(sdkp);
+		if (stop_disk)
+			sd_sync_cache(sdkp);
+		else
+			sd_sync_cache_async(sdkp);
 	}
 
-	if (system_state != SYSTEM_RESTART && sdkp->device->manage_start_stop) {
+	if (stop_disk) {
 		sd_printk(KERN_NOTICE, sdkp, "Stopping disk\n");
 		sd_start_stop_device(sdkp, 0);
 	}
