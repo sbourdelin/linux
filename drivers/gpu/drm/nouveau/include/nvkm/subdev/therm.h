@@ -84,6 +84,9 @@ struct nvkm_therm {
 
 	int (*attr_get)(struct nvkm_therm *, enum nvkm_therm_attr_type);
 	int (*attr_set)(struct nvkm_therm *, enum nvkm_therm_attr_type, int);
+
+	int  (*clkgate_engine)(struct nvkm_therm *, enum nvkm_devidx);
+	void (*clkgate_set)(struct nvkm_therm *, int gate_idx, bool enable);
 };
 
 int nvkm_therm_temp_get(struct nvkm_therm *);
@@ -94,6 +97,7 @@ int nv40_therm_new(struct nvkm_device *, int, struct nvkm_therm **);
 int nv50_therm_new(struct nvkm_device *, int, struct nvkm_therm **);
 int g84_therm_new(struct nvkm_device *, int, struct nvkm_therm **);
 int gt215_therm_new(struct nvkm_device *, int, struct nvkm_therm **);
+int gf100_therm_new(struct nvkm_device *, int, struct nvkm_therm **);
 int gf119_therm_new(struct nvkm_device *, int, struct nvkm_therm **);
 int gm107_therm_new(struct nvkm_device *, int, struct nvkm_therm **);
 #endif

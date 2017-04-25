@@ -143,6 +143,8 @@ gf119_therm = {
 	.temp_get = g84_temp_get,
 	.fan_sense = gt215_therm_fan_sense,
 	.program_alarms = nvkm_therm_program_alarms_polling,
+	.clkgate_engine = gf100_clkgate_engine,
+	.clkgate_set = gf100_clkgate_set,
 };
 
 int

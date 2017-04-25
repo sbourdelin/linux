@@ -26,6 +26,7 @@
 #include <core/option.h>
 
 #include <subdev/fb.h>
+#include <subdev/therm.h>
 
 bool
 nvkm_engine_chsw_load(struct nvkm_engine *engine)
@@ -86,6 +87,13 @@ static int
 nvkm_engine_fini(struct nvkm_subdev *subdev, bool suspend)
 {
 	struct nvkm_engine *engine = nvkm_engine(subdev);
+	struct nvkm_therm *therm = subdev->device->therm;
+	int gate_idx;
+
+	gate_idx = therm->clkgate_engine(therm, subdev->index);
+	if (gate_idx != -1)
+		therm->clkgate_set(therm, gate_idx, false);
+
 	if (engine->func->fini)
 		return engine->func->fini(engine, suspend);
 	return 0;
@@ -96,12 +104,13 @@ nvkm_engine_init(struct nvkm_subdev *subdev)
 {
 	struct nvkm_engine *engine = nvkm_engine(subdev);
 	struct nvkm_fb *fb = subdev->device->fb;
+	struct nvkm_therm *therm = subdev->device->therm;
 	int ret = 0, i;
 	s64 time;
 
 	if (!engine->usecount) {
 		nvkm_trace(subdev, "init skipped, engine has no users\n");
-		return ret;
+		goto finish;
 	}
 
 	if (engine->func->oneinit && !engine->subdev.oneinit) {
@@ -123,6 +132,15 @@ nvkm_engine_init(struct nvkm_subdev *subdev)
 
 	for (i = 0; fb && i < fb->tile.regions; i++)
 		nvkm_engine_tile(engine, i);
+
+finish:
+	if (!ret) {
+		int gate_idx = therm->clkgate_engine(therm, subdev->index);
+
+		if (gate_idx != -1)
+			therm->clkgate_set(therm, gate_idx, true);
+	}
+
 	return ret;
 }
 

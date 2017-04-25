@@ -393,6 +393,8 @@ nvkm_therm_new_(const struct nvkm_therm_func *func, struct nvkm_device *device,
 	therm->fan_set = nvkm_therm_fan_user_set;
 	therm->attr_get = nvkm_therm_attr_get;
 	therm->attr_set = nvkm_therm_attr_set;
+	therm->clkgate_engine = nvkm_therm_clkgate_engine;
+	therm->clkgate_set = nvkm_therm_clkgate_set;
 	therm->mode = therm->suspend = -1; /* undefined */
 	return 0;
 }
