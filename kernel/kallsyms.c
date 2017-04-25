@@ -205,6 +205,12 @@ unsigned long kallsyms_lookup_name(const char *name)
 	unsigned long i;
 	unsigned int off;
 
+	if (!name || *name == '\0')
+		return false;
+
+	if (strnchr(name, MODULE_NAME_LEN, ':'))
+		return module_kallsyms_lookup_name(name);
+
 	for (i = 0, off = 0; i < kallsyms_num_syms; i++) {
 		off = kallsyms_expand_symbol(off, namebuf, ARRAY_SIZE(namebuf));
 
