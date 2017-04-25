@@ -213,6 +213,73 @@ void scsi_queue_insert(struct scsi_cmnd *cmd, int reason)
 	__scsi_queue_insert(cmd, reason, 1);
 }
 
+static struct request *scsi_build_rq(const struct scsi_device *sdev,
+		const unsigned char *cmd, int data_direction, void *buffer,
+		unsigned bufflen, int timeout, int retries, u64 flags,
+		req_flags_t rq_flags)
+{
+	struct request *req;
+	struct scsi_request *rq;
+	int ret;
+
+	req = blk_get_request(sdev->request_queue,
+			data_direction == DMA_TO_DEVICE ?
+			REQ_OP_SCSI_OUT : REQ_OP_SCSI_IN, __GFP_RECLAIM);
+	if (IS_ERR(req))
+		return req;
+	rq = scsi_req(req);
+	scsi_req_init(req);
+
+	if (bufflen) {
+		ret = blk_rq_map_kern(sdev->request_queue, req,
+				      buffer, bufflen, __GFP_RECLAIM);
+		if (ret) {
+			blk_put_request(req);
+			return ERR_PTR(ret);
+		}
+	}
+
+	rq->cmd_len = COMMAND_SIZE(cmd[0]);
+	memcpy(rq->cmd, cmd, rq->cmd_len);
+	req->retries = retries;
+	req->timeout = timeout;
+	req->cmd_flags |= flags;
+	req->rq_flags |= rq_flags | RQF_QUIET | RQF_PREEMPT;
+
+	return req;
+}
+
+/**
+ * scsi_execute_async - insert a SCSI request
+ * @sdev:	scsi device
+ * @disk:       gendisk pointer that will be stored in the request structure
+ * @cmd:	scsi command
+ * @data_direction: data direction
+ * @buffer:	data buffer
+ * @bufflen:	length of buffer
+ * @timeout:	request timeout in seconds
+ * @retries:	number of times to retry request
+ * @flags:	flags for ->cmd_flags
+ * @rq_flags:	flags for ->rq_flags
+ * @done:       I/O completion function
+ */
+int scsi_execute_async(const struct scsi_device *sdev, struct gendisk *disk,
+		const unsigned char *cmd, int data_direction, void *buffer,
+		unsigned bufflen, int timeout, int retries, u64 flags,
+		req_flags_t rq_flags, rq_end_io_fn *done)
+{
+	struct request *req;
+
+	req = scsi_build_rq(sdev, cmd, data_direction, buffer, bufflen, timeout,
+			    retries, flags, rq_flags);
+	if (IS_ERR(req))
+		return PTR_ERR(req);
+	/* head injection *required* here otherwise quiesce won't work */
+	blk_execute_rq_nowait(req->q, disk, req, 1, done);
+
+	return 0;
+}
+EXPORT_SYMBOL(scsi_execute_async);
 
 /**
  * scsi_execute - insert request and wait for the result
@@ -242,24 +309,12 @@ int scsi_execute(struct scsi_device *sdev, const unsigned char *cmd,
 	struct scsi_request *rq;
 	int ret = DRIVER_ERROR << 24;
 
-	req = blk_get_request(sdev->request_queue,
-			data_direction == DMA_TO_DEVICE ?
-			REQ_OP_SCSI_OUT : REQ_OP_SCSI_IN, __GFP_RECLAIM);
+	req = scsi_build_rq(sdev, cmd, data_direction, buffer, bufflen,
+			    timeout, retries, flags, rq_flags);
 	if (IS_ERR(req))
-		return ret;
+		return PTR_ERR(req);
+
 	rq = scsi_req(req);
-	scsi_req_init(req);
-
-	if (bufflen &&	blk_rq_map_kern(sdev->request_queue, req,
-					buffer, bufflen, __GFP_RECLAIM))
-		goto out;
-
-	rq->cmd_len = COMMAND_SIZE(cmd[0]);
-	memcpy(rq->cmd, cmd, rq->cmd_len);
-	req->retries = retries;
-	req->timeout = timeout;
-	req->cmd_flags |= flags;
-	req->rq_flags |= rq_flags | RQF_QUIET | RQF_PREEMPT;
 
 	/*
 	 * head injection *required* here otherwise quiesce won't work
@@ -282,7 +337,7 @@ int scsi_execute(struct scsi_device *sdev, const unsigned char *cmd,
 	if (sshdr)
 		scsi_normalize_sense(rq->sense, rq->sense_len, sshdr);
 	ret = req->errors;
- out:
+
 	blk_put_request(req);
 
 	return ret;
