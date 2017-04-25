@@ -383,7 +383,7 @@ static int __init dummy_init_one(void)
 	return 0;
 
 err:
-	free_netdev(dev_dummy);
+	dummy_free_netdev(dev_dummy);
 	return err;
 }
 

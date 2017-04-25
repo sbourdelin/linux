@@ -1555,8 +1555,11 @@ static int ipip6_newlink(struct net *src_net, struct net_device *dev,
 		return -EEXIST;
 
 	err = ipip6_tunnel_create(dev);
-	if (err < 0)
+	if (err < 0) {
+		dst_cache_destroy(&nt->dst_cache);
+		free_percpu(dev->tstats);
 		return err;
+	}
 
 #ifdef CONFIG_IPV6_SIT_6RD
 	if (ipip6_netlink_6rd_parms(data, &ip6rd))

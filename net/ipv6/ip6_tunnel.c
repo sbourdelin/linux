@@ -1960,11 +1960,12 @@ static int ip6_tnl_newlink(struct net *src_net, struct net_device *dev,
 	struct ip6_tnl_net *ip6n = net_generic(net, ip6_tnl_net_id);
 	struct ip6_tnl *nt, *t;
 	struct ip_tunnel_encap ipencap;
+	int err;
 
 	nt = netdev_priv(dev);
 
 	if (ip6_tnl_netlink_encap_parms(data, &ipencap)) {
-		int err = ip6_tnl_encap_setup(nt, &ipencap);
+		err = ip6_tnl_encap_setup(nt, &ipencap);
 
 		if (err < 0)
 			return err;
@@ -1981,7 +1982,14 @@ static int ip6_tnl_newlink(struct net *src_net, struct net_device *dev,
 			return -EEXIST;
 	}
 
-	return ip6_tnl_create2(dev);
+	err = ip6_tnl_create2(dev);
+	if (err) {
+		gro_cells_destroy(&t->gro_cells);
+		dst_cache_destroy(&t->dst_cache);
+		free_percpu(dev->tstats);
+	}
+
+	return err;
 }
 
 static int ip6_tnl_changelink(struct net_device *dev, struct nlattr *tb[],

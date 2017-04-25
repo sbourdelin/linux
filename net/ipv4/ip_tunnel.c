@@ -63,6 +63,8 @@
 #include <net/ip6_route.h>
 #endif
 
+static void ip_tunnel_dev_free(struct net_device *dev);
+
 static unsigned int ip_tunnel_hash(__be32 key, __be32 remote)
 {
 	return hash_32((__force u32)key ^ (__force u32)remote,
@@ -285,7 +287,7 @@ static struct net_device *__ip_tunnel_create(struct net *net,
 	return dev;
 
 failed_free:
-	free_netdev(dev);
+	ip_tunnel_dev_free(dev);
 failed:
 	return ERR_PTR(err);
 }
@@ -1099,7 +1101,12 @@ int ip_tunnel_newlink(struct net_device *dev, struct nlattr *tb[],
 		dev->mtu = mtu;
 
 	ip_tunnel_add(itn, nt);
+
+	return 0;
 out:
+	gro_cells_destroy(&nt->gro_cells);
+	dst_cache_destroy(&nt->dst_cache);
+	free_percpu(dev->tstats);
 	return err;
 }
 EXPORT_SYMBOL_GPL(ip_tunnel_newlink);

@@ -77,6 +77,7 @@ static int ip6gre_tunnel_init(struct net_device *dev);
 static void ip6gre_tunnel_setup(struct net_device *dev);
 static void ip6gre_tunnel_link(struct ip6gre_net *ign, struct ip6_tnl *t);
 static void ip6gre_tnl_link_config(struct ip6_tnl *t, int set_mtu);
+static void ip6gre_dev_free(struct net_device *dev);
 
 /* Tunnel hash table */
 
@@ -351,7 +352,7 @@ static struct ip6_tnl *ip6gre_tunnel_locate(struct net *net,
 	return nt;
 
 failed_free:
-	free_netdev(dev);
+	ip6gre_dev_free(dev);
 	return NULL;
 }
 
@@ -1388,7 +1389,10 @@ static int ip6gre_newlink(struct net *src_net, struct net_device *dev,
 	dev_hold(dev);
 	ip6gre_tunnel_link(ign, nt);
 
+	return 0;
 out:
+	dst_cache_destroy(&nt->dst_cache);
+	free_percpu(dev->tstats);
 	return err;
 }
 

@@ -457,13 +457,13 @@ static int veth_newlink(struct net *src_net, struct net_device *dev,
 	return 0;
 
 err_register_dev:
-	/* nothing to do */
+	free_percpu(dev->vstats);
 err_configure_peer:
 	unregister_netdevice(peer);
 	return err;
 
 err_register_peer:
-	free_netdev(peer);
+	veth_dev_free(peer);
 	return err;
 }
 

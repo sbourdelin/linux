@@ -318,7 +318,7 @@ static int __init ifb_init_one(int index)
 	return 0;
 
 err:
-	free_netdev(dev_ifb);
+	ifb_dev_free(dev_ifb);
 	return err;
 }
 

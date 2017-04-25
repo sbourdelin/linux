@@ -208,7 +208,7 @@ static __net_init int loopback_net_init(struct net *net)
 
 
 out_free_netdev:
-	free_netdev(dev);
+	loopback_dev_free(dev);
 out:
 	if (net_eq(net, &init_net))
 		panic("loopback: Failed to register netdevice: %d\n", err);

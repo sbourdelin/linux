@@ -156,7 +156,11 @@ static int vlan_newlink(struct net *src_net, struct net_device *dev,
 	if (err < 0)
 		return err;
 
-	return register_vlan_dev(dev);
+	err = register_vlan_dev(dev);
+	if (err)
+		free_percpu(vlan->vlan_pcpu_stats);
+
+	return err;
 }
 
 static inline size_t vlan_qos_map_size(unsigned int n)

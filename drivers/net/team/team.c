@@ -2109,10 +2109,19 @@ static void team_setup(struct net_device *dev)
 static int team_newlink(struct net *src_net, struct net_device *dev,
 			struct nlattr *tb[], struct nlattr *data[])
 {
+	int ret;
+
 	if (tb[IFLA_ADDRESS] == NULL)
 		eth_hw_addr_random(dev);
 
-	return register_netdevice(dev);
+	ret = register_netdevice(dev);
+	if (ret) {
+		struct team *team = netdev_priv(dev);
+
+		free_percpu(team->pcpu_stats);
+	}
+
+	return ret;
 }
 
 static int team_validate(struct nlattr *tb[], struct nlattr *data[])

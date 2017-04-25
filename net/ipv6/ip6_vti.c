@@ -940,6 +940,7 @@ static int vti6_newlink(struct net *src_net, struct net_device *dev,
 {
 	struct net *net = dev_net(dev);
 	struct ip6_tnl *nt;
+	int ret;
 
 	nt = netdev_priv(dev);
 	vti6_netlink_parms(data, &nt->parms);
@@ -949,7 +950,11 @@ static int vti6_newlink(struct net *src_net, struct net_device *dev,
 	if (vti6_locate(net, &nt->parms, 0))
 		return -EEXIST;
 
-	return vti6_tnl_create2(dev);
+	ret = vti6_tnl_create2(dev);
+	if (ret)
+		free_percpu(dev->tstats);
+
+	return ret;
 }
 
 static void vti6_dellink(struct net_device *dev, struct list_head *head)
