@@ -1161,6 +1161,9 @@ static int ipoib_hard_header(struct sk_buff *skb,
 {
 	struct ipoib_header *header;
 
+	if (unlikely(skb_headroom(skb) < IPOIB_HARD_LEN))
+		return -EINVAL;
+
 	header = (struct ipoib_header *) skb_push(skb, sizeof *header);
 
 	header->proto = htons(type);
