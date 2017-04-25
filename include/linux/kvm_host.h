@@ -504,12 +504,17 @@ void vcpu_put(struct kvm_vcpu *vcpu);
 #ifdef __KVM_HAVE_IOAPIC
 void kvm_arch_post_irq_ack_notifier_list_update(struct kvm *kvm);
 void kvm_arch_post_irq_routing_update(struct kvm *kvm);
+bool kvm_arch_can_set_irq_routing(struct kvm *kvm);
 #else
 static inline void kvm_arch_post_irq_ack_notifier_list_update(struct kvm *kvm)
 {
 }
 static inline void kvm_arch_post_irq_routing_update(struct kvm *kvm)
 {
+}
+static bool kvm_arch_can_set_irq_routing(struct kvm *kvm)
+{
+	return true;
 }
 #endif
 
