@@ -229,7 +229,9 @@ static int rxkad_secure_packet_encrypt(const struct rxrpc_call *call,
 	len &= ~(call->conn->size_align - 1);
 
 	sg_init_table(sg, nsg);
-	skb_to_sgvec(skb, sg, 0, len);
+	err = skb_to_sgvec(skb, sg, 0, len);
+	if (unlikely(err < 0))
+		goto out;
 	skcipher_request_set_crypt(req, sg, sg, len, iv.x);
 	crypto_skcipher_encrypt(req);
 
@@ -342,7 +344,8 @@ static int rxkad_verify_packet_1(struct rxrpc_call *call, struct sk_buff *skb,
 		goto nomem;
 
 	sg_init_table(sg, nsg);
-	skb_to_sgvec(skb, sg, offset, 8);
+	if (unlikely(skb_to_sgvec(skb, sg, offset, 8) < 0))
+		goto nomem;
 
 	/* start the decryption afresh */
 	memset(&iv, 0, sizeof(iv));
@@ -429,7 +432,8 @@ static int rxkad_verify_packet_2(struct rxrpc_call *call, struct sk_buff *skb,
 	}
 
 	sg_init_table(sg, nsg);
-	skb_to_sgvec(skb, sg, offset, len);
+	if (unlikely(skb_to_sgvec(skb, sg, offset, len) < 0))
+		goto nomem;
 
 	/* decrypt from the session key */
 	token = call->conn->params.key->payload.data[0];
