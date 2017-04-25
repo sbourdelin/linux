@@ -726,7 +726,7 @@ static int wacom_add_shared_data(struct hid_device *hdev)
 
 	data = wacom_get_hdev_data(hdev);
 	if (!data) {
-		data = kzalloc(sizeof(struct wacom_hdev_data), GFP_KERNEL);
+		data = kzalloc(sizeof(*data), GFP_KERNEL);
 		if (!data) {
 			retval = -ENOMEM;
 			goto out;
@@ -1088,7 +1088,7 @@ static int __wacom_devm_sysfs_create_group(struct wacom *wacom,
 	int error;
 
 	devres = devres_alloc(wacom_devm_sysfs_group_release,
-			      sizeof(struct wacom_sysfs_group_devres),
+			      sizeof(*devres),
 			      GFP_KERNEL);
 	if (!devres)
 		return -ENOMEM;
@@ -2556,7 +2556,7 @@ static int wacom_probe(struct hid_device *hdev,
 	/* hid-core sets this quirk for the boot interface */
 	hdev->quirks &= ~HID_QUIRK_NOGET;
 
-	wacom = devm_kzalloc(&hdev->dev, sizeof(struct wacom), GFP_KERNEL);
+	wacom = devm_kzalloc(&hdev->dev, sizeof(*wacom), GFP_KERNEL);
 	if (!wacom)
 		return -ENOMEM;
 
