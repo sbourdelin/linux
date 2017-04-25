@@ -432,7 +432,7 @@ static struct pqi_io_request *pqi_alloc_io_request(
 	return io_request;
 }
 
-static void pqi_free_io_request(struct pqi_io_request *io_request)
+static inline void pqi_free_io_request(struct pqi_io_request *io_request)
 {
 	atomic_dec(&io_request->refcount);
 }
