@@ -2329,7 +2329,6 @@ static void wacom_wireless_work(struct work_struct *work)
 fail:
 	wacom_release_resources(wacom1);
 	wacom_release_resources(wacom2);
-	return;
 }
 
 static void wacom_remote_destroy_one(struct wacom *wacom, unsigned int index)
@@ -2534,8 +2533,6 @@ static void wacom_mode_change_work(struct work_struct *work)
 		if (error)
 			return;
 	}
-
-	return;
 }
 
 static int wacom_probe(struct hid_device *hdev,
