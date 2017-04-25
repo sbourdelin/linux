@@ -678,7 +678,7 @@ static void svm_init_erratum_383(void)
 		return;
 
 	/* Use _safe variants to not break nested virtualization */
-	val = native_read_msr_safe(MSR_AMD64_DC_CFG, &err);
+	val = native_read_msr_safe(MSR_F10H_DC_CFG, &err);
 	if (err)
 		return;
 
@@ -687,7 +687,7 @@ static void svm_init_erratum_383(void)
 	low  = lower_32_bits(val);
 	high = upper_32_bits(val);
 
-	native_write_msr_safe(MSR_AMD64_DC_CFG, low, high);
+	native_write_msr_safe(MSR_F10H_DC_CFG, low, high);
 
 	erratum_383_found = true;
 }

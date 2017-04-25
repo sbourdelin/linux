@@ -601,7 +601,7 @@ static void early_init_amd(struct cpuinfo_x86 *c)
 
 	/* F16h erratum 793, CVE-2013-6885 */
 	if (c->x86 == 0x16 && c->x86_model <= 0xf)
-		msr_set_bit(MSR_AMD64_LS_CFG, 15);
+		msr_set_bit(MSR_F16H_LS_CFG, 15);
 
 	/*
 	 * Check whether the machine is affected by erratum 400. This is
@@ -676,18 +676,16 @@ static void init_amd_gh(struct cpuinfo_x86 *c)
 	 * On family 10h BIOS may not have properly enabled WC+ support, causing
 	 * it to be converted to CD memtype. This may result in performance
 	 * degradation for certain nested-paging guests. Prevent this conversion
-	 * by clearing bit 24 in MSR_AMD64_BU_CFG2.
+	 * by clearing bit 24 in BU_CFG2.
 	 *
 	 * NOTE: we want to use the _safe accessors so as not to #GP kvm
 	 * guests on older kvm hosts.
 	 */
-	msr_clear_bit(MSR_AMD64_BU_CFG2, 24);
+	msr_clear_bit(MSR_F10H_BU_CFG2, 24);
 
 	if (cpu_has_amd_erratum(c, amd_erratum_383))
 		set_cpu_bug(c, X86_BUG_AMD_TLB_MMATCH);
 }
-
-#define MSR_AMD64_DE_CFG	0xC0011029
 
 static void init_amd_ln(struct cpuinfo_x86 *c)
 {
@@ -695,7 +693,7 @@ static void init_amd_ln(struct cpuinfo_x86 *c)
 	 * Apply erratum 665 fix unconditionally so machines without a BIOS
 	 * fix work.
 	 */
-	msr_set_bit(MSR_AMD64_DE_CFG, 31);
+	msr_set_bit(MSR_F12H_DE_CFG, 31);
 }
 
 static void init_amd_bd(struct cpuinfo_x86 *c)

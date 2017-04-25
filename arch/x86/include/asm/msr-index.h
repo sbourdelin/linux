@@ -293,9 +293,6 @@
 #define MSR_AMD64_PATCH_LOADER		0xc0010020
 #define MSR_AMD64_OSVW_ID_LENGTH	0xc0010140
 #define MSR_AMD64_OSVW_STATUS		0xc0010141
-#define MSR_AMD64_LS_CFG		0xc0011020
-#define MSR_AMD64_DC_CFG		0xc0011022
-#define MSR_AMD64_BU_CFG2		0xc001102a
 #define MSR_AMD64_IBSFETCHCTL		0xc0011030
 #define MSR_AMD64_IBSFETCHLINAD		0xc0011031
 #define MSR_AMD64_IBSFETCHPHYSAD	0xc0011032
@@ -315,6 +312,65 @@
 #define MSR_AMD64_IBSOPDATA4		0xc001103d
 #define MSR_AMD64_IBS_REG_COUNT_MAX	8 /* includes MSR_AMD64_IBSBRTARGET */
 
+/*
+ * MSRs in 0xc001101c-0xc001102f range are sparsely documented in BKDGs,
+ * but sometimes they can be found in errata documents.
+ * Registers 1020-1023 exist since K8 (mentioned in errata docs).
+ * Fam10h also has registers 1029, 102a (maybe more, not in docs).
+ * Fam15h BKDGs document registers 1028, 102b-102f, 101c, 1090, 10a1.
+ * Registers 1023 and 102a are called "Combined Unit Cfg" or "Bus Unit Cfg",
+ * depending on the CPU family.
+ */
+#define MSR_K8_LS_CFG			0xc0011020
+#define MSR_K8_IC_CFG			0xc0011021
+#define MSR_K8_DC_CFG			0xc0011022
+#define MSR_K8_BU_CFG			0xc0011023
+
+#define MSR_F10H_LS_CFG			0xc0011020
+#define MSR_F10H_IC_CFG			0xc0011021
+#define MSR_F10H_DC_CFG			0xc0011022
+#define MSR_F10H_BU_CFG			0xc0011023
+#define MSR_F10H_DE_CFG 		0xc0011029
+#define MSR_F10H_BU_CFG2		0xc001102a
+
+#define MSR_F12H_LS_CFG			0xc0011020
+#define MSR_F12H_IC_CFG			0xc0011021
+#define MSR_F12H_DC_CFG			0xc0011022
+#define MSR_F12H_CU_CFG			0xc0011023
+#define MSR_F12H_DE_CFG 		0xc0011029
+#define MSR_F12H_CU_CFG2		0xc001102a
+
+#define MSR_F14H_LS_CFG			0xc0011020
+#define MSR_F14H_IC_CFG			0xc0011021
+#define MSR_F14H_DC_CFG			0xc0011022
+#define MSR_F14H_CU_CFG			0xc0011023
+#define MSR_F14H_FP_CFG 		0xc0011028
+#define MSR_F14H_DE_CFG 		0xc0011029
+#define MSR_F14H_CU_CFG2		0xc001102a
+
+#define MSR_F16H_LS_CFG			0xc0011020
+#define MSR_F16H_IC_CFG			0xc0011021
+#define MSR_F16H_DC_CFG			0xc0011022
+#define MSR_F16H_BU_CFG			0xc0011023
+#define MSR_F16H_FP_CFG 		0xc0011028
+#define MSR_F16H_DE_CFG 		0xc0011029
+#define MSR_F16H_BU_CFG2		0xc001102a
+
+#define MSR_F15H_LS_CFG3		0xc001101c
+#define MSR_F15H_LS_CFG			0xc0011020
+#define MSR_F15H_IC_CFG			0xc0011021
+#define MSR_F15H_DC_CFG			0xc0011022
+#define MSR_F15H_CU_CFG			0xc0011023
+#define MSR_F15H_FP_CFG 		0xc0011028
+#define MSR_F15H_DE_CFG 		0xc0011029
+#define MSR_F15H_CU_CFG2		0xc001102a
+#define MSR_F15H_CU_CFG3		0xc001102b
+#define MSR_F15H_EX_CFG 		0xc001102c
+#define MSR_F15H_LS_CFG2		0xc001102d
+#define MSR_F15H_CU_PFTCFG		0xc001102f
+#define MSR_F15H_CU_PROCFB_SCALE_0	0xc0011090
+#define MSR_F15H_CU_CBBCFG		0xc00110a1
+
 /* Fam 17h MSRs */
 #define MSR_F17H_IRPERF			0xc00000e9
 
@@ -332,7 +388,6 @@
 #define MSR_F15H_NB_PERF_CTL		0xc0010240
 #define MSR_F15H_NB_PERF_CTR		0xc0010241
 #define MSR_F15H_PTSC			0xc0010280
-#define MSR_F15H_IC_CFG			0xc0011021
 
 /* Fam 10h MSRs */
 #define MSR_FAM10H_MMIO_CONF_BASE	0xc0010058
