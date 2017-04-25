@@ -3489,7 +3489,9 @@ void __init skb_init(void)
  *	@len: Length of buffer space to be mapped
  *
  *	Fill the specified scatter-gather list with mappings/pointers into a
- *	region of the buffer space attached to a socket buffer.
+ *	region of the buffer space attached to a socket buffer. Returns either
+ *	the number of scatterlist items used, or -EMSGSIZE if the contents
+ *	could not fit.
  */
 static int
 __skb_to_sgvec(struct sk_buff *skb, struct scatterlist *sg, int offset, int len)
@@ -3517,6 +3519,8 @@ __skb_to_sgvec(struct sk_buff *skb, struct scatterlist *sg, int offset, int len)
 		end = start + skb_frag_size(&skb_shinfo(skb)->frags[i]);
 		if ((copy = end - offset) > 0) {
 			skb_frag_t *frag = &skb_shinfo(skb)->frags[i];
+			if (elt && sg_is_last(&sg[elt - 1]))
+				return -EMSGSIZE;
 
 			if (copy > len)
 				copy = len;
@@ -3537,6 +3541,9 @@ __skb_to_sgvec(struct sk_buff *skb, struct scatterlist *sg, int offset, int len)
 
 		end = start + frag_iter->len;
 		if ((copy = end - offset) > 0) {
+			if (elt && sg_is_last(&sg[elt - 1]))
+				return -EMSGSIZE;
+
 			if (copy > len)
 				copy = len;
 			elt += __skb_to_sgvec(frag_iter, sg+elt, offset - start,
@@ -3580,6 +3587,9 @@ EXPORT_SYMBOL_GPL(skb_to_sgvec_nomark);
 int skb_to_sgvec(struct sk_buff *skb, struct scatterlist *sg, int offset, int len)
 {
 	int nsg = __skb_to_sgvec(skb, sg, offset, len);
+
+	if (nsg <= 0)
+		return nsg;
 
 	sg_mark_end(&sg[nsg - 1]);
 
