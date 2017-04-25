@@ -442,18 +442,18 @@ struct clk *clk_get_sys(const char *dev_id, const char *con_id);
 
 static inline struct clk *clk_get(struct device *dev, const char *id)
 {
-	return NULL;
+	return ERR_PTR(-ENODEV);
 }
 
 static inline struct clk *devm_clk_get(struct device *dev, const char *id)
 {
-	return NULL;
+	return ERR_PTR(-ENODEV);
 }
 
 static inline struct clk *devm_get_clk_from_child(struct device *dev,
 				struct device_node *np, const char *con_id)
 {
-	return NULL;
+	return ERR_PTR(-ENODEV);
 }
 
 static inline void clk_put(struct clk *clk) {}
@@ -494,12 +494,12 @@ static inline int clk_set_parent(struct clk *clk, struct clk *parent)
 
 static inline struct clk *clk_get_parent(struct clk *clk)
 {
-	return NULL;
+	return ERR_PTR(-ENODEV);
 }
 
 static inline struct clk *clk_get_sys(const char *dev_id, const char *con_id)
 {
-	return NULL;
+	return ERR_PTR(-ENODEV);
 }
 #endif
 
