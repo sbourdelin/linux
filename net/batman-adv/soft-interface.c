@@ -1011,7 +1011,7 @@ struct net_device *batadv_softif_create(struct net *net, const char *name)
 	if (ret < 0) {
 		pr_err("Unable to register the batman interface '%s': %i\n",
 		       name, ret);
-		free_netdev(soft_iface);
+		batadv_softif_free(soft_iface);
 		return NULL;
 	}
 
