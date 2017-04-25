@@ -3272,10 +3272,9 @@ static int ufshcd_memory_alloc(struct ufs_hba *hba)
 	/* Allocate memory for local reference block */
 	hba->lrb = devm_kcalloc(hba->dev, hba->nutrs, sizeof(*hba->lrb),
 				GFP_KERNEL);
-	if (!hba->lrb) {
-		dev_err(hba->dev, "LRB Memory allocation failed\n");
+	if (!hba->lrb)
 		goto out;
-	}
+
 	return 0;
 out:
 	return -ENOMEM;
