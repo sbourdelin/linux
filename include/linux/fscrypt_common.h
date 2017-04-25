@@ -102,14 +102,13 @@ static inline bool fscrypt_dummy_context_enabled(struct inode *inode)
 	return false;
 }
 
-static inline bool fscrypt_valid_contents_enc_mode(u32 mode)
+static inline bool fscrypt_valid_enc_modes(u32 contents_mode,
+					u32 filenames_mode)
 {
-	return (mode == FS_ENCRYPTION_MODE_AES_256_XTS);
-}
-
-static inline bool fscrypt_valid_filenames_enc_mode(u32 mode)
-{
-	return (mode == FS_ENCRYPTION_MODE_AES_256_CTS);
+	return ((contents_mode == FS_ENCRYPTION_MODE_AES_128_CBC &&
+		 filenames_mode == FS_ENCRYPTION_MODE_AES_128_CTS) ||
+		(contents_mode == FS_ENCRYPTION_MODE_AES_256_XTS &&
+		 filenames_mode == FS_ENCRYPTION_MODE_AES_256_CTS));
 }
 
 static inline bool fscrypt_is_dot_dotdot(const struct qstr *str)

@@ -10,6 +10,8 @@
 
 #include <keys/user-type.h>
 #include <linux/scatterlist.h>
+#include <crypto/aes.h>
+#include <crypto/hash.h>
 #include "fscrypt_private.h"
 
 static void derive_crypt_complete(struct crypto_async_request *req, int rc)
@@ -27,13 +29,13 @@ static void derive_crypt_complete(struct crypto_async_request *req, int rc)
  * derive_key_aes() - Derive a key using AES-128-ECB
  * @deriving_key: Encryption key used for derivation.
  * @source_key:   Source key to which to apply derivation.
- * @derived_key:  Derived key.
+ * @derived_key_raw:  Derived raw key.
  *
  * Return: Zero on success; non-zero otherwise.
  */
 static int derive_key_aes(u8 deriving_key[FS_AES_128_ECB_KEY_SIZE],
-				u8 source_key[FS_AES_256_XTS_KEY_SIZE],
-				u8 derived_key[FS_AES_256_XTS_KEY_SIZE])
+				const struct fscrypt_key *source_key,
+				u8 derived_raw_key[FS_MAX_KEY_SIZE])
 {
 	int res = 0;
 	struct skcipher_request *req = NULL;
@@ -60,10 +62,10 @@ static int derive_key_aes(u8 deriving_key[FS_AES_128_ECB_KEY_SIZE],
 	if (res < 0)
 		goto out;
 
-	sg_init_one(&src_sg, source_key, FS_AES_256_XTS_KEY_SIZE);
-	sg_init_one(&dst_sg, derived_key, FS_AES_256_XTS_KEY_SIZE);
-	skcipher_request_set_crypt(req, &src_sg, &dst_sg,
-					FS_AES_256_XTS_KEY_SIZE, NULL);
+	sg_init_one(&src_sg, source_key->raw, source_key->size);
+	sg_init_one(&dst_sg, derived_raw_key, source_key->size);
+	skcipher_request_set_crypt(req, &src_sg, &dst_sg, source_key->size,
+			NULL);
 	res = crypto_skcipher_encrypt(req);
 	if (res == -EINPROGRESS || res == -EBUSY) {
 		wait_for_completion(&ecr.completion);
@@ -77,7 +79,7 @@ out:
 
 static int validate_user_key(struct fscrypt_info *crypt_info,
 			struct fscrypt_context *ctx, u8 *raw_key,
-			const char *prefix)
+			const char *prefix, int min_keysize)
 {
 	char *description;
 	struct key *keyring_key;
@@ -111,14 +113,15 @@ static int validate_user_key(struct fscrypt_info *crypt_info,
 	master_key = (struct fscrypt_key *)ukp->data;
 	BUILD_BUG_ON(FS_AES_128_ECB_KEY_SIZE != FS_KEY_DERIVATION_NONCE_SIZE);
 
-	if (master_key->size != FS_AES_256_XTS_KEY_SIZE) {
+	if (master_key->size < min_keysize || master_key->size > FS_MAX_KEY_SIZE
+	    || master_key->size % AES_BLOCK_SIZE != 0) {
 		printk_once(KERN_WARNING
 				"%s: key size incorrect: %d\n",
 				__func__, master_key->size);
 		res = -ENOKEY;
 		goto out;
 	}
-	res = derive_key_aes(ctx->nonce, master_key->raw, raw_key);
+	res = derive_key_aes(ctx->nonce, master_key, raw_key);
 out:
 	up_read(&keyring_key->sem);
 	key_put(keyring_key);
@@ -129,27 +132,37 @@ static int determine_cipher_type(struct fscrypt_info *ci, struct inode *inode,
 				 const char **cipher_str_ret, int *keysize_ret)
 {
 	if (S_ISREG(inode->i_mode)) {
-		if (ci->ci_data_mode == FS_ENCRYPTION_MODE_AES_256_XTS) {
+		switch (ci->ci_data_mode) {
+		case FS_ENCRYPTION_MODE_AES_256_XTS:
 			*cipher_str_ret = "xts(aes)";
 			*keysize_ret = FS_AES_256_XTS_KEY_SIZE;
 			return 0;
+		case FS_ENCRYPTION_MODE_AES_128_CBC:
+			*cipher_str_ret = "cbc(aes)";
+			*keysize_ret = FS_AES_128_CBC_KEY_SIZE;
+			return 0;
+		default:
+			pr_warn_once("fscrypto: unsupported contents encryption mode %d for inode %lu\n",
+				     ci->ci_data_mode, inode->i_ino);
+			return -ENOKEY;
 		}
-		pr_warn_once("fscrypto: unsupported contents encryption mode "
-			     "%d for inode %lu\n",
-			     ci->ci_data_mode, inode->i_ino);
-		return -ENOKEY;
 	}
 
 	if (S_ISDIR(inode->i_mode) || S_ISLNK(inode->i_mode)) {
-		if (ci->ci_filename_mode == FS_ENCRYPTION_MODE_AES_256_CTS) {
+		switch (ci->ci_filename_mode) {
+		case FS_ENCRYPTION_MODE_AES_256_CTS:
 			*cipher_str_ret = "cts(cbc(aes))";
 			*keysize_ret = FS_AES_256_CTS_KEY_SIZE;
 			return 0;
+		case FS_ENCRYPTION_MODE_AES_128_CTS:
+			*cipher_str_ret = "cts(cbc(aes))";
+			*keysize_ret = FS_AES_128_CTS_KEY_SIZE;
+			return 0;
+		default:
+			pr_warn_once("fscrypto: unsupported filenames encryption mode %d for inode %lu\n",
+				     ci->ci_filename_mode, inode->i_ino);
+			return -ENOKEY;
 		}
-		pr_warn_once("fscrypto: unsupported filenames encryption mode "
-			     "%d for inode %lu\n",
-			     ci->ci_filename_mode, inode->i_ino);
-		return -ENOKEY;
 	}
 
 	pr_warn_once("fscrypto: unsupported file type %d for inode %lu\n",
@@ -163,7 +176,92 @@ static void put_crypt_info(struct fscrypt_info *ci)
 		return;
 
 	crypto_free_skcipher(ci->ci_ctfm);
+	crypto_free_cipher(ci->ci_essiv_tfm);
 	kmem_cache_free(fscrypt_info_cachep, ci);
+}
+
+static int derive_essiv_salt(u8 *raw_key, int keysize, u8 **salt_out,
+			unsigned int *saltsize)
+{
+	int res;
+	struct crypto_ahash *hash_tfm;
+	unsigned int digestsize;
+	u8 *salt = NULL;
+	struct scatterlist sg;
+	struct ahash_request *req = NULL;
+
+	hash_tfm = crypto_alloc_ahash("sha256", 0, 0);
+	if (IS_ERR(hash_tfm))
+		return PTR_ERR(hash_tfm);
+
+	digestsize = crypto_ahash_digestsize(hash_tfm);
+	salt = kzalloc(digestsize, GFP_NOFS);
+	if (!salt) {
+		res = -ENOMEM;
+		goto out;
+	}
+
+	req = ahash_request_alloc(hash_tfm, GFP_NOFS);
+	if (!req) {
+		kfree(salt);
+		res = -ENOMEM;
+		goto out;
+	}
+
+	sg_init_one(&sg, raw_key, keysize);
+	ahash_request_set_callback(req,
+			CRYPTO_TFM_REQ_MAY_BACKLOG | CRYPTO_TFM_REQ_MAY_SLEEP,
+			NULL, NULL);
+	ahash_request_set_crypt(req, &sg, salt, keysize);
+
+	res = crypto_ahash_digest(req);
+	if (res) {
+		kfree(salt);
+		goto out;
+	}
+
+	*salt_out = salt;
+	*saltsize = digestsize;
+
+out:
+	crypto_free_ahash(hash_tfm);
+	ahash_request_free(req);
+	return res;
+}
+
+static int init_essiv_generator(struct fscrypt_info *ci, u8 *raw_key,
+				int keysize)
+{
+	int res;
+	struct crypto_cipher *essiv_tfm;
+	u8 *salt = NULL;
+	unsigned int saltsize;
+
+	/* init ESSIV generator */
+	essiv_tfm = crypto_alloc_cipher("aes", 0, 0);
+	if (!essiv_tfm || IS_ERR(essiv_tfm)) {
+		res = essiv_tfm ? PTR_ERR(essiv_tfm) : -ENOMEM;
+		goto err;
+	}
+
+	res = derive_essiv_salt(raw_key, keysize, &salt, &saltsize);
+	if (res)
+		goto err;
+
+	res = crypto_cipher_setkey(essiv_tfm, salt, saltsize);
+	if (res)
+		goto err;
+
+	ci->ci_essiv_tfm = essiv_tfm;
+
+	return 0;
+
+err:
+	if (essiv_tfm && !IS_ERR(essiv_tfm))
+		crypto_free_cipher(essiv_tfm);
+
+	kzfree(salt);
+	return res;
 }
 
 int fscrypt_get_encryption_info(struct inode *inode)
@@ -171,6 +269,7 @@ int fscrypt_get_encryption_info(struct inode *inode)
 	struct fscrypt_info *crypt_info;
 	struct fscrypt_context ctx;
 	struct crypto_skcipher *ctfm;
+
 	const char *cipher_str;
 	int keysize;
 	u8 *raw_key = NULL;
@@ -207,6 +306,10 @@ int fscrypt_get_encryption_info(struct inode *inode)
 	if (ctx.flags & ~FS_POLICY_FLAGS_VALID)
 		return -EINVAL;
 
+	if (!fscrypt_valid_enc_modes(ctx.contents_encryption_mode,
+				ctx.filenames_encryption_mode))
+		return -EINVAL;
+
 	crypt_info = kmem_cache_alloc(fscrypt_info_cachep, GFP_NOFS);
 	if (!crypt_info)
 		return -ENOMEM;
@@ -215,6 +318,7 @@ int fscrypt_get_encryption_info(struct inode *inode)
 	crypt_info->ci_data_mode = ctx.contents_encryption_mode;
 	crypt_info->ci_filename_mode = ctx.filenames_encryption_mode;
 	crypt_info->ci_ctfm = NULL;
+	crypt_info->ci_essiv_tfm = NULL;
 	memcpy(crypt_info->ci_master_key, ctx.master_key_descriptor,
 				sizeof(crypt_info->ci_master_key));
 
@@ -231,10 +335,12 @@ int fscrypt_get_encryption_info(struct inode *inode)
 	if (!raw_key)
 		goto out;
 
-	res = validate_user_key(crypt_info, &ctx, raw_key, FS_KEY_DESC_PREFIX);
+	res = validate_user_key(crypt_info, &ctx, raw_key, FS_KEY_DESC_PREFIX,
+				keysize);
 	if (res && inode->i_sb->s_cop->key_prefix) {
 		int res2 = validate_user_key(crypt_info, &ctx, raw_key,
-					     inode->i_sb->s_cop->key_prefix);
+					     inode->i_sb->s_cop->key_prefix,
+					     keysize);
 		if (res2) {
 			if (res2 == -ENOKEY)
 				res = -ENOKEY;
@@ -246,9 +352,9 @@ int fscrypt_get_encryption_info(struct inode *inode)
 	ctfm = crypto_alloc_skcipher(cipher_str, 0, 0);
 	if (!ctfm || IS_ERR(ctfm)) {
 		res = ctfm ? PTR_ERR(ctfm) : -ENOMEM;
-		printk(KERN_DEBUG
-		       "%s: error %d (inode %u) allocating crypto tfm\n",
-		       __func__, res, (unsigned) inode->i_ino);
+		pr_debug(
+		      "%s: error %d (inode %u) allocating crypto tfm\n",
+		      __func__, res, (unsigned int) inode->i_ino);
 		goto out;
 	}
 	crypt_info->ci_ctfm = ctfm;
@@ -258,6 +364,15 @@ int fscrypt_get_encryption_info(struct inode *inode)
 	if (res)
 		goto out;
 
+	if (crypt_info->ci_data_mode == FS_ENCRYPTION_MODE_AES_128_CBC) {
+		res = init_essiv_generator(crypt_info, raw_key, keysize);
+		if (res) {
+			pr_debug(
+			     "%s: error %d (inode %u) allocating essiv tfm\n",
+			     __func__, res, (unsigned int) inode->i_ino);
+			goto out;
+		}
+	}
 	if (cmpxchg(&inode->i_crypt_info, NULL, crypt_info) == NULL)
 		crypt_info = NULL;
 out:
