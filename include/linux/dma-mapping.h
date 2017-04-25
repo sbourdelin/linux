@@ -164,10 +164,12 @@ int dma_release_from_coherent(struct device *dev, int order, void *vaddr);
 
 int dma_mmap_from_coherent(struct device *dev, struct vm_area_struct *vma,
 			    void *cpu_addr, size_t size, int *ret);
+int dma_vaddr_from_coherent(struct device *dev, void *vaddr, size_t size);
 #else
 #define dma_alloc_from_coherent(dev, size, handle, ret) (0)
 #define dma_release_from_coherent(dev, order, vaddr) (0)
 #define dma_mmap_from_coherent(dev, vma, vaddr, order, ret) (0)
+#define dma_vaddr_from_coherent(dev, vaddr, size) (0)
 #endif /* CONFIG_HAVE_GENERIC_DMA_COHERENT */
 
 #ifdef CONFIG_HAS_DMA
@@ -461,6 +463,9 @@ dma_get_sgtable_attrs(struct device *dev, struct sg_table *sgt, void *cpu_addr,
 {
 	const struct dma_map_ops *ops = get_dma_ops(dev);
 	BUG_ON(!ops);
+	/* dma_alloc_from_coherent() memory is not backed by struct page */
+	if (dma_vaddr_from_coherent(dev, cpu_addr, size))
+		return -ENXIO;
 	if (ops->get_sgtable)
 		return ops->get_sgtable(dev, sgt, cpu_addr, dma_addr, size,
 					attrs);

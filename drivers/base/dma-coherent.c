@@ -279,6 +279,15 @@ int dma_mmap_from_coherent(struct device *dev, struct vm_area_struct *vma,
 }
 EXPORT_SYMBOL(dma_mmap_from_coherent);
 
+int dma_vaddr_from_coherent(struct device *dev, void *vaddr, size_t size)
+{
+	struct dma_coherent_mem *mem = dev ? dev->dma_mem : NULL;
+
+	return mem && vaddr >= mem->virt_base &&
+		vaddr + size <= (mem->virt_base + (mem->size << PAGE_SHIFT));
+}
+EXPORT_SYMBOL(dma_vaddr_from_coherent);
+
 /*
  * Support for reserved memory regions defined in device tree
  */
