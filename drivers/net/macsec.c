@@ -617,7 +617,8 @@ static void macsec_encrypt_done(struct crypto_async_request *base, int err)
 
 static struct aead_request *macsec_alloc_req(struct crypto_aead *tfm,
 					     unsigned char **iv,
-					     struct scatterlist **sg)
+					     struct scatterlist **sg,
+					     int nfrags)
 {
 	size_t size, iv_offset, sg_offset;
 	struct aead_request *req;
@@ -629,7 +630,7 @@ static struct aead_request *macsec_alloc_req(struct crypto_aead *tfm,
 
 	size = ALIGN(size, __alignof__(struct scatterlist));
 	sg_offset = size;
-	size += sizeof(struct scatterlist) * (MAX_SKB_FRAGS + 1);
+	size += sizeof(struct scatterlist) * nfrags;
 
 	tmp = kmalloc(size, GFP_ATOMIC);
 	if (!tmp)
@@ -723,7 +724,7 @@ static struct sk_buff *macsec_encrypt(struct sk_buff *skb,
 		return ERR_PTR(-EINVAL);
 	}
 
-	req = macsec_alloc_req(tx_sa->key.tfm, &iv, &sg);
+	req = macsec_alloc_req(tx_sa->key.tfm, &iv, &sg, MAX_SKB_FRAGS + 1);
 	if (!req) {
 		macsec_txsa_put(tx_sa);
 		kfree_skb(skb);
@@ -921,13 +922,21 @@ static struct sk_buff *macsec_decrypt(struct sk_buff *skb,
 	struct aead_request *req;
 	struct macsec_eth_header *hdr;
 	u16 icv_len = secy->icv_len;
+	struct sk_buff *trailer;
+	int nfrags;
 
 	macsec_skb_cb(skb)->valid = false;
 	skb = skb_share_check(skb, GFP_ATOMIC);
 	if (!skb)
 		return ERR_PTR(-ENOMEM);
 
-	req = macsec_alloc_req(rx_sa->key.tfm, &iv, &sg);
+	nfrags = skb_cow_data(skb, 0, &trailer);
+	if (nfrags < 0) {
+		kfree_skb(skb);
+		return ERR_PTR(nfrags);
+	}
+
+	req = macsec_alloc_req(rx_sa->key.tfm, &iv, &sg, nfrags);
 	if (!req) {
 		kfree_skb(skb);
 		return ERR_PTR(-ENOMEM);
@@ -936,7 +945,7 @@ static struct sk_buff *macsec_decrypt(struct sk_buff *skb,
 	hdr = (struct macsec_eth_header *)skb->data;
 	macsec_fill_iv(iv, sci, ntohl(hdr->packet_number));
 
-	sg_init_table(sg, MAX_SKB_FRAGS + 1);
+	sg_init_table(sg, nfrags);
 	skb_to_sgvec(skb, sg, 0, skb->len);
 
 	if (hdr->tci_an & MACSEC_TCI_E) {
