@@ -49,8 +49,7 @@ void sm750_hw_i2c_close(void)
 
 	/* Set GPIO 30 & 31 back as GPIO pins */
 	value = peek32(GPIO_MUX);
-	value &= ~GPIO_MUX_30;
-	value &= ~GPIO_MUX_31;
+	value &= ~(GPIO_MUX_30 | GPIO_MUX_31);
 	poke32(GPIO_MUX, value);
 }
 
