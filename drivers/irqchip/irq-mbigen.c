@@ -108,7 +108,6 @@ static inline void get_mbigen_clear_reg(irq_hw_number_t hwirq,
 {
 	unsigned int ofst;
 
-	hwirq -= RESERVED_IRQ_PER_MBIGEN_CHIP;
 	ofst = hwirq / 32 * 4;
 
 	*mask = 1 << (hwirq % 32);
