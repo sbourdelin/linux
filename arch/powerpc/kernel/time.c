@@ -59,6 +59,7 @@
 #include <linux/suspend.h>
 #include <linux/rtc.h>
 #include <linux/sched/cputime.h>
+#include <linux/kprobes.h>
 #include <asm/trace.h>
 
 #include <asm/io.h>
@@ -236,6 +237,7 @@ static u64 scan_dispatch_log(u64 stop_tb)
 	local_paca->dtl_curr = dtl;
 	return stolen;
 }
+NOKPROBE_SYMBOL(scan_dispatch_log);
 
 /*
  * Accumulate stolen time by scanning the dispatch trace log.
@@ -263,6 +265,7 @@ void accumulate_stolen_time(void)
 
 	local_paca->soft_enabled = save_soft_enabled;
 }
+NOKPROBE_SYMBOL(accumulate_stolen_time);
 
 static inline u64 calculate_stolen_time(u64 stop_tb)
 {

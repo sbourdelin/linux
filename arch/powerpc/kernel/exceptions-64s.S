@@ -1534,6 +1534,7 @@ END_FTR_SECTION_IFSET(CPU_FTR_CFAR)
 1:	addi	r3,r1,STACK_FRAME_OVERHEAD
 	bl	kernel_bad_stack
 	b	1b
+_ASM_NOKPROBE_SYMBOL(bad_stack);
 
 /*
  * Called from arch_local_irq_enable when an interrupt needs

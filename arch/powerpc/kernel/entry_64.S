@@ -401,6 +401,7 @@ _GLOBAL(save_nvgprs)
 	clrrdi	r0,r11,1
 	std	r0,_TRAP(r1)
 	blr
+_ASM_NOKPROBE_SYMBOL(save_nvgprs);
 
 	
 /*

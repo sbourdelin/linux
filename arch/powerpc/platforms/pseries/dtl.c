@@ -29,6 +29,7 @@
 #include <asm/debugfs.h>
 #include <asm/plpar_wrappers.h>
 #include <asm/machdep.h>
+#include <linux/kprobes.h>
 
 struct dtl {
 	struct dtl_entry	*buf;
@@ -97,6 +98,7 @@ static void consume_dtle(struct dtl_entry *dtle, u64 index)
 	smp_wmb();
 	++dtlr->write_index;
 }
+NOKPROBE_SYMBOL(consume_dtle);
 
 static int dtl_start(struct dtl *dtl)
 {
