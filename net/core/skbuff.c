@@ -3489,7 +3489,9 @@ void __init skb_init(void)
  *	@len: Length of buffer space to be mapped
  *
  *	Fill the specified scatter-gather list with mappings/pointers into a
- *	region of the buffer space attached to a socket buffer.
+ *	region of the buffer space attached to a socket buffer. Returns either
+ *	the number of scatterlist items used, or -EMSGSIZE if the contents
+ *	could not fit.
  */
 static int
 __skb_to_sgvec(struct sk_buff *skb, struct scatterlist *sg, int offset, int len)
@@ -3511,6 +3513,9 @@ __skb_to_sgvec(struct sk_buff *skb, struct scatterlist *sg, int offset, int len)
 
 	for (i = 0; i < skb_shinfo(skb)->nr_frags; i++) {
 		int end;
+
+		if (elt && sg_is_last(&sg[elt - 1]))
+			return -EMSGSIZE;
 
 		WARN_ON(start > offset + len);
 
@@ -3534,6 +3539,9 @@ __skb_to_sgvec(struct sk_buff *skb, struct scatterlist *sg, int offset, int len)
 		int end;
 
 		WARN_ON(start > offset + len);
+
+		if (elt && sg_is_last(&sg[elt - 1]))
+			return -EMSGSIZE;
 
 		end = start + frag_iter->len;
 		if ((copy = end - offset) > 0) {
