@@ -281,9 +281,28 @@
 #define MSR_AMD64_PATCH_LOADER		0xc0010020
 #define MSR_AMD64_OSVW_ID_LENGTH	0xc0010140
 #define MSR_AMD64_OSVW_STATUS		0xc0010141
+/*
+ * MSRs in 0xc001101c-0xc001102f range are sparsely documented in BKDGs,
+ * but sometimes they can be found in errata documents.
+ * Registers 1020..1023 exist since K8. Fam10h and later have regs 1028..102d.
+ * Fam15h BKDGs document registers 102f, 101c, 1090, 10a1.
+ * Registers 1023 and 102a are called "Combined Unit Cfg" in Fam12h-15h,
+ * but "Bus Unit Cfg" in K8, Fam10h, 11h and 16h. Other "CU_" registers
+ * might also be "BU_" (did not find them in docs for these families).
+ */
+#define MSR_AMD64_LS_CFG3		0xc001101c
 #define MSR_AMD64_LS_CFG		0xc0011020
+#define MSR_AMD64_IC_CFG		0xc0011021
 #define MSR_AMD64_DC_CFG		0xc0011022
+#define MSR_AMD64_BU_CFG		0xc0011023
+#define MSR_AMD64_FP_CFG 		0xc0011028
+#define MSR_AMD64_DE_CFG 		0xc0011029
 #define MSR_AMD64_BU_CFG2		0xc001102a
+#define MSR_AMD64_CU_CFG3		0xc001102b
+#define MSR_AMD64_EX_CFG 		0xc001102c
+#define MSR_AMD64_LS_CFG2		0xc001102d
+#define MSR_AMD64_CU_PFTCFG		0xc001102f
+
 #define MSR_AMD64_IBSFETCHCTL		0xc0011030
 #define MSR_AMD64_IBSFETCHLINAD		0xc0011031
 #define MSR_AMD64_IBSFETCHPHYSAD	0xc0011032
@@ -320,7 +339,6 @@
 #define MSR_F15H_NB_PERF_CTL		0xc0010240
 #define MSR_F15H_NB_PERF_CTR		0xc0010241
 #define MSR_F15H_PTSC			0xc0010280
-#define MSR_F15H_IC_CFG			0xc0011021
 
 /* Fam 10h MSRs */
 #define MSR_FAM10H_MMIO_CONF_BASE	0xc0010058
