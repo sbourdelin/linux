@@ -4966,7 +4966,6 @@ static void ufshcd_exception_event_handler(struct work_struct *work)
 
 out:
 	pm_runtime_put_sync(hba->dev);
-	return;
 }
 
 /* Complete requests that have door-bell cleared */
