@@ -842,7 +842,7 @@ netxen_check_options(struct netxen_adapter *adapter)
 {
 	u32 fw_major, fw_minor, fw_build, prev_fw_version;
 	char brd_name[NETXEN_MAX_SHORT_NAME];
-	char serial_num[32];
+	char serial_num[33];
 	int i, offset, val, err;
 	__le32 *ptr32;
 	struct pci_dev *pdev = adapter->pdev;
@@ -861,6 +861,7 @@ netxen_check_options(struct netxen_adapter *adapter)
 		ptr32[i] = cpu_to_le32(val);
 		offset += sizeof(u32);
 	}
+	serial_num[32] = 0;
 
 	fw_major = NXRD32(adapter, NETXEN_FW_VERSION_MAJOR);
 	fw_minor = NXRD32(adapter, NETXEN_FW_VERSION_MINOR);
