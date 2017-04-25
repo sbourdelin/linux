@@ -360,9 +360,13 @@ static int esp_output(struct xfrm_state *x, struct sk_buff *skb)
 			esph = esp_output_set_extra(skb, esph, extra);
 
 			sg_init_table(sg, nfrags);
-			skb_to_sgvec(skb, sg,
-				     (unsigned char *)esph - skb->data,
-				     assoclen + ivlen + clen + alen);
+			err = skb_to_sgvec(skb, sg,
+				           (unsigned char *)esph - skb->data,
+				           assoclen + ivlen + clen + alen);
+			if (unlikely(err < 0)) {
+				spin_unlock_bh(&x->lock);
+				goto error;
+			}
 
 			allocsize = ALIGN(skb->data_len, L1_CACHE_BYTES);
 
@@ -381,11 +385,13 @@ static int esp_output(struct xfrm_state *x, struct sk_buff *skb)
 			pfrag->offset = pfrag->offset + allocsize;
 
 			sg_init_table(dsg, skb_shinfo(skb)->nr_frags + 1);
-			skb_to_sgvec(skb, dsg,
-				     (unsigned char *)esph - skb->data,
-				     assoclen + ivlen + clen + alen);
+			err = skb_to_sgvec(skb, dsg,
+				           (unsigned char *)esph - skb->data,
+				           assoclen + ivlen + clen + alen);
 
 			spin_unlock_bh(&x->lock);
+			if (unlikely(err < 0))
+				goto error;
 
 			goto skip_cow2;
 		}
@@ -422,9 +428,11 @@ skip_cow:
 	esph = esp_output_set_extra(skb, esph, extra);
 
 	sg_init_table(sg, nfrags);
-	skb_to_sgvec(skb, sg,
-		     (unsigned char *)esph - skb->data,
-		     assoclen + ivlen + clen + alen);
+	err = skb_to_sgvec(skb, sg,
+		           (unsigned char *)esph - skb->data,
+		           assoclen + ivlen + clen + alen);
+	if (unlikely(err < 0))
+		goto error;
 
 skip_cow2:
 	if ((x->props.flags & XFRM_STATE_ESN))
@@ -658,7 +666,9 @@ skip_cow:
 	esp_input_set_header(skb, seqhi);
 
 	sg_init_table(sg, nfrags);
-	skb_to_sgvec(skb, sg, 0, skb->len);
+	err = skb_to_sgvec(skb, sg, 0, skb->len);
+	if (unlikely(err < 0))
+		goto out;
 
 	skb->ip_summed = CHECKSUM_NONE;
 
