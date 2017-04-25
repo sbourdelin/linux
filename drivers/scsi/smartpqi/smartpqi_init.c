@@ -147,6 +147,16 @@ static inline bool pqi_is_logical_device(struct pqi_scsi_dev *device)
 	return !device->is_physical_device;
 }
 
+static inline bool pqi_is_external_raid_device(struct pqi_scsi_dev *device)
+{
+	return device->is_external_raid_device;
+}
+
+static inline bool pqi_is_external_raid_addr(u8 *scsi3addr)
+{
+	return scsi3addr[2] != 0;
+}
+
 static inline bool pqi_ctrl_offline(struct pqi_ctrl_info *ctrl_info)
 {
 	return !ctrl_info->controller_online;
@@ -885,6 +895,9 @@ static void pqi_assign_bus_target_lun(struct pqi_scsi_dev *device)
 {
 	u8 *scsi3addr;
 	u32 lunid;
+	int bus;
+	int target;
+	int lun;
 
 	scsi3addr = device->scsi3addr;
 	lunid = get_unaligned_le32(scsi3addr);
@@ -897,8 +910,16 @@ static void pqi_assign_bus_target_lun(struct pqi_scsi_dev *device)
 	}
 
 	if (pqi_is_logical_device(device)) {
-		pqi_set_bus_target_lun(device, PQI_RAID_VOLUME_BUS, 0,
-			lunid & 0x3fff);
+		if (pqi_is_external_raid_device(device)) {
+			bus = PQI_EXTERNAL_RAID_VOLUME_BUS;
+			target = (lunid >> 16) & 0x3fff;
+			lun = lunid & 0xff;
+		} else {
+			bus = PQI_RAID_VOLUME_BUS;
+			target = 0;
+			lun = lunid & 0x3fff;
+		}
+		pqi_set_bus_target_lun(device, bus, target, lun);
 		device->target_lun_valid = true;
 		return;
 	}
@@ -1137,9 +1158,15 @@ static int pqi_get_device_info(struct pqi_ctrl_info *ctrl_info,
 	memcpy(device->model, &buffer[16], sizeof(device->model));
 
 	if (pqi_is_logical_device(device) && device->devtype == TYPE_DISK) {
-		pqi_get_raid_level(ctrl_info, device);
-		pqi_get_offload_status(ctrl_info, device);
-		pqi_get_volume_status(ctrl_info, device);
+		if (pqi_is_external_raid_device(device)) {
+			device->raid_level = SA_RAID_UNKNOWN;
+			device->volume_status = CISS_LV_OK;
+			device->volume_offline = false;
+		} else {
+			pqi_get_raid_level(ctrl_info, device);
+			pqi_get_offload_status(ctrl_info, device);
+			pqi_get_volume_status(ctrl_info, device);
+		}
 	}
 
 out:
@@ -1356,6 +1383,8 @@ static void pqi_update_all_logical_drive_queue_depths(
 			continue;
 		if (!pqi_is_logical_device(device))
 			continue;
+		if (pqi_is_external_raid_device(device))
+			continue;
 		pqi_update_logical_drive_queue_depth(ctrl_info, device);
 	}
 }
@@ -1464,7 +1493,8 @@ static void pqi_dev_info(struct pqi_ctrl_info *ctrl_info,
 		scsi_device_type(device->devtype),
 		device->vendor,
 		device->model,
-		pqi_raid_level_to_string(device->raid_level),
+		pqi_is_logical_device(device) ?
+			pqi_raid_level_to_string(device->raid_level) : "",
 		device->offload_configured ? '+' : '-',
 		device->offload_enabled_pending ? '+' : '-',
 		device->expose_device ? '+' : '-',
@@ -1488,6 +1518,8 @@ static void pqi_scsi_update_device(struct pqi_scsi_dev *existing_device,
 	/* By definition, the scsi3addr and wwid fields are already the same. */
 
 	existing_device->is_physical_device = new_device->is_physical_device;
+	existing_device->is_external_raid_device =
+		new_device->is_external_raid_device;
 	existing_device->expose_device = new_device->expose_device;
 	existing_device->no_uld_attach = new_device->no_uld_attach;
 	existing_device->aio_enabled = new_device->aio_enabled;
@@ -1856,7 +1888,9 @@ static int pqi_update_scsi_devices(struct pqi_ctrl_info *ctrl_info)
 
 		memcpy(device->scsi3addr, scsi3addr, sizeof(device->scsi3addr));
 		device->is_physical_device = is_physical_device;
-		device->raid_level = SA_RAID_UNKNOWN;
+		if (!is_physical_device)
+			device->is_external_raid_device =
+				pqi_is_external_raid_addr(scsi3addr);
 
 		/* Gather information about the device. */
 		rc = pqi_get_device_info(ctrl_info, device);
