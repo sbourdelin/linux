@@ -580,7 +580,7 @@ static int esp_mac_probe(struct platform_device *dev)
 
 fail_free_irq:
 	if (esp_chips[!dev->id] == NULL)
-		free_irq(host->irq, esp);
+		free_irq(host->irq, NULL);
 fail_free_priv:
 	kfree(mep);
 fail_free_command_block:
