@@ -598,6 +598,7 @@ static int nvme_fill_device_id_eui64(struct nvme_ns *ns, struct sg_io_hdr *hdr,
 	int nvme_sc, res;
 	size_t len;
 	void *eui;
+	int i;
 
 	nvme_sc = nvme_identify_ns(ns->ctrl, ns->ns_id, &id_ns);
 	res = nvme_trans_status_code(hdr, nvme_sc);
@@ -628,7 +629,8 @@ static int nvme_fill_device_id_eui64(struct nvme_ns *ns, struct sg_io_hdr *hdr,
 	inq_response[5] = 0x02;	/* PIV=0b | Asso=00b | Designator Type=2h */
 	inq_response[6] = 0x00;	/* Rsvd */
 	inq_response[7] = len;	/* Designator Length */
-	memcpy(&inq_response[8], eui, len);
+	for (i = 0; i < len; i++)
+		inq_response[8 + i] = ((char *)eui)[len - (i + 1)];
 
 	res = nvme_trans_copy_to_user(hdr, inq_response, alloc_len);
 out_free_id:
