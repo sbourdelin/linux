@@ -164,31 +164,42 @@ static void intel_detect_pch(struct drm_i915_private *dev_priv)
 	 *
 	 * In some virtualized environments (e.g. XEN), there is irrelevant
 	 * ISA bridge in the system. To work reliably, we should scan trhough
-	 * all the ISA bridge devices and check for the first match, instead
+	 * all the ISA bridge devices and check for all the match, instead
 	 * of only checking the first one.
+	 *
+	 * If both the real ISA bridge and IGD are assigned to one guest, this
+	 * guest will have two matched ISA bridges: real and emulatated. We
+	 * couldn't guarantee which one is detected first, so we scan all the
+	 * match, instead of only checking the first match. Real one take
+	 * precedence over emulated to set pch_type and pch_id.Emulated one is
+	 * used to disable stolen memory.Finally pci_get_class() will return
+	 * NULL to exit loop and deference the last matched pch.
 	 */
 	while ((pch = pci_get_class(PCI_CLASS_BRIDGE_ISA << 8, pch))) {
 		if (pch->vendor == PCI_VENDOR_ID_INTEL) {
 			unsigned short id = pch->device & INTEL_PCH_DEVICE_ID_MASK;
-			dev_priv->pch_id = id;
 
 			if (id == INTEL_PCH_IBX_DEVICE_ID_TYPE) {
 				dev_priv->pch_type = PCH_IBX;
+				dev_priv->pch_id = id;
 				DRM_DEBUG_KMS("Found Ibex Peak PCH\n");
 				WARN_ON(!IS_GEN5(dev_priv));
 			} else if (id == INTEL_PCH_CPT_DEVICE_ID_TYPE) {
 				dev_priv->pch_type = PCH_CPT;
+				dev_priv->pch_id = id;
 				DRM_DEBUG_KMS("Found CougarPoint PCH\n");
 				WARN_ON(!(IS_GEN6(dev_priv) ||
 					IS_IVYBRIDGE(dev_priv)));
 			} else if (id == INTEL_PCH_PPT_DEVICE_ID_TYPE) {
 				/* PantherPoint is CPT compatible */
 				dev_priv->pch_type = PCH_CPT;
+				dev_priv->pch_id = id;
 				DRM_DEBUG_KMS("Found PantherPoint PCH\n");
 				WARN_ON(!(IS_GEN6(dev_priv) ||
 					IS_IVYBRIDGE(dev_priv)));
 			} else if (id == INTEL_PCH_LPT_DEVICE_ID_TYPE) {
 				dev_priv->pch_type = PCH_LPT;
+				dev_priv->pch_id = id;
 				DRM_DEBUG_KMS("Found LynxPoint PCH\n");
 				WARN_ON(!IS_HASWELL(dev_priv) &&
 					!IS_BROADWELL(dev_priv));
@@ -196,6 +207,7 @@ static void intel_detect_pch(struct drm_i915_private *dev_priv)
 					IS_BDW_ULT(dev_priv));
 			} else if (id == INTEL_PCH_LPT_LP_DEVICE_ID_TYPE) {
 				dev_priv->pch_type = PCH_LPT;
+				dev_priv->pch_id = id;
 				DRM_DEBUG_KMS("Found LynxPoint LP PCH\n");
 				WARN_ON(!IS_HASWELL(dev_priv) &&
 					!IS_BROADWELL(dev_priv));
@@ -203,16 +215,19 @@ static void intel_detect_pch(struct drm_i915_private *dev_priv)
 					!IS_BDW_ULT(dev_priv));
 			} else if (id == INTEL_PCH_SPT_DEVICE_ID_TYPE) {
 				dev_priv->pch_type = PCH_SPT;
+				dev_priv->pch_id = id;
 				DRM_DEBUG_KMS("Found SunrisePoint PCH\n");
 				WARN_ON(!IS_SKYLAKE(dev_priv) &&
 					!IS_KABYLAKE(dev_priv));
 			} else if (id == INTEL_PCH_SPT_LP_DEVICE_ID_TYPE) {
 				dev_priv->pch_type = PCH_SPT;
+				dev_priv->pch_id = id;
 				DRM_DEBUG_KMS("Found SunrisePoint LP PCH\n");
 				WARN_ON(!IS_SKYLAKE(dev_priv) &&
 					!IS_KABYLAKE(dev_priv));
 			} else if (id == INTEL_PCH_KBP_DEVICE_ID_TYPE) {
 				dev_priv->pch_type = PCH_KBP;
+				dev_priv->pch_id = id;
 				DRM_DEBUG_KMS("Found KabyPoint PCH\n");
 				WARN_ON(!IS_SKYLAKE(dev_priv) &&
 					!IS_KABYLAKE(dev_priv));
@@ -223,18 +238,26 @@ static void intel_detect_pch(struct drm_i915_private *dev_priv)
 					    PCI_SUBVENDOR_ID_REDHAT_QUMRANET &&
 				    pch->subsystem_device ==
 					    PCI_SUBDEVICE_ID_QEMU)) {
-				dev_priv->pch_type =
-					intel_virt_detect_pch(dev_priv);
+				/*
+				 * P2X is used for VMware, exclude it
+				 */
+				if (id != INTEL_PCH_P2X_DEVICE_ID_TYPE)
+					dev_priv->disable_stolen = true;
+				/*
+				 * Real PCH still hasn't been detected
+				 */
+				if (!HAS_PCH_SPLIT(dev_priv)) {
+					dev_priv->pch_type =
+						intel_virt_detect_pch(dev_priv);
+					dev_priv->pch_id = id;
+				}
 			} else
 				continue;
 
-			break;
 		}
 	}
-	if (!pch)
+	if (!HAS_PCH_SPLIT(dev_priv))
 		DRM_DEBUG_KMS("No PCH found.\n");
-
-	pci_dev_put(pch);
 }
 
 static int i915_getparam(struct drm_device *dev, void *data,

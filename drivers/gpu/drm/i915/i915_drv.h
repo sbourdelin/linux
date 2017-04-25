@@ -2135,6 +2135,7 @@ struct drm_i915_private {
 	struct intel_uncore uncore;
 
 	struct i915_virtual_gpu vgpu;
+	bool disable_stolen;
 
 	struct intel_gvt *gvt;
 
