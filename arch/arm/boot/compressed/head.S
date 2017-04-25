@@ -127,7 +127,8 @@
  AR_CLASS(	.arm	)
 start:
 		.type	start,#function
-		.rept	7
+   ARM(		.rept	7)
+ THUMB(		.rept	15)
 		__nop
 		.endr
    ARM(		mov	r0, r0		)
