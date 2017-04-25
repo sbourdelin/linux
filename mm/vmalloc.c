@@ -521,7 +521,7 @@ overflow:
 		}
 	}
 
-	if (printk_ratelimit())
+	if (printk_ratelimit() && !(gfp_mask & __GFP_NOWARN))
 		pr_warn("vmap allocation for size %lu failed: use vmalloc=<size> to increase size\n",
 			size);
 	kfree(va);
