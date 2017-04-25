@@ -1578,6 +1578,11 @@
 			extended tables themselves, and also PASID support. With
 			this option set, extended tables will not be used even
 			on hardware which claims to support them.
+		tboot_noforce [Default Off]
+			By default, tboot will force Intel IOMMU on, which
+			could harm performance for some workloads even IOMMU
+			identity mapping is enabled. This option will avoid
+			the 'force on' for Intel IOMMU.
 
 	intel_idle.max_cstate=	[KNL,HW,ACPI,X86]
 			0	disables intel_idle and fall back on acpi_idle.
