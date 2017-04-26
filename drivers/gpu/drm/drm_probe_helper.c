@@ -80,6 +80,46 @@ drm_mode_validate_flag(const struct drm_display_mode *mode,
 	return MODE_OK;
 }
 
+static enum drm_mode_status drm_mode_validate_connector_crtc(
+		struct drm_connector *connector,
+		struct drm_display_mode *mode)
+{
+	const struct drm_crtc_helper_funcs *crtc_funcs = NULL;
+	enum drm_mode_status mode_status = MODE_ERROR;
+	struct drm_device *dev = connector->dev;
+	struct drm_encoder *encoder;
+	struct drm_crtc *crtc;
+	bool callback_found = false;
+	int i;
+
+	for (i = 0; i < DRM_CONNECTOR_MAX_ENCODER; i++) {
+		encoder = drm_encoder_find(dev, connector->encoder_ids[i]);
+
+		if (!encoder)
+			continue;
+
+		drm_for_each_crtc(crtc, dev) {
+			crtc_funcs = crtc->helper_private;
+
+			if (!drm_encoder_crtc_ok(encoder, crtc))
+				continue;
+			if (!crtc_funcs || !crtc_funcs->mode_valid)
+				continue;
+
+			/* MODE_OK=0 and default mode_status=MODE_ERROR=-1
+			 * so if at least one crtc accepts the mode we get
+			 * MODE_OK */
+			mode_status &= crtc_funcs->mode_valid(crtc, mode);
+			callback_found |= true;
+		}
+	}
+
+	/* We can reach here without calling mode_valid if there is no
+	 * registered crtc with this callback, lets return MODE_OK in this
+	 * case */
+	return callback_found ? mode_status : MODE_OK;
+}
+
 static int drm_helper_probe_add_cmdline_mode(struct drm_connector *connector)
 {
 	struct drm_cmdline_mode *cmdline_mode;
@@ -431,6 +471,10 @@ retry:
 		if (mode->status == MODE_OK && connector_funcs->mode_valid)
 			mode->status = connector_funcs->mode_valid(connector,
 								   mode);
+
+		if (mode->status == MODE_OK)
+			mode->status = drm_mode_validate_connector_crtc(
+					connector, mode);
 	}
 
 prune:
