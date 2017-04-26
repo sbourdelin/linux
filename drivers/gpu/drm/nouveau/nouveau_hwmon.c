@@ -358,6 +358,23 @@ nouveau_hwmon_get_power1_crit(struct nouveau_drm *drm)
 	return iccsense->power_w_crit;
 }
 
+static struct attribute *pwm_fan_sensor_attrs[] = {
+	&sensor_dev_attr_pwm1_min.dev_attr.attr,
+	&sensor_dev_attr_pwm1_max.dev_attr.attr,
+	NULL
+};
+ATTRIBUTE_GROUPS(pwm_fan_sensor);
+
+static struct attribute *temp1_auto_point_sensor_attrs[] = {
+	&sensor_dev_attr_temp1_auto_point1_pwm.dev_attr.attr,
+	&sensor_dev_attr_temp1_auto_point1_temp.dev_attr.attr,
+	&sensor_dev_attr_temp1_auto_point1_temp_hyst.dev_attr.attr,
+	NULL
+};
+ATTRIBUTE_GROUPS(temp1_auto_point_sensor);
+
+#define N_ATTR_GROUPS   3
+
 static const u32 nouveau_config_chip[] = {
 	HWMON_C_UPDATE_INTERVAL,
 	0
@@ -792,17 +809,27 @@ nouveau_hwmon_init(struct drm_device *dev)
 #if defined(CONFIG_HWMON) || (defined(MODULE) && defined(CONFIG_HWMON_MODULE))
 	struct nouveau_drm *drm = nouveau_drm(dev);
 	struct nvkm_therm *therm = nvxx_therm(&drm->client.device);
+	const struct attribute_group *special_groups[N_ATTR_GROUPS];
 	struct nouveau_hwmon *hwmon;
 	struct device *hwmon_dev;
 	int ret = 0;
+	int i = 0;
 
 	hwmon = drm->hwmon = kzalloc(sizeof(*hwmon), GFP_KERNEL);
 	if (!hwmon)
 		return -ENOMEM;
 	hwmon->dev = dev;
 
+	if (therm && therm->attr_get && therm->attr_set) {
+		if (nvkm_therm_temp_get(therm) >= 0)
+			special_groups[i++] = &temp1_auto_point_sensor_group;
+		if (therm->fan_get && therm->fan_get(therm) >= 0)
+			special_groups[i++] = &pwm_fan_sensor_group;
+	}
+
+	special_groups[i] = 0;
 	hwmon_dev = hwmon_device_register_with_info(dev->dev, "nouveau", dev,
-						&nouveau_chip_info, NULL);
+					&nouveau_chip_info, special_groups);
 	if (IS_ERR(hwmon_dev)) {
 		ret = PTR_ERR(hwmon_dev);
 		NV_ERROR(drm, "Unable to register hwmon device: %d\n", ret);
