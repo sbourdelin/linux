@@ -34,7 +34,7 @@ static int wep_on_off;
 #define	WEP_ON_128BIT	2
 
 #include "ks_wlan.h"
-#include "ks_hostif.h"
+#include "hostif.h"
 #include "ks_wlan_ioctl.h"
 
 /* Include Wireless Extension definition and check version */
