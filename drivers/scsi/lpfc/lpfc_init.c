@@ -1422,6 +1422,13 @@ lpfc_handle_deferred_eratt(struct lpfc_hba *phba)
 	psli->sli_flag &= ~LPFC_SLI_ACTIVE;
 	spin_unlock_irq(&phba->hbalock);
 
+	if (phba->sli_rev < LPFC_SLI_REV4) {
+		/* Reset the port first */
+		lpfc_sli_brdrestart(phba);
+		rc = lpfc_sli_chipset_init(phba);
+		if (rc)
+			return (uint64_t)-1;
+	}
 
 	/*
 	 * Firmware stops when it triggred erratt. That could cause the I/Os
