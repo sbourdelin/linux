@@ -544,7 +544,7 @@ struct hostif_phy_information_confirm_t {
 
 /* sleep mode */
 #define SLP_ACTIVE  0
-#define SLP_SLEEP   1
+#define SLP_ASLEEP  1
 struct hostif_sleep_request_t {
 	struct hostif_hdr header;
 } __packed;

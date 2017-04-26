@@ -1727,7 +1727,7 @@ void hostif_sleep_request(struct ks_wlan_private *priv, unsigned long mode)
 
 	DPRINTK(3, "mode=%lu\n", mode);
 
-	if (mode == SLP_SLEEP) {
+	if (mode == SLP_ASLEEP) {
 		/* make primitive */
 		pp = kmalloc(hif_align_size(sizeof(*pp)), KS_WLAN_MEM_FLAG);
 		if (!pp) {
@@ -2315,7 +2315,7 @@ void hostif_sme_sleep_set(struct ks_wlan_private *priv)
 {
 	DPRINTK(3, "\n");
 	switch (priv->sleep_mode) {
-	case SLP_SLEEP:
+	case SLP_ASLEEP:
 		hostif_sleep_request(priv, priv->sleep_mode);
 		break;
 	case SLP_ACTIVE:

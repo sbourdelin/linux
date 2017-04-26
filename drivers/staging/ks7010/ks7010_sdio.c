@@ -103,7 +103,7 @@ static void ks_wlan_hw_sleep_doze_request(struct ks_wlan_private *priv)
 			DPRINTK(1, " error : GCR_B\n");
 			goto set_sleep_mode;
 		}
-		DPRINTK(3, "sleep_mode=SLP_SLEEP\n");
+		DPRINTK(3, "sleep_mode=SLP_ASLEEP\n");
 		atomic_set(&priv->sleepstatus.status, 1);
 		priv->last_doze = jiffies;
 	} else {
