@@ -453,9 +453,14 @@ ssize_t tpm_transmit_cmd(struct tpm_chip *chip, const void *buf,
 		return -EFAULT;
 
 	err = be32_to_cpu(header->return_code);
-	if (err != 0 && desc)
-		dev_err(&chip->dev, "A TPM error (%d) occurred %s\n", err,
-			desc);
+	if (err != 0 && desc) {
+		if (chip->flags & TPM_CHIP_FLAG_TPM2)
+			dev_err(&chip->dev, "A TPM 2.0 error (0x%x) occurred %s\n",
+				err, desc);
+		else
+			dev_err(&chip->dev, "A TPM error (%d) occurred %s\n",
+				err, desc);
+	}
 	if (err)
 		return err;
 
