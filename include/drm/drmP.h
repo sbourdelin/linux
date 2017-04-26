@@ -769,6 +769,11 @@ extern int drm_gem_prime_handle_to_fd(struct drm_device *dev,
 		int *prime_fd);
 extern struct drm_gem_object *drm_gem_prime_import(struct drm_device *dev,
 		struct dma_buf *dma_buf);
+
+extern struct drm_gem_object *drm_gem_prime_import_platform(
+		struct drm_device *dev,
+		struct dma_buf *dma_buf);
+
 extern int drm_gem_prime_fd_to_handle(struct drm_device *dev,
 		struct drm_file *file_priv, int prime_fd, uint32_t *handle);
 struct dma_buf *drm_gem_dmabuf_export(struct drm_device *dev,
