@@ -78,6 +78,13 @@ static int ovl_getattr(const struct path *path, struct kstat *stat,
 		stat->dev = lower->d_sb->s_dev;
 		stat->ino = lower->d_inode->i_ino;
 	}
+	/*
+	 * When all layers are on same fs, the tupple overlay bdev
+	 * and real inode ino is unique, so it is preferred to expose
+	 * overlay bdev for overlay inodes for things like du -x.
+	 */
+	if (ovl_same_sb(dentry->d_sb))
+		stat->dev = dentry->d_sb->s_dev;
 
 	return err;
 }
