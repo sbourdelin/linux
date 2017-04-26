@@ -365,22 +365,6 @@ static struct latch_tree_root bpf_tree __cacheline_aligned;
 
 int bpf_jit_kallsyms __read_mostly;
 
-static void bpf_prog_ksym_node_add(struct bpf_prog_aux *aux)
-{
-	WARN_ON_ONCE(!list_empty(&aux->bpf_progs_head));
-	list_add_tail_rcu(&aux->bpf_progs_head, &bpf_progs);
-	latch_tree_insert(&aux->ksym_tnode, &bpf_tree, &bpf_tree_ops);
-}
-
-static void bpf_prog_ksym_node_del(struct bpf_prog_aux *aux)
-{
-	if (list_empty(&aux->bpf_progs_head))
-		return;
-
-	latch_tree_erase(&aux->ksym_tnode, &bpf_tree, &bpf_tree_ops);
-	list_del_rcu(&aux->bpf_progs_head);
-}
-
 static bool bpf_prog_kallsyms_candidate(const struct bpf_prog *fp)
 {
 	return fp->jited && !bpf_prog_was_classic(fp);
@@ -392,38 +376,45 @@ static bool bpf_prog_kallsyms_verify_off(const struct bpf_prog *fp)
 	       fp->aux->bpf_progs_head.prev == LIST_POISON2;
 }
 
-void bpf_prog_kallsyms_add(struct bpf_prog *fp)
+void bpf_prog_link(struct bpf_prog *fp)
 {
-	if (!bpf_prog_kallsyms_candidate(fp) ||
-	    !capable(CAP_SYS_ADMIN))
-		return;
+	struct bpf_prog_aux *aux = fp->aux;
 
 	spin_lock_bh(&bpf_lock);
-	bpf_prog_ksym_node_add(fp->aux);
+	list_add_tail_rcu(&aux->bpf_progs_head, &bpf_progs);
+	if (bpf_prog_kallsyms_candidate(fp))
+		latch_tree_insert(&aux->ksym_tnode, &bpf_tree, &bpf_tree_ops);
 	spin_unlock_bh(&bpf_lock);
 }
 
-void bpf_prog_kallsyms_del(struct bpf_prog *fp)
+void bpf_prog_unlink(struct bpf_prog *fp)
 {
-	if (!bpf_prog_kallsyms_candidate(fp))
-		return;
+	struct bpf_prog_aux *aux = fp->aux;
 
 	spin_lock_bh(&bpf_lock);
-	bpf_prog_ksym_node_del(fp->aux);
+	list_del_rcu(&aux->bpf_progs_head);
+	if (bpf_prog_kallsyms_candidate(fp))
+		latch_tree_erase(&aux->ksym_tnode, &bpf_tree, &bpf_tree_ops);
 	spin_unlock_bh(&bpf_lock);
 }
 
 static struct bpf_prog *bpf_prog_kallsyms_find(unsigned long addr)
 {
 	struct latch_tree_node *n;
+	struct bpf_prog *prog;
 
 	if (!bpf_jit_kallsyms_enabled())
 		return NULL;
 
 	n = latch_tree_find((void *)addr, &bpf_tree, &bpf_tree_ops);
-	return n ?
-	       container_of(n, struct bpf_prog_aux, ksym_tnode)->prog :
-	       NULL;
+	if (!n)
+		return NULL;
+
+	prog = container_of(n, struct bpf_prog_aux, ksym_tnode)->prog;
+	if (!prog->priv_cap_sys_admin)
+		return NULL;
+
+	return prog;
 }
 
 const char *__bpf_address_lookup(unsigned long addr, unsigned long *size,
@@ -474,6 +465,10 @@ int bpf_get_kallsym(unsigned int symnum, unsigned long *value, char *type,
 
 	rcu_read_lock();
 	list_for_each_entry_rcu(aux, &bpf_progs, bpf_progs_head) {
+		if (!bpf_prog_kallsyms_candidate(aux->prog) ||
+		    !aux->prog->priv_cap_sys_admin)
+			continue;
+
 		if (it++ != symnum)
 			continue;
 

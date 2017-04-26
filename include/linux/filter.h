@@ -753,8 +753,8 @@ bpf_address_lookup(unsigned long addr, unsigned long *size,
 	return ret;
 }
 
-void bpf_prog_kallsyms_add(struct bpf_prog *fp);
-void bpf_prog_kallsyms_del(struct bpf_prog *fp);
+void bpf_prog_link(struct bpf_prog *fp);
+void bpf_prog_unlink(struct bpf_prog *fp);
 
 #else /* CONFIG_BPF_JIT */
 
