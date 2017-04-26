@@ -84,6 +84,7 @@ static int tcf_dump_walker(struct tcf_hashinfo *hinfo, struct sk_buff *skb,
 {
 	int err = 0, index = -1, i = 0, s_i = 0, n_i = 0;
 	u32 act_flags = cb->args[2];
+	unsigned long jiffy_since = cb->args[3];
 	struct nlattr *nest;
 
 	spin_lock_bh(&hinfo->lock);
@@ -99,6 +100,11 @@ static int tcf_dump_walker(struct tcf_hashinfo *hinfo, struct sk_buff *skb,
 		hlist_for_each_entry_rcu(p, head, tcfa_head) {
 			index++;
 			if (index < s_i)
+				continue;
+
+			if (jiffy_since &&
+			    time_after(jiffy_since,
+				       (unsigned long)p->tcfa_tm.lastuse))
 				continue;
 
 			nest = nla_nest_start(skb, n_i);
@@ -118,9 +124,11 @@ static int tcf_dump_walker(struct tcf_hashinfo *hinfo, struct sk_buff *skb,
 		}
 	}
 done:
+	if (index > 0)
+		cb->args[0] = index + 1;
+
 	spin_unlock_bh(&hinfo->lock);
 	if (n_i) {
-		cb->args[0] += n_i;
 		if (act_flags & TCA_FLAG_LARGE_DUMP_ON)
 			cb->args[1] = n_i;
 	}
@@ -1033,7 +1041,8 @@ static int tcf_action_add(struct net *net, struct nlattr *nla,
 }
 
 static const struct nla_policy tcaa_policy[TCA_ROOT_MAX + 1] = {
-	[TCA_ROOT_FLAGS]      = { .type = NLA_U32 },
+	[TCA_ROOT_FLAGS]           = { .type = NLA_U32 },
+	[TCA_ROOT_TIME_DELTA]      = { .type = NLA_U32 },
 };
 
 static int tc_ctl_action(struct sk_buff *skb, struct nlmsghdr *n,
@@ -1134,7 +1143,9 @@ static int tc_dump_action(struct sk_buff *skb, struct netlink_callback *cb)
 	struct tcamsg *t = (struct tcamsg *) nlmsg_data(cb->nlh);
 	struct nlattr *count_attr = NULL;
 	struct nlattr *tb[TCA_ROOT_MAX + 1];
+	unsigned long jiffy_since = 0;
 	struct nlattr *kind = NULL;
+	u32 msecs_since = 0;
 	u32 act_flags = 0;
 	u32 act_count = 0;
 
@@ -1159,12 +1170,19 @@ static int tc_dump_action(struct sk_buff *skb, struct netlink_callback *cb)
 	if (act_flags && !tca_flags_valid(act_flags))
 		return -EINVAL;
 
+	if (tb[TCA_ROOT_TIME_DELTA])
+		msecs_since = nla_get_u32(tb[TCA_ROOT_TIME_DELTA]);
+
 	nlh = nlmsg_put(skb, NETLINK_CB(cb->skb).portid, cb->nlh->nlmsg_seq,
 			cb->nlh->nlmsg_type, sizeof(*t), 0);
 	if (!nlh)
 		goto out_module_put;
 
+	if (msecs_since)
+		jiffy_since = jiffies - msecs_to_jiffies(msecs_since);
+
 	cb->args[2] = act_flags;
+	cb->args[3] = jiffy_since;
 	t = nlmsg_data(nlh);
 	t->tca_family = AF_UNSPEC;
 	t->tca__pad1 = 0;
