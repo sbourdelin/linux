@@ -1501,7 +1501,9 @@ int perf_evsel__open(struct perf_evsel *evsel, struct cpu_map *cpus,
 		nthreads = threads->nr;
 
 	if (evsel->fd == NULL &&
-	    perf_evsel__alloc_fd(evsel, cpus->nr, nthreads) < 0)
+	    perf_evsel__alloc_fd(evsel,
+				evsel->cpus ? evsel->cpus->nr : cpus->nr,
+				nthreads) < 0)
 		return -ENOMEM;
 
 	if (evsel->cgrp) {
