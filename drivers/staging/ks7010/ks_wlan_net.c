@@ -2309,21 +2309,18 @@ static int ks_wlan_set_sleep_mode(struct net_device *dev,
 
 	DPRINTK(2, "\n");
 
-	if (*uwrq == SLP_ASLEEP) {
-		priv->sleep_mode = *uwrq;
-		netdev_info(dev, "SET_SLEEP_MODE %d\n", priv->sleep_mode);
-
-		hostif_sme_enqueue(priv, SME_STOP_REQUEST);
-		hostif_sme_enqueue(priv, SME_SLEEP_REQUEST);
-
-	} else if (*uwrq == SLP_ACTIVE) {
-		priv->sleep_mode = *uwrq;
-		netdev_info(dev, "SET_SLEEP_MODE %d\n", priv->sleep_mode);
-		hostif_sme_enqueue(priv, SME_SLEEP_REQUEST);
-	} else {
+	if (*uwrq != SLP_ASLEEP && *uwrq != SLP_ACTIVE) {
 		netdev_err(dev, "SET_SLEEP_MODE %d errror\n", *uwrq);
 		return -EINVAL;
 	}
+
+	priv->sleep_mode = *uwrq;
+	netdev_info(dev, "SET_SLEEP_MODE %d\n", *uwrq);
+
+	if (*uwrq == SLP_ASLEEP)
+		hostif_sme_enqueue(priv, SME_STOP_REQUEST);
+
+	hostif_sme_enqueue(priv, SME_SLEEP_REQUEST);
 
 	return 0;
 }
