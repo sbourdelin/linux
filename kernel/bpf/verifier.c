@@ -3488,7 +3488,7 @@ int bpf_check(struct bpf_prog **prog, union bpf_attr *attr)
 	if (ret < 0)
 		goto skip_full_check;
 
-	env->allow_ptr_leaks = capable(CAP_SYS_ADMIN);
+	env->allow_ptr_leaks = env->prog->priv_cap_sys_admin;
 
 	ret = do_check(env);
 
@@ -3589,7 +3589,7 @@ int bpf_analyzer(struct bpf_prog *prog, const struct bpf_ext_analyzer_ops *ops,
 	if (ret < 0)
 		goto skip_full_check;
 
-	env->allow_ptr_leaks = capable(CAP_SYS_ADMIN);
+	env->allow_ptr_leaks = prog->priv_cap_sys_admin;
 
 	ret = do_check(env);
 

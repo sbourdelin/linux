@@ -786,7 +786,7 @@ EXPORT_SYMBOL_GPL(bpf_prog_get_type);
 /* last field in 'union bpf_attr' used by this command */
 #define	BPF_PROG_LOAD_LAST_FIELD kern_version
 
-static int bpf_prog_load(union bpf_attr *attr)
+static int bpf_prog_load(union bpf_attr *attr, bool cap_sys_admin)
 {
 	enum bpf_prog_type type = attr->prog_type;
 	struct bpf_prog *prog;
@@ -817,7 +817,8 @@ static int bpf_prog_load(union bpf_attr *attr)
 		return -EPERM;
 
 	/* plain bpf_prog allocation */
-	prog = bpf_prog_alloc(bpf_prog_size(attr->insn_cnt), GFP_USER);
+	prog = bpf_prog_alloc(bpf_prog_size(attr->insn_cnt), GFP_USER,
+			      cap_sys_admin);
 	if (!prog)
 		return -ENOMEM;
 
@@ -1053,7 +1054,7 @@ SYSCALL_DEFINE3(bpf, int, cmd, union bpf_attr __user *, uattr, unsigned int, siz
 		err = map_get_next_key(&attr);
 		break;
 	case BPF_PROG_LOAD:
-		err = bpf_prog_load(&attr);
+		err = bpf_prog_load(&attr, capable(CAP_SYS_ADMIN));
 		break;
 	case BPF_OBJ_PIN:
 		err = bpf_obj_pin(&attr);
