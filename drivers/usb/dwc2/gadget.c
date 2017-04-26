@@ -285,10 +285,9 @@ int dwc2_hsotg_tx_fifo_average_depth(struct dwc2_hsotg *hsotg)
 }
 
 /**
- * dwc2_hsotg_init_fifo - initialise non-periodic FIFOs
- * @hsotg: The device instance.
+ * dwc2_hsotg_init_periodic_fifos - initialize periodic FIFOs
  */
-static void dwc2_hsotg_init_fifo(struct dwc2_hsotg *hsotg)
+static void dwc2_hsotg_init_periodic_fifos(struct dwc2_hsotg *hsotg)
 {
 	unsigned int ep;
 	unsigned int addr;
@@ -303,27 +302,12 @@ static void dwc2_hsotg_init_fifo(struct dwc2_hsotg *hsotg)
 	WARN_ON(hsotg->fifo_map);
 	hsotg->fifo_map = 0;
 
-	/* set RX/NPTX FIFO sizes */
-	dwc2_writel(hsotg->params.g_rx_fifo_size, hsotg->regs + GRXFSIZ);
-	dwc2_writel((hsotg->params.g_rx_fifo_size << FIFOSIZE_STARTADDR_SHIFT) |
-		    (hsotg->params.g_np_tx_fifo_size << FIFOSIZE_DEPTH_SHIFT),
-		    hsotg->regs + GNPTXFSIZ);
-
 	/*
-	 * arange all the rest of the TX FIFOs, as some versions of this
-	 * block have overlapping default addresses. This also ensures
-	 * that if the settings have been changed, then they are set to
-	 * known values.
+	 * Arange periodic TX FIFOs to correctly calculated values.
+	 * Start at the end of the GNPTXFSIZ.
 	 */
-
-	/* start at the end of the GNPTXFSIZ, rounded up */
 	addr = hsotg->params.g_rx_fifo_size + hsotg->params.g_np_tx_fifo_size;
 
-	/*
-	 * Configure fifos sizes from provided configuration and assign
-	 * them to endpoints dynamically according to maxpacket size value of
-	 * given endpoint.
-	 */
 	fifo_count = dwc2_hsotg_tx_fifo_count(hsotg);
 
 	for (ep = 1; ep <= fifo_count; ep++) {
@@ -340,6 +324,21 @@ static void dwc2_hsotg_init_fifo(struct dwc2_hsotg *hsotg)
 	dwc2_writel(hsotg->hw_params.total_fifo_size |
 		    addr << GDFIFOCFG_EPINFOBASE_SHIFT,
 		    hsotg->regs + GDFIFOCFG);
+}
+
+/**
+ * dwc2_hsotg_init_non_periodic_fifos - initialize non-periodic FIFOs
+ */
+static void dwc2_hsotg_init_non_periodic_fifos(struct dwc2_hsotg *hsotg)
+{
+	if (!hsotg->params.enable_dynamic_fifo)
+		return;
+
+	/* set RX/NPTX FIFO sizes */
+	dwc2_writel(hsotg->params.g_rx_fifo_size, hsotg->regs + GRXFSIZ);
+	dwc2_writel((hsotg->params.g_rx_fifo_size << FIFOSIZE_STARTADDR_SHIFT) |
+		    (hsotg->params.g_np_tx_fifo_size << FIFOSIZE_DEPTH_SHIFT),
+		    hsotg->regs + GNPTXFSIZ);
 
 	/*
 	 * Chapter 2.1.1 of the Programming Guide - The TxFIFOs and the RxFIFO
@@ -3269,10 +3268,13 @@ void dwc2_hsotg_core_init_disconnected(struct dwc2_hsotg *hsotg,
 	}
 	dwc2_writel(usbcfg, hsotg->regs + GUSBCFG);
 
-	dwc2_hsotg_init_fifo(hsotg);
+	dwc2_hsotg_init_non_periodic_fifos(hsotg);
 
-	if (!is_usb_reset)
+	if (!is_usb_reset) {
+		dwc2_hsotg_init_periodic_fifos(hsotg);
+
 		__orr32(hsotg->regs + DCTL, DCTL_SFTDISCON);
+	}
 
 	dcfg |= DCFG_EPMISCNT(1);
 
