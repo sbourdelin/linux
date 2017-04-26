@@ -96,6 +96,8 @@ struct nvkm_therm_func {
 	int (*fan_sense)(struct nvkm_therm *);
 
 	void (*program_alarms)(struct nvkm_therm *);
+
+	void (*clkgate_engine)(struct nvkm_therm *, enum nvkm_devidx, bool);
 };
 
 void nv40_therm_intr(struct nvkm_therm *);
@@ -110,6 +112,9 @@ void g84_sensor_setup(struct nvkm_therm *);
 void g84_therm_fini(struct nvkm_therm *);
 
 int gt215_therm_fan_sense(struct nvkm_therm *);
+void gt215_therm_init(struct nvkm_therm *);
+
+void gf100_clkgate_engine(struct nvkm_therm *, enum nvkm_devidx, bool);
 
 void gf119_therm_init(struct nvkm_therm *);
 
