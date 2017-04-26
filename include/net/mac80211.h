@@ -895,7 +895,12 @@ struct ieee80211_tx_info {
 					u8 use_cts_prot:1;
 					u8 short_preamble:1;
 					u8 skip_table:1;
-					/* 2 bytes free */
+
+					/* txpower field refers to the first
+					 * entry of rates only (if present).
+					 */
+					s8 txpower;
+					/* 1 byte free */
 				};
 				/* only needed before rate control */
 				unsigned long jiffies;
@@ -1727,13 +1732,14 @@ enum ieee80211_sta_rx_bandwidth {
  * struct ieee80211_sta_rates - station rate selection table
  *
  * @rcu_head: RCU head used for freeing the table on update
- * @rate: transmit rates/flags to be used by default.
+ * @rate: transmit rates/power/flags to be used by default.
  *	Overriding entries per-packet is possible by using cb tx control.
  */
 struct ieee80211_sta_rates {
 	struct rcu_head rcu_head;
 	struct {
 		s8 idx;
+		s8 txpower;
 		u8 count;
 		u8 count_cts;
 		u8 count_rts;

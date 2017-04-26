@@ -52,6 +52,7 @@
 #include <linux/ieee80211.h>
 #include <linux/slab.h>
 #include <net/mac80211.h>
+#include "sta_info.h"
 #include "rate.h"
 #include "rc80211_minstrel.h"
 
@@ -125,11 +126,19 @@ static void
 minstrel_update_rates(struct minstrel_priv *mp, struct minstrel_sta_info *mi)
 {
 	struct ieee80211_sta_rates *ratetbl;
+	struct sta_info *sta;
+	s8 txpower;
 	int i = 0;
+
+	sta = container_of(mi->sta, struct sta_info, sta);
+	txpower = sta->sdata->vif.bss_conf.txpower;
 
 	ratetbl = kzalloc(sizeof(*ratetbl), GFP_ATOMIC);
 	if (!ratetbl)
 		return;
+
+	for (i = 0; i < ARRAY_SIZE(ratetbl->rate); i++)
+		ratetbl->rate[i].txpower = txpower;
 
 	/* Start with max_tp_rate */
 	minstrel_set_rate(mi, ratetbl, i++, mi->max_tp_rate[0]);

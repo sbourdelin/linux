@@ -921,11 +921,19 @@ static void
 minstrel_ht_update_rates(struct minstrel_priv *mp, struct minstrel_ht_sta *mi)
 {
 	struct ieee80211_sta_rates *rates;
+	struct sta_info *sta;
+	s8 txpower;
 	int i = 0;
+
+	sta = container_of(mi->sta, struct sta_info, sta);
+	txpower = sta->sdata->vif.bss_conf.txpower;
 
 	rates = kzalloc(sizeof(*rates), GFP_ATOMIC);
 	if (!rates)
 		return;
+
+	for (i = 0; i < ARRAY_SIZE(rates->rate); i++)
+		rates->rate[i].txpower = txpower;
 
 	/* Start with max_tp_rate[0] */
 	minstrel_ht_set_rate(mp, mi, rates, i++, mi->max_tp_rate[0]);
