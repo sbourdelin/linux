@@ -22,4 +22,10 @@
 
 #define bond_version DRV_DESCRIPTION ": v" DRV_VERSION " (" DRV_RELDATE ")\n"
 
+/* Must be compatible with struct sockaddr */
+struct bond_mac_addr {
+	unsigned short type;
+	unsigned char addr[MAX_ADDR_LEN];
+};
+
 #endif

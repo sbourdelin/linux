@@ -39,7 +39,7 @@
 #include <asm/byteorder.h>
 #include <net/bonding.h>
 #include <net/bond_alb.h>
-
+#include "bonding_priv.h"
 
 
 static const u8 mac_bcast[ETH_ALEN + 2] __long_aligned = {
@@ -1234,7 +1234,7 @@ static int alb_set_mac_address(struct bonding *bond, void *addr)
 {
 	struct slave *slave, *rollback_slave;
 	struct list_head *iter;
-	struct sockaddr sa;
+	struct bond_mac_addr sa;
 	char tmp_addr[ETH_ALEN];
 	int res;
 
@@ -1257,8 +1257,8 @@ static int alb_set_mac_address(struct bonding *bond, void *addr)
 	return 0;
 
 unwind:
-	memcpy(sa.sa_data, bond->dev->dev_addr, bond->dev->addr_len);
-	sa.sa_family = bond->dev->type;
+	memcpy(sa.addr, bond->dev->dev_addr, bond->dev->addr_len);
+	sa.type = bond->dev->type;
 
 	/* unwind from head to the slave that failed */
 	bond_for_each_slave(bond, rollback_slave, iter) {

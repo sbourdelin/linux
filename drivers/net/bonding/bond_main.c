@@ -1330,7 +1330,7 @@ int bond_enslave(struct net_device *bond_dev, struct net_device *slave_dev)
 	struct bonding *bond = netdev_priv(bond_dev);
 	const struct net_device_ops *slave_ops = slave_dev->netdev_ops;
 	struct slave *new_slave = NULL, *prev_slave;
-	struct sockaddr addr;
+	struct bond_mac_addr addr;
 	int link_reporting;
 	int res = 0, i;
 
@@ -1488,8 +1488,8 @@ int bond_enslave(struct net_device *bond_dev, struct net_device *slave_dev)
 		/* Set slave to master's mac address.  The application already
 		 * set the master's mac address to that of the first slave
 		 */
-		memcpy(addr.sa_data, bond_dev->dev_addr, bond_dev->addr_len);
-		addr.sa_family = slave_dev->type;
+		memcpy(addr.addr, bond_dev->dev_addr, bond_dev->addr_len);
+		addr.type = slave_dev->type;
 		res = dev_set_mac_address(slave_dev, &addr);
 		if (res) {
 			netdev_dbg(bond_dev, "Error %d calling set_mac_address\n", res);
@@ -1773,8 +1773,8 @@ err_restore_mac:
 		 * MAC if this slave's MAC is in use by the bond, or at
 		 * least print a warning.
 		 */
-		ether_addr_copy(addr.sa_data, new_slave->perm_hwaddr);
-		addr.sa_family = slave_dev->type;
+		ether_addr_copy(addr.addr, new_slave->perm_hwaddr);
+		addr.type = slave_dev->type;
 		dev_set_mac_address(slave_dev, &addr);
 	}
 
@@ -3619,7 +3619,8 @@ static int bond_set_mac_address(struct net_device *bond_dev, void *addr)
 {
 	struct bonding *bond = netdev_priv(bond_dev);
 	struct slave *slave, *rollback_slave;
-	struct sockaddr *sa = addr, tmp_sa;
+	struct sockaddr *sa = addr;
+	struct bond_mac_addr tmp_sa;
 	struct list_head *iter;
 	int res = 0;
 
@@ -3659,8 +3660,8 @@ static int bond_set_mac_address(struct net_device *bond_dev, void *addr)
 	return 0;
 
 unwind:
-	memcpy(tmp_sa.sa_data, bond_dev->dev_addr, bond_dev->addr_len);
-	tmp_sa.sa_family = bond_dev->type;
+	memcpy(tmp_sa.addr, bond_dev->dev_addr, bond_dev->addr_len);
+	tmp_sa.type = bond_dev->type;
 
 	/* unwind from head to the slave that failed */
 	bond_for_each_slave(bond, rollback_slave, iter) {
