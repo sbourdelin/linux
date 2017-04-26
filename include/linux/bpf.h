@@ -172,7 +172,7 @@ struct bpf_prog_aux {
 	u32 used_map_cnt;
 	u32 max_ctx_offset;
 	struct latch_tree_node ksym_tnode;
-	struct list_head ksym_lnode;
+	struct list_head bpf_progs_head;
 	const struct bpf_verifier_ops *ops;
 	struct bpf_map **used_maps;
 	struct bpf_prog *prog;
