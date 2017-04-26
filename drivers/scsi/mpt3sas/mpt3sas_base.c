@@ -1884,6 +1884,7 @@ _base_request_irq(struct MPT3SAS_ADAPTER *ioc, u8 index)
 
 	INIT_LIST_HEAD(&reply_q->list);
 	list_add_tail(&reply_q->list, &ioc->reply_queue_list);
+	kfree(reply_q);
 	return 0;
 }
 
