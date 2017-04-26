@@ -154,8 +154,23 @@ static int ovl_dir_getattr(const struct path *path, struct kstat *stat,
 	if (err)
 		return err;
 
+	/*
+	 * Always use the overlay bdev for directories, so 'find -xdev' will
+	 * scan the entire overlay mount and won't cross the overlay mount
+	 * boundaries.
+	 */
 	stat->dev = dentry->d_sb->s_dev;
-	stat->ino = dentry->d_inode->i_ino;
+	/*
+	 * When all layers are not on the same fs, the pair real inode numbers
+	 * and overlay bdev is not unique, so use the non persistent overlay
+	 * inode number.
+	 * When all layers are on the same fs, use the stable inode number,
+	 * which is persistent, unique and constant across copy up.
+	 */
+	if (!ovl_same_sb(dentry->d_sb))
+		stat->ino = dentry->d_inode->i_ino;
+	else if (OVL_TYPE_UPPER(type) && OVL_TYPE_MERGE(type))
+		stat->ino = ovl_dentry_lower(dentry)->d_inode->i_ino;
 
 	/*
 	 * It's probably not worth it to count subdirs to get the
