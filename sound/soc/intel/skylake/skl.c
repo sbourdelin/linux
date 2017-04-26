@@ -38,6 +38,12 @@
 
 static struct skl_machine_pdata skl_dmic_data;
 
+#define MAX_CODECS 3
+struct sst_codecs {
+	int num_codecs;
+	u8 codecs[MAX_CODECS][ACPI_ID_LEN];
+};
+
 /*
  * initialize the PCI registers
  */
@@ -862,24 +868,52 @@ static void skl_remove(struct pci_dev *pci)
 	dev_set_drvdata(&pci->dev, NULL);
 }
 
+static struct sst_acpi_mach *check_all_codecs(void *arg)
+{
+	struct sst_acpi_mach *mach = arg;
+	struct sst_codecs *codec_list = (struct sst_codecs *) mach->quirk_data;
+	int i;
+
+	if (mach->quirk_data == NULL)
+		return mach;
+
+	for (i = 0; i < codec_list->num_codecs; i++) {
+		if (sst_acpi_check_hid(codec_list->codecs[i]) != true)
+			return NULL;
+	}
+
+	return mach;
+}
+
+static struct sst_codecs skl_codecs = { 1, {"NAU88L25"} };
+static struct sst_codecs kbl_codecs = { 1, {"NAU88L25"} };
+static struct sst_codecs bxt_codecs = { 1, {"MX98357A"} };
+
 static struct sst_acpi_mach sst_skl_devdata[] = {
-	{ "INT343A", "skl_alc286s_i2s", "intel/dsp_fw_release.bin", NULL, NULL, NULL },
-	{ "INT343B", "skl_n88l25_s4567", "intel/dsp_fw_release.bin",
-				NULL, NULL, &skl_dmic_data },
-	{ "MX98357A", "skl_n88l25_m98357a", "intel/dsp_fw_release.bin",
-				NULL, NULL, &skl_dmic_data },
+	{ "INT343A", "skl_alc286s_i2s", "intel/dsp_fw_release.bin", NULL,
+				check_all_codecs, NULL, NULL },
+	{ "INT343B", "skl_n88l25_s4567", "intel/dsp_fw_release.bin", NULL,
+				check_all_codecs, &skl_codecs, &skl_dmic_data },
+	{ "MX98357A", "skl_n88l25_m98357a", "intel/dsp_fw_release.bin", NULL,
+				check_all_codecs, &skl_codecs, &skl_dmic_data },
 	{}
 };
 
 static struct sst_acpi_mach sst_bxtp_devdata[] = {
-	{ "INT343A", "bxt_alc298s_i2s", "intel/dsp_fw_bxtn.bin", NULL, NULL, NULL },
-	{ "DLGS7219", "bxt_da7219_max98357a_i2s", "intel/dsp_fw_bxtn.bin", NULL, NULL, NULL },
+	{ "INT343A", "bxt_alc298s_i2s", "intel/dsp_fw_bxtn.bin", NULL,
+				check_all_codecs, NULL, NULL },
+	{ "DLGS7219", "bxt_da7219_max98357a_i2s", "intel/dsp_fw_bxtn.bin", NULL,
+				check_all_codecs, &bxt_codecs, NULL },
+	{}
 };
 
 static struct sst_acpi_mach sst_kbl_devdata[] = {
-	{ "INT343A", "kbl_alc286s_i2s", "intel/dsp_fw_kbl.bin", NULL, NULL, NULL },
-	{ "INT343B", "kbl_n88l25_s4567", "intel/dsp_fw_kbl.bin", NULL, NULL, &skl_dmic_data },
-	{ "MX98357A", "kbl_n88l25_m98357a", "intel/dsp_fw_kbl.bin", NULL, NULL, &skl_dmic_data },
+	{ "INT343A", "kbl_alc286s_i2s", "intel/dsp_fw_kbl.bin", NULL,
+				check_all_codecs, NULL, NULL },
+	{ "INT343B", "kbl_n88l25_s4567", "intel/dsp_fw_kbl.bin", NULL,
+				check_all_codecs, &kbl_codecs, &skl_dmic_data },
+	{ "MX98357A", "kbl_n88l25_m98357a", "intel/dsp_fw_kbl.bin", NULL,
+				check_all_codecs, &kbl_codecs, &skl_dmic_data },
 	{}
 };
 
