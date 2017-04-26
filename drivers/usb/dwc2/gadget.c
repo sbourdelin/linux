@@ -293,8 +293,12 @@ static void dwc2_hsotg_init_fifo(struct dwc2_hsotg *hsotg)
 	unsigned int ep;
 	unsigned int addr;
 	int timeout;
+	int fifo_count;
 	u32 val;
 	u32 *txfsz = hsotg->params.g_tx_fifo_size;
+
+	if (!hsotg->params.enable_dynamic_fifo)
+		return;
 
 	/* Reset fifo map if not correctly cleared during previous session */
 	WARN_ON(hsotg->fifo_map);
@@ -321,9 +325,9 @@ static void dwc2_hsotg_init_fifo(struct dwc2_hsotg *hsotg)
 	 * them to endpoints dynamically according to maxpacket size value of
 	 * given endpoint.
 	 */
-	for (ep = 1; ep < MAX_EPS_CHANNELS; ep++) {
-		if (!txfsz[ep])
-			continue;
+	fifo_count = dwc2_hsotg_tx_fifo_count(hsotg);
+
+	for (ep = 1; ep <= fifo_count; ep++) {
 		val = addr;
 		val |= txfsz[ep] << FIFOSIZE_DEPTH_SHIFT;
 		WARN_ONCE(addr + txfsz[ep] > hsotg->fifo_mem,
