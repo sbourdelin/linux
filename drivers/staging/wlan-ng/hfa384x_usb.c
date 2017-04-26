@@ -3511,20 +3511,24 @@ static void hfa384x_int_rxmonitor(struct wlandevice *wlandev,
 		datap = skb_put(skb, sizeof(struct p80211_caphdr));
 		caphdr = (struct p80211_caphdr *)datap;
 
-		caphdr->version = htonl(P80211CAPTURE_VERSION);
-		caphdr->length = htonl(sizeof(struct p80211_caphdr));
+		caphdr->version = __be32_to_cpu(htonl(P80211CAPTURE_VERSION));
+		caphdr->length = __be32_to_cpu( htonl(sizeof(
+						struct p80211_caphdr)));
 		caphdr->mactime = __cpu_to_be64(rxdesc->time) * 1000;
 		caphdr->hosttime = __cpu_to_be64(jiffies);
-		caphdr->phytype = htonl(4);	/* dss_dot11_b */
-		caphdr->channel = htonl(hw->sniff_channel);
-		caphdr->datarate = htonl(rxdesc->rate);
-		caphdr->antenna = htonl(0);	/* unknown */
-		caphdr->priority = htonl(0);	/* unknown */
-		caphdr->ssi_type = htonl(3);	/* rssi_raw */
+
+		/* dss_dot11_b */
+		caphdr->phytype = __be32_to_cpu(htonl(4));
+
+		caphdr->channel = __be32_to_cpu(htonl(hw->sniff_channel));
+		caphdr->datarate = __be32_to_cpu(htonl(rxdesc->rate));
+		caphdr->antenna =  __be32_to_cpu(htonl(0));	/* unknown */
+		caphdr->priority = __be32_to_cpu(htonl(0));	/* unknown */
+		caphdr->ssi_type = __be32_to_cpu(htonl(3));	/* rssi_raw */
 		caphdr->ssi_signal = htonl(rxdesc->signal);
 		caphdr->ssi_noise = htonl(rxdesc->silence);
-		caphdr->preamble = htonl(0);	/* unknown */
-		caphdr->encoding = htonl(1);	/* cck */
+		caphdr->preamble = __be32_to_cpu(htonl(0));	/* unknown */
+		caphdr->encoding = __be32_to_cpu(htonl(1));	/* cck */
 	}
 
 	/* Copy the 802.11 header to the skb
