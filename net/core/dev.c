@@ -160,6 +160,7 @@ static int netif_rx_internal(struct sk_buff *skb);
 static int call_netdevice_notifiers_info(unsigned long val,
 					 struct net_device *dev,
 					 struct netdev_notifier_info *info);
+static struct napi_struct *napi_by_id(unsigned int napi_id);
 
 /*
  * The @dev_base_head list is protected by @dev_base_lock and the rtnl
@@ -862,6 +863,23 @@ struct net_device *dev_get_by_index(struct net *net, int ifindex)
 	return dev;
 }
 EXPORT_SYMBOL(dev_get_by_index);
+
+struct net_device *dev_get_by_napi_id(unsigned int napi_id)
+{
+	struct net_device *dev = NULL;
+	struct napi_struct *napi;
+
+	rcu_read_lock();
+
+	napi = napi_by_id(napi_id);
+	if (napi)
+		dev = napi->dev;
+
+	rcu_read_unlock();
+
+	return dev;
+}
+EXPORT_SYMBOL(dev_get_by_napi_id);
 
 /**
  *	netdev_get_name - get a netdevice name, knowing its ifindex.

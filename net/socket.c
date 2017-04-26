@@ -662,6 +662,26 @@ static bool skb_is_err_queue(const struct sk_buff *skb)
 	return skb->pkt_type == PACKET_OUTGOING;
 }
 
+static void put_ts_pktinfo(struct msghdr *msg, struct sk_buff *skb)
+{
+#ifdef CONFIG_NET_RX_BUSY_POLL
+	struct scm_ts_pktinfo ts_pktinfo;
+	struct net_device *orig_dev;
+
+	if (skb->napi_id < MIN_NAPI_ID || !skb_mac_header_was_set(skb))
+		return;
+
+	orig_dev = dev_get_by_napi_id(skb->napi_id);
+	if (!orig_dev)
+		return;
+
+	ts_pktinfo.if_index = orig_dev->ifindex;
+	ts_pktinfo.pkt_length = skb->len - skb_mac_offset(skb);
+	put_cmsg(msg, SOL_SOCKET, SCM_TIMESTAMPING_PKTINFO,
+		 sizeof(ts_pktinfo), &ts_pktinfo);
+#endif
+}
+
 /*
  * called from sock_recv_timestamp() if sock_flag(sk, SOCK_RCVTSTAMP)
  */
@@ -699,8 +719,12 @@ void __sock_recv_timestamp(struct msghdr *msg, struct sock *sk,
 		empty = 0;
 	if (shhwtstamps &&
 	    (sk->sk_tsflags & SOF_TIMESTAMPING_RAW_HARDWARE) &&
-	    ktime_to_timespec_cond(shhwtstamps->hwtstamp, tss.ts + 2))
+	    ktime_to_timespec_cond(shhwtstamps->hwtstamp, tss.ts + 2)) {
 		empty = 0;
+		if ((sk->sk_tsflags & SOF_TIMESTAMPING_OPT_PKTINFO) &&
+		    !skb_is_err_queue(skb))
+			put_ts_pktinfo(msg, skb);
+	}
 	if (!empty) {
 		put_cmsg(msg, SOL_SOCKET,
 			 SCM_TIMESTAMPING, sizeof(tss), &tss);
