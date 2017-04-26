@@ -60,15 +60,25 @@ out:
 static int ovl_getattr(const struct path *path, struct kstat *stat,
 		       u32 request_mask, unsigned int flags)
 {
-	struct dentry *dentry = path->dentry;
+	struct dentry *lower, *dentry = path->dentry;
 	struct path realpath;
 	const struct cred *old_cred;
+	enum ovl_path_type type;
 	int err;
 
-	ovl_path_real(dentry, &realpath);
+	type = ovl_path_real(dentry, &realpath);
 	old_cred = ovl_override_creds(dentry->d_sb);
 	err = vfs_getattr(&realpath, stat, request_mask, flags);
 	revert_creds(old_cred);
+	if (err)
+		return err;
+
+	lower = ovl_dentry_lower(dentry);
+	if (OVL_TYPE_COPYUP(type) && lower) {
+		stat->dev = lower->d_sb->s_dev;
+		stat->ino = lower->d_inode->i_ino;
+	}
+
 	return err;
 }
 
