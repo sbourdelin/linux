@@ -996,7 +996,7 @@ static void native_irq_wait(struct cxl_context *ctx)
 static irqreturn_t native_slice_irq_err(int irq, void *data)
 {
 	struct cxl_afu *afu = data;
-	u64 fir_slice, errstat, serr, afu_debug, afu_error, dsisr;
+	u64 fir_slice, errstat, serr, afu_debug, afu_error, dsisr, irq_mask;
 
 	/*
 	 * slice err interrupt is only used with full PSL (no XSL)
@@ -1013,6 +1013,10 @@ static irqreturn_t native_slice_irq_err(int irq, void *data)
 	dev_crit(&afu->dev, "CXL_PSL_AFU_DEBUG_An: 0x%016llx\n", afu_debug);
 	dev_crit(&afu->dev, "AFU_ERR_An: 0x%.16llx\n", afu_error);
 	dev_crit(&afu->dev, "PSL_DSISR_An: 0x%.16llx\n", dsisr);
+
+	/* mask off the IRQ so it won't retrigger until the card is reset */
+	irq_mask = (serr & 0xff80000000000000ULL) >> 32;
+	serr |= irq_mask;
 
 	cxl_p1n_write(afu, CXL_PSL_SERR_An, serr);
 
