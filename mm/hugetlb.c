@@ -1669,6 +1669,23 @@ struct page *__alloc_buddy_huge_page_with_mpol(struct hstate *h,
 	return __alloc_buddy_huge_page(h, vma, addr, NUMA_NO_NODE);
 }
 
+struct page *alloc_huge_page_nonid(struct hstate *h)
+{
+	struct page *page = NULL;
+	int nid = 0;
+
+	spin_lock(&hugetlb_lock);
+	if (h->free_huge_pages - h->resv_huge_pages > 0) {
+		for_each_online_node(nid) {
+			page = dequeue_huge_page_node(h, nid);
+			if (page)
+				break;
+		}
+	}
+	spin_unlock(&hugetlb_lock);
+	return page;
+}
+
 /*
  * This allocation function is useful in the context where vma is irrelevant.
  * E.g. soft-offlining uses this function because it only cares physical
