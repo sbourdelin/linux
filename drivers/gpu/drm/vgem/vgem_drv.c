@@ -335,10 +335,19 @@ static int __init vgem_init(void)
 	int ret;
 
 	vgem_device = drm_dev_alloc(&vgem_driver, NULL);
-	if (IS_ERR(vgem_device)) {
-		ret = PTR_ERR(vgem_device);
+	if (IS_ERR(vgem_device))
+		return PTR_ERR(vgem_device);
+
+	vgem_device->platformdev = platform_device_register_simple("vgem",
+					-1, NULL, 0);
+
+	if (!vgem_device->platformdev) {
+		ret = -ENODEV;
 		goto out;
 	}
+
+	dma_coerce_mask_and_coherent(&vgem_device->platformdev->dev,
+					DMA_BIT_MASK(64));
 
 	ret  = drm_dev_register(vgem_device, 0);
 	if (ret)
@@ -347,13 +356,15 @@ static int __init vgem_init(void)
 	return 0;
 
 out_unref:
-	drm_dev_unref(vgem_device);
+	platform_device_unregister(vgem_device->platformdev);
 out:
+	drm_dev_unref(vgem_device);
 	return ret;
 }
 
 static void __exit vgem_exit(void)
 {
+	platform_device_unregister(vgem_device->platformdev);
 	drm_dev_unregister(vgem_device);
 	drm_dev_unref(vgem_device);
 }
