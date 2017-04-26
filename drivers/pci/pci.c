@@ -12,6 +12,7 @@
 #include <linux/delay.h>
 #include <linux/dmi.h>
 #include <linux/init.h>
+#include <linux/numa.h>
 #include <linux/of.h>
 #include <linux/of_pci.h>
 #include <linux/pci.h>
@@ -5402,6 +5403,11 @@ int pci_bus_find_domain_nr(struct pci_bus *bus, struct device *parent)
 }
 #endif
 #endif
+
+int pci_bus_find_numa_node(struct pci_bus *bus)
+{
+	return NUMA_NO_NODE;
+}
 
 /**
  * pci_ext_cfg_avail - can we access extended PCI config space?
