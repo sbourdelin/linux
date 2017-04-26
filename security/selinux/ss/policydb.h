@@ -25,6 +25,7 @@
 #define _SS_POLICYDB_H_
 
 #include <linux/flex_array.h>
+#include <crypto/sha.h>
 
 #include "symtab.h"
 #include "avtab.h"
@@ -293,6 +294,9 @@ struct policydb {
 	size_t len;
 
 	unsigned int policyvers;
+	/* checksum computed on the policy */
+	unsigned char policycksum[SHA256_DIGEST_SIZE*2 + 1];
+	size_t policycksum_len;
 
 	unsigned int reject_unknown : 1;
 	unsigned int allow_unknown : 1;

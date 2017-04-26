@@ -53,6 +53,8 @@
 #include <linux/flex_array.h>
 #include <linux/vmalloc.h>
 #include <net/netlabel.h>
+#include <crypto/hash.h>
+#include <crypto/sha.h>
 
 #include "flask.h"
 #include "avc.h"
@@ -2167,6 +2169,95 @@ size_t security_policydb_len(void)
 	read_unlock(&policy_rwlock);
 
 	return len;
+}
+
+/**
+ * security_policydb_cksum - Get policydb checksum.
+ * @cksum: string to store checksum to
+ * @len: length of checksum
+ */
+ssize_t security_policydb_cksum(char *cksum, size_t len)
+{
+	int rc;
+
+	read_lock(&policy_rwlock);
+	if (strlcpy(cksum, policydb.policycksum, len) >= len)
+		rc = -ENAMETOOLONG;
+	rc = policydb.policycksum_len;
+	read_unlock(&policy_rwlock);
+
+	return rc;
+}
+
+/**
+ * security_policydb_compute_cksum - Compute checksum of a policy database.
+ */
+int security_policydb_compute_cksum(void)
+{
+	struct crypto_ahash *tfm;
+	struct ahash_request *req;
+	struct scatterlist sl;
+	char hashval[SHA256_DIGEST_SIZE];
+	int idx;
+	unsigned char *p;
+	size_t len;
+	void *data;
+	int rc;
+
+	rc = security_read_policy(&data, &len);
+	if (rc) {
+		printk(KERN_ERR "Failed to read security policy\n");
+		return rc;
+	}
+
+	tfm = crypto_alloc_ahash("sha256", 0, CRYPTO_ALG_ASYNC);
+	if (IS_ERR(tfm)) {
+		printk(KERN_ERR "Failed to alloc crypto hash sha256\n");
+		vfree(data);
+		rc = PTR_ERR(tfm);
+		return rc;
+	}
+
+	req = ahash_request_alloc(tfm, GFP_KERNEL);
+	if (!req) {
+		printk(KERN_ERR "Failed to alloc ahash_request for sha256\n");
+		crypto_free_ahash(tfm);
+		vfree(data);
+		rc = -ENOMEM;
+		return rc;
+	}
+
+	ahash_request_set_callback(req, 0, NULL, NULL);
+
+	rc = crypto_ahash_init(req);
+	if (rc) {
+		printk(KERN_ERR "Failed to init ahash\n");
+		ahash_request_free(req);
+		crypto_free_ahash(tfm);
+		vfree(data);
+		return rc;
+	}
+
+	sg_init_one(&sl, (void *)data, len);
+	ahash_request_set_crypt(req, &sl, hashval, sl.length);
+	rc = crypto_ahash_digest(req);
+
+	crypto_free_ahash(tfm);
+	ahash_request_free(req);
+	vfree(data);
+	if (rc) {
+		printk(KERN_ERR "Failed to compute digest\n");
+		return rc;
+	}
+
+	p = policydb.policycksum;
+	for (idx = 0; idx < SHA256_DIGEST_SIZE; idx++) {
+		snprintf(p, 3, "%02x", (unsigned char)(hashval[idx]));
+		p += 2;
+	}
+	policydb.policycksum_len = (size_t)(p - policydb.policycksum);
+
+	return 0;
 }
 
 /**

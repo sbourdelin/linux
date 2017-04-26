@@ -173,8 +173,11 @@ static int selinux_netcache_avc_callback(u32 event)
 
 static int selinux_lsm_notifier_avc_callback(u32 event)
 {
-	if (event == AVC_CALLBACK_RESET)
+	if (event == AVC_CALLBACK_RESET) {
+		if (security_policydb_compute_cksum() != 0)
+			printk(KERN_ERR "Failed to compute policydb cksum\n");
 		call_lsm_notifier(LSM_POLICY_CHANGE, NULL);
+	}
 
 	return 0;
 }
@@ -6071,6 +6074,11 @@ static int selinux_inode_getsecctx(struct inode *inode, void **ctx, u32 *ctxlen)
 	*ctxlen = len;
 	return 0;
 }
+
+static ssize_t selinux_policy_cksum(char *cksum, size_t len)
+{
+	return security_policydb_cksum(cksum, len);
+}
 #ifdef CONFIG_KEYS
 
 static int selinux_key_alloc(struct key *k, const struct cred *cred,
@@ -6284,6 +6292,8 @@ static struct security_hook_list selinux_hooks[] __lsm_ro_after_init = {
 	LSM_HOOK_INIT(inode_notifysecctx, selinux_inode_notifysecctx),
 	LSM_HOOK_INIT(inode_setsecctx, selinux_inode_setsecctx),
 	LSM_HOOK_INIT(inode_getsecctx, selinux_inode_getsecctx),
+
+	LSM_HOOK_INIT(policy_cksum, selinux_policy_cksum),
 
 	LSM_HOOK_INIT(unix_stream_connect, selinux_socket_unix_stream_connect),
 	LSM_HOOK_INIT(unix_may_send, selinux_socket_unix_may_send),
