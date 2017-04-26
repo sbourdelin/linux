@@ -21,11 +21,17 @@ from accessing the corresponding object from the original filesystem.
 This is most obvious from the 'st_dev' field returned by stat(2).
 
 While directories will report an st_dev from the overlay-filesystem,
-all non-directory objects will report an st_dev from the lower or
-upper filesystem that is providing the object.  Similarly st_ino will
-only be unique when combined with st_dev, and both of these can change
-over the lifetime of a non-directory object.  Many applications and
-tools ignore these values and will not be affected.
+non-directory objects may report an st_dev from the lower or upper
+filesystem that is providing the object.  Similarly st_ino will only
+be unique when combined with st_dev.  Many applications and tools
+ignore these values and will not be affected.
+
+In the special case of all overlay layers on the same underlying
+filesystem, all objects will report an st_dev from the overlay
+filesystem and st_ino from the underlying filesystem.  This will
+make the overlay mount more comliant with filesystem scanners and
+overlay objects will be distinguishable from the corresponding
+objects from the original filesystem.
 
 Upper and Lower
 ---------------
@@ -198,8 +204,7 @@ Non-standard behavior
 ---------------------
 
 The copy_up operation essentially creates a new, identical file and
-moves it over to the old name.  The new file may be on a different
-filesystem, so both st_dev and st_ino of the file may change.
+moves it over to the old name.
 
 Any open files referring to this inode will access the old data.
 
