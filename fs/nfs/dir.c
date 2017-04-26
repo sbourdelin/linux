@@ -175,13 +175,9 @@ typedef struct {
 static
 struct nfs_cache_array *nfs_readdir_get_array(struct page *page)
 {
-	void *ptr;
 	if (page == NULL)
 		return ERR_PTR(-EIO);
-	ptr = kmap(page);
-	if (ptr == NULL)
-		return ERR_PTR(-ENOMEM);
-	return ptr;
+	return kmap(page);
 }
 
 static
