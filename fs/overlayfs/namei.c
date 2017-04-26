@@ -457,6 +457,9 @@ struct dentry *ovl_lookup(struct inode *dir, struct dentry *dentry,
 		}
 		if (d.opaque)
 			type |= __OVL_PATH_OPAQUE;
+		/* overlay.fh xattr implies this is a copy up */
+		if (d.fh)
+			type |= __OVL_PATH_COPYUP;
 	}
 
 	/*
