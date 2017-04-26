@@ -536,12 +536,40 @@ static void ebpf_proc_stop(struct seq_file *s, void *v)
 	rcu_read_unlock();
 }
 
+static const char *bpf_type_string(enum bpf_prog_type type)
+{
+	static const char *bpf_type_names[] = {
+#define X(type) #type
+		BPF_PROG_TYPES
+#undef X
+	};
+
+	if (type >= ARRAY_SIZE(bpf_type_names))
+		return "<unknown>";
+
+	return bpf_type_names[type];
+}
+
 static int ebpf_proc_show(struct seq_file *s, void *v)
 {
+	struct bpf_prog *prog;
+	struct bpf_prog_aux *aux;
+	char prog_tag[sizeof(prog->tag) * 2 + 1] = { };
+
 	if (v == SEQ_START_TOKEN) {
-		seq_printf(s, "# tag\n");
+		seq_printf(s, "# tag\t\t\ttype\t\t\truntime\tcap\tmemlock\n");
 		return 0;
 	}
+
+	aux = v;
+	prog = aux->prog;
+
+	bin2hex(prog_tag, prog->tag, sizeof(prog->tag));
+	seq_printf(s, "%s\t%s\t%s\t%s\t%llu\n", prog_tag,
+		   bpf_type_string(prog->type),
+		   prog->jited ? "jit" : "int",
+		   prog->priv_cap_sys_admin ? "priv" : "unpriv",
+		   prog->pages * 1ULL << PAGE_SHIFT);
 
 	return 0;
 }
