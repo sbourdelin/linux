@@ -419,7 +419,7 @@ got_root:
 	boot_bh = sb_bread(sb, 0);
 	if (!boot_bh) {
 		pr_err("Cannot read boot block\n");
-		return -EINVAL;
+		return -EIO;
 	}
 	memcpy(sig, boot_bh->b_data, 4);
 	brelse(boot_bh);
