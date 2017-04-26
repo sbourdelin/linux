@@ -165,6 +165,15 @@ void vcpu_put(struct kvm_vcpu *vcpu)
 }
 EXPORT_SYMBOL_GPL(vcpu_put);
 
+/* TODO: merge with kvm_arch_vcpu_should_kick */
+static bool kvm_should_kick_request(struct kvm_vcpu *vcpu, unsigned req)
+{
+	int mode = kvm_vcpu_exiting_guest_mode(vcpu);
+
+	return req & KVM_REQUEST_WAIT ?
+		mode != OUTSIDE_GUEST_MODE : mode == IN_GUEST_MODE;
+}
+
 static void ack_flush(void *_completed)
 {
 }
@@ -174,6 +183,7 @@ bool kvm_make_all_cpus_request(struct kvm *kvm, unsigned int req)
 	int i, cpu, me;
 	cpumask_var_t cpus;
 	bool called = true;
+	bool wait = req & KVM_REQUEST_WAIT;
 	struct kvm_vcpu *vcpu;
 
 	zalloc_cpumask_var(&cpus, GFP_ATOMIC);
@@ -187,13 +197,13 @@ bool kvm_make_all_cpus_request(struct kvm *kvm, unsigned int req)
 			continue;
 
 		if (cpus != NULL && cpu != -1 && cpu != me &&
-		      kvm_vcpu_exiting_guest_mode(vcpu) != OUTSIDE_GUEST_MODE)
+		    kvm_should_kick_request(vcpu, req))
 			cpumask_set_cpu(cpu, cpus);
 	}
 	if (unlikely(cpus == NULL))
-		smp_call_function_many(cpu_online_mask, ack_flush, NULL, 1);
+		smp_call_function_many(cpu_online_mask, ack_flush, NULL, wait);
 	else if (!cpumask_empty(cpus))
-		smp_call_function_many(cpus, ack_flush, NULL, 1);
+		smp_call_function_many(cpus, ack_flush, NULL, wait);
 	else
 		called = false;
 	put_cpu();

@@ -117,12 +117,13 @@ static inline bool is_error_page(struct page *page)
 
 #define KVM_REQUEST_MASK           GENMASK(7,0)
 #define KVM_REQUEST_NO_WAKEUP      BIT(8)
+#define KVM_REQUEST_WAIT           BIT(9)
 /*
  * Architecture-independent vcpu->requests bit members
  * Bits 4-7 are reserved for more arch-independent bits.
  */
-#define KVM_REQ_TLB_FLUSH          (0 | KVM_REQUEST_NO_WAKEUP)
-#define KVM_REQ_MMU_RELOAD         (1 | KVM_REQUEST_NO_WAKEUP)
+#define KVM_REQ_TLB_FLUSH          (0 | KVM_REQUEST_NO_WAKEUP | KVM_REQUEST_WAIT)
+#define KVM_REQ_MMU_RELOAD         (1 | KVM_REQUEST_NO_WAKEUP | KVM_REQUEST_WAIT)
 #define KVM_REQ_PENDING_TIMER      2
 #define KVM_REQ_UNHALT             3
 #define KVM_REQUEST_ARCH_BASE      8
@@ -133,6 +134,9 @@ static inline bool is_error_page(struct page *page)
 })
 #define KVM_ARCH_REQ(nr)           KVM_ARCH_REQ_FLAGS(nr, 0)
 #define KVM_ARCH_REQ_NO_WAKEUP(nr) KVM_ARCH_REQ_FLAGS(nr, KVM_REQUEST_NO_WAKEUP)
+#define KVM_ARCH_REQ_WAIT(nr)      KVM_ARCH_REQ_FLAGS(nr, KVM_REQUEST_NO_WAKEUP)
+#define KVM_ARCH_REQ_WAIT_NO_WAKEUP(nr) \
+	KVM_ARCH_REQ_FLAGS(nr, KVM_REQUEST_NO_WAKEUP | KVM_REQUEST_WAIT)
 
 #define KVM_USERSPACE_IRQ_SOURCE_ID		0
 #define KVM_IRQFD_RESAMPLE_IRQ_SOURCE_ID	1
