@@ -378,6 +378,9 @@ dma_fence_default_wait(struct dma_fence *fence, bool intr, signed long timeout)
 	if (test_bit(DMA_FENCE_FLAG_SIGNALED_BIT, &fence->flags))
 		return ret;
 
+	if (!timeout)
+		return 0;
+
 	spin_lock_irqsave(fence->lock, flags);
 
 	if (intr && signal_pending(current)) {
