@@ -463,10 +463,16 @@ void choose_random_location(unsigned long input,
 			add_identity_map(random_addr, output_size);
 			*output = random_addr;
 		}
+
+		/*
+		 * This actually loads the identity pagetable on x86_64.
+		 * And this should only be done only if a new position
+		 * is found. Otherwise we should keep the old page table
+		 * to make it be like nokaslr case.
+		 */
+		finalize_identity_maps();
 	}
 
-	/* This actually loads the identity pagetable on x86_64. */
-	finalize_identity_maps();
 
 	/* Pick random virtual address starting from LOAD_PHYSICAL_ADDR. */
 	if (IS_ENABLED(CONFIG_X86_64))
