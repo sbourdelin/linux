@@ -358,11 +358,7 @@ static int __init vrfb_probe(struct platform_device *pdev)
 		return PTR_ERR(vrfb_base);
 
 	num_ctxs = pdev->num_resources - 1;
-
-	ctxs = devm_kzalloc(&pdev->dev,
-			sizeof(struct vrfb_ctx) * num_ctxs,
-			GFP_KERNEL);
-
+	ctxs = devm_kcalloc(&pdev->dev, num_ctxs, sizeof(*ctxs), GFP_KERNEL);
 	if (!ctxs)
 		return -ENOMEM;
 
