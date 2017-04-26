@@ -22,6 +22,33 @@ enum ovl_path_type {
 #define OVL_XATTR_PREFIX XATTR_TRUSTED_PREFIX "overlay."
 #define OVL_XATTR_OPAQUE OVL_XATTR_PREFIX "opaque"
 #define OVL_XATTR_REDIRECT OVL_XATTR_PREFIX "redirect"
+/*
+ * The tuple origin.{fh,layer,uuid} is a universal unique identifier
+ * for a copy up origin, where:
+ * origin.fh	- exported file handle of the lower file
+ * origin.root	- exported file handle of the lower layer root
+ * origin.uuid	- uuid of the lower filesystem
+ *
+ * origin.{fh,root} are stored in format of a variable length binary blob
+ * with struct ovl_fh header (total blob size up to 20 bytes).
+ * uuid is stored in raw format (16 bytes) as published by sb->s_uuid.
+ */
+#define OVL_XATTR_ORIGIN_	OVL_XATTR_PREFIX "origin."
+#define OVL_XATTR_ORIGIN_FH	OVL_XATTR_ORIGIN_ "fh"
+#define OVL_XATTR_ORIGIN_ROOT	OVL_XATTR_ORIGIN_ "root"
+#define OVL_XATTR_ORIGIN_UUID	OVL_XATTR_ORIGIN_ "uuid"
+
+/* On-disk and in-memeory format for redirect by file handle */
+#define OVL_FH_VERSION	0
+#define OVL_FH_MAGIC	0xfb
+
+struct ovl_fh {
+	unsigned char version;	/* 0 */
+	unsigned char magic;	/* 0xfb */
+	unsigned char len;	/* size of this header + size of fid */
+	unsigned char type;	/* fid_type of fid */
+	unsigned char fid[0];	/* file identifier */
+} __packed;
 
 #define OVL_ISUPPER_MASK 1UL
 
@@ -175,6 +202,8 @@ bool ovl_redirect_dir(struct super_block *sb);
 void ovl_clear_redirect_dir(struct super_block *sb);
 const char *ovl_dentry_get_redirect(struct dentry *dentry);
 void ovl_dentry_set_redirect(struct dentry *dentry, const char *redirect);
+bool ovl_redirect_fh(struct super_block *sb);
+void ovl_clear_redirect_fh(struct super_block *sb);
 void ovl_dentry_update(struct dentry *dentry, struct dentry *upperdentry);
 void ovl_inode_init(struct inode *inode, struct inode *realinode,
 		    bool is_upper);

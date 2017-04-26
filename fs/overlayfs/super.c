@@ -17,6 +17,7 @@
 #include <linux/statfs.h>
 #include <linux/seq_file.h>
 #include <linux/posix_acl_xattr.h>
+#include <linux/exportfs.h>
 #include "overlayfs.h"
 #include "ovl_entry.h"
 
@@ -928,6 +929,19 @@ static int ovl_fill_super(struct super_block *sb, void *data, int silent)
 		sb->s_flags |= MS_RDONLY;
 	else if (ufs->upper_mnt->mnt_sb == ufs->same_lower_sb)
 		ufs->same_sb = ufs->same_lower_sb;
+
+	/*
+	 * Redirect by file handle is used to find a lower entry in one of the
+	 * lower layers,  so the handle must be unique across all lower layers.
+	 * Therefore, enable redirect by file handle, only if all lower layers
+	 * are on the same sb which supports lookup by file handles.
+	 *
+	 * TODO: add support for looking up by (uuid,fh) tuple to enable
+	 *       redirect_fh for !same_lower_sb
+	 */
+	if (ufs->same_lower_sb && ufs->same_lower_sb->s_export_op &&
+	    ufs->same_lower_sb->s_export_op->fh_to_dentry)
+		ufs->redirect_fh = true;
 
 	if (remote)
 		sb->s_d_op = &ovl_reval_dentry_operations;

@@ -20,6 +20,8 @@
 #include <linux/namei.h>
 #include <linux/fdtable.h>
 #include <linux/ratelimit.h>
+#include <linux/mount.h>
+#include <linux/exportfs.h>
 #include "overlayfs.h"
 #include "ovl_entry.h"
 
@@ -232,6 +234,138 @@ int ovl_set_attr(struct dentry *upperdentry, struct kstat *stat)
 	return err;
 }
 
+static bool ovl_can_decode_fh(struct super_block *sb)
+{
+	return sb->s_export_op && sb->s_export_op->fh_to_dentry;
+}
+
+static struct ovl_fh *ovl_decode_fh(struct dentry *lower)
+{
+	struct ovl_fh *fh;
+	int fh_type, fh_len, dwords;
+	void *buf = NULL;
+	void *ret = NULL;
+	int buflen = MAX_HANDLE_SZ;
+	int err;
+
+	err = -EOPNOTSUPP;
+	/* Do not encode file handle if we cannot decode it later */
+	if (!ovl_can_decode_fh(lower->d_sb))
+		goto out_err;
+
+	err = -ENOMEM;
+	buf = kmalloc(buflen, GFP_TEMPORARY);
+	if (!buf)
+		goto out_err;
+
+	fh = buf;
+	dwords = (buflen - offsetof(struct ovl_fh, fid)) >> 2;
+	fh_type = exportfs_encode_fh(lower,
+				     (struct fid *)fh->fid,
+				     &dwords, 1);
+	fh_len = (dwords << 2) + offsetof(struct ovl_fh, fid);
+
+	err = -EOVERFLOW;
+	if (fh_len > buflen || fh_type <= 0 || fh_type == FILEID_INVALID)
+		goto out_err;
+
+	fh->version = OVL_FH_VERSION;
+	fh->magic = OVL_FH_MAGIC;
+	fh->type = fh_type;
+	fh->len = fh_len;
+
+	err = -ENOMEM;
+	ret = kmalloc(fh_len, GFP_KERNEL);
+	if (!ret)
+		goto out_err;
+
+	memcpy(ret, buf, fh_len);
+
+	kfree(buf);
+	return ret;
+
+out_err:
+	pr_warn_ratelimited("overlay: failed to get redirect fh (%i)\n", err);
+	kfree(buf);
+	kfree(ret);
+	return ERR_PTR(err);
+}
+
+static const struct ovl_fh null_fh = {
+	.version = OVL_FH_VERSION,
+	.magic = OVL_FH_MAGIC,
+	.type = FILEID_INVALID,
+	.len = sizeof(struct ovl_fh),
+};
+
+static int ovl_set_origin(struct dentry *dentry, struct dentry *upper)
+{
+	struct path lowerpath;
+	struct super_block *lower_sb;
+	const struct ovl_fh *fh = NULL;
+	const struct ovl_fh *rootfh = NULL;
+	int err;
+
+	ovl_path_lower(dentry, &lowerpath);
+	if (WARN_ON(!lowerpath.mnt))
+		return -EIO;
+
+	/*
+	 * Encoding a lower file handle where several layers are on the
+	 * same fs, require ecoding the layer root as well, because when
+	 * decoding the lower file handle we must provide the lowermnt.
+	 */
+	lower_sb = lowerpath.mnt->mnt_sb;
+	if (ovl_redirect_fh(dentry->d_sb) && ovl_can_decode_fh(lower_sb)) {
+		fh = ovl_decode_fh(lowerpath.dentry);
+		rootfh = ovl_decode_fh(lowerpath.mnt->mnt_root);
+	}
+	/*
+	 * On failure to encode lower fh, store an invalid 'null' fh, so
+	 * we can use the overlay.origin.fh xattr to distignuish between
+	 * a copy up and a pure upper inode.  If lower fs does not support
+	 * encoding fh, don't try to encode again (for any lower layer).
+	 */
+	err = 0;
+	if (IS_ERR_OR_NULL(fh)) {
+		err = PTR_ERR(fh);
+		fh = &null_fh;
+	}
+	if (IS_ERR_OR_NULL(rootfh)) {
+		if (err != -EOPNOTSUPP)
+			err = PTR_ERR(rootfh);
+		rootfh = NULL;
+	}
+	if (err == -EOPNOTSUPP) {
+		pr_warn("overlay: file handle not supported by lower - turning off redirect_fh\n");
+		ovl_clear_redirect_fh(dentry->d_sb);
+	}
+
+	err = ovl_do_setxattr(upper, OVL_XATTR_ORIGIN_FH, fh, fh->len, 0);
+	if (err)
+		goto out_err;
+
+	if (rootfh) {
+		err = ovl_do_setxattr(upper, OVL_XATTR_ORIGIN_ROOT, rootfh,
+				      rootfh->len, 0);
+	}
+	if (err)
+		goto out_err;
+
+	if (fh != &null_fh) {
+		err = ovl_do_setxattr(upper, OVL_XATTR_ORIGIN_UUID,
+				      lower_sb->s_uuid,
+				      sizeof(lower_sb->s_uuid), 0);
+	}
+
+out_err:
+	if (fh != &null_fh)
+		kfree(fh);
+	return err;
+	if (rootfh != &null_fh)
+		kfree(rootfh);
+}
+
 static int ovl_copy_up_locked(struct dentry *workdir, struct dentry *upperdir,
 			      struct dentry *dentry, struct path *lowerpath,
 			      struct kstat *stat, const char *link,
@@ -313,6 +447,14 @@ static int ovl_copy_up_locked(struct dentry *workdir, struct dentry *upperdir,
 	inode_lock(temp->d_inode);
 	err = ovl_set_attr(temp, stat);
 	inode_unlock(temp->d_inode);
+	if (err)
+		goto out_cleanup;
+
+	/*
+	 * Store identifier of lower inode in upper inode xattr to
+	 * allow lookup of the copy up origin inode.
+	 */
+	err = ovl_set_origin(dentry, temp);
 	if (err)
 		goto out_cleanup;
 
