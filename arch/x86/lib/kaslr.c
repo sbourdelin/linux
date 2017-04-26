@@ -79,7 +79,11 @@ unsigned long kaslr_get_random_long(const char *purpose)
 	}
 
 	/* Circular multiply for better bit diffusion */
-	asm("mul %3"
+#ifdef CONFIG_X86_64
+	asm("mulq %3"
+#else
+	asm("mull %3"
+#endif
 	    : "=a" (random), "=d" (raw)
 	    : "a" (random), "rm" (mix_const));
 	random += raw;
