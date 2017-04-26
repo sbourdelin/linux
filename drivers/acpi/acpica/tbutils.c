@@ -422,7 +422,6 @@ acpi_tb_get_table(struct acpi_table_desc *table_desc,
 			    "Table %p, Validation count is zero after increment\n",
 			    table_desc));
 		table_desc->validation_count--;
-		return_ACPI_STATUS(AE_LIMIT);
 	}
 
 	*out_table = table_desc->pointer;
