@@ -6610,13 +6610,17 @@ EXPORT_SYMBOL(dev_set_group);
 /**
  *	dev_set_mac_address - Change Media Access Control Address
  *	@dev: device
- *	@sa: new address
+ *	@addr: new address, whose type could be either struct sockaddr or
+ *	any other compatible type whose length is up to MAX_ADDR_LEN depending
+ *	on the dev->addr_len. Callers should check if its length is smaller than
+ *	dev->addr_len!!
  *
  *	Change the hardware (MAC) address of the device
  */
-int dev_set_mac_address(struct net_device *dev, struct sockaddr *sa)
+int dev_set_mac_address(struct net_device *dev, void *addr)
 {
 	const struct net_device_ops *ops = dev->netdev_ops;
+	struct sockaddr *sa = addr;
 	int err;
 
 	if (!ops->ndo_set_mac_address)
@@ -6625,7 +6629,7 @@ int dev_set_mac_address(struct net_device *dev, struct sockaddr *sa)
 		return -EINVAL;
 	if (!netif_device_present(dev))
 		return -ENODEV;
-	err = ops->ndo_set_mac_address(dev, sa);
+	err = ops->ndo_set_mac_address(dev, addr);
 	if (err)
 		return err;
 	dev->addr_assign_type = NET_ADDR_SET;
