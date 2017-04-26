@@ -373,8 +373,8 @@ static int locate_mem_hole_top_down(unsigned long start, unsigned long end,
 	/* If we are here, we found a suitable memory range */
 	kbuf->mem = temp_start;
 
-	/* Success, stop navigating through remaining System RAM ranges */
-	return 1;
+	/* always return zero, going through all the System RAM ranges */
+	return 0;
 }
 
 static int locate_mem_hole_bottom_up(unsigned long start, unsigned long end,
@@ -439,18 +439,27 @@ static int locate_mem_hole_callback(u64 start, u64 end, void *arg)
  *
  * Return: The memory walk will stop when func returns a non-zero value
  * and that value will be returned. If all free regions are visited without
- * func returning non-zero, then zero will be returned.
+ * func returning non-zero, then kbuf->mem will be additionally checked
+ * for top-down search.
+ * After all, zero will be returned if none of regions fits.
  */
 int __weak arch_kexec_walk_mem(struct kexec_buf *kbuf,
 			       int (*func)(u64, u64, void *))
 {
+	int ret;
+
+	kbuf->mem = 0;
 	if (kbuf->image->type == KEXEC_TYPE_CRASH)
-		return walk_iomem_res_desc(crashk_res.desc,
+		ret = walk_iomem_res_desc(crashk_res.desc,
 					   IORESOURCE_SYSTEM_RAM | IORESOURCE_BUSY,
 					   crashk_res.start, crashk_res.end,
 					   kbuf, func);
 	else
-		return walk_system_ram_res(0, ULONG_MAX, kbuf, func);
+		ret = walk_system_ram_res(0, ULONG_MAX, kbuf, func);
+
+	if (!ret && kbuf->mem)
+		ret = 1; /* found for top-down search */
+	return ret;
 }
 
 /**
