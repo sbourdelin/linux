@@ -64,6 +64,19 @@ static const struct drm_crtc_funcs arc_pgu_crtc_funcs = {
 	.atomic_destroy_state = drm_atomic_helper_crtc_destroy_state,
 };
 
+enum drm_mode_status arc_pgu_crtc_mode_valid(struct drm_crtc *crtc,
+					     struct drm_display_mode *mode)
+{
+	struct arcpgu_drm_private *arcpgu = crtc_to_arcpgu_priv(crtc);
+	long rate, clk_rate = mode->clock * 1000;
+
+	rate = clk_round_rate(arcpgu->clk, clk_rate);
+	if (rate != clk_rate)
+		return MODE_NOCLOCK;
+
+	return MODE_OK;
+}
+
 static void arc_pgu_crtc_mode_set_nofb(struct drm_crtc *crtc)
 {
 	struct arcpgu_drm_private *arcpgu = crtc_to_arcpgu_priv(crtc);
@@ -158,6 +171,7 @@ static void arc_pgu_crtc_atomic_begin(struct drm_crtc *crtc,
 }
 
 static const struct drm_crtc_helper_funcs arc_pgu_crtc_helper_funcs = {
+	.mode_valid	= arc_pgu_crtc_mode_valid,
 	.mode_set	= drm_helper_crtc_mode_set,
 	.mode_set_base	= drm_helper_crtc_mode_set_base,
 	.mode_set_nofb	= arc_pgu_crtc_mode_set_nofb,
