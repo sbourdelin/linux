@@ -41,7 +41,7 @@
 
 #define KVM_VCPU_MAX_FEATURES 4
 
-#define KVM_REQ_VCPU_EXIT	(8 | KVM_REQUEST_NO_WAKEUP)
+#define KVM_REQ_VCPU_EXIT	KVM_ARCH_REQ_NO_WAKEUP(0)
 
 int __attribute_const__ kvm_target_cpu(void);
 int kvm_reset_vcpu(struct kvm_vcpu *vcpu);
