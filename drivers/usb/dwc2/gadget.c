@@ -292,7 +292,6 @@ static void dwc2_hsotg_init_fifo(struct dwc2_hsotg *hsotg)
 {
 	unsigned int ep;
 	unsigned int addr;
-	int timeout;
 	int fifo_count;
 	u32 val;
 	u32 *txfsz = hsotg->params.g_tx_fifo_size;
@@ -341,33 +340,16 @@ static void dwc2_hsotg_init_fifo(struct dwc2_hsotg *hsotg)
 	dwc2_writel(hsotg->hw_params.total_fifo_size |
 		    addr << GDFIFOCFG_EPINFOBASE_SHIFT,
 		    hsotg->regs + GDFIFOCFG);
+
 	/*
-	 * according to p428 of the design guide, we need to ensure that
-	 * all fifos are flushed before continuing
+	 * Chapter 2.1.1 of the Programming Guide - The TxFIFOs and the RxFIFO
+	 * must be flushed after the RAM allocation is done, for proper FIFO
+	 * functioning.
+	 *
+	 * 0x10 - all TX FIFOs
 	 */
-
-	dwc2_writel(GRSTCTL_TXFNUM(0x10) | GRSTCTL_TXFFLSH |
-	       GRSTCTL_RXFFLSH, hsotg->regs + GRSTCTL);
-
-	/* wait until the fifos are both flushed */
-	timeout = 100;
-	while (1) {
-		val = dwc2_readl(hsotg->regs + GRSTCTL);
-
-		if ((val & (GRSTCTL_TXFFLSH | GRSTCTL_RXFFLSH)) == 0)
-			break;
-
-		if (--timeout == 0) {
-			dev_err(hsotg->dev,
-				"%s: timeout flushing fifos (GRSTCTL=%08x)\n",
-				__func__, val);
-			break;
-		}
-
-		udelay(1);
-	}
-
-	dev_dbg(hsotg->dev, "FIFOs reset, timeout at %d\n", timeout);
+	dwc2_flush_tx_fifo(hsotg, 0x10);
+	dwc2_flush_rx_fifo(hsotg);
 }
 
 /**
