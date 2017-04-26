@@ -309,7 +309,7 @@ asm(
  */
 #define read_sysreg(r) ({					\
 	u64 __val;						\
-	asm volatile("mrs %0, " __stringify(r) : "=r" (__val));	\
+	asm volatile("mrs %x0, " __stringify(r) : "=r" (__val));	\
 	__val;							\
 })
 
@@ -329,7 +329,7 @@ asm(
  */
 #define read_sysreg_s(r) ({						\
 	u64 __val;							\
-	asm volatile("mrs_s %0, " __stringify(r) : "=r" (__val));	\
+	asm volatile("mrs_s %x0, " __stringify(r) : "=r" (__val));	\
 	__val;								\
 })
 

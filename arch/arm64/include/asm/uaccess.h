@@ -97,7 +97,7 @@ static inline void set_fs(mm_segment_t fs)
 ({									\
 	unsigned long flag, roksum;					\
 	__chk_user_ptr(addr);						\
-	asm("adds %1, %1, %3; ccmp %1, %4, #2, cc; cset %0, ls"		\
+	asm("adds %x1, %x1, %3; ccmp %1, %x4, #2, cc; cset %x0, ls"	\
 		: "=&r" (flag), "=&r" (roksum)				\
 		: "1" (addr), "Ir" (size),				\
 		  "r" (current_thread_info()->addr_limit)		\
@@ -224,8 +224,8 @@ static inline void uaccess_enable_not_uao(void)
  */
 #define __get_user_asm(instr, alt_instr, reg, x, addr, err, feature)	\
 	asm volatile(							\
-	"1:"ALTERNATIVE(instr "     " reg "1, [%2]\n",			\
-			alt_instr " " reg "1, [%2]\n", feature)		\
+	"1:"ALTERNATIVE(instr "     " reg "1, [%x2]\n",			\
+			alt_instr " " reg "1, [%x2]\n", feature)	\
 	"2:\n"								\
 	"	.section .fixup, \"ax\"\n"				\
 	"	.align	2\n"						\
@@ -256,7 +256,7 @@ do {									\
 			       (err), ARM64_HAS_UAO);			\
 		break;							\
 	case 8:								\
-		__get_user_asm("ldr", "ldtr", "%",  __gu_val, (ptr),	\
+		__get_user_asm("ldr", "ldtr", "%x",  __gu_val, (ptr),	\
 			       (err), ARM64_HAS_UAO);			\
 		break;							\
 	default:							\
@@ -292,8 +292,8 @@ do {									\
 
 #define __put_user_asm(instr, alt_instr, reg, x, addr, err, feature)	\
 	asm volatile(							\
-	"1:"ALTERNATIVE(instr "     " reg "1, [%2]\n",			\
-			alt_instr " " reg "1, [%2]\n", feature)		\
+	"1:"ALTERNATIVE(instr "     " reg "1, [%x2]\n",			\
+			alt_instr " " reg "1, [%x2]\n", feature)	\
 	"2:\n"								\
 	"	.section .fixup,\"ax\"\n"				\
 	"	.align	2\n"						\
@@ -323,7 +323,7 @@ do {									\
 			       (err), ARM64_HAS_UAO);			\
 		break;							\
 	case 8:								\
-		__put_user_asm("str", "sttr", "%", __pu_val, (ptr),	\
+		__put_user_asm("str", "sttr", "%x", __pu_val, (ptr),	\
 			       (err), ARM64_HAS_UAO);			\
 		break;							\
 	default:							\

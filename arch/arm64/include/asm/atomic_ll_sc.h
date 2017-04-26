@@ -140,9 +140,9 @@ __LL_SC_PREFIX(atomic64_##op(long i, atomic64_t *v))			\
 									\
 	asm volatile("// atomic64_" #op "\n"				\
 "	prfm	pstl1strm, %2\n"					\
-"1:	ldxr	%0, %2\n"						\
-"	" #asm_op "	%0, %0, %3\n"					\
-"	stxr	%w1, %0, %2\n"						\
+"1:	ldxr	%x0, %2\n"						\
+"	" #asm_op "	%x0, %x0, %3\n"					\
+"	stxr	%w1, %x0, %2\n"						\
 "	cbnz	%w1, 1b"						\
 	: "=&r" (result), "=&r" (tmp), "+Q" (v->counter)		\
 	: "Ir" (i));							\
@@ -158,9 +158,9 @@ __LL_SC_PREFIX(atomic64_##op##_return##name(long i, atomic64_t *v))	\
 									\
 	asm volatile("// atomic64_" #op "_return" #name "\n"		\
 "	prfm	pstl1strm, %2\n"					\
-"1:	ld" #acq "xr	%0, %2\n"					\
-"	" #asm_op "	%0, %0, %3\n"					\
-"	st" #rel "xr	%w1, %0, %2\n"					\
+"1:	ld" #acq "xr	%x0, %2\n"					\
+"	" #asm_op "	%x0, %x0, %3\n"					\
+"	st" #rel "xr	%w1, %x0, %2\n"					\
 "	cbnz	%w1, 1b\n"						\
 "	" #mb								\
 	: "=&r" (result), "=&r" (tmp), "+Q" (v->counter)		\
@@ -180,9 +180,9 @@ __LL_SC_PREFIX(atomic64_fetch_##op##name(long i, atomic64_t *v))	\
 									\
 	asm volatile("// atomic64_fetch_" #op #name "\n"		\
 "	prfm	pstl1strm, %3\n"					\
-"1:	ld" #acq "xr	%0, %3\n"					\
-"	" #asm_op "	%1, %0, %4\n"					\
-"	st" #rel "xr	%w2, %1, %3\n"					\
+"1:	ld" #acq "xr	%x0, %3\n"					\
+"	" #asm_op "	%x1, %x0, %4\n"					\
+"	st" #rel "xr	%w2, %x1, %3\n"					\
 "	cbnz	%w2, 1b\n"						\
 "	" #mb								\
 	: "=&r" (result), "=&r" (val), "=&r" (tmp), "+Q" (v->counter)	\
@@ -233,10 +233,10 @@ __LL_SC_PREFIX(atomic64_dec_if_positive(atomic64_t *v))
 
 	asm volatile("// atomic64_dec_if_positive\n"
 "	prfm	pstl1strm, %2\n"
-"1:	ldxr	%0, %2\n"
-"	subs	%0, %0, #1\n"
+"1:	ldxr	%x0, %2\n"
+"	subs	%x0, %x0, #1\n"
 "	b.lt	2f\n"
-"	stlxr	%w1, %0, %2\n"
+"	stlxr	%w1, %x0, %2\n"
 "	cbnz	%w1, 1b\n"
 "	dmb	ish\n"
 "2:"
@@ -306,12 +306,12 @@ __LL_SC_PREFIX(__cmpxchg_double##name(unsigned long old1,		\
 									\
 	asm volatile("// __cmpxchg_double" #name "\n"			\
 	"	prfm	pstl1strm, %2\n"				\
-	"1:	ldxp	%0, %1, %2\n"					\
-	"	eor	%0, %0, %3\n"					\
-	"	eor	%1, %1, %4\n"					\
-	"	orr	%1, %0, %1\n"					\
-	"	cbnz	%1, 2f\n"					\
-	"	st" #rel "xp	%w0, %5, %6, %2\n"			\
+	"1:	ldxp	%x0, %x1, %2\n"					\
+	"	eor	%x0, %x0, %x3\n"				\
+	"	eor	%x1, %x1, %x4\n"				\
+	"	orr	%x1, %x0, %x1\n"				\
+	"	cbnz	%x1, 2f\n"					\
+	"	st" #rel "xp	%w0, %x5, %x6, %2\n"			\
 	"	cbnz	%w0, 1b\n"					\
 	"	" #mb "\n"						\
 	"2:"								\

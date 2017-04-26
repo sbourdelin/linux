@@ -28,8 +28,8 @@
 #define read_sysreg_elx(r,nvh,vh)					\
 	({								\
 		u64 reg;						\
-		asm volatile(ALTERNATIVE("mrs %0, " __stringify(r##nvh),\
-					 "mrs_s %0, " __stringify(r##vh),\
+		asm volatile(ALTERNATIVE("mrs %x0, " __stringify(r##nvh),\
+					 "mrs_s %x0, " __stringify(r##vh),\
 					 ARM64_HAS_VIRT_HOST_EXTN)	\
 			     : "=r" (reg));				\
 		reg;							\
@@ -52,8 +52,8 @@
 #define read_sysreg_el2(r)						\
 	({								\
 		u64 reg;						\
-		asm volatile(ALTERNATIVE("mrs %0, " __stringify(r##_EL2),\
-					 "mrs %0, " __stringify(r##_EL1),\
+		asm volatile(ALTERNATIVE("mrs %x0, " __stringify(r##_EL2),\
+					 "mrs %x0, " __stringify(r##_EL1),\
 					 ARM64_HAS_VIRT_HOST_EXTN)	\
 			     : "=r" (reg));				\
 		reg;							\
@@ -115,7 +115,7 @@ typeof(orig) * __hyp_text fname(void)					\
 {									\
 	typeof(alt) *val = orig;					\
 	asm volatile(ALTERNATIVE("nop		\n",			\
-				 "mov	%0, %1	\n",			\
+				 "mov	%x0, %x1\n",			\
 				 cond)					\
 		     : "+r" (val) : "r" (alt));				\
 	return val;							\

@@ -588,10 +588,10 @@ static inline int __ptep_test_and_clear_young(pte_t *ptep)
 
 	asm volatile("//	__ptep_test_and_clear_young\n"
 	"	prfm	pstl1strm, %2\n"
-	"1:	ldxr	%0, %2\n"
+	"1:	ldxr	%x0, %2\n"
 	"	ubfx	%w3, %w0, %5, #1	// extract PTE_AF (young)\n"
-	"	and	%0, %0, %4		// clear PTE_AF\n"
-	"	stxr	%w1, %0, %2\n"
+	"	and	%x0, %x0, %4		// clear PTE_AF\n"
+	"	stxr	%w1, %x0, %2\n"
 	"	cbnz	%w1, 1b\n"
 	: "=&r" (pteval), "=&r" (tmp), "+Q" (pte_val(*ptep)), "=&r" (res)
 	: "L" (~PTE_AF), "I" (ilog2(PTE_AF)));
@@ -625,7 +625,7 @@ static inline pte_t ptep_get_and_clear(struct mm_struct *mm,
 
 	asm volatile("//	ptep_get_and_clear\n"
 	"	prfm	pstl1strm, %2\n"
-	"1:	ldxr	%0, %2\n"
+	"1:	ldxr	%x0, %2\n"
 	"	stxr	%w1, xzr, %2\n"
 	"	cbnz	%w1, 1b\n"
 	: "=&r" (old_pteval), "=&r" (tmp), "+Q" (pte_val(*ptep)));
@@ -654,12 +654,12 @@ static inline void ptep_set_wrprotect(struct mm_struct *mm, unsigned long addres
 
 	asm volatile("//	ptep_set_wrprotect\n"
 	"	prfm	pstl1strm, %2\n"
-	"1:	ldxr	%0, %2\n"
-	"	tst	%0, %4			// check for hw dirty (!PTE_RDONLY)\n"
-	"	csel	%1, %3, xzr, eq		// set PTE_DIRTY|PTE_RDONLY if dirty\n"
-	"	orr	%0, %0, %1		// if !dirty, PTE_RDONLY is already set\n"
-	"	and	%0, %0, %5		// clear PTE_WRITE/PTE_DBM\n"
-	"	stxr	%w1, %0, %2\n"
+	"1:	ldxr	%x0, %2\n"
+	"	tst	%x0, %4			// check for hw dirty (!PTE_RDONLY)\n"
+	"	csel	%x1, %x3, xzr, eq	// set PTE_DIRTY|PTE_RDONLY if dirty\n"
+	"	orr	%x0, %x0, %x1		// if !dirty, PTE_RDONLY is already set\n"
+	"	and	%x0, %x0, %5		// clear PTE_WRITE/PTE_DBM\n"
+	"	stxr	%w1, %x0, %2\n"
 	"	cbnz	%w1, 1b\n"
 	: "=&r" (pteval), "=&r" (tmp), "+Q" (pte_val(*ptep))
 	: "r" (PTE_DIRTY|PTE_RDONLY), "L" (PTE_RDONLY), "L" (~PTE_WRITE)

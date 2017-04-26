@@ -495,7 +495,7 @@ void __kprobes jprobe_return(void)
 	 * -a special PC to identify it from the other kprobes.
 	 * -restore stack addr to original saved pt_regs
 	 */
-	asm volatile("				mov sp, %0	\n"
+	asm volatile("				mov sp, %x0	\n"
 		     "jprobe_return_break:	brk %1		\n"
 		     :
 		     : "r" (kcb->jprobe_saved_regs.sp),

@@ -115,13 +115,13 @@ alternative_else_nop_endif
 
 static inline unsigned long __kern_hyp_va(unsigned long v)
 {
-	asm volatile(ALTERNATIVE("and %0, %0, %1",
+	asm volatile(ALTERNATIVE("and %x0, %x0, %1",
 				 "nop",
 				 ARM64_HAS_VIRT_HOST_EXTN)
 		     : "+r" (v)
 		     : "i" (HYP_PAGE_OFFSET_HIGH_MASK));
 	asm volatile(ALTERNATIVE("nop",
-				 "and %0, %0, %1",
+				 "and %x0, %x0, %1",
 				 ARM64_HYP_OFFSET_LOW)
 		     : "+r" (v)
 		     : "i" (HYP_PAGE_OFFSET_LOW_MASK));
@@ -181,10 +181,10 @@ static inline void kvm_set_s2pte_readonly(pte_t *pte)
 
 	asm volatile("//	kvm_set_s2pte_readonly\n"
 	"	prfm	pstl1strm, %2\n"
-	"1:	ldxr	%0, %2\n"
-	"	and	%0, %0, %3		// clear PTE_S2_RDWR\n"
-	"	orr	%0, %0, %4		// set PTE_S2_RDONLY\n"
-	"	stxr	%w1, %0, %2\n"
+	"1:	ldxr	%x0, %2\n"
+	"	and	%x0, %x0, %3		// clear PTE_S2_RDWR\n"
+	"	orr	%x0, %x0, %4		// set PTE_S2_RDONLY\n"
+	"	stxr	%w1, %x0, %2\n"
 	"	cbnz	%w1, 1b\n"
 	: "=&r" (pteval), "=&r" (tmp), "+Q" (pte_val(*pte))
 	: "L" (~PTE_S2_RDWR), "L" (PTE_S2_RDONLY));

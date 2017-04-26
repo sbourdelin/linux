@@ -59,7 +59,7 @@ do {									\
 				: "=Q" (*p) : "r" (v) : "memory");	\
 		break;							\
 	case 8:								\
-		asm volatile ("stlr %1, %0"				\
+		asm volatile ("stlr %x1, %0"				\
 				: "=Q" (*p) : "r" (v) : "memory");	\
 		break;							\
 	}								\
@@ -86,7 +86,7 @@ do {									\
 			: "Q" (*p) : "memory");				\
 		break;							\
 	case 8:								\
-		asm volatile ("ldar %0, %1"				\
+		asm volatile ("ldar %x0, %1"				\
 			: "=r" (*(__u64 *)__u.__c)			\
 			: "Q" (*p) : "memory");				\
 		break;							\

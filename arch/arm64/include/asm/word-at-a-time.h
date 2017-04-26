@@ -68,18 +68,18 @@ static inline unsigned long load_unaligned_zeropad(const void *addr)
 
 	/* Load word from unaligned pointer addr */
 	asm(
-	"1:	ldr	%0, %3\n"
+	"1:	ldr	%x0, %3\n"
 	"2:\n"
 	"	.pushsection .fixup,\"ax\"\n"
 	"	.align 2\n"
-	"3:	and	%1, %2, #0x7\n"
-	"	bic	%2, %2, #0x7\n"
-	"	ldr	%0, [%2]\n"
-	"	lsl	%1, %1, #0x3\n"
+	"3:	and	%x1, %x2, #0x7\n"
+	"	bic	%x2, %x2, #0x7\n"
+	"	ldr	%x0, [%x2]\n"
+	"	lsl	%x1, %x1, #0x3\n"
 #ifndef __AARCH64EB__
-	"	lsr	%0, %0, %1\n"
+	"	lsr	%x0, %x0, %x1\n"
 #else
-	"	lsl	%0, %0, %1\n"
+	"	lsl	%x0, %x0, %x1\n"
 #endif
 	"	b	2b\n"
 	"	.popsection\n"
