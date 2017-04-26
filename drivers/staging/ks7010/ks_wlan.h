@@ -32,7 +32,7 @@
 
 #include <linux/io.h>
 
-#include "ks7010_sdio.h"
+#include "sdio.h"
 
 #ifdef KS_WLAN_DEBUG
 #define DPRINTK(n, fmt, args...) \

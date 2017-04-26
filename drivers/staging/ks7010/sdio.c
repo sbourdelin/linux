@@ -19,7 +19,7 @@
 #include "ks_wlan.h"
 #include "ks_wlan_ioctl.h"
 #include "hostif.h"
-#include "ks7010_sdio.h"
+#include "sdio.h"
 
 #define KS7010_FUNC_NUM 1
 #define KS7010_IO_BLOCK_SIZE 512
