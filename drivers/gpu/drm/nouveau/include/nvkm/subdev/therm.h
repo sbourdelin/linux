@@ -89,11 +89,13 @@ struct nvkm_therm {
 int nvkm_therm_temp_get(struct nvkm_therm *);
 int nvkm_therm_fan_sense(struct nvkm_therm *);
 int nvkm_therm_cstate(struct nvkm_therm *, int, int);
+void nvkm_therm_clkgate_engine(struct nvkm_therm *, enum nvkm_devidx, bool);
 
 int nv40_therm_new(struct nvkm_device *, int, struct nvkm_therm **);
 int nv50_therm_new(struct nvkm_device *, int, struct nvkm_therm **);
 int g84_therm_new(struct nvkm_device *, int, struct nvkm_therm **);
 int gt215_therm_new(struct nvkm_device *, int, struct nvkm_therm **);
+int gf100_therm_new(struct nvkm_device *, int, struct nvkm_therm **);
 int gf119_therm_new(struct nvkm_device *, int, struct nvkm_therm **);
 int gm107_therm_new(struct nvkm_device *, int, struct nvkm_therm **);
 #endif
