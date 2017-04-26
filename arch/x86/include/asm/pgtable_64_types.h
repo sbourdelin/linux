@@ -104,4 +104,15 @@ typedef struct { pteval_t pte; } pte_t;
 
 #define EARLY_DYNAMIC_PAGE_TABLES	64
 
+/*
+ * User space process size. 47bits minus one guard page.  The guard
+ * page is necessary on Intel CPUs: if a SYSCALL instruction is at
+ * the highest possible canonical userspace address, then that
+ * syscall will enter the kernel with a non-canonical return
+ * address, and SYSRET will explode dangerously.  We avoid this
+ * particular problem by preventing anything from being mapped
+ * at the maximum canonical address.
+ */
+#define TASK_SIZE_MAX	((_AC(1, UL) << 47) - PAGE_SIZE)
+
 #endif /* _ASM_X86_PGTABLE_64_DEFS_H */

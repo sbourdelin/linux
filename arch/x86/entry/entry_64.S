@@ -218,6 +218,14 @@ entry_SYSCALL_64_fastpath:
 	testl	$_TIF_ALLWORK_MASK, TASK_TI_flags(%r11)
 	jnz	1f
 
+	/*
+	 * If address limit is not based on user-mode, jump to slow path for
+	 * additional security checks.
+	 */
+	movq	$TASK_SIZE_MAX, %rcx
+	cmp	%rcx, TASK_addr_limit(%r11)
+	jne	1f
+
 	LOCKDEP_SYS_EXIT
 	TRACE_IRQS_ON		/* user mode is traced as IRQs on */
 	movq	RIP(%rsp), %rcx
