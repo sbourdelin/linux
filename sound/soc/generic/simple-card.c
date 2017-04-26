@@ -334,8 +334,8 @@ static int asoc_simple_card_parse_aux_devs(struct device_node *node,
 	if (n <= 0)
 		return -EINVAL;
 
-	card->aux_dev = devm_kzalloc(dev,
-			n * sizeof(*card->aux_dev), GFP_KERNEL);
+	card->aux_dev = devm_kcalloc(dev, n, sizeof(*card->aux_dev),
+				     GFP_KERNEL);
 	if (!card->aux_dev)
 		return -ENOMEM;
 
