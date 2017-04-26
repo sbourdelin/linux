@@ -228,10 +228,13 @@ static struct mtip_cmd *mtip_cmd_from_tag(struct driver_data *dd,
 static void mtip_async_complete(struct mtip_port *port,
 				int tag, struct mtip_cmd *cmd, int status)
 {
+	if (unlikely(!port))
+		return;
+
 	struct driver_data *dd = port->dd;
 	struct request *rq;
 
-	if (unlikely(!dd) || unlikely(!port))
+	if (unlikely(!dd))
 		return;
 
 	if (unlikely(status == PORT_IRQ_TF_ERR)) {
