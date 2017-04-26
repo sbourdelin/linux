@@ -598,9 +598,12 @@ static int intel_breadcrumbs_signaler(void *arg)
 			request = i915_gem_request_get_rcu(request);
 		rcu_read_unlock();
 		if (signal_complete(request)) {
-			local_bh_disable();
-			dma_fence_signal(&request->fence);
-			local_bh_enable(); /* kick start the tasklets */
+			if (!test_bit(DMA_FENCE_FLAG_SIGNALED_BIT,
+				      &request->fence.flags)) {
+				local_bh_disable();
+				dma_fence_signal(&request->fence);
+				local_bh_enable(); /* kick start the tasklet */
+			}
 
 			spin_lock_irq(&b->rb_lock);
 
