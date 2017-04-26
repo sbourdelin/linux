@@ -365,9 +365,11 @@ static void xgene_enet_rd_mcx_mac(struct xgene_enet_pdata *pdata,
 	cmd = pdata->mcx_mac_addr + MAC_COMMAND_REG_OFFSET;
 	cmd_done = pdata->mcx_mac_addr + MAC_COMMAND_DONE_REG_OFFSET;
 
+	spin_lock(&pdata->mac_lock);
 	if (!xgene_enet_rd_indirect(addr, rd, cmd, cmd_done, rd_addr, rd_data))
 		netdev_err(pdata->ndev, "MCX mac read failed, addr: %04x\n",
 			   rd_addr);
+	spin_unlock(&pdata->mac_lock);
 }
 
 static void xgene_gmac_set_mac_addr(struct xgene_enet_pdata *pdata)

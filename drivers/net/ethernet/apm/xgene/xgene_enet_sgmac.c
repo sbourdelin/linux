@@ -130,6 +130,7 @@ static u32 xgene_enet_rd_indirect(struct xgene_indirect_ctl *ctl, u32 rd_addr)
 
 static u32 xgene_enet_rd_mac(struct xgene_enet_pdata *p, u32 rd_addr)
 {
+	u32 val;
 	struct xgene_indirect_ctl ctl = {
 		.addr = p->mcx_mac_addr + MAC_ADDR_REG_OFFSET,
 		.ctl = p->mcx_mac_addr + MAC_READ_REG_OFFSET,
@@ -137,7 +138,11 @@ static u32 xgene_enet_rd_mac(struct xgene_enet_pdata *p, u32 rd_addr)
 		.cmd_done = p->mcx_mac_addr + MAC_COMMAND_DONE_REG_OFFSET
 	};
 
-	return xgene_enet_rd_indirect(&ctl, rd_addr);
+	spin_lock(&p->mac_lock);
+	val = xgene_enet_rd_indirect(&ctl, rd_addr);
+	spin_unlock(&p->mac_lock);
+
+	return val;
 }
 
 static int xgene_enet_ecc_init(struct xgene_enet_pdata *p)
