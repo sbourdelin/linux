@@ -2458,3 +2458,16 @@ COMPAT_SYSCALL_DEFINE1(sysinfo, struct compat_sysinfo __user *, info)
 	return 0;
 }
 #endif /* CONFIG_COMPAT */
+
+#ifdef CONFIG_ADDR_LIMIT_CHECK
+/*
+ * Used when an architecture specific implementation detects an invalid address
+ * limit. This function does not return.
+ */
+asmlinkage void addr_limit_check_failed(void)
+{
+	/* Try to fail on the generic address limit check */
+	addr_limit_check_syscall();
+	panic("Invalid address limit before returning to user-mode");
+}
+#endif
