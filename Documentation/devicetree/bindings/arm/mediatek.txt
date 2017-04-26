@@ -41,6 +41,8 @@ Supported boards:
 - Reference  board for MT7623N with NAND:
     Required root node properties:
       - compatible = "mediatek,mt7623n-rfb-nand", "mediatek,mt7623n";
+- Bananapi BPI-R2 board:
+      - compatible = "bananapi,bpi-r2", "mediatek,mt7623n";
 - MTK mt8127 tablet moose EVB:
     Required root node properties:
       - compatible = "mediatek,mt8127-moose", "mediatek,mt8127";
