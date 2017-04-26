@@ -770,6 +770,7 @@ int pci_register_host_bridge(struct pci_host_bridge *bridge)
 	device_enable_async_suspend(bus->bridge);
 	pci_set_bus_of_node(bus);
 	pci_set_bus_msi_domain(bus);
+	set_dev_node(&bus->dev, pci_bus_find_numa_node(bus));
 
 	if (!parent)
 		set_dev_node(bus->bridge, pcibus_to_node(bus));
@@ -861,7 +862,7 @@ static struct pci_bus *pci_alloc_child_bus(struct pci_bus *parent,
 	 */
 	child->dev.class = &pcibus_class;
 	dev_set_name(&child->dev, "%04x:%02x", pci_domain_nr(child), busnr);
-
+	set_dev_node(&child->dev, dev_to_node(&parent->dev));
 	/*
 	 * Set up the primary, secondary and subordinate
 	 * bus numbers.
