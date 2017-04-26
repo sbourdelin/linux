@@ -145,6 +145,21 @@ static u32 xgene_enet_rd_mac(struct xgene_enet_pdata *p, u32 rd_addr)
 	return val;
 }
 
+static void xgene_enet_rd_mcx_stats(struct xgene_enet_pdata *p,
+				    u32 rd_addr, u32 *rd_data)
+{
+	struct xgene_indirect_ctl ctl = {
+		.addr = p->mcx_stats_addr + STAT_ADDR_REG_OFFSET,
+		.ctl = p->mcx_stats_addr + STAT_READ_REG_OFFSET,
+		.cmd = p->mcx_stats_addr + STAT_COMMAND_REG_OFFSET,
+		.cmd_done = p->mcx_stats_addr + STAT_COMMAND_DONE_REG_OFFSET
+	};
+
+	spin_lock(&p->stats_lock);
+	*rd_data = xgene_enet_rd_indirect(&ctl, rd_addr);
+	spin_unlock(&p->stats_lock);
+}
+
 static int xgene_enet_ecc_init(struct xgene_enet_pdata *p)
 {
 	struct net_device *ndev = p->ndev;
@@ -676,6 +691,7 @@ const struct xgene_mac_ops xgene_sgmac_ops = {
 	.tx_enable	= xgene_sgmac_tx_enable,
 	.rx_disable	= xgene_sgmac_rx_disable,
 	.tx_disable	= xgene_sgmac_tx_disable,
+	.read_stats	= xgene_enet_rd_mcx_stats,
 	.set_speed	= xgene_sgmac_set_speed,
 	.set_mac_addr	= xgene_sgmac_set_mac_addr,
 	.set_framesize  = xgene_sgmac_set_frame_size,

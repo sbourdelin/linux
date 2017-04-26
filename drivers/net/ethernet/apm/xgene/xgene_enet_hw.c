@@ -366,6 +366,25 @@ static void xgene_enet_rd_mcx_mac(struct xgene_enet_pdata *pdata,
 	spin_unlock(&pdata->mac_lock);
 }
 
+static void xgene_enet_rd_mcx_stats(struct xgene_enet_pdata *pdata,
+				    u32 rd_addr, u32 *rd_data)
+{
+	void __iomem *addr, *rd, *cmd, *cmd_done;
+	int ret;
+
+	addr = pdata->mcx_stats_addr + STAT_ADDR_REG_OFFSET;
+	rd = pdata->mcx_stats_addr + STAT_READ_REG_OFFSET;
+	cmd = pdata->mcx_stats_addr + STAT_COMMAND_REG_OFFSET;
+	cmd_done = pdata->mcx_stats_addr + STAT_COMMAND_DONE_REG_OFFSET;
+
+	spin_lock(&pdata->stats_lock);
+	ret = xgene_enet_rd_indirect(addr, rd, cmd, cmd_done, rd_addr, rd_data);
+	if (!ret)
+		netdev_err(pdata->ndev, "MCX stats read not completed, addr: %04x\n",
+			   rd_addr);
+	spin_unlock(&pdata->stats_lock);
+}
+
 static void xgene_gmac_set_mac_addr(struct xgene_enet_pdata *pdata)
 {
 	u32 addr0, addr1;
@@ -1005,6 +1024,7 @@ const struct xgene_mac_ops xgene_gmac_ops = {
 	.tx_enable = xgene_gmac_tx_enable,
 	.rx_disable = xgene_gmac_rx_disable,
 	.tx_disable = xgene_gmac_tx_disable,
+	.read_stats = xgene_enet_rd_mcx_stats,
 	.set_speed = xgene_gmac_set_speed,
 	.set_mac_addr = xgene_gmac_set_mac_addr,
 	.set_framesize = xgene_enet_set_frame_size,

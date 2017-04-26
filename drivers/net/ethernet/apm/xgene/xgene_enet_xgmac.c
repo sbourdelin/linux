@@ -165,6 +165,25 @@ static void xgene_enet_rd_mac(struct xgene_enet_pdata *pdata,
 	spin_unlock(&pdata->mac_lock);
 }
 
+static void xgene_enet_rd_axg_stats(struct xgene_enet_pdata *pdata,
+				    u32 rd_addr, u32 *rd_data)
+{
+	void __iomem *addr, *rd, *cmd, *cmd_done;
+	int ret;
+
+	addr = pdata->mcx_stats_addr + STAT_ADDR_REG_OFFSET;
+	rd = pdata->mcx_stats_addr + STAT_READ_REG_OFFSET;
+	cmd = pdata->mcx_stats_addr + STAT_COMMAND_REG_OFFSET;
+	cmd_done = pdata->mcx_stats_addr + STAT_COMMAND_DONE_REG_OFFSET;
+
+	spin_lock(&pdata->stats_lock);
+	ret = xgene_enet_rd_indirect(addr, rd, cmd, cmd_done, rd_addr, rd_data);
+	if (!ret)
+		netdev_err(pdata->ndev, "AXG stats read not completed, addr: %04x\n",
+			   rd_addr);
+	spin_unlock(&pdata->stats_lock);
+}
+
 static bool xgene_enet_rd_pcs(struct xgene_enet_pdata *pdata,
 			      u32 rd_addr, u32 *rd_data)
 {
@@ -569,6 +588,7 @@ const struct xgene_mac_ops xgene_xgmac_ops = {
 	.set_mac_addr = xgene_xgmac_set_mac_addr,
 	.set_framesize = xgene_xgmac_set_frame_size,
 	.set_mss = xgene_xgmac_set_mss,
+	.read_stats = xgene_enet_rd_axg_stats,
 	.link_state = xgene_enet_link_state,
 	.enable_tx_pause = xgene_xgmac_enable_tx_pause,
 	.flowctl_rx = xgene_xgmac_flowctl_rx,
