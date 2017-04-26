@@ -71,11 +71,12 @@ static void __init early_code_mapping_set_exec(int executable)
 
 pgd_t * __init efi_call_phys_prolog(void)
 {
-	unsigned long vaddress;
+	unsigned long vaddr, left_vaddr;
+	unsigned int num_entries;
 	pgd_t *save_pgd;
-
-	int pgd;
+	pud_t *pud, *pud_k;
 	int n_pgds;
+	int i;
 
 	if (!efi_enabled(EFI_OLD_MEMMAP)) {
 		save_pgd = (pgd_t *)read_cr3();
@@ -88,10 +89,22 @@ pgd_t * __init efi_call_phys_prolog(void)
 	n_pgds = DIV_ROUND_UP((max_pfn << PAGE_SHIFT), PGDIR_SIZE);
 	save_pgd = kmalloc_array(n_pgds, sizeof(*save_pgd), GFP_KERNEL);
 
-	for (pgd = 0; pgd < n_pgds; pgd++) {
-		save_pgd[pgd] = *pgd_offset_k(pgd * PGDIR_SIZE);
-		vaddress = (unsigned long)__va(pgd * PGDIR_SIZE);
-		set_pgd(pgd_offset_k(pgd * PGDIR_SIZE), *pgd_offset_k(vaddress));
+	for (i = 0; i < n_pgds; i++) {
+		save_pgd[i] = *pgd_offset_k(i * PGDIR_SIZE);
+
+		vaddr = (unsigned long)__va(i * PGDIR_SIZE);
+		pud = pud_alloc_one(NULL, 0);
+
+		num_entries = PTRS_PER_PUD - pud_index(vaddr);
+		pud_k = pud_offset(pgd_offset_k(vaddr), vaddr);
+		memcpy(pud, pud_k, num_entries);
+		if (pud_index(vaddr) > 0) {
+			left_vaddr = vaddr + (num_entries * PUD_SIZE);
+			pud_k = pud_offset(pgd_offset_k(left_vaddr),
+					   left_vaddr);
+			memcpy(pud + num_entries, pud_k, pud_index(vaddr));
+		}
+		pgd_populate(NULL, pgd_offset_k(i * PGDIR_SIZE), pud);
 	}
 out:
 	__flush_tlb_all();
@@ -106,6 +119,8 @@ void __init efi_call_phys_epilog(pgd_t *save_pgd)
 	 */
 	int pgd_idx;
 	int nr_pgds;
+	pud_t *pud;
+	pgd_t *pgd;
 
 	if (!efi_enabled(EFI_OLD_MEMMAP)) {
 		write_cr3((unsigned long)save_pgd);
@@ -115,8 +130,12 @@ void __init efi_call_phys_epilog(pgd_t *save_pgd)
 
 	nr_pgds = DIV_ROUND_UP((max_pfn << PAGE_SHIFT) , PGDIR_SIZE);
 
-	for (pgd_idx = 0; pgd_idx < nr_pgds; pgd_idx++)
+	for (pgd_idx = 0; pgd_idx < nr_pgds; pgd_idx++) {
+		pgd = pgd_offset_k(pgd_idx * PGDIR_SIZE);
+		pud = (pud_t *)pgd_page_vaddr(*pgd);
+		pud_free(NULL, pud);
 		set_pgd(pgd_offset_k(pgd_idx * PGDIR_SIZE), save_pgd[pgd_idx]);
+	}
 
 	kfree(save_pgd);
 
