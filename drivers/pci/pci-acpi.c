@@ -10,6 +10,7 @@
 #include <linux/delay.h>
 #include <linux/init.h>
 #include <linux/irqdomain.h>
+#include <linux/numa.h>
 #include <linux/pci.h>
 #include <linux/msi.h>
 #include <linux/pci_hotplug.h>
@@ -851,6 +852,25 @@ struct irq_domain *pci_host_bridge_acpi_msi_domain(struct pci_bus *bus)
 		return NULL;
 
 	return irq_find_matching_fwnode(fwnode, DOMAIN_BUS_PCI_MSI);
+}
+
+int acpi_pci_bus_find_numa_node(struct pci_bus *bus)
+{
+	int node = NUMA_NO_NODE;
+	struct device *bridge = get_device(bus->bridge);
+
+	if (!bridge)
+		return node;
+
+	if (has_acpi_companion(bridge)) {
+		struct acpi_device *adev = to_acpi_device_node(bridge->fwnode);
+
+		node = acpi_get_node(adev->handle);
+	}
+
+	put_device(bridge);
+
+	return node;
 }
 
 static int __init acpi_pci_init(void)

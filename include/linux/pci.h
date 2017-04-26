@@ -1475,6 +1475,12 @@ static inline int acpi_pci_bus_find_domain_nr(struct pci_bus *bus)
 #endif
 int pci_bus_find_domain_nr(struct pci_bus *bus, struct device *parent);
 #endif
+#ifdef CONFIG_ACPI
+int acpi_pci_bus_find_numa_node(struct pci_bus *bus);
+#else
+static inline int acpi_pci_bus_find_numa_node(struct pci_bus *bus)
+{ return NUMA_NO_NODE; }
+#endif
 int pci_bus_find_numa_node(struct pci_bus *bus);
 
 /* some architectures require additional setup to direct VGA traffic */
