@@ -30,6 +30,7 @@
 #include <linux/uaccess.h>
 #include <linux/kobject.h>
 #include <linux/ctype.h>
+#include <crypto/sha.h>
 
 /* selinuxfs pseudo filesystem for exporting the security policy API.
    Based on the proc code and the fs/nfsd/nfsctl.c code. */
@@ -99,6 +100,7 @@ enum sel_inos {
 	SEL_STATUS,	/* export current status using mmap() */
 	SEL_POLICY,	/* allow userspace to read the in kernel policy */
 	SEL_VALIDATE_TRANS, /* compute validatetrans decision */
+	SEL_POLICYCKSUM,/* return policy SHA256 checkum */
 	SEL_INO_NEXT,	/* The next inode number to use */
 };
 
@@ -310,6 +312,22 @@ static ssize_t sel_read_policyvers(struct file *filp, char __user *buf,
 
 static const struct file_operations sel_policyvers_ops = {
 	.read		= sel_read_policyvers,
+	.llseek		= generic_file_llseek,
+};
+
+static ssize_t sel_read_policycksum(struct file *filp, char __user *buf,
+				    size_t count, loff_t *ppos)
+{
+	size_t tmpbuflen = SHA256_DIGEST_SIZE*2 + 1;
+	char tmpbuf[tmpbuflen];
+	ssize_t length;
+
+	length = security_policydb_cksum(tmpbuf, tmpbuflen);
+	return simple_read_from_buffer(buf, count, ppos, tmpbuf, length);
+}
+
+static const struct file_operations sel_policycksum_ops = {
+	.read		= sel_read_policycksum,
 	.llseek		= generic_file_llseek,
 };
 
@@ -1825,6 +1843,8 @@ static int sel_fill_super(struct super_block *sb, void *data, int silent)
 		[SEL_POLICY] = {"policy", &sel_policy_ops, S_IRUGO},
 		[SEL_VALIDATE_TRANS] = {"validatetrans", &sel_transition_ops,
 					S_IWUGO},
+		[SEL_POLICYCKSUM] = {"policycksum", &sel_policycksum_ops,
+				     S_IRUGO},
 		/* last one */ {""}
 	};
 	ret = simple_fill_super(sb, SELINUX_MAGIC, selinux_files);
