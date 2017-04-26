@@ -158,7 +158,11 @@ How to enable firmware-assisted dump (fadump):
 
 1. Set config option CONFIG_FA_DUMP=y and build kernel.
 2. Boot into linux kernel with 'fadump=on' kernel cmdline option.
-3. Optionally, user can also set 'fadump_reserve_mem=' kernel cmdline
+3. A user can pass additional kernel parameters as a comma separated list
+   through 'fadump_append=' parameter, to be enforced when fadump is active.
+   This can be used to pass parameters like nr_cpus=1, numa=off to reduce
+   memory consumption during dump capture.
+4. Optionally, user can also set 'fadump_reserve_mem=' kernel cmdline
    to specify size of the memory to reserve for boot memory dump
    preservation.
 
