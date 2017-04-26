@@ -1020,7 +1020,7 @@ void nvdimm_flush(struct nd_region *nd_region)
 	 * The first wmb() is needed to 'sfence' all previous writes
 	 * such that they are architecturally visible for the platform
 	 * buffer flush.  Note that we've already arranged for pmem
-	 * writes to avoid the cache via arch_memcpy_to_pmem().  The
+	 * writes to avoid the cache via memcpy_writethru().  The
 	 * final wmb() ensures ordering for the NVDIMM flush write.
 	 */
 	wmb();

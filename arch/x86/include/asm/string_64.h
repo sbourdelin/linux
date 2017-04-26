@@ -109,6 +109,11 @@ memcpy_mcsafe(void *dst, const void *src, size_t cnt)
 	return 0;
 }
 
+#ifdef CONFIG_ARCH_HAS_UACCESS_WRITETHRU
+#define __HAVE_ARCH_MEMCPY_WRITETHRU 1
+void memcpy_writethru(void *dst, const void *src, size_t cnt);
+#endif
+
 #endif /* __KERNEL__ */
 
 #endif /* _ASM_X86_STRING_64_H */
