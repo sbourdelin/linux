@@ -78,6 +78,10 @@ static bool memmap_too_large;
 extern unsigned long get_cmd_line_ptr(void);
 
 
+/* Store memory limit specified by "mem=nn[KMG]" or "memmap=nn[KMG]" */
+unsigned long long mem_limit = ULLONG_MAX;
+
+
 enum mem_avoid_index {
 	MEM_AVOID_ZO_RANGE = 0,
 	MEM_AVOID_INITRD,
@@ -128,15 +132,21 @@ parse_memmap(char *p, unsigned long long *start, unsigned long long *size)
 		return -EINVAL;
 
 	switch (*p) {
-	case '@':
-		/* Skip this region, usable */
-		*start = 0;
-		*size = 0;
-		return 0;
 	case '#':
 	case '$':
 	case '!':
 		*start = memparse(p + 1, &p);
+		return 0;
+	case '@':
+		/* memmap=nn@ss specifies usable region, should be skipped */
+		*size = 0;
+	default:
+		/*
+		 * If w/o offset, only size specified, memmap=nn[KMG] has the
+		 * same behaviour as mem=nn[KMG]. It limits the max address
+		 * system can use. Region above the limit should be avoided.
+		 */
+		*start = 0;
 		return 0;
 	}
 
@@ -163,9 +173,14 @@ static void mem_avoid_memmap(char *str)
 		if (rc < 0)
 			break;
 		str = k;
-		/* A usable region that should not be skipped */
-		if (size == 0)
+
+		if (start == 0) {
+			/* Store the specified memory limit if size > 0 */
+			if (size > 0)
+				mem_limit = size;
+
 			continue;
+		}
 
 		mem_avoid[MEM_AVOID_MEMMAP_BEGIN + i].start = start;
 		mem_avoid[MEM_AVOID_MEMMAP_BEGIN + i].size = size;
@@ -189,6 +204,7 @@ static int handle_mem_memmap(void)
 	size_t len = strlen((char *)args);
 	char *tmp_cmdline;
 	char *param, *val;
+	u64 mem_size;
 
 	tmp_cmdline = malloc(COMMAND_LINE_SIZE);
 	if (!tmp_cmdline )
@@ -211,8 +227,20 @@ static int handle_mem_memmap(void)
 			return -1;
 		}
 
-		if (!strcmp(param, "memmap"))
+		if (!strcmp(param, "memmap")) {
 			mem_avoid_memmap(val);
+		} else if (!strcmp(param, "mem")) {
+			char *p = val;
+
+			if (!strcmp(p, "nopentium"))
+				continue;
+			mem_size = memparse(p, &p);
+			if (mem_size == 0) {
+				free(tmp_cmdline);
+				return -EINVAL;
+			}
+			mem_limit = mem_size;
+		}
 	}
 
 	free(tmp_cmdline);
@@ -449,7 +477,8 @@ static void process_e820_entry(struct boot_e820_entry *entry,
 {
 	struct mem_vector region, overlap;
 	struct slot_area slot_area;
-	unsigned long start_orig;
+	unsigned long start_orig, end;
+	struct boot_e820_entry cur_entry;
 
 	/* Skip non-RAM entries. */
 	if (entry->type != E820_TYPE_RAM)
@@ -463,8 +492,15 @@ static void process_e820_entry(struct boot_e820_entry *entry,
 	if (entry->addr + entry->size < minimum)
 		return;
 
-	region.start = entry->addr;
-	region.size = entry->size;
+	/* Ignore entries above memory limit */
+	end = min(entry->size + entry->addr, mem_limit);
+	if (entry->addr >= end)
+		return;
+	cur_entry.addr = entry->addr;
+	cur_entry.size = end - entry->addr;
+
+	region.start = cur_entry.addr;
+	region.size = cur_entry.size;
 
 	/* Give up if slot area array is full. */
 	while (slot_area_index < MAX_SLOT_AREA) {
@@ -478,7 +514,7 @@ static void process_e820_entry(struct boot_e820_entry *entry,
 		region.start = ALIGN(region.start, CONFIG_PHYSICAL_ALIGN);
 
 		/* Did we raise the address above this e820 region? */
-		if (region.start > entry->addr + entry->size)
+		if (region.start > cur_entry.addr + cur_entry.size)
 			return;
 
 		/* Reduce size by any delta from the original address. */
