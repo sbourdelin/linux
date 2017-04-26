@@ -71,6 +71,7 @@ static const struct xgene_gstrings_stats gstrings_extd_stats[] = {
 	XGENE_EXTD_STAT(rx_oversize_pkt_cntr, ROVR, 16),
 	XGENE_EXTD_STAT(rx_fragments_cntr, RFRG, 16),
 	XGENE_EXTD_STAT(rx_jabber_cntr, RJBR, 16),
+	XGENE_EXTD_STAT(rx_jabber_recov_cntr, DUMP, 0),
 	XGENE_EXTD_STAT(rx_dropped_pkt_cntr, RDRP, 16),
 	XGENE_EXTD_STAT(rx_overrun_cntr, DUMP, 0),
 	XGENE_EXTD_STAT(tx_multicast_pkt_cntr, TMCA, 31),
@@ -96,9 +97,16 @@ static const struct xgene_gstrings_stats gstrings_extd_stats[] = {
 
 #define XGENE_STATS_LEN		ARRAY_SIZE(gstrings_stats)
 #define XGENE_EXTD_STATS_LEN	ARRAY_SIZE(gstrings_extd_stats)
+#define RFCS_IDX		7
+#define RALN_IDX		13
+#define RFLR_IDX		14
 #define FALSE_RFLR_IDX		15
-#define RX_OVERRUN_IDX		23
-#define TX_UNDERRUN_IDX		42
+#define RUND_IDX		18
+#define FALSE_RJBR_IDX		22
+#define RX_OVERRUN_IDX		24
+#define TFCS_IDX		38
+#define TFRG_IDX		42
+#define TX_UNDERRUN_IDX		43
 
 static void xgene_get_drvinfo(struct net_device *ndev,
 			      struct ethtool_drvinfo *info)
@@ -217,16 +225,26 @@ static int xgene_get_sset_count(struct net_device *ndev, int sset)
 
 static void xgene_get_extd_stats(struct xgene_enet_pdata *pdata)
 {
+	u32 tmp[XGENE_EXTD_STATS_LEN];
 	u32 rx_drop, tx_drop;
-	u32 tmp;
 	int i;
 
 	for (i = 0; i < XGENE_EXTD_STATS_LEN; i++) {
 		pdata->mac_ops->read_stats(pdata,
-					   gstrings_extd_stats[i].addr, &tmp);
+				gstrings_extd_stats[i].addr, &tmp[i]);
 		if (gstrings_extd_stats[i].mask)
-			pdata->extd_stats[i] += tmp &
+			pdata->extd_stats[i] += tmp[i] &
 				GENMASK(gstrings_extd_stats[i].mask - 1, 0);
+	}
+
+	if (pdata->phy_mode == PHY_INTERFACE_MODE_XGMII) {
+		/* Errata 10GE_10 - SW should intepret RALN as 0 */
+		pdata->extd_stats[RALN_IDX] = 0;
+	} else {
+		/* Errata ENET_15 - Fixes RFCS, RFLR, TFCS counter */
+		pdata->extd_stats[RFCS_IDX] -= tmp[RALN_IDX];
+		pdata->extd_stats[RFLR_IDX] -= tmp[RUND_IDX];
+		pdata->extd_stats[TFCS_IDX] -= tmp[TFRG_IDX];
 	}
 
 	pdata->mac_ops->get_drop_cnt(pdata, &rx_drop, &tx_drop);
@@ -235,6 +253,8 @@ static void xgene_get_extd_stats(struct xgene_enet_pdata *pdata)
 
 	/* Errata 10GE_8 -  Update Frame recovered from Errata 10GE_8/ENET_11 */
 	pdata->extd_stats[FALSE_RFLR_IDX] = pdata->false_rflr;
+	/* Errata ENET_15 - Jabber Frame recov'ed from Errata 10GE_10/ENET_15 */
+	pdata->extd_stats[FALSE_RJBR_IDX] = pdata->vlan_rjbr;
 }
 
 int xgene_extd_stats_init(struct xgene_enet_pdata *pdata)
