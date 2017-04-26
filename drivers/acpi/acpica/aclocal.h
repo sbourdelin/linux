@@ -838,7 +838,7 @@ struct acpi_comment_addr_node {
  * depdendency tree for the -ca option
  */
 struct acpi_file_node {
-	FILE *file;
+	void *file;
 	char *filename;
 	char *file_start;	/* Points to AML and indicates when the AML for this particular file starts. */
 	char *file_end;		/* Points to AML and indicates when the AML for this particular file ends. */
