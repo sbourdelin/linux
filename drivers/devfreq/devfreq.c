@@ -1059,6 +1059,7 @@ static ssize_t min_freq_store(struct device *dev, struct device_attribute *attr,
 	unsigned long value;
 	int ret;
 	unsigned long max;
+	unsigned long old_min;
 
 	ret = sscanf(buf, "%lu", &value);
 	if (ret != 1)
@@ -1071,9 +1072,22 @@ static ssize_t min_freq_store(struct device *dev, struct device_attribute *attr,
 		goto unlock;
 	}
 
+	ret = devfreq_get_freq_level(df, value);
+	if (ret < 0) {
+		dev_warn(dev, "Storing min freq failed with (%d) error\n", ret);
+		goto unlock;
+	}
+
+	old_min = df->min_freq;
 	df->min_freq = value;
-	update_devfreq(df);
-	ret = count;
+	ret = update_devfreq(df);
+	if (ret) {
+		df->min_freq = old_min;
+		dev_warn(dev, "Storing min freq failed with (%d) error\n", ret);
+	} else {
+		ret = count;
+	}
+
 unlock:
 	mutex_unlock(&df->lock);
 	return ret;
@@ -1086,6 +1100,7 @@ static ssize_t max_freq_store(struct device *dev, struct device_attribute *attr,
 	unsigned long value;
 	int ret;
 	unsigned long min;
+	unsigned long old_max;
 
 	ret = sscanf(buf, "%lu", &value);
 	if (ret != 1)
@@ -1098,9 +1113,22 @@ static ssize_t max_freq_store(struct device *dev, struct device_attribute *attr,
 		goto unlock;
 	}
 
+	ret = devfreq_get_freq_level(df, value);
+	if (ret < 0) {
+		dev_warn(dev, "Storing max freq failed with (%d) error\n", ret);
+		goto unlock;
+	}
+
+	old_max = df->max_freq;
 	df->max_freq = value;
-	update_devfreq(df);
-	ret = count;
+	ret = update_devfreq(df);
+	if (ret) {
+		df->max_freq = old_max;
+		dev_warn(dev, "Storing max freq failed with (%d) error\n", ret);
+	} else {
+		ret = count;
+	}
+
 unlock:
 	mutex_unlock(&df->lock);
 	return ret;
