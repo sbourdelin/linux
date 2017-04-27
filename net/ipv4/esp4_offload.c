@@ -38,6 +38,9 @@ static struct sk_buff **esp4_gro_receive(struct sk_buff **head,
 	__be32 spi;
 	int err;
 
+	if (ip_is_fragment(ip_hdr(skb)))
+		goto flush;
+
 	skb_pull(skb, offset);
 
 	if ((err = xfrm_parse_spi(skb, IPPROTO_ESP, &spi, &seq)) != 0)
@@ -78,6 +81,7 @@ static struct sk_buff **esp4_gro_receive(struct sk_buff **head,
 	return ERR_PTR(-EINPROGRESS);
 out:
 	skb_push(skb, offset);
+flush:
 	NAPI_GRO_CB(skb)->same_flow = 0;
 	NAPI_GRO_CB(skb)->flush = 1;
 
