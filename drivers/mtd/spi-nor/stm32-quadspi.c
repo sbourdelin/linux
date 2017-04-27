@@ -691,7 +691,6 @@ static struct platform_driver stm32_qspi_driver = {
 };
 module_platform_driver(stm32_qspi_driver);
 
-MODULE_ALIAS("platform:" DRIVER_NAME);
 MODULE_AUTHOR("Ludovic Barre <ludovic.barre@st.com>");
 MODULE_DESCRIPTION("STMicroelectronics STM32 quad spi driver");
 MODULE_LICENSE("GPL v2");
