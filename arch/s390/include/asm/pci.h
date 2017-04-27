@@ -124,6 +124,7 @@ struct zpci_dev {
 	unsigned long	iommu_pages;
 	unsigned int	next_bit;
 
+	struct iommu_device iommu_dev;  /* IOMMU core handle */
 	struct iommu_group *group;	/* IOMMU group for all devices behind this zdev */
 
 	char res_name[16];
