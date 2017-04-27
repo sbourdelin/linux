@@ -99,6 +99,9 @@ xfs_uuid_mount(
 	xfs_uuid_table[hole] = *uuid;
 	mutex_unlock(&xfs_uuid_table_mutex);
 
+	/* Publish UUID in struct super_block */
+	BUILD_BUG_ON(sizeof(mp->m_super->s_uuid) != sizeof(uuid_t));
+	memcpy(&mp->m_super->s_uuid, uuid, sizeof(uuid_t));
 	return 0;
 
  out_duplicate:
