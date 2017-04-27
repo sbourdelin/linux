@@ -714,34 +714,6 @@ wbcir_shutdown(struct pnp_dev *device)
 		proto = IR_PROTOCOL_RC5;
 		break;
 
-	case RC_TYPE_NEC:
-		mask[1] = bitrev8(mask_sc);
-		mask[0] = mask[1];
-		mask[3] = bitrev8(mask_sc >> 8);
-		mask[2] = mask[3];
-
-		match[1] = bitrev8(wake_sc);
-		match[0] = ~match[1];
-		match[3] = bitrev8(wake_sc >> 8);
-		match[2] = ~match[3];
-
-		proto = IR_PROTOCOL_NEC;
-		break;
-
-	case RC_TYPE_NECX:
-		mask[1] = bitrev8(mask_sc);
-		mask[0] = mask[1];
-		mask[2] = bitrev8(mask_sc >> 8);
-		mask[3] = bitrev8(mask_sc >> 16);
-
-		match[1] = bitrev8(wake_sc);
-		match[0] = ~match[1];
-		match[2] = bitrev8(wake_sc >> 8);
-		match[3] = bitrev8(wake_sc >> 16);
-
-		proto = IR_PROTOCOL_NEC;
-		break;
-
 	case RC_TYPE_NEC32:
 		mask[0] = bitrev8(mask_sc);
 		mask[1] = bitrev8(mask_sc >> 8);
@@ -1087,8 +1059,8 @@ wbcir_probe(struct pnp_dev *device, const struct pnp_device_id *dev_id)
 	data->dev->max_timeout = 10 * IR_DEFAULT_TIMEOUT;
 	data->dev->rx_resolution = US_TO_NS(2);
 	data->dev->allowed_protocols = RC_BIT_ALL_IR_DECODER;
-	data->dev->allowed_wakeup_protocols = RC_BIT_NEC | RC_BIT_NECX |
-			RC_BIT_NEC32 | RC_BIT_RC5 | RC_BIT_RC6_0 |
+	data->dev->allowed_wakeup_protocols =
+			RC_BIT_NEC | RC_BIT_RC5 | RC_BIT_RC6_0 |
 			RC_BIT_RC6_6A_20 | RC_BIT_RC6_6A_24 |
 			RC_BIT_RC6_6A_32 | RC_BIT_RC6_MCE;
 	data->dev->wakeup_protocol = RC_TYPE_RC6_MCE;

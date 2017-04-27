@@ -741,8 +741,6 @@ static int rc_validate_filter(struct rc_dev *dev,
 		[RC_TYPE_SONY15] = 0xff007f,
 		[RC_TYPE_SONY20] = 0x1fff7f,
 		[RC_TYPE_JVC] = 0xffff,
-		[RC_TYPE_NEC] = 0xffff,
-		[RC_TYPE_NECX] = 0xffffff,
 		[RC_TYPE_NEC32] = 0xffffffff,
 		[RC_TYPE_SANYO] = 0x1fffff,
 		[RC_TYPE_MCIR2_KBD] = 0xffff,
@@ -758,14 +756,9 @@ static int rc_validate_filter(struct rc_dev *dev,
 	enum rc_type protocol = dev->wakeup_protocol;
 
 	switch (protocol) {
+	case RC_TYPE_NEC:
 	case RC_TYPE_NECX:
-		if ((((s >> 16) ^ ~(s >> 8)) & 0xff) == 0)
-			return -EINVAL;
-		break;
-	case RC_TYPE_NEC32:
-		if ((((s >> 24) ^ ~(s >> 16)) & 0xff) == 0)
-			return -EINVAL;
-		break;
+		return -EINVAL;
 	case RC_TYPE_RC6_MCE:
 		if ((s & 0xffff0000) != 0x800f0000)
 			return -EINVAL;
@@ -1301,7 +1294,7 @@ unlock:
 /*
  * This is the list of all variants of all protocols, which is used by
  * the wakeup_protocols sysfs entry. In the protocols sysfs entry some
- * some protocols are grouped together (e.g. nec = nec + necx + nec32).
+ * some protocols are grouped together.
  *
  * For wakeup we need to know the exact protocol variant so the hardware
  * can be programmed exactly what to expect.
@@ -1316,9 +1309,7 @@ static const char * const proto_variant_names[] = {
 	[RC_TYPE_SONY12] = "sony-12",
 	[RC_TYPE_SONY15] = "sony-15",
 	[RC_TYPE_SONY20] = "sony-20",
-	[RC_TYPE_NEC] = "nec",
-	[RC_TYPE_NECX] = "nec-x",
-	[RC_TYPE_NEC32] = "nec-32",
+	[RC_TYPE_NEC32] = "nec",
 	[RC_TYPE_SANYO] = "sanyo",
 	[RC_TYPE_MCIR2_KBD] = "mcir2-kbd",
 	[RC_TYPE_MCIR2_MSE] = "mcir2-mse",
