@@ -44,6 +44,24 @@ enum rc_driver_type {
 	RC_DRIVER_IR_RAW_TX,
 };
 
+/* This is used for the input EVIOC[SG]KEYCODE_V2 ioctls */
+struct rc_scancode {
+	__u16 protocol;
+	__u16 reserved[3];
+	__u64 scancode;
+};
+
+struct rc_keymap_entry {
+	__u8  flags;
+	__u8  len;
+	__u16 index;
+	__u32 keycode;
+	union {
+		struct rc_scancode rc;
+		__u8 raw[32];
+	};
+};
+
 /**
  * struct rc_scancode_filter - Filter scan codes.
  * @data:	Scancode data to match.
@@ -166,7 +184,7 @@ struct rc_dev {
 	struct timer_list		timer_keyup;
 	u32				last_keycode;
 	enum rc_type			last_protocol;
-	u32				last_scancode;
+	u64				last_scancode;
 	u8				last_toggle;
 	u32				timeout;
 	u32				min_timeout;
@@ -262,10 +280,10 @@ int rc_open(struct rc_dev *rdev);
 void rc_close(struct rc_dev *rdev);
 
 void rc_repeat(struct rc_dev *dev);
-void rc_keydown(struct rc_dev *dev, enum rc_type protocol, u32 scancode, u8 toggle);
-void rc_keydown_notimeout(struct rc_dev *dev, enum rc_type protocol, u32 scancode, u8 toggle);
+void rc_keydown(struct rc_dev *dev, enum rc_type protocol, u64 scancode, u8 toggle);
+void rc_keydown_notimeout(struct rc_dev *dev, enum rc_type protocol, u64 scancode, u8 toggle);
 void rc_keyup(struct rc_dev *dev);
-u32 rc_g_keycode_from_table(struct rc_dev *dev, u32 scancode);
+u32 rc_g_keycode_from_table(struct rc_dev *dev, enum rc_type protocol, u64 scancode);
 
 /*
  * From rc-raw.c

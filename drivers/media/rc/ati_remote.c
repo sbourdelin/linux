@@ -546,6 +546,7 @@ static void ati_remote_input_report(struct urb *urb)
 		 * set, assume this is a scrollwheel up/down event.
 		 */
 		wheel_keycode = rc_g_keycode_from_table(ati_remote->rdev,
+							RC_TYPE_OTHER,
 							scancode & 0x78);
 
 		if (wheel_keycode == KEY_RESERVED) {
