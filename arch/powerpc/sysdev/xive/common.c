@@ -143,7 +143,6 @@ static u32 xive_scan_interrupts(struct xive_cpu *xc, bool just_peek)
 		struct xive_q *q;
 
 		prio = ffs(xc->pending_prio) - 1;
-		DBG_VERBOSE("scan_irq: trying prio %d\n", prio);
 
 		/* Try to fetch */
 		irq = xive_read_eq(&xc->queue[prio], just_peek);
@@ -171,12 +170,18 @@ static u32 xive_scan_interrupts(struct xive_cpu *xc, bool just_peek)
 	}
 
 	/* If nothing was found, set CPPR to 0xff */
-	if (irq == 0)
+	if (irq == 0) {
 		prio = 0xff;
+		DBG_VERBOSE("scan_irq(%d): nothing found\n", just_peek);
+	} else {
+		DBG_VERBOSE("scan_irq(%d): found irq %d prio %d\n",
+			    just_peek, irq, prio);
+	}
 
 	/* Update HW CPPR to match if necessary */
 	if (prio != xc->cppr) {
-		DBG_VERBOSE("scan_irq: adjusting CPPR to %d\n", prio);
+		DBG_VERBOSE("scan_irq(%d): adjusting CPPR %d->%d\n",
+			    just_peek, xc->cppr, prio);
 		xc->cppr = prio;
 		out_8(xive_tima + xive_tima_offset + TM_CPPR, prio);
 	}
@@ -260,7 +265,7 @@ static unsigned int xive_get_irq(void)
 	/* Scan our queue(s) for interrupts */
 	irq = xive_scan_interrupts(xc, false);
 
-	DBG_VERBOSE("get_irq: got irq 0x%x, new pending=0x%02x\n",
+	DBG_VERBOSE("get_irq: got irq %d new pending=0x%02x\n",
 	    irq, xc->pending_prio);
 
 	/* Return pending interrupt if any */
@@ -282,7 +287,7 @@ static unsigned int xive_get_irq(void)
 static void xive_do_queue_eoi(struct xive_cpu *xc)
 {
 	if (xive_scan_interrupts(xc, true) != 0) {
-		DBG_VERBOSE("eoi: pending=0x%02x\n", xc->pending_prio);
+		DBG_VERBOSE("eoi_irq: more pending !\n");
 		force_external_irq_replay();
 	}
 }
@@ -327,11 +332,13 @@ void xive_do_source_eoi(u32 hw_irq, struct xive_irq_data *xd)
 			in_be64(xd->eoi_mmio);
 		else {
 			eoi_val = xive_poke_esb(xd, XIVE_ESB_SET_PQ_00);
-			DBG_VERBOSE("eoi_val=%x\n", offset, eoi_val);
+			DBG_VERBOSE("hwirq 0x%x eoi_val=%x\n", hw_irq, eoi_val);
 
 			/* Re-trigger if needed */
-			if ((eoi_val & XIVE_ESB_VAL_Q) && xd->trig_mmio)
+			if ((eoi_val & XIVE_ESB_VAL_Q) && xd->trig_mmio) {
+				DBG_VERBOSE(" -> eoi retrigger !\n");
 				out_be64(xd->trig_mmio, 0);
+			}
 		}
 	}
 }
@@ -380,10 +387,15 @@ static void xive_do_source_set_mask(struct xive_irq_data *xd,
 	if (mask) {
 		val = xive_poke_esb(xd, XIVE_ESB_SET_PQ_01);
 		xd->saved_p = !!(val & XIVE_ESB_VAL_P);
-	} else if (xd->saved_p)
-		xive_poke_esb(xd, XIVE_ESB_SET_PQ_10);
-	else
-		xive_poke_esb(xd, XIVE_ESB_SET_PQ_00);
+		DBG_VERBOSE("masking val=%llx, sp=%d\n",
+			    val, xd->saved_p);
+	} else {
+		DBG_VERBOSE("unmasking sp=%d\n", xd->saved_p);
+		if (xd->saved_p)
+			xive_poke_esb(xd, XIVE_ESB_SET_PQ_10);
+		else
+			xive_poke_esb(xd, XIVE_ESB_SET_PQ_00);
+	}
 }
 
 /*
@@ -526,6 +538,7 @@ static unsigned int xive_irq_startup(struct irq_data *d)
 
 	pr_devel("xive_irq_startup: irq %d [0x%x] data @%p\n",
 		 d->irq, hw_irq, d);
+	pr_devel("  eoi_mmio=%p trig_mmio=%p\n", xd->eoi_mmio, xd->trig_mmio);
 
 #ifdef CONFIG_PCI_MSI
 	/*
@@ -753,6 +766,8 @@ static int xive_irq_retrigger(struct irq_data *d)
 	/* This should be only for MSIs */
 	if (WARN_ON(xd->flags & XIVE_IRQ_FLAG_LSI))
 		return 0;
+
+	DBG_VERBOSE("retrigger irq %d\n", d->irq);
 
 	/*
 	 * To perform a retrigger, we first set the PQ bits to
