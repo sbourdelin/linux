@@ -8,6 +8,7 @@
 
 #include <linux/pci.h>
 #include <linux/mutex.h>
+#include <linux/iommu.h>
 #include <asm-generic/pci.h>
 #include <asm/pci_clp.h>
 #include <asm/pci_debug.h>
@@ -123,6 +124,8 @@ struct zpci_dev {
 	unsigned long	iommu_pages;
 	unsigned int	next_bit;
 
+	struct iommu_group *group;	/* IOMMU group for all devices behind this zdev */
+
 	char res_name[16];
 	struct zpci_bar_struct bars[PCI_BAR_COUNT];
 
@@ -172,6 +175,10 @@ int clp_rescan_pci_devices_simple(void);
 int clp_add_pci_device(u32, u32, int);
 int clp_enable_fh(struct zpci_dev *, u8);
 int clp_disable_fh(struct zpci_dev *);
+
+/* IOMMU Interface */
+int zpci_init_iommu(struct zpci_dev *zdev);
+void zpci_destroy_iommu(struct zpci_dev *zdev);
 
 #ifdef CONFIG_PCI
 /* Error handling and recovery */

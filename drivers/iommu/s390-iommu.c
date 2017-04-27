@@ -163,22 +163,22 @@ static void s390_iommu_detach_device(struct iommu_domain *domain,
 	}
 }
 
+static struct iommu_group *s390_iommu_device_group(struct device *dev)
+{
+	struct zpci_dev *zdev = to_pci_dev(dev)->sysdata;
+
+	return zdev->group;
+}
+
 static int s390_iommu_add_device(struct device *dev)
 {
-	struct iommu_group *group;
-	int rc;
+	struct iommu_group *group = iommu_group_get_for_dev(dev);
+	if (IS_ERR(group))
+		return PTR_ERR(group);
 
-	group = iommu_group_get(dev);
-	if (!group) {
-		group = iommu_group_alloc();
-		if (IS_ERR(group))
-			return PTR_ERR(group);
-	}
-
-	rc = iommu_group_add_device(group, dev);
 	iommu_group_put(group);
 
-	return rc;
+	return 0;
 }
 
 static void s390_iommu_remove_device(struct device *dev)
@@ -333,6 +333,26 @@ static size_t s390_iommu_unmap(struct iommu_domain *domain,
 	return size;
 }
 
+int zpci_init_iommu(struct zpci_dev *zdev)
+{
+	int rc = 0;
+
+	zdev->group = iommu_group_alloc();
+
+	if (IS_ERR(zdev->group)) {
+		rc = PTR_ERR(zdev->group);
+		zdev->group = NULL;
+	}
+
+	return rc;
+}
+
+void zpci_destroy_iommu(struct zpci_dev *zdev)
+{
+	iommu_group_put(zdev->group);
+	zdev->group = NULL;
+}
+
 static struct iommu_ops s390_iommu_ops = {
 	.capable = s390_iommu_capable,
 	.domain_alloc = s390_domain_alloc,
@@ -344,6 +364,7 @@ static struct iommu_ops s390_iommu_ops = {
 	.iova_to_phys = s390_iommu_iova_to_phys,
 	.add_device = s390_iommu_add_device,
 	.remove_device = s390_iommu_remove_device,
+	.device_group = s390_iommu_device_group,
 	.pgsize_bitmap = S390_IOMMU_PGSIZES,
 };
 
