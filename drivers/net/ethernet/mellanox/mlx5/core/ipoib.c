@@ -405,7 +405,6 @@ static int mlx5i_xmit(struct net_device *dev, struct sk_buff *skb,
 
 	return mlx5i_sq_xmit(sq, skb, &mah->av, dqpn, dqkey);
 }
-#endif
 
 static int mlx5i_check_required_hca_cap(struct mlx5_core_dev *mdev)
 {
@@ -420,10 +419,10 @@ static int mlx5i_check_required_hca_cap(struct mlx5_core_dev *mdev)
 	return 0;
 }
 
-static struct net_device *mlx5_rdma_netdev_alloc(struct mlx5_core_dev *mdev,
-						 struct ib_device *ibdev,
-						 const char *name,
-						 void (*setup)(struct net_device *))
+struct net_device *mlx5_rdma_netdev_alloc(struct mlx5_core_dev *mdev,
+					  struct ib_device *ibdev,
+					  const char *name,
+					  void (*setup)(struct net_device *))
 {
 	const struct mlx5e_profile *profile = &mlx5i_nic_profile;
 	int nch = profile->max_nch(mdev);
@@ -482,7 +481,7 @@ free_mdev_resources:
 }
 EXPORT_SYMBOL(mlx5_rdma_netdev_alloc);
 
-static void mlx5_rdma_netdev_free(struct net_device *netdev)
+void mlx5_rdma_netdev_free(struct net_device *netdev)
 {
 	struct mlx5e_priv          *priv    = mlx5i_epriv(netdev);
 	const struct mlx5e_profile *profile = priv->profile;
@@ -495,4 +494,4 @@ static void mlx5_rdma_netdev_free(struct net_device *netdev)
 	mlx5e_destroy_mdev_resources(priv->mdev);
 }
 EXPORT_SYMBOL(mlx5_rdma_netdev_free);
-
+#endif
