@@ -196,6 +196,7 @@
 #define SPRN_DEAR	0x03D	/* Data Error Address Register */
 #define SPRN_ESR	0x03E	/* Exception Syndrome Register */
 #define SPRN_PIR	0x11E	/* Processor Identification Register */
+#define SPRN_PVR	0x11F	/* Processor Version Register */
 #define SPRN_DBSR	0x130	/* Debug Status Register */
 #define SPRN_DBCR0	0x134	/* Debug Control Register 0 */
 #define SPRN_DBCR1	0x135	/* Debug Control Register 1 */
