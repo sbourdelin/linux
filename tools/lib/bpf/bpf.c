@@ -235,3 +235,14 @@ int bpf_prog_test_run(int prog_fd, int repeat, void *data, __u32 size,
 		*duration = attr.test.duration;
 	return ret;
 }
+
+int bpf_prog_get_next_id(__u32 start_id, __u32 *next_id)
+{
+	union bpf_attr attr;
+
+	bzero(&attr, sizeof(attr));
+	attr.start_id = start_id;
+	attr.next_id = ptr_to_u64(next_id);
+
+	return sys_bpf(BPF_PROG_GET_NEXT_ID, &attr, sizeof(attr));
+}
