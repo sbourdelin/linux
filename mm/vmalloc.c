@@ -521,9 +521,13 @@ overflow:
 		}
 	}
 
+	if (gfp_mask & __GFP_NOWARN)
+		goto out;
+
 	if (printk_ratelimit())
 		pr_warn("vmap allocation for size %lu failed: use vmalloc=<size> to increase size\n",
 			size);
+out:
 	kfree(va);
 	return ERR_PTR(-EBUSY);
 }
