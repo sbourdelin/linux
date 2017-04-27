@@ -38,6 +38,7 @@
 #include <linux/platform_device.h>
 
 #include <linux/amba/bus.h>
+#include <asm/cputype.h>
 
 #include "io-pgtable.h"
 
@@ -176,15 +177,15 @@
 #define ARM_SMMU_CMDQ_CONS		0x9c
 
 #define ARM_SMMU_EVTQ_BASE		0xa0
-#define ARM_SMMU_EVTQ_PROD		0x100a8
-#define ARM_SMMU_EVTQ_CONS		0x100ac
+#define ARM_SMMU_EVTQ_PROD		(page1_offset_adjust(0x100a8))
+#define ARM_SMMU_EVTQ_CONS		(page1_offset_adjust(0x100ac))
 #define ARM_SMMU_EVTQ_IRQ_CFG0		0xb0
 #define ARM_SMMU_EVTQ_IRQ_CFG1		0xb8
 #define ARM_SMMU_EVTQ_IRQ_CFG2		0xbc
 
 #define ARM_SMMU_PRIQ_BASE		0xc0
-#define ARM_SMMU_PRIQ_PROD		0x100c8
-#define ARM_SMMU_PRIQ_CONS		0x100cc
+#define ARM_SMMU_PRIQ_PROD		(page1_offset_adjust(0x100c8))
+#define ARM_SMMU_PRIQ_CONS		(page1_offset_adjust(0x100cc))
 #define ARM_SMMU_PRIQ_IRQ_CFG0		0xd0
 #define ARM_SMMU_PRIQ_IRQ_CFG1		0xd8
 #define ARM_SMMU_PRIQ_IRQ_CFG2		0xdc
@@ -411,6 +412,10 @@
 
 #define MSI_IOVA_BASE			0x8000000
 #define MSI_IOVA_LENGTH			0x100000
+
+#define ARM_SMMU_PAGE0_REGS_ONLY		\
+	(((read_cpuid_id() & MIDR_CPU_MODEL_MASK) == MIDR_THUNDERX_99XX) \
+	|| ((read_cpuid_id() & MIDR_CPU_MODEL_MASK) == MIDR_BRCM_VULCAN))
 
 static bool disable_bypass;
 module_param_named(disable_bypass, disable_bypass, bool, S_IRUGO);
@@ -665,6 +670,15 @@ static struct arm_smmu_option_prop arm_smmu_options[] = {
 	{ ARM_SMMU_OPT_SKIP_PREFETCH, "hisilicon,broken-prefetch-cmd" },
 	{ 0, NULL},
 };
+
+static inline unsigned long page1_offset_adjust(
+	unsigned long off)
+{
+	if (!ARM_SMMU_PAGE0_REGS_ONLY)
+		return off;
+	else
+		return (off - SZ_64K);
+}
 
 static struct arm_smmu_domain *to_smmu_domain(struct iommu_domain *dom)
 {
@@ -2652,6 +2666,14 @@ static int arm_smmu_device_dt_probe(struct platform_device *pdev,
 	return ret;
 }
 
+static unsigned long arm_smmu_resource_size(void)
+{
+	if (ARM_SMMU_PAGE0_REGS_ONLY)
+		return SZ_64K;
+	else
+		return SZ_128K;
+}
+
 static int arm_smmu_device_probe(struct platform_device *pdev)
 {
 	int irq, ret;
@@ -2670,7 +2692,7 @@ static int arm_smmu_device_probe(struct platform_device *pdev)
 
 	/* Base address */
 	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
-	if (resource_size(res) + 1 < SZ_128K) {
+	if (resource_size(res) + 1 < arm_smmu_resource_size()) {
 		dev_err(dev, "MMIO region too small (%pr)\n", res);
 		return -EINVAL;
 	}
