@@ -169,7 +169,7 @@ static int fscache_objlist_show(struct seq_file *m, void *v)
 	struct fscache_object *obj = v;
 	struct fscache_cookie *cookie;
 	unsigned long config = data->config;
-	char _type[3], *type;
+	char _type[4], *type;
 	u8 *buf = data->buf, *p;
 
 	if ((unsigned long) v == 1) {
@@ -194,7 +194,7 @@ static int fscache_objlist_show(struct seq_file *m, void *v)
 	if ((unsigned long) v == 2) {
 		seq_puts(m, "======== ======== ==== ===== === === === == ====="
 			 " == == == ="
-			 " | ================ == == ================");
+			 " | ================ === == ================");
 		if (config & (FSCACHE_OBJLIST_CONFIG_KEY |
 			      FSCACHE_OBJLIST_CONFIG_AUX))
 			seq_puts(m, " ================");
@@ -256,13 +256,13 @@ static int fscache_objlist_show(struct seq_file *m, void *v)
 
 		switch (cookie->def->type) {
 		case 0:
-			type = "IX";
+			type = " IX";
 			break;
 		case 1:
-			type = "DT";
+			type = " DT";
 			break;
 		default:
-			sprintf(_type, "%02u", cookie->def->type);
+			sprintf(_type, "%03u", cookie->def->type);
 			type = _type;
 			break;
 		}

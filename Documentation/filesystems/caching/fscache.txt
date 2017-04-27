@@ -374,7 +374,7 @@ and the second set of columns describe the object's cookie, if present:
 	COLUMN		DESCRIPTION
 	===============	=======================================================
 	NETFS_COOKIE_DEF Name of netfs cookie definition
-	TY		Cookie type (IX - index, DT - data, hex - special)
+	TY		Cookie type (IX - index, DT - data, decimal - special)
 	FL		Cookie flags
 	NETFS_DATA	Netfs private data stored in the cookie
 	OBJECT_KEY	Object key	} 1 column, with separating comma
