@@ -734,6 +734,7 @@ static void dib0700_rc_urb_completion(struct urb *purb)
 
 	switch (d->props.rc.core.protocol) {
 	case RC_BIT_NEC:
+		protocol = RC_TYPE_NEC;
 		toggle = 0;
 
 		/* NEC protocol sends repeat code as 0 0 0 FF */
@@ -746,26 +747,10 @@ static void dib0700_rc_urb_completion(struct urb *purb)
 			goto resubmit;
 		}
 
-		if ((poll_reply->nec.data ^ poll_reply->nec.not_data) != 0xff) {
-			deb_data("NEC32 protocol\n");
-			keycode = RC_SCANCODE_NEC32(poll_reply->nec.system     << 24 |
-						     poll_reply->nec.not_system << 16 |
-						     poll_reply->nec.data       << 8  |
-						     poll_reply->nec.not_data);
-			protocol = RC_TYPE_NEC32;
-		} else if ((poll_reply->nec.system ^ poll_reply->nec.not_system) != 0xff) {
-			deb_data("NEC extended protocol\n");
-			keycode = RC_SCANCODE_NECX(poll_reply->nec.system << 8 |
-						    poll_reply->nec.not_system,
-						    poll_reply->nec.data);
-
-			protocol = RC_TYPE_NECX;
-		} else {
-			deb_data("NEC normal protocol\n");
-			keycode = RC_SCANCODE_NEC(poll_reply->nec.system,
-						   poll_reply->nec.data);
-			protocol = RC_TYPE_NEC;
-		}
+		keycode = RC_SCANCODE_NEC32(poll_reply->nec.system     << 24 |
+					    poll_reply->nec.not_system << 16 |
+					    poll_reply->nec.data       << 8  |
+					    poll_reply->nec.not_data);
 
 		break;
 	default:

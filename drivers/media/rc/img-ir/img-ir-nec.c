@@ -28,28 +28,15 @@ static int img_ir_nec_scancode(int len, u64 raw, u64 enabled_protocols,
 	addr_inv = (raw >>  8) & 0xff;
 	data     = (raw >> 16) & 0xff;
 	data_inv = (raw >> 24) & 0xff;
-	if ((data_inv ^ data) != 0xff) {
-		/* 32-bit NEC (used by Apple and TiVo remotes) */
-		/* scan encoding: as transmitted, MSBit = first received bit */
-		request->scancode = bitrev8(addr)     << 24 |
-				bitrev8(addr_inv) << 16 |
-				bitrev8(data)     <<  8 |
-				bitrev8(data_inv);
-		request->protocol = RC_TYPE_NEC32;
-	} else if ((addr_inv ^ addr) != 0xff) {
-		/* Extended NEC */
-		/* scan encoding: AAaaDD */
-		request->scancode = addr     << 16 |
-				addr_inv <<  8 |
-				data;
-		request->protocol = RC_TYPE_NECX;
-	} else {
-		/* Normal NEC */
-		/* scan encoding: AADD */
-		request->scancode = addr << 8 |
-				data;
-		request->protocol = RC_TYPE_NEC;
-	}
+
+	/* 32-bit NEC */
+	/* scan encoding: as transmitted, MSBit = first received bit */
+	request->scancode = 
+			bitrev8(addr)     << 24 |
+			bitrev8(addr_inv) << 16 |
+			bitrev8(data)     <<  8 |
+			bitrev8(data_inv);
+	request->protocol = RC_TYPE_NEC;
 	return IMG_IR_SCANCODE;
 }
 
@@ -60,55 +47,16 @@ static int img_ir_nec_filter(const struct rc_scancode_filter *in,
 	unsigned int addr, addr_inv, data, data_inv;
 	unsigned int addr_m, addr_inv_m, data_m, data_inv_m;
 
-	data       = in->data & 0xff;
-	data_m     = in->mask & 0xff;
-
-	protocols &= RC_BIT_NEC | RC_BIT_NECX | RC_BIT_NEC32;
-
-	/*
-	 * If only one bit is set, we were requested to do an exact
-	 * protocol. This should be the case for wakeup filters; for
-	 * normal filters, guess the protocol from the scancode.
-	 */
-	if (!is_power_of_2(protocols)) {
-		if ((in->data | in->mask) & 0xff000000)
-			protocols = RC_BIT_NEC32;
-		else if ((in->data | in->mask) & 0x00ff0000)
-			protocols = RC_BIT_NECX;
-		else
-			protocols = RC_BIT_NEC;
-	}
-
-	if (protocols == RC_BIT_NEC32) {
-		/* 32-bit NEC (used by Apple and TiVo remotes) */
-		/* scan encoding: as transmitted, MSBit = first received bit */
-		addr       = bitrev8(in->data >> 24);
-		addr_m     = bitrev8(in->mask >> 24);
-		addr_inv   = bitrev8(in->data >> 16);
-		addr_inv_m = bitrev8(in->mask >> 16);
-		data       = bitrev8(in->data >>  8);
-		data_m     = bitrev8(in->mask >>  8);
-		data_inv   = bitrev8(in->data >>  0);
-		data_inv_m = bitrev8(in->mask >>  0);
-	} else if (protocols == RC_BIT_NECX) {
-		/* Extended NEC */
-		/* scan encoding AAaaDD */
-		addr       = (in->data >> 16) & 0xff;
-		addr_m     = (in->mask >> 16) & 0xff;
-		addr_inv   = (in->data >>  8) & 0xff;
-		addr_inv_m = (in->mask >>  8) & 0xff;
-		data_inv   = data ^ 0xff;
-		data_inv_m = data_m;
-	} else {
-		/* Normal NEC */
-		/* scan encoding: AADD */
-		addr       = (in->data >>  8) & 0xff;
-		addr_m     = (in->mask >>  8) & 0xff;
-		addr_inv   = addr ^ 0xff;
-		addr_inv_m = addr_m;
-		data_inv   = data ^ 0xff;
-		data_inv_m = data_m;
-	}
+	/* 32-bit NEC */
+	/* scan encoding: as transmitted, MSBit = first received bit */
+	addr       = bitrev8(in->data >> 24);
+	addr_m     = bitrev8(in->mask >> 24);
+	addr_inv   = bitrev8(in->data >> 16);
+	addr_inv_m = bitrev8(in->mask >> 16);
+	data       = bitrev8(in->data >>  8);
+	data_m     = bitrev8(in->mask >>  8);
+	data_inv   = bitrev8(in->data >>  0);
+	data_inv_m = bitrev8(in->mask >>  0);
 
 	/* raw encoding: ddDDaaAA */
 	out->data = data_inv << 24 |
@@ -128,7 +76,7 @@ static int img_ir_nec_filter(const struct rc_scancode_filter *in,
  *        http://wiki.altium.com/display/ADOH/NEC+Infrared+Transmission+Protocol
  */
 struct img_ir_decoder img_ir_nec = {
-	.type = RC_BIT_NEC | RC_BIT_NECX | RC_BIT_NEC32,
+	.type = RC_BIT_NEC,
 	.control = {
 		.decoden = 1,
 		.code_type = IMG_IR_CODETYPE_PULSEDIST,

@@ -89,7 +89,6 @@ static int dtt200u_pid_filter(struct dvb_usb_adapter *adap, int index, u16 pid, 
 static int dtt200u_rc_query(struct dvb_usb_device *d)
 {
 	struct dtt200u_state *st = d->priv;
-	u32 scancode;
 	int ret;
 
 	mutex_lock(&d->data_mutex);
@@ -100,23 +99,13 @@ static int dtt200u_rc_query(struct dvb_usb_device *d)
 		goto ret;
 
 	if (st->data[0] == 1) {
-		enum rc_type proto = RC_TYPE_NEC;
+		u32 scancode;
 
-		scancode = st->data[1];
-		if ((u8) ~st->data[1] != st->data[2]) {
-			/* Extended NEC */
-			scancode = scancode << 8;
-			scancode |= st->data[2];
-			proto = RC_TYPE_NECX;
-		}
-		scancode = scancode << 8;
-		scancode |= st->data[3];
-
-		/* Check command checksum is ok */
-		if ((u8) ~st->data[3] == st->data[4])
-			rc_keydown(d->rc_dev, proto, scancode, 0);
-		else
-			rc_keyup(d->rc_dev);
+		scancode = RC_SCANCODE_NEC32((st->data[1] << 24) |
+					     (st->data[2] << 16) |
+					     (st->data[3] <<  8) |
+					     (st->data[4] <<  0));
+		rc_keydown(d->rc_dev, RC_TYPE_NEC, scancode, 0);
 	} else if (st->data[0] == 2) {
 		rc_repeat(d->rc_dev);
 	} else {

@@ -326,6 +326,49 @@ static unsigned int ir_establish_scancode(struct rc_dev *dev,
 }
 
 /**
+ * guess_protocol() - heuristics to guess the protocol for a scancode
+ * @rdev:	the struct rc_dev device descriptor
+ * @return:	the guessed RC_TYPE_* protocol
+ *
+ * Internal routine to guess the current IR protocol for legacy ioctls.
+ */
+static inline enum rc_type guess_protocol(struct rc_dev *rdev)
+{
+	struct rc_map *rc_map = &rdev->rc_map;
+
+	if (hweight64(rdev->enabled_protocols) == 1)
+		return rc_bitmap_to_type(rdev->enabled_protocols);
+	else if (hweight64(rdev->allowed_protocols) == 1)
+		return rc_bitmap_to_type(rdev->allowed_protocols);
+	else
+		return rc_map->rc_type;
+}
+
+/**
+ * to_nec32() - helper function to try to convert misc NEC scancodes to NEC32
+ * @orig:	original scancode
+ * @return:	NEC32 scancode
+ *
+ * This helper routine is used to provide backwards compatibility.
+ */
+static u64 to_nec32(u64 orig)
+{
+	u8 b3 = (u8)(orig >> 16);
+	u8 b2 = (u8)(orig >>  8);
+	u8 b1 = (u8)(orig >>  0);
+
+	if (orig <= 0xffff)
+		/* Plain old NEC */
+		return b2 << 24 | ((u8)~b2) << 16 |  b1 << 8 | ((u8)~b1);
+	else if (orig <= 0xffffff)
+		/* NEC extended */
+		return b3 << 24 | b2 << 16 |  b1 << 8 | ((u8)~b1);
+	else
+		/* NEC32 */
+		return orig;
+}
+
+/**
  * ir_setkeycode() - set a keycode in the scancode->keycode table
  * @idev:	the struct input_dev device descriptor
  * @scancode:	the desired scancode
@@ -357,6 +400,9 @@ static int ir_setkeycode(struct input_dev *idev,
 		retval = input_scancode_to_scalar(ke, &scancode);
 		if (retval)
 			goto out;
+
+		if (guess_protocol(rdev) == RC_TYPE_NEC)
+			scancode = to_nec32(scancode);
 
 		index = ir_establish_scancode(rdev, rc_map, scancode, true);
 		if (index >= rc_map->len) {
@@ -398,7 +444,10 @@ static int ir_setkeytable(struct rc_dev *dev,
 
 	for (i = 0; i < from->size; i++) {
 		index = ir_establish_scancode(dev, rc_map,
-					      from->scan[i].scancode, false);
+					      from->rc_type == RC_TYPE_NEC ?
+					      to_nec32(from->scan[i].scancode) :
+					      from->scan[i].scancode,
+					      false);
 		if (index >= rc_map->len) {
 			rc = -ENOMEM;
 			break;
@@ -472,6 +521,8 @@ static int ir_getkeycode(struct input_dev *idev,
 		if (retval)
 			goto out;
 
+		if (guess_protocol(rdev) == RC_TYPE_NEC)
+			scancode = to_nec32(scancode);
 		index = ir_lookup_by_scancode(rc_map, scancode);
 	}
 
@@ -668,7 +719,6 @@ static void ir_do_keydown(struct rc_dev *dev, enum rc_type protocol,
 
 		led_trigger_event(led_feedback, LED_FULL);
 	}
-
 	input_sync(dev->input_dev);
 }
 
@@ -741,7 +791,7 @@ static int rc_validate_filter(struct rc_dev *dev,
 		[RC_TYPE_SONY15] = 0xff007f,
 		[RC_TYPE_SONY20] = 0x1fff7f,
 		[RC_TYPE_JVC] = 0xffff,
-		[RC_TYPE_NEC32] = 0xffffffff,
+		[RC_TYPE_NEC] = 0xffffffff,
 		[RC_TYPE_SANYO] = 0x1fffff,
 		[RC_TYPE_MCIR2_KBD] = 0xffff,
 		[RC_TYPE_MCIR2_MSE] = 0x1fffff,
@@ -756,9 +806,6 @@ static int rc_validate_filter(struct rc_dev *dev,
 	enum rc_type protocol = dev->wakeup_protocol;
 
 	switch (protocol) {
-	case RC_TYPE_NEC:
-	case RC_TYPE_NECX:
-		return -EINVAL;
 	case RC_TYPE_RC6_MCE:
 		if ((s & 0xffff0000) != 0x800f0000)
 			return -EINVAL;
@@ -857,9 +904,7 @@ static const struct {
 	{ RC_BIT_UNKNOWN,	"unknown",	NULL			},
 	{ RC_BIT_RC5 |
 	  RC_BIT_RC5X_20,	"rc-5",		"ir-rc5-decoder"	},
-	{ RC_BIT_NEC |
-	  RC_BIT_NECX |
-	  RC_BIT_NEC32,		"nec",		"ir-nec-decoder"	},
+	{ RC_BIT_NEC,		"nec",		"ir-nec-decoder"	},
 	{ RC_BIT_RC6_0 |
 	  RC_BIT_RC6_6A_20 |
 	  RC_BIT_RC6_6A_24 |
@@ -1309,7 +1354,7 @@ static const char * const proto_variant_names[] = {
 	[RC_TYPE_SONY12] = "sony-12",
 	[RC_TYPE_SONY15] = "sony-15",
 	[RC_TYPE_SONY20] = "sony-20",
-	[RC_TYPE_NEC32] = "nec",
+	[RC_TYPE_NEC] = "nec",
 	[RC_TYPE_SANYO] = "sanyo",
 	[RC_TYPE_MCIR2_KBD] = "mcir2-kbd",
 	[RC_TYPE_MCIR2_MSE] = "mcir2-mse",

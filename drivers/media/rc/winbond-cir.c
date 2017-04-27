@@ -714,7 +714,7 @@ wbcir_shutdown(struct pnp_dev *device)
 		proto = IR_PROTOCOL_RC5;
 		break;
 
-	case RC_TYPE_NEC32:
+	case RC_TYPE_NEC:
 		mask[0] = bitrev8(mask_sc);
 		mask[1] = bitrev8(mask_sc >> 8);
 		mask[2] = bitrev8(mask_sc >> 16);
