@@ -82,6 +82,7 @@ enum bpf_cmd {
 	BPF_PROG_ATTACH,
 	BPF_PROG_DETACH,
 	BPF_PROG_TEST_RUN,
+	BPF_PROG_GET_NEXT_ID,
 };
 
 enum bpf_map_type {
@@ -201,6 +202,11 @@ union bpf_attr {
 		__u32		repeat;
 		__u32		duration;
 	} test;
+
+	struct { /* anonymous struct used by BPF_PROG_GET_NEXT_ID */
+		__u32		start_id;
+		__aligned_u64	next_id;
+	};
 } __attribute__((aligned(8)));
 
 /* BPF helper function descriptions:

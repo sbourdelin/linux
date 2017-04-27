@@ -22,8 +22,11 @@
 #include <linux/filter.h>
 #include <linux/version.h>
 #include <linux/kernel.h>
+#include <linux/idr.h>
 
 DEFINE_PER_CPU(int, bpf_prog_active);
+DEFINE_IDR(prog_idr);
+DEFINE_SPINLOCK(prog_idr_lock);
 
 int sysctl_unprivileged_bpf_disabled __read_mostly;
 
@@ -663,6 +666,9 @@ static void __bpf_prog_put_rcu(struct rcu_head *rcu)
 void bpf_prog_put(struct bpf_prog *prog)
 {
 	if (atomic_dec_and_test(&prog->aux->refcnt)) {
+		spin_lock(&prog_idr_lock);
+		idr_remove(&prog_idr, prog->id);
+		spin_unlock(&prog_idr_lock);
 		trace_bpf_prog_put_rcu(prog);
 		bpf_prog_kallsyms_del(prog);
 		call_rcu(&prog->aux->rcu, __bpf_prog_put_rcu);
@@ -790,7 +796,7 @@ static int bpf_prog_load(union bpf_attr *attr)
 {
 	enum bpf_prog_type type = attr->prog_type;
 	struct bpf_prog *prog;
-	int err;
+	int err, id;
 	char license[128];
 	bool is_gpl;
 
@@ -847,6 +853,15 @@ static int bpf_prog_load(union bpf_attr *attr)
 	err = bpf_check(&prog, attr);
 	if (err < 0)
 		goto free_used_maps;
+
+	spin_lock(&prog_idr_lock);
+	id = idr_alloc_cyclic(&prog_idr, prog, 1, INT_MAX, GFP_USER);
+	spin_unlock(&prog_idr_lock);
+	if (id < 0) {
+		err = id;
+		goto free_used_maps;
+	}
+	prog->id = id;
 
 	/* eBPF program is ready to be JITed */
 	prog = bpf_prog_select_runtime(prog, &err);
@@ -995,6 +1010,33 @@ static int bpf_prog_test_run(const union bpf_attr *attr,
 	return ret;
 }
 
+#define BPF_PROG_GET_NEXT_ID_LAST_FIELD next_id
+
+static int bpf_prog_get_next_id(union bpf_attr *attr)
+{
+	u64 __user *unext_id = u64_to_user_ptr(attr->next_id);
+	u32 next_id = attr->start_id;
+	struct bpf_prog *prog;
+
+	if (CHECK_ATTR(BPF_PROG_GET_NEXT_ID))
+		return -EINVAL;
+
+	if (next_id++ >= INT_MAX)
+		return -EINVAL;
+
+	spin_lock(&prog_idr_lock);
+	prog = idr_get_next(&prog_idr, &next_id);
+	spin_unlock(&prog_idr_lock);
+
+	if (!prog)
+		return -ENOENT;
+
+	if (copy_to_user(unext_id, &next_id, sizeof(next_id)))
+		return -EFAULT;
+
+	return 0;
+}
+
 SYSCALL_DEFINE3(bpf, int, cmd, union bpf_attr __user *, uattr, unsigned int, size)
 {
 	union bpf_attr attr = {};
@@ -1071,6 +1113,9 @@ SYSCALL_DEFINE3(bpf, int, cmd, union bpf_attr __user *, uattr, unsigned int, siz
 #endif
 	case BPF_PROG_TEST_RUN:
 		err = bpf_prog_test_run(&attr, uattr);
+		break;
+	case BPF_PROG_GET_NEXT_ID:
+		err = bpf_prog_get_next_id(&attr);
 		break;
 	default:
 		err = -EINVAL;
