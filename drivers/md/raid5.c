@@ -234,10 +234,12 @@ static void do_release_stripe(struct r5conf *conf, struct stripe_head *sh,
 			if (test_bit(R5_InJournal, &sh->dev[i].flags))
 				injournal++;
 	/*
-	 * When quiesce in r5c write back, set STRIPE_HANDLE for stripes with
-	 * data in journal, so they are not released to cached lists
+	 * With writeback journal, stripes with data in the journal are
+	 * released to cached lists. However, when journal device is
+	 * failed or in quiesce, these stripes need to be handled now.
 	 */
-	if (conf->quiesce && r5c_is_writeback(conf->log) &&
+	if ((conf->quiesce || r5l_log_disk_error(conf)) &&
+	    r5c_is_writeback(conf->log) &&
 	    !test_bit(STRIPE_HANDLE, &sh->state) && injournal != 0) {
 		if (test_bit(STRIPE_R5C_CACHING, &sh->state))
 			r5c_make_stripe_write_out(sh);
@@ -2694,6 +2696,15 @@ static void raid5_error(struct mddev *mddev, struct md_rdev *rdev)
 		bdevname(rdev->bdev, b),
 		mdname(mddev),
 		conf->raid_disks - mddev->degraded);
+
+	if (test_bit(Journal, &rdev->flags) && r5c_is_writeback(conf->log)) {
+		pr_warn("md/raid:%s: Journal device failed. Flushing data in the writeback cache.",
+			mdname(mddev));
+		spin_lock_irqsave(&conf->device_lock, flags);
+		r5c_flush_cache(conf, INT_MAX);
+		spin_unlock_irqrestore(&conf->device_lock, flags);
+	}
+
 	r5c_update_on_rdev_error(mddev);
 }
 
@@ -3055,6 +3066,11 @@ sector_t raid5_compute_blocknr(struct stripe_head *sh, int i, int previous)
  *      When LOG_CRITICAL, stripes with injournal == 0 will be sent to
  *      no_space_stripes list.
  *
+ *   3. during journal failure
+ *      In journal failure, we try to flush all cached data to raid disks
+ *      based on data in stripe cache. The array is read-only to upper
+ *      layers, so we would skip all pending writes.
+ *
  */
 static inline bool delay_towrite(struct r5conf *conf,
 				 struct r5dev *dev,
@@ -3067,6 +3083,9 @@ static inline bool delay_towrite(struct r5conf *conf,
 	/* case 2 above */
 	if (test_bit(R5C_LOG_CRITICAL, &conf->cache_state) &&
 	    s->injournal > 0)
+		return true;
+	/* case 3 above */
+	if (s->log_failed && s->injournal)
 		return true;
 	return false;
 }
@@ -4701,10 +4720,15 @@ static void handle_stripe(struct stripe_head *sh)
 	       " to_write=%d failed=%d failed_num=%d,%d\n",
 	       s.locked, s.uptodate, s.to_read, s.to_write, s.failed,
 	       s.failed_num[0], s.failed_num[1]);
-	/* check if the array has lost more than max_degraded devices and,
+	/*
+	 * check if the array has lost more than max_degraded devices and,
 	 * if so, some requests might need to be failed.
+	 *
+	 * When journal device failed (log_failed), we will only process
+	 * the stripe if there is data need write to raid disks
 	 */
-	if (s.failed > conf->max_degraded || s.log_failed) {
+	if (s.failed > conf->max_degraded ||
+	    (s.log_failed && s.injournal == 0)) {
 		sh->check_state = 0;
 		sh->reconstruct_state = 0;
 		break_stripe_batch_list(sh, 0);
@@ -5278,7 +5302,8 @@ static struct stripe_head *__get_priority_stripe(struct r5conf *conf, int group)
 	struct list_head *handle_list = NULL;
 	struct r5worker_group *wg;
 	bool second_try = !r5c_is_writeback(conf->log);
-	bool try_loprio = test_bit(R5C_LOG_TIGHT, &conf->cache_state);
+	bool try_loprio = test_bit(R5C_LOG_TIGHT, &conf->cache_state) ||
+		r5l_log_disk_error(conf);
 
 again:
 	wg = NULL;
