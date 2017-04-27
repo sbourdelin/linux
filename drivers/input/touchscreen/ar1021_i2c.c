@@ -44,7 +44,7 @@ static irqreturn_t ar1021_i2c_irq(int irq, void *dev_id)
 		goto out;
 
 	/* sync bit set ? */
-	if ((data[0] & 0x80) == 0)
+	if ((data[0] & AR1021_TOUCH) == 0)
 		goto out;
 
 	button = data[0] & BIT(0);
