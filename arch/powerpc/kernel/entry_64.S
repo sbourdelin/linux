@@ -176,7 +176,7 @@ system_call:			/* label this so stack traces look sane */
 	mtctr   r12
 	bctrl			/* Call handler */
 
-.Lsyscall_exit:
+__system_call:
 	std	r3,RESULT(r1)
 	CURRENT_THREAD_INFO(r12, r1)
 
@@ -294,12 +294,12 @@ END_FTR_SECTION_IFSET(CPU_FTR_HAS_PPR)
 	blt+	system_call
 
 	/* Return code is already in r3 thanks to do_syscall_trace_enter() */
-	b	.Lsyscall_exit
+	b	__system_call
 
 
 .Lsyscall_enosys:
 	li	r3,-ENOSYS
-	b	.Lsyscall_exit
+	b	__system_call
 	
 .Lsyscall_exit_work:
 #ifdef CONFIG_PPC_BOOK3S
@@ -388,7 +388,7 @@ END_FTR_SECTION_IFSET(CPU_FTR_HAS_PPR)
 	b	.	/* prevent speculative execution */
 #endif
 _ASM_NOKPROBE_SYMBOL(system_call_common);
-_ASM_NOKPROBE_SYMBOL(system_call);
+_ASM_NOKPROBE_SYMBOL(__system_call);
 
 /* Save non-volatile GPRs, if not already saved. */
 _GLOBAL(save_nvgprs)
@@ -413,38 +413,38 @@ _GLOBAL(save_nvgprs)
 _GLOBAL(ppc_fork)
 	bl	save_nvgprs
 	bl	sys_fork
-	b	.Lsyscall_exit
+	b	__system_call
 
 _GLOBAL(ppc_vfork)
 	bl	save_nvgprs
 	bl	sys_vfork
-	b	.Lsyscall_exit
+	b	__system_call
 
 _GLOBAL(ppc_clone)
 	bl	save_nvgprs
 	bl	sys_clone
-	b	.Lsyscall_exit
+	b	__system_call
 
 _GLOBAL(ppc32_swapcontext)
 	bl	save_nvgprs
 	bl	compat_sys_swapcontext
-	b	.Lsyscall_exit
+	b	__system_call
 
 _GLOBAL(ppc64_swapcontext)
 	bl	save_nvgprs
 	bl	sys_swapcontext
-	b	.Lsyscall_exit
+	b	__system_call
 
 _GLOBAL(ppc_switch_endian)
 	bl	save_nvgprs
 	bl	sys_switch_endian
-	b	.Lsyscall_exit
+	b	__system_call
 
 _GLOBAL(ret_from_fork)
 	bl	schedule_tail
 	REST_NVGPRS(r1)
 	li	r3,0
-	b	.Lsyscall_exit
+	b	__system_call
 
 _GLOBAL(ret_from_kernel_thread)
 	bl	schedule_tail
@@ -456,7 +456,7 @@ _GLOBAL(ret_from_kernel_thread)
 #endif
 	blrl
 	li	r3,0
-	b	.Lsyscall_exit
+	b	__system_call
 
 /*
  * This routine switches between two different tasks.  The process
