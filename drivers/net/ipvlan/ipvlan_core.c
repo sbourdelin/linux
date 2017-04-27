@@ -88,7 +88,7 @@ void ipvlan_ht_addr_del(struct ipvl_addr *addr)
 	hlist_del_init_rcu(&addr->hlnode);
 }
 
-unsigned int ipvlan_mac_hash(const unsigned char *addr)
+inline unsigned int ipvlan_mac_hash(const unsigned char *addr)
 {
 	u32 hash = jhash_1word(__get_unaligned_cpu32(addr + 2),
 			       ipvlan_jhash_secret);
@@ -505,7 +505,7 @@ static int ipvlan_xmit_mode_l2(struct sk_buff *skb, struct net_device *dev)
 			return ipvlan_rcv_int_frame(addr, &skb);
 
 		skb = skb_share_check(skb, GFP_ATOMIC);
-		if (!skb)
+		if (unlikely(!skb))
 			return NET_XMIT_DROP;
 
 		/* Packet definitely does not belong to any of the
@@ -596,7 +596,7 @@ static rx_handler_result_t ipvlan_handle_mode_l2(struct sk_buff **pskb,
 			 * when work-queue processes this frame. This is
 			 * achieved by returning RX_HANDLER_PASS.
 			 */
-			if (nskb)
+			if (likely(nskb))
 				ipvlan_multicast_enqueue(port, nskb, false);
 		}
 	} else {
