@@ -26,10 +26,10 @@
 #define IORT_IRQ_MASK(irq)		(irq & 0xffffffffULL)
 #define IORT_IRQ_TRIGGER_MASK(irq)	((irq >> 32) & 0xffffffffULL)
 
+#ifdef CONFIG_ACPI_IORT
 int iort_register_domain_token(int trans_id, struct fwnode_handle *fw_node);
 void iort_deregister_domain_token(int trans_id);
 struct fwnode_handle *iort_find_domain_token(int trans_id);
-#ifdef CONFIG_ACPI_IORT
 void acpi_iort_init(void);
 bool iort_node_match(u8 type);
 u32 iort_msi_map_rid(struct device *dev, u32 req_id);
@@ -38,6 +38,9 @@ struct irq_domain *iort_get_device_domain(struct device *dev, u32 req_id);
 void iort_set_dma_mask(struct device *dev);
 const struct iommu_ops *iort_iommu_configure(struct device *dev);
 #else
+static inline int iort_register_domain_token(int trans_id, struct fwnode_handle *fw_node) { return -ENOSYS; }
+static inline void iort_deregister_domain_token(int trans_id) {}
+static inline struct fwnode_handle *iort_find_domain_token(int trans_id) { return NULL;}
 static inline void acpi_iort_init(void) { }
 static inline bool iort_node_match(u8 type) { return false; }
 static inline u32 iort_msi_map_rid(struct device *dev, u32 req_id)
