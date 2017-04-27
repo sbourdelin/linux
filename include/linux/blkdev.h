@@ -912,14 +912,13 @@ static inline void rq_flush_dcache_pages(struct request *rq)
 #endif
 
 #ifdef CONFIG_PRINTK
-#define vfs_msg(sb, level, fmt, ...)				\
+__printf(3, 4)
+void __vfs_msg(struct super_block *sb, const char *level, const char *fmt, ...);
+#define vfs_msg(sb, level, fmt, ...)					\
 	__vfs_msg(sb, level, fmt, ##__VA_ARGS__)
 #else
-#define vfs_msg(sb, level, fmt, ...)				\
-do {								\
-	no_printk(fmt, ##__VA_ARGS__);				\
-	__vfs_msg(sb, "", " ");					\
-} while (0)
+#define vfs_msg(sb, level, fmt, ...)					\
+	no_printk(level fmt, ##__VA_ARGS__)
 #endif
 
 extern int blk_register_queue(struct gendisk *disk);

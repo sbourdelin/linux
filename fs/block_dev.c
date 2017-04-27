@@ -54,7 +54,8 @@ struct block_device *I_BDEV(struct inode *inode)
 }
 EXPORT_SYMBOL(I_BDEV);
 
-void __vfs_msg(struct super_block *sb, const char *prefix, const char *fmt, ...)
+#ifdef CONFIG_PRINTK
+void __vfs_msg(struct super_block *sb, const char *level, const char *fmt, ...)
 {
 	struct va_format vaf;
 	va_list args;
@@ -62,9 +63,10 @@ void __vfs_msg(struct super_block *sb, const char *prefix, const char *fmt, ...)
 	va_start(args, fmt);
 	vaf.fmt = fmt;
 	vaf.va = &args;
-	printk_ratelimited("%sVFS (%s): %pV\n", prefix, sb->s_id, &vaf);
+	printk_ratelimited("%sVFS (%s): %pV\n", level, sb->s_id, &vaf);
 	va_end(args);
 }
+#endif
 
 static void bdev_write_inode(struct block_device *bdev)
 {
@@ -775,7 +777,7 @@ int bdev_dax_supported(struct super_block *sb, int blocksize)
 
 	if (len < 1) {
 		vfs_msg(sb, KERN_ERR,
-				"error: dax access failed (%d)", len);
+				"error: dax access failed (%ld)", len);
 		return len < 0 ? len : -EIO;
 	}
 
