@@ -413,21 +413,21 @@ static void nd_pmem_shutdown(struct device *dev)
 
 static void nd_pmem_notify(struct device *dev, enum nvdimm_event event)
 {
-	struct pmem_device *pmem = dev_get_drvdata(dev);
-	struct nd_region *nd_region = to_region(pmem);
 	resource_size_t offset = 0, end_trunc = 0;
 	struct nd_namespace_common *ndns;
 	struct nd_namespace_io *nsio;
+	struct nd_region *nd_region;
+	struct pmem_device *pmem;
 	struct resource res;
 
 	if (event != NVDIMM_REVALIDATE_POISON)
 		return;
 
-	if (is_nd_btt(dev)) {
-		struct nd_btt *nd_btt = to_nd_btt(dev);
+	/* no badblocks instance to update in the btt case */
+	if (is_nd_btt(dev))
+		return;
 
-		ndns = nd_btt->ndns;
-	} else if (is_nd_pfn(dev)) {
+	if (is_nd_pfn(dev)) {
 		struct nd_pfn *nd_pfn = to_nd_pfn(dev);
 		struct nd_pfn_sb *pfn_sb = nd_pfn->pfn_sb;
 
@@ -440,6 +440,8 @@ static void nd_pmem_notify(struct device *dev, enum nvdimm_event event)
 	nsio = to_nd_namespace_io(&ndns->dev);
 	res.start = nsio->res.start + offset;
 	res.end = nsio->res.end - end_trunc;
+	pmem = dev_get_drvdata(dev);
+	nd_region = to_region(pmem);
 	nvdimm_badblocks_populate(nd_region, &pmem->bb, &res);
 }
 
