@@ -407,10 +407,13 @@ struct stmmac_desc_ops {
 extern const struct stmmac_desc_ops enh_desc_ops;
 extern const struct stmmac_desc_ops ndesc_ops;
 
+struct mac_device_info;
+
 /* Specific DMA helpers */
 struct stmmac_dma_ops {
 	/* DMA core initialization */
-	int (*reset)(void __iomem *ioaddr);
+	int (*reset)(void __iomem *ioaddr, struct mac_device_info *hw,
+		     phy_interface_t interface);
 	void (*init)(void __iomem *ioaddr, struct stmmac_dma_cfg *dma_cfg,
 		     u32 dma_tx, u32 dma_rx, int atds);
 	/* Configure the AXI Bus Mode Register */
@@ -445,12 +448,15 @@ struct stmmac_dma_ops {
 	void (*enable_tso)(void __iomem *ioaddr, bool en, u32 chan);
 };
 
-struct mac_device_info;
-
 /* Helpers to program the MAC core */
 struct stmmac_ops {
 	/* MAC core initialization */
 	void (*core_init)(struct mac_device_info *hw, int mtu);
+	/* Set port select. Called between asserting DMA reset and
+	 * waiting for the reset bit to clear.
+	 */
+	void (*set_ps)(struct mac_device_info *hw,
+		       phy_interface_t interface);
 	/* Enable and verify that the IPC module is supported */
 	int (*rx_ipc)(struct mac_device_info *hw);
 	/* Enable RX Queues */

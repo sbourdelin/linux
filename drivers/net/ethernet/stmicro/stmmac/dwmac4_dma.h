@@ -183,7 +183,8 @@
 #define DMA_CHAN0_DBG_STAT_RPS		GENMASK(11, 8)
 #define DMA_CHAN0_DBG_STAT_RPS_SHIFT	8
 
-int dwmac4_dma_reset(void __iomem *ioaddr);
+int dwmac4_dma_reset(void __iomem *ioaddr, struct mac_device_info *hw,
+		     phy_interface_t interface);
 void dwmac4_enable_dma_transmission(void __iomem *ioaddr, u32 tail_ptr);
 void dwmac4_enable_dma_irq(void __iomem *ioaddr);
 void dwmac410_enable_dma_irq(void __iomem *ioaddr);

@@ -75,6 +75,21 @@ static void dwmac1000_core_init(struct mac_device_info *hw, int mtu)
 #endif
 }
 
+static void dwmac1000_set_ps(struct mac_device_info *hw,
+			     phy_interface_t interface)
+{
+	void __iomem *ioaddr = hw->pcsr;
+	u32 value = readl(ioaddr + GMAC_CONTROL);
+
+	/* When a MII PHY is used, we must set the PS bit for the DMA
+	 * reset to succeed.
+	 */
+	if (interface == PHY_INTERFACE_MODE_MII)
+		value |= GMAC_CONTROL_PS;
+
+	writel(value, ioaddr + GMAC_CONTROL);
+}
+
 static int dwmac1000_rx_ipc_enable(struct mac_device_info *hw)
 {
 	void __iomem *ioaddr = hw->pcsr;
@@ -488,6 +503,7 @@ static void dwmac1000_debug(void __iomem *ioaddr, struct stmmac_extra_stats *x)
 
 static const struct stmmac_ops dwmac1000_ops = {
 	.core_init = dwmac1000_core_init,
+	.set_ps = dwmac1000_set_ps,
 	.rx_ipc = dwmac1000_rx_ipc_enable,
 	.dump_regs = dwmac1000_dump_regs,
 	.host_irq_status = dwmac1000_irq_status,

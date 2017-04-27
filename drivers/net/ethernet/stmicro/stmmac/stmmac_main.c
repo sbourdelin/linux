@@ -1585,7 +1585,8 @@ static int stmmac_init_dma_engine(struct stmmac_priv *priv)
 	if (priv->extend_desc && (priv->mode == STMMAC_RING_MODE))
 		atds = 1;
 
-	ret = priv->hw->dma->reset(priv->ioaddr);
+	ret = priv->hw->dma->reset(priv->ioaddr, priv->hw,
+				   priv->plat->interface);
 	if (ret) {
 		dev_err(priv->device, "Failed to reset the dma\n");
 		return ret;

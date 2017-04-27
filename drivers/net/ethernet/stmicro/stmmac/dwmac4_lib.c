@@ -14,7 +14,8 @@
 #include "dwmac4_dma.h"
 #include "dwmac4.h"
 
-int dwmac4_dma_reset(void __iomem *ioaddr)
+int dwmac4_dma_reset(void __iomem *ioaddr, struct mac_device_info *hw,
+		     phy_interface_t interface)
 {
 	u32 value = readl(ioaddr + DMA_BUS_MODE);
 	int limit;
@@ -22,6 +23,10 @@ int dwmac4_dma_reset(void __iomem *ioaddr)
 	/* DMA SW reset */
 	value |= DMA_BUS_MODE_SFT_RESET;
 	writel(value, ioaddr + DMA_BUS_MODE);
+
+	if (hw->mac->set_ps)
+		hw->mac->set_ps(hw, interface);
+
 	limit = 10;
 	while (limit--) {
 		if (!(readl(ioaddr + DMA_BUS_MODE) & DMA_BUS_MODE_SFT_RESET))

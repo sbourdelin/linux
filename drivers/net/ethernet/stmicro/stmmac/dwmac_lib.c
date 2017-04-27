@@ -23,7 +23,8 @@
 
 #define GMAC_HI_REG_AE		0x80000000
 
-int dwmac_dma_reset(void __iomem *ioaddr)
+int dwmac_dma_reset(void __iomem *ioaddr, struct mac_device_info *hw,
+		    phy_interface_t interface)
 {
 	u32 value = readl(ioaddr + DMA_BUS_MODE);
 	int err;
@@ -31,6 +32,9 @@ int dwmac_dma_reset(void __iomem *ioaddr)
 	/* DMA SW reset */
 	value |= DMA_BUS_MODE_SFT_RESET;
 	writel(value, ioaddr + DMA_BUS_MODE);
+
+	if (hw->mac->set_ps)
+		hw->mac->set_ps(hw, interface);
 
 	err = readl_poll_timeout(ioaddr + DMA_BUS_MODE, value,
 				 !(value & DMA_BUS_MODE_SFT_RESET),

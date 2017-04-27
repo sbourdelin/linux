@@ -144,6 +144,7 @@ void dwmac_dma_stop_tx(void __iomem *ioaddr);
 void dwmac_dma_start_rx(void __iomem *ioaddr);
 void dwmac_dma_stop_rx(void __iomem *ioaddr);
 int dwmac_dma_interrupt(void __iomem *ioaddr, struct stmmac_extra_stats *x);
-int dwmac_dma_reset(void __iomem *ioaddr);
+int dwmac_dma_reset(void __iomem *ioaddr, struct mac_device_info *hw,
+		    phy_interface_t interface);
 
 #endif /* __DWMAC_DMA_H__ */
