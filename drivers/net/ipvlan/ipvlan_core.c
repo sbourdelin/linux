@@ -289,6 +289,8 @@ void ipvlan_process_multicast(struct work_struct *work)
 		ethh = eth_hdr(skb);
 		mac_hash = ipvlan_mac_hash(ethh->h_dest);
 
+		ipvlan_skb_crossing_ns(skb, NULL);
+
 		if (ether_addr_equal(ethh->h_dest, port->dev->broadcast))
 			pkt_type = PACKET_BROADCAST;
 		else
@@ -433,7 +435,8 @@ out:
 	return ret;
 }
 
-static int ipvlan_process_l3_outbound(struct sk_buff *skb)
+static int ipvlan_process_l3_outbound(struct sk_buff *skb,
+				      struct net_device *dev)
 {
 	struct ethhdr *ethh = eth_hdr(skb);
 	int ret = NET_XMIT_DROP;
@@ -445,6 +448,8 @@ static int ipvlan_process_l3_outbound(struct sk_buff *skb)
 		kfree_skb(skb);
 		goto out;
 	}
+
+	ipvlan_skb_crossing_ns(skb, dev);
 
 	/* The ipvlan is a pseudo-L2 device, so the packets that we receive
 	 * will have L2; which need to discarded and processed further
@@ -478,8 +483,14 @@ static int ipvlan_xmit_mode_l3(struct sk_buff *skb, struct net_device *dev)
 	if (addr)
 		return ipvlan_rcv_int_frame(addr, &skb);
 
-	ipvlan_skb_crossing_ns(skb, ipvlan->phy_dev);
-	return ipvlan_process_l3_outbound(skb);
+	return ipvlan_process_l3_outbound(skb, ipvlan->phy_dev);
+}
+
+static inline int ipvlan_process_l2_outbound(struct sk_buff *skb,
+					     struct net_device *dev)
+{
+	ipvlan_skb_crossing_ns(skb, dev);
+	return dev_queue_xmit(skb);
 }
 
 static int ipvlan_xmit_mode_l2(struct sk_buff *skb, struct net_device *dev)
@@ -505,13 +516,11 @@ static int ipvlan_xmit_mode_l2(struct sk_buff *skb, struct net_device *dev)
 		return dev_forward_skb(ipvlan->phy_dev, skb);
 
 	} else if (is_multicast_ether_addr(ethh->h_dest)) {
-		ipvlan_skb_crossing_ns(skb, NULL);
 		ipvlan_multicast_enqueue(ipvlan->port, skb, true);
 		return NET_XMIT_SUCCESS;
 	}
 
-	ipvlan_skb_crossing_ns(skb, ipvlan->phy_dev);
-	return dev_queue_xmit(skb);
+	return ipvlan_process_l2_outbound(skb, ipvlan->phy_dev);
 }
 
 int ipvlan_queue_xmit(struct sk_buff *skb, struct net_device *dev)
@@ -587,10 +596,8 @@ static rx_handler_result_t ipvlan_handle_mode_l2(struct sk_buff **pskb,
 			 * when work-queue processes this frame. This is
 			 * achieved by returning RX_HANDLER_PASS.
 			 */
-			if (nskb) {
-				ipvlan_skb_crossing_ns(nskb, NULL);
+			if (nskb)
 				ipvlan_multicast_enqueue(port, nskb, false);
-			}
 		}
 	} else {
 		struct ipvl_addr *addr;
