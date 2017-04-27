@@ -97,6 +97,16 @@ static void __put_compound_page(struct page *page)
 
 void __put_page(struct page *page)
 {
+	if (is_zone_device_page(page)) {
+		put_dev_pagemap(page->pgmap);
+
+		/*
+		 * The page belong to device, do not return it to
+		 * page allocator.
+		 */
+		return;
+	}
+
 	if (unlikely(PageCompound(page)))
 		__put_compound_page(page);
 	else
