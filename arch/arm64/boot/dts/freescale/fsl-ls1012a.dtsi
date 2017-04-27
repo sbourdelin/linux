@@ -127,6 +127,14 @@
 			clocks = <&sysclk>;
 		};
 
+		ftm0: ftm0@29d0000 {
+			compatible = "fsl,ftm-alarm";
+			reg = <0x0 0x29d0000 0x0 0x10000>;
+			interrupts = <0 86 0x4>;
+			big-endian;
+			fsl,rcpm-wakeup = <&rcpm 0x00020000>;
+		};
+
 		i2c0: i2c@2180000 {
 			compatible = "fsl,vf610-i2c";
 			#address-cells = <1>;
