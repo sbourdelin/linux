@@ -423,16 +423,16 @@ nct6683_create_attr_group(struct device *dev,
 		return ERR_PTR(-EINVAL);
 
 	group = devm_kzalloc(dev, sizeof(*group), GFP_KERNEL);
-	if (group == NULL)
+	if (!group)
 		return ERR_PTR(-ENOMEM);
 
 	attrs = devm_kcalloc(dev, repeat * count + 1, sizeof(*attrs),
 			     GFP_KERNEL);
-	if (attrs == NULL)
+	if (!attrs)
 		return ERR_PTR(-ENOMEM);
 
 	su = devm_kcalloc(dev, repeat * count, sizeof(*su), GFP_KERNEL);
-	if (su == NULL)
+	if (!su)
 		return ERR_PTR(-ENOMEM);
 
 	group->attrs = attrs;
@@ -440,7 +440,7 @@ nct6683_create_attr_group(struct device *dev,
 
 	for (i = 0; i < repeat; i++) {
 		t = tg->templates;
-		for (j = 0; *t != NULL; j++) {
+		for (j = 0; *t; j++) {
 			snprintf(su->name, sizeof(su->name),
 				 (*t)->dev_attr.attr.name, tg->base + i);
 			if ((*t)->s2) {
@@ -1179,7 +1179,7 @@ static void nct6683_setup_sensors(struct nct6683_data *data)
 		if (reg >= NUM_MON_LABELS)
 			continue;
 		/* Skip if disabled or reserved */
-		if (nct6683_mon_label[reg] == NULL)
+		if (!nct6683_mon_label[reg])
 			continue;
 		if (reg < MON_VOLTAGE_START) {
 			data->temp_index[data->temp_num] = i;
