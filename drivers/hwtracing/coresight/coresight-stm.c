@@ -799,7 +799,7 @@ static int stm_probe(struct amba_device *adev, const struct amba_id *id)
 	struct stm_drvdata *drvdata;
 	struct resource *res = &adev->res;
 	struct resource ch_res;
-	size_t res_size, bitmap_size;
+	size_t res_size;
 	struct coresight_desc desc = { 0 };
 	struct device_node *np = adev->dev.of_node;
 
@@ -848,9 +848,9 @@ static int stm_probe(struct amba_device *adev, const struct amba_id *id)
 		res_size = min((resource_size_t)(drvdata->numsp *
 				 BYTES_PER_CHANNEL), resource_size(res));
 	}
-	bitmap_size = BITS_TO_LONGS(drvdata->numsp) * sizeof(long);
 
-	guaranteed = devm_kzalloc(dev, bitmap_size, GFP_KERNEL);
+	guaranteed = devm_kcalloc(dev, BITS_TO_LONGS(drvdata->numsp),
+				  sizeof(long), GFP_KERNEL);
 	if (!guaranteed)
 		return -ENOMEM;
 	drvdata->chs.guaranteed = guaranteed;
