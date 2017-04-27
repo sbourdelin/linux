@@ -346,6 +346,8 @@ static int pseries_remove_memblock(unsigned long base, unsigned int memblock_siz
 
 	if (!pfn_valid(start_pfn))
 		goto out;
+	if (memblock_is_reserved(base))
+		return -EINVAL;
 
 	block_sz = pseries_memory_block_size();
 	sections_per_block = block_sz / MIN_MEMORY_BLOCK_SIZE;
@@ -388,8 +390,7 @@ static int pseries_remove_mem_node(struct device_node *np)
 	base = be64_to_cpu(*(unsigned long *)regs);
 	lmb_size = be32_to_cpu(regs[3]);
 
-	pseries_remove_memblock(base, lmb_size);
-	return 0;
+	return pseries_remove_memblock(base, lmb_size);
 }
 
 static bool lmb_is_removable(struct of_drconf_cell *lmb)
