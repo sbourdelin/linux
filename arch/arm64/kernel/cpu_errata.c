@@ -190,9 +190,20 @@ void verify_local_cpu_errata_workarounds(void)
 		}
 }
 
-void update_cpu_errata_workarounds(void)
+/*
+ * Secondary CPUs are booted with the waker holding the
+ * CPU hotplug lock, hence we don't need to lock it here again.
+ */
+void update_secondary_cpu_errata_workarounds(void)
 {
 	update_cpu_capabilities(arm64_errata, "enabling workaround for");
+}
+
+void update_boot_cpu_errata_workarounds(void)
+{
+	get_online_cpus();
+	update_cpu_capabilities(arm64_errata, "enabling workaround for");
+	put_online_cpus();
 }
 
 void __init enable_errata_workarounds(void)
