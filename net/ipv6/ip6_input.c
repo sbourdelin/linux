@@ -165,6 +165,14 @@ int ipv6_rcv(struct sk_buff *skb, struct net_device *dev, struct packet_type *pt
 	    IPV6_ADDR_MC_SCOPE(&hdr->daddr) == 0)
 		goto err;
 
+	/* RFC4291 2.7
+	 * Routers must not forward any multicast packets beyond of the scope
+	 * indicated by the scop field in the destination multicast address.
+	*/
+	if (ipv6_addr_is_multicast(&hdr->daddr) &&
+	    IPV6_ADDR_MC_SCOPE(&hdr->daddr) != IPV6_ADDR_MC_SCOPE(&hdr->saddr))
+	        goto err;
+
 	/*
 	 * RFC4291 2.7
 	 * Multicast addresses must not be used as source addresses in IPv6
