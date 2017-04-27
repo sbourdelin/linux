@@ -21,6 +21,7 @@
 #include <linux/export.h>
 #include <linux/sched/task.h>
 #include <linux/sched/signal.h>
+#include <uapi/linux/nsfs.h>
 
 struct pid_cache {
 	int nr_ids;
@@ -427,6 +428,40 @@ static struct ns_common *pidns_get_parent(struct ns_common *ns)
 
 	return &get_pid_ns(pid_ns)->ns;
 }
+
+#ifdef CONFIG_CHECKPOINT_RESTORE
+long pidns_set_last_pid_vec(struct ns_common *ns,
+			    struct ns_ioc_pid_vec __user *vec)
+{
+	struct pid_namespace *pid_ns = to_pid_ns(ns);
+	pid_t pid, __user *pid_ptr;
+	u32 nr;
+
+	if (get_user(nr, &vec->nr))
+		return -EFAULT;
+	if (nr > 32 || nr < 1)
+		return -EINVAL;
+
+	pid_ptr = &vec->pid[0];
+	do {
+		if (!ns_capable(pid_ns->user_ns, CAP_SYS_ADMIN))
+			return -EPERM;
+
+		if (get_user(pid, pid_ptr))
+			return -EFAULT;
+		if (pid < 0 || pid > pid_max)
+			return -EINVAL;
+
+		/* Write directly: see the comment in pid_ns_ctl_handler() */
+		pid_ns->last_pid = pid;
+
+		pid_ns = pid_ns->parent;
+		pid_ptr++;
+	} while (--nr > 0 && pid_ns);
+
+	return nr ? -EINVAL : 0;
+}
+#endif	/* CONFIG_CHECKPOINT_RESTORE */
 
 static struct user_namespace *pidns_owner(struct ns_common *ns)
 {
