@@ -41,6 +41,8 @@ enum gpiod_flags {
 			  GPIOD_FLAGS_BIT_DIR_VAL,
 };
 
+struct gpiod_lookup_table;
+
 #ifdef CONFIG_GPIOLIB
 
 /* Return the number of GPIOs associated with a device / function */
@@ -143,6 +145,9 @@ struct gpio_desc *devm_fwnode_get_index_gpiod_from_child(struct device *dev,
 						struct fwnode_handle *child,
 						enum gpiod_flags flags,
 						const char *label);
+
+void gpiod_add_lookup_table(struct gpiod_lookup_table *table);
+void gpiod_remove_lookup_table(struct gpiod_lookup_table *table);
 
 #else /* CONFIG_GPIOLIB */
 
@@ -433,6 +438,14 @@ struct gpio_desc *devm_fwnode_get_index_gpiod_from_child(struct device *dev,
 						const char *label)
 {
 	return ERR_PTR(-ENOSYS);
+}
+
+static inline void gpiod_add_lookup_table(struct gpiod_lookup_table *table)
+{
+}
+
+static inline void gpiod_remove_lookup_table(struct gpiod_lookup_table *table)
+{
 }
 
 #endif /* CONFIG_GPIOLIB */
