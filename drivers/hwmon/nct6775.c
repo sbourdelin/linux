@@ -1070,16 +1070,16 @@ nct6775_create_attr_group(struct device *dev,
 		return ERR_PTR(-EINVAL);
 
 	group = devm_kzalloc(dev, sizeof(*group), GFP_KERNEL);
-	if (group == NULL)
+	if (!group)
 		return ERR_PTR(-ENOMEM);
 
 	attrs = devm_kcalloc(dev, repeat * count + 1, sizeof(*attrs),
 			     GFP_KERNEL);
-	if (attrs == NULL)
+	if (!attrs)
 		return ERR_PTR(-ENOMEM);
 
 	su = devm_kcalloc(dev, repeat * count, sizeof(*su), GFP_KERNEL);
-	if (su == NULL)
+	if (!su)
 		return ERR_PTR(-ENOMEM);
 
 	group->attrs = attrs;
@@ -1087,7 +1087,7 @@ nct6775_create_attr_group(struct device *dev,
 
 	for (i = 0; i < repeat; i++) {
 		t = tg->templates;
-		while (*t != NULL) {
+		while (*t) {
 			snprintf(su->name, sizeof(su->name),
 				 (*t)->dev_attr.attr.name, tg->base + i);
 			if ((*t)->s2) {
@@ -3000,11 +3000,11 @@ static umode_t nct6775_pwm_is_visible(struct kobject *kobj,
 	if ((nr >= 14 && nr <= 18) || nr == 21)   /* weight */
 		if (!data->REG_WEIGHT_TEMP_SEL[pwm])
 			return 0;
-	if (nr == 19 && data->REG_PWM[3] == NULL) /* pwm_max */
+	if (nr == 19 && !data->REG_PWM[3]) /* pwm_max */
 		return 0;
-	if (nr == 20 && data->REG_PWM[4] == NULL) /* pwm_step */
+	if (nr == 20 && !data->REG_PWM[4]) /* pwm_step */
 		return 0;
-	if (nr == 21 && data->REG_PWM[6] == NULL) /* weight_duty_base */
+	if (nr == 21 && !data->REG_PWM[6]) /* weight_duty_base */
 		return 0;
 
 	if (nr >= 22 && nr <= 35) {		/* auto point */
