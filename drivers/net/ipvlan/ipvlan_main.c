@@ -378,6 +378,7 @@ static const struct net_device_ops ipvlan_netdev_ops = {
 	.ndo_start_xmit		= ipvlan_start_xmit,
 	.ndo_fix_features	= ipvlan_fix_features,
 	.ndo_change_rx_flags	= ipvlan_change_rx_flags,
+	.ndo_set_mac_address	= eth_mac_addr,
 	.ndo_set_rx_mode	= ipvlan_set_multicast_mac_filter,
 	.ndo_get_stats64	= ipvlan_get_stats64,
 	.ndo_vlan_rx_add_vid	= ipvlan_vlan_rx_add_vid,
@@ -392,9 +393,10 @@ static int ipvlan_hard_header(struct sk_buff *skb, struct net_device *dev,
 	const struct ipvl_dev *ipvlan = netdev_priv(dev);
 	struct net_device *phy_dev = ipvlan->phy_dev;
 
-	/* TODO Probably use a different field than dev_addr so that the
-	 * mac-address on the virtual device is portable and can be carried
-	 * while the packets use the mac-addr on the physical device.
+	/* This driver uses (almost exclusively) L3 addresses for
+	 * routing/switching. Use the actual slave's MAC address,
+	 * but overwrite it later during the packet processing for
+	 * frames leaving from master
 	 */
 	return dev_hard_header(skb, phy_dev, type, daddr,
 			       saddr ? : dev->dev_addr, len);
@@ -559,11 +561,8 @@ int ipvlan_link_new(struct net *src_net, struct net_device *dev,
 	/* Increment id-base to the next slot for the future assignment */
 	port->dev_id_start = err + 1;
 
-	/* TODO Probably put random address here to be presented to the
-	 * world but keep using the physical-dev address for the outgoing
-	 * packets.
-	 */
-	memcpy(dev->dev_addr, phy_dev->dev_addr, ETH_ALEN);
+	/* TODO: consider storing the original MAC address in dev->perm_addr */
+	eth_hw_addr_random(dev);
 
 	dev->priv_flags |= IFF_IPVLAN_SLAVE;
 
@@ -619,7 +618,8 @@ void ipvlan_link_setup(struct net_device *dev)
 	ether_setup(dev);
 
 	dev->priv_flags &= ~(IFF_XMIT_DST_RELEASE | IFF_TX_SKB_SHARING);
-	dev->priv_flags |= IFF_UNICAST_FLT | IFF_NO_QUEUE;
+	dev->priv_flags |= IFF_UNICAST_FLT | IFF_NO_QUEUE
+			   | IFF_LIVE_ADDR_CHANGE;
 	dev->netdev_ops = &ipvlan_netdev_ops;
 	dev->destructor = free_netdev;
 	dev->header_ops = &ipvlan_header_ops;

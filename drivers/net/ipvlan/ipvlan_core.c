@@ -215,6 +215,89 @@ static void ipvlan_skb_crossing_ns(struct sk_buff *skb, struct net_device *dev)
 		skb->dev = dev;
 }
 
+static inline struct nd_opt_hdr *ipvlan_icmp6_nd_opts(struct icmp6hdr *icmph)
+{
+	return (struct nd_opt_hdr *)((struct nd_msg *)icmph)->opt;
+}
+
+static inline struct nd_opt_hdr *ipvlan_icmp6_rs_opts(struct icmp6hdr *icmph)
+{
+	return (struct nd_opt_hdr *)((struct rs_msg *)icmph)->opt;
+}
+
+static void ipvlan_proxy_l2_update_icmp6(const struct net_device *master,
+					 struct sk_buff *skb,
+					 struct nd_opt_hdr *nd_opt,
+					 u8 opt_type)
+{
+	u32 opts_len = skb_tail_pointer(skb) - (u8 *)nd_opt;
+
+	while (opts_len) {
+		u32 opt_len = nd_opt->nd_opt_len << 3;
+
+		if (nd_opt->nd_opt_type == opt_type) {
+			struct ipv6hdr *ip6h = ipv6_hdr(skb);
+			struct icmp6hdr *icmph = icmp6_hdr(skb);
+			u32 len = ntohs(ip6h->payload_len);
+
+			memcpy(nd_opt + 1, master->dev_addr, master->addr_len);
+			icmph->icmp6_cksum = 0;
+			icmph->icmp6_cksum =
+				csum_ipv6_magic(&ip6h->saddr,
+						&ip6h->daddr, len,
+						IPPROTO_ICMPV6,
+						csum_partial(icmph, len, 0));
+			return;
+		}
+
+		opts_len -= opt_len;
+		nd_opt = ((void *)nd_opt) + opt_len;
+	}
+}
+
+static void ipvlan_proxy_l2_outbound(struct sk_buff *skb,
+				     const struct net_device *master)
+{
+	/* masquerade the source MAC address for every outgoing frame */
+	memcpy(eth_hdr(skb)->h_source, master->dev_addr, master->addr_len);
+
+	/* ARP and some NDISC packets need additional treatment */
+	if (skb->protocol == htons(ETH_P_IPV6)) {
+		struct ipv6hdr *ip6h = ipv6_hdr(skb);
+		struct icmp6hdr *icmph = icmp6_hdr(skb);
+		struct nd_opt_hdr *nd_opt;
+		u8 opt_type;
+
+		if (likely(ip6h->nexthdr != NEXTHDR_ICMP))
+			return;
+
+		switch (icmph->icmp6_type) {
+		case NDISC_NEIGHBOUR_SOLICITATION: {
+			nd_opt = ipvlan_icmp6_nd_opts(icmph);
+			opt_type = ND_OPT_SOURCE_LL_ADDR;
+			break;
+		}
+		case NDISC_NEIGHBOUR_ADVERTISEMENT: {
+			nd_opt = ipvlan_icmp6_nd_opts(icmph);
+			opt_type = ND_OPT_TARGET_LL_ADDR;
+			break;
+		}
+		case NDISC_ROUTER_SOLICITATION: {
+			nd_opt = ipvlan_icmp6_rs_opts(icmph);
+			opt_type = ND_OPT_SOURCE_LL_ADDR;
+			break;
+		}
+		default:
+			return;
+		}
+
+		ipvlan_proxy_l2_update_icmp6(master, skb, nd_opt, opt_type);
+
+	} else if (unlikely(skb->protocol == htons(ETH_P_ARP))) {
+		memcpy(arp_hdr(skb) + 1, master->dev_addr, master->addr_len);
+	}
+}
+
 static void ipvlan_dispatch_multicast(struct ipvl_port *port,
 				      struct sk_buff *skb, u8 pkt_type,
 				      unsigned int mac_hash)
@@ -258,6 +341,7 @@ static void ipvlan_dispatch_multicast(struct ipvl_port *port,
 		/* If the packet originated here, send it out. */
 		skb->dev = port->dev;
 		skb->pkt_type = pkt_type;
+		ipvlan_proxy_l2_outbound(skb, port->dev);
 		dev_queue_xmit(skb);
 	} else {
 		if (consumed)
@@ -489,6 +573,7 @@ static int ipvlan_xmit_mode_l3(struct sk_buff *skb, struct net_device *dev)
 static inline int ipvlan_process_l2_outbound(struct sk_buff *skb,
 					     struct net_device *dev)
 {
+	ipvlan_proxy_l2_outbound(skb, dev);
 	ipvlan_skb_crossing_ns(skb, dev);
 	return dev_queue_xmit(skb);
 }
@@ -499,26 +584,26 @@ static int ipvlan_xmit_mode_l2(struct sk_buff *skb, struct net_device *dev)
 	struct ethhdr *ethh = eth_hdr(skb);
 	struct ipvl_addr *addr;
 
-	if (ether_addr_equal(ethh->h_dest, ethh->h_source)) {
-		addr = ipvlan_get_slave_addr_dst(skb, ipvlan->port);
-		if (addr)
-			return ipvlan_rcv_int_frame(addr, &skb);
+	if (is_multicast_ether_addr(ethh->h_dest)) {
+		ipvlan_multicast_enqueue(ipvlan->port, skb, true);
+		return NET_XMIT_SUCCESS;
+	}
 
+	if (ether_addr_equal(ethh->h_dest, ipvlan->phy_dev->dev_addr)) {
 		skb = skb_share_check(skb, GFP_ATOMIC);
 		if (unlikely(!skb))
 			return NET_XMIT_DROP;
 
-		/* Packet definitely does not belong to any of the
-		 * virtual devices, but the dest is local. So forward
-		 * the skb for the main-dev. At the RX side we just return
-		 * RX_PASS for it to be processed further on the stack.
+		/* Forward the skb for the master device. At the RX side we
+		 * just return RX_HANDLER_PASS for it to be processed further
+		 * on the stack.
 		 */
 		return dev_forward_skb(ipvlan->phy_dev, skb);
-
-	} else if (is_multicast_ether_addr(ethh->h_dest)) {
-		ipvlan_multicast_enqueue(ipvlan->port, skb, true);
-		return NET_XMIT_SUCCESS;
 	}
+
+	addr = ipvlan_get_slave_addr_dst(skb, ipvlan->port);
+	if (addr)
+		return ipvlan_rcv_int_frame(addr, &skb);
 
 	return ipvlan_process_l2_outbound(skb, ipvlan->phy_dev);
 }
@@ -562,6 +647,10 @@ static int ipvlan_rcv_ext_frame(struct ipvl_addr *addr, struct sk_buff *skb)
 	struct net_device *dev = ipvlan->dev;
 	unsigned int len = skb->len + ETH_HLEN;
 
+	/* NOTE: although not necessary restore the actual destination
+	 * address; this is also what traffic sniffers will display.
+	 */
+	memcpy(eth_hdr(skb)->h_dest, dev->dev_addr, dev->addr_len);
 	ipvlan_skb_crossing_ns(skb, dev);
 	ipvlan_count_rx(ipvlan, len, true, false);
 

@@ -32,7 +32,7 @@
 #include <net/l3mdev.h>
 
 #define IPVLAN_DRV	"ipvlan"
-#define IPV_DRV_VER	"0.1"
+#define IPV_DRV_VER	"0.2"
 
 #define IPVLAN_HASH_SIZE	(1 << BITS_PER_BYTE)
 #define IPVLAN_HASH_MASK	(IPVLAN_HASH_SIZE - 1)
