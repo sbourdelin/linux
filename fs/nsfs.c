@@ -6,6 +6,7 @@
 #include <linux/ktime.h>
 #include <linux/seq_file.h>
 #include <linux/user_namespace.h>
+#include <linux/pid_namespace.h>
 #include <linux/nsfs.h>
 #include <linux/uaccess.h>
 
@@ -186,6 +187,10 @@ static long ns_ioctl(struct file *filp, unsigned int ioctl,
 		argp = (uid_t __user *) arg;
 		uid = from_kuid_munged(current_user_ns(), user_ns->owner);
 		return put_user(uid, argp);
+	case NS_SET_LAST_PID_VEC:
+		if (ns->ops->type != CLONE_NEWPID)
+			return -EINVAL;
+		return pidns_set_last_pid_vec(ns, (void *)arg);
 	default:
 		return -ENOTTY;
 	}

@@ -9,6 +9,7 @@
 #include <linux/nsproxy.h>
 #include <linux/kref.h>
 #include <linux/ns_common.h>
+#include <uapi/linux/nsfs.h>
 
 struct pidmap {
        atomic_t nr_free;
@@ -102,6 +103,17 @@ static inline int reboot_pid_ns(struct pid_namespace *pid_ns, int cmd)
 	return 0;
 }
 #endif /* CONFIG_PID_NS */
+
+#if defined(CONFIG_PID_NS) && defined(CONFIG_CHECKPOINT_RESTORE)
+extern long pidns_set_last_pid_vec(struct ns_common *ns,
+				   struct ns_ioc_pid_vec __user *vec);
+#else /* CONFIG_PID_NS && CONFIG_CHECKPOINT_RESTORE */
+static inline long pidns_set_last_pid_vec(struct ns_common *ns,
+					  struct ns_ioc_pid_vec __user *vec)
+{
+	return -ENOTTY;
+}
+#endif /* CONFIG_PID_NS && CONFIG_CHECKPOINT_RESTORE */
 
 extern struct pid_namespace *task_active_pid_ns(struct task_struct *tsk);
 void pidhash_init(void);

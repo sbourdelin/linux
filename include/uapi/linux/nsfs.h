@@ -14,5 +14,12 @@
 #define NS_GET_NSTYPE		_IO(NSIO, 0x3)
 /* Get owner UID (in the caller's user namespace) for a user namespace */
 #define NS_GET_OWNER_UID	_IO(NSIO, 0x4)
+/* Set a vector of ns_last_pid for a pid namespace stack */
+#define NS_SET_LAST_PID_VEC	_IO(NSIO, 0x5)
+
+struct ns_ioc_pid_vec {
+	unsigned int nr;
+	pid_t pid[0];
+};
 
 #endif /* __LINUX_NSFS_H */
