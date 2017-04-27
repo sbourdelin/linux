@@ -1538,8 +1538,10 @@ static int bcm_release(struct socket *sock)
 	}
 
 	/* remove procfs entry */
+#ifdef CONFIG_PROC_FS
 	if (net->can.bcmproc_dir && bo->bcm_proc_read)
 		remove_proc_entry(bo->procname, net->can.bcmproc_dir);
+#endif
 
 	/* remove device reference */
 	if (bo->bound) {
@@ -1597,7 +1599,7 @@ static int bcm_connect(struct socket *sock, struct sockaddr *uaddr, int len,
 		/* no interface reference for ifindex = 0 ('any' CAN device) */
 		bo->ifindex = 0;
 	}
-
+#ifdef CONFIG_PROC_FS
 	if (net->can.bcmproc_dir) {
 		/* unique socket address as filename */
 		sprintf(bo->procname, "%lu", sock_i_ino(sk));
@@ -1609,6 +1611,7 @@ static int bcm_connect(struct socket *sock, struct sockaddr *uaddr, int len,
 			goto fail;
 		}
 	}
+#endif
 
 	bo->bound = 1;
 
@@ -1691,22 +1694,23 @@ static const struct can_proto bcm_can_proto = {
 
 static int canbcm_pernet_init(struct net *net)
 {
+#ifdef CONFIG_PROC_FS
 	/* create /proc/net/can-bcm directory */
-	if (IS_ENABLED(CONFIG_PROC_FS)) {
-		net->can.bcmproc_dir =
-			proc_net_mkdir(net, "can-bcm", net->proc_net);
-	}
+	net->can.bcmproc_dir = proc_net_mkdir(net, "can-bcm", net->proc_net);
+#endif
 
 	return 0;
 }
 
 static void canbcm_pernet_exit(struct net *net)
 {
+#ifdef CONFIG_PROC_FS
 	/* remove /proc/net/can-bcm directory */
 	if (IS_ENABLED(CONFIG_PROC_FS)) {
 		if (net->can.bcmproc_dir)
 			remove_proc_entry("can-bcm", net->proc_net);
 	}
+#endif
 }
 
 static struct pernet_operations canbcm_pernet_ops __read_mostly = {
