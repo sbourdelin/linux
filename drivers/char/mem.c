@@ -55,7 +55,7 @@ static inline int valid_phys_addr_range(phys_addr_t addr, size_t count)
 
 static inline int valid_mmap_phys_addr_range(unsigned long pfn, size_t size)
 {
-	return 1;
+	return (pfn << PAGE_SHIFT) + size <= __pa(high_memory);
 }
 #endif
 
