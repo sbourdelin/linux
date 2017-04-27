@@ -179,6 +179,7 @@ long nvdimm_clear_poison(struct device *dev, phys_addr_t phys,
 	struct nvdimm_bus_descriptor *nd_desc;
 	struct nd_cmd_clear_error clear_err;
 	struct nd_cmd_ars_cap ars_cap;
+	struct resource res;
 	u32 clear_err_unit, mask;
 	int cmd_rc, rc;
 
@@ -221,6 +222,14 @@ long nvdimm_clear_poison(struct device *dev, phys_addr_t phys,
 
 	if (clear_err.cleared > 0)
 		nvdimm_forget_poison(nvdimm_bus, phys, clear_err.cleared);
+
+	if (clear_err.cleared > 0 && clear_err.cleared / 512) {
+		nvdimm_bus_lock(&nvdimm_bus->dev);
+		res.start = phys;
+		res.end = phys + clear_err.cleared - 1;
+		__nvdimm_bus_badblocks_clear(nvdimm_bus, &res);
+		nvdimm_bus_unlock(&nvdimm_bus->dev);
+	}
 
 	return clear_err.cleared;
 }
