@@ -9,7 +9,7 @@
 
 #include "ipvlan.h"
 
-static u32 ipvl_nf_hook_refcnt = 0;
+static u32 ipvl_nf_hook_refcnt;
 
 static struct nf_hook_ops ipvl_nfops[] __read_mostly = {
 	{
@@ -73,8 +73,9 @@ static int ipvlan_set_port_mode(struct ipvl_port *port, u16 nval)
 			if (!err) {
 				mdev->l3mdev_ops = &ipvl_l3mdev_ops;
 				mdev->priv_flags |= IFF_L3MDEV_MASTER;
-			} else
+			} else {
 				return err;
+			}
 		} else if (port->mode == IPVLAN_MODE_L3S) {
 			/* Old mode was L3S */
 			mdev->priv_flags &= ~IFF_L3MDEV_MASTER;
@@ -107,7 +108,7 @@ static int ipvlan_port_create(struct net_device *dev)
 		return -EBUSY;
 	}
 
-	port = kzalloc(sizeof(struct ipvl_port), GFP_KERNEL);
+	port = kzalloc(sizeof(*port), GFP_KERNEL);
 	if (!port)
 		return -ENOMEM;
 
@@ -163,7 +164,7 @@ static void ipvlan_port_destroy(struct net_device *dev)
 	 NETIF_F_HW_VLAN_CTAG_FILTER | NETIF_F_HW_VLAN_STAG_FILTER)
 
 #define IPVLAN_STATE_MASK \
-	((1<<__LINK_STATE_NOCARRIER) | (1<<__LINK_STATE_DORMANT))
+	((1 << __LINK_STATE_NOCARRIER) | (1 << __LINK_STATE_DORMANT))
 
 static int ipvlan_init(struct net_device *dev)
 {
@@ -274,7 +275,7 @@ static void ipvlan_change_rx_flags(struct net_device *dev, int change)
 	struct net_device *phy_dev = ipvlan->phy_dev;
 
 	if (change & IFF_ALLMULTI)
-		dev_set_allmulti(phy_dev, dev->flags & IFF_ALLMULTI? 1 : -1);
+		dev_set_allmulti(phy_dev, (dev->flags & IFF_ALLMULTI) ? 1 : -1);
 }
 
 static void ipvlan_set_multicast_mac_filter(struct net_device *dev)
@@ -319,7 +320,7 @@ static void ipvlan_get_stats64(struct net_device *dev,
 		for_each_possible_cpu(idx) {
 			pcptr = per_cpu_ptr(ipvlan->pcpu_stats, idx);
 			do {
-				strt= u64_stats_fetch_begin_irq(&pcptr->syncp);
+				strt = u64_stats_fetch_begin_irq(&pcptr->syncp);
 				rx_pkts = pcptr->rx_pkts;
 				rx_bytes = pcptr->rx_bytes;
 				rx_mcast = pcptr->rx_mcast;
@@ -386,7 +387,7 @@ static const struct net_device_ops ipvlan_netdev_ops = {
 
 static int ipvlan_hard_header(struct sk_buff *skb, struct net_device *dev,
 			      unsigned short type, const void *daddr,
-			      const void *saddr, unsigned len)
+			      const void *saddr, unsigned int len)
 {
 	const struct ipvl_dev *ipvlan = netdev_priv(dev);
 	struct net_device *phy_dev = ipvlan->phy_dev;
@@ -400,7 +401,7 @@ static int ipvlan_hard_header(struct sk_buff *skb, struct net_device *dev,
 }
 
 static const struct header_ops ipvlan_header_ops = {
-	.create  	= ipvlan_hard_header,
+	.create		= ipvlan_hard_header,
 	.parse		= eth_header_parse,
 	.cache		= eth_header_cache,
 	.cache_update	= eth_header_cache_update,
@@ -571,13 +572,12 @@ int ipvlan_link_new(struct net *src_net, struct net_device *dev,
 		goto remove_ida;
 
 	err = netdev_upper_dev_link(phy_dev, dev);
-	if (err) {
+	if (err)
 		goto unregister_netdev;
-	}
+
 	err = ipvlan_set_port_mode(port, mode);
-	if (err) {
+	if (err)
 		goto unlink_netdev;
-	}
 
 	list_add_tail_rcu(&ipvlan->pnode, &port->ipvlans);
 	netif_stacked_transfer_operstate(phy_dev, dev);
@@ -627,8 +627,7 @@ void ipvlan_link_setup(struct net_device *dev)
 }
 EXPORT_SYMBOL_GPL(ipvlan_link_setup);
 
-static const struct nla_policy ipvlan_nl_policy[IFLA_IPVLAN_MAX + 1] =
-{
+static const struct nla_policy ipvlan_nl_policy[IFLA_IPVLAN_MAX + 1] = {
 	[IFLA_IPVLAN_MODE] = { .type = NLA_U16 },
 };
 
@@ -709,7 +708,7 @@ static int ipvlan_add_addr(struct ipvl_dev *ipvlan, void *iaddr, bool is_v6)
 {
 	struct ipvl_addr *addr;
 
-	addr = kzalloc(sizeof(struct ipvl_addr), GFP_ATOMIC);
+	addr = kzalloc(sizeof(*addr), GFP_ATOMIC);
 	if (!addr)
 		return -ENOMEM;
 
@@ -743,8 +742,6 @@ static void ipvlan_del_addr(struct ipvl_dev *ipvlan, void *iaddr, bool is_v6)
 	ipvlan_ht_addr_del(addr);
 	list_del(&addr->anode);
 	kfree_rcu(addr, rcu);
-
-	return;
 }
 
 static int ipvlan_add_addr6(struct ipvl_dev *ipvlan, struct in6_addr *ip6_addr)

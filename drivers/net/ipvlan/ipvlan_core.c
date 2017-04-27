@@ -17,7 +17,7 @@ void ipvlan_init_secret(void)
 }
 
 void ipvlan_count_rx(const struct ipvl_dev *ipvlan,
-			    unsigned int len, bool success, bool mcast)
+		     unsigned int len, bool success, bool mcast)
 {
 	if (likely(success)) {
 		struct ipvl_pcpu_stats *pcptr;
@@ -95,9 +95,9 @@ struct ipvl_addr *ipvlan_find_addr(const struct ipvl_dev *ipvlan,
 
 	list_for_each_entry(addr, &ipvlan->addrs, anode) {
 		if ((is_v6 && addr->atype == IPVL_IPV6 &&
-		    ipv6_addr_equal(&addr->ip6addr, iaddr)) ||
+		     ipv6_addr_equal(&addr->ip6addr, iaddr)) ||
 		    (!is_v6 && addr->atype == IPVL_IPV4 &&
-		    addr->ip4addr.s_addr == ((struct in_addr *)iaddr)->s_addr))
+		     addr->ip4addr.s_addr == ((struct in_addr *)iaddr)->s_addr))
 			return addr;
 	}
 	return NULL;
@@ -179,7 +179,7 @@ static void *ipvlan_get_L3_hdr(struct sk_buff *skb, int *type)
 
 unsigned int ipvlan_mac_hash(const unsigned char *addr)
 {
-	u32 hash = jhash_1word(__get_unaligned_cpu32(addr+2),
+	u32 hash = jhash_1word(__get_unaligned_cpu32(addr + 2),
 			       ipvlan_jhash_secret);
 
 	return hash & IPVLAN_MAC_FILTER_MASK;
@@ -234,11 +234,13 @@ void ipvlan_process_multicast(struct work_struct *work)
 				nskb->pkt_type = pkt_type;
 				nskb->dev = ipvlan->dev;
 				if (tx_pkt)
-					ret = dev_forward_skb(ipvlan->dev, nskb);
+					ret = dev_forward_skb(ipvlan->dev,
+							      nskb);
 				else
 					ret = netif_rx(nskb);
 			}
-			ipvlan_count_rx(ipvlan, len, ret == NET_RX_SUCCESS, true);
+			ipvlan_count_rx(ipvlan, len, ret == NET_RX_SUCCESS,
+					true);
 			local_bh_enable();
 		}
 		rcu_read_unlock();
@@ -461,11 +463,11 @@ static int ipvlan_process_outbound(struct sk_buff *skb)
 		skb_reset_network_header(skb);
 	}
 
-	if (skb->protocol == htons(ETH_P_IPV6))
+	if (skb->protocol == htons(ETH_P_IPV6)) {
 		ret = ipvlan_process_v6_outbound(skb);
-	else if (skb->protocol == htons(ETH_P_IP))
+	} else if (skb->protocol == htons(ETH_P_IP)) {
 		ret = ipvlan_process_v4_outbound(skb);
-	else {
+	} else {
 		pr_warn_ratelimited("Dropped outbound packet type=%x\n",
 				    ntohs(skb->protocol));
 		kfree_skb(skb);
@@ -534,7 +536,8 @@ static int ipvlan_xmit_mode_l2(struct sk_buff *skb, struct net_device *dev)
 	if (ether_addr_equal(eth->h_dest, eth->h_source)) {
 		lyr3h = ipvlan_get_L3_hdr(skb, &addr_type);
 		if (lyr3h) {
-			addr = ipvlan_addr_lookup(ipvlan->port, lyr3h, addr_type, true);
+			addr = ipvlan_addr_lookup(ipvlan->port, lyr3h,
+						  addr_type, true);
 			if (addr)
 				return ipvlan_rcv_frame(addr, &skb, true);
 		}
@@ -570,7 +573,7 @@ int ipvlan_queue_xmit(struct sk_buff *skb, struct net_device *dev)
 	if (unlikely(!pskb_may_pull(skb, sizeof(struct ethhdr))))
 		goto out;
 
-	switch(port->mode) {
+	switch (port->mode) {
 	case IPVLAN_MODE_L2:
 		return ipvlan_xmit_mode_l2(skb, dev);
 	case IPVLAN_MODE_L3:
@@ -580,7 +583,7 @@ int ipvlan_queue_xmit(struct sk_buff *skb, struct net_device *dev)
 
 	/* Should not reach here */
 	WARN_ONCE(true, "ipvlan_queue_xmit() called for mode = [%hx]\n",
-			  port->mode);
+		  port->mode);
 out:
 	kfree_skb(skb);
 	return NET_XMIT_DROP;
@@ -685,7 +688,7 @@ rx_handler_result_t ipvlan_handle_frame(struct sk_buff **pskb)
 
 	/* Should not reach here */
 	WARN_ONCE(true, "ipvlan_handle_frame() called for mode = [%hx]\n",
-			  port->mode);
+		  port->mode);
 	kfree_skb(skb);
 	return RX_HANDLER_CONSUMED;
 }
