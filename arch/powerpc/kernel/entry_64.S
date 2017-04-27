@@ -52,12 +52,11 @@ exception_marker:
 	.section	".text"
 	.align 7
 
-	.globl system_call_common
-system_call_common:
+_GLOBAL(system_call_common)
 #ifdef CONFIG_PPC_TRANSACTIONAL_MEM
 BEGIN_FTR_SECTION
 	extrdi.	r10, r12, 1, (63-MSR_TS_T_LG) /* transaction active? */
-	bne	tabort_syscall
+	bne	.Ltabort_syscall
 END_FTR_SECTION_IFSET(CPU_FTR_TM)
 #endif
 	andi.	r10,r12,MSR_PR
@@ -152,9 +151,9 @@ END_FW_FTR_SECTION_IFSET(FW_FEATURE_SPLPAR)
 	CURRENT_THREAD_INFO(r11, r1)
 	ld	r10,TI_FLAGS(r11)
 	andi.	r11,r10,_TIF_SYSCALL_DOTRACE
-	bne	syscall_dotrace		/* does not return */
+	bne	.Lsyscall_dotrace		/* does not return */
 	cmpldi	0,r0,NR_syscalls
-	bge-	syscall_enosys
+	bge-	.Lsyscall_enosys
 
 system_call:			/* label this so stack traces look sane */
 /*
@@ -208,7 +207,7 @@ system_call:			/* label this so stack traces look sane */
 	ld	r9,TI_FLAGS(r12)
 	li	r11,-MAX_ERRNO
 	andi.	r0,r9,(_TIF_SYSCALL_DOTRACE|_TIF_SINGLESTEP|_TIF_USER_WORK_MASK|_TIF_PERSYSCALL_MASK)
-	bne-	syscall_exit_work
+	bne-	.Lsyscall_exit_work
 
 	andi.	r0,r8,MSR_FP
 	beq 2f
@@ -232,7 +231,7 @@ system_call:			/* label this so stack traces look sane */
 
 3:	cmpld	r3,r11
 	ld	r5,_CCR(r1)
-	bge-	syscall_error
+	bge-	.Lsyscall_error
 .Lsyscall_error_cont:
 	ld	r7,_NIP(r1)
 BEGIN_FTR_SECTION
@@ -258,14 +257,14 @@ END_FTR_SECTION_IFSET(CPU_FTR_HAS_PPR)
 	RFI
 	b	.	/* prevent speculative execution */
 
-syscall_error:	
+.Lsyscall_error:
 	oris	r5,r5,0x1000	/* Set SO bit in CR */
 	neg	r3,r3
 	std	r5,_CCR(r1)
 	b	.Lsyscall_error_cont
 	
 /* Traced system call support */
-syscall_dotrace:
+.Lsyscall_dotrace:
 	bl	save_nvgprs
 	addi	r3,r1,STACK_FRAME_OVERHEAD
 	bl	do_syscall_trace_enter
@@ -298,11 +297,11 @@ syscall_dotrace:
 	b	.Lsyscall_exit
 
 
-syscall_enosys:
+.Lsyscall_enosys:
 	li	r3,-ENOSYS
 	b	.Lsyscall_exit
 	
-syscall_exit_work:
+.Lsyscall_exit_work:
 #ifdef CONFIG_PPC_BOOK3S
 	li	r10,MSR_RI
 	mtmsrd	r10,1		/* Restore RI */
@@ -362,7 +361,7 @@ END_FTR_SECTION_IFSET(CPU_FTR_HAS_PPR)
 	b	ret_from_except
 
 #ifdef CONFIG_PPC_TRANSACTIONAL_MEM
-tabort_syscall:
+.Ltabort_syscall:
 	/* Firstly we need to enable TM in the kernel */
 	mfmsr	r10
 	li	r9, 1
@@ -388,6 +387,8 @@ tabort_syscall:
 	rfid
 	b	.	/* prevent speculative execution */
 #endif
+_ASM_NOKPROBE_SYMBOL(system_call_common);
+_ASM_NOKPROBE_SYMBOL(system_call);
 
 /* Save non-volatile GPRs, if not already saved. */
 _GLOBAL(save_nvgprs)
