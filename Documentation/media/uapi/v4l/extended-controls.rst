@@ -1827,6 +1827,369 @@ enum v4l2_mpeg_cx2341x_video_median_filter_type -
     not insert, 1 = insert packets.
 
 
+MPEG-2 Parsed Control Reference
+---------------------------------
+
+The MPEG-2 parsed decoding controls are needed by stateless video decoders.
+Those decoders expose :ref:`Compressed formats <compressed-formats>` :ref:`V4L2_PIX_FMT_MPEG1_PARSED<V4L2-PIX-FMT-MPEG1-PARSED>` or :ref:`V4L2_PIX_FMT_MPEG2_PARSED<V4L2-PIX-FMT-MPEG2-PARSED>`.
+In order to decode the video bitstream chunk provided by user on output queue,
+stateless decoders require also some extra data resulting from this video
+bitstream chunk parsing. Those parsed extra data have to be set by user
+through control framework using the mpeg video extended controls defined
+in this section. Those controls have been defined based on MPEG-2 standard
+ISO/IEC 13818-2, and so derive directly from the MPEG-2 video bitstream syntax
+including how it is coded inside bitstream (enumeration values for ex.).
+
+MPEG-2 Parsed Control IDs
+^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+.. _mpeg2-parsed-control-id:
+
+.. c:type:: V4L2_CID_MPEG_VIDEO_MPEG2_SEQ_HDR
+    (enum)
+
+.. tabularcolumns:: |p{4.0cm}|p{2.5cm}|p{11.0cm}|
+
+.. c:type:: v4l2_mpeg_video_mpeg2_seq_hdr
+
+.. cssclass:: longtable
+
+.. flat-table:: struct v4l2_mpeg_video_mpeg2_seq_hdr
+    :header-rows:  0
+    :stub-columns: 0
+    :widths:       1 1 2
+
+    * - __u16
+      - ``width``
+      - Video width in pixels.
+    * - __u16
+      - ``height``
+      - Video height in pixels.
+    * - __u8
+      - ``aspect_ratio_info``
+      - Aspect ratio code as in the bitstream (1: 1:1 square pixels,
+        2: 4:3 display, 3: 16:9 display, 4: 2.21:1 display)
+    * - __u8
+      - ``framerate code``
+      - Framerate code as in the bitstream
+        (1: 24000/1001.0 '23.976 fps, 2: 24.0, 3: 25.0,
+        4: 30000/1001.0 '29.97, 5: 30.0, 6: 50.0, 7: 60000/1001.0,
+        8: 60.0)
+    * - __u16
+      - ``vbv_buffer_size``
+      -  Video Buffering Verifier size, expressed in 16KBytes unit.
+    * - __u32
+      - ``bitrate_value``
+      - Bitrate value as in the bitstream, expressed in 400bps unit
+    * - __u16
+      - ``constrained_parameters_flag``
+      - Set to 1 if this bitstream uses constrained parameters.
+    * - __u8
+      - ``load_intra_quantiser_matrix``
+      - If set to 1, ``intra_quantiser_matrix`` table is to be used for
+        decoding.
+    * - __u8
+      - ``load_non_intra_quantiser_matrix``
+      - If set to 1, ``non_intra_quantiser_matrix`` table is to be used for
+        decoding.
+    * - __u8
+      - ``intra_quantiser_matrix[64]``
+      - Intra quantization table, in zig-zag scan order.
+    * - __u8
+      - ``non_intra_quantiser_matrix[64]``
+      - Non-intra quantization table, in zig-zag scan order.
+    * - __u32
+      - ``par_w``
+      - Pixel aspect ratio width in pixels.
+    * - __u32
+      - ``par_h``
+      - Pixel aspect ratio height in pixels.
+    * - __u32
+      - ``fps_n``
+      - Framerate nominator.
+    * - __u32
+      - ``fps_d``
+      - Framerate denominator.
+    * - __u32
+      - ``bitrate``
+      - Bitrate in bps if constant bitrate, 0 otherwise.
+    * - :cspan:`2`
+
+
+.. c:type:: V4L2_CID_MPEG_VIDEO_MPEG2_SEQ_EXT
+    (enum)
+
+.. tabularcolumns:: |p{4.0cm}|p{2.5cm}|p{11.0cm}|
+
+.. c:type:: v4l2_mpeg_video_mpeg2_seq_ext
+
+.. cssclass:: longtable
+
+.. flat-table:: struct v4l2_mpeg_video_mpeg2_seq_ext
+    :header-rows:  0
+    :stub-columns: 0
+    :widths:       1 1 2
+
+    * - __u8
+      - ``profile``
+      - Encoding profile used to encode this bitstream.
+        (1: High Profile, 2: Spatially Scalable Profile,
+        3: SNR Scalable Profile, 4: Main Profile, 5: Simple Profile).
+    * - __u8
+      - ``level``
+      - Encoding level used to encode this bitstream
+        (4: High Level, 6: High 1440 Level, 8: Main Level, 10: Low Level).
+    * - __u8
+      - ``progressive``
+      - Set to 1 if frames are progressive (vs interlaced).
+    * - __u8
+      - ``chroma_format``
+      - Chrominance format (1: 420, 2: 422, 3: 444).
+    * - __u8
+      - ``horiz_size_ext``
+      - Horizontal size extension. This value is to be shifted 12 bits left
+        and added to ''seq_hdr->width'' to get the final video width:
+        `width = seq_hdr->width + seq_ext->horiz_size_ext << 12`
+    * - __u8
+      - ``vert_size_ext``
+      - Vertical size extension. This value is to be shifted 12 bits left
+        and added to ''seq_hdr->height'' to get the final video height:
+        `height = seq_hdr->height + seq_ext->vert_size_ext << 12`
+    * - __u16
+      - ``bitrate_ext``
+      -  Bitrate extension. This value, expressed in 400bps unit, is to be
+         shifted 18 bits left and added to ''seq_hdr->bitrate'' to get the
+         final bitrate:
+         `bitrate = seq_hdr->bitrate + (seq_ext->bitrate_ext << 18) * 400`
+    * - __u8
+      - ``vbv_buffer_size_ext``
+      -  Video Buffering Verifier size extension in bits.
+    * - __u8
+      - ``low_delay``
+      -  Low delay. Set to 1 if no B pictures are present.
+    * - __u8
+      - ``fps_n_ext``
+      -  Framerate extension nominator. This value is to be incremented and
+         multiplied by ''seq_hdr->fps_n'' to get the final framerate
+         nominator:
+         `fps_n = seq_hdr->fps_n * (seq_ext->fps_n_ext + 1)`
+    * - __u8
+      - ``fps_d_ext``
+      -  Framerate extension denominator. This value is to be incremented and
+         multiplied by ''seq_hdr->fps_d'' to get the final framerate
+         denominator:
+         `fps_d = seq_hdr->fps_d * (seq_ext->fps_d_ext + 1)`
+    * - :cspan:`2`
+
+
+.. c:type:: V4L2_CID_MPEG_VIDEO_MPEG2_SEQ_DISPLAY_EXT
+    (enum)
+
+.. tabularcolumns:: |p{4.0cm}|p{2.5cm}|p{11.0cm}|
+
+.. c:type:: v4l2_mpeg_video_mpeg2_seq_display_ext
+
+.. cssclass:: longtable
+
+.. flat-table:: struct v4l2_mpeg_video_mpeg2_seq_display_ext
+    :header-rows:  0
+    :stub-columns: 0
+    :widths:       1 1 2
+
+    * - __u16
+      - ``display_horizontal_size``, ``display_vertical_size``
+      - Dimensions of the video to be displayed. If those dimensions
+        are smaller than the final video dimensions, only this area
+        must be displayed.
+    * - __u8
+      - ``video_format``
+      - Video standard (0: Components, 1: PAL, 2: NTSC, 3: SECAM, 4:MAC)
+    * - __u8
+      - ``colour_description_flag``
+      - If set to 1, ''colour_primaries'', ''transfer_characteristics'',
+        ''matrix_coefficients'' are to be used for decoding.
+    * - __u8
+      - ``colour_primaries``
+      - Colour coding standard (1: ITU-R Rec. 709 (1990),
+        4: ITU-R Rec. 624-4 System M, 5: ITU-R Rec. 624-4 System B, G,
+        6: SMPTE 170M, 7: SMPTE 240M (1987))
+    * - __u8
+      - ``transfer_characteristics``
+      - Transfer characteristics coding standard (1: ITU-R Rec. 709 (1990),
+        4: ITU-R Rec. 624-4 System M, 5: ITU-R Rec. 624-4 System B, G,
+        6: SMPTE 170M, 7: SMPTE 240M (1987))
+    * - __u8
+      - ``matrix_coefficients``
+      - Matrix coefficients coding standard (1: ITU-R Rec. 709 (1990),
+        4: FCC, 5: ITU-R Rec. 624-4 System B, G, 6: SMPTE 170M,
+        7: SMPTE 240M (1987))
+    * - :cspan:`2`
+
+
+.. c:type:: V4L2_CID_MPEG_VIDEO_MPEG2_SEQ_MATRIX_EXT
+    (enum)
+
+.. tabularcolumns:: |p{4.0cm}|p{2.5cm}|p{11.0cm}|
+
+.. c:type:: v4l2_mpeg_video_mpeg2_seq_matrix_ext
+
+.. cssclass:: longtable
+
+.. flat-table:: struct v4l2_mpeg_video_mpeg2_seq_matrix_ext
+    :header-rows:  0
+    :stub-columns: 0
+    :widths:       1 1 2
+
+    * - __u8
+      - ``load_intra_quantiser_matrix``
+      - If set to 1, ``intra_quantiser_matrix`` table is to be used for
+        decoding.
+    * - __u8
+      - ``intra_quantiser_matrix[64]``
+      - Intra quantization table, in zig-zag scan order.
+    * - __u8
+      - ``load_non_intra_quantiser_matrix``
+      - If set to 1, ``non_intra_quantiser_matrix`` table is to be used for
+        decoding.
+    * - __u8
+      - ``non_intra_quantiser_matrix[64]``
+      - Non-intra quantization table, in zig-zag scan order.
+    * - __u8
+      - ``load_chroma_intra_quantiser_matrix``
+      - If set to 1, ``chroma_intra_quantiser_matrix`` table is to be used for
+        decoding.
+    * - __u8
+      - ``chroma_intra_quantiser_matrix[64]``
+      - Chroma intra quantization table, in zig-zag scan order.
+    * - __u8
+      - ``load_chroma_non_intra_quantiser_matrix``
+      - If set to 1, ``chroma_non_intra_quantiser_matrix`` table is to be used for
+        decoding.
+    * - __u8
+      - ``chroma_non_intra_quantiser_matrix[64]``
+      - Chroma non-intra quantization table, in zig-zag scan order.
+    * - :cspan:`2`
+
+
+.. c:type:: V4L2_CID_MPEG_VIDEO_MPEG2_PIC_HDR
+    (enum)
+
+.. tabularcolumns:: |p{4.0cm}|p{2.5cm}|p{11.0cm}|
+
+.. c:type:: v4l2_mpeg_video_mpeg2_pic_hdr
+
+.. cssclass:: longtable
+
+.. flat-table:: struct v4l2_mpeg_video_mpeg2_pic_hdr
+    :header-rows:  0
+    :stub-columns: 0
+    :widths:       1 1 2
+
+    * - __u32
+      - ``offset``
+      - Offset in bytes of the slice data from the beginning of packet.
+    * - __u16
+      - ``tsn``
+      - Temporal Sequence Number: order in which the frames must be displayed.
+    * - __u16
+      - ``vbv_delay``
+      - Video Buffering Verifier delay, in 90KHz cycles unit.
+    * - __u8
+      - ``pic_type``
+      - Picture coding type (1: Intra, 2: Predictive,
+        3: B, Bidirectionally Predictive, 4: D, DC Intra).
+    * - __u8
+      - ``full_pel_forward_vector``
+      - If set to 1, forward vectors are expressed in full pixel unit instead
+        half pixel unit.
+    * - __u8
+      - ``full_pel_backward_vector``
+      - If set to 1, backward vectors are expressed in full pixel unit instead
+        half pixel unit.
+    * - __u8
+      - ``f_code[2][2]``
+      - Motion vectors code.
+    * - :cspan:`2`
+
+
+.. c:type:: V4L2_CID_MPEG_VIDEO_MPEG2_PIC_EXT
+    (enum)
+
+.. tabularcolumns:: |p{4.0cm}|p{2.5cm}|p{11.0cm}|
+
+.. c:type:: v4l2_mpeg_video_mpeg2_pic_ext
+
+.. cssclass:: longtable
+
+.. flat-table:: struct v4l2_mpeg_video_mpeg2_pic_ext
+    :header-rows:  0
+    :stub-columns: 0
+    :widths:       1 1 2
+
+    * - __u8
+      - ``f_code[2][2]``
+      - Motion vectors code.
+    * - __u8
+      - ``intra_dc_precision``
+      - Precision of Discrete Cosine transform (0: 8 bits precision,
+        1: 9 bits precision, 2: 10 bits precision, 11: 11 bits precision).
+    * - __u8
+      - ``picture_structure``
+      - Picture structure (1: interlaced top field,
+        2: interlaced bottom field, 3: progressive frame).
+    * - __u8
+      - ``top_field_first``
+      - If set to 1 and interlaced stream, top field is output first.
+    * - __u8
+      - ``frame_pred_frame_dct``
+      - If set to 1, only frame-DCT and frame prediction are used.
+    * - __u8
+      - ``concealment_motion_vectors``
+      -  If set to 1, motion vectors are coded for intra macroblocks.
+    * - __u8
+      - ``q_scale_type``
+      - This flag affects the inverse quantisation process.
+    * - __u8
+      - ``intra_vlc_format``
+      - This flag affects the decoding of transform coefficient data.
+    * - __u8
+      - ``alternate_scan``
+      - This flag affects the decoding of transform coefficient data.
+    * - __u8
+      - ``repeat_first_field``
+      - This flag affects how the frames or fields are output by decoder.
+    * - __u8
+      - ``chroma_420_type``
+      - Set the same as ``progressive_frame``. Exists for historical reasons.
+    * - __u8
+      - ``progressive_frame``
+      - If this flag is set to 0, the two fields of a frame are two interlaced fields,
+        ``repeat_first_field`` must be 0 (two field duration). If the flag is set to 1,
+        the two fields are merged into one frame, ``picture_structure`` is so set to "Frame"
+        and ``frame_pred_frame_dct`` to 1.
+    * - __u8
+      - ``composite_display``
+      - This flag is set to 1 if pictures are encoded as (analog) composite video.
+    * - __u8
+      - ``v_axis``
+      - Used only when pictures are encoded according to PAL systems. This flag is set to 1
+        on a positive sign, 0 otherwise.
+    * - __u8
+      - ``field_sequence``
+      - Specifies the number of the field of an eight Field Sequence for a PAL system or
+        a five Field Sequence for a NTSC system
+    * - __u8
+      - ``sub_carrier``
+      - If the flag is set to 0, the sub-carrier/line-frequency relationship is correct.
+    * - __u8
+      - ``burst_amplitude``
+      - Specifies the burst amplitude for PAL and NTSC.
+    * - __u8
+      - ``sub_carrier_phase``
+      - Specifies the phase of the reference sub-carrier for the field synchronization.
+    * - :cspan:`2`
+
+
 VPX Control Reference
 ---------------------
 

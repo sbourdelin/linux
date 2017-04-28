@@ -622,7 +622,9 @@ struct v4l2_pix_format {
 #define V4L2_PIX_FMT_H264_MVC v4l2_fourcc('M', '2', '6', '4') /* H264 MVC */
 #define V4L2_PIX_FMT_H263     v4l2_fourcc('H', '2', '6', '3') /* H263          */
 #define V4L2_PIX_FMT_MPEG1    v4l2_fourcc('M', 'P', 'G', '1') /* MPEG-1 ES     */
+#define V4L2_PIX_FMT_MPEG1_PARSED v4l2_fourcc('M', 'G', '1', 'P') /* MPEG1 with parsing metadata given through controls */
 #define V4L2_PIX_FMT_MPEG2    v4l2_fourcc('M', 'P', 'G', '2') /* MPEG-2 ES     */
+#define V4L2_PIX_FMT_MPEG2_PARSED v4l2_fourcc('M', 'G', '2', 'P') /* MPEG2 with parsing metadata given through controls */
 #define V4L2_PIX_FMT_MPEG4    v4l2_fourcc('M', 'P', 'G', '4') /* MPEG-4 part 2 ES */
 #define V4L2_PIX_FMT_XVID     v4l2_fourcc('X', 'V', 'I', 'D') /* Xvid           */
 #define V4L2_PIX_FMT_VC1_ANNEX_G v4l2_fourcc('V', 'C', '1', 'G') /* SMPTE 421M Annex G compliant stream */
@@ -1605,6 +1607,12 @@ enum v4l2_ctrl_type {
 	V4L2_CTRL_TYPE_U8	     = 0x0100,
 	V4L2_CTRL_TYPE_U16	     = 0x0101,
 	V4L2_CTRL_TYPE_U32	     = 0x0102,
+	V4L2_CTRL_TYPE_MPEG2_SEQ_HDR  = 0x0109,
+	V4L2_CTRL_TYPE_MPEG2_SEQ_EXT  = 0x010A,
+	V4L2_CTRL_TYPE_MPEG2_SEQ_DISPLAY_EXT  = 0x010B,
+	V4L2_CTRL_TYPE_MPEG2_SEQ_MATRIX_EXT  = 0x010C,
+	V4L2_CTRL_TYPE_MPEG2_PIC_HDR  = 0x010D,
+	V4L2_CTRL_TYPE_MPEG2_PIC_EXT  = 0x010E,
 };
 
 /*  Used in the VIDIOC_QUERYCTRL ioctl for querying controls */

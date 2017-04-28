@@ -422,8 +422,42 @@ See also the examples in :ref:`control`.
       - any
       - An unsigned 32-bit valued control ranging from minimum to maximum
 	inclusive. The step value indicates the increment between values.
-
-
+    * - ``V4L2_CTRL_TYPE_MPEG2_SEQ_HDR``
+      - n/a
+      - n/a
+      - n/a
+      - Type of control
+	:c:type:`V4L2_CID_MPEG_VIDEO_MPEG2_SEQ_HDR`.
+    * - ``V4L2_CTRL_TYPE_MPEG2_SEQ_EXT``
+      - n/a
+      - n/a
+      - n/a
+      - Type of control
+	:c:type:`V4L2_CID_MPEG_VIDEO_MPEG2_SEQ_EXT`.
+    * - ``V4L2_CTRL_TYPE_MPEG2_SEQ_DISPLAY_EXT``
+      - n/a
+      - n/a
+      - n/a
+      - Type of control
+	:c:type:`V4L2_CID_MPEG_VIDEO_MPEG2_SEQ_DISPLAY_EXT`.
+    * - ``V4L2_CTRL_TYPE_MPEG2_SEQ_MATRIX_EXT``
+      - n/a
+      - n/a
+      - n/a
+      - Type of control
+	:c:type:`V4L2_CID_MPEG_VIDEO_MPEG2_SEQ_MATRIX_EXT`.
+    * - ``V4L2_CTRL_TYPE_MPEG2_PIC_HDR``
+      - n/a
+      - n/a
+      - n/a
+      - Type of control
+	:c:type:`V4L2_CID_MPEG_VIDEO_MPEG2_PIC_HDR`.
+    * - ``V4L2_CTRL_TYPE_MPEG2_PIC_EXT``
+      - n/a
+      - n/a
+      - n/a
+      - Type of control
+	:c:type:`V4L2_CID_MPEG_VIDEO_MPEG2_PIC_EXT`.
 
 .. tabularcolumns:: |p{6.6cm}|p{2.2cm}|p{8.7cm}|
 

@@ -129,6 +129,12 @@ replace symbol V4L2_CTRL_TYPE_STRING :c:type:`v4l2_ctrl_type`
 replace symbol V4L2_CTRL_TYPE_U16 :c:type:`v4l2_ctrl_type`
 replace symbol V4L2_CTRL_TYPE_U32 :c:type:`v4l2_ctrl_type`
 replace symbol V4L2_CTRL_TYPE_U8 :c:type:`v4l2_ctrl_type`
+replace symbol V4L2_CTRL_TYPE_MPEG2_SEQ_HDR :c:type:`v4l2-ctrl-type-mpeg2-seq-hdr`
+replace symbol V4L2_CTRL_TYPE_MPEG2_SEQ_EXT :c:type:`v4l2-ctrl-type-mpeg2-seq-ext`
+replace symbol V4L2_CTRL_TYPE_MPEG2_SEQ_DISPLAY_EXT :c:type:`v4l2-ctrl-type-mpeg2-seq-display-ext`
+replace symbol V4L2_CTRL_TYPE_MPEG2_SEQ_MATRIX_EXT :c:type:`v4l2-ctrl-type-mpeg2-seq-matrix-ext`
+replace symbol V4L2_CTRL_TYPE_MPEG2_PIC_HDR :c:type:`v4l2-ctrl-type-mpeg2-pic-hdr`
+replace symbol V4L2_CTRL_TYPE_MPEG2_PIC_EXT :c:type:`v4l2-ctrl-type-mpeg2-pic-ext`
 
 # V4L2 capability defines
 replace define V4L2_CAP_VIDEO_CAPTURE device-capabilities

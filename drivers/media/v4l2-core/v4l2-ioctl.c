@@ -1250,7 +1250,9 @@ static void v4l_fill_fmtdesc(struct v4l2_fmtdesc *fmt)
 		case V4L2_PIX_FMT_H264_MVC:	descr = "H.264 MVC"; break;
 		case V4L2_PIX_FMT_H263:		descr = "H.263"; break;
 		case V4L2_PIX_FMT_MPEG1:	descr = "MPEG-1 ES"; break;
+		case V4L2_PIX_FMT_MPEG1_PARSED:	descr = "MPEG-1 with parsing metadata"; break;
 		case V4L2_PIX_FMT_MPEG2:	descr = "MPEG-2 ES"; break;
+		case V4L2_PIX_FMT_MPEG2_PARSED:	descr = "MPEG-2 with parsing metadata"; break;
 		case V4L2_PIX_FMT_MPEG4:	descr = "MPEG-4 part 2 ES"; break;
 		case V4L2_PIX_FMT_XVID:		descr = "Xvid"; break;
 		case V4L2_PIX_FMT_VC1_ANNEX_G:	descr = "VC-1 (SMPTE 412M Annex G)"; break;

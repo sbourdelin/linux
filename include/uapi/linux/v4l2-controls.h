@@ -547,6 +547,100 @@ enum v4l2_mpeg_video_mpeg4_profile {
 };
 #define V4L2_CID_MPEG_VIDEO_MPEG4_QPEL		(V4L2_CID_MPEG_BASE+407)
 
+/*
+ * parsed MPEG-2 controls
+ * (needed by stateless video decoders)
+ * Those controls have been defined based on MPEG-2 standard ISO/IEC 13818-2,
+ * and so derive directly from the MPEG-2 video bitstream syntax including
+ * how it is coded inside bitstream (enumeration values for ex.).
+ */
+#define MPEG2_QUANTISER_MATRIX_SIZE	64
+#define V4L2_CID_MPEG_VIDEO_MPEG2_SEQ_HDR		(V4L2_CID_MPEG_BASE+450)
+struct v4l2_mpeg_video_mpeg2_seq_hdr {
+	__u16	width;
+	__u16	height;
+	__u8	aspect_ratio_info;
+	__u8	frame_rate_code;
+	__u16	vbv_buffer_size;
+	__u32	bitrate_value;
+	__u16	constrained_parameters_flag;
+	__u8	load_intra_quantiser_matrix;
+	__u8	load_non_intra_quantiser_matrix;
+	__u8	intra_quantiser_matrix[MPEG2_QUANTISER_MATRIX_SIZE];
+	__u8	non_intra_quantiser_matrix[MPEG2_QUANTISER_MATRIX_SIZE];
+	__u32	par_w;
+	__u32	par_h;
+	__u32	fps_n;
+	__u32	fps_d;
+	__u32	bitrate;
+};
+#define V4L2_CID_MPEG_VIDEO_MPEG2_SEQ_EXT		(V4L2_CID_MPEG_BASE+451)
+struct v4l2_mpeg_video_mpeg2_seq_ext {
+	__u8	profile;
+	__u8	level;
+	__u8	progressive;
+	__u8	chroma_format;
+	__u8	horiz_size_ext;
+	__u8	vert_size_ext;
+	__u16	bitrate_ext;
+	__u8	vbv_buffer_size_ext;
+	__u8	low_delay;
+	__u8	fps_n_ext;
+	__u8	fps_d_ext;
+};
+#define V4L2_CID_MPEG_VIDEO_MPEG2_SEQ_DISPLAY_EXT	(V4L2_CID_MPEG_BASE+452)
+struct v4l2_mpeg_video_mpeg2_seq_display_ext {
+	__u16	display_horizontal_size;
+	__u16	display_vertical_size;
+	__u8	video_format;
+	__u8	colour_description_flag;
+	__u8	colour_primaries;
+	__u8	transfer_characteristics;
+	__u8	matrix_coefficients;
+};
+#define V4L2_CID_MPEG_VIDEO_MPEG2_SEQ_MATRIX_EXT	(V4L2_CID_MPEG_BASE+453)
+struct v4l2_mpeg_video_mpeg2_seq_matrix_ext {
+	__u8	load_intra_quantiser_matrix;
+	__u8	intra_quantiser_matrix[MPEG2_QUANTISER_MATRIX_SIZE];
+	__u8	load_non_intra_quantiser_matrix;
+	__u8	non_intra_quantiser_matrix[MPEG2_QUANTISER_MATRIX_SIZE];
+	__u8	load_chroma_intra_quantiser_matrix;
+	__u8	chroma_intra_quantiser_matrix[MPEG2_QUANTISER_MATRIX_SIZE];
+	__u8	load_chroma_non_intra_quantiser_matrix;
+	__u8	chroma_non_intra_quantiser_matrix[MPEG2_QUANTISER_MATRIX_SIZE];
+};
+#define V4L2_CID_MPEG_VIDEO_MPEG2_PIC_HDR		(V4L2_CID_MPEG_BASE+454)
+struct v4l2_mpeg_video_mpeg2_pic_hdr {
+	__u32	offset;
+	__u16	tsn;
+	__u16	vbv_delay;
+	__u8	pic_type;
+	__u8	full_pel_forward_vector;
+	__u8	full_pel_backward_vector;
+	__u8	f_code[2][2];
+};
+#define V4L2_CID_MPEG_VIDEO_MPEG2_PIC_EXT		(V4L2_CID_MPEG_BASE+455)
+struct v4l2_mpeg_video_mpeg2_pic_ext {
+	__u8	f_code[2][2];
+	__u8	intra_dc_precision;
+	__u8	picture_structure;
+	__u8	top_field_first;
+	__u8	frame_pred_frame_dct;
+	__u8	concealment_motion_vectors;
+	__u8	q_scale_type;
+	__u8	intra_vlc_format;
+	__u8	alternate_scan;
+	__u8	repeat_first_field;
+	__u8	chroma_420_type;
+	__u8	progressive_frame;
+	__u8	composite_display;
+	__u8	v_axis;
+	__u8	field_sequence;
+	__u8	sub_carrier;
+	__u8	burst_amplitude;
+	__u8	sub_carrier_phase;
+};
+
 /*  Control IDs for VP8 streams
  *  Although VP8 is not part of MPEG we add these controls to the MPEG class
  *  as that class is already handling other video compression standards
