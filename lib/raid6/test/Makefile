@@ -99,6 +99,18 @@ altivec4.c: altivec.uc ../unroll.awk
 altivec8.c: altivec.uc ../unroll.awk
 	$(AWK) ../unroll.awk -vN=8 < altivec.uc > $@
 
+vpermxor1.c: vpermxor.uc ../unroll.awk
+	$(AWK) ../unroll.awk -vN=1 < vpermxor.uc > $@
+
+vpermxor2.c: vpermxor.uc ../unroll.awk
+	$(AWK) ../unroll.awk -vN=2 < vpermxor.uc > $@
+
+vpermxor4.c: vpermxor.uc ../unroll.awk
+	$(AWK) ../unroll.awk -vN=4 < vpermxor.uc > $@
+
+vpermxor8.c: vpermxor.uc ../unroll.awk
+	$(AWK) ../unroll.awk -vN=8 < vpermxor.uc > $@
+
 int1.c: int.uc ../unroll.awk
 	$(AWK) ../unroll.awk -vN=1 < int.uc > $@
 
@@ -124,7 +136,7 @@ tables.c: mktables
 	./mktables > tables.c
 
 clean:
-	rm -f *.o *.a mktables mktables.c *.uc int*.c altivec*.c neon*.c tables.c raid6test
+	rm -f *.o *.a mktables mktables.c *.uc int*.c altivec*.c vpermxor*.c neon*.c tables.c raid6test
 	rm -f tilegx*.c
 
 spotless: clean
