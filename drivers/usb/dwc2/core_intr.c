@@ -553,7 +553,7 @@ static void dwc2_handle_lpm_intr(struct dwc2_hsotg *hsotg)
 	hird_thres = (glpmcfg & GLPMCFG_HIRD_MASK & ~GLPMCFG_HIRD_THRES_EN) >>
 		     GLPMCFG_HIRD_THRES_SHIFT;
 	hird_thres_en = glpmcfg & GLPMCFG_HIRD_THRES_EN;
-	enslpm = glpmcfg & GLPMCFG_SNDLPM;
+	enslpm = glpmcfg & GLPMCFG_ENBLSLPM;
 
 	if (dwc2_is_device_mode(hsotg)) {
 		dev_dbg(hsotg->dev, "HIRD_THRES_EN = %d\n", hird_thres_en);
@@ -588,7 +588,8 @@ static void dwc2_handle_lpm_intr(struct dwc2_hsotg *hsotg)
 #define GINTMSK_COMMON	(GINTSTS_WKUPINT | GINTSTS_SESSREQINT |		\
 			 GINTSTS_CONIDSTSCHNG | GINTSTS_OTGINT |	\
 			 GINTSTS_MODEMIS | GINTSTS_DISCONNINT |		\
-			 GINTSTS_USBSUSP | GINTSTS_PRTINT)
+			 GINTSTS_USBSUSP | GINTSTS_PRTINT |		\
+			 GINTSTS_LPMTRANRCVD)
 
 /*
  * This function returns the Core Interrupt register
