@@ -74,8 +74,8 @@ static void install_fatal_handler(int sig)
 	action.sa_restorer = NULL;
 	action.sa_handler = last_ditch_exit;
 	if (sigaction(sig, &action, NULL) < 0) {
-		printf("failed to install handler for signal %d - errno = %d\n",
-		       sig, errno);
+		fprintf(stderr, "failed to install handler for signal %d "
+			"- errno = %d\n", sig, errno);
 		exit(1);
 	}
 }
