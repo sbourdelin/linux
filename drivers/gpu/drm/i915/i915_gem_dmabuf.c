@@ -196,7 +196,7 @@ out:
 	return err;
 }
 
-static const struct dma_buf_ops i915_dmabuf_ops =  {
+const struct dma_buf_ops i915_dmabuf_ops =  {
 	.map_dma_buf = i915_gem_map_dma_buf,
 	.unmap_dma_buf = i915_gem_unmap_dma_buf,
 	.release = drm_gem_dmabuf_release,
