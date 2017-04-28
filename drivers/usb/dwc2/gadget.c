@@ -3427,6 +3427,9 @@ void dwc2_hsotg_core_init_disconnected(struct dwc2_hsotg *hsotg,
 		val |= DCTL_SFTDISCON;
 	__orr32(hsotg->regs + DCTL, val);
 
+	/* configure the core to support LPM */
+	dwc2_gadget_init_lpm(hsotg);
+
 	/* must be at-least 3ms to allow bus to see disconnect */
 	mdelay(3);
 
@@ -4648,6 +4651,7 @@ int dwc2_gadget_init(struct dwc2_hsotg *hsotg, int irq)
 	hsotg->gadget.max_speed = USB_SPEED_HIGH;
 	hsotg->gadget.ops = &dwc2_hsotg_gadget_ops;
 	hsotg->gadget.name = dev_name(dev);
+
 	if (hsotg->dr_mode == USB_DR_MODE_OTG)
 		hsotg->gadget.is_otg = 1;
 	else if (hsotg->dr_mode == USB_DR_MODE_PERIPHERAL)
@@ -4885,4 +4889,22 @@ int dwc2_restore_device_registers(struct dwc2_hsotg *hsotg)
 	dwc2_writel(dctl, hsotg->regs + DCTL);
 
 	return 0;
+}
+
+/**
+ * dwc2_gadget_init_lpm - Configure the core to support LPM in device mode
+ */
+void dwc2_gadget_init_lpm(struct dwc2_hsotg *hsotg)
+{
+	u32 val;
+
+	if (!hsotg->params.lpm)
+		return;
+
+	val = GLPMCFG_LPMCAP | GLPMCFG_APPL1RES;
+	val |= hsotg->params.hird_threshold_en ? GLPMCFG_HIRD_THRES_EN : 0;
+	val |= hsotg->params.lpm_clock_gating ? GLPMCFG_ENBLSLPM : 0;
+	dwc2_writel(val, hsotg->regs + GLPMCFG);
+	dev_dbg(hsotg->dev, "GLPMCFG=0x%08x\n", dwc2_readl(hsotg->regs
+		+ GLPMCFG));
 }
