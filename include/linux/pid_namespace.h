@@ -54,6 +54,7 @@ struct pid_namespace {
 	struct ns_common ns;
 };
 
+struct ns_ioc_pid_vec;
 extern struct pid_namespace init_pid_ns;
 
 #define PIDNS_HASH_ADDING (1U << 31)
@@ -71,7 +72,8 @@ extern struct pid_namespace *copy_pid_ns(unsigned long flags,
 extern void zap_pid_ns_processes(struct pid_namespace *pid_ns);
 extern int reboot_pid_ns(struct pid_namespace *pid_ns, int cmd);
 extern void put_pid_ns(struct pid_namespace *ns);
-
+extern long pidns_set_last_pid_vec(struct ns_common *ns,
+				   struct ns_ioc_pid_vec __user *vec);
 #else /* !CONFIG_PID_NS */
 #include <linux/err.h>
 
@@ -100,6 +102,11 @@ static inline void zap_pid_ns_processes(struct pid_namespace *ns)
 static inline int reboot_pid_ns(struct pid_namespace *pid_ns, int cmd)
 {
 	return 0;
+}
+static inline long pidns_set_last_pid_vec(struct ns_common *ns,
+					  struct ns_ioc_pid_vec __user *vec)
+{
+	return -ENOTTY;
 }
 #endif /* CONFIG_PID_NS */
 

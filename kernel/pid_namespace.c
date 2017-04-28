@@ -21,6 +21,7 @@
 #include <linux/export.h>
 #include <linux/sched/task.h>
 #include <linux/sched/signal.h>
+#include <uapi/linux/nsfs.h>
 
 struct pid_cache {
 	int nr_ids;
@@ -426,6 +427,41 @@ static struct ns_common *pidns_get_parent(struct ns_common *ns)
 	}
 
 	return &get_pid_ns(pid_ns)->ns;
+}
+
+long pidns_set_last_pid_vec(struct ns_common *ns,
+			    struct ns_ioc_pid_vec __user *vec)
+{
+	struct pid_namespace *pid_ns = to_pid_ns(ns), *top;
+	pid_t pid[MAX_PID_NS_LEVEL];
+	u32 i, nr;
+
+	BUILD_BUG_ON(sizeof(pid_t) * MAX_PID_NS_LEVEL > 128);
+	if (get_user(nr, &vec->nr))
+		return -EFAULT;
+	if (nr > MAX_PID_NS_LEVEL || nr < 1)
+		return -EINVAL;
+	if (copy_from_user(pid, &vec->pid[0], nr * sizeof(pid_t)) != 0)
+		return -EFAULT;
+
+	top = pid_ns;
+	for (i = 0; i < nr-1; i++) {
+		top = top->parent;
+		if (!top || pid[i] < 0 || pid[i] > pid_max)
+			return -EINVAL;
+	}
+	if (!ns_capable(top->user_ns, CAP_SYS_ADMIN))
+		return -EPERM;
+	if (pid[nr-1] < 0 || pid[nr-1] > pid_max)
+		return -EINVAL;
+
+	for (i = 0; i < nr; i++) {
+		/* Write directly: see the comment in pid_ns_ctl_handler() */
+		pid_ns->last_pid = pid[i];
+		pid_ns = pid_ns->parent;
+	}
+
+	return 0;
 }
 
 static struct user_namespace *pidns_owner(struct ns_common *ns)
