@@ -2119,7 +2119,7 @@ out:
  */
 static __init void of_unittest_overlay_high_level(void)
 {
-	struct device_node *last_sibling;
+	struct device_node *last_sibling = NULL;
 	struct device_node *np;
 	struct device_node *of_symbols;
 	struct device_node *overlay_base_symbols;
