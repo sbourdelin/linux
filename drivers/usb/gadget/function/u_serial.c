@@ -1256,7 +1256,8 @@ static void gserial_console_exit(void)
 	struct gscons_info *info = &gscons_info;
 
 	unregister_console(&gserial_cons);
-	kthread_stop(info->console_thread);
+	if (info->console_thread && !IS_ERR(info->console_thread))
+		kthread_stop(info->console_thread);
 	gs_buf_free(&info->con_buf);
 }
 
