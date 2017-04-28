@@ -104,7 +104,8 @@ static ssize_t fw_cfg_dma_transfer(void *address, u32 length, u32 control)
 	dma_addr_t dma;
 	ssize_t ret = length;
 	enum dma_data_direction dir =
-		(control & FW_CFG_DMA_CTL_READ ? DMA_FROM_DEVICE : 0);
+		(control & FW_CFG_DMA_CTL_READ ? DMA_FROM_DEVICE : 0) |
+		(control & FW_CFG_DMA_CTL_WRITE ? DMA_TO_DEVICE : 0);
 
 	if (address && length) {
 		dma_addr = dma_map_single(NULL, address, length, dir);
@@ -190,6 +191,46 @@ static ssize_t fw_cfg_read_blob(u16 key,
 		while (pos-- > 0)
 			ioread8(fw_cfg_reg_data);
 		ioread8_rep(fw_cfg_reg_data, buf, count);
+	}
+
+end:
+	mutex_unlock(&fw_cfg_dev_lock);
+
+	acpi_release_global_lock(glk);
+
+	return ret;
+}
+
+/* write chunk of given fw_cfg blob (caller responsible for sanity-check) */
+static ssize_t fw_cfg_write_blob(u16 key,
+				 void *buf, loff_t pos, size_t count)
+{
+	u32 glk = -1U;
+	acpi_status status;
+	ssize_t ret = count;
+
+	/* If we have ACPI, ensure mutual exclusion against any potential
+	 * device access by the firmware, e.g. via AML methods:
+	 */
+	status = acpi_acquire_global_lock(ACPI_WAIT_FOREVER, &glk);
+	if (ACPI_FAILURE(status) && status != AE_NOT_CONFIGURED) {
+		/* Should never get here */
+		WARN(1, "fw_cfg_write_blob: Failed to lock ACPI!\n");
+		memset(buf, 0, count);
+		return -EBUSY;
+	}
+
+	mutex_lock(&fw_cfg_dev_lock);
+	if (pos == 0) {
+		ret = fw_cfg_dma_transfer(buf, count, key << 16
+					  | FW_CFG_DMA_CTL_SELECT
+					  | FW_CFG_DMA_CTL_WRITE);
+	} else {
+		iowrite16(fw_cfg_sel_endianness(key), fw_cfg_reg_ctrl);
+		ret = fw_cfg_dma_transfer(0, pos, FW_CFG_DMA_CTL_SKIP);
+		if (ret < 0)
+			goto end;
+		ret = fw_cfg_dma_transfer(buf, count, FW_CFG_DMA_CTL_WRITE);
 	}
 
 end:
@@ -448,9 +489,28 @@ static ssize_t fw_cfg_sysfs_read_raw(struct file *filp, struct kobject *kobj,
 	return fw_cfg_read_blob(entry->f.select, buf, pos, count, true);
 }
 
+static ssize_t fw_cfg_sysfs_write_raw(struct file *filp, struct kobject *kobj,
+				      struct bin_attribute *bin_attr,
+				      char *buf, loff_t pos, size_t count)
+{
+	struct fw_cfg_sysfs_entry *entry = to_entry(kobj);
+
+	if (!fw_cfg_dma_enabled())
+		return -ENOTSUPP;
+
+	if (pos >= entry->f.size && count)
+		return -EINVAL;
+
+	if (count > entry->f.size - pos)
+		count = entry->f.size - pos;
+
+	return fw_cfg_write_blob(entry->f.select, buf, pos, count);
+}
+
 static struct bin_attribute fw_cfg_sysfs_attr_raw = {
-	.attr = { .name = "raw", .mode = S_IRUSR },
+	.attr = { .name = "raw", .mode = 0600 },
 	.read = fw_cfg_sysfs_read_raw,
+	.write = fw_cfg_sysfs_write_raw,
 };
 
 /*
