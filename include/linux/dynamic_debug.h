@@ -180,6 +180,12 @@ static inline int ddebug_dyndbg_module_param_cb(char *param, char *val,
 	do { if (0) printk(KERN_DEBUG pr_fmt(fmt), ##__VA_ARGS__); } while (0)
 #define dynamic_dev_dbg(dev, fmt, ...)					\
 	do { if (0) dev_printk(KERN_DEBUG, dev, fmt, ##__VA_ARGS__); } while (0)
+
+static inline void dynamic_hex_dump(const char *prefix_str, int prefix_type,
+		int rowsize, int groupsize, const void *buf, size_t len,
+		bool ascii)
+{
+}
 #endif
 
 #endif
