@@ -1,0 +1,14 @@
+# Format:
+#	MIDR,Version,JSON/file/pathname,Type
+#
+# where
+#	MIDR	Processor version
+#	Version could be used to track version of of JSON file
+#		but currently unused.
+#	JSON/file/pathname is the path to JSON file, relative
+#		to tools/perf/pmu-events/arch/arm64/.
+#	Type is core, uncore etc
+#
+#
+#Family-model,Version,Filename,EventType
+0x00000000420f5161,v1,thunderx2,core

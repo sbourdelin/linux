@@ -1,0 +1,62 @@
+[
+    {
+        "PublicDescription": "Attributable Level 1 data cache access, read",
+        "EventCode": "0x40",
+        "EventName": "l1d_cache_access_read",
+        "BriefDescription": "l1d cache access, read",
+    },
+    {
+        "PublicDescription": "Attributable Level 1 data cache access, write ",
+        "EventCode": "0x41",
+        "EventName": "l1d_cache_access_write",
+        "BriefDescription": "l1d cache access, write",
+    },
+    {
+        "PublicDescription": "Attributable Level 1 data cache refill, read",
+        "EventCode": "0x42",
+        "EventName": "l1d_cache_refill_read",
+        "BriefDescription": "l1d cache refill, read",
+    },
+    {
+        "PublicDescription": "Attributable Level 1 data cache refill, write",
+        "EventCode": "0x43",
+        "EventName": "l1d_cache_refill_write",
+        "BriefDescription": "l1d refill, write",
+    },
+    {
+        "PublicDescription": "Attributable Level 1 data TLB refill, read",
+        "EventCode": "0x4C",
+        "EventName": "l1d_tlb_refill_read",
+        "BriefDescription": "l1d tlb refill, read",
+    },
+    {
+        "PublicDescription": "Attributable Level 1 data TLB refill, write",
+        "EventCode": "0x4D",
+        "EventName": "l1d_tlb_refill_write",
+        "BriefDescription": "l1d tlb refill, write",
+    },
+    {
+        "PublicDescription": "Attributable Level 1 data or unified TLB access, read",
+        "EventCode": "0x4E",
+        "EventName": "l1d_tlb_read",
+        "BriefDescription": "l1d tlb, read",
+    },
+    {
+        "PublicDescription": "Attributable Level 1 data or unified TLB access, write",
+        "EventCode": "0x4F",
+        "EventName": "l1d_tlb_write",
+        "BriefDescription": "l1d tlb, write",
+    },
+    {
+        "PublicDescription": "Bus access, read",
+        "EventCode": "0x60",
+        "EventName": "bus_access_read",
+        "BriefDescription": "Bus access, read",
+   },
+   {
+        "PublicDescription": "Bus access, write",
+        "EventCode": "0x61",
+        "EventName": "bus_access_write",
+        "BriefDescription": "Bus access, write",
+   }
+]
