@@ -124,6 +124,7 @@ static const char *usage_string =
 
 static int __init uml_version_setup(char *line, int *add)
 {
+	/* Version is shown when user intended to see it, not an error */
 	printf("%s\n", init_utsname()->release);
 	exit(0);
 
@@ -152,8 +153,8 @@ __uml_setup("root=", uml_root_setup,
 
 static int __init no_skas_debug_setup(char *line, int *add)
 {
-	printf("'debug' is not necessary to gdb UML in skas mode - run \n");
-	printf("'gdb linux'\n");
+	non_fatal("'debug' is not necessary to gdb UML in skas mode - run\n");
+	non_fatal("'gdb linux'\n");
 
 	return 0;
 }
@@ -167,6 +168,7 @@ static int __init Usage(char *line, int *add)
 {
 	const char **p;
 
+	/* Usage is usually shown when user intended to see it, not an error */
 	printf(usage_string, init_utsname()->release);
 	p = &__uml_help_start;
 	while (p < &__uml_help_end) {
@@ -287,8 +289,8 @@ int __init linux_main(int argc, char **argv)
 
 	diff = UML_ROUND_UP(brk_start) - UML_ROUND_UP(&_end);
 	if (diff > 1024 * 1024) {
-		printf("Adding %ld bytes to physical memory to account for "
-		       "exec-shield gap\n", diff);
+		non_fatal("Adding %ld bytes to physical memory to account for "
+			  "exec-shield gap\n", diff);
 		physmem_size += UML_ROUND_UP(brk_start) - UML_ROUND_UP(&_end);
 	}
 
@@ -328,8 +330,8 @@ int __init linux_main(int argc, char **argv)
 	end_vm = start_vm + virtmem_size;
 
 	if (virtmem_size < physmem_size)
-		printf("Kernel virtual memory size shrunk to %lu bytes\n",
-		       virtmem_size);
+		non_fatal("Kernel virtual memory size shrunk to %lu bytes\n",
+			  virtmem_size);
 
 	os_flush_stdout();
 

@@ -175,7 +175,7 @@ int __init main(int argc, char **argv, char **envp)
 	/* disable SIGIO for the fds and set SIGIO to be ignored */
 	err = deactivate_all_fds();
 	if (err)
-		printf("deactivate_all_fds failed, errno = %d\n", -err);
+		non_fatal("deactivate_all_fds failed, errno = %d\n", -err);
 
 	/*
 	 * Let any pending signals fire now.  This ensures
@@ -186,12 +186,12 @@ int __init main(int argc, char **argv, char **envp)
 
 	/* Reboot */
 	if (ret) {
-		printf("\n");
+		non_fatal("\n");
 		execvp(new_argv[0], new_argv);
 		perror("Failed to exec kernel");
 		ret = 1;
 	}
-	printf("\n");
+	non_fatal("\n");
 	return uml_exitcode;
 }
 

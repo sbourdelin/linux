@@ -25,13 +25,13 @@ static int __init check_tmpfs(const char *dir)
 {
 	struct statfs st;
 
-	printf("Checking if %s is on tmpfs...", dir);
+	non_fatal("Checking if %s is on tmpfs...", dir);
 	if (statfs(dir, &st) < 0) {
-		printf("%s\n", strerror(errno));
+		non_fatal("%s\n", strerror(errno));
 	} else if (st.f_type != TMPFS_MAGIC) {
-		printf("no\n");
+		non_fatal("no\n");
 	} else {
-		printf("OK\n");
+		non_fatal("OK\n");
 		return 0;
 	}
 	return -1;
@@ -61,18 +61,18 @@ static char * __init choose_tempdir(void)
 	int i;
 	const char *dir;
 
-	printf("Checking environment variables for a tempdir...");
+	non_fatal("Checking environment variables for a tempdir...");
 	for (i = 0; vars[i]; i++) {
 		dir = getenv(vars[i]);
 		if ((dir != NULL) && (*dir != '\0')) {
-			printf("%s\n", dir);
+			non_fatal("%s\n", dir);
 			if (check_tmpfs(dir) >= 0)
 				goto done;
 			else
 				goto warn;
 		}
 	}
-	printf("none found\n");
+	non_fatal("none found\n");
 
 	for (i = 0; tmpfs_dirs[i]; i++) {
 		dir = tmpfs_dirs[i];
@@ -82,7 +82,7 @@ static char * __init choose_tempdir(void)
 
 	dir = fallback_dir;
 warn:
-	printf("Warning: tempdir %s is not on tmpfs\n", dir);
+	non_fatal("Warning: tempdir %s is not on tmpfs\n", dir);
 done:
 	/* Make a copy since getenv results may not remain valid forever. */
 	return strdup(dir);
@@ -194,16 +194,16 @@ void __init check_tmpexec(void)
 
 	addr = mmap(NULL, UM_KERN_PAGE_SIZE,
 		    PROT_READ | PROT_WRITE | PROT_EXEC, MAP_PRIVATE, fd, 0);
-	printf("Checking PROT_EXEC mmap in %s...", tempdir);
+	non_fatal("Checking PROT_EXEC mmap in %s...", tempdir);
 	if (addr == MAP_FAILED) {
 		err = errno;
-		printf("%s\n", strerror(err));
+		non_fatal("%s\n", strerror(err));
 		close(fd);
 		if (err == EPERM)
-			printf("%s must be not mounted noexec\n", tempdir);
+			non_fatal("%s must be not mounted noexec\n", tempdir);
 		exit(1);
 	}
-	printf("OK\n");
+	non_fatal("OK\n");
 	munmap(addr, UM_KERN_PAGE_SIZE);
 
 	close(fd);

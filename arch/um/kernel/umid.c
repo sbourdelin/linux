@@ -16,14 +16,14 @@ static int __init set_umid_arg(char *name, int *add)
 	int err;
 
 	if (umid_inited) {
-		printf("umid already set\n");
+		non_fatal("umid already set\n");
 		return 0;
 	}
 
 	*add = 0;
 	err = set_umid(name);
 	if (err == -EEXIST)
-		printf("umid '%s' already in use\n", name);
+		non_fatal("umid '%s' already in use\n", name);
 	else if (!err)
 		umid_inited = 1;
 
