@@ -257,6 +257,10 @@ int perf_evsel__open_per_thread(struct perf_evsel *evsel,
 				struct thread_map *threads);
 int perf_evsel__open(struct perf_evsel *evsel, struct cpu_map *cpus,
 		     struct thread_map *threads);
+void perf_evsel__close_per_cpu(struct perf_evsel *evsel,
+			       struct cpu_map *cpus);
+void perf_evsel__close_per_thread(struct perf_evsel *evsel,
+				  struct thread_map *threads);
 void perf_evsel__close(struct perf_evsel *evsel, int ncpus, int nthreads);
 
 struct perf_sample;
