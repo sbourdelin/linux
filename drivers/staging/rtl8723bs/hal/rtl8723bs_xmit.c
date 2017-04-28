@@ -58,7 +58,7 @@ static s32 rtl8723_dequeue_writeport(struct adapter *padapter)
 	struct xmit_priv *pxmitpriv = &padapter->xmitpriv;
 	struct dvobj_priv *pdvobjpriv = adapter_to_dvobj(padapter);
 	struct xmit_buf *pxmitbuf;
-	struct adapter * pri_padapter = padapter;
+	struct adapter *pri_padapter = padapter;
 	s32 ret = 0;
 	u8 PageIdx = 0;
 	u32 deviceId;
@@ -300,7 +300,7 @@ static s32 xmit_xmitframes(struct adapter *padapter, struct xmit_priv *pxmitpriv
 						/* pxmitbuf->priv_data will be NULL, and will crash here */
 						if (pxmitbuf->len > 0 && pxmitbuf->priv_data) {
 							struct xmit_frame *pframe;
-							pframe = (struct xmit_frame*)pxmitbuf->priv_data;
+							pframe = (struct xmit_frame *)pxmitbuf->priv_data;
 							pframe->agg_num = k;
 							pxmitbuf->agg_num = k;
 							rtl8723b_update_txdesc(pframe, pframe->buf_addr);
@@ -391,7 +391,7 @@ static s32 xmit_xmitframes(struct adapter *padapter, struct xmit_priv *pxmitpriv
 
 			if (pxmitbuf->len > 0) {
 				struct xmit_frame *pframe;
-				pframe = (struct xmit_frame*)pxmitbuf->priv_data;
+				pframe = (struct xmit_frame *)pxmitbuf->priv_data;
 				pframe->agg_num = k;
 				pxmitbuf->agg_num = k;
 				rtl8723b_update_txdesc(pframe, pframe->buf_addr);
