@@ -30,3 +30,7 @@ config OPAL_PRD
 	help
 	  This enables the opal-prd driver, a facility to run processor
 	  recovery diagnostics on OpenPower machines
+
+config HARDWARE_TRACING
+	bool 'Enable removal of memory for hardware memory tracing'
+	depends on PPC_POWERNV && MEMORY_HOTPLUG
