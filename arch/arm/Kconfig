@@ -1,6 +1,7 @@
 config ARM
 	bool
 	default y
+	select ADDR_LIMIT_CHECK
 	select ARCH_CLOCKSOURCE_DATA
 	select ARCH_HAS_DEBUG_VIRTUAL
 	select ARCH_HAS_DEVMEM_IS_ALLOWED
