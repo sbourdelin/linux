@@ -106,6 +106,32 @@ struct drm_crtc_helper_funcs {
 	void (*commit)(struct drm_crtc *crtc);
 
 	/**
+	 * @mode_valid:
+	 *
+	 * This callback should be implemented if the crtc has some sort of
+	 * restriction in the modes it can display. For example, a given crtc
+	 * may be responsible to set a clock value. If the clock can not
+	 * produce all the values for the available modes then this callback
+	 * can be used to restrict the number of probbed modes to only the ones
+	 * that can be displayed.
+	 *
+	 * This is directly called at the same stage of connector->mode_valid
+	 * callback.
+	 *
+	 * NOTE:
+	 *
+	 * For a given set of crtc's in a drm_device, if at least one does not
+	 * have the mode_valid callback, or, at least one returns MODE_OK then
+	 * the mode will be probbed.
+	 *
+	 * RETURNS:
+	 *
+	 * drm_mode_status Enum
+	 */
+	enum drm_mode_status (*mode_valid)(struct drm_crtc *crtc,
+					   const struct drm_display_mode *mode);
+
+	/**
 	 * @mode_fixup:
 	 *
 	 * This callback is used to validate a mode. The parameter mode is the
