@@ -286,6 +286,7 @@ struct intel_engine_cs {
 	void		(*emit_breadcrumb)(struct drm_i915_gem_request *req,
 					   u32 *cs);
 	int		emit_breadcrumb_sz;
+	int             (*prepare_request)(struct drm_i915_gem_request *req);
 
 	/* Pass the request to the hardware queue (e.g. directly into
 	 * the legacy ringbuffer or to the end of an execlist).

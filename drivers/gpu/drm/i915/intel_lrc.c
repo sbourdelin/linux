@@ -626,6 +626,15 @@ static bool insert_request(struct i915_priotree *pt, struct rb_root *root)
 	return first;
 }
 
+static int execlists_prepare_request(struct drm_i915_gem_request *request)
+{
+	u32 *cs = intel_ring_begin(request, 0);
+	if (IS_ERR(cs))
+		return PTR_ERR(cs);
+
+	return 0;
+}
+
 static void execlists_submit_request(struct drm_i915_gem_request *request)
 {
 	struct intel_engine_cs *engine = request->engine;
@@ -818,7 +827,6 @@ static int execlists_request_alloc(struct drm_i915_gem_request *request)
 {
 	struct intel_engine_cs *engine = request->engine;
 	struct intel_context *ce = &request->ctx->engine[engine->id];
-	u32 *cs;
 	int ret;
 
 	GEM_BUG_ON(!ce->pin_count);
@@ -843,11 +851,9 @@ static int execlists_request_alloc(struct drm_i915_gem_request *request)
 			goto err;
 	}
 
-	cs = intel_ring_begin(request, 0);
-	if (IS_ERR(cs)) {
-		ret = PTR_ERR(cs);
+	ret = engine->prepare_request(request);
+	if (ret)
 		goto err_unreserve;
-	}
 
 	if (!ce->initialised) {
 		ret = engine->init_context(request);
@@ -1568,6 +1574,7 @@ void intel_logical_ring_cleanup(struct intel_engine_cs *engine)
 
 static void execlists_set_default_submission(struct intel_engine_cs *engine)
 {
+	engine->prepare_request = execlists_prepare_request;
 	engine->submit_request = execlists_submit_request;
 	engine->schedule = execlists_schedule;
 	engine->irq_tasklet.func = intel_lrc_irq_handler;
