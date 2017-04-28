@@ -177,9 +177,14 @@ vti6_tnl_unlink(struct vti6_net *ip6n, struct ip6_tnl *t)
 	}
 }
 
-static void vti6_dev_free(struct net_device *dev)
+static void vti6_destructor_free(struct net_device *dev)
 {
 	free_percpu(dev->tstats);
+}
+
+static void vti6_dev_free(struct net_device *dev)
+{
+	vti6_destructor_free(dev);
 	free_netdev(dev);
 }
 
@@ -296,6 +301,10 @@ static void vti6_dev_uninit(struct net_device *dev)
 	else
 		vti6_tnl_unlink(ip6n, t);
 	dev_put(dev);
+
+	/* dev is not registered, perform the free instead of destructor */
+	if (dev->reg_state == NETREG_UNINITIALIZED)
+		vti6_destructor_free(dev);
 }
 
 static int vti6_rcv(struct sk_buff *skb)

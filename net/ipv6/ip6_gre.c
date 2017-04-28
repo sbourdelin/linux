@@ -77,6 +77,7 @@ static int ip6gre_tunnel_init(struct net_device *dev);
 static void ip6gre_tunnel_setup(struct net_device *dev);
 static void ip6gre_tunnel_link(struct ip6gre_net *ign, struct ip6_tnl *t);
 static void ip6gre_tnl_link_config(struct ip6_tnl *t, int set_mtu);
+static void ip6gre_dev_free(struct net_device *dev);
 
 /* Tunnel hash table */
 
@@ -355,6 +356,14 @@ failed_free:
 	return NULL;
 }
 
+static void ip6gre_destructor_free(struct net_device *dev)
+{
+	struct ip6_tnl *t = netdev_priv(dev);
+
+	dst_cache_destroy(&t->dst_cache);
+	free_percpu(dev->tstats);
+}
+
 static void ip6gre_tunnel_uninit(struct net_device *dev)
 {
 	struct ip6_tnl *t = netdev_priv(dev);
@@ -363,6 +372,10 @@ static void ip6gre_tunnel_uninit(struct net_device *dev)
 	ip6gre_tunnel_unlink(ign, t);
 	dst_cache_reset(&t->dst_cache);
 	dev_put(dev);
+
+	/* dev is not registered, perform the free instead of destructor */
+	if (dev->reg_state == NETREG_UNINITIALIZED)
+		ip6gre_destructor_free(dev);
 }
 
 
@@ -981,10 +994,7 @@ static const struct net_device_ops ip6gre_netdev_ops = {
 
 static void ip6gre_dev_free(struct net_device *dev)
 {
-	struct ip6_tnl *t = netdev_priv(dev);
-
-	dst_cache_destroy(&t->dst_cache);
-	free_percpu(dev->tstats);
+	ip6gre_destructor_free(dev);
 	free_netdev(dev);
 }
 

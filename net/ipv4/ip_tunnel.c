@@ -954,13 +954,18 @@ int ip_tunnel_change_mtu(struct net_device *dev, int new_mtu)
 }
 EXPORT_SYMBOL_GPL(ip_tunnel_change_mtu);
 
-static void ip_tunnel_dev_free(struct net_device *dev)
+static void ip_tunnel_destructor_free(struct net_device *dev)
 {
 	struct ip_tunnel *tunnel = netdev_priv(dev);
 
 	gro_cells_destroy(&tunnel->gro_cells);
 	dst_cache_destroy(&tunnel->dst_cache);
 	free_percpu(dev->tstats);
+}
+
+static void ip_tunnel_dev_free(struct net_device *dev)
+{
+	ip_tunnel_destructor_free(dev);
 	free_netdev(dev);
 }
 
@@ -1192,6 +1197,10 @@ void ip_tunnel_uninit(struct net_device *dev)
 		ip_tunnel_del(itn, netdev_priv(dev));
 
 	dst_cache_reset(&tunnel->dst_cache);
+
+	/* dev is not registered, perform the free instead of destructor */
+	if (dev->reg_state == NETREG_UNINITIALIZED)
+		ip_tunnel_destructor_free(dev);
 }
 EXPORT_SYMBOL_GPL(ip_tunnel_uninit);
 

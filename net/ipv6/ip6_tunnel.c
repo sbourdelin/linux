@@ -247,13 +247,18 @@ ip6_tnl_unlink(struct ip6_tnl_net *ip6n, struct ip6_tnl *t)
 	}
 }
 
-static void ip6_dev_free(struct net_device *dev)
+static void ip6_tnl_destructor_free(struct net_device *dev)
 {
 	struct ip6_tnl *t = netdev_priv(dev);
 
 	gro_cells_destroy(&t->gro_cells);
 	dst_cache_destroy(&t->dst_cache);
 	free_percpu(dev->tstats);
+}
+
+static void ip6_dev_free(struct net_device *dev)
+{
+	ip6_tnl_destructor_free(dev);
 	free_netdev(dev);
 }
 
@@ -387,6 +392,10 @@ ip6_tnl_dev_uninit(struct net_device *dev)
 		ip6_tnl_unlink(ip6n, t);
 	dst_cache_reset(&t->dst_cache);
 	dev_put(dev);
+
+	/* dev is not registered, perform the free instead of destructor */
+	if (dev->reg_state == NETREG_UNINITIALIZED)
+		ip6_tnl_destructor_free(dev);
 }
 
 /**
