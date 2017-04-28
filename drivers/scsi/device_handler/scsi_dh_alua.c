@@ -522,7 +522,7 @@ static int alua_rtpg(struct scsi_device *sdev, struct alua_port_group *pg)
 	struct alua_port_group *tmp_pg;
 	int len, k, off, valid_states = 0, bufflen = ALUA_RTPG_SIZE;
 	unsigned char *desc, *buff;
-	unsigned err, retval;
+	unsigned err = SCSI_DH_OK, retval;
 	unsigned int tpg_desc_tbl_off;
 	unsigned char orig_transition_tmo;
 	unsigned long flags;
@@ -541,7 +541,6 @@ static int alua_rtpg(struct scsi_device *sdev, struct alua_port_group *pg)
 		return SCSI_DH_DEV_TEMP_BUSY;
 
  retry:
-	err = 0;
 	retval = submit_rtpg(sdev, buff, bufflen, &sense_hdr, pg->flags);
 
 	if (retval) {
@@ -569,6 +568,7 @@ static int alua_rtpg(struct scsi_device *sdev, struct alua_port_group *pg)
 			pg->flags |= ALUA_RTPG_EXT_HDR_UNSUPP;
 			goto retry;
 		}
+		err = SCSI_DH_IO;
 		/*
 		 * Retry on ALUA state transition or if any
 		 * UNIT ATTENTION occurred.
@@ -576,6 +576,9 @@ static int alua_rtpg(struct scsi_device *sdev, struct alua_port_group *pg)
 		if (sense_hdr.sense_key == NOT_READY &&
 		    sense_hdr.asc == 0x04 && sense_hdr.ascq == 0x0a)
 			err = SCSI_DH_RETRY;
+		if (sense_hdr.sense_key == ILLEGAL_REQUEST &&
+		    sense_hdr.asc == 0x25 && sense_hdr.ascq == 0x00)
+			err = SCSI_DH_DEV_OFFLINED;
 		else if (sense_hdr.sense_key == UNIT_ATTENTION)
 			err = SCSI_DH_RETRY;
 		if (err == SCSI_DH_RETRY &&
@@ -591,7 +594,7 @@ static int alua_rtpg(struct scsi_device *sdev, struct alua_port_group *pg)
 		scsi_print_sense_hdr(sdev, ALUA_DH_NAME, &sense_hdr);
 		kfree(buff);
 		pg->expiry = 0;
-		return SCSI_DH_IO;
+		return err;
 	}
 
 	len = get_unaligned_be32(&buff[0]) + 4;
