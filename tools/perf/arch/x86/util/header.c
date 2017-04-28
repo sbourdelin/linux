@@ -65,9 +65,11 @@ get_cpuid(char *buffer, size_t sz)
 }
 
 char *
-get_cpuid_str(void)
+get_cpuid_str(struct perf_pmu *pmu)
 {
 	char *buf = malloc(128);
+
+	do { if (pmu) {} } while (0);
 
 	if (__get_cpuid(buf, 128, "%s-%u-%X$") < 0) {
 		free(buf);

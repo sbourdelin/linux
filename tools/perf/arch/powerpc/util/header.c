@@ -34,10 +34,11 @@ get_cpuid(char *buffer, size_t sz)
 }
 
 char *
-get_cpuid_str(void)
+get_cpuid_str(struct perf_pmu *pmu)
 {
 	char *bufp;
 
+	do { if (pmu) {} } while (0);
 	if (asprintf(&bufp, "%.8lx", mfspr(SPRN_PVR)) < 0)
 		bufp = NULL;
 
