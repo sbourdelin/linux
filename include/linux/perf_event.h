@@ -718,6 +718,7 @@ struct perf_event {
 #endif
 
 	struct list_head		sb_list;
+	struct work_struct		destroy_work;
 #endif /* CONFIG_PERF_EVENTS */
 };
 

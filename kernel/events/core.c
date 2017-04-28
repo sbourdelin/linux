@@ -9321,6 +9321,16 @@ enabled:
 	account_pmu_sb_event(event);
 }
 
+static void perf_alloc_destroy_ev(struct work_struct *work)
+{
+	struct perf_event *event;
+
+	event = container_of(work, struct perf_event, destroy_work);
+	event->destroy(event);
+	module_put(event->pmu->module);
+	kfree(event);
+}
+
 /*
  * Allocate and initialize a event structure
  */
@@ -9335,6 +9345,7 @@ perf_event_alloc(struct perf_event_attr *attr, int cpu,
 	struct pmu *pmu;
 	struct perf_event *event;
 	struct hw_perf_event *hwc;
+	bool delay_destroy = false;
 	long err = -EINVAL;
 
 	if ((unsigned)cpu >= nr_cpu_ids) {
@@ -9498,15 +9509,22 @@ err_per_task:
 	exclusive_event_destroy(event);
 
 err_pmu:
-	if (event->destroy)
-		event->destroy(event);
-	module_put(pmu->module);
+	if (event->destroy) {
+		/* delay ->destroy due to nested get_online_cpus() */
+		INIT_WORK(&event->destroy_work, perf_alloc_destroy_ev);
+		delay_destroy = true;
+	} else {
+		module_put(pmu->module);
+	}
 err_ns:
 	if (is_cgroup_event(event))
 		perf_detach_cgroup(event);
 	if (event->ns)
 		put_pid_ns(event->ns);
-	kfree(event);
+	if (delay_destroy)
+		schedule_work(&event->destroy_work);
+	else
+		kfree(event);
 
 	return ERR_PTR(err);
 }
@@ -9799,7 +9817,7 @@ SYSCALL_DEFINE5(perf_event_open,
 		pid_t, pid, int, cpu, int, group_fd, unsigned long, flags)
 {
 	struct perf_event *group_leader = NULL, *output_event = NULL;
-	struct perf_event *event, *sibling;
+	struct perf_event *event = NULL, *sibling;
 	struct perf_event_attr attr;
 	struct perf_event_context *ctx, *uninitialized_var(gctx);
 	struct file *event_file = NULL;
@@ -9909,13 +9927,14 @@ SYSCALL_DEFINE5(perf_event_open,
 				 NULL, NULL, cgroup_fd);
 	if (IS_ERR(event)) {
 		err = PTR_ERR(event);
+		event = NULL;
 		goto err_cred;
 	}
 
 	if (is_sampling_event(event)) {
 		if (event->pmu->capabilities & PERF_PMU_CAP_NO_INTERRUPT) {
 			err = -EOPNOTSUPP;
-			goto err_alloc;
+			goto err_cred;
 		}
 	}
 
@@ -9928,7 +9947,7 @@ SYSCALL_DEFINE5(perf_event_open,
 	if (attr.use_clockid) {
 		err = perf_event_set_clock(event, attr.clockid);
 		if (err)
-			goto err_alloc;
+			goto err_cred;
 	}
 
 	if (pmu->task_ctx_nr == perf_sw_context)
@@ -9963,7 +9982,7 @@ SYSCALL_DEFINE5(perf_event_open,
 	ctx = find_get_context(pmu, task, event);
 	if (IS_ERR(ctx)) {
 		err = PTR_ERR(ctx);
-		goto err_alloc;
+		goto err_cred;
 	}
 
 	if ((pmu->capabilities & PERF_PMU_CAP_EXCLUSIVE) && group_leader) {
@@ -10187,18 +10206,21 @@ err_locked:
 err_context:
 	perf_unpin_context(ctx);
 	put_ctx(ctx);
-err_alloc:
-	/*
-	 * If event_file is set, the fput() above will have called ->release()
-	 * and that will take care of freeing the event.
-	 */
-	if (!event_file)
-		free_event(event);
 err_cred:
 	if (task)
 		mutex_unlock(&task->signal->cred_guard_mutex);
 err_cpus:
 	put_online_cpus();
+	/*
+	 * The event cleanup should happen earlier (as per cleanup in reverse
+	 * allocation order). It is delayed after the put_online_cpus() section
+	 * so we don't invoke event->destroy in it and risk recursive invocation
+	 * of it via static_key_slow_dec().
+	 * If event_file is set, the fput() above will have called ->release()
+	 * and that will take care of freeing the event.
+	 */
+	if (event && !event_file)
+		free_event(event);
 err_task:
 	if (task)
 		put_task_struct(task);
