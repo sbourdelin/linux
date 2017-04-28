@@ -32,6 +32,18 @@ static struct simplefb_format supported_formats[] = {
 	{ "r8g8b8", 24, {16, 8}, {8, 8}, {0, 8}, {0, 0}, DRM_FORMAT_RGB888 },
 };
 
+static bool arc_pgu_is_mode_valid(struct arcpgu_drm_private *arcpgu,
+				  const struct drm_display_mode *mode)
+{
+	long rate, clk_rate = mode->clock * 1000;
+
+	rate = clk_round_rate(arcpgu->clk, clk_rate);
+	if (rate != clk_rate)
+		return false;
+
+	return true;
+}
+
 static void arc_pgu_set_pxl_fmt(struct drm_crtc *crtc)
 {
 	struct arcpgu_drm_private *arcpgu = crtc_to_arcpgu_priv(crtc);
@@ -63,6 +75,17 @@ static const struct drm_crtc_funcs arc_pgu_crtc_funcs = {
 	.atomic_duplicate_state = drm_atomic_helper_crtc_duplicate_state,
 	.atomic_destroy_state = drm_atomic_helper_crtc_destroy_state,
 };
+
+enum drm_mode_status arc_pgu_crtc_mode_valid(struct drm_crtc *crtc,
+					     const struct drm_display_mode *mode)
+{
+	struct arcpgu_drm_private *arcpgu = crtc_to_arcpgu_priv(crtc);
+
+	if (!arc_pgu_is_mode_valid(arcpgu, mode))
+		return MODE_NOCLOCK;
+
+	return MODE_OK;
+}
 
 static void arc_pgu_crtc_mode_set_nofb(struct drm_crtc *crtc)
 {
@@ -134,10 +157,8 @@ static int arc_pgu_crtc_atomic_check(struct drm_crtc *crtc,
 {
 	struct arcpgu_drm_private *arcpgu = crtc_to_arcpgu_priv(crtc);
 	struct drm_display_mode *mode = &state->adjusted_mode;
-	long rate, clk_rate = mode->clock * 1000;
 
-	rate = clk_round_rate(arcpgu->clk, clk_rate);
-	if (rate != clk_rate)
+	if (!arc_pgu_is_mode_valid(arcpgu, mode))
 		return -EINVAL;
 
 	return 0;
@@ -158,6 +179,7 @@ static void arc_pgu_crtc_atomic_begin(struct drm_crtc *crtc,
 }
 
 static const struct drm_crtc_helper_funcs arc_pgu_crtc_helper_funcs = {
+	.mode_valid	= arc_pgu_crtc_mode_valid,
 	.mode_set	= drm_helper_crtc_mode_set,
 	.mode_set_base	= drm_helper_crtc_mode_set_base,
 	.mode_set_nofb	= arc_pgu_crtc_mode_set_nofb,
