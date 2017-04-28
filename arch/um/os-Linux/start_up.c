@@ -308,15 +308,17 @@ static void __init check_coredump_limit(void)
 		return;
 	}
 
-	printf("Core dump limits :\n\tsoft - ");
+	non_fatal("Core dump limits :\n\tsoft - ");
 	if (lim.rlim_cur == RLIM_INFINITY)
-		printf("NONE\n");
-	else printf("%lu\n", lim.rlim_cur);
+		non_fatal("NONE\n");
+	else
+		non_fatal("%lu\n", lim.rlim_cur);
 
-	printf("\thard - ");
+	non_fatal("\thard - ");
 	if (lim.rlim_max == RLIM_INFINITY)
-		printf("NONE\n");
-	else printf("%lu\n", lim.rlim_max);
+		non_fatal("NONE\n");
+	else
+		non_fatal("%lu\n", lim.rlim_max);
 }
 
 void __init os_early_checks(void)
