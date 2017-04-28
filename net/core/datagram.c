@@ -764,7 +764,7 @@ int skb_copy_and_csum_datagram_msg(struct sk_buff *skb,
 
 	if (msg_data_left(msg) < chunk) {
 		if (__skb_checksum_complete(skb))
-			goto csum_error;
+			goto fault;
 		if (skb_copy_datagram_msg(skb, hlen, msg, chunk))
 			goto fault;
 	} else {
