@@ -223,6 +223,7 @@ static int esp_output(struct xfrm_state *x, struct sk_buff *skb)
 	int extralen;
 	int tailen;
 	__be64 seqno;
+	int esp_offset = 0;
 	__u8 proto = *skb_mac_header(skb);
 
 	/* skb is pure payload to encrypt */
@@ -287,6 +288,8 @@ static int esp_output(struct xfrm_state *x, struct sk_buff *skb)
 			esph = (struct ip_esp_hdr *)(udpdata32 + 2);
 			break;
 		}
+
+		esp_offset = (unsigned char *)esph - (unsigned char *)uh;
 
 		*skb_mac_header(skb) = IPPROTO_UDP;
 	}
@@ -397,7 +400,7 @@ cow:
 		goto error;
 	nfrags = err;
 	tail = skb_tail_pointer(trailer);
-	esph = ip_esp_hdr(skb);
+	esph = (struct ip_esp_hdr *)(skb_transport_header(skb) + esp_offset);
 
 skip_cow:
 	esp_output_fill_trailer(tail, tfclen, plen, proto);
