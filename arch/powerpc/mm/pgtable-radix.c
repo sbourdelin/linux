@@ -115,7 +115,8 @@ static inline void __meminit print_mapping(unsigned long start,
 	if (end <= start)
 		return;
 
-	pr_info("Mapped range 0x%lx - 0x%lx with 0x%lx\n", start, end, size);
+	pr_info("Mapped range 0x%016lx - 0x%016lx with %lu MB\n",
+			start, end, (unsigned long) (size >> 20));
 }
 
 static int __meminit create_physical_mapping(unsigned long start,
