@@ -368,6 +368,44 @@ static const match_table_t tokens = {
 	{Opt_err, NULL},
 };
 
+static int parse_recursive_mount_options(char *data)
+{
+	substring_t args[MAX_OPT_ARGS];
+	char *options, *orig;
+	char *p;
+	int ret = 0;
+
+	/*
+	 * This is not a remount thread, but we allow recursive mounts
+	 * with varying RO/RW flag to support subvol-mounts. So error-out
+	 * if any other option being passed in here.
+	 */
+
+	options = kstrdup(data, GFP_NOFS);
+	if (!options)
+		return -ENOMEM;
+
+	orig = options;
+
+	while ((p = strsep(&options, ",")) != NULL) {
+		int token;
+		if (!*p)
+			continue;
+
+		token = match_token(p, tokens, args);
+		switch(token) {
+		case Opt_subvol:
+		case Opt_subvolid:
+			break;
+		default:
+			ret = -EBUSY;
+		}
+	}
+
+	kfree(orig);
+	return ret;
+}
+
 /*
  * Regular mount options parser.  Everything that is needed only when
  * reading in a new superblock is parsed here.
@@ -1585,6 +1623,8 @@ static struct dentry *btrfs_mount(struct file_system_type *fs_type, int flags,
 		btrfs_close_devices(fs_devices);
 		free_fs_info(fs_info);
 		if ((flags ^ s->s_flags) & MS_RDONLY)
+			error = -EBUSY;
+		if (parse_recursive_mount_options(data))
 			error = -EBUSY;
 	} else {
 		snprintf(s->s_id, sizeof(s->s_id), "%pg", bdev);
