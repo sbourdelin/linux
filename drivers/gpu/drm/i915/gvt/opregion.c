@@ -283,14 +283,22 @@ int intel_vgpu_emulate_opregion_request(struct intel_vgpu *vgpu, u32 swsci)
 {
 	u32 *scic, *parm;
 	u32 func, subfunc;
+	u32 scic_val, parm_val;
+	u32 gpa;
 
-	scic = vgpu_opregion(vgpu)->va + INTEL_GVT_OPREGION_SCIC;
-	parm = vgpu_opregion(vgpu)->va + INTEL_GVT_OPREGION_PARM;
+	memcpy(&gpa, vgpu_cfg_space(vgpu) + INTEL_GVT_PCI_OPREGION,
+			sizeof(gpa));
+	intel_gvt_hypervisor_read_gpa(vgpu, gpa + INTEL_GVT_OPREGION_SCIC,
+			&scic_val, sizeof(scic_val));
+	intel_gvt_hypervisor_read_gpa(vgpu, gpa + INTEL_GVT_OPREGION_PARM,
+			&parm_val, sizeof(parm_val));
 
 	if (!(swsci & SWSCI_SCI_SELECT)) {
 		gvt_vgpu_err("requesting SMI service\n");
 		return 0;
 	}
+	scic = &scic_val;
+	parm = &parm_val;
 	/* ignore non 0->1 trasitions */
 	if ((vgpu_cfg_space(vgpu)[INTEL_GVT_PCI_SWSCI]
 				& SWSCI_SCI_TRIGGER) ||
