@@ -339,6 +339,30 @@ static void register_decoders(struct delta_dev *delta)
 	}
 }
 
+static void register_ctrls(struct delta_dev *delta)
+{
+	const struct delta_dec *dec;
+	unsigned int i, j;
+	u32 meta_cid;
+
+	/* decoders optional meta controls */
+	for (i = 0; i < delta->nb_of_decoders; i++) {
+		dec = delta->decoders[i];
+		if (!dec->meta_cids)
+			continue;
+
+		for (j = 0; j < dec->nb_of_metas; j++) {
+			meta_cid = dec->meta_cids[j];
+			if (!meta_cid)
+				continue;
+
+			delta->cids[delta->nb_of_ctrls++] = meta_cid;
+		}
+	}
+
+	/* add here additional controls if needed */
+}
+
 static void delta_lock(void *priv)
 {
 	struct delta_ctx *ctx = priv;
@@ -353,6 +377,79 @@ static void delta_unlock(void *priv)
 	struct delta_dev *delta = ctx->dev;
 
 	mutex_unlock(&delta->lock);
+}
+
+static int delta_s_ctrl(struct v4l2_ctrl *ctrl)
+{
+	struct delta_ctx *ctx =
+		container_of(ctrl->handler, struct delta_ctx, ctrl_handler);
+	struct delta_dev *delta = ctx->dev;
+
+	if (ctx->nb_of_metas >= DELTA_MAX_METAS) {
+		dev_err(delta->dev, "%s not enough room to set meta control\n",
+			ctx->name);
+		return -EINVAL;
+	}
+
+	dev_dbg(delta->dev, "%s set metas[%d] from control id=%d (%s)\n",
+		ctx->name, ctx->nb_of_metas, ctrl->id, ctrl->name);
+
+	ctx->metas[ctx->nb_of_metas].cid = ctrl->id;
+	ctx->metas[ctx->nb_of_metas].p = ctrl->p_new.p;
+	ctx->nb_of_metas++;
+
+	return 0;
+}
+
+static const struct v4l2_ctrl_ops delta_ctrl_ops = {
+	.s_ctrl = delta_s_ctrl,
+};
+
+static int delta_ctrls_setup(struct delta_ctx *ctx)
+{
+	struct delta_dev *delta = ctx->dev;
+	struct v4l2_ctrl_handler *hdl = &ctx->ctrl_handler;
+	unsigned int i;
+
+	v4l2_ctrl_handler_init(hdl, delta->nb_of_ctrls);
+
+	for (i = 0; i < delta->nb_of_ctrls; i++) {
+		struct v4l2_ctrl *ctrl;
+		u32 cid = delta->cids[i];
+		struct v4l2_ctrl_config cfg;
+
+		/* override static config to set delta_ctrl_ops */
+		memset(&cfg, 0, sizeof(cfg));
+		cfg.id = cid;
+		cfg.ops = &delta_ctrl_ops;
+
+		ctrl = v4l2_ctrl_new_custom(hdl, &cfg, NULL);
+		if (hdl->error) {
+			int err = hdl->error;
+
+			dev_err(delta->dev, "%s failed to setup control '%s' (id=%d, size=%d, err=%d)\n",
+				ctx->name, cfg.name, cfg.id,
+				cfg.elem_size, err);
+			v4l2_ctrl_handler_free(hdl);
+			return err;
+		}
+
+		/* force unconditional execution of s_ctrl() by
+		 * disabling control value evaluation in case of
+		 * meta control (passed by pointer)
+		 */
+		if (ctrl->is_ptr)
+			ctrl->flags |= V4L2_CTRL_FLAG_EXECUTE_ON_WRITE;
+	}
+
+	v4l2_ctrl_handler_setup(hdl);
+	ctx->fh.ctrl_handler = hdl;
+
+	ctx->nb_of_metas = 0;
+	memset(ctx->metas, 0, sizeof(ctx->metas));
+
+	dev_dbg(delta->dev, "%s controls setup done\n", ctx->name);
+	return 0;
 }
 
 static int delta_open_decoder(struct delta_ctx *ctx, u32 streamformat,
@@ -896,6 +993,8 @@ static int delta_subscribe_event(struct v4l2_fh *fh,
 				 const struct v4l2_event_subscription *sub)
 {
 	switch (sub->type) {
+	case V4L2_EVENT_CTRL:
+		return v4l2_ctrl_subscribe_event(fh, sub);
 	case V4L2_EVENT_EOS:
 		return v4l2_event_subscribe(fh, sub, 2, NULL);
 	default:
@@ -963,6 +1062,12 @@ static void delta_run_work(struct work_struct *work)
 	au = to_au(vbuf);
 	au->size = vb2_get_plane_payload(&vbuf->vb2_buf, 0);
 	au->dts = vbuf->vb2_buf.timestamp;
+
+	/* set access unit meta data in case of decoder requires it */
+	memcpy(au->metas, ctx->metas, ctx->nb_of_metas * sizeof(au->metas[0]));
+	au->nb_of_metas = ctx->nb_of_metas;
+	/* reset context metas for next decoding */
+	ctx->nb_of_metas = 0;
 
 	/* dump access unit */
 	dump_au(ctx, au);
@@ -1364,6 +1469,12 @@ static int delta_vb2_au_start_streaming(struct vb2_queue *q,
 	au->size = vb2_get_plane_payload(&vbuf->vb2_buf, 0);
 	au->dts = vbuf->vb2_buf.timestamp;
 
+	/* set access unit meta data in case of decoder requires it */
+	memcpy(au->metas, ctx->metas, ctx->nb_of_metas * sizeof(au->metas[0]));
+	au->nb_of_metas = ctx->nb_of_metas;
+	/* reset context metas for next decoding */
+	ctx->nb_of_metas = 0;
+
 	delta_push_dts(ctx, au->dts);
 
 	/* dump access unit */
@@ -1659,6 +1770,13 @@ static int delta_open(struct file *file)
 	file->private_data = &ctx->fh;
 	v4l2_fh_add(&ctx->fh);
 
+	ret = delta_ctrls_setup(ctx);
+	if (ret) {
+		dev_err(delta->dev, "%s failed to setup controls (%d)\n",
+			DELTA_PREFIX, ret);
+		goto err_fh_del;
+	}
+
 	INIT_WORK(&ctx->run_work, delta_run_work);
 	mutex_init(&ctx->lock);
 
@@ -1668,7 +1786,7 @@ static int delta_open(struct file *file)
 		ret = PTR_ERR(ctx->fh.m2m_ctx);
 		dev_err(delta->dev, "%s failed to initialize m2m context (%d)\n",
 			DELTA_PREFIX, ret);
-		goto err_fh_del;
+		goto err_ctrls;
 	}
 
 	/*
@@ -1703,6 +1821,8 @@ static int delta_open(struct file *file)
 
 	return 0;
 
+err_ctrls:
+	v4l2_ctrl_handler_free(&ctx->ctrl_handler);
 err_fh_del:
 	v4l2_fh_del(&ctx->fh);
 	v4l2_fh_exit(&ctx->fh);
@@ -1731,6 +1851,8 @@ static int delta_release(struct file *file)
 	delta_trace_summary(ctx);
 
 	v4l2_m2m_ctx_release(ctx->fh.m2m_ctx);
+
+	v4l2_ctrl_handler_free(&ctx->ctrl_handler);
 
 	v4l2_fh_del(&ctx->fh);
 	v4l2_fh_exit(&ctx->fh);
@@ -1886,6 +2008,9 @@ static int delta_probe(struct platform_device *pdev)
 
 	/* register all supported formats */
 	register_formats(delta);
+
+	/* register all supported controls */
+	register_ctrls(delta);
 
 	/* register on V4L2 */
 	ret = v4l2_device_register(dev, &delta->v4l2_dev);
