@@ -1974,7 +1974,9 @@ int snd_soc_set_dmi_name(struct snd_soc_card *card, const char *flavour)
 		return 0; /* long name already set by driver or from DMI */
 
 	/* make up dmi long name as: vendor.product.version.board */
-	vendor = dmi_get_system_info(DMI_BOARD_VENDOR);
+	vendor = dmi_get_system_info(DMI_SYS_VENDOR);
+	if (!vendor)
+		vendor = dmi_get_system_info(DMI_BOARD_VENDOR);
 	if (!vendor) {
 		dev_warn(card->dev, "ASoC: no DMI vendor name!\n");
 		return 0;
