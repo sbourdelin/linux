@@ -445,10 +445,16 @@ void acpi_tb_put_table(struct acpi_table_desc *table_desc)
 
 	ACPI_FUNCTION_TRACE(acpi_tb_put_table);
 
-	if (table_desc->validation_count == 0) {
+	if ((table_desc->validation_count + 1) == 0) {
 		ACPI_WARNING((AE_INFO,
-			      "Table %p, Validation count is zero before decrement\n",
+			      "Table %p, Validation count is about to expire, decrement is unsafe\n",
 			      table_desc));
+		return_VOID;
+	}
+	if (table_desc->validation_count == 0) {
+		ACPI_ERROR((AE_INFO,
+			   "Table %p, Validation count is zero before decrement\n",
+			   table_desc));
 		return_VOID;
 	}
 	table_desc->validation_count--;
