@@ -22,9 +22,11 @@
 /**
  * enum vtpm_proxy_flags - flags for the proxy TPM
  * @VTPM_PROXY_FLAG_TPM2:	the proxy TPM uses TPM 2.0 protocol
+ * @VTPM_PROXY_PREPEND_LOCALITY:locality byte prepended on each command
  */
 enum vtpm_proxy_flags {
-	VTPM_PROXY_FLAG_TPM2	= 1,
+	VTPM_PROXY_FLAG_TPM2			= 1,
+	VTPM_PROXY_FLAG_PREPEND_LOCALITY	= 2,
 };
 
 /**
