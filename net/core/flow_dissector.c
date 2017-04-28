@@ -58,28 +58,6 @@ void skb_flow_dissector_init(struct flow_dissector *flow_dissector,
 EXPORT_SYMBOL(skb_flow_dissector_init);
 
 /**
- * skb_flow_get_be16 - extract be16 entity
- * @skb: sk_buff to extract from
- * @poff: offset to extract at
- * @data: raw buffer pointer to the packet
- * @hlen: packet header length
- *
- * The function will try to retrieve a be32 entity at
- * offset poff
- */
-static __be16 skb_flow_get_be16(const struct sk_buff *skb, int poff,
-				void *data, int hlen)
-{
-	__be16 *u, _u;
-
-	u = __skb_header_pointer(skb, poff, sizeof(_u), data, hlen, &_u);
-	if (u)
-		return *u;
-
-	return 0;
-}
-
-/**
  * __skb_flow_get_ports - extract the upper layer ports and return them
  * @skb: sk_buff to extract the ports from
  * @thoff: transport header offset
@@ -353,6 +331,29 @@ __skb_flow_dissect_gre(const struct sk_buff *skb,
 	return FLOW_DISSECT_RET_OUT_PROTO_AGAIN;
 }
 
+static enum flow_dissect_ret
+__skb_flow_dissect_icmp(const struct sk_buff *skb,
+			struct flow_dissector *flow_dissector,
+			void *target_container, void *data, int nhoff, int hlen)
+{
+	struct flow_dissector_key_icmp *key_icmp;
+	__be16 *u, _u;
+
+	if (!dissector_uses_key(flow_dissector, FLOW_DISSECTOR_KEY_ICMP))
+		return FLOW_DISSECT_RET_OUT_GOOD;
+
+	u = __skb_header_pointer(skb, nhoff, sizeof(_u), data, hlen, &_u);
+	if (!u)
+		return FLOW_DISSECT_RET_OUT_BAD;
+
+	key_icmp = skb_flow_dissector_target(flow_dissector,
+					     FLOW_DISSECTOR_KEY_ICMP,
+					     target_container);
+	key_icmp->icmp = *u;
+
+	return FLOW_DISSECT_RET_OUT_GOOD;
+}
+
 /**
  * __skb_flow_dissect - extract the flow_keys struct and return it
  * @skb: sk_buff to extract the flow from, can be NULL if the rest are specified
@@ -379,7 +380,6 @@ bool __skb_flow_dissect(const struct sk_buff *skb,
 	struct flow_dissector_key_basic *key_basic;
 	struct flow_dissector_key_addrs *key_addrs;
 	struct flow_dissector_key_ports *key_ports;
-	struct flow_dissector_key_icmp *key_icmp;
 	struct flow_dissector_key_tags *key_tags;
 	struct flow_dissector_key_vlan *key_vlan;
 	bool skip_vlan = false;
@@ -694,6 +694,17 @@ ip_proto_again:
 	case IPPROTO_MPLS:
 		proto = htons(ETH_P_MPLS_UC);
 		goto mpls;
+	case IPPROTO_ICMP:
+	case NEXTHDR_ICMP:
+		switch (__skb_flow_dissect_icmp(skb, flow_dissector,
+						target_container, data,
+						nhoff, hlen)) {
+		case FLOW_DISSECT_RET_OUT_GOOD:
+			goto out_good;
+		case FLOW_DISSECT_RET_OUT_BAD:
+		default:
+			goto out_bad;
+		}
 	default:
 		break;
 	}
@@ -706,14 +717,6 @@ ip_proto_again:
 		if (!__skb_flow_get_ports(skb, nhoff, ip_proto, data, hlen,
 					  &key_ports->ports))
 			goto out_bad;
-	}
-
-	if (dissector_uses_key(flow_dissector,
-			       FLOW_DISSECTOR_KEY_ICMP)) {
-		key_icmp = skb_flow_dissector_target(flow_dissector,
-						     FLOW_DISSECTOR_KEY_ICMP,
-						     target_container);
-		key_icmp->icmp = skb_flow_get_be16(skb, nhoff, data, hlen);
 	}
 
 out_good:
