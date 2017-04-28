@@ -364,6 +364,28 @@ static void read_counters(void)
 	}
 }
 
+/*
+ * Close all evnt FDs we open in __run_perf_stat() and
+ * create_perf_stat_counter(), taking care to match the number of threads and CPUs.
+ *
+ * Note that perf_evlist__close(evsel_list) is not equivalent, as it doesn't
+ * take the target into account.
+ */
+static void close_counters(void)
+{
+	bool per_cpu = target__has_cpu(&target);
+	struct perf_evsel *evsel;
+
+	evlist__for_each_entry(evsel_list, evsel) {
+		if (per_cpu)
+			perf_evsel__close_per_cpu(evsel,
+						  perf_evsel__cpus(evsel));
+		else
+			perf_evsel__close_per_thread(evsel,
+						     evsel_list->threads);
+	}
+}
+
 static void process_interval(void)
 {
 	struct timespec ts, rs;
@@ -704,7 +726,7 @@ try_again:
 	 * group leaders.
 	 */
 	read_counters();
-	perf_evlist__close(evsel_list);
+	close_counters();
 
 	return WEXITSTATUS(status);
 }
