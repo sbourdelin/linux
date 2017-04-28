@@ -13,6 +13,7 @@
 #include <wait.h>
 #include <sys/mman.h>
 #include <sys/utsname.h>
+#include <init.h>
 #include <os.h>
 
 void stack_protections(unsigned long address)
@@ -153,9 +154,24 @@ void um_early_printk(const char *s, unsigned int n)
 	printf("%.*s", n, s);
 }
 
+static int quiet_non_fatal;
+
+static int __init quiet_cmd_param(char *str, int *add)
+{
+	quiet_non_fatal = 1;
+	return 0;
+}
+
+__uml_setup("quiet", quiet_cmd_param,
+"quiet\n"
+"    Turns off non-fatal message during boot.\n\n");
+
 void non_fatal(const char *fmt, ...)
 {
 	va_list list;
+
+	if (quiet_non_fatal)
+		return;
 
 	va_start(list, fmt);
 	vfprintf(stderr, fmt, list);
