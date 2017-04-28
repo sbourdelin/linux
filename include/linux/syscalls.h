@@ -191,6 +191,28 @@ extern struct trace_event_functions exit_syscall_print_funcs;
 	SYSCALL_METADATA(sname, x, __VA_ARGS__)			\
 	__SYSCALL_DEFINEx(x, sname, __VA_ARGS__)
 
+
+/*
+ * Called before coming back to user-mode. Returning to user-mode with an
+ * address limit different than USER_DS can allow to overwrite kernel memory.
+ */
+static inline void addr_limit_check_syscall(void)
+{
+	BUG_ON(!segment_eq(get_fs(), USER_DS));
+}
+
+#ifndef CONFIG_ADDR_LIMIT_CHECK
+#define ADDR_LIMIT_CHECK_PRE() \
+	bool user_caller = segment_eq(get_fs(), USER_DS)
+#define ADDR_LIMIT_CHECK_POST() \
+	if (user_caller) addr_limit_check_syscall()
+#else
+#define ADDR_LIMIT_CHECK_PRE()
+#define ADDR_LIMIT_CHECK_POST()
+asmlinkage void addr_limit_check_failed(void) __noreturn;
+#endif
+
+
 #define __PROTECT(...) asmlinkage_protect(__VA_ARGS__)
 #define __SYSCALL_DEFINEx(x, name, ...)					\
 	asmlinkage long sys##name(__MAP(x,__SC_DECL,__VA_ARGS__))	\
@@ -199,7 +221,10 @@ extern struct trace_event_functions exit_syscall_print_funcs;
 	asmlinkage long SyS##name(__MAP(x,__SC_LONG,__VA_ARGS__));	\
 	asmlinkage long SyS##name(__MAP(x,__SC_LONG,__VA_ARGS__))	\
 	{								\
-		long ret = SYSC##name(__MAP(x,__SC_CAST,__VA_ARGS__));	\
+		long ret;						\
+		ADDR_LIMIT_CHECK_PRE();					\
+		ret = SYSC##name(__MAP(x,__SC_CAST,__VA_ARGS__));	\
+		ADDR_LIMIT_CHECK_POST();				\
 		__MAP(x,__SC_TEST,__VA_ARGS__);				\
 		__PROTECT(x, ret,__MAP(x,__SC_ARGS,__VA_ARGS__));	\
 		return ret;						\

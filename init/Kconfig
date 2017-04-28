@@ -1961,6 +1961,12 @@ config PROFILING
 config TRACEPOINTS
 	bool
 
+config ADDR_LIMIT_CHECK
+	bool
+	help
+	  Disable the generic address limit check. Allow each architecture to
+	  optimize how and when the verification is done.
+
 source "arch/Kconfig"
 
 endmenu		# General setup
