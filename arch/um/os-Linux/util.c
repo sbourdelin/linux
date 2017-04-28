@@ -152,3 +152,12 @@ void um_early_printk(const char *s, unsigned int n)
 {
 	printf("%.*s", n, s);
 }
+
+void non_fatal(const char *fmt, ...)
+{
+	va_list list;
+
+	va_start(list, fmt);
+	vfprintf(stderr, fmt, list);
+	va_end(list);
+}

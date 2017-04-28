@@ -81,15 +81,6 @@ static void fatal(char *fmt, ...)
 	exit(1);
 }
 
-static void non_fatal(char *fmt, ...)
-{
-	va_list list;
-
-	va_start(list, fmt);
-	vfprintf(stderr, fmt, list);
-	va_end(list);
-}
-
 static int start_ptraced_child(void)
 {
 	int pid, n, status;

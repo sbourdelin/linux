@@ -242,6 +242,7 @@ extern void setup_hostinfo(char *buf, int len);
 extern void os_dump_core(void) __attribute__ ((noreturn));
 extern void um_early_printk(const char *s, unsigned int n);
 extern void os_fix_helper_signals(void);
+extern void non_fatal(const char *fmt, ...);
 
 /* time.c */
 extern void os_idle_sleep(unsigned long long nsecs);
