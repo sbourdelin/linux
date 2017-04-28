@@ -1619,8 +1619,9 @@ static int hifn_start_device(struct hifn_device *dev)
 	return 0;
 }
 
-static int ablkcipher_get(void *saddr, unsigned int *srestp, unsigned int offset,
-		struct scatterlist *dst, unsigned int size, unsigned int *nbytesp)
+static int ablkcipher_get(void *saddr, unsigned int *srestp,
+			  unsigned int soffset, struct scatterlist *dst,
+			  unsigned int size, unsigned int *nbytesp)
 {
 	unsigned int srest = *srestp, nbytes = *nbytesp, copy;
 	void *daddr;
@@ -1633,19 +1634,19 @@ static int ablkcipher_get(void *saddr, unsigned int *srestp, unsigned int offset
 		copy = min3(srest, dst->length, size);
 
 		daddr = kmap_atomic(sg_page(dst));
-		memcpy(daddr + dst->offset + offset, saddr, copy);
+		memcpy(daddr + dst->offset, saddr + soffset, copy);
 		kunmap_atomic(daddr);
 
 		nbytes -= copy;
 		size -= copy;
 		srest -= copy;
 		saddr += copy;
-		offset = 0;
+		soffset = 0;
 
 		pr_debug("%s: copy: %u, size: %u, srest: %u, nbytes: %u.\n",
 			 __func__, copy, size, srest, nbytes);
 
-		dst++;
+		dst = sg_next(dst);
 		idx++;
 	}
 
@@ -1699,13 +1700,15 @@ static void hifn_process_ready(struct ablkcipher_request *req, int error)
 
 			err = ablkcipher_get(saddr, &t->length, t->offset,
 					dst, nbytes, &nbytes);
+			kunmap_atomic(saddr);
+
 			if (err < 0) {
-				kunmap_atomic(saddr);
+				if (!error)
+					error = err;
 				break;
 			}
 
 			idx += err;
-			kunmap_atomic(saddr);
 		}
 
 		hifn_cipher_walk_exit(&rctx->walk);
