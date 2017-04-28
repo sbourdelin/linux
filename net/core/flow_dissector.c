@@ -86,30 +86,41 @@ static __be16 skb_flow_get_be16(const struct sk_buff *skb, int poff,
  * @ip_proto: protocol for which to get port offset
  * @data: raw buffer pointer to the packet, if NULL use skb->data
  * @hlen: packet header length, if @data is NULL use skb_headlen(skb)
+ * @ports: pointer to return ports in
  *
  * The function will try to retrieve the ports at offset thoff + poff where poff
- * is the protocol port offset returned from proto_ports_offset
+ * is the protocol port offset returned from proto_ports_offset.
+ *
+ * Returns false on error, true otherwise.
  */
-__be32 __skb_flow_get_ports(const struct sk_buff *skb, int thoff, u8 ip_proto,
-			    void *data, int hlen)
+bool __skb_flow_get_ports(const struct sk_buff *skb, int thoff, u8 ip_proto,
+			  void *data, int hlen, __be32 *ports)
 {
 	int poff = proto_ports_offset(ip_proto);
+	__be32 *p, _p;
+
+	/* proto_ports_offset returning an error indicates that ip_proto is
+	 * not known to have ports. This is not considered an error here.
+	 * Rather it is considered that the flow key of the caller may use
+	 * the default value of port fields: 0.
+	 */
+	if (poff < 0) {
+		*ports = 0;
+		return true;
+	}
 
 	if (!data) {
 		data = skb->data;
 		hlen = skb_headlen(skb);
 	}
 
-	if (poff >= 0) {
-		__be32 *ports, _ports;
+	p = __skb_header_pointer(skb, thoff + poff, sizeof(_p),
+				 data, hlen, &_p);
+	if (!p)
+		return false;
+	*ports = *p;
 
-		ports = __skb_header_pointer(skb, thoff + poff,
-					     sizeof(_ports), data, hlen, &_ports);
-		if (ports)
-			return *ports;
-	}
-
-	return 0;
+	return true;
 }
 EXPORT_SYMBOL(__skb_flow_get_ports);
 
@@ -692,8 +703,9 @@ ip_proto_again:
 		key_ports = skb_flow_dissector_target(flow_dissector,
 						      FLOW_DISSECTOR_KEY_PORTS,
 						      target_container);
-		key_ports->ports = __skb_flow_get_ports(skb, nhoff, ip_proto,
-							data, hlen);
+		if (!__skb_flow_get_ports(skb, nhoff, ip_proto, data, hlen,
+					  &key_ports->ports))
+			goto out_bad;
 	}
 
 	if (dissector_uses_key(flow_dissector,
