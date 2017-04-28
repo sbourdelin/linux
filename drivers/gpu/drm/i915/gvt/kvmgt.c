@@ -41,6 +41,7 @@
 #include <linux/kvm_host.h>
 #include <linux/vfio.h>
 #include <linux/mdev.h>
+#include <linux/anon_inodes.h>
 
 #include "i915_drv.h"
 #include "gvt.h"
@@ -524,6 +525,106 @@ static int intel_vgpu_reg_init_opregion(struct intel_vgpu *vgpu)
 	return ret;
 }
 
+static int intel_vgpu_gvtg_mmap(struct file *file, struct vm_area_struct *vma)
+{
+	WARN_ON(1);
+
+	return 0;
+}
+
+static int intel_vgpu_gvtg_release(struct inode *inode, struct file *filp)
+{
+	return 0;
+}
+
+static long intel_vgpu_gvtg_ioctl(struct file *filp,
+		unsigned int ioctl, unsigned long arg)
+{
+	struct intel_vgpu *vgpu = filp->private_data;
+	int minsz;
+	struct intel_vgpu_dmabuf dmabuf;
+	int ret;
+
+	minsz = offsetofend(struct intel_vgpu_dmabuf, y_pos);
+	if (copy_from_user(&dmabuf, (void __user *)arg, minsz))
+		return -EFAULT;
+	if (ioctl == INTEL_VGPU_QUERY_DMABUF)
+		ret = intel_gvt_ops->vgpu_query_dmabuf(vgpu, &dmabuf);
+	else if (ioctl == INTEL_VGPU_GENERATE_DMABUF)
+		ret = intel_gvt_ops->vgpu_generate_dmabuf(vgpu, &dmabuf);
+	else {
+		gvt_vgpu_err("unsupported dmabuf operation\n");
+		return -EINVAL;
+	}
+
+	if (ret != 0) {
+		gvt_vgpu_err("gvt-g get dmabuf failed:%d\n", ret);
+		return -EINVAL;
+	}
+
+	return copy_to_user((void __user *)arg, &dmabuf, minsz) ? -EFAULT : 0;
+}
+
+static const struct file_operations intel_vgpu_gvtg_ops = {
+	.release        = intel_vgpu_gvtg_release,
+	.unlocked_ioctl = intel_vgpu_gvtg_ioctl,
+	.mmap           = intel_vgpu_gvtg_mmap,
+	.llseek         = noop_llseek,
+};
+
+static size_t intel_vgpu_reg_rw_gvtg(struct intel_vgpu *vgpu, char *buf,
+		size_t count, loff_t *ppos, bool iswrite)
+{
+	unsigned int i = VFIO_PCI_OFFSET_TO_INDEX(*ppos) -
+			VFIO_PCI_NUM_REGIONS;
+	loff_t pos = *ppos & VFIO_PCI_OFFSET_MASK;
+	int fd;
+
+	if (pos >= vgpu->vdev.region[i].size || iswrite) {
+		gvt_vgpu_err("invalid op or offset for Intel vgpu fd region\n");
+		return -EINVAL;
+	}
+
+	fd = anon_inode_getfd("gvtg", &intel_vgpu_gvtg_ops, vgpu,
+			O_RDWR | O_CLOEXEC);
+	if (fd < 0) {
+		gvt_vgpu_err("create intel vgpu fd failed:%d\n", fd);
+		return -EINVAL;
+	}
+
+	count = min(count, (size_t)(vgpu->vdev.region[i].size - pos));
+	memcpy(buf, &fd, count);
+
+	return count;
+}
+
+static void intel_vgpu_reg_release_gvtg(struct intel_vgpu *vgpu,
+		struct vfio_region *region)
+{
+}
+
+static const struct intel_vgpu_regops intel_vgpu_regops_gvtg = {
+	.rw = intel_vgpu_reg_rw_gvtg,
+	.release = intel_vgpu_reg_release_gvtg,
+};
+
+static int intel_vgpu_reg_init_gvtg(struct intel_vgpu *vgpu)
+{
+	int ret;
+
+	ret = intel_vgpu_register_reg(vgpu,
+		PCI_VENDOR_ID_INTEL | VFIO_REGION_TYPE_PCI_VENDOR_TYPE,
+		VFIO_REGION_SUBTYPE_INTEL_IGD_GVTG,
+		&intel_vgpu_regops_gvtg, sizeof(int),
+		VFIO_REGION_INFO_FLAG_READ, NULL);
+	if (ret) {
+		gvt_vgpu_err("failed to register gvtg region:%d\n", ret);
+		return ret;
+	}
+
+	return ret;
+}
+
 static int intel_vgpu_create(struct kobject *kobj, struct mdev_device *mdev)
 {
 	struct intel_vgpu *vgpu = NULL;
@@ -562,6 +663,14 @@ static int intel_vgpu_create(struct kobject *kobj, struct mdev_device *mdev)
 	}
 
 	gvt_dbg_core("create OpRegion succeeded for mdev:%s\n",
+			dev_name(mdev_dev(mdev)));
+
+	ret = intel_vgpu_reg_init_gvtg(vgpu);
+	if (ret) {
+		gvt_vgpu_err("create gvtg region failed\n");
+		goto out;
+	}
+	gvt_dbg_core("create gvtg region succeeded for mdev:%s\n",
 			dev_name(mdev_dev(mdev)));
 
 	gvt_dbg_core("intel_vgpu_create succeeded for mdev: %s\n",

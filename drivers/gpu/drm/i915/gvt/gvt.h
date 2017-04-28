@@ -467,6 +467,8 @@ struct intel_gvt_ops {
 	void (*vgpu_reset)(struct intel_vgpu *);
 	void (*vgpu_activate)(struct intel_vgpu *);
 	void (*vgpu_deactivate)(struct intel_vgpu *);
+	int (*vgpu_query_dmabuf)(struct intel_vgpu *, void *);
+	int (*vgpu_generate_dmabuf)(struct intel_vgpu *, void *);
 };
 
 
