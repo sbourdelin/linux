@@ -1274,14 +1274,15 @@ static u32 imon_remote_key_lookup(struct imon_context *ictx, u32 scancode)
 	bool is_release_code = false;
 
 	/* Look for the initial press of a button */
-	keycode = rc_g_keycode_from_table(ictx->rdev, scancode);
+	keycode = rc_g_keycode_from_table(ictx->rdev, ictx->rc_type, scancode);
 	ictx->rc_toggle = 0x0;
 	ictx->rc_scancode = scancode;
 
 	/* Look for the release of a button */
 	if (keycode == KEY_RESERVED) {
 		release = scancode & ~0x4000;
-		keycode = rc_g_keycode_from_table(ictx->rdev, release);
+		keycode = rc_g_keycode_from_table(ictx->rdev, ictx->rc_type,
+						  release);
 		if (keycode != KEY_RESERVED)
 			is_release_code = true;
 	}
@@ -1310,7 +1311,7 @@ static u32 imon_mce_key_lookup(struct imon_context *ictx, u32 scancode)
 		scancode = scancode | MCE_KEY_MASK | MCE_TOGGLE_BIT;
 
 	ictx->rc_scancode = scancode;
-	keycode = rc_g_keycode_from_table(ictx->rdev, scancode);
+	keycode = rc_g_keycode_from_table(ictx->rdev, ictx->rc_type, scancode);
 
 	/* not used in mce mode, but make sure we know its false */
 	ictx->release_code = false;

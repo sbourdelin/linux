@@ -137,8 +137,9 @@ enum rc_type {
  * @keycode: Linux input keycode
  */
 struct rc_map_table {
-	u32	scancode;
-	u32	keycode;
+	u64		scancode;
+	u32		keycode;
+	enum rc_type	protocol;
 };
 
 /**
