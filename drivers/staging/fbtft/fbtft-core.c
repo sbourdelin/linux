@@ -275,23 +275,31 @@ static int fbtft_backlight_get_brightness(struct backlight_device *bd)
 	return bd->props.brightness;
 }
 
+static const struct backlight_ops fbtft_bl_ops = {
+	.get_brightness	= fbtft_backlight_get_brightness,
+	.update_status	= fbtft_backlight_update_status,
+};
+#endif
+
 void fbtft_unregister_backlight(struct fbtft_par *par)
 {
+	#ifdef CONFIG_FB_BACKLIGHT
+
 	if (par->info->bl_dev) {
 		par->info->bl_dev->props.power = FB_BLANK_POWERDOWN;
 		backlight_update_status(par->info->bl_dev);
 		backlight_device_unregister(par->info->bl_dev);
 		par->info->bl_dev = NULL;
 	}
-}
 
-static const struct backlight_ops fbtft_bl_ops = {
-	.get_brightness	= fbtft_backlight_get_brightness,
-	.update_status	= fbtft_backlight_update_status,
-};
+	#endif
+}
+EXPORT_SYMBOL(fbtft_unregister_backlight);
 
 void fbtft_register_backlight(struct fbtft_par *par)
 {
+	#ifdef CONFIG_FB_BACKLIGHT
+
 	struct backlight_device *bd;
 	struct backlight_properties bl_props = { 0, };
 
@@ -320,13 +328,10 @@ void fbtft_register_backlight(struct fbtft_par *par)
 
 	if (!par->fbtftops.unregister_backlight)
 		par->fbtftops.unregister_backlight = fbtft_unregister_backlight;
+
+	#endif
 }
-#else
-void fbtft_register_backlight(struct fbtft_par *par) { };
-void fbtft_unregister_backlight(struct fbtft_par *par) { };
-#endif
 EXPORT_SYMBOL(fbtft_register_backlight);
-EXPORT_SYMBOL(fbtft_unregister_backlight);
 
 static void fbtft_set_addr_win(struct fbtft_par *par, int xs, int ys, int xe,
 			       int ye)
