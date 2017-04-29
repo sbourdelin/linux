@@ -261,10 +261,8 @@ static long efi_runtime_set_variable(unsigned long arg)
 	}
 
 	data = memdup_user(setvariable.data, setvariable.data_size);
-	if (IS_ERR(data)) {
-		kfree(name);
+	if (IS_ERR(data))
 		return PTR_ERR(data);
-	}
 
 	status = efi.set_variable(name, &vendor_guid,
 				setvariable.attributes,
