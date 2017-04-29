@@ -1450,22 +1450,14 @@ static int do_insnlist_ioctl(struct comedi_device *dev,
 		return -EFAULT;
 
 	data = kmalloc_array(MAX_SAMPLES, sizeof(unsigned int), GFP_KERNEL);
-	if (!data) {
-		ret = -ENOMEM;
-		goto error;
-	}
+	if (!data)
+		return -ENOMEM;
 
-	insns = kcalloc(insnlist.n_insns, sizeof(*insns), GFP_KERNEL);
-	if (!insns) {
-		ret = -ENOMEM;
-		goto error;
-	}
-
-	if (copy_from_user(insns, insnlist.insns,
-			   sizeof(*insns) * insnlist.n_insns)) {
-		dev_dbg(dev->class_dev, "copy_from_user failed\n");
-		ret = -EFAULT;
-		goto error;
+	insns = memdup_user(insnlist.insns, sizeof(*insns) * insnlist.n_insns);
+	if (IS_ERR(insns)) {
+		dev_dbg(dev->class_dev, "memdup_user failed\n");
+		kfree(data);
+		return PTR_ERR(insns);
 	}
 
 	for (i = 0; i < insnlist.n_insns; i++) {
