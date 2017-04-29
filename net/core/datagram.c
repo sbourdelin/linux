@@ -772,14 +772,17 @@ int skb_copy_and_csum_datagram_msg(struct sk_buff *skb,
 		if (skb_copy_and_csum_datagram(skb, hlen, &msg->msg_iter,
 					       chunk, &csum))
 			goto fault;
-		if (csum_fold(csum))
+
+		if (csum_fold(csum)) {
+			iov_iter_revert(&msg->msg_iter, chunk);
 			goto csum_error;
+		}
+
 		if (unlikely(skb->ip_summed == CHECKSUM_COMPLETE))
 			netdev_rx_csum_fault(skb->dev);
 	}
 	return 0;
 csum_error:
-	iov_iter_revert(&msg->msg_iter, chunk);
 	return -EINVAL;
 fault:
 	return -EFAULT;
