@@ -2302,7 +2302,7 @@ static int lmv_read_striped_page(struct obd_export *exp,
 	dp = kmap(ent_page);
 	memset(dp, 0, sizeof(*dp));
 	dp->ldp_hash_start = cpu_to_le64(offset);
-	dp->ldp_flags |= LDF_COLLIDE;
+	dp->ldp_flags |= cpu_to_le32(LDF_COLLIDE);
 
 	area = dp + 1;
 	left_bytes = PAGE_SIZE - sizeof(*dp);
@@ -2380,8 +2380,7 @@ out:
 		ent_page = NULL;
 	} else {
 		if (ent == area)
-			dp->ldp_flags |= LDF_EMPTY;
-		dp->ldp_flags = cpu_to_le32(dp->ldp_flags);
+			dp->ldp_flags |= cpu_to_le32(LDF_EMPTY);
 		dp->ldp_hash_end = cpu_to_le64(hash_offset);
 	}
 
