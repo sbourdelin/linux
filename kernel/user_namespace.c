@@ -986,17 +986,23 @@ bool userns_may_setgroups(const struct user_namespace *ns)
 }
 
 /*
- * Returns true if @ns is the same namespace as or a descendant of
- * @target_ns.
+ * Returns true if @child is the same namespace or a descendant of
+ * @ancestor.
  */
-bool current_in_userns(const struct user_namespace *target_ns)
+bool in_userns(const struct user_namespace *ancestor,
+	       const struct user_namespace *child)
 {
-	struct user_namespace *ns;
-	for (ns = current_user_ns(); ns; ns = ns->parent) {
-		if (ns == target_ns)
+	const struct user_namespace *ns;
+	for (ns = child; ns; ns = ns->parent) {
+		if (ns == ancestor)
 			return true;
 	}
 	return false;
+}
+
+bool current_in_userns(const struct user_namespace *target_ns)
+{
+	return in_userns(target_ns, current_user_ns());
 }
 
 static inline struct user_namespace *to_user_ns(struct ns_common *ns)
