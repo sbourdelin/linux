@@ -1,0 +1,387 @@
+/*
+ * PSX (Play Station 1/2) pad (SPI Interface)
+ *
+ * Copyright (C) 2017 Tomohiro Yoshidomi <sylph23k@gmail.com>
+ * Licensed under the GPL-2 or later.
+ *
+ * PSX pad plug (not socket)
+ *  123 456 789
+ * (...|...|...)
+ *
+ * 1: DAT -> MISO (pullup with 1k owm to 3.3V)
+ * 2: CMD -> MOSI
+ * 3: 9V (for motor, if not use N.C.)
+ * 4: GND
+ * 5: 3.3V
+ * 6: Attention -> CS(SS)
+ * 7: SCK -> SCK
+ * 8: N.C.
+ * 9: ACK -> N.C.
+ */
+
+#include <linux/kernel.h>
+#include <linux/device.h>
+#include <linux/input.h>
+#include <linux/input-polldev.h>
+#include <linux/module.h>
+#include <linux/spi/spi.h>
+#include <linux/types.h>
+#include <linux/pm.h>
+#include <linux/pm_runtime.h>
+
+#define REVERSE_BIT(x) ((((x) & 0x80) >> 7) | (((x) & 0x40) >> 5) | (((x) & 0x20) >> 3) | (((x) & 0x10) >> 1) | (((x) & 0x08) << 1) | (((x) & 0x04) << 3) | (((x) & 0x02) << 5) | (((x) & 0x01) << 7))
+
+static const u8 PSX_CMD_POLL[]		= {0x01, 0x42, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00};
+static const u8 PSX_CMD_ENTER_CFG[]	= {0x01, 0x43, 0x00, 0x01, 0x00, 0x00, 0x00, 0x00, 0x00};
+static const u8 PSX_CMD_EXIT_CFG[]	= {0x01, 0x43, 0x00, 0x00, 0x5A, 0x5A, 0x5A, 0x5A, 0x5A};
+static const u8 PSX_CMD_ENABLE_MOTOR[]	= {0x01, 0x4D, 0x00, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF};
+
+struct psxpad {
+	struct spi_device *spi;
+	struct input_polled_dev *pdev;
+	struct input_dev *idev;
+	char phys[0x20];
+	bool motor1enable;
+	bool motor2enable;
+	u8 motor1level;
+	u8 motor2level;
+	u8 pollcmd[sizeof(PSX_CMD_POLL)];
+	u8 enablemotor[sizeof(PSX_CMD_ENABLE_MOTOR)];
+	u8 sendbuf[0x20] ____cacheline_aligned;
+	u8 response[sizeof(PSX_CMD_POLL)] ____cacheline_aligned;
+};
+
+static int psxpad_command(struct psxpad *pad, const u8 sendcmd[], u8 response[], const u8 sendcmdlen)
+{
+	struct spi_transfer xfers = {
+		.tx_buf		= pad->sendbuf,
+		.rx_buf		= response,
+		.len		= sendcmdlen,
+	};
+	struct spi_message msg;
+	int err;
+	u8 loc;
+
+	spi_message_init(&msg);
+
+	for (loc = 0; loc < sendcmdlen; loc++)
+		pad->sendbuf[loc] = REVERSE_BIT(sendcmd[loc]);
+
+	err = spi_sync_transfer(pad->spi, &xfers, 1);
+	if (err) {
+		dev_err(&pad->idev->dev, "psxpad-spi: failed SPI xfers!!\n");
+		goto err_end;
+	}
+
+	for (loc = 0; loc < sendcmdlen; loc++)
+		response[loc] = REVERSE_BIT(response[loc]);
+
+	return 0;
+
+ err_end:
+
+	return err;
+}
+
+#ifdef CONFIG_JOYSTICK_PSXPAD_SPI_FF
+static void psxpad_setenablemotor(struct psxpad *pad, const bool motor1enable, const bool motor2enable)
+{
+	int err;
+
+	pad->motor1enable = motor1enable;
+	pad->motor2enable = motor2enable;
+
+	pad->enablemotor[3] = pad->motor1enable ? 0x00 : 0xFF;
+	pad->enablemotor[4] = pad->motor2enable ? 0x01 : 0xFF;
+
+	err = psxpad_command(pad, PSX_CMD_ENTER_CFG, pad->response, sizeof(PSX_CMD_ENTER_CFG));
+	if (err) {
+		dev_err(&pad->idev->dev, "psxpad-spi: setenablemotor: enter cfg failed!!\n");
+		return;
+	}
+	err = psxpad_command(pad, pad->enablemotor, pad->response, sizeof(PSX_CMD_ENABLE_MOTOR));
+	if (err) {
+		dev_err(&pad->idev->dev, "psxpad-spi: setenablemotor: enable motor failed!!\n");
+		return;
+	}
+	err = psxpad_command(pad, PSX_CMD_EXIT_CFG, pad->response, sizeof(PSX_CMD_EXIT_CFG));
+	if (err) {
+		dev_err(&pad->idev->dev, "psxpad-spi: setenablemotor: exit config failed!!\n");
+		return;
+	}
+}
+
+static void psxpad_setmotorlevel(struct psxpad *pad, const u8 motor1level, const u8 motor2level)
+{
+	pad->motor1level = motor1level ? 0xFF : 0x00;
+	pad->motor2level = motor2level;
+
+	pad->pollcmd[3] = pad->motor1level;
+	pad->pollcmd[4] = pad->motor2level;
+}
+#else	/* CONFIG_JOYSTICK_PSXPAD_SPI_FF */
+static void psxpad_setenablemotor(struct psxpad *pad, const bool motor1enable, const bool motor2enable) { }
+
+static void psxpad_setmotorlevel(struct psxpad *pad, const u8 motor1level, const u8 motor2level) { }
+#endif	/* CONFIG_JOYSTICK_PSXPAD_SPI_FF */
+
+static void psxpad_spi_poll_open(struct input_polled_dev *pdev)
+{
+	struct psxpad *pad = pdev->private;
+
+	pm_runtime_get_sync(&pad->spi->dev);
+}
+
+static void psxpad_spi_poll_close(struct input_polled_dev *pdev)
+{
+	struct psxpad *pad = pdev->private;
+
+	pm_runtime_put_sync(&pad->spi->dev);
+}
+
+static void psxpad_spi_poll(struct input_polled_dev *pdev)
+{
+	struct psxpad *pad = pdev->private;
+	int err;
+
+	err = psxpad_command(pad, pad->pollcmd, pad->response, sizeof(PSX_CMD_POLL));
+	if (err) {
+		dev_err(&pad->idev->dev, "psxpad-spi: poll: poll cmd failed!!\n");
+		return;
+	}
+
+	switch (pad->response[1]) {
+	case 0x73:	/* analog 1 */
+		input_report_abs(pad->idev, ABS_X,		pad->response[7]);
+		input_report_abs(pad->idev, ABS_Y,		pad->response[8]);
+		input_report_abs(pad->idev, ABS_RX,		pad->response[5]);
+		input_report_abs(pad->idev, ABS_RY,		pad->response[6]);
+		input_report_key(pad->idev, BTN_DPAD_UP,	(pad->response[3] & 0x10U) ? false : true);
+		input_report_key(pad->idev, BTN_DPAD_DOWN,	(pad->response[3] & 0x40U) ? false : true);
+		input_report_key(pad->idev, BTN_DPAD_LEFT,	(pad->response[3] & 0x80U) ? false : true);
+		input_report_key(pad->idev, BTN_DPAD_RIGHT,	(pad->response[3] & 0x20U) ? false : true);
+		input_report_key(pad->idev, BTN_X,		(pad->response[4] & 0x10U) ? false : true);
+		input_report_key(pad->idev, BTN_A,		(pad->response[4] & 0x20U) ? false : true);
+		input_report_key(pad->idev, BTN_B,		(pad->response[4] & 0x40U) ? false : true);
+		input_report_key(pad->idev, BTN_Y,		(pad->response[4] & 0x80U) ? false : true);
+		input_report_key(pad->idev, BTN_TL,		(pad->response[4] & 0x04U) ? false : true);
+		input_report_key(pad->idev, BTN_TR,		(pad->response[4] & 0x08U) ? false : true);
+		input_report_key(pad->idev, BTN_TL2,		(pad->response[4] & 0x01U) ? false : true);
+		input_report_key(pad->idev, BTN_TR2,		(pad->response[4] & 0x02U) ? false : true);
+		input_report_key(pad->idev, BTN_THUMBL,		(pad->response[3] & 0x02U) ? false : true);
+		input_report_key(pad->idev, BTN_THUMBR,		(pad->response[3] & 0x04U) ? false : true);
+		input_report_key(pad->idev, BTN_SELECT,		(pad->response[3] & 0x01U) ? false : true);
+		input_report_key(pad->idev, BTN_START,		(pad->response[3] & 0x08U) ? false : true);
+		break;
+
+	case 0x41:	/* digital */
+		input_report_abs(pad->idev, ABS_X,		0x80);
+		input_report_abs(pad->idev, ABS_Y,		0x80);
+		input_report_abs(pad->idev, ABS_RX,		0x80);
+		input_report_abs(pad->idev, ABS_RY,		0x80);
+		input_report_key(pad->idev, BTN_DPAD_UP,	(pad->response[3] & 0x10U) ? false : true);
+		input_report_key(pad->idev, BTN_DPAD_DOWN,	(pad->response[3] & 0x40U) ? false : true);
+		input_report_key(pad->idev, BTN_DPAD_LEFT,	(pad->response[3] & 0x80U) ? false : true);
+		input_report_key(pad->idev, BTN_DPAD_RIGHT,	(pad->response[3] & 0x20U) ? false : true);
+		input_report_key(pad->idev, BTN_X,		(pad->response[4] & 0x10U) ? false : true);
+		input_report_key(pad->idev, BTN_A,		(pad->response[4] & 0x20U) ? false : true);
+		input_report_key(pad->idev, BTN_B,		(pad->response[4] & 0x40U) ? false : true);
+		input_report_key(pad->idev, BTN_Y,		(pad->response[4] & 0x80U) ? false : true);
+		input_report_key(pad->idev, BTN_TL,		(pad->response[4] & 0x04U) ? false : true);
+		input_report_key(pad->idev, BTN_TR,		(pad->response[4] & 0x08U) ? false : true);
+		input_report_key(pad->idev, BTN_TL2,		(pad->response[4] & 0x01U) ? false : true);
+		input_report_key(pad->idev, BTN_TR2,		(pad->response[4] & 0x02U) ? false : true);
+		input_report_key(pad->idev, BTN_THUMBL,		false);
+		input_report_key(pad->idev, BTN_THUMBR,		false);
+		input_report_key(pad->idev, BTN_SELECT,		(pad->response[3] & 0x01U) ? false : true);
+		input_report_key(pad->idev, BTN_START,		(pad->response[3] & 0x08U) ? false : true);
+		break;
+	}
+
+	input_sync(pad->idev);
+	psxpad_setenablemotor(pad, true, true);
+}
+
+#ifdef CONFIG_JOYSTICK_PSXPAD_SPI_FF
+static int psxpad_spi_ff(struct input_dev *idev, void *data, struct ff_effect *effect)
+{
+	struct psxpad *pad = idev->dev.platform_data;
+
+	switch (effect->type) {
+	case FF_RUMBLE:
+		psxpad_setmotorlevel(pad, (effect->u.rumble.weak_magnitude >> 8) & 0xFFU, (effect->u.rumble.strong_magnitude >> 8) & 0xFFU);
+		break;
+	}
+
+	return 0;
+}
+
+static int psxpad_spi_init_ff(struct psxpad *pad)
+{
+	int err;
+
+	input_set_capability(pad->idev, EV_FF, FF_RUMBLE);
+	err = input_ff_create_memless(pad->idev, NULL, psxpad_spi_ff);
+	if (err) {
+		dev_err(&pad->idev->dev, "psxpad-spi: init_ff: ff alloc failed!!\n");
+		err = -ENOMEM;
+	}
+
+	return err;
+}
+#else	/* CONFIG_JOYSTICK_PSXPAD_SPI_FF */
+static inline int psxpad_spi_init_ff(struct psxpad *pad)
+{
+	return 0;
+}
+#endif	/* CONFIG_JOYSTICK_PSXPAD_SPI_FF */
+
+static int psxpad_spi_probe(struct spi_device *spi)
+{
+	struct psxpad *pad;
+	struct input_polled_dev *pdev;
+	struct input_dev *idev;
+	int err, i;
+
+	pad = devm_kzalloc(&spi->dev, sizeof(struct psxpad), GFP_KERNEL);
+	if (!pad) {
+		err = -ENOMEM;
+		goto err_free_mem1;
+	}
+	pdev = input_allocate_polled_device();
+	if (!pdev) {
+		dev_err(&spi->dev, "psxpad-spi: probe: pdev alloc failed!!\n");
+		err = -ENOMEM;
+		goto err_free_mem1;
+	}
+	for (i = 0; i < sizeof(PSX_CMD_POLL); i++)
+		pad->pollcmd[i] = PSX_CMD_POLL[i];
+	for (i = 0; i < sizeof(PSX_CMD_ENABLE_MOTOR); i++)
+		pad->enablemotor[i] = PSX_CMD_ENABLE_MOTOR[i];
+
+	/* input poll device settings */
+	pad->pdev = pdev;
+	pad->spi = spi;
+	pdev->private = pad;
+	pdev->open = psxpad_spi_poll_open;
+	pdev->close = psxpad_spi_poll_close;
+	pdev->poll = psxpad_spi_poll;
+	/* poll interval is about 60fps */
+	pdev->poll_interval = 16;
+	pdev->poll_interval_min = 8;
+	pdev->poll_interval_max = 32;
+
+	/* input device settings */
+	idev = pdev->input;
+	pad->idev = idev;
+	idev->name = "PSX (PS1/2) pad";
+	snprintf(pad->phys, sizeof(pad->phys), "%s/input", dev_name(&spi->dev));
+	idev->id.bustype = BUS_SPI;
+	idev->dev.parent = &spi->dev;
+	idev->dev.platform_data = pad;
+
+	/* key/value map settings */
+	input_set_abs_params(idev, ABS_X,	0, 255, 0, 0);
+	input_set_abs_params(idev, ABS_Y,	0, 255, 0, 0);
+	input_set_abs_params(idev, ABS_RX,	0, 255, 0, 0);
+	input_set_abs_params(idev, ABS_RY,	0, 255, 0, 0);
+	input_set_capability(idev, EV_KEY, BTN_DPAD_UP);
+	input_set_capability(idev, EV_KEY, BTN_DPAD_DOWN);
+	input_set_capability(idev, EV_KEY, BTN_DPAD_LEFT);
+	input_set_capability(idev, EV_KEY, BTN_DPAD_RIGHT);
+	input_set_capability(idev, EV_KEY, BTN_A);
+	input_set_capability(idev, EV_KEY, BTN_B);
+	input_set_capability(idev, EV_KEY, BTN_X);
+	input_set_capability(idev, EV_KEY, BTN_Y);
+	input_set_capability(idev, EV_KEY, BTN_TL);
+	input_set_capability(idev, EV_KEY, BTN_TR);
+	input_set_capability(idev, EV_KEY, BTN_TL2);
+	input_set_capability(idev, EV_KEY, BTN_TR2);
+	input_set_capability(idev, EV_KEY, BTN_THUMBL);
+	input_set_capability(idev, EV_KEY, BTN_THUMBR);
+	input_set_capability(idev, EV_KEY, BTN_SELECT);
+	input_set_capability(idev, EV_KEY, BTN_START);
+
+	/* force feedback */
+	err = psxpad_spi_init_ff(pad);
+	if (err) {
+		dev_err(&spi->dev, "psxpad-spi: probe: failed init ff!!\n");
+		err = -ENOMEM;
+		goto err_free_mem2;
+	}
+
+	/* SPI settings */
+	spi->mode = SPI_MODE_3;
+	spi->bits_per_word = 8;
+	/* (PSX pad might be possible works 250kHz/500kHz) */
+	spi->master->min_speed_hz = 125000;
+	spi->master->max_speed_hz = 125000;
+	spi_setup(spi);
+
+	/* pad settings */
+	psxpad_setmotorlevel(pad, 0, 0);
+
+	/* register input poll device */
+	err = input_register_polled_device(pdev);
+	if (err) {
+		dev_err(&spi->dev, "psxpad-spi: probe: failed register!!\n");
+		goto err_free_mem2;
+	}
+
+	pm_runtime_enable(&spi->dev);
+
+	return 0;
+
+ err_free_mem2:
+	input_free_polled_device(pdev);
+
+ err_free_mem1:
+	devm_kfree(&spi->dev, pad);
+
+	return err;
+}
+
+
+static int psxpad_spi_remove(struct spi_device *spi)
+{
+	return 0;
+}
+
+static int __maybe_unused psxpad_spi_suspend(struct device *dev)
+{
+	struct spi_device *spi = to_spi_device(dev);
+	struct psxpad *pad = spi_get_drvdata(spi);
+
+	psxpad_setmotorlevel(pad, 0, 0);
+
+	return 0;
+}
+
+static int __maybe_unused psxpad_spi_resume(struct device *dev)
+{
+	return 0;
+}
+
+static SIMPLE_DEV_PM_OPS(psxpad_spi_pm, psxpad_spi_suspend, psxpad_spi_resume);
+
+static const struct spi_device_id psxpad_spi_id[] = {
+	{ "psxpad-spi", 0 },
+	{ }
+};
+MODULE_DEVICE_TABLE(spi, psxpad_spi_id);
+
+static struct spi_driver psxpad_spi_driver = {
+	.driver = {
+		.name = "psxpad-spi",
+		.pm = &psxpad_spi_pm,
+	},
+	.id_table = psxpad_spi_id,
+	.probe   = psxpad_spi_probe,
+	.remove  = psxpad_spi_remove,
+};
+
+module_spi_driver(psxpad_spi_driver);
+
+MODULE_AUTHOR("Tomohiro Yoshidomi <sylph23k@gmail.com>");
+MODULE_DESCRIPTION("PSX (Play Station 1/2) pad with SPI Bus Driver");
+MODULE_LICENSE("GPL");

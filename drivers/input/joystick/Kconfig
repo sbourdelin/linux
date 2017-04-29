@@ -330,4 +330,21 @@ config JOYSTICK_MAPLE
 	  To compile this as a module choose M here: the module will be called
 	  maplecontrol.
 
+config JOYSTICK_PSXPAD_SPI
+	tristate "PSX (Play Station 1/2) pad with SPI Bus Driver"
+	depends on SPI
+	select INPUT_POLLDEV
+	help
+	  Say Y here if you connect PSX (PS1/2) pad with SPI Interface.
+
+	  To compile this driver as a module, choose M here: the
+	  module will be called psxpad-spi.
+
+config JOYSTICK_PSXPAD_SPI_FF
+	bool "PSX pad with SPI Bus rumble support"
+	depends on JOYSTICK_PSXPAD_SPI
+	select INPUT_FF_MEMLESS
+	help
+	  Say Y here if you want to take advantage of PSX pad rumble features.
+
 endif
