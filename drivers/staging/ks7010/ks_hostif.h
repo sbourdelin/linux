@@ -188,7 +188,7 @@ struct hostif_power_mngmt_request_t {
 	u32 wake_up;
 #define SLEEP_FALSE 0
 #define SLEEP_TRUE  1	/* not used */
-	u32 receiveDTIMs;
+	u32 receive_dtims;
 #define DTIM_FALSE 0
 #define DTIM_TRUE  1
 } __packed;
