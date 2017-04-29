@@ -8,6 +8,7 @@
  * directory of this archive for more details.
  */
 
+#include <linux/delay.h>
 #include <linux/module.h>
 #include <linux/regmap.h>
 
@@ -17,6 +18,7 @@
 
 #define ADXL345_REG_DEVID		0x00
 #define ADXL345_REG_POWER_CTL		0x2D
+#define ADXL345_REG_INT_SOURCE		0x30
 #define ADXL345_REG_DATA_FORMAT		0x31
 #define ADXL345_REG_DATAX0		0x32
 #define ADXL345_REG_DATAY0		0x34
@@ -24,6 +26,10 @@
 
 #define ADXL345_POWER_CTL_MEASURE	BIT(3)
 #define ADXL345_POWER_CTL_STANDBY	0x00
+
+/* INT_ENABLE/INT_MAP/INT_SOURCE bits */
+#define ADXL345_INT_DATA_READY		BIT(7)
+#define ADXL345_INT_OVERRUN		0
 
 #define ADXL345_DATA_FORMAT_FULL_RES	BIT(3) /* Up to 13-bits resolution */
 #define ADXL345_DATA_FORMAT_2G		0
@@ -44,8 +50,48 @@ static const int adxl345_uscale = 38300;
 
 struct adxl345_data {
 	struct regmap *regmap;
+	struct mutex lock; /* protect this data structure */
 	u8 data_range;
 };
+
+static int adxl345_set_mode(struct adxl345_data *data, u8 mode)
+{
+	struct device *dev = regmap_get_device(data->regmap);
+	int ret;
+
+	ret = regmap_write(data->regmap, ADXL345_REG_POWER_CTL, mode);
+	if (ret < 0) {
+		dev_err(dev, "Failed to set power mode, %d\n", ret);
+		return ret;
+	}
+
+	return 0;
+}
+
+static int adxl345_data_ready(struct adxl345_data *data)
+{
+	struct device *dev = regmap_get_device(data->regmap);
+	int tries = 5;
+	u32 val;
+	int ret;
+
+	do {
+		/*
+		 * 1/ODR + 1.1ms; 11.1ms at ODR of 0.10 Hz
+		 * Sensor currently operates at default ODR of 100 Hz
+		 */
+		usleep_range(1100, 11100);
+
+		ret = regmap_read(data->regmap, ADXL345_REG_INT_SOURCE, &val);
+		if (ret < 0)
+			return ret;
+		if ((val & ADXL345_INT_DATA_READY) == ADXL345_INT_DATA_READY)
+			return 0;
+	} while (--tries);
+	dev_err(dev, "Data is not yet ready, try again.\n");
+
+	return -EAGAIN;
+}
 
 #define ADXL345_CHANNEL(reg, axis) {					\
 	.type = IIO_ACCEL,						\
@@ -72,6 +118,19 @@ static int adxl345_read_raw(struct iio_dev *indio_dev,
 
 	switch (mask) {
 	case IIO_CHAN_INFO_RAW:
+		mutex_lock(&data->lock);
+		ret = adxl345_set_mode(data, ADXL345_POWER_CTL_MEASURE);
+		if (ret < 0) {
+			mutex_unlock(&data->lock);
+			return ret;
+		}
+
+		ret = adxl345_data_ready(data);
+		if (ret < 0) {
+			adxl345_set_mode(data, ADXL345_POWER_CTL_STANDBY);
+			mutex_unlock(&data->lock);
+			return ret;
+		}
 		/*
 		 * Data is stored in adjacent registers:
 		 * ADXL345_REG_DATA(X0/Y0/Z0) contain the least significant byte
@@ -79,10 +138,15 @@ static int adxl345_read_raw(struct iio_dev *indio_dev,
 		 */
 		ret = regmap_bulk_read(data->regmap, chan->address, &regval,
 				       sizeof(regval));
-		if (ret < 0)
+		mutex_unlock(&data->lock);
+		if (ret < 0) {
+			adxl345_set_mode(data, ADXL345_POWER_CTL_STANDBY);
 			return ret;
+		}
 
 		*val = sign_extend32(le16_to_cpu(regval), 12);
+		adxl345_set_mode(data, ADXL345_POWER_CTL_STANDBY);
+
 		return IIO_VAL_INT;
 	case IIO_CHAN_INFO_SCALE:
 		*val = 0;
@@ -136,6 +200,8 @@ int adxl345_core_probe(struct device *dev, struct regmap *regmap,
 		return ret;
 	}
 
+	mutex_init(&data->lock);
+
 	indio_dev->dev.parent = dev;
 	indio_dev->name = name;
 	indio_dev->info = &adxl345_info;
@@ -143,20 +209,9 @@ int adxl345_core_probe(struct device *dev, struct regmap *regmap,
 	indio_dev->channels = adxl345_channels;
 	indio_dev->num_channels = ARRAY_SIZE(adxl345_channels);
 
-	/* Enable measurement mode */
-	ret = regmap_write(data->regmap, ADXL345_REG_POWER_CTL,
-			   ADXL345_POWER_CTL_MEASURE);
-	if (ret < 0) {
-		dev_err(dev, "Failed to enable measurement mode: %d\n", ret);
-		return ret;
-	}
-
 	ret = iio_device_register(indio_dev);
-	if (ret < 0) {
+	if (ret < 0)
 		dev_err(dev, "iio_device_register failed: %d\n", ret);
-		regmap_write(data->regmap, ADXL345_REG_POWER_CTL,
-			     ADXL345_POWER_CTL_STANDBY);
-	}
 
 	return ret;
 }
@@ -169,8 +224,7 @@ int adxl345_core_remove(struct device *dev)
 
 	iio_device_unregister(indio_dev);
 
-	return regmap_write(data->regmap, ADXL345_REG_POWER_CTL,
-			    ADXL345_POWER_CTL_STANDBY);
+	return adxl345_set_mode(data, ADXL345_POWER_CTL_STANDBY);
 }
 EXPORT_SYMBOL_GPL(adxl345_core_remove);
 
