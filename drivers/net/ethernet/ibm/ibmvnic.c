@@ -1776,6 +1776,7 @@ static int ibmvnic_complete_tx(struct ibmvnic_adapter *adapter,
 	struct device *dev = &adapter->vdev->dev;
 	struct ibmvnic_tx_buff *txbuff;
 	union sub_crq *next;
+	struct sk_buff *skb;
 	int index;
 	int i, j;
 	u8 first;
@@ -1808,20 +1809,10 @@ restart_loop:
 						 DMA_TO_DEVICE);
 			}
 
+			skb = txbuff->skb;
 			if (txbuff->last_frag) {
-				if (atomic_sub_return(next->tx_comp.num_comps,
-						      &scrq->used) <=
-				    (adapter->req_tx_entries_per_subcrq / 2) &&
-				    netif_subqueue_stopped(adapter->netdev,
-							   txbuff->skb)) {
-					netif_wake_subqueue(adapter->netdev,
-							    scrq->pool_index);
-					netdev_dbg(adapter->netdev,
-						   "Started queue %d\n",
-						   scrq->pool_index);
-				}
-
 				dev_kfree_skb_any(txbuff->skb);
+				txbuff->skb = NULL;
 			}
 
 			adapter->tx_pool[pool].free_map[adapter->tx_pool[pool].
@@ -1832,6 +1823,14 @@ restart_loop:
 		}
 		/* remove tx_comp scrq*/
 		next->tx_comp.first = 0;
+				
+		if (atomic_sub_return(next->tx_comp.num_comps, &scrq->used) <=
+		    (adapter->req_tx_entries_per_subcrq / 2) &&
+		    netif_subqueue_stopped(adapter->netdev, skb)) {
+			netif_wake_subqueue(adapter->netdev, scrq->pool_index);
+			netdev_info(adapter->netdev, "Started queue %d\n",
+				    scrq->pool_index);
+		}
 	}
 
 	enable_scrq_irq(adapter, scrq);
