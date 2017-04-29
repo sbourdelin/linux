@@ -1394,21 +1394,15 @@ static int skd_sg_io_get_and_check_args(struct skd_device *skdev,
 		uint nbytes = sizeof(*iov) * sgp->iovec_count;
 		size_t iov_data_len;
 
-		iov = kmalloc(nbytes, GFP_KERNEL);
-		if (iov == NULL) {
-			pr_debug("%s:%s:%d alloc iovec failed %d\n",
+		iov = memdup_user(sgp->dxferp, nbytes);
+		if (IS_ERR(iov)) {
+			pr_debug("%s:%s:%d memdup_user iovec failed %d %p\n",
 				 skdev->name, __func__, __LINE__,
-				 sgp->iovec_count);
-			return -ENOMEM;
+				 sgp->iovec_count, sgp->dxferp);
+			return PTR_ERR(iov);
 		}
 		sksgio->iov = iov;
 		sksgio->iovcnt = sgp->iovec_count;
-
-		if (copy_from_user(iov, sgp->dxferp, nbytes)) {
-			pr_debug("%s:%s:%d copy_from_user iovec failed %p\n",
-				 skdev->name, __func__, __LINE__, sgp->dxferp);
-			return -EFAULT;
-		}
 
 		/*
 		 * Sum up the vecs, making sure they don't overflow
