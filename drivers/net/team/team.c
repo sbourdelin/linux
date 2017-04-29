@@ -1625,6 +1625,13 @@ err_team_queue_override_init:
 	return err;
 }
 
+static void team_destructor_free(struct net_device *dev)
+{
+	struct team *team = netdev_priv(dev);
+
+	free_percpu(team->pcpu_stats);
+}
+
 static void team_uninit(struct net_device *dev)
 {
 	struct team *team = netdev_priv(dev);
@@ -1641,13 +1648,16 @@ static void team_uninit(struct net_device *dev)
 	team_notify_peers_fini(team);
 	team_queue_override_fini(team);
 	mutex_unlock(&team->lock);
+
+	/* dev is not registered, perform the free instead of destructor */
+	if (dev->reg_state == NETREG_UNINITIALIZED)
+		team_destructor_free(dev);
+
 }
 
 static void team_destructor(struct net_device *dev)
 {
-	struct team *team = netdev_priv(dev);
-
-	free_percpu(team->pcpu_stats);
+	team_destructor_free(dev);
 	free_netdev(dev);
 }
 
