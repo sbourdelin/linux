@@ -35,13 +35,14 @@
 #include "ks7010_sdio.h"
 
 #ifdef KS_WLAN_DEBUG
-#define DPRINTK(n, fmt, args...) \
-	do { \
-		if (KS_WLAN_DEBUG > (n)) \
-			pr_notice("%s: "fmt, __func__, ## args); \
-	} while (0)
+#define DPRINTK(n, fmt, ...)					 \
+do {								 \
+	if (KS_WLAN_DEBUG > (n))				 \
+		pr_notice("%s: "fmt, __func__, ##__VA_ARGS__);	 \
+} while (0)
 #else
-#define DPRINTK(n, fmt, args...)
+#define DPRINTK(n, fmt, ...)					\
+	no_printk(fmt, ##__VA_ARGS__)
 #endif
 
 struct ks_wlan_parameter {
