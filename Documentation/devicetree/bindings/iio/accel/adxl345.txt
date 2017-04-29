@@ -15,6 +15,8 @@ Optional properties:
    in Documentation/devicetree/bindings/interrupt-controller/interrupts.txt
  - interrupts: interrupt mapping for IRQ as documented in
    Documentation/devicetree/bindings/interrupt-controller/interrupts.txt
+ - interrupt-names: specify INTx pin in use. Should be "INT1" for INT1 pin or
+   "INT2" for INT2 pin.
 
 Example for a I2C device node:
 
@@ -23,6 +25,7 @@ Example for a I2C device node:
 		reg = <0x53>;
 		interrupt-parent = <&gpio1>;
 		interrupts = <0 IRQ_TYPE_LEVEL_HIGH>;
+		interrupt-names = "INT1";
 	};
 
 Example for a SPI device node:
@@ -35,4 +38,5 @@ Example for a SPI device node:
 		spi-cpha;
 		interrupt-parent = <&gpio1>;
 		interrupts = <0 IRQ_TYPE_LEVEL_HIGH>;
+		interrupt-names = "INT1";
 	};
