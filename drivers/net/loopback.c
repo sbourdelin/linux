@@ -141,15 +141,28 @@ static int loopback_dev_init(struct net_device *dev)
 	return 0;
 }
 
-static void loopback_dev_free(struct net_device *dev)
+static void loopback_destructor_free(struct net_device *dev)
 {
 	dev_net(dev)->loopback_dev = NULL;
 	free_percpu(dev->lstats);
+}
+
+static void loopback_dev_uninit(struct net_device *dev)
+{
+	/* dev is not registered, perform the free instead of destructor */
+	if (dev->reg_state == NETREG_UNINITIALIZED)
+		loopback_destructor_free(dev);
+}
+
+static void loopback_dev_free(struct net_device *dev)
+{
+	loopback_destructor_free(dev);
 	free_netdev(dev);
 }
 
 static const struct net_device_ops loopback_ops = {
 	.ndo_init      = loopback_dev_init,
+	.ndo_uninit = loopback_dev_uninit,
 	.ndo_start_xmit= loopback_xmit,
 	.ndo_get_stats64 = loopback_get_stats64,
 	.ndo_set_mac_address = eth_mac_addr,
