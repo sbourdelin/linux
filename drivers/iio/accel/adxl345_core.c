@@ -14,8 +14,11 @@
 #include <linux/of_irq.h>
 #include <linux/regmap.h>
 
+#include <linux/iio/buffer.h>
 #include <linux/iio/iio.h>
 #include <linux/iio/trigger.h>
+#include <linux/iio/triggered_buffer.h>
+#include <linux/iio/trigger_consumer.h>
 
 #include "adxl345.h"
 
@@ -55,12 +58,20 @@
  */
 static const int adxl345_uscale = 38300;
 
+enum adxl345_scan_index {
+	ADXL345_IDX_X,
+	ADXL345_IDX_Y,
+	ADXL345_IDX_Z,
+	ADXL345_IDX_TSTAMP,
+};
+
 struct adxl345_data {
 	struct iio_trigger *data_ready_trig;
 	bool data_ready_trig_on;
 	struct regmap *regmap;
 	struct mutex lock; /* protect this data structure */
 	u8 data_range;
+	s16 buffer[8]; /* 3 x 16-bit channels + padding + 64-bit timestamp */
 };
 
 static int adxl345_set_mode(struct adxl345_data *data, u8 mode)
@@ -109,12 +120,25 @@ static int adxl345_data_ready(struct adxl345_data *data)
 	.address = reg,							\
 	.info_mask_separate = BIT(IIO_CHAN_INFO_RAW),			\
 	.info_mask_shared_by_type = BIT(IIO_CHAN_INFO_SCALE),		\
+	.scan_index = ADXL345_IDX_##axis,				\
+	.scan_type = {							\
+		.sign = 's',						\
+		.realbits = 13,						\
+		.storagebits = 16,					\
+		.endianness = IIO_LE,					\
+	},								\
 }
 
 static const struct iio_chan_spec adxl345_channels[] = {
 	ADXL345_CHANNEL(ADXL345_REG_DATAX0, X),
 	ADXL345_CHANNEL(ADXL345_REG_DATAY0, Y),
 	ADXL345_CHANNEL(ADXL345_REG_DATAZ0, Z),
+	IIO_CHAN_SOFT_TIMESTAMP(ADXL345_IDX_TSTAMP),
+};
+
+static const unsigned long adxl345_scan_masks[] = {
+	BIT(ADXL345_IDX_X) | BIT(ADXL345_IDX_Y) | BIT(ADXL345_IDX_Z),
+	0
 };
 
 static int adxl345_read_raw(struct iio_dev *indio_dev,
@@ -127,6 +151,10 @@ static int adxl345_read_raw(struct iio_dev *indio_dev,
 
 	switch (mask) {
 	case IIO_CHAN_INFO_RAW:
+		ret = iio_device_claim_direct_mode(indio_dev);
+		if (ret)
+			return ret;
+
 		mutex_lock(&data->lock);
 		ret = adxl345_set_mode(data, ADXL345_POWER_CTL_MEASURE);
 		if (ret < 0) {
@@ -148,12 +176,14 @@ static int adxl345_read_raw(struct iio_dev *indio_dev,
 		ret = regmap_bulk_read(data->regmap, chan->address, &regval,
 				       sizeof(regval));
 		mutex_unlock(&data->lock);
+		iio_device_release_direct_mode(indio_dev);
 		if (ret < 0) {
 			adxl345_set_mode(data, ADXL345_POWER_CTL_STANDBY);
 			return ret;
 		}
 
-		*val = sign_extend32(le16_to_cpu(regval), 12);
+		*val = sign_extend32(le16_to_cpu(regval),
+				     chan->scan_type.realbits - 1);
 		adxl345_set_mode(data, ADXL345_POWER_CTL_STANDBY);
 
 		return IIO_VAL_INT;
@@ -185,6 +215,64 @@ static irqreturn_t adxl345_irq(int irq, void *p)
 
 	return IRQ_NONE;
 }
+
+static irqreturn_t adxl345_trigger_handler(int irq, void *p)
+{
+	struct iio_poll_func *pf = p;
+	struct iio_dev *indio_dev = pf->indio_dev;
+	struct adxl345_data *data = iio_priv(indio_dev);
+	int ret;
+
+	mutex_lock(&data->lock);
+	/* Make sure data is ready when using external trigger */
+	if (!data->data_ready_trig_on) {
+		ret = adxl345_data_ready(data);
+		if (ret < 0)
+			goto error;
+	}
+
+	ret = regmap_bulk_read(data->regmap, ADXL345_REG_DATAX0, data->buffer,
+			       sizeof(__le16) * 3);
+	if (ret < 0)
+		goto error;
+
+	iio_push_to_buffers_with_timestamp(indio_dev, data->buffer,
+					   pf->timestamp);
+error:
+	mutex_unlock(&data->lock);
+	iio_trigger_notify_done(indio_dev->trig);
+
+	return IRQ_HANDLED;
+}
+
+static int adxl345_triggered_buffer_postenable(struct iio_dev *indio_dev)
+{
+	struct adxl345_data *data = iio_priv(indio_dev);
+	int ret;
+
+	ret = iio_triggered_buffer_postenable(indio_dev);
+	if (ret)
+		return ret;
+
+	return adxl345_set_mode(data, ADXL345_POWER_CTL_MEASURE);
+}
+
+static int adxl345_triggered_buffer_predisable(struct iio_dev *indio_dev)
+{
+	struct adxl345_data *data = iio_priv(indio_dev);
+	int ret;
+
+	ret = adxl345_set_mode(data, ADXL345_POWER_CTL_STANDBY);
+	if (ret)
+		return ret;
+
+	return iio_triggered_buffer_predisable(indio_dev);
+}
+
+static const struct iio_buffer_setup_ops adxl345_buffer_setup_ops = {
+	.postenable = adxl345_triggered_buffer_postenable,
+	.predisable = adxl345_triggered_buffer_predisable,
+};
 
 static int adxl345_drdy_trigger_set_state(struct iio_trigger *trig, bool state)
 {
@@ -278,6 +366,7 @@ int adxl345_core_probe(struct device *dev, struct regmap *regmap, int irq,
 	indio_dev->modes = INDIO_DIRECT_MODE;
 	indio_dev->channels = adxl345_channels;
 	indio_dev->num_channels = ARRAY_SIZE(adxl345_channels);
+	indio_dev->available_scan_masks = adxl345_scan_masks;
 
 	if (irq > 0) {
 		ret = devm_request_threaded_irq(dev,
@@ -309,6 +398,16 @@ int adxl345_core_probe(struct device *dev, struct regmap *regmap, int irq,
 			dev_err(dev, "Failed to register trigger: %d\n", ret);
 			return ret;
 		}
+	}
+
+	ret = devm_iio_triggered_buffer_setup(dev,
+					      indio_dev,
+					      iio_pollfunc_store_time,
+					      adxl345_trigger_handler,
+					      &adxl345_buffer_setup_ops);
+	if (ret < 0) {
+		dev_err(dev, "iio_triggered_buffer_setup failed: %d\n", ret);
+		return ret;
 	}
 
 	ret = iio_device_register(indio_dev);
