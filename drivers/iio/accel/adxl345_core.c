@@ -9,15 +9,20 @@
  */
 
 #include <linux/delay.h>
+#include <linux/interrupt.h>
 #include <linux/module.h>
+#include <linux/of_irq.h>
 #include <linux/regmap.h>
 
 #include <linux/iio/iio.h>
+#include <linux/iio/trigger.h>
 
 #include "adxl345.h"
 
 #define ADXL345_REG_DEVID		0x00
 #define ADXL345_REG_POWER_CTL		0x2D
+#define ADXL345_REG_INT_ENABLE		0x2E
+#define ADXL345_REG_INT_MAP		0x2F
 #define ADXL345_REG_INT_SOURCE		0x30
 #define ADXL345_REG_DATA_FORMAT		0x31
 #define ADXL345_REG_DATAX0		0x32
@@ -39,6 +44,8 @@
 
 #define ADXL345_DEVID			0xE5
 
+#define ADXL345_IRQ_NAME		"adxl345_event"
+
 /*
  * In full-resolution mode, scale factor is maintained at ~4 mg/LSB
  * in all g ranges.
@@ -49,6 +56,8 @@
 static const int adxl345_uscale = 38300;
 
 struct adxl345_data {
+	struct iio_trigger *data_ready_trig;
+	bool data_ready_trig_on;
 	struct regmap *regmap;
 	struct mutex lock; /* protect this data structure */
 	u8 data_range;
@@ -158,17 +167,62 @@ static int adxl345_read_raw(struct iio_dev *indio_dev,
 	return -EINVAL;
 }
 
+static irqreturn_t adxl345_irq(int irq, void *p)
+{
+	struct iio_dev *indio_dev = p;
+	struct adxl345_data *data = iio_priv(indio_dev);
+	int ret;
+	u32 int_stat;
+
+	ret = regmap_read(data->regmap, ADXL345_REG_INT_SOURCE, &int_stat);
+	if (ret < 0)
+		return IRQ_HANDLED;
+
+	if (int_stat & ADXL345_INT_DATA_READY) {
+		iio_trigger_poll_chained(data->data_ready_trig);
+		return IRQ_HANDLED;
+	}
+
+	return IRQ_NONE;
+}
+
+static int adxl345_drdy_trigger_set_state(struct iio_trigger *trig, bool state)
+{
+	struct iio_dev *indio_dev = iio_trigger_get_drvdata(trig);
+	struct adxl345_data *data = iio_priv(indio_dev);
+	struct device *dev = regmap_get_device(data->regmap);
+	int ret;
+
+	ret = regmap_update_bits(data->regmap,
+				 ADXL345_REG_INT_ENABLE,
+				 ADXL345_INT_DATA_READY,
+				 state ? ADXL345_INT_DATA_READY : 0);
+	if (ret < 0) {
+		dev_err(dev, "Failed to update INT_ENABLE bits\n");
+		return ret;
+	}
+	data->data_ready_trig_on = state;
+
+	return ret;
+}
+
+static const struct iio_trigger_ops adxl345_trigger_ops = {
+	.owner = THIS_MODULE,
+	.set_trigger_state = adxl345_drdy_trigger_set_state,
+};
+
 static const struct iio_info adxl345_info = {
 	.driver_module	= THIS_MODULE,
 	.read_raw	= adxl345_read_raw,
 };
 
-int adxl345_core_probe(struct device *dev, struct regmap *regmap,
+int adxl345_core_probe(struct device *dev, struct regmap *regmap, int irq,
 		       const char *name)
 {
 	struct adxl345_data *data;
 	struct iio_dev *indio_dev;
 	u32 regval;
+	int of_irq;
 	int ret;
 
 	ret = regmap_read(regmap, ADXL345_REG_DEVID, &regval);
@@ -199,6 +253,22 @@ int adxl345_core_probe(struct device *dev, struct regmap *regmap,
 		dev_err(dev, "Failed to set data range: %d\n", ret);
 		return ret;
 	}
+	/*
+	 * Any bits set to 0 send their respective interrupts to the INT1 pin,
+	 * whereas bits set to 1 send their respective interrupts to the INT2
+	 * pin. Map all interrupts to the specified pin.
+	 */
+	of_irq = of_irq_get_byname(dev->of_node, "INT2");
+	if (of_irq == irq)
+		regval = 0xFF;
+	else
+		regval = 0x00;
+
+	ret = regmap_write(data->regmap, ADXL345_REG_INT_MAP, regval);
+	if (ret < 0) {
+		dev_err(dev, "Failed to set up interrupts: %d\n", ret);
+		return ret;
+	}
 
 	mutex_init(&data->lock);
 
@@ -208,6 +278,38 @@ int adxl345_core_probe(struct device *dev, struct regmap *regmap,
 	indio_dev->modes = INDIO_DIRECT_MODE;
 	indio_dev->channels = adxl345_channels;
 	indio_dev->num_channels = ARRAY_SIZE(adxl345_channels);
+
+	if (irq > 0) {
+		ret = devm_request_threaded_irq(dev,
+						irq,
+						NULL,
+						adxl345_irq,
+						IRQF_TRIGGER_HIGH |
+						IRQF_ONESHOT,
+						ADXL345_IRQ_NAME,
+						indio_dev);
+		if (ret < 0) {
+			dev_err(dev, "Failed to request irq: %d\n", irq);
+			return ret;
+		}
+
+		data->data_ready_trig = devm_iio_trigger_alloc(dev,
+							       "%s-dev%d",
+							       indio_dev->name,
+							       indio_dev->id);
+		if (!data->data_ready_trig)
+			return -ENOMEM;
+
+		data->data_ready_trig->dev.parent = dev;
+		data->data_ready_trig->ops = &adxl345_trigger_ops;
+		iio_trigger_set_drvdata(data->data_ready_trig, indio_dev);
+
+		ret = devm_iio_trigger_register(dev, data->data_ready_trig);
+		if (ret) {
+			dev_err(dev, "Failed to register trigger: %d\n", ret);
+			return ret;
+		}
+	}
 
 	ret = iio_device_register(indio_dev);
 	if (ret < 0)

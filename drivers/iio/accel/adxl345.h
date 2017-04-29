@@ -11,7 +11,7 @@
 #ifndef _ADXL345_H_
 #define _ADXL345_H_
 
-int adxl345_core_probe(struct device *dev, struct regmap *regmap,
+int adxl345_core_probe(struct device *dev, struct regmap *regmap, int irq,
 		       const char *name);
 int adxl345_core_remove(struct device *dev);
 

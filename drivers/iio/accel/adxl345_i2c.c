@@ -34,7 +34,8 @@ static int adxl345_i2c_probe(struct i2c_client *client,
 		return PTR_ERR(regmap);
 	}
 
-	return adxl345_core_probe(&client->dev, regmap, id ? id->name : NULL);
+	return adxl345_core_probe(&client->dev, regmap, client->irq,
+				  id ? id->name : NULL);
 }
 
 static int adxl345_i2c_remove(struct i2c_client *client)

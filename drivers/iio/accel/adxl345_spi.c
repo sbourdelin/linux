@@ -42,7 +42,7 @@ static int adxl345_spi_probe(struct spi_device *spi)
 		return PTR_ERR(regmap);
 	}
 
-	return adxl345_core_probe(&spi->dev, regmap, id->name);
+	return adxl345_core_probe(&spi->dev, regmap, spi->irq, id->name);
 }
 
 static int adxl345_spi_remove(struct spi_device *spi)
