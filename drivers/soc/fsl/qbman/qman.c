@@ -1084,11 +1084,9 @@ loop:
 		 * entries well before the ring has been fully consumed, so
 		 * we're being *really* paranoid here.
 		 */
-		u64 now, then = jiffies;
+		unsigned int udel_time = jiffies_to_usecs(10000);
 
-		do {
-			now = jiffies;
-		} while ((then + 10000) > now);
+		usleep_range(udel_time/2, udel_time);
 		msg = qm_mr_current(p);
 		if (!msg)
 			return 0;
