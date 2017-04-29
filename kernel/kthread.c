@@ -169,12 +169,20 @@ void *kthread_probe_data(struct task_struct *task)
 
 static void __kthread_parkme(struct kthread *self)
 {
+	ulong flags;
+
 	__set_current_state(TASK_PARKED);
-	while (test_bit(KTHREAD_SHOULD_PARK, &self->flags)) {
-		if (!test_and_set_bit(KTHREAD_IS_PARKED, &self->flags))
-			complete(&self->parked);
-		schedule();
+	flags = self->flags;
+
+	while (test_bit(KTHREAD_SHOULD_PARK, &flags)) {
+		if (cmpxchg(&self->flags, flags,
+			    flags | (1 << KTHREAD_IS_PARKED)) == flags) {
+			if (!test_bit(KTHREAD_IS_PARKED, &flags))
+				complete(&self->parked);
+			schedule();
+		}
 		__set_current_state(TASK_PARKED);
+		flags = self->flags;
 	}
 	clear_bit(KTHREAD_IS_PARKED, &self->flags);
 	__set_current_state(TASK_RUNNING);
