@@ -1171,8 +1171,22 @@ static int bq27xxx_battery_status(struct bq27xxx_device_info *di,
 				  union power_supply_propval *val)
 {
 	int status;
+	int curr;
+	int flags;
+
+	curr = bq27xxx_read(di, BQ27XXX_REG_AI, false);
+	if (curr < 0) {
+		dev_err(di->dev, "error reading current\n");
+		return curr;
+	}
 
 	if (di->chip == BQ27000 || di->chip == BQ27010) {
+		flags = bq27xxx_read(di, BQ27XXX_REG_FLAGS, true);
+		if (flags & BQ27000_FLAG_CHGS) {
+			dev_dbg(di->dev, "negative current!\n");
+			curr = -curr;
+		}
+
 		if (di->cache.flags & BQ27000_FLAG_FC)
 			status = POWER_SUPPLY_STATUS_FULL;
 		else if (di->cache.flags & BQ27000_FLAG_CHGS)
@@ -1182,12 +1196,26 @@ static int bq27xxx_battery_status(struct bq27xxx_device_info *di,
 		else
 			status = POWER_SUPPLY_STATUS_DISCHARGING;
 	} else {
+		curr = (int)((s16)curr) * 1000;
+
 		if (di->cache.flags & BQ27XXX_FLAG_FC)
 			status = POWER_SUPPLY_STATUS_FULL;
 		else if (di->cache.flags & BQ27XXX_FLAG_DSC)
 			status = POWER_SUPPLY_STATUS_DISCHARGING;
 		else
 			status = POWER_SUPPLY_STATUS_CHARGING;
+	}
+
+
+	if (curr == 0 && status != POWER_SUPPLY_STATUS_NOT_CHARGING)
+		status = POWER_SUPPLY_STATUS_FULL;
+
+	if (status == POWER_SUPPLY_STATUS_FULL) {
+		/* Drawing or providing current when full */
+		if (curr > 0)
+			status = POWER_SUPPLY_STATUS_CHARGING;
+		else if (curr < 0)
+			status = POWER_SUPPLY_STATUS_DISCHARGING;
 	}
 
 	if (di->status_retry == 0 && di->status_change_reference != status) {
