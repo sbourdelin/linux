@@ -1190,6 +1190,11 @@ static int bq27xxx_battery_status(struct bq27xxx_device_info *di,
 			status = POWER_SUPPLY_STATUS_CHARGING;
 	}
 
+	if (di->status_retry == 0 && di->status_change_reference != status) {
+		di->status_change_reference = status;
+		power_supply_changed(di->bat);
+	}
+
 	val->intval = status;
 
 	return 0;
@@ -1340,12 +1345,38 @@ static int bq27xxx_battery_get_property(struct power_supply *psy,
 	return ret;
 }
 
+static void bq27xxx_status_change(struct work_struct *work)
+{
+	struct bq27xxx_device_info *di =
+			container_of(work, struct bq27xxx_device_info,
+				     status_work.work);
+	union power_supply_propval val;
+	int ret;
+
+	bq27xxx_battery_update(di);
+
+	ret = bq27xxx_battery_status(di, &val);
+	if (ret < 0)
+		return;
+
+	if (di->status_change_reference != val.intval) {
+		di->status_change_reference = val.intval;
+		power_supply_changed(di->bat);
+	}
+
+	if (di->status_retry > 0) {
+		di->status_retry--;
+		schedule_delayed_work(&di->status_work, HZ);
+	}
+}
+
 static void bq27xxx_external_power_changed(struct power_supply *psy)
 {
 	struct bq27xxx_device_info *di = power_supply_get_drvdata(psy);
 
-	cancel_delayed_work_sync(&di->poll_work);
-	schedule_delayed_work(&di->poll_work, 0);
+	cancel_delayed_work_sync(&di->status_work);
+	schedule_delayed_work(&di->status_work, HZ);
+	di->status_retry = 5;
 }
 
 int bq27xxx_battery_setup(struct bq27xxx_device_info *di)
@@ -1357,8 +1388,10 @@ int bq27xxx_battery_setup(struct bq27xxx_device_info *di)
 	psy_cfg.of_node = di->of_node;
 
 	INIT_DELAYED_WORK(&di->poll_work, bq27xxx_battery_poll);
+	INIT_DELAYED_WORK(&di->status_work, bq27xxx_status_change);
 	mutex_init(&di->lock);
 	di->regs = bq27xxx_regs[di->chip];
+	di->status_change_reference = POWER_SUPPLY_STATUS_UNKNOWN;
 
 	psy_desc = devm_kzalloc(di->dev, sizeof(*psy_desc), GFP_KERNEL);
 	if (!psy_desc)
@@ -1400,6 +1433,7 @@ void bq27xxx_battery_teardown(struct bq27xxx_device_info *di)
 	poll_interval = 0;
 
 	cancel_delayed_work_sync(&di->poll_work);
+	cancel_delayed_work_sync(&di->status_work);
 
 	power_supply_unregister(di->bat);
 

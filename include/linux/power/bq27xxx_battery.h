@@ -67,6 +67,9 @@ struct bq27xxx_device_info {
 	int charge_design_full;
 	unsigned long last_update;
 	struct delayed_work poll_work;
+	struct delayed_work status_work;
+	int status_retry;
+	int status_change_reference;
 	struct power_supply *bat;
 	struct list_head list;
 	struct mutex lock;
