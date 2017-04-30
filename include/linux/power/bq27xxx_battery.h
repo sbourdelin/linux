@@ -63,6 +63,7 @@ struct bq27xxx_device_info {
 	const char *name;
 	struct bq27xxx_access_methods bus;
 	struct bq27xxx_reg_cache cache;
+	struct device_node *of_node;
 	int charge_design_full;
 	unsigned long last_update;
 	struct delayed_work work;
