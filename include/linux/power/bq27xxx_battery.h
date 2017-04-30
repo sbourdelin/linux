@@ -66,7 +66,7 @@ struct bq27xxx_device_info {
 	struct device_node *of_node;
 	int charge_design_full;
 	unsigned long last_update;
-	struct delayed_work work;
+	struct delayed_work poll_work;
 	struct power_supply *bat;
 	struct list_head list;
 	struct mutex lock;

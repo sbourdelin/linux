@@ -769,8 +769,8 @@ static int poll_interval_param_set(const char *val, const struct kernel_param *k
 
 	mutex_lock(&bq27xxx_list_lock);
 	list_for_each_entry(di, &bq27xxx_battery_devices, list) {
-		cancel_delayed_work_sync(&di->work);
-		schedule_delayed_work(&di->work, 0);
+		cancel_delayed_work_sync(&di->poll_work);
+		schedule_delayed_work(&di->poll_work, 0);
 	}
 	mutex_unlock(&bq27xxx_list_lock);
 
@@ -1126,12 +1126,12 @@ static void bq27xxx_battery_poll(struct work_struct *work)
 {
 	struct bq27xxx_device_info *di =
 			container_of(work, struct bq27xxx_device_info,
-				     work.work);
+				     poll_work.work);
 
 	bq27xxx_battery_update(di);
 
 	if (poll_interval > 0)
-		schedule_delayed_work(&di->work, poll_interval * HZ);
+		schedule_delayed_work(&di->poll_work, poll_interval * HZ);
 }
 
 /*
@@ -1265,8 +1265,8 @@ static int bq27xxx_battery_get_property(struct power_supply *psy,
 
 	mutex_lock(&di->lock);
 	if (time_is_before_jiffies(di->last_update + 5 * HZ)) {
-		cancel_delayed_work_sync(&di->work);
-		bq27xxx_battery_poll(&di->work.work);
+		cancel_delayed_work_sync(&di->poll_work);
+		bq27xxx_battery_poll(&di->poll_work.work);
 	}
 	mutex_unlock(&di->lock);
 
@@ -1344,8 +1344,8 @@ static void bq27xxx_external_power_changed(struct power_supply *psy)
 {
 	struct bq27xxx_device_info *di = power_supply_get_drvdata(psy);
 
-	cancel_delayed_work_sync(&di->work);
-	schedule_delayed_work(&di->work, 0);
+	cancel_delayed_work_sync(&di->poll_work);
+	schedule_delayed_work(&di->poll_work, 0);
 }
 
 int bq27xxx_battery_setup(struct bq27xxx_device_info *di)
@@ -1356,7 +1356,7 @@ int bq27xxx_battery_setup(struct bq27xxx_device_info *di)
 	psy_cfg.drv_data = di;
 	psy_cfg.of_node = di->of_node;
 
-	INIT_DELAYED_WORK(&di->work, bq27xxx_battery_poll);
+	INIT_DELAYED_WORK(&di->poll_work, bq27xxx_battery_poll);
 	mutex_init(&di->lock);
 	di->regs = bq27xxx_regs[di->chip];
 
@@ -1399,7 +1399,7 @@ void bq27xxx_battery_teardown(struct bq27xxx_device_info *di)
 	 */
 	poll_interval = 0;
 
-	cancel_delayed_work_sync(&di->work);
+	cancel_delayed_work_sync(&di->poll_work);
 
 	power_supply_unregister(di->bat);
 
