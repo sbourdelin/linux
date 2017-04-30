@@ -2302,7 +2302,11 @@ static bool has_cpu_slab(int cpu, void *info)
 	struct kmem_cache *s = info;
 	struct kmem_cache_cpu *c = per_cpu_ptr(s->cpu_slab, cpu);
 
-	return c->page || c->partial;
+	return c->page
+#ifdef CONFIG_SLUB_CPU_PARTIAL
+		|| c->partial
+#endif
+		;
 }
 
 static void flush_all(struct kmem_cache *s)
@@ -2511,7 +2515,9 @@ static void *___slab_alloc(struct kmem_cache *s, gfp_t gfpflags, int node,
 	page = c->page;
 	if (!page)
 		goto new_slab;
+#ifdef CONFIG_SLUB_CPU_PARTIAL
 redo:
+#endif
 
 	if (unlikely(!node_match(page, node))) {
 		int searchnode = node;
@@ -2568,6 +2574,7 @@ load_freelist:
 
 new_slab:
 
+#ifdef CONFIG_SLUB_CPU_PARTIAL
 	if (c->partial) {
 		page = c->page = c->partial;
 		c->partial = page->next;
@@ -2575,6 +2582,7 @@ new_slab:
 		c->freelist = NULL;
 		goto redo;
 	}
+#endif
 
 	freelist = new_slab_objects(s, gfpflags, node, &c);
 
@@ -4760,6 +4768,7 @@ static ssize_t show_slab_objects(struct kmem_cache *s,
 			total += x;
 			nodes[node] += x;
 
+#ifdef CONFIG_SLUB_CPU_PARTIAL
 			page = READ_ONCE(c->partial);
 			if (page) {
 				node = page_to_nid(page);
@@ -4772,6 +4781,7 @@ static ssize_t show_slab_objects(struct kmem_cache *s,
 				total += x;
 				nodes[node] += x;
 			}
+#endif
 		}
 	}
 
@@ -4980,6 +4990,7 @@ static ssize_t objects_partial_show(struct kmem_cache *s, char *buf)
 }
 SLAB_ATTR_RO(objects_partial);
 
+#ifdef CONFIG_SLUB_CPU_PARTIAL
 static ssize_t slabs_cpu_partial_show(struct kmem_cache *s, char *buf)
 {
 	int objects = 0;
@@ -5010,6 +5021,7 @@ static ssize_t slabs_cpu_partial_show(struct kmem_cache *s, char *buf)
 	return len + sprintf(buf + len, "\n");
 }
 SLAB_ATTR_RO(slabs_cpu_partial);
+#endif
 
 static ssize_t reclaim_account_show(struct kmem_cache *s, char *buf)
 {
@@ -5364,7 +5376,9 @@ static struct attribute *slab_attrs[] = {
 	&destroy_by_rcu_attr.attr,
 	&shrink_attr.attr,
 	&reserved_attr.attr,
+#ifdef CONFIG_SLUB_CPU_PARTIAL
 	&slabs_cpu_partial_attr.attr,
+#endif
 #ifdef CONFIG_SLUB_DEBUG
 	&total_objects_attr.attr,
 	&slabs_attr.attr,
