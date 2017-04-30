@@ -1,10 +1,11 @@
 Linux kernel
 ============
 
-This file was moved to Documentation/admin-guide/README.rst
+Linux is a Unix-like operating system, originally written by Linus Torvalds.
+Please read Documentation/admin-guide/README.rst for an introduction.
 
-Please notice that there are several guides for kernel developers and users.
-These guides can be rendered in a number of formats, like HTML and PDF.
+There are several guides for kernel developers and users. These guides can be
+rendered in a number of formats, like HTML and PDF.
 
 In order to build the documentation, use ``make htmldocs`` or
 ``make pdfdocs``.
