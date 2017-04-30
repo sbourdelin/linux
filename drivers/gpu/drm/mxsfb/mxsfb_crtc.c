@@ -109,7 +109,7 @@ static void mxsfb_set_bus_fmt(struct mxsfb_drm_private *mxsfb)
 		reg |= CTRL_SET_BUS_WIDTH(STMLCDIF_24BIT);
 		break;
 	default:
-		dev_err(drm->dev, "Unknown media bus format %d\n", bus_format);
+		dev_err(drm->dev, "Unknown media bus format 0x%x\n", bus_format);
 		break;
 	}
 	writel(reg, mxsfb->base + LCDC_CTRL);
