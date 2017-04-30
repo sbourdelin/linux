@@ -123,7 +123,7 @@ struct mtd_info *__init crisv32_nand_flash_probe(void)
 	if (!read_cs || !write_cs) {
 		printk(KERN_ERR "CRISv32 NAND ioremap failed\n");
 		err = -EIO;
-		goto out_mtd;
+		goto out_ior;
 	}
 
 	/* Get pointer to private data */
@@ -162,9 +162,11 @@ struct mtd_info *__init crisv32_nand_flash_probe(void)
 	return crisv32_mtd;
 
 out_ior:
-	iounmap((void *)read_cs);
-	iounmap((void *)write_cs);
-out_mtd:
+	if (read_cs)
+		iounmap((void *)read_cs);
+	if (write_cs)
+		iounmap((void *)write_cs);
+
 	kfree(wrapper);
 	return NULL;
 }
