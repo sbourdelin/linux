@@ -151,6 +151,7 @@
 	battery: bq27500@55 {
 		compatible = "ti,bq27500";
 		reg = <0x55>;
+		power-supplies = <&charger>;
 	};
 };
 
