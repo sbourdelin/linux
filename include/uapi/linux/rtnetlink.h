@@ -179,6 +179,23 @@ struct rtattr {
 #define RTA_DATA(rta)   ((void*)(((char*)(rta)) + RTA_LENGTH(0)))
 #define RTA_PAYLOAD(rta) ((int)((rta)->rta_len) - RTA_LENGTH(0))
 
+/* Generic bitflags attribute content sent to the kernel.
+ *
+ * The nla_flag_values is a bitmap that defines the values being set
+ * The nla_flag_selector is a bitmask that defines which value is legit
+ *
+ * Examples:
+ *  nla_flag_values = 0x0, and nla_flag_selector = 0x1
+ *  implies we are selecting bit 1 and we want to set its value to 0.
+ *
+ *  nla_flag_values = 0x2, and nla_flag_selector = 0x2
+ *  implies we are selecting bit 2 and we want to set its value to 1.
+ *
+ */
+struct __nla_bit_flags {
+	__u32 nla_flag_values;
+	__u32 nla_flag_selector;
+};
 
 
 
