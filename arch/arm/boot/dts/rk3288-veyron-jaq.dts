@@ -45,7 +45,7 @@
 /dts-v1/;
 
 #include "rk3288-veyron-chromebook.dtsi"
-#include "cros-ec-sbs.dtsi"
+#include "rk3288-veyron-chromebook-sbs.dtsi"
 
 / {
 	model = "Google Jaq";
