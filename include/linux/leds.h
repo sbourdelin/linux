@@ -49,6 +49,7 @@ struct led_classdev {
 #define LED_HW_PLUGGABLE	BIT(19)
 #define LED_PANIC_INDICATOR	BIT(20)
 #define LED_BRIGHT_HW_CHANGED	BIT(21)
+#define LED_BRIGHTNESS_FAST	BIT(22)
 
 	/* set_brightness_work / blink_timer flags, atomic, private. */
 	unsigned long		work_flags;
