@@ -12,8 +12,10 @@
 
 static void __dump_stack(void)
 {
+	get_printk_buffer();
 	dump_stack_print_info(KERN_DEFAULT);
 	show_stack(NULL, NULL);
+	put_printk_buffer();
 }
 
 /**

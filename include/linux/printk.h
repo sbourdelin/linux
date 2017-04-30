@@ -170,6 +170,9 @@ int printk_emit(int facility, int level,
 
 asmlinkage __printf(1, 2) __cold
 int printk(const char *fmt, ...);
+void get_printk_buffer(void);
+void flush_printk_buffer(void);
+void put_printk_buffer(void);
 
 /*
  * Special printk facility for scheduler/timekeeping use only, _DO_NOT_USE_ !
@@ -216,6 +219,15 @@ static inline __printf(1, 2) __cold
 int printk(const char *s, ...)
 {
 	return 0;
+}
+static inline void get_printk_buffer(void)
+{
+}
+static inline void flush_printk_buffer(void)
+{
+}
+static inline void put_printk_buffer(void)
+{
 }
 static inline __printf(1, 2) __cold
 int printk_deferred(const char *s, ...)

@@ -1693,33 +1693,10 @@ static size_t log_output(int facility, int level, enum log_flags lflags, const c
 	return log_store(facility, level, lflags, 0, dict, dictlen, text, text_len);
 }
 
-asmlinkage int vprintk_emit(int facility, int level,
-			    const char *dict, size_t dictlen,
-			    const char *fmt, va_list args)
+static int process_log(int facility, int level, const char *dict,
+		       size_t dictlen, char *text, size_t text_len)
 {
-	static char textbuf[LOG_LINE_MAX];
-	char *text = textbuf;
-	size_t text_len = 0;
 	enum log_flags lflags = 0;
-	unsigned long flags;
-	int printed_len = 0;
-	bool in_sched = false;
-
-	if (level == LOGLEVEL_SCHED) {
-		level = LOGLEVEL_DEFAULT;
-		in_sched = true;
-	}
-
-	boot_delay_msec(level);
-	printk_delay();
-
-	/* This stops the holder of console_sem just where we want him */
-	logbuf_lock_irqsave(flags);
-	/*
-	 * The printf needs to come first; we need the syslog
-	 * prefix which might be passed-in as a parameter.
-	 */
-	text_len = vscnprintf(text, sizeof(textbuf), fmt, args);
 
 	/* mark and strip a trailing newline */
 	if (text_len && text[text_len-1] == '\n') {
@@ -1755,7 +1732,39 @@ asmlinkage int vprintk_emit(int facility, int level,
 	if (dict)
 		lflags |= LOG_PREFIX|LOG_NEWLINE;
 
-	printed_len += log_output(facility, level, lflags, dict, dictlen, text, text_len);
+	return log_output(facility, level, lflags, dict, dictlen, text,
+			  text_len);
+}
+
+asmlinkage int vprintk_emit(int facility, int level,
+			    const char *dict, size_t dictlen,
+			    const char *fmt, va_list args)
+{
+	static char textbuf[LOG_LINE_MAX];
+	char *text = textbuf;
+	size_t text_len = 0;
+	unsigned long flags;
+	int printed_len = 0;
+	bool in_sched = false;
+
+	if (level == LOGLEVEL_SCHED) {
+		level = LOGLEVEL_DEFAULT;
+		in_sched = true;
+	}
+
+	boot_delay_msec(level);
+	printk_delay();
+
+	/* This stops the holder of console_sem just where we want him */
+	logbuf_lock_irqsave(flags);
+	/*
+	 * The printf needs to come first; we need the syslog
+	 * prefix which might be passed-in as a parameter.
+	 */
+	text_len = vscnprintf(text, sizeof(textbuf), fmt, args);
+
+	printed_len = process_log(facility, level, dict, dictlen, text,
+				  text_len);
 
 	logbuf_unlock_irqrestore(flags);
 
@@ -1795,8 +1804,153 @@ asmlinkage int printk_emit(int facility, int level,
 }
 EXPORT_SYMBOL(printk_emit);
 
+#define MAX_PRINTK_BUFFERS 16
+static struct printk_buffer {
+	unsigned long context; /* printk_context() */
+	unsigned int nested;
+	unsigned int used; /* Valid bytes in buf[]. */
+	char buf[PAGE_SIZE];
+} printk_buffers[MAX_PRINTK_BUFFERS];
+
+/* Must not be called from NMI context. */
+static void __flush_printk_buffer(struct printk_buffer *ptr, bool all)
+{
+	unsigned long flags;
+
+	if (!ptr->used)
+		return;
+
+	/*
+	 * Since printk_deferred() directly calls vprintk_emit(LOGLEVEL_SCHED),
+	 * this function does not need to care about LOGLEVEL_SCHED case.
+	 * Therefore, it is safe to call console_trylock() + console_unlock().
+	 *
+	 * We don't call boot_delay_msec(level) here because level is unknown.
+	 */
+	printk_delay();
+
+	/* This stops the holder of console_sem just where we want him */
+	logbuf_lock_irqsave(flags);
+	while (1) {
+		char *text = ptr->buf;
+		unsigned int text_len = ptr->used;
+		char *cp = memchr(text, '\n', text_len);
+		char c;
+
+		if (cp++)
+			text_len = cp - text;
+		else if (all)
+			cp = text + text_len;
+		else
+			break;
+		/* printk_get_level() depends on text '\0'-terminated. */
+		c = *cp;
+		*cp = '\0';
+		process_log(0, LOGLEVEL_DEFAULT, NULL, 0, text, text_len);
+		ptr->used -= text_len;
+		if (!ptr->used)
+			break;
+		*cp = c;
+		memmove(text, text + text_len, ptr->used);
+	}
+	logbuf_unlock_irqrestore(flags);
+	/*
+	 * Try to acquire and then immediately release the console
+	 * semaphore.  The release will print out buffers and wake up
+	 * /dev/kmsg and syslog() users.
+	 */
+	if (console_trylock())
+		console_unlock();
+}
+
+static unsigned long printk_context(void)
+{
+	/*
+	 * Assume that we can use lower 2 bits for flags, as with
+	 * __mutex_owner() does.
+	 */
+	unsigned long context = (unsigned long) current;
+
+	/* Both bits set means processing NMI context. */
+	if (in_nmi())
+		context |= 3;
+	/* Only next-LSB set means processing hard IRQ context. */
+	else if (in_irq())
+		context |= 2;
+	/* Only LSB set means processing soft IRQ context. */
+	else if (in_serving_softirq())
+		context |= 1;
+	/*
+	 * Neither bits set means processing task context,
+	 * though still might be non sleepable context.
+	 */
+	return context;
+}
+
+static struct printk_buffer *find_printk_buffer(void)
+{
+	const unsigned long context = printk_context();
+	int i;
+
+	/* No-op if called from NMI context. */
+	if ((context & 3) == 3)
+		return NULL;
+	for (i = 0; i < MAX_PRINTK_BUFFERS; i++)
+		if (context == printk_buffers[i].context)
+			return &printk_buffers[i];
+	return NULL;
+}
+
+void get_printk_buffer(void)
+{
+	const unsigned long context = printk_context();
+	int i;
+
+	/* No-op if called from NMI context. */
+	if ((context & 3) == 3)
+		return;
+	for (i = 0; i < MAX_PRINTK_BUFFERS; i++) {
+		struct printk_buffer *ptr = &printk_buffers[i];
+
+		if (ptr->context != context) {
+			if (ptr->context ||
+			    cmpxchg(&ptr->context, 0, context))
+				continue;
+			ptr->nested = 0;
+			ptr->used = 0;
+		} else {
+			ptr->nested++;
+		}
+		break;
+	}
+}
+EXPORT_SYMBOL(get_printk_buffer);
+
+void flush_printk_buffer(void)
+{
+	struct printk_buffer *ptr = find_printk_buffer();
+
+	if (ptr)
+		__flush_printk_buffer(ptr, true);
+}
+EXPORT_SYMBOL(flush_printk_buffer);
+
+void put_printk_buffer(void)
+{
+	struct printk_buffer *ptr = find_printk_buffer();
+
+	if (!ptr || ptr->nested--)
+		return;
+	__flush_printk_buffer(ptr, true);
+	xchg(&ptr->context, 0);
+}
+EXPORT_SYMBOL(put_printk_buffer);
+
 int vprintk_default(const char *fmt, va_list args)
 {
+	struct printk_buffer *ptr;
+	va_list args2;
+	unsigned int i;
 	int r;
 
 #ifdef CONFIG_KGDB_KDB
@@ -1806,6 +1960,43 @@ int vprintk_default(const char *fmt, va_list args)
 		return r;
 	}
 #endif
+	ptr = find_printk_buffer();
+	if (!ptr)
+		goto use_unbuffered;
+	/*
+	 * Try to store to printk_buffer first. If it fails, flush completed
+	 * lines in printk_buffer, and then try to store to printk_buffer
+	 * again. If it still fails, flush incomplete line in printk_buffer
+	 * and use unbuffered printing.
+	 *
+	 * Since printk_buffer is identified by current thread and interrupt
+	 * context and same level of context does not recurse, we don't need
+	 * logbuf_lock_irqsave()/logbuf_unlock_irqrestore() here except
+	 * __flush_printk_buffer().
+	 */
+	for (i = 0; i < 2; i++) {
+		unsigned int pos = ptr->used;
+		char *text = ptr->buf + pos;
+
+		va_copy(args2, args);
+		r = vsnprintf(text, sizeof(ptr->buf) - pos, fmt, args2);
+		va_end(args2);
+		if (r + pos < sizeof(ptr->buf)) {
+			/*
+			 * Eliminate KERN_CONT at this point because we can
+			 * concatenate incomplete lines inside printk_buffer.
+			 */
+			if (r >= 2 && printk_get_level(text) == 'c') {
+				memmove(text, text + 2, r - 2);
+				ptr->used += r - 2;
+			} else {
+				ptr->used += r;
+			}
+			return r;
+		}
+		__flush_printk_buffer(ptr, i);
+	}
+use_unbuffered:
 	r = vprintk_emit(0, LOGLEVEL_DEFAULT, NULL, 0, fmt, args);
 
 	return r;
