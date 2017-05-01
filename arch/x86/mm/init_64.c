@@ -96,7 +96,9 @@ void sync_global_pgds(unsigned long start, unsigned long end, int removed)
 {
 	unsigned long address;
 
-	for (address = start; address <= end; address += PGDIR_SIZE) {
+	for (address = start; address <= end;
+	     address = ALIGN(address + 1, PGDIR_SIZE)) {
+
 		const pgd_t *pgd_ref = pgd_offset_k(address);
 		struct page *page;
 
