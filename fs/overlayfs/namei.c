@@ -96,34 +96,27 @@ static bool ovl_is_opaquedir(struct dentry *dentry)
 	return false;
 }
 
-static int ovl_lookup_single(struct dentry *base, struct ovl_lookup_data *d,
-			     const char *name, unsigned int namelen,
-			     size_t prelen, const char *post,
-			     struct dentry **ret)
+/* Update ovl_lookup_data struct from dentry found in layer */
+static int ovl_lookup_data(struct dentry *this, struct ovl_lookup_data *d,
+			   size_t prelen, const char *post,
+			   struct dentry **ret)
 {
-	struct dentry *this;
 	int err;
 
-	this = lookup_one_len_unlocked(name, base, namelen);
-	if (IS_ERR(this)) {
-		err = PTR_ERR(this);
-		this = NULL;
-		if (err == -ENOENT || err == -ENAMETOOLONG)
-			goto out;
-		goto out_err;
-	}
 	if (!this->d_inode)
 		goto put_and_out;
 
+	/* Don't support traversing automounts and other weirdness */
 	if (ovl_dentry_weird(this)) {
-		/* Don't support traversing automounts and other weirdness */
 		err = -EREMOTE;
 		goto out_err;
 	}
+	/* Stop lookup in lower layers on whiteout */
 	if (ovl_is_whiteout(this)) {
 		d->stop = d->opaque = true;
 		goto put_and_out;
 	}
+	/* Stop lookup in lower layers on non-dir */
 	if (!d_can_lookup(this)) {
 		d->stop = true;
 		if (d->is_dir)
@@ -131,10 +124,15 @@ static int ovl_lookup_single(struct dentry *base, struct ovl_lookup_data *d,
 		goto out;
 	}
 	d->is_dir = true;
+	/* Stop lookup in lower layers on opaque dir */
 	if (!d->last && ovl_is_opaquedir(this)) {
 		d->stop = d->opaque = true;
 		goto out;
 	}
+	/*
+	 * Check redirect dir even if d->last, because with redirect_dir,
+	 * a merge dir may have an opaque dir parent.
+	 */
 	err = ovl_check_redirect(this, d, prelen, post);
 	if (err)
 		goto out_err;
@@ -150,6 +148,25 @@ put_and_out:
 out_err:
 	dput(this);
 	return err;
+}
+
+static int ovl_lookup_single(struct dentry *base, struct ovl_lookup_data *d,
+			     const char *name, unsigned int namelen,
+			     size_t prelen, const char *post,
+			     struct dentry **ret)
+{
+	struct dentry *this = lookup_one_len_unlocked(name, base, namelen);
+	int err;
+
+	if (IS_ERR(this)) {
+		err = PTR_ERR(this);
+		*ret = NULL;
+		if (err == -ENOENT || err == -ENAMETOOLONG)
+			return 0;
+		return err;
+	}
+
+	return ovl_lookup_data(this, d, prelen, post, ret);
 }
 
 static int ovl_lookup_layer(struct dentry *base, struct ovl_lookup_data *d,
