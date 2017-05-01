@@ -151,6 +151,11 @@ static int smbalert_probe(struct i2c_client *ara,
 	struct i2c_adapter *adapter = ara->adapter;
 	int res;
 
+	if (!setup) {
+		dev_err(&adapter->dev, "setup not defined\n");
+		return -ENODATA;
+	}
+
 	alert = devm_kzalloc(&ara->dev, sizeof(struct i2c_smbus_alert),
 			     GFP_KERNEL);
 	if (!alert)
