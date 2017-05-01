@@ -149,9 +149,8 @@ static void sctp_seq_dump_local_addrs(struct seq_file *seq, struct sctp_ep_commo
 
 		addr = &laddr->a;
 		af = sctp_get_af_specific(addr->sa.sa_family);
-		if (primary && af->cmp_addr(addr, primary)) {
-			seq_printf(seq, "*");
-		}
+		if (primary && af->cmp_addr(addr, primary))
+			seq_putc(seq, '*');
 		af->seq_dump_addr(seq, addr);
 	}
 	rcu_read_unlock();
@@ -170,9 +169,8 @@ static void sctp_seq_dump_remote_addrs(struct seq_file *seq, struct sctp_associa
 		addr = &transport->ipaddr;
 
 		af = sctp_get_af_specific(addr->sa.sa_family);
-		if (af->cmp_addr(addr, primary)) {
-			seq_printf(seq, "*");
-		}
+		if (af->cmp_addr(addr, primary))
+			seq_putc(seq, '*');
 		af->seq_dump_addr(seq, addr);
 	}
 }
@@ -232,7 +230,7 @@ static int sctp_eps_seq_show(struct seq_file *seq, void *v)
 			   sock_i_ino(sk));
 
 		sctp_seq_dump_local_addrs(seq, epb);
-		seq_printf(seq, "\n");
+		seq_putc(seq, '\n');
 	}
 	read_unlock(&head->lock);
 	local_bh_enable();
@@ -355,7 +353,7 @@ static int sctp_assocs_seq_show(struct seq_file *seq, void *v)
 		   sock_i_ino(sk),
 		   epb->bind_addr.port,
 		   assoc->peer.port);
-	seq_printf(seq, " ");
+	seq_putc(seq, ' ');
 	sctp_seq_dump_local_addrs(seq, epb);
 	seq_printf(seq, "<-> ");
 	sctp_seq_dump_remote_addrs(seq, assoc);
@@ -369,8 +367,7 @@ static int sctp_assocs_seq_show(struct seq_file *seq, void *v)
 		sk->sk_wmem_queued,
 		sk->sk_sndbuf,
 		sk->sk_rcvbuf);
-	seq_printf(seq, "\n");
-
+	seq_putc(seq, '\n');
 	sctp_transport_put(transport);
 
 	return 0;
@@ -438,7 +435,7 @@ static int sctp_remaddr_seq_show(struct seq_file *seq, void *v)
 		 * The remote address (ADDR)
 		 */
 		tsp->af_specific->seq_dump_addr(seq, &tsp->ipaddr);
-		seq_printf(seq, " ");
+		seq_putc(seq, ' ');
 		/*
 		 * The association ID (ASSOC_ID)
 		 */
