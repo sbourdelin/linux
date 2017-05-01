@@ -1891,12 +1891,12 @@ intel_atomic_get_crtc_state(struct drm_atomic_state *state,
 }
 
 static inline struct intel_crtc_state *
-intel_atomic_get_existing_crtc_state(struct drm_atomic_state *state,
-				     struct intel_crtc *crtc)
+intel_atomic_get_old_crtc_state(struct drm_atomic_state *state,
+				struct intel_crtc *crtc)
 {
 	struct drm_crtc_state *crtc_state;
 
-	crtc_state = drm_atomic_get_existing_crtc_state(state, &crtc->base);
+	crtc_state = drm_atomic_get_old_crtc_state(state, &crtc->base);
 
 	if (crtc_state)
 		return to_intel_crtc_state(crtc_state);
