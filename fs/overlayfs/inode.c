@@ -73,8 +73,10 @@ static int ovl_getattr(const struct path *path, struct kstat *stat,
 		return err;
 
 	/*
-	 * When all layers are on the same fs, we use st_ino of the copy up
-	 * origin, if we know it.
+	 * When all layers are on the same fs, all real inode number are
+	 * unique, so we use the overlay st_dev, which is friendly to du -x.
+	 *
+	 * We also use st_ino of the copy up origin, if we know it.
 	 * This guaranties constant st_dev/st_ino across copy up.
 	 *
 	 * When redirect_fh is enabled, this also guaranties persistent
@@ -83,15 +85,14 @@ static int ovl_getattr(const struct path *path, struct kstat *stat,
 	if (ovl_same_sb(dentry->d_sb)) {
 		struct dentry *lower = ovl_dentry_lower(dentry);
 
+		stat->dev = dentry->d_sb->s_dev;
 		/*
 		 * Lower hardlinks are broken on copy up to differnt upper
 		 * files, so we cannot use the lower origin st_ino for those
 		 * different files, even for the same fs case.
 		 */
-		if (lower && lower->d_inode->i_nlink == 1) {
-			stat->dev = lower->d_sb->s_dev;
+		if (lower && lower->d_inode->i_nlink == 1)
 			stat->ino = lower->d_inode->i_ino;
-		}
 	}
 
 	return 0;
