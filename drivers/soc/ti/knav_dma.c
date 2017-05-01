@@ -739,8 +739,7 @@ static int knav_dma_probe(struct platform_device *pdev)
 		return -EINVAL;
 	}
 
-	kdev = devm_kzalloc(dev,
-			sizeof(struct knav_dma_pool_device), GFP_KERNEL);
+	kdev = devm_kzalloc(dev, sizeof(*kdev), GFP_KERNEL);
 	if (!kdev) {
 		dev_err(dev, "could not allocate driver mem\n");
 		return -ENOMEM;
