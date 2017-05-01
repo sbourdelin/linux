@@ -21,8 +21,7 @@
 
 #define MAX_RECVBUF_SZ (10240)
 
-struct phy_stat
-{
+struct phy_stat {
 	unsigned int phydw0;
 
 	unsigned int phydw1;
@@ -44,7 +43,9 @@ struct phy_stat
 #define	Rx_Smooth_Factor (20)
 
 
-void rtl8192c_translate_rx_signal_stuff(union recv_frame *precvframe, struct phy_stat *pphy_status);
-void rtl8192c_query_rx_desc_status(union recv_frame *precvframe, struct recv_stat *pdesc);
+void rtl8192c_translate_rx_signal_stuff(union recv_frame *precvframe,
+					struct phy_stat *pphy_status);
+void rtl8192c_query_rx_desc_status(union recv_frame *precvframe,
+				   struct recv_stat *pdesc);
 
 #endif
