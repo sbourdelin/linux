@@ -333,7 +333,7 @@ static void dma_debug_show_channels(struct seq_file *s,
 			chan->cfg.u.rx.thresh);
 		for (i = 0; i < KNAV_DMA_FDQ_PER_CHAN; i++)
 			seq_printf(s, "[%d]", chan->cfg.u.rx.fdq[i]);
-		seq_printf(s, "\n");
+		seq_putc(s, '\n');
 	}
 }
 
