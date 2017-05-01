@@ -20,6 +20,8 @@
 #include <linux/namei.h>
 #include <linux/fdtable.h>
 #include <linux/ratelimit.h>
+#include <linux/mount.h>
+#include <linux/exportfs.h>
 #include "overlayfs.h"
 #include "ovl_entry.h"
 
@@ -232,6 +234,105 @@ int ovl_set_attr(struct dentry *upperdentry, struct kstat *stat)
 	return err;
 }
 
+static struct ovl_fh *ovl_encode_fh(struct dentry *lower)
+{
+	struct ovl_fh *fh;
+	int fh_type, fh_len, dwords;
+	void *buf = NULL;
+	void *ret = NULL;
+	int buflen = MAX_HANDLE_SZ;
+	int err;
+
+	err = -ENOMEM;
+	buf = kmalloc(buflen, GFP_TEMPORARY);
+	if (!buf)
+		goto out_err;
+
+	fh = buf;
+	dwords = (buflen - offsetof(struct ovl_fh, fid)) >> 2;
+	/*
+	 * We encode a non-connectable file handle for non-dir, because we
+	 * only need to find the lower inode number and we don't want to pay
+	 * the price or reconnecting the dentry.
+	 */
+	fh_type = exportfs_encode_fh(lower,
+				     (struct fid *)fh->fid,
+				     &dwords, 0);
+	fh_len = (dwords << 2) + offsetof(struct ovl_fh, fid);
+
+	err = -EOVERFLOW;
+	if (fh_len > buflen || fh_type <= 0 || fh_type == FILEID_INVALID)
+		goto out_err;
+
+	fh->version = OVL_FH_VERSION;
+	fh->magic = OVL_FH_MAGIC;
+	fh->type = fh_type;
+	fh->len = fh_len;
+	memcpy(fh->uuid, lower->d_sb->s_uuid, sizeof(fh->uuid));
+
+	err = -ENOMEM;
+	ret = kmalloc(fh_len, GFP_KERNEL);
+	if (!ret)
+		goto out_err;
+
+	memcpy(ret, buf, fh_len);
+
+	kfree(buf);
+	return ret;
+
+out_err:
+	pr_warn_ratelimited("overlay: failed to get redirect fh (%i)\n", err);
+	kfree(buf);
+	kfree(ret);
+	return ERR_PTR(err);
+}
+
+static const struct ovl_fh null_fh = {
+	.version = OVL_FH_VERSION,
+	.magic = OVL_FH_MAGIC,
+	.type = FILEID_INVALID,
+	.len = sizeof(struct ovl_fh),
+};
+
+static int ovl_set_origin(struct dentry *dentry, struct dentry *upper)
+{
+	struct path lowerpath;
+	const struct ovl_fh *fh = NULL;
+	int err;
+
+	ovl_path_lower(dentry, &lowerpath);
+	if (WARN_ON(!lowerpath.mnt))
+		return -EIO;
+
+	/*
+	 * redirect_fh is disabled if not all layers are on the same fs, so
+	 * file handles the we encode are unique across all layers.
+	 */
+	if (ovl_redirect_fh(dentry->d_sb))
+		fh = ovl_encode_fh(lowerpath.dentry);
+	/*
+	 * When redirect_fh is disabled or on failure to encode lower fh,
+	 * store an invalid 'null' fh, so we can use the overlay.origin xattr
+	 * to distignuish between a copy up and a pure upper inode.  If lower
+	 * fs does not support encoding fh, disable redirect_fh and don't try
+	 * to encode again.
+	 */
+	if (IS_ERR_OR_NULL(fh)) {
+		err = PTR_ERR(fh);
+		if (err == -EOPNOTSUPP) {
+			pr_warn("overlay: file handle not supported by lower - turning off redirect_fh\n");
+			ovl_clear_redirect_fh(dentry->d_sb);
+		}
+		fh = &null_fh;
+	}
+
+	err = ovl_do_setxattr(upper, OVL_XATTR_ORIGIN, fh, fh->len, 0);
+
+	if (fh != &null_fh)
+		kfree(fh);
+	return err;
+}
+
 static int ovl_copy_up_locked(struct dentry *workdir, struct dentry *upperdir,
 			      struct dentry *dentry, struct path *lowerpath,
 			      struct kstat *stat, const char *link,
@@ -313,6 +414,14 @@ static int ovl_copy_up_locked(struct dentry *workdir, struct dentry *upperdir,
 	inode_lock(temp->d_inode);
 	err = ovl_set_attr(temp, stat);
 	inode_unlock(temp->d_inode);
+	if (err)
+		goto out_cleanup;
+
+	/*
+	 * Store identifier of lower inode in upper inode xattr to
+	 * allow lookup of the copy up origin inode.
+	 */
+	err = ovl_set_origin(dentry, temp);
 	if (err)
 		goto out_cleanup;
 

@@ -17,6 +17,7 @@
 #include <linux/statfs.h>
 #include <linux/seq_file.h>
 #include <linux/posix_acl_xattr.h>
+#include <linux/exportfs.h>
 #include "overlayfs.h"
 #include "ovl_entry.h"
 
@@ -928,6 +929,22 @@ static int ovl_fill_super(struct super_block *sb, void *data, int silent)
 		sb->s_flags |= MS_RDONLY;
 	else if (ufs->upper_mnt->mnt_sb == ufs->same_lower_sb)
 		ufs->same_sb = ufs->same_lower_sb;
+
+	/*
+	 * Redirect by file handle is used to find a dentry in one of the
+	 * layers, so the handle must be unique across all layers.
+	 * Therefore, enable redirect by file handle, only if all layers are
+	 * on the same sb which supports lookup by file handles.
+	 *
+	 * XXX: We could relax this to same_lower_sb, but we currently use
+	 * redirect_fh for constant inode numbers, which require same_sb.
+	 * Also, for NFS export of overlay, it is easier if all layers are on
+	 * the same fs, because then we can export the encoded file handle
+	 * without adding a layer descriptor to it.
+	 */
+	if (ufs->same_sb && ufs->same_sb->s_export_op &&
+	    ufs->same_sb->s_export_op->fh_to_dentry)
+		ufs->redirect_fh = true;
 
 	if (remote)
 		sb->s_d_op = &ovl_reval_dentry_operations;

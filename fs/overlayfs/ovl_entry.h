@@ -32,6 +32,8 @@ struct ovl_fs {
 	/* sb common to all (or all lower) layers */
 	struct super_block *same_lower_sb;
 	struct super_block *same_sb;
+	/* redirect by file handle */
+	bool redirect_fh;
 };
 
 /* private information held for every overlayfs dentry */
