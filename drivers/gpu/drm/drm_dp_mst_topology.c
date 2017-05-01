@@ -2861,8 +2861,8 @@ void drm_dp_mst_dump_topology(struct seq_file *m,
 		for (i = 0x3; i < 0x8 && buf[i]; i++)
 			seq_printf(m, "%c", buf[i]);
 
-		seq_printf(m, " revision: hw: %x.%x sw: %x.%x", buf[0x9] >> 4, buf[0x9] & 0xf, buf[0xa], buf[0xb]);
-		seq_printf(m, "\n");
+		seq_printf(m, " revision: hw: %x.%x sw: %x.%x\n",
+			   buf[0x9] >> 4, buf[0x9] & 0xf, buf[0xa], buf[0xb]);
 		bret = dump_dp_payload_table(mgr, buf);
 		if (bret == true) {
 			seq_printf(m, "payload table: ");
