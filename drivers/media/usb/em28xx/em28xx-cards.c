@@ -2669,6 +2669,7 @@ static inline void em28xx_set_model(struct em28xx *dev)
 
 	/* Should be initialized early, for I2C to work */
 	dev->def_i2c_bus = dev->board.def_i2c_bus;
+	dev->eeprom_i2c_bus = dev->board.eeprom_i2c_bus;
 }
 
 /* Wait until AC97_RESET reports the expected value reliably before proceeding.

@@ -440,7 +440,8 @@ struct em28xx_board {
 	int vchannels;
 	int tuner_type;
 	int tuner_addr;
-	unsigned def_i2c_bus;	/* Default I2C bus */
+	unsigned def_i2c_bus;		/* Default I2C bus */
+	unsigned eeprom_i2c_bus;	/* EEPROM I2C bus */
 
 	/* i2c flags */
 	unsigned int tda9887_conf;
@@ -643,6 +644,7 @@ struct em28xx {
 
 	unsigned char eeprom_addrwidth_16bit:1;
 	unsigned def_i2c_bus;	/* Default I2C bus */
+	unsigned eeprom_i2c_bus;/* EEPROM I2C bus */
 	unsigned cur_i2c_bus;	/* Current I2C bus */
 	struct rt_mutex i2c_bus_lock;
 
