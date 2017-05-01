@@ -97,6 +97,13 @@ static bool ovl_is_opaquedir(struct dentry *dentry)
 	return false;
 }
 
+static bool ovl_is_copyup(struct dentry *dentry)
+{
+	int res = vfs_getxattr(dentry, OVL_XATTR_ORIGIN, NULL, 0);
+
+	return res > 0;
+}
+
 /* Update ovl_lookup_data struct from dentry found in layer */
 static int ovl_lookup_data(struct dentry *this, struct ovl_lookup_data *d,
 			   size_t prelen, const char *post,
@@ -125,13 +132,16 @@ static int ovl_lookup_data(struct dentry *this, struct ovl_lookup_data *d,
 		goto put_and_out;
 	}
 	d->mode = mode;
-	/* Stop lookup in lower layers on non-dir */
+	/*
+	 * Stop lookup in lower layers on opaque dir and on non-dir
+	 * which is not upper or has no copy up origin.
+	 */
 	if (!d_can_lookup(this)) {
-		d->stop = true;
-		goto out;
-	}
-	/* Stop lookup in lower layers on opaque dir */
-	if (!d->last && ovl_is_opaquedir(this)) {
+		if (d->idx > 0 || !ovl_is_copyup(this)) {
+			d->stop = true;
+			goto out;
+		}
+	} else if (!d->last && ovl_is_opaquedir(this)) {
 		d->stop = d->opaque = true;
 		goto out;
 	}
