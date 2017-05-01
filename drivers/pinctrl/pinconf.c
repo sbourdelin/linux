@@ -441,12 +441,15 @@ static int pinconf_dbg_config_print(struct seq_file *s, void *d)
 	}
 
 	if (!found) {
-		seq_printf(s, "No config found for dev/state/pin, expected:\n");
-		seq_printf(s, "Searched dev:%s\n", dbg->dev_name);
-		seq_printf(s, "Searched state:%s\n", dbg->state_name);
-		seq_printf(s, "Searched pin:%s\n", dbg->pin_name);
-		seq_printf(s, "Use: modify config_pin <devname> "\
-				"<state> <pinname> <value>\n");
+		seq_printf(s,
+			   "No config found for dev/state/pin, expected:\n"
+			   "Searched dev:%s\n"
+			   "Searched state:%s\n"
+			   "Searched pin:%s\n"
+			   "Use: modify config_pin <devname> <state> <pinname> <value>\n",
+			   dbg->dev_name,
+			   dbg->state_name,
+			   dbg->pin_name);
 		goto exit;
 	}
 
