@@ -307,9 +307,9 @@ static int pinconf_pins_show(struct seq_file *s, void *what)
 	struct pinctrl_dev *pctldev = s->private;
 	unsigned i, pin;
 
-	seq_puts(s, "Pin config settings per pin\n");
-	seq_puts(s, "Format: pin (name): configs\n");
-
+	seq_puts(s,
+		 "Pin config settings per pin\n"
+		 "Format: pin (name): configs\n");
 	mutex_lock(&pctldev->mutex);
 
 	/* The pin number can be retrived from the pin controller descriptor */
@@ -352,8 +352,9 @@ static int pinconf_groups_show(struct seq_file *s, void *what)
 	unsigned ngroups = pctlops->get_groups_count(pctldev);
 	unsigned selector = 0;
 
-	seq_puts(s, "Pin config settings per pin group\n");
-	seq_puts(s, "Format: group (name): configs\n");
+	seq_puts(s,
+		 "Pin config settings per pin group\n"
+		 "Format: group (name): configs\n");
 
 	while (selector < ngroups) {
 		const char *gname = pctlops->get_group_name(pctldev, selector);
