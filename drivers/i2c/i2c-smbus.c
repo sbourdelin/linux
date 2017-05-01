@@ -21,6 +21,7 @@
 #include <linux/interrupt.h>
 #include <linux/kernel.h>
 #include <linux/module.h>
+#include <linux/of_irq.h>
 #include <linux/slab.h>
 #include <linux/workqueue.h>
 
@@ -237,6 +238,40 @@ struct i2c_client *i2c_setup_smbus_alert(struct i2c_adapter *adapter,
 	return i2c_new_device(adapter, &ara_board_info);
 }
 EXPORT_SYMBOL_GPL(i2c_setup_smbus_alert);
+
+int of_i2c_setup_smbus_alert(struct i2c_adapter *adap)
+{
+	struct i2c_client *client;
+	struct i2c_smbus_alert_setup *setup;
+	struct i2c_board_info info = {
+		I2C_BOARD_INFO("smbus_alert", 0x0c),
+	};
+	int irq;
+
+	if (!adap->dev.of_node)
+		return 0;
+
+	irq = of_irq_get_byname(adap->dev.of_node, "smbus_alert");
+	if (irq == -EINVAL || irq == -ENODATA)
+		return 0;
+	else if (irq < 0)
+		return irq;
+
+	setup = devm_kzalloc(&adap->dev, sizeof(struct i2c_smbus_alert_setup),
+		GFP_KERNEL);
+	if (!setup)
+		return -ENOMEM;
+
+	setup->irq = irq;
+	info.platform_data = setup;
+
+	client = i2c_new_device(adap, &info);
+	if (!client)
+		return -ENODEV;
+
+	return 0;
+}
+EXPORT_SYMBOL_GPL(of_i2c_setup_smbus_alert);
 
 /**
  * i2c_handle_smbus_alert - Handle an SMBus alert
