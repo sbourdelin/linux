@@ -343,8 +343,12 @@ static int ovl_find_layer_by_fh(struct dentry *dentry, int idx,
 {
 	struct super_block *same_sb = ovl_same_sb(dentry->d_sb);
 
-	/* We only support redirect_fh when all layers are on the same fs */
-	if (!same_sb)
+	/*
+	 * We only support redirect_fh when all layers are on the same fs.
+	 * Make sure that the stored uuid matches the uuid of the lower
+	 * layer where file handle will be decoded.
+	 */
+	if (!same_sb || memcmp(same_sb->s_uuid, fh->uuid, sizeof(fh->uuid)))
 		return -1;
 
 	/*

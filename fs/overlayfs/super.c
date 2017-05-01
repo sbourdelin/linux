@@ -18,6 +18,7 @@
 #include <linux/seq_file.h>
 #include <linux/posix_acl_xattr.h>
 #include <linux/exportfs.h>
+#include <linux/uuid.h>
 #include "overlayfs.h"
 #include "ovl_entry.h"
 
@@ -941,10 +942,20 @@ static int ovl_fill_super(struct super_block *sb, void *data, int silent)
 	 * Also, for NFS export of overlay, it is easier if all layers are on
 	 * the same fs, because then we can export the encoded file handle
 	 * without adding a layer descriptor to it.
+	 *
+	 * We use the lower fs uuid to validate that file handles are decoded
+	 * from the same fs they were encoded from, so redirect_fh requires
+	 * that the lower fs has filled a valid uuid in sb->s_uuid.
 	 */
 	if (ufs->same_sb && ufs->same_sb->s_export_op &&
-	    ufs->same_sb->s_export_op->fh_to_dentry)
-		ufs->redirect_fh = true;
+	    ufs->same_sb->s_export_op->fh_to_dentry) {
+		uuid_le *uuid = (uuid_le *) ufs->same_lower_sb->s_uuid;
+
+		if (uuid_le_cmp(*uuid, NULL_UUID_LE))
+			ufs->redirect_fh = true;
+		else
+			pr_warn("overlayfs: lower fs needs to report s_uuid.\n");
+	}
 
 	if (remote)
 		sb->s_d_op = &ovl_reval_dentry_operations;
