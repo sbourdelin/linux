@@ -1905,12 +1905,12 @@ intel_atomic_get_existing_crtc_state(struct drm_atomic_state *state,
 }
 
 static inline struct intel_plane_state *
-intel_atomic_get_existing_plane_state(struct drm_atomic_state *state,
+intel_atomic_get_new_plane_state(struct drm_atomic_state *state,
 				      struct intel_plane *plane)
 {
 	struct drm_plane_state *plane_state;
 
-	plane_state = drm_atomic_get_existing_plane_state(state, &plane->base);
+	plane_state = drm_atomic_get_new_plane_state(state, &plane->base);
 
 	return to_intel_plane_state(plane_state);
 }

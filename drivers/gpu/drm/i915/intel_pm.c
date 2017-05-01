@@ -2561,8 +2561,7 @@ static int ilk_compute_pipe_wm(struct intel_crtc_state *cstate)
 	for_each_intel_plane_on_crtc(dev, intel_crtc, intel_plane) {
 		struct intel_plane_state *ps;
 
-		ps = intel_atomic_get_existing_plane_state(state,
-							   intel_plane);
+		ps = intel_atomic_get_new_plane_state(state, intel_plane);
 		if (!ps)
 			continue;
 
@@ -3924,8 +3923,7 @@ skl_compute_wm_level(const struct drm_i915_private *dev_priv,
 
 	if (state)
 		intel_pstate =
-			intel_atomic_get_existing_plane_state(state,
-							      intel_plane);
+			intel_atomic_get_new_plane_state(state, intel_plane);
 
 	/*
 	 * Note: If we start supporting multiple pending atomic commits against
