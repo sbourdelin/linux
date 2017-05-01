@@ -69,7 +69,32 @@ static int ovl_getattr(const struct path *path, struct kstat *stat,
 	old_cred = ovl_override_creds(dentry->d_sb);
 	err = vfs_getattr(&realpath, stat, request_mask, flags);
 	revert_creds(old_cred);
-	return err;
+	if (err)
+		return err;
+
+	/*
+	 * When all layers are on the same fs, we use st_ino of the copy up
+	 * origin, if we know it.
+	 * This guaranties constant st_dev/st_ino across copy up.
+	 *
+	 * When redirect_fh is enabled, this also guaranties persistent
+	 * st_ino/st_dev across mount cycle.
+	 */
+	if (ovl_same_sb(dentry->d_sb)) {
+		struct dentry *lower = ovl_dentry_lower(dentry);
+
+		/*
+		 * Lower hardlinks are broken on copy up to differnt upper
+		 * files, so we cannot use the lower origin st_ino for those
+		 * different files, even for the same fs case.
+		 */
+		if (lower && lower->d_inode->i_nlink == 1) {
+			stat->dev = lower->d_sb->s_dev;
+			stat->ino = lower->d_inode->i_ino;
+		}
+	}
+
+	return 0;
 }
 
 int ovl_permission(struct inode *inode, int mask)
