@@ -621,10 +621,9 @@ static int dma_init(struct device_node *cloud, struct device_node *dma_node)
 	u32 i;
 
 	dma = devm_kzalloc(kdev->dev, sizeof(*dma), GFP_KERNEL);
-	if (!dma) {
-		dev_err(kdev->dev, "could not allocate driver mem\n");
+	if (!dma)
 		return -ENOMEM;
-	}
+
 	INIT_LIST_HEAD(&dma->list);
 	INIT_LIST_HEAD(&dma->chan_list);
 
@@ -740,10 +739,8 @@ static int knav_dma_probe(struct platform_device *pdev)
 	}
 
 	kdev = devm_kzalloc(dev, sizeof(*kdev), GFP_KERNEL);
-	if (!kdev) {
-		dev_err(dev, "could not allocate driver mem\n");
+	if (!kdev)
 		return -ENOMEM;
-	}
 
 	kdev->dev = dev;
 	INIT_LIST_HEAD(&kdev->list);
