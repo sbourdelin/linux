@@ -536,6 +536,7 @@ config AXP20X_POWER
 config MANAGER_SBS
 	tristate "Smart Battery System Manager"
 	depends on I2C && I2C_MUX
+	select I2C_SMBUS
 	help
 	  Say Y here to include support for Smart Battery System Manager
 	  ICs. The driver reports online and charging status via sysfs.
