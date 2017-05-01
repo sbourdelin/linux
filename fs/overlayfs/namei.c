@@ -27,7 +27,8 @@ struct ovl_lookup_data {
 	bool by_path;		/* redirect by path: */
 	char *redirect;		/* - path to follow */
 	bool by_fh;		/* redirect by file handle: */
-	struct ovl_fh *fh;	/* - file handle to follow */
+	bool verify_fh;		/* verify by file handle: */
+	struct ovl_fh *fh;	/* - file handle to follow/verify */
 };
 
 static int ovl_check_redirect(struct dentry *dentry, struct ovl_lookup_data *d,
@@ -206,14 +207,14 @@ static int ovl_lookup_data(struct dentry *this, struct ovl_lookup_data *d,
 	}
 	/*
 	 * If non-dir has a valid origin file handle, it will be used to
-	 * find the copy up origin in lower layers.
-	 *
-	 * Directory lookup by fh is not desired for all workloads, so it
-	 * will be enabled by a future mount option.
+	 * find the copy up origin in lower layers.  If verify_lower is
+	 * enabled a directory origin file handle will be used to verify
+	 * lower directory that was found by path.
 	 */
-	if (d->by_fh && !d_is_dir(this)) {
+	if (d->by_fh && (d->verify_fh || !d_is_dir(this))) {
 		ovl_check_redirect_fh(this, d);
-		d->stop = !d->fh;
+		if (!d_is_dir(this) && !d->fh)
+			d->stop = true;
 	}
 
 out:
@@ -364,6 +365,57 @@ static int ovl_find_layer_by_fh(struct dentry *dentry, int idx,
 }
 
 /*
+ * Verify that a lower directory matches the stored file handle.
+ * Return 0 on match, > 0 on mismatch, < 0 on error.
+ */
+static int ovl_verify_lower_fh(struct dentry **lower,
+			       struct ovl_lookup_data *d)
+{
+	struct ovl_fh *fh;
+	struct inode *inode;
+	int ret;
+
+	/* We should be called only to verify lower dir matches fh */
+	if (WARN_ON(!d->fh) || !S_ISDIR(d->mode))
+		return -EIO;
+
+	/* We currently support verify_lower for single lower layer */
+	if (WARN_ON(!d->last))
+		return -EIO;
+
+	/* If we have a copy up origin, we should have found a lower dir */
+	if (!*lower) {
+		pr_warn_ratelimited("overlayfs: failed to find lower dir\n");
+		return -ENOENT;
+	}
+
+	fh = ovl_encode_fh(*lower);
+	if (IS_ERR(fh)) {
+		ret = PTR_ERR(fh);
+		fh = NULL;
+		goto fail;
+	} else if (fh->len != d->fh->len || memcmp(fh, d->fh, fh->len)) {
+		ret = fh->len;
+		goto fail;
+	}
+
+	ret = 0;
+out:
+	/* Don't verify that handle again */
+	ovl_reset_redirect_fh(d);
+	kfree(fh);
+	return ret;
+
+fail:
+	inode = d_inode(*lower);
+	pr_warn_ratelimited("overlayfs: failed to verify lower dir (ino=%lu, ret=%i) - were layers copied?\n",
+			    inode ? inode->i_ino : 0, ret);
+	dput(*lower);
+	*lower = NULL;
+	goto out;
+}
+
+/*
  * Returns next layer in stack starting from top.
  * Returns -1 if this is the last layer.
  */
@@ -411,6 +463,7 @@ struct dentry *ovl_lookup(struct inode *dir, struct dentry *dentry,
 		.by_path = true,
 		.redirect = NULL,
 		.by_fh = ofs->redirect_fh,
+		.verify_fh = ofs->config.verify_lower,
 		.fh = NULL,
 	};
 
@@ -483,6 +536,10 @@ struct dentry *ovl_lookup(struct inode *dir, struct dentry *dentry,
 		err = ovl_lookup_layer(lowerpath.dentry, &d, &this);
 		if (err)
 			goto out_put;
+
+		/* Verify that lower matches the copy up origin fh */
+		if (d.verify_fh && d.fh && ovl_verify_lower_fh(&this, &d))
+			break;
 
 		if (!this)
 			continue;

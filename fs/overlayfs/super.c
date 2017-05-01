@@ -280,6 +280,7 @@ enum {
 	OPT_DEFAULT_PERMISSIONS,
 	OPT_REDIRECT_DIR_ON,
 	OPT_REDIRECT_DIR_OFF,
+	OPT_VERIFY_LOWER,
 	OPT_ERR,
 };
 
@@ -290,6 +291,7 @@ static const match_table_t ovl_tokens = {
 	{OPT_DEFAULT_PERMISSIONS,	"default_permissions"},
 	{OPT_REDIRECT_DIR_ON,		"redirect_dir=on"},
 	{OPT_REDIRECT_DIR_OFF,		"redirect_dir=off"},
+	{OPT_VERIFY_LOWER,		"verify_lower"},
 	{OPT_ERR,			NULL}
 };
 
@@ -360,6 +362,10 @@ static int ovl_parse_opt(char *opt, struct ovl_config *config)
 
 		case OPT_REDIRECT_DIR_OFF:
 			config->redirect_dir = false;
+			break;
+
+		case OPT_VERIFY_LOWER:
+			config->verify_lower = true;
 			break;
 
 		default:
@@ -955,6 +961,23 @@ static int ovl_fill_super(struct super_block *sb, void *data, int silent)
 			ufs->redirect_fh = true;
 		else
 			pr_warn("overlayfs: lower fs needs to report s_uuid.\n");
+	}
+
+	/*
+	 * The verify_lower feature is used to verify that lower directory
+	 * found by path matches the stored copy up origin.  Currently, only
+	 * single lower layer on same fs as upper layer is supported.
+	 */
+	if (ufs->config.verify_lower) {
+		ufs->config.verify_lower = false;
+		if (!ufs->same_sb)
+			pr_warn("overlayfs: option \"verify_lower\" requires lower/upper on same fs.\n");
+		if (numlower > 1)
+			pr_warn("overlayfs: option \"verify_lower\" requires single lower layer.\n");
+		else if (!ufs->redirect_fh)
+			pr_warn("overlayfs: option \"verify_lower\" not supported by lower fs.\n");
+		else
+			ufs->config.verify_lower = true;
 	}
 
 	if (remote)
