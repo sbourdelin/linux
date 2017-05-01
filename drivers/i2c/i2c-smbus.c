@@ -72,13 +72,12 @@ static int smbus_do_alert(struct device *dev, void *addrp)
  * The alert IRQ handler needs to hand work off to a task which can issue
  * SMBus calls, because those sleeping calls can't be made in IRQ context.
  */
-static void smbus_alert(struct work_struct *work)
+static irqreturn_t smbus_alert(int irq, void *d)
 {
-	struct i2c_smbus_alert *alert;
+	struct i2c_smbus_alert *alert = d;
 	struct i2c_client *ara;
 	unsigned short prev_addr = 0;	/* Not a valid address */
 
-	alert = container_of(work, struct i2c_smbus_alert, alert);
 	ara = alert->ara;
 
 	for (;;) {
@@ -115,6 +114,17 @@ static void smbus_alert(struct work_struct *work)
 		prev_addr = data.addr;
 	}
 
+	return IRQ_HANDLED;
+}
+
+static void smbalert_work(struct work_struct *work)
+{
+	struct i2c_smbus_alert *alert;
+
+	alert = container_of(work, struct i2c_smbus_alert, alert);
+
+	smbus_alert(alert->irq, alert);
+
 	/* We handled all alerts; re-enable level-triggered IRQs */
 	if (!alert->alert_edge_triggered)
 		enable_irq(alert->irq);
@@ -148,12 +158,14 @@ static int smbalert_probe(struct i2c_client *ara,
 
 	alert->alert_edge_triggered = setup->alert_edge_triggered;
 	alert->irq = setup->irq;
-	INIT_WORK(&alert->alert, smbus_alert);
+	INIT_WORK(&alert->alert, smbalert_work);
 	alert->ara = ara;
 
 	if (setup->irq > 0) {
-		res = devm_request_irq(&ara->dev, setup->irq, smbalert_irq,
-				       0, "smbus_alert", alert);
+		res = devm_request_threaded_irq(&ara->dev, alert->irq,
+						smbalert_irq, smbus_alert,
+						IRQF_SHARED | IRQF_ONESHOT,
+						"smbus_alert", alert);
 		if (res)
 			return res;
 	}
