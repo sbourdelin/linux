@@ -475,9 +475,7 @@ static int sctp_remaddr_seq_show(struct seq_file *seq, void *v)
 		 * The current state of this destination. I.e.
 		 * SCTP_ACTIVE, SCTP_INACTIVE, ...
 		 */
-		seq_printf(seq, "%d", tsp->state);
-
-		seq_printf(seq, "\n");
+		seq_printf(seq, "%d\n", tsp->state);
 	}
 
 	sctp_transport_put(transport);
