@@ -17,7 +17,7 @@
 
 struct ovl_lookup_data {
 	struct qstr name;
-	bool is_dir;
+	umode_t mode;
 	bool opaque;
 	bool stop;
 	bool last;
@@ -101,6 +101,7 @@ static int ovl_lookup_data(struct dentry *this, struct ovl_lookup_data *d,
 			   size_t prelen, const char *post,
 			   struct dentry **ret)
 {
+	mode_t mode;
 	int err;
 
 	if (!this->d_inode)
@@ -116,14 +117,18 @@ static int ovl_lookup_data(struct dentry *this, struct ovl_lookup_data *d,
 		d->stop = d->opaque = true;
 		goto put_and_out;
 	}
+	/* Stop lookup in lower layers on file type change */
+	mode = this->d_inode->i_mode & S_IFMT;
+	if (d->mode && d->mode != mode) {
+		d->stop = true;
+		goto put_and_out;
+	}
+	d->mode = mode;
 	/* Stop lookup in lower layers on non-dir */
 	if (!d_can_lookup(this)) {
 		d->stop = true;
-		if (d->is_dir)
-			goto put_and_out;
 		goto out;
 	}
-	d->is_dir = true;
 	/* Stop lookup in lower layers on opaque dir */
 	if (!d->last && ovl_is_opaquedir(this)) {
 		d->stop = d->opaque = true;
@@ -249,7 +254,7 @@ struct dentry *ovl_lookup(struct inode *dir, struct dentry *dentry,
 	int err;
 	struct ovl_lookup_data d = {
 		.name = dentry->d_name,
-		.is_dir = false,
+		.mode = 0,
 		.opaque = false,
 		.stop = false,
 		.last = !poe->numlower,
