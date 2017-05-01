@@ -4640,6 +4640,7 @@ static int init_one(struct pci_dev *pdev, const struct pci_device_id *ent)
 #ifdef CONFIG_PCI_IOV
 	u32 v, port_vec;
 #endif
+	struct pci_dev *root;
 
 	printk_once(KERN_INFO "%s - version %s\n", DRV_DESC, DRV_VERSION);
 
@@ -4737,6 +4738,22 @@ static int init_one(struct pci_dev *pdev, const struct pci_device_id *ent)
 	adapter->pf = func;
 	adapter->msg_enable = DFLT_MSG_ENABLE;
 	memset(adapter->chan_map, 0xff, sizeof(adapter->chan_map));
+
+	/* If possible, we use PCIe Relaxed Ordering Attribute to deliver
+	 * Ingress Packet Data to Free List Buffers in order to allow for
+	 * chipset performance optimizations between the Root Complex and
+	 * Memory Controllers.  (Messages to the associated Ingress Queue
+	 * notifying new Packet Placement in the Free Lists Buffers will be
+	 * send without the Relaxed Ordering Attribute thus guaranteing that
+	 * all preceding PCIe Transaction Layer Packets will be processed
+	 * first.)  But some Root Complexes have various issues with Upstream
+	 * Transaction Layer Packets with the Relaxed Ordering Attribute set.
+	 * So we check our Root Complex to see if it's flaged with advice
+	 * against using Relaxed Ordering.
+	 */
+	root = pci_find_pcie_root_port(adapter->pdev);
+	if (root && (root->dev_flags & PCI_DEV_FLAGS_NO_RELAXED_ORDERING))
+		adapter->flags |= ROOT_NO_RELAXED_ORDERING;
 
 	spin_lock_init(&adapter->stats_lock);
 	spin_lock_init(&adapter->tid_release_lock);
