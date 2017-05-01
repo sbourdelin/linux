@@ -21,6 +21,7 @@ struct ovl_lookup_data {
 	bool opaque;
 	bool stop;
 	bool last;
+	int idx;
 	char *redirect;
 };
 
@@ -258,6 +259,7 @@ struct dentry *ovl_lookup(struct inode *dir, struct dentry *dentry,
 		.opaque = false,
 		.stop = false,
 		.last = !poe->numlower,
+		.idx = 0,
 		.redirect = NULL,
 	};
 
@@ -299,6 +301,7 @@ struct dentry *ovl_lookup(struct inode *dir, struct dentry *dentry,
 		struct path lowerpath = poe->lowerstack[i];
 
 		d.last = i == poe->numlower - 1;
+		d.idx = i + 1;
 		err = ovl_lookup_layer(lowerpath.dentry, &d, &this);
 		if (err)
 			goto out_put;
