@@ -3912,8 +3912,11 @@ static void addrconf_dad_work(struct work_struct *w)
 	} else if (action == DAD_ABORT) {
 		in6_ifa_hold(ifp);
 		addrconf_dad_stop(ifp, 1);
-		if (disable_ipv6)
+		if (disable_ipv6) {
+			in6_ifa_put(ifp);
 			addrconf_ifdown(idev->dev, 0);
+			goto unlock;
+		}
 		goto out;
 	}
 
@@ -3960,6 +3963,7 @@ static void addrconf_dad_work(struct work_struct *w)
 		      ifp->dad_nonce);
 out:
 	in6_ifa_put(ifp);
+unlock:
 	rtnl_unlock();
 }
 
