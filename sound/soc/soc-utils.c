@@ -19,6 +19,8 @@
 #include <sound/pcm.h>
 #include <sound/pcm_params.h>
 #include <sound/soc.h>
+#include <linux/module.h>
+#include <linux/of.h>
 
 int snd_soc_calc_frame_size(int sample_size, int channels, int tdm_slots)
 {
@@ -359,9 +361,19 @@ static int snd_soc_dummy_remove(struct platform_device *pdev)
 	return 0;
 }
 
+#ifdef CONFIG_OF
+static const struct of_device_id dummy_dt_ids[] = {
+	{ .compatible = "linux,snd-soc-dummy", },
+	{ }
+};
+MODULE_DEVICE_TABLE(of, dummy_dt_ids);
+#endif
+
+
 static struct platform_driver soc_dummy_driver = {
 	.driver = {
 		.name = "snd-soc-dummy",
+		.of_match_table = of_match_ptr(dummy_dt_ids),
 	},
 	.probe = snd_soc_dummy_probe,
 	.remove = snd_soc_dummy_remove,
