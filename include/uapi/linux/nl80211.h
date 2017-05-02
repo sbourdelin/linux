@@ -947,6 +947,14 @@
  *	does not result in a change for the current association. Currently,
  *	only the %NL80211_ATTR_IE data is used and updated with this command.
  *
+ * @NL80211_CMD_SET_PMK: For offloaded 4-Way handshake, set the PMK or PMK-R0
+ *	for the given authenticator address (specified with &NL80211_ATTR_MAC).
+ *	When &NL80211_ATTR_PMKR0_NAME is set, &NL80211_ATTR_PMK specifies the
+ *	PMK-R0, otherwise it specifies the PMK.
+ * @NL80211_CMD_DEL_PMK: For offloaded 4-Way handshake, delete the previously
+ *	configured PMK for the authenticator address identified by
+ *	&NL80211_ATTR_MAC.
+ *
  * @NL80211_CMD_MAX: highest used command number
  * @__NL80211_CMD_AFTER_LAST: internal use
  */
@@ -1145,6 +1153,9 @@ enum nl80211_commands {
 	NL80211_CMD_SET_MULTICAST_TO_UNICAST,
 
 	NL80211_CMD_UPDATE_CONNECT_PARAMS,
+
+	NL80211_CMD_SET_PMK,
+	NL80211_CMD_DEL_PMK,
 
 	/* add new commands above here */
 
@@ -2083,12 +2094,19 @@ enum nl80211_commands {
  * @NL80211_ATTR_PMK: attribute for passing PMK key material. Used with
  *	%NL80211_CMD_SET_PMKSA for the PMKSA identified by %NL80211_ATTR_PMKID.
  *	For %NL80211_CMD_CONNECT it is used to provide PSK for offloading 4-way
- *	handshake for WPA/WPA2-PSK networks.
+ *	handshake for WPA/WPA2-PSK networks. For 802.1X authentication it is
+ *	used with %NL80211_CMD_SET_PMK. This attribute specifies the PMK-R0
+ *	when &NL80211_ATTR_PMKR0_NAME is specified in %NL80211_CMD_CONNECT.
  *
  * @NL80211_ATTR_SCHED_SCAN_MULTI: flag attribute which user-space shall use to
  *	indicate that it supports multiple active scheduled scan requests.
  * @NL80211_ATTR_SCHED_SCAN_MAX_REQS: indicates maximum number of scheduled
  *	scan request that may be active for the device (u32).
+ *
+ * @NL80211_ATTR_WANT_1X_OFFLOAD: flag attribute which user-space can include
+ *	in %NL80211_CMD_CONNECT to indicate that for 802.1X authentication it
+ *	wants to use the supported offload.
+ * @NL80211_ATTR_PMKR0_NAME: PMK-R0 Name for offloaded FT.
  *
  * @NUM_NL80211_ATTR: total number of nl80211_attrs available
  * @NL80211_ATTR_MAX: highest attribute number currently defined
@@ -2511,6 +2529,9 @@ enum nl80211_attrs {
 
 	NL80211_ATTR_SCHED_SCAN_MULTI,
 	NL80211_ATTR_SCHED_SCAN_MAX_REQS,
+
+	NL80211_ATTR_WANT_1X_OFFLOAD,
+	NL80211_ATTR_PMKR0_NAME,
 
 	/* add attributes here, update the policy in nl80211.c */
 
@@ -4857,6 +4878,9 @@ enum nl80211_feature_flags {
  * @NL80211_EXT_FEATURE_4WAY_HANDSHAKE_STA_PSK: Device supports doing 4-way
  *	handshake with PSK in station mode (PSK is passed as part of the connect
  *	and associate commands).
+ * @NL80211_EXT_FEATURE_4WAY_HANDSHAKE_STA_1X: Device supports doing 4-way
+ *	handshake with 802.1X in station mode (needs to pass EAP frames to
+ *	the host and accept the set_pmk/del_pmk commands).
  *
  * @NUM_NL80211_EXT_FEATURES: number of extended features.
  * @MAX_NL80211_EXT_FEATURES: highest extended feature index.
@@ -4878,6 +4902,7 @@ enum nl80211_ext_feature_index {
 	NL80211_EXT_FEATURE_CQM_RSSI_LIST,
 	NL80211_EXT_FEATURE_FILS_SK_OFFLOAD,
 	NL80211_EXT_FEATURE_4WAY_HANDSHAKE_STA_PSK,
+	NL80211_EXT_FEATURE_4WAY_HANDSHAKE_STA_1X,
 
 	/* add new features before the definition below */
 	NUM_NL80211_EXT_FEATURES,
