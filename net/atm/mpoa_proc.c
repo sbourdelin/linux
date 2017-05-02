@@ -145,8 +145,8 @@ static int mpc_show(struct seq_file *m, void *v)
 		return 0;
 	}
 
-	seq_printf(m, "\nInterface %d:\n\n", mpc->dev_num);
-	seq_printf(m, "Ingress Entries:\nIP address      State      Holding time  Packets fwded  VPI  VCI\n");
+	seq_printf(m, "\nInterface %d:\n\nIngress Entries:\nIP address      State      Holding time  Packets fwded  VPI  VCI\n",
+		   mpc->dev_num);
 	do_gettimeofday(&now);
 
 	for (in_entry = mpc->in_cache; in_entry; in_entry = in_entry->next) {
@@ -164,8 +164,8 @@ static int mpc_show(struct seq_file *m, void *v)
 		seq_printf(m, "\n");
 	}
 
-	seq_printf(m, "\n");
-	seq_printf(m, "Egress Entries:\nIngress MPC ATM addr\nCache-id        State      Holding time  Packets recvd  Latest IP addr   VPI VCI\n");
+	seq_printf(m,
+		   "\nEgress Entries:\nIngress MPC ATM addr\nCache-id        State      Holding time  Packets recvd  Latest IP addr   VPI VCI\n");
 	for (eg_entry = mpc->eg_cache; eg_entry; eg_entry = eg_entry->next) {
 		unsigned char *p = eg_entry->ctrl_info.in_MPC_data_ATM_addr;
 		for (i = 0; i < ATM_ESA_LEN; i++)
