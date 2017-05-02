@@ -353,6 +353,24 @@ void __init numa_emulation(struct numa_meminfo *numa_meminfo, int numa_dist_cnt)
 		goto no_emu;
 	}
 
+	/*
+	 * Determine the max emulated nid and the default phys nid to use
+	 * for unmapped nodes.
+	 */
+	max_emu_nid = 0;
+	dfl_phys_nid = NUMA_NO_NODE;
+	for (i = 0; i < ARRAY_SIZE(emu_nid_to_phys); i++) {
+		if (emu_nid_to_phys[i] != NUMA_NO_NODE) {
+			max_emu_nid = i;
+			if (dfl_phys_nid == NUMA_NO_NODE)
+				dfl_phys_nid = emu_nid_to_phys[i];
+		}
+	}
+	if (dfl_phys_nid == NUMA_NO_NODE) {
+		pr_warn("NUMA: Warning: can't determine default physical node, disabling emulation\n");
+		goto no_emu;
+	}
+
 	/* copy the physical distance table */
 	if (numa_dist_cnt) {
 		u64 phys;
@@ -370,24 +388,6 @@ void __init numa_emulation(struct numa_meminfo *numa_meminfo, int numa_dist_cnt)
 			for (j = 0; j < numa_dist_cnt; j++)
 				phys_dist[i * numa_dist_cnt + j] =
 					node_distance(i, j);
-	}
-
-	/*
-	 * Determine the max emulated nid and the default phys nid to use
-	 * for unmapped nodes.
-	 */
-	max_emu_nid = 0;
-	dfl_phys_nid = NUMA_NO_NODE;
-	for (i = 0; i < ARRAY_SIZE(emu_nid_to_phys); i++) {
-		if (emu_nid_to_phys[i] != NUMA_NO_NODE) {
-			max_emu_nid = i;
-			if (dfl_phys_nid == NUMA_NO_NODE)
-				dfl_phys_nid = emu_nid_to_phys[i];
-		}
-	}
-	if (dfl_phys_nid == NUMA_NO_NODE) {
-		pr_warning("NUMA: Warning: can't determine default physical node, disabling emulation\n");
-		goto no_emu;
 	}
 
 	/* commit */
