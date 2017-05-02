@@ -2344,6 +2344,8 @@ int nfs_fill_super(struct super_block *sb, struct nfs_mount_info *mount_info)
 
  	nfs_initialise_sb(sb);
 
+	printk("Registering bdi %u:%u for server %p\n", MAJOR(server->s_dev), MINOR(server->s_dev), server);
+	dump_stack();
 	ret = super_setup_bdi_name(sb, "%u:%u", MAJOR(server->s_dev),
 				   MINOR(server->s_dev));
 	if (ret)
@@ -2607,7 +2609,7 @@ struct dentry *nfs_fs_mount_common(struct nfs_server *server,
 		/* initial superblock/root creation */
 		error = mount_info->fill_super(s, mount_info);
 		if (error)
-			goto error_splat_super;
+			goto error_splat_super_err;
 		nfs_get_cache_cookie(s, mount_info->parsed, mount_info->cloned);
 	}
 
@@ -2630,6 +2632,7 @@ out_err_nosb:
 
 error_splat_root:
 	dput(mntroot);
+error_splat_super_err:
 	mntroot = ERR_PTR(error);
 error_splat_super:
 	deactivate_locked_super(s);
