@@ -2095,11 +2095,14 @@ static int scsi_init_rq(struct request_queue *q, struct request *rq, gfp_t gfp)
 	struct Scsi_Host *shost = q->rq_alloc_data;
 	struct scsi_cmnd *cmd = blk_mq_rq_to_pdu(rq);
 
+	if (!scsi_host_get(shost))
+		goto fail;
+
 	memset(cmd, 0, sizeof(*cmd));
 
 	cmd->sense_buffer = scsi_alloc_sense_buffer(shost, gfp, NUMA_NO_NODE);
 	if (!cmd->sense_buffer)
-		goto fail;
+		goto put;
 	cmd->req.sense = cmd->sense_buffer;
 
 	if (scsi_host_get_prot(shost) >= SHOST_DIX_TYPE0_PROTECTION) {
@@ -2112,6 +2115,8 @@ static int scsi_init_rq(struct request_queue *q, struct request *rq, gfp_t gfp)
 
 fail_free_sense:
 	scsi_free_sense_buffer(shost, cmd->sense_buffer);
+put:
+	scsi_host_put(shost);
 fail:
 	return -ENOMEM;
 }
@@ -2124,6 +2129,7 @@ static void scsi_exit_rq(struct request_queue *q, struct request *rq)
 	if (cmd->prot_sdb)
 		kmem_cache_free(scsi_sdb_cache, cmd->prot_sdb);
 	scsi_free_sense_buffer(shost, cmd->sense_buffer);
+	scsi_host_put(shost);
 }
 
 struct request_queue *scsi_alloc_queue(struct scsi_device *sdev)
