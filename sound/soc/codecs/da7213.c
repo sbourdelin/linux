@@ -737,7 +737,6 @@ static int da7213_dai_event(struct snd_soc_dapm_widget *w,
 	struct da7213_priv *da7213 = snd_soc_codec_get_drvdata(codec);
 	u8 pll_ctrl, pll_status;
 	int i = 0;
-	bool srm_lock = false;
 
 	switch (event) {
 	case SND_SOC_DAPM_PRE_PMU:
@@ -766,15 +765,12 @@ static int da7213_dai_event(struct snd_soc_dapm_widget *w,
 		/* Check SRM has locked */
 		do {
 			pll_status = snd_soc_read(codec, DA7213_PLL_STATUS);
-			if (pll_status & DA7219_PLL_SRM_LOCK) {
-				srm_lock = true;
-			} else {
-				++i;
-				msleep(50);
-			}
-		} while ((i < DA7213_SRM_CHECK_RETRIES) & (!srm_lock));
+			if (pll_status & DA7219_PLL_SRM_LOCK)
+				break;
+			msleep(50);
+		} while (++i < DA7213_SRM_CHECK_RETRIES);
 
-		if (!srm_lock)
+		if (i >= DA7213_SRM_CHECK_RETRIES)
 			dev_warn(codec->dev, "SRM failed to lock\n");
 
 		return 0;
