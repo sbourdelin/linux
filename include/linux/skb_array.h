@@ -117,6 +117,11 @@ static inline struct sk_buff *skb_array_consume_bh(struct skb_array *a)
 	return ptr_ring_consume_bh(&a->ring);
 }
 
+static inline struct sk_buff *__skb_array_consume(struct skb_array *a)
+{
+	return __ptr_ring_consume(&a->ring);
+}
+
 static inline int __skb_array_len_with_tag(struct sk_buff *skb)
 {
 	if (likely(skb)) {
