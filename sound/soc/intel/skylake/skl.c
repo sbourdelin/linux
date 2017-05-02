@@ -888,6 +888,7 @@ static struct sst_acpi_mach *check_all_codecs(void *arg)
 static struct sst_codecs skl_codecs = { 1, {"NAU88L25"} };
 static struct sst_codecs kbl_codecs = { 1, {"NAU88L25"} };
 static struct sst_codecs bxt_codecs = { 1, {"MX98357A"} };
+static struct sst_codecs kbl_poppy_codecs = { 1, {"10EC5663"} };
 
 static struct sst_acpi_mach sst_skl_devdata[] = {
 	{ "INT343A", "skl_alc286s_i2s", "intel/dsp_fw_release.bin", NULL,
@@ -913,6 +914,9 @@ static struct sst_acpi_mach sst_kbl_devdata[] = {
 				check_all_codecs, &kbl_codecs, &skl_dmic_data },
 	{ "MX98357A", "kbl_n88l25_m98357a", "intel/dsp_fw_kbl.bin", NULL,
 				check_all_codecs, &kbl_codecs, &skl_dmic_data },
+	{ "MX98927", "kbl_rt5663_m98927", "intel/dsp_fw_kbl.bin", NULL,
+				check_all_codecs, &kbl_poppy_codecs,
+				&skl_dmic_data },
 	{}
 };
 
