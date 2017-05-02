@@ -205,33 +205,22 @@ static struct sk_buff *dequeue_skb(struct Qdisc *q, bool *validate,
 {
 	const struct netdev_queue *txq = q->dev_queue;
 	struct sk_buff *skb = NULL;
+	spinlock_t *lock = NULL;
+
+	if (q->flags & TCQ_F_NOLOCK) {
+		lock = qdisc_lock(q);
+		spin_lock(lock);
+	}
 
 	*packets = 1;
-	if (unlikely(!skb_queue_empty(&q->gso_skb))) {
-		spinlock_t *lock = NULL;
-
-		if (q->flags & TCQ_F_NOLOCK) {
-			lock = qdisc_lock(q);
-			spin_lock(lock);
-		}
-
-		skb = skb_peek(&q->gso_skb);
-
-		/* skb may be null if another cpu pulls gso_skb off in between
-		 * empty check and lock.
-		 */
-		if (!skb) {
-			if (lock)
-				spin_unlock(lock);
-			goto validate;
-		}
-
+	skb = skb_peek(&q->gso_skb);
+	if (unlikely(skb)) {
 		/* skb in gso_skb were already validated */
 		*validate = false;
 		/* check the reason of requeuing without tx lock first */
 		txq = skb_get_tx_queue(txq->dev, skb);
 		if (!netif_xmit_frozen_or_stopped(txq)) {
-			skb = __skb_dequeue(&q->gso_skb);
+			__skb_unlink(skb, &q->gso_skb);
 			if (qdisc_is_percpu_stats(q)) {
 				qdisc_qstats_cpu_backlog_dec(q, skb);
 				qdisc_qstats_cpu_qlen_dec(q);
@@ -246,17 +235,18 @@ static struct sk_buff *dequeue_skb(struct Qdisc *q, bool *validate,
 			spin_unlock(lock);
 		return skb;
 	}
-validate:
+
 	*validate = true;
 
-	if ((q->flags & TCQ_F_ONETXQUEUE) &&
-	    netif_xmit_frozen_or_stopped(txq))
-		return skb;
-
 	skb = qdisc_dequeue_skb_bad_txq(q);
-	if (unlikely(skb))
+	if (unlikely(skb)) {
 		goto bulk;
-	skb = q->dequeue(q);
+	}
+
+	if (!(q->flags & TCQ_F_ONETXQUEUE) ||
+	    !netif_xmit_frozen_or_stopped(txq))
+		skb = q->dequeue(q);
+
 	if (skb) {
 bulk:
 		if (qdisc_may_bulk(q))
@@ -264,6 +254,11 @@ bulk:
 		else
 			try_bulk_dequeue_skb_slow(q, skb, packets);
 	}
+
+blocked:
+	if (lock)
+		spin_unlock(lock);
+
 	return skb;
 }
 
@@ -621,7 +616,7 @@ static struct sk_buff *pfifo_fast_dequeue(struct Qdisc *qdisc)
 		if (__skb_array_empty(q))
 			continue;
 
-		skb = skb_array_consume_bh(q);
+		skb = __skb_array_consume(q);
 	}
 	if (likely(skb)) {
 		qdisc_qstats_cpu_backlog_dec(qdisc, skb);
@@ -658,7 +653,7 @@ static void pfifo_fast_reset(struct Qdisc *qdisc)
 		struct skb_array *q = band2list(priv, band);
 		struct sk_buff *skb;
 
-		while ((skb = skb_array_consume_bh(q)) != NULL)
+		while ((skb = __skb_array_consume(q)) != NULL)
 			__skb_array_destroy_skb(skb);
 	}
 
