@@ -3614,8 +3614,15 @@ int btrfs_calc_num_tolerated_disk_barrier_failures(
 						   &space);
 			if (space.total_bytes == 0 || space.used_bytes == 0)
 				continue;
-			flags = space.flags;
 
+			/*
+			 * skip single profile as we have opened this
+			 * device for single profile
+			 */
+			if ((space.flags & BTRFS_BLOCK_GROUP_PROFILE_MASK) == 0)
+				continue;
+
+			flags = space.flags;
 			num_tolerated_disk_barrier_failures = min(
 				num_tolerated_disk_barrier_failures,
 				btrfs_get_num_tolerated_disk_barrier_failures(
