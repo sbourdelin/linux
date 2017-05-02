@@ -7487,7 +7487,7 @@ static void status_unused(struct seq_file *seq)
 	int i = 0;
 	struct md_rdev *rdev;
 
-	seq_printf(seq, "unused devices: ");
+	seq_puts(seq, "unused devices: ");
 
 	list_for_each_entry(rdev, &pending_raid_disks, same_set) {
 		char b[BDEVNAME_SIZE];
@@ -7496,7 +7496,7 @@ static void status_unused(struct seq_file *seq)
 			      bdevname(rdev->bdev,b));
 	}
 	if (!i)
-		seq_printf(seq, "<none>");
+		seq_puts(seq, "<none>");
 
 	seq_putc(seq, '\n');
 }
@@ -7525,13 +7525,13 @@ static int status_resync(struct seq_file *seq, struct mddev *mddev)
 
 	if (resync == 0) {
 		if (mddev->recovery_cp < MaxSector) {
-			seq_printf(seq, "\tresync=PENDING");
+			seq_puts(seq, "\tresync=PENDING");
 			return 1;
 		}
 		return 0;
 	}
 	if (resync < 3) {
-		seq_printf(seq, "\tresync=DELAYED");
+		seq_puts(seq, "\tresync=DELAYED");
 		return 1;
 	}
 
@@ -7559,7 +7559,7 @@ static int status_resync(struct seq_file *seq, struct mddev *mddev)
 		seq_putc(seq, '>');
 		for (i = 0; i < y; i++)
 			seq_putc(seq, '.');
-		seq_printf(seq, "] ");
+		seq_puts(seq, "] ");
 	}
 	seq_printf(seq, " %s =%3u.%u%% (%llu/%llu)",
 		   (test_bit(MD_RECOVERY_RESHAPE, &mddev->recovery)?
@@ -7673,7 +7673,8 @@ static int md_seq_show(struct seq_file *seq, void *v)
 
 	if (v == (void*)1) {
 		struct md_personality *pers;
-		seq_printf(seq, "Personalities : ");
+
+		seq_puts(seq, "Personalities : ");
 		spin_lock(&pers_lock);
 		list_for_each_entry(pers, &pers_list, list)
 			seq_printf(seq, "[%s] ", pers->name);
@@ -7694,9 +7695,9 @@ static int md_seq_show(struct seq_file *seq, void *v)
 						mddev->pers ? "" : "in");
 		if (mddev->pers) {
 			if (mddev->ro==1)
-				seq_printf(seq, " (read-only)");
+				seq_puts(seq, " (read-only)");
 			if (mddev->ro==2)
-				seq_printf(seq, " (auto-read-only)");
+				seq_puts(seq, " (auto-read-only)");
 			seq_printf(seq, " %s", mddev->pers->name);
 		}
 
@@ -7707,17 +7708,17 @@ static int md_seq_show(struct seq_file *seq, void *v)
 			seq_printf(seq, " %s[%d]",
 				bdevname(rdev->bdev,b), rdev->desc_nr);
 			if (test_bit(WriteMostly, &rdev->flags))
-				seq_printf(seq, "(W)");
+				seq_puts(seq, "(W)");
 			if (test_bit(Journal, &rdev->flags))
-				seq_printf(seq, "(J)");
+				seq_puts(seq, "(J)");
 			if (test_bit(Faulty, &rdev->flags)) {
-				seq_printf(seq, "(F)");
+				seq_puts(seq, "(F)");
 				continue;
 			}
 			if (rdev->raid_disk < 0)
-				seq_printf(seq, "(S)"); /* spare */
+				seq_puts(seq, "(S)"); /* spare */
 			if (test_bit(Replacement, &rdev->flags))
-				seq_printf(seq, "(R)");
+				seq_puts(seq, "(R)");
 			sectors += rdev->sectors;
 		}
 		rcu_read_unlock();
@@ -7742,17 +7743,18 @@ static int md_seq_show(struct seq_file *seq, void *v)
 			seq_printf(seq, " super external:%s",
 				   mddev->metadata_type);
 		else
-			seq_printf(seq, " super non-persistent");
+			seq_puts(seq, " super non-persistent");
 
 		if (mddev->pers) {
 			mddev->pers->status(seq, mddev);
-			seq_printf(seq, "\n      ");
+			seq_puts(seq, "\n      ");
 			if (mddev->pers->sync_request) {
 				if (status_resync(seq, mddev))
-					seq_printf(seq, "\n      ");
+					seq_puts(seq, "\n      ");
 			}
-		} else
-			seq_printf(seq, "\n       ");
+		} else {
+			seq_puts(seq, "\n       ");
+		}
 
 		bitmap_status(seq, mddev->bitmap);
 		seq_putc(seq, '\n');
