@@ -608,6 +608,14 @@ static int vlan_dev_init(struct net_device *dev)
 	return 0;
 }
 
+static void vlan_destructor_free(struct net_device *dev)
+{
+	struct vlan_dev_priv *vlan = vlan_dev_priv(dev);
+
+	free_percpu(vlan->vlan_pcpu_stats);
+	vlan->vlan_pcpu_stats = NULL;
+}
+
 static void vlan_dev_uninit(struct net_device *dev)
 {
 	struct vlan_priority_tci_mapping *pm;
@@ -620,6 +628,10 @@ static void vlan_dev_uninit(struct net_device *dev)
 			kfree(pm);
 		}
 	}
+
+	/* dev is not registered, perform the free instead of destructor */
+	if (dev->reg_state == NETREG_UNINITIALIZED)
+		vlan_destructor_free(dev);
 }
 
 static netdev_features_t vlan_dev_fix_features(struct net_device *dev,
@@ -803,10 +815,7 @@ static const struct net_device_ops vlan_netdev_ops = {
 
 static void vlan_dev_free(struct net_device *dev)
 {
-	struct vlan_dev_priv *vlan = vlan_dev_priv(dev);
-
-	free_percpu(vlan->vlan_pcpu_stats);
-	vlan->vlan_pcpu_stats = NULL;
+	vlan_destructor_free(dev);
 	free_netdev(dev);
 }
 
