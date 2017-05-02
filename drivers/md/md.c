@@ -7498,7 +7498,7 @@ static void status_unused(struct seq_file *seq)
 	if (!i)
 		seq_printf(seq, "<none>");
 
-	seq_printf(seq, "\n");
+	seq_putc(seq, '\n');
 }
 
 static int status_resync(struct seq_file *seq, struct mddev *mddev)
@@ -7552,12 +7552,13 @@ static int status_resync(struct seq_file *seq, struct mddev *mddev)
 	per_milli = res;
 	{
 		int i, x = per_milli/50, y = 20-x;
-		seq_printf(seq, "[");
+
+		seq_putc(seq, '[');
 		for (i = 0; i < x; i++)
-			seq_printf(seq, "=");
-		seq_printf(seq, ">");
+			seq_putc(seq, '=');
+		seq_putc(seq, '>');
 		for (i = 0; i < y; i++)
-			seq_printf(seq, ".");
+			seq_putc(seq, '.');
 		seq_printf(seq, "] ");
 	}
 	seq_printf(seq, " %s =%3u.%u%% (%llu/%llu)",
@@ -7678,7 +7679,7 @@ static int md_seq_show(struct seq_file *seq, void *v)
 			seq_printf(seq, "[%s] ", pers->name);
 
 		spin_unlock(&pers_lock);
-		seq_printf(seq, "\n");
+		seq_putc(seq, '\n');
 		seq->poll_event = atomic_read(&md_event_count);
 		return 0;
 	}
@@ -7754,8 +7755,7 @@ static int md_seq_show(struct seq_file *seq, void *v)
 			seq_printf(seq, "\n       ");
 
 		bitmap_status(seq, mddev->bitmap);
-
-		seq_printf(seq, "\n");
+		seq_putc(seq, '\n');
 	}
 	spin_unlock(&mddev->lock);
 
