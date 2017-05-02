@@ -224,9 +224,21 @@ static int veth_dev_init(struct net_device *dev)
 	return 0;
 }
 
-static void veth_dev_free(struct net_device *dev)
+static void veth_destructor_free(struct net_device *dev)
 {
 	free_percpu(dev->vstats);
+}
+
+static void veth_dev_uninit(struct net_device *dev)
+{
+	/* dev is not registered, perform the free instead of destructor */
+	if (dev->reg_state == NETREG_UNINITIALIZED)
+		veth_destructor_free(dev);
+}
+
+static void veth_dev_free(struct net_device *dev)
+{
+	veth_destructor_free(dev);
 	free_netdev(dev);
 }
 
@@ -284,6 +296,7 @@ out:
 
 static const struct net_device_ops veth_netdev_ops = {
 	.ndo_init            = veth_dev_init,
+	.ndo_uninit          = veth_dev_uninit,
 	.ndo_open            = veth_open,
 	.ndo_stop            = veth_close,
 	.ndo_start_xmit      = veth_xmit,
