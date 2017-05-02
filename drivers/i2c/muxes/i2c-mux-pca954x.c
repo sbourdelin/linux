@@ -306,7 +306,7 @@ static int pca954x_irq_setup(struct i2c_mux_core *muxc)
 {
 	struct pca954x *data = i2c_mux_priv(muxc);
 	struct i2c_client *client = data->client;
-	int c, err, irq;
+	int c, irq;
 
 	if (!data->chip->has_irq || client->irq <= 0)
 		return 0;
@@ -326,24 +326,22 @@ static int pca954x_irq_setup(struct i2c_mux_core *muxc)
 			handle_simple_irq);
 	}
 
-	err = devm_request_threaded_irq(&client->dev, data->client->irq, NULL,
-					pca954x_irq_handler,
-					IRQF_ONESHOT | IRQF_SHARED,
-					"pca954x", data);
-	if (err)
-		goto err_req_irq;
-
-	disable_irq(data->client->irq);
-
 	return 0;
-err_req_irq:
-	for (c = 0; c < data->chip->nchans; c++) {
-		irq = irq_find_mapping(data->irq, c);
-		irq_dispose_mapping(irq);
-	}
-	irq_domain_remove(data->irq);
+}
 
-	return err;
+static void pca954x_cleanup(struct i2c_mux_core *muxc)
+{
+	struct pca954x *data = i2c_mux_priv(muxc);
+	int c, irq;
+
+	if (data->irq) {
+		for (c = 0; c < data->chip->nchans; c++) {
+			irq = irq_find_mapping(data->irq, c);
+			irq_dispose_mapping(irq);
+		}
+		irq_domain_remove(data->irq);
+	}
+	i2c_mux_del_adapters(muxc);
 }
 
 /*
@@ -443,6 +441,14 @@ static int pca954x_probe(struct i2c_client *client,
 		}
 	}
 
+	if (data->chip->has_irq || client->irq > 0) {
+		ret = devm_request_threaded_irq(&client->dev, data->client->irq,
+		NULL, pca954x_irq_handler, IRQF_ONESHOT | IRQF_SHARED,
+		"pca954x", data);
+		if (ret)
+			goto fail_del_adapters;
+	}
+
 	dev_info(&client->dev,
 		 "registered %d multiplexed busses for I2C %s %s\n",
 		 num, data->chip->muxtype == pca954x_ismux
@@ -451,25 +457,15 @@ static int pca954x_probe(struct i2c_client *client,
 	return 0;
 
 fail_del_adapters:
-	i2c_mux_del_adapters(muxc);
+	pca954x_cleanup(muxc);
 	return ret;
 }
 
 static int pca954x_remove(struct i2c_client *client)
 {
 	struct i2c_mux_core *muxc = i2c_get_clientdata(client);
-	struct pca954x *data = i2c_mux_priv(muxc);
-	int c, irq;
 
-	if (data->irq) {
-		for (c = 0; c < data->chip->nchans; c++) {
-			irq = irq_find_mapping(data->irq, c);
-			irq_dispose_mapping(irq);
-		}
-		irq_domain_remove(data->irq);
-	}
-
-	i2c_mux_del_adapters(muxc);
+	pca954x_cleanup(muxc);
 	return 0;
 }
 
