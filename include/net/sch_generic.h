@@ -92,7 +92,7 @@ struct Qdisc {
 	struct gnet_stats_queue	qstats;
 	unsigned long		state;
 	struct Qdisc            *next_sched;
-	struct sk_buff		*skb_bad_txq;
+	struct sk_buff_head	skb_bad_txq;
 	struct rcu_head		rcu_head;
 	int			padded;
 	atomic_t		refcnt;
