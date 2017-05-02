@@ -1126,8 +1126,7 @@ static int __init erst_init(void)
 		goto err;
 
 	if (erst_disable) {
-		pr_info(
-	"Error Record Serialization Table (ERST) support is disabled.\n");
+		pr_info("ACPI ERST support is disabled.\n");
 		goto err;
 	}
 
@@ -1184,8 +1183,7 @@ static int __init erst_init(void)
 	if (!erst_erange.vaddr)
 		goto err_release_erange;
 
-	pr_info(
-	"Error Record Serialization Table (ERST) support is initialized.\n");
+	pr_info("ACPI ERST support is initialized.\n");
 
 	buf = kmalloc(erst_erange.size, GFP_KERNEL);
 	spin_lock_init(&erst_info.buf_lock);
