@@ -1468,12 +1468,20 @@ static unsigned long isolate_lru_pages(unsigned long nr_to_scan,
 	unsigned long nr_taken = 0;
 	unsigned long nr_zone_taken[MAX_NR_ZONES] = { 0 };
 	unsigned long nr_skipped[MAX_NR_ZONES] = { 0, };
+	unsigned long total_skipped = 0;
 	unsigned long skipped = 0;
 	unsigned long scan, nr_pages;
+	unsigned long lru_size;
 	LIST_HEAD(pages_skipped);
 
+	if (!mem_cgroup_disabled())
+		lru_size = mem_cgroup_get_lru_size(lruvec, lru);
+	else
+		lru_size = node_page_state(lruvec_pgdat(lruvec),
+						NR_LRU_BASE + lru);
+
 	for (scan = 0; scan < nr_to_scan && nr_taken < nr_to_scan &&
-					!list_empty(src); scan++) {
+		!list_empty(src) && (scan + total_skipped < lru_size); scan++) {
 		struct page *page;
 
 		page = lru_to_page(src);
@@ -1482,8 +1490,25 @@ static unsigned long isolate_lru_pages(unsigned long nr_to_scan,
 		VM_BUG_ON_PAGE(!PageLRU(page), page);
 
 		if (page_zonenum(page) > sc->reclaim_idx) {
+			if (skipped > SWAP_CLUSTER_MAX) {
+				int zid;
+
+				list_splice_init(&pages_skipped, src);
+				for (zid = 0; zid < MAX_NR_ZONES; zid++) {
+					if (!nr_skipped[zid])
+						continue;
+					__count_zid_vm_events(PGSCAN_SKIP, zid,
+							nr_skipped[zid]);
+					total_skipped += nr_skipped[zid];
+					nr_skipped[zid] = 0;
+				}
+				skipped = 0;
+			}
+
 			list_move(&page->lru, &pages_skipped);
 			nr_skipped[page_zonenum(page)]++;
+			skipped++;
+			scan--;
 			continue;
 		}
 
@@ -1521,12 +1546,12 @@ static unsigned long isolate_lru_pages(unsigned long nr_to_scan,
 				continue;
 
 			__count_zid_vm_events(PGSCAN_SKIP, zid, nr_skipped[zid]);
-			skipped += nr_skipped[zid];
+			total_skipped += nr_skipped[zid];
 		}
 	}
-	*nr_scanned = scan;
+	*nr_scanned = scan + total_skipped;
 	trace_mm_vmscan_lru_isolate(sc->reclaim_idx, sc->order, nr_to_scan,
-				    scan, skipped, nr_taken, mode, lru);
+				    scan, total_skipped, nr_taken, mode, lru);
 	update_lru_sizes(lruvec, lru, nr_zone_taken);
 	return nr_taken;
 }
