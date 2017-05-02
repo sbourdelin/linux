@@ -319,7 +319,7 @@ static int pinconf_pins_show(struct seq_file *s, void *what)
 		pin = pctldev->desc->pins[i].number;
 		desc = pin_desc_get(pctldev, pin);
 		/* Skip if we cannot search the pin */
-		if (desc == NULL)
+		if (!desc)
 			continue;
 
 		seq_printf(s, "pin %d (%s): ", pin, desc->name);
@@ -528,7 +528,7 @@ static ssize_t pinconf_dbg_config_write(struct file *file,
 
 	/* get arg 'device_name' */
 	token = strsep(&b, " ");
-	if (token == NULL)
+	if (!token)
 		return -EINVAL;
 	if (strlen(token) >= MAX_NAME_LEN)
 		return -EINVAL;
@@ -536,7 +536,7 @@ static ssize_t pinconf_dbg_config_write(struct file *file,
 
 	/* get arg 'state_name' */
 	token = strsep(&b, " ");
-	if (token == NULL)
+	if (!token)
 		return -EINVAL;
 	if (strlen(token) >= MAX_NAME_LEN)
 		return -EINVAL;
@@ -544,7 +544,7 @@ static ssize_t pinconf_dbg_config_write(struct file *file,
 
 	/* get arg 'pin_name' */
 	token = strsep(&b, " ");
-	if (token == NULL)
+	if (!token)
 		return -EINVAL;
 	if (strlen(token) >= MAX_NAME_LEN)
 		return -EINVAL;
@@ -552,7 +552,7 @@ static ssize_t pinconf_dbg_config_write(struct file *file,
 
 	/* get new_value of config' */
 	token = strsep(&b, " ");
-	if (token == NULL)
+	if (!token)
 		return -EINVAL;
 	if (strlen(token) >= MAX_NAME_LEN)
 		return -EINVAL;
