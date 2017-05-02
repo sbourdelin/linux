@@ -231,28 +231,33 @@ static void faulty_status(struct seq_file *seq, struct mddev *mddev)
 	struct faulty_conf *conf = mddev->private;
 	int n;
 
-	if ((n=atomic_read(&conf->counters[WriteTransient])) != 0)
+	n = atomic_read(&conf->counters[WriteTransient]);
+	if (n != 0)
 		seq_printf(seq, " WriteTransient=%d(%d)",
 			   n, conf->period[WriteTransient]);
 
-	if ((n=atomic_read(&conf->counters[ReadTransient])) != 0)
+	n = atomic_read(&conf->counters[ReadTransient]);
+	if (n != 0)
 		seq_printf(seq, " ReadTransient=%d(%d)",
 			   n, conf->period[ReadTransient]);
 
-	if ((n=atomic_read(&conf->counters[WritePersistent])) != 0)
+	n = atomic_read(&conf->counters[WritePersistent]);
+	if (n != 0)
 		seq_printf(seq, " WritePersistent=%d(%d)",
 			   n, conf->period[WritePersistent]);
 
-	if ((n=atomic_read(&conf->counters[ReadPersistent])) != 0)
+	n = atomic_read(&conf->counters[ReadPersistent]);
+	if (n != 0)
 		seq_printf(seq, " ReadPersistent=%d(%d)",
 			   n, conf->period[ReadPersistent]);
 
-
-	if ((n=atomic_read(&conf->counters[ReadFixable])) != 0)
+	n = atomic_read(&conf->counters[ReadFixable]);
+	if (n != 0)
 		seq_printf(seq, " ReadFixable=%d(%d)",
 			   n, conf->period[ReadFixable]);
 
-	if ((n=atomic_read(&conf->counters[WriteAll])) != 0)
+	n = atomic_read(&conf->counters[WriteAll]);
+	if (n != 0)
 		seq_puts(seq, " WriteAll");
 
 	seq_printf(seq, " nfaults=%d", conf->nfaults);
