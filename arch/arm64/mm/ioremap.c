@@ -24,6 +24,7 @@
 #include <linux/mm.h>
 #include <linux/vmalloc.h>
 #include <linux/io.h>
+#include <linux/memblock.h>
 
 #include <asm/fixmap.h>
 #include <asm/tlbflush.h>
@@ -103,6 +104,36 @@ void __iomem *ioremap_cache(phys_addr_t phys_addr, size_t size)
 				__builtin_return_address(0));
 }
 EXPORT_SYMBOL(ioremap_cache);
+
+/*
+ * Convert a physical pointer to a virtual kernel pointer for /dev/mem
+ * access
+ */
+void *xlate_dev_mem_ptr(phys_addr_t phys)
+{
+	unsigned long start  = phys &  PAGE_MASK;
+	unsigned long offset = phys & ~PAGE_MASK;
+	void *vaddr;
+
+	/* If page is RAM, we can use __va. Otherwise ioremap and unmap. */
+	if (page_is_ram(start >> PAGE_SHIFT) && memblock_is_memory(phys))
+		return __va(phys);
+
+	vaddr = ioremap_cache(start, PAGE_SIZE);
+	 /* Add the offset on success and return NULL if ioremap() failed */
+	if (vaddr)
+		vaddr += offset;
+
+	return vaddr;
+}
+
+void unxlate_dev_mem_ptr(phys_addr_t phys, void *addr)
+{
+	if (page_is_ram(phys >> PAGE_SHIFT))
+		return;
+
+	iounmap((void __iomem *)((unsigned long)addr & PAGE_MASK));
+}
 
 /*
  * Must be called after early_fixmap_init
