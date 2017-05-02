@@ -703,6 +703,7 @@ static void ata_pio_sector(struct ata_queued_cmd *qc)
 	struct page *page;
 	unsigned int offset;
 	unsigned char *buf;
+	unsigned long flags;
 
 	if (qc->curbytes == qc->nbytes - qc->sect_size)
 		ap->hsm_task_state = HSM_ST_LAST;
@@ -716,24 +717,16 @@ static void ata_pio_sector(struct ata_queued_cmd *qc)
 
 	DPRINTK("data %s\n", qc->tf.flags & ATA_TFLAG_WRITE ? "write" : "read");
 
-	if (PageHighMem(page)) {
-		unsigned long flags;
+	/* FIXME: use a bounce buffer */
+	local_irq_save(flags);
+	buf = kmap_atomic(page);
 
-		/* FIXME: use a bounce buffer */
-		local_irq_save(flags);
-		buf = kmap_atomic(page);
+	/* do the actual data transfer */
+	ap->ops->sff_data_xfer(qc, buf + offset, qc->sect_size,
+			       do_write);
 
-		/* do the actual data transfer */
-		ap->ops->sff_data_xfer(qc, buf + offset, qc->sect_size,
-				       do_write);
-
-		kunmap_atomic(buf);
-		local_irq_restore(flags);
-	} else {
-		buf = page_address(page);
-		ap->ops->sff_data_xfer(qc, buf + offset, qc->sect_size,
-				       do_write);
-	}
+	kunmap_atomic(buf);
+	local_irq_restore(flags);
 
 	if (!do_write && !PageSlab(page))
 		flush_dcache_page(page);
@@ -836,6 +829,7 @@ static int __atapi_pio_bytes(struct ata_queued_cmd *qc, unsigned int bytes)
 	struct page *page;
 	unsigned char *buf;
 	unsigned int offset, count, consumed;
+	unsigned long flags;
 
 next_sg:
 	sg = qc->cursg;
@@ -861,24 +855,16 @@ next_sg:
 
 	DPRINTK("data %s\n", qc->tf.flags & ATA_TFLAG_WRITE ? "write" : "read");
 
-	if (PageHighMem(page)) {
-		unsigned long flags;
+	/* FIXME: use bounce buffer */
+	local_irq_save(flags);
+	buf = kmap_atomic(page);
 
-		/* FIXME: use bounce buffer */
-		local_irq_save(flags);
-		buf = kmap_atomic(page);
+	/* do the actual data transfer */
+	consumed = ap->ops->sff_data_xfer(qc, buf + offset,
+							count, rw);
 
-		/* do the actual data transfer */
-		consumed = ap->ops->sff_data_xfer(qc, buf + offset,
-								count, rw);
-
-		kunmap_atomic(buf);
-		local_irq_restore(flags);
-	} else {
-		buf = page_address(page);
-		consumed = ap->ops->sff_data_xfer(qc, buf + offset,
-								count, rw);
-	}
+	kunmap_atomic(buf);
+	local_irq_restore(flags);
 
 	bytes -= min(bytes, consumed);
 	qc->curbytes += count;
