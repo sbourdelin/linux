@@ -72,7 +72,7 @@ static void bond_info_show_master(struct seq_file *seq)
 		seq_printf(seq, " (fail_over_mac %s)", optval->string);
 	}
 
-	seq_printf(seq, "\n");
+	seq_putc(seq, '\n');
 
 	if (bond_mode_uses_xmit_hash(bond)) {
 		optval = bond_opt_get_val(BOND_OPT_XMIT_HASH,
@@ -117,11 +117,11 @@ static void bond_info_show_master(struct seq_file *seq)
 			if (!bond->params.arp_targets[i])
 				break;
 			if (printed)
-				seq_printf(seq, ",");
+				seq_putc(seq, ',');
 			seq_printf(seq, " %pI4", &bond->params.arp_targets[i]);
 			printed = 1;
 		}
-		seq_printf(seq, "\n");
+		seq_putc(seq, '\n');
 	}
 
 	if (BOND_MODE(bond) == BOND_MODE_8023AD) {
