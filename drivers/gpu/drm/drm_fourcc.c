@@ -36,12 +36,24 @@ static char printable_char(int c)
 }
 
 /**
- * drm_mode_legacy_fb_format - compute drm fourcc code from legacy description
+ * drm_mode_legacy_fb_format - compute drm fourcc code from legacy description,
+ *                             little endian.
  * @bpp: bits per pixels
  * @depth: bit depth per pixel
  *
+ * Deprecated, use drm_mode_legacy_fb_format_he instead.
+ *
  * Computes a drm fourcc pixel format code for the given @bpp/@depth values.
  * Useful in fbdev emulation code, since that deals in those values.
+ *
+ * Note that drm_mode_addfb (DRM_IOCTL_MODE_ADDFB implementation) uses this
+ * too.
+ *
+ * For historical reasons, this function returns fourcc codes for framebuffer
+ * formats in little endian byte order unconditinally, even though fbdev
+ * emulation expects the framebuffer in host byte order (i.e. big endian on
+ * big endian machines).  Ideally we would simply fix this function, but that
+ * would break drivers expecting the broken behavior ...
  */
 uint32_t drm_mode_legacy_fb_format(uint32_t bpp, uint32_t depth)
 {
@@ -77,6 +89,46 @@ uint32_t drm_mode_legacy_fb_format(uint32_t bpp, uint32_t depth)
 	return fmt;
 }
 EXPORT_SYMBOL(drm_mode_legacy_fb_format);
+
+/**
+ * drm_mode_legacy_fb_format_he - compute drm fourcc code from legacy
+ *                                description, host endian.
+ * @bpp: bits per pixels
+ * @depth: bit depth per pixel
+ *
+ * Computes a drm fourcc pixel format code for the given @bpp/@depth values.
+ * Useful in fbdev emulation code, since that deals in those values.
+ */
+uint32_t drm_mode_legacy_fb_format_he(uint32_t bpp, uint32_t depth)
+{
+#ifdef __BIG_ENDIAN
+	uint32_t fmt;
+
+	switch (bpp) {
+	case 8:
+		fmt = DRM_FORMAT_C8;
+		break;
+	case 24:
+		fmt = DRM_FORMAT_BGR888;
+		break;
+	case 32:
+		if (depth == 24)
+			fmt = DRM_FORMAT_BGRX8888;
+		else
+			fmt = DRM_FORMAT_BGRA8888;
+		break;
+	default:
+		DRM_ERROR("bad bpp, assuming b8g8r8x8 pixel format\n");
+		fmt = DRM_FORMAT_BGRX8888;
+		break;
+	}
+
+	return fmt;
+#else
+	return drm_mode_legacy_fb_format(bpp, depth);
+#endif
+}
+EXPORT_SYMBOL(drm_mode_legacy_fb_format_he);
 
 /**
  * drm_get_format_name - fill a string with a drm fourcc format's name
