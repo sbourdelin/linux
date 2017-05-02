@@ -78,8 +78,10 @@ int __init early_init_dt_scan_fw_dump(unsigned long node,
 	 * dump data waiting for us.
 	 */
 	fdm_active = of_get_flat_dt_prop(node, "ibm,kernel-dump", NULL);
-	if (fdm_active)
+	if (fdm_active) {
+		pr_info("Firmware-assisted dump is active.\n");
 		fw_dump.dump_active = 1;
+	}
 
 	/* Get the sizes required to store dump data for the firmware provided
 	 * dump sections.
@@ -262,8 +264,12 @@ int __init fadump_reserve_mem(void)
 {
 	unsigned long base, size, memory_boundary;
 
-	if (!fw_dump.fadump_enabled)
+	if (!fw_dump.fadump_enabled) {
+		if (fw_dump.dump_active)
+			pr_warn("Firmware-assisted dump was active but kernel"
+				" booted with fadump disabled!\n");
 		return 0;
+	}
 
 	if (!fw_dump.fadump_supported) {
 		printk(KERN_INFO "Firmware-assisted dump is not supported on"
@@ -303,7 +309,6 @@ int __init fadump_reserve_mem(void)
 		memory_boundary = memblock_end_of_DRAM();
 
 	if (fw_dump.dump_active) {
-		printk(KERN_INFO "Firmware-assisted dump is active.\n");
 		/*
 		 * If last boot has crashed then reserve all the memory
 		 * above boot_memory_size so that we don't touch it until
@@ -361,6 +366,22 @@ unsigned long __init arch_reserved_kernel_pages(void)
 {
 	return memblock_reserved_size() / PAGE_SIZE;
 }
+
+/* Look for fadump_append= cmdline option. */
+static int __init early_fadump_append_param(char *p)
+{
+	if (!p)
+		return 1;
+
+	if (fw_dump.fadump_enabled && fw_dump.dump_active) {
+	pr_info("enforcing additional parameters (%s) passed through "
+		"'fadump_append=' parameter\n", p);
+		parse_early_options(p);
+	}
+
+	return 0;
+}
+early_param("fadump_append", early_fadump_append_param);
 
 /* Look for fadump= cmdline option. */
 static int __init early_fadump_param(char *p)
