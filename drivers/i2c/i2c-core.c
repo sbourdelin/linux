@@ -40,6 +40,7 @@
 #include <linux/gpio.h>
 #include <linux/hardirq.h>
 #include <linux/i2c.h>
+#include <linux/i2c-smbus.h>
 #include <linux/idr.h>
 #include <linux/init.h>
 #include <linux/irqflags.h>
@@ -2045,6 +2046,9 @@ static int i2c_register_adapter(struct i2c_adapter *adap)
 		dev_warn(&adap->dev,
 			 "Failed to create compatibility class link\n");
 #endif
+	res = of_i2c_setup_smbus_alert(adap);
+	if (res)
+		goto out_list;
 
 	i2c_init_recovery(adap);
 
