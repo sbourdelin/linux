@@ -464,6 +464,14 @@ isatap_chksrc(struct sk_buff *skb, const struct iphdr *iph, struct ip_tunnel *t)
 	return ok;
 }
 
+static void ipip6_destructor_free(struct net_device *dev)
+{
+	struct ip_tunnel *tunnel = netdev_priv(dev);
+
+	dst_cache_destroy(&tunnel->dst_cache);
+	free_percpu(dev->tstats);
+}
+
 static void ipip6_tunnel_uninit(struct net_device *dev)
 {
 	struct ip_tunnel *tunnel = netdev_priv(dev);
@@ -477,6 +485,10 @@ static void ipip6_tunnel_uninit(struct net_device *dev)
 	}
 	dst_cache_reset(&tunnel->dst_cache);
 	dev_put(dev);
+
+	/* dev is not registered, perform the free instead of destructor */
+	if (dev->reg_state == NETREG_UNINITIALIZED)
+		ipip6_destructor_free(dev);
 }
 
 static int ipip6_err(struct sk_buff *skb, u32 info)
@@ -1329,10 +1341,7 @@ static const struct net_device_ops ipip6_netdev_ops = {
 
 static void ipip6_dev_free(struct net_device *dev)
 {
-	struct ip_tunnel *tunnel = netdev_priv(dev);
-
-	dst_cache_destroy(&tunnel->dst_cache);
-	free_percpu(dev->tstats);
+	ipip6_destructor_free(dev);
 	free_netdev(dev);
 }
 
