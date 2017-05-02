@@ -253,7 +253,7 @@ static void faulty_status(struct seq_file *seq, struct mddev *mddev)
 			   n, conf->period[ReadFixable]);
 
 	if ((n=atomic_read(&conf->counters[WriteAll])) != 0)
-		seq_printf(seq, " WriteAll");
+		seq_puts(seq, " WriteAll");
 
 	seq_printf(seq, " nfaults=%d", conf->nfaults);
 }
