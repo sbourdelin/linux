@@ -67,6 +67,17 @@ are required in a relevant parent node:
 		    identifier, should be 1.
  - #size-cells    : should be zero.
 
+
+Optional properties
+-------------------
+
+- flash: An array of phandles that refer to the flash light sources
+  related to an image sensor. These could be e.g. LEDs. In case the LED
+  driver drives more than a single LED, then the phandles here refer to
+  the child nodes of the LED driver describing individual LEDs. Only
+  valid for device nodes that are related to an image sensor.
+
+
 Optional endpoint properties
 ----------------------------
 
