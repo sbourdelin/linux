@@ -180,6 +180,27 @@ static int ifb_dev_init(struct net_device *dev)
 	return 0;
 }
 
+static void ifb_destructor_free(struct net_device *dev)
+{
+	struct ifb_dev_private *dp = netdev_priv(dev);
+	struct ifb_q_private *txp = dp->tx_private;
+	int i;
+
+	for (i = 0; i < dev->num_tx_queues; i++, txp++) {
+		tasklet_kill(&txp->ifb_tasklet);
+		__skb_queue_purge(&txp->rq);
+		__skb_queue_purge(&txp->tq);
+	}
+	kfree(dp->tx_private);
+}
+
+static void ifb_dev_uninit(struct net_device *dev)
+{
+	/* dev is not registered, perform the free instead of destructor */
+	if (dev->reg_state == NETREG_UNINITIALIZED)
+		ifb_destructor_free(dev);
+}
+
 static const struct net_device_ops ifb_netdev_ops = {
 	.ndo_open	= ifb_open,
 	.ndo_stop	= ifb_close,
@@ -187,6 +208,7 @@ static const struct net_device_ops ifb_netdev_ops = {
 	.ndo_start_xmit	= ifb_xmit,
 	.ndo_validate_addr = eth_validate_addr,
 	.ndo_init	= ifb_dev_init,
+	.ndo_uninit	= ifb_dev_uninit,
 };
 
 #define IFB_FEATURES (NETIF_F_HW_CSUM | NETIF_F_SG  | NETIF_F_FRAGLIST	| \
@@ -197,16 +219,7 @@ static const struct net_device_ops ifb_netdev_ops = {
 
 static void ifb_dev_free(struct net_device *dev)
 {
-	struct ifb_dev_private *dp = netdev_priv(dev);
-	struct ifb_q_private *txp = dp->tx_private;
-	int i;
-
-	for (i = 0; i < dev->num_tx_queues; i++,txp++) {
-		tasklet_kill(&txp->ifb_tasklet);
-		__skb_queue_purge(&txp->rq);
-		__skb_queue_purge(&txp->tq);
-	}
-	kfree(dp->tx_private);
+	ifb_destructor_free(dev);
 	free_netdev(dev);
 }
 
