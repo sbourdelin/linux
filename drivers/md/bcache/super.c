@@ -2083,6 +2083,7 @@ static void bcache_exit(void)
 	if (bcache_major)
 		unregister_blkdev(bcache_major, "bcache");
 	unregister_reboot_notifier(&reboot);
+	mutex_destroy(&bch_register_lock);
 }
 
 static int __init bcache_init(void)
@@ -2100,6 +2101,7 @@ static int __init bcache_init(void)
 
 	bcache_major = register_blkdev(0, "bcache");
 	if (bcache_major < 0) {
+		mutex_destroy(&bch_register_lock);
 		unregister_reboot_notifier(&reboot);
 		return bcache_major;
 	}
