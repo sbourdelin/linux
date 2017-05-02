@@ -2153,7 +2153,8 @@ static int bind_rdev_to_array(struct md_rdev *rdev, struct mddev *mddev)
 	rdev->mddev = mddev;
 	pr_debug("md: bind<%s>\n", b);
 
-	if ((err = kobject_add(&rdev->kobj, &mddev->kobj, "dev-%s", b)))
+	err = kobject_add(&rdev->kobj, &mddev->kobj, "dev-%s", b);
+	if (err)
 		goto fail;
 
 	ko = &part_to_dev(rdev->bdev->bd_part)->kobj;
@@ -7306,7 +7307,8 @@ static int md_open(struct block_device *bdev, fmode_t mode)
 	}
 	BUG_ON(mddev != bdev->bd_disk->private_data);
 
-	if ((err = mutex_lock_interruptible(&mddev->open_mutex)))
+	err = mutex_lock_interruptible(&mddev->open_mutex);
+	if (err)
 		goto out;
 
 	if (test_bit(MD_CLOSING, &mddev->flags)) {
@@ -8927,10 +8929,12 @@ static int __init md_init(void)
 	if (!md_misc_wq)
 		goto err_misc_wq;
 
-	if ((ret = register_blkdev(MD_MAJOR, "md")) < 0)
+	ret = register_blkdev(MD_MAJOR, "md");
+	if (ret < 0)
 		goto err_md;
 
-	if ((ret = register_blkdev(0, "mdp")) < 0)
+	ret = register_blkdev(0, "mdp");
+	if (ret < 0)
 		goto err_mdp;
 	mdp_major = ret;
 
