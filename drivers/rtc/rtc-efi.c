@@ -23,6 +23,14 @@
 #include <linux/rtc.h>
 #include <linux/efi.h>
 
+/*
+ * Disable the use of rtc-efi as a RTC for X86 by default. This setting can be
+ * overridden using this module's enable parameter.
+ */
+static bool efi_rtc_enable = !IS_ENABLED(CONFIG_X86);
+
+module_param_named(enable, efi_rtc_enable, bool, 0644);
+
 #define EFI_ISDST (EFI_TIME_ADJUST_DAYLIGHT|EFI_TIME_IN_DAYLIGHT)
 
 /*
@@ -261,6 +269,9 @@ static int __init efi_rtc_probe(struct platform_device *dev)
 	struct rtc_device *rtc;
 	efi_time_t eft;
 	efi_time_cap_t cap;
+
+	if (!efi_rtc_enable)
+		return -ENODEV;
 
 	/* First check if the RTC is usable */
 	if (efi.get_time(&eft, &cap) != EFI_SUCCESS)
