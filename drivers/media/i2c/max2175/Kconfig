@@ -1,0 +1,8 @@
+config SDR_MAX2175
+	tristate "Maxim 2175 RF to Bits tuner"
+	depends on VIDEO_V4L2 && MEDIA_SDR_SUPPORT && I2C
+	---help---
+	  Support for Maxim 2175 tuner
+
+	  To compile this driver as a module, choose M here; the
+	  module will be called max2175.
