@@ -878,6 +878,19 @@ free_bat_counters:
 	return ret;
 }
 
+static void batadv_destructor_free(struct net_device *dev)
+{
+	batadv_debugfs_del_meshif(dev);
+	batadv_mesh_free(dev);
+}
+
+static void batadv_softif_uninit(struct net_device *dev)
+{
+	/* dev is not registered, perform the free instead of destructor */
+	if (dev->reg_state == NETREG_UNINITIALIZED)
+		batadv_destructor_free(dev);
+}
+
 /**
  * batadv_softif_slave_add - Add a slave interface to a batadv_soft_interface
  * @dev: batadv_soft_interface used as master interface
@@ -933,6 +946,7 @@ out:
 
 static const struct net_device_ops batadv_netdev_ops = {
 	.ndo_init = batadv_softif_init_late,
+	.ndo_uninit = batadv_softif_uninit,
 	.ndo_open = batadv_interface_open,
 	.ndo_stop = batadv_interface_release,
 	.ndo_get_stats = batadv_interface_stats,
@@ -953,9 +967,7 @@ static const struct net_device_ops batadv_netdev_ops = {
  */
 static void batadv_softif_free(struct net_device *dev)
 {
-	batadv_debugfs_del_meshif(dev);
-	batadv_mesh_free(dev);
-
+	batadv_destructor_free(dev);
 	/* some scheduled RCU callbacks need the bat_priv struct to accomplish
 	 * their tasks. Wait for them all to be finished before freeing the
 	 * netdev and its private data (bat_priv)
