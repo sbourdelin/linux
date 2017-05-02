@@ -594,16 +594,9 @@ out_unlock:
 }
 EXPORT_SYMBOL(drm_gem_prime_handle_to_fd);
 
-/**
- * drm_gem_prime_import - helper library implementation of the import callback
- * @dev: drm_device to import into
- * @dma_buf: dma-buf object to import
- *
- * This is the implementation of the gem_prime_import functions for GEM drivers
- * using the PRIME helpers.
- */
-struct drm_gem_object *drm_gem_prime_import(struct drm_device *dev,
-					    struct dma_buf *dma_buf)
+static struct drm_gem_object *__drm_gem_prime_import(struct drm_device *dev,
+					    struct dma_buf *dma_buf,
+					    struct device *attach_dev)
 {
 	struct dma_buf_attachment *attach;
 	struct sg_table *sgt;
@@ -625,7 +618,7 @@ struct drm_gem_object *drm_gem_prime_import(struct drm_device *dev,
 	if (!dev->driver->gem_prime_import_sg_table)
 		return ERR_PTR(-EINVAL);
 
-	attach = dma_buf_attach(dma_buf, dev->dev);
+	attach = dma_buf_attach(dma_buf, attach_dev);
 	if (IS_ERR(attach))
 		return ERR_CAST(attach);
 
@@ -655,7 +648,41 @@ fail_detach:
 
 	return ERR_PTR(ret);
 }
+
+/**
+ * drm_gem_prime_import - helper library implementation of the import callback
+ * @dev: drm_device to import into
+ * @dma_buf: dma-buf object to import
+ *
+ * This is the implementation of the gem_prime_import functions for GEM drivers
+ * using the PRIME helpers.
+ */
+struct drm_gem_object *drm_gem_prime_import(struct drm_device *dev,
+					    struct dma_buf *dma_buf)
+{
+	return __drm_gem_prime_import(dev, dma_buf, dev->dev);
+}
 EXPORT_SYMBOL(drm_gem_prime_import);
+
+/**
+ * drm_gem_prime_import_platform - alternate implementation of the import callback
+ * @dev: drm_device to import into
+ * @dma_buf: dma-buf object to import
+ *
+ * This is identical to drm_gem_prime_import except the device used for dma_buf
+ * attachment is an internal platform device instead of the standard device
+ * structure. The use of this function should be limited to drivers that do not
+ * set up an underlying device structure.
+ */
+struct drm_gem_object *drm_gem_prime_import_platform(struct drm_device *dev,
+					    struct dma_buf *dma_buf)
+{
+	if (WARN_ON_ONCE(!dev->platformdev))
+		return NULL;
+
+	return __drm_gem_prime_import(dev, dma_buf, &dev->platformdev->dev);
+}
+EXPORT_SYMBOL(drm_gem_prime_import_platform);
 
 /**
  * drm_gem_prime_fd_to_handle - PRIME import function for GEM drivers

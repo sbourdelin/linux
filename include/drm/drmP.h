@@ -439,6 +439,8 @@ struct drm_device {
 	struct pci_controller *hose;
 #endif
 
+	/**< Platform device for drivers that do not use the standard device */
+	struct platform_device *platformdev;
 	struct virtio_device *virtdev;
 
 	struct drm_sg_mem *sg;	/**< Scatter gather memory */
