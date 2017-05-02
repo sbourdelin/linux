@@ -17,6 +17,7 @@
 #include <linux/slab.h>
 #include <linux/fs.h>
 #include <linux/mm.h>
+#include <linux/uuid.h>
 #include "nd-core.h"
 #include "btt.h"
 #include "nd.h"
@@ -220,13 +221,6 @@ struct device *nd_btt_create(struct nd_region *nd_region)
 
 	__nd_device_register(dev);
 	return dev;
-}
-
-static bool uuid_is_null(u8 *uuid)
-{
-	static const u8 null_uuid[16];
-
-	return (memcmp(uuid, null_uuid, 16) == 0);
 }
 
 /**

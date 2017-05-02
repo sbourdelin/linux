@@ -58,6 +58,13 @@ static inline int uuid_be_cmp(const uuid_be u1, const uuid_be u2)
 	return memcmp(&u1, &u2, sizeof(uuid_be));
 }
 
+static inline bool uuid_is_null(u8 *uuid)
+{
+	static const u8 null_uuid[16];
+
+	return (memcmp(uuid, null_uuid, 16) == 0);
+}
+
 void generate_random_uuid(unsigned char uuid[16]);
 
 extern void uuid_le_gen(uuid_le *u);
