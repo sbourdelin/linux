@@ -80,6 +80,9 @@ Optional properties
 - lens-focus: A phandle to the node of the lens. Only valid for device
   nodes that are related to an image sensor.
 
+- eeprom: A phandle to the node of the related EEPROM. Only valid for
+  device nodes that are related to an image sensor.
+
 
 Optional endpoint properties
 ----------------------------
