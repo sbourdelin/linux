@@ -25,6 +25,18 @@
 #include <linux/types.h>
 #include <uapi/drm/drm_fourcc.h>
 
+/*
+ * DRM formats are little endian.  define cpu endian variants here, to
+ * reduce the #ifdefs needed in drivers.
+ */
+#ifdef __BIG_ENDIAN
+# define DRM_FORMAT_CPU_XRGB8888 DRM_FORMAT_BGRX8888
+# define DRM_FORMAT_CPU_ARGB8888 DRM_FORMAT_BGRA8888
+#else
+# define DRM_FORMAT_CPU_XRGB8888 DRM_FORMAT_XRGB8888
+# define DRM_FORMAT_CPU_ARGB8888 DRM_FORMAT_ARGB8888
+#endif
+
 struct drm_device;
 struct drm_mode_fb_cmd2;
 
