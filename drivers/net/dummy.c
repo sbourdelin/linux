@@ -153,9 +153,19 @@ static int dummy_dev_init(struct net_device *dev)
 	return 0;
 }
 
+static void dummy_destructor_free(struct net_device *dev)
+{
+	struct dummy_priv *priv = netdev_priv(dev);
+
+	kfree(priv->vfinfo);
+}
+
 static void dummy_dev_uninit(struct net_device *dev)
 {
 	free_percpu(dev->dstats);
+	/* dev is not registered, perform the free instead of destructor */
+	if (dev->reg_state == NETREG_UNINITIALIZED)
+		dummy_destructor_free(dev);
 }
 
 static int dummy_change_carrier(struct net_device *dev, bool new_carrier)
@@ -310,9 +320,7 @@ static const struct ethtool_ops dummy_ethtool_ops = {
 
 static void dummy_free_netdev(struct net_device *dev)
 {
-	struct dummy_priv *priv = netdev_priv(dev);
-
-	kfree(priv->vfinfo);
+	dummy_destructor_free(dev);
 	free_netdev(dev);
 }
 
