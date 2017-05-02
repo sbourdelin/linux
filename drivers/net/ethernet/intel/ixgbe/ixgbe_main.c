@@ -6437,6 +6437,19 @@ static void ixgbe_free_all_rx_resources(struct ixgbe_adapter *adapter)
 static int ixgbe_change_mtu(struct net_device *netdev, int new_mtu)
 {
 	struct ixgbe_adapter *adapter = netdev_priv(netdev);
+	int i, frame_size = new_mtu + ETH_HLEN + ETH_FCS_LEN + VLAN_HLEN;
+
+	/* If XDP is running enforce MTU limitations */
+	for (i = 0; i < adapter->num_rx_queues; i++) {
+		struct ixgbe_ring *ring = adapter->rx_ring[i];
+
+		if (frame_size > ixgbe_rx_bufsz(ring)) {
+			e_warn(probe,
+			       "Setting MTU > %i with XDP is not supported\n",
+			       ixgbe_rx_bufsz(ring));
+			return -EINVAL;
+		}
+	}
 
 	/*
 	 * For 82599EB we cannot allow legacy VFs to enable their receive
@@ -9289,6 +9302,10 @@ static netdev_features_t ixgbe_fix_features(struct net_device *netdev,
 
 	/* Turn off LRO if not RSC capable */
 	if (!(adapter->flags2 & IXGBE_FLAG2_RSC_CAPABLE))
+		features &= ~NETIF_F_LRO;
+
+	/* If XDP is enabled we can not enable LRO */
+	if (adapter->xdp_prog)
 		features &= ~NETIF_F_LRO;
 
 	return features;
