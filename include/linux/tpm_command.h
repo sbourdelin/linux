@@ -20,6 +20,13 @@
 #define TPM_ORD_OIAP                    10
 #define TPM_ORD_SEAL                    23
 #define TPM_ORD_UNSEAL                  24
+#define TPM_ORD_GET_CAP                101
+#define TPM_ORD_STARTUP                153
+#define TPM_ORD_CONTINUE_SELFTEST       83
+#define TPM_ORD_PCRREAD                 21
+#define TPM_ORD_PCREXTEND               20
+#define TPM_ORD_SAVESTATE              152
+#define TPM_ORD_READPUBEK              124
 
 /* Other constants */
 #define SRKHANDLE                       0x40000000
