@@ -583,6 +583,7 @@ static int wa_ring_whitelist_reg(struct intel_engine_cs *engine,
 static int gen8_init_workarounds(struct intel_engine_cs *engine)
 {
 	struct drm_i915_private *dev_priv = engine->i915;
+	int ret;
 
 	WA_SET_BIT_MASKED(INSTPM, INSTPM_FORCE_ORDERING);
 
@@ -627,6 +628,11 @@ static int gen8_init_workarounds(struct intel_engine_cs *engine)
 	WA_SET_FIELD_MASKED(GEN7_GT_MODE,
 			    GEN6_WIZ_HASHING_MASK,
 			    GEN6_WIZ_HASHING_16x4);
+
+	/* Allow the UMD to configure their own power clock state */
+	ret = wa_ring_whitelist_reg(engine, GEN8_R_PWR_CLK_STATE);
+	if (ret)
+		return ret;
 
 	return 0;
 }
@@ -793,6 +799,11 @@ static int gen9_init_workarounds(struct intel_engine_cs *engine)
 
 	/* WaAllowUMDToModifyHDCChicken1:skl,bxt,kbl,glk */
 	ret = wa_ring_whitelist_reg(engine, GEN8_HDC_CHICKEN1);
+	if (ret)
+		return ret;
+
+	/* Allow the UMD to configure their own power clock state */
+	ret = wa_ring_whitelist_reg(engine, GEN8_R_PWR_CLK_STATE);
 	if (ret)
 		return ret;
 
