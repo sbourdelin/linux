@@ -183,6 +183,8 @@ static void populate_properties(const void *blob,
 		const __be32 *val;
 		const char *pname;
 		u32 sz;
+		int prop_is_phandle = 0;
+		int prop_is_ibm_phandle = 0;
 
 		val = fdt_getprop_by_offset(blob, cur, &pname, &sz);
 		if (!val) {
@@ -198,11 +200,6 @@ static void populate_properties(const void *blob,
 		if (!strcmp(pname, "name"))
 			has_name = true;
 
-		pp = unflatten_dt_alloc(mem, sizeof(struct property),
-					__alignof__(struct property));
-		if (dryrun)
-			continue;
-
 		/* We accept flattened tree phandles either in
 		 * ePAPR-style "phandle" properties, or the
 		 * legacy "linux,phandle" properties.  If both
@@ -210,23 +207,34 @@ static void populate_properties(const void *blob,
 		 * will get weird. Don't do that.
 		 */
 		if (!strcmp(pname, "phandle") ||
-		    !strcmp(pname, "linux,phandle")) {
-			if (!np->phandle)
-				np->phandle = be32_to_cpup(val);
-		}
+		    !strcmp(pname, "linux,phandle"))
+			prop_is_phandle = 1;
 
 		/* And we process the "ibm,phandle" property
 		 * used in pSeries dynamic device tree
 		 * stuff
 		 */
-		if (!strcmp(pname, "ibm,phandle"))
-			np->phandle = be32_to_cpup(val);
+		if (!strcmp(pname, "ibm,phandle")) {
+			prop_is_phandle = 1;
+			prop_is_ibm_phandle = 1;
+		}
 
-		pp->name   = (char *)pname;
-		pp->length = sz;
-		pp->value  = (__be32 *)val;
-		*pprev     = pp;
-		pprev      = &pp->next;
+		if (!prop_is_phandle)
+			pp = unflatten_dt_alloc(mem, sizeof(struct property),
+						__alignof__(struct property));
+
+		if (dryrun)
+			continue;
+
+		if (!prop_is_phandle) {
+			pp->name   = (char *)pname;
+			pp->length = sz;
+			pp->value  = (__be32 *)val;
+			*pprev     = pp;
+			pprev      = &pp->next;
+		} else if (prop_is_ibm_phandle || !np->phandle) {
+			np->phandle = be32_to_cpup(val);
+		}
 	}
 
 	/* With version 0x10 we may not have the name property,
