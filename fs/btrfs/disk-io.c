@@ -3468,7 +3468,7 @@ static int write_dev_supers(struct btrfs_device *device,
 		 * to go down lazy.
 		 */
 		if (i == 0)
-			ret = btrfsic_submit_bh(REQ_OP_WRITE, REQ_FUA, bh);
+			ret = btrfsic_submit_bh(REQ_OP_WRITE, REQ_FUA | REQ_SYNC, bh);
 		else
 			ret = btrfsic_submit_bh(REQ_OP_WRITE, REQ_SYNC, bh);
 		if (ret)
