@@ -161,7 +161,7 @@ static int mpc_show(struct seq_file *m, void *v)
 			seq_printf(m, "   %-3d  %-3d",
 				   in_entry->shortcut->vpi,
 				   in_entry->shortcut->vci);
-		seq_printf(m, "\n");
+		seq_putc(m, '\n');
 	}
 
 	seq_printf(m,
@@ -185,9 +185,9 @@ static int mpc_show(struct seq_file *m, void *v)
 			seq_printf(m, " %-3d %-3d",
 				   eg_entry->shortcut->vpi,
 				   eg_entry->shortcut->vci);
-		seq_printf(m, "\n");
+		seq_putc(m, '\n');
 	}
-	seq_printf(m, "\n");
+	seq_putc(m, '\n');
 	return 0;
 }
 
