@@ -1,0 +1,11 @@
+config VIDEO_GO2001
+	tristate "GO2001 codec driver"
+	depends on VIDEO_V4L2 && PCI
+	select VIDEOBUF2_DMA_SG
+	---help---
+	  This driver supports the GO2001 PCI hardware codec. This codec
+	  is present on ChromeOS based devices like the Acer ChromeBox
+	  and ChromeBase 24 and LG ChromeBase as well.
+
+	  To compile this driver as a module, choose M here: the
+	  module will be called go2001.
