@@ -75,9 +75,7 @@ static int l_show(struct seq_file *m, void *v)
 #endif
 
 	get_usage_chars(class, usage);
-	seq_printf(m, " %s", usage);
-
-	seq_printf(m, ": ");
+	seq_printf(m, " %s: ", usage);
 	print_name(m, class);
 	seq_putc(m, '\n');
 
