@@ -1,0 +1,60 @@
+* PWM vibrator device tree bindings
+
+Registers a PWM device as vibrator.
+
+Required properties:
+- compatible: should be
+  * "pwm-vibrator"
+    For vibrators controlled using the PWM channel's duty cycle (higher duty means
+    the vibrator becomes stronger).
+  * "motorola,mapphone-pwm-vibrator"
+     For vibrator found in Motorola Droid 4. This vibrator generates a pulse for
+     every rising edge, so its controlled using a duty cycle of 50% and changing
+     the period time.
+- pwm-names: Should contain "enable" and optionally "direction"
+- pwms: Should contain a PWM handle for each entry in pwm-names
+
+Example from Motorola Droid 4:
+
+&omap4_pmx_core {
+	vibrator_direction_pin: pinmux_vibrator_direction_pin {
+		pinctrl-single,pins = <
+		OMAP4_IOPAD(0x1ce, PIN_OUTPUT | MUX_MODE1) /* dmtimer8_pwm_evt (gpio_27) */
+		>;
+	};
+
+	vibrator_enable_pin: pinmux_vibrator_enable_pin {
+		pinctrl-single,pins = <
+		OMAP4_IOPAD(0X1d0, PIN_OUTPUT | MUX_MODE1) /* dmtimer9_pwm_evt (gpio_28) */
+		>;
+	};
+};
+
+/ {
+	pwm8: dmtimer-pwm {
+		pinctrl-names = "default";
+		pinctrl-0 = <&vibrator_direction_pin>;
+
+		compatible = "ti,omap-dmtimer-pwm";
+		#pwm-cells = <3>;
+		ti,timers = <&timer8>;
+		ti,clock-source = <0x01>;
+	};
+
+	pwm9: dmtimer-pwm {
+		pinctrl-names = "default";
+		pinctrl-0 = <&vibrator_enable_pin>;
+
+		compatible = "ti,omap-dmtimer-pwm";
+		#pwm-cells = <3>;
+		ti,timers = <&timer9>;
+		ti,clock-source = <0x01>;
+	};
+
+	vibrator {
+		compatible = "pwm-vibrator";
+		pwms = <&pwm8 0 1000000000 0>,
+		       <&pwm9 0 1000000000 0>;
+		pwm-names = "enable", "direction";
+	};
+};
