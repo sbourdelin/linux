@@ -560,7 +560,7 @@ static void seq_header(struct seq_file *m)
 			"holdtime-total",
 			"holdtime-avg");
 	seq_line(m, '-', 0, 40 + 1 + 12 * (14 + 1));
-	seq_printf(m, "\n");
+	seq_putc(m, '\n');
 }
 
 static void *ls_start(struct seq_file *m, loff_t *pos)
