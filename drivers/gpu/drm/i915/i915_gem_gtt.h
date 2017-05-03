@@ -255,7 +255,8 @@ struct i915_address_space {
 	struct drm_i915_file_private *file;
 	struct list_head global_link;
 	u64 total;		/* size addr space maps (ex. 2GB for ggtt) */
-
+	/* size addr space reserved by GVT balloon, only used for ggtt */
+	u64 reserved;
 	bool closed;
 
 	struct i915_page_dma scratch_page;
