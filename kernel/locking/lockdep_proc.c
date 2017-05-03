@@ -61,7 +61,7 @@ static int l_show(struct seq_file *m, void *v)
 	char usage[LOCK_USAGE_CHARS];
 
 	if (v == &all_lock_classes) {
-		seq_printf(m, "all lock classes:\n");
+		seq_puts(m, "all lock classes:\n");
 		return 0;
 	}
 
@@ -141,8 +141,8 @@ static int lc_show(struct seq_file *m, void *v)
 
 	if (v == SEQ_START_TOKEN) {
 		if (nr_chain_hlocks > MAX_LOCKDEP_CHAIN_HLOCKS)
-			seq_printf(m, "(buggered) ");
-		seq_printf(m, "all lock chains:\n");
+			seq_puts(m, "(buggered) ");
+		seq_puts(m, "all lock chains:\n");
 		return 0;
 	}
 
@@ -541,7 +541,7 @@ static void seq_header(struct seq_file *m)
 	seq_puts(m, "lock_stat version 0.4\n");
 
 	if (unlikely(!debug_locks))
-		seq_printf(m, "*WARNING* lock debugging disabled!! - possibly due to a lockdep warning\n");
+		seq_puts(m, "*WARNING* lock debugging disabled!! - possibly due to a lockdep warning\n");
 
 	seq_line(m, '-', 0, 40 + 1 + 12 * (14 + 1));
 	seq_printf(m, "%40s %14s %14s %14s %14s %14s %14s %14s %14s %14s %14s "
