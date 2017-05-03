@@ -1909,7 +1909,8 @@ static inline unsigned int fold_hash(unsigned long x, unsigned long y)
  * payload bytes, to match the way that hash_name() iterates until it
  * finds the delimiter after the name.
  */
-unsigned int full_name_hash(const void *salt, const char *name, unsigned int len)
+unsigned int __pure full_name_hash(const void *salt, const char *name,
+				   unsigned int len)
 {
 	unsigned long a, x = 0, y = (unsigned long)salt;
 
@@ -1930,7 +1931,7 @@ done:
 EXPORT_SYMBOL(full_name_hash);
 
 /* Return the "hash_len" (hash and length) of a null-terminated string */
-u64 hashlen_string(const void *salt, const char *name)
+u64 __pure hashlen_string(const void *salt, const char *name)
 {
 	unsigned long a = 0, x = 0, y = (unsigned long)salt;
 	unsigned long adata, mask, len;
