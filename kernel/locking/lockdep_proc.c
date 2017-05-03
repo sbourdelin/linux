@@ -402,7 +402,7 @@ static void snprint_time(char *buf, size_t bufsiz, s64 nr)
 
 	nr += 5; /* for display rounding */
 	div = div_s64_rem(nr, 1000, &rem);
-	snprintf(buf, bufsiz, "%lld.%02d", (long long)div, (int)rem/10);
+	snprintf(buf, bufsiz, "%lld.%02d", (long long)div, (int)rem / 10);
 }
 
 static void seq_time(struct seq_file *m, s64 time)
@@ -461,11 +461,11 @@ static void seq_stats(struct seq_file *m, struct lock_stat_data *data)
 
 	namelen = strlen(name);
 	if (class->name_version > 1) {
-		snprintf(name+namelen, 3, "#%d", class->name_version);
+		snprintf(name + namelen, 3, "#%d", class->name_version);
 		namelen += 2;
 	}
 	if (class->subclass) {
-		snprintf(name+namelen, 3, "/%d", class->subclass);
+		snprintf(name + namelen, 3, "/%d", class->subclass);
 		namelen += 2;
 	}
 
@@ -504,7 +504,7 @@ static void seq_stats(struct seq_file *m, struct lock_stat_data *data)
 			break;
 
 		if (!i)
-			seq_line(m, '-', 40-namelen, namelen);
+			seq_line(m, '-', 40 - namelen, namelen);
 
 		snprintf(ip, sizeof(ip), "[<%p>]",
 				(void *)class->contention_point[i]);
@@ -519,7 +519,7 @@ static void seq_stats(struct seq_file *m, struct lock_stat_data *data)
 			break;
 
 		if (!i)
-			seq_line(m, '-', 40-namelen, namelen);
+			seq_line(m, '-', 40 - namelen, namelen);
 
 		snprintf(ip, sizeof(ip), "[<%p>]",
 				(void *)class->contending_point[i]);
