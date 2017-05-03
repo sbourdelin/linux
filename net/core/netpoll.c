@@ -663,13 +663,13 @@ int netpoll_setup(struct netpoll *np)
 {
 	struct net_device *ndev = NULL;
 	struct in_device *in_dev;
+	struct net *net;
 	int err;
 
 	rtnl_lock();
-	if (np->dev_name) {
-		struct net *net = current->nsproxy->net_ns;
-		ndev = __dev_get_by_name(net, np->dev_name);
-	}
+	net = current->nsproxy->net_ns;
+	ndev = __dev_get_by_name(net, np->dev_name);
+
 	if (!ndev) {
 		np_err(np, "%s doesn't exist, aborting\n", np->dev_name);
 		err = -ENODEV;
