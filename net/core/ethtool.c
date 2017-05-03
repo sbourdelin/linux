@@ -838,6 +838,32 @@ out:
 	return ret;
 }
 
+static int ethtool_get_ncsi_sw_stats(struct net_device *dev,
+				     void __user *useraddr)
+{
+	struct ethtool_ncsi_sw_stats *enss;
+	int ret;
+
+	if (!dev->ethtool_ops->get_ncsi_sw_stats)
+		return -EOPNOTSUPP;
+
+	enss = kzalloc(sizeof(*enss), GFP_KERNEL);
+	if (!enss)
+		return -ENOMEM;
+
+	if (copy_from_user(&enss->cmd, useraddr, sizeof(enss->cmd))) {
+		ret = -EFAULT;
+		goto out;
+	}
+
+	ret = dev->ethtool_ops->get_ncsi_sw_stats(dev, enss);
+	if (!ret && copy_to_user(useraddr, enss, sizeof(*enss)))
+		ret = -EFAULT;
+out:
+	kfree(enss);
+	return ret;
+}
+
 static void
 warn_incomplete_ethtool_legacy_settings_conversion(const char *details)
 {
@@ -2883,6 +2909,9 @@ int dev_ethtool(struct net *net, struct ifreq *ifr)
 		break;
 	case ETHTOOL_GNCSISTATS:
 		rc = ethtool_get_ncsi_stats(dev, useraddr);
+		break;
+	case ETHTOOL_GNCSISWSTATS:
+		rc = ethtool_get_ncsi_sw_stats(dev, useraddr);
 		break;
 	default:
 		rc = -EOPNOTSUPP;

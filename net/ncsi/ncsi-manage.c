@@ -521,6 +521,7 @@ static void ncsi_request_timeout(unsigned long data)
 {
 	struct ncsi_request *nr = (struct ncsi_request *)data;
 	struct ncsi_dev_priv *ndp = nr->ndp;
+	struct ncsi_pkt_hdr *hdr;
 	unsigned long flags;
 
 	/* If the request already had associated response,
@@ -533,6 +534,9 @@ static void ncsi_request_timeout(unsigned long data)
 		return;
 	}
 	spin_unlock_irqrestore(&ndp->lock, flags);
+
+	hdr = (struct ncsi_pkt_hdr *)skb_network_header(nr->cmd);
+	ncsi_dev_update_stats(ndp, hdr->type, 0, ETHTOOL_NCSI_SW_STAT_TIMEOUT);
 
 	/* Release the request */
 	ncsi_free_request(nr);

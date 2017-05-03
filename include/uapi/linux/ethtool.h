@@ -1334,6 +1334,7 @@ struct ethtool_per_queue_op {
 #define ETHTOOL_GNCSICHANNELS	0x00000050 /* Get NCSI channels */
 #define ETHTOOL_GNCSICINFO	0x00000051 /* Get NCSI channel information */
 #define ETHTOOL_GNCSISTATS	0x00000052 /* Get NCSI HW statistics */
+#define ETHTOOL_GNCSISWSTATS	0x00000053 /* Get NCSI software statistics */
 
 /* compatibility with older code */
 #define SPARC_ETH_GSET		ETHTOOL_GSET
@@ -2054,5 +2055,24 @@ struct ethtool_ncsi_stats {
 	__u64	pt_rx_channel_err;
 	__u64	pt_rx_us_err;
 	__u64	pt_rx_os_err;
+};
+
+/**
+ * struct ethtool_ncsi_sw_stats - NCSI software statistics
+ *
+ * @cmd: Command number = %ETHTOOL_GNCSISWSTATS
+ * @command: Statistics for sent command packets
+ * @response: Statistics for received response packets
+ * @aen: Statistics for received AEN packets
+ */
+struct ethtool_ncsi_sw_stats {
+	__u32	cmd;
+#define ETHTOOL_NCSI_SW_STAT_OK		0
+#define ETHTOOL_NCSI_SW_STAT_TIMEOUT	1
+#define ETHTOOL_NCSI_SW_STAT_ERROR	2
+#define ETHTOOL_NCSI_SW_STAT_MAX	3
+	__u64	command[128][ETHTOOL_NCSI_SW_STAT_MAX];
+	__u64	response[128][ETHTOOL_NCSI_SW_STAT_MAX];
+	__u64	aen[256][ETHTOOL_NCSI_SW_STAT_MAX];
 };
 #endif /* _UAPI_LINUX_ETHTOOL_H */

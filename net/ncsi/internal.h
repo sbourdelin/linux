@@ -275,6 +275,9 @@ struct ncsi_dev_priv {
 	struct list_head    channel_queue;   /* Config queue of channels   */
 	struct work_struct  work;            /* For channel management     */
 	struct packet_type  ptype;           /* NCSI packet Rx handler     */
+#ifdef CONFIG_NET_NCSI_DEBUG
+	struct ethtool_ncsi_sw_stats stats;  /* NCSI software statistics   */
+#endif /* CONFIG_NET_NCSI_DEBUG */
 	struct list_head    node;            /* Form NCSI device list      */
 };
 
@@ -341,4 +344,14 @@ int ncsi_aen_handler(struct ncsi_dev_priv *ndp, struct sk_buff *skb);
 void ncsi_ethtool_register_dev(struct net_device *dev);
 void ncsi_ethtool_unregister_dev(struct net_device *dev);
 
+/* Debugging functionality */
+#ifdef CONFIG_NET_NCSI_DEBUG
+void ncsi_dev_update_stats(struct ncsi_dev_priv *ndp,
+			   int type, int subtype, int errno);
+#else
+static inline void ncsi_dev_update_stats(struct ncsi_dev_priv *ndp,
+					 int type, int subtype, int errno)
+{
+}
+#endif /* CONFIG_NET_NCSI_DEBUG */
 #endif /* __NCSI_INTERNAL_H__ */

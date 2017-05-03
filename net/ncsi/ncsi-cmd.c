@@ -323,6 +323,8 @@ int ncsi_xmit_cmd(struct ncsi_cmd_arg *nca)
 	}
 
 	if (!nch) {
+		ncsi_dev_update_stats(nca->ndp, nca->type, 0,
+				      ETHTOOL_NCSI_SW_STAT_ERROR);
 		netdev_err(nca->ndp->ndev.dev,
 			   "Cannot send packet with type 0x%02x\n", nca->type);
 		return -ENOENT;
@@ -331,13 +333,18 @@ int ncsi_xmit_cmd(struct ncsi_cmd_arg *nca)
 	/* Get packet payload length and allocate the request */
 	nca->payload = nch->payload;
 	nr = ncsi_alloc_command(nca);
-	if (!nr)
+	if (!nr) {
+		ncsi_dev_update_stats(nca->ndp, nca->type, 0,
+				      ETHTOOL_NCSI_SW_STAT_ERROR);
 		return -ENOMEM;
+	}
 
 	/* Prepare the packet */
 	nca->id = nr->id;
 	ret = nch->handler(nr->cmd, nca);
 	if (ret) {
+		ncsi_dev_update_stats(nca->ndp, nca->type, 0,
+				      ETHTOOL_NCSI_SW_STAT_ERROR);
 		ncsi_free_request(nr);
 		return ret;
 	}
@@ -359,9 +366,12 @@ int ncsi_xmit_cmd(struct ncsi_cmd_arg *nca)
 	skb_get(nr->cmd);
 	ret = dev_queue_xmit(nr->cmd);
 	if (ret < 0) {
+		ncsi_dev_update_stats(nca->ndp, nca->type, 0,
+				      ETHTOOL_NCSI_SW_STAT_ERROR);
 		ncsi_free_request(nr);
 		return ret;
 	}
 
+	ncsi_dev_update_stats(nca->ndp, nca->type, 0, ETHTOOL_NCSI_SW_STAT_OK);
 	return 0;
 }

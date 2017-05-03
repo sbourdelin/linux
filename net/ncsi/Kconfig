@@ -10,3 +10,12 @@ config NET_NCSI
 	  support. Enable this only if your system connects to a network
 	  device via NCSI and the ethernet driver you're using supports
 	  the protocol explicitly.
+
+config NET_NCSI_DEBUG
+	bool "Enable NCSI debugging"
+	depends on NET_NCSI && DEBUG_FS
+	default n
+	---help---
+	  This enables the interfaces (e.g. debugfs) for NCSI debugging purpose.
+
+	  If unsure, say N.

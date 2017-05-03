@@ -380,5 +380,7 @@ struct ethtool_ops {
 					 struct ethtool_ncsi_channel_info *);
 	int	(*get_ncsi_stats)(struct net_device *,
 				  struct ethtool_ncsi_stats *);
+	int	(*get_ncsi_sw_stats)(struct net_device *,
+				     struct ethtool_ncsi_sw_stats *);
 };
 #endif /* _LINUX_ETHTOOL_H */

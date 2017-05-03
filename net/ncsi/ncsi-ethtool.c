@@ -260,6 +260,38 @@ static int ncsi_get_stats(struct net_device *dev,
 	return 0;
 }
 
+#ifdef CONFIG_NET_NCSI_DEBUG
+static int ncsi_get_sw_stats(struct net_device *dev,
+			     struct ethtool_ncsi_sw_stats *enss)
+{
+	struct ncsi_dev *nd;
+	struct ncsi_dev_priv *ndp;
+	unsigned long flags;
+
+	nd = ncsi_find_dev(dev);
+	if (!nd)
+		return -ENXIO;
+
+	ndp = TO_NCSI_DEV_PRIV(nd);
+	spin_lock_irqsave(&ndp->lock, flags);
+	memcpy(enss->command, ndp->stats.command,
+	       128 * ETHTOOL_NCSI_SW_STAT_MAX * sizeof(enss->command[0][0]));
+	memcpy(enss->response, ndp->stats.response,
+	       128 * ETHTOOL_NCSI_SW_STAT_MAX * sizeof(enss->response[0][0]));
+	memcpy(enss->aen, ndp->stats.aen,
+	       256 * ETHTOOL_NCSI_SW_STAT_MAX * sizeof(enss->aen[0][0]));
+	spin_unlock_irqrestore(&ndp->lock, flags);
+
+	return 0;
+}
+#else
+static int ncsi_get_sw_stats(struct net_device *dev,
+			     struct ethtool_ncsi_sw_stats *enss)
+{
+	return -EOPNOTSUPP;
+}
+#endif /* CONFIG_NET_NCSI_DEBUG */
+
 void ncsi_ethtool_register_dev(struct net_device *dev)
 {
 	struct ethtool_ops *ops;
@@ -271,6 +303,7 @@ void ncsi_ethtool_register_dev(struct net_device *dev)
 	ops->get_ncsi_channels = ncsi_get_channels;
 	ops->get_ncsi_channel_info = ncsi_get_channel_info;
 	ops->get_ncsi_stats = ncsi_get_stats;
+	ops->get_ncsi_sw_stats = ncsi_get_sw_stats;
 }
 
 void ncsi_ethtool_unregister_dev(struct net_device *dev)
@@ -284,4 +317,5 @@ void ncsi_ethtool_unregister_dev(struct net_device *dev)
 	ops->get_ncsi_channels = NULL;
 	ops->get_ncsi_channel_info = NULL;
 	ops->get_ncsi_stats = NULL;
+	ops->get_ncsi_sw_stats = NULL;
 }
