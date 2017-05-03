@@ -618,15 +618,9 @@ enum match_result {
 	MATCH_GT,
 };
 
-static enum match_result match_chain_srcline(struct callchain_cursor_node *node,
-					     struct callchain_list *cnode)
+static enum match_result match_chain_strings(const char *left,
+					     const char *right)
 {
-	char *left = get_srcline(cnode->ms.map->dso,
-				 map__rip_2objdump(cnode->ms.map, cnode->ip),
-				 cnode->ms.sym, true, false);
-	char *right = get_srcline(node->map->dso,
-				  map__rip_2objdump(node->map, node->ip),
-				  node->sym, true, false);
 	enum match_result ret = MATCH_EQ;
 	int cmp;
 
@@ -636,16 +630,79 @@ static enum match_result match_chain_srcline(struct callchain_cursor_node *node,
 		cmp = 1;
 	else if (left && !right)
 		cmp = -1;
-	else if (cnode->ip == node->ip)
-		cmp = 0;
 	else
-		cmp = (cnode->ip < node->ip) ? -1 : 1;
+		return MATCH_ERROR;
 
 	if (cmp != 0)
 		ret = cmp < 0 ? MATCH_LT : MATCH_GT;
 
+	return ret;
+}
+
+static enum match_result match_chain_srcline(struct callchain_cursor_node *node,
+					     struct callchain_list *cnode)
+{
+	char *left = get_srcline(cnode->ms.map->dso,
+				 map__rip_2objdump(cnode->ms.map, cnode->ip),
+				 cnode->ms.sym, true, false);
+	char *right = get_srcline(node->map->dso,
+				  map__rip_2objdump(node->map, node->ip),
+				  node->sym, true, false);
+	enum match_result ret = match_chain_strings(left, right);
+
 	free_srcline(left);
 	free_srcline(right);
+	return ret;
+}
+
+static enum match_result match_chain_inliner(struct callchain_cursor_node *node,
+					     struct callchain_list *cnode)
+{
+	u64 left_ip = map__rip_2objdump(cnode->ms.map, cnode->ip);
+	u64 right_ip = map__rip_2objdump(node->map, node->ip);
+	struct inline_node *left_node = NULL;
+	struct inline_node *right_node = NULL;
+	struct inline_list *left_entry = NULL;
+	struct inline_list *right_entry = NULL;
+	struct inline_list *left_last_entry = NULL;
+	struct inline_list *right_last_entry = NULL;
+	enum match_result ret = MATCH_EQ;
+
+	left_node = dso__parse_addr_inlines(cnode->ms.map->dso, left_ip);
+	if (!left_node)
+		return MATCH_ERROR;
+
+	right_node = dso__parse_addr_inlines(node->map->dso, right_ip);
+	if (!right_node) {
+		inline_node__delete(left_node);
+		return MATCH_ERROR;
+	}
+
+	left_entry = list_first_entry(&left_node->val,
+				      struct inline_list, list);
+	left_last_entry = list_last_entry(&left_node->val,
+					  struct inline_list, list);
+	right_entry = list_first_entry(&right_node->val,
+				       struct inline_list, list);
+	right_last_entry = list_last_entry(&right_node->val,
+					  struct inline_list, list);
+	while (ret == MATCH_EQ && (left_entry || right_entry)) {
+		ret = match_chain_strings(left_entry ? left_entry->funcname : NULL,
+					  right_entry ? right_entry->funcname : NULL);
+
+		if (left_entry && left_entry != left_last_entry)
+			left_entry = list_next_entry(left_entry, list);
+		else
+			left_entry = NULL;
+
+		if (right_entry && right_entry != right_last_entry)
+			right_entry = list_next_entry(right_entry, list);
+		else
+			right_entry = NULL;
+	}
+
+	inline_node__delete(left_node);
+	inline_node__delete(right_node);
 	return ret;
 }
 
@@ -671,7 +728,13 @@ static enum match_result match_chain(struct callchain_cursor_node *node,
 	}
 
 	if (left == right) {
-		if (node->branch) {
+		if (symbol_conf.inline_name && cnode->ip != node->ip) {
+			enum match_result match = match_chain_inliner(node,
+								      cnode);
+
+			if (match != MATCH_ERROR)
+				return match;
+		} else if (node->branch) {
 			cnode->branch_count++;
 
 			if (node->branch_flags.predicted)
