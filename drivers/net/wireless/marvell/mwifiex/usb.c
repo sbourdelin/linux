@@ -169,6 +169,11 @@ static void mwifiex_usb_rx_complete(struct urb *urb)
 	int recv_length = urb->actual_length;
 	int size, status;
 
+	if (!urb || !urb->context) {
+		pr_err("URB or URB context is not valid in USB Rx complete\n");
+		return;
+	}
+
 	if (!adapter || !adapter->card) {
 		pr_err("mwifiex adapter or card structure is not valid\n");
 		return;
@@ -259,6 +264,11 @@ static void mwifiex_usb_tx_complete(struct urb *urb)
 	struct usb_card_rec *card = adapter->card;
 	struct usb_tx_data_port *port;
 	int i;
+
+	if (!urb || !urb->context) {
+		pr_err("URB or URB context is not valid in USB Tx complete\n");
+		return;
+	}
 
 	mwifiex_dbg(adapter, INFO,
 		    "%s: status: %d\n", __func__, urb->status);
