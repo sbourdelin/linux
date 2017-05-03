@@ -116,9 +116,13 @@ static int vpd_section_attrib_add(const u8 *key, s32 key_len,
 		return VPD_OK;
 
 	info = kzalloc(sizeof(*info), GFP_KERNEL);
-	info->key = kzalloc(key_len + 1, GFP_KERNEL);
-	if (!info->key)
+	if (!info)
 		return -ENOMEM;
+	info->key = kzalloc(key_len + 1, GFP_KERNEL);
+	if (!info->key) {
+		kfree(info);
+		return -ENOMEM;
+	}
 
 	memcpy(info->key, key, key_len);
 
