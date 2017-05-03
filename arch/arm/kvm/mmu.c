@@ -301,9 +301,14 @@ static void unmap_stage2_range(struct kvm *kvm, phys_addr_t start, u64 size)
 		/*
 		 * If the range is too large, release the kvm->mmu_lock
 		 * to prevent starvation and lockup detector warnings.
+		 * Make sure the page table is still active when we regain
+		 * the lock.
 		 */
-		if (next != end)
+		if (next != end) {
 			cond_resched_lock(&kvm->mmu_lock);
+			if (!READ_ONCE(kvm->arch.pgd))
+				break;
+		}
 	} while (pgd++, addr = next, addr != end);
 }
 
@@ -1170,11 +1175,13 @@ static void stage2_wp_range(struct kvm *kvm, phys_addr_t addr, phys_addr_t end)
 		 * large. Otherwise, we may see kernel panics with
 		 * CONFIG_DETECT_HUNG_TASK, CONFIG_LOCKUP_DETECTOR,
 		 * CONFIG_LOCKDEP. Additionally, holding the lock too long
-		 * will also starve other vCPUs.
+		 * will also starve other vCPUs. We have to also make sure
+		 * that the page tables are not freed while we released
+		 * the lock.
 		 */
-		if (need_resched() || spin_needbreak(&kvm->mmu_lock))
-			cond_resched_lock(&kvm->mmu_lock);
-
+		cond_resched_lock(&kvm->mmu_lock);
+		if (!READ_ONCE(kvm->arch.pgd))
+			break;
 		next = stage2_pgd_addr_end(addr, end);
 		if (stage2_pgd_present(*pgd))
 			stage2_wp_puds(pgd, addr, next);
