@@ -114,7 +114,15 @@
 		simple-audio-card,aux-devs = <&codec_analog>;
 		simple-audio-card,routing =
 			"Left DAC", "AIF1 Slot 0 Left",
-			"Right DAC", "AIF1 Slot 0 Right";
+			"Right DAC", "AIF1 Slot 0 Right",
+			"AIF1 Slot 0 Left ADC", "Left ADC",
+			"AIF1 Slot 0 Right ADC", "Right ADC",
+			"Left ADC", "ADC",
+			"Right ADC", "ADC",
+			"Mic",  "MBIAS",
+			"Headset Mic", "HBIAS",
+			"MIC1", "Mic",
+			"MIC2", "Headset Mic";
 		status = "disabled";
 
 		simple-audio-card,cpu {
