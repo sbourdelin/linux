@@ -159,6 +159,7 @@ static int stm32_qspi_wait_cmd(struct stm32_qspi *qspi)
 {
 	u32 cr;
 	int err = 0;
+	long timeout = 0;
 
 	if (readl_relaxed(qspi->io_base + QUADSPI_SR) & SR_TCF)
 		return 0;
@@ -167,8 +168,13 @@ static int stm32_qspi_wait_cmd(struct stm32_qspi *qspi)
 	cr = readl_relaxed(qspi->io_base + QUADSPI_CR);
 	writel_relaxed(cr | CR_TCIE, qspi->io_base + QUADSPI_CR);
 
-	if (!wait_for_completion_interruptible_timeout(&qspi->cmd_completion,
-						       msecs_to_jiffies(1000)))
+	timeout = wait_for_completion_interruptible_timeout(
+				&qspi->cmd_completion, msecs_to_jiffies(1000));
+
+	/* since the calling side only cares about success of failure
+	 * returning -ETIMEDOUT even when interrupted should be ok here
+	 */
+	if (timeout == 0 || timeout == -ERESTARTSYS)
 		err = -ETIMEDOUT;
 
 	writel_relaxed(cr, qspi->io_base + QUADSPI_CR);
