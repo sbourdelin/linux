@@ -1706,9 +1706,7 @@ static int gfs2_rename2(struct inode *odir, struct dentry *odentry,
 			struct inode *ndir, struct dentry *ndentry,
 			unsigned int flags)
 {
-	flags &= ~RENAME_NOREPLACE;
-
-	if (flags & ~RENAME_EXCHANGE)
+	if (flags & ~(RENAME_NOREPLACE | RENAME_EXCHANGE))
 		return -EINVAL;
 
 	if (flags & RENAME_EXCHANGE)
