@@ -72,6 +72,12 @@ static const uint32_t i965_primary_formats[] = {
 	DRM_FORMAT_XBGR2101010,
 };
 
+static const uint64_t i9xx_format_modifiers[] = {
+	I915_FORMAT_MOD_X_TILED,
+	DRM_FORMAT_MOD_LINEAR,
+	DRM_FORMAT_MOD_INVALID
+};
+
 static const uint32_t skl_primary_formats[] = {
 	DRM_FORMAT_C8,
 	DRM_FORMAT_RGB565,
@@ -85,6 +91,14 @@ static const uint32_t skl_primary_formats[] = {
 	DRM_FORMAT_YVYU,
 	DRM_FORMAT_UYVY,
 	DRM_FORMAT_VYUY,
+};
+
+static const uint64_t skl_format_modifiers[] = {
+	I915_FORMAT_MOD_Yf_TILED,
+	I915_FORMAT_MOD_Y_TILED,
+	I915_FORMAT_MOD_X_TILED,
+	DRM_FORMAT_MOD_LINEAR,
+	DRM_FORMAT_MOD_INVALID
 };
 
 /* Cursor formats */
@@ -13381,6 +13395,103 @@ void intel_plane_destroy(struct drm_plane *plane)
 	kfree(to_intel_plane(plane));
 }
 
+static bool i8xx_mod_supported(uint32_t format, uint64_t modifier)
+{
+	switch (format) {
+	case DRM_FORMAT_C8:
+	case DRM_FORMAT_RGB565:
+	case DRM_FORMAT_XRGB1555:
+	case DRM_FORMAT_XRGB8888:
+		return modifier == DRM_FORMAT_MOD_LINEAR ||
+			modifier == I915_FORMAT_MOD_X_TILED;
+	default:
+		return false;
+	}
+}
+
+static bool i965_mod_supported(uint32_t format, uint64_t modifier)
+{
+	switch (format) {
+	case DRM_FORMAT_C8:
+	case DRM_FORMAT_RGB565:
+	case DRM_FORMAT_XRGB8888:
+	case DRM_FORMAT_XBGR8888:
+	case DRM_FORMAT_XRGB2101010:
+	case DRM_FORMAT_XBGR2101010:
+		return modifier == DRM_FORMAT_MOD_LINEAR ||
+			modifier == I915_FORMAT_MOD_X_TILED;
+	default:
+		return false;
+	}
+}
+
+static bool skl_mod_supported(uint32_t format, uint64_t modifier)
+{
+	switch (format) {
+	case DRM_FORMAT_C8:
+		switch (modifier) {
+		case DRM_FORMAT_MOD_LINEAR:
+		case I915_FORMAT_MOD_X_TILED:
+		case I915_FORMAT_MOD_Y_TILED:
+			return true;
+		default:
+			return false;
+		}
+	case DRM_FORMAT_RGB565:
+	case DRM_FORMAT_XRGB8888:
+	case DRM_FORMAT_XBGR8888:
+	case DRM_FORMAT_ARGB8888:
+	case DRM_FORMAT_ABGR8888:
+	case DRM_FORMAT_XRGB2101010:
+	case DRM_FORMAT_XBGR2101010:
+	case DRM_FORMAT_YUYV:
+	case DRM_FORMAT_YVYU:
+	case DRM_FORMAT_UYVY:
+	case DRM_FORMAT_VYUY:
+		/* All i915 modifiers are fine */
+		switch (modifier) {
+		case DRM_FORMAT_MOD_LINEAR:
+		case I915_FORMAT_MOD_X_TILED:
+		case I915_FORMAT_MOD_Y_TILED:
+		case I915_FORMAT_MOD_Yf_TILED:
+			return true;
+		default:
+			return false;
+		}
+	default:
+		return false;
+	}
+}
+
+static bool intel_primary_plane_format_mod_supported(struct drm_plane *plane,
+						     uint32_t format,
+						     uint64_t modifier)
+{
+	struct drm_i915_private *dev_priv = to_i915(plane->dev);
+
+	if (WARN_ON(modifier == DRM_FORMAT_MOD_INVALID))
+		return false;
+
+	if (INTEL_GEN(dev_priv) >= 9)
+		return skl_mod_supported(format, modifier);
+	else if (INTEL_GEN(dev_priv) >= 4)
+		return i965_mod_supported(format, modifier);
+	else
+		return i8xx_mod_supported(format, modifier);
+
+	return false;
+}
+
+static bool intel_cursor_plane_format_mod_supported(struct drm_plane *plane,
+						    uint32_t format,
+						    uint64_t modifier)
+{
+	if (WARN_ON(modifier == DRM_FORMAT_MOD_INVALID))
+		return false;
+
+	return modifier == DRM_FORMAT_MOD_LINEAR && format == DRM_FORMAT_ARGB8888;
+}
+
 const struct drm_plane_funcs intel_plane_funcs = {
 	.update_plane = drm_atomic_helper_update_plane,
 	.disable_plane = drm_atomic_helper_disable_plane,
@@ -13390,6 +13501,7 @@ const struct drm_plane_funcs intel_plane_funcs = {
 	.atomic_set_property = intel_plane_atomic_set_property,
 	.atomic_duplicate_state = intel_plane_duplicate_state,
 	.atomic_destroy_state = intel_plane_destroy_state,
+	.format_mod_supported = intel_primary_plane_format_mod_supported,
 };
 
 static int
@@ -13527,6 +13639,7 @@ static const struct drm_plane_funcs intel_cursor_plane_funcs = {
 	.atomic_set_property = intel_plane_atomic_set_property,
 	.atomic_duplicate_state = intel_plane_duplicate_state,
 	.atomic_destroy_state = intel_plane_destroy_state,
+	.format_mod_supported = intel_cursor_plane_format_mod_supported,
 };
 
 static struct intel_plane *
@@ -13537,6 +13650,7 @@ intel_primary_plane_create(struct drm_i915_private *dev_priv, enum pipe pipe)
 	const uint32_t *intel_primary_formats;
 	unsigned int supported_rotations;
 	unsigned int num_formats;
+	const uint64_t *intel_format_modifiers;
 	int ret;
 
 	primary = kzalloc(sizeof(*primary), GFP_KERNEL);
@@ -13575,18 +13689,21 @@ intel_primary_plane_create(struct drm_i915_private *dev_priv, enum pipe pipe)
 	if (INTEL_GEN(dev_priv) >= 9) {
 		intel_primary_formats = skl_primary_formats;
 		num_formats = ARRAY_SIZE(skl_primary_formats);
+		intel_format_modifiers = skl_format_modifiers;
 
 		primary->update_plane = skylake_update_primary_plane;
 		primary->disable_plane = skylake_disable_primary_plane;
 	} else if (INTEL_GEN(dev_priv) >= 4) {
 		intel_primary_formats = i965_primary_formats;
 		num_formats = ARRAY_SIZE(i965_primary_formats);
+		intel_format_modifiers = i9xx_format_modifiers;
 
 		primary->update_plane = i9xx_update_primary_plane;
 		primary->disable_plane = i9xx_disable_primary_plane;
 	} else {
 		intel_primary_formats = i8xx_primary_formats;
 		num_formats = ARRAY_SIZE(i8xx_primary_formats);
+		intel_format_modifiers = i9xx_format_modifiers;
 
 		primary->update_plane = i9xx_update_primary_plane;
 		primary->disable_plane = i9xx_disable_primary_plane;
@@ -13596,21 +13713,21 @@ intel_primary_plane_create(struct drm_i915_private *dev_priv, enum pipe pipe)
 		ret = drm_universal_plane_init(&dev_priv->drm, &primary->base,
 					       0, &intel_plane_funcs,
 					       intel_primary_formats, num_formats,
-					       NULL,
+					       intel_format_modifiers,
 					       DRM_PLANE_TYPE_PRIMARY,
 					       "plane 1%c", pipe_name(pipe));
 	else if (INTEL_GEN(dev_priv) >= 5 || IS_G4X(dev_priv))
 		ret = drm_universal_plane_init(&dev_priv->drm, &primary->base,
 					       0, &intel_plane_funcs,
 					       intel_primary_formats, num_formats,
-					       NULL,
+					       intel_format_modifiers,
 					       DRM_PLANE_TYPE_PRIMARY,
 					       "primary %c", pipe_name(pipe));
 	else
 		ret = drm_universal_plane_init(&dev_priv->drm, &primary->base,
 					       0, &intel_plane_funcs,
 					       intel_primary_formats, num_formats,
-					       NULL,
+					       intel_format_modifiers,
 					       DRM_PLANE_TYPE_PRIMARY,
 					       "plane %c", plane_name(primary->plane));
 	if (ret)
@@ -13746,6 +13863,11 @@ intel_update_cursor_plane(struct drm_plane *plane,
 	intel_crtc_update_cursor(crtc, state);
 }
 
+static const uint64_t cursor_format_modifiers[] = {
+	DRM_FORMAT_MOD_LINEAR,
+	DRM_FORMAT_MOD_INVALID
+};
+
 static struct intel_plane *
 intel_cursor_plane_create(struct drm_i915_private *dev_priv, enum pipe pipe)
 {
@@ -13781,7 +13903,8 @@ intel_cursor_plane_create(struct drm_i915_private *dev_priv, enum pipe pipe)
 				       0, &intel_cursor_plane_funcs,
 				       intel_cursor_formats,
 				       ARRAY_SIZE(intel_cursor_formats),
-				       NULL, DRM_PLANE_TYPE_CURSOR,
+				       cursor_format_modifiers,
+				       DRM_PLANE_TYPE_CURSOR,
 				       "cursor %c", pipe_name(pipe));
 	if (ret)
 		goto fail;
