@@ -79,17 +79,16 @@ static int l_show(struct seq_file *m, void *v)
 
 	seq_printf(m, ": ");
 	print_name(m, class);
-	seq_puts(m, "\n");
+	seq_putc(m, '\n');
 
 	list_for_each_entry(entry, &class->locks_after, entry) {
 		if (entry->distance == 1) {
 			seq_printf(m, " -> [%p] ", entry->class->key);
 			print_name(m, entry->class);
-			seq_puts(m, "\n");
+			seq_putc(m, '\n');
 		}
 	}
-	seq_puts(m, "\n");
-
+	seq_putc(m, '\n');
 	return 0;
 }
 
@@ -156,10 +155,9 @@ static int lc_show(struct seq_file *m, void *v)
 
 		seq_printf(m, "[%p] ", class->key);
 		print_name(m, class);
-		seq_puts(m, "\n");
+		seq_putc(m, '\n');
 	}
-	seq_puts(m, "\n");
-
+	seq_putc(m, '\n');
 	return 0;
 }
 
@@ -393,10 +391,10 @@ static void seq_line(struct seq_file *m, char c, int offset, int length)
 	int i;
 
 	for (i = 0; i < offset; i++)
-		seq_puts(m, " ");
+		seq_putc(m, ' ');
 	for (i = 0; i < length; i++)
 		seq_printf(m, "%c", c);
-	seq_puts(m, "\n");
+	seq_putc(m, '\n');
 }
 
 static void snprint_time(char *buf, size_t bufsiz, s64 nr)
@@ -483,7 +481,7 @@ static void seq_stats(struct seq_file *m, struct lock_stat_data *data)
 		seq_lock_time(m, &stats->write_waittime);
 		seq_printf(m, " %14lu ", stats->bounces[bounce_acquired_write]);
 		seq_lock_time(m, &stats->write_holdtime);
-		seq_puts(m, "\n");
+		seq_putc(m, '\n');
 	}
 
 	if (stats->read_holdtime.nr) {
@@ -492,7 +490,7 @@ static void seq_stats(struct seq_file *m, struct lock_stat_data *data)
 		seq_lock_time(m, &stats->read_waittime);
 		seq_printf(m, " %14lu ", stats->bounces[bounce_acquired_read]);
 		seq_lock_time(m, &stats->read_holdtime);
-		seq_puts(m, "\n");
+		seq_putc(m, '\n');
 	}
 
 	if (stats->read_waittime.nr + stats->write_waittime.nr == 0)
@@ -532,9 +530,9 @@ static void seq_stats(struct seq_file *m, struct lock_stat_data *data)
 			   ip, (void *)class->contending_point[i]);
 	}
 	if (i) {
-		seq_puts(m, "\n");
+		seq_putc(m, '\n');
 		seq_line(m, '.', 0, 40 + 1 + 12 * (14 + 1));
-		seq_puts(m, "\n");
+		seq_putc(m, '\n');
 	}
 }
 
