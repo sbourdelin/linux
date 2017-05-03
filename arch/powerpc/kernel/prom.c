@@ -682,6 +682,10 @@ void __init early_init_devtree(void *params)
 	of_scan_flat_dt(early_init_dt_scan_root, NULL);
 	of_scan_flat_dt(early_init_dt_scan_memory_ppc, NULL);
 
+#ifdef CONFIG_FA_DUMP
+	if (is_fadump_active())
+		update_command_line_with_fadump_append(boot_command_line);
+#endif
 	parse_early_param();
 
 	/* make sure we've parsed cmdline for mem= before this */

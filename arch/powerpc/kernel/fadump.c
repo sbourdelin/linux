@@ -78,8 +78,10 @@ int __init early_init_dt_scan_fw_dump(unsigned long node,
 	 * dump data waiting for us.
 	 */
 	fdm_active = of_get_flat_dt_prop(node, "ibm,kernel-dump", NULL);
-	if (fdm_active)
+	if (fdm_active) {
+		pr_info("Firmware-assisted dump is active.\n");
 		fw_dump.dump_active = 1;
+	}
 
 	/* Get the sizes required to store dump data for the firmware provided
 	 * dump sections.
@@ -262,8 +264,12 @@ int __init fadump_reserve_mem(void)
 {
 	unsigned long base, size, memory_boundary;
 
-	if (!fw_dump.fadump_enabled)
+	if (!fw_dump.fadump_enabled) {
+		if (fw_dump.dump_active)
+			pr_warn("Firmware-assisted dump was active but kernel"
+				" booted with fadump disabled!\n");
 		return 0;
+	}
 
 	if (!fw_dump.fadump_supported) {
 		printk(KERN_INFO "Firmware-assisted dump is not supported on"
@@ -303,7 +309,6 @@ int __init fadump_reserve_mem(void)
 		memory_boundary = memblock_end_of_DRAM();
 
 	if (fw_dump.dump_active) {
-		printk(KERN_INFO "Firmware-assisted dump is active.\n");
 		/*
 		 * If last boot has crashed then reserve all the memory
 		 * above boot_memory_size so that we don't touch it until
@@ -376,6 +381,67 @@ static int __init early_fadump_param(char *p)
 	return 0;
 }
 early_param("fadump", early_fadump_param);
+
+#define FADUMP_APPEND_CMDLINE_PREFIX		"fadump_append="
+
+static __init char *get_last_fadump_append(char *p)
+{
+	char *fadump_cmdline = NULL;
+
+	/* find fadump_append and use the last one if there are more */
+	p = strstr(p, FADUMP_APPEND_CMDLINE_PREFIX);
+	while (p) {
+		fadump_cmdline = p;
+		p = strstr(p+1, FADUMP_APPEND_CMDLINE_PREFIX);
+	}
+
+	return fadump_cmdline;
+}
+
+/*
+ * Replace "fadump_append=param1,param2,param3" in cmdline with
+ * "param1 param2 param3". This will ensure that the additional
+ * parameters passed with 'fadump_append=' are enforced.
+ */
+void __init update_command_line_with_fadump_append(char *cmdline)
+{
+	static char fadump_cmdline[COMMAND_LINE_SIZE] __initdata;
+	static char append_cmdline[COMMAND_LINE_SIZE] __initdata;
+	size_t fadump_append_size = 0;
+	char *last, *p, *token;
+
+	/* get the last occurrence of fadump_append= parameter */
+	last = get_last_fadump_append(cmdline);
+	if (!last)
+		return;
+
+	/* Extract what is passed in 'fadump_append=' */
+	p = last + strlen(FADUMP_APPEND_CMDLINE_PREFIX);
+	token = strchr(p, ' ');
+	if (token) {
+		fadump_append_size = token - p + 1;
+		strlcpy(append_cmdline, token, COMMAND_LINE_SIZE);
+	} else
+		fadump_append_size = strlen(p) + 1;
+
+	/*
+	 * Change parameters passed in 'fadump_append=' from being
+	 * comma-separated to space-separated.
+	 */
+	strlcpy(fadump_cmdline, p, fadump_append_size);
+	token = strchr(fadump_cmdline, ',');
+	while (token) {
+		*token = ' ';
+		token = strchr(token, ',');
+	}
+
+	strlcpy(last, fadump_cmdline, fadump_append_size);
+	strlcat(cmdline, append_cmdline, COMMAND_LINE_SIZE);
+
+	pr_info("Modifying command line to enforce the additional parameters"
+		" passed through 'fadump_append=' parameter.");
+	pr_info("Modified command line: %s\n", cmdline);
+}
 
 static void register_fw_dump(struct fadump_mem_struct *fdm)
 {
