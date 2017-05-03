@@ -2046,6 +2046,11 @@ S:	Maintained
 F:	arch/arm64/
 F:	Documentation/arm64/
 
+ARM64 DEFCONFIG
+M:	arm@kernel.org
+S:	Maintained
+F:	arch/arm64/configs/defconfig
+
 AS3645A LED FLASH CONTROLLER DRIVER
 M:	Laurent Pinchart <laurent.pinchart@ideasonboard.com>
 L:	linux-media@vger.kernel.org
