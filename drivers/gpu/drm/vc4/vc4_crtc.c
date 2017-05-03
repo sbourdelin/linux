@@ -232,7 +232,7 @@ int vc4_crtc_get_scanoutpos(struct drm_device *dev, unsigned int crtc_id,
 	ret |= DRM_SCANOUTPOS_IN_VBLANK;
 	vblank_lines = mode->vtotal - mode->vdisplay;
 
-	if (flags & DRM_CALLED_FROM_VBLIRQ) {
+	if (in_vblank_irq) {
 		/*
 		 * Assume the irq handler got called close to first
 		 * line of vblank, so PV has about a full vblank
@@ -272,14 +272,14 @@ int vc4_crtc_get_scanoutpos(struct drm_device *dev, unsigned int crtc_id,
 
 bool vc4_crtc_get_vblank_timestamp(struct drm_device *dev, unsigned int crtc_id,
 				  int *max_error, struct timeval *vblank_time,
-				  unsigned flags)
+				  bool in_vblank_irq)
 {
 	struct drm_crtc *crtc = drm_crtc_from_index(dev, crtc_id);
 	struct drm_crtc_state *state = crtc->state;
 
 	/* Helper routine in DRM core does all the work: */
 	return drm_calc_vbltimestamp_from_scanoutpos(dev, crtc_id, max_error,
-						     vblank_time, flags,
+						     vblank_time, in_vblank_irq,
 						     &state->adjusted_mode);
 }
 
