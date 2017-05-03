@@ -71,8 +71,14 @@ static inline int mm_is_core_local(struct mm_struct *mm)
 
 static inline int mm_is_thread_local(struct mm_struct *mm)
 {
-	return cpumask_equal(mm_cpumask(mm),
-			      cpumask_of(smp_processor_id()));
+	int rc;
+
+	rc = cpumask_equal(mm_cpumask(mm),
+			cpumask_of(smp_processor_id()));
+#ifdef CONFIG_PPC_BOOK3S_64
+	rc = rc && !test_bit(MM_CONTEXT_GLOBAL_TLBI, &mm->context.flags);
+#endif
+	return rc;
 }
 
 #else

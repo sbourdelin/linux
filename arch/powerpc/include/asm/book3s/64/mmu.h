@@ -78,8 +78,12 @@ struct spinlock;
 /* Maximum possible number of NPUs in a system. */
 #define NV_MAX_NPUS 8
 
+/* Bits definition for the context flags */
+#define MM_CONTEXT_GLOBAL_TLBI	1	/* TLBI must be global */
+
 typedef struct {
 	mm_context_id_t id;
+	unsigned long flags;
 	u16 user_psize;		/* page size index */
 
 	/* NPU NMMU context */
@@ -163,6 +167,11 @@ extern void radix_init_pseries(void);
 #else
 static inline void radix_init_pseries(void) { };
 #endif
+
+static inline void mm_context_set_global_tlbi(mm_context_t *ctx)
+{
+	set_bit(MM_CONTEXT_GLOBAL_TLBI, &ctx->flags);
+}
 
 #endif /* __ASSEMBLY__ */
 #endif /* _ASM_POWERPC_BOOK3S_64_MMU_H_ */
