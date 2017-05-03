@@ -115,11 +115,6 @@
  */
 #define ESDHC_FLAG_MULTIBLK_NO_INT	BIT(1)
 /*
- * The flag enables the workaround for ESDHC errata ENGcm07207 which
- * affects i.MX25 and i.MX35.
- */
-#define ESDHC_FLAG_ENGCM07207		BIT(2)
-/*
  * The flag tells that the ESDHC controller is an USDHC block that is
  * integrated on the i.MX6 series.
  */
@@ -149,11 +144,11 @@ struct esdhc_soc_data {
 };
 
 static struct esdhc_soc_data esdhc_imx25_data = {
-	.flags = ESDHC_FLAG_ENGCM07207,
+	.flags = ESDHC_FLAG_ERR004536,
 };
 
 static struct esdhc_soc_data esdhc_imx35_data = {
-	.flags = ESDHC_FLAG_ENGCM07207,
+	.flags = ESDHC_FLAG_ERR004536,
 };
 
 static struct esdhc_soc_data esdhc_imx51_data = {
@@ -286,7 +281,7 @@ static u32 esdhc_readl_le(struct sdhci_host *host, int reg)
 		 * ADMA2 capability of esdhc, but this bit is messed up on
 		 * some SOCs (e.g. on MX25, MX35 this bit is set, but they
 		 * don't actually support ADMA2). So set the BROKEN_ADMA
-		 * uirk on MX25/35 platforms.
+		 * quirk on MX25/35 platforms.
 		 */
 
 		if (val & SDHCI_CAN_DO_ADMA1) {
@@ -1277,11 +1272,6 @@ static int sdhci_esdhc_imx_probe(struct platform_device *pdev)
 						PINCTRL_STATE_DEFAULT);
 	if (IS_ERR(imx_data->pins_default))
 		dev_warn(mmc_dev(host->mmc), "could not get default state\n");
-
-	if (imx_data->socdata->flags & ESDHC_FLAG_ENGCM07207)
-		/* Fix errata ENGcm07207 present on i.MX25 and i.MX35 */
-		host->quirks |= SDHCI_QUIRK_NO_MULTIBLOCK
-			| SDHCI_QUIRK_BROKEN_ADMA;
 
 	if (esdhc_is_usdhc(imx_data)) {
 		host->quirks2 |= SDHCI_QUIRK2_PRESET_VALUE_BROKEN;
