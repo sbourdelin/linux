@@ -1033,10 +1033,21 @@ int ncsi_rcv_rsp(struct sk_buff *skb, struct net_device *dev,
 	if (ret) {
 		ncsi_dev_update_stats(ndp, hdr->type, 0,
 				      ETHTOOL_NCSI_SW_STAT_ERROR);
+		if (ncsi_dev_is_debug_pkt(ndp, nr))
+			ncsi_dev_reset_debug_pkt(ndp, NULL, -EINVAL);
+
 		goto out;
 	}
 
 	/* Process the packet */
+	if (ncsi_dev_is_debug_pkt(ndp, nr)) {
+		ncsi_dev_update_stats(ndp, hdr->type, 0,
+				      ETHTOOL_NCSI_SW_STAT_OK);
+		ncsi_dev_reset_debug_pkt(ndp, nr->rsp, 0);
+		nr->rsp = NULL;
+		goto out;
+	}
+
 	ret = nrh->handler(nr);
 	if (!ret) {
 		ncsi_dev_update_stats(ndp, hdr->type, 0,

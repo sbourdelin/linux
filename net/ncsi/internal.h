@@ -215,6 +215,9 @@ struct ncsi_request {
 	bool                 used;    /* Request that has been assigned  */
 	unsigned int         flags;   /* NCSI request property           */
 #define NCSI_REQ_FLAG_EVENT_DRIVEN	1
+#ifdef CONFIG_NET_NCSI_DEBUG
+#define NCSI_REQ_FLAG_DEBUG		2
+#endif
 	struct ncsi_dev_priv *ndp;    /* Associated NCSI device          */
 	struct sk_buff       *cmd;    /* Associated NCSI command packet  */
 	struct sk_buff       *rsp;    /* Associated NCSI response packet */
@@ -277,6 +280,15 @@ struct ncsi_dev_priv {
 	struct packet_type  ptype;           /* NCSI packet Rx handler     */
 #ifdef CONFIG_NET_NCSI_DEBUG
 	struct ethtool_ncsi_sw_stats stats;  /* NCSI software statistics   */
+	struct dentry       *dentry;         /* Debugfs directory           */
+	struct {
+		struct dentry  *dentry;
+		unsigned int   req;
+#define NCSI_PKT_REQ_FREE	0
+#define NCSI_PKT_REQ_BUSY	0xFFFFFFFF
+		int            errno;
+		struct sk_buff *rsp;
+	} pkt;
 #endif /* CONFIG_NET_NCSI_DEBUG */
 	struct list_head    node;            /* Form NCSI device list      */
 };
@@ -348,9 +360,51 @@ void ncsi_ethtool_unregister_dev(struct net_device *dev);
 #ifdef CONFIG_NET_NCSI_DEBUG
 void ncsi_dev_update_stats(struct ncsi_dev_priv *ndp,
 			   int type, int subtype, int errno);
+int ncsi_dev_init_debug(struct ncsi_dev_priv *ndp);
+void ncsi_dev_release_debug(struct ncsi_dev_priv *ndp);
+void ncsi_dev_reset_debug_pkt(struct ncsi_dev_priv *ndp,
+			      struct sk_buff *skb, int errno);
+
+static inline bool ncsi_dev_is_debug_pkt(struct ncsi_dev_priv *ndp,
+					 struct ncsi_request *nr)
+{
+	return ((nr->flags & NCSI_REQ_FLAG_DEBUG) && ndp->pkt.req == nr->id);
+}
+
+static inline void ncsi_dev_set_debug_pkt(struct ncsi_dev_priv *ndp,
+					  struct ncsi_request *nr)
+{
+	if (nr->flags & NCSI_REQ_FLAG_DEBUG)
+		ndp->pkt.req = nr->id;
+}
 #else
 static inline void ncsi_dev_update_stats(struct ncsi_dev_priv *ndp,
 					 int type, int subtype, int errno)
+{
+}
+
+static inline int ncsi_dev_init_debug(struct ncsi_dev_priv *ndp)
+{
+	return -ENOTTY;
+}
+
+static inline void ncsi_dev_release_debug(struct ncsi_dev_priv *ndp)
+{
+}
+
+static inline bool ncsi_dev_is_debug_pkt(struct ncsi_dev_priv *ndp,
+					 struct ncsi_request *nr)
+{
+	return false;
+}
+
+static inline void ncsi_dev_set_debug_pkt(struct ncsi_dev_priv *ndp,
+					  struct ncsi_request *nr)
+{
+}
+
+static inline void ncsi_dev_reset_debug_pkt(struct ncsi_dev_priv *ndp,
+					    struct sk_buff *skb, int errno)
 {
 }
 #endif /* CONFIG_NET_NCSI_DEBUG */

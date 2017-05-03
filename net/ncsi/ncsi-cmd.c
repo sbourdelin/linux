@@ -361,6 +361,7 @@ int ncsi_xmit_cmd(struct ncsi_cmd_arg *nca)
 	 */
 	nr->enabled = true;
 	mod_timer(&nr->timer, jiffies + 1 * HZ);
+	ncsi_dev_set_debug_pkt(nca->ndp, nr);
 
 	/* Send NCSI packet */
 	skb_get(nr->cmd);

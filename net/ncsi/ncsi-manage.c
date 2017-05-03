@@ -537,6 +537,8 @@ static void ncsi_request_timeout(unsigned long data)
 
 	hdr = (struct ncsi_pkt_hdr *)skb_network_header(nr->cmd);
 	ncsi_dev_update_stats(ndp, hdr->type, 0, ETHTOOL_NCSI_SW_STAT_TIMEOUT);
+	if (ncsi_dev_is_debug_pkt(ndp, nr))
+		ncsi_dev_reset_debug_pkt(ndp, NULL, -ETIMEDOUT);
 
 	/* Release the request */
 	ncsi_free_request(nr);
@@ -1287,6 +1289,13 @@ int ncsi_start_dev(struct ncsi_dev *nd)
 		return -ENOTTY;
 
 	if (!(ndp->flags & NCSI_DEV_PROBED)) {
+		/* The debugging functionality should have been initialized
+		 * when registerring the NCSI device. As the network device
+		 * name isn't available that time, we have to delay the work
+		 * to here.
+		 */
+		ncsi_dev_init_debug(ndp);
+
 		nd->state = ncsi_dev_state_probe;
 		schedule_work(&ndp->work);
 		return 0;
@@ -1336,6 +1345,7 @@ void ncsi_unregister_dev(struct ncsi_dev *nd)
 	struct ncsi_package *np, *tmp;
 	unsigned long flags;
 
+	ncsi_dev_release_debug(ndp);
 	dev_remove_pack(&ndp->ptype);
 
 	/* Restore ethtool operations */
