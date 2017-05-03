@@ -756,6 +756,43 @@ static int ethtool_set_link_ksettings(struct net_device *dev,
 	return dev->ethtool_ops->set_link_ksettings(dev, &link_ksettings);
 }
 
+static int ethtool_get_ncsi_channels(struct net_device *dev,
+				     void __user *useraddr)
+{
+	struct ethtool_ncsi_channels *enc;
+	short nr_channels;
+	ssize_t size = 0;
+	int ret;
+
+	if (!dev->ethtool_ops->get_ncsi_channels)
+		return -EOPNOTSUPP;
+
+	if (copy_from_user(&nr_channels, useraddr + sizeof(enc->cmd),
+			   sizeof(nr_channels)))
+		return -EFAULT;
+
+	size = sizeof(*enc);
+	if (nr_channels > 0)
+		size += nr_channels * sizeof(enc->id[0]);
+
+	enc = kzalloc(size, GFP_KERNEL);
+	if (!enc)
+		return -ENOMEM;
+
+	if (copy_from_user(enc, useraddr, size)) {
+		ret = -EFAULT;
+		goto out;
+	}
+
+	ret = dev->ethtool_ops->get_ncsi_channels(dev, enc);
+	if (copy_to_user(useraddr, enc, size))
+		ret = -EFAULT;
+
+out:
+	kfree(enc);
+	return ret;
+}
+
 static void
 warn_incomplete_ethtool_legacy_settings_conversion(const char *details)
 {
@@ -2792,6 +2829,9 @@ int dev_ethtool(struct net *net, struct ifreq *ifr)
 		break;
 	case ETHTOOL_PHY_STUNABLE:
 		rc = set_phy_tunable(dev, useraddr);
+		break;
+	case ETHTOOL_GNCSICHANNELS:
+		rc = ethtool_get_ncsi_channels(dev, useraddr);
 		break;
 	default:
 		rc = -EOPNOTSUPP;

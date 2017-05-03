@@ -1260,6 +1260,9 @@ struct ncsi_dev *ncsi_register_dev(struct net_device *dev,
 	list_add_tail_rcu(&ndp->node, &ncsi_dev_list);
 	spin_unlock_irqrestore(&ncsi_dev_lock, flags);
 
+	/* Change ethtool operations */
+	ncsi_ethtool_register_dev(dev);
+
 	/* Register NCSI packet Rx handler */
 	ndp->ptype.type = cpu_to_be16(ETH_P_NCSI);
 	ndp->ptype.func = ncsi_rcv_rsp;
@@ -1330,6 +1333,9 @@ void ncsi_unregister_dev(struct ncsi_dev *nd)
 	unsigned long flags;
 
 	dev_remove_pack(&ndp->ptype);
+
+	/* Restore ethtool operations */
+	ncsi_ethtool_unregister_dev(nd->dev);
 
 	list_for_each_entry_safe(np, tmp, &ndp->packages, node)
 		ncsi_remove_package(np);

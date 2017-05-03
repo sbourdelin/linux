@@ -337,4 +337,8 @@ int ncsi_rcv_rsp(struct sk_buff *skb, struct net_device *dev,
 		 struct packet_type *pt, struct net_device *orig_dev);
 int ncsi_aen_handler(struct ncsi_dev_priv *ndp, struct sk_buff *skb);
 
+/* ethtool */
+void ncsi_ethtool_register_dev(struct net_device *dev);
+void ncsi_ethtool_unregister_dev(struct net_device *dev);
+
 #endif /* __NCSI_INTERNAL_H__ */

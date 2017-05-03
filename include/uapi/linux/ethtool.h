@@ -1331,6 +1331,8 @@ struct ethtool_per_queue_op {
 #define ETHTOOL_PHY_GTUNABLE	0x0000004e /* Get PHY tunable configuration */
 #define ETHTOOL_PHY_STUNABLE	0x0000004f /* Set PHY tunable configuration */
 
+#define ETHTOOL_GNCSICHANNELS	0x00000050 /* Get NCSI channels */
+
 /* compatibility with older code */
 #define SPARC_ETH_GSET		ETHTOOL_GSET
 #define SPARC_ETH_SSET		ETHTOOL_SSET
@@ -1762,5 +1764,20 @@ struct ethtool_link_settings {
 	 * __u32 map_advertising[link_mode_masks_nwords];
 	 * __u32 map_lp_advertising[link_mode_masks_nwords];
 	 */
+};
+
+/**
+ * struct ethtool_ncsi_channels - NCSI channels
+ *
+ * @cmd: Command number = %ETHTOOL_GNCSICHANNELS
+ * @nr_channels: Number of available channels
+ * @id: Array of NCSI channel IDs
+ */
+struct ethtool_ncsi_channels {
+	__u32	cmd;
+	__s16	nr_channels;
+	__u32	id[0];
+#define ETHTOOL_NCSI_CHANNEL_ACTIVE	(1 << 8)
+#define ETHTOOL_NCSI_CHANNEL_FLAGS	0x100
 };
 #endif /* _UAPI_LINUX_ETHTOOL_H */
