@@ -836,8 +836,8 @@ void pinmux_generic_free_functions(struct pinctrl_dev *pctldev)
 	void **slot;
 	int i = 0;
 
-	indices = devm_kzalloc(pctldev->dev, sizeof(*indices) *
-			       pctldev->num_functions, GFP_KERNEL);
+	indices = kcalloc(pctldev->num_functions, sizeof(*indices),
+			  GFP_KERNEL);
 	if (!indices)
 		return;
 
@@ -850,6 +850,7 @@ void pinmux_generic_free_functions(struct pinctrl_dev *pctldev)
 		radix_tree_delete(&pctldev->pin_function_tree, indices[i]);
 		devm_kfree(pctldev->dev, function);
 	}
+	kfree(indices);
 
 	pctldev->num_functions = 0;
 }
