@@ -1567,14 +1567,12 @@ out:
  * @odentry: The old dentry of the file
  * @ndir: Parent directory of new file name
  * @ndentry: The new dentry of the file
- * @flags: The rename flags
  *
  * Returns: errno
  */
 
 static int gfs2_exchange(struct inode *odir, struct dentry *odentry,
-			 struct inode *ndir, struct dentry *ndentry,
-			 unsigned int flags)
+			 struct inode *ndir, struct dentry *ndentry)
 {
 	struct gfs2_inode *odip = GFS2_I(odir);
 	struct gfs2_inode *ndip = GFS2_I(ndir);
@@ -1710,7 +1708,7 @@ static int gfs2_rename2(struct inode *odir, struct dentry *odentry,
 		return -EINVAL;
 
 	if (flags & RENAME_EXCHANGE)
-		return gfs2_exchange(odir, odentry, ndir, ndentry, flags);
+		return gfs2_exchange(odir, odentry, ndir, ndentry);
 
 	return gfs2_rename(odir, odentry, ndir, ndentry);
 }
