@@ -53,7 +53,7 @@ static int blk_flags_show(struct seq_file *m, const unsigned long flags,
 		if (!(flags & BIT(i)))
 			continue;
 		if (sep)
-			seq_puts(m, " ");
+			seq_putc(m, ' ');
 		sep = true;
 		if (i < flag_name_count && flag_name[i])
 			seq_puts(m, flag_name[i]);
@@ -101,7 +101,7 @@ static int blk_queue_flags_show(struct seq_file *m, void *v)
 
 	blk_flags_show(m, q->queue_flags, blk_queue_flag_name,
 		       ARRAY_SIZE(blk_queue_flag_name));
-	seq_puts(m, "\n");
+	seq_putc(m, '\n');
 	return 0;
 }
 
@@ -159,11 +159,10 @@ static int queue_poll_stat_show(struct seq_file *m, void *v)
 	for (bucket = 0; bucket < BLK_MQ_POLL_STATS_BKTS/2; bucket++) {
 		seq_printf(m, "read  (%d Bytes): ", 1 << (9+bucket));
 		print_stat(m, &q->poll_stat[2*bucket]);
-		seq_puts(m, "\n");
-
+		seq_putc(m, '\n');
 		seq_printf(m, "write (%d Bytes): ",  1 << (9+bucket));
 		print_stat(m, &q->poll_stat[2*bucket+1]);
-		seq_puts(m, "\n");
+		seq_putc(m, '\n');
 	}
 	return 0;
 }
@@ -193,7 +192,7 @@ static int hctx_state_show(struct seq_file *m, void *v)
 
 	blk_flags_show(m, hctx->state, hctx_state_name,
 		       ARRAY_SIZE(hctx_state_name));
-	seq_puts(m, "\n");
+	seq_putc(m, '\n');
 	return 0;
 }
 
@@ -233,11 +232,11 @@ static int hctx_flags_show(struct seq_file *m, void *v)
 		seq_puts(m, alloc_policy_name[alloc_policy]);
 	else
 		seq_printf(m, "%d", alloc_policy);
-	seq_puts(m, " ");
+	seq_putc(m, ' ');
 	blk_flags_show(m,
 		       hctx->flags ^ BLK_ALLOC_POLICY_TO_MQ_FLAG(alloc_policy),
 		       hctx_flag_name, ARRAY_SIZE(hctx_flag_name));
-	seq_puts(m, "\n");
+	seq_putc(m, '\n');
 	return 0;
 }
 
