@@ -1333,6 +1333,7 @@ struct ethtool_per_queue_op {
 
 #define ETHTOOL_GNCSICHANNELS	0x00000050 /* Get NCSI channels */
 #define ETHTOOL_GNCSICINFO	0x00000051 /* Get NCSI channel information */
+#define ETHTOOL_GNCSISTATS	0x00000052 /* Get NCSI HW statistics */
 
 /* compatibility with older code */
 #define SPARC_ETH_GSET		ETHTOOL_GSET
@@ -1930,5 +1931,128 @@ struct ethtool_ncsi_channel_info {
 	__u8	mac[8][6];
 	__u32	vlan_valid_bits;
 	__u16	vlan[16];
+};
+
+/**
+ * struct ethtool_ncsi_stats - NCSI hardware statistics
+ *
+ * @cmd: Command number = %ETHTOOL_GNCSISTATS
+ * @hnc_cnt_hi: Counter cleared
+ * @hnc_cnt_lo: Counter cleared
+ * @hnc_rx_bytes: Rx bytes
+ * @hnc_tx_bytes: Tx bytes
+ * @hnc_rx_uc_pkts: Rx UC packets
+ * @hnc_rx_mc_pkts: Rx MC packets
+ * @hnc_rx_bc_pkts: Rx BC packets
+ * @hnc_tx_uc_pkts: Tx UC packets
+ * @hnc_tx_mc_pkts: Tx MC packets
+ * @hnc_tx_bc_pkts: Tx BC packets
+ * @hnc_fcs_err: FCS errors
+ * @hnc_align_err: Alignment errors
+ * @hnc_false_carrier: False carrier detection
+ * @hnc_runt_pkts: Rx runt packets
+ * @hnc_jabber_pkts: Rx jabber packets
+ * @hnc_rx_pause_xon: Rx pause XON frames
+ * @hnc_rx_pause_xoff: Rx XOFF frames
+ * @hnc_tx_pause_xon: Tx XON frames
+ * @hnc_tx_pause_xoff: Tx XOFF frames
+ * @hnc_tx_s_collision: Single collision frames
+ * @hnc_tx_m_collision: Multiple collision frames
+ * @hnc_l_collision: Late collision frames
+ * @hnc_e_collision: Excessive collision frames
+ * @hnc_rx_ctl_frames: Rx control frames
+ * @hnc_rx_64_frames: Rx 64-bytes frames
+ * @hnc_rx_127_frames: Rx 65-127 bytes frames
+ * @hnc_rx_255_frames: Rx 128-255 bytes frames
+ * @hnc_rx_511_frames: Rx 256-511 bytes frames
+ * @hnc_rx_1023_frames: Rx 512-1023 bytes frames
+ * @hnc_rx_1522_frames: Rx 1024-1522 bytes frames
+ * @hnc_rx_9022_frames: Rx 1523-9022 bytes frames
+ * @hnc_tx_64_frames: Tx 64-bytes frames
+ * @hnc_tx_127_frames: Tx 65-127 bytes frames
+ * @hnc_tx_255_frames: Tx 128-255 bytes frames
+ * @hnc_tx_511_frames: Tx 256-511 bytes frames
+ * @hnc_tx_1023_frames: Tx 512-1023 bytes frames
+ * @hnc_tx_1522_frames: Tx 1024-1522 bytes frames
+ * @hnc_tx_9022_frames: Tx 1523-9022 bytes frames
+ * @hnc_rx_valid_bytes: Rx valid bytes
+ * @hnc_rx_runt_pkts: Rx error runt packets
+ * @hnc_rx_jabber_pkts: Rx error jabber packets
+ * @ncsi_rx_cmds: Rx NCSI commands
+ * @ncsi_dropped_cmds: Dropped commands
+ * @ncsi_cmd_type_errs: Command type errors
+ * @ncsi_cmd_csum_errs: Command checksum errors
+ * @ncsi_rx_pkts: Rx NCSI packets
+ * @ncsi_tx_pkts: Tx NCSI packets
+ * @ncsi_tx_aen_pkts: Tx AEN packets
+ * @pt_tx_pkts: Tx packets
+ * @pt_tx_dropped: Tx dropped packets
+ * @pt_tx_channel_err: Tx channel errors
+ * @pt_tx_us_err: Tx undersize errors
+ * @pt_rx_pkts: Rx packets
+ * @pt_rx_dropped: Rx dropped packets
+ * @pt_rx_channel_err: Rx channel errors
+ * @pt_rx_us_err: Rx undersize errors
+ * @pt_rx_os_err: Rx oversize errors
+ */
+struct ethtool_ncsi_stats {
+	__u32	cmd;
+	__u64	hnc_cnt_hi;
+	__u64	hnc_cnt_lo;
+	__u64	hnc_rx_bytes;
+	__u64	hnc_tx_bytes;
+	__u64	hnc_rx_uc_pkts;
+	__u64	hnc_rx_mc_pkts;
+	__u64	hnc_rx_bc_pkts;
+	__u64	hnc_tx_uc_pkts;
+	__u64	hnc_tx_mc_pkts;
+	__u64	hnc_tx_bc_pkts;
+	__u64	hnc_fcs_err;
+	__u64	hnc_align_err;
+	__u64	hnc_false_carrier;
+	__u64	hnc_runt_pkts;
+	__u64	hnc_jabber_pkts;
+	__u64	hnc_rx_pause_xon;
+	__u64	hnc_rx_pause_xoff;
+	__u64	hnc_tx_pause_xon;
+	__u64	hnc_tx_pause_xoff;
+	__u64	hnc_tx_s_collision;
+	__u64	hnc_tx_m_collision;
+	__u64	hnc_l_collision;
+	__u64	hnc_e_collision;
+	__u64	hnc_rx_ctl_frames;
+	__u64	hnc_rx_64_frames;
+	__u64	hnc_rx_127_frames;
+	__u64	hnc_rx_255_frames;
+	__u64	hnc_rx_511_frames;
+	__u64	hnc_rx_1023_frames;
+	__u64	hnc_rx_1522_frames;
+	__u64	hnc_rx_9022_frames;
+	__u64	hnc_tx_64_frames;
+	__u64	hnc_tx_127_frames;
+	__u64	hnc_tx_255_frames;
+	__u64	hnc_tx_511_frames;
+	__u64	hnc_tx_1023_frames;
+	__u64	hnc_tx_1522_frames;
+	__u64	hnc_tx_9022_frames;
+	__u64	hnc_rx_valid_bytes;
+	__u64	hnc_rx_runt_pkts;
+	__u64	hnc_rx_jabber_pkts;
+	__u64	ncsi_rx_cmds;
+	__u64	ncsi_dropped_cmds;
+	__u64	ncsi_cmd_type_errs;
+	__u64	ncsi_cmd_csum_errs;
+	__u64	ncsi_rx_pkts;
+	__u64	ncsi_tx_pkts;
+	__u64	ncsi_tx_aen_pkts;
+	__u64	pt_tx_pkts;
+	__u64	pt_tx_dropped;
+	__u64	pt_tx_channel_err;
+	__u64	pt_tx_us_err;
+	__u64	pt_rx_pkts;
+	__u64	pt_rx_dropped;
+	__u64	pt_rx_channel_err;
+	__u64	pt_rx_us_err;
+	__u64	pt_rx_os_err;
 };
 #endif /* _UAPI_LINUX_ETHTOOL_H */

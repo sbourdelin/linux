@@ -175,6 +175,91 @@ static int ncsi_get_channel_info(struct net_device *dev,
 	return 0;
 }
 
+static int ncsi_get_stats(struct net_device *dev,
+			  struct ethtool_ncsi_stats *ens)
+{
+	struct ncsi_dev *nd;
+	struct ncsi_dev_priv *ndp;
+	struct ncsi_package *np;
+	struct ncsi_channel *nc;
+	struct ncsi_channel_stats *ncs;
+	unsigned long flags;
+
+	nd = ncsi_find_dev(dev);
+	if (!nd)
+		return -ENXIO;
+
+	ndp = TO_NCSI_DEV_PRIV(nd);
+	NCSI_FOR_EACH_PACKAGE(ndp, np) {
+		NCSI_FOR_EACH_CHANNEL(np, nc) {
+			spin_lock_irqsave(&nc->lock, flags);
+
+			ncs = &nc->stats;
+			ens->hnc_cnt_hi += ncs->hnc_cnt_hi;
+			ens->hnc_cnt_lo += ncs->hnc_cnt_lo;
+			ens->hnc_rx_bytes += ncs->hnc_rx_bytes;
+			ens->hnc_tx_bytes += ncs->hnc_tx_bytes;
+			ens->hnc_rx_uc_pkts += ncs->hnc_rx_uc_pkts;
+			ens->hnc_rx_mc_pkts += ncs->hnc_rx_mc_pkts;
+			ens->hnc_rx_bc_pkts += ncs->hnc_rx_bc_pkts;
+			ens->hnc_tx_uc_pkts += ncs->hnc_tx_uc_pkts;
+			ens->hnc_tx_mc_pkts += ncs->hnc_tx_mc_pkts;
+			ens->hnc_tx_bc_pkts += ncs->hnc_tx_bc_pkts;
+			ens->hnc_fcs_err += ncs->hnc_fcs_err;
+			ens->hnc_align_err += ncs->hnc_align_err;
+			ens->hnc_false_carrier += ncs->hnc_false_carrier;
+			ens->hnc_runt_pkts += ncs->hnc_runt_pkts;
+			ens->hnc_jabber_pkts += ncs->hnc_jabber_pkts;
+			ens->hnc_rx_pause_xon += ncs->hnc_rx_pause_xon;
+			ens->hnc_rx_pause_xoff += ncs->hnc_rx_pause_xoff;
+			ens->hnc_tx_pause_xon += ncs->hnc_tx_pause_xon;
+			ens->hnc_tx_pause_xoff += ncs->hnc_tx_pause_xoff;
+			ens->hnc_tx_s_collision += ncs->hnc_tx_s_collision;
+			ens->hnc_tx_m_collision += ncs->hnc_tx_m_collision;
+			ens->hnc_l_collision += ncs->hnc_l_collision;
+			ens->hnc_e_collision += ncs->hnc_e_collision;
+			ens->hnc_rx_ctl_frames += ncs->hnc_rx_ctl_frames;
+			ens->hnc_rx_64_frames += ncs->hnc_rx_64_frames;
+			ens->hnc_rx_127_frames += ncs->hnc_rx_127_frames;
+			ens->hnc_rx_255_frames += ncs->hnc_rx_255_frames;
+			ens->hnc_rx_511_frames += ncs->hnc_rx_511_frames;
+			ens->hnc_rx_1023_frames += ncs->hnc_rx_1023_frames;
+			ens->hnc_rx_1522_frames += ncs->hnc_rx_1522_frames;
+			ens->hnc_rx_9022_frames += ncs->hnc_rx_9022_frames;
+			ens->hnc_tx_64_frames += ncs->hnc_tx_64_frames;
+			ens->hnc_tx_127_frames += ncs->hnc_tx_127_frames;
+			ens->hnc_tx_255_frames += ncs->hnc_tx_255_frames;
+			ens->hnc_tx_511_frames += ncs->hnc_tx_511_frames;
+			ens->hnc_tx_1023_frames += ncs->hnc_tx_1023_frames;
+			ens->hnc_tx_1522_frames += ncs->hnc_tx_1522_frames;
+			ens->hnc_tx_9022_frames += ncs->hnc_tx_9022_frames;
+			ens->hnc_rx_valid_bytes += ncs->hnc_rx_valid_bytes;
+			ens->hnc_rx_runt_pkts += ncs->hnc_rx_runt_pkts;
+			ens->hnc_rx_jabber_pkts += ncs->hnc_rx_jabber_pkts;
+			ens->ncsi_rx_cmds += ncs->ncsi_rx_cmds;
+			ens->ncsi_dropped_cmds += ncs->ncsi_dropped_cmds;
+			ens->ncsi_cmd_type_errs += ncs->ncsi_cmd_type_errs;
+			ens->ncsi_cmd_csum_errs += ncs->ncsi_cmd_csum_errs;
+			ens->ncsi_rx_pkts += ncs->ncsi_rx_pkts;
+			ens->ncsi_tx_pkts += ncs->ncsi_tx_pkts;
+			ens->ncsi_tx_aen_pkts += ncs->ncsi_tx_aen_pkts;
+			ens->pt_tx_pkts += ncs->pt_tx_pkts;
+			ens->pt_tx_dropped += ncs->pt_tx_dropped;
+			ens->pt_tx_channel_err += ncs->pt_tx_channel_err;
+			ens->pt_tx_us_err += ncs->pt_tx_us_err;
+			ens->pt_rx_pkts += ncs->pt_rx_pkts;
+			ens->pt_rx_dropped += ncs->pt_rx_dropped;
+			ens->pt_rx_channel_err += ncs->pt_rx_channel_err;
+			ens->pt_rx_us_err += ncs->pt_rx_us_err;
+			ens->pt_rx_os_err += ncs->pt_rx_os_err;
+
+			spin_unlock_irqrestore(&nc->lock, flags);
+		}
+	}
+
+	return 0;
+}
+
 void ncsi_ethtool_register_dev(struct net_device *dev)
 {
 	struct ethtool_ops *ops;
@@ -185,6 +270,7 @@ void ncsi_ethtool_register_dev(struct net_device *dev)
 
 	ops->get_ncsi_channels = ncsi_get_channels;
 	ops->get_ncsi_channel_info = ncsi_get_channel_info;
+	ops->get_ncsi_stats = ncsi_get_stats;
 }
 
 void ncsi_ethtool_unregister_dev(struct net_device *dev)
@@ -197,4 +283,5 @@ void ncsi_ethtool_unregister_dev(struct net_device *dev)
 
 	ops->get_ncsi_channels = NULL;
 	ops->get_ncsi_channel_info = NULL;
+	ops->get_ncsi_stats = NULL;
 }
