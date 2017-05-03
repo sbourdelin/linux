@@ -49,6 +49,7 @@
 #include <linux/pm_runtime.h>
 #include <linux/slab.h>
 #include <linux/of_irq.h>
+#include <linux/tcp.h>
 
 #include "decl.h"
 #include "ioctl.h"
