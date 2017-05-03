@@ -793,6 +793,25 @@ out:
 	return ret;
 }
 
+static int ethtool_get_ncsi_channel_info(struct net_device *dev,
+					 void __user *useraddr)
+{
+	struct ethtool_ncsi_channel_info enci;
+	int ret;
+
+	if (!dev->ethtool_ops->get_ncsi_channel_info)
+		return -EOPNOTSUPP;
+
+	if (copy_from_user(&enci, useraddr, sizeof(enci)))
+		return -EFAULT;
+
+	ret = dev->ethtool_ops->get_ncsi_channel_info(dev, &enci);
+	if (!ret && copy_to_user(useraddr, &enci, sizeof(enci)))
+		return -EFAULT;
+
+	return ret;
+}
+
 static void
 warn_incomplete_ethtool_legacy_settings_conversion(const char *details)
 {
@@ -2832,6 +2851,9 @@ int dev_ethtool(struct net *net, struct ifreq *ifr)
 		break;
 	case ETHTOOL_GNCSICHANNELS:
 		rc = ethtool_get_ncsi_channels(dev, useraddr);
+		break;
+	case ETHTOOL_GNCSICINFO:
+		rc = ethtool_get_ncsi_channel_info(dev, useraddr);
 		break;
 	default:
 		rc = -EOPNOTSUPP;

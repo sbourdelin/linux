@@ -376,5 +376,7 @@ struct ethtool_ops {
 				      const struct ethtool_link_ksettings *);
 	int	(*get_ncsi_channels)(struct net_device *,
 				     struct ethtool_ncsi_channels *);
+	int	(*get_ncsi_channel_info)(struct net_device *,
+					 struct ethtool_ncsi_channel_info *);
 };
 #endif /* _LINUX_ETHTOOL_H */

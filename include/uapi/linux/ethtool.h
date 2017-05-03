@@ -1332,6 +1332,7 @@ struct ethtool_per_queue_op {
 #define ETHTOOL_PHY_STUNABLE	0x0000004f /* Set PHY tunable configuration */
 
 #define ETHTOOL_GNCSICHANNELS	0x00000050 /* Get NCSI channels */
+#define ETHTOOL_GNCSICINFO	0x00000051 /* Get NCSI channel information */
 
 /* compatibility with older code */
 #define SPARC_ETH_GSET		ETHTOOL_GSET
@@ -1779,5 +1780,155 @@ struct ethtool_ncsi_channels {
 	__u32	id[0];
 #define ETHTOOL_NCSI_CHANNEL_ACTIVE	(1 << 8)
 #define ETHTOOL_NCSI_CHANNEL_FLAGS	0x100
+};
+
+/**
+ * struct ethtool_ncsi_channel_info - NCSI channel information
+ *
+ * @cmd: Command number = %ETHTOOL_GNCSICINFO
+ * @id:  NCSI channel identifier
+ * @version: BCD encoded NCSI version
+ * @alpha2: BCD encoded NCSI version
+ * @fw_name: Firmware name string
+ * @fw_version: Firmware version
+ * @pci_ids: PCI identifier
+ * @mf_id: Manufacture identifier
+ * @cap_generic: Generic capability list
+ * @cap_bc: Broadcast capability list
+ * @setting_bc: Broadcast filtering setting
+ * @cap_mc: Multicast capability list
+ * @setting_mc: Multicast filtering setting
+ * @cap_buf: Length of receive buffer
+ * @cap_aen: AEN capability list
+ * @setting_aen: AEN setting
+ * @cap_vlan: VLAN filtering capability list
+ * @setting_vlan: VLAN filltering setting
+ * @cap_vlan_filter: Number of VLAN filtering entries
+ * @cap_mixed_filter: Number of mixed filtering entries
+ * @cap_mc_filter: Number of multicast filtering entries
+ * @cap_uc_filter: Number of unicast filtering entries
+ * @link_status: Link status
+ * @link_other_ind: Link other indication
+ * @link_oem: Link OEM information
+ * @mac_valid_bits: Bitmap for valid MAC filtering entries
+ * @mac: MAC filtering entries
+ * @vlan_valid_bits: Bitmap for valid VLAN filtering entries
+ * @vlan: VLAN filtering entries
+ */
+struct ethtool_ncsi_channel_info {
+	__u32	cmd;
+	__u32	id;
+	__u32	version;
+	__u32	alpha2;
+	__u8	fw_name[12];
+	__u32	fw_version;
+	__u16	pci_ids[4];
+	__u32	mf_id;
+	__u32	cap_generic;
+#define ETHTOOL_NCSI_G_HWA             (1 << 0) /* HW arbitration           */
+#define ETHTOOL_NCSI_G_HDS             (1 << 1) /* HNC driver status change */
+#define ETHTOOL_NCSI_G_FC              (1 << 2) /* HNC to MC flow control   */
+#define ETHTOOL_NCSI_G_FC1             (1 << 3) /* MC to HNC flow control   */
+#define ETHTOOL_NCSI_G_MC              (1 << 4) /* Global MC filtering      */
+#define ETHTOOL_NCSI_G_HWA_MASK        0x60
+#define ETHTOOL_NCSI_G_HWA_UNKNOWN     0x00     /* Unknown HW arbitration   */
+#define ETHTOOL_NCSI_G_HWA_SUPPORT     0x20     /* Supported HW arbitration */
+#define ETHTOOL_NCSI_G_HWA_NOT_SUPPORT 0x40     /* No HW arbitration        */
+#define ETHTOOL_NCSI_G_HWA_RESERVED    0x60     /* Reserved HW arbitration  */
+#define ETHTOOL_NCSI_G_MASK            0x7f
+	__u32	cap_bc;
+	__u32	setting_bc;
+#define ETHTOOL_NCSI_BC_ARP            (1 << 0) /* ARP packet filtering     */
+#define ETHTOOL_NCSI_BC_DHCPC          (1 << 1) /* DHCP client filtering    */
+#define ETHTOOL_NCSI_BC_DHCPS          (1 << 2) /* DHCP server filtering    */
+#define ETHTOOL_NCSI_BC_NETBIOS        (1 << 3) /* NetBIOS packet filtering */
+#define ETHTOOL_NCSI_BC_MASK           0xf
+	__u32	cap_mc;
+	__u32	setting_mc;
+#define ETHTOOL_NCSI_MC_IPV6_NEIGHBOR     (1 << 0) /* IPv6 neighbor filter  */
+#define ETHTOOL_NCSI_MC_IPV6_ROUTER       (1 << 1) /* IPv6 router filter    */
+#define ETHTOOL_NCSI_MC_DHCPV6_RELAY      (1 << 2) /* DHCPv6 relay/server   */
+#define ETHTOOL_NCSI_MC_DHCPV6_WELL_KNOWN (1 << 3) /* DHCPv6 well-known MC  */
+#define ETHTOOL_NCSI_MC_IPV6_MLD          (1 << 4) /* IPv6 MLD filtering    */
+#define ETHTOOL_NCSI_MC_IPV6_NEIGHBOR_S   (1 << 5) /* IPv6 neighbour filter */
+#define ETHTOOL_NCSI_MC_MASK              0x3f
+	__u32	cap_buf;
+	__u32	cap_aen;
+	__u32	setting_aen;
+#define ETHTOOL_NCSI_AEN_LSC           (1 << 0) /* Link status change       */
+#define ETHTOOL_NCSI_AEN_CR            (1 << 1) /* Configuration required   */
+#define ETHTOOL_NCSI_AEN_HDS           (1 << 2) /* HNC driver status        */
+#define ETHTOOL_NCSI_AEN_MASK          0x07
+	__u32	cap_vlan;
+	__u32	setting_vlan;
+#define ETHTOOL_NCSI_VLAN_ONLY         (1 << 0) /* Filter VLAN packet only  */
+#define ETHTOOL_NCSI_VLAN_NO           (1 << 1) /* Filter VLAN and non-VLAN */
+#define ETHTOOL_NCSI_VLAN_ANY          (1 << 2) /* Filter Any-and-non-VLAN  */
+#define ETHTOOL_NCSI_VLAN_MASK         0x07
+	__u8	cap_vlan_filter;
+	__u8	cap_mixed_filter;
+	__u8	cap_mc_filter;
+	__u8	cap_uc_filter;
+	__u32	link_status;
+#define ETHTOOL_NCSI_LINK_UP               (1 << 0)  /* Link up or down       */
+#define ETHTOOL_NCSI_LINK_SPEED_MASK       0x1e      /* Link speed            */
+#define ETHTOOL_NCSI_LINK_SPEED_INVALID         0x0
+#define ETHTOOL_NCSI_LINK_SPEED_10BASE_T_H      0x2
+#define ETHTOOL_NCSI_LINK_SPEED_10BASE_T_F      0x4
+#define ETHTOOL_NCSI_LINK_SPEED_100BASE_TX_H    0x6
+#define ETHTOOL_NCSI_LINK_SPEED_100BASE_T4      0x8
+#define ETHTOOL_NCSI_LINK_SPEED_100BASE_TX_F    0xa
+#define ETHTOOL_NCSI_LINK_SPEED_1000BASE_T_H    0xc
+#define ETHTOOL_NCSI_LINK_SPEED_1000BASE_T_F    0xe
+#define ETHTOOL_NCSI_LINK_SPEED_10GBASE_T       0x10
+#define ETHTOOL_NCSI_LINK_SPEED_20G             0x12
+#define ETHTOOL_NCSI_LINK_SPEED_25G             0x14
+#define ETHTOOL_NCSI_LINK_SPEED_40G             0x16
+#define ETHTOOL_NCSI_LINK_SPEED_50G             0x18
+#define ETHTOOL_NCSI_LINK_SPEED_100G            0x1a
+#define ETHTOOL_NCSI_LINK_SPEED_2_5G            0x1c
+#define ETHTOOL_NCSI_LINK_SPEED_OPTIONAL        0x1e
+#define ETHTOOL_NCSI_LINK_AUTONEG_ENABLED  (1 << 5)  /* Enabled auto-neg      */
+#define ETHTOOL_NCSI_LINK_AUTONEG_DONE     (1 << 6)  /* Auto-neg is done      */
+#define ETHTOOL_NCSI_LINK_PARALLEL         (1 << 7)  /* Parallel detection    */
+#define ETHTOOL_NCSI_LINK_LPA_1000BASE_T_F (1 << 9)  /* LPA: 1000BASE_T_Full  */
+#define ETHTOOL_NCSI_LINK_LPA_1000BASE_T_H (1 << 10) /* LPA: 1000BASE_T_Half  */
+#define ETHTOOL_NCSI_LINK_LPA_100_T4       (1 << 11) /* LPA: 100T4            */
+#define ETHTOOL_NCSI_LINK_LPA_100BASE_TX_F (1 << 12) /* LPA: 100BASE_TX_Full  */
+#define ETHTOOL_NCSI_LINK_LPA_100BASE_TX_H (1 << 13) /* LPA: 100BASE_TX_Half  */
+#define ETHTOOL_NCSI_LINK_LPA_10BASE_T_F   (1 << 14) /* LPA: 10BASE_T_Full    */
+#define ETHTOOL_NCSI_LINK_LPA_10BASE_T_H   (1 << 15) /* LPA: 10BASE_T_Half    */
+#define ETHTOOL_NCSI_LINK_TX_FC            (1 << 16) /* Tx flow control       */
+#define ETHTOOL_NCSI_LINK_RX_FC            (1 << 17) /* Rx flow control       */
+#define ETHTOOL_NCSI_LINK_LPA_FC_MASK      0xc0000
+#define ETHTOOL_NCSI_LINK_LPA_FC_NONE      0x0
+#define ETHTOOL_NCSI_LINK_LPA_FC_SYNC      0x40000
+#define ETHTOOL_NCSI_LINK_LPA_FC_ASYNC     0x80000
+#define ETHTOOL_NCSI_LINK_SERDES           (1 << 20) /* SerDes used or not    */
+#define ETHTOOL_NCSI_LINK_OEM_VALID        (1 << 21)
+#define ETHTOOL_NCSI_LINK_ESPEED_MASK      0xff000000
+#define ETHTOOL_NCSI_LINK_ESPEED_INVALID          0x0
+#define ETHTOOL_NCSI_LINK_ESPEED_10BASE_T_H       0x01000000
+#define ETHTOOL_NCSI_LINK_ESPEED_10BASE_T_F       0x02000000
+#define ETHTOOL_NCSI_LINK_ESPEED_100BASE_TX_H     0x03000000
+#define ETHTOOL_NCSI_LINK_ESPEED_100BASE_T4       0x04000000
+#define ETHTOOL_NCSI_LINK_ESPEED_100BASE_TX_F     0x05000000
+#define ETHTOOL_NCSI_LINK_ESPEED_1000BASE_T_H     0x06000000
+#define ETHTOOL_NCSI_LINK_ESPEED_1000BASE_T_F     0x07000000
+#define ETHTOOL_NCSI_LINK_ESPEED_10GBASE_T        0x08000000
+#define ETHTOOL_NCSI_LINK_ESPEED_20G              0x09000000
+#define ETHTOOL_NCSI_LINK_ESPEED_25G              0x0a000000
+#define ETHTOOL_NCSI_LINK_ESPEED_40G              0x0b000000
+#define ETHTOOL_NCSI_LINK_ESPEED_50G              0x0c000000
+#define ETHTOOL_NCSI_LINK_ESPEED_100G             0x0d000000
+#define ETHTOOL_NCSI_LINK_ESPEED_2_5G             0x0e000000
+#define ETHTOOL_NCSI_LINK_ESPEED_OPTIONAL         0x0f000000
+	__u32	link_other_ind;
+#define ETHTOOL_NCSI_LINK_HNC_DRV_STATUS   (1 << 0)
+	__u32	link_oem;
+	__u32	mac_valid_bits;
+	__u8	mac[8][6];
+	__u32	vlan_valid_bits;
+	__u16	vlan[16];
 };
 #endif /* _UAPI_LINUX_ETHTOOL_H */
