@@ -16,6 +16,11 @@ struct dax_operations {
 	 */
 	long (*direct_access)(struct dax_device *, pgoff_t, long,
 			void **, pfn_t *);
+
+	/*
+	 * check_error: check if a physical address range has any error.
+	 */
+	int (*check_error)(struct device *, phys_addr_t, unsigned long);
 };
 
 int dax_read_lock(void);
@@ -29,6 +34,8 @@ void kill_dax(struct dax_device *dax_dev);
 void *dax_get_private(struct dax_device *dax_dev);
 long dax_direct_access(struct dax_device *dax_dev, pgoff_t pgoff, long nr_pages,
 		void **kaddr, pfn_t *pfn);
+int dax_check_error(struct dax_device *dax_dev, struct device *dev,
+		phys_addr_t phys, unsigned long len);
 
 /*
  * We use lowest available bit in exceptional entry for locking, one bit for

@@ -249,13 +249,14 @@ __weak phys_addr_t dax_pgoff_to_phys(struct dev_dax *dev_dax, pgoff_t pgoff,
 		pgoff -= PHYS_PFN(resource_size(res));
 	}
 
-	if (i < dev_dax->num_resources) {
-		res = &dev_dax->res[i];
-		if (phys + size - 1 <= res->end)
-			return phys;
-	}
+	if ((i >= dev_dax->num_resources) ||
+	    (phys + size - 1 > res->end))
+		return -1;
 
-	return -1;
+	if (dax_check_error(dev_dax->dax_dev, dev_dax->dev.parent, phys, size))
+		return -1;
+
+	return phys;
 }
 
 static int __dev_dax_pte_fault(struct dev_dax *dev_dax, struct vm_fault *vmf)
@@ -340,7 +341,7 @@ static int __dev_dax_pmd_fault(struct dev_dax *dev_dax, struct vm_fault *vmf)
 	if (phys == -1) {
 		dev_dbg(dev, "%s: pgoff_to_phys(%#lx) failed\n", __func__,
 				pgoff);
-		return VM_FAULT_SIGBUS;
+		return VM_FAULT_FALLBACK;
 	}
 
 	pfn = phys_to_pfn_t(phys, dax_region->pfn_flags);
@@ -392,7 +393,7 @@ static int __dev_dax_pud_fault(struct dev_dax *dev_dax, struct vm_fault *vmf)
 	if (phys == -1) {
 		dev_dbg(dev, "%s: pgoff_to_phys(%#lx) failed\n", __func__,
 				pgoff);
-		return VM_FAULT_SIGBUS;
+		return VM_FAULT_FALLBACK;
 	}
 
 	pfn = phys_to_pfn_t(phys, dax_region->pfn_flags);
@@ -574,7 +575,8 @@ static void unregister_dev_dax(void *dev)
 }
 
 struct dev_dax *devm_create_dev_dax(struct dax_region *dax_region,
-		struct resource *res, int count)
+		struct resource *res, int count,
+		const struct dax_operations *ops)
 {
 	struct device *parent = dax_region->dev;
 	struct dax_device *dax_dev;
@@ -612,7 +614,7 @@ struct dev_dax *devm_create_dev_dax(struct dax_region *dax_region,
 	 * No 'host' or dax_operations since there is no access to this
 	 * device outside of mmap of the resulting character device.
 	 */
-	dax_dev = alloc_dax(dev_dax, NULL, NULL);
+	dax_dev = alloc_dax(dev_dax, NULL, ops);
 	if (!dax_dev)
 		goto err_dax;
 

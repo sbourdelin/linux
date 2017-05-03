@@ -104,6 +104,25 @@ long dax_direct_access(struct dax_device *dax_dev, pgoff_t pgoff, long nr_pages,
 }
 EXPORT_SYMBOL_GPL(dax_direct_access);
 
+/**
+ * dax_check_error() - check if a physical address range has any error
+ * @dax_dev: a dax_device instance representing the logical memory range
+ * @dev: a device instance representing the driver's device
+ * @phys: physical base address to check for error
+ * @len: length of physical address range to check for error
+ *
+ * Return: 0 if no error, negative errno if any error is found.
+ */
+int dax_check_error(struct dax_device *dax_dev, struct device *dev,
+		phys_addr_t phys, unsigned long len)
+{
+	if (!dax_dev->ops || !dax_dev->ops->check_error)
+		return 0;
+
+	return dax_dev->ops->check_error(dev, phys, len);
+}
+EXPORT_SYMBOL_GPL(dax_check_error);
+
 bool dax_alive(struct dax_device *dax_dev)
 {
 	lockdep_assert_held(&dax_srcu);

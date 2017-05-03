@@ -56,6 +56,32 @@ static void dax_pmem_percpu_kill(void *data)
 	wait_for_completion(&dax_pmem->cmp);
 }
 
+static int dax_pmem_check_error(struct device *dev, phys_addr_t phys,
+		unsigned long len)
+{
+	struct nd_region *nd_region = to_nd_region(dev->parent);
+	sector_t sector;
+
+	if (phys < nd_region->ndr_start) {
+		len = phys + len - nd_region->ndr_start;
+		phys = nd_region->ndr_start;
+	}
+
+	if (phys + len > nd_region->ndr_start + nd_region->ndr_size)
+		len = nd_region->ndr_start + nd_region->ndr_size - phys;
+
+	sector = (phys - nd_region->ndr_start) / 512;
+
+	if (unlikely(is_bad_pmem(&nd_region->bb, sector, len)))
+		return -EIO;
+
+	return 0;
+}
+
+static const struct dax_operations dax_pmem_ops = {
+	.check_error = dax_pmem_check_error,
+};
+
 static int dax_pmem_probe(struct device *dev)
 {
 	int rc;
@@ -130,7 +156,7 @@ static int dax_pmem_probe(struct device *dev)
 		return -ENOMEM;
 
 	/* TODO: support for subdividing a dax region... */
-	dev_dax = devm_create_dev_dax(dax_region, &res, 1);
+	dev_dax = devm_create_dev_dax(dax_region, &res, 1, &dax_pmem_ops);
 
 	/* child dev_dax instances now own the lifetime of the dax_region */
 	dax_region_put(dax_region);

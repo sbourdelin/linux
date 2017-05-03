@@ -12,6 +12,7 @@
  */
 #ifndef __DEVICE_DAX_H__
 #define __DEVICE_DAX_H__
+#include <linux/dax.h>
 struct device;
 struct dev_dax;
 struct resource;
@@ -21,5 +22,6 @@ struct dax_region *alloc_dax_region(struct device *parent,
 		int region_id, struct resource *res, unsigned int align,
 		void *addr, unsigned long flags);
 struct dev_dax *devm_create_dev_dax(struct dax_region *dax_region,
-		struct resource *res, int count);
+		struct resource *res, int count,
+		const struct dax_operations *ops);
 #endif /* __DEVICE_DAX_H__ */
