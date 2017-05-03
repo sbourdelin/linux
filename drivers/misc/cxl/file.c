@@ -239,7 +239,10 @@ static long afu_ioctl_start_work(struct cxl_context *ctx,
 		cxl_context_mm_count_put(ctx);
 		goto out;
 	}
-
+#ifdef CONFIG_PPC_BOOK3S_64
+	if (ctx->mm)
+		mm_context_set_global_tlbi(&ctx->mm->context);
+#endif
 	ctx->status = STARTED;
 	rc = 0;
 out:

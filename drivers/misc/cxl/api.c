@@ -347,7 +347,10 @@ int cxl_start_context(struct cxl_context *ctx, u64 wed,
 			cxl_context_mm_count_put(ctx);
 		goto out;
 	}
-
+#ifdef CONFIG_PPC_BOOK3S_64
+	if (ctx->mm)
+		mm_context_set_global_tlbi(&ctx->mm->context);
+#endif
 	ctx->status = STARTED;
 out:
 	mutex_unlock(&ctx->status_mutex);
