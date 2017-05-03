@@ -607,7 +607,7 @@ static int lock_stat_open(struct inode *inode, struct file *file)
 {
 	int res;
 	struct lock_class *class;
-	struct lock_stat_seq *data = vmalloc(sizeof(struct lock_stat_seq));
+	struct lock_stat_seq *data = vmalloc(sizeof(*data));
 
 	if (!data)
 		return -ENOMEM;
