@@ -389,6 +389,12 @@ static int sk_diag_fill(struct sock *sk, struct sk_buff *skb,
 				  nlmsg_flags, unlh, net_admin);
 }
 
+/*
+ * Ignore the position of the arguments req->id.idiag_dport and
+ * req->id.idiag_sport in both calls to inet_lookup() and inet6_lookup()
+ * functions, once this is a locked in behavior exposed to user space.
+ * Changing this will break things for people.
+ */
 struct sock *inet_diag_find_one_icsk(struct net *net,
 				     struct inet_hashinfo *hashinfo,
 				     const struct inet_diag_req_v2 *req)
