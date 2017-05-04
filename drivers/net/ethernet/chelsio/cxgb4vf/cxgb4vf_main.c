@@ -1818,7 +1818,7 @@ static int mboxlog_show(struct seq_file *seq, void *v)
 
 		seq_printf(seq, "  %08x %08x", hi, lo);
 	}
-	seq_puts(seq, "\n");
+	seq_putc(seq, '\n');
 	return 0;
 }
 
