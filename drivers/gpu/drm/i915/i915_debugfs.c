@@ -1529,8 +1529,8 @@ static int gen6_drpc_info(struct seq_file *m)
 
 	forcewake_count = READ_ONCE(dev_priv->uncore.fw_domain[FW_DOMAIN_ID_RENDER].wake_count);
 	if (forcewake_count) {
-		seq_puts(m, "RC information inaccurate because somebody "
-			    "holds a forcewake reference \n");
+		seq_puts(m,
+			 "RC information inaccurate because somebody holds a forcewake reference.\n");
 	} else {
 		/* NB: we cannot use forcewake, else we read the wrong values */
 		while (count++ < 50 && (I915_READ_NOTRACE(FORCEWAKE_ACK) & 1))
