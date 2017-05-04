@@ -85,14 +85,14 @@ static void hdac_wait_for_cmd_dmas(struct hdac_bus *bus)
 {
 	unsigned long timeout;
 
-	timeout = jiffies + msecs_to_jiffies(100);
+	timeout = 100 * 100; /* 100ms */
 	while ((snd_hdac_chip_readb(bus, RIRBCTL) & AZX_RBCTL_DMA_EN)
-		&& time_before(jiffies, timeout))
+	       && timeout--)
 		udelay(10);
 
-	timeout = jiffies + msecs_to_jiffies(100);
+	timeout = 100 * 100; /* 100ms */
 	while ((snd_hdac_chip_readb(bus, CORBCTL) & AZX_CORBCTL_RUN)
-		&& time_before(jiffies, timeout))
+	       && timeout--)
 		udelay(10);
 }
 
