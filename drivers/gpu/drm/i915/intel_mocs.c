@@ -85,10 +85,7 @@ struct drm_i915_mocs_table {
  *
  * Entries not part of the following tables are undefined as far as
  * userspace is concerned and shouldn't be relied upon.  For the time
- * being they will be implicitly initialized to the strictest caching
- * configuration (uncached) to guarantee forwards compatibility with
- * userspace programs written against more recent kernels providing
- * additional MOCS entries.
+ * being they will be implicitly initialized to follow the PTE.
  *
  * NOTE: These tables MUST start with being uncached and the length
  *       MUST be less than 63 as the last two registers are reserved
@@ -249,16 +246,13 @@ int intel_mocs_init_engine(struct intel_engine_cs *engine)
 			   table.table[index].control_value);
 
 	/*
-	 * Ok, now set the unused entries to uncached. These entries
+	 * Ok, now set the unused entries to follow the PTE. These entries
 	 * are officially undefined and no contract for the contents
 	 * and settings is given for these entries.
-	 *
-	 * Entry 0 in the table is uncached - so we are just writing
-	 * that value to all the used entries.
 	 */
 	for (; index < GEN9_NUM_MOCS_ENTRIES; index++)
 		I915_WRITE(mocs_register(engine->id, index),
-			   table.table[0].control_value);
+			   table.table[I915_MOCS_PTE].control_value);
 
 	return 0;
 }
@@ -295,16 +289,13 @@ static int emit_mocs_control_table(struct drm_i915_gem_request *req,
 	}
 
 	/*
-	 * Ok, now set the unused entries to uncached. These entries
+	 * Ok, now set the unused entries to follow the PTE. These entries
 	 * are officially undefined and no contract for the contents
 	 * and settings is given for these entries.
-	 *
-	 * Entry 0 in the table is uncached - so we are just writing
-	 * that value to all the used entries.
 	 */
 	for (; index < GEN9_NUM_MOCS_ENTRIES; index++) {
 		*cs++ = i915_mmio_reg_offset(mocs_register(engine, index));
-		*cs++ = table->table[0].control_value;
+		*cs++ = table->table[I915_MOCS_PTE].control_value;
 	}
 
 	*cs++ = MI_NOOP;
@@ -355,18 +346,17 @@ static int emit_mocs_l3cc_table(struct drm_i915_gem_request *req,
 	if (table->size & 0x01) {
 		/* Odd table size - 1 left over */
 		*cs++ = i915_mmio_reg_offset(GEN9_LNCFCMOCS(i));
-		*cs++ = l3cc_combine(table, 2 * i, 0);
+		*cs++ = l3cc_combine(table, 2 * i, I915_MOCS_PTE);
 		i++;
 	}
 
 	/*
-	 * Now set the rest of the table to uncached - use entry 0 as
-	 * this will be uncached. Leave the last pair uninitialised as
-	 * they are reserved by the hardware.
+	 * Now set the rest of the table to follow the PTE.
+	 * Leave the last pair as they are reserved by the hardware.
 	 */
 	for (; i < GEN9_NUM_MOCS_ENTRIES / 2; i++) {
 		*cs++ = i915_mmio_reg_offset(GEN9_LNCFCMOCS(i));
-		*cs++ = l3cc_combine(table, 0, 0);
+		*cs++ = l3cc_combine(table, I915_MOCS_PTE, I915_MOCS_PTE);
 	}
 
 	*cs++ = MI_NOOP;
@@ -402,17 +392,18 @@ void intel_mocs_init_l3cc_table(struct drm_i915_private *dev_priv)
 
 	/* Odd table size - 1 left over */
 	if (table.size & 0x01) {
-		I915_WRITE(GEN9_LNCFCMOCS(i), l3cc_combine(&table, 2*i, 0));
+		I915_WRITE(GEN9_LNCFCMOCS(i),
+			   l3cc_combine(&table, 2*i, I915_MOCS_PTE));
 		i++;
 	}
 
 	/*
-	 * Now set the rest of the table to uncached - use entry 0 as
-	 * this will be uncached. Leave the last pair as initialised as
-	 * they are reserved by the hardware.
+	 * Now set the rest of the table to follow the PTE.
+	 * Leave the last pair as they are reserved by the hardware.
 	 */
 	for (; i < (GEN9_NUM_MOCS_ENTRIES / 2); i++)
-		I915_WRITE(GEN9_LNCFCMOCS(i), l3cc_combine(&table, 0, 0));
+		I915_WRITE(GEN9_LNCFCMOCS(i),
+			   l3cc_combine(&table, I915_MOCS_PTE, I915_MOCS_PTE));
 }
 
 /**
