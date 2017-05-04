@@ -56,7 +56,7 @@ struct dwc3_pci {
 	struct platform_device *dwc3;
 	struct pci_dev *pci;
 
-	u8 uuid[16];
+	uuid_le uuid;
 
 	unsigned int has_dsm_for_pm:1;
 };
@@ -118,7 +118,7 @@ static int dwc3_pci_quirks(struct dwc3_pci *dwc)
 
 		if (pdev->device == PCI_DEVICE_ID_INTEL_BXT ||
 				pdev->device == PCI_DEVICE_ID_INTEL_BXT_M) {
-			acpi_str_to_uuid(PCI_INTEL_BXT_DSM_UUID, dwc->uuid);
+			uuid_le_to_bin(PCI_INTEL_BXT_DSM_UUID, &dwc->uuid);
 			dwc->has_dsm_for_pm = true;
 		}
 
@@ -288,7 +288,7 @@ static int dwc3_pci_dsm(struct dwc3_pci *dwc, int param)
 	tmp.type = ACPI_TYPE_INTEGER;
 	tmp.integer.value = param;
 
-	obj = acpi_evaluate_dsm(ACPI_HANDLE(&dwc->pci->dev), dwc->uuid,
+	obj = acpi_evaluate_dsm(ACPI_HANDLE(&dwc->pci->dev), &dwc->uuid,
 			1, PCI_INTEL_BXT_FUNC_PMU_PWR, &argv4);
 	if (!obj) {
 		dev_err(&dwc->pci->dev, "failed to evaluate _DSM\n");

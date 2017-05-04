@@ -182,17 +182,17 @@ out:
 
 static bool __init extlog_get_l1addr(void)
 {
-	u8 uuid[16];
+	uuid_le uuid;
 	acpi_handle handle;
 	union acpi_object *obj;
 
-	acpi_str_to_uuid(extlog_dsm_uuid, uuid);
-
+	if (uuid_le_to_bin(extlog_dsm_uuid, &uuid))
+		return false;
 	if (ACPI_FAILURE(acpi_get_handle(NULL, "\\_SB", &handle)))
 		return false;
-	if (!acpi_check_dsm(handle, uuid, EXTLOG_DSM_REV, 1 << EXTLOG_FN_ADDR))
+	if (!acpi_check_dsm(handle, &uuid, EXTLOG_DSM_REV, 1 << EXTLOG_FN_ADDR))
 		return false;
-	obj = acpi_evaluate_dsm_typed(handle, uuid, EXTLOG_DSM_REV,
+	obj = acpi_evaluate_dsm_typed(handle, &uuid, EXTLOG_DSM_REV,
 				      EXTLOG_FN_ADDR, NULL, ACPI_TYPE_INTEGER);
 	if (!obj) {
 		return false;

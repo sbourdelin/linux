@@ -118,7 +118,7 @@ static int wcove_typec_func(struct wcove_typec *wcove,
 	tmp.type = ACPI_TYPE_INTEGER;
 	tmp.integer.value = param;
 
-	obj = acpi_evaluate_dsm(ACPI_HANDLE(wcove->dev), uuid.b, 1, func,
+	obj = acpi_evaluate_dsm(ACPI_HANDLE(wcove->dev), &uuid, 1, func,
 				&argv4);
 	if (!obj) {
 		dev_err(wcove->dev, "%s: failed to evaluate _DSM\n", __func__);
@@ -314,7 +314,7 @@ static int wcove_typec_probe(struct platform_device *pdev)
 	if (ret)
 		return ret;
 
-	if (!acpi_check_dsm(ACPI_HANDLE(&pdev->dev), uuid.b, 0, 0x1f)) {
+	if (!acpi_check_dsm(ACPI_HANDLE(&pdev->dev), &uuid, 0, 0x1f)) {
 		dev_err(&pdev->dev, "Missing _DSM functions\n");
 		return -ENODEV;
 	}

@@ -61,7 +61,7 @@ static int ucsi_acpi_cmd(struct ucsi *ucsi, struct ucsi_control *ctrl)
 
 	ucsi->data->ctrl.raw_cmd = ctrl->raw_cmd;
 
-	obj = acpi_evaluate_dsm(ACPI_HANDLE(ucsi->dev), uuid.b, 1, 1, NULL);
+	obj = acpi_evaluate_dsm(ACPI_HANDLE(ucsi->dev), &uuid, 1, 1, NULL);
 	if (!obj) {
 		dev_err(ucsi->dev, "%s: failed to evaluate _DSM\n", __func__);
 		return -EIO;

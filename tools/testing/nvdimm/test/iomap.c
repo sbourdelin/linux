@@ -370,7 +370,7 @@ acpi_status __wrap_acpi_evaluate_object(acpi_handle handle, acpi_string path,
 }
 EXPORT_SYMBOL(__wrap_acpi_evaluate_object);
 
-union acpi_object * __wrap_acpi_evaluate_dsm(acpi_handle handle, const u8 *uuid,
+union acpi_object * __wrap_acpi_evaluate_dsm(acpi_handle handle, const uuid_le *uuid,
 		u64 rev, u64 func, union acpi_object *argv4)
 {
 	union acpi_object *obj = ERR_PTR(-ENXIO);
