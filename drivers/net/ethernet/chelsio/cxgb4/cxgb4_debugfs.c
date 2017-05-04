@@ -1353,8 +1353,9 @@ static int mps_trc_show(struct seq_file *seq, void *v)
 	if (tp.port < 8) {
 		i = adap->chan_map[tp.port & 3];
 		if (i >= MAX_NPORTS) {
-			dev_err(adap->pdev_dev, "tracer %u is assigned "
-				"to non-existing port\n", trcidx);
+			dev_err(adap->pdev_dev,
+				"tracer %u is assigned to non-existing port\n",
+				trcidx);
 			return -EINVAL;
 		}
 		seq_printf(seq, "tracer is capturing %s %s, ",
@@ -1798,11 +1799,11 @@ static int mps_tcam_show(struct seq_file *seq, void *v)
 				      FW_LDST_CMD_IDX_V(idx));
 			ret = t4_wr_mbox(adap, adap->mbox, &ldst_cmd,
 					 sizeof(ldst_cmd), &ldst_cmd);
-			if (ret)
-				dev_warn(adap->pdev_dev, "Can't read MPS "
-					 "replication map for idx %d: %d\n",
+			if (ret) {
+				dev_warn(adap->pdev_dev,
+					 "Can't read MPS replication map for idx %d: %d\n",
 					 idx, -ret);
-			else {
+			} else {
 				mps_rplc = ldst_cmd.u.mps.rplc;
 				rplc[0] = ntohl(mps_rplc.rplc31_0);
 				rplc[1] = ntohl(mps_rplc.rplc63_32);
