@@ -565,7 +565,7 @@ static int i40e_client_virtchnl_send(struct i40e_info *ldev,
 	struct i40e_hw *hw = &pf->hw;
 	i40e_status err;
 
-	err = i40e_aq_send_msg_to_vf(hw, vf_id, I40E_VIRTCHNL_OP_IWARP,
+	err = i40e_aq_send_msg_to_vf(hw, vf_id, VIRTCHNL_OP_IWARP,
 				     0, msg, len, NULL);
 	if (err)
 		dev_err(&pf->pdev->dev, "Unable to send iWarp message to VF, error %d, aq status %d\n",
@@ -611,7 +611,7 @@ static int i40e_client_setup_qvlist(struct i40e_info *ldev,
 		ldev->qvlist_info->qv_info[i] = *qv_info;
 		reg_idx = I40E_PFINT_LNKLSTN(v_idx - 1);
 
-		if (qv_info->ceq_idx == I40E_QUEUE_INVALID_IDX) {
+		if (qv_info->ceq_idx == QUEUE_INVALID_IDX) {
 			/* Special case - No CEQ mapped on this vector */
 			wr32(hw, reg_idx, I40E_PFINT_LNKLSTN_FIRSTQ_INDX_MASK);
 		} else {
@@ -629,7 +629,7 @@ static int i40e_client_setup_qvlist(struct i40e_info *ldev,
 				I40E_PFINT_CEQCTL_NEXTQ_INDX_SHIFT));
 			wr32(hw, I40E_PFINT_CEQCTL(qv_info->ceq_idx), reg);
 		}
-		if (qv_info->aeq_idx != I40E_QUEUE_INVALID_IDX) {
+		if (qv_info->aeq_idx != QUEUE_INVALID_IDX) {
 			reg = (I40E_PFINT_AEQCTL_CAUSE_ENA_MASK |
 			       (v_idx << I40E_PFINT_AEQCTL_MSIX_INDX_SHIFT) |
 			       (qv_info->itr_idx <<
