@@ -59,6 +59,9 @@ static void notrace klp_ftrace_handler(unsigned long ip,
 
 	ops = container_of(fops, struct klp_ops, fops);
 
+	/* RCU may not be watching, make it see us. */
+	rcu_irq_enter_irqson();
+
 	rcu_read_lock();
 
 	func = list_first_or_null_rcu(&ops->func_stack, struct klp_func,
@@ -116,6 +119,7 @@ static void notrace klp_ftrace_handler(unsigned long ip,
 	klp_arch_set_pc(regs, (unsigned long)func->new_func);
 unlock:
 	rcu_read_unlock();
+	rcu_irq_exit_irqson();
 }
 
 /*
