@@ -10122,6 +10122,13 @@ static int prepare_vmcs02(struct kvm_vcpu *vcpu, struct vmcs12 *vmcs12,
 	exec_control &= ~CPU_BASED_USE_IO_BITMAPS;
 	exec_control |= CPU_BASED_UNCOND_IO_EXITING;
 
+	/*
+	 * L2 should not occupy all the cpu time on L0 when L2
+	 * is idle, exit every time.
+	 */
+	exec_control |= CPU_BASED_MWAIT_EXITING |
+			CPU_BASED_MONITOR_EXITING;
+
 	vmcs_write32(CPU_BASED_VM_EXEC_CONTROL, exec_control);
 
 	/* EXCEPTION_BITMAP and CR0_GUEST_HOST_MASK should basically be the
