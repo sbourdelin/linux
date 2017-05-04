@@ -44,6 +44,17 @@ struct vtpm_proxy_new_dev {
 	__u32 minor;         /* output */
 };
 
+/**
+ * struct vtpm_proxy_supt_flags - parameter structure for the
+ *                                %VTPM_PROXY_IOC_GET_SUPT_FLAGS ioctl
+ * @flags: flags supported by the vtpm proxy driver
+ */
+struct vtpm_proxy_supt_flags {
+	__u32 flags;         /* output */
+};
+
 #define VTPM_PROXY_IOC_NEW_DEV	_IOWR(0xa1, 0x00, struct vtpm_proxy_new_dev)
+#define VTPM_PROXY_IOC_GET_SUPT_FLAGS \
+				_IOR(0xa1, 0x01, struct vtpm_proxy_supt_flags)
 
 #endif /* _UAPI_LINUX_VTPM_PROXY_H */

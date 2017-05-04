@@ -592,6 +592,33 @@ static long vtpmx_ioc_new_dev(struct file *file, unsigned int ioctl,
 	return 0;
 }
 
+/**
+ * vtpmx_ioc_get_supt_flags - handler for the %VTPM_PROXY_IOC_GET_SUPT_FLAGS
+ *                            ioctl
+ * @file:	/dev/vtpmx
+ * @ioctl:	the ioctl number
+ * @arg:	pointer to the struct vtpmx_proxy_get_supt_flags
+ *
+ * Return the bitfield of supported flags
+ */
+static long vtpmx_ioc_get_supt_flags(struct file *file, unsigned int ioctl,
+				     unsigned long arg)
+{
+	void __user *argp = (void __user *)arg;
+	struct vtpm_proxy_supt_flags __user *vtpm_supt_flags_p = argp;
+	struct vtpm_proxy_supt_flags flags = {
+		.flags = VTPM_PROXY_FLAGS_ALL,
+	};
+
+	if (!capable(CAP_SYS_ADMIN))
+		return -EPERM;
+
+	if (copy_to_user(vtpm_supt_flags_p, &flags, sizeof(flags)))
+		return -EFAULT;
+
+	return 0;
+}
+
 /*
  * vtpmx_fops_ioctl: ioctl on /dev/vtpmx
  *
@@ -604,6 +631,8 @@ static long vtpmx_fops_ioctl(struct file *f, unsigned int ioctl,
 	switch (ioctl) {
 	case VTPM_PROXY_IOC_NEW_DEV:
 		return vtpmx_ioc_new_dev(f, ioctl, arg);
+	case VTPM_PROXY_IOC_GET_SUPT_FLAGS:
+		return vtpmx_ioc_get_supt_flags(f, ioctl, arg);
 	default:
 		return -ENOIOCTLCMD;
 	}
