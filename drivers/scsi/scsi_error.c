@@ -426,6 +426,31 @@ static void scsi_report_sense(struct scsi_device *sdev,
 	}
 }
 
+/*
+ * generate uevent when receiving sense code from device
+ */
+static void scsi_send_sense_uevent(struct scsi_device *sdev,
+				   struct scsi_cmnd *scmd,
+				   struct scsi_sense_hdr *sshdr)
+{
+#ifdef CONFIG_SCSI_SENSE_UEVENT
+	struct scsi_event *evt;
+
+	if (!test_bit(sshdr->sense_key & 0xf,
+		      &sdev->sense_event_filter))
+		return;
+	evt = sdev_evt_alloc(SDEV_EVT_SCSI_SENSE, GFP_ATOMIC);
+	if (!evt)
+		return;
+
+	evt->sense_evt_data.lba = scsi_get_lba(scmd);
+	evt->sense_evt_data.size = blk_rq_bytes(scmd->request);
+	memcpy(&evt->sense_evt_data.sshdr, sshdr,
+	       sizeof(struct scsi_sense_hdr));
+	sdev_evt_send(sdev, evt);
+#endif
+}
+
 /**
  * scsi_check_sense - Examine scsi cmd sense
  * @scmd:	Cmd to have sense checked.
@@ -446,6 +471,7 @@ int scsi_check_sense(struct scsi_cmnd *scmd)
 		return FAILED;	/* no valid sense data */
 
 	scsi_report_sense(sdev, &sshdr);
+	scsi_send_sense_uevent(sdev, scmd, &sshdr);
 
 	if (scsi_sense_is_deferred(&sshdr))
 		return NEEDS_RETRY;

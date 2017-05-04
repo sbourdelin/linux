@@ -2656,8 +2656,9 @@ EXPORT_SYMBOL(scsi_device_set_state);
  */
 static void scsi_evt_emit(struct scsi_device *sdev, struct scsi_event *evt)
 {
-	int idx = 0;
-	char *envp[3];
+	int idx = 0, i;
+	char *envp[5];	/* SDEV_EVT_SCSI_SENSE needs most entries (4) */
+	int free_envp = -1;
 
 	switch (evt->evt_type) {
 	case SDEV_EVT_MEDIA_CHANGE:
@@ -2682,6 +2683,23 @@ static void scsi_evt_emit(struct scsi_device *sdev, struct scsi_event *evt)
 	case SDEV_EVT_ALUA_STATE_CHANGE_REPORTED:
 		envp[idx++] = "SDEV_UA=ASYMMETRIC_ACCESS_STATE_CHANGED";
 		break;
+#ifdef CONFIG_SCSI_SENSE_UEVENT
+	case SDEV_EVT_SCSI_SENSE:
+		envp[idx++] = "SDEV_UA=SCSI_SENSE";
+		for (i = idx; i < idx + 3; ++i) {
+			envp[i] = kzalloc(32, GFP_ATOMIC);
+			if (!envp[i])
+				break;
+			free_envp = i;
+		}
+		snprintf(envp[idx++], 32, "LBA=%lu", evt->sense_evt_data.lba);
+		snprintf(envp[idx++], 32, "SIZE=%d", evt->sense_evt_data.size);
+		snprintf(envp[idx++], 32, "SENSE_CODE=%1x/%02x/%02x",
+			 evt->sense_evt_data.sshdr.sense_key,
+			 evt->sense_evt_data.sshdr.asc,
+			 evt->sense_evt_data.sshdr.ascq);
+		break;
+#endif
 	default:
 		/* do nothing */
 		break;
@@ -2690,6 +2708,10 @@ static void scsi_evt_emit(struct scsi_device *sdev, struct scsi_event *evt)
 	envp[idx++] = NULL;
 
 	kobject_uevent_env(&sdev->sdev_gendev.kobj, KOBJ_CHANGE, envp);
+
+	/* no need to free envp[0], so start with i = 1 */
+	for (i = 1 ; i < free_envp; ++i)
+		kfree(envp[i]);
 }
 
 /**
@@ -2786,6 +2808,7 @@ struct scsi_event *sdev_evt_alloc(enum scsi_device_event evt_type,
 	case SDEV_EVT_MODE_PARAMETER_CHANGE_REPORTED:
 	case SDEV_EVT_LUN_CHANGE_REPORTED:
 	case SDEV_EVT_ALUA_STATE_CHANGE_REPORTED:
+	case SDEV_EVT_SCSI_SENSE:
 	default:
 		/* do nothing */
 		break;
