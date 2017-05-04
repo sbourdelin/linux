@@ -278,7 +278,7 @@ static int cim_ma_la_show(struct seq_file *seq, void *v, int idx)
 	const u32 *p = v;
 
 	if (v == SEQ_START_TOKEN) {
-		seq_puts(seq, "\n");
+		seq_putc(seq, '\n');
 	} else if (idx < CIM_MALA_SIZE) {
 		seq_printf(seq, "%02x%08x%08x%08x%08x\n",
 			   p[4], p[3], p[2], p[1], p[0]);
@@ -1196,7 +1196,7 @@ static int mboxlog_show(struct seq_file *seq, void *v)
 
 		seq_printf(seq, "  %08x %08x", hi, lo);
 	}
-	seq_puts(seq, "\n");
+	seq_putc(seq, '\n');
 	return 0;
 }
 
@@ -2112,9 +2112,7 @@ static int rss_config_show(struct seq_file *seq, void *v)
 							HASHTOEPLITZ_F));
 	seq_printf(seq, "  Udp4En:        %3s\n", yesno(rssconf & UDPENABLE_F));
 	seq_printf(seq, "  Disable:       %3s\n", yesno(rssconf & DISABLE_F));
-
-	seq_puts(seq, "\n");
-
+	seq_putc(seq, '\n');
 	rssconf = t4_read_reg(adapter, TP_RSS_CONFIG_TNL_A);
 	seq_printf(seq, "TP_RSS_CONFIG_TNL: %#x\n", rssconf);
 	seq_printf(seq, "  MaskSize:      %3d\n", MASKSIZE_G(rssconf));
@@ -2126,25 +2124,19 @@ static int rss_config_show(struct seq_file *seq, void *v)
 			   yesno(rssconf & HASHETH_F));
 	}
 	seq_printf(seq, "  UseWireCh:     %3s\n", yesno(rssconf & USEWIRECH_F));
-
-	seq_puts(seq, "\n");
-
+	seq_putc(seq, '\n');
 	rssconf = t4_read_reg(adapter, TP_RSS_CONFIG_OFD_A);
 	seq_printf(seq, "TP_RSS_CONFIG_OFD: %#x\n", rssconf);
 	seq_printf(seq, "  MaskSize:      %3d\n", MASKSIZE_G(rssconf));
 	seq_printf(seq, "  RRCplMapEn:    %3s\n", yesno(rssconf &
 							RRCPLMAPEN_F));
 	seq_printf(seq, "  RRCplQueWidth: %3d\n", RRCPLQUEWIDTH_G(rssconf));
-
-	seq_puts(seq, "\n");
-
+	seq_putc(seq, '\n');
 	rssconf = t4_read_reg(adapter, TP_RSS_CONFIG_SYN_A);
 	seq_printf(seq, "TP_RSS_CONFIG_SYN: %#x\n", rssconf);
 	seq_printf(seq, "  MaskSize:      %3d\n", MASKSIZE_G(rssconf));
 	seq_printf(seq, "  UseWireCh:     %3s\n", yesno(rssconf & USEWIRECH_F));
-
-	seq_puts(seq, "\n");
-
+	seq_putc(seq, '\n');
 	rssconf = t4_read_reg(adapter, TP_RSS_CONFIG_VRT_A);
 	seq_printf(seq, "TP_RSS_CONFIG_VRT: %#x\n", rssconf);
 	if (CHELSIO_CHIP_VERSION(adapter->params.chip) > CHELSIO_T5) {
@@ -2170,9 +2162,7 @@ static int rss_config_show(struct seq_file *seq, void *v)
 	seq_printf(seq, "  VfWrEn:        %3s\n", yesno(rssconf & VFWREN_F));
 	seq_printf(seq, "  KeyWrEn:       %3s\n", yesno(rssconf & KEYWREN_F));
 	seq_printf(seq, "  KeyWrAddr:     %3d\n", KEYWRADDR_G(rssconf));
-
-	seq_puts(seq, "\n");
-
+	seq_putc(seq, '\n');
 	rssconf = t4_read_reg(adapter, TP_RSS_CONFIG_CNG_A);
 	seq_printf(seq, "TP_RSS_CONFIG_CNG: %#x\n", rssconf);
 	seq_printf(seq, "  ChnCount3:     %3s\n", yesno(rssconf & CHNCOUNT3_F));
