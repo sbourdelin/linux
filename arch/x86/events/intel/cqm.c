@@ -572,8 +572,13 @@ static bool intel_cqm_sched_in_event(u32 rmid)
 
 	leader = list_first_entry(&cache_groups, struct perf_event,
 				  hw.cqm_groups_entry);
-	event = leader;
 
+	if (!list_empty(&cache_groups) && !__rmid_valid(leader->hw.cqm_rmid)) {
+		intel_cqm_xchg_rmid(leader, rmid);
+		return true;
+	}
+
+	event = leader;
 	list_for_each_entry_continue(event, &cache_groups,
 				     hw.cqm_groups_entry) {
 		if (__rmid_valid(event->hw.cqm_rmid))
@@ -740,6 +745,7 @@ static void intel_cqm_sched_out_conflicting_events(struct perf_event *event)
 {
 	struct perf_event *group, *g;
 	u32 rmid;
+	LIST_HEAD(conflicting_groups);
 
 	lockdep_assert_held(&cache_mutex);
 
@@ -763,7 +769,11 @@ static void intel_cqm_sched_out_conflicting_events(struct perf_event *event)
 
 		intel_cqm_xchg_rmid(group, INVALID_RMID);
 		__put_rmid(rmid);
+		list_move_tail(&group->hw.cqm_groups_entry,
+			       &conflicting_groups);
 	}
+
+	list_splice_tail(&conflicting_groups, &cache_groups);
 }
 
 /*
@@ -792,9 +802,9 @@ static void intel_cqm_sched_out_conflicting_events(struct perf_event *event)
  */
 static bool __intel_cqm_rmid_rotate(void)
 {
-	struct perf_event *group, *start = NULL;
+	struct perf_event *group, *start;
 	unsigned int threshold_limit;
-	unsigned int nr_needed = 0;
+	unsigned int nr_needed;
 	unsigned int nr_available;
 	bool rotated = false;
 
@@ -807,6 +817,9 @@ again:
 	 */
 	if (list_empty(&cache_groups) && list_empty(&cqm_rmid_limbo_lru))
 		goto out;
+
+	nr_needed = 0;
+	start = NULL;
 
 	list_for_each_entry(group, &cache_groups, hw.cqm_groups_entry) {
 		if (!__rmid_valid(group->hw.cqm_rmid)) {
