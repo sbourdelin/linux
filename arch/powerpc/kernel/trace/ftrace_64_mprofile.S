@@ -153,8 +153,18 @@ _GLOBAL(ftrace_stub)
 	 *
 	 * r0 can't be used as the base register for a DS-form load or store, so
 	 * we temporarily shuffle r1 (stack pointer) into r0 and then put it back.
+	 *
+	 * But, before we can do all that, we first need to confirm that we are
+	 * indeed here due to livepatch and not due to jprobes. The difference
+	 * between the two handlers is that jprobes additionally sets up r12.
+	 * So, we can compare nip with r12 as a test to determine if we are here
+	 * due to livepatch or due to jprobes.
 	 */
 livepatch_handler:
+	mfctr	r0
+	cmpd	r0, r12
+	beqctr
+
 	CURRENT_THREAD_INFO(r12, r1)
 
 	/* Save stack pointer into r0 */
