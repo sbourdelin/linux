@@ -72,9 +72,10 @@ _GLOBAL(ftrace_caller)
 	addi	r3,r3,function_trace_op@toc@l
 	ld	r5,0(r3)
 
-#ifdef CONFIG_LIVEPATCH
+#if defined(CONFIG_FUNCTION_GRAPH_TRACER) || defined(CONFIG_LIVEPATCH)
 	mr	r14,r7		/* remember old NIP */
 #endif
+
 	/* Calculate ip from nip-4 into r3 for call below */
 	subi    r3, r7, MCOUNT_INSN_SIZE
 
@@ -97,10 +98,19 @@ ftrace_call:
 	nop
 
 	/* Load ctr with the possibly modified NIP */
-	ld	r3, _NIP(r1)
-	mtctr	r3
+	ld	r15, _NIP(r1)
+
+#ifdef CONFIG_FUNCTION_GRAPH_TRACER
+.globl ftrace_graph_call
+ftrace_graph_call:
+	b	ftrace_graph_stub
+_GLOBAL(ftrace_graph_stub)
+#endif
+
+	mtctr	r15
+
 #ifdef CONFIG_LIVEPATCH
-	cmpd	r14,r3		/* has NIP been altered? */
+	cmpd	r14, r15		/* has NIP been altered? */
 #endif
 
 	/* Restore gprs */
@@ -122,13 +132,6 @@ ftrace_call:
 #ifdef CONFIG_LIVEPATCH
         /* Based on the cmpd above, if the NIP was altered handle livepatch */
 	bne-	livepatch_handler
-#endif
-
-#ifdef CONFIG_FUNCTION_GRAPH_TRACER
-.globl ftrace_graph_call
-ftrace_graph_call:
-	b	ftrace_graph_stub
-_GLOBAL(ftrace_graph_stub)
 #endif
 
 	bctr			/* jump after _mcount site */
@@ -233,50 +236,19 @@ livepatch_handler:
 
 #ifdef CONFIG_FUNCTION_GRAPH_TRACER
 _GLOBAL(ftrace_graph_caller)
-	stdu	r1, -112(r1)
-	/* with -mprofile-kernel, parameter regs are still alive at _mcount */
-	std	r10, 104(r1)
-	std	r9, 96(r1)
-	std	r8, 88(r1)
-	std	r7, 80(r1)
-	std	r6, 72(r1)
-	std	r5, 64(r1)
-	std	r4, 56(r1)
-	std	r3, 48(r1)
+	cmpd	r14, r15			/* has NIP been altered? */
+	bne-	ftrace_graph_stub
 
-	/* Save callee's TOC in the ABI compliant location */
-	std	r2, 24(r1)
-	ld	r2, PACATOC(r13)	/* get kernel TOC in r2 */
-
-	mfctr	r4		/* ftrace_caller has moved local addr here */
-	std	r4, 40(r1)
-	mflr	r3		/* ftrace_caller has restored LR from stack */
-	subi	r4, r4, MCOUNT_INSN_SIZE
+	ld	r3, _LINK(r1)
+	subi	r4, r14, MCOUNT_INSN_SIZE	/* load saved original NIP */
 
 	bl	prepare_ftrace_return
 	nop
 
 	/*
 	 * prepare_ftrace_return gives us the address we divert to.
-	 * Change the LR to this.
+	 * We save it in pt_regs to be used when we go back.
 	 */
-	mtlr	r3
-
-	ld	r0, 40(r1)
-	mtctr	r0
-	ld	r10, 104(r1)
-	ld	r9, 96(r1)
-	ld	r8, 88(r1)
-	ld	r7, 80(r1)
-	ld	r6, 72(r1)
-	ld	r5, 64(r1)
-	ld	r4, 56(r1)
-	ld	r3, 48(r1)
-
-	/* Restore callee's TOC */
-	ld	r2, 24(r1)
-
-	addi	r1, r1, 112
-	mflr	r0
-	bctr
+	std	r3, _LINK(r1)
+	b	ftrace_graph_stub
 #endif /* CONFIG_FUNCTION_GRAPH_TRACER */
