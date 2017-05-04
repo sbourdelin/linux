@@ -1026,6 +1026,7 @@ static int elan_probe(struct i2c_client *client,
 	const struct elan_transport_ops *transport_ops;
 	struct device *dev = &client->dev;
 	struct elan_tp_data *data;
+	union i2c_smbus_data dummy;
 	unsigned long irqflags;
 	int error;
 
@@ -1075,6 +1076,14 @@ static int elan_probe(struct i2c_client *client,
 		dev_err(dev, "Failed to add disable regulator action: %d\n",
 			error);
 		return error;
+	}
+
+	/* Make sure there is something at this address */
+	error = i2c_smbus_xfer(client->adapter, client->addr, 0,
+			       I2C_SMBUS_READ, 0, I2C_SMBUS_BYTE, &dummy);
+	if (error) {
+		dev_dbg(&client->dev, "nothing at this address: %d\n", error);
+		return -ENXIO;
 	}
 
 	/* Initialize the touchpad. */
