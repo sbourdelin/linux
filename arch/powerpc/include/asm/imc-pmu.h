@@ -24,6 +24,7 @@
  */
 #define IMC_MAX_CHIPS			32
 #define IMC_MAX_PMUS			32
+#define IMC_MAX_CORES			32
 
 /*
  * This macro is used for memory buffer allocation of
@@ -36,6 +37,11 @@
  * in the reserved memory region. Max pages to mmap (considering 4K PAGESIZE).
  */
 #define IMC_NEST_MAX_PAGES		64
+
+/*
+ * IMC Core engine expects 8K bytes of memory for counter collection.
+ */
+#define IMC_CORE_COUNTER_MEM		8192
 
 /*
  *Compatbility macros for IMC devices
@@ -101,4 +107,5 @@ extern struct perchip_nest_info nest_perchip_info[IMC_MAX_CHIPS];
 extern struct imc_pmu *per_nest_pmu_arr[IMC_MAX_PMUS];
 extern struct imc_pmu *core_imc_pmu;
 extern int __init init_imc_pmu(struct imc_events *events,int idx, struct imc_pmu *pmu_ptr);
+void core_imc_disable(void);
 #endif /* PPC_POWERNV_IMC_PMU_DEF_H */
