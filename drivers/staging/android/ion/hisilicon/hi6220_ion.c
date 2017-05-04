@@ -66,7 +66,7 @@ static int hi6220_ion_probe(struct platform_device *pdev)
 
 	for (i = 0; i < ipdev->data->nr; i++) {
 		ipdev->heaps[i] = ion_heap_create(&ipdev->data->heaps[i]);
-		if (!ipdev->heaps) {
+		if (IS_ERR_OR_NULL(ipdev->heaps[i])) {
 			ion_destroy_platform_data(ipdev->data);
 			return -ENOMEM;
 		}
