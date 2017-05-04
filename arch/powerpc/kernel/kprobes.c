@@ -62,8 +62,8 @@ kprobe_opcode_t *kprobe_lookup_name(const char *name, unsigned int offset)
 #ifdef CONFIG_KPROBES_ON_FTRACE
 		unsigned long faddr;
 		/*
-		 * Per livepatch.h, ftrace location is always within the first
-		 * 16 bytes of a function on powerpc with -mprofile-kernel.
+		 * Per livepatch.h, ftrace location always starts within the first
+		 * 16 bytes (inclusive) of a function with -mprofile-kernel.
 		 */
 		faddr = ftrace_location_range((unsigned long)addr,
 					      (unsigned long)addr + 16);

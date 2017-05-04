@@ -37,8 +37,8 @@ static inline void klp_arch_set_pc(struct pt_regs *regs, unsigned long ip)
 static inline unsigned long klp_get_ftrace_location(unsigned long faddr)
 {
 	/*
-	 * Live patch works only with -mprofile-kernel on PPC. In this case,
-	 * the ftrace location is always within the first 16 bytes.
+	 * Live patch only works with -mprofile-kernel on PPC. In this case, the
+	 * ftrace location always starts within the first 16 bytes (inclusive).
 	 */
 	return ftrace_location_range(faddr, faddr + 16);
 }
