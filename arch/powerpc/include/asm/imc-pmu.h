@@ -92,6 +92,10 @@ struct imc_pmu {
 #define IMC_DOMAIN_NEST		1
 #define IMC_DOMAIN_UNKNOWN	-1
 
+#define IMC_COUNTER_ENABLE	1
+#define IMC_COUNTER_DISABLE	0
+
+
 extern struct perchip_nest_info nest_perchip_info[IMC_MAX_CHIPS];
 extern struct imc_pmu *per_nest_pmu_arr[IMC_MAX_PMUS];
 extern int __init init_imc_pmu(struct imc_events *events,int idx, struct imc_pmu *pmu_ptr);

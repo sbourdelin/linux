@@ -301,3 +301,6 @@ OPAL_CALL(opal_int_eoi,				OPAL_INT_EOI);
 OPAL_CALL(opal_int_set_mfrr,			OPAL_INT_SET_MFRR);
 OPAL_CALL(opal_pci_tce_kill,			OPAL_PCI_TCE_KILL);
 OPAL_CALL(opal_nmmu_set_ptcr,			OPAL_NMMU_SET_PTCR);
+OPAL_CALL(opal_imc_counters_init,		OPAL_IMC_COUNTERS_INIT);
+OPAL_CALL(opal_imc_counters_start,		OPAL_IMC_COUNTERS_START);
+OPAL_CALL(opal_imc_counters_stop,		OPAL_IMC_COUNTERS_STOP);
