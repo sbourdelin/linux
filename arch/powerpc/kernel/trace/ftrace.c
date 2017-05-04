@@ -572,7 +572,7 @@ int ftrace_disable_ftrace_graph_caller(void)
  * Hook the return address and push it in the stack of return addrs
  * in current thread info. Return the address we want to divert to.
  */
-unsigned long prepare_ftrace_return(unsigned long parent, unsigned long ip)
+unsigned long prepare_ftrace_return(unsigned long parent, unsigned long ip, unsigned long fp)
 {
 	struct ftrace_graph_ent trace;
 	unsigned long return_hooker;
@@ -592,7 +592,7 @@ unsigned long prepare_ftrace_return(unsigned long parent, unsigned long ip)
 	if (!ftrace_graph_entry(&trace))
 		goto out;
 
-	if (ftrace_push_return_trace(parent, ip, &trace.depth, 0,
+	if (ftrace_push_return_trace(parent, ip, &trace.depth, fp,
 				     NULL) == -EBUSY)
 		goto out;
 

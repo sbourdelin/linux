@@ -241,6 +241,7 @@ _GLOBAL(ftrace_graph_caller)
 
 	ld	r3, _LINK(r1)
 	subi	r4, r14, MCOUNT_INSN_SIZE	/* load saved original NIP */
+	addi	r5, r1, SWITCH_FRAME_SIZE
 
 	bl	prepare_ftrace_return
 	nop

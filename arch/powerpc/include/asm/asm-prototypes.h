@@ -124,6 +124,7 @@ extern int __ucmpdi2(u64, u64);
 
 /* tracing */
 void _mcount(void);
-unsigned long prepare_ftrace_return(unsigned long parent, unsigned long ip);
+unsigned long prepare_ftrace_return(unsigned long parent, unsigned long ip,
+					unsigned long fp);
 
 #endif /* _ASM_POWERPC_ASM_PROTOTYPES_H */

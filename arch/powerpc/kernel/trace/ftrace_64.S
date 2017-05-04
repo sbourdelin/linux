@@ -68,6 +68,7 @@ _GLOBAL(return_to_handler)
 	 */
 	ld	r2, PACATOC(r13)
 
+	addi	r3, r1, 112
 	bl	ftrace_return_to_handler
 	nop
 
