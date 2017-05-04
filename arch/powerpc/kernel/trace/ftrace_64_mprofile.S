@@ -38,9 +38,6 @@
  * and then arrange for the ftrace function to be called.
  */
 _GLOBAL(ftrace_caller)
-	/* Save the original return address in A's stack frame */
-	std	r0,LRSAVE(r1)
-
 	/* Create our stack frame + pt_regs */
 	stdu	r1,-SWITCH_FRAME_SIZE(r1)
 
@@ -271,6 +268,5 @@ _GLOBAL(ftrace_graph_caller)
 
 	addi	r1, r1, 112
 	mflr	r0
-	std	r0, LRSAVE(r1)
 	bctr
 #endif /* CONFIG_FUNCTION_GRAPH_TRACER */
