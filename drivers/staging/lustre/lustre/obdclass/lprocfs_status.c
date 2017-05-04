@@ -399,27 +399,7 @@ EXPORT_SYMBOL(lprocfs_rd_uint);
 int lprocfs_wr_uint(struct file *file, const char __user *buffer,
 		    unsigned long count, void *data)
 {
-	unsigned *p = data;
-	char dummy[MAX_STRING_SIZE + 1], *end;
-	unsigned long tmp;
-
-	if (count >= sizeof(dummy))
-		return -EINVAL;
-
-	if (count == 0)
-		return 0;
-
-	if (copy_from_user(dummy, buffer, count))
-		return -EFAULT;
-
-	dummy[count] = '\0';
-
-	tmp = simple_strtoul(dummy, &end, 0);
-	if (dummy == end)
-		return -EINVAL;
-
-	*p = (unsigned int)tmp;
-	return count;
+	return kstrtouint_from_user(buffer, count, 0, (unsigned int *)data);
 }
 EXPORT_SYMBOL(lprocfs_wr_uint);
 
