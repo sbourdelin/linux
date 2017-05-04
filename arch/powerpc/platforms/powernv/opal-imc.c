@@ -34,6 +34,7 @@
 #include <asm/imc-pmu.h>
 
 u64 nest_max_offset;
+u64 core_max_offset;
 
 static int imc_event_prop_update(char *name, struct imc_events *events)
 {
@@ -113,6 +114,10 @@ static void update_max_value(u32 value, int pmu_domain)
 	case IMC_DOMAIN_NEST:
 		if (nest_max_offset < value)
 			nest_max_offset = value;
+		break;
+	case IMC_DOMAIN_CORE:
+		if (core_max_offset < value)
+			core_max_offset = value;
 		break;
 	default:
 		/* Unknown domain, return */
@@ -357,7 +362,7 @@ free_events:
 /*
  * imc_pmu_create : Takes the parent device which is the pmu unit and a
  *                  pmu_index as the inputs.
- * Allocates memory for the pmu, sets up its domain (NEST), and
+ * Allocates memory for the pmu, sets up its domain (NEST/CORE), and
  * calls imc_events_setup() to allocate memory for the events supported
  * by this pmu. Assigns a name for the pmu. Calls imc_events_node_parser()
  * to setup the individual events.
@@ -386,7 +391,10 @@ static int imc_pmu_create(struct device_node *parent, int pmu_index, int domain)
 		goto free_pmu;
 
 	/* Needed for hotplug/migration */
-	per_nest_pmu_arr[pmu_index] = pmu_ptr;
+	if (pmu_ptr->domain == IMC_DOMAIN_CORE)
+		core_imc_pmu = pmu_ptr;
+	else if (pmu_ptr->domain == IMC_DOMAIN_NEST)
+		per_nest_pmu_arr[pmu_index] = pmu_ptr;
 
 	pp = of_find_property(parent, "name", NULL);
 	if (!pp) {
@@ -407,7 +415,10 @@ static int imc_pmu_create(struct device_node *parent, int pmu_index, int domain)
 		goto free_pmu;
 	}
 	/* Save the name to register it later */
-	sprintf(buf, "nest_%s", (char *)pp->value);
+	if (pmu_ptr->domain == IMC_DOMAIN_NEST)
+		sprintf(buf, "nest_%s", (char *)pp->value);
+	else
+		sprintf(buf, "%s_imc", (char *)pp->value);
 	pmu_ptr->pmu.name = (char *)buf;
 
 	/*
@@ -456,6 +467,17 @@ static void __init imc_pmu_setup(struct device_node *parent)
 	 */
 	for_each_compatible_node(child, NULL, IMC_DTB_NEST_COMPAT) {
 		domain = IMC_DOMAIN_NEST;
+		rc = imc_pmu_create(child, pmu_count, domain);
+		if (rc)
+			return;
+		pmu_count++;
+	}
+	/*
+	 * Loop through the imc-counters tree for each compatible
+	 * "ibm,imc-counters-core", and update "struct imc_pmu".
+	 */
+	for_each_compatible_node(child, NULL, IMC_DTB_CORE_COMPAT) {
+		domain = IMC_DOMAIN_CORE;
 		rc = imc_pmu_create(child, pmu_count, domain);
 		if (rc)
 			return;

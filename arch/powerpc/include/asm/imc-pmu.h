@@ -42,6 +42,7 @@
  */
 #define IMC_DTB_COMPAT			"ibm,opal-in-memory-counters"
 #define IMC_DTB_NEST_COMPAT		"ibm,imc-counters-nest"
+#define IMC_DTB_CORE_COMPAT		"ibm,imc-counters-core"
 
 /*
  * Structure to hold per chip specific memory address
@@ -90,13 +91,14 @@ struct imc_pmu {
  * Domains for IMC PMUs
  */
 #define IMC_DOMAIN_NEST		1
+#define IMC_DOMAIN_CORE		2
 #define IMC_DOMAIN_UNKNOWN	-1
 
 #define IMC_COUNTER_ENABLE	1
 #define IMC_COUNTER_DISABLE	0
 
-
 extern struct perchip_nest_info nest_perchip_info[IMC_MAX_CHIPS];
 extern struct imc_pmu *per_nest_pmu_arr[IMC_MAX_PMUS];
+extern struct imc_pmu *core_imc_pmu;
 extern int __init init_imc_pmu(struct imc_events *events,int idx, struct imc_pmu *pmu_ptr);
 #endif /* PPC_POWERNV_IMC_PMU_DEF_H */

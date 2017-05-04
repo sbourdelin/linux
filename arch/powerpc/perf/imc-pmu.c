@@ -24,8 +24,11 @@ static atomic_t nest_events;
 /* Used to avoid races in calling enable/disable nest-pmu units*/
 static DEFINE_MUTEX(imc_nest_reserve);
 
+struct imc_pmu *core_imc_pmu;
+
 /* Needed for sanity check */
 extern u64 nest_max_offset;
+extern u64 core_max_offset;
 
 PMU_FORMAT_ATTR(event, "config:0-20");
 static struct attribute *imc_format_attrs[] = {
