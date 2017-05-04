@@ -2142,6 +2142,7 @@ static int nf_tables_newrule(struct net *net, struct sock *nlsk,
 	struct nft_userdata *udata;
 	struct nft_trans *trans = NULL;
 	struct nft_expr *expr;
+	struct sk_buff *skb2;
 	struct nft_ctx ctx;
 	struct nlattr *tmp;
 	unsigned int size, i, n, ulen = 0, usize = 0;
@@ -2281,8 +2282,24 @@ static int nf_tables_newrule(struct net *net, struct sock *nlsk,
 		goto err3;
 	}
 	chain->use++;
-	return 0;
 
+	skb2 = alloc_skb(NLMSG_GOODSIZE, GFP_KERNEL);
+	if (!skb2) {
+		err = -ENOMEM;
+		goto err4;
+	}
+	err = nf_tables_fill_rule_info(skb2, net, NETLINK_CB(skb).portid,
+				       nlh->nlmsg_seq, NFT_MSG_NEWRULE, 0,
+				       nfmsg->nfgen_family, table, chain, rule);
+	if (err < 0)
+		goto err5;
+
+	return nlmsg_unicast(nlsk, skb2, NETLINK_CB(skb).portid);
+
+err5:
+	kfree_skb(skb2);
+err4:
+	chain->use--;
 err3:
 	list_del_rcu(&rule->list);
 err2:
