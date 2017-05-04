@@ -1527,6 +1527,9 @@ intel_hdmi_detect(struct drm_connector *connector, bool force)
 	DRM_DEBUG_KMS("[CONNECTOR:%d:%s]\n",
 		      connector->base.id, connector->name);
 
+	if (intel_shared_digital_port_in_use(connector))
+		return connector_status_disconnected;;
+
 	intel_display_power_get(dev_priv, POWER_DOMAIN_GMBUS);
 
 	intel_hdmi_unset_edid(connector);

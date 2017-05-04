@@ -11271,6 +11271,32 @@ static bool check_digital_port_conflicts(struct drm_atomic_state *state)
 	return true;
 }
 
+bool intel_shared_digital_port_in_use(struct drm_connector *conn)
+{
+	struct drm_connector *peer;
+	struct drm_connector_list_iter iter;
+	struct intel_encoder *enc = to_intel_connector(conn)->encoder;
+	int ret = false;
+
+	drm_connector_list_iter_begin(conn->dev, &iter);
+	drm_for_each_connector_iter(peer, &iter) {
+		struct intel_encoder *peer_enc;
+
+		if (peer == conn ||
+		    peer->status != connector_status_connected)
+			continue;
+
+		peer_enc = to_intel_connector(peer)->encoder;
+		if (peer_enc->port == enc->port) {
+			ret = true;
+			break;
+		}
+	}
+	drm_connector_list_iter_end(&iter);
+
+	return ret;
+}
+
 static void
 clear_intel_crtc_state(struct intel_crtc_state *crtc_state)
 {
