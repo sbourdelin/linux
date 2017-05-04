@@ -5,6 +5,8 @@
 
 extern struct klp_patch *klp_transition_patch;
 
+extern bool klp_block_patch_removal;
+
 void klp_init_transition(struct klp_patch *patch, int state);
 void klp_cancel_transition(void);
 void klp_start_transition(void);

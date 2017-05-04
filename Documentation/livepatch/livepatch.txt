@@ -491,6 +491,10 @@ The current Livepatch implementation has several limitations:
     functions using immediate patches. But this is hard to detect properly
     in the ftrace handler, so the warning is always printed.
 
+    Also we are not able to detect when the code is not longer used in
+    the problematic context. We rather disable removing of livepatches
+    to avoid more possible damage.
+
 
   + Livepatch works reliably only when the dynamic ftrace is located at
     the very beginning of the function.

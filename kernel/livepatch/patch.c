@@ -67,8 +67,10 @@ static void notrace klp_ftrace_handler(unsigned long ip,
 	 * the RCU infrastructure. Then we might see wrong state of
 	 * func->stack and other flags.
 	 */
-	if (unlikely(!rcu_is_watching()))
+	if (unlikely(!rcu_is_watching())) {
+		klp_block_patch_removal = true;
 		WARN_ONCE(1, "Livepatch modified a function that can not be handled a safe way.!");
+	}
 
 	rcu_read_lock();
 

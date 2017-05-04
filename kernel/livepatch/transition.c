@@ -31,6 +31,8 @@
 
 struct klp_patch *klp_transition_patch;
 
+bool klp_block_patch_removal;
+
 static int klp_target_state = KLP_UNDEFINED;
 
 /*
@@ -87,8 +89,11 @@ static void klp_complete_transition(void)
 		}
 	}
 
-	if (klp_target_state == KLP_UNPATCHED && !immediate_func)
+	if (klp_target_state == KLP_UNPATCHED &&
+	    !immediate_func &&
+	    !klp_block_patch_removal) {
 		module_put(klp_transition_patch->mod);
+	}
 
 	/* Prevent klp_ftrace_handler() from seeing KLP_UNDEFINED state */
 	if (klp_target_state == KLP_PATCHED)
