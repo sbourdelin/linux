@@ -813,22 +813,23 @@ static int punch_hole(struct inode *inode, loff_t offset, loff_t len)
 	off_start = offset & (PAGE_SIZE - 1);
 	off_end = (offset + len) & (PAGE_SIZE - 1);
 
+	down_write(&F2FS_I(inode)->i_mmap_sem);
 	if (pg_start == pg_end) {
 		ret = fill_zero(inode, pg_start, off_start,
 						off_end - off_start);
 		if (ret)
-			return ret;
+			goto out;
 	} else {
 		if (off_start) {
 			ret = fill_zero(inode, pg_start++, off_start,
 						PAGE_SIZE - off_start);
 			if (ret)
-				return ret;
+				goto out;
 		}
 		if (off_end) {
 			ret = fill_zero(inode, pg_end, 0, off_end);
 			if (ret)
-				return ret;
+				goto out;
 		}
 
 		if (pg_start < pg_end) {
@@ -849,6 +850,8 @@ static int punch_hole(struct inode *inode, loff_t offset, loff_t len)
 		}
 	}
 
+out:
+	up_write(&F2FS_I(inode)->i_mmap_sem);
 	return ret;
 }
 
@@ -1084,16 +1087,17 @@ static int f2fs_collapse_range(struct inode *inode, loff_t offset, loff_t len)
 	pg_start = offset >> PAGE_SHIFT;
 	pg_end = (offset + len) >> PAGE_SHIFT;
 
+	down_write(&F2FS_I(inode)->i_mmap_sem);
 	/* write out all dirty pages from offset */
 	ret = filemap_write_and_wait_range(inode->i_mapping, offset, LLONG_MAX);
 	if (ret)
-		return ret;
+		goto out;
 
 	truncate_pagecache(inode, offset);
 
 	ret = f2fs_do_collapse(inode, pg_start, pg_end);
 	if (ret)
-		return ret;
+		goto out;
 
 	/* write out all moved pages, if possible */
 	filemap_write_and_wait_range(inode->i_mapping, offset, LLONG_MAX);
@@ -1106,6 +1110,8 @@ static int f2fs_collapse_range(struct inode *inode, loff_t offset, loff_t len)
 	if (!ret)
 		f2fs_i_size_write(inode, new_size);
 
+out:
+	up_write(&F2FS_I(inode)->i_mmap_sem);
 	return ret;
 }
 
@@ -1182,11 +1188,12 @@ static int f2fs_zero_range(struct inode *inode, loff_t offset, loff_t len,
 	off_start = offset & (PAGE_SIZE - 1);
 	off_end = (offset + len) & (PAGE_SIZE - 1);
 
+	down_write(&F2FS_I(inode)->i_mmap_sem);
 	if (pg_start == pg_end) {
 		ret = fill_zero(inode, pg_start, off_start,
 						off_end - off_start);
 		if (ret)
-			return ret;
+			goto unlock;
 
 		if (offset + len > new_size)
 			new_size = offset + len;
@@ -1196,7 +1203,7 @@ static int f2fs_zero_range(struct inode *inode, loff_t offset, loff_t len,
 			ret = fill_zero(inode, pg_start++, off_start,
 						PAGE_SIZE - off_start);
 			if (ret)
-				return ret;
+				goto unlock;
 
 			new_size = max_t(loff_t, new_size,
 					(loff_t)pg_start << PAGE_SHIFT);
@@ -1245,6 +1252,8 @@ static int f2fs_zero_range(struct inode *inode, loff_t offset, loff_t len,
 out:
 	if (!(mode & FALLOC_FL_KEEP_SIZE) && i_size_read(inode) < new_size)
 		f2fs_i_size_write(inode, new_size);
+unlock:
+	up_write(&F2FS_I(inode)->i_mmap_sem);
 
 	return ret;
 }
@@ -1271,16 +1280,17 @@ static int f2fs_insert_range(struct inode *inode, loff_t offset, loff_t len)
 	if (ret)
 		return ret;
 
+	down_write(&F2FS_I(inode)->i_mmap_sem);
 	f2fs_balance_fs(sbi, true);
 
 	ret = truncate_blocks(inode, i_size_read(inode), true);
 	if (ret)
-		return ret;
+		goto out;
 
 	/* write out all dirty pages from offset */
 	ret = filemap_write_and_wait_range(inode->i_mapping, offset, LLONG_MAX);
 	if (ret)
-		return ret;
+		goto out;
 
 	truncate_pagecache(inode, offset);
 
@@ -1309,6 +1319,8 @@ static int f2fs_insert_range(struct inode *inode, loff_t offset, loff_t len)
 
 	if (!ret)
 		f2fs_i_size_write(inode, new_size);
+out:
+	up_write(&F2FS_I(inode)->i_mmap_sem);
 	return ret;
 }
 
