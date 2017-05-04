@@ -1252,7 +1252,7 @@ static void gen8_dump_pdp(struct i915_hw_ppgtt *ppgtt,
 					else
 						seq_puts(m, "  SCRATCH ");
 				}
-				seq_puts(m, "\n");
+				seq_putc(m, '\n');
 			}
 			kunmap_atomic(pt_vaddr);
 		}
@@ -1435,7 +1435,7 @@ static void gen6_dump_ppgtt(struct i915_hw_ppgtt *ppgtt, struct seq_file *m)
 				else
 					seq_puts(m, "  SCRATCH ");
 			}
-			seq_puts(m, "\n");
+			seq_putc(m, '\n');
 		}
 		kunmap_atomic(pt_vaddr);
 	}
