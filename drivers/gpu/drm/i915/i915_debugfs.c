@@ -3191,8 +3191,7 @@ static int i915_display_info(struct seq_file *m, void *unused)
 	struct drm_connector_list_iter conn_iter;
 
 	intel_runtime_pm_get(dev_priv);
-	seq_printf(m, "CRTC info\n");
-	seq_printf(m, "---------\n");
+	seq_puts(m, "CRTC info\n---------\n");
 	for_each_intel_crtc(dev, crtc) {
 		bool active;
 		struct intel_crtc_state *pipe_config;
@@ -3226,9 +3225,7 @@ static int i915_display_info(struct seq_file *m, void *unused)
 		drm_modeset_unlock(&crtc->base.mutex);
 	}
 
-	seq_printf(m, "\n");
-	seq_printf(m, "Connector info\n");
-	seq_printf(m, "--------------\n");
+	seq_puts(m, "\nConnector info\n--------------\n");
 	mutex_lock(&dev->mode_config.mutex);
 	drm_connector_list_iter_begin(dev, &conn_iter);
 	drm_for_each_connector_iter(connector, &conn_iter)
