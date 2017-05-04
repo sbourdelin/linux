@@ -2903,16 +2903,14 @@ int i915_ggtt_probe_hw(struct drm_i915_private *dev_priv)
 	}
 
 	if ((ggtt->base.total - 1) >> 32) {
-		DRM_ERROR("We never expected a Global GTT with more than 32bits"
-			  " of address space! Found %lldM!\n",
+		DRM_ERROR("We never expected a Global GTT with more than 32bits of address space! Found %lldM!\n",
 			  ggtt->base.total >> 20);
 		ggtt->base.total = 1ULL << 32;
 		ggtt->mappable_end = min(ggtt->mappable_end, ggtt->base.total);
 	}
 
 	if (ggtt->mappable_end > ggtt->base.total) {
-		DRM_ERROR("mappable aperture extends past end of GGTT,"
-			  " aperture=%llx, total=%llx\n",
+		DRM_ERROR("mappable aperture extends past end of GGTT, aperture=%llx, total=%llx\n",
 			  ggtt->mappable_end, ggtt->base.total);
 		ggtt->mappable_end = ggtt->base.total;
 	}
