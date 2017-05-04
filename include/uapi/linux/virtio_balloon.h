@@ -35,6 +35,7 @@
 #define VIRTIO_BALLOON_F_STATS_VQ	1 /* Memory Stats virtqueue */
 #define VIRTIO_BALLOON_F_DEFLATE_ON_OOM	2 /* Deflate balloon on OOM */
 #define VIRTIO_BALLOON_F_PAGE_CHUNKS	3 /* Inflate/Deflate pages in chunks */
+#define VIRTIO_BALLOON_F_MISC_VQ	4 /* Virtqueue for misc. requests */
 
 /* Size of a PFN in the balloon interface. */
 #define VIRTIO_BALLOON_PFN_SHIFT 12
@@ -94,6 +95,17 @@ struct virtio_balloon_page_chunk {
 	/* Number of chunks in the payload */
 	__le64 chunk_num;
 	struct virtio_balloon_page_chunk_entry entry[];
+};
+
+struct virtio_balloon_miscq_msg {
+#define VIRTIO_BALLOON_MISCQ_CMD_REPORT_UNUSED_PAGES 0
+	__le32 cmd;
+/* Flag to indicate the completion of handling a command */
+#define VIRTIO_BALLOON_MISCQ_F_COMPLETION	1
+	__le32 flags;
+	union {
+		struct virtio_balloon_page_chunk chunk;
+	} payload;
 };
 
 #endif /* _LINUX_VIRTIO_BALLOON_H */
