@@ -175,11 +175,26 @@ intel_dp_aux_display_control_capable(struct intel_connector *connector)
 	return false;
 }
 
+static bool
+intel_dp_pwm_pin_display_control_capable(struct intel_connector *connector)
+{
+	struct intel_dp *intel_dp = enc_to_intel_dp(&connector->encoder->base);
+
+	/* Check the  eDP Display control capabilities registers to determine if
+	 * the panel can support backlight control via BL_PWM_DIM eDP pin
+	 */
+	return intel_dp->edp_dpcd[2] & DP_EDP_BACKLIGHT_BRIGHTNESS_PWM_PIN_CAP;
+}
+
 int intel_dp_aux_init_backlight_funcs(struct intel_connector *intel_connector)
 {
 	struct intel_panel *panel = &intel_connector->panel;
 
-	if (!i915.enable_dpcd_backlight)
+	if (i915.enable_dpcd_backlight == -1)
+		return -ENODEV;
+
+	if (i915.enable_dpcd_backlight == 0 &&
+	    intel_dp_pwm_pin_display_control_capable(intel_connector))
 		return -ENODEV;
 
 	if (!intel_dp_aux_display_control_capable(intel_connector))
