@@ -491,7 +491,7 @@ static int fwevtq_handler(struct sge_rspq *rspq, const __be64 *rsp,
 			break;
 		}
 		tq = s->egr_map[eq_idx];
-		if (unlikely(tq == NULL)) {
+		if (unlikely(!tq)) {
 			dev_err(adapter->pdev_dev,
 				"Egress Update QID %d TXQ=NULL\n", qid);
 			break;
@@ -2939,7 +2939,7 @@ static int cxgb4vf_pci_probe(struct pci_dev *pdev,
 		 */
 		netdev = alloc_etherdev_mq(sizeof(struct port_info),
 					   MAX_PORT_QSETS);
-		if (netdev == NULL) {
+		if (!netdev) {
 			t4vf_free_vi(adapter, viid);
 			err = -ENOMEM;
 			goto err_free_dev;
@@ -3053,7 +3053,7 @@ static int cxgb4vf_pci_probe(struct pci_dev *pdev,
 	for_each_port(adapter, pidx) {
 		struct port_info *pi = netdev_priv(adapter->port[pidx]);
 		netdev = adapter->port[pidx];
-		if (netdev == NULL)
+		if (!netdev)
 			continue;
 
 		netif_set_real_num_tx_queues(netdev, pi->nqsets);
@@ -3120,7 +3120,7 @@ err_disable_interrupts:
 err_free_dev:
 	for_each_port(adapter, pidx) {
 		netdev = adapter->port[pidx];
-		if (netdev == NULL)
+		if (!netdev)
 			continue;
 		pi = netdev_priv(netdev);
 		t4vf_free_vi(adapter, pi->viid);
@@ -3197,7 +3197,7 @@ static void cxgb4vf_pci_remove(struct pci_dev *pdev)
 			struct net_device *netdev = adapter->port[pidx];
 			struct port_info *pi;
 
-			if (netdev == NULL)
+			if (!netdev)
 				continue;
 
 			pi = netdev_priv(netdev);
