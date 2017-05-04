@@ -2625,6 +2625,14 @@ static int arm_smmu_device_hw_probe(struct arm_smmu_device *smmu)
 }
 
 #ifdef CONFIG_ACPI
+static void acpi_smmu_get_options(u32 model, struct arm_smmu_device *smmu)
+{
+	if (model == ACPI_IORT_SMMU_V3_CAVIUM_CN99XX)
+		smmu->options |= ARM_SMMU_OPT_PAGE0_REGS_ONLY;
+
+	dev_notice(smmu->dev, "option mask 0x%x\n", smmu->options);
+}
+
 static int arm_smmu_device_acpi_probe(struct platform_device *pdev,
 				      struct arm_smmu_device *smmu)
 {
@@ -2636,6 +2644,8 @@ static int arm_smmu_device_acpi_probe(struct platform_device *pdev,
 
 	/* Retrieve SMMUv3 specific data */
 	iort_smmu = (struct acpi_iort_smmu_v3 *)node->node_data;
+
+	acpi_smmu_get_options(iort_smmu->model, smmu);
 
 	if (iort_smmu->flags & ACPI_IORT_SMMU_V3_COHACC_OVERRIDE)
 		smmu->features |= ARM_SMMU_FEAT_COHERENCY;
