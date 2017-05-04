@@ -42,6 +42,7 @@
  * IMC Core engine expects 8K bytes of memory for counter collection.
  */
 #define IMC_CORE_COUNTER_MEM		8192
+#define IMC_THREAD_COUNTER_MEM		8192
 
 /*
  *Compatbility macros for IMC devices
@@ -50,6 +51,9 @@
 #define IMC_DTB_NEST_COMPAT		"ibm,imc-counters-nest"
 #define IMC_DTB_CORE_COMPAT		"ibm,imc-counters-core"
 #define IMC_DTB_THREAD_COMPAT		"ibm,imc-counters-thread"
+
+#define THREAD_IMC_LDBAR_MASK           0x0003ffffffffe000
+#define THREAD_IMC_ENABLE               0x8000000000000000
 
 /*
  * Structure to hold per chip specific memory address
@@ -110,4 +114,5 @@ extern struct imc_pmu *per_nest_pmu_arr[IMC_MAX_PMUS];
 extern struct imc_pmu *core_imc_pmu;
 extern int __init init_imc_pmu(struct imc_events *events,int idx, struct imc_pmu *pmu_ptr);
 void core_imc_disable(void);
+void thread_imc_disable(void);
 #endif /* PPC_POWERNV_IMC_PMU_DEF_H */
