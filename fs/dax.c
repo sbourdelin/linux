@@ -55,7 +55,7 @@ static int __init init_dax_wait_table(void)
 }
 fs_initcall(init_dax_wait_table);
 
-static long dax_map_atomic(struct block_device *bdev, struct blk_dax_ctl *dax)
+long dax_map_atomic(struct block_device *bdev, struct blk_dax_ctl *dax)
 {
 	struct request_queue *q = bdev->bd_queue;
 	long rc = -EIO;
@@ -72,14 +72,16 @@ static long dax_map_atomic(struct block_device *bdev, struct blk_dax_ctl *dax)
 	}
 	return rc;
 }
+EXPORT_SYMBOL_GPL(dax_map_atomic);
 
-static void dax_unmap_atomic(struct block_device *bdev,
+void dax_unmap_atomic(struct block_device *bdev,
 		const struct blk_dax_ctl *dax)
 {
 	if (IS_ERR(dax->addr))
 		return;
 	blk_queue_exit(bdev->bd_queue);
 }
+EXPORT_SYMBOL_GPL(dax_unmap_atomic);
 
 static int dax_is_pmd_entry(void *entry)
 {

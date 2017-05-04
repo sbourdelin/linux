@@ -7,6 +7,7 @@
 #include <asm/pgtable.h>
 
 struct iomap_ops;
+struct blk_dax_ctl;
 
 /*
  * We use lowest available bit in exceptional entry for locking, one bit for
@@ -36,6 +37,8 @@ static inline void *dax_radix_locked_entry(sector_t sector, unsigned long flags)
 			RADIX_DAX_ENTRY_LOCK);
 }
 
+long dax_map_atomic(struct block_device *bdev, struct blk_dax_ctl *dax);
+void dax_unmap_atomic(struct block_device *bdev, const struct blk_dax_ctl *dax);
 ssize_t dax_iomap_rw(struct kiocb *iocb, struct iov_iter *iter,
 		const struct iomap_ops *ops);
 int dax_iomap_fault(struct vm_fault *vmf, enum page_entry_size pe_size,
