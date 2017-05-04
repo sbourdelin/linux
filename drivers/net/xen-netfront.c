@@ -1426,6 +1426,9 @@ static int netfront_resume(struct xenbus_device *dev)
 {
 	struct netfront_info *info = dev_get_drvdata(&dev->dev);
 
+	if (!info)
+		return 0;
+
 	dev_dbg(&dev->dev, "%s\n", dev->nodename);
 
 	xennet_disconnect_backend(info);
@@ -1936,6 +1939,7 @@ abort_transaction_no_dev_fatal:
  out:
 	unregister_netdev(info->netdev);
 	xennet_free_netdev(info->netdev);
+	dev_set_drvdata(&dev->dev, NULL);
 	return err;
 }
 
@@ -1997,7 +2001,12 @@ static void netback_changed(struct xenbus_device *dev,
 			    enum xenbus_state backend_state)
 {
 	struct netfront_info *np = dev_get_drvdata(&dev->dev);
-	struct net_device *netdev = np->netdev;
+	struct net_device *netdev;
+
+	if (!np)
+		return;
+
+	netdev = np->netdev;
 
 	dev_dbg(&dev->dev, "%s\n", xenbus_strstate(backend_state));
 
