@@ -23,6 +23,8 @@
 #include <linux/uio.h>
 #include <linux/uuid.h>
 #include <linux/file.h>
+#include <linux/dax.h>
+#include <linux/iomap.h>
 
 #include "f2fs.h"
 #include "node.h"
@@ -105,6 +107,64 @@ static const struct vm_operations_struct f2fs_file_vm_ops = {
 	.map_pages	= filemap_map_pages,
 	.page_mkwrite	= f2fs_vm_page_mkwrite,
 };
+
+#ifdef CONFIG_FS_DAX
+static int f2fs_dax_huge_fault(struct vm_fault *vmf,
+	enum page_entry_size pe_size)
+{
+	int result;
+	struct inode *inode = file_inode(vmf->vma->vm_file);
+	struct super_block *sb = inode->i_sb;
+	bool write = vmf->flags & FAULT_FLAG_WRITE;
+
+	if (write) {
+		sb_start_pagefault(sb);
+		file_update_time(vmf->vma->vm_file);
+	}
+	down_read(&F2FS_I(inode)->i_mmap_sem);
+	result = dax_iomap_fault(vmf, pe_size, &f2fs_iomap_ops);
+	up_read(&F2FS_I(inode)->i_mmap_sem);
+	if (write)
+		sb_end_pagefault(sb);
+
+	return result;
+}
+
+static int f2fs_dax_fault(struct vm_fault *vmf)
+{
+	return f2fs_dax_huge_fault(vmf, PE_SIZE_PTE);
+}
+
+static int f2fs_dax_pfn_mkwrite(struct vm_fault *vmf)
+{
+	struct inode *inode = file_inode(vmf->vma->vm_file);
+	struct super_block *sb = inode->i_sb;
+	loff_t size;
+	int ret;
+
+	sb_start_pagefault(sb);
+	file_update_time(vmf->vma->vm_file);
+	down_read(&F2FS_I(inode)->i_mmap_sem);
+	size = (i_size_read(inode) + PAGE_SIZE - 1) >> PAGE_SHIFT;
+	if (vmf->pgoff >= size)
+		ret = VM_FAULT_SIGBUS;
+	else
+		ret = dax_pfn_mkwrite(vmf);
+	up_read(&F2FS_I(inode)->i_mmap_sem);
+	sb_end_pagefault(sb);
+
+	return ret;
+}
+
+static const struct vm_operations_struct f2fs_dax_vm_ops = {
+	.fault		= f2fs_dax_fault,
+	.huge_fault	= f2fs_dax_huge_fault,
+	.page_mkwrite	= f2fs_dax_fault,
+	.pfn_mkwrite	= f2fs_dax_pfn_mkwrite,
+};
+#else
+#define f2fs_dax_vm_ops f2fs_file_vm_ops
+#endif
 
 static int get_parent_ino(struct inode *inode, nid_t *pino)
 {
@@ -434,7 +494,13 @@ static int f2fs_file_mmap(struct file *file, struct vm_area_struct *vma)
 		return err;
 
 	file_accessed(file);
-	vma->vm_ops = &f2fs_file_vm_ops;
+	if (IS_DAX(file_inode(file))) {
+		vma->vm_ops = &f2fs_dax_vm_ops;
+		vma->vm_flags |= VM_MIXEDMAP | VM_HUGEPAGE;
+	} else {
+		vma->vm_ops = &f2fs_file_vm_ops;
+	}
+
 	return 0;
 }
 
@@ -517,6 +583,18 @@ static int truncate_partial_data_page(struct inode *inode, u64 from,
 
 	if (!offset && !cache_only)
 		return 0;
+
+#ifdef CONFIG_FS_DAX
+	if (IS_DAX(inode)) {
+		int ret;
+
+		down_read(&F2FS_I(inode)->dio_rwsem[WRITE]);
+		ret = iomap_zero_range(inode, from, PAGE_SIZE - offset,
+			NULL, &f2fs_iomap_ops);
+		up_read(&F2FS_I(inode)->dio_rwsem[WRITE]);
+		return ret;
+	}
+#endif
 
 	if (cache_only) {
 		page = find_lock_page(mapping, index);
@@ -749,6 +827,19 @@ static int fill_zero(struct inode *inode, pgoff_t index,
 
 	if (!len)
 		return 0;
+
+#ifdef CONFIG_FS_DAX
+	if (IS_DAX(inode)) {
+		int ret;
+
+		down_read(&F2FS_I(inode)->dio_rwsem[WRITE]);
+		ret = iomap_zero_range(inode,
+			F2FS_BLK_TO_BYTES((loff_t)index) + start,
+			len, NULL, &f2fs_iomap_ops);
+		up_read(&F2FS_I(inode)->dio_rwsem[WRITE]);
+		return ret;
+	}
+#endif
 
 	f2fs_balance_fs(sbi, true);
 
@@ -1073,6 +1164,12 @@ static int f2fs_collapse_range(struct inode *inode, loff_t offset, loff_t len)
 	loff_t new_size;
 	int ret;
 
+#ifdef CONFIG_FS_DAX
+	/* The original implementation does not apply to DAX files. */
+	if (IS_DAX(inode))
+		return -EINVAL;
+#endif
+
 	if (offset + len >= i_size_read(inode))
 		return -EINVAL;
 
@@ -1264,6 +1361,12 @@ static int f2fs_insert_range(struct inode *inode, loff_t offset, loff_t len)
 	pgoff_t nr, pg_start, pg_end, delta, idx;
 	loff_t new_size;
 	int ret = 0;
+
+#ifdef CONFIG_FS_DAX
+	/* The original implementation does not apply to DAX files. */
+	if (IS_DAX(inode))
+		return -EINVAL;
+#endif
 
 	new_size = i_size_read(inode) + len;
 	if (new_size > inode->i_sb->s_maxbytes)
@@ -1527,6 +1630,11 @@ static int f2fs_ioc_start_atomic_write(struct file *filp)
 	if (!inode_owner_or_capable(inode))
 		return -EACCES;
 
+#ifdef CONFIG_FS_DAX
+	if (IS_DAX(inode))
+		return -EINVAL;
+#endif
+
 	ret = mnt_want_write_file(filp);
 	if (ret)
 		return ret;
@@ -1568,6 +1676,11 @@ static int f2fs_ioc_commit_atomic_write(struct file *filp)
 	if (!inode_owner_or_capable(inode))
 		return -EACCES;
 
+#ifdef CONFIG_FS_DAX
+	if (IS_DAX(inode))
+		return -EINVAL;
+#endif
+
 	ret = mnt_want_write_file(filp);
 	if (ret)
 		return ret;
@@ -1604,6 +1717,11 @@ static int f2fs_ioc_start_volatile_write(struct file *filp)
 	if (!inode_owner_or_capable(inode))
 		return -EACCES;
 
+#ifdef CONFIG_FS_DAX
+	if (IS_DAX(inode))
+		return -EINVAL;
+#endif
+
 	ret = mnt_want_write_file(filp);
 	if (ret)
 		return ret;
@@ -1633,6 +1751,11 @@ static int f2fs_ioc_release_volatile_write(struct file *filp)
 	if (!inode_owner_or_capable(inode))
 		return -EACCES;
 
+#ifdef CONFIG_FS_DAX
+	if (IS_DAX(inode))
+		return -EINVAL;
+#endif
+
 	ret = mnt_want_write_file(filp);
 	if (ret)
 		return ret;
@@ -1661,6 +1784,11 @@ static int f2fs_ioc_abort_volatile_write(struct file *filp)
 
 	if (!inode_owner_or_capable(inode))
 		return -EACCES;
+
+#ifdef CONFIG_FS_DAX
+	if (IS_DAX(inode))
+		return -EINVAL;
+#endif
 
 	ret = mnt_want_write_file(filp);
 	if (ret)
@@ -2252,6 +2380,64 @@ long f2fs_ioctl(struct file *filp, unsigned int cmd, unsigned long arg)
 	}
 }
 
+#ifdef CONFIG_FS_DAX
+static ssize_t f2fs_dax_read_iter(struct kiocb *iocb, struct iov_iter *to)
+{
+	struct inode *inode = file_inode(iocb->ki_filp);
+	ssize_t ret;
+
+	inode_lock_shared(inode);
+
+	if (!IS_DAX(inode)) {
+		inode_unlock_shared(inode);
+		return generic_file_read_iter(iocb, to);
+	}
+
+	down_read(&F2FS_I(inode)->dio_rwsem[READ]);
+	ret = dax_iomap_rw(iocb, to, &f2fs_iomap_ops);
+	up_read(&F2FS_I(inode)->dio_rwsem[READ]);
+	inode_unlock_shared(inode);
+
+	file_accessed(iocb->ki_filp);
+	return ret;
+}
+
+static ssize_t f2fs_file_read_iter(struct kiocb *iocb, struct iov_iter *to)
+{
+	if (!iov_iter_count(to))
+		return 0; /* skip atime */
+
+	if (IS_DAX(file_inode(iocb->ki_filp)))
+		return f2fs_dax_read_iter(iocb, to);
+
+	return generic_file_read_iter(iocb, to);
+}
+
+static ssize_t f2fs_dax_write_iter(struct kiocb *iocb, struct iov_iter *from)
+{
+	struct inode *inode = file_inode(iocb->ki_filp);
+	ssize_t ret;
+
+	ret = file_remove_privs(iocb->ki_filp);
+	if (ret)
+		return ret;
+	ret = file_update_time(iocb->ki_filp);
+	if (ret)
+		return ret;
+
+	down_read(&F2FS_I(inode)->dio_rwsem[WRITE]);
+	ret = dax_iomap_rw(iocb, from, &f2fs_iomap_ops);
+	up_read(&F2FS_I(inode)->dio_rwsem[WRITE]);
+
+	return ret;
+}
+#else
+static ssize_t f2fs_dax_write_iter(struct kiocb *iocb, struct iov_iter *from)
+{
+	return __generic_file_write_iter(iocb, from);
+}
+#endif
+
 static ssize_t f2fs_file_write_iter(struct kiocb *iocb, struct iov_iter *from)
 {
 	struct file *file = iocb->ki_filp;
@@ -2278,7 +2464,10 @@ static ssize_t f2fs_file_write_iter(struct kiocb *iocb, struct iov_iter *from)
 			return err;
 		}
 		blk_start_plug(&plug);
-		ret = __generic_file_write_iter(iocb, from);
+		if (IS_DAX(inode))
+			ret = f2fs_dax_write_iter(iocb, from);
+		else
+			ret = __generic_file_write_iter(iocb, from);
 		blk_finish_plug(&plug);
 		clear_inode_flag(inode, FI_NO_PREALLOC);
 	}
@@ -2326,7 +2515,11 @@ long f2fs_compat_ioctl(struct file *file, unsigned int cmd, unsigned long arg)
 
 const struct file_operations f2fs_file_operations = {
 	.llseek		= f2fs_llseek,
+#ifdef CONFIG_FS_DAX
+	.read_iter	= f2fs_file_read_iter,
+#else
 	.read_iter	= generic_file_read_iter,
+#endif
 	.write_iter	= f2fs_file_write_iter,
 	.open		= f2fs_file_open,
 	.release	= f2fs_release_file,

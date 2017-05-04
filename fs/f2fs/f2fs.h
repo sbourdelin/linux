@@ -87,6 +87,11 @@ extern char *fault_name[FAULT_MAX];
 #define F2FS_MOUNT_FAULT_INJECTION	0x00010000
 #define F2FS_MOUNT_ADAPTIVE		0x00020000
 #define F2FS_MOUNT_LFS			0x00040000
+#ifdef CONFIG_FS_DAX
+#define F2FS_MOUNT_DAX			0x00080000 /* Direct Access */
+#else
+#define F2FS_MOUNT_DAX			0
+#endif
 
 #define clear_opt(sbi, option)	(sbi->mount_opt.opt &= ~F2FS_MOUNT_##option)
 #define set_opt(sbi, option)	(sbi->mount_opt.opt |= F2FS_MOUNT_##option)
@@ -2063,6 +2068,9 @@ int update_inode_page(struct inode *inode);
 int f2fs_write_inode(struct inode *inode, struct writeback_control *wbc);
 void f2fs_evict_inode(struct inode *inode);
 void handle_failed_inode(struct inode *inode);
+#ifdef CONFIG_FS_DAX
+extern struct iomap_ops f2fs_iomap_ops;
+#endif
 
 /*
  * namei.c

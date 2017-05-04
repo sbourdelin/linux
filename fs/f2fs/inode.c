@@ -13,6 +13,7 @@
 #include <linux/buffer_head.h>
 #include <linux/backing-dev.h>
 #include <linux/writeback.h>
+#include <linux/iomap.h>
 
 #include "f2fs.h"
 #include "node.h"
@@ -478,3 +479,90 @@ void handle_failed_inode(struct inode *inode)
 	/* iput will drop the inode object */
 	iput(inode);
 }
+
+#ifdef CONFIG_FS_DAX
+static int f2fs_iomap_begin(struct inode *inode, loff_t offset,
+	loff_t length, unsigned int flags, struct iomap *iomap)
+{
+	unsigned long first_block = F2FS_BYTES_TO_BLK(offset);
+	unsigned long last_block = F2FS_BYTES_TO_BLK(offset + length - 1);
+	struct f2fs_map_blocks map;
+	int ret;
+	loff_t original_i_size = i_size_read(inode);
+
+	if (WARN_ON_ONCE(f2fs_has_inline_data(inode)))
+		return -ERANGE;
+
+	map.m_lblk = first_block;
+	map.m_len = last_block - first_block + 1;
+	map.m_next_pgofs = NULL;
+
+	if (!(flags & IOMAP_WRITE))
+		ret = f2fs_map_blocks(inode, &map, 0, F2FS_GET_BLOCK_READ);
+	else {
+		ret = f2fs_map_blocks(inode, &map, 1, F2FS_GET_BLOCK_PRE_DIO);
+	/* i_size should be kept here and changed later in f2fs_iomap_end */
+		if (i_size_read(inode) != original_i_size)
+			f2fs_i_size_write(inode, original_i_size);
+	}
+
+	if (ret)
+		return ret;
+
+	iomap->flags = 0;
+	iomap->bdev = inode->i_sb->s_bdev;
+	iomap->offset = F2FS_BLK_TO_BYTES((u64)first_block);
+
+	if (map.m_len == 0) {
+		iomap->type = IOMAP_HOLE;
+		iomap->blkno = IOMAP_NULL_BLOCK;
+		iomap->length = F2FS_BLKSIZE;
+	} else {
+		if (map.m_flags & F2FS_MAP_MAPPED) {
+			iomap->type = IOMAP_MAPPED;
+		} else if (map.m_flags & F2FS_MAP_UNWRITTEN) {
+			iomap->type = IOMAP_UNWRITTEN;
+		} else {
+			WARN_ON_ONCE(1);
+			return -EIO;
+		}
+		iomap->blkno =
+			(sector_t)map.m_pblk << F2FS_LOG_SECTORS_PER_BLOCK;
+		iomap->length = F2FS_BLK_TO_BYTES((u64)map.m_len);
+	}
+
+	if (map.m_flags & F2FS_MAP_NEW)
+		iomap->flags |= IOMAP_F_NEW;
+	return 0;
+}
+
+static int f2fs_iomap_end(struct inode *inode, loff_t offset, loff_t length,
+	ssize_t written, unsigned int flags, struct iomap *iomap)
+{
+	if (!(flags & IOMAP_WRITE) || (flags & IOMAP_FAULT))
+		return 0;
+
+	if (offset + written > i_size_read(inode))
+		f2fs_i_size_write(inode, offset + written);
+
+	if (iomap->offset + iomap->length >
+			ALIGN(inode->i_size, F2FS_BLKSIZE)) {
+		block_t written_blk = F2FS_BYTES_TO_BLK(offset + written);
+		block_t end_blk = F2FS_BYTES_TO_BLK(offset + length);
+
+		if (written_blk < end_blk) {
+			down_write(&F2FS_I(inode)->i_mmap_sem);
+			truncate_inode_pages(inode->i_mapping, inode->i_size);
+			f2fs_truncate(inode);
+			up_write(&F2FS_I(inode)->i_mmap_sem);
+		}
+	}
+
+	return 0;
+}
+
+struct iomap_ops f2fs_iomap_ops = {
+	.iomap_begin	= f2fs_iomap_begin,
+	.iomap_end		= f2fs_iomap_end,
+};
+#endif
