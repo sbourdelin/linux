@@ -357,9 +357,8 @@ static int cim_qcfg_show(struct seq_file *seq, void *v)
 		return i;
 
 	t4_read_cimq_cfg(adap, base, size, thres);
-
-	seq_printf(seq,
-		   "  Queue  Base  Size Thres  RdPtr WrPtr  SOP  EOP Avail\n");
+	seq_puts(seq,
+		 "  Queue  Base  Size Thres  RdPtr WrPtr  SOP  EOP Avail\n");
 	for (i = 0; i < CIM_NUM_IBQ; i++, p += 4)
 		seq_printf(seq, "%7s %5x %5u %5u %6x  %4x %4u %4u %5u\n",
 			   qname[i], base[i], size[i], thres[i],
