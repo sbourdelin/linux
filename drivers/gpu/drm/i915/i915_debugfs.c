@@ -2358,7 +2358,7 @@ static int i915_llc(struct seq_file *m, void *data)
 
 	seq_printf(m, "LLC: %s\n", yesno(HAS_LLC(dev_priv)));
 	seq_printf(m, "%s: %lluMB\n", edram ? "eDRAM" : "eLLC",
-		   intel_uncore_edram_size(dev_priv)/1024/1024);
+		   intel_uncore_edram_size(dev_priv) / 1024 / 1024);
 
 	return 0;
 }
@@ -4502,7 +4502,7 @@ static void gen9_sseu_device_status(struct drm_i915_private *dev_priv,
 {
 	int s_max = 3, ss_max = 4;
 	int s, ss;
-	u32 s_reg[s_max], eu_reg[2*s_max], eu_mask[2];
+	u32 s_reg[s_max], eu_reg[2 * s_max], eu_mask[2];
 
 	/* BXT has a single slice and at most 3 subslices. */
 	if (IS_GEN9_LP(dev_priv)) {
@@ -4512,8 +4512,8 @@ static void gen9_sseu_device_status(struct drm_i915_private *dev_priv,
 
 	for (s = 0; s < s_max; s++) {
 		s_reg[s] = I915_READ(GEN9_SLICE_PGCTL_ACK(s));
-		eu_reg[2*s] = I915_READ(GEN9_SS01_EU_PGCTL_ACK(s));
-		eu_reg[2*s + 1] = I915_READ(GEN9_SS23_EU_PGCTL_ACK(s));
+		eu_reg[2 * s] = I915_READ(GEN9_SS01_EU_PGCTL_ACK(s));
+		eu_reg[2 * s + 1] = I915_READ(GEN9_SS23_EU_PGCTL_ACK(s));
 	}
 
 	eu_mask[0] = GEN9_PGCTL_SSA_EU08_ACK |
@@ -4547,8 +4547,8 @@ static void gen9_sseu_device_status(struct drm_i915_private *dev_priv,
 				sseu->subslice_mask |= BIT(ss);
 			}
 
-			eu_cnt = 2 * hweight32(eu_reg[2*s + ss/2] &
-					       eu_mask[ss%2]);
+			eu_cnt = 2 * hweight32(eu_reg[2 * s + ss / 2] &
+					       eu_mask[ss % 2]);
 			sseu->eu_total += eu_cnt;
 			sseu->eu_per_subslice = max_t(unsigned int,
 						      sseu->eu_per_subslice,
