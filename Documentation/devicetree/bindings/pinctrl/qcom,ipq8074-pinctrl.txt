@@ -1,0 +1,187 @@
+Qualcomm Technologies, Inc. IPQ8074 TLMM block
+
+This binding describes the Top Level Mode Multiplexer block found in the
+IPQ8074 platform.
+
+- compatible:
+	Usage: required
+	Value type: <string>
+	Definition: must be "qcom,ipq8074-pinctrl"
+
+- reg:
+	Usage: required
+	Value type: <prop-encoded-array>
+	Definition: the base address and size of the TLMM register space.
+
+- interrupts:
+	Usage: required
+	Value type: <prop-encoded-array>
+	Definition: should specify the TLMM summary IRQ.
+
+- interrupt-controller:
+	Usage: required
+	Value type: <none>
+	Definition: identifies this node as an interrupt controller
+
+- #interrupt-cells:
+	Usage: required
+	Value type: <u32>
+	Definition: must be 2. Specifying the pin number and flags, as defined
+		    in <dt-bindings/interrupt-controller/irq.h>
+
+- gpio-controller:
+	Usage: required
+	Value type: <none>
+	Definition: identifies this node as a gpio controller
+
+- #gpio-cells:
+	Usage: required
+	Value type: <u32>
+	Definition: must be 2. Specifying the pin number and flags, as defined
+		    in <dt-bindings/gpio/gpio.h>
+
+Please refer to ../gpio/gpio.txt and ../interrupt-controller/interrupts.txt for
+a general description of GPIO and interrupt bindings.
+
+Please refer to pinctrl-bindings.txt in this directory for details of the
+common pinctrl bindings used by client devices, including the meaning of the
+phrase "pin configuration node".
+
+The pin configuration nodes act as a container for an arbitrary number of
+subnodes. Each of these subnodes represents some desired configuration for a
+pin, a group, or a list of pins or groups. This configuration can include the
+mux function to select on those pin(s)/group(s), and various pin configuration
+parameters, such as pull-up, drive strength, etc.
+
+
+PIN CONFIGURATION NODES:
+
+The name of each subnode is not important; all subnodes should be enumerated
+and processed purely based on their content.
+
+Each subnode only affects those parameters that are explicitly listed. In
+other words, a subnode that lists a mux function but no pin configuration
+parameters implies no information about any pin configuration parameters.
+Similarly, a pin subnode that describes a pullup parameter implies no
+information about e.g. the mux function.
+
+
+The following generic properties as defined in pinctrl-bindings.txt are valid
+to specify in a pin configuration subnode:
+
+- pins:
+	Usage: required
+	Value type: <string-array>
+	Definition: List of gpio pins affected by the properties specified in
+		    this subnode.  Valid pins are:
+		    gpio0-gpio121,
+		    sdc1_clk,
+		    sdc1_cmd,
+		    sdc1_data
+		    sdc2_clk,
+		    sdc2_cmd,
+		    sdc2_data,
+		    qdsd_cmd,
+		    qdsd_data0,
+		    qdsd_data1,
+		    qdsd_data2,
+		    qdsd_data3
+
+- function:
+	Usage: required
+	Value type: <string>
+	Definition: Specify the alternative function to be configured for the
+		    specified pins. Functions are only valid for gpio pins.
+		    Valid values are:
+	gpio, qpic_pad, blsp5_i2c, blsp5_spi, wci20, blsp3_spi3,
+	burn0, pcm_zsi0, blsp5_uart, mac12, blsp3_spi0, burn1, mac01,
+	qdss_cti_trig_out_b0, qdss_cti_trig_in_b0, qpic_pad4,
+	blsp4_uart0, blsp4_i2c0, blsp4_spi0, mac21,
+	qdss_cti_trig_out_b1, qpic_pad5, qdss_cti_trig_in_b1,
+	qpic_pad6, qpic_pad7, cxc0, mac13, qdss_cti_trig_in_a1,
+	qdss_cti_trig_out_a1, wci22, qdss_cti_trig_in_a0, qpic_pad1,
+	qdss_cti_trig_out_a0, qpic_pad2, qpic_pad3, qdss_traceclk_b,
+	qpic_pad0, qdss_tracectl_b, qpic_pad8, pcm_zsi1,
+	qdss_tracedata_b, led0, pwm04, led1, pwm14, led2, pwm24,
+	pwm00, blsp4_uart1, blsp4_i2c1, blsp4_spi1, wci23, mac11,
+	blsp3_spi2, pwm10, pwm20, pwm30, audio_txmclk, pwm02,
+	audio_txbclk, pwm12, audio_txfsync, pwm22, audio_txd, pwm32,
+	audio_rxmclk, pwm03, atest_char0, audio_rxbclk, pwm13,
+	atest_char1, audio_rxfsync, pwm23, atest_char2, audio_rxd,
+	pwm33, atest_char3, pcm_drx, mac10, mac00, pcm_dtx, pcm_fsync,
+	mac20, qdss_traceclk_a, pcm_pclk, qdss_tracectl_a, atest_char,
+	qdss_tracedata_a, blsp0_uart, blsp0_i2c, blsp0_spi,
+	blsp1_uart, blsp1_i2c, blsp1_spi, blsp2_uart, blsp2_i2c,
+	blsp2_spi, blsp3_uart, blsp3_i2c, blsp3_spi, pta2_0, wci21,
+	cxc1, blsp3_spi1, pta2_1, pta2_2, pcie0_clk, dbg_out,
+	cri_trng0, pcie0_rst, cri_trng1, pcie0_wake, cri_trng,
+	pcie1_clk, rx2, ldo_update, pcie1_rst, ldo_en, pcie1_wake,
+	gcc_plltest, sd_card, pwm01, pta1_1, pwm11, rx1, pta1_2,
+	gcc_tlmm, pta1_0, pwm21, prng_rosc, sd_write, pwm31, rx0,
+	tsens_max, mdc, mdio, NA
+
+- bias-disable:
+	Usage: optional
+	Value type: <none>
+	Definition: The specified pins should be configued as no pull.
+
+- bias-pull-down:
+	Usage: optional
+	Value type: <none>
+	Definition: The specified pins should be configued as pull down.
+
+- bias-pull-up:
+	Usage: optional
+	Value type: <none>
+	Definition: The specified pins should be configued as pull up.
+
+- output-high:
+	Usage: optional
+	Value type: <none>
+	Definition: The specified pins are configured in output mode, driven
+		    high.
+		    Not valid for sdc pins.
+
+- output-low:
+	Usage: optional
+	Value type: <none>
+	Definition: The specified pins are configured in output mode, driven
+		    low.
+		    Not valid for sdc pins.
+
+- drive-strength:
+	Usage: optional
+	Value type: <u32>
+	Definition: Selects the drive strength for the specified pins, in mA.
+		    Valid values are: 2, 4, 6, 8, 10, 12, 14 and 16
+
+Example:
+
+	tlmm: pinctrl@1000000 {
+		compatible = "qcom,ipq8074-pinctrl";
+		reg = <0x1000000 0x300000>;
+		interrupts = <GIC_SPI 208 IRQ_TYPE_LEVEL_HIGH>;
+		gpio-controller;
+		#gpio-cells = <2>;
+		interrupt-controller;
+		#interrupt-cells = <2>;
+
+		uart2: uart2-default {
+			mux {
+				pins = "gpio23", "gpio24";
+				function = "blsp4_uart1";
+			};
+
+			rx {
+				pins = "gpio23";
+				drive-strength = <4>;
+				bias-disable;
+			};
+
+			tx {
+				pins = "gpio24";
+				drive-strength = <2>;
+				bias-pull-up;
+			};
+		};
+	};
