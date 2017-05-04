@@ -380,6 +380,22 @@ source "arch/powerpc/platforms/Kconfig"
 
 menu "Kernel options"
 
+config PPC_CPUFEATURES_DT
+	bool "cpufeatures cpu setup and device tree support (UNSTABLE)"
+	depends on PPC_BOOK3S_64
+	default n
+	---help---
+	  cpufeatures is a proposed new device tree binding for describing
+	  CPU compatibility and features. Saying y here will attempt to use
+	  cpufeatures binding if the firmware provides it. This binding is
+	  not stable, so a kernel built with this option may not function
+	  properly with future firmware.
+
+config PPC_CPUFEATURES_ENABLE_UNKNOWN
+	bool "cpufeatures pass through unknown features to guest/userspace"
+	depends on PPC_CPUFEATURES_DT
+	default y
+
 config HIGHMEM
 	bool "High memory support"
 	depends on PPC32

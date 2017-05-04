@@ -1,6 +1,12 @@
 #ifndef _UAPI__ASM_POWERPC_CPUTABLE_H
 #define _UAPI__ASM_POWERPC_CPUTABLE_H
 
+/*
+ * IMPORTANT!
+ * All future PPC_FEATURE_* definitions must be allocated by OPAL / skiboot
+ * firmware, in accordance with the ibm,powerpc-cpu-features specification.
+ */
+
 /* in AT_HWCAP */
 #define PPC_FEATURE_32			0x80000000
 #define PPC_FEATURE_64			0x40000000
