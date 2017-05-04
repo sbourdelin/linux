@@ -58,7 +58,7 @@ void camif_hw_set_test_pattern(struct camif_dev *camif, unsigned int pattern)
 }
 
 void camif_hw_set_effect(struct camif_dev *camif, unsigned int effect,
-			unsigned int cr, unsigned int cb)
+			unsigned int cb, unsigned int cr)
 {
 	static const struct v4l2_control colorfx[] = {
 		{ V4L2_COLORFX_NONE,		CIIMGEFF_FIN_BYPASS },

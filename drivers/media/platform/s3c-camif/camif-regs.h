@@ -255,7 +255,7 @@ void camif_hw_set_output_dma(struct camif_vp *vp);
 void camif_hw_set_target_format(struct camif_vp *vp);
 void camif_hw_set_test_pattern(struct camif_dev *camif, unsigned int pattern);
 void camif_hw_set_effect(struct camif_dev *camif, unsigned int effect,
-			unsigned int cr, unsigned int cb);
+			unsigned int cb, unsigned int cr);
 void camif_hw_set_output_addr(struct camif_vp *vp, struct camif_addr *paddr,
 			      int index);
 void camif_hw_dump_regs(struct camif_dev *camif, const char *label);
