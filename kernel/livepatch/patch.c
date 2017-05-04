@@ -62,6 +62,14 @@ static void notrace klp_ftrace_handler(unsigned long ip,
 	/* RCU may not be watching, make it see us. */
 	rcu_irq_enter_irqson();
 
+	/*
+	 * RCU still might not see us if we patch a function inside
+	 * the RCU infrastructure. Then we might see wrong state of
+	 * func->stack and other flags.
+	 */
+	if (unlikely(!rcu_is_watching()))
+		WARN_ONCE(1, "Livepatch modified a function that can not be handled a safe way.!");
+
 	rcu_read_lock();
 
 	func = list_first_or_null_rcu(&ops->func_stack, struct klp_func,

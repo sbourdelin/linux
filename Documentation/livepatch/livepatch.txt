@@ -476,6 +476,21 @@ The current Livepatch implementation has several limitations:
     by "notrace".
 
 
+  + Limited patching of RCU infrastructure
+
+    The livepatch ftrace handler uses RCU for handling the stack of patches.
+    Also the ftrace framework uses RCU to detect when the handlers are not
+    longer in use.
+
+    The directly used RCU functions could not be patched. Otherwise,
+    there would be an infinite recursion.
+
+    Some other RCU functions can not be patched safely because the RCU
+    framework might be in an inconsistent state. This context is annotated
+    and warning is printed. In theory, it might be safe to modify such
+    functions using immediate patches. But this is hard to detect properly
+    in the ftrace handler, so the warning is always printed.
+
 
   + Livepatch works reliably only when the dynamic ftrace is located at
     the very beginning of the function.
