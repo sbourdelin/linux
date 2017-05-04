@@ -58,7 +58,7 @@
 
 #include <linux/power/bq27xxx_battery.h>
 
-#define DRIVER_VERSION		"1.2.0"
+#define DRIVER_VERSION		"1.3.0"
 
 #define BQ27XXX_MANUFACTURER	"Texas Instruments"
 
@@ -132,7 +132,7 @@ enum bq27xxx_reg_index {
 	[BQ27XXX_DM_CKSUM] = 0x60
 
 /* Register mappings */
-static u8 bq27xxx_regs[][BQ27XXX_REG_MAX] = {
+static u8 bq27xxx_regs[BQ27MAX][BQ27XXX_REG_MAX] = {
 	[BQ27000] = {
 		[BQ27XXX_REG_CTRL] = 0x00,
 		[BQ27XXX_REG_TEMP] = 0x06,
@@ -779,7 +779,7 @@ static enum power_supply_property bq27421_battery_props[] = {
 static struct {
 	enum power_supply_property *props;
 	size_t size;
-} bq27xxx_battery_props[] = {
+} bq27xxx_battery_props[BQ27MAX] = {
 	BQ27XXX_PROP(BQ27000, bq27000_battery_props),
 	BQ27XXX_PROP(BQ27010, bq27010_battery_props),
 	BQ27XXX_PROP(BQ2750X, bq2750x_battery_props),
@@ -796,6 +796,33 @@ static struct {
 	BQ27XXX_PROP(BQ27541, bq27541_battery_props),
 	BQ27XXX_PROP(BQ27545, bq27545_battery_props),
 	BQ27XXX_PROP(BQ27421, bq27421_battery_props),
+};
+
+static enum bq27xxx_chip bq27xxx_chips[] = {
+	[BQ27000]   = BQ27000,
+	[BQ27010]   = BQ27010,
+	[BQ2750X]   = BQ2750X,
+	[BQ2751X]   = BQ2751X,
+	[BQ2752X]   = BQ2751X,
+	[BQ27500]   = BQ27500,
+	[BQ27510G1] = BQ27510G1,
+	[BQ27510G2] = BQ27510G2,
+	[BQ27510G3] = BQ27510G3,
+	[BQ27520G1] = BQ27520G1,
+	[BQ27520G2] = BQ27520G2,
+	[BQ27520G3] = BQ27520G3,
+	[BQ27520G4] = BQ27520G4,
+	[BQ27530]   = BQ27530,
+	[BQ27531]   = BQ27530,
+	[BQ27541]   = BQ27541,
+	[BQ27542]   = BQ27541,
+	[BQ27546]   = BQ27541,
+	[BQ27742]   = BQ27541,
+	[BQ27545]   = BQ27545,
+	[BQ27421]   = BQ27421,
+	[BQ27425]   = BQ27421,
+	[BQ27441]   = BQ27421,
+	[BQ27621]   = BQ27421,
 };
 
 static DEFINE_MUTEX(bq27xxx_list_lock);
@@ -854,6 +881,54 @@ static const char * const bq27xxx_dm_reg_name[] = {
 	[BQ27XXX_DM_DESIGN_CAPACITY] = "design-capacity",
 	[BQ27XXX_DM_DESIGN_ENERGY] = "design-energy",
 	[BQ27XXX_DM_TERMINATE_VOLTAGE] = "terminate-voltage",
+};
+
+static struct bq27xxx_dm_reg bq27500_dm_regs[] = {
+	[BQ27XXX_DM_DESIGN_CAPACITY]   = { 48, 10, 2,    0, 65535 },
+	[BQ27XXX_DM_DESIGN_ENERGY]     = { }, /* missing on chip */
+	[BQ27XXX_DM_TERMINATE_VOLTAGE] = { 80, 48, 2, 1000, 32767 },
+};
+
+static struct bq27xxx_dm_reg bq27545_dm_regs[] = {
+	[BQ27XXX_DM_DESIGN_CAPACITY]   = { 48, 23, 2,    0, 32767 },
+	[BQ27XXX_DM_DESIGN_ENERGY]     = { 48, 25, 2,    0, 32767 },
+	[BQ27XXX_DM_TERMINATE_VOLTAGE] = { 80, 67, 2, 2800,  3700 },
+};
+
+static struct bq27xxx_dm_reg bq27421_dm_regs[] = {
+	[BQ27XXX_DM_DESIGN_CAPACITY]   = { 82, 10, 2,    0,  8000 },
+	[BQ27XXX_DM_DESIGN_ENERGY]     = { 82, 12, 2,    0, 32767 },
+	[BQ27XXX_DM_TERMINATE_VOLTAGE] = { 82, 16, 2, 2500,  3700 },
+};
+
+static struct bq27xxx_dm_reg bq27425_dm_regs[] = {
+	[BQ27XXX_DM_DESIGN_CAPACITY]   = { 82, 12, 2,    0, 32767 },
+	[BQ27XXX_DM_DESIGN_ENERGY]     = { 82, 14, 2,    0, 32767 },
+	[BQ27XXX_DM_TERMINATE_VOLTAGE] = { 82, 18, 2, 2800,  3700 },
+};
+
+static struct bq27xxx_dm_reg bq27621_dm_regs[] = {
+	[BQ27XXX_DM_DESIGN_CAPACITY]   = { 82, 3, 2,    0,  8000 },
+	[BQ27XXX_DM_DESIGN_ENERGY]     = { 82, 5, 2,    0, 32767 },
+	[BQ27XXX_DM_TERMINATE_VOLTAGE] = { 82, 9, 2, 2500,  3700 },
+};
+
+static struct bq27xxx_dm_reg *bq27xxx_dm_regs[] = {
+	[BQ27500] = bq27500_dm_regs,
+	[BQ27545] = bq27545_dm_regs,
+	[BQ27421] = bq27421_dm_regs,
+	[BQ27425] = bq27425_dm_regs,
+	[BQ27441] = bq27421_dm_regs,
+	[BQ27621] = bq27621_dm_regs,
+};
+
+static u32 bq27xxx_unseal_keys[] = {
+	[BQ27500] = 0x04143672,
+	[BQ27545] = 0x04143672,
+	[BQ27421] = 0x80008000,
+	[BQ27425] = 0x04143672,
+	[BQ27441] = 0x80008000,
+	[BQ27621] = 0x80008000,
 };
 
 
@@ -1865,9 +1940,16 @@ int bq27xxx_battery_setup(struct bq27xxx_device_info *di)
 		.drv_data = di,
 	};
 
+	di->ram_chip = di->chip == BQ27421 || di->chip == BQ27441 || di->chip == BQ27621;
+
+	di->unseal_key = bq27xxx_unseal_keys[di->chip];
+	di->dm_regs = bq27xxx_dm_regs[di->chip];
+	di->chip = bq27xxx_chips[di->chip];
+
+	di->regs = bq27xxx_regs[di->chip];
+
 	INIT_DELAYED_WORK(&di->work, bq27xxx_battery_poll);
 	mutex_init(&di->lock);
-	di->regs = bq27xxx_regs[di->chip];
 
 	psy_desc = devm_kzalloc(di->dev, sizeof(*psy_desc), GFP_KERNEL);
 	if (!psy_desc)
