@@ -32,6 +32,17 @@ config BMP280_SPI
 	depends on SPI_MASTER
 	select REGMAP
 
+config DPS310
+       tristate "Infineon DPS310 pressure and temperature sensor"
+       depends on I2C
+       select REGMAP_I2C
+       help
+	 Support for the Infineon DPS310 digital barometric pressure sensor.
+	 This driver measures temperature only.
+
+	 This driver can also be built as a module.  If so, the module will be
+	 called dps310.
+
 config HID_SENSOR_PRESS
 	depends on HID_SENSOR_HUB
 	select IIO_BUFFER
