@@ -242,7 +242,7 @@ static int i915_gem_stolen_list_info(struct seq_file *m, void *data)
 		if (count == total)
 			break;
 
-		if (obj->stolen == NULL)
+		if (!obj->stolen)
 			continue;
 
 		objects[count++] = obj;
@@ -254,7 +254,7 @@ static int i915_gem_stolen_list_info(struct seq_file *m, void *data)
 		if (count == total)
 			break;
 
-		if (obj->stolen == NULL)
+		if (!obj->stolen)
 			continue;
 
 		objects[count++] = obj;
@@ -557,7 +557,7 @@ static int i915_gem_pageflip_info(struct seq_file *m, void *data)
 
 		spin_lock_irq(&dev->event_lock);
 		work = crtc->flip_work;
-		if (work == NULL) {
+		if (!work) {
 			seq_printf(m, "No flip due on pipe %c (plane %c)\n",
 				   pipe, plane);
 		} else {
@@ -3717,7 +3717,7 @@ static ssize_t i915_displayport_test_active_write(struct file *file,
 			continue;
 
 		if (connector->status == connector_status_connected &&
-		    connector->encoder != NULL) {
+		    connector->encoder) {
 			intel_dp = enc_to_intel_dp(connector->encoder);
 			status = kstrtoint(input_buffer, 10, &val);
 			if (status < 0)
@@ -3756,7 +3756,7 @@ static int i915_displayport_test_active_show(struct seq_file *m, void *data)
 			continue;
 
 		if (connector->status == connector_status_connected &&
-		    connector->encoder != NULL) {
+		    connector->encoder) {
 			intel_dp = enc_to_intel_dp(connector->encoder);
 			seq_putc(m,
 				 intel_dp->compliance.test_active ? '1' : '0');
@@ -3801,7 +3801,7 @@ static int i915_displayport_test_data_show(struct seq_file *m, void *data)
 			continue;
 
 		if (connector->status == connector_status_connected &&
-		    connector->encoder != NULL) {
+		    connector->encoder) {
 			intel_dp = enc_to_intel_dp(connector->encoder);
 			if (intel_dp->compliance.test_type ==
 			    DP_TEST_LINK_EDID_READ)
@@ -3855,7 +3855,7 @@ static int i915_displayport_test_type_show(struct seq_file *m, void *data)
 			continue;
 
 		if (connector->status == connector_status_connected &&
-		    connector->encoder != NULL) {
+		    connector->encoder) {
 			intel_dp = enc_to_intel_dp(connector->encoder);
 			seq_printf(m, "%02lx", intel_dp->compliance.test_type);
 		} else {
