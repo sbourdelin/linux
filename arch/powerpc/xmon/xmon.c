@@ -28,6 +28,7 @@
 #include <linux/bug.h>
 #include <linux/nmi.h>
 #include <linux/ctype.h>
+#include <linux/ftrace.h>
 
 #include <asm/debugfs.h>
 #include <asm/ptrace.h>
@@ -459,6 +460,7 @@ static int xmon_core(struct pt_regs *regs, int fromipi)
 
 	local_irq_save(flags);
 	hard_irq_disable();
+	pause_graph_tracing();
 
 	bp = in_breakpoint_table(regs->nip, &offset);
 	if (bp != NULL) {
@@ -655,6 +657,7 @@ static int xmon_core(struct pt_regs *regs, int fromipi)
 
 	touch_nmi_watchdog();
 	local_irq_restore(flags);
+	unpause_graph_tracing();
 
 	return cmd != 'X' && cmd != EOF;
 }
