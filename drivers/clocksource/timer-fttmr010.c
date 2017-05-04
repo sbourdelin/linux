@@ -263,7 +263,7 @@ CLOCKSOURCE_OF_DECLARE(fttmr010, "faraday,fttmr010", fttmr010_timer_of_init);
 
 static int __init gemini_timer_of_init(struct device_node *np)
 {
-	static struct regmap *map;
+	struct regmap *map;
 	int ret;
 	u32 val;
 
