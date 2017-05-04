@@ -131,7 +131,6 @@ restart:
 			if (!inode)
 				continue;
 			if (!nfs_sb_active(inode->i_sb)) {
-				rcu_read_lock();
 				spin_unlock(&clp->cl_lock);
 				iput(inode);
 				spin_lock(&clp->cl_lock);
@@ -170,7 +169,6 @@ restart:
 			if (!inode)
 				continue;
 			if (!nfs_sb_active(inode->i_sb)) {
-				rcu_read_lock();
 				spin_unlock(&clp->cl_lock);
 				iput(inode);
 				spin_lock(&clp->cl_lock);
