@@ -450,6 +450,8 @@ enum {
 	TCA_FLOWER_KEY_MPLS_TC,		/* u8 - 3 bits */
 	TCA_FLOWER_KEY_MPLS_LABEL,	/* be32 - 20 bits */
 
+	TCA_FLOWER_META_TRUNCATED,
+
 	__TCA_FLOWER_MAX,
 };
 
