@@ -353,7 +353,7 @@ static struct hist_field *create_hist_field(struct ftrace_event_field *field,
 	if (field && is_function_field(field))
 		return NULL;
 
-	hist_field = kzalloc(sizeof(struct hist_field), GFP_KERNEL);
+	hist_field = kzalloc(sizeof(*hist_field), GFP_KERNEL);
 	if (!hist_field)
 		return NULL;
 
