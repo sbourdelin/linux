@@ -660,6 +660,7 @@ void signal_wake_up_state(struct task_struct *t, unsigned int state)
 	if (!wake_up_state(t, state | TASK_INTERRUPTIBLE))
 		kick_process(t);
 }
+EXPORT_SYMBOL_GPL(signal_wake_up_state);
 
 /*
  * Remove signals in mask from the pending set and queue.
