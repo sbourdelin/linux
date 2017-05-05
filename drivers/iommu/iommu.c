@@ -259,9 +259,9 @@ int iommu_get_group_resv_regions(struct iommu_group *group,
 		struct list_head dev_resv_regions;
 
 		INIT_LIST_HEAD(&dev_resv_regions);
-		iommu_get_resv_regions(device->dev, &dev_resv_regions);
+		iommu_get_resv_regions(&device->dev, &dev_resv_regions);
 		ret = iommu_insert_device_resv_regions(&dev_resv_regions, head);
-		iommu_put_resv_regions(device->dev, &dev_resv_regions);
+		iommu_put_resv_regions(&device->dev, &dev_resv_regions);
 		if (ret)
 			break;
 	}
