@@ -69,13 +69,15 @@ A. button.lid_init_state=method:
    notification is missing.
    This option is the default behavior during the period the userspace
    isn't ready to handle the buggy AML tables.
-B. button.lid_init_state=open:
-   When this option is specified, the ACPI button driver always reports the
-   initial lid state as "opened" and whether the "opened"/"closed" events
-   are paired fully relies on the firmware implementation.
+B. button.lid_init_state=open/close:
+   When one of these options are specified, the ACPI button driver always
+   reports the initial lid state as fixed "opened"/"closed" and whether the
+   "opened"/"closed" events are paired fully relies on the firmware
+   implementation.
    This may fix some platforms where the returning value of the _LID
    control method is not reliable and the initial lid state notification is
-   missing.
+   missing. Especially useful for platforms where different usage models
+   require contractory initial lid state.
 
 If the userspace has been prepared to ignore the unreliable "opened" events
 and the unreliable initial state notification, Linux users should always
