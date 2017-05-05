@@ -16,6 +16,73 @@ enum reg_type {
 	REG_TYPE_BASE,
 };
 
+enum string_instruction {
+	INSB		= 0x6c,
+	INSW_INSD	= 0x6d,
+	OUTSB		= 0x6e,
+	OUTSW_OUTSD	= 0x6f,
+	MOVSB		= 0xa4,
+	MOVSW_MOVSD	= 0xa5,
+	CMPSB		= 0xa6,
+	CMPSW_CMPSD	= 0xa7,
+	STOSB		= 0xaa,
+	STOSW_STOSD	= 0xab,
+	LODSB		= 0xac,
+	LODSW_LODSD	= 0xad,
+	SCASB		= 0xae,
+	SCASW_SCASD	= 0xaf,
+};
+
+/**
+ * is_string_instruction - Determine if instruction is a string instruction
+ * @insn:	Instruction structure containing the opcode
+ *
+ * Return: true if the instruction, determined by the opcode, is any of the
+ * string instructions as defined in the Intel Software Development manual.
+ * False otherwise.
+ */
+static bool is_string_instruction(struct insn *insn)
+{
+	insn_get_opcode(insn);
+
+	/* all string instructions have a 1-byte opcode */
+	if (insn->opcode.nbytes != 1)
+		return false;
+
+	switch (insn->opcode.bytes[0]) {
+	case INSB:
+		/* fall through */
+	case INSW_INSD:
+		/* fall through */
+	case OUTSB:
+		/* fall through */
+	case OUTSW_OUTSD:
+		/* fall through */
+	case MOVSB:
+		/* fall through */
+	case MOVSW_MOVSD:
+		/* fall through */
+	case CMPSB:
+		/* fall through */
+	case CMPSW_CMPSD:
+		/* fall through */
+	case STOSB:
+		/* fall through */
+	case STOSW_STOSD:
+		/* fall through */
+	case LODSB:
+		/* fall through */
+	case LODSW_LODSD:
+		/* fall through */
+	case SCASB:
+		/* fall through */
+	case SCASW_SCASD:
+		return true;
+	default:
+		return false;
+	}
+}
+
 static int get_reg_offset(struct insn *insn, struct pt_regs *regs,
 			  enum reg_type type)
 {
