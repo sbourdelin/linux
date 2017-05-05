@@ -104,8 +104,10 @@ int selinux_enforcing;
 static int __init enforcing_setup(char *str)
 {
 	unsigned long enforcing;
-	if (!kstrtoul(str, 0, &enforcing))
+	if (!kstrtoul(str, 0, &enforcing)) {
 		selinux_enforcing = enforcing ? 1 : 0;
+		security_policydb_update_info(NULL);
+	}
 	return 1;
 }
 __setup("enforcing=", enforcing_setup);
@@ -6063,6 +6065,11 @@ static int selinux_inode_getsecctx(struct inode *inode, void **ctx, u32 *ctxlen)
 	*ctxlen = len;
 	return 0;
 }
+
+static int selinux_policy_brief(char **brief, size_t *len, bool alloc)
+{
+	return security_policydb_brief(brief, len, alloc);
+}
 #ifdef CONFIG_KEYS
 
 static int selinux_key_alloc(struct key *k, const struct cred *cred,
@@ -6276,6 +6283,8 @@ static struct security_hook_list selinux_hooks[] __lsm_ro_after_init = {
 	LSM_HOOK_INIT(inode_notifysecctx, selinux_inode_notifysecctx),
 	LSM_HOOK_INIT(inode_setsecctx, selinux_inode_setsecctx),
 	LSM_HOOK_INIT(inode_getsecctx, selinux_inode_getsecctx),
+
+	LSM_HOOK_INIT(policy_brief, selinux_policy_brief),
 
 	LSM_HOOK_INIT(unix_stream_connect, selinux_socket_unix_stream_connect),
 	LSM_HOOK_INIT(unix_may_send, selinux_socket_unix_may_send),

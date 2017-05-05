@@ -32,6 +32,8 @@
 #include <linux/errno.h>
 #include <linux/audit.h>
 #include <linux/flex_array.h>
+#include <crypto/hash.h>
+#include <crypto/sha.h>
 #include "security.h"
 
 #include "policydb.h"
@@ -879,6 +881,8 @@ void policydb_destroy(struct policydb *p)
 	ebitmap_destroy(&p->filename_trans_ttypes);
 	ebitmap_destroy(&p->policycaps);
 	ebitmap_destroy(&p->permissive_map);
+
+	kfree(p->policybrief);
 }
 
 /*
@@ -2220,6 +2224,67 @@ out:
 }
 
 /*
+ * Compute summary of a policy database binary representation file,
+ * and store it into a policy database structure.
+ */
+static int policydb_brief(struct policydb *policydb, void *ptr)
+{
+	struct policy_file *fp = ptr;
+	struct crypto_shash *tfm;
+	char hashalg[] = "sha256";
+	int hashsize = SHA256_DIGEST_SIZE;
+	char hashval[hashsize];
+	int idx;
+	unsigned char *p;
+
+	if (policydb->policybrief)
+		return -EINVAL;
+
+	tfm = crypto_alloc_shash(hashalg, 0, 0);
+	if (IS_ERR(tfm)) {
+		printk(KERN_ERR "Failed to alloc crypto hash %s\n", hashalg);
+		return PTR_ERR(tfm);
+	}
+
+	{
+		int rc;
+
+		SHASH_DESC_ON_STACK(desc, tfm);
+		desc->tfm = tfm;
+		desc->flags = 0;
+		rc = crypto_shash_init(desc);
+		if (rc) {
+			printk(KERN_ERR "Failed to init shash\n");
+			crypto_free_shash(tfm);
+			return rc;
+		}
+
+		crypto_shash_update(desc, fp->data, fp->len);
+		crypto_shash_final(desc, hashval);
+		crypto_free_shash(tfm);
+	}
+
+	/* policy brief is in the form:
+	 * <0 or 1 for enforce>:<0 or 1 for checkreqprot>:<hashalg>=<checksum>
+	 */
+	policydb->policybrief = kzalloc(5 + strlen(hashalg) + 2*hashsize + 1,
+					GFP_KERNEL);
+	if (policydb->policybrief == NULL)
+		return -ENOMEM;
+
+	sprintf(policydb->policybrief, "x:x:%s=", hashalg);
+	security_policydb_update_info(policydb);
+	p = policydb->policybrief + strlen(policydb->policybrief);
+	for (idx = 0; idx < hashsize; idx++) {
+		snprintf(p, 3, "%02x", (unsigned char)(hashval[idx]));
+		p += 2;
+	}
+	policydb->policybrief_len = (size_t)(p - policydb->policybrief);
+
+	return 0;
+}
+
+/*
  * Read the configuration data from a policy database binary
  * representation file into a policy database structure.
  */
@@ -2237,6 +2302,11 @@ int policydb_read(struct policydb *p, void *fp)
 	rc = policydb_init(p);
 	if (rc)
 		return rc;
+
+	/* Compute sumarry of policy, and store it in policydb */
+	rc = policydb_brief(p, fp);
+	if (rc)
+		goto bad;
 
 	/* Read the magic number and string length. */
 	rc = next_entry(buf, fp, sizeof(u32) * 2);

@@ -97,6 +97,8 @@ int security_mls_enabled(void);
 int security_load_policy(void *data, size_t len);
 int security_read_policy(void **data, size_t *len);
 size_t security_policydb_len(void);
+int security_policydb_brief(char **brief, size_t *len, bool alloc);
+void security_policydb_update_info(void *p);
 
 int security_policycap_supported(unsigned int req_cap);
 
