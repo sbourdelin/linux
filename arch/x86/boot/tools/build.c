@@ -287,6 +287,15 @@ static inline int reserve_pecoff_reloc_section(int c)
 }
 #endif /* CONFIG_EFI_STUB */
 
+static void security_fields_update(void)
+{
+	unsigned int security_offset;
+	char *dest;
+
+	security_offset = get_unaligned_le32(&buf[0x268]);
+	dest = (char *)&buf[security_offset + 4];
+	strncpy(dest, CONFIG_SEC_SIGNER, 8);
+}
 
 /*
  * Parse zoffset.h and find the entry points. We could just #include zoffset.h
@@ -400,6 +409,8 @@ int main(int argc, char ** argv)
 	update_pecoff_bss(i + (sys_size * 16), init_sz);
 
 	efi_stub_entry_update();
+
+	security_fields_update();
 
 	crc = partial_crc32(buf, i, crc);
 	if (fwrite(buf, 1, i, dest) != i)

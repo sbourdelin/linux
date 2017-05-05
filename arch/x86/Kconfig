@@ -1786,6 +1786,20 @@ config EFI_MIXED
 
 	   If unsure, say N.
 
+config SEC_SIGNER
+	string "The signer name"
+	default "none"
+
+config SEC_DISTRO
+	int "The distro version"
+	default 0
+	range 0 65535
+
+config SEC_VERSION
+	int "The security version"
+	default 0
+	range 0 65535
+
 config SECCOMP
 	def_bool y
 	prompt "Enable seccomp to safely compute untrusted bytecode"

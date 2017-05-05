@@ -301,7 +301,7 @@ _start:
 	# Part 2 of the header, from the old setup.S
 
 		.ascii	"HdrS"		# header signature
-		.word	0x020d		# header version number (>= 0x0105)
+		.word	0x020e		# header version number (>= 0x0105)
 					# or else old loadlin-1.5 will fail)
 		.globl realmode_swtch
 realmode_swtch:	.word	0, 0		# default_switch, SETUPSEG
@@ -552,6 +552,7 @@ pref_address:		.quad LOAD_PHYSICAL_ADDR	# preferred load addr
 
 init_size:		.long INIT_SIZE		# kernel initialization size
 handover_offset:	.long 0			# Filled in by build.c
+secdata_offset:		.long secdata_start
 
 # End of setup header #####################################################
 
@@ -629,3 +630,15 @@ die:
 setup_corrupt:
 	.byte	7
 	.string	"No setup signature found...\n"
+
+	.section ".secdata", "a"
+secdata_start:
+sec_length:
+	.long	secdata_end - secdata_start
+sec_signer:
+	.quad	0				# Filled by build.c
+sec_distro:
+	.word	CONFIG_SEC_DISTRO
+sec_version:
+	.word	CONFIG_SEC_VERSION
+secdata_end:
