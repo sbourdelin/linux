@@ -3406,7 +3406,7 @@ static void rtw_cfg80211_preinit_wiphy(struct adapter *padapter, struct wiphy *w
 	wiphy->flags |= WIPHY_FLAG_OFFCHAN_TX | WIPHY_FLAG_HAVE_AP_SME;
 
 #if defined(CONFIG_PM)
-	wiphy->flags |= WIPHY_FLAG_SUPPORTS_SCHED_SCAN;
+	wiphy->max_sched_scan_reqs = 1;
 #ifdef CONFIG_PNO_SUPPORT
 	wiphy->max_sched_scan_ssids = MAX_PNO_LIST_COUNT;
 #endif
