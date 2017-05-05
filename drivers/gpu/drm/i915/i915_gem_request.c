@@ -821,6 +821,9 @@ static void i915_gem_mark_busy(const struct intel_engine_cs *engine)
 
 	GEM_BUG_ON(!dev_priv->gt.active_requests);
 
+	if (NEEDS_CSR_GT_PERF_WA(dev_priv))
+		intel_display_power_get(dev_priv, POWER_DOMAIN_MODESET);
+
 	intel_runtime_pm_get_noresume(dev_priv);
 	dev_priv->gt.awake = true;
 
