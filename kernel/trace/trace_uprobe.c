@@ -612,11 +612,11 @@ static int probes_seq_show(struct seq_file *m, void *v)
 	} else {
 		switch (sizeof(void *)) {
 		case 4:
-			seq_printf(m, "0x00000000");
+			seq_puts(m, "0x00000000");
 			break;
 		case 8:
 		default:
-			seq_printf(m, "0x0000000000000000");
+			seq_puts(m, "0x0000000000000000");
 			break;
 		}
 	}
