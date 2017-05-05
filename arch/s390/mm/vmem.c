@@ -252,7 +252,8 @@ int __meminit vmemmap_populate(unsigned long start, unsigned long end, int node)
 			if (MACHINE_HAS_EDAT1) {
 				void *new_page;
 
-				new_page = vmemmap_alloc_block(PMD_SIZE, node);
+				new_page = vmemmap_alloc_block(PMD_SIZE, node,
+							       true);
 				if (!new_page)
 					goto out;
 				pmd_val(*pm_dir) = __pa(new_page) | sgt_prot;
@@ -272,7 +273,7 @@ int __meminit vmemmap_populate(unsigned long start, unsigned long end, int node)
 		if (pte_none(*pt_dir)) {
 			void *new_page;
 
-			new_page = vmemmap_alloc_block(PAGE_SIZE, node);
+			new_page = vmemmap_alloc_block(PAGE_SIZE, node, true);
 			if (!new_page)
 				goto out;
 			pte_val(*pt_dir) = __pa(new_page) | pgt_prot;
