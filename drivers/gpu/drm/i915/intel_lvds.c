@@ -548,7 +548,7 @@ static int intel_lid_notify(struct notifier_block *nb, unsigned long val,
 	/* Don't force modeset on machines where it causes a GPU lockup */
 	if (dmi_check_system(intel_no_modeset_on_lid))
 		goto exit;
-	if (!acpi_lid_open()) {
+	if (!val) {
 		/* do modeset on next lid open event */
 		dev_priv->modeset_restore = MODESET_ON_LID_OPEN;
 		goto exit;
