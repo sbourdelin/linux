@@ -35,6 +35,13 @@
 #include "mxsfb_drv.h"
 #include "mxsfb_regs.h"
 
+#define MXS_SET_ADDR		0x4
+#define MXS_CLR_ADDR		0x8
+#define MODULE_CLKGATE		BIT(30)
+#define MODULE_SFTRST		BIT(31)
+/* 1 second delay should be plenty of time for block reset. */
+#define RESET_MAX_TIMEOUT	1000000
+
 static u32 set_hsync_pulse_width(struct mxsfb_drm_private *mxsfb, u32 val)
 {
 	return (val & mxsfb->devdata->hs_wdth_mask) <<
@@ -159,6 +166,48 @@ static void mxsfb_disable_controller(struct mxsfb_drm_private *mxsfb)
 		clk_disable_unprepare(mxsfb->clk_disp_axi);
 }
 
+/*
+ * Clear the bit and poll it cleared.  This is usually called with
+ * a reset address and mask being either SFTRST(bit 31) or CLKGATE
+ * (bit 30).
+ */
+static int clear_poll_bit(void __iomem *addr, u32 mask)
+{
+	unsigned int timeout = RESET_MAX_TIMEOUT;
+
+	/* clear the bit */
+	writel(mask, addr + MXS_CLR_ADDR);
+
+	udelay(1);
+
+	/* poll the bit becoming clear */
+	while ((readl(addr) & mask) && --timeout)
+		;
+
+	return !timeout;
+}
+
+static int mxsfb_reset_block(void __iomem *reset_addr)
+{
+	int ret;
+
+	/* clear and poll SFTRST */
+	ret = clear_poll_bit(reset_addr, MODULE_SFTRST);
+	if (ret)
+		return ret;
+
+	/* clear CLKGATE */
+	writel(MODULE_CLKGATE, reset_addr + MXS_CLR_ADDR);
+
+	/* clear and poll SFTRST */
+	ret = clear_poll_bit(reset_addr, MODULE_SFTRST);
+	if (ret)
+		return ret;
+
+	/* clear and poll CLKGATE */
+	return clear_poll_bit(reset_addr, MODULE_CLKGATE);
+}
+
 static void mxsfb_crtc_mode_set_nofb(struct mxsfb_drm_private *mxsfb)
 {
 	struct drm_display_mode *m = &mxsfb->pipe.crtc.state->adjusted_mode;
@@ -172,6 +221,10 @@ static void mxsfb_crtc_mode_set_nofb(struct mxsfb_drm_private *mxsfb)
 	 * first stop the controller and drain its FIFOs.
 	 */
 	mxsfb_enable_axi_clk(mxsfb);
+
+	err = mxsfb_reset_block(mxsfb->base);
+	if (err)
+		return;
 
 	/* Clear the FIFOs */
 	writel(CTRL1_FIFO_CLEAR, mxsfb->base + LCDC_CTRL1 + REG_SET);
