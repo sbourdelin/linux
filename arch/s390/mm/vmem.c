@@ -253,7 +253,7 @@ int __meminit vmemmap_populate(unsigned long start, unsigned long end, int node)
 				void *new_page;
 
 				new_page = vmemmap_alloc_block(PMD_SIZE, node,
-							       true);
+							       VMEMMAP_ZERO);
 				if (!new_page)
 					goto out;
 				pmd_val(*pm_dir) = __pa(new_page) | sgt_prot;
