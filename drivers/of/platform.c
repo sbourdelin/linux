@@ -36,7 +36,7 @@ const struct of_device_id of_default_bus_match_table[] = {
 	{} /* Empty terminated list */
 };
 
-static int of_dev_node_match(struct device *dev, void *data)
+int of_dev_node_match(struct device *dev, void *data)
 {
 	return dev->of_node == data;
 }

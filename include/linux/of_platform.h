@@ -57,6 +57,7 @@ extern const struct of_device_id of_default_bus_match_table[];
 extern struct platform_device *of_device_alloc(struct device_node *np,
 					 const char *bus_id,
 					 struct device *parent);
+extern int of_dev_node_match(struct device *dev, void *data);
 extern struct platform_device *of_find_device_by_node(struct device_node *np);
 
 /* Platform devices and busses creation */
