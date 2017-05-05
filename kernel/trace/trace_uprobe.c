@@ -705,13 +705,13 @@ static int uprobe_buffer_init(void)
 	int cpu, err_cpu;
 
 	uprobe_cpu_buffer = alloc_percpu(struct uprobe_cpu_buffer);
-	if (uprobe_cpu_buffer == NULL)
+	if (!uprobe_cpu_buffer)
 		return -ENOMEM;
 
 	for_each_possible_cpu(cpu) {
 		struct page *p = alloc_pages_node(cpu_to_node(cpu),
 						  GFP_KERNEL, 0);
-		if (p == NULL) {
+		if (!p) {
 			err_cpu = cpu;
 			goto err;
 		}
