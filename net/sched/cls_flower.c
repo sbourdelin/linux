@@ -187,7 +187,8 @@ static int fl_classify(struct sk_buff *skb, const struct tcf_proto *tp,
 	 * so do it rather here.
 	 */
 	skb_key.basic.n_proto = skb->protocol;
-	skb_flow_dissect(skb, &head->dissector, &skb_key, 0);
+	if (!skb_flow_dissect(skb, &head->dissector, &skb_key, 0))
+		return -1;
 
 	fl_set_masked_key(&skb_mkey, &skb_key, &head->mask);
 
