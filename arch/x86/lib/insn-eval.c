@@ -899,12 +899,22 @@ long get_mem_offset(struct pt_regs *regs, int reg_offset, int addr_size)
 		return -1L;
 	return offset;
 }
-/*
- * return the address being referenced be instruction
- * for rm=3 returning the content of the rm reg
- * for rm!=3 calculates the address using SIB and Disp
+
+/**
+ * get_addr_ref_32_64() - Obtain a 32/64-bit linear address
+ * @insn:	Instruction struct with ModRM and SiB bytes and displacement
+ * @regs:	Structure with register values as seen when entering kernel mode
+ *
+ * This function is to be used with 32-bit and 64-bit address encodings to
+ * obtain the effective memory address referred by the instruction's ModRM,
+ * SIB, and displacement bytes, as applicable. Also, the segment base is used
+ * to compute the linear address. In protected mode, segment limits are
+ * enforced.
+ *
+ * Return: linear address referenced by instruction and registers on success.
+ * -1L on failure.
  */
-void __user *insn_get_addr_ref(struct insn *insn, struct pt_regs *regs)
+static void __user *get_addr_ref_32_64(struct insn *insn, struct pt_regs *regs)
 {
 	unsigned long linear_addr, seg_base_addr, seg_limit;
 	long eff_addr, base, indx;
@@ -1025,4 +1035,32 @@ void __user *insn_get_addr_ref(struct insn *insn, struct pt_regs *regs)
 	return (void __user *)linear_addr;
 out_err:
 	return (void __user *)-1;
+}
+
+/**
+ * insn_get_addr_ref() - Obtain the linear address referred by instruction
+ * @insn:	Instruction structure containing ModRM byte and displacement
+ * @regs:	Structure with register values as seen when entering kernel mode
+ *
+ * Obtain the memory address referred by the instruction's ModRM bytes and
+ * displacement. Also, the segment used as base is determined by either any
+ * segment override prefixes in insn or the default segment of the registers
+ * involved in the address computation. In protected mode, segment limits
+ * are enforced.
+ *
+ * Return: linear address referenced by instruction and registers on success.
+ * -1L on failure.
+ */
+void __user *insn_get_addr_ref(struct insn *insn, struct pt_regs *regs)
+{
+	switch (insn->addr_bytes) {
+	case 2:
+		return get_addr_ref_16(insn, regs);
+	case 4:
+		/* fall through */
+	case 8:
+		return get_addr_ref_32_64(insn, regs);
+	default:
+		return (void __user *)-1;
+	}
 }
