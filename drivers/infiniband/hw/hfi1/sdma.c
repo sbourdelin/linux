@@ -1125,7 +1125,7 @@ void sdma_seqfile_dump_cpu_list(struct seq_file *s,
 				continue;
 
 			if (j > 0)
-				seq_puts(s, ",");
+				seq_putc(s, ',');
 
 			seq_printf(s, " sdma%2d",
 				   rht_node->map[i]->sde[j]->this_idx);
@@ -1133,7 +1133,7 @@ void sdma_seqfile_dump_cpu_list(struct seq_file *s,
 		seq_puts(s, " ]");
 	}
 
-	seq_puts(s, "\n");
+	seq_putc(s, '\n');
 }
 
 /*
