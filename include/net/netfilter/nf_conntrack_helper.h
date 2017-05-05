@@ -111,7 +111,7 @@ int nf_conntrack_broadcast_help(struct sk_buff *skb, unsigned int protoff,
 				enum ip_conntrack_info ctinfo,
 				unsigned int timeout);
 
-struct nf_ct_helper_expectfn {
+struct nf_ct_nat_helper {
 	struct list_head head;
 	const char *name;
 	void (*expectfn)(struct nf_conn *ct, struct nf_conntrack_expect *exp);
@@ -121,12 +121,12 @@ __printf(3,4)
 void nf_ct_helper_log(struct sk_buff *skb, const struct nf_conn *ct,
 		      const char *fmt, ...);
 
-void nf_ct_helper_expectfn_register(struct nf_ct_helper_expectfn *n);
-void nf_ct_helper_expectfn_unregister(struct nf_ct_helper_expectfn *n);
-struct nf_ct_helper_expectfn *
-nf_ct_helper_expectfn_find_by_name(const char *name);
-struct nf_ct_helper_expectfn *
-nf_ct_helper_expectfn_find_by_symbol(const void *symbol);
+void nf_ct_nat_helper_register(struct nf_ct_nat_helper *n);
+void nf_ct_nat_helper_unregister(struct nf_ct_nat_helper *n);
+struct nf_ct_nat_helper *
+nf_ct_nat_helper_find_by_name(const char *name);
+struct nf_ct_nat_helper *
+nf_ct_nat_helper_find_by_symbol(const void *symbol);
 
 extern struct hlist_head *nf_ct_helper_hash;
 extern unsigned int nf_ct_helper_hsize;
