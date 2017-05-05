@@ -490,9 +490,7 @@ static int create_trace_uprobe(int argc, char **argv)
 	tu->offset = offset;
 	tu->inode = inode;
 	tu->filename = kstrdup(filename, GFP_KERNEL);
-
 	if (!tu->filename) {
-		pr_info("Failed to allocate filename.\n");
 		ret = -ENOMEM;
 		goto error;
 	}
