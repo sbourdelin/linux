@@ -626,10 +626,16 @@ static netdev_features_t vlan_dev_fix_features(struct net_device *dev,
 {
 	struct net_device *real_dev = vlan_dev_priv(dev)->real_dev;
 	netdev_features_t old_features = features;
+	netdev_features_t real_dev_features = real_dev->features;
 
-	features = netdev_intersect_features(features, real_dev->vlan_features);
+	features = netdev_intersect_features(features,
+					     (real_dev->vlan_features |
+					      NETIF_F_HW_CSUM));
 	features |= NETIF_F_RXCSUM;
-	features = netdev_intersect_features(features, real_dev->features);
+	if (real_dev_features & (NETIF_F_IP_CSUM|NETIF_F_IPV6_CSUM))
+		real_dev_features |= NETIF_F_HW_CSUM;
+
+	features = netdev_intersect_features(features, real_dev_features);
 
 	features |= old_features & (NETIF_F_SOFT_FEATURES | NETIF_F_GSO_SOFTWARE);
 	features |= NETIF_F_LLTX;
