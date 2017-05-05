@@ -194,6 +194,10 @@ mwifiex_11n_aggregate_pkt(struct mwifiex_private *priv,
 
 	if (tx_info_src->flags & MWIFIEX_BUF_FLAG_TDLS_PKT)
 		tx_info_aggr->flags |= MWIFIEX_BUF_FLAG_TDLS_PKT;
+
+	if (tx_info_src->flags & MWIFIEX_BUF_FLAG_TCP_ACK)
+		tx_info_aggr->flags |= MWIFIEX_BUF_FLAG_TCP_ACK;
+
 	tx_info_aggr->flags |= MWIFIEX_BUF_FLAG_AGGR_PKT;
 	skb_aggr->priority = skb_src->priority;
 	skb_aggr->tstamp = skb_src->tstamp;

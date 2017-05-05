@@ -934,6 +934,7 @@ static int mwifiex_usb_aggr_tx_data(struct mwifiex_adapter *adapter, u8 ep,
 	struct urb_context *context = NULL;
 	struct txpd *local_tx_pd =
 		(struct txpd *)((u8 *)skb->data + adapter->intf_hdr_len);
+	struct mwifiex_txinfo *tx_info = MWIFIEX_SKB_TXCB(skb);
 	u8 f_send_aggr_buf = 0;
 	u8 f_send_cur_buf = 0;
 	u8 f_precopy_cur_buf = 0;
@@ -989,8 +990,9 @@ static int mwifiex_usb_aggr_tx_data(struct mwifiex_adapter *adapter, u8 ep,
 		}
 	}
 
-	if (local_tx_pd->flags & MWIFIEX_TxPD_POWER_MGMT_NULL_PACKET) {
-		/* Send NULL packet immediately*/
+	if (local_tx_pd->flags & MWIFIEX_TxPD_POWER_MGMT_NULL_PACKET ||
+	    tx_info->flags & MWIFIEX_BUF_FLAG_TCP_ACK) {
+		/* Send NULL data/TCP ACK packet immediately*/
 		if (f_precopy_cur_buf) {
 			if (skb_queue_empty(&port->tx_aggr.aggr_list)) {
 				f_precopy_cur_buf = 0;

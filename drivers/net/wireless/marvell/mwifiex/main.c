@@ -851,6 +851,30 @@ mwifiex_clone_skb_for_tx_status(struct mwifiex_private *priv,
 	return skb;
 }
 
+static bool is_piggyback_tcp_ack(struct sk_buff *skb)
+{
+	struct ethhdr *ethh = NULL;
+	struct iphdr  *iph = NULL;
+	struct tcphdr *tcph = NULL;
+
+	ethh = (struct ethhdr *)skb->data;
+	if (ntohs(ethh->h_proto) != ETH_P_IP)
+		return false;
+
+	iph = (struct iphdr *)((u8 *)ethh + sizeof(struct ethhdr));
+	if (iph->protocol != IPPROTO_TCP)
+		return false;
+
+	tcph = (struct tcphdr *)((u8 *)iph + iph->ihl * 4);
+	/* Piggyback ack without payload*/
+	if (*((u8 *)tcph + 13) == 0x10 &&
+	    ntohs(iph->tot_len) <= (iph->ihl + tcph->doff) * 4) {
+		return true;
+	}
+
+	return false;
+}
+
 /*
  * CFG802.11 network device handler for data transmission.
  */
@@ -904,6 +928,8 @@ mwifiex_hard_start_xmit(struct sk_buff *skb, struct net_device *dev)
 	tx_info->bss_num = priv->bss_num;
 	tx_info->bss_type = priv->bss_type;
 	tx_info->pkt_len = skb->len;
+	if (is_piggyback_tcp_ack(skb))
+		tx_info->flags |= MWIFIEX_BUF_FLAG_TCP_ACK;
 
 	multicast = is_multicast_ether_addr(skb->data);
 
