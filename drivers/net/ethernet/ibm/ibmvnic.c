@@ -675,8 +675,12 @@ static int __ibmvnic_open(struct net_device *netdev)
 	adapter->state = VNIC_OPENING;
 	replenish_pools(adapter);
 
-	for (i = 0; i < adapter->req_rx_queues; i++)
-		napi_enable(&adapter->napi[i]);
+	if (adapter->napi_disabled) {
+		for (i = 0; i < adapter->req_rx_queues; i++)
+			napi_enable(&adapter->napi[i]);
+
+		adapter->napi_disabled = false;
+	}
 
 	/* We're ready to receive frames, enable the sub-crq interrupts and
 	 * set the logical link state to up
@@ -780,9 +784,11 @@ static int __ibmvnic_close(struct net_device *netdev)
 	adapter->state = VNIC_CLOSING;
 	netif_tx_stop_all_queues(netdev);
 
-	if (adapter->napi) {
+	if (!adapter->napi_disabled) {
 		for (i = 0; i < adapter->req_rx_queues; i++)
 			napi_disable(&adapter->napi[i]);
+
+		adapter->napi_disabled = true;
 	}
 
 	clean_tx_pools(adapter);
@@ -3540,6 +3546,9 @@ static int ibmvnic_probe(struct vio_dev *dev, const struct vio_device_id *id)
 		free_netdev(netdev);
 		return rc;
 	}
+
+	adapter->napi_disabled = true;
+
 	dev_info(&dev->dev, "ibmvnic registered\n");
 
 	adapter->state = VNIC_PROBED;
