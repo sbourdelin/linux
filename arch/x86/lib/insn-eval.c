@@ -5,6 +5,7 @@
  */
 #include <linux/kernel.h>
 #include <linux/string.h>
+#include <linux/ratelimit.h>
 #include <asm/inat.h>
 #include <asm/insn.h>
 #include <asm/insn-eval.h>
@@ -85,9 +86,8 @@ static int get_reg_offset(struct insn *insn, struct pt_regs *regs,
 		break;
 
 	default:
-		pr_err("invalid register type");
-		BUG();
-		break;
+		printk_ratelimited(KERN_ERR "insn-eval: x86: invalid register type");
+		return -EINVAL;
 	}
 
 	if (regno >= nr_registers) {
