@@ -695,7 +695,7 @@ int insn_get_modrm_rm_off(struct insn *insn, struct pt_regs *regs)
  */
 void __user *insn_get_addr_ref(struct insn *insn, struct pt_regs *regs)
 {
-	unsigned long linear_addr;
+	unsigned long linear_addr, seg_base_addr, seg_limit;
 	long eff_addr, base, indx;
 	int addr_offset, base_offset, indx_offset;
 	insn_byte_t sib;
@@ -709,6 +709,10 @@ void __user *insn_get_addr_ref(struct insn *insn, struct pt_regs *regs)
 		if (addr_offset < 0)
 			goto out_err;
 		eff_addr = regs_get_register(regs, addr_offset);
+		seg_base_addr = insn_get_seg_base(regs, insn, addr_offset);
+		if (seg_base_addr == -1L)
+			goto out_err;
+		seg_limit = get_seg_limit(regs, insn, addr_offset);
 	} else {
 		if (insn->sib.nbytes) {
 			/*
@@ -734,6 +738,11 @@ void __user *insn_get_addr_ref(struct insn *insn, struct pt_regs *regs)
 				indx = regs_get_register(regs, indx_offset);
 
 			eff_addr = base + indx * (1 << X86_SIB_SCALE(sib));
+			seg_base_addr = insn_get_seg_base(regs, insn,
+							  base_offset);
+			if (seg_base_addr == -1L)
+				goto out_err;
+			seg_limit = get_seg_limit(regs, insn, base_offset);
 		} else {
 			addr_offset = get_reg_offset(insn, regs, REG_TYPE_RM);
 			/*
@@ -751,10 +760,25 @@ void __user *insn_get_addr_ref(struct insn *insn, struct pt_regs *regs)
 			} else {
 				eff_addr = regs_get_register(regs, addr_offset);
 			}
+			seg_base_addr = insn_get_seg_base(regs, insn,
+							  addr_offset);
+			if (seg_base_addr == -1L)
+				goto out_err;
+			seg_limit = get_seg_limit(regs, insn, addr_offset);
 		}
 		eff_addr += insn->displacement.value;
 	}
+
 	linear_addr = (unsigned long)eff_addr;
+	/*
+	 * Make sure the effective address is within the limits of the
+	 * segment. In long mode, the limit is -1L. Thus, the second part
+	 * of the check always succeeds.
+	 */
+	if (linear_addr > seg_limit)
+		goto out_err;
+
+	linear_addr += seg_base_addr;
 
 	return (void __user *)linear_addr;
 out_err:
