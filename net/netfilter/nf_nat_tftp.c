@@ -18,6 +18,11 @@ MODULE_DESCRIPTION("TFTP NAT helper");
 MODULE_LICENSE("GPL");
 MODULE_ALIAS("ip_nat_tftp");
 
+static struct nf_ct_nat_helper tftp_nat = {
+	.name = "tftp-nat-follow-master",
+	.expectfn = nf_nat_follow_master,
+};
+
 static unsigned int help(struct sk_buff *skb,
 			 enum ip_conntrack_info ctinfo,
 			 struct nf_conntrack_expect *exp)
@@ -27,7 +32,7 @@ static unsigned int help(struct sk_buff *skb,
 	exp->saved_proto.udp.port
 		= ct->tuplehash[IP_CT_DIR_ORIGINAL].tuple.src.u.udp.port;
 	exp->dir = IP_CT_DIR_REPLY;
-	exp->expectfn = nf_nat_follow_master;
+	exp->nat_helper = &tftp_nat;
 	if (nf_ct_expect_related(exp) != 0) {
 		nf_ct_helper_log(skb, exp->master, "cannot add expectation");
 		return NF_DROP;
@@ -38,12 +43,14 @@ static unsigned int help(struct sk_buff *skb,
 static void __exit nf_nat_tftp_fini(void)
 {
 	RCU_INIT_POINTER(nf_nat_tftp_hook, NULL);
+	nf_ct_nat_helper_unregister(&tftp_nat);
 	synchronize_rcu();
 }
 
 static int __init nf_nat_tftp_init(void)
 {
 	BUG_ON(nf_nat_tftp_hook != NULL);
+	nf_ct_nat_helper_register(&tftp_nat);
 	RCU_INIT_POINTER(nf_nat_tftp_hook, help);
 	return 0;
 }

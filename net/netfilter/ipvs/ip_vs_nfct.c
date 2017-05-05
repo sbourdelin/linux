@@ -220,6 +220,11 @@ alter:
 	return;
 }
 
+static struct nf_ct_nat_helper ip_vs_nat = {
+	.name = "ip-vs-nat",
+	.expectfn = ip_vs_nfct_expect_callback,
+};
+
 /*
  * Create NF conntrack expectation with wildcard (optional) source port.
  * Then the default callback function will alter the reply and will confirm
@@ -245,7 +250,7 @@ void ip_vs_nfct_expect_related(struct sk_buff *skb, struct nf_conn *ct,
 			proto, port ? &port : NULL,
 			from_rs ? &cp->cport : &cp->vport);
 
-	exp->expectfn = ip_vs_nfct_expect_callback;
+	exp->nat_helper = &ip_vs_nat;
 
 	IP_VS_DBG(7, "%s: ct=%p, expect tuple=" FMT_TUPLE "\n",
 		__func__, ct, ARG_TUPLE(&exp->tuple));

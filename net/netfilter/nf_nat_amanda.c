@@ -24,6 +24,11 @@ MODULE_DESCRIPTION("Amanda NAT helper");
 MODULE_LICENSE("GPL");
 MODULE_ALIAS("ip_nat_amanda");
 
+static struct nf_ct_nat_helper amanda_nat = {
+	.name = "amanda-nat-follow-master",
+	.expectfn = nf_nat_follow_master,
+};
+
 static unsigned int help(struct sk_buff *skb,
 			 enum ip_conntrack_info ctinfo,
 			 unsigned int protoff,
@@ -41,7 +46,7 @@ static unsigned int help(struct sk_buff *skb,
 
 	/* When you see the packet, we need to NAT it the same as the
 	 * this one (ie. same IP: it will be TCP and master is UDP). */
-	exp->expectfn = nf_nat_follow_master;
+	exp->nat_helper = &amanda_nat;
 
 	/* Try to get same port: if not, try to change it. */
 	for (port = ntohs(exp->saved_proto.tcp.port); port != 0; port++) {
@@ -76,12 +81,14 @@ static unsigned int help(struct sk_buff *skb,
 static void __exit nf_nat_amanda_fini(void)
 {
 	RCU_INIT_POINTER(nf_nat_amanda_hook, NULL);
+	nf_ct_nat_helper_unregister(&amanda_nat);
 	synchronize_rcu();
 }
 
 static int __init nf_nat_amanda_init(void)
 {
 	BUG_ON(nf_nat_amanda_hook != NULL);
+	nf_ct_nat_helper_register(&amanda_nat);
 	RCU_INIT_POINTER(nf_nat_amanda_hook, help);
 	return 0;
 }

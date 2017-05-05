@@ -125,8 +125,6 @@ void nf_ct_nat_helper_register(struct nf_ct_nat_helper *n);
 void nf_ct_nat_helper_unregister(struct nf_ct_nat_helper *n);
 struct nf_ct_nat_helper *
 nf_ct_nat_helper_find_by_name(const char *name);
-struct nf_ct_nat_helper *
-nf_ct_nat_helper_find_by_symbol(const void *symbol);
 
 extern struct hlist_head *nf_ct_helper_hash;
 extern unsigned int nf_ct_helper_hsize;

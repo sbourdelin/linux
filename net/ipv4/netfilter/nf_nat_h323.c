@@ -21,6 +21,26 @@
 #include <linux/netfilter/nf_conntrack_h323.h>
 
 /****************************************************************************/
+static void ip_nat_q931_expect(struct nf_conn *new,
+			       struct nf_conntrack_expect *this);
+static void ip_nat_callforwarding_expect(struct nf_conn *new,
+					 struct nf_conntrack_expect *this);
+
+static struct nf_ct_nat_helper q931_nat = {
+	.name		= "Q.931",
+	.expectfn	= ip_nat_q931_expect,
+};
+
+static struct nf_ct_nat_helper callforwarding_nat = {
+	.name		= "callforwarding",
+	.expectfn	= ip_nat_callforwarding_expect,
+};
+
+static struct nf_ct_nat_helper follow_master_nat = {
+	.name		= "h323-nat-follow-master",
+	.expectfn	= nf_nat_follow_master,
+};
+
 static int set_addr(struct sk_buff *skb, unsigned int protoff,
 		    unsigned char **data, int dataoff,
 		    unsigned int addroff, __be32 ip, __be16 port)
@@ -187,10 +207,10 @@ static int nat_rtp_rtcp(struct sk_buff *skb, struct nf_conn *ct,
 
 	/* Set expectations for NAT */
 	rtp_exp->saved_proto.udp.port = rtp_exp->tuple.dst.u.udp.port;
-	rtp_exp->expectfn = nf_nat_follow_master;
+	rtp_exp->nat_helper = &follow_master_nat;
 	rtp_exp->dir = !dir;
 	rtcp_exp->saved_proto.udp.port = rtcp_exp->tuple.dst.u.udp.port;
-	rtcp_exp->expectfn = nf_nat_follow_master;
+	rtcp_exp->nat_helper = &follow_master_nat;
 	rtcp_exp->dir = !dir;
 
 	/* Lookup existing expects */
@@ -289,7 +309,7 @@ static int nat_t120(struct sk_buff *skb, struct nf_conn *ct,
 
 	/* Set expectations for NAT */
 	exp->saved_proto.tcp.port = exp->tuple.dst.u.tcp.port;
-	exp->expectfn = nf_nat_follow_master;
+	exp->nat_helper = &follow_master_nat;
 	exp->dir = !dir;
 
 	/* Try to get same port: if not, try to change it. */
@@ -341,7 +361,7 @@ static int nat_h245(struct sk_buff *skb, struct nf_conn *ct,
 
 	/* Set expectations for NAT */
 	exp->saved_proto.tcp.port = exp->tuple.dst.u.tcp.port;
-	exp->expectfn = nf_nat_follow_master;
+	exp->nat_helper = &follow_master_nat;
 	exp->dir = !dir;
 
 	/* Check existing expects */
@@ -433,7 +453,7 @@ static int nat_q931(struct sk_buff *skb, struct nf_conn *ct,
 
 	/* Set expectations for NAT */
 	exp->saved_proto.tcp.port = exp->tuple.dst.u.tcp.port;
-	exp->expectfn = ip_nat_q931_expect;
+	exp->nat_helper = &q931_nat;
 	exp->dir = !dir;
 
 	/* Check existing expects */
@@ -527,7 +547,7 @@ static int nat_callforwarding(struct sk_buff *skb, struct nf_conn *ct,
 	exp->saved_addr = exp->tuple.dst.u3;
 	exp->tuple.dst.u3.ip = ct->tuplehash[!dir].tuple.dst.u3.ip;
 	exp->saved_proto.tcp.port = exp->tuple.dst.u.tcp.port;
-	exp->expectfn = ip_nat_callforwarding_expect;
+	exp->nat_helper = &callforwarding_nat;
 	exp->dir = !dir;
 
 	/* Try to get same port: if not, try to change it. */
@@ -567,16 +587,6 @@ static int nat_callforwarding(struct sk_buff *skb, struct nf_conn *ct,
 	return 0;
 }
 
-static struct nf_ct_nat_helper q931_nat = {
-	.name		= "Q.931",
-	.expectfn	= ip_nat_q931_expect,
-};
-
-static struct nf_ct_nat_helper callforwarding_nat = {
-	.name		= "callforwarding",
-	.expectfn	= ip_nat_callforwarding_expect,
-};
-
 /****************************************************************************/
 static int __init init(void)
 {
@@ -601,6 +611,7 @@ static int __init init(void)
 	RCU_INIT_POINTER(nat_q931_hook, nat_q931);
 	nf_ct_nat_helper_register(&q931_nat);
 	nf_ct_nat_helper_register(&callforwarding_nat);
+	nf_ct_nat_helper_register(&follow_master_nat);
 	return 0;
 }
 
@@ -618,6 +629,7 @@ static void __exit fini(void)
 	RCU_INIT_POINTER(nat_q931_hook, NULL);
 	nf_ct_nat_helper_unregister(&q931_nat);
 	nf_ct_nat_helper_unregister(&callforwarding_nat);
+	nf_ct_nat_helper_unregister(&follow_master_nat);
 	synchronize_rcu();
 }
 

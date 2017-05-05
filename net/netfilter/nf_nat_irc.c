@@ -26,6 +26,11 @@ MODULE_DESCRIPTION("IRC (DCC) NAT helper");
 MODULE_LICENSE("GPL");
 MODULE_ALIAS("ip_nat_irc");
 
+static struct nf_ct_nat_helper irc_nat = {
+	.name = "irc-nat-follow-master",
+	.expectfn = nf_nat_follow_master,
+};
+
 static unsigned int help(struct sk_buff *skb,
 			 enum ip_conntrack_info ctinfo,
 			 unsigned int protoff,
@@ -44,7 +49,7 @@ static unsigned int help(struct sk_buff *skb,
 
 	exp->saved_proto.tcp.port = exp->tuple.dst.u.tcp.port;
 	exp->dir = IP_CT_DIR_REPLY;
-	exp->expectfn = nf_nat_follow_master;
+	exp->nat_helper = &irc_nat;
 
 	/* Try to get same port: if not, try to change it. */
 	for (port = ntohs(exp->saved_proto.tcp.port); port != 0; port++) {
@@ -96,12 +101,14 @@ static unsigned int help(struct sk_buff *skb,
 static void __exit nf_nat_irc_fini(void)
 {
 	RCU_INIT_POINTER(nf_nat_irc_hook, NULL);
+	nf_ct_nat_helper_unregister(&irc_nat);
 	synchronize_rcu();
 }
 
 static int __init nf_nat_irc_init(void)
 {
 	BUG_ON(nf_nat_irc_hook != NULL);
+	nf_ct_nat_helper_register(&irc_nat);
 	RCU_INIT_POINTER(nf_nat_irc_hook, help);
 	return 0;
 }

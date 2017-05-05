@@ -24,6 +24,11 @@ MODULE_AUTHOR("Rusty Russell <rusty@rustcorp.com.au>");
 MODULE_DESCRIPTION("ftp NAT helper");
 MODULE_ALIAS("ip_nat_ftp");
 
+static struct nf_ct_nat_helper ftp_nat = {
+	.name = "ftp-nat-follow-master",
+	.expectfn = nf_nat_follow_master,
+};
+
 /* FIXME: Time out? --RR */
 
 static int nf_nat_ftp_fmt_cmd(struct nf_conn *ct, enum nf_ct_ftp_type type,
@@ -80,7 +85,7 @@ static unsigned int nf_nat_ftp(struct sk_buff *skb,
 
 	/* When you see the packet, we need to NAT it the same as the
 	 * this one. */
-	exp->expectfn = nf_nat_follow_master;
+	exp->nat_helper = &ftp_nat;
 
 	/* Try to get same port: if not, try to change it. */
 	for (port = ntohs(exp->saved_proto.tcp.port); port != 0; port++) {
@@ -123,12 +128,14 @@ out:
 static void __exit nf_nat_ftp_fini(void)
 {
 	RCU_INIT_POINTER(nf_nat_ftp_hook, NULL);
+	nf_ct_nat_helper_unregister(&ftp_nat);
 	synchronize_rcu();
 }
 
 static int __init nf_nat_ftp_init(void)
 {
 	BUG_ON(nf_nat_ftp_hook != NULL);
+	nf_ct_nat_helper_register(&ftp_nat);
 	RCU_INIT_POINTER(nf_nat_ftp_hook, nf_nat_ftp);
 	return 0;
 }

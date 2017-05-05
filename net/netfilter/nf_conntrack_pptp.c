@@ -69,6 +69,9 @@ void
 			     struct nf_conntrack_expect *exp) __read_mostly;
 EXPORT_SYMBOL_GPL(nf_nat_pptp_hook_expectfn);
 
+static void pptp_expectfn(struct nf_conn *ct,
+			  struct nf_conntrack_expect *exp);
+
 #if defined(DEBUG) || defined(CONFIG_DYNAMIC_DEBUG)
 /* PptpControlMessageType names */
 const char *const pptp_msg_name[] = {
@@ -98,6 +101,11 @@ EXPORT_SYMBOL(pptp_msg_name);
 
 #define PPTP_GRE_TIMEOUT 		(10 MINS)
 #define PPTP_GRE_STREAM_TIMEOUT 	(5 HOURS)
+
+static struct nf_ct_nat_helper pptp_nat = {
+	.name			= "pptp-nat",
+	.expectfn		= pptp_expectfn,
+};
 
 static void pptp_expectfn(struct nf_conn *ct,
 			 struct nf_conntrack_expect *exp)
@@ -221,7 +229,7 @@ static int exp_gre(struct nf_conn *ct, __be16 callid, __be16 peer_callid)
 			  &ct->tuplehash[dir].tuple.src.u3,
 			  &ct->tuplehash[dir].tuple.dst.u3,
 			  IPPROTO_GRE, &peer_callid, &callid);
-	exp_orig->expectfn = pptp_expectfn;
+	exp_orig->nat_helper = &pptp_nat;
 
 	/* reply direction, PAC->PNS */
 	dir = IP_CT_DIR_REPLY;
@@ -230,7 +238,7 @@ static int exp_gre(struct nf_conn *ct, __be16 callid, __be16 peer_callid)
 			  &ct->tuplehash[dir].tuple.src.u3,
 			  &ct->tuplehash[dir].tuple.dst.u3,
 			  IPPROTO_GRE, &callid, &peer_callid);
-	exp_reply->expectfn = pptp_expectfn;
+	exp_reply->nat_helper = &pptp_nat;
 
 	nf_nat_pptp_exp_gre = rcu_dereference(nf_nat_pptp_hook_exp_gre);
 	if (nf_nat_pptp_exp_gre && ct->status & IPS_NAT_MASK)
@@ -607,11 +615,13 @@ static struct nf_conntrack_helper pptp __read_mostly = {
 
 static int __init nf_conntrack_pptp_init(void)
 {
+	nf_ct_nat_helper_register(&pptp_nat);
 	return nf_conntrack_helper_register(&pptp);
 }
 
 static void __exit nf_conntrack_pptp_fini(void)
 {
+	nf_ct_nat_helper_unregister(&pptp_nat);
 	nf_conntrack_helper_unregister(&pptp);
 }
 
