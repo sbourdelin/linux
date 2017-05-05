@@ -1324,7 +1324,7 @@ static bool compatible_field(struct ftrace_event_field *field,
 {
 	if (field == test_field)
 		return true;
-	if (field == NULL || test_field == NULL)
+	if (!field || !test_field)
 		return false;
 	if (strcmp(field->name, test_field->name) != 0)
 		return false;
