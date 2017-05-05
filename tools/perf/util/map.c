@@ -17,6 +17,7 @@
 #include <linux/string.h>
 #include "srcline.h"
 #include "unwind.h"
+#include "srccode.h"
 
 static void __maps__insert(struct maps *maps, struct map *map);
 
@@ -410,6 +411,34 @@ int map__fprintf_srcline(struct map *map, u64 addr, const char *prefix,
 		if (srcline != SRCLINE_UNKNOWN)
 			ret = fprintf(fp, "%s%s", prefix, srcline);
 		free_srcline(srcline);
+	}
+	return ret;
+}
+
+int map__fprintf_srccode(struct map *map, u64 addr,
+			 const char *prefix, FILE *fp)
+{
+	char *srcline;
+	int ret = 0;
+
+	if (map && map->dso) {
+		srcline_full_filename = true;
+		srcline = get_srcline(map->dso,
+				      map__rip_2objdump(map, addr), NULL,
+				      true, true);
+		if (srcline != SRCLINE_UNKNOWN) {
+			char srcfile[1024];
+			int line, len;
+			char *srccode;
+			if (sscanf(srcline, "%1023[^:]:%d", srcfile, &line)
+			    == 2 &&
+			    (srccode = find_sourceline(srcfile, line, &len))
+			    != NULL)
+				ret = fprintf(fp, "%s%-8d %.*s",
+						prefix,
+						line, len, srccode);
+			free_srcline(srcline);
+		}
 	}
 	return ret;
 }
