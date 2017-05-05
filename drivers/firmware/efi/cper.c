@@ -364,7 +364,6 @@ static void cper_print_pcie(const char *pfx, const struct cper_sec_pcie *pcie,
 		printk("%s""command: 0x%04x, status: 0x%04x\n", pfx,
 		       pcie->command, pcie->status);
 	if (pcie->validation_bits & CPER_PCIE_VALID_DEVICE_ID) {
-		const __u8 *p;
 		printk("%s""device_id: %04x:%02x:%02x.%x\n", pfx,
 		       pcie->device_id.segment, pcie->device_id.bus,
 		       pcie->device_id.device, pcie->device_id.function);
@@ -374,8 +373,8 @@ static void cper_print_pcie(const char *pfx, const struct cper_sec_pcie *pcie,
 		       pcie->device_id.secondary_bus);
 		printk("%s""vendor_id: 0x%04x, device_id: 0x%04x\n", pfx,
 		       pcie->device_id.vendor_id, pcie->device_id.device_id);
-		p = pcie->device_id.class_code;
-		printk("%s""class_code: %02x%02x%02x\n", pfx, p[0], p[1], p[2]);
+		printk("%s""class_code: 0x%06x\n", pfx,
+		       pcie->device_id.class_code);
 	}
 	if (pcie->validation_bits & CPER_PCIE_VALID_SERIAL_NUMBER)
 		printk("%s""serial number: 0x%04x, 0x%04x\n", pfx,

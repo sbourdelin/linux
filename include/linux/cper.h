@@ -416,7 +416,7 @@ struct cper_sec_pcie {
 	struct {
 		__u16	vendor_id;
 		__u16	device_id;
-		__u8	class_code[3];
+		__u32	class_code:24;
 		__u8	function;
 		__u8	device;
 		__u16	segment;
