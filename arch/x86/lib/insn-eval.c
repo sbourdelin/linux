@@ -688,6 +688,62 @@ int insn_get_modrm_rm_off(struct insn *insn, struct pt_regs *regs)
 	return get_reg_offset(insn, regs, REG_TYPE_RM);
 }
 
+/**
+ * _to_signed_long() - Cast an unsigned long into signed long
+ * @val		A 32-bit or 64-bit unsigned long
+ * @long_bytes	The number of bytes used to represent a long number
+ * @out		The casted signed long
+ *
+ * Return: A signed long of either 32 or 64 bits, as per the build configuration
+ * of the kernel.
+ */
+static int _to_signed_long(unsigned long val, int long_bytes, long *out)
+{
+	if (!out)
+		return -EINVAL;
+
+#ifdef CONFIG_X86_64
+	if (long_bytes == 4) {
+		/* higher bytes should all be zero */
+		if (val & ~0xffffffff)
+			return -EINVAL;
+
+		/* sign-extend to a 64-bit long */
+		*out = (long)((int)(val));
+		return 0;
+	} else if (long_bytes == 8) {
+		*out = (long)val;
+		return 0;
+	} else {
+		return -EINVAL;
+	}
+#else
+	*out = (long)val;
+	return 0;
+#endif
+}
+
+/** get_mem_offset() - Obtain the memory offset indicated in operand register
+ * @regs	Structure with register values as seen when entering kernel mode
+ * @reg_offset	Offset from the base of pt_regs of the operand register
+ * @addr_size	Address size of the code segment in use
+ *
+ * Obtain the offset (a signed number with size as specified in addr_size)
+ * indicated in the register used for register-indirect memory adressing.
+ *
+ * Return: A memory offset to be used in the computation of effective address.
+ */
+long get_mem_offset(struct pt_regs *regs, int reg_offset, int addr_size)
+{
+	int ret;
+	long offset = -1L;
+	unsigned long uoffset = regs_get_register(regs, reg_offset);
+
+	ret = _to_signed_long(uoffset, addr_size, &offset);
+	if (ret)
+		return -1L;
+	return offset;
+}
 /*
  * return the address being referenced be instruction
  * for rm=3 returning the content of the rm reg
@@ -697,18 +753,21 @@ void __user *insn_get_addr_ref(struct insn *insn, struct pt_regs *regs)
 {
 	unsigned long linear_addr, seg_base_addr, seg_limit;
 	long eff_addr, base, indx;
-	int addr_offset, base_offset, indx_offset;
+	int addr_offset, base_offset, indx_offset, addr_bytes;
 	insn_byte_t sib;
 
 	insn_get_modrm(insn);
 	insn_get_sib(insn);
 	sib = insn->sib.value;
+	addr_bytes = insn->addr_bytes;
 
 	if (X86_MODRM_MOD(insn->modrm.value) == 3) {
 		addr_offset = get_reg_offset(insn, regs, REG_TYPE_RM);
 		if (addr_offset < 0)
 			goto out_err;
-		eff_addr = regs_get_register(regs, addr_offset);
+		eff_addr = get_mem_offset(regs, addr_offset, addr_bytes);
+		if (eff_addr == -1L)
+			goto out_err;
 		seg_base_addr = insn_get_seg_base(regs, insn, addr_offset);
 		if (seg_base_addr == -1L)
 			goto out_err;
@@ -722,20 +781,28 @@ void __user *insn_get_addr_ref(struct insn *insn, struct pt_regs *regs)
 			 * in the address computation.
 			 */
 			base_offset = get_reg_offset(insn, regs, REG_TYPE_BASE);
-			if (base_offset == -EDOM)
+			if (base_offset == -EDOM) {
 				base = 0;
-			else if (base_offset < 0)
+			} else if (base_offset < 0) {
 				goto out_err;
-			else
-				base = regs_get_register(regs, base_offset);
+			} else {
+				base = get_mem_offset(regs, base_offset,
+						      addr_bytes);
+				if (base == -1L)
+					goto out_err;
+			}
 
 			indx_offset = get_reg_offset(insn, regs, REG_TYPE_INDEX);
-			if (indx_offset == -EDOM)
+			if (indx_offset == -EDOM) {
 				indx = 0;
-			else if (indx_offset < 0)
+			} else if (indx_offset < 0) {
 				goto out_err;
-			else
-				indx = regs_get_register(regs, indx_offset);
+			} else {
+				indx = get_mem_offset(regs, indx_offset,
+						      addr_bytes);
+				if (indx == -1L)
+					goto out_err;
+			}
 
 			eff_addr = base + indx * (1 << X86_SIB_SCALE(sib));
 			seg_base_addr = insn_get_seg_base(regs, insn,
@@ -758,7 +825,10 @@ void __user *insn_get_addr_ref(struct insn *insn, struct pt_regs *regs)
 			} else if (addr_offset < 0) {
 				goto out_err;
 			} else {
-				eff_addr = regs_get_register(regs, addr_offset);
+				eff_addr = get_mem_offset(regs, addr_offset,
+							  addr_bytes);
+				if (eff_addr == -1L)
+					goto out_err;
 			}
 			seg_base_addr = insn_get_seg_base(regs, insn,
 							  addr_offset);
@@ -770,6 +840,13 @@ void __user *insn_get_addr_ref(struct insn *insn, struct pt_regs *regs)
 	}
 
 	linear_addr = (unsigned long)eff_addr;
+	/*
+	 * If address size is 32-bit, truncate the 4 most significant bytes.
+	 * This is to avoid phony negative offsets.
+	 */
+	if (addr_bytes == 4)
+		linear_addr &= 0xffffffff;
+
 	/*
 	 * Make sure the effective address is within the limits of the
 	 * segment. In long mode, the limit is -1L. Thus, the second part
