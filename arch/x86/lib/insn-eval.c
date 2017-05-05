@@ -603,6 +603,71 @@ static unsigned long get_seg_limit(struct pt_regs *regs, struct insn *insn,
 }
 
 /**
+ * insn_get_code_seg_defaults() - Obtain code segment default parameters
+ * @regs:	Structure with register values as seen when entering kernel mode
+ *
+ * Obtain the default parameters of the code segment: address and operand sizes.
+ * The code segment is obtained from the selector contained in the CS register
+ * in regs. In protected mode, the default address is determined by inspecting
+ * the L and D bits of the segment descriptor. In virtual-8086 mode, the default
+ * is always two bytes for both address and operand sizes.
+ *
+ * Return: A populated insn_code_seg_defaults structure on success. The
+ * structure contains only zeros on failure.
+ */
+struct insn_code_seg_defaults insn_get_code_seg_defaults(struct pt_regs *regs)
+{
+	struct desc_struct *desc;
+	struct insn_code_seg_defaults defs;
+	unsigned short sel;
+	/*
+	 * The most significant byte of AR_TYPE_MASK determines whether a
+	 * segment contains data or code.
+	 */
+	unsigned int type_mask = AR_TYPE_MASK & (1 << 11);
+
+	memset(&defs, 0, sizeof(defs));
+
+	if (v8086_mode(regs)) {
+		defs.address_bytes = 2;
+		defs.operand_bytes = 2;
+		return defs;
+	}
+
+	sel = (unsigned short)regs->cs;
+
+	desc = get_desc(sel);
+	if (!desc)
+		return defs;
+
+	/* if data segment, return */
+	if (!(desc->b & type_mask))
+		return defs;
+
+	switch ((desc->l << 1) | desc->d) {
+	case 0: /* Legacy mode. CS.L=0, CS.D=0 */
+		defs.address_bytes = 2;
+		defs.operand_bytes = 2;
+		break;
+	case 1: /* Legacy mode. CS.L=0, CS.D=1 */
+		defs.address_bytes = 4;
+		defs.operand_bytes = 4;
+		break;
+	case 2: /* IA-32e 64-bit mode. CS.L=1, CS.D=0 */
+		defs.address_bytes = 8;
+		defs.operand_bytes = 4;
+		break;
+	case 3: /* Invalid setting. CS.L=1, CS.D=1 */
+		/* fall through */
+	default:
+		defs.address_bytes = 0;
+		defs.operand_bytes = 0;
+	}
+
+	return defs;
+}
+
+/**
  * insn_get_reg_offset_modrm_rm() - Obtain register in r/m part of ModRM byte
  * @insn:	Instruction structure containing the ModRM byte
  * @regs:	Structure with register values as seen when entering kernel mode

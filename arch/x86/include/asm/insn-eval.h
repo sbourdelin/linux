@@ -11,9 +11,15 @@
 #include <linux/err.h>
 #include <asm/ptrace.h>
 
+struct insn_code_seg_defaults {
+	unsigned char address_bytes;
+	unsigned char operand_bytes;
+};
+
 void __user *insn_get_addr_ref(struct insn *insn, struct pt_regs *regs);
 int insn_get_modrm_rm_off(struct insn *insn, struct pt_regs *regs);
 unsigned long insn_get_seg_base(struct pt_regs *regs, struct insn *insn,
 				int regoff);
+struct insn_code_seg_defaults insn_get_code_seg_defaults(struct pt_regs *regs);
 
 #endif /* _ASM_X86_INSN_EVAL_H */
