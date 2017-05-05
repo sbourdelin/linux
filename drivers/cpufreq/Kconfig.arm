@@ -90,11 +90,11 @@ config ARM_KIRKWOOD_CPUFREQ
 config ARM_MT8173_CPUFREQ
 	tristate "Mediatek MT8173 CPUFreq support"
 	depends on ARCH_MEDIATEK && REGULATOR
-	depends on ARM64 || (ARM_CPU_TOPOLOGY && COMPILE_TEST)
+	depends on (ARM || ARM64) || (ARM_CPU_TOPOLOGY && COMPILE_TEST)
 	depends on !CPU_THERMAL || THERMAL
 	select PM_OPP
 	help
-	  This adds the CPUFreq driver support for Mediatek MT8173 SoC.
+	  This adds the CPUFreq driver support for Mediatek SoCs.
 
 config ARM_OMAP2PLUS_CPUFREQ
 	bool "TI OMAP2+"
