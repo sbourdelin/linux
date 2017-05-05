@@ -1108,13 +1108,18 @@ u32 __skb_get_hash_symmetric(const struct sk_buff *skb);
 u32 skb_get_poff(const struct sk_buff *skb);
 u32 __skb_get_poff(const struct sk_buff *skb, void *data,
 		   const struct flow_keys *keys, int hlen);
-__be32 __skb_flow_get_ports(const struct sk_buff *skb, int thoff, u8 ip_proto,
-			    void *data, int hlen_proto);
+bool __skb_flow_get_ports(const struct sk_buff *skb, int thoff, u8 ip_proto,
+			  void *data, int hlen_proto, __be32 *ports);
 
 static inline __be32 skb_flow_get_ports(const struct sk_buff *skb,
 					int thoff, u8 ip_proto)
 {
-	return __skb_flow_get_ports(skb, thoff, ip_proto, NULL, 0);
+	__be32 ports;
+
+	if (__skb_flow_get_ports(skb, thoff, ip_proto, NULL, 0, &ports))
+		return ports;
+	else
+		return 0;
 }
 
 void skb_flow_dissector_init(struct flow_dissector *flow_dissector,
