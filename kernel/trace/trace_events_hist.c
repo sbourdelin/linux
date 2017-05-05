@@ -1013,7 +1013,7 @@ hist_trigger_entry_print(struct seq_file *m,
 	}
 
 	if (!multiline)
-		seq_puts(m, " ");
+		seq_putc(m, ' ');
 
 	seq_printf(m, "} hitcount: %10llu",
 		   tracing_map_read_sum(elt, HITCOUNT_IDX));
@@ -1030,7 +1030,7 @@ hist_trigger_entry_print(struct seq_file *m,
 		}
 	}
 
-	seq_puts(m, "\n");
+	seq_putc(m, '\n');
 }
 
 static int print_entries(struct seq_file *m,
@@ -1168,7 +1168,7 @@ static int event_hist_trigger_print(struct seq_file *m,
 		key_field = hist_data->fields[i];
 
 		if (i > hist_data->n_vals)
-			seq_puts(m, ",");
+			seq_putc(m, ',');
 
 		if (key_field->flags & HIST_FIELD_FL_STACKTRACE)
 			seq_puts(m, "stacktrace");
@@ -1182,7 +1182,7 @@ static int event_hist_trigger_print(struct seq_file *m,
 		if (i == HITCOUNT_IDX)
 			seq_puts(m, "hitcount");
 		else {
-			seq_puts(m, ",");
+			seq_putc(m, ',');
 			hist_field_print(m, hist_data->fields[i]);
 		}
 	}
@@ -1195,7 +1195,7 @@ static int event_hist_trigger_print(struct seq_file *m,
 		sort_key = &hist_data->sort_keys[i];
 
 		if (i > 0)
-			seq_puts(m, ",");
+			seq_putc(m, ',');
 
 		if (sort_key->field_idx == HITCOUNT_IDX)
 			seq_puts(m, "hitcount");
