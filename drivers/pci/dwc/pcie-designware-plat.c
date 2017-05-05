@@ -28,13 +28,6 @@ struct dw_plat_pcie {
 	struct dw_pcie		*pci;
 };
 
-static irqreturn_t dw_plat_pcie_msi_irq_handler(int irq, void *arg)
-{
-	struct pcie_port *pp = arg;
-
-	return dw_handle_msi_irq(pp);
-}
-
 static void dw_plat_pcie_host_init(struct pcie_port *pp)
 {
 	struct dw_pcie *pci = to_dw_pcie_from_pp(pp);
@@ -46,8 +39,15 @@ static void dw_plat_pcie_host_init(struct pcie_port *pp)
 		dw_pcie_msi_init(pp);
 }
 
+static void dw_plat_msi_host_init (struct dw_pcie *pci)
+{
+	struct pcie_port *pp = &pci->pp;
+	irq_set_chained_handler_and_data(pp->msi_irq, dw_handle_msi_irq, pci);
+}
+
 static struct dw_pcie_host_ops dw_plat_pcie_host_ops = {
 	.host_init = dw_plat_pcie_host_init,
+	.msi_host_init = dw_plat_msi_host_init,
 };
 
 static int dw_plat_add_pcie_port(struct pcie_port *pp,
@@ -64,14 +64,6 @@ static int dw_plat_add_pcie_port(struct pcie_port *pp,
 		pp->msi_irq = platform_get_irq(pdev, 0);
 		if (pp->msi_irq < 0)
 			return pp->msi_irq;
-
-		ret = devm_request_irq(dev, pp->msi_irq,
-					dw_plat_pcie_msi_irq_handler,
-					IRQF_SHARED, "dw-plat-pcie-msi", pp);
-		if (ret) {
-			dev_err(dev, "failed to request MSI IRQ\n");
-			return ret;
-		}
 	}
 
 	pp->root_bus_nr = -1;
@@ -82,6 +74,18 @@ static int dw_plat_add_pcie_port(struct pcie_port *pp,
 		dev_err(dev, "failed to initialize host\n");
 		return ret;
 	}
+
+	return 0;
+}
+
+static int dw_plat_pcie_remove(struct platform_device *pdev)
+{
+	struct dw_plat_pcie *dw_plat_pcie = platform_get_drvdata(pdev);
+	struct dw_pcie *pci = dw_plat_pcie->pci;
+
+	dw_pcie_free_msi(&pci->pp);
+
+	platform_set_drvdata(pdev, NULL);
 
 	return 0;
 }
@@ -136,5 +140,6 @@ static struct platform_driver dw_plat_pcie_driver = {
 		.suppress_bind_attrs = true,
 	},
 	.probe = dw_plat_pcie_probe,
+	.remove = dw_plat_pcie_remove,
 };
 builtin_platform_driver(dw_plat_pcie_driver);
