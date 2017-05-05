@@ -518,6 +518,13 @@ static struct task_struct *dup_task_struct(struct task_struct *orig, int node)
 	atomic_set(&tsk->stack_refcount, 1);
 #endif
 
+	/*
+	 * Forking kthreads (e.g. usermodehelper) should not inherit this
+	 * field since it's a pointer to a 'struct kthread' which is not
+	 * reference counted.
+	 */
+	tsk->set_child_tid = NULL;
+
 	if (err)
 		goto free_stack;
 
