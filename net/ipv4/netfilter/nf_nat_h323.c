@@ -28,16 +28,19 @@ static void ip_nat_callforwarding_expect(struct nf_conn *new,
 
 static struct nf_ct_nat_helper q931_nat = {
 	.name		= "Q.931",
+	.me		= THIS_MODULE,
 	.expectfn	= ip_nat_q931_expect,
 };
 
 static struct nf_ct_nat_helper callforwarding_nat = {
 	.name		= "callforwarding",
+	.me		= THIS_MODULE,
 	.expectfn	= ip_nat_callforwarding_expect,
 };
 
 static struct nf_ct_nat_helper follow_master_nat = {
 	.name		= "h323-nat-follow-master",
+	.me		= THIS_MODULE,
 	.expectfn	= nf_nat_follow_master,
 };
 

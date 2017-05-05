@@ -26,6 +26,7 @@ MODULE_ALIAS("ip_nat_ftp");
 
 static struct nf_ct_nat_helper ftp_nat = {
 	.name = "ftp-nat-follow-master",
+	.me = THIS_MODULE,
 	.expectfn = nf_nat_follow_master,
 };
 

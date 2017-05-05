@@ -26,6 +26,7 @@ MODULE_ALIAS("ip_nat_amanda");
 
 static struct nf_ct_nat_helper amanda_nat = {
 	.name = "amanda-nat-follow-master",
+	.me = THIS_MODULE,
 	.expectfn = nf_nat_follow_master,
 };
 

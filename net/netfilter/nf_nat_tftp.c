@@ -20,6 +20,7 @@ MODULE_ALIAS("ip_nat_tftp");
 
 static struct nf_ct_nat_helper tftp_nat = {
 	.name = "tftp-nat-follow-master",
+	.me = THIS_MODULE,
 	.expectfn = nf_nat_follow_master,
 };
 

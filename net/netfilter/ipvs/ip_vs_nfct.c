@@ -222,6 +222,7 @@ alter:
 
 static struct nf_ct_nat_helper ip_vs_nat = {
 	.name = "ip-vs-nat",
+	.me = THIS_MODULE,
 	.expectfn = ip_vs_nfct_expect_callback,
 };
 

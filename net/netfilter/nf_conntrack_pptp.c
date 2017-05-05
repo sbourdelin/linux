@@ -104,6 +104,7 @@ EXPORT_SYMBOL(pptp_msg_name);
 
 static struct nf_ct_nat_helper pptp_nat = {
 	.name			= "pptp-nat",
+	.me			= THIS_MODULE,
 	.expectfn		= pptp_expectfn,
 };
 
