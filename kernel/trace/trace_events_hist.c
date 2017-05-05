@@ -1015,9 +1015,7 @@ hist_trigger_entry_print(struct seq_file *m,
 	if (!multiline)
 		seq_puts(m, " ");
 
-	seq_puts(m, "}");
-
-	seq_printf(m, " hitcount: %10llu",
+	seq_printf(m, "} hitcount: %10llu",
 		   tracing_map_read_sum(elt, HITCOUNT_IDX));
 
 	for (i = 1; i < hist_data->n_vals; i++) {
