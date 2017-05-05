@@ -1310,7 +1310,7 @@ extern int netdev_open(struct net_device *pnetdev);
 
 static int cfg80211_rtw_change_iface(struct wiphy *wiphy,
 				     struct net_device *ndev,
-				     enum nl80211_iftype type, u32 *flags,
+				     enum nl80211_iftype type,
 				     struct vif_params *params)
 {
 	enum nl80211_iftype old_type;
@@ -2711,7 +2711,7 @@ static struct wireless_dev *
 		struct wiphy *wiphy,
 		const char *name,
 		unsigned char name_assign_type,
-		enum nl80211_iftype type, u32 *flags, struct vif_params *params)
+		enum nl80211_iftype type, struct vif_params *params)
 {
 	int ret = 0;
 	struct net_device* ndev = NULL;
