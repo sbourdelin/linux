@@ -187,7 +187,7 @@ static int fscache_objlist_show(struct seq_file *m, void *v)
 			seq_puts(m, ", ");
 		if (config & FSCACHE_OBJLIST_CONFIG_AUX)
 			seq_puts(m, "AUX_DATA");
-		seq_puts(m, "\n");
+		seq_putc(m, '\n');
 		return 0;
 	}
 
@@ -198,7 +198,7 @@ static int fscache_objlist_show(struct seq_file *m, void *v)
 		if (config & (FSCACHE_OBJLIST_CONFIG_KEY |
 			      FSCACHE_OBJLIST_CONFIG_AUX))
 			seq_puts(m, " ================");
-		seq_puts(m, "\n");
+		seq_putc(m, '\n');
 		return 0;
 	}
 
@@ -285,7 +285,7 @@ static int fscache_objlist_show(struct seq_file *m, void *v)
 		fscache_unuse_cookie(obj);
 
 		if (keylen > 0 || auxlen > 0) {
-			seq_puts(m, " ");
+			seq_putc(m, ' ');
 			for (p = buf; keylen > 0; keylen--)
 				seq_printf(m, "%02x", *p++);
 			if (auxlen > 0) {
@@ -296,7 +296,7 @@ static int fscache_objlist_show(struct seq_file *m, void *v)
 			}
 		}
 
-		seq_puts(m, "\n");
+		seq_putc(m, '\n');
 	} else {
 		seq_puts(m, "<no_netfs>\n");
 	}
