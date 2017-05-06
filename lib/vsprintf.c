@@ -395,7 +395,7 @@ struct printf_spec {
 #define FIELD_WIDTH_MAX ((1 << 23) - 1)
 #define PRECISION_MAX ((1 << 15) - 1)
 
-int kptr_restrict __read_mostly;
+int kptr_restrict __read_mostly = 4;
 
 /*
  * Always cleanse %p and %pK specifiers
