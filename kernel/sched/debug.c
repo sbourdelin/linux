@@ -78,8 +78,7 @@ static int sched_feat_show(struct seq_file *m, void *v)
 			seq_puts(m, "NO_");
 		seq_printf(m, "%s ", sched_feat_names[i]);
 	}
-	seq_puts(m, "\n");
-
+	seq_putc(m, '\n');
 	return 0;
 }
 

@@ -221,7 +221,7 @@ static int __cpuacct_percpu_seq_show(struct seq_file *m,
 		percpu = cpuacct_cpuusage_read(ca, i, index);
 		seq_printf(m, "%llu ", (unsigned long long) percpu);
 	}
-	seq_printf(m, "\n");
+	seq_putc(m, '\n');
 	return 0;
 }
 
@@ -249,7 +249,7 @@ static int cpuacct_all_seq_show(struct seq_file *m, void *V)
 	seq_puts(m, "cpu");
 	for (index = 0; index < CPUACCT_STAT_NSTATS; index++)
 		seq_printf(m, " %s", cpuacct_stat_desc[index]);
-	seq_puts(m, "\n");
+	seq_putc(m, '\n');
 
 	for_each_possible_cpu(cpu) {
 		struct cpuacct_usage *cpuusage = per_cpu_ptr(ca->cpuusage, cpu);
@@ -271,7 +271,7 @@ static int cpuacct_all_seq_show(struct seq_file *m, void *V)
 			raw_spin_unlock_irq(&cpu_rq(cpu)->lock);
 #endif
 		}
-		seq_puts(m, "\n");
+		seq_putc(m, '\n');
 	}
 	return 0;
 }
