@@ -182,7 +182,7 @@ static void kcm_format_psock(struct kcm_psock *psock, struct seq_file *seq,
 				seq_printf(seq, "RxWait=%u ",
 					   psock->strp.rx_need_bytes);
 			else
-				seq_printf(seq, "RxWait ");
+				seq_puts(seq, "RxWait ");
 		}
 	} else  {
 		if (psock->strp.rx_paused)
