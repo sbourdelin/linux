@@ -1394,23 +1394,29 @@ static noinline_for_stack
 char *address_val(char *buf, char *end, const void *addr, const char *fmt)
 {
 	unsigned long long num;
+	int cleanse = kptr_restrict_cleanse_addresses();
+	int decleanse_idx = 1;
 	int size;
 
 	switch (fmt[1]) {
 	case 'd':
 		num = *(const dma_addr_t *)addr;
 		size = sizeof(dma_addr_t);
+		decleanse_idx = 2;
 		break;
 	case 'p':
+		decleanse_idx = 2;
+		/* fall thru */
 	default:
 		num = *(const phys_addr_t *)addr;
 		size = sizeof(phys_addr_t);
 		break;
 	}
 
-	return special_hex_number(buf, end,
-		      kptr_restrict_cleanse_addresses() ? 0UL : num,
-		      size);
+	/* 'P' on the tail means don't restrict the pointer. */
+	cleanse = cleanse && (fmt[decleanse_idx] != 'P');
+
+	return special_hex_number(buf, end, cleanse ? 0UL : num, size);
 }
 
 static noinline_for_stack
