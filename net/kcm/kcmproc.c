@@ -116,7 +116,7 @@ static void kcm_format_mux_header(struct seq_file *seq)
 		   "Status");
 
 	/* XXX: pdsts header stuff here */
-	seq_puts(seq, "\n");
+	seq_putc(seq, '\n');
 }
 
 static void kcm_format_sock(struct kcm_sock *kcm, struct seq_file *seq,
@@ -146,7 +146,7 @@ static void kcm_format_sock(struct kcm_sock *kcm, struct seq_file *seq,
 	if (kcm->rx_wait)
 		seq_puts(seq, "RxWait ");
 
-	seq_puts(seq, "\n");
+	seq_putc(seq, '\n');
 }
 
 static void kcm_format_psock(struct kcm_psock *psock, struct seq_file *seq,
@@ -192,7 +192,7 @@ static void kcm_format_psock(struct kcm_psock *psock, struct seq_file *seq,
 			seq_puts(seq, "RdyRx ");
 	}
 
-	seq_puts(seq, "\n");
+	seq_putc(seq, '\n');
 }
 
 static void
