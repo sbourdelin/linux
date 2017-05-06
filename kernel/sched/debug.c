@@ -231,7 +231,7 @@ static void sd_free_ctl_entry(struct ctl_table **tablep)
 	for (entry = *tablep; entry->mode; entry++) {
 		if (entry->child)
 			sd_free_ctl_entry(&entry->child);
-		if (entry->proc_handler == NULL)
+		if (!entry->proc_handler)
 			kfree(entry->procname);
 	}
 
@@ -265,7 +265,7 @@ sd_alloc_ctl_domain_table(struct sched_domain *sd)
 {
 	struct ctl_table *table = sd_alloc_ctl_entry(14);
 
-	if (table == NULL)
+	if (!table)
 		return NULL;
 
 	set_table_entry(&table[0], "min_interval", &sd->min_interval,
@@ -311,7 +311,7 @@ static struct ctl_table *sd_alloc_ctl_cpu_table(int cpu)
 	for_each_domain(cpu, sd)
 		domain_num++;
 	entry = table = sd_alloc_ctl_entry(domain_num + 1);
-	if (table == NULL)
+	if (!table)
 		return NULL;
 
 	i = 0;
@@ -336,7 +336,7 @@ void register_sched_domain_sysctl(void)
 	WARN_ON(sd_ctl_dir[0].child);
 	sd_ctl_dir[0].child = entry;
 
-	if (entry == NULL)
+	if (!entry)
 		return;
 
 	for_each_possible_cpu(i) {
