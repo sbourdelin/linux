@@ -14,7 +14,6 @@
 #define _CRYPTO_IF_ALG_H
 
 #include <linux/compiler.h>
-#include <linux/completion.h>
 #include <linux/if_alg.h>
 #include <linux/scatterlist.h>
 #include <linux/types.h>
@@ -35,11 +34,6 @@ struct alg_sock {
 
 	const struct af_alg_type *type;
 	void *private;
-};
-
-struct af_alg_completion {
-	struct completion completion;
-	int err;
 };
 
 struct af_alg_control {
@@ -81,17 +75,9 @@ void af_alg_link_sg(struct af_alg_sgl *sgl_prev, struct af_alg_sgl *sgl_new);
 
 int af_alg_cmsg_send(struct msghdr *msg, struct af_alg_control *con);
 
-int af_alg_wait_for_completion(int err, struct af_alg_completion *completion);
-void af_alg_complete(struct crypto_async_request *req, int err);
-
 static inline struct alg_sock *alg_sk(struct sock *sk)
 {
 	return (struct alg_sock *)sk;
-}
-
-static inline void af_alg_init_completion(struct af_alg_completion *completion)
-{
-	init_completion(&completion->completion);
 }
 
 #endif	/* _CRYPTO_IF_ALG_H */

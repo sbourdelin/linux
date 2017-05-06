@@ -24,6 +24,7 @@
 #include <linux/slab.h>
 #include <linux/string.h>
 #include <linux/uaccess.h>
+#include <linux/completion.h>
 
 /*
  * Autoloaded crypto modules should only use a prefixed name to avoid allowing
@@ -136,6 +137,13 @@
 #define CRYPTO_MINALIGN ARCH_KMALLOC_MINALIGN
 
 #define CRYPTO_MINALIGN_ATTR __attribute__ ((__aligned__(CRYPTO_MINALIGN)))
+
+/*
+ * Macro for declaring a crypto op async wait object on stack
+ */
+#define DECLARE_CRYPTO_WAIT(_wait) \
+	struct crypto_wait _wait = { \
+		COMPLETION_INITIALIZER_ONSTACK((_wait).completion), 0 }
 
 struct scatterlist;
 struct crypto_ablkcipher;
@@ -466,6 +474,25 @@ struct crypto_alg {
 	
 	struct module *cra_module;
 } CRYPTO_MINALIGN_ATTR;
+
+/**
+ * A helper struct for waiting for completion of async crypto ops
+ */
+struct crypto_wait {
+	struct completion completion;
+	int err;
+};
+
+/*
+ * Async ops completion helper functioons
+ */
+int crypto_wait_req(int err, struct crypto_wait *wait);
+void crypto_req_done(struct crypto_async_request *req, int err);
+
+static inline void crypto_init_wait(struct crypto_wait *wait)
+{
+	init_completion(&wait->completion);
+}
 
 /*
  * Algorithm registration interface.
@@ -1603,6 +1630,7 @@ static inline int crypto_comp_decompress(struct crypto_comp *tfm,
 	return crypto_comp_crt(tfm)->cot_decompress(crypto_comp_tfm(tfm),
 						    src, slen, dst, dlen);
 }
+
 
 #endif	/* _LINUX_CRYPTO_H */
 
