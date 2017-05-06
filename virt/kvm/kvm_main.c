@@ -3705,7 +3705,7 @@ static const struct file_operations vm_stat_get_per_vm_fops = {
 	.release = kvm_debugfs_release,
 	.read    = simple_attr_read,
 	.write   = simple_attr_write,
-	.llseek  = generic_file_llseek,
+	.llseek  = no_llseek,
 };
 
 static int vcpu_stat_get_per_vm(void *data, u64 *val)
@@ -3750,7 +3750,7 @@ static const struct file_operations vcpu_stat_get_per_vm_fops = {
 	.release = kvm_debugfs_release,
 	.read    = simple_attr_read,
 	.write   = simple_attr_write,
-	.llseek  = generic_file_llseek,
+	.llseek  = no_llseek,
 };
 
 static const struct file_operations *stat_fops_per_vm[] = {
