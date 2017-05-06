@@ -234,7 +234,6 @@ static struct {
 #define cpuhp_lock_acquire()      lock_map_acquire(&cpu_hotplug.dep_map)
 #define cpuhp_lock_release()      lock_map_release(&cpu_hotplug.dep_map)
 
-
 void get_online_cpus(void)
 {
 	might_sleep();
@@ -262,7 +261,6 @@ void put_online_cpus(void)
 		wake_up(&cpu_hotplug.wq);
 
 	cpuhp_lock_release();
-
 }
 EXPORT_SYMBOL_GPL(put_online_cpus);
 
@@ -1004,9 +1002,9 @@ int freeze_secondary_cpus(int primary)
 		trace_suspend_resume(TPS("CPU_OFF"), cpu, true);
 		error = _cpu_down(cpu, 1, CPUHP_OFFLINE);
 		trace_suspend_resume(TPS("CPU_OFF"), cpu, false);
-		if (!error)
+		if (!error) {
 			cpumask_set_cpu(cpu, frozen_cpus);
-		else {
+		} else {
 			pr_err("Error taking CPU%d down: %d\n", cpu, error);
 			break;
 		}
@@ -1110,7 +1108,6 @@ cpu_hotplug_pm_callback(struct notifier_block *nb,
 	return NOTIFY_OK;
 }
 
-
 static int __init cpu_hotplug_pm_sync_init(void)
 {
 	/*
@@ -1137,7 +1134,7 @@ static struct cpuhp_step cpuhp_bp_states[] = {
 		.teardown.single	= NULL,
 	},
 #ifdef CONFIG_SMP
-	[CPUHP_CREATE_THREADS]= {
+	[CPUHP_CREATE_THREADS] = {
 		.name			= "threads:prepare",
 		.startup.single		= smpboot_create_threads,
 		.teardown.single	= NULL,
@@ -1241,8 +1238,10 @@ static struct cpuhp_step cpuhp_ap_states[] = {
 		.startup.single		= NULL,
 		.teardown.single	= rcutree_dying_cpu,
 	},
-	/* Entry state on starting. Interrupts enabled from here on. Transient
-	 * state for synchronsization */
+	/*
+	 * Entry state on starting. Interrupts enabled from here on. Transient
+	 * state for synchronsization
+	 */
 	[CPUHP_AP_ONLINE] = {
 		.name			= "ap:online",
 	},
