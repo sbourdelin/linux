@@ -256,12 +256,12 @@ static void show_doms(struct seq_file *s, struct rdt_resource *r, int closid)
 	seq_printf(s, "%*s:", max_name_width, r->name);
 	list_for_each_entry(dom, &r->domains, list) {
 		if (sep)
-			seq_puts(s, ";");
+			seq_putc(s, ';');
 		seq_printf(s, r->format_str, dom->id, max_data_width,
 			   dom->ctrl_val[closid]);
 		sep = true;
 	}
-	seq_puts(s, "\n");
+	seq_putc(s, '\n');
 }
 
 int rdtgroup_schemata_show(struct kernfs_open_file *of,
