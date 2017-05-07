@@ -2001,8 +2001,8 @@ static struct ssi_hash_template driver_hash[] = {
 			.halg = {
 				.digestsize = SHA1_DIGEST_SIZE,
 				.statesize = sizeof(struct sha1_state),
-				},
 			},
+		},
 		.hash_mode = DRV_HASH_SHA1,
 		.hw_mode = DRV_HASH_HW_SHA1,
 		.inter_digestsize = SHA1_DIGEST_SIZE,
@@ -2028,8 +2028,8 @@ static struct ssi_hash_template driver_hash[] = {
 			.halg = {
 				.digestsize = SHA256_DIGEST_SIZE,
 				.statesize = sizeof(struct sha256_state),
-				},
 			},
+		},
 		.hash_mode = DRV_HASH_SHA256,
 		.hw_mode = DRV_HASH_HW_SHA256,
 		.inter_digestsize = SHA256_DIGEST_SIZE,
@@ -2055,8 +2055,8 @@ static struct ssi_hash_template driver_hash[] = {
 			.halg = {
 				.digestsize = SHA224_DIGEST_SIZE,
 				.statesize = sizeof(struct sha256_state),
-				},
 			},
+		},
 		.hash_mode = DRV_HASH_SHA224,
 		.hw_mode = DRV_HASH_HW_SHA256,
 		.inter_digestsize = SHA256_DIGEST_SIZE,
@@ -2083,8 +2083,8 @@ static struct ssi_hash_template driver_hash[] = {
 			.halg = {
 				.digestsize = SHA384_DIGEST_SIZE,
 				.statesize = sizeof(struct sha512_state),
-				},
 			},
+		},
 		.hash_mode = DRV_HASH_SHA384,
 		.hw_mode = DRV_HASH_HW_SHA512,
 		.inter_digestsize = SHA512_DIGEST_SIZE,
@@ -2110,8 +2110,8 @@ static struct ssi_hash_template driver_hash[] = {
 			.halg = {
 				.digestsize = SHA512_DIGEST_SIZE,
 				.statesize = sizeof(struct sha512_state),
-				},
 			},
+		},
 		.hash_mode = DRV_HASH_SHA512,
 		.hw_mode = DRV_HASH_HW_SHA512,
 		.inter_digestsize = SHA512_DIGEST_SIZE,
@@ -2138,8 +2138,8 @@ static struct ssi_hash_template driver_hash[] = {
 			.halg = {
 				.digestsize = MD5_DIGEST_SIZE,
 				.statesize = sizeof(struct md5_state),
-				},
 			},
+		},
 		.hash_mode = DRV_HASH_MD5,
 		.hw_mode = DRV_HASH_HW_MD5,
 		.inter_digestsize = MD5_DIGEST_SIZE,
@@ -2163,12 +2163,12 @@ static struct ssi_hash_template driver_hash[] = {
 			.halg = {
 				.digestsize = AES_BLOCK_SIZE,
 				.statesize = sizeof(struct aeshash_state),
-				},
 			},
-			.hash_mode = DRV_HASH_NULL,
-			.hw_mode = DRV_CIPHER_XCBC_MAC,
-			.inter_digestsize = AES_BLOCK_SIZE,
 		},
+		.hash_mode = DRV_HASH_NULL,
+		.hw_mode = DRV_CIPHER_XCBC_MAC,
+		.inter_digestsize = AES_BLOCK_SIZE,
+	},
 #if SSI_CC_HAS_CMAC
 	{
 		.name = "cmac(aes)",
@@ -2189,12 +2189,12 @@ static struct ssi_hash_template driver_hash[] = {
 			.halg = {
 				.digestsize = AES_BLOCK_SIZE,
 				.statesize = sizeof(struct aeshash_state),
-				},
 			},
-			.hash_mode = DRV_HASH_NULL,
-			.hw_mode = DRV_CIPHER_CMAC,
-			.inter_digestsize = AES_BLOCK_SIZE,
 		},
+		.hash_mode = DRV_HASH_NULL,
+		.hw_mode = DRV_CIPHER_CMAC,
+		.inter_digestsize = AES_BLOCK_SIZE,
+	},
 #endif
 	
 };
