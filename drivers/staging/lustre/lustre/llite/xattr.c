@@ -86,12 +86,16 @@ ll_xattr_set_common(const struct xattr_handler *handler,
 		    const char *name, const void *value, size_t size,
 		    int flags)
 {
-	char fullname[strlen(handler->prefix) + strlen(name) + 1];
+	int fullname_len = strlen(handler->prefix) + strlen(name) + 1;
+	char *fullname = kmalloc_array(fullname_len, sizeof(char), GFP_KERNEL);
 	struct ll_sb_info *sbi = ll_i2sbi(inode);
 	struct ptlrpc_request *req = NULL;
 	const char *pv = value;
 	__u64 valid;
 	int rc;
+
+	if (fullname == NULL)
+		return -ENOMEM;
 
 	if (flags == XATTR_REPLACE) {
 		ll_stats_ops_tally(ll_i2sbi(inode), LPROC_LL_REMOVEXATTR, 1);
@@ -153,6 +157,9 @@ ll_xattr_set_common(const struct xattr_handler *handler,
 	}
 
 	ptlrpc_req_finished(req);
+
+	kfree(fullname);
+
 	return 0;
 }
 
@@ -363,12 +370,16 @@ static int ll_xattr_get_common(const struct xattr_handler *handler,
 			       struct dentry *dentry, struct inode *inode,
 			       const char *name, void *buffer, size_t size)
 {
-	char fullname[strlen(handler->prefix) + strlen(name) + 1];
+	int fullname_len = strlen(handler->prefix) + strlen(name) + 1;
+	char *fullname = kmalloc_array(fullname_len, sizeof(char), GFP_KERNEL);
 	struct ll_sb_info *sbi = ll_i2sbi(inode);
 #ifdef CONFIG_FS_POSIX_ACL
 	struct ll_inode_info *lli = ll_i2info(inode);
 #endif
 	int rc;
+
+	if (fullname == NULL)
+		return -ENOMEM;
 
 	CDEBUG(D_VFSTRACE, "VFS Op:inode="DFID"(%p)\n",
 	       PFID(ll_inode2fid(inode)), inode);
@@ -411,8 +422,12 @@ static int ll_xattr_get_common(const struct xattr_handler *handler,
 		return -ENODATA;
 #endif
 	sprintf(fullname, "%s%s\n", handler->prefix, name);
-	return ll_xattr_list(inode, fullname, handler->flags, buffer, size,
-			     OBD_MD_FLXATTR);
+
+	rc = ll_xattr_list(inode, fullname, handler->flags, buffer, size,
+			   OBD_MD_FLXATTR);
+	kfree(fullname);
+
+	return rc;
 }
 
 static ssize_t ll_getxattr_lov(struct inode *inode, void *buf, size_t buf_size)
