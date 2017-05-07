@@ -706,9 +706,7 @@ static int regs_show(struct seq_file *s, void *data)
 	seq_printf(s, "PDIV: 0x%x\n", r);
 
 	r = readl(ts->regs + SENSOR_HOTSPOT_OFF);
-	seq_printf(s, "HOTSPOT: 0x%x\n", r);
-
-	seq_puts(s, "\n");
+	seq_printf(s, "HOTSPOT: 0x%x\n\n", r);
 	seq_puts(s, "-----SOC_THERM-----\n");
 
 	r = readl(ts->regs + SENSOR_TEMP1);
@@ -809,9 +807,7 @@ static int regs_show(struct seq_file *s, void *data)
 	}
 
 	r = readl(ts->regs + THROT_GLOBAL_CFG);
-	seq_puts(s, "\n");
-	seq_printf(s, "GLOBAL THROTTLE CONFIG: 0x%08x\n", r);
-
+	seq_printf(s, "\nGLOBAL THROTTLE CONFIG: 0x%08x\n", r);
 	seq_puts(s, "---------------------------------------------------\n");
 	r = readl(ts->regs + THROT_STATUS);
 	state = REG_GET_MASK(r, THROT_STATUS_BREACH_MASK);
