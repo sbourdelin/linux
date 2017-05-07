@@ -1012,7 +1012,7 @@ static void add_timer_randomness(struct timer_rand_state *state, unsigned num)
 
 	preempt_disable();
 
-	sample.jiffies = jiffies;
+	sample.jiffies = (long)jiffies;
 	sample.cycles = random_get_entropy();
 	sample.num = num;
 	r = &input_pool;
@@ -1025,7 +1025,7 @@ static void add_timer_randomness(struct timer_rand_state *state, unsigned num)
 	 */
 
 	if (!state->dont_count_entropy) {
-		delta = sample.jiffies - state->last_time;
+		delta = sample.jiffies - (long)state->last_time;
 		state->last_time = sample.jiffies;
 
 		delta2 = delta - state->last_delta;
