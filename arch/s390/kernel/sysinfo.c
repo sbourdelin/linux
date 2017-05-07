@@ -139,13 +139,13 @@ static void stsi_15_1_x(struct seq_file *m, struct sysinfo_15_1_x *info)
 		return;
 	if (stsi(info, 15, 1, topology_max_mnest))
 		return;
-	seq_printf(m, "CPU Topology HW:     ");
+	seq_puts(m, "CPU Topology HW:     ");
 	for (i = 0; i < TOPOLOGY_NR_MAG; i++)
 		seq_printf(m, " %d", info->mag[i]);
 	seq_putc(m, '\n');
 #ifdef CONFIG_SCHED_TOPOLOGY
 	store_topology(info);
-	seq_printf(m, "CPU Topology SW:     ");
+	seq_puts(m, "CPU Topology SW:     ");
 	for (i = 0; i < TOPOLOGY_NR_MAG; i++)
 		seq_printf(m, " %d", info->mag[i]);
 	seq_putc(m, '\n');
@@ -202,13 +202,13 @@ static void stsi_2_2_2(struct seq_file *m, struct sysinfo_2_2_2 *info)
 	EBCASC(info->name, sizeof(info->name));
 	seq_putc(m, '\n');
 	seq_printf(m, "LPAR Number:          %d\n", info->lpar_number);
-	seq_printf(m, "LPAR Characteristics: ");
+	seq_puts(m, "LPAR Characteristics: ");
 	if (info->characteristics & LPAR_CHAR_DEDICATED)
-		seq_printf(m, "Dedicated ");
+		seq_puts(m, "Dedicated ");
 	if (info->characteristics & LPAR_CHAR_SHARED)
-		seq_printf(m, "Shared ");
+		seq_puts(m, "Shared ");
 	if (info->characteristics & LPAR_CHAR_LIMITED)
-		seq_printf(m, "Limited ");
+		seq_puts(m, "Limited ");
 	seq_putc(m, '\n');
 	seq_printf(m, "LPAR Name:            %-8.8s\n", info->name);
 	seq_printf(m, "LPAR Adjustment:      %d\n", info->caf);
