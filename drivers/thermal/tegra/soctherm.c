@@ -655,9 +655,7 @@ static int regs_show(struct seq_file *s, void *data)
 	for (i = 0; i < ts->soc->num_tsensors; i++) {
 		r = readl(ts->regs + tsensors[i].base + SENSOR_CONFIG1);
 		state = REG_GET_MASK(r, SENSOR_CONFIG1_TEMP_ENABLE);
-
-		seq_printf(s, "%s: ", tsensors[i].name);
-		seq_printf(s, "En(%d) ", state);
+		seq_printf(s, "%s: En(%d) ", tsensors[i].name, state);
 
 		if (!state) {
 			seq_putc(s, '\n');
