@@ -312,7 +312,8 @@ static irqreturn_t socfpga_fpga_isr(int irq, void *dev_id)
 
 static int socfpga_fpga_wait_for_config_done(struct socfpga_fpga_priv *priv)
 {
-	int timeout, ret = 0;
+	int ret = 0;
+	long timeout;
 
 	socfpga_fpga_disable_irqs(priv);
 	init_completion(&priv->status_complete);
@@ -323,6 +324,8 @@ static int socfpga_fpga_wait_for_config_done(struct socfpga_fpga_priv *priv)
 						msecs_to_jiffies(10));
 	if (timeout == 0)
 		ret = -ETIMEDOUT;
+	else if (timeout == -ERESTARTSYS)
+		ret = -ERESTARTSYS;
 
 	socfpga_fpga_disable_irqs(priv);
 	return ret;
