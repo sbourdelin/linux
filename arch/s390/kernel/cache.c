@@ -82,8 +82,8 @@ void show_cacheinfo(struct seq_file *m)
 			   cache->disable_sysfs ? "Shared" : "Private");
 		seq_printf(m, "size=%dK ", cache->size >> 10);
 		seq_printf(m, "line_size=%u ", cache->coherency_line_size);
-		seq_printf(m, "associativity=%d", cache->ways_of_associativity);
-		seq_puts(m, "\n");
+		seq_printf(m, "associativity=%d\n",
+			   cache->ways_of_associativity);
 	}
 }
 
