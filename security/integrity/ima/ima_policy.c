@@ -1035,7 +1035,7 @@ static void policy_func_show(struct seq_file *m, enum ima_hooks func)
 		seq_printf(m, pt(Opt_func), tbuf);
 		break;
 	}
-	seq_puts(m, " ");
+	seq_putc(m, ' ');
 }
 
 int ima_policy_show(struct seq_file *m, void *v)
@@ -1057,7 +1057,7 @@ int ima_policy_show(struct seq_file *m, void *v)
 	if (entry->action & AUDIT)
 		seq_puts(m, pt(Opt_audit));
 
-	seq_puts(m, " ");
+	seq_putc(m, ' ');
 
 	if (entry->flags & IMA_FUNC)
 		policy_func_show(m, entry->func);
@@ -1071,19 +1071,19 @@ int ima_policy_show(struct seq_file *m, void *v)
 			seq_printf(m, pt(Opt_mask), mt(mask_read));
 		if (entry->mask & MAY_APPEND)
 			seq_printf(m, pt(Opt_mask), mt(mask_append));
-		seq_puts(m, " ");
+		seq_putc(m, ' ');
 	}
 
 	if (entry->flags & IMA_FSMAGIC) {
 		snprintf(tbuf, sizeof(tbuf), "0x%lx", entry->fsmagic);
 		seq_printf(m, pt(Opt_fsmagic), tbuf);
-		seq_puts(m, " ");
+		seq_putc(m, ' ');
 	}
 
 	if (entry->flags & IMA_PCR) {
 		snprintf(tbuf, sizeof(tbuf), "%d", entry->pcr);
 		seq_printf(m, pt(Opt_pcr), tbuf);
-		seq_puts(m, " ");
+		seq_putc(m, ' ');
 	}
 
 	if (entry->flags & IMA_FSUUID)
@@ -1097,7 +1097,7 @@ int ima_policy_show(struct seq_file *m, void *v)
 			seq_printf(m, pt(Opt_uid_lt), tbuf);
 		else
 			seq_printf(m, pt(Opt_uid_eq), tbuf);
-		seq_puts(m, " ");
+		seq_putc(m, ' ');
 	}
 
 	if (entry->flags & IMA_EUID) {
@@ -1108,7 +1108,7 @@ int ima_policy_show(struct seq_file *m, void *v)
 			seq_printf(m, pt(Opt_euid_lt), tbuf);
 		else
 			seq_printf(m, pt(Opt_euid_eq), tbuf);
-		seq_puts(m, " ");
+		seq_putc(m, ' ');
 	}
 
 	if (entry->flags & IMA_FOWNER) {
@@ -1119,7 +1119,7 @@ int ima_policy_show(struct seq_file *m, void *v)
 			seq_printf(m, pt(Opt_fowner_lt), tbuf);
 		else
 			seq_printf(m, pt(Opt_fowner_eq), tbuf);
-		seq_puts(m, " ");
+		seq_putc(m, ' ');
 	}
 
 	for (i = 0; i < MAX_LSM_RULES; i++) {
@@ -1157,7 +1157,7 @@ int ima_policy_show(struct seq_file *m, void *v)
 	if (entry->flags & IMA_PERMIT_DIRECTIO)
 		seq_puts(m, "permit_directio ");
 	rcu_read_unlock();
-	seq_puts(m, "\n");
+	seq_putc(m, '\n');
 	return 0;
 }
 #endif	/* CONFIG_IMA_READ_POLICY */
