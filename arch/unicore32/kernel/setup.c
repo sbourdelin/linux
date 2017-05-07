@@ -316,18 +316,15 @@ static int c_show(struct seq_file *m, void *v)
 	seq_puts(m, "Features\t: CMOV UC-F64");
 
 	seq_printf(m, "\nCPU implementer\t: 0x%02x\n", uc32_cpuid >> 24);
-	seq_printf(m, "CPU architecture: 2\n");
+	seq_puts(m, "CPU architecture: 2\n");
 	seq_printf(m, "CPU revision\t: %d\n", (uc32_cpuid >> 16) & 15);
-
-	seq_printf(m, "Cache type\t: write-back\n"
-			"Cache clean\t: cp0 c5 ops\n"
-			"Cache lockdown\t: not support\n"
-			"Cache format\t: Harvard\n");
-
-	seq_puts(m, "\n");
-
-	seq_printf(m, "Hardware\t: PKUnity v3\n");
-
+	seq_puts(m,
+		 "Cache type\t: write-back\n"
+		 "Cache clean\t: cp0 c5 ops\n"
+		 "Cache lockdown\t: not support\n"
+		 "Cache format\t: Harvard\n"
+		 "\n"
+		 "Hardware\t: PKUnity v3\n");
 	return 0;
 }
 
