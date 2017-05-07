@@ -2268,7 +2268,7 @@ static int pm_genpd_summary_one(struct seq_file *s,
 		kfree(kobj_path);
 	}
 
-	seq_puts(s, "\n");
+	seq_putc(s, '\n');
 exit:
 	genpd_unlock(genpd);
 
