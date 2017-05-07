@@ -128,7 +128,7 @@ static void show_cpu_summary(struct seq_file *m, void *v)
 	for (i = 0; i < ARRAY_SIZE(int_hwcap_str); i++)
 		if (int_hwcap_str[i] && (int_hwcap & (1UL << i)))
 			seq_printf(m, "%s ", int_hwcap_str[i]);
-	seq_puts(m, "\n");
+	seq_putc(m, '\n');
 	show_facilities(m);
 	show_cacheinfo(m);
 	for_each_online_cpu(cpu) {
