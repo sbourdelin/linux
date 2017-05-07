@@ -98,8 +98,7 @@ static void stsi_1_1_1(struct seq_file *m, struct sysinfo_1_1_1 *info)
 	seq_printf(m, "Model:                %-16.16s", info->model_capacity);
 	if (info->model[0] != '\0')
 		seq_printf(m, " %-16.16s", info->model);
-	seq_putc(m, '\n');
-	seq_printf(m, "Sequence Code:        %-16.16s\n", info->sequence);
+	seq_printf(m, "\nSequence Code:        %-16.16s\n", info->sequence);
 	seq_printf(m, "Plant:                %-4.4s\n", info->plant);
 	seq_printf(m, "Model Capacity:       %-16.16s %08u\n",
 		   info->model_capacity, info->model_cap_rating);
@@ -200,8 +199,7 @@ static void stsi_2_2_2(struct seq_file *m, struct sysinfo_2_2_2 *info)
 	if (stsi(info, 2, 2, 2))
 		return;
 	EBCASC(info->name, sizeof(info->name));
-	seq_putc(m, '\n');
-	seq_printf(m, "LPAR Number:          %d\n", info->lpar_number);
+	seq_printf(m, "\nLPAR Number:          %d\n", info->lpar_number);
 	seq_puts(m, "LPAR Characteristics: ");
 	if (info->characteristics & LPAR_CHAR_DEDICATED)
 		seq_puts(m, "Dedicated ");
@@ -209,8 +207,7 @@ static void stsi_2_2_2(struct seq_file *m, struct sysinfo_2_2_2 *info)
 		seq_puts(m, "Shared ");
 	if (info->characteristics & LPAR_CHAR_LIMITED)
 		seq_puts(m, "Limited ");
-	seq_putc(m, '\n');
-	seq_printf(m, "LPAR Name:            %-8.8s\n", info->name);
+	seq_printf(m, "\nLPAR Name:            %-8.8s\n", info->name);
 	seq_printf(m, "LPAR Adjustment:      %d\n", info->caf);
 	seq_printf(m, "LPAR CPUs Total:      %d\n", info->cpus_total);
 	seq_printf(m, "LPAR CPUs Configured: %d\n", info->cpus_configured);
@@ -256,8 +253,8 @@ static void stsi_3_2_2(struct seq_file *m, struct sysinfo_3_2_2 *info)
 	for (i = 0; i < info->count; i++) {
 		EBCASC(info->vm[i].name, sizeof(info->vm[i].name));
 		EBCASC(info->vm[i].cpi, sizeof(info->vm[i].cpi));
-		seq_putc(m, '\n');
-		seq_printf(m, "VM%02d Name:            %-8.8s\n", i, info->vm[i].name);
+		seq_printf(m, "\nVM%02d Name:            %-8.8s\n",
+			   i, info->vm[i].name);
 		seq_printf(m, "VM%02d Control Program: %-16.16s\n", i, info->vm[i].cpi);
 		seq_printf(m, "VM%02d Adjustment:      %d\n", i, info->vm[i].caf);
 		seq_printf(m, "VM%02d CPUs Total:      %d\n", i, info->vm[i].cpus_total);
