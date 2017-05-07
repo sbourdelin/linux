@@ -1086,10 +1086,8 @@ int ima_policy_show(struct seq_file *m, void *v)
 		seq_puts(m, " ");
 	}
 
-	if (entry->flags & IMA_FSUUID) {
-		seq_printf(m, "fsuuid=%pU", entry->fsuuid);
-		seq_puts(m, " ");
-	}
+	if (entry->flags & IMA_FSUUID)
+		seq_printf(m, "fsuuid=%pU ", entry->fsuuid);
 
 	if (entry->flags & IMA_UID) {
 		snprintf(tbuf, sizeof(tbuf), "%d", __kuid_val(entry->uid));
