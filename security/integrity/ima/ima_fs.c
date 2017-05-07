@@ -242,14 +242,14 @@ static int ima_ascii_measurements_show(struct seq_file *m, void *v)
 
 	/* 4th:  template specific data */
 	for (i = 0; i < e->template_desc->num_fields; i++) {
-		seq_puts(m, " ");
+		seq_putc(m, ' ');
 		if (e->template_data[i].len == 0)
 			continue;
 
 		e->template_desc->fields[i]->field_show(m, IMA_SHOW_ASCII,
 							&e->template_data[i]);
 	}
-	seq_puts(m, "\n");
+	seq_putc(m, '\n');
 	return 0;
 }
 
