@@ -1987,20 +1987,22 @@ static struct ssi_hash_template driver_hash[] = {
 		.hmac_driver_name = "hmac-sha1-dx",
 		.blocksize = SHA1_BLOCK_SIZE,
 		.synchronize = false,
-		.template_ahash = {
-			.init = ssi_ahash_init,
-			.update = ssi_ahash_update,
-			.final = ssi_ahash_final,
-			.finup = ssi_ahash_finup,
-			.digest = ssi_ahash_digest,
+		{
+			.template_ahash = {
+				.init = ssi_ahash_init,
+				.update = ssi_ahash_update,
+				.final = ssi_ahash_final,
+				.finup = ssi_ahash_finup,
+				.digest = ssi_ahash_digest,
 #ifdef EXPORT_FIXED
-			.export = ssi_ahash_export,
-			.import = ssi_ahash_import,
+				.export = ssi_ahash_export,
+				.import = ssi_ahash_import,
 #endif
-			.setkey = ssi_ahash_setkey,
-			.halg = {
-				.digestsize = SHA1_DIGEST_SIZE,
-				.statesize = sizeof(struct sha1_state),
+				.setkey = ssi_ahash_setkey,
+				.halg = {
+					.digestsize = SHA1_DIGEST_SIZE,
+					.statesize = sizeof(struct sha1_state),
+				},
 			},
 		},
 		.hash_mode = DRV_HASH_SHA1,
@@ -2014,20 +2016,22 @@ static struct ssi_hash_template driver_hash[] = {
 		.hmac_driver_name = "hmac-sha256-dx",
 		.blocksize = SHA256_BLOCK_SIZE,
 		.synchronize = false,
-		.template_ahash = {
-			.init = ssi_ahash_init,
-			.update = ssi_ahash_update,
-			.final = ssi_ahash_final,
-			.finup = ssi_ahash_finup,
-			.digest = ssi_ahash_digest,
+		{
+			.template_ahash = {
+				.init = ssi_ahash_init,
+				.update = ssi_ahash_update,
+				.final = ssi_ahash_final,
+				.finup = ssi_ahash_finup,
+				.digest = ssi_ahash_digest,
 #ifdef EXPORT_FIXED
-			.export = ssi_ahash_export,
-			.import = ssi_ahash_import,
+				.export = ssi_ahash_export,
+				.import = ssi_ahash_import,
 #endif
-			.setkey = ssi_ahash_setkey,
-			.halg = {
-				.digestsize = SHA256_DIGEST_SIZE,
-				.statesize = sizeof(struct sha256_state),
+				.setkey = ssi_ahash_setkey,
+				.halg = {
+					.digestsize = SHA256_DIGEST_SIZE,
+					.statesize = sizeof(struct sha256_state),
+				},
 			},
 		},
 		.hash_mode = DRV_HASH_SHA256,
@@ -2041,20 +2045,22 @@ static struct ssi_hash_template driver_hash[] = {
 		.hmac_driver_name = "hmac-sha224-dx",
 		.blocksize = SHA224_BLOCK_SIZE,
 		.synchronize = false,
-		.template_ahash = {
-			.init = ssi_ahash_init,
-			.update = ssi_ahash_update,
-			.final = ssi_ahash_final,
-			.finup = ssi_ahash_finup,
-			.digest = ssi_ahash_digest,
+		{
+			.template_ahash = {
+				.init = ssi_ahash_init,
+				.update = ssi_ahash_update,
+				.final = ssi_ahash_final,
+				.finup = ssi_ahash_finup,
+				.digest = ssi_ahash_digest,
 #ifdef EXPORT_FIXED
-			.export = ssi_ahash_export,
-			.import = ssi_ahash_import,
+				.export = ssi_ahash_export,
+				.import = ssi_ahash_import,
 #endif
-			.setkey = ssi_ahash_setkey,
-			.halg = {
-				.digestsize = SHA224_DIGEST_SIZE,
-				.statesize = sizeof(struct sha256_state),
+				.setkey = ssi_ahash_setkey,
+				.halg = {
+					.digestsize = SHA224_DIGEST_SIZE,
+					.statesize = sizeof(struct sha256_state),
+				},
 			},
 		},
 		.hash_mode = DRV_HASH_SHA224,
@@ -2069,20 +2075,22 @@ static struct ssi_hash_template driver_hash[] = {
 		.hmac_driver_name = "hmac-sha384-dx",
 		.blocksize = SHA384_BLOCK_SIZE,
 		.synchronize = false,
-		.template_ahash = {
-			.init = ssi_ahash_init,
-			.update = ssi_ahash_update,
-			.final = ssi_ahash_final,
-			.finup = ssi_ahash_finup,
-			.digest = ssi_ahash_digest,
+		{
+			.template_ahash = {
+				.init = ssi_ahash_init,
+				.update = ssi_ahash_update,
+				.final = ssi_ahash_final,
+				.finup = ssi_ahash_finup,
+				.digest = ssi_ahash_digest,
 #ifdef EXPORT_FIXED
-			.export = ssi_ahash_export,
-			.import = ssi_ahash_import,
+				.export = ssi_ahash_export,
+				.import = ssi_ahash_import,
 #endif
-			.setkey = ssi_ahash_setkey,
-			.halg = {
-				.digestsize = SHA384_DIGEST_SIZE,
-				.statesize = sizeof(struct sha512_state),
+				.setkey = ssi_ahash_setkey,
+				.halg = {
+					.digestsize = SHA384_DIGEST_SIZE,
+					.statesize = sizeof(struct sha512_state),
+				},
 			},
 		},
 		.hash_mode = DRV_HASH_SHA384,
@@ -2096,20 +2104,22 @@ static struct ssi_hash_template driver_hash[] = {
 		.hmac_driver_name = "hmac-sha512-dx",
 		.blocksize = SHA512_BLOCK_SIZE,
 		.synchronize = false,
-		.template_ahash = {
-			.init = ssi_ahash_init,
-			.update = ssi_ahash_update,
-			.final = ssi_ahash_final,
-			.finup = ssi_ahash_finup,
-			.digest = ssi_ahash_digest,
+		{
+			.template_ahash = {
+				.init = ssi_ahash_init,
+				.update = ssi_ahash_update,
+				.final = ssi_ahash_final,
+				.finup = ssi_ahash_finup,
+				.digest = ssi_ahash_digest,
 #ifdef EXPORT_FIXED
-			.export = ssi_ahash_export,
-			.import = ssi_ahash_import,
+				.export = ssi_ahash_export,
+				.import = ssi_ahash_import,
 #endif
-			.setkey = ssi_ahash_setkey,
-			.halg = {
-				.digestsize = SHA512_DIGEST_SIZE,
-				.statesize = sizeof(struct sha512_state),
+				.setkey = ssi_ahash_setkey,
+				.halg = {
+					.digestsize = SHA512_DIGEST_SIZE,
+					.statesize = sizeof(struct sha512_state),
+				},
 			},
 		},
 		.hash_mode = DRV_HASH_SHA512,
@@ -2124,20 +2134,22 @@ static struct ssi_hash_template driver_hash[] = {
 		.hmac_driver_name = "hmac-md5-dx",
 		.blocksize = MD5_HMAC_BLOCK_SIZE,
 		.synchronize = false,
-		.template_ahash = {
-			.init = ssi_ahash_init,
-			.update = ssi_ahash_update,
-			.final = ssi_ahash_final,
-			.finup = ssi_ahash_finup,
-			.digest = ssi_ahash_digest,
+		{
+			.template_ahash = {
+				.init = ssi_ahash_init,
+				.update = ssi_ahash_update,
+				.final = ssi_ahash_final,
+				.finup = ssi_ahash_finup,
+				.digest = ssi_ahash_digest,
 #ifdef EXPORT_FIXED
-			.export = ssi_ahash_export,
-			.import = ssi_ahash_import,
+				.export = ssi_ahash_export,
+				.import = ssi_ahash_import,
 #endif
-			.setkey = ssi_ahash_setkey,
-			.halg = {
-				.digestsize = MD5_DIGEST_SIZE,
-				.statesize = sizeof(struct md5_state),
+				.setkey = ssi_ahash_setkey,
+				.halg = {
+					.digestsize = MD5_DIGEST_SIZE,
+					.statesize = sizeof(struct md5_state),
+				},
 			},
 		},
 		.hash_mode = DRV_HASH_MD5,
@@ -2149,20 +2161,22 @@ static struct ssi_hash_template driver_hash[] = {
 		.driver_name = "xcbc-aes-dx",
 		.blocksize = AES_BLOCK_SIZE,
 		.synchronize = false,
-		.template_ahash = {
-			.init = ssi_ahash_init,
-			.update = ssi_mac_update,
-			.final = ssi_mac_final,
-			.finup = ssi_mac_finup,
-			.digest = ssi_mac_digest,
-			.setkey = ssi_xcbc_setkey,
+		{
+			.template_ahash = {
+				.init = ssi_ahash_init,
+				.update = ssi_mac_update,
+				.final = ssi_mac_final,
+				.finup = ssi_mac_finup,
+				.digest = ssi_mac_digest,
+				.setkey = ssi_xcbc_setkey,
 #ifdef EXPORT_FIXED
-			.export = ssi_ahash_export,
-			.import = ssi_ahash_import,
+				.export = ssi_ahash_export,
+				.import = ssi_ahash_import,
 #endif
-			.halg = {
-				.digestsize = AES_BLOCK_SIZE,
-				.statesize = sizeof(struct aeshash_state),
+				.halg = {
+					.digestsize = AES_BLOCK_SIZE,
+					.statesize = sizeof(struct aeshash_state),
+				},
 			},
 		},
 		.hash_mode = DRV_HASH_NULL,
@@ -2175,20 +2189,22 @@ static struct ssi_hash_template driver_hash[] = {
 		.driver_name = "cmac-aes-dx",
 		.blocksize = AES_BLOCK_SIZE,
 		.synchronize = false,
-		.template_ahash = {
-			.init = ssi_ahash_init,
-			.update = ssi_mac_update,
-			.final = ssi_mac_final,
-			.finup = ssi_mac_finup,
-			.digest = ssi_mac_digest,
-			.setkey = ssi_cmac_setkey,
+		{
+			.template_ahash = {
+				.init = ssi_ahash_init,
+				.update = ssi_mac_update,
+				.final = ssi_mac_final,
+				.finup = ssi_mac_finup,
+				.digest = ssi_mac_digest,
+				.setkey = ssi_cmac_setkey,
 #ifdef EXPORT_FIXED
-			.export = ssi_ahash_export,
-			.import = ssi_ahash_import,
+				.export = ssi_ahash_export,
+				.import = ssi_ahash_import,
 #endif
-			.halg = {
-				.digestsize = AES_BLOCK_SIZE,
-				.statesize = sizeof(struct aeshash_state),
+				.halg = {
+					.digestsize = AES_BLOCK_SIZE,
+					.statesize = sizeof(struct aeshash_state),
+				},
 			},
 		},
 		.hash_mode = DRV_HASH_NULL,
