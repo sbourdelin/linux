@@ -660,7 +660,7 @@ static int regs_show(struct seq_file *s, void *data)
 		seq_printf(s, "En(%d) ", state);
 
 		if (!state) {
-			seq_puts(s, "\n");
+			seq_putc(s, '\n');
 			continue;
 		}
 
