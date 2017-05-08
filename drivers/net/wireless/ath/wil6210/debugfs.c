@@ -76,11 +76,11 @@ static void wil_print_vring(struct seq_file *s, struct wil6210_priv *wil,
 			volatile struct vring_tx_desc *d = &vring->va[i].tx;
 
 			if ((i % 128) == 0 && (i != 0))
-				seq_puts(s, "\n");
+				seq_putc(s, '\n');
 			seq_printf(s, "%c", (d->dma.status & BIT(0)) ?
 					_s : (vring->ctx[i].skb ? _h : 'h'));
 		}
-		seq_puts(s, "\n");
+		seq_putc(s, '\n');
 	}
 	seq_puts(s, "}\n");
 }
@@ -233,7 +233,7 @@ static void wil_print_ring(struct seq_file *s, const char *prefix,
 				wil_seq_hexdump(s, databuf, len, "      : ");
 			}
 		} else {
-			seq_puts(s, "\n");
+			seq_putc(s, '\n');
 		}
 	}
  out:
@@ -1366,7 +1366,7 @@ has_keys:
 		seq_printf(s, " [%i%s]%6phN", i, cc->key_set ? "+" : "-",
 			   cc->pn);
 	}
-	seq_puts(s, "\n");
+	seq_putc(s, '\n');
 }
 
 static int wil_sta_debugfs_show(struct seq_file *s, void *data)
@@ -1423,7 +1423,7 @@ __acquires(&p->tid_rx_lock) __releases(&p->tid_rx_lock)
 			     mcs++)
 				seq_printf(s, " %lld",
 					   p->stats.rx_per_mcs[mcs]);
-			seq_puts(s, "\n");
+			seq_putc(s, '\n');
 		}
 	}
 
