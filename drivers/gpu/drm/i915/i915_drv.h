@@ -2979,6 +2979,11 @@ intel_info(const struct drm_i915_private *dev_priv)
 
 #define HAS_DECOUPLED_MMIO(dev_priv) (INTEL_INFO(dev_priv)->has_decoupled_mmio)
 
+#define NEEDS_CSR_GT_PERF_WA(dev_priv) \
+	(HAS_CSR(dev_priv) && \
+	(IS_SKL_GT3(dev_priv) || IS_SKL_GT4(dev_priv)) && \
+	(dev_priv)->csr.dmc_payload)
+
 #include "i915_trace.h"
 
 static inline bool intel_scanout_needs_vtd_wa(struct drm_i915_private *dev_priv)

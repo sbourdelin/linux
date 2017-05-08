@@ -821,6 +821,23 @@ static void i915_gem_mark_busy(const struct intel_engine_cs *engine)
 
 	GEM_BUG_ON(!dev_priv->gt.active_requests);
 
+	/*
+	 * It seems that the DMC likes to transition between the DC states
+	 * a lot when there are no connected displays (no active power
+	 * domains) during simple command submission.
+	 *
+	 * This frantic activity on DC states has a terrible impact on the
+	 * performance of the overall chip with huge latencies observed in
+	 * the interrupt handlers and elsewhere. Simple tests like
+	 * igt/gem_latency -n 0 are slowed down by a factor of eight.
+	 *
+	 * Work around it by grabbing a modeset display power domain whilst
+	 * there is any GT activity. This seems to be effective in making
+	 * the DMC keep its paws off the chip.
+	 */
+	if (NEEDS_CSR_GT_PERF_WA(dev_priv))
+		intel_display_power_get(dev_priv, POWER_DOMAIN_MODESET);
+
 	intel_runtime_pm_get_noresume(dev_priv);
 	dev_priv->gt.awake = true;
 

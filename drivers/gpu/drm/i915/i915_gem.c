@@ -3151,7 +3151,11 @@ i915_gem_idle_work_handler(struct work_struct *work)
 
 	if (INTEL_GEN(dev_priv) >= 6)
 		gen6_rps_idle(dev_priv);
+
 	intel_runtime_pm_put(dev_priv);
+
+	if (NEEDS_CSR_GT_PERF_WA(dev_priv))
+		intel_display_power_put(dev_priv, POWER_DOMAIN_MODESET);
 out_unlock:
 	mutex_unlock(&dev->struct_mutex);
 
