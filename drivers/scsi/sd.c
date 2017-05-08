@@ -827,6 +827,7 @@ static int sd_setup_write_zeroes_cmnd(struct scsi_cmnd *cmd)
 	struct scsi_disk *sdkp = scsi_disk(rq->rq_disk);
 	u64 sector = blk_rq_pos(rq) >> (ilog2(sdp->sector_size) - 9);
 	u32 nr_sectors = blk_rq_sectors(rq) >> (ilog2(sdp->sector_size) - 9);
+	int ret;
 
 	if (!(rq->cmd_flags & REQ_NOUNMAP)) {
 		switch (sdkp->zeroing_mode) {
@@ -839,9 +840,22 @@ static int sd_setup_write_zeroes_cmnd(struct scsi_cmnd *cmd)
 
 	if (sdp->no_write_same)
 		return BLKPREP_INVALID;
+
+	if (sd_is_zoned(sdkp)) {
+		ret = sd_zbc_write_lock_zone(cmd);
+		if (ret != BLKPREP_OK)
+			return ret;
+	}
+
 	if (sdkp->ws16 || sector > 0xffffffff || nr_sectors > 0xffff)
-		return sd_setup_write_same16_cmnd(cmd, false);
-	return sd_setup_write_same10_cmnd(cmd, false);
+		ret = sd_setup_write_same16_cmnd(cmd, false);
+	else
+		ret = sd_setup_write_same10_cmnd(cmd, false);
+
+	if (sd_is_zoned(sdkp) && ret != BLKPREP_OK)
+		sd_zbc_write_unlock_zone(cmd);
+
+	return ret;
 }
 
 static void sd_config_write_same(struct scsi_disk *sdkp)
