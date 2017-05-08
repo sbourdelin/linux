@@ -100,6 +100,61 @@ enable - Enable/disable the PWM signal (read/write).
 	0 - disabled
 	1 - enabled
 
+deadtime_re -The rising edge dead-time
+deadtime_fe - the falling edge dead-time
+	For a PWM controller with more than one output signals per PWM channel
+	dead-times are the delays introduced between the edges of the output
+	signals and the original signal introduced in dead-time generator
+	engine.
+	E.g. consider a PWM controller with a dead-time engine as in the following
+	diagram:
+
+                        -----------------
+                       |                 |---> PWMH
+        PWM signal --->| Dead-time engine|
+                       |                 |---> PWML
+                        -----------------
+
+	With no dead-time configured, the PWMH and PWML signals will be
+	complementary signals (rising and falling edges of PWMH and PWML
+	have opposite leves, same duration and same starting time) as
+	follows:
+
+                      ____0    D____P     ____      ____      ____
+        PWM signal __|    |____|    |____|    |____|    |____|    |___
+                      ____      ____      ____      ____      ____
+              PWMH __|    |____|    |____|    |____|    |____|    |___
+                   __      ____      ____      ____      ____      ___
+              PWML   |____|    |____|    |____|    |____|    |____|
+
+	Where - 0 is the starting point of the signal
+	      - D is the starting point of the duty-cycle
+	      - P is the signal period
+
+	Based on the above diagram:
+	- rising edge dead-time - is the delay introduced in one of the
+	dead-time engine output signals; the delay is introduced after
+	rising edge of the original PWM signal
+	- falling edge dead-time - is the delay introduced in one of the
+	dead-time engine output signals; the delay is introduced after
+	the end of falling edge of the original PWM signal
+	See the following diagram:
+
+                      ____0    D____P     ____      ____      ____
+        PWM signal __|    |____|    |____|    |____|    |____|    |___
+                        __        __        __        __        __
+              PWMH ____|  |____re|  |______|  |______|  |______|  |___
+                   __        __        __        __        __        __
+              PWML   |______|  |____fe|  |______|  |______|  |______|
+
+	In the upper diagram:
+	- re = rising edge = the delay between D point of the original PWM signal
+	(rising edge) and the starting point of the next edge of one of the PWM
+	dead-time engine output
+	- fe = falling edge = the delay between P point of the original PWM signal
+	(falling edge) and the starting point of the next edge of one of the PWM
+	dead-time engine output
+
 Implementing a PWM driver
 -------------------------
 
