@@ -54,6 +54,46 @@ TRACE_EVENT(thermal_power_allocator,
 		__entry->delta_temp)
 );
 
+TRACE_EVENT(thermal_power_allocator_divvyup,
+	TP_PROTO(struct thermal_zone_device *tz, u32 *granted_power,
+		u32 *avail_room, u32 *spare_power, u32 *max_power,
+		size_t num_actors),
+	TP_ARGS(tz, granted_power, avail_room, spare_power, max_power,
+		num_actors),
+	TP_STRUCT__entry(
+		__field(int, tz_id)
+		__dynamic_array(u32, granted_power, num_actors)
+		__dynamic_array(u32, avail_room, num_actors)
+		__dynamic_array(u32, spare_power, num_actors)
+		__dynamic_array(u32, max_power, num_actors)
+		__field(size_t, num_actors)
+	),
+	TP_fast_assign(
+		__entry->tz_id = tz->id;
+		memcpy(__get_dynamic_array(granted_power), granted_power,
+			num_actors * sizeof(*granted_power));
+		memcpy(__get_dynamic_array(avail_room), avail_room,
+			num_actors * sizeof(*avail_room));
+		memcpy(__get_dynamic_array(spare_power), spare_power,
+			num_actors * sizeof(*spare_power));
+		memcpy(__get_dynamic_array(max_power), max_power,
+			num_actors * sizeof(*max_power));
+		__entry->num_actors = num_actors;
+	),
+
+	TP_printk("thermal_zone_id=%d granted_power={%s} avail_room={%s} spare_power={%s} max_power={%s}",
+		__entry->tz_id,
+		__print_array(__get_dynamic_array(granted_power),
+			      __entry->num_actors, 4),
+		__print_array(__get_dynamic_array(avail_room),
+			      __entry->num_actors, 4),
+		__print_array(__get_dynamic_array(spare_power),
+			      __entry->num_actors, 4),
+		__print_array(__get_dynamic_array(max_power),
+			      __entry->num_actors, 4)
+		)
+);
+
 TRACE_EVENT(thermal_power_allocator_pid,
 	TP_PROTO(struct thermal_zone_device *tz, s32 err, s32 err_integral,
 		 s64 p, s64 i, s64 d, s32 output),
