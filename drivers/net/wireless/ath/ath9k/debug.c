@@ -161,7 +161,7 @@ static ssize_t read_file_ani(struct file *file, char __user *user_buf,
 	};
 
 	buf = kzalloc(size, GFP_KERNEL);
-	if (buf == NULL)
+	if (!buf)
 		return -ENOMEM;
 
 	len += scnprintf(buf + len, size - len, "%15s: %s\n", "ANI",
@@ -315,7 +315,7 @@ static ssize_t read_file_antenna_diversity(struct file *file,
 	};
 
 	buf = kzalloc(size, GFP_KERNEL);
-	if (buf == NULL)
+	if (!buf)
 		return -ENOMEM;
 
 	if (!(pCap->hw_caps & ATH9K_HW_CAP_ANT_DIV_COMB)) {
@@ -1008,7 +1008,7 @@ static ssize_t read_file_btcoex(struct file *file, char __user *user_buf,
 	size_t retval;
 
 	buf = kzalloc(size, GFP_KERNEL);
-	if (buf == NULL)
+	if (!buf)
 		return -ENOMEM;
 
 	if (!sc->sc_ah->common.btcoex_enabled) {
