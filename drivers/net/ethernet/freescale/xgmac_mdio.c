@@ -71,31 +71,6 @@ static void xgmac_write32(u32 value,
 }
 
 /*
- * Wait until the MDIO bus is free
- */
-static int xgmac_wait_until_free(struct device *dev,
-				 struct tgec_mdio_controller __iomem *regs,
-				 bool is_little_endian)
-{
-	unsigned int timeout;
-
-	/* Wait till the bus is free */
-	timeout = TIMEOUT;
-	while ((xgmac_read32(&regs->mdio_stat, is_little_endian) &
-		MDIO_STAT_BSY) && timeout) {
-		cpu_relax();
-		timeout--;
-	}
-
-	if (!timeout) {
-		dev_err(dev, "timeout waiting for bus to be free\n");
-		return -ETIMEDOUT;
-	}
-
-	return 0;
-}
-
-/*
  * Wait till the MDIO read or write operation is complete
  */
 static int xgmac_wait_until_done(struct device *dev,
@@ -147,7 +122,7 @@ static int xgmac_mdio_write(struct mii_bus *bus, int phy_id, int regnum, u16 val
 
 	xgmac_write32(mdio_stat, &regs->mdio_stat, endian);
 
-	ret = xgmac_wait_until_free(&bus->dev, regs, endian);
+	ret = xgmac_wait_until_done(&bus->dev, regs, endian);
 	if (ret)
 		return ret;
 
@@ -159,7 +134,7 @@ static int xgmac_mdio_write(struct mii_bus *bus, int phy_id, int regnum, u16 val
 	if (regnum & MII_ADDR_C45) {
 		xgmac_write32(regnum & 0xffff, &regs->mdio_addr, endian);
 
-		ret = xgmac_wait_until_free(&bus->dev, regs, endian);
+		ret = xgmac_wait_until_done(&bus->dev, regs, endian);
 		if (ret)
 			return ret;
 	}
@@ -201,7 +176,7 @@ static int xgmac_mdio_read(struct mii_bus *bus, int phy_id, int regnum)
 
 	xgmac_write32(mdio_stat, &regs->mdio_stat, endian);
 
-	ret = xgmac_wait_until_free(&bus->dev, regs, endian);
+	ret = xgmac_wait_until_done(&bus->dev, regs, endian);
 	if (ret)
 		return ret;
 
@@ -213,7 +188,7 @@ static int xgmac_mdio_read(struct mii_bus *bus, int phy_id, int regnum)
 	if (regnum & MII_ADDR_C45) {
 		xgmac_write32(regnum & 0xffff, &regs->mdio_addr, endian);
 
-		ret = xgmac_wait_until_free(&bus->dev, regs, endian);
+		ret = xgmac_wait_until_done(&bus->dev, regs, endian);
 		if (ret)
 			return ret;
 	}
