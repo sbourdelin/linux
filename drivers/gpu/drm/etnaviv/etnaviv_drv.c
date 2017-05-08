@@ -530,7 +530,6 @@ static int etnaviv_bind(struct device *dev)
 
 	priv = kzalloc(sizeof(*priv), GFP_KERNEL);
 	if (!priv) {
-		dev_err(dev, "failed to allocate private data\n");
 		ret = -ENOMEM;
 		goto out_unref;
 	}
