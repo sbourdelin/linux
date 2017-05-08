@@ -12,6 +12,12 @@
  *  2 of the License, or (at your option) any later version.
  */
 
+/*
+ * feature fixup tests do memcmp with raw addresses rather than
+ * objects, which panics on boot with fortify on. TODO FIXME
+ */
+#define __NO_FORTIFY
+
 #include <linux/types.h>
 #include <linux/jump_label.h>
 #include <linux/kernel.h>
