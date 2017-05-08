@@ -147,7 +147,7 @@ static int aoedisk_debugfs_show(struct seq_file *s, void *ignored)
 			seq_printf(s, "%c%s", c, ifp->nd->name);
 			c = ',';
 		}
-		seq_puts(s, "\n");
+		seq_putc(s, '\n');
 	}
 	spin_unlock_irqrestore(&d->lock, flags);
 
