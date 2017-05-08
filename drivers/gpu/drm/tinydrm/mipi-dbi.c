@@ -946,7 +946,7 @@ static int mipi_dbi_debugfs_command_show(struct seq_file *m, void *unused)
 
 		for (i = 0; i < len; i++)
 			seq_printf(m, "%02x", val[i]);
-		seq_puts(m, "\n");
+		seq_putc(m, '\n');
 	}
 
 	return 0;
