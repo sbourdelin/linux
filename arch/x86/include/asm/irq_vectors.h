@@ -48,6 +48,9 @@
 
 #define IA32_SYSCALL_VECTOR		0x80
 
+/* Refcount overflow reporting exception. */
+#define X86_REFCOUNT_VECTOR		0x81
+
 /*
  * Vectors 0x30-0x3f are used for ISA interrupts.
  *   round up to the next 16-vector boundary

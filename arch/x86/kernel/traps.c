@@ -218,8 +218,13 @@ do_trap_no_signal(struct task_struct *tsk, int trapnr, char *str,
 	}
 
 	if (!user_mode(regs)) {
-		if (fixup_exception(regs, trapnr))
+		if (fixup_exception(regs, trapnr)) {
+			if (IS_ENABLED(CONFIG_FAST_REFCOUNT) &&
+			    trapnr == X86_REFCOUNT_VECTOR)
+				refcount_error_report(regs, str);
+
 			return 0;
+		}
 
 		if (fixup_bug(regs, trapnr))
 			return 0;
@@ -326,6 +331,10 @@ DO_ERROR(X86_TRAP_TS,     SIGSEGV, "invalid TSS",		invalid_TSS)
 DO_ERROR(X86_TRAP_NP,     SIGBUS,  "segment not present",	segment_not_present)
 DO_ERROR(X86_TRAP_SS,     SIGBUS,  "stack segment",		stack_segment)
 DO_ERROR(X86_TRAP_AC,     SIGBUS,  "alignment check",		alignment_check)
+
+#ifdef CONFIG_FAST_REFCOUNT
+DO_ERROR(X86_REFCOUNT_VECTOR, SIGILL, "refcount overflow",	refcount_error)
+#endif
 
 #ifdef CONFIG_VMAP_STACK
 __visible void __noreturn handle_stack_overflow(const char *message,
@@ -1015,6 +1024,11 @@ void __init trap_init(void)
 #ifdef CONFIG_X86_32
 	set_system_intr_gate(IA32_SYSCALL_VECTOR, entry_INT80_32);
 	set_bit(IA32_SYSCALL_VECTOR, used_vectors);
+#endif
+
+#ifdef CONFIG_FAST_REFCOUNT
+	set_intr_gate(X86_REFCOUNT_VECTOR, refcount_error);
+	set_bit(X86_REFCOUNT_VECTOR, used_vectors);
 #endif
 
 	/*
