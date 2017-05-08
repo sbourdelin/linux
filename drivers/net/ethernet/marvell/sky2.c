@@ -4562,7 +4562,7 @@ static int sky2_debug_show(struct seq_file *seq, void *v)
 			seq_printf(seq, "[%d] %#x %d %#x\n",
 				   idx, le->opcode, le->length, le->status);
 		}
-		seq_puts(seq, "\n");
+		seq_putc(seq, '\n');
 	}
 
 	seq_printf(seq, "Tx ring pending=%u...%u report=%d done=%d\n",
