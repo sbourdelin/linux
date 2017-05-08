@@ -2958,7 +2958,6 @@ static int gfx_v7_0_cp_compute_resume(struct amdgpu_device *adev)
 {
 	int r, i, j;
 	u32 tmp;
-	bool use_doorbell = true;
 	u64 hqd_gpu_addr;
 	u64 mqd_gpu_addr;
 	u64 eop_gpu_addr;
@@ -3056,10 +3055,7 @@ static int gfx_v7_0_cp_compute_resume(struct amdgpu_device *adev)
 		/* enable doorbell? */
 		mqd->queue_state.cp_hqd_pq_doorbell_control =
 			RREG32(mmCP_HQD_PQ_DOORBELL_CONTROL);
-		if (use_doorbell)
-			mqd->queue_state.cp_hqd_pq_doorbell_control |= CP_HQD_PQ_DOORBELL_CONTROL__DOORBELL_EN_MASK;
-		else
-			mqd->queue_state.cp_hqd_pq_doorbell_control &= ~CP_HQD_PQ_DOORBELL_CONTROL__DOORBELL_EN_MASK;
+		mqd->queue_state.cp_hqd_pq_doorbell_control |= CP_HQD_PQ_DOORBELL_CONTROL__DOORBELL_EN_MASK;
 		WREG32(mmCP_HQD_PQ_DOORBELL_CONTROL,
 		       mqd->queue_state.cp_hqd_pq_doorbell_control);
 
@@ -3138,23 +3134,19 @@ static int gfx_v7_0_cp_compute_resume(struct amdgpu_device *adev)
 		       mqd->queue_state.cp_hqd_pq_rptr_report_addr_hi);
 
 		/* enable the doorbell if requested */
-		if (use_doorbell) {
-			mqd->queue_state.cp_hqd_pq_doorbell_control =
+		mqd->queue_state.cp_hqd_pq_doorbell_control =
 				RREG32(mmCP_HQD_PQ_DOORBELL_CONTROL);
-			mqd->queue_state.cp_hqd_pq_doorbell_control &=
+		mqd->queue_state.cp_hqd_pq_doorbell_control &=
 				~CP_HQD_PQ_DOORBELL_CONTROL__DOORBELL_OFFSET_MASK;
-			mqd->queue_state.cp_hqd_pq_doorbell_control |=
+		mqd->queue_state.cp_hqd_pq_doorbell_control |=
 				(ring->doorbell_index <<
 				 CP_HQD_PQ_DOORBELL_CONTROL__DOORBELL_OFFSET__SHIFT);
-			mqd->queue_state.cp_hqd_pq_doorbell_control |=
+		mqd->queue_state.cp_hqd_pq_doorbell_control |=
 				CP_HQD_PQ_DOORBELL_CONTROL__DOORBELL_EN_MASK;
-			mqd->queue_state.cp_hqd_pq_doorbell_control &=
+		mqd->queue_state.cp_hqd_pq_doorbell_control &=
 				~(CP_HQD_PQ_DOORBELL_CONTROL__DOORBELL_SOURCE_MASK |
 				CP_HQD_PQ_DOORBELL_CONTROL__DOORBELL_HIT_MASK);
 
-		} else {
-			mqd->queue_state.cp_hqd_pq_doorbell_control = 0;
-		}
 		WREG32(mmCP_HQD_PQ_DOORBELL_CONTROL,
 		       mqd->queue_state.cp_hqd_pq_doorbell_control);
 
