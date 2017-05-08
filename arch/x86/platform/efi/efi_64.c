@@ -302,6 +302,9 @@ static void __init __map_region(efi_memory_desc_t *md, u64 va)
 	unsigned long pfn;
 	pgd_t *pgd = efi_pgd;
 
+	if (efi_enabled(EFI_OLD_MEMMAP))
+		pgd = swapper_pg_dir;
+
 	if (!(md->attribute & EFI_MEMORY_WB))
 		flags |= _PAGE_PCD;
 
