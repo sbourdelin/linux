@@ -182,12 +182,12 @@ static void etnaviv_buffer_dump(struct etnaviv_gpu *gpu, struct seq_file *m)
 
 	for (i = 0; i < size / 4; i++) {
 		if (i && !(i % 4))
-			seq_puts(m, "\n");
+			seq_putc(m, '\n');
 		if (i % 4 == 0)
 			seq_printf(m, "\t0x%p: ", ptr + i);
 		seq_printf(m, "%08x ", *(ptr + i));
 	}
-	seq_puts(m, "\n");
+	seq_putc(m, '\n');
 }
 
 static int etnaviv_ring_show(struct etnaviv_gpu *gpu, struct seq_file *m)
