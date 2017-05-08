@@ -1292,6 +1292,9 @@ void omap_gem_free_object(struct drm_gem_object *obj)
 	list_del(&omap_obj->mm_list);
 	spin_unlock(&priv->list_lock);
 
+	if (omap_obj->flags & OMAP_BO_MEM_PIN)
+		omap_gem_put_paddr_locked(obj);
+
 	/* this means the object is still pinned.. which really should
 	 * not happen.  I think..
 	 */
@@ -1338,6 +1341,11 @@ struct drm_gem_object *omap_gem_new(struct drm_device *dev,
 			return NULL;
 		}
 
+		if (flags & OMAP_BO_MEM_CONTIG) {
+			dev_err(dev->dev, "Tiled buffers require TILER memory\n");
+			return NULL;
+		}
+
 		/*
 		 * Tiled buffers are always shmem paged backed. When they are
 		 * scanned out, they are remapped into DMM/TILER.
@@ -1351,7 +1359,8 @@ struct drm_gem_object *omap_gem_new(struct drm_device *dev,
 		 */
 		flags &= ~(OMAP_BO_CACHED|OMAP_BO_WC|OMAP_BO_UNCACHED);
 		flags |= tiler_get_cpu_cache_flags();
-	} else if ((flags & OMAP_BO_SCANOUT) && !priv->has_dmm) {
+	} else if ((flags & OMAP_BO_MEM_CONTIG) ||
+		((flags & OMAP_BO_SCANOUT) && !priv->has_dmm)) {
 		/*
 		 * OMAP_BO_SCANOUT hints that the buffer doesn't need to be
 		 * tiled. However, to lower the pressure on memory allocation,
@@ -1411,12 +1420,24 @@ struct drm_gem_object *omap_gem_new(struct drm_device *dev,
 			goto err_release;
 	}
 
+	if (flags & OMAP_BO_MEM_PIN) {
+		dma_addr_t dummy;
+
+		ret = omap_gem_get_paddr(obj, &dummy, true);
+		if (ret)
+			goto err_free_dma;
+	}
+
 	spin_lock(&priv->list_lock);
 	list_add(&omap_obj->mm_list, &priv->obj_list);
 	spin_unlock(&priv->list_lock);
 
 	return obj;
 
+err_free_dma:
+	if (flags & OMAP_BO_MEM_DMA_API)
+		dma_free_writecombine(dev->dev, size,
+				omap_obj->vaddr, omap_obj->paddr);
 err_release:
 	drm_gem_object_release(obj);
 err_free:
