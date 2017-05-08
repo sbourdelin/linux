@@ -116,6 +116,7 @@ ls_ucode_img_load_gr(const struct nvkm_subdev *subdev, struct ls_ucode_img *img,
 	ret = nvkm_firmware_get(subdev->device, f, &sig);
 	if (ret)
 		goto free_data;
+
 	img->sig = kmemdup(sig->data, sig->size, GFP_KERNEL);
 	if (!img->sig) {
 		ret = -ENOMEM;
@@ -127,10 +128,12 @@ ls_ucode_img_load_gr(const struct nvkm_subdev *subdev, struct ls_ucode_img *img,
 					     &img->ucode_desc);
 	if (IS_ERR(img->ucode_data)) {
 		ret = PTR_ERR(img->ucode_data);
-		goto free_data;
+		goto free_img_sig;
 	}
 	img->ucode_size = img->ucode_desc.image_size;
 
+free_img_sig:
+	kfree(img->sig);
 free_sig:
 	nvkm_firmware_put(sig);
 free_data:
