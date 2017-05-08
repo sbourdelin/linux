@@ -81,11 +81,7 @@ qcaspi_info_show(struct seq_file *s, void *what)
 	else
 		seq_puts(s, "in use");
 
-	seq_puts(s, "\n");
-
-	seq_printf(s, "TX ring size     : %u\n",
-		   qca->txr.size);
-
+	seq_printf(s, "\nTX ring size     : %u\n", qca->txr.size);
 	seq_printf(s, "Sync state       : %u (",
 		   (unsigned int)qca->sync);
 	switch (qca->sync) {
@@ -102,10 +98,8 @@ qcaspi_info_show(struct seq_file *s, void *what)
 		seq_puts(s, "INVALID");
 		break;
 	}
-	seq_puts(s, ")\n");
 
-	seq_printf(s, "IRQ              : %d\n",
-		   qca->spi_dev->irq);
+	seq_printf(s, ")\nIRQ              : %d\n", qca->spi_dev->irq);
 	seq_printf(s, "INTR REQ         : %u\n",
 		   qca->intr_req);
 	seq_printf(s, "INTR SVC         : %u\n",
