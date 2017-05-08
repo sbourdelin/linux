@@ -195,7 +195,7 @@ static int usbmisc_imx27_init(struct imx_usbmisc_data *data)
 	return 0;
 }
 
-static int usbmisc_imx53_init(struct imx_usbmisc_data *data)
+static int usbmisc_imx5x_init(struct imx_usbmisc_data *data, bool has_clkonoff)
 {
 	struct imx_usbmisc *usbmisc = dev_get_drvdata(data->dev);
 	void __iomem *reg = NULL;
@@ -242,10 +242,15 @@ static int usbmisc_imx53_init(struct imx_usbmisc_data *data)
 			val = readl(reg) | MX53_USB_UHx_CTRL_WAKE_UP_EN
 				| MX53_USB_UHx_CTRL_ULPI_INT_EN;
 			writel(val, reg);
-			/* Disable internal 60Mhz clock */
-			reg = usbmisc->base + MX53_USB_CLKONOFF_CTRL_OFFSET;
-			val = readl(reg) | MX53_USB_CLKONOFF_CTRL_H2_INT60CKOFF;
-			writel(val, reg);
+			if (has_clkonoff) {
+				/* Disable internal 60Mhz clock */
+				reg = usbmisc->base +
+					MX53_USB_CLKONOFF_CTRL_OFFSET;
+				val = readl(reg) |
+					MX53_USB_CLKONOFF_CTRL_H2_INT60CKOFF;
+				writel(val, reg);
+			}
+
 		}
 		if (data->disable_oc) {
 			reg = usbmisc->base + MX53_USB_UH2_CTRL_OFFSET;
@@ -267,10 +272,15 @@ static int usbmisc_imx53_init(struct imx_usbmisc_data *data)
 			val = readl(reg) | MX53_USB_UHx_CTRL_WAKE_UP_EN
 				| MX53_USB_UHx_CTRL_ULPI_INT_EN;
 			writel(val, reg);
-			/* Disable internal 60Mhz clock */
-			reg = usbmisc->base + MX53_USB_CLKONOFF_CTRL_OFFSET;
-			val = readl(reg) | MX53_USB_CLKONOFF_CTRL_H3_INT60CKOFF;
-			writel(val, reg);
+
+			if (has_clkonoff) {
+				/* Disable internal 60Mhz clock */
+				reg = usbmisc->base +
+					MX53_USB_CLKONOFF_CTRL_OFFSET;
+				val = readl(reg) |
+					MX53_USB_CLKONOFF_CTRL_H3_INT60CKOFF;
+				writel(val, reg);
+			}
 		}
 		if (data->disable_oc) {
 			reg = usbmisc->base + MX53_USB_UH3_CTRL_OFFSET;
@@ -283,6 +293,16 @@ static int usbmisc_imx53_init(struct imx_usbmisc_data *data)
 	spin_unlock_irqrestore(&usbmisc->lock, flags);
 
 	return 0;
+}
+
+static int usbmisc_imx51_init(struct imx_usbmisc_data *data)
+{
+	return usbmisc_imx5x_init(data, false);
+}
+
+static int usbmisc_imx53_init(struct imx_usbmisc_data *data)
+{
+	return usbmisc_imx5x_init(data, true);
 }
 
 static int usbmisc_imx6q_set_wakeup
@@ -456,6 +476,10 @@ static const struct usbmisc_ops imx27_usbmisc_ops = {
 	.init = usbmisc_imx27_init,
 };
 
+static const struct usbmisc_ops imx51_usbmisc_ops = {
+	.init = usbmisc_imx51_init,
+};
+
 static const struct usbmisc_ops imx53_usbmisc_ops = {
 	.init = usbmisc_imx53_init,
 };
@@ -536,7 +560,7 @@ static const struct of_device_id usbmisc_imx_dt_ids[] = {
 	},
 	{
 		.compatible = "fsl,imx51-usbmisc",
-		.data = &imx53_usbmisc_ops,
+		.data = &imx51_usbmisc_ops,
 	},
 	{
 		.compatible = "fsl,imx53-usbmisc",
