@@ -1285,19 +1285,14 @@ static int mtdswap_show(struct seq_file *s, void *data)
 			"erased %u times\n",
 			cwp, d->pages_per_eblk - cwp, cwecount);
 
-	seq_printf(s, "total erasures: %lu\n", sum);
-
-	seq_puts(s, "\n");
-
+	seq_printf(s, "total erasures: %lu\n\n", sum);
 	seq_printf(s, "mtdswap_readsect count: %llu\n", d->sect_read_count);
 	seq_printf(s, "mtdswap_writesect count: %llu\n", d->sect_write_count);
 	seq_printf(s, "mtdswap_discard count: %llu\n", d->discard_count);
 	seq_printf(s, "mtd read count: %llu\n", d->mtd_read_count);
 	seq_printf(s, "mtd write count: %llu\n", d->mtd_write_count);
 	seq_printf(s, "discarded pages count: %llu\n", d->discard_page_count);
-
-	seq_puts(s, "\n");
-	seq_printf(s, "total pages: %u\n", pages);
+	seq_printf(s, "\ntotal pages: %u\n", pages);
 	seq_printf(s, "pages mapped: %u\n", mapped);
 
 	return 0;
