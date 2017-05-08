@@ -1989,7 +1989,7 @@ static int sm501fb_probe(struct platform_device *pdev)
 	    info->fb[HEAD_CRT] == NULL) {
 		dev_err(dev, "no framebuffers found\n");
 		ret = -ENODEV;
-		goto err_alloc;
+		goto err_probed_panel;
 	}
 
 	/* get the resources for both of the framebuffers */
