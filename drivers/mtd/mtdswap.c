@@ -559,8 +559,7 @@ static int mtdswap_erase_block(struct mtdswap_dev *d, struct swap_eb *eb)
 
 retry:
 	init_waitqueue_head(&wq);
-	memset(&erase, 0, sizeof(struct erase_info));
-
+	memset(&erase, 0, sizeof(erase));
 	erase.mtd	= mtd;
 	erase.callback	= mtdswap_erase_callback;
 	erase.addr	= mtdswap_eb_offset(d, eb);
