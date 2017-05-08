@@ -126,10 +126,7 @@ static int mic_msi_irq_info_show(struct seq_file *s, void *pos)
 			seq_printf(s, "%-10s", "offset:");
 			for (j = (MIC_NUM_OFFSETS - 1); j >= 0; j--)
 				seq_printf(s, "%4d ", j);
-			seq_puts(s, "\n");
-
-
-			seq_printf(s, "%-10s", "count:");
+			seq_printf(s, "\n%-10s", "count:");
 			for (j = (MIC_NUM_OFFSETS - 1); j >= 0; j--)
 				seq_printf(s, "%4d ",
 					   (mdev->irq_info.mic_msi_map[i] &
