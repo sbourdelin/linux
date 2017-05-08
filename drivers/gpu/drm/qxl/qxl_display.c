@@ -581,24 +581,24 @@ static void qxl_cursor_atomic_update(struct drm_plane *plane,
 		obj = to_qxl_framebuffer(fb)->obj;
 		user_bo = gem_to_qxl_bo(obj);
 
-		/* pinning is done in the prepare/cleanup framevbuffer */
-		ret = qxl_bo_kmap(user_bo, &user_ptr);
-		if (ret)
-			goto out_free_release;
-
 		ret = qxl_alloc_bo_reserved(qdev, release,
 					    sizeof(struct qxl_cursor) + size,
 					    &cursor_bo);
 		if (ret)
-			goto out_kunmap;
+			goto out_free_release;
 
 		ret = qxl_release_reserve_list(release, true);
 		if (ret)
 			goto out_free_bo;
 
-		ret = qxl_bo_kmap(cursor_bo, (void **)&cursor);
+		/* pinning is done in the prepare/cleanup framevbuffer */
+		ret = qxl_bo_kmap(user_bo, &user_ptr);
 		if (ret)
 			goto out_backoff;
+
+		ret = qxl_bo_kmap(cursor_bo, (void **)&cursor);
+		if (ret)
+			goto out_kunmap;
 
 		cursor->header.unique = 0;
 		cursor->header.type = SPICE_CURSOR_TYPE_ALPHA;
@@ -636,12 +636,12 @@ static void qxl_cursor_atomic_update(struct drm_plane *plane,
 
 	return;
 
+out_kunmap:
+	qxl_bo_kunmap(user_bo);
 out_backoff:
 	qxl_release_backoff_reserve_list(release);
 out_free_bo:
 	qxl_bo_unref(&cursor_bo);
-out_kunmap:
-	qxl_bo_kunmap(user_bo);
 out_free_release:
 	qxl_release_free(qdev, release);
 	return;
