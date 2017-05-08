@@ -85,6 +85,7 @@ enum perf_output_field {
 	PERF_OUTPUT_INSN	    = 1U << 21,
 	PERF_OUTPUT_INSNLEN	    = 1U << 22,
 	PERF_OUTPUT_BRSTACKINSN	    = 1U << 23,
+	PERF_OUTPUT_SRCCODE	    = 1U << 24,
 };
 
 struct output_option {
@@ -115,6 +116,7 @@ struct output_option {
 	{.str = "insn", .field = PERF_OUTPUT_INSN},
 	{.str = "insnlen", .field = PERF_OUTPUT_INSNLEN},
 	{.str = "brstackinsn", .field = PERF_OUTPUT_BRSTACKINSN},
+	{.str = "srccode", .field = PERF_OUTPUT_SRCCODE},
 };
 
 /* default set to maintain compatibility with current format */
@@ -304,7 +306,7 @@ static int perf_evsel__check_attr(struct perf_evsel *evsel,
 		       "to DSO.\n");
 		return -EINVAL;
 	}
-	if (PRINT_FIELD(SRCLINE) && !PRINT_FIELD(IP)) {
+	if ((PRINT_FIELD(SRCLINE) || PRINT_FIELD(SRCCODE)) && !PRINT_FIELD(IP)) {
 		pr_err("Display of source line number requested but sample IP is not\n"
 		       "selected. Hence, no address to lookup the source line number.\n");
 		return -EINVAL;
@@ -633,6 +635,20 @@ static int grab_bb(u8 *buffer, u64 start, u64 end,
 	return len;
 }
 
+static void print_srccode(struct thread *thread, u8 cpumode, uint64_t addr)
+{
+	struct addr_location al;
+	memset(&al, 0, sizeof(al));
+
+	thread__find_addr_map(thread, cpumode, MAP__FUNCTION, addr, &al);
+	if (!al.map)
+		thread__find_addr_map(thread, cpumode, MAP__VARIABLE,
+			      addr, &al);
+	if (al.map && map__fprintf_srccode(al.map, al.addr, "", stdout,
+		    &thread->srccode_state))
+		printf("\n");
+}
+
 static void print_jump(uint64_t ip, struct branch_entry *en,
 		       struct perf_insn *x, u8 *inbuf, int len,
 		       int insn)
@@ -723,6 +739,8 @@ static void print_sample_brstackinsn(struct perf_sample *sample,
 			     br->entries[nr - 1].from, &lastsym, attr);
 		print_jump(br->entries[nr - 1].from, &br->entries[nr - 1],
 			    &x, buffer, len, 0);
+		if (PRINT_FIELD(SRCCODE))
+			print_srccode(thread, x.cpumode, br->entries[nr - 1].from);
 	}
 
 	/* Print all blocks */
@@ -751,12 +769,16 @@ static void print_sample_brstackinsn(struct perf_sample *sample,
 			print_ip_sym(thread, x.cpumode, x.cpu, ip, &lastsym, attr);
 			if (ip == end) {
 				print_jump(ip, &br->entries[i], &x, buffer + off, len - off, insn);
+				if (PRINT_FIELD(SRCCODE))
+					print_srccode(thread, x.cpumode, ip);
 				break;
 			} else {
 				printf("\t%016" PRIx64 "\t%s\n", ip,
 					dump_insn(&x, ip, buffer + off, len - off, &ilen));
 				if (ilen == 0)
 					break;
+				if (PRINT_FIELD(SRCCODE))
+					print_srccode(thread, x.cpumode, ip);
 				insn++;
 			}
 		}
@@ -787,6 +809,8 @@ static void print_sample_brstackinsn(struct perf_sample *sample,
 
 		printf("\t%016" PRIx64 "\t%s\n", sample->ip,
 			dump_insn(&x, sample->ip, buffer, len, NULL));
+		if (PRINT_FIELD(SRCCODE))
+			print_srccode(thread, x.cpumode, sample->ip);
 		return;
 	}
 	for (off = 0; off <= end - start; off += ilen) {
@@ -794,6 +818,8 @@ static void print_sample_brstackinsn(struct perf_sample *sample,
 			dump_insn(&x, start + off, buffer + off, len - off, &ilen));
 		if (ilen == 0)
 			break;
+		if (PRINT_FIELD(SRCCODE))
+			print_srccode(thread, x.cpumode, start + off);
 	}
 }
 
@@ -947,6 +973,12 @@ static void print_sample_bts(struct perf_sample *sample,
 	print_insn(sample, attr, thread, machine);
 
 	printf("\n");
+
+	if (PRINT_FIELD(SRCCODE)) {
+		if (map__fprintf_srccode(al->map, al->addr, "", stdout,
+					 &thread->srccode_state))
+			printf("\n");
+	}
 }
 
 static struct {
@@ -1195,6 +1227,12 @@ static void process_event(struct perf_script *script,
 		print_sample_bpf_output(sample);
 	print_insn(sample, attr, thread, machine);
 	printf("\n");
+
+	if (PRINT_FIELD(SRCCODE)) {
+		if (map__fprintf_srccode(al->map, al->addr, "", stdout,
+					 &thread->srccode_state))
+			printf("\n");
+	}
 }
 
 static struct scripting_ops	*scripting_ops;
