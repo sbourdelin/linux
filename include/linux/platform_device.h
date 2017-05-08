@@ -59,6 +59,21 @@ extern struct resource *platform_get_resource_byname(struct platform_device *,
 extern int platform_get_irq_byname(struct platform_device *, const char *);
 extern int platform_add_devices(struct platform_device **, int);
 
+static inline struct resource *
+platform_get_resource_by_name_or_index(struct platform_device *dev,
+				       unsigned int type,
+				       const char *name,
+				       unsigned int num)
+{
+	struct resource *r;
+
+	r = platform_get_resource_byname(dev, type, name);
+	if (r)
+		return r;
+
+	return platform_get_resource(dev, type, num);
+}
+
 struct platform_device_info {
 		struct device *parent;
 		struct fwnode_handle *fwnode;
