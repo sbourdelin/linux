@@ -68,11 +68,25 @@ static const struct gmbus_pin gmbus_pins_bxt[] = {
 	[GMBUS_PIN_3_BXT] = { "misc", GPIOD },
 };
 
+/*
+ * FIXME: Spec maps 3-misc-0xc541c and 4-portd-0xc5420.
+ * However, current available pre-prod VBT maps:
+ * portD to pin 3 using 0xc5420.
+ */
+static const struct gmbus_pin gmbus_pins_cnp[] = {
+	[GMBUS_PIN_1_BXT] = { "dpb", GPIOB },
+	[GMBUS_PIN_2_BXT] = { "dpc", GPIOC },
+	[GMBUS_PIN_3_BXT] = { "misc", GPIOE },
+	[GMBUS_PIN_4_CNP] = { "dpd", GPIOD },
+};
+
 /* pin is expected to be valid */
 static const struct gmbus_pin *get_gmbus_pin(struct drm_i915_private *dev_priv,
 					     unsigned int pin)
 {
-	if (IS_GEN9_LP(dev_priv))
+	if (HAS_PCH_CNP(dev_priv))
+		return &gmbus_pins_cnp[pin];
+	else if (IS_GEN9_LP(dev_priv))
 		return &gmbus_pins_bxt[pin];
 	else if (IS_GEN9_BC(dev_priv))
 		return &gmbus_pins_skl[pin];
@@ -87,7 +101,9 @@ bool intel_gmbus_is_valid_pin(struct drm_i915_private *dev_priv,
 {
 	unsigned int size;
 
-	if (IS_GEN9_LP(dev_priv))
+	if (HAS_PCH_CNP(dev_priv))
+		size = ARRAY_SIZE(gmbus_pins_cnp);
+	else if (IS_GEN9_LP(dev_priv))
 		size = ARRAY_SIZE(gmbus_pins_bxt);
 	else if (IS_GEN9_BC(dev_priv))
 		size = ARRAY_SIZE(gmbus_pins_skl);
