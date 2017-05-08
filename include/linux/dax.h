@@ -18,17 +18,48 @@ struct dax_operations {
 			void **, pfn_t *);
 };
 
+#if IS_ENABLED(CONFIG_DAX)
 int dax_read_lock(void);
 void dax_read_unlock(int id);
 struct dax_device *dax_get_by_host(const char *host);
+void put_dax(struct dax_device *dax_dev);
+long dax_direct_access(struct dax_device *dax_dev, pgoff_t pgoff, long nr_pages,
+		void **kaddr, pfn_t *pfn);
+#else
+static inline int dax_read_lock(void)
+{
+	/* all dax operations inside this lock will fail below */
+	return 0;
+}
+
+static inline void dax_read_unlock(int id)
+{
+}
+
+static inline struct dax_device *dax_get_by_host(const char *host)
+{
+	return NULL;
+}
+
+static inline void put_dax(struct dax_device *dax_dev)
+{
+}
+
+static inline long dax_direct_access(struct dax_device *dax_dev, pgoff_t pgoff,
+		long nr_pages, void **kaddr, pfn_t *pfn)
+{
+	/* avoid 'uninitialized variable' warnings for @kaddr and @pfn */
+	*pfn = (pfn_t) { .val = ULLONG_MAX };
+	*kaddr = (void *) ULONG_MAX;
+
+	return -EOPNOTSUPP;
+}
+#endif
 struct dax_device *alloc_dax(void *private, const char *host,
 		const struct dax_operations *ops);
-void put_dax(struct dax_device *dax_dev);
 bool dax_alive(struct dax_device *dax_dev);
 void kill_dax(struct dax_device *dax_dev);
 void *dax_get_private(struct dax_device *dax_dev);
-long dax_direct_access(struct dax_device *dax_dev, pgoff_t pgoff, long nr_pages,
-		void **kaddr, pfn_t *pfn);
 
 /*
  * We use lowest available bit in exceptional entry for locking, one bit for
