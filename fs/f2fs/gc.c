@@ -586,6 +586,7 @@ static void move_encrypted_block(struct inode *inode, block_t bidx,
 	struct f2fs_io_info fio = {
 		.sbi = F2FS_I_SB(inode),
 		.type = DATA,
+		.seg_type = CURSEG_COLD_DATA,
 		.op = REQ_OP_READ,
 		.op_flags = 0,
 		.encrypted_page = NULL,
@@ -632,7 +633,7 @@ static void move_encrypted_block(struct inode *inode, block_t bidx,
 	fio.new_blkaddr = fio.old_blkaddr = dn.data_blkaddr;
 
 	allocate_data_block(fio.sbi, NULL, fio.old_blkaddr, &newaddr,
-							&sum, CURSEG_COLD_DATA);
+							&sum, fio.seg_type);
 
 	fio.encrypted_page = pagecache_get_page(META_MAPPING(fio.sbi), newaddr,
 					FGP_LOCK | FGP_CREAT, GFP_NOFS);
@@ -936,7 +937,7 @@ next:
 	}
 
 	if (gc_type == FG_GC)
-		f2fs_submit_merged_bio(sbi,
+		f2fs_submit_log_bio(sbi,
 				(type == SUM_TYPE_NODE) ? NODE : DATA, WRITE);
 
 	blk_finish_plug(&plug);

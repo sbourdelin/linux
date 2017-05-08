@@ -328,7 +328,7 @@ static int __commit_inmem_pages(struct inode *inode,
 	}
 
 	if (last_idx != ULONG_MAX)
-		f2fs_submit_merged_bio_cond(sbi, inode, 0, last_idx,
+		f2fs_submit_log_bio_cond(sbi, inode, 0, last_idx,
 							DATA, WRITE);
 
 	if (!err)
@@ -2140,14 +2140,15 @@ void allocate_data_block(struct f2fs_sb_info *sbi, struct page *page,
 
 static void do_write_page(struct f2fs_summary *sum, struct f2fs_io_info *fio)
 {
-	int type = __get_segment_type(fio->page, fio->type);
 	int err;
+
+	fio->seg_type = __get_segment_type(fio->page, fio->type);
 
 	if (fio->type == NODE || fio->type == DATA)
 		mutex_lock(&fio->sbi->wio_mutex[fio->type]);
 reallocate:
 	allocate_data_block(fio->sbi, fio->page, fio->old_blkaddr,
-					&fio->new_blkaddr, sum, type);
+					&fio->new_blkaddr, sum, fio->seg_type);
 
 	/* writeout dirty page into bdev */
 	err = f2fs_submit_page_mbio(fio);
@@ -2296,8 +2297,13 @@ void f2fs_wait_on_page_writeback(struct page *page,
 	if (PageWriteback(page)) {
 		struct f2fs_sb_info *sbi = F2FS_P_SB(page);
 
-		f2fs_submit_merged_bio_cond(sbi, page->mapping->host,
+		if (type == META)
+			f2fs_submit_meta_bio_cond(sbi, page->mapping->host,
 						0, page->index, type, WRITE);
+		else
+			f2fs_submit_log_bio_cond(sbi, page->mapping->host,
+						0, page->index, type, WRITE);
+
 		if (ordered)
 			wait_on_page_writeback(page);
 		else

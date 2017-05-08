@@ -278,28 +278,27 @@ static bool __has_merged_page(struct f2fs_bio_info *io,
 	return false;
 }
 
-static bool has_merged_page(struct f2fs_sb_info *sbi, struct inode *inode,
-				nid_t ino, pgoff_t idx, enum page_type type)
-{
-	enum page_type btype = PAGE_TYPE_OF_BIO(type);
-	struct f2fs_bio_info *io = &sbi->write_io[btype];
-	bool ret;
-
-	down_read(&io->io_rwsem);
-	ret = __has_merged_page(io, inode, ino, idx);
-	up_read(&io->io_rwsem);
-	return ret;
-}
-
-static void __f2fs_submit_merged_bio(struct f2fs_sb_info *sbi,
-				struct inode *inode, nid_t ino, pgoff_t idx,
-				enum page_type type, int rw)
+static struct f2fs_bio_info *__get_bio_info(struct f2fs_sb_info *sbi, int rw,
+					enum page_type type, int seg_type)
 {
 	enum page_type btype = PAGE_TYPE_OF_BIO(type);
 	struct f2fs_bio_info *io;
 
-	io = is_read_io(rw) ? &sbi->read_io : &sbi->write_io[btype];
+	if (btype == META) {
+		int io_type = is_read_io(rw) ? READ : WRITE;
 
+		io = &sbi->meta_io[io_type];
+	} else {
+		io = &sbi->log_io[seg_type];
+	}
+
+	return io;
+}
+
+static void __f2fs_submit_merged_bio(struct f2fs_bio_info *io,
+				struct inode *inode, nid_t ino, pgoff_t idx,
+				enum page_type type)
+{
 	down_write(&io->io_rwsem);
 
 	if (!__has_merged_page(io, inode, ino, idx))
@@ -310,7 +309,7 @@ static void __f2fs_submit_merged_bio(struct f2fs_sb_info *sbi,
 		io->fio.type = META_FLUSH;
 		io->fio.op = REQ_OP_WRITE;
 		io->fio.op_flags = REQ_META | REQ_PRIO | REQ_SYNC;
-		if (!test_opt(sbi, NOBARRIER))
+		if (!test_opt(io->sbi, NOBARRIER))
 			io->fio.op_flags |= REQ_PREFLUSH | REQ_FUA;
 	}
 	__submit_merged_bio(io);
@@ -318,25 +317,45 @@ out:
 	up_write(&io->io_rwsem);
 }
 
-void f2fs_submit_merged_bio(struct f2fs_sb_info *sbi, enum page_type type,
-									int rw)
-{
-	__f2fs_submit_merged_bio(sbi, NULL, 0, 0, type, rw);
-}
-
-void f2fs_submit_merged_bio_cond(struct f2fs_sb_info *sbi,
+void f2fs_submit_log_bio_cond(struct f2fs_sb_info *sbi,
 				struct inode *inode, nid_t ino, pgoff_t idx,
 				enum page_type type, int rw)
 {
-	if (has_merged_page(sbi, inode, ino, idx, type))
-		__f2fs_submit_merged_bio(sbi, inode, ino, idx, type, rw);
+	bool is_data = (type == DATA);
+	int i = is_data ? CURSEG_HOT_DATA : CURSEG_HOT_NODE;
+	int max = is_data ? CURSEG_COLD_DATA : CURSEG_COLD_NODE;
+
+	for (; i <= max; i++)
+		__f2fs_submit_merged_bio(&sbi->log_io[i],
+					inode, ino, idx, type);
+}
+
+void f2fs_submit_log_bio(struct f2fs_sb_info *sbi,
+					enum page_type type, int rw)
+{
+	f2fs_submit_log_bio_cond(sbi, NULL, 0, 0, type, rw);
+}
+
+void f2fs_submit_meta_bio_cond(struct f2fs_sb_info *sbi,
+				struct inode *inode, nid_t ino, pgoff_t idx,
+				enum page_type type, int rw)
+{
+	int io_type = is_read_io(rw) ? READ : WRITE;
+
+	__f2fs_submit_merged_bio(&sbi->meta_io[io_type], inode, ino, idx, type);
+}
+
+void f2fs_submit_meta_bio(struct f2fs_sb_info *sbi,
+					enum page_type type, int rw)
+{
+	f2fs_submit_meta_bio_cond(sbi, NULL, 0, 0, type, rw);
 }
 
 void f2fs_flush_merged_bios(struct f2fs_sb_info *sbi)
 {
-	f2fs_submit_merged_bio(sbi, DATA, WRITE);
-	f2fs_submit_merged_bio(sbi, NODE, WRITE);
-	f2fs_submit_merged_bio(sbi, META, WRITE);
+	f2fs_submit_log_bio(sbi, DATA, WRITE);
+	f2fs_submit_log_bio(sbi, NODE, WRITE);
+	f2fs_submit_meta_bio(sbi, META, WRITE);
 }
 
 /*
@@ -371,13 +390,12 @@ int f2fs_submit_page_bio(struct f2fs_io_info *fio)
 int f2fs_submit_page_mbio(struct f2fs_io_info *fio)
 {
 	struct f2fs_sb_info *sbi = fio->sbi;
-	enum page_type btype = PAGE_TYPE_OF_BIO(fio->type);
 	struct f2fs_bio_info *io;
 	bool is_read = is_read_io(fio->op);
 	struct page *bio_page;
 	int err = 0;
 
-	io = is_read ? &sbi->read_io : &sbi->write_io[btype];
+	io = __get_bio_info(sbi, fio->op, fio->type, fio->seg_type);
 
 	if (fio->old_blkaddr != NEW_ADDR)
 		verify_block_addr(sbi, fio->old_blkaddr);
@@ -1513,7 +1531,7 @@ out:
 		ClearPageUptodate(page);
 
 	if (wbc->for_reclaim) {
-		f2fs_submit_merged_bio_cond(sbi, inode, 0, page->index,
+		f2fs_submit_log_bio_cond(sbi, inode, 0, page->index,
 						DATA, WRITE);
 		clear_inode_flag(inode, FI_HOT_DATA);
 		remove_dirty_inode(inode);
@@ -1525,7 +1543,7 @@ out:
 		f2fs_balance_fs(sbi, need_balance_fs);
 
 	if (unlikely(f2fs_cp_error(sbi))) {
-		f2fs_submit_merged_bio(sbi, DATA, WRITE);
+		f2fs_submit_log_bio(sbi, DATA, WRITE);
 		submitted = NULL;
 	}
 
@@ -1684,7 +1702,7 @@ continue_unlock:
 		mapping->writeback_index = done_index;
 
 	if (last_idx != ULONG_MAX)
-		f2fs_submit_merged_bio_cond(F2FS_M_SB(mapping), mapping->host,
+		f2fs_submit_log_bio_cond(F2FS_M_SB(mapping), mapping->host,
 						0, last_idx, DATA, WRITE);
 
 	return ret;

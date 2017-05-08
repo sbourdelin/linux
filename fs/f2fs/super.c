@@ -1950,13 +1950,15 @@ try_onemore:
 	set_sbi_flag(sbi, SBI_POR_DOING);
 	spin_lock_init(&sbi->stat_lock);
 
-	init_rwsem(&sbi->read_io.io_rwsem);
-	sbi->read_io.sbi = sbi;
-	sbi->read_io.bio = NULL;
-	for (i = 0; i < NR_PAGE_TYPE; i++) {
-		init_rwsem(&sbi->write_io[i].io_rwsem);
-		sbi->write_io[i].sbi = sbi;
-		sbi->write_io[i].bio = NULL;
+	for (i = 0; i < 2; i++) {
+		init_rwsem(&sbi->meta_io[i].io_rwsem);
+		sbi->meta_io[i].sbi = sbi;
+		sbi->meta_io[i].bio = NULL;
+	}
+	for (i = 0; i < NR_CURSEG_TYPE; i++) {
+		init_rwsem(&sbi->log_io[i].io_rwsem);
+		sbi->log_io[i].sbi = sbi;
+		sbi->log_io[i].bio = NULL;
 	}
 
 	init_rwsem(&sbi->cp_rwsem);

@@ -212,7 +212,7 @@ int ra_meta_pages(struct f2fs_sb_info *sbi, block_t start, int nrpages,
 		f2fs_put_page(page, 0);
 	}
 out:
-	f2fs_submit_merged_bio(sbi, META, READ);
+	f2fs_submit_meta_bio(sbi, META, READ);
 	blk_finish_plug(&plug);
 	return blkno - start;
 }
@@ -249,13 +249,13 @@ static int f2fs_write_meta_page(struct page *page,
 	dec_page_count(sbi, F2FS_DIRTY_META);
 
 	if (wbc->for_reclaim)
-		f2fs_submit_merged_bio_cond(sbi, page->mapping->host,
+		f2fs_submit_meta_bio_cond(sbi, page->mapping->host,
 						0, page->index, META, WRITE);
 
 	unlock_page(page);
 
 	if (unlikely(f2fs_cp_error(sbi)))
-		f2fs_submit_merged_bio(sbi, META, WRITE);
+		f2fs_submit_meta_bio(sbi, META, WRITE);
 
 	return 0;
 
@@ -358,7 +358,7 @@ continue_unlock:
 	}
 stop:
 	if (nwritten)
-		f2fs_submit_merged_bio(sbi, type, WRITE);
+		f2fs_submit_meta_bio(sbi, type, WRITE);
 
 	blk_finish_plug(&plug);
 
@@ -906,7 +906,7 @@ retry:
 		 * We should submit bio, since it exists several
 		 * wribacking dentry pages in the freeing inode.
 		 */
-		f2fs_submit_merged_bio(sbi, DATA, WRITE);
+		f2fs_submit_log_bio(sbi, DATA, WRITE);
 		cond_resched();
 	}
 	goto retry;

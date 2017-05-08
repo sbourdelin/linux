@@ -795,6 +795,7 @@ enum page_type {
 struct f2fs_io_info {
 	struct f2fs_sb_info *sbi;	/* f2fs_sb_info pointer */
 	enum page_type type;	/* contains DATA/NODE/META/META_FLUSH */
+	int seg_type;		/* indicate current segment type */
 	int op;			/* contains REQ_OP_ */
 	int op_flags;		/* req_flag_bits */
 	block_t new_blkaddr;	/* new block address to be written */
@@ -879,8 +880,8 @@ struct f2fs_sb_info {
 	struct f2fs_sm_info *sm_info;		/* segment manager */
 
 	/* for bio operations */
-	struct f2fs_bio_info read_io;			/* for read bios */
-	struct f2fs_bio_info write_io[NR_PAGE_TYPE];	/* for write bios */
+	struct f2fs_bio_info meta_io[2];		/* for meta bios */
+	struct f2fs_bio_info log_io[NR_CURSEG_TYPE];	/* for log bios */
 	struct mutex wio_mutex[NODE + 1];	/* bio ordering for NODE/DATA */
 	int write_io_size_bits;			/* Write IO size bits */
 	mempool_t *write_io_dummy;		/* Dummy pages */
@@ -2324,11 +2325,15 @@ void destroy_checkpoint_caches(void);
 /*
  * data.c
  */
-void f2fs_submit_merged_bio(struct f2fs_sb_info *sbi, enum page_type type,
-			int rw);
-void f2fs_submit_merged_bio_cond(struct f2fs_sb_info *sbi,
+void f2fs_submit_log_bio_cond(struct f2fs_sb_info *sbi,
 				struct inode *inode, nid_t ino, pgoff_t idx,
 				enum page_type type, int rw);
+void f2fs_submit_log_bio(struct f2fs_sb_info *sbi, enum page_type type, int rw);
+void f2fs_submit_meta_bio_cond(struct f2fs_sb_info *sbi,
+				struct inode *inode, nid_t ino, pgoff_t idx,
+				enum page_type type, int rw);
+void f2fs_submit_meta_bio(struct f2fs_sb_info *sbi,
+					enum page_type type, int rw);
 void f2fs_flush_merged_bios(struct f2fs_sb_info *sbi);
 int f2fs_submit_page_bio(struct f2fs_io_info *fio);
 int f2fs_submit_page_mbio(struct f2fs_io_info *fio);
