@@ -427,9 +427,7 @@ static int read_file_dma(struct seq_file *file, void *data)
 		seq_printf(file, "%d: %08x ", i, val[i]);
 	}
 
-	seq_puts(file, "\n\n");
-	seq_puts(file, "Num QCU: chain_st fsp_ok fsp_st DCU: chain_st\n");
-
+	seq_puts(file, "\n\nNum QCU: chain_st fsp_ok fsp_st DCU: chain_st\n");
 	for (i = 0; i < ATH9K_NUM_QUEUES; i++, qcuOffset += 4, dcuOffset += 5) {
 		if (i == 8) {
 			qcuOffset = 0;
@@ -448,9 +446,8 @@ static int read_file_dma(struct seq_file *file, void *data)
 			   (*dcuBase & (0x1f << dcuOffset)) >> dcuOffset);
 	}
 
-	seq_puts(file, "\n");
-
-	seq_printf(file, "qcu_stitch state:   %2x    qcu_fetch state:        %2x\n",
+	seq_printf(file,
+		   "\nqcu_stitch state:   %2x    qcu_fetch state:        %2x\n",
 		   (val[3] & 0x003c0000) >> 18, (val[3] & 0x03c00000) >> 22);
 	seq_printf(file, "qcu_complete state: %2x    dcu_complete state:     %2x\n",
 		   (val[3] & 0x1c000000) >> 26, (val[6] & 0x3));
