@@ -421,7 +421,7 @@ static int read_file_dma(struct seq_file *file, void *data)
 
 	for (i = 0; i < ATH9K_NUM_DMA_DEBUG_REGS; i++) {
 		if (i % 4 == 0)
-			seq_puts(file, "\n");
+			seq_putc(file, '\n');
 
 		val[i] = REG_READ_D(ah, AR_DMADBG_0 + (i * sizeof(u32)));
 		seq_printf(file, "%d: %08x ", i, val[i]);
@@ -702,8 +702,7 @@ static int read_file_misc(struct seq_file *file, void *data)
 	if (rxfilter & ATH9K_RX_FILTER_CONTROL_WRAPPER)
 		seq_puts(file, " CONTROL_WRAPPER");
 
-	seq_puts(file, "\n");
-
+	seq_putc(file, '\n');
 	reg = sc->sc_ah->imask;
 
 	seq_printf(file, "INTERRUPT-MASK: 0x%x", reg);
@@ -723,8 +722,7 @@ static int read_file_misc(struct seq_file *file, void *data)
 	if (reg & ATH9K_INT_BB_WATCHDOG)
 		seq_puts(file, " BB_WATCHDOG");
 
-	seq_puts(file, "\n");
-
+	seq_putc(file, '\n');
 	i = 0;
 	ath_for_each_chanctx(sc, ctx) {
 		if (list_empty(&ctx->vifs))
@@ -981,7 +979,7 @@ static int read_file_dump_nfcal(struct seq_file *file, void *data)
 		seq_printf(file, " %d\t %d\t %d\t\t", i, h[i].privNF, nread);
 		for (j = 0; j < nread; j++)
 			seq_printf(file, " %d", h[i].nfCalBuffer[j]);
-		seq_puts(file, "\n");
+		seq_putc(file, '\n');
 	}
 
 	return 0;
