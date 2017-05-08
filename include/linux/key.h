@@ -24,6 +24,7 @@
 #include <linux/atomic.h>
 #include <linux/assoc_array.h>
 #include <linux/refcount.h>
+#include <linux/path.h>
 
 #ifdef __KERNEL__
 #include <linux/uidgid.h>
@@ -92,7 +93,15 @@ struct keyring_index_key {
 
 union key_payload {
 	void __rcu		*rcu_data0;
-	void			*data[4];
+	union {
+		void		*data[4];
+		/* Layout of big_key payload words. */
+		struct {
+			u8		*key_data;
+			struct path	key_path;
+			size_t		key_len;
+		};
+	};
 };
 
 /*****************************************************************************/

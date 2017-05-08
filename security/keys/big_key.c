@@ -22,16 +22,6 @@
 #include <crypto/skcipher.h>
 
 /*
- * Layout of key payload words.
- */
-enum {
-	big_key_data,
-	big_key_path,
-	big_key_path_2nd_part,
-	big_key_len,
-};
-
-/*
  * Crypto operation with big_key data
  */
 enum big_key_op {
@@ -123,7 +113,7 @@ error:
  */
 int big_key_preparse(struct key_preparsed_payload *prep)
 {
-	struct path *path = (struct path *)&prep->payload.data[big_key_path];
+	struct path *path = &prep->payload.key_path;
 	struct file *file;
 	u8 *enckey;
 	u8 *data = NULL;
@@ -138,7 +128,7 @@ int big_key_preparse(struct key_preparsed_payload *prep)
 	/* Set an arbitrary quota */
 	prep->quotalen = 16;
 
-	prep->payload.data[big_key_len] = (void *)(unsigned long)datalen;
+	prep->payload.key_len = datalen;
 
 	if (datalen > BIG_KEY_FILE_THRESHOLD) {
 		/* Create a shmem file to store the data in.  This will permit the data
@@ -190,7 +180,7 @@ int big_key_preparse(struct key_preparsed_payload *prep)
 		/* Pin the mount and dentry to the key so that we can open it again
 		 * later
 		 */
-		prep->payload.data[big_key_data] = enckey;
+		prep->payload.key_data = enckey;
 		*path = file->f_path;
 		path_get(path);
 		fput(file);
@@ -202,7 +192,7 @@ int big_key_preparse(struct key_preparsed_payload *prep)
 		if (!data)
 			return -ENOMEM;
 
-		prep->payload.data[big_key_data] = data;
+		prep->payload.key_data = data;
 		memcpy(data, prep->data, prep->datalen);
 	}
 	return 0;
@@ -222,11 +212,11 @@ error:
 void big_key_free_preparse(struct key_preparsed_payload *prep)
 {
 	if (prep->datalen > BIG_KEY_FILE_THRESHOLD) {
-		struct path *path = (struct path *)&prep->payload.data[big_key_path];
+		struct path *path = &prep->payload.key_path;
 
 		path_put(path);
 	}
-	kfree(prep->payload.data[big_key_data]);
+	kfree(prep->payload.key_data);
 }
 
 /*
@@ -235,12 +225,12 @@ void big_key_free_preparse(struct key_preparsed_payload *prep)
  */
 void big_key_revoke(struct key *key)
 {
-	struct path *path = (struct path *)&key->payload.data[big_key_path];
+	struct path *path = &key->payload.key_path;
 
 	/* clear the quota */
 	key_payload_reserve(key, 0);
 	if (key_is_instantiated(key) &&
-	    (size_t)key->payload.data[big_key_len] > BIG_KEY_FILE_THRESHOLD)
+	    key->payload.key_len > BIG_KEY_FILE_THRESHOLD)
 		vfs_truncate(path, 0);
 }
 
@@ -249,17 +239,17 @@ void big_key_revoke(struct key *key)
  */
 void big_key_destroy(struct key *key)
 {
-	size_t datalen = (size_t)key->payload.data[big_key_len];
+	size_t datalen = key->payload.key_len;
 
 	if (datalen > BIG_KEY_FILE_THRESHOLD) {
-		struct path *path = (struct path *)&key->payload.data[big_key_path];
+		struct path *path = &key->payload.key_path;
 
 		path_put(path);
 		path->mnt = NULL;
 		path->dentry = NULL;
 	}
-	kfree(key->payload.data[big_key_data]);
-	key->payload.data[big_key_data] = NULL;
+	kfree(key->payload.key_data);
+	key->payload.key_data = NULL;
 }
 
 /*
@@ -267,7 +257,7 @@ void big_key_destroy(struct key *key)
  */
 void big_key_describe(const struct key *key, struct seq_file *m)
 {
-	size_t datalen = (size_t)key->payload.data[big_key_len];
+	size_t datalen = key->payload.key_len;
 
 	seq_puts(m, key->description);
 
@@ -283,17 +273,17 @@ void big_key_describe(const struct key *key, struct seq_file *m)
  */
 long big_key_read(const struct key *key, char __user *buffer, size_t buflen)
 {
-	size_t datalen = (size_t)key->payload.data[big_key_len];
+	size_t datalen = key->payload.key_len;
 	long ret;
 
 	if (!buffer || buflen < datalen)
 		return datalen;
 
 	if (datalen > BIG_KEY_FILE_THRESHOLD) {
-		struct path *path = (struct path *)&key->payload.data[big_key_path];
+		struct path *path = &key->payload.key_path;
 		struct file *file;
 		u8 *data;
-		u8 *enckey = (u8 *)key->payload.data[big_key_data];
+		u8 *enckey = key->payload.key_data;
 		size_t enclen = ALIGN(datalen, crypto_skcipher_blocksize(big_key_skcipher));
 
 		data = kmalloc(enclen, GFP_KERNEL);
@@ -329,8 +319,7 @@ error:
 		kfree(data);
 	} else {
 		ret = datalen;
-		if (copy_to_user(buffer, key->payload.data[big_key_data],
-				 datalen) != 0)
+		if (copy_to_user(buffer, key->payload.key_data, datalen) != 0)
 			ret = -EFAULT;
 	}
 
