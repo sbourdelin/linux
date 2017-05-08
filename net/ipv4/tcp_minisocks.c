@@ -85,8 +85,6 @@ tcp_timewait_check_oow_rate_limit(struct inet_timewait_sock *tw,
  * spinlock it. I do not want! Well, probability of misbehaviour
  * is ridiculously low and, seems, we could use some mb() tricks
  * to avoid misread sequence numbers, states etc.  --ANK
- *
- * We don't need to initialize tmp_out.sack_ok as we don't use the results
  */
 enum tcp_tw_status
 tcp_timewait_state_process(struct inet_timewait_sock *tw, struct sk_buff *skb,
@@ -96,7 +94,7 @@ tcp_timewait_state_process(struct inet_timewait_sock *tw, struct sk_buff *skb,
 	struct tcp_timewait_sock *tcptw = tcp_twsk((struct sock *)tw);
 	bool paws_reject = false;
 
-	tmp_opt.saw_tstamp = 0;
+	memset(&tmp_opt, 0, sizeof(tmp_opt));
 	if (th->doff > (sizeof(*th) >> 2) && tcptw->tw_ts_recent_stamp) {
 		tcp_parse_options(skb, &tmp_opt, 0, NULL);
 
@@ -542,8 +540,6 @@ EXPORT_SYMBOL(tcp_create_openreq_child);
  *
  * XXX (TFO) - The current impl contains a special check for ack
  * validation and inside tcp_v4_reqsk_send_ack(). Can we do better?
- *
- * We don't need to initialize tmp_opt.sack_ok as we don't use the results
  */
 
 struct sock *tcp_check_req(struct sock *sk, struct sk_buff *skb,
@@ -557,7 +553,7 @@ struct sock *tcp_check_req(struct sock *sk, struct sk_buff *skb,
 	bool paws_reject = false;
 	bool own_req;
 
-	tmp_opt.saw_tstamp = 0;
+	memset(&tmp_opt, 0, sizeof(tmp_opt));
 	if (th->doff > (sizeof(struct tcphdr)>>2)) {
 		tcp_parse_options(skb, &tmp_opt, 0, NULL);
 
