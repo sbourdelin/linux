@@ -464,7 +464,7 @@ static void mcp23s08_dbg_show(struct seq_file *s, struct gpio_chip *chip)
 			(mcp->cache[MCP_GPIO] & mask) ? "hi" : "lo",
 			(mcp->cache[MCP_GPPU] & mask) ? "up" : "  ");
 		/* NOTE:  ignoring the irq-related registers */
-		seq_puts(s, "\n");
+		seq_putc(s, '\n');
 	}
 done:
 	mutex_unlock(&mcp->lock);
