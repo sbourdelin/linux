@@ -212,8 +212,7 @@ u8 rtw_hal_antdiv_before_linked(struct adapter *Adapter)
 
 		rtw_antenna_select_cmd(Adapter, dm_swat_tbl->CurAntenna, false);
 		return true;
-	} else {
+	}
 		dm_swat_tbl->SWAS_NoLink_State = 0;
 		return false;
-	}
 }
