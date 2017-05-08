@@ -3176,6 +3176,7 @@ static void skl_detach_scaler(struct intel_crtc *intel_crtc, int id)
 static void skl_detach_scalers(struct intel_crtc *intel_crtc)
 {
 	struct intel_crtc_scaler_state *scaler_state;
+	struct drm_i915_private *dev_priv = to_i915(intel_crtc->base.dev);
 	int i;
 
 	scaler_state = &intel_crtc->config->scaler_state;
@@ -3184,6 +3185,14 @@ static void skl_detach_scalers(struct intel_crtc *intel_crtc)
 	for (i = 0; i < intel_crtc->num_scalers; i++) {
 		if (!scaler_state->scalers[i].in_use)
 			skl_detach_scaler(intel_crtc, i);
+	}
+
+	if (IS_GEMINILAKE(dev_priv)) {
+		u32 tmp;
+
+		tmp = I915_READ(CLKGATE_DIS_PSL(intel_crtc->pipe));
+		tmp &= ~DPF_GATING_DIS;
+		I915_WRITE(CLKGATE_DIS_PSL(intel_crtc->pipe), tmp);
 	}
 }
 
@@ -4762,6 +4771,14 @@ static void skylake_pfit_enable(struct intel_crtc *crtc)
 
 		if (WARN_ON(crtc->config->scaler_state.scaler_id < 0))
 			return;
+
+		if (IS_GEMINILAKE(dev_priv)) {
+			u32 tmp;
+
+			tmp = I915_READ(CLKGATE_DIS_PSL(crtc->pipe));
+			tmp |= DPF_GATING_DIS;
+			I915_WRITE(CLKGATE_DIS_PSL(crtc->pipe), tmp);
+		}
 
 		id = scaler_state->scaler_id;
 		I915_WRITE(SKL_PS_CTRL(pipe, id), PS_SCALER_EN |
