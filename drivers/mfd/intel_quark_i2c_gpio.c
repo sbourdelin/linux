@@ -72,6 +72,10 @@ static const struct i2c_mode_info platform_i2c_mode_info[] = {
 		.name = "GalileoGen2",
 		.i2c_scl_freq = 400000,
 	},
+	{
+		.name = "SIMATIC IOT2000",
+		.i2c_scl_freq = 400000,
+	},
 	{}
 };
 
