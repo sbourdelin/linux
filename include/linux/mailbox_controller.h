@@ -58,6 +58,7 @@ struct mbox_chan_ops {
  * @ops:		Operators that work on each communication chan
  * @chans:		Array of channels
  * @num_chans:		Number of channels in the 'chans' array.
+ * @txdone_none:	The controller has no sense of TX done
  * @txdone_irq:		Indicates if the controller can report to API when
  *			the last transmitted data was read by the remote.
  *			Eg, if it has some TX ACK irq.
@@ -78,6 +79,7 @@ struct mbox_controller {
 	int num_chans;
 	bool txdone_irq;
 	bool txdone_poll;
+	bool txdone_none;
 	unsigned txpoll_period;
 	struct mbox_chan *(*of_xlate)(struct mbox_controller *mbox,
 				      const struct of_phandle_args *sp);

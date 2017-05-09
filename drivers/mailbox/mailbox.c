@@ -453,6 +453,8 @@ int mbox_controller_register(struct mbox_controller *mbox)
 		txdone = TXDONE_BY_IRQ;
 	else if (mbox->txdone_poll)
 		txdone = TXDONE_BY_POLL;
+	else if (mbox->txdone_none)
+		txdone = TXDONE_NONE;
 	else /* It has to be ACK then */
 		txdone = TXDONE_BY_ACK;
 
