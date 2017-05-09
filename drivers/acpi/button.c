@@ -348,7 +348,12 @@ int acpi_lid_notifier_unregister(struct notifier_block *nb)
 }
 EXPORT_SYMBOL(acpi_lid_notifier_unregister);
 
-int acpi_lid_open(void)
+/*
+ * The intentional usage model is to register a lid notifier and use the
+ * notified value instead. Directly evaluating _LID without seeing a
+ * Notify(lid, 0x80) is not reliable.
+ */
+int __deprecated acpi_lid_open(void)
 {
 	if (!lid_device)
 		return -ENODEV;
