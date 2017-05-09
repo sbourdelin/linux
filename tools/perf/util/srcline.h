@@ -13,6 +13,7 @@ char *get_srcline(struct dso *dso, u64 addr, struct symbol *sym,
 char *__get_srcline(struct dso *dso, u64 addr, struct symbol *sym,
 		  bool show_sym, bool show_addr, bool unwind_inlines);
 void free_srcline(char *srcline);
+char *get_srcline_split(struct dso *dso, u64 addr, unsigned *line);
 
 #define SRCLINE_UNKNOWN  ((char *) "??:0")
 
