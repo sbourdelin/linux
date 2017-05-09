@@ -1073,9 +1073,7 @@ static enum print_line_t trace_stack_print(struct trace_iterator *iter,
 		if (trace_seq_has_overflowed(s))
 			break;
 
-		trace_seq_puts(s, " => ");
-		seq_print_ip_sym(s, *p, flags);
-		trace_seq_putc(s, '\n');
+		trace_seq_printf(s, " => %pF\n", (void *) *p);
 	}
 
 	return trace_handle_return(s);
