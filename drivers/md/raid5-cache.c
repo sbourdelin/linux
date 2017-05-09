@@ -622,20 +622,29 @@ static void r5l_do_submit_io(struct r5l_log *log, struct r5l_io_unit *io)
 	__r5l_set_io_unit_state(io, IO_UNIT_IO_START);
 	spin_unlock_irqrestore(&log->io_list_lock, flags);
 
+	/*
+	 * In case of journal device failures, submit_bio will get error
+	 * and calls endio, then active stripes will continue write
+	 * process. Therefore, it is not necessary to check Faulty bit
+	 * of journal device here.
+	 *
+	 * However, calling r5l_log_endio for current_bio may free the
+	 * io_unit. Therefore, it is necessary to check io->split_bio
+	 * before submitting io->current_bio.
+	 */
+	if (io->split_bio) {
+		if (io->has_flush)
+			io->split_bio->bi_opf |= REQ_PREFLUSH;
+		if (io->has_fua)
+			io->split_bio->bi_opf |= REQ_FUA;
+		submit_bio(io->split_bio);
+	}
+
 	if (io->has_flush)
 		io->current_bio->bi_opf |= REQ_PREFLUSH;
 	if (io->has_fua)
 		io->current_bio->bi_opf |= REQ_FUA;
 	submit_bio(io->current_bio);
-
-	if (!io->split_bio)
-		return;
-
-	if (io->has_flush)
-		io->split_bio->bi_opf |= REQ_PREFLUSH;
-	if (io->has_fua)
-		io->split_bio->bi_opf |= REQ_FUA;
-	submit_bio(io->split_bio);
 }
 
 /* deferred io_unit will be dispatched here */
