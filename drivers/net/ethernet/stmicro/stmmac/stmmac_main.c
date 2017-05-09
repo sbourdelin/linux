@@ -3748,11 +3748,11 @@ static int stmmac_sysfs_ring_read(struct seq_file *seq, void *v)
 		seq_printf(seq, "RX Queue %d:\n", queue);
 
 		if (priv->extend_desc) {
-			seq_printf(seq, "Extended descriptor ring:\n");
+			seq_puts(seq, "Extended descriptor ring:\n");
 			sysfs_display_ring((void *)rx_q->dma_erx,
 					   DMA_RX_SIZE, 1, seq);
 		} else {
-			seq_printf(seq, "Descriptor ring:\n");
+			seq_puts(seq, "Descriptor ring:\n");
 			sysfs_display_ring((void *)rx_q->dma_rx,
 					   DMA_RX_SIZE, 0, seq);
 		}
@@ -3764,11 +3764,11 @@ static int stmmac_sysfs_ring_read(struct seq_file *seq, void *v)
 		seq_printf(seq, "TX Queue %d:\n", queue);
 
 		if (priv->extend_desc) {
-			seq_printf(seq, "Extended descriptor ring:\n");
+			seq_puts(seq, "Extended descriptor ring:\n");
 			sysfs_display_ring((void *)tx_q->dma_etx,
 					   DMA_TX_SIZE, 1, seq);
 		} else {
-			seq_printf(seq, "Descriptor ring:\n");
+			seq_puts(seq, "Descriptor ring:\n");
 			sysfs_display_ring((void *)tx_q->dma_tx,
 					   DMA_TX_SIZE, 0, seq);
 		}
@@ -3798,7 +3798,7 @@ static int stmmac_sysfs_dma_cap_read(struct seq_file *seq, void *v)
 	struct stmmac_priv *priv = netdev_priv(dev);
 
 	if (!priv->hw_cap_support) {
-		seq_printf(seq, "DMA HW features not supported\n");
+		seq_puts(seq, "DMA HW features not supported\n");
 		return 0;
 	}
 
