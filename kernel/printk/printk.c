@@ -49,6 +49,7 @@
 #include <linux/sched/debug.h>
 #include <linux/sched/task_stack.h>
 #include <linux/kthread.h>
+#include <uapi/linux/sched/types.h>
 
 #include <linux/uaccess.h>
 #include <asm/sections.h>
@@ -2926,6 +2927,43 @@ static DEFINE_PER_CPU(struct irq_work, wake_up_klogd_work) = {
 	.func = wake_up_klogd_work_func,
 	.flags = IRQ_WORK_LAZY,
 };
+
+static int printk_kthread_func(void *data)
+{
+	while (1) {
+		set_current_state(TASK_INTERRUPTIBLE);
+		if (!test_bit(PRINTK_PENDING_OUTPUT, &printk_pending))
+			schedule();
+
+		__set_current_state(TASK_RUNNING);
+
+		console_lock();
+		console_unlock();
+	}
+
+	return 0;
+}
+
+/*
+ * Init printk kthread at late_initcall stage, after core/arch/device/etc.
+ * initialization.
+ */
+static int __init init_printk_kthread(void)
+{
+	struct task_struct *thread;
+	struct sched_param param = { .sched_priority = MAX_USER_RT_PRIO / 2 };
+
+	thread = kthread_run(printk_kthread_func, NULL, "printk");
+	if (IS_ERR(thread)) {
+		pr_err("printk: unable to create printing thread\n");
+		return PTR_ERR(thread);
+	}
+
+	sched_setscheduler(thread, SCHED_FIFO, &param);
+	printk_kthread = thread;
+	return 0;
+}
+late_initcall(init_printk_kthread);
 
 void wake_up_klogd(void)
 {
