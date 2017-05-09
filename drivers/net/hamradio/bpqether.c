@@ -185,7 +185,8 @@ static int bpq_rcv(struct sk_buff *skb, struct net_device *dev, struct packet_ty
 	if (!net_eq(dev_net(dev), &init_net))
 		goto drop;
 
-	if ((skb = skb_share_check(skb, GFP_ATOMIC)) == NULL)
+	skb = skb_share_check(skb, GFP_ATOMIC);
+	if (!skb)
 		return NET_RX_DROP;
 
 	if (!pskb_may_pull(skb, sizeof(struct ethhdr)))
@@ -286,7 +287,8 @@ static netdev_tx_t bpq_xmit(struct sk_buff *skb, struct net_device *dev)
 	bpq = netdev_priv(dev);
 
 	orig_dev = dev;
-	if ((dev = bpq_get_ether_dev(dev)) == NULL) {
+	dev = bpq_get_ether_dev(dev);
+	if (!dev) {
 		orig_dev->stats.tx_dropped++;
 		kfree_skb(skb);
 		return NETDEV_TX_OK;
@@ -565,12 +567,14 @@ static int bpq_device_event(struct notifier_block *this,
 		break;
 
 	case NETDEV_DOWN:	/* ethernet device closed -> close BPQ interface */
-		if ((dev = bpq_get_ax25_dev(dev)) != NULL)
+		dev = bpq_get_ax25_dev(dev);
+		if (dev)
 			dev_close(dev);
 		break;
 
 	case NETDEV_UNREGISTER:	/* ethernet device removed -> free BPQ interface */
-		if ((dev = bpq_get_ax25_dev(dev)) != NULL)
+		dev = bpq_get_ax25_dev(dev);
+		if (dev)
 			bpq_free_device(dev);
 		break;
 	default:
