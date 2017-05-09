@@ -23,6 +23,7 @@
 #include <linux/export.h>
 #include <drm/drmP.h>
 #include <drm/drm_encoder.h>
+#include <drm/drm_modeset_helper_vtables.h>
 
 #include "drm_crtc_internal.h"
 
@@ -239,3 +240,25 @@ int drm_mode_getencoder(struct drm_device *dev, void *data,
 
 	return 0;
 }
+
+/**
+ * drm_encoder_mode_valid - call encoder->mode_valid callback, if any.
+ * @encoder: encoder
+ * @mode: mode to be validated
+ *
+ * If no mode_valid callback is available this will return MODE_OK.
+ *
+ * Returns: drm_mode_status Enum
+ */
+enum drm_mode_status drm_encoder_mode_valid(struct drm_encoder *encoder,
+					    const struct drm_display_mode *mode)
+{
+	const struct drm_encoder_helper_funcs *encoder_funcs =
+		encoder->helper_private;
+
+	if (!encoder_funcs || !encoder_funcs->mode_valid)
+		return MODE_OK;
+
+	return encoder_funcs->mode_valid(encoder, mode);
+}
+EXPORT_SYMBOL(drm_encoder_mode_valid);

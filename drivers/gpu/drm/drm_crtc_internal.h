@@ -129,6 +129,8 @@ int drm_mode_obj_set_property_ioctl(struct drm_device *dev, void *data,
 /* drm_encoder.c */
 int drm_encoder_register_all(struct drm_device *dev);
 void drm_encoder_unregister_all(struct drm_device *dev);
+enum drm_mode_status drm_encoder_mode_valid(struct drm_encoder *encoder,
+					    const struct drm_display_mode *mode);
 
 /* IOCTL */
 int drm_mode_getencoder(struct drm_device *dev,
