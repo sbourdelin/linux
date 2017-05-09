@@ -778,6 +778,8 @@ struct acpi_iort_smmu {
 #define ACPI_IORT_SMMU_CORELINK_MMU400  0x00000002	/* ARM Corelink MMU-400 */
 #define ACPI_IORT_SMMU_CORELINK_MMU500  0x00000003	/* ARM Corelink MMU-500 */
 
+#define ACPI_IORT_SMMU_V3_CAVIUM_CN99XX 0x00000002 /* Cavium ThunderX2 SMMUv3 */
+
 /* Masks for Flags field above */
 
 #define ACPI_IORT_SMMU_DVM_SUPPORTED    (1)
