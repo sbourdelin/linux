@@ -66,6 +66,12 @@ MODULE_LICENSE("GPL");
 MODULE_DESCRIPTION("Broadcom BCM573xx network driver");
 MODULE_VERSION(DRV_MODULE_VERSION);
 
+#ifdef CONFIG_SPARC
+#define BNXT_DMA_ATTRS  DMA_ATTR_WEAK_ORDERING
+#else
+#define BNXT_DMA_ATTRS	0
+#endif
+
 #define BNXT_RX_OFFSET (NET_SKB_PAD + NET_IP_ALIGN)
 #define BNXT_RX_DMA_OFFSET NET_SKB_PAD
 #define BNXT_RX_COPY_THRESH 256
@@ -582,7 +588,8 @@ static struct page *__bnxt_alloc_rx_page(struct bnxt *bp, dma_addr_t *mapping,
 	if (!page)
 		return NULL;
 
-	*mapping = dma_map_page(dev, page, 0, PAGE_SIZE, bp->rx_dir);
+	*mapping = dma_map_page_attrs(dev, page, 0, PAGE_SIZE, bp->rx_dir,
+				      BNXT_DMA_ATTRS);
 	if (dma_mapping_error(dev, *mapping)) {
 		__free_page(page);
 		return NULL;
@@ -601,8 +608,9 @@ static inline u8 *__bnxt_alloc_rx_data(struct bnxt *bp, dma_addr_t *mapping,
 	if (!data)
 		return NULL;
 
-	*mapping = dma_map_single(&pdev->dev, data + bp->rx_dma_offset,
-				  bp->rx_buf_use_size, bp->rx_dir);
+	*mapping = dma_map_single_attrs(&pdev->dev, data + bp->rx_dma_offset,
+					bp->rx_buf_use_size, bp->rx_dir,
+					BNXT_DMA_ATTRS);
 
 	if (dma_mapping_error(&pdev->dev, *mapping)) {
 		kfree(data);
@@ -705,8 +713,9 @@ static inline int bnxt_alloc_rx_page(struct bnxt *bp,
 			return -ENOMEM;
 	}
 
-	mapping = dma_map_page(&pdev->dev, page, offset, BNXT_RX_PAGE_SIZE,
-			       PCI_DMA_FROMDEVICE);
+	mapping = dma_map_page_attrs(&pdev->dev, page, offset,
+				     BNXT_RX_PAGE_SIZE, PCI_DMA_FROMDEVICE,
+				     BNXT_DMA_ATTRS);
 	if (dma_mapping_error(&pdev->dev, mapping)) {
 		__free_page(page);
 		return -EIO;
@@ -799,7 +808,8 @@ static struct sk_buff *bnxt_rx_page_skb(struct bnxt *bp,
 		return NULL;
 	}
 	dma_addr -= bp->rx_dma_offset;
-	dma_unmap_page(&bp->pdev->dev, dma_addr, PAGE_SIZE, bp->rx_dir);
+	dma_unmap_page_attrs(&bp->pdev->dev, dma_addr, PAGE_SIZE, bp->rx_dir,
+			     BNXT_DMA_ATTRS);
 
 	if (unlikely(!payload))
 		payload = eth_get_headlen(data_ptr, len);
@@ -841,8 +851,8 @@ static struct sk_buff *bnxt_rx_skb(struct bnxt *bp,
 	}
 
 	skb = build_skb(data, 0);
-	dma_unmap_single(&bp->pdev->dev, dma_addr, bp->rx_buf_use_size,
-			 bp->rx_dir);
+	dma_unmap_single_attrs(&bp->pdev->dev, dma_addr, bp->rx_buf_use_size,
+			       bp->rx_dir, BNXT_DMA_ATTRS);
 	if (!skb) {
 		kfree(data);
 		return NULL;
@@ -909,8 +919,8 @@ static struct sk_buff *bnxt_rx_pages(struct bnxt *bp, struct bnxt_napi *bnapi,
 			return NULL;
 		}
 
-		dma_unmap_page(&pdev->dev, mapping, BNXT_RX_PAGE_SIZE,
-			       PCI_DMA_FROMDEVICE);
+		dma_unmap_page_attrs(&pdev->dev, mapping, BNXT_RX_PAGE_SIZE,
+				     PCI_DMA_FROMDEVICE, BNXT_DMA_ATTRS);
 
 		skb->data_len += frag_len;
 		skb->len += frag_len;
@@ -1329,8 +1339,9 @@ static inline struct sk_buff *bnxt_tpa_end(struct bnxt *bp,
 		tpa_info->mapping = new_mapping;
 
 		skb = build_skb(data, 0);
-		dma_unmap_single(&bp->pdev->dev, mapping, bp->rx_buf_use_size,
-				 bp->rx_dir);
+		dma_unmap_single_attrs(&bp->pdev->dev, mapping,
+				       bp->rx_buf_use_size, bp->rx_dir,
+				       BNXT_DMA_ATTRS);
 
 		if (!skb) {
 			kfree(data);
@@ -1971,9 +1982,11 @@ static void bnxt_free_rx_skbs(struct bnxt *bp)
 				if (!data)
 					continue;
 
-				dma_unmap_single(&pdev->dev, tpa_info->mapping,
-						 bp->rx_buf_use_size,
-						 bp->rx_dir);
+				dma_unmap_single_attrs(&pdev->dev,
+						       tpa_info->mapping,
+						       bp->rx_buf_use_size,
+						       bp->rx_dir,
+						       BNXT_DMA_ATTRS);
 
 				tpa_info->data = NULL;
 
@@ -1993,13 +2006,15 @@ static void bnxt_free_rx_skbs(struct bnxt *bp)
 
 			if (BNXT_RX_PAGE_MODE(bp)) {
 				mapping -= bp->rx_dma_offset;
-				dma_unmap_page(&pdev->dev, mapping,
-					       PAGE_SIZE, bp->rx_dir);
+				dma_unmap_page_attrs(&pdev->dev, mapping,
+						     PAGE_SIZE, bp->rx_dir,
+						     BNXT_DMA_ATTRS);
 				__free_page(data);
 			} else {
-				dma_unmap_single(&pdev->dev, mapping,
-						 bp->rx_buf_use_size,
-						 bp->rx_dir);
+				dma_unmap_single_attrs(&pdev->dev, mapping,
+						       bp->rx_buf_use_size,
+						       bp->rx_dir,
+						       BNXT_DMA_ATTRS);
 				kfree(data);
 			}
 		}
@@ -2012,8 +2027,10 @@ static void bnxt_free_rx_skbs(struct bnxt *bp)
 			if (!page)
 				continue;
 
-			dma_unmap_page(&pdev->dev, rx_agg_buf->mapping,
-				       BNXT_RX_PAGE_SIZE, PCI_DMA_FROMDEVICE);
+			dma_unmap_page_attrs(&pdev->dev, rx_agg_buf->mapping,
+					     BNXT_RX_PAGE_SIZE,
+					     PCI_DMA_FROMDEVICE,
+					     BNXT_DMA_ATTRS);
 
 			rx_agg_buf->page = NULL;
 			__clear_bit(j, rxr->rx_agg_bmap);
