@@ -31,9 +31,20 @@ const struct file_operations afs_mntpt_file_operations = {
 	.llseek		= noop_llseek,
 };
 
+static int afs_mntpt_readlink(struct dentry *dentry, char __user *buffer,
+		int buflen)
+{
+	DEFINE_DELAYED_CALL(done);
+	int res = readlink_copy(buffer, buflen,
+				page_get_link(dentry, d_inode(dentry),
+					      &done));
+	do_delayed_call(&done);
+	return res;
+}
+
 const struct inode_operations afs_mntpt_inode_operations = {
 	.lookup		= afs_mntpt_lookup,
-	.readlink	= page_readlink,
+	.readlink	= afs_mntpt_readlink,
 	.getattr	= afs_getattr,
 };
 
