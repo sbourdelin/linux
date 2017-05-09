@@ -35,7 +35,7 @@ static inline int should_deliver(const struct net_bridge_port *p,
 
 int br_dev_queue_push_xmit(struct net *net, struct sock *sk, struct sk_buff *skb)
 {
-	if (!is_skb_forwardable(skb->dev, skb))
+	if (!is_skb_forwardable(skb->dev, skb, 0))
 		goto drop;
 
 	skb_push(skb, ETH_HLEN);
@@ -96,7 +96,7 @@ static void __br_forward(const struct net_bridge_port *to,
 		net = dev_net(indev);
 	} else {
 		if (unlikely(netpoll_tx_running(to->br->dev))) {
-			if (!is_skb_forwardable(skb->dev, skb)) {
+			if (!is_skb_forwardable(skb->dev, skb, skb->dev_mtu)) {
 				kfree_skb(skb);
 			} else {
 				skb_push(skb, ETH_HLEN);

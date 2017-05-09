@@ -172,7 +172,7 @@ static void l2tp_eth_dev_recv(struct l2tp_session *session, struct sk_buff *skb,
 	skb_dst_drop(skb);
 	nf_reset(skb);
 
-	if (dev_forward_skb(dev, skb) == NET_RX_SUCCESS) {
+	if (dev_forward_skb(dev, skb, 0) == NET_RX_SUCCESS) {
 		atomic_long_inc(&priv->rx_packets);
 		atomic_long_add(data_len, &priv->rx_bytes);
 	} else {

@@ -1768,14 +1768,18 @@ static inline void net_timestamp_set(struct sk_buff *skb)
 			__net_timestamp(SKB);		\
 	}						\
 
-bool is_skb_forwardable(const struct net_device *dev, const struct sk_buff *skb)
+bool is_skb_forwardable(const struct net_device *dev,
+			const struct sk_buff *skb, int mtu)
 {
 	unsigned int len;
 
 	if (!(dev->flags & IFF_UP))
 		return false;
 
-	len = dev->mtu + dev->hard_header_len + VLAN_HLEN;
+	if (mtu == 0)
+		mtu = dev->mtu;
+
+	len = mtu + dev->hard_header_len + VLAN_HLEN;
 	if (skb->len <= len)
 		return true;
 
@@ -1789,9 +1793,9 @@ bool is_skb_forwardable(const struct net_device *dev, const struct sk_buff *skb)
 }
 EXPORT_SYMBOL_GPL(is_skb_forwardable);
 
-int __dev_forward_skb(struct net_device *dev, struct sk_buff *skb)
+int __dev_forward_skb(struct net_device *dev, struct sk_buff *skb, int mtu)
 {
-	int ret = ____dev_forward_skb(dev, skb);
+	int ret = ____dev_forward_skb(dev, skb, mtu);
 
 	if (likely(!ret)) {
 		skb->protocol = eth_type_trans(skb, dev);
@@ -1807,6 +1811,7 @@ EXPORT_SYMBOL_GPL(__dev_forward_skb);
  *
  * @dev: destination network device
  * @skb: buffer to forward
+ * @mtu: Maximum size to forward. If 0 dev->mtu is used.
  *
  * return values:
  *	NET_RX_SUCCESS	(no congestion)
@@ -1820,9 +1825,9 @@ EXPORT_SYMBOL_GPL(__dev_forward_skb);
  * we have to clear all information in the skb that could
  * impact namespace isolation.
  */
-int dev_forward_skb(struct net_device *dev, struct sk_buff *skb)
+int dev_forward_skb(struct net_device *dev, struct sk_buff *skb, int mtu)
 {
-	return __dev_forward_skb(dev, skb) ?: netif_rx_internal(skb);
+	return __dev_forward_skb(dev, skb, mtu) ?: netif_rx_internal(skb);
 }
 EXPORT_SYMBOL_GPL(dev_forward_skb);
 
