@@ -3090,6 +3090,8 @@ static void tpacpi_send_radiosw_update(void)
 
 static void hotkey_exit(void)
 {
+	int res;
+
 #ifdef CONFIG_THINKPAD_ACPI_HOTKEY_POLL
 	mutex_lock(&hotkey_mutex);
 	hotkey_poll_stop_sync();
@@ -3101,11 +3103,8 @@ static void hotkey_exit(void)
 
 	dbg_printk(TPACPI_DBG_EXIT | TPACPI_DBG_HKEY,
 		   "restoring original HKEY status and mask\n");
-	/* yes, there is a bitwise or below, we want the
-	 * functions to be called even if one of them fail */
-	if (((tp_features.hotkey_mask &&
-	      hotkey_mask_set(hotkey_orig_mask)) |
-	     hotkey_status_set(false)) != 0)
+	res = tp_features.hotkey_mask ? hotkey_mask_set(hotkey_orig_mask) : 0;
+	if (hotkey_status_set(false) || res)
 		pr_err("failed to restore hot key mask "
 		       "to BIOS defaults\n");
 }
