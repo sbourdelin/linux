@@ -3802,10 +3802,10 @@ static int stmmac_sysfs_dma_cap_read(struct seq_file *seq, void *v)
 		return 0;
 	}
 
-	seq_printf(seq, "==============================\n");
-	seq_printf(seq, "\tDMA HW features\n");
-	seq_printf(seq, "==============================\n");
-
+	seq_puts(seq,
+		 "==============================\n"
+		 "\tDMA HW features\n"
+		 "==============================\n");
 	seq_printf(seq, "\t10/100 Mbps: %s\n",
 		   (priv->dma_cap.mbps_10_100) ? "Y" : "N");
 	seq_printf(seq, "\t1000 Mbps: %s\n",
