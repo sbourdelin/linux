@@ -55,8 +55,7 @@ static int rpc_proc_show(struct seq_file *seq, void *v) {
 		seq_printf(seq, "proc%u %u",
 					vers->number, vers->nrprocs);
 		for (j = 0; j < vers->nrprocs; j++)
-			seq_printf(seq, " %u",
-					vers->procs[j].p_count);
+			seq_printf(seq, " %u", 0);
 		seq_putc(seq, '\n');
 	}
 	return 0;

@@ -1532,7 +1532,6 @@ call_start(struct rpc_task *task)
 			(RPC_IS_ASYNC(task) ? "async" : "sync"));
 
 	/* Increment call count */
-	task->tk_msg.rpc_proc->p_count++;
 	clnt->cl_stats->rpccnt++;
 	task->tk_action = call_reserve;
 }
