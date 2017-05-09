@@ -53,10 +53,14 @@ enum {
  * @duty_cycle: PWM duty cycle (in nanoseconds)
  * @polarity: PWM polarity
  * @enabled: PWM enabled status
+ * @deadtime_re: PWM rising edge deadtime
+ * @deadtime_fe: PWM falling edge deadtime
  */
 struct pwm_state {
 	unsigned int period;
 	unsigned int duty_cycle;
+	unsigned int deadtime_re;
+	unsigned int deadtime_fe;
 	enum pwm_polarity polarity;
 	bool enabled;
 };
@@ -143,6 +147,36 @@ static inline enum pwm_polarity pwm_get_polarity(const struct pwm_device *pwm)
 	return state.polarity;
 }
 
+static inline void pwm_set_deadtime_re(struct pwm_device *pwm, unsigned int dt)
+{
+	if (pwm)
+		pwm->state.deadtime_re = dt;
+}
+
+static inline unsigned int pwm_get_deadtime_re(const struct pwm_device *pwm)
+{
+	struct pwm_state state;
+
+	pwm_get_state(pwm, &state);
+
+	return state.deadtime_re;
+}
+
+static inline void pwm_set_deadtime_fe(struct pwm_device *pwm, unsigned int dt)
+{
+	if (pwm)
+		pwm->state.deadtime_fe = dt;
+}
+
+static inline unsigned int pwm_get_deadtime_fe(const struct pwm_device *pwm)
+{
+	struct pwm_state state;
+
+	pwm_get_state(pwm, &state);
+
+	return state.deadtime_fe;
+}
+
 static inline void pwm_get_args(const struct pwm_device *pwm,
 				struct pwm_args *args)
 {
@@ -180,6 +214,8 @@ static inline void pwm_init_state(const struct pwm_device *pwm,
 	state->period = args.period;
 	state->polarity = args.polarity;
 	state->duty_cycle = 0;
+	state->deadtime_re = 0;
+	state->deadtime_fe = 0;
 }
 
 /**

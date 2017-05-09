@@ -469,7 +469,8 @@ int pwm_apply_state(struct pwm_device *pwm, struct pwm_state *state)
 	int err;
 
 	if (!pwm || !state || !state->period ||
-	    state->duty_cycle > state->period)
+	    state->duty_cycle > state->period ||
+	    state->deadtime_re + state->deadtime_fe > state->period)
 		return -EINVAL;
 
 	if (!memcmp(state, &pwm->state, sizeof(*state)))
@@ -578,6 +579,9 @@ int pwm_adjust_config(struct pwm_device *pwm)
 
 	pwm_get_args(pwm, &pargs);
 	pwm_get_state(pwm, &state);
+
+	state.deadtime_re = 0;
+	state.deadtime_fe = 0;
 
 	/*
 	 * If the current period is zero it means that either the PWM driver
@@ -997,6 +1001,10 @@ static void pwm_dbg_show(struct pwm_chip *chip, struct seq_file *s)
 		seq_printf(s, " duty: %u ns", state.duty_cycle);
 		seq_printf(s, " polarity: %s",
 			   state.polarity ? "inverse" : "normal");
+		seq_printf(s, " dead-time rising edge: %u ns",
+			   state.deadtime_re);
+		seq_printf(s, " dead-time falling edge: %u ns",
+			   state.deadtime_fe);
 
 		seq_puts(s, "\n");
 	}
