@@ -830,8 +830,7 @@ static int yam_seq_show(struct seq_file *seq, void *v)
 	seq_printf(seq, "  RxFrames %lu\n", dev->stats.rx_packets);
 	seq_printf(seq, "  TxInt    %u\n", yp->nb_mdint);
 	seq_printf(seq, "  RxInt    %u\n", yp->nb_rxint);
-	seq_printf(seq, "  RxOver   %lu\n", dev->stats.rx_fifo_errors);
-	seq_printf(seq, "\n");
+	seq_printf(seq, "  RxOver   %lu\n\n", dev->stats.rx_fifo_errors);
 	return 0;
 }
 
