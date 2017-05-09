@@ -30,7 +30,7 @@
  * Declare these symbols weak so that if architecture provides a purgatory,
  * these will be overridden.
  */
-char __weak kexec_purgatory[0];
+void * __weak kexec_purgatory;
 size_t __weak kexec_purgatory_size = 0;
 
 static int kexec_calculate_store_digests(struct kimage *image);
