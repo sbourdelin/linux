@@ -24,6 +24,7 @@
 #include <drm/drm_connector.h>
 #include <drm/drm_edid.h>
 #include <drm/drm_encoder.h>
+#include <drm/drm_modeset_helper_vtables.h>
 
 #include "drm_crtc_internal.h"
 #include "drm_internal.h"
@@ -1418,3 +1419,25 @@ struct drm_tile_group *drm_mode_create_tile_group(struct drm_device *dev,
 	return tg;
 }
 EXPORT_SYMBOL(drm_mode_create_tile_group);
+
+/**
+ * drm_connector_mode_valid - call connector->mode_valid callback, if any.
+ * @connector: connector
+ * @mode: mode to be validated
+ *
+ * If no mode_valid callback is available this will return MODE_OK.
+ *
+ * Returns: drm_mode_status Enum
+ */
+enum drm_mode_status drm_connector_mode_valid(struct drm_connector *connector,
+					      struct drm_display_mode *mode)
+{
+	const struct drm_connector_helper_funcs *connector_funcs =
+		connector->helper_private;
+
+	if (!connector_funcs || !connector_funcs->mode_valid)
+		return MODE_OK;
+
+	return connector_funcs->mode_valid(connector, mode);
+}
+EXPORT_SYMBOL(drm_connector_mode_valid);
