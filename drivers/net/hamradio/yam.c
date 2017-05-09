@@ -401,7 +401,8 @@ static unsigned char *add_mcs(unsigned char *bits, int bitrate,
 	}
 
 	/* Allocate a new mcs */
-	if ((p = kmalloc(sizeof(struct yam_mcs), GFP_KERNEL)) == NULL) {
+	p = kmalloc(sizeof(*p), GFP_KERNEL);
+	if (!p) {
 		release_firmware(fw);
 		return NULL;
 	}
@@ -549,7 +550,8 @@ static inline void yam_rx_flag(struct net_device *dev, struct yam_port *yp)
 		if ((yp->rx_crch & yp->rx_crcl) != 0xFF) {
 			/* Bad crc */
 		} else {
-			if (!(skb = dev_alloc_skb(pkt_len))) {
+			skb = dev_alloc_skb(pkt_len);
+			if (!skb) {
 				printk(KERN_WARNING "%s: memory squeeze, dropping packet\n", dev->name);
 				++dev->stats.rx_dropped;
 			} else {
@@ -670,7 +672,8 @@ static void yam_tx_byte(struct net_device *dev, struct yam_port *yp)
 		break;
 	case TX_HEAD:
 		if (--yp->tx_count <= 0) {
-			if (!(skb = skb_dequeue(&yp->send_queue))) {
+			skb = skb_dequeue(&yp->send_queue);
+			if (!skb) {
 				ptt_off(dev);
 				yp->tx_state = TX_OFF;
 				break;
@@ -879,7 +882,8 @@ static int yam_open(struct net_device *dev)
 		printk(KERN_ERR "%s: cannot 0x%lx busy\n", dev->name, dev->base_addr);
 		return -EACCES;
 	}
-	if ((u = yam_check_uart(dev->base_addr)) == c_uart_unknown) {
+	u = yam_check_uart(dev->base_addr);
+	if (u == c_uart_unknown) {
 		printk(KERN_ERR "%s: cannot find uart type\n", dev->name);
 		ret = -EIO;
 		goto out_release_base;
