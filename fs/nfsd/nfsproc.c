@@ -743,12 +743,12 @@ static const struct svc_procedure nfsd_procedures2[18] = {
 };
 
 
-struct svc_version	nfsd_version2 = {
-		.vs_vers	= 2,
-		.vs_nproc	= 18,
-		.vs_proc	= nfsd_procedures2,
-		.vs_dispatch	= nfsd_dispatch,
-		.vs_xdrsize	= NFS2_SVC_XDRSIZE,
+const struct svc_version nfsd_version2 = {
+	.vs_vers	= 2,
+	.vs_nproc	= 18,
+	.vs_proc	= nfsd_procedures2,
+	.vs_dispatch	= nfsd_dispatch,
+	.vs_xdrsize	= NFS2_SVC_XDRSIZE,
 };
 
 /*
