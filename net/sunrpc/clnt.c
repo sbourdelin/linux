@@ -2489,7 +2489,8 @@ static void rpcproc_encode_null(struct rpc_rqst *rqstp, struct xdr_stream *xdr,
 {
 }
 
-static int rpcproc_decode_null(void *rqstp, struct xdr_stream *xdr, void *obj)
+static int rpcproc_decode_null(struct rpc_rqst *rqstp, struct xdr_stream *xdr,
+		void *obj)
 {
 	return 0;
 }
