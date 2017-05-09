@@ -1,0 +1,63 @@
+* Device tree bindings for Maxim/Dallas DS1374 Multi Function Device (MFD)
+
+The Maxim/Dallas DS1374 is a multi function device that combines rtc,
+watchdog or alarm, as well as trickle charger.
+
+The DS1374 is connected via I2C.
+
+Required properties:
+- compatible: "dallas,ds1374"
+- reg: I2C slave address
+- dallas,ds1374-mode: Should be one of the following values:
+			<0> for RTC
+			<1> for RTC + Alarm (Interrupt)
+			<2> for RTC + Watchdog
+
+Required child:
+A single available child device of type matching the "dallas,ds1374-mode"
+property.
+
+Optional properties (watchdog):
+- dallas,ds1374-remap-wdt-reset: Boolean describing whether the INT pin
+				 on the device is used as interrupt for
+				 the alarm
+
+See ../watchdog/* for generic watchdog bindings.
+
+Optional properties (real time clock):
+- interrupt: phandle to interrupt cell for the rtc's alarm feature
+
+See ../rtc/* for generic rtc bindings.
+
+Optional properties (trickle-charger):
+- dallas,trickle-resistor-ohms : Selected resistor for trickle charger
+	Values usable for ds1374 are 250, 2000, 4000
+	Should be given if trickle charger should be enabled
+- dallas,trickle-diode-disable : Do not use internal trickle charger diode
+	Should be given if internal trickle charger diode should be disabled
+
+Example for rtc with alarm mode and interrupt:
+
+i2c@12ca0000 {
+	rtc@68 {
+		compatible = "ds1374";
+		reg = <0x68>;
+		interrupts = <&gpio0 62>;
+		dallas,ds1374-mode = <2>
+
+		dallas,trickle-resistor-ohms = <250>;
+		dallas,trickle-diode-disable;
+	};
+};
+
+Example for rtc with watchdog and reset on timeout, with reset remapped
+to the INT pin:
+
+i2c@12ca0000 {
+	rtc@68 {
+		compatible = "ds1374";
+		reg = <0x68>;
+		dallas,ds1374-mode = <2>
+		dallas,ds1374-remap-wdt-reset;
+	};
+};
