@@ -157,12 +157,8 @@ static int rsi_usb_reg_read(struct usb_device *usbdev,
 			    u16 *value,
 			    u16 len)
 {
-	u8 *buf;
-	int status = -ENOMEM;
-
-	buf  = kmalloc(0x04, GFP_KERNEL);
-	if (!buf)
-		return status;
+	u8 buf[4];
+	int status;
 
 	status = usb_control_msg(usbdev,
 				 usb_rcvctrlpipe(usbdev, 0),
@@ -179,7 +175,6 @@ static int rsi_usb_reg_read(struct usb_device *usbdev,
 			"%s: Reg read failed with error code :%d\n",
 			__func__, status);
 	}
-	kfree(buf);
 
 	return status;
 }
@@ -199,12 +194,8 @@ static int rsi_usb_reg_write(struct usb_device *usbdev,
 			     u16 value,
 			     u16 len)
 {
-	u8 *usb_reg_buf;
-	int status = -ENOMEM;
-
-	usb_reg_buf  = kmalloc(0x04, GFP_KERNEL);
-	if (!usb_reg_buf)
-		return status;
+	u8 usb_reg_buf[4];
+	int status;
 
 	usb_reg_buf[0] = (value & 0x00ff);
 	usb_reg_buf[1] = (value & 0xff00) >> 8;
@@ -225,7 +216,6 @@ static int rsi_usb_reg_write(struct usb_device *usbdev,
 			"%s: Reg write failed with error code :%d\n",
 			__func__, status);
 	}
-	kfree(usb_reg_buf);
 
 	return status;
 }
