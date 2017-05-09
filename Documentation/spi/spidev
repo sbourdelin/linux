@@ -108,6 +108,13 @@ settings for data transfer parameters:
 	speed, in Hz.  The controller can't necessarily assign that specific
 	clock speed.
 
+    SPI_IOC_WR_DEFAULT_MAX_SPEED_HZ ... pass a pointer to a u32 which will
+	assign the maximum speed in Hz directly to the underlying device.
+	The controller can't necessarily assign that clock speed.
+	Any subsequent open() to the same /dev/spidevB.D will be configured
+	by default to use the maximum speed assigned by the last successful
+	call to SPI_IOC_WR_DEFAULT_MAX_SPEED_HZ.
+
 NOTES:
 
     - At this time there is no async I/O support; everything is purely
