@@ -474,6 +474,7 @@ spidev_ioctl(struct file *filp, unsigned int cmd, unsigned long arg)
 				dev_dbg(&spi->dev, "%d bits per word\n", tmp);
 		}
 		break;
+	case SPI_IOC_WR_DEFAULT_MAX_SPEED_HZ:
 	case SPI_IOC_WR_MAX_SPEED_HZ:
 		retval = __get_user(tmp, (__u32 __user *)arg);
 		if (retval == 0) {
@@ -483,9 +484,12 @@ spidev_ioctl(struct file *filp, unsigned int cmd, unsigned long arg)
 			retval = spi_setup(spi);
 			if (retval >= 0)
 				spidev->speed_hz = tmp;
-			else
+			else {
 				dev_dbg(&spi->dev, "%d Hz (max)\n", tmp);
-			spi->max_speed_hz = save;
+				spi->max_speed_hz = save;
+			}
+			if (cmd != SPI_IOC_WR_DEFAULT_MAX_SPEED_HZ)
+				spi->max_speed_hz = save;
 		}
 		break;
 

@@ -128,7 +128,7 @@ struct spi_ioc_transfer {
 #define SPI_IOC_RD_BITS_PER_WORD	_IOR(SPI_IOC_MAGIC, 3, __u8)
 #define SPI_IOC_WR_BITS_PER_WORD	_IOW(SPI_IOC_MAGIC, 3, __u8)
 
-/* Read / Write SPI device default max speed hz */
+/* Read / Write SPI device max speed hz */
 #define SPI_IOC_RD_MAX_SPEED_HZ		_IOR(SPI_IOC_MAGIC, 4, __u32)
 #define SPI_IOC_WR_MAX_SPEED_HZ		_IOW(SPI_IOC_MAGIC, 4, __u32)
 
@@ -136,6 +136,8 @@ struct spi_ioc_transfer {
 #define SPI_IOC_RD_MODE32		_IOR(SPI_IOC_MAGIC, 5, __u32)
 #define SPI_IOC_WR_MODE32		_IOW(SPI_IOC_MAGIC, 5, __u32)
 
+/* Write SPI device default max speed hz */
+#define SPI_IOC_WR_DEFAULT_MAX_SPEED_HZ	_IOW(SPI_IOC_MAGIC, 6, __u32)
 
 
 #endif /* SPIDEV_H */
