@@ -71,7 +71,6 @@ static inline u32 ping_hashfn(const struct net *net, u32 num, u32 mask)
 	pr_debug("hash(%u) = %u\n", num, res);
 	return res;
 }
-EXPORT_SYMBOL_GPL(ping_hash);
 
 static inline struct hlist_nulls_head *ping_hashslot(struct ping_table *table,
 					     struct net *net, unsigned int num)
@@ -152,6 +151,7 @@ int ping_hash(struct sock *sk)
 
 	return 0;
 }
+EXPORT_SYMBOL_GPL(ping_hash);
 
 void ping_unhash(struct sock *sk)
 {
