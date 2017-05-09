@@ -434,7 +434,7 @@ static int bpq_seq_show(struct seq_file *seq, void *v)
 			bpqdev->dest_addr);
 
 		if (is_multicast_ether_addr(bpqdev->acpt_addr))
-			seq_printf(seq, "*\n");
+			seq_puts(seq, "*\n");
 		else
 			seq_printf(seq, "%pM\n", bpqdev->acpt_addr);
 
