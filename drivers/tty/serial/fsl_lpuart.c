@@ -231,7 +231,11 @@
 #define DEV_NAME	"ttyLP"
 #define UART_NR		6
 
+/* IMX lpuart has four extra unused regs located at the beginning */
+#define IMX_REG_OFF	0x10
+
 static bool lpuart_is_be;
+static u8 lpuart_reg_off;
 
 struct lpuart_port {
 	struct uart_port	port;
@@ -263,6 +267,7 @@ struct lpuart_port {
 struct lpuart_soc_data {
 	bool	is_32;
 	bool	is_be;
+	u8	reg_off;
 };
 
 static struct lpuart_soc_data vf_data = {
@@ -272,11 +277,19 @@ static struct lpuart_soc_data vf_data = {
 static struct lpuart_soc_data ls_data = {
 	.is_32 = true,
 	.is_be = true,
+	.reg_off = 0x0,
+};
+
+static struct lpuart_soc_data imx_data = {
+	.is_32 = true,
+	.is_be = false,
+	.reg_off = IMX_REG_OFF,
 };
 
 static const struct of_device_id lpuart_dt_ids[] = {
 	{ .compatible = "fsl,vf610-lpuart", .data = &vf_data, },
 	{ .compatible = "fsl,ls1021a-lpuart", .data = &ls_data, },
+	{ .compatible = "fsl,imx7ulp-lpuart", .data = &imx_data, },
 	{ /* sentinel */ }
 };
 MODULE_DEVICE_TABLE(of, lpuart_dt_ids);
@@ -286,15 +299,16 @@ static void lpuart_dma_tx_complete(void *arg);
 
 static u32 lpuart32_read(void __iomem *addr)
 {
-	return lpuart_is_be ? ioread32be(addr) : readl(addr);
+	return lpuart_is_be ? ioread32be(addr + lpuart_reg_off) :
+			      readl(addr + lpuart_reg_off);
 }
 
 static void lpuart32_write(u32 val, void __iomem *addr)
 {
 	if (lpuart_is_be)
-		iowrite32be(val, addr);
+		iowrite32be(val, addr + lpuart_reg_off);
 	else
-		writel(val, addr);
+		writel(val, addr + lpuart_reg_off);
 }
 
 static void lpuart_stop_tx(struct uart_port *port)
@@ -2008,6 +2022,7 @@ static int lpuart_probe(struct platform_device *pdev)
 	sport->port.line = ret;
 	sport->lpuart32 = sdata->is_32;
 	lpuart_is_be = sdata->is_be;
+	lpuart_reg_off = sdata->reg_off;
 
 	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
 	sport->port.membase = devm_ioremap_resource(&pdev->dev, res);
