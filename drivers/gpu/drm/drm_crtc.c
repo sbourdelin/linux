@@ -38,6 +38,7 @@
 #include <drm/drm_crtc.h>
 #include <drm/drm_edid.h>
 #include <drm/drm_fourcc.h>
+#include <drm/drm_modeset_helper_vtables.h>
 #include <drm/drm_modeset_lock.h>
 #include <drm/drm_atomic.h>
 #include <drm/drm_auth.h>
@@ -741,3 +742,24 @@ int drm_mode_crtc_set_obj_prop(struct drm_mode_object *obj,
 
 	return ret;
 }
+
+/**
+ * drm_crtc_mode_valid - call crtc->mode_valid callback, if any.
+ * @crtc: crtc
+ * @mode: mode to be validated
+ *
+ * If no mode_valid callback is available this will return MODE_OK.
+ *
+ * Returns: drm_mode_status Enum
+ */
+enum drm_mode_status drm_crtc_mode_valid(struct drm_crtc *crtc,
+					 const struct drm_display_mode *mode)
+{
+	const struct drm_crtc_helper_funcs *crtc_funcs = crtc->helper_private;
+
+	if (!crtc_funcs || !crtc_funcs->mode_valid)
+		return MODE_OK;
+
+	return crtc_funcs->mode_valid(crtc, mode);
+}
+EXPORT_SYMBOL(drm_crtc_mode_valid);

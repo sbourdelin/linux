@@ -45,6 +45,9 @@ void drm_crtc_unregister_all(struct drm_device *dev);
 
 struct dma_fence *drm_crtc_create_fence(struct drm_crtc *crtc);
 
+enum drm_mode_status drm_crtc_mode_valid(struct drm_crtc *crtc,
+					 const struct drm_display_mode *mode);
+
 /* IOCTLs */
 int drm_mode_getcrtc(struct drm_device *dev,
 		     void *data, struct drm_file *file_priv);
