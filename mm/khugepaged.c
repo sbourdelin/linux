@@ -1080,6 +1080,7 @@ static void collapse_huge_page(struct mm_struct *mm,
 	result = SCAN_SUCCEED;
 out_up_write:
 	up_write(&mm->mmap_sem);
+	put_page(new_page);
 out_nolock:
 	trace_mm_collapse_huge_page(mm, isolated, result);
 	return;
