@@ -765,12 +765,20 @@ static void __init arm_smmu_v3_init_resources(struct resource *res,
 {
 	struct acpi_iort_smmu_v3 *smmu;
 	int num_res = 0;
+	unsigned long size = SZ_128K;
 
 	/* Retrieve SMMUv3 specific data */
 	smmu = (struct acpi_iort_smmu_v3 *)node->node_data;
 
+	/*
+	 * Override the size, for Cavium ThunderX2 implementation
+	 * which doesn't support the page 1 SMMU register space.
+	 */
+	if (smmu->model == ACPI_IORT_SMMU_V3_CAVIUM_CN99XX)
+		size = SZ_64K;
+
 	res[num_res].start = smmu->base_address;
-	res[num_res].end = smmu->base_address + SZ_128K - 1;
+	res[num_res].end = smmu->base_address + size - 1;
 	res[num_res].flags = IORESOURCE_MEM;
 
 	num_res++;
