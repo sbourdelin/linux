@@ -106,6 +106,26 @@ struct drm_crtc_helper_funcs {
 	void (*commit)(struct drm_crtc *crtc);
 
 	/**
+	 * @mode_valid:
+	 *
+	 * This callback is used to check if a specific mode is valid in this
+	 * crtc. This should be implemented if the crtc has some sort of
+	 * restriction in the modes it can display. For example, a given crtc
+	 * may be responsible to set a clock value. If the clock can not
+	 * produce all the values for the available modes then this callback
+	 * can be used to restrict the number of modes to only the ones that
+	 * can be displayed.
+	 *
+	 * This is called at mode probe and at atomic check phase.
+	 *
+	 * RETURNS:
+	 *
+	 * drm_mode_status Enum
+	 */
+	enum drm_mode_status (*mode_valid)(struct drm_crtc *crtc,
+					   const struct drm_display_mode *mode);
+
+	/**
 	 * @mode_fixup:
 	 *
 	 * This callback is used to validate a mode. The parameter mode is the
@@ -457,6 +477,26 @@ struct drm_encoder_helper_funcs {
 	void (*dpms)(struct drm_encoder *encoder, int mode);
 
 	/**
+	 * @mode_valid:
+	 *
+	 * This callback is used to check if a specific mode is valid in this
+	 * encoder. This should be implemented if the encoder has some sort
+	 * of restriction in the modes it can display. For example, a given
+	 * encoder may be responsible to set a clock value. If the clock can
+	 * not produce all the values for the available modes then this callback
+	 * can be used to restrict the number of modes to only the ones that
+	 * can be displayed.
+	 *
+	 * This is called at mode probe and at atomic check phase.
+	 *
+	 * RETURNS:
+	 *
+	 * drm_mode_status Enum
+	 */
+	enum drm_mode_status (*mode_valid)(struct drm_encoder *crtc,
+					   const struct drm_display_mode *mode);
+
+	/**
 	 * @mode_fixup:
 	 *
 	 * This callback is used to validate and adjust a mode. The parameter
@@ -794,6 +834,11 @@ struct drm_connector_helper_funcs {
 	 * This callback is used by the probe helpers to filter the mode list
 	 * (which is usually derived from the EDID data block from the sink).
 	 * See e.g. drm_helper_probe_single_connector_modes().
+	 *
+	 * This callback is never called in atomic check phase so that userspace
+	 * can override kernel sink checks in case of broken EDID with wrong
+	 * limits from the sink. You can use the remaining mode_valid()
+	 * callbacks to validate the mode against your video path.
 	 *
 	 * NOTE:
 	 *
