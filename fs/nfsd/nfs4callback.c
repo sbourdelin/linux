@@ -705,7 +705,7 @@ static const struct rpc_procinfo nfs4_cb_procedures[] = {
 	PROC(CB_NOTIFY_LOCK,	COMPOUND,	cb_notify_lock,	cb_notify_lock),
 };
 
-static struct rpc_version nfs_cb_version4 = {
+static const struct rpc_version nfs_cb_version4 = {
 /*
  * Note on the callback rpc program version number: despite language in rfc
  * 5661 section 18.36.3 requiring servers to use 4 in this field, the
