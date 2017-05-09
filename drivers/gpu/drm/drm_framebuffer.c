@@ -357,31 +357,17 @@ static void drm_mode_rmfb_work_fn(struct work_struct *w)
 	}
 }
 
-/**
- * drm_mode_rmfb - remove an FB from the configuration
- * @dev: drm device for the ioctl
- * @data: data pointer for the ioctl
- * @file_priv: drm file for the ioctl call
- *
- * Remove the FB specified by the user.
- *
- * Called by the user via ioctl.
- *
- * Returns:
- * Zero on success, negative errno on failure.
- */
-int drm_mode_rmfb(struct drm_device *dev,
-		   void *data, struct drm_file *file_priv)
+static int __rmfb(struct drm_device *dev, struct drm_file *file_priv,
+		  uint32_t fb_id, bool rmfb)
 {
 	struct drm_framebuffer *fb = NULL;
 	struct drm_framebuffer *fbl = NULL;
-	uint32_t *id = data;
 	int found = 0;
 
 	if (!drm_core_check_feature(dev, DRIVER_MODESET))
 		return -EINVAL;
 
-	fb = drm_framebuffer_lookup(dev, *id);
+	fb = drm_framebuffer_lookup(dev, fb_id);
 	if (!fb)
 		return -ENOENT;
 
@@ -407,7 +393,7 @@ int drm_mode_rmfb(struct drm_device *dev,
 	 * so run this in a separate stack as there's no way to correctly
 	 * handle this after the fb is already removed from the lookup table.
 	 */
-	if (drm_framebuffer_read_refcount(fb) > 1) {
+	if (rmfb && drm_framebuffer_read_refcount(fb) > 1) {
 		struct drm_mode_rmfb_work arg;
 
 		INIT_WORK_ONSTACK(&arg.work, drm_mode_rmfb_work_fn);
@@ -425,6 +411,50 @@ int drm_mode_rmfb(struct drm_device *dev,
 fail_unref:
 	drm_framebuffer_put(fb);
 	return -ENOENT;
+}
+
+/**
+ * drm_mode_rmfb - remove an FB from the configuration
+ * @dev: drm device for the ioctl
+ * @data: data pointer for the ioctl
+ * @file_priv: drm file for the ioctl call
+ *
+ * Remove the FB specified by the user.
+ *
+ * Called by the user via ioctl.
+ *
+ * Returns:
+ * Zero on success, negative errno on failure.
+ */
+int drm_mode_rmfb(struct drm_device *dev,
+		  void *data, struct drm_file *file_priv)
+{
+	uint32_t *id = data;
+	return __rmfb(dev, file_priv, *id, true);
+}
+
+/**
+ * drm_mode_unref_fb - unreference an FB
+ * @dev: drm device for the ioctl
+ * @data: data pointer for the ioctl
+ * @file_priv: drm file for the ioctl call
+ *
+ * Unreference the FB specified by the user.
+ *
+ * Called by the user via ioctl.
+ *
+ * Returns:
+ * Zero on success, negative errno on failure.
+ */
+int drm_mode_unref_fb(struct drm_device *dev, void *data,
+		      struct drm_file *file_priv)
+{
+	struct drm_mode_unref_fb *r = data;
+
+	if (r->pad)
+		return -EINVAL;
+
+	return __rmfb(dev, file_priv, r->fb_id, false);
 }
 
 /**

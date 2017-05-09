@@ -685,6 +685,26 @@ struct drm_mode_destroy_blob {
 	__u32 blob_id;
 };
 
+/**
+ * Similar to rmfb but does not have the side effect of shutting down any
+ * pipes that are scanning out the fb.
+ *
+ * Advantages compared to rmfb:
+ *   * slightly easier userspace, it doesn't have to track fb-id's until
+ *     they come of the screen
+ *   * it might be desirable to keep existing layers on screen across
+ *     process restart (for crashing or upgrading the compositor)
+ *
+ * Disadvantages:
+ *   * depending on userspace architecture, layers left on screen could
+ *     be considered an information leak, ie. new incoming master process
+ *     has access to buffers that are still being scanned out.
+ */
+struct drm_mode_unref_fb {
+	__u32 pad;      /* must be zero for now.. */
+	__u32 fb_id;
+};
+
 #if defined(__cplusplus)
 }
 #endif
