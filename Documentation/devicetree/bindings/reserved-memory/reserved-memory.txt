@@ -64,6 +64,10 @@ reusable (optional) - empty property
       system can use that region to store volatile or cached data that
       can be otherwise regenerated or migrated elsewhere.
 
+reserved-names (optional)
+    - Provides a named tag to the client program to help pretty print/identify
+      the reserved memory region.
+
 Linux implementation note:
 - If a "linux,cma-default" property is present, then Linux will use the
   region for the default pool of the contiguous memory allocator.
