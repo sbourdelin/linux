@@ -439,8 +439,9 @@ static int decode_clone(struct xdr_stream *xdr)
  */
 static int nfs4_xdr_dec_allocate(struct rpc_rqst *rqstp,
 				 struct xdr_stream *xdr,
-				 struct nfs42_falloc_res *res)
+				 void *data)
 {
+	struct nfs42_falloc_res *res = data;
 	struct compound_hdr hdr;
 	int status;
 
@@ -466,8 +467,9 @@ out:
  */
 static int nfs4_xdr_dec_copy(struct rpc_rqst *rqstp,
 			     struct xdr_stream *xdr,
-			     struct nfs42_copy_res *res)
+			     void *data)
 {
+	struct nfs42_copy_res *res = data;
 	struct compound_hdr hdr;
 	int status;
 
@@ -496,8 +498,9 @@ out:
  */
 static int nfs4_xdr_dec_deallocate(struct rpc_rqst *rqstp,
 				   struct xdr_stream *xdr,
-				   struct nfs42_falloc_res *res)
+				   void *data)
 {
+	struct nfs42_falloc_res *res = data;
 	struct compound_hdr hdr;
 	int status;
 
@@ -523,8 +526,9 @@ out:
  */
 static int nfs4_xdr_dec_seek(struct rpc_rqst *rqstp,
 			     struct xdr_stream *xdr,
-			     struct nfs42_seek_res *res)
+			     void *data)
 {
+	struct nfs42_seek_res *res = data;
 	struct compound_hdr hdr;
 	int status;
 
@@ -547,8 +551,9 @@ out:
  */
 static int nfs4_xdr_dec_layoutstats(struct rpc_rqst *rqstp,
 				    struct xdr_stream *xdr,
-				    struct nfs42_layoutstat_res *res)
+				    void *data)
 {
+	struct nfs42_layoutstat_res *res = data;
 	struct compound_hdr hdr;
 	int status, i;
 
@@ -577,8 +582,9 @@ out:
  */
 static int nfs4_xdr_dec_clone(struct rpc_rqst *rqstp,
 			      struct xdr_stream *xdr,
-			      struct nfs42_clone_res *res)
+			      void *data)
 {
+	struct nfs42_clone_res *res = data;
 	struct compound_hdr hdr;
 	int status;
 
