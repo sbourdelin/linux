@@ -16,6 +16,8 @@
 #include <linux/buffer_head.h>
 #include <linux/falloc.h>
 #include <linux/sched/signal.h>
+#include <linux/proc_fs.h>
+#include <linux/user_namespace.h>
 
 #include "internal.h"
 
@@ -614,6 +616,25 @@ out:
 	return ret;
 }
 
+static struct ns_common *get_sb_userns(struct ns_common *ns_common)
+{
+	struct user_namespace *ns;
+
+	ns = container_of(ns_common, struct user_namespace, ns);
+
+	return &get_user_ns(ns)->ns;
+}
+
+static int ioctl_fs_sb_userns(struct file *filp)
+{
+	struct super_block *sb = file_inode(filp)->i_sb;
+
+	if (!ns_capable(sb->s_user_ns, CAP_SYS_ADMIN))
+		return -EPERM;
+
+	return open_related_ns(&sb->s_user_ns->ns, get_sb_userns);
+}
+
 /*
  * When you add any new common ioctls to the switches above and below
  * please update compat_sys_ioctl() too.
@@ -677,6 +698,8 @@ int do_vfs_ioctl(struct file *filp, unsigned int fd, unsigned int cmd,
 
 	case FIDEDUPERANGE:
 		return ioctl_file_dedupe_range(filp, argp);
+	case FS_IOC_SB_USERNS:
+		return ioctl_fs_sb_userns(filp);
 
 	default:
 		if (S_ISREG(inode->i_mode))

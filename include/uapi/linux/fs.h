@@ -240,6 +240,8 @@ struct fsxattr {
 #define FICLONE		_IOW(0x94, 9, int)
 #define FICLONERANGE	_IOW(0x94, 13, struct file_clone_range)
 #define FIDEDUPERANGE	_IOWR(0x94, 54, struct file_dedupe_range)
+/* Get a file descriptor to an owning userns for a superblock */
+#define FS_IOC_SB_USERNS		_IOR('X', 55, int)
 
 #define	FS_IOC_GETFLAGS			_IOR('f', 1, long)
 #define	FS_IOC_SETFLAGS			_IOW('f', 2, long)
