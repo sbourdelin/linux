@@ -24,6 +24,7 @@
 #include "md.h"
 #include "raid5.h"
 #include "bitmap.h"
+#include "raid5-log.h"
 
 /*
  * metadata/data stored in disk with 4k size unit (a block) regardless
@@ -679,6 +680,7 @@ static void r5c_disable_writeback_async(struct work_struct *work)
 		return;
 	pr_info("md/raid:%s: Disabling writeback cache for degraded array.\n",
 		mdname(mddev));
+	md_update_sb(mddev, 1);
 	mddev_suspend(mddev);
 	log->r5c_journal_mode = R5C_JOURNAL_MODE_WRITE_THROUGH;
 	mddev_resume(mddev);
@@ -1557,6 +1559,8 @@ void r5l_wake_reclaim(struct r5l_log *log, sector_t space)
 void r5l_quiesce(struct r5l_log *log, int state)
 {
 	struct mddev *mddev;
+	struct r5conf *conf;
+
 	if (!log || state == 2)
 		return;
 	if (state == 0)
@@ -1564,10 +1568,12 @@ void r5l_quiesce(struct r5l_log *log, int state)
 	else if (state == 1) {
 		/* make sure r5l_write_super_and_discard_space exits */
 		mddev = log->rdev->mddev;
+		conf = mddev->private;
 		wake_up(&mddev->sb_wait);
 		kthread_park(log->reclaim_thread->tsk);
 		r5l_wake_reclaim(log, MaxSector);
-		r5l_do_reclaim(log);
+		if (!r5l_log_disk_error(conf))
+			r5l_do_reclaim(log);
 	}
 }
 
@@ -2982,7 +2988,7 @@ ioerr:
 	return ret;
 }
 
-void r5c_update_on_rdev_error(struct mddev *mddev)
+void r5c_update_on_rdev_error(struct mddev *mddev, struct md_rdev *rdev)
 {
 	struct r5conf *conf = mddev->private;
 	struct r5l_log *log = conf->log;
@@ -2990,7 +2996,8 @@ void r5c_update_on_rdev_error(struct mddev *mddev)
 	if (!log)
 		return;
 
-	if (raid5_calc_degraded(conf) > 0 &&
+	if ((raid5_calc_degraded(conf) > 0 ||
+	     test_bit(Journal, &rdev->flags)) &&
 	    conf->log->r5c_journal_mode == R5C_JOURNAL_MODE_WRITE_BACK)
 		schedule_work(&log->disable_writeback_work);
 }
