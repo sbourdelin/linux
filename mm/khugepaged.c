@@ -1082,6 +1082,8 @@ out_up_write:
 	up_write(&mm->mmap_sem);
 out_nolock:
 	trace_mm_collapse_huge_page(mm, isolated, result);
+	if (page != NULL && result != SCAN_SUCCEED)
+		put_page(new_page);
 	return;
 out:
 	mem_cgroup_cancel_charge(new_page, memcg, true);
@@ -1555,6 +1557,8 @@ tree_unlocked:
 	}
 out:
 	VM_BUG_ON(!list_empty(&pagelist));
+	if (page != NULL && result != SCAN_SUCCEED)
+		put_page(new_page);
 	/* TODO: tracepoints */
 }
 
