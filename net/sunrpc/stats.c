@@ -102,7 +102,7 @@ void svc_seq_show(struct seq_file *seq, const struct svc_stat *statp) {
 			continue;
 		seq_printf(seq, "proc%d %u", i, vers->vs_nproc);
 		for (j = 0; j < vers->vs_nproc; j++, proc++)
-			seq_printf(seq, " %u", proc->pc_count);
+			seq_printf(seq, " %u", 0);
 		seq_putc(seq, '\n');
 	}
 }
