@@ -121,13 +121,8 @@ static const struct flag_info flag_array[] = {
 		.set	= "user",
 		.clear	= "    ",
 	}, {
-#if _PAGE_RO == 0
-		.mask	= _PAGE_RW,
+		.mask	= _PAGE_RW | _PAGE_RO,
 		.val	= _PAGE_RW,
-#else
-		.mask	= _PAGE_RO,
-		.val	= 0,
-#endif
 		.set	= "rw",
 		.clear	= "ro",
 	}, {
