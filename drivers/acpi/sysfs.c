@@ -346,11 +346,22 @@ static ssize_t acpi_table_show(struct file *filp, struct kobject *kobj,
 	return len;
 }
 
+static bool acpi_table_has_multiple_instances(char *signature)
+{
+	acpi_status status;
+	struct acpi_table_header *header;
+
+	status = acpi_get_table(signature, 2, &header);
+	if (ACPI_FAILURE(status))
+		return false;
+	acpi_put_table(header);
+	return true;
+}
+
 static int acpi_table_attr_init(struct kobject *tables_obj,
 				struct acpi_table_attr *table_attr,
 				struct acpi_table_header *table_header)
 {
-	struct acpi_table_header *header = NULL;
 	struct acpi_table_attr *attr = NULL;
 	char instance_str[ACPI_INST_SIZE];
 
@@ -371,9 +382,9 @@ static int acpi_table_attr_init(struct kobject *tables_obj,
 
 	ACPI_MOVE_NAME(table_attr->filename, table_header->signature);
 	table_attr->filename[ACPI_NAME_SIZE] = '\0';
-	if (table_attr->instance > 1 || (table_attr->instance == 1 &&
-					 !acpi_get_table
-					 (table_header->signature, 2, &header))) {
+	if (table_attr->instance > 1 ||
+	    (table_attr->instance == 1 &&
+	     acpi_table_has_multiple_instances(table_header->signature))) {
 		snprintf(instance_str, sizeof(instance_str), "%u",
 			 table_attr->instance);
 		strcat(table_attr->filename, instance_str);
@@ -422,11 +433,11 @@ acpi_status acpi_sysfs_table_handler(u32 event, void *table, void *context)
 
 static int acpi_tables_sysfs_init(void)
 {
-	struct acpi_table_attr *table_attr;
+	struct acpi_table_attr *table_attr = NULL;
 	struct acpi_table_header *table_header = NULL;
 	int table_index;
 	acpi_status status;
-	int ret;
+	int ret = 0;
 
 	tables_kobj = kobject_create_and_add("tables", acpi_kobj);
 	if (!tables_kobj)
@@ -446,16 +457,26 @@ static int acpi_tables_sysfs_init(void)
 			continue;
 
 		table_attr = kzalloc(sizeof(*table_attr), GFP_KERNEL);
-		if (!table_attr)
-			return -ENOMEM;
+		if (!table_attr) {
+			ret = -ENOMEM;
+			goto next_table;
+		}
 
 		ret = acpi_table_attr_init(tables_kobj,
 					   table_attr, table_header);
+		if (ret)
+			goto next_table;
+		list_add_tail(&table_attr->node, &acpi_table_attr_list);
+
+next_table:
+		acpi_put_table(table_header);
 		if (ret) {
-			kfree(table_attr);
+			if (table_attr) {
+				kfree(table_attr);
+				table_attr = NULL;
+			}
 			return ret;
 		}
-		list_add_tail(&table_attr->node, &acpi_table_attr_list);
 	}
 
 	kobject_uevent(tables_kobj, KOBJ_ADD);
