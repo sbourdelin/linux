@@ -109,7 +109,7 @@ static void mtk_rdma_config(struct mtk_ddp_comp *comp, unsigned int width,
 			    unsigned int height, unsigned int vrefresh,
 			    unsigned int bpc)
 {
-	unsigned int threshold;
+	unsigned long long threshold;
 	unsigned int reg;
 
 	rdma_update_bits(comp, DISP_REG_RDMA_SIZE_CON_0, 0xfff, width);
@@ -121,10 +121,11 @@ static void mtk_rdma_config(struct mtk_ddp_comp *comp, unsigned int width,
 	 * output threshold to 6 microseconds with 7/6 overhead to
 	 * account for blanking, and with a pixel depth of 4 bytes:
 	 */
-	threshold = width * height * vrefresh * 4 * 7 / 1000000;
+	threshold = (unsigned long long)width * height * vrefresh *
+		    4 * 7 / 1000000;
 	reg = RDMA_FIFO_UNDERFLOW_EN |
 	      RDMA_FIFO_PSEUDO_SIZE(SZ_8K) |
-	      RDMA_OUTPUT_VALID_FIFO_THRESHOLD(threshold);
+	      (unsigned int)RDMA_OUTPUT_VALID_FIFO_THRESHOLD(threshold);
 	writel(reg, comp->regs + DISP_REG_RDMA_FIFO_CON);
 }
 
