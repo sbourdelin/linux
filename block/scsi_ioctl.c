@@ -231,6 +231,7 @@ static int blk_fill_sghdr_rq(struct request_queue *q, struct request *rq,
 			     struct sg_io_hdr *hdr, fmode_t mode)
 {
 	struct scsi_request *req = scsi_req(rq);
+	unsigned long timeout;
 
 	if (copy_from_user(req->cmd, hdr->cmdp, hdr->cmd_len))
 		return -EFAULT;
@@ -242,7 +243,11 @@ static int blk_fill_sghdr_rq(struct request_queue *q, struct request *rq,
 	 */
 	req->cmd_len = hdr->cmd_len;
 
-	rq->timeout = msecs_to_jiffies(hdr->timeout);
+	timeout = msecs_to_jiffies(hdr->timeout);
+	if (timeout == MAX_JIFFY_OFFSET)
+		rq->timeout = 0;
+	else
+		rq->timeout = timeout;
 	if (!rq->timeout)
 		rq->timeout = q->sg_timeout;
 	if (!rq->timeout)
