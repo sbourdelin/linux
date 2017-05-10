@@ -62,6 +62,7 @@ static void ext4_finish_bio(struct bio *bio)
 {
 	int i;
 	struct bio_vec *bvec;
+	bool error_reported = false;
 
 	bio_for_each_segment_all(bvec, bio, i) {
 		struct page *page = bvec->bv_page;
@@ -87,7 +88,19 @@ static void ext4_finish_bio(struct bio *bio)
 
 		if (bio->bi_error) {
 			SetPageError(page);
-			mapping_set_error(page->mapping, -EIO);
+			if (!error_reported) {
+				struct inode *inode = page->mapping->host;
+				sector_t bi_sector = bio->bi_iter.bi_sector;
+
+				ext4_warning(inode->i_sb,
+					"I/O error %d writing to inode %lu "
+					"(starting block %llu)",
+					bio->bi_error, inode->i_ino,
+					(unsigned long long)
+					bi_sector >> (inode->i_blkbits - 9));
+				mapping_set_error(page->mapping, bio->bi_error);
+				error_reported = true;
+			}
 		}
 		bh = head = page_buffers(page);
 		/*
@@ -296,7 +309,6 @@ ext4_io_end_t *ext4_get_io_end(ext4_io_end_t *io_end)
 static void ext4_end_bio(struct bio *bio)
 {
 	ext4_io_end_t *io_end = bio->bi_private;
-	sector_t bi_sector = bio->bi_iter.bi_sector;
 	char b[BDEVNAME_SIZE];
 
 	if (WARN_ONCE(!io_end, "io_end is NULL: %s: sector %Lu len %u err %d\n",
@@ -309,19 +321,6 @@ static void ext4_end_bio(struct bio *bio)
 		return;
 	}
 	bio->bi_end_io = NULL;
-
-	if (bio->bi_error) {
-		struct inode *inode = io_end->inode;
-
-		ext4_warning(inode->i_sb, "I/O error %d writing to inode %lu "
-			     "(offset %llu size %ld starting block %llu)",
-			     bio->bi_error, inode->i_ino,
-			     (unsigned long long) io_end->offset,
-			     (long) io_end->size,
-			     (unsigned long long)
-			     bi_sector >> (inode->i_blkbits - 9));
-		mapping_set_error(inode->i_mapping, bio->bi_error);
-	}
 
 	if (io_end->flag & EXT4_IO_END_UNWRITTEN) {
 		/*
