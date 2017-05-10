@@ -1,0 +1,29 @@
+#ifndef __NITROX_COMMON_H
+#define __NITROX_COMMON_H
+
+#include "nitrox_dev.h"
+#include "nitrox_req.h"
+
+void nitrox_pf_cleanup_isr(struct nitrox_device *ndev);
+int nitrox_pf_init_isr(struct nitrox_device *ndev);
+
+int nitrox_common_sw_init(struct nitrox_device *ndev);
+void nitrox_common_sw_cleanup(struct nitrox_device *ndev);
+
+void pkt_slc_resp_handler(unsigned long data);
+int nitrox_se_request(struct nitrox_device *ndev, struct crypto_request *req);
+
+void nitrox_config_emu_unit(struct nitrox_device *ndev);
+void nitrox_config_pkt_input_rings(struct nitrox_device *ndev);
+void nitrox_config_pkt_solicit_ports(struct nitrox_device *ndev);
+void nitrox_config_vfmode(struct nitrox_device *ndev, int mode);
+void nitrox_config_nps_unit(struct nitrox_device *ndev);
+void nitrox_config_pom_unit(struct nitrox_device *ndev);
+void nitrox_config_rand_unit(struct nitrox_device *ndev);
+void nitrox_config_efl_unit(struct nitrox_device *ndev);
+void nitrox_config_bmi_unit(struct nitrox_device *ndev);
+void nitrox_config_bmo_unit(struct nitrox_device *ndev);
+void nitrox_config_lbc_unit(struct nitrox_device *ndev);
+void invalidate_lbc(struct nitrox_device *ndev);
+
+#endif /* __NITROX_COMMON_H */

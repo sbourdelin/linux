@@ -1,0 +1,181 @@
+#ifndef __NITROX_DEV_H
+#define __NITROX_DEV_H
+
+#include <linux/dma-mapping.h>
+#include <linux/interrupt.h>
+#include <linux/pci.h>
+
+#define VERSION_LEN 32
+
+struct nitrox_cmdq {
+	/* command queue lock */
+	spinlock_t cmdq_lock;
+	/* in progress list lock */
+	spinlock_t pending_lock;
+	/* backlog list lock */
+	spinlock_t backlog_lock;
+
+	/* request submitted to chip, in progress */
+	struct list_head in_progress_head;
+	/* hw queue full, hold in backlog list */
+	struct list_head backlog_head;
+
+	/* doorbell address */
+	u8 __iomem *dbell_csr_addr;
+	/* base address of the queue */
+	u8 *head;
+
+	/* in progress command count */
+	atomic_t pending_count;
+
+	/* command size 32B/64B */
+	u8 instr_size;
+	/* command queue initializataion done */
+	u8 init_done;
+	/* current write index */
+	u16 write_index;
+	u32 qsize;
+
+	u8 *head_unaligned;
+	dma_addr_t dma_unaligned;
+	dma_addr_t dma;
+};
+
+struct nitrox_hw {
+	/* firmware version */
+	char fw_name[VERSION_LEN];
+
+	u16 vendor_id;
+	u16 device_id;
+	u8 revision_id;
+
+	/* CNN55XX cores */
+	u8 se_cores;
+	u8 ae_cores;
+	u8 zip_cores;
+};
+
+#define MAX_MSIX_VECTOR_NAME	20
+/**
+ * vectors for queues (64 AE, 64 SE and 64 ZIP) and
+ * error condition/mailbox.
+ */
+#define MAX_MSIX_VECTORS	192
+
+struct nitrox_msix {
+	struct msix_entry *entries;
+	char **names;
+	DECLARE_BITMAP(irqs, MAX_MSIX_VECTORS);
+	u32 nr_entries;
+};
+
+struct bh_data {
+	int qno;
+	/* slc port completion count address */
+	u8 __iomem *completion_cnt_csr_addr;
+
+	struct nitrox_device *ndev;
+	struct tasklet_struct resp_handler;
+};
+
+struct nitrox_bh {
+	struct bh_data *slc;
+};
+
+/* NITROX-5 driver state */
+#define NITROX_UCODE_LOADED	0
+#define NITROX_READY		1
+
+/* command queue size */
+#define DEFAULT_CMD_QLEN 2048
+/* command timeout in milliseconds */
+#define CMD_TIMEOUT 2000
+
+#define DEV(ndev) ((struct device *)(&(ndev)->pdev->dev))
+#define PF_MODE 0
+
+/**
+ * struct nitrox_device - NITROX Device Information.
+ * @list: pointer to linked list of devices
+ * @bar_addr: iomap address
+ * @pdev: PCI device information
+ * @status: NITROX status
+ * @timeout: Request timeout in jiffies
+ * @refcnt: Device usage count
+ * @qlen: Command queue length
+ * @nr_queues: Number of command queues
+ * @idx: device index (0..N)
+ * @node: NUMA node id attached
+ * @ctx_pool: DMA pool for crypto context
+ * @pkt_cmdqs: SE Command queues
+ * @msix: MSI-X information
+ * @bh: post processing work
+ * @hw: hardware information
+ */
+struct nitrox_device {
+	struct list_head list;
+
+	u8 __iomem *bar_addr;
+	struct pci_dev *pdev;
+
+	unsigned long status;
+	unsigned long timeout;
+	atomic_t refcnt;
+
+	u32 qlen;
+	u16 nr_queues;
+	u8 idx;
+	int node;
+
+	struct dma_pool *ctx_pool;
+	struct nitrox_cmdq *pkt_cmdqs;
+
+	struct nitrox_msix msix;
+	struct nitrox_bh bh;
+
+	struct nitrox_hw hw;
+};
+
+static inline u8 __iomem *nitrox_csr_addr(struct nitrox_device *ndev,
+					  u64 offset)
+{
+	u8 __iomem *bar_addr = READ_ONCE(ndev->bar_addr);
+
+	return (bar_addr + offset);
+}
+
+/**
+ * nitrox_read_csr - Read from device register
+ * @ndev: NITROX device
+ * @offset: offset of the register to read
+ *
+ * Returns: value read
+ */
+static inline u64 nitrox_read_csr(struct nitrox_device *ndev, u64 offset)
+{
+	return readq(ndev->bar_addr + offset);
+}
+
+/**
+ * nitrox_write_csr - Write to device register
+ * @ndev: NITROX device
+ * @offset: offset of the register to write
+ * @value: value to write
+ */
+static inline void nitrox_write_csr(struct nitrox_device *ndev, u64 offset,
+				    u64 value)
+{
+	writeq(value, (ndev->bar_addr + offset));
+}
+
+static inline int nitrox_in_use(struct nitrox_device *ndev)
+{
+	return atomic_read(&ndev->refcnt) != 0;
+}
+
+static inline int nitrox_ready(struct nitrox_device *ndev)
+{
+	return test_bit(NITROX_READY, &ndev->status);
+}
+
+#endif /* __NITROX_DEV_H */
