@@ -1893,7 +1893,7 @@ static long dm_compat_ctl_ioctl(struct file *file, uint command, ulong u)
 #define dm_compat_ctl_ioctl NULL
 #endif
 
-int dm_open(struct inode *inode, struct file *filp)
+static int dm_open(struct inode *inode, struct file *filp)
 {
 	int r;
 	struct dm_file *priv;
@@ -1911,7 +1911,7 @@ int dm_open(struct inode *inode, struct file *filp)
 	return 0;
 }
 
-int dm_release(struct inode *inode, struct file *filp)
+static int dm_release(struct inode *inode, struct file *filp)
 {
 	kfree(filp->private_data);
 	return 0;
