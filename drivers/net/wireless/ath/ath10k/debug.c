@@ -2418,6 +2418,79 @@ int ath10k_debug_create(struct ath10k *ar)
 	return 0;
 }
 
+#ifdef	CONFIG_ATH10K_DEBUGFS
+static ssize_t ath10k_write_debug_mask(struct file *file,
+				       const char __user *ubuf,
+				       size_t count, loff_t *ppos)
+{
+	struct ath10k *ar = file->private_data;
+	int ret;
+	u32 val;
+
+        if (kstrtou32_from_user(ubuf, count, 0, &val))
+                return -EINVAL;
+
+	ar->debug_mask = val;
+	ret = count;
+
+	return ret;
+}
+
+static ssize_t ath10k_read_debug_mask(struct file *file, char __user *ubuf,
+				      size_t count, loff_t *ppos)
+{
+	char buf[32];
+	struct ath10k *ar = file->private_data;
+	int len = 0;
+
+	len = scnprintf(buf, sizeof(buf) - len, "0x%x\n", ar->debug_mask);
+	return simple_read_from_buffer(ubuf, count, ppos, buf, len);
+}
+
+static const struct file_operations fops_debug_mask = {
+	.read = ath10k_read_debug_mask,
+	.write = ath10k_write_debug_mask,
+	.open = simple_open
+};
+
+static ssize_t ath10k_write_trace_debug_mask(struct file *file,
+					     const char __user *ubuf,
+					     size_t count, loff_t *ppos)
+{
+	struct ath10k *ar = file->private_data;
+	int ret;
+	u32 val;
+
+        if (kstrtou32_from_user(ubuf, count, 0, &val))
+                return -EINVAL;
+
+	ar->trace_debug_mask = val;
+	ret = count;
+
+	return ret;
+}
+
+static ssize_t ath10k_read_trace_debug_mask(struct file *file,
+					    char __user *ubuf,
+					    size_t count, loff_t *ppos)
+{
+	char buf[32];
+	struct ath10k *ar = file->private_data;
+	int len = 0;
+
+	len = scnprintf(buf, sizeof(buf) - len, "0x%x\n",
+			ar->trace_debug_mask);
+	return simple_read_from_buffer(ubuf, count, ppos, buf, len);
+}
+
+static const struct file_operations fops_trace_debug_mask = {
+	.read = ath10k_read_trace_debug_mask,
+	.write = ath10k_write_trace_debug_mask,
+	.open = simple_open
+};
+#endif	/* CONFIG_ATH10K_DEBUGFS */
+
+
 void ath10k_debug_destroy(struct ath10k *ar)
 {
 	vfree(ar->debug.fw_crash_data);
@@ -2447,6 +2520,13 @@ int ath10k_debug_register(struct ath10k *ar)
 
 	init_completion(&ar->debug.tpc_complete);
 	init_completion(&ar->debug.fw_stats_complete);
+
+#ifdef	CONFIG_ATH10K_DEBUG
+	debugfs_create_file("debug", S_IRUSR, ar->debug.debugfs_phy, ar,
+			    &fops_debug_mask);
+	debugfs_create_file("trace_debug", S_IRUSR, ar->debug.debugfs_phy, ar,
+			    &fops_trace_debug_mask);
+#endif
 
 	debugfs_create_file("fw_stats", 0400, ar->debug.debugfs_phy, ar,
 			    &fops_fw_stats);
@@ -2536,7 +2616,7 @@ void ath10k_debug_unregister(struct ath10k *ar)
 #endif /* CONFIG_ATH10K_DEBUGFS */
 
 #ifdef CONFIG_ATH10K_DEBUG
-void ath10k_dbg(struct ath10k *ar, enum ath10k_debug_mask mask,
+void _ath10k_dbg(struct ath10k *ar, enum ath10k_debug_mask mask,
 		const char *fmt, ...)
 {
 	struct va_format vaf;
@@ -2547,16 +2627,16 @@ void ath10k_dbg(struct ath10k *ar, enum ath10k_debug_mask mask,
 	vaf.fmt = fmt;
 	vaf.va = &args;
 
-	if (ath10k_debug_mask & mask)
+	if (ar->debug_mask & mask)
 		dev_printk(KERN_DEBUG, ar->dev, "%pV", &vaf);
-
-	trace_ath10k_log_dbg(ar, mask, &vaf);
+	if (ar->trace_debug_mask & mask)
+		trace_ath10k_log_dbg(ar, mask, &vaf);
 
 	va_end(args);
 }
-EXPORT_SYMBOL(ath10k_dbg);
+EXPORT_SYMBOL(_ath10k_dbg);
 
-void ath10k_dbg_dump(struct ath10k *ar,
+void _ath10k_dbg_dump(struct ath10k *ar,
 		     enum ath10k_debug_mask mask,
 		     const char *msg, const char *prefix,
 		     const void *buf, size_t len)
@@ -2565,7 +2645,7 @@ void ath10k_dbg_dump(struct ath10k *ar,
 	size_t linebuflen;
 	const void *ptr;
 
-	if (ath10k_debug_mask & mask) {
+	if (ar->debug_mask & mask) {
 		if (msg)
 			ath10k_dbg(ar, mask, "%s\n", msg);
 
@@ -2584,9 +2664,10 @@ void ath10k_dbg_dump(struct ath10k *ar,
 	}
 
 	/* tracing code doesn't like null strings :/ */
-	trace_ath10k_log_dbg_dump(ar, msg ? msg : "", prefix ? prefix : "",
-				  buf, len);
+	if (ar->trace_debug_mask & mask)
+		trace_ath10k_log_dbg_dump(ar, msg ? msg : "", prefix ? prefix : "",
+					  buf, len);
 }
-EXPORT_SYMBOL(ath10k_dbg_dump);
+EXPORT_SYMBOL(_ath10k_dbg_dump);
 
 #endif /* CONFIG_ATH10K_DEBUG */

@@ -200,27 +200,43 @@ void ath10k_sta_update_rx_duration(struct ath10k *ar,
 #endif /* CONFIG_MAC80211_DEBUGFS */
 
 #ifdef CONFIG_ATH10K_DEBUG
-__printf(3, 4) void ath10k_dbg(struct ath10k *ar,
+static inline int
+_ath10k_do_dbg(struct ath10k *ar, enum ath10k_debug_mask mask)
+{
+	if (ar->trace_debug_mask & mask)
+		return (1);
+	if (ar->debug_mask & mask)
+		return (1);
+	return (0);
+}
+
+__printf(3, 4) void _ath10k_dbg(struct ath10k *ar,
 			       enum ath10k_debug_mask mask,
 			       const char *fmt, ...);
-void ath10k_dbg_dump(struct ath10k *ar,
+
+void _ath10k_dbg_dump(struct ath10k *ar,
 		     enum ath10k_debug_mask mask,
 		     const char *msg, const char *prefix,
 		     const void *buf, size_t len);
+
+#define	ath10k_dbg(ar, mask, ...)					\
+	do {								\
+		if (_ath10k_do_dbg(ar, mask)) {				\
+			_ath10k_dbg((ar), (mask), __VA_ARGS__);		\
+		};							\
+	} while (0)
+
+#define	ath10k_dbg_dump(ar, mask, msg, pfx, buf, len)			\
+	do {								\
+		if (_ath10k_do_dbg(ar, mask)) {				\
+			_ath10k_dbg_dump((ar), (mask), (msg), (pfx), (buf), (len)); \
+		};							\
+	} while (0)
+
 #else /* CONFIG_ATH10K_DEBUG */
 
-static inline int ath10k_dbg(struct ath10k *ar,
-			     enum ath10k_debug_mask dbg_mask,
-			     const char *fmt, ...)
-{
-	return 0;
-}
+#define	ath10k_dbg(ar, mask, fmt, ...)
+#define	ath10k_dbg_dump(ar, mask, msg, pfx, buf, len)
 
-static inline void ath10k_dbg_dump(struct ath10k *ar,
-				   enum ath10k_debug_mask mask,
-				   const char *msg, const char *prefix,
-				   const void *buf, size_t len)
-{
-}
 #endif /* CONFIG_ATH10K_DEBUG */
 #endif /* _DEBUG_H_ */
