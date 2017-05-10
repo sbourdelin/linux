@@ -643,7 +643,7 @@ static void __init __pci_mmcfg_init(int early)
 		return;
 
 	if (pcibios_last_bus < 0) {
-		const struct pci_mmcfg_region *cfg;
+		struct pci_mmcfg_region *cfg;
 
 		list_for_each_entry(cfg, &pci_mmcfg_list, list) {
 			if (cfg->segment)
