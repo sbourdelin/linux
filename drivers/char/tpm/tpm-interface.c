@@ -370,6 +370,81 @@ err_len:
 }
 
 /**
+ * tmp_transfer - Send a TPM command to the TPM and receive response
+ *
+ * @chip: TPM chip to use
+ * @buf: TPM command buffer
+ * @count: size of the TPM command
+ * @bufsiz: length of the TPM command buffer
+ *
+ * Return:
+ *     >0 when the operation is successful; returns response length
+ *     A negative number for system errors (errno).
+ */
+ssize_t tpm_transfer(struct tpm_chip *chip, u8 *buf, u32 count, size_t bufsiz)
+{
+	int rc;
+	struct tpm_output_header *header = (void *)buf;
+	u32 ordinal = be32_to_cpu(*((__be32 *) (buf + 6)));
+	ssize_t len = 0;
+	unsigned long stop;
+
+	rc = chip->ops->send(chip, (u8 *) buf, count);
+	if (rc < 0) {
+		dev_err(&chip->dev,
+			"tpm_transfer: tpm_send: error %d\n", rc);
+		goto out;
+	}
+
+	if (chip->flags & TPM_CHIP_FLAG_IRQ)
+		goto out_recv;
+
+	if (chip->flags & TPM_CHIP_FLAG_TPM2)
+		stop = jiffies + tpm2_calc_ordinal_duration(chip, ordinal);
+	else
+		stop = jiffies + tpm_calc_ordinal_duration(chip, ordinal);
+	do {
+		u8 status = chip->ops->status(chip);
+		if ((status & chip->ops->req_complete_mask) ==
+		    chip->ops->req_complete_val)
+			goto out_recv;
+
+		if (chip->ops->req_canceled(chip, status)) {
+			dev_err(&chip->dev, "Operation Canceled\n");
+			rc = -ECANCELED;
+			goto out;
+		}
+
+		msleep(TPM_TIMEOUT);	/* CHECK */
+		rmb();
+	} while (time_before(jiffies, stop));
+
+	chip->ops->cancel(chip);
+	dev_err(&chip->dev, "Operation Timed out\n");
+	rc = -ETIME;
+	goto out;
+
+out_recv:
+	len = chip->ops->recv(chip, (u8 *) buf, bufsiz);
+	if (len < 0) {
+		rc = len;
+		dev_err(&chip->dev,
+			"tpm_transfer: tpm_recv: error %d\n", rc);
+		goto out;
+	} else if (len < TPM_HEADER_SIZE) {
+		rc = -EFAULT;
+		goto out;
+	}
+
+	if (len != be32_to_cpu(header->length))
+		rc = -EFAULT;
+
+out:
+	return rc ? rc : len;
+}
+EXPORT_SYMBOL_GPL(tpm_transfer);
+
+/**
  * tmp_transmit - Internal kernel interface to transmit TPM commands.
  *
  * @chip: TPM chip to use
@@ -384,11 +459,9 @@ err_len:
 ssize_t tpm_transmit(struct tpm_chip *chip, struct tpm_space *space,
 		     u8 *buf, size_t bufsiz, unsigned int flags)
 {
-	struct tpm_output_header *header = (void *)buf;
 	int rc;
 	ssize_t len = 0;
 	u32 count, ordinal;
-	unsigned long stop;
 	bool need_locality;
 
 	if (!tpm_validate_command(chip, space, buf, bufsiz))
@@ -427,57 +500,9 @@ ssize_t tpm_transmit(struct tpm_chip *chip, struct tpm_space *space,
 	if (rc)
 		goto out;
 
-	rc = chip->ops->send(chip, (u8 *) buf, count);
-	if (rc < 0) {
-		dev_err(&chip->dev,
-			"tpm_transmit: tpm_send: error %d\n", rc);
+	len = tpm_transfer(chip, buf, count, bufsiz);
+	if (len < 0)
 		goto out;
-	}
-
-	if (chip->flags & TPM_CHIP_FLAG_IRQ)
-		goto out_recv;
-
-	if (chip->flags & TPM_CHIP_FLAG_TPM2)
-		stop = jiffies + tpm2_calc_ordinal_duration(chip, ordinal);
-	else
-		stop = jiffies + tpm_calc_ordinal_duration(chip, ordinal);
-	do {
-		u8 status = chip->ops->status(chip);
-		if ((status & chip->ops->req_complete_mask) ==
-		    chip->ops->req_complete_val)
-			goto out_recv;
-
-		if (chip->ops->req_canceled(chip, status)) {
-			dev_err(&chip->dev, "Operation Canceled\n");
-			rc = -ECANCELED;
-			goto out;
-		}
-
-		msleep(TPM_TIMEOUT);	/* CHECK */
-		rmb();
-	} while (time_before(jiffies, stop));
-
-	chip->ops->cancel(chip);
-	dev_err(&chip->dev, "Operation Timed out\n");
-	rc = -ETIME;
-	goto out;
-
-out_recv:
-	len = chip->ops->recv(chip, (u8 *) buf, bufsiz);
-	if (len < 0) {
-		rc = len;
-		dev_err(&chip->dev,
-			"tpm_transmit: tpm_recv: error %d\n", rc);
-		goto out;
-	} else if (len < TPM_HEADER_SIZE) {
-		rc = -EFAULT;
-		goto out;
-	}
-
-	if (len != be32_to_cpu(header->length)) {
-		rc = -EFAULT;
-		goto out;
-	}
 
 	rc = tpm2_commit_space(chip, space, ordinal, buf, &len);
 
