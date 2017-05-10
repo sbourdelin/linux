@@ -2078,7 +2078,7 @@ sg_get_rq_mark(Sg_fd * sfp, int pack_id)
 		}
 	}
 	write_unlock_irqrestore(&sfp->rq_list_lock, iflags);
-	return resp;
+	return (resp->done == 2) ? resp : NULL;
 }
 
 /* always adds to end of list */
