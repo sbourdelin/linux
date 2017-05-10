@@ -1251,24 +1251,20 @@ static int rtnl_xdp_fill(struct sk_buff *skb, struct net_device *dev)
 {
 	struct nlattr *xdp;
 	u32 xdp_flags = 0;
-	u8 val = 0;
 	int err;
+	u8 val;
 
 	xdp = nla_nest_start(skb, IFLA_XDP);
 	if (!xdp)
 		return -EMSGSIZE;
+
 	if (rcu_access_pointer(dev->xdp_prog)) {
 		xdp_flags = XDP_FLAGS_SKB_MODE;
 		val = 1;
-	} else if (dev->netdev_ops->ndo_xdp) {
-		struct netdev_xdp xdp_op = {};
-
-		xdp_op.command = XDP_QUERY_PROG;
-		err = dev->netdev_ops->ndo_xdp(dev, &xdp_op);
-		if (err)
-			goto err_cancel;
-		val = xdp_op.prog_attached;
+	} else {
+		val = dev_xdp_attached(dev);
 	}
+
 	err = nla_put_u8(skb, IFLA_XDP_ATTACHED, val);
 	if (err)
 		goto err_cancel;
