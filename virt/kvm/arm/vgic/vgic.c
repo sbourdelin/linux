@@ -33,11 +33,12 @@ struct vgic_global __section(.hyp.text) kvm_vgic_global_state = {.gicv3_cpuif = 
 
 /*
  * Locking order is always:
- * its->cmd_lock (mutex)
- *   its->its_lock (mutex)
- *     vgic_cpu->ap_list_lock
- *       kvm->lpi_list_lock
- *         vgic_irq->irq_lock
+ * kvm->lock (mutex)
+ *   its->cmd_lock (mutex)
+ *     its->its_lock (mutex)
+ *       vgic_cpu->ap_list_lock
+ *         kvm->lpi_list_lock
+ *           vgic_irq->irq_lock
  *
  * If you need to take multiple locks, always take the upper lock first,
  * then the lower ones, e.g. first take the its_lock, then the irq_lock.
