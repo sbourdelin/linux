@@ -6973,11 +6973,6 @@ lpfc_sli4_hba_setup(struct lpfc_hba *phba)
 			rqbp->entry_count = LPFC_NVMET_RQE_DEF_COUNT;
 			rqbp->buffer_count = 0;
 
-			phba->sli4_hba.nvmet_mrq_hdr[i]->entry_repost =
-				LPFC_QUEUE_MAX_REPOST;
-			phba->sli4_hba.nvmet_mrq_data[i]->entry_repost =
-				LPFC_QUEUE_MAX_REPOST;
-
 			lpfc_post_rq_buffer(
 				phba, phba->sli4_hba.nvmet_mrq_hdr[i],
 				phba->sli4_hba.nvmet_mrq_data[i],
@@ -13032,7 +13027,7 @@ lpfc_sli4_sp_handle_eqe(struct lpfc_hba *phba, struct lpfc_eqe *eqe,
 		while ((cqe = lpfc_sli4_cq_get(cq))) {
 			workposted |= lpfc_sli4_sp_handle_mcqe(phba, cqe);
 			if (!(++ecount % cq->entry_repost))
-				lpfc_sli4_cq_release(cq, LPFC_QUEUE_NOARM);
+				break;
 			cq->CQ_mbox++;
 		}
 		break;
@@ -13046,7 +13041,7 @@ lpfc_sli4_sp_handle_eqe(struct lpfc_hba *phba, struct lpfc_eqe *eqe,
 				workposted |= lpfc_sli4_sp_handle_cqe(phba, cq,
 								      cqe);
 			if (!(++ecount % cq->entry_repost))
-				lpfc_sli4_cq_release(cq, LPFC_QUEUE_NOARM);
+				break;
 		}
 
 		/* Track the max number of CQEs processed in 1 EQ */
@@ -13542,7 +13537,7 @@ lpfc_sli4_fof_handle_eqe(struct lpfc_hba *phba, struct lpfc_eqe *eqe)
 	while ((cqe = lpfc_sli4_cq_get(cq))) {
 		workposted |= lpfc_sli4_fp_handle_cqe(phba, cq, cqe);
 		if (!(++ecount % cq->entry_repost))
-			lpfc_sli4_cq_release(cq, LPFC_QUEUE_NOARM);
+			break;
 	}
 
 	/* Track the max number of CQEs processed in 1 EQ */
@@ -13624,7 +13619,7 @@ lpfc_sli4_fof_intr_handler(int irq, void *dev_id)
 	while ((eqe = lpfc_sli4_eq_get(eq))) {
 		lpfc_sli4_fof_handle_eqe(phba, eqe);
 		if (!(++ecount % eq->entry_repost))
-			lpfc_sli4_eq_release(eq, LPFC_QUEUE_NOARM);
+			break;
 		eq->EQ_processed++;
 	}
 
@@ -13922,16 +13917,9 @@ lpfc_sli4_queue_alloc(struct lpfc_hba *phba, uint32_t entry_size,
 	}
 	queue->entry_size = entry_size;
 	queue->entry_count = entry_count;
-
-	/*
-	 * entry_repost is calculated based on the number of entries in the
-	 * queue. This works out except for RQs. If buffers are NOT initially
-	 * posted for every RQE, entry_repost should be adjusted accordingly.
-	 */
-	queue->entry_repost = (entry_count >> 3);
-	if (queue->entry_repost < LPFC_QUEUE_MIN_REPOST)
-		queue->entry_repost = LPFC_QUEUE_MIN_REPOST;
 	queue->phba = phba;
+
+	/* entry_repost will be set during q creation */
 
 	return queue;
 out_fail:
@@ -14163,6 +14151,7 @@ lpfc_eq_create(struct lpfc_hba *phba, struct lpfc_queue *eq, uint32_t imax)
 		status = -ENXIO;
 	eq->host_index = 0;
 	eq->hba_index = 0;
+	eq->entry_repost = LPFC_EQ_REPOST;
 
 	mempool_free(mbox, phba->mbox_mem_pool);
 	return status;
@@ -14236,9 +14225,9 @@ lpfc_cq_create(struct lpfc_hba *phba, struct lpfc_queue *cq,
 	default:
 		lpfc_printf_log(phba, KERN_ERR, LOG_SLI,
 				"0361 Unsupported CQ count: "
-				"entry cnt %d sz %d pg cnt %d repost %d\n",
+				"entry cnt %d sz %d pg cnt %d\n",
 				cq->entry_count, cq->entry_size,
-				cq->page_count, cq->entry_repost);
+				cq->page_count);
 		if (cq->entry_count < 256) {
 			status = -EINVAL;
 			goto out;
@@ -14291,6 +14280,7 @@ lpfc_cq_create(struct lpfc_hba *phba, struct lpfc_queue *cq,
 	cq->assoc_qid = eq->queue_id;
 	cq->host_index = 0;
 	cq->hba_index = 0;
+	cq->entry_repost = LPFC_CQ_REPOST;
 
 out:
 	mempool_free(mbox, phba->mbox_mem_pool);
@@ -14482,6 +14472,7 @@ lpfc_cq_create_set(struct lpfc_hba *phba, struct lpfc_queue **cqp,
 		cq->assoc_qid = eq->queue_id;
 		cq->host_index = 0;
 		cq->hba_index = 0;
+		cq->entry_repost = LPFC_CQ_REPOST;
 
 		rc = 0;
 		list_for_each_entry(dmabuf, &cq->page_list, list) {
@@ -14730,6 +14721,7 @@ lpfc_mq_create(struct lpfc_hba *phba, struct lpfc_queue *mq,
 	mq->subtype = subtype;
 	mq->host_index = 0;
 	mq->hba_index = 0;
+	mq->entry_repost = LPFC_MQ_REPOST;
 
 	/* link the mq onto the parent cq child list */
 	list_add_tail(&mq->list, &cq->child_list);
@@ -14955,34 +14947,6 @@ out:
 }
 
 /**
- * lpfc_rq_adjust_repost - Adjust entry_repost for an RQ
- * @phba: HBA structure that indicates port to create a queue on.
- * @rq:   The queue structure to use for the receive queue.
- * @qno:  The associated HBQ number
- *
- *
- * For SLI4 we need to adjust the RQ repost value based on
- * the number of buffers that are initially posted to the RQ.
- */
-void
-lpfc_rq_adjust_repost(struct lpfc_hba *phba, struct lpfc_queue *rq, int qno)
-{
-	uint32_t cnt;
-
-	/* sanity check on queue memory */
-	if (!rq)
-		return;
-	cnt = lpfc_hbq_defs[qno]->entry_count;
-
-	/* Recalc repost for RQs based on buffers initially posted */
-	cnt = (cnt >> 3);
-	if (cnt < LPFC_QUEUE_MIN_REPOST)
-		cnt = LPFC_QUEUE_MIN_REPOST;
-
-	rq->entry_repost = cnt;
-}
-
-/**
  * lpfc_rq_create - Create a Receive Queue on the HBA
  * @phba: HBA structure that indicates port to create a queue on.
  * @hrq: The queue structure to use to create the header receive queue.
@@ -15167,6 +15131,7 @@ lpfc_rq_create(struct lpfc_hba *phba, struct lpfc_queue *hrq,
 	hrq->subtype = subtype;
 	hrq->host_index = 0;
 	hrq->hba_index = 0;
+	hrq->entry_repost = LPFC_RQ_REPOST;
 
 	/* now create the data queue */
 	lpfc_sli4_config(phba, mbox, LPFC_MBOX_SUBSYSTEM_FCOE,
@@ -15259,6 +15224,7 @@ lpfc_rq_create(struct lpfc_hba *phba, struct lpfc_queue *hrq,
 	drq->subtype = subtype;
 	drq->host_index = 0;
 	drq->hba_index = 0;
+	drq->entry_repost = LPFC_RQ_REPOST;
 
 	/* link the header and data RQs onto the parent cq child list */
 	list_add_tail(&hrq->list, &cq->child_list);
@@ -15416,6 +15382,7 @@ lpfc_mrq_create(struct lpfc_hba *phba, struct lpfc_queue **hrqp,
 		hrq->subtype = subtype;
 		hrq->host_index = 0;
 		hrq->hba_index = 0;
+		hrq->entry_repost = LPFC_RQ_REPOST;
 
 		drq->db_format = LPFC_DB_RING_FORMAT;
 		drq->db_regaddr = phba->sli4_hba.RQDBregaddr;
@@ -15424,6 +15391,7 @@ lpfc_mrq_create(struct lpfc_hba *phba, struct lpfc_queue **hrqp,
 		drq->subtype = subtype;
 		drq->host_index = 0;
 		drq->hba_index = 0;
+		drq->entry_repost = LPFC_RQ_REPOST;
 
 		list_add_tail(&hrq->list, &cq->child_list);
 		list_add_tail(&drq->list, &cq->child_list);
