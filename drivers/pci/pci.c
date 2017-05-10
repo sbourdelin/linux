@@ -3712,7 +3712,7 @@ EXPORT_SYMBOL_GPL(pci_intx);
  * pci_intx_mask_supported - probe for INTx masking support
  * @dev: the PCI device to operate on
  *
- * Check if the device dev support INTx masking via the config space
+ * Check if the device dev supports INTx masking via the config space
  * command word.
  */
 bool pci_intx_mask_supported(struct pci_dev *dev)
@@ -3736,11 +3736,21 @@ bool pci_intx_mask_supported(struct pci_dev *dev)
 	 * go ahead and check it.
 	 */
 	if ((new ^ orig) & ~PCI_COMMAND_INTX_DISABLE) {
+		/*
+		 * If anything else than PCI_COMMAND_INTX_DISABLE bit has
+		 * changed (and maybe PCI_COMMAND_INTX_DISABLE too)
+		 */
 		dev_err(&dev->dev, "Command register changed from 0x%x to 0x%x: driver or hardware bug?\n",
 			orig, new);
 	} else if ((new ^ orig) & PCI_COMMAND_INTX_DISABLE) {
+		/*
+		 * OK. Only PCI_COMMAND_INTX_DISABLE bit has changed
+		 */
 		mask_supported = true;
 		pci_write_config_word(dev, PCI_COMMAND, orig);
+	} else {
+		dev_err(&dev->dev, "Command register hasn't changed when written from 0x%x to 0x%x: driver or hardware bug?\n",
+			orig, new);
 	}
 
 	pci_cfg_access_unlock(dev);
@@ -3798,7 +3808,7 @@ done:
  * @dev: the PCI device to operate on
  *
  * Check if the device dev has its INTx line asserted, mask it and
- * return true in that case. False is returned if not interrupt was
+ * return true in that case. False is returned if interrupt wasn't
  * pending.
  */
 bool pci_check_and_mask_intx(struct pci_dev *dev)
