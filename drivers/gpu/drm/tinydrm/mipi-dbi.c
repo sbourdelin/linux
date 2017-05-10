@@ -914,8 +914,7 @@ static int mipi_dbi_debugfs_command_show(struct seq_file *m, void *unused)
 {
 	struct mipi_dbi *mipi = m->private;
 	u8 cmd, val[4];
-	size_t len, i;
-	int ret;
+	int len, ret;
 
 	for (cmd = 0; cmd < 255; cmd++) {
 		if (!mipi_dbi_command_is_read(mipi, cmd))
@@ -944,9 +943,7 @@ static int mipi_dbi_debugfs_command_show(struct seq_file *m, void *unused)
 			continue;
 		}
 
-		for (i = 0; i < len; i++)
-			seq_printf(m, "%02x", val[i]);
-		seq_puts(m, "\n");
+		seq_printf(m, "%*phN\n", len, val);
 	}
 
 	return 0;
