@@ -1080,7 +1080,7 @@ static int dasd_eckd_read_conf(struct dasd_device *device)
 					"error %d", rc);
 			return rc;
 		}
-		if (conf_data == NULL) {
+		if (!conf_data) {
 			DBF_EVENT_DEVID(DBF_WARNING, device->cdev, "%s",
 					"No configuration data "
 					"retrieved");
@@ -2049,7 +2049,7 @@ static int dasd_eckd_end_analysis(struct dasd_block *block)
 				 "Track 0 has no records following the VTOC\n");
 	}
 
-	if (count_area != NULL && count_area->kl == 0) {
+	if (count_area && count_area->kl == 0) {
 		/* we found notthing violating our disk layout */
 		if (dasd_check_blocksize(count_area->dl) == 0)
 			block->bp_block = count_area->dl;
@@ -2649,10 +2649,10 @@ static int dasd_eckd_format_process_data(struct dasd_device *base,
 	old_start = fdata->start_unit;
 	old_stop = fdata->stop_unit;
 
-	if (!tpm && fmt_buffer != NULL) {
+	if (!tpm && fmt_buffer) {
 		/* Command Mode / Format Check */
 		format_step = 1;
-	} else if (tpm && fmt_buffer != NULL) {
+	} else if (tpm && fmt_buffer) {
 		/* Transport Mode / Format Check */
 		format_step = DASD_CQR_MAX_CCW / rpt;
 	} else {
@@ -4681,7 +4681,7 @@ static void dasd_eckd_dump_sense_ccw(struct dasd_device *device,
 	int len, sl, sct;
 
 	page = (char *) get_zeroed_page(GFP_ATOMIC);
-	if (page == NULL) {
+	if (!page) {
 		DBF_DEV_EVENT(DBF_WARNING, device, "%s",
 			      "No memory to dump sense data\n");
 		return;
@@ -4785,7 +4785,7 @@ static void dasd_eckd_dump_sense_tcw(struct dasd_device *device,
 	u8 *sense, *rcq;
 
 	page = (char *) get_zeroed_page(GFP_ATOMIC);
-	if (page == NULL) {
+	if (!page) {
 		DBF_DEV_EVENT(DBF_WARNING, device, " %s",
 			    "No memory to dump sense data");
 		return;
