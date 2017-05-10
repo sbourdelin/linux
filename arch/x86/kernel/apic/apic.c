@@ -1161,6 +1161,7 @@ enum apic_interrupt_mode {
 	APIC_PIC = 0,
 	APIC_VIRTUAL_WIRE,
 	APIC_SYMMETRIC_IO,
+	APIC_SYMMETRIC_IO_NO_ROUTING,
 	APIC_MODE_COUNT
 };
 
@@ -1214,6 +1215,20 @@ static int __init apic_interrupt_mode_select(void)
 	}
 
 	/* Other checks of APIC options will be done in each setup function */
+
+#ifdef CONFIG_SMP
+	if (read_apic_id() != boot_cpu_physical_apicid) {
+		panic("Boot APIC ID in local APIC unexpected (%d vs %d)",
+		     read_apic_id(), boot_cpu_physical_apicid);
+		/* Or can we switch back to PIC here? */
+	}
+
+	/* If SMP should be disabled, then really disable it! */
+	if (!setup_max_cpus) {
+		pr_info("SMP mode deactivated\n");
+		return APIC_SYMMETRIC_IO_NO_ROUTING;
+	}
+#endif
 
 	return APIC_SYMMETRIC_IO;
 }
@@ -1279,6 +1294,12 @@ void __init apic_interrupt_mode_init(void)
 		return;
 	case APIC_SYMMETRIC_IO:
 		pr_info("Switch to symmectic I/O mode\n");
+		default_setup_apic_routing();
+		apic_bsp_setup(false);
+		return;
+	case APIC_SYMMETRIC_IO_NO_ROUTING:
+		pr_info("Switch to symmectic I/O mode with no APIC routing\n");
+		apic_bsp_setup(false);
 		return;
 	}
 }

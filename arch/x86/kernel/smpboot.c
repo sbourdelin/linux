@@ -1332,20 +1332,10 @@ void __init native_smp_prepare_cpus(unsigned int max_cpus)
 		return;
 	case SMP_FORCE_UP:
 		disable_smp();
-		apic_bsp_setup(false);
 		return;
 	case SMP_OK:
 		break;
 	}
-
-	if (read_apic_id() != boot_cpu_physical_apicid) {
-		panic("Boot APIC ID in local APIC unexpected (%d vs %d)",
-		     read_apic_id(), boot_cpu_physical_apicid);
-		/* Or can we switch back to PIC here? */
-	}
-
-	default_setup_apic_routing();
-	cpu0_logical_apicid = apic_bsp_setup(false);
 
 	if (x2apic_mode)
 		cpu0_logical_apicid = apic_read(APIC_LDR);
