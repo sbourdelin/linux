@@ -1157,14 +1157,7 @@ void __init sync_Arb_IDs(void)
 			APIC_INT_LEVELTRIG | APIC_DM_INIT);
 }
 
-enum apic_interrupt_mode {
-	APIC_PIC = 0,
-	APIC_VIRTUAL_WIRE,
-	APIC_VIRTUAL_WIRE_NO_CONFIG,
-	APIC_SYMMETRIC_IO,
-	APIC_SYMMETRIC_IO_NO_ROUTING,
-	APIC_MODE_COUNT
-};
+enum apic_interrupt_mode_id apic_interrupt_mode;
 
 static int __init apic_interrupt_mode_select(int *upmode)
 {
@@ -1295,7 +1288,8 @@ void __init apic_interrupt_mode_init(void)
 {
 	int upmode = false;
 
-	switch (apic_interrupt_mode_select(&upmode)) {
+	apic_interrupt_mode = apic_interrupt_mode_select(&upmode);
+	switch (apic_interrupt_mode) {
 	case APIC_PIC:
 		pr_info("Keep in PIC mode(8259)\n");
 		return;
