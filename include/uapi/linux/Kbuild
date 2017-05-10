@@ -61,6 +61,7 @@ header-y += atm_zatm.h
 header-y += audit.h
 header-y += auto_fs4.h
 header-y += auto_fs.h
+header-y += auto_dev-ioctl.h
 header-y += auxvec.h
 header-y += ax25.h
 header-y += b1lli.h
