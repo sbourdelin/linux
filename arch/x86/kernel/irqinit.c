@@ -72,8 +72,6 @@ void __init init_ISA_irqs(void)
 	struct irq_chip *chip = legacy_pic->chip;
 	int i;
 
-	apic_virtual_wire_mode_setup();
-
 	legacy_pic->init(0);
 
 	for (i = 0; i < nr_legacy_irqs(); i++)
