@@ -1507,6 +1507,20 @@ static void intel_dp_print_rates(struct intel_dp *intel_dp)
 	DRM_DEBUG_KMS("common rates: %s\n", str);
 }
 
+bool __intel_reduced_m_n(struct intel_dp *intel_dp)
+{
+	struct intel_dp_desc *desc = &intel_dp->desc;
+	bool ret = false;
+
+	/* Analogix 7737 needs reduced N and M at HBR2 link rates */
+	if (desc->oui[0] == 0x00 &&
+	    desc->oui[1] == 0x22 &&
+	    desc->oui[2] == 0xb9)
+		ret = true;
+
+	return ret;
+}
+
 bool
 __intel_dp_read_desc(struct intel_dp *intel_dp, struct intel_dp_desc *desc)
 {
@@ -1526,6 +1540,8 @@ bool intel_dp_read_desc(struct intel_dp *intel_dp)
 
 	if (!__intel_dp_read_desc(intel_dp, desc))
 		return false;
+
+	intel_dp->reduce_m_n = __intel_reduced_m_n(intel_dp);
 
 	dev_id_len = strnlen(desc->device_id, sizeof(desc->device_id));
 	DRM_DEBUG_KMS("DP %s: OUI %*phD%s dev-ID %*pE HW-rev %d.%d SW-rev %d.%d\n",
@@ -1753,7 +1769,8 @@ found:
 	intel_link_compute_m_n(bpp, lane_count,
 			       adjusted_mode->crtc_clock,
 			       pipe_config->port_clock,
-			       &pipe_config->dp_m_n);
+			       &pipe_config->dp_m_n,
+				intel_dp->reduce_m_n);
 
 	if (intel_connector->panel.downclock_mode != NULL &&
 		dev_priv->drrs.type == SEAMLESS_DRRS_SUPPORT) {
@@ -1761,7 +1778,8 @@ found:
 			intel_link_compute_m_n(bpp, lane_count,
 				intel_connector->panel.downclock_mode->clock,
 				pipe_config->port_clock,
-				&pipe_config->dp_m2_n2);
+				&pipe_config->dp_m2_n2,
+				intel_dp->reduce_m_n);
 	}
 
 	/*

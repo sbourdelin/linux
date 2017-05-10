@@ -1017,6 +1017,7 @@ struct intel_dp {
 
 	/* Displayport compliance testing */
 	struct intel_dp_compliance compliance;
+	bool reduce_m_n;
 };
 
 struct intel_lspcon {
