@@ -2444,6 +2444,8 @@ struct ath10k *ath10k_core_create(size_t priv_size, struct device *dev,
 	ar->hw_rev = hw_rev;
 	ar->hif.ops = hif_ops;
 	ar->hif.bus = bus;
+	ar->debug_mask = ath10k_debug_mask;
+	ar->trace_debug_mask = ath10k_debug_mask;
 
 	switch (hw_rev) {
 	case ATH10K_HW_QCA988X:
