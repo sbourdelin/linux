@@ -260,8 +260,11 @@ static int dsa_loop_drv_probe(struct mdio_device *mdiodev)
 		return -ENOMEM;
 
 	ps->netdev = dev_get_by_name(&init_net, pdata->netdev);
-	if (!ps->netdev)
+	if (!ps->netdev) {
+		devm_kfree(&mdiodev->dev, ps);
+		devm_kfree(&mdiodev->dev, ds);
 		return -EPROBE_DEFER;
+	}
 
 	pdata->cd.netdev[DSA_LOOP_CPU_PORT] = &ps->netdev->dev;
 
