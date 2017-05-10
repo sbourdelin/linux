@@ -13229,10 +13229,6 @@ drop:
 	case FC_STATUS_INSUFF_BUF_NEED_BUF:
 		hrq->RQ_no_posted_buf++;
 		/* Post more buffers if possible */
-		spin_lock_irqsave(&phba->hbalock, iflags);
-		phba->hba_flag |= HBA_POST_RECEIVE_BUFFER;
-		spin_unlock_irqrestore(&phba->hbalock, iflags);
-		workposted = true;
 		break;
 	}
 out:
@@ -13386,7 +13382,7 @@ process_cq:
 	while ((cqe = lpfc_sli4_cq_get(cq))) {
 		workposted |= lpfc_sli4_fp_handle_cqe(phba, cq, cqe);
 		if (!(++ecount % cq->entry_repost))
-			lpfc_sli4_cq_release(cq, LPFC_QUEUE_NOARM);
+			break;
 	}
 
 	/* Track the max number of CQEs processed in 1 EQ */
@@ -13676,7 +13672,7 @@ lpfc_sli4_hba_intr_handler(int irq, void *dev_id)
 
 		lpfc_sli4_hba_handle_eqe(phba, eqe, hba_eqidx);
 		if (!(++ecount % fpeq->entry_repost))
-			lpfc_sli4_eq_release(fpeq, LPFC_QUEUE_NOARM);
+			break;
 		fpeq->EQ_processed++;
 	}
 
