@@ -1160,12 +1160,13 @@ void __init sync_Arb_IDs(void)
 enum apic_interrupt_mode {
 	APIC_PIC = 0,
 	APIC_VIRTUAL_WIRE,
+	APIC_VIRTUAL_WIRE_NO_CONFIG,
 	APIC_SYMMETRIC_IO,
 	APIC_SYMMETRIC_IO_NO_ROUTING,
 	APIC_MODE_COUNT
 };
 
-static int __init apic_interrupt_mode_select(void)
+static int __init apic_interrupt_mode_select(int *upmode)
 {
 	/* Check kernel option */
 	if (disable_apic) {
@@ -1208,8 +1209,12 @@ static int __init apic_interrupt_mode_select(void)
 	if (!smp_found_config) {
 		disable_ioapic_support();
 
-		if (!acpi_lapic)
+		if (!acpi_lapic) {
 			pr_info("ACPI MADT or MP table not detected\n");
+			*upmode = true;
+
+			return APIC_VIRTUAL_WIRE_NO_CONFIG;
+		}
 
 		return APIC_VIRTUAL_WIRE;
 	}
@@ -1285,23 +1290,27 @@ void __init apic_virtual_wire_mode_setup(void)
 /* Init the interrupt delivery mode for the BSP */
 void __init apic_interrupt_mode_init(void)
 {
-	switch (apic_interrupt_mode_select()) {
+	int upmode = false;
+
+	switch (apic_interrupt_mode_select(&upmode)) {
 	case APIC_PIC:
 		pr_info("Keep in PIC mode(8259)\n");
 		return;
 	case APIC_VIRTUAL_WIRE:
+	case APIC_VIRTUAL_WIRE_NO_CONFIG:
 		pr_info("Switch to virtual wire mode\n");
-		return;
+		default_setup_apic_routing();
+		break;
 	case APIC_SYMMETRIC_IO:
 		pr_info("Switch to symmectic I/O mode\n");
 		default_setup_apic_routing();
-		apic_bsp_setup(false);
-		return;
+		break;
 	case APIC_SYMMETRIC_IO_NO_ROUTING:
 		pr_info("Switch to symmectic I/O mode with no APIC routing\n");
-		apic_bsp_setup(false);
 		return;
 	}
+
+	apic_bsp_setup(upmode);
 }
 
 static void lapic_setup_esr(void)

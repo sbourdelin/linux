@@ -1324,8 +1324,6 @@ void __init native_smp_prepare_cpus(unsigned int max_cpus)
 	switch (smp_sanity_check(max_cpus)) {
 	case SMP_NO_CONFIG:
 		disable_smp();
-		if (APIC_init_uniprocessor())
-			pr_notice("Local APIC not detected. Using dummy APIC emulation.\n");
 		return;
 	case SMP_NO_APIC:
 		disable_smp();
