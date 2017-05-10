@@ -479,22 +479,23 @@ lpfc_sli4_rq_put(struct lpfc_queue *hq, struct lpfc_queue *dq,
 	if (unlikely(!hq) || unlikely(!dq))
 		return -ENOMEM;
 	put_index = hq->host_index;
-	temp_hrqe = hq->qe[hq->host_index].rqe;
+	temp_hrqe = hq->qe[put_index].rqe;
 	temp_drqe = dq->qe[dq->host_index].rqe;
 
 	if (hq->type != LPFC_HRQ || dq->type != LPFC_DRQ)
 		return -EINVAL;
-	if (hq->host_index != dq->host_index)
+	if (put_index != dq->host_index)
 		return -EINVAL;
 	/* If the host has not yet processed the next entry then we are done */
-	if (((hq->host_index + 1) % hq->entry_count) == hq->hba_index)
+	if (((put_index + 1) % hq->entry_count) == hq->hba_index)
 		return -EBUSY;
 	lpfc_sli_pcimem_bcopy(hrqe, temp_hrqe, hq->entry_size);
 	lpfc_sli_pcimem_bcopy(drqe, temp_drqe, dq->entry_size);
 
 	/* Update the host index to point to the next slot */
-	hq->host_index = ((hq->host_index + 1) % hq->entry_count);
+	hq->host_index = ((put_index + 1) % hq->entry_count);
 	dq->host_index = ((dq->host_index + 1) % dq->entry_count);
+	hq->RQ_buf_posted++;
 
 	/* Ring The Header Receive Queue Doorbell */
 	if (!(hq->host_index % hq->entry_repost)) {
@@ -512,7 +513,6 @@ lpfc_sli4_rq_put(struct lpfc_queue *hq, struct lpfc_queue *dq,
 		} else {
 			return -EINVAL;
 		}
-		hq->RQ_buf_posted += hq->entry_repost;
 		writel(doorbell.word0, hq->db_regaddr);
 	}
 	return put_index;
@@ -6900,11 +6900,13 @@ lpfc_sli4_hba_setup(struct lpfc_hba *phba)
 			INIT_LIST_HEAD(&rqbp->rqb_buffer_list);
 			rqbp->rqb_alloc_buffer = lpfc_sli4_nvmet_alloc;
 			rqbp->rqb_free_buffer = lpfc_sli4_nvmet_free;
-			rqbp->entry_count = 256;
+			rqbp->entry_count = LPFC_NVMET_RQE_DEF_COUNT;
 			rqbp->buffer_count = 0;
 
-			/* Divide by 4 and round down to multiple of 16 */
-			rc = (phba->cfg_nvmet_mrq_post >> 2) & 0xfff8;
+			/* Divide by 8 and round down to multiple of 16 */
+			rc = (phba->cfg_nvmet_mrq_post >> 3) & 0xfff8;
+			if (rc > LPFC_QUEUE_MAX_REPOST)
+				rc = LPFC_QUEUE_MAX_REPOST;
 			phba->sli4_hba.nvmet_mrq_hdr[i]->entry_repost = rc;
 			phba->sli4_hba.nvmet_mrq_data[i]->entry_repost = rc;
 
