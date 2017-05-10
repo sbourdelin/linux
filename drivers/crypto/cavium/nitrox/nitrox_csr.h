@@ -42,6 +42,8 @@
 #define NPS_CORE_INT_ACTIVE	0x1000080
 #define NPS_CORE_INT		0x10000A0
 #define NPS_CORE_INT_ENA_W1S	0x10000B8
+#define NPS_STATS_PKT_DMA_RD_CNT	0x1000180
+#define NPS_STATS_PKT_DMA_WR_CNT	0x1000190
 
 /* NPS packet registers */
 #define NPS_PKT_INT				0x1040018
@@ -73,11 +75,13 @@
 #define POM_GRP_EXECMASKX(_i)	(0x11C1100 | ((_i) * 8))
 #define POM_INT		0x11C0000
 #define POM_PERF_CTL	0x11CC400
+#define POM_PERF_CNT	0x11CC408
 
 /* BMI registers */
 #define BMI_INT		0x1140000
 #define BMI_CTL		0x1140020
 #define BMI_INT_ENA_W1S	0x1140018
+#define BMI_NPS_PKT_CNT	0x1140070
 
 /* EFL registers */
 #define EFL_CORE_INT_ENA_W1SX(_i)		(0x1240018 + ((_i) * 0x400))
@@ -91,6 +95,7 @@
 
 /* BMO registers */
 #define BMO_CTL2		0x1180028
+#define BMO_NPS_SLC_PKT_CNT	0x1180078
 
 /* LBC registers */
 #define LBC_INT			0x1200000

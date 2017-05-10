@@ -134,6 +134,9 @@ struct nitrox_device {
 	struct nitrox_bh bh;
 
 	struct nitrox_hw hw;
+#if IS_ENABLED(CONFIG_DEBUG_FS)
+	struct dentry *debugfs_dir;
+#endif
 };
 
 static inline u8 __iomem *nitrox_csr_addr(struct nitrox_device *ndev,
