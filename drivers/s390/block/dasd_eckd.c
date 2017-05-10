@@ -3863,7 +3863,7 @@ static struct dasd_ccw_req *dasd_raw_build_cp(struct dasd_device *startdev,
 	unsigned int pfx_datasize;
 
 	/*
-	 * raw track access needs to be mutiple of 64k and on 64k boundary
+	 * Raw track access needs to be multiple of 64k and on 64k boundary.
 	 * For read requests we can fix an incorrect alignment by padding
 	 * the request with dummy pages.
 	 */
@@ -4143,7 +4143,7 @@ dasd_eckd_fill_info(struct dasd_device * device,
 
 /*
  * Release device ioctl.
- * Buils a channel programm to releases a prior reserved
+ * Builds a channel program to release a prior reserved
  * (see dasd_eckd_reserve) device.
  */
 static int
