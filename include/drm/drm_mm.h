@@ -281,7 +281,7 @@ static inline u64 drm_mm_hole_node_start(const struct drm_mm_node *hole_node)
 	return __drm_mm_hole_node_start(hole_node);
 }
 
-static inline u64 __drm_mm_hole_node_end(const struct drm_mm_node *hole_node)
+static inline u64 __drm_mm_hole_node_end(struct drm_mm_node *hole_node)
 {
 	return list_next_entry(hole_node, node_list)->start;
 }
@@ -297,7 +297,7 @@ static inline u64 __drm_mm_hole_node_end(const struct drm_mm_node *hole_node)
  * Returns:
  * End of the subsequent hole.
  */
-static inline u64 drm_mm_hole_node_end(const struct drm_mm_node *hole_node)
+static inline u64 drm_mm_hole_node_end(struct drm_mm_node *hole_node)
 {
 	return __drm_mm_hole_node_end(hole_node);
 }
