@@ -35,6 +35,7 @@
 #include <linux/mutex.h>
 #include <linux/rbtree.h>
 #include <linux/scatterlist.h>
+#include <linux/device.h>
 
 /**
  * struct drm_prime_file_private - per-file tracking for PRIME
