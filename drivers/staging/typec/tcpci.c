@@ -287,12 +287,12 @@ static int tcpci_pd_transmit(struct tcpc_dev *tcpc,
 	unsigned int reg, cnt, header;
 	int ret;
 
-	cnt = msg ? pd_header_cnt(msg->header) * 4 : 0;
+	cnt = msg ? pd_header_cnt(le16_to_cpu(msg->header)) * 4 : 0;
 	ret = regmap_write(tcpci->regmap, TCPC_TX_BYTE_CNT, cnt + 2);
 	if (ret < 0)
 		return ret;
 
-	header = msg ? msg->header : 0;
+	header = msg ? le16_to_cpu(msg->header) : 0;
 	ret = tcpci_write16(tcpci, TCPC_TX_HDR, header);
 	if (ret < 0)
 		return ret;
@@ -390,7 +390,7 @@ static irqreturn_t tcpci_irq(int irq, void *dev_id)
 		regmap_read(tcpci->regmap, TCPC_RX_BYTE_CNT, &cnt);
 
 		tcpci_read16(tcpci, TCPC_RX_HDR, &reg);
-		msg.header = reg;
+		msg.header = cpu_to_le16(reg);
 
 		if (WARN_ON(cnt > sizeof(msg.payload)))
 			cnt = sizeof(msg.payload);
