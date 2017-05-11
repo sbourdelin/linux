@@ -93,7 +93,7 @@ static DEFINE_SEMAPHORE(hyperv_mmio_lock);
 
 static int vmbus_exists(void)
 {
-	if (hv_acpi_dev == NULL)
+	if (!hv_acpi_dev)
 		return -ENODEV;
 
 	return 0;
@@ -568,7 +568,7 @@ static const struct hv_vmbus_device_id *hv_vmbus_get_id(struct hv_driver *drv,
 		return id;
 
 	id = drv->id_table;
-	if (id == NULL)
+	if (!id)
 		return NULL; /* empty device table */
 
 	for (; !is_null_guid(&id->guid); id++)
@@ -871,7 +871,7 @@ void vmbus_on_msg_dpc(unsigned long data)
 	entry = &channel_message_table[hdr->msgtype];
 	if (entry->handler_type	== VMHT_BLOCKING) {
 		ctx = kmalloc(sizeof(*ctx), GFP_ATOMIC);
-		if (ctx == NULL)
+		if (!ctx)
 			return;
 
 		INIT_WORK(&ctx->work, vmbus_onmessage_work);
@@ -894,7 +894,7 @@ static void vmbus_channel_isr(struct vmbus_channel *channel)
 	void (*callback_fn)(void *);
 
 	callback_fn = READ_ONCE(channel->onchannel_callback);
-	if (likely(callback_fn != NULL))
+	if (likely(callback_fn))
 		(*callback_fn)(channel->channel_callback_context);
 }
 
@@ -970,7 +970,7 @@ static void vmbus_isr(void)
 	union hv_synic_event_flags *event;
 	bool handled = false;
 
-	if (unlikely(page_addr == NULL))
+	if (unlikely(!page_addr))
 		return;
 
 	event = (union hv_synic_event_flags *)page_addr +
