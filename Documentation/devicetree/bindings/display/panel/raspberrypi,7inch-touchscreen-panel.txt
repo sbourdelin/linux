@@ -1,0 +1,7 @@
+Official 7" (800x480) Raspberry Pi touchscreen panel's panel.
+
+This binding is compatible with the simple-panel binding, which is specified
+in simple-panel.txt in this directory.
+
+Required properties:
+- compatible:	Must be "raspberrypi,7inch-touchscreen-panel"

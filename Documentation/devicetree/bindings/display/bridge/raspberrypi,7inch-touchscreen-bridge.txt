@@ -1,0 +1,68 @@
+Official 7" (800x480) Raspberry Pi touchscreen panel's bridge.
+
+This DSI panel contains:
+
+- TC358762 DSI->DPI bridge
+- Atmel microcontroller on I2C for power sequencing the DSI bridge and
+  controlling backlight
+- Touchscreen controller on I2C for touch input
+
+and this covers the TC358762 bridge and Atmel microcontroller, while
+../panel/raspberrypi,7inch-touchscreen-panel.txt covers the panel.
+
+Required properties:
+- compatible:	Must be "raspberrypi,7inch-touchscreen-bridge"
+- raspberrypi,touchscreen-bridge:
+		Handle to the I2C device for Atmel microcontroller
+
+Example:
+
+dsi1: dsi@7e700000 {
+	#address-cells = <1>;
+	#size-cells = <0>;
+	<...>
+
+	lcd-bridge@0 {
+		compatible = "raspberrypi,7inch-touchscreen-bridge";
+		reg = <0>;
+
+		raspberrypi,touchscreen-bridge = <&pitouchscreen_bridge>;
+		ports {
+			#address-cells = <1>;
+			#size-cells = <0>;
+			port@0 {
+				reg = <0>;
+				pitouchscreen_bridge_port: endpoint {
+					remote-endpoint = <&pitouchscreen_panel_port>;
+				};
+			};
+		};
+	};
+};
+
+i2c_dsi: i2c {
+	compatible = "i2c-gpio";
+	#address-cells = <1>;
+	#size-cells = <0>;
+	gpios = <&gpio 28 0
+		 &gpio 29 0>;
+
+	pitouchscreen_bridge: bridge@45 {
+		compatible = "raspberrypi,touchscreen-bridge-i2c";
+		reg = <0x45>;
+	};
+};
+
+lcd {
+	compatible = "raspberrypi,7inch-touchscreen-panel";
+	ports {
+		#address-cells = <1>;
+		#size-cells = <0>;
+		port@0 {
+			reg = <0>;
+			pitouchscreen_panel_port: endpoint {
+				remote-endpoint = <&pitouchscreen_bridge_port>;
+			};
+		};
+	};
+};
