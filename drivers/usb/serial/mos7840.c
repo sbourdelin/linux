@@ -244,6 +244,12 @@ struct moschip_port {
 	struct usb_ctrlrequest *led_dr;
 
 	unsigned long flags;
+
+	int serial_flags;
+	int baud_base;
+	int custom_divisor;
+
+	struct mutex cfg_lock;
 };
 
 /*
@@ -1554,6 +1560,7 @@ static int mos7840_tiocmset(struct tty_struct *tty,
  *	this function calculates the proper baud rate divisor for the specified
  *	baud rate.
  *****************************************************************************/
+#define MAX_BAUD_RATE 3145728
 static int mos7840_calc_baud_rate_divisor(struct usb_serial_port *port,
 					  int baudRate, int *divisor,
 					  __u16 *clk_sel_val)
@@ -1582,8 +1589,8 @@ static int mos7840_calc_baud_rate_divisor(struct usb_serial_port *port,
 	} else if ((baudRate > 921600) && (baudRate <= 1572864)) {
 		*divisor = 1572864 / baudRate;
 		*clk_sel_val = 0x60;
-	} else if ((baudRate > 1572864) && (baudRate <= 3145728)) {
-		*divisor = 3145728 / baudRate;
+	} else if ((baudRate > 1572864) && (baudRate <= MAX_BAUD_RATE)) {
+		*divisor = MAX_BAUD_RATE / baudRate;
 		*clk_sel_val = 0x70;
 	}
 	return 0;
@@ -1733,6 +1740,8 @@ static void mos7840_change_port_settings(struct tty_struct *tty,
 		return;
 	}
 
+	mutex_lock(&mos7840_port->cfg_lock);
+
 	lData = LCR_BITS_8;
 	lStop = LCR_STOP_1;
 	lParity = LCR_PAR_NONE;
@@ -1831,6 +1840,16 @@ static void mos7840_change_port_settings(struct tty_struct *tty,
 	/* Determine divisor based on baud rate */
 	baud = tty_get_baud_rate(tty);
 
+	if (baud == 38400 &&
+	    (mos7840_port->serial_flags & ASYNC_SPD_MASK) == ASYNC_SPD_CUST &&
+	    mos7840_port->custom_divisor) {
+		baud = mos7840_port->baud_base / mos7840_port->custom_divisor;
+		dev_dbg(&port->dev, "Set custom baudrate (%d / %d) = %d",
+			mos7840_port->baud_base,
+			mos7840_port->custom_divisor,
+			baud);
+	}
+
 	if (!baud) {
 		/* pick a default, any default... */
 		dev_dbg(&port->dev, "%s", "Picked default baud...\n");
@@ -1855,6 +1874,8 @@ static void mos7840_change_port_settings(struct tty_struct *tty,
 	}
 	dev_dbg(&port->dev, "%s - mos7840_port->shadowLCR is End %x\n", __func__,
 		mos7840_port->shadowLCR);
+
+	mutex_unlock(&mos7840_port->cfg_lock);
 }
 
 /*****************************************************************************
@@ -1950,17 +1971,83 @@ static int mos7840_get_serial_info(struct moschip_port *mos7840_port,
 
 	memset(&tmp, 0, sizeof(tmp));
 
+	mutex_lock(&mos7840_port->cfg_lock);
+
 	tmp.type = PORT_16550A;
 	tmp.line = mos7840_port->port->minor;
 	tmp.port = mos7840_port->port->port_number;
 	tmp.irq = 0;
+	tmp.flags = mos7840_port->serial_flags;
 	tmp.xmit_fifo_size = NUM_URBS * URB_TRANSFER_BUFFER_SIZE;
-	tmp.baud_base = 9600;
+	tmp.baud_base = mos7840_port->baud_base;
+	tmp.custom_divisor = mos7840_port->custom_divisor;
 	tmp.close_delay = 5 * HZ;
 	tmp.closing_wait = 30 * HZ;
 
+	mutex_unlock(&mos7840_port->cfg_lock);
+
 	if (copy_to_user(retinfo, &tmp, sizeof(*retinfo)))
 		return -EFAULT;
+	return 0;
+}
+
+static int mos7840_set_serial_info(struct tty_struct *tty,
+			   struct moschip_port *priv,
+			   struct serial_struct __user *newinfo)
+{
+	struct serial_struct new_serial;
+	int old_flags = priv->serial_flags;
+	int old_divisor = priv->custom_divisor;
+	int old_base = priv->baud_base;
+
+	if (copy_from_user(&new_serial, newinfo, sizeof(new_serial)))
+		return -EFAULT;
+	mutex_lock(&priv->cfg_lock);
+
+	if (!capable(CAP_SYS_ADMIN)) {
+		if (((new_serial.flags & ~ASYNC_USR_MASK) !=
+		     (priv->serial_flags & ~ASYNC_USR_MASK))) {
+			mutex_unlock(&priv->cfg_lock);
+			return -EPERM;
+		}
+		priv->serial_flags = ((priv->serial_flags & ~ASYNC_USR_MASK) |
+			       (new_serial.flags & ASYNC_USR_MASK));
+		priv->custom_divisor = new_serial.custom_divisor;
+		goto check_and_exit;
+	}
+
+	if (new_serial.baud_base > MAX_BAUD_RATE) {
+		mutex_unlock(&priv->cfg_lock);
+		return -EINVAL;
+	}
+	/* Save user supplied value, use it later to calculate the baudrate. */
+	priv->baud_base = new_serial.baud_base;
+
+	priv->serial_flags = ((priv->serial_flags & ~ASYNC_FLAGS) |
+					(new_serial.flags & ASYNC_FLAGS));
+	priv->custom_divisor = new_serial.custom_divisor;
+check_and_exit:
+	if ((priv->serial_flags & ASYNC_SPD_MASK) == ASYNC_SPD_HI)
+		tty->alt_speed = 57600;
+	else if ((priv->serial_flags & ASYNC_SPD_MASK) == ASYNC_SPD_VHI)
+		tty->alt_speed = 115200;
+	else if ((priv->serial_flags & ASYNC_SPD_MASK) == ASYNC_SPD_SHI)
+		tty->alt_speed = 230400;
+	else if ((priv->serial_flags & ASYNC_SPD_MASK) == ASYNC_SPD_WARP)
+		tty->alt_speed = 460800;
+	else
+		tty->alt_speed = 0;
+
+	if (((old_flags & ASYNC_SPD_MASK) !=
+	     (priv->serial_flags & ASYNC_SPD_MASK)) ||
+	    (((priv->serial_flags & ASYNC_SPD_MASK) == ASYNC_SPD_CUST) &&
+	     ((old_divisor != priv->custom_divisor) ||
+			old_base != priv->baud_base))) {
+		mutex_unlock(&priv->cfg_lock);
+		mos7840_change_port_settings(tty, priv, &tty->termios);
+	}
+
+	mutex_unlock(&priv->cfg_lock);
 	return 0;
 }
 
@@ -1997,7 +2084,7 @@ static int mos7840_ioctl(struct tty_struct *tty,
 
 	case TIOCSSERIAL:
 		dev_dbg(&port->dev, "%s TIOCSSERIAL\n", __func__);
-		break;
+		return mos7840_set_serial_info(tty, mos7840_port, argp);
 	default:
 		break;
 	}
@@ -2135,6 +2222,10 @@ static int mos7840_port_probe(struct usb_serial_port *port)
 	mos7840_port = kzalloc(sizeof(struct moschip_port), GFP_KERNEL);
 	if (!mos7840_port)
 		return -ENOMEM;
+
+	mutex_init(&mos7840_port->cfg_lock);
+	mos7840_port->baud_base = MAX_BAUD_RATE;
+	mos7840_port->custom_divisor = 1;
 
 	/* Initialize all port interrupt end point to port 0 int
 	 * endpoint. Our device has only one interrupt end point
