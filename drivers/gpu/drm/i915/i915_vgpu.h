@@ -29,5 +29,6 @@
 void i915_check_vgpu(struct drm_i915_private *dev_priv);
 int intel_vgt_balloon(struct drm_i915_private *dev_priv);
 void intel_vgt_deballoon(struct drm_i915_private *dev_priv);
+bool intel_vgpu_has_full_ppgtt(struct drm_i915_private *dev_priv);
 
 #endif /* _I915_VGPU_H_ */
