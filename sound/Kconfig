@@ -54,7 +54,8 @@ config SOUND_OSS_CORE_PRECLAIM
 
 	  If unsure, say Y.
 
-source "sound/oss/dmasound/Kconfig"
+### TO-BE-REMOVED
+# source "sound/oss/dmasound/Kconfig"
 
 if !M68K && !UML
 
@@ -110,17 +111,18 @@ source "sound/soc/Kconfig"
 
 endif # SND
 
-menuconfig SOUND_PRIME
-	tristate "Open Sound System (DEPRECATED)"
-	select SOUND_OSS_CORE
-	help
-	  Say 'Y' or 'M' to enable Open Sound System drivers.
-
-if SOUND_PRIME
-
-source "sound/oss/Kconfig"
-
-endif # SOUND_PRIME
+### TO-BE-REMOVED
+# menuconfig SOUND_PRIME
+# 	tristate "Open Sound System (DEPRECATED)"
+# 	select SOUND_OSS_CORE
+# 	help
+# 	  Say 'Y' or 'M' to enable Open Sound System drivers.
+#
+# if SOUND_PRIME
+#
+# source "sound/oss/Kconfig"
+#
+# endif # SOUND_PRIME
 
 endif # !M68K
 
