@@ -889,7 +889,7 @@ err_free:
  * Returns TCM_NO_SENSE upon success or a sense code != TCM_NO_SENSE if parsing
  * fails.
  */
-sense_reason_t target_parse_xcopy_cmd(struct xcopy_op *xop)
+static sense_reason_t target_parse_xcopy_cmd(struct xcopy_op *xop)
 {
 	struct se_cmd *se_cmd = xop->xop_se_cmd;
 	unsigned char *p = NULL, *seg_desc;
