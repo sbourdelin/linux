@@ -671,12 +671,24 @@ static struct dt_cpu_feature_match __initdata
 	{"wait-v3", feat_enable, 0},
 };
 
-/* XXX: how to configure this? Default + boot time? */
-#ifdef CONFIG_PPC_CPUFEATURES_ENABLE_UNKNOWN
-#define CPU_FEATURE_ENABLE_UNKNOWN 1
-#else
-#define CPU_FEATURE_ENABLE_UNKNOWN 0
-#endif
+static bool __initdata using_dt_cpu_ftrs = true;
+static bool __initdata dt_cpu_ftrs_enable_unknown = true;
+
+static int __init dt_cpu_ftrs_parse(char *str)
+{
+	if (!str)
+		return 0;
+
+	if (!strcmp(str, "off"))
+		using_dt_cpu_ftrs = false;
+	else if (!strcmp(str, "known"))
+		dt_cpu_ftrs_enable_unknown = false;
+	else
+		return 1;
+
+	return 0;
+}
+early_param("dt_cpu_ftrs", dt_cpu_ftrs_parse);
 
 static void __init cpufeatures_setup_start(u32 isa)
 {
@@ -707,7 +719,7 @@ static bool __init cpufeatures_process_feature(struct dt_cpu_feature *f)
 		}
 	}
 
-	if (!known && CPU_FEATURE_ENABLE_UNKNOWN) {
+	if (!known && dt_cpu_ftrs_enable_unknown) {
 		if (!feat_try_enable_unknown(f)) {
 			pr_info("not enabling: %s (unknown and unsupported by kernel)\n",
 				f->name);
@@ -766,8 +778,6 @@ static int __init fdt_find_cpu_features(unsigned long node, const char *uname,
 	return 0;
 }
 
-static bool __initdata using_dt_cpu_ftrs = false;
-
 bool __init dt_cpu_ftrs_in_use(void)
 {
 	return using_dt_cpu_ftrs;
@@ -775,6 +785,16 @@ bool __init dt_cpu_ftrs_in_use(void)
 
 bool __init dt_cpu_ftrs_init(void *fdt)
 {
+	if (!using_dt_cpu_ftrs) {
+		/*
+		 * This should never happen because this runs before
+		 * early_praam, however if the init ordering changes,
+		 * test if early_param has disabled this.
+		 */
+		return false;
+	}
+	using_dt_cpu_ftrs = false;
+
 	/* Setup and verify the FDT, if it fails we just bail */
 	if (!early_init_dt_verify(fdt))
 		return false;
@@ -1027,5 +1047,8 @@ static int __init dt_cpu_ftrs_scan_callback(unsigned long node, const char
 
 void __init dt_cpu_ftrs_scan(void)
 {
+	if (!using_dt_cpu_ftrs)
+		return;
+
 	of_scan_flat_dt(dt_cpu_ftrs_scan_callback, NULL);
 }
