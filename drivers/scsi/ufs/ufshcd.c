@@ -933,6 +933,30 @@ out:
 }
 
 /**
+ * ufshcd_read_auto_hibern8_state - Reads hosts auto-hibern8 feature state
+ * @hba: per adapter instance
+ */
+u32 ufshcd_read_auto_hibern8_state(struct ufs_hba *hba)
+{
+	return ufshcd_readl(hba, REG_AUTO_HIBERNATE_IDLE_TIMER);
+}
+
+/**
+ * ufshcd_setup_auto_hibern8 - Sets up hosts auto-hibern8 feature
+ * @hba: per adapter instance
+ * @scale: timer scale (1/10/100us/1/10/100ms)
+ * @timer_val: value to be multipled with scale (idle timeout)
+ */
+void ufshcd_setup_auto_hibern8(struct ufs_hba *hba, u8 scale, u16 timer_val)
+{
+	u32 val = (scale << 10) & UFSHCD_AHIBERN8_SCALE_MASK;
+
+	val |= timer_val & UFSHCD_AHIBERN8_TIMER_MASK;
+
+	ufshcd_writel(hba, val, REG_AUTO_HIBERNATE_IDLE_TIMER);
+}
+
+/**
  * ufshcd_is_devfreq_scaling_required - check if scaling is required or not
  * @hba: per adapter instance
  * @scale_up: True if scaling up and false if scaling down
@@ -5338,6 +5362,7 @@ static void ufshcd_tmc_handler(struct ufs_hba *hba)
 static void ufshcd_sl_intr(struct ufs_hba *hba, u32 intr_status)
 {
 	hba->errors = UFSHCD_ERROR_MASK & intr_status;
+
 	if (hba->errors)
 		ufshcd_check_errors(hba);
 

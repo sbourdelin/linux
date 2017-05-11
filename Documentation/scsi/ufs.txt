@@ -17,6 +17,7 @@ Contents
   3.4 SCSI Error handling
 4. UFSHCD User Interface
   4.1 UFS Query IOCTL
+  4.2 UFS Auto-Hibern8 IOCTL
 
 
 1. Overview
@@ -173,6 +174,52 @@ host and device using IOCTL interface.
 
   This enables user to control some of the UFS specific features inaccessible
   in other way.
+
+4.2 UFS Auto-Hibern8 IOCTL
+
+  This interface enables user to get/set information about UFS Host
+  Auto-Hibern8 feature for capable hosts. You can use following snippet
+  to comunicate with this interface:
+
+	#include <sys/ioctl.h>
+	#include <scsi/ufs/ioctl.h>
+	#include <scsi/ufs/ufshci.h>
+
+	static int handleWrite(int fd, uint8_t scale, uint16_t timer_val)
+	{
+		ufs_ioctl_auto_hibern8_data hibern8_data;
+
+		/* State, that we want to write the data */
+		hibern8_data.write = true;
+
+		/* Timer scale (check <scsi/ufs/ufshci.h>) */
+		hibern8_data.scale = *scale;
+
+		/* Timer value (max. 0x3fff) */
+		hibern8_data.timer_val = *timer_val;
+
+		/* [fd] used here shall be opened UFS device */
+		return ioctl(fd, UFS_IOCTL_AUTO_HIBERN8, &hibern8_data);
+	}
+
+	static int handleRead(int fd, uint8_t *scale, uint16_t *timer_val)
+	{
+		ufs_ioctl_auto_hibern8_data hibern8_data;
+		int error;
+
+		/* State, that we want to read data  */
+		hibern8_data.write = false;
+
+		/* [fd] used here shall be opened UFS device */
+		error = ioctl(fd, UFS_IOCTL_AUTO_HIBERN8, &hibern8_data);
+
+		if (!error) {
+			*scale = hibern8_data.scale;
+			*timer_val = hibern8_data.timer_val;
+		}
+
+		return error;
+	}
 
 
 UFS Specifications can be found at,

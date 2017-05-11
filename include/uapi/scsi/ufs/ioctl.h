@@ -8,6 +8,7 @@
  *  SCSI_IOCTL_GET_PCI
  */
 #define UFS_IOCTL_QUERY			0x53A0
+#define UFS_IOCTL_AUTO_HIBERN8		0x53A1
 
 /**
  * struct ufs_ioctl_query_data - used to transfer data to and from user via
@@ -56,6 +57,36 @@ struct ufs_ioctl_query_data {
 	 * For Read Flag you will have to allocate 1 byte
 	 */
 	__u8 *buffer;
+};
+
+/**
+ * struct ufs_ioctl_auto_hibern8_data - used to hold Auto-Hibern8 feature
+ * configuration
+ *
+ * @write: flag indicating whether config should be written or read
+ * @scale: scale of the timer (length of one tick)
+ * @timer_val: value of the timer to be multipled by scale (0x0000-0x3FFF)
+ *
+ * Received/Submitted: scale, timer_val
+ */
+struct ufs_ioctl_auto_hibern8_data {
+	/*
+	 * This flag indicates whether configuration wirtten in this structure
+	 * should be written, or overwritten by reading currently written
+	 */
+	bool write;
+
+	/*
+	 * Scale of the timer. Prease refer to <uapi/scsi/ufs/ufshci.h> for
+	 * correct values and their meaning.
+	 */
+	__u8 scale;
+
+	/*
+	 * Actual timer value, which will be multipled by the scale.
+	 * Maximal value: 1023. 0 will disable the feature.
+	 */
+	__u16 timer_val;
 };
 
 #endif /* UAPI_UFS_IOCTL_H_ */

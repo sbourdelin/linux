@@ -273,6 +273,62 @@ out:
 	return err;
 }
 
+static int ufshcd_auto_hibern8_ioctl(struct ufs_hba *hba, void __user *buffer)
+{
+	struct ufs_ioctl_auto_hibern8_data *ioctl_data;
+	int err = 0;
+	u32 status = 0;
+
+	if (!(hba->capabilities & MASK_AUTO_HIBERN8_SUPPORT))
+		return -ENOTSUPP;
+
+	if (!buffer)
+		return -EINVAL;
+
+	ioctl_data = kzalloc(sizeof(struct ufs_ioctl_auto_hibern8_data),
+				GFP_KERNEL);
+	if (!ioctl_data) {
+		err = -ENOMEM;
+		goto out;
+	}
+
+	/* extract params from user buffer */
+	if (copy_from_user(ioctl_data, buffer, sizeof(*ioctl_data))) {
+		err = -EFAULT;
+		goto out_release_mem;
+	}
+
+	if (ioctl_data->write) {
+		if (ioctl_data->timer_val > UFSHCD_AHIBERN8_TIMER_MASK ||
+		    (ioctl_data->scale >= UFSHCD_AHIBERN8_SCALE_MAX)) {
+			err = -EINVAL;
+			goto out_release_mem;
+		}
+
+		/* Write valid state to host */
+		ufshcd_setup_auto_hibern8(hba, ioctl_data->scale,
+			ioctl_data->timer_val);
+	} else {
+		status = ufshcd_read_auto_hibern8_state(hba);
+		ioctl_data->scale =
+			(status & UFSHCD_AHIBERN8_SCALE_MASK) >> 10;
+		ioctl_data->timer_val =
+			(status & UFSHCD_AHIBERN8_TIMER_MASK);
+
+		/* Copy state to user */
+		err = copy_to_user(buffer, ioctl_data, sizeof(*ioctl_data));
+	}
+
+out_release_mem:
+	kfree(ioctl_data);
+out:
+	if (err)
+		dev_err(hba->dev, "Auto-Hibern8 request failed (error: %d)",
+			err);
+
+	return err;
+}
+
 /**
  * ufshcd_ioctl - ufs ioctl callback registered in scsi_host
  * @dev: scsi device required for per LUN queries
@@ -281,6 +337,7 @@ out:
  *
  * Supported commands:
  * UFS_IOCTL_QUERY
+ * UFS_IOCTL_AUTO_HIBERN8
  */
 int ufshcd_ioctl(struct scsi_device *dev, int cmd, void __user *buffer)
 {
@@ -295,6 +352,11 @@ int ufshcd_ioctl(struct scsi_device *dev, int cmd, void __user *buffer)
 		pm_runtime_get_sync(hba->dev);
 		err = ufshcd_query_ioctl(hba, ufshcd_scsi_to_upiu_lun(dev->lun),
 				buffer);
+		pm_runtime_put_sync(hba->dev);
+		break;
+	case UFS_IOCTL_AUTO_HIBERN8:
+		pm_runtime_get_sync(hba->dev);
+		err = ufshcd_auto_hibern8_ioctl(hba, buffer);
 		pm_runtime_put_sync(hba->dev);
 		break;
 	default:

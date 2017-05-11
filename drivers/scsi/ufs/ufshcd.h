@@ -860,6 +860,10 @@ u32 ufshcd_get_local_unipro_ver(struct ufs_hba *hba);
 u8 ufshcd_scsi_to_upiu_lun(unsigned int scsi_lun);
 u16 ufshcd_upiu_wlun_to_scsi_wlun(u8 upiu_wlun_id);
 
+/* Expose Auto-Hibern8 API */
+void ufshcd_setup_auto_hibern8(struct ufs_hba *hba, u8 scale, u16 timer_val);
+u32 ufshcd_read_auto_hibern8_state(struct ufs_hba *hba);
+
 /* Wrapper functions for safely calling variant operations */
 static inline const char *ufshcd_get_var_name(struct ufs_hba *hba)
 {
