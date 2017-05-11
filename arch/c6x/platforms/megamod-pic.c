@@ -168,7 +168,7 @@ static void __init set_megamod_mux(struct megamod_pic *pic, int src, int output)
  * The MUX map is an array of up to 12 cells; one for each usable core priority
  * interrupt. The value of a given cell is the megamodule interrupt source
  * which is to me MUXed to the output corresponding to the cell position
- * withing the array. The first cell in the array corresponds to priority
+ * within the array. The first cell in the array corresponds to priority
  * 4 and the last (12th) cell corresponds to priority 15. The allowed
  * values are 4 - ((NR_COMBINERS * 32) - 1). Note that the combined interrupt
  * sources (0 - 3) are not allowed to be mapped through this property. They
