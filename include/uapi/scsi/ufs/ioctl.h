@@ -9,6 +9,7 @@
  */
 #define UFS_IOCTL_QUERY			0x53A0
 #define UFS_IOCTL_AUTO_HIBERN8		0x53A1
+#define UFS_IOCTL_TASK_MANAGEMENT	0x53A2
 
 /**
  * struct ufs_ioctl_query_data - used to transfer data to and from user via
@@ -87,6 +88,23 @@ struct ufs_ioctl_auto_hibern8_data {
 	 * Maximal value: 1023. 0 will disable the feature.
 	 */
 	__u16 timer_val;
+};
+
+/**
+ * struct ufs_ioctl_task_mgmt_data - used to perform Task Management specific
+ * functions
+ *
+ * @task_id: ID of a task to be managed
+ * @task_func: function to perform on managed task
+ * @response: Task Management response
+ *
+ * Submitted: task_id, task_func
+ * Received: response
+ */
+struct ufs_ioctl_task_mgmt_data {
+	__u8 task_id;
+	__u8 task_func;
+	__u8 response;
 };
 
 #endif /* UAPI_UFS_IOCTL_H_ */

@@ -66,4 +66,14 @@ enum query_opcode {
 	UPIU_QUERY_OPCODE_TOGGLE_FLAG	= 0x8,
 };
 
+/* Task management functions */
+enum {
+	UFS_ABORT_TASK		= 0x01,
+	UFS_ABORT_TASK_SET	= 0x02,
+	UFS_CLEAR_TASK_SET	= 0x04,
+	UFS_LOGICAL_RESET	= 0x08,
+	UFS_QUERY_TASK		= 0x80,
+	UFS_QUERY_TASK_SET	= 0x81,
+};
+
 #endif /* UAPI_UFS_H_ */

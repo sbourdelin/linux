@@ -5437,7 +5437,7 @@ out:
  *
  * Returns non-zero value on error, zero on success.
  */
-static int ufshcd_issue_tm_cmd(struct ufs_hba *hba, int lun_id, int task_id,
+int ufshcd_issue_tm_cmd(struct ufs_hba *hba, int lun_id, int task_id,
 		u8 tm_function, u8 *tm_response)
 {
 	struct utp_task_req_desc *task_req_descp;

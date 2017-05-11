@@ -180,6 +180,7 @@ static int ufshcd_query_ioctl(struct ufs_hba *hba, u8 lun, void __user *buffer)
 		goto out_release_mem;
 	}
 
+	/* Prepare to handle query */
 	switch (ioctl_data->opcode) {
 	case UPIU_QUERY_OPCODE_WRITE_DESC:
 		write = true;
@@ -329,6 +330,51 @@ out:
 	return err;
 }
 
+static int ufshcd_task_mgmt_ioctl(struct ufs_hba *hba, u8 lun,
+	void __user *buffer)
+{
+	struct ufs_ioctl_task_mgmt_data *ioctl_data;
+	int err = 0;
+
+	if (!buffer)
+		return -EINVAL;
+
+	if (!ufs_is_valid_unit_desc_lun(lun))
+		return -EINVAL;
+
+	ioctl_data = kzalloc(sizeof(struct ufs_ioctl_task_mgmt_data),
+				GFP_KERNEL);
+	if (!ioctl_data) {
+		err = -ENOMEM;
+		goto out;
+	}
+
+	/* Extract params from user buffer */
+	if (copy_from_user(ioctl_data, buffer, sizeof(*ioctl_data))) {
+		err = -EFAULT;
+		goto out_release_mem;
+	}
+
+	err = ufshcd_issue_tm_cmd(hba, lun, ioctl_data->task_id,
+		ioctl_data->task_func, &ioctl_data->response);
+
+	if (err)
+		goto out_release_mem;
+
+	/* Copy response to user */
+	if (copy_to_user(buffer, ioctl_data, sizeof(*ioctl_data)))
+		err = -EFAULT;
+
+out_release_mem:
+	kfree(ioctl_data);
+out:
+	if (err)
+		dev_err(hba->dev, "User Task Management failed (error: %d)",
+			err);
+
+	return err;
+}
+
 /**
  * ufshcd_ioctl - ufs ioctl callback registered in scsi_host
  * @dev: scsi device required for per LUN queries
@@ -338,6 +384,7 @@ out:
  * Supported commands:
  * UFS_IOCTL_QUERY
  * UFS_IOCTL_AUTO_HIBERN8
+ * UFS_IOCTL_TASK_MANAGEMENT
  */
 int ufshcd_ioctl(struct scsi_device *dev, int cmd, void __user *buffer)
 {
@@ -357,6 +404,12 @@ int ufshcd_ioctl(struct scsi_device *dev, int cmd, void __user *buffer)
 	case UFS_IOCTL_AUTO_HIBERN8:
 		pm_runtime_get_sync(hba->dev);
 		err = ufshcd_auto_hibern8_ioctl(hba, buffer);
+		pm_runtime_put_sync(hba->dev);
+		break;
+	case UFS_IOCTL_TASK_MANAGEMENT:
+		pm_runtime_get_sync(hba->dev);
+		err = ufshcd_task_mgmt_ioctl(hba,
+			ufshcd_scsi_to_upiu_lun(dev->lun), buffer);
 		pm_runtime_put_sync(hba->dev);
 		break;
 	default:

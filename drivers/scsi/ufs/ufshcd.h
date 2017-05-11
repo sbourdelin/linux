@@ -864,6 +864,10 @@ u16 ufshcd_upiu_wlun_to_scsi_wlun(u8 upiu_wlun_id);
 void ufshcd_setup_auto_hibern8(struct ufs_hba *hba, u8 scale, u16 timer_val);
 u32 ufshcd_read_auto_hibern8_state(struct ufs_hba *hba);
 
+/* Expose Task Management API */
+int ufshcd_issue_tm_cmd(struct ufs_hba *hba, int lun_id, int task_id,
+		u8 tm_function, u8 *tm_response);
+
 /* Wrapper functions for safely calling variant operations */
 static inline const char *ufshcd_get_var_name(struct ufs_hba *hba)
 {

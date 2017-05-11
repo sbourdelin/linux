@@ -88,16 +88,6 @@ static inline bool ufs_is_valid_unit_desc_lun(u8 lun)
  * UFS Protocol Information Unit related definitions
  */
 
-/* Task management functions */
-enum {
-	UFS_ABORT_TASK		= 0x01,
-	UFS_ABORT_TASK_SET	= 0x02,
-	UFS_CLEAR_TASK_SET	= 0x04,
-	UFS_LOGICAL_RESET	= 0x08,
-	UFS_QUERY_TASK		= 0x80,
-	UFS_QUERY_TASK_SET	= 0x81,
-};
-
 /* UTP UPIU Transaction Codes Initiator to Target */
 enum {
 	UPIU_TRANSACTION_NOP_OUT	= 0x00,

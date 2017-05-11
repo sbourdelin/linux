@@ -18,6 +18,7 @@ Contents
 4. UFSHCD User Interface
   4.1 UFS Query IOCTL
   4.2 UFS Auto-Hibern8 IOCTL
+  4.3 UFS Task Management IOCTL
 
 
 1. Overview
@@ -220,6 +221,40 @@ host and device using IOCTL interface.
 
 		return error;
 	}
+4.3 UFS Task Management IOCTL
+
+  This interface enables user to manage tasks on the device. It's meant
+  mainly for test and troubleshooting purposes. You can use following
+  snippet to comunicate with this interface:
+
+	#include <sys/ioctl.h>
+	#include <scsi/ufs/ioctl.h>
+	#include <scsi/ufs/ufs.h>
+
+	static int handleTask(int fd, uint8_t task_id, uint8_t task_func,
+		uint8_t *response)
+	{
+		ufs_ioctl_task_mgmt_data task_data;
+		int error;
+
+		/* Task ID (normally in range 0-F) */
+		task_data.task_id = task_id;
+
+		/* Task Function (check <scsi/ufs/ufs.h>) */
+		task_data.task_func = task_func;
+
+		/* [fd] used here shall be opened UFS device */
+		error = ioctl(fd, UFS_IOCTL_TASK_MANAGEMENT, &task_data);
+
+		if (!error)
+			/* This will return task specific response */
+			*response = task_data.response;
+
+		return error;
+	}
+
+  This one should be used with extreme care as it's more of a testing/vaidation
+  interface.
 
 
 UFS Specifications can be found at,
