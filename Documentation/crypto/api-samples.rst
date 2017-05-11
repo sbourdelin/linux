@@ -48,7 +48,7 @@ Code Example For Symmetric Key Cipher Operation
             break;
         case -EINPROGRESS:
         case -EBUSY:
-            rc = wait_for_completion_interruptible(
+            rc = wait_for_completion(
                 &sk->result.completion);
             if (!rc && !sk->result.err) {
                 reinit_completion(&sk->result.completion);
