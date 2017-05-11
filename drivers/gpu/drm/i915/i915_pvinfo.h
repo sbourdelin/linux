@@ -58,7 +58,8 @@ struct vgt_if {
 	uint16_t version_major;
 	uint16_t version_minor;
 	u32 vgt_id;		/* ID of vGT instance */
-	u32 rsv1[12];		/* pad to offset 0x40 */
+	uint32_t  vgt_caps;     /* VGT capabilities */
+	u32 rsv1[11];		/* pad to offset 0x40 */
 	/*
 	 *  Data structure to describe the balooning info of resources.
 	 *  Each VM can only have one portion of continuous area for now.
