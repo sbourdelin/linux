@@ -115,10 +115,8 @@ int __init tcm_add_region(struct tcm_region *reg)
 	struct tcm_pool *pool;
 
 	pool = kmalloc(sizeof(*pool), GFP_KERNEL);
-	if (!pool) {
-		pr_err("Failed to alloc memory for TCM pool!\n");
+	if (!pool)
 		return -ENOMEM;
-	}
 
 	pool->tag = reg->tag;
 	pool->start = reg->res.start;
