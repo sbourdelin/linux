@@ -2170,6 +2170,68 @@ size_t security_policydb_len(void)
 }
 
 /**
+ * security_policydb_brief - Get policydb brief
+ * @brief: pointer to buffer holding brief
+ * @len: in: brief buffer length if no alloc, out: brief string len
+ * @alloc: whether to allocate buffer for brief or not
+ *
+ * On success 0 is returned , or negative value on error.
+ **/
+int security_policydb_brief(char **brief, size_t *len, bool alloc)
+{
+	size_t policybrief_len;
+
+	if (!ss_initialized || brief == NULL)
+		return -EINVAL;
+
+	read_lock(&policy_rwlock);
+	policybrief_len = strlen(policydb.policybrief);
+	read_unlock(&policy_rwlock);
+
+	if (alloc)
+		/* *brief must be kfreed by caller in this case */
+		*brief = kzalloc(policybrief_len + 1, GFP_KERNEL);
+	else
+		/*
+		 * if !alloc, caller must pass a buffer that
+		 * can hold policybrief_len+1 chars
+		 */
+		if (*len < policybrief_len + 1) {
+			/* put in *len the string size we need to write */
+			*len = policybrief_len;
+			return -ENAMETOOLONG;
+		}
+
+	if (*brief == NULL)
+		return -ENOMEM;
+
+	read_lock(&policy_rwlock);
+	*len = strlen(policydb.policybrief);
+	strncpy(*brief, policydb.policybrief, *len);
+	read_unlock(&policy_rwlock);
+
+	return 0;
+}
+
+void security_policydb_update_info(u32 requested)
+{
+	/* policy brief is in the form:
+	 * <0 or 1 for enforce>:<0 or 1 for checkreqprot>:<hashalg>=<checksum>
+	 */
+
+	if (!ss_initialized)
+		return;
+
+	/* update global policydb, needs write lock */
+	write_lock_irq(&policy_rwlock);
+	if (requested == SECURITY__SETENFORCE)
+		policydb.policybrief[0] = '0' + selinux_enforcing;
+	else if (requested == SECURITY__SETCHECKREQPROT)
+		policydb.policybrief[2] = '0' + selinux_checkreqprot;
+	write_unlock_irq(&policy_rwlock);
+}
+
+/**
  * security_port_sid - Obtain the SID for a port.
  * @protocol: protocol number
  * @port: port number

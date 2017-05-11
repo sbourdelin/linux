@@ -159,6 +159,7 @@ static ssize_t sel_write_enforce(struct file *file, const char __user *buf,
 			from_kuid(&init_user_ns, audit_get_loginuid(current)),
 			audit_get_sessionid(current));
 		selinux_enforcing = new_value;
+		security_policydb_update_info(SECURITY__SETENFORCE);
 		if (selinux_enforcing)
 			avc_ss_reset(0);
 		selnl_notify_setenforce(selinux_enforcing);
@@ -621,6 +622,7 @@ static ssize_t sel_write_checkreqprot(struct file *file, const char __user *buf,
 		goto out;
 
 	selinux_checkreqprot = new_value ? 1 : 0;
+	security_policydb_update_info(SECURITY__SETCHECKREQPROT);
 	length = count;
 out:
 	kfree(page);

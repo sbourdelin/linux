@@ -293,6 +293,8 @@ struct policydb {
 	size_t len;
 
 	unsigned int policyvers;
+	/* summary computed on the policy */
+	unsigned char *policybrief;
 
 	unsigned int reject_unknown : 1;
 	unsigned int allow_unknown : 1;

@@ -1331,6 +1331,20 @@
  *	@inode we wish to get the security context of.
  *	@ctx is a pointer in which to place the allocated security context.
  *	@ctxlen points to the place to put the length of @ctx.
+ *
+ * Security hooks for policy brief
+ *
+ * @policy_brief:
+ *
+ *	Returns a string containing a brief info of the policydb, in the
+ *	following form:
+ *	<0 or 1 for enforce>:<0 or 1 for checkreqprot>:<hashalg>=<checksum>
+ *
+ *	@brief: pointer to buffer holding brief
+ *	@len: in: brief buffer length if no alloc, out: brief string len
+ *	@alloc: whether to allocate buffer for brief or not
+ *	On success 0 is returned , or negative value on error.
+ *
  * This is the main security structure.
  */
 
@@ -1562,6 +1576,7 @@ union security_list_options {
 	int (*inode_setsecctx)(struct dentry *dentry, void *ctx, u32 ctxlen);
 	int (*inode_getsecctx)(struct inode *inode, void **ctx, u32 *ctxlen);
 
+	int (*policy_brief)(char **brief, size_t *len, bool alloc);
 #ifdef CONFIG_SECURITY_NETWORK
 	int (*unix_stream_connect)(struct sock *sock, struct sock *other,
 					struct sock *newsk);
@@ -1806,6 +1821,7 @@ struct security_hook_heads {
 	struct list_head inode_notifysecctx;
 	struct list_head inode_setsecctx;
 	struct list_head inode_getsecctx;
+	struct list_head policy_brief;
 #ifdef CONFIG_SECURITY_NETWORK
 	struct list_head unix_stream_connect;
 	struct list_head unix_may_send;
