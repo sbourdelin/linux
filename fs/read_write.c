@@ -33,9 +33,9 @@ const struct file_operations generic_ro_fops = {
 
 EXPORT_SYMBOL(generic_ro_fops);
 
-static inline int unsigned_offsets(struct file *file)
+static inline bool unsigned_offsets(struct file *file)
 {
-	return file->f_mode & FMODE_UNSIGNED_OFFSET;
+	return !!(file->f_mode & FMODE_UNSIGNED_OFFSET);
 }
 
 /**
