@@ -1145,7 +1145,7 @@ struct hv_device *vmbus_device_create(const uuid_le *type,
 {
 	struct hv_device *child_device_obj;
 
-	child_device_obj = kzalloc(sizeof(struct hv_device), GFP_KERNEL);
+	child_device_obj = kzalloc(sizeof(*child_device_obj), GFP_KERNEL);
 	if (!child_device_obj) {
 		pr_err("Unable to allocate device object for child device\n");
 		return NULL;
