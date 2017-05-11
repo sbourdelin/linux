@@ -1772,11 +1772,11 @@ u64 get_kvmclock_ns(struct kvm *kvm)
 
 	hv_clock.tsc_timestamp = ka->master_cycle_now;
 	hv_clock.system_time = ka->master_kernel_ns + ka->kvmclock_offset;
-	spin_unlock(&ka->pvclock_gtod_sync_lock);
 
 	kvm_get_time_scale(NSEC_PER_SEC, __this_cpu_read(cpu_tsc_khz) * 1000LL,
 			   &hv_clock.tsc_shift,
 			   &hv_clock.tsc_to_system_mul);
+	spin_unlock(&ka->pvclock_gtod_sync_lock);
 	return __pvclock_read_cycles(&hv_clock, rdtsc());
 }
 
