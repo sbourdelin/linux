@@ -99,6 +99,7 @@ enum sel_inos {
 	SEL_STATUS,	/* export current status using mmap() */
 	SEL_POLICY,	/* allow userspace to read the in kernel policy */
 	SEL_VALIDATE_TRANS, /* compute validatetrans decision */
+	SEL_POLICYBRIEF,/* return policy summary */
 	SEL_INO_NEXT,	/* The next inode number to use */
 };
 
@@ -311,6 +312,29 @@ static ssize_t sel_read_policyvers(struct file *filp, char __user *buf,
 
 static const struct file_operations sel_policyvers_ops = {
 	.read		= sel_read_policyvers,
+	.llseek		= generic_file_llseek,
+};
+
+static ssize_t sel_read_policybrief(struct file *filp, char __user *buf,
+				    size_t count, loff_t *ppos)
+{
+	char *tmpbuf;
+	size_t len;
+	ssize_t rc;
+
+	rc = security_policydb_brief(&tmpbuf, &len, true);
+	if (rc)
+		return rc;
+
+	rc = simple_read_from_buffer(buf, count, ppos, tmpbuf, len);
+
+	kfree(tmpbuf);
+
+	return rc;
+}
+
+static const struct file_operations sel_policybrief_ops = {
+	.read		= sel_read_policybrief,
 	.llseek		= generic_file_llseek,
 };
 
@@ -1827,6 +1851,8 @@ static int sel_fill_super(struct super_block *sb, void *data, int silent)
 		[SEL_POLICY] = {"policy", &sel_policy_ops, S_IRUGO},
 		[SEL_VALIDATE_TRANS] = {"validatetrans", &sel_transition_ops,
 					S_IWUGO},
+		[SEL_POLICYBRIEF] = {"policybrief", &sel_policybrief_ops,
+				     S_IRUGO},
 		/* last one */ {""}
 	};
 	ret = simple_fill_super(sb, SELINUX_MAGIC, selinux_files);
