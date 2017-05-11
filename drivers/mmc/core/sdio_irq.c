@@ -137,9 +137,13 @@ static int sdio_irq_thread(void *_host)
 		 * holding of the host lock does not cover too much work
 		 * that doesn't require that lock to be held.
 		 */
-		ret = __mmc_claim_host(host, &host->sdio_irq_thread_abort);
-		if (ret)
+		mmc_claim_host(host);
+		if (!host->sdio_irqs) {
+			ret = 1;
+			mmc_release_host(host);
 			break;
+		}
+
 		ret = process_sdio_pending_irqs(host);
 		host->sdio_irq_pending = false;
 		mmc_release_host(host);
@@ -195,7 +199,6 @@ static int sdio_card_irq_get(struct mmc_card *card)
 
 	if (!host->sdio_irqs++) {
 		if (!(host->caps2 & MMC_CAP2_SDIO_IRQ_NOTHREAD)) {
-			atomic_set(&host->sdio_irq_thread_abort, 0);
 			host->sdio_irq_thread =
 				kthread_run(sdio_irq_thread, host,
 					    "ksdioirqd/%s", mmc_hostname(host));
@@ -223,7 +226,6 @@ static int sdio_card_irq_put(struct mmc_card *card)
 
 	if (!--host->sdio_irqs) {
 		if (!(host->caps2 & MMC_CAP2_SDIO_IRQ_NOTHREAD)) {
-			atomic_set(&host->sdio_irq_thread_abort, 1);
 			kthread_stop(host->sdio_irq_thread);
 		} else if (host->caps & MMC_CAP_SDIO_IRQ) {
 			host->ops->enable_sdio_irq(host, 0);
