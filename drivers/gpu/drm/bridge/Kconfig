@@ -69,6 +69,15 @@ config DRM_SIL_SII8620
 	help
 	  Silicon Image SII8620 HDMI/MHL bridge chip driver.
 
+config DRM_RASPBERRYPI_TOUCHSCREEN_BRIDGE
+	tristate "Raspberry Pi 7-inch touchscreen bridge"
+	depends on OF
+	select DRM_KMS_HELPER
+	help
+	  Say Y here if you want to enable support for the Raspberry
+	  Pi 7" Touchscreen.  To compile this driver as a module,
+	  choose M here.
+
 config DRM_SII902X
 	tristate "Silicon Image sii902x RGB/HDMI bridge"
 	depends on OF
