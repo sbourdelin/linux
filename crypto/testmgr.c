@@ -217,10 +217,9 @@ static int ahash_partial_update(struct ahash_request **preq,
 	statesize = crypto_ahash_statesize(
 			crypto_ahash_reqtfm(req));
 	state = kmalloc(statesize + sizeof(guard), GFP_KERNEL);
-	if (!state) {
-		pr_err("alt: hash: Failed to alloc state for %s\n", algo);
+	if (!state)
 		goto out_nostate;
-	}
+
 	memcpy(state + statesize, guard, sizeof(guard));
 	ret = crypto_ahash_export(req, state);
 	WARN_ON(memcmp(state + statesize, guard, sizeof(guard)));
@@ -1632,11 +1631,8 @@ static int test_cprng(struct crypto_rng *tfm,
 	seedsize = crypto_rng_seedsize(tfm);
 
 	seed = kmalloc(seedsize, GFP_KERNEL);
-	if (!seed) {
-		printk(KERN_ERR "alg: cprng: Failed to allocate seed space "
-		       "for %s\n", algo);
+	if (!seed)
 		return -ENOMEM;
-	}
 
 	for (i = 0; i < tcount; i++) {
 		memset(result, 0, 32);
