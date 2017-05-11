@@ -4156,6 +4156,17 @@ static void pci_dev_save_and_disable(struct pci_dev *dev)
 	pci_set_power_state(dev, PCI_D0);
 
 	pci_save_state(dev);
+
+	/*
+	 * Disable MSI/MSI-X before resetting. Some devices have been found to
+	 * trigger interrupts while in the middle of Function Level Reset. The
+	 * MSI/MSI-X state will get restored after we reset.
+	 */
+	if (dev->msi_enabled)
+		pci_msi_set_enable(dev, 0);
+	if (dev->msix_enabled)
+		pci_msix_clear_and_set_ctrl(dev, PCI_MSIX_FLAGS_ENABLE, 0);
+
 	/*
 	 * Disable the device by clearing the Command register, except for
 	 * INTx-disable which is set.  This not only disables MMIO and I/O port
