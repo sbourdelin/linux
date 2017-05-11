@@ -841,6 +841,13 @@ static inline bool ufshcd_is_hs_mode(struct ufs_pa_layer_attr *pwr_info)
 /* Expose Query-Request API */
 int ufshcd_query_flag(struct ufs_hba *hba, enum query_opcode opcode,
 	enum flag_idn idn, bool *flag_res);
+
+int ufshcd_query_attr(struct ufs_hba *hba, enum query_opcode opcode,
+	enum attr_idn idn, u8 index, u8 selector, u32 *attr_val);
+
+int ufshcd_query_descriptor(struct ufs_hba *hba, enum query_opcode opcode,
+	enum desc_idn idn, u8 index, u8 selector, u8 *desc_buf, int *buf_len);
+
 int ufshcd_hold(struct ufs_hba *hba, bool async);
 void ufshcd_release(struct ufs_hba *hba);
 
@@ -848,6 +855,10 @@ int ufshcd_map_desc_id_to_length(struct ufs_hba *hba, enum desc_idn desc_id,
 	int *desc_length);
 
 u32 ufshcd_get_local_unipro_ver(struct ufs_hba *hba);
+
+/* Expose API for obtaining UPIU/SCSI LUN */
+u8 ufshcd_scsi_to_upiu_lun(unsigned int scsi_lun);
+u16 ufshcd_upiu_wlun_to_scsi_wlun(u8 upiu_wlun_id);
 
 /* Wrapper functions for safely calling variant operations */
 static inline const char *ufshcd_get_var_name(struct ufs_hba *hba)

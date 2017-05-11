@@ -61,6 +61,18 @@ config SCSI_UFSHCD_PCI
 
 	  If unsure, say N.
 
+config SCSI_UFSHCD_IOCTL
+	bool "Enable ioctl() Configuration Interface for this module"
+	depends on SCSI_UFSHCD
+	---help---
+	This enables UFS Configuration Interface for user-space.
+	Interface enables you to configure and read state of some
+	of the UFS features, which are inavailable in other way.
+
+	  If you intend to configure UFS Host/Device through it, say Y here.
+
+	  If unsure, say N.
+
 config SCSI_UFS_DWC_TC_PCI
 	tristate "DesignWare pci support using a G210 Test Chip"
 	depends on SCSI_UFSHCD_PCI

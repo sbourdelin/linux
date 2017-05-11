@@ -15,6 +15,8 @@ Contents
   3.2 UTP Transfer requests
   3.3 UFS error handling
   3.4 SCSI Error handling
+4. UFSHCD User Interface
+  4.1 UFS Query IOCTL
 
 
 1. Overview
@@ -125,8 +127,53 @@ The current UFSHCD implementation supports following functionality,
   SCSI Midlayer through .eh_abort_handler, .eh_device_reset_handler and
   .eh_host_reset_handler.
 
-In this version of UFSHCD Query requests and power management
+In this version of UFSHCD power management
 functionality are not implemented.
+
+
+4. UFSHCD User Interface
+------------------
+
+Current impementation of UFSHCD enables user to communicate with
+host and device using IOCTL interface.
+
+4.1 UFS Query IOCTL
+
+  This interface enables user to get information about UFS Device
+  and set some of its configurable properties. You can use following
+  snippet to communicate with this interface:
+
+	#include <sys/ioctl.h>
+	#include <scsi/ufs/ioctl.h>
+	#include <scsi/ufs/ufs.h>
+
+	static int handleQuery(int fd, uint8_t opcode, uint8_t idn,
+		uint8_t buf_size, uint8_t *buffer)
+	{
+		ufs_ioctl_query_data query_data;
+
+		/* Operation code (check <scsi/ufs/ufs.h>) */
+		query_data.opcode = opcode;
+
+		/* Query ID  (check <scsi/ufs/ufs.h>) */
+		query_data.idn = idn;
+
+		/*
+		 * Pointer to allocated memory. Filled with proper data if
+		 * [opcode] determines write operation.
+		 */
+		query_data.buffer = buffer;
+
+		/* Size of allocated memory */
+		query_data.buf_size = buf_size;
+
+		/* [fd] used here shall be opened UFS device */
+		return ioctl(fd, UFS_IOCTL_QUERY, &query_data);
+	}
+
+  This enables user to control some of the UFS specific features inaccessible
+  in other way.
+
 
 UFS Specifications can be found at,
 UFS - http://www.jedec.org/sites/default/files/docs/JESD220.pdf

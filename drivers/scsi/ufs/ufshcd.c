@@ -41,9 +41,11 @@
 #include <linux/devfreq.h>
 #include <linux/nls.h>
 #include <linux/of.h>
+
 #include "ufshcd.h"
 #include "ufs_quirks.h"
 #include "unipro.h"
+#include "ufshcd-ioctl.h"
 
 #define CREATE_TRACE_POINTS
 #include <trace/events/ufs.h>
@@ -2244,7 +2246,7 @@ static int ufshcd_comp_scsi_upiu(struct ufs_hba *hba, struct ufshcd_lrb *lrbp)
  *
  * Returns UPIU LUN id
  */
-static inline u8 ufshcd_scsi_to_upiu_lun(unsigned int scsi_lun)
+u8 ufshcd_scsi_to_upiu_lun(unsigned int scsi_lun)
 {
 	if (scsi_is_wlun(scsi_lun))
 		return (scsi_lun & UFS_UPIU_MAX_UNIT_NUM_ID)
@@ -2259,7 +2261,7 @@ static inline u8 ufshcd_scsi_to_upiu_lun(unsigned int scsi_lun)
  *
  * Returns SCSI W-LUN id
  */
-static inline u16 ufshcd_upiu_wlun_to_scsi_wlun(u8 upiu_wlun_id)
+u16 ufshcd_upiu_wlun_to_scsi_wlun(u8 upiu_wlun_id)
 {
 	return (upiu_wlun_id & ~UFS_UPIU_WLUN_ID) | SCSI_W_LUN_BASE;
 }
@@ -2720,7 +2722,7 @@ out_unlock:
  *
  * Returns 0 for success, non-zero in case of failure
 */
-static int ufshcd_query_attr(struct ufs_hba *hba, enum query_opcode opcode,
+int ufshcd_query_attr(struct ufs_hba *hba, enum query_opcode opcode,
 			enum attr_idn idn, u8 index, u8 selector, u32 *attr_val)
 {
 	struct ufs_query_req *request = NULL;
@@ -2810,7 +2812,22 @@ static int ufshcd_query_attr_retry(struct ufs_hba *hba,
 	return ret;
 }
 
-static int __ufshcd_query_descriptor(struct ufs_hba *hba,
+/**
+ * ufshcd_query_descriptor - API function for sending descriptor
+ * requests
+ * hba: per-adapter instance
+ * opcode: attribute opcode
+ * idn: attribute idn to access
+ * index: index field
+ * selector: selector field
+ * desc_buf: the buffer that contains the descriptor
+ * buf_len: length parameter passed to the device
+ *
+ * Returns 0 for success, non-zero in case of failure.
+ * The buf_len parameter will contain, on return, the length parameter
+ * received on the response.
+ */
+int ufshcd_query_descriptor(struct ufs_hba *hba,
 			enum query_opcode opcode, enum desc_idn idn, u8 index,
 			u8 selector, u8 *desc_buf, int *buf_len)
 {
@@ -2875,8 +2892,8 @@ out:
 }
 
 /**
- * ufshcd_query_descriptor_retry - API function for sending descriptor
- * requests
+ * ufshcd_query_descriptor_retry - function for sending descriptor
+ * requests with retry mechanism
  * hba: per-adapter instance
  * opcode: attribute opcode
  * idn: attribute idn to access
@@ -2890,16 +2907,16 @@ out:
  * received on the response.
  */
 static int ufshcd_query_descriptor_retry(struct ufs_hba *hba,
-					 enum query_opcode opcode,
-					 enum desc_idn idn, u8 index,
-					 u8 selector,
-					 u8 *desc_buf, int *buf_len)
+				 enum query_opcode opcode,
+				 enum desc_idn idn, u8 index,
+				 u8 selector,
+				 u8 *desc_buf, int *buf_len)
 {
 	int err;
 	int retries;
 
 	for (retries = QUERY_REQ_RETRIES; retries > 0; retries--) {
-		err = __ufshcd_query_descriptor(hba, opcode, idn, index,
+		err = ufshcd_query_descriptor(hba, opcode, idn, index,
 						selector, desc_buf, buf_len);
 		if (!err || err == -EINVAL)
 			break;
@@ -3184,7 +3201,7 @@ static inline int ufshcd_read_unit_desc_param(struct ufs_hba *hba,
 	 * Unit descriptors are only available for general purpose LUs (LUN id
 	 * from 0 to 7) and RPMB Well known LU.
 	 */
-	if (lun != UFS_UPIU_RPMB_WLUN && (lun >= UFS_UPIU_MAX_GENERAL_LUN))
+	if (!ufs_is_valid_unit_desc_lun(lun))
 		return -EOPNOTSUPP;
 
 	return ufshcd_read_desc_param(hba, QUERY_DESC_IDN_UNIT, lun,
@@ -6502,6 +6519,10 @@ static struct scsi_host_template ufshcd_driver_template = {
 	.eh_device_reset_handler = ufshcd_eh_device_reset_handler,
 	.eh_host_reset_handler   = ufshcd_eh_host_reset_handler,
 	.eh_timed_out		= ufshcd_eh_timed_out,
+	.ioctl			= ufshcd_ioctl,
+#ifdef CONFIG_COMPAT
+	.compat_ioctl		= ufshcd_ioctl,
+#endif
 	.this_id		= -1,
 	.sg_tablesize		= SG_ALL,
 	.cmd_per_lun		= UFSHCD_CMD_PER_LUN,
