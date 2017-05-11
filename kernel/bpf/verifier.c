@@ -823,10 +823,27 @@ static int check_pkt_ptr_alignment(const struct bpf_reg_state *reg,
 }
 
 static int check_val_ptr_alignment(const struct bpf_reg_state *reg,
-				   int size, bool strict)
+				   int off, int size, bool strict)
 {
-	if (strict && size != 1) {
-		verbose("Unknown alignment. Only byte-sized access allowed in value access.\n");
+	int reg_off;
+
+	/* Byte size accesses are always allowed. */
+	if (!strict || size == 1)
+		return 0;
+
+	reg_off = reg->off;
+	if (reg->id) {
+		if (reg->aux_off_align % size) {
+			verbose("Value access is only %u byte aligned, %d byte access not allowed\n",
+				reg->aux_off_align, size);
+			return -EACCES;
+		}
+		reg_off += reg->aux_off;
+	}
+
+	if ((reg_off + off) % size != 0) {
+		verbose("misaligned value access off %d+%d size %d\n",
+			reg_off, off, size);
 		return -EACCES;
 	}
 
@@ -846,7 +863,7 @@ static int check_ptr_alignment(struct bpf_verifier_env *env,
 	case PTR_TO_PACKET:
 		return check_pkt_ptr_alignment(reg, off, size, strict);
 	case PTR_TO_MAP_VALUE_ADJ:
-		return check_val_ptr_alignment(reg, size, strict);
+		return check_val_ptr_alignment(reg, off, size, strict);
 	default:
 		if (off % size != 0) {
 			verbose("misaligned access off %d size %d\n",
