@@ -19,6 +19,7 @@ Contents
   4.1 UFS Query IOCTL
   4.2 UFS Auto-Hibern8 IOCTL
   4.3 UFS Task Management IOCTL
+  4.4 UFS DME Read IOCTL
 
 
 1. Overview
@@ -255,6 +256,41 @@ host and device using IOCTL interface.
 
   This one should be used with extreme care as it's more of a testing/vaidation
   interface.
+
+4.4 UFS DME Read IOCTL
+
+  This interface enables user to check link state of UFS Device. It's meant
+  mainly for test and troubleshooting purposes. You can use following
+  snippet to comunicate with this interface:
+
+	#include <sys/ioctl.h>
+	#include <scsi/ufs/ioctl.h>
+	#include <scsi/ufs/ufs.h>
+
+	static int handleDME(int fd, uint16_t attr_id, bool local_link,
+		uint32_t *response)
+	{
+		ufs_ioctl_dme_get_data dme_data;
+		int error;
+
+		/* Attribute ID (max. 0x7fff) */
+		dme_data.attr_id = attr_id;
+
+		/* Local or Device part of link? */
+		dme_data.peer = !local_link;
+
+		/* [fd] used here shall be opened UFS device */
+		error = ioctl(fd, UFS_IOCTL_DME, &dme_data);
+
+		if (!error)
+			/* This will return DME specific response */
+			*response = dme_data.response;
+
+		return error;
+	}
+
+  This is read-only interface, since we don't want to work-around driver
+  as these are link-level values and configurations managed strictly in driver.
 
 
 UFS Specifications can be found at,

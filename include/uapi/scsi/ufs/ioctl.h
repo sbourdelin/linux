@@ -10,6 +10,7 @@
 #define UFS_IOCTL_QUERY			0x53A0
 #define UFS_IOCTL_AUTO_HIBERN8		0x53A1
 #define UFS_IOCTL_TASK_MANAGEMENT	0x53A2
+#define UFS_IOCTL_DME			0x53A3
 
 /**
  * struct ufs_ioctl_query_data - used to transfer data to and from user via
@@ -105,6 +106,27 @@ struct ufs_ioctl_task_mgmt_data {
 	__u8 task_id;
 	__u8 task_func;
 	__u8 response;
+};
+
+/**
+ * struct ufs_ioctl_dme_get_data - used to request information from a specific
+ * UniPro or M-PHY attribute
+ *
+ * @attr_id: attribute identifier (valid range: 0x0000 to 0x7FFF)
+ * @selector: selector on attribute ( shall be != 0 only for some attribiutes;
+ * please reffer UniPro documentation for details)
+ * @peer: indicate whether peer or local UniPro Link
+ * @response: variable where the kernel will put the attribute value read from
+ * the local or peer UniPro Link
+ *
+ * Submitted: attr_id, peer
+ * Received: response
+ */
+struct ufs_ioctl_dme_get_data {
+	__u16 attr_id;
+	__u16 selector;
+	bool peer;
+	__u32 response;
 };
 
 #endif /* UAPI_UFS_IOCTL_H_ */

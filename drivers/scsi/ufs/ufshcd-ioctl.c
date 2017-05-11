@@ -376,6 +376,58 @@ out:
 }
 
 /**
+ * ufshcd_dme_get_ioctl - provide read access to all UniPro and M-PHY attributes
+ * on the both local and peer side of the Link
+ * @hba: per-adapter instance
+ * @buffer: user space buffer for ufs_ioctl_dme_get_data structure
+ *
+ * Returns 0 for success or negative error code otherwise
+ *
+ * It will send the UIC DME_GET or DME_PEER_GET command to read the value of
+ * specified attribute and put the value in the response field.
+ */
+static int ufshcd_dme_get_ioctl(struct ufs_hba *hba, void __user *buffer)
+{
+	struct ufs_ioctl_dme_get_data *ioctl_data;
+	int err = 0;
+
+	if (!buffer)
+		return -EINVAL;
+
+	ioctl_data = kzalloc(sizeof(struct ufs_ioctl_dme_get_data), GFP_KERNEL);
+	if (!ioctl_data) {
+		err = -ENOMEM;
+		goto out;
+	}
+
+	/* Extract params from user buffer */
+	if (copy_from_user(ioctl_data, buffer, sizeof(*ioctl_data))) {
+		err = -EFAULT;
+		goto out_release_mem;
+	}
+
+	err = ufshcd_dme_get_attr(hba,
+		UIC_ARG_MIB_SEL(ioctl_data->attr_id, ioctl_data->selector),
+		&ioctl_data->response, ioctl_data->peer);
+
+	if (err)
+		goto out_release_mem;
+
+	/* Copy response to user */
+	if (copy_to_user(buffer, ioctl_data, sizeof(*ioctl_data)))
+		err = -EFAULT;
+
+out_release_mem:
+	kfree(ioctl_data);
+out:
+	if (err)
+		dev_err(hba->dev, "User DME_GET request failed (error: %d)",
+			err);
+
+	return err;
+}
+
+/**
  * ufshcd_ioctl - ufs ioctl callback registered in scsi_host
  * @dev: scsi device required for per LUN queries
  * @cmd: command opcode
@@ -385,6 +437,7 @@ out:
  * UFS_IOCTL_QUERY
  * UFS_IOCTL_AUTO_HIBERN8
  * UFS_IOCTL_TASK_MANAGEMENT
+ * UFS_IOCTL_DME
  */
 int ufshcd_ioctl(struct scsi_device *dev, int cmd, void __user *buffer)
 {
@@ -410,6 +463,11 @@ int ufshcd_ioctl(struct scsi_device *dev, int cmd, void __user *buffer)
 		pm_runtime_get_sync(hba->dev);
 		err = ufshcd_task_mgmt_ioctl(hba,
 			ufshcd_scsi_to_upiu_lun(dev->lun), buffer);
+		pm_runtime_put_sync(hba->dev);
+		break;
+	case UFS_IOCTL_DME:
+		pm_runtime_get_sync(hba->dev);
+		err = ufshcd_dme_get_ioctl(hba, buffer);
 		pm_runtime_put_sync(hba->dev);
 		break;
 	default:

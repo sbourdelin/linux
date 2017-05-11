@@ -76,4 +76,6 @@ enum {
 	UFS_QUERY_TASK_SET	= 0x81,
 };
 
+#define UFS_DME_MAX_ATTRIBUTE		0x7FFF
+
 #endif /* UAPI_UFS_H_ */
