@@ -206,10 +206,8 @@ static struct megamod_pic * __init init_megamod_pic(struct device_node *np)
 
 	pr_info("Initializing C64x+ Megamodule PIC\n");
 	pic = kzalloc(sizeof(*pic), GFP_KERNEL);
-	if (!pic) {
-		pr_err("%s: Could not alloc PIC structure.\n", np->full_name);
+	if (!pic)
 		return NULL;
-	}
 
 	pic->irqhost = irq_domain_add_linear(np, NR_COMBINERS * 32,
 					     &megamod_domain_ops, pic);
