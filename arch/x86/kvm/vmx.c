@@ -6209,17 +6209,19 @@ static int handle_ept_violation(struct kvm_vcpu *vcpu)
 	u32 error_code;
 
 	exit_qualification = vmcs_readl(EXIT_QUALIFICATION);
+	gpa = vmcs_read64(GUEST_PHYSICAL_ADDRESS);
+	trace_kvm_page_fault(gpa, exit_qualification);
 
-	if (is_guest_mode(vcpu)
-	    && !(exit_qualification & EPT_VIOLATION_GVA_TRANSLATED)) {
-		/*
-		 * Fix up exit_qualification according to whether guest
-		 * page table accesses are reads or writes.
-		 */
-		u64 eptp = nested_ept_get_cr3(vcpu);
-		if (!(eptp & VMX_EPT_AD_ENABLE_BIT))
-			exit_qualification &= ~EPT_VIOLATION_ACC_WRITE;
-	}
+	/*
+	 * All guest page table accesses are potential writes to A/D bits.
+	 * but EPT microcode only reports them as such when EPT A/D is
+	 * enabled.  Tracing ept_access_test_paddr_read_only_ad_disabled (from
+	 * kvm-unit-tests) with eptad=0 and eptad=1 shows that the processor
+	 * does not change its behavior when EPTP enables A/D bits; the only
+	 * difference is in the exit qualification.  So fix this up here.
+	 */
+	if (!(exit_qualification & EPT_VIOLATION_GVA_TRANSLATED))
+		exit_qualification |= EPT_VIOLATION_ACC_WRITE;
 
 	/*
 	 * EPT violation happened while executing iret from NMI,
@@ -6230,9 +6232,6 @@ static int handle_ept_violation(struct kvm_vcpu *vcpu)
 	if (!(to_vmx(vcpu)->idt_vectoring_info & VECTORING_INFO_VALID_MASK) &&
 			(exit_qualification & INTR_INFO_UNBLOCK_NMI))
 		vmcs_set_bits(GUEST_INTERRUPTIBILITY_INFO, GUEST_INTR_STATE_NMI);
-
-	gpa = vmcs_read64(GUEST_PHYSICAL_ADDRESS);
-	trace_kvm_page_fault(gpa, exit_qualification);
 
 	/* Is it a read fault? */
 	error_code = (exit_qualification & EPT_VIOLATION_ACC_READ)
@@ -6250,6 +6249,17 @@ static int handle_ept_violation(struct kvm_vcpu *vcpu)
 		      ? PFERR_PRESENT_MASK : 0;
 
 	vcpu->arch.gpa_available = true;
+
+	if (is_guest_mode(vcpu)
+	    && !(exit_qualification & EPT_VIOLATION_GVA_TRANSLATED)) {
+		/*
+		 * Now fix up exit_qualification according to what the
+		 * L1 hypervisor expects to see.
+		 */
+		u64 eptp = nested_ept_get_cr3(vcpu);
+		if (!(eptp & VMX_EPT_AD_ENABLE_BIT))
+			exit_qualification &= ~EPT_VIOLATION_ACC_WRITE;
+	}
 	vcpu->arch.exit_qualification = exit_qualification;
 
 	return kvm_mmu_page_fault(vcpu, gpa, error_code, NULL, 0);
