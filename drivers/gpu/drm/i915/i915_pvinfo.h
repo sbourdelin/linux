@@ -53,6 +53,10 @@ enum vgt_g2v_type {
 	VGT_G2V_MAX,
 };
 
+enum vgt_caps_type {
+	VGT_CAPS_FULL_PPGTT = (1 << 2),
+};
+
 struct vgt_if {
 	u64 magic;		/* VGT_MAGIC */
 	uint16_t version_major;
