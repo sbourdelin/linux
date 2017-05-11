@@ -59,6 +59,26 @@ struct drm_bridge_funcs {
 	void (*detach)(struct drm_bridge *bridge);
 
 	/**
+	 * @mode_valid:
+	 *
+	 * This callback is used to check if a specific mode is valid in this
+	 * bridge. This should be implemented if the bridge has some sort of
+	 * restriction in the modes it can display. For example, a given bridge
+	 * may be responsible to set a clock value. If the clock can not
+	 * produce all the values for the available modes then this callback
+	 * can be used to restrict the number of modes to only the ones that
+	 * can be displayed.
+	 *
+	 * This is called at mode probe and at atomic check phase.
+	 *
+	 * RETURNS:
+	 *
+	 * drm_mode_status Enum
+	 */
+	enum drm_mode_status (*mode_valid)(struct drm_bridge *crtc,
+					   const struct drm_display_mode *mode);
+
+	/**
 	 * @mode_fixup:
 	 *
 	 * This callback is used to validate and adjust a mode. The paramater

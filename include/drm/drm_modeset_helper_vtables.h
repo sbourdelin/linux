@@ -106,14 +106,37 @@ struct drm_crtc_helper_funcs {
 	void (*commit)(struct drm_crtc *crtc);
 
 	/**
+	 * @mode_valid:
+	 *
+	 * This callback is used to check if a specific mode is valid in this
+	 * crtc. This should be implemented if the crtc has some sort of
+	 * restriction in the modes it can display. For example, a given crtc
+	 * may be responsible to set a clock value. If the clock can not
+	 * produce all the values for the available modes then this callback
+	 * can be used to restrict the number of modes to only the ones that
+	 * can be displayed.
+	 *
+	 * This is called at mode probe and at atomic check phase.
+	 *
+	 * RETURNS:
+	 *
+	 * drm_mode_status Enum
+	 */
+	enum drm_mode_status (*mode_valid)(struct drm_crtc *crtc,
+					   const struct drm_display_mode *mode);
+
+	/**
 	 * @mode_fixup:
 	 *
-	 * This callback is used to validate a mode. The parameter mode is the
-	 * display mode that userspace requested, adjusted_mode is the mode the
-	 * encoders need to be fed with. Note that this is the inverse semantics
-	 * of the meaning for the &drm_encoder and &drm_bridge_funcs.mode_fixup
-	 * vfunc. If the CRTC cannot support the requested conversion from mode
-	 * to adjusted_mode it should reject the modeset.
+	 * This callback is used to do the validation of an adjusted mode in the
+	 * crtc. The parameter mode is the display mode that userspace requested,
+	 * adjusted_mode is the mode the encoders need to be fed with. Note that
+	 * this is the inverse semantics of the meaning for the &drm_encoder and
+	 * &drm_bridge_funcs.mode_fixup vfunc. If the CRTC cannot support the
+	 * requested conversion from mode to adjusted_mode it should reject the
+	 * modeset. Also note that initial validation of a mode supplied by
+	 * userspace should be done in &drm_crtc_helper_funcs.mode_valid and not
+	 * in this callback.
 	 *
 	 * This function is used by both legacy CRTC helpers and atomic helpers.
 	 * With atomic helpers it is optional.
@@ -135,17 +158,19 @@ struct drm_crtc_helper_funcs {
 	 * Also beware that neither core nor helpers filter modes before
 	 * passing them to the driver: While the list of modes that is
 	 * advertised to userspace is filtered using the
-	 * &drm_connector.mode_valid callback, neither the core nor the helpers
-	 * do any filtering on modes passed in from userspace when setting a
-	 * mode. It is therefore possible for userspace to pass in a mode that
-	 * was previously filtered out using &drm_connector.mode_valid or add a
-	 * custom mode that wasn't probed from EDID or similar to begin with.
-	 * Even though this is an advanced feature and rarely used nowadays,
-	 * some users rely on being able to specify modes manually so drivers
-	 * must be prepared to deal with it. Specifically this means that all
-	 * drivers need not only validate modes in &drm_connector.mode_valid but
-	 * also in this or in the &drm_encoder_helper_funcs.mode_fixup callback
-	 * to make sure invalid modes passed in from userspace are rejected.
+	 * &drm_connector_helper_funcs.mode_valid callback, neither the core nor
+	 * the helpers do any filtering on modes passed in from userspace when
+	 * setting a mode. It is therefore possible for userspace to pass in a
+	 * mode that was previously filtered out using
+	 * &drm_connector_helper_funcs.mode_valid or add a custom mode that
+	 * wasn't probed from EDID or similar to begin with. Even though this
+	 * is an advanced feature and rarely used nowadays, some users rely on
+	 * being able to specify modes manually so drivers must be prepared to
+	 * deal with it. Specifically this means that all drivers need not only
+	 * validate modes in &drm_connector.mode_valid but also in this or in
+	 * the &drm_crtc_helper_funcs.mode_valid,
+	 * &drm_encoder_helper_funcs.mode_valid and &drm_bridge_funcs.mode_valid
+	 * callbacks, where applicable.
 	 *
 	 * RETURNS:
 	 *
@@ -457,11 +482,31 @@ struct drm_encoder_helper_funcs {
 	void (*dpms)(struct drm_encoder *encoder, int mode);
 
 	/**
+	 * @mode_valid:
+	 *
+	 * This callback is used to check if a specific mode is valid in this
+	 * encoder. This should be implemented if the encoder has some sort
+	 * of restriction in the modes it can display. For example, a given
+	 * encoder may be responsible to set a clock value. If the clock can
+	 * not produce all the values for the available modes then this callback
+	 * can be used to restrict the number of modes to only the ones that
+	 * can be displayed.
+	 *
+	 * This is called at mode probe and at atomic check phase.
+	 *
+	 * RETURNS:
+	 *
+	 * drm_mode_status Enum
+	 */
+	enum drm_mode_status (*mode_valid)(struct drm_encoder *crtc,
+					   const struct drm_display_mode *mode);
+
+	/**
 	 * @mode_fixup:
 	 *
-	 * This callback is used to validate and adjust a mode. The parameter
-	 * mode is the display mode that should be fed to the next element in
-	 * the display chain, either the final &drm_connector or a &drm_bridge.
+	 * This callback is used to adjust a mode. The parameter mode is the
+	 * display mode that should be fed to the next element in the display
+	 * chain, either the final &drm_connector or a &drm_bridge.
 	 * The parameter adjusted_mode is the input mode the encoder requires. It
 	 * can be modified by this callback and does not need to match mode.
 	 *
@@ -484,19 +529,20 @@ struct drm_encoder_helper_funcs {
 	 *
 	 * Also beware that neither core nor helpers filter modes before
 	 * passing them to the driver: While the list of modes that is
-	 * advertised to userspace is filtered using the connector's
+	 * advertised to userspace is filtered using the
 	 * &drm_connector_helper_funcs.mode_valid callback, neither the core nor
 	 * the helpers do any filtering on modes passed in from userspace when
 	 * setting a mode. It is therefore possible for userspace to pass in a
 	 * mode that was previously filtered out using
 	 * &drm_connector_helper_funcs.mode_valid or add a custom mode that
-	 * wasn't probed from EDID or similar to begin with.  Even though this
+	 * wasn't probed from EDID or similar to begin with. Even though this
 	 * is an advanced feature and rarely used nowadays, some users rely on
 	 * being able to specify modes manually so drivers must be prepared to
 	 * deal with it. Specifically this means that all drivers need not only
 	 * validate modes in &drm_connector.mode_valid but also in this or in
-	 * the &drm_crtc_helper_funcs.mode_fixup callback to make sure
-	 * invalid modes passed in from userspace are rejected.
+	 * the &drm_crtc_helper_funcs.mode_valid,
+	 * &drm_encoder_helper_funcs.mode_valid and &drm_bridge_funcs.mode_valid
+	 * callbacks, where applicable.
 	 *
 	 * RETURNS:
 	 *
@@ -795,13 +841,23 @@ struct drm_connector_helper_funcs {
 	 * (which is usually derived from the EDID data block from the sink).
 	 * See e.g. drm_helper_probe_single_connector_modes().
 	 *
+	 * This callback is never called in atomic check phase so that userspace
+	 * can override kernel sink checks in case of broken EDID with wrong
+	 * limits from the sink. You can use the remaining mode_valid()
+	 * callbacks to validate the mode against your video path.
+	 *
 	 * NOTE:
 	 *
 	 * This only filters the mode list supplied to userspace in the
-	 * GETCONNECOTR IOCTL. Userspace is free to create modes of its own and
+	 * GETCONNECTOR IOCTL. Userspace is free to create modes of its own and
 	 * ask the kernel to use them. It this case the atomic helpers or legacy
-	 * CRTC helpers will not call this function. Drivers therefore must
-	 * still fully validate any mode passed in in a modeset request.
+	 * CRTC helpers will not call this function but the mode will be
+	 * validated in atomic check phase using the mode_valid() callbacks
+	 * (&drm_crtc_helper_funcs.mode_valid, &drm_encoder_helper_funcs.mode_valid
+	 * and &drm_bridge_funcs.mode_valid).
+	 * Drivers therefore must implement the mode_valid() callbacks if the
+	 * video pipeline has some sort of restrictions in the modes that can
+	 * be displayed.
 	 *
 	 * To avoid races with concurrent connector state updates, the helper
 	 * libraries always call this with the &drm_mode_config.connection_mutex
