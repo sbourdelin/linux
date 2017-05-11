@@ -473,29 +473,18 @@ static int ext4_find_unwritten_pgoff(struct inode *inode,
 					  (pgoff_t)num);
 		if (nr_pages == 0) {
 			if (whence == SEEK_DATA)
-				break;
+				goto out;
 
 			BUG_ON(whence != SEEK_HOLE);
-			/*
-			 * If this is the first time to go into the loop and
-			 * offset is not beyond the end offset, it will be a
-			 * hole at this offset
-			 */
-			if (lastoff == startoff || lastoff < endoff)
-				found = 1;
 			break;
 		}
 
 		/*
-		 * If this is the first time to go into the loop and
-		 * offset is smaller than the first page offset, it will be a
-		 * hole at this offset.
+		 * If current offset is smaller than the first page offset,
+		 * there is a hole at this offset.
 		 */
-		if (lastoff == startoff && whence == SEEK_HOLE &&
-		    lastoff < page_offset(pvec.pages[0])) {
-			found = 1;
+		if (whence == SEEK_HOLE && lastoff < page_offset(pvec.pages[0]))
 			break;
-		}
 
 		for (i = 0; i < nr_pages; i++) {
 			struct page *page = pvec.pages[i];
@@ -558,13 +547,17 @@ static int ext4_find_unwritten_pgoff(struct inode *inode,
 		if (nr_pages < num && whence == SEEK_HOLE) {
 			found = 1;
 			*offset = lastoff;
-			break;
+			goto out;
 		}
 
 		index = pvec.pages[i - 1]->index + 1;
 		pagevec_release(&pvec);
 	} while (index <= end);
 
+	if (whence == SEEK_HOLE && lastoff < endoff) {
+		found = 1;
+		*offset = lastoff;
+	}
 out:
 	pagevec_release(&pvec);
 	return found;
