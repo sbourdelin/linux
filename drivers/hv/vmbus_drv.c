@@ -991,7 +991,7 @@ static void vmbus_isr(void)
 		/*
 		 * Our host is win8 or above. The signaling mechanism
 		 * has changed and we can directly look at the event page.
-		 * If bit n is set then we have an interrup on the channel
+		 * If bit n is set then we have an interrupt on the channel
 		 * whose id is n.
 		 */
 		handled = true;
