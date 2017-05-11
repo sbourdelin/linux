@@ -1019,20 +1019,15 @@ unsigned int mmc_align_data_size(struct mmc_card *card, unsigned int sz)
 EXPORT_SYMBOL(mmc_align_data_size);
 
 /**
- *	__mmc_claim_host - exclusively claim a host
+ *	mmc_claim_host - exclusively claim a host
  *	@host: mmc host to claim
- *	@abort: whether or not the operation should be aborted
  *
- *	Claim a host for a set of operations.  If @abort is non null and
- *	dereference a non-zero value then this will return prematurely with
- *	that non-zero value without acquiring the lock.  Returns zero
- *	with the lock held otherwise.
+ *	Claim a host for a set of operations.
  */
-int __mmc_claim_host(struct mmc_host *host, atomic_t *abort)
+void mmc_claim_host(struct mmc_host *host)
 {
 	DECLARE_WAITQUEUE(wait, current);
 	unsigned long flags;
-	int stop;
 	bool pm = false;
 
 	might_sleep();
@@ -1041,31 +1036,25 @@ int __mmc_claim_host(struct mmc_host *host, atomic_t *abort)
 	spin_lock_irqsave(&host->lock, flags);
 	while (1) {
 		set_current_state(TASK_UNINTERRUPTIBLE);
-		stop = abort ? atomic_read(abort) : 0;
-		if (stop || !host->claimed || host->claimer == current)
+		if (!host->claimed || host->claimer == current)
 			break;
 		spin_unlock_irqrestore(&host->lock, flags);
 		schedule();
 		spin_lock_irqsave(&host->lock, flags);
 	}
 	set_current_state(TASK_RUNNING);
-	if (!stop) {
-		host->claimed = 1;
-		host->claimer = current;
-		host->claim_cnt += 1;
-		if (host->claim_cnt == 1)
-			pm = true;
-	} else
-		wake_up(&host->wq);
+	host->claimed = 1;
+	host->claimer = current;
+	host->claim_cnt += 1;
+	if (host->claim_cnt == 1)
+		pm = true;
 	spin_unlock_irqrestore(&host->lock, flags);
 	remove_wait_queue(&host->wq, &wait);
 
 	if (pm)
 		pm_runtime_get_sync(mmc_dev(host));
-
-	return stop;
 }
-EXPORT_SYMBOL(__mmc_claim_host);
+EXPORT_SYMBOL(mmc_claim_host);
 
 /**
  *	mmc_release_host - release a host
