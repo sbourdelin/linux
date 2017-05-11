@@ -347,6 +347,7 @@ struct mmc_host {
 
 	wait_queue_head_t	wq;
 	struct task_struct	*claimer;	/* task that has host claimed */
+	bool			claimer_is_blkdev; /* claimer is blkdev */
 	int			claim_cnt;	/* "claim" nesting count */
 
 	struct delayed_work	detect;

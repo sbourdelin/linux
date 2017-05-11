@@ -1019,12 +1019,12 @@ unsigned int mmc_align_data_size(struct mmc_card *card, unsigned int sz)
 EXPORT_SYMBOL(mmc_align_data_size);
 
 /**
- *	mmc_claim_host - exclusively claim a host
+ *	__mmc_claim_host - exclusively claim a host
  *	@host: mmc host to claim
  *
  *	Claim a host for a set of operations.
  */
-void mmc_claim_host(struct mmc_host *host)
+void __mmc_claim_host(struct mmc_host *host, bool is_blkdev)
 {
 	DECLARE_WAITQUEUE(wait, current);
 	unsigned long flags;
@@ -1036,7 +1036,11 @@ void mmc_claim_host(struct mmc_host *host)
 	spin_lock_irqsave(&host->lock, flags);
 	while (1) {
 		set_current_state(TASK_UNINTERRUPTIBLE);
-		if (!host->claimed || host->claimer == current)
+		if (!host->claimed)
+			break;
+		if (host->claimer_is_blkdev && is_blkdev)
+			break;
+		if (host->claimer == current)
 			break;
 		spin_unlock_irqrestore(&host->lock, flags);
 		schedule();
@@ -1045,6 +1049,7 @@ void mmc_claim_host(struct mmc_host *host)
 	set_current_state(TASK_RUNNING);
 	host->claimed = 1;
 	host->claimer = current;
+	host->claimer_is_blkdev = is_blkdev;
 	host->claim_cnt += 1;
 	if (host->claim_cnt == 1)
 		pm = true;
@@ -1054,7 +1059,7 @@ void mmc_claim_host(struct mmc_host *host)
 	if (pm)
 		pm_runtime_get_sync(mmc_dev(host));
 }
-EXPORT_SYMBOL(mmc_claim_host);
+EXPORT_SYMBOL(__mmc_claim_host);
 
 /**
  *	mmc_release_host - release a host
@@ -1076,6 +1081,7 @@ void mmc_release_host(struct mmc_host *host)
 	} else {
 		host->claimed = 0;
 		host->claimer = NULL;
+		host->claimer_is_blkdev = 0;
 		spin_unlock_irqrestore(&host->lock, flags);
 		wake_up(&host->wq);
 		pm_runtime_mark_last_busy(mmc_dev(host));
