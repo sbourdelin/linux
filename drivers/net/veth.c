@@ -33,6 +33,7 @@ struct veth_priv {
 	struct net_device __rcu	*peer;
 	atomic64_t		dropped;
 	unsigned		requested_headroom;
+	int			mru;
 };
 
 /*
@@ -101,6 +102,7 @@ static const struct ethtool_ops veth_ethtool_ops = {
 static netdev_tx_t veth_xmit(struct sk_buff *skb, struct net_device *dev)
 {
 	struct veth_priv *priv = netdev_priv(dev);
+	struct veth_priv *rcv_priv;
 	struct net_device *rcv;
 	int length = skb->len;
 
@@ -110,8 +112,10 @@ static netdev_tx_t veth_xmit(struct sk_buff *skb, struct net_device *dev)
 		kfree_skb(skb);
 		goto drop;
 	}
+	rcv_priv = netdev_priv(rcv);
 
-	if (likely(dev_forward_skb(rcv, skb, 0) == NET_RX_SUCCESS)) {
+	if (likely(dev_forward_skb(rcv, skb, rcv_priv->mru) ==
+		   NET_RX_SUCCESS)) {
 		struct pcpu_vstats *stats = this_cpu_ptr(dev->vstats);
 
 		u64_stats_update_begin(&stats->syncp);
@@ -341,6 +345,11 @@ static int veth_validate(struct nlattr *tb[], struct nlattr *data[])
 		if (!is_valid_veth_mtu(nla_get_u32(tb[IFLA_MTU])))
 			return -EINVAL;
 	}
+
+	if (tb[VETH_MRU])
+		if (!is_valid_veth_mtu(nla_get_u32(tb[VETH_MRU])))
+			return -EINVAL;
+
 	return 0;
 }
 
@@ -446,10 +455,15 @@ static int veth_newlink(struct net *src_net, struct net_device *dev,
 	 */
 
 	priv = netdev_priv(dev);
+	if (tb[VETH_MRU])
+		priv->mru = nla_get_u32(tb[VETH_MRU]);
 	rcu_assign_pointer(priv->peer, peer);
 
 	priv = netdev_priv(peer);
+	if (tbp[VETH_MRU])
+		priv->mru = nla_get_u32(tbp[VETH_MRU]);
 	rcu_assign_pointer(priv->peer, dev);
+
 	return 0;
 
 err_register_dev:
@@ -485,8 +499,34 @@ static void veth_dellink(struct net_device *dev, struct list_head *head)
 	}
 }
 
+static int veth_changelink(struct net_device *dev,
+			   struct nlattr *tb[], struct nlattr *data[])
+{
+	struct veth_priv *priv = netdev_priv(dev);
+
+	if (data && data[VETH_MRU])
+		priv->mru = nla_get_u32(data[VETH_MRU]);
+	return 0;
+}
+
+static size_t veth_get_size(const struct net_device *dev)
+{
+	return nla_total_size(4);/* VETH_MRU */
+}
+
+static int veth_fill_info(struct sk_buff *skb,
+			  const struct net_device *dev)
+{
+	struct veth_priv *priv = netdev_priv(dev);
+
+	if (nla_put_u32(skb, VETH_MRU, priv->mru))
+		return -EMSGSIZE;
+	return 0;
+}
+
 static const struct nla_policy veth_policy[VETH_INFO_MAX + 1] = {
 	[VETH_INFO_PEER]	= { .len = sizeof(struct ifinfomsg) },
+	[VETH_MRU]		= { .type = NLA_U32 },
 };
 
 static struct net *veth_get_link_net(const struct net_device *dev)
@@ -504,9 +544,12 @@ static struct rtnl_link_ops veth_link_ops = {
 	.validate	= veth_validate,
 	.newlink	= veth_newlink,
 	.dellink	= veth_dellink,
+	.changelink	= veth_changelink,
 	.policy		= veth_policy,
 	.maxtype	= VETH_INFO_MAX,
 	.get_link_net	= veth_get_link_net,
+	.get_size	= veth_get_size,
+	.fill_info	= veth_fill_info,
 };
 
 /*
