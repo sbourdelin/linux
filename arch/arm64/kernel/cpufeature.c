@@ -986,8 +986,16 @@ void update_cpu_capabilities(const struct arm64_cpu_capabilities *caps,
  */
 void __init enable_cpu_capabilities(const struct arm64_cpu_capabilities *caps)
 {
-	for (; caps->matches; caps++)
-		if (caps->enable && cpus_have_cap(caps->capability))
+	for (; caps->matches; caps++) {
+		unsigned int num = caps->capability;
+
+		if (!cpus_have_cap(num))
+			continue;
+
+		/* Ensure cpus_have_const_cap(num) works */
+		static_branch_enable(&cpu_hwcap_keys[num]);
+
+		if (caps->enable) {
 			/*
 			 * Use stop_machine() as it schedules the work allowing
 			 * us to modify PSTATE, instead of on_each_cpu() which
@@ -995,6 +1003,8 @@ void __init enable_cpu_capabilities(const struct arm64_cpu_capabilities *caps)
 			 * we return.
 			 */
 			stop_machine(caps->enable, NULL, cpu_online_mask);
+		}
+	}
 }
 
 /*
@@ -1086,7 +1096,7 @@ void check_local_cpu_capabilities(void)
 	 * advertised capabilities.
 	 */
 	if (!sys_caps_initialised)
-		update_cpu_errata_workarounds_cpuslocked();
+		update_cpu_errata_workarounds();
 	else
 		verify_local_cpu_capabilities();
 }
