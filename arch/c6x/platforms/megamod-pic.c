@@ -339,6 +339,4 @@ void __init megamod_pic_init(void)
 
 	soc_ops.get_exception = get_exception;
 	soc_ops.assert_event = assert_event;
-
-	return;
 }
