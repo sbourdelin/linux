@@ -3301,16 +3301,16 @@ int dev_change_xdp_fd(struct net_device *dev, struct netlink_ext_ack *extack,
 struct sk_buff *validate_xmit_skb_list(struct sk_buff *skb, struct net_device *dev);
 struct sk_buff *dev_hard_start_xmit(struct sk_buff *skb, struct net_device *dev,
 				    struct netdev_queue *txq, int *ret);
-int __dev_forward_skb(struct net_device *dev, struct sk_buff *skb);
-int dev_forward_skb(struct net_device *dev, struct sk_buff *skb);
+int __dev_forward_skb(struct net_device *dev, struct sk_buff *skb, int mtu);
+int dev_forward_skb(struct net_device *dev, struct sk_buff *skb, int mtu);
 bool is_skb_forwardable(const struct net_device *dev,
-			const struct sk_buff *skb);
+			const struct sk_buff *skb, int mtu);
 
 static __always_inline int ____dev_forward_skb(struct net_device *dev,
-					       struct sk_buff *skb)
+					       struct sk_buff *skb, int mtu)
 {
 	if (skb_orphan_frags(skb, GFP_ATOMIC) ||
-	    unlikely(!is_skb_forwardable(dev, skb))) {
+	    unlikely(!is_skb_forwardable(dev, skb, mtu))) {
 		atomic_long_inc(&dev->rx_dropped);
 		kfree_skb(skb);
 		return NET_RX_DROP;

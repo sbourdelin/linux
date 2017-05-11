@@ -234,7 +234,8 @@ void ipvlan_process_multicast(struct work_struct *work)
 				nskb->pkt_type = pkt_type;
 				nskb->dev = ipvlan->dev;
 				if (tx_pkt)
-					ret = dev_forward_skb(ipvlan->dev, nskb);
+					ret = dev_forward_skb(ipvlan->dev,
+							      nskb, 0);
 				else
 					ret = netif_rx(nskb);
 			}
@@ -301,7 +302,7 @@ static int ipvlan_rcv_frame(struct ipvl_addr *addr, struct sk_buff **pskb,
 
 	if (local) {
 		skb->pkt_type = PACKET_HOST;
-		if (dev_forward_skb(ipvlan->dev, skb) == NET_RX_SUCCESS)
+		if (dev_forward_skb(ipvlan->dev, skb, 0) == NET_RX_SUCCESS)
 			success = true;
 	} else {
 		ret = RX_HANDLER_ANOTHER;
@@ -547,7 +548,7 @@ static int ipvlan_xmit_mode_l2(struct sk_buff *skb, struct net_device *dev)
 		 * the skb for the main-dev. At the RX side we just return
 		 * RX_PASS for it to be processed further on the stack.
 		 */
-		return dev_forward_skb(ipvlan->phy_dev, skb);
+		return dev_forward_skb(ipvlan->phy_dev, skb, 0);
 
 	} else if (is_multicast_ether_addr(eth->h_dest)) {
 		ipvlan_skb_crossing_ns(skb, NULL);
