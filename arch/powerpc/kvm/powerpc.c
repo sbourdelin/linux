@@ -618,6 +618,9 @@ int kvm_vm_ioctl_check_extension(struct kvm *kvm, long ext)
 		/* Disable this on POWER9 until code handles new HPTE format */
 		r = !!hv_enabled && !cpu_has_feature(CPU_FTR_ARCH_300);
 		break;
+	case KVM_CAP_PPC_FWNMI:
+		r = 1;
+		break;
 #endif
 	case KVM_CAP_PPC_HTM:
 		r = cpu_has_feature(CPU_FTR_TM_COMP) &&
@@ -1538,6 +1541,12 @@ static int kvm_vcpu_ioctl_enable_cap(struct kvm_vcpu *vcpu,
 		break;
 	}
 #endif /* CONFIG_KVM_XICS */
+#ifdef CONFIG_PPC_BOOK3S_64
+	case KVM_CAP_PPC_FWNMI:
+		r = 0;
+		vcpu->kvm->arch.fwnmi_enabled = true;
+		break;
+#endif /* CONFIG_PPC_BOOK3S_64 */
 	default:
 		r = -EINVAL;
 		break;
