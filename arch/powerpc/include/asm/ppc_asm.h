@@ -418,7 +418,7 @@ END_FTR_SECTION_IFCLR(CPU_FTR_601)
 	lis	r4,KERNELBASE@h;		\
 	.machine push;				\
 	.machine "power4";			\
-0:	tlbie	r4;				\
+0:	tlbie	r4,0;				\
 	.machine pop;				\
 	addi	r4,r4,0x1000;			\
 	bdnz	0b

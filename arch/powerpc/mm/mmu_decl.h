@@ -55,7 +55,7 @@ extern void _tlbil_pid_noind(unsigned int pid);
 static inline void _tlbil_va(unsigned long address, unsigned int pid,
 			     unsigned int tsize, unsigned int ind)
 {
-	asm volatile ("tlbie %0; sync" : : "r" (address) : "memory");
+	asm volatile ("tlbie %0,0; sync" : : "r" (address) : "memory");
 }
 #elif defined(CONFIG_PPC_BOOK3E)
 extern void _tlbil_va(unsigned long address, unsigned int pid,
