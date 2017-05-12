@@ -692,8 +692,8 @@ static void forget_original_parent(struct task_struct *father,
 			if (likely(!t->ptrace))
 				t->parent = t->real_parent;
 			if (t->pdeath_signal)
-				group_send_sig_info(t->pdeath_signal,
-						    SEND_SIG_NOINFO, t);
+				do_send_sig_info(t->pdeath_signal,
+						 SEND_SIG_NOINFO, t, true);
 		}
 		/*
 		 * If this is a threaded reparent there is no need to
