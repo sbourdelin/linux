@@ -1052,6 +1052,7 @@ static int ov772x_probe(struct i2c_client *client,
 			"I2C-Adapter doesn't support I2C_FUNC_SMBUS_BYTE_DATA\n");
 		return -EIO;
 	}
+	client->flags |= I2C_CLIENT_SCCB;
 
 	priv = devm_kzalloc(&client->dev, sizeof(*priv), GFP_KERNEL);
 	if (!priv)
