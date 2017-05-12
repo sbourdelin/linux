@@ -1618,11 +1618,8 @@ static int ipoib_dev_init_default(struct net_device *dev)
 		goto out;
 
 	priv->tx_ring = vzalloc(ipoib_sendq_size * sizeof *priv->tx_ring);
-	if (!priv->tx_ring) {
-		printk(KERN_WARNING "%s: failed to allocate TX ring (%d entries)\n",
-		       priv->ca->name, ipoib_sendq_size);
+	if (!priv->tx_ring)
 		goto out_rx_ring_cleanup;
-	}
 
 	/* priv->tx_head, tx_tail & tx_outstanding are already 0 */
 
