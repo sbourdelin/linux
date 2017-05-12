@@ -331,6 +331,10 @@ static void siblings_grants(struct thermal_zone_device *tz,
 		total_avail_room += avail_room[i];
 	}
 
+	trace_thermal_power_allocator_divvyup(tz, granted_power, avail_room,
+					      spare_power, max_power,
+					      num_actors);
+
 	/* Share the extra power inside the same family. */
 	for (i = 0; i < num_actors; i++) {
 		u64 power;
