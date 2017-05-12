@@ -126,17 +126,11 @@ struct acpi_whea_header {
 struct acpi_table_bert {
 	struct acpi_table_header header;	/* Common ACPI table header */
 	u32 region_length;	/* Length of the boot error region */
-	u64 address;		/* Physical address of the error region */
-};
-
-/* Boot Error Region (not a subtable, pointed to by Address field above) */
-
-struct acpi_bert_region {
-	u32 block_status;	/* Type of error information */
-	u32 raw_data_offset;	/* Offset to raw error data */
-	u32 raw_data_length;	/* Length of raw error data */
-	u32 data_length;	/* Length of generic error data */
-	u32 error_severity;	/* Severity code */
+	u64 address;		/*
+				 * Physical address of the error region
+				 * which is a Generic Error Status Block
+				 * (struct acpi_hest_generic_status)
+				 */
 };
 
 /* Values for block_status flags above */
