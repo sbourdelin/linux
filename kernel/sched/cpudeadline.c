@@ -131,16 +131,39 @@ int cpudl_find(struct cpudl *cp, struct task_struct *p,
 	    cpumask_and(later_mask, cp->free_cpus, &p->cpus_allowed)) {
 		best_cpu = cpumask_any(later_mask);
 		goto out;
-	} else if (cpumask_test_cpu(cpudl_maximum(cp), &p->cpus_allowed) &&
-			dl_time_before(dl_se->deadline, cp->elements[0].dl)) {
-		best_cpu = cpudl_maximum(cp);
-		if (later_mask)
-			cpumask_set_cpu(best_cpu, later_mask);
+	} else {
+		u64 cpudl_dl;
+		int cpudl_cpu;
+		int cpudl_valid;
+		unsigned long flags;
+
+		/*
+		 * Referring to cp->elements must be atomic ops.
+		 */
+		raw_spin_lock_irqsave(&cp->lock, flags);
+		/*
+		 * No problem even in case of very initial heap tree
+		 * to which no entry has been added yet, since
+		 * cp->elements[0].cpu was initialized to zero and
+		 * cp->elements[0].idx was initialized to IDX_INVALID,
+		 * that means the case will be filtered out at the
+		 * following condition.
+		 */
+		cpudl_cpu = cpudl_maximum(cp);
+		cpudl_dl = cp->elements[0].dl;
+		cpudl_valid = cp->elements[cpudl_cpu].idx;
+		raw_spin_unlock_irqrestore(&cp->lock, flags);
+
+		if (cpudl_valid != IDX_INVALID &&
+		    cpumask_test_cpu(cpudl_cpu, &p->cpus_allowed) &&
+		    dl_time_before(dl_se->deadline, cpudl_dl)) {
+			best_cpu = cpudl_cpu;
+			if (later_mask)
+				cpumask_set_cpu(best_cpu, later_mask);
+		}
 	}
 
 out:
-	WARN_ON(best_cpu != -1 && !cpu_present(best_cpu));
-
 	return best_cpu;
 }
 
