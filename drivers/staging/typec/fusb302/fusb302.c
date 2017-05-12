@@ -365,15 +365,16 @@ static int fusb302_i2c_block_read(struct fusb302_chip *chip, u8 address,
 	if (ret < 0) {
 		fusb302_log(chip, "cannot block read 0x%02x, len=%d, ret=%d",
 			    address, length, ret);
-		return ret;
+		goto done;
 	}
 	if (ret != length) {
 		fusb302_log(chip, "only read %d/%d bytes from 0x%02x",
 			    ret, length, address);
-		return -EIO;
+		ret = -EIO;
 	}
 	atomic_set(&chip->i2c_busy, 0);
 
+done:
 	return ret;
 }
 
