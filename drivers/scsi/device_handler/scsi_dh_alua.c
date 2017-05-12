@@ -652,9 +652,15 @@ static int alua_rtpg(struct scsi_device *sdev, struct alua_port_group *pg)
 					rcu_read_lock();
 					list_for_each_entry_rcu(h,
 						&tmp_pg->dh_list, node) {
-						/* h->sdev should always be valid */
-						BUG_ON(!h->sdev);
-						h->sdev->access_state = desc[0];
+						/*
+						 * We might be racing with
+						 * alua_bus_detach here
+						 */
+						struct scsi_device *sdev =
+							h->sdev;
+						if (sdev)
+							sdev->access_state =
+								desc[0];
 					}
 					rcu_read_unlock();
 				}
@@ -694,11 +700,13 @@ static int alua_rtpg(struct scsi_device *sdev, struct alua_port_group *pg)
 			pg->expiry = 0;
 			rcu_read_lock();
 			list_for_each_entry_rcu(h, &pg->dh_list, node) {
-				BUG_ON(!h->sdev);
-				h->sdev->access_state =
+				struct scsi_device *sdev = h->sdev;
+				if (!sdev)
+					continue;
+				sdev->access_state =
 					(pg->state & SCSI_ACCESS_STATE_MASK);
 				if (pg->pref)
-					h->sdev->access_state |=
+					sdev->access_state |=
 						SCSI_ACCESS_STATE_PREFERRED;
 			}
 			rcu_read_unlock();
