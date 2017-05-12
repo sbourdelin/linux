@@ -18,6 +18,7 @@ SECTIONS
 	.entrytext	: { *(.entrytext) }
 	.inittext	: { *(.inittext) }
 	.initdata	: { *(.initdata) }
+	.secdata	: { *(.secdata) }
 	__end_init = .;
 
 	.text		: { *(.text) }
