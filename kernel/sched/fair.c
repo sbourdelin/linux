@@ -8219,8 +8219,19 @@ more_balance:
 
 		/* All tasks on this runqueue were pinned by CPU affinity */
 		if (unlikely(env.flags & LBF_ALL_PINNED)) {
+			struct cpumask tmp;
+
+			/* Cpumask of all initially possible busiest cpus. */
+			cpumask_copy(&tmp, sched_domain_span(env.sd));
+			cpumask_clear_cpu(env.dst_cpu, &tmp);
+
 			cpumask_clear_cpu(cpu_of(busiest), cpus);
-			if (!cpumask_empty(cpus)) {
+			/*
+			 * Go back to "redo" iff the load-balance cpumask
+			 * contains other potential busiest cpus for the
+			 * current sched domain.
+			 */
+			if (cpumask_intersects(cpus, &tmp)) {
 				env.loop = 0;
 				env.loop_break = sched_nr_migrate_break;
 				goto redo;
