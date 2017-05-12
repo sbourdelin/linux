@@ -119,18 +119,16 @@ static inline int cpudl_maximum(struct cpudl *cp)
  * @p: the task
  * @later_mask: a mask to fill in with the selected CPUs (or NULL)
  *
- * Returns: int - best CPU (heap maximum if suitable)
+ * Returns: (int)bool - CPUs were found
  */
 int cpudl_find(struct cpudl *cp, struct task_struct *p,
 	       struct cpumask *later_mask)
 {
-	int best_cpu = -1;
 	const struct sched_dl_entity *dl_se = &p->dl;
 
 	if (later_mask &&
 	    cpumask_and(later_mask, cp->free_cpus, &p->cpus_allowed)) {
-		best_cpu = cpumask_any(later_mask);
-		goto out;
+		return 1;
 	} else {
 		u64 cpudl_dl;
 		int cpudl_cpu;
@@ -157,14 +155,13 @@ int cpudl_find(struct cpudl *cp, struct task_struct *p,
 		if (cpudl_valid != IDX_INVALID &&
 		    cpumask_test_cpu(cpudl_cpu, &p->cpus_allowed) &&
 		    dl_time_before(dl_se->deadline, cpudl_dl)) {
-			best_cpu = cpudl_cpu;
 			if (later_mask)
-				cpumask_set_cpu(best_cpu, later_mask);
+				cpumask_set_cpu(cpudl_cpu, later_mask);
+			return 1;
 		}
 	}
 
-out:
-	return best_cpu;
+	return 0;
 }
 
 /*
