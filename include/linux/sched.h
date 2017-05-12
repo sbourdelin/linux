@@ -455,6 +455,16 @@ struct sched_dl_entity {
 	 * own bandwidth to be enforced, thus we need one timer per task.
 	 */
 	struct hrtimer			dl_timer;
+
+	/*
+	 * Accounting for periods that run less than @dl_runtime:
+	 * @nr_underrun_sched hints some scheduling issue.
+	 * @nr_underrun_block hints some block reason. E.g. long sleep.
+	 * @nr_underrun_yield hints the yield reason.
+	 */
+	u64				nr_underrun_sched;
+	u64				nr_underrun_block;
+	u64				nr_underrun_yield;
 };
 
 union rcu_special {

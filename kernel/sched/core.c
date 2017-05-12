@@ -3958,6 +3958,9 @@ __setparam_dl(struct task_struct *p, const struct sched_attr *attr)
 	dl_se->dl_period = attr->sched_period ?: dl_se->dl_deadline;
 	dl_se->flags = attr->sched_flags;
 	dl_se->dl_bw = to_ratio(dl_se->dl_period, dl_se->dl_runtime);
+	dl_se->nr_underrun_sched = 0;
+	dl_se->nr_underrun_block = 0;
+	dl_se->nr_underrun_yield = 0;
 
 	/*
 	 * Changing the parameters of a task is 'tricky' and we're not doing

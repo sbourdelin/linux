@@ -957,6 +957,9 @@ void proc_sched_show_task(struct task_struct *p, struct seq_file *m)
 	if (p->policy == SCHED_DEADLINE) {
 		P(dl.runtime);
 		P(dl.deadline);
+		P(dl.nr_underrun_sched);
+		P(dl.nr_underrun_block);
+		P(dl.nr_underrun_yield);
 	}
 #undef PN_SCHEDSTAT
 #undef PN
