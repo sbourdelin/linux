@@ -359,8 +359,6 @@ latex_documents = [
      'The kernel development community', 'manual'),
     ('input/index', 'linux-input.tex', 'The Linux input driver subsystem',
      'The kernel development community', 'manual'),
-    ('kernel-documentation', 'kernel-documentation.tex', 'The Linux Kernel Documentation',
-     'The kernel development community', 'manual'),
     ('kernel-hacking/index', 'kernel-hacking.tex', 'Unreliable Guide To Hacking The Linux Kernel',
      'The kernel development community', 'manual'),
     ('media/index', 'media.tex', 'Linux Media Subsystem Documentation',
