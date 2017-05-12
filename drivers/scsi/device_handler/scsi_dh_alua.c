@@ -1108,6 +1108,10 @@ static int alua_bus_attach(struct scsi_device *sdev)
 	h = kzalloc(sizeof(*h) , GFP_KERNEL);
 	if (!h)
 		return -ENOMEM;
+	if (scsi_device_get(sdev)) {
+		ret = -ENXIO;
+		goto failed;
+	}
 	spin_lock_init(&h->pg_lock);
 	rcu_assign_pointer(h->pg, NULL);
 	h->init_error = SCSI_DH_OK;
@@ -1119,10 +1123,13 @@ static int alua_bus_attach(struct scsi_device *sdev)
 	if (err == SCSI_DH_NOMEM)
 		ret = -ENOMEM;
 	if (err != SCSI_DH_OK && err != SCSI_DH_DEV_OFFLINED)
-		goto failed;
+		goto failed_put;
 
 	sdev->handler_data = h;
 	return 0;
+
+failed_put:
+	scsi_device_put(sdev);
 failed:
 	kfree(h);
 	return ret;
@@ -1140,6 +1147,7 @@ static void alua_bus_detach(struct scsi_device *sdev)
 	spin_lock(&h->pg_lock);
 	pg = rcu_dereference_protected(h->pg, lockdep_is_held(&h->pg_lock));
 	rcu_assign_pointer(h->pg, NULL);
+	scsi_device_put(h->sdev);
 	h->sdev = NULL;
 	spin_unlock(&h->pg_lock);
 	if (pg) {
