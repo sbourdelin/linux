@@ -82,11 +82,6 @@ struct sync_file *sync_file_create(struct dma_fence *fence)
 
 	sync_file->fence = dma_fence_get(fence);
 
-	snprintf(sync_file->name, sizeof(sync_file->name), "%s-%s%llu-%d",
-		 fence->ops->get_driver_name(fence),
-		 fence->ops->get_timeline_name(fence), fence->context,
-		 fence->seqno);
-
 	return sync_file;
 }
 EXPORT_SYMBOL(sync_file_create);
@@ -268,7 +263,7 @@ static struct sync_file *sync_file_merge(const char *name, struct sync_file *a,
 		goto err;
 	}
 
-	strlcpy(sync_file->name, name, sizeof(sync_file->name));
+	strlcpy(sync_file->user_name, name, sizeof(sync_file->user_name));
 	return sync_file;
 
 err:
@@ -422,7 +417,16 @@ static long sync_file_ioctl_fence_info(struct sync_file *sync_file,
 	}
 
 no_fences:
-	strlcpy(info.name, sync_file->name, sizeof(info.name));
+	if (!sync_file->user_name[0]) {
+		scnprintf(sync_file->user_name,
+			  sizeof(sync_file->user_name),
+			  "%s-%s%llu-%d",
+			  sync_file->fence->ops->get_driver_name(sync_file->fence),
+			  sync_file->fence->ops->get_timeline_name(sync_file->fence),
+			  sync_file->fence->context,
+			  sync_file->fence->seqno);
+	}
+	strlcpy(info.name, sync_file->user_name, sizeof(info.name));
 	info.status = dma_fence_is_signaled(sync_file->fence);
 	info.num_fences = num_fences;
 
