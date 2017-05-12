@@ -59,6 +59,31 @@ struct drm_bridge_funcs {
 	void (*detach)(struct drm_bridge *bridge);
 
 	/**
+	 * @mode_valid:
+	 *
+	 * This callback is used to check if a specific mode is valid in this
+	 * bridge. This should be implemented if the bridge has some sort of
+	 * restriction in the modes it can display. For example, a given bridge
+	 * may be responsible to set a clock value. If the clock can not
+	 * produce all the values for the available modes then this callback
+	 * can be used to restrict the number of modes to only the ones that
+	 * can be displayed.
+	 *
+	 * This hook is used by the probe helpers to filter the mode list in
+	 * drm_helper_probe_single_connector_modes(), and it is used by the
+	 * atomic helpers to validate modes supplied by userspace in
+	 * drm_atomic_helper_check_modeset().
+	 *
+	 * This function is optional.
+	 *
+	 * RETURNS:
+	 *
+	 * drm_mode_status Enum
+	 */
+	enum drm_mode_status (*mode_valid)(struct drm_bridge *crtc,
+					   const struct drm_display_mode *mode);
+
+	/**
 	 * @mode_fixup:
 	 *
 	 * This callback is used to validate and adjust a mode. The paramater
@@ -81,6 +106,12 @@ struct drm_bridge_funcs {
 	 * just check whether a configuration would be possible). Drivers MUST
 	 * NOT touch any persistent state (hardware or software) or data
 	 * structures except the passed in @state parameter.
+	 *
+	 * Also beware that userspace can request its own custom modes, neither
+	 * core nor helpers filter modes to the list of probe modes reported by
+	 * the GETCONNECTOR IOCTL and stored in &drm_connector.modes. To ensure
+	 * that modes are filtered consistently put any bridge constraints and
+	 * limits checks into @mode_valid.
 	 *
 	 * RETURNS:
 	 *
