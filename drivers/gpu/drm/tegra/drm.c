@@ -382,20 +382,30 @@ int tegra_drm_submit(struct tegra_drm_context *context,
 
 	while (num_cmdbufs) {
 		struct drm_tegra_cmdbuf cmdbuf;
-		struct host1x_bo *bo;
+		struct drm_gem_object *gem;
+		struct tegra_bo *bo;
 
 		if (copy_from_user(&cmdbuf, cmdbufs, sizeof(cmdbuf))) {
 			err = -EFAULT;
 			goto fail;
 		}
 
-		bo = host1x_bo_lookup(file, cmdbuf.handle);
-		if (!bo) {
+		gem = drm_gem_object_lookup(file, cmdbuf.handle);
+		if (!gem) {
 			err = -ENOENT;
 			goto fail;
 		}
 
-		host1x_job_add_gather(job, bo, cmdbuf.words, cmdbuf.offset);
+		drm_gem_object_unreference_unlocked(gem);
+
+		if (cmdbuf.words * 4 > gem->size) {
+			err = -EINVAL;
+			goto fail;
+		}
+
+		bo = to_tegra_bo(gem);
+		host1x_job_add_gather(job, &bo->base,
+				      cmdbuf.words, cmdbuf.offset);
 		num_cmdbufs--;
 		cmdbufs++;
 	}
