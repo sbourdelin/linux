@@ -853,8 +853,6 @@ static struct platform_driver * const drivers[] = {
 
 static int __init mv64x60_edac_init(void)
 {
-	int ret = 0;
-
 	printk(KERN_INFO "Marvell MV64x60 EDAC driver " MV64x60_REVISION "\n");
 	printk(KERN_INFO "\t(C) 2006-2007 MontaVista Software\n");
 	/* make sure error reporting method is sane */
