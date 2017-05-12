@@ -188,25 +188,22 @@ struct pci_bus *pci_acpi_scan_root(struct acpi_pci_root *root)
 
 	ri = kzalloc_node(sizeof(*ri), GFP_KERNEL, node);
 	if (!ri)
-		return NULL;
+		goto err_allocri;
 
 	root_ops = kzalloc_node(sizeof(*root_ops), GFP_KERNEL, node);
 	if (!root_ops)
-		return NULL;
+		goto err_allocops;
 
 	ri->cfg = pci_acpi_setup_ecam_mapping(root);
-	if (!ri->cfg) {
-		kfree(ri);
-		kfree(root_ops);
-		return NULL;
-	}
+	if (!ri->cfg)
+		goto err_ecam;
 
 	root_ops->release_info = pci_acpi_generic_release_info;
 	root_ops->prepare_resources = pci_acpi_root_prepare_resources;
 	root_ops->pci_ops = &ri->cfg->ops->pci_ops;
 	bus = acpi_pci_root_create(root, root_ops, &ri->common, ri->cfg);
 	if (!bus)
-		return NULL;
+		goto err_rootcreate;
 
 	pci_bus_size_bridges(bus);
 	pci_bus_assign_resources(bus);
@@ -215,6 +212,15 @@ struct pci_bus *pci_acpi_scan_root(struct acpi_pci_root *root)
 		pcie_bus_configure_settings(child);
 
 	return bus;
+
+err_rootcreate:
+	pci_ecam_free(ri->cfg);
+err_ecam:
+	kfree(root_ops);
+err_allocops:
+	kfree(ri);
+err_allocri:
+	return NULL;
 }
 
 void pcibios_add_bus(struct pci_bus *bus)
