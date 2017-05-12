@@ -37,4 +37,7 @@ config NET_DSA_TAG_MTK
 config NET_DSA_TAG_LAN9303
 	bool
 
+config NET_DSA_TAG_KSZ
+	bool
+
 endif
