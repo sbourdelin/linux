@@ -140,7 +140,7 @@ struct dw_pcie_host_ops {
 	phys_addr_t (*get_msi_addr)(struct pcie_port *pp);
 	u32 (*get_msi_data)(struct pcie_port *pp, int pos);
 	void (*scan_bus)(struct pcie_port *pp);
-	int (*msi_host_init)(struct dw_pcie *pci, struct msi_controller *chip);
+	int (*msi_host_init)(struct dw_pcie *pci);
 	void (*msi_irq_ack)(int irq, struct pcie_port *pp);
 };
 

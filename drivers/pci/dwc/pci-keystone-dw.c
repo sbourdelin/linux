@@ -162,7 +162,7 @@ void ks_dw_pcie_msi_clear_irq(struct pcie_port *pp, int irq)
 			 BIT(bit_pos));
 }
 
-int ks_dw_pcie_msi_host_init(struct dw_pcie *pci, struct msi_controller *chip)
+int ks_dw_pcie_msi_host_init(struct dw_pcie *pci)
 {
 	/* overide number of vectors and sent them to Keystone Max MSI IRQs */
 	pci->pp.num_vectors = MAX_MSI_IRQS;
