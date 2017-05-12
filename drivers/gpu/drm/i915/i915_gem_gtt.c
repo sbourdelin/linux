@@ -1854,7 +1854,8 @@ static void i915_address_space_init(struct i915_address_space *vm,
 {
 	i915_gem_timeline_init(dev_priv, &vm->timeline, name);
 
-	drm_mm_init(&vm->mm, 0, vm->total);
+	/* Always exclude the top page to avoid prefetches past the end. */
+	drm_mm_init(&vm->mm, 0, vm->total - I915_GTT_PAGE_SIZE);
 	vm->mm.head_node.color = I915_COLOR_UNEVICTABLE;
 
 	INIT_LIST_HEAD(&vm->active_list);
@@ -2388,7 +2389,7 @@ static void i915_gtt_color_adjust(const struct drm_mm_node *node,
 	 * GTT boundary.
 	 */
 	node = list_next_entry(node, node_list);
-	if (node->color != color)
+	if (node->allocated && node->color != color)
 		*end -= I915_GTT_PAGE_SIZE;
 }
 
