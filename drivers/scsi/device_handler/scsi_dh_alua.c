@@ -53,6 +53,7 @@
 #define ALUA_FAILOVER_TIMEOUT		60
 #define ALUA_FAILOVER_RETRIES		5
 #define ALUA_RTPG_DELAY_MSECS		5
+#define ALUA_RTPG_RETRY_INTERVAL	(2*HZ)
 
 /* device handler flags */
 #define ALUA_OPTIMIZE_STPG		0x01
@@ -86,7 +87,6 @@ struct alua_port_group {
 	unsigned		flags; /* used for optimizing STPG */
 	unsigned char		transition_tmo;
 	unsigned long		expiry;
-	unsigned long		interval;
 	struct delayed_work	rtpg_work;
 	spinlock_t		lock;
 	struct list_head	rtpg_list;
@@ -681,7 +681,6 @@ static int alua_rtpg(struct scsi_device *sdev, struct alua_port_group *pg)
 	case SCSI_ACCESS_STATE_TRANSITIONING:
 		if (time_before(jiffies, pg->expiry)) {
 			/* State transition, retry */
-			pg->interval = 2;
 			err = SCSI_DH_RETRY;
 		} else {
 			struct alua_dh_data *h;
@@ -811,7 +810,7 @@ static void alua_rtpg_work(struct work_struct *work)
 				pg->flags |= ALUA_PG_RUN_RTPG;
 				spin_unlock_irqrestore(&pg->lock, flags);
 				queue_delayed_work(alua_wq, &pg->rtpg_work,
-						   pg->interval * HZ);
+						   ALUA_RTPG_RETRY_INTERVAL);
 				return;
 			}
 			/* Send RTPG on failure or if TUR indicates SUCCESS */
@@ -823,7 +822,7 @@ static void alua_rtpg_work(struct work_struct *work)
 			pg->flags |= ALUA_PG_RUN_RTPG;
 			spin_unlock_irqrestore(&pg->lock, flags);
 			queue_delayed_work(alua_wq, &pg->rtpg_work,
-					   pg->interval * HZ);
+					   ALUA_RTPG_RETRY_INTERVAL);
 			return;
 		}
 		if (err != SCSI_DH_OK)
@@ -836,11 +835,9 @@ static void alua_rtpg_work(struct work_struct *work)
 		spin_lock_irqsave(&pg->lock, flags);
 		if (err == SCSI_DH_RETRY || pg->flags & ALUA_PG_RUN_RTPG) {
 			pg->flags |= ALUA_PG_RUN_RTPG;
-			pg->interval = 0;
 			pg->flags &= ~ALUA_PG_RUNNING;
 			spin_unlock_irqrestore(&pg->lock, flags);
-			queue_delayed_work(alua_wq, &pg->rtpg_work,
-					   pg->interval * HZ);
+			queue_delayed_work(alua_wq, &pg->rtpg_work, 0);
 			return;
 		}
 	}
@@ -886,7 +883,6 @@ static bool alua_rtpg_queue(struct alua_port_group *pg,
 		force = true;
 	}
 	if (pg->rtpg_sdev == NULL) {
-		pg->interval = 0;
 		pg->flags |= ALUA_PG_RUN_RTPG;
 		kref_get(&pg->kref);
 		pg->rtpg_sdev = sdev;
