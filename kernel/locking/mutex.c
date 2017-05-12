@@ -227,9 +227,11 @@ static void __sched __mutex_lock_slowpath(struct mutex *lock);
  * (or statically defined) before it can be locked. memset()-ing
  * the mutex to 0 is not allowed.
  *
- * ( The CONFIG_DEBUG_MUTEXES .config option turns on debugging
+ * .. note::
+ *
+ *   The CONFIG_DEBUG_MUTEXES .config option turns on debugging
  *   checks that will enforce the restrictions and will also do
- *   deadlock debugging. )
+ *   deadlock debugging.
  *
  * This function is similar to (but not equivalent to) down().
  */
