@@ -199,8 +199,18 @@ static void dw_pci_bottom_unmask(struct irq_data *data)
 	mutex_unlock(&pp->lock);
 }
 
+static void dw_pci_bottom_ack(struct irq_data *d)
+{
+	struct msi_desc *msi = irq_data_get_msi_desc(d);
+	struct pcie_port *pp = (struct pcie_port *) msi_desc_to_pci_sysdata(msi);
+
+	if (pp->ops->msi_irq_ack)
+		pp->ops->msi_irq_ack(d->irq, pp);
+}
+
 static struct irq_chip dw_pci_msi_bottom_irq_chip = {
 	.name			= "DWPCI-MSI",
+	.irq_ack		= dw_pci_bottom_ack,
 	.irq_compose_msi_msg	= dw_pci_setup_msi_msg,
 	.irq_set_affinity	= dw_pci_msi_set_affinity,
 	.irq_mask		= dw_pci_bottom_mask,
@@ -622,7 +632,7 @@ int dw_pcie_host_init(struct pcie_port *pp)
 							 pci);
 #endif
 		} else {
-			ret = pp->ops->msi_host_init(pp, &dw_pcie_msi_chip);
+			ret = pp->ops->msi_host_init(pci, &dw_pcie_msi_chip);
 			if (ret < 0)
 				goto error;
 		}

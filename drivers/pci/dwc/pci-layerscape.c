@@ -162,10 +162,9 @@ static void ls_pcie_host_init(struct pcie_port *pp)
 	iowrite32(0, pci->dbi_base + PCIE_DBI_RO_WR_EN);
 }
 
-static int ls_pcie_msi_host_init(struct pcie_port *pp,
+static int ls_pcie_msi_host_init(struct dw_pcie *pci,
 				 struct msi_controller *chip)
 {
-	struct dw_pcie *pci = to_dw_pcie_from_pp(pp);
 	struct device *dev = pci->dev;
 	struct device_node *np = dev->of_node;
 	struct device_node *msi_node;
