@@ -517,6 +517,45 @@ static void sriov_restore_state(struct pci_dev *dev)
 		msleep(100);
 }
 
+/*
+ * pci_vf_bar_valid - check if VF BARs have resource allocated
+ * @dev: the PCI device
+ * @pos: register offset of SR-IOV capability in PCI config space
+ * Returns true any VF BAR has resource allocated, false
+ * if all VF BARs are empty.
+ */
+static bool pci_vf_bar_valid(struct pci_dev *dev, int pos)
+{
+	int i;
+	u32 bar_value;
+	u32 bar_size_mask = ~(PCI_BASE_ADDRESS_SPACE |
+			PCI_BASE_ADDRESS_MEM_TYPE_64 |
+			PCI_BASE_ADDRESS_MEM_PREFETCH);
+
+	for (i = 0; i < PCI_SRIOV_NUM_BARS; i++) {
+		pci_read_config_dword(dev, pos + PCI_SRIOV_BAR + i * 4, &bar_value);
+		if (bar_value & bar_size_mask)
+			return true;
+	}
+
+	return false;
+}
+
+/*
+ * is_amd_display_adapter - check if it is an AMD/ATI GPU device
+ * @dev: the PCI device
+ *
+ * Returns true if device is an AMD/ATI display adapter,
+ * otherwise return false.
+ */
+
+static bool is_amd_display_adapter(struct pci_dev *dev)
+{
+	return (((dev->class >> 16) == PCI_BASE_CLASS_DISPLAY) &&
+		(dev->vendor == PCI_VENDOR_ID_ATI ||
+		dev->vendor == PCI_VENDOR_ID_AMD));
+}
+
 /**
  * pci_iov_init - initialize the IOV capability
  * @dev: the PCI device
@@ -531,9 +570,27 @@ int pci_iov_init(struct pci_dev *dev)
 		return -ENODEV;
 
 	pos = pci_find_ext_capability(dev, PCI_EXT_CAP_ID_SRIOV);
-	if (pos)
-		return sriov_init(dev, pos);
-
+	if (pos) {
+	/*
+	 * If the device is an AMD graphics device and it supports
+	 * SR-IOV it will require a large amount of resources.
+	 * Before calling sriov_init() must ensure that the system
+	 * BIOS also supports SR-IOV and that system BIOS has been
+	 * able to allocate enough resources.
+	 * If the VF BARs are zero then the system BIOS does not
+	 * support SR-IOV or it could not allocate the resources
+	 * and this platform will not support AMD graphics SR-IOV.
+	 * Therefore do not call sriov_init().
+	 * If the system BIOS does support SR-IOV then the VF BARs
+	 * will be properly initialized to non-zero values.
+	 */
+		if (is_amd_display_adapter(dev)) {
+			if (pci_vf_bar_valid(dev, pos))
+				return sriov_init(dev, pos);
+		} else {
+			return sriov_init(dev, pos);
+		}
+	}
 	return -ENODEV;
 }
 
