@@ -122,11 +122,11 @@ static u32 vnt_get_rsvtime(struct vnt_private *priv, u8 pkt_type,
 				       frame_length, rate);
 
 	if (pkt_type == PK_TYPE_11B)
-		ack_time = vnt_get_frame_time(priv->preamble_type, pkt_type,
-					      14, (u16)priv->top_cck_basic_rate);
+		ack_time = vnt_get_frame_time(priv->preamble_type, pkt_type, 14,
+					      (u16)priv->top_cck_basic_rate);
 	else
-		ack_time = vnt_get_frame_time(priv->preamble_type, pkt_type,
-					      14, (u16)priv->top_ofdm_basic_rate);
+		ack_time = vnt_get_frame_time(priv->preamble_type, pkt_type, 14,
+					      (u16)priv->top_ofdm_basic_rate);
 
 	if (need_ack)
 		return data_time + priv->sifs + ack_time;
@@ -141,8 +141,9 @@ static __le16 vnt_rxtx_rsvtime_le16(struct vnt_private *priv, u8 pkt_type,
 		frame_length, rate, need_ack));
 }
 
-static __le16 vnt_get_rtscts_rsvtime_le(struct vnt_private *priv,
-					 u8 rsv_type, u8 pkt_type, u32 frame_length, u16 current_rate)
+static __le16 vnt_get_rtscts_rsvtime_le(struct vnt_private *priv, u8 rsv_type,
+					t_type, u32 frame_length,
+					u16 current_rate)
 {
 	u32 rrv_time, rts_time, cts_time, ack_time, data_time;
 
@@ -226,8 +227,8 @@ static __le16 vnt_get_rtscts_duration_le(struct vnt_usb_send_context *context,
 	case RTSDUR_AA:
 	case RTSDUR_AA_F0:
 	case RTSDUR_AA_F1:
-		cts_time = vnt_get_frame_time(priv->preamble_type,
-					      pkt_type, 14, priv->top_ofdm_basic_rate);
+		cts_time = vnt_get_frame_time(priv->preamble_type, pkt_type, 14,
+					      priv->top_ofdm_basic_rate);
 		dur_time = cts_time + 2 * priv->sifs +
 			vnt_get_rsvtime(priv, pkt_type,
 					frame_length, rate, need_ack);
@@ -684,8 +685,8 @@ static u16 vnt_rxtx_ab(struct vnt_usb_send_context *tx_context,
 
 static u16 vnt_generate_tx_parameter(struct vnt_usb_send_context *tx_context,
 				      struct vnt_tx_buffer *tx_buffer,
-				      struct vnt_mic_hdr **mic_hdr, u32 need_mic,
-				      bool need_rts)
+				      struct vnt_mic_hdr **mic_hdr,
+				      u32 need_mic, bool need_rts)
 {
 
 	if (tx_context->pkt_type == PK_TYPE_11GB ||
