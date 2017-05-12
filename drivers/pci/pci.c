@@ -3845,13 +3845,30 @@ EXPORT_SYMBOL(pci_wait_for_pending_transaction);
  */
 static void pci_flr_wait(struct pci_dev *dev)
 {
+	struct pci_dev *bridge = dev->bus->self;
 	int i = 0;
+	u16 bctl;
 	u32 id;
+
+	/*
+	 * Disable MasterAbortMode while we are waiting to avoid reporting
+	 * bus errors for reading the command register on a device that is
+	 * not ready (in some architectures)
+	 */
+	if (bridge) {
+		pci_read_config_word(bridge, PCI_BRIDGE_CONTROL, &bctl);
+		pci_write_config_word(bridge, PCI_BRIDGE_CONTROL,
+				      bctl & ~PCI_BRIDGE_CTL_MASTER_ABORT);
+	}
 
 	do {
 		msleep(100);
 		pci_read_config_dword(dev, PCI_COMMAND, &id);
 	} while (i++ < 10 && id == ~0);
+
+	/* restore bridge state */
+	if (bridge)
+		pci_write_config_word(bridge, PCI_BRIDGE_CONTROL, bctl);
 
 	if (id == ~0)
 		dev_warn(&dev->dev, "Failed to return from FLR\n");
