@@ -21,6 +21,7 @@
  * compromise in place of having locks on each irq in account_system_time.
  */
 DEFINE_PER_CPU(struct irqtime, cpu_irqtime);
+DEFINE_PER_CPU(u64, cpu_intrstat);
 
 static int sched_clock_irqtime;
 
@@ -69,9 +70,10 @@ void irqtime_account_irq(struct task_struct *curr)
 	 * in that case, so as not to confuse scheduler with a special task
 	 * that do not consume any time, but still wants to run.
 	 */
-	if (hardirq_count())
+	if (hardirq_count()) {
 		irqtime_account_delta(irqtime, delta, CPUTIME_IRQ);
-	else if (in_serving_softirq() && curr != this_cpu_ksoftirqd())
+		__this_cpu_add(cpu_intrstat, delta);
+	} else if (in_serving_softirq() && curr != this_cpu_ksoftirqd())
 		irqtime_account_delta(irqtime, delta, CPUTIME_SOFTIRQ);
 }
 EXPORT_SYMBOL_GPL(irqtime_account_irq);

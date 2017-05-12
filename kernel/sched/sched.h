@@ -44,6 +44,15 @@
 #define SCHED_WARN_ON(x)	((void)(x))
 #endif
 
+#ifdef CONFIG_IRQ_TIME_ACCOUNTING
+DECLARE_PER_CPU(u64, cpu_intrstat);
+DECLARE_PER_CPU(u64, cpu_intrlast);
+
+#define INTR_BUCKET_SZ		10
+#define INTR_THRS_PCT		800
+#define INTR_PRECISION		1000
+#endif
+
 struct rq;
 struct cpuidle_state;
 
@@ -58,6 +67,25 @@ extern atomic_long_t calc_load_tasks;
 
 extern void calc_global_load_tick(struct rq *this_rq);
 extern long calc_load_fold_active(struct rq *this_rq, long adjust);
+
+#ifdef CONFIG_IRQ_TIME_ACCOUNTING
+extern unsigned int intr_threshold;
+#define INTRLOAD_HIGH(_rq)	((_rq)->intrload > intr_threshold)
+
+extern void inc_intr_buckets(unsigned int intrload);
+extern void dec_intr_buckets(unsigned int intrload);
+extern void init_intr_buckets(void);
+extern void update_intr_load_threshold(void);
+static inline void init_intr_threshold(void) {intr_threshold = INTR_PRECISION; }
+#else
+#define INTRLOAD_HIGH(_rq)	(0)
+
+static inline void inc_intr_buckets(unsigned int intrload) { }
+static inline void dec_intr_buckets(unsigned int intrload) { }
+static inline void init_intr_buckets(void) { }
+static inline void update_intr_load_threshold(void) { }
+static inline void init_intr_threshold(void) { }
+#endif
 
 #ifdef CONFIG_SMP
 extern void cpu_load_update_active(struct rq *this_rq);
@@ -650,7 +678,9 @@ struct rq {
 	struct load_weight load;
 	unsigned long nr_load_updates;
 	u64 nr_switches;
-
+#ifdef CONFIG_IRQ_TIME_ACCOUNTING
+	unsigned int intrload;
+#endif
 	struct cfs_rq cfs;
 	struct rt_rq rt;
 	struct dl_rq dl;
@@ -1550,6 +1580,11 @@ static inline void rq_last_tick_reset(struct rq *rq)
 }
 
 extern void update_rq_clock(struct rq *rq);
+#ifdef CONFIG_IRQ_TIME_ACCOUNTING
+extern void update_rq_intrload(struct rq *rq);
+#else
+static inline void update_rq_intrload(struct rq *rq) { }
+#endif
 
 extern void activate_task(struct rq *rq, struct task_struct *p, int flags);
 extern void deactivate_task(struct rq *rq, struct task_struct *p, int flags);

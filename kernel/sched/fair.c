@@ -5598,6 +5598,7 @@ find_idlest_cpu(struct sched_group *group, struct task_struct *p, int this_cpu)
 	u64 latest_idle_timestamp = 0;
 	int least_loaded_cpu = this_cpu;
 	int shallowest_idle_cpu = -1;
+	int shallowest_idle_cpu_backup = -1;
 	int i;
 
 	/* Check if we have any choice: */
@@ -5614,10 +5615,16 @@ find_idlest_cpu(struct sched_group *group, struct task_struct *p, int this_cpu)
 				 * We give priority to a CPU whose idle state
 				 * has the smallest exit latency irrespective
 				 * of any idle timestamp.
+				 *
+				 * Furthermore, we are aware of the interrupt
+				 * load on the CPU.
 				 */
 				min_exit_latency = idle->exit_latency;
 				latest_idle_timestamp = rq->idle_stamp;
-				shallowest_idle_cpu = i;
+				if (!INTRLOAD_HIGH(rq))
+					shallowest_idle_cpu = i;
+				else
+					shallowest_idle_cpu_backup = i;
 			} else if ((!idle || idle->exit_latency == min_exit_latency) &&
 				   rq->idle_stamp > latest_idle_timestamp) {
 				/*
@@ -5637,7 +5644,12 @@ find_idlest_cpu(struct sched_group *group, struct task_struct *p, int this_cpu)
 		}
 	}
 
-	return shallowest_idle_cpu != -1 ? shallowest_idle_cpu : least_loaded_cpu;
+	if (shallowest_idle_cpu != -1)
+		return shallowest_idle_cpu;
+	else if (shallowest_idle_cpu_backup != -1)
+		return shallowest_idle_cpu_backup;
+
+	return least_loaded_cpu;
 }
 
 /*
@@ -5748,15 +5760,18 @@ static int select_idle_core(struct task_struct *p, struct sched_domain *sd, int 
 
 	for_each_cpu_wrap(core, cpus, target, wrap) {
 		bool idle = true;
+		int rcpu = -1;
 
 		for_each_cpu(cpu, cpu_smt_mask(core)) {
 			cpumask_clear_cpu(cpu, cpus);
 			if (!idle_cpu(cpu))
 				idle = false;
+			if (!INTRLOAD_HIGH(cpu_rq(cpu)))
+				rcpu = cpu;
 		}
 
 		if (idle)
-			return core;
+			return (rcpu == -1 ? core : rcpu);
 	}
 
 	/*
@@ -5772,7 +5787,7 @@ static int select_idle_core(struct task_struct *p, struct sched_domain *sd, int 
  */
 static int select_idle_smt(struct task_struct *p, struct sched_domain *sd, int target)
 {
-	int cpu;
+	int cpu, backup_cpu = -1;
 
 	if (!static_branch_likely(&sched_smt_present))
 		return -1;
@@ -5780,11 +5795,15 @@ static int select_idle_smt(struct task_struct *p, struct sched_domain *sd, int t
 	for_each_cpu(cpu, cpu_smt_mask(target)) {
 		if (!cpumask_test_cpu(cpu, &p->cpus_allowed))
 			continue;
-		if (idle_cpu(cpu))
-			return cpu;
+		if (idle_cpu(cpu)) {
+			if (!INTRLOAD_HIGH(cpu_rq(cpu)))
+				return cpu;
+			else
+				backup_cpu = cpu;
+		}
 	}
 
-	return -1;
+	return backup_cpu;
 }
 
 #else /* CONFIG_SCHED_SMT */
@@ -5812,7 +5831,7 @@ static int select_idle_cpu(struct task_struct *p, struct sched_domain *sd, int t
 	u64 avg_cost, avg_idle = this_rq()->avg_idle;
 	u64 time, cost;
 	s64 delta;
-	int cpu, wrap;
+	int cpu, wrap, backup_cpu = -1;
 
 	this_sd = rcu_dereference(*this_cpu_ptr(&sd_llc));
 	if (!this_sd)
@@ -5832,10 +5851,18 @@ static int select_idle_cpu(struct task_struct *p, struct sched_domain *sd, int t
 	for_each_cpu_wrap(cpu, sched_domain_span(sd), target, wrap) {
 		if (!cpumask_test_cpu(cpu, &p->cpus_allowed))
 			continue;
-		if (idle_cpu(cpu))
-			break;
+		if (idle_cpu(cpu)) {
+			if (INTRLOAD_HIGH(cpu_rq(cpu))) {
+				backup_cpu = cpu;
+			} else {
+				backup_cpu = -1;
+				break;
+			}
+		}
 	}
 
+	if (backup_cpu >= 0)
+		cpu = backup_cpu;
 	time = local_clock() - time;
 	cost = this_sd->avg_scan_cost;
 	delta = (s64)(time - cost) / 8;
@@ -5852,13 +5879,14 @@ static int select_idle_sibling(struct task_struct *p, int prev, int target)
 	struct sched_domain *sd;
 	int i;
 
-	if (idle_cpu(target))
+	if (idle_cpu(target) && !INTRLOAD_HIGH(cpu_rq(target)))
 		return target;
 
 	/*
 	 * If the previous cpu is cache affine and idle, don't be stupid.
 	 */
-	if (prev != target && cpus_share_cache(prev, target) && idle_cpu(prev))
+	if (prev != target && cpus_share_cache(prev, target) && idle_cpu(prev)
+	    && !INTRLOAD_HIGH(cpu_rq(prev)))
 		return prev;
 
 	sd = rcu_dereference(per_cpu(sd_llc, target));

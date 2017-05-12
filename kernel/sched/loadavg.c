@@ -61,6 +61,10 @@
 /* Variables and functions for calc_load */
 atomic_long_t calc_load_tasks;
 unsigned long calc_load_update;
+#ifdef CONFIG_IRQ_TIME_ACCOUNTING
+atomic_t intr_buckets[(INTR_PRECISION/INTR_BUCKET_SZ)];
+unsigned int intr_threshold;
+#endif
 unsigned long avenrun[3];
 EXPORT_SYMBOL(avenrun); /* should be removed */
 
@@ -346,6 +350,41 @@ static inline void calc_global_nohz(void) { }
 
 #endif /* CONFIG_NO_HZ_COMMON */
 
+#ifdef CONFIG_IRQ_TIME_ACCOUNTING
+void init_intr_buckets(void)
+{
+	int i;
+
+	atomic_set(intr_buckets, num_online_cpus());
+	for (i = 1; i < (INTR_PRECISION/INTR_BUCKET_SZ); i++)
+		atomic_set(intr_buckets+i, 0);
+}
+
+void dec_intr_buckets(unsigned int intrload)
+{
+	atomic_dec_if_positive(intr_buckets+(intrload/INTR_BUCKET_SZ));
+}
+
+void inc_intr_buckets(unsigned int intrload)
+{
+	atomic_inc(intr_buckets+(intrload/INTR_BUCKET_SZ));
+}
+
+void update_intr_load_threshold(void)
+{
+	unsigned int count_cpus = 0, bucket_count = 0;
+
+	while ((count_cpus <=
+	       ((num_online_cpus()*INTR_THRS_PCT)/INTR_PRECISION)) &&
+		(bucket_count < (INTR_PRECISION/INTR_BUCKET_SZ))) {
+		count_cpus += atomic_read(intr_buckets+bucket_count);
+		++bucket_count;
+	}
+
+	intr_threshold = (bucket_count*INTR_BUCKET_SZ);
+}
+#endif
+
 /*
  * calc_load - update the avenrun load estimates 10 ticks after the
  * CPUs have updated calc_load_tasks.
@@ -381,6 +420,7 @@ void calc_global_load(unsigned long ticks)
 	 * In case we idled for multiple LOAD_FREQ intervals, catch up in bulk.
 	 */
 	calc_global_nohz();
+	update_intr_load_threshold();
 }
 
 /*

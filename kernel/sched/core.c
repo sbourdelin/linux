@@ -40,6 +40,38 @@
 #include <trace/events/sched.h>
 
 DEFINE_PER_CPU_SHARED_ALIGNED(struct rq, runqueues);
+#ifdef CONFIG_IRQ_TIME_ACCOUNTING
+DEFINE_PER_CPU(u64, cpu_intrlast);
+
+void update_rq_intrload(struct rq *rq)
+{
+	u64 intrused, intrstat;
+
+	unsigned int load;
+	int change;
+
+	intrstat = __this_cpu_read(cpu_intrstat);
+	intrused = intrstat - __this_cpu_read(cpu_intrlast);
+	__this_cpu_write(cpu_intrlast, intrstat);
+
+	if (intrused >= TICK_NSEC)
+		intrused = TICK_NSEC - 1;
+	/*
+	 * Actually, need to divide by NSEC_PER_SEC. Instead, right shift by 30,
+	 * 2^30 is close enough to 10^9. Lose some precision, gain performance.
+	 */
+	load = (100*HZ*intrused)>>30;
+
+	dec_intr_buckets(rq->intrload);
+	change = rq->intrload - load;
+	if (change < 0)
+		rq->intrload = load;
+	else if (change > 0)
+		rq->intrload -= (change + 3)/4;
+
+	inc_intr_buckets(rq->intrload);
+}
+#endif
 
 /*
  * Debugging: various feature bits
@@ -3101,6 +3133,7 @@ void scheduler_tick(void)
 	rq_lock(rq, &rf);
 
 	update_rq_clock(rq);
+	update_rq_intrload(rq);
 	curr->sched_class->task_tick(rq, curr, 0);
 	cpu_load_update_active(rq);
 	calc_global_load_tick(rq);
@@ -5717,6 +5750,10 @@ void set_rq_online(struct rq *rq)
 			if (class->rq_online)
 				class->rq_online(rq);
 		}
+#ifdef CONFIG_IRQ_TIME_ACCOUNTING
+		rq->intrload = 0;
+		inc_intr_buckets(rq->intrload);
+#endif
 	}
 }
 
@@ -5731,6 +5768,9 @@ void set_rq_offline(struct rq *rq)
 		}
 
 		cpumask_clear_cpu(rq->cpu, rq->rd->online);
+#ifdef CONFIG_IRQ_TIME_ACCOUNTING
+		dec_intr_buckets(rq->intrload);
+#endif
 		rq->online = 0;
 	}
 }
@@ -6184,6 +6224,8 @@ void __init sched_init(void)
 	init_sched_fair_class();
 
 	init_schedstats();
+	init_intr_buckets();
+	init_intr_threshold();
 
 	scheduler_running = 1;
 }
