@@ -285,9 +285,8 @@ int __init oprofile_perf_init(struct oprofile_operations *ops)
 		goto out;
 	}
 
-	counter_config = kcalloc(num_counters,
-			sizeof(struct op_counter_config), GFP_KERNEL);
-
+	counter_config = kcalloc(num_counters, sizeof(*counter_config),
+				 GFP_KERNEL);
 	if (!counter_config) {
 		pr_info("oprofile: failed to allocate %d "
 				"counters\n", num_counters);
