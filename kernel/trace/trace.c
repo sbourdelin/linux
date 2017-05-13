@@ -7550,6 +7550,7 @@ static int instance_rmdir(const char *name)
 	}
 
 	tracing_set_nop(tr);
+	clear_ftrace_function_probes(tr);
 	event_trace_del_tracer(tr);
 	ftrace_clear_pids(tr);
 	ftrace_destroy_function_files(tr);
