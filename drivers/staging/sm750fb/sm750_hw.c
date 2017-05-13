@@ -184,7 +184,7 @@ int hw_sm750_output_setMode(struct lynxfb_output *output,
 			    struct fb_fix_screeninfo *fix)
 {
 	int ret;
-	disp_output_t dispSet;
+	enum disp_output dispSet;
 	int channel;
 
 	ret = 0;
