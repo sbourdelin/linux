@@ -224,7 +224,7 @@ xt_osf_match_packet(const struct sk_buff *skb, struct xt_action_param *p)
 				sizeof(struct tcphdr), optsize, opts);
 	}
 
-	rcu_read_lock();
+	/* rcu_read_lock()ed by nf_hook */
 	list_for_each_entry_rcu(kf, &xt_osf_fingers[df], finger_entry) {
 		int foptsize, optnum;
 
@@ -338,7 +338,6 @@ xt_osf_match_packet(const struct sk_buff *skb, struct xt_action_param *p)
 		    info->loglevel == XT_OSF_LOGLEVEL_FIRST)
 			break;
 	}
-	rcu_read_unlock();
 
 	if (!fcount && (info->flags & XT_OSF_LOG))
 		nf_log_packet(net, xt_family(p), xt_hooknum(p), skb, xt_in(p),

@@ -53,7 +53,7 @@ udp_conn_schedule(struct netns_ipvs *ipvs, int af, struct sk_buff *skb,
 		return 0;
 	}
 
-	rcu_read_lock();
+	/* rcu_read_lock()ed by nf_hook */
 	if (likely(!ip_vs_iph_inverse(iph)))
 		svc = ip_vs_service_find(ipvs, af, skb->mark, iph->protocol,
 					 &iph->daddr, ports[1]);
@@ -69,7 +69,6 @@ udp_conn_schedule(struct netns_ipvs *ipvs, int af, struct sk_buff *skb,
 			 * It seems that we are very loaded.
 			 * We have to drop this packet :(
 			 */
-			rcu_read_unlock();
 			*verdict = NF_DROP;
 			return 0;
 		}
@@ -84,11 +83,9 @@ udp_conn_schedule(struct netns_ipvs *ipvs, int af, struct sk_buff *skb,
 				*verdict = ip_vs_leave(svc, skb, pd, iph);
 			else
 				*verdict = NF_DROP;
-			rcu_read_unlock();
 			return 0;
 		}
 	}
-	rcu_read_unlock();
 	/* NF_ACCEPT */
 	return 1;
 }

@@ -125,14 +125,13 @@ ip_vs_in_stats(struct ip_vs_conn *cp, struct sk_buff *skb)
 		s->cnt.inbytes += skb->len;
 		u64_stats_update_end(&s->syncp);
 
-		rcu_read_lock();
+		/* rcu_read_lock()ed by nf_hook */
 		svc = rcu_dereference(dest->svc);
 		s = this_cpu_ptr(svc->stats.cpustats);
 		u64_stats_update_begin(&s->syncp);
 		s->cnt.inpkts++;
 		s->cnt.inbytes += skb->len;
 		u64_stats_update_end(&s->syncp);
-		rcu_read_unlock();
 
 		s = this_cpu_ptr(ipvs->tot_stats.cpustats);
 		u64_stats_update_begin(&s->syncp);
@@ -159,14 +158,13 @@ ip_vs_out_stats(struct ip_vs_conn *cp, struct sk_buff *skb)
 		s->cnt.outbytes += skb->len;
 		u64_stats_update_end(&s->syncp);
 
-		rcu_read_lock();
+		/* rcu_read_lock()ed by nf_hook */
 		svc = rcu_dereference(dest->svc);
 		s = this_cpu_ptr(svc->stats.cpustats);
 		u64_stats_update_begin(&s->syncp);
 		s->cnt.outpkts++;
 		s->cnt.outbytes += skb->len;
 		u64_stats_update_end(&s->syncp);
-		rcu_read_unlock();
 
 		s = this_cpu_ptr(ipvs->tot_stats.cpustats);
 		u64_stats_update_begin(&s->syncp);
@@ -1222,7 +1220,7 @@ static struct ip_vs_conn *__ip_vs_rs_conn_out(unsigned int hooknum,
 	if (!pptr)
 		return NULL;
 
-	rcu_read_lock();
+	/* rcu_read_lock()ed by nf_hook */
 	dest = ip_vs_find_real_service(ipvs, af, iph->protocol,
 				       &iph->saddr, pptr[0]);
 	if (dest) {
@@ -1237,7 +1235,6 @@ static struct ip_vs_conn *__ip_vs_rs_conn_out(unsigned int hooknum,
 						  pptr[0], pptr[1]);
 		}
 	}
-	rcu_read_unlock();
 
 	return cp;
 }
@@ -1680,11 +1677,10 @@ ip_vs_in_icmp(struct netns_ipvs *ipvs, struct sk_buff *skb, int *related,
 			if (dest) {
 				struct ip_vs_dest_dst *dest_dst;
 
-				rcu_read_lock();
+				/* rcu_read_lock()ed by nf_hook */
 				dest_dst = rcu_dereference(dest->dest_dst);
 				if (dest_dst)
 					mtu = dst_mtu(dest_dst->dst_cache);
-				rcu_read_unlock();
 			}
 			if (mtu > 68 + sizeof(struct iphdr))
 				mtu -= sizeof(struct iphdr);

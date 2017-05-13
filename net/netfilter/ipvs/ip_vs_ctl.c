@@ -550,18 +550,16 @@ bool ip_vs_has_real_service(struct netns_ipvs *ipvs, int af, __u16 protocol,
 	/* Check for "full" addressed entries */
 	hash = ip_vs_rs_hashkey(af, daddr, dport);
 
-	rcu_read_lock();
+	/* rcu_read_lock()ed by nf_hook */
 	hlist_for_each_entry_rcu(dest, &ipvs->rs_table[hash], d_list) {
 		if (dest->port == dport &&
 		    dest->af == af &&
 		    ip_vs_addr_equal(af, &dest->addr, daddr) &&
 		    (dest->protocol == protocol || dest->vfwmark)) {
 			/* HIT */
-			rcu_read_unlock();
 			return true;
 		}
 	}
-	rcu_read_unlock();
 
 	return false;
 }

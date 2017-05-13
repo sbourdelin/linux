@@ -1322,7 +1322,7 @@ ip_vs_icmp_xmit(struct sk_buff *skb, struct ip_vs_conn *cp,
 	rt_mode = (hooknum != NF_INET_FORWARD) ?
 		  IP_VS_RT_MODE_LOCAL | IP_VS_RT_MODE_NON_LOCAL |
 		  IP_VS_RT_MODE_RDR : IP_VS_RT_MODE_NON_LOCAL;
-	rcu_read_lock();
+	/* rcu_read_lock()ed by nf_hook */
 	local = __ip_vs_get_out_rt(cp->ipvs, cp->af, skb, cp->dest, cp->daddr.ip, rt_mode,
 				   NULL, iph);
 	if (local < 0)
@@ -1368,12 +1368,10 @@ ip_vs_icmp_xmit(struct sk_buff *skb, struct ip_vs_conn *cp,
 	skb->ignore_df = 1;
 
 	rc = ip_vs_nat_send_or_cont(NFPROTO_IPV4, skb, cp, local);
-	rcu_read_unlock();
 	goto out;
 
   tx_error:
 	kfree_skb(skb);
-	rcu_read_unlock();
 	rc = NF_STOLEN;
   out:
 	LeaveFunction(10);
@@ -1414,7 +1412,7 @@ ip_vs_icmp_xmit_v6(struct sk_buff *skb, struct ip_vs_conn *cp,
 	rt_mode = (hooknum != NF_INET_FORWARD) ?
 		  IP_VS_RT_MODE_LOCAL | IP_VS_RT_MODE_NON_LOCAL |
 		  IP_VS_RT_MODE_RDR : IP_VS_RT_MODE_NON_LOCAL;
-	rcu_read_lock();
+	/* rcu_read_lock()ed by nf_hook */
 	local = __ip_vs_get_out_rt_v6(cp->ipvs, cp->af, skb, cp->dest,
 				      &cp->daddr.in6, NULL, ipvsh, 0, rt_mode);
 	if (local < 0)
@@ -1460,12 +1458,10 @@ ip_vs_icmp_xmit_v6(struct sk_buff *skb, struct ip_vs_conn *cp,
 	skb->ignore_df = 1;
 
 	rc = ip_vs_nat_send_or_cont(NFPROTO_IPV6, skb, cp, local);
-	rcu_read_unlock();
 	goto out;
 
 tx_error:
 	kfree_skb(skb);
-	rcu_read_unlock();
 	rc = NF_STOLEN;
 out:
 	LeaveFunction(10);

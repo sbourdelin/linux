@@ -524,12 +524,12 @@ err:
 }
 
 #ifdef CONFIG_NF_CONNTRACK_TIMEOUT
+/* rcu_read_lock()ed by caller */
 static struct ctnl_timeout *
 ctnl_timeout_find_get(struct net *net, const char *name)
 {
 	struct ctnl_timeout *timeout, *matching = NULL;
 
-	rcu_read_lock();
 	list_for_each_entry_rcu(timeout, &net->nfct_timeout_list, head) {
 		if (strncmp(timeout->name, name, CTNL_TIMEOUT_NAME_MAX) != 0)
 			continue;
@@ -545,7 +545,6 @@ ctnl_timeout_find_get(struct net *net, const char *name)
 		break;
 	}
 err:
-	rcu_read_unlock();
 	return matching;
 }
 
