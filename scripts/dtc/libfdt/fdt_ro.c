@@ -64,6 +64,9 @@ static int _fdt_nodename_eq(const void *fdt, int offset,
 		/* short match */
 		return 0;
 
+	if (*p == '/')
+		/* Uncompressed node name. Only compare the last part. */
+		p = strrchr(p, '/') + 1;
 	if (memcmp(p, s, len) != 0)
 		return 0;
 
