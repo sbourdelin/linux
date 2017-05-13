@@ -108,6 +108,11 @@ case "${ARCH}" in
 			cp -v -- "${objtree}/vmlinux" "${tmpdir}/boot/vmlinux-${KERNELRELEASE}"
 		fi
 		;;
+	arm)
+		if [ -f "${objtree}/arch/${ARCH}/boot/${KBUILD_IMAGE}" ]; then
+			cp -v -- "${objtree}/arch/${ARCH}/boot/${KBUILD_IMAGE}" "${tmpdir}/boot/${KBUILD_IMAGE}-${KERNELRELEASE}"
+		fi
+		;;
 	*)
 		[ -f "${KBUILD_IMAGE}" ] && cp -v -- "${KBUILD_IMAGE}" "${tmpdir}/boot/vmlinux-kbuild-${KERNELRELEASE}"
 		echo "" >&2
