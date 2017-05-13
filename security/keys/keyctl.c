@@ -323,14 +323,11 @@ long keyctl_update_key(key_serial_t id,
 	/* pull the payload in if one was supplied */
 	payload = NULL;
 	if (_payload) {
-		ret = -ENOMEM;
-		payload = kmalloc(plen, GFP_KERNEL);
-		if (!payload)
+		payload = memdup_user(_payload, plen);
+		if (IS_ERR(payload)) {
+			ret = PTR_ERR(payload);
 			goto error;
-
-		ret = -EFAULT;
-		if (copy_from_user(payload, _payload, plen) != 0)
-			goto error2;
+		}
 	}
 
 	/* find the target key (which must be writable) */
