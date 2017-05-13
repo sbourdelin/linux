@@ -161,6 +161,7 @@ int __init davinci_pm_init(void)
 						davinci_cpu_suspend_sz);
 
 	suspend_set_ops(&davinci_pm_ops);
+	return 0;
 
 no_sram_mem:
 	iounmap(pm_config.ddrpsc_reg_base);
