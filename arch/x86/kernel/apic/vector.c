@@ -102,6 +102,27 @@ static void free_apic_chip_data(struct apic_chip_data *data)
 	}
 }
 
+static int pick_leisure_cpu(const struct cpumask *mask)
+{
+	int cpu, vector;
+	int min_nr_vector = NR_VECTORS;
+	int target_cpu = cpumask_first_and(mask, cpu_online_mask);
+
+	for_each_cpu_and(cpu, mask, cpu_online_mask) {
+		int nr_vectors = 0;
+
+		for (vector = FIRST_EXTERNAL_VECTOR; vector < NR_VECTORS; vector++) {
+			if (!IS_ERR_OR_NULL(per_cpu(vector_irq, cpu)[vector]))
+				nr_vectors++;
+		}
+		if (nr_vectors < min_nr_vector) {
+			min_nr_vector = nr_vectors;
+			target_cpu = cpu;
+		}
+	}
+	return target_cpu;
+}
+
 static int __assign_irq_vector(int irq, struct apic_chip_data *d,
 			       const struct cpumask *mask)
 {
@@ -131,7 +152,7 @@ static int __assign_irq_vector(int irq, struct apic_chip_data *d,
 	/* Only try and allocate irqs on cpus that are present */
 	cpumask_clear(d->old_domain);
 	cpumask_clear(searched_cpumask);
-	cpu = cpumask_first_and(mask, cpu_online_mask);
+	cpu = pick_leisure_cpu(mask);
 	while (cpu < nr_cpu_ids) {
 		int new_cpu, offset;
 
