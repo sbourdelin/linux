@@ -19,6 +19,7 @@
 #include <linux/string.h>
 #include <linux/tty.h>
 #include <linux/8250_pci.h>
+#include <linux/property.h>
 
 #include <asm/byteorder.h>
 
@@ -188,8 +189,14 @@ static void setup_gpio(u8 __iomem *p)
 }
 
 static void *
-xr17v35x_register_gpio(struct pci_dev *pcidev)
+xr17v35x_register_gpio(struct pci_dev *pcidev, unsigned int first_gpio,
+		       unsigned int ngpio)
 {
+	struct property_entry properties[] = {
+		PROPERTY_ENTRY_U32("first_gpio", first_gpio),
+		PROPERTY_ENTRY_U32("ngpio", ngpio),
+		{ }
+	};
 	struct platform_device *pdev;
 
 	pdev = platform_device_alloc("gpio_exar", PLATFORM_DEVID_AUTO);
@@ -197,10 +204,11 @@ xr17v35x_register_gpio(struct pci_dev *pcidev)
 		return NULL;
 
 	/*
-	 * platform_device_add_data kmemdups the data, therefore we can safely
-	 * pass a stack reference.
+	 * platform_device_add_data and platform_device_add_properties copy
+	 * the data, therefore we can safely pass a stack references.
 	 */
 	if (platform_device_add_data(pdev, &pcidev, sizeof(pcidev)) < 0 ||
+	    platform_device_add_properties(pdev, properties) < 0 ||
 	    platform_device_add(pdev) < 0) {
 		platform_device_put(pdev);
 		return NULL;
@@ -242,7 +250,7 @@ pci_xr17v35x_setup(struct exar8250 *priv, struct pci_dev *pcidev,
 		/* Setup Multipurpose Input/Output pins. */
 		setup_gpio(p);
 
-		port->port.private_data = xr17v35x_register_gpio(pcidev);
+		port->port.private_data = xr17v35x_register_gpio(pcidev, 0, 16);
 	}
 
 	return 0;

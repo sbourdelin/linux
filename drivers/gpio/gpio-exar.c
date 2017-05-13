@@ -31,6 +31,7 @@ struct exar_gpio_chip {
 	int index;
 	void __iomem *regs;
 	char name[20];
+	unsigned int first_gpio;
 };
 
 static void exar_update(struct gpio_chip *chip, unsigned int reg, int val,
@@ -51,9 +52,11 @@ static void exar_update(struct gpio_chip *chip, unsigned int reg, int val,
 static int exar_set_direction(struct gpio_chip *chip, int direction,
 			      unsigned int offset)
 {
-	unsigned int bank = offset / 8;
-	unsigned int addr;
+	struct exar_gpio_chip *exar_gpio = gpiochip_get_data(chip);
+	unsigned int bank, addr;
 
+	offset += exar_gpio->first_gpio;
+	bank = offset / 8;
 	addr = bank ? EXAR_OFFSET_MPIOSEL_HI : EXAR_OFFSET_MPIOSEL_LO;
 	exar_update(chip, addr, direction, offset % 8);
 	return 0;
@@ -73,10 +76,12 @@ static int exar_get(struct gpio_chip *chip, unsigned int reg)
 
 static int exar_get_direction(struct gpio_chip *chip, unsigned int offset)
 {
-	unsigned int bank = offset / 8;
-	unsigned int addr;
+	struct exar_gpio_chip *exar_gpio = gpiochip_get_data(chip);
+	unsigned int bank, addr;
 	int val;
 
+	offset += exar_gpio->first_gpio;
+	bank = offset / 8;
 	addr = bank ? EXAR_OFFSET_MPIOSEL_HI : EXAR_OFFSET_MPIOSEL_LO;
 	val = exar_get(chip, addr) >> (offset % 8);
 
@@ -85,10 +90,12 @@ static int exar_get_direction(struct gpio_chip *chip, unsigned int offset)
 
 static int exar_get_value(struct gpio_chip *chip, unsigned int offset)
 {
-	unsigned int bank = offset / 8;
-	unsigned int addr;
+	struct exar_gpio_chip *exar_gpio = gpiochip_get_data(chip);
+	unsigned int bank, addr;
 	int val;
 
+	offset += exar_gpio->first_gpio;
+	bank = offset / 8;
 	addr = bank ? EXAR_OFFSET_MPIOLVL_HI : EXAR_OFFSET_MPIOLVL_LO;
 	val = exar_get(chip, addr) >> (offset % 8);
 
@@ -98,9 +105,11 @@ static int exar_get_value(struct gpio_chip *chip, unsigned int offset)
 static void exar_set_value(struct gpio_chip *chip, unsigned int offset,
 			   int value)
 {
-	unsigned int bank = offset / 8;
-	unsigned int addr;
+	struct exar_gpio_chip *exar_gpio = gpiochip_get_data(chip);
+	unsigned int bank, addr;
 
+	offset += exar_gpio->first_gpio;
+	bank = offset / 8;
 	addr = bank ? EXAR_OFFSET_MPIOLVL_HI : EXAR_OFFSET_MPIOLVL_LO;
 	exar_update(chip, addr, value, offset % 8);
 }
@@ -123,6 +132,7 @@ static int gpio_exar_probe(struct platform_device *pdev)
 	struct exar_gpio_chip *exar_gpio;
 	void __iomem *p;
 	int index, ret;
+	u32 val;
 
 	if (pcidev->vendor != PCI_VENDOR_ID_EXAR)
 		return -ENODEV;
@@ -152,9 +162,12 @@ static int gpio_exar_probe(struct platform_device *pdev)
 	exar_gpio->gpio_chip.get = exar_get_value;
 	exar_gpio->gpio_chip.set = exar_set_value;
 	exar_gpio->gpio_chip.base = -1;
-	exar_gpio->gpio_chip.ngpio = 16;
+	device_property_read_u32(&pdev->dev, "ngpio", &val);
+	exar_gpio->gpio_chip.ngpio = val;
 	exar_gpio->regs = p;
 	exar_gpio->index = index;
+	device_property_read_u32(&pdev->dev, "first_gpio", &val);
+	exar_gpio->first_gpio = val;
 
 	ret = devm_gpiochip_add_data(&pdev->dev,
 				     &exar_gpio->gpio_chip, exar_gpio);
