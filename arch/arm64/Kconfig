@@ -526,6 +526,16 @@ config HISILICON_ERRATUM_161010701
 	  CMD_PREFETCH_CFG. This will skip the prefetch cmd usage.
 
 	  If unsure, say Y.
+config HISILICON_ERRATUM_161010801
+	bool "HiSilicon erratum 161010801: Reserve HW MSI regions"
+	default y
+	help
+	  On HiSilicon Hip06/Hip07 platforms, the SMMU v3 has to bypass the
+	  GIC ITS doorbel msi address regions. This will make sure that ITS
+	  doorbell address regions are reserved and excluded from iova
+	  allocations.
+
+	  If unsure, say Y.
 
 endmenu
 

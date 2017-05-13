@@ -669,6 +669,73 @@ void erratum_skip_prefetch_cmd(struct arm_smmu_device *smmu, void *arg)
 	smmu->options |= ARM_SMMU_OPT_SKIP_PREFETCH;
 }
 
+#ifdef CONFIG_HISILICON_ERRATUM_161010801
+static void parse_hisi_csrt_msi(struct arm_smmu_device *smmu,
+		const struct acpi_iort_smmu_v3 *iort)
+
+{
+	struct acpi_csrt_group *grp, *end;
+	struct acpi_table_csrt *csrt;
+	acpi_status status;
+
+	status = acpi_get_table(ACPI_SIG_CSRT, 0,
+				(struct acpi_table_header **)&csrt);
+	if (ACPI_FAILURE(status)) {
+		dev_warn(smmu->dev, "HiSi CSRT table get failed: 0x%x\n",
+								status);
+		return;
+	}
+
+	grp = (struct acpi_csrt_group *)(csrt + 1);
+	end = (struct acpi_csrt_group *)((void *)csrt + csrt->header.length);
+
+	while (grp < end) {
+		if (grp->device_id == iort->model) {
+			/*
+			 * We don't have the optional shared info for this grp
+			 * and has only one resource descriptor with vendor
+			 * defined msi region for this group. Go straight to
+			 * vendor defined info.
+			 */
+			struct acpi_csrt_descriptor *desc =
+					(struct acpi_csrt_descriptor *)&grp[1];
+
+			/*
+			 * HiSilicon CSRT vendor info. First 8 bytes gives smmu
+			 * node base addr, next 8 bytes HW MSI reserve region
+			 * addr and the remaining 4 byte the len.
+			 */
+			void *vendor = &desc[1];
+			u64 base = (*(u64 *)vendor);
+
+			if (base == iort->base_address && smmu->msi_region) {
+				/* Replace the default SW msi with HW msi */
+
+				smmu->msi_region->start =
+						*((u64 *)((u64 *)vendor+1));
+				smmu->msi_region->length =
+						*((u32 *)((u64 *)vendor+2));
+				smmu->msi_region->type = IOMMU_RESV_MSI;
+				dev_info(smmu->dev,
+					"HiSi msi addr 0x%pa size 0x%zx\n",
+					&smmu->msi_region->start,
+					smmu->msi_region->length);
+				return;
+			}
+		}
+
+		grp = (struct acpi_csrt_group *)((void *)grp + grp->length);
+	}
+
+}
+void erratum_hisi_resv_hw_msi(struct arm_smmu_device *smmu, void *arg)
+{
+	const struct acpi_iort_smmu_v3 *iort_smmu = arg;
+
+	parse_hisi_csrt_msi(smmu, iort_smmu);
+}
+#endif
+
 struct smmu_erratum_workaround {
 	enum smmu_erratum_match_type match_type;
 	const void *id;	/* Indicate the Erratum ID */
@@ -691,6 +758,14 @@ static const struct smmu_erratum_workaround smmu_workarounds[] = {
 		.enable = erratum_skip_prefetch_cmd,
 	},
 
+#endif
+#ifdef CONFIG_HISILICON_ERRATUM_161010801
+	{
+		.match_type = se_match_acpi_iort_model,
+		.id = (void *)ACPI_IORT_SMMU_HISILICON_HI161X,
+		.desc_str = "HiSilicon erratum 161010801",
+		.enable = erratum_hisi_resv_hw_msi,
+	},
 #endif
 	{
 
