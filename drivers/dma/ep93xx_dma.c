@@ -45,6 +45,7 @@
 
 #define M2P_PPALLOC			0x0008
 #define M2P_STATUS			0x000c
+#define M2P_STATUS_NEXTBUFFER		BIT(6)
 
 #define M2P_MAXCNT0			0x0020
 #define M2P_BASE0			0x0024
@@ -312,6 +313,13 @@ static void m2p_set_control(struct ep93xx_dma_chan *edmac, u32 control)
 	readl(edmac->regs + M2P_CONTROL);
 }
 
+static inline u32 m2p_channel_nextbuf(struct ep93xx_dma_chan *edmac)
+{
+	if (readl(edmac->regs + M2P_STATUS) & M2P_STATUS_NEXTBUFFER)
+		return 1;
+	return 0;
+}
+
 static int m2p_hw_setup(struct ep93xx_dma_chan *edmac)
 {
 	struct ep93xx_dma_data *data = edmac->chan.private;
@@ -322,6 +330,10 @@ static int m2p_hw_setup(struct ep93xx_dma_chan *edmac)
 	control = M2P_CONTROL_CH_ERROR_INT | M2P_CONTROL_ICE
 		| M2P_CONTROL_ENABLE;
 	m2p_set_control(edmac, control);
+
+	if (m2p_channel_nextbuf(edmac) != 0)
+		dev_warn(chan2dev(edmac), "M2P: Starting from BASE1\n");
+	edmac->buffer = 0;
 
 	return 0;
 }
