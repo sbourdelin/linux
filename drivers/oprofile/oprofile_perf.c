@@ -288,8 +288,6 @@ int __init oprofile_perf_init(struct oprofile_operations *ops)
 	counter_config = kcalloc(num_counters, sizeof(*counter_config),
 				 GFP_KERNEL);
 	if (!counter_config) {
-		pr_info("oprofile: failed to allocate %d "
-				"counters\n", num_counters);
 		ret = -ENOMEM;
 		num_counters = 0;
 		goto out;
@@ -299,8 +297,6 @@ int __init oprofile_perf_init(struct oprofile_operations *ops)
 		per_cpu(perf_events, cpu) = kcalloc(num_counters,
 				sizeof(struct perf_event *), GFP_KERNEL);
 		if (!per_cpu(perf_events, cpu)) {
-			pr_info("oprofile: failed to allocate %d perf events "
-					"for cpu %d\n", num_counters, cpu);
 			ret = -ENOMEM;
 			goto out;
 		}
