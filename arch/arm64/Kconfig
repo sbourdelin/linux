@@ -518,8 +518,16 @@ config QCOM_QDF2400_ERRATUM_0065
 
 	  If unsure, say Y.
 
-endmenu
+config HISILICON_ERRATUM_161010701
+	bool "HiSilicon erratum 161010701: Skip SMMU Prefetch Cmd"
+	default y
+	help
+	  On HiSilicon Hip06/Hip07 platforms, the SMMU v3 doesn't support the
+	  CMD_PREFETCH_CFG. This will skip the prefetch cmd usage.
 
+	  If unsure, say Y.
+
+endmenu
 
 choice
 	prompt "Page size"

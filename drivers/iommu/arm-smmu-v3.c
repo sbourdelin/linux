@@ -656,16 +656,6 @@ struct arm_smmu_domain {
 	struct iommu_domain		domain;
 };
 
-struct arm_smmu_option_prop {
-	u32 opt;
-	const char *prop;
-};
-
-static struct arm_smmu_option_prop arm_smmu_options[] = {
-	{ ARM_SMMU_OPT_SKIP_PREFETCH, "hisilicon,broken-prefetch-cmd" },
-	{ 0, NULL},
-};
-
 enum smmu_erratum_match_type {
 	se_match_dt,
 };
@@ -683,7 +673,17 @@ struct smmu_erratum_workaround {
 };
 
 static const struct smmu_erratum_workaround smmu_workarounds[] = {
+#ifdef CONFIG_HISILICON_ERRATUM_161010701
+	{
+		.match_type = se_match_dt,
+		.id = "hisilicon,erratum-161010701",
+		.desc_str = "HiSilicon erratum 161010701",
+		.enable = erratum_skip_prefetch_cmd,
+	},
+#endif
+	{
 
+	},
 };
 
 typedef bool (*se_match_fn_t)(const struct smmu_erratum_workaround *,
@@ -739,20 +739,6 @@ static void smmu_check_workarounds(struct arm_smmu_device *smmu,
 static struct arm_smmu_domain *to_smmu_domain(struct iommu_domain *dom)
 {
 	return container_of(dom, struct arm_smmu_domain, domain);
-}
-
-static void parse_driver_options(struct arm_smmu_device *smmu)
-{
-	int i = 0;
-
-	do {
-		if (of_property_read_bool(smmu->dev->of_node,
-						arm_smmu_options[i].prop)) {
-			smmu->options |= arm_smmu_options[i].opt;
-			dev_notice(smmu->dev, "option %s\n",
-				arm_smmu_options[i].prop);
-		}
-	} while (arm_smmu_options[++i].opt);
 }
 
 /* Low-level queue manipulation functions */
@@ -2713,8 +2699,6 @@ static int arm_smmu_device_dt_probe(struct platform_device *pdev,
 		dev_err(dev, "invalid #iommu-cells value (%d)\n", cells);
 	else
 		ret = 0;
-
-	parse_driver_options(smmu);
 
 	smmu_check_workarounds(smmu, se_match_dt, dev->of_node);
 
