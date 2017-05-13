@@ -449,8 +449,6 @@ static __inline__ unsigned long __arch_hweight64(unsigned long x)
 
 #include <asm-generic/bitops/ext2-atomic-setbit.h>
 
-#include <asm-generic/bitops/sched.h>
-
 #endif /* __KERNEL__ */
 
 #endif /* _ASM_IA64_BITOPS_H */

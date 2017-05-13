@@ -1092,7 +1092,7 @@ dec_rt_prio(struct rt_rq *rt_rq, int prio)
 			struct rt_prio_array *array = &rt_rq->active;
 
 			rt_rq->highest_prio.curr =
-				sched_find_first_bit(array->bitmap);
+				find_first_bit(array->bitmap, MAX_RT_PRIO);
 		}
 
 	} else
@@ -1496,7 +1496,7 @@ static struct sched_rt_entity *pick_next_rt_entity(struct rq *rq,
 	struct list_head *queue;
 	int idx;
 
-	idx = sched_find_first_bit(array->bitmap);
+	idx = find_first_bit(array->bitmap, MAX_RT_PRIO);
 	BUG_ON(idx >= MAX_RT_PRIO);
 
 	queue = array->queue + idx;

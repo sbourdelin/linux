@@ -425,7 +425,6 @@ static inline __attribute__ ((const)) int __ffs(unsigned long x)
 
 #include <asm-generic/bitops/hweight.h>
 #include <asm-generic/bitops/fls64.h>
-#include <asm-generic/bitops/sched.h>
 #include <asm-generic/bitops/lock.h>
 
 #include <asm-generic/bitops/find.h>

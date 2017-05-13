@@ -322,8 +322,6 @@ unsigned long __arch_hweight64(__u64 w);
 
 #include <asm-generic/bitops/ext2-atomic-setbit.h>
 
-#include <asm-generic/bitops/sched.h>
-
 #endif /* __KERNEL__ */
 
 #endif /* _ASM_POWERPC_BITOPS_H */

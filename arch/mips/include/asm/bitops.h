@@ -606,8 +606,6 @@ static inline int ffs(int word)
 
 #ifdef __KERNEL__
 
-#include <asm-generic/bitops/sched.h>
-
 #include <asm/arch_hweight.h>
 #include <asm-generic/bitops/const_hweight.h>
 

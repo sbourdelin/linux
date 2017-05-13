@@ -34,7 +34,6 @@ int ffs(int x);
 unsigned long __ffs(unsigned long);
 
 #include <asm-generic/bitops/ffz.h>
-#include <asm-generic/bitops/sched.h>
 
 /*
  * hweightN: returns the hamming weight (i.e. the number

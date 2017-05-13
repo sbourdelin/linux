@@ -312,7 +312,6 @@ int __ilog2_u64(u64 n)
 	return bit;
 }
 
-#include <asm-generic/bitops/sched.h>
 #include <asm-generic/bitops/hweight.h>
 #include <asm-generic/bitops/lock.h>
 

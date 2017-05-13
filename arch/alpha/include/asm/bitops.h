@@ -433,24 +433,6 @@ static inline unsigned int __arch_hweight8(unsigned int w)
 
 #ifdef __KERNEL__
 
-/*
- * Every architecture must define this function. It's the fastest
- * way of searching a 100-bit bitmap.  It's guaranteed that at least
- * one of the 100 bits is cleared.
- */
-static inline unsigned long
-sched_find_first_bit(const unsigned long b[2])
-{
-	unsigned long b0, b1, ofs, tmp;
-
-	b0 = b[0];
-	b1 = b[1];
-	ofs = (b0 ? 0 : 64);
-	tmp = (b0 ? b0 : b1);
-
-	return __ffs(tmp) + ofs;
-}
-
 #include <asm-generic/bitops/le.h>
 
 #include <asm-generic/bitops/ext2-atomic-setbit.h>

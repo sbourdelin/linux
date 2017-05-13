@@ -43,8 +43,6 @@
 
 #include <asm-generic/bitops/ext2-atomic-setbit.h>
 
-#include <asm-generic/bitops/sched.h>
-
 #endif /* __KERNEL__ */
 
 #endif /* _CRIS_BITOPS_H */

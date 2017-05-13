@@ -20,7 +20,6 @@
 #error only <linux/bitops.h> can be included directly
 #endif
 
-#include <asm-generic/bitops/sched.h>
 #include <asm-generic/bitops/ffs.h>
 #include <asm-generic/bitops/const_hweight.h>
 #include <asm-generic/bitops/lock.h>

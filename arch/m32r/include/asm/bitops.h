@@ -255,7 +255,6 @@ static __inline__ int test_and_change_bit(int nr, volatile void * addr)
 
 #ifdef __KERNEL__
 
-#include <asm-generic/bitops/sched.h>
 #include <asm-generic/bitops/find.h>
 #include <asm-generic/bitops/ffs.h>
 #include <asm-generic/bitops/hweight.h>
