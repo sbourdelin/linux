@@ -345,19 +345,10 @@ static inline u32 m2p_channel_state(struct ep93xx_dma_chan *edmac)
 
 static void m2p_hw_shutdown(struct ep93xx_dma_chan *edmac)
 {
-	u32 control;
-
-	control = readl(edmac->regs + M2P_CONTROL);
-	control &= ~(M2P_CONTROL_STALLINT | M2P_CONTROL_NFBINT);
-	m2p_set_control(edmac, control);
-
-	while (m2p_channel_state(edmac) >= M2P_STATE_ON)
-		cpu_relax();
-
 	m2p_set_control(edmac, 0);
 
-	while (m2p_channel_state(edmac) == M2P_STATE_STALL)
-		cpu_relax();
+	while (m2p_channel_state(edmac) != M2P_STATE_IDLE)
+		dev_warn(chan2dev(edmac), "M2P: Not yet IDLE\n");
 }
 
 static void m2p_fill_desc(struct ep93xx_dma_chan *edmac)
