@@ -604,12 +604,12 @@ add_emeta_page:
 	l_mg->smeta_alloc_type = PBLK_KMALLOC_META;
 	for (i = 0; i < PBLK_DATA_LINES; i++) {
 		l_mg->sline_meta[i].meta = kmalloc(lm->smeta_len, GFP_KERNEL);
-		if (!l_mg->sline_meta[i].meta)
-			while (--i >= 0) {
+		if (!l_mg->sline_meta[i].meta) {
+			while (--i >= 0)
 				kfree(l_mg->sline_meta[i].meta);
-				ret = -ENOMEM;
-				goto fail;
-			}
+			ret = -ENOMEM;
+			goto fail;
+		}
 	}
 
 	if (lm->emeta_len > KMALLOC_MAX_CACHE_SIZE) {
@@ -617,12 +617,12 @@ add_emeta_page:
 
 		for (i = 0; i < PBLK_DATA_LINES; i++) {
 			l_mg->eline_meta[i].meta = vmalloc(lm->emeta_len);
-			if (!l_mg->eline_meta[i].meta)
-				while (--i >= 0) {
+			if (!l_mg->eline_meta[i].meta) {
+				while (--i >= 0)
 					vfree(l_mg->eline_meta[i].meta);
-					ret = -ENOMEM;
-					goto fail;
-				}
+				ret = -ENOMEM;
+				goto fail_free_meta;
+			}
 		}
 	} else {
 		l_mg->emeta_alloc_type = PBLK_KMALLOC_META;
@@ -630,12 +630,12 @@ add_emeta_page:
 		for (i = 0; i < PBLK_DATA_LINES; i++) {
 			l_mg->eline_meta[i].meta =
 					kmalloc(lm->emeta_len, GFP_KERNEL);
-			if (!l_mg->eline_meta[i].meta)
-				while (--i >= 0) {
+			if (!l_mg->eline_meta[i].meta) {
+				while (--i >= 0)
 					kfree(l_mg->eline_meta[i].meta);
-					ret = -ENOMEM;
-					goto fail;
-				}
+				ret = -ENOMEM;
+				goto fail_free_meta;
+			}
 		}
 	}
 
