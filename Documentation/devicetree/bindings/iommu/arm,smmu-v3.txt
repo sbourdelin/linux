@@ -46,7 +46,7 @@ the PCIe specification.
                         devicetree/bindings/interrupt-controller/msi.txt
                       for a description of the msi-parent property.
 
-- hisilicon,broken-prefetch-cmd
+- hisilicon,erratum-161010701
                     : Avoid sending CMD_PREFETCH_* commands to the SMMU.
 
 ** Example
