@@ -666,6 +666,20 @@ static struct arm_smmu_option_prop arm_smmu_options[] = {
 	{ 0, NULL},
 };
 
+enum smmu_erratum_match_type {
+	se_match_dt,
+};
+
+struct smmu_erratum_workaround {
+	enum smmu_erratum_match_type match_type;
+	const void *id;	/* Indicate the Erratum ID */
+	const char *desc_str;
+};
+
+static const struct smmu_erratum_workaround smmu_workarounds[] = {
+
+};
+
 static struct arm_smmu_domain *to_smmu_domain(struct iommu_domain *dom)
 {
 	return container_of(dom, struct arm_smmu_domain, domain);
