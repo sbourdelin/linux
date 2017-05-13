@@ -658,6 +658,7 @@ struct arm_smmu_domain {
 
 enum smmu_erratum_match_type {
 	se_match_dt,
+	se_match_acpi_iort_model,
 };
 
 void erratum_skip_prefetch_cmd(struct arm_smmu_device *smmu, void *arg)
@@ -680,6 +681,13 @@ static const struct smmu_erratum_workaround smmu_workarounds[] = {
 		.desc_str = "HiSilicon erratum 161010701",
 		.enable = erratum_skip_prefetch_cmd,
 	},
+	{
+		.match_type = se_match_acpi_iort_model,
+		.id = (void *)ACPI_IORT_SMMU_HISILICON_HI161X,
+		.desc_str = "HiSilicon erratum 161010701",
+		.enable = erratum_skip_prefetch_cmd,
+	},
+
 #endif
 	{
 
@@ -695,6 +703,15 @@ bool smmu_check_dt_erratum(const struct smmu_erratum_workaround *wa,
 	const struct device_node *np = arg;
 
 	return of_property_read_bool(np, wa->id);
+}
+
+static
+bool smmu_check_acpi_iort_erratum(const struct smmu_erratum_workaround *wa,
+				const void *arg)
+{
+	const struct acpi_iort_smmu_v3 *iort_smmu = arg;
+
+	return (iort_smmu->model == *(u32 *)(&wa->id)) ? true : false;
 }
 
 static void smmu_enable_errata(struct arm_smmu_device *smmu,
@@ -729,6 +746,9 @@ static void smmu_check_workarounds(struct arm_smmu_device *smmu,
 	switch (type) {
 	case se_match_dt:
 		match_fn = smmu_check_dt_erratum;
+		break;
+	case se_match_acpi_iort_model:
+		match_fn = smmu_check_acpi_iort_erratum;
 		break;
 	}
 
@@ -2672,6 +2692,8 @@ static int arm_smmu_device_acpi_probe(struct platform_device *pdev,
 
 	/* Retrieve SMMUv3 specific data */
 	iort_smmu = (struct acpi_iort_smmu_v3 *)node->node_data;
+
+	smmu_check_workarounds(smmu, se_match_acpi_iort_model, iort_smmu);
 
 	if (iort_smmu->flags & ACPI_IORT_SMMU_V3_COHACC_OVERRIDE)
 		smmu->features |= ARM_SMMU_FEAT_COHERENCY;
