@@ -81,8 +81,8 @@
 #define DPMS_OFFSET	9
 #define DPMS_MASK	(3 << DPMS_OFFSET)
 #define DPMS_USAGE	(DPMS_MASK << 16)
-#define DPMS_OFF	((3 << DPMS_OFFSET) | DPMS_USAGE)
 #define DPMS_ON		((0 << DPMS_OFFSET) | DPMS_USAGE)
+#define DPMS_OFF	((3 << DPMS_OFFSET) | DPMS_USAGE)
 
 /*
  * LCD1 means panel path TFT1  & panel path DVI (so enable DAC)
