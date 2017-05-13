@@ -20,7 +20,7 @@ a.k.a stuff fixing for this driver to move out of staging
 8.  Handle the many checkpatch errors.
 9.  Implement ahash import/export correctly.
 10. Go through a proper review of DT bindings and sysfs ABI
-11. Sort out FIPS mode: bake tests into testmgr, sort out behaviour on error, 
+11. Sort out FIPS mode: bake tests into testmgr, sort out behaviour on error,
     figure if 3DES weak key check is needed
 
 Kernel infrastructure items
