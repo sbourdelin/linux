@@ -196,8 +196,12 @@ xr17v35x_register_gpio(struct pci_dev *pcidev)
 	if (!pdev)
 		return NULL;
 
-	platform_set_drvdata(pdev, pcidev);
-	if (platform_device_add(pdev) < 0) {
+	/*
+	 * platform_device_add_data kmemdups the data, therefore we can safely
+	 * pass a stack reference.
+	 */
+	if (platform_device_add_data(pdev, &pcidev, sizeof(pcidev)) < 0 ||
+	    platform_device_add(pdev) < 0) {
 		platform_device_put(pdev);
 		return NULL;
 	}
