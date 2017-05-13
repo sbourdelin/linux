@@ -1,5 +1,6 @@
 menuconfig DAX
 	tristate "DAX: direct access to differentiated memory"
+	depends on BLOCK
 	select SRCU
 	default m if NVDIMM_DAX
 
