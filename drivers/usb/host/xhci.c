@@ -4055,6 +4055,7 @@ static int xhci_set_usb2_hardware_lpm(struct usb_hcd *hcd,
 	unsigned long	flags;
 	int		hird, exit_latency;
 	int		ret;
+	int		disable_hle = 0;
 
 	if (hcd->speed >= HCD_USB3 || !xhci->hw_lpm_support ||
 			!udev->lpm_capable)
@@ -4079,7 +4080,11 @@ static int xhci_set_usb2_hardware_lpm(struct usb_hcd *hcd,
 	xhci_dbg(xhci, "%s port %d USB2 hardware LPM\n",
 			enable ? "enable" : "disable", port_num + 1);
 
-	if (enable) {
+	/* Check for optional disable HLE if XHCI 1.0 */
+	if ((xhci->quirks & XHCI_HLE_DISABLE) && (xhci->hci_version == 0x100))
+		disable_hle = 1;
+
+	if (enable && !disable_hle) {
 		/* Host supports BESL timeout instead of HIRD */
 		if (udev->usb2_hw_lpm_besl_capable) {
 			/* if device doesn't have a preferred BESL value use a
