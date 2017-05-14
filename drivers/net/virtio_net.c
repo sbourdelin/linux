@@ -2698,7 +2698,7 @@ static __init int virtio_net_driver_init(void)
 	if (ret)
 		goto err_dead;
 
-        ret = register_virtio_driver(&virtio_net_driver);
+	ret = register_virtio_driver(&virtio_net_driver);
 	if (ret)
 		goto err_virtio;
 	return 0;
