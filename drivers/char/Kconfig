@@ -594,5 +594,15 @@ config TILE_SROM
 
 source "drivers/char/xillybus/Kconfig"
 
+config LRNG
+	bool "Linux Random Number Generator"
+	select CRYPTO_DRBG_MENU
+	select CRYPTO_CMAC if CRYPTO_DRBG_CTR
+	help
+	  The Linux Random Number Generator (LRNG) is the replacement
+	  of the legacy /dev/random provided with drivers/char/random.c.
+	  It generates entropy from different noise sources and
+	  delivers significant entropy during boot.
+
 endmenu
 
