@@ -438,7 +438,7 @@ retry:
 		 * in user space by returned bits, then preparing for next
 		 * iteration.
 		 */
-		if (changed && r->var >= 0) {
+		if (changed) {
 			params->cmask |= (1 << r->var);
 			vstamps[r->var] = stamp;
 			again = true;

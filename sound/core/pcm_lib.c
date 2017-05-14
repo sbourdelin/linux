@@ -1146,6 +1146,10 @@ int snd_pcm_hw_rule_add(struct snd_pcm_runtime *runtime, unsigned int cond,
 	struct snd_pcm_hw_rule *c;
 	unsigned int k;
 	va_list args;
+
+	if (!hw_is_mask(var) && !hw_is_interval(var))
+		return -EINVAL;
+
 	va_start(args, dep);
 	if (constrs->rules_num >= constrs->rules_all) {
 		struct snd_pcm_hw_rule *new;
@@ -1448,10 +1452,11 @@ int snd_pcm_hw_constraint_msbits(struct snd_pcm_runtime *runtime,
 				 unsigned int msbits)
 {
 	unsigned long l = (msbits << 16) | width;
-	return snd_pcm_hw_rule_add(runtime, cond, -1,
-				    snd_pcm_hw_rule_msbits,
-				    (void*) l,
-				    SNDRV_PCM_HW_PARAM_SAMPLE_BITS, -1);
+	return snd_pcm_hw_rule_add(runtime, cond,
+				   SNDRV_PCM_HW_PARAM_SAMPLE_BITS,
+				   snd_pcm_hw_rule_msbits,
+				   (void *) l,
+				   SNDRV_PCM_HW_PARAM_SAMPLE_BITS, -1);
 }
 
 EXPORT_SYMBOL(snd_pcm_hw_constraint_msbits);
