@@ -275,6 +275,8 @@ static int constrain_mask_params(struct snd_pcm_substream *substream,
 		m = hw_param_mask(params, k);
 		if (snd_mask_empty(m))
 			return -EINVAL;
+
+		/* This parameter is not requested to change by application. */
 		if (!(params->rmask & (1 << k)))
 			continue;
 
@@ -286,6 +288,7 @@ static int constrain_mask_params(struct snd_pcm_substream *substream,
 
 		trace_hw_params_mask(substream, k, -1, &old_mask, m);
 
+		/* Set corresponding flag so that applications get it. */
 		if (changed)
 			params->cmask |= 1 << k;
 		if (changed < 0)
@@ -310,6 +313,8 @@ static int constrain_interval_params(struct snd_pcm_substream *substream,
 		i = hw_param_interval(params, k);
 		if (snd_interval_empty(i))
 			return -EINVAL;
+
+		/* This parameter is not requested to change by application. */
 		if (!(params->rmask & (1 << k)))
 			continue;
 
@@ -321,6 +326,7 @@ static int constrain_interval_params(struct snd_pcm_substream *substream,
 
 		trace_hw_params_interval(substream, k, -1, &old_interval, i);
 
+		/* Set corresponding flag so that applications get it. */
 		if (changed)
 			params->cmask |= 1 << k;
 		if (changed < 0)
@@ -346,17 +352,54 @@ static int constrain_params_by_rules(struct snd_pcm_substream *substream,
 	struct snd_interval __maybe_unused old_interval;
 	struct snd_mask __maybe_unused old_mask;
 
+	/*
+	 * Each application of rule has own sequence number.
+	 *
+	 * Each member of 'rstamps' array represents the sequence number of
+	 * recent application of corresponding rule.
+	 */
 	for (k = 0; k < constrs->rules_num; k++)
 		rstamps[k] = 0;
+
+	/*
+	 * Each member of 'vstamps' array represents the sequence number of
+	 * recent application of rule in which corresponding parameters were
+	 * changed.
+	 *
+	 * In initial state, elements corresponding to parameters requested by
+	 * application is 1. For unrequested parameters, corresponding members
+	 * have 0 so that the parameters are never changed anymore.
+	 */
 	for (k = 0; k <= SNDRV_PCM_HW_PARAM_LAST_INTERVAL; k++)
 		vstamps[k] = (params->rmask & (1 << k)) ? 1 : 0;
+
+	/* Due to the above design, actual sequence number starts at 2. */
 	stamp = 2;
 retry:
+	/* Apply all rules in order. */
 	again = false;
 	for (k = 0; k < constrs->rules_num; k++) {
 		r = &constrs->rules[k];
+
+		/*
+		 * Check condition bits of this rule. When the rule has
+		 * some condition bits, parameter without the bits is
+		 * never processed. SNDRV_PCM_HW_PARAMS_NO_PERIOD_WAKEUP
+		 * is an example of the condition bits.
+		 */
 		if (r->cond && !(r->cond & params->flags))
 			continue;
+
+		/*
+		 * The 'deps' array includes maximum three dependencies
+		 * to SNDRV_PCM_HW_PARAM_XXXs for this rule. The fourth
+		 * member of this array is a sentinel and should be
+		 * negative value.
+		 *
+		 * This rule should be processed in this time when dependent
+		 * parameters were changed at former applications of the other
+		 * rules.
+		 */
 		for (d = 0; r->deps[d] >= 0; d++) {
 			if (vstamps[r->deps[d]] > rstamps[k])
 				break;
@@ -389,6 +432,12 @@ retry:
 		}
 
 		rstamps[k] = stamp;
+
+		/*
+		 * When some parameters are changed, notify it to applications
+		 * in user space by returned bits, then preparing for next
+		 * iteration.
+		 */
 		if (changed && r->var >= 0) {
 			params->cmask |= (1 << r->var);
 			vstamps[r->var] = stamp;
@@ -396,9 +445,11 @@ retry:
 		}
 		if (changed < 0)
 			return changed;
+
 		stamp++;
 	}
 
+	/* Iterate to evaluate all rules till no parameters are changed. */
 	if (again)
 		goto retry;
 
