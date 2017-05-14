@@ -308,31 +308,12 @@ static int constrain_mask_params(struct snd_pcm_hw_constraints *constrs,
 	return 0;
 }
 
-int snd_pcm_hw_refine(struct snd_pcm_substream *substream, 
-		      struct snd_pcm_hw_params *params)
+static int constrain_interval_params(struct snd_pcm_hw_constraints *constrs,
+				     struct snd_pcm_hw_params *params)
 {
+	struct snd_interval *i;
 	unsigned int k;
-	struct snd_pcm_hardware *hw;
-	struct snd_mask *m = NULL;
-	struct snd_interval *i = NULL;
-	struct snd_pcm_hw_constraints *constrs = &substream->runtime->hw_constraints;
-	unsigned int rstamps[constrs->rules_num];
-	unsigned int vstamps[SNDRV_PCM_HW_PARAM_LAST_INTERVAL + 1];
-	unsigned int stamp = 2;
-	int changed, again;
-
-	params->info = 0;
-	params->fifo_size = 0;
-	if (params->rmask & (1 << SNDRV_PCM_HW_PARAM_SAMPLE_BITS))
-		params->msbits = 0;
-	if (params->rmask & (1 << SNDRV_PCM_HW_PARAM_RATE)) {
-		params->rate_num = 0;
-		params->rate_den = 0;
-	}
-
-	changed = constrain_mask_params(constrs, params);
-	if (changed < 0)
-		return changed;
+	int changed;
 
 	for (k = SNDRV_PCM_HW_PARAM_FIRST_INTERVAL; k <= SNDRV_PCM_HW_PARAM_LAST_INTERVAL; k++) {
 		i = hw_param_interval(params, k);
@@ -364,6 +345,39 @@ int snd_pcm_hw_refine(struct snd_pcm_substream *substream,
 		if (changed < 0)
 			return changed;
 	}
+
+	return 0;
+}
+
+int snd_pcm_hw_refine(struct snd_pcm_substream *substream, 
+		      struct snd_pcm_hw_params *params)
+{
+	unsigned int k;
+	struct snd_pcm_hardware *hw;
+	struct snd_mask *m = NULL;
+	struct snd_interval *i = NULL;
+	struct snd_pcm_hw_constraints *constrs = &substream->runtime->hw_constraints;
+	unsigned int rstamps[constrs->rules_num];
+	unsigned int vstamps[SNDRV_PCM_HW_PARAM_LAST_INTERVAL + 1];
+	unsigned int stamp = 2;
+	int changed, again;
+
+	params->info = 0;
+	params->fifo_size = 0;
+	if (params->rmask & (1 << SNDRV_PCM_HW_PARAM_SAMPLE_BITS))
+		params->msbits = 0;
+	if (params->rmask & (1 << SNDRV_PCM_HW_PARAM_RATE)) {
+		params->rate_num = 0;
+		params->rate_den = 0;
+	}
+
+	changed = constrain_mask_params(constrs, params);
+	if (changed < 0)
+		return changed;
+
+	changed = constrain_interval_params(constrs, params);
+	if (changed < 0)
+		return changed;
 
 	for (k = 0; k < constrs->rules_num; k++)
 		rstamps[k] = 0;
