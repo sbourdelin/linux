@@ -697,6 +697,79 @@ struct drm_prime_handle {
 	__s32 fd;
 };
 
+/** DRM_ROTATE_0
+ *
+ * Signals that a drm plane has been rotated 0 degrees.
+ *
+ * This define is provided as a convenience, looking up the property id
+ * using the name->prop id lookup is the preferred method.
+ */
+#define DRM_ROTATE_0           BIT(0)
+
+/** DRM_ROTATE_90
+ *
+ * Signals that a drm plane has been rotated 90 degrees in counter clockwise
+ * direction.
+ *
+ * This define is provided as a convenience, looking up the property id
+ * using the name->prop id lookup is the preferred method.
+ */
+#define DRM_ROTATE_90          BIT(1)
+
+/** DRM_ROTATE_180
+ *
+ * Signals that a drm plane has been rotated 180 degrees in counter clockwise
+ * direction.
+ *
+ * This define is provided as a convenience, looking up the property id
+ * using the name->prop id lookup is the preferred method.
+ */
+#define DRM_ROTATE_180         BIT(2)
+
+/** DRM_ROTATE_270
+ *
+ * Signals that a drm plane has been rotated 270 degrees in counter clockwise
+ * direction.
+ *
+ * This define is provided as a convenience, looking up the property id
+ * using the name->prop id lookup is the preferred method.
+ */
+#define DRM_ROTATE_270         BIT(3)
+
+
+/** DRM_ROTATE_MASK
+ *
+ * Bitmask used to look for drm plane rotations.
+ */
+#define DRM_ROTATE_MASK (DRM_ROTATE_0   | DRM_ROTATE_90 | \
+                        DRM_ROTATE_180 | DRM_ROTATE_270)
+
+/** DRM_REFLECT_X
+ *
+ * Signals that a drm plane has been reflected in the X axis.
+ *
+ * This define is provided as a convenience, looking up the property id
+ * using the name->prop id lookup is the preferred method.
+ */
+#define DRM_REFLECT_X          BIT(4)
+
+/** DRM_REFLECT_Y
+ *
+ * Signals that a drm plane has been reflected in the Y axis.
+ *
+ * This define is provided as a convenience, looking up the property id
+ * using the name->prop id lookup is the preferred method.
+ */
+#define DRM_REFLECT_Y          BIT(5)
+
+
+/** DRM_REFLECT_MASK
+ *
+ * Bitmask used to look for drm plane reflections.
+ */
+#define DRM_REFLECT_MASK (DRM_REFLECT_X | DRM_REFLECT_Y)
+
+
 #if defined(__cplusplus)
 }
 #endif
