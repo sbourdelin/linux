@@ -288,11 +288,13 @@ static int constrain_mask_params(struct snd_pcm_substream *substream,
 
 		trace_hw_params_mask(substream, k, -1, &old_mask, m);
 
+		if (changed < 0)
+			return changed;
+
+
 		/* Set corresponding flag so that applications get it. */
 		if (changed)
 			params->cmask |= 1 << k;
-		if (changed < 0)
-			return changed;
 	}
 
 	return 0;
@@ -326,11 +328,12 @@ static int constrain_interval_params(struct snd_pcm_substream *substream,
 
 		trace_hw_params_interval(substream, k, -1, &old_interval, i);
 
+		if (changed < 0)
+			return changed;
+
 		/* Set corresponding flag so that applications get it. */
 		if (changed)
 			params->cmask |= 1 << k;
-		if (changed < 0)
-			return changed;
 	}
 
 	return 0;
@@ -431,6 +434,9 @@ retry:
 						 hw_param_interval(params, r->var));
 		}
 
+		if (changed < 0)
+			return changed;
+
 		rstamps[k] = stamp;
 
 		/*
@@ -443,8 +449,6 @@ retry:
 			vstamps[r->var] = stamp;
 			again = true;
 		}
-		if (changed < 0)
-			return changed;
 
 		stamp++;
 	}
