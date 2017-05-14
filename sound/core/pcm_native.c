@@ -37,7 +37,9 @@
 #include <sound/minors.h>
 #include <linux/uio.h>
 
+#ifdef CONFIG_SND_DEBUG
 #define CREATE_TRACE_POINTS
+#endif
 #include "pcm_params_trace.h"
 
 /*
