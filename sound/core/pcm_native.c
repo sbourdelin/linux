@@ -555,11 +555,35 @@ static int snd_pcm_hw_params_choose(struct snd_pcm_substream *pcm,
 	const int *v;
 	int err;
 
+	struct snd_interval __maybe_unused old_interval;
+	struct snd_mask __maybe_unused old_mask;
+
 	for (v = vars; *v != -1; v++) {
+		/* Keep old parameter to trace. */
+		if (trace_hw_params_mask_enabled()) {
+			if (hw_is_mask(*v))
+				old_mask = *hw_param_mask(params, *v);
+		}
+		if (trace_hw_params_interval_enabled()) {
+			if (hw_is_interval(*v))
+				old_interval = *hw_param_interval(params, *v);
+		}
+
 		if (*v != SNDRV_PCM_HW_PARAM_BUFFER_SIZE)
 			err = snd_pcm_hw_param_first(pcm, params, *v, NULL);
 		else
 			err = snd_pcm_hw_param_last(pcm, params, *v, NULL);
+
+		/* Trace the parameter. */
+		if (hw_is_mask(*v)) {
+			trace_hw_params_mask(pcm, *v, -1, &old_mask,
+					     hw_param_mask(params, *v));
+		}
+		if (hw_is_interval(*v)) {
+			trace_hw_params_interval(pcm, *v, -1, &old_interval,
+						 hw_param_interval(params, *v));
+		}
+
 		if (snd_BUG_ON(err < 0))
 			return err;
 	}
