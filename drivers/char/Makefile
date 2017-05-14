@@ -6,7 +6,12 @@ obj-y				+= mem.o
 
 ifeq ($(CONFIG_LRNG),y)
   obj-$(CONFIG_LRNG)		+= lrng.o
-  lrng-y			+= lrng_base.o lrng_kcapi.o
+  lrng-y			+= lrng_base.o
+  ifeq ($(CONFIG_CRYPTO_DRBG),y)
+    lrng-y			+= lrng_kcapi.o
+  else
+    lrng-y			+= lrng_standalone.o
+  endif
 else
   obj-y				+= random.o
 endif

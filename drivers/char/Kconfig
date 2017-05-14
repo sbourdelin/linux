@@ -596,7 +596,6 @@ source "drivers/char/xillybus/Kconfig"
 
 config LRNG
 	bool "Linux Random Number Generator"
-	select CRYPTO_DRBG_MENU
 	select CRYPTO_CMAC if CRYPTO_DRBG_CTR
 	help
 	  The Linux Random Number Generator (LRNG) is the replacement
