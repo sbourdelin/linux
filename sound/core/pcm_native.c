@@ -37,6 +37,9 @@
 #include <sound/minors.h>
 #include <linux/uio.h>
 
+#define CREATE_TRACE_POINTS
+#include "pcm_params_trace.h"
+
 /*
  *  Compatibility
  */
@@ -255,35 +258,15 @@ static bool hw_support_mmap(struct snd_pcm_substream *substream)
 	return true;
 }
 
-#undef RULES_DEBUG
-
-#ifdef RULES_DEBUG
-#define HW_PARAM(v) [SNDRV_PCM_HW_PARAM_##v] = #v
-static const char * const snd_pcm_hw_param_names[] = {
-	HW_PARAM(ACCESS),
-	HW_PARAM(FORMAT),
-	HW_PARAM(SUBFORMAT),
-	HW_PARAM(SAMPLE_BITS),
-	HW_PARAM(FRAME_BITS),
-	HW_PARAM(CHANNELS),
-	HW_PARAM(RATE),
-	HW_PARAM(PERIOD_TIME),
-	HW_PARAM(PERIOD_SIZE),
-	HW_PARAM(PERIOD_BYTES),
-	HW_PARAM(PERIODS),
-	HW_PARAM(BUFFER_TIME),
-	HW_PARAM(BUFFER_SIZE),
-	HW_PARAM(BUFFER_BYTES),
-	HW_PARAM(TICK_TIME),
-};
-#endif
-
-static int constrain_mask_params(struct snd_pcm_hw_constraints *constrs,
+static int constrain_mask_params(struct snd_pcm_substream *substream,
+				 struct snd_pcm_hw_constraints *constrs,
 				 struct snd_pcm_hw_params *params)
 {
 	struct snd_mask *m;
 	unsigned int k;
 	int changed;
+
+	struct snd_mask __maybe_unused old_mask;
 
 	for (k = SNDRV_PCM_HW_PARAM_FIRST_MASK; k <= SNDRV_PCM_HW_PARAM_LAST_MASK; k++) {
 		m = hw_param_mask(params, k);
@@ -291,14 +274,15 @@ static int constrain_mask_params(struct snd_pcm_hw_constraints *constrs,
 			return -EINVAL;
 		if (!(params->rmask & (1 << k)))
 			continue;
-#ifdef RULES_DEBUG
-		pr_debug("%s = ", snd_pcm_hw_param_names[k]);
-		pr_cont("%04x%04x%04x%04x -> ", m->bits[3], m->bits[2], m->bits[1], m->bits[0]);
-#endif
+
+		/* Keep the parameter to trace. */
+		if (trace_hw_params_mask_enabled())
+			old_mask = *m;
+
 		changed = snd_mask_refine(m, constrs_mask(constrs, k));
-#ifdef RULES_DEBUG
-		pr_cont("%04x%04x%04x%04x\n", m->bits[3], m->bits[2], m->bits[1], m->bits[0]);
-#endif
+
+		trace_hw_params_mask(substream, k, -1, &old_mask, m);
+
 		if (changed)
 			params->cmask |= 1 << k;
 		if (changed < 0)
@@ -308,12 +292,15 @@ static int constrain_mask_params(struct snd_pcm_hw_constraints *constrs,
 	return 0;
 }
 
-static int constrain_interval_params(struct snd_pcm_hw_constraints *constrs,
+static int constrain_interval_params(struct snd_pcm_substream *substream,
+				     struct snd_pcm_hw_constraints *constrs,
 				     struct snd_pcm_hw_params *params)
 {
 	struct snd_interval *i;
 	unsigned int k;
 	int changed;
+
+	struct snd_interval __maybe_unused old_interval;
 
 	for (k = SNDRV_PCM_HW_PARAM_FIRST_INTERVAL; k <= SNDRV_PCM_HW_PARAM_LAST_INTERVAL; k++) {
 		i = hw_param_interval(params, k);
@@ -321,25 +308,15 @@ static int constrain_interval_params(struct snd_pcm_hw_constraints *constrs,
 			return -EINVAL;
 		if (!(params->rmask & (1 << k)))
 			continue;
-#ifdef RULES_DEBUG
-		pr_debug("%s = ", snd_pcm_hw_param_names[k]);
-		if (i->empty)
-			pr_cont("empty");
-		else
-			pr_cont("%c%u %u%c",
-			       i->openmin ? '(' : '[', i->min,
-			       i->max, i->openmax ? ')' : ']');
-		pr_cont(" -> ");
-#endif
+
+		/* Keep the parameter to trace. */
+		if (trace_hw_params_interval_enabled())
+			old_interval = *i;
+
 		changed = snd_interval_refine(i, constrs_interval(constrs, k));
-#ifdef RULES_DEBUG
-		if (i->empty)
-			pr_cont("empty\n");
-		else 
-			pr_cont("%c%u %u%c\n",
-			       i->openmin ? '(' : '[', i->min,
-			       i->max, i->openmax ? ')' : ']');
-#endif
+
+		trace_hw_params_interval(substream, k, -1, &old_interval, i);
+
 		if (changed)
 			params->cmask |= 1 << k;
 		if (changed < 0)
@@ -349,7 +326,8 @@ static int constrain_interval_params(struct snd_pcm_hw_constraints *constrs,
 	return 0;
 }
 
-static int constrain_params_by_rules(struct snd_pcm_hw_constraints *constrs,
+static int constrain_params_by_rules(struct snd_pcm_substream *substream,
+				     struct snd_pcm_hw_constraints *constrs,
 				     struct snd_pcm_hw_params *params)
 {
 	unsigned int k;
@@ -358,10 +336,8 @@ static int constrain_params_by_rules(struct snd_pcm_hw_constraints *constrs,
 	unsigned int stamp = 2;
 	int changed, again;
 
-#ifdef RULES_DEBUG
-	struct snd_mask *m = NULL;
-	struct snd_interval *i = NULL;
-#endif
+	struct snd_interval __maybe_unused old_interval;
+	struct snd_mask __maybe_unused old_mask;
 
 	for (k = 0; k < constrs->rules_num; k++)
 		rstamps[k] = 0;
@@ -383,41 +359,31 @@ static int constrain_params_by_rules(struct snd_pcm_hw_constraints *constrs,
 			}
 			if (!doit)
 				continue;
-#ifdef RULES_DEBUG
-			pr_debug("Rule %d [%p]: ", k, r->func);
-			if (r->var >= 0) {
-				pr_cont("%s = ", snd_pcm_hw_param_names[r->var]);
-				if (hw_is_mask(r->var)) {
-					m = hw_param_mask(params, r->var);
-					pr_cont("%x", *m->bits);
-				} else {
-					i = hw_param_interval(params, r->var);
-					if (i->empty)
-						pr_cont("empty");
-					else
-						pr_cont("%c%u %u%c",
-						       i->openmin ? '(' : '[', i->min,
-						       i->max, i->openmax ? ')' : ']');
-				}
-			}
-#endif
-			changed = r->func(params, r);
-#ifdef RULES_DEBUG
-			if (r->var >= 0) {
-				pr_cont(" -> ");
+
+			/* Keep old parameter to trace. */
+			if (trace_hw_params_mask_enabled()) {
 				if (hw_is_mask(r->var))
-					pr_cont("%x", *m->bits);
-				else {
-					if (i->empty)
-						pr_cont("empty");
-					else
-						pr_cont("%c%u %u%c",
-						       i->openmin ? '(' : '[', i->min,
-						       i->max, i->openmax ? ')' : ']');
-				}
+					old_mask = *hw_param_mask(params, r->var);
 			}
-			pr_cont("\n");
-#endif
+			if (trace_hw_params_interval_enabled()) {
+				if (hw_is_interval(r->var))
+					old_interval = *hw_param_interval(params, r->var);
+			}
+
+			changed = r->func(params, r);
+
+			/* Trace the parameter. */
+			if (hw_is_mask(r->var)) {
+				trace_hw_params_mask(substream, r->var, k,
+						&old_mask,
+						hw_param_mask(params, r->var));
+			}
+			if (hw_is_interval(r->var)) {
+				trace_hw_params_interval(substream, r->var, k,
+						&old_interval,
+						hw_param_interval(params, r->var));
+			}
+
 			rstamps[k] = stamp;
 			if (changed && r->var >= 0) {
 				params->cmask |= (1 << r->var);
@@ -451,15 +417,15 @@ int snd_pcm_hw_refine(struct snd_pcm_substream *substream,
 		params->rate_den = 0;
 	}
 
-	changed = constrain_mask_params(constrs, params);
+	changed = constrain_mask_params(substream, constrs, params);
 	if (changed < 0)
 		return changed;
 
-	changed = constrain_interval_params(constrs, params);
+	changed = constrain_interval_params(substream, constrs, params);
 	if (changed < 0)
 		return changed;
 
-	changed = constrain_params_by_rules(constrs, params);
+	changed = constrain_params_by_rules(substream, constrs, params);
 	if (changed < 0)
 		return changed;
 
