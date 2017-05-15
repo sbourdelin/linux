@@ -825,6 +825,9 @@ int __br_vlan_set_default_pvid(struct net_bridge *br, u16 pvid)
 		return 0;
 	}
 
+	if (pvid >= VLAN_VID_MASK)
+		return -EINVAL;
+
 	changed = kcalloc(BITS_TO_LONGS(BR_MAX_PORTS), sizeof(unsigned long),
 			  GFP_KERNEL);
 	if (!changed)
