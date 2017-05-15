@@ -402,15 +402,20 @@ provisioning_mode_store(struct device *dev, struct device_attribute *attr,
 	if (sdp->type != TYPE_DISK)
 		return -EINVAL;
 
-	if (!strncmp(buf, lbp_mode[SD_LBP_UNMAP], 20))
+	if (!strncmp(buf, lbp_mode[SD_LBP_UNMAP],
+		     strlen(lbp_mode[SD_LBP_UNMAP])))
 		sd_config_discard(sdkp, SD_LBP_UNMAP);
-	else if (!strncmp(buf, lbp_mode[SD_LBP_WS16], 20))
+	else if (!strncmp(buf, lbp_mode[SD_LBP_WS16],
+			  strlen(lbp_mode[SD_LBP_WS16])))
 		sd_config_discard(sdkp, SD_LBP_WS16);
-	else if (!strncmp(buf, lbp_mode[SD_LBP_WS10], 20))
+	else if (!strncmp(buf, lbp_mode[SD_LBP_WS10],
+			  strlen(lbp_mode[SD_LBP_WS10])))
 		sd_config_discard(sdkp, SD_LBP_WS10);
-	else if (!strncmp(buf, lbp_mode[SD_LBP_ZERO], 20))
+	else if (!strncmp(buf, lbp_mode[SD_LBP_ZERO],
+			  strlen(lbp_mode[SD_LBP_ZERO])))
 		sd_config_discard(sdkp, SD_LBP_ZERO);
-	else if (!strncmp(buf, lbp_mode[SD_LBP_DISABLE], 20))
+	else if (!strncmp(buf, lbp_mode[SD_LBP_DISABLE],
+			  strlen(lbp_mode[SD_LBP_DISABLE])))
 		sd_config_discard(sdkp, SD_LBP_DISABLE);
 	else
 		return -EINVAL;
@@ -444,13 +449,17 @@ zeroing_mode_store(struct device *dev, struct device_attribute *attr,
 	if (!capable(CAP_SYS_ADMIN))
 		return -EACCES;
 
-	if (!strncmp(buf, zeroing_mode[SD_ZERO_WRITE], 20))
+	if (!strncmp(buf, zeroing_mode[SD_ZERO_WRITE],
+		     strlen(zeroing_mode[SD_ZERO_WRITE])))
 		sdkp->zeroing_mode = SD_ZERO_WRITE;
-	else if (!strncmp(buf, zeroing_mode[SD_ZERO_WS], 20))
+	else if (!strncmp(buf, zeroing_mode[SD_ZERO_WS],
+			  strlen(zeroing_mode[SD_ZERO_WS])))
 		sdkp->zeroing_mode = SD_ZERO_WS;
-	else if (!strncmp(buf, zeroing_mode[SD_ZERO_WS16_UNMAP], 20))
+	else if (!strncmp(buf, zeroing_mode[SD_ZERO_WS16_UNMAP],
+			  strlen(zeroing_mode[SD_ZERO_WS16_UNMAP])))
 		sdkp->zeroing_mode = SD_ZERO_WS16_UNMAP;
-	else if (!strncmp(buf, zeroing_mode[SD_ZERO_WS10_UNMAP], 20))
+	else if (!strncmp(buf, zeroing_mode[SD_ZERO_WS10_UNMAP],
+			  strlen(zeroing_mode[SD_ZERO_WS10_UNMAP])))
 		sdkp->zeroing_mode = SD_ZERO_WS10_UNMAP;
 	else
 		return -EINVAL;
