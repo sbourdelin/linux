@@ -313,9 +313,11 @@ skip:
 	/* Some devices don't initialise properly. In particular
 	 * the packet filter is not reset. There are devices that
 	 * don't do reset all the way. So the packet filter should
-	 * be set to a sane initial value.
+	 * be set to a sane initial value, if filtering is supported.
+	 * RNDIS does not support it.
 	 */
-	usbnet_cdc_update_filter(dev);
+	if (!rndis)
+		usbnet_cdc_update_filter(dev);
 
 	return 0;
 
