@@ -5,8 +5,8 @@
 #include "ddk750_hwi2c.h"
 #include "ddk750_power.h"
 
-#define MAX_HWI2C_FIFO                  16
-#define HWI2C_WAIT_TIMEOUT              0xF0000
+#define MAX_HWI2C_FIFO		16
+#define HWI2C_WAIT_TIMEOUT	0xF0000
 
 int sm750_hw_i2c_init(unsigned char bus_speed_mode)
 {
