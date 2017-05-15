@@ -3938,6 +3938,16 @@ drm_parse_hdmi_vsdb_video(struct drm_connector *connector, const u8 *db)
 	struct drm_display_info *info = &connector->display_info;
 	u8 len = cea_db_payload_len(db);
 
+	if (len >= 4) {
+		info->src_phy_addr.a = (db[4] & 0xF0) >> 4;
+		info->src_phy_addr.b = db[4] & 0x0F;
+		info->src_phy_addr.c = (db[5] & 0xF0) >> 4;
+		info->src_phy_addr.d = db[5] & 0x0F;
+
+		DRM_DEBUG_KMS("HDMI SPA = %01x.%01x.%01x.%01x\n",
+				info->src_phy_addr.a, info->src_phy_addr.b,
+				info->src_phy_addr.c, info->src_phy_addr.d);
+	}
 	if (len >= 6)
 		info->dvi_dual = db[6] & 1;
 	if (len >= 7)

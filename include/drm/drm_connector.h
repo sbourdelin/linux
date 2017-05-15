@@ -126,6 +126,17 @@ struct drm_scdc {
 	struct drm_scrambling scrambling;
 };
 
+/**
+ * struct drm_hdmi_cec_spa
+ *
+ * Provides the Source Physical address from an HDMI VSDB EDID
+ */
+struct drm_hdmi_cec_spa {
+	u8 a;
+	u8 b;
+	u8 c;
+	u8 d;
+};
 
 /**
  * struct drm_hdmi_info - runtime information about the connected HDMI sink
@@ -262,6 +273,11 @@ struct drm_display_info {
 	 * @hdmi: advance features of a HDMI sink.
 	 */
 	struct drm_hdmi_info hdmi;
+
+	/**
+	 * @src_phy_addr: HDMI CEC Source Physical Address
+	 */
+	struct drm_hdmi_cec_spa src_phy_addr;
 };
 
 int drm_display_info_set_bus_formats(struct drm_display_info *info,
