@@ -18,15 +18,13 @@
 
 struct bpf_reg_state {
 	enum bpf_reg_type type;
+	u32 off;
 	union {
 		/* valid when type == CONST_IMM | PTR_TO_STACK | UNKNOWN_VALUE */
 		s64 imm;
 
 		/* valid when type == PTR_TO_PACKET* */
-		struct {
-			u16 off;
-			u16 range;
-		};
+		u32 range;
 
 		/* valid when type == CONST_PTR_TO_MAP | PTR_TO_MAP_VALUE |
 		 *   PTR_TO_MAP_VALUE_OR_NULL

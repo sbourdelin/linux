@@ -231,10 +231,10 @@ static void print_verifier_state(struct bpf_verifier_state *state)
 		else if (t == CONST_PTR_TO_MAP || t == PTR_TO_MAP_VALUE ||
 			 t == PTR_TO_MAP_VALUE_OR_NULL ||
 			 t == PTR_TO_MAP_VALUE_ADJ)
-			verbose("(ks=%d,vs=%d,id=%u)",
+			verbose("(ks=%d,vs=%d,id=%u,off=%u)",
 				reg->map_ptr->key_size,
 				reg->map_ptr->value_size,
-				reg->id);
+				reg->id, reg->off);
 		if (reg->min_value != BPF_REGISTER_MIN_RANGE)
 			verbose(",min_value=%lld",
 				(long long)reg->min_value);
@@ -469,6 +469,7 @@ static void init_reg_state(struct bpf_reg_state *regs)
 
 	for (i = 0; i < MAX_BPF_REG; i++) {
 		regs[i].type = NOT_INIT;
+		regs[i].off = 0;
 		regs[i].imm = 0;
 		regs[i].min_value = BPF_REGISTER_MIN_RANGE;
 		regs[i].max_value = BPF_REGISTER_MAX_RANGE;
@@ -487,6 +488,7 @@ static void init_reg_state(struct bpf_reg_state *regs)
 static void __mark_reg_unknown_value(struct bpf_reg_state *regs, u32 regno)
 {
 	regs[regno].type = UNKNOWN_VALUE;
+	regs[regno].off = 0;
 	regs[regno].id = 0;
 	regs[regno].imm = 0;
 }
@@ -713,6 +715,7 @@ static int check_map_access_adj(struct bpf_verifier_env *env, u32 regno,
 }
 
 #define MAX_PACKET_OFF 0xffff
+#define MAX_MAP_OFF KMALLOC_MAX_SIZE
 
 static bool may_access_direct_pkt_data(struct bpf_verifier_env *env,
 				       const struct bpf_call_arg_meta *meta,
@@ -823,10 +826,27 @@ static int check_pkt_ptr_alignment(const struct bpf_reg_state *reg,
 }
 
 static int check_val_ptr_alignment(const struct bpf_reg_state *reg,
-				   int size, bool strict)
+				   int off, int size, bool strict)
 {
-	if (strict && size != 1) {
-		verbose("Unknown alignment. Only byte-sized access allowed in value access.\n");
+	int reg_off;
+
+	/* Byte size accesses are always allowed. */
+	if (!strict || size == 1)
+		return 0;
+
+	reg_off = reg->off;
+	if (reg->id) {
+		if (reg->aux_off_align % size) {
+			verbose("Value access is only %u byte aligned, %d byte access not allowed\n",
+				reg->aux_off_align, size);
+			return -EACCES;
+		}
+		reg_off += reg->aux_off;
+	}
+
+	if ((reg_off + off) % size != 0) {
+		verbose("misaligned value access off %d+%d size %d\n",
+			reg_off, off, size);
 		return -EACCES;
 	}
 
@@ -846,7 +866,7 @@ static int check_ptr_alignment(struct bpf_verifier_env *env,
 	case PTR_TO_PACKET:
 		return check_pkt_ptr_alignment(reg, off, size, strict);
 	case PTR_TO_MAP_VALUE_ADJ:
-		return check_val_ptr_alignment(reg, size, strict);
+		return check_val_ptr_alignment(reg, off, size, strict);
 	default:
 		if (off % size != 0) {
 			verbose("misaligned access off %d size %d\n",
@@ -1336,6 +1356,7 @@ static void clear_all_pkt_pointers(struct bpf_verifier_env *env)
 		    reg->type != PTR_TO_PACKET_END)
 			continue;
 		reg->type = UNKNOWN_VALUE;
+		reg->off = 0;
 		reg->imm = 0;
 	}
 }
@@ -1415,6 +1436,7 @@ static int check_call(struct bpf_verifier_env *env, int func_id, int insn_idx)
 	for (i = 0; i < CALLER_SAVED_REGS; i++) {
 		reg = regs + caller_saved[i];
 		reg->type = NOT_INIT;
+		reg->off = 0;
 		reg->imm = 0;
 	}
 
@@ -1458,8 +1480,8 @@ static int check_call(struct bpf_verifier_env *env, int func_id, int insn_idx)
 	return 0;
 }
 
-static int check_packet_ptr_add(struct bpf_verifier_env *env,
-				struct bpf_insn *insn)
+static int check_pointer_add(struct bpf_verifier_env *env,
+			     struct bpf_insn *insn, bool is_packet)
 {
 	struct bpf_reg_state *regs = env->cur_state.regs;
 	struct bpf_reg_state *dst_reg = &regs[insn->dst_reg];
@@ -1468,79 +1490,96 @@ static int check_packet_ptr_add(struct bpf_verifier_env *env,
 	s32 imm;
 
 	if (BPF_SRC(insn->code) == BPF_K) {
-		/* pkt_ptr += imm */
+		int max_offset;
+
+		/* pointer += imm */
 		imm = insn->imm;
 
 add_imm:
 		if (imm < 0) {
-			verbose("addition of negative constant to packet pointer is not allowed\n");
+			verbose("addition of negative constant to pointer is not allowed\n");
 			return -EACCES;
 		}
-		if (imm >= MAX_PACKET_OFF ||
-		    imm + dst_reg->off >= MAX_PACKET_OFF) {
-			verbose("constant %d is too large to add to packet pointer\n",
-				imm);
+		max_offset = (is_packet ? MAX_PACKET_OFF : MAX_MAP_OFF);
+		if (imm >= max_offset ||
+		    imm + dst_reg->off >= max_offset) {
+			verbose("constant %d is too large to add to pointer\n", imm);
 			return -EACCES;
 		}
-		/* a constant was added to pkt_ptr.
+		/* a constant was added to the pointer.
 		 * Remember it while keeping the same 'id'
 		 */
 		dst_reg->off += imm;
 	} else {
-		bool had_id;
-
-		if (src_reg->type == PTR_TO_PACKET) {
-			/* R6=pkt(id=0,off=0,r=62) R7=imm22; r7 += r6 */
+		if ((is_packet && src_reg->type == PTR_TO_PACKET) ||
+		    (!is_packet && src_reg->type == PTR_TO_MAP_VALUE_ADJ)) {
+			/* R6={pkt,map}(id=0,off=0,r=62) R7=imm22; r7 += r6 */
 			tmp_reg = *dst_reg;  /* save r7 state */
-			*dst_reg = *src_reg; /* copy pkt_ptr state r6 into r7 */
+			*dst_reg = *src_reg; /* copy ptr state r6 into r7 */
 			src_reg = &tmp_reg;  /* pretend it's src_reg state */
 			/* if the checks below reject it, the copy won't matter,
 			 * since we're rejecting the whole program. If all ok,
 			 * then imm22 state will be added to r7
-			 * and r7 will be pkt(id=0,off=22,r=62) while
-			 * r6 will stay as pkt(id=0,off=0,r=62)
+			 * and r7 will be {pkt,map}(id=0,off=22,r=62) while
+			 * r6 will stay as {pkt,map}(id=0,off=0,r=62)
 			 */
 		}
 
 		if (src_reg->type == CONST_IMM) {
-			/* pkt_ptr += reg where reg is known constant */
+			/* pointer += reg where reg is known constant */
 			imm = src_reg->imm;
 			goto add_imm;
 		}
-		/* disallow pkt_ptr += reg
+		/* disallow pointer += reg
 		 * if reg is not uknown_value with guaranteed zero upper bits
-		 * otherwise pkt_ptr may overflow and addition will become
+		 * otherwise pointer_ptr may overflow and addition will become
 		 * subtraction which is not allowed
 		 */
 		if (src_reg->type != UNKNOWN_VALUE) {
-			verbose("cannot add '%s' to ptr_to_packet\n",
+			verbose("cannot add '%s' to pointer\n",
 				reg_type_str[src_reg->type]);
 			return -EACCES;
 		}
-		if (src_reg->imm < 48) {
+		if (is_packet && src_reg->imm < 48) {
 			verbose("cannot add integer value with %lld upper zero bits to ptr_to_packet\n",
 				src_reg->imm);
 			return -EACCES;
 		}
 
-		had_id = (dst_reg->id != 0);
-
-		/* dst_reg stays as pkt_ptr type and since some positive
+		/* dst_reg stays as the same type and since some positive
 		 * integer value was added to the pointer, increment its 'id'
 		 */
 		dst_reg->id = ++env->id_gen;
 
-		/* something was added to pkt_ptr, set range to zero */
 		dst_reg->aux_off += dst_reg->off;
 		dst_reg->off = 0;
-		dst_reg->range = 0;
-		if (had_id)
+
+		if (is_packet) {
+			/* something was added to packet ptr, set range to zero */
+			dst_reg->range = 0;
+		}
+		if (dst_reg->aux_off_align) {
 			dst_reg->aux_off_align = min(dst_reg->aux_off_align,
 						     src_reg->min_align);
-		else
+		} else {
 			dst_reg->aux_off_align = src_reg->min_align;
+		}
+		if (!dst_reg->aux_off_align)
+			dst_reg->aux_off_align = 1;
 	}
 	return 0;
+}
+
+static int check_packet_ptr_add(struct bpf_verifier_env *env,
+				struct bpf_insn *insn)
+{
+	return check_pointer_add(env, insn, true);
+}
+
+static int check_map_ptr_add(struct bpf_verifier_env *env,
+			     struct bpf_insn *insn)
+{
+	return check_pointer_add(env, insn, false);
 }
 
 static int evaluate_reg_alu(struct bpf_verifier_env *env, struct bpf_insn *insn)
@@ -2056,10 +2095,23 @@ static int check_alu_op(struct bpf_verifier_env *env, struct bpf_insn *insn)
 		if (env->allow_ptr_leaks &&
 		    BPF_CLASS(insn->code) == BPF_ALU64 && opcode == BPF_ADD &&
 		    (dst_reg->type == PTR_TO_MAP_VALUE ||
-		     dst_reg->type == PTR_TO_MAP_VALUE_ADJ))
-			dst_reg->type = PTR_TO_MAP_VALUE_ADJ;
-		else
+		     dst_reg->type == PTR_TO_MAP_VALUE_ADJ ||
+		     (BPF_SRC(insn->code) == BPF_X &&
+		      (regs[insn->src_reg].type == PTR_TO_MAP_VALUE ||
+		       regs[insn->src_reg].type == PTR_TO_MAP_VALUE_ADJ)))) {
+			if (dst_reg->type == PTR_TO_MAP_VALUE) {
+				dst_reg->type = PTR_TO_MAP_VALUE_ADJ;
+			} else if (BPF_SRC(insn->code) == BPF_X) {
+				struct bpf_reg_state *src_reg;
+
+				src_reg = &regs[insn->src_reg];
+				if (src_reg->type == PTR_TO_MAP_VALUE)
+					src_reg->type = PTR_TO_MAP_VALUE_ADJ;
+			}
+			check_map_ptr_add(env, insn);
+		} else {
 			mark_reg_unknown_value(regs, insn->dst_reg);
+		}
 	}
 
 	return 0;
@@ -2480,6 +2532,7 @@ static int check_ld_abs(struct bpf_verifier_env *env, struct bpf_insn *insn)
 	for (i = 0; i < CALLER_SAVED_REGS; i++) {
 		reg = regs + caller_saved[i];
 		reg->type = NOT_INIT;
+		reg->off = 0;
 		reg->imm = 0;
 	}
 
