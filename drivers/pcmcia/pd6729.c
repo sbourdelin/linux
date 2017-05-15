@@ -183,8 +183,7 @@ static irqreturn_t pd6729_interrupt(int irq, void *dev)
 	while (1) {
 		loopcount++;
 		if (loopcount > 20) {
-			printk(KERN_ERR "pd6729: infinite eventloop "
-			       "in interrupt\n");
+			pr_err("infinite event loop in interrupt\n");
 			break;
 		}
 
@@ -348,8 +347,8 @@ static int pd6729_set_socket(struct pcmcia_socket *sock, socket_state_t *state)
 		break;
 	default:
 		dev_dbg(&sock->dev,
-			"pd6729_set_socket called with invalid VCC power "
-			"value: %i\n", state->Vcc);
+			"%s called with invalid VCC power value: %i\n",
+			__func__, state->Vcc);
 		return -EINVAL;
 	}
 
@@ -369,8 +368,9 @@ static int pd6729_set_socket(struct pcmcia_socket *sock, socket_state_t *state)
 		reg |= I365_VPP1_12V;
 		break;
 	default:
-		dev_dbg(&sock->dev, "pd6729: pd6729_set_socket called with "
-			"invalid VPP power value: %i\n", state->Vpp);
+		dev_dbg(&sock->dev,
+			"%s called with invalid VPP power value: %i\n",
+			__func__, state->Vpp);
 		return -EINVAL;
 	}
 
@@ -597,8 +597,7 @@ static u_int pd6729_isa_scan(void)
 	int i;
 
 	if (irq_mode == 1) {
-		printk(KERN_INFO "pd6729: PCI card interrupts, "
-		       "PCI status changes\n");
+		pr_info("PCI card interrupts, PCI status changes\n");
 		return 0;
 	}
 
@@ -641,15 +640,15 @@ static int pd6729_pci_probe(struct pci_dev *dev,
 	}
 
 	if (!pci_resource_start(dev, 0)) {
-		dev_warn(&dev->dev, "refusing to load the driver as the "
-			"io_base is NULL.\n");
+		dev_warn(&dev->dev,
+			 "refusing to load the driver as the io_base is NULL.\n");
 		ret = -ENOMEM;
 		goto err_out_disable;
 	}
 
-	dev_info(&dev->dev, "Cirrus PD6729 PCI to PCMCIA Bridge at 0x%llx "
-		"on irq %d\n",
-		(unsigned long long)pci_resource_start(dev, 0), dev->irq);
+	dev_info(&dev->dev,
+		 "Cirrus PD6729 PCI to PCMCIA Bridge at 0x%llx on irq %d\n",
+		 (unsigned long long)pci_resource_start(dev, 0), dev->irq);
 	/*
 	 * Since we have no memory BARs some firmware may not
 	 * have had PCI_COMMAND_MEMORY enabled, yet the device needs it.
