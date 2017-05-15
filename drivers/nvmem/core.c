@@ -528,7 +528,7 @@ int nvmem_unregister(struct nvmem_device *nvmem)
 		device_remove_bin_file(nvmem->base_dev, &nvmem->eeprom);
 
 	nvmem_device_remove_all_cells(nvmem);
-	device_del(&nvmem->dev);
+	device_unregister(&nvmem->dev);
 
 	return 0;
 }
