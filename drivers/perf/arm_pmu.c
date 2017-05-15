@@ -787,10 +787,8 @@ struct arm_pmu *armpmu_alloc(void)
 	int cpu;
 
 	pmu = kzalloc(sizeof(*pmu), GFP_KERNEL);
-	if (!pmu) {
-		pr_info("failed to allocate PMU device!\n");
+	if (!pmu)
 		goto out;
-	}
 
 	pmu->hw_events = alloc_percpu(struct pmu_hw_events);
 	if (!pmu->hw_events) {
