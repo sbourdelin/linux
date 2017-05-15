@@ -122,9 +122,12 @@ ENTRY(startup_32)
 	addl	%ebp, gdt+2(%ebp)
 	lgdt	gdt(%ebp)
 
-	/* Enable PAE mode */
+	/* Enable PAE and LA57 mode */
 	movl	%cr4, %eax
 	orl	$X86_CR4_PAE, %eax
+#ifdef CONFIG_X86_5LEVEL
+	orl	$X86_CR4_LA57, %eax
+#endif
 	movl	%eax, %cr4
 
  /*
@@ -136,13 +139,24 @@ ENTRY(startup_32)
 	movl	$(BOOT_INIT_PGT_SIZE/4), %ecx
 	rep	stosl
 
-	/* Build Level 4 */
-	leal	pgtable + 0(%ebx), %edi
+	xorl	%edx, %edx
+
+	/* Build Top Level */
+	leal	pgtable(%ebx,%edx,1), %edi
 	leal	0x1007 (%edi), %eax
 	movl	%eax, 0(%edi)
 
+#ifdef CONFIG_X86_5LEVEL
+	/* Build Level 4 */
+	addl	$0x1000, %edx
+	leal	pgtable(%ebx,%edx), %edi
+	leal	0x1007 (%edi), %eax
+	movl	%eax, 0(%edi)
+#endif
+
 	/* Build Level 3 */
-	leal	pgtable + 0x1000(%ebx), %edi
+	addl	$0x1000, %edx
+	leal	pgtable(%ebx,%edx), %edi
 	leal	0x1007(%edi), %eax
 	movl	$4, %ecx
 1:	movl	%eax, 0x00(%edi)
@@ -152,7 +166,8 @@ ENTRY(startup_32)
 	jnz	1b
 
 	/* Build Level 2 */
-	leal	pgtable + 0x2000(%ebx), %edi
+	addl	$0x1000, %edx
+	leal	pgtable(%ebx,%edx), %edi
 	movl	$0x00000183, %eax
 	movl	$2048, %ecx
 1:	movl	%eax, 0(%edi)
