@@ -122,11 +122,13 @@ static u32 vnt_get_rsvtime(struct vnt_private *priv, u8 pkt_type,
 				       frame_length, rate);
 
 	if (pkt_type == PK_TYPE_11B)
-		ack_time = vnt_get_frame_time(priv->preamble_type, pkt_type,
-					      14, (u16)priv->top_cck_basic_rate);
+		ack_time = vnt_get_frame_time(priv->preamble_type,
+					      pkt_type, 14,
+					      (u16)priv->top_cck_basic_rate);
 	else
-		ack_time = vnt_get_frame_time(priv->preamble_type, pkt_type,
-					      14, (u16)priv->top_ofdm_basic_rate);
+		ack_time = vnt_get_frame_time(priv->preamble_type,
+					      pkt_type, 14,
+					      (u16)priv->top_ofdm_basic_rate);
 
 	if (need_ack)
 		return data_time + priv->sifs + ack_time;
@@ -147,7 +149,10 @@ static __le16 vnt_get_rtscts_rsvtime_le(struct vnt_private *priv, u8 rsv_type,
 {
 	u32 rrv_time, rts_time, cts_time, ack_time, data_time;
 
-	rrv_time = rts_time = cts_time = ack_time = data_time = 0;
+	rrv_time = 0;
+	rts_time = 0;
+	cts_time = 0;
+	ack_time = 0;
 
 	data_time = vnt_get_frame_time(priv->preamble_type, pkt_type,
 				       frame_length, current_rate);
@@ -155,9 +160,11 @@ static __le16 vnt_get_rtscts_rsvtime_le(struct vnt_private *priv, u8 rsv_type,
 	if (rsv_type == 0) {
 		rts_time = vnt_get_frame_time(priv->preamble_type, pkt_type,
 					      20, priv->top_cck_basic_rate);
-		cts_time = ack_time = vnt_get_frame_time(priv->preamble_type,
-							 pkt_type, 14,
-							 priv->top_cck_basic_rate);
+		ack_time = vnt_get_frame_time(priv->preamble_type,
+					      pkt_type, 14,
+					      priv->top_cck_basic_rate);
+		cts_time = ack_time;
+
 	} else if (rsv_type == 1) {
 		rts_time = vnt_get_frame_time(priv->preamble_type, pkt_type,
 					      20, priv->top_cck_basic_rate);
@@ -168,8 +175,10 @@ static __le16 vnt_get_rtscts_rsvtime_le(struct vnt_private *priv, u8 rsv_type,
 	} else if (rsv_type == 2) {
 		rts_time = vnt_get_frame_time(priv->preamble_type, pkt_type,
 					      20, priv->top_ofdm_basic_rate);
-		cts_time = ack_time = vnt_get_frame_time(priv->preamble_type,
-			pkt_type, 14, priv->top_ofdm_basic_rate);
+		ack_time = vnt_get_frame_time(priv->preamble_type, pkt_type,
+					      14, priv->top_ofdm_basic_rate);
+		cts_time = ack_time;
+
 	} else if (rsv_type == 3) {
 		cts_time = vnt_get_frame_time(priv->preamble_type, pkt_type,
 					      14, priv->top_cck_basic_rate);
@@ -267,7 +276,6 @@ static u16 vnt_mac_hdr_pos(struct vnt_usb_send_context *tx_context,
 static u16 vnt_rxtx_datahead_g(struct vnt_usb_send_context *tx_context,
 			       struct vnt_tx_datahead_g *buf)
 {
-
 	struct vnt_private *priv = tx_context->priv;
 	struct ieee80211_hdr *hdr =
 				(struct ieee80211_hdr *)tx_context->skb->data;
@@ -691,7 +699,6 @@ static u16 vnt_generate_tx_parameter(struct vnt_usb_send_context *tx_context,
 				     struct vnt_mic_hdr **mic_hdr, u32 need_mic,
 				     bool need_rts)
 {
-
 	if (tx_context->pkt_type == PK_TYPE_11GB ||
 	    tx_context->pkt_type == PK_TYPE_11GA) {
 		if (need_rts) {
@@ -779,14 +786,12 @@ static void vnt_fill_txkey(struct vnt_usb_send_context *tx_context,
 		if (ieee80211_has_a4(hdr->frame_control))
 			ether_addr_copy(mic_hdr->addr4, hdr->addr4);
 
-
 		memcpy(key_buffer, tx_key->key, WLAN_KEY_LEN_CCMP);
 
 		break;
 	default:
 		break;
 	}
-
 }
 
 int vnt_tx_packet(struct vnt_private *priv, struct sk_buff *skb)
