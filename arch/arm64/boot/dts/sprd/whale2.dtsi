@@ -61,11 +61,4 @@
 		};
 
 	};
-
-	ext_26m: ext-26m {
-		compatible = "fixed-clock";
-		#clock-cells = <0>;
-		clock-frequency = <26000000>;
-		clock-output-names = "ext_26m";
-	};
 };
