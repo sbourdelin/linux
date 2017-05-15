@@ -1,0 +1,24 @@
+Spreadtrum divider clock driver which only supports simple indexed divider
+
+This binding uses the common clock binding[1].
+
+[1] Documentation/devicetree/bindings/clock/clock-bindings.txt
+
+Required properties:
+
+- compatible : should be "sprd,divider-clock"
+
+- sprd,div-msk:	arbitrary bitmask for programming the divider,
+		denominator of divider is the value consisted
+		of these bits plus 1.
+
+Example:
+
+	clk_sdio0_1x: clk@402d032c {
+		compatible = "sprd,divider-clock";
+		#clock-cells = <0>;
+		reg = <0 0x402d032c 0 0x4>;
+		sprd,div-msk = <0x100>;
+		clocks = <&clk_sdio0_2x>;
+		clock-output-names = "clk_sdio0_1x";
+	};

@@ -1,0 +1,17 @@
+Spreadtrum adjustable pll clock driver
+
+Required properties:
+
+- compatible : must be one of:
+	"sprd,sc9836-adjustable-pll-clock"
+	"sprd,sc9860-adjustable-pll-clock"
+
+Example:
+	clk_mpll0: clk@40400024 {
+		compatible = "sprd,sc9860-adjustable-pll-clock";
+		#clock-cells = <0>;
+		reg = <0 0x40400024 0 0x4>,
+		      <0 0x40400028 0 0x4>;
+		clocks = <&clk_mpll_gates 2>;
+		clock-output-names = "clk_mpll0";
+	};
