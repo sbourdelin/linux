@@ -121,10 +121,9 @@ static int add_interval(struct resource_map *map, u_long base, u_long num)
 			break;
 	}
 	q = kmalloc(sizeof(*q), GFP_KERNEL);
-	if (!q) {
-		printk(KERN_WARNING "out of memory to update resources\n");
+	if (!q)
 		return -ENOMEM;
-	}
+
 	q->base = base; q->num = num;
 	q->next = p->next; p->next = q;
 	return 0;
@@ -159,10 +158,9 @@ static int sub_interval(struct resource_map *map, u_long base, u_long num)
 			} else {
 				/* Split the block into two pieces */
 				p = kmalloc(sizeof(*p), GFP_KERNEL);
-				if (!p) {
-					printk(KERN_WARNING "out of memory to update resources\n");
+				if (!p)
 					return -ENOMEM;
-				}
+
 				p->base = base+num;
 				p->num = q->base+q->num - p->base;
 				q->num = base - q->base;
