@@ -1811,12 +1811,14 @@ static int __init x25_init(void)
 	x25_register_sysctl();
 	rc = x25_proc_init();
 	if (rc != 0)
-		goto out_dev;
+		goto out_sysctl;
 out:
 	return rc;
-out_dev:
+out_sysctl:
+	x25_unregister_sysctl();
 	unregister_netdevice_notifier(&x25_dev_notifier);
 out_sock:
+	dev_remove_pack(&x25_packet_type);
 	sock_unregister(AF_X25);
 out_proto:
 	proto_unregister(&x25_proto);
