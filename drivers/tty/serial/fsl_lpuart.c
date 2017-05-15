@@ -258,13 +258,21 @@ struct lpuart_port {
 	wait_queue_head_t	dma_wait;
 };
 
+struct lpuart_soc_data {
+	bool	is_32;
+};
+
+static const struct lpuart_soc_data vf_data = {
+	.is_32 = false,
+};
+
+static const struct lpuart_soc_data ls_data = {
+	.is_32 = true,
+};
+
 static const struct of_device_id lpuart_dt_ids[] = {
-	{
-		.compatible = "fsl,vf610-lpuart",
-	},
-	{
-		.compatible = "fsl,ls1021a-lpuart",
-	},
+	{ .compatible = "fsl,vf610-lpuart", .data = &vf_data, },
+	{ .compatible = "fsl,ls1021a-lpuart", .data = &ls_data, },
 	{ /* sentinel */ }
 };
 MODULE_DEVICE_TABLE(of, lpuart_dt_ids);
@@ -1971,6 +1979,9 @@ static struct uart_driver lpuart_reg = {
 
 static int lpuart_probe(struct platform_device *pdev)
 {
+	const struct of_device_id *of_id = of_match_device(lpuart_dt_ids,
+							   &pdev->dev);
+	const struct lpuart_soc_data *sdata = of_id->data;
 	struct device_node *np = pdev->dev.of_node;
 	struct lpuart_port *sport;
 	struct resource *res;
@@ -1988,7 +1999,7 @@ static int lpuart_probe(struct platform_device *pdev)
 		return ret;
 	}
 	sport->port.line = ret;
-	sport->lpuart32 = of_device_is_compatible(np, "fsl,ls1021a-lpuart");
+	sport->lpuart32 = sdata->is_32;
 
 	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
 	sport->port.membase = devm_ioremap_resource(&pdev->dev, res);
