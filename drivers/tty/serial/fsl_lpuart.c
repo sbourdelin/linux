@@ -231,6 +231,9 @@
 #define DEV_NAME	"ttyLP"
 #define UART_NR		6
 
+/* IMX lpuart has four extra unused regs located at the beginning */
+#define IMX_REG_OFF	0x10
+
 static bool lpuart_is_be;
 
 struct lpuart_port {
@@ -263,6 +266,7 @@ struct lpuart_port {
 struct lpuart_soc_data {
 	bool	is_32;
 	bool	is_be;
+	u8	reg_off;
 };
 
 static const struct lpuart_soc_data vf_data = {
@@ -272,11 +276,19 @@ static const struct lpuart_soc_data vf_data = {
 static const struct lpuart_soc_data ls_data = {
 	.is_32 = true,
 	.is_be = true,
+	.reg_off = 0x0,
+};
+
+static struct lpuart_soc_data imx_data = {
+	.is_32 = true,
+	.is_be = false,
+	.reg_off = IMX_REG_OFF,
 };
 
 static const struct of_device_id lpuart_dt_ids[] = {
 	{ .compatible = "fsl,vf610-lpuart", .data = &vf_data, },
 	{ .compatible = "fsl,ls1021a-lpuart", .data = &ls_data, },
+	{ .compatible = "fsl,imx7ulp-lpuart", .data = &imx_data, },
 	{ /* sentinel */ }
 };
 MODULE_DEVICE_TABLE(of, lpuart_dt_ids);
@@ -2014,6 +2026,7 @@ static int lpuart_probe(struct platform_device *pdev)
 	if (IS_ERR(sport->port.membase))
 		return PTR_ERR(sport->port.membase);
 
+	sport->port.membase += sdata->reg_off;
 	sport->port.mapbase = res->start;
 	sport->port.dev = &pdev->dev;
 	sport->port.type = PORT_LPUART;
