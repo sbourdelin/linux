@@ -1715,7 +1715,7 @@ static void check_reg_overflow(struct bpf_reg_state *reg)
 static u32 calc_align(u32 imm)
 {
 	if (!imm)
-		return 1U << 31;
+		return 1U << 16;
 	return imm - ((imm - 1) & imm);
 }
 
