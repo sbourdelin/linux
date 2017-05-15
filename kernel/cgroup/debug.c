@@ -237,8 +237,9 @@ static int cgroup_masks_read(struct seq_file *seq, void *v)
 		u16  *mask;
 		char *name;
 	} mask_list[] = {
-		{ &cgrp->subtree_control, "subtree_control" },
-		{ &cgrp->subtree_ss_mask, "subtree_ss_mask" },
+		{ &cgrp->subtree_control,  "subtree_control"  },
+		{ &cgrp->subtree_ss_mask,  "subtree_ss_mask"  },
+		{ &cgrp->resource_control, "resource_control" },
 	};
 
 	mutex_lock(&cgroup_mutex);
@@ -246,7 +247,7 @@ static int cgroup_masks_read(struct seq_file *seq, void *v)
 		u16 mask = *mask_list[i].mask;
 		bool first = true;
 
-		seq_printf(seq, "%-15s: ", mask_list[i].name);
+		seq_printf(seq, "%-16s: ", mask_list[i].name);
 		for_each_subsys(ss, j) {
 			if (!(mask & (1 << ss->id)))
 				continue;

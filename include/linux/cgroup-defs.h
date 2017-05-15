@@ -61,6 +61,9 @@ enum {
 	 * specified at mount time and thus is implemented here.
 	 */
 	CGRP_CPUSET_CLONE_CHILDREN,
+
+	/* Special child resource domain cgroup */
+	CGRP_RESOURCE_DOMAIN,
 };
 
 /* cgroup_root->flags */
@@ -293,10 +296,22 @@ struct cgroup {
 	u16 old_subtree_control;
 	u16 old_subtree_ss_mask;
 
+	/*
+	 * The bitmask of subsystems that have separate sets of control
+	 * knobs in a special child resource cgroup to control internal
+	 * processes within the current cgroup so that they won't compete
+	 * directly with other regular child cgroups. This is for the
+	 * default hierarchy only.
+	 */
+	u16 resource_control;
+
 	/* Private pointers for each registered subsystem */
 	struct cgroup_subsys_state __rcu *subsys[CGROUP_SUBSYS_COUNT];
 
 	struct cgroup_root *root;
+
+	/* Pointer to the special resource child cgroup */
+	struct cgroup *resource_domain;
 
 	/*
 	 * List of cgrp_cset_links pointing at css_sets with tasks in this

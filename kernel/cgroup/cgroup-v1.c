@@ -99,9 +99,6 @@ int cgroup_transfer_tasks(struct cgroup *to, struct cgroup *from)
 	if (cgroup_on_dfl(to))
 		return -EINVAL;
 
-	if (!cgroup_may_migrate_to(to))
-		return -EBUSY;
-
 	mutex_lock(&cgroup_mutex);
 
 	percpu_down_write(&cgroup_threadgroup_rwsem);

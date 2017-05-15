@@ -23,7 +23,7 @@ CONTENTS
   2-4. Controlling Controllers
     2-4-1. Enabling and Disabling
     2-4-2. Top-down Constraint
-    2-4-3. No Internal Process Constraint
+    2-4-3. Managing Internal Process Competition
   2-5. Delegation
     2-5-1. Model of Delegation
     2-5-2. Delegation Containment
@@ -218,9 +218,7 @@ a subtree while still maintaining the common resource domain for them.
 Enabling thread mode on a subtree makes it threaded.  The root of a
 threaded subtree is called thread root and serves as the resource
 domain for the entire subtree.  In a threaded subtree, threads of a
-process can be put in different cgroups and are not subject to the no
-internal process constraint - threaded controllers can be enabled on
-non-leaf cgroups whether they have threads in them or not.
+process can be put in different cgroups.
 
 To enable the thread mode on a cgroup, the following conditions must
 be met.
@@ -262,11 +260,6 @@ When a threaded controller is enabled inside a threaded subtree,
 it only accounts for and controls resource consumptions associated
 with the threads in the cgroup and its descendants.  All consumptions
 which aren't tied to a specific thread belong to the thread root.
-
-Because a threaded subtree is exempt from no internal process
-constraint, a threaded controller must be able to handle competition
-between threads in a non-leaf cgroup and its child cgroups.  Each
-threaded controller defines how such competitions are handled.
 
 A new child cgroup created under a thread root will not be threaded.
 Thread mode has to be explicitly enabled on each of the thread root's
@@ -364,35 +357,38 @@ the parent has the controller enabled and a controller can't be
 disabled if one or more children have it enabled.
 
 
-2-4-3. No Internal Process Constraint
+2-4-3. Managing Internal Process Competition
 
-Non-root cgroups can only distribute resources to their children when
-they don't have any processes of their own.  In other words, only
-cgroups which don't contain any processes can have controllers enabled
-in their "cgroup.subtree_control" files.
+There are resources managed by some controllers that don't work well
+if the internal processes in a non-leaf cgroup have to compete against
+the resource requirement of the other child cgroups. Other controllers
+work perfectly fine with internal process competition.
 
-This guarantees that, when a controller is looking at the part of the
-hierarchy which has it enabled, processes are always only on the
-leaves.  This rules out situations where child cgroups compete against
-internal processes of the parent.
+Internal processes are allowed in a non-leaf cgroup. Controllers
+that don't like internal process competition can use
+the "cgroup.resource_control" file to create a special
+"cgroup.resource_domain" child cgroup that hold the control knobs
+for all the internal processes in the cgroup.
 
-The root cgroup is exempt from this restriction.  Root contains
-processes and anonymous resource consumption which can't be associated
-with any other cgroups and requires special treatment from most
-controllers.  How resource consumption in the root cgroup is governed
-is up to each controller.
+  # echo "+memory -pids" > cgroup.resource_control
 
-The threaded cgroups and the thread roots are also exempt from this
-restriction.
+Here, the control files for the memory controller are activated in the
+"cgroup.resource_domain" directory while that of the pids controller
+are removed. All the internal processes in the cgroup will use the
+memory control files in the "cgroup.resource_domain" directory to
+manage their memory. The memory control files in the cgroup itself
+can then be used to manage resource distribution between internal
+processes as a group and other child cgroups.
 
-Note that the restriction doesn't get in the way if there is no
-enabled controller in the cgroup's "cgroup.subtree_control".  This is
-important as otherwise it wouldn't be possible to create children of a
-populated cgroup.  To control resource distribution of a cgroup, the
-cgroup must create children and transfer all its processes to the
-children before enabling controllers in its "cgroup.subtree_control"
-file.
+Only controllers that are enabled in the "cgroup.controllers" file
+can be enabled in the "cgroup.resource_control" file. Once enabled,
+the parent cgroup cannot take away the controller until it has been
+disabled in the "cgroup.resource_control" file.
 
+The directory name "cgroup.resource_domain" is reserved. It cannot
+be created or deleted directly and no child cgroups can be created
+underneath it. All the "cgroup." control files are missing and so
+the users cannot move process into it.
 
 2-5. Delegation
 
@@ -722,6 +718,22 @@ All cgroup core files are prefixed with "cgroup."
 	When read, it shows space separated list of the controllers
 	which are enabled to control resource distribution from the
 	cgroup to its children.
+
+	Space separated list of controllers prefixed with '+' or '-'
+	can be written to enable or disable controllers.  A controller
+	name prefixed with '+' enables the controller and '-'
+	disables.  If a controller appears more than once on the list,
+	the last one is effective.  When multiple enable and disable
+	operations are specified, either all succeed or all fail.
+
+  cgroup.resource_control
+
+	A read-write space separated values file which exists on all
+	cgroups.  Starts out empty.
+
+	When read, it shows space separated list of the controllers
+	which are enabled to have separate control files in the
+	"cgroup.resource_domain" directory for internal processes.
 
 	Space separated list of controllers prefixed with '+' or '-'
 	can be written to enable or disable controllers.  A controller
