@@ -629,10 +629,8 @@ static int pd6729_pci_probe(struct pci_dev *dev,
 	struct pd6729_socket *socket;
 
 	socket = kcalloc(MAX_SOCKETS, sizeof(*socket), GFP_KERNEL);
-	if (!socket) {
-		dev_warn(&dev->dev, "failed to kzalloc socket.\n");
+	if (!socket)
 		return -ENOMEM;
-	}
 
 	ret = pci_enable_device(dev);
 	if (ret) {
