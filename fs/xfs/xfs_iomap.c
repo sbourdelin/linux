@@ -1067,7 +1067,7 @@ xfs_file_iomap_begin(
 
 	/* optionally associate a dax device with the iomap bdev */
 	bdev = iomap->bdev;
-	if (blk_queue_dax(bdev->bd_queue))
+	if (IS_ENABLED(CONFIG_FS_DAX) && blk_queue_dax(bdev->bd_queue))
 		iomap->dax_dev = dax_get_by_host(bdev->bd_disk->disk_name);
 	else
 		iomap->dax_dev = NULL;
@@ -1149,7 +1149,9 @@ xfs_file_iomap_end(
 	unsigned		flags,
 	struct iomap		*iomap)
 {
-	put_dax(iomap->dax_dev);
+	if (IS_ENABLED(CONFIG_FS_DAX))
+		put_dax(iomap->dax_dev);
+
 	if ((flags & IOMAP_WRITE) && iomap->type == IOMAP_DELALLOC)
 		return xfs_file_iomap_end_delalloc(XFS_I(inode), offset,
 				length, written, iomap);
