@@ -7,7 +7,7 @@
 
 static logical_chip_type_t chip;
 
-logical_chip_type_t sm750_get_chip_type(void)
+enum logical_chip_type sm750_get_chip_type(void)
 {
 	return chip;
 }
