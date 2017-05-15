@@ -163,6 +163,9 @@ struct css_set {
 	/* reference count */
 	refcount_t refcount;
 
+	/* internal task count, protected by css_set_lock */
+	int task_count;
+
 	/*
 	 * If not threaded, the following points to self.  If threaded, to
 	 * a cset which belongs to the top cgroup of the threaded subtree.

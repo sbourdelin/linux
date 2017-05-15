@@ -23,10 +23,6 @@ static void debug_css_free(struct cgroup_subsys_state *css)
 /*
  * debug_taskcount_read - return the number of tasks in a cgroup.
  * @cgrp: the cgroup in question
- *
- * Return the number of tasks in the cgroup.  The returned number can be
- * higher than the actual number of tasks due to css_set references from
- * namespace roots and temporary usages.
  */
 static u64 debug_taskcount_read(struct cgroup_subsys_state *css,
 				struct cftype *cft)
@@ -37,7 +33,7 @@ static u64 debug_taskcount_read(struct cgroup_subsys_state *css,
 
 	spin_lock_irq(&css_set_lock);
 	list_for_each_entry(link, &cgrp->cset_links, cset_link)
-		count += refcount_read(&link->cset->refcount);
+		count += link->cset->task_count;
 	spin_unlock_irq(&css_set_lock);
 	return count;
 }
