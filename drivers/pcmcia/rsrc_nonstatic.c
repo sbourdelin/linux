@@ -120,7 +120,7 @@ static int add_interval(struct resource_map *map, u_long base, u_long num)
 		if ((p->next == map) || (p->next->base > base+num-1))
 			break;
 	}
-	q = kmalloc(sizeof(struct resource_map), GFP_KERNEL);
+	q = kmalloc(sizeof(*q), GFP_KERNEL);
 	if (!q) {
 		printk(KERN_WARNING "out of memory to update resources\n");
 		return -ENOMEM;
@@ -158,8 +158,7 @@ static int sub_interval(struct resource_map *map, u_long base, u_long num)
 				q->num = base - q->base;
 			} else {
 				/* Split the block into two pieces */
-				p = kmalloc(sizeof(struct resource_map),
-					GFP_KERNEL);
+				p = kmalloc(sizeof(*p), GFP_KERNEL);
 				if (!p) {
 					printk(KERN_WARNING "out of memory to update resources\n");
 					return -ENOMEM;
@@ -1018,7 +1017,7 @@ static int nonstatic_init(struct pcmcia_socket *s)
 {
 	struct socket_data *data;
 
-	data = kzalloc(sizeof(struct socket_data), GFP_KERNEL);
+	data = kzalloc(sizeof(*data), GFP_KERNEL);
 	if (!data)
 		return -ENOMEM;
 
