@@ -2492,11 +2492,14 @@ out_unlock_rcu:
 	return tsk;
 }
 
-void cgroup_procs_write_finish(void)
+void cgroup_procs_write_finish(struct task_struct *task)
 	__releases(&cgroup_threadgroup_rwsem)
 {
 	struct cgroup_subsys *ss;
 	int ssid;
+
+	/* release reference from cgroup_procs_write_start() */
+	put_task_struct(task);
 
 	percpu_up_write(&cgroup_threadgroup_rwsem);
 	for_each_subsys(ss, ssid)
@@ -3300,7 +3303,6 @@ restart:
 
 static int cgroup_apply_cftypes(struct cftype *cfts, bool is_add)
 {
-	LIST_HEAD(pending);
 	struct cgroup_subsys *ss = cfts[0].ss;
 	struct cgroup *root = &ss->root->cgrp;
 	struct cgroup_subsys_state *css;
@@ -4065,7 +4067,7 @@ static ssize_t cgroup_procs_write(struct kernfs_open_file *of,
 	ret = cgroup_attach_task(cgrp, task, true);
 
 out_finish:
-	cgroup_procs_write_finish();
+	cgroup_procs_write_finish(task);
 out_unlock:
 	cgroup_kn_unlock(of->kn);
 
@@ -4135,7 +4137,7 @@ static ssize_t cgroup_threads_write(struct kernfs_open_file *of,
 	ret = cgroup_attach_task(cgrp, task, false);
 
 out_finish:
-	cgroup_procs_write_finish();
+	cgroup_procs_write_finish(task);
 out_unlock:
 	cgroup_kn_unlock(of->kn);
 
