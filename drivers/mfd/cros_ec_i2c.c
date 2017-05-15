@@ -23,6 +23,14 @@
 #include <linux/platform_device.h>
 #include <linux/slab.h>
 
+/*
+ * Some EC chip has larger flash sector size which requires longer erase time.
+ * During erase the CPU is usually stalled and can't even respond to
+ * interrupts. We sleep for a while to block any EC command from executing
+ * during the flash erase period to prevent i2c timeout.
+ */
+#define EC_FLASH_ERASE_DELAY_MS	5000
+
 /**
  * Request format for protocol v3
  * byte 0	0xda (EC_COMMAND_PROTOCOL_3)
@@ -176,6 +184,16 @@ static int cros_ec_pkt_xfer_i2c(struct cros_ec_device *ec_dev,
 	}
 
 	ret = ec_response->data_len;
+
+	/*
+	 * If we get EC_RES_IN_PROGRESS for EC_CMD_FLASH_ERASE this means EC
+	 * need a long time to erase flash, during flash erase CPU is stalled
+	 * and can't respond to interrupts, so we sleep for a while to stop new
+	 * EC commands from communicating with EC.
+	 */
+	if (msg->command == EC_CMD_FLASH_ERASE &&
+	    msg->result == EC_RES_IN_PROGRESS)
+		msleep(EC_FLASH_ERASE_DELAY_MS);
 
 done:
 	if (msg->command == EC_CMD_REBOOT_EC)
