@@ -231,6 +231,8 @@
 #define DEV_NAME	"ttyLP"
 #define UART_NR		6
 
+static bool lpuart_is_be;
+
 struct lpuart_port {
 	struct uart_port	port;
 	struct clk		*clk;
@@ -260,6 +262,7 @@ struct lpuart_port {
 
 struct lpuart_soc_data {
 	bool	is_32;
+	bool	is_be;
 };
 
 static const struct lpuart_soc_data vf_data = {
@@ -268,6 +271,7 @@ static const struct lpuart_soc_data vf_data = {
 
 static const struct lpuart_soc_data ls_data = {
 	.is_32 = true,
+	.is_be = true,
 };
 
 static const struct of_device_id lpuart_dt_ids[] = {
@@ -282,12 +286,15 @@ static void lpuart_dma_tx_complete(void *arg);
 
 static u32 lpuart32_read(void __iomem *addr)
 {
-	return ioread32be(addr);
+	return lpuart_is_be ? ioread32be(addr) : readl(addr);
 }
 
 static void lpuart32_write(u32 val, void __iomem *addr)
 {
-	iowrite32be(val, addr);
+	if (lpuart_is_be)
+		iowrite32be(val, addr);
+	else
+		writel(val, addr);
 }
 
 static void lpuart_stop_tx(struct uart_port *port)
@@ -2000,6 +2007,7 @@ static int lpuart_probe(struct platform_device *pdev)
 	}
 	sport->port.line = ret;
 	sport->lpuart32 = sdata->is_32;
+	lpuart_is_be = sdata->is_be;
 
 	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
 	sport->port.membase = devm_ioremap_resource(&pdev->dev, res);
