@@ -173,7 +173,7 @@ static int create_xattr(struct ubifs_info *c, struct inode *host,
 	mutex_unlock(&host_ui->ui_mutex);
 
 	ubifs_release_budget(c, &req);
-	insert_inode_hash(inode);
+	clear_nlink(inode);
 	iput(inode);
 	return 0;
 
@@ -272,8 +272,10 @@ static struct inode *iget_xattr(struct ubifs_info *c, ino_t inum)
 			  (int)PTR_ERR(inode));
 		return inode;
 	}
-	if (ubifs_inode(inode)->xattr)
+	if (ubifs_inode(inode)->xattr) {
+		clear_nlink(inode);
 		return inode;
+	}
 	ubifs_err(c, "corrupt extended attribute entry");
 	iput(inode);
 	return ERR_PTR(-EINVAL);
@@ -546,7 +548,6 @@ static int ubifs_xattr_remove(struct inode *host, const char *name)
 	}
 
 	ubifs_assert(inode->i_nlink == 1);
-	clear_nlink(inode);
 	err = remove_xattr(c, host, inode, &nm);
 	if (err)
 		set_nlink(inode, 1);
