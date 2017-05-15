@@ -334,8 +334,13 @@ static u16 cgroup_control(struct cgroup *cgrp)
 	struct cgroup *parent = cgroup_parent(cgrp);
 	u16 root_ss_mask = cgrp->root->subsys_mask;
 
-	if (parent)
-		return parent->subtree_control;
+	if (parent) {
+		u16 ss_mask = parent->subtree_control;
+
+		if (cgroup_is_threaded(cgrp))
+			ss_mask &= cgrp_dfl_threaded_ss_mask;
+		return ss_mask;
+	}
 
 	if (cgroup_on_dfl(cgrp))
 		root_ss_mask &= ~(cgrp_dfl_inhibit_ss_mask |
@@ -348,8 +353,13 @@ static u16 cgroup_ss_mask(struct cgroup *cgrp)
 {
 	struct cgroup *parent = cgroup_parent(cgrp);
 
-	if (parent)
-		return parent->subtree_ss_mask;
+	if (parent) {
+		u16 ss_mask = parent->subtree_ss_mask;
+
+		if (cgroup_is_threaded(cgrp))
+			ss_mask &= cgrp_dfl_threaded_ss_mask;
+		return ss_mask;
+	}
 
 	return cgrp->root->subsys_mask;
 }
@@ -595,6 +605,24 @@ static struct css_set *proc_css_set(struct css_set *cset)
 static bool css_set_threaded(struct css_set *cset)
 {
 	return proc_css_set(cset) != cset;
+}
+
+/**
+ * threaded_children_count - returns # of threaded children
+ * @cgrp: cgroup to be tested
+ *
+ * cgroup_mutex must be held by the caller.
+ */
+static int threaded_children_count(struct cgroup *cgrp)
+{
+	struct cgroup *child;
+	int count = 0;
+
+	lockdep_assert_held(&cgroup_mutex);
+	cgroup_for_each_live_child(child, cgrp)
+		if (cgroup_is_threaded(child))
+			count++;
+	return count;
 }
 
 /**
@@ -2926,15 +2954,15 @@ static ssize_t cgroup_subtree_control_write(struct kernfs_open_file *of,
 	}
 
 	/* can't enable !threaded controllers on a threaded cgroup */
-	if (cgrp->proc_cgrp && (enable & ~cgrp_dfl_threaded_ss_mask)) {
+	if (cgroup_is_threaded(cgrp) && (enable & ~cgrp_dfl_threaded_ss_mask)) {
 		ret = -EBUSY;
 		goto out_unlock;
 	}
 
 	/*
-	 * Except for root and threaded cgroups, subtree_control must be
-	 * zero for a cgroup with tasks so that child cgroups don't compete
-	 * against tasks.
+	 * Except for root, thread roots and threaded cgroups, subtree_control
+	 * must be zero for a cgroup with tasks so that child cgroups don't
+	 * compete against tasks.
 	 */
 	if (enable && cgroup_parent(cgrp) && !cgrp->proc_cgrp) {
 		struct cgrp_cset_link *link;
@@ -2982,22 +3010,48 @@ static int cgroup_enable_threaded(struct cgroup *cgrp)
 	LIST_HEAD(csets);
 	struct cgrp_cset_link *link;
 	struct css_set *cset, *cset_next;
+	struct cgroup *child;
 	int ret;
+	u16 ss_mask;
 
 	lockdep_assert_held(&cgroup_mutex);
 
 	/* noop if already threaded */
-	if (cgrp->proc_cgrp)
+	if (cgroup_is_threaded(cgrp))
 		return 0;
 
-	/* allow only if there are neither children or enabled controllers */
-	if (css_has_online_children(&cgrp->self) || cgrp->subtree_control)
+	/*
+	 * Allow only if it is not the root and there are:
+	 * 1) no children,
+	 * 2) no non-threaded controllers are enabled, and
+	 * 3) no attached tasks.
+	 *
+	 * With no attached tasks, it is assumed that no css_sets will be
+	 * linked to the current cgroup. This may not be true if some dead
+	 * css_sets linger around due to task_struct leakage, for example.
+	 */
+	if (css_has_online_children(&cgrp->self) ||
+	   (cgroup_control(cgrp) & ~cgrp_dfl_threaded_ss_mask) ||
+	   !cgroup_parent(cgrp) || cgroup_is_populated(cgrp))
 		return -EBUSY;
 
-	/* find all csets which need ->proc_cset updated */
+	/* make the parent cgroup a thread root */
+	child = cgrp;
+	cgrp = cgroup_parent(child);
+
+	/* noop for parent if parent has already been threaded */
+	if (cgrp->proc_cgrp)
+		goto setup_child;
+
+	/*
+	 * For the parent cgroup, we need to find all csets which need
+	 * ->proc_cset updated
+	 */
 	spin_lock_irq(&css_set_lock);
 	list_for_each_entry(link, &cgrp->cset_links, cset_link) {
 		cset = link->cset;
+		if (cset->dead)
+			continue;
 		if (css_set_populated(cset)) {
 			WARN_ON_ONCE(css_set_threaded(cset));
 			WARN_ON_ONCE(cset->pcset_preload);
@@ -3036,7 +3090,34 @@ static int cgroup_enable_threaded(struct cgroup *cgrp)
 	/* mark it threaded */
 	cgrp->proc_cgrp = cgrp;
 
-	return 0;
+setup_child:
+	ss_mask = cgroup_ss_mask(child);
+	/*
+	 * If some non-threaded controllers are enabled, they have to be
+	 * disabled.
+	 */
+	if (ss_mask & ~cgrp_dfl_threaded_ss_mask) {
+		cgroup_save_control(child);
+		child->proc_cgrp = cgrp;
+		ret = cgroup_apply_control(child);
+		cgroup_finalize_control(child, ret);
+		kernfs_activate(child->kn);
+
+		/*
+		 * If an error happen (it shouldn't), the thread mode
+		 * enablement fails, but the parent will remain as thread
+		 * root. That shouldn't be a problem as a thread root
+		 * without threaded children is not much different from
+		 * a non-threaded cgroup.
+		 */
+		WARN_ON_ONCE(ret);
+		if (ret)
+			child->proc_cgrp = NULL;
+	} else {
+		child->proc_cgrp = cgrp;
+		ret = 0;
+	}
+	return ret;
 
 err_put_csets:
 	spin_lock_irq(&css_set_lock);
@@ -3055,25 +3136,70 @@ err_put_csets:
 static int cgroup_disable_threaded(struct cgroup *cgrp)
 {
 	struct cgrp_cset_link *link;
+	struct cgroup *parent = cgroup_parent(cgrp);
 
 	lockdep_assert_held(&cgroup_mutex);
 
-	/* noop if already !threaded */
-	if (!cgrp->proc_cgrp)
+	/* partial disable isn't supported */
+	if (cgrp->proc_cgrp != parent)
+		return -EBUSY;
+
+	/* noop if not a threaded cgroup */
+	if (!cgroup_is_threaded(cgrp))
 		return 0;
 
-	/* partial disable isn't supported */
-	if (cgrp->proc_cgrp != cgrp)
+	/*
+	 * Allow only if there are
+	 * 1) no children, and
+	 * 2) no attached tasks.
+	 *
+	 * With no attached tasks, it is assumed that no css_sets will be
+	 * linked to the current cgroup. This may not be true if some dead
+	 * css_sets linger around due to task_struct leakage, for example.
+	 */
+	if (css_has_online_children(&cgrp->self) || cgroup_is_populated(cgrp))
 		return -EBUSY;
 
-	/* allow only if there are neither children or enabled controllers */
-	if (css_has_online_children(&cgrp->self) || cgrp->subtree_control)
-		return -EBUSY;
+	/*
+	 * If the cgroup has some non-threaded controllers enabled at the
+	 * subtree_control level of the parent, we need to re-enabled those
+	 * controllers.
+	 */
+	cgrp->proc_cgrp = NULL;
+	if (cgroup_ss_mask(cgrp) & ~cgrp_dfl_threaded_ss_mask) {
+		int ret;
 
-	/* walk all csets and reset ->proc_cset */
+		cgrp->proc_cgrp = parent;
+		cgroup_save_control(cgrp);
+		cgrp->proc_cgrp = NULL;
+		ret = cgroup_apply_control(cgrp);
+		cgroup_finalize_control(cgrp, ret);
+		kernfs_activate(cgrp->kn);
+
+		/*
+		 * If an error happen, we abandon update to the thread root
+		 * and return the erorr.
+		 */
+		if (ret)
+			return ret;
+	}
+
+	/*
+	 * Check remaining threaded children count to see if the threaded
+	 * csets of the parent need to be removed and ->proc_cset reset.
+	 */
 	spin_lock_irq(&css_set_lock);
+
+	if (threaded_children_count(parent))
+		goto out_unlock;	/* still have threaded children left */
+
+	cgrp = parent;
 	list_for_each_entry(link, &cgrp->cset_links, cset_link) {
 		struct css_set *cset = link->cset;
+
+		/* skip dead css_set */
+		if (cset->dead)
+			continue;
 
 		if (css_set_threaded(cset)) {
 			struct css_set *pcset = proc_css_set(cset);
@@ -3090,6 +3216,7 @@ static int cgroup_disable_threaded(struct cgroup *cgrp)
 		}
 	}
 	cgrp->proc_cgrp = NULL;
+out_unlock:
 	spin_unlock_irq(&css_set_lock);
 
 	return 0;
@@ -4480,7 +4607,16 @@ static struct cgroup *cgroup_create(struct cgroup *parent)
 	cgrp->self.parent = &parent->self;
 	cgrp->root = root;
 	cgrp->level = level;
-	cgrp->proc_cgrp = parent->proc_cgrp;
+
+	/*
+	 * A child cgroup created directly under a thread root will not
+	 * be threaded. Thread mode has to be explicitly enabled for it.
+	 * The child cgroup will be threaded if its parent is threaded.
+	 */
+	if (cgroup_is_thread_root(parent))
+		cgrp->proc_cgrp = NULL;
+	else
+		cgrp->proc_cgrp = parent->proc_cgrp;
 
 	for (tcgrp = cgrp; tcgrp; tcgrp = cgroup_parent(tcgrp))
 		cgrp->ancestor_ids[tcgrp->level] = tcgrp->id;
@@ -4710,6 +4846,12 @@ static int cgroup_destroy_locked(struct cgroup *cgrp)
 	 */
 	if (css_has_online_children(&cgrp->self))
 		return -EBUSY;
+
+	/*
+	 * Do an implicit thread mode disable if on default hierarchy.
+	 */
+	if (cgroup_on_dfl(cgrp))
+		cgroup_disable_threaded(cgrp);
 
 	/*
 	 * Mark @cgrp and the associated csets dead.  The former prevents

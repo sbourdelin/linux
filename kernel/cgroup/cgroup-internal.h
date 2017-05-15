@@ -124,6 +124,16 @@ static inline bool notify_on_release(const struct cgroup *cgrp)
 	return test_bit(CGRP_NOTIFY_ON_RELEASE, &cgrp->flags);
 }
 
+static inline bool cgroup_is_threaded(const struct cgroup *cgrp)
+{
+	return cgrp->proc_cgrp && (cgrp->proc_cgrp != cgrp);
+}
+
+static inline bool cgroup_is_thread_root(const struct cgroup *cgrp)
+{
+	return cgrp->proc_cgrp == cgrp;
+}
+
 void put_css_set_locked(struct css_set *cset);
 
 static inline void put_css_set(struct css_set *cset)

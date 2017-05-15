@@ -222,21 +222,32 @@ process can be put in different cgroups and are not subject to the no
 internal process constraint - threaded controllers can be enabled on
 non-leaf cgroups whether they have threads in them or not.
 
-To enable the thread mode, the following conditions must be met.
+To enable the thread mode on a cgroup, the following conditions must
+be met.
 
-- The thread root doesn't have any child cgroups.
+- The cgroup doesn't have any child cgroups.
 
-- The thread root doesn't have any controllers enabled.
+- The cgroup doesn't have any non-threaded controllers enabled.
+
+- The cgroup doesn't have any processes attached to it.
 
 Thread mode can be enabled by writing "enable" to "cgroup.threads"
 file.
 
   # echo enable > cgroup.threads
 
-Inside a threaded subtree, "cgroup.threads" can be read and contains
-the list of the thread IDs of all threads in the cgroup.  Except that
-the operations are per-thread instead of per-process, "cgroup.threads"
-has the same format and behaves the same way as "cgroup.procs".
+The parent of the threaded cgroup will become the thread root, if
+it hasn't been a thread root yet. In other word, thread mode cannot
+be enabled on the root cgroup as it doesn't have a parent cgroup. A
+thread root can have child cgroups and controllers enabled before
+becoming one.
+
+A threaded subtree includes the thread root and all the threaded child
+cgroups as well as their descendants which are all threaded cgroups.
+"cgroup.threads" can be read and contains the list of the thread
+IDs of all threads in the cgroup.  Except that the operations are
+per-thread instead of per-process, "cgroup.threads" has the same
+format and behaves the same way as "cgroup.procs".
 
 The thread root serves as the resource domain for the whole subtree,
 and, while the threads can be scattered across the subtree, all the
@@ -246,25 +257,30 @@ not readable in the subtree proper.  However, "cgroup.procs" can be
 written to from anywhere in the subtree to migrate all threads of the
 matching process to the cgroup.
 
-Only threaded controllers can be enabled in a threaded subtree.  When
-a threaded controller is enabled inside a threaded subtree, it only
-accounts for and controls resource consumptions associated with the
-threads in the cgroup and its descendants.  All consumptions which
-aren't tied to a specific thread belong to the thread root.
+Only threaded controllers can be enabled in a non-root threaded cgroup.
+When a threaded controller is enabled inside a threaded subtree,
+it only accounts for and controls resource consumptions associated
+with the threads in the cgroup and its descendants.  All consumptions
+which aren't tied to a specific thread belong to the thread root.
 
 Because a threaded subtree is exempt from no internal process
 constraint, a threaded controller must be able to handle competition
 between threads in a non-leaf cgroup and its child cgroups.  Each
 threaded controller defines how such competitions are handled.
 
+A new child cgroup created under a thread root will not be threaded.
+Thread mode has to be explicitly enabled on each of the thread root's
+children.  Descendants of a threaded cgroup, however, will always be
+threaded and that mode cannot be disabled.
+
 To disable the thread mode, the following conditions must be met.
 
-- The cgroup is a thread root.  Thread mode can't be disabled
-  partially in the subtree.
+- The cgroup is a child of a thread root.  Thread mode can't be
+  disabled partially further down the hierarchy.
 
-- The thread root doesn't have any child cgroups.
+- The cgroup doesn't have any child cgroups.
 
-- The thread root doesn't have any controllers enabled.
+- The cgroup doesn't have any threads attached to it.
 
 Thread mode can be disabled by writing "disable" to "cgroup.threads"
 file.
@@ -365,6 +381,9 @@ processes and anonymous resource consumption which can't be associated
 with any other cgroups and requires special treatment from most
 controllers.  How resource consumption in the root cgroup is governed
 is up to each controller.
+
+The threaded cgroups and the thread roots are also exempt from this
+restriction.
 
 Note that the restriction doesn't get in the way if there is no
 enabled controller in the cgroup's "cgroup.subtree_control".  This is
