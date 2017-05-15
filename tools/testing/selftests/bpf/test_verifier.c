@@ -3117,7 +3117,6 @@ static struct bpf_test tests[] = {
 		.errstr_unpriv = "R0 pointer arithmetic prohibited",
 		.result_unpriv = REJECT,
 		.result = ACCEPT,
-		.flags = F_NEEDS_EFFICIENT_UNALIGNED_ACCESS,
 	},
 	{
 		"valid map access into an array with a variable",
@@ -3133,7 +3132,7 @@ static struct bpf_test tests[] = {
 			BPF_JMP_IMM(BPF_JGE, BPF_REG_1, MAX_ENTRIES, 3),
 			BPF_ALU64_IMM(BPF_LSH, BPF_REG_1, 2),
 			BPF_ALU64_REG(BPF_ADD, BPF_REG_0, BPF_REG_1),
-			BPF_ST_MEM(BPF_DW, BPF_REG_0, 0,
+			BPF_ST_MEM(BPF_W, BPF_REG_0, 0,
 				   offsetof(struct test_val, foo)),
 			BPF_EXIT_INSN(),
 		},
@@ -3141,7 +3140,6 @@ static struct bpf_test tests[] = {
 		.errstr_unpriv = "R0 pointer arithmetic prohibited",
 		.result_unpriv = REJECT,
 		.result = ACCEPT,
-		.flags = F_NEEDS_EFFICIENT_UNALIGNED_ACCESS,
 	},
 	{
 		"valid map access into an array with a signed variable",
@@ -3161,7 +3159,7 @@ static struct bpf_test tests[] = {
 			BPF_MOV32_IMM(BPF_REG_1, 0),
 			BPF_ALU32_IMM(BPF_LSH, BPF_REG_1, 2),
 			BPF_ALU64_REG(BPF_ADD, BPF_REG_0, BPF_REG_1),
-			BPF_ST_MEM(BPF_DW, BPF_REG_0, 0,
+			BPF_ST_MEM(BPF_W, BPF_REG_0, 0,
 				   offsetof(struct test_val, foo)),
 			BPF_EXIT_INSN(),
 		},
@@ -3169,7 +3167,6 @@ static struct bpf_test tests[] = {
 		.errstr_unpriv = "R0 pointer arithmetic prohibited",
 		.result_unpriv = REJECT,
 		.result = ACCEPT,
-		.flags = F_NEEDS_EFFICIENT_UNALIGNED_ACCESS,
 	},
 	{
 		"invalid map access into an array with a constant",
@@ -3211,7 +3208,6 @@ static struct bpf_test tests[] = {
 		.errstr = "R0 min value is outside of the array range",
 		.result_unpriv = REJECT,
 		.result = REJECT,
-		.flags = F_NEEDS_EFFICIENT_UNALIGNED_ACCESS,
 	},
 	{
 		"invalid map access into an array with a variable",
@@ -3226,7 +3222,7 @@ static struct bpf_test tests[] = {
 			BPF_LDX_MEM(BPF_W, BPF_REG_1, BPF_REG_0, 0),
 			BPF_ALU64_IMM(BPF_LSH, BPF_REG_1, 2),
 			BPF_ALU64_REG(BPF_ADD, BPF_REG_0, BPF_REG_1),
-			BPF_ST_MEM(BPF_DW, BPF_REG_0, 0,
+			BPF_ST_MEM(BPF_W, BPF_REG_0, 0,
 				   offsetof(struct test_val, foo)),
 			BPF_EXIT_INSN(),
 		},
@@ -3235,7 +3231,6 @@ static struct bpf_test tests[] = {
 		.errstr = "R0 min value is negative, either use unsigned index or do a if (index >=0) check.",
 		.result_unpriv = REJECT,
 		.result = REJECT,
-		.flags = F_NEEDS_EFFICIENT_UNALIGNED_ACCESS,
 	},
 	{
 		"invalid map access into an array with no floor check",
@@ -3253,7 +3248,7 @@ static struct bpf_test tests[] = {
 			BPF_MOV32_IMM(BPF_REG_1, 0),
 			BPF_ALU32_IMM(BPF_LSH, BPF_REG_1, 2),
 			BPF_ALU64_REG(BPF_ADD, BPF_REG_0, BPF_REG_1),
-			BPF_ST_MEM(BPF_DW, BPF_REG_0, 0,
+			BPF_ST_MEM(BPF_W, BPF_REG_0, 0,
 				   offsetof(struct test_val, foo)),
 			BPF_EXIT_INSN(),
 		},
@@ -3262,7 +3257,6 @@ static struct bpf_test tests[] = {
 		.errstr = "R0 min value is negative, either use unsigned index or do a if (index >=0) check.",
 		.result_unpriv = REJECT,
 		.result = REJECT,
-		.flags = F_NEEDS_EFFICIENT_UNALIGNED_ACCESS,
 	},
 	{
 		"invalid map access into an array with a invalid max check",
@@ -3319,7 +3313,6 @@ static struct bpf_test tests[] = {
 		.errstr = "R0 min value is negative, either use unsigned index or do a if (index >=0) check.",
 		.result_unpriv = REJECT,
 		.result = REJECT,
-		.flags = F_NEEDS_EFFICIENT_UNALIGNED_ACCESS,
 	},
 	{
 		"multiple registers share map_lookup_elem result",
@@ -3435,7 +3428,7 @@ static struct bpf_test tests[] = {
 			BPF_ALU64_IMM(BPF_ADD, BPF_REG_1, 1),
 			BPF_ALU64_IMM(BPF_LSH, BPF_REG_1, 2),
 			BPF_ALU64_REG(BPF_ADD, BPF_REG_0, BPF_REG_1),
-			BPF_ST_MEM(BPF_DW, BPF_REG_0, 0, offsetof(struct test_val, foo)),
+			BPF_ST_MEM(BPF_W, BPF_REG_0, 0, offsetof(struct test_val, foo)),
 			BPF_EXIT_INSN(),
 		},
 		.fixup_map2 = { 3 },
@@ -3443,7 +3436,6 @@ static struct bpf_test tests[] = {
 		.result = REJECT,
 		.errstr_unpriv = "R0 pointer arithmetic prohibited",
 		.result_unpriv = REJECT,
-		.flags = F_NEEDS_EFFICIENT_UNALIGNED_ACCESS,
 	},
 	{
 		"constant register |= constant should keep constant type",
@@ -4835,7 +4827,6 @@ static struct bpf_test tests[] = {
 		.errstr = "R0 min value is negative, either use unsigned index or do a if (index >=0) check.",
 		.result = REJECT,
 		.result_unpriv = REJECT,
-		.flags = F_NEEDS_EFFICIENT_UNALIGNED_ACCESS,
 	},
 	{
 		"invalid range check",
@@ -4867,7 +4858,6 @@ static struct bpf_test tests[] = {
 		.errstr = "R0 min value is negative, either use unsigned index or do a if (index >=0) check.",
 		.result = REJECT,
 		.result_unpriv = REJECT,
-		.flags = F_NEEDS_EFFICIENT_UNALIGNED_ACCESS,
 	},
 	{
 		"map in map access",
