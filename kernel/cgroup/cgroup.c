@@ -341,7 +341,7 @@ static u16 cgroup_control(struct cgroup *cgrp)
 	u16 root_ss_mask = cgrp->root->subsys_mask;
 
 	if (parent) {
-		u16 ss_mask = parent->subtree_control;
+		u16 ss_mask = parent->subtree_control|cgrp->enable_ss_mask;
 
 		if (test_bit(CGRP_RESOURCE_DOMAIN, &cgrp->flags))
 			return parent->resource_control;
@@ -363,7 +363,7 @@ static u16 cgroup_ss_mask(struct cgroup *cgrp)
 	struct cgroup *parent = cgroup_parent(cgrp);
 
 	if (parent) {
-		u16 ss_mask = parent->subtree_ss_mask;
+		u16 ss_mask = parent->subtree_ss_mask|cgrp->enable_ss_mask;
 
 		if (test_bit(CGRP_RESOURCE_DOMAIN, &cgrp->flags))
 			return parent->resource_control;
@@ -2540,15 +2540,18 @@ void cgroup_procs_write_finish(struct task_struct *task)
 			ss->post_attach();
 }
 
-static void cgroup_print_ss_mask(struct seq_file *seq, u16 ss_mask)
+static void cgroup_print_ss_mask(struct seq_file *seq, u16 ss_mask,
+				 u16 passthru_mask)
 {
 	struct cgroup_subsys *ss;
 	bool printed = false;
 	int ssid;
 
-	do_each_subsys_mask(ss, ssid, ss_mask) {
+	do_each_subsys_mask(ss, ssid, ss_mask|passthru_mask) {
 		if (printed)
 			seq_putc(seq, ' ');
+		if (passthru_mask & (1 << ssid))
+			seq_putc(seq, '#');
 		seq_printf(seq, "%s", ss->name);
 		printed = true;
 	} while_each_subsys_mask();
@@ -2561,7 +2564,7 @@ static int cgroup_controllers_show(struct seq_file *seq, void *v)
 {
 	struct cgroup *cgrp = seq_css(seq)->cgroup;
 
-	cgroup_print_ss_mask(seq, cgroup_control(cgrp));
+	cgroup_print_ss_mask(seq, cgroup_control(cgrp), cgrp->passthru_ss_mask);
 	return 0;
 }
 
@@ -2570,7 +2573,7 @@ static int cgroup_subtree_control_show(struct seq_file *seq, void *v)
 {
 	struct cgroup *cgrp = seq_css(seq)->cgroup;
 
-	cgroup_print_ss_mask(seq, cgrp->subtree_control);
+	cgroup_print_ss_mask(seq, cgrp->subtree_control, 0);
 	return 0;
 }
 
@@ -2579,7 +2582,7 @@ static int cgroup_resource_control_show(struct seq_file *seq, void *v)
 {
 	struct cgroup *cgrp = seq_css(seq)->cgroup;
 
-	cgroup_print_ss_mask(seq, cgrp->resource_control);
+	cgroup_print_ss_mask(seq, cgrp->resource_control, 0);
 	return 0;
 }
 
@@ -2692,6 +2695,8 @@ static void cgroup_save_control(struct cgroup *cgrp)
 	cgroup_for_each_live_descendant_pre(dsct, d_css, cgrp) {
 		dsct->old_subtree_control = dsct->subtree_control;
 		dsct->old_subtree_ss_mask = dsct->subtree_ss_mask;
+		dsct->old_enable_ss_mask = dsct->enable_ss_mask;
+		dsct->old_passthru_ss_mask = dsct->passthru_ss_mask;
 	}
 }
 
@@ -2709,10 +2714,11 @@ static void cgroup_propagate_control(struct cgroup *cgrp)
 	struct cgroup_subsys_state *d_css;
 
 	cgroup_for_each_live_descendant_pre(dsct, d_css, cgrp) {
-		dsct->subtree_control &= cgroup_control(dsct);
+		dsct->subtree_control &= cgroup_control(dsct)|
+					 dsct->passthru_ss_mask;
 		dsct->subtree_ss_mask =
 			cgroup_calc_subtree_ss_mask(dsct->subtree_control,
-						    cgroup_ss_mask(dsct));
+				cgroup_ss_mask(dsct)|dsct->passthru_ss_mask);
 	}
 }
 
@@ -2731,6 +2737,8 @@ static void cgroup_restore_control(struct cgroup *cgrp)
 	cgroup_for_each_live_descendant_post(dsct, d_css, cgrp) {
 		dsct->subtree_control = dsct->old_subtree_control;
 		dsct->subtree_ss_mask = dsct->old_subtree_ss_mask;
+		dsct->enable_ss_mask = dsct->old_enable_ss_mask;
+		dsct->passthru_ss_mask = dsct->old_passthru_ss_mask;
 	}
 }
 
@@ -2772,7 +2780,8 @@ static int cgroup_apply_control_enable(struct cgroup *cgrp)
 
 			WARN_ON_ONCE(css && percpu_ref_is_dying(&css->refcnt));
 
-			if (!(cgroup_ss_mask(dsct) & (1 << ss->id)))
+			if (!(cgroup_ss_mask(dsct) & (1 << ss->id)) ||
+			    (dsct->passthru_ss_mask & (1 << ss->id)))
 				continue;
 
 			if (!css) {
@@ -2822,7 +2831,8 @@ static void cgroup_apply_control_disable(struct cgroup *cgrp)
 				continue;
 
 			if (css->parent &&
-			    !(cgroup_ss_mask(dsct) & (1 << ss->id))) {
+			    (!(cgroup_ss_mask(dsct) & (1 << ss->id)) ||
+			    (dsct->passthru_ss_mask & (1 << ss->id)))) {
 				kill_css(css);
 			} else if (!css_visible(css)) {
 				css_clear_dir(css);
@@ -2895,7 +2905,8 @@ static ssize_t cgroup_subtree_control_write(struct kernfs_open_file *of,
 					    loff_t off)
 {
 	u16 enable = 0, disable = 0;
-	struct cgroup *cgrp, *child;
+	u16 child_enable, child_passthru = 0;
+	struct cgroup *cgrp, *child, *grandchild;
 	struct cgroup_subsys *ss;
 	char *tok;
 	int ssid, ret;
@@ -2933,22 +2944,36 @@ static ssize_t cgroup_subtree_control_write(struct kernfs_open_file *of,
 		return -ENODEV;
 
 	/*
-	 * We cannot disable controllers that are enabled in a child
-	 * cgroup.
+	 * Because a controller can be enabled on a grandchild if it is
+	 * enabled in subtree_control, we need to look at all the children
+	 * and grandchildren for what are enabled.
 	 */
-	if (disable) {
-		u16 child_enable = cgrp->resource_control;
+	child_enable = cgrp->resource_control;
+	cgroup_for_each_live_child(child, cgrp) {
+		child_enable |= child->subtree_control|
+				child->resource_control|
+				child->enable_ss_mask;
+		child_passthru |= child->passthru_ss_mask;
 
-		cgroup_for_each_live_child(child, cgrp)
-			child_enable |= child->subtree_control|
-					child->resource_control;
-		if (disable & child_enable) {
-			ret = -EBUSY;
-			goto out_unlock;
-		}
+		cgroup_for_each_live_child(grandchild, child)
+			child_enable |= grandchild->subtree_control|
+					grandchild->resource_control|
+					grandchild->enable_ss_mask|
+					grandchild->passthru_ss_mask;
 	}
 
-	if (enable & ~cgroup_control(cgrp)) {
+	/*
+	 * We cannot disable controllers that are enabled or in pass-through
+	 * mode in a child or grandchild cgroup. We also cannot enable
+	 * controllers that are in pass-through mode in a child cgroup.
+	 */
+	if ((disable & (child_enable|child_passthru)) ||
+	    (enable  & child_passthru)) {
+		ret = -EBUSY;
+		goto out_unlock;
+	}
+
+	if (enable & ~(cgroup_control(cgrp)|cgrp->passthru_ss_mask)) {
 		ret = -ENOENT;
 		goto out_unlock;
 	}
@@ -2963,7 +2988,7 @@ static ssize_t cgroup_subtree_control_write(struct kernfs_open_file *of,
 
 	/* can't enable !threaded controllers on a threaded cgroup */
 	if (cgroup_is_threaded(cgrp) && (enable & ~cgrp_dfl_threaded_ss_mask)) {
-		ret = -EBUSY;
+		ret = -EINVAL;
 		goto out_unlock;
 	}
 
@@ -2972,6 +2997,164 @@ static ssize_t cgroup_subtree_control_write(struct kernfs_open_file *of,
 
 	cgrp->subtree_control |= enable;
 	cgrp->subtree_control &= ~disable;
+
+	/*
+	 * Clear the child's enable_ss_mask for those bits that are enabled
+	 * in subtree_control.
+	 */
+	if (child_enable & enable) {
+		cgroup_for_each_live_child(child, cgrp)
+			child->enable_ss_mask &= ~enable;
+	}
+
+	ret = cgroup_apply_control(cgrp);
+
+	cgroup_finalize_control(cgrp, ret);
+
+	kernfs_activate(cgrp->kn);
+	ret = 0;
+out_unlock:
+	cgroup_kn_unlock(of->kn);
+	return ret ?: nbytes;
+}
+
+/*
+ * Change the enabled and pass-through controllers for a cgroup in the
+ * default hierarchy
+ */
+static ssize_t cgroup_controllers_write(struct kernfs_open_file *of,
+					char *buf, size_t nbytes,
+					loff_t off)
+{
+	u16 enable = 0, disable = 0, passthru = 0;
+	u16 child_enable, parent_subtree;
+	struct cgroup *cgrp, *child, *parent;
+	struct cgroup_subsys *ss;
+	char *tok;
+	int ssid, ret;
+
+	/*
+	 * Parse input - space separated list of subsystem names prefixed
+	 * with either +, - or #.
+	 */
+	buf = strstrip(buf);
+	while ((tok = strsep(&buf, " "))) {
+		if (tok[0] == '\0')
+			continue;
+		do_each_subsys_mask(ss, ssid, ~cgrp_dfl_inhibit_ss_mask) {
+			if (!cgroup_ssid_enabled(ssid) ||
+			    strcmp(tok + 1, ss->name))
+				continue;
+
+			if (*tok == '+') {
+				enable |= 1 << ssid;
+				disable &= ~(1 << ssid);
+				passthru &= ~(1 << ssid);
+			} else if (*tok == '-') {
+				disable |= 1 << ssid;
+				enable &= ~(1 << ssid);
+				passthru &= ~(1 << ssid);
+			} else if (*tok == '#') {
+				passthru |= 1 << ssid;
+				enable &= ~(1 << ssid);
+				disable &= ~(1 << ssid);
+			} else {
+				return -EINVAL;
+			}
+			break;
+		} while_each_subsys_mask();
+		if (ssid == CGROUP_SUBSYS_COUNT)
+			return -EINVAL;
+	}
+
+	cgrp = cgroup_kn_lock_live(of->kn, true);
+	if (!cgrp)
+		return -ENODEV;
+
+	/*
+	 * Write to root cgroup's controllers file is not allowed.
+	 */
+	parent = cgroup_parent(cgrp);
+	if (!parent) {
+		ret = -EINVAL;
+		goto out_unlock;
+	}
+
+	/*
+	 * We only looks at parent's subtree_control that are not in
+	 * passthru_ss_mask.
+	 */
+	parent_subtree = parent->subtree_control & ~cgrp->passthru_ss_mask;
+
+	/*
+	 * Reject disable bits that are in parent's subtree_control except
+	 * when they are also in passthru_ss_mask.
+	 */
+	if (disable & parent_subtree) {
+		ret = -EINVAL;
+		goto out_unlock;
+	}
+
+	child_enable = cgrp->resource_control|cgrp->subtree_control;
+	cgroup_for_each_live_child(child, cgrp)
+		child_enable |= child->subtree_control|child->resource_control|
+				child->enable_ss_mask|child->passthru_ss_mask;
+
+	/*
+	 * Mask off bits that have been set as well as enable bits set
+	 * in parent's subtree_control, but not in passthru_ss_mask.
+	 */
+	passthru &= ~cgrp->passthru_ss_mask;
+	enable   &= ~(cgrp->enable_ss_mask|parent_subtree);
+
+	/*
+	 * We cannot enable, disable or pass-through controllers that
+	 * are enabled in children's passthru_ss_mask, enable_ss_mask,
+	 * resource_control or subtree_control as well as its own
+	 * resource_control and subtree_control.
+	 */
+	if ((disable|passthru|enable) & child_enable) {
+		ret = -EBUSY;
+		goto out_unlock;
+	}
+
+	/*
+	 * We also cannot enable or pass through controllers that are not
+	 * enabled in its parent's passthru_ss_mask or controllers.
+	 */
+	if (((enable|passthru) & (parent->passthru_ss_mask|
+				  cgroup_control(parent)))
+				  != (enable|passthru)) {
+		ret = -ENOENT;
+		goto out_unlock;
+	}
+
+	disable &= cgrp->enable_ss_mask|cgrp->passthru_ss_mask;
+	if (!enable && !disable && !passthru) {
+		ret = 0;
+		goto out_unlock;
+	}
+
+	/*
+	 * Can't enable or pass through !threaded controllers on a
+	 * threaded cgroup
+	 */
+	if (cgroup_is_threaded(cgrp) &&
+	   ((enable|passthru) & ~cgrp_dfl_threaded_ss_mask)) {
+		ret = -EINVAL;
+		goto out_unlock;
+	}
+
+	/* Save and update control masks and prepare csses */
+	cgroup_save_control(cgrp);
+
+	cgrp->passthru_ss_mask |= passthru;
+	cgrp->passthru_ss_mask &= ~(disable|enable);
+
+	/* Mask off enable bits set in parent's subtree_control */
+	enable &= ~parent->subtree_control;
+	cgrp->enable_ss_mask |= enable;
+	cgrp->enable_ss_mask &= ~(disable|passthru);
 
 	ret = cgroup_apply_control(cgrp);
 
@@ -3102,7 +3285,8 @@ static int cgroup_enable_threaded(struct cgroup *cgrp)
 	/*
 	 * Allow only if it is not the root and there are:
 	 * 1) no children,
-	 * 2) no non-threaded controllers are enabled, and
+	 * 2) no non-threaded controllers are enabled or in pass-through
+	 *    mode, and
 	 * 3) no attached tasks.
 	 *
 	 * With no attached tasks, it is assumed that no css_sets will be
@@ -3110,7 +3294,8 @@ static int cgroup_enable_threaded(struct cgroup *cgrp)
 	 * css_sets linger around due to task_struct leakage, for example.
 	 */
 	if (css_has_online_children(&cgrp->self) ||
-	   (cgroup_control(cgrp) & ~cgrp_dfl_threaded_ss_mask) ||
+	   ((cgroup_control(cgrp)|cgrp->passthru_ss_mask)
+		& ~cgrp_dfl_threaded_ss_mask) ||
 	   !cgroup_parent(cgrp) || cgroup_is_populated(cgrp))
 		return -EBUSY;
 
@@ -4375,6 +4560,7 @@ static struct cftype cgroup_base_files[] = {
 	{
 		.name = "cgroup.controllers",
 		.seq_show = cgroup_controllers_show,
+		.write = cgroup_controllers_write,
 	},
 	{
 		.name = "cgroup.subtree_control",
@@ -4526,7 +4712,8 @@ static void css_release(struct percpu_ref *ref)
 }
 
 static void init_and_link_css(struct cgroup_subsys_state *css,
-			      struct cgroup_subsys *ss, struct cgroup *cgrp)
+			      struct cgroup_subsys *ss, struct cgroup *cgrp,
+			      struct cgroup_subsys_state *parent_css)
 {
 	lockdep_assert_held(&cgroup_mutex);
 
@@ -4542,7 +4729,7 @@ static void init_and_link_css(struct cgroup_subsys_state *css,
 	atomic_set(&css->online_cnt, 0);
 
 	if (cgroup_parent(cgrp)) {
-		css->parent = cgroup_css(cgroup_parent(cgrp), ss);
+		css->parent = parent_css;
 		css_get(css->parent);
 	}
 
@@ -4605,11 +4792,23 @@ static struct cgroup_subsys_state *css_create(struct cgroup *cgrp,
 					      struct cgroup_subsys *ss)
 {
 	struct cgroup *parent = cgroup_parent(cgrp);
-	struct cgroup_subsys_state *parent_css = cgroup_css(parent, ss);
+	struct cgroup_subsys_state *parent_css;
 	struct cgroup_subsys_state *css;
 	int err;
 
 	lockdep_assert_held(&cgroup_mutex);
+
+	/*
+	 * Need to skip over ancestor cgroups with skip flag set.
+	 */
+	while (parent && (parent->passthru_ss_mask & (1 << ss->id)))
+		parent = cgroup_parent(parent);
+
+	if (!parent) {
+		WARN_ON_ONCE(1);
+		return ERR_PTR(-EINVAL);
+	}
+	parent_css = cgroup_css(parent, ss);
 
 	css = ss->css_alloc(parent_css);
 	if (!css)
@@ -4617,7 +4816,7 @@ static struct cgroup_subsys_state *css_create(struct cgroup *cgrp,
 	if (IS_ERR(css))
 		return css;
 
-	init_and_link_css(css, ss, cgrp);
+	init_and_link_css(css, ss, cgrp, parent_css);
 
 	err = percpu_ref_init(&css->refcnt, css_release, 0, GFP_KERNEL);
 	if (err)
@@ -5044,7 +5243,7 @@ static void __init cgroup_init_subsys(struct cgroup_subsys *ss, bool early)
 	css = ss->css_alloc(cgroup_css(&cgrp_dfl_root.cgrp, ss));
 	/* We don't handle early failures gracefully */
 	BUG_ON(IS_ERR(css));
-	init_and_link_css(css, ss, &cgrp_dfl_root.cgrp);
+	init_and_link_css(css, ss, &cgrp_dfl_root.cgrp, NULL);
 
 	/*
 	 * Root csses are never destroyed and we can't initialize

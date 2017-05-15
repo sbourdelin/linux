@@ -305,6 +305,17 @@ struct cgroup {
 	 */
 	u16 resource_control;
 
+	/*
+	 * The bitmasks of subsystems enabled and in pass-through mode in
+	 * the current cgroup. The parent's subtree_ss_mask has priority.
+	 * A bit set in subtree_ss_mask will suppress the setting of the
+	 * corresponding bit in enable_ss_mask and passthru_ss_mask.
+	 */
+	u16 enable_ss_mask;
+	u16 passthru_ss_mask;
+	u16 old_enable_ss_mask;
+	u16 old_passthru_ss_mask;
+
 	/* Private pointers for each registered subsystem */
 	struct cgroup_subsys_state __rcu *subsys[CGROUP_SUBSYS_COUNT];
 

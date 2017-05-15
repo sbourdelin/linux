@@ -212,8 +212,12 @@ static int cgroup_subsys_states_read(struct seq_file *seq, void *v)
 	mutex_lock(&cgroup_mutex);
 	for_each_subsys(ss, i) {
 		css = rcu_dereference_check(cgrp->subsys[ss->id], true);
-		if (!css)
+		if (!css) {
+			if (cgrp->passthru_ss_mask & (1 << ss->id))
+				seq_printf(seq, "%2d: %-4s\t- [Pass-through]\n",
+					   ss->id, ss->name);
 			continue;
+		}
 		pbuf[0] = '\0';
 
 		/* Show the parent CSS if applicable*/
@@ -240,6 +244,8 @@ static int cgroup_masks_read(struct seq_file *seq, void *v)
 		{ &cgrp->subtree_control,  "subtree_control"  },
 		{ &cgrp->subtree_ss_mask,  "subtree_ss_mask"  },
 		{ &cgrp->resource_control, "resource_control" },
+		{ &cgrp->enable_ss_mask,   "enable_ss_mask"   },
+		{ &cgrp->passthru_ss_mask, "passthru_ss_mask" },
 	};
 
 	mutex_lock(&cgroup_mutex);

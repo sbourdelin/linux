@@ -308,25 +308,28 @@ both cgroups.
 2-4-1. Enabling and Disabling
 
 Each cgroup has a "cgroup.controllers" file which lists all
-controllers available for the cgroup to enable.
+controllers available for the cgroup to enable for its children.
 
   # cat cgroup.controllers
   cpu io memory
 
-No controller is enabled by default.  Controllers can be enabled and
-disabled by writing to the "cgroup.subtree_control" file.
+No controller is enabled by default.  Controllers can be
+enabled and disabled on the child cgroups by writing to the
+"cgroup.subtree_control" file. A '+' prefix enables the controller,
+and a '-' prefix disables it.
 
   # echo "+cpu +memory -io" > cgroup.subtree_control
 
-Only controllers which are listed in "cgroup.controllers" can be
-enabled.  When multiple operations are specified as above, either they
-all succeed or fail.  If multiple operations on the same controller
-are specified, the last one is effective.
+Only controllers which are listed in "cgroup.controllers" can
+be enabled in the "cgroup.subtree_control" file.  When multiple
+operations are specified as above, either they all succeed or fail.
+If multiple operations on the same controller are specified, the last
+one is effective.
 
 Enabling a controller in a cgroup indicates that the distribution of
 the target resource across its immediate children will be controlled.
-Consider the following sub-hierarchy.  The enabled controllers are
-listed in parentheses.
+Consider the following sub-hierarchy.  The enabled controllers in the
+"cgroup.subtree_control" file are listed in parentheses.
 
   A(cpu,memory) - B(memory) - C()
                             \ D()
@@ -336,6 +339,17 @@ of CPU cycles and memory to its children, in this case, B.  As B has
 "memory" enabled but not "CPU", C and D will compete freely on CPU
 cycles but their division of memory available to B will be controlled.
 
+By not enabling a controller in a cgroup and its descendants, we can
+effectively trim the hierarchy as seen by a controller from the leafs
+up. From the perspective of the cpu controller, the hierarchy is:
+
+  A - B|C|D
+
+From the perspective of the memory controller, the hierarchy becomes:
+
+  A - B - C
+        \ D
+
 As a controller regulates the distribution of the target resource to
 the cgroup's children, enabling it creates the controller's interface
 files in the child cgroups.  In the above example, enabling "cpu" on B
@@ -343,7 +357,81 @@ would create the "cpu." prefixed controller interface files in C and
 D.  Likewise, disabling "memory" from B would remove the "memory."
 prefixed controller interface files from C and D.  This means that the
 controller interface files - anything which doesn't start with
-"cgroup." are owned by the parent rather than the cgroup itself.
+"cgroup." can be considered to be owned by the parent under this
+control scheme.
+
+Enabling controllers via the "cgroup.subtree_control" file is
+relatively coarse-grained.  Fine-grained control of the controllers in
+a non-root cgroup can be done by writing to its "cgroup.controllers"
+file directly. A '+' prefix enables an controller as long as that
+controller is also enabled on its parent. Similarly, the '-' prefix
+disables a controller as long that controller isn't enabled in its
+parent's subtree_control file.
+
+The special prefix '#' is used to mark a controller in pass-through
+mode. In this mode, the controller is disabled in the cgroup
+effectively collapsing it with its parent from the perspective of
+that controller. However, it allows its child cgroups to enable the
+controller or have it in pass-through mode again. For example,
+
+   +   #   #   #   +
+   A - B - C - D - E
+         \ F
+	   +
+In this case, the effective hiearchy is:
+
+	A|B|C|D - E
+	        \ F
+
+Under this control scheme, the interface files can be considered to be
+owned by the cgroup itself. The use of the special '#' prefix allows
+the users to trim away layers in the middle of the hierarchy, thus
+flattening the tree from the perspective of that particular controller.
+As a result, different controllers can have quite different views of
+their virtual process hierarchy that can best fit their own needs.
+
+In the diagram below, the controller name in the parenthesis represents
+controller enabled by writing to the "cgroup.controllers" file.
+
+  A(cpu,memory) - B(cpu,#memory) - C()
+                                 \ D(memory)
+
+From the memory controller's perspective, the hierarchy looks like:
+
+   A|B|C - D
+
+For the CPU controller, the hierarchy is:
+
+   A - B|C|D
+
+Both control schemes can be used together with some limitations
+as shown in the following table about the interaction between
+subtree_control file of the parent of a cgroup and its controllers
+file.
+
+  ++: enable a controller in parent's subtree_control
+  --: disable a controller in parent's subtree_control
+   +: enable a controller in controllers
+   -: disable a controller in controllers
+   #: skip a controller in controllers
+
+  Old State  New Desired State  Result
+  ---------  -----------------  ------
+    ++               +          Ignored
+    ++               #          Accepted
+    ++               -          Rejected*
+    --             + or #       Accepted
+    --               -          Ignored
+     +               ++         Accepted
+     +               --         Rejected
+     -             ++ or --     Accepted
+     #             ++ or --     Rejected
+
+In the special case that the cgroup is in both '++' & '#' states
+('++' followed by '#'), the '-' prefix can be used to turn off the
+'#' leading to an effective '++' state.  A cgroup in '+' or '#' state
+cannot be changed back to '-' or switched to each other as long as
+its children have that controller in a non-'-' state.
 
 
 2-4-2. Top-down Constraint
@@ -353,8 +441,8 @@ a resource only if the resource has been distributed to it from the
 parent.  This means that all non-root "cgroup.subtree_control" files
 can only contain controllers which are enabled in the parent's
 "cgroup.subtree_control" file.  A controller can be enabled only if
-the parent has the controller enabled and a controller can't be
-disabled if one or more children have it enabled.
+the parent has the controller enabled ('+' or '#') and a controller
+can't be disabled if one or more children have it enabled.
 
 
 2-4-3. Managing Internal Process Competition
@@ -704,11 +792,18 @@ All cgroup core files are prefixed with "cgroup."
 
   cgroup.controllers
 
-	A read-only space separated values file which exists on all
+	A read-write space separated values file which exists on all
 	cgroups.
 
-	It shows space separated list of all controllers available to
-	the cgroup.  The controllers are not ordered.
+	When read, it shows space separated list of all controllers
+	available to the cgroup.  The controllers are not ordered.
+
+	Space separated list of controllers prefixed with '+', '-' or
+	'#' can be written to enable, disable or set the controllers
+	in pass-through mode. If a controller appears more than once
+	on the list, the last one is effective.  When multiple enable
+	and disable operations are specified, either all succeed or
+	all fail.
 
   cgroup.subtree_control
 
