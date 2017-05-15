@@ -15,7 +15,12 @@
 #define _UAPI_LINUX_SEG6_H
 
 #include <linux/types.h>
+
+#ifdef __KERNEL__
 #include <linux/in6.h>		/* For struct in6_addr. */
+#else
+#include <netinet/in.h>
+#endif
 
 /*
  * SRH
