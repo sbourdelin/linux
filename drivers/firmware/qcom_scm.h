@@ -95,5 +95,9 @@ extern int __qcom_scm_iommu_secure_ptbl_size(struct device *dev, u32 spare,
 					     size_t *size);
 extern int __qcom_scm_iommu_secure_ptbl_init(struct device *dev, u64 addr,
 					     u32 size, u32 spare);
+#define QCOM_MEM_PROT_ASSIGN_ID	0x16
+extern int  __qcom_scm_assign_mem(struct device *dev, phys_addr_t mem_addr,
+		size_t mem_sz, phys_addr_t srcVm, size_t srcVm_sz,
+		phys_addr_t destVm, size_t destVm_sz);
 
 #endif

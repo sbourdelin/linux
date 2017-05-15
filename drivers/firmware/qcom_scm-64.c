@@ -439,3 +439,30 @@ int __qcom_scm_iommu_secure_ptbl_init(struct device *dev, u64 addr, u32 size,
 
 	return ret;
 }
+
+int __qcom_scm_assign_mem(struct device *dev, phys_addr_t mem_addr,
+		size_t mem_sz, phys_addr_t srcVm, size_t srcVm_sz,
+		phys_addr_t destVm, size_t destVm_sz)
+{
+	int ret;
+	struct qcom_scm_desc desc = {0};
+	struct arm_smccc_res res;
+
+	desc.args[0] = mem_addr;
+	desc.args[1] = mem_sz;
+	desc.args[2] = srcVm;
+	desc.args[3] = srcVm_sz;
+	desc.args[4] = destVm;
+	desc.args[5] = destVm_sz;
+	desc.args[6] = 0;
+
+	desc.arginfo = QCOM_SCM_ARGS(7, QCOM_SCM_RO, QCOM_SCM_VAL,
+				QCOM_SCM_RO, QCOM_SCM_VAL, QCOM_SCM_RO,
+				QCOM_SCM_VAL, QCOM_SCM_VAL);
+
+	ret = qcom_scm_call(dev, QCOM_SCM_SVC_MP,
+				QCOM_MEM_PROT_ASSIGN_ID,
+				&desc, &res);
+
+	return ret ? : res.a1;
+}
