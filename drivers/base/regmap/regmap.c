@@ -528,6 +528,7 @@ int regmap_attach_dev(struct device *dev, struct regmap *map,
 		return -ENOMEM;
 	}
 	*m = map;
+	devm_add_action(dev, (void (*)(void *))regmap_debugfs_exit, map);
 	devres_add(dev, m);
 
 	return 0;
@@ -1215,7 +1216,6 @@ void regmap_exit(struct regmap *map)
 	struct regmap_async *async;
 
 	regcache_exit(map);
-	regmap_debugfs_exit(map);
 	regmap_range_exit(map);
 	if (map->bus && map->bus->free_context)
 		map->bus->free_context(map->bus_context);
