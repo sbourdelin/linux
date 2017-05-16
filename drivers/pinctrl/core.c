@@ -702,7 +702,6 @@ static void pinctrl_generic_free_groups(struct pinctrl_dev *pctldev)
 		group = radix_tree_lookup(&pctldev->pin_group_tree,
 					  indices[i]);
 		radix_tree_delete(&pctldev->pin_group_tree, indices[i]);
-		devm_kfree(pctldev->dev, group);
 	}
 
 	pctldev->num_groups = 0;
