@@ -250,10 +250,8 @@ static int __init sh_clk_div_register_ops(struct clk *clks, int nr,
 
 	freq_table_size *= (nr_divs + 1);
 	freq_table = kzalloc(freq_table_size * nr, GFP_KERNEL);
-	if (!freq_table) {
-		pr_err("%s: unable to alloc memory\n", __func__);
+	if (!freq_table)
 		return -ENOMEM;
-	}
 
 	for (k = 0; !ret && (k < nr); k++) {
 		clkp = clks + k;
@@ -471,10 +469,8 @@ int __init sh_clk_fsidiv_register(struct clk *clks, int nr)
 
 	for (i = 0; i < nr; i++) {
 		map = kzalloc(sizeof(*map), GFP_KERNEL);
-		if (!map) {
-			pr_err("%s: unable to alloc memory\n", __func__);
+		if (!map)
 			return -ENOMEM;
-		}
 
 		/* clks[i].enable_reg came from SH_CLK_FSIDIV() */
 		map->phys		= (phys_addr_t)clks[i].enable_reg;
