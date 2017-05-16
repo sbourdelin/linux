@@ -183,7 +183,6 @@ struct lmc_err_ctx {
 struct thunderx_lmc {
 	void __iomem *regs;
 	struct pci_dev *pdev;
-	struct msix_entry msix_ent;
 
 	atomic_t ecc_int;
 
@@ -738,18 +737,17 @@ static int thunderx_lmc_probe(struct pci_dev *pdev,
 	mci->scrub_mode = SCRUB_NONE;
 
 	lmc->pdev = pdev;
-	lmc->msix_ent.entry = 0;
 
 	lmc->ring_head = 0;
 	lmc->ring_tail = 0;
 
-	ret = pci_enable_msix_exact(pdev, &lmc->msix_ent, 1);
-	if (ret) {
+	ret = pci_alloc_irq_vectors(pdev, 1, 1, PCI_IRQ_MSIX);
+	if (ret < 0) {
 		dev_err(&pdev->dev, "Cannot enable interrupt: %d\n", ret);
 		goto err_free;
 	}
 
-	ret = devm_request_threaded_irq(&pdev->dev, lmc->msix_ent.vector,
+	ret = devm_request_threaded_irq(&pdev->dev, pci_irq_vector(pdev, 0),
 					thunderx_lmc_err_isr,
 					thunderx_lmc_threaded_isr, 0,
 					"[EDAC] ThunderX LMC", mci);
@@ -1079,7 +1077,6 @@ struct thunderx_ocx {
 	struct edac_device_ctl_info *edac_dev;
 
 	struct dentry *debugfs;
-	struct msix_entry msix_ent[OCX_INTS];
 
 	struct ocx_com_err_ctx com_err_ctx[RING_ENTRIES];
 	struct ocx_link_err_ctx link_err_ctx[RING_ENTRIES];
@@ -1095,12 +1092,9 @@ struct thunderx_ocx {
 #define OCX_OTHER_SIZE		(50 * ARRAY_SIZE(ocx_com_link_errors))
 
 /* This handler is threaded */
-static irqreturn_t thunderx_ocx_com_isr(int irq, void *irq_id)
+static irqreturn_t thunderx_ocx_com_isr(int irq, void *dev_id)
 {
-	struct msix_entry *msix = irq_id;
-	struct thunderx_ocx *ocx = container_of(msix, struct thunderx_ocx,
-						msix_ent[msix->entry]);
-
+	struct thunderx_ocx *ocx = (struct thunderx_ocx *) dev_id;
 	int lane;
 	unsigned long head = ring_pos(ocx->com_ring_head,
 				      ARRAY_SIZE(ocx->com_err_ctx));
@@ -1124,12 +1118,9 @@ static irqreturn_t thunderx_ocx_com_isr(int irq, void *irq_id)
 	return IRQ_WAKE_THREAD;
 }
 
-static irqreturn_t thunderx_ocx_com_threaded_isr(int irq, void *irq_id)
+static irqreturn_t thunderx_ocx_com_threaded_isr(int irq, void *dev_id)
 {
-	struct msix_entry *msix = irq_id;
-	struct thunderx_ocx *ocx = container_of(msix, struct thunderx_ocx,
-						msix_ent[msix->entry]);
-
+	struct thunderx_ocx *ocx = (struct thunderx_ocx *) dev_id;
 	irqreturn_t ret = IRQ_NONE;
 
 	unsigned long tail;
@@ -1188,16 +1179,14 @@ err_free:
 	return ret;
 }
 
-static irqreturn_t thunderx_ocx_lnk_isr(int irq, void *irq_id)
+static irqreturn_t thunderx_ocx_lnk_isr(int irq, void *dev_id)
 {
-	struct msix_entry *msix = irq_id;
-	struct thunderx_ocx *ocx = container_of(msix, struct thunderx_ocx,
-						msix_ent[msix->entry]);
+	struct thunderx_ocx *ocx = (struct thunderx_ocx *) dev_id;
 	unsigned long head = ring_pos(ocx->link_ring_head,
 				      ARRAY_SIZE(ocx->link_err_ctx));
 	struct ocx_link_err_ctx *ctx = &ocx->link_err_ctx[head];
 
-	ctx->link = msix->entry;
+	ctx->link = irq - pci_irq_vector(ocx->pdev, 0);
 	ctx->reg_com_link_int = readq(ocx->regs + OCX_COM_LINKX_INT(ctx->link));
 
 	writeq(ctx->reg_com_link_int, ocx->regs + OCX_COM_LINKX_INT(ctx->link));
@@ -1207,11 +1196,9 @@ static irqreturn_t thunderx_ocx_lnk_isr(int irq, void *irq_id)
 	return IRQ_WAKE_THREAD;
 }
 
-static irqreturn_t thunderx_ocx_lnk_threaded_isr(int irq, void *irq_id)
+static irqreturn_t thunderx_ocx_lnk_threaded_isr(int irq, void *dev_id)
 {
-	struct msix_entry *msix = irq_id;
-	struct thunderx_ocx *ocx = container_of(msix, struct thunderx_ocx,
-						msix_ent[msix->entry]);
+	struct thunderx_ocx *ocx = (struct thunderx_ocx *) dev_id;
 	irqreturn_t ret = IRQ_NONE;
 	unsigned long tail;
 	struct ocx_link_err_ctx *ctx;
@@ -1410,20 +1397,15 @@ static int thunderx_ocx_probe(struct pci_dev *pdev,
 
 	ocx->pdev = pdev;
 
-	for (i = 0; i < OCX_INTS; i++) {
-		ocx->msix_ent[i].entry = i;
-		ocx->msix_ent[i].vector = 0;
-	}
-
-	ret = pci_enable_msix_exact(pdev, ocx->msix_ent, OCX_INTS);
-	if (ret) {
+	ret = pci_alloc_irq_vectors(pdev, 1, OCX_INTS, PCI_IRQ_MSIX);
+	if (ret < 0) {
 		dev_err(&pdev->dev, "Cannot enable interrupt: %d\n", ret);
 		goto err_free;
 	}
 
 	for (i = 0; i < OCX_INTS; i++) {
 		ret = devm_request_threaded_irq(&pdev->dev,
-						ocx->msix_ent[i].vector,
+						pci_irq_vector(pdev, i),
 						(i == 3) ?
 						 thunderx_ocx_com_isr :
 						 thunderx_ocx_lnk_isr,
@@ -1431,7 +1413,7 @@ static int thunderx_ocx_probe(struct pci_dev *pdev,
 						 thunderx_ocx_com_threaded_isr :
 						 thunderx_ocx_lnk_threaded_isr,
 						0, "[EDAC] ThunderX OCX",
-						&ocx->msix_ent[i]);
+						ocx);
 		if (ret)
 			goto err_free;
 	}
@@ -1773,19 +1755,14 @@ struct thunderx_l2c {
 
 	int index;
 
-	struct msix_entry msix_ent;
-
 	struct l2c_err_ctx err_ctx[RING_ENTRIES];
 	unsigned long ring_head;
 	unsigned long ring_tail;
 };
 
-static irqreturn_t thunderx_l2c_tad_isr(int irq, void *irq_id)
+static irqreturn_t thunderx_l2c_tad_isr(int irq, void *dev_id)
 {
-	struct msix_entry *msix = irq_id;
-	struct thunderx_l2c *tad = container_of(msix, struct thunderx_l2c,
-						msix_ent);
-
+	struct thunderx_l2c *tad = (struct thunderx_l2c *) dev_id;
 	unsigned long head = ring_pos(tad->ring_head, ARRAY_SIZE(tad->err_ctx));
 	struct l2c_err_ctx *ctx = &tad->err_ctx[head];
 
@@ -1812,12 +1789,9 @@ static irqreturn_t thunderx_l2c_tad_isr(int irq, void *irq_id)
 	return IRQ_WAKE_THREAD;
 }
 
-static irqreturn_t thunderx_l2c_cbc_isr(int irq, void *irq_id)
+static irqreturn_t thunderx_l2c_cbc_isr(int irq, void *dev_id)
 {
-	struct msix_entry *msix = irq_id;
-	struct thunderx_l2c *cbc = container_of(msix, struct thunderx_l2c,
-						msix_ent);
-
+	struct thunderx_l2c *cbc = (struct thunderx_l2c *) dev_id;
 	unsigned long head = ring_pos(cbc->ring_head, ARRAY_SIZE(cbc->err_ctx));
 	struct l2c_err_ctx *ctx = &cbc->err_ctx[head];
 
@@ -1841,12 +1815,9 @@ static irqreturn_t thunderx_l2c_cbc_isr(int irq, void *irq_id)
 	return IRQ_WAKE_THREAD;
 }
 
-static irqreturn_t thunderx_l2c_mci_isr(int irq, void *irq_id)
+static irqreturn_t thunderx_l2c_mci_isr(int irq, void *dev_id)
 {
-	struct msix_entry *msix = irq_id;
-	struct thunderx_l2c *mci = container_of(msix, struct thunderx_l2c,
-						msix_ent);
-
+	struct thunderx_l2c *mci = (struct thunderx_l2c *) dev_id;
 	unsigned long head = ring_pos(mci->ring_head, ARRAY_SIZE(mci->err_ctx));
 	struct l2c_err_ctx *ctx = &mci->err_ctx[head];
 
@@ -1862,12 +1833,9 @@ static irqreturn_t thunderx_l2c_mci_isr(int irq, void *irq_id)
 	return IRQ_WAKE_THREAD;
 }
 
-static irqreturn_t thunderx_l2c_threaded_isr(int irq, void *irq_id)
+static irqreturn_t thunderx_l2c_threaded_isr(int irq, void *dev_id)
 {
-	struct msix_entry *msix = irq_id;
-	struct thunderx_l2c *l2c = container_of(msix, struct thunderx_l2c,
-						msix_ent);
-
+	struct thunderx_l2c *l2c = (struct thunderx_l2c *) dev_id;
 	unsigned long tail = ring_pos(l2c->ring_tail, ARRAY_SIZE(l2c->err_ctx));
 	struct l2c_err_ctx *ctx = &l2c->err_ctx[tail];
 	irqreturn_t ret = IRQ_NONE;
@@ -2049,20 +2017,17 @@ static int thunderx_l2c_probe(struct pci_dev *pdev,
 	l2c->ring_head = 0;
 	l2c->ring_tail = 0;
 
-	l2c->msix_ent.entry = 0;
-	l2c->msix_ent.vector = 0;
-
-	ret = pci_enable_msix_exact(pdev, &l2c->msix_ent, 1);
-	if (ret) {
+	ret = pci_alloc_irq_vectors(pdev, 1, 1, PCI_IRQ_MSIX);
+	if (ret < 0) {
 		dev_err(&pdev->dev, "Cannot enable interrupt: %d\n", ret);
 		goto err_free;
 	}
 
-	ret = devm_request_threaded_irq(&pdev->dev, l2c->msix_ent.vector,
+	ret = devm_request_threaded_irq(&pdev->dev, pci_irq_vector(pdev, 0),
 					thunderx_l2c_isr,
 					thunderx_l2c_threaded_isr,
 					0, "[EDAC] ThunderX L2C",
-					&l2c->msix_ent);
+					l2c);
 	if (ret)
 		goto err_free;
 
