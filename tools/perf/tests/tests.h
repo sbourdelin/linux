@@ -34,6 +34,7 @@ struct test {
 		int (*get_nr)(void);
 		const char *(*get_desc)(int subtest);
 	} subtest;
+	bool (*ison)(void);
 };
 
 /* Tests */
@@ -98,6 +99,8 @@ int test__clang(int subtest);
 const char *test__clang_subtest_get_desc(int subtest);
 int test__clang_subtest_get_nr(void);
 int test__unit_number__scnprint(int subtest);
+
+bool test__bp_signal_is_on(void);
 
 #if defined(__arm__) || defined(__aarch64__)
 #ifdef HAVE_DWARF_UNWIND_SUPPORT
