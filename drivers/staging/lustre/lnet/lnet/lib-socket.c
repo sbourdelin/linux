@@ -181,7 +181,7 @@ lnet_ipif_enumerate(char ***namesp)
 			goto out0;
 		}
 
-		ifc.ifc_buf = (char *)ifr;
+		ifc.ifc_buf = (char __user *)ifr;
 		ifc.ifc_len = nalloc * sizeof(*ifr);
 
 		rc = lnet_sock_ioctl(SIOCGIFCONF, (unsigned long)&ifc);
