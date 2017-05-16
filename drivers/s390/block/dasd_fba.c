@@ -132,12 +132,9 @@ dasd_fba_check_characteristics(struct dasd_device *device)
 
 	if (!private) {
 		private = kzalloc(sizeof(*private), GFP_KERNEL | GFP_DMA);
-		if (!private) {
-			dev_warn(&device->cdev->dev,
-				 "Allocating memory for private DASD "
-				 "data failed\n");
+		if (!private)
 			return -ENOMEM;
-		}
+
 		device->private = private;
 	} else {
 		memset(private, 0, sizeof(*private));
