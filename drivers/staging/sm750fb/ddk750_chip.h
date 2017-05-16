@@ -32,17 +32,17 @@ enum logical_chip_type {
 };
 
 
-typedef enum _clock_type_t {
+enum clock_type {
 	MXCLK_PLL,
 	PRIMARY_PLL,
 	SECONDARY_PLL,
 	VGA0_PLL,
 	VGA1_PLL,
-}
-clock_type_t;
+};
+
 
 struct pll_value {
-	clock_type_t clockType;
+	enum clock_type clockType;
 	unsigned long inputFreq; /* Input clock frequency to the PLL */
 
 	/* Use this when clockType = PANEL_PLL */
