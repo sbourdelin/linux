@@ -803,7 +803,7 @@ void ishtp_cl_send_msg(struct ishtp_device *dev, struct ishtp_cl *cl)
  * @ishtp_hdr: Pointer to message header
  *
  * Receive and dispatch ISHTP client messages. This function executes in ISR
- * context
+ * or work queue context
  */
 void recv_ishtp_cl_msg(struct ishtp_device *dev,
 		       struct ishtp_msg_hdr *ishtp_hdr)
@@ -813,7 +813,6 @@ void recv_ishtp_cl_msg(struct ishtp_device *dev,
 	struct ishtp_cl_rb *new_rb;
 	unsigned char *buffer = NULL;
 	struct ishtp_cl_rb *complete_rb = NULL;
-	unsigned long	dev_flags;
 	unsigned long	flags;
 	int	rb_count;
 
@@ -828,9 +827,9 @@ void recv_ishtp_cl_msg(struct ishtp_device *dev,
 		goto	eoi;
 	}
 
-	spin_lock_irqsave(&dev->read_list_spinlock, dev_flags);
+	spin_lock_irqsave(&dev->read_list_spinlock, flags);
 	if (list_empty(&dev->read_list.list)) {
-		spin_unlock_irqrestore(&dev->read_list_spinlock, dev_flags);
+		spin_unlock_irqrestore(&dev->read_list_spinlock, flags);
 		goto eoi;
 	}
 
@@ -845,8 +844,7 @@ void recv_ishtp_cl_msg(struct ishtp_device *dev,
 
 		 /* If no Rx buffer is allocated, disband the rb */
 		if (rb->buffer.size == 0 || rb->buffer.data == NULL) {
-			spin_unlock_irqrestore(&dev->read_list_spinlock,
-				dev_flags);
+			spin_unlock_irqrestore(&dev->read_list_spinlock, flags);
 			dev_err(&cl->device->dev,
 				"Rx buffer is not allocated.\n");
 			list_del(&rb->list);
@@ -862,8 +860,7 @@ void recv_ishtp_cl_msg(struct ishtp_device *dev,
 		 * back FC, so communication will be stuck anyway)
 		 */
 		if (rb->buffer.size < ishtp_hdr->length + rb->buf_idx) {
-			spin_unlock_irqrestore(&dev->read_list_spinlock,
-				dev_flags);
+			spin_unlock_irqrestore(&dev->read_list_spinlock, flags);
 			dev_err(&cl->device->dev,
 				"message overflow. size %d len %d idx %ld\n",
 				rb->buffer.size, ishtp_hdr->length,
@@ -889,14 +886,13 @@ void recv_ishtp_cl_msg(struct ishtp_device *dev,
 			 * the whole msg arrived, send a new FC, and add a new
 			 * rb buffer for the next coming msg
 			 */
-			spin_lock_irqsave(&cl->free_list_spinlock, flags);
+			spin_lock(&cl->free_list_spinlock);
 
 			if (!list_empty(&cl->free_rb_list.list)) {
 				new_rb = list_entry(cl->free_rb_list.list.next,
 					struct ishtp_cl_rb, list);
 				list_del_init(&new_rb->list);
-				spin_unlock_irqrestore(&cl->free_list_spinlock,
-					flags);
+				spin_unlock(&cl->free_list_spinlock);
 				new_rb->cl = cl;
 				new_rb->buf_idx = 0;
 				INIT_LIST_HEAD(&new_rb->list);
@@ -905,8 +901,7 @@ void recv_ishtp_cl_msg(struct ishtp_device *dev,
 
 				ishtp_hbm_cl_flow_control_req(dev, cl);
 			} else {
-				spin_unlock_irqrestore(&cl->free_list_spinlock,
-					flags);
+				spin_unlock(&cl->free_list_spinlock);
 			}
 		}
 		/* One more fragment in message (even if this was last) */
@@ -919,7 +914,7 @@ void recv_ishtp_cl_msg(struct ishtp_device *dev,
 		break;
 	}
 
-	spin_unlock_irqrestore(&dev->read_list_spinlock, dev_flags);
+	spin_unlock_irqrestore(&dev->read_list_spinlock, flags);
 	/* If it's nobody's message, just read and discard it */
 	if (!buffer) {
 		uint8_t	rd_msg_buf[ISHTP_RD_MSG_BUF_SIZE];
@@ -945,7 +940,7 @@ eoi:
  * @hbm: hbm buffer
  *
  * Receive and dispatch ISHTP client messages using DMA. This function executes
- * in ISR context
+ * in ISR or work queue context
  */
 void recv_ishtp_cl_msg_dma(struct ishtp_device *dev, void *msg,
 			   struct dma_xfer_hbm *hbm)
@@ -955,12 +950,11 @@ void recv_ishtp_cl_msg_dma(struct ishtp_device *dev, void *msg,
 	struct ishtp_cl_rb *new_rb;
 	unsigned char *buffer = NULL;
 	struct ishtp_cl_rb *complete_rb = NULL;
-	unsigned long	dev_flags;
 	unsigned long	flags;
 
-	spin_lock_irqsave(&dev->read_list_spinlock, dev_flags);
+	spin_lock_irqsave(&dev->read_list_spinlock, flags);
 	if (list_empty(&dev->read_list.list)) {
-		spin_unlock_irqrestore(&dev->read_list_spinlock, dev_flags);
+		spin_unlock_irqrestore(&dev->read_list_spinlock, flags);
 		goto eoi;
 	}
 
@@ -975,8 +969,7 @@ void recv_ishtp_cl_msg_dma(struct ishtp_device *dev, void *msg,
 		 * If no Rx buffer is allocated, disband the rb
 		 */
 		if (rb->buffer.size == 0 || rb->buffer.data == NULL) {
-			spin_unlock_irqrestore(&dev->read_list_spinlock,
-				dev_flags);
+			spin_unlock_irqrestore(&dev->read_list_spinlock, flags);
 			dev_err(&cl->device->dev,
 				"response buffer is not allocated.\n");
 			list_del(&rb->list);
@@ -992,8 +985,7 @@ void recv_ishtp_cl_msg_dma(struct ishtp_device *dev, void *msg,
 		 * back FC, so communication will be stuck anyway)
 		 */
 		if (rb->buffer.size < hbm->msg_length) {
-			spin_unlock_irqrestore(&dev->read_list_spinlock,
-				dev_flags);
+			spin_unlock_irqrestore(&dev->read_list_spinlock, flags);
 			dev_err(&cl->device->dev,
 				"message overflow. size %d len %d idx %ld\n",
 				rb->buffer.size, hbm->msg_length, rb->buf_idx);
@@ -1017,14 +1009,13 @@ void recv_ishtp_cl_msg_dma(struct ishtp_device *dev, void *msg,
 		 * the whole msg arrived, send a new FC, and add a new
 		 * rb buffer for the next coming msg
 		 */
-		spin_lock_irqsave(&cl->free_list_spinlock, flags);
+		spin_lock(&cl->free_list_spinlock);
 
 		if (!list_empty(&cl->free_rb_list.list)) {
 			new_rb = list_entry(cl->free_rb_list.list.next,
 				struct ishtp_cl_rb, list);
 			list_del_init(&new_rb->list);
-			spin_unlock_irqrestore(&cl->free_list_spinlock,
-				flags);
+			spin_unlock(&cl->free_list_spinlock);
 			new_rb->cl = cl;
 			new_rb->buf_idx = 0;
 			INIT_LIST_HEAD(&new_rb->list);
@@ -1033,8 +1024,7 @@ void recv_ishtp_cl_msg_dma(struct ishtp_device *dev, void *msg,
 
 			ishtp_hbm_cl_flow_control_req(dev, cl);
 		} else {
-			spin_unlock_irqrestore(&cl->free_list_spinlock,
-				flags);
+			spin_unlock(&cl->free_list_spinlock);
 		}
 
 		/* One more fragment in message (this is always last) */
@@ -1047,7 +1037,7 @@ void recv_ishtp_cl_msg_dma(struct ishtp_device *dev, void *msg,
 		break;
 	}
 
-	spin_unlock_irqrestore(&dev->read_list_spinlock, dev_flags);
+	spin_unlock_irqrestore(&dev->read_list_spinlock, flags);
 	/* If it's nobody's message, just read and discard it */
 	if (!buffer) {
 		dev_err(dev->devc, "Dropped Rx (DMA) msg - no request\n");
