@@ -4954,6 +4954,7 @@ static int init_one(struct pci_dev *pdev, const struct pci_device_id *ent)
 			break;
 		adapter->chan_map[pi->tx_chan] = i;
 		print_port_info(adapter->port[i]);
+		netif_carrier_off(adapter->port[i]);
 	}
 	if (i == 0) {
 		dev_err(&pdev->dev, "could not register any net devices\n");
