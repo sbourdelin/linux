@@ -61,6 +61,14 @@ static int inline_list__append(char *filename, char *funcname, int line_nr,
 	return 0;
 }
 
+static void inline_list__reverse(struct inline_node *node)
+{
+	struct inline_list *ilist, *n;
+
+	list_for_each_entry_safe_reverse(ilist, n, &node->val, list)
+		list_move_tail(&ilist->list, &node->val);
+}
+
 #ifdef HAVE_LIBBFD_SUPPORT
 
 /*
@@ -200,14 +208,6 @@ static void addr2line_cleanup(struct a2l_data *a2l)
 
 #define MAX_INLINE_NEST 1024
 
-static void inline_list__reverse(struct inline_node *node)
-{
-	struct inline_list *ilist, *n;
-
-	list_for_each_entry_safe_reverse(ilist, n, &node->val, list)
-		list_move_tail(&ilist->list, &node->val);
-}
-
 static int addr2line(const char *dso_name, u64 addr,
 		     char **file, unsigned int *line, struct dso *dso,
 		     bool unwind_inlines, struct inline_node *node)
@@ -244,11 +244,6 @@ static int addr2line(const char *dso_name, u64 addr,
 							dso) != 0)
 					return 0;
 			}
-		}
-
-		if ((node != NULL) &&
-		    (callchain_param.order != ORDER_CALLEE)) {
-			inline_list__reverse(node);
 		}
 	}
 
@@ -494,12 +489,17 @@ char *get_srcline(struct dso *dso, u64 addr, struct symbol *sym,
 struct inline_node *dso__parse_addr_inlines(struct dso *dso, u64 addr)
 {
 	const char *dso_name;
+	struct inline_node *node;
 
 	dso_name = dso__name(dso);
 	if (dso_name == NULL)
 		return NULL;
 
-	return addr2inlines(dso_name, addr, dso);
+	node = addr2inlines(dso_name, addr, dso);
+	if (node && callchain_param.order != ORDER_CALLEE)
+		inline_list__reverse(node);
+
+	return node;
 }
 
 void inline_node__delete(struct inline_node *node)
