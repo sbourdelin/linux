@@ -829,6 +829,11 @@ void recv_ishtp_cl_msg(struct ishtp_device *dev,
 	}
 
 	spin_lock_irqsave(&dev->read_list_spinlock, dev_flags);
+	if (list_empty(&dev->read_list.list)) {
+		spin_unlock_irqrestore(&dev->read_list_spinlock, dev_flags);
+		goto eoi;
+	}
+
 	rb_count = -1;
 	list_for_each_entry(rb, &dev->read_list.list, list) {
 		++rb_count;
@@ -954,6 +959,11 @@ void recv_ishtp_cl_msg_dma(struct ishtp_device *dev, void *msg,
 	unsigned long	flags;
 
 	spin_lock_irqsave(&dev->read_list_spinlock, dev_flags);
+	if (list_empty(&dev->read_list.list)) {
+		spin_unlock_irqrestore(&dev->read_list_spinlock, dev_flags);
+		goto eoi;
+	}
+
 	list_for_each_entry(rb, &dev->read_list.list, list) {
 		cl = rb->cl;
 		if (!cl || !(cl->host_client_id == hbm->host_client_id &&
