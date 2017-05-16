@@ -253,10 +253,11 @@ static int addr2line(const char *dso_name, u64 addr,
 	}
 
 	if (a2l->found && a2l->filename) {
-		*file = strdup(a2l->filename);
-		*line = a2l->line;
-
-		if (*file)
+		if (file)
+			*file = strdup(a2l->filename);
+		if (line)
+			*line = a2l->line;
+		if (*a2l->filename)
 			ret = 1;
 	}
 
@@ -278,8 +279,6 @@ void dso__free_a2l(struct dso *dso)
 static struct inline_node *addr2inlines(const char *dso_name, u64 addr,
 	struct dso *dso)
 {
-	char *file = NULL;
-	unsigned int line = 0;
 	struct inline_node *node;
 
 	node = zalloc(sizeof(*node));
@@ -291,7 +290,7 @@ static struct inline_node *addr2inlines(const char *dso_name, u64 addr,
 	INIT_LIST_HEAD(&node->val);
 	node->addr = addr;
 
-	if (!addr2line(dso_name, addr, &file, &line, dso, TRUE, node))
+	if (!addr2line(dso_name, addr, NULL, NULL, dso, TRUE, node))
 		goto out_free_inline_node;
 
 	if (list_empty(&node->val))
