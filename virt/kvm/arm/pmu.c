@@ -532,7 +532,7 @@ int kvm_arm_pmu_v3_set_attr(struct kvm_vcpu *vcpu, struct kvm_device_attr *attr)
 			return -EFAULT;
 
 		/* The PMU overflow interrupt can be a PPI or a valid SPI. */
-		if (!(irq_is_ppi(irq) || vgic_valid_spi(vcpu->kvm, irq)))
+		if (!(irq_is_ppi(irq) || irq_is_spi(irq)))
 			return -EINVAL;
 
 		if (!pmu_irq_is_valid(vcpu->kvm, irq))
