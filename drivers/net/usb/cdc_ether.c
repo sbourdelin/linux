@@ -315,8 +315,10 @@ skip:
 	 * don't do reset all the way. So the packet filter should
 	 * be set to a sane initial value.
 	 */
-	usbnet_cdc_update_filter(dev);
-
+	if (!rndis) {
+		usbnet_cdc_update_filter(dev);
+	}
+	
 	return 0;
 
 bad_desc:
