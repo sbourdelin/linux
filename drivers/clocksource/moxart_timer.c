@@ -253,4 +253,5 @@ out_free:
 	return ret;
 }
 CLOCKSOURCE_OF_DECLARE(moxart, "moxa,moxart-timer", moxart_timer_init);
-CLOCKSOURCE_OF_DECLARE(aspeed, "aspeed,ast2400-timer", moxart_timer_init);
+CLOCKSOURCE_OF_DECLARE(ast2400, "aspeed,ast2400-timer", moxart_timer_init);
+CLOCKSOURCE_OF_DECLARE(ast2500, "aspeed,ast2500-timer", moxart_timer_init);
