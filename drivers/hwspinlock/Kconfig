@@ -53,4 +53,13 @@ config HSEM_U8500
 
 	  If unsure, say N.
 
+config HWSPINLOCK_SPRD
+	tristate "SPRD Hardware Spinlock device"
+	depends on ARCH_SPRD
+	select HWSPINLOCK
+	help
+	  Say y here to support the SPRD Hardware Spinlock device.
+
+	  If unsure, say N.
+
 endmenu
