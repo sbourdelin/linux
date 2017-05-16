@@ -497,14 +497,12 @@ static struct virtqueue *virtio_ccw_setup_vq(struct virtio_device *vdev,
 	/* Allocate queue. */
 	info = kzalloc(sizeof(struct virtio_ccw_vq_info), GFP_KERNEL);
 	if (!info) {
-		dev_warn(&vcdev->cdev->dev, "no info\n");
 		err = -ENOMEM;
 		goto out_err;
 	}
 	info->info_block = kzalloc(sizeof(*info->info_block),
 				   GFP_DMA | GFP_KERNEL);
 	if (!info->info_block) {
-		dev_warn(&vcdev->cdev->dev, "no info block\n");
 		err = -ENOMEM;
 		goto out_err;
 	}
@@ -1224,7 +1222,6 @@ static int virtio_ccw_online(struct ccw_device *cdev)
 
 	vcdev = kzalloc(sizeof(*vcdev), GFP_KERNEL);
 	if (!vcdev) {
-		dev_warn(&cdev->dev, "Could not get memory for virtio\n");
 		ret = -ENOMEM;
 		goto out_free;
 	}
