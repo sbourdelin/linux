@@ -1,8 +1,9 @@
 #ifndef DDK750_CHIP_H__
 #define DDK750_CHIP_H__
-#define DEFAULT_INPUT_CLOCK 14318181 /* Default reference clock */
+#define MHZ(x)			((x) * 1000000)
+#define DEFAULT_INPUT_CLOCK	14318181 /* Default reference clock */
 #ifndef SM750LE_REVISION_ID
-#define SM750LE_REVISION_ID ((unsigned char)0xfe)
+#define SM750LE_REVISION_ID	((unsigned char)0xfe)
 #endif
 
 #include <linux/io.h>

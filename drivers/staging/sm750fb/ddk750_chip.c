@@ -5,8 +5,6 @@
 #include "ddk750_chip.h"
 #include "ddk750_power.h"
 
-#define MHz(x) ((x) * 1000000)
-
 static logical_chip_type_t chip;
 
 logical_chip_type_t sm750_get_chip_type(void)
@@ -36,7 +34,7 @@ static unsigned int get_mxclk_freq(void)
 	unsigned int M, N, OD, POD;
 
 	if (sm750_get_chip_type() == SM750LE)
-		return MHz(130);
+		return MHZ(130);
 
 	pll_reg = peek32(MXCLK_PLL_CTRL);
 	M = (pll_reg & PLL_CTRL_M_MASK) >> PLL_CTRL_M_SHIFT;
@@ -98,8 +96,8 @@ static void set_memory_clock(unsigned int frequency)
 		 * Set the frequency to the maximum frequency
 		 * that the DDR Memory can take which is 336MHz.
 		 */
-		if (frequency > MHz(336))
-			frequency = MHz(336);
+		if (frequency > MHZ(336))
+			frequency = MHZ(336);
 
 		/* Calculate the divisor */
 		divisor = DIV_ROUND_CLOSEST(get_mxclk_freq(), frequency);
@@ -150,8 +148,8 @@ static void set_master_clock(unsigned int frequency)
 		 * Set the frequency to the maximum frequency
 		 * that the SM750 engine can run, which is about 190 MHz.
 		 */
-		if (frequency > MHz(190))
-			frequency = MHz(190);
+		if (frequency > MHZ(190))
+			frequency = MHZ(190);
 
 		/* Calculate the divisor */
 		divisor = DIV_ROUND_CLOSEST(get_mxclk_freq(), frequency);
@@ -237,13 +235,13 @@ int ddk750_init_hw(struct initchip_param *pInitParam)
 	}
 
 	/* Set the Main Chip Clock */
-	set_chip_clock(MHz((unsigned int)pInitParam->chipClock));
+	set_chip_clock(MHZ((unsigned int)pInitParam->chipClock));
 
 	/* Set up memory clock. */
-	set_memory_clock(MHz(pInitParam->memClock));
+	set_memory_clock(MHZ(pInitParam->memClock));
 
 	/* Set up master clock */
-	set_master_clock(MHz(pInitParam->masterClock));
+	set_master_clock(MHZ(pInitParam->masterClock));
 
 	/*
 	 * Reset the memory controller.

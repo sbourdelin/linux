@@ -1,14 +1,14 @@
 #ifndef LYNXDRV_H_
 #define LYNXDRV_H_
 
-#define FB_ACCEL_SMI 0xab
+#define FB_ACCEL_SMI			0xab
 
-#define MHZ(x) ((x) * 1000000)
+#define MHZ(x)				((x) * 1000000)
 
 #define DEFAULT_SM750_CHIP_CLOCK	290
 #define DEFAULT_SM750LE_CHIP_CLOCK	333
 #ifndef SM750LE_REVISION_ID
-#define SM750LE_REVISION_ID ((unsigned char)0xfe)
+#define SM750LE_REVISION_ID		((unsigned char)0xfe)
 #endif
 
 enum sm750_pnltype {
