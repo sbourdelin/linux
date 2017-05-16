@@ -623,7 +623,7 @@ extern const struct comedi_lrange range_unknown;
  * There may also be a flag that indicates the minimum and maximum are merely
  * scale factors for an unknown, external reference.
  */
-struct comedi_lrange {
+const struct comedi_lrange {
 	int length;
 	struct comedi_krange range[];
 };
