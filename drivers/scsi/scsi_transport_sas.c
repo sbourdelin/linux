@@ -213,6 +213,11 @@ static void sas_host_release(struct device *dev)
 		blk_cleanup_queue(q);
 }
 
+static void sas_initialize_rq(struct request *rq)
+{
+	scsi_req_init(rq);
+}
+
 static int sas_bsg_initialize(struct Scsi_Host *shost, struct sas_rphy *rphy)
 {
 	struct request_queue *q;
@@ -230,6 +235,7 @@ static int sas_bsg_initialize(struct Scsi_Host *shost, struct sas_rphy *rphy)
 	q = blk_alloc_queue(GFP_KERNEL);
 	if (!q)
 		return -ENOMEM;
+	q->initialize_rq_fn = sas_initialize_rq;
 	q->cmd_size = sizeof(struct scsi_request);
 
 	if (rphy) {
