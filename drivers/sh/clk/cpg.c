@@ -470,8 +470,7 @@ int __init sh_clk_fsidiv_register(struct clk *clks, int nr)
 	int i;
 
 	for (i = 0; i < nr; i++) {
-
-		map = kzalloc(sizeof(struct clk_mapping), GFP_KERNEL);
+		map = kzalloc(sizeof(*map), GFP_KERNEL);
 		if (!map) {
 			pr_err("%s: unable to alloc memory\n", __func__);
 			return -ENOMEM;
