@@ -24,13 +24,13 @@ static inline void poke32(u32 data, u32 addr)
 }
 
 /* This is all the chips recognized by this library */
-typedef enum _logical_chip_type_t {
+enum logical_chip_type {
 	SM_UNKNOWN,
 	SM718,
 	SM750,
 	SM750LE,
-}
-logical_chip_type_t;
+};
+
 
 typedef enum _clock_type_t {
 	MXCLK_PLL,
@@ -94,7 +94,7 @@ struct initchip_param {
 	/* More initialization parameter can be added if needed */
 };
 
-logical_chip_type_t sm750_get_chip_type(void);
+enum logical_chip_type sm750_get_chip_type(void);
 void sm750_set_chip_type(unsigned short devId, u8 revId);
 unsigned int sm750_calc_pll_value(unsigned int request, struct  pll_value *pll);
 unsigned int sm750_format_pll_reg(struct pll_value *pPLL);
