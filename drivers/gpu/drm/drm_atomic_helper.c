@@ -3220,7 +3220,7 @@ void drm_atomic_helper_plane_reset(struct drm_plane *plane)
 
 	if (plane->state) {
 		plane->state->plane = plane;
-		plane->state->rotation = DRM_ROTATE_0;
+		plane->state->rotation = DRM_MODE_PROP_ROTATE_0;
 	}
 }
 EXPORT_SYMBOL(drm_atomic_helper_plane_reset);
