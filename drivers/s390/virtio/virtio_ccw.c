@@ -513,7 +513,7 @@ static struct virtqueue *virtio_ccw_setup_vq(struct virtio_device *vdev,
 	}
 	size = PAGE_ALIGN(vring_size(info->num, KVM_VIRTIO_CCW_RING_ALIGN));
 	info->queue = alloc_pages_exact(size, GFP_KERNEL | __GFP_ZERO);
-	if (info->queue == NULL) {
+	if (!info->queue) {
 		dev_warn(&vcdev->cdev->dev, "no queue\n");
 		err = -ENOMEM;
 		goto out_err;
@@ -1387,7 +1387,7 @@ static void __init no_auto_parse(void)
 				 &from_ssid, &from);
 		if (rc)
 			continue;
-		if (parm != NULL) {
+		if (parm) {
 			rc = parse_busid(parm, &to_cssid,
 					 &to_ssid, &to);
 			if ((from_ssid > to_ssid) ||
