@@ -596,3 +596,9 @@ int __qcom_scm_iommu_secure_ptbl_init(struct device *dev, u64 addr, u32 size,
 {
 	return -ENODEV;
 }
+int __qcom_scm_assign_mem(struct device *dev, phys_addr_t mem_addr,
+		size_t mem_sz, phys_addr_t srcVm, size_t srcVm_sz,
+		phys_addr_t destVm, size_t destVm_sz)
+{
+return -ENODEV;
+}
