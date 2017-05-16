@@ -88,7 +88,7 @@
 		};
 
 		vic: interrupt-controller@1e6c0080 {
-			compatible = "aspeed,ast2400-vic";
+			compatible = "aspeed,ast2500-vic";
 			interrupt-controller;
 			#interrupt-cells = <1>;
 			valid-sources = <0xfefff7ff 0x0807ffff>;
@@ -993,7 +993,7 @@
 			};
 
 			timer: timer@1e782000 {
-				compatible = "aspeed,ast2400-timer";
+				compatible = "aspeed,ast2500-timer";
 				reg = <0x1e782000 0x90>;
 				// The moxart_timer driver registers only one
 				// interrupt and assumes it's for timer 1
