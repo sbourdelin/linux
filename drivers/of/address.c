@@ -6,6 +6,7 @@
 #include <linux/ioport.h>
 #include <linux/module.h>
 #include <linux/of_address.h>
+#include <linux/of_pci.h>
 #include <linux/pci.h>
 #include <linux/pci_regs.h>
 #include <linux/sizes.h>
@@ -46,6 +47,8 @@ struct of_bus {
 				int na, int ns, int pna);
 	int		(*translate)(__be32 *addr, u64 offset, int na);
 	unsigned int	(*get_flags)(const __be32 *addr);
+	int		(*get_dma_ranges)(struct device_node *np,
+					  u64 *dma_addr, u64 *paddr, u64 *size);
 };
 
 /*
@@ -171,6 +174,144 @@ static int of_bus_pci_translate(__be32 *addr, u64 offset, int na)
 {
 	return of_bus_default_translate(addr + 1, offset, na - 1);
 }
+
+static int of_bus_pci_get_dma_ranges(struct device_node *np, u64 *dma_addr,
+				     u64 *paddr, u64 *size)
+{
+	struct device_node *node = of_node_get(np);
+	int ret = 0;
+	struct resource_entry *window;
+	LIST_HEAD(res);
+
+	if (!node)
+		return -EINVAL;
+
+	*size = 0;
+	/*
+	 * PCI dma-ranges is not mandatory property.
+	 * many devices do no need to have it, since
+	 * host bridge does not require inbound memory
+	 * configuration or rather have design limitations.
+	 * so we look for dma-ranges, if missing we
+	 * just return the caller full size, and also
+	 * no dma-ranges suggests that, host bridge allows
+	 * whatever comes in, so we set dma_addr to 0.
+	 */
+	ret = of_pci_get_dma_ranges(np, &res);
+	if (!ret) {
+		resource_list_for_each_entry(window, &res) {
+		struct resource *res_dma = window->res;
+
+		if (*size < resource_size(res_dma)) {
+			*dma_addr = res_dma->start - window->offset;
+			*paddr = res_dma->start;
+			*size = resource_size(res_dma);
+			}
+		}
+	}
+	pci_free_resource_list(&res);
+
+	/*
+	 * return the largest possible size,
+	 * since PCI master allows everything.
+	 */
+	if (*size == 0) {
+		pr_debug("empty/zero size dma-ranges found for node(%s)\n",
+			np->full_name);
+		*size = DMA_BIT_MASK(sizeof(dma_addr_t) * 8) - 1;
+		*dma_addr = *paddr = 0;
+		ret = 0;
+	}
+
+	pr_debug("dma_addr(%llx) cpu_addr(%llx) size(%llx)\n",
+		 *dma_addr, *paddr, *size);
+
+	of_node_put(node);
+
+	return ret;
+}
+
+static int get_dma_ranges(struct device_node *np, u64 *dma_addr,
+				u64 *paddr, u64 *size)
+{
+	struct device_node *node = of_node_get(np);
+	const __be32 *ranges = NULL;
+	int len, naddr, nsize, pna;
+	int ret = 0;
+	u64 dmaaddr;
+
+	if (!node)
+		return -EINVAL;
+
+	while (1) {
+		naddr = of_n_addr_cells(node);
+		nsize = of_n_size_cells(node);
+		node = of_get_next_parent(node);
+		if (!node)
+			break;
+
+		ranges = of_get_property(node, "dma-ranges", &len);
+
+		/* Ignore empty ranges, they imply no translation required */
+		if (ranges && len > 0)
+			break;
+
+		/*
+		 * At least empty ranges has to be defined for parent node if
+		 * DMA is supported
+		 */
+		if (!ranges)
+			break;
+	}
+
+	if (!ranges) {
+		pr_debug("no dma-ranges found for node(%s)\n", np->full_name);
+		ret = -ENODEV;
+		goto out;
+	}
+
+	len /= sizeof(u32);
+
+	pna = of_n_addr_cells(node);
+
+	/* dma-ranges format:
+	 * DMA addr	: naddr cells
+	 * CPU addr	: pna cells
+	 * size		: nsize cells
+	 */
+	dmaaddr = of_read_number(ranges, naddr);
+	*paddr = of_translate_dma_address(np, ranges);
+	if (*paddr == OF_BAD_ADDR) {
+		pr_err("translation of DMA address(%pad) to CPU address failed node(%s)\n",
+		       dma_addr, np->full_name);
+		ret = -EINVAL;
+		goto out;
+	}
+	*dma_addr = dmaaddr;
+
+	*size = of_read_number(ranges + naddr + pna, nsize);
+
+	pr_debug("dma_addr(%llx) cpu_addr(%llx) size(%llx)\n",
+		 *dma_addr, *paddr, *size);
+
+out:
+	of_node_put(node);
+
+	return ret;
+}
+
+static int of_bus_isa_get_dma_ranges(struct device_node *np, u64 *dma_addr,
+				     u64 *paddr, u64 *size)
+{
+	return get_dma_ranges(np, dma_addr, paddr, size);
+}
+
+static int of_bus_default_get_dma_ranges(struct device_node *np, u64 *dma_addr,
+					 u64 *paddr, u64 *size)
+{
+	return get_dma_ranges(np, dma_addr, paddr, size);
+}
+
 #endif /* CONFIG_OF_ADDRESS_PCI */
 
 #ifdef CONFIG_PCI
@@ -424,6 +565,7 @@ static struct of_bus of_busses[] = {
 		.map = of_bus_pci_map,
 		.translate = of_bus_pci_translate,
 		.get_flags = of_bus_pci_get_flags,
+		.get_dma_ranges = of_bus_pci_get_dma_ranges,
 	},
 #endif /* CONFIG_OF_ADDRESS_PCI */
 	/* ISA */
@@ -435,6 +577,7 @@ static struct of_bus of_busses[] = {
 		.map = of_bus_isa_map,
 		.translate = of_bus_isa_translate,
 		.get_flags = of_bus_isa_get_flags,
+		.get_dma_ranges = of_bus_isa_get_dma_ranges,
 	},
 	/* Default */
 	{
@@ -445,6 +588,7 @@ static struct of_bus of_busses[] = {
 		.map = of_bus_default_map,
 		.translate = of_bus_default_translate,
 		.get_flags = of_bus_default_get_flags,
+		.get_dma_ranges = of_bus_default_get_dma_ranges,
 	},
 };
 
@@ -820,74 +964,17 @@ EXPORT_SYMBOL(of_io_request_and_map);
  *	size			: nsize cells
  *
  * It returns -ENODEV if "dma-ranges" property was not found
- * for this device in DT.
+ * for this device in DT, except if PCI device then, dma-ranges
+ * can be optional property, and in that case returns size with
+ * entire host memory.
  */
 int of_dma_get_range(struct device_node *np, u64 *dma_addr, u64 *paddr, u64 *size)
 {
-	struct device_node *node = of_node_get(np);
-	const __be32 *ranges = NULL;
-	int len, naddr, nsize, pna;
-	int ret = 0;
-	u64 dmaaddr;
+	struct of_bus *bus;
 
-	if (!node)
-		return -EINVAL;
-
-	while (1) {
-		naddr = of_n_addr_cells(node);
-		nsize = of_n_size_cells(node);
-		node = of_get_next_parent(node);
-		if (!node)
-			break;
-
-		ranges = of_get_property(node, "dma-ranges", &len);
-
-		/* Ignore empty ranges, they imply no translation required */
-		if (ranges && len > 0)
-			break;
-
-		/*
-		 * At least empty ranges has to be defined for parent node if
-		 * DMA is supported
-		 */
-		if (!ranges)
-			break;
-	}
-
-	if (!ranges) {
-		pr_debug("no dma-ranges found for node(%s)\n", np->full_name);
-		ret = -ENODEV;
-		goto out;
-	}
-
-	len /= sizeof(u32);
-
-	pna = of_n_addr_cells(node);
-
-	/* dma-ranges format:
-	 * DMA addr	: naddr cells
-	 * CPU addr	: pna cells
-	 * size		: nsize cells
-	 */
-	dmaaddr = of_read_number(ranges, naddr);
-	*paddr = of_translate_dma_address(np, ranges);
-	if (*paddr == OF_BAD_ADDR) {
-		pr_err("translation of DMA address(%pad) to CPU address failed node(%s)\n",
-		       dma_addr, np->full_name);
-		ret = -EINVAL;
-		goto out;
-	}
-	*dma_addr = dmaaddr;
-
-	*size = of_read_number(ranges + naddr + pna, nsize);
-
-	pr_debug("dma_addr(%llx) cpu_addr(%llx) size(%llx)\n",
-		 *dma_addr, *paddr, *size);
-
-out:
-	of_node_put(node);
-
-	return ret;
+	/* get bus specific dma-ranges. */
+	bus = of_match_bus(np);
+	return bus->get_dma_ranges(np, dma_addr, paddr, size);
 }
 EXPORT_SYMBOL_GPL(of_dma_get_range);
 
