@@ -1970,11 +1970,27 @@ void *vmalloc_32_user(unsigned long size)
 EXPORT_SYMBOL(vmalloc_32_user);
 
 /*
+ * VM_KERNEL indicates an address is mapped linearly.The linear mapping may
+ * use larger pages which vmalloc_to_page cannot handle.
+ */
+static inline struct page *aligned_get_page(char *addr, struct vm_struct *vm)
+{
+	struct page *p = NULL;
+
+	if (vm->flags & VM_KERNEL)
+		p = virt_to_page(lm_alias(addr));
+	else
+		p = vmalloc_to_page(addr);
+
+	return p;
+}
+
+/*
  * small helper routine , copy contents to buf from addr.
  * If the page is not present, fill zero.
  */
-
-static int aligned_vread(char *buf, char *addr, unsigned long count)
+static int aligned_vread(char *buf, char *addr, unsigned long count,
+					struct vm_struct *vm)
 {
 	struct page *p;
 	int copied = 0;
@@ -1986,7 +2002,7 @@ static int aligned_vread(char *buf, char *addr, unsigned long count)
 		length = PAGE_SIZE - offset;
 		if (length > count)
 			length = count;
-		p = vmalloc_to_page(addr);
+		p = aligned_get_page(addr, vm);
 		/*
 		 * To do safe access to this _mapped_ area, we need
 		 * lock. But adding lock here means that we need to add
@@ -2013,7 +2029,8 @@ static int aligned_vread(char *buf, char *addr, unsigned long count)
 	return copied;
 }
 
-static int aligned_vwrite(char *buf, char *addr, unsigned long count)
+static int aligned_vwrite(char *buf, char *addr, unsigned long count,
+					struct vm_struct *vm)
 {
 	struct page *p;
 	int copied = 0;
@@ -2025,7 +2042,7 @@ static int aligned_vwrite(char *buf, char *addr, unsigned long count)
 		length = PAGE_SIZE - offset;
 		if (length > count)
 			length = count;
-		p = vmalloc_to_page(addr);
+		p = aligned_get_page(addr, vm);
 		/*
 		 * To do safe access to this _mapped_ area, we need
 		 * lock. But adding lock here means that we need to add
@@ -2112,7 +2129,7 @@ long vread(char *buf, char *addr, unsigned long count)
 		if (n > count)
 			n = count;
 		if (!(vm->flags & VM_IOREMAP))
-			aligned_vread(buf, addr, n);
+			aligned_vread(buf, addr, n, vm);
 		else /* IOREMAP area is treated as memory hole */
 			memset(buf, 0, n);
 		buf += n;
@@ -2193,7 +2210,7 @@ long vwrite(char *buf, char *addr, unsigned long count)
 		if (n > count)
 			n = count;
 		if (!(vm->flags & VM_IOREMAP)) {
-			aligned_vwrite(buf, addr, n);
+			aligned_vwrite(buf, addr, n, vm);
 			copied++;
 		}
 		buf += n;
@@ -2712,6 +2729,9 @@ static int s_show(struct seq_file *m, void *p)
 
 	if (v->flags & VM_USERMAP)
 		seq_puts(m, " user");
+
+	if (v->flags & VM_KERNEL)
+		seq_puts(m, " kernel");
 
 	if (is_vmalloc_addr(v->pages))
 		seq_puts(m, " vpages");
