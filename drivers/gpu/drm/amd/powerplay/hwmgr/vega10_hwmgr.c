@@ -4199,7 +4199,7 @@ static int vega10_force_clock_level(struct pp_hwmgr *hwmgr,
 		}
 		data->smc_state_table.gfx_boot_level = i;
 
-		for (i = 31; i >= 0; i--) {
+		for (i = 32; --i; ) {
 			if (mask & (1 << i))
 				break;
 		}
