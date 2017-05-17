@@ -4944,11 +4944,11 @@ static ssize_t aliases_show(struct kmem_cache *s, char *buf)
 }
 SLAB_ATTR_RO(aliases);
 
-static ssize_t partial_show(struct kmem_cache *s, char *buf)
+static ssize_t partial_slabs_show(struct kmem_cache *s, char *buf)
 {
 	return show_slab_objects(s, buf, SO_PARTIAL);
 }
-SLAB_ATTR_RO(partial);
+SLAB_ATTR_RO(partial_slabs);
 
 static ssize_t cpu_slabs_show(struct kmem_cache *s, char *buf)
 {
@@ -4974,17 +4974,17 @@ static ssize_t slabs_objects_show(struct kmem_cache *s, char *buf)
 }
 SLAB_ATTR_RO(slabs_objects);
 
-static ssize_t objects_partial_show(struct kmem_cache *s, char *buf)
+static ssize_t partial_slabs_objects_show(struct kmem_cache *s, char *buf)
 {
 	return show_slab_objects(s, buf, SO_PARTIAL|SO_OBJECTS);
 }
-SLAB_ATTR_RO(objects_partial);
+SLAB_ATTR_RO(partial_slabs_objects);
 
-static ssize_t total_objects_partial_show(struct kmem_cache *s, char *buf)
+static ssize_t partial_slabs_total_objects_show(struct kmem_cache *s, char *buf)
 {
 	return show_slab_objects(s, buf, SO_PARTIAL|SO_TOTAL);
 }
-SLAB_ATTR_RO(total_objects_partial);
+SLAB_ATTR_RO(partial_slabs_total_objects);
 
 static ssize_t slabs_cpu_partial_show(struct kmem_cache *s, char *buf)
 {
@@ -5363,9 +5363,9 @@ static struct attribute *slab_attrs[] = {
 	&min_partial_attr.attr,
 	&cpu_partial_attr.attr,
 	&slabs_objects_attr.attr,
-	&objects_partial_attr.attr,
-	&total_objects_partial_attr.attr,
-	&partial_attr.attr,
+	&partial_slabs_objects_attr.attr,
+	&partial_slabs_total_objects_attr.attr,
+	&partial_slabs_attr.attr,
 	&cpu_slabs_objects_attr.attr,
 	&cpu_slabs_total_objects_attr.attr,
 	&cpu_slabs_attr.attr,
