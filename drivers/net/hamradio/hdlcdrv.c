@@ -574,7 +574,7 @@ static int hdlcdrv_ioctl(struct net_device *dev, struct ifreq *ifr, int cmd)
 		break;		
 
 	case HDLCDRVCTL_CALIBRATE:
-		if(!capable(CAP_SYS_RAWIO))
+		if (!capable(CAP_SYS_RAWIO) || !netif_running(dev))
 			return -EPERM;
 		if (bi.data.calibrate > INT_MAX / s->par.bitrate)
 			return -EINVAL;
