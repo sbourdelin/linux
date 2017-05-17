@@ -1317,6 +1317,17 @@ static int nvme_configure_admin_queue(struct nvme_dev *dev)
 	u32 aqa;
 	u64 cap = lo_hi_readq(dev->bar + NVME_REG_CAP);
 	struct nvme_queue *nvmeq;
+	struct pci_dev *pdev = to_pci_dev(dev->dev);
+	unsigned long size;
+
+	size = 4096 + 2 * 4 * dev->db_stride;
+	if (size > 8192) {
+		iounmap(dev->bar);
+		dev->bar = ioremap(pci_resource_start(pdev, 0), size);
+		if (!dev->bar)
+			return -ENOMEM;
+		dev->dbs = dev->bar + 4096;
+	}
 
 	dev->subsystem = readl(dev->bar + NVME_REG_VS) >= NVME_VS(1, 1, 0) ?
 						NVME_CAP_NSSRC(cap) : 0;
