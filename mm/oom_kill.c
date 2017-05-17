@@ -302,10 +302,11 @@ static int oom_evaluate_task(struct task_struct *task, void *arg)
 	 * the task has MMF_OOM_SKIP because chances that it would release
 	 * any memory is quite low.
 	 */
-	if (!is_sysrq_oom(oc) && tsk_is_oom_victim(task)) {
+	if (tsk_is_oom_victim(task)) {
 		if (test_bit(MMF_OOM_SKIP, &task->signal->oom_mm->flags))
 			goto next;
-		goto abort;
+		if (!is_sysrq_oom(oc))
+			goto abort;
 	}
 
 	/*
@@ -559,22 +560,11 @@ static void oom_reap_task(struct task_struct *tsk)
 	while (attempts++ < MAX_OOM_REAP_RETRIES && !__oom_reap_task_mm(tsk, mm))
 		schedule_timeout_idle(HZ/10);
 
-	if (attempts <= MAX_OOM_REAP_RETRIES)
-		goto done;
-
-
-	pr_info("oom_reaper: unable to reap pid:%d (%s)\n",
-		task_pid_nr(tsk), tsk->comm);
-	debug_show_all_locks();
-
-done:
-	tsk->oom_reaper_list = NULL;
-
-	/*
-	 * Hide this mm from OOM killer because it has been either reaped or
-	 * somebody can't call up_write(mmap_sem).
-	 */
-	set_bit(MMF_OOM_SKIP, &mm->flags);
+	if (attempts > MAX_OOM_REAP_RETRIES) {
+		pr_info("oom_reaper: unable to reap pid:%d (%s)\n",
+			task_pid_nr(tsk), tsk->comm);
+		debug_show_all_locks();
+	}
 
 	/* Drop a reference taken by wake_oom_reaper */
 	put_task_struct(tsk);
@@ -590,6 +580,7 @@ static int oom_reaper(void *unused)
 		if (oom_reaper_list != NULL) {
 			tsk = oom_reaper_list;
 			oom_reaper_list = tsk->oom_reaper_list;
+			tsk->oom_reaper_list = NULL;
 		}
 		spin_unlock(&oom_reaper_lock);
 
@@ -605,8 +596,7 @@ static void wake_oom_reaper(struct task_struct *tsk)
 	if (!oom_reaper_th)
 		return;
 
-	/* tsk is already queued? */
-	if (tsk == oom_reaper_list || tsk->oom_reaper_list)
+	if (test_and_set_bit(MMF_OOM_SKIP, &tsk->signal->oom_mm->flags))
 		return;
 
 	get_task_struct(tsk);
@@ -1066,6 +1056,9 @@ void pagefault_out_of_memory(void)
 	};
 
 	if (mem_cgroup_oom_synchronize(true))
+		return;
+
+	if (tsk_is_oom_victim(current))
 		return;
 
 	if (!mutex_trylock(&oom_lock))
