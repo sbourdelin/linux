@@ -4986,7 +4986,7 @@ static ssize_t partial_slabs_total_objects_show(struct kmem_cache *s, char *buf)
 }
 SLAB_ATTR_RO(partial_slabs_total_objects);
 
-static ssize_t slabs_cpu_partial_show(struct kmem_cache *s, char *buf)
+static ssize_t cpu_partial_slabs_show(struct kmem_cache *s, char *buf)
 {
 	int objects = 0;
 	int pages = 0;
@@ -5019,7 +5019,7 @@ static ssize_t slabs_cpu_partial_show(struct kmem_cache *s, char *buf)
 #endif
 	return len + sprintf(buf + len, "\n");
 }
-SLAB_ATTR_RO(slabs_cpu_partial);
+SLAB_ATTR_RO(cpu_partial_slabs);
 
 static ssize_t reclaim_account_show(struct kmem_cache *s, char *buf)
 {
@@ -5377,7 +5377,7 @@ static struct attribute *slab_attrs[] = {
 	&destroy_by_rcu_attr.attr,
 	&shrink_attr.attr,
 	&reserved_attr.attr,
-	&slabs_cpu_partial_attr.attr,
+	&cpu_partial_slabs_attr.attr,
 #ifdef CONFIG_SLUB_DEBUG
 	&slabs_total_objects_attr.attr,
 	&slabs_attr.attr,
