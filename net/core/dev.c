@@ -1348,7 +1348,6 @@ static int __dev_open(struct net_device *dev)
 		dev->flags |= IFF_UP;
 		dev_set_rx_mode(dev);
 		dev_activate(dev);
-		add_device_randomness(dev->dev_addr, dev->addr_len);
 	}
 
 	return ret;
