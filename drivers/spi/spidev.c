@@ -106,8 +106,7 @@ spidev_sync(struct spidev_data *spidev, struct spi_message *message)
 	spin_lock_irq(&spidev->spi_lock);
 	spi = spidev->spi;
 	spin_unlock_irq(&spidev->spi_lock);
-
-	if (spi == NULL)
+	if (!spi)
 		status = -ESHUTDOWN;
 	else
 		status = spi_sync(spi, message);
@@ -218,7 +217,7 @@ static int spidev_message(struct spidev_data *spidev,
 
 	spi_message_init(&msg);
 	k_xfers = kcalloc(n_xfers, sizeof(*k_tmp), GFP_KERNEL);
-	if (k_xfers == NULL)
+	if (!k_xfers)
 		return -ENOMEM;
 
 	/* Construct spi_message, copying any tx data to bounce buffer.
@@ -387,8 +386,7 @@ spidev_ioctl(struct file *filp, unsigned int cmd, unsigned long arg)
 	spin_lock_irq(&spidev->spi_lock);
 	spi = spi_dev_get(spidev->spi);
 	spin_unlock_irq(&spidev->spi_lock);
-
-	if (spi == NULL)
+	if (!spi)
 		return -ESHUTDOWN;
 
 	/* use the buffer lock here for triple duty:
@@ -535,8 +533,7 @@ spidev_compat_ioc_message(struct file *filp, unsigned int cmd,
 	spin_lock_irq(&spidev->spi_lock);
 	spi = spi_dev_get(spidev->spi);
 	spin_unlock_irq(&spidev->spi_lock);
-
-	if (spi == NULL)
+	if (!spi)
 		return -ESHUTDOWN;
 
 	/* SPI_IOC_MESSAGE needs the buffer locked "normally" */
@@ -655,7 +652,7 @@ static int spidev_release(struct inode *inode, struct file *filp)
 			spidev->speed_hz = spidev->spi->max_speed_hz;
 
 		/* ... after we unbound from the underlying device? */
-		dofree = (spidev->spi == NULL);
+		dofree = !spidev->spi;
 		spin_unlock_irq(&spidev->spi_lock);
 
 		if (dofree)
