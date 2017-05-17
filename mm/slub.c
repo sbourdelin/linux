@@ -4760,19 +4760,6 @@ static ssize_t show_slab_objects(struct kmem_cache *s,
 
 			total += x;
 			nodes[node] += x;
-
-			page = slub_percpu_partial_read_once(c);
-			if (page) {
-				node = page_to_nid(page);
-				if (flags & SO_TOTAL)
-					WARN_ON_ONCE(1);
-				else if (flags & SO_OBJECTS)
-					WARN_ON_ONCE(1);
-				else
-					x = page->pages;
-				total += x;
-				nodes[node] += x;
-			}
 		}
 	}
 
