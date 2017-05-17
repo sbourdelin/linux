@@ -4,6 +4,7 @@ generic-y += dma-contiguous.h
 generic-y += div64.h
 generic-y += emergency-restart.h
 generic-y += export.h
+generic-y += fb.h
 generic-y += irq_regs.h
 generic-y += irq_work.h
 generic-y += kmap_types.h
