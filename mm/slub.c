@@ -4981,6 +4981,12 @@ static ssize_t objects_partial_show(struct kmem_cache *s, char *buf)
 }
 SLAB_ATTR_RO(objects_partial);
 
+static ssize_t total_objects_partial_show(struct kmem_cache *s, char *buf)
+{
+	return show_slab_objects(s, buf, SO_PARTIAL|SO_TOTAL);
+}
+SLAB_ATTR_RO(total_objects_partial);
+
 static ssize_t slabs_cpu_partial_show(struct kmem_cache *s, char *buf)
 {
 	int objects = 0;
@@ -5359,6 +5365,7 @@ static struct attribute *slab_attrs[] = {
 	&cpu_partial_attr.attr,
 	&objects_attr.attr,
 	&objects_partial_attr.attr,
+	&total_objects_partial_attr.attr,
 	&partial_attr.attr,
 	&cpu_slabs_attr.attr,
 	&ctor_attr.attr,
