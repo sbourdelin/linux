@@ -21,6 +21,8 @@
 #include <linux/spi/spi.h>
 #include <linux/of_device.h>
 
+enum chips { mchp23k256, mchp23lcv1024 };
+
 struct mchp23k256_flash {
 	struct spi_device	*spi;
 	struct mutex		lock;
@@ -128,6 +130,7 @@ static int mchp23k256_probe(struct spi_device *spi)
 	struct mchp23k256_flash *flash;
 	struct flash_platform_data *data;
 	int err;
+	enum chips chip;
 
 	flash = devm_kzalloc(&spi->dev, sizeof(*flash), GFP_KERNEL);
 	if (!flash)
@@ -143,14 +146,27 @@ static int mchp23k256_probe(struct spi_device *spi)
 
 	data = dev_get_platdata(&spi->dev);
 
+	if (spi->dev.of_node)
+		chip = (enum chips)of_device_get_match_data(&spi->dev);
+	else
+		chip = mchp23k256;
+
 	mtd_set_of_node(&flash->mtd, spi->dev.of_node);
 	flash->mtd.dev.parent	= &spi->dev;
 	flash->mtd.type		= MTD_RAM;
 	flash->mtd.flags	= MTD_CAP_RAM;
 	flash->mtd.writesize	= 1;
-	flash->mtd.size		= SZ_32K;
 	flash->mtd._read	= mchp23k256_read;
 	flash->mtd._write	= mchp23k256_write;
+
+	switch (chip){
+	case mchp23lcv1024:
+		flash->mtd.size		= SZ_128K;
+		break;
+	default:
+		flash->mtd.size		= SZ_32K;
+		break;
+	}
 
 	flash->mtd.erasesize = PAGE_SIZE;
 	while (flash->mtd.size & (flash->mtd.erasesize - 1))
@@ -172,7 +188,8 @@ static int mchp23k256_remove(struct spi_device *spi)
 }
 
 static const struct of_device_id mchp23k256_of_table[] = {
-	{ .compatible = "microchip,mchp23k256" },
+	{ .compatible = "microchip,mchp23k256", .data = (void *)mchp23k256 },
+	{ .compatible = "microchip,mchp23lcv1024", .data = (void *)mchp23lcv1024 },
 	{}
 };
 MODULE_DEVICE_TABLE(of, mchp23k256_of_table);
