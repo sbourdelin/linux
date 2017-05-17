@@ -4956,6 +4956,18 @@ static ssize_t cpu_slabs_show(struct kmem_cache *s, char *buf)
 }
 SLAB_ATTR_RO(cpu_slabs);
 
+static ssize_t cpu_slabs_objects_show(struct kmem_cache *s, char *buf)
+{
+	return show_slab_objects(s, buf, SO_CPU|SO_OBJECTS);
+}
+SLAB_ATTR_RO(cpu_slabs_objects);
+
+static ssize_t cpu_slabs_total_objects_show(struct kmem_cache *s, char *buf)
+{
+	return show_slab_objects(s, buf, SO_CPU|SO_TOTAL);
+}
+SLAB_ATTR_RO(cpu_slabs_total_objects);
+
 static ssize_t objects_show(struct kmem_cache *s, char *buf)
 {
 	return show_slab_objects(s, buf, SO_ALL|SO_OBJECTS);
@@ -5354,6 +5366,8 @@ static struct attribute *slab_attrs[] = {
 	&objects_partial_attr.attr,
 	&total_objects_partial_attr.attr,
 	&partial_attr.attr,
+	&cpu_slabs_objects_attr.attr,
+	&cpu_slabs_total_objects_attr.attr,
 	&cpu_slabs_attr.attr,
 	&ctor_attr.attr,
 	&aliases_attr.attr,
