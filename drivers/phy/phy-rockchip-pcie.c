@@ -99,8 +99,8 @@ static inline void phy_wr_cfg(struct rockchip_pcie_phy *rk_phy,
 				   PHY_CFG_WR_SHIFT));
 }
 
-static inline u32 phy_rd_cfg(struct rockchip_pcie_phy *rk_phy,
-			     u32 addr)
+static inline u32 __maybe_unused
+phy_rd_cfg(struct rockchip_pcie_phy *rk_phy, u32 addr)
 {
 	u32 val;
 
