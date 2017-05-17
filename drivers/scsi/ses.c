@@ -604,6 +604,7 @@ static int ses_intf_add(struct device *cdev,
 	unsigned char *buf = NULL, *hdr_buf, *type_ptr;
 	struct ses_device *ses_dev;
 	u32 result;
+	int page;
 	int i, types, len, components = 0;
 	int err = -ENOMEM;
 	int num_enclosures;
@@ -630,7 +631,8 @@ static int ses_intf_add(struct device *cdev,
 	if (!hdr_buf || !ses_dev)
 		goto err_init_free;
 
-	result = ses_recv_diag(sdev, 1, hdr_buf, INIT_ALLOC_SIZE);
+	page = 1;
+	result = ses_recv_diag(sdev, page, hdr_buf, INIT_ALLOC_SIZE);
 	if (result)
 		goto recv_failed;
 
@@ -639,7 +641,7 @@ static int ses_intf_add(struct device *cdev,
 	if (!buf)
 		goto err_free;
 
-	result = ses_recv_diag(sdev, 1, buf, len);
+	result = ses_recv_diag(sdev, page, buf, len);
 	if (result)
 		goto recv_failed;
 
@@ -669,7 +671,8 @@ static int ses_intf_add(struct device *cdev,
 	ses_dev->page1_len = len;
 	buf = NULL;
 
-	result = ses_recv_diag(sdev, 2, hdr_buf, INIT_ALLOC_SIZE);
+	page = 2;
+	result = ses_recv_diag(sdev, page, hdr_buf, INIT_ALLOC_SIZE);
 	if (result)
 		goto recv_failed;
 
@@ -679,7 +682,7 @@ static int ses_intf_add(struct device *cdev,
 		goto err_free;
 
 	/* make sure getting page 2 actually works */
-	result = ses_recv_diag(sdev, 2, buf, len);
+	result = ses_recv_diag(sdev, page, buf, len);
 	if (result)
 		goto recv_failed;
 	ses_dev->page2 = buf;
@@ -688,7 +691,8 @@ static int ses_intf_add(struct device *cdev,
 
 	/* The additional information page --- allows us
 	 * to match up the devices */
-	result = ses_recv_diag(sdev, 10, hdr_buf, INIT_ALLOC_SIZE);
+	page = 10;
+	result = ses_recv_diag(sdev, page, hdr_buf, INIT_ALLOC_SIZE);
 	if (!result) {
 
 		len = (hdr_buf[2] << 8) + hdr_buf[3] + 4;
@@ -696,7 +700,7 @@ static int ses_intf_add(struct device *cdev,
 		if (!buf)
 			goto err_free;
 
-		result = ses_recv_diag(sdev, 10, buf, len);
+		result = ses_recv_diag(sdev, page, buf, len);
 		if (result)
 			goto recv_failed;
 		ses_dev->page10 = buf;
@@ -733,8 +737,9 @@ static int ses_intf_add(struct device *cdev,
 	return 0;
 
  recv_failed:
-	sdev_printk(KERN_ERR, sdev, "Failed to get diagnostic page 0x%x\n",
-		    result);
+	sdev_printk(KERN_ERR, sdev,
+		    "Failed to get diagnostic page %d with error %d\n",
+		    page, result);
 	err = -ENODEV;
  err_free:
 	kfree(buf);
