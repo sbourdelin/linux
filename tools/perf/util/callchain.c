@@ -15,6 +15,7 @@
 #include <stdbool.h>
 #include <errno.h>
 #include <math.h>
+#include <ctype.h>
 
 #include "asm/bug.h"
 
@@ -65,7 +66,6 @@ static int parse_callchain_mode(const char *value)
 		return 0;
 	}
 
-	pr_err("Invalid callchain mode: %s\n", value);
 	return -1;
 }
 
@@ -82,7 +82,6 @@ static int parse_callchain_order(const char *value)
 		return 0;
 	}
 
-	pr_err("Invalid callchain order: %s\n", value);
 	return -1;
 }
 
@@ -105,7 +104,6 @@ static int parse_callchain_sort_key(const char *value)
 		return 0;
 	}
 
-	pr_err("Invalid callchain sort key: %s\n", value);
 	return -1;
 }
 
@@ -124,7 +122,6 @@ static int parse_callchain_value(const char *value)
 		return 0;
 	}
 
-	pr_err("Invalid callchain config key: %s\n", value);
 	return -1;
 }
 
@@ -197,6 +194,9 @@ __parse_callchain_report_opt(const char *arg, bool allow_record_opt)
 		}
 
 try_numbers:
+		if (!isdigit(*tok))
+			pr_err("Invalid callchain param: %s\n", tok);
+
 		if (try_stack_size) {
 			unsigned long size = 0;
 
