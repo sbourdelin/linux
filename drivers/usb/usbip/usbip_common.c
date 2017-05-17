@@ -381,6 +381,12 @@ static unsigned int tweak_transfer_flags(unsigned int flags)
 	return flags;
 }
 
+static unsigned int tweak_submit_transfer_flags(unsigned int flags)
+{
+	flags |= URB_FREE_BUFFER;
+	return flags;
+}
+
 static void usbip_pack_cmd_submit(struct usbip_header *pdu, struct urb *urb,
 				  int pack)
 {
@@ -398,7 +404,8 @@ static void usbip_pack_cmd_submit(struct usbip_header *pdu, struct urb *urb,
 		spdu->number_of_packets		= urb->number_of_packets;
 		spdu->interval			= urb->interval;
 	} else  {
-		urb->transfer_flags         = spdu->transfer_flags;
+		urb->transfer_flags         =
+			tweak_submit_transfer_flags(spdu->transfer_flags);
 		urb->transfer_buffer_length = spdu->transfer_buffer_length;
 		urb->start_frame            = spdu->start_frame;
 		urb->number_of_packets      = spdu->number_of_packets;

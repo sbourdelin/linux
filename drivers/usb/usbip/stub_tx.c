@@ -28,7 +28,6 @@ static void stub_free_priv_and_urb(struct stub_priv *priv)
 	struct urb *urb = priv->urb;
 
 	kfree(urb->setup_packet);
-	kfree(urb->transfer_buffer);
 	list_del(&priv->list);
 	kmem_cache_free(stub_priv_cache, priv);
 	usb_free_urb(urb);
