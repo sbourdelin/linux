@@ -20,13 +20,16 @@ Date:		April 2017
 Contact:	Heikki Krogerus <heikki.krogerus@linux.intel.com>
 Description:
 		The supported power roles. This attribute can be used to request
-		power role swap on the port when the port supports USB Power
-		Delivery. Swapping is supported as synchronous operation, so
+		power role swap. Swapping is supported as synchronous operation, so
 		write(2) to the attribute will not return until the operation
 		has finished. The attribute is notified about role changes so
 		that poll(2) on the attribute wakes up. Change on the role will
 		also generate uevent KOBJ_CHANGE. The current role is show in
 		brackets, for example "[source] sink" when in source mode.
+		When both the port and the port-partner supports USB Power
+		Delivery, the PR_SWAP command is used to perform the role swap.
+		Otherwise, the port roles would be re-resolved by forcing
+		a disconnect and reconnect.
 
 		Valid values: source, sink
 

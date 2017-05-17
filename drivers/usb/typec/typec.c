@@ -887,19 +887,9 @@ static ssize_t power_role_store(struct device *dev,
 	struct typec_port *port = to_typec_port(dev);
 	int ret = size;
 
-	if (!port->cap->pd_revision) {
-		dev_dbg(dev, "USB Power Delivery not supported\n");
-		return -EOPNOTSUPP;
-	}
-
 	if (!port->cap->pr_set) {
 		dev_dbg(dev, "power role swapping not supported\n");
 		return -EOPNOTSUPP;
-	}
-
-	if (port->pwr_opmode != TYPEC_PWR_MODE_PD) {
-		dev_dbg(dev, "partner unable to swap power role\n");
-		return -EIO;
 	}
 
 	ret = sysfs_match_string(typec_roles, buf);
