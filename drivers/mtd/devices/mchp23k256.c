@@ -143,6 +143,7 @@ static int mchp23k256_probe(struct spi_device *spi)
 
 	data = dev_get_platdata(&spi->dev);
 
+	mtd_set_of_node(&flash->mtd, spi->dev.of_node);
 	flash->mtd.dev.parent	= &spi->dev;
 	flash->mtd.type		= MTD_RAM;
 	flash->mtd.flags	= MTD_CAP_RAM;
@@ -150,6 +151,10 @@ static int mchp23k256_probe(struct spi_device *spi)
 	flash->mtd.size		= SZ_32K;
 	flash->mtd._read	= mchp23k256_read;
 	flash->mtd._write	= mchp23k256_write;
+
+	flash->mtd.erasesize = PAGE_SIZE;
+	while (flash->mtd.size & (flash->mtd.erasesize - 1))
+		flash->mtd.erasesize >>= 1;
 
 	err = mtd_device_register(&flash->mtd, data ? data->parts : NULL,
 				  data ? data->nr_parts : 0);
