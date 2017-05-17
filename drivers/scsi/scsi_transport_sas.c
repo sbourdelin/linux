@@ -215,7 +215,7 @@ static void sas_host_release(struct device *dev)
 
 static void sas_initialize_rq(struct request *rq)
 {
-	scsi_req_init(rq);
+	scsi_req_init(scsi_req(rq));
 }
 
 static int sas_bsg_initialize(struct Scsi_Host *shost, struct sas_rphy *rphy)

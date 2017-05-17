@@ -1119,7 +1119,9 @@ EXPORT_SYMBOL(scsi_init_io);
 /* Called from inside blk_get_request() */
 static void scsi_initialize_rq(struct request *rq)
 {
-	scsi_req_init(rq);
+	struct scsi_cmnd *cmd = blk_mq_rq_to_pdu(rq);
+
+	scsi_req_init(&cmd->req);
 }
 
 /* Called after a request has been started. */
