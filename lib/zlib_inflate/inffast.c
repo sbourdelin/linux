@@ -27,7 +27,7 @@ union uu {
 };
 
 /* Endian independed version */
-static inline unsigned short
+static inline unsigned short __maybe_unused
 get_unaligned16(const unsigned short *p)
 {
 	union uu  mm;
