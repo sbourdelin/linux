@@ -121,7 +121,6 @@ struct hv_ring_buffer {
 struct hv_ring_buffer_info {
 	struct hv_ring_buffer *ring_buffer;
 	u32 ring_size;			/* Include the shared header */
-	spinlock_t ring_lock;
 
 	u32 ring_datasize;		/* < ring_size */
 	u32 ring_data_startoffset;
