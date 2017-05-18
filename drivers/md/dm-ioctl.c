@@ -1741,7 +1741,7 @@ static int copy_params(struct dm_ioctl __user *user, struct dm_ioctl *param_kern
 	 */
 	dmi = NULL;
 	noio_flag = memalloc_noio_save();
-	dmi = kvmalloc(param_kernel->data_size, GFP_KERNEL);
+	dmi = kvmalloc(param_kernel->data_size, GFP_KERNEL | __GFP_HIGH);
 	memalloc_noio_restore(noio_flag);
 
 	if (!dmi) {
