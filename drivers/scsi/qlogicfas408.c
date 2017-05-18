@@ -329,7 +329,6 @@ static unsigned int ql_pcmd(struct scsi_cmnd *cmd)
 		 */
 		if ((k = ql_wai(priv)))
 			return (k << 16);
-		k = inb(qbase + 5);	/* should be 0x10, bus service */
 	}
 
 	/*
