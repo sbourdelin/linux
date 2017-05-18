@@ -426,6 +426,48 @@ static void scsi_report_sense(struct scsi_device *sdev,
 	}
 }
 
+/*
+ * generate uevent when receiving sense code from device
+ */
+static void scsi_send_sense_uevent(struct scsi_device *sdev,
+				   struct scsi_cmnd *scmd,
+				   struct scsi_sense_hdr *sshdr)
+{
+#ifdef CONFIG_SCSI_SENSE_UEVENT
+	struct scsi_event *evt;
+	unsigned char sb_len;
+
+	if (!test_bit(sshdr->sense_key & 0xf,
+		      &sdev->sense_event_filter))
+		return;
+	evt = sdev_evt_alloc(SDEV_EVT_SCSI_SENSE, GFP_ATOMIC);
+	if (!evt)
+		return;
+
+	evt->sense_evt_data.cmnd = kzalloc(scmd->cmd_len, GFP_ATOMIC);
+	if (!evt->sense_evt_data.cmnd)
+		goto alloc_cmd_fail;
+
+	sb_len = scsi_sense_data_length(scmd->sense_buffer);
+
+	evt->sense_evt_data.sense_buffer = kzalloc(sb_len, GFP_ATOMIC);
+	if (!evt->sense_evt_data.sense_buffer)
+		goto alloc_sense_fail;
+
+	evt->sense_evt_data.cmd_len = scmd->cmd_len;
+	evt->sense_evt_data.sb_len = sb_len;
+	memcpy(evt->sense_evt_data.cmnd, scmd->cmnd, scmd->cmd_len);
+	memcpy(evt->sense_evt_data.sense_buffer, scmd->sense_buffer, sb_len);
+
+	sdev_evt_send(sdev, evt);
+	return;
+alloc_sense_fail:
+	kfree(evt->sense_evt_data.cmnd);
+alloc_cmd_fail:
+	kfree(evt);
+#endif
+}
+
 /**
  * scsi_check_sense - Examine scsi cmd sense
  * @scmd:	Cmd to have sense checked.
@@ -446,6 +488,7 @@ int scsi_check_sense(struct scsi_cmnd *scmd)
 		return FAILED;	/* no valid sense data */
 
 	scsi_report_sense(sdev, &sshdr);
+	scsi_send_sense_uevent(sdev, scmd, &sshdr);
 
 	if (scsi_sense_is_deferred(&sshdr))
 		return NEEDS_RETRY;
