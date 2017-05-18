@@ -1798,7 +1798,7 @@ ixgbe_setup_mac_link_sfp_x550a(struct ixgbe_hw *hw, ixgbe_link_speed speed,
 	if (ret_val == IXGBE_ERR_SFP_NOT_PRESENT)
 		return 0;
 
-	if (!ret_val)
+	if (ret_val)
 		return ret_val;
 
 	/* Configure internal PHY for KR/KX. */
