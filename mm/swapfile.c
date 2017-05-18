@@ -2426,12 +2426,12 @@ static const struct file_operations proc_swaps_operations = {
 	.poll		= swaps_poll,
 };
 
-static int __init procswaps_init(void)
+static int __init proc_swaps_init(void)
 {
 	proc_create("swaps", 0, NULL, &proc_swaps_operations);
 	return 0;
 }
-__initcall(procswaps_init);
+__initcall(proc_swaps_init);
 #endif /* CONFIG_PROC_FS */
 
 #ifdef MAX_SWAPFILES_CHECK
