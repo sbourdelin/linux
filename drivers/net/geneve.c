@@ -1311,12 +1311,12 @@ static int geneve_fill_info(struct sk_buff *skb, const struct net_device *dev)
 		if (nla_put_u8(skb, IFLA_GENEVE_UDP_ZERO_CSUM6_TX,
 			       !(info->key.tun_flags & TUNNEL_CSUM)))
 			goto nla_put_failure;
-
-		if (nla_put_u8(skb, IFLA_GENEVE_UDP_ZERO_CSUM6_RX,
-			       !geneve->use_udp6_rx_checksums))
-			goto nla_put_failure;
 #endif
 	}
+
+	if (nla_put_u8(skb, IFLA_GENEVE_UDP_ZERO_CSUM6_RX,
+		       !geneve->use_udp6_rx_checksums))
+		goto nla_put_failure;
 
 	if (nla_put_u8(skb, IFLA_GENEVE_TTL, info->key.ttl) ||
 	    nla_put_u8(skb, IFLA_GENEVE_TOS, info->key.tos) ||
