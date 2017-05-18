@@ -380,6 +380,7 @@ static int xhci_stop_device(struct xhci_hcd *xhci, int slot_id, int suspend)
 {
 	struct xhci_virt_device *virt_dev;
 	struct xhci_command *cmd;
+	struct xhci_ep_ctx *ep_ctx;
 	unsigned long flags;
 	int ret;
 	int i;
@@ -407,11 +408,42 @@ static int xhci_stop_device(struct xhci_hcd *xhci, int slot_id, int suspend)
 				return -ENOMEM;
 
 			}
-			xhci_queue_stop_endpoint(xhci, command, slot_id, i,
-						 suspend);
+
+			/* on AMD platforms with SNPS 3.1 USB controller has
+			 * an issue if the stop EP command is issued when
+			 * the controller is not in running state.
+			 * If issued, its leading to a RTL bug because of
+			 * which controller goes to a bad state.
+			 * Adding a conditional check to prevent this.
+			 */
+
+			if (xhci->quirks & XHCI_BROKEN_STOP) {
+				ep_ctx = xhci_get_ep_ctx(xhci,
+						virt_dev->out_ctx, i);
+
+				if (GET_EP_CTX_STATE(ep_ctx) ==
+							EP_STATE_RUNNING) {
+					xhci_queue_stop_endpoint(xhci, command,
+							slot_id, i, suspend);
+				}
+			} else {
+				xhci_queue_stop_endpoint(xhci, command,
+						slot_id, i, suspend);
+			}
 		}
 	}
-	xhci_queue_stop_endpoint(xhci, cmd, slot_id, 0, suspend);
+
+	if (xhci->quirks & XHCI_BROKEN_STOP) {
+		ep_ctx = xhci_get_ep_ctx(xhci, virt_dev->out_ctx, 0);
+
+		if (GET_EP_CTX_STATE(ep_ctx) ==  EP_STATE_RUNNING) {
+			xhci_queue_stop_endpoint(xhci, cmd, slot_id, 0,
+						 suspend);
+		}
+	} else {
+		xhci_queue_stop_endpoint(xhci, cmd, slot_id, 0, suspend);
+	}
+
 	xhci_ring_cmd_db(xhci);
 	spin_unlock_irqrestore(&xhci->lock, flags);
 
