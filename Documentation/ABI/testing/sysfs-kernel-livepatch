@@ -8,6 +8,15 @@ Description:
 		The /sys/kernel/livepatch directory contains subdirectories for
 		each loaded live patch module.
 
+What:		/sys/kernel/livepatch/force
+Date:		May 2017
+KernelVersion:	4.13.0
+Contact:	live-patching@vger.kernel.org
+Description:
+		A write-only attribute that allows administrator to affect the
+		course of an existing transition. A fake signal can be send or
+		tasks TIF can be cleared.
+
 What:		/sys/kernel/livepatch/<patch>
 Date:		Nov 2014
 KernelVersion:	3.19.0
