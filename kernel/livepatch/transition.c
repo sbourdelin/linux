@@ -591,3 +591,19 @@ void klp_send_fake_signal(void)
 	}
 	read_unlock(&tasklist_lock);
 }
+
+/*
+ * Drop TIF_PATCH_PENDING of all tasks on admin's request. This forces an
+ * existing transition to finish.
+ */
+void klp_unmark_tasks(void)
+{
+	struct task_struct *g, *task;
+
+	pr_warn("all tasks marked as migrated on admin's request\n");
+
+	read_lock(&tasklist_lock);
+	for_each_process_thread(g, task)
+		klp_update_patch_state(task);
+	read_unlock(&tasklist_lock);
+}

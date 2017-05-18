@@ -469,6 +469,9 @@ static ssize_t force_store(struct kobject *kobj, struct kobj_attribute *attr,
 	case KLP_FORCE_FAKE:
 		klp_send_fake_signal();
 		break;
+	case KLP_FORCE_UNMARK:
+		klp_unmark_tasks();
+		break;
 	default:
 		return -EINVAL;
 	}

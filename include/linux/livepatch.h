@@ -31,6 +31,7 @@
 
 /* values for sysfs force attribute */
 #define KLP_FORCE_FAKE		1
+#define KLP_FORCE_UNMARK	2
 
 /* task patch states */
 #define KLP_UNDEFINED	-1
