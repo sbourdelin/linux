@@ -2626,6 +2626,75 @@ static inline bool memcg_has_children(struct mem_cgroup *memcg)
 	return ret;
 }
 
+bool mem_cgroup_select_oom_victim(struct oom_control *oc)
+{
+	struct mem_cgroup *iter;
+	unsigned long chosen_memcg_points;
+
+	oc->chosen_memcg = NULL;
+
+	if (mem_cgroup_disabled())
+		return false;
+
+	if (!cgroup_subsys_on_dfl(memory_cgrp_subsys))
+		return false;
+
+	pr_info("Choosing a victim memcg because of %s",
+		oc->memcg ?
+		"memory limit reached of cgroup " :
+		"out of memory\n");
+	if (oc->memcg) {
+		pr_cont_cgroup_path(oc->memcg->css.cgroup);
+		pr_cont("\n");
+	}
+
+	chosen_memcg_points = 0;
+
+	for_each_mem_cgroup_tree(iter, oc->memcg) {
+		unsigned long points;
+		int nid;
+
+		if (mem_cgroup_is_root(iter))
+			continue;
+
+		if (memcg_has_children(iter))
+			continue;
+
+		points = 0;
+		for_each_node_state(nid, N_MEMORY) {
+			if (oc->nodemask && !node_isset(nid, *oc->nodemask))
+				continue;
+			points += mem_cgroup_node_nr_lru_pages(iter, nid,
+					LRU_ALL_ANON | BIT(LRU_UNEVICTABLE));
+		}
+		points += mem_cgroup_get_nr_swap_pages(iter);
+
+		pr_info("Memcg ");
+		pr_cont_cgroup_path(iter->css.cgroup);
+		pr_cont(": %lu\n", points);
+
+		if (points > chosen_memcg_points) {
+			if (oc->chosen_memcg)
+				css_put(&oc->chosen_memcg->css);
+
+			oc->chosen_memcg = iter;
+			css_get(&iter->css);
+
+			chosen_memcg_points = points;
+		}
+	}
+
+	if (oc->chosen_memcg) {
+		pr_info("Kill memcg ");
+		pr_cont_cgroup_path(oc->chosen_memcg->css.cgroup);
+		pr_cont(" (%lu)\n", chosen_memcg_points);
+	} else {
+		pr_info("No elegible memory cgroup found\n");
+	}
+
+	return !!oc->chosen_memcg;
+}
+
 /*
  * Reclaims as many pages from the given memcg as possible.
  *

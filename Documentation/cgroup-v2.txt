@@ -44,6 +44,7 @@ CONTENTS
     5-2-1. Memory Interface Files
     5-2-2. Usage Guidelines
     5-2-3. Memory Ownership
+    5-2-4. Cgroup-aware OOM Killer
   5-3. IO
     5-3-1. IO Interface Files
     5-3-2. Writeback
@@ -831,8 +832,7 @@ PAGE_SIZE multiple when read back.
 	  oom
 
 		The number of times the OOM killer has been invoked in
-		the cgroup.  This may not exactly match the number of
-		processes killed but should generally be close.
+		the cgroup.
 
   memory.stat
 
@@ -986,6 +986,26 @@ If a cgroup sweeps a considerable amount of memory which is expected
 to be accessed repeatedly by other cgroups, it may make sense to use
 POSIX_FADV_DONTNEED to relinquish the ownership of memory areas
 belonging to the affected files to ensure correct memory ownership.
+
+
+5-2-4. Cgroup-aware OOM Killer
+
+Cgroup v2 memory controller implements a cgroup-aware OOM killer.
+It means that it treats memory cgroups as memory consumers
+rather then individual processes. Under the OOM conditions it tries
+to find an elegible leaf memory cgroup, and kill all processes
+in this cgroup. If it's not possible (e.g. all processes belong
+to the root cgroup), it falls back to the traditional per-process
+behaviour.
+
+The memory controller tries to make the best choise of a victim cgroup.
+In general, it tries to select the largest cgroup, matching given
+node/zone requirements, but the concrete algorithm is not defined,
+and may be changed later.
+
+This affects both system- and cgroup-wide OOMs. For a cgroup-wide OOM
+the memory controller considers only cgroups belonging to a sub-tree
+of the OOM-ing cgroup, including itself.
 
 
 5-3. IO

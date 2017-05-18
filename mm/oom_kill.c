@@ -802,6 +802,8 @@ static bool task_will_free_mem(struct task_struct *task)
 	return ret;
 }
 
+static void __oom_kill_process(struct task_struct *victim);
+
 static void oom_kill_process(struct oom_control *oc, const char *message)
 {
 	struct task_struct *p = oc->chosen;
@@ -809,11 +811,9 @@ static void oom_kill_process(struct oom_control *oc, const char *message)
 	struct task_struct *victim = p;
 	struct task_struct *child;
 	struct task_struct *t;
-	struct mm_struct *mm;
 	unsigned int victim_points = 0;
 	static DEFINE_RATELIMIT_STATE(oom_rs, DEFAULT_RATELIMIT_INTERVAL,
 					      DEFAULT_RATELIMIT_BURST);
-	bool can_oom_reap = true;
 
 	/*
 	 * If the task is already exiting, don't alarm the sysadmin or kill
@@ -862,6 +862,15 @@ static void oom_kill_process(struct oom_control *oc, const char *message)
 		}
 	}
 	read_unlock(&tasklist_lock);
+
+	__oom_kill_process(victim);
+}
+
+static void __oom_kill_process(struct task_struct *victim)
+{
+	struct task_struct *p;
+	struct mm_struct *mm;
+	bool can_oom_reap = true;
 
 	p = find_lock_task_mm(victim);
 	if (!p) {
@@ -970,6 +979,20 @@ int unregister_oom_notifier(struct notifier_block *nb)
 }
 EXPORT_SYMBOL_GPL(unregister_oom_notifier);
 
+static int oom_kill_task_fn(struct task_struct *p, void *arg)
+{
+	if (is_global_init(p))
+		return 0;
+
+	if (p->flags & PF_KTHREAD)
+		return 0;
+
+	get_task_struct(p);
+	__oom_kill_process(p);
+
+	return 0;
+}
+
 /**
  * out_of_memory - kill the "best" process when we run out of memory
  * @oc: pointer to struct oom_control
@@ -1032,13 +1055,29 @@ bool out_of_memory(struct oom_control *oc)
 		return true;
 	}
 
-	select_bad_process(oc);
+	/*
+	 * Try to find an elegible memory cgroup. If nothing found,
+	 * fallback to a per-process OOM.
+	 */
+	if (!mem_cgroup_select_oom_victim(oc))
+		select_bad_process(oc);
+
 	/* Found nothing?!?! Either we hang forever, or we panic. */
-	if (!oc->chosen && !is_sysrq_oom(oc) && !is_memcg_oom(oc)) {
+	if (!oc->chosen_memcg && !oc->chosen && !is_sysrq_oom(oc) &&
+	    !is_memcg_oom(oc)) {
 		dump_header(oc, NULL);
 		panic("Out of memory and no killable processes...\n");
 	}
-	if (oc->chosen && oc->chosen != (void *)-1UL) {
+
+	if (oc->chosen_memcg) {
+		/* Try to kill the whole memory cgroup. */
+		if (!is_memcg_oom(oc))
+			mem_cgroup_event(oc->chosen_memcg, MEMCG_OOM);
+		mem_cgroup_scan_tasks(oc->chosen_memcg, oom_kill_task_fn, NULL);
+
+		css_put(&oc->chosen_memcg->css);
+		schedule_timeout_killable(1);
+	} else if (oc->chosen && oc->chosen != (void *)-1UL) {
 		oom_kill_process(oc, !is_memcg_oom(oc) ? "Out of memory" :
 				 "Memory cgroup out of memory");
 		/*
