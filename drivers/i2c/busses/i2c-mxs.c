@@ -527,7 +527,7 @@ static int mxs_i2c_pio_setup_xfer(struct i2c_adapter *adap,
 
 			/* Wait for the end of the transfer. */
 			ret = mxs_i2c_pio_wait_xfer_end(i2c);
-			if (ret) {
+			if (ret && ret != -ENXIO) {
 				dev_err(i2c->dev,
 					"PIO: Failed to finish WRITE cmd!\n");
 				break;
