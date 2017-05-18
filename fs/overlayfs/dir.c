@@ -973,13 +973,13 @@ static int ovl_rename(struct inode *olddir, struct dentry *old,
 		if (ovl_type_origin(old) && !ovl_type_merge(new->d_parent)) {
 			err = ovl_set_impure(new->d_parent, new_upperdir);
 			if (err)
-				goto out_dput;
+				goto out_revert_creds;
 		}
 		if (!overwrite && ovl_type_origin(new) &&
 		    !ovl_type_merge(old->d_parent)) {
 			err = ovl_set_impure(old->d_parent, old_upperdir);
 			if (err)
-				goto out_dput;
+				goto out_revert_creds;
 		}
 	}
 
