@@ -2204,7 +2204,13 @@ static int hv_pci_probe(struct hv_device *hdev,
 	struct hv_pcibus_device *hbus;
 	int ret;
 
-	hbus = kzalloc(sizeof(*hbus), GFP_KERNEL);
+	/*
+	 * hv_pcibus_device contains the hypercall arguments for retargeting in
+	 * hv_irq_unmask(). Those must not cross a page boundary.
+	 */
+	BUILD_BUG_ON(sizeof(*hbus) > PAGE_SIZE);
+
+	hbus = (struct hv_pcibus_device *)get_zeroed_page(GFP_KERNEL);
 	if (!hbus)
 		return -ENOMEM;
 	hbus->state = hv_pcibus_init;
@@ -2308,7 +2314,7 @@ free_config:
 close:
 	vmbus_close(hdev->channel);
 free_bus:
-	kfree(hbus);
+	free_page((unsigned long)hbus);
 	return ret;
 }
 
@@ -2386,7 +2392,7 @@ static int hv_pci_remove(struct hv_device *hdev)
 	irq_domain_free_fwnode(hbus->sysdata.fwnode);
 	put_hvpcibus(hbus);
 	wait_for_completion(&hbus->remove_event);
-	kfree(hbus);
+	free_page((unsigned long)hbus);
 	return 0;
 }
 
