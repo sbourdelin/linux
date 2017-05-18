@@ -29,6 +29,9 @@
 
 #include <asm/livepatch.h>
 
+/* values for sysfs force attribute */
+#define KLP_FORCE_FAKE		1
+
 /* task patch states */
 #define KLP_UNDEFINED	-1
 #define KLP_UNPATCHED	 0
