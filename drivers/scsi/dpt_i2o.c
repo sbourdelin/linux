@@ -2292,11 +2292,8 @@ static s32 adpt_scsi_to_i2o(adpt_hba* pHba, struct scsi_cmnd* cmd, struct adpt_d
 	mptr+=4;
 	lenptr=mptr++;		/* Remember me - fill in when we know */
 	if (dpt_dma64(pHba)) {
-		reqlen = 16;		// SINGLE SGE
 		*mptr++ = (0x7C<<24)+(2<<16)+0x02; /* Enable 64 bit */
 		*mptr++ = 1 << PAGE_SHIFT;
-	} else {
-		reqlen = 14;		// SINGLE SGE
 	}
 	/* Now fill in the SGList and command */
 
