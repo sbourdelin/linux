@@ -86,7 +86,9 @@ ll_xattr_set_common(const struct xattr_handler *handler,
 		    const char *name, const void *value, size_t size,
 		    int flags)
 {
-	char fullname[strlen(handler->prefix) + strlen(name) + 1];
+	const unsigned int prefix_len = strlen(handler->prefix);
+	const unsigned int name_len = strlen(name);
+	char fullname[prefix_len + name_len + 1];
 	struct ll_sb_info *sbi = ll_i2sbi(inode);
 	struct ptlrpc_request *req = NULL;
 	const char *pv = value;
