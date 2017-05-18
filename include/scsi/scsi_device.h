@@ -214,12 +214,22 @@ struct scsi_device {
 	atomic_t ioerr_cnt;
 
 #ifdef CONFIG_SCSI_SENSE_UEVENT
+#define MAX_SENSE_EVENT_PER_SECOND	16
 	/*
 	 * filter of sense code uevent
 	 * setting bit X (0x00 - 0x0e) of sense_event_filter enables
 	 * uevent for sense key X
 	 */
-	unsigned long		sense_event_filter;
+	unsigned long	sense_event_filter;
+	/*
+	 * To rate limit uevents to MAX_SENSE_EVENT_PER_SECOND, we track
+	 * nano second time of MAX_SENSE_EVENT_PER_SECOND most recent
+	 * events. If there are already MAX_SENSE_EVENT_PER_SECOND in the
+	 * past seconds, new event is dropped.
+	 */
+	u64		latest_event_times[MAX_SENSE_EVENT_PER_SECOND];
+	int		latest_event_idx;
+	spinlock_t	latest_event_lock;
 #endif
 
 	struct device		sdev_gendev,

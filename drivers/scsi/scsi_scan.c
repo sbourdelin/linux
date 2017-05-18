@@ -301,6 +301,10 @@ static struct scsi_device *scsi_alloc_sdev(struct scsi_target *starget,
 		}
 	}
 
+#ifdef CONFIG_SCSI_SENSE_UEVENT
+	spin_lock_init(&sdev->latest_event_lock);
+#endif
+
 	return sdev;
 
 out_device_destroy:
