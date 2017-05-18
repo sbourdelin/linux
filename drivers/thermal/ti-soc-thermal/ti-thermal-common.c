@@ -160,10 +160,9 @@ static struct ti_thermal_data
 	struct ti_thermal_data *data;
 
 	data = devm_kzalloc(bgp->dev, sizeof(*data), GFP_KERNEL);
-	if (!data) {
-		dev_err(bgp->dev, "kzalloc fail\n");
+	if (!data)
 		return NULL;
-	}
+
 	data->sensor_id = id;
 	data->bgp = bgp;
 	data->mode = THERMAL_DEVICE_ENABLED;
