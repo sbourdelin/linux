@@ -127,6 +127,9 @@ struct cpufreq_policy {
 	 */
 	unsigned int		transition_delay_us;
 
+	/* Boost switch for tasks with p->in_iowait set */
+	unsigned int		iowait_boost_enable;
+
 	 /* Cached frequency lookup from cpufreq_driver_resolve_freq. */
 	unsigned int cached_target_freq;
 	int cached_resolved_idx;

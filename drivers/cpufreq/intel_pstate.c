@@ -2235,6 +2235,7 @@ static int intel_cpufreq_cpu_init(struct cpufreq_policy *policy)
 
 	policy->cpuinfo.transition_latency = INTEL_CPUFREQ_TRANSITION_LATENCY;
 	policy->transition_delay_us = INTEL_CPUFREQ_TRANSITION_DELAY;
+	policy->iowait_boost_enable = 1;
 	/* This reflects the intel_pstate_get_cpu_pstates() setting. */
 	policy->cur = policy->cpuinfo.min_freq;
 
