@@ -238,6 +238,18 @@ static int keyzero(struct btree_geo *geo, unsigned long *key)
 	return 1;
 }
 
+static int getpos(struct btree_geo *geo, unsigned long *node,
+		unsigned long *key)
+{
+	unsigned int i;
+
+	for (i = 0; i < geo->no_pairs; i++) {
+		if (keycmp(geo, node, i, key) <= 0)
+			return i;
+	}
+	return -ENOENT;
+}
+
 void *btree_lookup(struct btree_head *head, struct btree_geo *geo,
 		unsigned long *key)
 {
@@ -248,10 +260,8 @@ void *btree_lookup(struct btree_head *head, struct btree_geo *geo,
 		return NULL;
 
 	for ( ; height > 1; height--) {
-		for (i = 0; i < geo->no_pairs; i++)
-			if (keycmp(geo, node, i, key) <= 0)
-				break;
-		if (i == geo->no_pairs)
+		i = getpos(geo, node, key);
+		if (i < 0)
 			return NULL;
 		node = bval(geo, node, i);
 		if (!node)
@@ -278,10 +288,8 @@ int btree_update(struct btree_head *head, struct btree_geo *geo,
 		return -ENOENT;
 
 	for ( ; height > 1; height--) {
-		for (i = 0; i < geo->no_pairs; i++)
-			if (keycmp(geo, node, i, key) <= 0)
-				break;
-		if (i == geo->no_pairs)
+		i = getpos(geo, node, key);
+		if (i < 0)
 			return -ENOENT;
 		node = bval(geo, node, i);
 		if (!node)
@@ -326,10 +334,8 @@ retry:
 
 	node = head->node;
 	for (height = head->height ; height > 1; height--) {
-		for (i = 0; i < geo->no_pairs; i++)
-			if (keycmp(geo, node, i, key) <= 0)
-				break;
-		if (i == geo->no_pairs)
+		i = getpos(geo, node, key);
+		if (i < 0)
 			goto miss;
 		oldnode = node;
 		node = bval(geo, node, i);
@@ -360,26 +366,17 @@ miss:
 }
 EXPORT_SYMBOL_GPL(btree_get_prev);
 
-static int getpos(struct btree_geo *geo, unsigned long *node,
-		unsigned long *key)
-{
-	int i;
-
-	for (i = 0; i < geo->no_pairs; i++) {
-		if (keycmp(geo, node, i, key) <= 0)
-			break;
-	}
-	return i;
-}
-
 static int getfill(struct btree_geo *geo, unsigned long *node, int start)
 {
-	int i;
+	unsigned int i;
+
+	if (unlikely(start < 0))
+		return -ENOENT;
 
 	for (i = start; i < geo->no_pairs; i++)
 		if (!bval(geo, node, i))
-			break;
-	return i;
+			return i;
+	return -ENOENT;
 }
 
 /*
@@ -392,11 +389,9 @@ static unsigned long *find_level(struct btree_head *head, struct btree_geo *geo,
 	int i, height;
 
 	for (height = head->height; height > level; height--) {
-		for (i = 0; i < geo->no_pairs; i++)
-			if (keycmp(geo, node, i, key) <= 0)
-				break;
+		i = getpos(geo, node, key);
 
-		if ((i == geo->no_pairs) || !bval(geo, node, i)) {
+		if ((i < 0) || !bval(geo, node, i)) {
 			/* right-most key is too large, update it */
 			/* FIXME: If the right-most key on higher levels is
 			 * always zero, this wouldn't be necessary. */
@@ -466,7 +461,7 @@ retry:
 	/* two identical keys are not allowed */
 	BUG_ON(pos < fill && keycmp(geo, node, pos, key) == 0);
 
-	if (fill == geo->no_pairs) {
+	if (fill < 0) {
 		/* need to split node */
 		unsigned long *new;
 
@@ -474,27 +469,27 @@ retry:
 		if (!new)
 			return -ENOMEM;
 		err = btree_insert_level(head, geo,
-				bkey(geo, node, fill / 2 - 1),
+				bkey(geo, node, geo->no_pairs / 2 - 1),
 				new, level + 1, gfp);
 		if (err) {
 			mempool_free(new, head->mempool);
 			return err;
 		}
-		for (i = 0; i < fill / 2; i++) {
+		for (i = 0; i < geo->no_pairs / 2; i++) {
 			setkey(geo, new, i, bkey(geo, node, i));
 			setval(geo, new, i, bval(geo, node, i));
-			setkey(geo, node, i, bkey(geo, node, i + fill / 2));
-			setval(geo, node, i, bval(geo, node, i + fill / 2));
-			clearpair(geo, node, i + fill / 2);
+			setkey(geo, node, i, bkey(geo, node, i + geo->no_pairs / 2));
+			setval(geo, node, i, bval(geo, node, i + geo->no_pairs / 2));
+			clearpair(geo, node, i + geo->no_pairs / 2);
 		}
-		if (fill & 1) {
-			setkey(geo, node, i, bkey(geo, node, fill - 1));
-			setval(geo, node, i, bval(geo, node, fill - 1));
-			clearpair(geo, node, fill - 1);
+		if (geo->no_pairs & 1) {
+			setkey(geo, node, i, bkey(geo, node, geo->no_pairs - 1));
+			setval(geo, node, i, bval(geo, node, geo->no_pairs - 1));
+			clearpair(geo, node, geo->no_pairs - 1);
 		}
 		goto retry;
 	}
-	BUG_ON(fill >= geo->no_pairs);
+	BUG_ON(fill < 0);
 
 	/* shift and insert */
 	for (i = fill; i > pos; i--) {
