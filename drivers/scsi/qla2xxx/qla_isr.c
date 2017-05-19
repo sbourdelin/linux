@@ -1345,11 +1345,10 @@ qla2x00_mbx_iocb_entry(scsi_qla_host_t *vha, struct req_que *req,
 	    QLA_LOGIO_LOGIN_RETRIED : 0;
 	if (mbx->entry_status) {
 		ql_dbg(ql_dbg_async, vha, 0x5043,
-		    "Async-%s error entry - hdl=%x portid=%02x%02x%02x "
+		    "Async-%s error entry - hdl=%x portid=%06x "
 		    "entry-status=%x status=%x state-flag=%x "
 		    "status-flags=%x.\n", type, sp->handle,
-		    fcport->d_id.b.domain, fcport->d_id.b.area,
-		    fcport->d_id.b.al_pa, mbx->entry_status,
+		    fcport->d_id.b24, mbx->entry_status,
 		    le16_to_cpu(mbx->status), le16_to_cpu(mbx->state_flags),
 		    le16_to_cpu(mbx->status_flags));
 
@@ -1365,10 +1364,8 @@ qla2x00_mbx_iocb_entry(scsi_qla_host_t *vha, struct req_que *req,
 		status = 0;
 	if (!status && le16_to_cpu(mbx->mb0) == MBS_COMMAND_COMPLETE) {
 		ql_dbg(ql_dbg_async, vha, 0x5045,
-		    "Async-%s complete - hdl=%x portid=%02x%02x%02x mbx1=%x.\n",
-		    type, sp->handle, fcport->d_id.b.domain,
-		    fcport->d_id.b.area, fcport->d_id.b.al_pa,
-		    le16_to_cpu(mbx->mb1));
+		    "Async-%s complete - hdl=%x portid=%06x mbx1=%x.\n",
+		    type, sp->handle, fcport->d_id.b24, le16_to_cpu(mbx->mb1));
 
 		data[0] = MBS_COMMAND_COMPLETE;
 		if (sp->type == SRB_LOGIN_CMD) {
@@ -1394,10 +1391,10 @@ qla2x00_mbx_iocb_entry(scsi_qla_host_t *vha, struct req_que *req,
 	}
 
 	ql_log(ql_log_warn, vha, 0x5046,
-	    "Async-%s failed - hdl=%x portid=%02x%02x%02x status=%x "
-	    "mb0=%x mb1=%x mb2=%x mb6=%x mb7=%x.\n", type, sp->handle,
-	    fcport->d_id.b.domain, fcport->d_id.b.area, fcport->d_id.b.al_pa,
-	    status, le16_to_cpu(mbx->mb0), le16_to_cpu(mbx->mb1),
+	    "Async-%s failed - hdl=%x portid=%06x status=%x "
+	    "mb0=%x mb1=%x mb2=%x mb6=%x mb7=%x.\n",
+	    type, sp->handle, fcport->d_id.b24, status,
+	    le16_to_cpu(mbx->mb0), le16_to_cpu(mbx->mb1),
 	    le16_to_cpu(mbx->mb2), le16_to_cpu(mbx->mb6),
 	    le16_to_cpu(mbx->mb7));
 
@@ -1649,10 +1646,8 @@ qla24xx_logio_entry(scsi_qla_host_t *vha, struct req_que *req,
 		QLA_LOGIO_LOGIN_RETRIED : 0;
 	if (logio->entry_status) {
 		ql_log(ql_log_warn, fcport->vha, 0x5034,
-		    "Async-%s error entry - %8phC hdl=%x"
-		    "portid=%02x%02x%02x entry-status=%x.\n",
-		    type, fcport->port_name, sp->handle, fcport->d_id.b.domain,
-		    fcport->d_id.b.area, fcport->d_id.b.al_pa,
+		    "Async-%s error entry - %8phC hdl=%x portid=%06x entry-status=%x.\n",
+		    type, fcport->port_name, sp->handle, fcport->d_id.b24,
 		    logio->entry_status);
 		ql_dump_buffer(ql_dbg_async + ql_dbg_buffer, vha, 0x504d,
 		    (uint8_t *)logio, sizeof(*logio));
@@ -1662,10 +1657,8 @@ qla24xx_logio_entry(scsi_qla_host_t *vha, struct req_que *req,
 
 	if (le16_to_cpu(logio->comp_status) == CS_COMPLETE) {
 		ql_dbg(ql_dbg_async, fcport->vha, 0x5036,
-		    "Async-%s complete - %8phC hdl=%x portid=%02x%02x%02x "
-		    "iop0=%x.\n", type, fcport->port_name, sp->handle,
-		    fcport->d_id.b.domain,
-		    fcport->d_id.b.area, fcport->d_id.b.al_pa,
+		    "Async-%s complete - %8phC hdl=%x portid=%06x iop0=%x.\n",
+		    type, fcport->port_name, sp->handle, fcport->d_id.b24,
 		    le32_to_cpu(logio->io_parameter[0]));
 
 		vha->hw->exch_starvation = 0;
@@ -1736,10 +1729,9 @@ qla24xx_logio_entry(scsi_qla_host_t *vha, struct req_que *req,
 	}
 
 	ql_dbg(ql_dbg_async, fcport->vha, 0x5037,
-	    "Async-%s failed - %8phC hdl=%x portid=%02x%02x%02x comp=%x "
+	    "Async-%s failed - %8phC hdl=%x portid=%06x comp=%x "
 	    "iop0=%x iop1=%x.\n", type, fcport->port_name,
-	    sp->handle, fcport->d_id.b.domain,
-	    fcport->d_id.b.area, fcport->d_id.b.al_pa,
+	    sp->handle, fcport->d_id.b24,
 	    le16_to_cpu(logio->comp_status),
 	    le32_to_cpu(logio->io_parameter[0]),
 	    le32_to_cpu(logio->io_parameter[1]));
@@ -2513,11 +2505,10 @@ check_scsi_status:
 
 		if (atomic_read(&fcport->state) == FCS_ONLINE) {
 			ql_dbg(ql_dbg_disc, fcport->vha, 0x3021,
-				"Port to be marked lost on fcport=%02x%02x%02x, current "
-				"port state= %s comp_status %x.\n", fcport->d_id.b.domain,
-				fcport->d_id.b.area, fcport->d_id.b.al_pa,
-				port_state_str[atomic_read(&fcport->state)],
-				comp_status);
+			    "Port to be marked lost on fcport=%06x, current port state=%s comp_status=%x.\n",
+			    fcport->d_id.b24,
+			    port_state_str[atomic_read(&fcport->state)],
+			    comp_status);
 
 			if (no_logout)
 				fcport->logout_on_delete = 0;
@@ -2557,14 +2548,11 @@ check_scsi_status:
 out:
 	if (logit)
 		ql_dbg(ql_dbg_io, fcport->vha, 0x3022,
-		    "FCP command status: 0x%x-0x%x (0x%x) nexus=%ld:%d:%llu "
-		    "portid=%02x%02x%02x oxid=0x%x cdb=%10phN len=0x%x "
-		    "rsp_info=0x%x resid=0x%x fw_resid=0x%x sp=%p cp=%p.\n",
-		    comp_status, scsi_status, res, vha->host_no,
-		    cp->device->id, cp->device->lun, fcport->d_id.b.domain,
-		    fcport->d_id.b.area, fcport->d_id.b.al_pa, ox_id,
-		    cp->cmnd, scsi_bufflen(cp), rsp_info_len,
-		    resid_len, fw_resid_len, sp, cp);
+		    "FCP command status: 0x%x-0x%x (0x%x) nexus=%ld:%d:%llu portid=%06x oxid=0x%x cdb=%10phN len=0x%x rsp_info=0x%x resid=0x%x fw_resid=0x%x sp=%p cp=%p.\n",
+		    comp_status, scsi_status, res, vha->host_no, cp->device->id,
+		    cp->device->lun, fcport->d_id.b24, ox_id, cp->cmnd,
+		    scsi_bufflen(cp), rsp_info_len, resid_len, fw_resid_len,
+		    sp, cp);
 
 	if (rsp->status_srb == NULL)
 		sp->done(sp, res);

@@ -202,10 +202,9 @@ qla2x00_async_login(struct scsi_qla_host *vha, fc_port_t *fcport,
 	}
 
 	ql_dbg(ql_dbg_disc, vha, 0x2072,
-	    "Async-login - %8phC hdl=%x, loopid=%x portid=%02x%02x%02x "
-		"retries=%d.\n", fcport->port_name, sp->handle, fcport->loop_id,
-	    fcport->d_id.b.domain, fcport->d_id.b.area, fcport->d_id.b.al_pa,
-	    fcport->login_retry);
+	    "Async-login - %8phC hdl=%x, loopid=%x portid=%06x retries=%d.\n",
+	    fcport->port_name, sp->handle, fcport->loop_id,
+	    fcport->d_id.b24, fcport->login_retry);
 	return rval;
 
 done_free_sp:
@@ -253,10 +252,8 @@ qla2x00_async_logout(struct scsi_qla_host *vha, fc_port_t *fcport)
 		goto done_free_sp;
 
 	ql_dbg(ql_dbg_disc, vha, 0x2070,
-	    "Async-logout - hdl=%x loop-id=%x portid=%02x%02x%02x %8phC.\n",
-	    sp->handle, fcport->loop_id, fcport->d_id.b.domain,
-		fcport->d_id.b.area, fcport->d_id.b.al_pa,
-		fcport->port_name);
+	    "Async-logout - hdl=%x loop-id=%x portid=%06x %8phC.\n",
+	    sp->handle, fcport->loop_id, fcport->d_id.b24, fcport->port_name);
 	return rval;
 
 done_free_sp:
@@ -307,9 +304,8 @@ qla2x00_async_adisc(struct scsi_qla_host *vha, fc_port_t *fcport,
 		goto done_free_sp;
 
 	ql_dbg(ql_dbg_disc, vha, 0x206f,
-	    "Async-adisc - hdl=%x loopid=%x portid=%02x%02x%02x.\n",
-	    sp->handle, fcport->loop_id, fcport->d_id.b.domain,
-	    fcport->d_id.b.area, fcport->d_id.b.al_pa);
+	    "Async-adisc - hdl=%x loopid=%x portid=%06x.\n",
+	    sp->handle, fcport->loop_id, fcport->d_id.b24);
 	return rval;
 
 done_free_sp:
@@ -359,10 +355,8 @@ static void qla24xx_handle_gnl_done_event(scsi_qla_host_t *vha,
 	n = ea->data[0] / sizeof(struct get_name_list_extended);
 
 	ql_dbg(ql_dbg_disc, vha, 0x20e1,
-	    "%s %d %8phC n %d %02x%02x%02x lid %d \n",
-	    __func__, __LINE__, fcport->port_name, n,
-	    fcport->d_id.b.domain, fcport->d_id.b.area,
-	    fcport->d_id.b.al_pa, fcport->loop_id);
+	    "%s %d %8phC n %d %06x lid %d \n", __func__, __LINE__,
+	    fcport->port_name, n, fcport->d_id.b24, fcport->loop_id);
 
 	for (i = 0; i < n; i++) {
 		e = &vha->gnl.l[i];
@@ -381,12 +375,10 @@ static void qla24xx_handle_gnl_done_event(scsi_qla_host_t *vha,
 		loop_id = (loop_id & 0x7fff);
 
 		ql_dbg(ql_dbg_disc, vha, 0x20e2,
-		    "%s found %8phC CLS [%d|%d] ID[%02x%02x%02x|%02x%02x%02x] lid[%d|%d]\n",
+		    "%s found %8phC CLS [%d|%d] ID[%06x|%06x] lid[%d|%d]\n",
 		    __func__, fcport->port_name,
 		    e->current_login_state, fcport->fw_login_state,
-		    id.b.domain, id.b.area, id.b.al_pa,
-		    fcport->d_id.b.domain, fcport->d_id.b.area,
-		    fcport->d_id.b.al_pa, loop_id, fcport->loop_id);
+		    id.b24, fcport->d_id.b24, loop_id, fcport->loop_id);
 
 		if ((id.b24 != fcport->d_id.b24) ||
 		    ((fcport->loop_id != FC_NO_LOOP_ID) &&
@@ -1071,9 +1063,8 @@ void qla2x00_fcport_event_handler(scsi_qla_host_t *vha, struct event_arg *ea)
 				rc = qla24xx_post_gpnid_work(vha, &ea->id);
 				if (rc) {
 					ql_log(ql_log_warn, vha, 0xd044,
-					    "RSCN GPNID work failed %02x%02x%02x\n",
-					    ea->id.b.domain, ea->id.b.area,
-					    ea->id.b.al_pa);
+					    "RSCN GPNID work failed %06x\n",
+					    ea->id.b24);
 				}
 			} else {
 				ea->fcport = fcport;
@@ -1189,9 +1180,8 @@ qla2x00_async_tm_cmd(fc_port_t *fcport, uint32_t flags, uint32_t lun,
 		goto done_free_sp;
 
 	ql_dbg(ql_dbg_taskm, vha, 0x802f,
-	    "Async-tmf hdl=%x loop-id=%x portid=%02x%02x%02x.\n",
-	    sp->handle, fcport->loop_id, fcport->d_id.b.domain,
-	    fcport->d_id.b.area, fcport->d_id.b.al_pa);
+	    "Async-tmf hdl=%x loop-id=%x portid=%06x.\n",
+	    sp->handle, fcport->loop_id, fcport->d_id.b24);
 
 	wait_for_completion(&tm_iocb->u.tmf.comp);
 
@@ -1359,10 +1349,9 @@ qla24xx_handle_plogi_done_event(struct scsi_qla_host *vha, struct event_arg *ea)
 		break;
 	case MBS_PORT_ID_USED:
 		ql_dbg(ql_dbg_disc, vha, 0x20ed,
-		    "%s %d %8phC NPortId %02x%02x%02x inuse post gidpn\n",
-		    __func__, __LINE__, ea->fcport->port_name,
-		    ea->fcport->d_id.b.domain, ea->fcport->d_id.b.area,
-		    ea->fcport->d_id.b.al_pa);
+			"%s %d %8phC NPortId %06x inuse post gidpn\n",
+			__func__, __LINE__, ea->fcport->port_name,
+			ea->fcport->d_id.b24);
 
 		qla2x00_clear_loop_id(ea->fcport);
 		qla24xx_post_gidpn_work(vha, ea->fcport);
@@ -4667,10 +4656,7 @@ qla2x00_find_all_fabric_devs(scsi_qla_host_t *vha)
 			first_dev = 0;
 		} else if (new_fcport->d_id.b24 == wrap.b24) {
 			ql_dbg(ql_dbg_disc, vha, 0x209f,
-			    "Device wrap (%02x%02x%02x).\n",
-			    new_fcport->d_id.b.domain,
-			    new_fcport->d_id.b.area,
-			    new_fcport->d_id.b.al_pa);
+			    "Device wrap (%06x).\n", new_fcport->d_id.b24);
 			break;
 		}
 
@@ -4905,10 +4891,8 @@ qla2x00_fabric_login(scsi_qla_host_t *vha, fc_port_t *fcport,
 
 	for (;;) {
 		ql_dbg(ql_dbg_disc, vha, 0x2000,
-		    "Trying Fabric Login w/loop id 0x%04x for port "
-		    "%02x%02x%02x.\n",
-		    fcport->loop_id, fcport->d_id.b.domain,
-		    fcport->d_id.b.area, fcport->d_id.b.al_pa);
+		    "Trying Fabric Login w/loop id 0x%04x for port %06x.\n",
+		    fcport->loop_id, fcport->d_id.b24);
 
 		/* Login fcport on switch. */
 		rval = ha->isp_ops->fabric_login(vha, fcport->loop_id,
@@ -4930,10 +4914,8 @@ qla2x00_fabric_login(scsi_qla_host_t *vha, fc_port_t *fcport,
 			fcport->loop_id = mb[1];
 
 			ql_dbg(ql_dbg_disc, vha, 0x2001,
-			    "Fabric Login: port in use - next loop "
-			    "id=0x%04x, port id= %02x%02x%02x.\n",
-			    fcport->loop_id, fcport->d_id.b.domain,
-			    fcport->d_id.b.area, fcport->d_id.b.al_pa);
+			    "Fabric Login: port in use - next loop id=0x%04x, port id= %06x.\n",
+			    fcport->loop_id, fcport->d_id.b24);
 
 		} else if (mb[0] == MBS_COMMAND_COMPLETE) {
 			/*
@@ -5001,10 +4983,8 @@ qla2x00_fabric_login(scsi_qla_host_t *vha, fc_port_t *fcport,
 			 * unrecoverable / not handled error
 			 */
 			ql_dbg(ql_dbg_disc, vha, 0x2002,
-			    "Failed=%x port_id=%02x%02x%02x loop_id=%x "
-			    "jiffies=%lx.\n", mb[0], fcport->d_id.b.domain,
-			    fcport->d_id.b.area, fcport->d_id.b.al_pa,
-			    fcport->loop_id, jiffies);
+			    "Failed=%x port_id=%06x loop_id=%x jiffies=%lx.\n",
+			    mb[0], fcport->d_id.b24, fcport->loop_id, jiffies);
 
 			*next_loopid = fcport->loop_id;
 			ha->isp_ops->fabric_logout(vha, fcport->loop_id,
@@ -7542,17 +7522,13 @@ qla24xx_update_fcport_fcp_prio(scsi_qla_host_t *vha, fc_port_t *fcport)
 	if (ret == QLA_SUCCESS) {
 		if (fcport->fcp_prio != priority)
 			ql_dbg(ql_dbg_user, vha, 0x709e,
-			    "Updated FCP_CMND priority - value=%d loop_id=%d "
-			    "port_id=%02x%02x%02x.\n", priority,
-			    fcport->loop_id, fcport->d_id.b.domain,
-			    fcport->d_id.b.area, fcport->d_id.b.al_pa);
+			    "Updated FCP_CMND priority - value=%d loop_id=%d port_id=%06x.\n",
+			    priority, fcport->loop_id, fcport->d_id.b24);
 		fcport->fcp_prio = priority & 0xf;
 	} else
 		ql_dbg(ql_dbg_user, vha, 0x704f,
-		    "Unable to update FCP_CMND priority - ret=0x%x for "
-		    "loop_id=%d port_id=%02x%02x%02x.\n", ret, fcport->loop_id,
-		    fcport->d_id.b.domain, fcport->d_id.b.area,
-		    fcport->d_id.b.al_pa);
+		    "Unable to update FCP_CMND priority - ret=0x%x for loop_id=%d port_id=%06x.\n",
+		    ret, fcport->loop_id, fcport->d_id.b24);
 	return  ret;
 }
 

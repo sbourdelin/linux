@@ -2366,9 +2366,8 @@ qla2x00_els_dcmd_iocb_timeout(void *data)
 	unsigned long flags = 0;
 
 	ql_dbg(ql_dbg_io, vha, 0x3069,
-	    "%s Timeout, hdl=%x, portid=%02x%02x%02x\n",
-	    sp->name, sp->handle, fcport->d_id.b.domain, fcport->d_id.b.area,
-	    fcport->d_id.b.al_pa);
+	    "%s Timeout, hdl=%x, portid=%06x\n",
+	    sp->name, sp->handle, fcport->d_id.b24);
 
 	/* Abort the exchange */
 	spin_lock_irqsave(&ha->hardware_lock, flags);
@@ -2393,9 +2392,8 @@ qla2x00_els_dcmd_sp_done(void *ptr, int res)
 	struct scsi_qla_host *vha = sp->vha;
 
 	ql_dbg(ql_dbg_io, vha, 0x3072,
-	    "%s hdl=%x, portid=%02x%02x%02x done\n",
-	    sp->name, sp->handle, fcport->d_id.b.domain,
-	    fcport->d_id.b.area, fcport->d_id.b.al_pa);
+	    "%s hdl=%x, portid=%06x done\n",
+	    sp->name, sp->handle, fcport->d_id.b24);
 
 	complete(&lio->u.els_logo.comp);
 }
@@ -2432,8 +2430,7 @@ qla24xx_els_dcmd_iocb(scsi_qla_host_t *vha, int els_opcode,
 	fcport->d_id.b.area = remote_did.b.area;
 	fcport->d_id.b.al_pa = remote_did.b.al_pa;
 
-	ql_dbg(ql_dbg_io, vha, 0x3073, "portid=%02x%02x%02x done\n",
-	    fcport->d_id.b.domain, fcport->d_id.b.area, fcport->d_id.b.al_pa);
+	ql_dbg(ql_dbg_io, vha, 0x3073, "portid=%06x done\n", fcport->d_id.b24);
 
 	sp->type = SRB_ELS_DCMD;
 	sp->name = "ELS_DCMD";
@@ -2472,9 +2469,8 @@ qla24xx_els_dcmd_iocb(scsi_qla_host_t *vha, int els_opcode,
 	}
 
 	ql_dbg(ql_dbg_io, vha, 0x3074,
-	    "%s LOGO sent, hdl=%x, loopid=%x, portid=%02x%02x%02x.\n",
-	    sp->name, sp->handle, fcport->loop_id, fcport->d_id.b.domain,
-	    fcport->d_id.b.area, fcport->d_id.b.al_pa);
+	    "%s LOGO sent, hdl=%x, loopid=%x, portid=%06x.\n",
+	    sp->name, sp->handle, fcport->loop_id, fcport->d_id.b24);
 
 	wait_for_completion(&elsio->u.els_logo.comp);
 

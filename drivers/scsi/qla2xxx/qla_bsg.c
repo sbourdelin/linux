@@ -382,10 +382,9 @@ qla2x00_process_els(struct bsg_job *bsg_job)
 	sp->done = qla2x00_bsg_job_done;
 
 	ql_dbg(ql_dbg_user, vha, 0x700a,
-	    "bsg rqst type: %s els type: %x - loop-id=%x "
-	    "portid=%-2x%02x%02x.\n", type,
-	    bsg_request->rqst_data.h_els.command_code, fcport->loop_id,
-	    fcport->d_id.b.domain, fcport->d_id.b.area, fcport->d_id.b.al_pa);
+	    "bsg rqst type: %s els type: %x - loop-id=%x portid=%06x.\n",
+	    type, bsg_request->rqst_data.h_els.command_code, fcport->loop_id,
+	    fcport->d_id.b24);
 
 	rval = qla2x00_start_sp(sp);
 	if (rval != QLA_SUCCESS) {
@@ -529,11 +528,9 @@ qla2x00_process_ct(struct bsg_job *bsg_job)
 	sp->done = qla2x00_bsg_job_done;
 
 	ql_dbg(ql_dbg_user, vha, 0x7016,
-	    "bsg rqst type: %s else type: %x - "
-	    "loop-id=%x portid=%02x%02x%02x.\n", type,
-	    (bsg_request->rqst_data.h_ct.preamble_word2 >> 16),
-	    fcport->loop_id, fcport->d_id.b.domain, fcport->d_id.b.area,
-	    fcport->d_id.b.al_pa);
+	    "bsg rqst type: %s else type: %x - loop-id=%x portid=%06x.\n",
+	    type, bsg_request->rqst_data.h_ct.preamble_word2 >> 16,
+	    fcport->loop_id, fcport->d_id.b24);
 
 	rval = qla2x00_start_sp(sp);
 	if (rval != QLA_SUCCESS) {

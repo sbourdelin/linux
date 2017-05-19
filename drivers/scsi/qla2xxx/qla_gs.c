@@ -129,9 +129,8 @@ qla2x00_chk_ms_status(scsi_qla_host_t *vha, ms_iocb_entry_t *ms_pkt,
 	rval = QLA_FUNCTION_FAILED;
 	if (ms_pkt->entry_status != 0) {
 		ql_dbg(ql_dbg_disc, vha, 0x2031,
-		    "%s failed, error status (%x) on port_id: %02x%02x%02x.\n",
-		    routine, ms_pkt->entry_status, vha->d_id.b.domain,
-		    vha->d_id.b.area, vha->d_id.b.al_pa);
+		    "%s failed, error status (%x) on port_id: %06x.\n",
+		    routine, ms_pkt->entry_status, vha->d_id.b24);
 	} else {
 		if (IS_FWI2_CAPABLE(ha))
 			comp_status = le16_to_cpu(
@@ -145,10 +144,9 @@ qla2x00_chk_ms_status(scsi_qla_host_t *vha, ms_iocb_entry_t *ms_pkt,
 			if (ct_rsp->header.response !=
 			    cpu_to_be16(CT_ACCEPT_RESPONSE)) {
 				ql_dbg(ql_dbg_disc + ql_dbg_buffer, vha, 0x2077,
-				    "%s failed rejected request on port_id: %02x%02x%02x Completion status 0x%x, response 0x%x\n",
-				    routine, vha->d_id.b.domain,
-				    vha->d_id.b.area, vha->d_id.b.al_pa,
-				    comp_status, ct_rsp->header.response);
+				    "%s failed rejected request on port_id: %06x Compeltion status 0x%x, response 0x%x\n",
+				    routine, vha->d_id.b24, comp_status,
+				    ct_rsp->header.response);
 				ql_dump_buffer(ql_dbg_disc + ql_dbg_buffer, vha,
 				    0x2078, (uint8_t *)&ct_rsp->header,
 				    sizeof(struct ct_rsp_hdr));
@@ -178,10 +176,8 @@ qla2x00_chk_ms_status(scsi_qla_host_t *vha, ms_iocb_entry_t *ms_pkt,
 			break;
 		default:
 			ql_dbg(ql_dbg_disc, vha, 0x2033,
-			    "%s failed, completion status (%x) on port_id: "
-			    "%02x%02x%02x.\n", routine, comp_status,
-			    vha->d_id.b.domain, vha->d_id.b.area,
-			    vha->d_id.b.al_pa);
+			    "%s failed, completion status (%x) on port_id: %06x.\n",
+			    routine, comp_status, vha->d_id.b24);
 			break;
 		}
 	}
@@ -259,11 +255,8 @@ qla2x00_ga_nxt(scsi_qla_host_t *vha, fc_port_t *fcport)
 			fcport->d_id.b.domain = 0xf0;
 
 		ql_dbg(ql_dbg_disc, vha, 0x2063,
-		    "GA_NXT entry - nn %8phN pn %8phN "
-		    "port_id=%02x%02x%02x.\n",
-		    fcport->node_name, fcport->port_name,
-		    fcport->d_id.b.domain, fcport->d_id.b.area,
-		    fcport->d_id.b.al_pa);
+		    "GA_NXT entry - nn %8phN pn %8phN port_id=%06x.\n",
+		    fcport->node_name, fcport->port_name, fcport->d_id.b24);
 	}
 
 	return (rval);
@@ -494,11 +487,9 @@ qla2x00_gnn_id(scsi_qla_host_t *vha, sw_info_t *list)
 			    ct_rsp->rsp.gnn_id.node_name, WWN_SIZE);
 
 			ql_dbg(ql_dbg_disc, vha, 0x2058,
-			    "GID_PT entry - nn %8phN pn %8phN "
-			    "portid=%02x%02x%02x.\n",
+			    "GID_PT entry - nn %8phN pn %8phN portid=%06x.\n",
 			    list[i].node_name, list[i].port_name,
-			    list[i].d_id.b.domain, list[i].d_id.b.area,
-			    list[i].d_id.b.al_pa);
+			    list[i].d_id.b24);
 		}
 
 		/* Last device exit. */
@@ -868,11 +859,8 @@ qla2x00_sns_ga_nxt(scsi_qla_host_t *vha, fc_port_t *fcport)
 			fcport->d_id.b.domain = 0xf0;
 
 		ql_dbg(ql_dbg_disc, vha, 0x2061,
-		    "GA_NXT entry - nn %8phN pn %8phN "
-		    "port_id=%02x%02x%02x.\n",
-		    fcport->node_name, fcport->port_name,
-		    fcport->d_id.b.domain, fcport->d_id.b.area,
-		    fcport->d_id.b.al_pa);
+		    "GA_NXT entry - nn %8phN pn %8phN port_id=%06x.\n",
+		    fcport->node_name, fcport->port_name, fcport->d_id.b24);
 	}
 
 	return (rval);
@@ -1055,11 +1043,9 @@ qla2x00_sns_gnn_id(scsi_qla_host_t *vha, sw_info_t *list)
 			    WWN_SIZE);
 
 			ql_dbg(ql_dbg_disc, vha, 0x206e,
-			    "GID_PT entry - nn %8phN pn %8phN "
-			    "port_id=%02x%02x%02x.\n",
+			    "GID_PT entry - nn %8phN pn %8phN port_id=%06x.\n",
 			    list[i].node_name, list[i].port_name,
-			    list[i].d_id.b.domain, list[i].d_id.b.area,
-			    list[i].d_id.b.al_pa);
+			    list[i].d_id.b24);
 		}
 
 		/* Last device exit. */
@@ -2919,10 +2905,9 @@ int qla24xx_async_gidpn(scsi_qla_host_t *vha, fc_port_t *fcport)
 		goto done_free_sp;
 
 	ql_dbg(ql_dbg_disc, vha, 0x20a4,
-	    "Async-%s - %8phC hdl=%x loopid=%x portid %02x%02x%02x.\n",
+	    "Async-%s - %8phC hdl=%x loopid=%x portid %06x.\n",
 	    sp->name, fcport->port_name,
-	    sp->handle, fcport->loop_id, fcport->d_id.b.domain,
-	    fcport->d_id.b.area, fcport->d_id.b.al_pa);
+	    sp->handle, fcport->loop_id, fcport->d_id.b24);
 	return rval;
 
 done_free_sp:
@@ -3077,10 +3062,9 @@ int qla24xx_async_gpsc(scsi_qla_host_t *vha, fc_port_t *fcport)
 		goto done_free_sp;
 
 	ql_dbg(ql_dbg_disc, vha, 0x205e,
-	    "Async-%s %8phC hdl=%x loopid=%x portid=%02x%02x%02x.\n",
+	    "Async-%s %8phC hdl=%x loopid=%x portid=%06x.\n",
 	    sp->name, fcport->port_name, sp->handle,
-	    fcport->loop_id, fcport->d_id.b.domain,
-	    fcport->d_id.b.area, fcport->d_id.b.al_pa);
+	    fcport->loop_id, fcport->d_id.b24);
 	return rval;
 
 done_free_sp:

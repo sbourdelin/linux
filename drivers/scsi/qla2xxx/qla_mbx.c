@@ -1783,10 +1783,9 @@ qla2x00_get_port_database(scsi_qla_host_t *vha, fc_port_t *fcport, uint8_t opt)
 		if (pd->master_state != PD_STATE_PORT_LOGGED_IN &&
 		    pd->slave_state != PD_STATE_PORT_LOGGED_IN) {
 			ql_dbg(ql_dbg_mbx, vha, 0x100a,
-			    "Unable to verify login-state (%x/%x) - "
-			    "portid=%02x%02x%02x.\n", pd->master_state,
-			    pd->slave_state, fcport->d_id.b.domain,
-			    fcport->d_id.b.area, fcport->d_id.b.al_pa);
+			    "Unable to verify login-state (%x/%x) - portid=%06x.\n",
+			    pd->master_state, pd->slave_state,
+			    fcport->d_id.b24);
 			rval = QLA_FUNCTION_FAILED;
 			goto gpd_error_out;
 		}

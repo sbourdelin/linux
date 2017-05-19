@@ -769,9 +769,7 @@ qla2x00_issue_logo(struct file *filp, struct kobject *kobj,
 	did.b.area = (type & 0x0000ff00) >> 8;
 	did.b.al_pa = (type & 0x000000ff);
 
-	ql_log(ql_log_info, vha, 0xd04d, "portid=%02x%02x%02x done\n",
-	    did.b.domain, did.b.area, did.b.al_pa);
-
+	ql_log(ql_log_info, vha, 0xd04d, "portid=%06x done\n", did.b24);
 	ql_log(ql_log_info, vha, 0x70e4, "%s: %d\n", __func__, type);
 
 	qla24xx_els_dcmd_iocb(vha, ELS_DCMD_LOGO, did);
