@@ -386,17 +386,19 @@ void sym_calc_value(struct symbol *sym)
 			prop = sym_get_choice_prop(sym);
 			newval.tri = (prop_get_symbol(prop)->curr.val == sym) ? yes : no;
 		} else {
-			if (sym->visible != no) {
-				/* if the symbol is visible use the user value
-				 * if available, otherwise try the default value
-				 */
+			/* If the user defined a value, let's not ignore it,
+			 * even if the symbol is not visible.
+			 */
+			if (sym_has_value(sym)) {
 				sym->flags |= SYMBOL_WRITE;
-				if (sym_has_value(sym)) {
-					newval.tri = EXPR_AND(sym->def[S_DEF_USER].tri,
-							      sym->visible);
-					goto calc_newval;
-				}
+				newval.tri = sym->def[S_DEF_USER].tri;
+				goto calc_newval;
 			}
+
+			if (sym->visible != no)
+				sym->flags |= SYMBOL_WRITE;
+
+			/* otherwise, let's use the default */
 			if (sym->rev_dep.tri != no)
 				sym->flags |= SYMBOL_WRITE;
 			if (!sym_is_choice(sym)) {
@@ -433,13 +435,15 @@ void sym_calc_value(struct symbol *sym)
 	case S_STRING:
 	case S_HEX:
 	case S_INT:
-		if (sym->visible != no) {
+		if (sym_has_value(sym)) {
 			sym->flags |= SYMBOL_WRITE;
-			if (sym_has_value(sym)) {
-				newval.val = sym->def[S_DEF_USER].val;
-				break;
-			}
+			newval.val = sym->def[S_DEF_USER].val;
+			goto calc_newval;
 		}
+
+		if (sym->visible != no)
+			sym->flags |= SYMBOL_WRITE;
+
 		prop = sym_get_default_prop(sym);
 		if (prop) {
 			struct symbol *ds = prop_get_symbol(prop);

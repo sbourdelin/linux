@@ -448,13 +448,6 @@ int conf_read(const char *name)
 
 	for_all_symbols(i, sym) {
 		if (sym_has_value(sym) && !sym_is_choice_value(sym)) {
-			/* Reset values of generates values, so they'll appear
-			 * as new, if they should become visible, but that
-			 * doesn't quite work if the Kconfig and the saved
-			 * configuration disagree.
-			 */
-			if (sym->visible == no && !conf_unsaved)
-				sym->flags &= ~SYMBOL_DEF_USER;
 			switch (sym->type) {
 			case S_STRING:
 			case S_INT:
