@@ -817,6 +817,8 @@ ssize_t events_sysfs_show(struct device *dev, struct device_attribute *attr,
 ssize_t events_ht_sysfs_show(struct device *dev, struct device_attribute *attr,
 			  char *page);
 
+bool skid_kernel_samples(struct perf_event *event, struct pt_regs *regs);
+
 #ifdef CONFIG_CPU_SUP_AMD
 
 int amd_pmu_init(void);

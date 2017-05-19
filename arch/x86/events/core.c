@@ -1454,6 +1454,12 @@ int x86_pmu_handle_irq(struct pt_regs *regs)
 		if (!x86_perf_event_set_period(event))
 			continue;
 
+		/*
+		 * For security, drop the skid kernel samples.
+		 */
+		if (skid_kernel_samples(event, regs))
+			continue;
+
 		if (perf_event_overflow(event, &data, regs))
 			x86_pmu_stop(event, 0);
 	}
@@ -1668,6 +1674,24 @@ ssize_t events_ht_sysfs_show(struct device *dev, struct device_attribute *attr,
 			topology_max_smt_threads() > 1 ?
 			pmu_attr->event_str_ht :
 			pmu_attr->event_str_noht);
+}
+
+bool skid_kernel_samples(struct perf_event *event, struct pt_regs *regs)
+{
+	u64 ip;
+
+	/*
+	 * Without PEBS, we may get kernel samples even though
+	 * exclude_kernel is specified due to skid in sampling.
+	 */
+	if ((event->attr.exclude_kernel) &&
+	    (event->attr.sample_type & PERF_SAMPLE_IP)) {
+		ip = perf_instruction_pointer(regs);
+		if (kernel_ip(ip))
+			return true;
+	}
+
+	return false;
 }
 
 EVENT_ATTR(cpu-cycles,			CPU_CYCLES		);

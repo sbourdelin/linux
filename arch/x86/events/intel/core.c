@@ -2160,6 +2160,12 @@ again:
 		if (has_branch_stack(event))
 			data.br_stack = &cpuc->lbr_stack;
 
+		/*
+		 * For security, drop the skid kernel samples.
+		 */
+		if (skid_kernel_samples(event, regs))
+			continue;
+
 		if (perf_event_overflow(event, &data, regs))
 			x86_pmu_stop(event, 0);
 	}
