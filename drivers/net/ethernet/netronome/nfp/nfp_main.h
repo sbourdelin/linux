@@ -72,6 +72,7 @@ struct nfp_eth_table;
  * @max_data_vnics:	Number of data vNICs app firmware supports
  * @num_vnics:		Number of vNICs spawned
  * @vnics:		Linked list of vNIC structures (struct nfp_net)
+ * @ports:		Linked list of port structures (struct nfp_port)
  * @port_refresh_work:	Work entry for taking netdevs out
  */
 struct nfp_pf {
@@ -100,6 +101,7 @@ struct nfp_pf {
 	unsigned int num_vnics;
 
 	struct list_head vnics;
+	struct list_head ports;
 	struct work_struct port_refresh_work;
 	struct mutex lock;
 };
