@@ -41,11 +41,9 @@ static int ezusb_writememory(struct usb_device *dev, int address,
 		return -ENODEV;
 
 	transfer_buffer = kmemdup(data, length, GFP_KERNEL);
-	if (!transfer_buffer) {
-		dev_err(&dev->dev, "%s - kmalloc(%d) failed.\n",
-							__func__, length);
+	if (!transfer_buffer)
 		return -ENOMEM;
-	}
+
 	result = usb_control_msg(dev, usb_sndctrlpipe(dev, 0), request,
 				 USB_DIR_OUT | USB_TYPE_VENDOR | USB_RECIP_DEVICE,
 				 address, 0, transfer_buffer, length, 3000);
