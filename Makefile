@@ -10,6 +10,12 @@ NAME = Fearless Coyote
 # Comments in this file are targeted only to the developer, do not
 # expect to learn how to build the kernel reading this file.
 
+# Check Make version (note: this check will break at Make 10.x)
+MIN_MAKE_VERSION := 3.81
+ifneq ($(firstword $(sort $(MAKE_VERSION) $(MIN_MAKE_VERSION))),$(MIN_MAKE_VERSION))
+$(error GNU Make >= $(MIN_MAKE_VERSION) is required.  You are running version $(MAKE_VERSION))
+endif
+
 # o Do not use make's built-in rules and variables
 #   (this increases performance and avoids hard-to-debug behaviour);
 # o Look for make include files relative to root of kernel src
