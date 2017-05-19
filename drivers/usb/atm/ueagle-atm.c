@@ -1058,7 +1058,6 @@ static void __uea_load_page_e4(struct uea_softc *sc, u8 pageno, int boot)
 
 bad:
 	uea_err(INS_TO_USBDEV(sc), "sending DSP block %u failed\n", blockno);
-	return;
 }
 
 static void uea_load_page_e4(struct work_struct *work)
@@ -2101,7 +2100,6 @@ bad2:
 			E4_FUNCTION_TYPE(cmv->wFunction),
 			E4_FUNCTION_SUBTYPE(cmv->wFunction));
 	uea_leaves(INS_TO_USBDEV(sc));
-	return;
 }
 
 static void uea_schedule_load_page_e1(struct uea_softc *sc,
