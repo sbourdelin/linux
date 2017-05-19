@@ -79,6 +79,19 @@ struct acpi_lpi_state {
 	u8 index;
 	u8 entry_method;
 	char desc[ACPI_CX_DESC_LEN];
+	struct acpi_generic_address res_cntr;
+	struct acpi_generic_address usage_cntr;
+};
+
+struct acpi_lpi_sysfs_state {
+	struct acpi_lpi_state lpi_state;
+	struct kobject kobj;
+};
+
+struct acpi_lpi_sysfs_data {
+	u8 state_count;
+	struct kobject kobj;
+	struct acpi_lpi_sysfs_state *sysfs_states;
 };
 
 struct acpi_processor_power {
@@ -88,6 +101,7 @@ struct acpi_processor_power {
 		struct acpi_lpi_state lpi_states[ACPI_PROCESSOR_MAX_POWER];
 	};
 	int timer_broadcast_on_state;
+	struct acpi_lpi_sysfs_data *lpi_sysfs_data;
 };
 
 /* Performance Management */
