@@ -955,7 +955,7 @@ static void uea_load_page_e1(struct work_struct *work)
 		sc->dsp_firm = NULL;
 	}
 
-	if (sc->dsp_firm == NULL && request_dsp(sc) < 0)
+	if (!sc->dsp_firm && request_dsp(sc) < 0)
 		return;
 
 	p = sc->dsp_firm->data;
@@ -1076,7 +1076,7 @@ static void uea_load_page_e4(struct work_struct *work)
 		sc->dsp_firm = NULL;
 	}
 
-	if (sc->dsp_firm == NULL && request_dsp(sc) < 0)
+	if (!sc->dsp_firm && request_dsp(sc) < 0)
 		return;
 
 	p = (struct l1_code *) sc->dsp_firm->data;
@@ -1596,7 +1596,7 @@ static void cmvs_file_name(struct uea_softc *sc, char *const cmv_name, int ver)
 
 	kernel_param_lock(THIS_MODULE);
 	/* set proper name corresponding modem version and line type */
-	if (cmv_file[sc->modem_index] == NULL) {
+	if (!cmv_file[sc->modem_index]) {
 		if (UEA_CHIP_VERSION(sc) == ADI930)
 			file_arr[3] = '9';
 		else if (UEA_CHIP_VERSION(sc) == EAGLE_IV)
