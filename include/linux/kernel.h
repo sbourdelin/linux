@@ -850,9 +850,19 @@ static inline void ftrace_dump(enum ftrace_dump_mode oops_dump_mode) { }
  * @member:	the name of the member within the struct.
  *
  */
-#define container_of(ptr, type, member) ({			\
+#define ____container_of(ptr, type, member) ({			\
 	const typeof( ((type *)0)->member ) *__mptr = (ptr);	\
 	(type *)( (char *)__mptr - offsetof(type,member) );})
+
+#if GCC_VERSION >= 40900 /* GCC 4.9 added support for _Generic */
+#define container_of(ptr, type, member)					\
+	_Generic((ptr),							\
+		 default: ____container_of(ptr, type, member),		\
+		 const typeof(*(ptr)) *: ____container_of(ptr, const type, \
+							  member))
+#else
+#define container_of(ptr, type, member) ____container_of(ptr, type, member)
+#endif
 
 /* Rebuild everything on CONFIG_FTRACE_MCOUNT_RECORD */
 #ifdef CONFIG_FTRACE_MCOUNT_RECORD
