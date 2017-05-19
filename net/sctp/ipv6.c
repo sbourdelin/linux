@@ -157,7 +157,7 @@ static void sctp_v6_err(struct sk_buff *skb, struct inet6_skb_parm *opt,
 	savesctp = skb->transport_header;
 	skb_reset_network_header(skb);
 	skb_set_transport_header(skb, offset);
-	sk = sctp_err_lookup(net, AF_INET6, skb, sctp_hdr(skb), &asoc, &transport);
+	sk = sctp_err_lookup(net, AF_INET6, skb, &asoc, &transport);
 	/* Put back, the original pointers. */
 	skb->network_header   = saveip;
 	skb->transport_header = savesctp;

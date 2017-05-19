@@ -469,19 +469,19 @@ void sctp_icmp_proto_unreachable(struct sock *sk,
 
 /* Common lookup code for icmp/icmpv6 error handler. */
 struct sock *sctp_err_lookup(struct net *net, int family, struct sk_buff *skb,
-			     struct sctphdr *sctphdr,
 			     struct sctp_association **app,
 			     struct sctp_transport **tpp)
 {
+	struct sctp_init_chunk _chunkhdr, *chunkhdr;
+	struct sctphdr _sctphdr, *sctphdr;
 	union sctp_addr saddr;
 	union sctp_addr daddr;
 	struct sctp_af *af;
 	struct sock *sk = NULL;
 	struct sctp_association *asoc;
 	struct sctp_transport *transport = NULL;
-	struct sctp_init_chunk *chunkhdr;
-	__u32 vtag = ntohl(sctphdr->vtag);
-	int len = skb->len - ((void *)sctphdr - (void *)skb->data);
+	int offset;
+	__u32 vtag;
 
 	*app = NULL; *tpp = NULL;
 
@@ -515,14 +515,23 @@ struct sock *sctp_err_lookup(struct net *net, int family, struct sk_buff *skb,
 	 * or the chunk type or the Initiate Tag does not match, silently
 	 * discard the packet.
 	 */
+	offset = skb_transport_offset(skb);
+	sctphdr = skb_header_pointer(skb, offset, sizeof(_sctphdr), &_sctphdr);
+	if (unlikely(!sctphdr))
+		goto out;
+
+	vtag = ntohl(sctphdr->vtag);
 	if (vtag == 0) {
-		chunkhdr = (void *)sctphdr + sizeof(struct sctphdr);
-		if (len < sizeof(struct sctphdr) + sizeof(sctp_chunkhdr_t)
-			  + sizeof(__be32) ||
+		offset += sizeof(_sctphdr);
+		/* chunk header + first 4 octects of init header */
+		chunkhdr = skb_header_pointer(skb, offset,
+					      sizeof(struct sctp_chunkhdr) +
+					      sizeof(__be32), &_chunkhdr);
+		if (!chunkhdr ||
 		    chunkhdr->chunk_hdr.type != SCTP_CID_INIT ||
-		    ntohl(chunkhdr->init_hdr.init_tag) != asoc->c.my_vtag) {
+		    ntohl(chunkhdr->init_hdr.init_tag) != asoc->c.my_vtag)
 			goto out;
-		}
+
 	} else if (vtag != asoc->c.peer_vtag) {
 		goto out;
 	}
@@ -585,7 +594,7 @@ void sctp_v4_err(struct sk_buff *skb, __u32 info)
 	savesctp = skb->transport_header;
 	skb_reset_network_header(skb);
 	skb_set_transport_header(skb, ihlen);
-	sk = sctp_err_lookup(net, AF_INET, skb, sctp_hdr(skb), &asoc, &transport);
+	sk = sctp_err_lookup(net, AF_INET, skb, &asoc, &transport);
 	/* Put back, the original values. */
 	skb->network_header = saveip;
 	skb->transport_header = savesctp;

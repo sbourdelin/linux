@@ -150,7 +150,7 @@ void sctp_v4_err(struct sk_buff *skb, u32 info);
 void sctp_hash_endpoint(struct sctp_endpoint *);
 void sctp_unhash_endpoint(struct sctp_endpoint *);
 struct sock *sctp_err_lookup(struct net *net, int family, struct sk_buff *,
-			     struct sctphdr *, struct sctp_association **,
+			     struct sctp_association **,
 			     struct sctp_transport **);
 void sctp_err_finish(struct sock *, struct sctp_transport *);
 void sctp_icmp_frag_needed(struct sock *, struct sctp_association *,
