@@ -51,9 +51,11 @@ int acpi_processor_ffh_lpi_probe(unsigned int cpu)
 {
 	return arm_cpuidle_init(cpu);
 }
+EXPORT_SYMBOL(acpi_processor_ffh_lpi_probe);
 
 int acpi_processor_ffh_lpi_enter(struct acpi_lpi_state *lpi)
 {
 	return CPU_PM_CPU_IDLE_ENTER(arm_cpuidle_suspend, lpi->index);
 }
+EXPORT_SYMBOL(acpi_processor_ffh_lpi_enter);
 #endif

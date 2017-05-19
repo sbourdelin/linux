@@ -1211,15 +1211,20 @@ static int acpi_processor_get_lpi_info(struct acpi_processor *pr)
 	return 0;
 }
 
-int __weak acpi_processor_ffh_lpi_probe(unsigned int cpu)
+#ifdef CONFIG_ARCH_HAS_ACPI_LPI
+int acpi_processor_ffh_lpi_probe(unsigned int cpu);
+int acpi_processor_ffh_lpi_enter(struct acpi_lpi_state *lpi);
+#else
+static int acpi_processor_ffh_lpi_probe(unsigned int cpu)
 {
 	return -ENODEV;
 }
 
-int __weak acpi_processor_ffh_lpi_enter(struct acpi_lpi_state *lpi)
+static int acpi_processor_ffh_lpi_enter(struct acpi_lpi_state *lpi)
 {
 	return -ENODEV;
 }
+#endif /* CONFIG_ARCH_HAS_ACPI_LPI */
 
 /**
  * acpi_idle_lpi_enter - enters an ACPI any LPI state

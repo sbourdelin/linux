@@ -224,6 +224,9 @@ config ACPI_PROCESSOR_IDLE
 	bool
 	select CPU_IDLE
 
+config ARCH_HAS_ACPI_LPI
+	def_bool n
+
 config ACPI_MCFG
 	bool
 
