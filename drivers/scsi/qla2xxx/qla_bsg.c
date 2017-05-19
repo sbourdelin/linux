@@ -2135,7 +2135,7 @@ qla8044_serdes_op(struct bsg_job *bsg_job)
 		bsg_reply->reply_payload_rcv_len = sizeof(sr);
 		break;
 	default:
-		ql_dbg(ql_dbg_user, vha, 0x70cf,
+		ql_dbg(ql_dbg_user, vha, 0x7020,
 		    "Unknown serdes cmd %x.\n", sr.cmd);
 		rval = -EINVAL;
 		break;
@@ -2147,7 +2147,7 @@ qla8044_serdes_op(struct bsg_job *bsg_job)
 	bsg_job->reply_len = sizeof(struct fc_bsg_reply);
 	bsg_reply->result = DID_OK << 16;
 	bsg_job_done(bsg_job, bsg_reply->result,
-		       bsg_reply->reply_payload_rcv_len);
+	    bsg_reply->reply_payload_rcv_len);
 	return 0;
 }
 

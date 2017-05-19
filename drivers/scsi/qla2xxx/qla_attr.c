@@ -44,7 +44,7 @@ qla2x00_sysfs_read_fw_dump(struct file *filp, struct kobject *kobj,
 		    MCTP_DUMP_SIZE);
 	else if (ha->fw_dump_reading)
 		return memory_read_from_buffer(buf, count, &off, ha->fw_dump,
-					ha->fw_dump_len);
+		    ha->fw_dump_len);
 	else
 		return 0;
 }
@@ -162,7 +162,7 @@ qla2x00_sysfs_read_nvram(struct file *filp, struct kobject *kobj,
 		ha->isp_ops->read_optrom(vha, ha->nvram, ha->flt_region_nvram << 2,
 		    ha->nvram_size);
 	return memory_read_from_buffer(buf, count, &off, ha->nvram,
-					ha->nvram_size);
+	    ha->nvram_size);
 }
 
 static ssize_t
@@ -406,8 +406,8 @@ qla2x00_sysfs_write_optrom_ctl(struct file *filp, struct kobject *kobj,
 		    start == (ha->flt_region_fw * 4))
 			valid = 1;
 		else if (IS_QLA24XX_TYPE(ha) || IS_QLA25XX(ha)
-			|| IS_CNA_CAPABLE(ha) || IS_QLA2031(ha)
-			|| IS_QLA27XX(ha))
+		    || IS_CNA_CAPABLE(ha) || IS_QLA2031(ha)
+		    || IS_QLA27XX(ha))
 			valid = 1;
 		if (!valid) {
 			ql_log(ql_log_warn, vha, 0x7065,
@@ -769,7 +769,7 @@ qla2x00_issue_logo(struct file *filp, struct kobject *kobj,
 	did.b.area = (type & 0x0000ff00) >> 8;
 	did.b.al_pa = (type & 0x000000ff);
 
-	ql_log(ql_log_info, vha, 0x70e3, "portid=%02x%02x%02x done\n",
+	ql_log(ql_log_info, vha, 0xd04d, "portid=%02x%02x%02x done\n",
 	    did.b.domain, did.b.area, did.b.al_pa);
 
 	ql_log(ql_log_info, vha, 0x70e4, "%s: %d\n", __func__, type);
@@ -1295,7 +1295,7 @@ qla24xx_84xx_fw_version_show(struct device *dev,
 
 	if ((rval == QLA_SUCCESS) && (status[0] == 0))
 		return scnprintf(buf, PAGE_SIZE, "%u\n",
-			(uint32_t)ha->cs84xx->op_fw_version);
+		    (uint32_t)ha->cs84xx->op_fw_version);
 
 	return scnprintf(buf, PAGE_SIZE, "\n");
 }
@@ -1608,7 +1608,7 @@ static void
 qla2x00_get_host_speed(struct Scsi_Host *shost)
 {
 	struct qla_hw_data *ha = ((struct scsi_qla_host *)
-					(shost_priv(shost)))->hw;
+	    (shost_priv(shost)))->hw;
 	u32 speed = FC_PORTSPEED_UNKNOWN;
 
 	if (IS_QLAFX00(ha)) {
@@ -1853,7 +1853,7 @@ qla2x00_get_fc_host_stats(struct Scsi_Host *shost)
 	    !ha->dpc_active) {
 		/* Must be in a 'READY' state for statistics retrieval. */
 		rval = qla2x00_get_link_status(base_vha, base_vha->loop_id,
-						stats, stats_dma);
+		    stats, stats_dma);
 	}
 
 	if (rval != QLA_SUCCESS)
@@ -2063,8 +2063,7 @@ qla24xx_vport_create(struct fc_vport *fc_vport, bool disable)
 			vha->flags.difdix_supported = 0;
 	}
 
-	if (scsi_add_host_with_dma(vha->host, &fc_vport->dev,
-				   &ha->pdev->dev)) {
+	if (scsi_add_host_with_dma(vha->host, &fc_vport->dev, &ha->pdev->dev)) {
 		ql_dbg(ql_dbg_user, vha, 0x7083,
 		    "scsi_add_host failure for VP[%d].\n", vha->vp_idx);
 		goto vport_create_failed_2;
@@ -2087,9 +2086,10 @@ qla24xx_vport_create(struct fc_vport *fc_vport, bool disable)
 
 	/* Create a request queue in QoS mode for the vport */
 	for (cnt = 0; cnt < ha->nvram_npiv_size; cnt++) {
-		if (memcmp(ha->npiv_info[cnt].port_name, vha->port_name, 8) == 0
-			&& memcmp(ha->npiv_info[cnt].node_name, vha->node_name,
-					8) == 0) {
+		if ((memcmp(ha->npiv_info[cnt].port_name,
+		    vha->port_name, 8) == 0) &&
+		    (memcmp(ha->npiv_info[cnt].node_name,
+		    vha->node_name, 8) == 0)) {
 			qos = ha->npiv_info[cnt].q_qos;
 			break;
 		}
