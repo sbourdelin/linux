@@ -1313,11 +1313,14 @@ static inline void dec_slabs_node(struct kmem_cache *s, int node,
  * Hooks for other subsystems that check memory allocations. In a typical
  * production configuration these hooks all should produce no code at all.
  */
+
+#ifdef CONFIG_NUMA
 static inline void kmalloc_large_node_hook(void *ptr, size_t size, gfp_t flags)
 {
 	kmemleak_alloc(ptr, size, 1, flags);
 	kasan_kmalloc_large(ptr, size, flags);
 }
+#endif
 
 static inline void kfree_hook(const void *x)
 {
