@@ -58,7 +58,7 @@ minor_get_dyn(ulong *sysminor)
 }
 
 static int
-minor_get_static(ulong *sysminor, ulong aoemaj, int aoemin)
+minor_get_static(ulong *sysminor, ulong aoemaj, unsigned int aoemin)
 {
 	ulong flags;
 	ulong n;
