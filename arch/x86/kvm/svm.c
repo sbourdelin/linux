@@ -2070,8 +2070,12 @@ static void svm_set_dr7(struct kvm_vcpu *vcpu, unsigned long value)
 static int pf_interception(struct vcpu_svm *svm)
 {
 	u64 fault_address = svm->vmcb->control.exit_info_2;
+	struct kvm_vcpu *vcpu = &svm->vcpu;
 	u64 error_code;
 	int r = 1;
+
+	/* On #NPF, exit_info_2 contains a valid GPA */
+	vcpu->arch.gpa_val = fault_address;
 
 	switch (svm->apf_reason) {
 	default:
