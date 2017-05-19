@@ -3063,6 +3063,55 @@ static unsigned bdw_limit_period(struct perf_event *event, unsigned left)
 	return left;
 }
 
+static __init unsigned int glm_get_ref_cycles_factor(void)
+{
+	return 1;
+}
+
+static __init unsigned int nhm_get_ref_cycles_factor(void)
+{
+	u64 platform_info;
+
+	rdmsrl(MSR_PLATFORM_INFO, platform_info);
+	return (platform_info >> 8) & 0xff;
+}
+
+static __init unsigned int skl_get_ref_cycles_factor(void)
+{
+	unsigned int cpuid21_eax, cpuid21_ebx, cpuid21_ecx, unused;
+
+	cpuid(21, &cpuid21_eax, &cpuid21_ebx, &cpuid21_ecx, &unused);
+	if (!cpuid21_eax || !cpuid21_ebx)
+		return 0;
+
+	return cpuid21_ebx / cpuid21_eax;
+}
+
+/*
+ * BUS_CYCLES (0x013c) is another event which is not affected by core
+ * frequency changes. It has a constant ratio with the CPU ref_cycles.
+ * BUS_CYCLES could be used as an alternative event for ref_cycles on
+ * GP counter.
+ */
+void nhm_ref_cycles_rep(struct perf_event *event)
+{
+	struct hw_perf_event *hwc = &event->hw;
+
+	hwc->config = (hwc->config & ~X86_RAW_EVENT_MASK) |
+		      intel_perfmon_event_map[PERF_COUNT_HW_BUS_CYCLES];
+	hwc->flags |= PERF_X86_EVENT_REF_CYCLES_REP;
+
+	/* adjust the sample period for ref_cycles replacement event */
+	if (is_sampling_event(event) && hwc->sample_period != 1) {
+
+		hwc->sample_period /= x86_pmu.ref_cycles_factor;
+		if (hwc->sample_period < 2)
+			hwc->sample_period = 2;
+		hwc->last_period = hwc->sample_period;
+		local64_set(&hwc->period_left, hwc->sample_period);
+	}
+}
+
 PMU_FORMAT_ATTR(event,	"config:0-7"	);
 PMU_FORMAT_ATTR(umask,	"config:8-15"	);
 PMU_FORMAT_ATTR(edge,	"config:18"	);
@@ -3712,7 +3761,9 @@ __init int intel_pmu_init(void)
 
 		intel_pmu_pebs_data_source_nhm();
 		x86_add_quirk(intel_nehalem_quirk);
-
+		x86_pmu.ref_cycles_factor = nhm_get_ref_cycles_factor();
+		if (x86_pmu.ref_cycles_factor)
+			x86_pmu.ref_cycles_rep = nhm_ref_cycles_rep;
 		pr_cont("Nehalem events, ");
 		break;
 
@@ -3772,6 +3823,9 @@ __init int intel_pmu_init(void)
 		x86_pmu.lbr_pt_coexist = true;
 		x86_pmu.flags |= PMU_FL_HAS_RSP_1;
 		x86_pmu.cpu_events = glm_events_attrs;
+		x86_pmu.ref_cycles_factor = glm_get_ref_cycles_factor();
+		if (x86_pmu.ref_cycles_factor)
+			x86_pmu.ref_cycles_rep = nhm_ref_cycles_rep;
 		pr_cont("Goldmont events, ");
 		break;
 
@@ -3801,6 +3855,9 @@ __init int intel_pmu_init(void)
 			X86_CONFIG(.event=0xb1, .umask=0x3f, .inv=1, .cmask=1);
 
 		intel_pmu_pebs_data_source_nhm();
+		x86_pmu.ref_cycles_factor = nhm_get_ref_cycles_factor();
+		if (x86_pmu.ref_cycles_factor)
+			x86_pmu.ref_cycles_rep = nhm_ref_cycles_rep;
 		pr_cont("Westmere events, ");
 		break;
 
@@ -3836,6 +3893,9 @@ __init int intel_pmu_init(void)
 		/* UOPS_DISPATCHED.THREAD,c=1,i=1 to count stall cycles*/
 		intel_perfmon_event_map[PERF_COUNT_HW_STALLED_CYCLES_BACKEND] =
 			X86_CONFIG(.event=0xb1, .umask=0x01, .inv=1, .cmask=1);
+		x86_pmu.ref_cycles_factor = nhm_get_ref_cycles_factor();
+		if (x86_pmu.ref_cycles_factor)
+			x86_pmu.ref_cycles_rep = nhm_ref_cycles_rep;
 
 		pr_cont("SandyBridge events, ");
 		break;
@@ -3870,6 +3930,9 @@ __init int intel_pmu_init(void)
 		/* UOPS_ISSUED.ANY,c=1,i=1 to count stall cycles */
 		intel_perfmon_event_map[PERF_COUNT_HW_STALLED_CYCLES_FRONTEND] =
 			X86_CONFIG(.event=0x0e, .umask=0x01, .inv=1, .cmask=1);
+		x86_pmu.ref_cycles_factor = nhm_get_ref_cycles_factor();
+		if (x86_pmu.ref_cycles_factor)
+			x86_pmu.ref_cycles_rep = nhm_ref_cycles_rep;
 
 		pr_cont("IvyBridge events, ");
 		break;
@@ -3899,6 +3962,9 @@ __init int intel_pmu_init(void)
 		x86_pmu.get_event_constraints = hsw_get_event_constraints;
 		x86_pmu.cpu_events = hsw_events_attrs;
 		x86_pmu.lbr_double_abort = true;
+		x86_pmu.ref_cycles_factor = nhm_get_ref_cycles_factor();
+		if (x86_pmu.ref_cycles_factor)
+			x86_pmu.ref_cycles_rep = nhm_ref_cycles_rep;
 		pr_cont("Haswell events, ");
 		break;
 
@@ -3935,6 +4001,9 @@ __init int intel_pmu_init(void)
 		x86_pmu.get_event_constraints = hsw_get_event_constraints;
 		x86_pmu.cpu_events = hsw_events_attrs;
 		x86_pmu.limit_period = bdw_limit_period;
+		x86_pmu.ref_cycles_factor = nhm_get_ref_cycles_factor();
+		if (x86_pmu.ref_cycles_factor)
+			x86_pmu.ref_cycles_rep = nhm_ref_cycles_rep;
 		pr_cont("Broadwell events, ");
 		break;
 
@@ -3953,6 +4022,9 @@ __init int intel_pmu_init(void)
 		/* all extra regs are per-cpu when HT is on */
 		x86_pmu.flags |= PMU_FL_HAS_RSP_1;
 		x86_pmu.flags |= PMU_FL_NO_HT_SHARING;
+		x86_pmu.ref_cycles_factor = glm_get_ref_cycles_factor();
+		if (x86_pmu.ref_cycles_factor)
+			x86_pmu.ref_cycles_rep = nhm_ref_cycles_rep;
 
 		pr_cont("Knights Landing/Mill events, ");
 		break;
@@ -3988,6 +4060,9 @@ __init int intel_pmu_init(void)
 						  skl_format_attr);
 		WARN_ON(!x86_pmu.format_attrs);
 		x86_pmu.cpu_events = hsw_events_attrs;
+		x86_pmu.ref_cycles_factor = skl_get_ref_cycles_factor();
+		if (x86_pmu.ref_cycles_factor)
+			x86_pmu.ref_cycles_rep = nhm_ref_cycles_rep;
 		pr_cont("Skylake events, ");
 		break;
 
@@ -4024,15 +4099,17 @@ __init int intel_pmu_init(void)
 		((1LL << x86_pmu.num_counters_fixed)-1) << INTEL_PMC_IDX_FIXED;
 
 	if (x86_pmu.event_constraints) {
-		/*
-		 * event on fixed counter2 (REF_CYCLES) only works on this
-		 * counter, so do not extend mask to generic counters
-		 */
 		for_each_event_constraint(c, x86_pmu.event_constraints) {
-			if (c->cmask == FIXED_EVENT_FLAGS
-			    && c->idxmsk64 != INTEL_PMC_MSK_FIXED_REF_CYCLES) {
+			if (c->cmask == FIXED_EVENT_FLAGS)
 				c->idxmsk64 |= (1ULL << x86_pmu.num_counters) - 1;
-			}
+			/*
+			 * event on fixed counter2 (REF_CYCLES) only works on
+			 * this counter on some old platforms, e.g. core2, Atom.
+			 * So do not extend mask to generic counters
+			 */
+			if ((c->idxmsk64 == INTEL_PMC_MSK_FIXED_REF_CYCLES) &&
+			    !x86_pmu.ref_cycles_rep)
+				c->idxmsk64 &= ~((1ULL << x86_pmu.num_counters) - 1);
 			c->idxmsk64 &=
 				~(~0ULL << (INTEL_PMC_IDX_FIXED + x86_pmu.num_counters_fixed));
 			c->weight = hweight64(c->idxmsk64);

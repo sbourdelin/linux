@@ -101,6 +101,10 @@ again:
 	delta = (new_raw_count << shift) - (prev_raw_count << shift);
 	delta >>= shift;
 
+	/* Correct the count number if applying ref_cycles replacement */
+	if (!is_sampling_event(event) &&
+	    (hwc->flags & PERF_X86_EVENT_REF_CYCLES_REP))
+		delta *= x86_pmu.ref_cycles_factor;
 	local64_add(delta, &event->count);
 	local64_sub(delta, &hwc->period_left);
 
@@ -934,6 +938,21 @@ int x86_schedule_events(struct cpu_hw_events *cpuc, int n, int *assign)
 		for (i = 0; i < n; i++) {
 			e = cpuc->event_list[i];
 			e->hw.flags |= PERF_X86_EVENT_COMMITTED;
+
+			/*
+			 * 0x0300 is pseudo-encoding for REF_CPU_CYCLES.
+			 * It indicates that fixed counter 2 should be used.
+			 *
+			 * If fixed counter 2 is occupied and a GP counter
+			 * is assigned, an alternative event which can be
+			 * counted in GP counter will be used to replace
+			 * the pseudo-encoding REF_CPU_CYCLES event.
+			 */
+			if (((e->hw.config & X86_RAW_EVENT_MASK) == 0x0300) &&
+			    (assign[i] < INTEL_PMC_IDX_FIXED) &&
+			    x86_pmu.ref_cycles_rep)
+				x86_pmu.ref_cycles_rep(e);
+
 			if (x86_pmu.commit_scheduling)
 				x86_pmu.commit_scheduling(cpuc, i, assign[i]);
 		}

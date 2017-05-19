@@ -68,6 +68,7 @@ struct event_constraint {
 #define PERF_X86_EVENT_EXCL_ACCT	0x0200 /* accounted EXCL event */
 #define PERF_X86_EVENT_AUTO_RELOAD	0x0400 /* use PEBS auto-reload */
 #define PERF_X86_EVENT_FREERUNNING	0x0800 /* use freerunning PEBS */
+#define PERF_X86_EVENT_REF_CYCLES_REP	0x1000 /* use ref_cycles replacement */
 
 
 struct amd_nb {
@@ -550,6 +551,8 @@ struct x86_pmu {
 	int		perfctr_second_write;
 	bool		late_ack;
 	unsigned	(*limit_period)(struct perf_event *event, unsigned l);
+	unsigned int	ref_cycles_factor;
+	void		(*ref_cycles_rep)(struct perf_event *event);
 
 	/*
 	 * sysfs attrs
