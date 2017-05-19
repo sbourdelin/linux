@@ -498,6 +498,53 @@ qla25xx_copy_fce(struct qla_hw_data *ha, void *ptr, uint32_t **last_chain)
 }
 
 static inline void *
+qla25xx_copy_exlogin(struct qla_hw_data *ha, void *ptr, uint32_t **last_chain)
+{
+	struct qla2xxx_offld_chain *c = ptr;
+
+	if (!ha->exlogin_buf)
+		return ptr;
+
+	*last_chain = &c->type;
+
+	c->type = htonl(DUMP_CHAIN_EXLOGIN);
+	c->chain_size = htonl(sizeof(struct qla2xxx_offld_chain) +
+	    ha->exlogin_size);
+	c->size = htonl(ha->exlogin_size);
+	c->addr_l = htonl(LSD(ha->exlogin_buf_dma));
+	c->addr_h = htonl(MSD(ha->exlogin_buf_dma));
+
+	ptr += sizeof(struct qla2xxx_offld_chain);
+	memcpy(ptr, ha->exlogin_buf, ha->exlogin_size);
+
+	return (char *)ptr + ntohl(c->size);
+}
+
+static inline void *
+qla81xx_copy_exchoffld(struct qla_hw_data *ha, void *ptr, uint32_t **last_chain)
+{
+	struct qla2xxx_offld_chain *c = ptr;
+
+	if (!ha->exchoffld_buf)
+		return ptr;
+
+	*last_chain = &c->type;
+
+	c->type = htonl(DUMP_CHAIN_EXCHG);
+	c->chain_size = htonl(sizeof(struct qla2xxx_offld_chain) +
+	    ha->exchoffld_size);
+	c->size = htonl(ha->exchoffld_size);
+	c->addr_l = htonl(LSD(ha->exchoffld_buf_dma));
+	c->addr_h = htonl(MSD(ha->exchoffld_buf_dma));
+
+	ptr += sizeof(struct qla2xxx_offld_chain);
+	memcpy(ptr, ha->exchoffld_buf, ha->exchoffld_size);
+
+	return (char *)ptr + ntohl(c->size);
+}
+
+
+static inline void *
 qla2xxx_copy_atioqueues(struct qla_hw_data *ha, void *ptr,
 	uint32_t **last_chain)
 {
@@ -1606,6 +1653,7 @@ qla25xx_fw_dump(scsi_qla_host_t *vha, int hardware_locked)
 	nxt_chain = qla25xx_copy_fce(ha, nxt_chain, &last_chain);
 	nxt_chain = qla25xx_copy_mqueues(ha, nxt_chain, &last_chain);
 	nxt_chain = qla2xxx_copy_atioqueues(ha, nxt_chain, &last_chain);
+	nxt_chain = qla25xx_copy_exlogin(ha, nxt_chain, &last_chain);
 	if (last_chain) {
 		ha->fw_dump->version |= htonl(DUMP_CHAIN_VARIANT);
 		*last_chain |= htonl(DUMP_CHAIN_LAST);
@@ -1932,6 +1980,8 @@ qla81xx_fw_dump(scsi_qla_host_t *vha, int hardware_locked)
 	nxt_chain = qla25xx_copy_fce(ha, nxt_chain, &last_chain);
 	nxt_chain = qla25xx_copy_mqueues(ha, nxt_chain, &last_chain);
 	nxt_chain = qla2xxx_copy_atioqueues(ha, nxt_chain, &last_chain);
+	nxt_chain = qla25xx_copy_exlogin(ha, nxt_chain, &last_chain);
+	nxt_chain = qla81xx_copy_exchoffld(ha, nxt_chain, &last_chain);
 	if (last_chain) {
 		ha->fw_dump->version |= htonl(DUMP_CHAIN_VARIANT);
 		*last_chain |= htonl(DUMP_CHAIN_LAST);
@@ -2443,6 +2493,8 @@ copy_queue:
 	nxt_chain = qla25xx_copy_fce(ha, nxt_chain, &last_chain);
 	nxt_chain = qla25xx_copy_mqueues(ha, nxt_chain, &last_chain);
 	nxt_chain = qla2xxx_copy_atioqueues(ha, nxt_chain, &last_chain);
+	nxt_chain = qla25xx_copy_exlogin(ha, nxt_chain, &last_chain);
+	nxt_chain = qla81xx_copy_exchoffld(ha, nxt_chain, &last_chain);
 	if (last_chain) {
 		ha->fw_dump->version |= htonl(DUMP_CHAIN_VARIANT);
 		*last_chain |= htonl(DUMP_CHAIN_LAST);

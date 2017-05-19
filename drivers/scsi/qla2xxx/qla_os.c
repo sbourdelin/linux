@@ -4048,9 +4048,6 @@ qla2x00_set_exchoffld_buffer(scsi_qla_host_t *vha)
 	if (!ql2xexchoffld)
 		return QLA_SUCCESS;
 
-	ql_log(ql_log_info, vha, 0xd014,
-	    "Exchange offload count: %d.\n", ql2xexlogins);
-
 	max_cnt = 0;
 	rval = qla_get_exchoffld_status(vha, &size, &max_cnt);
 	if (rval != QLA_SUCCESS) {
