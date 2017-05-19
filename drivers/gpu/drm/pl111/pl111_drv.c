@@ -78,7 +78,7 @@ struct drm_mode_config_funcs mode_config_funcs = {
 	.atomic_commit = drm_atomic_helper_commit,
 };
 
-static int pl111_modeset_init(struct drm_device *dev)
+static int __used pl111_modeset_init(struct drm_device *dev)
 {
 	struct drm_mode_config *mode_config;
 	struct pl111_drm_dev_private *priv = dev->dev_private;
@@ -146,7 +146,7 @@ static void pl111_lastclose(struct drm_device *dev)
 	drm_fbdev_cma_restore_mode(priv->fbdev);
 }
 
-static struct drm_driver pl111_drm_driver = {
+static struct drm_driver __used pl111_drm_driver = {
 	.driver_features =
 		DRIVER_MODESET | DRIVER_GEM | DRIVER_PRIME | DRIVER_ATOMIC,
 	.lastclose = pl111_lastclose,
