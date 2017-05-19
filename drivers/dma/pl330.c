@@ -538,7 +538,7 @@ struct _xfer_spec {
 	struct dma_pl330_desc *desc;
 };
 
-static inline bool _queue_empty(struct pl330_thread *thrd)
+static inline bool __maybe_unused _queue_empty(struct pl330_thread *thrd)
 {
 	return thrd->req[0].desc == NULL && thrd->req[1].desc == NULL;
 }
@@ -564,7 +564,7 @@ static inline u32 get_revision(u32 periph_id)
 	return (periph_id >> PERIPH_REV_SHIFT) & PERIPH_REV_MASK;
 }
 
-static inline u32 _emit_ADDH(unsigned dry_run, u8 buf[],
+static inline u32 __maybe_unused _emit_ADDH(unsigned dry_run, u8 buf[],
 		enum pl330_dst da, u16 val)
 {
 	if (dry_run)
@@ -738,7 +738,7 @@ static inline u32 _emit_MOV(unsigned dry_run, u8 buf[],
 	return SZ_DMAMOV;
 }
 
-static inline u32 _emit_NOP(unsigned dry_run, u8 buf[])
+static inline u32 __maybe_unused _emit_NOP(unsigned dry_run, u8 buf[])
 {
 	if (dry_run)
 		return SZ_DMANOP;
@@ -778,7 +778,8 @@ static inline u32 _emit_SEV(unsigned dry_run, u8 buf[], u8 ev)
 	return SZ_DMASEV;
 }
 
-static inline u32 _emit_ST(unsigned dry_run, u8 buf[], enum pl330_cond cond)
+static inline u32 _emit_ST(unsigned dry_run, u8 buf[],
+					  enum pl330_cond cond)
 {
 	if (dry_run)
 		return SZ_DMAST;
@@ -817,7 +818,7 @@ static inline u32 _emit_STP(unsigned dry_run, u8 buf[],
 	return SZ_DMASTP;
 }
 
-static inline u32 _emit_STZ(unsigned dry_run, u8 buf[])
+static inline u32 __maybe_unused _emit_STZ(unsigned dry_run, u8 buf[])
 {
 	if (dry_run)
 		return SZ_DMASTZ;
@@ -829,7 +830,7 @@ static inline u32 _emit_STZ(unsigned dry_run, u8 buf[])
 	return SZ_DMASTZ;
 }
 
-static inline u32 _emit_WFE(unsigned dry_run, u8 buf[], u8 ev,
+static inline u32 __maybe_unused _emit_WFE(unsigned dry_run, u8 buf[], u8 ev,
 		unsigned invalidate)
 {
 	if (dry_run)
