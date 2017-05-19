@@ -5326,8 +5326,6 @@ static void qlt_response_pkt(struct scsi_qla_host *vha, response_t *pkt)
 	 * Otherwise, some commands can stuck.
 	 */
 
-	tgt->irq_cmd_count++;
-
 	switch (pkt->entry_type) {
 	case CTIO_CRC2:
 	case CTIO_TYPE7:
@@ -5353,10 +5351,8 @@ static void qlt_response_pkt(struct scsi_qla_host *vha, response_t *pkt)
 		}
 
 		rc = qlt_chk_qfull_thresh_hold(vha, atio, true);
-		if (rc != 0) {
-			tgt->irq_cmd_count--;
+		if (rc != 0)
 			return;
-		}
 
 		rc = qlt_handle_cmd_for_atio(vha, atio);
 		if (unlikely(rc != 0)) {
@@ -5488,7 +5484,6 @@ static void qlt_response_pkt(struct scsi_qla_host *vha, response_t *pkt)
 		break;
 	}
 
-	tgt->irq_cmd_count--;
 }
 
 /*
@@ -5518,7 +5513,6 @@ void qlt_async_event(uint16_t code, struct scsi_qla_host *vha,
 	 * Otherwise, some commands can stuck.
 	 */
 
-	tgt->irq_cmd_count++;
 
 	switch (code) {
 	case MBA_RESET:			/* Reset */
@@ -5606,7 +5600,6 @@ void qlt_async_event(uint16_t code, struct scsi_qla_host *vha,
 		break;
 	}
 
-	tgt->irq_cmd_count--;
 }
 
 static fc_port_t *qlt_get_port_database(struct scsi_qla_host *vha,
