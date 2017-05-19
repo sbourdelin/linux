@@ -180,26 +180,30 @@ static int __init at91sam926x_pit_dt_init(struct device_node *node)
 	data->base = of_iomap(node, 0);
 	if (!data->base) {
 		pr_err("Could not map PIT address\n");
-		return -ENXIO;
+		ret = -ENXIO;
+		goto error_free;
 	}
 
 	data->mck = of_clk_get(node, 0);
 	if (IS_ERR(data->mck)) {
 		pr_err("Unable to get mck clk\n");
-		return PTR_ERR(data->mck);
+		ret = PTR_ERR(data->mck);
+		goto error_iounmap;
 	}
 
 	ret = clk_prepare_enable(data->mck);
 	if (ret) {
 		pr_err("Unable to enable mck\n");
-		return ret;
+		goto error_clk_put;
 	}
 
 	/* Get the interrupts property */
 	data->irq = irq_of_parse_and_map(node, 0);
 	if (!data->irq) {
 		pr_err("Unable to get IRQ from DT\n");
-		return -EINVAL;
+		ret = -EINVAL;
+		goto error_clk_disable;
+
 	}
 
 	/*
@@ -223,11 +227,11 @@ static int __init at91sam926x_pit_dt_init(struct device_node *node)
 	data->clksrc.rating = 175;
 	data->clksrc.read = read_pit_clk;
 	data->clksrc.flags = CLOCK_SOURCE_IS_CONTINUOUS;
-	
+
 	ret = clocksource_register_hz(&data->clksrc, pit_rate);
 	if (ret) {
 		pr_err("Failed to register clocksource\n");
-		return ret;
+		goto error_clk_disable;
 	}
 
 	/* Set up irq handler */
@@ -236,7 +240,7 @@ static int __init at91sam926x_pit_dt_init(struct device_node *node)
 			  "at91_tick", data);
 	if (ret) {
 		pr_err("Unable to setup IRQ\n");
-		return ret;
+		goto error_unregister_clk;
 	}
 
 	/* Set up and register clockevents */
@@ -254,6 +258,19 @@ static int __init at91sam926x_pit_dt_init(struct device_node *node)
 	clockevents_register_device(&data->clkevt);
 
 	return 0;
+
+error_unregister_clk:
+	clocksource_unregister(&data->clksrc);
+error_clk_disable:
+	clk_disable_unprepare(data->mck);
+error_clk_put:
+	clk_put(data->mck);
+error_iounmap:
+	iounmap(data->base);
+error_free:
+	kfree(data);
+
+	return ret;
 }
 CLOCKSOURCE_OF_DECLARE(at91sam926x_pit, "atmel,at91sam9260-pit",
 		       at91sam926x_pit_dt_init);
