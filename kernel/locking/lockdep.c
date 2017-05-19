@@ -1374,7 +1374,9 @@ static void print_lock_class_header(struct lock_class *class, int depth)
 
 	printk("%*s->", depth, "");
 	print_lock_name(class);
+#ifdef CONFIG_DEBUG_LOCKDEP
 	printk(KERN_CONT " ops: %lu", class->ops);
+#endif
 	printk(KERN_CONT " {\n");
 
 	for (bit = 0; bit < LOCK_USAGE_STATES; bit++) {
@@ -3249,7 +3251,9 @@ static int __lock_acquire(struct lockdep_map *lock, unsigned int subclass,
 		if (!class)
 			return 0;
 	}
+#ifdef CONFIG_DEBUG_LOCKDEP
 	atomic_inc((atomic_t *)&class->ops);
+#endif
 	if (very_verbose(class)) {
 		printk("\nacquire class [%p] %s", class->key, class->name);
 		if (class->name_version > 1)
