@@ -32,7 +32,8 @@
 #include "irq.h"
 
 int kvm_irq_map_gsi(struct kvm *kvm,
-		    struct kvm_kernel_irq_routing_entry *entries, int gsi)
+		    struct kvm_kernel_irq_routing_entry *entries,
+		    u32 gsi)
 {
 	struct kvm_irq_routing_table *irq_rt;
 	struct kvm_kernel_irq_routing_entry *e;
