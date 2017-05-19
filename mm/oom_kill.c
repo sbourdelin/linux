@@ -873,6 +873,12 @@ static void oom_kill_process(struct oom_control *oc, const char *message)
 		victim = p;
 	}
 
+	/* Raise event before sending signal: reaper must see this */
+	if (!is_memcg_oom(oc))
+		count_vm_event(OOM_KILL);
+	else
+		mem_cgroup_event(oc->memcg, MEMCG_OOM_KILL);
+
 	/* Get a reference to safely compare mm after task_unlock(victim) */
 	mm = victim->mm;
 	mmgrab(mm);

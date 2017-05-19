@@ -55,6 +55,7 @@ enum memcg_event_item {
 	MEMCG_HIGH,
 	MEMCG_MAX,
 	MEMCG_OOM,
+	MEMCG_OOM_KILL,
 	MEMCG_NR_EVENTS,
 };
 

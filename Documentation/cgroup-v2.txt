@@ -830,9 +830,19 @@ PAGE_SIZE multiple when read back.
 
 	  oom
 
+		The number of time the cgroup's memory usage was
+		reached the limit and allocation was about to fail.
+		Result could be oom kill, -ENOMEM from any syscall or
+		completely ignored in cases like disk readahead.
+		For now oom in memory cgroup kills tasks iff shortage
+		has happened inside page fault.
+
+	  oom_kill
+
 		The number of times the OOM killer has been invoked in
 		the cgroup.  This may not exactly match the number of
-		processes killed but should generally be close.
+		processes killed but should generally be close:	each
+		invocation could kill several processes at once.
 
   memory.stat
 
