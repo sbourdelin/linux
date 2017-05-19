@@ -116,6 +116,7 @@ struct nfp_cpp;
 struct nfp_eth_table_port;
 struct nfp_net;
 struct nfp_net_r_vector;
+struct nfp_port;
 
 /* Convenience macro for wrapping descriptor index on ring size */
 #define D_IDX(ring, idx)	((idx) & ((ring)->cnt - 1))
@@ -558,7 +559,7 @@ struct nfp_net_dp {
  * @vnic_list:		Entry on device vNIC list
  * @pdev:		Backpointer to PCI device
  * @app:		APP handle if available
- * @eth_port:		Translated ETH Table port entry
+ * @port:		Pointer to nfp_port structure if vNIC is a port
  */
 struct nfp_net {
 	struct nfp_net_dp dp;
@@ -630,7 +631,7 @@ struct nfp_net {
 	struct pci_dev *pdev;
 	struct nfp_app *app;
 
-	struct nfp_eth_table_port *eth_port;
+	struct nfp_port *port;
 };
 
 /* Functions to read/write from/to a BAR
@@ -835,8 +836,6 @@ int nfp_net_ring_reconfig(struct nfp_net *nn, struct nfp_net_dp *new,
 			  struct netlink_ext_ack *extack);
 
 bool nfp_net_link_changed_read_clear(struct nfp_net *nn);
-int nfp_net_refresh_eth_port(struct nfp_net *nn);
-void nfp_net_refresh_port_table(struct nfp_net *nn);
 
 #ifdef CONFIG_NFP_DEBUG
 void nfp_net_debugfs_create(void);
