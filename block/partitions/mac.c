@@ -19,7 +19,7 @@ extern void note_bootable_part(dev_t dev, int part, int goodness);
  * Code to understand MacOS partition tables.
  */
 
-static inline void mac_fix_string(char *stg, int len)
+static inline void __maybe_unused mac_fix_string(char *stg, int len)
 {
 	int i;
 
