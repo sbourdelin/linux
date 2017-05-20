@@ -25,10 +25,8 @@ static int spk_ttyio_ldisc_open(struct tty_struct *tty)
 	speakup_tty = tty;
 
 	ldisc_data = kmalloc(sizeof(struct spk_ldisc_data), GFP_KERNEL);
-	if (!ldisc_data) {
-		pr_err("speakup: Failed to allocate ldisc_data.\n");
+	if (!ldisc_data)
 		return -ENOMEM;
-	}
 
 	sema_init(&ldisc_data->sem, 0);
 	ldisc_data->buf_free = true;
@@ -50,6 +48,7 @@ static int spk_ttyio_receive_buf2(struct tty_struct *tty,
 
 	if (spk_ttyio_synth->read_buff_add) {
 		int i;
+
 		for (i = 0; i < count; i++)
 			spk_ttyio_synth->read_buff_add(cp[i]);
 
@@ -61,7 +60,8 @@ static int spk_ttyio_receive_buf2(struct tty_struct *tty,
 		return 0;
 
 	/* Make sure the consumer has read buf before we have seen
-         * buf_free == true and overwrite buf */
+	 * buf_free == true and overwrite buf
+	 */
 	mb();
 
 	ldisc_data->buf = cp[0];
@@ -162,6 +162,7 @@ static int spk_ttyio_out(struct spk_synth *in_synth, const char ch)
 {
 	if (in_synth->alive && speakup_tty && speakup_tty->ops->write) {
 		int ret = speakup_tty->ops->write(speakup_tty, &ch, 1);
+
 		if (ret == 0)
 			/* No room */
 			return 0;
@@ -204,7 +205,8 @@ static unsigned char ttyio_in(int timeout)
 
 	rv = ldisc_data->buf;
 	/* Make sure we have read buf before we set buf_free to let
-	 * the producer overwrite it */
+	 * the producer overwrite it
+	 */
 	mb();
 	ldisc_data->buf_free = true;
 	/* Let TTY push more characters */
