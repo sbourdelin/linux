@@ -3841,6 +3841,12 @@ static int i40e_set_channels(struct net_device *dev,
 	if (vsi->type != I40E_VSI_MAIN)
 		return -EINVAL;
 
+	/* We do not support setting channels via ethtool when TCs are
+	 * configured through mqprio
+	 */
+	if (pf->flags & I40E_FLAG_TC_MQPRIO)
+		return -EINVAL;
+
 	/* verify they are not requesting separate vectors */
 	if (!count || ch->rx_count || ch->tx_count)
 		return -EINVAL;
