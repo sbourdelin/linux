@@ -2149,6 +2149,11 @@ static void nvme_reset_notify(struct pci_dev *pdev, bool prepare)
 {
 	struct nvme_dev *dev = pci_get_drvdata(pdev);
 
+	if (!dev) {
+		pr_err("reset%s notification to nvme failed",
+				prepare ? " preparation" : "");
+		return;
+	}
 	if (prepare)
 		nvme_dev_disable(dev, false);
 	else
