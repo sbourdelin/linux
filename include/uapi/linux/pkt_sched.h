@@ -620,6 +620,7 @@ struct tc_drr_stats {
 enum {
 	TC_MQPRIO_HW_OFFLOAD_NONE,	/* no offload requested */
 	TC_MQPRIO_HW_OFFLOAD_TCS,	/* offload TCs, no queue counts */
+	TC_MQPRIO_HW_OFFLOAD,		/* fully supported offload */
 	__TC_MQPRIO_HW_OFFLOAD_MAX
 };
 
@@ -632,6 +633,18 @@ struct tc_mqprio_qopt {
 	__u16	count[TC_QOPT_MAX_QUEUE];
 	__u16	offset[TC_QOPT_MAX_QUEUE];
 };
+
+#define TC_MQPRIO_F_MIN_RATE  0x1
+#define TC_MQPRIO_F_MAX_RATE  0x2
+
+enum {
+	TCA_MQPRIO_UNSPEC,
+	TCA_MQPRIO_MIN_RATE64,
+	TCA_MQPRIO_MAX_RATE64,
+	__TCA_MQPRIO_MAX,
+};
+
+#define TCA_MQPRIO_MAX (__TCA_MQPRIO_MAX - 1)
 
 /* SFB */
 
