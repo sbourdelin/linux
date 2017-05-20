@@ -300,6 +300,7 @@ struct asd_sas_port {
 struct asd_sas_event {
 	struct sas_work work;
 	struct asd_sas_phy *phy;
+	int type;
 };
 
 static inline struct asd_sas_event *to_asd_sas_event(struct work_struct *work)
@@ -314,11 +315,6 @@ static inline struct asd_sas_event *to_asd_sas_event(struct work_struct *work)
  */
 struct asd_sas_phy {
 /* private: */
-	struct asd_sas_event   port_events[PORT_NUM_EVENTS];
-	struct asd_sas_event   phy_events[PHY_NUM_EVENTS];
-
-	unsigned long port_events_pending;
-	unsigned long phy_events_pending;
 
 	int error;
 	int suspended;
@@ -365,6 +361,7 @@ struct scsi_core {
 struct sas_ha_event {
 	struct sas_work work;
 	struct sas_ha_struct *ha;
+	int type;
 };
 
 static inline struct sas_ha_event *to_sas_ha_event(struct work_struct *work)
@@ -383,9 +380,6 @@ enum sas_ha_state {
 
 struct sas_ha_struct {
 /* private: */
-	struct sas_ha_event ha_events[HA_NUM_EVENTS];
-	unsigned long	 pending;
-
 	struct list_head  defer_q; /* work queued while draining */
 	struct mutex	  drain_mutex;
 	unsigned long	  state;

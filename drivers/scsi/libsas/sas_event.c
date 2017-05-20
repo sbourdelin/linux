@@ -27,6 +27,10 @@
 #include "sas_internal.h"
 #include "sas_dump.h"
 
+static const work_func_t sas_ha_event_fns[HA_NUM_EVENTS] = {
+	[HAE_RESET] = sas_hae_reset,
+};
+
 void sas_queue_work(struct sas_ha_struct *ha, struct sas_work *sw)
 {
 	if (!test_bit(SAS_HA_REGISTERED, &ha->state))
@@ -40,17 +44,14 @@ void sas_queue_work(struct sas_ha_struct *ha, struct sas_work *sw)
 		scsi_queue_work(ha->core.shost, &sw->work);
 }
 
-static void sas_queue_event(int event, unsigned long *pending,
-			    struct sas_work *work,
+static void sas_queue_event(int event, struct sas_work *work,
 			    struct sas_ha_struct *ha)
 {
-	if (!test_and_set_bit(event, pending)) {
-		unsigned long flags;
+	unsigned long flags;
 
-		spin_lock_irqsave(&ha->lock, flags);
-		sas_queue_work(ha, work);
-		spin_unlock_irqrestore(&ha->lock, flags);
-	}
+	spin_lock_irqsave(&ha->lock, flags);
+	sas_queue_work(ha, work);
+	spin_unlock_irqrestore(&ha->lock, flags);
 }
 
 
@@ -111,52 +112,87 @@ void sas_enable_revalidation(struct sas_ha_struct *ha)
 		if (!test_and_clear_bit(ev, &d->pending))
 			continue;
 
-		sas_queue_event(ev, &d->pending, &d->disc_work[ev].work, ha);
+		sas_queue_event(ev, &d->disc_work[ev].work, ha);
 	}
 	mutex_unlock(&ha->disco_mutex);
 }
 
+static void sas_ha_event_worker(struct work_struct *work)
+{
+	struct sas_ha_event *ev = to_sas_ha_event(work);
+
+	sas_ha_event_fns[ev->type](work);
+	kfree(ev);
+}
+
+static void sas_port_event_worker(struct work_struct *work)
+{
+	struct asd_sas_event *ev = to_asd_sas_event(work);
+
+	sas_port_event_fns[ev->type](work);
+	kfree(ev);
+}
+
+static void sas_phy_event_worker(struct work_struct *work)
+{
+	struct asd_sas_event *ev = to_asd_sas_event(work);
+
+	sas_phy_event_fns[ev->type](work);
+	kfree(ev);
+}
+
 static void notify_ha_event(struct sas_ha_struct *sas_ha, enum ha_event event)
 {
+	struct sas_ha_event *ev;
+
 	BUG_ON(event >= HA_NUM_EVENTS);
 
-	sas_queue_event(event, &sas_ha->pending,
-			&sas_ha->ha_events[event].work, sas_ha);
+	ev = kzalloc(sizeof(*ev), GFP_ATOMIC);
+	if (!ev)
+		return;
+
+	INIT_SAS_WORK(&ev->work, sas_ha_event_worker);
+	ev->ha = sas_ha;
+	ev->type = event;
+	sas_queue_event(event, &ev->work, sas_ha);
 }
 
 static void notify_port_event(struct asd_sas_phy *phy, enum port_event event)
 {
+	struct asd_sas_event *ev;
 	struct sas_ha_struct *ha = phy->ha;
 
 	BUG_ON(event >= PORT_NUM_EVENTS);
 
-	sas_queue_event(event, &phy->port_events_pending,
-			&phy->port_events[event].work, ha);
+	ev = kzalloc(sizeof(*ev), GFP_ATOMIC);
+	if (!ev)
+		return;
+
+	INIT_SAS_WORK(&ev->work, sas_port_event_worker);
+	ev->phy = phy;
+	ev->type = event;
+	sas_queue_event(event, &ev->work, ha);
 }
 
 void sas_notify_phy_event(struct asd_sas_phy *phy, enum phy_event event)
 {
+	struct asd_sas_event *ev;
 	struct sas_ha_struct *ha = phy->ha;
 
 	BUG_ON(event >= PHY_NUM_EVENTS);
 
-	sas_queue_event(event, &phy->phy_events_pending,
-			&phy->phy_events[event].work, ha);
+	ev = kzalloc(sizeof(*ev), GFP_ATOMIC);
+	if (!ev)
+		return;
+
+	INIT_SAS_WORK(&ev->work, sas_phy_event_worker);
+	ev->phy = phy;
+	ev->type = event;
+	sas_queue_event(event, &ev->work, ha);
 }
 
 int sas_init_events(struct sas_ha_struct *sas_ha)
 {
-	static const work_func_t sas_ha_event_fns[HA_NUM_EVENTS] = {
-		[HAE_RESET] = sas_hae_reset,
-	};
-
-	int i;
-
-	for (i = 0; i < HA_NUM_EVENTS; i++) {
-		INIT_SAS_WORK(&sas_ha->ha_events[i].work, sas_ha_event_fns[i]);
-		sas_ha->ha_events[i].ha = sas_ha;
-	}
-
 	sas_ha->notify_ha_event = notify_ha_event;
 	sas_ha->notify_port_event = notify_port_event;
 	sas_ha->notify_phy_event = sas_notify_phy_event;

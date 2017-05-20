@@ -111,10 +111,6 @@ void sas_hash_addr(u8 *hashed, const u8 *sas_addr)
 
 void sas_hae_reset(struct work_struct *work)
 {
-	struct sas_ha_event *ev = to_sas_ha_event(work);
-	struct sas_ha_struct *ha = ev->ha;
-
-	clear_bit(HAE_RESET, &ha->pending);
 }
 
 int sas_register_ha(struct sas_ha_struct *sas_ha)
@@ -375,8 +371,6 @@ void sas_prep_resume_ha(struct sas_ha_struct *ha)
 		struct asd_sas_phy *phy = ha->sas_phy[i];
 
 		memset(phy->attached_sas_addr, 0, SAS_ADDR_SIZE);
-		phy->port_events_pending = 0;
-		phy->phy_events_pending = 0;
 		phy->frame_rcvd_size = 0;
 	}
 }
