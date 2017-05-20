@@ -136,7 +136,8 @@ static inline void nsp_inc_resid(struct scsi_cmnd *SCpnt, int residInc)
 	scsi_set_resid(SCpnt, scsi_get_resid(SCpnt) + residInc);
 }
 
-static void nsp_cs_message(const char *func, int line, char *type, char *fmt, ...)
+static __printf(4, 5)
+void nsp_cs_message(const char *func, int line, char *type, const char *fmt, ...)
 {
 	va_list args;
 	char buf[NSP_DEBUG_BUF_LEN];
@@ -153,7 +154,8 @@ static void nsp_cs_message(const char *func, int line, char *type, char *fmt, ..
 }
 
 #ifdef NSP_DEBUG
-static void nsp_cs_dmessage(const char *func, int line, int mask, char *fmt, ...)
+static __printf(4, 5)
+void nsp_cs_dmessage(const char *func, int line, int mask, const char *fmt, ...)
 {
 	va_list args;
 	char buf[NSP_DEBUG_BUF_LEN];
