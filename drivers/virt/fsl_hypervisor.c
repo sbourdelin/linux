@@ -224,10 +224,8 @@ static long ioctl_memcpy(struct fsl_hv_ioctl_memcpy __user *p)
 	 * get_user_pages().
 	 */
 	pages = kcalloc(num_pages, sizeof(*pages), GFP_KERNEL);
-	if (!pages) {
-		pr_debug("fsl-hv: could not allocate page list\n");
+	if (!pages)
 		return -ENOMEM;
-	}
 
 	/*
 	 * sg_list is the list of fh_sg_list objects that we pass to the
@@ -236,7 +234,6 @@ static long ioctl_memcpy(struct fsl_hv_ioctl_memcpy __user *p)
 	sg_list_unaligned = kmalloc(num_pages * sizeof(struct fh_sg_list) +
 		sizeof(struct fh_sg_list) - 1, GFP_KERNEL);
 	if (!sg_list_unaligned) {
-		pr_debug("fsl-hv: could not allocate S/G list\n");
 		ret = -ENOMEM;
 		goto exit;
 	}
