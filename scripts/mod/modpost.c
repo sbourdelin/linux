@@ -2166,6 +2166,17 @@ static int add_versions(struct buffer *b, struct module *mod)
 {
 	struct symbol *s, *exp;
 	int err = 0;
+	const char *mod_name;
+
+	mod_name = strrchr(mod->name, '/');
+	if (mod_name == NULL)
+		mod_name = mod->name;
+	else
+		mod_name++;
+	if (strlen(mod_name) >= MODULE_NAME_LEN) {
+		merror("module name is too long [%s.ko]\n", mod->name);
+		return 1;
+	}
 
 	for (s = mod->unres; s; s = s->next) {
 		exp = find_symbol(s->name);
