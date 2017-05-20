@@ -47,7 +47,7 @@ struct clusterip_config {
 
 	__be32 clusterip;			/* the IP address */
 	u_int8_t clustermac[ETH_ALEN];		/* the MAC address */
-	struct net_device *dev;			/* device */
+	int ifindex;				/* device ifindex */
 	u_int16_t num_total_nodes;		/* total number of nodes */
 	unsigned long local_nodes;		/* node number array */
 
@@ -98,19 +98,23 @@ clusterip_config_put(struct clusterip_config *c)
  * entry(rule) is removed, remove the config from lists, but don't free it
  * yet, since proc-files could still be holding references */
 static inline void
-clusterip_config_entry_put(struct clusterip_config *c)
+clusterip_config_entry_put(struct net *net, struct clusterip_config *c)
 {
-	struct net *net = dev_net(c->dev);
 	struct clusterip_net *cn = net_generic(net, clusterip_net_id);
 
 	local_bh_disable();
 	if (refcount_dec_and_lock(&c->entries, &cn->lock)) {
+		struct net_device *dev;
+
 		list_del_rcu(&c->list);
 		spin_unlock(&cn->lock);
 		local_bh_enable();
 
-		dev_mc_del(c->dev, c->clustermac);
-		dev_put(c->dev);
+		dev = dev_get_by_index(net, c->ifindex);
+		if (dev) {
+			dev_mc_del(dev, c->clustermac);
+			dev_put(dev);
+		}
 
 		/* In case anyone still accesses the file, the open/close
 		 * functions are also incrementing the refcount on their own,
@@ -182,7 +186,7 @@ clusterip_config_init(const struct ipt_clusterip_tgt_info *i, __be32 ip,
 	if (!c)
 		return ERR_PTR(-ENOMEM);
 
-	c->dev = dev;
+	c->ifindex = dev->ifindex;
 	c->clusterip = ip;
 	memcpy(&c->clustermac, &i->clustermac, ETH_ALEN);
 	c->num_total_nodes = i->num_total_nodes;
@@ -427,12 +431,14 @@ static int clusterip_tg_check(const struct xt_tgchk_param *par)
 			}
 
 			config = clusterip_config_init(cipinfo,
-							e->ip.dst.s_addr, dev);
+						       e->ip.dst.s_addr, dev);
 			if (IS_ERR(config)) {
 				dev_put(dev);
 				return PTR_ERR(config);
 			}
-			dev_mc_add(config->dev, config->clustermac);
+
+			dev_mc_add(dev, config->clustermac);
+			dev_put(dev);
 		}
 	}
 	cipinfo->config = config;
@@ -458,7 +464,7 @@ static void clusterip_tg_destroy(const struct xt_tgdtor_param *par)
 
 	/* if no more entries are referencing the config, remove it
 	 * from the list and destroy the proc entry */
-	clusterip_config_entry_put(cipinfo->config);
+	clusterip_config_entry_put(par->net, cipinfo->config);
 
 	clusterip_config_put(cipinfo->config);
 
@@ -558,10 +564,9 @@ arp_mangle(void *priv,
 	 * addresses on different interfacs.  However, in the CLUSTERIP case
 	 * this wouldn't work, since we didn't subscribe the mcast group on
 	 * other interfaces */
-	if (c->dev != state->out) {
-		pr_debug("not mangling arp reply on different "
-			 "interface: cip'%s'-skb'%s'\n",
-			 c->dev->name, state->out->name);
+	if (c->ifindex != state->out->ifindex) {
+		pr_debug("not mangling arp reply on different interface: cip'%d'-skb'%d'\n",
+			 c->ifindex, state->out->ifindex);
 		clusterip_config_put(c);
 		return NF_ACCEPT;
 	}
