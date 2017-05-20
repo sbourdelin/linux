@@ -93,7 +93,7 @@ static int gpio_mouse_probe(struct platform_device *pdev)
 		}
 	}
 
-	input_poll = input_allocate_polled_device();
+	input_poll = devm_input_allocate_polled_device(&pdev->dev);
 	if (!input_poll) {
 		dev_err(&pdev->dev, "not enough memory for input device\n");
 		error = -ENOMEM;
@@ -124,7 +124,7 @@ static int gpio_mouse_probe(struct platform_device *pdev)
 	error = input_register_polled_device(input_poll);
 	if (error) {
 		dev_err(&pdev->dev, "could not register input device\n");
-		goto out_free_polldev;
+		goto out_free_gpios;
 	}
 
 	dev_dbg(&pdev->dev, "%d ms scan time, buttons: %s%s%s\n",
@@ -134,9 +134,6 @@ static int gpio_mouse_probe(struct platform_device *pdev)
 			pdata->bright < 0 ? "" : "right");
 
 	return 0;
-
- out_free_polldev:
-	input_free_polled_device(input_poll);
 
  out_free_gpios:
 	while (--i >= 0) {
@@ -155,7 +152,6 @@ static int gpio_mouse_remove(struct platform_device *pdev)
 	int pin, i;
 
 	input_unregister_polled_device(input);
-	input_free_polled_device(input);
 
 	for (i = 0; i < GPIO_MOUSE_PIN_MAX; i++) {
 		pin = pdata->pins[i];
