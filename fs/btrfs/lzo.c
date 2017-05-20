@@ -229,8 +229,11 @@ static int lzo_compress_pages(struct list_head *ws,
 		in_len = min(bytes_left, PAGE_SIZE);
 	}
 
-	if (tot_out > tot_in)
+	/* Compression must save at least one PAGE_SIZE */
+	if (tot_out + PAGE_SIZE > tot_in) {
+		ret = -E2BIG;
 		goto out;
+	}
 
 	/* store the size of all chunks of compressed data */
 	cpage_out = kmap(pages[0]);
