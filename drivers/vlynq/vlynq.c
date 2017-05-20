@@ -684,11 +684,8 @@ static int vlynq_probe(struct platform_device *pdev)
 		return -ENODEV;
 
 	dev = kzalloc(sizeof(*dev), GFP_KERNEL);
-	if (!dev) {
-		printk(KERN_ERR
-		       "vlynq: failed to allocate device structure\n");
+	if (!dev)
 		return -ENOMEM;
-	}
 
 	dev->id = pdev->id;
 	dev->dev.bus = &vlynq_bus_type;
