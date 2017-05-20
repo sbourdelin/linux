@@ -660,10 +660,8 @@ static int fsl_hv_open(struct inode *inode, struct file *filp)
 	int ret = 0;
 
 	dbq = kzalloc(sizeof(*dbq), GFP_KERNEL);
-	if (!dbq) {
-		pr_err("fsl-hv: out of memory\n");
+	if (!dbq)
 		return -ENOMEM;
-	}
 
 	spin_lock_init(&dbq->lock);
 	init_waitqueue_head(&dbq->wait);
