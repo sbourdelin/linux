@@ -4972,7 +4972,7 @@ static long btrfs_ioctl_qgroup_create(struct file *file, void __user *arg)
 
 	/* FIXME: check if the IDs really exist */
 	if (sa->create) {
-		ret = btrfs_create_qgroup(trans, fs_info, sa->qgroupid);
+		ret = btrfs_create_qgroup(trans, fs_info, sa->qgroupid, 0);
 	} else {
 		ret = btrfs_remove_qgroup(trans, fs_info, sa->qgroupid, 0);
 	}

@@ -1317,9 +1317,18 @@ out:
 }
 
 int btrfs_create_qgroup(struct btrfs_trans_handle *trans,
-			struct btrfs_fs_info *fs_info, u64 qgroupid)
+			struct btrfs_fs_info *fs_info, u64 qgroupid,
+			int check_subvol_exists)
 {
 	int ret;
+
+	if (check_subvol_exists && btrfs_qgroup_level(qgroupid) == 0) {
+		ret = btrfs_subvolume_exists(fs_info, qgroupid);
+		if (ret < 0)
+			return ret;
+		if (!ret)
+			return -ENOENT;
+	}
 
 	mutex_lock(&fs_info->qgroup_ioctl_lock);
 	ret = __btrfs_create_qgroup(trans, fs_info, qgroupid);
