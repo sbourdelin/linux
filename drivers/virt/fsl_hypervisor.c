@@ -659,7 +659,7 @@ static int fsl_hv_open(struct inode *inode, struct file *filp)
 	unsigned long flags;
 	int ret = 0;
 
-	dbq = kzalloc(sizeof(struct doorbell_queue), GFP_KERNEL);
+	dbq = kzalloc(sizeof(*dbq), GFP_KERNEL);
 	if (!dbq) {
 		pr_err("fsl-hv: out of memory\n");
 		return -ENOMEM;
