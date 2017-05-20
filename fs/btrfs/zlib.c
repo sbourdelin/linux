@@ -190,7 +190,8 @@ static int zlib_compress_pages(struct list_head *ws,
 		goto out;
 	}
 
-	if (workspace->strm.total_out >= workspace->strm.total_in) {
+	/* Compression must save at least one PAGE_SIZE */
+	if (workspace->strm.total_out + PAGE_SIZE >= workspace->strm.total_in) {
 		ret = -E2BIG;
 		goto out;
 	}
