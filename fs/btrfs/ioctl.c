@@ -2554,7 +2554,7 @@ static noinline int btrfs_ioctl_snap_destroy(struct file *file,
 	 */
 	if (!btrfs_test_opt(fs_info, QGROUP_KEEP)) {
 		ret = btrfs_remove_qgroup(trans, fs_info,
-					  dest->root_key.objectid);
+					  dest->root_key.objectid, 0);
 		if (ret && ret != -ENOENT)
 			pr_info("Could not automatically delete qgroup: %d\n", ret);
 	}
@@ -4974,7 +4974,7 @@ static long btrfs_ioctl_qgroup_create(struct file *file, void __user *arg)
 	if (sa->create) {
 		ret = btrfs_create_qgroup(trans, fs_info, sa->qgroupid);
 	} else {
-		ret = btrfs_remove_qgroup(trans, fs_info, sa->qgroupid);
+		ret = btrfs_remove_qgroup(trans, fs_info, sa->qgroupid, 0);
 	}
 
 	err = btrfs_end_transaction(trans);
