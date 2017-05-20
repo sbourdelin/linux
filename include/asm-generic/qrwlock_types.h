@@ -1,9 +1,6 @@
 #ifndef __ASM_GENERIC_QRWLOCK_TYPES_H
 #define __ASM_GENERIC_QRWLOCK_TYPES_H
 
-#include <linux/types.h>
-#include <asm/spinlock_types.h>
-
 /*
  * The queue read/write lock data structure
  */
@@ -17,5 +14,8 @@ typedef struct qrwlock {
 	.cnts = ATOMIC_INIT(0),			\
 	.wait_lock = __ARCH_SPIN_LOCK_UNLOCKED,	\
 }
+
+#include <linux/types.h>
+#include <linux/spinlock_types.h>
 
 #endif /* __ASM_GENERIC_QRWLOCK_TYPES_H */
