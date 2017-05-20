@@ -1281,40 +1281,35 @@ out:
 	return ret;
 }
 
-int btrfs_remove_qgroup(struct btrfs_trans_handle *trans,
-			struct btrfs_fs_info *fs_info, u64 qgroupid)
+/* Must be called with qgroup_ioctl_lock held */
+static int __btrfs_remove_qgroup(struct btrfs_trans_handle *trans,
+				 struct btrfs_fs_info *fs_info, u64 qgroupid)
 {
+	struct btrfs_qgroup_list *list;
 	struct btrfs_root *quota_root;
 	struct btrfs_qgroup *qgroup;
-	struct btrfs_qgroup_list *list;
-	int ret = 0;
+	int ret;
 
-	mutex_lock(&fs_info->qgroup_ioctl_lock);
 	quota_root = fs_info->quota_root;
-	if (!quota_root) {
-		ret = -EINVAL;
-		goto out;
-	}
+	if (!quota_root)
+		return -EINVAL;
 
 	qgroup = find_qgroup_rb(fs_info, qgroupid);
-	if (!qgroup) {
-		ret = -ENOENT;
-		goto out;
-	} else {
-		/* check if there are no children of this qgroup */
-		if (!list_empty(&qgroup->members)) {
-			ret = -EBUSY;
-			goto out;
-		}
-	}
+	if (!qgroup)
+		return -ENOENT;
+
+	/* check if there are no children of this qgroup */
+	if (!list_empty(&qgroup->members))
+		return -EBUSY;
+
 	ret = del_qgroup_item(trans, quota_root, qgroupid);
 
 	while (!list_empty(&qgroup->groups)) {
 		list = list_first_entry(&qgroup->groups,
 					struct btrfs_qgroup_list, next_group);
 		ret = __del_qgroup_relation(trans, fs_info,
-					   qgroupid,
-					   list->group->qgroupid);
+					    qgroupid,
+					    list->group->qgroupid);
 		if (ret)
 			goto out;
 	}
@@ -1322,8 +1317,20 @@ int btrfs_remove_qgroup(struct btrfs_trans_handle *trans,
 	spin_lock(&fs_info->qgroup_lock);
 	del_qgroup_rb(fs_info, qgroupid);
 	spin_unlock(&fs_info->qgroup_lock);
+
 out:
+	return ret;
+}
+
+int btrfs_remove_qgroup(struct btrfs_trans_handle *trans,
+			struct btrfs_fs_info *fs_info, u64 qgroupid)
+{
+	int ret;
+
+	mutex_lock(&fs_info->qgroup_ioctl_lock);
+	ret = __btrfs_remove_qgroup(trans, fs_info, qgroupid);
 	mutex_unlock(&fs_info->qgroup_ioctl_lock);
+
 	return ret;
 }
 
