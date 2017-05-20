@@ -415,7 +415,6 @@ vhost_scsi_allocate_evt(struct vhost_scsi *vs,
 
 	evt = kzalloc(sizeof(*evt), GFP_KERNEL);
 	if (!evt) {
-		vq_err(vq, "Failed to allocate vhost_scsi_evt\n");
 		vs->vs_events_missed = true;
 		return NULL;
 	}
@@ -1719,24 +1718,18 @@ static int vhost_scsi_nexus_cb(struct se_portal_group *se_tpg,
 
 		tv_cmd->tvc_sgl = kzalloc(sizeof(struct scatterlist) *
 					VHOST_SCSI_PREALLOC_SGLS, GFP_KERNEL);
-		if (!tv_cmd->tvc_sgl) {
-			pr_err("Unable to allocate tv_cmd->tvc_sgl\n");
+		if (!tv_cmd->tvc_sgl)
 			goto out;
-		}
 
 		tv_cmd->tvc_upages = kzalloc(sizeof(struct page *) *
 				VHOST_SCSI_PREALLOC_UPAGES, GFP_KERNEL);
-		if (!tv_cmd->tvc_upages) {
-			pr_err("Unable to allocate tv_cmd->tvc_upages\n");
+		if (!tv_cmd->tvc_upages)
 			goto out;
-		}
 
 		tv_cmd->tvc_prot_sgl = kzalloc(sizeof(struct scatterlist) *
 				VHOST_SCSI_PREALLOC_PROT_SGLS, GFP_KERNEL);
-		if (!tv_cmd->tvc_prot_sgl) {
-			pr_err("Unable to allocate tv_cmd->tvc_prot_sgl\n");
+		if (!tv_cmd->tvc_prot_sgl)
 			goto out;
-		}
 	}
 	return 0;
 out:
@@ -1759,7 +1752,6 @@ static int vhost_scsi_make_nexus(struct vhost_scsi_tpg *tpg,
 	tv_nexus = kzalloc(sizeof(*tv_nexus), GFP_KERNEL);
 	if (!tv_nexus) {
 		mutex_unlock(&tpg->tv_tpg_mutex);
-		pr_err("Unable to allocate struct vhost_scsi_nexus\n");
 		return -ENOMEM;
 	}
 	/*
@@ -1958,10 +1950,9 @@ vhost_scsi_make_tpg(struct se_wwn *wwn,
 		return ERR_PTR(-EINVAL);
 
 	tpg = kzalloc(sizeof(*tpg), GFP_KERNEL);
-	if (!tpg) {
-		pr_err("Unable to allocate struct vhost_scsi_tpg");
+	if (!tpg)
 		return ERR_PTR(-ENOMEM);
-	}
+
 	mutex_init(&tpg->tv_tpg_mutex);
 	INIT_LIST_HEAD(&tpg->tv_tpg_list);
 	tpg->tport = tport;
@@ -2012,10 +2003,9 @@ vhost_scsi_make_tport(struct target_fabric_configfs *tf,
 		return ERR_PTR(-EINVAL); */
 
 	tport = kzalloc(sizeof(*tport), GFP_KERNEL);
-	if (!tport) {
-		pr_err("Unable to allocate struct vhost_scsi_tport");
+	if (!tport)
 		return ERR_PTR(-ENOMEM);
-	}
+
 	tport->tport_wwpn = wwpn;
 	/*
 	 * Determine the emulated Protocol Identifier and Target Port Name
