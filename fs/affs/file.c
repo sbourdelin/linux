@@ -800,9 +800,9 @@ err_first_bh:
 	return written;
 
 err_bh:
-	bh = prev_bh;
 	if (!written)
 		written = PTR_ERR(bh);
+	bh = prev_bh;
 	goto done;
 }
 
