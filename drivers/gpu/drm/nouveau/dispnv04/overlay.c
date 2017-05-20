@@ -90,6 +90,42 @@ cos_mul(int degrees, int factor)
 }
 
 static int
+verify_fb(const struct drm_framebuffer *fb, uint32_t src_w, uint32_t src_h,
+	  uint32_t crtc_w, uint32_t crtc_h, bool scale_fail, bool offset_fail)
+{
+	if (fb->pitches[0] & 0x3f) {
+		DRM_DEBUG_KMS("Unsuitable framebuffer for plane: align 64: 0x%x\n",
+			      fb->pitches[0]);
+		return -EINVAL;
+	}
+
+	if (fb->pitches[0] >= 0x10000) {
+		DRM_DEBUG_KMS("Unsuitable framebuffer for plane: pitch 0x%x >= 0x10000\n",
+			      fb->pitches[0]);
+		return -EINVAL;
+	}
+
+	if (fb->pitches[1] && fb->pitches[0] != fb->pitches[1]) {
+		DRM_DEBUG_KMS("Unsuitable framebuffer for plane: diff pitches: 0x%x != 0x%x\n",
+			      fb->pitches[0], fb->pitches[1]);
+		return -ERANGE;
+	}
+
+	if (scale_fail) {
+		DRM_DEBUG_KMS("Unsuitable framebuffer scaling: %dx%d -> %dx%d\n",
+			      src_w, src_h, crtc_w, crtc_h);
+		return -ERANGE;
+	}
+
+	if (offset_fail) {
+		DRM_DEBUG_KMS("Unsuitable framebuffer offset\n");
+		return -ERANGE;
+	}
+
+	return 0;
+}
+
+static int
 nv10_update_plane(struct drm_plane *plane, struct drm_crtc *crtc,
 		  struct drm_framebuffer *fb, int crtc_x, int crtc_y,
 		  unsigned int crtc_w, unsigned int crtc_h,
@@ -107,7 +143,9 @@ nv10_update_plane(struct drm_plane *plane, struct drm_crtc *crtc,
 	bool flip = nv_plane->flip;
 	int soff = NV_PCRTC0_SIZE * nv_crtc->index;
 	int soff2 = NV_PCRTC0_SIZE * !nv_crtc->index;
-	int format, ret;
+	unsigned shift = drm->client.device.info.chipset >= 0x30 ? 1 : 3;
+	unsigned format = 0;
+	int ret;
 
 	/* Source parameters given in 16.16 fixed point, ignore fractional. */
 	src_x >>= 16;
@@ -115,18 +153,11 @@ nv10_update_plane(struct drm_plane *plane, struct drm_crtc *crtc,
 	src_w >>= 16;
 	src_h >>= 16;
 
-	format = ALIGN(src_w * 4, 0x100);
-
-	if (format > 0xffff)
-		return -ERANGE;
-
-	if (drm->client.device.info.chipset >= 0x30) {
-		if (crtc_w < (src_w >> 1) || crtc_h < (src_h >> 1))
-			return -ERANGE;
-	} else {
-		if (crtc_w < (src_w >> 3) || crtc_h < (src_h >> 3))
-			return -ERANGE;
-	}
+	ret = verify_fb(fb, src_w, src_h, crtc_w, crtc_h,
+			crtc_w < (src_w >> shift) || crtc_h < (src_h >> shift),
+			false);
+	if (ret)
+		return ret;
 
 	ret = nouveau_bo_pin(nv_fb->nvbo, TTM_PL_FLAG_VRAM, false);
 	if (ret)
@@ -160,7 +191,7 @@ nv10_update_plane(struct drm_plane *plane, struct drm_crtc *crtc,
 		nvif_wr32(dev, NV_PVIDEO_UVPLANE_OFFSET_BUFF(flip),
 			nv_fb->nvbo->bo.offset + fb->offsets[1]);
 	}
-	nvif_wr32(dev, NV_PVIDEO_FORMAT(flip), format);
+	nvif_wr32(dev, NV_PVIDEO_FORMAT(flip), format | fb->pitches[0]);
 	nvif_wr32(dev, NV_PVIDEO_STOP, 0);
 	/* TODO: wait for vblank? */
 	nvif_wr32(dev, NV_PVIDEO_BUFFER, flip ? 0x10 : 0x1);
@@ -357,7 +388,7 @@ nv04_update_plane(struct drm_plane *plane, struct drm_crtc *crtc,
 	struct nouveau_bo *cur = nv_plane->cur;
 	uint32_t overlay = 1;
 	int brightness = (nv_plane->brightness - 512) * 62 / 512;
-	int pitch, ret, i;
+	int ret, i;
 
 	/* Source parameters given in 16.16 fixed point, ignore fractional. */
 	src_x >>= 16;
@@ -365,17 +396,9 @@ nv04_update_plane(struct drm_plane *plane, struct drm_crtc *crtc,
 	src_w >>= 16;
 	src_h >>= 16;
 
-	pitch = ALIGN(src_w * 4, 0x100);
-
-	if (pitch > 0xffff)
-		return -ERANGE;
-
-	/* TODO: Compute an offset? Not sure how to do this for YUYV. */
-	if (src_x != 0 || src_y != 0)
-		return -ERANGE;
-
-	if (crtc_w < src_w || crtc_h < src_h)
-		return -ERANGE;
+	ret = verify_fb(fb, src_w, src_h, crtc_w, crtc_h,
+			crtc_w < src_w || crtc_h < src_h,
+			src_x != 0 || src_y != 0);
 
 	ret = nouveau_bo_pin(nv_fb->nvbo, TTM_PL_FLAG_VRAM, false);
 	if (ret)
@@ -389,8 +412,9 @@ nv04_update_plane(struct drm_plane *plane, struct drm_crtc *crtc,
 
 	for (i = 0; i < 2; i++) {
 		nvif_wr32(dev, NV_PVIDEO_BUFF0_START_ADDRESS + 4 * i,
-			nv_fb->nvbo->bo.offset);
-		nvif_wr32(dev, NV_PVIDEO_BUFF0_PITCH_LENGTH + 4 * i, pitch);
+			  nv_fb->nvbo->bo.offset);
+		nvif_wr32(dev, NV_PVIDEO_BUFF0_PITCH_LENGTH + 4 * i,
+			  fb->pitches[0]);
 		nvif_wr32(dev, NV_PVIDEO_BUFF0_OFFSET + 4 * i, 0);
 	}
 	nvif_wr32(dev, NV_PVIDEO_WINDOW_START, crtc_y << 16 | crtc_x);
