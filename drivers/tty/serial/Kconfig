@@ -1461,6 +1461,15 @@ config SERIAL_XILINX_PS_UART_CONSOLE
 	help
 	  Enable a Cadence UART port to be the system console.
 
+config SERIAL_XILINX_PS_UART_NR_UARTS
+       int "Maximum number of Cadence UART ports"
+       depends on CONFIG_SERIAL_XILINX_NR_UARTS
+       range 1 64
+       default 2
+       help
+         Set this to the number of Cadence UARTS in your system, or the number
+	 you think you might implement.
+
 config SERIAL_AR933X
 	tristate "AR933X serial port support"
 	depends on HAVE_CLK && SOC_AR933X
