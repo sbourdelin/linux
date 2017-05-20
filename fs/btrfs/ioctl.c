@@ -4936,6 +4936,100 @@ drop_write:
 	return ret;
 }
 
+static long btrfs_ioctl_qgroup_create_v2(struct file *file, void __user *arg)
+{
+	struct btrfs_ioctl_qgroup_create_args_v2 create_args;
+	struct inode *inode = file_inode(file);
+	struct btrfs_trans_handle *trans;
+	struct btrfs_fs_info *fs_info;
+	struct btrfs_root *root;
+	int check_subvol_exists;
+	int ret, err;
+
+	fs_info = btrfs_sb(inode->i_sb);
+	root = BTRFS_I(inode)->root;
+
+	if (!capable(CAP_SYS_ADMIN))
+		return -EPERM;
+
+	ret = copy_from_user(&create_args, arg, sizeof(create_args));
+	if (ret)
+		return ret;
+
+	if (!create_args.qgroupid)
+		return -EINVAL;
+
+	ret = mnt_want_write_file(file);
+	if (ret)
+		return ret;
+
+	trans = btrfs_join_transaction(root);
+	if (IS_ERR(trans)) {
+		ret = PTR_ERR(trans);
+		goto out;
+	}
+
+	check_subvol_exists = !(create_args.flags &
+				BTRFS_QGROUP_CREATE_IGNORE_UNUSED);
+	ret = btrfs_create_qgroup(trans, fs_info, create_args.qgroupid,
+				  check_subvol_exists);
+
+	err = btrfs_end_transaction(trans);
+	if (err && !ret)
+		ret = err;
+
+out:
+	mnt_drop_write_file(file);
+	return ret;
+}
+
+static long btrfs_ioctl_qgroup_remove_v2(struct file *file, void __user *arg)
+{
+	struct btrfs_ioctl_qgroup_remove_args_v2 remove_args;
+	struct inode *inode = file_inode(file);
+	struct btrfs_trans_handle *trans;
+	struct btrfs_fs_info *fs_info;
+	struct btrfs_root *root;
+	int check_in_use;
+	int ret, err;
+
+	fs_info = btrfs_sb(inode->i_sb);
+	root = BTRFS_I(inode)->root;
+
+	if (!capable(CAP_SYS_ADMIN))
+		return -EPERM;
+
+	ret = copy_from_user(&remove_args, arg, sizeof(remove_args));
+	if (ret)
+		return ret;
+
+	if (!remove_args.qgroupid)
+		return -EINVAL;
+
+	ret = mnt_want_write_file(file);
+	if (ret)
+		return ret;
+
+	trans = btrfs_join_transaction(root);
+	if (IS_ERR(trans)) {
+		ret = PTR_ERR(trans);
+		goto out;
+	}
+
+	check_in_use = !(remove_args.flags &
+			 BTRFS_QGROUP_REMOVE_NO_CHECK_IN_USE);
+	ret = btrfs_remove_qgroup(trans, fs_info, remove_args.qgroupid,
+				  check_in_use);
+
+	err = btrfs_end_transaction(trans);
+	if (err && !ret)
+		ret = err;
+
+out:
+	mnt_drop_write_file(file);
+	return ret;
+}
+
 static long btrfs_ioctl_qgroup_create(struct file *file, void __user *arg)
 {
 	struct inode *inode = file_inode(file);
@@ -5626,6 +5720,10 @@ long btrfs_ioctl(struct file *file, unsigned int
 		return btrfs_ioctl_qgroup_assign(file, argp);
 	case BTRFS_IOC_QGROUP_CREATE:
 		return btrfs_ioctl_qgroup_create(file, argp);
+	case BTRFS_IOC_QGROUP_CREATE_V2:
+		return btrfs_ioctl_qgroup_create_v2(file, argp);
+	case BTRFS_IOC_QGROUP_REMOVE_V2:
+		return btrfs_ioctl_qgroup_remove_v2(file, argp);
 	case BTRFS_IOC_QGROUP_LIMIT:
 		return btrfs_ioctl_qgroup_limit(file, argp);
 	case BTRFS_IOC_QUOTA_RESCAN:
