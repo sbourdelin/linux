@@ -41,7 +41,7 @@ void sas_queue_work(struct sas_ha_struct *ha, struct sas_work *sw)
 		if (list_empty(&sw->drain_node))
 			list_add(&sw->drain_node, &ha->defer_q);
 	} else
-		scsi_queue_work(ha->core.shost, &sw->work);
+		queue_work(ha->event_q, &sw->work);
 }
 
 static void sas_queue_event(int event, struct sas_work *work,

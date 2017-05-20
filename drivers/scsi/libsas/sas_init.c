@@ -38,6 +38,8 @@
 
 #include "../scsi_sas_internal.h"
 
+static DEFINE_IDA(sas_ida);
+
 static struct kmem_cache *sas_task_cache;
 
 struct sas_task *sas_alloc_task(gfp_t flags)
@@ -116,6 +118,7 @@ void sas_hae_reset(struct work_struct *work)
 int sas_register_ha(struct sas_ha_struct *sas_ha)
 {
 	int error = 0;
+	char name[64];
 
 	mutex_init(&sas_ha->disco_mutex);
 	spin_lock_init(&sas_ha->phy_port_lock);
@@ -145,6 +148,30 @@ int sas_register_ha(struct sas_ha_struct *sas_ha)
 		printk(KERN_NOTICE "couldn't start event thread:%d\n", error);
 		goto Undo_ports;
 	}
+
+	sas_ha->id = ida_simple_get(&sas_ida, 0, 0, GFP_KERNEL);
+	if(sas_ha->id < 0)
+		goto Undo_ports;
+
+	memset(name, 0, 64);
+	snprintf(name, 64, "sas-event-%d", sas_ha->id);
+	sas_ha->event_q = create_singlethread_workqueue(name);
+
+	/*
+	 * sas-disc-xx workqueue run the discover work except
+	 * probe and destruct.
+	 */
+	snprintf(name, 64, "sas-disc-%d", sas_ha->id);
+	sas_ha->disc_q = create_singlethread_workqueue(name);
+	if(!sas_ha->event_q || !sas_ha->disc_q) {
+		ida_simple_remove(&sas_ida, sas_ha->id);
+		if (sas_ha->event_q)
+			destroy_workqueue(sas_ha->event_q);
+		if (sas_ha->disc_q)
+			destroy_workqueue(sas_ha->disc_q);
+		goto Undo_ports;
+	}
+
 
 	INIT_LIST_HEAD(&sas_ha->eh_done_q);
 	INIT_LIST_HEAD(&sas_ha->eh_ata_q);
@@ -181,6 +208,9 @@ int sas_unregister_ha(struct sas_ha_struct *sas_ha)
 	__sas_drain_work(sas_ha);
 	mutex_unlock(&sas_ha->drain_mutex);
 
+	destroy_workqueue(sas_ha->event_q);
+	destroy_workqueue(sas_ha->disc_q);
+	ida_simple_remove(&sas_ida, sas_ha->id);
 	return 0;
 }
 
@@ -569,7 +599,6 @@ void sas_domain_release_transport(struct scsi_transport_template *stt)
 EXPORT_SYMBOL_GPL(sas_domain_release_transport);
 
 /* ---------- SAS Class register/unregister ---------- */
-
 static int __init sas_class_init(void)
 {
 	sas_task_cache = KMEM_CACHE(sas_task, SLAB_HWCACHE_ALIGN);

@@ -102,6 +102,56 @@ void sas_free_device(struct kref *kref);
 extern const work_func_t sas_phy_event_fns[PHY_NUM_EVENTS];
 extern const work_func_t sas_port_event_fns[PORT_NUM_EVENTS];
 
+static inline void wait_discover_event_init(struct asd_sas_port *port)
+{
+	if (port) {
+		init_completion(&port->disc.completion);
+		port->disc.wait = 1;
+	}
+}
+
+static inline void wait_for_discover_event_finish(
+		struct asd_sas_port *port)
+{
+	if (port && port->disc.wait == 1)
+		wait_for_completion(&port->disc.completion);
+}
+
+static inline void wait_sas_event_init(struct asd_sas_port *port)
+{
+	if (port) {
+		init_completion(&port->completion);
+		port->busy = 0;
+	}
+}
+
+static inline void wait_for_sas_event_finish(
+		struct asd_sas_port *port)
+{
+	if (port && port->busy)
+		wait_for_completion(&port->completion);
+}
+
+static inline void sas_busy_port(struct asd_sas_port *port)
+{
+	if (port)
+		port->busy++;
+}
+
+static inline void sas_unbusy_port(struct asd_sas_port *port)
+{
+	if (port && (port->busy > 0)) {
+		port->busy--;
+		if (!port->busy)
+			complete(&port->completion);
+	}
+
+	if (port && (port->disc.wait == 1)) {
+		complete(&port->disc.completion);
+		port->disc.wait = 0;
+	}
+}
+
 #ifdef CONFIG_SCSI_SAS_HOST_SMP
 extern int sas_smp_host_handler(struct Scsi_Host *shost, struct request *req,
 				struct request *rsp);

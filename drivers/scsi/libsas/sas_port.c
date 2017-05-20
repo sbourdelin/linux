@@ -191,7 +191,9 @@ static void sas_form_port(struct asd_sas_phy *phy)
 	if (si->dft->lldd_port_formed)
 		si->dft->lldd_port_formed(phy);
 
+	wait_sas_event_init(port);
 	sas_discover_event(phy->port, DISCE_DISCOVER_DOMAIN);
+	wait_for_sas_event_finish(port);
 }
 
 /**
@@ -218,7 +220,9 @@ void sas_deform_port(struct asd_sas_phy *phy, int gone)
 		dev->pathways--;
 
 	if (port->num_phys == 1) {
+		wait_sas_event_init(port);
 		sas_unregister_domain_devices(port, gone);
+		wait_for_sas_event_finish(port);
 		sas_port_delete(port->port);
 		port->port = NULL;
 	} else {

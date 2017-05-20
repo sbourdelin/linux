@@ -503,11 +503,10 @@ static void sas_revalidate_domain(struct work_struct *work)
 	struct domain_device *ddev = port->port_dev;
 
 	/* prevent revalidation from finding sata links in recovery */
-	mutex_lock(&ha->disco_mutex);
 	if (test_bit(SAS_HA_ATA_EH_ACTIVE, &ha->state)) {
 		SAS_DPRINTK("REVALIDATION DEFERRED on port %d, pid:%d\n",
 			    port->id, task_pid_nr(current));
-		goto out;
+		return;
 	}
 
 	clear_bit(DISCE_REVALIDATE_DOMAIN, &port->disc.pending);
@@ -521,20 +520,57 @@ static void sas_revalidate_domain(struct work_struct *work)
 
 	SAS_DPRINTK("done REVALIDATING DOMAIN on port %d, pid:%d, res 0x%x\n",
 		    port->id, task_pid_nr(current), res);
- out:
-	mutex_unlock(&ha->disco_mutex);
+}
+
+static const work_func_t sas_event_fns[DISC_NUM_EVENTS] = {
+	[DISCE_DISCOVER_DOMAIN] = sas_discover_domain,
+	[DISCE_REVALIDATE_DOMAIN] = sas_revalidate_domain,
+	[DISCE_PROBE] = sas_probe_devices,
+	[DISCE_SUSPEND] = sas_suspend_devices,
+	[DISCE_RESUME] = sas_resume_devices,
+	[DISCE_DESTRUCT] = sas_destruct_devices,
+};
+
+/* a simple wrapper for sas discover event funtions */
+static void sas_discover_common_fn(struct work_struct *work)
+{
+	struct sas_discovery_event *ev = to_sas_discovery_event(work);
+	struct asd_sas_port *port = ev->port;
+
+	sas_event_fns[ev->type](work);
+	sas_unbusy_port(port);
 }
 
 /* ---------- Events ---------- */
 
 static void sas_chain_work(struct sas_ha_struct *ha, struct sas_work *sw)
 {
+	int ret;
+	struct sas_discovery_event *ev = to_sas_discovery_event(&sw->work);
+	struct asd_sas_port *port = ev->port;
+
 	/* chained work is not subject to SA_HA_DRAINING or
 	 * SAS_HA_REGISTERED, because it is either submitted in the
 	 * workqueue, or known to be submitted from a context that is
 	 * not racing against draining
 	 */
-	scsi_queue_work(ha->core.shost, &sw->work);
+	sas_busy_port(port);
+
+	/*
+	 * discovery event probe and destruct would be called in other
+	 * discovery event like discover domain and revalidate domain
+	 * events, in some cases, we need to sync execute probe and destruct
+	 * events, so run discover events except probe/destruct in a new
+	 * workqueue.
+	 */
+	if (ev->type == DISCE_PROBE || ev->type == DISCE_DESTRUCT)
+		ret = scsi_queue_work(ha->core.shost, &sw->work);
+	else
+		ret = queue_work(ha->disc_q, &sw->work);
+
+	if (ret != 1)
+		/* queue a work fail, unbusy the ha before return */
+		sas_unbusy_port(port);
 }
 
 static void sas_chain_event(int event, unsigned long *pending,
@@ -575,18 +611,10 @@ void sas_init_disc(struct sas_discovery *disc, struct asd_sas_port *port)
 {
 	int i;
 
-	static const work_func_t sas_event_fns[DISC_NUM_EVENTS] = {
-		[DISCE_DISCOVER_DOMAIN] = sas_discover_domain,
-		[DISCE_REVALIDATE_DOMAIN] = sas_revalidate_domain,
-		[DISCE_PROBE] = sas_probe_devices,
-		[DISCE_SUSPEND] = sas_suspend_devices,
-		[DISCE_RESUME] = sas_resume_devices,
-		[DISCE_DESTRUCT] = sas_destruct_devices,
-	};
-
 	disc->pending = 0;
 	for (i = 0; i < DISC_NUM_EVENTS; i++) {
-		INIT_SAS_WORK(&disc->disc_work[i].work, sas_event_fns[i]);
+		INIT_SAS_WORK(&disc->disc_work[i].work, sas_discover_common_fn);
 		disc->disc_work[i].port = port;
+		disc->disc_work[i].type = i;
 	}
 }
