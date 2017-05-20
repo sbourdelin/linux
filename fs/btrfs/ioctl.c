@@ -2544,6 +2544,20 @@ static noinline int btrfs_ioctl_snap_destroy(struct file *file,
 		}
 	}
 
+	/*
+	 * Attempt to automatically remove the automatically attached qgroup
+	 * setup in btrfs_qgroup_inherit. As a matter of convention, the id
+	 * is the same as the subvolume id.
+	 *
+	 * This can fail non-fatally for level 0 qgroups, and potentially
+	 * leave the filesystem in an awkward, (but working) state.
+	 */
+	if (!btrfs_test_opt(fs_info, QGROUP_KEEP)) {
+		ret = btrfs_remove_qgroup(trans, fs_info,
+					  dest->root_key.objectid);
+		if (ret && ret != -ENOENT)
+			pr_info("Could not automatically delete qgroup: %d\n", ret);
+	}
 out_end_trans:
 	trans->block_rsv = NULL;
 	trans->bytes_reserved = 0;

@@ -321,7 +321,7 @@ enum {
 	Opt_commit_interval, Opt_barrier, Opt_nodefrag, Opt_nodiscard,
 	Opt_noenospc_debug, Opt_noflushoncommit, Opt_acl, Opt_datacow,
 	Opt_datasum, Opt_treelog, Opt_noinode_cache, Opt_usebackuproot,
-	Opt_nologreplay, Opt_norecovery,
+	Opt_nologreplay, Opt_norecovery, Opt_qgroup_keep, Opt_qgroup_nokeep,
 #ifdef CONFIG_BTRFS_DEBUG
 	Opt_fragment_data, Opt_fragment_metadata, Opt_fragment_all,
 #endif
@@ -381,6 +381,8 @@ static const match_table_t tokens = {
 	{Opt_rescan_uuid_tree, "rescan_uuid_tree"},
 	{Opt_fatal_errors, "fatal_errors=%s"},
 	{Opt_commit_interval, "commit=%d"},
+	{Opt_qgroup_keep, "qgroup_keep"},
+	{Opt_qgroup_nokeep, "qgroup_nokeep"},
 #ifdef CONFIG_BTRFS_DEBUG
 	{Opt_fragment_data, "fragment=data"},
 	{Opt_fragment_metadata, "fragment=metadata"},
@@ -807,6 +809,14 @@ int btrfs_parse_options(struct btrfs_fs_info *info, char *options,
 					   BTRFS_DEFAULT_COMMIT_INTERVAL);
 				info->commit_interval = BTRFS_DEFAULT_COMMIT_INTERVAL;
 			}
+			break;
+		case Opt_qgroup_keep:
+			btrfs_set_and_info(info, QGROUP_KEEP,
+					   "do not automatically delete qgroups");
+			break;
+		case Opt_qgroup_nokeep:
+			btrfs_clear_and_info(info, QGROUP_KEEP,
+					     "automatically delete qgroups");
 			break;
 #ifdef CONFIG_BTRFS_DEBUG
 		case Opt_fragment_all:
@@ -1299,6 +1309,10 @@ static int btrfs_show_options(struct seq_file *seq, struct dentry *dentry)
 		seq_puts(seq, ",fatal_errors=panic");
 	if (info->commit_interval != BTRFS_DEFAULT_COMMIT_INTERVAL)
 		seq_printf(seq, ",commit=%d", info->commit_interval);
+	if (btrfs_test_opt(info, QGROUP_KEEP))
+		seq_puts(seq, ",qgroup_keep");
+	else
+		seq_puts(seq, ",qgroup_nokeep");
 #ifdef CONFIG_BTRFS_DEBUG
 	if (btrfs_test_opt(info, FRAGMENT_DATA))
 		seq_puts(seq, ",fragment=data");
