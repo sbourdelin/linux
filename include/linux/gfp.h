@@ -469,6 +469,14 @@ static inline struct page *alloc_pages_node(int nid, gfp_t gfp_mask,
 	return __alloc_pages_node(nid, gfp_mask, order);
 }
 
+#ifdef CONFIG_DETECT_MEMALLOC_STALL_TASK
+extern void start_memalloc_timer(const gfp_t gfp_mask, const int order);
+extern void stop_memalloc_timer(const gfp_t gfp_mask);
+#else
+#define start_memalloc_timer(gfp_mask, order) do { } while (0)
+#define stop_memalloc_timer(gfp_mask) do { } while (0)
+#endif
+
 #ifdef CONFIG_NUMA
 extern struct page *alloc_pages_current(gfp_t gfp_mask, unsigned order);
 

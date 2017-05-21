@@ -324,11 +324,14 @@ void *mempool_alloc(mempool_t *pool, gfp_t gfp_mask)
 
 	gfp_temp = gfp_mask & ~(__GFP_DIRECT_RECLAIM|__GFP_IO);
 
+	start_memalloc_timer(gfp_temp, -1);
 repeat_alloc:
 
 	element = pool->alloc(gfp_temp, pool->pool_data);
-	if (likely(element != NULL))
+	if (likely(element != NULL)) {
+		stop_memalloc_timer(gfp_temp);
 		return element;
+	}
 
 	spin_lock_irqsave(&pool->lock, flags);
 	if (likely(pool->curr_nr)) {
@@ -341,6 +344,7 @@ repeat_alloc:
 		 * for debugging.
 		 */
 		kmemleak_update_trace(element);
+		stop_memalloc_timer(gfp_temp);
 		return element;
 	}
 
@@ -350,13 +354,16 @@ repeat_alloc:
 	 */
 	if (gfp_temp != gfp_mask) {
 		spin_unlock_irqrestore(&pool->lock, flags);
+		stop_memalloc_timer(gfp_temp);
 		gfp_temp = gfp_mask;
+		start_memalloc_timer(gfp_temp, -1);
 		goto repeat_alloc;
 	}
 
 	/* We must not sleep if !__GFP_DIRECT_RECLAIM */
 	if (!(gfp_mask & __GFP_DIRECT_RECLAIM)) {
 		spin_unlock_irqrestore(&pool->lock, flags);
+		stop_memalloc_timer(gfp_temp);
 		return NULL;
 	}
 
