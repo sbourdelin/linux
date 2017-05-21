@@ -32,7 +32,7 @@
 /* Maximum number of letters for an LSM name string */
 #define SECURITY_NAME_MAX	10
 
-struct security_hook_heads security_hook_heads __lsm_ro_after_init;
+static struct security_hook_heads security_hook_heads __lsm_ro_after_init;
 char *lsm_names;
 /* Boot-time LSM user choice */
 static __initdata char chosen_lsm[SECURITY_NAME_MAX + 1] =
@@ -137,10 +137,16 @@ void __init security_add_hooks(struct security_hook_list *hooks, int count,
 				char *lsm)
 {
 	int i;
+	struct list_head *list = (struct list_head *) &security_hook_heads;
 
 	for (i = 0; i < count; i++) {
+		const unsigned int idx = hooks[i].idx;
+
+		if (WARN_ON(idx >= sizeof(security_hook_heads) /
+			    sizeof(struct list_head)))
+			continue;
 		hooks[i].lsm = lsm;
-		list_add_tail_rcu(&hooks[i].list, hooks[i].head);
+		list_add_tail_rcu(&hooks[i].list, &list[idx]);
 	}
 	if (lsm_append(lsm, &lsm_names) < 0)
 		panic("%s - Cannot get early memory.\n", __func__);

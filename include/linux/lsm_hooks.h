@@ -1884,8 +1884,8 @@ struct security_hook_heads {
  */
 struct security_hook_list {
 	struct list_head		list;
-	struct list_head		*head;
 	union security_list_options	hook;
+	const unsigned int		idx;
 	char				*lsm;
 };
 
@@ -1896,9 +1896,9 @@ struct security_hook_list {
  * text involved.
  */
 #define LSM_HOOK_INIT(HEAD, HOOK) \
-	{ .head = &security_hook_heads.HEAD, .hook = { .HEAD = HOOK } }
+	{ .idx = offsetof(struct security_hook_heads, HEAD) / \
+		sizeof(struct list_head), .hook = { .HEAD = HOOK } }
 
-extern struct security_hook_heads security_hook_heads;
 extern char *lsm_names;
 
 extern void security_add_hooks(struct security_hook_list *hooks, int count,
