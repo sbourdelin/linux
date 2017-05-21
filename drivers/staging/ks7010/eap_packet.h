@@ -16,7 +16,7 @@ struct ether_hdr {
 	unsigned char h_source_snap;
 	unsigned char h_command;
 	unsigned char h_vendor_id[3];
-	unsigned short h_proto;	/* packet type ID field */
+	__be16 h_proto;	/* packet type ID field */
 #define ETHER_PROTOCOL_TYPE_EAP		0x888e
 #define ETHER_PROTOCOL_TYPE_IP		0x0800
 #define ETHER_PROTOCOL_TYPE_ARP		0x0806
