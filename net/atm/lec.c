@@ -796,7 +796,7 @@ static void lec_info(struct seq_file *seq, struct lec_arp_table *entry)
 
 	for (i = 0; i < ETH_ALEN; i++)
 		seq_printf(seq, "%2.2x", entry->mac_addr[i] & 0xff);
-	seq_printf(seq, " ");
+	seq_putc(seq, ' ');
 	for (i = 0; i < ATM_ESA_LEN; i++)
 		seq_printf(seq, "%2.2x", entry->atm_addr[i] & 0xff);
 	seq_printf(seq, " %s %4.4x", lec_arp_get_status_string(entry->status),
