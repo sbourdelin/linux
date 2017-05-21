@@ -518,7 +518,7 @@ send_to_lecd(struct lec_priv *priv, atmlec_msg_type type,
 		return -1;
 	skb->len = sizeof(struct atmlec_msg);
 	mesg = (struct atmlec_msg *)skb->data;
-	memset(mesg, 0, sizeof(struct atmlec_msg));
+	memset(mesg, 0, sizeof(*mesg));
 	mesg->type = type;
 	if (data != NULL)
 		mesg->sizeoftlvs = data->len;
@@ -690,7 +690,7 @@ static int lec_vcc_attach(struct atm_vcc *vcc, void __user *arg)
 	if (ioc_data.dev_num < 0 || ioc_data.dev_num >= MAX_LEC_ITF ||
 	    !dev_lec[ioc_data.dev_num])
 		return -EINVAL;
-	vpriv = kmalloc(sizeof(struct lec_vcc_priv), GFP_KERNEL);
+	vpriv = kmalloc(sizeof(*vpriv), GFP_KERNEL);
 	if (!vpriv)
 		return -ENOMEM;
 	vpriv->xoff = 0;
@@ -1552,7 +1552,7 @@ static struct lec_arp_table *make_entry(struct lec_priv *priv,
 {
 	struct lec_arp_table *to_return;
 
-	to_return = kzalloc(sizeof(struct lec_arp_table), GFP_ATOMIC);
+	to_return = kzalloc(sizeof(*to_return), GFP_ATOMIC);
 	if (!to_return) {
 		pr_info("LEC: Arp entry kmalloc failed\n");
 		return NULL;
@@ -2156,7 +2156,7 @@ static int lec_mcast_make(struct lec_priv *priv, struct atm_vcc *vcc)
 	struct lec_vcc_priv *vpriv;
 	int err = 0;
 
-	vpriv = kmalloc(sizeof(struct lec_vcc_priv), GFP_KERNEL);
+	vpriv = kmalloc(sizeof(*vpriv), GFP_KERNEL);
 	if (!vpriv)
 		return -ENOMEM;
 	vpriv->xoff = 0;
