@@ -3,6 +3,7 @@
 #include <linux/spinlock_types.h>
 #include <linux/slab.h>
 #include <linux/ioctl.h>
+#include <linux/magic.h>
 
 /* pvfs2-config.h ***********************************************************/
 #define ORANGEFS_VERSION_MAJOR 2
@@ -79,8 +80,6 @@ typedef __u64 ORANGEFS_flags;
 typedef __u64 ORANGEFS_ds_position;
 typedef __s32 ORANGEFS_error;
 typedef __s64 ORANGEFS_offset;
-
-#define ORANGEFS_SUPER_MAGIC 0x20030528
 
 /*
  * ORANGEFS error codes are a signed 32-bit integer. Error codes are negative, but
