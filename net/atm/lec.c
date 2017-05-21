@@ -804,7 +804,7 @@ static void lec_info(struct seq_file *seq, struct lec_arp_table *entry)
 	if (entry->vcc)
 		seq_printf(seq, "%3d %3d ", entry->vcc->vpi, entry->vcc->vci);
 	else
-		seq_printf(seq, "        ");
+		seq_puts(seq, "        ");
 	if (entry->recv_vcc) {
 		seq_printf(seq, "     %3d %3d", entry->recv_vcc->vpi,
 			   entry->recv_vcc->vci);
