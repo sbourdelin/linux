@@ -121,57 +121,6 @@ void mconsole_log(struct mc_request *req)
 	mconsole_reply(req, "", 0, 0);
 }
 
-void mconsole_proc(struct mc_request *req)
-{
-	struct vfsmount *mnt = task_active_pid_ns(current)->proc_mnt;
-	char *buf;
-	int len;
-	struct file *file;
-	int first_chunk = 1;
-	char *ptr = req->request.data;
-
-	ptr += strlen("proc");
-	ptr = skip_spaces(ptr);
-
-	file = file_open_root(mnt->mnt_root, mnt, ptr, O_RDONLY, 0);
-	if (IS_ERR(file)) {
-		mconsole_reply(req, "Failed to open file", 1, 0);
-		printk(KERN_ERR "open /proc/%s: %ld\n", ptr, PTR_ERR(file));
-		goto out;
-	}
-
-	buf = kmalloc(PAGE_SIZE, GFP_KERNEL);
-	if (buf == NULL) {
-		mconsole_reply(req, "Failed to allocate buffer", 1, 0);
-		goto out_fput;
-	}
-
-	do {
-		loff_t pos = file->f_pos;
-		mm_segment_t old_fs = get_fs();
-		set_fs(KERNEL_DS);
-		len = vfs_read(file, buf, PAGE_SIZE - 1, &pos);
-		set_fs(old_fs);
-		file->f_pos = pos;
-		if (len < 0) {
-			mconsole_reply(req, "Read of file failed", 1, 0);
-			goto out_free;
-		}
-		/* Begin the file content on his own line. */
-		if (first_chunk) {
-			mconsole_reply(req, "\n", 0, 1);
-			first_chunk = 0;
-		}
-		buf[len] = '\0';
-		mconsole_reply(req, buf, 0, (len > 0));
-	} while (len > 0);
- out_free:
-	kfree(buf);
- out_fput:
-	fput(file);
- out: ;
-}
-
 #define UML_MCONSOLE_HELPTEXT \
 "Commands: \n\
     version - Get kernel version \n\
@@ -187,7 +136,6 @@ void mconsole_proc(struct mc_request *req)
     stop - pause the UML; it will do nothing until it receives a 'go' \n\
     go - continue the UML after a 'stop' \n\
     log <string> - make UML enter <string> into the kernel log\n\
-    proc <file> - returns the contents of the UML's /proc/<file>\n\
     stack <pid> - returns the stack of the specified pid\n\
 "
 
