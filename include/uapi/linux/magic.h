@@ -34,6 +34,7 @@
 #define FUTEXFS_SUPER_MAGIC	0xBAD1DEA
 #define HFS_SUPER_MAGIC		0x4244		/* "BD": HFS MDB (super block) */
 #define HFS_MFS_SUPER_MAGIC	0xD2D7		/* MFS MDB (super block) */
+#define HFSPLUS_SUPER_MAGIC     0x482b
 #define HOSTFS_SUPER_MAGIC	0x00c0ffee
 #define HPFS_SUPER_MAGIC	0xf995e849
 #define HUGETLBFS_MAGIC		0x958458f6	/* some random number */
