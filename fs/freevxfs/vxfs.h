@@ -38,11 +38,7 @@
  * superblocks of the Veritas Filesystem.
  */
 #include <linux/types.h>
-
-/*
- * Superblock magic number (vxfs_super->vs_magic).
- */
-#define VXFS_SUPER_MAGIC	0xa501FCF5
+#include <linux/magic.h>
 
 /*
  * The root inode.
