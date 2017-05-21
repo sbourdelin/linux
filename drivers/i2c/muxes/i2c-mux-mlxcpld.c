@@ -40,7 +40,7 @@
 #include <linux/module.h>
 #include <linux/platform_device.h>
 #include <linux/slab.h>
-#include <linux/i2c/mlxcpld.h>
+#include <linux/platform_data/x86/mlxcpld.h>
 
 #define CPLD_MUX_MAX_NCHANS	8
 
