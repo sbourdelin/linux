@@ -37,6 +37,7 @@
 #define __EXOFS_COM_H__
 
 #include <linux/types.h>
+#include <linux/magic.h>
 
 #include <scsi/osd_attributes.h>
 #include <scsi/osd_initiator.h>
@@ -78,11 +79,6 @@ enum {
  ****************************************************************************/
 #define EXOFS_BLKSHIFT	12
 #define EXOFS_BLKSIZE	(1UL << EXOFS_BLKSHIFT)
-
-/****************************************************************************
- * superblock-related things
- ****************************************************************************/
-#define EXOFS_SUPER_MAGIC	0x5DF5
 
 /*
  * The file system control block - stored in object EXOFS_SUPER_ID's data.
