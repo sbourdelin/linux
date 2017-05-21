@@ -530,4 +530,12 @@ config PHY_MESON8B_USB2
 	  and GXBB SoCs.
 	  If unsure, say N.
 
+config PHY_MT7623_PCIE
+	tristate "Mediatek PCIe PHY driver for MT7623 SoC families"
+	depends on ARCH_MEDIATEK && OF
+	select GENERIC_PHY
+	select MFD_SYSCON
+	help
+	  Say 'Y' here to add support for Mediatek PCIe PHY driver which
+	  can be found on the MT7623 SoC families.
 endmenu
