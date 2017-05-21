@@ -14,6 +14,7 @@
 #define _LINUX_HFSPLUS_RAW_H
 
 #include <linux/types.h>
+#include <linux/magic.h>
 
 /* Some constants */
 #define HFSPLUS_SECTOR_SIZE        512

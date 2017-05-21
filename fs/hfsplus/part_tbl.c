@@ -26,8 +26,6 @@
 #define HFS_DRVR_DESC_MAGIC	0x4552 /* "ER": driver descriptor map */
 #define HFS_OLD_PMAP_MAGIC	0x5453 /* "TS": old-type partition map */
 #define HFS_NEW_PMAP_MAGIC	0x504D /* "PM": new-type partition map */
-#define HFS_SUPER_MAGIC		0x4244 /* "BD": HFS MDB (super block) */
-#define HFS_MFS_SUPER_MAGIC	0xD2D7 /* MFS MDB (super block) */
 
 /*
  * The new style Mac partition map

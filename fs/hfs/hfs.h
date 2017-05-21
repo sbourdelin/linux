@@ -9,6 +9,8 @@
 #ifndef _HFS_H
 #define _HFS_H
 
+#include <linux/magic.h>
+
 /* offsets to various blocks */
 #define HFS_DD_BLK		0 /* Driver Descriptor block */
 #define HFS_PMAP_BLK		1 /* First block of partition map */
@@ -18,8 +20,6 @@
 #define HFS_DRVR_DESC_MAGIC	0x4552 /* "ER": driver descriptor map */
 #define HFS_OLD_PMAP_MAGIC	0x5453 /* "TS": old-type partition map */
 #define HFS_NEW_PMAP_MAGIC	0x504D /* "PM": new-type partition map */
-#define HFS_SUPER_MAGIC		0x4244 /* "BD": HFS MDB (super block) */
-#define HFS_MFS_SUPER_MAGIC	0xD2D7 /* MFS MDB (super block) */
 
 /* various FIXED size parameters */
 #define HFS_SECTOR_SIZE		512    /* size of an HFS sector */
