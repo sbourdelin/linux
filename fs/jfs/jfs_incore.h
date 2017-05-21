@@ -23,14 +23,10 @@
 #include <linux/rwsem.h>
 #include <linux/slab.h>
 #include <linux/bitops.h>
+#include <linux/magic.h>
 #include "jfs_types.h"
 #include "jfs_xtree.h"
 #include "jfs_dtree.h"
-
-/*
- * JFS magic number
- */
-#define JFS_SUPER_MAGIC 0x3153464a /* "JFS1" */
 
 /*
  * JFS-private inode information

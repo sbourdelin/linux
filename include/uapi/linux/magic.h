@@ -34,6 +34,7 @@
 #define HPFS_SUPER_MAGIC	0xf995e849
 #define HUGETLBFS_MAGIC		0x958458f6	/* some random number */
 #define ISOFS_SUPER_MAGIC	0x9660
+#define JFS_SUPER_MAGIC		0x3153464a	/* "JFS1" */
 #define JFFS2_SUPER_MAGIC	0x72b6
 #define MINIX2_SUPER_MAGIC	0x2468		/* minix v2 fs, 14 char names */
 #define MINIX2_SUPER_MAGIC2	0x2478		/* minix v2 fs, 30 char names */
