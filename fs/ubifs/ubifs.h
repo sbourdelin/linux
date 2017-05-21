@@ -38,6 +38,7 @@
 #include <linux/backing-dev.h>
 #include <linux/security.h>
 #include <linux/xattr.h>
+#include <linux/magic.h>
 #ifdef CONFIG_UBIFS_FS_ENCRYPTION
 #include <linux/fscrypt_supp.h>
 #else
@@ -48,9 +49,6 @@
 
 /* Version of this UBIFS implementation */
 #define UBIFS_VERSION 1
-
-/* UBIFS file system VFS magic number */
-#define UBIFS_SUPER_MAGIC 0x24051905
 
 /* Number of UBIFS blocks per VFS page */
 #define UBIFS_BLOCKS_PER_PAGE (PAGE_SIZE / UBIFS_BLOCK_SIZE)
