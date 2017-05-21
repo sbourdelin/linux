@@ -34,6 +34,8 @@ struct bdi_writeback;
 
 void init_mm_internals(void);
 
+extern unsigned long vm_nr_remapping;
+
 #ifndef CONFIG_NEED_MULTIPLE_NODES	/* Don't use mapnrs, do it properly */
 extern unsigned long max_mapnr;
 
