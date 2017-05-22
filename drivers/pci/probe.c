@@ -531,6 +531,7 @@ struct pci_host_bridge *pci_alloc_host_bridge(size_t priv)
 		return NULL;
 
 	INIT_LIST_HEAD(&bridge->windows);
+	INIT_LIST_HEAD(&bridge->inbound_windows);
 
 	return bridge;
 }
@@ -726,6 +727,7 @@ int pci_register_host_bridge(struct pci_host_bridge *bridge)
 	struct pci_bus *bus, *b;
 	resource_size_t offset;
 	LIST_HEAD(resources);
+	LIST_HEAD(inbound_resources);
 	struct resource *res;
 	char addr[64], *fmt;
 	const char *name;
@@ -739,6 +741,8 @@ int pci_register_host_bridge(struct pci_host_bridge *bridge)
 
 	/* temporarily move resources off the list */
 	list_splice_init(&bridge->windows, &resources);
+	list_splice_init(&bridge->inbound_windows, &inbound_resources);
+
 	bus->sysdata = bridge->sysdata;
 	bus->msi = bridge->msi;
 	bus->ops = bridge->ops;
@@ -793,6 +797,10 @@ int pci_register_host_bridge(struct pci_host_bridge *bridge)
 		dev_info(parent, "PCI host bridge to bus %s\n", name);
 	else
 		pr_info("PCI host bridge to bus %s\n", name);
+
+	/* Add inbound mem resource. */
+	resource_list_for_each_entry_safe(window, n, &inbound_resources)
+		list_move_tail(&window->node, &bridge->inbound_windows);
 
 	/* Add initial resources to the bus */
 	resource_list_for_each_entry_safe(window, n, &resources) {
@@ -2300,7 +2308,8 @@ void __weak pcibios_remove_bus(struct pci_bus *bus)
 
 static struct pci_bus *pci_create_root_bus_msi(struct device *parent,
 		int bus, struct pci_ops *ops, void *sysdata,
-		struct list_head *resources, struct msi_controller *msi)
+		struct list_head *resources, struct list_head *in_res,
+		struct msi_controller *msi)
 {
 	int error;
 	struct pci_host_bridge *bridge;
@@ -2313,6 +2322,9 @@ static struct pci_bus *pci_create_root_bus_msi(struct device *parent,
 	bridge->dev.release = pci_release_host_bridge_dev;
 
 	list_splice_init(resources, &bridge->windows);
+	if (in_res)
+		list_splice_init(in_res, &bridge->inbound_windows);
+
 	bridge->sysdata = sysdata;
 	bridge->busnr = bus;
 	bridge->ops = ops;
@@ -2329,11 +2341,20 @@ err_out:
 	return NULL;
 }
 
+struct pci_bus *pci_create_root_bus2(struct device *parent, int bus,
+		struct pci_ops *ops, void *sysdata, struct list_head *resources,
+		struct list_head *in_res)
+{
+	return pci_create_root_bus_msi(parent, bus, ops, sysdata,
+				       resources, in_res, NULL);
+}
+EXPORT_SYMBOL_GPL(pci_create_root_bus2);
+
 struct pci_bus *pci_create_root_bus(struct device *parent, int bus,
 		struct pci_ops *ops, void *sysdata, struct list_head *resources)
 {
-	return pci_create_root_bus_msi(parent, bus, ops, sysdata, resources,
-				       NULL);
+	return pci_create_root_bus_msi(parent, bus, ops, sysdata,
+				       resources, NULL, NULL);
 }
 EXPORT_SYMBOL_GPL(pci_create_root_bus);
 
@@ -2415,7 +2436,8 @@ struct pci_bus *pci_scan_root_bus_msi(struct device *parent, int bus,
 			break;
 		}
 
-	b = pci_create_root_bus_msi(parent, bus, ops, sysdata, resources, msi);
+	b = pci_create_root_bus_msi(parent, bus, ops, sysdata,
+				    resources, NULL, msi);
 	if (!b)
 		return NULL;
 

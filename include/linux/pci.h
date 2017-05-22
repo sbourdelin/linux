@@ -432,6 +432,7 @@ struct pci_host_bridge {
 	void *sysdata;
 	int busnr;
 	struct list_head windows;	/* resource_entry */
+	struct list_head inbound_windows;	/* inbound memory */
 	void (*release_fn)(struct pci_host_bridge *);
 	void *release_data;
 	struct msi_controller *msi;
