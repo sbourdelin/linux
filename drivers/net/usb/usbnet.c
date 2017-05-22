@@ -2124,11 +2124,8 @@ int usbnet_write_cmd_async(struct usbnet *dev, u8 cmd, u8 reqtype,
 
 	if (data) {
 		buf = kmemdup(data, size, GFP_ATOMIC);
-		if (!buf) {
-			netdev_err(dev->net, "Error allocating buffer"
-				   " in %s!\n", __func__);
+		if (!buf)
 			goto fail_free;
-		}
 	}
 
 	req = kmalloc(sizeof(struct usb_ctrlrequest), GFP_ATOMIC);
