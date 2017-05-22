@@ -448,69 +448,11 @@ static ssize_t orangefs_file_read_iter(struct kiocb *iocb,
 	return generic_file_read_iter(iocb, iter);
 }
 
-static ssize_t orangefs_file_write_iter(struct kiocb *iocb, struct iov_iter *iter)
+static ssize_t orangefs_file_write_iter(struct kiocb *iocb,
+    struct iov_iter *iter)
 {
-	struct file *file = iocb->ki_filp;
-	loff_t pos;
-	ssize_t rc;
-
-	BUG_ON(iocb->private);
-
-	gossip_debug(GOSSIP_FILE_DEBUG, "orangefs_file_write_iter\n");
-
-	inode_lock(file->f_mapping->host);
-
-	/* Make sure generic_write_checks sees an up to date inode size. */
-	if (file->f_flags & O_APPEND) {
-		rc = orangefs_inode_getattr(file->f_mapping->host, 0, 1,
-		    STATX_SIZE);
-		if (rc == -ESTALE)
-			rc = -EIO;
-		if (rc) {
-			gossip_err("%s: orangefs_inode_getattr failed, "
-			    "rc:%zd:.\n", __func__, rc);
-			goto out;
-		}
-	}
-
-	if (file->f_pos > i_size_read(file->f_mapping->host))
-		orangefs_i_size_write(file->f_mapping->host, file->f_pos);
-
-	rc = generic_write_checks(iocb, iter);
-
-	if (rc <= 0) {
-		gossip_err("%s: generic_write_checks failed, rc:%zd:.\n",
-			   __func__, rc);
-		goto out;
-	}
-
-	/*
-	 * if we are appending, generic_write_checks would have updated
-	 * pos to the end of the file, so we will wait till now to set
-	 * pos...
-	 */
-	pos = *(&iocb->ki_pos);
-
-	rc = do_readv_writev(ORANGEFS_IO_WRITE,
-			     file,
-			     &pos,
-			     iter);
-	if (rc < 0) {
-		gossip_err("%s: do_readv_writev failed, rc:%zd:.\n",
-			   __func__, rc);
-		goto out;
-	}
-
-	iocb->ki_pos = pos;
 	orangefs_stats.writes++;
-
-	if (pos > i_size_read(file->f_mapping->host))
-		orangefs_i_size_write(file->f_mapping->host, pos);
-
-out:
-
-	inode_unlock(file->f_mapping->host);
-	return rc;
+	return generic_file_write_iter(iocb, iter);
 }
 
 /*
@@ -606,9 +548,8 @@ static int orangefs_file_release(struct inode *inode, struct file *file)
 	orangefs_flush_inode(inode);
 
 	/*
-	 * remove all associated inode pages from the page cache and
-	 * readahead cache (if any); this forces an expensive refresh of
-	 * data for the next caller of mmap (or 'get_block' accesses)
+	 * remove all associated inode pages from the readahead cache
+	 * (if any)
 	 */
 	if (file_inode(file) &&
 	    file_inode(file)->i_mapping &&
@@ -621,8 +562,6 @@ static int orangefs_file_release(struct inode *inode, struct file *file)
 			gossip_debug(GOSSIP_INODE_DEBUG,
 			    "flush_racache finished\n");
 		}
-		truncate_inode_pages(file_inode(file)->i_mapping,
-				     0);
 	}
 	return 0;
 }
@@ -741,6 +680,40 @@ const struct file_operations orangefs_file_operations = {
 	.fsync		= orangefs_fsync,
 };
 
+static int orangefs_writepage(struct page *page,
+    struct writeback_control *wbc)
+{
+	struct inode *inode = page->mapping->host;
+	struct iov_iter iter;
+	struct iovec iov;
+	loff_t off;
+	size_t len;
+	ssize_t r;
+	void *map;
+
+	off = page_offset(page);
+	len = i_size_read(inode);
+	if (off + PAGE_SIZE > len)
+		len = len - off;
+	else
+		len = PAGE_SIZE;
+
+	map = kmap_atomic(page);
+	iov.iov_base = map;
+	iov.iov_len = len;
+	iov_iter_init(&iter, WRITE, &iov, 1, len);
+
+	set_page_writeback(page);
+
+	r = wait_for_direct_io(ORANGEFS_IO_WRITE, inode, &off, &iter,
+	    len, 0);
+	kunmap_atomic(map);
+
+	end_page_writeback(page);
+	unlock_page(page);
+	return 0;
+}
+
 static int orangefs_readpage(struct file *file, struct page *page)
 {
 	int ret;
@@ -786,6 +759,17 @@ static int orangefs_readpage(struct file *file, struct page *page)
 	return ret;
 }
 
+static int orangefs_write_end(struct file *file,
+    struct address_space *mapping, loff_t pos, unsigned len,
+    unsigned copied, struct page *page, void *fsdata)
+{
+	int r;
+	r = simple_write_end(file, mapping, pos, len, copied, page,
+	    fsdata);
+	mark_inode_dirty_sync(file_inode(file));
+	return r;
+}
+
 static void orangefs_invalidatepage(struct page *page,
 				 unsigned int offset,
 				 unsigned int length)
@@ -815,17 +799,17 @@ static ssize_t orangefs_direct_IO(struct kiocb *iocb,
 {
 	struct file *file = iocb->ki_filp;
 	loff_t pos = *(&iocb->ki_pos);
-	/*
-	 * This cannot happen until write_iter becomes
-	 * generic_file_write_iter.
-	 */
-	BUG_ON(iov_iter_rw(iter) != READ);
-	return do_readv_writev(ORANGEFS_IO_READ, file, &pos, iter);
+	return do_readv_writev(iocb->ki_flags & IOCB_WRITE ?
+	    ORANGEFS_IO_WRITE : ORANGEFS_IO_READ, file, &pos, iter);
 }
 
 /** ORANGEFS2 implementation of address space operations */
 const struct address_space_operations orangefs_address_operations = {
+	.writepage = orangefs_writepage,
 	.readpage = orangefs_readpage,
+	.set_page_dirty = __set_page_dirty_nobuffers,
+	.write_begin = simple_write_begin,
+	.write_end = orangefs_write_end,
 	.invalidatepage = orangefs_invalidatepage,
 	.releasepage = orangefs_releasepage,
 	.direct_IO = orangefs_direct_IO,
