@@ -169,12 +169,11 @@ const struct inode_operations orangefs_file_inode_operations = {
 
 static int orangefs_init_iops(struct inode *inode)
 {
-	inode->i_mapping->a_ops = &orangefs_address_operations;
-
 	switch (inode->i_mode & S_IFMT) {
 	case S_IFREG:
 		inode->i_op = &orangefs_file_inode_operations;
 		inode->i_fop = &orangefs_file_operations;
+		inode->i_data.a_ops = &orangefs_address_operations;
 		inode->i_blkbits = PAGE_SHIFT;
 		break;
 	case S_IFLNK:
