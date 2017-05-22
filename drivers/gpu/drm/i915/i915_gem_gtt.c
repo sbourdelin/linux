@@ -2189,6 +2189,100 @@ static void gen8_ggtt_clear_range(struct i915_address_space *vm,
 		gen8_set_pte(&gtt_base[i], scratch_pte);
 }
 
+#ifdef CONFIG_INTEL_IOMMU
+struct insert_page {
+	struct i915_address_space *vm;
+	dma_addr_t addr;
+	u64 offset;
+	enum i915_cache_level level;
+};
+
+static int gen8_ggtt_insert_page__cb(void *_arg)
+{
+	struct insert_page *arg = _arg;
+
+	struct drm_i915_private *dev_priv = arg->vm->i915;
+
+	gen8_ggtt_insert_page(arg->vm, arg->addr,
+				arg->offset, arg->level, 0);
+
+	POSTING_READ(GFX_FLSH_CNTL_GEN6);
+
+	return 0;
+}
+
+static void gen8_ggtt_insert_page__BKL(struct i915_address_space *vm,
+				       dma_addr_t addr,
+				       u64 offset,
+				       enum i915_cache_level level,
+				       u32 unused)
+{
+	struct insert_page arg = { vm, addr, offset, level };
+
+	stop_machine(gen8_ggtt_insert_page__cb, &arg, NULL);
+}
+
+
+struct insert_entries {
+	struct i915_address_space *vm;
+	struct sg_table *st;
+	u64 start;
+	enum i915_cache_level level;
+};
+
+static int gen8_ggtt_insert_entries__cb(void *_arg)
+{
+	struct insert_entries *arg = _arg;
+
+	struct drm_i915_private *dev_priv = arg->vm->i915;
+
+	gen8_ggtt_insert_entries(arg->vm, arg->st,
+					arg->start, arg->level, 0);
+
+	POSTING_READ(GFX_FLSH_CNTL_GEN6);
+
+	return 0;
+}
+
+static void gen8_ggtt_insert_entries__BKL(struct i915_address_space *vm,
+					  struct sg_table *st,
+					  u64 start,
+					  enum i915_cache_level level,
+					  u32 unused)
+{
+	struct insert_entries arg = { vm, st, start, level };
+
+	stop_machine(gen8_ggtt_insert_entries__cb, &arg, NULL);
+}
+
+struct clear_range {
+	struct i915_address_space *vm;
+	u64 start;
+	u64 length;
+};
+
+static int gen8_ggtt_clear_range__cb(void *_arg)
+{
+	struct clear_range *arg = _arg;
+
+	struct drm_i915_private *dev_priv = arg->vm->i915;
+
+	gen8_ggtt_clear_range(arg->vm, arg->start, arg->length);
+
+	POSTING_READ(GFX_FLSH_CNTL_GEN6);
+
+	return 0;
+}
+
+static void gen8_ggtt_clear_range__BKL(struct i915_address_space *vm,
+                                       u64 start,
+                                       u64 length)
+{
+	struct clear_range arg = { vm, start, length };
+	stop_machine(gen8_ggtt_clear_range__cb, &arg, NULL);
+}
+#endif
+
 static void gen6_ggtt_clear_range(struct i915_address_space *vm,
 				  u64 start, u64 length)
 {
@@ -2786,6 +2880,18 @@ static int gen8_gmch_probe(struct i915_ggtt *ggtt)
 		ggtt->base.clear_range = gen8_ggtt_clear_range;
 
 	ggtt->base.insert_entries = gen8_ggtt_insert_entries;
+
+#ifdef CONFIG_INTEL_IOMMU
+	/* Serialize GTT updates on BXT if VT-d is on. */
+	if (IS_BROXTON(dev_priv) && intel_iommu_gfx_mapped) {
+		ggtt->base.insert_entries = gen8_ggtt_insert_entries__BKL;
+		ggtt->base.insert_page    = gen8_ggtt_insert_page__BKL;
+		if (!USES_FULL_PPGTT(dev_priv) ||
+		    intel_scanout_needs_vtd_wa(dev_priv)) {
+			ggtt->base.clear_range = gen8_ggtt_clear_range__BKL;
+		}
+	}
+#endif
 
 	ggtt->invalidate = gen6_ggtt_invalidate;
 
