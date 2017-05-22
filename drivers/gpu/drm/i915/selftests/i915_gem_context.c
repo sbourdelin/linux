@@ -320,7 +320,7 @@ static unsigned long max_dwords(struct drm_i915_gem_object *obj)
 static int igt_ctx_exec(void *arg)
 {
 	struct drm_i915_private *i915 = arg;
-	struct drm_i915_gem_object *obj;
+	struct drm_i915_gem_object *uninitialized_var(obj);
 	struct drm_file *file;
 	IGT_TIMEOUT(end_time);
 	LIST_HEAD(objects);
