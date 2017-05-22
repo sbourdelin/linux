@@ -751,7 +751,7 @@ const struct file_operations orangefs_file_operations = {
 	.fsync		= orangefs_fsync,
 };
 
-static int read_one_page(struct page *page)
+static int orangefs_readpage(struct file *file, struct page *page)
 {
 	int ret;
 	int max_block;
@@ -794,42 +794,6 @@ static int read_one_page(struct page *page)
 	/* unlock the page after the ->readpage() routine completes */
 	unlock_page(page);
 	return ret;
-}
-
-static int orangefs_readpage(struct file *file, struct page *page)
-{
-	return read_one_page(page);
-}
-
-static int orangefs_readpages(struct file *file,
-			   struct address_space *mapping,
-			   struct list_head *pages,
-			   unsigned nr_pages)
-{
-	int page_idx;
-	int ret;
-
-	gossip_debug(GOSSIP_INODE_DEBUG, "orangefs_readpages called\n");
-
-	for (page_idx = 0; page_idx < nr_pages; page_idx++) {
-		struct page *page;
-
-		page = list_entry(pages->prev, struct page, lru);
-		list_del(&page->lru);
-		if (!add_to_page_cache(page,
-				       mapping,
-				       page->index,
-				       readahead_gfp_mask(mapping))) {
-			ret = read_one_page(page);
-			gossip_debug(GOSSIP_INODE_DEBUG,
-				"failure adding page to cache, read_one_page returned: %d\n",
-				ret);
-	      } else {
-			put_page(page);
-	      }
-	}
-	BUG_ON(!list_empty(pages));
-	return 0;
 }
 
 static void orangefs_invalidatepage(struct page *page,
@@ -877,7 +841,6 @@ static ssize_t orangefs_direct_IO(struct kiocb *iocb,
 /** ORANGEFS2 implementation of address space operations */
 const struct address_space_operations orangefs_address_operations = {
 	.readpage = orangefs_readpage,
-	.readpages = orangefs_readpages,
 	.invalidatepage = orangefs_invalidatepage,
 	.releasepage = orangefs_releasepage,
 	.direct_IO = orangefs_direct_IO,
