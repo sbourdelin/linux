@@ -17,10 +17,13 @@
 #include "dpcon-cmd.h"
 #include "fsl-mc-private.h"
 
-#define FSL_MC_IS_ALLOCATABLE(_obj_type) \
-	(strcmp(_obj_type, "dpbp") == 0 || \
-	 strcmp(_obj_type, "dpmcp") == 0 || \
-	 strcmp(_obj_type, "dpcon") == 0)
+#define FSL_MC_IS_ALLOCATABLE(_obj_type)	\
+({						\
+	const char *__obj_type = _obj_type;	\
+	(strcmp(__obj_type, "dpbp") == 0 ||	\
+	 strcmp(__obj_type, "dpmcp") == 0 ||	\
+	 strcmp(__obj_type, "dpcon") == 0);	\
+})
 
 /**
  * fsl_mc_resource_pool_add_device - add allocatable object to a resource

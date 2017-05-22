@@ -21,9 +21,13 @@
 
 #define FSL_MC_DPRC_DRIVER_NAME    "fsl_mc_dprc"
 
-#define FSL_MC_DEVICE_MATCH(_mc_dev, _obj_desc) \
-	(strcmp((_mc_dev)->obj_desc.type, (_obj_desc)->type) == 0 && \
-	 (_mc_dev)->obj_desc.id == (_obj_desc)->id)
+#define FSL_MC_DEVICE_MATCH(_mc_dev, _obj_desc)				\
+({									\
+	struct fsl_mc_device *__mc_dev = _mc_dev;			\
+	struct dprc_obj_desc *__obj_desc = _obj_desc;			\
+	(strcmp(__mc_dev->obj_desc.type, __obj_desc->type) == 0 &&	\
+	__mc_dev->obj_desc.id == __obj_desc->id);			\
+})
 
 struct dprc_child_objs {
 	int child_count;
