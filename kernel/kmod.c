@@ -110,6 +110,7 @@ out:
 /**
  * __request_module - try to load a kernel module
  * @wait: wait (or not) for the operation to complete
+ * @allow_cap: if positive, may allow modprobe if this capability is set.
  * @fmt: printf style format string for the name of the module
  * @...: arguments as specified in the format string
  *
@@ -120,10 +121,20 @@ out:
  * must check that the service they requested is now available not blindly
  * invoke it.
  *
+ * If "allow_cap" is positive, The security subsystem will trust the caller
+ * that "allow_cap" may allow to load some modules with a specific alias,
+ * the security subsystem will make some exceptions based on that. This is
+ * primally useful for backward compatibility. A permission check should not
+ * be that strict and userspace should be able to continue to trigger module
+ * auto-loading if needed.
+ *
  * If module auto-loading support is disabled then this function
  * becomes a no-operation.
+ *
+ * This function should not be directly used by other subsystems, for that
+ * please call request_module().
  */
-int __request_module(bool wait, const char *fmt, ...)
+int __request_module(bool wait, int allow_cap, const char *fmt, ...)
 {
 	va_list args;
 	char module_name[MODULE_NAME_LEN];
@@ -150,7 +161,7 @@ int __request_module(bool wait, const char *fmt, ...)
 	if (ret >= MODULE_NAME_LEN)
 		return -ENAMETOOLONG;
 
-	ret = security_kernel_module_request(module_name);
+	ret = security_kernel_module_request(module_name, allow_cap);
 	if (ret)
 		return ret;
 

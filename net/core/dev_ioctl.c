@@ -366,8 +366,16 @@ void dev_load(struct net *net, const char *name)
 	rcu_read_unlock();
 
 	no_module = !dev;
+	/*
+	 * First do the CAP_NET_ADMIN check, then let the security
+	 * subsystem checks know that this can be allowed since this is
+	 * a "netdev-%s" module and CAP_NET_ADMIN is set.
+	 *
+	 * For this exception call __request_module().
+	 */
 	if (no_module && capable(CAP_NET_ADMIN))
-		no_module = request_module("netdev-%s", name);
+		no_module = __request_module(true, CAP_NET_ADMIN,
+					     "netdev-%s", name);
 	if (no_module && capable(CAP_SYS_MODULE))
 		request_module("%s", name);
 }

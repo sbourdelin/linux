@@ -578,6 +578,8 @@
  *	Ability to trigger the kernel to automatically upcall to userspace for
  *	userspace to load a kernel module with the given name.
  *	@kmod_name name of the module requested by the kernel
+ *	@allow_cap capability that allows to automatically load a kernel
+ *	module.
  *	Return 0 if successful.
  * @kernel_read_file:
  *	Read a file specified by userspace.
@@ -1516,7 +1518,7 @@ union security_list_options {
 	void (*cred_transfer)(struct cred *new, const struct cred *old);
 	int (*kernel_act_as)(struct cred *new, u32 secid);
 	int (*kernel_create_files_as)(struct cred *new, struct inode *inode);
-	int (*kernel_module_request)(char *kmod_name);
+	int (*kernel_module_request)(char *kmod_name, int allow_cap);
 	int (*kernel_read_file)(struct file *file, enum kernel_read_file_id id);
 	int (*kernel_post_read_file)(struct file *file, char *buf, loff_t size,
 				     enum kernel_read_file_id id);

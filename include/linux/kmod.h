@@ -32,18 +32,19 @@
 extern char modprobe_path[]; /* for sysctl */
 /* modprobe exit status on success, -ve on error.  Return value
  * usually useless though. */
-extern __printf(2, 3)
-int __request_module(bool wait, const char *name, ...);
-#define request_module(mod...) __request_module(true, mod)
-#define request_module_nowait(mod...) __request_module(false, mod)
+extern __printf(3, 4)
+int __request_module(bool wait, int allow_cap, const char *name, ...);
 #define try_then_request_module(x, mod...) \
-	((x) ?: (__request_module(true, mod), (x)))
+	((x) ?: (__request_module(true, -1, mod), (x)))
 #else
-static inline int request_module(const char *name, ...) { return -ENOSYS; }
-static inline int request_module_nowait(const char *name, ...) { return -ENOSYS; }
+static inline __printf(3, 4)
+int __request_module(bool wait, int allow_cap, const char *name, ...)
+{ return -ENOSYS; }
 #define try_then_request_module(x, mod...) (x)
 #endif
 
+#define request_module(mod...) __request_module(true, -1, mod)
+#define request_module_nowait(mod...) __request_module(false, -1, mod)
 
 struct cred;
 struct file;
