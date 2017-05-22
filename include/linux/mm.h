@@ -2549,5 +2549,10 @@ void __init setup_nr_node_ids(void);
 static inline void setup_nr_node_ids(void) {}
 #endif
 
+#define KB (1UL << 10)
+#define MB (1UL << 20)
+#define GB (1UL << 30)
+#define TB (1UL << 40)
+
 #endif /* __KERNEL__ */
 #endif /* _LINUX_MM_H */

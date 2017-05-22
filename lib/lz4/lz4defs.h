@@ -37,6 +37,7 @@
 
 #include <asm/unaligned.h>
 #include <linux/string.h>	 /* memset, memcpy */
+#include <linux/mm.h>
 
 #define FORCE_INLINE __always_inline
 
@@ -80,10 +81,6 @@ typedef uintptr_t uptrval;
 #define LZ4_SKIPTRIGGER 6
 
 #define HASH_UNIT sizeof(size_t)
-
-#define KB (1 << 10)
-#define MB (1 << 20)
-#define GB (1U << 30)
 
 #define MAXD_LOG 16
 #define MAX_DISTANCE ((1 << MAXD_LOG) - 1)

@@ -74,10 +74,6 @@
 #define DBG_LOW(fmt...)
 #endif
 
-#define KB (1024)
-#define MB (1024*KB)
-#define GB (1024L*MB)
-
 /*
  * Note:  pte   --> Linux PTE
  *        HPTE  --> PowerPC Hashed Page Table Entry
