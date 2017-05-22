@@ -2779,6 +2779,30 @@ void i915_handle_error(struct drm_i915_private *dev_priv,
 	if (!engine_mask)
 		goto out;
 
+	/* try engine reset first, and continue if fails */
+	if (intel_has_reset_engine(dev_priv)) {
+		struct intel_engine_cs *engine;
+		unsigned int tmp;
+
+		/* protect against concurrent reset attempts */
+		if (test_and_set_bit(I915_RESET_ENGINE_IN_PROGRESS,
+				     &dev_priv->gpu_error.flags))
+			goto out;
+
+		for_each_engine_masked(engine, dev_priv, engine_mask, tmp) {
+			if (i915_reset_engine(engine) == 0)
+				engine_mask &= ~intel_engine_flag(engine);
+		}
+
+		/* clear unconditionally, full reset won't care about it */
+		clear_bit(I915_RESET_ENGINE_IN_PROGRESS,
+			  &dev_priv->gpu_error.flags);
+
+		if (!engine_mask)
+			goto out;
+	}
+
+	/* full reset needs the mutex, stop any other user trying to do so */
 	if (test_and_set_bit(I915_RESET_BACKOFF,
 			     &dev_priv->gpu_error.flags))
 		goto out;

@@ -1864,6 +1864,19 @@ error:
 	goto finish;
 }
 
+/**
+ * i915_reset_engine - reset GPU engine to recover from a hang
+ * @engine: engine to reset
+ *
+ * Reset a specific GPU engine. Useful if a hang is detected.
+ * Returns zero on successful reset or otherwise an error code.
+ */
+int i915_reset_engine(struct intel_engine_cs *engine)
+{
+	/* FIXME: replace me with engine reset sequence */
+	return -ENODEV;
+}
+
 static int i915_pm_suspend(struct device *kdev)
 {
 	struct pci_dev *pdev = to_pci_dev(kdev);
