@@ -294,6 +294,10 @@ int orangefs_inode_getattr(struct inode *inode, int new, int bypass,
 
 	type = orangefs_inode_type(new_op->
 	    downcall.resp.getattr.attributes.objtype);
+	if (type == -1) {
+		ret = -EIO;
+		goto out;
+	}
 	ret = orangefs_inode_is_stale(inode, new,
 	    &new_op->downcall.resp.getattr.attributes,
 	    new_op->downcall.resp.getattr.link_target);

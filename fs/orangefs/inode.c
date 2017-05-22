@@ -175,22 +175,16 @@ static int orangefs_init_iops(struct inode *inode)
 		inode->i_fop = &orangefs_file_operations;
 		inode->i_data.a_ops = &orangefs_address_operations;
 		inode->i_blkbits = PAGE_SHIFT;
-		break;
+		return 0;
 	case S_IFLNK:
 		inode->i_op = &orangefs_symlink_inode_operations;
-		break;
+		return 0;
 	case S_IFDIR:
 		inode->i_op = &orangefs_dir_inode_operations;
 		inode->i_fop = &orangefs_dir_operations;
-		break;
-	default:
-		gossip_debug(GOSSIP_INODE_DEBUG,
-			     "%s: unsupported mode\n",
-			     __func__);
-		return -EINVAL;
+		return 0;
 	}
-
-	return 0;
+	BUG_ON(1);
 }
 
 /*
