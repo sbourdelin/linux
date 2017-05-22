@@ -790,6 +790,12 @@ static const char * const typec_data_roles[] = {
 	[TYPEC_HOST]	= "host",
 };
 
+static const char * const typec_port_types[] = {
+	[TYPEC_PORT_DFP] = "dfp",
+	[TYPEC_PORT_UFP] = "ufp",
+	[TYPEC_PORT_DRP] = "drp",
+};
+
 static ssize_t
 preferred_role_store(struct device *dev, struct device_attribute *attr,
 		     const char *buf, size_t size)
@@ -927,6 +933,39 @@ static ssize_t power_role_show(struct device *dev,
 }
 static DEVICE_ATTR_RW(power_role);
 
+static ssize_t
+port_type_store(struct device *dev, struct device_attribute *attr,
+			const char *buf, size_t size)
+{
+	struct typec_port *port = to_typec_port(dev);
+	int ret;
+
+	if (!port->cap->port_type_set) {
+		dev_dbg(dev, "changing port type not supported\n");
+		return -EOPNOTSUPP;
+	}
+
+	ret = sysfs_match_string(typec_port_types, buf);
+	if (ret < 0)
+		return ret;
+
+	ret = port->cap->port_type_set(port->cap, ret);
+	if (ret)
+		return ret;
+
+	return size;
+}
+
+static ssize_t
+port_type_show(struct device *dev, struct device_attribute *attr,
+		char *buf)
+{
+	struct typec_port *port = to_typec_port(dev);
+
+	return sprintf(buf, "%s\n", typec_port_types[port->cap->type]);
+}
+static DEVICE_ATTR_RW(port_type);
+
 static const char * const typec_pwr_opmodes[] = {
 	[TYPEC_PWR_MODE_USB]	= "default",
 	[TYPEC_PWR_MODE_1_5A]	= "1.5A",
@@ -1036,6 +1075,7 @@ static struct attribute *typec_attrs[] = {
 	&dev_attr_usb_power_delivery_revision.attr,
 	&dev_attr_usb_typec_revision.attr,
 	&dev_attr_vconn_source.attr,
+	&dev_attr_port_type.attr,
 	NULL,
 };
 ATTRIBUTE_GROUPS(typec);

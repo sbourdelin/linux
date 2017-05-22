@@ -73,6 +73,19 @@ Description:
 
 		Valid values: source, sink, none (to remove preference)
 
+What:           /sys/class/typec/<port>/port_type
+Date:           May 2017
+Description:
+		Indicates the type of the port. This attribute can be used for
+		requesting a change in the port type. Port type change is
+		supported as a synchronous operation, so write(2) to the
+		attribute will not return until the operation has finished.
+
+		Valid values:
+		- DRP
+		- DFP
+		- UFP
+
 What:		/sys/class/typec/<port>/supported_accessory_modes
 Date:		April 2017
 Contact:	Heikki Krogerus <heikki.krogerus@linux.intel.com>
