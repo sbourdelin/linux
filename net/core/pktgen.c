@@ -3757,10 +3757,8 @@ static int __net_init pktgen_create_thread(int cpu, struct pktgen_net *pn)
 	struct task_struct *p;
 
 	t = kzalloc_node(sizeof(*t), GFP_KERNEL, cpu_to_node(cpu));
-	if (!t) {
-		pr_err("ERROR: out of memory, can't create new thread\n");
+	if (!t)
 		return -ENOMEM;
-	}
 
 	mutex_init(&t->if_lock);
 	t->cpu = cpu;
