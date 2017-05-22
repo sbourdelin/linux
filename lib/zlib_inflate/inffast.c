@@ -26,6 +26,7 @@ union uu {
 	unsigned char b[2];
 };
 
+#ifndef CONFIG_HAVE_EFFICIENT_UNALIGNED_ACCESS
 /* Endian independed version */
 static inline unsigned short
 get_unaligned16(const unsigned short *p)
@@ -37,6 +38,7 @@ get_unaligned16(const unsigned short *p)
 	mm.b[1] = b[1];
 	return mm.us;
 }
+#endif
 
 #ifdef POSTINC
 #  define OFF 0
