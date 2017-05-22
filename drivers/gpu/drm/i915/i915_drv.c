@@ -1870,11 +1870,55 @@ error:
  *
  * Reset a specific GPU engine. Useful if a hang is detected.
  * Returns zero on successful reset or otherwise an error code.
+ *
+ * Procedure is:
+ *  - identifies the request that caused the hang and it is dropped
+ *  - reset engine (which will force the engine to idle)
+ *  - re-init/configure engine
  */
 int i915_reset_engine(struct intel_engine_cs *engine)
 {
-	/* FIXME: replace me with engine reset sequence */
-	return -ENODEV;
+	int ret;
+	struct drm_i915_private *dev_priv = engine->i915;
+	struct i915_gpu_error *error = &dev_priv->gpu_error;
+	struct drm_i915_gem_request *active_request;
+
+	GEM_BUG_ON(!test_bit(I915_RESET_ENGINE_IN_PROGRESS, &error->flags));
+
+	DRM_DEBUG_DRIVER("resetting %s\n", engine->name);
+
+	active_request = i915_gem_reset_prepare_engine(engine);
+	if (IS_ERR(active_request)) {
+		DRM_DEBUG_DRIVER("Previous reset failed, promote to full reset\n");
+		ret = PTR_ERR(active_request);
+		goto out;
+	}
+
+	/*
+	 * the request that caused the hang is stuck on elsp, we know the
+	 * active request and can drop it, adjust head to skip the offending
+	 * request to resume executing remaining requests in the queue.
+	 */
+	i915_gem_reset_engine(engine, active_request);
+
+	/* finally, reset engine */
+	ret = intel_gpu_reset(dev_priv, intel_engine_flag(engine));
+	if (ret) {
+		DRM_ERROR("Failed to reset %s, ret=%d\n", engine->name, ret);
+		goto out;
+	}
+
+	i915_gem_reset_finish_engine(engine);
+
+	/*
+	 * The engine and its registers (and workarounds in case of render)
+	 * have been reset to their default values. Follow the init_ring
+	 * process to program RING_MODE, HWSP and re-enable submission.
+	 */
+	ret = engine->init_hw(engine);
+
+out:
+	return ret;
 }
 
 static int i915_pm_suspend(struct device *kdev)
