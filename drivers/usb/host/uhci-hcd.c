@@ -269,6 +269,10 @@ static int resume_detect_interrupts_are_broken(struct uhci_hcd *uhci)
 	 * we can't depend on resume-detect interrupts. */
 	if (ignore_oc)
 		return 1;
+#ifdef CONFIG_USB_UHCI_ASPEED
+	if (uhci->is_aspeed)
+		return 1;
+#endif
 
 	return uhci->resume_detect_interrupts_are_broken ?
 		uhci->resume_detect_interrupts_are_broken(uhci) : 0;
@@ -383,6 +387,15 @@ __acquires(uhci->lock)
 static void start_rh(struct uhci_hcd *uhci)
 {
 	uhci->is_stopped = 0;
+
+#ifdef CONFIG_USB_UHCI_ASPEED
+	/*
+	 * Clear stale status bits on Aspeed as we get a stale HCH
+	 * which causes problems later on
+	 */
+	if (uhci->is_aspeed)
+		uhci_writew(uhci, uhci_readw(uhci, USBSTS), USBSTS);
+#endif
 
 	/* Mark it configured and running with a 64-byte max packet.
 	 * All interrupts are enabled, even though RESUME won't do anything.
