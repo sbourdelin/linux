@@ -1986,7 +1986,7 @@ static void pktgen_mark_device(const struct pktgen_net *pn, const char *ifname)
 	while (1) {
 
 		pkt_dev = __pktgen_NN_threads(pn, ifname, REMOVE);
-		if (pkt_dev == NULL)
+		if (!pkt_dev)
 			break;	/* success */
 
 		mutex_unlock(&pktgen_thread_lock);
@@ -3274,7 +3274,7 @@ static struct pktgen_dev *next_to_run(struct pktgen_thread *t)
 	list_for_each_entry_rcu(pkt_dev, &t->if_list, list) {
 		if (!pkt_dev->running)
 			continue;
-		if (best == NULL)
+		if (!best)
 			best = pkt_dev;
 		else if (ktime_compare(pkt_dev->next_tx, best->next_tx) < 0)
 			best = pkt_dev;
@@ -3402,7 +3402,7 @@ static void pktgen_xmit(struct pktgen_dev *pkt_dev)
 		kfree_skb(pkt_dev->skb);
 
 		pkt_dev->skb = fill_packet(odev, pkt_dev);
-		if (pkt_dev->skb == NULL) {
+		if (!pkt_dev->skb) {
 			pr_err("ERROR: couldn't allocate skb in fill_packet\n");
 			schedule();
 			pkt_dev->clone_count--;	/* back out increment, OOM */
@@ -3685,7 +3685,7 @@ static int pktgen_add_device(struct pktgen_thread *t, const char *ifname)
 	strcpy(pkt_dev->odevname, ifname);
 	pkt_dev->flows = vzalloc_node(MAX_CFLOWS * sizeof(struct flow_state),
 				      node);
-	if (pkt_dev->flows == NULL) {
+	if (!pkt_dev->flows) {
 		kfree(pkt_dev);
 		return -ENOMEM;
 	}
@@ -3868,7 +3868,7 @@ static int __net_init pg_net_init(struct net *net)
 		return -ENODEV;
 	}
 	pe = proc_create(PGCTRL, 0600, pn->proc_dir, &pktgen_fops);
-	if (pe == NULL) {
+	if (!pe) {
 		pr_err("cannot create %s procfs entry\n", PGCTRL);
 		ret = -EINVAL;
 		goto remove;
