@@ -1568,6 +1568,15 @@ static int io_submit_one(struct kioctx *ctx, struct iocb __user *user_iocb,
 	req->common.ki_pos = iocb->aio_offset;
 	req->common.ki_complete = aio_complete;
 	req->common.ki_flags = iocb_flags(req->common.ki_filp);
+	if (iocb->aio_flags & IOCB_FLAG_IOPRIO)
+		/*
+		 * If the IOCB_FLAG_IOPRIO flag of aio_flags is set,
+		 * then the aio_reqprio is interpreted as a I/O
+		 * scheduling class and priority. This is then set
+		 * on the bio that is created from this request, which
+		 * enables the priority to be passed to device drivers.
+		 */
+		req->common.ki_ioprio = iocb->aio_reqprio;
 
 	if (iocb->aio_flags & IOCB_FLAG_RESFD) {
 		/*

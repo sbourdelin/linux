@@ -275,6 +275,7 @@ struct kiocb {
 	void (*ki_complete)(struct kiocb *iocb, long ret, long ret2);
 	void			*private;
 	int			ki_flags;
+	u16			ki_ioprio; /* See linux/ioprio.h */
 };
 
 static inline bool is_sync_kiocb(struct kiocb *kiocb)

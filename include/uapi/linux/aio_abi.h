@@ -54,6 +54,12 @@ enum {
  */
 #define IOCB_FLAG_RESFD		(1 << 0)
 
+/*
+ * IOCB_FLAG_IOPRIO - Set if the "aio_reqprio" member of the "struct iocb"
+ *                    is interpreted as an I/O scheduling class and priority
+ */
+#define IOCB_FLAG_IOPRIO	(1 << 1)
+
 /* read() from /dev/aio returns these structures. */
 struct io_event {
 	__u64		data;		/* the data field from the iocb */
