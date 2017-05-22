@@ -2995,10 +2995,10 @@ static struct sk_buff *fill_packet_ipv6(struct net_device *odev,
 
 	skb_reset_mac_header(skb);
 	skb_set_network_header(skb, skb->len);
-	iph = (struct ipv6hdr *) skb_put(skb, sizeof(struct ipv6hdr));
+	iph = (struct ipv6hdr *)skb_put(skb, sizeof(*iph));
 
 	skb_set_transport_header(skb, skb->len);
-	udph = (struct udphdr *) skb_put(skb, sizeof(struct udphdr));
+	udph = (struct udphdr *)skb_put(skb, sizeof(*udph));
 	skb_set_queue_mapping(skb, queue_map);
 	skb->priority = pkt_dev->skb_priority;
 
@@ -3678,7 +3678,7 @@ static int pktgen_add_device(struct pktgen_thread *t, const char *ifname)
 		return -EBUSY;
 	}
 
-	pkt_dev = kzalloc_node(sizeof(struct pktgen_dev), GFP_KERNEL, node);
+	pkt_dev = kzalloc_node(sizeof(*pkt_dev), GFP_KERNEL, node);
 	if (!pkt_dev)
 		return -ENOMEM;
 
@@ -3756,8 +3756,7 @@ static int __net_init pktgen_create_thread(int cpu, struct pktgen_net *pn)
 	struct proc_dir_entry *pe;
 	struct task_struct *p;
 
-	t = kzalloc_node(sizeof(struct pktgen_thread), GFP_KERNEL,
-			 cpu_to_node(cpu));
+	t = kzalloc_node(sizeof(*t), GFP_KERNEL, cpu_to_node(cpu));
 	if (!t) {
 		pr_err("ERROR: out of memory, can't create new thread\n");
 		return -ENOMEM;
