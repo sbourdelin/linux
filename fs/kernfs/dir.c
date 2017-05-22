@@ -634,6 +634,7 @@ static struct kernfs_node *__kernfs_new_node(struct kernfs_root *root,
 	if (ret < 0)
 		goto err_out2;
 	kn->ino = ret;
+	kn->generation = atomic_inc_return(&root->next_generation);
 
 	atomic_set(&kn->count, 1);
 	atomic_set(&kn->active, KN_DEACTIVATED_BIAS);
@@ -877,6 +878,7 @@ struct kernfs_root *kernfs_create_root(struct kernfs_syscall_ops *scops,
 
 	ida_init(&root->ino_ida);
 	INIT_LIST_HEAD(&root->supers);
+	atomic_set(&root->next_generation, 0);
 
 	kn = __kernfs_new_node(root, "", S_IFDIR | S_IRUGO | S_IXUGO,
 			       KERNFS_DIR);
