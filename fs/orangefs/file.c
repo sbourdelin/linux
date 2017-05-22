@@ -402,10 +402,8 @@ out:
  * Read data from a specified offset in a file (referenced by inode).
  * Data may be placed either in a user or kernel buffer.
  */
-ssize_t orangefs_inode_read(struct inode *inode,
-			    struct iov_iter *iter,
-			    loff_t *offset,
-			    loff_t readahead_size)
+static ssize_t orangefs_inode_read(struct inode *inode,
+    struct iov_iter *iter, loff_t *offset, loff_t readahead_size)
 {
 	struct orangefs_inode_s *orangefs_inode = ORANGEFS_I(inode);
 	size_t count = iov_iter_count(iter);

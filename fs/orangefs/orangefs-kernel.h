@@ -463,11 +463,6 @@ ssize_t orangefs_listxattr(struct dentry *dentry, char *buffer, size_t size);
 struct inode *orangefs_iget(struct super_block *sb,
 			 struct orangefs_object_kref *ref);
 
-ssize_t orangefs_inode_read(struct inode *inode,
-			    struct iov_iter *iter,
-			    loff_t *offset,
-			    loff_t readahead_size);
-
 /*
  * defined in devorangefs-req.c
  */
