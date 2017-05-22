@@ -465,3 +465,207 @@ int device_reset(struct device *dev)
 	return ret;
 }
 EXPORT_SYMBOL_GPL(device_reset);
+
+/**
+ * APIs to manage an array of reset controls.
+ */
+/**
+ * of_reset_control_get_count - Count number of resets available with a device
+ *
+ * @node: device node that contains 'resets'.
+ *
+ * Returns positive reset count on success, or error number on failure and
+ * on count being zero.
+ */
+static int of_reset_control_get_count(struct device_node *node)
+{
+	int count;
+
+	if (!node)
+		return -EINVAL;
+
+	count = of_count_phandle_with_args(node, "resets", "#reset-cells");
+	if (count == 0)
+		count = -ENOENT;
+
+	return count;
+}
+
+/**
+ * reset_control_array_assert: assert a list of resets
+ *
+ * @resets: reset control array holding info about the list of resets
+ *
+ * This API doesn't guarantee that the reset lines controlled by
+ * the reset array are asserted in any particular order.
+ *
+ * Returns 0 on success or error number on failure.
+ */
+int reset_control_array_assert(struct reset_control_array *resets)
+{
+	int ret, i;
+
+	if (!resets)
+		return 0;
+
+	if (IS_ERR(resets))
+		return -EINVAL;
+
+	for (i = 0; i < resets->num_rstcs; i++) {
+		ret = reset_control_assert(resets->rstc[i]);
+		if (ret)
+			goto err;
+	}
+
+	return 0;
+
+err:
+	while (i--)
+		reset_control_deassert(resets->rstc[i]);
+	return ret;
+}
+EXPORT_SYMBOL_GPL(reset_control_array_assert);
+
+/**
+ * reset_control_array_deassert: deassert a list of resets
+ *
+ * @resets: reset control array holding info about the list of resets
+ *
+ * This API doesn't guarantee that the reset lines controlled by
+ * the reset array are deasserted in any particular order.
+ *
+ * Returns 0 on success or error number on failure.
+ */
+int reset_control_array_deassert(struct reset_control_array *resets)
+{
+	int ret, i;
+
+	if (!resets)
+		return 0;
+
+	if (IS_ERR(resets))
+		return -EINVAL;
+
+	for (i = 0; i < resets->num_rstcs; i++) {
+		ret = reset_control_deassert(resets->rstc[i]);
+		if (ret)
+			goto err;
+	}
+
+	return 0;
+
+err:
+	while (i--)
+		reset_control_assert(resets->rstc[i]);
+	return ret;
+}
+EXPORT_SYMBOL_GPL(reset_control_array_deassert);
+
+static void devm_reset_control_array_release(struct device *dev, void *res)
+{
+	struct reset_control_array *resets = res;
+
+	reset_control_array_put(resets);
+}
+
+/**
+ * of_reset_control_array_get - Get a list of reset controls using
+ *				device node.
+ *
+ * @np: device node for the device that requests the reset controls array
+ * @shared: whether reset controls are shared or not
+ * @optional: whether it is optional to get the reset controls
+ *
+ * Returns pointer to allocated reset_control_array on success or
+ * error on failure
+ */
+struct reset_control_array *
+of_reset_control_array_get(struct device_node *np, bool shared, bool optional)
+{
+	struct reset_control_array *resets;
+	struct reset_control *rstc;
+	int num, i;
+	void *err;
+
+	num = of_reset_control_get_count(np);
+	if (num < 0)
+		return optional ? NULL : ERR_PTR(num);
+
+	resets = kzalloc(sizeof(*resets) + sizeof(resets->rstc[0]) * num,
+			 GFP_KERNEL);
+	if (!resets)
+		return ERR_PTR(-ENOMEM);
+
+	for (i = 0; i < num; i++) {
+		rstc = __of_reset_control_get(np, NULL, i, shared, optional);
+		if (IS_ERR(rstc)) {
+			err = ERR_CAST(rstc);
+			goto err_rst;
+		}
+		resets->rstc[i] = rstc;
+	}
+	resets->num_rstcs = num;
+
+	return resets;
+
+err_rst:
+	while (--i >= 0)
+		reset_control_put(resets->rstc[i]);
+
+	kfree(resets);
+
+	return err;
+}
+EXPORT_SYMBOL_GPL(of_reset_control_array_get);
+
+/**
+ * devm_reset_control_array_get - Resource managed reset control array get
+ *
+ * @dev: device that requests the list of reset controls
+ * @shared: whether reset controls are shared or not
+ * @optional: whether it is optional to get the reset controls
+ *
+ * The reset control array APIs are intended for a list of resets
+ * that just have to be asserted or deasserted, without any
+ * requirements on the order.
+ *
+ * Returns pointer to allocated reset_control_array on success or
+ * error on failure
+ */
+struct reset_control_array *
+devm_reset_control_array_get(struct device *dev, bool shared, bool optional)
+{
+	struct reset_control_array **devres;
+	struct reset_control_array *resets;
+
+	devres = devres_alloc(devm_reset_control_array_release,
+			      sizeof(*devres), GFP_KERNEL);
+	if (!devres)
+		return ERR_PTR(-ENOMEM);
+
+	resets = of_reset_control_array_get(dev->of_node, shared, optional);
+	if (IS_ERR(resets)) {
+		devres_free(resets);
+		return resets;
+	}
+
+	*devres = resets;
+	devres_add(dev, devres);
+
+	return resets;
+}
+EXPORT_SYMBOL_GPL(devm_reset_control_array_get);
+
+void reset_control_array_put(struct reset_control_array *resets)
+{
+	int i;
+
+	if (IS_ERR_OR_NULL(resets))
+		return;
+
+	for (i = 0; i < resets->num_rstcs; i++)
+		reset_control_put(resets->rstc[i]);
+
+	kfree(resets);
+}
+EXPORT_SYMBOL_GPL(reset_control_array_put);
