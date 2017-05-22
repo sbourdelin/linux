@@ -812,7 +812,7 @@ static int check_pkt_ptr_alignment(const struct bpf_reg_state *reg,
 	 * we force this to 2 which is universally what architectures use
 	 * when they don't set CONFIG_HAVE_EFFICIENT_UNALIGNED_ACCESS.
 	 */
-	ip_align = strict ? 2 : NET_IP_ALIGN;
+	ip_align = 2;
 	if ((ip_align + reg_off + off) % size != 0) {
 		verbose("misaligned packet access off %d+%d+%d size %d\n",
 			ip_align, reg_off, off, size);
