@@ -869,6 +869,7 @@ err_irq:
 	i915_workqueues_cleanup(dev_priv);
 err_engines:
 	i915_engines_cleanup(dev_priv);
+	intel_uc_cleanup(dev_priv);
 	return ret;
 }
 
@@ -883,6 +884,7 @@ static void i915_driver_cleanup_early(struct drm_i915_private *dev_priv)
 	intel_irq_fini(dev_priv);
 	i915_workqueues_cleanup(dev_priv);
 	i915_engines_cleanup(dev_priv);
+	intel_uc_cleanup(dev_priv);
 }
 
 static int i915_mmio_setup(struct drm_i915_private *dev_priv)
