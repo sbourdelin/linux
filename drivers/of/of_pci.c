@@ -283,6 +283,102 @@ parse_failed:
 	return err;
 }
 EXPORT_SYMBOL_GPL(of_pci_get_host_bridge_resources);
+
+/**
+ * of_pci_get_dma_ranges - Parse PCI host bridge inbound resources from DT
+ * @np: device node of the host bridge having the dma-ranges property
+ * @resources: list where the range of resources will be added after DT parsing
+ *
+ * It is the caller's job to free the @resources list.
+ *
+ * This function will parse the "dma-ranges" property of a
+ * PCI host bridge device node and setup the resource mapping based
+ * on its content.
+ *
+ * It returns zero if the range parsing has been successful or a standard error
+ * value if it failed.
+ */
+
+int of_pci_get_dma_ranges(struct device_node *dn, struct list_head *resources)
+{
+	struct device_node *node = of_node_get(dn);
+	int rlen;
+	int pna = of_n_addr_cells(node);
+	const int na = 3, ns = 2;
+	int np = pna + na + ns;
+	int ret = 0;
+	struct resource *res;
+	const u32 *dma_ranges;
+	struct of_pci_range range;
+
+	if (!node)
+		return -EINVAL;
+
+	while (1) {
+		dma_ranges = of_get_property(node, "dma-ranges", &rlen);
+
+		/* Ignore empty ranges, they imply no translation required. */
+		if (dma_ranges && rlen > 0)
+			break;
+
+		/* no dma-ranges, they imply no translation required. */
+		if (!dma_ranges)
+			break;
+
+		node = of_get_next_parent(node);
+
+		if (!node)
+			break;
+	}
+
+	if (!dma_ranges) {
+		pr_debug("pcie device has no dma-ranges defined for node(%s)\n",
+			  dn->full_name);
+		ret = -EINVAL;
+		goto out;
+	}
+
+	while ((rlen -= np * 4) >= 0) {
+		range.pci_space = be32_to_cpup((const __be32 *) &dma_ranges[0]);
+		range.pci_addr = of_read_number(dma_ranges + 1, ns);
+		range.cpu_addr = of_translate_dma_address(node,
+							dma_ranges + na);
+		range.size = of_read_number(dma_ranges + pna + na, ns);
+		range.flags = IORESOURCE_MEM;
+
+		dma_ranges += np;
+
+		/*
+		 * If we failed translation or got a zero-sized region
+		 * then skip this range.
+		 */
+		if (range.cpu_addr == OF_BAD_ADDR || range.size == 0)
+			continue;
+
+		res = kzalloc(sizeof(struct resource), GFP_KERNEL);
+		if (!res) {
+			ret = -ENOMEM;
+			goto parse_failed;
+		}
+
+		ret = of_pci_range_to_resource(&range, dn, res);
+		if (ret) {
+			kfree(res);
+			continue;
+		}
+
+		pci_add_resource_offset(resources, res,
+					res->start - range.pci_addr);
+	}
+	return ret;
+
+parse_failed:
+	pci_free_resource_list(resources);
+out:
+	of_node_put(node);
+	return ret;
+}
+EXPORT_SYMBOL_GPL(of_pci_get_dma_ranges);
 #endif /* CONFIG_OF_ADDRESS */
 
 /**
