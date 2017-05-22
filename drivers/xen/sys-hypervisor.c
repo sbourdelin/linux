@@ -50,6 +50,18 @@ static int __init xen_sysfs_type_init(void)
 	return sysfs_create_file(hypervisor_kobj, &type_attr.attr);
 }
 
+static ssize_t guest_type_show(struct hyp_sysfs_attr *attr, char *buffer)
+{
+	return sprintf(buffer, "%s\n", xen_guest_type);
+}
+
+HYPERVISOR_ATTR_RO(guest_type);
+
+static int __init xen_sysfs_guest_type_init(void)
+{
+	return sysfs_create_file(hypervisor_kobj, &guest_type_attr.attr);
+}
+
 /* xen version attributes */
 static ssize_t major_show(struct hyp_sysfs_attr *attr, char *buffer)
 {
@@ -471,6 +483,9 @@ static int __init hyper_sysfs_init(void)
 	ret = xen_sysfs_type_init();
 	if (ret)
 		goto out;
+	ret = xen_sysfs_guest_type_init();
+	if (ret)
+		goto guest_type_out;
 	ret = xen_sysfs_version_init();
 	if (ret)
 		goto version_out;
@@ -502,6 +517,8 @@ uuid_out:
 comp_out:
 	sysfs_remove_group(hypervisor_kobj, &version_group);
 version_out:
+	sysfs_remove_file(hypervisor_kobj, &guest_type_attr.attr);
+guest_type_out:
 	sysfs_remove_file(hypervisor_kobj, &type_attr.attr);
 out:
 	return ret;
