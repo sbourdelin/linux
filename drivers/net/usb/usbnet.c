@@ -2128,7 +2128,7 @@ int usbnet_write_cmd_async(struct usbnet *dev, u8 cmd, u8 reqtype,
 			goto fail_free;
 	}
 
-	req = kmalloc(sizeof(struct usb_ctrlrequest), GFP_ATOMIC);
+	req = kmalloc(sizeof(*req), GFP_ATOMIC);
 	if (!req)
 		goto fail_free_buf;
 
