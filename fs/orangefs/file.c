@@ -441,22 +441,11 @@ static ssize_t orangefs_inode_read(struct inode *inode,
 	return ret;
 }
 
-static ssize_t orangefs_file_read_iter(struct kiocb *iocb, struct iov_iter *iter)
+static ssize_t orangefs_file_read_iter(struct kiocb *iocb,
+    struct iov_iter *iter)
 {
-	struct file *file = iocb->ki_filp;
-	loff_t pos = *(&iocb->ki_pos);
-	ssize_t rc = 0;
-
-	BUG_ON(iocb->private);
-
-	gossip_debug(GOSSIP_FILE_DEBUG, "orangefs_file_read_iter\n");
-
 	orangefs_stats.reads++;
-
-	rc = do_readv_writev(ORANGEFS_IO_READ, file, &pos, iter);
-	iocb->ki_pos = pos;
-
-	return rc;
+	return generic_file_read_iter(iocb, iter);
 }
 
 static ssize_t orangefs_file_write_iter(struct kiocb *iocb, struct iov_iter *iter)
