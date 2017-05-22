@@ -819,22 +819,17 @@ static int orangefs_releasepage(struct page *page, gfp_t foo)
 	return 0;
 }
 
-/*
- * Having a direct_IO entry point in the address_space_operations
- * struct causes the kernel to allows us to use O_DIRECT on
- * open. Nothing will ever call this thing, but in the future we
- * will need to be able to use O_DIRECT on open in order to support
- * AIO. Modeled after NFS, they do this too.
- */
-
 static ssize_t orangefs_direct_IO(struct kiocb *iocb,
 				  struct iov_iter *iter)
 {
-	gossip_debug(GOSSIP_INODE_DEBUG,
-		     "orangefs_direct_IO: %pD\n",
-		     iocb->ki_filp);
-
-	return -EINVAL;
+	struct file *file = iocb->ki_filp;
+	loff_t pos = *(&iocb->ki_pos);
+	/*
+	 * This cannot happen until write_iter becomes
+	 * generic_file_write_iter.
+	 */
+	BUG_ON(iov_iter_rw(iter) != READ);
+	return do_readv_writev(ORANGEFS_IO_READ, file, &pos, iter);
 }
 
 /** ORANGEFS2 implementation of address space operations */
