@@ -29,6 +29,17 @@ config CFG80211
 
 	  When built as a module it will be called cfg80211.
 
+config CFG80211_SCAN_RESULT_EXPIRE
+	int "Scan completion time" if CFG80211
+	default 30
+	---help---
+	  This value is the time in seconds the mac80211 scan method needs
+	  to finish. An expiration time to 30 seconds should be sufficient
+	  for most cases but for some other cases we might be interested in
+	  tweak this value.
+
+	  If unsure, leave the default of 30.
+
 config NL80211_TESTMODE
 	bool "nl80211 testmode command"
 	depends on CFG80211

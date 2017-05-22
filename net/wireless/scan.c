@@ -70,8 +70,6 @@ module_param(bss_entries_limit, int, 0644);
 MODULE_PARM_DESC(bss_entries_limit,
                  "limit to number of scan BSS entries (per wiphy, default 1000)");
 
-#define IEEE80211_SCAN_RESULT_EXPIRE	(30 * HZ)
-
 static void bss_free(struct cfg80211_internal_bss *bss)
 {
 	struct cfg80211_bss_ies *ies;
@@ -476,7 +474,7 @@ void cfg80211_bss_age(struct cfg80211_registered_device *rdev,
 
 void cfg80211_bss_expire(struct cfg80211_registered_device *rdev)
 {
-	__cfg80211_bss_expire(rdev, jiffies - IEEE80211_SCAN_RESULT_EXPIRE);
+	__cfg80211_bss_expire(rdev, jiffies - rdev->scan_result_expire);
 }
 
 const u8 *cfg80211_find_ie_match(u8 eid, const u8 *ies, int len,
@@ -737,7 +735,7 @@ struct cfg80211_bss *cfg80211_get_bss(struct wiphy *wiphy,
 		if (!is_valid_ether_addr(bss->pub.bssid))
 			continue;
 		/* Don't get expired BSS structs */
-		if (time_after(now, bss->ts + IEEE80211_SCAN_RESULT_EXPIRE) &&
+		if (time_after(now, bss->ts + rdev->scan_result_expire) &&
 		    !atomic_read(&bss->hold))
 			continue;
 		if (is_bss(&bss->pub, bssid, ssid, ssid_len)) {

@@ -499,6 +499,8 @@ use_default_name:
 
 	init_waitqueue_head(&rdev->dev_wait);
 
+	rdev->scan_result_expire = CONFIG_CFG80211_SCAN_RESULT_EXPIRE;
+
 	/*
 	 * Initialize wiphy parameters to IEEE 802.11 MIB default values.
 	 * Fragmentation and RTS threshold are disabled by default with the
