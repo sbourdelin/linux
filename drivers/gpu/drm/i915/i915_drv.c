@@ -1901,11 +1901,21 @@ int i915_reset_engine(struct intel_engine_cs *engine)
 	 */
 	i915_gem_reset_engine(engine, active_request);
 
-	/* finally, reset engine */
-	ret = intel_gpu_reset(dev_priv, intel_engine_flag(engine));
-	if (ret) {
-		DRM_ERROR("Failed to reset %s, ret=%d\n", engine->name, ret);
-		goto out;
+	if (!dev_priv->guc.execbuf_client) {
+		/* finally, reset engine */
+		ret = intel_gpu_reset(dev_priv, intel_engine_flag(engine));
+		if (ret) {
+			DRM_ERROR("Failed to reset %s, ret=%d\n",
+				  engine->name, ret);
+			goto out;
+		}
+	} else {
+		ret = i915_guc_reset_engine(engine);
+		if (ret) {
+			DRM_ERROR("GuC failed to reset %s, ret=%d\n",
+				  engine->name, ret);
+			goto out;
+		}
 	}
 
 	i915_gem_reset_finish_engine(engine);
@@ -1918,6 +1928,10 @@ int i915_reset_engine(struct intel_engine_cs *engine)
 	ret = engine->init_hw(engine);
 	if (ret)
 		goto out;
+
+	/* for guc too */
+	if (dev_priv->guc.execbuf_client)
+		i915_guc_submission_reenable_engine(engine);
 
 	error->reset_engine_count[engine->id]++;
 out:
