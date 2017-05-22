@@ -1445,7 +1445,6 @@ static __init int sctp_init(void)
 	sctp_ep_hashtable = kmalloc_array(64, sizeof(*sctp_ep_hashtable),
 					  GFP_KERNEL);
 	if (!sctp_ep_hashtable) {
-		pr_err("Failed endpoint_hash alloc\n");
 		status = -ENOMEM;
 		goto err_ehash_alloc;
 	}
