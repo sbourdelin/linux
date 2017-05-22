@@ -261,7 +261,16 @@ struct notifier_block;
 
 #ifdef CONFIG_MODULES
 
-extern int modules_disabled; /* for sysctl */
+enum {
+	MODULES_AUTOLOAD_ALLOWED	= 0,
+	MODULES_AUTOLOAD_PRIVILEGED	= 1,
+	MODULES_AUTOLOAD_DISABLED	= 2,
+};
+
+extern int modules_disabled; /* sysctl for explicit module load/unload */
+extern int modules_autoload_mode; /* sysctl for automatic module loading */
+extern const int modules_autoload_max; /* max value for modules_autoload_mode */
+
 /* Get/put a kernel symbol (calls must be symmetric) */
 void *__symbol_get(const char *symbol);
 void *__symbol_get_gpl(const char *symbol);
@@ -497,6 +506,9 @@ bool __is_module_percpu_address(unsigned long addr, unsigned long *can_addr);
 bool is_module_percpu_address(unsigned long addr);
 bool is_module_text_address(unsigned long addr);
 
+/* Determine whether a module auto-load operation is permitted. */
+int may_autoload_module(char *kmod_name, int allow_cap);
+
 static inline bool within_module_core(unsigned long addr,
 				      const struct module *mod)
 {
@@ -640,6 +652,11 @@ static inline bool is_livepatch_module(struct module *mod)
 #endif /* CONFIG_LIVEPATCH */
 
 #else /* !CONFIG_MODULES... */
+
+static inline int may_autoload_module(char *kmod_name, int allow_cap)
+{
+	return -ENOSYS;
+}
 
 static inline struct module *__module_address(unsigned long addr)
 {

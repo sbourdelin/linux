@@ -43,6 +43,7 @@ show up in /proc/sys/kernel:
 - l2cr                        [ PPC only ]
 - modprobe                    ==> Documentation/debugging-modules.txt
 - modules_disabled
+- modules_autoload_mode
 - msg_next_id		      [ sysv ipc ]
 - msgmax
 - msgmnb
@@ -408,6 +409,56 @@ in an otherwise modular kernel.  This toggle defaults to off
 (0), but can be set true (1).  Once true, modules can be
 neither loaded nor unloaded, and the toggle cannot be set back
 to false.  Generally used with the "kexec_load_disabled" toggle.
+
+==============================================================
+
+modules_autoload_mode:
+
+A sysctl to control if modules auto-load feature is allowed or not.
+This sysctl complements "modules_disabled" which is for all module
+operations where this flag applies only to automatic module loading.
+Automatic module loading happens when programs request a kernel
+feature that is implemented by an unloaded module, the kernel
+automatically runs the program pointed by "modprobe" sysctl in order
+to load the corresponding module.
+
+Historically, the kernel was always able to automatically load modules
+if they are not blacklisted. This is one of the most important and
+transparent operations of Linux, it allows to provide numerous other
+features as they are needed which is crucial for a better user experience.
+However, as Linux is popular now and used for different appliances some
+of these may need to control such operations. For such systems, recent
+needs showed that in some cases allowing to control automatic module
+loading is as important as the operation itself. Restricting unprivileged
+programs or attackers that abuse this feature to load unused modules or
+modules that contain bugs is a significant security measure.
+
+The three modes that "modules_autoload_mode" support allow to provide
+restrictions on automatic module loading without breaking user
+experience.
+
+When modules_autoload_mode is set to (0), the default, there are no
+restrictions.
+
+When modules_autoload_mode is set to (1), processes must have
+CAP_SYS_MODULE to be able to trigger a module auto-load operation,
+or CAP_NET_ADMIN for modules with a 'netdev-%s' alias.
+
+When modules_autoload_mode is set to (2), automatic module loading is
+disabled for all. Once set, this value can not be changed.
+
+
+Notes on relation between "modules_disabled=0" and
+"modules_autoload_mode=2":
+1) Restricting automatic module loading does not interfere with
+explicit module load or unload operations.
+2) New features provided by modules can be made available without
+rebooting the system.
+3) A bad version of a module can be unloaded and replaced with a
+better one without rebooting the system.
+
+The original idea of module auto-load restriction comes from
+grsecurity 'GRKERNSEC_MODHARDEN' config option.
 
 ==============================================================
 

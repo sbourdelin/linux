@@ -282,6 +282,8 @@ module_param(sig_enforce, bool_enable_only, 0644);
 
 /* Block module loading/unloading? */
 int modules_disabled = 0;
+int modules_autoload_mode = MODULES_AUTOLOAD_ALLOWED;
+const int modules_autoload_max = MODULES_AUTOLOAD_DISABLED;
 core_param(nomodule, modules_disabled, bint, 0);
 
 /* Waiting for a module to finish initializing? */
@@ -4295,6 +4297,46 @@ struct module *__module_text_address(unsigned long addr)
 	return mod;
 }
 EXPORT_SYMBOL_GPL(__module_text_address);
+
+/**
+ * may_autoload_module - Determine whether a module auto-load operation
+ * is permitted
+ * @kmod_name: The module name
+ * @allow_cap: if positive, may allow to auto-load the module if this capability
+ * is set
+ *
+ * Determine whether a module auto-load operation is allowed or not. The check
+ * uses the sysctl "modules_autoload_mode" value.
+ *
+ * This allows to have more control on automatic module loading, and align it
+ * with explicit load/unload module operations. The kernel contains several
+ * modules, some of them are not updated often and may contain bugs and
+ * vulnerabilities.
+ *
+ * The "allow_cap" is passed by callers to explicitly note that the module has
+ * the appropriate alias and that the "allow_cap" capability is set. This is
+ * for backward compatibility, the aim is to have a clear picture where:
+ *
+ * 1) Implicit module loading is allowed
+ * 2) Implicit module loading as with the explicit one requires CAP_SYS_MODULE.
+ * 3) Implicit module loading as with the explicit one can be disabled.
+ *
+ * Returns 0 if the module request is allowed or -EPERM if not.
+ */
+int may_autoload_module(char *kmod_name, int allow_cap)
+{
+	if (modules_autoload_mode == MODULES_AUTOLOAD_ALLOWED)
+		return 0;
+	else if (modules_autoload_mode == MODULES_AUTOLOAD_PRIVILEGED) {
+		/* Check CAP_SYS_MODULE then allow_cap if valid */
+		if (capable(CAP_SYS_MODULE) ||
+		    (allow_cap > 0 && capable(allow_cap)))
+		       return 0;
+	}
+
+	/* MODULES_AUTOLOAD_DISABLED or not enough caps */
+	return -EPERM;
+}
 
 /* Don't grab lock, we're oopsing. */
 void print_modules(void)
