@@ -441,21 +441,41 @@ static int raydium_i2c_write_object(struct i2c_client *client,
 	return 0;
 }
 
+static int raydium_i2c_flash_select(struct i2c_client *client)
+{
+	static const u8 cmd[2][2] = {
+		{ 0x06, 0x01 },
+		{ 0x02, 0xA1 },
+	};
+	int i;
+	int error;
+
+	for (i = 0; i < 2; i++) {
+		error = raydium_i2c_write_object(client, cmd[i], sizeof(cmd[i]),
+						 RAYDIUM_WAIT_READY);
+		if (error) {
+			dev_err(&client->dev,
+				"flash select failed at step %d: %d\n", i, error);
+			return error;
+		}
+	}
+
+	return 0;
+}
+
 static bool raydium_i2c_boot_trigger(struct i2c_client *client)
 {
-	static const u8 cmd[7][6] = {
+	static const u8 cmd[5][6] = {
 		{ 0x08, 0x0C, 0x09, 0x00, 0x50, 0xD7 },
 		{ 0x08, 0x04, 0x09, 0x00, 0x50, 0xA5 },
 		{ 0x08, 0x04, 0x09, 0x00, 0x50, 0x00 },
 		{ 0x08, 0x04, 0x09, 0x00, 0x50, 0xA5 },
 		{ 0x08, 0x0C, 0x09, 0x00, 0x50, 0x00 },
-		{ 0x06, 0x01, 0x00, 0x00, 0x00, 0x00 },
-		{ 0x02, 0xA2, 0x00, 0x00, 0x00, 0x00 },
 	};
 	int i;
 	int error;
 
-	for (i = 0; i < 7; i++) {
+	for (i = 0; i < 5; i++) {
 		error = raydium_i2c_write_object(client, cmd[i], sizeof(cmd[i]),
 						 RAYDIUM_WAIT_READY);
 		if (error) {
@@ -686,6 +706,12 @@ static int raydium_i2c_do_update_firmware(struct raydium_data *ts,
 	error = raydium_i2c_boot_trigger(client);
 	if (error) {
 		dev_err(&client->dev, "send boot trigger fail: %d\n", error);
+		return error;
+	}
+
+	error = raydium_i2c_flash_select(client);
+	if (error) {
+		dev_err(&client->dev, "send flash select fail: %d\n", error);
 		return error;
 	}
 
