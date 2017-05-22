@@ -227,3 +227,9 @@ For 32-bit we have the following conventions - kernel is built with
 .Lafter_call_\@:
 #endif
 .endm
+
+#ifdef CONFIG_XEN_PV
+#define PV_ENTRY(sym) ENTRY(_xen_##sym); pop %rcx; pop %r11; .globl sym; sym:
+#else
+#define PV_ENTRY(sym) ENTRY(sym)
+#endif

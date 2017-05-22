@@ -88,6 +88,7 @@
 #include "pmu.h"
 
 void *xen_initial_gdt;
+unsigned int pv_idt_prologue;
 
 RESERVE_BRK(shared_info_page_brk, PAGE_SIZE);
 
@@ -620,7 +621,7 @@ static int cvt_gate_to_trap(int vector, const gate_desc *val,
 
 	info->vector = vector;
 
-	addr = gate_offset(*val);
+	addr = gate_offset(*val) + pv_idt_prologue;
 #ifdef CONFIG_X86_64
 	/*
 	 * Look for known traps using IST, and substitute them
@@ -657,7 +658,7 @@ static int cvt_gate_to_trap(int vector, const gate_desc *val,
 			return 0;
 	}
 #endif	/* CONFIG_X86_64 */
-	info->address = addr;
+	info->address = addr - pv_idt_prologue;
 
 	info->cs = gate_segment(*val);
 	info->flags = val->dpl;
@@ -1264,6 +1265,9 @@ asmlinkage __visible void __init xen_start_kernel(void)
 	pv_info = xen_info;
 	pv_init_ops = xen_init_ops;
 	pv_cpu_ops = xen_cpu_ops;
+#ifdef CONFIG_X86_64
+	pv_idt_prologue = 3; /* size of pop %rcx; pop %r11; */
+#endif
 
 	x86_platform.get_nmi_reason = xen_get_nmi_reason;
 

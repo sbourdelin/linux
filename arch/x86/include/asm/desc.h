@@ -85,9 +85,16 @@ static inline phys_addr_t get_cpu_gdt_paddr(unsigned int cpu)
 
 #ifdef CONFIG_X86_64
 
+#ifdef CONFIG_XEN_PV
+extern unsigned int pv_idt_prologue;
+#else
+#define pv_idt_prologue 0
+#endif
+
 static inline void pack_gate(gate_desc *gate, unsigned type, unsigned long func,
 			     unsigned dpl, unsigned ist, unsigned seg)
 {
+	func -= pv_idt_prologue;
 	gate->offset_low	= PTR_LOW(func);
 	gate->segment		= __KERNEL_CS;
 	gate->ist		= ist;

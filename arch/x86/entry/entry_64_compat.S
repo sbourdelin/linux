@@ -290,11 +290,10 @@ END(entry_SYSCALL_compat)
  * edi  arg5
  * ebp  arg6
  */
-ENTRY(entry_INT80_compat)
+PV_ENTRY(entry_INT80_compat)
 	/*
 	 * Interrupts are off on entry.
 	 */
-	PARAVIRT_ADJUST_EXCEPTION_FRAME
 	ASM_CLAC			/* Do this early to minimize exposure */
 	SWAPGS
 
