@@ -121,6 +121,31 @@ static int pcie_port_enable_irq_vec(struct pci_dev *dev, int *irqs, int mask)
 		nvec = max(nvec, entry + 1);
 	}
 
+	if (mask & PCIE_PORT_SERVICE_DPC) {
+		u16 reg16, pos;
+
+		/*
+		 * The code below follows Section 6.2.10.1 of the PCI Express
+		 * Base Specification 4.0 stating that bits 4-0 of DPC
+		 * Capability Register contain a value indicating which of the
+		 * MSI/MSI-X vectors assigned to the port is going to be used
+		 * for DPC, where "For MSI-X, the value in this register
+		 * indicates which MSI-X Table entry is used to generate the
+		 * interrupt message." and "For MSI, the value in this field
+		 * indicates the offset between the base Message Data and the
+		 * interrupt message that is generated."
+		 */
+		pos = pci_find_ext_capability(dev, PCI_EXT_CAP_ID_DPC);
+		pci_read_config_word(dev, pos + PCI_EXP_DPC_CAP, &reg16);
+		entry = reg16 & 0x1f;
+		if (entry >= nr_entries)
+			goto out_free_irqs;
+
+		irqs[PCIE_PORT_SERVICE_DPC_SHIFT] = pci_irq_vector(dev, entry);
+
+		nvec = max(nvec, entry + 1);
+	}
+
 	/*
 	 * If nvec is equal to the allocated number of entries, we can just use
 	 * what we have.  Otherwise, the port has some extra entries not for the
