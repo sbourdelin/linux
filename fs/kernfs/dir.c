@@ -643,6 +643,7 @@ static struct kernfs_node *__kernfs_new_node(struct kernfs_root *root,
 	kn->ino = ret;
 	kn->generation = atomic_inc_return(&root->next_generation);
 
+	/* set ino first. Above atomic_inc_return has a barrier */
 	atomic_set(&kn->count, 1);
 	atomic_set(&kn->active, KN_DEACTIVATED_BIAS);
 	RB_CLEAR_NODE(&kn->rb);
@@ -672,6 +673,40 @@ struct kernfs_node *kernfs_new_node(struct kernfs_node *parent,
 		kn->parent = parent;
 	}
 	return kn;
+}
+
+/*
+ * kernfs_get_node_by_ino - get kernfs_node from inode number
+ * @root: the kernfs root
+ * @ino: inode number
+ *
+ * RETURNS:
+ * NULL on failure. Return a kernfs node with reference counter incremented
+ */
+struct kernfs_node *kernfs_get_node_by_ino(struct kernfs_root *root,
+					   unsigned int ino)
+{
+	struct kernfs_node *kn;
+
+	rcu_read_lock();
+	kn = idr_find(&root->ino_idr, ino);
+	if (!kn)
+		goto out;
+	/* kernfs_put removes the ino after count is 0 */
+	if (!atomic_inc_not_zero(&kn->count)) {
+		kn = NULL;
+		goto out;
+	}
+	/* If this node is reused, __kernfs_new_node sets ino before count */
+	if (kn->ino != ino)
+		goto out;
+	rcu_read_unlock();
+
+	return kn;
+out:
+	rcu_read_unlock();
+	kernfs_put(kn);
+	return NULL;
 }
 
 /**
