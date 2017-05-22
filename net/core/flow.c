@@ -409,10 +409,9 @@ static int flow_cache_cpu_prepare(struct flow_cache *fc, int cpu)
 
 	if (!fcp->hash_table) {
 		fcp->hash_table = kzalloc_node(sz, GFP_KERNEL, cpu_to_node(cpu));
-		if (!fcp->hash_table) {
-			pr_err("NET: failed to allocate flow cache sz %u\n", sz);
+		if (!fcp->hash_table)
 			return -ENOMEM;
-		}
+
 		fcp->hash_rnd_recalc = 1;
 		fcp->hash_count = 0;
 		tasklet_init(&fcp->flush_tasklet, flow_cache_flush_tasklet, 0);
