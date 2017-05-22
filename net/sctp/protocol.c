@@ -1454,7 +1454,7 @@ static __init int sctp_init(void)
 	}
 
 	/* Allocate and initialize the SCTP port hash table.
-	 * Note that order is initalized to start at the max sized
+	 * Note that order is initialized to start at the max sized
 	 * table we want to support.  If we can't get that many pages
 	 * reduce the order and try again
 	 */
