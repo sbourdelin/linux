@@ -948,6 +948,11 @@ retry:
 	}
 
 out:
+	if (ret == -EDEADLK) {
+		drm_modeset_backoff(&ctx);
+		goto retry;
+	}
+
 	if (ret && crtc->funcs->page_flip_target)
 		drm_crtc_vblank_put(crtc);
 	if (fb)
@@ -955,11 +960,6 @@ out:
 	if (crtc->primary->old_fb)
 		drm_framebuffer_put(crtc->primary->old_fb);
 	crtc->primary->old_fb = NULL;
-
-	if (ret == -EDEADLK) {
-		drm_modeset_backoff(&ctx);
-		goto retry;
-	}
 
 	drm_modeset_drop_locks(&ctx);
 	drm_modeset_acquire_fini(&ctx);
