@@ -31,65 +31,78 @@
  * with PHY.
  */
 struct stmmac_pci_dmi_data {
-	const char *name;
-	const char *asset_tag;
-	unsigned int func;
+	int func;
 	int phy_addr;
 };
 
 typedef int (*stmmac_setup)(struct pci_dev *, struct plat_stmmacenet_data *);
 
-static struct stmmac_pci_dmi_data quark_pci_dmi_data[] = {
+static const struct stmmac_pci_dmi_data galileo_stmmac_dmi_data[] = {
 	{
-		.name = "Galileo",
+		.func = 6,
+		.phy_addr = 1,
+	},
+	{-1, -1},
+};
+
+static const struct stmmac_pci_dmi_data iot2040_stmmac_dmi_data[] = {
+	{
 		.func = 6,
 		.phy_addr = 1,
 	},
 	{
-		.name = "GalileoGen2",
-		.func = 6,
-		.phy_addr = 1,
-	},
-	{
-		.name = "SIMATIC IOT2000",
-		.asset_tag = "6ES7647-0AA00-0YA2",
-		.func = 6,
-		.phy_addr = 1,
-	},
-	{
-		.name = "SIMATIC IOT2000",
-		.asset_tag = "6ES7647-0AA00-1YA2",
-		.func = 6,
-		.phy_addr = 1,
-	},
-	{
-		.name = "SIMATIC IOT2000",
-		.asset_tag = "6ES7647-0AA00-1YA2",
 		.func = 7,
 		.phy_addr = 1,
+	},
+	{-1, -1},
+};
+
+static const struct dmi_system_id quark_pci_dmi[] = {
+	{
+		.matches = {
+			DMI_EXACT_MATCH(DMI_BOARD_NAME, "Galileo"),
+		},
+		.driver_data = (void *)galileo_stmmac_dmi_data,
+	},
+	{
+		.matches = {
+			DMI_EXACT_MATCH(DMI_BOARD_NAME, "GalileoGen2"),
+		},
+		.driver_data = (void *)galileo_stmmac_dmi_data,
+	},
+	{
+		.matches = {
+			DMI_EXACT_MATCH(DMI_BOARD_NAME, "SIMATIC IOT2000"),
+			DMI_EXACT_MATCH(DMI_BOARD_ASSET_TAG,
+					"6ES7647-0AA00-0YA2"),
+		},
+		.driver_data = (void *)galileo_stmmac_dmi_data,
+	},
+	{
+		.matches = {
+			DMI_EXACT_MATCH(DMI_BOARD_NAME, "SIMATIC IOT2000"),
+			DMI_EXACT_MATCH(DMI_BOARD_ASSET_TAG,
+					"6ES7647-0AA00-1YA2"),
+		},
+		.driver_data = (void *)iot2040_stmmac_dmi_data,
 	},
 	{}
 };
 
 static int stmmac_pci_find_phy_addr(struct pci_dev *pdev,
-				    struct stmmac_pci_dmi_data *dmi_data)
+				    const struct dmi_system_id *dmi_list)
 {
-	const char *name = dmi_get_system_info(DMI_BOARD_NAME);
-	const char *asset_tag = dmi_get_system_info(DMI_BOARD_ASSET_TAG);
-	unsigned int func = PCI_FUNC(pdev->devfn);
-	struct stmmac_pci_dmi_data *dmi;
+	const struct stmmac_pci_dmi_data *dmi_data;
+	const struct dmi_system_id *dmi_id;
+	int func = PCI_FUNC(pdev->devfn);
 
-	if (!name)
+	dmi_id = dmi_first_match(dmi_list);
+	if (!dmi_id)
 		return -ENODEV;
 
-	for (dmi = dmi_data; dmi->name && *dmi->name; dmi++) {
-		if (!strcmp(dmi->name, name) && dmi->func == func) {
-			/* If asset tag is provided, match on it as well. */
-			if (dmi->asset_tag && strcmp(dmi->asset_tag, asset_tag))
-				continue;
-			return dmi->phy_addr;
-		}
-	}
+	for (dmi_data = dmi_id->driver_data; dmi_data->func >= 0; dmi_data++)
+		if (dmi_data->func == func)
+			return dmi_data->phy_addr;
 
 	return -ENODEV;
 }
@@ -153,7 +166,7 @@ static int quark_default_setup(struct pci_dev *pdev,
 	 * Refuse to load the driver and register net device if MAC controller
 	 * does not connect to any PHY interface.
 	 */
-	ret = stmmac_pci_find_phy_addr(pdev, quark_pci_dmi_data);
+	ret = stmmac_pci_find_phy_addr(pdev, quark_pci_dmi);
 	if (ret < 0) {
 		/*
 		 * Galileo boards with old firmware don't support DMI. We always
