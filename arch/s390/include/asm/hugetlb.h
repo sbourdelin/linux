@@ -38,14 +38,8 @@ static inline int prepare_hugepage_range(struct file *file,
 
 #define arch_clear_hugepage_flags(page)		do { } while (0)
 
-static inline void huge_pte_clear(struct mm_struct *mm, unsigned long addr,
-				  pte_t *ptep)
-{
-	if ((pte_val(*ptep) & _REGION_ENTRY_TYPE_MASK) == _REGION_ENTRY_TYPE_R3)
-		pte_val(*ptep) = _REGION3_ENTRY_EMPTY;
-	else
-		pte_val(*ptep) = _SEGMENT_ENTRY_EMPTY;
-}
+void huge_pte_clear(struct mm_struct *mm, unsigned long addr,
+		    pte_t *ptep, unsigned long sz);
 
 static inline void huge_ptep_clear_flush(struct vm_area_struct *vma,
 					 unsigned long address, pte_t *ptep)
