@@ -1744,8 +1744,12 @@ static int gen8_reset_engine_start(struct intel_engine_cs *engine)
 					 RESET_CTL_READY_TO_RESET,
 					 RESET_CTL_READY_TO_RESET,
 					 700);
-	if (ret)
-		DRM_ERROR("%s: reset request timeout\n", engine->name);
+	if (GEM_WARN_ON(ret)) {
+		/* hw did not ack ready-to-reset, reset anyway */
+		DRM_DEBUG_DRIVER("%s: reset request timeout, continue\n",
+				 engine->name);
+		ret = 0;
+	}
 
 	return ret;
 }
