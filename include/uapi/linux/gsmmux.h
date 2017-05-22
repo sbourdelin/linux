@@ -24,6 +24,7 @@ struct gsm_config
 
 #define GSMIOC_GETCONF		_IOR('G', 0, struct gsm_config)
 #define GSMIOC_SETCONF		_IOW('G', 1, struct gsm_config)
+#define GSMIOC_DISCONNECT	_IO('G', 2)
 
 struct gsm_netconfig {
 	unsigned int adaption;  /* Adaption to use in network mode */

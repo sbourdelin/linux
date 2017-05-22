@@ -2602,6 +2602,8 @@ static int gsmld_ioctl(struct tty_struct *tty, struct file *file,
 		if (copy_from_user(&c, (void *)arg, sizeof(c)))
 			return -EFAULT;
 		return gsmld_config(tty, gsm, &c);
+	case GSMIOC_DISCONNECT:
+		return gsm_disconnect(gsm);
 	default:
 		return n_tty_ioctl_helper(tty, file, cmd, arg);
 	}

@@ -79,10 +79,16 @@ for example, it's possible :
 
 Note that after closing the physical port the modem is still in multiplexing
 mode. This may prevent a successful re-opening of the port later. To avoid
-this situation either reset the modem if your hardware allows that or send
-a disconnect command frame manually before initializing the multiplexing mode
-for the second time. The byte sequence for the disconnect command frame is:
-0xf9, 0x03, 0xef, 0x03, 0xc3, 0x16, 0xf9.
+this situation you can
+a) reset the modem if your hardware allows that
+b) send a disconnect command frame manually before initializing the
+   multiplexing mode for the second time
+or
+c) close the connection with the GSMIOC_DISCONNECT ioctl before closing the
+   physical port.
+
+The byte sequence for the disconnect command frame is: 0xf9, 0x03, 0xef, 0x03,
+0xc3, 0x16, 0xf9.
 
 Additional Documentation
 ------------------------
