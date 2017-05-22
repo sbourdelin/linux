@@ -515,6 +515,9 @@ static ssize_t orangefs_file_write_iter(struct kiocb *iocb, struct iov_iter *ite
 	iocb->ki_pos = pos;
 	orangefs_stats.writes++;
 
+	if (pos > i_size_read(file->f_mapping->host))
+		orangefs_i_size_write(file->f_mapping->host, pos);
+
 out:
 
 	inode_unlock(file->f_mapping->host);

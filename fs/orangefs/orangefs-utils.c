@@ -262,6 +262,9 @@ int orangefs_inode_getattr(struct inode *inode, int new, int bypass,
 	gossip_debug(GOSSIP_UTILS_DEBUG, "%s: called on inode %pU\n", __func__,
 	    get_khandle_from_ino(inode));
 
+	if (inode->i_state & I_DIRTY)
+		return 0;
+
 	if (!new && !bypass) {
 		/*
 		 * Must have all the attributes in the mask and be within cache

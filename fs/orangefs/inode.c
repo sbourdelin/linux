@@ -17,7 +17,6 @@ static int orangefs_setattr_size(struct inode *inode, struct iattr *iattr)
 {
 	struct orangefs_inode_s *orangefs_inode = ORANGEFS_I(inode);
 	struct orangefs_kernel_op_s *new_op;
-	loff_t orig_size;
 	int ret = -EINVAL;
 
 	gossip_debug(GOSSIP_INODE_DEBUG,
@@ -27,17 +26,6 @@ static int orangefs_setattr_size(struct inode *inode, struct iattr *iattr)
 		     &orangefs_inode->refn.khandle,
 		     orangefs_inode->refn.fs_id,
 		     iattr->ia_size);
-
-	/* Ensure that we have a up to date size, so we know if it changed. */
-	ret = orangefs_inode_getattr(inode, 0, 1, STATX_SIZE);
-	if (ret == -ESTALE)
-		ret = -EIO;
-	if (ret) {
-		gossip_err("%s: orangefs_inode_getattr failed, ret:%d:.\n",
-		    __func__, ret);
-		return ret;
-	}
-	orig_size = i_size_read(inode);
 
 	truncate_setsize(inode, iattr->ia_size);
 
@@ -64,9 +52,6 @@ static int orangefs_setattr_size(struct inode *inode, struct iattr *iattr)
 	if (ret != 0)
 		return ret;
 
-	if (orig_size != i_size_read(inode))
-		iattr->ia_valid |= ATTR_CTIME | ATTR_MTIME;
-
 	return ret;
 }
 
@@ -75,38 +60,25 @@ static int orangefs_setattr_size(struct inode *inode, struct iattr *iattr)
  */
 int orangefs_setattr(struct dentry *dentry, struct iattr *iattr)
 {
-	int ret = -EINVAL;
-	struct inode *inode = dentry->d_inode;
-
-	gossip_debug(GOSSIP_INODE_DEBUG,
-		     "orangefs_setattr: called on %pd\n",
-		     dentry);
-
-	ret = setattr_prepare(dentry, iattr);
-	if (ret)
-		goto out;
-
+	int r;
 	if (iattr->ia_valid & ATTR_SIZE) {
-		ret = orangefs_setattr_size(inode, iattr);
-		if (ret)
-			goto out;
+		/* XXX: ATTR_CTIME_SET and ATTR_MTIME_SET */
+		if (i_size_read(d_inode(dentry)) != iattr->ia_size)
+			iattr->ia_valid |= ATTR_CTIME | ATTR_MTIME;
 	}
-
-	setattr_copy(inode, iattr);
-	mark_inode_dirty(inode);
-
-	ret = orangefs_inode_setattr(inode, iattr);
-	gossip_debug(GOSSIP_INODE_DEBUG,
-		     "orangefs_setattr: inode_setattr returned %d\n",
-		     ret);
-
-	if (!ret && (iattr->ia_valid & ATTR_MODE))
-		/* change mod on a file that has ACLs */
-		ret = posix_acl_chmod(inode, inode->i_mode);
-
-out:
-	gossip_debug(GOSSIP_INODE_DEBUG, "orangefs_setattr: returning %d\n", ret);
-	return ret;
+	r = simple_setattr(dentry, iattr);
+	if (r)
+		return r;
+	if (iattr->ia_valid & ATTR_SIZE) {
+		r = orangefs_setattr_size(d_inode(dentry), iattr);
+		if (r)
+			return r;
+	}
+	if (iattr->ia_valid & ATTR_MODE) {
+		return posix_acl_chmod(d_inode(dentry),
+		    d_inode(dentry)->i_mode);
+	}
+	return 0;
 }
 
 /*
@@ -115,7 +87,6 @@ out:
 int orangefs_getattr(const struct path *path, struct kstat *stat,
 		     u32 request_mask, unsigned int flags)
 {
-	int ret = -ENOENT;
 	struct inode *inode = path->dentry->d_inode;
 	struct orangefs_inode_s *orangefs_inode = NULL;
 
@@ -123,38 +94,13 @@ int orangefs_getattr(const struct path *path, struct kstat *stat,
 		     "orangefs_getattr: called on %pd\n",
 		     path->dentry);
 
-	ret = orangefs_inode_getattr(inode, 0, 0, request_mask);
-	if (ret == 0) {
-		generic_fillattr(inode, stat);
+	generic_fillattr(inode, stat);
 
-		/* override block size reported to stat */
-		orangefs_inode = ORANGEFS_I(inode);
-		stat->blksize = orangefs_inode->blksize;
-
-		if (request_mask & STATX_SIZE)
-			stat->result_mask = STATX_BASIC_STATS;
-		else
-			stat->result_mask = STATX_BASIC_STATS &
-			    ~STATX_SIZE;
-	}
-	return ret;
-}
-
-int orangefs_permission(struct inode *inode, int mask)
-{
-	int ret;
-
-	if (mask & MAY_NOT_BLOCK)
-		return -ECHILD;
-
-	gossip_debug(GOSSIP_INODE_DEBUG, "%s: refreshing\n", __func__);
-
-	/* Make sure the permission (and other common attrs) are up to date. */
-	ret = orangefs_inode_getattr(inode, 0, 0, STATX_MODE);
-	if (ret < 0)
-		return ret;
-
-	return generic_permission(inode, mask);
+	/* override block size reported to stat */
+	orangefs_inode = ORANGEFS_I(inode);
+	stat->blksize = orangefs_inode->blksize;
+	stat->result_mask = STATX_BASIC_STATS;
+	return 0;
 }
 
 /* ORANGEDS2 implementation of VFS inode operations for files */
@@ -164,7 +110,6 @@ const struct inode_operations orangefs_file_inode_operations = {
 	.setattr = orangefs_setattr,
 	.getattr = orangefs_getattr,
 	.listxattr = orangefs_listxattr,
-	.permission = orangefs_permission,
 };
 
 static int orangefs_init_iops(struct inode *inode)

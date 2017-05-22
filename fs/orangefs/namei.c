@@ -446,14 +446,20 @@ static int orangefs_rename(struct inode *old_dir,
 	ret = service_operation(new_op,
 				"orangefs_rename",
 				get_interruptible_flag(old_dentry->d_inode));
-
 	gossip_debug(GOSSIP_NAME_DEBUG,
 		     "orangefs_rename: got downcall status %d\n",
 		     ret);
 
+	if (ret < 0)
+		goto out;
+
 	if (new_dentry->d_inode)
 		new_dentry->d_inode->i_ctime = current_time(new_dentry->d_inode);
 
+	new_dir->i_mtime = current_time(new_dir);
+	new_dir->i_ctime = current_time(new_dir);
+
+out:
 	op_release(new_op);
 	return ret;
 }
@@ -472,5 +478,4 @@ const struct inode_operations orangefs_dir_inode_operations = {
 	.setattr = orangefs_setattr,
 	.getattr = orangefs_getattr,
 	.listxattr = orangefs_listxattr,
-	.permission = orangefs_permission,
 };

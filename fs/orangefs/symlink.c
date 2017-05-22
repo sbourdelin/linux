@@ -13,5 +13,4 @@ const struct inode_operations orangefs_symlink_inode_operations = {
 	.setattr = orangefs_setattr,
 	.getattr = orangefs_getattr,
 	.listxattr = orangefs_listxattr,
-	.permission = orangefs_permission,
 };
