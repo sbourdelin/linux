@@ -16,8 +16,9 @@
 #include <linux/irq.h>
 #include <linux/irqdomain.h>
 #include <linux/msi.h>
-#include "../include/mc-bus.h"
-#include "../include/mc-cmd.h"
+#include <linux/fsl/mc-bus.h>
+#include <linux/fsl/mc-cmd.h>
+
 #include "fsl-mc-private.h"
 
 /*

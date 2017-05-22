@@ -29,9 +29,9 @@
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
  * POSSIBILITY OF SUCH DAMAGE.
  */
-#include "../include/mc-sys.h"
-#include "../include/mc-cmd.h"
-#include "../include/dpbp.h"
+#include <linux/fsl/mc-sys.h>
+#include <linux/fsl/mc-cmd.h>
+#include <linux/fsl/dpbp.h>
 
 #include "dpbp-cmd.h"
 

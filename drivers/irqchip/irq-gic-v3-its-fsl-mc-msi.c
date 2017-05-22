@@ -16,8 +16,7 @@
 #include <linux/msi.h>
 #include <linux/of.h>
 #include <linux/of_irq.h>
-#include "../include/mc-bus.h"
-#include "fsl-mc-private.h"
+#include <linux/fsl/mc-bus.h>
 
 static struct irq_chip its_msi_irq_chip = {
 	.name = "ITS-fMSI",

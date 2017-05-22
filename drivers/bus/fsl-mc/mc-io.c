@@ -31,8 +31,9 @@
  */
 
 #include <linux/io.h>
-#include "../include/mc-bus.h"
-#include "../include/mc-sys.h"
+#include <linux/fsl/mc-bus.h>
+#include <linux/fsl/mc-sys.h>
+#include <linux/fsl/mc-cmd.h>
 
 #include "fsl-mc-private.h"
 #include "dpmcp.h"

@@ -10,11 +10,11 @@
 
 #include <linux/module.h>
 #include <linux/msi.h>
-#include "../include/mc-bus.h"
-#include "../include/mc-sys.h"
+#include <linux/fsl/mc-bus.h>
+#include <linux/fsl/mc-sys.h>
+#include <linux/fsl/dpcon-cmd.h>
 
 #include "dpbp-cmd.h"
-#include "dpcon-cmd.h"
 #include "fsl-mc-private.h"
 
 #define FSL_MC_IS_ALLOCATABLE(_obj_type)	\

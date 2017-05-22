@@ -13,8 +13,8 @@
 #include <linux/slab.h>
 #include <linux/interrupt.h>
 #include <linux/msi.h>
-#include "../include/mc-bus.h"
-#include "../include/mc-sys.h"
+#include <linux/fsl/mc-bus.h>
+#include <linux/fsl/mc-sys.h>
 
 #include "dprc-cmd.h"
 #include "fsl-mc-private.h"
