@@ -1256,15 +1256,18 @@ void cxgbi_ddp_set_one_ppod(struct cxgbi_pagepod *ppod,
 		*sg_off = offset;
 	}
 
-	if (offset == len) {
-		offset = 0;
-		sg = sg_next(sg);
-		if (sg) {
-			addr = sg_dma_address(sg);
-			len = sg_dma_len(sg);
+	if (sg) {
+		if (offset == len) {
+			offset = 0;
+			sg = sg_next(sg);
+			if (sg) {
+				addr = sg_dma_address(sg);
+				len = sg_dma_len(sg);
+			}
 		}
-	}
-	ppod->addr[i] = sg ? cpu_to_be64(addr + offset) : 0ULL;
+		ppod->addr[i] = cpu_to_be64(addr + offset);
+	} else
+		ppod->addr[i] = 0ULL;
 }
 EXPORT_SYMBOL_GPL(cxgbi_ddp_set_one_ppod);
 
