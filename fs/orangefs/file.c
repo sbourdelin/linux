@@ -599,8 +599,6 @@ static int orangefs_file_mmap(struct file *file, struct vm_area_struct *vma)
 	return generic_file_readonly_mmap(file, vma);
 }
 
-#define mapping_nrpages(idata) ((idata)->nrpages)
-
 /*
  * Called to notify the module that there are no more references to
  * this file (i.e. no processes have it open).
@@ -622,7 +620,7 @@ static int orangefs_file_release(struct inode *inode, struct file *file)
 	 */
 	if (file_inode(file) &&
 	    file_inode(file)->i_mapping &&
-	    mapping_nrpages(&file_inode(file)->i_data)) {
+	    file_inode(file)->i_mapping->nrpages) {
 		if (orangefs_features & ORANGEFS_FEATURE_READAHEAD) {
 			gossip_debug(GOSSIP_INODE_DEBUG,
 			    "calling flush_racache on %pU\n",
