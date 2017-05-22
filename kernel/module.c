@@ -4301,12 +4301,15 @@ EXPORT_SYMBOL_GPL(__module_text_address);
 /**
  * may_autoload_module - Determine whether a module auto-load operation
  * is permitted
+ * @task: The task performing the request
  * @kmod_name: The module name
  * @allow_cap: if positive, may allow to auto-load the module if this capability
  * is set
  *
- * Determine whether a module auto-load operation is allowed or not. The check
- * uses the sysctl "modules_autoload_mode" value.
+ * Determine whether a module auto-load operation is allowed or not. First we
+ * check if the task is allowed to perform the module auto-load request, we
+ * check per-task "modules_autoload_mode", if the access is not denied, then
+ * we check the global sysctl "modules_autoload_mode".
  *
  * This allows to have more control on automatic module loading, and align it
  * with explicit load/unload module operations. The kernel contains several
@@ -4323,11 +4326,14 @@ EXPORT_SYMBOL_GPL(__module_text_address);
  *
  * Returns 0 if the module request is allowed or -EPERM if not.
  */
-int may_autoload_module(char *kmod_name, int allow_cap)
+int may_autoload_module(struct task_struct *task, char *kmod_name, int allow_cap)
 {
-	if (modules_autoload_mode == MODULES_AUTOLOAD_ALLOWED)
+	unsigned int autoload = max_t(unsigned int, modules_autoload_mode,
+				      task->modules_autoload_mode);
+
+	if (autoload == MODULES_AUTOLOAD_ALLOWED)
 		return 0;
-	else if (modules_autoload_mode == MODULES_AUTOLOAD_PRIVILEGED) {
+	else if (autoload == MODULES_AUTOLOAD_PRIVILEGED) {
 		/* Check CAP_SYS_MODULE then allow_cap if valid */
 		if (capable(CAP_SYS_MODULE) ||
 		    (allow_cap > 0 && capable(allow_cap)))
@@ -4336,6 +4342,51 @@ int may_autoload_module(char *kmod_name, int allow_cap)
 
 	/* MODULES_AUTOLOAD_DISABLED or not enough caps */
 	return -EPERM;
+}
+
+/**
+ * task_set_modules_autoload_mode - Set per-task modules auto-load mode
+ * @value: Value to set "modules_autoload_mode" of current task
+ *
+ * Set current task "modules_autoload_mode". The task has to have
+ * CAP_SYS_ADMIN in its namespace or be running with no_new_privs. This
+ * avoids scenarios where unprivileged tasks can affect the behaviour of
+ * privilged children by restricting module features.
+ *
+ * The task's "modules_autoload_mode" may only be increased, never decreased.
+ *
+ * Returns 0 on success, -EINVAL if @value is not valid, -EACCES if task does
+ * not have CAP_SYS_ADMIN in its namespace or is not running with no_new_privs,
+ * and finally -EPERM if @value is less strict than current task
+ * "modules_autoload_mode".
+ *
+ */
+int task_set_modules_autoload_mode(unsigned long value)
+{
+	if (value > MODULES_AUTOLOAD_DISABLED)
+		return -EINVAL;
+
+	/*
+	 * To set task "modules_autoload_mode" requires that the task has
+	 * CAP_SYS_ADMIN in its namespace or be running with no_new_privs.
+	 * This avoids scenarios where unprivileged tasks can affect the
+	 * behaviour of privileged children by restricting module features.
+	 */
+	if (!task_no_new_privs(current) &&
+	    security_capable_noaudit(current_cred(), current_user_ns(),
+				     CAP_SYS_ADMIN) != 0)
+		return -EACCES;
+
+	/*
+	 * The "modules_autoload_mode" may only be increased, never decreased,
+	 * ensuring that once applied, processes can never relax their settings.
+	 */
+	if (current->modules_autoload_mode > value)
+		return -EPERM;
+	else if (current->modules_autoload_mode < value)
+		current->modules_autoload_mode = value;
+
+	return 0;
 }
 
 /* Don't grab lock, we're oopsing. */

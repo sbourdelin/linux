@@ -88,6 +88,7 @@
 #include <linux/string_helpers.h>
 #include <linux/user_namespace.h>
 #include <linux/fs_struct.h>
+#include <linux/module.h>
 
 #include <asm/pgtable.h>
 #include <asm/processor.h>
@@ -346,10 +347,15 @@ static inline void task_cap(struct seq_file *m, struct task_struct *p)
 
 static inline void task_seccomp(struct seq_file *m, struct task_struct *p)
 {
+	int autoload = task_modules_autoload_mode(p);
+
 	seq_put_decimal_ull(m, "NoNewPrivs:\t", task_no_new_privs(p));
 #ifdef CONFIG_SECCOMP
 	seq_put_decimal_ull(m, "\nSeccomp:\t", p->seccomp.mode);
 #endif
+	if (autoload != -ENOSYS)
+		seq_put_decimal_ull(m, "\nModulesAutoloadMode:\t", autoload);
+
 	seq_putc(m, '\n');
 }
 

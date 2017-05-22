@@ -17,6 +17,7 @@ place where this information is gathered.
    :maxdepth: 2
 
    no_new_privs
+   modules_autoload_mode
    seccomp_filter
    unshare
 

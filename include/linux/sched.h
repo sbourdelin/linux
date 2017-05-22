@@ -613,6 +613,11 @@ struct task_struct {
 
 	struct restart_block		restart_block;
 
+#ifdef CONFIG_MODULES
+	/* per-task modules auto-load mode */
+	unsigned			modules_autoload_mode:2;
+#endif
+
 	pid_t				pid;
 	pid_t				tgid;
 

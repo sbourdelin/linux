@@ -886,6 +886,36 @@ static int cap_prctl_drop(unsigned long cap)
 	return commit_creds(new);
 }
 
+/*
+ * Implement PR_SET_MODULES_AUTOLOAD_MODE.
+ *
+ * Returns 0 on success, -ve on error.
+ */
+static int pr_set_modules_autoload_mode(unsigned long arg2, unsigned long arg3,
+					unsigned long arg4, unsigned long arg5)
+{
+	if (arg3 || arg4 || arg5)
+		return -EINVAL;
+
+	return task_set_modules_autoload_mode(arg2);
+}
+
+/*
+ * Implement PR_GET_MODULES_AUTOLOAD_MODE.
+ *
+ * Return current task "modules_autoload_mode", -ve on error.
+ */
+static inline int pr_get_modules_autoload_mode(unsigned long arg2,
+					       unsigned long arg3,
+					       unsigned long arg4,
+					       unsigned long arg5)
+{
+	if (arg3 || arg4 || arg5)
+		return -EINVAL;
+
+	return task_modules_autoload_mode(current);
+}
+
 /**
  * cap_task_prctl - Implement process control functions for this security module
  * @option: The process control function requested
@@ -1016,6 +1046,12 @@ int cap_task_prctl(int option, unsigned long arg2, unsigned long arg3,
 			return commit_creds(new);
 		}
 
+	case PR_SET_MODULES_AUTOLOAD_MODE:
+		return pr_set_modules_autoload_mode(arg2, arg3, arg4, arg5);
+
+	case PR_GET_MODULES_AUTOLOAD_MODE:
+		return pr_get_modules_autoload_mode(arg2, arg3, arg4, arg5);
+
 	default:
 		/* No functionality available - continue with default */
 		return -ENOSYS;
@@ -1083,7 +1119,7 @@ int cap_kernel_module_request(char *kmod_name, int allow_cap)
 	int ret;
 	char comm[sizeof(current->comm)];
 
-	ret = may_autoload_module(kmod_name, allow_cap);
+	ret = may_autoload_module(current, kmod_name, allow_cap);
 	if (ret < 0)
 		pr_notice_ratelimited(
 			"module: automatic module loading of %.64s by \"%s\"[%d] was denied\n",
