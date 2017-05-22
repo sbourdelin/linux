@@ -811,9 +811,8 @@ static int vhost_copy_from_user(struct vhost_virtqueue *vq, void *to,
 				     ARRAY_SIZE(vq->iotlb_iov),
 				     VHOST_ACCESS_RO);
 		if (ret < 0) {
-			vq_err(vq, "IOTLB translation failure: uaddr "
-			       "%p size 0x%llx\n", from,
-			       (unsigned long long) size);
+			vq_err(vq, "IOTLB translation failure: uaddr %p size 0x%llx\n",
+			       from, (unsigned long long)size);
 			goto out;
 		}
 		iov_iter_init(&f, READ, vq->iotlb_iov, ret, size);
@@ -836,16 +835,14 @@ static void __user *__vhost_get_user_slow(struct vhost_virtqueue *vq,
 			     ARRAY_SIZE(vq->iotlb_iov),
 			     VHOST_ACCESS_RO);
 	if (ret < 0) {
-		vq_err(vq, "IOTLB translation failure: uaddr "
-			"%p size 0x%llx\n", addr,
-			(unsigned long long) size);
+		vq_err(vq, "IOTLB translation failure: uaddr %p size 0x%llx\n",
+		       addr, (unsigned long long)size);
 		return NULL;
 	}
 
 	if (ret != 1 || vq->iotlb_iov[0].iov_len != size) {
-		vq_err(vq, "Non atomic userspace memory access: uaddr "
-			"%p size 0x%llx\n", addr,
-			(unsigned long long) size);
+		vq_err(vq, "Non atomic userspace memory access: uaddr %p size 0x%llx\n",
+		       addr, (unsigned long long)size);
 		return NULL;
 	}
 
@@ -1816,8 +1813,7 @@ int vhost_vq_init_access(struct vhost_virtqueue *vq)
 	}
 	r = vhost_get_used(vq, last_used_idx, &vq->used->idx);
 	if (r) {
-		vq_err(vq, "Can't access used idx at %p\n",
-		       &vq->used->idx);
+		vq_err(vq, "Can't access used idx at %p\n", &vq->used->idx);
 		goto err;
 	}
 	vq->last_used_idx = vhost16_to_cpu(vq, last_used_idx);
@@ -1910,10 +1906,8 @@ static int get_indirect(struct vhost_virtqueue *vq,
 
 	/* Sanity check */
 	if (unlikely(len % sizeof desc)) {
-		vq_err(vq, "Invalid length in indirect descriptor: "
-		       "len 0x%llx not multiple of 0x%zx\n",
-		       (unsigned long long)len,
-		       sizeof desc);
+		vq_err(vq, "Invalid length in indirect descriptor: len 0x%llx not multiple of 0x%zx\n",
+		       (unsigned long long)len, sizeof(desc));
 		return -EINVAL;
 	}
 
@@ -1921,7 +1915,7 @@ static int get_indirect(struct vhost_virtqueue *vq,
 			     UIO_MAXIOV, VHOST_ACCESS_RO);
 	if (unlikely(ret < 0)) {
 		if (ret != -EAGAIN)
-			vq_err(vq, "Translation failure %d in indirect.\n", ret);
+			vq_err(vq, "Translation failure %d in indirect\n", ret);
 		return ret;
 	}
 	iov_iter_init(&from, READ, vq->indirect, ret, len);
@@ -1942,8 +1936,7 @@ static int get_indirect(struct vhost_virtqueue *vq,
 	do {
 		unsigned iov_count = *in_num + *out_num;
 		if (unlikely(++found > count)) {
-			vq_err(vq, "Loop detected: last one at %u "
-			       "indirect size %u\n",
+			vq_err(vq, "Loop detected: last one at %u indirect size %u\n",
 			       i, count);
 			return -EINVAL;
 		}
@@ -1969,7 +1962,7 @@ static int get_indirect(struct vhost_virtqueue *vq,
 		if (unlikely(ret < 0)) {
 			if (ret != -EAGAIN)
 				vq_err(vq, "Translation failure %d indirect idx %d\n",
-					ret, i);
+				       ret, i);
 			return ret;
 		}
 		/* If this is an input descriptor, increment that count. */
@@ -1984,8 +1977,8 @@ static int get_indirect(struct vhost_virtqueue *vq,
 			/* If it's an output descriptor, they're all supposed
 			 * to come before any input descriptors. */
 			if (unlikely(*in_num)) {
-				vq_err(vq, "Indirect descriptor "
-				       "has out after in: idx %d\n", i);
+				vq_err(vq, "Indirect descriptor has out after in: idx %d\n",
+				       i);
 				return -EINVAL;
 			}
 			*out_num += ret;
@@ -2020,14 +2013,14 @@ int vhost_get_vq_desc(struct vhost_virtqueue *vq,
 	if (vq->avail_idx == vq->last_avail_idx) {
 		if (unlikely(vhost_get_avail(vq, avail_idx, &vq->avail->idx))) {
 			vq_err(vq, "Failed to access avail idx at %p\n",
-				&vq->avail->idx);
+			       &vq->avail->idx);
 			return -EFAULT;
 		}
 		vq->avail_idx = vhost16_to_cpu(vq, avail_idx);
 
 		if (unlikely((u16)(vq->avail_idx - last_avail_idx) > vq->num)) {
-			vq_err(vq, "Guest moved used index from %u to %u",
-				last_avail_idx, vq->avail_idx);
+			vq_err(vq, "Guest moved used index from %u to %u\n",
+			       last_avail_idx, vq->avail_idx);
 			return -EFAULT;
 		}
 
@@ -2057,7 +2050,7 @@ int vhost_get_vq_desc(struct vhost_virtqueue *vq,
 
 	/* If their number is silly, that's an error. */
 	if (unlikely(head >= vq->num)) {
-		vq_err(vq, "Guest says index %u > %u is available",
+		vq_err(vq, "Guest says index %u > %u is available\n",
 		       head, vq->num);
 		return -EINVAL;
 	}
@@ -2071,13 +2064,12 @@ int vhost_get_vq_desc(struct vhost_virtqueue *vq,
 	do {
 		unsigned iov_count = *in_num + *out_num;
 		if (unlikely(i >= vq->num)) {
-			vq_err(vq, "Desc index is %u > %u, head = %u",
+			vq_err(vq, "Desc index is %u > %u, head = %u\n",
 			       i, vq->num, head);
 			return -EINVAL;
 		}
 		if (unlikely(++found > vq->num)) {
-			vq_err(vq, "Loop detected: last one at %u "
-			       "vq size %u head %u\n",
+			vq_err(vq, "Loop detected: last one at %u vq size %u head %u\n",
 			       i, vq->num, head);
 			return -EINVAL;
 		}
@@ -2094,8 +2086,8 @@ int vhost_get_vq_desc(struct vhost_virtqueue *vq,
 					   log, log_num, &desc);
 			if (unlikely(ret < 0)) {
 				if (ret != -EAGAIN)
-					vq_err(vq, "Failure detected "
-						"in indirect descriptor at idx %d\n", i);
+					vq_err(vq, "Failure detected in indirect descriptor at idx %d\n",
+					       i);
 				return ret;
 			}
 			continue;
@@ -2111,7 +2103,7 @@ int vhost_get_vq_desc(struct vhost_virtqueue *vq,
 		if (unlikely(ret < 0)) {
 			if (ret != -EAGAIN)
 				vq_err(vq, "Translation failure %d descriptor idx %d\n",
-					ret, i);
+				       ret, i);
 			return ret;
 		}
 		if (access == VHOST_ACCESS_WO) {
@@ -2127,8 +2119,8 @@ int vhost_get_vq_desc(struct vhost_virtqueue *vq,
 			/* If it's an output descriptor, they're all supposed
 			 * to come before any input descriptors. */
 			if (unlikely(*in_num)) {
-				vq_err(vq, "Descriptor has out after in: "
-				       "idx %d\n", i);
+				vq_err(vq, "Descriptor has out after in: idx %d\n",
+				       i);
 				return -EINVAL;
 			}
 			*out_num += ret;
@@ -2177,15 +2169,15 @@ static int __vhost_add_used_n(struct vhost_virtqueue *vq,
 	used = vq->used->ring + start;
 	if (count == 1) {
 		if (vhost_put_user(vq, heads[0].id, &used->id)) {
-			vq_err(vq, "Failed to write used id");
+			vq_err(vq, "Failed to write used id\n");
 			return -EFAULT;
 		}
 		if (vhost_put_user(vq, heads[0].len, &used->len)) {
-			vq_err(vq, "Failed to write used len");
+			vq_err(vq, "Failed to write used len\n");
 			return -EFAULT;
 		}
 	} else if (vhost_copy_to_user(vq, used, heads, count * sizeof *used)) {
-		vq_err(vq, "Failed to write used");
+		vq_err(vq, "Failed to write used\n");
 		return -EFAULT;
 	}
 	if (unlikely(vq->log_used)) {
@@ -2230,7 +2222,7 @@ int vhost_add_used_n(struct vhost_virtqueue *vq, struct vring_used_elem *heads,
 	smp_wmb();
 	if (vhost_put_user(vq, cpu_to_vhost16(vq, vq->last_used_idx),
 			   &vq->used->idx)) {
-		vq_err(vq, "Failed to increment used idx");
+		vq_err(vq, "Failed to increment used idx\n");
 		return -EFAULT;
 	}
 	if (unlikely(vq->log_used)) {
@@ -2262,7 +2254,7 @@ static bool vhost_notify(struct vhost_dev *dev, struct vhost_virtqueue *vq)
 		 * interrupts. */
 		smp_mb();
 		if (vhost_get_avail(vq, flags, &vq->avail->flags)) {
-			vq_err(vq, "Failed to get flags");
+			vq_err(vq, "Failed to get flags\n");
 			return true;
 		}
 		return !(flags & cpu_to_vhost16(vq, VRING_AVAIL_F_NO_INTERRUPT));
@@ -2289,7 +2281,7 @@ static bool vhost_notify(struct vhost_dev *dev, struct vhost_virtqueue *vq)
 	smp_mb();
 
 	if (vhost_get_avail(vq, event, vhost_used_event(vq))) {
-		vq_err(vq, "Failed to get used event idx");
+		vq_err(vq, "Failed to get used event idx\n");
 		return true;
 	}
 	vq->last_used_event = vhost16_to_cpu(vq, event);

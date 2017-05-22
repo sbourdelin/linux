@@ -69,8 +69,8 @@ static void handle_vq(struct vhost_test *n)
 			break;
 		}
 		if (in) {
-			vq_err(vq, "Unexpected descriptor format for TX: "
-			       "out %d, int %d\n", out, in);
+			vq_err(vq, "Unexpected descriptor format for TX: out %d, int %d\n",
+			       out, in);
 			break;
 		}
 		len = iov_length(vq->iov, out);

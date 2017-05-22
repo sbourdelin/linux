@@ -473,7 +473,7 @@ again:
 
 	if ((vq->iov[out].iov_len != sizeof(struct virtio_scsi_event))) {
 		vq_err(vq, "Expecting virtio_scsi_event, got %zu bytes\n",
-				vq->iov[out].iov_len);
+		       vq->iov[out].iov_len);
 		vs->vs_events_missed = true;
 		return;
 	}
@@ -885,8 +885,8 @@ vhost_scsi_handle_vq(struct vhost_scsi *vs, struct vhost_virtqueue *vq)
 		 * errors back to the guest.
 		 */
 		if (unlikely(vq->iov[out].iov_len < rsp_size)) {
-			vq_err(vq, "Expecting at least virtio_scsi_cmd_resp"
-				" size, got %zu bytes\n", vq->iov[out].iov_len);
+			vq_err(vq, "Expecting at least virtio_scsi_cmd_resp size, got %zu bytes\n",
+			       vq->iov[out].iov_len);
 			break;
 		}
 		/*
@@ -981,16 +981,14 @@ vhost_scsi_handle_vq(struct vhost_scsi *vs, struct vhost_virtqueue *vq)
 		if (t10_pi) {
 			if (v_req_pi.pi_bytesout) {
 				if (data_direction != DMA_TO_DEVICE) {
-					vq_err(vq, "Received non zero pi_bytesout,"
-						" but wrong data_direction\n");
+					vq_err(vq, "Received non zero pi_bytesout, but wrong data_direction\n");
 					vhost_scsi_send_bad_target(vs, vq, head, out);
 					continue;
 				}
 				prot_bytes = vhost32_to_cpu(vq, v_req_pi.pi_bytesout);
 			} else if (v_req_pi.pi_bytesin) {
 				if (data_direction != DMA_FROM_DEVICE) {
-					vq_err(vq, "Received non zero pi_bytesin,"
-						" but wrong data_direction\n");
+					vq_err(vq, "Received non zero pi_bytesin, but wrong data_direction\n");
 					vhost_scsi_send_bad_target(vs, vq, head, out);
 					continue;
 				}
@@ -1026,9 +1024,8 @@ vhost_scsi_handle_vq(struct vhost_scsi *vs, struct vhost_virtqueue *vq)
 		 * TODO what if cdb was too small for varlen cdb header?
 		 */
 		if (unlikely(scsi_command_size(cdb) > VHOST_SCSI_MAX_CDB_SIZE)) {
-			vq_err(vq, "Received SCSI CDB with command_size: %d that"
-				" exceeds SCSI_MAX_VARLEN_CDB_SIZE: %d\n",
-				scsi_command_size(cdb), VHOST_SCSI_MAX_CDB_SIZE);
+			vq_err(vq, "Received SCSI CDB with command_size: %d that exceeds SCSI_MAX_VARLEN_CDB_SIZE: %d\n",
+			       scsi_command_size(cdb), VHOST_SCSI_MAX_CDB_SIZE);
 			vhost_scsi_send_bad_target(vs, vq, head, out);
 			continue;
 		}

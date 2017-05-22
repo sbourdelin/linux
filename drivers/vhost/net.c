@@ -424,8 +424,8 @@ static void handle_tx(struct vhost_net *net)
 			break;
 		}
 		if (in) {
-			vq_err(vq, "Unexpected descriptor format for TX: "
-			       "out %d, int %d\n", out, in);
+			vq_err(vq, "Unexpected descriptor format for TX: out %d, int %d\n",
+			       out, in);
 			break;
 		}
 		/* Skip header. TODO: support TSO. */
@@ -434,8 +434,7 @@ static void handle_tx(struct vhost_net *net)
 		iov_iter_advance(&msg.msg_iter, hdr_size);
 		/* Sanity check */
 		if (!msg_data_left(&msg)) {
-			vq_err(vq, "Unexpected header len for TX: "
-			       "%zd expected %zd\n",
+			vq_err(vq, "Unexpected header len for TX: %zd expected %zd\n",
 			       len, hdr_size);
 			break;
 		}
@@ -612,8 +611,8 @@ static int get_rx_bufs(struct vhost_virtqueue *vq,
 			goto err;
 		}
 		if (unlikely(out || in <= 0)) {
-			vq_err(vq, "unexpected descriptor format for RX: "
-				"out %d, in %d\n", out, in);
+			vq_err(vq, "unexpected descriptor format for RX: out %d, in %d\n",
+			       out, in);
 			r = -EINVAL;
 			goto err;
 		}
@@ -743,8 +742,8 @@ static void handle_rx(struct vhost_net *net)
 		if (unlikely(vhost_hlen)) {
 			if (copy_to_iter(&hdr, sizeof(hdr),
 					 &fixup) != sizeof(hdr)) {
-				vq_err(vq, "Unable to write vnet_hdr "
-				       "at addr %p\n", vq->iov->iov_base);
+				vq_err(vq, "Unable to write vnet_hdr at addr %p\n",
+				       vq->iov->iov_base);
 				goto out;
 			}
 		} else {
@@ -759,7 +758,7 @@ static void handle_rx(struct vhost_net *net)
 		if (likely(mergeable) &&
 		    copy_to_iter(&num_buffers, sizeof num_buffers,
 				 &fixup) != sizeof num_buffers) {
-			vq_err(vq, "Failed num_buffers write");
+			vq_err(vq, "Failed num_buffers write\n");
 			vhost_discard_vq_desc(vq, headcount);
 			goto out;
 		}
