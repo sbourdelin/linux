@@ -120,6 +120,11 @@ void __weak watchdog_nmi_disable(unsigned int cpu)
 {
 }
 
+void __weak watchdog_nmi_reconfigure(void)
+{
+}
+
+
 #ifdef CONFIG_SOFTLOCKUP_DETECTOR
 
 /* Helper for online, unparked cpus. */
@@ -597,6 +602,12 @@ static void watchdog_disable_all_cpus(void)
 	}
 }
 
+static int watchdog_update_cpus(void)
+{
+	return smpboot_update_cpumask_percpu_thread(
+		    &watchdog_threads, &watchdog_cpumask);
+}
+
 #else /* SOFTLOCKUP */
 static int watchdog_park_threads(void)
 {
@@ -613,6 +624,10 @@ static int watchdog_enable_all_cpus(void)
 }
 
 static void watchdog_disable_all_cpus(void)
+{
+}
+
+static int watchdog_update_cpus(void)
 {
 }
 
@@ -648,6 +663,8 @@ int lockup_detector_suspend(void)
 		watchdog_enabled = 0;
 	}
 
+	watchdog_nmi_reconfigure();
+
 	mutex_unlock(&watchdog_proc_mutex);
 
 	return ret;
@@ -667,6 +684,8 @@ void lockup_detector_resume(void)
 	 */
 	if (watchdog_running && !watchdog_suspended)
 		watchdog_unpark_threads();
+
+	watchdog_nmi_reconfigure();
 
 	mutex_unlock(&watchdog_proc_mutex);
 	put_online_cpus();
@@ -692,6 +711,8 @@ static int proc_watchdog_update(void)
 		err = watchdog_enable_all_cpus();
 	else
 		watchdog_disable_all_cpus();
+
+	watchdog_nmi_reconfigure();
 
 	return err;
 
@@ -878,12 +899,11 @@ int proc_watchdog_cpumask(struct ctl_table *table, int write,
 			 * a temporary cpumask, so we are likely not in a
 			 * position to do much else to make things better.
 			 */
-#ifdef CONFIG_SOFTLOCKUP_DETECTOR
-			if (smpboot_update_cpumask_percpu_thread(
-				    &watchdog_threads, &watchdog_cpumask) != 0)
+			if (watchdog_update_cpus() != 0)
 				pr_err("cpumask update failed\n");
-#endif
 		}
+
+		watchdog_nmi_reconfigure();
 	}
 out:
 	mutex_unlock(&watchdog_proc_mutex);
