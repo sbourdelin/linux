@@ -76,6 +76,7 @@ int mmc_send_status(struct mmc_card *card, u32 *status)
 
 	return 0;
 }
+EXPORT_SYMBOL_GPL(mmc_send_status);
 
 static int _mmc_select_card(struct mmc_host *host, struct mmc_card *card)
 {
