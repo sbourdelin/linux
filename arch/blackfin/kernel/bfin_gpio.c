@@ -119,7 +119,7 @@ static void gpio_error(unsigned gpio)
 static void set_label(unsigned short ident, const char *label)
 {
 	if (label) {
-		strncpy(str_ident[ident].name, label,
+		strlcpy(str_ident[ident].name, label,
 			 RESOURCE_LABEL_SIZE);
 		str_ident[ident].name[RESOURCE_LABEL_SIZE - 1] = 0;
 	}
