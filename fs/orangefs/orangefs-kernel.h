@@ -252,6 +252,7 @@ struct orangefs_sb_info_s {
 	int mount_pending;
 	int no_list;
 	struct list_head list;
+	struct backing_dev_info bdi;
 };
 
 /*

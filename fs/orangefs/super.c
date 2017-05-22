@@ -399,15 +399,11 @@ static int orangefs_fill_sb(struct super_block *sb,
 		struct orangefs_fs_mount_response *fs_mount,
 		void *data, int silent)
 {
-	int ret = -EINVAL;
-	struct inode *root = NULL;
-	struct dentry *root_dentry = NULL;
+	int ret;
+	struct inode *root;
+	struct dentry *root_dentry;
 	struct orangefs_object_kref root_object;
 
-	/* alloc and init our private orangefs sb info */
-	sb->s_fs_info = kzalloc(sizeof(struct orangefs_sb_info_s), GFP_KERNEL);
-	if (!ORANGEFS_SB(sb))
-		return -ENOMEM;
 	ORANGEFS_SB(sb)->sb = sb;
 
 	ORANGEFS_SB(sb)->root_khandle = fs_mount->root_khandle;
@@ -429,6 +425,8 @@ static int orangefs_fill_sb(struct super_block *sb,
 	sb->s_blocksize = orangefs_bufmap_size_query();
 	sb->s_blocksize_bits = orangefs_bufmap_shift_query();
 	sb->s_maxbytes = MAX_LFS_FILESIZE;
+
+	sb->s_bdi = &ORANGEFS_SB(sb)->bdi;
 
 	root_object.khandle = ORANGEFS_SB(sb)->root_khandle;
 	root_object.fs_id = ORANGEFS_SB(sb)->fs_id;
@@ -508,6 +506,23 @@ struct dentry *orangefs_mount(struct file_system_type *fst,
 		goto free_op;
 	}
 
+	/* alloc and init our private orangefs sb info */
+	sb->s_fs_info = kzalloc(sizeof(struct orangefs_sb_info_s), GFP_KERNEL);
+	if (!ORANGEFS_SB(sb)) {
+		d = ERR_PTR(-ENOMEM);
+		goto free_op;
+	}
+
+	ret = bdi_setup_and_register(&ORANGEFS_SB(sb)->bdi, "orangefs");
+	if (ret) {
+		/*
+		 * Ordinarily freed by orangefs_kill_sb but that won't
+		 * happen yet.
+		 */
+		kfree(sb->s_fs_info);
+		goto free_op;
+	}
+
 	ret = orangefs_fill_sb(sb,
 	      &new_op->downcall.resp.fs_mount, data,
 	      flags & MS_SILENT ? 1 : 0);
@@ -581,6 +596,8 @@ void orangefs_kill_sb(struct super_block *sb)
 
 	/* provided sb cleanup */
 	kill_anon_super(sb);
+
+	bdi_destroy(&ORANGEFS_SB(sb)->bdi);
 
 	/*
 	 * issue the unmount to userspace to tell it to remove the
