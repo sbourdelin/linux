@@ -171,16 +171,15 @@ void iommu_dma_get_resv_regions(struct device *dev, struct list_head *list)
 {
 	struct pci_host_bridge *bridge;
 	struct resource_entry *window;
+	struct iommu_resv_region *region;
+	phys_addr_t start, end;
+	size_t length;
 
 	if (!dev_is_pci(dev))
 		return;
 
 	bridge = pci_find_host_bridge(to_pci_dev(dev)->bus);
 	resource_list_for_each_entry(window, &bridge->windows) {
-		struct iommu_resv_region *region;
-		phys_addr_t start;
-		size_t length;
-
 		if (resource_type(window->res) != IORESOURCE_MEM)
 			continue;
 
@@ -188,6 +187,43 @@ void iommu_dma_get_resv_regions(struct device *dev, struct list_head *list)
 		length = window->res->end - window->res->start + 1;
 		region = iommu_alloc_resv_region(start, length, 0,
 				IOMMU_RESV_RESERVED);
+		if (!region)
+			return;
+
+		list_add_tail(&region->list, list);
+	}
+
+	/* PCI inbound memory reservation. */
+	start = length = 0;
+	resource_list_for_each_entry(window, &bridge->inbound_windows) {
+		end = window->res->start - window->offset;
+
+		if (start > end) {
+			/* multiple ranges assumed sorted. */
+			pr_warn("PCI: failed to reserve iovas\n");
+			return;
+		}
+
+		if (start != end) {
+			length = end - start - 1;
+			region = iommu_alloc_resv_region(start, length, 0,
+				IOMMU_RESV_RESERVED);
+			if (!region)
+				return;
+
+			list_add_tail(&region->list, list);
+		}
+
+		start += end + length + 1;
+	}
+	/*
+	 * the last dma-range should honour based on the
+	 * 32/64-bit dma addresses.
+	 */
+	if ((start) && (start < DMA_BIT_MASK(sizeof(dma_addr_t) * 8))) {
+		length = DMA_BIT_MASK((sizeof(dma_addr_t) * 8)) - 1;
+		region = iommu_alloc_resv_region(start, length, 0,
+			IOMMU_RESV_RESERVED);
 		if (!region)
 			return;
 
