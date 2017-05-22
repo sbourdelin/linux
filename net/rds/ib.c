@@ -131,7 +131,7 @@ static void rds_ib_add_one(struct ib_device *device)
 	if (device->node_type != RDMA_NODE_IB_CA)
 		return;
 
-	rds_ibdev = kzalloc_node(sizeof(struct rds_ib_device), GFP_KERNEL,
+	rds_ibdev = kzalloc_node(sizeof(*rds_ibdev), GFP_KERNEL,
 				 ibdev_to_node(device));
 	if (!rds_ibdev)
 		return;
