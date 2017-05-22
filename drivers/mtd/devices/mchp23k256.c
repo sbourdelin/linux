@@ -21,10 +21,14 @@
 #include <linux/spi/spi.h>
 #include <linux/of_device.h>
 
+#define MAX_CMD_SIZE		4
+enum chips { mchp23k256, mchp23lcv1024 };
+
 struct mchp23k256_flash {
 	struct spi_device	*spi;
 	struct mutex		lock;
 	struct mtd_info		mtd;
+	u8			addr_width;
 };
 
 #define MCHP23K256_CMD_WRITE_STATUS	0x01
@@ -34,22 +38,35 @@ struct mchp23k256_flash {
 
 #define to_mchp23k256_flash(x) container_of(x, struct mchp23k256_flash, mtd)
 
+static void mchp23k256_addr2cmd(struct mchp23k256_flash *flash,
+				unsigned int addr, u8 *cmd)
+{
+	/* cmd[0] has opcode */
+	cmd[1] = addr >> (flash->addr_width * 8 -  8);
+	cmd[2] = addr >> (flash->addr_width * 8 - 16);
+	cmd[3] = addr >> (flash->addr_width * 8 - 24);
+}
+
+static int mchp23k256_cmdsz(struct mchp23k256_flash *flash)
+{
+	return 1 + flash->addr_width;
+}
+
 static int mchp23k256_write(struct mtd_info *mtd, loff_t to, size_t len,
 			    size_t *retlen, const unsigned char *buf)
 {
 	struct mchp23k256_flash *flash = to_mchp23k256_flash(mtd);
 	struct spi_transfer transfer[2] = {};
 	struct spi_message message;
-	unsigned char command[3];
+	unsigned char command[MAX_CMD_SIZE];
 
 	spi_message_init(&message);
 
 	command[0] = MCHP23K256_CMD_WRITE;
-	command[1] = to >> 8;
-	command[2] = to;
+	mchp23k256_addr2cmd(flash, to, command);
 
 	transfer[0].tx_buf = command;
-	transfer[0].len = sizeof(command);
+	transfer[0].len = mchp23k256_cmdsz(flash);
 	spi_message_add_tail(&transfer[0], &message);
 
 	transfer[1].tx_buf = buf;
@@ -73,17 +90,16 @@ static int mchp23k256_read(struct mtd_info *mtd, loff_t from, size_t len,
 	struct mchp23k256_flash *flash = to_mchp23k256_flash(mtd);
 	struct spi_transfer transfer[2] = {};
 	struct spi_message message;
-	unsigned char command[3];
+	unsigned char command[MAX_CMD_SIZE];
 
 	spi_message_init(&message);
 
 	memset(&transfer, 0, sizeof(transfer));
 	command[0] = MCHP23K256_CMD_READ;
-	command[1] = from >> 8;
-	command[2] = from;
+	mchp23k256_addr2cmd(flash, from, command);
 
 	transfer[0].tx_buf = command;
-	transfer[0].len = sizeof(command);
+	transfer[0].len = mchp23k256_cmdsz(flash);
 	spi_message_add_tail(&transfer[0], &message);
 
 	transfer[1].rx_buf = buf;
@@ -128,6 +144,7 @@ static int mchp23k256_probe(struct spi_device *spi)
 	struct mchp23k256_flash *flash;
 	struct flash_platform_data *data;
 	int err;
+	enum chips chip;
 
 	flash = devm_kzalloc(&spi->dev, sizeof(*flash), GFP_KERNEL);
 	if (!flash)
@@ -143,14 +160,29 @@ static int mchp23k256_probe(struct spi_device *spi)
 
 	data = dev_get_platdata(&spi->dev);
 
+	if (spi->dev.of_node)
+		chip = (enum chips)of_device_get_match_data(&spi->dev);
+	else
+		chip = mchp23k256;
+
 	mtd_set_of_node(&flash->mtd, spi->dev.of_node);
 	flash->mtd.dev.parent	= &spi->dev;
 	flash->mtd.type		= MTD_RAM;
 	flash->mtd.flags	= MTD_CAP_RAM;
 	flash->mtd.writesize	= 1;
-	flash->mtd.size		= SZ_32K;
 	flash->mtd._read	= mchp23k256_read;
 	flash->mtd._write	= mchp23k256_write;
+
+	switch (chip) {
+	case mchp23lcv1024:
+		flash->mtd.size		= SZ_128K;
+		flash->addr_width	= 3;
+		break;
+	default:
+		flash->mtd.size		= SZ_32K;
+		flash->addr_width	= 2;
+		break;
+	}
 
 	flash->mtd.erasesize = PAGE_SIZE;
 	while (flash->mtd.size & (flash->mtd.erasesize - 1))
@@ -172,7 +204,8 @@ static int mchp23k256_remove(struct spi_device *spi)
 }
 
 static const struct of_device_id mchp23k256_of_table[] = {
-	{ .compatible = "microchip,mchp23k256" },
+	{ .compatible = "microchip,mchp23k256", .data = (void *)mchp23k256 },
+	{ .compatible = "microchip,mchp23lcv1024", .data = (void *)mchp23lcv1024 },
 	{}
 };
 MODULE_DEVICE_TABLE(of, mchp23k256_of_table);
