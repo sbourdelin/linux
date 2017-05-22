@@ -348,6 +348,25 @@
 	};
 };
 
+&edma1 {
+	status = "okay";
+};
+
+&dspi2 {
+	bus-num = <1>;
+	pinctrl-names = "default";
+	pinctrl-0 = <&pinctrl_dspi2>;
+	status = "okay";
+	spi-num-chipselects = <2>;
+
+	hi8435@1 {
+		compatible = "holt,hi8435";
+		reg = <1>;
+		spi-max-frequency = <20000000>;
+		gpios = <&gpio5 3 0>;
+	};
+};
+
 &i2c0 {
 	clock-frequency = <100000>;
 	pinctrl-names = "default";
