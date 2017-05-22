@@ -296,7 +296,7 @@ struct inode *orangefs_new_inode(struct super_block *sb, struct inode *dir,
 	inode->i_uid = current_fsuid();
 	inode->i_gid = current_fsgid();
 	inode->i_atime = inode->i_mtime = inode->i_ctime = current_time(inode);
-	inode->i_size = PAGE_SIZE;
+	inode->i_size = 0;
 	inode->i_rdev = dev;
 
 	error = insert_inode_locked4(inode, hash, orangefs_test_inode, ref);

@@ -319,6 +319,8 @@ static int orangefs_symlink(struct inode *dir,
 		     "Assigned symlink inode new number of %pU\n",
 		     get_khandle_from_ino(inode));
 
+	inode->i_size = strlen(symname);
+
 	d_instantiate(dentry, inode);
 	unlock_new_inode(inode);
 	orangefs_set_timeout(dentry);
@@ -383,6 +385,8 @@ static int orangefs_mkdir(struct inode *dir, struct dentry *dentry, umode_t mode
 	gossip_debug(GOSSIP_NAME_DEBUG,
 		     "Assigned dir inode new number of %pU\n",
 		     get_khandle_from_ino(inode));
+
+	inode->i_size = PAGE_SIZE;
 
 	d_instantiate(dentry, inode);
 	unlock_new_inode(inode);
