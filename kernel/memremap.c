@@ -11,7 +11,6 @@
  * General Public License for more details.
  */
 #include <linux/radix-tree.h>
-#include <linux/memremap.h>
 #include <linux/device.h>
 #include <linux/types.h>
 #include <linux/pfn_t.h>
