@@ -14,14 +14,14 @@ logical_chip_type_t sm750_get_chip_type(void)
 	return chip;
 }
 
-void sm750_set_chip_type(unsigned short devId, u8 revId)
+void sm750_set_chip_type(unsigned short dev_id, u8 rev_id)
 {
-	if (devId == 0x718) {
+	if (dev_id == 0x718) {
 		chip = SM718;
-	} else if (devId == 0x750) {
+	} else if (dev_id == 0x750) {
 		chip = SM750;
 		/* SM750 and SM750LE are different in their revision ID only. */
-		if (revId == SM750LE_REVISION_ID) {
+		if (rev_id == SM750LE_REVISION_ID) {
 			chip = SM750LE;
 			pr_info("found sm750le\n");
 		}
