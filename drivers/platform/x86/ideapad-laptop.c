@@ -435,6 +435,8 @@ static ssize_t touchpad_show(struct device *dev,
 	return sprintf(buf, "%lu\n", result);
 }
 
+#if 0
+/* Switch to RO for now: It might be revisited in the future */
 static ssize_t touchpad_store(struct device *dev,
 			      struct device_attribute *attr,
 			      const char *buf, size_t count)
@@ -453,7 +455,7 @@ static ssize_t touchpad_store(struct device *dev,
 	return count;
 }
 
-/* Switch to RO for now: It might be revisited in the future */
+#endif
 static DEVICE_ATTR_RO(touchpad);
 
 static struct attribute *ideapad_attributes[] = {
