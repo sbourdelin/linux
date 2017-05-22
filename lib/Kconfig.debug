@@ -801,10 +801,25 @@ config LOCKUP_DETECTOR
 	  The frequency of hrtimer and NMI events and the soft and hard lockup
 	  thresholds can be controlled through the sysctl watchdog_thresh.
 
+config SOFTLOCKUP_DETECTOR
+	bool "Detect Soft Lockups"
+	depends on LOCKUP_DETECTOR
+
+config HARDLOCKUP_DETECTOR_PERF
+	bool
+	select SOFTLOCKUP_DETECTOR
+
+#
+# arch/ can define HAVE_NMI_WATCHDOG to provide their own NMI watchdog
+# rather than the perf based detector.
+#
+# The arch may do its own thing, or select HARDLOCKUP_DETECTOR, which 
+#
 config HARDLOCKUP_DETECTOR
-	def_bool y
-	depends on LOCKUP_DETECTOR && !HAVE_NMI_WATCHDOG
-	depends on PERF_EVENTS && HAVE_PERF_EVENTS_NMI
+	bool "Detect Hard Lockups"
+	depends on LOCKUP_DETECTOR
+	depends on !HAVE_NMI_WATCHDOG || (PERF_EVENTS && HAVE_PERF_EVENTS_NMI)
+	select HARDLOCKUP_DETECTOR_PERF if !HAVE_NMI_WATCHDOG
 
 config BOOTPARAM_HARDLOCKUP_PANIC
 	bool "Panic (Reboot) On Hard Lockups"
@@ -826,7 +841,7 @@ config BOOTPARAM_HARDLOCKUP_PANIC_VALUE
 
 config BOOTPARAM_SOFTLOCKUP_PANIC
 	bool "Panic (Reboot) On Soft Lockups"
-	depends on LOCKUP_DETECTOR
+	depends on SOFTLOCKUP_DETECTOR
 	help
 	  Say Y here to enable the kernel to panic on "soft lockups",
 	  which are bugs that cause the kernel to loop in kernel
@@ -843,7 +858,7 @@ config BOOTPARAM_SOFTLOCKUP_PANIC
 
 config BOOTPARAM_SOFTLOCKUP_PANIC_VALUE
 	int
-	depends on LOCKUP_DETECTOR
+	depends on SOFTLOCKUP_DETECTOR
 	range 0 1
 	default 0 if !BOOTPARAM_SOFTLOCKUP_PANIC
 	default 1 if BOOTPARAM_SOFTLOCKUP_PANIC
@@ -851,7 +866,7 @@ config BOOTPARAM_SOFTLOCKUP_PANIC_VALUE
 config DETECT_HUNG_TASK
 	bool "Detect Hung Tasks"
 	depends on DEBUG_KERNEL
-	default LOCKUP_DETECTOR
+	default SOFTLOCKUP_DETECTOR
 	help
 	  Say Y here to enable the kernel to detect "hung tasks",
 	  which are bugs that cause the task to be stuck in
