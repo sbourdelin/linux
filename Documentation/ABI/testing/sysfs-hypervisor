@@ -1,0 +1,131 @@
+What:		/sys/hypervisor/compilation/compile_date
+Date:		March 2009
+KernelVersion:	2.6.30
+Contact:	xen-devel@lists.xenproject.org
+Description:
+		Contains the build time stamp of the Xen hypervisor
+
+What:		/sys/hypervisor/compilation/compiled_by
+Date:		March 2009
+KernelVersion:	2.6.30
+Contact:	xen-devel@lists.xenproject.org
+Description:
+		Contains information who built the Xen hypervisor
+
+What:		/sys/hypervisor/compilation/compiler
+Date:		March 2009
+KernelVersion:	2.6.30
+Contact:	xen-devel@lists.xenproject.org
+Description:
+		Compiler which was used to build the Xen hypervisor
+
+What:		/sys/hypervisor/pmu/pmu_mode
+Date:		August 2015
+KernelVersion:	4.3
+Contact:	Boris Ostrovsky <boris.ostrovsky@oracle.com>
+Description:
+		Describes mode that Xen's performance-monitoring unit (PMU)
+		uses. Accepted values are
+			"off"  -- PMU is disabled
+			"self" -- The guest can profile itself
+			"hv"   -- The guest can profile itself and, if it is
+				  privileged (e.g. dom0), the hypervisor
+			"all" --  The guest can profile itself, the hypervisor
+				  and all other guests. Only available to
+				  privileged guests.
+
+What:           /sys/hypervisor/pmu/pmu_features
+Date:           August 2015
+KernelVersion:  4.3
+Contact:        Boris Ostrovsky <boris.ostrovsky@oracle.com>
+Description:
+		Describes Xen PMU features (as an integer). A set bit indicates
+		that the corresponding feature is enabled. See
+		include/xen/interface/xenpmu.h for available features
+
+What:		/sys/hypervisor/properties/capabilities
+Date:		March 2009
+KernelVersion:	2.6.30
+Contact:	xen-devel@lists.xenproject.org
+Description:
+		Space separated list of supported guest system types. Each type
+		is in the format: <class>-<major>.<minor>-<arch>
+		With:
+			<class>: "xen" -- x86: paravirtualized, arm: standard
+				 "hvm" -- x86 only: full virtualized
+			<major>: major guest interface version
+			<minor>: minor guest interface version
+			<arch>:  architecture, e.g.:
+				 "x86_32": 32 bit x86 guest without PAE
+				 "x86_32p": 32 bit x86 guest with PAE
+				 "x86_64": 64 bit x86 guest
+				 "armv7l": 32 bit arm guest
+				 "aarch64": 64 bit arm guest
+
+What:		/sys/hypervisor/properties/changeset
+Date:		March 2009
+KernelVersion:	2.6.30
+Contact:	xen-devel@lists.xenproject.org
+Description:
+		Changeset of the hypervisor (git commit)
+
+What:		/sys/hypervisor/properties/features
+Date:		March 2009
+KernelVersion:	2.6.30
+Contact:	xen-devel@lists.xenproject.org
+Description:
+		Features the Xen hypervisor supports for the guest as defined
+		in include/xen/interface/features.h printed as a hex value.
+
+What:		/sys/hypervisor/properties/pagesize
+Date:		March 2009
+KernelVersion:	2.6.30
+Contact:	xen-devel@lists.xenproject.org
+Description:
+		Default page size of the hypervisor printed as a hex value.
+
+What:		/sys/hypervisor/properties/virtual_start
+Date:		March 2009
+KernelVersion:	2.6.30
+Contact:	xen-devel@lists.xenproject.org
+Description:
+		Virtual address of the hypervisor as a hex value.
+
+What:		/sys/hypervisor/type
+Date:		March 2009
+KernelVersion:	2.6.30
+Contact:	xen-devel@lists.xenproject.org
+Description:
+		Type of hypervisor:
+		"xen": Xen hypervisor
+
+What:		/sys/hypervisor/uuid
+Date:		March 2009
+KernelVersion:	2.6.30
+Contact:	xen-devel@lists.xenproject.org
+Description:
+		UUID of the guest as known to the Xen hypervisor.
+
+What:		/sys/hypervisor/version/extra
+Date:		March 2009
+KernelVersion:	2.6.30
+Contact:	xen-devel@lists.xenproject.org
+Description:
+		The Xen version is in the format <major>.<minor><extra>
+		This is the <extra> part of it.
+
+What:		/sys/hypervisor/version/major
+Date:		March 2009
+KernelVersion:	2.6.30
+Contact:	xen-devel@lists.xenproject.org
+Description:
+		The Xen version is in the format <major>.<minor><extra>
+		This is the <major> part of it.
+
+What:		/sys/hypervisor/version/minor
+Date:		March 2009
+KernelVersion:	2.6.30
+Contact:	xen-devel@lists.xenproject.org
+Description:
+		The Xen version is in the format <major>.<minor><extra>
+		This is the <minor> part of it.
