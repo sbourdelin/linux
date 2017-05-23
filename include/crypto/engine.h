@@ -18,6 +18,7 @@
 #include <linux/kthread.h>
 #include <crypto/algapi.h>
 #include <crypto/hash.h>
+#include <crypto/skcipher.h>
 
 #define ENGINE_NAME_LEN	30
 /*
@@ -69,12 +70,18 @@ struct crypto_engine {
 				      struct ablkcipher_request *req);
 	int (*unprepare_cipher_request)(struct crypto_engine *engine,
 					struct ablkcipher_request *req);
+	int (*prepare_skcipher_request)(struct crypto_engine *engine,
+					struct skcipher_request *req);
+	int (*unprepare_skcipher_request)(struct crypto_engine *engine,
+					  struct skcipher_request *req);
 	int (*prepare_hash_request)(struct crypto_engine *engine,
 				    struct ahash_request *req);
 	int (*unprepare_hash_request)(struct crypto_engine *engine,
 				      struct ahash_request *req);
 	int (*cipher_one_request)(struct crypto_engine *engine,
 				  struct ablkcipher_request *req);
+	int (*skcipher_one_request)(struct crypto_engine *engine,
+				    struct skcipher_request *req);
 	int (*hash_one_request)(struct crypto_engine *engine,
 				struct ahash_request *req);
 
@@ -90,12 +97,19 @@ int crypto_transfer_cipher_request(struct crypto_engine *engine,
 				   bool need_pump);
 int crypto_transfer_cipher_request_to_engine(struct crypto_engine *engine,
 					     struct ablkcipher_request *req);
+int crypto_transfer_skcipher_request(struct crypto_engine *engine,
+				     struct skcipher_request *req,
+				     bool need_pump);
+int crypto_transfer_skcipher_request_to_engine(struct crypto_engine *engine,
+					       struct skcipher_request *req);
 int crypto_transfer_hash_request(struct crypto_engine *engine,
 				 struct ahash_request *req, bool need_pump);
 int crypto_transfer_hash_request_to_engine(struct crypto_engine *engine,
 					   struct ahash_request *req);
 void crypto_finalize_cipher_request(struct crypto_engine *engine,
 				    struct ablkcipher_request *req, int err);
+void crypto_finalize_skcipher_request(struct crypto_engine *engine,
+				      struct skcipher_request *req, int err);
 void crypto_finalize_hash_request(struct crypto_engine *engine,
 				  struct ahash_request *req, int err);
 int crypto_engine_start(struct crypto_engine *engine);

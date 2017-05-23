@@ -36,6 +36,7 @@ static void crypto_pump_requests(struct crypto_engine *engine,
 	struct crypto_async_request *async_req, *backlog;
 	struct ahash_request *hreq;
 	struct ablkcipher_request *breq;
+	struct skcipher_request *skreq;
 	unsigned long flags;
 	bool was_busy = false;
 	int ret, rtype;
@@ -123,17 +124,34 @@ static void crypto_pump_requests(struct crypto_engine *engine,
 		}
 		return;
 	case CRYPTO_ALG_TYPE_ABLKCIPHER:
-		breq = ablkcipher_request_cast(engine->cur_req);
-		if (engine->prepare_cipher_request) {
-			ret = engine->prepare_cipher_request(engine, breq);
-			if (ret) {
-				dev_err(engine->dev, "failed to prepare request: %d\n",
-					ret);
-				goto req_err;
+	/* since CRYPTO_ALG_TYPE_ABLKCIPHER == CRYPTO_ALG_TYPE_SKCIPHER
+	 * differenciate both with the presence of cipher_one_request
+	 */
+		if (engine->cipher_one_request) {
+			breq = ablkcipher_request_cast(engine->cur_req);
+			if (engine->prepare_cipher_request) {
+				ret = engine->prepare_cipher_request(engine, breq);
+				if (ret) {
+					dev_err(engine->dev, "failed to prepare request: %d\n",
+						ret);
+					goto req_err;
+				}
+				engine->cur_req_prepared = true;
 			}
-			engine->cur_req_prepared = true;
+			ret = engine->cipher_one_request(engine, breq);
+		} else {
+			skreq = skcipher_request_cast(engine->cur_req);
+			if (engine->prepare_skcipher_request) {
+				ret = engine->prepare_skcipher_request(engine, skreq);
+				if (ret) {
+					dev_err(engine->dev, "failed to prepare request: %d\n",
+						ret);
+					goto req_err;
+				}
+				engine->cur_req_prepared = true;
 		}
-		ret = engine->cipher_one_request(engine, breq);
+		ret = engine->skcipher_one_request(engine, skreq);
+		}
 		if (ret) {
 			dev_err(engine->dev, "failed to cipher one request from queue\n");
 			goto req_err;
@@ -151,8 +169,13 @@ req_err:
 		crypto_finalize_hash_request(engine, hreq, ret);
 		break;
 	case CRYPTO_ALG_TYPE_ABLKCIPHER:
-		breq = ablkcipher_request_cast(engine->cur_req);
-		crypto_finalize_cipher_request(engine, breq, ret);
+		if (engine->cipher_one_request) {
+			breq = ablkcipher_request_cast(engine->cur_req);
+			crypto_finalize_cipher_request(engine, breq, ret);
+		} else {
+			skreq = skcipher_request_cast(engine->cur_req);
+			crypto_finalize_skcipher_request(engine, skreq, ret);
+		}
 		break;
 	}
 	return;
@@ -211,6 +234,49 @@ int crypto_transfer_cipher_request_to_engine(struct crypto_engine *engine,
 	return crypto_transfer_cipher_request(engine, req, true);
 }
 EXPORT_SYMBOL_GPL(crypto_transfer_cipher_request_to_engine);
+
+/**
+ * crypto_transfer_skcipher_request - transfer the new request into the
+ * enginequeue
+ * @engine: the hardware engine
+ * @req: the request need to be listed into the engine queue
+ */
+int crypto_transfer_skcipher_request(struct crypto_engine *engine,
+				     struct skcipher_request *req,
+				     bool need_pump)
+{
+	unsigned long flags;
+	int ret;
+
+	spin_lock_irqsave(&engine->queue_lock, flags);
+
+	if (!engine->running) {
+		spin_unlock_irqrestore(&engine->queue_lock, flags);
+		return -ESHUTDOWN;
+	}
+
+	ret = crypto_enqueue_request(&engine->queue, &req->base);
+
+	if (!engine->busy && need_pump)
+		kthread_queue_work(engine->kworker, &engine->pump_requests);
+
+	spin_unlock_irqrestore(&engine->queue_lock, flags);
+	return ret;
+}
+EXPORT_SYMBOL_GPL(crypto_transfer_skcipher_request);
+
+/**
+ * crypto_transfer_skcipher_request_to_engine - transfer one request to list
+ * into the engine queue
+ * @engine: the hardware engine
+ * @req: the request need to be listed into the engine queue
+ */
+int crypto_transfer_skcipher_request_to_engine(struct crypto_engine *engine,
+					       struct skcipher_request *req)
+{
+	return crypto_transfer_skcipher_request(engine, req, true);
+}
+EXPORT_SYMBOL_GPL(crypto_transfer_skcipher_request_to_engine);
 
 /**
  * crypto_transfer_hash_request - transfer the new request into the
@@ -292,6 +358,43 @@ void crypto_finalize_cipher_request(struct crypto_engine *engine,
 EXPORT_SYMBOL_GPL(crypto_finalize_cipher_request);
 
 /**
+ * crypto_finalize_skcipher_request - finalize one request if the request is done
+ * @engine: the hardware engine
+ * @req: the request need to be finalized
+ * @err: error number
+ */
+void crypto_finalize_skcipher_request(struct crypto_engine *engine,
+				      struct skcipher_request *req, int err)
+{
+	unsigned long flags;
+	bool finalize_cur_req = false;
+	int ret;
+
+	spin_lock_irqsave(&engine->queue_lock, flags);
+	if (engine->cur_req == &req->base)
+		finalize_cur_req = true;
+	spin_unlock_irqrestore(&engine->queue_lock, flags);
+
+	if (finalize_cur_req) {
+		if (engine->cur_req_prepared &&
+		    engine->unprepare_skcipher_request) {
+			ret = engine->unprepare_skcipher_request(engine, req);
+			if (ret)
+				dev_err(engine->dev, "failed to unprepare request\n");
+		}
+		spin_lock_irqsave(&engine->queue_lock, flags);
+		engine->cur_req = NULL;
+		engine->cur_req_prepared = false;
+		spin_unlock_irqrestore(&engine->queue_lock, flags);
+	}
+
+	req->base.complete(&req->base, err);
+
+	kthread_queue_work(engine->kworker, &engine->pump_requests);
+}
+EXPORT_SYMBOL_GPL(crypto_finalize_skcipher_request);
+
+/**
  * crypto_finalize_hash_request - finalize one request if the request is done
  * @engine: the hardware engine
  * @req: the request need to be finalized
@@ -343,6 +446,17 @@ int crypto_engine_start(struct crypto_engine *engine)
 	if (engine->running || engine->busy) {
 		spin_unlock_irqrestore(&engine->queue_lock, flags);
 		return -EBUSY;
+	}
+
+	if (!engine->skcipher_one_request && !engine->cipher_one_request &&
+	    !engine->hash_one_request) {
+		dev_err(engine->dev, "need at least one request type\n");
+		return -EINVAL;
+	}
+
+	if (engine->skcipher_one_request && engine->cipher_one_request) {
+		dev_err(engine->dev, "Cannot use both skcipher and ablkcipher\n");
+		return -EINVAL;
 	}
 
 	engine->running = true;
