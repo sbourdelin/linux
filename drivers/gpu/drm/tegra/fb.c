@@ -202,7 +202,6 @@ unreference:
 
 #ifdef CONFIG_DRM_FBDEV_EMULATION
 static struct fb_ops tegra_fb_ops = {
-	.owner = THIS_MODULE,
 	DRM_FB_HELPER_DEFAULT_OPS,
 	.fb_fillrect = drm_fb_helper_sys_fillrect,
 	.fb_copyarea = drm_fb_helper_sys_copyarea,
