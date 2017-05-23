@@ -358,6 +358,9 @@ struct host1x_firewall {
 
 static int check_register(struct host1x_firewall *fw, unsigned long offset)
 {
+	if (!fw->job->is_addr_reg)
+		return 0;
+
 	if (fw->job->is_addr_reg(fw->dev, fw->class, offset)) {
 		if (!fw->num_relocs)
 			return -EINVAL;
@@ -367,6 +370,19 @@ static int check_register(struct host1x_firewall *fw, unsigned long offset)
 
 		fw->num_relocs--;
 		fw->reloc++;
+	}
+
+	return 0;
+}
+
+static int check_class(struct host1x_firewall *fw, u32 class)
+{
+	if (!fw->job->is_valid_class) {
+		if (fw->class != class)
+			return -EINVAL;
+	} else {
+		if (!fw->job->is_valid_class(fw->class))
+			return -EINVAL;
 	}
 
 	return 0;
@@ -445,10 +461,8 @@ static int validate(struct host1x_firewall *fw, struct host1x_job_gather *g)
 {
 	u32 *cmdbuf_base = (u32 *)fw->job->gather_copy_mapped +
 		(g->offset / sizeof(u32));
+	u32 job_class = fw->class;
 	int err = 0;
-
-	if (!fw->job->is_addr_reg)
-		return 0;
 
 	fw->words = g->words;
 	fw->cmdbuf = g->bo;
@@ -469,7 +483,9 @@ static int validate(struct host1x_firewall *fw, struct host1x_job_gather *g)
 			fw->class = word >> 6 & 0x3ff;
 			fw->mask = word & 0x3f;
 			fw->reg = word >> 16 & 0xfff;
-			err = check_mask(fw);
+			err = check_class(fw, job_class);
+			if (!err)
+				err = check_mask(fw);
 			if (err)
 				goto out;
 			break;
