@@ -13,10 +13,12 @@
 
 #define PCIE_PORT_DEVICE_MAXSERVICES   5
 /*
- * According to the PCI Express Base Specification 2.0, the indices of
- * the MSI-X table entries used by port services must not exceed 31
+ * According to the PCI Express Base Specification REV. 3.1 and according
+ * to the PCI Local Bus Specification REV. 3.0 respectively, the indices of
+ * the MSI-X table entries or the max number of MSI vectors used by port
+ * services must not exceed 31
  */
-#define PCIE_PORT_MAX_MSIX_ENTRIES	32
+#define PCIE_PORT_MAX_MSI_ENTRIES	32
 
 #define get_descriptor_id(type, service) (((type - 4) << 8) | service)
 

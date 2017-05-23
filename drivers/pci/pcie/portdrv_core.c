@@ -44,14 +44,15 @@ static void release_pcie_device(struct device *dev)
 }
 
 /**
- * pcie_port_enable_msix - try to set up MSI-X as interrupt mode for given port
+ * pcie_port_enable_irq_vec - try to set up MSI-X or MSI as interrupt mode
+ * for given port
  * @dev: PCI Express port to handle
  * @irqs: Array of interrupt vectors to populate
  * @mask: Bitmask of port capabilities returned by get_port_device_capability()
  *
  * Return value: 0 on success, error code on failure
  */
-static int pcie_port_enable_msix(struct pci_dev *dev, int *irqs, int mask)
+static int pcie_port_enable_irq_vec(struct pci_dev *dev, int *irqs, int mask)
 {
 	int nr_entries, entry, nvec = 0;
 
@@ -61,8 +62,8 @@ static int pcie_port_enable_msix(struct pci_dev *dev, int *irqs, int mask)
 	 * equal to the number of entries this port actually uses, we'll happily
 	 * go through without any tricks.
 	 */
-	nr_entries = pci_alloc_irq_vectors(dev, 1, PCIE_PORT_MAX_MSIX_ENTRIES,
-			PCI_IRQ_MSIX);
+	nr_entries = pci_alloc_irq_vectors(dev, 1, PCIE_PORT_MAX_MSI_ENTRIES,
+			PCI_IRQ_MSIX | PCI_IRQ_MSI);
 	if (nr_entries < 0)
 		return nr_entries;
 
@@ -77,7 +78,9 @@ static int pcie_port_enable_msix(struct pci_dev *dev, int *irqs, int mask)
 		 * Number field in the PCI Express Capabilities register", where
 		 * according to Section 7.8.2 of the specification "For MSI-X,
 		 * the value in this field indicates which MSI-X Table entry is
-		 * used to generate the interrupt message."
+		 * used to generate the interrupt message." and "For MSI, the
+		 * value in this field indicates the offset between the base
+		 * Message Data and the interrupt message that is generated."
 		 */
 		pcie_capability_read_word(dev, PCI_EXP_FLAGS, &reg16);
 		entry = (reg16 & PCI_EXP_FLAGS_IRQ) >> 9;
@@ -100,7 +103,9 @@ static int pcie_port_enable_msix(struct pci_dev *dev, int *irqs, int mask)
 		 * MSI/MSI-X vectors assigned to the port is going to be used
 		 * for AER, where "For MSI-X, the value in this register
 		 * indicates which MSI-X Table entry is used to generate the
-		 * interrupt message."
+		 * interrupt message."  and "For MSI, the value
+		 * in this field indicates the offset between the base Message
+		 * Data and the interrupt message that is generated."
 		 */
 		pos = pci_find_ext_capability(dev, PCI_EXT_CAP_ID_ERR);
 		pci_read_config_dword(dev, pos + PCI_ERR_ROOT_STATUS, &reg32);
@@ -124,7 +129,7 @@ static int pcie_port_enable_msix(struct pci_dev *dev, int *irqs, int mask)
 
 		/* Now allocate the MSI-X vectors for real */
 		nr_entries = pci_alloc_irq_vectors(dev, nvec, nvec,
-				PCI_IRQ_MSIX);
+				PCI_IRQ_MSIX | PCI_IRQ_MSI);
 		if (nr_entries < 0)
 			return nr_entries;
 	}
@@ -146,26 +151,23 @@ out_free_irqs:
  */
 static int pcie_init_service_irqs(struct pci_dev *dev, int *irqs, int mask)
 {
-	unsigned flags = PCI_IRQ_LEGACY | PCI_IRQ_MSI;
 	int ret, i;
 
 	for (i = 0; i < PCIE_PORT_DEVICE_MAXSERVICES; i++)
 		irqs[i] = -1;
 
 	/*
-	 * If MSI cannot be used for PCIe PME or hotplug, we have to use
-	 * INTx or other interrupts, e.g. system shared interrupt.
+	 * Make sure MSI can be used for PCIe PME or hotplug. otherwise we have
+	 * to use INTx or other interrupts, e.g. system shared interrupt.
 	 */
-	if (((mask & PCIE_PORT_SERVICE_PME) && pcie_pme_no_msi()) ||
-	    ((mask & PCIE_PORT_SERVICE_HP) && pciehp_no_msi())) {
-		flags &= ~PCI_IRQ_MSI;
-	} else {
-		/* Try to use MSI-X if supported */
-		if (!pcie_port_enable_msix(dev, irqs, mask))
+	if (!((mask & PCIE_PORT_SERVICE_PME) && pcie_pme_no_msi()) &&
+	    !((mask & PCIE_PORT_SERVICE_HP) && pciehp_no_msi()))
+		/* Try to use MSI-X or MSI if supported */
+		if (!pcie_port_enable_irq_vec(dev, irqs, mask))
 			return 0;
-	}
 
-	ret = pci_alloc_irq_vectors(dev, 1, 1, flags);
+	/* fall back to legacy IRQ */
+	ret = pci_alloc_irq_vectors(dev, 1, 1, PCI_IRQ_LEGACY);
 	if (ret < 0)
 		return -ENODEV;
 
