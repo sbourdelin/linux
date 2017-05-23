@@ -1615,7 +1615,6 @@ static int __init octeon_irq_init_gpio(
 		irq_domain_add_linear(
 			gpio_node, 16, &octeon_irq_domain_gpio_ops, gpiod);
 	} else {
-		pr_warn("Cannot allocate memory for GPIO irq_domain.\n");
 		return -ENOMEM;
 	}
 
