@@ -15,6 +15,8 @@
 #include <drm/drm_atomic.h>
 #include <drm/drm_atomic_helper.h>
 
+#include <soc/tegra/fuse.h>
+
 #include "drm.h"
 #include "gem.h"
 
@@ -131,7 +133,8 @@ static int tegra_drm_load(struct drm_device *drm, unsigned long flags)
 	if (!tegra)
 		return -ENOMEM;
 
-	if (iommu_present(&platform_bus_type)) {
+	if (iommu_present(&platform_bus_type) &&
+	    tegra_get_chip_id() != TEGRA20) {
 		u64 carveout_start, carveout_end, gem_start, gem_end;
 		struct iommu_domain_geometry *geometry;
 		unsigned long order;

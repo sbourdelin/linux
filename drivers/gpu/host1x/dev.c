@@ -25,6 +25,8 @@
 #include <linux/of.h>
 #include <linux/slab.h>
 
+#include <soc/tegra/fuse.h>
+
 #define CREATE_TRACE_POINTS
 #include <trace/events/host1x.h>
 #undef CREATE_TRACE_POINTS
@@ -177,7 +179,8 @@ static int host1x_probe(struct platform_device *pdev)
 		return err;
 	}
 
-	if (iommu_present(&platform_bus_type)) {
+	if (iommu_present(&platform_bus_type) &&
+	    tegra_get_chip_id() != TEGRA20) {
 		struct iommu_domain_geometry *geometry;
 		unsigned long order;
 
