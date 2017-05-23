@@ -725,7 +725,10 @@ static void spi_set_cs(struct spi_device *spi, bool enable)
 		enable = !enable;
 
 	if (gpio_is_valid(spi->cs_gpio)) {
-		gpio_set_value(spi->cs_gpio, !enable);
+		struct gpio_desc *gpio = gpio_to_desc(spi->cs_gpio);
+
+		if (gpio)
+			gpiod_set_value(gpio, !enable);
 		/* Some SPI masters need both GPIO CS & slave_select */
 		if ((spi->master->flags & SPI_MASTER_GPIO_SS) &&
 		    spi->master->set_cs)
