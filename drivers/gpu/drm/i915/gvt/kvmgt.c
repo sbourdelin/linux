@@ -53,11 +53,21 @@ static const struct intel_gvt_ops *intel_gvt_ops;
 #define VFIO_PCI_INDEX_TO_OFFSET(index) ((u64)(index) << VFIO_PCI_OFFSET_SHIFT)
 #define VFIO_PCI_OFFSET_MASK    (((u64)(1) << VFIO_PCI_OFFSET_SHIFT) - 1)
 
+struct vfio_region;
+struct intel_vgpu_regops {
+	size_t (*rw)(struct intel_vgpu *vgpu, char *buf,
+			size_t count, loff_t *ppos, bool iswrite);
+	void (*release)(struct intel_vgpu *vgpu,
+			struct vfio_region *region);
+};
+
 struct vfio_region {
 	u32				type;
 	u32				subtype;
 	size_t				size;
 	u32				flags;
+	const struct intel_vgpu_regops	*ops;
+	void				*data;
 };
 
 struct kvmgt_pgfn {
@@ -642,7 +652,7 @@ static ssize_t intel_vgpu_rw(struct mdev_device *mdev, char *buf,
 	int ret = -EINVAL;
 
 
-	if (index >= VFIO_PCI_NUM_REGIONS) {
+	if (index >= VFIO_PCI_NUM_REGIONS + vgpu->vdev.num_regions) {
 		gvt_vgpu_err("invalid index: %u\n", index);
 		return -EINVAL;
 	}
@@ -676,8 +686,11 @@ static ssize_t intel_vgpu_rw(struct mdev_device *mdev, char *buf,
 	case VFIO_PCI_BAR5_REGION_INDEX:
 	case VFIO_PCI_VGA_REGION_INDEX:
 	case VFIO_PCI_ROM_REGION_INDEX:
+		break;
 	default:
-		gvt_vgpu_err("unsupported region: %u\n", index);
+		index -= VFIO_PCI_NUM_REGIONS;
+		return vgpu->vdev.region[index].ops->rw(vgpu, buf, count,
+				ppos, is_write);
 	}
 
 	return ret == 0 ? count : ret;
@@ -940,7 +953,8 @@ static long intel_vgpu_ioctl(struct mdev_device *mdev, unsigned int cmd,
 
 		info.flags = VFIO_DEVICE_FLAGS_PCI;
 		info.flags |= VFIO_DEVICE_FLAGS_RESET;
-		info.num_regions = VFIO_PCI_NUM_REGIONS;
+		info.num_regions = VFIO_PCI_NUM_REGIONS +
+				vgpu->vdev.num_regions;
 		info.num_irqs = VFIO_PCI_NUM_IRQS;
 
 		return copy_to_user((void __user *)arg, &info, minsz) ?
@@ -1061,6 +1075,7 @@ static long intel_vgpu_ioctl(struct mdev_device *mdev, unsigned int cmd,
 		}
 
 		if (caps.size) {
+			info.flags |= VFIO_REGION_INFO_FLAG_CAPS;
 			if (info.argsz < sizeof(info) + caps.size) {
 				info.argsz = sizeof(info) + caps.size;
 				info.cap_offset = 0;
