@@ -663,10 +663,9 @@ static int cps_pm_online_cpu(unsigned int cpu)
 
 	if (!per_cpu(ready_count, core)) {
 		core_rc = kmalloc(dlinesz * 2, GFP_KERNEL);
-		if (!core_rc) {
-			pr_err("Failed allocate core %u ready_count\n", core);
+		if (!core_rc)
 			return -ENOMEM;
-		}
+
 		per_cpu(ready_count_alloc, core) = core_rc;
 
 		/* Ensure ready_count is aligned to a cacheline boundary */
