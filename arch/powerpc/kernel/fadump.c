@@ -1046,28 +1046,66 @@ void fadump_cleanup(void)
 	}
 }
 
+/* Time to wait before a reschedule point */
+#define RELEASE_TIME_LIMIT			500	/* in milliseconds */
+
+/* Release memory in batches of 'N' pages each */
+#define RELEASE_PAGES_BATCH			(1 << 22)
+
+static void fadump_free_reserved_memory(unsigned long start, unsigned long end)
+{
+	unsigned long pfn, start_pfn, end_pfn;
+	unsigned int remaining = end > start ? (end - start) >> PAGE_SHIFT : 0;
+	unsigned long time_limit = jiffies +
+					msecs_to_jiffies(RELEASE_TIME_LIMIT);
+
+	while (remaining) {
+		/* A reschedule point for every 'X' milliseconds */
+		if (time_after_eq(jiffies, time_limit)) {
+			cond_resched();
+			time_limit = jiffies +
+					msecs_to_jiffies(RELEASE_TIME_LIMIT);
+		}
+
+		/* release memory in batches of 'N' pages */
+		start_pfn = start >> PAGE_SHIFT;
+		if (remaining > RELEASE_PAGES_BATCH) {
+			end_pfn = start_pfn + RELEASE_PAGES_BATCH;
+			remaining -= RELEASE_PAGES_BATCH;
+		} else {
+			end_pfn = end >> PAGE_SHIFT;
+			remaining = 0;
+		}
+
+		for (pfn = start_pfn; pfn < end_pfn; pfn++)
+			free_reserved_page(pfn_to_page(pfn));
+
+		start = end_pfn << PAGE_SHIFT;
+	}
+}
+
 /*
  * Release the memory that was reserved in early boot to preserve the memory
  * contents. The released memory will be available for general use.
  */
 static void fadump_release_memory(unsigned long begin, unsigned long end)
 {
-	unsigned long addr;
 	unsigned long ra_start, ra_end;
 
 	ra_start = fw_dump.reserve_dump_area_start;
 	ra_end = ra_start + fw_dump.reserve_dump_area_size;
 
-	for (addr = begin; addr < end; addr += PAGE_SIZE) {
-		/*
-		 * exclude the dump reserve area. Will reuse it for next
-		 * fadump registration.
-		 */
-		if (addr <= ra_end && ((addr + PAGE_SIZE) > ra_start))
-			continue;
-
-		free_reserved_page(pfn_to_page(addr >> PAGE_SHIFT));
-	}
+	/*
+	 * exclude the dump reserve area. Will reuse it for next
+	 * fadump registration.
+	 */
+	if (begin < ra_end && end > ra_start) {
+		if (begin < ra_start)
+			fadump_free_reserved_memory(begin, ra_start);
+		if (end > ra_end)
+			fadump_free_reserved_memory(ra_end, end);
+	} else
+		fadump_free_reserved_memory(begin, end);
 }
 
 static void fadump_invalidate_release_mem(void)
