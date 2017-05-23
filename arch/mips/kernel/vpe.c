@@ -94,7 +94,7 @@ struct vpe *alloc_vpe(int minor)
 	struct vpe *v;
 
 	v = kzalloc(sizeof(*v), GFP_KERNEL);
-	if (v == NULL)
+	if (!v)
 		goto out;
 
 	INIT_LIST_HEAD(&v->tc);
@@ -115,7 +115,7 @@ struct tc *alloc_tc(int index)
 	struct tc *tc;
 
 	tc = kzalloc(sizeof(*tc), GFP_KERNEL);
-	if (tc == NULL)
+	if (!tc)
 		goto out;
 
 	INIT_LIST_HEAD(&tc->tc);
@@ -340,10 +340,9 @@ static int apply_r_mips_lo16(struct module *me, uint32_t *location,
 	/* Sign extend the addend we extract from the lo insn.	*/
 	vallo = ((insnlo & 0xffff) ^ 0x8000) - 0x8000;
 
-	if (mips_hi16_list != NULL) {
-
+	if (mips_hi16_list) {
 		l = mips_hi16_list;
-		while (l != NULL) {
+		while (l) {
 			unsigned long insn;
 
 			/*
@@ -391,7 +390,7 @@ static int apply_r_mips_lo16(struct module *me, uint32_t *location,
 	return 0;
 
 out_free:
-	while (l != NULL) {
+	while (l) {
 		next = l->next;
 		kfree(l);
 		l = next;
@@ -562,7 +561,7 @@ static int find_vpe_symbols(struct vpe *v, Elf_Shdr *sechdrs,
 			v->shared_ptr = (void *)sym[i].st_value;
 	}
 
-	if ((v->__start == 0) || (v->shared_ptr == NULL))
+	if ((v->__start == 0) || !v->shared_ptr)
 		return -1;
 
 	return 0;
@@ -737,7 +736,7 @@ static int vpe_elfload(struct vpe *v)
 			return -ENOEXEC;
 		}
 
-		if (v->shared_ptr == NULL)
+		if (!v->shared_ptr)
 			pr_warn("VPE loader: program does not contain vpe_shared symbol.\n"
 				" Unable to use AMVP (AP/SP) facilities.\n");
 	}
@@ -777,7 +776,7 @@ static int vpe_open(struct inode *inode, struct file *filp)
 	}
 
 	v = get_vpe(aprp_cpu_index());
-	if (v == NULL) {
+	if (!v) {
 		pr_warn("VPE loader: unable to get vpe\n");
 
 		return -ENODEV;
@@ -822,7 +821,7 @@ static int vpe_release(struct inode *inode, struct file *filp)
 	int ret = 0;
 
 	v = get_vpe(aprp_cpu_index());
-	if (v == NULL)
+	if (!v)
 		return -ENODEV;
 
 	hdr = (Elf_Ehdr *) v->pbuffer;
@@ -866,8 +865,7 @@ static ssize_t vpe_write(struct file *file, const char __user *buffer,
 		return -ENODEV;
 
 	v = get_vpe(aprp_cpu_index());
-
-	if (v == NULL)
+	if (!v)
 		return -ENODEV;
 
 	if ((count + v->len) > v->plen) {
@@ -895,7 +893,7 @@ void *vpe_get_shared(int index)
 {
 	struct vpe *v = get_vpe(index);
 
-	if (v == NULL)
+	if (!v)
 		return NULL;
 
 	return v->shared_ptr;
@@ -906,7 +904,7 @@ int vpe_notify(int index, struct vpe_notifications *notify)
 {
 	struct vpe *v = get_vpe(index);
 
-	if (v == NULL)
+	if (!v)
 		return -1;
 
 	list_add(&notify->list, &v->notify);
@@ -918,7 +916,7 @@ char *vpe_getcwd(int index)
 {
 	struct vpe *v = get_vpe(index);
 
-	if (v == NULL)
+	if (!v)
 		return NULL;
 
 	return v->cwd;
