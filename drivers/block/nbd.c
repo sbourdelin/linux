@@ -1948,6 +1948,9 @@ static int nbd_genl_status(struct sk_buff *skb, struct genl_info *info)
 	}
 
 	dev_list = nla_nest_start(reply, NBD_ATTR_DEVICE_LIST);
+	if (!dev_list)
+		goto out;
+
 	if (index == -1) {
 		ret = idr_for_each(&nbd_index_idr, &status_cb, reply);
 		if (ret) {
