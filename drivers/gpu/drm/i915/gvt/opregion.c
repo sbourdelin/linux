@@ -114,6 +114,7 @@ void intel_vgpu_clean_opregion(struct intel_vgpu *vgpu)
 int intel_vgpu_init_opregion(struct intel_vgpu *vgpu, u32 gpa)
 {
 	int ret;
+	unsigned long pfn;
 
 	gvt_dbg_core("vgpu%d: init vgpu opregion\n", vgpu->id);
 
@@ -127,7 +128,12 @@ int intel_vgpu_init_opregion(struct intel_vgpu *vgpu, u32 gpa)
 		ret = map_vgpu_opregion(vgpu, true);
 		if (ret)
 			return ret;
-	}
+	} else {
+		pfn = intel_gvt_hypervisor_gfn_to_mfn(vgpu, gpa >> PAGE_SHIFT);
+		vgpu_opregion(vgpu)->va = memremap(pfn << PAGE_SHIFT,
+						INTEL_GVT_OPREGION_SIZE,
+						MEMREMAP_WB);
+		}
 
 	return 0;
 }
