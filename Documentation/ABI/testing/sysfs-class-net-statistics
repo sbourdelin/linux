@@ -21,7 +21,8 @@ Contact:	netdev@vger.kernel.org
 Description:
 		Indicates the number of bytes received by this network device.
 		See the network driver for the exact meaning of when this
-		value is incremented.
+		value is incremented. However, for an Ethernet frame, it should
+		include the Ethernet header, data, and frame check sum.
 
 What:		/sys/class/<iface>/statistics/rx_compressed
 Date:		April 2005
@@ -125,7 +126,8 @@ Description:
 		device. See the network driver for the exact meaning of this
 		value, in particular whether this accounts for all successfully
 		transmitted packets or all packets that have been queued for
-		transmission.
+		transmission. For an Ethernet frame, it should include the
+		Ethernet header, data, and frame check sum.
 
 What:		/sys/class/<iface>/statistics/tx_carrier_errors
 Date:		April 2005
