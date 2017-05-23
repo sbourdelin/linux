@@ -82,6 +82,11 @@ config MDIO_BUS_MUX_MMIOREG
 config MDIO_CAVIUM
 	tristate
 
+config MDIO_CORTINA
+	tristate "Driver for Cortina quad-10G Ethernet PHY"
+	---help---
+	  Currently only supports the Cortina CS4340 PHY.
+
 config MDIO_GPIO
 	tristate "GPIO lib-based bitbanged MDIO buses"
 	depends on MDIO_BITBANG && GPIOLIB
