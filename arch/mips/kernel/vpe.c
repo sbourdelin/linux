@@ -93,7 +93,7 @@ struct vpe *alloc_vpe(int minor)
 {
 	struct vpe *v;
 
-	v = kzalloc(sizeof(struct vpe), GFP_KERNEL);
+	v = kzalloc(sizeof(*v), GFP_KERNEL);
 	if (v == NULL)
 		goto out;
 
@@ -114,7 +114,7 @@ struct tc *alloc_tc(int index)
 {
 	struct tc *tc;
 
-	tc = kzalloc(sizeof(struct tc), GFP_KERNEL);
+	tc = kzalloc(sizeof(*tc), GFP_KERNEL);
 	if (tc == NULL)
 		goto out;
 
