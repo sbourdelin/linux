@@ -29,6 +29,7 @@
 
 #include <linux/dma-buf.h>
 #include <drm/drmP.h>
+#include <linux/vfio.h>
 
 #include "i915_drv.h"
 #include "gvt.h"
@@ -45,9 +46,9 @@ static struct sg_table *intel_vgpu_gem_get_pages(
 	int i, ret;
 	gen8_pte_t __iomem *gtt_entries;
 	unsigned int fb_gma = 0, fb_size = 0;
-	struct intel_vgpu_plane_info *plane_info;
+	struct plane_info *plane_info;
 
-	plane_info = (struct intel_vgpu_plane_info *)obj->gvt_plane_info;
+	plane_info = (struct plane_info *)obj->gvt_plane_info;
 	if (WARN_ON(!plane_info))
 		return ERR_PTR(-EINVAL);
 
@@ -81,9 +82,9 @@ static struct sg_table *intel_vgpu_gem_get_pages(
 static void intel_vgpu_gem_put_pages(struct drm_i915_gem_object *obj,
 		struct sg_table *pages)
 {
-	struct intel_vgpu_plane_info *plane_info;
+	struct plane_info *plane_info;
 
-	plane_info = (struct intel_vgpu_plane_info *)obj->gvt_plane_info;
+	plane_info = (struct plane_info *)obj->gvt_plane_info;
 	if (WARN_ON(!plane_info))
 		return;
 
@@ -98,7 +99,7 @@ static const struct drm_i915_gem_object_ops intel_vgpu_gem_ops = {
 };
 
 static struct drm_i915_gem_object *intel_vgpu_create_gem(struct drm_device *dev,
-		struct intel_vgpu_plane_info *info)
+		struct plane_info *info)
 {
 	struct drm_i915_private *pri = dev->dev_private;
 	struct drm_i915_gem_object *obj;
@@ -141,14 +142,14 @@ static struct drm_i915_gem_object *intel_vgpu_create_gem(struct drm_device *dev,
 	return obj;
 }
 
-static struct intel_vgpu_plane_info *intel_vgpu_get_plane_info(
+static struct plane_info *intel_vgpu_get_plane_info(
 		struct drm_device *dev,
 		struct intel_vgpu *vgpu, int plane_id)
 {
 	struct drm_i915_private *dev_priv = dev->dev_private;
 	struct intel_vgpu_primary_plane_format *p;
 	struct intel_vgpu_cursor_plane_format *c;
-	struct intel_vgpu_plane_info *info;
+	struct plane_info *info;
 
 	info = kmalloc(sizeof(*info), GFP_KERNEL);
 	if (!info)
@@ -225,8 +226,8 @@ static struct intel_vgpu_plane_info *intel_vgpu_get_plane_info(
 int intel_vgpu_query_dmabuf(struct intel_vgpu *vgpu, void *args)
 {
 	struct drm_device *dev = &vgpu->gvt->dev_priv->drm;
-	struct intel_vgpu_dmabuf *gvt_dmabuf = args;
-	struct intel_vgpu_plane_info *info;
+	struct dmabuf_info *gvt_dmabuf = args;
+	struct plane_info *info;
 
 	info = intel_vgpu_get_plane_info(dev, vgpu, gvt_dmabuf->plane_id);
 	if (info == NULL)
@@ -242,8 +243,8 @@ int intel_vgpu_create_dmabuf(struct intel_vgpu *vgpu, void *args)
 	struct dma_buf *dmabuf;
 	struct drm_i915_gem_object *obj;
 	struct drm_device *dev = &vgpu->gvt->dev_priv->drm;
-	struct intel_vgpu_dmabuf *gvt_dmabuf = args;
-	struct intel_vgpu_plane_info *info;
+	struct dmabuf_info *gvt_dmabuf = args;
+	struct plane_info *info;
 	int ret;
 
 	info = intel_vgpu_get_plane_info(dev, vgpu, gvt_dmabuf->plane_id);

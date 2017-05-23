@@ -26,28 +26,6 @@
 #ifndef _GVT_DMABUF_H_
 #define _GVT_DMABUF_H_
 
-struct intel_vgpu_plane_info {
-	uint32_t drm_format;
-	uint32_t width;
-	uint32_t height;
-	uint32_t stride;
-	uint32_t start;
-	uint32_t x_pos;
-	uint32_t y_pos;
-	uint32_t size;
-	uint64_t drm_format_mod;
-};
-
-#define INTEL_VGPU_QUERY_DMABUF		0
-#define INTEL_VGPU_GENERATE_DMABUF	1
-
-struct intel_vgpu_dmabuf {
-	uint32_t plane_id;
-	/* out */
-	uint32_t fd;
-	struct intel_vgpu_plane_info plane_info;
-};
-
 int intel_vgpu_query_dmabuf(struct intel_vgpu *vgpu, void *args);
 int intel_vgpu_create_dmabuf(struct intel_vgpu *vgpu, void *args);
 
