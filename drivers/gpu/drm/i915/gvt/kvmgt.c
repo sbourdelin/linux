@@ -41,6 +41,7 @@
 #include <linux/kvm_host.h>
 #include <linux/vfio.h>
 #include <linux/mdev.h>
+#include <linux/anon_inodes.h>
 
 #include "i915_drv.h"
 #include "gvt.h"
@@ -524,6 +525,85 @@ static int intel_vgpu_reg_init_opregion(struct intel_vgpu *vgpu)
 	return ret;
 }
 
+static int intel_vgpu_dmabuf_mgr_fd_mmap(struct file *file,
+		struct vm_area_struct *vma)
+{
+	return -EPERM;
+}
+
+static int intel_vgpu_dmabuf_mgr_fd_release(struct inode *inode,
+		struct file *filp)
+{
+	struct intel_vgpu *vgpu = filp->private_data;
+
+	if (WARN_ON(!vgpu->vdev.vfio_device))
+		return -EINVAL;
+
+	vfio_device_put(vgpu->vdev.vfio_device);
+
+	return 0;
+}
+
+static long intel_vgpu_dmabuf_mgr_fd_ioctl(struct file *filp,
+		unsigned int ioctl, unsigned long arg)
+{
+	struct intel_vgpu *vgpu = filp->private_data;
+	int minsz;
+	int ret;
+	struct fd f;
+
+	f = fdget(vgpu->dmabuf_mgr_fd);
+	if (!f.file)
+		return -EBADF;
+
+	if (ioctl == VFIO_DEVICE_QUERY_PLANE) {
+		struct plane_info info;
+
+		minsz = offsetofend(struct plane_info, drm_format_mod);
+		if (copy_from_user(&info, (void __user *)arg, minsz)) {
+			fdput(f);
+			return -EFAULT;
+		}
+		ret = intel_gvt_ops->vgpu_query_plane(vgpu, &info);
+		if (ret != 0) {
+			fdput(f);
+			gvt_vgpu_err("query plane failed:%d\n", ret);
+			return -EINVAL;
+		}
+		fdput(f);
+		return copy_to_user((void __user *)arg, &info, minsz) ?
+								-EFAULT : 0;
+	} else if (ioctl == VFIO_DEVICE_CREATE_DMABUF) {
+		struct dmabuf_info dmabuf;
+
+		minsz = offsetofend(struct dmabuf_info, plane_info);
+		if (copy_from_user(&dmabuf, (void __user *)arg, minsz)) {
+			fdput(f);
+			return -EFAULT;
+		}
+		ret = intel_gvt_ops->vgpu_create_dmabuf(vgpu, &dmabuf);
+		if (ret != 0) {
+			fdput(f);
+			gvt_vgpu_err("create dmabuf failed:%d\n", ret);
+			return -EINVAL;
+		}
+		fdput(f);
+		return copy_to_user((void __user *)arg, &dmabuf, minsz) ?
+								-EFAULT : 0;
+	}
+
+	fdput(f);
+	gvt_vgpu_err("unsupported dmabuf operation\n");
+
+	return -EINVAL;
+}
+
+static const struct file_operations intel_vgpu_dmabuf_mgr_fd_ops = {
+	.release        = intel_vgpu_dmabuf_mgr_fd_release,
+	.unlocked_ioctl = intel_vgpu_dmabuf_mgr_fd_ioctl,
+	.mmap           = intel_vgpu_dmabuf_mgr_fd_mmap,
+	.llseek         = noop_llseek,
+};
 static int intel_vgpu_create(struct kobject *kobj, struct mdev_device *mdev)
 {
 	struct intel_vgpu *vgpu = NULL;
@@ -1259,6 +1339,33 @@ static long intel_vgpu_ioctl(struct mdev_device *mdev, unsigned int cmd,
 	} else if (cmd == VFIO_DEVICE_RESET) {
 		intel_gvt_ops->vgpu_reset(vgpu);
 		return 0;
+	} else if (cmd == VFIO_DEVICE_GET_FD) {
+		int fd;
+		u32 type;
+		struct vfio_device *device;
+
+		if (copy_from_user(&type, (void __user *)arg, sizeof(type)))
+			return -EINVAL;
+		if (type != VFIO_DEVICE_DMABUF_MGR_FD)
+			return -EINVAL;
+
+		device = vfio_device_get_from_dev(mdev_dev(mdev));
+		if (device == NULL) {
+			gvt_vgpu_err("kvmgt: vfio device is null\n");
+			return -EINVAL;
+		}
+		vgpu->vdev.vfio_device = device;
+
+		fd = anon_inode_getfd("intel-vgpu-dmabuf-mgr-fd",
+			&intel_vgpu_dmabuf_mgr_fd_ops,
+			vgpu, O_RDWR | O_CLOEXEC);
+		if (fd < 0) {
+			gvt_vgpu_err("create dmabuf mgr fd failed\n");
+			return -EINVAL;
+		}
+		vgpu->dmabuf_mgr_fd = fd;
+
+		return fd;
 	}
 
 	return 0;

@@ -484,10 +484,58 @@ struct vfio_pci_hot_reset {
 
 #define VFIO_DEVICE_PCI_HOT_RESET	_IO(VFIO_TYPE, VFIO_BASE + 13)
 
+/**
+ * VFIO_DEVICE_GET_FD - _IO(VFIO_TYPE, VFIO_BASE + 14, __u32)
+ *
+ * Create a fd for a vfio device based on the input type
+ * Vendor driver should handle this ioctl to create a fd and manage the
+ * life cycle of this fd.
+ *
+ * Return: a fd if vendor support that type, -errno if not supported
+ */
+
+#define VFIO_DEVICE_GET_FD	_IO(VFIO_TYPE, VFIO_BASE + 14)
+
+#define VFIO_DEVICE_DMABUF_MGR_FD	0 /* Supported fd types */
+
+/*
+ * VFIO_DEVICE_QUERY_PLANE - _IO(VFIO_TYPE, VFIO_BASE + 15, struct plane_info)
+ * Query plane information for a plane
+ */
+struct plane_info {
+	__u32 plane_id;
+	__u32 drm_format;
+	__u32 width;
+	__u32 height;
+	__u32 stride;
+	__u32 start;
+	__u32 x_pos;
+	__u32 y_pos;
+	__u32 size;
+	__u64 drm_format_mod;
+};
+
+#define VFIO_PRIMARY_PLANE		1
+#define VFIO_CURSOR_PLANE		2
+
+#define VFIO_DEVICE_QUERY_PLANE _IO(VFIO_TYPE, VFIO_BASE + 15)
+
+/*
+ * VFIO_DEVICE_CREATE_DMABUF - _IO(VFIO, VFIO_BASE + 16, struct dmabuf_info)
+ *
+ * Create a dma-buf for a plane
+ */
+struct dmabuf_info {
+	__u32 fd;
+	struct plane_info plane_info;
+};
+#define VFIO_DEVICE_CREATE_DMABUF _IO(VFIO_TYPE, VFIO_BASE + 16)
+
 /* -------- API for Type1 VFIO IOMMU -------- */
 
 /**
- * VFIO_IOMMU_GET_INFO - _IOR(VFIO_TYPE, VFIO_BASE + 12, struct vfio_iommu_info)
+ * VFIO_IOMMU_GET_INFO - _IOR(VFIO_TYPE, VFIO_BASE + 12,
+ *							struct vfio_iommu_info)
  *
  * Retrieve information about the IOMMU object. Fills in provided
  * struct vfio_iommu_info. Caller sets argsz.

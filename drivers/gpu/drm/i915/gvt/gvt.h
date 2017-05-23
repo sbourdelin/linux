@@ -185,8 +185,10 @@ struct intel_vgpu {
 		struct kvm *kvm;
 		struct work_struct release_work;
 		atomic_t released;
+		struct vfio_device *vfio_device;
 	} vdev;
 #endif
+	int dmabuf_mgr_fd;
 };
 
 struct intel_gvt_gm {
@@ -467,6 +469,8 @@ struct intel_gvt_ops {
 	void (*vgpu_reset)(struct intel_vgpu *);
 	void (*vgpu_activate)(struct intel_vgpu *);
 	void (*vgpu_deactivate)(struct intel_vgpu *);
+	int (*vgpu_query_plane)(struct intel_vgpu *vgpu, void *);
+	int (*vgpu_create_dmabuf)(struct intel_vgpu *vgpu, void *);
 };
 
 
