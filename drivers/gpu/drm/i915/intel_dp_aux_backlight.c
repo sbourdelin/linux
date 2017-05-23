@@ -43,6 +43,9 @@ static void set_aux_backlight_enable(struct intel_dp *intel_dp, bool enable)
 	else
 		reg_val &= ~(DP_EDP_BACKLIGHT_ENABLE);
 
+	/* TODO: If the panel also support enabling backlight via BL_ENABLE pin,
+	 * the backlight will be enabled again in _intel_edp_backlight_on()
+	 */
 	if (drm_dp_dpcd_writeb(&intel_dp->aux, DP_EDP_DISPLAY_CONTROL_REGISTER,
 			       reg_val) != 1) {
 		DRM_DEBUG_KMS("Failed to %s aux backlight\n",
@@ -168,20 +171,35 @@ intel_dp_aux_display_control_capable(struct intel_connector *connector)
 	/* Check the  eDP Display control capabilities registers to determine if
 	 * the panel can support backlight control over the aux channel
 	 */
-	if (intel_dp->edp_dpcd[1] & DP_EDP_TCON_BACKLIGHT_ADJUSTMENT_CAP &&
-	    (intel_dp->edp_dpcd[2] & DP_EDP_BACKLIGHT_BRIGHTNESS_AUX_SET_CAP) &&
-	    !(intel_dp->edp_dpcd[2] & DP_EDP_BACKLIGHT_BRIGHTNESS_PWM_PIN_CAP)) {
+	if ((intel_dp->edp_dpcd[1] & DP_EDP_TCON_BACKLIGHT_ADJUSTMENT_CAP) &&
+	    (intel_dp->edp_dpcd[2] & DP_EDP_BACKLIGHT_BRIGHTNESS_AUX_SET_CAP)) {
 		DRM_DEBUG_KMS("AUX Backlight Control Supported!\n");
 		return true;
 	}
 	return false;
 }
 
+static bool
+intel_dp_pwm_pin_display_control_capable(struct intel_connector *connector)
+{
+	struct intel_dp *intel_dp = enc_to_intel_dp(&connector->encoder->base);
+
+	/* Check the  eDP Display control capabilities registers to determine if
+	 * the panel can support backlight control via BL_PWM_DIM eDP pin
+	 */
+	return (intel_dp->edp_dpcd[1] & DP_EDP_TCON_BACKLIGHT_ADJUSTMENT_CAP) &&
+	       (intel_dp->edp_dpcd[2] & DP_EDP_BACKLIGHT_BRIGHTNESS_PWM_PIN_CAP);
+}
+
 int intel_dp_aux_init_backlight_funcs(struct intel_connector *intel_connector)
 {
 	struct intel_panel *panel = &intel_connector->panel;
 
-	if (!i915.enable_dpcd_backlight)
+	if (i915.enable_dpcd_backlight == -1)
+		return -ENODEV;
+
+	if (i915.enable_dpcd_backlight == 0 &&
+	    intel_dp_pwm_pin_display_control_capable(intel_connector))
 		return -ENODEV;
 
 	if (!intel_dp_aux_display_control_capable(intel_connector))
