@@ -7316,6 +7316,26 @@ int perf_event_account_interrupt(struct perf_event *event)
 	return __perf_event_account_interrupt(event, 1);
 }
 
+static bool skid_kernel_samples(struct perf_event *event, struct pt_regs *regs)
+{
+	/*
+	 * We may get kernel samples even though exclude_kernel
+	 * is specified due to potential skid in sampling.
+	 * The skid kernel samples could be dropped or just do
+	 * nothing by testing the flag PERF_PMU_CAP_NO_SKID.
+	 */
+	if (event->pmu->capabilities & PERF_PMU_CAP_NO_SKID)
+		return false;
+
+	if (event->attr.exclude_kernel &&
+	    !user_mode(regs) &&
+	    (event->attr.sample_type & PERF_SAMPLE_IP)) {
+		return true;
+	}
+
+	return false;
+}
+
 /*
  * Generic event overflow handling, sampling.
  */
@@ -7335,6 +7355,12 @@ static int __perf_event_overflow(struct perf_event *event,
 		return 0;
 
 	ret = __perf_event_account_interrupt(event, throttle);
+
+	/*
+	 * For security, drop the skid kernel samples if necessary.
+	 */
+	if (skid_kernel_samples(event, regs))
+		return ret;
 
 	/*
 	 * XXX event_limit might not quite work as expected on inherited
