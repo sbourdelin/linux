@@ -1222,7 +1222,7 @@ static void write_bulk_callback(struct urb *urb)
 		stats->tx_errors += agg->skb_num;
 	} else {
 		stats->tx_packets += agg->skb_num;
-		stats->tx_bytes += agg->skb_len;
+		stats->tx_bytes += agg->skb_len + CRC_SIZE;
 	}
 
 	spin_lock(&tp->tx_lock);
@@ -1820,7 +1820,6 @@ static int rx_bottom(struct r8152 *tp, int budget)
 			if (urb->actual_length < len_used)
 				break;
 
-			pkt_len -= CRC_SIZE;
 			rx_data += sizeof(struct rx_desc);
 
 			skb = napi_alloc_skb(napi, pkt_len);
@@ -1844,7 +1843,7 @@ static int rx_bottom(struct r8152 *tp, int budget)
 			}
 
 find_next_rx:
-			rx_data = rx_agg_align(rx_data + pkt_len + CRC_SIZE);
+			rx_data = rx_agg_align(rx_data + pkt_len);
 			rx_desc = (struct rx_desc *)rx_data;
 			len_used = (int)(rx_data - (u8 *)agg->head);
 			len_used += sizeof(struct rx_desc);
