@@ -619,7 +619,7 @@ static int elan_i2c_finish_fw_update(struct i2c_client *client,
 
 	error = elan_i2c_write_cmd(client, ETP_I2C_STAND_CMD, ETP_I2C_RESET);
 	if (!error)
-		ret = wait_for_completion_interruptible_timeout(completion,
+		ret = wait_for_completion_timeout(completion,
 							msecs_to_jiffies(300));
 	disable_irq(client->irq);
 
