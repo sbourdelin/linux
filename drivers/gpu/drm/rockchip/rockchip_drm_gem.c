@@ -315,6 +315,11 @@ struct rockchip_gem_object *
 	struct drm_gem_object *obj;
 	int ret;
 
+	if (!size) {
+		DRM_ERROR("gem buffer size is zero\n");
+		return ERR_PTR(-EINVAL);
+	}
+
 	size = round_up(size, PAGE_SIZE);
 
 	rk_obj = kzalloc(sizeof(*rk_obj), GFP_KERNEL);
