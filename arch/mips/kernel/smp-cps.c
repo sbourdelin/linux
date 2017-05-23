@@ -168,10 +168,8 @@ static void __init cps_prepare_cpus(unsigned int max_cpus)
 	/* Allocate core boot configuration structs */
 	mips_cps_core_bootcfg = kcalloc(ncores, sizeof(*mips_cps_core_bootcfg),
 					GFP_KERNEL);
-	if (!mips_cps_core_bootcfg) {
-		pr_err("Failed to allocate boot config for %u cores\n", ncores);
+	if (!mips_cps_core_bootcfg)
 		goto err_out;
-	}
 
 	/* Allocate VPE boot configuration structs */
 	for (c = 0; c < ncores; c++) {
@@ -179,11 +177,8 @@ static void __init cps_prepare_cpus(unsigned int max_cpus)
 		mips_cps_core_bootcfg[c].vpe_config = kcalloc(core_vpes,
 				sizeof(*mips_cps_core_bootcfg[c].vpe_config),
 				GFP_KERNEL);
-		if (!mips_cps_core_bootcfg[c].vpe_config) {
-			pr_err("Failed to allocate %u VPE boot configs\n",
-			       core_vpes);
+		if (!mips_cps_core_bootcfg[c].vpe_config)
 			goto err_out;
-		}
 	}
 
 	/* Mark this CPU as booted */
