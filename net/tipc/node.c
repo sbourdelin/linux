@@ -324,10 +324,9 @@ struct tipc_node *tipc_node_create(struct net *net, u32 addr, u16 capabilities)
 		goto exit;
 	}
 	n = kzalloc(sizeof(*n), GFP_ATOMIC);
-	if (!n) {
-		pr_warn("Node creation failed, no memory\n");
+	if (!n)
 		goto exit;
-	}
+
 	n->addr = addr;
 	n->net = net;
 	n->capabilities = capabilities;

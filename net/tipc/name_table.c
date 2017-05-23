@@ -117,10 +117,8 @@ static struct publication *publ_create(u32 type, u32 lower, u32 upper,
 				       u32 key)
 {
 	struct publication *publ = kzalloc(sizeof(*publ), GFP_ATOMIC);
-	if (publ == NULL) {
-		pr_warn("Publication creation failure, no memory\n");
+	if (!publ)
 		return NULL;
-	}
 
 	publ->type = type;
 	publ->lower = lower;
@@ -270,11 +268,9 @@ static struct publication *tipc_nameseq_insert_publ(struct net *net,
 		if (nseq->first_free == nseq->alloc) {
 			struct sub_seq *sseqs = tipc_subseq_alloc(nseq->alloc * 2);
 
-			if (!sseqs) {
-				pr_warn("Cannot publish {%u,%u,%u}, no memory\n",
-					type, lower, upper);
+			if (!sseqs)
 				return NULL;
-			}
+
 			memcpy(sseqs, nseq->sseqs,
 			       nseq->alloc * sizeof(struct sub_seq));
 			kfree(nseq->sseqs);
@@ -283,11 +279,8 @@ static struct publication *tipc_nameseq_insert_publ(struct net *net,
 		}
 
 		info = kzalloc(sizeof(*info), GFP_ATOMIC);
-		if (!info) {
-			pr_warn("Cannot publish {%u,%u,%u}, no memory\n",
-				type, lower, upper);
+		if (!info)
 			return NULL;
-		}
 
 		INIT_LIST_HEAD(&info->node_list);
 		INIT_LIST_HEAD(&info->cluster_list);
