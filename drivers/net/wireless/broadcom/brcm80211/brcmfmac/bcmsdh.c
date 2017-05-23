@@ -1274,14 +1274,16 @@ static int brcmf_ops_sdio_suspend(struct device *dev)
 static int brcmf_ops_sdio_resume(struct device *dev)
 {
 	struct brcmf_bus *bus_if = dev_get_drvdata(dev);
-	struct brcmf_sdio_dev *sdiodev = bus_if->bus_priv.sdio;
 	struct sdio_func *func = container_of(dev, struct sdio_func, dev);
 
 	brcmf_dbg(SDIO, "Enter: F%d\n", func->num);
 	if (func->num != SDIO_FUNC_2)
 		return 0;
 
-	brcmf_sdiod_freezer_off(sdiodev);
+	if (!bus_if)
+		return 0;
+
+	brcmf_sdiod_freezer_off(bus_if->bus_priv.sdio);
 	return 0;
 }
 
@@ -1319,4 +1321,3 @@ void brcmf_sdio_exit(void)
 
 	sdio_unregister_driver(&brcmf_sdmmc_driver);
 }
-
