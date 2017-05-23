@@ -1687,7 +1687,11 @@ enum {
 	SYNAPTICS_INTERTOUCH_ON,
 };
 
+#if IS_ENABLED(CONFIG_RMI4_SMB)
 static int synaptics_intertouch = SYNAPTICS_INTERTOUCH_NOT_SET;
+#else /* CONFIG_RMI4_SMB */
+static int synaptics_intertouch = SYNAPTICS_INTERTOUCH_OFF;
+#endif /* CONFIG_RMI4_SMB */
 module_param_named(synaptics_intertouch, synaptics_intertouch, int, 0644);
 MODULE_PARM_DESC(synaptics_intertouch, "Use a secondary bus for the Synaptics device.");
 
