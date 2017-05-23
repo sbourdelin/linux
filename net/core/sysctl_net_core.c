@@ -69,11 +69,12 @@ static int rps_sock_flow_sysctl(struct ctl_table *table, int write,
 				}
 				rps_cpu_mask = roundup_pow_of_two(nr_cpu_ids) - 1;
 				sock_table->mask = size - 1;
+
+				for (i = 0; i < size; i++)
+					sock_table->ents[i] = RPS_NO_CPU;
 			} else
 				sock_table = orig_sock_table;
 
-			for (i = 0; i < size; i++)
-				sock_table->ents[i] = RPS_NO_CPU;
 		} else
 			sock_table = NULL;
 
