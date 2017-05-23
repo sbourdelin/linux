@@ -1262,43 +1262,55 @@ static int dax_pmd_insert_mapping(struct vm_fault *vmf, struct iomap *iomap,
 	struct block_device *bdev = iomap->bdev;
 	struct inode *inode = mapping->host;
 	const size_t size = PMD_SIZE;
+	char *fallback_reason = "";
 	void *ret = NULL, *kaddr;
 	long length = 0;
 	pgoff_t pgoff;
 	pfn_t pfn;
 	int id;
 
-	if (bdev_dax_pgoff(bdev, sector, size, &pgoff) != 0)
+	if (bdev_dax_pgoff(bdev, sector, size, &pgoff) != 0) {
+		fallback_reason = "bad pgoff";
 		goto fallback;
+	}
 
 	id = dax_read_lock();
 	length = dax_direct_access(dax_dev, pgoff, PHYS_PFN(size), &kaddr, &pfn);
-	if (length < 0)
+	if (length < 0) {
+		fallback_reason = "direct access";
 		goto unlock_fallback;
+	}
 	length = PFN_PHYS(length);
 
-	if (length < size)
+	if (length < size) {
+		fallback_reason = "bad length";
 		goto unlock_fallback;
-	if (pfn_t_to_pfn(pfn) & PG_PMD_COLOUR)
+	} else if (pfn_t_to_pfn(pfn) & PG_PMD_COLOUR) {
+		fallback_reason = "pfn unaligned";
 		goto unlock_fallback;
-	if (!pfn_t_devmap(pfn))
+	} else if (!pfn_t_devmap(pfn)) {
+		fallback_reason = "pfn_t not devmap";
 		goto unlock_fallback;
+	}
 	dax_read_unlock(id);
 
 	ret = dax_insert_mapping_entry(mapping, vmf, *entryp, sector,
 			RADIX_DAX_PMD);
-	if (IS_ERR(ret))
+	if (IS_ERR(ret)) {
+		fallback_reason = "insert mapping";
 		goto fallback;
+	}
 	*entryp = ret;
 
-	trace_dax_pmd_insert_mapping(inode, vmf, length, pfn, ret);
+	trace_dax_pmd_insert_mapping(inode, vmf, length, pfn, ret, "");
 	return vmf_insert_pfn_pmd(vmf->vma, vmf->address, vmf->pmd,
 			pfn, vmf->flags & FAULT_FLAG_WRITE);
 
 unlock_fallback:
 	dax_read_unlock(id);
 fallback:
-	trace_dax_pmd_insert_mapping_fallback(inode, vmf, length, pfn, ret);
+	trace_dax_pmd_insert_mapping_fallback(inode, vmf, length, pfn, ret,
+			fallback_reason);
 	return VM_FAULT_FALLBACK;
 }
 

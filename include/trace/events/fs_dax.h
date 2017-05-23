@@ -106,8 +106,9 @@ DEFINE_PMD_LOAD_HOLE_EVENT(dax_pmd_load_hole_fallback);
 
 DECLARE_EVENT_CLASS(dax_pmd_insert_mapping_class,
 	TP_PROTO(struct inode *inode, struct vm_fault *vmf,
-		long length, pfn_t pfn, void *radix_entry),
-	TP_ARGS(inode, vmf, length, pfn, radix_entry),
+		long length, pfn_t pfn, void *radix_entry,
+		char *fallback_reason),
+	TP_ARGS(inode, vmf, length, pfn, radix_entry, fallback_reason),
 	TP_STRUCT__entry(
 		__field(unsigned long, ino)
 		__field(unsigned long, vm_flags)
@@ -115,6 +116,7 @@ DECLARE_EVENT_CLASS(dax_pmd_insert_mapping_class,
 		__field(long, length)
 		__field(u64, pfn_val)
 		__field(void *, radix_entry)
+		__field(char *, fallback_reason)
 		__field(dev_t, dev)
 		__field(int, write)
 	),
@@ -127,9 +129,10 @@ DECLARE_EVENT_CLASS(dax_pmd_insert_mapping_class,
 		__entry->length = length;
 		__entry->pfn_val = pfn.val;
 		__entry->radix_entry = radix_entry;
+		__entry->fallback_reason = fallback_reason;
 	),
 	TP_printk("dev %d:%d ino %#lx %s %s address %#lx length %#lx "
-			"pfn %#llx %s radix_entry %#lx",
+			"pfn %#llx %s radix_entry %#lx %s",
 		MAJOR(__entry->dev),
 		MINOR(__entry->dev),
 		__entry->ino,
@@ -137,18 +140,20 @@ DECLARE_EVENT_CLASS(dax_pmd_insert_mapping_class,
 		__entry->write ? "write" : "read",
 		__entry->address,
 		__entry->length,
-		__entry->pfn_val & ~PFN_FLAGS_MASK,
+		__entry->pfn_val,
 		__print_flags_u64(__entry->pfn_val & PFN_FLAGS_MASK, "|",
 			PFN_FLAGS_TRACE),
-		(unsigned long)__entry->radix_entry
+		(unsigned long)__entry->radix_entry,
+		__entry->fallback_reason
 	)
 )
 
 #define DEFINE_PMD_INSERT_MAPPING_EVENT(name) \
 DEFINE_EVENT(dax_pmd_insert_mapping_class, name, \
 	TP_PROTO(struct inode *inode, struct vm_fault *vmf, \
-		long length, pfn_t pfn, void *radix_entry), \
-	TP_ARGS(inode, vmf, length, pfn, radix_entry))
+		long length, pfn_t pfn, void *radix_entry, \
+		char *fallback_reason), \
+	TP_ARGS(inode, vmf, length, pfn, radix_entry, fallback_reason))
 
 DEFINE_PMD_INSERT_MAPPING_EVENT(dax_pmd_insert_mapping);
 DEFINE_PMD_INSERT_MAPPING_EVENT(dax_pmd_insert_mapping_fallback);
