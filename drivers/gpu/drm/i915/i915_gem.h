@@ -30,6 +30,7 @@
 #ifdef CONFIG_DRM_I915_DEBUG_GEM
 #define GEM_BUG_ON(expr) BUG_ON(expr)
 #define GEM_WARN_ON(expr) WARN_ON(expr)
+#define GEM_WARN(condition, format, ...) WARN(condition, format, __VA_ARGS__)
 
 #define GEM_DEBUG_DECL(var) var
 #define GEM_DEBUG_EXEC(expr) expr
@@ -38,6 +39,7 @@
 #else
 #define GEM_BUG_ON(expr) BUILD_BUG_ON_INVALID(expr)
 #define GEM_WARN_ON(expr) (BUILD_BUG_ON_INVALID(expr), 0)
+#define GEM_WARN(condition, format, ...) BUILD_BUG_ON_INVALID(condition)
 
 #define GEM_DEBUG_DECL(var)
 #define GEM_DEBUG_EXEC(expr) do { } while (0)

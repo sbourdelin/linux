@@ -3332,7 +3332,8 @@ static int wait_for_engines(struct drm_i915_private *i915)
 	enum intel_engine_id id;
 
 	for_each_engine(engine, i915, id) {
-		if (GEM_WARN_ON(wait_for_engine(engine, 50))) {
+		if (wait_for_engine(engine, 50)) {
+			GEM_WARN(1, "%s wait for idle timeout", engine->name);
 			i915_gem_set_wedged(i915);
 			return -EIO;
 		}
