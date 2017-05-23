@@ -1166,6 +1166,11 @@ ext4_xattr_set_handle(handle_t *handle, struct inode *inode, int name_index,
 		return -EINVAL;
 	if (strlen(name) > 255)
 		return -ERANGE;
+
+	error = dquot_initialize(inode);
+	if (error)
+		return error;
+
 	ext4_write_lock_xattr(inode, &no_expand);
 
 	error = ext4_reserve_inode_write(handle, inode, &is.iloc);
