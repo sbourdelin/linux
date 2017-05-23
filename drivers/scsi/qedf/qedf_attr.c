@@ -8,33 +8,6 @@
  */
 #include "qedf.h"
 
-static ssize_t
-qedf_fcoe_mac_show(struct device *dev,
-	struct device_attribute *attr, char *buf)
-{
-	struct fc_lport *lport = shost_priv(class_to_shost(dev));
-	u32 port_id;
-	u8 lport_src_id[3];
-	u8 fcoe_mac[6];
-
-	port_id = fc_host_port_id(lport->host);
-	lport_src_id[2] = (port_id & 0x000000FF);
-	lport_src_id[1] = (port_id & 0x0000FF00) >> 8;
-	lport_src_id[0] = (port_id & 0x00FF0000) >> 16;
-	fc_fcoe_set_mac(fcoe_mac, lport_src_id);
-
-	return scnprintf(buf, PAGE_SIZE, "%pM\n", fcoe_mac);
-}
-
-static DEVICE_ATTR(fcoe_mac, S_IRUGO, qedf_fcoe_mac_show, NULL);
-
-struct device_attribute *qedf_host_attrs[] = {
-	&dev_attr_fcoe_mac,
-	NULL,
-};
-
-extern const struct qed_fcoe_ops *qed_ops;
-
 inline bool qedf_is_vport(struct qedf_ctx *qedf)
 {
 	return (!(qedf->lport->vport == NULL));
@@ -53,6 +26,55 @@ static struct qedf_ctx *qedf_get_base_qedf(struct qedf_ctx *qedf)
 	base_lport = shost_priv(vport_to_shost(lport->vport));
 	return (struct qedf_ctx *)(lport_priv(base_lport));
 }
+
+static ssize_t
+qedf_fcoe_mac_show(struct device *dev,
+	struct device_attribute *attr, char *buf)
+{
+	struct fc_lport *lport = shost_priv(class_to_shost(dev));
+	u32 port_id;
+	u8 lport_src_id[3];
+	u8 fcoe_mac[6];
+
+	port_id = fc_host_port_id(lport->host);
+	lport_src_id[2] = (port_id & 0x000000FF);
+	lport_src_id[1] = (port_id & 0x0000FF00) >> 8;
+	lport_src_id[0] = (port_id & 0x00FF0000) >> 16;
+	fc_fcoe_set_mac(fcoe_mac, lport_src_id);
+
+	return scnprintf(buf, PAGE_SIZE, "%pM\n", fcoe_mac);
+}
+
+static ssize_t
+qedf_fka_period_show(struct device *dev,
+	struct device_attribute *attr, char *buf)
+{
+	struct fc_lport *lport = shost_priv(class_to_shost(dev));
+	struct qedf_ctx *qedf = lport_priv(lport);
+	int fka_period = -1;
+
+	if (qedf_is_vport(qedf))
+		qedf = qedf_get_base_qedf(qedf);
+
+	if (!qedf->ctlr.sel_fcf)
+		goto out;
+
+	fka_period = qedf->ctlr.sel_fcf->fka_period;
+
+out:
+	return scnprintf(buf, PAGE_SIZE, "%d\n", fka_period);
+}
+
+static DEVICE_ATTR(fcoe_mac, S_IRUGO, qedf_fcoe_mac_show, NULL);
+static DEVICE_ATTR(fka_period, S_IRUGO, qedf_fka_period_show, NULL);
+
+struct device_attribute *qedf_host_attrs[] = {
+	&dev_attr_fcoe_mac,
+	&dev_attr_fka_period,
+	NULL,
+};
+
+extern const struct qed_fcoe_ops *qed_ops;
 
 void qedf_capture_grc_dump(struct qedf_ctx *qedf)
 {
