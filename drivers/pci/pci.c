@@ -11,6 +11,7 @@
 #include <linux/kernel.h>
 #include <linux/delay.h>
 #include <linux/dmi.h>
+#include <linux/idr.h>
 #include <linux/init.h>
 #include <linux/of.h>
 #include <linux/of_pci.h>
@@ -5340,15 +5341,25 @@ static void pci_no_domains(void)
 }
 
 #ifdef CONFIG_PCI_DOMAINS
-static atomic_t __domain_nr = ATOMIC_INIT(-1);
+DEFINE_IDA(__domain_nr);
 
-int pci_get_new_domain_nr(void)
+/* get domain number from IDA */
+static bool ida_domain = true;
+
+int pci_get_new_domain_nr(struct pci_bus *bus)
 {
-	return atomic_inc_return(&__domain_nr);
+	return ida_simple_get(&__domain_nr, 0, sizeof(u64), GFP_KERNEL);
+}
+
+void pci_put_old_domain_nr(struct pci_bus *bus)
+{
+	if (ida_domain)
+		ida_simple_remove(&__domain_nr, bus->domain_nr);
 }
 
 #ifdef CONFIG_PCI_DOMAINS_GENERIC
-static int of_pci_bus_find_domain_nr(struct device *parent)
+static int of_pci_bus_find_domain_nr(struct pci_bus *bus,
+				     struct device *parent)
 {
 	static int use_dt_domains = -1;
 	int domain = -1;
@@ -5361,19 +5372,21 @@ static int of_pci_bus_find_domain_nr(struct device *parent)
 	 * If DT domain property is valid (domain >= 0) and
 	 * use_dt_domains != 0, the DT assignment is valid since this means
 	 * we have not previously allocated a domain number by using
-	 * pci_get_new_domain_nr(); we should also update use_dt_domains to
-	 * 1, to indicate that we have just assigned a domain number from
-	 * DT.
+	 * pci_get_new_domain_nr(), so we should set ida_domain to false to
+	 * indicate that we don't allocate domain from idr; we should also
+	 * update use_dt_domains to 1, to indicate that we have just assigned
+	 * a domain number from DT.
 	 *
 	 * If DT domain property value is not valid (ie domain < 0), and we
 	 * have not previously assigned a domain number from DT
-	 * (use_dt_domains != 1) we should assign a domain number by
-	 * using the:
+	 * (use_dt_domains != 1 && ida_domain != false) we should assign a
+	 * domain number by using the:
 	 *
 	 * pci_get_new_domain_nr()
 	 *
-	 * API and update the use_dt_domains value to keep track of method we
-	 * are using to assign domain numbers (use_dt_domains = 0).
+	 * API and update the use_dt_domains and ida_domain value to keep track
+	 * of method we are using to assign domain numbers (use_dt_domains = 0
+	 * and ida_domain = true).
 	 *
 	 * All other combinations imply we have a platform that is trying
 	 * to mix domain numbers obtained from DT and pci_get_new_domain_nr(),
@@ -5383,9 +5396,10 @@ static int of_pci_bus_find_domain_nr(struct device *parent)
 	 */
 	if (domain >= 0 && use_dt_domains) {
 		use_dt_domains = 1;
-	} else if (domain < 0 && use_dt_domains != 1) {
+		ida_domain = false;
+	} else if (domain < 0 && use_dt_domains != 1 && ida_domain != false) {
 		use_dt_domains = 0;
-		domain = pci_get_new_domain_nr();
+		domain = pci_get_new_domain_nr(bus);
 	} else {
 		dev_err(parent, "Node %s has inconsistent \"linux,pci-domain\" property in DT\n",
 			parent->of_node->full_name);
@@ -5397,7 +5411,7 @@ static int of_pci_bus_find_domain_nr(struct device *parent)
 
 int pci_bus_find_domain_nr(struct pci_bus *bus, struct device *parent)
 {
-	return acpi_disabled ? of_pci_bus_find_domain_nr(parent) :
+	return acpi_disabled ? of_pci_bus_find_domain_nr(bus, parent) :
 			       acpi_pci_bus_find_domain_nr(bus);
 }
 #endif
