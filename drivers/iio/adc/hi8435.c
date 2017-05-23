@@ -462,8 +462,6 @@ static int hi8435_probe(struct spi_device *spi)
 	idev->channels		= hi8435_channels;
 	idev->num_channels	= ARRAY_SIZE(hi8435_channels);
 
-	/* unmask all events */
-	priv->event_scan_mask = ~(0);
 	/*
 	 * There is a restriction in the chip - the hysteresis can not be odd.
 	 * If the hysteresis is set to odd value then chip gets into lock state
