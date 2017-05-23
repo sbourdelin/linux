@@ -113,6 +113,7 @@ config SND_SOC_ALL_CODECS
 	select SND_SOC_PCM5102A
 	select SND_SOC_PCM512x_I2C if I2C
 	select SND_SOC_PCM512x_SPI if SPI_MASTER
+	select SND_SOC_PCM9211_I2C if I2C
 	select SND_SOC_RT286 if I2C
 	select SND_SOC_RT298 if I2C
 	select SND_SOC_RT5514 if I2C
@@ -683,6 +684,15 @@ config SND_SOC_PCM512x_SPI
 	depends on SPI_MASTER
 	select SND_SOC_PCM512x
 	select REGMAP_SPI
+
+config SND_SOC_PCM9211
+	tristate
+
+config SND_SOC_PCM9211_I2C
+	tristate "Texas Instruments PCM9211 CODEC - I2C"
+	depends on I2C
+	select SND_SOC_PCM9211
+	select REGMAP_I2C
 
 config SND_SOC_RL6231
 	tristate

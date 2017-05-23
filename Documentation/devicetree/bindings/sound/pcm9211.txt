@@ -1,0 +1,118 @@
+PCM9211 audio CODEC
+
+This device support both I2C and SPI (configured with pin strapping
+on the board). The driver is currently implementing i2c only.
+
+Required properties:
+
+  - compatible : "ti,pcm9211"
+
+  - reg : the I2C address of the device for I2C, the chip select
+          number for SPI.
+
+  - VCCAD-supply, VCC-supply, VDDRX-supply and AVDD-supply :
+   power supplies for the device, as covered in bindings/regulator/regulator.txt
+
+Optional properties:
+
+  - clocks : A clock specifier for the clock connected to XTI. While the
+    device could work without it, this driver currently relies on it being
+    available
+
+  - clock-names : Must speficy "xti" to match the requested clock.
+
+  - reset-gpios : GPIO wired to the reset pin, if not supplied a soft-reset is
+    used as fallback
+
+  - int0-gpios : GPIO connected to interrupt0 output of the PCM9211. The
+    line can be configured to any of MPO0,1 and MPIOA,B,C0-4 and error/int0.
+    If this is specified it is used as an interrupt to notify alsa controls
+    about changes of the incoming sampling rate on DIR (spdif) as well as NPCM
+    status.
+
+  - ti,group-function: An array with size 3 specifying function for pingroups
+    A, B and C.  Possible values are defined in dt-bindings/sound/pcm9211.h
+
+  - ti,mpio-a-flags-gpio: An array with size 4 specifying flags out or gpio
+    mode per pin, when function DIR_FLAGS_GPIO is selected for group a.
+    Possible values are defined in dt-bindings/sound/pcm9211.h
+
+  - ti,mpio-b-flags-gpio: An array with size 4 specifying flags out or gpio
+    mode per pin, when function DIR_FLAGS_GPIO is selected for group b.
+    Possible values are defined in dt-bindings/sound/pcm9211.h
+
+  - ti,mpio-c-flags-gpio: An array with size 4 specifying flags out or gpio
+    mode per pin, when function DIR_FLAGS_GPIO is selected for group c.
+    Possible values are defined in dt-bindings/sound/pcm9211.h
+
+  - ti,mpio-a-flag: An array with size 4 specifying flag assinged per pin,
+    when function DIR_FLAGS_GPIO is selected for group a and pin is set to
+    flags mode.
+    Possible values are defined in dt-bindings/sound/pcm9211.h
+
+  - ti,mpio-b-flag: An array with size 4 specifying flag assinged per pin,
+    when function DIR_FLAGS_GPIO is selected for group b and pin is set to
+    flags mode.
+    Possible values are defined in dt-bindings/sound/pcm9211.h
+
+  - ti,mpio-c-flag: An array with size 4 specifying flag assinged per pin,
+    when function DIR_FLAGS_GPIO is selected for group c and pin is set to
+    flags mode.
+    Possible values are defined in dt-bindings/sound/pcm9211.h
+
+  - ti,mpo-function: An array with size 2 specifying flag assinged per mpo
+    pin.
+    Possible values are defined in dt-bindings/sound/pcm9211.h
+
+  - ti,int0-function: Selects error/int0 pin function.
+    Possible values are defined in dt-bindings/sound/pcm9211.h
+
+  - ti,int1-function: Selects error/int1 pin function.
+    Possible values are defined in dt-bindings/sound/pcm9211.h
+
+Examples:
+
+	pcm9211: pcm9211@43 {
+		compatible = "ti,pcm9211";
+		reg = <0x43>;
+
+		VCCAD-supply = <&reg_5v0_analog>;
+		VCC-supply = <&reg_3v3_pll_analog>;
+		VDDRX-supply = <&reg_3v3>;
+		DVDD-supply = <&reg_3v3>;
+
+		clocks = <&xti_clk>;
+		clock-names = "xti";
+	};
+
+
+	pcm9211: pcm9211@43 {
+		compatible = "ti,pcm9211";
+		reg = <0x43>;
+
+		VCCAD-supply = <&reg_5v0_analog>;
+		VCC-supply = <&reg_3v3_pll_analog>;
+		VDDRX-supply = <&reg_3v3>;
+		DVDD-supply = <&reg_3v3>;
+
+		clocks = <&xti_clk>;
+		clock-names = "xti";
+
+		reset-gpios = <&gpio1 0 GPIO_ACTIVE_HIGH>;
+		int-gpios = <&gpio1 0 GPIO_ACTIVE_HIGH>;
+
+		ti,group-function = /bits/ 8
+			<PCM9211_MPIO_A_GROUP_BIPHASE_INPUT,
+			PCM9211_MPIO_B_GROUP_DIR_FLAGS_GPIO,
+			PCM9211_MPIO_C_GROUP_AUXIN1>;
+		ti,mpio-b-flags-gpio = /bits/ 8
+			<PCM9211_MPIO_DIR_FLAGS,
+			PCM9211_MPIO_DIR_FLAGS,
+			PCM9211_MPIO_DIR_FLAGS,
+			PCM9211_MPIO_DIR_FLAGS>;
+		ti,mpio-b-flag = /bits/ 8
+			<PCM9211_MPIO_FLAG_INT0,
+			PCM9211_MPIO_FLAG_CLKST,
+			PCM9211_MPIO_FLAG_CLKST,
+			PCM9211_MPIO_FLAG_CLKST>;
+	};
