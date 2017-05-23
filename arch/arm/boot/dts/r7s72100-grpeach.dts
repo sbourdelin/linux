@@ -1,0 +1,65 @@
+/*
+ * Device Tree Source for the GRPEACH board
+ *
+ * Copyright (C) 2017 Jacopo Mondi <jacopo+renesas@jmondi.org>
+ * Copyright (C) 2016 Renesas Electronics
+ *
+ * This file is licensed under the terms of the GNU General Public License
+ * version 2.  This program is licensed "as is" without any warranty of any
+ * kind, whether express or implied.
+ */
+
+/dts-v1/;
+#include "r7s72100.dtsi"
+
+/ {
+	model = "GRPEACH";
+	compatible = "renesas,grpeach", "renesas,r7s72100";
+
+	aliases {
+		serial2 = &scif2;
+	};
+
+	chosen {
+		bootargs = "console=ttySC2,115200 ignore_loglevel rw root=/dev/mtdblock0";
+	};
+
+	memory {
+		device_type = "memory";
+		reg = <0x20000000 0x00A00000>;	/* 10Mb @ 0x20000000 */
+
+	};
+
+	lbsc {
+		#address-cells = <1>;
+		#size-cells = <1>;
+	};
+
+	qspi@18000000 {
+		compatible = "mtd-rom";
+		probe-type = "map_rom";
+		reg = <0x18000000 0x00800000>;   /* 8 MB*/
+		bank-width = <4>;
+		device-width = <1>;
+
+		#address-cells = <1>;
+		#size-cells = <1>;
+
+		rootfs@18600000 {
+			label = "rootfs";
+			reg = <0x00600000 0x00200000>; /* 2MB @ 0x18600000 */
+		};
+	};
+};
+
+&extal_clk {
+	clock-frequency = <13330000>;
+};
+
+&usb_x1_clk {
+	clock-frequency = <48000000>;
+};
+
+&scif2 {
+	status = "okay";
+};
