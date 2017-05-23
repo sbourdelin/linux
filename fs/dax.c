@@ -1320,6 +1320,7 @@ static int dax_pmd_load_hole(struct vm_fault *vmf, struct iomap *iomap,
 	struct address_space *mapping = vmf->vma->vm_file->f_mapping;
 	unsigned long pmd_addr = vmf->address & PMD_MASK;
 	struct inode *inode = mapping->host;
+	char *fallback_reason = "";
 	struct page *zero_page;
 	void *ret = NULL;
 	spinlock_t *ptl;
@@ -1327,17 +1328,22 @@ static int dax_pmd_load_hole(struct vm_fault *vmf, struct iomap *iomap,
 
 	zero_page = mm_get_huge_zero_page(vmf->vma->vm_mm);
 
-	if (unlikely(!zero_page))
+	if (unlikely(!zero_page)) {
+		fallback_reason = "no zero page";
 		goto fallback;
+	}
 
 	ret = dax_insert_mapping_entry(mapping, vmf, *entryp, 0,
 			RADIX_DAX_PMD | RADIX_DAX_HZP);
-	if (IS_ERR(ret))
+	if (IS_ERR(ret)) {
+		fallback_reason = "insert mapping";
 		goto fallback;
+	}
 	*entryp = ret;
 
 	ptl = pmd_lock(vmf->vma->vm_mm, vmf->pmd);
 	if (!pmd_none(*(vmf->pmd))) {
+		fallback_reason = "pmd collision";
 		spin_unlock(ptl);
 		goto fallback;
 	}
@@ -1346,11 +1352,12 @@ static int dax_pmd_load_hole(struct vm_fault *vmf, struct iomap *iomap,
 	pmd_entry = pmd_mkhuge(pmd_entry);
 	set_pmd_at(vmf->vma->vm_mm, pmd_addr, vmf->pmd, pmd_entry);
 	spin_unlock(ptl);
-	trace_dax_pmd_load_hole(inode, vmf, zero_page, ret);
+	trace_dax_pmd_load_hole(inode, vmf, zero_page, ret, "");
 	return VM_FAULT_NOPAGE;
 
 fallback:
-	trace_dax_pmd_load_hole_fallback(inode, vmf, zero_page, ret);
+	trace_dax_pmd_load_hole_fallback(inode, vmf, zero_page, ret,
+			fallback_reason);
 	return VM_FAULT_FALLBACK;
 }
 

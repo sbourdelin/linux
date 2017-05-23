@@ -65,14 +65,15 @@ DEFINE_PMD_FAULT_EVENT(dax_pmd_fault_done);
 DECLARE_EVENT_CLASS(dax_pmd_load_hole_class,
 	TP_PROTO(struct inode *inode, struct vm_fault *vmf,
 		struct page *zero_page,
-		void *radix_entry),
-	TP_ARGS(inode, vmf, zero_page, radix_entry),
+		void *radix_entry, char *fallback_reason),
+	TP_ARGS(inode, vmf, zero_page, radix_entry, fallback_reason),
 	TP_STRUCT__entry(
 		__field(unsigned long, ino)
 		__field(unsigned long, vm_flags)
 		__field(unsigned long, address)
 		__field(struct page *, zero_page)
 		__field(void *, radix_entry)
+		__field(char *, fallback_reason)
 		__field(dev_t, dev)
 	),
 	TP_fast_assign(
@@ -82,24 +83,27 @@ DECLARE_EVENT_CLASS(dax_pmd_load_hole_class,
 		__entry->address = vmf->address;
 		__entry->zero_page = zero_page;
 		__entry->radix_entry = radix_entry;
+		__entry->fallback_reason = fallback_reason;
 	),
 	TP_printk("dev %d:%d ino %#lx %s address %#lx zero_page %p "
-			"radix_entry %#lx",
+			"radix_entry %#lx %s",
 		MAJOR(__entry->dev),
 		MINOR(__entry->dev),
 		__entry->ino,
 		__entry->vm_flags & VM_SHARED ? "shared" : "private",
 		__entry->address,
 		__entry->zero_page,
-		(unsigned long)__entry->radix_entry
+		(unsigned long)__entry->radix_entry,
+		__entry->fallback_reason
 	)
 )
 
 #define DEFINE_PMD_LOAD_HOLE_EVENT(name) \
 DEFINE_EVENT(dax_pmd_load_hole_class, name, \
 	TP_PROTO(struct inode *inode, struct vm_fault *vmf, \
-		struct page *zero_page, void *radix_entry), \
-	TP_ARGS(inode, vmf, zero_page, radix_entry))
+		struct page *zero_page, void *radix_entry, \
+		char *fallback_reason), \
+	TP_ARGS(inode, vmf, zero_page, radix_entry, fallback_reason))
 
 DEFINE_PMD_LOAD_HOLE_EVENT(dax_pmd_load_hole);
 DEFINE_PMD_LOAD_HOLE_EVENT(dax_pmd_load_hole_fallback);
