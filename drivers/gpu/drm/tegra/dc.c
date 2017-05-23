@@ -1989,8 +1989,6 @@ static int tegra_dc_probe(struct platform_device *pdev)
 		return PTR_ERR(dc->rst);
 	}
 
-	reset_control_assert(dc->rst);
-
 	if (dc->soc->has_powergate) {
 		if (dc->pipe == 0)
 			dc->powergate = TEGRA_POWERGATE_DIS;
@@ -2061,13 +2059,6 @@ static int tegra_dc_remove(struct platform_device *pdev)
 static int tegra_dc_suspend(struct device *dev)
 {
 	struct tegra_dc *dc = dev_get_drvdata(dev);
-	int err;
-
-	err = reset_control_assert(dc->rst);
-	if (err < 0) {
-		dev_err(dev, "failed to assert reset: %d\n", err);
-		return err;
-	}
 
 	if (dc->soc->has_powergate)
 		tegra_powergate_power_off(dc->powergate);
@@ -2093,12 +2084,6 @@ static int tegra_dc_resume(struct device *dev)
 		err = clk_prepare_enable(dc->clk);
 		if (err < 0) {
 			dev_err(dev, "failed to enable clock: %d\n", err);
-			return err;
-		}
-
-		err = reset_control_deassert(dc->rst);
-		if (err < 0) {
-			dev_err(dev, "failed to deassert reset: %d\n", err);
 			return err;
 		}
 	}
