@@ -39,6 +39,7 @@ struct drm_i915_gem_object_ops {
 	unsigned int flags;
 #define I915_GEM_OBJECT_HAS_STRUCT_PAGE 0x1
 #define I915_GEM_OBJECT_IS_SHRINKABLE   0x2
+#define I915_GEM_OBJECT_IS_GVT_DMABUF	0x4
 
 	/* Interface between the GEM object and its backing storage.
 	 * get_pages() is called once prior to the use of the associated set
@@ -184,6 +185,8 @@ struct drm_i915_gem_object {
 		} userptr;
 
 		unsigned long scratch;
+
+		void *gvt_plane_info;
 	};
 
 	/** for phys allocated objects */
@@ -283,6 +286,12 @@ static inline bool
 i915_gem_object_is_shrinkable(const struct drm_i915_gem_object *obj)
 {
 	return obj->ops->flags & I915_GEM_OBJECT_IS_SHRINKABLE;
+}
+
+static inline bool
+i915_gem_object_is_gvt_dmabuf(const struct drm_i915_gem_object *obj)
+{
+	return obj->ops->flags & I915_GEM_OBJECT_IS_GVT_DMABUF;
 }
 
 static inline bool

@@ -1609,6 +1609,10 @@ i915_gem_set_domain_ioctl(struct drm_device *dev, void *data,
 	if (!obj)
 		return -ENOENT;
 
+	/* The obj is a gvt dma-buf object and set domain is not supported */
+	if (i915_gem_object_is_gvt_dmabuf(obj))
+		return -EPERM;
+
 	/* Try to flush the object off the GPU without holding the lock.
 	 * We will repeat the flush holding the lock in the normal manner
 	 * to catch cases where we are gazumped.
@@ -3713,6 +3717,10 @@ int i915_gem_set_caching_ioctl(struct drm_device *dev, void *data,
 	obj = i915_gem_object_lookup(file, args->handle);
 	if (!obj)
 		return -ENOENT;
+
+	/* the obj is a gvt dma-buf and set caching mode is not supported */
+	if (i915_gem_object_is_gvt_dmabuf(obj))
+		return -EPERM;
 
 	if (obj->cache_level == level)
 		goto out;
