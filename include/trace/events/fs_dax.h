@@ -8,8 +8,8 @@
 
 DECLARE_EVENT_CLASS(dax_pmd_fault_class,
 	TP_PROTO(struct inode *inode, struct vm_fault *vmf,
-		pgoff_t max_pgoff, int result),
-	TP_ARGS(inode, vmf, max_pgoff, result),
+		pgoff_t max_pgoff, int result, char *fallback_reason),
+	TP_ARGS(inode, vmf, max_pgoff, result, fallback_reason),
 	TP_STRUCT__entry(
 		__field(unsigned long, ino)
 		__field(unsigned long, vm_start)
@@ -18,6 +18,7 @@ DECLARE_EVENT_CLASS(dax_pmd_fault_class,
 		__field(unsigned long, address)
 		__field(pgoff_t, pgoff)
 		__field(pgoff_t, max_pgoff)
+		__field(char *, fallback_reason)
 		__field(dev_t, dev)
 		__field(unsigned int, flags)
 		__field(int, result)
@@ -33,9 +34,10 @@ DECLARE_EVENT_CLASS(dax_pmd_fault_class,
 		__entry->pgoff = vmf->pgoff;
 		__entry->max_pgoff = max_pgoff;
 		__entry->result = result;
+		__entry->fallback_reason = fallback_reason;
 	),
 	TP_printk("dev %d:%d ino %#lx %s %s address %#lx vm_start "
-			"%#lx vm_end %#lx pgoff %#lx max_pgoff %#lx %s",
+			"%#lx vm_end %#lx pgoff %#lx max_pgoff %#lx %s %s",
 		MAJOR(__entry->dev),
 		MINOR(__entry->dev),
 		__entry->ino,
@@ -46,15 +48,16 @@ DECLARE_EVENT_CLASS(dax_pmd_fault_class,
 		__entry->vm_end,
 		__entry->pgoff,
 		__entry->max_pgoff,
-		__print_flags(__entry->result, "|", VM_FAULT_RESULT_TRACE)
+		__print_flags(__entry->result, "|", VM_FAULT_RESULT_TRACE),
+		__entry->fallback_reason
 	)
 )
 
 #define DEFINE_PMD_FAULT_EVENT(name) \
 DEFINE_EVENT(dax_pmd_fault_class, name, \
 	TP_PROTO(struct inode *inode, struct vm_fault *vmf, \
-		pgoff_t max_pgoff, int result), \
-	TP_ARGS(inode, vmf, max_pgoff, result))
+		pgoff_t max_pgoff, int result, char *fallback_reason), \
+	TP_ARGS(inode, vmf, max_pgoff, result, fallback_reason))
 
 DEFINE_PMD_FAULT_EVENT(dax_pmd_fault);
 DEFINE_PMD_FAULT_EVENT(dax_pmd_fault_done);

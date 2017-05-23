@@ -1353,6 +1353,7 @@ static int dax_iomap_pmd_fault(struct vm_fault *vmf,
 	struct inode *inode = mapping->host;
 	int result = VM_FAULT_FALLBACK;
 	struct iomap iomap = { 0 };
+	char *fallback_reason = "";
 	pgoff_t max_pgoff, pgoff;
 	void *entry;
 	loff_t pos;
@@ -1366,17 +1367,22 @@ static int dax_iomap_pmd_fault(struct vm_fault *vmf,
 	pgoff = linear_page_index(vma, pmd_addr);
 	max_pgoff = (i_size_read(inode) - 1) >> PAGE_SHIFT;
 
-	trace_dax_pmd_fault(inode, vmf, max_pgoff, 0);
+	trace_dax_pmd_fault(inode, vmf, max_pgoff, 0, "");
 
 	/* Fall back to PTEs if we're going to COW */
-	if (write && !(vma->vm_flags & VM_SHARED))
+	if (write && !(vma->vm_flags & VM_SHARED)) {
+		fallback_reason = "copy on write";
 		goto fallback;
+	}
 
 	/* If the PMD would extend outside the VMA */
-	if (pmd_addr < vma->vm_start)
+	if (pmd_addr < vma->vm_start) {
+		fallback_reason = "before vma";
 		goto fallback;
-	if ((pmd_addr + PMD_SIZE) > vma->vm_end)
+	} else if ((pmd_addr + PMD_SIZE) > vma->vm_end) {
+		fallback_reason = "beyond vma";
 		goto fallback;
+	}
 
 	if (pgoff > max_pgoff) {
 		result = VM_FAULT_SIGBUS;
@@ -1384,8 +1390,10 @@ static int dax_iomap_pmd_fault(struct vm_fault *vmf,
 	}
 
 	/* If the PMD would extend beyond the file size */
-	if ((pgoff | PG_PMD_COLOUR) > max_pgoff)
+	if ((pgoff | PG_PMD_COLOUR) > max_pgoff) {
+		fallback_reason = "beyond file";
 		goto fallback;
+	}
 
 	/*
 	 * grab_mapping_entry() will make sure we get a 2M empty entry, a DAX
@@ -1394,8 +1402,10 @@ static int dax_iomap_pmd_fault(struct vm_fault *vmf,
 	 * back to 4k entries.
 	 */
 	entry = grab_mapping_entry(mapping, pgoff, RADIX_DAX_PMD);
-	if (IS_ERR(entry))
+	if (IS_ERR(entry)) {
+		fallback_reason = "entry lock";
 		goto fallback;
+	}
 
 	/*
 	 * Note that we don't use iomap_apply here.  We aren't doing I/O, only
@@ -1404,11 +1414,15 @@ static int dax_iomap_pmd_fault(struct vm_fault *vmf,
 	 */
 	pos = (loff_t)pgoff << PAGE_SHIFT;
 	error = ops->iomap_begin(inode, pos, PMD_SIZE, iomap_flags, &iomap);
-	if (error)
+	if (error) {
+		fallback_reason = "iomap begin";
 		goto unlock_entry;
+	}
 
-	if (iomap.offset + iomap.length < pos + PMD_SIZE)
+	if (iomap.offset + iomap.length < pos + PMD_SIZE) {
+		fallback_reason = "beyond iomap";
 		goto finish_iomap;
+	}
 
 	switch (iomap.type) {
 	case IOMAP_MAPPED:
@@ -1448,7 +1462,8 @@ static int dax_iomap_pmd_fault(struct vm_fault *vmf,
 		count_vm_event(THP_FAULT_FALLBACK);
 	}
 out:
-	trace_dax_pmd_fault_done(inode, vmf, max_pgoff, result);
+	trace_dax_pmd_fault_done(inode, vmf, max_pgoff, result,
+			fallback_reason);
 	return result;
 }
 #else
