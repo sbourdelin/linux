@@ -334,7 +334,8 @@ struct pid *alloc_pid(struct pid_namespace *ns)
 
 	upid = pid->numbers + ns->level;
 	spin_lock_irq(&pidmap_lock);
-	if (!(ns->nr_hashed & PIDNS_HASH_ADDING))
+	if (!(ns->nr_hashed & PIDNS_HASH_ADDING) ||
+	    (!ns->child_reaper && !is_child_reaper(pid)))
 		goto out_unlock;
 	for ( ; upid >= pid->numbers; --upid) {
 		hlist_add_head_rcu(&upid->pid_chain,
