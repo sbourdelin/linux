@@ -1814,6 +1814,10 @@ int synaptics_init(struct psmouse *psmouse)
 	}
 
 	if (SYN_CAP_INTERTOUCH(info.ext_cap_0c)) {
+#if !IS_ENABLED(CONFIG_RMI4_SMB) || !defined(CONFIG_MOUSE_PS2_SYNAPTICS_SMBUS)
+		psmouse_warn(psmouse, "The touchpad can support a better bus than the too old PS/2 protocol.\n"
+			"Make sure MOUSE_PS2_SYNAPTICS_SMBUS and RMI4_SMB are enabled to get a better touchpad experience.\n");
+#endif
 		error = synaptics_setup_intertouch(psmouse, &info, true);
 		if (!error)
 			return PSMOUSE_SYNAPTICS_SMBUS;
