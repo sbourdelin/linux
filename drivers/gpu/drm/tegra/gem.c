@@ -74,6 +74,9 @@ static void *tegra_bo_kmap(struct host1x_bo *bo, unsigned int page)
 {
 	struct tegra_bo *obj = host1x_to_tegra_bo(bo);
 
+	if (page * PAGE_SIZE >= obj->gem.size)
+		return NULL;
+
 	if (obj->vaddr)
 		return obj->vaddr + page * PAGE_SIZE;
 	else if (obj->gem.import_attach)
