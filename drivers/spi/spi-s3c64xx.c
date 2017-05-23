@@ -306,6 +306,12 @@ static void prepare_dma(struct s3c64xx_spi_dma_data *dma,
 	desc = dmaengine_prep_slave_sg(dma->ch, sgt->sgl, sgt->nents,
 				       dma->direction, DMA_PREP_INTERRUPT);
 
+	if (!desc) {
+		dev_err(&sdd->master->dev,
+			"%s:dmaengine_prep_slave_sg Failed\n", __func__);
+		return;
+	}
+
 	desc->callback = s3c64xx_spi_dmacb;
 	desc->callback_param = dma;
 
