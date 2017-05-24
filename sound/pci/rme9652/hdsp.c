@@ -3930,6 +3930,31 @@ static int snd_hdsp_playback_copy(struct snd_pcm_substream *substream, int chann
 	return count;
 }
 
+static int playback_copy_frames(struct snd_pcm_substream *substream,
+				unsigned int hwoff, unsigned long data,
+				unsigned int off, snd_pcm_uframes_t count)
+{
+	struct hdsp *hdsp = snd_pcm_substream_chip(substream);
+	struct snd_pcm_runtime *runtime = substream->runtime;
+	char __user *src = (char __user *)data;
+	char *channel_buf;
+
+	channel_buf = hdsp_channel_buffer_location(hdsp,
+				substream->pstr->stream, runtime->channels);
+	if (snd_BUG_ON(!channel_buf))
+		return -EIO;
+	channel_buf += hwoff * 4;
+
+	if (src == NULL) {
+		memset(channel_buf, 0, count * 4);
+	} else {
+		if (copy_from_user(channel_buf, src, count * 4))
+			return -EFAULT;
+	}
+
+	return 0;
+}
+
 static int snd_hdsp_capture_copy(struct snd_pcm_substream *substream, int channel,
 				 snd_pcm_uframes_t pos, void __user *dst, snd_pcm_uframes_t count)
 {
@@ -3943,6 +3968,26 @@ static int snd_hdsp_capture_copy(struct snd_pcm_substream *substream, int channe
 	if (snd_BUG_ON(!channel_buf))
 		return -EIO;
 	if (copy_to_user(dst, channel_buf + pos * 4, count * 4))
+		return -EFAULT;
+	return count;
+}
+
+static int capture_copy_frames(struct snd_pcm_substream *substream,
+			       unsigned int hwoff, unsigned long data,
+			       unsigned int off, snd_pcm_uframes_t count)
+{
+	struct hdsp *hdsp = snd_pcm_substream_chip(substream);
+	struct snd_pcm_runtime *runtime = substream->runtime;
+	char __user *dst = (char __user *)data;
+	char *channel_buf;
+
+	channel_buf = hdsp_channel_buffer_location(hdsp,
+				substream->pstr->stream, runtime->channels);
+	if (snd_BUG_ON(!channel_buf))
+		return -EIO;
+	channel_buf += hwoff * 4;
+
+	if (copy_to_user(dst, channel_buf + hwoff * 4, count * 4))
 		return -EFAULT;
 	return count;
 }
@@ -4871,6 +4916,7 @@ static const struct snd_pcm_ops snd_hdsp_playback_ops = {
 	.pointer =	snd_hdsp_hw_pointer,
 	.copy =		snd_hdsp_playback_copy,
 	.silence =	snd_hdsp_hw_silence,
+	.copy_frames =	playback_copy_frames,
 };
 
 static const struct snd_pcm_ops snd_hdsp_capture_ops = {
@@ -4882,6 +4928,7 @@ static const struct snd_pcm_ops snd_hdsp_capture_ops = {
 	.trigger =	snd_hdsp_trigger,
 	.pointer =	snd_hdsp_hw_pointer,
 	.copy =		snd_hdsp_capture_copy,
+	.copy_frames =	capture_copy_frames,
 };
 
 static int snd_hdsp_create_hwdep(struct snd_card *card, struct hdsp *hdsp)
