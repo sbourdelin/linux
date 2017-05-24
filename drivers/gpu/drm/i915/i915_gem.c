@@ -2212,8 +2212,9 @@ void __i915_gem_object_invalidate(struct drm_i915_gem_object *obj)
 	if (obj->base.filp == NULL)
 		return;
 
-	mapping = obj->base.filp->f_mapping,
+	mapping = obj->base.filp->f_mapping;
 	invalidate_mapping_pages(mapping, 0, (loff_t)-1);
+	unmap_mapping_range(mapping, 0, (loff_t)-1, 0);
 }
 
 static void
