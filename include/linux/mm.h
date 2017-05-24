@@ -344,6 +344,9 @@ struct vm_fault {
 					 * page table to avoid allocation from
 					 * atomic context.
 					 */
+#ifdef CONFIG_MEM_RANGE_LOCK
+	struct range_lock *lockrange;	/* Range lock interval */
+#endif
 };
 
 /* page entry size for vm->huge_fault() */
