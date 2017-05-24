@@ -3581,6 +3581,7 @@ static int inet6_rtm_getroute(struct sk_buff *in_skb, struct nlmsghdr *nlh,
 	struct rtmsg *rtm;
 	struct flowi6 fl6;
 	int err, iif = 0, oif = 0;
+	bool fibmatch;
 
 	err = nlmsg_parse(nlh, sizeof(*rtm), tb, RTA_MAX, rtm_ipv6_policy,
 			  extack);
@@ -3591,6 +3592,7 @@ static int inet6_rtm_getroute(struct sk_buff *in_skb, struct nlmsghdr *nlh,
 	memset(&fl6, 0, sizeof(fl6));
 	rtm = nlmsg_data(nlh);
 	fl6.flowlabel = ip6_make_flowinfo(rtm->rtm_tos, 0);
+	fibmatch = (rtm->rtm_flags & RTM_F_FIB_MATCH) ? true : false;
 
 	if (tb[RTA_SRC]) {
 		if (nla_len(tb[RTA_SRC]) < sizeof(struct in6_addr))
@@ -3636,12 +3638,27 @@ static int inet6_rtm_getroute(struct sk_buff *in_skb, struct nlmsghdr *nlh,
 		if (!ipv6_addr_any(&fl6.saddr))
 			flags |= RT6_LOOKUP_F_HAS_SADDR;
 
-		rt = (struct rt6_info *)ip6_route_input_lookup(net, dev, &fl6,
-							       flags);
+		if (!fibmatch)
+			rt = (struct rt6_info *)ip6_route_input_lookup(net, dev,
+								       &fl6,
+								       flags);
 	} else {
 		fl6.flowi6_oif = oif;
 
-		rt = (struct rt6_info *)ip6_route_output(net, NULL, &fl6);
+		if (!fibmatch)
+			rt = (struct rt6_info *)ip6_route_output_flags(net,
+								       NULL,
+								       &fl6, 0);
+	}
+
+	if (fibmatch) {
+		rt = (struct rt6_info *)ip6_route_lookup(net, &fl6, 0);
+		if (rt->dst.error) {
+			err = rt->dst.error;
+			ip6_rt_put(rt);
+			goto errout;
+		}
+
 	}
 
 	if (rt == net->ipv6.ip6_null_entry) {
@@ -3658,10 +3675,15 @@ static int inet6_rtm_getroute(struct sk_buff *in_skb, struct nlmsghdr *nlh,
 	}
 
 	skb_dst_set(skb, &rt->dst);
-
-	err = rt6_fill_node(net, skb, rt, &fl6.daddr, &fl6.saddr, iif,
-			    RTM_NEWROUTE, NETLINK_CB(in_skb).portid,
-			    nlh->nlmsg_seq, 0);
+	if (fibmatch) {
+		err = rt6_fill_node(net, skb, rt, NULL, NULL, iif,
+				    RTM_NEWROUTE, NETLINK_CB(in_skb).portid,
+				    nlh->nlmsg_seq, 0);
+	} else {
+		err = rt6_fill_node(net, skb, rt, &fl6.daddr, &fl6.saddr, iif,
+				    RTM_NEWROUTE, NETLINK_CB(in_skb).portid,
+				    nlh->nlmsg_seq, 0);
+	}
 	if (err < 0) {
 		kfree_skb(skb);
 		goto errout;
