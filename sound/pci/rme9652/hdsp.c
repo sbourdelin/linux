@@ -3913,23 +3913,6 @@ static char *hdsp_channel_buffer_location(struct hdsp *hdsp,
 		return hdsp->playback_buffer + (mapped_channel * HDSP_CHANNEL_BUFFER_BYTES);
 }
 
-static int snd_hdsp_playback_copy(struct snd_pcm_substream *substream, int channel,
-				  snd_pcm_uframes_t pos, void __user *src, snd_pcm_uframes_t count)
-{
-	struct hdsp *hdsp = snd_pcm_substream_chip(substream);
-	char *channel_buf;
-
-	if (snd_BUG_ON(pos + count > HDSP_CHANNEL_BUFFER_BYTES / 4))
-		return -EINVAL;
-
-	channel_buf = hdsp_channel_buffer_location (hdsp, substream->pstr->stream, channel);
-	if (snd_BUG_ON(!channel_buf))
-		return -EIO;
-	if (copy_from_user(channel_buf + pos * 4, src, count * 4))
-		return -EFAULT;
-	return count;
-}
-
 static int playback_copy_frames(struct snd_pcm_substream *substream,
 				unsigned int hwoff, unsigned long data,
 				unsigned int off, snd_pcm_uframes_t count)
@@ -3955,23 +3938,6 @@ static int playback_copy_frames(struct snd_pcm_substream *substream,
 	return 0;
 }
 
-static int snd_hdsp_capture_copy(struct snd_pcm_substream *substream, int channel,
-				 snd_pcm_uframes_t pos, void __user *dst, snd_pcm_uframes_t count)
-{
-	struct hdsp *hdsp = snd_pcm_substream_chip(substream);
-	char *channel_buf;
-
-	if (snd_BUG_ON(pos + count > HDSP_CHANNEL_BUFFER_BYTES / 4))
-		return -EINVAL;
-
-	channel_buf = hdsp_channel_buffer_location (hdsp, substream->pstr->stream, channel);
-	if (snd_BUG_ON(!channel_buf))
-		return -EIO;
-	if (copy_to_user(dst, channel_buf + pos * 4, count * 4))
-		return -EFAULT;
-	return count;
-}
-
 static int capture_copy_frames(struct snd_pcm_substream *substream,
 			       unsigned int hwoff, unsigned long data,
 			       unsigned int off, snd_pcm_uframes_t count)
@@ -3989,19 +3955,6 @@ static int capture_copy_frames(struct snd_pcm_substream *substream,
 
 	if (copy_to_user(dst, channel_buf + hwoff * 4, count * 4))
 		return -EFAULT;
-	return count;
-}
-
-static int snd_hdsp_hw_silence(struct snd_pcm_substream *substream, int channel,
-				  snd_pcm_uframes_t pos, snd_pcm_uframes_t count)
-{
-	struct hdsp *hdsp = snd_pcm_substream_chip(substream);
-	char *channel_buf;
-
-	channel_buf = hdsp_channel_buffer_location (hdsp, substream->pstr->stream, channel);
-	if (snd_BUG_ON(!channel_buf))
-		return -EIO;
-	memset(channel_buf + pos * 4, 0, count * 4);
 	return count;
 }
 
@@ -4914,8 +4867,6 @@ static const struct snd_pcm_ops snd_hdsp_playback_ops = {
 	.prepare =	snd_hdsp_prepare,
 	.trigger =	snd_hdsp_trigger,
 	.pointer =	snd_hdsp_hw_pointer,
-	.copy =		snd_hdsp_playback_copy,
-	.silence =	snd_hdsp_hw_silence,
 	.copy_frames =	playback_copy_frames,
 };
 
@@ -4927,7 +4878,6 @@ static const struct snd_pcm_ops snd_hdsp_capture_ops = {
 	.prepare =	snd_hdsp_prepare,
 	.trigger =	snd_hdsp_trigger,
 	.pointer =	snd_hdsp_hw_pointer,
-	.copy =		snd_hdsp_capture_copy,
 	.copy_frames =	capture_copy_frames,
 };
 
