@@ -387,7 +387,9 @@ struct snd_pcm_runtime {
 	/* -- mmap -- */
 	struct snd_pcm_mmap_status *status;
 	struct snd_pcm_mmap_control *control;
+#if IS_ENABLED(CONFIG_SND_PCM_PROXY_DRIVER_SUPPORT)
 	int client_space;	/* Where the client puts PCM frames. Usually, 1 means user space. */
+#endif
 
 	/* -- locking / scheduling -- */
 	snd_pcm_uframes_t twake; 	/* do transfer (!poll) wakeup if non-zero */

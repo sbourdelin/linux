@@ -58,6 +58,19 @@ config SND_SEQ_DUMMY
 	  To compile this driver as a module, choose M here: the module
 	  will be called snd-seq-dummy.
 
+config SND_PCM_PROXY_DRIVER_SUPPORT
+	bool "PCM Proxy driver support"
+	default n
+	depends on SND_PCM
+	help
+	  This feature is for PCM proxy driver support, which drives the
+	  other PCM drivers in kernel space. In a view of userspace
+	  applications, the driver gives non-ALSA interfaces to drive PCM
+	  hardwares. This config adds infrastructure for such drivers, to
+	  handle PCM frames in kernel space.
+	  The proxy drivers have a limitation of available ALSA drivers,
+	  which can delegate data transmission to stuffs in ALSA PCM core.
+
 config SND_OSSEMUL
 	select SOUND_OSS_CORE
 	bool
@@ -77,7 +90,7 @@ config SND_MIXER_OSS
 config SND_PCM_OSS
 	tristate "OSS PCM (digital audio) API"
 	select SND_OSSEMUL
-	select SND_PCM
+	select SND_PCM_PROXY_DRIVER_SUPPORT
 	help
 	  To enable OSS digital audio (PCM) emulation (/dev/dsp*), say Y
 	  here and read <file:Documentation/sound/alsa/OSS-Emulation.txt>.

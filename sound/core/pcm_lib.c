@@ -42,7 +42,7 @@
 #define trace_hw_ptr_error(substream, reason)
 #endif
 
-static int writei_from_space0(struct snd_pcm_substream *substream,
+static int __maybe_unused writei_from_space0(struct snd_pcm_substream *substream,
 				unsigned int hwoff, unsigned long data,
 				unsigned int off, snd_pcm_uframes_t count)
 {
@@ -77,7 +77,7 @@ static int writei_from_space1(struct snd_pcm_substream *substream,
 	return 0;
 }
 
-static int writen_from_space0(struct snd_pcm_substream *substream,
+static int __maybe_unused writen_from_space0(struct snd_pcm_substream *substream,
 				unsigned int hwoff, unsigned long data,
 				unsigned int off, snd_pcm_uframes_t count)
 {
@@ -138,7 +138,7 @@ static int writen_from_space1(struct snd_pcm_substream *substream,
 	return 0;
 }
 
-static int readi_to_space0(struct snd_pcm_substream *substream,
+static int __maybe_unused readi_to_space0(struct snd_pcm_substream *substream,
 				unsigned int hwoff, unsigned long data,
 				unsigned int off, snd_pcm_uframes_t count)
 {
@@ -169,7 +169,7 @@ static int readi_to_space1(struct snd_pcm_substream *substream,
 	return 0;
 }
 
-static int readn_to_space0(struct snd_pcm_substream *substream,
+static int __maybe_unused readn_to_space0(struct snd_pcm_substream *substream,
 				unsigned int hwoff, unsigned long data,
 				unsigned int off, snd_pcm_uframes_t count)
 {
@@ -287,19 +287,23 @@ void snd_pcm_playback_silence(struct snd_pcm_substream *substream,
 		return;
 
 	if (substream->ops->copy_frames) {
-		if (runtime->client_space == 0)
+		if (IS_ENABLED(CONFIG_SND_PCM_PROXY_DRIVER_SUPPORT) &&
+		    runtime->client_space == 0)
 			return;
-		copy_frames = substream->ops->copy_frames;
+		else
+			copy_frames = substream->ops->copy_frames;
 	} else {
 		if (runtime->access == SNDRV_PCM_ACCESS_RW_INTERLEAVED ||
 		    runtime->access == SNDRV_PCM_ACCESS_MMAP_INTERLEAVED) {
-			if (runtime->client_space == 0)
+			if (IS_ENABLED(CONFIG_SND_PCM_PROXY_DRIVER_SUPPORT) &&
+			    runtime->client_space == 0)
 				copy_frames = writei_from_space0;
 			else
 				copy_frames = writei_from_space1;
 		} else {
-			if (rnutime->client-space == 0)
-				copy_frames = writen_from_space0;
+			if (IS_ENABLED(CONFIG_SND_PCM_PROXY_DRIVER_SUPPORT) &&
+			    runtime->client_space == 0)
+				copy_frames = writen_from_space1;
 			else
 				copy_frames = writen_from_space1;
 		}
@@ -2304,11 +2308,14 @@ snd_pcm_sframes_t snd_pcm_lib_write(struct snd_pcm_substream *substream,
 		return -EINVAL;
 
 	if (substream->ops->copy_frames) {
-		if (runtime->client_space == 0)
+		if (IS_ENABLED(CONFIG_SND_PCM_PROXY_DRIVER_SUPPORT) &&
+		    runtime->client_space == 0)
 			return -ENXIO;
-		copy_frames = substream->ops->copy_frames;
+		else
+			copy_frames = substream->ops->copy_frames;
 	} else {
-		if (runtime->client_space == 0)
+		if (IS_ENABLED(CONFIG_SND_PCM_PROXY_DRIVER_SUPPORT) &&
+		    runtime->client_space == 0)
 			copy_frames = writei_from_space0;
 		else
 			copy_frames = writei_from_space1;
@@ -2338,12 +2345,14 @@ snd_pcm_sframes_t snd_pcm_lib_writev(struct snd_pcm_substream *substream,
 		return -EINVAL;
 
 	if (substream->ops->copy_frames) {
-		if (runtime->client_space == 0)
+		if (IS_ENABLED(CONFIG_SND_PCM_PROXY_DRIVER_SUPPORT) &&
+		    runtime->client_space == 0)
 			return -ENXIO;
 		else
 			copy_frames = substream->ops->copy_frames;
 	} else {
-		if (runtime->client_space == 0)
+		if (IS_ENABLED(CONFIG_SND_PCM_PROXY_DRIVER_SUPPORT) &&
+		    runtime->client_space == 0)
 			copy_frames = writen_from_space0;
 		else
 			copy_frames = writen_from_space1;
@@ -2481,11 +2490,14 @@ snd_pcm_sframes_t snd_pcm_lib_read(struct snd_pcm_substream *substream,
 		return -EINVAL;
 
 	if (substream->ops->copy_frames) {
-		if (runtime->client_space == 0)
-			return -ENXIO;
-		copy_frames = substream->ops->copy_frames;
+		if (IS_ENABLED(CONFIG_SND_PCM_PROXY_DRIVER_SUPPORT) &&
+		    runtime->client_space == 0)
+				return -ENXIO;
+		else
+			copy_frames = substream->ops->copy_frames;
 	} else {
-		if (runtime->client_space == 0)
+		if (IS_ENABLED(CONFIG_SND_PCM_PROXY_DRIVER_SUPPORT) &&
+		    runtime->client_space == 0)
 			copy_frames = readi_to_space0;
 		else
 			copy_frames = readi_to_space1;
@@ -2517,11 +2529,14 @@ snd_pcm_sframes_t snd_pcm_lib_readv(struct snd_pcm_substream *substream,
 		return -EINVAL;
 
 	if (substream->ops->copy_frames) {
-		if (runtime->client_space == 0)
-			return -ENXIO;
-		copy_frames = substream->ops->copy_frames;
+		if (IS_ENABLED(CONFIG_SND_PCM_PROXY_DRIVER_SUPPORT) &&
+		    runtime->client_space == 0)
+				return -ENXIO;
+		else
+			copy_frames = substream->ops->copy_frames;
 	} else {
-		if (runtime->client_space == 0)
+		if (IS_ENABLED(CONFIG_SND_PCM_PROXY_DRIVER_SUPPORT) &&
+		    runtime->client_space == 0)
 			copy_frames = readn_to_space0;
 		else
 			copy_frames = readn_to_space1;

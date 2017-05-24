@@ -600,12 +600,14 @@ static int snd_pcm_hw_params(struct snd_pcm_substream *substream,
 		pm_qos_add_request(&substream->latency_pm_qos_req,
 				   PM_QOS_CPU_DMA_LATENCY, usecs);
 
-	/*
-	 * Usual client puts PCM frames on user space, on the other
-	 * hand PCM proxy drivers puts on kernel space. This is a
-	 * switch handlers for PCM frames in different spaces.
-	 */
-	runtime->client_space = 1;
+	if (IS_ENABLED(CONFIG_SND_PCM_PROXY_DRIVER_SUPPORT)) {
+		/*
+		 * Usual client puts PCM frames on user space, on the other
+		 * hand PCM proxy drivers puts on kernel space. This is a
+		 * switch handlers for PCM frames in different spaces.
+		 */
+		runtime->client_space = 1;
+	}
 
 	return 0;
  _error:
