@@ -157,6 +157,8 @@ void pci_remove_root_bus(struct pci_bus *bus)
 	list_for_each_entry_safe(child, tmp,
 				 &bus->devices, bus_list)
 		pci_remove_bus_device(child);
+
+	pci_put_old_domain_nr(bus);
 	pci_remove_bus(bus);
 	host_bridge->bus = NULL;
 
