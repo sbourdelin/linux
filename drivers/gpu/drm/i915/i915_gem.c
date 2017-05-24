@@ -2406,7 +2406,21 @@ rebuild_st:
 			if (!*s) {
 				/* reclaim and warn, but no oom */
 				gfp = mapping_gfp_mask(mapping);
-				gfp |= __GFP_NORETRY;
+
+				/* Our bo are always dirty and so we require
+				 * kswapd to reclaim our pages (direct reclaim
+				 * performs no swapping on its own). However,
+				 * direct reclaim is meant to wait for kswapd
+				 * when under pressure, this is broken. As a
+				 * result __GFP_RECLAIM is unreliable and fails
+				 * to actually reclaim dirty pages -- unless
+				 * you try over and over again with
+				 * !__GFP_NORETRY. However, we still want to
+				 * fail this allocation rather than trigger
+				 * the out-of-memory killer and for this we
+				 * subvert __GFP_THISNODE for that side effect.
+				 */
+				gfp |= __GFP_THISNODE;
 			}
 		} while (1);
 
