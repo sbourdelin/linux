@@ -15,6 +15,7 @@
 #include <linux/debug_locks.h>
 #include <linux/mm_types.h>
 #include <linux/range.h>
+#include <linux/range_lock.h>
 #include <linux/pfn.h>
 #include <linux/percpu-refcount.h>
 #include <linux/bit_spinlock.h>
@@ -2587,6 +2588,32 @@ void __init setup_nr_node_ids(void);
 #else
 static inline void setup_nr_node_ids(void) {}
 #endif
+
+#ifdef CONFIG_MEM_RANGE_LOCK
+#define mm_range_define(r)						\
+	struct range_lock r = __RANGE_LOCK_INITIALIZER(0, RANGE_LOCK_FULL)
+#define mm_read_lock(m, r)	range_read_lock(&(m)->mmap_sem, r)
+#define mm_read_trylock(m, r)	range_read_trylock(&(m)->mmap_sem, r)
+#define mm_read_unlock(m, r)	range_read_unlock(&(m)->mmap_sem, r)
+#define mm_write_lock(m, r)	range_write_lock(&(m)->mmap_sem, r)
+#define mm_write_trylock(m, r)	range_write_trylock(&(m)->mmap_sem, r)
+#define mm_write_unlock(m, r)	range_write_unlock(&(m)->mmap_sem, r)
+#define mm_write_lock_killable(m, r) \
+	range_write_lock_interruptible(&(m)->mmap_sem, r)
+#define mm_downgrade_write(m, r) range_downgrade_write(&(m)->mmap_sem, r)
+
+#else /* CONFIG_MEM_RANGE_LOCK */
+#define mm_range_define(r)	do { } while (0)
+#define mm_read_lock(m, r)	down_read(&(m)->mmap_sem)
+#define mm_read_trylock(m, r)	down_read_trylock(&(m)->mmap_sem)
+#define mm_read_unlock(m, r)	up_read(&(m)->mmap_sem)
+#define mm_write_lock(m, r)	down_write(&(m)->mmap_sem)
+#define mm_write_trylock(m, r)	down_write_trylock(&(m)->mmap_sem)
+#define mm_write_unlock(m, r)	up_write(&(m)->mmap_sem)
+#define mm_write_lock_killable(m, r) down_write_killable(&(m)->mmap_sem)
+#define mm_downgrade_write(m, r) downgrade_write(&(m)->mmap_sem)
+
+#endif /* CONFIG_MEM_RANGE_LOCK */
 
 #endif /* __KERNEL__ */
 #endif /* _LINUX_MM_H */
