@@ -762,11 +762,9 @@ slow_path:
 		list = container_of(obj, struct rhlist_head, rhead);
 		plist = container_of(head, struct rhlist_head, rhead);
 
-		RCU_INIT_POINTER(list->next, plist);
-		head = rht_dereference_bucket(head->next, tbl, hash);
-		RCU_INIT_POINTER(list->rhead.next, head);
-		rcu_assign_pointer(*pprev, obj);
-
+		RCU_INIT_POINTER(list->next, rht_dereference_bucket(plist->next,
+								    tbl, hash));
+		RCU_INIT_POINTER(plist->next, list);
 		goto good;
 	}
 
