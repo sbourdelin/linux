@@ -360,9 +360,9 @@ static void __insert_vmap_area(struct vmap_area *va)
 
 		parent = *p;
 		tmp_va = rb_entry(parent, struct vmap_area, rb_node);
-		if (va->va_start < tmp_va->va_end)
+		if (va->va_end <= tmp_va->va_start)
 			p = &(*p)->rb_left;
-		else if (va->va_end > tmp_va->va_start)
+		else if (va->va_start >= tmp_va->va_end)
 			p = &(*p)->rb_right;
 		else
 			BUG();
