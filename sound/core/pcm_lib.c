@@ -227,17 +227,21 @@ void snd_pcm_playback_silence(struct snd_pcm_substream *substream,
 	if (frames == 0)
 		return;
 
-	if (runtime->access == SNDRV_PCM_ACCESS_RW_INTERLEAVED ||
-	    runtime->access == SNDRV_PCM_ACCESS_MMAP_INTERLEAVED) {
-		if (substream->ops->silence)
-			copy_frames = writei_silence;
-		else
-			copy_frames = writei_from_space1;
+	if (substream->ops->copy_frames) {
+		copy_frames = substream->ops->copy_frames;
 	} else {
-		if (substream->ops->silence)
-			copy_frames = writen_silence;
-		else
-			copy_frames = writen_from_space1;
+		if (runtime->access == SNDRV_PCM_ACCESS_RW_INTERLEAVED ||
+		    runtime->access == SNDRV_PCM_ACCESS_MMAP_INTERLEAVED) {
+			if (substream->ops->silence)
+				copy_frames = writei_silence;
+			else
+				copy_frames = writei_from_space1;
+		} else {
+			if (substream->ops->silence)
+				copy_frames = writen_silence;
+			else
+				copy_frames = writen_from_space1;
+		}
 	}
 
 	ofs = runtime->silence_start % runtime->buffer_size;
@@ -2253,7 +2257,9 @@ snd_pcm_sframes_t snd_pcm_lib_write(struct snd_pcm_substream *substream,
 	    runtime->channels > 1)
 		return -EINVAL;
 
-	if (substream->ops->copy)
+	if (substream->ops->copy_frames)
+		copy_frames = substream->ops->copy_frames;
+	else if (substream->ops->copy)
 		copy_frames = snd_pcm_lib_write_transfer;
 	else
 		copy_frames = writei_from_space1;
@@ -2314,7 +2320,9 @@ snd_pcm_sframes_t snd_pcm_lib_writev(struct snd_pcm_substream *substream,
 	if (runtime->access != SNDRV_PCM_ACCESS_RW_NONINTERLEAVED)
 		return -EINVAL;
 
-	if (substream->ops->copy)
+	if (substream->ops->copy_frames)
+		copy_frames = substream->ops->copy_frames;
+	else if (substream->ops->copy)
 		copy_frames = snd_pcm_lib_writev_transfer;
 	else
 		copy_frames = writen_from_space1;
@@ -2465,7 +2473,9 @@ snd_pcm_sframes_t snd_pcm_lib_read(struct snd_pcm_substream *substream,
 	if (runtime->access != SNDRV_PCM_ACCESS_RW_INTERLEAVED)
 		return -EINVAL;
 
-	if (substream->ops->copy)
+	if (substream->ops->copy_frames)
+		copy_frames = substream->ops->copy_frames;
+	else if (substream->ops->copy)
 		copy_frames = snd_pcm_lib_read_transfer;
 	else
 		copy_frames = readi_to_space1;
@@ -2523,7 +2533,9 @@ snd_pcm_sframes_t snd_pcm_lib_readv(struct snd_pcm_substream *substream,
 	if (runtime->access != SNDRV_PCM_ACCESS_RW_NONINTERLEAVED)
 		return -EINVAL;
 
-	if (substream->ops->copy)
+	if (substream->ops->copy_frames)
+		copy_frames = substream->ops->copy_frames;
+	else if (substream->ops->copy)
 		copy_frames = snd_pcm_lib_readv_transfer;
 	else
 		copy_frames = readn_to_space1;
