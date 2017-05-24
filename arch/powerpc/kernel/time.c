@@ -946,10 +946,7 @@ static void register_decrementer_clockevent(int cpu)
 
 static void enable_large_decrementer(void)
 {
-	if (!cpu_has_feature(CPU_FTR_ARCH_300))
-		return;
-
-	if (decrementer_max <= DECREMENTER_DEFAULT_MAX)
+	if (!cpu_has_feature(CPU_FTR_LARGE_DEC))
 		return;
 
 	/*
@@ -966,7 +963,7 @@ static void __init set_decrementer_max(void)
 	u32 bits = 32;
 
 	/* Prior to ISAv3 the decrementer is always 32 bit */
-	if (!cpu_has_feature(CPU_FTR_ARCH_300))
+	if (!cpu_has_feature(CPU_FTR_LARGE_DEC))
 		return;
 
 	cpu = of_find_node_by_type(NULL, "cpu");

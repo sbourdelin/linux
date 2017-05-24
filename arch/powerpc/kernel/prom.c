@@ -165,6 +165,7 @@ static struct ibm_pa_feature {
 	{ .pabyte = 1,  .pabit = 1, .invert = 1, .cpu_features = CPU_FTR_NODSISRALIGN },
 	{ .pabyte = 5,  .pabit = 0, .cpu_features  = CPU_FTR_REAL_LE,
 				    .cpu_user_ftrs = PPC_FEATURE_TRUE_LE },
+	{ .pabyte = 24, .pabit = 0, .cpu_features = CPU_FTR_LARGE_DEC },
 	/*
 	 * If the kernel doesn't support TM (ie CONFIG_PPC_TRANSACTIONAL_MEM=n),
 	 * we don't want to turn on TM here, so we use the *_COMP versions
