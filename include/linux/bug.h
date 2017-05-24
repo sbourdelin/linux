@@ -3,6 +3,7 @@
 
 #include <asm/bug.h>
 #include <linux/compiler.h>
+#include <linux/types.h>
 
 enum bug_trap_type {
 	BUG_TRAP_TYPE_NONE = 0,
