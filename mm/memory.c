@@ -3771,7 +3771,11 @@ unlock:
  * return value.  See filemap_fault() and __lock_page_or_retry().
  */
 static int __handle_mm_fault(struct vm_area_struct *vma, unsigned long address,
-		unsigned int flags)
+			     unsigned int flags
+#ifdef CONFIG_MEM_RANGE_LOCK
+			     , struct range_lock *range
+#endif
+	)
 {
 	struct vm_fault vmf = {
 		.vma = vma,
@@ -3779,6 +3783,9 @@ static int __handle_mm_fault(struct vm_area_struct *vma, unsigned long address,
 		.flags = flags,
 		.pgoff = linear_page_index(vma, address),
 		.gfp_mask = __get_fault_gfp_mask(vma),
+#ifdef CONFIG_MEM_RANGE_LOCK
+		.lockrange = range,
+#endif
 	};
 	struct mm_struct *mm = vma->vm_mm;
 	pgd_t *pgd;
@@ -3853,8 +3860,12 @@ static int __handle_mm_fault(struct vm_area_struct *vma, unsigned long address,
  * The mmap_sem may have been released depending on flags and our
  * return value.  See filemap_fault() and __lock_page_or_retry().
  */
-int handle_mm_fault(struct vm_area_struct *vma, unsigned long address,
-		unsigned int flags)
+int _handle_mm_fault(struct vm_area_struct *vma, unsigned long address,
+		     unsigned int flags
+#ifdef CONFIG_MEM_RANGE_LOCK
+		     , struct range_lock *range
+#endif
+	)
 {
 	int ret;
 
@@ -3881,7 +3892,11 @@ int handle_mm_fault(struct vm_area_struct *vma, unsigned long address,
 	if (unlikely(is_vm_hugetlb_page(vma)))
 		ret = hugetlb_fault(vma->vm_mm, vma, address, flags);
 	else
-		ret = __handle_mm_fault(vma, address, flags);
+		ret = __handle_mm_fault(vma, address, flags
+#ifdef CONFIG_MEM_RANGE_LOCK
+					, range
+#endif
+			);
 
 	if (flags & FAULT_FLAG_USER) {
 		mem_cgroup_oom_disable();
@@ -3910,7 +3925,7 @@ int handle_mm_fault(struct vm_area_struct *vma, unsigned long address,
 
 	return ret;
 }
-EXPORT_SYMBOL_GPL(handle_mm_fault);
+EXPORT_SYMBOL_GPL(_handle_mm_fault);
 
 #ifndef __PAGETABLE_P4D_FOLDED
 /*
@@ -4173,7 +4188,7 @@ int __access_remote_vm(struct task_struct *tsk, struct mm_struct *mm,
 		struct page *page = NULL;
 
 		ret = get_user_pages_remote(tsk, mm, addr, 1,
-				gup_flags, &page, &vma, NULL);
+					    gup_flags, &page, &vma, NULL, NULL);
 		if (ret <= 0) {
 #ifndef CONFIG_HAVE_IOREMAP_PROT
 			break;

@@ -284,8 +284,17 @@ void __vma_link_list(struct mm_struct *mm, struct vm_area_struct *vma,
 		struct vm_area_struct *prev, struct rb_node *rb_parent);
 
 #ifdef CONFIG_MMU
-extern long populate_vma_page_range(struct vm_area_struct *vma,
+#ifdef CONFIG_MEM_RANGE_LOCK
+extern long _populate_vma_page_range(struct vm_area_struct *vma,
+		unsigned long start, unsigned long end, int *nonblocking,
+		struct range_lock *range);
+#define populate_vma_page_range _populate_vma_page_range
+#else
+extern long _populate_vma_page_range(struct vm_area_struct *vma,
 		unsigned long start, unsigned long end, int *nonblocking);
+#define populate_vma_page_range(v, s, e, n, r) \
+	_populate_vma_page_range(v, s, e, n)
+#endif
 extern void munlock_vma_pages_range(struct vm_area_struct *vma,
 			unsigned long start, unsigned long end);
 static inline void munlock_vma_pages_all(struct vm_area_struct *vma)

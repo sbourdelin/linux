@@ -111,7 +111,8 @@ static int process_vm_rw_single_vec(unsigned long addr,
 		 */
 		down_read(&mm->mmap_sem);
 		pages = get_user_pages_remote(task, mm, pa, pages, flags,
-					      process_pages, NULL, &locked);
+					      process_pages, NULL, &locked,
+					      NULL);
 		if (locked)
 			up_read(&mm->mmap_sem);
 		if (pages <= 0)

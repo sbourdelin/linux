@@ -453,7 +453,11 @@ unmap:
  * If it is, *@nonblocking will be set to 0 and -EBUSY returned.
  */
 static int faultin_page(struct task_struct *tsk, struct vm_area_struct *vma,
-		unsigned long address, unsigned int *flags, int *nonblocking)
+		unsigned long address, unsigned int *flags, int *nonblocking
+#ifdef CONFIG_MEM_RANGE_LOCK
+		, struct range_lock *range
+#endif
+		)
 {
 	unsigned int fault_flags = 0;
 	int ret;
@@ -479,7 +483,7 @@ static int faultin_page(struct task_struct *tsk, struct vm_area_struct *vma,
 		fault_flags |= FAULT_FLAG_TRIED;
 	}
 
-	ret = handle_mm_fault(vma, address, fault_flags);
+	ret = handle_mm_fault(vma, address, fault_flags, range);
 	if (ret & VM_FAULT_ERROR) {
 		if (ret & VM_FAULT_OOM)
 			return -ENOMEM;
@@ -574,6 +578,7 @@ static int check_vma_flags(struct vm_area_struct *vma, unsigned long gup_flags)
  * @vmas:	array of pointers to vmas corresponding to each page.
  *		Or NULL if the caller does not require them.
  * @nonblocking: whether waiting for disk IO or mmap_sem contention
+ * @range:	range the lock is applying wheN CONFIG_MEM_RANGE_LOCK is set
  *
  * Returns number of pages pinned. This may be fewer than the number
  * requested. If nr_pages is 0 or negative, returns 0. If no pages
@@ -618,9 +623,13 @@ static int check_vma_flags(struct vm_area_struct *vma, unsigned long gup_flags)
  * you need some special @gup_flags.
  */
 static long __get_user_pages(struct task_struct *tsk, struct mm_struct *mm,
-		unsigned long start, unsigned long nr_pages,
-		unsigned int gup_flags, struct page **pages,
-		struct vm_area_struct **vmas, int *nonblocking)
+			     unsigned long start, unsigned long nr_pages,
+			     unsigned int gup_flags, struct page **pages,
+			     struct vm_area_struct **vmas, int *nonblocking
+#ifdef CONFIG_MEM_RANGE_LOCK
+			     , struct range_lock *range
+#endif
+	)
 {
 	long i = 0;
 	unsigned int page_mask;
@@ -679,7 +688,11 @@ retry:
 		if (!page) {
 			int ret;
 			ret = faultin_page(tsk, vma, start, &foll_flags,
-					nonblocking);
+					   nonblocking
+#ifdef CONFIG_MEM_RANGE_LOCK
+					   , range
+#endif
+				);
 			switch (ret) {
 			case 0:
 				goto retry;
@@ -776,9 +789,13 @@ static bool vma_permits_fault(struct vm_area_struct *vma,
  * This function will not return with an unlocked mmap_sem. So it has not the
  * same semantics wrt the @mm->mmap_sem as does filemap_fault().
  */
-int fixup_user_fault(struct task_struct *tsk, struct mm_struct *mm,
+int _fixup_user_fault(struct task_struct *tsk, struct mm_struct *mm,
 		     unsigned long address, unsigned int fault_flags,
-		     bool *unlocked)
+		     bool *unlocked
+#ifdef CONFIG_MEM_RANGE_LOCK
+		      , struct range_lock *range
+#endif
+	)
 {
 	struct vm_area_struct *vma;
 	int ret, major = 0;
@@ -794,7 +811,7 @@ retry:
 	if (!vma_permits_fault(vma, fault_flags))
 		return -EFAULT;
 
-	ret = handle_mm_fault(vma, address, fault_flags);
+	ret = handle_mm_fault(vma, address, fault_flags, range);
 	major |= ret & VM_FAULT_MAJOR;
 	if (ret & VM_FAULT_ERROR) {
 		if (ret & VM_FAULT_OOM)
@@ -824,7 +841,7 @@ retry:
 	}
 	return 0;
 }
-EXPORT_SYMBOL_GPL(fixup_user_fault);
+EXPORT_SYMBOL_GPL(_fixup_user_fault);
 
 static __always_inline long __get_user_pages_locked(struct task_struct *tsk,
 						struct mm_struct *mm,
@@ -833,6 +850,9 @@ static __always_inline long __get_user_pages_locked(struct task_struct *tsk,
 						struct page **pages,
 						struct vm_area_struct **vmas,
 						int *locked, bool notify_drop,
+#ifdef CONFIG_MEM_RANGE_LOCK
+						struct range_lock *range,
+#endif
 						unsigned int flags)
 {
 	long ret, pages_done;
@@ -852,7 +872,11 @@ static __always_inline long __get_user_pages_locked(struct task_struct *tsk,
 	lock_dropped = false;
 	for (;;) {
 		ret = __get_user_pages(tsk, mm, start, nr_pages, flags, pages,
-				       vmas, locked);
+				       vmas, locked
+#ifdef CONFIG_MEM_RANGE_LOCK
+				       , range
+#endif
+			);
 		if (!locked)
 			/* VM_FAULT_RETRY couldn't trigger, bypass */
 			return ret;
@@ -892,7 +916,11 @@ static __always_inline long __get_user_pages_locked(struct task_struct *tsk,
 		lock_dropped = true;
 		down_read(&mm->mmap_sem);
 		ret = __get_user_pages(tsk, mm, start, 1, flags | FOLL_TRIED,
-				       pages, NULL, NULL);
+				       pages, NULL, NULL
+#ifdef CONFIG_MEM_RANGE_LOCK
+				       , range
+#endif
+			);
 		if (ret != 1) {
 			BUG_ON(ret > 1);
 			if (!pages_done)
@@ -940,10 +968,13 @@ static __always_inline long __get_user_pages_locked(struct task_struct *tsk,
  */
 long get_user_pages_locked(unsigned long start, unsigned long nr_pages,
 			   unsigned int gup_flags, struct page **pages,
-			   int *locked)
+			   int *locked, struct range_lock *range)
 {
 	return __get_user_pages_locked(current, current->mm, start, nr_pages,
 				       pages, NULL, locked, true,
+#ifdef CONFIG_MEM_RANGE_LOCK
+				       range,
+#endif
 				       gup_flags | FOLL_TOUCH);
 }
 EXPORT_SYMBOL(get_user_pages_locked);
@@ -966,7 +997,11 @@ static __always_inline long __get_user_pages_unlocked(struct task_struct *tsk,
 
 	down_read(&mm->mmap_sem);
 	ret = __get_user_pages_locked(tsk, mm, start, nr_pages, pages, NULL,
-				      &locked, false, gup_flags);
+				      &locked, false,
+#ifdef CONFIG_MEM_RANGE_LOCK
+				      &range,
+#endif
+				      gup_flags);
 	if (locked)
 		up_read(&mm->mmap_sem);
 	return ret;
@@ -1051,16 +1086,23 @@ EXPORT_SYMBOL(get_user_pages_unlocked);
  * should use get_user_pages because it cannot pass
  * FAULT_FLAG_ALLOW_RETRY to handle_mm_fault.
  */
-long get_user_pages_remote(struct task_struct *tsk, struct mm_struct *mm,
+long _get_user_pages_remote(struct task_struct *tsk, struct mm_struct *mm,
 		unsigned long start, unsigned long nr_pages,
 		unsigned int gup_flags, struct page **pages,
-		struct vm_area_struct **vmas, int *locked)
+		struct vm_area_struct **vmas, int *locked
+#ifdef CONFIG_MEM_RANGE_LOCK
+		, struct range_lock *range
+#endif
+		)
 {
 	return __get_user_pages_locked(tsk, mm, start, nr_pages, pages, vmas,
 				       locked, true,
+#ifdef CONFIG_MEM_RANGE_LOCK
+				       range,
+#endif
 				       gup_flags | FOLL_TOUCH | FOLL_REMOTE);
 }
-EXPORT_SYMBOL(get_user_pages_remote);
+EXPORT_SYMBOL(_get_user_pages_remote);
 
 /*
  * This is the same as get_user_pages_remote(), just with a
@@ -1069,15 +1111,22 @@ EXPORT_SYMBOL(get_user_pages_remote);
  * passing of a locked parameter.  We also obviously don't pass
  * FOLL_REMOTE in here.
  */
-long get_user_pages(unsigned long start, unsigned long nr_pages,
+long _get_user_pages(unsigned long start, unsigned long nr_pages,
 		unsigned int gup_flags, struct page **pages,
-		struct vm_area_struct **vmas)
+		struct vm_area_struct **vmas
+#ifdef CONFIG_MEM_RANGE_LOCK
+		, struct range_lock *range
+#endif
+		)
 {
 	return __get_user_pages_locked(current, current->mm, start, nr_pages,
 				       pages, vmas, NULL, false,
+#ifdef CONFIG_MEM_RANGE_LOCK
+				       range,
+#endif
 				       gup_flags | FOLL_TOUCH);
 }
-EXPORT_SYMBOL(get_user_pages);
+EXPORT_SYMBOL(_get_user_pages);
 
 /**
  * populate_vma_page_range() -  populate a range of pages in the vma.
@@ -1098,8 +1147,13 @@ EXPORT_SYMBOL(get_user_pages);
  * If @nonblocking is non-NULL, it must held for read only and may be
  * released.  If it's released, *@nonblocking will be set to 0.
  */
-long populate_vma_page_range(struct vm_area_struct *vma,
-		unsigned long start, unsigned long end, int *nonblocking)
+long _populate_vma_page_range(struct vm_area_struct *vma,
+			      unsigned long start, unsigned long end,
+			      int *nonblocking
+#ifdef CONFIG_MEM_RANGE_LOCK
+			      , struct range_lock *range
+#endif
+	)
 {
 	struct mm_struct *mm = vma->vm_mm;
 	unsigned long nr_pages = (end - start) / PAGE_SIZE;
@@ -1136,7 +1190,11 @@ long populate_vma_page_range(struct vm_area_struct *vma,
 	 * not result in a stack expansion that recurses back here.
 	 */
 	return __get_user_pages(current, mm, start, nr_pages, gup_flags,
-				NULL, NULL, nonblocking);
+				NULL, NULL, nonblocking
+#ifdef CONFIG_MEM_RANGE_LOCK
+				, range
+#endif
+		);
 }
 
 /*
@@ -1185,7 +1243,8 @@ int __mm_populate(unsigned long start, unsigned long len, int ignore_errors)
 		 * double checks the vma flags, so that it won't mlock pages
 		 * if the vma was already munlocked.
 		 */
-		ret = populate_vma_page_range(vma, nstart, nend, &locked);
+		ret = populate_vma_page_range(vma, nstart, nend, &locked,
+					      NULL);
 		if (ret < 0) {
 			if (ignore_errors) {
 				ret = 0;
@@ -1223,7 +1282,11 @@ struct page *get_dump_page(unsigned long addr)
 
 	if (__get_user_pages(current, current->mm, addr, 1,
 			     FOLL_FORCE | FOLL_DUMP | FOLL_GET, &page, &vma,
-			     NULL) < 1)
+			     NULL
+#ifdef CONFIG_MEM_RANGE_LOCK
+			     , NULL
+#endif
+		    ) < 1)
 		return NULL;
 	flush_cache_page(vma, addr, page_to_pfn(page));
 	return page;

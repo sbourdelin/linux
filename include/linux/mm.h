@@ -1286,14 +1286,28 @@ int generic_error_remove_page(struct address_space *mapping, struct page *page);
 int invalidate_inode_page(struct page *page);
 
 #ifdef CONFIG_MMU
-extern int handle_mm_fault(struct vm_area_struct *vma, unsigned long address,
-		unsigned int flags);
-extern int fixup_user_fault(struct task_struct *tsk, struct mm_struct *mm,
-			    unsigned long address, unsigned int fault_flags,
-			    bool *unlocked);
-#else
+#ifdef CONFIG_MEM_RANGE_LOCK
+extern int _handle_mm_fault(struct vm_area_struct *vma, unsigned long address,
+			    unsigned int flags, struct range_lock *range);
+extern int _fixup_user_fault(struct task_struct *tsk, struct mm_struct *mm,
+			     unsigned long address, unsigned int fault_flags,
+			     bool *unlocked, struct range_lock *range);
+#define handle_mm_fault _handle_mm_fault
+#define fixup_user_fault _fixup_user_fault
+#else /* CONFIG_MEM_RANGE_LOCK */
+extern int _handle_mm_fault(struct vm_area_struct *vma, unsigned long address,
+			    unsigned int flags);
+extern int _fixup_user_fault(struct task_struct *tsk, struct mm_struct *mm,
+			     unsigned long address, unsigned int fault_flags,
+			     bool *unlocked);
+#define handle_mm_fault(v, a, f, r) _handle_mm_fault(v, a, f)
+#define fixup_user_fault(t, m, a, f, u, r) _fixup_user_fault(t, m, a, f, u)
+#endif /* CONFIG_MEM_RANGE_LOCK */
+
+#else /* CONFIG_MMU */
 static inline int handle_mm_fault(struct vm_area_struct *vma,
-		unsigned long address, unsigned int flags)
+		unsigned long address, unsigned int flags,
+		struct range_lock *range)
 {
 	/* should never happen if there's no MMU */
 	BUG();
@@ -1301,7 +1315,8 @@ static inline int handle_mm_fault(struct vm_area_struct *vma,
 }
 static inline int fixup_user_fault(struct task_struct *tsk,
 		struct mm_struct *mm, unsigned long address,
-		unsigned int fault_flags, bool *unlocked)
+		unsigned int fault_flags, bool *unlocked,
+		struct range_lock *range)
 {
 	/* should never happen if there's no MMU */
 	BUG();
@@ -1316,15 +1331,36 @@ extern int access_remote_vm(struct mm_struct *mm, unsigned long addr,
 extern int __access_remote_vm(struct task_struct *tsk, struct mm_struct *mm,
 		unsigned long addr, void *buf, int len, unsigned int gup_flags);
 
-long get_user_pages_remote(struct task_struct *tsk, struct mm_struct *mm,
+#ifdef CONFIG_MEM_RANGE_LOCK
+long _get_user_pages_remote(struct task_struct *tsk, struct mm_struct *mm,
+			    unsigned long start, unsigned long nr_pages,
+			    unsigned int gup_flags, struct page **pages,
+			    struct vm_area_struct **vmas, int *locked,
+			    struct range_lock *range);
+#define get_user_pages_remote _get_user_pages_remote
+#else
+long _get_user_pages_remote(struct task_struct *tsk, struct mm_struct *mm,
 			    unsigned long start, unsigned long nr_pages,
 			    unsigned int gup_flags, struct page **pages,
 			    struct vm_area_struct **vmas, int *locked);
-long get_user_pages(unsigned long start, unsigned long nr_pages,
+#define get_user_pages_remote(t, m, s, n, g, p, v, l, r) \
+	_get_user_pages_remote(t, m, s, n, g, p, v, l)
+#endif
+#ifdef CONFIG_MEM_RANGE_LOCK
+long _get_user_pages(unsigned long start, unsigned long nr_pages,
+			    unsigned int gup_flags, struct page **pages,
+			    struct vm_area_struct **vmas,
+			    struct range_lock *range);
+#define get_user_pages _get_user_pages
+#else
+long _get_user_pages(unsigned long start, unsigned long nr_pages,
 			    unsigned int gup_flags, struct page **pages,
 			    struct vm_area_struct **vmas);
+#define get_user_pages(s, n, g, p, v, r) _get_user_pages(s, n, g, p, v)
+#endif
 long get_user_pages_locked(unsigned long start, unsigned long nr_pages,
-		    unsigned int gup_flags, struct page **pages, int *locked);
+		    unsigned int gup_flags, struct page **pages, int *locked,
+		    struct range_lock *range);
 long get_user_pages_unlocked(unsigned long start, unsigned long nr_pages,
 		    struct page **pages, unsigned int gup_flags);
 int get_user_pages_fast(unsigned long start, int nr_pages, int write,

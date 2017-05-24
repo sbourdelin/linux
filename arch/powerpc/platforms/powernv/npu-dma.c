@@ -764,7 +764,7 @@ int pnv_npu2_handle_fault(struct npu_context *context, uintptr_t *ea,
 		is_write = flags[i] & NPU2_WRITE;
 		rc = get_user_pages_remote(NULL, mm, ea[i], 1,
 					is_write ? FOLL_WRITE : 0,
-					page, NULL, NULL);
+					page, NULL, NULL, NULL);
 
 		/*
 		 * To support virtualised environments we will have to do an
