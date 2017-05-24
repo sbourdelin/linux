@@ -1672,6 +1672,47 @@ static inline bool may_mandlock(void)
 	return capable(CAP_SYS_ADMIN);
 }
 
+static void mount_log(char *prefix, struct mount *mnt, int flags, char *data,
+			char *umntlog)
+{
+	struct super_block *sb = mnt->mnt.mnt_sb;
+
+	/*
+	 * Avoid logs from non dev based FS, mostly the FS_USERNS_MOUNT fs, so
+	 * that it will be less chatty when sandboxed ns is created.
+	 */
+	if (!(sb->s_type->fs_flags & FS_REQUIRES_DEV))
+		return;
+
+	if (umntlog) {
+		int ret;
+		/*
+		 * If mnt dir is more than we can hold in 80 bytes, we
+		 * show only as much as we could, so pls keep the dir:%pd
+		 * to the end.
+		 */
+		ret = snprintf(umntlog, 80, "%s %s dev:%s s_active:%d dir:%pd",
+				prefix, sb->s_type->name, sb->s_id,
+				atomic_read(&sb->s_active),mnt->mnt_mountpoint);
+		/* If there is truncation just add '..' to the end*/
+		if (ret)
+			strcpy(umntlog+77, "..");
+		return;
+	}
+
+	if (!strcmp(prefix, "bind ")) {
+		printk(KERN_NOTICE "%s %s dev:%s s_active:%d dir:%pd\n",
+			prefix, sb->s_type->name, sb->s_id,
+			atomic_read(&sb->s_active), mnt->mnt_mountpoint);
+		return;
+	}
+
+	/* for remount and new mount */
+	printk(KERN_NOTICE "%s %s dev:%s s_active:%d flags:%d opt:%s dir:%pd\n",
+		prefix, sb->s_type->name, sb->s_id, atomic_read(&sb->s_active),
+		flags, data, mnt->mnt_mountpoint);
+}
+
 /*
  * Now umount can handle mount points as well as block devices.
  * This is important for filesystems which use unnamed block devices.
@@ -1686,6 +1727,7 @@ SYSCALL_DEFINE2(umount, char __user *, name, int, flags)
 	struct mount *mnt;
 	int retval;
 	int lookup_flags = 0;
+	char umntlog[80] = {0};
 
 	if (flags & ~(MNT_FORCE | MNT_DETACH | MNT_EXPIRE | UMOUNT_NOFOLLOW))
 		return -EINVAL;
@@ -1711,7 +1753,13 @@ SYSCALL_DEFINE2(umount, char __user *, name, int, flags)
 	if (flags & MNT_FORCE && !capable(CAP_SYS_ADMIN))
 		goto dput_and_out;
 
+	mount_log("umount", mnt, 0, NULL, umntlog);
+
 	retval = do_umount(mnt, flags);
+
+	if (!retval && strlen(umntlog))
+		printk(KERN_NOTICE "%s\n", umntlog);
+
 dput_and_out:
 	/* we mustn't call path_put() as that would clear mnt_expiry_mark */
 	dput(path.dentry);
@@ -2250,6 +2298,8 @@ static int do_loopback(struct path *path, const char *old_name,
 		lock_mount_hash();
 		umount_tree(mnt, UMOUNT_SYNC);
 		unlock_mount_hash();
+	} else {
+		mount_log("bind  ", mnt, 0, NULL, NULL);
 	}
 out2:
 	unlock_mount(mp);
@@ -2339,6 +2389,10 @@ static int do_remount(struct path *path, int flags, int mnt_flags,
 		unlock_mount_hash();
 	}
 	up_write(&sb->s_umount);
+
+	if (!err)
+		mount_log("rmount", mnt, flags, (char *)data, NULL);
+
 	return err;
 }
 
@@ -2526,6 +2580,9 @@ static int do_new_mount(struct path *path, const char *fstype, int flags,
 	err = do_add_mount(real_mount(mnt), path, mnt_flags);
 	if (err)
 		mntput(mnt);
+	else
+		mount_log("mount ", real_mount(mnt), flags, (char *)data, NULL);
+
 	return err;
 }
 
