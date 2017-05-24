@@ -377,7 +377,6 @@ static int alchemy_pci_probe(struct platform_device *pdev)
 
 	ctx = kzalloc(sizeof(*ctx), GFP_KERNEL);
 	if (!ctx) {
-		dev_err(&pdev->dev, "no memory for pcictl context\n");
 		ret = -ENOMEM;
 		goto out;
 	}
