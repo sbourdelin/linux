@@ -506,13 +506,17 @@ static long madvise_free(struct vm_area_struct *vma,
  */
 static long madvise_dontneed(struct vm_area_struct *vma,
 			     struct vm_area_struct **prev,
-			     unsigned long start, unsigned long end)
+			     unsigned long start, unsigned long end
+#ifdef CONFIG_MEM_RANGE_LOCK
+			     , struct range_lock *range
+#endif
+	)
 {
 	*prev = vma;
 	if (!can_madv_dontneed_vma(vma))
 		return -EINVAL;
 
-	if (!userfaultfd_remove(vma, start, end)) {
+	if (!userfaultfd_remove(vma, start, end, range)) {
 		*prev = NULL; /* mmap_sem has been dropped, prev is stale */
 
 		down_read(&current->mm->mmap_sem);
@@ -558,8 +562,12 @@ static long madvise_dontneed(struct vm_area_struct *vma,
  * This is effectively punching a hole into the middle of a file.
  */
 static long madvise_remove(struct vm_area_struct *vma,
-				struct vm_area_struct **prev,
-				unsigned long start, unsigned long end)
+			   struct vm_area_struct **prev,
+			   unsigned long start, unsigned long end
+#ifdef CONFIG_MEM_RANGE_LOCK
+			   , struct range_lock *range
+#endif
+	)
 {
 	loff_t offset;
 	int error;
@@ -589,7 +597,7 @@ static long madvise_remove(struct vm_area_struct *vma,
 	 * mmap_sem.
 	 */
 	get_file(f);
-	if (userfaultfd_remove(vma, start, end)) {
+	if (userfaultfd_remove(vma, start, end, NULL)) {
 		/* mmap_sem was not released by userfaultfd_remove() */
 		up_read(&current->mm->mmap_sem);
 	}
@@ -648,17 +656,29 @@ static int madvise_inject_error(int behavior,
 
 static long
 madvise_vma(struct vm_area_struct *vma, struct vm_area_struct **prev,
-		unsigned long start, unsigned long end, int behavior)
+	    unsigned long start, unsigned long end, int behavior
+#ifdef CONFIG_MEM_RANGE_LOCK
+	    , struct range_lock *range
+#endif
+	)
 {
 	switch (behavior) {
 	case MADV_REMOVE:
-		return madvise_remove(vma, prev, start, end);
+		return madvise_remove(vma, prev, start, end
+#ifdef CONFIG_MEM_RANGE_LOCK
+				      , range
+#endif
+			);
 	case MADV_WILLNEED:
 		return madvise_willneed(vma, prev, start, end);
 	case MADV_FREE:
 		return madvise_free(vma, prev, start, end);
 	case MADV_DONTNEED:
-		return madvise_dontneed(vma, prev, start, end);
+		return madvise_dontneed(vma, prev, start, end
+#ifdef CONFIG_MEM_RANGE_LOCK
+					, range
+#endif
+			);
 	default:
 		return madvise_behavior(vma, prev, start, end, behavior);
 	}
@@ -826,7 +846,11 @@ SYSCALL_DEFINE3(madvise, unsigned long, start, size_t, len_in, int, behavior)
 			tmp = end;
 
 		/* Here vma->vm_start <= start < tmp <= (end|vma->vm_end). */
-		error = madvise_vma(vma, &prev, start, tmp, behavior);
+		error = madvise_vma(vma, &prev, start, tmp, behavior
+#ifdef CONFIG_MEM_RANGE_LOCK
+				    , &range
+#endif
+			);
 		if (error)
 			goto out;
 		start = tmp;

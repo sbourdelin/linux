@@ -703,8 +703,12 @@ void mremap_userfaultfd_complete(struct vm_userfaultfd_ctx *vm_ctx,
 	userfaultfd_event_wait_completion(ctx, &ewq);
 }
 
-bool userfaultfd_remove(struct vm_area_struct *vma,
-			unsigned long start, unsigned long end)
+bool _userfaultfd_remove(struct vm_area_struct *vma,
+			 unsigned long start, unsigned long end
+#ifdef CONFIG_MEM_RANGE_LOCK
+			 , struct range_lock *range
+#endif
+	)
 {
 	struct mm_struct *mm = vma->vm_mm;
 	struct userfaultfd_ctx *ctx;

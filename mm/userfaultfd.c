@@ -156,7 +156,11 @@ static __always_inline ssize_t __mcopy_atomic_hugetlb(struct mm_struct *dst_mm,
 					      unsigned long dst_start,
 					      unsigned long src_start,
 					      unsigned long len,
-					      bool zeropage)
+					      bool zeropage
+#ifdef CONFIG_MEM_RANGE_LOCK
+					      , struct range_lock *range
+#endif
+					      )
 {
 	int vm_alloc_shared = dst_vma->vm_flags & VM_SHARED;
 	int vm_shared = dst_vma->vm_flags & VM_SHARED;
@@ -368,7 +372,11 @@ extern ssize_t __mcopy_atomic_hugetlb(struct mm_struct *dst_mm,
 				      unsigned long dst_start,
 				      unsigned long src_start,
 				      unsigned long len,
-				      bool zeropage);
+				      bool zeropage
+#ifdef CONFIG_MEM_RANGE_LOCK
+				      , struct range_lock *range
+#endif
+				      );
 #endif /* CONFIG_HUGETLB_PAGE */
 
 static __always_inline ssize_t __mcopy_atomic(struct mm_struct *dst_mm,
@@ -439,7 +447,11 @@ retry:
 	 */
 	if (is_vm_hugetlb_page(dst_vma))
 		return  __mcopy_atomic_hugetlb(dst_mm, dst_vma, dst_start,
-						src_start, len, zeropage);
+					       src_start, len, zeropage
+#ifdef CONFIG_MEM_RANGE_LOCK
+					       , &range
+#endif
+					       );
 
 	if (!vma_is_anonymous(dst_vma) && !vma_is_shmem(dst_vma))
 		goto out_unlock;

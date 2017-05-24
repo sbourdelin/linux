@@ -61,9 +61,18 @@ extern void mremap_userfaultfd_complete(struct vm_userfaultfd_ctx *,
 					unsigned long from, unsigned long to,
 					unsigned long len);
 
-extern bool userfaultfd_remove(struct vm_area_struct *vma,
-			       unsigned long start,
-			       unsigned long end);
+#ifdef CONFIG_MEM_RANGE_LOCK
+extern bool _userfaultfd_remove(struct vm_area_struct *vma,
+				unsigned long start,
+				unsigned long end,
+				struct range_lock *range);
+#define userfaultfd_remove _userfaultfd_remove
+#else
+extern bool _userfaultfd_remove(struct vm_area_struct *vma,
+				unsigned long start,
+				unsigned long end);
+#define userfaultfd_remove(v, s, e, r) _userfaultfd_remove(v, s, e)
+#endif /* CONFIG_MEM_RANGE_LOCK */
 
 extern int userfaultfd_unmap_prep(struct vm_area_struct *vma,
 				  unsigned long start, unsigned long end,
@@ -117,12 +126,23 @@ static inline void mremap_userfaultfd_complete(struct vm_userfaultfd_ctx *ctx,
 {
 }
 
+#ifdef CONFIG_MEM_RANGE_LOCK
 static inline bool userfaultfd_remove(struct vm_area_struct *vma,
 				      unsigned long start,
-				      unsigned long end)
+				      unsigned long end,
+				      struct range_lock *range)
 {
 	return true;
 }
+#else
+static inline bool _userfaultfd_remove(struct vm_area_struct *vma,
+				       unsigned long start,
+				       unsigned long end)
+{
+	return true;
+}
+#define userfaultfd_remove(v, s, e, r) _userfaultfd_remove(v, s, e)
+#endif
 
 static inline int userfaultfd_unmap_prep(struct vm_area_struct *vma,
 					 unsigned long start, unsigned long end,
