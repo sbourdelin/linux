@@ -309,6 +309,18 @@ config NEED_BOUNCE_POOL
 	bool
 	default y if TILE && USB_OHCI_HCD
 
+config MEM_RANGE_LOCK
+	bool "Use range lock for process's memory layout"
+	default n
+	depends on EXPERT
+	depends on MMU
+	depends on X86_64 || PPC64
+	help
+	  Use range lock instead of traditional semaphore to protect per
+	  process memory layout. This is required when dealing with massive
+	  threaded process on very large system (more than 80 cpu threads).
+	  If unsure say n.
+
 config NR_QUICK
 	int
 	depends on QUICKLIST
