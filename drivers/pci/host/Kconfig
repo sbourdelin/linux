@@ -30,7 +30,7 @@ config PCIE_XILINX_NWL
 config PCI_FTPCI100
 	bool "Faraday Technology FTPCI100 PCI controller"
 	depends on OF
-	depends on ARM
+	depends on ARM && (ARCH_GEMINI || COMPILE_TEST)
 	default ARCH_GEMINI
 
 config PCI_TEGRA
