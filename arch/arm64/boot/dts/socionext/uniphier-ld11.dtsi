@@ -398,6 +398,10 @@
 				compatible = "socionext,uniphier-ld11-reset";
 				#reset-cells = <1>;
 			};
+
+			sys_wdt: watchdog {
+				compatible = "socionext,uniphier-wdt";
+			};
 		};
 	};
 };
