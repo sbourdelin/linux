@@ -29,6 +29,9 @@ static int arm_pmu_acpi_register_irq(int cpu)
 		return -EINVAL;
 
 	gsi = gicc->performance_interrupt;
+	if (!gsi)
+		return 0;
+
 	if (gicc->flags & ACPI_MADT_PERFORMANCE_IRQ_MODE)
 		trigger = ACPI_EDGE_SENSITIVE;
 	else
@@ -58,7 +61,8 @@ static void arm_pmu_acpi_unregister_irq(int cpu)
 		return;
 
 	gsi = gicc->performance_interrupt;
-	acpi_unregister_gsi(gsi);
+	if (gsi)
+		acpi_unregister_gsi(gsi);
 }
 
 static int arm_pmu_acpi_parse_irqs(void)
