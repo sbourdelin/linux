@@ -441,10 +441,9 @@ static const struct address_space_operations aio_ctx_aops = {
 #endif
 };
 
-static int aio_setup_ring(struct kioctx *ctx)
+static int aio_setup_ring(struct kioctx *ctx, unsigned nr_events)
 {
 	struct aio_ring *ring;
-	unsigned nr_events = ctx->max_reqs;
 	struct mm_struct *mm = current->mm;
 	unsigned long size, unused;
 	int nr_pages;
@@ -753,7 +752,7 @@ static struct kioctx *ioctx_alloc(unsigned nr_events)
 	if (!ctx->cpu)
 		goto err;
 
-	err = aio_setup_ring(ctx);
+	err = aio_setup_ring(ctx, nr_events);
 	if (err < 0)
 		goto err;
 
