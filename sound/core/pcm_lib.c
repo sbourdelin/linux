@@ -42,6 +42,53 @@
 #define trace_hw_ptr_error(substream, reason)
 #endif
 
+static int writei_silence(struct snd_pcm_substream *substream,
+			  unsigned int hwoff, unsigned long data,
+			  unsigned int off, snd_pcm_uframes_t count)
+{
+	struct snd_pcm_runtime *runtime = substream->runtime;
+	char *hwbuf;
+
+	if (substream->ops->silence)
+		return substream->ops->silence(substream, -1, hwoff, count);
+
+	hwbuf = runtime->dma_area + frames_to_bytes(runtime, hwoff);
+	snd_pcm_format_set_silence(runtime->format, hwbuf,
+				   count * runtime->channels);
+
+	return 0;
+}
+
+static int writen_silence(struct snd_pcm_substream *substream,
+			  unsigned int hwoff, unsigned long data,
+			  unsigned int off, snd_pcm_uframes_t count)
+{
+	struct snd_pcm_runtime *runtime = substream->runtime;
+	unsigned int channels = runtime->channels;
+	snd_pcm_uframes_t dma_csize = runtime->dma_bytes / channels;
+	char *hwbuf;
+	int c;
+	int err;
+
+	if (substream->ops->silence) {
+		for (c = 0; c < channels; ++c) {
+			err = substream->ops->silence(substream, c, hwoff,
+						      count);
+			if (err < 0)
+				return err;
+		}
+	} else {
+		for (c = 0; c < channels; ++c) {
+			hwbuf = runtime->dma_area + (c * dma_csize) +
+					samples_to_bytes(runtime, hwoff);
+			snd_pcm_format_set_silence(runtime->format, hwbuf,
+						   count);
+		}
+	}
+
+	return 0;
+}
+
 /*
  * fill ring buffer with silence
  * runtime->silence_start: starting pointer to silence area
@@ -51,10 +98,13 @@
  *
  * when runtime->silence_size >= runtime->boundary - fill processed area with silence immediately
  */
-void snd_pcm_playback_silence(struct snd_pcm_substream *substream, snd_pcm_uframes_t new_hw_ptr)
+void snd_pcm_playback_silence(struct snd_pcm_substream *substream,
+			      snd_pcm_uframes_t new_hw_ptr)
 {
 	struct snd_pcm_runtime *runtime = substream->runtime;
 	snd_pcm_uframes_t frames, ofs, transfer;
+	snd_pcm_copy_frames_t copy_frames;
+	int err;
 
 	if (runtime->silence_size < runtime->boundary) {
 		snd_pcm_sframes_t noise_dist, n;
@@ -104,36 +154,24 @@ void snd_pcm_playback_silence(struct snd_pcm_substream *substream, snd_pcm_ufram
 		return;
 	if (frames == 0)
 		return;
+
+	if (runtime->access == SNDRV_PCM_ACCESS_RW_INTERLEAVED ||
+	    runtime->access == SNDRV_PCM_ACCESS_MMAP_INTERLEAVED)
+		copy_frames = writei_silence;
+	else
+		copy_frames = writen_silence;
+
 	ofs = runtime->silence_start % runtime->buffer_size;
 	while (frames > 0) {
-		transfer = ofs + frames > runtime->buffer_size ? runtime->buffer_size - ofs : frames;
-		if (runtime->access == SNDRV_PCM_ACCESS_RW_INTERLEAVED ||
-		    runtime->access == SNDRV_PCM_ACCESS_MMAP_INTERLEAVED) {
-			if (substream->ops->silence) {
-				int err;
-				err = substream->ops->silence(substream, -1, ofs, transfer);
-				snd_BUG_ON(err < 0);
-			} else {
-				char *hwbuf = runtime->dma_area + frames_to_bytes(runtime, ofs);
-				snd_pcm_format_set_silence(runtime->format, hwbuf, transfer * runtime->channels);
-			}
-		} else {
-			unsigned int c;
-			unsigned int channels = runtime->channels;
-			if (substream->ops->silence) {
-				for (c = 0; c < channels; ++c) {
-					int err;
-					err = substream->ops->silence(substream, c, ofs, transfer);
-					snd_BUG_ON(err < 0);
-				}
-			} else {
-				size_t dma_csize = runtime->dma_bytes / channels;
-				for (c = 0; c < channels; ++c) {
-					char *hwbuf = runtime->dma_area + (c * dma_csize) + samples_to_bytes(runtime, ofs);
-					snd_pcm_format_set_silence(runtime->format, hwbuf, transfer);
-				}
-			}
-		}
+		if (ofs + frames > runtime->buffer_size)
+			transfer = runtime->buffer_size - ofs;
+		else
+			transfer = frames;
+
+		err = copy_frames(substream, ofs, (unsigned long)NULL, 0,
+				  transfer);
+		snd_BUG_ON(err < 0);
+
 		runtime->silence_filled += transfer;
 		frames -= transfer;
 		ofs = 0;
