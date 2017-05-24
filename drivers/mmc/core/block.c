@@ -63,7 +63,9 @@ MODULE_ALIAS("mmc:block");
 
 #define MMC_BLK_TIMEOUT_MS  (10 * 60 * 1000)        /* 10 minute timeout */
 #define MMC_SANITIZE_REQ_TIMEOUT 240000
-#define MMC_EXTRACT_INDEX_FROM_ARG(x) ((x & 0x00FF0000) >> 16)
+#define MMC_EXTRACT_SWITCH_MODE_FROM_ARG(x) (((x) & 0x030F0000) >> 24)
+#define MMC_EXTRACT_INDEX_FROM_ARG(x) (((x) & 0x00FF0000) >> 16)
+#define MMC_EXTRACT_VALUE_FROM_ARG(x) (((x) & 0x00000FF0) >> 8)
 
 #define mmc_req_rel_wr(req)	((req->cmd_flags & REQ_FUA) && \
 				  (rq_data_dir(req) == WRITE))
@@ -527,6 +529,24 @@ static int __mmc_blk_ioctl_cmd(struct mmc_card *card, struct mmc_blk_data *md,
 			       __func__, err);
 
 		return err;
+	}
+
+	if ((MMC_EXTRACT_INDEX_FROM_ARG(cmd.arg) == EXT_CSD_PART_CONFIG) &&
+	    (cmd.opcode == MMC_SWITCH)) {
+		u8 mode = MMC_EXTRACT_SWITCH_MODE_FROM_ARG(cmd.arg);
+		u8 value = MMC_EXTRACT_VALUE_FROM_ARG(cmd.arg);
+
+		switch (mode) {
+		case MMC_SWITCH_MODE_SET_BITS:
+			card->ext_csd.part_config |= value;
+			break;
+		case MMC_SWITCH_MODE_CLEAR_BITS:
+			card->ext_csd.part_config &= ~value;
+			break;
+		case MMC_SWITCH_MODE_WRITE_BYTE:
+			card->ext_csd.part_config = value;
+			break;
+		}
 	}
 
 	mmc_wait_for_req(card->host, &mrq);
