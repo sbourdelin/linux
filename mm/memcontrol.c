@@ -3121,6 +3121,8 @@ unsigned int memcg1_events[] = {
 	PGPGOUT,
 	PGFAULT,
 	PGMAJFAULT,
+	PGMAJFAULT_A,
+	PGMAJFAULT_F,
 };
 
 static const char *const memcg1_event_names[] = {
@@ -3128,6 +3130,8 @@ static const char *const memcg1_event_names[] = {
 	"pgpgout",
 	"pgfault",
 	"pgmajfault",
+	"pgmajfault_a",
+	"pgmajfault_f",
 };
 
 static int memcg_stat_show(struct seq_file *m, void *v)
@@ -5228,7 +5232,8 @@ static int memory_stat_show(struct seq_file *m, void *v)
 	/* Accumulated memory events */
 
 	seq_printf(m, "pgfault %lu\n", events[PGFAULT]);
-	seq_printf(m, "pgmajfault %lu\n", events[PGMAJFAULT]);
+	seq_printf(m, "pgmajfault %lu\n", events[PGMAJFAULT_S] +
+			events[PGMAJFAULT_A] + events[PGMAJFAULT_F]);
 
 	seq_printf(m, "workingset_refault %lu\n",
 		   stat[WORKINGSET_REFAULT]);
