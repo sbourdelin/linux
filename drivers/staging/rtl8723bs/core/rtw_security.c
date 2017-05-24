@@ -37,60 +37,84 @@ const char *security_type_str(u8 value)
 }
 
 #ifdef DBG_SW_SEC_CNT
-#define WEP_SW_ENC_CNT_INC(sec, ra) \
-	if (is_broadcast_mac_addr(ra)) \
-		sec->wep_sw_enc_cnt_bc++; \
-	else if (is_multicast_mac_addr(ra)) \
-		sec->wep_sw_enc_cnt_mc++; \
-	else \
+static inline void WEP_SW_ENC_CNT_INC(struct security_priv *sec, const u8 *ra)
+{
+	if (is_broadcast_mac_addr(ra))
+		sec->wep_sw_enc_cnt_bc++;
+	else if (is_multicast_mac_addr(ra))
+		sec->wep_sw_enc_cnt_mc++;
+	else
 		sec->wep_sw_enc_cnt_uc++;
+}
 
-#define WEP_SW_DEC_CNT_INC(sec, ra) \
-	if (is_broadcast_mac_addr(ra)) \
-		sec->wep_sw_dec_cnt_bc++; \
-	else if (is_multicast_mac_addr(ra)) \
-		sec->wep_sw_dec_cnt_mc++; \
-	else \
+static inline void WEP_SW_DEC_CNT_INC(struct security_priv *sec, const u8 *ra)
+{
+	if (is_broadcast_mac_addr(ra))
+		sec->wep_sw_dec_cnt_bc++;
+	else if (is_multicast_mac_addr(ra))
+		sec->wep_sw_dec_cnt_mc++;
+	else
 		sec->wep_sw_dec_cnt_uc++;
+}
 
-#define TKIP_SW_ENC_CNT_INC(sec, ra) \
-	if (is_broadcast_mac_addr(ra)) \
-		sec->tkip_sw_enc_cnt_bc++; \
-	else if (is_multicast_mac_addr(ra)) \
-		sec->tkip_sw_enc_cnt_mc++; \
-	else \
+static inline void TKIP_SW_ENC_CNT_INC(struct security_priv *sec, const u8 *ra)
+{
+	if (is_broadcast_mac_addr(ra))
+		sec->tkip_sw_enc_cnt_bc++;
+	else if (is_multicast_mac_addr(ra))
+		sec->tkip_sw_enc_cnt_mc++;
+	else
 		sec->tkip_sw_enc_cnt_uc++;
+}
 
-#define TKIP_SW_DEC_CNT_INC(sec, ra) \
-	if (is_broadcast_mac_addr(ra)) \
-		sec->tkip_sw_dec_cnt_bc++; \
-	else if (is_multicast_mac_addr(ra)) \
-		sec->tkip_sw_dec_cnt_mc++; \
-	else \
+static inline void TKIP_SW_DEC_CNT_INC(struct security_priv *sec, const u8 *ra)
+{
+	if (is_broadcast_mac_addr(ra))
+		sec->tkip_sw_dec_cnt_bc++;
+	else if (is_multicast_mac_addr(ra))
+		sec->tkip_sw_dec_cnt_mc++;
+	else
 		sec->tkip_sw_dec_cnt_uc++;
+}
 
-#define AES_SW_ENC_CNT_INC(sec, ra) \
-	if (is_broadcast_mac_addr(ra)) \
-		sec->aes_sw_enc_cnt_bc++; \
-	else if (is_multicast_mac_addr(ra)) \
-		sec->aes_sw_enc_cnt_mc++; \
-	else \
+static inline void AES_SW_ENC_CNT_INC(struct security_priv *sec, const u8 *ra)
+{
+	if (is_broadcast_mac_addr(ra))
+		sec->aes_sw_enc_cnt_bc++;
+	else if (is_multicast_mac_addr(ra))
+		sec->aes_sw_enc_cnt_mc++;
+	else
 		sec->aes_sw_enc_cnt_uc++;
+}
 
-#define AES_SW_DEC_CNT_INC(sec, ra) \
-	if (is_broadcast_mac_addr(ra)) \
-		sec->aes_sw_dec_cnt_bc++; \
-	else if (is_multicast_mac_addr(ra)) \
-		sec->aes_sw_dec_cnt_mc++; \
-	else \
+static inline void AES_SW_DEC_CNT_INC(struct security_priv *sec, const u8 *ra)
+{
+	if (is_broadcast_mac_addr(ra))
+		sec->aes_sw_dec_cnt_bc++;
+	else if (is_multicast_mac_addr(ra))
+		sec->aes_sw_dec_cnt_mc++;
+	else
 		sec->aes_sw_dec_cnt_uc++;
+}
 #else
-#define WEP_SW_ENC_CNT_INC(sec, ra)
-#define WEP_SW_DEC_CNT_INC(sec, ra)
-#define TKIP_SW_ENC_CNT_INC(sec, ra)
-#define TKIP_SW_DEC_CNT_INC(sec, ra)
-#define AES_SW_ENC_CNT_INC(sec, ra)
-#define AES_SW_DEC_CNT_INC(sec, ra)
+static inline void WEP_SW_ENC_CNT_INC(struct security_priv *sec, const u8 *ra)
+{
+}
+static inline void WEP_SW_DEC_CNT_INC(struct security_priv *sec, const u8 *ra)
+{
+}
+static inline void TKIP_SW_ENC_CNT_INC(struct security_priv *sec, const u8 *ra)
+{
+}
+static inline void TKIP_SW_DEC_CNT_INC(struct security_priv *sec, const u8 *ra)
+{
+}
+static inline void AES_SW_ENC_CNT_INC(struct security_priv *sec, const u8 *ra)
+{
+}
+static inline void AES_SW_DEC_CNT_INC(struct security_priv *sec, const u8 *ra)
+{
+}
 #endif /* DBG_SW_SEC_CNT */
 
 /* WEP related ===== */
@@ -2235,11 +2259,13 @@ static void rijndaelEncrypt(u32 rk[/*44*/], u8 pt[16], u8 ct[16])
 	s2 = GETU32(pt +  8) ^ rk[2];
 	s3 = GETU32(pt + 12) ^ rk[3];
 
-#define ROUND(i, d, s) \
-d##0 = TE0(s##0) ^ TE1(s##1) ^ TE2(s##2) ^ TE3(s##3) ^ rk[4 * i]; \
-d##1 = TE0(s##1) ^ TE1(s##2) ^ TE2(s##3) ^ TE3(s##0) ^ rk[4 * i + 1]; \
-d##2 = TE0(s##2) ^ TE1(s##3) ^ TE2(s##0) ^ TE3(s##1) ^ rk[4 * i + 2]; \
-d##3 = TE0(s##3) ^ TE1(s##0) ^ TE2(s##1) ^ TE3(s##2) ^ rk[4 * i + 3]
+#define ROUND(i, d, s)	\
+do {	\
+	d##0 = TE0(s##0) ^ TE1(s##1) ^ TE2(s##2) ^ TE3(s##3) ^ rk[4 * i];\
+	d##1 = TE0(s##1) ^ TE1(s##2) ^ TE2(s##3) ^ TE3(s##0) ^ rk[4 * i + 1];\
+	d##2 = TE0(s##2) ^ TE1(s##3) ^ TE2(s##0) ^ TE3(s##1) ^ rk[4 * i + 2];\
+	d##3 = TE0(s##3) ^ TE1(s##0) ^ TE2(s##1) ^ TE3(s##2) ^ rk[4 * i + 3];\
+} while (0)
 
 	/* Nr - 1 full rounds: */
 	r = Nr >> 1;
