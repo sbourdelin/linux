@@ -200,7 +200,7 @@ static int vpd_section_init(const char *name, struct vpd_section *sec,
 	sec->raw_name = kasprintf(GFP_KERNEL, "%s_raw", name);
 	if (!sec->raw_name) {
 		err = -ENOMEM;
-		goto err_iounmap;
+		goto err_unmap;
 	}
 
 	sysfs_bin_attr_init(&sec->bin_attr);
@@ -231,8 +231,8 @@ err_sysfs_remove:
 	sysfs_remove_bin_file(vpd_kobj, &sec->bin_attr);
 err_free_raw_name:
 	kfree(sec->raw_name);
-err_iounmap:
-	iounmap(sec->baseaddr);
+err_unmap:
+	memunmap(sec->baseaddr);
 	return err;
 }
 
@@ -243,7 +243,7 @@ static int vpd_section_destroy(struct vpd_section *sec)
 		kobject_put(sec->kobj);
 		sysfs_remove_bin_file(vpd_kobj, &sec->bin_attr);
 		kfree(sec->raw_name);
-		iounmap(sec->baseaddr);
+		memunmap(sec->baseaddr);
 	}
 
 	return 0;
@@ -251,38 +251,39 @@ static int vpd_section_destroy(struct vpd_section *sec)
 
 static int vpd_sections_init(phys_addr_t physaddr)
 {
-	struct vpd_cbmem __iomem *temp;
-	struct vpd_cbmem header;
+	struct vpd_cbmem *header;
 	int ret = 0;
 
-	temp = memremap(physaddr, sizeof(struct vpd_cbmem), MEMREMAP_WB);
-	if (!temp)
+	header = memremap(physaddr, sizeof(struct vpd_cbmem), MEMREMAP_WB);
+	if (!header)
 		return -ENOMEM;
 
-	memcpy_fromio(&header, temp, sizeof(struct vpd_cbmem));
-	iounmap(temp);
-
-	if (header.magic != VPD_CBMEM_MAGIC)
-		return -ENODEV;
-
-	if (header.ro_size) {
-		ret = vpd_section_init("ro", &ro_vpd,
-				       physaddr + sizeof(struct vpd_cbmem),
-				       header.ro_size);
-		if (ret)
-			return ret;
+	if (header->magic != VPD_CBMEM_MAGIC) {
+		ret = -ENODEV;
+		goto out;
 	}
 
-	if (header.rw_size) {
+	if (header->ro_size) {
+		ret = vpd_section_init("ro", &ro_vpd,
+				       physaddr + sizeof(struct vpd_cbmem),
+				       header->ro_size);
+		if (ret)
+			goto out;
+	}
+
+	if (header->rw_size) {
 		ret = vpd_section_init("rw", &rw_vpd,
 				       physaddr + sizeof(struct vpd_cbmem) +
-				       header.ro_size, header.rw_size);
+						header->ro_size,
+				       header->rw_size);
 		if (ret) {
 			vpd_section_destroy(&ro_vpd);
-			return ret;
+			goto out;
 		}
 	}
 
+out:
+	memunmap(header);
 	return 0;
 }
 
