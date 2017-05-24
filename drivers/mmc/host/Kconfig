@@ -134,6 +134,7 @@ config MMC_SDHCI_OF_ARASAN
 config MMC_SDHCI_OF_AT91
 	tristate "SDHCI OF support for the Atmel SDMMC controller"
 	depends on MMC_SDHCI_PLTFM
+	depends on ARCH_AT91 || COMPILE_TEST
 	depends on OF
 	help
 	  This selects the Atmel SDMMC driver
@@ -572,7 +573,6 @@ config MMC_TMIO
 
 config MMC_SDHI
 	tristate "SH-Mobile SDHI SD/SDIO controller support"
-	depends on SUPERH || ARM || ARM64
 	depends on SUPERH || ARCH_RENESAS || COMPILE_TEST
 	select MMC_TMIO_CORE
 	help
@@ -634,7 +634,7 @@ config MMC_CAVIUM_OCTEON
 
 config MMC_CAVIUM_THUNDERX
 	tristate "Cavium ThunderX SD/MMC Card Interface support"
-	depends on PCI && 64BIT && (ARM64 || COMPILE_TEST)
+	depends on PCI && 64BIT && (ARCH_THUNDER || COMPILE_TEST)
 	depends on GPIOLIB
 	depends on OF_ADDRESS
 	help
@@ -836,6 +836,7 @@ config MMC_BCM2835
 
 config MMC_MTK
 	tristate "MediaTek SD/MMC Card Interface support"
+	depends on ARCH_MEDIATEK || COMPILE_TEST
 	depends on HAS_DMA
 	help
 	  This selects the MediaTek(R) Secure digital and Multimedia card Interface.
@@ -866,6 +867,7 @@ config MMC_SDHCI_BRCMSTB
 
 config MMC_SDHCI_XENON
 	tristate "Marvell Xenon eMMC/SD/SDIO SDHCI driver"
+	depends on ARCH_MVEBU || COMPILE_TEST
 	depends on MMC_SDHCI_PLTFM
 	help
 	  This selects Marvell Xenon eMMC/SD/SDIO SDHCI.
