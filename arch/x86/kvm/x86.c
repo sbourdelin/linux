@@ -8373,7 +8373,8 @@ static inline bool kvm_vcpu_has_events(struct kvm_vcpu *vcpu)
 	if (vcpu->arch.pv.pv_unhalted)
 		return true;
 
-	if (atomic_read(&vcpu->arch.nmi_queued))
+	if (vcpu->arch.nmi_pending ||
+	    atomic_read(&vcpu->arch.nmi_queued))
 		return true;
 
 	if (kvm_test_request(KVM_REQ_SMI, vcpu))
