@@ -17,6 +17,17 @@ config TYPEC_TCPCI
 	help
 	  Type-C Port Controller driver for TCPCI-compliant controller.
 
+config TYPEC_WCOVE
+	tristate "Intel WhiskeyCove PMIC USB Type-C PHY driver"
+	depends on ACPI
+	depends on INTEL_SOC_PMIC
+	depends on INTEL_PMC_IPC
+	depends on BXT_WC_PMIC_OPREGION
+	help
+	  Intel WhiskeyCove PMIC USB PHY Type-C driver that works with Type-C
+	  Port Controller Manager to provide USB Power Delivery and USB Type-C
+	  functionalities.
+
 source "drivers/staging/typec/fusb302/Kconfig"
 
 endif
