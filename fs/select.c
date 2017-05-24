@@ -468,13 +468,15 @@ static int do_select(int n, fd_set_bits *fds, struct timespec64 *end_time)
 
 	poll_initwait(&table);
 	wait = &table.pt;
-	if (end_time && !end_time->tv_sec && !end_time->tv_nsec) {
-		wait->_qproc = NULL;
-		timed_out = 1;
-	}
 
-	if (end_time && !timed_out)
-		slack = select_estimate_accuracy(end_time);
+	if (end_time) {
+		if (end_time->tv_sec || end_time->tv_nsec) {
+			slack = select_estimate_accuracy(end_time);
+		} else {
+			wait->_qproc = NULL;
+			timed_out = 1;
+		}
+	}
 
 	retval = 0;
 	for (;;) {
