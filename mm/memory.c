@@ -2737,7 +2737,8 @@ int do_swap_page(struct vm_fault *vmf)
 	}
 
 	swapcache = page;
-	locked = lock_page_or_retry(page, vma->vm_mm, vmf->flags);
+	locked = lock_page_or_retry(page, vma->vm_mm, vmf->flags,
+				    vmf->lockrange);
 
 	delayacct_clear_flag(DELAYACCT_PF_SWAPIN);
 	if (!locked) {

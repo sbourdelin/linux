@@ -1053,7 +1053,11 @@ EXPORT_SYMBOL_GPL(__lock_page_killable);
  * with the page locked and the mmap_sem unperturbed.
  */
 int __lock_page_or_retry(struct page *page, struct mm_struct *mm,
-			 unsigned int flags)
+			 unsigned int flags
+#ifdef CONFIG_MEM_RANGE_LOCK
+			 , struct range_lock *range
+#endif
+	)
 {
 	if (flags & FAULT_FLAG_ALLOW_RETRY) {
 		/*
@@ -2234,7 +2238,8 @@ retry_find:
 			goto no_cached_page;
 	}
 
-	if (!lock_page_or_retry(page, vmf->vma->vm_mm, vmf->flags)) {
+	if (!lock_page_or_retry(page, vmf->vma->vm_mm, vmf->flags,
+				vmf->lockrange)) {
 		put_page(page);
 		return ret | VM_FAULT_RETRY;
 	}

@@ -433,8 +433,13 @@ static inline pgoff_t linear_page_index(struct vm_area_struct *vma,
 
 extern void __lock_page(struct page *page);
 extern int __lock_page_killable(struct page *page);
+#ifdef CONFIG_MEM_RANGE_LOCK
+extern int __lock_page_or_retry(struct page *page, struct mm_struct *mm,
+				unsigned int flags, struct range_lock *range);
+#else
 extern int __lock_page_or_retry(struct page *page, struct mm_struct *mm,
 				unsigned int flags);
+#endif
 extern void unlock_page(struct page *page);
 
 static inline int trylock_page(struct page *page)
@@ -473,12 +478,24 @@ static inline int lock_page_killable(struct page *page)
  * Return value and mmap_sem implications depend on flags; see
  * __lock_page_or_retry().
  */
+#ifdef CONFIG_MEM_RANGE_LOCK
 static inline int lock_page_or_retry(struct page *page, struct mm_struct *mm,
+				     unsigned int flags,
+				     struct range_lock *range)
+{
+	might_sleep();
+	return trylock_page(page) || __lock_page_or_retry(page, mm, flags,
+							  range);
+}
+#else
+static inline int _lock_page_or_retry(struct page *page, struct mm_struct *mm,
 				     unsigned int flags)
 {
 	might_sleep();
 	return trylock_page(page) || __lock_page_or_retry(page, mm, flags);
 }
+#define lock_page_or_retry(p, m, f, r) _lock_page_or_retry(p, m, f)
+#endif /* CONFIG_MEM_RANGE_LOCK */
 
 /*
  * This is exported only for wait_on_page_locked/wait_on_page_writeback, etc.,
