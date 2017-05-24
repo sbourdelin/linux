@@ -4017,30 +4017,38 @@ static int fxrstor_fixup(struct x86_emulate_ctxt *ctxt,
 
 static int em_fxrstor(struct x86_emulate_ctxt *ctxt)
 {
-	struct fxregs_state fx_state;
+	struct fxregs_state *fx_state;
 	int rc;
 
 	rc = check_fxsr(ctxt);
 	if (rc != X86EMUL_CONTINUE)
 		return rc;
 
-	rc = segmented_read_std(ctxt, ctxt->memop.addr.mem, &fx_state, 512);
-	if (rc != X86EMUL_CONTINUE)
-		return rc;
+	fx_state = kmalloc(sizeof(*fx_state), GFP_KERNEL);
+	if (!fx_state)
+		return -ENOMEM;
 
-	if (fx_state.mxcsr >> 16)
-		return emulate_gp(ctxt, 0);
+	rc = segmented_read_std(ctxt, ctxt->memop.addr.mem, fx_state, 512);
+	if (rc != X86EMUL_CONTINUE)
+		goto out;
+
+	if (fx_state->mxcsr >> 16) {
+		rc = emulate_gp(ctxt, 0);
+		goto out;
+	}
 
 	ctxt->ops->get_fpu(ctxt);
 
 	if (ctxt->mode < X86EMUL_MODE_PROT64)
-		rc = fxrstor_fixup(ctxt, &fx_state);
+		rc = fxrstor_fixup(ctxt, fx_state);
 
 	if (rc == X86EMUL_CONTINUE)
-		rc = asm_safe("fxrstor %[fx]", : [fx] "m"(fx_state));
+		rc = asm_safe("fxrstor %[fx]", : [fx] "m"(*fx_state));
 
 	ctxt->ops->put_fpu(ctxt);
 
+out:
+	kfree(fx_state);
 	return rc;
 }
 
