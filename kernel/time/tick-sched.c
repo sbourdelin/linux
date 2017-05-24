@@ -726,9 +726,16 @@ static ktime_t tick_nohz_stop_sched_tick(struct tick_sched *ts,
 		 *
 		 * Only once we exit the idle loop will we re-enable the tick,
 		 * see tick_nohz_idle_exit().
+		 *
+		 * Also, make sure we schedule TIMER_SOFTIRQ now instead of
+		 * relying on the hrtimer interrupt to do it to avoid
+		 * postponing processing of expired timers. If we have a
+		 * constant stream of interrupts with a period shorter than
+		 * the minimum delay of the current clocksource we can end up
+		 * postponing the timers indefinitely.
 		 */
 		if (delta == 0) {
-			tick_nohz_restart(ts, now);
+			raise_softirq(TIMER_SOFTIRQ);
 			goto out;
 		}
 	}
