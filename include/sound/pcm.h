@@ -63,6 +63,10 @@ struct snd_pcm_substream;
 struct snd_pcm_audio_tstamp_config; /* definitions further down */
 struct snd_pcm_audio_tstamp_report;
 
+typedef int (*snd_pcm_copy_frames_t)(struct snd_pcm_substream *substream,
+				     unsigned int hwoff, unsigned int long data,
+				     unsigned int off, snd_pcm_uframes_t count);
+
 struct snd_pcm_ops {
 	int (*open)(struct snd_pcm_substream *substream);
 	int (*close)(struct snd_pcm_substream *substream);
