@@ -377,6 +377,23 @@ static inline void copy_kprobe(struct kprobe *ap, struct kprobe *p)
 static bool kprobes_allow_optimization;
 
 /*
+ * Synchronizing wait on trampline code for interrupted tasks/threads.
+ * Since the threads running on dynamically allocated trampline code
+ * can be interrupted, kprobes has to wait for those tasks back on
+ * track and scheduled. If the kernel is preemptive, the thread can be
+ * preempted by other tasks on the trampoline too. For such case, this
+ * calls synchronize_rcu_tasks() to wait for those tasks back on track.
+ */
+static void synchronize_on_trampoline(void)
+{
+#ifdef CONFIG_PREEMPT
+	synchronize_rcu_tasks();
+#else
+	synchronize_sched();
+#endif
+}
+
+/*
  * Call all pre_handler on the list, but ignores its return value.
  * This must be called from arch-dep optimized caller.
  */
@@ -577,8 +594,12 @@ static void kprobe_optimizer(struct work_struct *work)
 	 * there is a chance that Nth instruction is interrupted. In that
 	 * case, running interrupt can return to 2nd-Nth byte of jump
 	 * instruction. This wait is for avoiding it.
+	 * With CONFIG_PREEMPT, the interrupts can leads preemption. To wait
+	 * for such thread, we will use synchronize_rcu_tasks() which ensures
+	 * all preeempted tasks are scheduled normally. So we can ensure there
+	 * is no threads running there.
 	 */
-	synchronize_sched();
+	synchronize_on_trampoline();
 
 	/* Step 3: Optimize kprobes after quiesence period */
 	do_optimize_kprobes();
