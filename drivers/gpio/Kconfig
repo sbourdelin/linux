@@ -608,6 +608,20 @@ config GPIO_GPIO_MM
 	  The base port addresses for the devices may be configured via the base
 	  array module parameter.
 
+config GPIO_INT0002
+	tristate "Intel ACPI INT0002 Virtual GPIO"
+	depends on ACPI
+	select GPIOLIB_IRQCHIP
+	---help---
+	  Some peripherals on Baytrail and Cherrytrail platforms signal
+	  PME to the PMC to wakeup the system. When this happens software
+	  needs to explicitly clear the interrupt source to avoid an IRQ
+	  storm on IRQ 9. This is modelled in ACPI through the INT0002
+	  Virtual GPIO ACPI device.
+
+	  To compile this driver as a module, choose M here: the module will
+	  be called gpio_int0002.
+
 config GPIO_IT87
 	tristate "IT87xx GPIO support"
 	help
