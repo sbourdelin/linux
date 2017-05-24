@@ -872,7 +872,11 @@ static int hugepage_vma_revalidate(struct mm_struct *mm, unsigned long address,
 static bool __collapse_huge_page_swapin(struct mm_struct *mm,
 					struct vm_area_struct *vma,
 					unsigned long address, pmd_t *pmd,
-					int referenced)
+					int referenced
+#ifdef CONFIG_MEM_RANGE_LOCK
+					, struct range_lock *range
+#endif
+	)
 {
 	int swapped_in = 0, ret = 0;
 	struct vm_fault vmf = {
@@ -881,6 +885,9 @@ static bool __collapse_huge_page_swapin(struct mm_struct *mm,
 		.flags = FAULT_FLAG_ALLOW_RETRY,
 		.pmd = pmd,
 		.pgoff = linear_page_index(vma, address),
+#ifdef CONFIG_MEM_RANGE_LOCK
+		.lockrange = range,
+#endif
 	};
 
 	/* we only decide to swapin, if there is enough young ptes */
@@ -927,7 +934,11 @@ static bool __collapse_huge_page_swapin(struct mm_struct *mm,
 static void collapse_huge_page(struct mm_struct *mm,
 				   unsigned long address,
 				   struct page **hpage,
-				   int node, int referenced)
+				   int node, int referenced
+#ifdef CONFIG_MEM_RANGE_LOCK
+				   , struct range_lock *range
+#endif
+				   )
 {
 	pmd_t *pmd, _pmd;
 	pte_t *pte;
@@ -985,7 +996,11 @@ static void collapse_huge_page(struct mm_struct *mm,
 	 * If it fails, we release mmap_sem and jump out_nolock.
 	 * Continuing to collapse causes inconsistency.
 	 */
-	if (!__collapse_huge_page_swapin(mm, vma, address, pmd, referenced)) {
+	if (!__collapse_huge_page_swapin(mm, vma, address, pmd, referenced
+#ifdef CONFIG_MEM_RANGE_LOCK
+					 , range
+#endif
+		    )) {
 		mem_cgroup_cancel_charge(new_page, memcg, true);
 		up_read(&mm->mmap_sem);
 		goto out_nolock;
@@ -1092,7 +1107,11 @@ out:
 static int khugepaged_scan_pmd(struct mm_struct *mm,
 			       struct vm_area_struct *vma,
 			       unsigned long address,
-			       struct page **hpage)
+			       struct page **hpage
+#ifdef CONFIG_MEM_RANGE_LOCK
+			       , struct range_lock *range
+#endif
+	)
 {
 	pmd_t *pmd;
 	pte_t *pte, *_pte;
@@ -1206,7 +1225,11 @@ out_unmap:
 	if (ret) {
 		node = khugepaged_find_target_node();
 		/* collapse_huge_page will return with the mmap_sem released */
-		collapse_huge_page(mm, address, hpage, node, referenced);
+		collapse_huge_page(mm, address, hpage, node, referenced
+#ifdef CONFIG_MEM_RANGE_LOCK
+				   , range
+#endif
+			);
 	}
 out:
 	trace_mm_khugepaged_scan_pmd(mm, page, writable, referenced,
@@ -1727,7 +1750,11 @@ skip:
 			} else {
 				ret = khugepaged_scan_pmd(mm, vma,
 						khugepaged_scan.address,
-						hpage);
+						hpage
+#ifdef CONFIG_MEM_RANGE_LOCK
+						, &range
+#endif
+						);
 			}
 			/* move to next address */
 			khugepaged_scan.address += HPAGE_PMD_SIZE;
