@@ -689,8 +689,12 @@ static inline void *alloc_tramp(unsigned long size)
 {
 	return module_alloc(size);
 }
-static inline void tramp_free(void *tramp)
+static inline void tramp_free(void *tramp, int size)
 {
+	int npages;
+
+	npages = PAGE_ALIGN(size) >> PAGE_SHIFT;
+	set_memory_rw((unsigned long)tramp, npages);
 	module_memfree(tramp);
 }
 #else
@@ -699,7 +703,7 @@ static inline void *alloc_tramp(unsigned long size)
 {
 	return NULL;
 }
-static inline void tramp_free(void *tramp) { }
+static inline void tramp_free(void *tramp, int size) { }
 #endif
 
 /* Defined as markers to the end of the ftrace default trampolines */
@@ -771,7 +775,7 @@ create_trampoline(struct ftrace_ops *ops, unsigned int *tramp_size)
 	/* Copy ftrace_caller onto the trampoline memory */
 	ret = probe_kernel_read(trampoline, (void *)start_offset, size);
 	if (WARN_ON(ret < 0)) {
-		tramp_free(trampoline);
+		tramp_free(trampoline, *tramp_size);
 		return 0;
 	}
 
@@ -797,7 +801,7 @@ create_trampoline(struct ftrace_ops *ops, unsigned int *tramp_size)
 
 	/* Are we pointing to the reference? */
 	if (WARN_ON(memcmp(op_ptr.op, op_ref, 3) != 0)) {
-		tramp_free(trampoline);
+		tramp_free(trampoline, *tramp_size);
 		return 0;
 	}
 
@@ -939,7 +943,7 @@ void arch_ftrace_trampoline_free(struct ftrace_ops *ops)
 	if (!ops || !(ops->flags & FTRACE_OPS_FL_ALLOC_TRAMP))
 		return;
 
-	tramp_free((void *)ops->trampoline);
+	tramp_free((void *)ops->trampoline, ops->trampoline_size);
 	ops->trampoline = 0;
 }
 
