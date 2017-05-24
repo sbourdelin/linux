@@ -19,11 +19,13 @@
 #include <linux/of_irq.h>
 #include <linux/of_platform.h>
 #include <linux/clk.h>
+#include <linux/reset.h>
 
 #include "8250.h"
 
 struct of_serial_info {
 	struct clk *clk;
+	struct reset_control *rst;
 	int type;
 	int line;
 };
@@ -132,6 +134,18 @@ static int of_platform_serial_setup(struct platform_device *ofdev,
 		}
 	}
 
+	info->rst = devm_reset_control_get_optional(&ofdev->dev, NULL);
+	if (IS_ERR(info->rst)) {
+		ret = PTR_ERR(info->rst);
+		if (ret == -EPROBE_DEFER)
+			goto out;
+		info->rst = NULL;
+	} else {
+		ret = reset_control_deassert(info->rst);
+		if (ret)
+			goto out;
+	}
+
 	port->type = type;
 	port->uartclk = clk;
 	port->flags = UPF_SHARE_IRQ | UPF_BOOT_AUTOCONF | UPF_IOREMAP
@@ -231,6 +245,8 @@ static int of_platform_serial_remove(struct platform_device *ofdev)
 
 	if (info->clk)
 		clk_disable_unprepare(info->clk);
+	if (info->rst)
+		reset_control_assert(info->rst);
 	kfree(info);
 	return 0;
 }
