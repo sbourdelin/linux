@@ -182,7 +182,7 @@ static __always_inline ssize_t __mcopy_atomic_hugetlb(struct mm_struct *dst_mm,
 	 * feature is not supported.
 	 */
 	if (zeropage) {
-		up_read(&dst_mm->mmap_sem);
+		mm_read_unlock(dst_mm, range);
 		return -EINVAL;
 	}
 
@@ -280,7 +280,7 @@ retry:
 		cond_resched();
 
 		if (unlikely(err == -EFAULT)) {
-			up_read(&dst_mm->mmap_sem);
+			mm_read_unlock(dst_mm, range);
 			BUG_ON(!page);
 
 			err = copy_huge_page_from_user(page,
@@ -290,7 +290,7 @@ retry:
 				err = -EFAULT;
 				goto out;
 			}
-			down_read(&dst_mm->mmap_sem);
+			mm_read_lock(dst_mm, range);
 
 			dst_vma = NULL;
 			goto retry;
@@ -310,7 +310,7 @@ retry:
 	}
 
 out_unlock:
-	up_read(&dst_mm->mmap_sem);
+	mm_read_unlock(dst_mm, range);
 out:
 	if (page) {
 		/*
@@ -391,6 +391,7 @@ static __always_inline ssize_t __mcopy_atomic(struct mm_struct *dst_mm,
 	unsigned long src_addr, dst_addr;
 	long copied;
 	struct page *page;
+	mm_range_define(range);
 
 	/*
 	 * Sanitize the command parameters:
@@ -407,7 +408,7 @@ static __always_inline ssize_t __mcopy_atomic(struct mm_struct *dst_mm,
 	copied = 0;
 	page = NULL;
 retry:
-	down_read(&dst_mm->mmap_sem);
+	mm_read_lock(dst_mm, &range);
 
 	/*
 	 * Make sure the vma is not shared, that the dst range is
@@ -520,7 +521,7 @@ retry:
 		if (unlikely(err == -EFAULT)) {
 			void *page_kaddr;
 
-			up_read(&dst_mm->mmap_sem);
+			mm_read_unlock(dst_mm, &range);
 			BUG_ON(!page);
 
 			page_kaddr = kmap(page);
@@ -549,7 +550,7 @@ retry:
 	}
 
 out_unlock:
-	up_read(&dst_mm->mmap_sem);
+	mm_read_unlock(dst_mm, &range);
 out:
 	if (page)
 		put_page(page);

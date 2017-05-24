@@ -134,25 +134,28 @@ int qib_get_user_pages(unsigned long start_page, size_t num_pages,
 		       struct page **p)
 {
 	int ret;
+	mm_range_define(range);
 
-	down_write(&current->mm->mmap_sem);
+	mm_write_lock(current->mm, &range);
 
 	ret = __qib_get_user_pages(start_page, num_pages, p);
 
-	up_write(&current->mm->mmap_sem);
+	mm_write_unlock(current->mm, &range);
 
 	return ret;
 }
 
 void qib_release_user_pages(struct page **p, size_t num_pages)
 {
+	mm_range_define(range);
+
 	if (current->mm) /* during close after signal, mm can be NULL */
-		down_write(&current->mm->mmap_sem);
+		mm_write_lock(current->mm, &range);
 
 	__qib_release_user_pages(p, num_pages, 1);
 
 	if (current->mm) {
 		current->mm->pinned_vm -= num_pages;
-		up_write(&current->mm->mmap_sem);
+		mm_write_unlock(current->mm, &range);
 	}
 }

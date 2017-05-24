@@ -377,6 +377,7 @@ static int vvp_mmap_locks(const struct lu_env *env,
 	int		 result = 0;
 	struct iov_iter i;
 	struct iovec iov;
+	mm_range_define(range);
 
 	LASSERT(io->ci_type == CIT_READ || io->ci_type == CIT_WRITE);
 
@@ -396,7 +397,7 @@ static int vvp_mmap_locks(const struct lu_env *env,
 		count += addr & (~PAGE_MASK);
 		addr &= PAGE_MASK;
 
-		down_read(&mm->mmap_sem);
+		mm_read_lock(mm, &range);
 		while ((vma = our_vma(mm, addr, count)) != NULL) {
 			struct inode *inode = file_inode(vma->vm_file);
 			int flags = CEF_MUST;
@@ -437,7 +438,7 @@ static int vvp_mmap_locks(const struct lu_env *env,
 			count -= vma->vm_end - addr;
 			addr = vma->vm_end;
 		}
-		up_read(&mm->mmap_sem);
+		mm_read_unlock(mm, &range);
 		if (result < 0)
 			break;
 	}

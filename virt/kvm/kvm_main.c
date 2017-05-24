@@ -1242,6 +1242,7 @@ unsigned long kvm_host_page_size(struct kvm *kvm, gfn_t gfn)
 {
 	struct vm_area_struct *vma;
 	unsigned long addr, size;
+	mm_range_define(range);
 
 	size = PAGE_SIZE;
 
@@ -1249,7 +1250,7 @@ unsigned long kvm_host_page_size(struct kvm *kvm, gfn_t gfn)
 	if (kvm_is_error_hva(addr))
 		return PAGE_SIZE;
 
-	down_read(&current->mm->mmap_sem);
+	mm_read_lock(current->mm, &range);
 	vma = find_vma(current->mm, addr);
 	if (!vma)
 		goto out;
@@ -1257,7 +1258,7 @@ unsigned long kvm_host_page_size(struct kvm *kvm, gfn_t gfn)
 	size = vma_kernel_pagesize(vma);
 
 out:
-	up_read(&current->mm->mmap_sem);
+	mm_read_unlock(current->mm, &range);
 
 	return size;
 }
@@ -1397,6 +1398,7 @@ static int hva_to_pfn_slow(unsigned long addr, bool *async, bool write_fault,
 {
 	struct page *page[1];
 	int npages = 0;
+	mm_range_define(range);
 
 	might_sleep();
 
@@ -1404,9 +1406,9 @@ static int hva_to_pfn_slow(unsigned long addr, bool *async, bool write_fault,
 		*writable = write_fault;
 
 	if (async) {
-		down_read(&current->mm->mmap_sem);
+		mm_read_lock(current->mm, &range);
 		npages = get_user_page_nowait(addr, write_fault, page);
-		up_read(&current->mm->mmap_sem);
+		mm_read_unlock(current->mm, &range);
 	} else {
 		unsigned int flags = FOLL_HWPOISON;
 
@@ -1448,7 +1450,11 @@ static bool vma_is_valid(struct vm_area_struct *vma, bool write_fault)
 
 static int hva_to_pfn_remapped(struct vm_area_struct *vma,
 			       unsigned long addr, bool *async,
-			       bool write_fault, kvm_pfn_t *p_pfn)
+			       bool write_fault, kvm_pfn_t *p_pfn
+#ifdef CONFIG_MEM_RANGE_LOCK
+			       , struct range_lock *range
+#endif
+	)
 {
 	unsigned long pfn;
 	int r;
@@ -1462,7 +1468,7 @@ static int hva_to_pfn_remapped(struct vm_area_struct *vma,
 		bool unlocked = false;
 		r = fixup_user_fault(current, current->mm, addr,
 				     (write_fault ? FAULT_FLAG_WRITE : 0),
-				     &unlocked, NULL);
+				     &unlocked, range);
 		if (unlocked)
 			return -EAGAIN;
 		if (r)
@@ -1512,6 +1518,7 @@ static kvm_pfn_t hva_to_pfn(unsigned long addr, bool atomic, bool *async,
 	struct vm_area_struct *vma;
 	kvm_pfn_t pfn = 0;
 	int npages, r;
+	mm_range_define(range);
 
 	/* we can do it either atomically or asynchronously, not both */
 	BUG_ON(atomic && async);
@@ -1526,7 +1533,7 @@ static kvm_pfn_t hva_to_pfn(unsigned long addr, bool atomic, bool *async,
 	if (npages == 1)
 		return pfn;
 
-	down_read(&current->mm->mmap_sem);
+	mm_read_lock(current->mm, &range);
 	if (npages == -EHWPOISON ||
 	      (!async && check_user_page_hwpoison(addr))) {
 		pfn = KVM_PFN_ERR_HWPOISON;
@@ -1539,7 +1546,11 @@ retry:
 	if (vma == NULL)
 		pfn = KVM_PFN_ERR_FAULT;
 	else if (vma->vm_flags & (VM_IO | VM_PFNMAP)) {
-		r = hva_to_pfn_remapped(vma, addr, async, write_fault, &pfn);
+		r = hva_to_pfn_remapped(vma, addr, async, write_fault, &pfn
+#ifdef CONFIG_MEM_RANGE_LOCK
+					, &range
+#endif
+			);
 		if (r == -EAGAIN)
 			goto retry;
 		if (r < 0)
@@ -1550,7 +1561,7 @@ retry:
 		pfn = KVM_PFN_ERR_FAULT;
 	}
 exit:
-	up_read(&current->mm->mmap_sem);
+	mm_read_unlock(current->mm, &range);
 	return pfn;
 }
 

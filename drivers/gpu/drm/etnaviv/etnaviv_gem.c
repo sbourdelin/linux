@@ -747,6 +747,7 @@ static struct page **etnaviv_gem_userptr_do_get_pages(
 	struct page **pvec;
 	uintptr_t ptr;
 	unsigned int flags = 0;
+	mm_range_define(range);
 
 	pvec = drm_malloc_ab(npages, sizeof(struct page *));
 	if (!pvec)
@@ -758,7 +759,7 @@ static struct page **etnaviv_gem_userptr_do_get_pages(
 	pinned = 0;
 	ptr = etnaviv_obj->userptr.ptr;
 
-	down_read(&mm->mmap_sem);
+	mm_read_lock(mm, &range);
 	while (pinned < npages) {
 		ret = get_user_pages_remote(task, mm, ptr, npages - pinned,
 					    flags, pvec + pinned, NULL, NULL,
@@ -769,7 +770,7 @@ static struct page **etnaviv_gem_userptr_do_get_pages(
 		ptr += ret * PAGE_SIZE;
 		pinned += ret;
 	}
-	up_read(&mm->mmap_sem);
+	mm_read_unlock(mm, &range);
 
 	if (ret < 0) {
 		release_pages(pvec, pinned, 0);

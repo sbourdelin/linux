@@ -200,10 +200,11 @@ static int videobuf_dma_init_user(struct videobuf_dmabuf *dma, int direction,
 			   unsigned long data, unsigned long size)
 {
 	int ret;
+	mm_range_define(range);
 
-	down_read(&current->mm->mmap_sem);
+	mm_read_lock(current->mm, &range);
 	ret = videobuf_dma_init_user_locked(dma, direction, data, size);
-	up_read(&current->mm->mmap_sem);
+	mm_read_unlock(current->mm, &range);
 
 	return ret;
 }

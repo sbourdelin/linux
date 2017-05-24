@@ -76,6 +76,7 @@ bool hfi1_can_pin_pages(struct hfi1_devdata *dd, struct mm_struct *mm,
 	unsigned int usr_ctxts =
 			dd->num_rcv_contexts - dd->first_dyn_alloc_ctxt;
 	bool can_lock = capable(CAP_IPC_LOCK);
+	mm_range_define(range);
 
 	/*
 	 * Calculate per-cache size. The calculation below uses only a quarter
@@ -91,9 +92,9 @@ bool hfi1_can_pin_pages(struct hfi1_devdata *dd, struct mm_struct *mm,
 	/* Convert to number of pages */
 	size = DIV_ROUND_UP(size, PAGE_SIZE);
 
-	down_read(&mm->mmap_sem);
+	mm_read_lock(mm, &range);
 	pinned = mm->pinned_vm;
-	up_read(&mm->mmap_sem);
+	mm_read_unlock(mm, &range);
 
 	/* First, check the absolute limit against all pinned pages. */
 	if (pinned + npages >= ulimit && !can_lock)
@@ -106,14 +107,15 @@ int hfi1_acquire_user_pages(struct mm_struct *mm, unsigned long vaddr, size_t np
 			    bool writable, struct page **pages)
 {
 	int ret;
+	mm_range_define(range);
 
 	ret = get_user_pages_fast(vaddr, npages, writable, pages);
 	if (ret < 0)
 		return ret;
 
-	down_write(&mm->mmap_sem);
+	mm_write_lock(mm, &range);
 	mm->pinned_vm += ret;
-	up_write(&mm->mmap_sem);
+	mm_write_unlock(mm, &range);
 
 	return ret;
 }
@@ -130,8 +132,10 @@ void hfi1_release_user_pages(struct mm_struct *mm, struct page **p,
 	}
 
 	if (mm) { /* during close after signal, mm can be NULL */
-		down_write(&mm->mmap_sem);
+		mm_range_define(range);
+
+		mm_write_lock(mm, &range);
 		mm->pinned_vm -= npages;
-		up_write(&mm->mmap_sem);
+		mm_write_unlock(mm, &range);
 	}
 }

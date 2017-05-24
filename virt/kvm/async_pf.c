@@ -78,6 +78,7 @@ static void async_pf_execute(struct work_struct *work)
 	unsigned long addr = apf->addr;
 	gva_t gva = apf->gva;
 	int locked = 1;
+	mm_range_define(range);
 
 	might_sleep();
 
@@ -86,11 +87,11 @@ static void async_pf_execute(struct work_struct *work)
 	 * mm and might be done in another context, so we must
 	 * access remotely.
 	 */
-	down_read(&mm->mmap_sem);
+	mm_read_lock(mm, &range);
 	get_user_pages_remote(NULL, mm, addr, 1, FOLL_WRITE, NULL, NULL,
-			&locked);
+			      &locked, &range);
 	if (locked)
-		up_read(&mm->mmap_sem);
+		mm_read_unlock(mm, &range);
 
 	kvm_async_page_present_sync(vcpu, apf);
 

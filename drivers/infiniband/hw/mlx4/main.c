@@ -1142,6 +1142,7 @@ static void mlx4_ib_disassociate_ucontext(struct ib_ucontext *ibcontext)
 	struct mlx4_ib_ucontext *context = to_mucontext(ibcontext);
 	struct task_struct *owning_process  = NULL;
 	struct mm_struct   *owning_mm       = NULL;
+	mm_range_define(range);
 
 	owning_process = get_pid_task(ibcontext->tgid, PIDTYPE_PID);
 	if (!owning_process)
@@ -1173,7 +1174,7 @@ static void mlx4_ib_disassociate_ucontext(struct ib_ucontext *ibcontext)
 	/* need to protect from a race on closing the vma as part of
 	 * mlx4_ib_vma_close().
 	 */
-	down_write(&owning_mm->mmap_sem);
+	mm_read_lock(owning_mm, &range);
 	for (i = 0; i < HW_BAR_COUNT; i++) {
 		vma = context->hw_bar_info[i].vma;
 		if (!vma)
@@ -1193,7 +1194,7 @@ static void mlx4_ib_disassociate_ucontext(struct ib_ucontext *ibcontext)
 		context->hw_bar_info[i].vma->vm_ops = NULL;
 	}
 
-	up_write(&owning_mm->mmap_sem);
+	mm_read_unlock(owning_mm, &range);
 	mmput(owning_mm);
 	put_task_struct(owning_process);
 }

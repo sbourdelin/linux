@@ -249,6 +249,7 @@ static int do_mmu_notifier_register(struct mmu_notifier *mn,
 {
 	struct mmu_notifier_mm *mmu_notifier_mm;
 	int ret;
+	mm_range_define(range);
 
 	BUG_ON(atomic_read(&mm->mm_users) <= 0);
 
@@ -258,7 +259,7 @@ static int do_mmu_notifier_register(struct mmu_notifier *mn,
 		goto out;
 
 	if (take_mmap_sem)
-		down_write(&mm->mmap_sem);
+		mm_write_lock(mm, &range);
 	ret = mm_take_all_locks(mm);
 	if (unlikely(ret))
 		goto out_clean;
@@ -287,7 +288,7 @@ static int do_mmu_notifier_register(struct mmu_notifier *mn,
 	mm_drop_all_locks(mm);
 out_clean:
 	if (take_mmap_sem)
-		up_write(&mm->mmap_sem);
+		mm_write_unlock(mm, &range);
 	kfree(mmu_notifier_mm);
 out:
 	BUG_ON(atomic_read(&mm->mm_users) <= 0);

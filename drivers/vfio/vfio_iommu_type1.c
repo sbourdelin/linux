@@ -251,6 +251,7 @@ static int vfio_lock_acct(struct task_struct *task, long npage, bool *lock_cap)
 	struct mm_struct *mm;
 	bool is_current;
 	int ret;
+	mm_range_define(range);
 
 	if (!npage)
 		return 0;
@@ -261,7 +262,7 @@ static int vfio_lock_acct(struct task_struct *task, long npage, bool *lock_cap)
 	if (!mm)
 		return -ESRCH; /* process exited */
 
-	ret = down_write_killable(&mm->mmap_sem);
+	ret = mm_write_trylock(mm, &range);
 	if (!ret) {
 		if (npage > 0) {
 			if (lock_cap ? !*lock_cap :
@@ -279,7 +280,7 @@ static int vfio_lock_acct(struct task_struct *task, long npage, bool *lock_cap)
 		if (!ret)
 			mm->locked_vm += npage;
 
-		up_write(&mm->mmap_sem);
+		mm_write_unlock(mm);
 	}
 
 	if (!is_current)
@@ -339,6 +340,7 @@ static int vaddr_get_pfn(struct mm_struct *mm, unsigned long vaddr,
 	struct page *page[1];
 	struct vm_area_struct *vma;
 	int ret;
+	mm_range_define(range);
 
 	if (mm == current->mm) {
 		ret = get_user_pages_fast(vaddr, 1, !!(prot & IOMMU_WRITE),
@@ -349,10 +351,10 @@ static int vaddr_get_pfn(struct mm_struct *mm, unsigned long vaddr,
 		if (prot & IOMMU_WRITE)
 			flags |= FOLL_WRITE;
 
-		down_read(&mm->mmap_sem);
+		mm_read_lock(mm, &range);
 		ret = get_user_pages_remote(NULL, mm, vaddr, 1, flags, page,
-					    NULL, NULL);
-		up_read(&mm->mmap_sem);
+					    NULL, NULL, NULL);
+		mm_read_unlock(mm, &range);
 	}
 
 	if (ret == 1) {
@@ -360,7 +362,7 @@ static int vaddr_get_pfn(struct mm_struct *mm, unsigned long vaddr,
 		return 0;
 	}
 
-	down_read(&mm->mmap_sem);
+	mm_read_lock(mm, &range);
 
 	vma = find_vma_intersection(mm, vaddr, vaddr + 1);
 
@@ -370,7 +372,7 @@ static int vaddr_get_pfn(struct mm_struct *mm, unsigned long vaddr,
 			ret = 0;
 	}
 
-	up_read(&mm->mmap_sem);
+	mm_read_unlock(mm, &range);
 	return ret;
 }
 

@@ -468,14 +468,16 @@ create_pagelist(char __user *buf, size_t count, unsigned short type,
 		}
 		/* do not try and release vmalloc pages */
 	} else {
-		down_read(&task->mm->mmap_sem);
+		mm_range_define(range);
+
+		mm_read_lock(task->mm->mmap_sem, &range);
 		actual_pages = get_user_pages(
 				          (unsigned long)buf & ~(PAGE_SIZE - 1),
 					  num_pages,
 					  (type == PAGELIST_READ) ? FOLL_WRITE : 0,
 					  pages,
 					  NULL /*vmas */);
-		up_read(&task->mm->mmap_sem);
+		mm_read_unlock(task->mm->mmap_sem, &range);
 
 		if (actual_pages != num_pages) {
 			vchiq_log_info(vchiq_arm_log_level,

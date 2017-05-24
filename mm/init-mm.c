@@ -19,7 +19,11 @@ struct mm_struct init_mm = {
 	.pgd		= swapper_pg_dir,
 	.mm_users	= ATOMIC_INIT(2),
 	.mm_count	= ATOMIC_INIT(1),
+#ifdef CONFIG_MEM_RANGE_LOCK
+	.mmap_sem	= __RANGE_LOCK_TREE_INITIALIZER(init_mm.mmap_sem),
+#else
 	.mmap_sem	= __RWSEM_INITIALIZER(init_mm.mmap_sem),
+#endif
 	.page_table_lock =  __SPIN_LOCK_UNLOCKED(init_mm.page_table_lock),
 	.mmlist		= LIST_HEAD_INIT(init_mm.mmlist),
 	.user_ns	= &init_user_ns,

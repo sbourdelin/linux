@@ -231,9 +231,10 @@ static struct amdgpu_mn *amdgpu_mn_get(struct amdgpu_device *adev)
 	struct mm_struct *mm = current->mm;
 	struct amdgpu_mn *rmn;
 	int r;
+	mm_range_define(range);
 
 	mutex_lock(&adev->mn_lock);
-	if (down_write_killable(&mm->mmap_sem)) {
+	if (mm_write_lock_killable(mm, &range)) {
 		mutex_unlock(&adev->mn_lock);
 		return ERR_PTR(-EINTR);
 	}
@@ -261,13 +262,13 @@ static struct amdgpu_mn *amdgpu_mn_get(struct amdgpu_device *adev)
 	hash_add(adev->mn_hash, &rmn->node, (unsigned long)mm);
 
 release_locks:
-	up_write(&mm->mmap_sem);
+	mm_write_unlock(mm, &range);
 	mutex_unlock(&adev->mn_lock);
 
 	return rmn;
 
 free_rmn:
-	up_write(&mm->mmap_sem);
+	mm_write_unlock(mm, &range);
 	mutex_unlock(&adev->mn_lock);
 	kfree(rmn);
 

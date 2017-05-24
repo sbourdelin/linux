@@ -260,6 +260,7 @@ static long privcmd_ioctl_mmap(struct file *file, void __user *udata)
 	int rc;
 	LIST_HEAD(pagelist);
 	struct mmap_gfn_state state;
+	mm_range_define(range);
 
 	/* We only support privcmd_ioctl_mmap_batch for auto translated. */
 	if (xen_feature(XENFEAT_auto_translated_physmap))
@@ -279,7 +280,7 @@ static long privcmd_ioctl_mmap(struct file *file, void __user *udata)
 	if (rc || list_empty(&pagelist))
 		goto out;
 
-	down_write(&mm->mmap_sem);
+	mm_write_lock(mm, &range);
 
 	{
 		struct page *page = list_first_entry(&pagelist,
@@ -304,7 +305,7 @@ static long privcmd_ioctl_mmap(struct file *file, void __user *udata)
 
 
 out_up:
-	up_write(&mm->mmap_sem);
+	mm_write_unlock(mm, &range);
 
 out:
 	free_page_list(&pagelist);
@@ -454,6 +455,7 @@ static long privcmd_ioctl_mmap_batch(
 	unsigned long nr_pages;
 	LIST_HEAD(pagelist);
 	struct mmap_batch_state state;
+	mm_range_define(range);
 
 	switch (version) {
 	case 1:
@@ -500,7 +502,7 @@ static long privcmd_ioctl_mmap_batch(
 		}
 	}
 
-	down_write(&mm->mmap_sem);
+	mm_write_lock(mm, &range);
 
 	vma = find_vma(mm, m.addr);
 	if (!vma ||
@@ -556,7 +558,7 @@ static long privcmd_ioctl_mmap_batch(
 	BUG_ON(traverse_pages_block(m.num, sizeof(xen_pfn_t),
 				    &pagelist, mmap_batch_fn, &state));
 
-	up_write(&mm->mmap_sem);
+	mm_write_unlock(mm, &range);
 
 	if (state.global_error) {
 		/* Write back errors in second pass. */
@@ -577,7 +579,7 @@ out:
 	return ret;
 
 out_unlock:
-	up_write(&mm->mmap_sem);
+	mm_write_unlock(mm, &range);
 	goto out;
 }
 

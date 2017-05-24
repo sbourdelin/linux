@@ -183,10 +183,12 @@ static long __get_user_pages_unlocked(struct task_struct *tsk,
 			unsigned int gup_flags)
 {
 	long ret;
-	down_read(&mm->mmap_sem);
+	mm_range_define(range);
+
+	mm_read_lock(mm, &range);
 	ret = __get_user_pages(tsk, mm, start, nr_pages, gup_flags, pages,
 				NULL, NULL);
-	up_read(&mm->mmap_sem);
+	mm_read_unlock(mm, &range);
 	return ret;
 }
 
@@ -249,12 +251,13 @@ void *vmalloc_user(unsigned long size)
 	ret = __vmalloc(size, GFP_KERNEL | __GFP_ZERO, PAGE_KERNEL);
 	if (ret) {
 		struct vm_area_struct *vma;
+		mm_range_define(range);
 
-		down_write(&current->mm->mmap_sem);
+		mm_write_lock(current->mm, &range);
 		vma = find_vma(current->mm, (unsigned long)ret);
 		if (vma)
 			vma->vm_flags |= VM_USERMAP;
-		up_write(&current->mm->mmap_sem);
+		mm_write_unlock(current->mm, &range);
 	}
 
 	return ret;
@@ -1647,10 +1650,11 @@ int vm_munmap(unsigned long addr, size_t len)
 {
 	struct mm_struct *mm = current->mm;
 	int ret;
+	mm_range_define(range);
 
-	down_write(&mm->mmap_sem);
+	mm_write_lock(mm, &range);
 	ret = do_munmap(mm, addr, len, NULL);
-	up_write(&mm->mmap_sem);
+	mm_write_unlock(mm, &range);
 	return ret;
 }
 EXPORT_SYMBOL(vm_munmap);
@@ -1736,10 +1740,11 @@ SYSCALL_DEFINE5(mremap, unsigned long, addr, unsigned long, old_len,
 		unsigned long, new_addr)
 {
 	unsigned long ret;
+	mm_range_define(range);
 
-	down_write(&current->mm->mmap_sem);
+	mm_write_lock(current->mm, &range);
 	ret = do_mremap(addr, old_len, new_len, flags, new_addr);
-	up_write(&current->mm->mmap_sem);
+	mm_write_unlock(current->mm, &range);
 	return ret;
 }
 
@@ -1819,8 +1824,9 @@ int __access_remote_vm(struct task_struct *tsk, struct mm_struct *mm,
 {
 	struct vm_area_struct *vma;
 	int write = gup_flags & FOLL_WRITE;
+	mm_range_define(range);
 
-	down_read(&mm->mmap_sem);
+	mm_read_lock(mm, &range);
 
 	/* the access must start within one of the target process's mappings */
 	vma = find_vma(mm, addr);
@@ -1842,7 +1848,7 @@ int __access_remote_vm(struct task_struct *tsk, struct mm_struct *mm,
 		len = 0;
 	}
 
-	up_read(&mm->mmap_sem);
+	mm_read_unlock(mm, &range);
 
 	return len;
 }

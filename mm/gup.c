@@ -824,7 +824,7 @@ retry:
 	}
 
 	if (ret & VM_FAULT_RETRY) {
-		down_read(&mm->mmap_sem);
+		mm_read_lock(mm, range);
 		if (!(fault_flags & FAULT_FLAG_TRIED)) {
 			*unlocked = true;
 			fault_flags &= ~FAULT_FLAG_ALLOW_RETRY;
@@ -914,7 +914,7 @@ static __always_inline long __get_user_pages_locked(struct task_struct *tsk,
 		 */
 		*locked = 1;
 		lock_dropped = true;
-		down_read(&mm->mmap_sem);
+		mm_read_lock(mm, range);
 		ret = __get_user_pages(tsk, mm, start, 1, flags | FOLL_TRIED,
 				       pages, NULL, NULL
 #ifdef CONFIG_MEM_RANGE_LOCK
@@ -939,7 +939,7 @@ static __always_inline long __get_user_pages_locked(struct task_struct *tsk,
 		 * We must let the caller know we temporarily dropped the lock
 		 * and so the critical section protected by it was lost.
 		 */
-		up_read(&mm->mmap_sem);
+		mm_read_unlock(mm, range);
 		*locked = 0;
 	}
 	return pages_done;
@@ -994,8 +994,9 @@ static __always_inline long __get_user_pages_unlocked(struct task_struct *tsk,
 {
 	long ret;
 	int locked = 1;
+	mm_range_define(range);
 
-	down_read(&mm->mmap_sem);
+	mm_read_lock(mm, &range);
 	ret = __get_user_pages_locked(tsk, mm, start, nr_pages, pages, NULL,
 				      &locked, false,
 #ifdef CONFIG_MEM_RANGE_LOCK
@@ -1003,7 +1004,7 @@ static __always_inline long __get_user_pages_unlocked(struct task_struct *tsk,
 #endif
 				      gup_flags);
 	if (locked)
-		up_read(&mm->mmap_sem);
+		mm_read_unlock(mm, &range);
 	return ret;
 }
 
@@ -1211,6 +1212,7 @@ int __mm_populate(unsigned long start, unsigned long len, int ignore_errors)
 	struct vm_area_struct *vma = NULL;
 	int locked = 0;
 	long ret = 0;
+	mm_range_define(range);
 
 	VM_BUG_ON(start & ~PAGE_MASK);
 	VM_BUG_ON(len != PAGE_ALIGN(len));
@@ -1223,7 +1225,7 @@ int __mm_populate(unsigned long start, unsigned long len, int ignore_errors)
 		 */
 		if (!locked) {
 			locked = 1;
-			down_read(&mm->mmap_sem);
+			mm_read_lock(mm, &range);
 			vma = find_vma(mm, nstart);
 		} else if (nstart >= vma->vm_end)
 			vma = vma->vm_next;
@@ -1244,7 +1246,7 @@ int __mm_populate(unsigned long start, unsigned long len, int ignore_errors)
 		 * if the vma was already munlocked.
 		 */
 		ret = populate_vma_page_range(vma, nstart, nend, &locked,
-					      NULL);
+					      &range);
 		if (ret < 0) {
 			if (ignore_errors) {
 				ret = 0;
@@ -1256,7 +1258,7 @@ int __mm_populate(unsigned long start, unsigned long len, int ignore_errors)
 		ret = 0;
 	}
 	if (locked)
-		up_read(&mm->mmap_sem);
+		mm_read_unlock(mm, &range);
 	return ret;	/* 0 or negative error code */
 }
 

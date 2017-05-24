@@ -90,6 +90,7 @@ static int process_vm_rw_single_vec(unsigned long addr,
 	unsigned long max_pages_per_loop = PVM_MAX_KMALLOC_PAGES
 		/ sizeof(struct pages *);
 	unsigned int flags = 0;
+	mm_range_define(range);
 
 	/* Work out address and page range required */
 	if (len == 0)
@@ -109,12 +110,12 @@ static int process_vm_rw_single_vec(unsigned long addr,
 		 * access remotely because task/mm might not
 		 * current/current->mm
 		 */
-		down_read(&mm->mmap_sem);
+		mm_read_lock(mm, &range);
 		pages = get_user_pages_remote(task, mm, pa, pages, flags,
 					      process_pages, NULL, &locked,
-					      NULL);
+					      &range);
 		if (locked)
-			up_read(&mm->mmap_sem);
+			mm_read_unlock(mm, &range);
 		if (pages <= 0)
 			return -EFAULT;
 

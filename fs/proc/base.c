@@ -216,6 +216,7 @@ static ssize_t proc_pid_cmdline_read(struct file *file, char __user *buf,
 	unsigned long p;
 	char c;
 	ssize_t rv;
+	mm_range_define(range);
 
 	BUG_ON(*pos < 0);
 
@@ -238,12 +239,12 @@ static ssize_t proc_pid_cmdline_read(struct file *file, char __user *buf,
 		goto out_mmput;
 	}
 
-	down_read(&mm->mmap_sem);
+	mm_read_lock(mm, &range);
 	arg_start = mm->arg_start;
 	arg_end = mm->arg_end;
 	env_start = mm->env_start;
 	env_end = mm->env_end;
-	up_read(&mm->mmap_sem);
+	mm_read_unlock(mm, &range);
 
 	BUG_ON(arg_start > arg_end);
 	BUG_ON(env_start > env_end);
@@ -913,6 +914,7 @@ static ssize_t environ_read(struct file *file, char __user *buf,
 	int ret = 0;
 	struct mm_struct *mm = file->private_data;
 	unsigned long env_start, env_end;
+	mm_range_define(range);
 
 	/* Ensure the process spawned far enough to have an environment. */
 	if (!mm || !mm->env_end)
@@ -926,10 +928,10 @@ static ssize_t environ_read(struct file *file, char __user *buf,
 	if (!mmget_not_zero(mm))
 		goto free;
 
-	down_read(&mm->mmap_sem);
+	mm_read_lock(mm, &range);
 	env_start = mm->env_start;
 	env_end = mm->env_end;
-	up_read(&mm->mmap_sem);
+	mm_read_unlock(mm, &range);
 
 	while (count > 0) {
 		size_t this_len, max_len;
@@ -1919,6 +1921,7 @@ static int map_files_d_revalidate(struct dentry *dentry, unsigned int flags)
 	struct task_struct *task;
 	struct inode *inode;
 	int status = 0;
+	mm_range_define(range);
 
 	if (flags & LOOKUP_RCU)
 		return -ECHILD;
@@ -1933,9 +1936,9 @@ static int map_files_d_revalidate(struct dentry *dentry, unsigned int flags)
 		goto out;
 
 	if (!dname_to_vma_addr(dentry, &vm_start, &vm_end)) {
-		down_read(&mm->mmap_sem);
+		mm_read_lock(mm, &range);
 		exact_vma_exists = !!find_exact_vma(mm, vm_start, vm_end);
-		up_read(&mm->mmap_sem);
+		mm_read_unlock(mm, &range);
 	}
 
 	mmput(mm);
@@ -1966,6 +1969,7 @@ static int map_files_get_link(struct dentry *dentry, struct path *path)
 	struct task_struct *task;
 	struct mm_struct *mm;
 	int rc;
+	mm_range_define(range);
 
 	rc = -ENOENT;
 	task = get_proc_task(d_inode(dentry));
@@ -1982,14 +1986,14 @@ static int map_files_get_link(struct dentry *dentry, struct path *path)
 		goto out_mmput;
 
 	rc = -ENOENT;
-	down_read(&mm->mmap_sem);
+	mm_read_lock(mm, &range);
 	vma = find_exact_vma(mm, vm_start, vm_end);
 	if (vma && vma->vm_file) {
 		*path = vma->vm_file->f_path;
 		path_get(path);
 		rc = 0;
 	}
-	up_read(&mm->mmap_sem);
+	mm_read_unlock(mm, &range);
 
 out_mmput:
 	mmput(mm);
@@ -2062,6 +2066,7 @@ static struct dentry *proc_map_files_lookup(struct inode *dir,
 	struct task_struct *task;
 	int result;
 	struct mm_struct *mm;
+	mm_range_define(range);
 
 	result = -ENOENT;
 	task = get_proc_task(dir);
@@ -2080,7 +2085,7 @@ static struct dentry *proc_map_files_lookup(struct inode *dir,
 	if (!mm)
 		goto out_put_task;
 
-	down_read(&mm->mmap_sem);
+	mm_read_lock(mm, &range);
 	vma = find_exact_vma(mm, vm_start, vm_end);
 	if (!vma)
 		goto out_no_vma;
@@ -2090,7 +2095,7 @@ static struct dentry *proc_map_files_lookup(struct inode *dir,
 				(void *)(unsigned long)vma->vm_file->f_mode);
 
 out_no_vma:
-	up_read(&mm->mmap_sem);
+	mm_read_unlock(mm, &range);
 	mmput(mm);
 out_put_task:
 	put_task_struct(task);
@@ -2115,6 +2120,7 @@ proc_map_files_readdir(struct file *file, struct dir_context *ctx)
 	struct map_files_info info;
 	struct map_files_info *p;
 	int ret;
+	mm_range_define(range);
 
 	ret = -ENOENT;
 	task = get_proc_task(file_inode(file));
@@ -2132,7 +2138,7 @@ proc_map_files_readdir(struct file *file, struct dir_context *ctx)
 	mm = get_task_mm(task);
 	if (!mm)
 		goto out_put_task;
-	down_read(&mm->mmap_sem);
+	mm_read_lock(mm, &range);
 
 	nr_files = 0;
 
@@ -2159,7 +2165,7 @@ proc_map_files_readdir(struct file *file, struct dir_context *ctx)
 			ret = -ENOMEM;
 			if (fa)
 				flex_array_free(fa);
-			up_read(&mm->mmap_sem);
+			mm_read_unlock(mm, &range);
 			mmput(mm);
 			goto out_put_task;
 		}
@@ -2178,7 +2184,7 @@ proc_map_files_readdir(struct file *file, struct dir_context *ctx)
 				BUG();
 		}
 	}
-	up_read(&mm->mmap_sem);
+	mm_read_unlock(mm, &range);
 
 	for (i = 0; i < nr_files; i++) {
 		p = flex_array_get(fa, i);

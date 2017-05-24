@@ -37,6 +37,7 @@ static void tce_iommu_detach_group(void *iommu_data,
 static long try_increment_locked_vm(struct mm_struct *mm, long npages)
 {
 	long ret = 0, locked, lock_limit;
+	mm_range_define(range);
 
 	if (WARN_ON_ONCE(!mm))
 		return -EPERM;
@@ -44,7 +45,7 @@ static long try_increment_locked_vm(struct mm_struct *mm, long npages)
 	if (!npages)
 		return 0;
 
-	down_write(&mm->mmap_sem);
+	mm_write_lock(mm, &range);
 	locked = mm->locked_vm + npages;
 	lock_limit = rlimit(RLIMIT_MEMLOCK) >> PAGE_SHIFT;
 	if (locked > lock_limit && !capable(CAP_IPC_LOCK))
@@ -58,17 +59,19 @@ static long try_increment_locked_vm(struct mm_struct *mm, long npages)
 			rlimit(RLIMIT_MEMLOCK),
 			ret ? " - exceeded" : "");
 
-	up_write(&mm->mmap_sem);
+	mm_write_unlock(mm, &range);
 
 	return ret;
 }
 
 static void decrement_locked_vm(struct mm_struct *mm, long npages)
 {
+	mm_range_define(range);
+
 	if (!mm || !npages)
 		return;
 
-	down_write(&mm->mmap_sem);
+	mm_write_lock(mm, &range);
 	if (WARN_ON_ONCE(npages > mm->locked_vm))
 		npages = mm->locked_vm;
 	mm->locked_vm -= npages;
@@ -76,7 +79,7 @@ static void decrement_locked_vm(struct mm_struct *mm, long npages)
 			npages << PAGE_SHIFT,
 			mm->locked_vm << PAGE_SHIFT,
 			rlimit(RLIMIT_MEMLOCK));
-	up_write(&mm->mmap_sem);
+	mm_write_unlock(mm, &range);
 }
 
 /*

@@ -208,6 +208,7 @@ int do_page_fault(struct pt_regs *regs, unsigned long address,
  	int is_exec = trap == 0x400;
 	int fault;
 	int rc = 0, store_update_sp = 0;
+	mm_range_define(range);
 
 #if !(defined(CONFIG_4xx) || defined(CONFIG_BOOKE))
 	/*
@@ -308,12 +309,12 @@ int do_page_fault(struct pt_regs *regs, unsigned long address,
 	 * source.  If this is invalid we can skip the address space check,
 	 * thus avoiding the deadlock.
 	 */
-	if (!down_read_trylock(&mm->mmap_sem)) {
+	if (!mm_read_trylock(mm, &range)) {
 		if (!user_mode(regs) && !search_exception_tables(regs->nip))
 			goto bad_area_nosemaphore;
 
 retry:
-		down_read(&mm->mmap_sem);
+		mm_read_lock(mm, &range);
 	} else {
 		/*
 		 * The above down_read_trylock() might have succeeded in
@@ -446,7 +447,7 @@ good_area:
 	 * make sure we exit gracefully rather than endlessly redo
 	 * the fault.
 	 */
-	fault = handle_mm_fault(vma, address, flags, NULL);
+	fault = handle_mm_fault(vma, address, flags, &range);
 
 	/*
 	 * Handle the retry right now, the mmap_sem has been released in that
@@ -466,7 +467,7 @@ good_area:
 		}
 		/* We will enter mm_fault_error() below */
 	} else
-		up_read(&current->mm->mmap_sem);
+		mm_read_unlock(mm, &range);
 
 	if (unlikely(fault & (VM_FAULT_RETRY|VM_FAULT_ERROR))) {
 		if (fault & VM_FAULT_SIGSEGV)
@@ -505,7 +506,7 @@ good_area:
 	goto bail;
 
 bad_area:
-	up_read(&mm->mmap_sem);
+	mm_read_unlock(mm, &range);
 
 bad_area_nosemaphore:
 	/* User mode accesses cause a SIGSEGV */

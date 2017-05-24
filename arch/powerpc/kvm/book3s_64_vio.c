@@ -60,11 +60,12 @@ static unsigned long kvmppc_stt_pages(unsigned long tce_pages)
 static long kvmppc_account_memlimit(unsigned long stt_pages, bool inc)
 {
 	long ret = 0;
+	mm_range_define(range);
 
 	if (!current || !current->mm)
 		return ret; /* process exited */
 
-	down_write(&current->mm->mmap_sem);
+	mm_write_lock(current->mm, &range);
 
 	if (inc) {
 		unsigned long locked, lock_limit;
@@ -89,7 +90,7 @@ static long kvmppc_account_memlimit(unsigned long stt_pages, bool inc)
 			rlimit(RLIMIT_MEMLOCK),
 			ret ? " - exceeded" : "");
 
-	up_write(&current->mm->mmap_sem);
+	mm_write_unlock(current->mm, &range);
 
 	return ret;
 }

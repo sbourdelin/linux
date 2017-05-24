@@ -185,8 +185,9 @@ static struct radeon_mn *radeon_mn_get(struct radeon_device *rdev)
 	struct mm_struct *mm = current->mm;
 	struct radeon_mn *rmn;
 	int r;
+	mm_range_define(range);
 
-	if (down_write_killable(&mm->mmap_sem))
+	if (mm_write_lock_killable(mm, &range))
 		return ERR_PTR(-EINTR);
 
 	mutex_lock(&rdev->mn_lock);
@@ -215,13 +216,13 @@ static struct radeon_mn *radeon_mn_get(struct radeon_device *rdev)
 
 release_locks:
 	mutex_unlock(&rdev->mn_lock);
-	up_write(&mm->mmap_sem);
+	mm_write_unlock(mm, &range);
 
 	return rmn;
 
 free_rmn:
 	mutex_unlock(&rdev->mn_lock);
-	up_write(&mm->mmap_sem);
+	mm_write_unlock(mm, &range);
 	kfree(rmn);
 
 	return ERR_PTR(r);

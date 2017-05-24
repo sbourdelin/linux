@@ -78,6 +78,7 @@ void kfd_process_destroy_wq(void)
 struct kfd_process *kfd_create_process(const struct task_struct *thread)
 {
 	struct kfd_process *process;
+	mm_range_define(range);
 
 	BUG_ON(!kfd_process_wq);
 
@@ -89,7 +90,7 @@ struct kfd_process *kfd_create_process(const struct task_struct *thread)
 		return ERR_PTR(-EINVAL);
 
 	/* Take mmap_sem because we call __mmu_notifier_register inside */
-	down_write(&thread->mm->mmap_sem);
+	mm_write_lock(thread->mm->mmap_sem, &range);
 
 	/*
 	 * take kfd processes mutex before starting of process creation
@@ -108,7 +109,7 @@ struct kfd_process *kfd_create_process(const struct task_struct *thread)
 
 	mutex_unlock(&kfd_processes_mutex);
 
-	up_write(&thread->mm->mmap_sem);
+	mm_write_unlock(thread->mm->mmap_sem, &range);
 
 	return process;
 }

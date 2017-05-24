@@ -897,6 +897,7 @@ void kfd_signal_iommu_event(struct kfd_dev *dev, unsigned int pasid,
 {
 	struct kfd_hsa_memory_exception_data memory_exception_data;
 	struct vm_area_struct *vma;
+	mm_range_define(range);
 
 	/*
 	 * Because we are called from arbitrary context (workqueue) as opposed
@@ -910,7 +911,7 @@ void kfd_signal_iommu_event(struct kfd_dev *dev, unsigned int pasid,
 
 	memset(&memory_exception_data, 0, sizeof(memory_exception_data));
 
-	down_read(&p->mm->mmap_sem);
+	mm_read_lock(p->mm->mmap_sem, &range);
 	vma = find_vma(p->mm, address);
 
 	memory_exception_data.gpu_id = dev->id;
@@ -937,7 +938,7 @@ void kfd_signal_iommu_event(struct kfd_dev *dev, unsigned int pasid,
 		}
 	}
 
-	up_read(&p->mm->mmap_sem);
+	mm_read_unlock(p->mm->mmap_sem, &range);
 
 	mutex_lock(&p->event_mutex);
 

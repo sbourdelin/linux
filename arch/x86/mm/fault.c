@@ -962,7 +962,11 @@ bad_area_nosemaphore(struct pt_regs *regs, unsigned long error_code,
 
 static void
 __bad_area(struct pt_regs *regs, unsigned long error_code,
-	   unsigned long address,  struct vm_area_struct *vma, int si_code)
+	   unsigned long address,  struct vm_area_struct *vma, int si_code
+#ifdef CONFIG_MEM_RANGE_LOCK
+	   , struct range_lock *range
+#endif
+	)
 {
 	struct mm_struct *mm = current->mm;
 
@@ -970,16 +974,30 @@ __bad_area(struct pt_regs *regs, unsigned long error_code,
 	 * Something tried to access memory that isn't in our memory map..
 	 * Fix it, but check if it's kernel or user first..
 	 */
-	up_read(&mm->mmap_sem);
+	mm_read_unlock(mm, range);
 
 	__bad_area_nosemaphore(regs, error_code, address, vma, si_code);
 }
 
 static noinline void
-bad_area(struct pt_regs *regs, unsigned long error_code, unsigned long address)
+_bad_area(struct pt_regs *regs, unsigned long error_code, unsigned long address
+#ifdef CONFIG_MEM_RANGE_LOCK
+	 , struct range_lock *range
+#endif
+	)
 {
-	__bad_area(regs, error_code, address, NULL, SEGV_MAPERR);
+	__bad_area(regs, error_code, address, NULL, SEGV_MAPERR
+#ifdef CONFIG_MEM_RANGE_LOCK
+		   , range
+#endif
+		);
 }
+
+#ifdef CONFIG_MEM_RANGE_LOCK
+#define bad_area _bad_area
+#else
+#define bad_area(r, e, a, _r) _bad_area(r, e, a)
+#endif
 
 static inline bool bad_area_access_from_pkeys(unsigned long error_code,
 		struct vm_area_struct *vma)
@@ -1000,7 +1018,11 @@ static inline bool bad_area_access_from_pkeys(unsigned long error_code,
 
 static noinline void
 bad_area_access_error(struct pt_regs *regs, unsigned long error_code,
-		      unsigned long address, struct vm_area_struct *vma)
+		      unsigned long address, struct vm_area_struct *vma
+#ifdef CONFIG_MEM_RANGE_LOCK
+		      , struct range_lock *range
+#endif
+	)
 {
 	/*
 	 * This OSPKE check is not strictly necessary at runtime.
@@ -1008,9 +1030,17 @@ bad_area_access_error(struct pt_regs *regs, unsigned long error_code,
 	 * if pkeys are compiled out.
 	 */
 	if (bad_area_access_from_pkeys(error_code, vma))
-		__bad_area(regs, error_code, address, vma, SEGV_PKUERR);
+		__bad_area(regs, error_code, address, vma, SEGV_PKUERR
+#ifdef CONFIG_MEM_RANGE_LOCK
+			   , range
+#endif
+			);
 	else
-		__bad_area(regs, error_code, address, vma, SEGV_ACCERR);
+		__bad_area(regs, error_code, address, vma, SEGV_ACCERR
+#ifdef CONFIG_MEM_RANGE_LOCK
+			   , range
+#endif
+			);
 }
 
 static void
@@ -1268,6 +1298,7 @@ __do_page_fault(struct pt_regs *regs, unsigned long error_code,
 	struct mm_struct *mm;
 	int fault, major = 0;
 	unsigned int flags = FAULT_FLAG_ALLOW_RETRY | FAULT_FLAG_KILLABLE;
+	mm_range_define(range);
 
 	tsk = current;
 	mm = tsk->mm;
@@ -1381,14 +1412,14 @@ __do_page_fault(struct pt_regs *regs, unsigned long error_code,
 	 * validate the source. If this is invalid we can skip the address
 	 * space check, thus avoiding the deadlock:
 	 */
-	if (unlikely(!down_read_trylock(&mm->mmap_sem))) {
+	if (unlikely(!mm_read_trylock(mm, &range))) {
 		if ((error_code & PF_USER) == 0 &&
 		    !search_exception_tables(regs->ip)) {
 			bad_area_nosemaphore(regs, error_code, address, NULL);
 			return;
 		}
 retry:
-		down_read(&mm->mmap_sem);
+		mm_read_lock(mm, &range);
 	} else {
 		/*
 		 * The above down_read_trylock() might have succeeded in
@@ -1400,13 +1431,13 @@ retry:
 
 	vma = find_vma(mm, address);
 	if (unlikely(!vma)) {
-		bad_area(regs, error_code, address);
+		bad_area(regs, error_code, address, &range);
 		return;
 	}
 	if (likely(vma->vm_start <= address))
 		goto good_area;
 	if (unlikely(!(vma->vm_flags & VM_GROWSDOWN))) {
-		bad_area(regs, error_code, address);
+		bad_area(regs, error_code, address, &range);
 		return;
 	}
 	if (error_code & PF_USER) {
@@ -1417,12 +1448,12 @@ retry:
 		 * 32 pointers and then decrements %sp by 65535.)
 		 */
 		if (unlikely(address + 65536 + 32 * sizeof(unsigned long) < regs->sp)) {
-			bad_area(regs, error_code, address);
+			bad_area(regs, error_code, address, &range);
 			return;
 		}
 	}
 	if (unlikely(expand_stack(vma, address))) {
-		bad_area(regs, error_code, address);
+		bad_area(regs, error_code, address, &range);
 		return;
 	}
 
@@ -1432,7 +1463,11 @@ retry:
 	 */
 good_area:
 	if (unlikely(access_error(error_code, vma))) {
-		bad_area_access_error(regs, error_code, address, vma);
+		bad_area_access_error(regs, error_code, address, vma
+#ifdef CONFIG_MEM_RANGE_LOCK
+				      , &range
+#endif
+			);
 		return;
 	}
 
@@ -1442,7 +1477,7 @@ good_area:
 	 * the fault.  Since we never set FAULT_FLAG_RETRY_NOWAIT, if
 	 * we get VM_FAULT_RETRY back, the mmap_sem has been unlocked.
 	 */
-	fault = handle_mm_fault(vma, address, flags, NULL);
+	fault = handle_mm_fault(vma, address, flags, &range);
 	major |= fault & VM_FAULT_MAJOR;
 
 	/*
@@ -1468,7 +1503,7 @@ good_area:
 		return;
 	}
 
-	up_read(&mm->mmap_sem);
+	mm_read_unlock(mm, &range);
 	if (unlikely(fault & VM_FAULT_ERROR)) {
 		mm_fault_error(regs, error_code, address, vma, fault);
 		return;

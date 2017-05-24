@@ -211,12 +211,13 @@ static struct i915_mmu_notifier *
 i915_mmu_notifier_find(struct i915_mm_struct *mm)
 {
 	struct i915_mmu_notifier *mn = mm->mn;
+	mm_range_define(range);
 
 	mn = mm->mn;
 	if (mn)
 		return mn;
 
-	down_write(&mm->mm->mmap_sem);
+	mm_write_lock(mm->mm, &range);
 	mutex_lock(&mm->i915->mm_lock);
 	if ((mn = mm->mn) == NULL) {
 		mn = i915_mmu_notifier_create(mm->mm);
@@ -224,7 +225,7 @@ i915_mmu_notifier_find(struct i915_mm_struct *mm)
 			mm->mn = mn;
 	}
 	mutex_unlock(&mm->i915->mm_lock);
-	up_write(&mm->mm->mmap_sem);
+	mm_write_unlock(mm->mm, &range);
 
 	return mn;
 }
@@ -511,13 +512,14 @@ __i915_gem_userptr_get_pages_worker(struct work_struct *_work)
 	if (pvec != NULL) {
 		struct mm_struct *mm = obj->userptr.mm->mm;
 		unsigned int flags = 0;
+		mm_range_define(range);
 
 		if (!obj->userptr.read_only)
 			flags |= FOLL_WRITE;
 
 		ret = -EFAULT;
 		if (mmget_not_zero(mm)) {
-			down_read(&mm->mmap_sem);
+			mm_read_lock(mm, &range);
 			while (pinned < npages) {
 				ret = get_user_pages_remote
 					(work->task, mm,
@@ -530,7 +532,7 @@ __i915_gem_userptr_get_pages_worker(struct work_struct *_work)
 
 				pinned += ret;
 			}
-			up_read(&mm->mmap_sem);
+			mm_read_unlock(mm, &range);
 			mmput(mm);
 		}
 	}

@@ -2420,6 +2420,7 @@ void task_numa_work(struct callback_head *work)
 	unsigned long start, end;
 	unsigned long nr_pte_updates = 0;
 	long pages, virtpages;
+	mm_range_define(range);
 
 	SCHED_WARN_ON(p != container_of(work, struct task_struct, numa_work));
 
@@ -2469,8 +2470,7 @@ void task_numa_work(struct callback_head *work)
 	if (!pages)
 		return;
 
-
-	down_read(&mm->mmap_sem);
+	mm_read_lock(mm, &range);
 	vma = find_vma(mm, start);
 	if (!vma) {
 		reset_ptenuma_scan(p);
@@ -2537,7 +2537,7 @@ out:
 		mm->numa_scan_offset = start;
 	else
 		reset_ptenuma_scan(p);
-	up_read(&mm->mmap_sem);
+	mm_read_unlock(mm, &range);
 
 	/*
 	 * Make sure tasks use at least 32x as much time to run other code

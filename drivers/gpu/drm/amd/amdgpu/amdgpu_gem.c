@@ -312,6 +312,7 @@ int amdgpu_gem_userptr_ioctl(struct drm_device *dev, void *data,
 	struct amdgpu_bo *bo;
 	uint32_t handle;
 	int r;
+	mm_range_define(range);
 
 	if (offset_in_page(args->addr | args->size))
 		return -EINVAL;
@@ -350,7 +351,7 @@ int amdgpu_gem_userptr_ioctl(struct drm_device *dev, void *data,
 	}
 
 	if (args->flags & AMDGPU_GEM_USERPTR_VALIDATE) {
-		down_read(&current->mm->mmap_sem);
+		mm_read_lock(current->mm, &range);
 
 		r = amdgpu_ttm_tt_get_user_pages(bo->tbo.ttm,
 						 bo->tbo.ttm->pages);
@@ -367,7 +368,7 @@ int amdgpu_gem_userptr_ioctl(struct drm_device *dev, void *data,
 		if (r)
 			goto free_pages;
 
-		up_read(&current->mm->mmap_sem);
+		mm_read_unlock(current->mm, &range);
 	}
 
 	r = drm_gem_handle_create(filp, gobj, &handle);
@@ -383,7 +384,7 @@ free_pages:
 	release_pages(bo->tbo.ttm->pages, bo->tbo.ttm->num_pages, false);
 
 unlock_mmap_sem:
-	up_read(&current->mm->mmap_sem);
+	mm_read_unlock(current->mm, &range);
 
 release_object:
 	drm_gem_object_unreference_unlocked(gobj);

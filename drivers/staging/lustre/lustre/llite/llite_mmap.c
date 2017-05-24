@@ -61,9 +61,10 @@ struct vm_area_struct *our_vma(struct mm_struct *mm, unsigned long addr,
 			       size_t count)
 {
 	struct vm_area_struct *vma, *ret = NULL;
+	mm_range_define(range);
 
 	/* mmap_sem must have been held by caller. */
-	LASSERT(!down_write_trylock(&mm->mmap_sem));
+	LASSERT(!range_write_trylock(&mm->mmap_sem, &range));
 
 	for (vma = find_vma(mm, addr);
 	    vma && vma->vm_start < (addr + count); vma = vma->vm_next) {

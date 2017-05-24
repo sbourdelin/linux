@@ -521,6 +521,7 @@ static int amdgpu_cs_parser_bos(struct amdgpu_cs_parser *p,
 	bool need_mmap_lock = false;
 	unsigned i, tries = 10;
 	int r;
+	mm_range_define(range);
 
 	INIT_LIST_HEAD(&p->validated);
 
@@ -538,7 +539,7 @@ static int amdgpu_cs_parser_bos(struct amdgpu_cs_parser *p,
 		list_add(&p->uf_entry.tv.head, &p->validated);
 
 	if (need_mmap_lock)
-		down_read(&current->mm->mmap_sem);
+		mm_read_lock(current->mm, &range);
 
 	while (1) {
 		struct list_head need_pages;
@@ -695,7 +696,7 @@ error_validate:
 error_free_pages:
 
 	if (need_mmap_lock)
-		up_read(&current->mm->mmap_sem);
+		mm_read_unlock(current->mm, &range);
 
 	if (p->bo_list) {
 		for (i = p->bo_list->first_userptr;

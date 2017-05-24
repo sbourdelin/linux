@@ -57,10 +57,11 @@ static void usnic_uiom_reg_account(struct work_struct *work)
 {
 	struct usnic_uiom_reg *umem = container_of(work,
 						struct usnic_uiom_reg, work);
+	mm_range_define(range);
 
-	down_write(&umem->mm->mmap_sem);
+	mm_write_lock(umem->mm->mmap_sem, &range);
 	umem->mm->locked_vm -= umem->diff;
-	up_write(&umem->mm->mmap_sem);
+	mm_write_unlock(umem->mm->mmap_sem, &range);
 	mmput(umem->mm);
 	kfree(umem);
 }
@@ -113,6 +114,7 @@ static int usnic_uiom_get_pages(unsigned long addr, size_t size, int writable,
 	int flags;
 	dma_addr_t pa;
 	unsigned int gup_flags;
+	mm_range_define(range);
 
 	if (!can_do_mlock())
 		return -EPERM;
@@ -125,7 +127,7 @@ static int usnic_uiom_get_pages(unsigned long addr, size_t size, int writable,
 
 	npages = PAGE_ALIGN(size + (addr & ~PAGE_MASK)) >> PAGE_SHIFT;
 
-	down_write(&current->mm->mmap_sem);
+	mm_write_lock(current->mm, &range);
 
 	locked = npages + current->mm->locked_vm;
 	lock_limit = rlimit(RLIMIT_MEMLOCK) >> PAGE_SHIFT;
@@ -188,7 +190,7 @@ out:
 	else
 		current->mm->locked_vm = locked;
 
-	up_write(&current->mm->mmap_sem);
+	mm_write_unlock(current->mm, &range);
 	free_page((unsigned long) page_list);
 	return ret;
 }
@@ -424,6 +426,7 @@ void usnic_uiom_reg_release(struct usnic_uiom_reg *uiomr, int closing)
 {
 	struct mm_struct *mm;
 	unsigned long diff;
+	mm_range_define(range);
 
 	__usnic_uiom_reg_release(uiomr->pd, uiomr, 1);
 
@@ -444,7 +447,7 @@ void usnic_uiom_reg_release(struct usnic_uiom_reg *uiomr, int closing)
 	 * we defer the vm_locked accounting to the system workqueue.
 	 */
 	if (closing) {
-		if (!down_write_trylock(&mm->mmap_sem)) {
+		if (!range_write_trylock(&mm->mmap_sem, &range)) {
 			INIT_WORK(&uiomr->work, usnic_uiom_reg_account);
 			uiomr->mm = mm;
 			uiomr->diff = diff;
@@ -453,10 +456,10 @@ void usnic_uiom_reg_release(struct usnic_uiom_reg *uiomr, int closing)
 			return;
 		}
 	} else
-		down_write(&mm->mmap_sem);
+		mm_write_lock(mm, &range);
 
 	current->mm->locked_vm -= diff;
-	up_write(&mm->mmap_sem);
+	mm_write_unlock(mm, &range);
 	mmput(mm);
 	kfree(uiomr);
 }

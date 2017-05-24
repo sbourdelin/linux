@@ -279,6 +279,9 @@ struct proc_maps_private {
 #ifdef CONFIG_NUMA
 	struct mempolicy *task_mempolicy;
 #endif
+#ifdef CONFIG_MEM_RANGE_LOCK
+	struct range_lock range;
+#endif
 };
 
 struct mm_struct *proc_mem_open(struct inode *inode, unsigned int mode);

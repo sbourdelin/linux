@@ -2069,6 +2069,7 @@ dump_phys_mem(void *virt_addr, u32 num_bytes)
 	struct page   *page;
 	struct page  **pages;
 	u8            *kmapped_virt_ptr;
+	mm_range_define(range);
 
 	/* Align virtAddr and endVirtAddr to 16 byte boundaries. */
 
@@ -2089,14 +2090,14 @@ dump_phys_mem(void *virt_addr, u32 num_bytes)
 		return;
 	}
 
-	down_read(&current->mm->mmap_sem);
+	mm_read_lock(current->mm, &range);
 	rc = get_user_pages(
 		(unsigned long)virt_addr, /* start */
 		num_pages,                /* len */
 		0,                        /* gup_flags */
 		pages,                    /* pages (array of page pointers) */
 		NULL);                    /* vmas */
-	up_read(&current->mm->mmap_sem);
+	mm_read_unlock(current->mm, &range);
 
 	prev_idx = -1;
 	page = NULL;

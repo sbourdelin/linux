@@ -39,6 +39,7 @@ int copro_handle_mm_fault(struct mm_struct *mm, unsigned long ea,
 	struct vm_area_struct *vma;
 	unsigned long is_write;
 	int ret;
+	mm_range_define(range);
 
 	if (mm == NULL)
 		return -EFAULT;
@@ -46,7 +47,7 @@ int copro_handle_mm_fault(struct mm_struct *mm, unsigned long ea,
 	if (mm->pgd == NULL)
 		return -EFAULT;
 
-	down_read(&mm->mmap_sem);
+	mm_read_lock(mm, &range);
 	ret = -EFAULT;
 	vma = find_vma(mm, ea);
 	if (!vma)
@@ -95,7 +96,7 @@ int copro_handle_mm_fault(struct mm_struct *mm, unsigned long ea,
 		current->min_flt++;
 
 out_unlock:
-	up_read(&mm->mmap_sem);
+	mm_read_unlock(mm, &range);
 	return ret;
 }
 EXPORT_SYMBOL_GPL(copro_handle_mm_fault);
