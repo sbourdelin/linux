@@ -151,10 +151,8 @@ int bfin_pm_suspend_mem_enter(void)
 					 + L1_DATA_B_LENGTH + L1_SCRATCH_LENGTH,
 					  GFP_ATOMIC);
 
-	if (memptr == NULL) {
-		panic("bf53x_suspend_l1_mem malloc failed");
+	if (!memptr)
 		return -ENOMEM;
-	}
 
 #ifndef CONFIG_BF60x
 	wakeup = bfin_read_VR_CTL() & ~FREQ;
