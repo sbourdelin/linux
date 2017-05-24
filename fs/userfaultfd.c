@@ -222,7 +222,9 @@ static inline bool userfaultfd_huge_must_wait(struct userfaultfd_ctx *ctx,
 	pte_t *pte;
 	bool ret = true;
 
+#ifndef CONFIG_MEM_RANGE_LOCK
 	VM_BUG_ON(!rwsem_is_locked(&mm->mmap_sem));
+#endif
 
 	pte = huge_pte_offset(mm, address);
 	if (!pte)
@@ -271,7 +273,9 @@ static inline bool userfaultfd_must_wait(struct userfaultfd_ctx *ctx,
 	pte_t *pte;
 	bool ret = true;
 
+#ifndef CONFIG_MEM_RANGE_LOCK
 	VM_BUG_ON(!rwsem_is_locked(&mm->mmap_sem));
+#endif
 
 	pgd = pgd_offset(mm, address);
 	if (!pgd_present(*pgd))
@@ -340,7 +344,9 @@ int handle_userfault(struct vm_fault *vmf, unsigned long reason)
 	bool must_wait, return_to_userland;
 	long blocking_state;
 
+#ifndef CONFIG_MEM_RANGE_LOCK
 	BUG_ON(!rwsem_is_locked(&mm->mmap_sem));
+#endif
 
 	ret = VM_FAULT_SIGBUS;
 	ctx = vmf->vma->vm_userfaultfd_ctx.ctx;
