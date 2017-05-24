@@ -43,7 +43,10 @@
 #else
 #include <linux/fscrypt_notsupp.h>
 #endif
+#include <linux/sysfs.h>
+#include <linux/completion.h>
 #include <linux/random.h>
+#include "sysfs.h"
 #include "ubifs-media.h"
 
 /* Version of this UBIFS implementation */
@@ -1216,6 +1219,8 @@ struct ubifs_debug_info;
  * @mount_opts: UBIFS-specific mount options
  *
  * @dbg: debugging-related information
+ * @kobj: kobject for /sys/fs/ubifs/
+ * @kobj_unregister: completion to unregister sysfs kobject
  */
 struct ubifs_info {
 	struct super_block *vfs_sb;
@@ -1446,6 +1451,8 @@ struct ubifs_info {
 	struct ubifs_mount_opts mount_opts;
 
 	struct ubifs_debug_info *dbg;
+	struct kobject kobj;
+	struct completion kobj_unregister;
 };
 
 extern struct list_head ubifs_infos;
