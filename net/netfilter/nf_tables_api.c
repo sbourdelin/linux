@@ -13,6 +13,7 @@
 #include <linux/list.h>
 #include <linux/skbuff.h>
 #include <linux/netlink.h>
+#include <linux/vmalloc.h>
 #include <linux/netfilter.h>
 #include <linux/netfilter/nfnetlink.h>
 #include <linux/netfilter/nf_tables.h>
@@ -2909,13 +2910,13 @@ static int nf_tables_newset(struct net *net, struct sock *nlsk,
 {
 	const struct nfgenmsg *nfmsg = nlmsg_data(nlh);
 	u8 genmask = nft_genmask_next(net);
+	unsigned int size, alloc_size;
 	const struct nft_set_ops *ops;
 	struct nft_af_info *afi;
 	struct nft_table *table;
 	struct nft_set *set;
 	struct nft_ctx ctx;
 	char name[NFT_SET_MAXNAMELEN];
-	unsigned int size;
 	bool create;
 	u64 timeout;
 	u32 ktype, dtype, flags, policy, gc_int, objtype;
@@ -3031,6 +3032,8 @@ static int nf_tables_newset(struct net *net, struct sock *nlsk,
 	if (IS_ERR(set)) {
 		if (PTR_ERR(set) != -ENOENT)
 			return PTR_ERR(set);
+
+		set = NULL;
 	} else {
 		if (nlh->nlmsg_flags & NLM_F_EXCL)
 			return -EEXIST;
@@ -3054,10 +3057,16 @@ static int nf_tables_newset(struct net *net, struct sock *nlsk,
 	if (ops->privsize != NULL)
 		size = ops->privsize(nla, &desc);
 
-	err = -ENOMEM;
-	set = kzalloc(sizeof(*set) + size + udlen, GFP_KERNEL);
+	alloc_size = sizeof(*set) + size + udlen;
+	if (alloc_size <= (PAGE_SIZE << PAGE_ALLOC_COSTLY_ORDER))
+		set = kzalloc(alloc_size, GFP_KERNEL | __GFP_NOWARN |
+					  __GFP_NORETRY);
 	if (set == NULL)
+		set = vzalloc(alloc_size);
+	if (set == NULL) {
+		err = -ENOMEM;
 		goto err1;
+	}
 
 	nla_strlcpy(name, nla[NFTA_SET_NAME], sizeof(set->name));
 	err = nf_tables_set_alloc_name(&ctx, set, name);
@@ -3100,7 +3109,7 @@ static int nf_tables_newset(struct net *net, struct sock *nlsk,
 err3:
 	ops->destroy(set);
 err2:
-	kfree(set);
+	kvfree(set);
 err1:
 	module_put(ops->type->owner);
 	return err;
@@ -3110,7 +3119,7 @@ static void nft_set_destroy(struct nft_set *set)
 {
 	set->ops->destroy(set);
 	module_put(set->ops->type->owner);
-	kfree(set);
+	kvfree(set);
 }
 
 static void nf_tables_set_destroy(const struct nft_ctx *ctx, struct nft_set *set)
