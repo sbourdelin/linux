@@ -373,7 +373,6 @@ static __init int isram_test_init(void)
 	sdram = kmalloc(test_len * 2, GFP_KERNEL);
 	if (!sdram) {
 		sram_free(l1inst);
-		pr_warning("SKIP: could not allocate sdram\n");
 		return 0;
 	}
 
