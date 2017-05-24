@@ -243,7 +243,7 @@ static int vpd_section_destroy(struct vpd_section *sec)
 {
 	if (sec->enabled) {
 		vpd_section_attrib_destroy(sec);
-		kobject_del(sec->kobj);
+		kobject_put(sec->kobj);
 		sysfs_remove_bin_file(vpd_kobj, &sec->bin_attr);
 		kfree(sec->raw_name);
 		iounmap(sec->baseaddr);
@@ -330,7 +330,7 @@ static void __exit vpd_platform_exit(void)
 {
 	vpd_section_destroy(&ro_vpd);
 	vpd_section_destroy(&rw_vpd);
-	kobject_del(vpd_kobj);
+	kobject_put(vpd_kobj);
 }
 
 module_init(vpd_platform_init);
