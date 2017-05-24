@@ -2012,7 +2012,8 @@ mapping_error:
  *     looks at the tail of the queue of FIFO (tx_cons), not
  *     the head (tx_prod)
  */
-static void sky2_tx_complete(struct sky2_port *sky2, u16 done)
+static void sky2_tx_complete(struct sky2_port *sky2, u16 done,
+			     bool update_stats)
 {
 	struct net_device *dev = sky2->netdev;
 	u16 idx;
@@ -2046,10 +2047,12 @@ static void sky2_tx_complete(struct sky2_port *sky2, u16 done)
 
 	netdev_completed_queue(dev, pkts_compl, bytes_compl);
 
-	u64_stats_update_begin(&sky2->tx_stats.syncp);
-	sky2->tx_stats.packets += pkts_compl;
-	sky2->tx_stats.bytes += bytes_compl;
-	u64_stats_update_end(&sky2->tx_stats.syncp);
+	if (likely(update_stats)) {
+		u64_stats_update_begin(&sky2->tx_stats.syncp);
+		sky2->tx_stats.packets += pkts_compl;
+		sky2->tx_stats.bytes += bytes_compl;
+		u64_stats_update_end(&sky2->tx_stats.syncp);
+	}
 }
 
 static void sky2_tx_reset(struct sky2_hw *hw, unsigned port)
@@ -2120,7 +2123,7 @@ static void sky2_hw_down(struct sky2_port *sky2)
 	sky2_tx_reset(hw, port);
 
 	/* Free any pending frames stuck in HW queue */
-	sky2_tx_complete(sky2, sky2->tx_prod);
+	sky2_tx_complete(sky2, sky2->tx_prod, false);
 }
 
 /* Network shutdown */
@@ -2635,7 +2638,7 @@ static inline void sky2_tx_done(struct net_device *dev, u16 last)
 	struct sky2_port *sky2 = netdev_priv(dev);
 
 	if (netif_running(dev)) {
-		sky2_tx_complete(sky2, last);
+		sky2_tx_complete(sky2, last, true);
 
 		/* Wake unless it's detached, and called e.g. from sky2_close() */
 		if (tx_avail(sky2) > MAX_SKB_TX_LE + 4)
