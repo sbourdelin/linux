@@ -3366,6 +3366,9 @@ static struct worker_pool *get_unbound_pool(const struct workqueue_attrs *attrs)
 	copy_workqueue_attrs(pool->attrs, attrs);
 	pool->node = target_node;
 
+	if (!cpumask_weight(pool->attrs->cpumask))
+		cpumask_copy(pool->attrs->cpumask, cpumask_of(smp_processor_id()));
+
 	/*
 	 * no_numa isn't a worker_pool attribute, always clear it.  See
 	 * 'struct workqueue_attrs' comments for detail.
