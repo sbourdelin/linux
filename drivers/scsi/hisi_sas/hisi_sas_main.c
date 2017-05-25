@@ -118,6 +118,38 @@ int hisi_sas_get_ncq_tag(struct sas_task *task, u32 *tag)
 }
 EXPORT_SYMBOL_GPL(hisi_sas_get_ncq_tag);
 
+bool hisi_sas_is_rw_cmd(struct sas_task *task)
+{
+	switch (task->task_proto) {
+	case SAS_PROTOCOL_SSP:
+	{
+		unsigned char op = task->ssp_task.cmd->cmnd[0];
+
+		if (op == READ_6 || op == WRITE_6 ||
+			op == READ_10 || op == WRITE_10 ||
+			op == READ_12 || op == WRITE_12 ||
+			op == READ_16 || op == WRITE_16)
+			return true;
+		break;
+	}
+	case SAS_PROTOCOL_SATA:
+	case SAS_PROTOCOL_STP:
+	case SAS_PROTOCOL_SATA | SAS_PROTOCOL_STP:
+	{
+		u32 cmd_proto = hisi_sas_get_ata_protocol(
+				task->ata_task.fis.command,
+				task->data_dir);
+		if (cmd_proto != SATA_PROTOCOL_NONDATA)
+			return true;
+		break;
+	}
+	default:
+		break;
+	}
+	return false;
+}
+EXPORT_SYMBOL_GPL(hisi_sas_is_rw_cmd);
+
 static struct hisi_hba *dev_to_hisi_hba(struct domain_device *device)
 {
 	return device->port->ha->lldd_ha;

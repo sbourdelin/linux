@@ -371,6 +371,7 @@ extern void hisi_sas_sata_done(struct sas_task *task,
 			    struct hisi_sas_slot *slot);
 extern int hisi_sas_get_ncq_tag(struct sas_task *task, u32 *tag);
 extern int hisi_sas_get_fw_info(struct hisi_hba *hisi_hba);
+extern bool hisi_sas_is_rw_cmd(struct sas_task *task);
 extern int hisi_sas_probe(struct platform_device *pdev,
 			  const struct hisi_sas_hw *ops);
 extern int hisi_sas_remove(struct platform_device *pdev);
