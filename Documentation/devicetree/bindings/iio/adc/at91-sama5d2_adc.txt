@@ -11,6 +11,13 @@ Required properties:
   - atmel,min-sample-rate-hz: Minimum sampling rate, it depends on SoC.
   - atmel,max-sample-rate-hz: Maximum sampling rate, it depends on SoC.
   - atmel,startup-time-ms: Startup time expressed in ms, it depends on SoC.
+  - atmel,trigger-edge-type: phandle to one of the adtrg possible edge types
+
+Required adtrg node:
+  - Required edge nodes:
+	For each possible edge type for the ADTRG hardware trigger pin,
+	 a specific sub node. The driver recognises only the three possible
+	 edge types: external_rising, external_falling, external_any.
 
 Example:
 
@@ -25,4 +32,14 @@ adc: adc@fc030000 {
 	atmel,startup-time-ms = <4>;
 	vddana-supply = <&vdd_3v3_lp_reg>;
 	vref-supply = <&vdd_3v3_lp_reg>;
+	atmel,trigger-edge-type = <&external_rising>;
+
+	adtrg: adtrg {
+		external_rising: external_rising {
+		};
+		external_falling: external_falling {
+		};
+		external_any: external_any {
+		};
+	};
 }
