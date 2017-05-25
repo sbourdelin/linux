@@ -26,6 +26,7 @@
 #include <linux/bio.h>
 #include <linux/lzo.h>
 #include "compression.h"
+#include "ctree.h"
 
 #define LZO_LEN	4
 
@@ -99,6 +100,7 @@ static int lzo_compress_pages(struct list_head *ws,
 	int nr_pages = 0;
 	struct page *in_page = NULL;
 	struct page *out_page = NULL;
+	u32 sectorsize;
 	unsigned long bytes_left;
 	unsigned long len = *total_out;
 	unsigned long nr_dest_pages = *out_pages;
@@ -229,8 +231,13 @@ static int lzo_compress_pages(struct list_head *ws,
 		in_len = min(bytes_left, PAGE_SIZE);
 	}
 
-	if (tot_out > tot_in)
+	/* Compression must save at least one sectorsize */
+	sectorsize = btrfs_inode_sectorsize(mapping->host);
+
+	if (tot_out + sectorsize > tot_in) {
+		ret = -E2BIG;
 		goto out;
+	}
 
 	/* store the size of all chunks of compressed data */
 	cpage_out = kmap(pages[0]);

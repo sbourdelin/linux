@@ -31,6 +31,7 @@
 #include <linux/pagemap.h>
 #include <linux/bio.h>
 #include "compression.h"
+#include "ctree.h"
 
 struct workspace {
 	z_stream strm;
@@ -86,6 +87,7 @@ static int zlib_compress_pages(struct list_head *ws,
 	int nr_pages = 0;
 	struct page *in_page = NULL;
 	struct page *out_page = NULL;
+	u32 sectorsize;
 	unsigned long bytes_left;
 	unsigned long len = *total_out;
 	unsigned long nr_dest_pages = *out_pages;
@@ -191,7 +193,10 @@ static int zlib_compress_pages(struct list_head *ws,
 		goto out;
 	}
 
-	if (workspace->strm.total_out >= workspace->strm.total_in) {
+	/* Compression must save at least one sectorsize */
+	sectorsize = btrfs_inode_sectorsize(mapping->host);
+
+	if (workspace->strm.total_out + sectorsize > workspace->strm.total_in) {
 		ret = -E2BIG;
 		goto out;
 	}
