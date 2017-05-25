@@ -619,7 +619,8 @@ static int dlpar_cpu_remove_by_index(u32 drc_index)
 	}
 
 	rc = dlpar_cpu_remove(dn, drc_index);
-	of_node_put(dn);
+	if (rc)
+		of_node_put(dn);
 	return rc;
 }
 
