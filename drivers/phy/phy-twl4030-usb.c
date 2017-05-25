@@ -750,13 +750,16 @@ static int twl4030_usb_probe(struct platform_device *pdev)
 	if (status < 0) {
 		dev_dbg(&pdev->dev, "can't get IRQ %d, err %d\n",
 			twl->irq, status);
+		usb_remove_phy(&twl->phy);
 		return status;
 	}
 
 	if (pdata)
 		err = phy_create_lookup(phy, "usb", "musb-hdrc.0");
-	if (err)
+	if (err) {
+		usb_remove_phy(&twl->phy);
 		return err;
+	}
 
 	pm_runtime_mark_last_busy(&pdev->dev);
 	pm_runtime_put_autosuspend(twl->dev);
