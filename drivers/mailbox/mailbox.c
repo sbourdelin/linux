@@ -85,9 +85,17 @@ static void msg_submit(struct mbox_chan *chan)
 exit:
 	spin_unlock_irqrestore(&chan->lock, flags);
 
-	if (!err && (chan->txdone_method & TXDONE_BY_POLL))
-		/* kick start the timer immediately to avoid delays */
-		hrtimer_start(&chan->mbox->poll_hrt, 0, HRTIMER_MODE_REL);
+	if (!err && (chan->txdone_method & TXDONE_BY_POLL)) {
+
+		spin_lock_irqsave(&chan->mbox->lock_hrt, flags);
+		/* try to start the timer immediately to avoid delays */
+		if (!chan->mbox->hrt_active) {
+			chan->mbox->hrt_active = 1;
+			hrtimer_start(&chan->mbox->poll_hrt, 0,
+							HRTIMER_MODE_REL);
+		}
+		spin_unlock_irqrestore(&chan->mbox->lock_hrt, flags);
+	}
 }
 
 static void tx_tick(struct mbox_chan *chan, int r)
@@ -118,26 +126,65 @@ static enum hrtimer_restart txdone_hrtimer(struct hrtimer *hrtimer)
 {
 	struct mbox_controller *mbox =
 		container_of(hrtimer, struct mbox_controller, poll_hrt);
+	unsigned long flags;
 	bool txdone, resched = false;
 	int i;
+
+	spin_lock(&mbox->lock_hrt);
 
 	for (i = 0; i < mbox->num_chans; i++) {
 		struct mbox_chan *chan = &mbox->chans[i];
 
+		/*
+		 * While iterating over channels we take the channel locks
+		 * to be sure that reading of active_req is not racy and
+		 * there are no randomly queued requests.
+		 */
+		spin_lock_irqsave(&chan->lock, flags);
+
 		if (chan->active_req && chan->cl) {
 			txdone = chan->mbox->ops->last_tx_done(chan);
-			if (txdone)
+
+			if (txdone) {
+
+				spin_unlock_irqrestore(&chan->lock, flags);
+
+				/* We have to unlock HR timer lock to avoid
+				 * deadlock: tx_tick() acquires HR-timer
+				 * spinlock to run timer. */
+				spin_unlock(&mbox->lock_hrt);
+
 				tx_tick(chan, 0);
-			else
+
+				spin_lock(&mbox->lock_hrt);
+
+				/*
+				 * It's possible that while we unlocked
+				 * HR-timer lock here then someone can queue
+				 * another request on another channel or
+				 * tx_tick() above can queue a request. Such
+				 * sequence will observe that timer is active
+				 * and won't start it and leave. Therefore, we
+				 * have to resched timer here in all cases
+				 * manually.
+				 */
 				resched = true;
+				continue;
+			}
+
+			resched = true;
 		}
+
+		spin_unlock_irqrestore(&chan->lock, flags);
 	}
 
-	if (resched) {
+	if (resched)
 		hrtimer_forward_now(hrtimer, ms_to_ktime(mbox->txpoll_period));
-		return HRTIMER_RESTART;
-	}
-	return HRTIMER_NORESTART;
+	else
+		mbox->hrt_active = 0;
+	spin_unlock(&mbox->lock_hrt);
+
+	return resched ? HRTIMER_RESTART : HRTIMER_NORESTART;
 }
 
 /**
@@ -462,6 +509,7 @@ int mbox_controller_register(struct mbox_controller *mbox)
 			return -EINVAL;
 		}
 
+		spin_lock_init(&mbox->lock_hrt);
 		hrtimer_init(&mbox->poll_hrt, CLOCK_MONOTONIC,
 			     HRTIMER_MODE_REL);
 		mbox->poll_hrt.function = txdone_hrtimer;
