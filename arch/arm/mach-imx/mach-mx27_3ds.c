@@ -22,6 +22,7 @@
 
 #include <linux/platform_device.h>
 #include <linux/gpio.h>
+#include <linux/gpio/machine.h>
 #include <linux/irq.h>
 #include <linux/usb/otg.h>
 #include <linux/usb/ulpi.h>
@@ -313,11 +314,29 @@ static struct imx_ssi_platform_data mx27_3ds_ssi_pdata = {
 };
 
 /* SPI */
+static struct gpiod_lookup_table spi1_cs_gpio_table = {
+	.dev_id = "spi.0",
+	.table = {
+		GPIO_LOOKUP("gpio-mxc", SPI1_SS0,
+			    "spi-cs", GPIO_ACTIVE_HIGH),
+		{ },
+	},
+};
+
 static int spi1_chipselect[] = {SPI1_SS0};
 
 static const struct spi_imx_master spi1_pdata __initconst = {
 	.chipselect	= spi1_chipselect,
 	.num_chipselect	= ARRAY_SIZE(spi1_chipselect),
+};
+
+static struct gpiod_lookup_table spi2_cs_gpio_table = {
+	.dev_id = "spi.1",
+	.table = {
+		GPIO_LOOKUP("gpio-mxc", SPI2_SS0,
+			    "spi-cs", GPIO_ACTIVE_HIGH),
+		{ },
+	},
 };
 
 static int spi2_chipselect[] = {SPI2_SS0};
@@ -398,7 +417,9 @@ static void __init mx27pdk_init(void)
 	imx27_add_imx_keypad(&mx27_3ds_keymap_data);
 	imx27_add_imx2_wdt();
 
+	gpiod_add_lookup_table(&spi2_cs_gpio_table);
 	imx27_add_spi_imx1(&spi2_pdata);
+	gpiod_add_lookup_table(&spi1_cs_gpio_table);
 	imx27_add_spi_imx0(&spi1_pdata);
 
 	imx27_add_imx_i2c(0, &mx27_3ds_i2c0_data);

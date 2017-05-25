@@ -27,6 +27,7 @@
 #include <linux/irq.h>
 #include <linux/delay.h>
 #include <linux/gpio.h>
+#include <linux/gpio/machine.h>
 #include <linux/usb/otg.h>
 #include <linux/usb/ulpi.h>
 
@@ -199,6 +200,17 @@ static struct spi_board_info pca100_spi_board_info[] __initdata = {
 		.bus_num = 0,
 		.chip_select = 1,
 		.platform_data = &at25320,
+	},
+};
+
+static struct gpiod_lookup_table pca100_spi_cs_gpio_table = {
+	.dev_id = "spi.0",
+	.table = {
+		GPIO_LOOKUP_IDX("gpio-mxc", SPI1_SS0,
+				"spi-cs", 0, GPIO_ACTIVE_HIGH),
+		GPIO_LOOKUP_IDX("gpio-mxc", SPI1_SS1,
+				"spi-cs", 1, GPIO_ACTIVE_HIGH),
+		{ },
 	},
 };
 
@@ -376,6 +388,7 @@ static void __init pca100_init(void)
 	mxc_gpio_mode(GPIO_PORTD | 27 | GPIO_GPIO | GPIO_IN);
 	spi_register_board_info(pca100_spi_board_info,
 				ARRAY_SIZE(pca100_spi_board_info));
+	gpiod_add_lookup_table(&pca100_spi_cs_gpio_table);
 	imx27_add_spi_imx0(&pca100_spi0_data);
 
 	imx27_add_imx_fb(&pca100_fb_data);
