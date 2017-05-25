@@ -395,11 +395,12 @@ struct btrfs_dir_item *btrfs_match_dir_item_name(struct btrfs_fs_info *fs_info,
 
 	leaf = path->nodes[0];
 	dir_item = btrfs_item_ptr(leaf, path->slots[0], struct btrfs_dir_item);
-	if (verify_dir_item(fs_info, leaf, path->slots[0], dir_item))
-		return NULL;
 
 	total_len = btrfs_item_size_nr(leaf, path->slots[0]);
 	while (cur < total_len) {
+		if (verify_dir_item(fs_info, leaf, path->slots[0], dir_item))
+			return NULL;
+
 		this_len = sizeof(*dir_item) +
 			btrfs_dir_name_len(leaf, dir_item) +
 			btrfs_dir_data_len(leaf, dir_item);

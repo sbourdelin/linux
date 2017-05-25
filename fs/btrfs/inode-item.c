@@ -32,6 +32,7 @@ static int find_name_in_backref(struct btrfs_path *path, const char *name,
 	u32 item_size;
 	u32 cur_offset = 0;
 	int len;
+	u16 namelen_ret;
 
 	leaf = path->nodes[0];
 	item_size = btrfs_item_size_nr(leaf, path->slots[0]);
@@ -43,6 +44,10 @@ static int find_name_in_backref(struct btrfs_path *path, const char *name,
 		cur_offset += len + sizeof(*ref);
 		if (len != name_len)
 			continue;
+		namelen_ret = btrfs_check_namelen(leaf, path->slots[0],
+						name_ptr, name_len);
+		if (namelen_ret != name_len)
+			break;
 		if (memcmp_extent_buffer(leaf, name, name_ptr, name_len) == 0) {
 			*ref_ret = ref;
 			return 1;
@@ -62,6 +67,7 @@ int btrfs_find_name_in_ext_backref(struct btrfs_path *path, u64 ref_objectid,
 	u32 item_size;
 	u32 cur_offset = 0;
 	int ref_name_len;
+	u16 namelen_ret;
 
 	leaf = path->nodes[0];
 	item_size = btrfs_item_size_nr(leaf, path->slots[0]);
@@ -77,7 +83,10 @@ int btrfs_find_name_in_ext_backref(struct btrfs_path *path, u64 ref_objectid,
 		extref = (struct btrfs_inode_extref *) (ptr + cur_offset);
 		name_ptr = (unsigned long)(&extref->name);
 		ref_name_len = btrfs_inode_extref_name_len(leaf, extref);
-
+		namelen_ret = btrfs_check_namelen(leaf, path->slots[0],
+						name_ptr, name_len);
+		if (namelen_ret != ref_name_len)
+			break;
 		if (ref_name_len == name_len &&
 		    btrfs_inode_extref_parent(leaf, extref) == ref_objectid &&
 		    (memcmp_extent_buffer(leaf, name, name_ptr, name_len) == 0)) {

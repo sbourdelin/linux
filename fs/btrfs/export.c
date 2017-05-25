@@ -234,6 +234,7 @@ static int btrfs_get_name(struct dentry *parent, char *name,
 	int name_len;
 	int ret;
 	u64 ino;
+	u16 namelen_ret;
 
 	if (!S_ISDIR(dir->i_mode))
 		return -EINVAL;
@@ -282,6 +283,12 @@ static int btrfs_get_name(struct dentry *parent, char *name,
 		name_len = btrfs_inode_ref_name_len(leaf, iref);
 	}
 
+	namelen_ret = btrfs_check_namelen(leaf, path->slots[0], name_ptr,
+					  name_len);
+	if (namelen_ret != name_len) {
+		btrfs_free_path(path);
+		return -EIO;
+	}
 	read_extent_buffer(leaf, name, name_ptr, name_len);
 	btrfs_free_path(path);
 

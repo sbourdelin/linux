@@ -863,6 +863,9 @@ static noinline int drop_one_dir_item(struct btrfs_trans_handle *trans,
 
 	btrfs_dir_item_key_to_cpu(leaf, di, &location);
 	name_len = btrfs_dir_name_len(leaf, di);
+	if (verify_dir_item(fs_info, leaf, path->slots[0], di))
+		return -EIO;
+
 	name = kmalloc(name_len, GFP_NOFS);
 	if (!name)
 		return -ENOMEM;
@@ -953,6 +956,7 @@ static noinline int backref_in_log(struct btrfs_root *log,
 	int item_size;
 	int ret;
 	int match = 0;
+	u16 namelen_ret;
 
 	path = btrfs_alloc_path();
 	if (!path)
@@ -976,9 +980,11 @@ static noinline int backref_in_log(struct btrfs_root *log,
 	ptr_end = ptr + item_size;
 	while (ptr < ptr_end) {
 		ref = (struct btrfs_inode_ref *)ptr;
+		name_ptr = (unsigned long)(ref + 1);
 		found_name_len = btrfs_inode_ref_name_len(path->nodes[0], ref);
+		namelen_ret = btrfs_check_namelen(path->nodes[0],
+				path->slots[0], name_ptr, found_name_len);
 		if (found_name_len == namelen) {
-			name_ptr = (unsigned long)(ref + 1);
 			ret = memcmp_extent_buffer(path->nodes[0], name,
 						   name_ptr, namelen);
 			if (ret == 0) {
@@ -1005,6 +1011,7 @@ static inline int __add_inode_ref(struct btrfs_trans_handle *trans,
 {
 	struct btrfs_fs_info *fs_info = root->fs_info;
 	int ret;
+	u16 namelen_ret;
 	char *victim_name;
 	int victim_name_len;
 	struct extent_buffer *leaf;
@@ -1041,6 +1048,11 @@ again:
 			victim_ref = (struct btrfs_inode_ref *)ptr;
 			victim_name_len = btrfs_inode_ref_name_len(leaf,
 								   victim_ref);
+			namelen_ret = btrfs_check_namelen(leaf, path->slots[0],
+						(unsigned long)(victim_ref + 1),
+						victim_name_len);
+			if (namelen_ret != victim_name_len)
+				return -EIO;
 			victim_name = kmalloc(victim_name_len, GFP_NOFS);
 			if (!victim_name)
 				return -ENOMEM;
@@ -1087,6 +1099,7 @@ again:
 	if (!IS_ERR_OR_NULL(extref)) {
 		u32 item_size;
 		u32 cur_offset = 0;
+		u16 namelen_ret;
 		unsigned long base;
 		struct inode *victim_parent;
 
@@ -1099,6 +1112,11 @@ again:
 			extref = (struct btrfs_inode_extref *)(base + cur_offset);
 
 			victim_name_len = btrfs_inode_extref_name_len(leaf, extref);
+			namelen_ret = btrfs_check_namelen(leaf, path->slots[0],
+						(unsigned long)&extref->name,
+						victim_name_len);
+			if (namelen_ret != victim_name_len)
+				return -EIO;
 
 			if (btrfs_inode_extref_parent(leaf, extref) != parent_objectid)
 				goto next;
@@ -1175,16 +1193,20 @@ next:
 	return 0;
 }
 
-static int extref_get_fields(struct extent_buffer *eb, unsigned long ref_ptr,
-			     u32 *namelen, char **name, u64 *index,
-			     u64 *parent_objectid)
+static int extref_get_fields(struct extent_buffer *eb, int slot,
+			     unsigned long ref_ptr, u32 *namelen, char **name,
+			     u64 *index, u64 *parent_objectid)
 {
 	struct btrfs_inode_extref *extref;
-
+	u32 namelen_ret;
 	extref = (struct btrfs_inode_extref *)ref_ptr;
 
 	*namelen = btrfs_inode_extref_name_len(eb, extref);
 	*name = kmalloc(*namelen, GFP_NOFS);
+	namelen_ret = btrfs_check_namelen(eb, slot,
+					(unsigned long)&extref->name, *namelen);
+	if (namelen_ret != *namelen)
+		return -EIO;
 	if (*name == NULL)
 		return -ENOMEM;
 
@@ -1198,14 +1220,18 @@ static int extref_get_fields(struct extent_buffer *eb, unsigned long ref_ptr,
 	return 0;
 }
 
-static int ref_get_fields(struct extent_buffer *eb, unsigned long ref_ptr,
-			  u32 *namelen, char **name, u64 *index)
+static int ref_get_fields(struct extent_buffer *eb, int slot,
+		unsigned long ref_ptr, u32 *namelen, char **name, u64 *index)
 {
 	struct btrfs_inode_ref *ref;
-
+	u32 namelen_ret;
 	ref = (struct btrfs_inode_ref *)ref_ptr;
 
 	*namelen = btrfs_inode_ref_name_len(eb, ref);
+	namelen_ret = btrfs_check_namelen(eb, slot, (unsigned long)(ref + 1),
+					*namelen);
+	if (namelen_ret != *namelen)
+		return -EIO;
 	*name = kmalloc(*namelen, GFP_NOFS);
 	if (*name == NULL)
 		return -ENOMEM;
@@ -1280,8 +1306,8 @@ static noinline int add_inode_ref(struct btrfs_trans_handle *trans,
 
 	while (ref_ptr < ref_end) {
 		if (log_ref_ver) {
-			ret = extref_get_fields(eb, ref_ptr, &namelen, &name,
-						&ref_index, &parent_objectid);
+			ret = extref_get_fields(eb, slot, ref_ptr, &namelen,
+					&name, &ref_index, &parent_objectid);
 			/*
 			 * parent object can change from one array
 			 * item to another.
@@ -1293,7 +1319,7 @@ static noinline int add_inode_ref(struct btrfs_trans_handle *trans,
 				goto out;
 			}
 		} else {
-			ret = ref_get_fields(eb, ref_ptr, &namelen, &name,
+			ret = ref_get_fields(eb, slot, ref_ptr, &namelen, &name,
 					     &ref_index);
 		}
 		if (ret)
@@ -1704,7 +1730,8 @@ static noinline int replay_one_name(struct btrfs_trans_handle *trans,
 				    struct btrfs_dir_item *di,
 				    struct btrfs_key *key)
 {
-	char *name;
+	struct btrfs_fs_info *fs_info = root->fs_info;
+	char *name = NULL;
 	int name_len;
 	struct btrfs_dir_item *dst_di;
 	struct btrfs_key found_key;
@@ -1721,6 +1748,12 @@ static noinline int replay_one_name(struct btrfs_trans_handle *trans,
 		return -EIO;
 
 	name_len = btrfs_dir_name_len(eb, di);
+	ret = verify_dir_item(fs_info, eb, path->slots[0], di);
+	if (ret) {
+		ret = -EIO;
+		goto out;
+	}
+
 	name = kmalloc(name_len, GFP_NOFS);
 	if (!name) {
 		ret = -ENOMEM;
@@ -2102,6 +2135,7 @@ static int replay_xattr_deletes(struct btrfs_trans_handle *trans,
 			      struct btrfs_path *path,
 			      const u64 ino)
 {
+	struct btrfs_fs_info *fs_info = root->fs_info;
 	struct btrfs_key search_key;
 	struct btrfs_path *log_path;
 	int i;
@@ -2142,6 +2176,12 @@ process_leaf:
 			u16 data_len = btrfs_dir_data_len(path->nodes[0], di);
 			u32 this_len = sizeof(*di) + name_len + data_len;
 			char *name;
+
+			if (verify_dir_item(fs_info, path->nodes[0],
+					path->slots[0], di)) {
+				ret = -EIO;
+				goto out;
+			}
 
 			name = kmalloc(name_len, GFP_NOFS);
 			if (!name) {
@@ -4524,6 +4564,8 @@ static int btrfs_check_ref_name_override(struct extent_buffer *eb,
 		u64 parent;
 		u32 this_name_len;
 		u32 this_len;
+		u16 namelen_ret;
+
 		unsigned long name_ptr;
 		struct btrfs_dir_item *di;
 
@@ -4546,6 +4588,12 @@ static int btrfs_check_ref_name_override(struct extent_buffer *eb,
 			this_len = sizeof(*extref) + this_name_len;
 		}
 
+		namelen_ret = btrfs_check_namelen(eb, slot, name_ptr,
+						this_name_len);
+		if (namelen_ret != this_name_len) {
+			ret = -EIO;
+			goto out;
+		}
 		if (this_name_len > name_len) {
 			char *new_name;
 

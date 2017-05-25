@@ -371,6 +371,7 @@ int btrfs_del_root_ref(struct btrfs_trans_handle *trans,
 	unsigned long ptr;
 	int err = 0;
 	int ret;
+	u16 namelen_ret;
 
 	path = btrfs_alloc_path();
 	if (!path)
@@ -390,6 +391,12 @@ again:
 		WARN_ON(btrfs_root_ref_dirid(leaf, ref) != dirid);
 		WARN_ON(btrfs_root_ref_name_len(leaf, ref) != name_len);
 		ptr = (unsigned long)(ref + 1);
+		namelen_ret = btrfs_check_namelen(leaf, path->slots[0],
+						ptr, name_len);
+		if (namelen_ret != name_len) {
+			err = -EIO;
+			goto out;
+		}
 		WARN_ON(memcmp_extent_buffer(leaf, name, ptr, name_len));
 		*sequence = btrfs_root_ref_sequence(leaf, ref);
 
