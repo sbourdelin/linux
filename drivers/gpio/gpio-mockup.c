@@ -381,7 +381,7 @@ static int gpio_mockup_probe(struct platform_device *pdev)
 			ret = gpio_mockup_add(dev, &chips[i],
 					      chip_name, base, ngpio);
 		} else {
-			ret = -1;
+			ret = -EINVAL;
 		}
 
 		if (ret) {
