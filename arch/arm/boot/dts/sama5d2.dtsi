@@ -1307,7 +1307,18 @@
 				atmel,min-sample-rate-hz = <200000>;
 				atmel,max-sample-rate-hz = <20000000>;
 				atmel,startup-time-ms = <4>;
+				atmel,trigger-edge-type = <&external_rising>;
 				status = "disabled";
+
+				/* possible edge type for ADTRG trigger pin */
+				adtrg: adtrg {
+					external_rising: external_rising {
+					};
+					external_falling: external_falling {
+					};
+					external_any: external_any {
+					};
+				};
 			};
 
 			pioA: pinctrl@fc038000 {
