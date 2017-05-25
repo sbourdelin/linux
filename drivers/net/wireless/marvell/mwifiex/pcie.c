@@ -3209,9 +3209,6 @@ static void mwifiex_unregister_dev(struct mwifiex_adapter *adapter)
 
 	if (card->msix_enable) {
 		for (i = 0; i < MWIFIEX_NUM_MSIX_VECTORS; i++)
-			synchronize_irq(card->msix_entries[i].vector);
-
-		for (i = 0; i < MWIFIEX_NUM_MSIX_VECTORS; i++)
 			free_irq(card->msix_entries[i].vector,
 				 &card->msix_ctx[i]);
 
