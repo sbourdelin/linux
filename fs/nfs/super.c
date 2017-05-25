@@ -2544,10 +2544,31 @@ EXPORT_SYMBOL_GPL(nfs_set_sb_security);
 int nfs_clone_sb_security(struct super_block *s, struct dentry *mntroot,
 			  struct nfs_mount_info *mount_info)
 {
+	int error;
+	unsigned long kflags = 0, kflags_out = 0;
+	struct security_mnt_opts opts;
+
 	/* clone any lsm security options from the parent to the new sb */
 	if (d_inode(mntroot)->i_op != NFS_SB(s)->nfs_client->rpc_ops->dir_inode_ops)
 		return -ESTALE;
-	return security_sb_clone_mnt_opts(mount_info->cloned->sb, s);
+	error = security_sb_clone_mnt_opts(mount_info->cloned->sb, s);
+	if (error)
+		goto err;
+
+	if (NFS_SB(s)->caps & NFS_CAP_SECURITY_LABEL &&
+		!(NFS_SB(mount_info->cloned->sb)->caps & NFS_CAP_SECURITY_LABEL)) {
+		memset(&opts, 0, sizeof(opts));
+		kflags |= SECURITY_LSM_NATIVE_LABELS;
+
+		error = security_sb_set_mnt_opts(s, &opts, kflags, &kflags_out);
+		if (error)
+			goto err;
+
+		if (!(kflags_out & SECURITY_LSM_NATIVE_LABELS))
+			NFS_SB(s)->caps &= ~NFS_CAP_SECURITY_LABEL;
+	}
+err:
+	return error;
 }
 EXPORT_SYMBOL_GPL(nfs_clone_sb_security);
 
