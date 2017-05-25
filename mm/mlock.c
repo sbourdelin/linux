@@ -64,6 +64,7 @@ void clear_page_mlock(struct page *page)
 			    -hpage_nr_pages(page));
 	count_vm_event(UNEVICTABLE_PGCLEARED);
 	if (!isolate_lru_page(page)) {
+		count_vm_event(UNEVICTABLE_PGMUNLOCKED);
 		putback_lru_page(page);
 	} else {
 		/*
