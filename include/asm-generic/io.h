@@ -351,6 +351,8 @@ static inline void writesq(volatile void __iomem *addr, const void *buffer,
 #define IO_SPACE_LIMIT 0xffff
 #endif
 
+#include <linux/logic_pio.h>
+
 /*
  * {in,out}{b,w,l}() access little endian I/O. {in,out}{b,w,l}_p() can be
  * implemented on hardware that needs an additional delay for I/O accesses to
@@ -358,51 +360,75 @@ static inline void writesq(volatile void __iomem *addr, const void *buffer,
  */
 
 #ifndef inb
+#ifdef CONFIG_INDIRECT_PIO
+#define inb logic_inb
+#else
 #define inb inb
 static inline u8 inb(unsigned long addr)
 {
 	return readb(PCI_IOBASE + addr);
 }
+#endif /* CONFIG_INDIRECT_PIO */
 #endif
 
 #ifndef inw
+#ifdef CONFIG_INDIRECT_PIO
+#define inw logic_inw
+#else
 #define inw inw
 static inline u16 inw(unsigned long addr)
 {
 	return readw(PCI_IOBASE + addr);
 }
+#endif /* CONFIG_INDIRECT_PIO */
 #endif
 
 #ifndef inl
+#ifdef CONFIG_INDIRECT_PIO
+#define inl logic_inl
+#else
 #define inl inl
 static inline u32 inl(unsigned long addr)
 {
 	return readl(PCI_IOBASE + addr);
 }
+#endif /* CONFIG_INDIRECT_PIO */
 #endif
 
 #ifndef outb
+#ifdef CONFIG_INDIRECT_PIO
+#define outb logic_outb
+#else
 #define outb outb
 static inline void outb(u8 value, unsigned long addr)
 {
 	writeb(value, PCI_IOBASE + addr);
 }
+#endif /* CONFIG_INDIRECT_PIO */
 #endif
 
 #ifndef outw
+#ifdef CONFIG_INDIRECT_PIO
+#define outw logic_outw
+#else
 #define outw outw
 static inline void outw(u16 value, unsigned long addr)
 {
 	writew(value, PCI_IOBASE + addr);
 }
+#endif /* CONFIG_INDIRECT_PIO */
 #endif
 
 #ifndef outl
+#ifdef CONFIG_INDIRECT_PIO
+#define outl logic_outl
+#else
 #define outl outl
 static inline void outl(u32 value, unsigned long addr)
 {
 	writel(value, PCI_IOBASE + addr);
 }
+#endif /* CONFIG_INDIRECT_PIO */
 #endif
 
 #ifndef inb_p
@@ -459,54 +485,78 @@ static inline void outl_p(u32 value, unsigned long addr)
  */
 
 #ifndef insb
+#ifdef CONFIG_INDIRECT_PIO
+#define insb logic_insb
+#else
 #define insb insb
 static inline void insb(unsigned long addr, void *buffer, unsigned int count)
 {
 	readsb(PCI_IOBASE + addr, buffer, count);
 }
+#endif /* CONFIG_INDIRECT_PIO */
 #endif
 
 #ifndef insw
+#ifdef CONFIG_INDIRECT_PIO
+#define insw logic_insw
+#else
 #define insw insw
 static inline void insw(unsigned long addr, void *buffer, unsigned int count)
 {
 	readsw(PCI_IOBASE + addr, buffer, count);
 }
+#endif /* CONFIG_INDIRECT_PIO */
 #endif
 
 #ifndef insl
+#ifdef CONFIG_INDIRECT_PIO
+#define insl logic_insl
+#else
 #define insl insl
 static inline void insl(unsigned long addr, void *buffer, unsigned int count)
 {
 	readsl(PCI_IOBASE + addr, buffer, count);
 }
+#endif /* CONFIG_INDIRECT_PIO */
 #endif
 
 #ifndef outsb
+#ifdef CONFIG_INDIRECT_PIO
+#define outsb logic_outsb
+#else
 #define outsb outsb
 static inline void outsb(unsigned long addr, const void *buffer,
 			 unsigned int count)
 {
 	writesb(PCI_IOBASE + addr, buffer, count);
 }
+#endif /* CONFIG_INDIRECT_PIO */
 #endif
 
 #ifndef outsw
+#ifdef CONFIG_INDIRECT_PIO
+#define outsw logic_outsw
+#else
 #define outsw outsw
 static inline void outsw(unsigned long addr, const void *buffer,
 			 unsigned int count)
 {
 	writesw(PCI_IOBASE + addr, buffer, count);
 }
+#endif /* CONFIG_INDIRECT_PIO */
 #endif
 
 #ifndef outsl
+#ifdef CONFIG_INDIRECT_PIO
+#define outsl logic_outsl
+#else
 #define outsl outsl
 static inline void outsl(unsigned long addr, const void *buffer,
 			 unsigned int count)
 {
 	writesl(PCI_IOBASE + addr, buffer, count);
 }
+#endif /* CONFIG_INDIRECT_PIO */
 #endif
 
 #ifndef insb_p

@@ -1,0 +1,280 @@
+/*
+ * Copyright (C) 2017 Hisilicon Limited, All Rights Reserved.
+ * Author: Gabriele Paoloni <gabriele.paoloni@huawei.com>
+ * Author: Zhichang Yuan <yuanzhichang@hisilicon.com>
+ *
+ * This program is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License version 2 as
+ * published by the Free Software Foundation.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
+ */
+
+#include <linux/of.h>
+#include <linux/io.h>
+#include <linux/logic_pio.h>
+#include <linux/mm.h>
+#include <linux/rculist.h>
+#include <linux/sizes.h>
+#include <linux/slab.h>
+
+/* The unique hardware address list. */
+static LIST_HEAD(io_range_list);
+static DEFINE_MUTEX(io_range_mutex);
+
+/*
+ * register a new io range node in the io range list.
+ *
+ * @newrange: pointer to the io range to be registered.
+ *
+ * returns 0 on success, the error code in case of failure
+ */
+int logic_pio_register_range(struct logic_pio_hwaddr *new_range)
+{
+	struct logic_pio_hwaddr *range;
+	int ret = 0;
+	resource_size_t start = new_range->hw_start;
+	resource_size_t end = new_range->hw_start + new_range->size;
+	resource_size_t allocated_mmio_size = 0;
+	resource_size_t allocated_iio_size = MMIO_UPPER_LIMIT;
+
+	if (!new_range || !new_range->fwnode || !new_range->size)
+		return -EINVAL;
+
+	mutex_lock(&io_range_mutex);
+	list_for_each_entry_rcu(range, &io_range_list, list) {
+
+		if (range->fwnode == new_range->fwnode) {
+			/* range already there */
+			ret = -EFAULT;
+			goto end_register;
+		}
+		if (range->flags == PIO_CPU_MMIO &&
+				new_range->flags == PIO_CPU_MMIO) {
+			/* for MMIO ranges we need to check for overlap */
+			if (start >= range->hw_start + range->size ||
+				end < range->hw_start)
+				allocated_mmio_size += range->size;
+			else {
+				ret = -EFAULT;
+				goto end_register;
+			}
+		} else if (range->flags == PIO_INDIRECT &&
+				new_range->flags == PIO_INDIRECT) {
+			allocated_iio_size += range->size;
+		}
+	}
+
+	/* range not registered yet, check for available space */
+	if (new_range->flags == PIO_CPU_MMIO) {
+
+		if (allocated_mmio_size + new_range->size - 1 >
+			MMIO_UPPER_LIMIT) {
+			/* if it's too big check if 64K space can be reserved */
+			if (allocated_mmio_size + SZ_64K - 1 >
+			MMIO_UPPER_LIMIT) {
+				ret = -E2BIG;
+				goto end_register;
+			}
+			new_range->size = SZ_64K;
+			pr_warn("Requested IO range too big, new size set to 64K\n");
+		}
+
+		new_range->io_start = allocated_mmio_size + new_range->size;
+
+	} else if (new_range->flags == PIO_INDIRECT) {
+
+		if (allocated_iio_size + new_range->size - 1 >
+		IO_SPACE_LIMIT) {
+			ret = -E2BIG;
+			goto end_register;
+		}
+		new_range->io_start = allocated_iio_size + new_range->size;
+
+	} else {
+		/* invalid flag */
+		ret = -EINVAL;
+		goto end_register;
+	}
+
+	list_add_tail_rcu(&new_range->list, &io_range_list);
+
+end_register:
+	mutex_unlock(&io_range_mutex);
+	return ret;
+}
+
+/*
+ * traverse the io_range_list to find the registered node whose device node
+ * and/or physical IO address match to.
+ */
+struct logic_pio_hwaddr *find_io_range_by_fwnode(struct fwnode_handle *fwnode)
+{
+	struct logic_pio_hwaddr *range;
+
+	list_for_each_entry_rcu(range, &io_range_list, list) {
+		if (range->fwnode == fwnode)
+			return range;
+	}
+	return NULL;
+}
+
+/* return a registered range given an input PIO token */
+static struct logic_pio_hwaddr *find_io_range(unsigned long pio)
+{
+	struct logic_pio_hwaddr *range;
+
+	list_for_each_entry_rcu(range, &io_range_list, list) {
+		if (pio >= range->io_start &&
+				pio < range->io_start + range->size)
+			return range;
+	}
+	pr_err("PIO entry token invalid\n");
+	return NULL;
+}
+
+/*
+ * Translate the input logical pio to the corresponding hardware address.
+ * The input pio should be unique in the whole logical PIO space.
+ */
+resource_size_t logic_pio_to_hwaddr(unsigned long pio)
+{
+	struct logic_pio_hwaddr *range;
+	resource_size_t hwaddr = -1;
+
+	range = find_io_range(pio);
+	if (range)
+		hwaddr = range->hw_start + pio - range->io_start;
+
+	return hwaddr;
+}
+
+/*
+ * This function is generic for translating a hardware address to logical PIO.
+ * @hw_addr: the hardware address of host, can be CPU address or host-local
+ *		address;
+ */
+unsigned long
+logic_pio_trans_hwaddr(struct fwnode_handle *fwnode, resource_size_t addr)
+{
+	struct logic_pio_hwaddr *range;
+
+	range = find_io_range_by_fwnode(fwnode);
+	if (!range || range->flags == PIO_CPU_MMIO) {
+		pr_err("range not found or invalid\n");
+		return -1;
+	}
+	return addr - range->hw_start + range->io_start;
+}
+
+unsigned long
+logic_pio_trans_cpuaddr(resource_size_t addr)
+{
+	struct logic_pio_hwaddr *range;
+
+	list_for_each_entry_rcu(range, &io_range_list, list) {
+		if (range->flags != PIO_CPU_MMIO)
+			continue;
+		if (addr >= range->hw_start &&
+			addr < range->hw_start + range->size)
+			return addr - range->hw_start +
+				range->io_start;
+	}
+	pr_err("addr not registered in io_range_list\n");
+	return -1;
+}
+
+#if defined(CONFIG_INDIRECT_PIO) && defined(PCI_IOBASE)
+#define BUILD_LOGIC_PIO(bw, type)\
+type logic_in##bw(unsigned long addr)\
+{\
+	type ret = -1;\
+\
+	if (addr < MMIO_UPPER_LIMIT) {\
+		ret = read##bw(PCI_IOBASE + addr);\
+	} else {\
+		struct logic_pio_hwaddr *entry = find_io_range(addr);\
+\
+		if (entry && entry->ops)\
+			ret = entry->ops->pfin(entry->devpara,\
+					addr, sizeof(type));\
+		else\
+			WARN_ON_ONCE(1);\
+	}	\
+	return ret;\
+}	\
+\
+void logic_out##bw(type value, unsigned long addr)\
+{\
+	if (addr < MMIO_UPPER_LIMIT) {\
+		write##bw(value, PCI_IOBASE + addr);\
+	} else {\
+		struct logic_pio_hwaddr *entry = find_io_range(addr);\
+\
+		if (entry && entry->ops)\
+			entry->ops->pfout(entry->devpara,\
+						addr, value, sizeof(type));\
+		else\
+			WARN_ON_ONCE(1);\
+	}	\
+}	\
+\
+void logic_ins##bw(unsigned long addr, void *buffer, unsigned int count)\
+{\
+	if (addr < MMIO_UPPER_LIMIT) {\
+		reads##bw(PCI_IOBASE + addr, buffer, count);\
+	} else {\
+		struct logic_pio_hwaddr *entry = find_io_range(addr);\
+\
+		if (entry && entry->ops)\
+			entry->ops->pfins(entry->devpara,\
+				addr, buffer, sizeof(type), count);\
+		else\
+			WARN_ON_ONCE(1);\
+	}	\
+\
+}	\
+\
+void logic_outs##bw(unsigned long addr, const void *buffer,\
+		    unsigned int count)\
+{\
+	if (addr < MMIO_UPPER_LIMIT)\
+		writes##bw(PCI_IOBASE + addr, buffer, count);\
+	else {\
+		struct logic_pio_hwaddr *entry = find_io_range(addr);\
+\
+		if (entry && entry->ops)\
+			entry->ops->pfouts(entry->devpara,\
+				addr, buffer, sizeof(type), count);\
+		else\
+			WARN_ON_ONCE(1);\
+	}	\
+}
+
+BUILD_LOGIC_PIO(b, u8)
+
+EXPORT_SYMBOL(logic_inb);
+EXPORT_SYMBOL(logic_outb);
+EXPORT_SYMBOL(logic_insb);
+EXPORT_SYMBOL(logic_outsb);
+
+BUILD_LOGIC_PIO(w, u16)
+
+EXPORT_SYMBOL(logic_inw);
+EXPORT_SYMBOL(logic_outw);
+EXPORT_SYMBOL(logic_insw);
+EXPORT_SYMBOL(logic_outsw);
+
+BUILD_LOGIC_PIO(l, u32)
+
+EXPORT_SYMBOL(logic_inl);
+EXPORT_SYMBOL(logic_outl);
+EXPORT_SYMBOL(logic_insl);
+EXPORT_SYMBOL(logic_outsl);
+#endif /* CONFIG_INDIRECT_PIO && PCI_IOBASE */
