@@ -5062,8 +5062,8 @@ ftrace_graph_release(struct inode *inode, struct file *file)
 		free_ftrace_hash(old_hash);
 	}
 
- out:
-	kfree(fgd->new_hash);
+out:
+	free_ftrace_hash(fgd->new_hash);
 	kfree(fgd);
 
 	return ret;
