@@ -1649,6 +1649,13 @@ static int pxa_ecc_init(struct pxa3xx_nand_info *info,
 	return 0;
 }
 
+static int pxa3xx_nand_get_set_features(struct mtd_info *mtd,
+					struct nand_chip *chip,
+					int feature_addr, u8 *subfeature_para)
+{
+	return -ENOTSUPP;
+}
+
 static int pxa3xx_nand_scan(struct mtd_info *mtd)
 {
 	struct nand_chip *chip = mtd_to_nand(mtd);
@@ -1812,6 +1819,8 @@ static int alloc_nand_resource(struct platform_device *pdev)
 		chip->write_buf		= pxa3xx_nand_write_buf;
 		chip->options		|= NAND_NO_SUBPAGE_WRITE;
 		chip->cmdfunc		= nand_cmdfunc;
+		chip->onfi_set_features	= pxa3xx_nand_get_set_features;
+		chip->onfi_get_features	= pxa3xx_nand_get_set_features;
 	}
 
 	nand_hw_control_init(chip->controller);
