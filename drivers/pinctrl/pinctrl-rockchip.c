@@ -146,6 +146,7 @@ struct rockchip_drv {
  * @irq_lock: bus lock for irq chip
  * @new_irqs: newly configured irqs which must be muxed as GPIOs in
  *	irq_bus_sync_unlock()
+ * @route_mask: bits describing the routing pins of per bank
  */
 struct rockchip_pin_bank {
 	void __iomem			*reg_base;
@@ -170,6 +171,7 @@ struct rockchip_pin_bank {
 	u32				toggle_edge_mode;
 	struct mutex			irq_lock;
 	u32				new_irqs;
+	u32				route_mask;
 };
 
 #define PIN_BANK(id, pins, label)			\
@@ -316,6 +318,8 @@ struct rockchip_pin_ctrl {
 	int	(*schmitt_calc_reg)(struct rockchip_pin_bank *bank,
 				    int pin_num, struct regmap **regmap,
 				    int *reg, u8 *bit);
+	bool	(*iomux_route)(u8 bank_num, int pin, int mux,
+			       u32 *reg, u32 *value);
 };
 
 struct rockchip_pin_config {
@@ -381,6 +385,22 @@ struct rockchip_mux_recalced_data {
 	u8 reg;
 	u8 bit;
 	u8 mask;
+};
+
+/**
+ * struct rockchip_mux_recalced_data: represent a pin iomux data.
+ * @bank: bank number.
+ * @pin: index at register or used to calc index.
+ * @func: the min pin.
+ * @route_offset: the max pin.
+ * @route_val: the register offset.
+ */
+struct rockchip_mux_route_data {
+	u8 bank;
+	u8 pin;
+	u8 func;
+	u32 route_offset;
+	u32 route_val;
 };
 
 static struct regmap_config rockchip_regmap_config = {
@@ -683,7 +703,7 @@ static int rockchip_set_mux(struct rockchip_pin_bank *bank, int pin, int mux)
 	struct regmap *regmap;
 	int reg, ret, mask, mux_type;
 	u8 bit;
-	u32 data, rmask;
+	u32 data, rmask, route_reg, route_val;
 
 	ret = rockchip_verify_mux(bank, pin, mux);
 	if (ret < 0)
@@ -718,6 +738,15 @@ static int rockchip_set_mux(struct rockchip_pin_bank *bank, int pin, int mux)
 
 	if (ctrl->iomux_recalc && (mux_type & IOMUX_RECALCED))
 		ctrl->iomux_recalc(bank->bank_num, pin, &reg, &bit, &mask);
+
+	if (ctrl->iomux_route && (bank->route_mask & BIT(pin))) {
+		if (ctrl->iomux_route(bank->bank_num, pin, mux,
+				      &route_reg, &route_val)) {
+			ret = regmap_write(regmap, route_reg, route_val);
+			if (ret)
+				return ret;
+		}
+	}
 
 	data = (mask << (bit + 16));
 	rmask = data | (data >> 16);
