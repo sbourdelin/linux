@@ -40,6 +40,7 @@
 #include <linux/ioport.h>
 #include <linux/acpi.h>
 #include <linux/highmem.h>
+#include <linux/gpio/consumer.h>
 
 #define CREATE_TRACE_POINTS
 #include <trace/events/spi.h>
@@ -531,8 +532,10 @@ int spi_add_device(struct spi_device *spi)
 		goto done;
 	}
 
-	if (master->cs_gpios)
-		spi->cs_gpio = master->cs_gpios[spi->chip_select];
+	if (master->cs_gpios[spi->chip_select])
+		spi->cs_gpio = desc_to_gpio(master->cs_gpios[spi->chip_select]);
+	else
+		spi->cs_gpio = -ENOENT;
 
 	/* Drivers may modify this initial i/o setup, but will
 	 * normally rely on the device being setup.  Devices
@@ -1878,7 +1881,8 @@ EXPORT_SYMBOL_GPL(spi_alloc_master);
 #ifdef CONFIG_OF
 static int of_spi_register_master(struct spi_master *master)
 {
-	int nb, i, *cs;
+	int nb, i;
+	struct gpio_desc **cs;
 	struct device_node *np = master->dev.of_node;
 
 	if (!np)
@@ -1894,7 +1898,7 @@ static int of_spi_register_master(struct spi_master *master)
 		return nb;
 
 	cs = devm_kzalloc(&master->dev,
-			  sizeof(int) * master->num_chipselect,
+			  sizeof(*master->cs_gpios) * master->num_chipselect,
 			  GFP_KERNEL);
 	master->cs_gpios = cs;
 
@@ -1902,10 +1906,16 @@ static int of_spi_register_master(struct spi_master *master)
 		return -ENOMEM;
 
 	for (i = 0; i < master->num_chipselect; i++)
-		cs[i] = -ENOENT;
+		cs[i] = NULL;
 
-	for (i = 0; i < nb; i++)
-		cs[i] = of_get_named_gpio(np, "cs-gpios", i);
+	for (i = 0; i < nb; i++) {
+		struct gpio_desc *gpio;
+
+		gpio = devm_gpiod_get_index(&master->dev, "cs", i,
+					    GPIOD_OUT_HIGH);
+		if (!IS_ERR(gpio))
+			cs[i] = gpio;
+	}
 
 	return 0;
 }

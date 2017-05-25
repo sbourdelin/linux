@@ -1360,12 +1360,18 @@ static int spi_imx_probe(struct platform_device *pdev)
 	if (mxc_platform_info) {
 		master->num_chipselect = mxc_platform_info->num_chipselect;
 		master->cs_gpios = devm_kzalloc(&master->dev,
-			sizeof(int) * master->num_chipselect, GFP_KERNEL);
+			sizeof(*master->cs_gpios) * master->num_chipselect, GFP_KERNEL);
 		if (!master->cs_gpios)
 			return -ENOMEM;
 
-		for (i = 0; i < master->num_chipselect; i++)
-			master->cs_gpios[i] = mxc_platform_info->chipselect[i];
+		for (i = 0; i < master->num_chipselect; i++) {
+			struct gpio_desc *cs;
+
+			cs = devm_gpiod_get_index(&pdev->dev, "spi-cs", i,
+						  GPIOD_OUT_HIGH);
+			if (!IS_ERR(cs))
+				master->cs_gpios[i] = cs;
+		}
  	}
 
 	spi_imx->bitbang.chipselect = spi_imx_chipselect;
@@ -1454,19 +1460,6 @@ static int spi_imx_probe(struct platform_device *pdev)
 		dev_err(&pdev->dev, "No CS GPIOs available\n");
 		ret = -EINVAL;
 		goto out_clk_put;
-	}
-
-	for (i = 0; i < master->num_chipselect; i++) {
-		if (!gpio_is_valid(master->cs_gpios[i]))
-			continue;
-
-		ret = devm_gpio_request(&pdev->dev, master->cs_gpios[i],
-					DRIVER_NAME);
-		if (ret) {
-			dev_err(&pdev->dev, "Can't get CS GPIO %i\n",
-				master->cs_gpios[i]);
-			goto out_clk_put;
-		}
 	}
 
 	dev_info(&pdev->dev, "probed\n");

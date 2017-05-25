@@ -816,7 +816,7 @@ static int ep93xx_spi_probe(struct platform_device *pdev)
 
 	master->num_chipselect = info->num_chipselect;
 	master->cs_gpios = devm_kzalloc(&master->dev,
-					sizeof(int) * master->num_chipselect,
+					sizeof(*master->cs_gpios) * master->num_chipselect,
 					GFP_KERNEL);
 	if (!master->cs_gpios) {
 		error = -ENOMEM;
@@ -824,19 +824,17 @@ static int ep93xx_spi_probe(struct platform_device *pdev)
 	}
 
 	for (i = 0; i < master->num_chipselect; i++) {
-		master->cs_gpios[i] = info->chipselect[i];
+		struct gpio_desc *cs;
 
-		if (!gpio_is_valid(master->cs_gpios[i]))
-			continue;
-
-		error = devm_gpio_request_one(&pdev->dev, master->cs_gpios[i],
-					      GPIOF_OUT_INIT_HIGH,
-					      "ep93xx-spi");
-		if (error) {
+		cs = devm_gpiod_get_index(&pdev->dev, "spi-cs", i,
+					  GPIOD_OUT_HIGH);
+		if (IS_ERR(cs)) {
 			dev_err(&pdev->dev, "could not request cs gpio %d\n",
-				master->cs_gpios[i]);
+				i);
+			error = PTR_ERR(cs);
 			goto fail_release_master;
 		}
+		master->cs_gpios[i] = cs;
 	}
 
 	platform_set_drvdata(pdev, master);
