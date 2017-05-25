@@ -239,7 +239,7 @@ static int vfio_pci_enable(struct vfio_pci_device *vdev)
 			vdev->nointx = true;
 			pci_intx(pdev, 0);
 		} else
-			vdev->pci_2_3 = pci_intx_mask_supported(pdev);
+			vdev->pci_2_3 = pci_is_intx_mask_supported(pdev);
 	}
 
 	pci_read_config_word(pdev, PCI_COMMAND, &cmd);

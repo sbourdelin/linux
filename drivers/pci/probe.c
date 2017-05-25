@@ -1399,6 +1399,9 @@ int pci_setup_device(struct pci_dev *dev)
 		}
 	}
 
+	if (pci_intx_mask_supported(dev))
+		dev->intx_mask_support = 1;
+
 	switch (dev->hdr_type) {		    /* header type */
 	case PCI_HEADER_TYPE_NORMAL:		    /* standard header */
 		if (class == PCI_CLASS_BRIDGE_PCI)

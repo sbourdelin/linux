@@ -73,7 +73,7 @@ static int probe(struct pci_dev *pdev,
 		return -ENODEV;
 	}
 
-	if (!pci_intx_mask_supported(pdev)) {
+	if (!pci_is_intx_mask_supported(pdev)) {
 		err = -ENODEV;
 		goto err_verify;
 	}

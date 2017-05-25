@@ -367,6 +367,7 @@ struct pci_dev {
 	unsigned int    __aer_firmware_first_valid:1;
 	unsigned int	__aer_firmware_first:1;
 	unsigned int	broken_intx_masking:1;
+	unsigned int	intx_mask_support:1;	/* INTx masking is supported */
 	unsigned int	io_window_1k:1;	/* Intel P2P bridge 1K I/O windows */
 	unsigned int	irq_managed:1;
 	unsigned int	has_secondary_link:1;
@@ -1002,6 +1003,15 @@ int __must_check pci_enable_device_mem(struct pci_dev *dev);
 int __must_check pci_reenable_device(struct pci_dev *);
 int __must_check pcim_enable_device(struct pci_dev *pdev);
 void pcim_pin_device(struct pci_dev *pdev);
+
+static inline bool pci_is_intx_mask_supported(struct pci_dev *pdev)
+{
+	/*
+	 * INTx masking is supported if device passed INTx test and it's INTx
+	 * masking feature works properly.
+	 */
+	return (pdev->intx_mask_support && !pdev->broken_intx_masking);
+}
 
 static inline int pci_is_enabled(struct pci_dev *pdev)
 {
