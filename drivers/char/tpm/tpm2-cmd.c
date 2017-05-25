@@ -831,6 +831,9 @@ void tpm2_shutdown(struct tpm_chip *chip, u16 shutdown_type)
 	struct tpm2_cmd cmd;
 	int rc;
 
+	if (chip->flags & TPM_CHIP_FLAG_NO_SHUTDOWN)
+		return;
+
 	cmd.header.in = tpm2_shutdown_header;
 	cmd.params.startup_in.startup_type = cpu_to_be16(shutdown_type);
 

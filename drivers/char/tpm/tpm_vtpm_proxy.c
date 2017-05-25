@@ -504,7 +504,8 @@ static struct file *vtpm_proxy_create_device(
 	vtpm_proxy_fops_open(file);
 
 	if (proxy_dev->flags & VTPM_PROXY_FLAG_TPM2)
-		proxy_dev->chip->flags |= TPM_CHIP_FLAG_TPM2;
+		proxy_dev->chip->flags |= TPM_CHIP_FLAG_TPM2 |
+					  TPM_CHIP_FLAG_NO_SHUTDOWN;
 
 	vtpm_proxy_work_start(proxy_dev);
 
