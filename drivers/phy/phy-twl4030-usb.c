@@ -723,7 +723,10 @@ static int twl4030_usb_probe(struct platform_device *pdev)
 		dev_err(&pdev->dev, "ldo init failed\n");
 		return err;
 	}
-	usb_add_phy_dev(&twl->phy);
+
+	err = usb_add_phy_dev(&twl->phy);
+	if (err)
+		return err;
 
 	platform_set_drvdata(pdev, twl);
 	if (device_create_file(&pdev->dev, &dev_attr_vbus))
