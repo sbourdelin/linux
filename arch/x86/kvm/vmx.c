@@ -9590,7 +9590,7 @@ static int nested_vmx_check_msr_bitmap_controls(struct kvm_vcpu *vcpu,
 	if (!nested_cpu_has(vmcs12, CPU_BASED_USE_MSR_BITMAPS))
 		return 0;
 
-	if (vmcs12_read_any(vcpu, MSR_BITMAP, &addr)) {
+	if (!cpu_has_vmx_msr_bitmap()) {
 		WARN_ON(1);
 		return -EINVAL;
 	}
