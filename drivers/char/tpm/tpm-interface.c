@@ -428,11 +428,11 @@ ssize_t tpm_transmit(struct tpm_chip *chip, struct tpm_space *space,
 		goto out;
 
 	rc = chip->ops->send(chip, (u8 *) buf, count);
-	if (rc < 0) {
+	if (rc < 0 && rc != -EPIPE)
 		dev_err(&chip->dev,
 			"tpm_transmit: tpm_send: error %d\n", rc);
+	if (rc < 0)
 		goto out;
-	}
 
 	if (chip->flags & TPM_CHIP_FLAG_IRQ)
 		goto out_recv;
