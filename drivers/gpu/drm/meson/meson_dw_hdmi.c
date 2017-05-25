@@ -537,7 +537,7 @@ static irqreturn_t dw_hdmi_top_thread_irq(int irq, void *dev_id)
 
 /* TOFIX Enable support for non-vic modes */
 static enum drm_mode_status dw_hdmi_mode_valid(struct drm_connector *connector,
-					       struct drm_display_mode *mode)
+					       const struct drm_display_mode *mode)
 {
 	unsigned int vclk_freq;
 	unsigned int venc_freq;
