@@ -356,6 +356,7 @@ static void ubifs_evict_inode(struct inode *inode)
 	if (inode->i_nlink)
 		goto done;
 
+	sb_start_intwrite(inode->i_sb);
 	if (is_bad_inode(inode))
 		goto out;
 
@@ -377,6 +378,7 @@ out:
 		c->bi.nospace = c->bi.nospace_rp = 0;
 		smp_wmb();
 	}
+	sb_end_intwrite(inode->i_sb);
 done:
 	clear_inode(inode);
 #ifdef CONFIG_UBIFS_FS_ENCRYPTION
@@ -484,6 +486,64 @@ static int ubifs_sync_fs(struct super_block *sb, int wait)
 		return err;
 
 	return ubi_sync(c->vi.ubi_num);
+}
+
+static int ubifs_freeze_super(struct super_block *sb)
+{
+	struct ubifs_info *c = sb->s_fs_info;
+	int err;
+
+	dbg_gen("starting");
+	/* freeze_super always succeeds if file system is in read-only.
+	 * however if there are errors, UBIFS is switched to read-only mode.
+	 * so @ro_error should be checked.
+	 */
+	err = freeze_super(sb);
+	if (!err && c->ro_error) {
+		thaw_super(sb);
+		return -EIO;
+	}
+	return err;
+}
+
+static int ubifs_freeze(struct super_block *sb)
+{
+	struct ubifs_info *c = sb->s_fs_info;
+	int ret;
+
+	if (c->ro_error)
+		return -EIO;
+
+	if (c->ro_mount)
+		return 0;
+
+	down_write(&c->commit_sem);
+	ret = ubifs_nothing_to_commit(c);
+	up_write(&c->commit_sem);
+
+	/* writes were blocked and ubifs_sync_fs was called before.
+	 * but TNC/LPT isn't guarranteed to be clean. because if commit was
+	 * already started before writes were blocked, TNC/LPT might have
+	 * COW nodes. so we try to commit again in this case.
+	 */
+	if (!ret) {
+		ret = ubifs_run_commit(c);
+		if (ret)
+			return ret;
+
+		down_write(&c->commit_sem);
+		ret = ubifs_nothing_to_commit(c);
+		up_write(&c->commit_sem);
+		if (!ret)
+			return -EINVAL;
+	}
+
+	return 0;
+}
+
+static int ubifs_unfreeze(struct super_block *sb)
+{
+	return 0;
 }
 
 /**
@@ -1888,6 +1948,9 @@ const struct super_operations ubifs_super_operations = {
 	.remount_fs    = ubifs_remount_fs,
 	.show_options  = ubifs_show_options,
 	.sync_fs       = ubifs_sync_fs,
+	.freeze_super  = ubifs_freeze_super,
+	.freeze_fs     = ubifs_freeze,
+	.unfreeze_fs   = ubifs_unfreeze,
 };
 
 /**

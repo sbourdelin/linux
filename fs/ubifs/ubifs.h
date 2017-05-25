@@ -1642,6 +1642,7 @@ int ubifs_run_commit(struct ubifs_info *c);
 void ubifs_recovery_commit(struct ubifs_info *c);
 int ubifs_gc_should_commit(struct ubifs_info *c);
 void ubifs_wait_for_commit(struct ubifs_info *c);
+int ubifs_nothing_to_commit(struct ubifs_info *c);
 
 /* master.c */
 int ubifs_read_master(struct ubifs_info *c);

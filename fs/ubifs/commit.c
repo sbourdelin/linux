@@ -49,7 +49,7 @@
 #include "ubifs.h"
 
 /*
- * nothing_to_commit - check if there is nothing to commit.
+ * ubifs_nothing_to_commit - check if there is nothing to commit.
  * @c: UBIFS file-system description object
  *
  * This is a helper function which checks if there is anything to commit. It is
@@ -65,7 +65,7 @@
  *
  * This function returns %1 if there is nothing to commit and %0 otherwise.
  */
-static int nothing_to_commit(struct ubifs_info *c)
+int ubifs_nothing_to_commit(struct ubifs_info *c)
 {
 	/*
 	 * During mounting or remounting from R/O mode to R/W mode we may
@@ -120,7 +120,7 @@ static int do_commit(struct ubifs_info *c)
 		goto out_up;
 	}
 
-	if (nothing_to_commit(c)) {
+	if (ubifs_nothing_to_commit(c)) {
 		up_write(&c->commit_sem);
 		err = 0;
 		goto out_cancel;
