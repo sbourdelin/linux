@@ -81,6 +81,11 @@
 static const char ibmvnic_driver_name[] = "ibmvnic";
 static const char ibmvnic_driver_string[] = "IBM System i/p Virtual NIC Driver";
 
+static bool large_send_offload;
+module_param(large_send_offload, bool, 0644);
+MODULE_PARM_DESC(large_send_offload,
+		 "Determines whether large send offload is enabled");
+
 MODULE_AUTHOR("Santiago Leon <santi_leon@yahoo.com>");
 MODULE_DESCRIPTION("IBM System i/p Virtual NIC Driver");
 MODULE_LICENSE("GPL");
@@ -996,6 +1001,17 @@ static int ibmvnic_xmit(struct sk_buff *skb, struct net_device *netdev)
 		goto out;
 	}
 
+	/* All scatter-gather SKB's will be linearized for the time being, but
+	 * scatter-gather is only enabled if the user wishes to use TSO.
+	 */
+	if (skb_shinfo(skb)->nr_frags && __skb_linearize(skb)) {
+		dev_kfree_skb_any(skb);
+		tx_send_failed++;
+		tx_dropped++;
+		ret = NETDEV_TX_OK;
+		goto out;
+	}
+
 	tx_pool = &adapter->tx_pool[queue_num];
 	tx_scrq = adapter->tx_scrq[queue_num];
 	txq = netdev_get_tx_queue(netdev, skb_get_queue_mapping(skb));
@@ -1051,6 +1067,11 @@ static int ibmvnic_xmit(struct sk_buff *skb, struct net_device *netdev)
 
 	if (skb->ip_summed == CHECKSUM_PARTIAL) {
 		tx_crq.v1.flags1 |= IBMVNIC_TX_CHKSUM_OFFLOAD;
+		hdrs += 2;
+	}
+	if (skb_is_gso(skb)) {
+		tx_crq.v1.flags1 |= IBMVNIC_TX_LSO;
+		tx_crq.v1.mss = cpu_to_be16(skb_shinfo(skb)->gso_size);
 		hdrs += 2;
 	}
 	/* determine if l2/3/4 headers are sent to firmware */
@@ -2586,10 +2607,10 @@ static void handle_query_ip_offload_rsp(struct ibmvnic_adapter *adapter)
 	adapter->ip_offload_ctrl.udp_ipv4_chksum = buf->udp_ipv4_chksum;
 	adapter->ip_offload_ctrl.tcp_ipv6_chksum = buf->tcp_ipv6_chksum;
 	adapter->ip_offload_ctrl.udp_ipv6_chksum = buf->udp_ipv6_chksum;
+	adapter->ip_offload_ctrl.large_tx_ipv4 = buf->large_tx_ipv4;
+	adapter->ip_offload_ctrl.large_tx_ipv6 = buf->large_tx_ipv6;
 
-	/* large_tx/rx disabled for now, additional features needed */
-	adapter->ip_offload_ctrl.large_tx_ipv4 = 0;
-	adapter->ip_offload_ctrl.large_tx_ipv6 = 0;
+	/* large_rx disabled for now, additional features needed */
 	adapter->ip_offload_ctrl.large_rx_ipv4 = 0;
 	adapter->ip_offload_ctrl.large_rx_ipv6 = 0;
 
@@ -2604,6 +2625,18 @@ static void handle_query_ip_offload_rsp(struct ibmvnic_adapter *adapter)
 	if ((adapter->netdev->features &
 	    (NETIF_F_IP_CSUM | NETIF_F_IPV6_CSUM)))
 		adapter->netdev->features |= NETIF_F_RXCSUM;
+
+	if (large_send_offload) {
+		/* Scatter-gather is not currently supported by firmware.
+		 * It will only be enabled to support TSO operations.
+		 */
+		adapter->netdev->features = NETIF_F_SG;
+
+		if (buf->large_tx_ipv4)
+			adapter->netdev->features |= NETIF_F_TSO;
+		if (buf->large_tx_ipv6)
+			adapter->netdev->features |= NETIF_F_TSO6;
+	}
 
 	memset(&crq, 0, sizeof(crq));
 	crq.control_ip_offload.first = IBMVNIC_CRQ_CMD;
