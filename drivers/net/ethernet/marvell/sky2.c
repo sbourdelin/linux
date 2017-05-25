@@ -2046,10 +2046,10 @@ static void sky2_tx_complete(struct sky2_port *sky2, u16 done)
 
 	netdev_completed_queue(dev, pkts_compl, bytes_compl);
 
-	u64_stats_update_begin(&sky2->tx_stats.syncp);
+	u64_stats_update_begin_raw(&sky2->tx_stats.syncp);
 	sky2->tx_stats.packets += pkts_compl;
 	sky2->tx_stats.bytes += bytes_compl;
-	u64_stats_update_end(&sky2->tx_stats.syncp);
+	u64_stats_update_end_raw(&sky2->tx_stats.syncp);
 }
 
 static void sky2_tx_reset(struct sky2_hw *hw, unsigned port)
@@ -2661,10 +2661,10 @@ static inline void sky2_rx_done(struct sky2_hw *hw, unsigned port,
 	if (packets == 0)
 		return;
 
-	u64_stats_update_begin(&sky2->rx_stats.syncp);
+	u64_stats_update_begin_raw(&sky2->rx_stats.syncp);
 	sky2->rx_stats.packets += packets;
 	sky2->rx_stats.bytes += bytes;
-	u64_stats_update_end(&sky2->rx_stats.syncp);
+	u64_stats_update_end_raw(&sky2->rx_stats.syncp);
 
 	sky2->last_rx = jiffies;
 	sky2_rx_update(netdev_priv(dev), rxqaddr[port]);
