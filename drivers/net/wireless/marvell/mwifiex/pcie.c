@@ -505,12 +505,10 @@ static int mwifiex_pm_wakeup_card_complete(struct mwifiex_adapter *adapter)
 }
 
 /*
- * This function disables the host interrupt.
- *
- * The host interrupt mask is read, the disable bit is reset and
- * written back to the card host interrupt mask register.
+ * This function masks the host interrupt. Effective only for legacy PCI
+ * interrupts.
  */
-static int mwifiex_pcie_disable_host_int(struct mwifiex_adapter *adapter)
+static int __mwifiex_pcie_disable_host_int(struct mwifiex_adapter *adapter)
 {
 	if (mwifiex_pcie_ok_to_access_hw(adapter)) {
 		if (mwifiex_write_reg(adapter, PCIE_HOST_INT_MASK,
@@ -525,18 +523,30 @@ static int mwifiex_pcie_disable_host_int(struct mwifiex_adapter *adapter)
 	return 0;
 }
 
-static void mwifiex_pcie_disable_host_int_noerr(struct mwifiex_adapter *adapter)
+/*
+ * Disable interrupts, synchronizing with any outstanding interrupts.
+ */
+static void mwifiex_pcie_disable_host_int(struct mwifiex_adapter *adapter)
 {
-	WARN_ON(mwifiex_pcie_disable_host_int(adapter));
+	struct pcie_service_card *card = adapter->card;
+	int i;
+
+	WARN_ON(__mwifiex_pcie_disable_host_int(adapter));
+
+	if (card->msix_enable) {
+		for (i = 0; i < MWIFIEX_NUM_MSIX_VECTORS; i++) {
+			disable_irq(card->msix_entries[i].vector);
+		}
+	} else {
+		disable_irq(card->dev->irq);
+	}
 }
 
 /*
- * This function enables the host interrupt.
- *
- * The host interrupt enable mask is written to the card
- * host interrupt mask register.
+ * This function unmasks the host interrupt. Effective only for legacy PCI
+ * interrupts.
  */
-static int mwifiex_pcie_enable_host_int(struct mwifiex_adapter *adapter)
+static int __mwifiex_pcie_enable_host_int(struct mwifiex_adapter *adapter)
 {
 	if (mwifiex_pcie_ok_to_access_hw(adapter)) {
 		/* Simply write the mask to the register */
@@ -546,6 +556,26 @@ static int mwifiex_pcie_enable_host_int(struct mwifiex_adapter *adapter)
 				    "Enable host interrupt failed\n");
 			return -1;
 		}
+	}
+
+	return 0;
+}
+
+static int mwifiex_pcie_enable_host_int(struct mwifiex_adapter *adapter)
+{
+	struct pcie_service_card *card = adapter->card;
+	int i, ret;
+
+	ret = __mwifiex_pcie_enable_host_int(adapter);
+	if (ret)
+		return ret;
+
+	if (card->msix_enable) {
+		for (i = 0; i < MWIFIEX_NUM_MSIX_VECTORS; i++) {
+			enable_irq(card->msix_entries[i].vector);
+		}
+	} else {
+		enable_irq(card->dev->irq);
 	}
 
 	return 0;
@@ -1738,7 +1768,7 @@ static int mwifiex_pcie_process_cmd_complete(struct mwifiex_adapter *adapter)
 			while (reg->sleep_cookie && (count++ < 10) &&
 			       mwifiex_pcie_ok_to_access_hw(adapter))
 				usleep_range(50, 60);
-			mwifiex_pcie_enable_host_int(adapter);
+			__mwifiex_pcie_enable_host_int(adapter);
 			mwifiex_process_sleep_confirm_resp(adapter, skb->data,
 							   skb->len);
 		} else {
@@ -2081,7 +2111,7 @@ static int mwifiex_prog_fw_w_helper(struct mwifiex_adapter *adapter,
 		    "info: Downloading FW image (%d bytes)\n",
 		    firmware_len);
 
-	if (mwifiex_pcie_disable_host_int(adapter)) {
+	if (__mwifiex_pcie_disable_host_int(adapter)) {
 		mwifiex_dbg(adapter, ERROR,
 			    "%s: Disabling interrupts failed.\n", __func__);
 		return -1;
@@ -2335,8 +2365,7 @@ static void mwifiex_interrupt_status(struct mwifiex_adapter *adapter,
 		if ((pcie_ireg == 0xFFFFFFFF) || !pcie_ireg)
 			return;
 
-
-		mwifiex_pcie_disable_host_int(adapter);
+		__mwifiex_pcie_disable_host_int(adapter);
 
 		/* Clear the pending interrupts */
 		if (mwifiex_write_reg(adapter, PCIE_HOST_INT_STATUS,
@@ -2386,9 +2415,6 @@ static irqreturn_t mwifiex_pcie_interrupt(int irq, void *context)
 		goto exit;
 	}
 	adapter = card->adapter;
-
-	if (adapter->surprise_removed)
-		goto exit;
 
 	if (card->msix_enable)
 		mwifiex_interrupt_status(adapter, ctx->msg_id);
@@ -2494,7 +2520,7 @@ static int mwifiex_process_pcie_int(struct mwifiex_adapter *adapter)
 		    "info: cmd_sent=%d data_sent=%d\n",
 		    adapter->cmd_sent, adapter->data_sent);
 	if (!card->msi_enable && adapter->ps_state != PS_STATE_SLEEP)
-		mwifiex_pcie_enable_host_int(adapter);
+		__mwifiex_pcie_enable_host_int(adapter);
 
 	return 0;
 }
@@ -3055,6 +3081,7 @@ static int mwifiex_pcie_request_irq(struct mwifiex_adapter *adapter)
 						  &card->msix_ctx[i]);
 				if (ret)
 					break;
+				disable_irq(card->msix_entries[i].vector);
 			}
 
 			if (ret) {
@@ -3087,6 +3114,7 @@ static int mwifiex_pcie_request_irq(struct mwifiex_adapter *adapter)
 		pr_err("request_irq failed: ret=%d\n", ret);
 		return -1;
 	}
+	disable_irq(pdev->irq);
 
 	return 0;
 }
@@ -3244,7 +3272,7 @@ static struct mwifiex_if_ops pcie_ops = {
 	.register_dev =			mwifiex_register_dev,
 	.unregister_dev =		mwifiex_unregister_dev,
 	.enable_int =			mwifiex_pcie_enable_host_int,
-	.disable_int =			mwifiex_pcie_disable_host_int_noerr,
+	.disable_int =			mwifiex_pcie_disable_host_int,
 	.process_int_status =		mwifiex_process_int_status,
 	.host_to_card =			mwifiex_pcie_host_to_card,
 	.wakeup =			mwifiex_pm_wakeup_card,
