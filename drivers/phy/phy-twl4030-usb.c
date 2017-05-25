@@ -499,7 +499,7 @@ static int twl4030_usb_ldo_init(struct twl4030_usb *twl)
 
 	twl->usb3v1 = devm_regulator_get(twl->dev, "usb3v1");
 	if (IS_ERR(twl->usb3v1))
-		return -ENODEV;
+		return PTR_ERR(twl->usb3v1);
 
 	twl_i2c_write_u8(TWL_MODULE_PM_RECEIVER, 0, VUSB3V1_TYPE);
 
@@ -508,7 +508,7 @@ static int twl4030_usb_ldo_init(struct twl4030_usb *twl)
 
 	twl->usb1v5 = devm_regulator_get(twl->dev, "usb1v5");
 	if (IS_ERR(twl->usb1v5))
-		return -ENODEV;
+		return PTR_ERR(twl->usb1v5);
 
 	twl_i2c_write_u8(TWL_MODULE_PM_RECEIVER, 0, VUSB1V5_TYPE);
 
@@ -517,7 +517,7 @@ static int twl4030_usb_ldo_init(struct twl4030_usb *twl)
 
 	twl->usb1v8 = devm_regulator_get(twl->dev, "usb1v8");
 	if (IS_ERR(twl->usb1v8))
-		return -ENODEV;
+		return PTR_ERR(twl->usb1v8);
 
 	twl_i2c_write_u8(TWL_MODULE_PM_RECEIVER, 0, VUSB1V8_TYPE);
 
