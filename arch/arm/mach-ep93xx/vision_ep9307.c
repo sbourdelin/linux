@@ -18,6 +18,7 @@
 #include <linux/platform_device.h>
 #include <linux/irq.h>
 #include <linux/gpio.h>
+#include <linux/gpio/machine.h>
 #include <linux/fb.h>
 #include <linux/io.h>
 #include <linux/mtd/partitions.h>
@@ -242,6 +243,19 @@ static struct spi_board_info vision_spi_board_info[] __initdata = {
 	},
 };
 
+static struct gpiod_lookup_table vision_gpios_table = {
+	.dev_id = "spi.0",
+	.table = {
+		GPIO_LOOKUP_IDX("gpio-ep93xx", EP93XX_GPIO_LINE_EGPIO6,
+				"spi-cs", 0, GPIO_ACTIVE_HIGH),
+		GPIO_LOOKUP_IDX("gpio-ep93xx", EP93XX_GPIO_LINE_EGPIO7,
+				"spi-cs", 1, GPIO_ACTIVE_HIGH),
+		GPIO_LOOKUP_IDX("gpio-ep93xx", EP93XX_GPIO_LINE_G(2),
+				"spi-cs", 2, GPIO_ACTIVE_HIGH),
+		{},
+	},
+};
+
 static int vision_spi_chipselects[] __initdata = {
 	EP93XX_GPIO_LINE_EGPIO6,
 	EP93XX_GPIO_LINE_EGPIO7,
@@ -291,6 +305,7 @@ static void __init vision_init_machine(void)
 
 	ep93xx_register_i2c(&vision_i2c_gpio_data, vision_i2c_info,
 				ARRAY_SIZE(vision_i2c_info));
+	gpiod_add_lookup_table(&vision_gpios_table);
 	ep93xx_register_spi(&vision_spi_master, vision_spi_board_info,
 				ARRAY_SIZE(vision_spi_board_info));
 	vision_register_i2s();

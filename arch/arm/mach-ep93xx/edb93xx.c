@@ -27,6 +27,8 @@
 #include <linux/kernel.h>
 #include <linux/init.h>
 #include <linux/platform_device.h>
+#include <linux/gpio.h>
+#include <linux/gpio/machine.h>
 #include <linux/i2c.h>
 #include <linux/i2c-gpio.h>
 #include <linux/spi/spi.h>
@@ -116,6 +118,15 @@ static struct spi_board_info edb93xx_spi_board_info[] __initdata = {
 	},
 };
 
+static struct gpiod_lookup_table edb93xx_gpios_table = {
+	.dev_id = "spi.0",
+	.table = {
+		GPIO_LOOKUP("gpio-ep93xx", EP93XX_GPIO_LINE_EGPIO6,
+			    "spi-cs", GPIO_ACTIVE_HIGH),
+		{},
+	},
+};
+
 static int edb93xx_spi_chipselects[] __initdata = {
 	EP93XX_GPIO_LINE_EGPIO6,
 };
@@ -134,6 +145,7 @@ static void __init edb93xx_register_spi(void)
 	else if (machine_is_edb9315a())
 		edb93xx_cs4271_data.gpio_nreset = EP93XX_GPIO_LINE_EGPIO14;
 
+	gpiod_add_lookup_table(&edb93xx_gpios_table);
 	ep93xx_register_spi(&edb93xx_spi_info, edb93xx_spi_board_info,
 			    ARRAY_SIZE(edb93xx_spi_board_info));
 }

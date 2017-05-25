@@ -26,6 +26,7 @@
 #include <linux/platform_data/video-ep93xx.h>
 #include <linux/platform_data/spi-ep93xx.h>
 #include <linux/gpio.h>
+#include <linux/gpio/machine.h>
 
 #include <mach/hardware.h>
 #include <mach/gpio-ep93xx.h>
@@ -119,6 +120,15 @@ static struct spi_board_info simone_spi_devices[] __initdata = {
  * low between multi-message command blocks. From v1.4, it uses a GPIO instead.
  * v1.3 parts will still work, since the signal on SFRMOUT is automatic.
  */
+static struct gpiod_lookup_table simone_gpios_table = {
+	.dev_id = "spi.0",
+	.table = {
+		GPIO_LOOKUP("gpio-ep93xx", EP93XX_GPIO_LINE_EGPIO1,
+			    "spi-cs", GPIO_ACTIVE_HIGH),
+		{},
+	},
+};
+
 static int simone_spi_chipselects[] __initdata = {
 	EP93XX_GPIO_LINE_EGPIO1,
 };
@@ -163,6 +173,7 @@ static void __init simone_init_machine(void)
 	ep93xx_register_fb(&simone_fb_info);
 	ep93xx_register_i2c(&simone_i2c_gpio_data, simone_i2c_board_info,
 			    ARRAY_SIZE(simone_i2c_board_info));
+	gpiod_add_lookup_table(&simone_gpios_table);
 	ep93xx_register_spi(&simone_spi_info, simone_spi_devices,
 			    ARRAY_SIZE(simone_spi_devices));
 	simone_register_audio();
