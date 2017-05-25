@@ -618,7 +618,7 @@ struct regmap *__regmap_init(struct device *dev,
 		goto err;
 
 	map = kzalloc(sizeof(*map), GFP_KERNEL);
-	if (map == NULL) {
+	if (!map) {
 		ret = -ENOMEM;
 		goto err;
 	}
@@ -918,7 +918,7 @@ struct regmap *__regmap_init(struct device *dev,
 		goto err_map;
 
 	map->work_buf = kzalloc(map->format.buf_size, GFP_KERNEL);
-	if (map->work_buf == NULL) {
+	if (!map->work_buf) {
 		ret = -ENOMEM;
 		goto err_map;
 	}
@@ -993,7 +993,7 @@ skip_format_initialization:
 		}
 
 		new = kzalloc(sizeof(*new), GFP_KERNEL);
-		if (new == NULL) {
+		if (!new) {
 			ret = -ENOMEM;
 			goto err_range;
 		}
@@ -1014,10 +1014,10 @@ skip_format_initialization:
 			goto err_range;
 		}
 
-		if (map->selector_work_buf == NULL) {
+		if (!map->selector_work_buf) {
 			map->selector_work_buf =
 				kzalloc(map->format.buf_size, GFP_KERNEL);
-			if (map->selector_work_buf == NULL) {
+			if (!map->selector_work_buf) {
 				ret = -ENOMEM;
 				goto err_range;
 			}
