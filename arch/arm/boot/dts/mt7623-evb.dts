@@ -13,7 +13,7 @@
  */
 
 /dts-v1/;
-#include "mt7623.dtsi"
+#include "mt7623-mt6323.dtsi"
 
 / {
 	model = "MediaTek MT7623 evaluation board";
