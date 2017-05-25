@@ -726,7 +726,7 @@ static int selinux_set_mnt_opts(struct super_block *sb,
 	 * will be used for both mounts)
 	 */
 	if ((sbsec->flags & SE_SBINITIALIZED) && (sb->s_type->fs_flags & FS_BINARY_MOUNTDATA)
-	    && (num_opts == 0))
+	    && (num_opts == 0) && !(kern_flags & SECURITY_LSM_NATIVE_LABELS))
 		goto out;
 
 	root_isec = backing_inode_security_novalidate(root);
@@ -793,7 +793,7 @@ static int selinux_set_mnt_opts(struct super_block *sb,
 		}
 	}
 
-	if (sbsec->flags & SE_SBINITIALIZED) {
+	if (sbsec->flags & SE_SBINITIALIZED && !(kern_flags & SECURITY_LSM_NATIVE_LABELS)) {
 		/* previously mounted with options, but not on this attempt? */
 		if ((sbsec->flags & SE_MNTMASK) && !num_opts)
 			goto out_double_mount;
