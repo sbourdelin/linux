@@ -1517,6 +1517,7 @@ static void btc8821a2ant_action_bt_inquiry(struct btc_coexist *btcoexist)
 	btc8821a2ant_sw_mechanism2(btcoexist, false, false, false, 0x18);
 }
 
+static
 void btc8821a2ant_action_wifi_link_process(struct btc_coexist *btcoexist)
 {
 	struct rtl_priv *rtlpriv = btcoexist->adapter;

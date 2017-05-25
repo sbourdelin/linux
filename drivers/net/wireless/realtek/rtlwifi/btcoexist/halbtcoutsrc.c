@@ -24,6 +24,7 @@
  ******************************************************************************/
 
 #include "halbt_precomp.h"
+#include "rtl_btc.h"
 
 /***********************************************
  *		Global variables
@@ -36,19 +37,6 @@ u32 btc_dbg_type[BTC_MSG_MAX];
 /***************************************************
  *		Debug related function
  ***************************************************/
-
-const char *const gl_btc_wifi_bw_string[] = {
-	"11bg",
-	"HT20",
-	"HT40",
-	"HT80",
-	"HT160"
-};
-
-const char *const gl_btc_wifi_freq_string[] = {
-	"2.4G",
-	"5G"
-};
 
 static bool halbtc_is_bt_coexist_available(struct btc_coexist *btcoexist)
 {
@@ -313,7 +301,7 @@ static u32 halbtc_get_bt_patch_version(struct btc_coexist *btcoexist)
 	return 0;
 }
 
-u32 halbtc_get_wifi_link_status(struct btc_coexist *btcoexist)
+static u32 halbtc_get_wifi_link_status(struct btc_coexist *btcoexist)
 {
 	/* return value:
 	 * [31:16] => connected port number
@@ -671,6 +659,7 @@ static void halbtc_write_4byte(void *bt_context, u32 reg_addr, u32 data)
 	rtl_write_dword(rtlpriv, reg_addr, data);
 }
 
+static
 void halbtc_write_local_reg_1byte(void *btc_context, u32 reg_addr, u8 data)
 {
 	struct btc_coexist *btcoexist = (struct btc_coexist *)btc_context;
@@ -682,22 +671,6 @@ void halbtc_write_local_reg_1byte(void *btc_context, u32 reg_addr, u8 data)
 		rtl_write_byte(rtlpriv, reg_addr, data);
 	else if (btcoexist->chip_interface == BTC_INTF_USB)
 		rtl_write_byte(rtlpriv, reg_addr, data);
-}
-
-void halbtc_set_macreg(void *btc_context, u32 reg_addr, u32 bit_mask, u32 data)
-{
-	struct btc_coexist *btcoexist = (struct btc_coexist *)btc_context;
-	struct rtl_priv *rtlpriv = btcoexist->adapter;
-
-	rtl_set_bbreg(rtlpriv->mac80211.hw, reg_addr, bit_mask, data);
-}
-
-u32 halbtc_get_macreg(void *btc_context, u32 reg_addr, u32 bit_mask)
-{
-	struct btc_coexist *btcoexist = (struct btc_coexist *)btc_context;
-	struct rtl_priv *rtlpriv = btcoexist->adapter;
-
-	return rtl_get_bbreg(rtlpriv->mac80211.hw, reg_addr, bit_mask);
 }
 
 static void halbtc_set_bbreg(void *bt_context, u32 reg_addr, u32 bit_mask,
@@ -745,6 +718,7 @@ static void halbtc_fill_h2c_cmd(void *bt_context, u8 element_id,
 					cmd_len, cmd_buf);
 }
 
+static
 void halbtc_set_bt_reg(void *btc_context, u8 reg_type, u32 offset, u32 set_val)
 {
 	struct btc_coexist *btcoexist = (struct btc_coexist *)btc_context;
@@ -776,7 +750,7 @@ void halbtc_set_bt_reg(void *btc_context, u8 reg_type, u32 offset, u32 set_val)
 	}
 }
 
-bool halbtc_under_ips(struct btc_coexist *btcoexist)
+static bool halbtc_under_ips(struct btc_coexist *btcoexist)
 {
 	struct rtl_priv *rtlpriv = btcoexist->adapter;
 	struct rtl_ps_ctl *ppsc = rtl_psc(rtlpriv);
@@ -882,34 +856,6 @@ bool exhalbtc_bind_bt_coex_withadapter(void *adapter)
 			 "[BTCoex], Package Type = Non-TFBGA\n");
 
 	return true;
-}
-
-void exhalbtc_power_on_setting(struct btc_coexist *btcoexist)
-{
-	if (!halbtc_is_bt_coexist_available(btcoexist))
-		return;
-
-	btcoexist->statistics.cnt_power_on++;
-
-	if (IS_HARDWARE_TYPE_8723B(btcoexist->adapter)) {
-		if (btcoexist->board_info.btdm_ant_num == 2)
-			ex_btc8723b2ant_power_on_setting(btcoexist);
-		else if (btcoexist->board_info.btdm_ant_num == 1)
-			ex_btc8723b1ant_power_on_setting(btcoexist);
-	}
-}
-
-void exhalbtc_pre_load_firmware(struct btc_coexist *btcoexist)
-{
-	if (!halbtc_is_bt_coexist_available(btcoexist))
-		return;
-
-	btcoexist->statistics.cnt_pre_load_firmware++;
-
-	if (IS_HARDWARE_TYPE_8723B(btcoexist->adapter)) {
-		if (btcoexist->board_info.btdm_ant_num == 2)
-			ex_btc8723b2ant_pre_load_firmware(btcoexist);
-	}
 }
 
 void exhalbtc_init_hw_config(struct btc_coexist *btcoexist)
@@ -1214,19 +1160,6 @@ void exhalbtc_bt_info_notify(struct btc_coexist *btcoexist,
 	halbtc_normal_low_power(btcoexist);
 }
 
-void exhalbtc_rf_status_notify(struct btc_coexist *btcoexist, u8 type)
-{
-	if (!halbtc_is_bt_coexist_available(btcoexist))
-		return;
-
-	if (IS_HARDWARE_TYPE_8821(btcoexist->adapter)) {
-	} else if (IS_HARDWARE_TYPE_8723B(btcoexist->adapter)) {
-		if (btcoexist->board_info.btdm_ant_num == 1)
-			ex_btc8723b1ant_rf_status_notify(btcoexist, type);
-	} else if (IS_HARDWARE_TYPE_8192E(btcoexist->adapter)) {
-	}
-}
-
 void exhalbtc_stack_operation_notify(struct btc_coexist *btcoexist, u8 type)
 {
 	u8 stack_op_type;
@@ -1360,13 +1293,6 @@ void exhalbtc_dbg_control(struct btc_coexist *btcoexist,
 	halbtc_leave_low_power(btcoexist);
 
 	halbtc_normal_low_power(btcoexist);
-}
-
-void exhalbtc_antenna_detection(struct btc_coexist *btcoexist, u32 cent_freq,
-				u32 offset, u32 span, u32 seconds)
-{
-	if (!halbtc_is_bt_coexist_available(btcoexist))
-		return;
 }
 
 void exhalbtc_stack_update_profile_info(void)

@@ -833,6 +833,7 @@ static void btc8723b2ant_set_sw_fulltime_dac_swing(struct btc_coexist *btcoex,
 		btc8723b2ant_set_dac_swing_reg(btcoex, 0x18);
 }
 
+static
 void btc8723b2ant_dac_swing(struct btc_coexist *btcoexist,
 			    bool force_exec, bool dac_swing_on,
 			    u32 dac_swing_lvl)
