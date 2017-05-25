@@ -16,18 +16,97 @@
 #include <asm/code-patching.h>
 #include <linux/uaccess.h>
 #include <linux/kprobes.h>
+#include <asm/pgtable.h>
+#include <asm/tlbflush.h>
 
+struct vm_struct *text_poke_area;
+static DEFINE_RAW_SPINLOCK(text_poke_lock);
+
+/*
+ * This is an early_initcall and early_initcalls happen at the right time
+ * for us, after slab is enabled and before we mark ro pages R/O. In the
+ * future if get_vm_area is randomized, this will be more flexible than
+ * fixmap
+ */
+static int __init setup_text_poke_area(void)
+{
+	text_poke_area = get_vm_area(PAGE_SIZE, VM_ALLOC);
+	if (!text_poke_area) {
+		WARN_ONCE(1, "could not create area for mapping kernel addrs"
+				" which allow for patching kernel code\n");
+		return 0;
+	}
+	pr_info("text_poke area ready...\n");
+	raw_spin_lock_init(&text_poke_lock);
+	return 0;
+}
+
+/*
+ * This can be called for kernel text or a module.
+ */
+static int kernel_map_addr(void *addr)
+{
+	unsigned long pfn;
+	int err;
+
+	if (is_vmalloc_addr(addr))
+		pfn = vmalloc_to_pfn(addr);
+	else
+		pfn = __pa_symbol(addr) >> PAGE_SHIFT;
+
+	err = map_kernel_page((unsigned long)text_poke_area->addr,
+			(pfn << PAGE_SHIFT), _PAGE_KERNEL_RW | _PAGE_PRESENT);
+	pr_devel("Mapped addr %p with pfn %lx\n", text_poke_area->addr, pfn);
+	if (err)
+		return -1;
+	return 0;
+}
+
+static inline void kernel_unmap_addr(void *addr)
+{
+	pte_t *pte;
+	unsigned long kaddr = (unsigned long)addr;
+
+	pte = pte_offset_kernel(pmd_offset(pud_offset(pgd_offset_k(kaddr),
+				kaddr), kaddr), kaddr);
+	pr_devel("clearing mm %p, pte %p, kaddr %lx\n", &init_mm, pte, kaddr);
+	pte_clear(&init_mm, kaddr, pte);
+}
 
 int patch_instruction(unsigned int *addr, unsigned int instr)
 {
 	int err;
+	unsigned int *dest = NULL;
+	unsigned long flags;
+	unsigned long kaddr = (unsigned long)addr;
 
-	__put_user_size(instr, addr, 4, err);
-	if (err)
-		return err;
-	asm ("dcbst 0, %0; sync; icbi 0,%0; sync; isync" : : "r" (addr));
-	return 0;
+	/*
+	 * During early early boot patch_instruction is called
+	 * when text_poke_area is not ready, but we still need
+	 * to allow patching. We just do the plain old patching
+	 */
+	if (!text_poke_area) {
+		__put_user_size(instr, addr, 4, err);
+		asm ("dcbst 0, %0; sync; icbi 0,%0; sync; isync" :: "r" (addr));
+		return 0;
+	}
+
+	raw_spin_lock_irqsave(&text_poke_lock, flags);
+	if (kernel_map_addr(addr)) {
+		err = -1;
+		goto out;
+	}
+
+	dest = (unsigned int *)(text_poke_area->addr) +
+		((kaddr & ~PAGE_MASK) / sizeof(unsigned int));
+	__put_user_size(instr, dest, 4, err);
+	asm ("dcbst 0, %0; sync; icbi 0,%0; sync; isync" :: "r" (dest));
+	kernel_unmap_addr(text_poke_area->addr);
+out:
+	raw_spin_unlock_irqrestore(&text_poke_lock, flags);
+	return err;
 }
+NOKPROBE_SYMBOL(patch_instruction);
 
 int patch_branch(unsigned int *addr, unsigned long target, int flags)
 {
@@ -514,3 +593,4 @@ static int __init test_code_patching(void)
 late_initcall(test_code_patching);
 
 #endif /* CONFIG_CODE_PATCHING_SELFTEST */
+early_initcall(setup_text_poke_area);
