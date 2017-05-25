@@ -127,13 +127,8 @@ static struct gpiod_lookup_table edb93xx_gpios_table = {
 	},
 };
 
-static int edb93xx_spi_chipselects[] __initdata = {
-	EP93XX_GPIO_LINE_EGPIO6,
-};
-
 static struct ep93xx_spi_info edb93xx_spi_info __initdata = {
-	.chipselect	= edb93xx_spi_chipselects,
-	.num_chipselect	= ARRAY_SIZE(edb93xx_spi_chipselects),
+	.num_chipselect	= 1,
 };
 
 static void __init edb93xx_register_spi(void)

@@ -129,13 +129,8 @@ static struct gpiod_lookup_table simone_gpios_table = {
 	},
 };
 
-static int simone_spi_chipselects[] __initdata = {
-	EP93XX_GPIO_LINE_EGPIO1,
-};
-
 static struct ep93xx_spi_info simone_spi_info __initdata = {
-	.chipselect	= simone_spi_chipselects,
-	.num_chipselect	= ARRAY_SIZE(simone_spi_chipselects),
+	.num_chipselect	= 1,
 	.use_dma = 1,
 };
 

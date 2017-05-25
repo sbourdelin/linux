@@ -256,15 +256,8 @@ static struct gpiod_lookup_table vision_gpios_table = {
 	},
 };
 
-static int vision_spi_chipselects[] __initdata = {
-	EP93XX_GPIO_LINE_EGPIO6,
-	EP93XX_GPIO_LINE_EGPIO7,
-	EP93XX_GPIO_LINE_G(2),
-};
-
 static struct ep93xx_spi_info vision_spi_master __initdata = {
-	.chipselect	= vision_spi_chipselects,
-	.num_chipselect	= ARRAY_SIZE(vision_spi_chipselects),
+	.num_chipselect	= 3,
 	.use_dma	= 1,
 };
 
