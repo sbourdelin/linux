@@ -18,6 +18,10 @@ struct indirect_pio_device_desc {
 	int (*pre_setup)(struct acpi_device *adev, void *pdata);
 };
 
+#ifdef CONFIG_HISILICON_LPC
+extern const struct indirect_pio_device_desc lpc_host_desc;
+#endif
+
 int acpi_set_logic_pio_resource(struct device *child,
 		struct device *hostdev);
 

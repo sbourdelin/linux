@@ -467,7 +467,9 @@ static int hisilpc_probe(struct platform_device *pdev)
 	}
 
 	/* register the LPC host PIO resources */
-	if (!has_acpi_companion(dev)) {
+	if (has_acpi_companion(dev)) {
+		lpcdev->io_host = find_io_range_by_fwnode(dev->fwnode);
+	} else {
 		struct logic_pio_hwaddr *range;
 
 		range = kzalloc(sizeof(*range), GFP_KERNEL);
@@ -481,13 +483,14 @@ static int hisilpc_probe(struct platform_device *pdev)
 		ret = logic_pio_register_range(range);
 		if (ret) {
 			kfree(range);
-			dev_err(dev, "OF: register IO range FAIL!\n");
+			dev_err(dev, "OF: logic_pio_register_range returned %d!\n",
+					ret);
 			return -ret;
 		}
 		lpcdev->io_host = range;
 	}
 	if (!lpcdev->io_host) {
-		dev_err(dev, "Hisilpc IO hasn't registered!\n");
+		dev_err(dev, "HiSi LPC IO hasn't been registered!\n");
 		return -EFAULT;
 	}
 
@@ -533,10 +536,72 @@ static const struct of_device_id hisilpc_of_match[] = {
 	{},
 };
 
+#ifdef CONFIG_ACPI
+#include <acpi/acpi_indirect_pio.h>
+
+struct lpc_private_data {
+	resource_size_t io_size;
+	resource_size_t io_start;
+};
+
+static struct lpc_private_data lpc_data = {
+	.io_size = LPC_BUS_IO_SIZE,
+	.io_start = LPC_MIN_BUS_RANGE,
+};
+
+static int lpc_host_io_setup(struct acpi_device *adev, void *pdata)
+{
+	int ret = 0;
+	struct logic_pio_hwaddr *range;
+	struct lpc_private_data *lpc_private;
+	struct acpi_device *child;
+
+	lpc_private = (struct lpc_private_data *)pdata;
+	range = kzalloc(sizeof(*range), GFP_KERNEL);
+	if (!range)
+		return -ENOMEM;
+	range->fwnode = &adev->fwnode;
+	range->flags = PIO_INDIRECT;
+	range->size = lpc_private->io_size;
+	range->hw_start = lpc_private->io_start;
+
+	ret = logic_pio_register_range(range);
+	if (ret) {
+		kfree(range);
+		return ret;
+	}
+
+	/* In HiSilicon lpc, only care about the children of the host. */
+	list_for_each_entry(child, &adev->children, node) {
+		ret = acpi_set_logic_pio_resource(&child->dev, &adev->dev);
+		if (ret) {
+			dev_err(&child->dev,
+					"acpi_set_logic_pio_resource() returned %d\n",
+					ret);
+			return ret;
+		}
+	}
+
+	return ret;
+}
+
+static const struct acpi_device_id hisilpc_acpi_match[] = {
+	{"HISI0191", },
+	{},
+};
+
+const struct indirect_pio_device_desc lpc_host_desc = {
+	.pdata = &lpc_data,
+	.pre_setup = lpc_host_io_setup,
+};
+
+#endif
+
 static struct platform_driver hisilpc_driver = {
 	.driver = {
 		.name           = "hisi_lpc",
 		.of_match_table = hisilpc_of_match,
+		.acpi_match_table = ACPI_PTR(hisilpc_acpi_match),
 	},
 	.probe = hisilpc_probe,
 };

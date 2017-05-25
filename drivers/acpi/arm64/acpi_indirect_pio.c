@@ -261,6 +261,9 @@ int acpi_set_logic_pio_resource(struct device *child,
 
 /* All the host devices which apply indirect-PIO can be listed here. */
 static const struct acpi_device_id acpi_indirect_host_id[] = {
+#ifdef CONFIG_HISILICON_LPC
+	{"HISI0191", INDIRECT_PIO_INFO(lpc_host_desc)},
+#endif
 	{""},
 };
 
