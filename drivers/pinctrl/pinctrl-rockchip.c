@@ -187,6 +187,20 @@ struct rockchip_pin_bank {
 		},					\
 	}
 
+#define PIN_BANK_ROUTE(id, pins, label, route)		\
+	{						\
+		.bank_num	= id,			\
+		.nr_pins	= pins,			\
+		.name		= label,		\
+		.route_mask	= route,		\
+		.iomux		= {			\
+			{ .offset = -1 },		\
+			{ .offset = -1 },		\
+			{ .offset = -1 },		\
+			{ .offset = -1 },		\
+		},					\
+	}
+
 #define PIN_BANK_IOMUX_FLAGS(id, pins, label, iom0, iom1, iom2, iom3)	\
 	{								\
 		.bank_num	= id,					\
@@ -603,6 +617,159 @@ static void rk3328_recalc_mux(u8 bank_num, int pin, int *reg,
 	*reg = data->reg;
 	*mask = data->mask;
 	*bit = data->bit;
+}
+
+static const struct rockchip_mux_route_data  rk3228_mux_route_data[] = {
+	{
+		/* pwm0-0 */
+		.bank = 0,
+		.pin = 26,
+		.func = 1,
+		.route_offset = 0x50,
+		.route_val = BIT(16),
+	}, {
+		/* pwm0-1 */
+		.bank = 3,
+		.pin = 21,
+		.func = 1,
+		.route_offset = 0x50,
+		.route_val = BIT(16) | BIT(0),
+	}, {
+		/* pwm1-0 */
+		.bank = 0,
+		.pin = 27,
+		.func = 1,
+		.route_offset = 0x50,
+		.route_val = BIT(16 + 1),
+	}, {
+		/* pwm1-1 */
+		.bank = 0,
+		.pin = 30,
+		.func = 2,
+		.route_offset = 0x50,
+		.route_val = BIT(16 + 1) | BIT(1),
+	}, {
+		/* pwm2-0 */
+		.bank = 0,
+		.pin = 28,
+		.func = 1,
+		.route_offset = 0x50,
+		.route_val = BIT(16 + 2),
+	}, {
+		/* pwm2-1 */
+		.bank = 1,
+		.pin = 12,
+		.func = 2,
+		.route_offset = 0x50,
+		.route_val = BIT(16 + 2) | BIT(2),
+	}, {
+		/* pwm3-0 */
+		.bank = 3,
+		.pin = 26,
+		.func = 1,
+		.route_offset = 0x50,
+		.route_val = BIT(16 + 3),
+	}, {
+		/* pwm3-1 */
+		.bank = 1,
+		.pin = 11,
+		.func = 2,
+		.route_offset = 0x50,
+		.route_val = BIT(16 + 3) | BIT(3),
+	}, {
+		/* sdio-0_d0 */
+		.bank = 1,
+		.pin = 1,
+		.func = 1,
+		.route_offset = 0x50,
+		.route_val = BIT(16 + 4),
+	}, {
+		/* sdio-1_d0 */
+		.bank = 3,
+		.pin = 2,
+		.func = 1,
+		.route_offset = 0x50,
+		.route_val = BIT(16 + 4) | BIT(4),
+	}, {
+		/* spi-0_rx */
+		.bank = 0,
+		.pin = 13,
+		.func = 2,
+		.route_offset = 0x50,
+		.route_val = BIT(16 + 5),
+	}, {
+		/* spi-1_rx */
+		.bank = 2,
+		.pin = 0,
+		.func = 2,
+		.route_offset = 0x50,
+		.route_val = BIT(16 + 5) | BIT(5),
+	}, {
+		/* emmc-0_cmd */
+		.bank = 1,
+		.pin = 22,
+		.func = 2,
+		.route_offset = 0x50,
+		.route_val = BIT(16 + 7),
+	}, {
+		/* emmc-1_cmd */
+		.bank = 2,
+		.pin = 4,
+		.func = 2,
+		.route_offset = 0x50,
+		.route_val = BIT(16 + 7) | BIT(7),
+	}, {
+		/* uart2-0_rx */
+		.bank = 1,
+		.pin = 19,
+		.func = 2,
+		.route_offset = 0x50,
+		.route_val = BIT(16 + 8),
+	}, {
+		/* uart2-1_rx */
+		.bank = 1,
+		.pin = 10,
+		.func = 2,
+		.route_offset = 0x50,
+		.route_val = BIT(16 + 8) | BIT(8),
+	}, {
+		/* uart1-0_rx */
+		.bank = 1,
+		.pin = 10,
+		.func = 1,
+		.route_offset = 0x50,
+		.route_val = BIT(16 + 11),
+	}, {
+		/* uart1-1_rx */
+		.bank = 3,
+		.pin = 13,
+		.func = 1,
+		.route_offset = 0x50,
+		.route_val = BIT(16 + 11) | BIT(11),
+	},
+};
+
+static bool rk3228_set_mux_route(u8 bank_num, int pin,
+				 int mux, u32 *reg, u32 *value)
+{
+	const struct rockchip_mux_route_data *data = NULL;
+	int i;
+
+	for (i = 0; i < ARRAY_SIZE(rk3228_mux_route_data); i++)
+		if ((rk3228_mux_route_data[i].bank == bank_num) &&
+		    (rk3228_mux_route_data[i].pin == pin) &&
+		    (rk3228_mux_route_data[i].func == mux)) {
+			data = &rk3228_mux_route_data[i];
+			break;
+		}
+
+	if (!data)
+		return false;
+
+	*reg = data->route_offset;
+	*value = data->route_val;
+
+	return true;
 }
 
 static int rockchip_get_mux(struct rockchip_pin_bank *bank, int pin)
@@ -2852,10 +3019,10 @@ static struct rockchip_pin_ctrl rk3188_pin_ctrl = {
 };
 
 static struct rockchip_pin_bank rk3228_pin_banks[] = {
-	PIN_BANK(0, 32, "gpio0"),
-	PIN_BANK(1, 32, "gpio1"),
-	PIN_BANK(2, 32, "gpio2"),
-	PIN_BANK(3, 32, "gpio3"),
+	PIN_BANK_ROUTE(0, 32, "gpio0", 0x5c002000),
+	PIN_BANK_ROUTE(1, 32, "gpio1", 0x00483c02),
+	PIN_BANK_ROUTE(2, 32, "gpio2", 0x00000011),
+	PIN_BANK_ROUTE(3, 32, "gpio3", 0x04202004),
 };
 
 static struct rockchip_pin_ctrl rk3228_pin_ctrl = {
@@ -2866,6 +3033,7 @@ static struct rockchip_pin_ctrl rk3228_pin_ctrl = {
 		.grf_mux_offset		= 0x0,
 		.pull_calc_reg		= rk3228_calc_pull_reg_and_bit,
 		.drv_calc_reg		= rk3228_calc_drv_reg_and_bit,
+		.iomux_route		= rk3228_set_mux_route,
 };
 
 static struct rockchip_pin_bank rk3288_pin_banks[] = {
