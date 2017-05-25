@@ -1613,7 +1613,7 @@ static void btc8821a1ant_act_wifi_con_bt_acl_busy(struct btc_coexist *btcoexist,
 			btc8821a1ant_coex_table_with_type(btcoexist,
 							  NORMAL_EXEC, 1);
 			coex_dm->auto_tdma_adjust = false;
-		} else if ((bt_rssi_state != BTC_RSSI_STATE_HIGH) &&
+		} else if ((bt_rssi_state == BTC_RSSI_STATE_HIGH) ||
 			   (bt_rssi_state == BTC_RSSI_STATE_STAY_HIGH)) {
 			btc8821a1ant_ps_tdma(btcoexist, NORMAL_EXEC, true, 14);
 			btc8821a1ant_coex_table_with_type(btcoexist,
