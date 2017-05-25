@@ -3078,6 +3078,8 @@ int btrfs_find_name_in_ext_backref(struct btrfs_path *path,
 				   int name_len,
 				   struct btrfs_inode_extref **extref_ret);
 
+u16 btrfs_check_namelen(struct extent_buffer *leaf, int slot,
+			unsigned long start, u32 namelen);
 /* file-item.c */
 struct btrfs_dio_private;
 int btrfs_del_csums(struct btrfs_trans_handle *trans,

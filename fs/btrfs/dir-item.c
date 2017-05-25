@@ -484,3 +484,25 @@ int verify_dir_item(struct btrfs_fs_info *fs_info,
 
 	return 0;
 }
+
+/*
+ * Returns >0: the value @namelen after cut according item boundary
+ * Returns  0: on error
+ */
+u16 btrfs_check_namelen(struct extent_buffer *leaf, int slot,
+			unsigned long start, u32 namelen)
+{
+	u32 end;
+	u64 ret = namelen;
+
+	end = btrfs_leaf_data(leaf) + btrfs_item_end_nr(leaf, slot);
+
+	if (start > end)
+		return 0;
+	if (start + namelen > end) {
+		ret = end - start;
+		if (ret > U16_MAX)
+			ret = 0;
+	}
+	return ret;
+}
