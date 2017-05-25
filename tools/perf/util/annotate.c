@@ -257,10 +257,18 @@ static int jump__parse(struct arch *arch __maybe_unused, struct ins_operands *op
 static int jump__scnprintf(struct ins *ins, char *bf, size_t size,
 			   struct ins_operands *ops)
 {
+	const char *c = strchr(ops->raw, ',');
+
 	if (!ops->target.addr || ops->target.offset < 0)
 		return ins__raw_scnprintf(ins, bf, size, ops);
 
-	return scnprintf(bf, size, "%-6.6s %" PRIx64, ins->name, ops->target.offset);
+	if (c++ != NULL)
+		return scnprintf(bf, size, "%-6.6s %.*s%" PRIx64,
+			ins->name, c - ops->raw, ops->raw,
+			ops->target.offset);
+	else
+		return scnprintf(bf, size, "%-6.6s %" PRIx64,
+			ins->name, ops->target.offset);
 }
 
 static struct ins_ops jump_ops = {
