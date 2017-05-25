@@ -2113,12 +2113,6 @@ static int mwifiex_prog_fw_w_helper(struct mwifiex_adapter *adapter,
 		    "info: Downloading FW image (%d bytes)\n",
 		    firmware_len);
 
-	if (__mwifiex_pcie_disable_host_int(adapter)) {
-		mwifiex_dbg(adapter, ERROR,
-			    "%s: Disabling interrupts failed.\n", __func__);
-		return -1;
-	}
-
 	skb = dev_alloc_skb(MWIFIEX_UPLD_SIZE);
 	if (!skb) {
 		ret = -ENOMEM;
