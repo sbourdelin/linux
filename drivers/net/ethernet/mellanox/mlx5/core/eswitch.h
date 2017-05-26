@@ -348,6 +348,7 @@ int mlx5_devlink_eswitch_inline_mode_get(struct devlink *devlink, u8 *mode);
 int mlx5_eswitch_inline_mode_get(struct mlx5_eswitch *esw, int nvfs, u8 *mode);
 int mlx5_devlink_eswitch_encap_mode_set(struct devlink *devlink, u8 encap);
 int mlx5_devlink_eswitch_encap_mode_get(struct devlink *devlink, u8 *encap);
+#ifdef CONFIG_MLX5_EN_ESWITCH_OFFLOADS
 void mlx5_eswitch_register_vport_rep(struct mlx5_eswitch *esw,
 				     int vport_index,
 				     struct mlx5_eswitch_rep *rep);
@@ -355,12 +356,29 @@ void mlx5_eswitch_unregister_vport_rep(struct mlx5_eswitch *esw,
 				       int vport_index);
 struct net_device *mlx5_eswitch_get_uplink_netdev(struct mlx5_eswitch *esw);
 
-#ifdef CONFIG_MLX5_EN_ESWITCH_OFFLOADS
 int mlx5_eswitch_add_vlan_action(struct mlx5_eswitch *esw,
 				 struct mlx5_esw_flow_attr *attr);
 int mlx5_eswitch_del_vlan_action(struct mlx5_eswitch *esw,
 				 struct mlx5_esw_flow_attr *attr);
 #else
+static inline void
+mlx5_eswitch_register_vport_rep(struct mlx5_eswitch *esw, int vport_index,
+				struct mlx5_eswitch_rep *rep)
+{
+	return;
+}
+static inline void
+mlx5_eswitch_unregister_vport_rep(struct mlx5_eswitch *esw, int vport_index)
+{
+	return;
+}
+
+static inline struct net_device *
+mlx5_eswitch_get_uplink_netdev(struct mlx5_eswitch *esw)
+{
+	return NULL;
+}
+
 static inline int mlx5_eswitch_add_vlan_action(struct mlx5_eswitch *esw,
 					       struct mlx5_esw_flow_attr *attr)
 {

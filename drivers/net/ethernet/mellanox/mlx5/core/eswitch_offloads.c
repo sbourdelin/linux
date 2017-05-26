@@ -1126,6 +1126,7 @@ int mlx5_devlink_eswitch_encap_mode_get(struct devlink *devlink, u8 *encap)
 	return 0;
 }
 
+#ifdef CONFIG_MLX5_EN_ESWITCH_OFFLOADS
 void mlx5_eswitch_register_vport_rep(struct mlx5_eswitch *esw,
 				     int vport_index,
 				     struct mlx5_eswitch_rep *__rep)
@@ -1170,3 +1171,4 @@ struct net_device *mlx5_eswitch_get_uplink_netdev(struct mlx5_eswitch *esw)
 	rep = &offloads->vport_reps[UPLINK_REP_INDEX];
 	return rep->netdev;
 }
+#endif
