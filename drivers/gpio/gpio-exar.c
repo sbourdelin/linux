@@ -51,11 +51,11 @@ static void exar_update(struct gpio_chip *chip, unsigned int reg, int val,
 static int exar_set_direction(struct gpio_chip *chip, int direction,
 			      unsigned int offset)
 {
-	unsigned int bank = offset / 8;
-	unsigned int addr;
+	unsigned int addr = offset / 8 ?
+		EXAR_OFFSET_MPIOSEL_HI : EXAR_OFFSET_MPIOSEL_LO;
+	unsigned int bit  = offset % 8;
 
-	addr = bank ? EXAR_OFFSET_MPIOSEL_HI : EXAR_OFFSET_MPIOSEL_LO;
-	exar_update(chip, addr, direction, offset % 8);
+	exar_update(chip, addr, direction, bit);
 	return 0;
 }
 
@@ -73,36 +73,30 @@ static int exar_get(struct gpio_chip *chip, unsigned int reg)
 
 static int exar_get_direction(struct gpio_chip *chip, unsigned int offset)
 {
-	unsigned int bank = offset / 8;
-	unsigned int addr;
-	int val;
+	unsigned int addr = offset / 8 ?
+		EXAR_OFFSET_MPIOSEL_HI : EXAR_OFFSET_MPIOSEL_LO;
+	unsigned int bit  = offset % 8;
 
-	addr = bank ? EXAR_OFFSET_MPIOSEL_HI : EXAR_OFFSET_MPIOSEL_LO;
-	val = exar_get(chip, addr) & BIT(offset % 8);
-
-	return !!val;
+	return !!(exar_get(chip, addr) & BIT(bit));
 }
 
 static int exar_get_value(struct gpio_chip *chip, unsigned int offset)
 {
-	unsigned int bank = offset / 8;
-	unsigned int addr;
-	int val;
+	unsigned int addr = offset / 8 ?
+		EXAR_OFFSET_MPIOLVL_HI : EXAR_OFFSET_MPIOLVL_LO;
+	unsigned int bit  = offset % 8;
 
-	addr = bank ? EXAR_OFFSET_MPIOLVL_HI : EXAR_OFFSET_MPIOLVL_LO;
-	val = exar_get(chip, addr) & BIT(offset % 8);
-
-	return !!val;
+	return !!(exar_get(chip, addr) & BIT(bit));
 }
 
 static void exar_set_value(struct gpio_chip *chip, unsigned int offset,
 			   int value)
 {
-	unsigned int bank = offset / 8;
-	unsigned int addr;
+	unsigned int addr = offset / 8 ?
+		EXAR_OFFSET_MPIOLVL_HI : EXAR_OFFSET_MPIOLVL_LO;
+	unsigned int bit  = offset % 8;
 
-	addr = bank ? EXAR_OFFSET_MPIOLVL_HI : EXAR_OFFSET_MPIOLVL_LO;
-	exar_update(chip, addr, value, offset % 8);
+	exar_update(chip, addr, value, bit);
 }
 
 static int exar_direction_output(struct gpio_chip *chip, unsigned int offset,
