@@ -14,9 +14,14 @@
 
 /* Registers used by JIT */
 #define MIPS_R_ZERO	0
+#define MIPS_R_AT	1
 #define MIPS_R_V0	2
+#define MIPS_R_V1	3
 #define MIPS_R_A0	4
 #define MIPS_R_A1	5
+#define MIPS_R_A2	6
+#define MIPS_R_A3	7
+#define MIPS_R_A4	8
 #define MIPS_R_T4	12
 #define MIPS_R_T5	13
 #define MIPS_R_T6	14
@@ -29,6 +34,8 @@
 #define MIPS_R_S5	21
 #define MIPS_R_S6	22
 #define MIPS_R_S7	23
+#define MIPS_R_T8	24
+#define MIPS_R_T9	25
 #define MIPS_R_SP	29
 #define MIPS_R_RA	31
 
