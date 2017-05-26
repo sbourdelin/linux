@@ -148,17 +148,18 @@ void __ndisc_fill_addr_option(struct sk_buff *skb, int type, void *data,
 
 	opt[0] = type;
 	opt[1] = space>>3;
+	opt   += 2;
+	space -= 2;
 
-	memset(opt + 2, 0, pad);
+	memset(opt, 0, pad);
 	opt   += pad;
 	space -= pad;
 
-	memcpy(opt+2, data, data_len);
-	data_len += 2;
+	memcpy(opt, data, data_len);
 	opt += data_len;
 	space -= data_len;
-	if (space > 0)
-		memset(opt, 0, space);
+
+	memset(opt, 0, space);
 }
 EXPORT_SYMBOL_GPL(__ndisc_fill_addr_option);
 
