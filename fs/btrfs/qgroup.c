@@ -1247,8 +1247,51 @@ int btrfs_del_qgroup_relation(struct btrfs_trans_handle *trans,
 	return ret;
 }
 
+/*
+ * Meant to only operate on level-0 qroupid.
+ *
+ * It returns 1 if a matching subvolume is found; 0 if none is found.
+ * < 0 if there is an error.
+ */
+static int btrfs_subvolume_exists(struct btrfs_fs_info *fs_info, u64 qgroupid)
+{
+	struct btrfs_path *path;
+	struct btrfs_key key;
+	int err, ret = 0;
+
+	if (qgroupid == BTRFS_FS_TREE_OBJECTID)
+		return 1;
+
+	path = btrfs_alloc_path();
+	if (!path)
+		return -ENOMEM;
+
+	key.objectid = qgroupid;
+	key.type = BTRFS_ROOT_BACKREF_KEY;
+	key.offset = 0;
+
+	err = btrfs_search_slot_for_read(fs_info->tree_root, &key, path, 1, 0);
+	if (err == 1)
+		goto out;
+
+	if (err) {
+		ret = err;
+		goto out;
+	}
+
+	btrfs_item_key_to_cpu(path->nodes[0], &key, path->slots[0]);
+	if (key.objectid != qgroupid || key.type != BTRFS_ROOT_BACKREF_KEY)
+		goto out;
+
+	ret = 1;
+out:
+	btrfs_free_path(path);
+	return ret;
+}
+
 int btrfs_create_qgroup(struct btrfs_trans_handle *trans,
-			struct btrfs_fs_info *fs_info, u64 qgroupid)
+			struct btrfs_fs_info *fs_info, u64 qgroupid,
+			int check_subvol_exists)
 {
 	struct btrfs_root *quota_root;
 	struct btrfs_qgroup *qgroup;
@@ -1260,10 +1303,21 @@ int btrfs_create_qgroup(struct btrfs_trans_handle *trans,
 		ret = -EINVAL;
 		goto out;
 	}
+
 	qgroup = find_qgroup_rb(fs_info, qgroupid);
 	if (qgroup) {
 		ret = -EEXIST;
 		goto out;
+	}
+
+	if (check_subvol_exists && btrfs_qgroup_level(qgroupid) == 0) {
+		ret = btrfs_subvolume_exists(fs_info, qgroupid);
+		if (ret < 0)
+			goto out;
+		if (!ret) {
+			ret = -ENOENT;
+			goto out;
+		}
 	}
 
 	ret = add_qgroup_item(trans, quota_root, qgroupid);
@@ -1282,7 +1336,8 @@ out:
 }
 
 int btrfs_remove_qgroup(struct btrfs_trans_handle *trans,
-			struct btrfs_fs_info *fs_info, u64 qgroupid)
+			struct btrfs_fs_info *fs_info, u64 qgroupid,
+			int check_subvol_exists)
 {
 	struct btrfs_root *quota_root;
 	struct btrfs_qgroup *qgroup;
@@ -1300,13 +1355,24 @@ int btrfs_remove_qgroup(struct btrfs_trans_handle *trans,
 	if (!qgroup) {
 		ret = -ENOENT;
 		goto out;
-	} else {
-		/* check if there are no children of this qgroup */
-		if (!list_empty(&qgroup->members)) {
+	}
+
+	if (check_subvol_exists && btrfs_qgroup_level(qgroupid) == 0) {
+		ret = btrfs_subvolume_exists(fs_info, qgroupid);
+		if (ret < 0)
+			goto out;
+		if (ret) {
 			ret = -EBUSY;
 			goto out;
 		}
 	}
+
+	/* check if there are no children of this qgroup */
+	if (!list_empty(&qgroup->members)) {
+		ret = -EBUSY;
+		goto out;
+	}
+
 	ret = del_qgroup_item(trans, quota_root, qgroupid);
 
 	if (ret && ret != -ENOENT)

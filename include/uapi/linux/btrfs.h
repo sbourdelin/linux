@@ -653,6 +653,24 @@ struct btrfs_ioctl_qgroup_create_args {
 	__u64 create;
 	__u64 qgroupid;
 };
+
+struct btrfs_ioctl_qgroup_create_args_v2 {
+	__u64 qgroupid;
+	__u64 flags;
+	__u64 reserved[16];
+};
+
+/*
+ * Allows for the deletion of qgroups even if they are associated with active
+ * volumes.
+ */
+#define BTRFS_QGROUP_NO_SUBVOL_CHECK	(1ULL << 0)
+struct btrfs_ioctl_qgroup_remove_args_v2 {
+	__u64 qgroupid;
+	__u64 flags;
+	__u64 reserved[16];
+};
+
 struct btrfs_ioctl_timespec {
 	__u64 sec;
 	__u32 nsec;
@@ -818,5 +836,9 @@ enum btrfs_err_code {
 				   struct btrfs_ioctl_feature_flags[3])
 #define BTRFS_IOC_RM_DEV_V2 _IOW(BTRFS_IOCTL_MAGIC, 58, \
 				   struct btrfs_ioctl_vol_args_v2)
+#define BTRFS_IOC_QGROUP_CREATE_V2 _IOW(BTRFS_IOCTL_MAGIC, 59, \
+					struct btrfs_ioctl_qgroup_create_args_v2)
+#define BTRFS_IOC_QGROUP_REMOVE_V2 _IOW(BTRFS_IOCTL_MAGIC, 60, \
+					struct btrfs_ioctl_qgroup_remove_args_v2)
 
 #endif /* _UAPI_LINUX_BTRFS_H */
