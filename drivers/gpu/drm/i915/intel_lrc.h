@@ -62,6 +62,8 @@ enum {
 	INTEL_CONTEXT_SCHEDULE_OUT,
 };
 
+struct sseu_dev_info;
+
 /* Logical Rings */
 void intel_logical_ring_stop(struct intel_engine_cs *engine);
 void intel_logical_ring_cleanup(struct intel_engine_cs *engine);
