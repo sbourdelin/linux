@@ -168,8 +168,6 @@ void blk_mq_quiesce_queue(struct request_queue *q)
 	unsigned int i;
 	bool rcu = false;
 
-	__blk_mq_stop_hw_queues(q, true);
-
 	spin_lock_irq(q->queue_lock);
 	queue_flag_set(QUEUE_FLAG_QUIESCED, q);
 	spin_unlock_irq(q->queue_lock);
@@ -198,7 +196,12 @@ void blk_mq_unquiesce_queue(struct request_queue *q)
 	queue_flag_clear(QUEUE_FLAG_QUIESCED, q);
 	spin_unlock_irq(q->queue_lock);
 
-	blk_mq_start_stopped_hw_queues(q, true);
+	/*
+	 * During quiescing, requests can be inserted
+	 * to scheduler queue or sw queue, so we run
+	 * queues for dispatching these requests.
+	 */
+	blk_mq_start_hw_queues(q);
 }
 EXPORT_SYMBOL_GPL(blk_mq_unquiesce_queue);
 
