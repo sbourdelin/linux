@@ -255,6 +255,7 @@ static inline void free_thread_stack(struct task_struct *tsk)
 
 			this_cpu_write(cached_stacks[i], tsk->stack_vm_area);
 			local_irq_restore(flags);
+			kmemleak_not_leak(tsk->stack);
 			return;
 		}
 		local_irq_restore(flags);
