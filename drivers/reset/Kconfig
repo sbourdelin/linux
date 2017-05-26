@@ -28,6 +28,12 @@ config RESET_ATH79
 	  This enables the ATH79 reset controller driver that supports the
 	  AR71xx SoC reset controller.
 
+config RESET_BASIC
+	bool "Basic Reset Driver"
+	help
+	  This enables a basic single-register reset controller driver that
+	  supports clearing a single bit in a register.
+
 config RESET_BERLIN
 	bool "Berlin Reset Driver" if COMPILE_TEST
 	default ARCH_BERLIN
