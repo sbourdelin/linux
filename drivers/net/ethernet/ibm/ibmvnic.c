@@ -149,6 +149,20 @@ static const struct ibmvnic_stat ibmvnic_stats[] = {
 	{"internal_mac_rx_errors", IBMVNIC_STAT_OFF(internal_mac_rx_errors)},
 };
 
+static netdev_features_t ibmvnic_fix_features(struct net_device *dev,
+					      netdev_features_t features)
+{
+	/* Scatter-gather is not currently supported by firmware.
+	 * It will only be enabled to support TSO operations.
+	 */
+	if (!(features & (NETIF_F_TSO | NETIF_F_TSO6)))
+		features &= ~NETIF_F_SG;
+	else
+		features |= NETIF_F_SG;
+
+	return features;
+}
+
 static long h_reg_sub_crq(unsigned long unit_address, unsigned long token,
 			  unsigned long length, unsigned long *number,
 			  unsigned long *irq)
@@ -996,6 +1010,17 @@ static int ibmvnic_xmit(struct sk_buff *skb, struct net_device *netdev)
 		goto out;
 	}
 
+	/* All scatter-gather SKB's will be linearized for the time being, but
+	 * scatter-gather is only enabled if the user wishes to use TSO.
+	 */
+	if (skb_shinfo(skb)->nr_frags && __skb_linearize(skb)) {
+		dev_kfree_skb_any(skb);
+		tx_send_failed++;
+		tx_dropped++;
+		ret = NETDEV_TX_OK;
+		goto out;
+	}
+
 	tx_pool = &adapter->tx_pool[queue_num];
 	tx_scrq = adapter->tx_scrq[queue_num];
 	txq = netdev_get_tx_queue(netdev, skb_get_queue_mapping(skb));
@@ -1051,6 +1076,11 @@ static int ibmvnic_xmit(struct sk_buff *skb, struct net_device *netdev)
 
 	if (skb->ip_summed == CHECKSUM_PARTIAL) {
 		tx_crq.v1.flags1 |= IBMVNIC_TX_CHKSUM_OFFLOAD;
+		hdrs += 2;
+	}
+	if (skb_is_gso(skb)) {
+		tx_crq.v1.flags1 |= IBMVNIC_TX_LSO;
+		tx_crq.v1.mss = cpu_to_be16(skb_shinfo(skb)->gso_size);
 		hdrs += 2;
 	}
 	/* determine if l2/3/4 headers are sent to firmware */
@@ -1477,6 +1507,7 @@ static const struct net_device_ops ibmvnic_netdev_ops = {
 	.ndo_set_mac_address	= ibmvnic_set_mac,
 	.ndo_validate_addr	= eth_validate_addr,
 	.ndo_tx_timeout		= ibmvnic_tx_timeout,
+	.ndo_fix_features	= ibmvnic_fix_features,
 #ifdef CONFIG_NET_POLL_CONTROLLER
 	.ndo_poll_controller	= ibmvnic_netpoll_controller,
 #endif
@@ -2586,10 +2617,10 @@ static void handle_query_ip_offload_rsp(struct ibmvnic_adapter *adapter)
 	adapter->ip_offload_ctrl.udp_ipv4_chksum = buf->udp_ipv4_chksum;
 	adapter->ip_offload_ctrl.tcp_ipv6_chksum = buf->tcp_ipv6_chksum;
 	adapter->ip_offload_ctrl.udp_ipv6_chksum = buf->udp_ipv6_chksum;
+	adapter->ip_offload_ctrl.large_tx_ipv4 = buf->large_tx_ipv4;
+	adapter->ip_offload_ctrl.large_tx_ipv6 = buf->large_tx_ipv6;
 
-	/* large_tx/rx disabled for now, additional features needed */
-	adapter->ip_offload_ctrl.large_tx_ipv4 = 0;
-	adapter->ip_offload_ctrl.large_tx_ipv6 = 0;
+	/* large_rx disabled for now, additional features needed */
 	adapter->ip_offload_ctrl.large_rx_ipv4 = 0;
 	adapter->ip_offload_ctrl.large_rx_ipv6 = 0;
 
@@ -2604,6 +2635,11 @@ static void handle_query_ip_offload_rsp(struct ibmvnic_adapter *adapter)
 	if ((adapter->netdev->features &
 	    (NETIF_F_IP_CSUM | NETIF_F_IPV6_CSUM)))
 		adapter->netdev->features |= NETIF_F_RXCSUM;
+
+	if (buf->large_tx_ipv4)
+		adapter->netdev->hw_features |= NETIF_F_TSO;
+	if (buf->large_tx_ipv6)
+		adapter->netdev->hw_features |= NETIF_F_TSO6;
 
 	memset(&crq, 0, sizeof(crq));
 	crq.control_ip_offload.first = IBMVNIC_CRQ_CMD;
