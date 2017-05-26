@@ -255,6 +255,96 @@ enum auxtrace_error_type {
 /* Attribute type for custom synthesized events */
 #define PERF_TYPE_SYNTH		3000000000
 
+/* Attribute config for custom synthesized events */
+enum perf_synth_id {
+	PERF_SYNTH_INTEL_PTWRITE,
+	PERF_SYNTH_INTEL_MWAIT,
+	PERF_SYNTH_INTEL_PWRE,
+	PERF_SYNTH_INTEL_EXSTOP,
+	PERF_SYNTH_INTEL_PWRX,
+	PERF_SYNTH_INTEL_CBR,
+};
+
+/*
+ * Raw data formats for synthesized events. Note that raw data plus the raw data
+ * size (4 bytes) must align to 8-bytes.
+ */
+
+struct perf_synth_intel_ptwrite {
+	union {
+		struct {
+			u32	ip		:  1,
+				reserved	: 31;
+		};
+		u32	flags;
+	};
+	u64	payload;
+} __packed;
+
+struct perf_synth_intel_mwait {
+	u32 reserved;
+	union {
+		struct {
+			u64	hints		:  8,
+				reserved1	: 24,
+				extensions	:  2,
+				reserved2	: 30;
+		};
+		u64	payload;
+	};
+} __packed;
+
+struct perf_synth_intel_pwre {
+	u32 reserved;
+	union {
+		struct {
+			u64	reserved1	:  7,
+				hw		:  1,
+				subcstate	:  4,
+				cstate		:  4,
+				reserved2	: 48;
+		};
+		u64	payload;
+	};
+} __packed;
+
+struct perf_synth_intel_exstop {
+	union {
+		struct {
+			u32	ip		:  1,
+				reserved	: 31;
+		};
+		u32	flags;
+	};
+};
+
+struct perf_synth_intel_pwrx {
+	u32 reserved;
+	union {
+		struct {
+			u64	deepest_cstate	:  4,
+				last_cstate	:  4,
+				wake_reason	:  4,
+				reserved1	: 52;
+		};
+		u64	payload;
+	};
+} __packed;
+
+struct perf_synth_intel_cbr {
+	union {
+		struct {
+			u32	cbr		:  8,
+				reserved1	:  8,
+				max_nonturbo	:  8,
+				reserved2	:  8;
+		};
+		u32	flags;
+	};
+	u32 freq;
+	u32 reserved3;
+};
+
 /*
  * The kernel collects the number of events it couldn't send in a stretch and
  * when possible sends this number in a PERF_RECORD_LOST event. The number of
