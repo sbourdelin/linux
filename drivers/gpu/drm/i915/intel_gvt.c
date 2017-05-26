@@ -97,7 +97,7 @@ int intel_gvt_init(struct drm_i915_private *dev_priv)
 
 	if (!i915.enable_execlists) {
 		DRM_INFO("GPU guest virtualisation [GVT-g] disabled due to disabled execlist submission [i915.enable_execlists module parameter]\n");
-		goto bail;
+		return -EIO;
 	}
 
 	/*
