@@ -1113,11 +1113,13 @@ static void xhci_handle_cmd_reset_ep(struct xhci_hcd *xhci, int slot_id,
 {
 	struct xhci_virt_device *vdev;
 	struct xhci_ep_ctx *ep_ctx;
+	struct xhci_virt_ep *ep;
 	unsigned int ep_index;
 
 	ep_index = TRB_TO_EP_INDEX(le32_to_cpu(trb->generic.field[3]));
 	vdev = xhci->devs[slot_id];
 	ep_ctx = xhci_get_ep_ctx(xhci, vdev->out_ctx, ep_index);
+	ep = &xhci->devs[slot_id]->eps[ep_index];
 	trace_xhci_handle_cmd_reset_ep(ep_ctx);
 
 	/* This command will only fail if the endpoint wasn't halted,
@@ -1130,6 +1132,7 @@ static void xhci_handle_cmd_reset_ep(struct xhci_hcd *xhci, int slot_id,
 	 * command complete before the endpoint can be used.  Queue that here
 	 * because the HW can't handle two commands being queued in a row.
 	 */
+	ep->ep_state &= ~EP_RESET_PENDING;
 	if (xhci->quirks & XHCI_RESET_EP_QUIRK) {
 		struct xhci_command *command;
 
@@ -1145,7 +1148,11 @@ static void xhci_handle_cmd_reset_ep(struct xhci_hcd *xhci, int slot_id,
 		xhci_ring_cmd_db(xhci);
 	} else {
 		/* Clear our internal halted state */
-		xhci->devs[slot_id]->eps[ep_index].ep_state &= ~EP_HALTED;
+		ep->ep_state &= ~EP_HALTED;
+		if (!(ep->ep_state & SET_DEQ_PENDING)) {
+			/* Restart any rings with pending URBs */
+			ring_doorbell_for_active_rings(xhci, slot_id, ep_index);
+		}
 	}
 }
 
@@ -1800,19 +1807,25 @@ struct xhci_segment *trb_in_td(struct xhci_hcd *xhci,
 static void xhci_cleanup_halted_endpoint(struct xhci_hcd *xhci,
 		unsigned int slot_id, unsigned int ep_index,
 		unsigned int stream_id,
-		struct xhci_td *td, union xhci_trb *ep_trb)
+		struct xhci_td *td)
 {
 	struct xhci_virt_ep *ep = &xhci->devs[slot_id]->eps[ep_index];
 	struct xhci_command *command;
+
+	if (ep->ep_state & EP_RESET_PENDING)
+		return;
+
 	command = xhci_alloc_command(xhci, false, false, GFP_ATOMIC);
 	if (!command)
 		return;
 
-	ep->ep_state |= EP_HALTED;
+	ep->ep_state |= EP_HALTED | EP_RESET_PENDING;
 	ep->stopped_stream = stream_id;
 
 	xhci_queue_reset_ep(xhci, command, slot_id, ep_index);
-	xhci_cleanup_stalled_ring(xhci, ep_index, td);
+	if (td != NULL && !(ep->ep_state & SET_DEQ_PENDING)) {
+		xhci_cleanup_stalled_ring(xhci, ep_index, td);
+	}
 
 	ep->stopped_stream = 0;
 
@@ -1947,7 +1960,7 @@ static int finish_td(struct xhci_hcd *xhci, struct xhci_td *td,
 		 * The class driver clears the device side halt later.
 		 */
 		xhci_cleanup_halted_endpoint(xhci, slot_id, ep_index,
-					ep_ring->stream_id, td, ep_trb);
+					ep_ring->stream_id, td);
 	} else {
 		/* Update ring dequeue pointer */
 		while (ep_ring->dequeue != td->last_trb)
@@ -2587,6 +2600,17 @@ cleanup:
 	 * the event.
 	 */
 	} while (handling_skipped_tds);
+
+	/*
+	 * If a cancelled TRB halts the endpoint, reset it here.
+	 */
+	if (trb_comp_code == COMP_STALL_ERROR ||
+		xhci_requires_manual_halt_cleanup(xhci, ep_ctx,
+						trb_comp_code)) {
+		/* No harm in calling this twice; second call will be a no-op */
+		xhci_cleanup_halted_endpoint(xhci, slot_id, ep_index,
+				ep_ring->stream_id, td);
+	}
 
 	return 0;
 }

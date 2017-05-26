@@ -922,6 +922,7 @@ struct xhci_virt_ep {
 #define EP_HAS_STREAMS		(1 << 4)
 /* Transitioning the endpoint to not using streams, don't enqueue URBs */
 #define EP_GETTING_NO_STREAMS	(1 << 5)
+#define EP_RESET_PENDING      (1 << 6) /* For stall recovery */
 	/* ----  Related to URB cancellation ---- */
 	struct list_head	cancelled_td_list;
 	struct xhci_td		*stopped_td;
