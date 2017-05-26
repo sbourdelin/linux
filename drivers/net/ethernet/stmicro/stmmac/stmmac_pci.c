@@ -35,9 +35,7 @@ struct stmmac_pci_dmi_data {
 	int phy_addr;
 };
 
-struct stmmac_pci_info {
-	int (*setup)(struct pci_dev *pdev, struct plat_stmmacenet_data *plat);
-};
+typedef int (*stmmac_setup)(struct pci_dev *, struct plat_stmmacenet_data *);
 
 static int stmmac_pci_find_phy_addr(struct pci_dev *pdev,
 				    const struct dmi_system_id *dmi_list)
@@ -87,8 +85,8 @@ static void common_default_data(struct plat_stmmacenet_data *plat)
 	plat->rx_queues_cfg[0].pkt_route = 0x0;
 }
 
-static int stmmac_default_data(struct pci_dev *pdev,
-			       struct plat_stmmacenet_data *plat)
+static int stmmac_default_setup(struct pci_dev *pdev,
+				struct plat_stmmacenet_data *plat)
 {
 	/* Set common default data first */
 	common_default_data(plat);
@@ -103,10 +101,6 @@ static int stmmac_default_data(struct pci_dev *pdev,
 
 	return 0;
 }
-
-static const struct stmmac_pci_info stmmac_pci_info = {
-	.setup = stmmac_default_data,
-};
 
 static const struct stmmac_pci_dmi_data galileo_stmmac_dmi_data[] = {
 	{
@@ -160,8 +154,8 @@ static const struct dmi_system_id quark_pci_dmi[] = {
 	{}
 };
 
-static int quark_default_data(struct pci_dev *pdev,
-			      struct plat_stmmacenet_data *plat)
+static int quark_default_setup(struct pci_dev *pdev,
+			       struct plat_stmmacenet_data *plat)
 {
 	int ret;
 
@@ -197,10 +191,6 @@ static int quark_default_data(struct pci_dev *pdev,
 	return 0;
 }
 
-static const struct stmmac_pci_info quark_pci_info = {
-	.setup = quark_default_data,
-};
-
 /**
  * stmmac_pci_probe
  *
@@ -216,7 +206,7 @@ static const struct stmmac_pci_info quark_pci_info = {
 static int stmmac_pci_probe(struct pci_dev *pdev,
 			    const struct pci_device_id *id)
 {
-	struct stmmac_pci_info *info = (struct stmmac_pci_info *)id->driver_data;
+	stmmac_setup setup = (stmmac_setup)id->driver_data;
 	struct plat_stmmacenet_data *plat;
 	struct stmmac_resources res;
 	int i;
@@ -257,7 +247,7 @@ static int stmmac_pci_probe(struct pci_dev *pdev,
 
 	pci_set_master(pdev);
 
-	ret = info->setup(pdev, plat);
+	ret = setup(pdev, plat);
 	if (ret)
 		return ret;
 
@@ -289,16 +279,17 @@ static SIMPLE_DEV_PM_OPS(stmmac_pm_ops, stmmac_suspend, stmmac_resume);
 #define STMMAC_QUARK_ID  0x0937
 #define STMMAC_DEVICE_ID 0x1108
 
-#define STMMAC_DEVICE(vendor_id, dev_id, info)	{	\
+#define STMMAC_DEVICE(vendor_id, dev_id, setup)	{	\
 	PCI_DEVICE(vendor_id, dev_id),			\
-	.driver_data = (kernel_ulong_t)&info		\
+	.driver_data = (kernel_ulong_t)&setup		\
 	}
 
 static const struct pci_device_id stmmac_id_table[] = {
-	STMMAC_DEVICE(STMMAC_VENDOR_ID, STMMAC_DEVICE_ID, stmmac_pci_info),
+	STMMAC_DEVICE(STMMAC_VENDOR_ID, STMMAC_DEVICE_ID, stmmac_default_setup),
 	STMMAC_DEVICE(PCI_VENDOR_ID_STMICRO, PCI_DEVICE_ID_STMICRO_MAC,
-		      stmmac_pci_info),
-	STMMAC_DEVICE(PCI_VENDOR_ID_INTEL, STMMAC_QUARK_ID, quark_pci_info),
+		      stmmac_default_setup),
+	STMMAC_DEVICE(PCI_VENDOR_ID_INTEL, STMMAC_QUARK_ID,
+		      quark_default_setup),
 	{}
 };
 
