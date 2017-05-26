@@ -286,6 +286,7 @@ int mlx5_eswitch_get_vport_stats(struct mlx5_eswitch *esw,
 struct mlx5_flow_spec;
 struct mlx5_esw_flow_attr;
 
+#ifdef CONFIG_MLX5_EN_ESWITCH_OFFLOADS
 struct mlx5_flow_handle *
 mlx5_eswitch_add_offloaded_rule(struct mlx5_eswitch *esw,
 				struct mlx5_flow_spec *spec,
@@ -294,6 +295,22 @@ void
 mlx5_eswitch_del_offloaded_rule(struct mlx5_eswitch *esw,
 				struct mlx5_flow_handle *rule,
 				struct mlx5_esw_flow_attr *attr);
+#else
+static inline struct mlx5_flow_handle *
+mlx5_eswitch_add_offloaded_rule(struct mlx5_eswitch *esw,
+				struct mlx5_flow_spec *spec,
+				struct mlx5_esw_flow_attr *attr)
+{
+	return ERR_PTR(-EOPNOTSUPP);
+}
+static inline void
+mlx5_eswitch_del_offloaded_rule(struct mlx5_eswitch *esw,
+				struct mlx5_flow_handle *rule,
+				struct mlx5_esw_flow_attr *attr)
+{
+	return;
+}
+#endif
 
 struct mlx5_flow_handle *
 mlx5_eswitch_create_vport_rx_rule(struct mlx5_eswitch *esw, int vport, u32 tirn);
