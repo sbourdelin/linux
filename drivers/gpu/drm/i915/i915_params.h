@@ -28,50 +28,50 @@
 #include <linux/cache.h> /* for __read_mostly */
 
 #define I915_PARAMS_FOR_EACH(func) \
-	func(int, modeset); \
-	func(int, panel_ignore_lid); \
-	func(int, semaphores); \
-	func(int, lvds_channel_mode); \
-	func(int, panel_use_ssc); \
-	func(int, vbt_sdvo_panel_type); \
-	func(int, enable_rc6); \
-	func(int, enable_dc); \
-	func(int, enable_fbc); \
-	func(int, enable_ppgtt); \
-	func(int, enable_execlists); \
-	func(int, enable_psr); \
-	func(int, disable_power_well); \
-	func(int, enable_ips); \
-	func(int, invert_brightness); \
-	func(int, enable_guc_loading); \
-	func(int, enable_guc_submission); \
-	func(int, guc_log_level); \
-	func(char *, guc_firmware_path); \
-	func(char *, huc_firmware_path); \
-	func(int, use_mmio_flip); \
-	func(int, mmio_debug); \
-	func(int, edp_vswing); \
-	func(unsigned int, inject_load_failure); \
+	func(int, modeset, -1) \
+	func(int, panel_ignore_lid, 1) \
+	func(int, semaphores, -1) \
+	func(int, lvds_channel_mode, 0) \
+	func(int, panel_use_ssc, -1) \
+	func(int, vbt_sdvo_panel_type, -1) \
+	func(int, enable_rc6, -1) \
+	func(int, enable_dc, -1) \
+	func(int, enable_fbc, -1) \
+	func(int, enable_ppgtt, -1) \
+	func(int, enable_execlists, -1) \
+	func(int, enable_psr, -1) \
+	func(int, disable_power_well, -1) \
+	func(int, enable_ips, 1) \
+	func(int, invert_brightness, 0) \
+	func(int, enable_guc_loading, 0) \
+	func(int, enable_guc_submission, 0) \
+	func(int, guc_log_level, -1) \
+	func(char *, guc_firmware_path, NULL) \
+	func(char *, huc_firmware_path, NULL) \
+	func(int, use_mmio_flip, 0) \
+	func(int, mmio_debug, 0) \
+	func(int, edp_vswing, 0) \
+	func(unsigned int, inject_load_failure, 0) \
 	/* leave bools at the end to not create holes */ \
-	func(bool, alpha_support); \
-	func(bool, enable_cmd_parser); \
-	func(bool, enable_hangcheck); \
-	func(bool, fastboot); \
-	func(bool, prefault_disable); \
-	func(bool, load_detect_test); \
-	func(bool, force_reset_modeset_test); \
-	func(bool, reset); \
-	func(bool, error_capture); \
-	func(bool, disable_display); \
-	func(bool, verbose_state_checks); \
-	func(bool, nuclear_pageflip); \
-	func(bool, enable_dp_mst); \
-	func(bool, enable_dpcd_backlight); \
-	func(bool, enable_gvt)
+	func(bool, alpha_support, IS_ENABLED(CONFIG_DRM_I915_ALPHA_SUPPORT)) \
+	func(bool, enable_cmd_parser, true) \
+	func(bool, enable_hangcheck, true) \
+	func(bool, fastboot, false) \
+	func(bool, prefault_disable, false) \
+	func(bool, load_detect_test, false) \
+	func(bool, force_reset_modeset_test, false) \
+	func(bool, reset, true) \
+	func(bool, error_capture, true) \
+	func(bool, disable_display, false) \
+	func(bool, verbose_state_checks, true) \
+	func(bool, nuclear_pageflip, false) \
+	func(bool, enable_dp_mst, true) \
+	func(bool, enable_dpcd_backlight, false) \
+	func(bool, enable_gvt, false)
 
-#define MEMBER(T, member) T member
+#define MEMBER(T, member, value) T member;
 struct i915_params {
-	I915_PARAMS_FOR_EACH(MEMBER);
+	I915_PARAMS_FOR_EACH(MEMBER)
 };
 #undef MEMBER
 
