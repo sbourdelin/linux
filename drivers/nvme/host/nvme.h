@@ -109,6 +109,7 @@ static inline struct nvme_request *nvme_req(struct request *req)
 enum nvme_ctrl_state {
 	NVME_CTRL_NEW,
 	NVME_CTRL_LIVE,
+	NVME_CTRL_SCHED_RESET,
 	NVME_CTRL_RESETTING,
 	NVME_CTRL_RECONNECTING,
 	NVME_CTRL_DELETING,

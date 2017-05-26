@@ -1366,7 +1366,12 @@ static bool nvme_should_reset(struct nvme_dev *dev, u32 csts)
 	 */
 	bool nssro = dev->subsystem && (csts & NVME_CSTS_NSSRO);
 
-	/* If there is a reset ongoing, we shouldn't reset again. */
+	/*
+	 * If there is a reset ongoing, we shouldn't reset again.  Even though
+	 * work_busy provides an advisory hint, nvme_reset is always called
+	 * after this and takes care of synchronization using controller state
+	 * change.
+	 */
 	if (work_busy(&dev->reset_work))
 		return false;
 
@@ -2003,8 +2008,8 @@ static int nvme_reset(struct nvme_dev *dev)
 {
 	if (!dev->ctrl.admin_q || blk_queue_dying(dev->ctrl.admin_q))
 		return -ENODEV;
-	if (work_busy(&dev->reset_work))
-		return -ENODEV;
+	if (!nvme_change_ctrl_state(&dev->ctrl, NVME_CTRL_SCHED_RESET))
+		return -EBUSY;
 	if (!queue_work(nvme_workq, &dev->reset_work))
 		return -EBUSY;
 	return 0;
@@ -2131,6 +2136,7 @@ static int nvme_probe(struct pci_dev *pdev, const struct pci_device_id *id)
 
 	dev_info(dev->ctrl.device, "pci function %s\n", dev_name(&pdev->dev));
 
+	nvme_change_ctrl_state(&dev->ctrl, NVME_CTRL_SCHED_RESET);
 	queue_work(nvme_workq, &dev->reset_work);
 	return 0;
 

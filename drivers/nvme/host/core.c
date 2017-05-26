@@ -161,11 +161,20 @@ bool nvme_change_ctrl_state(struct nvme_ctrl *ctrl,
 			break;
 		}
 		break;
-	case NVME_CTRL_RESETTING:
+	case NVME_CTRL_SCHED_RESET:
 		switch (old_state) {
 		case NVME_CTRL_NEW:
 		case NVME_CTRL_LIVE:
 		case NVME_CTRL_RECONNECTING:
+			changed = true;
+			/* FALLTHRU */
+		default:
+			break;
+		}
+		break;
+	case NVME_CTRL_RESETTING:
+		switch (old_state) {
+		case NVME_CTRL_SCHED_RESET:
 			changed = true;
 			/* FALLTHRU */
 		default:
@@ -1895,6 +1904,7 @@ static ssize_t nvme_sysfs_show_state(struct device *dev,
 	static const char *const state_name[] = {
 		[NVME_CTRL_NEW]		= "new",
 		[NVME_CTRL_LIVE]	= "live",
+		[NVME_CTRL_SCHED_RESET] = "sched_reset",
 		[NVME_CTRL_RESETTING]	= "resetting",
 		[NVME_CTRL_RECONNECTING]= "reconnecting",
 		[NVME_CTRL_DELETING]	= "deleting",
