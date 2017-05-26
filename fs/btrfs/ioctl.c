@@ -5027,6 +5027,8 @@ static long btrfs_ioctl_qgroup_create(struct file *file, void __user *arg)
 	if (!capable(CAP_SYS_ADMIN))
 		return -EPERM;
 
+	pr_info_once("btrfs: Usage of deprecated btrfs_qgroup_create ioctl\n");
+
 	ret = mnt_want_write_file(file);
 	if (ret)
 		return ret;
