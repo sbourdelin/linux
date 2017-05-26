@@ -1218,12 +1218,19 @@ int xhci_hub_control(struct usb_hcd *hcd, u16 typeReq, u16 wValue,
 			xhci_dbg(xhci, "set port reset, actual port %d status  = 0x%x\n", wIndex, temp);
 			break;
 		case USB_PORT_FEAT_REMOTE_WAKE_MASK:
-			xhci_set_remote_wake_mask(xhci, port_array,
+			if((xhci->quirks & XHCI_U2_DISABLE_WAKE) &&(hcd->speed < HCD_USB3)) {
+				temp = readl(port_array[wIndex]);
+				xhci_dbg(xhci, "skip set port remote wake mask, "
+						"actual port %d status  = 0x%x\n",
+						wIndex, temp);
+			}else{	
+				xhci_set_remote_wake_mask(xhci, port_array,
 					wIndex, wake_mask);
-			temp = readl(port_array[wIndex]);
-			xhci_dbg(xhci, "set port remote wake mask, "
-					"actual port %d status  = 0x%x\n",
-					wIndex, temp);
+				temp = readl(port_array[wIndex]);
+				xhci_dbg(xhci, "set port remote wake mask, "
+						"actual port %d status  = 0x%x\n",
+						wIndex, temp);
+			}
 			break;
 		case USB_PORT_FEAT_BH_PORT_RESET:
 			temp |= PORT_WR;
@@ -1461,6 +1468,9 @@ int xhci_bus_suspend(struct usb_hcd *hcd)
 				t2 |= PORT_WKOC_E | PORT_WKCONN_E;
 				t2 &= ~PORT_WKDISC_E;
 			}
+		
+			if((xhci->quirks & XHCI_U2_DISABLE_WAKE) &&(hcd->speed < HCD_USB3))
+				t2 &= ~PORT_WAKE_BITS;
 		} else
 			t2 &= ~PORT_WAKE_BITS;
 
