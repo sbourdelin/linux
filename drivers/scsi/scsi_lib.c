@@ -3030,7 +3030,10 @@ scsi_internal_device_unblock(struct scsi_device *sdev,
 		return -EINVAL;
 
 	if (q->mq_ops) {
-		blk_mq_start_stopped_hw_queues(q, false);
+		if (blk_queue_quiesced(q))
+			blk_mq_unquiesce_queue(q);
+		else
+			blk_mq_start_stopped_hw_queues(q, false);
 	} else {
 		spin_lock_irqsave(q->queue_lock, flags);
 		blk_start_queue(q);
