@@ -170,6 +170,10 @@ void blk_mq_quiesce_queue(struct request_queue *q)
 
 	__blk_mq_stop_hw_queues(q, true);
 
+	spin_lock_irq(q->queue_lock);
+	queue_flag_set(QUEUE_FLAG_QUIESCED, q);
+	spin_unlock_irq(q->queue_lock);
+
 	queue_for_each_hw_ctx(q, hctx, i) {
 		if (hctx->flags & BLK_MQ_F_BLOCKING)
 			synchronize_srcu(&hctx->queue_rq_srcu);
@@ -190,6 +194,10 @@ EXPORT_SYMBOL_GPL(blk_mq_quiesce_queue);
  */
 void blk_mq_unquiesce_queue(struct request_queue *q)
 {
+	spin_lock_irq(q->queue_lock);
+	queue_flag_clear(QUEUE_FLAG_QUIESCED, q);
+	spin_unlock_irq(q->queue_lock);
+
 	blk_mq_start_stopped_hw_queues(q, true);
 }
 EXPORT_SYMBOL_GPL(blk_mq_unquiesce_queue);
@@ -209,6 +217,9 @@ void blk_mq_wake_waiters(struct request_queue *q)
 	 * the queue are notified as well.
 	 */
 	wake_up_all(&q->mq_freeze_wq);
+
+	/* Forcibly unquiesce the queue to avoid having stuck requests */
+	blk_mq_unquiesce_queue(q);
 }
 
 bool blk_mq_can_queue(struct blk_mq_hw_ctx *hctx)
@@ -1127,13 +1138,15 @@ static void __blk_mq_run_hw_queue(struct blk_mq_hw_ctx *hctx)
 
 	if (!(hctx->flags & BLK_MQ_F_BLOCKING)) {
 		rcu_read_lock();
-		blk_mq_sched_dispatch_requests(hctx);
+		if (!blk_queue_quiesced(hctx->queue))
+			blk_mq_sched_dispatch_requests(hctx);
 		rcu_read_unlock();
 	} else {
 		might_sleep();
 
 		srcu_idx = srcu_read_lock(&hctx->queue_rq_srcu);
-		blk_mq_sched_dispatch_requests(hctx);
+		if (!blk_queue_quiesced(hctx->queue))
+			blk_mq_sched_dispatch_requests(hctx);
 		srcu_read_unlock(&hctx->queue_rq_srcu, srcu_idx);
 	}
 }
@@ -1538,9 +1551,14 @@ insert:
 static void blk_mq_try_issue_directly(struct blk_mq_hw_ctx *hctx,
 		struct request *rq, blk_qc_t *cookie)
 {
-	if (!(hctx->flags & BLK_MQ_F_BLOCKING)) {
+	bool blocking = hctx->flags & BLK_MQ_F_BLOCKING;
+	bool quiesced;
+
+	if (!blocking) {
 		rcu_read_lock();
-		__blk_mq_try_issue_directly(rq, cookie, false);
+		quiesced = blk_queue_quiesced(rq->q);
+		if (!quiesced)
+			__blk_mq_try_issue_directly(rq, cookie, false);
 		rcu_read_unlock();
 	} else {
 		unsigned int srcu_idx;
@@ -1548,9 +1566,14 @@ static void blk_mq_try_issue_directly(struct blk_mq_hw_ctx *hctx,
 		might_sleep();
 
 		srcu_idx = srcu_read_lock(&hctx->queue_rq_srcu);
-		__blk_mq_try_issue_directly(rq, cookie, true);
+		quiesced = blk_queue_quiesced(rq->q);
+		if (!quiesced)
+			__blk_mq_try_issue_directly(rq, cookie, true);
 		srcu_read_unlock(&hctx->queue_rq_srcu, srcu_idx);
 	}
+
+	if (quiesced)
+		blk_mq_sched_insert_request(rq, false, false, false, blocking);
 }
 
 static blk_qc_t blk_mq_make_request(struct request_queue *q, struct bio *bio)
