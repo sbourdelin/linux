@@ -1658,6 +1658,42 @@ TRACE_EVENT(qgroup_meta_reserve,
 		show_root_type(__entry->refroot), __entry->diff)
 );
 
+TRACE_EVENT(btrfs_encoder,
+
+	TP_PROTO(int encode, int bio, struct inode *inode, int type,
+			unsigned long bfr, unsigned long aft,
+			unsigned long start, int ret),
+
+	TP_ARGS(encode, bio, inode, type, bfr, aft, start, ret),
+
+	TP_STRUCT__entry_btrfs(
+		__field(	int,		encode)
+		__field(	int,		bio)
+		__field(	unsigned long,	i_ino)
+		__field(	int,		type)
+		__field(	unsigned long,	bfr)
+		__field(	unsigned long,	aft)
+		__field(	unsigned long,	start)
+		__field(	int,		ret)
+	),
+
+	TP_fast_assign_btrfs(btrfs_sb(inode->i_sb),
+		__entry->encode		= encode;
+		__entry->bio		= bio;
+		__entry->i_ino		= inode->i_ino;
+		__entry->type		= type;
+		__entry->bfr		= bfr;
+		__entry->aft		= aft;
+		__entry->start		= start;
+		__entry->ret		= ret;
+	),
+
+	TP_printk_btrfs("%s %s ino:%lu tfm:%d bfr:%lu aft:%lu start:%lu ret:%d",
+		__entry->encode ? "encode":"decode",
+		__entry->bio ? "bio":"pge", __entry->i_ino, __entry->type,
+		__entry->bfr, __entry->aft, __entry->start, __entry->ret)
+
+);
 #endif /* _TRACE_BTRFS_H */
 
 /* This part must be outside protection */
