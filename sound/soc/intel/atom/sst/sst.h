@@ -318,12 +318,10 @@ struct sst_ipc_reg {
 };
 
 struct sst_shim_regs64 {
-	u64 csr;
 	u64 pisr;
 	u64 pimr;
 	u64 isrx;
 	u64 isrd;
-	u64 imrx;
 	u64 imrd;
 	u64 ipcx;
 	u64 ipcd;
