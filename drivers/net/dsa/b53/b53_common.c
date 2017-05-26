@@ -1991,7 +1991,7 @@ int b53_switch_register(struct b53_device *dev)
 
 	pr_info("found switch: %s, rev %i\n", dev->name, dev->core_rev);
 
-	return dsa_register_switch(dev->ds, dev->ds->dev);
+	return dsa_register_switch(dev->ds);
 }
 EXPORT_SYMBOL(b53_switch_register);
 
