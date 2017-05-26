@@ -3721,6 +3721,7 @@ skl_ddb_get_pipe_allocation_limits(struct drm_device *dev,
 	struct drm_i915_private *dev_priv = to_i915(dev);
 	struct drm_crtc *for_crtc = cstate->base.crtc;
 	unsigned int pipe_size, ddb_size;
+	unsigned int active_crtcs;
 	int nth_active_pipe;
 
 	if (WARN_ON(!state) || !cstate->base.active) {
@@ -3731,10 +3732,11 @@ skl_ddb_get_pipe_allocation_limits(struct drm_device *dev,
 	}
 
 	if (intel_state->active_pipe_changes)
-		*num_active = hweight32(intel_state->active_crtcs);
+		active_crtcs = intel_state->active_crtcs;
 	else
-		*num_active = hweight32(dev_priv->active_crtcs);
+		active_crtcs = dev_priv->active_crtcs;
 
+	*num_active = hweight32(active_crtcs);
 	ddb_size = INTEL_INFO(dev_priv)->ddb_size;
 	WARN_ON(ddb_size == 0);
 
@@ -3754,12 +3756,15 @@ skl_ddb_get_pipe_allocation_limits(struct drm_device *dev,
 		 * copy from old state to be sure
 		 */
 		*alloc = to_intel_crtc_state(for_crtc->state)->wm.skl.ddb;
-		return;
+		if (!skl_ddb_entry_size(alloc))
+			DRM_DEBUG_KMS("Cached pipe DDB is 0 recalculate\n");
+		else
+			return;
 	}
 
-	nth_active_pipe = hweight32(intel_state->active_crtcs &
+	nth_active_pipe = hweight32(active_crtcs &
 				    (drm_crtc_mask(for_crtc) - 1));
-	pipe_size = ddb_size / hweight32(intel_state->active_crtcs);
+	pipe_size = ddb_size / hweight32(active_crtcs);
 	alloc->start = nth_active_pipe * ddb_size / *num_active;
 	alloc->end = alloc->start + pipe_size;
 }
