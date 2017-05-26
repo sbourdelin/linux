@@ -289,6 +289,10 @@ hsw_dp_audio_config_update(struct intel_crtc *intel_crtc, enum port port,
 	enum pipe pipe = intel_crtc->pipe;
 	u32 tmp;
 
+	/* It doesn't work on KBL and uses automatic N/M. */
+	if (IS_KABYLAKE(dev_priv))
+		nm = NULL;
+
 	if (nm)
 		DRM_DEBUG_KMS("using Maud %u, Naud %u\n", nm->m, nm->n);
 	else
