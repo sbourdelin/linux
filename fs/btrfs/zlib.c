@@ -30,6 +30,7 @@
 #include <linux/sched.h>
 #include <linux/pagemap.h>
 #include <linux/bio.h>
+#include <linux/refcount.h>
 #include "compression.h"
 
 struct workspace {

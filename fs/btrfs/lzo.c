@@ -25,6 +25,7 @@
 #include <linux/pagemap.h>
 #include <linux/bio.h>
 #include <linux/lzo.h>
+#include <linux/refcount.h>
 #include "compression.h"
 
 #define LZO_LEN	4
