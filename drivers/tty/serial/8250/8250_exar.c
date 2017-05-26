@@ -14,6 +14,7 @@
 #include <linux/kernel.h>
 #include <linux/module.h>
 #include <linux/pci.h>
+#include <linux/property.h>
 #include <linux/serial_core.h>
 #include <linux/serial_reg.h>
 #include <linux/slab.h>
@@ -195,8 +196,14 @@ static void setup_gpio(struct pci_dev *pcidev, u8 __iomem *p)
 }
 
 static void *
-xr17v35x_register_gpio(struct pci_dev *pcidev)
+xr17v35x_register_gpio(struct pci_dev *pcidev, unsigned int first_pin,
+		       unsigned int npins)
 {
+	struct property_entry properties[] = {
+		PROPERTY_ENTRY_U32("first_pin", first_pin),
+		PROPERTY_ENTRY_U32("npins", npins),
+		{ }
+	};
 	struct platform_device *pdev;
 
 	pdev = platform_device_alloc("gpio_exar", PLATFORM_DEVID_AUTO);
@@ -206,7 +213,8 @@ xr17v35x_register_gpio(struct pci_dev *pcidev)
 	pdev->dev.parent = &pcidev->dev;
 	ACPI_COMPANION_SET(&pdev->dev, ACPI_COMPANION(&pcidev->dev));
 
-	if (platform_device_add(pdev) < 0) {
+	if (platform_device_add_properties(pdev, properties) < 0 ||
+	    platform_device_add(pdev) < 0) {
 		platform_device_put(pdev);
 		return NULL;
 	}
@@ -249,7 +257,7 @@ pci_xr17v35x_setup(struct exar8250 *priv, struct pci_dev *pcidev,
 
 		if (pcidev->vendor == PCI_VENDOR_ID_EXAR)
 			port->port.private_data =
-				xr17v35x_register_gpio(pcidev);
+				xr17v35x_register_gpio(pcidev, 0, 16);
 	}
 
 	return 0;
