@@ -1,0 +1,31 @@
+Basic single-register reset controller
+======================================
+
+This describes a generic reset controller where the reset lines are controlled
+by single bits within a 32-bit memory location. The memory location is assumed
+to be part of a syscon regmap.
+
+Reset controller required properties:
+ - compatible: should be "reset-basic"
+ - #reset-cells: must be set to 1
+ - reg: reset register location within regmap
+
+Device node required properties:
+ - resets phandle
+ - bit number, counting from zero, for the desired reset line. Max is 31.
+
+Example:
+
+syscon {
+	compatible = "syscon";
+
+	uart_rest: rest@0c {
+		compatible = "reset-basic";
+		#reset-cells = <1>;
+		reg = <0x0c>;
+	};
+}
+
+&uart {
+	resets = <&uart_rest 0x04>;
+}
