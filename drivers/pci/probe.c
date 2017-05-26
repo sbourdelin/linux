@@ -1330,6 +1330,48 @@ static void pci_msi_setup_pci_dev(struct pci_dev *dev)
 }
 
 /**
+ * pci_test_intx_masking - probe for INTx masking support
+ * @dev: the PCI device to operate on
+ *
+ * Check if the @dev supports INTx masking via the config space
+ * command word. Executed when PCI device is setup. Result is saved
+ * in broken_intx_masking field of struct pci_dev and can be checked
+ * with pci_intx_mask_supported at any time later, after the PCI device
+ * has been setup (this avoids testing of PCI_COMMAND_INTX_DISABLE
+ * register at runtime).
+ */
+static void pci_test_intx_masking(struct pci_dev *dev)
+{
+	u16 orig, toggle, new;
+
+	/*
+	 * If device doesn't support this feature though it could pass the test.
+	 */
+	if (dev->broken_intx_masking)
+		return;
+
+	pci_cfg_access_lock(dev);
+
+	/*
+	 * Perform the test.
+	 */
+	pci_read_config_word(dev, PCI_COMMAND, &orig);
+	toggle = orig ^ PCI_COMMAND_INTX_DISABLE;
+	pci_write_config_word(dev, PCI_COMMAND, toggle);
+	pci_read_config_word(dev, PCI_COMMAND, &new);
+
+	/*
+	 * Restore initial state.
+	 */
+	pci_write_config_word(dev, PCI_COMMAND, orig);
+
+	pci_cfg_access_unlock(dev);
+
+	if (new != toggle)
+		dev->broken_intx_masking = 1;
+}
+
+/**
  * pci_setup_device - fill in class and map information of a device
  * @dev: the device structure to fill
  *
@@ -1398,6 +1440,8 @@ int pci_setup_device(struct pci_dev *dev)
 			pci_write_config_word(dev, PCI_COMMAND, cmd);
 		}
 	}
+
+	pci_test_intx_masking(dev);
 
 	switch (dev->hdr_type) {		    /* header type */
 	case PCI_HEADER_TYPE_NORMAL:		    /* standard header */
