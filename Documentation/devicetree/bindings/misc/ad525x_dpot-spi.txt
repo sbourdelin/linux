@@ -1,0 +1,44 @@
+Digital Potentiometers (SPI) compatible with Analog Devices family
+
+Required properties:
+- compatible: Should be one of
+	* "ad,ad5160"
+	* "ad,ad5161"
+	* "ad,ad5162"
+	* "ad,ad5165"
+	* "ad,ad5200"
+	* "ad,ad5201"
+	* "ad,ad5203"
+	* "ad,ad5204"
+	* "ad,ad5206"
+	* "ad,ad5207"
+	* "ad,ad5231"
+	* "ad,ad5232"
+	* "ad,ad5233"
+	* "ad,ad5235"
+	* "ad,ad5260"
+	* "ad,ad5262"
+	* "ad,ad5263"
+	* "ad,ad5290"
+	* "ad,ad5291"
+	* "ad,ad5292"
+	* "ad,ad5293"
+	* "ad,ad7376"
+	* "ad,ad8400"
+	* "ad,ad8402"
+	* "ad,ad8403"
+	* "ad,adn2850"
+	* "ad,ad5270"
+	* "ad,ad5271"
+- reg : spi chip select number for the device
+- spi-max-frequency : max spi frequency to use
+see: Documentation/misc-devices/ad525x_dpot.txt
+
+Example:
+	ad5204@1 {
+		#address-cells = <1>;
+		#size-cells = <1>;
+		compatible = "ad,ad5204";
+		spi-max-frequency = <5000000>;
+		reg = <1>;
+	};
