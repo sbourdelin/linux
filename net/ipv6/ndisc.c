@@ -147,17 +147,18 @@ void __ndisc_fill_addr_option(struct sk_buff *skb, int type, void *data,
 
 	opt[0] = type;
 	opt[1] = space >> 3;
+	opt   += 2;
+	space -= 2;
 
-	memset(opt + 2, 0, pad);
+	memset(opt, 0, pad);
 	opt   += pad;
 	space -= pad;
 
-	memcpy(opt + 2, data, data_len);
-	data_len += 2;
+	memcpy(opt, data, data_len);
 	opt += data_len;
 	space -= data_len;
-	if (space > 0)
-		memset(opt, 0, space);
+
+	memset(opt, 0, space);
 }
 EXPORT_SYMBOL_GPL(__ndisc_fill_addr_option);
 
@@ -997,6 +998,7 @@ static void ndisc_recv_na(struct sk_buff *skb)
 	if (neigh) {
 		u8 old_flags = neigh->flags;
 		struct net *net = dev_net(dev);
+		u32 flags;
 
 		if (neigh->nud_state & NUD_FAILED)
 			goto out;
@@ -1013,13 +1015,14 @@ static void ndisc_recv_na(struct sk_buff *skb)
 			goto out;
 		}
 
+		flags = NEIGH_UPDATE_F_WEAK_OVERRIDE | NEIGH_UPDATE_F_OVERRIDE_ISROUTER;
+		if (msg->icmph.icmp6_override)
+			flags |= NEIGH_UPDATE_F_OVERRIDE;
+		if (msg->icmph.icmp6_router)
+			flags |= NEIGH_UPDATE_F_ISROUTER;
 		ndisc_update(dev, neigh, lladdr,
 			     msg->icmph.icmp6_solicited ? NUD_REACHABLE : NUD_STALE,
-			     NEIGH_UPDATE_F_WEAK_OVERRIDE|
-			     (msg->icmph.icmp6_override ? NEIGH_UPDATE_F_OVERRIDE : 0)|
-			     NEIGH_UPDATE_F_OVERRIDE_ISROUTER|
-			     (msg->icmph.icmp6_router ? NEIGH_UPDATE_F_ISROUTER : 0),
-			     NDISC_NEIGHBOUR_ADVERTISEMENT, &ndopts);
+			     flags, NDISC_NEIGHBOUR_ADVERTISEMENT, &ndopts);
 
 		if ((old_flags & ~neigh->flags) & NTF_ROUTER) {
 			/*
@@ -1217,12 +1220,11 @@ static void ndisc_router_discovery(struct sk_buff *skb)
 	 * received RA message (RFC 2462) -- yoshfuji
 	 */
 	old_if_flags = in6_dev->if_flags;
-	in6_dev->if_flags = (in6_dev->if_flags & ~(IF_RA_MANAGED |
-				IF_RA_OTHERCONF)) |
-				(ra_msg->icmph.icmp6_addrconf_managed ?
-					IF_RA_MANAGED : 0) |
-				(ra_msg->icmph.icmp6_addrconf_other ?
-					IF_RA_OTHERCONF : 0);
+	in6_dev->if_flags &= ~(IF_RA_MANAGED | IF_RA_OTHERCONF);
+	if (ra_msg->icmph.icmp6_addrconf_managed)
+		in6_dev->if_flags |= IF_RA_MANAGED;
+	if (ra_msg->icmph.icmp6_addrconf_other)
+		in6_dev->if_flags |= IF_RA_OTHERCONF;
 
 	if (old_if_flags != in6_dev->if_flags)
 		send_ifinfo_notify = true;
