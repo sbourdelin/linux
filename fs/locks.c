@@ -2052,16 +2052,28 @@ SYSCALL_DEFINE2(flock, unsigned int, fd, unsigned int, cmd)
  */
 int vfs_test_lock(struct file *filp, struct file_lock *fl)
 {
-	if (filp->f_op->lock && is_remote_lock(filp))
+	if (filp->f_op->lock && is_remote_lock(filp)) {
+		fl->fl_flags |= FL_PID_PRIV;
 		return filp->f_op->lock(filp, F_GETLK, fl);
+	}
 	posix_test_lock(filp, fl);
 	return 0;
 }
 EXPORT_SYMBOL_GPL(vfs_test_lock);
 
+static inline int flock_translate_pid(struct file_lock *fl)
+{
+	if (IS_OFDLCK(fl))
+		return -1;
+	if (fl->fl_flags & FL_PID_PRIV)
+		return fl->fl_pid;
+	return pid_vnr(fl->fl_nspid);
+}
+
+
 static int posix_lock_to_flock(struct flock *flock, struct file_lock *fl)
 {
-	flock->l_pid = IS_OFDLCK(fl) ? -1 : fl->fl_pid;
+	flock->l_pid = flock_translate_pid(fl);
 #if BITS_PER_LONG == 32
 	/*
 	 * Make sure we can represent the posix lock via
@@ -2083,7 +2095,7 @@ static int posix_lock_to_flock(struct flock *flock, struct file_lock *fl)
 #if BITS_PER_LONG == 32
 static void posix_lock_to_flock64(struct flock64 *flock, struct file_lock *fl)
 {
-	flock->l_pid = IS_OFDLCK(fl) ? -1 : fl->fl_pid;
+	flock->l_pid = flock_translate_pid(fl);
 	flock->l_start = fl->fl_start;
 	flock->l_len = fl->fl_end == OFFSET_MAX ? 0 :
 		fl->fl_end - fl->fl_start + 1;
@@ -2636,7 +2648,9 @@ static void lock_get_status(struct seq_file *f, struct file_lock *fl,
 	struct inode *inode = NULL;
 	unsigned int fl_pid;
 
-	if (fl->fl_nspid) {
+	if (fl->fl_flags & FL_PID_PRIV) {
+		fl_pid = fl->fl_pid;
+	} else {
 		struct pid_namespace *proc_pidns = file_inode(f->file)->i_sb->s_fs_info;
 
 		/* Don't let fl_pid change based on who is reading the file */
@@ -2649,8 +2663,7 @@ static void lock_get_status(struct seq_file *f, struct file_lock *fl,
 		 */
 		if (fl_pid == 0)
 			return;
-	} else
-		fl_pid = fl->fl_pid;
+	}
 
 	if (fl->fl_file != NULL)
 		inode = locks_inode(fl->fl_file);
