@@ -632,6 +632,12 @@ void key_put(struct key *key)
 }
 EXPORT_SYMBOL(key_put);
 
+static bool key_get_not_free(struct key *key)
+{
+	lockdep_assert_held(&key_serial_lock);
+	return refcount_inc_not_zero(&key->usage);
+}
+
 /*
  * Find a key by its serial number.
  */
@@ -660,14 +666,12 @@ not_found:
 	goto error;
 
 found:
-	/* pretend it doesn't exist if it is awaiting deletion */
-	if (refcount_read(&key->usage) == 0)
-		goto not_found;
-
-	/* this races with key_put(), but that doesn't matter since key_put()
-	 * doesn't actually change the key
+	/*
+	 * Pretend it doesn't exist if it is awaiting deletion. This races with
+	 * key_put(), but we can peek at the key until we drop key_serial_lock.
 	 */
-	__key_get(key);
+	if (!key_get_not_free(key))
+		goto not_found;
 
 error:
 	spin_unlock(&key_serial_lock);
