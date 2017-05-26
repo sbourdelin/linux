@@ -103,7 +103,7 @@ struct mousedev_client {
 	spinlock_t packet_lock;
 	int pos_x, pos_y;
 
-	signed char ps2[6];
+	unsigned char ps2[6];
 	unsigned char ready, buffer, bufsiz;
 	unsigned char imexseq, impsseq;
 	enum mousedev_emul mode;
@@ -577,7 +577,7 @@ static inline int mousedev_limit_delta(int delta, int limit)
 }
 
 static void mousedev_packet(struct mousedev_client *client,
-			    signed char *ps2_data)
+	unsigned char *ps2_data)
 {
 	struct mousedev_motion *p = &client->packets[client->tail];
 
