@@ -193,7 +193,7 @@ static struct tcf_chain *tcf_chain_create(struct tcf_block *block,
 
 	chain = kzalloc(sizeof(*chain), GFP_KERNEL);
 	if (!chain)
-		return NULL;
+		return ERR_PTR(-ENOMEM);
 	list_add_tail(&chain->list, &block->chain_list);
 	chain->block = block;
 	chain->index = chain_index;
@@ -231,10 +231,7 @@ struct tcf_chain *tcf_chain_get(struct tcf_block *block, u32 chain_index,
 			return chain;
 		}
 	}
-	if (create)
-		return tcf_chain_create(block, chain_index);
-	else
-		return NULL;
+	return create ? tcf_chain_create(block, chain_index) : ERR_PTR(-EINVAL);
 }
 EXPORT_SYMBOL(tcf_chain_get);
 
@@ -267,8 +264,8 @@ int tcf_block_get(struct tcf_block **p_block,
 	INIT_LIST_HEAD(&block->chain_list);
 	/* Create chain 0 by default, it has to be always present. */
 	chain = tcf_chain_create(block, 0);
-	if (!chain) {
-		err = -ENOMEM;
+	if (IS_ERR(chain)) {
+		err = PTR_ERR(chain);
 		goto err_chain_create;
 	}
 	tcf_chain_filter_chain_ptr_set(chain, p_filter_chain);
@@ -517,8 +514,8 @@ replay:
 	}
 	chain = tcf_chain_get(block, chain_index,
 			      n->nlmsg_type == RTM_NEWTFILTER);
-	if (!chain) {
-		err = n->nlmsg_type == RTM_NEWTFILTER ? -ENOMEM : -EINVAL;
+	if (IS_ERR(chain)) {
+		err = PTR_ERR(chain);
 		goto errout;
 	}
 

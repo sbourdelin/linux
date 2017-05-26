@@ -35,8 +35,8 @@ static int tcf_action_goto_chain_init(struct tc_action *a, struct tcf_proto *tp)
 	if (!tp)
 		return -EINVAL;
 	a->goto_chain = tcf_chain_get(tp->chain->block, chain_index, true);
-	if (!a->goto_chain)
-		return -ENOMEM;
+	if (IS_ERR(a->goto_chain))
+		return PTR_ERR(a->goto_chain);
 	return 0;
 }
 
