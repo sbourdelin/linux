@@ -302,7 +302,6 @@ skip_unset_push:
 out:
 	return err;
 }
-#endif
 
 static struct mlx5_flow_handle *
 mlx5_eswitch_add_send_to_vport_rule(struct mlx5_eswitch *esw, int vport, u32 sqn)
@@ -395,7 +394,6 @@ out_err:
 	return err;
 }
 
-#ifdef CONFIG_MLX5_EN_ESWITCH_OFFLOADS
 static int esw_add_fdb_miss_rule(struct mlx5_eswitch *esw)
 {
 	struct mlx5_flow_act flow_act = {0};

@@ -340,11 +340,25 @@ struct mlx5_esw_flow_attr {
 	struct mlx5e_tc_flow_parse_attr *parse_attr;
 };
 
+#ifdef CONFIG_MLX5_EN_ESWITCH_OFFLOADS
 int mlx5_eswitch_sqs2vport_start(struct mlx5_eswitch *esw,
 				 struct mlx5_eswitch_rep *rep,
 				 u16 *sqns_array, int sqns_num);
 void mlx5_eswitch_sqs2vport_stop(struct mlx5_eswitch *esw,
 				 struct mlx5_eswitch_rep *rep);
+#else
+static inline int mlx5_eswitch_sqs2vport_start(struct mlx5_eswitch *esw,
+					       struct mlx5_eswitch_rep *rep,
+					       u16 *sqns_array, int sqns_num)
+{
+	return -EOPNOTSUPP;
+}
+static inline void mlx5_eswitch_sqs2vport_stop(struct mlx5_eswitch *esw,
+					       struct mlx5_eswitch_rep *rep)
+{
+	return;
+}
+#endif
 
 int mlx5_devlink_eswitch_mode_set(struct devlink *devlink, u16 mode);
 int mlx5_devlink_eswitch_mode_get(struct devlink *devlink, u16 *mode);
