@@ -4186,6 +4186,7 @@ static const char * const nand_ecc_modes[] = {
 	[NAND_ECC_HW_SYNDROME]	= "hw_syndrome",
 	[NAND_ECC_HW_OOB_FIRST]	= "hw_oob_first",
 	[NAND_ECC_ON_DIE]	= "on-die",
+	[NAND_ECC_BENAND]	= "benand",
 };
 
 static int of_get_nand_ecc_mode(struct device_node *np)
@@ -4751,6 +4752,19 @@ int nand_scan_tail(struct mtd_info *mtd)
 			ecc->write_oob = nand_write_oob_std;
 		break;
 
+	case NAND_ECC_BENAND:
+		if (!ecc->read_page || !ecc->read_subpage) {
+			WARN(1, "No ECC functions supplied; benand ECC not possible\n");
+			ret = -EINVAL;
+			goto err_free;
+		}
+		ecc->write_page = nand_write_page_raw;
+		ecc->read_page_raw = nand_read_page_raw;
+		ecc->write_page_raw = nand_write_page_raw;
+		ecc->read_oob = nand_read_oob_std;
+		ecc->write_oob = nand_write_oob_std;
+		break;
+
 	case NAND_ECC_NONE:
 		pr_warn("NAND_ECC_NONE selected by board driver. This is not recommended!\n");
 		ecc->read_page = nand_read_page_raw;
@@ -4831,6 +4845,7 @@ int nand_scan_tail(struct mtd_info *mtd)
 	/* Large page NAND with SOFT_ECC should support subpage reads */
 	switch (ecc->mode) {
 	case NAND_ECC_SOFT:
+	case NAND_ECC_BENAND:
 		if (chip->page_shift > 9)
 			chip->options |= NAND_SUBPAGE_READ;
 		break;
