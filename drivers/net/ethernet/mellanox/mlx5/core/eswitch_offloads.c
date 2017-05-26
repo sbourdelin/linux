@@ -122,6 +122,7 @@ mlx5_eswitch_del_offloaded_rule(struct mlx5_eswitch *esw,
 	esw->offloads.num_flows--;
 }
 
+#ifdef CONFIG_MLX5_EN_ESWITCH_OFFLOADS
 static int esw_set_global_vlan_pop(struct mlx5_eswitch *esw, u8 val)
 {
 	struct mlx5_eswitch_rep *rep;
@@ -301,6 +302,7 @@ skip_unset_push:
 out:
 	return err;
 }
+#endif
 
 static struct mlx5_flow_handle *
 mlx5_eswitch_add_send_to_vport_rule(struct mlx5_eswitch *esw, int vport, u32 sqn)

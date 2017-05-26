@@ -338,10 +338,23 @@ void mlx5_eswitch_unregister_vport_rep(struct mlx5_eswitch *esw,
 				       int vport_index);
 struct net_device *mlx5_eswitch_get_uplink_netdev(struct mlx5_eswitch *esw);
 
+#ifdef CONFIG_MLX5_EN_ESWITCH_OFFLOADS
 int mlx5_eswitch_add_vlan_action(struct mlx5_eswitch *esw,
 				 struct mlx5_esw_flow_attr *attr);
 int mlx5_eswitch_del_vlan_action(struct mlx5_eswitch *esw,
 				 struct mlx5_esw_flow_attr *attr);
+#else
+static inline int mlx5_eswitch_add_vlan_action(struct mlx5_eswitch *esw,
+					       struct mlx5_esw_flow_attr *attr)
+{
+	return -EOPNOTSUPP;
+}
+static inline int mlx5_eswitch_del_vlan_action(struct mlx5_eswitch *esw,
+					       struct mlx5_esw_flow_attr *attr)
+{
+	return -EOPNOTSUPP;
+}
+#endif
 int __mlx5_eswitch_set_vport_vlan(struct mlx5_eswitch *esw,
 				  int vport, u16 vlan, u8 qos, u8 set_flags);
 
