@@ -61,6 +61,10 @@ enum opcode {
 	insn_srlv, insn_subu, insn_sw, insn_sync, insn_syscall, insn_tlbp,
 	insn_tlbr, insn_tlbwi, insn_tlbwr, insn_wait, insn_wsbh, insn_xor,
 	insn_xori, insn_yield, insn_lddir, insn_ldpte, insn_lhu,
+	insn_bgtz, insn_blez, insn_ddivu, insn_dmultu, insn_dsbh, insn_dshd,
+	insn_dsllv, insn_dsra32, insn_dsrav, insn_dsrlv, insn_lbu, insn_movn,
+	insn_movz, insn_multu, insn_nor, insn_sb, insn_sh, insn_slti,
+	insn_dinsu,
 	insn_invalid /* insn_invalid must be last */
 };
 
@@ -214,6 +218,13 @@ Ip_u2u1msbu3(op)					\
 }							\
 UASM_EXPORT_SYMBOL(uasm_i##op);
 
+#define I_u2u1msb32msb3(op)				\
+Ip_u2u1msbu3(op)					\
+{							\
+	build_insn(buf, insn##op, b, a, c+d-33, c-32);	\
+}							\
+UASM_EXPORT_SYMBOL(uasm_i##op);
+
 #define I_u2u1msbdu3(op)				\
 Ip_u2u1msbu3(op)					\
 {							\
@@ -264,6 +275,8 @@ I_u1u2s3(_beq)
 I_u1u2s3(_beql)
 I_u1s2(_bgez)
 I_u1s2(_bgezl)
+I_u1s2(_bgtz)
+I_u1s2(_blez)
 I_u1s2(_bltz)
 I_u1s2(_bltzl)
 I_u1u2s3(_bne)
@@ -272,17 +285,25 @@ I_u1u2(_cfc1)
 I_u2u1(_cfcmsa)
 I_u1u2(_ctc1)
 I_u2u1(_ctcmsa)
+I_u1u2(_ddivu)
 I_u1u2u3(_dmfc0)
 I_u1u2u3(_dmtc0)
+I_u1u2(_dmultu)
 I_u2u1s3(_daddiu)
 I_u3u1u2(_daddu)
 I_u1(_di);
 I_u1u2(_divu)
+I_u2u1(_dsbh);
+I_u2u1(_dshd);
 I_u2u1u3(_dsll)
 I_u2u1u3(_dsll32)
+I_u3u2u1(_dsllv)
 I_u2u1u3(_dsra)
+I_u2u1u3(_dsra32)
+I_u3u2u1(_dsrav)
 I_u2u1u3(_dsrl)
 I_u2u1u3(_dsrl32)
+I_u3u2u1(_dsrlv)
 I_u2u1u3(_drotr)
 I_u2u1u3(_drotr32)
 I_u3u1u2(_dsubu)
@@ -294,6 +315,7 @@ I_u1(_jal)
 I_u2u1(_jalr)
 I_u1(_jr)
 I_u2s3u1(_lb)
+I_u2s3u1(_lbu)
 I_u2s3u1(_ld)
 I_u2s3u1(_lh)
 I_u2s3u1(_lhu)
@@ -303,6 +325,8 @@ I_u1s2(_lui)
 I_u2s3u1(_lw)
 I_u1u2u3(_mfc0)
 I_u1u2u3(_mfhc0)
+I_u3u1u2(_movn)
+I_u3u1u2(_movz)
 I_u1(_mfhi)
 I_u1(_mflo)
 I_u1u2u3(_mtc0)
@@ -310,15 +334,20 @@ I_u1u2u3(_mthc0)
 I_u1(_mthi)
 I_u1(_mtlo)
 I_u3u1u2(_mul)
-I_u2u1u3(_ori)
+I_u1u2(_multu)
+I_u3u1u2(_nor)
 I_u3u1u2(_or)
+I_u2u1u3(_ori)
 I_0(_rfe)
+I_u2s3u1(_sb)
 I_u2s3u1(_sc)
 I_u2s3u1(_scd)
 I_u2s3u1(_sd)
+I_u2s3u1(_sh)
 I_u2u1u3(_sll)
 I_u3u2u1(_sllv)
 I_s3s1s2(_slt)
+I_u2u1s3(_slti)
 I_u2u1s3(_sltiu)
 I_u3u1u2(_sltu)
 I_u2u1u3(_sra)
@@ -339,6 +368,7 @@ I_u2u1u3(_xori)
 I_u2u1(_yield)
 I_u2u1msbu3(_dins);
 I_u2u1msb32u3(_dinsm);
+I_u2u1msb32msb3(_dinsu);
 I_u1(_syscall);
 I_u1u2s3(_bbit0);
 I_u1u2s3(_bbit1);
