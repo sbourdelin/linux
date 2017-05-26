@@ -43,7 +43,6 @@ enum {
 	FDB_SLOW_PATH
 };
 
-#ifdef CONFIG_MLX5_EN_ESWITCH_OFFLOADS
 struct mlx5_flow_handle *
 mlx5_eswitch_add_offloaded_rule(struct mlx5_eswitch *esw,
 				struct mlx5_flow_spec *spec,
@@ -426,7 +425,6 @@ out:
 	kvfree(spec);
 	return err;
 }
-#endif
 
 #define ESW_OFFLOADS_NUM_GROUPS  4
 
@@ -477,7 +475,6 @@ static void esw_destroy_offloads_fast_fdb_table(struct mlx5_eswitch *esw)
 
 #define MAX_PF_SQ 256
 
-#ifdef CONFIG_MLX5_EN_ESWITCH_OFFLOADS
 static int esw_create_offloads_fdb_tables(struct mlx5_eswitch *esw, int nvports)
 {
 	int inlen = MLX5_ST_SZ_BYTES(create_flow_group_in);
@@ -737,7 +734,6 @@ static int esw_offloads_start(struct mlx5_eswitch *esw)
 	return err;
 }
 
-#ifdef CONFIG_MLX5_EN_ESWITCH_OFFLOADS
 int esw_offloads_init(struct mlx5_eswitch *esw, int nvports)
 {
 	struct mlx5_eswitch_rep *rep;
@@ -796,7 +792,6 @@ create_fdb_err:
 
 	return err;
 }
-#endif
 
 static int esw_offloads_stop(struct mlx5_eswitch *esw)
 {
@@ -819,7 +814,6 @@ static int esw_offloads_stop(struct mlx5_eswitch *esw)
 	return err;
 }
 
-#ifdef CONFIG_MLX5_EN_ESWITCH_OFFLOADS
 void esw_offloads_cleanup(struct mlx5_eswitch *esw, int nvports)
 {
 	struct mlx5_eswitch_rep *rep;
@@ -836,7 +830,6 @@ void esw_offloads_cleanup(struct mlx5_eswitch *esw, int nvports)
 	esw_destroy_offloads_table(esw);
 	esw_destroy_offloads_fdb_tables(esw);
 }
-#endif
 
 static int esw_mode_from_devlink(u16 mode, u16 *mlx5_mode)
 {
@@ -1124,7 +1117,6 @@ int mlx5_devlink_eswitch_encap_mode_get(struct devlink *devlink, u8 *encap)
 	return 0;
 }
 
-#ifdef CONFIG_MLX5_EN_ESWITCH_OFFLOADS
 void mlx5_eswitch_register_vport_rep(struct mlx5_eswitch *esw,
 				     int vport_index,
 				     struct mlx5_eswitch_rep *__rep)
@@ -1169,4 +1161,3 @@ struct net_device *mlx5_eswitch_get_uplink_netdev(struct mlx5_eswitch *esw)
 	rep = &offloads->vport_reps[UPLINK_REP_INDEX];
 	return rep->netdev;
 }
-#endif
