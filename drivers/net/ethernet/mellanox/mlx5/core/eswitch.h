@@ -243,8 +243,19 @@ struct mlx5_eswitch {
 	int                     mode;
 };
 
+#ifdef CONFIG_MLX5_EN_ESWITCH_OFFLOADS
 void esw_offloads_cleanup(struct mlx5_eswitch *esw, int nvports);
 int esw_offloads_init(struct mlx5_eswitch *esw, int nvports);
+#else
+static inline void esw_offloads_cleanup(struct mlx5_eswitch *esw, int nvports)
+{
+	return;
+}
+static inline int esw_offloads_init(struct mlx5_eswitch *esw, int nvports)
+{
+	return -EOPNOTSUPP;
+}
+#endif
 
 /* E-Switch API */
 int mlx5_eswitch_init(struct mlx5_core_dev *dev);
