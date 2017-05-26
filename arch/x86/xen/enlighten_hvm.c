@@ -68,9 +68,10 @@ static void __init init_hvm_pv_info(void)
 	xen_domain_type = XEN_HVM_DOMAIN;
 
 	/* PVH set up hypercall page in xen_prepare_pvh(). */
-	if (xen_pvh_domain())
+	if (xen_pvh_domain()) {
 		pv_info.name = "Xen PVH";
-	else {
+		xen_guest_type = "PVH";
+	} else {
 		u64 pfn;
 		uint32_t msr;
 

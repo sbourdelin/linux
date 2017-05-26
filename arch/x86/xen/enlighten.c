@@ -47,6 +47,9 @@ EXPORT_PER_CPU_SYMBOL(xen_vcpu_id);
 enum xen_domain_type xen_domain_type = XEN_NATIVE;
 EXPORT_SYMBOL_GPL(xen_domain_type);
 
+const char *xen_guest_type = "HVM";
+EXPORT_SYMBOL_GPL(xen_guest_type);
+
 unsigned long *machine_to_phys_mapping = (void *)MACH2PHYS_VIRT_START;
 EXPORT_SYMBOL(machine_to_phys_mapping);
 unsigned long  machine_to_phys_nr;
