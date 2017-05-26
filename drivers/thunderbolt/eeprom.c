@@ -204,6 +204,11 @@ struct tb_drom_entry_header {
 	enum tb_drom_entry_type type:1;
 } __packed;
 
+struct tb_drom_entry_generic {
+	struct tb_drom_entry_header header;
+	u8 data[0];
+} __packed;
+
 struct tb_drom_entry_port {
 	/* BYTES 0-1 */
 	struct tb_drom_entry_header header;
@@ -295,6 +300,42 @@ int tb_drom_read_uid_only(struct tb_switch *sw, u64 *uid)
 	return 0;
 }
 
+static const char *parse_name(const u8 *data, u8 len)
+{
+	char *name;
+
+	name = kmemdup(data, len, GFP_KERNEL);
+	if (name)
+		name[len - 1] = '\0';
+	return name;
+}
+
+static int tb_drom_parse_entry_generic(struct tb_switch *sw,
+		struct tb_drom_entry_header *header)
+{
+	const struct tb_drom_entry_generic *entry =
+		(const struct tb_drom_entry_generic *)header;
+
+	switch (header->index) {
+	case 1:
+		/* Length includes 2 bytes header so remove it before copy */
+		sw->vendor_name = parse_name(entry->data,
+					     header->len - sizeof(*header));
+		if (!sw->vendor_name)
+			return -ENOMEM;
+		break;
+
+	case 2:
+		sw->device_name = parse_name(entry->data,
+					     header->len - sizeof(*header));
+		if (!sw->device_name)
+			return -ENOMEM;
+		break;
+	}
+
+	return 0;
+}
+
 static int tb_drom_parse_entry_port(struct tb_switch *sw,
 				    struct tb_drom_entry_header *header)
 {
@@ -350,6 +391,7 @@ static int tb_drom_parse_entries(struct tb_switch *sw)
 
 		switch (entry->type) {
 		case TB_DROM_ENTRY_GENERIC:
+			res = tb_drom_parse_entry_generic(sw, entry);
 			break;
 		case TB_DROM_ENTRY_PORT:
 			res = tb_drom_parse_entry_port(sw, entry);
