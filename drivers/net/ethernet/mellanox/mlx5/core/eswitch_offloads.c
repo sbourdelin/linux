@@ -670,7 +670,6 @@ static void esw_destroy_vport_rx_group(struct mlx5_eswitch *esw)
 {
 	mlx5_destroy_flow_group(esw->offloads.vport_rx_group);
 }
-#endif
 
 struct mlx5_flow_handle *
 mlx5_eswitch_create_vport_rx_rule(struct mlx5_eswitch *esw, int vport, u32 tirn)
@@ -710,6 +709,7 @@ out:
 	kvfree(spec);
 	return flow_rule;
 }
+#endif
 
 static int esw_offloads_start(struct mlx5_eswitch *esw)
 {
