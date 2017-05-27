@@ -206,14 +206,20 @@ int irq_startup(struct irq_desc *desc, bool resend)
 
 void irq_shutdown(struct irq_desc *desc)
 {
-	irq_state_set_disabled(desc);
 	desc->depth = 1;
+
+	if (unlikely(irqd_irq_disabled(&desc->irq_data) &&
+		irqd_irq_masked(&desc->irq_data)))
+		goto out;
+
+	irq_state_set_disabled(desc);
 	if (desc->irq_data.chip->irq_shutdown)
 		desc->irq_data.chip->irq_shutdown(&desc->irq_data);
 	else if (desc->irq_data.chip->irq_disable)
 		desc->irq_data.chip->irq_disable(&desc->irq_data);
 	else
 		desc->irq_data.chip->irq_mask(&desc->irq_data);
+out:
 	irq_domain_deactivate_irq(&desc->irq_data);
 	irq_state_set_masked(desc);
 }
