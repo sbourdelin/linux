@@ -27,8 +27,8 @@
 
 #define LIQUIDIO_PACKAGE ""
 #define LIQUIDIO_BASE_MAJOR_VERSION 1
-#define LIQUIDIO_BASE_MINOR_VERSION 5
-#define LIQUIDIO_BASE_MICRO_VERSION 1
+#define LIQUIDIO_BASE_MINOR_VERSION 6
+#define LIQUIDIO_BASE_MICRO_VERSION 0
 #define LIQUIDIO_BASE_VERSION   __stringify(LIQUIDIO_BASE_MAJOR_VERSION) "." \
 				__stringify(LIQUIDIO_BASE_MINOR_VERSION)
 #define LIQUIDIO_MICRO_VERSION  "." __stringify(LIQUIDIO_BASE_MICRO_VERSION)
@@ -63,6 +63,8 @@ enum octeon_tag_type {
  */
 #define OPCODE_CORE 0           /* used for generic core operations */
 #define OPCODE_NIC  1           /* used for NIC operations */
+#define OPCODE_OVS  2           /* used for OVS operations */
+
 /* Subcodes are used by host driver/apps to identify the sub-operation
  * for the core. They only need to by unique for a given subsystem.
  */
@@ -886,6 +888,23 @@ union oct_nic_if_cfg {
 		u64 num_oqueues:16;
 		u64 num_iqueues:16;
 		u64 base_queue:16;
+#endif
+	} s;
+};
+
+union oct_nic_vf_info {
+	u64 u64;
+	struct {
+#ifdef __BIG_ENDIAN_BITFIELD
+		u64 max_vfs:32;
+		u64 bus_num:8;
+		u64 dev_fn:8;
+		u64 reserved:16;
+#else
+		u64 reserved:16;
+		u64 dev_fn:8;
+		u64 bus_num:8;
+		u64 max_vfs:32;
 #endif
 	} s;
 };

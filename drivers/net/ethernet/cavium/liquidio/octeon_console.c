@@ -724,18 +724,22 @@ static int octeon_console_read(struct octeon_device *oct, u32 console_num,
 }
 
 #define FBUF_SIZE	(4 * 1024 * 1024)
-u8 fbuf[FBUF_SIZE];
 
 int octeon_download_firmware(struct octeon_device *oct, const u8 *data,
 			     size_t size)
 {
 	int ret = 0;
-	u8 *p = fbuf;
 	u32 crc32_result;
 	u64 load_addr;
 	u32 image_len;
 	struct octeon_firmware_file_header *h;
 	u32 i, rem;
+	char *bootcmd;
+	char date[30];
+	struct timeval time;
+	struct tm tm;
+	size_t cmdlen;
+
 
 	if (size < sizeof(struct octeon_firmware_file_header)) {
 		dev_err(&oct->pci_dev->dev, "Firmware file too small (%d < %d).\n",
@@ -805,10 +809,9 @@ int octeon_download_firmware(struct octeon_device *oct, const u8 *data,
 			else
 				size = FBUF_SIZE;
 
-			memcpy(p, data, size);
-
 			/* download the image */
-			octeon_pci_write_core_mem(oct, load_addr, p, (u32)size);
+			octeon_pci_write_core_mem(
+					oct, load_addr, (u8 *)data, (u32)size);
 
 			data += size;
 			rem -= (u32)size;
@@ -818,8 +821,18 @@ int octeon_download_firmware(struct octeon_device *oct, const u8 *data,
 	dev_info(&oct->pci_dev->dev, "Writing boot command: %s\n",
 		 h->bootcmd);
 
-	/* Invoke the bootcmd */
-	ret = octeon_console_send_cmd(oct, h->bootcmd, 50);
+	/*Get time of the day*/
+	do_gettimeofday(&time);
+	time_to_tm(time.tv_sec, (-sys_tz.tz_minuteswest) * 60,  &tm);
+	snprintf(date, 30, " date=%04ld.%02d.%02d-%02d:%02d:%02d",
+		 tm.tm_year + 1900, tm.tm_mon + 1, tm.tm_mday,
+		 tm.tm_hour, tm.tm_min, tm.tm_sec);
+	cmdlen = strlen(h->bootcmd) + sizeof(date) + 1;
+	bootcmd = kmalloc(cmdlen, GFP_KERNEL);
+	strncpy(bootcmd, h->bootcmd, cmdlen);
+	strcat(bootcmd, date);
+	ret = octeon_console_send_cmd(oct, bootcmd, 50);
+	kfree(bootcmd);
 
 	return 0;
 }

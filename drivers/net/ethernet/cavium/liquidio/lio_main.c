@@ -43,6 +43,8 @@ MODULE_FIRMWARE(LIO_FW_DIR LIO_FW_BASE_NAME LIO_210SV_NAME LIO_FW_NAME_SUFFIX);
 MODULE_FIRMWARE(LIO_FW_DIR LIO_FW_BASE_NAME LIO_210NV_NAME LIO_FW_NAME_SUFFIX);
 MODULE_FIRMWARE(LIO_FW_DIR LIO_FW_BASE_NAME LIO_410NV_NAME LIO_FW_NAME_SUFFIX);
 MODULE_FIRMWARE(LIO_FW_DIR LIO_FW_BASE_NAME LIO_23XX_NAME LIO_FW_NAME_SUFFIX);
+MODULE_FIRMWARE(LIO_FW_DIR LIO_FW_BASE_NAME LIO_23XX_NAME "_"
+		 LIO_FW_NAME_TYPE_OVS LIO_FW_NAME_SUFFIX);
 
 static int ddr_timeout = 10000;
 module_param(ddr_timeout, int, 0644);
@@ -57,7 +59,7 @@ MODULE_PARM_DESC(debug, "NETIF_MSG debug bits");
 
 static char fw_type[LIO_MAX_FW_TYPE_LEN];
 module_param_string(fw_type, fw_type, sizeof(fw_type), 0000);
-MODULE_PARM_DESC(fw_type, "Type of firmware to be loaded. Default \"nic\"");
+MODULE_PARM_DESC(fw_type, "Type of firmware to be loaded (nic,ovs,none). Default \"nic\".  Use \"none\" to load firmware from flash on LiquidIO adapter.");
 
 static int ptp_enable = 1;
 
@@ -1414,6 +1416,12 @@ static bool fw_type_is_none(void)
 		       sizeof(LIO_FW_NAME_TYPE_NONE)) == 0;
 }
 
+static bool is_fw_type_ovs(void)
+{
+	return strncmp(fw_type, LIO_FW_NAME_TYPE_OVS,
+		       sizeof(LIO_FW_NAME_TYPE_OVS)) == 0;
+}
+
 /**
  *\brief Destroy resources associated with octeon device
  * @param pdev PCI device structure
@@ -1775,6 +1783,9 @@ static void liquidio_remove(struct pci_dev *pdev)
 	struct octeon_device *oct_dev = pci_get_drvdata(pdev);
 
 	dev_dbg(&oct_dev->pci_dev->dev, "Stopping device\n");
+
+	if (is_fw_type_ovs())
+		lio_mgmt_exit();
 
 	if (oct_dev->watchdog_task)
 		kthread_stop(oct_dev->watchdog_task);
@@ -3933,6 +3944,8 @@ static int setup_nic_devices(struct octeon_device *octeon_dev)
 	u32 resp_size, ctx_size, data_size;
 	u32 ifidx_or_pfnum;
 	struct lio_version *vdata;
+	union oct_nic_vf_info vf_info;
+
 
 	/* This is to handle link status changes */
 	octeon_register_dispatch_fn(octeon_dev, OPCODE_NIC,
@@ -4001,9 +4014,16 @@ static int setup_nic_devices(struct octeon_device *octeon_dev)
 
 		sc->iq_no = 0;
 
+		/* Populate VF info for OVS firmware */
+		vf_info.u64 = 0;
+
+		vf_info.s.bus_num = octeon_dev->pci_dev->bus->number;
+		vf_info.s.dev_fn = octeon_dev->pci_dev->devfn;
+		vf_info.s.max_vfs = octeon_dev->sriov_info.max_vfs;
+
 		octeon_prepare_soft_command(octeon_dev, sc, OPCODE_NIC,
 					    OPCODE_NIC_IF_CFG, 0,
-					    if_cfg.u64, 0);
+					    if_cfg.u64, vf_info.u64);
 
 		sc->callback = if_cfg_callback;
 		sc->callback_arg = sc;
@@ -4381,6 +4401,9 @@ static int liquidio_init_nic_module(struct octeon_device *oct)
 		dev_err(&oct->pci_dev->dev, "Setup NIC devices failed\n");
 		goto octnet_init_failure;
 	}
+
+	if (is_fw_type_ovs())
+		lio_mgmt_init(oct);
 
 	liquidio_ptp_init(oct);
 
