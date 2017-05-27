@@ -1,0 +1,31 @@
+* Spreadtrum Pin Controller
+
+The Spreadtrum pin controller are organized in 3 blocks (types).
+
+The first block comprises some global control registers, and each
+register contains several feilds with one bit or several bits to
+configurate for some global common configuration, such as domain
+pad driving level, system control select and so on. We recognise
+every feild comprising one bit or several bits in one global control
+register as one pin, thus we should record every pin's bit offset,
+bit width and register offset to configurate this feild (pin).
+
+The second block comprises some common registers which have unified
+register definition, and each register described one pin is used
+to configurate pin sleep mode and function select.
+
+The last block comprises some misc registers which also have unified
+register definition, and each register described one pin is used to
+configurate drive strength, pull up/down and so on.
+
+This driver supports the generic pin multiplexing and configuration
+bindings. For details on each properties, you can refer to
+./pinctrl-bindings.txt.
+
+Required properties for Spreadtrum pin controller:
+- compatible: "sprd,<soc>-pinctrl"
+  Please refer to each sprd,<soc>-pinctrl.txt binding doc for supported SoCs.
+
+Required properties for pin configuration node:
+- sprd,pins: each entry consists of 2 integers and represents the pin
+  id and config setting for one pin.

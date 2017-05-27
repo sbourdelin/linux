@@ -1,0 +1,26 @@
+* Spreadtrum SC9860 Pin Controller
+
+Please refer to sprd,pinctrl.txt in this directory for common binding part
+and usage.
+
+Required properties:
+- compatible: must be "sprd,sc9860-pinctrl".
+- reg: the register address of pin controller device.
+- sprd,pins: two integers array, represents a group of pins id and config
+  setting. The format is sprd,pins = <PIN_ID CONFIG>, PIN_ID can be found
+  from pinctrl-sprd-sc9860.c file or spec file, CONFIG is the pad setting
+  value like pull-up for this pin.
+
+Example:
+pin_controller: pinctrl@402a0000 {
+	compatible = "sprd,sc9860-pinctrl";
+	reg = <0x402a0000 0x10000>;
+
+	vio_sd0_ms_0: sd0_ms0 {
+		sprd,pins = <8 0x1>;
+	};
+
+	vbc_iis0_0: iis0_c {
+		sprd,pins = <34 0xc>;
+	};
+};
