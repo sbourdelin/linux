@@ -157,6 +157,16 @@ config SUN8I_DE2_CCU
 	select SUNXI_CCU_DIV
 	select SUNXI_CCU_GATE
 
+config SUN8I_R40_CCU
+	bool "Support for the Allwinner R40 CCU"
+	select SUNXI_CCU_DIV
+	select SUNXI_CCU_NK
+	select SUNXI_CCU_NKM
+	select SUNXI_CCU_NKMP
+	select SUNXI_CCU_NM
+	select SUNXI_CCU_MP
+	default MACH_SUN8I
+
 config SUN9I_A80_CCU
 	bool "Support for the Allwinner A80 CCU"
 	select SUNXI_CCU_DIV
