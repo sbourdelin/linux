@@ -191,7 +191,7 @@ u32 method_id, const struct acpi_buffer *in, struct acpi_buffer *out)
 	if (!(block->flags & ACPI_WMI_METHOD))
 		return AE_BAD_DATA;
 
-	if (block->instance_count < instance)
+	if (block->instance_count <= instance)
 		return AE_BAD_PARAMETER;
 
 	input.count = 2;
@@ -250,7 +250,7 @@ struct acpi_buffer *out)
 	block = &wblock->gblock;
 	handle = wblock->handle;
 
-	if (block->instance_count < instance)
+	if (block->instance_count <= instance)
 		return AE_BAD_PARAMETER;
 
 	/* Check GUID is a data block */
@@ -323,7 +323,7 @@ const struct acpi_buffer *in)
 	block = &wblock->gblock;
 	handle = wblock->handle;
 
-	if (block->instance_count < instance)
+	if (block->instance_count <= instance)
 		return AE_BAD_PARAMETER;
 
 	/* Check GUID is a data block */
