@@ -1,0 +1,134 @@
+NMI Generic Handler
+===================
+
+This module allows you to Panic or Ignore specific NMI events.
+
+
+Author: Adrien Mahieux <adrien.mahieux@gmail.com>
+Tools:  https://github.com/saruspete/kdumptools
+
+
+Description
+-----------
+
+Manage NMI events in a more fine-grained manner than unknown_nmi_panic sysctl.
+
+
+When a host is unresponsive, we'd like to take a vmcore for offline analysis.
+If kdump is correctly setup, we need to crash/panic the system for it to start.
+
+This is usually done by sending an NMI to the system (as no userland process
+is responding anymore) through the BMC.
+
+If no handler registers the vendor-specific NMI event to trigger a crash,
+the kernel logs a "Dazed and confused, but trying to continue" message and
+server is still unresponsive.
+
+
+Why not just using "nmi_panic" sysctls ?
+----------------------------------------
+
+There is 3 sysctls that allows administrators to generate a panic:
+- panic_on_io_nmi
+- panic_on_unrecovered_nmi
+- unknown_nmi_panic
+
+These sysctl are overkill as multiple NMI can be generated for non-critical
+events like:
+- Software debugging, like perf on Pentium processors
+- External cards like FPGA to communicate
+- Motherboard alerts of a dying Power-Supply
+
+However, the NMI event changes between
+vendors and/or revisions. Also, you may get NMI for non-critical events, like
+a redundent power-supply unit dead, or a FPGA card being stuck.
+
+If you are fine with the current unknown_nmi_panic settings, this module can
+also be used to ignore other NMIs during the dump process, even those who have
+a kernel module for handling. This avoid the interruption of the dump process,
+thus having a non-usable vmcore.
+
+
+Parameters
+----------
+
+Available events are (in processing order):
+
+- events_ignore=LIST Events to ignore silently, let them pass to other handlers
+- events_drop=LISt   Events to drop, so no other handler can process them
+- events_panic=LIST  Events to make the kernel Panic
+
+LIST is standard kernel lists, can be composed of
+- simple lists:  0,13,16,44,10
+- ranges:        10-100
+- Mix of both:   0,1,2-8,10
+
+
+Like all modules, you can also configure it from boot cmd by prefixing the
+module name and a dot:
+  nmimgr.events_ignore=... nmimgr.events_drop=... nmimgr.events_panic=...
+
+
+
+
+Discover your hardware NMI events
+---------------------------------
+
+When trying new hardware, you'll have to discover the NMI events assigned
+to the external generator.
+
+To ease this task, you can use the setup.sh script located at:
+  https://raw.githubusercontent.com/Saruspete/nmimgr/master/setup.sh
+
+
+If you want to do it manually, or if your hardware is not referenced yet:
+
+- ensure all nmi sysctls are disabled (sysctl -a|grep _nmi)
+- load the module without parameter
+- generate an NMI from your BMC
+- check dmesg for lines containing "nmimgr:", specifically "Handling new NMI".
+- The code you are interested in (the event) is the decimal value between ( )
+
+If you see this log: "Handling new NMI type:1 event:0x10 (16)"
+Then the event code generated is 16.
+To make the system panic:
+  # modprobe nmimgr events_panic=16
+To ignore it and disable messages:
+  # modprobe nmimgr events_ignore=16
+
+
+Configure it permanently
+------------------------
+
+If you want to be able to reconfigure it, and if built as a module:
+    # echo "options nmimgr events_panic=16 events_drop=10" > \
+	/etc/modprobe.d/nmimgr.conf
+
+If it's built-in, change the cmdline boot, adding parameters
+
+2) Reload it:
+    # rmmod nmimgr; modprobe nmimgr
+3) Check the parameters are correctly set (you should see your value)
+    # cat /sys/module/nmimgr/parameters/events_panic
+
+
+
+Generate an NMI
+---------------
+
+- ipmitool chassis power diag
+- vboxmanage debugvm "VMName" injectnmi
+- virsh inject-nmi "VMName"
+
+
+Kernel Revision history
+-----------------------
+
+2.6.32: Using notifier_block structs
+3.2   : Moved NMI descriptions to an enum: LOCAL, UNKNOWN, MAX
+        https://lwn.net/Articles/461215/
+        https://lkml.org/lkml/2012/3/8/386
+3.5   : Moved "register_nmi_handler" to a macro + static struct nmiaction fn##_na
+        This broke the loop logic used between 3.2 and 3.5
+
+

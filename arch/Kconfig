@@ -12,6 +12,24 @@ config KEXEC_CORE
 config HAVE_IMA_KEXEC
 	bool
 
+config NMI_MGR
+	tristate "NMI Generic Handler"
+	depends on HAVE_NMI
+	depends on X86
+	help
+	  NMI Generic handler allows admins to specify NMI Events to
+	  drop, ignore or make the system panic.
+	  This is needed for servers with BMC (HP ILO, Dell IDRAC,
+	  AMI ASMB...) to specify events instead of killall sysctl
+	  "unknown_nmi_panic".
+
+	  It can be used to avoid kdump being interrupted by double NMI
+
+	  See <file:Documentation/nmimgr.txt>
+
+	  If unsure, say N.
+
+
 config OPROFILE
 	tristate "OProfile system profiling"
 	depends on PROFILING
