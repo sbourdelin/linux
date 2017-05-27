@@ -18,6 +18,8 @@ Required properties:
  * Core, iface, and bus clocks required for "qcom,scm"
 - clock-names: Must contain "core" for the core clock, "iface" for the interface
   clock and "bus" for the bus clock per the requirements of the compatible.
+- qcom,dload-mode-addr: Specifies the address (2 cells) for the download mode
+			magic (optional)
 
 Example for MSM8916:
 

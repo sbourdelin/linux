@@ -19,6 +19,7 @@
 #include <linux/cpumask.h>
 #include <linux/export.h>
 #include <linux/dma-mapping.h>
+#include <linux/module.h>
 #include <linux/types.h>
 #include <linux/qcom_scm.h>
 #include <linux/of.h>
@@ -27,6 +28,9 @@
 #include <linux/reset-controller.h>
 
 #include "qcom_scm.h"
+
+static bool download_mode;
+module_param(download_mode, bool, 0700);
 
 #define SCM_HAS_CORE_CLK	BIT(0)
 #define SCM_HAS_IFACE_CLK	BIT(1)
@@ -38,6 +42,8 @@ struct qcom_scm {
 	struct clk *iface_clk;
 	struct clk *bus_clk;
 	struct reset_controller_dev reset;
+
+	phys_addr_t dload_mode_addr;
 };
 
 static struct qcom_scm *__scm;
@@ -345,6 +351,28 @@ int qcom_scm_io_writel(phys_addr_t addr, unsigned int val)
 }
 EXPORT_SYMBOL(qcom_scm_io_writel);
 
+static void qcom_scm_set_download_mode(bool enable)
+{
+	bool avail;
+	int ret;
+
+	avail = __qcom_scm_is_call_available(__scm->dev,
+					     QCOM_SCM_SVC_BOOT,
+					     QCOM_SCM_SET_DLOAD_MODE);
+	if (avail) {
+		ret = __qcom_scm_set_dload_mode(__scm->dev, enable);
+		if (ret)
+			dev_err(__scm->dev, "SCM failed to set download mode: %d\n", ret);
+	} else if (__scm->dload_mode_addr) {
+		ret = __qcom_scm_io_writel(__scm->dev, __scm->dload_mode_addr,
+					   enable ? QCOM_SCM_SET_DLOAD_MODE : 0);
+		if (ret)
+			dev_err(__scm->dev, "SCM failed to set download mode: %d\n", ret);
+	} else {
+		dev_err(__scm->dev, "No available mechanism for setting download mode\n");
+	}
+}
+
 /**
  * qcom_scm_is_available() - Checks if SCM is available
  */
@@ -365,6 +393,7 @@ static int qcom_scm_probe(struct platform_device *pdev)
 	struct qcom_scm *scm;
 	unsigned long clks;
 	int ret;
+	u64 val;
 
 	scm = devm_kzalloc(&pdev->dev, sizeof(*scm), GFP_KERNEL);
 	if (!scm)
@@ -418,7 +447,20 @@ static int qcom_scm_probe(struct platform_device *pdev)
 
 	__qcom_scm_init();
 
+	ret = of_property_read_u64(pdev->dev.of_node, "qcom,dload-mode-addr", &val);
+	if (!ret)
+		scm->dload_mode_addr = val;
+
+	if (download_mode)
+		qcom_scm_set_download_mode(true);
+
 	return 0;
+}
+
+void qcom_scm_shutdown(struct platform_device *pdev)
+{
+	if (download_mode)
+		qcom_scm_set_download_mode(false);
 }
 
 static const struct of_device_id qcom_scm_dt_match[] = {
@@ -448,6 +490,7 @@ static struct platform_driver qcom_scm_driver = {
 		.of_match_table = qcom_scm_dt_match,
 	},
 	.probe = qcom_scm_probe,
+	.shutdown = qcom_scm_shutdown,
 };
 
 static int __init qcom_scm_init(void)
