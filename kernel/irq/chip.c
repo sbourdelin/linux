@@ -206,13 +206,23 @@ int irq_startup(struct irq_desc *desc, bool resend)
 
 void irq_shutdown(struct irq_desc *desc)
 {
+	int irq_disabled = irqd_irq_disabled(&desc->irq_data);
+
 	irq_state_set_disabled(desc);
 	desc->depth = 1;
 	if (desc->irq_data.chip->irq_shutdown)
 		desc->irq_data.chip->irq_shutdown(&desc->irq_data);
-	else if (desc->irq_data.chip->irq_disable)
+	/*
+	 * 1/ Some chips may require balanced irq enable &_disable.
+	 * 2/ Due to the lazy disable approach, a irq could be
+	 *    disabled but unmasked.
+	 *
+	 * So if this irq is already disabled, let's mask it instead
+	 * of trying to call irq_disable again.
+	 */
+	else if (desc->irq_data.chip->irq_disable && !irq_disabled)
 		desc->irq_data.chip->irq_disable(&desc->irq_data);
-	else
+	else if (desc->irq_data.chip->irq_mask)
 		desc->irq_data.chip->irq_mask(&desc->irq_data);
 	irq_domain_deactivate_irq(&desc->irq_data);
 	irq_state_set_masked(desc);
