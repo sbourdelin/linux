@@ -33,41 +33,14 @@
 #include "ssi_hash.h"
 #include "ssi_aead.h"
 
-#define LLI_MAX_NUM_OF_DATA_ENTRIES 128
-#define LLI_MAX_NUM_OF_ASSOC_DATA_ENTRIES 4
-#define MLLI_TABLE_MIN_ALIGNMENT 4 /*Force the MLLI table to be align to uint32 */
-#define MAX_NUM_OF_BUFFERS_IN_MLLI 4
-#define MAX_NUM_OF_TOTAL_MLLI_ENTRIES (2*LLI_MAX_NUM_OF_DATA_ENTRIES + \
-					LLI_MAX_NUM_OF_ASSOC_DATA_ENTRIES )
-
 #ifdef CC_DEBUG
-#define DUMP_SGL(sg) \
-	while (sg) { \
-		SSI_LOG_DEBUG("page=%p offset=%u length=%u (dma_len=%u) " \
-			     "dma_addr=%08x\n", sg_page(sg), (sg)->offset, \
-			(sg)->length, sg_dma_len(sg), (sg)->dma_address); \
-		(sg) = sg_next(sg); \
-	}
-#define DUMP_MLLI_TABLE(mlli_p, nents) \
-	do { \
-		SSI_LOG_DEBUG("mlli=%pK nents=%u\n", (mlli_p), (nents)); \
-		while((nents)--) { \
-			SSI_LOG_DEBUG("addr=0x%08X size=0x%08X\n", \
-			     (mlli_p)[LLI_WORD0_OFFSET], \
-			     (mlli_p)[LLI_WORD1_OFFSET]); \
-			(mlli_p) += LLI_ENTRY_WORD_SIZE; \
-		} \
-	} while (0)
 #define GET_DMA_BUFFER_TYPE(buff_type) ( \
 	((buff_type) == SSI_DMA_BUF_NULL) ? "BUF_NULL" : \
 	((buff_type) == SSI_DMA_BUF_DLLI) ? "BUF_DLLI" : \
 	((buff_type) == SSI_DMA_BUF_MLLI) ? "BUF_MLLI" : "BUF_INVALID")
 #else
-#define DX_BUFFER_MGR_DUMP_SGL(sg)
-#define DX_BUFFER_MGR_DUMP_MLLI_TABLE(mlli_p, nents)
 #define GET_DMA_BUFFER_TYPE(buff_type)
 #endif
-
 
 enum dma_buffer_type {
 	DMA_NULL_TYPE = -1,
@@ -186,22 +159,20 @@ static inline int ssi_buffer_mgr_render_buff_to_mlli(
 
 	/*handle buffer longer than 64 kbytes */
 	while (buff_size > CC_MAX_MLLI_ENTRY_SIZE ) {
-		LLI_SET_ADDR(mlli_entry_p,buff_dma);
-		LLI_SET_SIZE(mlli_entry_p, CC_MAX_MLLI_ENTRY_SIZE);
-		SSI_LOG_DEBUG("entry[%d]: single_buff=0x%08X size=%08X\n",*curr_nents,
-			   mlli_entry_p[LLI_WORD0_OFFSET],
-			   mlli_entry_p[LLI_WORD1_OFFSET]);
+		cc_lli_set_addr(mlli_entry_p, buff_dma);
+		cc_lli_set_size(mlli_entry_p, CC_MAX_MLLI_ENTRY_SIZE);
+		SSI_LOG_DEBUG("entry[%d]: word0=0x%08X word1=%08X\n",
+			      *curr_nents, mlli_entry_p[0], mlli_entry_p[1]);
 		buff_dma += CC_MAX_MLLI_ENTRY_SIZE;
 		buff_size -= CC_MAX_MLLI_ENTRY_SIZE;
 		mlli_entry_p = mlli_entry_p + 2;
 		(*curr_nents)++;
 	}
 	/*Last entry */
-	LLI_SET_ADDR(mlli_entry_p,buff_dma);
-	LLI_SET_SIZE(mlli_entry_p, buff_size);
-	SSI_LOG_DEBUG("entry[%d]: single_buff=0x%08X size=%08X\n",*curr_nents,
-		   mlli_entry_p[LLI_WORD0_OFFSET],
-		   mlli_entry_p[LLI_WORD1_OFFSET]);
+	cc_lli_set_addr(mlli_entry_p, buff_dma);
+	cc_lli_set_size(mlli_entry_p, buff_size);
+	SSI_LOG_DEBUG("entry[%d]: word0=0x%08X word1=%08X\n", *curr_nents,
+		      mlli_entry_p[0], mlli_entry_p[1]);
 	mlli_entry_p = mlli_entry_p + 2;
 	*mlli_entry_pp = mlli_entry_p;
 	(*curr_nents)++;
