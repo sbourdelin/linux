@@ -138,7 +138,7 @@ void v4l2_flash_release(struct v4l2_flash *v4l2_flash);
 
 #else
 static inline struct v4l2_flash *v4l2_flash_init(
-	struct device *dev, struct device_node *of_node,
+	struct device *dev, struct fwnode_handle *fwn,
 	struct led_classdev_flash *fled_cdev,
 	struct led_classdev_flash *iled_cdev,
 	const struct v4l2_flash_ops *ops,
