@@ -1008,7 +1008,7 @@ menu "Lock Debugging (spinlocks, mutexes, etc...)"
 
 config DEBUG_RT_MUTEXES
 	bool "RT Mutex debugging, deadlock detection"
-	depends on DEBUG_KERNEL && RT_MUTEXES
+	depends on DEBUG_KERNEL && RT_MUTEXES && SCHED_RT
 	help
 	 This allows rt mutex semantics violations and rt mutex related
 	 deadlocks (lockups) to be detected and reported automatically.
