@@ -259,6 +259,7 @@ static struct feature_property {
 	{"ibm,dfp", 1, 0, PPC_FEATURE_HAS_DFP},
 	{"ibm,purr", 1, CPU_FTR_PURR, 0},
 	{"ibm,spurr", 1, CPU_FTR_SPURR, 0},
+	{"ibm,dec-bits", 32, CPU_FTR_LARGE_DEC, 0},
 #endif /* CONFIG_PPC64 */
 };
 
