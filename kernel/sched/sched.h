@@ -137,7 +137,7 @@ static inline int rt_policy(int policy)
 
 static inline int dl_policy(int policy)
 {
-	return policy == SCHED_DEADLINE;
+	return IS_ENABLED(CONFIG_SCHED_DL) && policy == SCHED_DEADLINE;
 }
 static inline bool valid_policy(int policy)
 {
@@ -667,7 +667,9 @@ struct rq {
 
 	struct cfs_rq cfs;
 	struct rt_rq rt;
+#ifdef CONFIG_SCHED_DL
 	struct dl_rq dl;
+#endif
 
 #ifdef CONFIG_FAIR_GROUP_SCHED
 	/* list of leaf cfs_rq on this cpu: */
@@ -1438,9 +1440,12 @@ static inline void set_curr_task(struct rq *rq, struct task_struct *curr)
 
 #ifdef CONFIG_SMP
 #define sched_class_highest (&stop_sched_class)
-#else
+#elif defined(CONFIG_SCHED_DL)
 #define sched_class_highest (&dl_sched_class)
+#else
+#define sched_class_highest (&rt_sched_class)
 #endif
+
 #define for_each_class(class) \
    for (class = sched_class_highest; class; class = class->next)
 

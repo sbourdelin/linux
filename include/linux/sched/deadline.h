@@ -13,7 +13,7 @@
 
 static inline int dl_prio(int prio)
 {
-	if (unlikely(prio < MAX_DL_PRIO))
+	if (IS_ENABLED(CONFIG_SCHED_DL) && unlikely(prio < MAX_DL_PRIO))
 		return 1;
 	return 0;
 }

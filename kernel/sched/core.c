@@ -634,9 +634,11 @@ bool sched_can_stop_tick(struct rq *rq)
 {
 	int fifo_nr_running;
 
+#ifdef CONFIG_SCHED_DL
 	/* Deadline tasks, even if single, need the tick */
 	if (rq->dl.dl_nr_running)
 		return false;
+#endif
 
 	/*
 	 * If there are more than one RR tasks, we need the tick to effect the
@@ -2174,9 +2176,11 @@ static void __sched_fork(unsigned long clone_flags, struct task_struct *p)
 	memset(&p->se.statistics, 0, sizeof(p->se.statistics));
 #endif
 
+#ifdef CONFIG_SCHED_DL
 	RB_CLEAR_NODE(&p->dl.rb_node);
 	init_dl_task_timer(&p->dl);
 	__dl_clear_params(p);
+#endif
 
 	INIT_LIST_HEAD(&p->rt.run_list);
 	p->rt.timeout		= 0;
@@ -3699,6 +3703,9 @@ void rt_mutex_setprio(struct task_struct *p, struct task_struct *pi_task)
 	 *      --> -dl task blocks on mutex A and could preempt the
 	 *          running task
 	 */
+#ifdef CONFIG_SCHED_DL
+	if (dl_prio(oldprio))
+		p->dl.dl_boosted = 0;
 	if (dl_prio(prio)) {
 		if (!dl_prio(p->normal_prio) ||
 		    (pi_task && dl_entity_preempt(&pi_task->dl, &p->dl))) {
@@ -3707,15 +3714,13 @@ void rt_mutex_setprio(struct task_struct *p, struct task_struct *pi_task)
 		} else
 			p->dl.dl_boosted = 0;
 		p->sched_class = &dl_sched_class;
-	} else if (rt_prio(prio)) {
-		if (dl_prio(oldprio))
-			p->dl.dl_boosted = 0;
+	} else
+#endif
+	if (rt_prio(prio)) {
 		if (oldprio < prio)
 			queue_flag |= ENQUEUE_HEAD;
 		p->sched_class = &rt_sched_class;
 	} else {
-		if (dl_prio(oldprio))
-			p->dl.dl_boosted = 0;
 		if (rt_prio(oldprio))
 			p->rt.timeout = 0;
 		p->sched_class = &fair_sched_class;
@@ -5266,7 +5271,8 @@ int cpuset_cpumask_can_shrink(const struct cpumask *cur,
 	if (!cpumask_weight(cur))
 		return ret;
 
-	ret = dl_cpuset_cpumask_can_shrink(cur, trial);
+	if (IS_ENABLED(CONFIG_SCHED_DL))
+		ret = dl_cpuset_cpumask_can_shrink(cur, trial);
 
 	return ret;
 }
@@ -5561,7 +5567,7 @@ static void cpuset_cpu_active(void)
 static int cpuset_cpu_inactive(unsigned int cpu)
 {
 	if (!cpuhp_tasks_frozen) {
-		if (dl_cpu_busy(cpu))
+		if (IS_ENABLED(CONFIG_SCHED_DL) && dl_cpu_busy(cpu))
 			return -EBUSY;
 		cpuset_update_active_cpus();
 	} else {
@@ -5721,7 +5727,9 @@ void __init sched_init_smp(void)
 	free_cpumask_var(non_isolated_cpus);
 
 	init_sched_rt_class();
+#ifdef CONFIG_SCHED_DL
 	init_sched_dl_class();
+#endif
 
 	sched_init_smt();
 	sched_clock_init_late();
@@ -5825,7 +5833,9 @@ void __init sched_init(void)
 #endif /* CONFIG_CPUMASK_OFFSTACK */
 
 	init_rt_bandwidth(&def_rt_bandwidth, global_rt_period(), global_rt_runtime());
+#ifdef CONFIG_SCHED_DL
 	init_dl_bandwidth(&def_dl_bandwidth, global_rt_period(), global_rt_runtime());
+#endif
 
 #ifdef CONFIG_SMP
 	init_defrootdomain();
@@ -5855,7 +5865,9 @@ void __init sched_init(void)
 		rq->calc_load_update = jiffies + LOAD_FREQ;
 		init_cfs_rq(&rq->cfs);
 		init_rt_rq(&rq->rt);
+#ifdef CONFIG_SCHED_DL
 		init_dl_rq(&rq->dl);
+#endif
 #ifdef CONFIG_FAIR_GROUP_SCHED
 		root_task_group.shares = ROOT_TASK_GROUP_LOAD;
 		INIT_LIST_HEAD(&rq->leaf_cfs_rq_list);
@@ -6518,16 +6530,19 @@ int sched_rt_handler(struct ctl_table *table, int write,
 		if (ret)
 			goto undo;
 
-		ret = sched_dl_global_validate();
-		if (ret)
-			goto undo;
+		if (IS_ENABLED(CONFIG_SCHED_DL)) {
+			ret = sched_dl_global_validate();
+			if (ret)
+				goto undo;
+		}
 
 		ret = sched_rt_global_constraints();
 		if (ret)
 			goto undo;
 
 		sched_rt_do_global();
-		sched_dl_do_global();
+		if (IS_ENABLED(CONFIG_SCHED_DL))
+			sched_dl_do_global();
 	}
 	if (0) {
 undo:

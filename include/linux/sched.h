@@ -522,7 +522,9 @@ struct task_struct {
 #ifdef CONFIG_CGROUP_SCHED
 	struct task_group		*sched_task_group;
 #endif
+#ifdef CONFIG_SCHED_DL
 	struct sched_dl_entity		dl;
+#endif
 
 #ifdef CONFIG_PREEMPT_NOTIFIERS
 	/* List of struct preempt_notifier: */
