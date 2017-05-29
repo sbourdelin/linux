@@ -112,8 +112,10 @@ static void update_curr_stop(struct rq *rq)
 const struct sched_class stop_sched_class = {
 #ifdef CONFIG_SCHED_DL
 	.next			= &dl_sched_class,
-#else
+#elif defined(CONFIG_SCHED_RT)
 	.next			= &rt_sched_class,
+#else
+	.next			= &fair_sched_class,
 #endif
 
 	.enqueue_task		= enqueue_task_stop,

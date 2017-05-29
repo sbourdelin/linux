@@ -7,7 +7,7 @@ struct task_struct;
 
 static inline int rt_prio(int prio)
 {
-	if (unlikely(prio < MAX_RT_PRIO))
+	if (IS_ENABLED(CONFIG_SCHED_RT) && unlikely(prio < MAX_RT_PRIO))
 		return 1;
 	return 0;
 }
@@ -17,7 +17,7 @@ static inline int rt_task(struct task_struct *p)
 	return rt_prio(p->prio);
 }
 
-#ifdef CONFIG_RT_MUTEXES
+#if defined(CONFIG_RT_MUTEXES) && defined(CONFIG_SCHED_RT)
 /*
  * Must hold either p->pi_lock or task_rq(p)->lock.
  */

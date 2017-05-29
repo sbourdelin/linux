@@ -132,7 +132,8 @@ static inline int fair_policy(int policy)
 
 static inline int rt_policy(int policy)
 {
-	return policy == SCHED_FIFO || policy == SCHED_RR;
+	return IS_ENABLED(CONFIG_SCHED_RT) &&
+	       (policy == SCHED_FIFO || policy == SCHED_RR);
 }
 
 static inline int dl_policy(int policy)
@@ -1447,8 +1448,10 @@ static inline void set_curr_task(struct rq *rq, struct task_struct *curr)
 #define sched_class_highest (&stop_sched_class)
 #elif defined(CONFIG_SCHED_DL)
 #define sched_class_highest (&dl_sched_class)
-#else
+#elif defined(CONFIG_SCHED_RT)
 #define sched_class_highest (&rt_sched_class)
+#else
+#define sched_class_highest (&fair_sched_class)
 #endif
 
 #define for_each_class(class) \

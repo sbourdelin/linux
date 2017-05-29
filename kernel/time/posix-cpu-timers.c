@@ -790,10 +790,12 @@ static void check_thread_timers(struct task_struct *tsk,
 				struct list_head *firing)
 {
 	struct list_head *timers = tsk->cpu_timers;
-	struct signal_struct *const sig = tsk->signal;
 	struct task_cputime *tsk_expires = &tsk->cputime_expires;
 	u64 expires;
+#ifdef CONFIG_SCHED_RT
+	struct signal_struct *const sig = tsk->signal;
 	unsigned long soft;
+#endif
 
 	/*
 	 * If cputime_expires is zero, then there are no active
@@ -811,6 +813,7 @@ static void check_thread_timers(struct task_struct *tsk,
 	tsk_expires->sched_exp = check_timers_list(++timers, firing,
 						   tsk->se.sum_exec_runtime);
 
+#ifdef CONFIG_SCHED_RT
 	/*
 	 * Check for the special case thread timers.
 	 */
@@ -847,6 +850,7 @@ static void check_thread_timers(struct task_struct *tsk,
 			__group_send_sig_info(SIGXCPU, SEND_SIG_PRIV, tsk);
 		}
 	}
+#endif
 	if (task_cputime_zero(tsk_expires))
 		tick_dep_clear_task(tsk, TICK_DEP_BIT_POSIX_TIMER);
 }

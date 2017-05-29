@@ -401,6 +401,7 @@ static struct ctl_table kern_table[] = {
 	},
 #endif /* CONFIG_NUMA_BALANCING */
 #endif /* CONFIG_SCHED_DEBUG */
+#ifdef CONFIG_SCHED_RT
 	{
 		.procname	= "sched_rt_period_us",
 		.data		= &sysctl_sched_rt_period,
@@ -422,6 +423,7 @@ static struct ctl_table kern_table[] = {
 		.mode		= 0644,
 		.proc_handler	= sched_rr_handler,
 	},
+#endif
 #ifdef CONFIG_SCHED_AUTOGROUP
 	{
 		.procname	= "sched_autogroup_enabled",
@@ -1071,7 +1073,7 @@ static struct ctl_table kern_table[] = {
 		.extra1		= &neg_one,
 	},
 #endif
-#ifdef CONFIG_RT_MUTEXES
+#if defined(CONFIG_RT_MUTEXES) && defined(CONFIG_SCHED_RT)
 	{
 		.procname	= "max_lock_depth",
 		.data		= &max_lock_depth,

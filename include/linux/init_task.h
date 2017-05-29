@@ -225,6 +225,16 @@ extern struct cred init_cred;
 #define INIT_TASK_SECURITY
 #endif
 
+#ifdef CONFIG_SCHED_RT
+#define INIT_TASK_RT(tsk)						\
+	.rt		= {						\
+		.run_list	= LIST_HEAD_INIT(tsk.rt.run_list),	\
+		.time_slice	= RR_TIMESLICE,				\
+	},
+#else
+#define INIT_TASK_RT(tsk)
+#endif
+
 /*
  *  INIT_TASK is used to set up the first task table, touch at
  * your own risk!. Base=0, limit=0x1fffff (=2MB)
@@ -250,10 +260,7 @@ extern struct cred init_cred;
 	.se		= {						\
 		.group_node 	= LIST_HEAD_INIT(tsk.se.group_node),	\
 	},								\
-	.rt		= {						\
-		.run_list	= LIST_HEAD_INIT(tsk.rt.run_list),	\
-		.time_slice	= RR_TIMESLICE,				\
-	},								\
+	INIT_TASK_RT(tsk)						\
 	.tasks		= LIST_HEAD_INIT(tsk.tasks),			\
 	INIT_PUSHABLE_TASKS(tsk)					\
 	INIT_CGROUP_SCHED(tsk)						\
