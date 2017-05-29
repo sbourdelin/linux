@@ -3985,56 +3985,42 @@ static int em_fxsave(struct x86_emulate_ctxt *ctxt)
 	return segmented_write_std(ctxt, ctxt->memop.addr.mem, &fx_state, size);
 }
 
-static int fxrstor_fixup(struct x86_emulate_ctxt *ctxt,
-		struct fxregs_state *new)
-{
-	int rc = X86EMUL_CONTINUE;
-	struct fxregs_state old;
-
-	rc = asm_safe("fxsave %[fx]", , [fx] "+m"(old));
-	if (rc != X86EMUL_CONTINUE)
-		return rc;
-
-	/*
-	 * 64 bit host will restore XMM 8-15, which is not correct on non-64
-	 * bit guests.  Load the current values in order to preserve 64 bit
-	 * XMMs after fxrstor.
-	 */
-#ifdef CONFIG_X86_64
-	/* XXX: accessing XMM 8-15 very awkwardly */
-	memcpy(&new->xmm_space[8 * 16/4], &old.xmm_space[8 * 16/4], 8 * 16);
-#endif
-
-	/*
-	 * Hardware doesn't save and restore XMM 0-7 without CR4.OSFXSR, but
-	 * does save and restore MXCSR.
-	 */
-	if (!(ctxt->ops->get_cr(ctxt, 4) & X86_CR4_OSFXSR))
-		memcpy(new->xmm_space, old.xmm_space, 8 * 16);
-
-	return rc;
-}
-
 static int em_fxrstor(struct x86_emulate_ctxt *ctxt)
 {
 	struct fxregs_state fx_state;
 	int rc;
+	unsigned int size = 0;
 
 	rc = check_fxsr(ctxt);
 	if (rc != X86EMUL_CONTINUE)
 		return rc;
 
-	rc = segmented_read_std(ctxt, ctxt->memop.addr.mem, &fx_state, 512);
+	ctxt->ops->get_fpu(ctxt);
+
+	if (ctxt->mode < X86EMUL_MODE_PROT64) {
+		rc = asm_safe("fxsave %[fx]", , [fx] "+m"(fx_state));
+		if (rc != X86EMUL_CONTINUE)
+			return rc;
+		/*
+		 * Hardware doesn't save and restore XMM 0-7 without
+		 * CR4.OSFXSR, but does save and restore MXCSR.
+		 */
+		if (ctxt->ops->get_cr(ctxt, 4) & X86_CR4_OSFXSR)
+			size = offsetof(struct fxregs_state, xmm_space[8]);
+		else
+			size = offsetof(struct fxregs_state, xmm_space[0]);
+	} else if (ctxt->mode == X86EMUL_MODE_PROT64)
+		size = offsetof(struct fxregs_state, xmm_space[16]);
+
+	if (size == 0)
+		return X86EMUL_UNHANDLEABLE;
+
+	rc = segmented_read_std(ctxt, ctxt->memop.addr.mem, &fx_state, size);
 	if (rc != X86EMUL_CONTINUE)
 		return rc;
 
 	if (fx_state.mxcsr >> 16)
 		return emulate_gp(ctxt, 0);
-
-	ctxt->ops->get_fpu(ctxt);
-
-	if (ctxt->mode < X86EMUL_MODE_PROT64)
-		rc = fxrstor_fixup(ctxt, &fx_state);
 
 	if (rc == X86EMUL_CONTINUE)
 		rc = asm_safe("fxrstor %[fx]", : [fx] "m"(fx_state));
