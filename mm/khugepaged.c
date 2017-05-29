@@ -336,6 +336,13 @@ int hugepage_madvise(struct vm_area_struct *vma,
 		 * it got registered before VM_NOHUGEPAGE was set.
 		 */
 		break;
+	case MADV_RESET_HUGEPAGE:
+		*vm_flags &= ~(VM_HUGEPAGE | VM_NOHUGEPAGE);
+		/*
+		 * The vma will be treated according to the
+		 * system-wide settings in transparent_hugepage_flags
+		 */
+		break;
 	}
 
 	return 0;

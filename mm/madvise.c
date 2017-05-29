@@ -105,6 +105,7 @@ static long madvise_behavior(struct vm_area_struct *vma,
 		break;
 	case MADV_HUGEPAGE:
 	case MADV_NOHUGEPAGE:
+	case MADV_RESET_HUGEPAGE:
 		error = hugepage_madvise(vma, &new_flags, behavior);
 		if (error) {
 			/*
@@ -684,6 +685,7 @@ madvise_behavior_valid(int behavior)
 #ifdef CONFIG_TRANSPARENT_HUGEPAGE
 	case MADV_HUGEPAGE:
 	case MADV_NOHUGEPAGE:
+	case MADV_RESET_HUGEPAGE:
 #endif
 	case MADV_DONTDUMP:
 	case MADV_DODUMP:
@@ -739,6 +741,9 @@ madvise_behavior_valid(int behavior)
  *  MADV_NOHUGEPAGE - mark the given range as not worth being backed by
  *		transparent huge pages so the existing pages will not be
  *		coalesced into THP and new pages will not be allocated as THP.
+ *  MADV_RESET_HUGEPAGE - clear MADV_HUGEPAGE/MADV_NOHUGEPAGE marking;
+ *		the range will be treated by khugepaged according to the
+ *		system wide settings
  *  MADV_DONTDUMP - the application wants to prevent pages in the given range
  *		from being included in its core dump.
  *  MADV_DODUMP - cancel MADV_DONTDUMP: no longer exclude from core dump.

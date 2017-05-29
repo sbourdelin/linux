@@ -64,6 +64,9 @@
 					   overrides the coredump filter bits */
 #define MADV_DODUMP	17		/* Clear the MADV_NODUMP flag */
 
+#define MADV_RESET_HUGEPAGE 18		/* Reset flags controlling backing with
+					   hugepages */
+
 /* compatibility flags */
 #define MAP_FILE	0
 
