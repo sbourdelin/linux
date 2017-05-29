@@ -726,6 +726,7 @@ struct kvm_ppc_resize_hpt {
 
 /* machine type bits, to be used as argument to KVM_CREATE_VM */
 #define KVM_VM_S390_UCONTROL	1
+#define KVM_VM_S390_LATE_MMAP	2
 
 /* on ppc, 0 indicate default, 1 should force HV and 2 PR */
 #define KVM_VM_PPC_HV 1
@@ -925,6 +926,7 @@ struct kvm_ppc_resize_hpt {
 #define KVM_CAP_X86_GUEST_MWAIT 143
 #define KVM_CAP_ARM_USER_IRQ 144
 #define KVM_CAP_S390_CMMA_MIGRATION 145
+#define KVM_CAP_S390_LATE_MMAP 200
 
 #ifdef KVM_CAP_IRQ_ROUTING
 

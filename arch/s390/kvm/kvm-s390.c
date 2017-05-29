@@ -389,6 +389,7 @@ int kvm_vm_ioctl_check_extension(struct kvm *kvm, long ext)
 	case KVM_CAP_S390_USER_INSTR0:
 	case KVM_CAP_S390_CMMA_MIGRATION:
 	case KVM_CAP_S390_AIS:
+	case KVM_CAP_S390_LATE_MMAP:
 		r = 1;
 		break;
 	case KVM_CAP_S390_MEM_OP:
@@ -1796,6 +1797,7 @@ int kvm_arch_init_vm(struct kvm *kvm, unsigned long type)
 	int i, rc;
 	char debug_name[16];
 	static unsigned long sca_offset;
+	bool mixed_pgtables = false;
 
 	rc = -EINVAL;
 #ifdef CONFIG_KVM_S390_UCONTROL
@@ -1804,11 +1806,13 @@ int kvm_arch_init_vm(struct kvm *kvm, unsigned long type)
 	if ((type & KVM_VM_S390_UCONTROL) && (!capable(CAP_SYS_ADMIN)))
 		goto out_err;
 #else
-	if (type)
+	if (type & KVM_VM_S390_LATE_MMAP)
+		mixed_pgtables = true;
+	else if (type)
 		goto out_err;
 #endif
 
-	rc = s390_enable_sie(false);
+	rc = s390_enable_sie(mixed_pgtables);
 	if (rc)
 		goto out_err;
 

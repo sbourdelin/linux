@@ -117,6 +117,16 @@ In order to create user controlled virtual machines on S390, check
 KVM_CAP_S390_UCONTROL and use the flag KVM_VM_S390_UCONTROL as
 privileged user (CAP_SYS_ADMIN).
 
+When creating a virtual machine with the flag KVM_VM_S390_LATE_MMAP
+on s390, only memory mmap'ed after VM creation is guaranteed to be usable
+in user memory regions, because special page tables that might be
+necessary for virtualization will only be created for memory mmaped
+after this call. This avoids having to enable system wide vm.alloc_pgste
+in order to create KVM guests. Whether this type of VM can be created is
+indicated by the capability "KVM_CAP_S390_LATE_MMAP". If memory used for
+user memory regions is mmap'ed before VM creation or !mmap'ed memory is used
+for user memory regions, don't use this VM type.
+
 To use hardware assisted virtualization on MIPS (VZ ASE) rather than
 the default trap & emulate implementation (which changes the virtual
 memory layout to fit in user mode), check KVM_CAP_MIPS_VZ and use the
@@ -984,6 +994,9 @@ When the KVM_CAP_SYNC_MMU capability is available, changes in the backing of
 the memory region are automatically reflected into the guest.  For example, an
 mmap() that affects the region will be made visible immediately.  Another
 example is madvise(MADV_DROP).
+
+See KVM_CREATE_VM for special handling related to KVM_VM_S390_LATE_MMAP
+on s390x.
 
 It is recommended to use this API instead of the KVM_SET_MEMORY_REGION ioctl.
 The KVM_SET_MEMORY_REGION does not allow fine grained control over memory
