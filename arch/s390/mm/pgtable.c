@@ -196,7 +196,7 @@ static inline pgste_t ptep_xchg_start(struct mm_struct *mm,
 {
 	pgste_t pgste = __pgste(0);
 
-	if (mm_has_pgste(mm)) {
+	if (pgtable_has_pgste(mm, __pa(ptep))) {
 		pgste = pgste_get_lock(ptep);
 		pgste = pgste_pte_notify(mm, addr, ptep, pgste);
 	}
@@ -207,7 +207,7 @@ static inline pte_t ptep_xchg_commit(struct mm_struct *mm,
 				    unsigned long addr, pte_t *ptep,
 				    pgste_t pgste, pte_t old, pte_t new)
 {
-	if (mm_has_pgste(mm)) {
+	if (pgtable_has_pgste(mm, __pa(ptep))) {
 		if (pte_val(old) & _PAGE_INVALID)
 			pgste_set_key(ptep, pgste, new, mm);
 		if (pte_val(new) & _PAGE_INVALID) {
@@ -263,7 +263,7 @@ pte_t ptep_modify_prot_start(struct mm_struct *mm, unsigned long addr,
 	preempt_disable();
 	pgste = ptep_xchg_start(mm, addr, ptep);
 	old = ptep_flush_lazy(mm, addr, ptep);
-	if (mm_has_pgste(mm)) {
+	if (pgtable_has_pgste(mm, __pa(ptep))) {
 		pgste = pgste_update_all(old, pgste, mm);
 		pgste_set(ptep, pgste);
 	}
@@ -278,7 +278,7 @@ void ptep_modify_prot_commit(struct mm_struct *mm, unsigned long addr,
 
 	if (!MACHINE_HAS_NX)
 		pte_val(pte) &= ~_PAGE_NOEXEC;
-	if (mm_has_pgste(mm)) {
+	if (pgtable_has_pgste(mm, __pa(ptep))) {
 		pgste = pgste_get(ptep);
 		pgste_set_key(ptep, pgste, pte, mm);
 		pgste = pgste_set_pte(ptep, pgste, pte);
@@ -445,7 +445,7 @@ void ptep_set_pte_at(struct mm_struct *mm, unsigned long addr,
 {
 	pgste_t pgste;
 
-	/* the mm_has_pgste() check is done in set_pte_at() */
+	/* the pgtable_has_pgste() check is done in set_pte_at() */
 	preempt_disable();
 	pgste = pgste_get_lock(ptep);
 	pgste_val(pgste) &= ~_PGSTE_GPS_ZERO;
@@ -569,6 +569,9 @@ void ptep_zap_unused(struct mm_struct *mm, unsigned long addr,
 	pgste_t pgste;
 	pte_t pte;
 
+	if (!pgtable_has_pgste(mm, __pa(ptep)))
+		return;
+
 	/* Zap unused and logically-zero pages */
 	preempt_disable();
 	pgste = pgste_get_lock(ptep);
@@ -588,18 +591,22 @@ void ptep_zap_unused(struct mm_struct *mm, unsigned long addr,
 
 void ptep_zap_key(struct mm_struct *mm, unsigned long addr, pte_t *ptep)
 {
+	const bool has_pgste = pgtable_has_pgste(mm, __pa(ptep));
 	unsigned long ptev;
 	pgste_t pgste;
 
 	/* Clear storage key */
 	preempt_disable();
-	pgste = pgste_get_lock(ptep);
-	pgste_val(pgste) &= ~(PGSTE_ACC_BITS | PGSTE_FP_BIT |
-			      PGSTE_GR_BIT | PGSTE_GC_BIT);
+	if (has_pgste) {
+		pgste = pgste_get_lock(ptep);
+		pgste_val(pgste) &= ~(PGSTE_ACC_BITS | PGSTE_FP_BIT |
+				      PGSTE_GR_BIT | PGSTE_GC_BIT);
+	}
 	ptev = pte_val(*ptep);
 	if (!(ptev & _PAGE_INVALID) && (ptev & _PAGE_WRITE))
 		page_set_storage_key(ptev & PAGE_MASK, PAGE_DEFAULT_KEY, 1);
-	pgste_set_unlock(ptep, pgste);
+	if (has_pgste)
+		pgste_set_unlock(ptep, pgste);
 	preempt_enable();
 }
 
@@ -630,6 +637,10 @@ bool test_and_clear_guest_dirty(struct mm_struct *mm, unsigned long addr)
 	 */
 	if (pmd_large(*pmd))
 		return true;
+	if (!pgtable_has_pgste(mm, __pa(pmd))) {
+		WARN_ONCE(true, "Guest address on page table without pgste");
+		return false;
+	}
 
 	ptep = pte_alloc_map_lock(mm, pmd, addr, &ptl);
 	if (unlikely(!ptep))
@@ -666,6 +677,11 @@ int set_guest_storage_key(struct mm_struct *mm, unsigned long addr,
 	ptep = get_locked_pte(mm, addr, &ptl);
 	if (unlikely(!ptep))
 		return -EFAULT;
+	if (!pgtable_has_pgste(mm, __pa(ptep))) {
+		pte_unmap_unlock(ptep, ptl);
+		WARN_ONCE(true, "Guest address on page table without pgste");
+		return -EFAULT;
+	}
 
 	new = old = pgste_get_lock(ptep);
 	pgste_val(new) &= ~(PGSTE_GR_BIT | PGSTE_GC_BIT |
@@ -744,6 +760,11 @@ int reset_guest_reference_bit(struct mm_struct *mm, unsigned long addr)
 	ptep = get_locked_pte(mm, addr, &ptl);
 	if (unlikely(!ptep))
 		return -EFAULT;
+	if (!pgtable_has_pgste(mm, __pa(ptep))) {
+		pte_unmap_unlock(ptep, ptl);
+		WARN_ONCE(true, "Guest address on page table without pgste");
+		return -EFAULT;
+	}
 
 	new = old = pgste_get_lock(ptep);
 	/* Reset guest reference bit only */
@@ -776,6 +797,11 @@ int get_guest_storage_key(struct mm_struct *mm, unsigned long addr,
 	ptep = get_locked_pte(mm, addr, &ptl);
 	if (unlikely(!ptep))
 		return -EFAULT;
+	if (!pgtable_has_pgste(mm, __pa(ptep))) {
+		pte_unmap_unlock(ptep, ptl);
+		WARN_ONCE(true, "Guest address on page table without pgste");
+		return -EFAULT;
+	}
 
 	pgste = pgste_get_lock(ptep);
 	*key = (pgste_val(pgste) & (PGSTE_ACC_BITS | PGSTE_FP_BIT)) >> 56;
@@ -816,6 +842,11 @@ int pgste_perform_essa(struct mm_struct *mm, unsigned long hva, int orc,
 	ptep = get_locked_pte(mm, hva, &ptl);
 	if (unlikely(!ptep))
 		return -EFAULT;
+	if (!pgtable_has_pgste(mm, __pa(ptep))) {
+		pte_unmap_unlock(ptep, ptl);
+		WARN_ONCE(true, "Guest address on page table without pgste");
+		return -EFAULT;
+	}
 	pgste = pgste_get_lock(ptep);
 	pgstev = pgste_val(pgste);
 	if (oldpte)
@@ -908,6 +939,11 @@ int set_pgste_bits(struct mm_struct *mm, unsigned long hva,
 	ptep = get_locked_pte(mm, hva, &ptl);
 	if (unlikely(!ptep))
 		return -EFAULT;
+	if (!pgtable_has_pgste(mm, __pa(ptep))) {
+		pte_unmap_unlock(ptep, ptl);
+		WARN_ONCE(true, "Guest address on page table without pgste");
+		return -EFAULT;
+	}
 	new = pgste_get_lock(ptep);
 
 	pgste_val(new) &= ~bits;
@@ -935,6 +971,11 @@ int get_pgste(struct mm_struct *mm, unsigned long hva, unsigned long *pgstep)
 	ptep = get_locked_pte(mm, hva, &ptl);
 	if (unlikely(!ptep))
 		return -EFAULT;
+	if (!pgtable_has_pgste(mm, __pa(ptep))) {
+		pte_unmap_unlock(ptep, ptl);
+		WARN_ONCE(true, "Guest address on page table without pgste");
+		return -EFAULT;
+	}
 	*pgstep = pgste_val(pgste_get(ptep));
 	pte_unmap_unlock(ptep, ptl);
 	return 0;

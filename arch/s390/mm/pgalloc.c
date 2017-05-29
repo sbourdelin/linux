@@ -201,7 +201,7 @@ unsigned long *page_table_alloc(struct mm_struct *mm)
 	table = (unsigned long *) page_to_phys(page);
 	if (mm_alloc_pgste(mm)) {
 		/* Return 4K page table with PGSTEs */
-		atomic_set(&page->_mapcount, 3);
+		atomic_set(&page->_mapcount, 4);
 		clear_table(table, _PAGE_INVALID, PAGE_SIZE/2);
 		clear_table(table + PTRS_PER_PTE, 0, PAGE_SIZE/2);
 	} else {
@@ -221,7 +221,7 @@ void page_table_free(struct mm_struct *mm, unsigned long *table)
 	unsigned int bit, mask;
 
 	page = pfn_to_page(__pa(table) >> PAGE_SHIFT);
-	if (!mm_alloc_pgste(mm)) {
+	if (!pgtable_has_pgste(mm, __pa(table))) {
 		/* Free 2K page table fragment of a 4K page */
 		bit = (__pa(table) & ~PAGE_MASK)/(PTRS_PER_PTE*sizeof(pte_t));
 		spin_lock_bh(&mm->context.pgtable_lock);
@@ -249,9 +249,9 @@ void page_table_free_rcu(struct mmu_gather *tlb, unsigned long *table,
 
 	mm = tlb->mm;
 	page = pfn_to_page(__pa(table) >> PAGE_SHIFT);
-	if (mm_alloc_pgste(mm)) {
+	if (pgtable_has_pgste(mm, __pa(table))) {
 		gmap_unlink(mm, table, vmaddr);
-		table = (unsigned long *) (__pa(table) | 3);
+		table = (unsigned long *) (__pa(table) | 4);
 		tlb_remove_table(tlb, table);
 		return;
 	}
@@ -269,7 +269,7 @@ void page_table_free_rcu(struct mmu_gather *tlb, unsigned long *table,
 
 static void __tlb_remove_table(void *_table)
 {
-	unsigned int mask = (unsigned long) _table & 3;
+	unsigned int mask = (unsigned long) _table & 7;
 	void *table = (void *)((unsigned long) _table ^ mask);
 	struct page *page = pfn_to_page(__pa(table) >> PAGE_SHIFT);
 
@@ -282,11 +282,13 @@ static void __tlb_remove_table(void *_table)
 		if (atomic_xor_bits(&page->_mapcount, mask << 4) != 0)
 			break;
 		/* fallthrough */
-	case 3:		/* 4K page table with pgstes */
+	case 4:		/* 4K page table with pgstes */
 		pgtable_page_dtor(page);
 		atomic_set(&page->_mapcount, -1);
 		__free_page(page);
 		break;
+	default:
+		WARN_ONCE(true, "Unknown table type: %x", mask);
 	}
 }
 

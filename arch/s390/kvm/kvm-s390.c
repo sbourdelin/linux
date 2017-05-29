@@ -354,7 +354,7 @@ long kvm_arch_dev_ioctl(struct file *filp,
 			unsigned int ioctl, unsigned long arg)
 {
 	if (ioctl == KVM_S390_ENABLE_SIE)
-		return s390_enable_sie();
+		return s390_enable_sie(false);
 	return -EINVAL;
 }
 
@@ -1808,7 +1808,7 @@ int kvm_arch_init_vm(struct kvm *kvm, unsigned long type)
 		goto out_err;
 #endif
 
-	rc = s390_enable_sie();
+	rc = s390_enable_sie(false);
 	if (rc)
 		goto out_err;
 

@@ -1049,6 +1049,17 @@ int get_pgste(struct mm_struct *mm, unsigned long hva, unsigned long *pgstep);
 int pgste_perform_essa(struct mm_struct *mm, unsigned long hva, int orc,
 			unsigned long *oldpte, unsigned long *oldpgste);
 
+static inline int pgtable_has_pgste(struct mm_struct *mm, unsigned long addr)
+{
+	struct page *page;
+
+	if (!mm_has_pgste(mm))
+		return 0;
+
+	page = pfn_to_page(addr >> PAGE_SHIFT);
+	return atomic_read(&page->_mapcount) & 0x4U;
+}
+
 /*
  * Certain architectures need to do special things when PTEs
  * within a page table are directly modified.  Thus, the following
@@ -1061,7 +1072,7 @@ static inline void set_pte_at(struct mm_struct *mm, unsigned long addr,
 		pte_val(entry) &= ~_PAGE_NOEXEC;
 	if (pte_present(entry))
 		pte_val(entry) &= ~_PAGE_UNUSED;
-	if (mm_has_pgste(mm))
+	if (pgtable_has_pgste(mm, __pa(ptep)))
 		ptep_set_pte_at(mm, addr, ptep, entry);
 	else
 		*ptep = entry;
@@ -1487,7 +1498,7 @@ static inline swp_entry_t __swp_entry(unsigned long type, unsigned long offset)
 
 extern int vmem_add_mapping(unsigned long start, unsigned long size);
 extern int vmem_remove_mapping(unsigned long start, unsigned long size);
-extern int s390_enable_sie(void);
+extern int s390_enable_sie(bool mixed_pgtables);
 extern int s390_enable_skey(void);
 extern void s390_reset_cmma(struct mm_struct *mm);
 

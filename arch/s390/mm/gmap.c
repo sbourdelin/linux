@@ -583,6 +583,9 @@ int __gmap_link(struct gmap *gmap, unsigned long gaddr, unsigned long vmaddr)
 	/* large pmds cannot yet be handled */
 	if (pmd_large(*pmd))
 		return -EFAULT;
+	/* only page tables with pgstes can be linked into a gmap */
+	if (!pgtable_has_pgste(mm, pmd_pfn(*pmd) << PAGE_SHIFT))
+		return -EFAULT;
 	/* Link gmap segment table entry location to page table. */
 	rc = radix_tree_preload(GFP_KERNEL);
 	if (rc)
@@ -2120,17 +2123,19 @@ static inline void thp_split_mm(struct mm_struct *mm)
 /*
  * switch on pgstes for its userspace process (for kvm)
  */
-int s390_enable_sie(void)
+int s390_enable_sie(bool mixed_pgtables)
 {
 	struct mm_struct *mm = current->mm;
 
 	/* Do we have pgstes? if yes, we are done */
 	if (mm_has_pgste(mm))
 		return 0;
-	/* Fail if the page tables are 2K */
-	if (!mm_alloc_pgste(mm))
+	/* Fail if the page tables are 2K and mixed pgtables are disabled */
+	if (!mixed_pgtables && !mm_alloc_pgste(mm))
 		return -EINVAL;
 	down_write(&mm->mmap_sem);
+	/* allocate page tables with pgste from now on if not already done */
+	mm->context.alloc_pgste = 1;
 	mm->context.has_pgste = 1;
 	/* split thp mappings and disable thp for future mappings */
 	thp_split_mm(mm);
