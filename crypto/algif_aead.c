@@ -57,7 +57,7 @@ struct aead_ctx {
 
 	void *iv;
 
-	struct af_alg_completion completion;
+	struct crypto_wait wait;
 
 	unsigned long used;
 
@@ -648,10 +648,10 @@ static int aead_recvmsg_sync(struct socket *sock, struct msghdr *msg, int flags)
 			       used, ctx->iv);
 	aead_request_set_ad(&ctx->aead_req, ctx->aead_assoclen);
 
-	err = af_alg_wait_for_completion(ctx->enc ?
-					 crypto_aead_encrypt(&ctx->aead_req) :
-					 crypto_aead_decrypt(&ctx->aead_req),
-					 &ctx->completion);
+	err = crypto_wait_req(ctx->enc ?
+			 crypto_aead_encrypt(&ctx->aead_req) :
+			 crypto_aead_decrypt(&ctx->aead_req),
+			 &ctx->wait);
 
 	if (err) {
 		/* EBADMSG implies a valid cipher operation took place */
@@ -912,7 +912,7 @@ static int aead_accept_parent_nokey(void *private, struct sock *sk)
 	ctx->enc = 0;
 	ctx->tsgl.cur = 0;
 	ctx->aead_assoclen = 0;
-	af_alg_init_completion(&ctx->completion);
+	crypto_init_wait(&ctx->wait);
 	sg_init_table(ctx->tsgl.sg, ALG_MAX_PAGES);
 	INIT_LIST_HEAD(&ctx->list);
 
@@ -920,7 +920,7 @@ static int aead_accept_parent_nokey(void *private, struct sock *sk)
 
 	aead_request_set_tfm(&ctx->aead_req, aead);
 	aead_request_set_callback(&ctx->aead_req, CRYPTO_TFM_REQ_MAY_BACKLOG,
-				  af_alg_complete, &ctx->completion);
+				  crypto_req_done, &ctx->wait);
 
 	sk->sk_destruct = aead_sock_destruct;
 

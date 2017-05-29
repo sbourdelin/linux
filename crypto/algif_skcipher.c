@@ -43,7 +43,7 @@ struct skcipher_ctx {
 
 	void *iv;
 
-	struct af_alg_completion completion;
+	struct crypto_wait wait;
 
 	atomic_t inflight;
 	size_t used;
@@ -684,11 +684,10 @@ static int skcipher_recvmsg_sync(struct socket *sock, struct msghdr *msg,
 		skcipher_request_set_crypt(&ctx->req, sg, ctx->rsgl.sg, used,
 					   ctx->iv);
 
-		err = af_alg_wait_for_completion(
-				ctx->enc ?
-					crypto_skcipher_encrypt(&ctx->req) :
-					crypto_skcipher_decrypt(&ctx->req),
-				&ctx->completion);
+		err = crypto_wait_req(ctx->enc ?
+				      crypto_skcipher_encrypt(&ctx->req) :
+				      crypto_skcipher_decrypt(&ctx->req),
+				      &ctx->wait);
 
 free:
 		af_alg_free_sg(&ctx->rsgl);
@@ -948,14 +947,14 @@ static int skcipher_accept_parent_nokey(void *private, struct sock *sk)
 	ctx->merge = 0;
 	ctx->enc = 0;
 	atomic_set(&ctx->inflight, 0);
-	af_alg_init_completion(&ctx->completion);
+	crypto_init_wait(&ctx->wait);
 
 	ask->private = ctx;
 
 	skcipher_request_set_tfm(&ctx->req, skcipher);
 	skcipher_request_set_callback(&ctx->req, CRYPTO_TFM_REQ_MAY_SLEEP |
 						 CRYPTO_TFM_REQ_MAY_BACKLOG,
-				      af_alg_complete, &ctx->completion);
+				      crypto_req_done, &ctx->wait);
 
 	sk->sk_destruct = skcipher_sock_destruct;
 
