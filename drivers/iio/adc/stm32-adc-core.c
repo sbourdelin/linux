@@ -186,7 +186,6 @@ static void stm32_adc_irq_remove(struct platform_device *pdev,
 static int stm32_adc_probe(struct platform_device *pdev)
 {
 	struct stm32_adc_priv *priv;
-	struct device_node *np = pdev->dev.of_node;
 	struct resource *res;
 	int ret;
 
@@ -249,7 +248,7 @@ static int stm32_adc_probe(struct platform_device *pdev)
 
 	platform_set_drvdata(pdev, &priv->common);
 
-	ret = of_platform_populate(np, NULL, NULL, &pdev->dev);
+	ret = devm_of_platform_populate(&pdev->dev);
 	if (ret < 0) {
 		dev_err(&pdev->dev, "failed to populate DT children\n");
 		goto err_irq_remove;
@@ -274,7 +273,6 @@ static int stm32_adc_remove(struct platform_device *pdev)
 	struct stm32_adc_common *common = platform_get_drvdata(pdev);
 	struct stm32_adc_priv *priv = to_stm32_adc_priv(common);
 
-	of_platform_depopulate(&pdev->dev);
 	stm32_adc_irq_remove(pdev, priv);
 	clk_disable_unprepare(priv->aclk);
 	regulator_disable(priv->vref);
