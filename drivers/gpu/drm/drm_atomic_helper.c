@@ -2668,7 +2668,12 @@ int drm_atomic_helper_resume(struct drm_device *dev,
 
 	drm_modeset_acquire_init(&ctx, 0);
 	while (1) {
+		err = drm_modeset_lock_all_ctx(dev, &ctx);
+		if (err)
+			goto out;
+
 		err = drm_atomic_helper_commit_duplicated_state(state, &ctx);
+out:
 		if (err != -EDEADLK)
 			break;
 
