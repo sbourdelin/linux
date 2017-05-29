@@ -130,7 +130,7 @@ static int stm32_dac_probe(struct platform_device *pdev)
 
 	platform_set_drvdata(pdev, &priv->common);
 
-	ret = of_platform_populate(pdev->dev.of_node, NULL, NULL, dev);
+	ret = devm_of_platform_populate(&pdev->dev);
 	if (ret < 0) {
 		dev_err(dev, "failed to populate DT children\n");
 		goto err_pclk;
@@ -151,7 +151,6 @@ static int stm32_dac_remove(struct platform_device *pdev)
 	struct stm32_dac_common *common = platform_get_drvdata(pdev);
 	struct stm32_dac_priv *priv = to_stm32_dac_priv(common);
 
-	of_platform_depopulate(&pdev->dev);
 	clk_disable_unprepare(priv->pclk);
 	regulator_disable(priv->vref);
 
