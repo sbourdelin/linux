@@ -969,7 +969,7 @@ static int add_display_components(struct device *dev,
 	 * to our components list.
 	 */
 	if (of_device_is_compatible(dev->of_node, "qcom,mdss")) {
-		ret = of_platform_populate(dev->of_node, NULL, NULL, dev);
+		ret = devm_of_platform_populate(dev);
 		if (ret) {
 			dev_err(dev, "failed to populate children devices\n");
 			return ret;
@@ -978,7 +978,6 @@ static int add_display_components(struct device *dev,
 		mdp_dev = device_find_child(dev, NULL, compare_name_mdp);
 		if (!mdp_dev) {
 			dev_err(dev, "failed to find MDSS MDP node\n");
-			of_platform_depopulate(dev);
 			return -ENODEV;
 		}
 
@@ -992,11 +991,7 @@ static int add_display_components(struct device *dev,
 		mdp_dev = dev;
 	}
 
-	ret = add_components_mdp(mdp_dev, matchptr);
-	if (ret)
-		of_platform_depopulate(dev);
-
-	return ret;
+	return add_components_mdp(mdp_dev, matchptr);
 }
 
 /*
@@ -1072,7 +1067,6 @@ static int msm_pdev_probe(struct platform_device *pdev)
 static int msm_pdev_remove(struct platform_device *pdev)
 {
 	component_master_del(&pdev->dev, &msm_drm_ops);
-	of_platform_depopulate(&pdev->dev);
 
 	return 0;
 }
