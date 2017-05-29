@@ -1456,6 +1456,9 @@ static void nvme_set_latency_tolerance(struct device *dev, s32 val)
 	struct nvme_ctrl *ctrl = dev_get_drvdata(dev);
 	u64 latency;
 
+	if (ctrl->state == NVME_CTRL_DELETING || ctrl->state == NVME_CTRL_DEAD)
+		return;
+
 	switch (val) {
 	case PM_QOS_LATENCY_TOLERANCE_NO_CONSTRAINT:
 	case PM_QOS_LATENCY_ANY:
