@@ -304,6 +304,8 @@ ACPI_EXPORT_SYMBOL_INIT(acpi_install_table)
  *
  * PARAMETERS:  table               - Pointer to a buffer containing the ACPI
  *                                    table to be loaded.
+ *              table_index         - Pointer to a variable receiving the table
+ *                                    index, or NULL.
  *
  * RETURN:      Status
  *
@@ -314,10 +316,10 @@ ACPI_EXPORT_SYMBOL_INIT(acpi_install_table)
  *              to ensure that the table is not deleted or unmapped.
  *
  ******************************************************************************/
-acpi_status acpi_load_table(struct acpi_table_header *table)
+acpi_status acpi_load_table(struct acpi_table_header *table, u32 *table_index)
 {
+	u32 table_index_dummy;
 	acpi_status status;
-	u32 table_index;
 
 	ACPI_FUNCTION_TRACE(acpi_load_table);
 
@@ -327,16 +329,46 @@ acpi_status acpi_load_table(struct acpi_table_header *table)
 		return_ACPI_STATUS(AE_BAD_PARAMETER);
 	}
 
+	if (!table_index)
+		table_index = &table_index_dummy;
+
 	/* Install the table and load it into the namespace */
 
 	ACPI_INFO(("Host-directed Dynamic ACPI Table Load:"));
 	status = acpi_tb_install_and_load_table(ACPI_PTR_TO_PHYSADDR(table),
 						ACPI_TABLE_ORIGIN_EXTERNAL_VIRTUAL,
-						FALSE, &table_index);
+						FALSE, table_index);
 	return_ACPI_STATUS(status);
 }
 
 ACPI_EXPORT_SYMBOL(acpi_load_table)
+
+/*******************************************************************************
+ *
+ * FUNCTION:    acpi_unload_table
+ *
+ * PARAMETERS:  table_index         - Index of the table to be unloaded.
+ *
+ * RETURN:      Status
+ *
+ * DESCRIPTION: Unloads the table and deletes all namespace objects associated
+ *              with that table. Unloading of the DSDT is not allowed.
+ *              Note: Mainly intended to support hotplug removal of SSDTs.
+ *
+ ******************************************************************************/
+acpi_status acpi_unload_table(u32 table_index)
+{
+	ACPI_FUNCTION_TRACE(acpi_unload_table);
+
+	if (!table_index) {
+		return_ACPI_STATUS(AE_BAD_PARAMETER);
+	}
+
+	ACPI_INFO(("Host-directed Dynamic ACPI Table Unload:"));
+	return acpi_tb_unload_table(table_index);
+}
+
+ACPI_EXPORT_SYMBOL(acpi_unload_table)
 
 /*******************************************************************************
  *
