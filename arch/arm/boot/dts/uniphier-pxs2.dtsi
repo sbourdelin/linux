@@ -387,6 +387,12 @@
 				compatible = "socionext,uniphier-pxs2-reset";
 				#reset-cells = <1>;
 			};
+
+			pvtctl: pvtctl {
+				compatible = "socionext,uniphier-pxs2-thermal";
+				interrupts = <0 3 1>;
+				#thermal-sensor-cells = <0>;
+			};
 		};
 	};
 };
