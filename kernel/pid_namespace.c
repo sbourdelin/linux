@@ -385,15 +385,6 @@ static struct ns_common *pidns_for_children_get(struct task_struct *task)
 	}
 	task_unlock(task);
 
-	if (ns) {
-		read_lock(&tasklist_lock);
-		if (!ns->child_reaper) {
-			put_pid_ns(ns);
-			ns = NULL;
-		}
-		read_unlock(&tasklist_lock);
-	}
-
 	return ns ? &ns->ns : NULL;
 }
 
@@ -427,6 +418,15 @@ static int pidns_install(struct nsproxy *nsproxy, struct ns_common *ns)
 		ancestor = ancestor->parent;
 	if (ancestor != active)
 		return -EINVAL;
+
+	/*
+	 * Disallow processes to use pid namespace till its
+	 * creator makes child reaper. Otherwise, several
+	 * processes race for that, and it's not clear who
+	 * establishes init.
+	 */
+	if (!new->child_reaper)
+		return -ESRCH;
 
 	put_pid_ns(nsproxy->pid_ns_for_children);
 	nsproxy->pid_ns_for_children = get_pid_ns(new);
