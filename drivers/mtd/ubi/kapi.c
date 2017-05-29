@@ -107,6 +107,19 @@ void ubi_get_volume_info(struct ubi_volume_desc *desc,
 EXPORT_SYMBOL_GPL(ubi_get_volume_info);
 
 /**
+ * ubi_volume_kobject - get kobject for a UBI volume.
+ * @desc: volume descriptor
+ *
+ * Retrieves a pointer to the struct kobject underlying the UBI volume.
+ * The caller must hold a reference to the UBI volume.
+ */
+struct kobject *ubi_volume_kobj(struct ubi_volume_desc *desc)
+{
+	return &desc->vol->dev.kobj;
+}
+EXPORT_SYMBOL_GPL(ubi_volume_kobj);
+
+/**
  * ubi_open_volume - open UBI volume.
  * @ubi_num: UBI device number
  * @vol_id: volume ID

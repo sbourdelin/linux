@@ -26,6 +26,8 @@
 #include <linux/scatterlist.h>
 #include <mtd/ubi-user.h>
 
+struct kobject;
+
 /* All voumes/LEBs */
 #define UBI_ALL -1
 
@@ -241,6 +243,7 @@ struct ubi_volume_desc *ubi_open_volume(int ubi_num, int vol_id, int mode);
 struct ubi_volume_desc *ubi_open_volume_nm(int ubi_num, const char *name,
 					   int mode);
 struct ubi_volume_desc *ubi_open_volume_path(const char *pathname, int mode);
+struct kobject *ubi_volume_kobj(struct ubi_volume_desc *desc);
 
 int ubi_register_volume_notifier(struct notifier_block *nb,
 				 int ignore_existing);

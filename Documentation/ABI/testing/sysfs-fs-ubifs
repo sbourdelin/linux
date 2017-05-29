@@ -1,0 +1,6 @@
+What:		/sys/fs/ubifs/<disk>/ubi
+Date:		May 2017
+Description:
+		This symbolic link points to the file system's underlying UBI
+		volume.  The <disk> is the major:minor numbers of the anonymous
+		block device backing the file system.

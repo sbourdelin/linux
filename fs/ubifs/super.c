@@ -1164,6 +1164,10 @@ static int mount_ubifs(struct ubifs_info *c)
 	if (err)
 		return err;
 
+	err = ubifs_sysfs_register(c);
+	if (err)
+		goto out_debugging;
+
 	err = check_volume_empty(c);
 	if (err)
 		goto out_free;
@@ -1496,6 +1500,8 @@ out_free:
 	vfree(c->ileb_buf);
 	vfree(c->sbuf);
 	kfree(c->bottom_up_buf);
+	ubifs_sysfs_unregister(c);
+out_debugging:
 	ubifs_debugging_exit(c);
 	return err;
 }
@@ -1536,6 +1542,7 @@ static void ubifs_umount(struct ubifs_info *c)
 	vfree(c->sbuf);
 	kfree(c->bottom_up_buf);
 	ubifs_debugging_exit(c);
+	ubifs_sysfs_unregister(c);
 }
 
 /**
@@ -2271,14 +2278,20 @@ static int __init ubifs_init(void)
 	if (err)
 		goto out_compr;
 
+	err = ubifs_sysfs_init();
+	if (err)
+		goto out_dbg;
+
 	err = register_filesystem(&ubifs_fs_type);
 	if (err) {
 		pr_err("UBIFS error (pid %d): cannot register file system, error %d",
 		       current->pid, err);
-		goto out_dbg;
+		goto out_sysfs;
 	}
 	return 0;
 
+out_sysfs:
+	ubifs_sysfs_exit();
 out_dbg:
 	dbg_debugfs_exit();
 out_compr:
@@ -2308,6 +2321,7 @@ static void __exit ubifs_exit(void)
 	rcu_barrier();
 	kmem_cache_destroy(ubifs_inode_slab);
 	unregister_filesystem(&ubifs_fs_type);
+	ubifs_sysfs_exit();
 }
 module_exit(ubifs_exit);
 
