@@ -1,0 +1,55 @@
+* Cypress cyttsp touchscreen controller, generation 5
+
+Required properties:
+ - compatible		: must be "cypress,cyttsp5"
+ - reg			: Device I2C address or SPI chip select number
+ - interrupt-parent	: the phandle for the gpio controller
+			  (see interrupt binding[0]).
+ - interrupts		: (gpio) interrupt to which the chip is connected
+			  (see interrupt binding[0]).
+
+Optional properties (many of them coming from touchscreen binding[1]):
+ - reset-gpios		: the reset gpio the chip is connected to
+			  (see GPIO binding[2] for more details).
+ - touchscreen-size-x	: horizontal resolution of touchscreen (in pixels)
+ - touchscreen-size-y	: vertical resolution of touchscreen (in pixels)
+ - touchscreen-fuzz-x	: horizontal noise value of the absolute input device
+			  (in pixels)
+ - touchscreen-fuzz-y	: vertical noise value of the absolute input device
+			  (in pixels)
+
+This touchscreen can handle some buttons that are touchscreen's defined zones.
+Each button's event can be customized using a sub-node properties:
+	- linux,code: Keycode to emit.
+
+[0]: Documentation/devicetree/bindings/interrupt-controller/interrupts.txt
+[1]: Documentation/devicetree/bindings/input/touchscreen/touchscreen.txt
+[2]: Documentation/devicetree/bindings/gpio/gpio.txt
+
+Example:
+&i2c0 {
+	[...]
+
+	tsc@24 {
+		compatible = "cypress,cyttsp5";
+		reg = <0x24>;
+
+		pinctrl-names = "default";
+		pinctrl-0 = <&tp_reset_ds203>;
+		interrupt-parent = <&pio>;
+		interrupts = <1 5 IRQ_TYPE_LEVEL_LOW>;
+		reset-gpios = <&pio 7 1 GPIO_ACTIVE_HIGH>;
+
+		button@0 {
+			linux,code = <KEY_HOMEPAGE>;
+		};
+
+		button@1 {
+			linux,code = <KEY_MENU>;
+		};
+
+		button@2 {
+			linux,code = <KEY_BACK>;
+		};
+	};
+};
