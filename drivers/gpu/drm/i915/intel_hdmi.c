@@ -1381,6 +1381,7 @@ intel_hdmi_compute_ycbcr_config(struct drm_connector_state *conn_state,
 {
 	struct drm_connector *connector = conn_state->connector;
 	struct drm_display_info *info = &connector->display_info;
+	struct intel_crtc *intel_crtc = to_intel_crtc(conn_state->crtc);
 	struct drm_display_mode *mode = &config->base.adjusted_mode;
 	enum drm_hdmi_output_type type = conn_state->hdmi_output;
 	u8 src_output_cap = intel_hdmi_get_src_output_support(connector);
@@ -1425,6 +1426,16 @@ intel_hdmi_compute_ycbcr_config(struct drm_connector_state *conn_state,
 		config->port_clock /= 2;
 		*clock_12bpc /= 2;
 		*clock_8bpc /= 2;
+
+		/* ycbcr 420 output conversion needs a scaler */
+		if (skl_update_scaler_crtc_hdmi_output(config)) {
+			DRM_ERROR("Scaler allocation for output failed\n");
+			return DRM_HDMI_OUTPUT_INVALID;
+		}
+
+		/* Bind this scaler to pipe */
+		intel_pch_panel_fitting(intel_crtc, config,
+					DRM_MODE_SCALE_FULLSCREEN);
 		break;
 
 	case DRM_HDMI_OUTPUT_YCBCR422:
