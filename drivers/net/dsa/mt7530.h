@@ -15,7 +15,6 @@
 #define __MT7530_H
 
 #define MT7530_NUM_PORTS		7
-#define MT7530_CPU_PORT			6
 #define MT7530_NUM_FDB_RECORDS		2048
 
 #define	NUM_TRGMII_CTRL			5
