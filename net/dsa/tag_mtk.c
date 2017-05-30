@@ -47,9 +47,7 @@ out_free:
 	return NULL;
 }
 
-static struct sk_buff *mtk_tag_rcv(struct sk_buff *skb, struct net_device *dev,
-				   struct packet_type *pt,
-				   struct net_device *orig_dev)
+static struct sk_buff *mtk_tag_rcv(struct sk_buff *skb, struct net_device *dev)
 {
 	struct dsa_switch_tree *dst = dev->dsa_ptr;
 	struct dsa_switch *ds;

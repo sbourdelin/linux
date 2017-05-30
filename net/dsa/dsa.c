@@ -209,7 +209,7 @@ static int dsa_switch_rcv(struct sk_buff *skb, struct net_device *dev,
 	if (!skb)
 		return 0;
 
-	nskb = dst->tag_ops->rcv(skb, dev, pt, orig_dev);
+	nskb = dst->tag_ops->rcv(skb, dev);
 	if (!nskb) {
 		kfree_skb(skb);
 		return 0;
