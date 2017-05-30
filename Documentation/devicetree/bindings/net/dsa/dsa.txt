@@ -55,6 +55,11 @@ A user port has the following optional property:
 - label			: Describes the label associated with this port, which
                           will become the netdev name.
 
+- cpu			: Option for non "cpu"/"dsa" ports. A phandle to a
+			  "cpu" port, which will be used for passing packets
+			  from this port to the host. If not present, the first
+			  "cpu" port will be used.
+
 Port child nodes may also contain the following optional standardised
 properties, described in binding documents:
 
@@ -71,7 +76,7 @@ properties, described in binding documents:
 			  Documentation/devicetree/bindings/net/fixed-link.txt
 			  for details.
 
-Example
+Examples
 
 The following example shows three switches on three MDIO busses,
 linked into one DSA cluster.
@@ -259,6 +264,60 @@ linked into one DSA cluster.
 					speed = <1000>;
 					full-duplex;
 				};
+			};
+		};
+	};
+};
+
+The following example shows a switch that has two cpu ports each connecting
+to a different MAC.
+
+&mdio0 {
+	switch@0 {
+		compatible = "mediatek,mt7530";
+		#address-cells = <1>;
+		#size-cells = <0>;
+		reg = <0>;
+
+		ports {
+			#address-cells = <1>;
+			#size-cells = <0>;
+			port@0 {
+				reg = <0>;
+				label = "lan0";
+				cpu = <&cpu_port1>;
+			};
+
+			port@1 {
+				reg = <1>;
+				label = "lan1";
+				cpu = <&cpu_port1>;
+			};
+
+			port@2 {
+				reg = <2>;
+				label = "lan2";
+				cpu = <&cpu_port1>;
+			};
+
+			port@3 {
+				reg = <3>;
+				label = "wan";
+				cpu = <&cpu_port2>;
+			};
+
+			cpu_port2: port@5 {
+				reg = <5>;
+				label = "cpu";
+				ethernet = <&gmac2>;
+				phy-mode = "trgmii";
+			};
+
+			cpu_port1: port@6 {
+				reg = <6>;
+				label = "cpu";
+				ethernet = <&gmac1>;
+				phy-mode = "trgmii";
 			};
 		};
 	};
