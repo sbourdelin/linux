@@ -242,6 +242,9 @@ static void fc_disc_restart(struct fc_disc *disc)
 	 */
 	disc->disc_id = (disc->disc_id + 2) | 1;
 	disc->retry_count = 0;
+	disc->pending = 1;
+	disc->requested = 0;
+
 	fc_disc_gpn_ft_req(disc);
 }
 
@@ -370,9 +373,6 @@ static void fc_disc_gpn_ft_req(struct fc_disc *disc)
 	struct fc_lport *lport = fc_disc_lport(disc);
 
 	WARN_ON(!fc_lport_test_ready(lport));
-
-	disc->pending = 1;
-	disc->requested = 0;
 
 	disc->buf_len = 0;
 	disc->seq_count = 0;
@@ -503,6 +503,9 @@ static void fc_disc_timeout(struct work_struct *work)
 					    struct fc_disc,
 					    disc_work.work);
 	mutex_lock(&disc->disc_mutex);
+	disc->pending = 1;
+	disc->requested = 0;
+
 	fc_disc_gpn_ft_req(disc);
 	mutex_unlock(&disc->disc_mutex);
 }
