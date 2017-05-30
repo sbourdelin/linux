@@ -334,4 +334,8 @@
 	INTEL_KBL_GT3_IDS(info), \
 	INTEL_KBL_GT4_IDS(info)
 
+#define INTEL_CFL_IDS(info) \
+	INTEL_VGA_DEVICE(0x3E92, info), /* CFL-S GT2 */ \
+	INTEL_VGA_DEVICE(0x3E9B, info) /* CFL-H GT2 */
+
 #endif /* _I915_PCIIDS_H */
