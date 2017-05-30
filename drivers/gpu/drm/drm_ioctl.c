@@ -715,11 +715,11 @@ long drm_ioctl(struct file *filp,
 	const struct drm_ioctl_desc *ioctl = NULL;
 	drm_ioctl_t *func;
 	unsigned int nr = DRM_IOCTL_NR(cmd);
-	int retcode = -EINVAL;
 	char stack_kdata[128];
-	char *kdata = NULL;
+	char *kdata = stack_kdata;
 	unsigned int in_size, out_size, drv_size, ksize;
 	bool is_driver_ioctl;
+	int retcode;
 
 	dev = file_priv->minor->dev;
 
@@ -731,12 +731,12 @@ long drm_ioctl(struct file *filp,
 	if (is_driver_ioctl) {
 		/* driver ioctl */
 		if (nr - DRM_COMMAND_BASE >= dev->driver->num_ioctls)
-			goto err_i1;
+			goto err_invalid_ioctl;
 		ioctl = &dev->driver->ioctls[nr - DRM_COMMAND_BASE];
 	} else {
 		/* core ioctl */
 		if (nr >= DRM_CORE_IOCTL_COUNT)
-			goto err_i1;
+			goto err_invalid_ioctl;
 		ioctl = &drm_ioctls[nr];
 	}
 
@@ -758,27 +758,48 @@ long drm_ioctl(struct file *filp,
 
 	if (unlikely(!func)) {
 		DRM_DEBUG("no function\n");
-		retcode = -EINVAL;
-		goto err_i1;
+		goto err_invalid;
 	}
 
 	retcode = drm_ioctl_permit(ioctl->flags, file_priv);
 	if (unlikely(retcode))
-		goto err_i1;
+		goto out;
 
-	if (ksize <= sizeof(stack_kdata)) {
-		kdata = stack_kdata;
-	} else {
-		kdata = kmalloc(ksize, GFP_KERNEL);
-		if (!kdata) {
-			retcode = -ENOMEM;
-			goto err_i1;
+	if (in_size) {
+		if (unlikely(!access_ok(VERIFY_READ, arg, in_size)))
+			goto err_invalid_user;
+
+		switch (in_size) {
+		case 4:
+			if (unlikely(__copy_from_user(kdata, (void __user *)arg,
+						      4)))
+				goto err_invalid_user;
+			break;
+		case 8:
+			if (unlikely(__copy_from_user(kdata, (void __user *)arg,
+						      8)))
+				goto err_invalid_user;
+			break;
+		case 16:
+			if (unlikely(__copy_from_user(kdata, (void __user *)arg,
+						      16)))
+				goto err_invalid_user;
+			break;
+
+		default:
+			if (ksize > sizeof(stack_kdata)) {
+				kdata = kmalloc(ksize, GFP_KERNEL);
+				if (unlikely(!kdata)) {
+					retcode = -ENOMEM;
+					goto out;
+				}
+			}
+
+			if (unlikely(__copy_from_user(kdata, (void __user *)arg,
+						      in_size)))
+				goto err_invalid_user;
+			break;
 		}
-	}
-
-	if (copy_from_user(kdata, (void __user *)arg, in_size) != 0) {
-		retcode = -EFAULT;
-		goto err_i1;
 	}
 
 	if (ksize > in_size)
@@ -794,21 +815,53 @@ long drm_ioctl(struct file *filp,
 		mutex_unlock(&drm_global_mutex);
 	}
 
-	if (copy_to_user((void __user *)arg, kdata, out_size) != 0)
-		retcode = -EFAULT;
+	if (out_size) {
+		if (unlikely(!access_ok(VERIFY_WRITE, arg, out_size)))
+			goto err_invalid_user;
 
-      err_i1:
-	if (!ioctl)
-		DRM_DEBUG("invalid ioctl: pid=%d, dev=0x%lx, auth=%d, cmd=0x%02x, nr=0x%02x\n",
-			  task_pid_nr(current),
-			  (long)old_encode_dev(file_priv->minor->kdev->devt),
-			  file_priv->authenticated, cmd, nr);
+		switch (out_size) {
+		case 4:
+			if (unlikely(__copy_to_user((void __user *)arg,
+						    kdata, 4)))
+				goto err_invalid_user;
+			break;
+		case 8:
+			if (unlikely(__copy_to_user((void __user *)arg,
+						    kdata, 8)))
+				goto err_invalid_user;
+			break;
+		case 16:
+			if (unlikely(__copy_to_user((void __user *)arg,
+						    kdata, 16)))
+				goto err_invalid_user;
+			break;
+		default:
+			if (unlikely(__copy_to_user((void __user *)arg,
+						    kdata, out_size)))
+				goto err_invalid_user;
+			break;
+		}
+	}
 
+out:
 	if (kdata != stack_kdata)
 		kfree(kdata);
 	if (retcode)
 		DRM_DEBUG("ret = %d\n", retcode);
 	return retcode;
+
+err_invalid_ioctl:
+	DRM_DEBUG("invalid ioctl: pid=%d, dev=0x%lx, auth=%d, cmd=0x%02x, nr=0x%02x\n",
+		  task_pid_nr(current),
+		  (long)old_encode_dev(file_priv->minor->kdev->devt),
+		  file_priv->authenticated, cmd, nr);
+err_invalid:
+	retcode = -EINVAL;
+	goto out;
+
+err_invalid_user:
+	retcode = -EFAULT;
+	goto out;
 }
 EXPORT_SYMBOL(drm_ioctl);
 
