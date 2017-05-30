@@ -367,7 +367,7 @@ static irqreturn_t tpm_ioserirq_handler(int irq, void *dev_id)
 static int st33zp24_send(struct tpm_chip *chip, unsigned char *buf,
 			 size_t len)
 {
-	struct st33zp24_dev *tpm_dev = dev_get_drvdata(&chip->dev);
+	struct st33zp24_dev *tpm_dev;
 	u32 status, i, size, ordinal;
 	int burstcnt = 0;
 	int ret;
@@ -382,6 +382,7 @@ static int st33zp24_send(struct tpm_chip *chip, unsigned char *buf,
 	if (ret < 0)
 		return ret;
 
+	tpm_dev = dev_get_drvdata(&chip->dev);
 	status = st33zp24_status(chip);
 	if ((status & TPM_STS_COMMAND_READY) == 0) {
 		st33zp24_cancel(chip);
