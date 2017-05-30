@@ -246,7 +246,7 @@ static int asoc_graph_card_parse_of(struct graph_card_data *priv)
 			continue;
 
 		if (rcpu_ep != cpu_ep) {
-			dev_err(dev, "remote-endpoint missmatch (%s/%s/%s)\n",
+			dev_err(dev, "remote-endpoint mismatch (%s/%s/%s)\n",
 				cpu_ep->name, codec_ep->name, rcpu_ep->name);
 			ret = -EINVAL;
 			goto parse_of_err;
