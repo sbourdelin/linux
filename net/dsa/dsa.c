@@ -209,11 +209,12 @@ static int dsa_switch_rcv(struct sk_buff *skb, struct net_device *dev,
 	if (!skb)
 		return 0;
 
+	/* Receive function may have to reallocate the original SKB */
 	nskb = dst->tag_ops->rcv(skb, dev);
-	if (!nskb) {
+	if (nskb != skb)
 		kfree_skb(skb);
+	if (!nskb)
 		return 0;
-	}
 
 	skb = nskb;
 	skb_push(skb, ETH_HLEN);
