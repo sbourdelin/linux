@@ -363,7 +363,7 @@ static netdev_tx_t dsa_slave_xmit(struct sk_buff *skb, struct net_device *dev)
 	dev->stats.tx_bytes += skb->len;
 
 	/* Transmit function may have to reallocate the original SKB */
-	nskb = p->xmit(skb, dev);
+	nskb = p->dp->ds->dst->tag_ops->xmit(skb, dev);
 	if (!nskb)
 		return NETDEV_TX_OK;
 
@@ -1136,7 +1136,6 @@ int dsa_slave_resume(struct net_device *slave_dev)
 int dsa_slave_create(struct dsa_switch *ds, struct device *parent,
 		     int port, const char *name)
 {
-	struct dsa_switch_tree *dst = ds->dst;
 	struct net_device *master;
 	struct net_device *slave_dev;
 	struct dsa_slave_priv *p;
@@ -1172,7 +1171,6 @@ int dsa_slave_create(struct dsa_switch *ds, struct device *parent,
 	p = netdev_priv(slave_dev);
 	p->dp = &ds->ports[port];
 	INIT_LIST_HEAD(&p->mall_tc_list);
-	p->xmit = dst->tag_ops->xmit;
 
 	p->old_pause = -1;
 	p->old_link = -1;

@@ -71,9 +71,6 @@ struct dsa_device_ops {
 };
 
 struct dsa_slave_priv {
-	struct sk_buff *	(*xmit)(struct sk_buff *skb,
-					struct net_device *dev);
-
 	/* DSA port data, such as switch, port index, etc. */
 	struct dsa_port		*dp;
 
