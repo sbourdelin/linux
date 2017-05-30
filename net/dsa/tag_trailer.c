@@ -32,17 +32,14 @@ static struct sk_buff *trailer_xmit(struct sk_buff *skb, struct net_device *dev)
 		padlen = 60 - skb->len;
 
 	nskb = alloc_skb(NET_IP_ALIGN + skb->len + padlen + 4, GFP_ATOMIC);
-	if (nskb == NULL) {
-		kfree_skb(skb);
+	if (!nskb)
 		return NULL;
-	}
 	skb_reserve(nskb, NET_IP_ALIGN);
 
 	skb_reset_mac_header(nskb);
 	skb_set_network_header(nskb, skb_network_header(skb) - skb->head);
 	skb_set_transport_header(nskb, skb_transport_header(skb) - skb->head);
 	skb_copy_and_csum_dev(skb, skb_put(nskb, skb->len));
-	kfree_skb(skb);
 
 	if (padlen) {
 		u8 *pad = skb_put(nskb, padlen);

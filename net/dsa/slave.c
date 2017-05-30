@@ -364,6 +364,8 @@ static netdev_tx_t dsa_slave_xmit(struct sk_buff *skb, struct net_device *dev)
 
 	/* Transmit function may have to reallocate the original SKB */
 	nskb = p->dp->ds->dst->tag_ops->xmit(skb, dev);
+	if (nskb != skb)
+		kfree_skb(skb);
 	if (!nskb)
 		return NETDEV_TX_OK;
 
