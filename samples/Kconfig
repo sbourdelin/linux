@@ -118,4 +118,10 @@ config SAMPLE_STATX
 	help
 	  Build example userspace program to use the new extended-stat syscall.
 
+config SAMPLE_WHITEEGRET
+	bool "Build WhiteEgret sample user application"
+	depends on SECURITY_WHITEEGRET
+	help
+	  Build sample userspace application for WhiteEgret LSM module.
+
 endif # SAMPLES
