@@ -434,6 +434,8 @@ static const struct snd_kcontrol_new sgtl5000_snd_controls[] = {
 			0x1f, 1,
 			lineout_volume),
 	SOC_SINGLE("Lineout Playback Switch", SGTL5000_CHIP_ANA_CTRL, 8, 1, 1),
+
+	SOC_SINGLE("AVC Enable", SGTL5000_DAP_AVC_CTRL, 0, 1, 0),
 };
 
 /* mute the codec used by alsa core */
