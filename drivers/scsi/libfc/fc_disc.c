@@ -503,10 +503,12 @@ static void fc_disc_timeout(struct work_struct *work)
 					    struct fc_disc,
 					    disc_work.work);
 	mutex_lock(&disc->disc_mutex);
-	disc->pending = 1;
-	disc->requested = 0;
+	if (!disc->pending) {
+		disc->pending = 1;
+		disc->requested = 0;
 
-	fc_disc_gpn_ft_req(disc);
+		fc_disc_gpn_ft_req(disc);
+	}
 	mutex_unlock(&disc->disc_mutex);
 }
 
