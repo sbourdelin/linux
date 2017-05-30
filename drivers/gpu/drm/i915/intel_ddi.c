@@ -429,7 +429,7 @@ skl_get_buf_trans_edp(struct drm_i915_private *dev_priv, int *n_entries)
 		}
 	}
 
-	if (IS_KABYLAKE(dev_priv))
+	if (IS_KABYLAKE(dev_priv) || IS_COFFEELAKE(dev_priv))
 		return kbl_get_buf_trans_dp(dev_priv, n_entries);
 	else
 		return skl_get_buf_trans_dp(dev_priv, n_entries);
@@ -458,7 +458,7 @@ static int intel_ddi_hdmi_level(struct drm_i915_private *dev_priv, enum port por
 	if (IS_GEN9_LP(dev_priv))
 		return hdmi_level;
 
-	if (IS_GEN9_BC(dev_priv)) {
+	if (IS_GEN9_BC(dev_priv) || IS_COFFEELAKE(dev_priv)) {
 		skl_get_buf_trans_hdmi(dev_priv, &n_hdmi_entries);
 		hdmi_default_entry = 8;
 	} else if (IS_BROADWELL(dev_priv)) {
@@ -1478,7 +1478,7 @@ static void skl_ddi_set_iboost(struct intel_encoder *encoder, u32 level)
 		if (dp_iboost) {
 			iboost = dp_iboost;
 		} else {
-			if (IS_KABYLAKE(dev_priv))
+			if (IS_KABYLAKE(dev_priv) || IS_COFFEELAKE(dev_priv))
 				ddi_translations = kbl_get_buf_trans_dp(dev_priv,
 									&n_entries);
 			else
