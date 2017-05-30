@@ -1120,6 +1120,7 @@ static int arp_invalidate(struct net_device *dev, __be32 ip)
 					   NEIGH_UPDATE_F_OVERRIDE|
 					   NEIGH_UPDATE_F_ADMIN, 0);
 		neigh_release(neigh);
+		neigh_remove_one(neigh, &arp_tbl);
 	}
 
 	return err;
