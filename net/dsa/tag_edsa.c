@@ -90,7 +90,7 @@ static struct sk_buff *edsa_rcv(struct sk_buff *skb, struct net_device *dev)
 	int source_port;
 
 	if (unlikely(!pskb_may_pull(skb, EDSA_HLEN)))
-		goto out_drop;
+		return NULL;
 
 	/*
 	 * Skip the two null bytes after the ethertype.
@@ -101,7 +101,7 @@ static struct sk_buff *edsa_rcv(struct sk_buff *skb, struct net_device *dev)
 	 * Check that frame type is either TO_CPU or FORWARD.
 	 */
 	if ((edsa_header[0] & 0xc0) != 0x00 && (edsa_header[0] & 0xc0) != 0xc0)
-		goto out_drop;
+		return NULL;
 
 	/*
 	 * Determine source device and port.
@@ -114,14 +114,14 @@ static struct sk_buff *edsa_rcv(struct sk_buff *skb, struct net_device *dev)
 	 * port is a registered DSA port.
 	 */
 	if (source_device >= DSA_MAX_SWITCHES)
-		goto out_drop;
+		return NULL;
 
 	ds = dst->ds[source_device];
 	if (!ds)
-		goto out_drop;
+		return NULL;
 
 	if (source_port >= ds->num_ports || !ds->ports[source_port].netdev)
-		goto out_drop;
+		return NULL;
 
 	/*
 	 * If the 'tagged' bit is set, convert the DSA tag to a 802.1q
@@ -178,9 +178,6 @@ static struct sk_buff *edsa_rcv(struct sk_buff *skb, struct net_device *dev)
 	skb->dev = ds->ports[source_port].netdev;
 
 	return skb;
-
-out_drop:
-	return NULL;
 }
 
 const struct dsa_device_ops edsa_netdev_ops = {
