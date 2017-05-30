@@ -83,12 +83,12 @@ acpi_status acpi_os_terminate(void);
  */
 static inline void *acpi_os_allocate(acpi_size size)
 {
-	return kmalloc(size, irqs_disabled()? GFP_ATOMIC : GFP_KERNEL);
+	return kmalloc(size, irqs_disabled()? GFP_ATOMIC : GFP_NOIO);
 }
 
 static inline void *acpi_os_allocate_zeroed(acpi_size size)
 {
-	return kzalloc(size, irqs_disabled()? GFP_ATOMIC : GFP_KERNEL);
+	return kzalloc(size, irqs_disabled()? GFP_ATOMIC : GFP_NOIO);
 }
 
 static inline void acpi_os_free(void *memory)
@@ -99,7 +99,7 @@ static inline void acpi_os_free(void *memory)
 static inline void *acpi_os_acquire_object(acpi_cache_t * cache)
 {
 	return kmem_cache_zalloc(cache,
-				 irqs_disabled()? GFP_ATOMIC : GFP_KERNEL);
+				 irqs_disabled()? GFP_ATOMIC : GFP_NOIO);
 }
 
 static inline acpi_thread_id acpi_os_get_thread_id(void)
