@@ -305,6 +305,53 @@ out_unlock:
 
 CONFIGFS_ATTR(nvmet_ns_, device_path);
 
+static ssize_t nvmet_ns_device_eui64_show(struct config_item *item, char *page)
+{
+	return sprintf(page, "%8phN\n", &to_nvmet_ns(item)->eui64);
+}
+
+static ssize_t nvmet_ns_device_eui64_store(struct config_item *item,
+					   const char *page, size_t count)
+{
+	struct nvmet_ns *ns = to_nvmet_ns(item);
+	struct nvmet_subsys *subsys = ns->subsys;
+	u8 eui64[8];
+	const char *p = page;
+	int i;
+	int ret = 0;
+
+
+	mutex_lock(&subsys->lock);
+	if (ns->enabled) {
+		ret = -EBUSY;
+		goto out_unlock;
+	}
+
+	for (i = 0; i < 8; i++) {
+		if (p + 2 > page + count) {
+			ret = -EINVAL;
+			goto out_unlock;
+		}
+		if (!isxdigit(p[0]) || !isxdigit(p[1])) {
+			ret = -EINVAL;
+			goto out_unlock;
+		}
+
+		eui64[i] = (hex_to_bin(p[0]) << 4) | hex_to_bin(p[1]);
+		p += 2;
+
+		if (*p == '-')
+			p++;
+	}
+
+	memcpy(&ns->eui64, eui64, sizeof(eui64));
+out_unlock:
+	mutex_unlock(&subsys->lock);
+	return ret ? ret : count;
+}
+
+CONFIGFS_ATTR(nvmet_ns_, device_eui64);
+
 static ssize_t nvmet_ns_device_uuid_show(struct config_item *item, char *page)
 {
 	return sprintf(page, "%pUb\n", &to_nvmet_ns(item)->uuid);
@@ -427,6 +474,7 @@ static struct configfs_attribute *nvmet_ns_attrs[] = {
 	&nvmet_ns_attr_device_path,
 	&nvmet_ns_attr_device_nguid,
 	&nvmet_ns_attr_device_uuid,
+	&nvmet_ns_attr_device_eui64,
 	&nvmet_ns_attr_enable,
 	NULL,
 };

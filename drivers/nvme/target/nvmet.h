@@ -47,6 +47,7 @@ struct nvmet_ns {
 	loff_t			size;
 	u8			nguid[16];
 	u8			uuid[16];
+	u8			eui64[8];
 
 	bool			enabled;
 	struct nvmet_subsys	*subsys;
