@@ -148,6 +148,9 @@ struct drm_hdmi_info {
 
 	/** @ycbcr420_vcb_map: bitmap of SVD index, to extraxt vcb modes */
 	u64 ycbcr420_vcb_map;
+
+	/** @ycbcr420_dc_modes: bitmap of deep color support index */
+	u8 ycbcr420_dc_modes;
 };
 
 /**
