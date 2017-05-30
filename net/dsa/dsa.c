@@ -27,6 +27,11 @@
 
 #include "dsa_priv.h"
 
+bool dsa_uses_tagged_protocol(struct dsa_switch_tree *dst)
+{
+	return !!dst->rcv;
+}
+
 static struct sk_buff *dsa_slave_notag_xmit(struct sk_buff *skb,
 					    struct net_device *dev)
 {
