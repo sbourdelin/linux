@@ -1511,6 +1511,16 @@ static const char *const bcm2835_clock_per_parents[] = {
 	"pllh_aux",
 };
 
+static const char *const bcm2835_pcm_per_parents[] = {
+	"-",
+	"xosc",
+	"-",
+	"-",
+	"-",
+	"-",
+	"plld_per",
+};
+
 #define REGISTER_PER_CLK(...)	REGISTER_CLK(				\
 	.num_mux_parents = ARRAY_SIZE(bcm2835_clock_per_parents),	\
 	.parents = bcm2835_clock_per_parents,				\
@@ -2000,6 +2010,7 @@ static const struct bcm2835_clk_desc clk_desc_array[] = {
 		.int_bits = 12,
 		.frac_bits = 12,
 		.is_mash_clock = true,
+		.parents = bcm2835_pcm_per_parents,
 		.tcnt_mux = 23),
 	[BCM2835_CLOCK_PWM]	= REGISTER_PER_CLK(
 		.name = "pwm",
