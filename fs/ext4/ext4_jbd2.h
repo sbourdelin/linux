@@ -149,7 +149,8 @@ struct ext4_journal_cb_entry {
 
 	/*  Function to call with this callback structure */
 	void (*jce_func)(struct super_block *sb,
-			 struct ext4_journal_cb_entry *jce, int error);
+			 struct ext4_journal_cb_entry *jce, int error,
+			 struct list_head *post_cb_list);
 
 	/* user data goes here */
 };
@@ -185,7 +186,7 @@ static inline void _ext4_journal_callback_add(handle_t *handle,
 static inline void ext4_journal_callback_add(handle_t *handle,
 			void (*func)(struct super_block *sb,
 				     struct ext4_journal_cb_entry *jce,
-				     int rc),
+				     int rc, struct list_head *post_cb_list),
 			struct ext4_journal_cb_entry *jce)
 {
 	struct ext4_sb_info *sbi =

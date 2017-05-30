@@ -368,7 +368,8 @@ static void ext4_mb_generate_from_pa(struct super_block *sb, void *bitmap,
 static void ext4_mb_generate_from_freelist(struct super_block *sb, void *bitmap,
 						ext4_group_t group);
 static void ext4_free_data_callback(struct super_block *sb,
-				struct ext4_journal_cb_entry *jce, int rc);
+				struct ext4_journal_cb_entry *jce, int rc,
+				struct list_head *post_cb_list);
 
 static inline void *mb_correct_addr_and_bit(int *bit, void *addr)
 {
@@ -2782,7 +2783,8 @@ int ext4_mb_release(struct super_block *sb)
 }
 
 static inline int ext4_issue_discard(struct super_block *sb,
-		ext4_group_t block_group, ext4_grpblk_t cluster, int count)
+		ext4_group_t block_group, ext4_grpblk_t cluster, int count,
+		struct bio **biop)
 {
 	ext4_fsblk_t discard_block;
 
@@ -2791,36 +2793,24 @@ static inline int ext4_issue_discard(struct super_block *sb,
 	count = EXT4_C2B(EXT4_SB(sb), count);
 	trace_ext4_discard_blocks(sb,
 			(unsigned long long) discard_block, count);
-	return sb_issue_discard(sb, discard_block, count, GFP_NOFS, 0);
+	if (biop) {
+		return __blkdev_issue_discard(sb->s_bdev,
+				discard_block << (sb->s_blocksize_bits - 9),
+				count << (sb->s_blocksize_bits - 9),
+				GFP_NOFS, 0, biop);
+	} else
+		return sb_issue_discard(sb, discard_block, count, GFP_NOFS, 0);
 }
 
-/*
- * This function is called by the jbd2 layer once the commit has finished,
- * so we know we can free the blocks that were released with that commit.
- */
-static void ext4_free_data_callback(struct super_block *sb,
-				    struct ext4_journal_cb_entry *jce,
-				    int rc)
+static void ext4_free_data_in_buddy(struct super_block *sb,
+				    struct ext4_free_data *entry)
 {
-	struct ext4_free_data *entry = (struct ext4_free_data *)jce;
 	struct ext4_buddy e4b;
 	struct ext4_group_info *db;
 	int err, count = 0, count2 = 0;
 
 	mb_debug(1, "gonna free %u blocks in group %u (0x%p):",
 		 entry->efd_count, entry->efd_group, entry);
-
-	if (test_opt(sb, DISCARD)) {
-		err = ext4_issue_discard(sb, entry->efd_group,
-					 entry->efd_start_cluster,
-					 entry->efd_count);
-		if (err && err != -EOPNOTSUPP)
-			ext4_msg(sb, KERN_WARNING, "discard request in"
-				 " group:%d block:%d count:%d failed"
-				 " with %d", entry->efd_group,
-				 entry->efd_start_cluster,
-				 entry->efd_count, err);
-	}
 
 	err = ext4_mb_load_buddy(sb, entry->efd_group, &e4b);
 	/* we expect to find existing buddy because it's pinned */
@@ -2860,6 +2850,67 @@ static void ext4_free_data_callback(struct super_block *sb,
 	ext4_mb_unload_buddy(&e4b);
 
 	mb_debug(1, "freed %u blocks in %u structures\n", count, count2);
+}
+
+/*
+ * This function is called by the jbd2 layer once the commit has finished,
+ * so we know we can free the blocks that were released with that commit.
+ */
+static void ext4_free_data_callback(struct super_block *sb,
+				    struct ext4_journal_cb_entry *jce,
+				    int rc, struct list_head *post_cb_list)
+{
+	struct ext4_free_data *entry = (struct ext4_free_data *)jce;
+
+	ext4_free_data_in_buddy(sb, entry);
+}
+
+static void ext4_bio_wait_endio(struct bio *bio)
+{
+	struct completion *wait = (struct completion *)bio->bi_private;
+
+	complete(wait);
+}
+
+static void ext4_free_after_discard_callback(struct super_block *sb,
+				    struct ext4_journal_cb_entry *jce,
+				    int rc, struct list_head *post_cb_list)
+{
+	struct ext4_free_data *entry = (struct ext4_free_data *)jce;
+
+	wait_for_completion_io(&entry->efd_bio_wait);
+	ext4_free_data_in_buddy(sb, entry);
+}
+
+static void ext4_discard_callback(struct super_block *sb,
+				    struct ext4_journal_cb_entry *jce,
+				    int rc, struct list_head *post_cb_list)
+{
+	struct ext4_free_data *entry = (struct ext4_free_data *)jce;
+	int err;
+
+	err = ext4_issue_discard(sb, entry->efd_group,
+				 entry->efd_start_cluster,
+				 entry->efd_count,
+				 &entry->efd_discard_bio);
+	if (err && err != -EOPNOTSUPP) {
+		ext4_msg(sb, KERN_WARNING, "discard request in"
+			 " group:%d block:%d count:%d failed"
+			 " with %d", entry->efd_group,
+			 entry->efd_start_cluster,
+			 entry->efd_count, err);
+	}
+
+	if (entry->efd_discard_bio) {
+		init_completion(&entry->efd_bio_wait);
+		entry->efd_discard_bio->bi_end_io = ext4_bio_wait_endio;
+		entry->efd_discard_bio->bi_private = &entry->efd_bio_wait;
+		submit_bio(entry->efd_discard_bio);
+		jce->jce_func = ext4_free_after_discard_callback;
+	} else
+		jce->jce_func = ext4_free_data_callback;
+
+	list_add_tail(&jce->jce_list, post_cb_list);
 }
 
 int __init ext4_init_mballoc(void)
@@ -4666,7 +4717,10 @@ ext4_mb_free_metadata(handle_t *handle, struct ext4_buddy *e4b,
 		}
 	}
 	/* Add the extent to transaction's private list */
-	new_entry->efd_jce.jce_func = ext4_free_data_callback;
+	if (test_opt(sb, DISCARD))
+		new_entry->efd_jce.jce_func = ext4_discard_callback;
+	else
+		new_entry->efd_jce.jce_func = ext4_free_data_callback;
 	spin_lock(&sbi->s_md_lock);
 	_ext4_journal_callback_add(handle, &new_entry->efd_jce);
 	sbi->s_mb_free_pending += clusters;
@@ -4861,6 +4915,7 @@ do_more:
 		new_entry->efd_group = block_group;
 		new_entry->efd_count = count_clusters;
 		new_entry->efd_tid = handle->h_transaction->t_tid;
+		new_entry->efd_discard_bio = NULL;
 
 		ext4_lock_group(sb, block_group);
 		mb_clear_bits(bitmap_bh->b_data, bit, count_clusters);
@@ -4871,7 +4926,8 @@ do_more:
 		 * them with group lock_held
 		 */
 		if (test_opt(sb, DISCARD)) {
-			err = ext4_issue_discard(sb, block_group, bit, count);
+			err = ext4_issue_discard(sb, block_group, bit, count,
+						 NULL);
 			if (err && err != -EOPNOTSUPP)
 				ext4_msg(sb, KERN_WARNING, "discard request in"
 					 " group:%d block:%d count:%lu failed"
@@ -5094,7 +5150,7 @@ __acquires(bitlock)
 	 */
 	mb_mark_used(e4b, &ex);
 	ext4_unlock_group(sb, group);
-	ret = ext4_issue_discard(sb, group, start, count);
+	ret = ext4_issue_discard(sb, group, start, count, NULL);
 	ext4_lock_group(sb, group);
 	mb_free_blocks(NULL, e4b, start, ex.fe_len);
 	return ret;

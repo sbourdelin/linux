@@ -95,6 +95,10 @@ struct ext4_free_data {
 
 	/* transaction which freed this extent */
 	tid_t				efd_tid;
+
+	/* discard bio to be submitted for this entry */
+	struct bio			*efd_discard_bio;
+	struct completion		efd_bio_wait;
 };
 
 struct ext4_prealloc_space {
