@@ -283,6 +283,7 @@ static void fc_disc_done(struct fc_disc *disc, enum fc_disc_event event)
 {
 	struct fc_lport *lport = fc_disc_lport(disc);
 	struct fc_rport_priv *rdata;
+	void (*callback)(struct fc_lport *, enum fc_disc_event);
 
 	FC_DISC_DBG(disc, "Discovery complete\n");
 
@@ -311,8 +312,10 @@ static void fc_disc_done(struct fc_disc *disc, enum fc_disc_event event)
 		kref_put(&rdata->kref, fc_rport_destroy);
 	}
 	rcu_read_unlock();
+	callback = disc->disc_callback;
 	mutex_unlock(&disc->disc_mutex);
-	disc->disc_callback(lport, event);
+	if (callback)
+		callback(lport, event);
 	mutex_lock(&disc->disc_mutex);
 }
 
@@ -711,9 +714,13 @@ static void fc_disc_stop(struct fc_lport *lport)
 {
 	struct fc_disc *disc = &lport->disc;
 
-	if (disc->pending)
-		cancel_delayed_work_sync(&disc->disc_work);
+	mutex_lock(&disc->disc_mutex);
+	disc->disc_callback = NULL;
+	mutex_unlock(&disc->disc_mutex);
+	cancel_delayed_work_sync(&disc->disc_work);
+	mutex_lock(&disc->disc_mutex);
 	fc_disc_stop_rports(disc);
+	mutex_unlock(&disc->disc_mutex);
 }
 
 /**
