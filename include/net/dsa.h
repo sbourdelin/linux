@@ -129,9 +129,7 @@ struct dsa_switch_tree {
 
 	/* Copy of tag_ops->rcv for faster access in hot path */
 	struct sk_buff *	(*rcv)(struct sk_buff *skb,
-				       struct net_device *dev,
-				       struct packet_type *pt,
-				       struct net_device *orig_dev);
+				       struct net_device *dev);
 
 	/*
 	 * Original copy of the master netdev ethtool_ops
