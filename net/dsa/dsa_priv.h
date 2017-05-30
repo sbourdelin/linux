@@ -78,6 +78,7 @@ struct dsa_slave_priv {
 
 	/* DSA port data, such as switch, port index, etc. */
 	struct dsa_port		*dp;
+	struct net_device	*master;
 
 	/*
 	 * The phylib phy_device pointer for the PHY connected

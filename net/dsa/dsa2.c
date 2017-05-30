@@ -253,8 +253,6 @@ static int dsa_cpu_port_apply(struct dsa_port *port, u32 index,
 		return err;
 	}
 
-	ds->cpu_port_mask |= BIT(index);
-
 	memset(&ds->ports[index].devlink_port, 0,
 	       sizeof(ds->ports[index].devlink_port));
 	err = devlink_port_register(ds->devlink, &ds->ports[index].devlink_port,
@@ -269,6 +267,10 @@ static void dsa_cpu_port_unapply(struct dsa_port *port, u32 index,
 	dsa_cpu_dsa_destroy(port);
 	ds->cpu_port_mask &= ~BIT(index);
 
+	if (ds->ports[index].ethernet) {
+		dev_put(ds->ports[index].ethernet);
+		ds->ports[index].ethernet = NULL;
+	}
 }
 
 static int dsa_user_port_apply(struct dsa_port *port, u32 index,
@@ -530,6 +532,29 @@ static int dsa_cpu_parse(struct dsa_port *port, u32 index,
 
 	dst->rcv = dst->tag_ops->rcv;
 
+	dev_hold(ethernet_dev);
+	ds->ports[index].ethernet = ethernet_dev;
+	ds->cpu_port_mask |= BIT(index);
+
+	return 0;
+}
+
+static int dsa_user_parse(struct device_node *port, u32 index,
+			  struct dsa_switch *ds)
+{
+	struct device_node *cpu_port;
+	const unsigned int *cpu_port_reg;
+	int cpu_port_index;
+
+	cpu_port = of_parse_phandle(port, "cpu", 0);
+	if (cpu_port) {
+		cpu_port_reg = of_get_property(cpu_port, "reg", NULL);
+		if (!cpu_port_reg)
+			return -EINVAL;
+		cpu_port_index = be32_to_cpup(cpu_port_reg);
+		ds->ports[index].upstream = cpu_port_index;
+	}
+
 	return 0;
 }
 
@@ -544,11 +569,13 @@ static int dsa_ds_parse(struct dsa_switch_tree *dst, struct dsa_switch *ds)
 		if (!dsa_port_is_valid(port))
 			continue;
 
-		if (dsa_port_is_cpu(port)) {
+		if (dsa_port_is_cpu(port))
 			err = dsa_cpu_parse(port, index, dst, ds);
+		else if (dsa_is_normal_port(port))
+			err = dsa_user_parse(port->dn, index,  ds);
+
 			if (err)
 				return err;
-		}
 	}
 
 	pr_info("DSA: switch %d %d parsed\n", dst->tree, ds->index);
