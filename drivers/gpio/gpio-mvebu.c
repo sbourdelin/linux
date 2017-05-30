@@ -768,6 +768,7 @@ static int mvebu_pwm_probe(struct platform_device *pdev,
 	mvpwm->chip.dev = dev;
 	mvpwm->chip.ops = &mvebu_pwm_ops;
 	mvpwm->chip.npwm = mvchip->chip.ngpio;
+	mvpwm->chip.base = -1;
 
 	spin_lock_init(&mvpwm->lock);
 
