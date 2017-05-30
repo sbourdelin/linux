@@ -908,6 +908,7 @@ static inline struct file *get_file(struct file *f)
 #define FL_UNLOCK_PENDING	512 /* Lease is being broken */
 #define FL_OFDLCK	1024	/* lock is "owned" by struct file */
 #define FL_LAYOUT	2048	/* outstanding pNFS layout */
+#define FL_PID_PRIV	4096	/* F_GETLK should report fl_pid */
 
 #define FL_CLOSE_POSIX (FL_POSIX | FL_CLOSE)
 
@@ -973,6 +974,12 @@ int opens_in_grace(struct net *);
  * 3) lock range end
  *
  * Obviously, the last two criteria only matter for POSIX locks.
+ *
+ * fl_pid and fl_nspid appear redundant, but fl_pid is used to handle cases
+ * where a local F_GETLK returns a lock that was granted to a remote owner,
+ * as might exist with a remotely available filesystem like NFS.  For that
+ * case, the lock manager should set fl_pid, and that value is returned to a
+ * local F_GETLK.
  */
 struct file_lock {
 	struct file_lock *fl_next;	/* singly linked list for this inode  */
