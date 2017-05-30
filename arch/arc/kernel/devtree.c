@@ -33,6 +33,8 @@ static void __init arc_set_early_base_baud(unsigned long dt_root)
 		arc_base_baud = 33333333;	/* Fixed 33MHz clk (AXS10x) */
 	else if (of_flat_dt_is_compatible(dt_root, "ezchip,arc-nps"))
 		arc_base_baud = 800000000;      /* Fixed 800MHz clk (NPS) */
+	else if (of_flat_dt_is_compatible(dt_root, "snps,hsdk"))
+		arc_base_baud = 33330000;	/* Fixed 33.33MHz clk (HSDK) */
 	else
 		arc_base_baud = 50000000;	/* Fixed default 50MHz */
 }
