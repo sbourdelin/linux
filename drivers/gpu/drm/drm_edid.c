@@ -2781,7 +2781,9 @@ add_detailed_modes(struct drm_connector *connector, struct edid *edid,
 #define VIDEO_BLOCK     0x02
 #define VENDOR_BLOCK    0x03
 #define SPEAKER_BLOCK	0x04
-#define VIDEO_CAPABILITY_BLOCK	0x07
+#define VIDEO_CAPABILITY_BLOCK 0x07
+#define VIDEO_DATA_BLOCK_420	0x0E
+#define VIDEO_CAP_BLOCK_Y420CMDB 0x0F
 #define EDID_BASIC_AUDIO	(1 << 6)
 #define EDID_CEA_YCRCB444	(1 << 5)
 #define EDID_CEA_YCRCB422	(1 << 4)
@@ -3143,15 +3145,50 @@ drm_display_mode_from_vic_index(struct drm_connector *connector,
 	return newmode;
 }
 
+static void
+drm_add_vcb_modes(struct drm_connector *connector, u8 vic)
+{
+	u32 *map;
+	u8 index = 0;
+	struct drm_hdmi_info *hdmi = &connector->display_info.hdmi;
+
+	/* VICs are 1 to 127(107 defined till CEA-861-F) */
+	vic &= 127;
+
+	/*
+	 * ycbcr420_vcb_modes is a fix position 128 bit bitmap. This indicates
+	 * support for ycbcr420 output per VIC. Arrangement is bit[n] indicates
+	 * if vic[n+1] supports ycbcr420 output.
+	 * ycbcr420_vcb_modes[0] = |VIC=32 |VIC=31 |............|VIC=2 |VIC=1 |
+	 * ycbcr420_vcb_modes[1] = |VIC=64 |VIC=63 |............|VIC=34|VIC=33|
+	 * ycbcr420_vcb_modes[2] = |VIC=96 |VIC=95 |............|VIC=66|VIC=65|
+	 * ycbcr420_vcb_modes[3] = |VIC=128|VIC=127|............|VIC=34|VIC=97|
+	 */
+	map = &(hdmi->ycbcr420_vcb_modes[(vic - 1) / 32]);
+	index = (vic - 1) % 32;
+	*map |= (1 << index);
+}
+
 static int
 do_cea_modes(struct drm_connector *connector, const u8 *db, u8 len)
 {
 	int i, modes = 0;
+	struct drm_hdmi_info *hdmi = &connector->display_info.hdmi;
+	u64 hdmi_vcb_map = hdmi->ycbcr420_vcb_map;
 
 	for (i = 0; i < len; i++) {
 		struct drm_display_mode *mode;
 		mode = drm_display_mode_from_vic_index(connector, db, len, i);
 		if (mode) {
+			/*
+			 * ycbcr420 capability block contains a bitmap which
+			 * gives the index of such CEA modes in VDB, which can
+			 * support ycbcr420 sampling output also.
+			 * For example, if the bit 0 in bitmap is set,
+			 * first mode in VDB can support ycbcr420 output too.
+			 */
+			if (hdmi_vcb_map & (1 << i))
+				drm_add_vcb_modes(connector, db[i]);
 			drm_mode_probed_add(connector, mode);
 			modes++;
 		}
@@ -3427,6 +3464,12 @@ out:
 }
 
 static int
+cea_db_extended_tag(const u8 *db)
+{
+	return db[1];
+}
+
+static int
 cea_db_payload_len(const u8 *db)
 {
 	return db[0] & 0x1f;
@@ -3487,8 +3530,69 @@ static bool cea_db_is_hdmi_forum_vsdb(const u8 *db)
 	return oui == HDMI_FORUM_IEEE_OUI;
 }
 
+static bool cea_db_is_y420cmdb(const u8 *db)
+{
+	u8 len = cea_db_payload_len(db);
+
+	if (cea_db_tag(db) != VIDEO_CAPABILITY_BLOCK)
+		return false;
+
+	if (!len)
+		return false;
+
+	if (cea_db_extended_tag(db) != VIDEO_CAP_BLOCK_Y420CMDB)
+		return false;
+
+	return true;
+}
+
 #define for_each_cea_db(cea, i, start, end) \
 	for ((i) = (start); (i) < (end) && (i) + cea_db_payload_len(&(cea)[(i)]) < (end); (i) += cea_db_payload_len(&(cea)[(i)]) + 1)
+
+static void drm_parse_y420cmdb_bitmap(struct drm_connector *connector,
+				     const u8 *db)
+{
+	struct drm_display_info *info = &connector->display_info;
+	struct drm_hdmi_info *hdmi = &info->hdmi;
+	u8 map_len = cea_db_payload_len(db) - 1;
+	u8 count;
+	u64 map = 0;
+
+	if (!db)
+		return;
+
+	if (map_len == 0) {
+		/* All CEA modes support ycbcr420 sampling also.*/
+		hdmi->ycbcr420_vcb_map = U64_MAX;
+		info->color_formats |= DRM_COLOR_FORMAT_YCRCB420;
+		return;
+	}
+
+	/*
+	 * This map indicates which of the existing CEA block modes
+	 * from VDB can support YCBCR420 output too. So if bit=0 is
+	 * set, first mode from VDB can support YCBCR420 output too.
+	 * We will parse and keep this map, before parsing VDB itself
+	 * to avoid going through the same block again and again.
+	 *
+	 * Spec is not clear about max possible size of this block.
+	 * Clamping max bitmap block size at 8 bytes. Every byte can
+	 * address 8 CEA modes, in this way this map can address
+	 * 8*8 = first 64 SVDs.
+	 */
+	if (WARN_ON_ONCE(map_len > 8))
+		map_len = 8;
+
+	for (count = 0; count < map_len; count++)
+		map |= (u64)db[2 + count] << (8 * count);
+
+	if (map) {
+		DRM_DEBUG_KMS("Sink supports ycbcr 420\n");
+		info->color_formats |= DRM_COLOR_FORMAT_YCRCB420;
+	}
+
+	hdmi->ycbcr420_vcb_map = map;
+}
 
 static int
 add_cea_modes(struct drm_connector *connector, struct edid *edid)
@@ -4196,6 +4300,8 @@ static void drm_parse_cea_ext(struct drm_connector *connector,
 			drm_parse_hdmi_vsdb_video(connector, db);
 		if (cea_db_is_hdmi_forum_vsdb(db))
 			drm_parse_hdmi_forum_vsdb(connector, db);
+		if (cea_db_is_y420cmdb(db))
+			drm_parse_y420cmdb_bitmap(connector, db);
 	}
 }
 
@@ -4430,6 +4536,13 @@ int drm_add_edid_modes(struct drm_connector *connector, struct edid *edid)
 	quirks = edid_get_quirks(edid);
 
 	/*
+	 * CEA-861-F adds ycbcr capability map block, for HDMI 2.0 sinks.
+	 * To avoid multiple parsing of same block, lets get the sink info
+	 * before parsing CEA modes.
+	 */
+	drm_add_display_info(connector, edid);
+
+	/*
 	 * EDID spec says modes should be preferred in this order:
 	 * - preferred detailed mode
 	 * - other detailed modes from base block
@@ -4450,13 +4563,12 @@ int drm_add_edid_modes(struct drm_connector *connector, struct edid *edid)
 	num_modes += add_cea_modes(connector, edid);
 	num_modes += add_alternate_cea_modes(connector, edid);
 	num_modes += add_displayid_detailed_modes(connector, edid);
+
 	if (edid->features & DRM_EDID_FEATURE_DEFAULT_GTF)
 		num_modes += add_inferred_modes(connector, edid);
 
 	if (quirks & (EDID_QUIRK_PREFER_LARGE_60 | EDID_QUIRK_PREFER_LARGE_75))
 		edid_fixup_preferred(connector, quirks);
-
-	drm_add_display_info(connector, edid);
 
 	if (quirks & EDID_QUIRK_FORCE_6BPC)
 		connector->display_info.bpc = 6;

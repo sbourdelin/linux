@@ -137,6 +137,17 @@ struct drm_scdc {
 struct drm_hdmi_info {
 	/** @scdc: sink's scdc support and capabilities */
 	struct drm_scdc scdc;
+
+	/**
+	 * @ycbcr420_vcb_modes: bitmap of modes which can support ycbcr420
+	 * output also along with normal outputs. There are total 107 VICs
+	 * defined by CEA-861-F spec, so the size is 128bits to map upto 128
+	 * VICs;
+	 */
+	u32 ycbcr420_vcb_modes[4];
+
+	/** @ycbcr420_vcb_map: bitmap of SVD index, to extraxt vcb modes */
+	u64 ycbcr420_vcb_map;
 };
 
 /**
@@ -200,6 +211,7 @@ struct drm_display_info {
 #define DRM_COLOR_FORMAT_RGB444		(1<<0)
 #define DRM_COLOR_FORMAT_YCRCB444	(1<<1)
 #define DRM_COLOR_FORMAT_YCRCB422	(1<<2)
+#define DRM_COLOR_FORMAT_YCRCB420	(1<<3)
 
 	/**
 	 * @color_formats: HDMI Color formats, selects between RGB and YCrCb
