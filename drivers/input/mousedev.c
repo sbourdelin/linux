@@ -103,7 +103,7 @@ struct mousedev_client {
 	spinlock_t packet_lock;
 	int pos_x, pos_y;
 
-	signed char ps2[6];
+	unsigned char ps2[6];
 	unsigned char ready, buffer, bufsiz;
 	unsigned char imexseq, impsseq;
 	enum mousedev_emul mode;
@@ -571,27 +571,27 @@ static int mousedev_open(struct inode *inode, struct file *file)
 	return error;
 }
 
-static inline int mousedev_limit_delta(int delta, int limit)
+static inline void
+update_clamped(unsigned char *ps2_data, int *delta, int limit)
 {
-	return delta > limit ? limit : (delta < -limit ? -limit : delta);
+	int val = *delta > limit ? limit : (*delta < -limit ? -limit : *delta);
+	*ps2_data = (unsigned char) val;
+	*delta -= val;
 }
 
 static void mousedev_packet(struct mousedev_client *client,
-			    signed char *ps2_data)
+	unsigned char *ps2_data)
 {
 	struct mousedev_motion *p = &client->packets[client->tail];
 
 	ps2_data[0] = 0x08 |
 		((p->dx < 0) << 4) | ((p->dy < 0) << 5) | (p->buttons & 0x07);
-	ps2_data[1] = mousedev_limit_delta(p->dx, 127);
-	ps2_data[2] = mousedev_limit_delta(p->dy, 127);
-	p->dx -= ps2_data[1];
-	p->dy -= ps2_data[2];
+	update_clamped(&ps2_data[1], &p->dx, 127);
+	update_clamped(&ps2_data[2], &p->dy, 127);
 
 	switch (client->mode) {
 	case MOUSEDEV_EMUL_EXPS:
-		ps2_data[3] = mousedev_limit_delta(p->dz, 7);
-		p->dz -= ps2_data[3];
+		update_clamped(&ps2_data[3], &p->dz, 7);
 		ps2_data[3] = (ps2_data[3] & 0x0f) | ((p->buttons & 0x18) << 1);
 		client->bufsiz = 4;
 		break;
@@ -599,8 +599,7 @@ static void mousedev_packet(struct mousedev_client *client,
 	case MOUSEDEV_EMUL_IMPS:
 		ps2_data[0] |=
 			((p->buttons & 0x10) >> 3) | ((p->buttons & 0x08) >> 1);
-		ps2_data[3] = mousedev_limit_delta(p->dz, 127);
-		p->dz -= ps2_data[3];
+		update_clamped(&ps2_data[3], &p->dz, 127);
 		client->bufsiz = 4;
 		break;
 
