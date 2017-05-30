@@ -433,6 +433,22 @@ int drm_mode_convert_umode(struct drm_display_mode *out,
 			   const struct drm_mode_modeinfo *in);
 void drm_mode_probed_add(struct drm_connector *connector, struct drm_display_mode *mode);
 void drm_mode_debug_printmodeline(const struct drm_display_mode *mode);
+bool drm_mode_is_420(struct drm_display_info *display,
+			struct drm_display_mode *mode);
+bool drm_can_support_this_ycbcr_output(struct drm_display_info *display,
+					struct drm_display_mode *mode,
+					enum drm_hdmi_output_type type,
+					u32 source_outputs);
+bool drm_can_support_any_ycbcr_output(struct drm_display_info *display,
+					u32 source_outputs);
+enum drm_hdmi_output_type
+drm_get_highest_quality_ycbcr_supported(struct drm_display_info *display,
+					struct drm_display_mode *mode,
+					u32 source_output_map);
+enum drm_hdmi_output_type
+drm_get_lowest_quality_ycbcr_supported(struct drm_display_info *display,
+					struct drm_display_mode *mode,
+					u32 source_output_map);
 
 struct drm_display_mode *drm_cvt_mode(struct drm_device *dev,
 				      int hdisplay, int vdisplay, int vrefresh,

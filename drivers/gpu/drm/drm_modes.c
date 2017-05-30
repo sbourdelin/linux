@@ -1576,3 +1576,180 @@ int drm_mode_convert_umode(struct drm_display_mode *out,
 out:
 	return ret;
 }
+
+/**
+ * drm_mode_is_420 - if a given videomode can be supported in YCBCR420
+ * output format also
+ *
+ * @connector: drm connector under action.
+ * @mode: video mode to be tested.
+ *
+ * Returns:
+ * true if the mode can support YCBCR420 output
+ * false if not.
+ */
+bool drm_mode_is_420(struct drm_display_info *display,
+			struct drm_display_mode *mode)
+{
+	u8 vic = drm_match_cea_mode(mode);
+	u32 *vcb_map;
+	u8 index;
+
+	if (!drm_valid_cea_vic(vic))
+		return false;
+	/*
+	 * ycbcr420_vcb_modes is a fix position 128 bit bitmap. This indicates
+	 * support for ycbcr420 output per VIC. Arrangement is bit[n] indicates
+	 * if vic[n+1] supports ycbcr420 output.
+	 * ycbcr420_vcb_modes[0] = |VIC=32 |VIC=31 |............|VIC=2 |VIC=1 |
+	 * ycbcr420_vcb_modes[1] = |VIC=64 |VIC=63 |............|VIC=34|VIC=33|
+	 * ycbcr420_vcb_modes[2] = |VIC=96 |VIC=95 |............|VIC=66|VIC=65|
+	 * ycbcr420_vcb_modes[3] = |VIC=128|VIC=127|............|VIC=34|VIC=97|
+	 */
+	vcb_map = &(display->hdmi.ycbcr420_vcb_modes[(vic - 1) / 32]);
+	index = (vic - 1) % 32;
+	return  *vcb_map & (1 << index);
+}
+
+/**
+ * drm_can_support_this_ycbcr_output - can a given source and sink combination
+ * support a particular YCBCR output type.
+ *
+ * @display: sink information.
+ * @mode: video mode from modeset
+ * @type: enum indicating YCBCR output type
+ * @source_outputs: bitmap of source supported HDMI output formats.
+ *
+ * Returns:
+ * true on success.
+ * false on failure.
+ */
+bool drm_can_support_this_ycbcr_output(struct drm_display_info *display,
+					struct drm_display_mode *mode,
+					enum drm_hdmi_output_type type,
+					u32 source_outputs)
+{
+	/* YCBCR420 output support can be per mode basis */
+	if (type == DRM_HDMI_OUTPUT_YCBCR420 &&
+		!drm_mode_is_420(display, mode))
+		return false;
+
+	return display->color_formats & source_outputs & type;
+}
+
+/**
+ * drm_can_support_any_ycbcr_output - can a given source and sink combination
+ * support any YCBCR outputs.
+ *
+ * @display: sink information.
+ * @source_outputs: bitmap of source supported HDMI output formats.
+ *
+ * Returns:
+ * true on success.
+ * false on failure.
+ */
+bool drm_can_support_any_ycbcr_output(struct drm_display_info *display,
+					u32 source_outputs)
+{
+	u32 supported_formats;
+
+	if (!source_outputs || !display->color_formats) {
+		DRM_DEBUG_KMS("Source/Sink doesn't support any output ?\n");
+		return DRM_HDMI_OUTPUT_INVALID;
+	}
+
+	/* Get the common supported fromats between source and sink */
+	supported_formats = display->color_formats & source_outputs;
+	if (!supported_formats || (supported_formats ==
+		DRM_COLOR_FORMAT_RGB444)) {
+		DRM_ERROR("No common YCBCR formats between source and sink\n");
+		return false;
+	}
+
+	DRM_DEBUG_KMS("Src and Sink combination can support YCBCR output\n");
+	return true;
+}
+
+/**
+ * drm_get_highest_quality_ycbcr_supported - get the ycbcr output mode
+ * with highest subsampling rate
+ * @display: struct drm_display_info from current connector
+ * @mode: video mode from modeset
+ * @source_output_map: bitmap of supported HDMI output modes from source
+ *
+ * Finds the best possible ycbcr output mode (based on subsampling), for the
+ * given source and sink combination.
+ *
+ * Returns:
+ * enum corresponding to best output mode on success.
+ * DRM_HDMI_OUTPUT_INVALID on failure.
+ */
+enum drm_hdmi_output_type
+drm_get_highest_quality_ycbcr_supported(struct drm_display_info *display,
+					struct drm_display_mode *mode,
+					u32 source_output_map)
+{
+	enum drm_hdmi_output_type output = DRM_HDMI_OUTPUT_INVALID;
+	u32 supported_formats = source_output_map & display->color_formats;
+
+	/*
+	 * Get the ycbcr output with the highest possible subsampling rate.
+	 * Preference should go as:
+	 * ycbcr 444
+	 * ycbcr 422
+	 * ycbcr 420
+	 */
+	if (supported_formats & DRM_COLOR_FORMAT_YCRCB444)
+		output = DRM_COLOR_FORMAT_YCRCB444;
+	else if (supported_formats & DRM_COLOR_FORMAT_YCRCB422)
+		output = DRM_COLOR_FORMAT_YCRCB422;
+	else if (supported_formats & DRM_COLOR_FORMAT_YCRCB420 &&
+			drm_mode_is_420(display, mode))
+		output = DRM_COLOR_FORMAT_YCRCB420;
+
+	DRM_DEBUG_KMS("Highest subsampled YCBCR mode supported is %s\n",
+			drm_get_hdmi_output_name(supported_formats));
+	return output;
+}
+
+/**
+ * drm_get_lowest_quality_ycbcr_supported - get the ycbcr output mode
+ * with lowest subsampling rate
+ * @display: struct drm_display_info from current connector
+ * @mode: video mode from modeset
+ * @source_output_map: bitmap of supported HDMI output modes from source
+ *
+ * Finds the lowest possible ycbcr output mode (based on subsampling), for the
+ * given source and sink combination.
+ *
+ * Returns:
+ * enum corresponding to best output mode on success.
+ * DRM_HDMI_OUTPUT_INVALID on failure.
+ */
+enum drm_hdmi_output_type
+drm_get_lowest_quality_ycbcr_supported(struct drm_display_info *display,
+					struct drm_display_mode *mode,
+					u32 source_output_map)
+{
+	enum drm_hdmi_output_type output = DRM_HDMI_OUTPUT_INVALID;
+	u32 supported_formats = source_output_map & display->color_formats;
+
+	/*
+	 * Get the ycbcr output with the lowest possible subsampling rate.
+	 * Preference should go as:
+	 * ycbcr 420
+	 * ycbcr 422
+	 * ycbcr 444
+	 */
+	if (supported_formats & DRM_COLOR_FORMAT_YCRCB420 &&
+		drm_mode_is_420(display, mode))
+		output = DRM_HDMI_OUTPUT_YCBCR420;
+	else if (display->color_formats & DRM_COLOR_FORMAT_YCRCB422)
+		output = DRM_HDMI_OUTPUT_YCBCR422;
+	else if (display->color_formats & DRM_COLOR_FORMAT_YCRCB444)
+		output = DRM_HDMI_OUTPUT_YCBCR420;
+
+	DRM_DEBUG_KMS("Lowest subsampled YCBCR mode supported is %s\n",
+			drm_get_hdmi_output_name(supported_formats));
+	return output;
+}
