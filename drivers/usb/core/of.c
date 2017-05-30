@@ -28,6 +28,9 @@
  *
  * Find the node from device tree according to its port number.
  *
+ * Takes a reference to the returned device-tree node, which needs to be
+ * dropped after use.
+ *
  * Return: On success, a pointer to the device node, %NULL on failure.
  */
 struct device_node *usb_of_get_child_node(struct device_node *parent,
