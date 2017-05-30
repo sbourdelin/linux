@@ -336,6 +336,7 @@
 
 #define INTEL_CFL_IDS(info) \
 	INTEL_VGA_DEVICE(0x3E92, info), /* CFL-S GT2 */ \
-	INTEL_VGA_DEVICE(0x3E9B, info) /* CFL-H GT2 */
+	INTEL_VGA_DEVICE(0x3E9B, info), /* CFL-H GT2 */ \
+	INTEL_VGA_DEVICE(0x3EA5, info) /* CFL-U GT3 */
 
 #endif /* _I915_PCIIDS_H */
