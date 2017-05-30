@@ -901,6 +901,49 @@ void pnv_pci_dma_bus_setup(struct pci_bus *bus)
 	}
 }
 
+int pnv_pci_set_p2p_sender(struct pci_dev *dev)
+{
+	struct pci_controller *hose = pci_bus_to_host(dev->bus);
+	struct pnv_phb *phb = hose->private_data;
+	struct pnv_ioda_pe *pe;
+	int rc;
+
+	if (!opal_check_token(OPAL_PCI_SET_P2P))
+		return -ENXIO;
+
+	pe = pnv_ioda_get_pe(dev);
+	if (!pe)
+		return -ENODEV;
+
+	rc = opal_pci_set_p2p(phb->opal_id, OPAL_PCI_P2P_SENDER);
+	if (rc != OPAL_SUCCESS)
+		return -EIO;
+	/*
+	 * Redefine the TVT entry in bypass mode for the device.
+	 * Now that the PHB is marked as a p2p sender, it disables
+	 * range checking.
+	 */
+	pnv_pci_ioda2_set_bypass(pe, true);
+	return 0;
+}
+EXPORT_SYMBOL_GPL(pnv_pci_set_p2p_sender);
+
+int pnv_pci_set_p2p_receiver(struct pci_dev *dev)
+{
+	struct pci_controller *hose = pci_bus_to_host(dev->bus);
+	struct pnv_phb *phb = hose->private_data;
+	int rc;
+
+	if (!opal_check_token(OPAL_PCI_SET_P2P))
+		return -ENXIO;
+
+	rc = opal_pci_set_p2p(phb->opal_id, OPAL_PCI_P2P_RECEIVER);
+	if (rc != OPAL_SUCCESS)
+		return -EIO;
+	return 0;
+}
+EXPORT_SYMBOL_GPL(pnv_pci_set_p2p_receiver);
+
 void pnv_pci_shutdown(void)
 {
 	struct pci_controller *hose;
