@@ -798,8 +798,8 @@ enum {
 
 struct snd_timer_tread {
 	int event;
-	struct timespec tstamp;
 	unsigned int val;
+	struct timespec tstamp;
 };
 
 /****************************************************************************
