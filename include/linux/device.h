@@ -966,6 +966,7 @@ struct device {
 
 	bool			offline_disabled:1;
 	bool			offline:1;
+	bool			of_node_reused:1;
 };
 
 static inline struct device *kobj_to_dev(struct kobject *kobj)
@@ -1144,6 +1145,7 @@ extern int device_offline(struct device *dev);
 extern int device_online(struct device *dev);
 extern void set_primary_fwnode(struct device *dev, struct fwnode_handle *fwnode);
 extern void set_secondary_fwnode(struct device *dev, struct fwnode_handle *fwnode);
+void device_set_of_node_from_dev(struct device *dev, const struct device *dev2);
 
 static inline int dev_num_vf(struct device *dev)
 {
