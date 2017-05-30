@@ -29,7 +29,7 @@
 
 bool dsa_uses_tagged_protocol(struct dsa_switch_tree *dst)
 {
-	return !!dst->rcv;
+	return dst->tag_ops && dst->tag_ops->rcv;
 }
 
 static struct sk_buff *dsa_slave_notag_xmit(struct sk_buff *skb,
@@ -209,7 +209,7 @@ static int dsa_switch_rcv(struct sk_buff *skb, struct net_device *dev,
 	if (!skb)
 		return 0;
 
-	nskb = dst->rcv(skb, dev, pt, orig_dev);
+	nskb = dst->tag_ops->rcv(skb, dev, pt, orig_dev);
 	if (!nskb) {
 		kfree_skb(skb);
 		return 0;

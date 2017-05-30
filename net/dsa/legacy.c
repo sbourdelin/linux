@@ -150,8 +150,6 @@ static int dsa_switch_setup_one(struct dsa_switch *ds, struct device *parent)
 		dst->tag_ops = dsa_resolve_tag_protocol(tag_protocol);
 		if (IS_ERR(dst->tag_ops))
 			return PTR_ERR(dst->tag_ops);
-
-		dst->rcv = dst->tag_ops->rcv;
 	}
 
 	memcpy(ds->rtable, cd->rtable, sizeof(ds->rtable));
