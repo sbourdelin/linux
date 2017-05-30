@@ -1888,11 +1888,25 @@ static ssize_t wwid_show(struct device *dev, struct device_attribute *attr,
 }
 static DEVICE_ATTR(wwid, S_IRUGO, wwid_show, NULL);
 
+static ssize_t nguid_show(struct device *dev, struct device_attribute *attr,
+			  char *buf)
+{
+	struct nvme_ns *ns = nvme_get_ns_from_dev(dev);
+	return sprintf(buf, "%pU\n", ns->nguid);
+}
+static DEVICE_ATTR(nguid, S_IRUGO, nguid_show, NULL);
+
 static ssize_t uuid_show(struct device *dev, struct device_attribute *attr,
 								char *buf)
 {
 	struct nvme_ns *ns = nvme_get_ns_from_dev(dev);
-	return sprintf(buf, "%pU\n", ns->nguid);
+
+	/* For backward compatibility expose the NGUID to userspace if
+	 * we have no UUID set
+	 */
+	if (!memchr_inv(ns->uuid, 0, sizeof(ns->uuid)))
+		return sprintf(buf, "%pU\n", ns->nguid);
+	return sprintf(buf, "%pU\n", ns->uuid);
 }
 static DEVICE_ATTR(uuid, S_IRUGO, uuid_show, NULL);
 
@@ -1915,6 +1929,7 @@ static DEVICE_ATTR(nsid, S_IRUGO, nsid_show, NULL);
 static struct attribute *nvme_ns_attrs[] = {
 	&dev_attr_wwid.attr,
 	&dev_attr_uuid.attr,
+	&dev_attr_nguid.attr,
 	&dev_attr_eui.attr,
 	&dev_attr_nsid.attr,
 	NULL,
@@ -1927,6 +1942,11 @@ static umode_t nvme_ns_attrs_are_visible(struct kobject *kobj,
 	struct nvme_ns *ns = nvme_get_ns_from_dev(dev);
 
 	if (a == &dev_attr_uuid.attr) {
+		if (!memchr_inv(ns->uuid, 0, sizeof(ns->uuid)) ||
+		    !memchr_inv(ns->nguid, 0, sizeof(ns->nguid)))
+			return 0;
+	}
+	if (a == &dev_attr_nguid.attr) {
 		if (!memchr_inv(ns->nguid, 0, sizeof(ns->nguid)))
 			return 0;
 	}
