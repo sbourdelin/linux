@@ -522,24 +522,9 @@ static void qpnpint_spmi_read(struct irq_data *d, u8 reg, void *buf, size_t len)
 
 static void cleanup_irq(struct spmi_pmic_arb *pa, u16 apid, int id)
 {
-	u16 ppid = pa->apid_data[apid].ppid;
-	u8 sid = ppid >> 8;
-	u8 per = ppid & 0xFF;
 	u8 irq_mask = BIT(id);
 
 	writel_relaxed(irq_mask, pa->intr + pa->ver_ops->irq_clear(apid));
-
-	if (pmic_arb_write_cmd(pa->spmic, SPMI_CMD_EXT_WRITEL, sid,
-			(per << 8) + QPNPINT_REG_LATCHED_CLR, &irq_mask, 1))
-		dev_err_ratelimited(&pa->spmic->dev,
-				"failed to ack irq_mask = 0x%x for ppid = %x\n",
-				irq_mask, ppid);
-
-	if (pmic_arb_write_cmd(pa->spmic, SPMI_CMD_EXT_WRITEL, sid,
-			       (per << 8) + QPNPINT_REG_EN_CLR, &irq_mask, 1))
-		dev_err_ratelimited(&pa->spmic->dev,
-				"failed to ack irq_mask = 0x%x for ppid = %x\n",
-				irq_mask, ppid);
 }
 
 static void periph_interrupt(struct spmi_pmic_arb *pa, u16 apid)
@@ -697,6 +682,17 @@ static struct irq_chip pmic_arb_irqchip = {
 	.flags		= IRQCHIP_MASK_ON_SUSPEND
 			| IRQCHIP_SKIP_SET_WAKE,
 };
+
+static void qpnpint_irq_domain_activate(struct irq_domain *domain,
+					struct irq_data *d)
+{
+	u8 irq = HWIRQ_IRQ(d->hwirq);
+	u8 buf;
+
+	buf = BIT(irq);
+	qpnpint_spmi_write(d, QPNPINT_REG_EN_CLR, &buf, 1);
+	qpnpint_spmi_write(d, QPNPINT_REG_LATCHED_CLR, &buf, 1);
+}
 
 static int qpnpint_irq_domain_dt_translate(struct irq_domain *d,
 					   struct device_node *controller,
@@ -1164,6 +1160,7 @@ static const struct pmic_arb_ver_ops pmic_arb_v5 = {
 static const struct irq_domain_ops pmic_arb_irq_domain_ops = {
 	.map	= qpnpint_irq_domain_map,
 	.xlate	= qpnpint_irq_domain_dt_translate,
+	.activate	= qpnpint_irq_domain_activate,
 };
 
 static int spmi_pmic_arb_probe(struct platform_device *pdev)
