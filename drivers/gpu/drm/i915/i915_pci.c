@@ -430,6 +430,7 @@ static const struct intel_device_info intel_coffeelake_info = {
 	.is_alpha_support = 1,
 	.platform = INTEL_COFFEELAKE,
 	.gen = 9,
+	.has_csr = 1,
 	.ddb_size = 896,
 };
 
