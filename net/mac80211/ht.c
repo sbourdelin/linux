@@ -309,16 +309,18 @@ void ieee80211_ba_session_work(struct work_struct *work)
 	struct tid_ampdu_tx *tid_tx;
 	int tid;
 
+	mutex_lock(&sta->ampdu_mlme.mtx);
 	/*
 	 * When this flag is set, new sessions should be
 	 * blocked, and existing sessions will be torn
 	 * down by the code that set the flag, so this
 	 * need not run.
 	 */
-	if (test_sta_flag(sta, WLAN_STA_BLOCK_BA))
-		return;
+	if (test_sta_flag(sta, WLAN_STA_BLOCK_BA)) {
+		sta->ampdu_mlme.tid_rx_manage_offl = 0;
+		goto unlock;
+	}
 
-	mutex_lock(&sta->ampdu_mlme.mtx);
 	for (tid = 0; tid < IEEE80211_NUM_TIDS; tid++) {
 		if (test_and_clear_bit(tid, sta->ampdu_mlme.tid_rx_timer_expired))
 			___ieee80211_stop_rx_ba_session(
@@ -330,6 +332,18 @@ void ieee80211_ba_session_work(struct work_struct *work)
 			___ieee80211_stop_rx_ba_session(
 				sta, tid, WLAN_BACK_RECIPIENT,
 				WLAN_REASON_UNSPECIFIED, true);
+
+		if (test_and_clear_bit(tid,
+				       sta->ampdu_mlme.tid_rx_manage_offl))
+			__ieee80211_start_rx_ba_session(sta, 0, 0, 0, 1, tid,
+							IEEE80211_MAX_AMPDU_BUF,
+							false, true);
+
+		if (test_and_clear_bit(tid + IEEE80211_NUM_TIDS,
+				       sta->ampdu_mlme.tid_rx_manage_offl))
+			___ieee80211_stop_rx_ba_session(
+				sta, tid, WLAN_BACK_RECIPIENT,
+				0, false);
 
 		spin_lock_bh(&sta->lock);
 
@@ -365,6 +379,7 @@ void ieee80211_ba_session_work(struct work_struct *work)
 		if (test_and_clear_bit(HT_AGG_STATE_STOP_CB, &tid_tx->state))
 			ieee80211_stop_tx_ba_cb(sta, tid, tid_tx);
 	}
+ unlock:
 	mutex_unlock(&sta->ampdu_mlme.mtx);
 }
 
