@@ -142,9 +142,10 @@ static struct platform_device *pdev;
 static void atml_plat_remove(void)
 {
 	struct tpm_chip *chip = dev_get_drvdata(&pdev->dev);
-	struct tpm_atmel_priv *priv = dev_get_drvdata(&chip->dev);
+	struct tpm_atmel_priv *priv;
 
 	if (chip) {
+		priv = dev_get_drvdata(&chip->dev);
 		tpm_chip_unregister(chip);
 		if (priv->have_region)
 			atmel_release_region(priv->base, priv->region_size);
