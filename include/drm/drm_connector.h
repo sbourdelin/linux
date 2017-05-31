@@ -137,6 +137,8 @@ struct drm_scdc {
 struct drm_hdmi_info {
 	/** @scdc: sink's scdc support and capabilities */
 	struct drm_scdc scdc;
+	/* Colorimerty info from EDID */
+	u32 colorimetry;
 };
 
 /**
