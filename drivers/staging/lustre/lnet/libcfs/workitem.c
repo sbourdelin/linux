@@ -140,6 +140,10 @@ cfs_wi_deschedule(struct cfs_wi_sched *sched, struct cfs_workitem *wi)
 
 	LASSERT(!in_interrupt()); /* because we use plain spinlock */
 	LASSERT(!sched->ws_stopping);
+	if (wi->wi_scheduled) {
+		LASSERT(!list_empty(&wi->wi_list));
+		LASSERT(sched->ws_nscheduled > 0);
+	}
 
 	/*
 	 * return 0 if it's running already, otherwise return 1, which
@@ -151,18 +155,14 @@ cfs_wi_deschedule(struct cfs_wi_sched *sched, struct cfs_workitem *wi)
 	rc = !(wi->wi_running);
 
 	if (wi->wi_scheduled) { /* cancel pending schedules */
-		LASSERT(!list_empty(&wi->wi_list));
 		list_del_init(&wi->wi_list);
-
-		LASSERT(sched->ws_nscheduled > 0);
 		sched->ws_nscheduled--;
-
 		wi->wi_scheduled = 0;
 	}
 
-	LASSERT(list_empty(&wi->wi_list));
-
 	spin_unlock(&sched->ws_lock);
+
+	LASSERT(list_empty(&wi->wi_list));
 	return rc;
 }
 EXPORT_SYMBOL(cfs_wi_deschedule);
