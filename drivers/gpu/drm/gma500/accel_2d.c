@@ -55,7 +55,7 @@ void psb_spank(struct drm_psb_private *dev_priv)
 		_PSB_CS_RESET_TWOD_RESET, PSB_CR_SOFT_RESET);
 	PSB_RSGX32(PSB_CR_SOFT_RESET);
 
-	msleep(1);
+	mdelay(1);
 
 	PSB_WSGX32(0, PSB_CR_SOFT_RESET);
 	wmb();
@@ -64,7 +64,7 @@ void psb_spank(struct drm_psb_private *dev_priv)
 	wmb();
 	(void) PSB_RSGX32(PSB_CR_BIF_CTRL);
 
-	msleep(1);
+	mdelay(1);
 	PSB_WSGX32(PSB_RSGX32(PSB_CR_BIF_CTRL) & ~_PSB_CB_CTRL_CLEAR_FAULT,
 		   PSB_CR_BIF_CTRL);
 	(void) PSB_RSGX32(PSB_CR_BIF_CTRL);
