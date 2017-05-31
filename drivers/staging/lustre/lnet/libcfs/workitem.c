@@ -111,22 +111,23 @@ cfs_wi_exit(struct cfs_wi_sched *sched, struct cfs_workitem *wi)
 {
 	LASSERT(!in_interrupt()); /* because we use plain spinlock */
 	LASSERT(!sched->ws_stopping);
+	LASSERT(wi->wi_running);
+	if (wi->wi_scheduled) {
+		LASSERT(!list_empty(&wi->wi_list));
+		LASSERT(sched->ws_nscheduled > 0);
+	}
 
 	spin_lock(&sched->ws_lock);
 
-	LASSERT(wi->wi_running);
 	if (wi->wi_scheduled) { /* cancel pending schedules */
-		LASSERT(!list_empty(&wi->wi_list));
 		list_del_init(&wi->wi_list);
-
-		LASSERT(sched->ws_nscheduled > 0);
 		sched->ws_nscheduled--;
 	}
 
-	LASSERT(list_empty(&wi->wi_list));
-
 	wi->wi_scheduled = 1; /* LBUG future schedule attempts */
 	spin_unlock(&sched->ws_lock);
+
+	LASSERT(list_empty(&wi->wi_list));
 }
 EXPORT_SYMBOL(cfs_wi_exit);
 
