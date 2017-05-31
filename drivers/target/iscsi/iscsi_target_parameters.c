@@ -702,7 +702,7 @@ int iscsi_update_param_value(struct iscsi_param *param, char *value)
 {
 	kfree(param->value);
 
-	param->value = kstrdup(value, GFP_KERNEL);
+	param->value = kstrdup(value, GFP_ATOMIC);
 	if (!param->value) {
 		pr_err("Unable to allocate memory for value.\n");
 		return -ENOMEM;
