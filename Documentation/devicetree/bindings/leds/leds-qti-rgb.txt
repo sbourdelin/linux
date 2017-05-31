@@ -1,0 +1,66 @@
+Qualcomm Technologies, Inc. TRI_LED driver specific bindings
+
+This binding document describes the properties of TRI_LED module in
+Qualcomm Technologies, Inc. PMIC chips.
+
+- compatible:
+	Usage: required
+	Value type: <string>
+	Definition: Must be "qcom,leds-rgb".
+
+- reg:
+	Usage: required
+	Value type: <prop-encoded-array>
+	Definition: Register base of the TRI_LED module and length.
+
+- pwm-names:
+	Usage: required
+	Value type: <stringlist>
+	Definition: A list of string to label the PWM devices defined in pwms
+		property which are using for controlling LEDs.
+		It must be: "blue", "green", "red".
+
+- pwms:
+	Usage: required
+	Value type: <prop-encoded-array>
+	Definition: A list of the PWM devices (phandles) used for controlling
+		LEDs.
+
+- qcom,support-blink:
+	Usage: optional
+	Value type: <prop-encoded-array>
+	Definition: An array of integer values to indicate if "blue", "green", "red"
+		LEDs support blink control. The values are listed as the fixed
+		order for "blue", "green", "red" LEDs.
+
+- qcom,on-ms:
+	Usage: optional
+	Value type: <prop-encoded-array>
+	Definition: An array of time values (milli-seconds) to represent the
+		on duration for "blue", "green", "red" LEDs. The values are
+		listed as the fixed order for "blue", "green", "red" LEDs.
+		This property has to be defined if "qcom,support-blink" is
+		present.
+
+- qcom,off-ms:
+	Usage: optional
+	Value type: <prop-encoded-array>
+	Definition: An array of time values (milli-seconds) to represent the
+		off duration for "blue", "green", "red" LEDs. The values are
+		listed as the fixed order for "blue", "green", "red" LEDs.
+		This property has to be defined if "qcom,support-blink" is
+		present.
+
+Example:
+
+	pmi8998_rgb: rgb@d000{
+		compatible = "qcom,leds-rgb";
+		reg = <0xd000 0x100>;
+		pwm-names = "blue", "green", "red";
+		pwms =  <&pmi8998_pwm_3 0 1000000>,
+			<&pmi8998_pwm_4 0 1000000>,
+			<&pmi8998_pwm_5 0 1000000>;
+		qcom,support-blink = <1 1 1>;
+		qcom,on-ms = <500 500 500>;
+		qcom,off-ms = <500 500 500>;
+	};
