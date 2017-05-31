@@ -367,6 +367,66 @@ out:
 	nvmet_req_complete(req, status);
 }
 
+static void nvmet_execute_identify_desclist(struct nvmet_req *req)
+{
+	static const int buf_size = SZ_4K;
+	struct nvmet_ns *ns;
+	struct nvme_ns_nid *ns_nid;
+	u8 *nid_list;
+	u16 status = 0;
+	int pos = 0;
+	const u8 *p;
+
+	ns = nvmet_find_namespace(req->sq->ctrl, req->cmd->identify.nsid);
+	if (!ns) {
+		status = NVME_SC_INVALID_NS | NVME_SC_DNR;
+		goto out;
+	}
+
+	nid_list = kzalloc(buf_size, GFP_KERNEL);
+	if (!nid_list) {
+		status = NVME_SC_INTERNAL;
+		goto out_put_ns;
+	}
+
+	p = nid_list;
+
+	if (memchr_inv(&ns->uuid, 0, sizeof(ns->uuid))) {
+		ns_nid = (struct nvme_ns_nid *)p;
+		ns_nid->nidt = NVME_NIDT_UUID;
+		ns_nid->nidl = NVME_NIDT_UUID_LEN;
+		memcpy(&ns_nid->nid, &ns->uuid, sizeof(ns->uuid));
+		pos += sizeof(struct nvme_ns_nid) + sizeof(ns->uuid);
+		if (pos > buf_size) {
+			status = NVME_SC_INVALID_OPCODE | NVME_SC_DNR;
+			goto out_free_nid_list;
+		}
+		p += pos;
+	}
+	if (memchr_inv(ns->nguid, 0, sizeof(ns->nguid))) {
+		ns_nid = (struct nvme_ns_nid *)p;
+		ns_nid->nidt = NVME_NIDT_NGUID;
+		ns_nid->nidl = NVME_NIDT_NGUID_LEN;
+		memcpy(&ns_nid->nid, &ns->nguid, sizeof(ns->nguid));
+		pos += sizeof(struct nvme_ns_nid) + sizeof(ns->nguid);
+		if (pos > buf_size) {
+			status = NVME_SC_INVALID_OPCODE | NVME_SC_DNR;
+			goto out_free_nid_list;
+		}
+		p += pos;
+	}
+
+	status = nvmet_copy_to_sgl(req, 0, nid_list, buf_size);
+
+out_free_nid_list:
+	kfree(nid_list);
+
+out_put_ns:
+	nvmet_put_namespace(ns);
+out:
+	nvmet_req_complete(req, status);
+}
+
 /*
  * A "mimimum viable" abort implementation: the command is mandatory in the
  * spec, but we are not required to do any useful work.  We couldn't really
@@ -514,6 +574,9 @@ u16 nvmet_parse_admin_cmd(struct nvmet_req *req)
 			return 0;
 		case NVME_ID_CNS_NS_ACTIVE_LIST:
 			req->execute = nvmet_execute_identify_nslist;
+			return 0;
+		case NVME_ID_CNS_NS_DESC_LIST:
+			req->execute = nvmet_execute_identify_desclist;
 			return 0;
 		}
 		break;
