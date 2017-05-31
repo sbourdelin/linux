@@ -4819,9 +4819,26 @@ skl_compute_wm(struct drm_atomic_state *state)
 	struct drm_crtc_state *cstate;
 	struct intel_atomic_state *intel_state = to_intel_atomic_state(state);
 	struct skl_wm_values *results = &intel_state->wm_results;
+	struct drm_device *dev = state->dev;
 	struct skl_pipe_wm *pipe_wm;
 	bool changed = false;
 	int ret, i;
+
+	if (to_i915(dev)->wm.distrust_bios_wm) {
+		changed = true;
+
+		/*
+		 * The first commit after driver load must update the ddb
+		 * allocations, so make sure we at least hold a lock to
+		 * inspect the state required for watermark updates.
+		 *
+		 * Below we'll grab the required crtc state.
+		 */
+		ret = drm_modeset_lock(&dev->mode_config.connection_mutex,
+				       state->acquire_ctx);
+		if (ret)
+			return ret;
+	}
 
 	/*
 	 * If this transaction isn't actually touching any CRTC's, don't
@@ -4833,6 +4850,7 @@ skl_compute_wm(struct drm_atomic_state *state)
 	 */
 	for_each_new_crtc_in_state(state, crtc, cstate, i)
 		changed = true;
+
 	if (!changed)
 		return 0;
 
