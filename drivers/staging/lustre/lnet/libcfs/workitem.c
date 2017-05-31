@@ -212,9 +212,9 @@ static int cfs_wi_scheduler(void *arg)
 			CWARN("Unable to bind %s on CPU partition %d\n",
 			      sched->ws_name, sched->ws_cpt);
 
+	LASSERT(sched->ws_starting == 1);
 	spin_lock(&cfs_wi_data.wi_glock);
 
-	LASSERT(sched->ws_starting == 1);
 	sched->ws_starting--;
 	sched->ws_nthreads++;
 
@@ -231,11 +231,14 @@ static int cfs_wi_scheduler(void *arg)
 		       nloops < CFS_WI_RESCHED) {
 			wi = list_entry(sched->ws_runq.next,
 					struct cfs_workitem, wi_list);
+
+			spin_unlock(&sched->ws_lock);
 			LASSERT(wi->wi_scheduled && !wi->wi_running);
+			LASSERT(sched->ws_nscheduled > 0);
+			spin_lock(&sched->ws_lock);
 
 			list_del_init(&wi->wi_list);
 
-			LASSERT(sched->ws_nscheduled > 0);
 			sched->ws_nscheduled--;
 
 			wi->wi_running = 1;
@@ -254,7 +257,10 @@ static int cfs_wi_scheduler(void *arg)
 			if (list_empty(&wi->wi_list))
 				continue;
 
+			spin_unlock(&sched->ws_lock);
 			LASSERT(wi->wi_scheduled);
+			spin_lock(&sched->ws_lock);
+
 			/* wi is rescheduled, should be on rerunq now, we
 			 * move it to runq so it can run action now
 			 */
