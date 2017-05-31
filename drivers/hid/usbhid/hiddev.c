@@ -238,7 +238,7 @@ static int hiddev_release(struct inode * inode, struct file * file)
 	if (!--list->hiddev->open) {
 		if (list->hiddev->exist) {
 			hid_hw_close(list->hiddev->hid);
-			usbhid_put_power(list->hiddev->hid);
+			hid_hw_power(list->hiddev->hid, PM_HINT_NORMAL);
 		} else {
 			mutex_unlock(&list->hiddev->existancelock);
 			kfree(list->hiddev);
@@ -301,7 +301,7 @@ static int hiddev_open(struct inode *inode, struct file *file)
 	if (!list->hiddev->open++)
 		if (list->hiddev->exist) {
 			struct hid_device *hid = hiddev->hid;
-			res = usbhid_get_power(hid);
+			res = hid_hw_power(hid, PM_HINT_FULLON);
 			if (res < 0) {
 				res = -EIO;
 				goto bail_unlock;
