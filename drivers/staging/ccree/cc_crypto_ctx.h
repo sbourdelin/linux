@@ -239,10 +239,10 @@ struct drv_ctx_cipher {
 	enum drv_crypto_padding_type padding_type;
 	u32 key_size; /* numeric value in bytes   */
 	u32 data_unit_size; /* required for XTS */
-	/* block_state is the AES engine block state.
-	*  It is used by the host to pass IV or counter at initialization.
-	*  It is used by SeP for intermediate block chaining state and for
-	*  returning MAC algorithms results.           */
+	/*  block_state is the AES engine block state.
+	 *  It is used by the host to pass IV or counter at initialization.
+	 *  It is used by SeP for intermediate block chaining state and for
+	 *  returning MAC algorithms results.           */
 	u8 block_state[CC_AES_BLOCK_SIZE];
 	u8 key[CC_AES_KEY_SIZE_MAX];
 	u8 xex_key[CC_AES_KEY_SIZE_MAX];
