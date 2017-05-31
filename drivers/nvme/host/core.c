@@ -643,6 +643,71 @@ int nvme_identify_ctrl(struct nvme_ctrl *dev, struct nvme_id_ctrl **id)
 	return error;
 }
 
+static void nvme_parse_ns_descs(struct nvme_ns *ns, void *ns_nid)
+{
+	struct nvme_ns_nid *cur;
+	const u8 *p;
+	int pos = 0;
+	int len;
+
+	p = (u8 *)ns_nid;
+
+	for (;;) {
+		cur = (struct nvme_ns_nid *)p;
+
+		switch (cur->nidl) {
+		case 0:
+			return;
+		case 8:
+		case 16:
+			break;
+		default:
+			dev_warn(ns->ctrl->dev,
+				 "Target returned bogus Namespace Identification Descriptor length: %d\n",
+				 cur->nidl);
+			return;
+
+		}
+
+		switch (cur->nidt) {
+		case NVME_NIDT_EUI64:
+			len = NVME_NIDT_EUI64_LEN;
+			memcpy(ns->eui, cur->nid, len);
+			break;
+		case NVME_NIDT_NGUID:
+			len = NVME_NIDT_NGUID_LEN;
+			memcpy(ns->nguid, cur->nid, len);
+			break;
+		case NVME_NIDT_UUID:
+			len = NVME_NIDT_UUID_LEN;
+			memcpy(ns->uuid, cur->nid, len);
+			break;
+		default:
+			dev_warn(ns->ctrl->dev,
+				 "Invalid Namespace Identification Descriptor Type: %d\n",
+				 cur->nidt);
+			return;
+		}
+
+		pos += sizeof(struct nvme_ns_nid) + len;
+		if (pos >= SZ_4K)
+			return;
+		p += pos;
+	}
+}
+
+static int nvme_identify_ns_descs(struct nvme_ctrl *dev, unsigned nsid,
+				  void *ns_nid)
+{
+	struct nvme_command c = { };
+
+	c.identify.opcode = nvme_admin_identify;
+	c.identify.nsid = cpu_to_le32(nsid);
+	c.identify.cns = NVME_ID_CNS_NS_DESC_LIST;
+
+	return nvme_submit_sync_cmd(dev->admin_q, &c, ns_nid, SZ_4K);
+}
+
 static int nvme_identify_ns_list(struct nvme_ctrl *dev, unsigned nsid, __le32 *ns_list)
 {
 	struct nvme_command c = { };
@@ -1017,6 +1082,29 @@ static int nvme_revalidate_ns(struct nvme_ns *ns, struct nvme_id_ns **id)
 		memcpy(ns->eui, (*id)->eui64, sizeof(ns->eui));
 	if (ns->ctrl->vs >= NVME_VS(1, 2, 0))
 		memcpy(ns->nguid, (*id)->nguid, sizeof(ns->nguid));
+	if (ns->ctrl->vs >= NVME_VS(1, 3, 0)) {
+		void *ns_nid;
+		int ret;
+
+
+		ns_nid = kzalloc(SZ_4K, GFP_KERNEL);
+		if (!ns_nid) {
+			dev_warn(ns->ctrl->dev,
+				 "%s: Identify Descriptors failed\n", __func__);
+			return 0;
+		}
+
+		ret = nvme_identify_ns_descs(ns->ctrl, ns->ns_id, ns_nid);
+		if (ret) {
+			dev_warn(ns->ctrl->dev,
+				 "%s: Identify Descriptors failed\n", __func__);
+			 /* Don't treat error as fatal we potentially
+			  * already have a NGUID or EUI-64 */
+			return 0;
+		}
+		nvme_parse_ns_descs(ns, ns_nid);
+		kfree(ns_nid);
+	}
 
 	return 0;
 }
