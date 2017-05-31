@@ -302,10 +302,11 @@ cfs_wi_sched_destroy(struct cfs_wi_sched *sched)
 		return;
 	}
 
-	LASSERT(!list_empty(&sched->ws_list));
 	sched->ws_stopping = 1;
 
 	spin_unlock(&cfs_wi_data.wi_glock);
+
+	LASSERT(!list_empty(&sched->ws_list));
 
 	i = 2;
 	wake_up_all(&sched->ws_waitq);
