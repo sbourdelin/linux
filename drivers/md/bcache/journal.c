@@ -726,6 +726,7 @@ static struct journal_write *journal_wait_for_write(struct cache_set *c,
 			btree_flush_write(c);
 		}
 
+		spin_unlock(&c->journal.lock);
 		closure_sync(&cl);
 		spin_lock(&c->journal.lock);
 		wait = true;
