@@ -353,6 +353,10 @@ drm_hdmi_avi_infoframe_quant_range(struct hdmi_avi_infoframe *frame,
 				   enum hdmi_quantization_range rgb_quant_range,
 				   bool rgb_quant_range_selectable);
 
+int
+drm_hdmi_infoframe_set_hdr_metadata(struct hdmi_drm_infoframe *frame,
+				    void *hdr_source_metadata);
+
 /**
  * drm_eld_mnl - Get ELD monitor name length in bytes.
  * @eld: pointer to an eld memory structure with mnl set
