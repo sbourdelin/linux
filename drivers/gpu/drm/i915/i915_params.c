@@ -115,6 +115,10 @@ MODULE_PARM_DESC(vbt_sdvo_panel_type,
 	"Override/Ignore selection of SDVO panel mode in the VBT "
 	"(-2=ignore, -1=auto [default], index in VBT BIOS table)");
 
+module_param_named_unsafe(vbt_firmware, i915.vbt_firmware, charp, 0400);
+MODULE_PARM_DESC(vbt_firmware,
+		 "Load VBT from specified file under /lib/firmware");
+
 module_param_named_unsafe(reset, i915.reset, bool, 0600);
 MODULE_PARM_DESC(reset, "Attempt GPU resets (default: true)");
 
