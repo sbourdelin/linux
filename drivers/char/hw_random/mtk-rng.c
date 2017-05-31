@@ -148,6 +148,7 @@ static int mtk_rng_probe(struct platform_device *pdev)
 }
 
 static const struct of_device_id mtk_rng_match[] = {
+	{ .compatible = "mediatek,generic-rng" },
 	{ .compatible = "mediatek,mt7623-rng" },
 	{},
 };
