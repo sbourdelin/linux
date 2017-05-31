@@ -131,7 +131,7 @@ struct qed_ptt *qed_ptt_acquire(struct qed_hwfn *p_hwfn)
 		}
 
 		spin_unlock_bh(&p_hwfn->p_ptt_pool->lock);
-		usleep_range(1000, 2000);
+		udelay(1500);
 	}
 
 	DP_NOTICE(p_hwfn, "PTT acquire timeout - failed to allocate PTT\n");
