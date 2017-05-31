@@ -1906,10 +1906,12 @@ EXPORT_SYMBOL(dquot_free_inode);
  * We are holding reference on transfer_from & transfer_to, no need to
  * protect them by srcu_read_lock().
  */
-int __dquot_transfer(struct inode *inode, struct dquot **transfer_to)
+int __dquot_transfer(struct inode *inode, struct dquot **transfer_to,
+		     int inodes_extra)
 {
 	qsize_t space, cur_space;
 	qsize_t rsv_space = 0;
+	qsize_t inode_count = 1 + inodes_extra;
 	struct dquot *transfer_from[MAXQUOTAS] = {};
 	int cnt, ret = 0;
 	char is_valid[MAXQUOTAS] = {};
@@ -1946,7 +1948,7 @@ int __dquot_transfer(struct inode *inode, struct dquot **transfer_to)
 			continue;
 		is_valid[cnt] = 1;
 		transfer_from[cnt] = i_dquot(inode)[cnt];
-		ret = check_idq(transfer_to[cnt], 1, &warn_to[cnt]);
+		ret = check_idq(transfer_to[cnt], inode_count, &warn_to[cnt]);
 		if (ret)
 			goto over_quota;
 		ret = check_bdq(transfer_to[cnt], space, 0, &warn_to[cnt]);
@@ -1963,7 +1965,7 @@ int __dquot_transfer(struct inode *inode, struct dquot **transfer_to)
 		/* Due to IO error we might not have transfer_from[] structure */
 		if (transfer_from[cnt]) {
 			int wtype;
-			wtype = info_idq_free(transfer_from[cnt], 1);
+			wtype = info_idq_free(transfer_from[cnt], inode_count);
 			if (wtype != QUOTA_NL_NOWARN)
 				prepare_warning(&warn_from_inodes[cnt],
 						transfer_from[cnt], wtype);
@@ -1971,13 +1973,13 @@ int __dquot_transfer(struct inode *inode, struct dquot **transfer_to)
 			if (wtype != QUOTA_NL_NOWARN)
 				prepare_warning(&warn_from_space[cnt],
 						transfer_from[cnt], wtype);
-			dquot_decr_inodes(transfer_from[cnt], 1);
+			dquot_decr_inodes(transfer_from[cnt], inode_count);
 			dquot_decr_space(transfer_from[cnt], cur_space);
 			dquot_free_reserved_space(transfer_from[cnt],
 						  rsv_space);
 		}
 
-		dquot_incr_inodes(transfer_to[cnt], 1);
+		dquot_incr_inodes(transfer_to[cnt], inode_count);
 		dquot_incr_space(transfer_to[cnt], cur_space);
 		dquot_resv_space(transfer_to[cnt], rsv_space);
 
@@ -2005,7 +2007,7 @@ EXPORT_SYMBOL(__dquot_transfer);
 /* Wrapper for transferring ownership of an inode for uid/gid only
  * Called from FSXXX_setattr()
  */
-int dquot_transfer(struct inode *inode, struct iattr *iattr)
+int dquot_transfer(struct inode *inode, struct iattr *iattr, int inodes_extra)
 {
 	struct dquot *transfer_to[MAXQUOTAS] = {};
 	struct dquot *dquot;
@@ -2037,7 +2039,7 @@ int dquot_transfer(struct inode *inode, struct iattr *iattr)
 		}
 		transfer_to[GRPQUOTA] = dquot;
 	}
-	ret = __dquot_transfer(inode, transfer_to);
+	ret = __dquot_transfer(inode, transfer_to, inodes_extra);
 out_put:
 	dqput_all(transfer_to);
 	return ret;

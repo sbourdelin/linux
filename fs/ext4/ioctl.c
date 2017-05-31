@@ -21,6 +21,7 @@
 #include "ext4.h"
 #include <linux/fsmap.h>
 #include "fsmap.h"
+#include "xattr.h"
 #include <trace/events/ext4.h>
 
 /**
@@ -319,6 +320,7 @@ static int ext4_ioctl_setproject(struct file *filp, __u32 projid)
 	struct ext4_iloc iloc;
 	struct ext4_inode *raw_inode;
 	struct dquot *transfer_to[MAXQUOTAS] = { };
+	int ea_inode_refs;
 
 	if (!ext4_has_feature_project(sb)) {
 		if (projid != EXT4_DEF_PROJID)
@@ -371,9 +373,17 @@ static int ext4_ioctl_setproject(struct file *filp, __u32 projid)
 	if (err)
 		goto out_stop;
 
+	down_read(&EXT4_I(inode)->xattr_sem);
+	ea_inode_refs = ext4_xattr_inode_count(inode);
+	if (ea_inode_refs < 0) {
+		up_read(&EXT4_I(inode)->xattr_sem);
+		err = ea_inode_refs;
+		goto out_stop;
+	}
+
 	transfer_to[PRJQUOTA] = dqget(sb, make_kqid_projid(kprojid));
 	if (!IS_ERR(transfer_to[PRJQUOTA])) {
-		err = __dquot_transfer(inode, transfer_to);
+		err = __dquot_transfer(inode, transfer_to, ea_inode_refs);
 		dqput(transfer_to[PRJQUOTA]);
 		if (err)
 			goto out_dirty;
@@ -382,6 +392,7 @@ static int ext4_ioctl_setproject(struct file *filp, __u32 projid)
 	EXT4_I(inode)->i_projid = kprojid;
 	inode->i_ctime = current_time(inode);
 out_dirty:
+	up_read(&EXT4_I(inode)->xattr_sem);
 	rc = ext4_mark_iloc_dirty(handle, inode, &iloc);
 	if (!err)
 		err = rc;

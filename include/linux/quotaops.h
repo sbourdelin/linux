@@ -106,8 +106,9 @@ int dquot_get_next_dqblk(struct super_block *sb, struct kqid *id,
 int dquot_set_dqblk(struct super_block *sb, struct kqid id,
 		struct qc_dqblk *di);
 
-int __dquot_transfer(struct inode *inode, struct dquot **transfer_to);
-int dquot_transfer(struct inode *inode, struct iattr *iattr);
+int __dquot_transfer(struct inode *inode, struct dquot **transfer_to,
+		int inodes_extra);
+int dquot_transfer(struct inode *inode, struct iattr *iattr, int inodes_extra);
 
 static inline struct mem_dqinfo *sb_dqinfo(struct super_block *sb, int type)
 {
@@ -226,7 +227,8 @@ static inline void dquot_free_inode(struct inode *inode)
 {
 }
 
-static inline int dquot_transfer(struct inode *inode, struct iattr *iattr)
+static inline int dquot_transfer(struct inode *inode, struct iattr *iattr,
+		int inodes_extra)
 {
 	return 0;
 }

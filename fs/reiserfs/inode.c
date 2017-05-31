@@ -3370,7 +3370,7 @@ int reiserfs_setattr(struct dentry *dentry, struct iattr *attr)
 		reiserfs_write_unlock(inode->i_sb);
 		if (error)
 			goto out;
-		error = dquot_transfer(inode, attr);
+		error = dquot_transfer(inode, attr, 0);
 		reiserfs_write_lock(inode->i_sb);
 		if (error) {
 			journal_end(&th);

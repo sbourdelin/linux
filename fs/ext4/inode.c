@@ -5267,6 +5267,7 @@ int ext4_setattr(struct dentry *dentry, struct iattr *attr)
 	int error, rc = 0;
 	int orphan = 0;
 	const unsigned int ia_valid = attr->ia_valid;
+	int ea_inode_refs;
 
 	if (unlikely(ext4_forced_shutdown(EXT4_SB(inode->i_sb))))
 		return -EIO;
@@ -5293,7 +5294,12 @@ int ext4_setattr(struct dentry *dentry, struct iattr *attr)
 			error = PTR_ERR(handle);
 			goto err_out;
 		}
-		error = dquot_transfer(inode, attr);
+
+		down_read(&EXT4_I(inode)->xattr_sem);
+		error = ea_inode_refs = ext4_xattr_inode_count(inode);
+		if (ea_inode_refs >= 0)
+			error = dquot_transfer(inode, attr, ea_inode_refs);
+		up_read(&EXT4_I(inode)->xattr_sem);
 		if (error) {
 			ext4_journal_stop(handle);
 			return error;

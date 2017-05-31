@@ -1259,7 +1259,7 @@ int ocfs2_setattr(struct dentry *dentry, struct iattr *attr)
 			mlog_errno(status);
 			goto bail_unlock;
 		}
-		status = __dquot_transfer(inode, transfer_to);
+		status = __dquot_transfer(inode, transfer_to, 0);
 		if (status < 0)
 			goto bail_commit;
 	} else {

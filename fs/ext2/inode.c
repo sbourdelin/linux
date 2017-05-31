@@ -1656,7 +1656,7 @@ int ext2_setattr(struct dentry *dentry, struct iattr *iattr)
 	}
 	if ((iattr->ia_valid & ATTR_UID && !uid_eq(iattr->ia_uid, inode->i_uid)) ||
 	    (iattr->ia_valid & ATTR_GID && !gid_eq(iattr->ia_gid, inode->i_gid))) {
-		error = dquot_transfer(inode, iattr);
+		error = dquot_transfer(inode, iattr, 0);
 		if (error)
 			return error;
 	}
