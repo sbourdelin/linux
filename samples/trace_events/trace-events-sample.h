@@ -225,6 +225,13 @@ TRACE_DEFINE_ENUM(TRACE_SAMPLE_FOO);
 TRACE_DEFINE_ENUM(TRACE_SAMPLE_BAR);
 TRACE_DEFINE_ENUM(TRACE_SAMPLE_ZOO);
 
+/*
+ * The same problem as above applies to sizeof(), so there is also
+ * a macro to solve that problem.
+ */
+
+TRACE_DEFINE_SIZEOF(pteval_t);
+
 TRACE_EVENT(foo_bar,
 
 	TP_PROTO(const char *foo, int bar, const int *lst,
