@@ -179,12 +179,12 @@ cfs_wi_schedule(struct cfs_wi_sched *sched, struct cfs_workitem *wi)
 {
 	LASSERT(!in_interrupt()); /* because we use plain spinlock */
 	LASSERT(!sched->ws_stopping);
+	if (!wi->wi_scheduled)
+		LASSERT(list_empty(&wi->wi_list));
 
 	spin_lock(&sched->ws_lock);
 
 	if (!wi->wi_scheduled) {
-		LASSERT(list_empty(&wi->wi_list));
-
 		wi->wi_scheduled = 1;
 		sched->ws_nscheduled++;
 		if (!wi->wi_running) {
@@ -195,8 +195,8 @@ cfs_wi_schedule(struct cfs_wi_sched *sched, struct cfs_workitem *wi)
 		}
 	}
 
-	LASSERT(!list_empty(&wi->wi_list));
 	spin_unlock(&sched->ws_lock);
+	LASSERT(!list_empty(&wi->wi_list));
 }
 EXPORT_SYMBOL(cfs_wi_schedule);
 
