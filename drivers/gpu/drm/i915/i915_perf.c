@@ -1438,10 +1438,23 @@ static void config_oa_regs(struct drm_i915_private *dev_priv,
 	}
 }
 
+static void count_total_mux_regs(struct drm_i915_private *dev_priv)
+{
+	int i;
+
+	dev_priv->perf.oa.total_n_mux_regs = 0;
+	for (i = 0; i < dev_priv->perf.oa.n_mux_configs; i++) {
+		dev_priv->perf.oa.total_n_mux_regs +=
+			dev_priv->perf.oa.mux_regs_lens[i];
+	}
+}
+
 static int hsw_enable_metric_set(struct drm_i915_private *dev_priv)
 {
 	int ret = i915_oa_select_metric_set_hsw(dev_priv);
 	int i;
+
+	count_total_mux_regs(dev_priv);
 
 	if (ret)
 		return ret;
@@ -1755,6 +1768,8 @@ static int gen8_enable_metric_set(struct drm_i915_private *dev_priv)
 {
 	int ret = dev_priv->perf.oa.ops.select_metric_set(dev_priv);
 	int i;
+
+	count_total_mux_regs(dev_priv);
 
 	if (ret)
 		return ret;
@@ -2092,6 +2107,68 @@ void i915_oa_init_reg_state(struct intel_engine_cs *engine,
 		return;
 
 	gen8_update_reg_state_unlocked(ctx, reg_state);
+}
+
+int i915_oa_emit_noa_config_locked(struct drm_i915_gem_request *req)
+{
+	struct drm_i915_private *dev_priv = req->i915;
+	int max_loads = 125;
+	int n_load, n_registers, n_loaded_register;
+	int i, j;
+	u32 *cs;
+
+	lockdep_assert_held(&dev_priv->drm.struct_mutex);
+
+	if (!IS_GEN(dev_priv, 8, 9))
+		return 0;
+
+	/* Perf not supported or not enabled. */
+	if (!dev_priv->perf.initialized ||
+	    !dev_priv->perf.oa.exclusive_stream)
+		return 0;
+
+	n_registers = dev_priv->perf.oa.total_n_mux_regs;
+	n_load = (n_registers / max_loads) +
+		 (n_registers % max_loads) == 0;
+
+	cs = intel_ring_begin(req,
+			      3 * 2 + /* MI_LOAD_REGISTER_IMM for chicken registers */
+			      n_load + /* MI_LOAD_REGISTER_IMM for mux registers */
+			      n_registers * 2 + /* offset & value for mux registers*/
+			      1 /* NOOP */);
+	if (IS_ERR(cs))
+		return PTR_ERR(cs);
+
+	*cs++ = MI_LOAD_REGISTER_IMM(1);
+	*cs++ = i915_mmio_reg_offset(GDT_CHICKEN_BITS);
+	*cs++ = 0xA0;
+
+	n_loaded_register = 0;
+	for (i = 0; i < dev_priv->perf.oa.n_mux_configs; i++) {
+		const struct i915_oa_reg *mux_regs =
+			dev_priv->perf.oa.mux_regs[i];
+		const int mux_regs_len = dev_priv->perf.oa.mux_regs_lens[i];
+
+		for (j = 0; j < mux_regs_len; j++) {
+			if ((n_loaded_register % max_loads) == 0) {
+				n_load = min(n_registers - n_loaded_register, max_loads);
+				*cs++ = MI_LOAD_REGISTER_IMM(n_load);
+			}
+
+			*cs++ = i915_mmio_reg_offset(mux_regs[j].addr);
+			*cs++ = mux_regs[j].value;
+			n_loaded_register++;
+		}
+	}
+
+	*cs++ = MI_LOAD_REGISTER_IMM(1);
+	*cs++ = i915_mmio_reg_offset(GDT_CHICKEN_BITS);
+	*cs++ = 0x80;
+
+	*cs++ = MI_NOOP;
+	intel_ring_advance(req, cs);
+
+	return 0;
 }
 
 /**
