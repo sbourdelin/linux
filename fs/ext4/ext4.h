@@ -1517,6 +1517,7 @@ struct ext4_sb_info {
 	long s_es_nr_inode;
 	struct ext4_es_stats s_es_stats;
 	struct mb_cache *s_mb_cache;
+	struct mb_cache *s_ea_inode_cache;
 	spinlock_t s_es_lock ____cacheline_aligned_in_smp;
 
 	/* Ratelimit ext4 messages. */
@@ -2099,7 +2100,11 @@ static inline struct ext4_inode *ext4_raw_inode(struct ext4_iloc *iloc)
 	return (struct ext4_inode *) (iloc->bh->b_data + iloc->offset);
 }
 
-#define ext4_is_quota_file(inode) IS_NOQUOTA(inode)
+static inline bool ext4_is_quota_file(struct inode *inode)
+{
+	return IS_NOQUOTA(inode) &&
+	       !(EXT4_I(inode)->i_flags & EXT4_EA_INODE_FL);
+}
 
 /*
  * This structure is stuffed into the struct file's private_data field

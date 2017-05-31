@@ -927,6 +927,10 @@ static void ext4_put_super(struct super_block *sb)
 		invalidate_bdev(sbi->journal_bdev);
 		ext4_blkdev_remove(sbi);
 	}
+	if (sbi->s_ea_inode_cache) {
+		ext4_xattr_destroy_cache(sbi->s_ea_inode_cache);
+		sbi->s_ea_inode_cache = NULL;
+	}
 	if (sbi->s_mb_cache) {
 		ext4_xattr_destroy_cache(sbi->s_mb_cache);
 		sbi->s_mb_cache = NULL;
@@ -1178,7 +1182,10 @@ static int ext4_set_context(struct inode *inode, const void *ctx, size_t len,
 	if (res)
 		return res;
 retry:
-	credits = ext4_xattr_set_credits(inode, len);
+	res = ext4_xattr_set_credits(inode, len, &credits);
+	if (res)
+		return res;
+
 	handle = ext4_journal_start(inode, EXT4_HT_MISC, credits);
 	if (IS_ERR(handle))
 		return PTR_ERR(handle);
@@ -4067,6 +4074,15 @@ no_journal:
 		goto failed_mount_wq;
 	}
 
+	if (ext4_has_feature_ea_inode(sb)) {
+		sbi->s_ea_inode_cache = ext4_xattr_create_cache();
+		if (!sbi->s_ea_inode_cache) {
+			ext4_msg(sb, KERN_ERR,
+				 "Failed to create an s_ea_inode_cache");
+			goto failed_mount_wq;
+		}
+	}
+
 	if ((DUMMY_ENCRYPTION_ENABLED(sbi) || ext4_has_feature_encrypt(sb)) &&
 	    (blocksize != PAGE_SIZE)) {
 		ext4_msg(sb, KERN_ERR,
@@ -4296,6 +4312,10 @@ failed_mount4:
 	if (EXT4_SB(sb)->rsv_conversion_wq)
 		destroy_workqueue(EXT4_SB(sb)->rsv_conversion_wq);
 failed_mount_wq:
+	if (sbi->s_ea_inode_cache) {
+		ext4_xattr_destroy_cache(sbi->s_ea_inode_cache);
+		sbi->s_ea_inode_cache = NULL;
+	}
 	if (sbi->s_mb_cache) {
 		ext4_xattr_destroy_cache(sbi->s_mb_cache);
 		sbi->s_mb_cache = NULL;
