@@ -661,7 +661,8 @@ static int pci_raw_set_power_state(struct pci_dev *dev, pci_power_t state)
 
 	/* check if this device supports the desired state */
 	if ((state == PCI_D1 && !dev->d1_support)
-	   || (state == PCI_D2 && !dev->d2_support))
+	   || (state == PCI_D2 && !dev->d2_support)
+	   || (state == PCI_D3hot && !pci_pme_capable(dev, state)))
 		return -EIO;
 
 	pci_read_config_word(dev, dev->pm_cap + PCI_PM_CTRL, &pmcsr);
