@@ -243,6 +243,8 @@ drivers.
 Open/Close, File Operations and IOCTLs
 ======================================
 
+.. _drm_driver_fops:
+
 File Operations
 ---------------
 
