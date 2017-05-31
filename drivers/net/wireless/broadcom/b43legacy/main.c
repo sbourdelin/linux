@@ -2859,7 +2859,9 @@ static void b43legacy_op_bss_info_changed(struct ieee80211_hw *hw,
 	b43legacy_write32(dev, B43legacy_MMIO_GEN_IRQ_MASK, 0);
 
 	if (changed & BSS_CHANGED_BSSID) {
+		spin_unlock_irqrestore(&wl->irq_lock, flags);
 		b43legacy_synchronize_irq(dev);
+		spin_lock_irqsave(&wl->irq_lock, flags);
 
 		if (conf->bssid)
 			memcpy(wl->bssid, conf->bssid, ETH_ALEN);
