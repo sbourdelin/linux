@@ -2343,7 +2343,7 @@ static unsigned long get_segment_base(unsigned int segment)
 
 		/* IRQs are off, so this synchronizes with smp_store_release */
 		ldt = lockless_dereference(current->active_mm->context.ldt);
-		if (!ldt || idx > ldt->size)
+		if (!ldt || idx > ldt->n_entries)
 			return 0;
 
 		desc = &ldt->entries[idx];
