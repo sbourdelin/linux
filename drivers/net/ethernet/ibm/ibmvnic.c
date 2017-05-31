@@ -81,7 +81,7 @@
 static const char ibmvnic_driver_name[] = "ibmvnic";
 static const char ibmvnic_driver_string[] = "IBM System i/p Virtual NIC Driver";
 
-MODULE_AUTHOR("Santiago Leon <santi_leon@yahoo.com>");
+MODULE_AUTHOR("Thomas Falcon <tlfalcon@linux.vnet.ibm.com>");
 MODULE_DESCRIPTION("IBM System i/p Virtual NIC Driver");
 MODULE_LICENSE("GPL");
 MODULE_VERSION(IBMVNIC_DRIVER_VERSION);
