@@ -1516,7 +1516,7 @@ static inline void nvme_release_cmb(struct nvme_dev *dev)
 
 static size_t db_bar_size(struct nvme_dev *dev, unsigned nr_io_queues)
 {
-	return 4096 + ((nr_io_queues + 1) * 8 * dev->db_stride);
+	return SZ_4K + ((nr_io_queues + 1) * 8 * dev->db_stride);
 }
 
 static int nvme_setup_io_queues(struct nvme_dev *dev)
@@ -1553,7 +1553,7 @@ static int nvme_setup_io_queues(struct nvme_dev *dev)
 				return -ENOMEM;
 			size = db_bar_size(dev, nr_io_queues);
 		} while (1);
-		dev->dbs = dev->bar + 4096;
+		dev->dbs = dev->bar + SZ_4K;
 		adminq->q_db = dev->dbs;
 	}
 
@@ -1732,7 +1732,7 @@ static int nvme_pci_enable(struct nvme_dev *dev)
 
 	dev->q_depth = min_t(int, NVME_CAP_MQES(cap) + 1, NVME_Q_DEPTH);
 	dev->db_stride = 1 << NVME_CAP_STRIDE(cap);
-	dev->dbs = dev->bar + 4096;
+	dev->dbs = dev->bar + SZ_4K;
 
 	/*
 	 * Temporary fix for the Apple controller found in the MacBook8,1 and
