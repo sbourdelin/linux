@@ -9,6 +9,8 @@
 
 struct mb_cache;
 
+typedef sector_t cache_value_t;
+
 struct mb_cache_entry {
 	/* List of entries in cache - protected by cache->c_list_lock */
 	struct list_head	e_list;
@@ -19,15 +21,15 @@ struct mb_cache_entry {
 	u32			e_key;
 	u32			e_referenced:1;
 	u32			e_reusable:1;
-	/* Block number of hashed block - stable during lifetime of the entry */
-	sector_t		e_block;
+	/* User provided value - stable during lifetime of the entry */
+	cache_value_t		e_value;
 };
 
 struct mb_cache *mb_cache_create(int bucket_bits);
 void mb_cache_destroy(struct mb_cache *cache);
 
 int mb_cache_entry_create(struct mb_cache *cache, gfp_t mask, u32 key,
-			  sector_t block, bool reusable);
+			  cache_value_t value, bool reusable);
 void __mb_cache_entry_free(struct mb_cache_entry *entry);
 static inline int mb_cache_entry_put(struct mb_cache *cache,
 				     struct mb_cache_entry *entry)
@@ -38,10 +40,10 @@ static inline int mb_cache_entry_put(struct mb_cache *cache,
 	return 1;
 }
 
-void mb_cache_entry_delete_block(struct mb_cache *cache, u32 key,
-				  sector_t block);
+void mb_cache_entry_delete(struct mb_cache *cache, u32 key,
+			   cache_value_t value);
 struct mb_cache_entry *mb_cache_entry_get(struct mb_cache *cache, u32 key,
-					  sector_t block);
+					  cache_value_t value);
 struct mb_cache_entry *mb_cache_entry_find_first(struct mb_cache *cache,
 						 u32 key);
 struct mb_cache_entry *mb_cache_entry_find_next(struct mb_cache *cache,
