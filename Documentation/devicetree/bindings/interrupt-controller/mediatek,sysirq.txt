@@ -1,4 +1,4 @@
-+Mediatek 65xx/67xx/81xx sysirq
++Mediatek MT65xx/MT67xx/MT762x/MT81xx sysirq
 
 Mediatek SOCs sysirq support controllable irq inverter for each GIC SPI
 interrupt.
@@ -15,6 +15,7 @@ Required properties:
 	"mediatek,mt6582-sysirq"
 	"mediatek,mt6580-sysirq"
 	"mediatek,mt6577-sysirq"
+	"mediatek,mt7622-sysirq"
 	"mediatek,mt2701-sysirq"
 - interrupt-controller : Identifies the node as an interrupt controller
 - #interrupt-cells : Use the same format as specified by GIC in arm,gic.txt.
