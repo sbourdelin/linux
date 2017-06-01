@@ -36,6 +36,10 @@
 #include <linux/highmem.h>
 #include <crypto/hash_info.h>
 
+#ifdef CONFIG_X86
+#include <asm/intel-family.h>
+#endif
+
 enum tpm_const {
 	TPM_MINOR = 224,	/* officially assigned */
 	TPM_BUFSIZE = 4096,
@@ -435,6 +439,22 @@ struct tpm_buf {
 	unsigned int flags;
 	u8 *data;
 };
+
+#define INTEL_LEGACY_BLK_BASE_ADDR	0xFED08000
+#define LPC_CNTRL_REG_OFFSET		0x84
+#define LPC_CLKRUN_EN			(1 << 2)
+
+#ifdef CONFIG_X86
+static inline bool is_bsw(void)
+{
+	return ((boot_cpu_data.x86_model == INTEL_FAM6_ATOM_AIRMONT) ? 1 : 0);
+}
+#else
+static inline bool is_bsw(void)
+{
+	return false;
+}
+#endif
 
 static inline int tpm_buf_init(struct tpm_buf *buf, u16 tag, u32 ordinal)
 {

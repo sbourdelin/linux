@@ -89,13 +89,70 @@ static inline int is_itpm(struct acpi_device *dev)
 }
 #endif
 
+/**
+ * disable_lpc_clk_run() - clear LPC CLKRUN_EN i.e. clocks will be free running
+ */
+static void disable_lpc_clk_run(void)
+{
+	u32 clkrun_val;
+	void __iomem *ilb_base_addr = NULL;
+
+	ilb_base_addr = (void __iomem *)
+		kmap_atomic_pfn(INTEL_LEGACY_BLK_BASE_ADDR >> PAGE_SHIFT);
+
+	clkrun_val = ioread32(ilb_base_addr + LPC_CNTRL_REG_OFFSET);
+
+	/* Disable LPC CLKRUN# */
+	clkrun_val &= ~LPC_CLKRUN_EN;
+	iowrite32(clkrun_val, ilb_base_addr + LPC_CNTRL_REG_OFFSET);
+
+	kunmap_atomic(ilb_base_addr);
+	/*
+	 * Write any random value on port 0x80 which is on LPC, to make
+	 * sure LPC clock is running before sending any TPM command.
+	 */
+	outb(0x80, 0xCC);
+}
+
+/**
+ * enable_lpc_clk_run() - set LPC CLKRUN_EN i.e. clocks can be turned off
+ */
+static void enable_lpc_clk_run(void)
+{
+	u32 clkrun_val;
+	void __iomem *ilb_base_addr = NULL;
+
+	ilb_base_addr = (void __iomem *)
+		kmap_atomic_pfn(INTEL_LEGACY_BLK_BASE_ADDR >> PAGE_SHIFT);
+
+	clkrun_val = ioread32(ilb_base_addr + LPC_CNTRL_REG_OFFSET);
+
+	/* Enable LPC CLKRUN# */
+	clkrun_val |= LPC_CLKRUN_EN;
+	iowrite32(clkrun_val, ilb_base_addr + LPC_CNTRL_REG_OFFSET);
+
+	kunmap_atomic(ilb_base_addr);
+	/*
+	 * Write any random value on port 0x80 which is on LPC, to make
+	 * sure LPC clock is running before sending any TPM command.
+	 */
+	outb(0x80, 0xCC);
+}
+
 static int tpm_tcg_read_bytes(struct tpm_tis_data *data, u32 addr, u16 len,
 			      u8 *result)
 {
 	struct tpm_tis_tcg_phy *phy = to_tpm_tis_tcg_phy(data);
 
+	if (is_bsw())
+		disable_lpc_clk_run();
+
 	while (len--)
 		*result++ = ioread8(phy->iobase + addr);
+
+	if (is_bsw())
+		enable_lpc_clk_run();
+
 	return 0;
 }
 
@@ -104,8 +161,15 @@ static int tpm_tcg_write_bytes(struct tpm_tis_data *data, u32 addr, u16 len,
 {
 	struct tpm_tis_tcg_phy *phy = to_tpm_tis_tcg_phy(data);
 
+	if (is_bsw())
+		disable_lpc_clk_run();
+
 	while (len--)
 		iowrite8(*value++, phy->iobase + addr);
+
+	if (is_bsw())
+		enable_lpc_clk_run();
+
 	return 0;
 }
 
@@ -113,7 +177,14 @@ static int tpm_tcg_read16(struct tpm_tis_data *data, u32 addr, u16 *result)
 {
 	struct tpm_tis_tcg_phy *phy = to_tpm_tis_tcg_phy(data);
 
+	if (is_bsw())
+		disable_lpc_clk_run();
+
 	*result = ioread16(phy->iobase + addr);
+
+	if (is_bsw())
+		enable_lpc_clk_run();
+
 	return 0;
 }
 
@@ -121,7 +192,14 @@ static int tpm_tcg_read32(struct tpm_tis_data *data, u32 addr, u32 *result)
 {
 	struct tpm_tis_tcg_phy *phy = to_tpm_tis_tcg_phy(data);
 
+	if (is_bsw())
+		disable_lpc_clk_run();
+
 	*result = ioread32(phy->iobase + addr);
+
+	if (is_bsw())
+		enable_lpc_clk_run();
+
 	return 0;
 }
 
@@ -129,7 +207,14 @@ static int tpm_tcg_write32(struct tpm_tis_data *data, u32 addr, u32 value)
 {
 	struct tpm_tis_tcg_phy *phy = to_tpm_tis_tcg_phy(data);
 
+	if (is_bsw())
+		disable_lpc_clk_run();
+
 	iowrite32(value, phy->iobase + addr);
+
+	if (is_bsw())
+		enable_lpc_clk_run();
+
 	return 0;
 }
 
