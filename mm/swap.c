@@ -906,11 +906,11 @@ EXPORT_SYMBOL(__pagevec_lru_add);
  * not-present entries.
  *
  * pagevec_lookup_entries() returns the number of entries which were
- * found.
+ * found. It also updates @start to index the next page for the traversal.
  */
 unsigned pagevec_lookup_entries(struct pagevec *pvec,
 				struct address_space *mapping,
-				pgoff_t start, unsigned nr_pages,
+				pgoff_t *start, unsigned nr_pages,
 				pgoff_t *indices)
 {
 	pvec->nr = find_get_entries(mapping, start, nr_pages,

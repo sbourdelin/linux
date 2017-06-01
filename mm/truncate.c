@@ -289,26 +289,25 @@ void truncate_inode_pages_range(struct address_space *mapping,
 
 	pagevec_init(&pvec, 0);
 	index = start;
-	while (index < end && pagevec_lookup_entries(&pvec, mapping, index,
+	while (index < end && pagevec_lookup_entries(&pvec, mapping, &index,
 			min(end - index, (pgoff_t)PAGEVEC_SIZE),
 			indices)) {
 		for (i = 0; i < pagevec_count(&pvec); i++) {
 			struct page *page = pvec.pages[i];
 
 			/* We rely upon deletion not changing page->index */
-			index = indices[i];
-			if (index >= end)
+			if (indices[i] >= end)
 				break;
 
 			if (radix_tree_exceptional_entry(page)) {
-				truncate_exceptional_entry(mapping, index,
+				truncate_exceptional_entry(mapping, indices[i],
 							   page);
 				continue;
 			}
 
 			if (!trylock_page(page))
 				continue;
-			WARN_ON(page_to_index(page) != index);
+			WARN_ON(page_to_index(page) != indices[i]);
 			if (PageWriteback(page)) {
 				unlock_page(page);
 				continue;
@@ -319,7 +318,6 @@ void truncate_inode_pages_range(struct address_space *mapping,
 		pagevec_remove_exceptionals(&pvec);
 		pagevec_release(&pvec);
 		cond_resched();
-		index++;
 	}
 
 	if (partial_start) {
@@ -363,17 +361,19 @@ void truncate_inode_pages_range(struct address_space *mapping,
 
 	index = start;
 	for ( ; ; ) {
+		pgoff_t lookup_start = index;
+
 		cond_resched();
-		if (!pagevec_lookup_entries(&pvec, mapping, index,
+		if (!pagevec_lookup_entries(&pvec, mapping, &index,
 			min(end - index, (pgoff_t)PAGEVEC_SIZE), indices)) {
 			/* If all gone from start onwards, we're done */
-			if (index == start)
+			if (lookup_start == start)
 				break;
 			/* Otherwise restart to make sure all gone */
 			index = start;
 			continue;
 		}
-		if (index == start && indices[0] >= end) {
+		if (lookup_start == start && indices[0] >= end) {
 			/* All gone out of hole to be punched, we're done */
 			pagevec_remove_exceptionals(&pvec);
 			pagevec_release(&pvec);
@@ -383,28 +383,26 @@ void truncate_inode_pages_range(struct address_space *mapping,
 			struct page *page = pvec.pages[i];
 
 			/* We rely upon deletion not changing page->index */
-			index = indices[i];
-			if (index >= end) {
+			if (indices[i] >= end) {
 				/* Restart punch to make sure all gone */
-				index = start - 1;
+				index = start;
 				break;
 			}
 
 			if (radix_tree_exceptional_entry(page)) {
-				truncate_exceptional_entry(mapping, index,
+				truncate_exceptional_entry(mapping, indices[i],
 							   page);
 				continue;
 			}
 
 			lock_page(page);
-			WARN_ON(page_to_index(page) != index);
+			WARN_ON(page_to_index(page) != indices[i]);
 			wait_on_page_writeback(page);
 			truncate_inode_page(mapping, page);
 			unlock_page(page);
 		}
 		pagevec_remove_exceptionals(&pvec);
 		pagevec_release(&pvec);
-		index++;
 	}
 
 out:
@@ -501,44 +499,44 @@ unsigned long invalidate_mapping_pages(struct address_space *mapping,
 	int i;
 
 	pagevec_init(&pvec, 0);
-	while (index <= end && pagevec_lookup_entries(&pvec, mapping, index,
+	while (index <= end && pagevec_lookup_entries(&pvec, mapping, &index,
 			min(end - index, (pgoff_t)PAGEVEC_SIZE - 1) + 1,
 			indices)) {
 		for (i = 0; i < pagevec_count(&pvec); i++) {
 			struct page *page = pvec.pages[i];
 
 			/* We rely upon deletion not changing page->index */
-			index = indices[i];
-			if (index > end)
+			if (indices[i] > end)
 				break;
 
 			if (radix_tree_exceptional_entry(page)) {
-				invalidate_exceptional_entry(mapping, index,
-							     page);
+				invalidate_exceptional_entry(mapping,
+							     indices[i], page);
 				continue;
 			}
 
 			if (!trylock_page(page))
 				continue;
 
-			WARN_ON(page_to_index(page) != index);
+			WARN_ON(page_to_index(page) != indices[i]);
 
 			/* Middle of THP: skip */
 			if (PageTransTail(page)) {
 				unlock_page(page);
 				continue;
 			} else if (PageTransHuge(page)) {
-				index += HPAGE_PMD_NR - 1;
-				i += HPAGE_PMD_NR - 1;
+				if (index < indices[i] + HPAGE_PMD_NR)
+					index = indices[i] + HPAGE_PMD_NR;
 				/*
 				 * 'end' is in the middle of THP. Don't
 				 * invalidate the page as the part outside of
 				 * 'end' could be still useful.
 				 */
-				if (index > end) {
+				if (indices[i] + HPAGE_PMD_NR - 1 > end) {
 					unlock_page(page);
-					continue;
+					break;
 				}
+				i += HPAGE_PMD_NR - 1;
 			}
 
 			ret = invalidate_inode_page(page);
@@ -554,7 +552,6 @@ unsigned long invalidate_mapping_pages(struct address_space *mapping,
 		pagevec_remove_exceptionals(&pvec);
 		pagevec_release(&pvec);
 		cond_resched();
-		index++;
 	}
 	return count;
 }
@@ -632,26 +629,25 @@ int invalidate_inode_pages2_range(struct address_space *mapping,
 
 	pagevec_init(&pvec, 0);
 	index = start;
-	while (index <= end && pagevec_lookup_entries(&pvec, mapping, index,
+	while (index <= end && pagevec_lookup_entries(&pvec, mapping, &index,
 			min(end - index, (pgoff_t)PAGEVEC_SIZE - 1) + 1,
 			indices)) {
 		for (i = 0; i < pagevec_count(&pvec); i++) {
 			struct page *page = pvec.pages[i];
 
 			/* We rely upon deletion not changing page->index */
-			index = indices[i];
-			if (index > end)
+			if (indices[i] > end)
 				break;
 
 			if (radix_tree_exceptional_entry(page)) {
 				if (!invalidate_exceptional_entry2(mapping,
-								   index, page))
+							indices[i], page))
 					ret = -EBUSY;
 				continue;
 			}
 
 			lock_page(page);
-			WARN_ON(page_to_index(page) != index);
+			WARN_ON(page_to_index(page) != indices[i]);
 			if (page->mapping != mapping) {
 				unlock_page(page);
 				continue;
@@ -663,8 +659,8 @@ int invalidate_inode_pages2_range(struct address_space *mapping,
 					 * Zap the rest of the file in one hit.
 					 */
 					unmap_mapping_range(mapping,
-					   (loff_t)index << PAGE_SHIFT,
-					   (loff_t)(1 + end - index)
+					   (loff_t)indices[i] << PAGE_SHIFT,
+					   (loff_t)(1 + end - indices[i])
 							 << PAGE_SHIFT,
 							 0);
 					did_range_unmap = 1;
@@ -673,7 +669,7 @@ int invalidate_inode_pages2_range(struct address_space *mapping,
 					 * Just zap this page
 					 */
 					unmap_mapping_range(mapping,
-					   (loff_t)index << PAGE_SHIFT,
+					   (loff_t)indices[i] << PAGE_SHIFT,
 					   PAGE_SIZE, 0);
 				}
 			}
@@ -690,7 +686,6 @@ int invalidate_inode_pages2_range(struct address_space *mapping,
 		pagevec_remove_exceptionals(&pvec);
 		pagevec_release(&pvec);
 		cond_resched();
-		index++;
 	}
 	/*
 	 * For DAX we invalidate page tables after invalidating radix tree.  We
