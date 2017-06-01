@@ -99,12 +99,36 @@ ftrace_call:
 	bl	ftrace_stub
 	nop
 
-	/* Load ctr with the possibly modified NIP */
-	ld	r3, _NIP(r1)
-	mtctr	r3
+	/* Load the possibly modified NIP */
+	ld	r15, _NIP(r1)
+
 #ifdef CONFIG_LIVEPATCH
-	cmpd	r14,r3		/* has NIP been altered? */
+	cmpd	r14, r15		/* has NIP been altered? */
 #endif
+
+#if defined(CONFIG_LIVEPATCH) && defined(CONFIG_KPROBES_ON_FTRACE)
+	beq	1f
+
+	/* Check if there is an active kprobe on us */
+	subi	r3, r14, 4
+	bl	is_current_kprobe_addr
+	nop
+
+	/*
+	 * If r3 == 1, then this is a kprobe/jprobe.
+	 * else, this is livepatched function.
+	 *
+	 * The subsequent conditional branch for livepatch_handler
+	 * will use the result of this compare. For kprobe/jprobe,
+	 * we just need to branch to the new NIP, so nothing special
+	 * is needed.
+	 */
+	cmpdi	r3, 1
+1:
+#endif
+
+	/* Load CTR with the possibly modified NIP */
+	mtctr	r15
 
 	/* Restore gprs */
 	REST_GPR(0,r1)
