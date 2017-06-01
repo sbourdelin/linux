@@ -841,7 +841,7 @@ int dax_writeback_mapping_range(struct address_space *mapping,
 
 	pagevec_init(&pvec, 0);
 	while (!done) {
-		pvec.nr = find_get_entries_tag(mapping, start_index,
+		pvec.nr = find_get_entries_tag(mapping, &start_index,
 				PAGECACHE_TAG_TOWRITE, PAGEVEC_SIZE,
 				pvec.pages, indices);
 
@@ -859,7 +859,6 @@ int dax_writeback_mapping_range(struct address_space *mapping,
 			if (ret < 0)
 				goto out;
 		}
-		start_index = indices[pvec.nr - 1] + 1;
 	}
 out:
 	put_dax(dax_dev);
