@@ -529,8 +529,14 @@ static int sb_finish_set_opts(struct super_block *sb)
 		       sb->s_id, sb->s_type->name);
 
 	sbsec->flags |= SE_SBINITIALIZED;
+
+	/* Explicitly set or clear SBLABEL_MNT.  It's not sufficient to simply
+	   leave the flag untouched because sb_clone_mnt_opts might be handing
+	   us a superblock that needs the flag to be cleared. */
 	if (selinux_is_sblabel_mnt(sb))
 		sbsec->flags |= SBLABEL_MNT;
+	else
+		sbsec->flags &= ~SBLABEL_MNT;
 
 	/* Initialize the root inode. */
 	rc = inode_doinit_with_dentry(root_inode, root);
@@ -963,8 +969,11 @@ mismatch:
 }
 
 static int selinux_sb_clone_mnt_opts(const struct super_block *oldsb,
-					struct super_block *newsb)
+					struct super_block *newsb,
+					unsigned long kern_flags,
+					unsigned long *set_kern_flags)
 {
+	int rc = 0;
 	const struct superblock_security_struct *oldsbsec = oldsb->s_security;
 	struct superblock_security_struct *newsbsec = newsb->s_security;
 
@@ -977,14 +986,23 @@ static int selinux_sb_clone_mnt_opts(const struct super_block *oldsb,
 	 * mount options.  thus we can safely deal with this superblock later
 	 */
 	if (!ss_initialized)
-		return 0;
+		goto out;
+
+	if (kern_flags && !set_kern_flags) {
+		/* Specifying internal flags without providing a place to
+		 * place the results is not allowed */
+		rc = -EINVAL;
+		goto out;
+	}
 
 	/* how can we clone if the old one wasn't set up?? */
 	BUG_ON(!(oldsbsec->flags & SE_SBINITIALIZED));
 
 	/* if fs is reusing a sb, make sure that the contexts match */
-	if (newsbsec->flags & SE_SBINITIALIZED)
-		return selinux_cmp_sb_context(oldsb, newsb);
+	if (newsbsec->flags & SE_SBINITIALIZED) {
+		rc = selinux_cmp_sb_context(oldsb, newsb);
+		goto out;
+	}
 
 	mutex_lock(&newsbsec->lock);
 
@@ -993,6 +1011,19 @@ static int selinux_sb_clone_mnt_opts(const struct super_block *oldsb,
 	newsbsec->sid = oldsbsec->sid;
 	newsbsec->def_sid = oldsbsec->def_sid;
 	newsbsec->behavior = oldsbsec->behavior;
+
+	if (newsbsec->behavior == SECURITY_FS_USE_NATIVE
+			&& !(kern_flags & SECURITY_LSM_NATIVE_LABELS)
+			&& !set_context) {
+		rc = security_fs_use(newsb);
+		if (rc)
+			goto out_unlock;
+	}
+
+	if (kern_flags & SECURITY_LSM_NATIVE_LABELS && !set_context) {
+		newsbsec->behavior = SECURITY_FS_USE_NATIVE;
+		*set_kern_flags |= SECURITY_LSM_NATIVE_LABELS;
+	}
 
 	if (set_context) {
 		u32 sid = oldsbsec->mntpoint_sid;
@@ -1013,8 +1044,10 @@ static int selinux_sb_clone_mnt_opts(const struct super_block *oldsb,
 	}
 
 	sb_finish_set_opts(newsb);
+out_unlock:
 	mutex_unlock(&newsbsec->lock);
-	return 0;
+out:
+	return rc;
 }
 
 static int selinux_parse_opts_str(char *options,
