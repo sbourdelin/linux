@@ -326,6 +326,7 @@ struct i40iw_cqp_request *i40iw_get_cqp_request(struct i40iw_cqp *cqp, bool wait
 		cqp_request->waiting = true;
 	} else {
 		atomic_set(&cqp_request->refcount, 1);
+		cqp_request->waiting = false;
 	}
 	return cqp_request;
 }
