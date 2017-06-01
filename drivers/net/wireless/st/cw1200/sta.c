@@ -154,7 +154,9 @@ void __cw1200_cqm_bssloss_sm(struct cw1200_common *priv,
 	int tx = 0;
 
 	priv->delayed_link_loss = 0;
+	spin_unlock(&priv->bss_loss_lock);
 	cancel_work_sync(&priv->bss_params_work);
+	spin_lock(&priv->bss_loss_lock);
 
 	pr_debug("[STA] CQM BSSLOSS_SM: state: %d init %d good %d bad: %d txlock: %d uj: %d\n",
 		 priv->bss_loss_state,
