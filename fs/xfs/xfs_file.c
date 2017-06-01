@@ -1045,13 +1045,11 @@ xfs_find_get_desired_pgoff(
 	endoff = XFS_FSB_TO_B(mp, map->br_startoff + map->br_blockcount);
 	end = (endoff - 1) >> PAGE_SHIFT;
 	do {
-		int		want;
 		unsigned	nr_pages;
 		unsigned int	i;
 
-		want = min_t(pgoff_t, end - index, PAGEVEC_SIZE - 1) + 1;
-		nr_pages = pagevec_lookup(&pvec, inode->i_mapping, &index,
-					  want);
+		nr_pages = pagevec_lookup_range(&pvec, inode->i_mapping,
+						&index, end, PAGEVEC_SIZE);
 		if (nr_pages == 0)
 			break;
 
@@ -1075,9 +1073,6 @@ xfs_find_get_desired_pgoff(
 				*offset = lastoff;
 				goto out;
 			}
-			/* Searching done if the page index is out of range. */
-			if (page->index > end)
-				goto out;
 
 			lock_page(page);
 			/*
@@ -1116,13 +1111,6 @@ xfs_find_get_desired_pgoff(
 			lastoff = page_offset(page) + PAGE_SIZE;
 			unlock_page(page);
 		}
-
-		/*
-		 * The number of returned pages less than our desired, search
-		 * done.
-		 */
-		if (nr_pages < want)
-			break;
 
 		pagevec_release(&pvec);
 	} while (index <= end);
