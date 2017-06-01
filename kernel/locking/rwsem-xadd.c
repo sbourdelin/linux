@@ -341,9 +341,13 @@ done:
 }
 
 /*
- * Return true only if we can still spin on the owner field of the rwsem.
+ * Return the folowing three values depending on the lock owner state.
+ *   1	when owner has changed and no reader is detected yet.
+ *   0	when owner has change and/or owner is a reader.
+ *  -1	when optimistic spinning has to stop because either the owner stops
+ *	running or its timeslice has been used up.
  */
-static noinline bool rwsem_spin_on_owner(struct rw_semaphore *sem)
+static noinline int rwsem_spin_on_owner(struct rw_semaphore *sem)
 {
 	struct task_struct *owner = READ_ONCE(sem->owner);
 
@@ -367,7 +371,7 @@ static noinline bool rwsem_spin_on_owner(struct rw_semaphore *sem)
 		if (!owner->on_cpu || need_resched() ||
 				vcpu_is_preempted(task_cpu(owner))) {
 			rcu_read_unlock();
-			return false;
+			return -1;
 		}
 
 		cpu_relax();
@@ -378,7 +382,7 @@ out:
 	 * If there is a new owner or the owner is not set, we continue
 	 * spinning.
 	 */
-	return !rwsem_owner_is_reader(READ_ONCE(sem->owner));
+	return rwsem_owner_is_reader(READ_ONCE(sem->owner)) ? 0 : 1;
 }
 
 static bool rwsem_optimistic_spin(struct rw_semaphore *sem,
@@ -399,7 +403,7 @@ static bool rwsem_optimistic_spin(struct rw_semaphore *sem,
 	 *  2) readers own the lock as we can't determine if they are
 	 *     actively running or not.
 	 */
-	while (rwsem_spin_on_owner(sem)) {
+	while (rwsem_spin_on_owner(sem) > 0) {
 		/*
 		 * Try to acquire the lock
 		 */
