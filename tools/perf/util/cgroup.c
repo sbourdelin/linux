@@ -133,7 +133,10 @@ static int add_cgroup(struct perf_evlist *evlist, char *str)
 
 	return -1;
 found:
-	refcount_inc(&cgrp->refcnt);
+	if (refcount_read(&cgrp->refcnt) == 0)
+		refcount_set(&cgrp->refcnt, 1);
+	else
+		refcount_inc(&cgrp->refcnt);
 	counter->cgrp = cgrp;
 	return 0;
 }
