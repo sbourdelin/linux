@@ -1,0 +1,512 @@
+/*
+ * TI TPS68470 PMIC operation region driver
+ *
+ * Copyright (C) 2017 Intel Corporation. All rights reserved.
+ *
+ * This program is free software; you can redistribute it and/or
+ * modify it under the terms of the GNU General Public License version
+ * 2 as published by the Free Software Foundation.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * Based on drivers/acpi/pmic/intel_pmic* drivers
+ *
+ */
+
+#include <linux/acpi.h>
+#include <linux/mfd/tps68470.h>
+#include <linux/module.h>
+#include <linux/platform_device.h>
+#include <linux/regmap.h>
+#include "ti_pmic_tps68470.h"
+
+#define S_IO_I2C_EN	(BIT(0) | BIT(1))
+
+static const struct ti_pmic_table power_table[] = {
+	{
+		.address = 0x00,
+		.reg = TPS68470_REG_S_I2C_CTL,
+		.bitmask = S_IO_I2C_EN,
+		/* S_I2C_CTL */
+	},
+	{
+		.address = 0x04,
+		.reg = TPS68470_REG_VCMCTL,
+		.bitmask = BIT(0),
+		/* VCMCTL */
+	},
+	{
+		.address = 0x08,
+		.reg = TPS68470_REG_VAUX1CTL,
+		.bitmask = BIT(0),
+		/* VAUX1_CTL */
+	},
+	{
+		.address = 0x0C,
+		.reg = TPS68470_REG_VAUX2CTL,
+		.bitmask = BIT(0),
+		/* VAUX2CTL */
+	},
+	{
+		.address = 0x10,
+		.reg = TPS68470_REG_VACTL,
+		.bitmask = BIT(0),
+		/* VACTL */
+	},
+	{
+		.address = 0x14,
+		.reg = TPS68470_REG_VDCTL,
+		.bitmask = BIT(0),
+		/* VDCTL */
+	},
+};
+
+/* Table to set voltage regulator value */
+static const struct ti_pmic_table vr_val_table[] = {
+	{
+		.address = 0x00,
+		.reg = TPS68470_REG_VSIOVAL,
+		.bitmask = TPS68470_VSIOVAL_IOVOLT_MASK,
+		/* TPS68470_REG_VSIOVAL */
+	},
+	{
+		.address = 0x04,
+		.reg = TPS68470_REG_VIOVAL,
+		.bitmask = TPS68470_VIOVAL_IOVOLT_MASK,
+		/* TPS68470_REG_VIOVAL */
+	},
+	{
+		.address = 0x08,
+		.reg = TPS68470_REG_VCMVAL,
+		.bitmask = TPS68470_VCMVAL_VCVOLT_MASK,
+		/* TPS68470_REG_VCMVAL */
+	},
+	{
+		.address = 0x0C,
+		.reg = TPS68470_REG_VAUX1VAL,
+		.bitmask = TPS68470_VAUX1VAL_AUX1VOLT_MASK,
+		/* TPS68470_REG_VAUX1VAL */
+	},
+	{
+		.address = 0x10,
+		.reg = TPS68470_REG_VAUX2VAL,
+		.bitmask = TPS68470_VAUX2VAL_AUX2VOLT_MASK,
+		/* TPS68470_REG_VAUX2VAL */
+	},
+	{
+		.address = 0x14,
+		.reg = TPS68470_REG_VAVAL,
+		.bitmask = TPS68470_VAVAL_AVOLT_MASK,
+		/* TPS68470_REG_VAVAL */
+	},
+	{
+		.address = 0x18,
+		.reg = TPS68470_REG_VDVAL,
+		.bitmask = TPS68470_VDVAL_DVOLT_MASK,
+		/* TPS68470_REG_VDVAL */
+	},
+};
+
+/* Table to configure clock frequency */
+static const struct ti_pmic_table clk_freq_table[] = {
+	{
+		.address = 0x00,
+		.reg = TPS68470_REG_POSTDIV2,
+		.bitmask = BIT(0) | BIT(1),
+		/* TPS68470_REG_POSTDIV2 */
+	},
+	{
+		.address = 0x04,
+		.reg = TPS68470_REG_BOOSTDIV,
+		.bitmask = 0x1F,
+		/* TPS68470_REG_BOOSTDIV */
+	},
+	{
+		.address = 0x08,
+		.reg = TPS68470_REG_BUCKDIV,
+		.bitmask = 0x0F,
+		/* TPS68470_REG_BUCKDIV */
+	},
+	{
+		.address = 0x0C,
+		.reg = TPS68470_REG_PLLSWR,
+		.bitmask = 0x13,
+		/* TPS68470_REG_PLLSWR */
+	},
+	{
+		.address = 0x10,
+		.reg = TPS68470_REG_XTALDIV,
+		.bitmask = 0xFF,
+		/* TPS68470_REG_XTALDIV */
+	},
+	{
+		.address = 0x14,
+		.reg = TPS68470_REG_PLLDIV,
+		.bitmask = 0xFF,
+		/* TPS68470_REG_PLLDIV */
+	},
+	{
+		.address = 0x18,
+		.reg = TPS68470_REG_POSTDIV,
+		.bitmask = 0x83,
+		/* TPS68470_REG_POSTDIV */
+	},
+};
+
+/* Table to configure and enable clocks */
+static const struct ti_pmic_table clk_table[] = {
+	{
+		.address = 0x00,
+		.reg = TPS68470_REG_PLLCTL,
+		.bitmask = 0xF5,
+		/* TPS68470_REG_PLLCTL */
+	},
+	{
+		.address = 0x04,
+		.reg = TPS68470_REG_PLLCTL2,
+		.bitmask = BIT(0),
+		/* TPS68470_REG_PLLCTL2 */
+	},
+	{
+		.address = 0x08,
+		.reg = TPS68470_REG_CLKCFG1,
+		.bitmask = TPS68470_CLKCFG1_MODE_A_MASK |
+			TPS68470_CLKCFG1_MODE_B_MASK,
+		/* TPS68470_REG_CLKCFG1 */
+	},
+	{
+		.address = 0x0C,
+		.reg = TPS68470_REG_CLKCFG2,
+		.bitmask = TPS68470_CLKCFG1_MODE_A_MASK |
+			TPS68470_CLKCFG1_MODE_B_MASK,
+		/* TPS68470_REG_CLKCFG2 */
+	},
+};
+
+#define TI_PMIC_POWER_OPREGION_ID		0xB0
+#define TI_PMIC_VR_VAL_OPREGION_ID		0xB1
+#define TI_PMIC_CLOCK_OPREGION_ID		0xB2
+#define TI_PMIC_CLKFREQ_OPREGION_ID		0xB3
+
+struct ti_pmic_opregion {
+	struct mutex lock;
+	struct regmap *regmap;
+	struct ti_pmic_opregion_data *data;
+};
+
+static int pmic_get_reg_bit(u64 address, struct ti_pmic_table *table,
+			    int count, int *reg, int *bitmask)
+{
+	u64 i;
+
+	i = address / 4;
+	if (i >= count)
+		return -ENOENT;
+
+	*reg = table[i].reg;
+	if (bitmask)
+		*bitmask = table[i].bitmask;
+	return 0;
+}
+
+static acpi_status ti_pmic_clk_freq_handler(u32 function,
+					    acpi_physical_address address,
+					    u32 bits, u64 *value,
+					    void *handler_context,
+					    void *region_context)
+{
+	struct ti_pmic_opregion *opregion = region_context;
+	struct regmap *regmap = opregion->regmap;
+	struct ti_pmic_opregion_data *d = opregion->data;
+	int reg, ret, bitmask;
+
+	if (bits != 32)
+		return AE_BAD_PARAMETER;
+
+	ret = pmic_get_reg_bit(address, d->clk_freq_table,
+				  d->clk_freq_table_size, &reg, &bitmask);
+	if (ret < 0)
+		return AE_BAD_PARAMETER;
+
+	if (function == ACPI_WRITE && (*value > bitmask))
+		return AE_BAD_PARAMETER;
+
+	mutex_lock(&opregion->lock);
+
+	ret = (function == ACPI_READ) ?
+		d->get_clk_freq(regmap, reg, bitmask, value) :
+		d->update_clk_freq(regmap, reg, bitmask, *value);
+
+	mutex_unlock(&opregion->lock);
+
+	return ret ? AE_ERROR : AE_OK;
+}
+
+static acpi_status ti_pmic_clk_handler(u32 function,
+				       acpi_physical_address address, u32 bits,
+				       u64 *value, void *handler_context,
+				       void *region_context)
+{
+	struct ti_pmic_opregion *opregion = region_context;
+	struct regmap *regmap = opregion->regmap;
+	struct ti_pmic_opregion_data *d = opregion->data;
+	int reg, bitmask, ret;
+
+	if (bits != 32)
+		return AE_BAD_PARAMETER;
+
+	ret = pmic_get_reg_bit(address, d->clk_table,
+				  d->clk_table_size, &reg, &bitmask);
+	if (ret < 0)
+		return AE_BAD_PARAMETER;
+
+	if (function == ACPI_WRITE && (*value > bitmask))
+		return AE_BAD_PARAMETER;
+
+	mutex_lock(&opregion->lock);
+
+	ret = (function == ACPI_READ) ?
+		d->get_clk(regmap, reg, bitmask, value) :
+		d->update_clk(regmap, reg, bitmask, *value);
+
+	mutex_unlock(&opregion->lock);
+
+	return ret ? AE_ERROR : AE_OK;
+}
+
+static acpi_status ti_pmic_vr_val_handler(u32 function,
+					  acpi_physical_address address,
+					  u32 bits, u64 *value,
+					  void *handler_context,
+					  void *region_context)
+{
+	struct ti_pmic_opregion *opregion = region_context;
+	struct regmap *regmap = opregion->regmap;
+	struct ti_pmic_opregion_data *d = opregion->data;
+	int reg, bitmask, ret;
+
+	if (bits != 32)
+		return AE_BAD_PARAMETER;
+
+	ret = pmic_get_reg_bit(address, d->vr_val_table,
+				  d->vr_val_table_size, &reg, &bitmask);
+	if (ret < 0)
+		return AE_BAD_PARAMETER;
+
+	if (function == ACPI_WRITE && (*value > bitmask))
+		return AE_BAD_PARAMETER;
+
+	mutex_lock(&opregion->lock);
+
+	ret = (function == ACPI_READ) ?
+		d->get_vr_val(regmap, reg, bitmask, value) :
+		d->update_vr_val(regmap, reg, bitmask, *value);
+
+	mutex_unlock(&opregion->lock);
+
+	return ret ? AE_ERROR : AE_OK;
+}
+
+static acpi_status ti_pmic_power_handler(u32 function,
+					 acpi_physical_address address,
+					 u32 bits, u64 *value,
+					 void *handler_context,
+					 void *region_context)
+{
+	struct ti_pmic_opregion *opregion = region_context;
+	struct regmap *regmap = opregion->regmap;
+	struct ti_pmic_opregion_data *d = opregion->data;
+	int reg, bitmask, ret;
+
+	if (bits != 32)
+		return AE_BAD_PARAMETER;
+
+	/* set/clear for bit 0, bits 0 and 1 together */
+	if (function == ACPI_WRITE &&
+	    !(*value == 0 || *value == 1 || *value == 3)) {
+		ret = AE_BAD_PARAMETER;
+	}
+
+	ret = pmic_get_reg_bit(address, d->power_table,
+				  d->power_table_size, &reg, &bitmask);
+	if (ret < 0)
+		return AE_BAD_PARAMETER;
+
+	mutex_lock(&opregion->lock);
+
+	ret = (function == ACPI_READ) ?
+		d->get_power(regmap, reg, bitmask, value) :
+		d->update_power(regmap, reg, bitmask, *value);
+
+	mutex_unlock(&opregion->lock);
+
+	return ret ? AE_ERROR : AE_OK;
+}
+
+int ti_pmic_install_opregion_handler(struct device *dev, acpi_handle handle,
+				     struct regmap *regmap,
+				     struct ti_pmic_opregion_data *d)
+{
+	acpi_status status;
+	struct ti_pmic_opregion *opregion;
+
+	if (!dev || !regmap || !d) {
+		WARN(1, "dev, regmap or opregion data is NULL\n");
+		return -EINVAL;
+	}
+
+	if (!handle) {
+		WARN(1, "acpi handle is NULL\n");
+		return -ENODEV;
+	}
+
+	opregion = devm_kzalloc(dev, sizeof(*opregion), GFP_KERNEL);
+	if (!opregion)
+		return -ENOMEM;
+
+	mutex_init(&opregion->lock);
+	opregion->regmap = regmap;
+
+	status = acpi_install_address_space_handler(handle,
+						    TI_PMIC_POWER_OPREGION_ID,
+						    ti_pmic_power_handler,
+						    NULL, opregion);
+	if (ACPI_FAILURE(status))
+		goto out_error;
+
+	status = acpi_install_address_space_handler(handle,
+						    TI_PMIC_VR_VAL_OPREGION_ID,
+						    ti_pmic_vr_val_handler,
+						    NULL, opregion);
+	if (ACPI_FAILURE(status))
+		goto out_remove_power_handler;
+
+	status = acpi_install_address_space_handler(handle,
+						    TI_PMIC_CLOCK_OPREGION_ID,
+						    ti_pmic_clk_handler,
+						    NULL, opregion);
+	if (ACPI_FAILURE(status))
+		goto out_remove_vr_val_handler;
+
+	status = acpi_install_address_space_handler(handle,
+						    TI_PMIC_CLKFREQ_OPREGION_ID,
+						    ti_pmic_clk_freq_handler,
+						    NULL, opregion);
+	if (ACPI_FAILURE(status))
+		goto out_remove_clk_handler;
+
+	opregion->data = d;
+	return 0;
+
+out_remove_clk_handler:
+	acpi_remove_address_space_handler(handle, TI_PMIC_CLOCK_OPREGION_ID,
+					  ti_pmic_clk_handler);
+out_remove_vr_val_handler:
+	acpi_remove_address_space_handler(handle, TI_PMIC_VR_VAL_OPREGION_ID,
+					  ti_pmic_vr_val_handler);
+out_remove_power_handler:
+	acpi_remove_address_space_handler(handle, TI_PMIC_POWER_OPREGION_ID,
+					  ti_pmic_power_handler);
+out_error:
+	return -ENODEV;
+}
+
+static int ti_tps68470_pmic_get_power(struct regmap *regmap, int reg,
+				       int bitmask, u64 *value)
+{
+	int data;
+
+	if (regmap_read(regmap, reg, &data))
+		return -EIO;
+
+	*value = (data & bitmask) ? 1 : 0;
+	return 0;
+}
+
+static int ti_tps68470_pmic_get_vr_val(struct regmap *regmap, int reg,
+				       int bitmask, u64 *value)
+{
+	int data;
+
+	if (regmap_read(regmap, reg, &data))
+		return -EIO;
+
+	*value = data & bitmask;
+	return 0;
+}
+
+static int ti_tps68470_pmic_get_clk(struct regmap *regmap, int reg,
+				       int bitmask, u64 *value)
+{
+	int data;
+
+	if (regmap_read(regmap, reg, &data))
+		return -EIO;
+
+	*value = (data & bitmask) ? 1 : 0;
+	return 0;
+}
+
+static int ti_tps68470_pmic_get_clk_freq(struct regmap *regmap, int reg,
+				       int bitmask, u64 *value)
+{
+	int data;
+
+	if (regmap_read(regmap, reg, &data))
+		return -EIO;
+
+	*value = data & bitmask;
+	return 0;
+}
+
+static int ti_tps68470_regmap_update_bits(struct regmap *regmap, int reg,
+					int bitmask, u64 value)
+{
+	return regmap_update_bits(regmap, reg, bitmask, value);
+}
+
+static struct ti_pmic_opregion_data ti_tps68470_pmic_opregion_data = {
+	/* Regulators */
+	.get_power	= ti_tps68470_pmic_get_power,
+	.update_power	= ti_tps68470_regmap_update_bits,
+	.power_table	= (struct ti_pmic_table *) &power_table,
+	.power_table_size = ARRAY_SIZE(power_table),
+	.get_vr_val	= ti_tps68470_pmic_get_vr_val,
+	.update_vr_val	= ti_tps68470_regmap_update_bits,
+	.vr_val_table	= (struct ti_pmic_table *) &vr_val_table,
+	.vr_val_table_size = ARRAY_SIZE(vr_val_table),
+	/* Clocks */
+	.get_clk	= ti_tps68470_pmic_get_clk,
+	.update_clk	= ti_tps68470_regmap_update_bits,
+	.clk_table	= (struct ti_pmic_table *) &clk_table,
+	.clk_table_size = ARRAY_SIZE(clk_table),
+	.get_clk_freq	= ti_tps68470_pmic_get_clk_freq,
+	.update_clk_freq = ti_tps68470_regmap_update_bits,
+	.clk_freq_table	= (struct ti_pmic_table *) &clk_freq_table,
+	.clk_freq_table_size = ARRAY_SIZE(clk_freq_table),
+};
+
+static int ti_tps68470_pmic_opregion_probe(struct platform_device *pdev)
+{
+	struct tps68470 *pmic = dev_get_drvdata(pdev->dev.parent);
+
+	return ti_pmic_install_opregion_handler(&pdev->dev,
+			ACPI_HANDLE(pdev->dev.parent), pmic->regmap,
+			&ti_tps68470_pmic_opregion_data);
+}
+
+static struct platform_driver ti_tps68470_pmic_opregion_driver = {
+	.probe = ti_tps68470_pmic_opregion_probe,
+	.driver = {
+		.name = "tps68470_pmic_opregion",
+	},
+};
+
+builtin_platform_driver(ti_tps68470_pmic_opregion_driver)
+
+MODULE_AUTHOR("Rajmohan Mani <rajmohan.mani@intel.com>");
+MODULE_DESCRIPTION("TI TPS68470 ACPI operation region driver");
+MODULE_LICENSE("GPL v2");

@@ -106,6 +106,8 @@ obj-$(CONFIG_CHT_WC_PMIC_OPREGION) += pmic/intel_pmic_chtwc.o
 
 obj-$(CONFIG_ACPI_CONFIGFS)	+= acpi_configfs.o
 
+obj-$(CONFIG_TI_PMIC_TPS68470_OPREGION)	+= pmic/ti_pmic_tps68470.o
+
 video-objs			+= acpi_video.o video_detect.o
 obj-y				+= dptf/
 
