@@ -15,8 +15,14 @@ value of a #clock-cells property in the clock provider node.
 
 Required properties:
 #clock-cells:	   Number of cells in a clock specifier; Typically 0 for nodes
-		   with a single clock output and 1 for nodes with multiple
-		   clock outputs.
+		   with a single clock output and it must be able to be
+		   referenced without index, and 1 for nodes with single or
+		   multiple clock outputs which have to be referenced by index.
+
+		   Please note that if a node with a single clock output
+		   but it has "clock-indices" property (see bellow), it has
+		   to be referenced by index, its "#clock-cells" cannot be
+		   defined 0.
 
 Optional properties:
 clock-output-names: Recommended to be a list of strings of clock output signal
