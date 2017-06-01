@@ -227,8 +227,9 @@ static int needs_bounce(struct device *dev, dma_addr_t dma_addr, size_t size)
 
 		limit = (mask + 1) & ~mask;
 		if (limit && size > limit) {
-			dev_err(dev, "DMA mapping too big (requested %#x "
-				"mask %#Lx)\n", size, *dev->dma_mask);
+			dev_err(dev,
+				"DMA mapping too big (requested %#x mask %#Lx)\n",
+				size, *dev->dma_mask);
 			return -E2BIG;
 		}
 
@@ -546,8 +547,7 @@ void dmabounce_unregister_dev(struct device *dev)
 
 	if (!device_info) {
 		dev_warn(dev,
-			 "Never registered with dmabounce but attempting"
-			 "to unregister!\n");
+			 "Never registered with dmabounce but attempting to unregister!\n");
 		return;
 	}
 
