@@ -768,15 +768,11 @@ static void shmem_undo_range(struct inode *inode, loff_t lstart, loff_t lend,
 	pagevec_init(&pvec, 0);
 	index = start;
 	while (index < end) {
-		if (!pagevec_lookup_entries(&pvec, mapping, &index,
-				min(end - index, (pgoff_t)PAGEVEC_SIZE),
-				indices))
+		if (!pagevec_lookup_entries_range(&pvec, mapping, &index,
+				end - 1, PAGEVEC_SIZE, indices))
 			break;
 		for (i = 0; i < pagevec_count(&pvec); i++) {
 			struct page *page = pvec.pages[i];
-
-			if (indices[i] >= end)
-				break;
 
 			if (radix_tree_exceptional_entry(page)) {
 				if (unfalloc)
@@ -860,9 +856,8 @@ static void shmem_undo_range(struct inode *inode, loff_t lstart, loff_t lend,
 
 		cond_resched();
 
-		if (!pagevec_lookup_entries(&pvec, mapping, &index,
-				min(end - index, (pgoff_t)PAGEVEC_SIZE),
-				indices)) {
+		if (!pagevec_lookup_entries_range(&pvec, mapping, &index,
+				end - 1, PAGEVEC_SIZE, indices)) {
 			/* If all gone or hole-punch or unfalloc, we're done */
 			if (lookup_start == start || end != -1)
 				break;
@@ -872,9 +867,6 @@ static void shmem_undo_range(struct inode *inode, loff_t lstart, loff_t lend,
 		}
 		for (i = 0; i < pagevec_count(&pvec); i++) {
 			struct page *page = pvec.pages[i];
-
-			if (indices[i] >= end)
-				break;
 
 			if (radix_tree_exceptional_entry(page)) {
 				if (unfalloc)
@@ -2494,9 +2486,9 @@ static pgoff_t shmem_seek_hole_data(struct address_space *mapping,
 
 	pagevec_init(&pvec, 0);
 	pvec.nr = 1;		/* start small: we may be there already */
-	while (!done) {
+	while (!done && index < end) {
 		last = index;
-		pvec.nr = find_get_entries(mapping, &index,
+		pvec.nr = find_get_entries_range(mapping, &index, end - 1,
 					pvec.nr, pvec.pages, indices);
 		if (!pvec.nr) {
 			if (whence == SEEK_DATA)
@@ -2516,8 +2508,7 @@ static pgoff_t shmem_seek_hole_data(struct address_space *mapping,
 				if (!PageUptodate(page))
 					page = NULL;
 			}
-			if (last >= end ||
-			    (page && whence == SEEK_DATA) ||
+			if ((page && whence == SEEK_DATA) ||
 			    (!page && whence == SEEK_HOLE)) {
 				done = true;
 				break;
