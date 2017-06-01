@@ -721,11 +721,11 @@ static void init_send_wr(struct rxe_qp *qp, struct rxe_send_wr *wr,
 
 static int init_send_wqe(struct rxe_qp *qp, struct ib_send_wr *ibwr,
 			 unsigned int mask, unsigned int length,
-			 struct rxe_send_wqe *wqe)
+			 struct rxe_send_wqe *wqe, unsigned long *flags)
 {
 	int num_sge = ibwr->num_sge;
 	struct ib_sge *sge;
-	int i;
+	int i, err;
 	u8 *p;
 
 	init_send_wr(qp, &wqe->wr, ibwr);
@@ -740,8 +740,11 @@ static int init_send_wqe(struct rxe_qp *qp, struct ib_send_wr *ibwr,
 
 		sge = ibwr->sg_list;
 		for (i = 0; i < num_sge; i++, sge++) {
-			if (qp->is_user && copy_from_user(p, (__user void *)
-					    (uintptr_t)sge->addr, sge->length))
+			spin_unlock_irqrestore(&qp->sq.sq_lock, *flags);
+			err = copy_from_user(p, (__user void *)
+					(uintptr_t)sge->addr, sge->length);
+			spin_lock_irqsave(&qp->sq.sq_lock, *flags);
+			if (qp->is_user && err)
 				return -EFAULT;
 
 			else if (!qp->is_user)
@@ -794,7 +797,7 @@ static int post_one_send(struct rxe_qp *qp, struct ib_send_wr *ibwr,
 
 	send_wqe = producer_addr(sq->queue);
 
-	err = init_send_wqe(qp, ibwr, mask, length, send_wqe);
+	err = init_send_wqe(qp, ibwr, mask, length, send_wqe, &flags);
 	if (unlikely(err))
 		goto err1;
 
