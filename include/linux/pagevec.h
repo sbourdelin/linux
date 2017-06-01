@@ -22,10 +22,18 @@ struct pagevec {
 
 void __pagevec_release(struct pagevec *pvec);
 void __pagevec_lru_add(struct pagevec *pvec);
-unsigned pagevec_lookup_entries(struct pagevec *pvec,
+unsigned pagevec_lookup_entries_range(struct pagevec *pvec,
+				struct address_space *mapping,
+				pgoff_t *start, pgoff_t end,
+				unsigned nr_entries, pgoff_t *indices);
+static inline unsigned pagevec_lookup_entries(struct pagevec *pvec,
 				struct address_space *mapping,
 				pgoff_t *start, unsigned nr_entries,
-				pgoff_t *indices);
+				pgoff_t *indices)
+{
+	return pagevec_lookup_entries_range(pvec, mapping, start, (pgoff_t)-1,
+					    nr_entries, indices);
+}
 void pagevec_remove_exceptionals(struct pagevec *pvec);
 unsigned pagevec_lookup_range(struct pagevec *pvec,
 			      struct address_space *mapping,

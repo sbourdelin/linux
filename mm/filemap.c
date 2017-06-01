@@ -1354,9 +1354,10 @@ no_page:
 EXPORT_SYMBOL(pagecache_get_page);
 
 /**
- * find_get_entries - gang pagecache lookup
+ * find_get_entries_range - gang pagecache lookup
  * @mapping:	The address_space to search
  * @start:	The starting page cache index
+ * @end:	The final page cache index (inclusive)
  * @nr_entries:	The maximum number of entries
  * @entries:	Where the resulting entries are placed
  * @indices:	The cache indices corresponding to the entries in @entries
@@ -1376,9 +1377,9 @@ EXPORT_SYMBOL(pagecache_get_page);
  * find_get_entries() returns the number of pages and shadow entries which were
  * found. It also updates @start to index the next page for the traversal.
  */
-unsigned find_get_entries(struct address_space *mapping,
-			  pgoff_t *start, unsigned int nr_entries,
-			  struct page **entries, pgoff_t *indices)
+unsigned find_get_entries_range(struct address_space *mapping,
+			pgoff_t *start, pgoff_t end, unsigned int nr_entries,
+			struct page **entries, pgoff_t *indices)
 {
 	void **slot;
 	unsigned int ret = 0;
@@ -1390,6 +1391,9 @@ unsigned find_get_entries(struct address_space *mapping,
 	rcu_read_lock();
 	radix_tree_for_each_slot(slot, &mapping->page_tree, &iter, *start) {
 		struct page *head, *page;
+
+		if (iter.index > end)
+			break;
 repeat:
 		page = radix_tree_deref_slot(slot);
 		if (unlikely(!page))
@@ -1425,13 +1429,25 @@ repeat:
 export:
 		indices[ret] = iter.index;
 		entries[ret] = page;
-		if (++ret == nr_entries)
-			break;
+		if (++ret == nr_entries) {
+			*start = indices[ret - 1] + 1;
+			goto out;
+		}
 	}
+
+	/*
+	 * We come here when there is no page beyond @end. We take care to not
+	 * overflow the index @start as it confuses some of the callers. This
+	 * breaks the iteration when there is page at index -1 but that is
+	 * already broken anyway.
+	 */
+	if (end == (pgoff_t)-1)
+		*start = (pgoff_t)-1;
+	else
+		*start = end + 1;
+out:
 	rcu_read_unlock();
 
-	if (ret)
-		*start = indices[ret - 1] + 1;
 	return ret;
 }
 

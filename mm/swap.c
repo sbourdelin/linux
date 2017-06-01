@@ -889,10 +889,11 @@ void __pagevec_lru_add(struct pagevec *pvec)
 EXPORT_SYMBOL(__pagevec_lru_add);
 
 /**
- * pagevec_lookup_entries - gang pagecache lookup
+ * pagevec_lookup_entries_range - gang pagecache lookup
  * @pvec:	Where the resulting entries are placed
  * @mapping:	The address_space to search
  * @start:	The starting entry index
+ * @end:	The final entry index (inclusive)
  * @nr_entries:	The maximum number of entries
  * @indices:	The cache indices corresponding to the entries in @pvec
  *
@@ -908,13 +909,13 @@ EXPORT_SYMBOL(__pagevec_lru_add);
  * pagevec_lookup_entries() returns the number of entries which were
  * found. It also updates @start to index the next page for the traversal.
  */
-unsigned pagevec_lookup_entries(struct pagevec *pvec,
+unsigned pagevec_lookup_entries_range(struct pagevec *pvec,
 				struct address_space *mapping,
-				pgoff_t *start, unsigned nr_pages,
+				pgoff_t *start, pgoff_t end, unsigned nr_pages,
 				pgoff_t *indices)
 {
-	pvec->nr = find_get_entries(mapping, start, nr_pages,
-				    pvec->pages, indices);
+	pvec->nr = find_get_entries_range(mapping, start, end, nr_pages,
+					  pvec->pages, indices);
 	return pagevec_count(pvec);
 }
 
