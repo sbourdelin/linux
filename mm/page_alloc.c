@@ -3152,10 +3152,13 @@ void warn_alloc(gfp_t gfp_mask, nodemask_t *nodemask, const char *fmt, ...)
 	va_list args;
 	static DEFINE_RATELIMIT_STATE(nopage_rs, DEFAULT_RATELIMIT_INTERVAL,
 				      DEFAULT_RATELIMIT_BURST);
+	static DEFINE_MUTEX(warn_alloc_lock);
 
 	if ((gfp_mask & __GFP_NOWARN) || !__ratelimit(&nopage_rs))
 		return;
 
+	if (gfp_mask & __GFP_DIRECT_RECLAIM)
+		mutex_lock(&warn_alloc_lock);
 	pr_warn("%s: ", current->comm);
 
 	va_start(args, fmt);
@@ -3174,6 +3177,8 @@ void warn_alloc(gfp_t gfp_mask, nodemask_t *nodemask, const char *fmt, ...)
 
 	dump_stack();
 	warn_alloc_show_mem(gfp_mask, nodemask);
+	if (gfp_mask & __GFP_DIRECT_RECLAIM)
+		mutex_unlock(&warn_alloc_lock);
 }
 
 static inline struct page *
