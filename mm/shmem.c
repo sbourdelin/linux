@@ -769,7 +769,7 @@ static void shmem_undo_range(struct inode *inode, loff_t lstart, loff_t lend,
 	index = start;
 	while (index < end) {
 		if (!pagevec_lookup_entries_range(&pvec, mapping, &index,
-				end - 1, PAGEVEC_SIZE, indices))
+				end - 1, indices))
 			break;
 		for (i = 0; i < pagevec_count(&pvec); i++) {
 			struct page *page = pvec.pages[i];
@@ -857,7 +857,7 @@ static void shmem_undo_range(struct inode *inode, loff_t lstart, loff_t lend,
 		cond_resched();
 
 		if (!pagevec_lookup_entries_range(&pvec, mapping, &index,
-				end - 1, PAGEVEC_SIZE, indices)) {
+				end - 1, indices)) {
 			/* If all gone or hole-punch or unfalloc, we're done */
 			if (lookup_start == start || end != -1)
 				break;

@@ -894,7 +894,6 @@ EXPORT_SYMBOL(__pagevec_lru_add);
  * @mapping:	The address_space to search
  * @start:	The starting entry index
  * @end:	The final entry index (inclusive)
- * @nr_entries:	The maximum number of entries
  * @indices:	The cache indices corresponding to the entries in @pvec
  *
  * pagevec_lookup_entries() will search for and return a group of up
@@ -911,10 +910,9 @@ EXPORT_SYMBOL(__pagevec_lru_add);
  */
 unsigned pagevec_lookup_entries_range(struct pagevec *pvec,
 				struct address_space *mapping,
-				pgoff_t *start, pgoff_t end, unsigned nr_pages,
-				pgoff_t *indices)
+				pgoff_t *start, pgoff_t end, pgoff_t *indices)
 {
-	pvec->nr = find_get_entries_range(mapping, start, end, nr_pages,
+	pvec->nr = find_get_entries_range(mapping, start, end, PAGEVEC_SIZE,
 					  pvec->pages, indices);
 	return pagevec_count(pvec);
 }

@@ -290,7 +290,7 @@ void truncate_inode_pages_range(struct address_space *mapping,
 	pagevec_init(&pvec, 0);
 	index = start;
 	while (index < end && pagevec_lookup_entries_range(&pvec, mapping,
-			&index, end - 1, PAGEVEC_SIZE, indices)) {
+			&index, end - 1, indices)) {
 		for (i = 0; i < pagevec_count(&pvec); i++) {
 			struct page *page = pvec.pages[i];
 
@@ -354,7 +354,7 @@ void truncate_inode_pages_range(struct address_space *mapping,
 
 		cond_resched();
 		if (!pagevec_lookup_entries_range(&pvec, mapping, &index,
-					end - 1, PAGEVEC_SIZE, indices)) {
+					end - 1, indices)) {
 			/* If all gone from start onwards, we're done */
 			if (lookup_start == start)
 				break;
@@ -476,7 +476,7 @@ unsigned long invalidate_mapping_pages(struct address_space *mapping,
 
 	pagevec_init(&pvec, 0);
 	while (index <= end && pagevec_lookup_entries_range(&pvec, mapping,
-			&index, end, PAGEVEC_SIZE, indices)) {
+			&index, end, indices)) {
 		for (i = 0; i < pagevec_count(&pvec); i++) {
 			struct page *page = pvec.pages[i];
 
@@ -601,7 +601,7 @@ int invalidate_inode_pages2_range(struct address_space *mapping,
 	pagevec_init(&pvec, 0);
 	index = start;
 	while (index <= end && pagevec_lookup_entries_range(&pvec, mapping,
-			&index, end, PAGEVEC_SIZE, indices)) {
+			&index, end, indices)) {
 		for (i = 0; i < pagevec_count(&pvec); i++) {
 			struct page *page = pvec.pages[i];
 
