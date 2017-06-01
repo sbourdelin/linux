@@ -115,21 +115,21 @@ enum machine_type {
 /* Address of data segment in memory after it is loaded.
    Note that it is up to you to define SEGMENT_SIZE
    on machines not listed here.  */
-#if defined(vax) || defined(hp300) || defined(pyr)
+#if defined(__vax__) || defined(__hp300__) || defined(__pyr__)
 #define SEGMENT_SIZE page_size
 #endif
-#ifdef	sony
+#ifdef	__sony__
 #define	SEGMENT_SIZE	0x2000
 #endif	/* Sony.  */
-#ifdef is68k
+#ifdef __is68k__
 #define SEGMENT_SIZE 0x20000
 #endif
-#if defined(m68k) && defined(PORTAR)
+#if defined(__m68k__) && defined(__PORTAR__)
 #define PAGE_SIZE 0x400
 #define SEGMENT_SIZE PAGE_SIZE
 #endif
 
-#ifdef linux
+#ifdef __linux__
 #ifndef __KERNEL__
 #include <unistd.h>
 #endif
@@ -260,7 +260,7 @@ struct relocation_info
   unsigned int r_extern:1;
   /* Four bits that aren't used, but when writing an object file
      it is desirable to clear them.  */
-#ifdef NS32K
+#ifdef __NS32K__
   unsigned r_bsr:1;
   unsigned r_disp:1;
   unsigned r_pad:2;
