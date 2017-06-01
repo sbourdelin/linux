@@ -725,7 +725,7 @@ static int init_send_wqe(struct rxe_qp *qp, struct ib_send_wr *ibwr,
 {
 	int num_sge = ibwr->num_sge;
 	struct ib_sge *sge;
-	int i;
+	int i, err;
 	u8 *p;
 
 	init_send_wr(qp, &wqe->wr, ibwr);
@@ -740,8 +740,11 @@ static int init_send_wqe(struct rxe_qp *qp, struct ib_send_wr *ibwr,
 
 		sge = ibwr->sg_list;
 		for (i = 0; i < num_sge; i++, sge++) {
-			if (qp->is_user && copy_from_user(p, (__user void *)
-					    (uintptr_t)sge->addr, sge->length))
+			spin_unlock_irq(&qp->sq.sq_lock);
+			err = copy_from_user(p, (__user void *)
+					    (uintptr_t)sge->addr, sge->length);
+			spin_lock_irq(&qp->sq.sq_lock);
+			if (qp->is_user && err)
 				return -EFAULT;
 
 			else if (!qp->is_user)
