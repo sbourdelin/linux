@@ -486,10 +486,8 @@ static int imx_mmdc_perf_init(struct platform_device *pdev, void __iomem *mmdc_b
 		of_match_device(imx_mmdc_dt_ids, &pdev->dev);
 
 	pmu_mmdc = kzalloc(sizeof(*pmu_mmdc), GFP_KERNEL);
-	if (!pmu_mmdc) {
-		pr_err("failed to allocate PMU device!\n");
+	if (!pmu_mmdc)
 		return -ENOMEM;
-	}
 
 	/* The first instance registers the hotplug state */
 	if (!cpuhp_mmdc_state) {
