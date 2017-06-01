@@ -289,15 +289,10 @@ void truncate_inode_pages_range(struct address_space *mapping,
 
 	pagevec_init(&pvec, 0);
 	index = start;
-	while (index < end && pagevec_lookup_entries(&pvec, mapping, &index,
-			min(end - index, (pgoff_t)PAGEVEC_SIZE),
-			indices)) {
+	while (index < end && pagevec_lookup_entries_range(&pvec, mapping,
+			&index, end - 1, PAGEVEC_SIZE, indices)) {
 		for (i = 0; i < pagevec_count(&pvec); i++) {
 			struct page *page = pvec.pages[i];
-
-			/* We rely upon deletion not changing page->index */
-			if (indices[i] >= end)
-				break;
 
 			if (radix_tree_exceptional_entry(page)) {
 				truncate_exceptional_entry(mapping, indices[i],
@@ -352,20 +347,14 @@ void truncate_inode_pages_range(struct address_space *mapping,
 			put_page(page);
 		}
 	}
-	/*
-	 * If the truncation happened within a single page no pages
-	 * will be released, just zeroed, so we can bail out now.
-	 */
-	if (start >= end)
-		goto out;
 
 	index = start;
-	for ( ; ; ) {
+	while (index < end) {
 		pgoff_t lookup_start = index;
 
 		cond_resched();
-		if (!pagevec_lookup_entries(&pvec, mapping, &index,
-			min(end - index, (pgoff_t)PAGEVEC_SIZE), indices)) {
+		if (!pagevec_lookup_entries_range(&pvec, mapping, &index,
+					end - 1, PAGEVEC_SIZE, indices)) {
 			/* If all gone from start onwards, we're done */
 			if (lookup_start == start)
 				break;
@@ -373,21 +362,8 @@ void truncate_inode_pages_range(struct address_space *mapping,
 			index = start;
 			continue;
 		}
-		if (lookup_start == start && indices[0] >= end) {
-			/* All gone out of hole to be punched, we're done */
-			pagevec_remove_exceptionals(&pvec);
-			pagevec_release(&pvec);
-			break;
-		}
 		for (i = 0; i < pagevec_count(&pvec); i++) {
 			struct page *page = pvec.pages[i];
-
-			/* We rely upon deletion not changing page->index */
-			if (indices[i] >= end) {
-				/* Restart punch to make sure all gone */
-				index = start;
-				break;
-			}
 
 			if (radix_tree_exceptional_entry(page)) {
 				truncate_exceptional_entry(mapping, indices[i],
@@ -499,15 +475,10 @@ unsigned long invalidate_mapping_pages(struct address_space *mapping,
 	int i;
 
 	pagevec_init(&pvec, 0);
-	while (index <= end && pagevec_lookup_entries(&pvec, mapping, &index,
-			min(end - index, (pgoff_t)PAGEVEC_SIZE - 1) + 1,
-			indices)) {
+	while (index <= end && pagevec_lookup_entries_range(&pvec, mapping,
+			&index, end, PAGEVEC_SIZE, indices)) {
 		for (i = 0; i < pagevec_count(&pvec); i++) {
 			struct page *page = pvec.pages[i];
-
-			/* We rely upon deletion not changing page->index */
-			if (indices[i] > end)
-				break;
 
 			if (radix_tree_exceptional_entry(page)) {
 				invalidate_exceptional_entry(mapping,
@@ -629,15 +600,10 @@ int invalidate_inode_pages2_range(struct address_space *mapping,
 
 	pagevec_init(&pvec, 0);
 	index = start;
-	while (index <= end && pagevec_lookup_entries(&pvec, mapping, &index,
-			min(end - index, (pgoff_t)PAGEVEC_SIZE - 1) + 1,
-			indices)) {
+	while (index <= end && pagevec_lookup_entries_range(&pvec, mapping,
+			&index, end, PAGEVEC_SIZE, indices)) {
 		for (i = 0; i < pagevec_count(&pvec); i++) {
 			struct page *page = pvec.pages[i];
-
-			/* We rely upon deletion not changing page->index */
-			if (indices[i] > end)
-				break;
 
 			if (radix_tree_exceptional_entry(page)) {
 				if (!invalidate_exceptional_entry2(mapping,
