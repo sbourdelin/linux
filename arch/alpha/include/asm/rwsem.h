@@ -179,7 +179,8 @@ static inline void __downgrade_write(struct rw_semaphore *sem)
 	"2:	br	1b\n"
 	".previous"
 	:"=&r" (oldcount), "=m" (sem->count), "=&r" (temp)
-	:"Ir" (-RWSEM_WAITING_BIAS), "m" (sem->count) : "memory");
+	:"Ir" (-RWSEM_ACTIVE_WRITE_BIAS + RWSEM_ACTIVE_READ_BIAS),
+	 "m" (sem->count) : "memory");
 #endif
 	if (unlikely(oldcount < 0))
 		rwsem_downgrade_wake(sem);
