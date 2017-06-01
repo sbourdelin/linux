@@ -336,25 +336,32 @@ struct se_node_acl *core_tpg_add_initiator_node_acl(
 	return acl;
 }
 
-static void target_shutdown_sessions(struct se_node_acl *acl)
+static bool target_shutdown_sessions(struct se_node_acl *acl)
 {
 	struct se_session *sess;
 	unsigned long flags;
+	LIST_HEAD(tmp_list);
 
-restart:
 	spin_lock_irqsave(&acl->nacl_sess_lock, flags);
 	list_for_each_entry(sess, &acl->acl_sess_list, sess_acl_list) {
 		if (sess->sess_tearing_down)
 			continue;
 
+		list_move_tail(&sess->sess_acl_list, &tmp_list);
+	}
+	spin_unlock_irqrestore(&acl->nacl_sess_lock, flags);
+
+	if (list_empty(&tmp_list))
+		return true;
+
+	list_for_each_entry(sess, &tmp_list, sess_acl_list) {
 		list_del_init(&sess->sess_acl_list);
-		spin_unlock_irqrestore(&acl->nacl_sess_lock, flags);
 
 		if (acl->se_tpg->se_tpg_tfo->close_session)
 			acl->se_tpg->se_tpg_tfo->close_session(sess);
-		goto restart;
 	}
-	spin_unlock_irqrestore(&acl->nacl_sess_lock, flags);
+
+	return false;
 }
 
 void core_tpg_del_initiator_node_acl(struct se_node_acl *acl)
@@ -367,7 +374,8 @@ void core_tpg_del_initiator_node_acl(struct se_node_acl *acl)
 	list_del(&acl->acl_list);
 	mutex_unlock(&tpg->acl_node_mutex);
 
-	target_shutdown_sessions(acl);
+	while (!target_shutdown_sessions(acl))
+		;
 
 	target_put_nacl(acl);
 	/*
