@@ -123,7 +123,7 @@ alloc_safe_buffer(struct dmabounce_device_info *device_info, void *ptr,
 		pool = NULL;
 	}
 
-	buf = kmalloc(sizeof(struct safe_buffer), GFP_ATOMIC);
+	buf = kmalloc(sizeof(*buf), GFP_ATOMIC);
 	if (buf == NULL) {
 		dev_warn(dev, "%s: kmalloc failed\n", __func__);
 		return NULL;
@@ -487,7 +487,7 @@ int dmabounce_register_dev(struct device *dev, unsigned long small_buffer_size,
 	struct dmabounce_device_info *device_info;
 	int ret;
 
-	device_info = kmalloc(sizeof(struct dmabounce_device_info), GFP_ATOMIC);
+	device_info = kmalloc(sizeof(*device_info), GFP_ATOMIC);
 	if (!device_info) {
 		dev_err(dev,
 			"Could not allocated dmabounce_device_info\n");
