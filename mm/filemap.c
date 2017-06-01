@@ -391,7 +391,7 @@ static int __filemap_fdatawait_range(struct address_space *mapping,
 	pagevec_init(&pvec, 0);
 	while ((index <= end) &&
 			(nr_pages = pagevec_lookup_range_tag(&pvec, mapping,
-			&index, end, PAGECACHE_TAG_WRITEBACK, PAGEVEC_SIZE))) {
+			&index, end, PAGECACHE_TAG_WRITEBACK))) {
 		unsigned i;
 
 		for (i = 0; i < nr_pages; i++) {
