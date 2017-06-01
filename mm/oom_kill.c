@@ -343,10 +343,11 @@ abort:
  * Simple selection loop. We choose the process with the highest number of
  * 'points'. In case scan was aborted, oc->chosen is set to -1.
  */
-static void select_bad_process(struct oom_control *oc)
+static void select_bad_process(struct oom_control *oc,
+			       struct mem_cgroup *memcg)
 {
-	if (is_memcg_oom(oc))
-		mem_cgroup_scan_tasks(oc->memcg, oom_evaluate_task, oc);
+	if (memcg)
+		mem_cgroup_scan_tasks(memcg, oom_evaluate_task, oc);
 	else {
 		struct task_struct *p;
 
@@ -1032,7 +1033,7 @@ bool out_of_memory(struct oom_control *oc)
 		return true;
 	}
 
-	select_bad_process(oc);
+	select_bad_process(oc, oc->memcg);
 	/* Found nothing?!?! Either we hang forever, or we panic. */
 	if (!oc->chosen && !is_sysrq_oom(oc) && !is_memcg_oom(oc)) {
 		dump_header(oc, NULL);
