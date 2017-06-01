@@ -1039,6 +1039,12 @@ bool out_of_memory(struct oom_control *oc)
 		return true;
 	}
 
+	if (mem_cgroup_select_oom_victim(oc) &&
+	    mem_cgroup_kill_oom_victim(oc)) {
+		schedule_timeout_killable(1);
+		return true;
+	}
+
 	select_bad_process(oc, oc->memcg);
 	/* Found nothing?!?! Either we hang forever, or we panic. */
 	if (!oc->chosen && !is_sysrq_oom(oc) && !is_memcg_oom(oc)) {

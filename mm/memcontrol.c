@@ -2625,6 +2625,184 @@ static inline bool memcg_has_children(struct mem_cgroup *memcg)
 	return ret;
 }
 
+static long mem_cgroup_oom_badness(struct mem_cgroup *memcg,
+				   const nodemask_t *nodemask)
+{
+	long points = 0;
+	int nid;
+	struct mem_cgroup *iter;
+
+	for_each_mem_cgroup_tree(iter, memcg) {
+		for_each_node_state(nid, N_MEMORY) {
+			if (nodemask && !node_isset(nid, *nodemask))
+				continue;
+
+			points += mem_cgroup_node_nr_lru_pages(iter, nid,
+					LRU_ALL_ANON | BIT(LRU_UNEVICTABLE));
+		}
+
+		points += mem_cgroup_get_nr_swap_pages(iter);
+		points += memcg_page_state(iter, MEMCG_KERNEL_STACK_KB) /
+			(PAGE_SIZE / 1024);
+		points += memcg_page_state(iter, MEMCG_SLAB_UNRECLAIMABLE);
+		points += memcg_page_state(iter, MEMCG_SOCK);
+	}
+
+	return points;
+}
+
+bool mem_cgroup_select_oom_victim(struct oom_control *oc)
+{
+	struct cgroup_subsys_state *css = NULL;
+	struct mem_cgroup *iter = NULL;
+	struct mem_cgroup *chosen_memcg = NULL;
+	struct mem_cgroup *parent = root_mem_cgroup;
+	unsigned long totalpages = oc->totalpages;
+	long chosen_memcg_points = 0;
+	long points = 0;
+
+	oc->chosen = NULL;
+	oc->chosen_memcg = NULL;
+
+	if (mem_cgroup_disabled())
+		return false;
+
+	if (!cgroup_subsys_on_dfl(memory_cgrp_subsys))
+		return false;
+
+	pr_info("Choosing a victim memcg because of the %s",
+		oc->memcg ?
+		"memory limit reached of cgroup " :
+		"system-wide OOM\n");
+	if (oc->memcg) {
+		pr_cont_cgroup_path(oc->memcg->css.cgroup);
+		pr_cont("\n");
+
+		chosen_memcg = oc->memcg;
+		parent = oc->memcg;
+	}
+
+	rcu_read_lock();
+
+	for (;;) {
+		css = css_next_child(css, &parent->css);
+		if (css) {
+			iter = mem_cgroup_from_css(css);
+
+			points = mem_cgroup_oom_badness(iter, oc->nodemask);
+			points += iter->oom_score_adj * (totalpages / 1000);
+
+			pr_info("Cgroup ");
+			pr_cont_cgroup_path(iter->css.cgroup);
+			pr_cont(": %ld\n", points);
+
+			if (points > chosen_memcg_points) {
+				chosen_memcg = iter;
+				chosen_memcg_points = points;
+				oc->chosen_points = points;
+			}
+
+			continue;
+		}
+
+		if (chosen_memcg && !chosen_memcg->oom_kill_all_tasks) {
+			/* Go deeper in the cgroup hierarchy */
+			totalpages = chosen_memcg_points;
+			chosen_memcg_points = 0;
+
+			parent = chosen_memcg;
+			chosen_memcg = NULL;
+
+			continue;
+		}
+
+		if (!chosen_memcg && parent != root_mem_cgroup)
+			chosen_memcg = parent;
+
+		break;
+	}
+
+	if (!oc->memcg) {
+		/*
+		 * We should also consider tasks in the root cgroup
+		 * with badness larger than oc->chosen_points
+		 */
+
+		struct css_task_iter it;
+		struct task_struct *task;
+		int ret = 0;
+
+		css_task_iter_start(&root_mem_cgroup->css, &it);
+		while (!ret && (task = css_task_iter_next(&it)))
+			ret = oom_evaluate_task(task, oc);
+		css_task_iter_end(&it);
+	}
+
+	if (!oc->chosen && chosen_memcg) {
+		pr_info("Chosen cgroup ");
+		pr_cont_cgroup_path(chosen_memcg->css.cgroup);
+		pr_cont(": %ld\n", oc->chosen_points);
+
+		if (chosen_memcg->oom_kill_all_tasks) {
+			css_get(&chosen_memcg->css);
+			oc->chosen_memcg = chosen_memcg;
+		} else {
+			/*
+			 * If we don't need to kill all tasks in the cgroup,
+			 * let's select the biggest task.
+			 */
+			oc->chosen_points = 0;
+			select_bad_process(oc, chosen_memcg);
+		}
+	} else if (oc->chosen)
+		pr_info("Chosen task %s (%d) in root cgroup: %ld\n",
+			oc->chosen->comm, oc->chosen->pid, oc->chosen_points);
+
+	rcu_read_unlock();
+
+	oc->chosen_points = 0;
+	return !!oc->chosen || !!oc->chosen_memcg;
+}
+
+static int __oom_kill_task(struct task_struct *tsk, void *arg)
+{
+	if (!is_global_init(tsk) && !(tsk->flags & PF_KTHREAD)) {
+		get_task_struct(tsk);
+		__oom_kill_process(tsk);
+	}
+	return 0;
+}
+
+bool mem_cgroup_kill_oom_victim(struct oom_control *oc)
+{
+	if (oc->chosen_memcg) {
+		/*
+		 * Kill all tasks in the cgroup hierarchy
+		 */
+		mem_cgroup_scan_tasks(oc->chosen_memcg,
+				      __oom_kill_task, NULL);
+
+		/*
+		 * Release oc->chosen_memcg
+		 */
+		css_put(&oc->chosen_memcg->css);
+		oc->chosen_memcg = NULL;
+	}
+
+	if (oc->chosen && oc->chosen != (void *)-1UL) {
+		__oom_kill_process(oc->chosen);
+		return true;
+	}
+
+	/*
+	 * Reset points before falling back to an old
+	 * per-process OOM victim selection logic
+	 */
+	oc->chosen_points = 0;
+
+	return !!oc->chosen;
+}
+
 /*
  * Reclaims as many pages from the given memcg as possible.
  *

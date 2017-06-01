@@ -34,6 +34,7 @@ struct mem_cgroup;
 struct page;
 struct mm_struct;
 struct kmem_cache;
+struct oom_control;
 
 /* Cgroup-specific page state, on top of universal node page state */
 enum memcg_stat_item {
@@ -470,6 +471,9 @@ static inline bool task_in_memcg_oom(struct task_struct *p)
 }
 
 bool mem_cgroup_oom_synchronize(bool wait);
+
+bool mem_cgroup_select_oom_victim(struct oom_control *oc);
+bool mem_cgroup_kill_oom_victim(struct oom_control *oc);
 
 #ifdef CONFIG_MEMCG_SWAP
 extern int do_swap_account;
@@ -930,6 +934,15 @@ static inline void memcg_put_cache_ids(void)
 static inline void memcg_kmem_update_page_stat(struct page *page,
 				enum memcg_stat_item idx, int val)
 {
+}
+
+static inline bool mem_cgroup_select_oom_victim(struct oom_control *oc)
+{
+	return false;
+}
+static inline bool mem_cgroup_kill_oom_victim(struct oom_control *oc)
+{
+	return false;
 }
 #endif /* CONFIG_MEMCG && !CONFIG_SLOB */
 
