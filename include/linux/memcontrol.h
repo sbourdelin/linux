@@ -195,6 +195,9 @@ struct mem_cgroup {
 	/* OOM-Killer disable */
 	int		oom_kill_disable;
 
+	/* kill all tasks below in case of OOM */
+	bool oom_kill_all_tasks;
+
 	/* handle for "memory.events" */
 	struct cgroup_file events_file;
 
