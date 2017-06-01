@@ -1476,14 +1476,15 @@ static void intel_dsi_prepare(struct intel_encoder *intel_encoder,
 				txclkesc(intel_dsi->escape_clk_div, 100));
 
 		if (IS_GEN9_LP(dev_priv) && (!intel_dsi->dual_link)) {
+			enum port port_other = port == PORT_A ? PORT_C : PORT_A;
+
 			/*
 			 * BXT spec says write MIPI_INIT_COUNT for
 			 * both the ports, even if only one is
 			 * getting used. So write the other port
 			 * if not in dual link mode.
 			 */
-			I915_WRITE(MIPI_INIT_COUNT(port ==
-						PORT_A ? PORT_C : PORT_A),
+			I915_WRITE(MIPI_INIT_COUNT(port_other),
 					intel_dsi->init_count);
 		}
 
