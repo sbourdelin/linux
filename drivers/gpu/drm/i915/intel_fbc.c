@@ -1045,6 +1045,7 @@ void intel_fbc_choose_crtc(struct drm_i915_private *dev_priv,
 	struct drm_plane *plane;
 	struct drm_plane_state *plane_state;
 	bool crtc_chosen = false;
+	bool new_planes = false;
 	int i;
 
 	mutex_lock(&fbc->lock);
@@ -1066,6 +1067,7 @@ void intel_fbc_choose_crtc(struct drm_i915_private *dev_priv,
 			to_intel_plane_state(plane_state);
 		struct intel_crtc_state *intel_crtc_state;
 		struct intel_crtc *crtc = to_intel_crtc(plane_state->crtc);
+		new_planes = true;
 
 		if (!intel_plane_state->base.visible)
 			continue;
@@ -1084,7 +1086,7 @@ void intel_fbc_choose_crtc(struct drm_i915_private *dev_priv,
 		break;
 	}
 
-	if (!crtc_chosen)
+	if (new_planes && !crtc_chosen)
 		fbc->no_fbc_reason = "no suitable CRTC for FBC";
 
 out:
