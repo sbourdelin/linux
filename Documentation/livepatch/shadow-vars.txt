@@ -1,0 +1,175 @@
+Shadow Variables
+================
+
+Shadow variables are a simple way for livepatch modules to associate new
+"shadow" data to existing data structures.  Original data structures
+(both definition and storage) are left unmodified and "new" data is
+allocated separately.  A shadow variable hashtable associates a string
+key and a pointer to the original data with a pointer to the new data.
+
+
+API
+---
+
+void *klp_shadow_attach(void *obj, char *var, gfp_t gfp, void *data);
+
+  Description: Allocate and attach a new shadow variable.
+  Parameters:
+
+    void *obj  - pointer to original data
+    char *var  - string key describing new data
+    gfp_t gfp  - GFP flags used to allocate shadow variable metadata
+    void *data - pointer to new data
+
+  Returns: the shadow variable data element, otherwise NULL on failure.
+
+
+void klp_shadow_detach(void *obj, char *var);
+
+  Description: Detach and free a shadow variable.
+  Parameters:
+
+      void *obj  - pointer to original data
+      char *var  - string key describing new data
+
+
+void *klp_shadow_get(void *obj, char *var);
+
+  Description: Retrieve a shadow variable data pointer.
+  Parameters:
+
+      void *obj  - pointer to original data
+      char *var  - string key describing new data
+
+  Returns: the shadow variable data element, otherwise NULL if the
+  <obj, var> combination is not found.
+
+
+Concurrency notes:
+
+* The shadow variable API simply provides a relationship between an
+<obj, var> pair and a pointer value.  It is the responsibility of the
+caller to provide any mutual exclusion required of the shadow data.
+
+* Once klp_shadow_attach() adds a shadow variable to the
+klp_shadow_hash, it is considered live and klp_shadow_get() may
+return the shadow variable's data pointer.  Therefore, initialization of
+shadow data should be completed before attaching the shadow variable.
+
+* If the API is called under a special context (like spinlocks),
+set the GFP flags passed to klp_shadow_attach() accordingly.
+
+* The klp_shadow_hash is an RCU-enabled hashtable and should be safe
+against concurrent klp_shadow_detach() and klp_shadow_get() operations.
+
+
+Use cases
+---------
+
+Example 1: Commit 1d147bfa6429 ("mac80211: fix AP powersave TX vs.
+wakeup race") added a spinlock to net/mac80211/sta_info.h :: struct
+sta_info.  Implementing this change with via shadow variable is
+straightforward.
+
+Allocation - when a host sta_info structure is allocated, allocate a
+corresponding spinlock_t and attach it as a new shadow variable:
+
+struct sta_info *sta_info_alloc(struct ieee80211_sub_if_data *sdata,
+				const u8 *addr, gfp_t gfp)
+{
+	struct sta_info *sta;
+	spinlock_t *ps_lock;
+	...
+	sta = kzalloc(sizeof(*sta) + hw->sta_data_size, gfp);
+	...
+	ps_lock = kzalloc(sizeof(*ps_lock), gfp);
+	if (!ps_lock)
+		goto free;
+	spin_lock_init(ps_lock);
+	if (!klp_shadow_attach(sta, "ps_lock", gfp, ps_lock))
+		goto shadow_fail;
+	...
+
+Usage - when using the shadow spinlock, query the shadow variable API to
+retrieve it:
+
+void ieee80211_sta_ps_deliver_wakeup(struct sta_info *sta)
+{
+	spinlock_t *ps_lock;
+	...
+	/* sync with ieee80211_tx_h_unicast_ps_buf */
+	ps_lock = klp_shadow_get(sta, "ps_lock");
+	if (ps_lock)
+		spin_lock(ps_lock);
+	...
+	if (ps_lock)
+		spin_unlock(ps_lock);
+	...
+
+Release - when the host sta_info structure is freed, first detach the
+shadow variable and then free the shadow spinlock:
+
+void sta_info_free(struct ieee80211_local *local, struct sta_info *sta)
+{
+	spinlock_t *ps_lock;
+	...
+	ps_lock = klp_shadow_get(sta, "ps_lock");
+	if (ps_lock) {
+		klp_shadow_detach(sta, "ps_lock");
+		kfree(ps_lock);
+	}
+
+ 	kfree(sta);
+
+
+
+Example 2: Commit 82486aa6f1b9 ("ipv4: restore rt->fi for reference
+counting") added a struct fib_info pointer to include/net/route.h ::
+struct rtable. A shadow variable can be used to implement the new
+pointer, with no additional storage required.
+
+This implementation diverges from the original commit, as it can attach
+the shadow variable when the code actually uses it:
+
+static void rt_init_metrics(struct rtable *rt, struct fib_info *fi)
+{
+	if (fi->fib_metrics != (u32 *)dst_default_metrics) {
+		fib_info_hold(fi);
+		klp_shadow_attach(rt, "fi", GFP_ATOMIC, fi);
+	}
+
+	dst_init_metrics(&rt->dst, fi->fib_metrics, true);
+}
+
+The shadow variable can be detached when it's no longer needed:
+
+static void ipv4_dst_destroy(struct dst_entry *dst)
+{
+	struct rtable *rt = (struct rtable *) dst;
+	struct fib_info *shadow_fi;
+
+	shadow_fi = klp_shadow_get(rt, "fi");
+	if (shadow_fi) {
+		klp_shadow_detach(rt, "fi");
+		fib_info_put(shadow_fi);
+	}
+
+
+Other examples: shadow variables can also be used as a simple flag
+indicating that a data structure had been allocated by new, livepatched
+code.  In this case, it doesn't matter what data value the shadow
+variable holds, its existence can be keyed off of to handle the data
+structure accordingly.
+
+
+References
+==========
+
+* https://github.com/dynup/kpatch
+The livepatch implementation is based on the kpatch version of shadow
+variables.
+
+* http://files.mkgnu.net/files/dynamos/doc/papers/dynamos_eurosys_07.pdf
+Dynamic and Adaptive Updates of Non-Quiescent Subsystems in Commodity
+Operating System Kernels (Kritis Makris, Kyung Dong Ryu 2007) presented
+a datatype update technique called "shadow data structures".
