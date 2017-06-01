@@ -614,7 +614,7 @@ static void native_machine_emergency_restart(void)
 				udelay(50);
 				/* Actually do the reset */
 				outb(cf9|reboot_code, 0xcf9);
-				udelay(50);
+				mdelay(50);
 			}
 			reboot_type = BOOT_TRIPLE;
 			break;
