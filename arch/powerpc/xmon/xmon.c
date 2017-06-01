@@ -28,6 +28,7 @@
 #include <linux/bug.h>
 #include <linux/nmi.h>
 #include <linux/ctype.h>
+#include <linux/ftrace.h>
 
 #include <asm/debugfs.h>
 #include <asm/ptrace.h>
@@ -456,9 +457,12 @@ static int xmon_core(struct pt_regs *regs, int fromipi)
 	int cpu;
 	int secondary;
 #endif
+	int save_ftrace_enabled;
 
 	local_irq_save(flags);
 	hard_irq_disable();
+
+	save_ftrace_enabled = __ftrace_enabled_save();
 
 	bp = in_breakpoint_table(regs->nip, &offset);
 	if (bp != NULL) {
@@ -654,6 +658,7 @@ static int xmon_core(struct pt_regs *regs, int fromipi)
 	insert_cpu_bpts();
 
 	touch_nmi_watchdog();
+	__ftrace_enabled_restore(save_ftrace_enabled);
 	local_irq_restore(flags);
 
 	return cmd != 'X' && cmd != EOF;
