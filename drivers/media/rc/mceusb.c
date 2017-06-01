@@ -760,9 +760,6 @@ static void mce_request_packet(struct mceusb_dev *ir, unsigned char *data,
 
 	dev_dbg(dev, "receive request called (size=%#x)", size);
 
-	async_urb->transfer_buffer_length = size;
-	async_urb->dev = ir->usbdev;
-
 	res = usb_submit_urb(async_urb, GFP_ATOMIC);
 	if (res) {
 		dev_err(dev, "receive request FAILED! (res=%d)", res);
