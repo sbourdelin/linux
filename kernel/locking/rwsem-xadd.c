@@ -529,6 +529,14 @@ struct rw_semaphore __sched *rwsem_down_read_failed(struct rw_semaphore *sem)
 		goto enqueue;
 
 	/*
+	 * Steal the lock if no writer was present and the optimistic
+	 * spinning disable bit isn't set.
+	 */
+	count = atomic_long_read(&sem->count);
+	if (!count_has_writer(count))
+		return sem;
+
+	/*
 	 * Undo read bias from down_read operation to stop active locking if:
 	 * 1) Optimistic spinners are present;
 	 * 2) the wait_lock isn't free; or
