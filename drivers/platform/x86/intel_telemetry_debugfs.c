@@ -960,14 +960,13 @@ static int __init telemetry_debugfs_init(void)
 	if (err < 0)
 		return -EINVAL;
 
-
-#ifdef CONFIG_PM_SLEEP
 	register_pm_notifier(&pm_notifier);
-#endif /* CONFIG_PM_SLEEP */
 
 	debugfs_conf->telemetry_dbg_dir = debugfs_create_dir("telemetry", NULL);
-	if (!debugfs_conf->telemetry_dbg_dir)
-		return -ENOMEM;
+	if (!debugfs_conf->telemetry_dbg_dir) {
+		err = -ENOMEM;
+		goto out_pm;
+	}
 
 	f = debugfs_create_file("pss_info", S_IFREG | S_IRUGO,
 				debugfs_conf->telemetry_dbg_dir, NULL,
@@ -1014,6 +1013,8 @@ static int __init telemetry_debugfs_init(void)
 out:
 	debugfs_remove_recursive(debugfs_conf->telemetry_dbg_dir);
 	debugfs_conf->telemetry_dbg_dir = NULL;
+out_pm:
+	unregister_pm_notifier(&pm_notifier);
 
 	return err;
 }
@@ -1022,6 +1023,7 @@ static void __exit telemetry_debugfs_exit(void)
 {
 	debugfs_remove_recursive(debugfs_conf->telemetry_dbg_dir);
 	debugfs_conf->telemetry_dbg_dir = NULL;
+	unregister_pm_notifier(&pm_notifier);
 }
 
 late_initcall(telemetry_debugfs_init);
