@@ -336,10 +336,11 @@ struct se_node_acl *core_tpg_add_initiator_node_acl(
 	return acl;
 }
 
-static void target_shutdown_sessions(struct se_node_acl *acl)
+static void target_shutdown_sessions(struct se_node_acl *acl, bool do_restart)
 {
 	struct se_session *sess;
 	unsigned long flags;
+	LIST_HEAD(tmp_list);
 
 restart:
 	spin_lock_irqsave(&acl->nacl_sess_lock, flags);
@@ -347,14 +348,22 @@ restart:
 		if (sess->sess_tearing_down)
 			continue;
 
+		list_move_tail(&sess->sess_acl_list, &tmp_list);
+	}
+	spin_unlock_irqrestore(&acl->nacl_sess_lock, flags);
+
+	if (list_empty(&tmp_list))
+		return;
+
+	list_for_each_entry(sess, &tmp_list, sess_acl_list) {
 		list_del_init(&sess->sess_acl_list);
-		spin_unlock_irqrestore(&acl->nacl_sess_lock, flags);
 
 		if (acl->se_tpg->se_tpg_tfo->close_session)
 			acl->se_tpg->se_tpg_tfo->close_session(sess);
-		goto restart;
 	}
-	spin_unlock_irqrestore(&acl->nacl_sess_lock, flags);
+
+	if (do_restart)
+		goto restart;
 }
 
 void core_tpg_del_initiator_node_acl(struct se_node_acl *acl)
@@ -367,7 +376,7 @@ void core_tpg_del_initiator_node_acl(struct se_node_acl *acl)
 	list_del(&acl->acl_list);
 	mutex_unlock(&tpg->acl_node_mutex);
 
-	target_shutdown_sessions(acl);
+	target_shutdown_sessions(acl, true);
 
 	target_put_nacl(acl);
 	/*
@@ -414,7 +423,7 @@ int core_tpg_set_initiator_node_queue_depth(
 	/*
 	 * Shutdown all pending sessions to force session reinstatement.
 	 */
-	target_shutdown_sessions(acl);
+	target_shutdown_sessions(acl, false);
 
 	pr_debug("Successfully changed queue depth to: %d for Initiator"
 		" Node: %s on %s Target Portal Group: %u\n", acl->queue_depth,
