@@ -1638,13 +1638,12 @@ void clean_bdev_aliases(struct block_device *bdev, sector_t block, sector_t len)
 
 	end = (block + len - 1) >> (PAGE_SHIFT - bd_inode->i_blkbits);
 	pagevec_init(&pvec, 0);
-	while (index <= end && pagevec_lookup(&pvec, bd_mapping, index,
+	while (index <= end && pagevec_lookup(&pvec, bd_mapping, &index,
 			min(end - index, (pgoff_t)PAGEVEC_SIZE - 1) + 1)) {
 		for (i = 0; i < pagevec_count(&pvec); i++) {
 			struct page *page = pvec.pages[i];
 
-			index = page->index;
-			if (index > end)
+			if (page->index > end)
 				break;
 			if (!page_has_buffers(page))
 				continue;
@@ -1675,7 +1674,6 @@ unlock_page:
 		}
 		pagevec_release(&pvec);
 		cond_resched();
-		index++;
 	}
 }
 EXPORT_SYMBOL(clean_bdev_aliases);
