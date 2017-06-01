@@ -234,7 +234,7 @@ static void pat_bsp_init(u64 pat)
 
 static void pat_ap_init(u64 pat)
 {
-	if (!this_cpu_has(X86_FEATURE_PAT)) {
+	if (!boot_cpu_has(X86_FEATURE_PAT)) {
 		/*
 		 * If this happens we are on a secondary CPU, but switched to
 		 * PAT on the boot CPU. We have no way to undo PAT.
