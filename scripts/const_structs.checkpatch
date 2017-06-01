@@ -25,6 +25,7 @@ irq_domain_ops
 item_operations
 iwl_cfg
 iwl_ops
+k_clock
 kgdb_arch
 kgdb_io
 kset_uevent_ops
