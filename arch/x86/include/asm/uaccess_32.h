@@ -16,6 +16,54 @@ unsigned long __must_check __copy_from_user_ll_nocache_nozero
 static __always_inline unsigned long __must_check
 raw_copy_to_user(void __user *to, const void *from, unsigned long n)
 {
+	if (__builtin_constant_p(n)) {
+		unsigned long ret = 0;
+
+		switch (n) {
+		case 1:
+			__uaccess_begin();
+			__put_user_asm(*(u8 *)from, to, ret,
+					"b", "b", "iq", 1);
+			__uaccess_end();
+			return ret;
+		case 2:
+			__uaccess_begin();
+			__put_user_asm(*(u16 *)from, to, ret,
+					"w", "w", "ir", 2);
+			__uaccess_end();
+			return ret;
+		case 4:
+			__uaccess_begin();
+			__put_user_asm(*(u32 *)from, to, ret,
+					"l", "k", "ir", 4);
+			__uaccess_end();
+			return ret;
+		case 6:
+			__uaccess_begin();
+			__put_user_asm(*(u32 *)from, to, ret,
+					"l", "k", "ir", 4);
+			if (likely(!ret)) {
+				asm("":::"memory");
+				__put_user_asm(*(u16 *)(4 + (char *)from),
+						(u16 __user *)(4 + (char __user *)to),
+						ret, "w", "w", "ir", 2);
+			}
+			__uaccess_end();
+			return ret;
+		case 8:
+			__uaccess_begin();
+			__put_user_asm(*(u32 *)from, to, ret,
+					"l", "k", "ir", 4);
+			if (likely(!ret)) {
+				asm("":::"memory");
+				__put_user_asm(*(u32 *)(4 + (char *)from),
+						(u32 __user *)(4 + (char __user *)to),
+						ret, "l", "k", "ir", 4);
+			}
+			__uaccess_end();
+			return ret;
+		}
+	}
 	return __copy_user_ll((__force void *)to, from, n);
 }
 
