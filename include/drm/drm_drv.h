@@ -29,6 +29,7 @@
 
 #include <linux/list.h>
 #include <linux/irqreturn.h>
+#include <drm/drm_deprecated.h>
 
 struct drm_device;
 struct drm_file;
@@ -81,6 +82,7 @@ struct drm_driver {
 	 *
 	 * Zero on success, non-zero value on failure.
 	 */
+	drm_deprecated
 	int (*load) (struct drm_device *, unsigned long flags);
 
 	/**
@@ -160,6 +162,7 @@ struct drm_driver {
 	 * the device.
 	 *
 	 */
+	drm_deprecated
 	void (*unload) (struct drm_device *);
 
 	/**
@@ -370,6 +373,7 @@ struct drm_driver {
 	 * This is deprecated and should not be used by new drivers. Use
 	 * @gem_free_object_unlocked instead.
 	 */
+	drm_deprecated
 	void (*gem_free_object) (struct drm_gem_object *obj);
 
 	/**

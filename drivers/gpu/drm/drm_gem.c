@@ -800,7 +800,7 @@ drm_gem_object_free(struct kref *kref)
 
 	if (dev->driver->gem_free_object_unlocked) {
 		dev->driver->gem_free_object_unlocked(obj);
-	} else if (dev->driver->gem_free_object) {
+	} else if (DRM_DEPRECATED_WARN(dev->driver->gem_free_object)) {
 		WARN_ON(!mutex_is_locked(&dev->struct_mutex));
 
 		dev->driver->gem_free_object(obj);

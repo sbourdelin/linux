@@ -34,6 +34,17 @@ config DRM_DP_AUX_CHARDEV
 	  read and write values to arbitrary DPCD registers on the DP aux
 	  channel.
 
+config DRM_DEBUG_DEPRECATED
+	bool "Insert extra warnings if deprecated code is used"
+	default n
+	depends on DRM
+	help
+	  Enables extra warnings if deprecated code and callbacks are used.
+
+	  Recommended for driver developers only.
+
+	  If in doubt, say "N".
+
 config DRM_DEBUG_MM
 	bool "Insert extra checks and debug info into the DRM range managers"
 	default n

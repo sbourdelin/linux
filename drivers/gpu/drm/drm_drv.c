@@ -778,7 +778,7 @@ int drm_dev_register(struct drm_device *dev, unsigned long flags)
 
 	dev->registered = true;
 
-	if (dev->driver->load) {
+	if (DRM_DEPRECATED_WARN(dev->driver->load)) {
 		ret = dev->driver->load(dev, flags);
 		if (ret)
 			goto err_minors;
@@ -830,7 +830,7 @@ void drm_dev_unregister(struct drm_device *dev)
 	if (drm_core_check_feature(dev, DRIVER_MODESET))
 		drm_modeset_unregister_all(dev);
 
-	if (dev->driver->unload)
+	if (DRM_DEPRECATED_WARN(dev->driver->unload))
 		dev->driver->unload(dev);
 
 	if (dev->agp)
