@@ -1720,9 +1720,10 @@ out:
 EXPORT_SYMBOL(find_get_pages_range_tag);
 
 /**
- * find_get_entries_tag - find and return entries that match @tag
+ * find_get_entries_range_tag - find and return entries that match @tag
  * @mapping:	the address_space to search
  * @start:	the starting page cache index
+ * @end:	the final page cache index (inclusive)
  * @tag:	the tag index
  * @nr_entries:	the maximum number of entries
  * @entries:	where the resulting entries are placed
@@ -1731,9 +1732,10 @@ EXPORT_SYMBOL(find_get_pages_range_tag);
  * Like find_get_entries, except we only return entries which are tagged with
  * @tag.
  */
-unsigned find_get_entries_tag(struct address_space *mapping, pgoff_t *start,
-			int tag, unsigned int nr_entries,
-			struct page **entries, pgoff_t *indices)
+unsigned find_get_entries_range_tag(struct address_space *mapping,
+			pgoff_t *start, pgoff_t end, int tag,
+			unsigned int nr_entries, struct page **entries,
+			pgoff_t *indices)
 {
 	void **slot;
 	unsigned int ret = 0;
@@ -1746,6 +1748,9 @@ unsigned find_get_entries_tag(struct address_space *mapping, pgoff_t *start,
 	radix_tree_for_each_tagged(slot, &mapping->page_tree,
 				   &iter, *start, tag) {
 		struct page *head, *page;
+
+		if (iter.index > end)
+			break;
 repeat:
 		page = radix_tree_deref_slot(slot);
 		if (unlikely(!page))
@@ -1782,17 +1787,28 @@ repeat:
 export:
 		indices[ret] = iter.index;
 		entries[ret] = page;
-		if (++ret == nr_entries)
-			break;
+		if (++ret == nr_entries) {
+			*start = indices[ret - 1] + 1;
+			goto out;
+		}
 	}
-	rcu_read_unlock();
 
-	if (ret)
-		*start = indices[ret - 1] + 1;
+	/*
+	 * We come here when we got at @end. We take care to not overflow the
+	 * index @index as it confuses some of the callers. This breaks the
+	 * iteration when there is page at index -1 but that is already broken
+	 * anyway.
+	 */
+	if (end == (pgoff_t)-1)
+		*start = (pgoff_t)-1;
+	else
+		*start = end + 1;
+out:
+	rcu_read_unlock();
 
 	return ret;
 }
-EXPORT_SYMBOL(find_get_entries_tag);
+EXPORT_SYMBOL(find_get_entries_range_tag);
 
 /*
  * CD/DVDs are error prone. When a medium error occurs, the driver may fail

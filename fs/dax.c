@@ -819,7 +819,6 @@ int dax_writeback_mapping_range(struct address_space *mapping,
 	pgoff_t indices[PAGEVEC_SIZE];
 	struct dax_device *dax_dev;
 	struct pagevec pvec;
-	bool done = false;
 	int i, ret = 0;
 
 	if (WARN_ON_ONCE(inode->i_blkbits != PAGE_SHIFT))
@@ -840,20 +839,15 @@ int dax_writeback_mapping_range(struct address_space *mapping,
 	tag_pages_for_writeback(mapping, start_index, end_index);
 
 	pagevec_init(&pvec, 0);
-	while (!done) {
-		pvec.nr = find_get_entries_tag(mapping, &start_index,
-				PAGECACHE_TAG_TOWRITE, PAGEVEC_SIZE,
+	while (start_index <= end_index) {
+		pvec.nr = find_get_entries_range_tag(mapping, &start_index,
+				end_index, PAGECACHE_TAG_TOWRITE, PAGEVEC_SIZE,
 				pvec.pages, indices);
 
 		if (pvec.nr == 0)
 			break;
 
 		for (i = 0; i < pvec.nr; i++) {
-			if (indices[i] > end_index) {
-				done = true;
-				break;
-			}
-
 			ret = dax_writeback_one(bdev, dax_dev, mapping,
 					indices[i], pvec.pages[i]);
 			if (ret < 0)
