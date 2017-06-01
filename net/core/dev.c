@@ -1282,7 +1282,9 @@ int dev_set_alias(struct net_device *dev, const char *alias, size_t len)
 		return -ENOMEM;
 	dev->ifalias = new_ifalias;
 
-	strlcpy(dev->ifalias, alias, len+1);
+	/* alias comes from the userspace and may not be zero-terminated. */
+	memcpy(dev->ifalias, alias, len);
+	dev->ifalias[len] = 0;
 	return len;
 }
 
