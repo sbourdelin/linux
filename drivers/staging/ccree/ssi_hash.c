@@ -144,8 +144,6 @@ static int ssi_hash_map_result(struct device *dev,
 			digestsize);
 		return -ENOMEM;
 	}
-	SSI_UPDATE_DMA_ADDR_TO_48BIT(state->digest_result_dma_addr,
-						digestsize);
 	SSI_LOG_DEBUG("Mapped digest result buffer %u B "
 		     "at va=%pK to dma=0x%llX\n",
 		digestsize, state->digest_result_buff,
@@ -211,17 +209,12 @@ static int ssi_hash_map_request(struct device *dev,
 		ctx->inter_digestsize, state->digest_buff);
 		goto fail3;
 	}
-	SSI_UPDATE_DMA_ADDR_TO_48BIT(state->digest_buff_dma_addr,
-							ctx->inter_digestsize);
 	SSI_LOG_DEBUG("Mapped digest %d B at va=%pK to dma=0x%llX\n",
 		ctx->inter_digestsize, state->digest_buff,
 		(unsigned long long)state->digest_buff_dma_addr);
 
 	if (is_hmac) {
-		SSI_RESTORE_DMA_ADDR_TO_48BIT(ctx->digest_buff_dma_addr);
 		dma_sync_single_for_cpu(dev, ctx->digest_buff_dma_addr, ctx->inter_digestsize, DMA_BIDIRECTIONAL);
-		SSI_UPDATE_DMA_ADDR_TO_48BIT(ctx->digest_buff_dma_addr,
-							ctx->inter_digestsize);
 		if ((ctx->hw_mode == DRV_CIPHER_XCBC_MAC) || (ctx->hw_mode == DRV_CIPHER_CMAC)) {
 			memset(state->digest_buff, 0, ctx->inter_digestsize);
 		} else { /*sha*/
@@ -236,17 +229,11 @@ static int ssi_hash_map_request(struct device *dev,
 			memcpy(state->digest_bytes_len, digest_len_init, HASH_LEN_SIZE);
 #endif
 		}
-		SSI_RESTORE_DMA_ADDR_TO_48BIT(state->digest_buff_dma_addr);
 		dma_sync_single_for_device(dev, state->digest_buff_dma_addr, ctx->inter_digestsize, DMA_BIDIRECTIONAL);
-		SSI_UPDATE_DMA_ADDR_TO_48BIT(state->digest_buff_dma_addr,
-							ctx->inter_digestsize);
 
 		if (ctx->hash_mode != DRV_HASH_NULL) {
-			SSI_RESTORE_DMA_ADDR_TO_48BIT(ctx->opad_tmp_keys_dma_addr);
 			dma_sync_single_for_cpu(dev, ctx->opad_tmp_keys_dma_addr, ctx->inter_digestsize, DMA_BIDIRECTIONAL);
 			memcpy(state->opad_digest_buff, ctx->opad_tmp_keys_buff, ctx->inter_digestsize);
-			SSI_UPDATE_DMA_ADDR_TO_48BIT(ctx->opad_tmp_keys_dma_addr,
-							ctx->inter_digestsize);
 		}
 	} else { /*hash*/
 		/* Copy the initial digests if hash flow. The SRAM contains the
@@ -271,8 +258,6 @@ static int ssi_hash_map_request(struct device *dev,
 			HASH_LEN_SIZE, state->digest_bytes_len);
 			goto fail4;
 		}
-		SSI_UPDATE_DMA_ADDR_TO_48BIT(state->digest_bytes_len_dma_addr,
-								HASH_LEN_SIZE);
 		SSI_LOG_DEBUG("Mapped digest len %u B at va=%pK to dma=0x%llX\n",
 			HASH_LEN_SIZE, state->digest_bytes_len,
 			(unsigned long long)state->digest_bytes_len_dma_addr);
@@ -287,8 +272,6 @@ static int ssi_hash_map_request(struct device *dev,
 			ctx->inter_digestsize, state->opad_digest_buff);
 			goto fail5;
 		}
-		SSI_UPDATE_DMA_ADDR_TO_48BIT(state->opad_digest_dma_addr,
-							ctx->inter_digestsize);
 		SSI_LOG_DEBUG("Mapped opad digest %d B at va=%pK to dma=0x%llX\n",
 			ctx->inter_digestsize, state->opad_digest_buff,
 			(unsigned long long)state->opad_digest_dma_addr);
@@ -304,13 +287,11 @@ static int ssi_hash_map_request(struct device *dev,
 
 fail5:
 	if (state->digest_bytes_len_dma_addr != 0) {
-		SSI_RESTORE_DMA_ADDR_TO_48BIT(state->digest_bytes_len_dma_addr);
 		dma_unmap_single(dev, state->digest_bytes_len_dma_addr, HASH_LEN_SIZE, DMA_BIDIRECTIONAL);
 		state->digest_bytes_len_dma_addr = 0;
 	}
 fail4:
 	if (state->digest_buff_dma_addr != 0) {
-		SSI_RESTORE_DMA_ADDR_TO_48BIT(state->digest_buff_dma_addr);
 		dma_unmap_single(dev, state->digest_buff_dma_addr, ctx->inter_digestsize, DMA_BIDIRECTIONAL);
 		state->digest_buff_dma_addr = 0;
 	}
@@ -344,7 +325,6 @@ static void ssi_hash_unmap_request(struct device *dev,
 				   struct ssi_hash_ctx *ctx)
 {
 	if (state->digest_buff_dma_addr != 0) {
-		SSI_RESTORE_DMA_ADDR_TO_48BIT(state->digest_buff_dma_addr);
 		dma_unmap_single(dev, state->digest_buff_dma_addr,
 				 ctx->inter_digestsize, DMA_BIDIRECTIONAL);
 		SSI_LOG_DEBUG("Unmapped digest-buffer: digest_buff_dma_addr=0x%llX\n",
@@ -352,7 +332,6 @@ static void ssi_hash_unmap_request(struct device *dev,
 		state->digest_buff_dma_addr = 0;
 	}
 	if (state->digest_bytes_len_dma_addr != 0) {
-		SSI_RESTORE_DMA_ADDR_TO_48BIT(state->digest_bytes_len_dma_addr);
 		dma_unmap_single(dev, state->digest_bytes_len_dma_addr,
 				 HASH_LEN_SIZE, DMA_BIDIRECTIONAL);
 		SSI_LOG_DEBUG("Unmapped digest-bytes-len buffer: digest_bytes_len_dma_addr=0x%llX\n",
@@ -360,7 +339,6 @@ static void ssi_hash_unmap_request(struct device *dev,
 		state->digest_bytes_len_dma_addr = 0;
 	}
 	if (state->opad_digest_dma_addr != 0) {
-		SSI_RESTORE_DMA_ADDR_TO_48BIT(state->opad_digest_dma_addr);
 		dma_unmap_single(dev, state->opad_digest_dma_addr,
 				 ctx->inter_digestsize, DMA_BIDIRECTIONAL);
 		SSI_LOG_DEBUG("Unmapped opad-digest: opad_digest_dma_addr=0x%llX\n",
@@ -381,7 +359,6 @@ static void ssi_hash_unmap_result(struct device *dev,
 				  unsigned int digestsize, u8 *result)
 {
 	if (state->digest_result_dma_addr != 0) {
-		SSI_RESTORE_DMA_ADDR_TO_48BIT(state->digest_result_dma_addr);
 		dma_unmap_single(dev,
 				 state->digest_result_dma_addr,
 				 digestsize,
@@ -1078,7 +1055,6 @@ static int ssi_hash_setkey(void *hash,
 				   " DMA failed\n", key, keylen);
 			return -ENOMEM;
 		}
-		SSI_UPDATE_DMA_ADDR_TO_48BIT(ctx->key_params.key_dma_addr, keylen);
 		SSI_LOG_DEBUG("mapping key-buffer: key_dma_addr=0x%llX "
 			     "keylen=%u\n",
 			     (unsigned long long)ctx->key_params.key_dma_addr,
@@ -1226,7 +1202,6 @@ out:
 	}
 
 	if (ctx->key_params.key_dma_addr) {
-		SSI_RESTORE_DMA_ADDR_TO_48BIT(ctx->key_params.key_dma_addr);
 		dma_unmap_single(&ctx->drvdata->plat_dev->dev,
 				ctx->key_params.key_dma_addr,
 				ctx->key_params.keylen, DMA_TO_DEVICE);
@@ -1270,7 +1245,6 @@ static int ssi_xcbc_setkey(struct crypto_ahash *ahash,
 			   " DMA failed\n", key, keylen);
 		return -ENOMEM;
 	}
-	SSI_UPDATE_DMA_ADDR_TO_48BIT(ctx->key_params.key_dma_addr, keylen);
 	SSI_LOG_DEBUG("mapping key-buffer: key_dma_addr=0x%llX "
 		     "keylen=%u\n",
 		     (unsigned long long)ctx->key_params.key_dma_addr,
@@ -1317,7 +1291,6 @@ static int ssi_xcbc_setkey(struct crypto_ahash *ahash,
 	if (rc != 0)
 		crypto_ahash_set_flags(ahash, CRYPTO_TFM_RES_BAD_KEY_LEN);
 
-	SSI_RESTORE_DMA_ADDR_TO_48BIT(ctx->key_params.key_dma_addr);
 	dma_unmap_single(&ctx->drvdata->plat_dev->dev,
 			ctx->key_params.key_dma_addr,
 			ctx->key_params.keylen, DMA_TO_DEVICE);
@@ -1352,7 +1325,6 @@ static int ssi_cmac_setkey(struct crypto_ahash *ahash,
 	/* STAT_PHASE_1: Copy key to ctx */
 	START_CYCLE_COUNT();
 
-	SSI_RESTORE_DMA_ADDR_TO_48BIT(ctx->opad_tmp_keys_dma_addr);
 	dma_sync_single_for_cpu(&ctx->drvdata->plat_dev->dev,
 				ctx->opad_tmp_keys_dma_addr,
 				keylen, DMA_TO_DEVICE);
@@ -1364,7 +1336,6 @@ static int ssi_cmac_setkey(struct crypto_ahash *ahash,
 	dma_sync_single_for_device(&ctx->drvdata->plat_dev->dev,
 				   ctx->opad_tmp_keys_dma_addr,
 				   keylen, DMA_TO_DEVICE);
-	SSI_UPDATE_DMA_ADDR_TO_48BIT(ctx->opad_tmp_keys_dma_addr, keylen);
 
 	ctx->key_params.keylen = keylen;
 
@@ -1379,7 +1350,6 @@ static void ssi_hash_free_ctx(struct ssi_hash_ctx *ctx)
 	struct device *dev = &ctx->drvdata->plat_dev->dev;
 
 	if (ctx->digest_buff_dma_addr != 0) {
-		SSI_RESTORE_DMA_ADDR_TO_48BIT(ctx->digest_buff_dma_addr);
 		dma_unmap_single(dev, ctx->digest_buff_dma_addr,
 				 sizeof(ctx->digest_buff), DMA_BIDIRECTIONAL);
 		SSI_LOG_DEBUG("Unmapped digest-buffer: "
@@ -1388,7 +1358,6 @@ static void ssi_hash_free_ctx(struct ssi_hash_ctx *ctx)
 		ctx->digest_buff_dma_addr = 0;
 	}
 	if (ctx->opad_tmp_keys_dma_addr != 0) {
-		SSI_RESTORE_DMA_ADDR_TO_48BIT(ctx->opad_tmp_keys_dma_addr);
 		dma_unmap_single(dev, ctx->opad_tmp_keys_dma_addr,
 				 sizeof(ctx->opad_tmp_keys_buff),
 				 DMA_BIDIRECTIONAL);
@@ -1415,8 +1384,6 @@ static int ssi_hash_alloc_ctx(struct ssi_hash_ctx *ctx)
 			sizeof(ctx->digest_buff), ctx->digest_buff);
 		goto fail;
 	}
-	SSI_UPDATE_DMA_ADDR_TO_48BIT(ctx->digest_buff_dma_addr,
-						sizeof(ctx->digest_buff));
 	SSI_LOG_DEBUG("Mapped digest %zu B at va=%pK to dma=0x%llX\n",
 		sizeof(ctx->digest_buff), ctx->digest_buff,
 		(unsigned long long)ctx->digest_buff_dma_addr);
@@ -1428,8 +1395,6 @@ static int ssi_hash_alloc_ctx(struct ssi_hash_ctx *ctx)
 			ctx->opad_tmp_keys_buff);
 		goto fail;
 	}
-	SSI_UPDATE_DMA_ADDR_TO_48BIT(ctx->opad_tmp_keys_dma_addr,
-					sizeof(ctx->opad_tmp_keys_buff));
 	SSI_LOG_DEBUG("Mapped opad_tmp_keys %zu B at va=%pK to dma=0x%llX\n",
 		sizeof(ctx->opad_tmp_keys_buff), ctx->opad_tmp_keys_buff,
 		(unsigned long long)ctx->opad_tmp_keys_dma_addr);
