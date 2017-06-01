@@ -83,6 +83,9 @@
 #warning Unfortunate NUMA and NUMA Balancing config, growing page-frame for last_cpupid.
 #endif
 
+/* A preset threshold for considering page remapping */
+unsigned long vm_nr_remapping = 32;
+
 #ifndef CONFIG_NEED_MULTIPLE_NODES
 /* use the per-pgdat data instead for discontigmem - mbligh */
 unsigned long max_mapnr;
@@ -3374,6 +3377,82 @@ out:
 	return ret;
 }
 
+static int redo_fault_around(struct vm_fault *vmf)
+{
+	unsigned long address = vmf->address, nr_pages, mask;
+	pgoff_t start_pgoff = vmf->pgoff;
+	pgoff_t end_pgoff;
+	pte_t *lpte, *rpte;
+	int off, ret = 0, is_mapped = 0;
+
+	nr_pages = READ_ONCE(fault_around_bytes) >> PAGE_SHIFT;
+	mask = ~(nr_pages * PAGE_SIZE - 1) & PAGE_MASK;
+
+	vmf->address = max(address & mask, vmf->vma->vm_start);
+	off = ((address - vmf->address) >> PAGE_SHIFT) & (PTRS_PER_PTE - 1);
+	start_pgoff -= off;
+
+	/*
+	 *  end_pgoff is either end of page table or end of vma
+	 *  or fault_around_pages() from start_pgoff, depending what is nearest.
+	 */
+	end_pgoff = start_pgoff -
+		((vmf->address >> PAGE_SHIFT) & (PTRS_PER_PTE - 1)) +
+		PTRS_PER_PTE - 1;
+	end_pgoff = min3(end_pgoff, vma_pages(vmf->vma) + vmf->vma->vm_pgoff - 1,
+			start_pgoff + nr_pages - 1);
+
+	if (nr_pages < vm_nr_remapping) {
+		int i, start_off = 0, end_off = 0;
+
+		lpte = vmf->pte - off;
+		for (i = 0; i < nr_pages; i++) {
+			if (!pte_none(*lpte)) {
+				is_mapped++;
+			} else {
+				if (!start_off)
+					start_off = i;
+				end_off = i;
+			}
+			lpte++;
+		}
+		if (is_mapped != nr_pages) {
+			is_mapped = 0;
+			end_pgoff = start_pgoff + end_off;
+			start_pgoff += start_off;
+			vmf->pte += start_off;
+		}
+		lpte = NULL;
+	} else {
+		lpte = vmf->pte - 1;
+		rpte = vmf->pte + 1;
+		if (!pte_none(*lpte) && !pte_none(*rpte))
+			is_mapped = 1;
+		lpte = NULL;
+		rpte = NULL;
+	}
+
+	if (!is_mapped) {
+		vmf->pte -= off;
+		vmf->vma->vm_ops->map_pages(vmf, start_pgoff, end_pgoff);
+		vmf->pte -= (vmf->address >> PAGE_SHIFT) - (address >> PAGE_SHIFT);
+	}
+
+	/* Huge page is mapped? Page fault is solved */
+	if (pmd_trans_huge(*vmf->pmd)) {
+		ret = VM_FAULT_NOPAGE;
+		goto out;
+	}
+
+	if (vmf->pte)
+		pte_unmap_unlock(vmf->pte, vmf->ptl);
+
+out:
+	vmf->address = address;
+	vmf->pte = NULL;
+	return ret;
+}
+
 static int do_read_fault(struct vm_fault *vmf)
 {
 	struct vm_area_struct *vma = vmf->vma;
@@ -3393,6 +3472,17 @@ static int do_read_fault(struct vm_fault *vmf)
 	ret = __do_fault(vmf);
 	if (unlikely(ret & (VM_FAULT_ERROR | VM_FAULT_NOPAGE | VM_FAULT_RETRY)))
 		return ret;
+
+	/*
+	 * Remap pages after read
+	 */
+	if (!(vma->vm_flags & VM_RAND_READ) && vma->vm_ops->map_pages
+			&& fault_around_bytes >> PAGE_SHIFT > 1) {
+		ret |= alloc_set_pte(vmf, vmf->memcg, vmf->page);
+		unlock_page(vmf->page);
+		redo_fault_around(vmf);
+		return ret;
+	}
 
 	ret |= finish_fault(vmf);
 	unlock_page(vmf->page);
