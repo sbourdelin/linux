@@ -1638,8 +1638,7 @@ void clean_bdev_aliases(struct block_device *bdev, sector_t block, sector_t len)
 
 	end = (block + len - 1) >> (PAGE_SHIFT - bd_inode->i_blkbits);
 	pagevec_init(&pvec, 0);
-	while (pagevec_lookup_range(&pvec, bd_mapping, &index, end,
-				    PAGEVEC_SIZE)) {
+	while (pagevec_lookup_range(&pvec, bd_mapping, &index, end)) {
 		count = pagevec_count(&pvec);
 		for (i = 0; i < count; i++) {
 			struct page *page = pvec.pages[i];

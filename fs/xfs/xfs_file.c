@@ -1049,7 +1049,7 @@ xfs_find_get_desired_pgoff(
 		unsigned int	i;
 
 		nr_pages = pagevec_lookup_range(&pvec, inode->i_mapping,
-						&index, end, PAGEVEC_SIZE);
+						&index, end);
 		if (nr_pages == 0)
 			break;
 
