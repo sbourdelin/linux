@@ -151,3 +151,14 @@ int sun4i_ddc_create(struct sun4i_hdmi *hdmi, struct clk *parent)
 {
 	return _sun4i_ddc_create(hdmi, parent, &sun4i_variant);
 }
+
+static const struct sun4i_ddc_variant sun6i_variant = {
+	.reg_offset	= SUN6I_HDMI_DDC_CLK_REG,
+	.pre_divider	= 1,
+	.m_offset	= 2,
+};
+
+int sun6i_ddc_create(struct sun4i_hdmi *hdmi, struct clk *parent)
+{
+	return _sun4i_ddc_create(hdmi, parent, &sun6i_variant);
+}
