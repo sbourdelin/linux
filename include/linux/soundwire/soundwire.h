@@ -598,6 +598,8 @@ enum sdw_clok_stop_type {
  * @get_clk_stop_mode: query the clock mode supported, shall return mode
  * based on dynamic if present or property
  * @clk_stop: clock stop callback
+ * @pre_bus_config: apply the given bus config for slave
+ * @port_prep: prepare the port with given parameters
  */
 struct sdw_slave_ops {
 	int (*read_prop)(struct sdw_slave *sdw);
@@ -609,6 +611,11 @@ struct sdw_slave_ops {
 	int (*clk_stop)(struct sdw_slave *slave,
 			enum sdw_clk_stop_mode mode,
 			enum sdw_clok_stop_type type);
+	int (*pre_bus_config)(struct sdw_slave *slave,
+			struct sdw_bus_conf *conf);
+	int (*port_prep)(struct sdw_slave *slave,
+			struct sdw_prepare_ch *prepare_ch,
+			enum sdw_port_prep_ops pre_ops);
 };
 
 /**
@@ -725,6 +732,11 @@ struct sdw_master_ops {
 	enum sdw_command_response (*xfer_msg_async)
 			(struct sdw_bus *bus, struct sdw_msg *msg,
 			int page, struct sdw_wait *wait);
+	int (*set_ssp_interval)(struct sdw_bus *bus, unsigned int ssp_interval,
+			unsigned int bank);
+	int (*set_bus_conf)(struct sdw_bus *bus, struct sdw_bus_conf *conf);
+	int (*pre_bank_switch)(struct sdw_bus *bus);
+	int (*post_bank_switch)(struct sdw_bus *bus);
 };
 
 /**
@@ -938,6 +950,9 @@ int sdw_release_stream(struct sdw_bus *bus, struct sdw_slave *slave,
 int sdw_config_ports(struct sdw_bus *bus, struct sdw_slave *slave,
 				struct sdw_ports_config *ports_config,
 				unsigned int stream_tag);
+int sdw_prepare_and_enable(unsigned int stream_tag);
+
+int sdw_disable_and_deprepare(unsigned int stream_tag);
 
 int sdw_transfer(struct sdw_bus *bus, struct sdw_slave *slave,
 			struct sdw_msg *msg);

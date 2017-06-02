@@ -437,6 +437,8 @@ struct sdw_core {
 
 void sdw_create_row_col_pair(void);
 void sdw_init_bus_params(struct sdw_bus *sdw_bus);
+int sdw_prepare_and_enable_ops(struct sdw_stream_tag *stream_tag);
+int sdw_disable_and_deprepare_ops(struct sdw_stream_tag *stream_tag);
 struct sdw_dpn_prop *sdw_get_slv_dpn_prop(struct sdw_slave *slave,
 				enum sdw_data_direction direction,
 				unsigned int port_num);

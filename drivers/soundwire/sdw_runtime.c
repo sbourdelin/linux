@@ -1542,3 +1542,1119 @@ static int sdw_wait_for_bank_switch(struct sdw_bus *bus)
 
 	return 0;
 }
+
+/**
+ * sdw_update_bus_conf_to_slv: This function updates the new bus parameters
+ * to the Slave driver. New parameters will be in effect on next bank
+ * switch. This is to inform Slave driver to program any implementation
+ * defined registers based on new bus params to the alternate bank of Slave
+ * registers.
+ *
+ * mstr_rt: Master runtime list.
+ * bus_conf: Bus conf
+ */
+static int sdw_update_bus_conf_to_slv(struct sdw_mstr_runtime *mstr_rt,
+					struct sdw_bus_conf *bus_conf)
+{
+	struct sdw_slave *slave;
+	struct sdw_slv_runtime *slv_rt;
+	int ret = 0;
+
+	/* Iterate for all Slave(s) in Slave list */
+	list_for_each_entry(slv_rt, &mstr_rt->slv_rt_list,
+						slave_mstr_node) {
+		slave = slv_rt->slv;
+		if (slave->ops->pre_bus_config)
+			ret = slave->ops->pre_bus_config(slave, bus_conf);
+			if (ret < 0)
+				return ret;
+	}
+
+	return ret;
+}
+
+/**
+ * sdw_program_params: This function performs Master/Slave transport
+ * parameters register programming and also perform bus parameters SSP,
+ * clock gear, register programming. This API is called sdw_prepare_op,
+ * sdw_enable_op, sdw_disable_op and sdw_deprepare_op.
+ *
+ * @sdw_bus: Bus handle.
+ */
+static int sdw_program_params(struct sdw_bus *bus)
+{
+	struct sdw_mstr_runtime *sdw_mstr_rt = NULL;
+	bool chn_en;
+	struct sdw_bus_conf bus_conf;
+	int bank_to_use;
+	int ret = 0;
+
+	/* Iterate for all Master(s) in Master list */
+	list_for_each_entry(sdw_mstr_rt, &bus->mstr_rt_list, mstr_node) {
+		/*
+		 * Program transport and port parameters for Master and Slave
+		 * ports.
+		 */
+		ret = sdw_program_xport_params(bus, sdw_mstr_rt);
+		if (ret < 0) {
+			dev_err(bus->dev, "Program transport parameters failed ret = %d\n", ret);
+			return ret;
+		}
+
+
+		/* Get current bank in use from bus structure */
+		bank_to_use = !bus->params.active_bank;
+
+		/* Program SSP interval API call */
+		if (bus->ops->set_ssp_interval) {
+			ret = bus->ops->set_ssp_interval(bus,
+					bus->params.system_interval,
+					bank_to_use);
+			if (ret < 0) {
+				dev_err(bus->dev, "Program SSP interval failed ret = %d\n", ret);
+				return ret;
+			}
+		}
+
+		/* Program clock gear API call */
+		bus_conf.clk_freq = (bus->params.curr_dr_clk_freq /
+						SDW_DOUBLE_RATE_FACTOR);
+		bus_conf.num_rows = bus->params.row;
+		bus_conf.num_cols = bus->params.col;
+		bus_conf.bank = bank_to_use;
+
+		if (bus->ops->set_bus_conf)
+			bus->ops->set_bus_conf(bus, &bus_conf);
+
+		/* Update new bus params to all the Slaves */
+		ret = sdw_update_bus_conf_to_slv(sdw_mstr_rt, &bus_conf);
+		if (ret < 0) {
+			dev_err(bus->dev, "Update of bus params to Slaves failed ret = %d\n", ret);
+			return ret;
+		}
+
+		/*
+		 * Enable port(s) channel(s) on alternate bank for all active
+		 * streams.
+		 */
+		chn_en = true;
+		ret = sdw_enable_disable_ports(bus, NULL, sdw_mstr_rt,
+								chn_en);
+		if (ret < 0) {
+			dev_err(bus->dev, "Enable channel failed ret = %d\n", ret);
+			return ret;
+		}
+	}
+
+	return ret;
+}
+
+/**
+ * sdw_prep_deprep_slv_ports: This function prepares/de-prepares all the
+ * Slave port(s). It calls all individual APIs to perform:
+ * - Pre-prepare port(s) operation.
+ * - Prepare port(s) operation.
+ * - Post-prepare port(s) operation.
+ * This API is called from sdw_prep_deprep_ports.
+ *
+ * @sdw_bus: Bus handle.
+ * @sdw_slv_rt: Runtime Slave handle.
+ * @prt_slv_strm: Runtime port handle.
+ * @prep: prepare or de-prepare operation.
+ */
+static int sdw_prep_deprep_slv_ports(struct sdw_bus *bus,
+			struct sdw_slv_runtime *sdw_slv_rt,
+			struct sdw_port_runtime *port_slv_rt,
+			bool prep)
+{
+	const struct sdw_slave_ops *ops = sdw_slv_rt->slv->ops;
+	struct sdw_dpn_prop *dpn_prop;
+	struct sdw_prepare_ch prep_ch;
+	int ret = 0;
+	int bank_to_use;
+	u16 addr;
+	u8 wbuf, rbuf;
+
+	/* Get current bank in use from bus structure*/
+	bank_to_use = !bus->params.active_bank;
+
+	dpn_prop = sdw_get_slv_dpn_prop(sdw_slv_rt->slv, sdw_slv_rt->direction,
+						port_slv_rt->port_num);
+	if (!dpn_prop)
+		return -EINVAL;
+
+	/*
+	 * Pre-prepare port(s) API call. There can be case that some Slave
+	 * needs to perform some operations before preparing port(s).
+	 */
+	prep_ch.num = port_slv_rt->port_num;
+	prep_ch.ch_mask = port_slv_rt->channel_mask;
+
+	if (prep)
+		prep_ch.prepare = true;
+	else
+		prep_ch.prepare = false;
+
+	prep_ch.bank = bank_to_use;
+
+	if (ops->port_prep) {
+
+		ret = ops->port_prep(sdw_slv_rt->slv, &prep_ch,
+					SDW_OPS_PORT_PRE_PREP);
+		if (ret < 0) {
+			dev_err(bus->dev, "Slave Port Pre-Prepare failed ret = %d\n", ret);
+			goto out;
+		}
+	}
+
+	/* Prepare Slave port(s) operation */
+	if (!dpn_prop->simple_ch_prep_sm) {
+
+		addr = SDW_DPN_PREPARECTRL +
+			(SDW_NUM_DATA_PORT_REGISTERS * port_slv_rt->port_num);
+
+		/* Read prepare_ctrl Slave register */
+		rbuf = sdw_read(sdw_slv_rt->slv, addr);
+		if (prep)
+			wbuf = (rbuf | port_slv_rt->channel_mask);
+		else
+			wbuf = (rbuf & ~(port_slv_rt->channel_mask));
+
+		/* Write prepare_ctrl Slave register */
+		ret = sdw_write(sdw_slv_rt->slv, addr, wbuf);
+		if (ret != SDW_NUM_MSG1) {
+			ret = -EINVAL;
+			dev_err(bus->dev,
+					"Slave prep_ctrl reg write failed\n");
+			goto out;
+		}
+
+		/* TODO:  Wait for completion on port ready */
+	}
+
+	/*
+	 * Post-prepare port(s) API call. There can be case that some Slave
+	 * needs to perform some operations after preparing port(s).
+	 */
+	if (ops->port_prep) {
+		ret = ops->port_prep(sdw_slv_rt->slv, &prep_ch,
+					SDW_OPS_PORT_POST_PREP);
+		if (ret < 0)
+			dev_err(bus->dev, "Slave Port Post-Prepare failed ret = %d\n", ret);
+	}
+
+out:
+	return ret;
+}
+
+/**
+ * sdw_prep_deprep_mstr_ports: This function prepares/de-prepares all the
+ * Master port(s). It calls all individual APIs to perform:
+ * - Pre-prepare port(s) operation.
+ * - Prepare port(s) operation.
+ * - Post-prepare port(s) operation.
+ * This API is called from sdw_prep_deprep_ports.
+ *
+ * @sdw_bus: Bus handle.
+ * @sdw_mstr_rt: Runtime Master handle.
+ * @prt_slv_strm: Runtime port handle.
+ * @prep: prepare or de-prepare operation.
+ */
+static int sdw_prep_deprep_mstr_ports(struct sdw_bus *bus,
+				struct sdw_mstr_runtime *sdw_mstr_rt,
+				struct sdw_port_runtime *port_rt,
+				bool prep)
+{
+	const struct sdw_master_port_ops *ops = bus->port_ops;
+	struct sdw_prepare_ch prep_ch;
+	int ret = 0;
+
+	/*
+	 * Fill prep_ch structure values with port number, channel mask and
+	 * prepare/de-prepare flag value
+	 */
+	prep_ch.num = port_rt->port_num;
+	prep_ch.ch_mask = port_rt->channel_mask;
+	prep_ch.prepare = prep; /* Prepare/De-prepare */
+	prep_ch.bank = !bus->params.active_bank;
+
+	/*
+	 * Pre-prepare/Pre-deprepare port(s) API call. There can be case
+	 * that some Master(s) needs to perform some operations before
+	 * preparing/de-preparing port(s).
+	 */
+	if (ops->dpn_port_prep) {
+		ret = ops->dpn_port_prep(bus, &prep_ch, SDW_OPS_PORT_PRE_PREP);
+		if (ret < 0)
+			return ret;
+	}
+
+	/* Prepare/De-prepare API call */
+	if (ops->dpn_port_prep) {
+		ret = ops->dpn_port_prep(bus, &prep_ch, SDW_OPS_PORT_PREP);
+		if (ret < 0)
+			return ret;
+	}
+
+	/*
+	 * Post-prepare/Post-deprepare port(s) API call. There can be case
+	 * that some Master(s) needs to perform some operations after
+	 * preparing/de-preparing port(s).
+	 */
+	if (ops->dpn_port_prep) {
+		ret = ops->dpn_port_prep(bus, &prep_ch, SDW_OPS_PORT_POST_PREP);
+		if (ret < 0)
+			return ret;
+	}
+
+	return ret;
+}
+
+/**
+ * sdw_prep_deprep_ports: This function calls individual APIs for
+ * prepare/de-prepare for all the Ports of all the Master(s) and Slave(s)
+ * associated with current stream. This API is called from sdw_prepare_op
+ * and sdw_deprepare_op.
+ *
+ * @sdw_bus: Bus handle.
+ * @sdw_rt: Runtime stream handle.
+ */
+static int sdw_prep_deprep_ports(struct sdw_bus *bus,
+		struct sdw_runtime *sdw_rt, bool is_prep)
+{
+	struct sdw_port_runtime *port_slv_rt, *port_rt;
+	struct sdw_slv_runtime *sdw_slv_rt = NULL;
+	struct sdw_mstr_runtime *sdw_mstr_rt = NULL;
+	struct sdw_dpn_prop *dpn_prop;
+	int ret = 0;
+
+	/* Iterate for all Slave(s) in Slave list */
+	list_for_each_entry(sdw_slv_rt,
+			&sdw_rt->slv_rt_list, slave_strm_node) {
+
+		/* Iterate for all Slave port(s) in port list */
+		list_for_each_entry(port_slv_rt,
+				&sdw_slv_rt->port_rt_list, port_node) {
+
+			dpn_prop = sdw_get_slv_dpn_prop(sdw_slv_rt->slv,
+							sdw_slv_rt->direction,
+							port_slv_rt->port_num);
+			if (!dpn_prop)
+				return -EINVAL;
+
+
+			 /* Enable interrupt before Port prepare */
+			if (is_prep) {
+
+
+				ret = sdw_configure_dpn_intr(sdw_slv_rt->slv,
+						port_slv_rt->port_num, is_prep,
+						dpn_prop->device_interrupts);
+				if (ret < 0)
+					return ret;
+			}
+
+			/*
+			 * Prepare/De-prepare API call for all Slave port(s)
+			 */
+			ret = sdw_prep_deprep_slv_ports(bus,
+					sdw_slv_rt, port_slv_rt,
+					is_prep);
+			if (ret < 0)
+				return ret;
+
+			 /* Disable interrupt after Port de-prepare */
+			if (!is_prep) {
+
+				ret = sdw_configure_dpn_intr(sdw_slv_rt->slv,
+						port_slv_rt->port_num, is_prep,
+						dpn_prop->device_interrupts);
+				if (ret < 0)
+					return ret;
+
+			}
+		}
+	}
+
+	/* Iterate for all Master(s) in Master list */
+	list_for_each_entry(sdw_mstr_rt,
+			&sdw_rt->mstr_rt_list, mstr_strm_node) {
+
+		/* Iterate for all Master port(s) in port list */
+		list_for_each_entry(port_rt,
+			&sdw_mstr_rt->port_rt_list, port_node) {
+
+			/*
+			 * Prepare/De-prepare API call for all Master
+			 * port(s)
+			 */
+			ret = sdw_prep_deprep_mstr_ports(bus,
+					sdw_mstr_rt, port_rt,
+					is_prep);
+			if (ret < 0)
+				return ret;
+		}
+	}
+
+	return ret;
+}
+
+
+/**
+ * sdw_check_strm_params: Validates all the received stream parameters with
+ * the Master capabilities on which current stream will be running.  This
+ * API is called from sdw_prepare_op.
+ *
+ * @master_prop: Master capabilities.
+ * @mstr_params: Master PCM parameters.
+ * @stream_params: Stream PCM parameters.
+ */
+static int sdw_check_strm_params(struct sdw_master_prop *master_prop,
+			struct sdw_stream_params *mstr_params,
+			struct sdw_stream_params *stream_params)
+{
+	/*
+	 * Note: Asynchronous mode not supported, return error in case
+	 * stream is not operating in isochronous mode.
+	 */
+	if ((master_prop->max_freq % mstr_params->rate) != 0)
+		return -EINVAL;
+
+	/* Check for sampling frequency */
+	if (stream_params->rate != mstr_params->rate)
+		return -EINVAL;
+
+	return 0;
+}
+
+/**
+ * sdw_compute_params: This function calls individual API's for computing
+ * clock frequency, frame shape, frame frequency, SSP for bus and all
+ * transport/port port parameters for Master and Slave port(s). This API is
+ * called from sdw_prepare_op and sdw_deprepare_op.
+ *
+ * @sdw_bus: Bus handle.
+ * @sdw_mstr_rt: Runtime Master handle.
+ */
+static int sdw_compute_params(struct sdw_bus *bus,
+		struct sdw_mstr_runtime *sdw_mstr_rt)
+{
+
+	int ret, frame_interval = 0;
+
+	/*
+	 * Compute bus parameters API Call. It computes clock frequency
+	 * based on current bandwidth required for bus. It also computes
+	 * frame shape and SoundWire frame frequency.
+	 */
+	ret = sdw_compute_bus_params(bus, &frame_interval, sdw_mstr_rt);
+	if (ret < 0) {
+		dev_err(bus->dev, "Compute bus parameters failed ret = %d\n", ret);
+		return ret;
+	}
+
+	/*
+	 * Compute system interval API call. It computes system interval and
+	 * stream interval for bus which is required for computing SSP.
+	 */
+	ret = sdw_compute_system_interval(bus, frame_interval);
+	if (ret < 0) {
+		dev_err(bus->dev, "Compute system interval failed ret = %d\n", ret);
+		return ret;
+	}
+
+	/*
+	 * Compute transport parameters API call. It computes all the
+	 * transport parameters for all Master(s) associated with current
+	 * stream and all Slave(s) associated with Master(s).
+	 */
+	ret = sdw_compute_xport_params(bus);
+	if (ret < 0) {
+		dev_err(bus->dev, "Compute transport parameters failed ret = %d\n", ret);
+		return ret;
+	}
+
+	return 0;
+}
+
+/**
+ * sdw_update_bus_params_ops: This API performs one of the following
+ * operation based on bus state. Called from sdw_update_bus_params API.
+ * - pre-enable port(s) channel(s).
+ * - bank switch operation.
+ * - post-enable port channel.
+ * - bank-switch wait operation.
+ * - disable port(s) channel(s) operation.
+ *
+ * @sdw_rt: Runtime stream handle.
+ * @bus_state: Operation to be performed.
+ */
+static int sdw_update_bus_params_ops(struct sdw_runtime *sdw_rt,
+				enum sdw_update_bus_ops bus_state)
+{
+	struct sdw_mstr_runtime	*sdw_mstr_rt = NULL;
+	struct sdw_bus *bus = NULL;
+	const struct sdw_master_ops *ops;
+	bool chn_en;
+	int ret = 0;
+
+	/* TODO: Implement ops */
+	/* Iterate for all Master(s) in Master list */
+	list_for_each_entry(sdw_mstr_rt, &sdw_rt->mstr_rt_list,
+					mstr_strm_node) {
+
+		ops = sdw_mstr_rt->bus->ops;
+
+		/*
+		 * Note that currently all the operations of aggregation
+		 * mode are performed sequentially. The switch case is kept
+		 * in order for code to scale where below operations can be
+		 * performed or called in different order.
+		 */
+		switch (bus_state) {
+		case SDW_BUS_PORT_PRE:
+			/* Pre-enable port(s) channel(s) */
+			if (ops->pre_bank_switch) {
+				ret = ops->pre_bank_switch(bus);
+				if (ret < 0)
+					return ret;
+			}
+			break;
+
+		case SDW_BUS_BANK_SWITCH:
+			/* Bank-switch operation */
+			ret = sdw_bank_switch(bus);
+			if (ret < 0)
+				return ret;
+			break;
+
+		case SDW_BUS_PORT_POST:
+			/* Post-enable port(s) channel(s) */
+			if (ops->post_bank_switch) {
+				ret = ops->post_bank_switch(bus);
+				if (ret < 0)
+					return ret;
+			}
+			break;
+
+		case SDW_BUS_BANK_SWITCH_WAIT:
+			/* Bank-switch wait operation */
+			ret = sdw_wait_for_bank_switch(bus);
+			if (ret < 0)
+				return ret;
+			break;
+
+		case SDW_BUS_PORT_DIS_CHN:
+			/*
+			 * Disable channel on previous bank for all active
+			 * stream(s)
+			 */
+			chn_en = false;
+			ret = sdw_enable_disable_ports(bus, NULL,
+				sdw_mstr_rt, chn_en);
+			if (ret < 0)
+				return ret;
+			break;
+
+		default:
+			return -EINVAL;
+			break;
+		}
+	}
+
+	return ret;
+}
+
+/**
+ * sdw_update_bus_params: Once all the bus and port parameters are
+ * programmed, this function performs bank-switch where all the new
+ * configured parameters gets in effect on alternate.The bank-switch
+ * operation are different for normal and aggregation mode. In normal mode
+ * where only one Master is used for stream, bank-switch is performed
+ * directly followed by disabling channel on previous bank for active
+ * stream. In aggregation mode below flow is used.
+ * - pre-enable port(s) channel(s) operation.
+ * - bank switch operation.
+ * - post-enable port(s) channel(s) operation.
+ * - bank-switch wait operation.
+ * - disable port(s) channel(s) operation.
+ *
+ * @sdw_bus: Bus Handle.
+ * @sdw_rt: Runtime stream handle.
+ * @last_node: Boolean used in case of aggregation mode operation.
+ */
+static int sdw_update_bus_params(struct sdw_bus *bus,
+		struct sdw_runtime *sdw_rt, bool last_node)
+{
+	int ret = 0;
+
+	/*
+	 * The flow in this API is common for both aggregation and
+	 * non-aggregation mode. Bus doesn't differentiate in both of
+	 * the flows, however controller driver should take actions based
+	 * normal or aggregation mode.
+	 */
+
+	/* Check for last node */
+	if (!last_node)
+		return ret;
+
+	/*
+	 * Perform pre-enable ports. There can be case that some of
+	 * controller or Slave port(s) Channel(s) needs to perform some
+	 * operation before enabling port(s) channel(s).
+	 */
+	ret = sdw_update_bus_params_ops(sdw_rt, SDW_BUS_PORT_PRE);
+	if (ret < 0) {
+		dev_err(bus->dev, "Pre-enable port(s) channel(s) failed ret = %d\n", ret);
+		return ret;
+	}
+
+	/*
+	 * Bank-switch operation. Write is broadcast with new rows and
+	 * columns programmed in frame_ctrl register
+	 */
+	ret = sdw_update_bus_params_ops(sdw_rt, SDW_BUS_BANK_SWITCH);
+	if (ret < 0) {
+		dev_err(bus->dev, "Bank switch operation failed ret = %d\n", ret);
+		return ret;
+	}
+
+	/*
+	 * Perform post-enable ports. There can be case that some of
+	 * controller or Slave port(s) Channel(s) needs to perform some
+	 * operation after enabling port(s) channel(s).
+	 */
+	ret = sdw_update_bus_params_ops(sdw_rt, SDW_BUS_PORT_POST);
+	if (ret < 0) {
+		dev_err(bus->dev, "Post-enable port failed ret = %d\n", ret);
+		return ret;
+	}
+
+	/*
+	 * Bank-switch post wait operation. In aggregation mode, bank-switch
+	 * is performed in sync for all Master(s) in post_enable operation.
+	 * This API call check whether bank switch is successful or not.
+	 */
+	ret = sdw_update_bus_params_ops(sdw_rt, SDW_BUS_BANK_SWITCH_WAIT);
+	if (ret < 0) {
+		dev_err(bus->dev, "Bank switch wait operation failed ret = %d\n", ret);
+		return ret;
+	}
+
+	/*
+	 * Disable port(s) channel(s) on previous bank for all active streams.
+	 */
+	ret = sdw_update_bus_params_ops(sdw_rt, SDW_BUS_PORT_DIS_CHN);
+	if (ret < 0) {
+		dev_err(bus->dev, "Disable port(s) channel(s) failed ret = %d\n", ret);
+		return ret;
+	}
+
+	return ret;
+}
+
+/**
+ * sdw_check_last_node: Check for last node in the given list.
+ *
+ * @sdw_mstr_rt: Runtime Master handle.
+ * @sdw_rt: Runtime stream handle.
+ *
+ * Returns true if given node is last node else false.
+ */
+static bool sdw_check_last_node(struct sdw_mstr_runtime *sdw_mstr_rt,
+					struct sdw_runtime *sdw_rt)
+{
+	struct sdw_mstr_runtime	*last_rt = NULL;
+
+	/* Get last entry from given list */
+	last_rt = list_last_entry(&sdw_rt->mstr_rt_list,
+			struct sdw_mstr_runtime, mstr_strm_node);
+	if (sdw_mstr_rt == last_rt)
+		return true;
+	else
+		return false;
+}
+
+/**
+ * sdw_deprepare_op: perform all operations required to de-prepare port(s).
+ * Below is the sequence.
+ * - De-prepare port(s) for current stream.
+ * - Compute bus parameters.
+ * - Program bus parameters.
+ * - Update bus parameters. Switch to alternate bank.
+ * - Change stream state.
+ *
+ * @sdw_bus: Bus handle.
+ * @sdw_mstr_rt: Runtime Master handle.
+ * @sdw_rt: Runtime stream handle.
+ */
+static int sdw_deprepare_op(struct sdw_bus *bus,
+		struct sdw_mstr_runtime *sdw_mstr_rt,
+		struct sdw_runtime *sdw_rt)
+{
+
+	struct sdw_stream_params *mstr_params;
+	bool last_node = false;
+	int ret;
+
+	/*
+	 * Check whether current Master handle is last in the list This is
+	 * needed because some operations in sdw_update_bus_params are only
+	 * performed when all Master(s)/Slave(s) processing is done. Also
+	 * the stream state is changed after all Master(s)/Slave(s)
+	 * processing is done.
+	 */
+	last_node = sdw_check_last_node(sdw_mstr_rt, sdw_rt);
+	mstr_params = &sdw_mstr_rt->stream_params;
+
+	/*
+	 * De-prepare port(s) for Master and Slave associated with current
+	 * stream
+	 */
+	ret = sdw_prep_deprep_ports(bus, sdw_rt, false);
+	if (ret < 0) {
+		dev_err(bus->dev, "De-prepare port(s) failed ret = %d\n", ret);
+		return ret;
+	}
+
+	/* Calculate cumulative bus bandwidth */
+	sdw_mstr_rt->bus_rt.stream_bw = mstr_params->rate *
+		mstr_params->channel_count * mstr_params->bps;
+	bus->params.bandwidth -= sdw_mstr_rt->bus_rt.stream_bw;
+
+	/* Perform error check on bus cumulative bandwidth */
+	if (!bus->params.bandwidth) {
+		dev_err(bus->dev, "Bandwidth calculation failed\n");
+		return -EINVAL;
+	}
+
+	/* Check for any active stream on current bus handle */
+	if (bus->params.bandwidth == 0) {
+
+		bus->params.system_interval = 0;
+		bus->params.stream_interval = 0;
+		bus->params.frame_freq = 0;
+
+		/* Change stream state to DEPREPARE */
+		if (last_node)
+			sdw_rt->stream_state = SDW_STATE_STRM_DEPREPARE;
+
+		/*
+		 * No active stream on current bus handle, return
+		 * successfully
+		 */
+		return 0;
+	}
+
+	/*
+	 * Compute bus parameters and transport parameters for current
+	 * Master handle and the Slave(s) associated with it. Bus parameters
+	 * includes computation of clock, frame shape, frame frequency, SSP
+	 * and transport parameters includes computation of hstart, hstop,
+	 * blockoffset, subblockoffset, blockpackingmode, lanecontrol etc.
+	 */
+	ret = sdw_compute_params(bus, sdw_mstr_rt);
+	if (ret < 0) {
+		dev_err(bus->dev, "Parameter computation failed ret = %d\n", ret);
+		return ret;
+	}
+
+	/*
+	 * Program bus parameters and transport parameters for current
+	 * Master handle and Slave(s) associated with it. Bus parameters
+	 * includes programming clock gear, SSP registers. Transport
+	 * parameters includes programming registers for hstart, hstop,
+	 * blockoffset, subblockoffset, blockpackingmode, lanecontrol,
+	 * SampleInterval, etc.
+	 */
+	ret = sdw_program_params(bus);
+	if (ret < 0) {
+		dev_err(bus->dev, "Transport parameters configuration failed ret = %d\n", ret);
+		return ret;
+	}
+
+	/*
+	 * Update bus parameters which is basically bank switch operation
+	 * where bus switches from current bank to alternate bank where new
+	 * programmed values take effect. Bank switch operation can be
+	 * performed for individual bus or for multiple bus in sync based on
+	 * stream configuration.
+	 */
+	ret = sdw_update_bus_params(bus, sdw_rt, last_node);
+	if (ret < 0) {
+		dev_err(bus->dev, "Update parameters failed ret = %d\n", ret);
+		return ret;
+	}
+
+	/* Change stream state to DEPREPARE */
+	if (last_node)
+		sdw_rt->stream_state = SDW_STATE_STRM_DEPREPARE;
+
+	return ret;
+}
+
+/**
+ * sdw_disable_op: perform all operations required to disable port(s)
+ * channel(s). Below is sequence.
+ * - Disable Master/Slave port(s) channel(s) for current stream.
+ * - Program bus parameters.
+ * - Update bus parameters. Switch to alternate bank.
+ * - Change stream state.
+ *
+ * @sdw_bus: Bus handle.
+ * @sdw_mstr_rt: Runtime Master handle.
+ * @sdw_rt: Runtime stream handle.
+ */
+static int sdw_disable_op(struct sdw_bus *bus,
+			struct sdw_mstr_runtime *sdw_mstr_rt,
+			struct sdw_runtime *sdw_rt)
+{
+
+	bool last_node = false;
+	bool chn_en;
+	int ret;
+
+	/*
+	 * Check whether current Master handle is last in the list This is
+	 * needed because some operations in sdw_update_bus_params are only
+	 * performed when all Master(s)/Slave(s) processing is done. Also
+	 * the stream state is changed after all Master(s)/Slave(s)
+	 * processing is done.
+	 */
+	last_node = sdw_check_last_node(sdw_mstr_rt, sdw_rt);
+
+	/*
+	 * Disable port(s) channel(s) for Master(s) and Slave(s) associated
+	 * with current stream
+	 */
+	chn_en = false;
+	ret = sdw_enable_disable_ports(bus, sdw_rt, NULL, chn_en);
+	if (ret < 0) {
+		dev_err(bus->dev, "Disable port(s) channel(s) failed ret = %d\n", ret);
+		return ret;
+	}
+
+	/*
+	 * Program bus parameters and transport parameters for current
+	 * Master handle and Slave(s) associated with it. Bus parameters
+	 * includes programming clock gear, SSP registers. Transport
+	 * parameters includes programming registers for hstart, hstop,
+	 * blockoffset, subblockoffset, blockpackingmode, lanecontrol, etc.
+	 */
+	ret = sdw_program_params(bus);
+	if (ret < 0) {
+		dev_err(bus->dev, "Program parameters failed ret = %d\n", ret);
+		return ret;
+	}
+
+	/*
+	 * Update bus parameters which is basically bank switch operation
+	 * where bus switches from current bank to alternate bank where new
+	 * programmed values take effect. Bank switch operation can be
+	 * performed for individual bus or for multiple bus in sync based on
+	 * stream configuration.
+	 */
+	ret = sdw_update_bus_params(bus, sdw_rt, last_node);
+	if (ret < 0) {
+		dev_err(bus->dev, "Update parameters failed ret = %d\n", ret);
+		return ret;
+	}
+
+	/* Change stream state to DISABLE */
+	if (last_node)
+		sdw_rt->stream_state = SDW_STATE_STRM_DISABLE;
+
+	return ret;
+}
+
+/**
+ * sdw_enable_op: perform all operations required to enable port(s) channel(s).
+ * Below is sequence.
+ * - Program bus parameters.
+ * - Enable Master/Slave port(s) channel(s) for current stream.
+ * - Update bus parameters. Switch to alternate bank.
+ * - Change stream state.
+ *
+ * @sdw_bus: Bus handle.
+ * @sdw_mstr_rt: Runtime Master handle.
+ * @sdw_rt: Runtime stream handle.
+ */
+static int sdw_enable_op(struct sdw_bus *bus,
+		struct sdw_mstr_runtime *sdw_mstr_rt,
+		struct sdw_runtime *sdw_rt)
+{
+
+	bool last_node = false;
+	bool chn_en;
+	int ret;
+
+	/*
+	 * Check whether current Master handle is last in the list This is
+	 * needed because some operations in sdw_update_bus_params are only
+	 * performed when all Master(s)/Slave(s) processing is done. Also
+	 * the stream state is changed after all Master(s)/Slave(s)
+	 * processing is done.
+	 */
+	last_node = sdw_check_last_node(sdw_mstr_rt, sdw_rt);
+
+	/*
+	 * Program bus parameters and transport parameters for current
+	 * Master handle and Slave(s) associated with it. Bus parameters
+	 * includes programming clock gear, SSP registers. Transport
+	 * parameters includes programming registers for hstart, hstop,
+	 * blockoffset, subblockoffset, blockpackingmode, lanecontrol, etc.
+	 */
+	ret = sdw_program_params(bus);
+	if (ret < 0) {
+		dev_err(bus->dev, "Program parameters failed ret = %d\n", ret);
+		return ret;
+	}
+
+	/*
+	 * Enable port(s) channel(s) for Master(s) and Slave(s) associated
+	 * with current stream
+	 */
+	chn_en = true;
+	ret = sdw_enable_disable_ports(bus, sdw_rt, NULL, chn_en);
+	if (ret < 0) {
+		dev_err(bus->dev, "Enable port(s) channel(s) failed ret = %d\n", ret);
+		return ret;
+	}
+
+	/*
+	 * Update bus parameters which is basically bank switch operation
+	 * where bus switches from current bank to alternate bank where new
+	 * programmed values take effect. Bank switch operation can be
+	 * performed for individual bus or for multiple bus in sync based on
+	 * stream configuration.
+	 */
+	ret = sdw_update_bus_params(bus, sdw_rt, last_node);
+	if (ret < 0) {
+		dev_err(bus->dev, "Update parameters failed ret = %d\n", ret);
+		return ret;
+	}
+
+	/* Change stream state to ENABLE */
+	if (last_node)
+		sdw_rt->stream_state = SDW_STATE_STRM_ENABLE;
+
+	return ret;
+}
+
+/**
+ * sdw_prepare_op: Perform all operations required to prepare ports. Below is
+ * sequence.
+ * - Cross check stream parameters with Master parameters.
+ * - Compute bus and transport parameters.
+ * - Program bus and transport parameters.
+ * - Update bus parameters. Switch to alternate bank.
+ * - Prepare port(s) for current stream.
+ * - Change stream state.
+ *
+ * @sdw_bus: Bus handle.
+ * @sdw_mstr_rt: Runtime Master handle.
+ * @sdw_rt: Runtime stream handle.
+ */
+static int sdw_prepare_op(struct sdw_bus *bus,
+	struct sdw_mstr_runtime *sdw_mstr_rt,
+	struct sdw_runtime *sdw_rt)
+{
+	struct sdw_stream_params *stream_params = &sdw_rt->stream_params;
+	struct sdw_master_prop *master_prop = &bus->prop;
+	struct sdw_stream_params *mstr_params;
+	bool last_node = false;
+	int ret;
+
+	/*
+	 * Check whether current Master handle is last in the list This is
+	 * needed because some operations in sdw_update_bus_params are only
+	 * performed when all Master(s)/Slave(s) processing is done. Also
+	 * the stream state is changed after all Master(s)/Slave(s)
+	 * processing is done.
+	 */
+	last_node = sdw_check_last_node(sdw_mstr_rt, sdw_rt);
+
+	/* Retrieve stream parameters */
+	mstr_params = &sdw_mstr_rt->stream_params;
+
+	/* Check for isochronous mode, sample rate support etc. */
+	ret = sdw_check_strm_params(master_prop, mstr_params, stream_params);
+	if (ret < 0) {
+		dev_err(bus->dev, "Check for stream parameters failed ret = %d\n", ret);
+		return ret;
+	}
+
+	/* Calculate stream bandwidth and cumulative bus bandwidth */
+	sdw_mstr_rt->bus_rt.stream_bw = mstr_params->rate *
+		mstr_params->channel_count * mstr_params->bps;
+	bus->params.bandwidth += sdw_mstr_rt->bus_rt.stream_bw;
+
+	/*
+	 * Compute bus parameters and transport parameters for current
+	 * Master and the Slave(s) associated with it. Bus parameters
+	 * includes computation of clock, frame shape, frame frequency, SSP
+	 * and transport parameters includes computation of hstart, hstop,
+	 * blockoffset, subblockoffset, blockpackingmode etc for all the
+	 * Ports of this Master and Slave(s) associated with current stream
+	 * and already active streams.
+	 */
+	ret = sdw_compute_params(bus, sdw_mstr_rt);
+	if (ret < 0) {
+		dev_err(bus->dev, "Compute parameters failed ret = %d\n", ret);
+		return ret;
+	}
+
+	/*
+	 * Program bus parameters and transport parameters for current
+	 * Master and Slave(s) associated with it. Bus parameters includes
+	 * programming clock gear, SSP registers. Transport parameters
+	 * includes programming registers for hstart, hstop, blockoffset,
+	 * subblockoffset, blockpackingmode, lanecontrol, etc.
+	 */
+	ret = sdw_program_params(bus);
+	if (ret < 0) {
+		dev_err(bus->dev, "Program parameters failed ret = %d\n", ret);
+		return ret;
+	}
+
+	/*
+	 * Update bus parameters which is basically bank switch operation
+	 * where bus switches from current bank to alternate bank where new
+	 * programmed values take effect. Bank switch operation can be
+	 * performed for individual bus or for multiple bus in sync based on
+	 * stream configuration.
+	 */
+	ret = sdw_update_bus_params(bus, sdw_rt, last_node);
+	if (ret < 0) {
+		dev_err(bus->dev, "Update parameters failed ret = %d\n", ret);
+		return ret;
+	}
+
+	/*
+	 * Prepare port(s) for Master and Slave associated with current
+	 * stream
+	 */
+	ret = sdw_prep_deprep_ports(bus, sdw_rt, true);
+	if (ret < 0) {
+		dev_err(bus->dev, "Prepare port(s) failed ret = %d\n", ret);
+		return ret;
+	}
+
+	/* Change stream state to PREPARE */
+	if (last_node)
+		sdw_rt->stream_state = SDW_STATE_STRM_PREPARE;
+
+	return ret;
+}
+
+/**
+ * sdw_prepare_and_enable_ops: This is called by the bus for doing
+ * operations related to stream prepare and enable. sdw_bus_ops are
+ * performed on bus for preparing and enabling of the streams.
+ *
+ * @stream_tag: Stream tag on which operations needs to be performed.
+ */
+int sdw_prepare_and_enable_ops(struct sdw_stream_tag *stream_tag)
+{
+	struct sdw_runtime *sdw_rt = stream_tag->sdw_rt;
+	struct sdw_mstr_runtime *sdw_mstr_rt = NULL;
+	struct sdw_bus *bus = NULL;
+	int ret = 0;
+
+	/*
+	 * Perform prepare and enable operation on all the Masters and
+	 * Slaves associated with stream. Note that the loop is iterated for
+	 * all Master. Stream with only Slave to Slave communication is not
+	 * supported.
+	 */
+
+	/* Check stream state whether to perform prepare & enable operation */
+	if (sdw_rt->stream_state != SDW_STATE_STRM_CONFIG)
+		return ret;
+
+	/* Iterate for all Master(s) in Master list for Prepare operation */
+	list_for_each_entry(sdw_mstr_rt, &sdw_rt->mstr_rt_list,
+					mstr_strm_node) {
+		/* Get bus structure */
+		bus = sdw_mstr_rt->bus;
+
+		/* Prepare operation of Master/Slave port(s) */
+		ret = sdw_prepare_op(bus, sdw_mstr_rt, sdw_rt);
+		if (ret < 0) {
+			dev_err(bus->dev, "Prepare Operation failed ret = %d\n", ret);
+			return -EINVAL;
+		}
+	}
+
+	/* Iterate for all Master(s) in Master list for Enable operation */
+	list_for_each_entry(sdw_mstr_rt, &sdw_rt->mstr_rt_list,
+					mstr_strm_node) {
+
+		/* Get bus structure */
+		bus = sdw_mstr_rt->bus;
+
+		/* Enable operation of Master/Slave port(s) channel(s) */
+		ret = sdw_enable_op(bus, sdw_mstr_rt, sdw_rt);
+		if (ret < 0) {
+			dev_err(bus->dev, "Enable Operation failed ret = %d\n", ret);
+			return -EINVAL;
+		}
+	}
+
+	return ret;
+}
+
+/**
+ * sdw_disable_and_deprepare_ops: This is called by the bus for doing
+ * operations related to stream disable and de-prepare.sdw_bus_ops are
+ * performed on bus for disabling and de-preparing of the streams.
+ *
+ * @stream_tag: Stream tag on which operations needs to be performed.
+ */
+int sdw_disable_and_deprepare_ops(struct sdw_stream_tag *stream_tag)
+{
+	struct sdw_runtime *sdw_rt = stream_tag->sdw_rt;
+	struct sdw_mstr_runtime *sdw_mstr_rt = NULL;
+	struct sdw_bus *bus = NULL;
+	int ret = 0;
+
+	/*
+	 * Check stream state whether to perform disable &
+	 * deprepare operation
+	 */
+	if (sdw_rt->stream_state != SDW_STATE_STRM_ENABLE)
+		return ret;
+
+	/* Iterate for all Master(s) in Master list for Disable operation */
+	list_for_each_entry(sdw_mstr_rt,
+			&sdw_rt->mstr_rt_list, mstr_strm_node) {
+
+		/* Get bus structure */
+		bus = sdw_mstr_rt->bus;
+
+		/* Disable operation of Master/Slave port(s) channel(s) */
+		ret = sdw_disable_op(bus, sdw_mstr_rt, sdw_rt);
+		if (ret < 0) {
+			dev_err(bus->dev, "Disable Operation failed ret = %d\n", ret);
+			return -EINVAL;
+		}
+	}
+
+	/* Iterate for all Master(s) in Master list for De-prepare operation */
+	list_for_each_entry(sdw_mstr_rt,
+			&sdw_rt->mstr_rt_list, mstr_strm_node) {
+
+		/* Get bus structure */
+		bus = sdw_mstr_rt->bus;
+
+		/* Disable operation of Master/Slave port(s) */
+		ret = sdw_deprepare_op(bus, sdw_mstr_rt, sdw_rt);
+		if (ret < 0) {
+			dev_err(bus->dev, "De-prepare Operation failed ret = %d\n", ret);
+			return -EINVAL;
+		}
+	}
+
+	return ret;
+}
