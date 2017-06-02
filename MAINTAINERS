@@ -6085,6 +6085,11 @@ S:	Supported
 F:	drivers/scsi/hisi_sas/
 F:	Documentation/devicetree/bindings/scsi/hisilicon-sas.txt
 
+HMEM (ACPI HETEROGENEOUS MEMORY SUPPORT)
+M:	Ross Zwisler <ross.zwisler@linux.intel.com>
+S:	Supported
+F:	drivers/acpi/hmem/
+
 HOST AP DRIVER
 M:	Jouni Malinen <j@w1.fi>
 L:	linux-wireless@vger.kernel.org

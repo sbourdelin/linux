@@ -1,0 +1,7 @@
+config ACPI_HMEM
+	bool "ACPI Heterogeneous Memory Support"
+	depends on ACPI_NUMA
+	depends on SYSFS
+	help
+	  Exports a sysfs representation of the ACPI Heterogeneous Memory
+	  Attributes Table (HMAT).
