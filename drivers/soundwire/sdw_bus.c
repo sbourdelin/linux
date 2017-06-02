@@ -87,6 +87,8 @@ int sdw_add_bus_master(struct sdw_bus *bus)
 	if (bus->ops->read_prop)
 		bus->ops->read_prop(bus);
 
+	sdw_sysfs_bus_init(bus);
+
 	/*
 	 * SDW is an enumerable bus, but devices can be powered off, so they
 	 * won't be able to report as present.

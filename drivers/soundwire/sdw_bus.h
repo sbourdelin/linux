@@ -66,4 +66,6 @@ int sdw_acpi_find_slaves(struct sdw_bus *bus)
 }
 #endif
 
+extern const struct attribute_group *slave_dev_attr_groups[];
+
 #endif /* __SDW_BUS_H */

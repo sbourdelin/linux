@@ -494,6 +494,7 @@ struct sdw_slave_ops {
  * @bus: bus for this slave
  * @ops: slave callback ops
  * @prop: slave properties
+ * @sysfs: sysfs for this slave
  * @node: node for bus list of slaves
  * @addr: Logical address
  */
@@ -545,6 +546,7 @@ struct sdw_master_prop {
 	struct sdw_dpn_prop *dpn_prop;
 };
 
+struct sdw_master_sysfs;
 struct sdw_msg;
 struct sdw_wait;
 
@@ -605,6 +607,7 @@ struct sdw_wait {
  * @lock: bus lock
  * @ops: master callback ops
  * @prop: master properties
+ * @sysfs: bus sysfs
  * @wait_msg: wait messages for async messages
  */
 struct sdw_bus {
@@ -617,11 +620,19 @@ struct sdw_bus {
 	spinlock_t lock;
 	const struct sdw_master_ops *ops;
 	struct sdw_master_prop prop;
+	struct sdw_master_sysfs *sysfs;
 	struct sdw_wait wait_msg;
 };
 
 int sdw_add_bus_master(struct sdw_bus *bus);
 void sdw_delete_bus_master(struct sdw_bus *bus);
+
+struct sdw_slave_sysfs;
+
+int sdw_sysfs_bus_init(struct sdw_bus *bus);
+void sdw_sysfs_bus_exit(struct sdw_bus *bus);
+int sdw_sysfs_slave_init(struct sdw_slave *slave);
+void sdw_sysfs_slave_exit(struct sdw_slave *slave);
 
 struct sdw_driver {
 	const char *name;

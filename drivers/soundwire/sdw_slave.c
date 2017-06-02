@@ -115,6 +115,7 @@ static int sdw_add_slave(struct sdw_bus *bus,
 	slave->dev.fwnode = fwnode;
 	dev_set_name(&slave->dev, "%s", name);
 	slave->dev.release = sdw_slave_release;
+	slave->dev.groups = slave_dev_attr_groups;
 	slave->dev.bus = &sdw_bus_type;
 	slave->bus = bus;
 	slave->status = SDW_SLAVE_NOT_PRESENT;
