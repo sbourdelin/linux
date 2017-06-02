@@ -28,12 +28,24 @@
 #include <media/v4l2-ioctl.h>
 #include <media/videobuf2-v4l2.h>
 #include <media/videobuf2-dma-contig.h>
+#if defined(CONFIG_EXYNOS_IOMMU) && defined(CONFIG_ARM_DMA_USE_IOMMU)
+#include <asm/dma-iommu.h>
+#include <linux/dma-iommu.h>
+#include <linux/dma-mapping.h>
+#include <linux/iommu.h>
+#include <linux/kref.h>
+#include <linux/of_platform.h>
+#endif
 
 #include "jpeg-core.h"
 #include "jpeg-hw-s5p.h"
 #include "jpeg-hw-exynos4.h"
 #include "jpeg-hw-exynos3250.h"
 #include "jpeg-regs.h"
+
+#if defined(CONFIG_EXYNOS_IOMMU) && defined(CONFIG_ARM_DMA_USE_IOMMU)
+static struct dma_iommu_mapping *mapping;
+#endif
 
 static struct s5p_jpeg_fmt sjpeg_formats[] = {
 	{
@@ -955,6 +967,60 @@ static void exynos4_jpeg_parse_q_tbl(struct s5p_jpeg_ctx *ctx)
 		}
 	}
 }
+
+#if defined(CONFIG_EXYNOS_IOMMU) && defined(CONFIG_ARM_DMA_USE_IOMMU)
+static int jpeg_iommu_init(struct platform_device *pdev)
+{
+	struct device *dev = &pdev->dev;
+	int err;
+
+	mapping = arm_iommu_create_mapping(&platform_bus_type, 0x20000000,
+					   SZ_512M);
+	if (IS_ERR(mapping)) {
+		dev_err(dev, "IOMMU mapping failed\n");
+		return PTR_ERR(mapping);
+	}
+
+	dev->dma_parms = devm_kzalloc(dev, sizeof(*dev->dma_parms), GFP_KERNEL);
+	if (!dev->dma_parms) {
+		err = -ENOMEM;
+		goto error_alloc;
+	}
+
+	err = dma_set_max_seg_size(dev, 0xffffffffu);
+	if (err)
+		goto error;
+
+	err = arm_iommu_attach_device(dev, mapping);
+	if (err)
+		goto error;
+
+	return 0;
+
+error:
+	devm_kfree(dev, dev->dma_parms);
+	dev->dma_parms = NULL;
+
+error_alloc:
+	arm_iommu_release_mapping(mapping);
+	mapping = NULL;
+
+	return err;
+}
+
+static void jpeg_iommu_deinit(struct platform_device *pdev)
+{
+	struct device *dev = &pdev->dev;
+
+	if (mapping) {
+		arm_iommu_detach_device(dev);
+		devm_kfree(dev, dev->dma_parms);
+		dev->dma_parms = NULL;
+		arm_iommu_release_mapping(mapping);
+		mapping = NULL;
+	}
+}
+#endif
 
 /*
  * ============================================================================
@@ -2816,6 +2882,13 @@ static int s5p_jpeg_probe(struct platform_device *pdev)
 	spin_lock_init(&jpeg->slock);
 	jpeg->dev = &pdev->dev;
 
+#if defined(CONFIG_EXYNOS_IOMMU) && defined(CONFIG_ARM_DMA_USE_IOMMU)
+	ret = jpeg_iommu_init(pdev);
+	if (ret) {
+		dev_err(&pdev->dev, "IOMMU Initialization failed\n");
+		return ret;
+	}
+#endif
 	/* memory-mapped registers */
 	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
 
@@ -2961,6 +3034,10 @@ static int s5p_jpeg_remove(struct platform_device *pdev)
 		for (i = jpeg->variant->num_clocks - 1; i >= 0; i--)
 			clk_disable_unprepare(jpeg->clocks[i]);
 	}
+
+#if defined(CONFIG_EXYNOS_IOMMU) && defined(CONFIG_ARM_DMA_USE_IOMMU)
+	jpeg_iommu_deinit(pdev);
+#endif
 
 	return 0;
 }
