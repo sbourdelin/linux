@@ -240,3 +240,10 @@ int sun4i_tmds_create(struct sun4i_hdmi *hdmi)
 {
 	return _sun4i_tmds_create(hdmi, 0);
 }
+
+/* sun6i variant has a different value offset for the divider */
+
+int sun6i_tmds_create(struct sun4i_hdmi *hdmi)
+{
+	return _sun4i_tmds_create(hdmi, 1);
+}
