@@ -155,6 +155,8 @@ enum sun4i_hdmi_pkt_type {
 	SUN4I_HDMI_PKT_END = 15,
 };
 
+struct sun4i_hdmi_variant;
+
 struct sun4i_hdmi {
 	struct drm_connector	connector;
 	struct drm_encoder	encoder;
@@ -162,9 +164,13 @@ struct sun4i_hdmi {
 
 	void __iomem		*base;
 
+	/* Reset control */
+	struct reset_control	*reset;
+
 	/* Parent clocks */
 	struct clk		*bus_clk;
 	struct clk		*mod_clk;
+	struct clk		*ddc_parent_clk;
 	struct clk		*pll0_clk;
 	struct clk		*pll1_clk;
 
@@ -175,6 +181,8 @@ struct sun4i_hdmi {
 	struct sun4i_drv	*drv;
 
 	bool			hdmi_monitor;
+
+	const struct sun4i_hdmi_variant	*variant;
 };
 
 int sun4i_ddc_create(struct sun4i_hdmi *hdmi, struct clk *clk);
