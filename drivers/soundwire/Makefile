@@ -10,5 +10,5 @@ obj-$(CONFIG_SOUNDWIRE_BUS) += soundwire-bus.o
 ##Intel Objs
 
 #link driver
-soundwire-cadence-objs := sdw_cadence.o
+soundwire-cadence-objs := sdw_cadence.o sdw_cadence_dai.o
 obj-$(CONFIG_SOUNDWIRE_CADENCE)	+= soundwire-cadence.o

@@ -815,6 +815,9 @@ static int cdns_sdw_probe(struct platform_device *pdev)
 	/* now register the bus */
 	sdw_add_bus_master(&sdw->bus);
 
+	/* register DAIs */
+	cdns_register_dai(sdw);
+
 	/*
 	 * Suspending the device after audio suspend delay (3 secs).
 	 *
@@ -838,6 +841,8 @@ static int cdns_sdw_remove(struct platform_device *pdev)
 	sdw = platform_get_drvdata(pdev);
 
 	free_irq(sdw->res->irq, sdw);
+
+	cdns_deregister_dai(sdw);
 
 	sdw_delete_bus_master(&sdw->bus);
 

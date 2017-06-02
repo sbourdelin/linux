@@ -324,4 +324,7 @@ static inline void cdns_sdw_port_writel(struct cdns_sdw *sdw, int offset,
 	return cdns_sdw_writel(sdw, offset + port_num * CDNS_DP_SIZE, value);
 }
 
+int cdns_register_dai(struct cdns_sdw *sdw);
+void cdns_deregister_dai(struct cdns_sdw *sdw);
+
 #endif /* __SDW_CADENCE_H */
