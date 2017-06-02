@@ -2635,6 +2635,9 @@ static char *setup_overhead(char *keys)
 	if (sort__mode == SORT_MODE__DIFF)
 		return keys;
 
+	if (strstr(keys, "overhead"))
+		return keys;
+
 	keys = prefix_if_not_in("overhead", keys);
 
 	if (symbol_conf.cumulate_callchain)
