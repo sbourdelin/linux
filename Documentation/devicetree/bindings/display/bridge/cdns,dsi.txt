@@ -1,0 +1,55 @@
+Cadence DSI bridge
+==================
+
+The Cadence DSI bridge is a DPI to DSI bridge supporting up to 4 DSI lanes.
+
+Required properties:
+- compatible: should be set to "cdns,dsi".
+- reg: physical base address and length of the controller's registers.
+- interrupts: interrupt line connected to the DSI bridge.
+- clocks: DSI bridge clocks.
+- clock-names: must contain "pclk" and "sysclk".
+- phys: phandle link to the MIPI D-PHY controller.
+- phy-names: must contain "dphy".
+- #address-cells: must be set to 1.
+- #size-cells: must be set to 0.
+
+Required subnodes:
+- ports: Ports as described in Documentation/devicetree/bindings/graph.txt.
+  Currently contains a single input port at address 0 representing the DPI
+  input. Other ports will be added later to support the SDI inputs.
+  Port 0 should be connected to a DPI encoder output.
+- one subnode per DSI device connected on the DSI bus. Each DSI device should
+  contain a reg property encoding its address on the bus.
+
+Example:
+
+	dsi0: dsi@fd0c0000 {
+		compatible = "cdns,dsi";
+		reg = <0x0 0xfd0c0000 0x0 0x1000>;
+		clocks = <&pclk>, <&sysclk>;
+		clock-names = "pclk", "hclk";
+		interrupts = <1>;
+		phys = <&dphy1>;
+		phy-names = "dphy";
+		#address-cells = <1>;
+		#size-cells = <0>;
+
+		ports {
+			#address-cells = <1>;
+			#size-cells = <0>;
+
+			port@0 {
+				reg = <0>;
+				dsi0_dpi_input: endpoint {
+					remote-endpoint = <&xxx_dpi_output>;
+				};
+			};
+		};
+
+		panel: dsi-dev@0 {
+			compatible = "<vendor,panel>";
+			reg = <0>;
+		};
+	};
+
