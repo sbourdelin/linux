@@ -64,3 +64,7 @@ obj-$(CONFIG_PHY_CYGNUS_PCIE)		+= phy-bcm-cygnus-pcie.o
 obj-$(CONFIG_ARCH_TEGRA) += tegra/
 obj-$(CONFIG_PHY_NS2_PCIE)		+= phy-bcm-ns2-pcie.o
 obj-$(CONFIG_PHY_MESON8B_USB2)		+= phy-meson8b-usb2.o
+obj-$(CONFIG_BRCM_USB_PHY)		+= phy-brcm-usb-dvr.o
+
+phy-brcm-usb-dvr-objs := phy-brcm-usb.o phy-brcm-usb-init.o
+
