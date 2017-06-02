@@ -2996,7 +2996,7 @@ static netdev_tx_t stmmac_xmit(struct sk_buff *skb, struct net_device *dev)
 	if (unlikely(is_jumbo) && likely(priv->synopsys_id <
 					 DWMAC_CORE_4_00)) {
 		entry = priv->hw->mode->jumbo_frm(tx_q, skb, csum_insertion);
-		if (unlikely(entry < 0))
+		if (unlikely((int)entry < 0))
 			goto dma_map_err;
 	}
 
