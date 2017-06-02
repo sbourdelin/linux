@@ -60,6 +60,7 @@
 #include <linux/pm_domain.h>
 #include <linux/pm_runtime.h>
 #include <linux/soundwire/soundwire.h>
+#include "sdw_bus.h"
 
 static const struct sdw_device_id *
 sdw_get_device_id(struct sdw_slave *sdw, struct sdw_driver *sdrv)
@@ -227,12 +228,31 @@ void sdw_unregister_driver(struct sdw_driver *drv)
 {
 	        driver_unregister(&drv->driver);
 }
-EXPORT_SYMBOL(sdw_unregister_driver);
+EXPORT_SYMBOL_GPL(sdw_unregister_driver);
 
 
 static int __init sdw_bus_init(void)
 {
-	return bus_register(&sdw_bus_type);
+	int ret;
+	int i;
+
+	for (i = 0; i < SDW_NUM_STREAM_TAGS; i++)
+		sdw_core.stream_tags[i].stream_tag = i;
+
+	INIT_LIST_HEAD(&sdw_core.bus_list);
+
+	ret = bus_register(&sdw_bus_type);
+	if (ret < 0)
+		return ret;
+	/*
+	 * Initialization of bandwidth and runtime stream
+	 * management related operations required for bus driver.
+	 * Currently pre-calculation of row-column combination is performed
+	 * which is required to expedite computation of bus frame shape.
+	 */
+	sdw_create_row_col_pair();
+
+	return ret;
 }
 
 static void __exit sdw_bus_exit(void)

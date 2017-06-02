@@ -441,6 +441,81 @@ struct sdw_slave_prop {
 	struct sdw_dpn_prop *sink_dpn_prop;
 };
 
+/**
+ * struct sdw_port_params: This is used to program the Data Port based on
+ * Data Port stream params. These parameters are not banked and not expected
+ * to change dynamically to avoid audio artifacts.
+ *
+ * @num: Port number.
+ * @bps: Word length of the Port
+ * @flow_mode: Port Data flow mode.
+ * @data_mode: Test modes or normal mode.
+ */
+struct sdw_port_params {
+	unsigned int num;
+	unsigned int bps;
+	unsigned int flow_mode;
+	unsigned int data_mode;
+};
+
+/**
+ * struct sdw_transport_params: This is used to program the Data Port based
+ * on Data Port transport params. All these parameters are banked and can be
+ * modified during a bank switch without any artefact's in audio stream. Bus
+ * driver modifies these parameters as part new stream getting
+ * enabled/disabled on the bus. Registers are explained next to each field
+ * where values will be filled. Those are MIPI defined registers for Slave
+ * devices.
+ *
+ * @blk_grp_ctrl_valid: If Port implement block group control
+ * @port_num: Port number for which params are to be programmed.
+ * @blk_grp_ctrl: Block group control value.
+ * @sample_interval: Sample interval.
+ * @offset1: Blockoffset of the payload Data.
+ * @offset2: Blockoffset of the payload Data.
+ * @hstart: Horizontal start of the payload Data.
+ * @hstop: Horizontal stop of the payload Data.
+ * @blk_pkg_mode: Block per channel or block per Port.
+ * @lane_ctrl: Data lane Port uses for Data transfer. Currently only single
+ *	data lane is supported in bus driver.
+ */
+struct sdw_transport_params {
+	bool blk_grp_ctrl_valid;
+	unsigned int port_num;
+	unsigned int blk_grp_ctrl;
+	unsigned int sample_interval;
+	unsigned int offset1;
+	unsigned int offset2;
+	unsigned int hstart;
+	unsigned int hstop;
+	unsigned int blk_pkg_mode;
+	unsigned int lane_ctrl;
+};
+
+/**
+ * struct sdw_bus_conf: Bus params for the Slave/Master to be ready for next
+ * bus changes.
+ *
+ * @clk_freq: Clock frequency in Hertz
+ * @num_rows: Number of rows in frame
+ * @num_cols: Number of columns in frame
+ * @bank: Register bank, which bank Slave/Master driver should program for
+ * implementation defined registers. This is the inverted value of the
+ * current bank.
+ *
+ * The implementation of this bus driver follows the recommendations of the
+ * MIPI specification and will never modify registers in the current bank to
+ * avoid audible issues and bus conflicts. Bus reconfigurations are always
+ * handled through a synchronized bank switch mechanism. The use of
+ * Port-specific banks is not supported for now.
+ */
+struct sdw_bus_conf {
+	unsigned int clk_freq;
+	u16 num_rows;
+	unsigned int num_cols;
+	unsigned int bank;
+};
+
 int sdw_master_read_prop(struct sdw_bus *bus);
 int sdw_slave_read_prop(struct sdw_slave *slave);
 
@@ -591,6 +666,37 @@ struct sdw_master_ops {
 };
 
 /**
+ * struct sdw_bus_params: Structure holding bus configuration information
+ *
+ * @clk_state: State of the clock (ON/OFF)
+ * @active_bank: Current bank in use (BANK0/BANK1)
+ * @max_clk_dr_freq: Maximum double rate clock frequency. This is maximum
+ * double clock rate supported per bus
+ * @curr_clk_dr_freq: Current double rate clock frequency in use. This is
+ * current clock rate at which bus is running
+ * @clk_div: Current clock divider in use
+ * @bandwidth: Total bandwidth
+ * @system_interval: Bus System interval (Stream Synchronization Point).
+ * @stream_interval: Stream interval
+ * @frame_freq: SoundWire Frame frequency on bus
+ * @col: Active columns
+ * @row: Active rows
+ */
+struct sdw_bus_params {
+	unsigned int clk_state;
+	unsigned int active_bank;
+	unsigned int max_dr_clk_freq;
+	unsigned int curr_dr_clk_freq;
+	unsigned int clk_div;
+	unsigned int bandwidth;
+	unsigned int system_interval;
+	unsigned int stream_interval;
+	unsigned int frame_freq;
+	unsigned int col;
+	unsigned int row;
+};
+
+/**
  * struct sdw_msg: Message to be sent on sdw bus
  *
  * @addr: the register address of the slave
@@ -630,6 +736,7 @@ struct sdw_wait {
  * @lock: bus lock
  * @ops: master callback ops
  * @port_ops: master port callback ops
+ * @params: current bus parameters
  * @prop: master properties
  * @sysfs: bus sysfs
  * @wait_msg: wait messages for async messages
@@ -644,6 +751,7 @@ struct sdw_bus {
 	spinlock_t lock;
 	const struct sdw_master_ops *ops;
 	const struct sdw_master_port_ops *port_ops;
+	struct sdw_bus_params params;
 	struct sdw_master_prop prop;
 	struct sdw_master_sysfs *sysfs;
 	struct sdw_wait wait_msg;

@@ -62,6 +62,12 @@
 #include <linux/soundwire/soundwire.h>
 #include "sdw_bus.h"
 
+/*
+ * Global SoundWire core instance contains list of Masters registered, core
+ *	lock and SoundWire stream tags.
+ */
+struct sdw_core sdw_core;
+
 /**
  * sdw_add_bus_master: add a bus master instance
  *
@@ -102,6 +108,17 @@ int sdw_add_bus_master(struct sdw_bus *bus)
 
 	/* ACPI check first */
 	sdw_acpi_find_slaves(bus);
+
+	/* Initialize bandwidth calculation data structures */
+	sdw_init_bus_params(bus);
+
+	/*
+	 * Add bus to the list of buses inside core. This is list of Slave
+	 * devices enumerated on this bus. Adding new devices at end. It can
+	 * be added at any location in list.
+	 */
+	list_add_tail(&bus->bus_node, &sdw_core.bus_list);
+
 
 	return 0;
 }
