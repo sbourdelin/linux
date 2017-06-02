@@ -433,6 +433,11 @@ err_guc:
 		DRM_NOTE("Falling back from GuC submission to execlist mode\n");
 	}
 
+	if (i915.enable_guc_loading) {
+		i915.enable_guc_loading = 0;
+		DRM_NOTE("GuC firmware loading disabled\n");
+	}
+
 	return ret;
 }
 
