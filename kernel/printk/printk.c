@@ -2942,6 +2942,60 @@ static DEFINE_PER_CPU(struct irq_work, wake_up_klogd_work) = {
 	.flags = IRQ_WORK_LAZY,
 };
 
+static void printk_kthread_func(unsigned int cpu)
+{
+	while (1) {
+		set_current_state(TASK_INTERRUPTIBLE);
+		if (!test_bit(PRINTK_PENDING_OUTPUT, &printk_pending))
+			schedule();
+
+		__set_current_state(TASK_RUNNING);
+
+		if (kthread_should_stop())
+			break;
+
+		if (kthread_should_park()) {
+			kthread_parkme();
+			/* We might have been woken for stop */
+			continue;
+		}
+
+		console_lock();
+		console_unlock();
+	}
+}
+
+static int printk_kthread_should_run(unsigned int cpu)
+{
+	return test_bit(PRINTK_PENDING_OUTPUT, &printk_pending);
+}
+
+static struct smp_hotplug_thread printk_kthreads = {
+	.store			= &printk_kthread,
+	.thread_should_run	= printk_kthread_should_run,
+	.thread_fn		= printk_kthread_func,
+	.thread_comm		= "printk/%u",
+};
+
+/*
+ * Init printk kthread at late_initcall stage, after core/arch/device/etc.
+ * initialization.
+ */
+static int __init init_printk_kthreads(void)
+{
+	cpumask_copy(&printk_cpumask, cpu_possible_mask);
+
+	if (smpboot_register_percpu_thread_cpumask(&printk_kthreads,
+						   &printk_cpumask)) {
+		printk_enforce_emergency = true;
+		pr_err("printk: failed to create threads\n");
+		return -EINVAL;
+	}
+
+	return 0;
+}
+late_initcall(init_printk_kthreads);
+
 void wake_up_klogd(void)
 {
 	preempt_disable();
