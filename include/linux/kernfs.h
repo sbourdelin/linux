@@ -135,6 +135,7 @@ struct kernfs_node {
 	umode_t			mode;
 	unsigned int		ino;
 	struct kernfs_iattrs	*iattr;
+	u32			generation;
 };
 
 /*
@@ -170,6 +171,7 @@ struct kernfs_root {
 	struct list_head	supers;
 
 	wait_queue_head_t	deactivate_waitq;
+	atomic_t		next_generation;
 };
 
 struct kernfs_open_file {
