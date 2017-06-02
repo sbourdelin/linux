@@ -425,6 +425,22 @@ static const struct intel_device_info intel_kabylake_gt3_info = {
 	.ring_mask = RENDER_RING | BSD_RING | BLT_RING | VEBOX_RING | BSD2_RING,
 };
 
+#define CFL_FEATURES \
+	.is_alpha_support = 1, \
+	BDW_FEATURES, \
+	.platform = INTEL_COFFEELAKE, \
+	.gen = 9, \
+	.ddb_size = 896
+
+static const struct intel_device_info intel_coffeelake_info = {
+	CFL_FEATURES,
+};
+
+static const struct intel_device_info intel_coffeelake_gt3_info = {
+	CFL_FEATURES,
+	.ring_mask = RENDER_RING | BSD_RING | BLT_RING | VEBOX_RING | BSD2_RING,
+};
+
 /*
  * Make sure any device matches here are from most specific to most
  * general.  For example, since the Quanta match is based on the subsystem
