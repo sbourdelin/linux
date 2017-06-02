@@ -4052,6 +4052,7 @@ __init int intel_pmu_init(void)
 						  skl_format_attr);
 		WARN_ON(!x86_pmu.format_attrs);
 		x86_pmu.cpu_events = hsw_events_attrs;
+		intel_pmu_pebs_data_source_skl();
 		pr_cont("Skylake events, ");
 		break;
 

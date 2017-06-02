@@ -931,14 +931,18 @@ union perf_mem_data_src {
 			mem_snoop:5,	/* snoop mode */
 			mem_lock:2,	/* lock instr */
 			mem_dtlb:7,	/* tlb access */
-			mem_rsvd:31;
+			mem_lvlx:8,	/* memory hierarchy level, ext */
+			mem_snoopx:2,	/* snoop mode, ext */
+			mem_rsvd:21;
 	};
 };
 #elif defined(__BIG_ENDIAN_BITFIELD)
 union perf_mem_data_src {
 	__u64 val;
 	struct {
-		__u64	mem_rsvd:31,
+		__u64	mem_rsvd:21,
+			mem_snoopx:2,	/* snoop mode, ext */
+			mem_lvlx:8,	/* memory hierarchy level, ext */
 			mem_dtlb:7,	/* tlb access */
 			mem_lock:2,	/* lock instr */
 			mem_snoop:5,	/* snoop mode */
@@ -975,6 +979,13 @@ union perf_mem_data_src {
 #define PERF_MEM_LVL_UNC	0x2000 /* Uncached memory */
 #define PERF_MEM_LVL_SHIFT	5
 
+#define PERF_MEM_LVLX_REMOTE    0x01 /* Remote */
+#define PERF_MEM_LVLX_L4	0x02 /* L4 */
+#define PERF_MEM_LVLX_RAM	0x04 /* Ram */
+/* 5 free */
+
+#define PERF_MEM_LVLX_SHIFT	33
+
 /* snoop mode */
 #define PERF_MEM_SNOOP_NA	0x01 /* not available */
 #define PERF_MEM_SNOOP_NONE	0x02 /* no snoop */
@@ -982,6 +993,10 @@ union perf_mem_data_src {
 #define PERF_MEM_SNOOP_MISS	0x08 /* snoop miss */
 #define PERF_MEM_SNOOP_HITM	0x10 /* snoop hit modified */
 #define PERF_MEM_SNOOP_SHIFT	19
+
+#define PERF_MEM_SNOOPX_FWD	0x01 /* forward */
+/* 1 free */
+#define PERF_MEM_SNOOPX_SHIFT	41
 
 /* locked instruction */
 #define PERF_MEM_LOCK_NA	0x01 /* not available */
