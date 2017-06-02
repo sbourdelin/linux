@@ -167,6 +167,9 @@ struct sdw_bus {
 	spinlock_t lock;
 };
 
+int sdw_add_bus_master(struct sdw_bus *bus);
+void sdw_delete_bus_master(struct sdw_bus *bus);
+
 struct sdw_driver {
 	const char *name;
 
