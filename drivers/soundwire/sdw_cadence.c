@@ -102,6 +102,185 @@ static enum sdw_command_response cdns_fill_msg_resp(struct cdns_sdw *sdw,
 	return SDW_CMD_OK;
 }
 
+static enum sdw_command_response
+_cdns_xfer_msg(struct cdns_sdw *sdw, struct sdw_msg *msg, int cmd,
+				int offset, int count, bool async)
+{
+	u32 base, i, data;
+	u16 addr;
+	unsigned long time;
+
+	/* program the watermark level */
+	cdns_sdw_writel(sdw, CDNS_MCP_FIFOLEVEL, count);
+
+	base = CDNS_MCP_CMD_BASE;
+	addr = msg->addr;
+
+	for (i = 0; i < count; i++) {
+		data = msg->device << SDW_REG_SHIFT(CDNS_MCP_CMD_DEV_ADDR);
+		data |= cmd << SDW_REG_SHIFT(CDNS_MCP_CMD_COMMAND);
+		data |= addr++  << SDW_REG_SHIFT(CDNS_MCP_CMD_REG_ADDR_L);
+		if (msg->flags == SDW_MSG_FLAG_WRITE)
+			data |= msg->buf[i + offset];
+
+		data |= msg->ssp_sync << SDW_REG_SHIFT(CDNS_MCP_CMD_SSP_TAG);
+
+		cdns_sdw_writel(sdw, base, data);
+		base += CDNS_MCP_CMD_LEN;
+	}
+
+	if (async)
+		return 0;
+
+	/* wait for timeout or response */
+	time = wait_for_completion_timeout(&sdw->tx_complete,
+				msecs_to_jiffies(CDNS_TX_TIMEOUT));
+	if (!time) {
+		dev_err(sdw->dev, "Msg trf timedout\n");
+		msg->len = 0;
+		return SDW_CMD_FAILED;
+	}
+
+	return cdns_fill_msg_resp(sdw, msg, count, offset);
+}
+
+static int cdns_program_scp_addr(struct cdns_sdw *sdw, struct sdw_msg *msg)
+{
+	u32 data[2], base;
+	unsigned long time;
+	int nack = 0, no_ack = 0;
+	int i;
+
+	/* program RX watermark as 2 for 2 cmds */
+	cdns_sdw_writel(sdw, CDNS_MCP_FIFOLEVEL, 2);
+
+	data[0] = msg->device << SDW_REG_SHIFT(CDNS_MCP_CMD_DEV_ADDR);
+	data[0] |= 0x3 << SDW_REG_SHIFT(CDNS_MCP_CMD_COMMAND);
+	data[1] = data[0];
+
+	data[0] |= SDW_SCP_ADDRPAGE1 << SDW_REG_SHIFT(CDNS_MCP_CMD_REG_ADDR_L);
+	data[1] |= SDW_SCP_ADDRPAGE2 << SDW_REG_SHIFT(CDNS_MCP_CMD_REG_ADDR_L);
+
+	data[0] |= msg->addr_page1;
+	data[1] |= msg->addr_page2;
+
+	base = CDNS_MCP_CMD_BASE;
+	cdns_sdw_writel(sdw, base, data[0]);
+	base += CDNS_MCP_CMD_LEN;
+	cdns_sdw_writel(sdw, base, data[1]);
+
+	time = wait_for_completion_timeout(&sdw->tx_complete,
+				msecs_to_jiffies(CDNS_TX_TIMEOUT));
+	if (!time) {
+		dev_err(sdw->dev, "SCP Msg trf timedout\n");
+		msg->len = 0;
+		return -ETIMEDOUT;
+	}
+
+	/* check response for the two writes */
+	for (i = 0; i < 2; i++) {
+		if (!(sdw->response_buf[i] & CDNS_MCP_RESP_ACK)) {
+			no_ack = 1;
+			dev_err(sdw->dev, "Program SCP Ack not received\n");
+			if (sdw->response_buf[i] & CDNS_MCP_RESP_NACK) {
+				nack = 1;
+				dev_err(sdw->dev, "Program SCP NACK rcvd\n");
+			}
+		}
+	}
+
+	/*
+	 * For NACK or NO ack, don't return err if we are in Broadcast mode
+	 */
+	if (nack && (msg->device != 15)) {
+		dev_err(sdw->dev, "SCP_addrpage NACKed for slave %d\n", msg->device);
+		return -EREMOTEIO;
+	} else if (no_ack && (msg->device != 15)) {
+		dev_err(sdw->dev, "SCP_addrpage ignored for slave %d\n", msg->device);
+		return -EREMOTEIO;
+	}
+
+	return 0;
+}
+
+static int cdns_prep_msg(struct cdns_sdw *sdw, struct sdw_msg *msg,
+						int page, int *cmd)
+{
+	int ret;
+
+	if (page) {
+		ret = cdns_program_scp_addr(sdw, msg);
+		if (ret) {
+			msg->len = 0;
+			return ret;
+		}
+	}
+
+	switch (msg->flags) {
+	case SDW_MSG_FLAG_READ:
+		*cmd = CDNS_MCP_CMD_READ;
+		break;
+
+	case SDW_MSG_FLAG_WRITE:
+		*cmd = CDNS_MCP_CMD_WRITE;
+		break;
+
+	default:
+		dev_err(sdw->dev, "Invalid msg cmd: %d\n", msg->flags);
+		return -EINVAL;
+	}
+
+	return 0;
+}
+
+static enum sdw_command_response
+cdns_xfer_msg(struct sdw_bus *bus, struct sdw_msg *msg, int page)
+{
+	struct cdns_sdw *sdw = bus_to_cdns(bus);
+	int cmd = 0, ret, i;
+
+	ret = cdns_prep_msg(sdw, msg, page, &cmd);
+	if (ret)
+		return SDW_CMD_FAILED;
+
+	for (i = 0; i < msg->len / CDNS_MCP_CMD_LEN; i++) {
+		ret = _cdns_xfer_msg(sdw, msg, cmd, i * CDNS_MCP_CMD_LEN,
+				CDNS_MCP_CMD_LEN, false);
+		if (ret < 0)
+			goto exit;
+	}
+
+	if (!(msg->len % CDNS_MCP_CMD_LEN))
+		goto exit;
+
+	ret = _cdns_xfer_msg(sdw, msg, cmd, i * CDNS_MCP_CMD_LEN,
+			msg->len % CDNS_MCP_CMD_LEN, false);
+
+exit:
+	return ret;
+}
+
+static enum sdw_command_response
+cdns_xfer_msg_async(struct sdw_bus *bus, struct sdw_msg *msg,
+				int page, struct sdw_wait *wait)
+{
+	struct cdns_sdw *sdw = bus_to_cdns(bus);
+	int cmd = 0, ret;
+
+	/* for async only 1 message is supported */
+	if (msg->len > 1)
+		return -ENOTSUPP;
+
+	ret = cdns_prep_msg(sdw, msg, page, &cmd);
+	if (ret)
+		return SDW_CMD_FAILED;
+
+	sdw->async = wait;
+	sdw->async->length = msg->len;
+
+	/* don't wait for reply as caller would do so */
+	return _cdns_xfer_msg(sdw, msg, cmd, 0, msg->len, true);
+}
 
 /*
  * IRQ handling
@@ -340,6 +519,141 @@ static int cdns_sdw_init(struct cdns_sdw *sdw, bool first_init)
 	return 0;
 }
 
+static int cdns_ssp_interval(struct sdw_bus *bus, unsigned int ssp_interval,
+				unsigned int bank)
+{
+	struct cdns_sdw *sdw = bus_to_cdns(bus);
+
+	if (bank)
+		cdns_sdw_writel(sdw, CDNS_MCP_SSP_CTRL1, ssp_interval);
+	else
+		cdns_sdw_writel(sdw, CDNS_MCP_SSP_CTRL0, ssp_interval);
+
+	return 0;
+}
+
+static int cdns_bus_conf(struct sdw_bus *bus, struct sdw_bus_conf *conf)
+{
+	struct cdns_sdw *sdw = bus_to_cdns(bus);
+	int mcp_clkctrl_off, mcp_clkctrl;
+
+	int divider = bus->prop.max_freq / conf->clk_freq;
+
+	if (conf->bank)
+		mcp_clkctrl_off = CDNS_MCP_CLK_CTRL1;
+	else
+		mcp_clkctrl_off = CDNS_MCP_CLK_CTRL0;
+
+	mcp_clkctrl = cdns_sdw_readl(sdw, mcp_clkctrl_off);
+	mcp_clkctrl |= divider;
+
+	cdns_sdw_writel(sdw, mcp_clkctrl_off, mcp_clkctrl);
+
+	return 0;
+}
+
+static int cdns_port_params(struct sdw_bus *bus,
+			struct sdw_port_params *p_params, unsigned int bank)
+{
+	struct cdns_sdw *sdw = bus_to_cdns(bus);
+	int dpn_config = 0, dpn_config_off;
+
+	if (bank)
+		dpn_config_off = CDNS_DPN_B1_CONFIG(p_params->num);
+	else
+		dpn_config_off = CDNS_DPN_B0_CONFIG(p_params->num);
+
+	dpn_config = cdns_sdw_readl(sdw, dpn_config_off);
+
+	dpn_config |= ((p_params->bps - 1) << SDW_REG_SHIFT(CDNS_DPN_CONFIG_WL));
+	dpn_config |= (p_params->flow_mode << SDW_REG_SHIFT(CDNS_DPN_CONFIG_PORT_FLOW));
+	dpn_config |= (p_params->data_mode << SDW_REG_SHIFT(CDNS_DPN_CONFIG_PORT_DAT));
+
+	cdns_sdw_writel(sdw, dpn_config_off, dpn_config);
+
+	return 0;
+}
+
+static int cdns_transport_params(struct sdw_bus *bus,
+			struct sdw_transport_params *t_params,
+			unsigned int bank)
+{
+	struct cdns_sdw *sdw = bus_to_cdns(bus);
+	int dpn_config = 0, dpn_config_off;
+	int dpn_samplectrl_off;
+	int dpn_offsetctrl = 0, dpn_offsetctrl_off;
+	int dpn_hctrl = 0, dpn_hctrl_off;
+	int num = t_params->port_num;
+
+	if (bank) {
+		dpn_config_off = CDNS_DPN_B1_CONFIG(num);
+		dpn_samplectrl_off = CDNS_DPN_B1_SAMPLE_CTRL(num);
+		dpn_hctrl_off = CDNS_DPN_B1_HCTRL(num);
+		dpn_offsetctrl_off = CDNS_DPN_B1_OFFSET_CTRL(num);
+	} else {
+		dpn_config_off = CDNS_DPN_B0_CONFIG(num);
+		dpn_samplectrl_off = CDNS_DPN_B0_SAMPLE_CTRL(num);
+		dpn_hctrl_off = CDNS_DPN_B0_HCTRL(num);
+		dpn_offsetctrl_off = CDNS_DPN_B0_OFFSET_CTRL(num);
+	}
+
+	dpn_config = cdns_sdw_readl(sdw, dpn_config_off);
+
+	dpn_config |= (t_params->blk_grp_ctrl << SDW_REG_SHIFT(CDNS_DPN_CONFIG_BGC));
+	dpn_config |= (t_params->blk_pkg_mode << SDW_REG_SHIFT(CDNS_DPN_CONFIG_BPM));
+
+	cdns_sdw_writel(sdw, dpn_config_off, dpn_config);
+
+	dpn_offsetctrl |= (t_params->offset1 << SDW_REG_SHIFT(CDNS_DPN_OFFSET_CTRL_1));
+	dpn_offsetctrl |= (t_params->offset2 << SDW_REG_SHIFT(CDNS_DPN_OFFSET_CTRL_2));
+
+	cdns_sdw_writel(sdw, dpn_offsetctrl_off,  dpn_offsetctrl);
+
+	dpn_hctrl |= (t_params->hstart << SDW_REG_SHIFT(CDNS_DPN_HCTRL_HSTART));
+	dpn_hctrl |= (t_params->hstop << SDW_REG_SHIFT(CDNS_DPN_HCTRL_HSTOP));
+	dpn_hctrl |= (t_params->lane_ctrl << SDW_REG_SHIFT(CDNS_DPN_HCTRL_LCTRL));
+
+	cdns_sdw_writel(sdw, dpn_hctrl_off, dpn_hctrl);
+
+	cdns_sdw_writel(sdw, dpn_samplectrl_off,
+					(t_params->sample_interval - 1));
+
+	return 0;
+}
+
+static int cdns_port_enable(struct sdw_bus *bus,
+			struct sdw_enable_ch *enable_ch, unsigned int bank)
+{
+	struct cdns_sdw *sdw = bus_to_cdns(bus);
+	int dpn_chnen_off, ch_mask;
+
+	if (bank)
+		dpn_chnen_off = CDNS_DPN_B1_CH_EN(enable_ch->num);
+	else
+		dpn_chnen_off = CDNS_DPN_B0_CH_EN(enable_ch->num);
+
+	ch_mask = enable_ch->ch_mask * enable_ch->enable;
+
+	cdns_sdw_writel(sdw, dpn_chnen_off, ch_mask);
+
+	return 0;
+}
+
+static const struct sdw_master_ops cdns_ops = {
+	.read_prop = sdw_master_read_prop,
+	.xfer_msg = cdns_xfer_msg,
+	.xfer_msg_async = cdns_xfer_msg_async,
+	.set_ssp_interval = cdns_ssp_interval,
+	.set_bus_conf = cdns_bus_conf,
+};
+
+static const struct sdw_master_port_ops cdns_port_ops = {
+	.dpn_set_port_params = cdns_port_params,
+	.dpn_set_port_transport_params = cdns_transport_params,
+	.dpn_port_prep = NULL,
+	.dpn_port_enable_ch = cdns_port_enable,
+};
+
 static int cdns_sdw_probe(struct platform_device *pdev)
 {
 	struct cdns_sdw *sdw;
@@ -357,6 +671,8 @@ static int cdns_sdw_probe(struct platform_device *pdev)
 	sdw->bus.acpi_enabled = true;
 	sdw->bus.dev = &pdev->dev;
 	sdw->bus.link_id = pdev->id;
+	sdw->bus.ops = &cdns_ops;
+	sdw->bus.port_ops = &cdns_port_ops;
 
 	platform_set_drvdata(pdev, sdw);
 
