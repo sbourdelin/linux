@@ -2875,6 +2875,12 @@ context_switch(struct rq *rq, struct task_struct *prev,
 	rq_unpin_lock(rq, rf);
 	spin_release(&rq->lock.dep_map, 1, _THIS_IP_);
 
+	/*
+	 * Some architectures require that a spin lock is taken before
+	 * _switch. The rq_lock satisfies this condition. See powerpc
+	 * _switch for details.
+	 */
+
 	/* Here we just switch the register state and the stack. */
 	switch_to(prev, next, prev);
 	barrier();
