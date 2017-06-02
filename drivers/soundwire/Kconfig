@@ -18,4 +18,12 @@ config SOUNDWIRE_BUS
 	tristate
 	default SOUNDWIRE
 
+config SOUNDWIRE_CADENCE
+	tristate "Intel Soundwire driver for CADENCE Controller"
+	depends on SOUNDWIRE_BUS
+	---help---
+	  If you have an Intel device with Soundwire controller then
+	  enable this config option to get the soundwire support for your
+	  device
+
 endif
