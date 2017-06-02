@@ -661,7 +661,7 @@ void __init emergency_stack_init(void)
 
 static void * __init pcpu_fc_alloc(unsigned int cpu, size_t size, size_t align)
 {
-	return __alloc_bootmem_node(NODE_DATA(cpu_to_node(cpu)), size, align,
+	return __alloc_bootmem_node(NODE_DATA(early_cpu_to_node(cpu)), size, align,
 				    __pa(MAX_DMA_ADDRESS));
 }
 
@@ -672,10 +672,19 @@ static void __init pcpu_fc_free(void *ptr, size_t size)
 
 static int pcpu_cpu_distance(unsigned int from, unsigned int to)
 {
-	if (cpu_to_node(from) == cpu_to_node(to))
-		return LOCAL_DISTANCE;
-	else
-		return REMOTE_DISTANCE;
+#ifndef CONFIG_NUMA
+	return LOCAL_DISTANCE;
+#else
+	int from_nid, to_nid;
+
+	from_nid = early_cpu_to_node(from);
+	to_nid   = early_cpu_to_node(to);
+
+	if (from_nid == -1 || to_nid == -1)
+		return LOCAL_DISTANCE;	/* Or assume remote? */
+
+	return node_distance(from_nid, to_nid);
+#endif
 }
 
 unsigned long __per_cpu_offset[NR_CPUS] __read_mostly;
