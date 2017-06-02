@@ -1,0 +1,90 @@
+Mediatek MT6380 Regulator Driver
+
+All voltage regulators are defined as subnodes of the regulators node. A list
+of regulators provided by this controller are defined as subnodes of the
+PMIC's node. Each regulator is named according to its regulator type,
+buck_<name> and ldo_<name>. The definition for each of these nodes is defined
+using the standard binding for regulators at
+Documentation/devicetree/bindings/regulator/regulator.txt.
+
+The valid names for regulators are::
+BUCK:
+  buck_vcore1, buck_vcore, buck_vrf
+LDO:
+  ldo_vmldo ,ldo_valdo , ldo_vphyldo, ldo_vddrldo, ldo_vtldo
+
+Example:
+
+	mt6380regulator: mt6380regulator {
+		compatible = "mediatek,mt6380-regulator";
+
+		mt6380_vcpu_reg: buck_vcore1 {
+			regulator-name = "vcpu";
+			regulator-min-microvolt = < 600000>;
+			regulator-max-microvolt = <1393750>;
+			regulator-ramp-delay = <6250>;
+			regulator-always-on;
+			regulator-boot-on;
+		};
+
+		mt6380_vcore_reg: buck_vcore {
+			regulator-name = "vcore";
+			regulator-min-microvolt = <600000>;
+			regulator-max-microvolt = <1393750>;
+			regulator-ramp-delay = <6250>;
+		};
+
+		mt6380_vrf_reg: buck_vrf {
+			regulator-name = "vrf";
+			regulator-min-microvolt = <1200000>;
+			regulator-max-microvolt = <1575000>;
+			regulator-ramp-delay = <0>;
+			regulator-always-on;
+			regulator-boot-on;
+		};
+
+		mt6380_vm_reg: ldo_vmldo {
+			regulator-name = "vmldo";
+			regulator-min-microvolt = <1050000>;
+			regulator-max-microvolt = <1400000>;
+			regulator-ramp-delay = <0>;
+			regulator-always-on;
+			regulator-boot-on;
+		};
+
+		mt6380_va_reg: ldo_valdo {
+			regulator-name = "valdo";
+			regulator-min-microvolt = <2200000>;
+			regulator-max-microvolt = <3300000>;
+			regulator-ramp-delay = <0>;
+			regulator-always-on;
+			regulator-boot-on;
+		};
+
+		mt6380_vphy_reg: ldo_vphyldo {
+			regulator-name = "vphyldo";
+			regulator-min-microvolt = <1800000>;
+			regulator-max-microvolt = <1800000>;
+			regulator-ramp-delay = <0>;
+			regulator-always-on;
+			regulator-boot-on;
+		};
+
+		mt6380_vddr_reg: ldo_vddrldo {
+			regulator-name = "vddr";
+			regulator-min-microvolt = <1240000>;
+			regulator-max-microvolt = <1840000>;
+			regulator-ramp-delay = <0>;
+			regulator-always-on;
+			regulator-boot-on;
+		};
+
+		mt6380_vt_reg: ldo_vtldo {
+			regulator-name = "vadc18";
+			regulator-min-microvolt = <2200000>;
+			regulator-max-microvolt = <3300000>;
+			regulator-ramp-delay = <0>;
+			regulator-always-on;
+			regulator-boot-on;
+		};
+	};
