@@ -1803,6 +1803,7 @@ again:
 	if (!bio_remaining_done(bio))
 		return;
 
+	__bio_free(bio);
 	/*
 	 * Need to have a real endio function for chained bios, otherwise
 	 * various corner cases will break (like stacking block devices that
