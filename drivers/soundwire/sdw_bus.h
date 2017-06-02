@@ -369,6 +369,36 @@ struct sdw_index_to_row {
 };
 
 /**
+ * struct sdw_group_params: Structure holding temporary variable while
+ * computing transport parameters of Master(s) and Slave(s).
+ *
+ * @rate: Holds stream rate.
+ * @full_bw: Holds full bandwidth per group.
+ * @payload_bw: Holds payload bandwidth per group.
+ * @hwidth: Holds hwidth per group.
+ */
+struct sdw_group_params {
+	int rate;
+	int full_bw;
+	int payload_bw;
+	int hwidth;
+};
+
+/**
+ * struct sdw_group_count: Structure holding group count and stream rate
+ * array while computing transport parameters of Master(s) and Slave(s).
+ *
+ * @group_count: Holds actual group count.
+ * @max_size: Holds maximum capacity of array.
+ * @stream_rates: Pointer to stream rates.
+ */
+struct sdw_group_count {
+	unsigned int group_count;
+	unsigned int max_size;
+	unsigned int *stream_rates;
+};
+
+/**
  * struct sdw_row_col_pair: Information for each row column pair. This is
  * used by bus driver for quick BW calculation.
  *
@@ -425,5 +455,65 @@ static inline void sdw_dec_ref_count(int *ref_count)
 	(*ref_count)--;
 }
 
+/*
+ * Helper function for bus driver to create messages
+ */
+static inline void sdw_create_rd_msg(struct sdw_msg *msg, bool ssp_sync,
+				u16 addr, u16 len, u8 *buf, u8 dev_num)
+{
+	msg->ssp_sync = ssp_sync;
+	msg->flags = SDW_MSG_FLAG_READ;
+	msg->addr = addr;
+	msg->len = len;
+	msg->buf = buf;
+	msg->device = dev_num;
+	msg->addr_page1 = 0x0;
+	msg->addr_page2 = 0x0;
+}
+
+static inline void sdw_create_wr_msg(struct sdw_msg *msg, bool ssp_sync,
+				u16 addr, u16 len, u8 *buf, u8 dev_num)
+{
+	msg->ssp_sync = ssp_sync;
+	msg->flags = SDW_MSG_FLAG_WRITE;
+	msg->addr = addr;
+	msg->len = len;
+	msg->buf = buf;
+	msg->device = dev_num;
+	msg->addr_page1 = 0x0;
+	msg->addr_page2 = 0x0;
+}
+
+/* Retrieve and return channel count from channel mask */
+static inline int sdw_chn_mask_to_chn(int chn_mask)
+{
+	int c = 0;
+
+	for (c = 0; chn_mask; chn_mask >>= 1)
+		c += chn_mask & 1;
+
+	return c;
+}
+
+/* Fill transport parameter data structure */
+static inline void sdw_fill_xport_params(struct sdw_transport_params *params,
+					int port_num,
+					bool grp_ctrl_valid,
+					int grp_ctrl,
+					int off1, int off2,
+					int hstart, int hstop,
+					int pack_mode, int lane_ctrl)
+{
+
+	params->port_num = port_num;
+	params->blk_grp_ctrl_valid = grp_ctrl_valid;
+	params->blk_grp_ctrl = grp_ctrl;
+	params->offset1 = off1;
+	params->offset2 = off2;
+	params->hstart = hstart;
+	params->hstop = hstop;
+	params->blk_pkg_mode = pack_mode;
+	params->lane_ctrl = lane_ctrl;
+}
 
 #endif /* __SDW_BUS_H */

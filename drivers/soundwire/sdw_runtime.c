@@ -974,3 +974,571 @@ static int sdw_compute_system_interval(struct sdw_bus *bus,
 
 	return 0;
 }
+
+/**
+ * sdw_compute_slv_xport_params: This function performs transport parameters
+ * computation of all Slave port(s) for all current and active streams.
+ * This API is called by sdw_compute_xport_params function.
+ *
+ * @sdw_bus: Bus handle.
+ */
+static int sdw_compute_slv_xport_params(struct sdw_bus *bus)
+{
+	struct sdw_mstr_runtime *sdw_mstr_rt;
+	struct sdw_slv_runtime *slv_rt = NULL;
+	struct sdw_port_runtime *port_rt;
+	int no_of_chan = 0;
+	int port_bo, bps;
+
+	/* Iterate for all Master(s) in Master list */
+	list_for_each_entry(sdw_mstr_rt,
+			&bus->mstr_rt_list, mstr_node) {
+
+		/* Get block offset from Master runtime */
+		port_bo = sdw_mstr_rt->bus_rt.block_offset;
+
+		/* Iterate for all Slave(s) in Slave list */
+		list_for_each_entry(slv_rt, &sdw_mstr_rt->slv_rt_list,
+						slave_mstr_node) {
+
+			/*
+			 * Do not compute any transport parameters if stream
+			 * state is in DEPREPARE
+			 */
+			if (slv_rt->sdw_rt->stream_state ==
+					SDW_STATE_STRM_DEPREPARE)
+				continue;
+
+			/* Get bps value */
+			bps = slv_rt->stream_params.bps;
+
+			/* Iterate for all Slave port(s) in port list */
+			list_for_each_entry(port_rt, &slv_rt->port_rt_list,
+							port_node) {
+
+				/*
+				 * Get no. of channels running on current
+				 * port.
+				 */
+				no_of_chan = sdw_chn_mask_to_chn(
+						port_rt->channel_mask);
+
+				/*
+				 * Fill computed transport parameters for
+				 * current port.
+				 */
+				sdw_fill_xport_params(&port_rt->
+					transport_params,
+					port_rt->port_num,
+					true,
+					SDW_BLK_GRP_CNT_1,
+					port_bo,
+					port_bo >> 8,
+					sdw_mstr_rt->bus_rt.hstart,
+					sdw_mstr_rt->bus_rt.hstop,
+					(SDW_BLK_GRP_CNT_1 * no_of_chan), 0x0);
+
+				/*
+				 * Increment block offset for next
+				 * port/Slave
+				 */
+				port_bo += bps * no_of_chan;
+			}
+		}
+	}
+
+	return 0;
+}
+
+/**
+ * sdw_compute_mstr_xport_params: This function performs transport
+ * parameters computation of all Master port(s) for all current and active
+ * streams. This API is called by sdw_compute_xport_params function.
+ *
+ * @sdw_bus: Bus handle.
+ * @grp_prms: Group Params.
+ * @group_count: Holds group count.
+ */
+static int sdw_compute_mstr_xport_params(struct sdw_bus *bus,
+			struct sdw_group_params *grp_prms,
+			int group_count)
+{
+	struct sdw_mstr_runtime *sdw_mstr_rt = NULL;
+	struct sdw_port_runtime *port_rt;
+	int hstop = 0, hstart = 0;
+	int i, block_offset, port_bo, no_of_chan;
+	int rate, bps, chn;
+
+	/* Compute hstop */
+	hstop = bus->params.col - 1;
+
+	/* Run loop for all groups to compute transport parameters */
+	for (i = 0; i < group_count; i++) {
+
+		/* Port block offset */
+		port_bo = block_offset = 1;
+
+		/*
+		 * Iterate for all Master(s) in Master list Find all the
+		 * streams associated with current group.
+		 */
+		list_for_each_entry(sdw_mstr_rt,
+				&bus->mstr_rt_list, mstr_node) {
+
+			/*
+			 * Do not compute any transport parameters if stream
+			 * state is in DEPREPARE
+			 */
+			if (sdw_mstr_rt->sdw_rt->stream_state ==
+					SDW_STATE_STRM_DEPREPARE)
+				continue;
+
+			/* Get rate, bps, channel values */
+			rate = sdw_mstr_rt->stream_params.rate;
+			bps = sdw_mstr_rt->stream_params.bps;
+			chn = sdw_mstr_rt->stream_params.channel_count;
+
+			/* Check whether stream belongs to this group */
+			if (rate != grp_prms[i].rate)
+				continue;
+
+			/* Compute hstart and hstop for given Master handle */
+			sdw_mstr_rt->bus_rt.hstart = hstart =
+				hstop - grp_prms[i].hwidth + 1;
+			sdw_mstr_rt->bus_rt.hstop = hstop;
+
+			/*
+			 * Iterate for all Master port(s) in port list
+			 * Compute hstart, hstop, block offset for each
+			 * port(s) of current Master handle.
+			 */
+			list_for_each_entry(port_rt,
+					&sdw_mstr_rt->port_rt_list, port_node) {
+
+				/*
+				 * Get no. of channels running on current
+				 * port.
+				 */
+				no_of_chan = sdw_chn_mask_to_chn(
+						port_rt->channel_mask);
+
+				/*
+				 * Fill computed transport parameters for
+				 * current port.
+				 */
+				sdw_fill_xport_params(
+					&port_rt->transport_params,
+					port_rt->port_num,
+					true,
+					SDW_BLK_GRP_CNT_1,
+					port_bo,
+					port_bo >> 8,
+					hstart,
+					hstop,
+					(SDW_BLK_GRP_CNT_1 * no_of_chan), 0x0);
+
+				/* Fill Master runtime params only once. */
+				if (port_rt == list_first_entry(
+						&sdw_mstr_rt->port_rt_list,
+						struct sdw_port_runtime,
+						port_node)) {
+
+					/*
+					 * While processing first node, make
+					 * a copy of hstart, hstop, block
+					 * offset in Master runtime data
+					 * structure.
+					 */
+					sdw_mstr_rt->bus_rt.hstart = hstart;
+					sdw_mstr_rt->bus_rt.hstop = hstop;
+					sdw_mstr_rt->bus_rt.block_offset
+								= port_bo;
+					sdw_mstr_rt->bus_rt.sub_block_offset
+								= 0;
+				}
+
+				/* Compute block offset for next port */
+				port_bo += bps * chn;
+			}
+
+			/*
+			 * Compute block offset for next stream of same group
+			 */
+			block_offset += bps * chn;
+
+			/*
+			 * Re-assign port_bo for next stream under same
+			 * group
+			 */
+			port_bo = block_offset;
+		}
+
+		/* Compute hstop for next group */
+		hstop = hstop - grp_prms[i].hwidth;
+	}
+
+	return 0;
+}
+
+/**
+ * sdw_compute_group_params: This function performs calculation of full
+ * bandwidth, payload bandwidth and hwidth per group. This API is called by
+ * sdw_compute_xport_params function.
+ *
+ * @sdw_bus: Bus handle.
+ * @grp_prms: Group Params
+ * @stream_rate: Stream rate array;
+ * @group_count: Holds group count.
+ */
+static int sdw_compute_group_params(struct sdw_bus *bus,
+			struct sdw_group_params *grp_prms,
+			int *stream_rates,
+			int group_count)
+{
+
+	struct sdw_mstr_runtime *sdw_mstr_rt = NULL;
+	int sel_col = bus->params.col; /* Computed columns */
+	int column_needed = 0;
+	int i, rate, bps, chn;
+
+	/* Calculate full bandwidth per group */
+	for (i = 0; i < group_count; i++) {
+		grp_prms[i].rate = stream_rates[i];
+		grp_prms[i].full_bw = bus->params.curr_dr_clk_freq/
+					grp_prms[i].rate;
+	}
+
+	/* Iterate for all Master(s) in Master list */
+	list_for_each_entry(sdw_mstr_rt, &bus->mstr_rt_list, mstr_node) {
+
+		/*
+		 * Do not compute any transport parameters if stream state
+		 * is in DEPREPARE
+		 */
+		if (sdw_mstr_rt->sdw_rt->stream_state ==
+				SDW_STATE_STRM_DEPREPARE)
+			continue;
+
+		/* Get rate, bps, channel values */
+		rate = sdw_mstr_rt->stream_params.rate;
+		bps = sdw_mstr_rt->stream_params.bps;
+		chn = sdw_mstr_rt->stream_params.channel_count;
+
+		/* Calculate payload bandwidth per group */
+		for (i = 0; i < group_count; i++) {
+			if (rate == grp_prms[i].rate)
+				grp_prms[i].payload_bw += bps * chn;
+		}
+	}
+
+	/* Calculate hwidth per group and total column needed per Master */
+	for (i = 0; i < group_count; i++) {
+		grp_prms[i].hwidth =
+			(sel_col * grp_prms[i].payload_bw +
+			grp_prms[i].full_bw - 1)/grp_prms[i].full_bw;
+		column_needed += grp_prms[i].hwidth;
+	}
+
+	/* Check column required should not be greater than selected columns */
+	if (column_needed > sel_col - 1)
+		return -EINVAL;
+
+	return 0;
+}
+
+/**
+ * sdw_add_element_group_count: This function checks grouping already exist
+ * for given rate. If not, it adds new group in array for given rate.  This
+ * API is called by sdw_get_group_count.
+ *
+ * @grp_cnt: pointer holding stream rate array information
+ * @rate: Sampling frequency
+ */
+static int sdw_add_element_group_count(struct sdw_group_count *grp_cnt,
+					unsigned int rate)
+{
+
+	int num = grp_cnt->group_count;
+	int i;
+
+	/* Run loop for number of groups already computed */
+	for (i = 0; i < num; i++) {
+
+		if (rate == grp_cnt->stream_rates[i])
+			break;
+
+		if (i == num) {
+
+			if (grp_cnt->group_count >= grp_cnt->max_size) {
+
+				/* Inc. max size by 1 element */
+				grp_cnt->max_size += 1;
+				grp_cnt->stream_rates = krealloc(
+							grp_cnt->stream_rates,
+							(sizeof(int) *
+							grp_cnt->max_size),
+							GFP_KERNEL);
+				if (!grp_cnt->stream_rates)
+					return -ENOMEM;
+			}
+
+			/* Add new stream rate */
+			grp_cnt->stream_rates[grp_cnt->group_count++] = rate;
+		}
+	}
+
+	return 0;
+}
+
+/**
+ * sdw_get_group_count: This function performs grouping of streams having
+ * stream sample rate and computes group count. This API is called by
+ * sdw_compute_xport_params.
+ *
+ * @sdw_bus: Bus handle.
+ * @grp_cnt: Struture holding stream rate array information.
+ */
+static int sdw_get_group_count(struct sdw_bus *bus,
+				struct sdw_group_count *grp_cnt)
+{
+
+	struct sdw_mstr_runtime *sdw_mstr_rt;
+	unsigned int curr_rate = 0;
+	int ret = 0;
+
+	/* Initialize temporary group count data structure */
+	grp_cnt->group_count = 0;
+	grp_cnt->max_size = SDW_STRM_RATE_GROUPING;
+	grp_cnt->stream_rates = kcalloc(grp_cnt->max_size, sizeof(int),
+						GFP_KERNEL);
+	if (!grp_cnt->stream_rates)
+		return -ENOMEM;
+
+	/* Iterate for all Master(s) in Master list */
+	list_for_each_entry(sdw_mstr_rt,
+			&bus->mstr_rt_list, mstr_node) {
+
+		/*
+		 * Do not compute any transport parameters if stream state
+		 * is in DEPREPARE
+		 */
+		if (sdw_mstr_rt->sdw_rt->stream_state ==
+						SDW_STATE_STRM_DEPREPARE)
+			continue;
+
+		/* Perform grouping of streams based on stream rate */
+
+		/* check for first entry from Master node list */
+		if (sdw_mstr_rt == list_first_entry(&bus->mstr_rt_list,
+					struct sdw_mstr_runtime, mstr_node))
+			/* Add first entry */
+			grp_cnt->stream_rates[grp_cnt->group_count++] =
+					sdw_mstr_rt->stream_params.rate;
+
+		else {
+			curr_rate = sdw_mstr_rt->stream_params.rate;
+
+			ret = sdw_add_element_group_count(grp_cnt, curr_rate);
+			if (ret < 0)
+				return ret;
+
+		}
+	}
+
+	return ret;
+
+}
+
+/**
+ * sdw_compute_xport_params: This function computes transport parameters for
+ * port(s) of all current and active stream(s) on given Master.The function
+ * also computes transport parameters of all Slave(s) port(s) associated
+ * with given Master. This API is called from sdw_compute_params.
+ *
+ * @sdw_bus: Bus handle.
+ */
+static int sdw_compute_xport_params(struct sdw_bus *bus)
+{
+	struct sdw_group_params *grp_prms = NULL;
+	struct sdw_group_count grp_cnt;
+	int ret;
+
+	/*
+	 * Perform grouping of streams based on stream sampling rate and get
+	 * number of group count.
+	 */
+	ret = sdw_get_group_count(bus, &grp_cnt);
+	if (ret < 0)
+		goto out;
+
+	/* Check for number of streams and number of group count */
+	if (grp_cnt.group_count == 0)
+		goto out;
+
+	/* Allocate resources holding temporary variables */
+	grp_prms = kzalloc((sizeof(*grp_prms) *
+				grp_cnt.group_count), GFP_KERNEL);
+	if (!grp_prms) {
+		ret = -ENOMEM;
+		goto out;
+	}
+
+	/*
+	 * Since the grouping of streams are performed based on stream rate,
+	 * hwidth, full bandwidth and cumulative payload bandwidth is
+	 * computed for each group which is required to compute transport
+	 * parameters.
+	 */
+	ret = sdw_compute_group_params(bus, grp_prms,
+			&grp_cnt.stream_rates[0], grp_cnt.group_count);
+	if (ret < 0)
+		goto out;
+
+	/*
+	 * Once all the group related computation is performed, transport
+	 * parameters of Master(s) port(s) are computed
+	 */
+	ret = sdw_compute_mstr_xport_params(bus, grp_prms,
+				grp_cnt.group_count);
+	if (ret < 0)
+		goto out;
+
+	/*
+	 * Once all the Master port(s) transport port(s) are computed,
+	 * transport parameters for Slave port(s) are computed.
+	 */
+	ret = sdw_compute_slv_xport_params(bus);
+	if (ret < 0)
+		goto out;
+
+out:
+	/* Free up temporary resources */
+	kfree(grp_prms);
+	kfree(grp_cnt.stream_rates);
+
+	return ret;
+}
+
+/**
+ * sdw_bank_switch: This function programs frame control register and
+ * broadcast message on Slave broadcast address based on bank to be used. In
+ * normal mode, it checks for bank bank switch completion, in aggregation
+ * mode, it comes out without checking.
+ *
+ * @sdw_bus: Bus handle.
+ */
+static int sdw_bank_switch(struct sdw_bus *bus)
+{
+	struct sdw_msg *wr_msg;
+	int bank_to_use, numcol, numrow;
+	int link_mask = bus->link_sync_mask;
+	int ret = 0;
+	u16 addr;
+	u8 *wbuf = NULL;
+
+	/* Allocate and assign resources for bank switch message */
+	wr_msg = kzalloc(sizeof(*wr_msg), GFP_KERNEL);
+	if (!wr_msg) {
+		ret = -ENOMEM;
+		goto error;
+	}
+
+	bus->wait_msg.msg = wr_msg;
+
+	wbuf = kzalloc(sizeof(*wbuf), GFP_KERNEL);
+	if (!wbuf) {
+		ret = -ENOMEM;
+		goto error;
+	}
+
+	/* Get row and column index to program register */
+	numcol = sdw_find_col_index(bus->params.col);
+	numrow = sdw_find_row_index(bus->params.row);
+
+	/* Fill frame_ctrl register values */
+	wbuf[0] = numcol | (numrow << 3);
+
+	/* Get current bank in use from bus structure */
+	bank_to_use = !bus->params.active_bank;
+
+	/* Create write message to write frame_ctrl register */
+	if (bank_to_use)
+		addr = (SDW_SCP_FRAMECTRL + SDW_BANK1_REGISTER_OFFSET);
+	else
+		addr = SDW_SCP_FRAMECTRL;
+
+	sdw_create_wr_msg(wr_msg, true, addr, SDW_BUF_SIZE1, wbuf,
+			SDW_BROADCAST_ADDR);
+
+	/* Return without waiting from message to get transferred */
+	if (link_mask) {
+
+		/* Transfer message to write frame_ctrl register */
+		sdw_transfer_async(bus, NULL, wr_msg, &bus->wait_msg);
+	} else {
+
+		/* Transfer message to write frame_ctrl register */
+		ret = sdw_transfer(bus, NULL, wr_msg);
+		if (ret != SDW_NUM_MSG1) {
+			ret = -EINVAL;
+			dev_err(bus->dev, "Slave frame_ctrl reg write failed\n");
+			goto error;
+		}
+	}
+
+	if (!link_mask) {
+		/* Free up resources in case of normal bank switch flow */
+		kfree(bus->wait_msg.msg->buf);
+		kfree(bus->wait_msg.msg);
+		bus->wait_msg.msg = NULL;
+
+		/* Update active bank local variable */
+		bus->params.active_bank = bank_to_use;
+	}
+
+	return ret;
+
+error:
+	kfree(wr_msg);
+	kfree(wbuf);
+	return ret;
+}
+
+/**
+ * sdw_wait_for_bank_switch: This function waits for reply for bank switch
+ * operation performed in aggregation mode where bank switch operation
+ * returns without checking whether switch is successful or not. After
+ * performing all the post enable operations, this API is called from
+ * sdw_update_bus_params_ops to wait till band switch operation is complete.
+ *
+ * @sdw_bus: Bus handle.
+ */
+static int sdw_wait_for_bank_switch(struct sdw_bus *bus)
+{
+	unsigned long time_left;
+	int bank_to_use;
+
+	/* Check whether to perform wait operation */
+	if (bus->wait_msg.msg != NULL) {
+
+		/* Wait on completion for transfer complete */
+		time_left = wait_for_completion_timeout(
+				&bus->wait_msg.complete,
+				msecs_to_jiffies(SDW_BANK_SWITCH_TO));
+
+		if (!time_left) {
+			dev_err(bus->dev, "Controller Timed out\n");
+			return -ETIMEDOUT;
+		}
+
+		/* Update active bank local variable */
+		bank_to_use = bus->params.active_bank;
+		bus->params.active_bank = !bank_to_use;
+
+		/* Free up resources */
+		kfree(bus->wait_msg.msg->buf);
+		kfree(bus->wait_msg.msg);
+	}
+
+	return 0;
+}
