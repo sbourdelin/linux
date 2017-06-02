@@ -110,7 +110,8 @@ static void cpudl_heapify(struct cpudl *cp, int idx)
 
 static inline int cpudl_maximum_cpu(struct cpudl *cp)
 {
-	return cp->elements[0].cpu;
+	int cpu = cp->elements[0].cpu;
+	return cp->elements[cpu].idx == IDX_INVALID ? -1 : cpu;
 }
 
 static inline u64 cpudl_maximum_dl(struct cpudl *cp)
