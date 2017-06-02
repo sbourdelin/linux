@@ -419,7 +419,7 @@ static int block2mtd_setup2(const char *val)
 
 	if (token[1]) {
 		ret = parse_num(&erase_size, token[1]);
-		if (ret) {
+		if (ret || erase_size > U32_MAX) {
 			pr_err("illegal erase size\n");
 			return 0;
 		}
