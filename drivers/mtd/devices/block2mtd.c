@@ -355,6 +355,19 @@ err_free_block2mtd:
 	return NULL;
 }
 
+static void del_device(struct block2mtd_dev *dev)
+{
+	if (!dev->ro_mode)
+		block2mtd_sync(&dev->mtd);
+	mtd_device_unregister(&dev->mtd);
+	mutex_destroy(&dev->write_mutex);
+	pr_info("mtd%d: [%s] removed\n",
+		dev->mtd.index,
+		dev->mtd.name + strlen("block2mtd: "));
+	list_del(&dev->list);
+	block2mtd_free_device(dev);
+}
+
 
 /* This function works similar to reguler strtoul.  In addition, it
  * allows some suffixes for a more human-readable number format:
@@ -477,6 +490,19 @@ static int block2mtd_setup2(const char *val)
 		}
 	}
 
+	if (strncmp(name, "del=", strlen("del=")) == 0) {
+		struct list_head *pos, *next;
+		list_for_each_safe(pos, next, &blkmtd_device_list) {
+			struct block2mtd_dev *dev =
+				list_entry(pos, typeof(*dev), list);
+			if (strcmp(dev->mtd.name + strlen("block2mtd: "),
+				name + strlen("del=")) != 0)
+				continue;
+			del_device(dev);
+			return 0;
+		}
+	}
+
 	add_device(name, erase_size, write_size, subpage_sft, timeout);
 
 	return 0;
@@ -536,14 +562,7 @@ static void block2mtd_exit(void)
 	/* Remove the MTD devices */
 	list_for_each_safe(pos, next, &blkmtd_device_list) {
 		struct block2mtd_dev *dev = list_entry(pos, typeof(*dev), list);
-		block2mtd_sync(&dev->mtd);
-		mtd_device_unregister(&dev->mtd);
-		mutex_destroy(&dev->write_mutex);
-		pr_info("mtd%d: [%s] removed\n",
-			dev->mtd.index,
-			dev->mtd.name + strlen("block2mtd: "));
-		list_del(&dev->list);
-		block2mtd_free_device(dev);
+		del_device(dev);
 	}
 }
 
