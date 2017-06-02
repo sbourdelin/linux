@@ -402,6 +402,14 @@ DEFINE_RAW_SPINLOCK(logbuf_lock);
 	} while (0)
 
 #ifdef CONFIG_PRINTK
+/*
+ * Delayed printk version, for scheduler-internal messages:
+ */
+#define PRINTK_PENDING_WAKEUP	0x01
+#define PRINTK_PENDING_OUTPUT	0x02
+
+static unsigned long printk_pending;
+
 DECLARE_WAIT_QUEUE_HEAD(log_wait);
 /* the next printk record to read by syslog(READ) or /proc/kmsg */
 static u64 syslog_seq;
@@ -2709,25 +2717,15 @@ static int __init printk_late_init(void)
 late_initcall(printk_late_init);
 
 #if defined CONFIG_PRINTK
-/*
- * Delayed printk version, for scheduler-internal messages:
- */
-#define PRINTK_PENDING_WAKEUP	0x01
-#define PRINTK_PENDING_OUTPUT	0x02
-
-static DEFINE_PER_CPU(int, printk_pending);
-
 static void wake_up_klogd_work_func(struct irq_work *irq_work)
 {
-	int pending = __this_cpu_xchg(printk_pending, 0);
-
-	if (pending & PRINTK_PENDING_OUTPUT) {
+	if (test_and_clear_bit(PRINTK_PENDING_OUTPUT, &printk_pending)) {
 		/* If trylock fails, someone else is doing the printing */
 		if (console_trylock())
 			console_unlock();
 	}
 
-	if (pending & PRINTK_PENDING_WAKEUP)
+	if (test_and_clear_bit(PRINTK_PENDING_WAKEUP, &printk_pending))
 		wake_up_interruptible(&log_wait);
 }
 
@@ -2740,7 +2738,7 @@ void wake_up_klogd(void)
 {
 	preempt_disable();
 	if (waitqueue_active(&log_wait)) {
-		this_cpu_or(printk_pending, PRINTK_PENDING_WAKEUP);
+		set_bit(PRINTK_PENDING_WAKEUP, &printk_pending);
 		irq_work_queue(this_cpu_ptr(&wake_up_klogd_work));
 	}
 	preempt_enable();
@@ -2753,7 +2751,7 @@ int vprintk_deferred(const char *fmt, va_list args)
 	r = vprintk_emit(0, LOGLEVEL_SCHED, NULL, 0, fmt, args);
 
 	preempt_disable();
-	__this_cpu_or(printk_pending, PRINTK_PENDING_OUTPUT);
+	set_bit(PRINTK_PENDING_OUTPUT, &printk_pending);
 	irq_work_queue(this_cpu_ptr(&wake_up_klogd_work));
 	preempt_enable();
 
