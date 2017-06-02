@@ -505,6 +505,7 @@ struct pwrap_slv_type {
 	 * so the pointers added increases flexibility allowing determination
 	 * which type is used by the detection through device tree.
 	 */
+	int (*pwrap_init)(struct pmic_wrapper *wrp);
 	int (*pwrap_read)(struct pmic_wrapper *wrp, u32 adr, u32 *rdata);
 	int (*pwrap_write)(struct pmic_wrapper *wrp, u32 adr, u32 wdata);
 };
@@ -983,7 +984,7 @@ static int pwrap_mt2701_init_soc_specific(struct pmic_wrapper *wrp)
 	return 0;
 }
 
-static int pwrap_init(struct pmic_wrapper *wrp)
+static int pwrap_init_mt6397(struct pmic_wrapper *wrp)
 {
 	int ret;
 	u32 rdata;
@@ -1081,6 +1082,43 @@ static int pwrap_init(struct pmic_wrapper *wrp)
 	return 0;
 }
 
+static int pwrap_init_mt6380(struct pmic_wrapper *wrp)
+{
+	int ret;
+
+	reset_control_reset(wrp->rstc);
+
+	pwrap_writel(wrp, 1, PWRAP_WRAP_EN);
+	pwrap_writel(wrp, wrp->master->arb_en_all, PWRAP_HIPRIO_ARB_EN);
+	pwrap_writel(wrp, 1, PWRAP_WACS2_EN);
+
+	ret = wrp->master->init_reg_clock(wrp);
+	if (ret)
+		return ret;
+
+	pwrap_writel(wrp, 0x1, PWRAP_WACS0_EN);
+	pwrap_writel(wrp, 0x1, PWRAP_WACS1_EN);
+	pwrap_writel(wrp, 0x1, PWRAP_WACS2_EN);
+
+	if (wrp->master->init_soc_specific) {
+		ret = wrp->master->init_soc_specific(wrp);
+		if (ret)
+			return ret;
+	}
+
+	/* Setup the init done registers */
+	pwrap_writel(wrp, 1, PWRAP_INIT_DONE2);
+	pwrap_writel(wrp, 1, PWRAP_INIT_DONE0);
+	pwrap_writel(wrp, 1, PWRAP_INIT_DONE1);
+
+	return 0;
+}
+
+static int pwrap_init(struct pmic_wrapper *wrp)
+{
+	return wrp->slave->pwrap_init(wrp);
+}
+
 static irqreturn_t pwrap_interrupt(int irqno, void *dev_id)
 {
 	u32 rdata;
@@ -1107,6 +1145,8 @@ static const struct regmap_config pwrap_regmap_config = {
 static const struct pwrap_slv_type pmic_mt6323 = {
 	.dew_regs = mt6323_regs,
 	.type = PMIC_MT6323,
+
+	.pwrap_init = pwrap_init_mt6397,
 	.pwrap_read = pwrap_read16,
 	.pwrap_write = pwrap_write16,
 };
@@ -1114,6 +1154,8 @@ static const struct pwrap_slv_type pmic_mt6323 = {
 static const struct pwrap_slv_type pmic_mt6380 = {
 	.dew_regs = NULL,
 	.type = PMIC_MT6380,
+
+	.pwrap_init = pwrap_init_mt6380,
 	.pwrap_read = pwrap_read32,
 	.pwrap_write = pwrap_write32,
 };
@@ -1121,6 +1163,8 @@ static const struct pwrap_slv_type pmic_mt6380 = {
 static const struct pwrap_slv_type pmic_mt6397 = {
 	.dew_regs = mt6397_regs,
 	.type = PMIC_MT6397,
+
+	.pwrap_init = pwrap_init_mt6397,
 	.pwrap_read = pwrap_read16,
 	.pwrap_write = pwrap_write16,
 };
