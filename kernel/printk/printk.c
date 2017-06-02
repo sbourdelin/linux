@@ -48,6 +48,8 @@
 #include <linux/sched/clock.h>
 #include <linux/sched/debug.h>
 #include <linux/sched/task_stack.h>
+#include <linux/kthread.h>
+#include <linux/smpboot.h>
 
 #include <linux/uaccess.h>
 #include <asm/sections.h>
@@ -401,15 +403,16 @@ DEFINE_RAW_SPINLOCK(logbuf_lock);
 		printk_safe_exit_irqrestore(flags);	\
 	} while (0)
 
-#ifdef CONFIG_PRINTK
 /*
- * Delayed printk version, for scheduler-internal messages:
+ * Used both for deferred printk version (scheduler-internal messages)
+ * and printk_kthread control.
  */
 #define PRINTK_PENDING_WAKEUP	0x01
 #define PRINTK_PENDING_OUTPUT	0x02
 
 static unsigned long printk_pending;
 
+#ifdef CONFIG_PRINTK
 DECLARE_WAIT_QUEUE_HEAD(log_wait);
 /* the next printk record to read by syslog(READ) or /proc/kmsg */
 static u64 syslog_seq;
@@ -444,6 +447,145 @@ static u32 clear_idx;
 static char __log_buf[__LOG_BUF_LEN] __aligned(LOG_ALIGN);
 static char *log_buf = __log_buf;
 static u32 log_buf_len = __LOG_BUF_LEN;
+
+static struct cpumask printk_cpumask __read_mostly;
+static DEFINE_PER_CPU(struct task_struct *, printk_kthread);
+/*
+ * We can't call into the scheduler (wake_up() printk kthread) during
+ * suspend/kexec/etc. This temporarily switches printk to old behaviour.
+ */
+static atomic_t printk_emergency __read_mostly;
+/*
+ * Disable printk_kthread permanently. Unlike `oops_in_progress'
+ * it doesn't go back to 0.
+ */
+static bool printk_enforce_emergency __read_mostly;
+/*
+ * The number of lines a task can print before offloading printing
+ * job to printk_kthread. 0 indicates 'no limit'.
+ */
+static unsigned int atomic_print_limit;
+
+module_param_named(atomic_print_limit, atomic_print_limit, uint, 0644);
+MODULE_PARM_DESC(atomic_print_limit,
+		 "max lines to print before offloading to printk kthread");
+
+/* Must be called with preemption disabled. */
+static inline bool printk_offloading_enabled(void)
+{
+	return atomic_print_limit &&
+		!printk_enforce_emergency &&
+		__this_cpu_read(printk_kthread) &&
+		atomic_read(&printk_emergency) == 0;
+}
+
+/*
+ * This disables printing offloading and instead attempts
+ * to do the usual console_trylock()->console_unlock().
+ *
+ * Note, this does not stop the printk_kthread if it's already
+ * printing logbuf messages.
+ */
+void printk_emergency_begin(void)
+{
+	atomic_inc(&printk_emergency);
+}
+
+/* This re-enables printk_kthread offloading. */
+void printk_emergency_end(void)
+{
+	atomic_dec(&printk_emergency);
+}
+
+/*
+ * Under heavy printing load or with a slow serial console (or both)
+ * console_unlock() can stall CPUs, which can result in soft/hard-lockups,
+ * lost interrupts, RCU stalls, etc. Therefore we attempt to limit the
+ * number of lines a process can print from console_unlock().
+ *
+ * There is one more reason to do offloading - there might be other processes
+ * (including user space tasks) sleeping on the console_sem in uninterruptible
+ * state; and keeping the console_sem locked for long time may have a negative
+ * impact on them.
+ *
+ * This function must be called from 'printk_safe' context under
+ * console_sem lock.
+ */
+static inline bool console_offload_printing(void)
+{
+	static struct task_struct *printing_task;
+	static unsigned long long lines_printed;
+	static unsigned long saved_csw;
+	int cpu;
+
+	if (!printk_offloading_enabled())
+		return false;
+
+	if (system_state != SYSTEM_RUNNING || oops_in_progress)
+		return false;
+
+	/* A new task - reset the counters. */
+	if (printing_task != current) {
+		lines_printed = 0;
+		printing_task = current;
+		saved_csw = current->nvcsw + current->nivcsw;
+		return false;
+	}
+
+	lines_printed++;
+	if (lines_printed < atomic_print_limit)
+		return false;
+
+	if (current == __this_cpu_read(printk_kthread)) {
+		/*
+		 * Do not reset `lines_printed' counter and do not let it to
+		 * pass the emergency watermark, but at the same time keep it
+		 * above `atomic_print_limit', which forces `printk_kthread'
+		 * to offload printing. Keep in mind that `printk_kthread'
+		 * might be the only process left that would down() console_sem
+		 * and call console_unlock().
+		 */
+		lines_printed--;
+		return true;
+	}
+
+	/*
+	 * A trivial emergency enforcement - give up on printk_kthread if
+	 * we can't wake it up. This assumes that `atomic_print_limit' is
+	 * reasonably and sufficiently large.
+	 */
+	if (lines_printed > 10 * (unsigned long long)atomic_print_limit &&
+			saved_csw == (current->nvcsw + current->nivcsw)) {
+		printk_enforce_emergency = true;
+		pr_crit("Declaring printk emergency mode.\n");
+		return false;
+	}
+
+	/*
+	 * Wakeup `printk_kthread' but don't reset the `lines_printed'
+	 * counter, let task overrun the limit. The idea is that
+	 *
+	 *   a) woken up printk_kthread (if succeeded)
+	 * or
+	 *   b) concurrent printk from another CPU or a task from console_sem
+	 *      wait list (if any)
+	 *
+	 * will take over, change `printing_task' and reset the counter.
+	 * If neither a) nor b) happens - we continue printing from
+	 * current process. Which is bad and can be risky, but since
+	 * we couldn't wake_up() printk_kthread, the things already
+	 * don't look normal.
+	 *
+	 * Here we wake_up() every available `printk_kthread'. We probably
+	 * don't really need to wake_up() it on the current CPU, but
+	 * `printk_cpumask' may be quite restrictive and the only available
+	 * `printk_kthread' could be the one that was created on this CPU.
+	 */
+	for_each_cpu_and(cpu, cpu_online_mask, &printk_cpumask)
+		wake_up_process(per_cpu(printk_kthread, cpu));
+
+	return true;
+}
 
 /* Return log buffer address */
 char *log_buf_addr_get(void)
@@ -1765,6 +1907,15 @@ asmlinkage int vprintk_emit(int facility, int level,
 
 	printed_len += log_output(facility, level, lflags, dict, dictlen, text, text_len);
 
+	/*
+	 * Emergency level indicates that the system is unstable and, thus,
+	 * we better stop relying on wake_up(printk_kthread) and try to do
+	 * a direct printing.
+	 */
+	if (level == LOGLEVEL_EMERG)
+		printk_enforce_emergency = true;
+
+	set_bit(PRINTK_PENDING_OUTPUT, &printk_pending);
 	logbuf_unlock_irqrestore(flags);
 
 	/* If called from the scheduler, we can not call up(). */
@@ -1881,6 +2032,10 @@ static void call_console_drivers(const char *ext_text, size_t ext_len,
 static size_t msg_print_text(const struct printk_log *msg,
 			     bool syslog, char *buf, size_t size) { return 0; }
 static bool suppress_message_printing(int level) { return false; }
+
+void printk_emergency_begin(void) {}
+void printk_emergency_end(void) {}
+static inline bool console_offload_printing(void) { return false; }
 
 #endif /* CONFIG_PRINTK */
 
@@ -2177,8 +2332,17 @@ void console_unlock(void)
 	unsigned long flags;
 	bool wake_klogd = false;
 	bool do_cond_resched, retry;
+	bool did_offload;
 
 	if (console_suspended) {
+		/*
+		 * Here and later, we need to clear the PENDING_OUTPUT bit
+		 * in order to avoid an infinite loop in printk_kthread
+		 * function when console_unlock() cannot flush messages
+		 * because we suspended consoles. Someone else will print
+		 * the messages from resume_console().
+		 */
+		clear_bit(PRINTK_PENDING_OUTPUT, &printk_pending);
 		up_console_sem();
 		return;
 	}
@@ -2200,6 +2364,7 @@ void console_unlock(void)
 	do_cond_resched = console_may_schedule;
 again:
 	console_may_schedule = 0;
+	did_offload = 0;
 
 	/*
 	 * We released the console_sem lock, so we need to recheck if
@@ -2207,6 +2372,7 @@ again:
 	 * console.
 	 */
 	if (!can_use_console()) {
+		clear_bit(PRINTK_PENDING_OUTPUT, &printk_pending);
 		console_locked = 0;
 		up_console_sem();
 		return;
@@ -2235,7 +2401,7 @@ again:
 			len = 0;
 		}
 skip:
-		if (console_seq == log_next_seq)
+		if (did_offload || console_seq == log_next_seq)
 			break;
 
 		msg = log_from_idx(console_idx);
@@ -2267,9 +2433,38 @@ skip:
 		stop_critical_timings();	/* don't trace print latency */
 		call_console_drivers(ext_text, ext_len, text, len);
 		start_critical_timings();
+
+		/*
+		 * Sometimes current task may re-acquire console_sem ahead of
+		 * just woken up printk_kthread, because we let processes to
+		 * compete for console_sem. In this case current task will jump
+		 * to `again' label (if there are any pending messages), print
+		 * one more line, break out of printing loop (we don't reset
+		 * `lines_printed' after wake_up_process() exactly for this
+		 * purpose) and do up_console_sem(); this will be repeated as
+		 * long as current task successfully console_trylock()-s.
+		 *
+		 * Eventually and hopefully, either printk_kthread or some
+		 * other task will acquire console_sem and current process will
+		 * be able to leave console_unlock(). Until this happens we
+		 * cannot be sure that anyone will take over and flush the
+		 * `logbuf' messages. So in the worst case scenario we,
+		 * basically, have old printk()/console_unlock() behaviour:
+		 * a task prints all pending logbuf messages.
+		 *
+		 * If printk_kthread never wakes up (which may indicate that
+		 * the system is unstable or something weird is going on),
+		 * then we keep jumping to `again' label printing one message
+		 * from the logbuf each time. This is a bit ugly, but at least
+		 * we will print out the logbuf. If such condition occurs,
+		 * console_offload_printing() should declare `printk_emergency'
+		 * at some point and we will stop all attempts to offload
+		 * printing.
+		 */
+		did_offload = console_offload_printing();
 		printk_safe_exit_irqrestore(flags);
 
-		if (do_cond_resched)
+		if (!did_offload && do_cond_resched)
 			cond_resched();
 	}
 	console_locked = 0;
@@ -2284,12 +2479,16 @@ skip:
 
 	/*
 	 * Someone could have filled up the buffer again, so re-check if there's
-	 * something to flush. In case we cannot trylock the console_sem again,
-	 * there's a new owner and the console_unlock() from them will do the
-	 * flush, no worries.
+	 * something to flush. Try to lock the console_sem even if we
+	 * `did_offload', because we need to know for sure that some other task
+	 * has acquired the console_sem. In case we cannot trylock the
+	 * console_sem again, there's a new owner and the console_unlock() from
+	 * them will do the flush, no worries.
 	 */
 	raw_spin_lock(&logbuf_lock);
 	retry = console_seq != log_next_seq;
+	if (!retry)
+		clear_bit(PRINTK_PENDING_OUTPUT, &printk_pending);
 	raw_spin_unlock(&logbuf_lock);
 	printk_safe_exit_irqrestore(flags);
 
@@ -2719,8 +2918,11 @@ late_initcall(printk_late_init);
 #if defined CONFIG_PRINTK
 static void wake_up_klogd_work_func(struct irq_work *irq_work)
 {
-	if (test_and_clear_bit(PRINTK_PENDING_OUTPUT, &printk_pending)) {
-		/* If trylock fails, someone else is doing the printing */
+	if (test_bit(PRINTK_PENDING_OUTPUT, &printk_pending)) {
+		/*
+		 * If trylock fails, someone else is doing the printing.
+		 * PRINTK_PENDING_OUTPUT bit is cleared by console_unlock().
+		 */
 		if (console_trylock())
 			console_unlock();
 	}
