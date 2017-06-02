@@ -51,6 +51,7 @@
 #include <linux/kthread.h>
 #include <linux/smpboot.h>
 #include <linux/suspend.h>
+#include <linux/syscore_ops.h>
 
 #include <linux/uaccess.h>
 #include <asm/sections.h>
@@ -2970,6 +2971,22 @@ static struct notifier_block printk_pm_nb = {
 	.notifier_call = printk_pm_notify,
 };
 
+static int printk_pm_syscore_suspend(void)
+{
+	printk_emergency_begin();
+	return 0;
+}
+
+static void printk_pm_syscore_resume(void)
+{
+	printk_emergency_end();
+}
+
+static struct syscore_ops printk_pm_syscore_ops = {
+	.suspend = printk_pm_syscore_suspend,
+	.resume = printk_pm_syscore_resume,
+};
+
 static void printk_kthread_func(unsigned int cpu)
 {
 	while (1) {
@@ -3027,6 +3044,7 @@ static int __init init_printk_kthreads(void)
 		return -EINVAL;
 	}
 
+	register_syscore_ops(&printk_pm_syscore_ops);
 	return 0;
 }
 late_initcall(init_printk_kthreads);
