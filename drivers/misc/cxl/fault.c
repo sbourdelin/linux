@@ -132,18 +132,17 @@ static int cxl_handle_segment_miss(struct cxl_context *ctx,
 	return IRQ_HANDLED;
 }
 
-static void cxl_handle_page_fault(struct cxl_context *ctx,
-				  struct mm_struct *mm, u64 dsisr, u64 dar)
+int cxl_handle_page_fault(bool kernel_context,
+			  struct mm_struct *mm, u64 dsisr, u64 dar)
 {
-	unsigned flt = 0;
-	int result;
 	unsigned long access, flags, inv_flags = 0;
+	unsigned int flt = 0;
+	int rc;
 
-	trace_cxl_pte_miss(ctx, dsisr, dar);
-
-	if ((result = copro_handle_mm_fault(mm, dar, dsisr, &flt))) {
-		pr_devel("copro_handle_mm_fault failed: %#x\n", result);
-		return cxl_ack_ae(ctx);
+	rc = copro_handle_mm_fault(mm, dsisr, dar, &flt);
+	if (rc) {
+		pr_devel("copro_handle_mm_fault failed: %#x\n", rc);
+		return rc;
 	}
 
 	if (!radix_enabled()) {
@@ -156,7 +155,7 @@ static void cxl_handle_page_fault(struct cxl_context *ctx,
 			access |= _PAGE_WRITE;
 
 		access |= _PAGE_PRIVILEGED;
-		if ((!ctx->kernel) || (REGION_ID(dar) == USER_REGION_ID))
+		if (!kernel_context || (REGION_ID(dar) == USER_REGION_ID))
 			access &= ~_PAGE_PRIVILEGED;
 
 		if (dsisr & DSISR_NOHPTE)
@@ -166,8 +165,7 @@ static void cxl_handle_page_fault(struct cxl_context *ctx,
 		hash_page_mm(mm, dar, access, 0x300, inv_flags);
 		local_irq_restore(flags);
 	}
-	pr_devel("Page fault successfully handled for pe: %i!\n", ctx->pe);
-	cxl_ops->ack_irq(ctx, CXL_PSL_TFC_An_R, 0);
+	return 0;
 }
 
 /*
@@ -254,9 +252,15 @@ void cxl_handle_fault(struct work_struct *fault_work)
 
 	if (cxl_is_segment_miss(ctx, dsisr))
 		cxl_handle_segment_miss(ctx, mm, dar);
-	else if (cxl_is_page_fault(ctx, dsisr))
-		cxl_handle_page_fault(ctx, mm, dsisr, dar);
-	else
+	else if (cxl_is_page_fault(ctx, dsisr)) {
+			trace_cxl_pte_miss(ctx, dsisr, dar);
+			if (cxl_handle_page_fault(ctx->kernel, mm, dsisr, dar)) {
+				cxl_ack_ae(ctx);
+			} else {
+				cxl_ops->ack_irq(ctx, CXL_PSL_TFC_An_R, 0);
+			}
+			pr_devel("Page fault successfully handled for pe: %i!\n", ctx->pe);
+	} else
 		WARN(1, "cxl_handle_fault has nothing to handle\n");
 
 	if (mm)
