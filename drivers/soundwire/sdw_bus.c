@@ -89,6 +89,7 @@ int sdw_add_bus_master(struct sdw_bus *bus)
 
 	spin_lock_init(&bus->lock);
 	INIT_LIST_HEAD(&bus->slaves);
+	INIT_LIST_HEAD(&bus->mstr_rt_list);
 
 	if (bus->ops->read_prop)
 		bus->ops->read_prop(bus);

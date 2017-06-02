@@ -315,7 +315,6 @@ struct sdw_mstr_runtime {
  * inside bus driver for efficient BW management.
  * @stream_state: Current State of the stream.
  */
-
 struct sdw_runtime {
 	int tx_ref_count;
 	int rx_ref_count;
@@ -340,7 +339,6 @@ struct sdw_runtime {
  * available for allocation if reference count is 0.
  * @sdw_rt: Holds the stream runtime information.
  */
-
 struct sdw_stream_tag {
 	int stream_tag;
 	struct mutex stream_lock;
@@ -409,6 +407,23 @@ struct sdw_core {
 
 void sdw_create_row_col_pair(void);
 void sdw_init_bus_params(struct sdw_bus *sdw_bus);
+struct sdw_dpn_prop *sdw_get_slv_dpn_prop(struct sdw_slave *slave,
+				enum sdw_data_direction direction,
+				unsigned int port_num);
 int sdw_configure_dpn_intr(struct sdw_slave *slave, int port,
 					bool enable, int mask);
+
+/* Reference count increment */
+static inline void sdw_inc_ref_count(int *ref_count)
+{
+	(*ref_count)++;
+}
+
+/* Reference count decrement */
+static inline void sdw_dec_ref_count(int *ref_count)
+{
+	(*ref_count)--;
+}
+
+
 #endif /* __SDW_BUS_H */

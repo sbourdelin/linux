@@ -739,6 +739,8 @@ struct sdw_wait {
  * @params: current bus parameters
  * @prop: master properties
  * @sysfs: bus sysfs
+ * @mstr_rt_list: runtime list
+ * @link_sync_mask: sync mask value
  * @wait_msg: wait messages for async messages
  */
 struct sdw_bus {
@@ -754,6 +756,8 @@ struct sdw_bus {
 	struct sdw_bus_params params;
 	struct sdw_master_prop prop;
 	struct sdw_master_sysfs *sysfs;
+	struct list_head mstr_rt_list;
+	unsigned int link_sync_mask;
 	struct sdw_wait wait_msg;
 };
 
@@ -797,6 +801,81 @@ enum {
 	SDW_MSG_FLAG_READ = 0,
 	SDW_MSG_FLAG_WRITE,
 };
+
+/**
+ * sdw_port_config: SoundWire Port configuration for a given port (Master
+ *	and Slave) associated with the stream.
+ *
+ * @num: Port number to be configured
+ * @ch_mask: Which channels needs to be enabled for this Port.
+ */
+struct sdw_port_config {
+	unsigned int num;
+	unsigned int ch_mask;
+};
+
+/**
+ * sdw_ports_config: Ports configuration set by the Master(s) and Slave(s)
+ * via "sdw_config_ports" API. Both Master(s) and Slave(s) needs to provide
+ * port configuration because port configuration for Master(s) and Slave(s)
+ * could be different for a given stream. E.g.  in case of Stream associated
+ * with Single Master and a Slave, both Master and Slave shall have same
+ * "sdw_ports_config" except the "num" inside "sdw_port_config"(assuming
+ * Master and Slave supports stereo channels per port). In case of stereo
+ * stream attached to single Master and two Slaves, "num_ports" for each
+ * Slave shall be 1 and for the Master it shall be 2 for "sdw_ports_config",
+ * "ch_mask" for Slave which handles left channel shall be 0x1, and for
+ * Slave which handles right channel shall be 0x2. "num" should be based on
+ * port allocated by Master and Slaves(assuming Master supports stereo
+ * channels per port and Slave supports mono channel per port).
+ *
+ * @num_ports: Number of ports to be configured.  @port_cfg: Port
+ * configuration for each Port.
+ */
+
+struct sdw_ports_config {
+	unsigned int num_ports;
+	struct sdw_port_config *port_config;
+};
+
+/**
+ * sdw_stream_config: Stream configuration set by the Master(s) and Slave(s)
+ * via sdw_config_stream API. Both Master(s) and Slave(s) needs to provide
+ * stream configuration because stream configuration for Master(s) and
+ * Slave(s) could be different for a given stream. E.g. in case of Stream
+ * associated with Single Master and a Slave, both Master and Slave shall
+ * have same "sdw_stream_config" except the "direction" (assuming Master and
+ * Slave supports stereo channels per port). In case of stereo stream
+ * attached to single Master and two Slaves, "channel_count" for each Slave
+ * shall be 1 and for the Master it shall be 2, (assuming Master supports
+ * stereo channels per port and Slave supports mono channel per port).
+ *
+ * @frame_rate: Audio frame rate of the stream (not the bus frame rate
+ * defining command bandwidth).
+ * @channel_count: Channel count of the stream.  @bps: Number of bits per
+ * audio sample.  @direction: Data direction w.r.t Port. This is used by bus
+ * driver to identify source and sink of the stream.
+ * @type: Stream type PCM or PDM. This is internally used by bus driver for
+ * bandwidth allocation.
+ */
+struct sdw_stream_config {
+	unsigned int frame_rate;
+	unsigned int channel_count;
+	unsigned int bps;
+	enum sdw_data_direction direction;
+	enum sdw_stream_type type;
+};
+
+int sdw_alloc_stream_tag(unsigned int *stream_tag);
+void sdw_release_stream_tag(unsigned int stream_tag);
+int sdw_config_stream(struct sdw_bus *bus, struct sdw_slave *slave,
+			struct sdw_stream_config *stream_config,
+			unsigned int stream_tag);
+int sdw_release_stream(struct sdw_bus *bus, struct sdw_slave *slave,
+						unsigned int stream_tag);
+int sdw_config_ports(struct sdw_bus *bus, struct sdw_slave *slave,
+				struct sdw_ports_config *ports_config,
+				unsigned int stream_tag);
 
 int sdw_transfer(struct sdw_bus *bus, struct sdw_slave *slave,
 			struct sdw_msg *msg);
