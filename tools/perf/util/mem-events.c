@@ -170,6 +170,7 @@ static const char * const mem_lvlx[] = {
 	NULL,
 	"L4",
 	"RAM",
+	"PMEM",
 };
 
 int perf_mem__lvl_scnprintf(char *out, size_t sz, struct mem_info *mem_info)
