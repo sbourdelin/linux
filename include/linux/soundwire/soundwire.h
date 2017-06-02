@@ -52,6 +52,7 @@
 
 #include <linux/device.h>
 #include <linux/mod_devicetable.h>
+#include <linux/soundwire/sdw_registers.h>
 
 struct sdw_bus;
 struct sdw_slave;
@@ -100,6 +101,22 @@ enum sdw_slave_status {
 	SDW_SLAVE_RESERVED = 3,
 };
 
+/**
+ * enum sdw_command_response: Command response as defined by SDW spec
+ *
+ * @SDW_CMD_OK: cmd was okay
+ * @SDW_CMD_IGNORED: cmd is ignored
+ * @SDW_CMD_FAILED: cmd failed
+ *
+ * The enum is different than actual Spec as response in the Spec is
+ * combination of ACK/NAK bits
+ */
+enum sdw_command_response {
+	SDW_CMD_OK = 0,
+	SDW_CMD_IGNORED = 1,
+	SDW_CMD_FAILED = 2,
+};
+
 /*
  * sdw bus defines
  */
@@ -140,11 +157,59 @@ struct sdw_slave {
 	struct device dev;
 	enum sdw_slave_status status;
 	struct sdw_bus *bus;
+	const struct sdw_slave_ops *ops;
+	struct sdw_slave_sysfs *sysfs;
 	struct list_head node;
 	u16 addr;
 };
 
 #define dev_to_sdw_dev(_dev) container_of(_dev, struct sdw_slave, dev)
+
+struct sdw_msg;
+struct sdw_wait;
+
+/**
+ * struct sdw_master_ops: master driver ops
+ *
+ * @read_prop: read the properties of a master
+ * @xfer_msg: the transfer message callback
+ * @xfer_msg_async: the async version of transfer message callback
+ */
+struct sdw_master_ops {
+	enum sdw_command_response (*xfer_msg)
+			(struct sdw_bus *bus, struct sdw_msg *msg, int page);
+	enum sdw_command_response (*xfer_msg_async)
+			(struct sdw_bus *bus, struct sdw_msg *msg,
+			int page, struct sdw_wait *wait);
+};
+
+/**
+ * struct sdw_msg: Message to be sent on sdw bus
+ *
+ * @addr: the register address of the slave
+ * @len: number of messages i.e reads/writes to be performed
+ * @addr_page1: SCP address page 1 Slave register
+ * @addr_page2: SCP address page 2 Slave register
+ * @flags: transfer flags, indicate if xfer is read or write
+ * @buf: message data buffer
+ * @ssp_sync: Send message at SSP (Stream Synchronization Point)
+ */
+struct sdw_msg {
+	u16 addr;
+	u16 len;
+	u16 device;
+	u8 addr_page1;
+	u8 addr_page2;
+	u8 flags;
+	u8 *buf;
+	bool ssp_sync;
+};
+
+struct sdw_wait {
+	int length;
+	struct completion complete;
+	struct sdw_msg *msg;
+};
 
 /**
  * struct sdw_bus: the SoundWire bus
@@ -156,6 +221,8 @@ struct sdw_slave {
  * @slaves: list of slaves on this bus
  * @assigned: logical addresses assigned
  * @lock: bus lock
+ * @ops: master callback ops
+ * @wait_msg: wait messages for async messages
  */
 struct sdw_bus {
 	struct list_head bus_node;
@@ -165,6 +232,8 @@ struct sdw_bus {
 	struct list_head slaves;
 	bool assigned[SDW_MAX_DEVICES + 1];
 	spinlock_t lock;
+	const struct sdw_master_ops *ops;
+	struct sdw_wait wait_msg;
 };
 
 int sdw_add_bus_master(struct sdw_bus *bus);
@@ -179,6 +248,7 @@ struct sdw_driver {
 	void (*shutdown)(struct sdw_slave *sdw);
 
 	const struct sdw_device_id *id_table;
+	const struct sdw_slave_ops *ops;
 
 	struct device_driver driver;
 };
@@ -188,4 +258,21 @@ struct sdw_driver {
 int sdw_register_driver(struct sdw_driver *drv, struct module *owner);
 void sdw_unregister_driver(struct sdw_driver *drv);
 
-#endif /* __SOUNDWIRE_H */
+/* messaging and data api's */
+
+s8 sdw_read(struct sdw_slave *slave, u16 addr);
+int sdw_write(struct sdw_slave *slave, u16 addr, u8 value);
+int sdw_nread(struct sdw_slave *slave, u16 addr, size_t count, u8 *val);
+int sdw_nwrite(struct sdw_slave *slave, u16 addr, size_t count, u8 *val);
+
+enum {
+	SDW_MSG_FLAG_READ = 0,
+	SDW_MSG_FLAG_WRITE,
+};
+
+int sdw_transfer(struct sdw_bus *bus, struct sdw_slave *slave,
+			struct sdw_msg *msg);
+int sdw_transfer_async(struct sdw_bus *bus, struct sdw_slave *slave,
+			struct sdw_msg *msg, struct sdw_wait *wait);
+
+ #endif /* __SOUNDWIRE_H */

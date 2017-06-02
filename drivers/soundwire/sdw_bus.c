@@ -103,3 +103,239 @@ void sdw_delete_bus_master(struct sdw_bus *bus)
 	WARN_ON(!list_empty(&bus->slaves));
 }
 EXPORT_SYMBOL(sdw_delete_bus_master);
+
+/*
+ * SDW IO Calls
+ */
+
+static int _sdw_transfer(struct sdw_bus *bus, struct sdw_slave *slave,
+				struct sdw_msg *msg, struct sdw_wait *wait)
+{
+	int page;
+	int ret;
+
+	/*
+	 * scp paging addr is defined as:
+	 *  SDW_ENUM_ADDR-> 0 we are enumerating so don't program
+	 *	scp, sets to default.
+	 *  SDW_BROADCAST_ADDR -> 15, its broadcast, so program SCP
+	 *  Rest: dependent on paging support
+	 */
+	switch (msg->device) {
+	case SDW_ENUM_ADDR:
+		page = 0;
+		break;
+
+	case SDW_BROADCAST_ADDR:
+		page = 1;
+		break;
+
+	}
+
+	if (!wait) {
+		spin_lock(&bus->lock);
+		ret = bus->ops->xfer_msg(bus, msg, page);
+		spin_unlock(&bus->lock);
+	} else {
+		if (!bus->ops->xfer_msg_async)
+			return -ENOTSUPP;
+
+		wait->msg = msg;
+		wait->length = msg->len;
+
+		spin_lock(&bus->lock);
+		ret = bus->ops->xfer_msg_async(bus, msg, page, wait);
+		spin_unlock(&bus->lock);
+
+		if (ret < 0) {
+			dev_err(bus->dev, "Transfer async msg failed: %d\n", ret);
+			return ret;
+		}
+	}
+
+	return ret;
+}
+
+/**
+ * sdw_transfer: transfers messages(s) to a sdw slave device.
+ * The transfer is done synchronously and this call would wait for the
+ * result and return
+ *
+ * @bus: sdw bus
+ * @slave: sdw slave, can be null for broadcast
+ * @msg: the sdw message to be xfered
+ */
+int sdw_transfer(struct sdw_bus *bus, struct sdw_slave *slave,
+					struct sdw_msg *msg)
+{
+	int ret;
+
+	pm_runtime_get_sync(bus->dev);
+	ret = _sdw_transfer(bus, slave, msg, NULL);
+	pm_runtime_put(bus->dev);
+
+	return ret;
+}
+EXPORT_SYMBOL(sdw_transfer);
+
+/**
+ * sdw_transfer_async: transfers messages(s) to a sdw slave device
+ * asynchronously
+ *
+ * The transfer is done asynchronously and this call would return without the
+ * result and caller would be signalled for completion on sdw_wait
+ *
+ * @bus: sdw bus
+ * @slave: sdw slave, can be null for broadcast
+ * @msg: the sdw message to be xfered
+ * @wait: wait block on which API will signal completion
+ */
+int sdw_transfer_async(struct sdw_bus *bus, struct sdw_slave *slave,
+			struct sdw_msg *msg, struct sdw_wait *wait)
+{
+	int ret;
+
+	pm_runtime_get_sync(bus->dev);
+	ret =_sdw_transfer(bus, slave, msg, wait);
+	pm_runtime_put(bus->dev);
+
+	return ret;
+}
+EXPORT_SYMBOL(sdw_transfer_async);
+
+s8 sdw_read(struct sdw_slave *slave, u16 addr)
+{
+	struct sdw_msg msg;
+	u8 buf[1];
+	int ret;
+
+	msg.addr = addr;
+	msg.len = 1;
+	msg.device = slave->addr;
+	msg.addr_page1 = 0;
+	msg.addr_page2 = 0;
+	msg.flags = SDW_MSG_FLAG_READ;
+	msg.buf = buf;
+	msg.ssp_sync = 0;
+
+	ret = sdw_transfer(slave->bus, slave, &msg);
+	if (ret)
+		return buf[0];
+	else
+		return ret;
+}
+EXPORT_SYMBOL(sdw_read);
+
+int sdw_write(struct sdw_slave *slave, u16 addr, u8 value)
+{
+	struct sdw_msg msg;
+	u8 buf[1];
+
+	buf[0] = value;
+
+	msg.addr = addr;
+	msg.len = 1;
+	msg.device = slave->addr;
+	msg.addr_page1 = 0;
+	msg.addr_page2 = 0;
+	msg.flags = SDW_MSG_FLAG_WRITE;
+	msg.buf = buf;
+	msg.ssp_sync = 0;
+
+	return sdw_transfer(slave->bus, slave, &msg);
+}
+EXPORT_SYMBOL(sdw_write);
+
+int sdw_nread(struct sdw_slave *slave, u16 addr, size_t count, u8 *val)
+{
+	struct sdw_msg msg;
+
+	msg.addr = addr;
+	msg.len = count;
+	msg.device = slave->addr;
+	msg.addr_page1 = 0;
+	msg.addr_page2 = 0;
+	msg.flags = SDW_MSG_FLAG_READ;
+	msg.buf = val;
+	msg.ssp_sync = 0;
+
+	return sdw_transfer(slave->bus, slave, &msg);
+}
+EXPORT_SYMBOL(sdw_nread);
+
+int sdw_nwrite(struct sdw_slave *slave, u16 addr, size_t count, u8 *val)
+{
+	struct sdw_msg msg;
+
+	msg.addr = addr;
+	msg.len = count;
+	msg.device = slave->addr;
+	msg.addr_page1 = 0;
+	msg.addr_page2 = 0;
+	msg.flags = SDW_MSG_FLAG_WRITE;
+	msg.buf = val;
+	msg.ssp_sync = 0;
+
+	return sdw_transfer(slave->bus, slave, &msg);
+}
+EXPORT_SYMBOL(sdw_nwrite);
+
+static int sdw_write_nopm(struct sdw_slave *slave, u16 addr, u8 value)
+{
+	struct sdw_msg msg;
+	u8 buf[1];
+
+	buf[0] = value;
+
+	msg.addr = addr;
+	msg.len = 1;
+	msg.device = slave->addr;
+	msg.addr_page1 = 0;
+	msg.addr_page2 = 0;
+	msg.flags = SDW_MSG_FLAG_WRITE;
+	msg.buf = buf;
+	msg.ssp_sync = 0;
+
+	return _sdw_transfer(slave->bus, slave, &msg, NULL);
+}
+
+static s8 sdw_bus_read_nopm(struct sdw_bus *bus, u16 addr)
+{
+	struct sdw_msg msg;
+	u8 buf[1];
+	int ret;
+
+	msg.addr = addr;
+	msg.len = 1;
+	msg.addr_page1 = 0;
+	msg.addr_page2 = 0;
+	msg.flags = SDW_MSG_FLAG_READ;
+	msg.buf = buf;
+	msg.ssp_sync = 0;
+
+	msg.device = SDW_BROADCAST_ADDR;
+	ret = _sdw_transfer(bus, NULL, &msg, NULL);
+	if (ret)
+		return buf[0];
+	else
+		return ret;
+}
+
+static int sdw_bus_write_nopm(struct sdw_bus *bus, u16 addr, u8 value)
+{
+	struct sdw_msg msg;
+	u8 buf[1];
+
+	buf[0] = value;
+
+	msg.addr = addr;
+	msg.len = 1;
+	msg.addr_page1 = 0;
+	msg.addr_page2 = 0;
+	msg.flags = SDW_MSG_FLAG_WRITE;
+	msg.buf = buf;
+	msg.ssp_sync = 0;
+	msg.device = SDW_BROADCAST_ADDR;
+
+	return _sdw_transfer(bus, NULL, &msg, NULL);
+}
