@@ -512,13 +512,22 @@ _GLOBAL(_switch)
 	std	r23,_CCR(r1)
 	std	r1,KSP(r3)	/* Set old stack pointer */
 
-#ifdef CONFIG_SMP
-	/* We need a sync somewhere here to make sure that if the
-	 * previous task gets rescheduled on another CPU, it sees all
-	 * stores it has performed on this one.
+	/*
+	 * On SMP kernels, care must be taken because a task may be
+	 * scheduled off CPUx and on to CPUy. Memory ordering must be
+	 * considered.
+	 *
+	 * Cacheable stores on CPUx will be visible when the task is
+	 * scheduled on CPUy by virtue of smp_store_release(t->on_cpu, 0)
+	 * pairing with smp_cond_load_acquire(!t->on_cpu) on the other
+	 * CPU.
+	 *
+	 * Uncacheable stores in the case of involuntary preemption must
+	 * be taken care of. The smp_mb__before_spin_lock() in __schedule()
+	 * is a hwsync, which orders mmio too. That does not have to be
+	 * in any particular place within the context switch path, because
+	 * the context switch path itself does not do any mmio.
 	 */
-	sync
-#endif /* CONFIG_SMP */
 
 	/*
 	 * The kernel context switch path must contain a spin_lock,
