@@ -68,6 +68,7 @@
 		regulator-min-microvolt = <3300000>;
 		regulator-max-microvolt = <3300000>;
 	};
+
 };
 
 &can0 {
@@ -101,7 +102,7 @@
 };
 
 &i2c0 {
-	status = "okay";
+	status = "disabled";
 	clock-frequency = <100000>;
 
 	/*
@@ -175,4 +176,29 @@
 
 &usb1 {
 	status = "okay";
+};
+
+&fpga_bridge0 {
+	reg-names = "axi_h2f_lw";
+	#address-cells = <2>;
+	#size-cells = <1>;
+	ranges = <0x00000001 0x00080000 0xff280000 0x00000040>;
+
+	i2c_0: i2c@0x100080000 {
+		compatible = "altr,softip-i2c-v1.0";
+		reg = <0x00000001 0x00080000 0x00000040>;
+		interrupt-parent = <&intc>;
+		interrupts = <0 43 4>;
+		clocks = <&clk_0>;
+		fifo-size = <4>;
+		clock-frequency = <100000>;
+		#address-cells = <1>;
+		#size-cells = <0>;
+
+		eeprom@51 {
+			compatible = "atmel,24c32";
+			reg = <0x51>;
+			pagesize = <32>;
+		};
+	};
 };

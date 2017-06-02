@@ -133,6 +133,13 @@
 					#address-cells = <1>;
 					#size-cells = <0>;
 
+					clk_0: clk_0 {
+						compatible = "fixed-clock";
+						#clock-cells = <0>;
+						clock-frequency = <50000000>;
+						clock-output-names = "clk_0-clk";
+					};
+
 					osc1: osc1 {
 						#clock-cells = <0>;
 						compatible = "fixed-clock";
@@ -529,11 +536,11 @@
 				};
 		};
 
-		fpga_bridge0: fpga_bridge@ff400000 {
+		fpga_bridge0: fpga_bridge@ff200000 {
 			compatible = "altr,socfpga-lwhps2fpga-bridge";
-			reg = <0xff400000 0x100000>;
+			reg = <0xff200000 0x00200000>;
 			resets = <&rst LWHPS2FPGA_RESET>;
-			clocks = <&l4_main_clk>;
+			clocks = <&clk_0>;
 		};
 
 		fpga_bridge1: fpga_bridge@ff500000 {
