@@ -240,8 +240,10 @@ static int vtbl_check(const struct ubi_device *ubi,
 		if (reserved_pebs > ubi->good_peb_count) {
 			ubi_err(ubi, "too large reserved_pebs %d, good PEBs %d",
 				reserved_pebs, ubi->good_peb_count);
-			err = 9;
-			goto bad;
+			if (!ubi->ro_mode) {
+				err = 9;
+				goto bad;
+			}
 		}
 
 		if (name_len > UBI_VOL_NAME_MAX) {
@@ -652,10 +654,12 @@ static int init_volumes(struct ubi_device *ubi,
 		if (ubi->corr_peb_count)
 			ubi_err(ubi, "%d PEBs are corrupted and not used",
 				ubi->corr_peb_count);
-		return -ENOSPC;
+		if (!ubi->ro_mode)
+			return -ENOSPC;
+	} else {
+		ubi->rsvd_pebs += reserved_pebs;
+		ubi->avail_pebs -= reserved_pebs;
 	}
-	ubi->rsvd_pebs += reserved_pebs;
-	ubi->avail_pebs -= reserved_pebs;
 
 	return 0;
 }
