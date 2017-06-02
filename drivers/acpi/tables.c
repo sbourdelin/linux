@@ -218,6 +218,33 @@ void acpi_table_print_madt_entry(struct acpi_subtable_header *header)
 	}
 }
 
+static unsigned long __init
+acpi_get_entry_type(char *id, void *entry)
+{
+	if (!strncmp(id, ACPI_SIG_HMAT, 4))
+		return ((struct acpi_hmat_structure *)entry)->type;
+	else
+		return ((struct acpi_subtable_header *)entry)->type;
+}
+
+static unsigned long __init
+acpi_get_entry_length(char *id, void *entry)
+{
+	if (!strncmp(id, ACPI_SIG_HMAT, 4))
+		return ((struct acpi_hmat_structure *)entry)->length;
+	else
+		return ((struct acpi_subtable_header *)entry)->length;
+}
+
+static unsigned long __init
+acpi_get_subtable_header_length(char *id)
+{
+	if (!strncmp(id, ACPI_SIG_HMAT, 4))
+		return sizeof(struct acpi_hmat_structure);
+	else
+		return sizeof(struct acpi_subtable_header);
+}
+
 /**
  * acpi_parse_entries_array - for each proc_num find a suitable subtable
  *
@@ -242,10 +269,10 @@ acpi_parse_entries_array(char *id, unsigned long table_size,
 		struct acpi_subtable_proc *proc, int proc_num,
 		unsigned int max_entries)
 {
-	struct acpi_subtable_header *entry;
-	unsigned long table_end;
+	unsigned long table_end, subtable_header_length;
 	int count = 0;
 	int errs = 0;
+	void *entry;
 	int i;
 
 	if (acpi_disabled)
@@ -263,19 +290,23 @@ acpi_parse_entries_array(char *id, unsigned long table_size,
 	}
 
 	table_end = (unsigned long)table_header + table_header->length;
+	subtable_header_length = acpi_get_subtable_header_length(id);
 
 	/* Parse all entries looking for a match. */
 
-	entry = (struct acpi_subtable_header *)
-	    ((unsigned long)table_header + table_size);
+	entry = (void *)table_header + table_size;
 
-	while (((unsigned long)entry) + sizeof(struct acpi_subtable_header) <
-	       table_end) {
+	while (((unsigned long)entry) + subtable_header_length  < table_end) {
+		unsigned long entry_type, entry_length;
+
 		if (max_entries && count >= max_entries)
 			break;
 
+		entry_type = acpi_get_entry_type(id, entry);
+		entry_length = acpi_get_entry_length(id, entry);
+
 		for (i = 0; i < proc_num; i++) {
-			if (entry->type != proc[i].id)
+			if (entry_type != proc[i].id)
 				continue;
 			if (!proc[i].handler ||
 			     (!errs && proc[i].handler(entry, table_end))) {
@@ -290,16 +321,15 @@ acpi_parse_entries_array(char *id, unsigned long table_size,
 			count++;
 
 		/*
-		 * If entry->length is 0, break from this loop to avoid
+		 * If entry_length is 0, break from this loop to avoid
 		 * infinite loop.
 		 */
-		if (entry->length == 0) {
+		if (entry_length == 0) {
 			pr_err("[%4.4s:0x%02x] Invalid zero length\n", id, proc->id);
 			return -EINVAL;
 		}
 
-		entry = (struct acpi_subtable_header *)
-		    ((unsigned long)entry + entry->length);
+		entry += entry_length;
 	}
 
 	if (max_entries && count > max_entries) {
