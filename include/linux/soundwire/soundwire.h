@@ -493,6 +493,38 @@ struct sdw_transport_params {
 };
 
 /**
+ * struct sdw_enable_ch: Enable/disable Data Port channel.
+ *
+ * @num: Port number for which params are to be programmed.
+ * @ch_mask: Active channel mask for this Port.
+ * @enable: Enable/disable channel, true (enable) or false (disable)
+ */
+struct sdw_enable_ch {
+	unsigned int num;
+	unsigned int ch_mask;
+	bool enable;
+};
+/**
+ * struct sdw_prepare_ch: Prepare/De-prepare the Data Port channel. This is
+ * similar to the prepare API of Alsa, where most of the hardware interfaces
+ * are prepared for the playback/capture to start. All the parameters are
+ * known to the hardware at this point for starting playback/capture next.
+ *
+ * @num: Port number.  @ch_mask: Channels to be prepared/deprepared
+ * specified by ch_mask.  @prepare: Prepare/de-prepare channel, true
+ * (prepare) or false (de-prepare).
+ * @bank: Register bank, which bank Slave/Master driver should program for
+ * implementation defined registers. This is the inverted value of the
+ * current bank.
+ */
+struct sdw_prepare_ch {
+	unsigned int num;
+	unsigned int ch_mask;
+	bool prepare;
+	unsigned int bank;
+};
+
+/**
  * struct sdw_bus_conf: Bus params for the Slave/Master to be ready for next
  * bus changes.
  *
@@ -643,6 +675,36 @@ struct sdw_master_prop {
 struct sdw_master_sysfs;
 struct sdw_msg;
 struct sdw_wait;
+
+/**
+ * struct sdw_master_port_ops: Callback functions from bus to Master
+ * driver to set Master Data ports. Since Master registers are not standard,
+ * the onus is on the driver to implement these.
+ *
+ * @dpn_set_port_params: Set the Port parameters for the Master Port. This
+ * is mandatory callback to be provided by Master, if it support data ports.
+ * @dpn_set_port_transport_params: Set transport parameters for the Master
+ * Port. This is mandatory callback to be provided by Master if it supports
+ * data ports.
+ * @dpn_port_prep: Port prepare operations for the Master Data Port. Called
+ * before and after Port prepare as well as for Master Data Port prepare.
+ * @dpn_port_enable_ch: Enable the channels of particular Master Port.
+ * Actual enabling of the port is done as a part of bank switch This call is
+ * to enable the channels in alternate bank. This is mandatory if Master
+ * supports data ports.
+ */
+struct sdw_master_port_ops {
+	int (*dpn_set_port_params)(struct sdw_bus *bus,
+			struct sdw_port_params *port_params, unsigned int bank);
+	int (*dpn_set_port_transport_params)(struct sdw_bus *bus,
+			struct sdw_transport_params *transport_params,
+			unsigned int bank);
+	int (*dpn_port_prep)(struct sdw_bus *bus,
+				struct sdw_prepare_ch *prepare_ch,
+				enum sdw_port_prep_ops prep_ops);
+	int (*dpn_port_enable_ch)(struct sdw_bus *bus,
+			struct sdw_enable_ch *enable_ch, unsigned int bank);
+};
 
 /**
  * struct sdw_master_ops: master driver ops
