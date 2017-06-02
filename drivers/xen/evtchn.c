@@ -58,6 +58,8 @@
 #include <xen/xen-ops.h>
 #include <asm/xen/hypervisor.h>
 
+static DEFINE_PER_CPU(int, bind_last_selected_cpu);
+
 struct per_user_data {
 	struct mutex bind_mutex; /* serialize bind/unbind operations */
 	struct rb_root evtchns;
@@ -433,6 +435,36 @@ static void evtchn_unbind_from_user(struct per_user_data *u,
 	del_evtchn(u, evtchn);
 }
 
+static void evtchn_bind_interdom_next_vcpu(int evtchn)
+{
+	unsigned int selected_cpu, irq;
+	struct irq_desc *desc = NULL;
+	unsigned long flags;
+
+	irq = irq_from_evtchn(evtchn);
+	desc = irq_to_desc(irq);
+
+	if (!desc)
+		return;
+
+	raw_spin_lock_irqsave(&desc->lock, flags);
+	selected_cpu = this_cpu_read(bind_last_selected_cpu);
+	selected_cpu = cpumask_next_and(selected_cpu,
+			desc->irq_common_data.affinity, cpu_online_mask);
+
+	if (unlikely(selected_cpu >= nr_cpu_ids))
+		selected_cpu = cpumask_first_and(desc->irq_common_data.affinity,
+				cpu_online_mask);
+
+	raw_spin_unlock_irqrestore(&desc->lock, flags);
+	this_cpu_write(bind_last_selected_cpu, selected_cpu);
+
+	local_irq_disable();
+	/* unmask expects irqs to be disabled */
+	xen_rebind_evtchn_to_cpu(evtchn, selected_cpu);
+	local_irq_enable();
+}
+
 static long evtchn_ioctl(struct file *file,
 			 unsigned int cmd, unsigned long arg)
 {
@@ -490,8 +522,10 @@ static long evtchn_ioctl(struct file *file,
 			break;
 
 		rc = evtchn_bind_to_user(u, bind_interdomain.local_port);
-		if (rc == 0)
+		if (rc == 0) {
 			rc = bind_interdomain.local_port;
+			evtchn_bind_interdom_next_vcpu(rc);
+		}
 		break;
 	}
 

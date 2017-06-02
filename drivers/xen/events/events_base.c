@@ -1303,10 +1303,9 @@ void rebind_evtchn_irq(int evtchn, int irq)
 }
 
 /* Rebind an evtchn so that it gets delivered to a specific cpu */
-static int rebind_irq_to_cpu(unsigned irq, unsigned tcpu)
+int xen_rebind_evtchn_to_cpu(int evtchn, unsigned tcpu)
 {
 	struct evtchn_bind_vcpu bind_vcpu;
-	int evtchn = evtchn_from_irq(irq);
 	int masked;
 
 	if (!VALID_EVTCHN(evtchn))
@@ -1337,6 +1336,12 @@ static int rebind_irq_to_cpu(unsigned irq, unsigned tcpu)
 		unmask_evtchn(evtchn);
 
 	return 0;
+}
+EXPORT_SYMBOL_GPL(xen_rebind_evtchn_to_cpu);
+
+static int rebind_irq_to_cpu(unsigned irq, unsigned tcpu)
+{
+	return xen_rebind_evtchn_to_cpu(evtchn_from_irq(irq), tcpu);
 }
 
 static int set_affinity_irq(struct irq_data *data, const struct cpumask *dest,
