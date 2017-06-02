@@ -457,9 +457,15 @@ static DEFINE_PER_CPU(struct task_struct *, printk_kthread);
 static atomic_t printk_emergency __read_mostly;
 /*
  * Disable printk_kthread permanently. Unlike `oops_in_progress'
- * it doesn't go back to 0.
+ * it doesn't go back to 0 (unless set by user-space).
  */
 static bool printk_enforce_emergency __read_mostly;
+
+module_param_named(enforce_emergency, printk_enforce_emergency,
+		    bool, 0644);
+MODULE_PARM_DESC(printk_enforce_emergency,
+		 "don't offload message printing to printk kthread");
+
 /*
  * The number of lines a task can print before offloading printing
  * job to printk_kthread. 0 indicates 'no limit'.
