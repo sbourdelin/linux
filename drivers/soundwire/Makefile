@@ -9,6 +9,10 @@ obj-$(CONFIG_SOUNDWIRE_BUS) += soundwire-bus.o
 
 ##Intel Objs
 
+#shim module
+soundwire-intel-shim-objs := sdw_intel_shim.o
+obj-$(CONFIG_SOUNDWIRE_CADENCE)	+= soundwire-intel-shim.o
+
 #link driver
 soundwire-cadence-objs := sdw_cadence.o sdw_cadence_dai.o
 obj-$(CONFIG_SOUNDWIRE_CADENCE)	+= soundwire-cadence.o
