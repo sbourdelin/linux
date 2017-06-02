@@ -368,7 +368,7 @@ static int rpmsg_dev_probe(struct device *dev)
 		goto out;
 	}
 
-	if (rpdev->ops->announce_create)
+	if (rpdev->ops && rpdev->ops->announce_create)
 		err = rpdev->ops->announce_create(rpdev);
 out:
 	return err;
