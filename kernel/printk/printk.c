@@ -50,6 +50,7 @@
 #include <linux/sched/task_stack.h>
 #include <linux/kthread.h>
 #include <linux/smpboot.h>
+#include <linux/suspend.h>
 
 #include <linux/uaccess.h>
 #include <asm/sections.h>
@@ -2942,6 +2943,33 @@ static DEFINE_PER_CPU(struct irq_work, wake_up_klogd_work) = {
 	.flags = IRQ_WORK_LAZY,
 };
 
+static int printk_pm_notify(struct notifier_block *notify_block,
+			    unsigned long mode, void *unused)
+{
+	switch (mode) {
+	case PM_HIBERNATION_PREPARE:
+	case PM_SUSPEND_PREPARE:
+	case PM_RESTORE_PREPARE:
+		printk_emergency_begin();
+		break;
+
+	case PM_POST_SUSPEND:
+	case PM_POST_HIBERNATION:
+	case PM_POST_RESTORE:
+		printk_emergency_end();
+		break;
+
+	default:
+		return NOTIFY_DONE;
+	}
+
+	return NOTIFY_OK;
+}
+
+static struct notifier_block printk_pm_nb = {
+	.notifier_call = printk_pm_notify,
+};
+
 static void printk_kthread_func(unsigned int cpu)
 {
 	while (1) {
@@ -2989,6 +3017,13 @@ static int __init init_printk_kthreads(void)
 						   &printk_cpumask)) {
 		printk_enforce_emergency = true;
 		pr_err("printk: failed to create threads\n");
+		return -EINVAL;
+	}
+
+	if (register_pm_notifier(&printk_pm_nb) != 0) {
+		printk_enforce_emergency = true;
+		smpboot_unregister_percpu_thread(&printk_kthreads);
+		pr_err("printk: unable to register PM notifier\n");
 		return -EINVAL;
 	}
 
