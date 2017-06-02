@@ -344,8 +344,12 @@
 	INTEL_VGA_DEVICE(0x3E90, info), /* SRV GT1 */ \
 	INTEL_VGA_DEVICE(0x3E92, info)  /* SRV GT2 */
 
+#define INTEL_CFL_H_IDS(info) \
+	INTEL_VGA_DEVICE(0x3E94, info) /* Halo GT2 */
+
 #define INTEL_CFL_IDS(info) \
 	INTEL_CFL_U_IDS(info), \
-	INTEL_CFL_S_IDS(info)
+	INTEL_CFL_S_IDS(info), \
+	INTEL_CFL_H_IDS(info)
 
 #endif /* _I915_PCIIDS_H */
