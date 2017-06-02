@@ -727,15 +727,13 @@ int brcmf_sdiod_recv_chain(struct brcmf_sdio_dev *sdiodev,
 			return -ENOMEM;
 		err = brcmf_sdiod_buffrw(sdiodev, SDIO_FUNC_2, false, addr,
 					 glom_skb);
-		if (err) {
-			brcmu_pkt_buf_free_skb(glom_skb);
-			goto done;
+		if (!err) {
+			skb_queue_walk(pktq, skb) {
+				memcpy(skb->data, glom_skb->data, skb->len);
+				skb_pull(glom_skb, skb->len);
+			}
 		}
-
-		skb_queue_walk(pktq, skb) {
-			memcpy(skb->data, glom_skb->data, skb->len);
-			skb_pull(glom_skb, skb->len);
-		}
+		brcmu_pkt_buf_free_skb(glom_skb);
 	} else
 		err = brcmf_sdiod_sglist_rw(sdiodev, SDIO_FUNC_2, false, addr,
 					    pktq);
