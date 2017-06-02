@@ -3429,8 +3429,7 @@ handle_failed_stripe(struct r5conf *conf, struct stripe_head *sh,
 				struct bio *nextbi =
 					r5_next_bio(bi, sh->dev[i].sector);
 
-				bi->bi_error = -EIO;
-				bio_endio(bi);
+				bio_io_error(bi);
 				bi = nextbi;
 			}
 		}
