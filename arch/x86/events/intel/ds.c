@@ -79,10 +79,12 @@ void __init intel_pmu_pebs_data_source_nhm(void)
 	pebs_data_source[0x07] = OP_LH | P(LVL, L3)  | P(SNOOP, HITM);
 }
 
-void __init intel_pmu_pebs_data_source_skl(void)
+void __init intel_pmu_pebs_data_source_skl(bool pmem)
 {
-	pebs_data_source[0x08] = OP_LH | P(LVLX, L4) | P(SNOOP, HIT);
-	pebs_data_source[0x09] = OP_LH | P(LVLX, L4) | P(LVLX, REMOTE) | P(SNOOP, HIT);
+	u64 pmem_or_l4 = pmem ? P(LVLX, PMEM) : P(LVLX, L4);
+
+	pebs_data_source[0x08] = OP_LH | pmem_or_l4 | P(SNOOP, HIT);
+	pebs_data_source[0x09] = OP_LH | pmem_or_l4 | P(LVLX, REMOTE) | P(SNOOP, HIT);
 	pebs_data_source[0x0b] = OP_LH | P(LVLX, RAM) | P(LVLX, REMOTE) | P(SNOOP, NONE);
 	pebs_data_source[0x0c] = OP_LH | P(LVL, NA) | P(LVLX, REMOTE) | P(SNOOPX, FWD);
 	pebs_data_source[0x0d] = OP_LH | P(LVL, NA) | P(LVLX, REMOTE) | P(SNOOP, HITM);

@@ -982,7 +982,8 @@ union perf_mem_data_src {
 #define PERF_MEM_LVLX_REMOTE    0x01 /* Remote */
 #define PERF_MEM_LVLX_L4	0x02 /* L4 */
 #define PERF_MEM_LVLX_RAM	0x04 /* Ram */
-/* 5 free */
+#define PERF_MEM_LVLX_PMEM	0x08 /* Persistent Memory */
+/* 4 free */
 
 #define PERF_MEM_LVLX_SHIFT	33
 
