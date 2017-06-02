@@ -1646,3 +1646,30 @@ FTR_SECTION_ELSE
 	beq	doorbell_super_common
 ALT_FTR_SECTION_END_IFSET(CPU_FTR_HVMODE)
 	blr
+
+/*
+ * Similar to __replay_interrupt but called from cpu idle wakeup
+ * with SRR1 wake value in r3.
+ */
+_GLOBAL(__replay_wakeup_interrupt)
+	extrdi	r3,r3,42,4	/* Get SRR1 wake reason in low bits */
+	mfmsr	r12
+	mflr	r11
+	mfcr	r9
+	/* Don't set EE in MSR, we have hard disable set */
+	cmpwi	r3,0x6
+	beq	decrementer_common
+	cmpwi	r3,0x8
+	beq	hardware_interrupt_common
+BEGIN_FTR_SECTION
+	cmpwi	r3,0x3
+	beq	h_doorbell_common
+	cmpwi	r3,0x9
+	beq	h_virt_irq_common
+	cmpwi	r3,0xa
+	beq	hmi_exception_common
+FTR_SECTION_ELSE
+	cmpwi	r3,0x5
+	beq	doorbell_super_common
+ALT_FTR_SECTION_END_IFSET(CPU_FTR_HVMODE)
+	blr

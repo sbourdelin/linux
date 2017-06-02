@@ -32,6 +32,7 @@
 #ifndef __ASSEMBLY__
 
 extern void __replay_interrupt(unsigned int vector);
+extern void __replay_wakeup_interrupt(unsigned long srr1);
 
 extern void timer_interrupt(struct pt_regs *);
 extern void performance_monitor_exception(struct pt_regs *regs);
