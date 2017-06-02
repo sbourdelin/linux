@@ -38,6 +38,7 @@ struct block2mtd_dev {
 	struct block_device *blkdev;
 	struct mtd_info mtd;
 	struct mutex write_mutex;
+	bool ro_mode;
 };
 
 
@@ -212,7 +213,10 @@ static void block2mtd_free_device(struct block2mtd_dev *dev)
 	if (dev->blkdev) {
 		invalidate_mapping_pages(dev->blkdev->bd_inode->i_mapping,
 					0, -1);
-		blkdev_put(dev->blkdev, FMODE_READ|FMODE_WRITE|FMODE_EXCL);
+		if (dev->ro_mode)
+			blkdev_put(dev->blkdev, FMODE_READ);
+		else
+			blkdev_put(dev->blkdev, FMODE_READ|FMODE_WRITE|FMODE_EXCL);
 	}
 
 	kfree(dev);
@@ -240,6 +244,13 @@ static struct block2mtd_dev *add_device(char *devname, uint32_t erase_size,
 	/* Get a handle on the device */
 	bdev = blkdev_get_by_path(devname, mode, dev);
 
+	/* Try fallback to read only mode */
+	if (IS_ERR(bdev)) {
+		bdev = blkdev_get_by_path(devname, FMODE_READ, dev);
+		if (!IS_ERR(bdev))
+			dev->ro_mode = true;
+	}
+
 #ifndef MODULE
 	/*
 	 * We might not have the root device mounted at this point.
@@ -261,6 +272,13 @@ static struct block2mtd_dev *add_device(char *devname, uint32_t erase_size,
 		if (!devt)
 			continue;
 		bdev = blkdev_get_by_dev(devt, mode, dev);
+
+		/* Try fallback to read only mode */
+		if (IS_ERR(bdev)) {
+			bdev = blkdev_get_by_path(devname, FMODE_READ, dev);
+			if (!IS_ERR(bdev))
+				dev->ro_mode = true;
+		}
 	}
 #endif
 
@@ -295,16 +313,22 @@ static struct block2mtd_dev *add_device(char *devname, uint32_t erase_size,
 
 	dev->mtd.name = name;
 
+	if (dev->ro_mode) {
+		dev->mtd.type = MTD_ROM;
+		dev->mtd.flags = MTD_CAP_ROM;
+	} else {
+		dev->mtd.type = MTD_RAM;
+		dev->mtd.flags = MTD_CAP_RAM;
+		dev->mtd._erase = block2mtd_erase;
+		dev->mtd._write = block2mtd_write;
+		dev->mtd._sync = block2mtd_sync;
+	}
+
 	dev->mtd.size = dev->blkdev->bd_inode->i_size & PAGE_MASK;
 	dev->mtd.erasesize = erase_size;
 	dev->mtd.writesize = write_size;
 	dev->mtd.subpage_sft = subpage_sft;
 	dev->mtd.writebufsize = PAGE_SIZE;
-	dev->mtd.type = MTD_RAM;
-	dev->mtd.flags = MTD_CAP_RAM;
-	dev->mtd._erase = block2mtd_erase;
-	dev->mtd._write = block2mtd_write;
-	dev->mtd._sync = block2mtd_sync;
 	dev->mtd._read = block2mtd_read;
 	dev->mtd.priv = dev;
 	dev->mtd.owner = THIS_MODULE;
@@ -315,9 +339,10 @@ static struct block2mtd_dev *add_device(char *devname, uint32_t erase_size,
 	}
 
 	list_add(&dev->list, &blkmtd_device_list);
-	pr_info("mtd%d: [%s] erase_size = %dKiB [%d], write_size = %dKiB [%d], subpage_sft = %d\n",
+	pr_info("mtd%d: [%s] mode = %s, erase_size = %dKiB [%d], write_size = %dKiB [%d], subpage_sft = %d\n",
 		dev->mtd.index,
 		dev->mtd.name + strlen("block2mtd: "),
+		(dev->ro_mode ? "RO" : "R/W"),
 		dev->mtd.erasesize >> 10, dev->mtd.erasesize,
 		dev->mtd.writesize >> 10, dev->mtd.writesize,
 		dev->mtd.subpage_sft);
