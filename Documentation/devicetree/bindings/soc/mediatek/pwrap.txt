@@ -35,6 +35,10 @@ Required properties in pwrap device node.
   "wrap": Main module clock
 - clocks: Must contain an entry for each entry in clock-names.
 
+Required properties in pwrap device node
+- compatible:
+	"mediatek,mt7622-pwrap" for MT7622 SoCs
+
 Optional properities:
 - pmic: Mediatek PMIC MFD is the child device of pwrap
   See the following for child node definitions:
