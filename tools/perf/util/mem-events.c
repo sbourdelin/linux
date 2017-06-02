@@ -166,11 +166,18 @@ static const char * const mem_lvl[] = {
 	"Uncached",
 };
 
+static const char * const mem_lvlx[] = {
+	NULL,
+	"L4",
+	"RAM",
+};
+
 int perf_mem__lvl_scnprintf(char *out, size_t sz, struct mem_info *mem_info)
 {
 	size_t i, l = 0;
 	u64 m =  PERF_MEM_LVL_NA;
 	u64 hit, miss;
+	int printed;
 
 	if (mem_info)
 		m  = mem_info->data_src.mem_lvl;
@@ -184,17 +191,37 @@ int perf_mem__lvl_scnprintf(char *out, size_t sz, struct mem_info *mem_info)
 	/* already taken care of */
 	m &= ~(PERF_MEM_LVL_HIT|PERF_MEM_LVL_MISS);
 
+	if (mem_info &&
+	     (mem_info->data_src.mem_lvlx & PERF_MEM_LVLX_REMOTE))
+		l += scnprintf(out + l, sz - l, "Remote ");
+
+	printed = 0;
 	for (i = 0; m && i < ARRAY_SIZE(mem_lvl); i++, m >>= 1) {
 		if (!(m & 0x1))
 			continue;
-		if (l) {
+		if (printed++) {
 			strcat(out, " or ");
 			l += 4;
 		}
 		l += scnprintf(out + l, sz - l, mem_lvl[i]);
 	}
-	if (*out == '\0')
-		l += scnprintf(out, sz - l, "N/A");
+
+	m = 0;
+	if (mem_info)
+		m = mem_info->data_src.mem_lvlx;
+
+	for (i = 0; m && i < ARRAY_SIZE(mem_lvlx); i++, m >>= 1) {
+		if (!(m & 0x1) || !mem_lvlx[i])
+			continue;
+		if (printed++) {
+			strcat(out, " or ");
+			l += 4;
+		}
+		l += scnprintf(out + l, sz - l, mem_lvlx[i]);
+	}
+
+	if (l == 0)
+		l += scnprintf(out + l, sz - l, "N/A");
 	if (hit)
 		l += scnprintf(out + l, sz - l, " hit");
 	if (miss)
@@ -230,6 +257,14 @@ int perf_mem__snp_scnprintf(char *out, size_t sz, struct mem_info *mem_info)
 			l += 4;
 		}
 		l += scnprintf(out + l, sz - l, snoop_access[i]);
+	}
+	if (mem_info &&
+	     (mem_info->data_src.mem_snoopx & PERF_MEM_SNOOPX_FWD)) {
+		if (l) {
+			strcat(out, " or ");
+			l += 4;
+		}
+		l += scnprintf(out + l, sz - l, "Fwd");
 	}
 
 	if (*out == '\0')
