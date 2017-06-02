@@ -1692,6 +1692,7 @@ int cgroup_setup_root(struct cgroup_root *root, u16 ss_mask, int ref_flags)
 		goto exit_root_id;
 	}
 	root_cgrp->kn = root->kf_root->kn;
+	kernfs_encode_node_id(root_cgrp->kn, &root_cgrp->node_id);
 
 	ret = css_populate_dir(&root_cgrp->self);
 	if (ret)
@@ -4208,6 +4209,8 @@ int cgroup_mkdir(struct kernfs_node *parent_kn, const char *name, umode_t mode)
 
 	/* let's create and online css's */
 	kernfs_activate(kn);
+
+	kernfs_encode_node_id(kn, &cgrp->node_id);
 
 	ret = 0;
 	goto out_unlock;

@@ -65,6 +65,17 @@ const struct super_operations kernfs_sops = {
 	.show_path	= kernfs_sop_show_path,
 };
 
+/*
+ * A special version of export_encode_fh(). This will avoid to get inode and
+ * then do the fhandle encoding. This function must match with export_encode_fh
+ * and the kernfs node should be a directory.
+ */
+void kernfs_encode_node_id(struct kernfs_node *kn, struct kernfs_node_id *id)
+{
+	id->ino = kn->ino;
+	id->gen = kn->generation;
+}
+
 static struct inode *kernfs_fh_get_inode(struct super_block *sb,
 		u64 ino, u32 generation)
 {

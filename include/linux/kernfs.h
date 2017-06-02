@@ -247,6 +247,12 @@ struct kernfs_ops {
 #endif
 };
 
+/* match with 'struct fid' */
+struct kernfs_node_id {
+	u32 ino;
+	u32 gen;
+};
+
 #ifdef CONFIG_KERNFS
 
 static inline enum kernfs_node_type kernfs_type(struct kernfs_node *kn)
@@ -338,6 +344,8 @@ void kernfs_kill_sb(struct super_block *sb);
 struct super_block *kernfs_pin_sb(struct kernfs_root *root, const void *ns);
 
 void kernfs_init(void);
+
+void kernfs_encode_node_id(struct kernfs_node *kn, struct kernfs_node_id *id);
 
 #else	/* CONFIG_KERNFS */
 
