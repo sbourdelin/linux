@@ -39,9 +39,18 @@ struct memory_target {
 
 	bool is_cached;
 	bool is_registered;
+	bool has_perf_attributes;
 };
 #define to_memory_target(dev) container_of(dev, struct memory_target, dev)
 
+struct memory_locality {
+	struct list_head list;
+	struct acpi_hmat_locality *hmat_loc;
+};
+
 extern const struct attribute_group *memory_initiator_attribute_groups[];
 extern const struct attribute_group *memory_target_attribute_groups[];
+extern struct attribute *performance_attributes[];
+
+extern struct list_head locality_list;
 #endif /* _ACPI_HMEM_H_ */
