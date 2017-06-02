@@ -125,7 +125,7 @@ static int _sun4i_ddc_create(struct sun4i_hdmi *hdmi, struct clk *parent,
 	if (!ddc)
 		return -ENOMEM;
 
-	init.name = "hdmi-ddc";
+	init.name = "hdmi-ddc-divider";
 	init.ops = &sun4i_ddc_ops;
 	init.parent_names = &parent_name;
 	init.num_parents = 1;
