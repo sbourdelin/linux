@@ -471,9 +471,95 @@ static int cdns_config_update(struct cdns_sdw *sdw)
 	return 0;
 }
 
+/* TODO: optimize number of arguments for below API */
+static int cdns_sdw_allocate_pdi(struct cdns_sdw *sdw, struct sdw_ishim *shim,
+			struct sdw_cdns_pdi **stream, u32 start, u32 num,
+			u32 pdi_offset, bool pcm)
+{
+	const struct sdw_ishim_ops *ops = sdw->res->ops;
+	struct sdw_cdns_pdi *pdi;
+	int i;
+
+	if (!num)
+		return 0;
+
+	pdi = devm_kcalloc(sdw->dev, num, sizeof(*pdi), GFP_KERNEL);
+	if (!pdi)
+		return -ENOMEM;
+
+	for (i = start; i < num; i++)  {
+		pdi[i].ch_count = ops->pdi_ch_cap(shim, sdw->bus.link_id, i, pcm);
+		pdi[i].pdi_num = i + pdi_offset;
+		pdi[i].assigned = false;
+	}
+
+	*stream = pdi;
+	return 0;
+
+}
+static int cdns_sdw_pdi_init(struct cdns_sdw *sdw)
+{
+	struct sdw_ishim *shim = sdw->res->shim;
+	const struct sdw_ishim_ops *ops = sdw->res->ops;
+	struct sdw_cdns_stream_config config;
+	struct sdw_cdns_streams *stream;
+	int i;
+
+	/* get the shim configuration */
+	ops->pdi_init(shim, sdw->bus.link_id, &config);
+
+	/* copy the info */
+	sdw->pcm.num_bd = config.pcm_bd;
+	sdw->pcm.num_in = config.pcm_in;
+	sdw->pcm.num_out = config.pcm_out;
+	sdw->pdm.num_bd = config.pdm_bd;
+	sdw->pdm.num_in = config.pdm_in;
+	sdw->pdm.num_out = config.pdm_out;
+
+	for (i = 0; i < CDNS_MAX_PORTS; i++) {
+		sdw->ports[i].allocated = false;
+		sdw->ports[i].idx = i;
+	}
+
+	stream = &sdw->pcm;
+	/* first two BDs are reserved for bulk transfers, allocate them */
+	cdns_sdw_allocate_pdi(sdw, shim, &stream->bd,
+			CDNS_PCM_PDI_OFFSET, sdw->pcm.num_bd, 0, 1);
+	stream->num_bd -= CDNS_PCM_PDI_OFFSET;
+
+	cdns_sdw_allocate_pdi(sdw, shim, &stream->in, 0,
+					stream->num_in, 0, 1);
+	cdns_sdw_allocate_pdi(sdw, shim, &stream->out, 0,
+					stream->num_out, 0, 1);
+
+	stream = &sdw->pdm;
+	/* now allocate for PDMs */
+	cdns_sdw_allocate_pdi(sdw, shim, &stream->bd, 0,
+				stream->num_bd, CDNS_PDM_PDI_OFFSET, 0);
+	cdns_sdw_allocate_pdi(sdw, shim, &stream->in, 0,
+				stream->num_in, CDNS_PDM_PDI_OFFSET, 0);
+	cdns_sdw_allocate_pdi(sdw, shim, &stream->out, 0,
+				stream->num_out, CDNS_PDM_PDI_OFFSET, 0);
+
+	return 0;
+}
+
 static int cdns_sdw_init(struct cdns_sdw *sdw, bool first_init)
 {
 	u32 val;
+
+	if (sdw->res && sdw->res->shim) {
+		struct sdw_ishim *shim = sdw->res->shim;
+		const struct sdw_ishim_ops *ops = sdw->res->ops;
+
+		/* we need to power up and init shim first */
+		ops->link_power_up(shim, sdw->bus.link_id);
+		ops->init(shim, sdw->bus.link_id);
+
+		/* now configure the shim by setting SyncPRD and SyncPU */
+		ops->sync(shim, sdw->bus.link_id, SDW_ISHIM_SYNCPRD);
+		ops->sync(shim, sdw->bus.link_id, SDW_ISHIM_CMDSYNC);
+	}
 
 	/* Set clock divider */
 	cdns_sdw_updatel(sdw, CDNS_MCP_CLK_CTRL0, CDNS_DEFAULT_CLK_DIVIDER, CDNS_DEFAULT_CLK_DIVIDER);
@@ -512,6 +598,10 @@ static int cdns_sdw_init(struct cdns_sdw *sdw, bool first_init)
 
 	cdns_sdw_writel(sdw, CDNS_MCP_CONFIG, val);
 
+	/* Init the PDI */
+	if (first_init && sdw->res && sdw->res->shim)
+		cdns_sdw_pdi_init(sdw);
+
 	/* enable interrupt and configuration */
 	cdns_enable_interrupt(sdw);
 	cdns_config_update(sdw);
@@ -548,6 +638,30 @@ static int cdns_bus_conf(struct sdw_bus *bus, struct sdw_bus_conf *conf)
 	mcp_clkctrl |= divider;
 
 	cdns_sdw_writel(sdw, mcp_clkctrl_off, mcp_clkctrl);
+
+	return 0;
+}
+
+static int cdns_pre_bank_switch(struct sdw_bus *bus)
+{
+	struct cdns_sdw *sdw = bus_to_cdns(bus);
+	const struct sdw_ishim_ops *ops = sdw->res->ops;
+	struct sdw_ishim *shim = sdw->res->shim;
+
+	if ((bus->link_sync_mask) && (ops->sync))
+		return ops->sync(shim, sdw->bus.link_id, SDW_ISHIM_CMDSYNC);
+
+	return 0;
+}
+
+static int cdns_post_bank_switch(struct sdw_bus *bus)
+{
+	struct cdns_sdw *sdw = bus_to_cdns(bus);
+	const struct sdw_ishim_ops *ops = sdw->res->ops;
+	struct sdw_ishim *shim = sdw->res->shim;
+
+	if (ops->sync)
+		return ops->sync(shim, sdw->bus.link_id, SDW_ISHIM_SYNCGO);
 
 	return 0;
 }
@@ -645,6 +759,8 @@ static const struct sdw_master_ops cdns_ops = {
 	.xfer_msg_async = cdns_xfer_msg_async,
 	.set_ssp_interval = cdns_ssp_interval,
 	.set_bus_conf = cdns_bus_conf,
+	.pre_bank_switch = cdns_pre_bank_switch,
+	.post_bank_switch = cdns_post_bank_switch,
 };
 
 static const struct sdw_master_port_ops cdns_port_ops = {
@@ -739,9 +855,13 @@ static int cdns_sdw_suspend(struct device *dev)
 	struct cdns_sdw *sdw;
 	volatile u32 status;
 	unsigned long timeout;
+	struct sdw_ishim *shim;
+	const struct sdw_ishim_ops *ops;
 	int ret;
 
 	sdw = dev_get_drvdata(dev);
+	shim = sdw->res->shim;
+	ops = sdw->res->ops;
 
 	/* check suspend status */
 	status = cdns_sdw_readl(sdw, CDNS_MCP_STAT);
@@ -776,22 +896,39 @@ static int cdns_sdw_suspend(struct device *dev)
 		ret = -EBUSY;
 	}
 
+	if (shim) {
+		/* invoke shim for pd */
+		ops->link_power_down(shim, sdw->bus.link_id);
+
+		/* invoke shim for wake enable */
+		ops->wake(shim, sdw->bus.link_id, true);
+	}
+
 	return 0;
 }
 
 static int cdns_sdw_resume(struct device *dev)
 {
 	struct cdns_sdw *sdw;
+	struct sdw_ishim *shim;
+	const struct sdw_ishim_ops *ops;
 	volatile u32 status;
 	int ret;
 
 	sdw = dev_get_drvdata(dev);
+	shim = sdw->res->shim;
+	ops = sdw->res->ops;
+
 	/* check resume status */
 	status = cdns_sdw_readl(sdw, CDNS_MCP_STAT) & CDNS_MCP_STAT_CLK_STOP;
 	if (!status) {
 		dev_info(dev, "Clock is already running\n");
 		return 0;
 	}
+
+	/* invoke shim for wake disable */
+	if (shim)
+		ops->wake(shim, sdw->bus.link_id, false);
 
 	ret = cdns_sdw_init(sdw, false);
 	if (ret)
