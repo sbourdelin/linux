@@ -2523,14 +2523,13 @@ static int __init fcoe_init(void)
 	fcoe_dev_setup();
 
 	rc = fcoe_if_init();
-	if (rc)
-		goto out_free;
-
 	mutex_unlock(&fcoe_config_mutex);
+
+	if (rc)
+		goto out_destroy;
+
 	return 0;
 
-out_free:
-	mutex_unlock(&fcoe_config_mutex);
 out_destroy:
 	destroy_workqueue(fcoe_wq);
 	return rc;
