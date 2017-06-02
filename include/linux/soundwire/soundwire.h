@@ -469,6 +469,11 @@ struct sdw_slave_id {
 	__u16 link_id;
 };
 
+struct sdw_slave_intr_status {
+	u8 control_port;
+	u8 port[15];
+};
+
 enum sdw_clok_stop_type {
 	SDW_CLK_PRE_STOP = 0,
 	SDW_CLK_POST_STOP,
@@ -480,9 +485,23 @@ enum sdw_clok_stop_type {
  * struct sdw_slave_ops: Slave driver callback ops
  *
  * @read_prop: read slave properties callback
+ * @interrupt_callback: callback for device interrupt notification (invoked
+ * in thread context)
+ * @update_status: callback to update slave status
+ * @get_clk_stop_mode: query the clock mode supported, shall return mode
+ * based on dynamic if present or property
+ * @clk_stop: clock stop callback
  */
 struct sdw_slave_ops {
 	int (*read_prop)(struct sdw_slave *sdw);
+	int (*interrupt_callback)(struct sdw_slave *slave,
+			struct sdw_slave_intr_status *status);
+	int (*update_status)(struct sdw_slave *slave,
+			enum sdw_slave_status status);
+	int (*get_clk_stop_mode)(struct sdw_slave *slave);
+	int (*clk_stop)(struct sdw_slave *slave,
+			enum sdw_clk_stop_mode mode,
+			enum sdw_clok_stop_type type);
 };
 
 /**
@@ -556,6 +575,10 @@ struct sdw_wait;
  * @read_prop: read the properties of a master
  * @xfer_msg: the transfer message callback
  * @xfer_msg_async: the async version of transfer message callback
+ * @set_ssp_interval: set the Stream Synchronization Point (SSP) interval
+ * @set_bus_conf: Set the given bus configuration
+ * @pre_bank_switch: callback before doing the bank switch
+ * @post_bank_switch: callback after doing the bank switch
  */
 struct sdw_master_ops {
 	int (*read_prop)(struct sdw_bus *bus);
@@ -606,6 +629,7 @@ struct sdw_wait {
  * @assigned: logical addresses assigned
  * @lock: bus lock
  * @ops: master callback ops
+ * @port_ops: master port callback ops
  * @prop: master properties
  * @sysfs: bus sysfs
  * @wait_msg: wait messages for async messages
@@ -619,6 +643,7 @@ struct sdw_bus {
 	bool assigned[SDW_MAX_DEVICES + 1];
 	spinlock_t lock;
 	const struct sdw_master_ops *ops;
+	const struct sdw_master_port_ops *port_ops;
 	struct sdw_master_prop prop;
 	struct sdw_master_sysfs *sysfs;
 	struct sdw_wait wait_msg;
@@ -670,4 +695,11 @@ int sdw_transfer(struct sdw_bus *bus, struct sdw_slave *slave,
 int sdw_transfer_async(struct sdw_bus *bus, struct sdw_slave *slave,
 			struct sdw_msg *msg, struct sdw_wait *wait);
 
- #endif /* __SOUNDWIRE_H */
+int sdw_handle_slave_status(struct sdw_bus *bus,
+			enum sdw_slave_status status[]);
+
+int sdw_bus_prep_clk_stop(struct sdw_bus *bus);
+int sdw_bus_clk_stop(struct sdw_bus *bus);
+int sdw_bus_clk_stop_exit(struct sdw_bus *bus);
+
+#endif /* __SOUNDWIRE_H */

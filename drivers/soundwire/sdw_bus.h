@@ -68,4 +68,6 @@ int sdw_acpi_find_slaves(struct sdw_bus *bus)
 
 extern const struct attribute_group *slave_dev_attr_groups[];
 
+int sdw_configure_dpn_intr(struct sdw_slave *slave, int port,
+					bool enable, int mask);
 #endif /* __SDW_BUS_H */
