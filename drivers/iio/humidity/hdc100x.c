@@ -13,6 +13,12 @@
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
  * GNU General Public License for more details.
  *
+ * Datasheets:
+ * http://www.ti.com/product/HDC1000/datasheet
+ * http://www.ti.com/product/HDC1008/datasheet
+ * http://www.ti.com/product/HDC1010/datasheet
+ * http://www.ti.com/product/HDC1050/datasheet
+ * http://www.ti.com/product/HDC1080/datasheet
  */
 
 #include <linux/delay.h>
