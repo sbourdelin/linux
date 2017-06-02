@@ -196,6 +196,7 @@ struct s5p_jpeg_marker {
  * @sof_len:	SOF0 marker's payload length (without length field itself)
  * @components:	number of image components
  * @size:	image buffer size in bytes
+ * @type:	buffer type of the queue (enum v4l2_buf_type)
  */
 struct s5p_jpeg_q_data {
 	struct s5p_jpeg_fmt	*fmt;
@@ -208,6 +209,7 @@ struct s5p_jpeg_q_data {
 	u32			sof_len;
 	u32			components;
 	u32			size;
+	u32			type;
 };
 
 /**
