@@ -76,9 +76,16 @@ int sdw_add_bus_master(struct sdw_bus *bus)
 		pr_err("Soundwire bus w/o a device\n");
 		return -ENODEV;
 	}
+	if (!bus->ops) {
+		dev_err(bus->dev, "Bus ops are missing\n");
+		return -EINVAL;
+	}
 
 	spin_lock_init(&bus->lock);
 	INIT_LIST_HEAD(&bus->slaves);
+
+	if (bus->ops->read_prop)
+		bus->ops->read_prop(bus);
 
 	/*
 	 * SDW is an enumerable bus, but devices can be powered off, so they
@@ -130,6 +137,13 @@ static int _sdw_transfer(struct sdw_bus *bus, struct sdw_slave *slave,
 		page = 1;
 		break;
 
+	default:
+		if (slave)
+			page = slave->prop.paging_support;
+		else
+			page = 0;
+
+		break;
 	}
 
 	if (!wait) {

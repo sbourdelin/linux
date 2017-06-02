@@ -130,6 +130,10 @@ static int sdw_add_slave(struct sdw_bus *bus,
 		return ret;
 	}
 
+	/* device is added so init the properties */
+	if (slave->ops && slave->ops->read_prop)
+		slave->ops->read_prop(slave);
+
 	return 0;
 }
 

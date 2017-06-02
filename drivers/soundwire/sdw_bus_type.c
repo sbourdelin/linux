@@ -134,6 +134,7 @@ static int sdw_drv_probe(struct device *dev)
 		dev_err(dev, "Failed to attach PM domain: %d\n", ret);
 		return ret;
 	}
+	sdw->ops = sdrv->ops;
 
 	/*
 	 * Unbound SDW functions are always suspended. During probe, the

@@ -86,6 +86,29 @@ enum {
  * these are bit masks as devices can have multiple capabilities
  */
 
+/*
+ * flow modes for SDW port. These can be isochronous, tx controlled,
+ * rx controlled or async
+ */
+#define SDW_PORT_FLOW_MODE_ISOCH	BIT(0)
+#define SDW_PORT_FLOW_MODE_TX_CNTRL	BIT(1)
+#define SDW_PORT_FLOW_MODE_RX_CNTRL	BIT(2)
+#define SDW_PORT_FLOW_MODE_ASYNC	BIT(3)
+
+/*
+ * sample packaging for block. It can be per port or por channel
+ */
+#define SDW_PORT_PACKG_PER_PORT		BIT(0)
+#define SDW_PORT_PACKG_PER_CH		BIT(1)
+
+/*
+ * Port encoding mask definitions, these are from DisCo spec
+ * it can be 2's compliment, type sign magnitude or IEEE 32 float.
+ */
+#define SDW_PORT_ENC_2COMPL		BIT(0)
+#define SDW_PORT_ENC_SIGN_MAGN		BIT(1)
+#define SDW_PORT_ENC_IEEE_32FLOAT	BIT(2)
+
 /**
  * enum sdw_slave_status: slave status
  *
@@ -117,6 +140,310 @@ enum sdw_command_response {
 	SDW_CMD_FAILED = 2,
 };
 
+/**
+ * enum sdw_dp_type: Data port types
+ *
+ * @SDW_DP_TYPE_FULL: Full Data Port is supported
+ * @SDW_DP_TYPE_SIMPLE: Simplified Data Port as defined in spec.
+ * DPN_SampleCtrl2, DPN_OffsetCtrl2, DPN_HCtrl and DPN_BlockCtrl3
+ * are not implemented.
+ * @SDW_DP_TYPE_REDUCED: Reduced Data Port as defined in spec.
+ * DPN_SampleCtrl2, DPN_HCtrl are not implemented.
+ */
+enum sdw_dp_type {
+	SDW_DP_TYPE_FULL = 0,
+	SDW_DP_TYPE_SIMPLE = 1,
+	SDW_DP_TYPE_REDUCED = 2,
+};
+
+/* block group count enum */
+enum sdw_dpn_grouping {
+	SDW_BLK_GRP_CNT_1 = 0,
+	SDW_BLK_GRP_CNT_2 = 1,
+	SDW_BLK_GRP_CNT_3 = 2,
+	SDW_BLK_GRP_CNT_4 = 3,
+};
+
+/**
+ * enum sdw_stream_type: data stream type
+ *
+ * @SDW_STREAM_PCM: PCM data stream
+ * @SDW_STREAM_PDM: PDM data stream
+ *
+ * spec doesn't define this, but is used in implementation
+ */
+enum sdw_stream_type {
+	SDW_STREAM_PCM = 0,
+	SDW_STREAM_PDM = 1,
+};
+
+/**
+ * enum sdw_ch_prepare_mode: Channel prepare modes
+ *
+ * @SDW_CH_PREP_SIMPLE: Simplified channel prepare state machine
+ * @SDW_CH_PREP_NORMAL: Normal channel prepare state machine.
+ */
+enum sdw_ch_prepare_mode {
+	SDW_CH_PREP_SIMPLE = 0,
+	SDW_CH_PREP_NORMAL = 1,
+};
+
+/**
+ * enum sdw_data_direction: Data direction w.r.t Port
+ *
+ * @SDW_DATA_DIR_IN: Data is going into Port
+ * @SDW_DATA_DIR_OUT: Data is going out of Port
+ *
+ * For playback, data direction for the Master Port will be OUT as PORT is
+ * doing tx. Slave port will be IN as PORT is doing rx
+ */
+enum sdw_data_direction {
+	SDW_DATA_DIR_IN = 0,
+	SDW_DATA_DIR_OUT = 1,
+};
+
+/**
+ * enum sdw_port_data_mode: Data Port mode. It can be normal mode where audio
+ * data is received and transmitted, or any of the 3 different test modes
+ * Test modes are normally used for testing at component and system level.
+ *
+ * @SDW_PORT_DATA_MODE_NORMAL: Normal data mode where audio data is received
+ * and transmitted.
+ * @SDW_PORT_DATA_MODE_STATIC_1: Simple test mode which uses static value of
+ * logic 1. The encoding will result in signal transitions at every bitslot
+ * owned by this Port.
+ * @SDW_PORT_DATA_MODE_STATIC_0: Simple test mode which uses static value of
+ * logic 0. The encoding will result in no signal transitions
+ * @SDW_PORT_DATA_MODE_PRBS: Test mode which uses a PRBS generator to produce
+ * a pseudo random data pattern that is transferred
+ */
+enum sdw_port_data_mode {
+	SDW_PORT_DATA_MODE_NORMAL = 0,
+	SDW_PORT_DATA_MODE_STATIC_1 = 1,
+	SDW_PORT_DATA_MODE_STATIC_0 = 2,
+	SDW_PORT_DATA_MODE_PRBS = 3,
+};
+
+/**
+ * enum sdw_port_prep_ops: Prepare operations for Master Data Ports
+ *
+ * @SDW_OPS_PORT_PRE_PREP: Pre prepare operation for the Ports.
+ * @SDW_OPS_PORT_PREP: Prepare operation for the Ports.
+ * @SDW_OPS_PORT_POST_PREP: Post prepare operation for the Ports.
+ */
+enum sdw_port_prep_ops {
+	SDW_OPS_PORT_PRE_PREP = 0,
+	SDW_OPS_PORT_PREP = 1,
+	SDW_OPS_PORT_POST_PREP = 2,
+};
+
+/*
+ * SDW properties, defined in MIPI DisCo spec v1.0
+ */
+enum sdw_clk_stop_reset_behave {
+	SDW_CLK_STOP_KEEP_STATUS = 1,
+};
+
+enum sdw_p15_behave {
+	SDW_P15_READ_IGNORED = 0,
+	SDW_P15_CMD_OK = 1,
+};
+
+/**
+ * struct sdw_dp0_prop: DP0 properties
+ *
+ * @max_word: Maximum number of bits in a Payload Channel Sample, 1 – 64
+ * (inclusive)
+ * @min_word: Maximum number of bits in a Payload Channel Sample, 1 – 64
+ * (inclusive)
+ * @num_words: number of wordlengths supported
+ * @words: wordlengths supported
+ * @flow_controlled: Can Slave implementation result in an OK_NotReady
+ * response
+ * @simple_ch_prep_sm: If channel prepare sequence is required
+ * @device_interrupts: If implementation-defined interrupts are supported
+ *
+ * NOTE: the wordlengths are specified by Spec as max, min AND number of
+ * discrete values, implementation can define based on the wordlengths they
+ * support
+ */
+struct sdw_dp0_prop {
+	u32 max_word;
+	u32 min_word;
+	u32 num_words;
+	u32 *words;
+	bool flow_controlled;
+	bool simple_ch_prep_sm;
+	bool device_interrupts;
+};
+
+enum sdw_dpn_type {
+	SDW_DPN_FULL = 0,
+	SDW_DPN_SIMPLE = 1,
+	SDW_DPN_REDUCED = 2,
+};
+
+enum sdw_mode {
+	SDW_MODE_ISOCHRONOUS = BIT(0),
+	SDW_MODE_TX = BIT(1),
+	SDW_MODE_RX = BIT(2),
+	SDW_MODE_ASYNC = BIT(3),
+};
+
+/**
+ * enum sdw_clk_stop_mode: Clock Stop modes
+ *
+ * @SDW_CLK_STOP_MODE_0: Clock Stop mode 0. This mode indicates Slave can
+ * continue operation seamlessly on clock restart
+ * @SDW_CLK_STOP_MODE_1: Clock Stop mode 1. Indicates Slave may have entered
+ * a deeper power-saving mode, so is not capable of continuing operation
+ * seamlessly when the clock restarts
+ */
+enum sdw_clk_stop_mode {
+	SDW_CLK_STOP_MODE0 = 1,
+	SDW_CLK_STOP_MODE1 = 2,
+};
+
+/**
+ * struct sdw_dpn_audio_mode: Audio mode properties for DPn
+ *
+ * @bus_min_freq: Minimum bus frequency of this mode, in Hz
+ * @bus_max_freq: Maximum bus frequency of this mode, in Hz
+ * @bus_num_freq: Number of discrete frequency supported of this mode
+ * @bus_freq: Discrete bus frequencies of this mode, in Hz
+ * @bus_min_freq: Minimum sampling frequency of this mode, in Hz
+ * @bus_max_freq: Maximum sampling bus frequency of this mode, in Hz
+ * @bus_num_freq: Number of discrete sampling frequency supported of this mode
+ * @bus_freq: Discrete sampling frequencies of this mode, in Hz
+ * @prep_ch_behave: Specifies the dependencies between Channel Prepare
+ * sequence and bus clock configuration
+ * If 0, Channel Prepare can happen at any Bus clock rate
+ * If 1, Channel Prepare sequence shall happen only after Bus clock is
+ * changed to a frequency supported by this mode or compatible modes
+ * described by the next field
+ * @glitchless: Bitmap describing possible glitchless transitions from this
+ * Audio Mode to other Audio Modes
+ */
+struct sdw_dpn_audio_mode {
+	u32 bus_min_freq;
+	u32 bus_max_freq;
+	u32 bus_num_freq;
+	u32 *bus_freq;
+	u32 max_freq;
+	u32 min_freq;
+	u32 num_freq;
+	u32 *freq;
+	u32 prep_ch_behave;
+	u32 glitchless;
+};
+
+/**
+ * struct sdw_dpn_prop: Data Port DPn properties
+ *
+ * @port: port number
+ * @max_word: Maximum number of bits in a Payload Channel Sample, 1 – 64
+ * (inclusive)
+ * @min_word: Minimum number of bits in a Payload Channel Sample, 1 – 64
+ * (inclusive)
+ * @num_words: Number of discrete supported wordlengths
+ * @words: Discrete supported wordlength
+ * @type: Data port type, Full or Simplified
+ * @max_grouping: Maximum number of samples that can be grouped together for
+ * a full data port
+ * @simple_ch_prep_sm: If the channel prepare sequence is not required,
+ * and the Port Ready interrupt is not supported
+ * @ch_prep_timeout: Port-specific timeout value in milliseconds
+ * @device_interrupts: If set, each bit corresponds to support for
+ * implementation-defined interrupts
+ * @max_ch: Minimum channels supported
+ * @min_ch: Maximum channels supported
+ * @num_ch: Number of discrete channels supported
+ * @ch: Discrete channels supported
+ * @num_ch_combinations: Number of channel combinations supported
+ * @ch_combinations: Channel combinations supported
+ * @modes: SDW mode supported
+ * @max_async_buffer: Number of samples that this port can buffer in
+ * asynchronous modes
+ * @block_pack_mode: Type of block port mode supported
+ * @port_encoding: Payload Channel Sample encoding schemes supported
+ * @audio_mode: Audio mode supported
+ */
+struct sdw_dpn_prop {
+	u32 port;
+	u32 max_word;
+	u32 min_word;
+	u32 num_words;
+	u32 *words;
+	enum sdw_dpn_type type;
+	u32 max_grouping;
+	bool simple_ch_prep_sm;
+	u32 ch_prep_timeout;
+	u32 device_interrupts;
+	u32 max_ch;
+	u32 min_ch;
+	u32 num_ch;
+	u32 *ch;
+	u32 num_ch_combinations;
+	u32 *ch_combinations;
+	enum sdw_mode modes;
+	u32 max_async_buffer;
+	bool block_pack_mode;
+	u32 port_encoding;
+	struct sdw_dpn_audio_mode audio_mode;
+};
+
+/**
+ * struct sdw_slave_prop: SoundWire Slave properties
+ *
+ * @mipi_revision: Spec version of the implementation
+ * @wake_capable: If wake-up events are supported
+ * @test_mode_capable: If test mode is supported
+ * @clk_stop_mode1: If Clock-Stop Mode 1 is supported
+ * @simple_clk_stop_capable: If Simple clock mode is supported
+ * @clk_stop_timeout: Worst-case latency of the Clock Stop Prepare state
+ * machine transitions, in milliseconds.
+ * @ch_prep_timeout: Worst-case latency of the Channel Prepare state machine
+ * transitions, in milliseconds
+ * @reset_behave: If Slave keeps the status of the SlaveStopClockPrepare
+ * state machine (P=1 SCSP_SM) after exit from clock-stop mode1
+ * @high_PHY_capable: If Slave is HighPHY capable
+ * @paging_support: Does Slave implement paging registers SCP_AddrPage1
+ * and SCP_AddrPage2
+ * @bank_delay_support: Does Slave implements bank delay/bridge support
+ * registers SCP_BankDelay and SCP_NextFrame
+ * @p15_behave: Slave behavior when the Master attempts a Read to the Port15
+ * alias
+ * @master_count: Number of Masters present on this Slave
+ * @source_ports: Bitmap identifying source ports on the Device
+ * @sink_ports: Bitmap identifying sink ports on the Device
+ * @dp0_prop: Data Port 0 properties
+ * @src_dpn_prop: Source Data Port N properties
+ * @sink_dpn_prop: Sink Data Port N properties
+ */
+struct sdw_slave_prop {
+	u32 mipi_revision;
+	bool wake_capable;
+	bool test_mode_capable;
+	bool clk_stop_mode1;
+	bool simple_clk_stop_capable;
+	u32 clk_stop_timeout;
+	u32 ch_prep_timeout;
+	enum sdw_clk_stop_reset_behave reset_behave;
+	bool high_PHY_capable;
+	bool paging_support;
+	bool bank_delay_support;
+	enum sdw_p15_behave p15_behave;
+	u32 master_count;
+	u32 source_ports;
+	u32 sink_ports;
+	struct sdw_dp0_prop *dp0_prop;
+	struct sdw_dpn_prop *src_dpn_prop;
+	struct sdw_dpn_prop *sink_dpn_prop;
+};
+
+int sdw_master_read_prop(struct sdw_bus *bus);
+int sdw_slave_read_prop(struct sdw_slave *slave);
+
 /*
  * sdw bus defines
  */
@@ -142,6 +469,22 @@ struct sdw_slave_id {
 	__u16 link_id;
 };
 
+enum sdw_clok_stop_type {
+	SDW_CLK_PRE_STOP = 0,
+	SDW_CLK_POST_STOP,
+	SDW_CLK_PRE_START,
+	SDW_CLK_POST_START,
+};
+
+/**
+ * struct sdw_slave_ops: Slave driver callback ops
+ *
+ * @read_prop: read slave properties callback
+ */
+struct sdw_slave_ops {
+	int (*read_prop)(struct sdw_slave *sdw);
+};
+
 /**
  * struct sdw_slave: SoundWire Slave
  *
@@ -149,6 +492,8 @@ struct sdw_slave_id {
  * @dev: Linux device
  * @status: device enumeration status
  * @bus: bus for this slave
+ * @ops: slave callback ops
+ * @prop: slave properties
  * @node: node for bus list of slaves
  * @addr: Logical address
  */
@@ -158,12 +503,47 @@ struct sdw_slave {
 	enum sdw_slave_status status;
 	struct sdw_bus *bus;
 	const struct sdw_slave_ops *ops;
+	struct sdw_slave_prop prop;
 	struct sdw_slave_sysfs *sysfs;
 	struct list_head node;
 	u16 addr;
 };
 
 #define dev_to_sdw_dev(_dev) container_of(_dev, struct sdw_slave, dev)
+
+/**
+ * struct sdw_master_prop: master properties
+ *
+ * @revision: MIPI spec version of the implementation
+ * @clk_stop_mode: Clocks Stop modes supported
+ * @max_freq: Maximum Bus clock in Hz for this Master
+ * @num_clk_gears: Number of clock gears supported
+ * @clk_gears: The clock gears supported
+ * @num_freq: Number of clock frequencies (in Hz) supported
+ * @freq: The clock frequencies (in Hz) supported
+ * @default_freq: Controller default Frame rate in Hz
+ * @default_rows: Number of rows
+ * @default_col: Number of columns
+ * @dynamic_frame: Is dynamic frame supported
+ * @err_threshold: Number of times that software may retry sending a single
+ * command
+ * @dpn_prop: Data Port N properties
+ */
+struct sdw_master_prop {
+	u32 revision;
+	enum sdw_clk_stop_mode clk_stop_mode;
+	u32 max_freq;
+	u32 num_clk_gears;
+	u32 *clk_gears;
+	u32 num_freq;
+	u32 *freq;
+	u32 default_freq;
+	u32 default_rows;
+	u32 default_col;
+	bool dynamic_frame;
+	u32 err_threshold;
+	struct sdw_dpn_prop *dpn_prop;
+};
 
 struct sdw_msg;
 struct sdw_wait;
@@ -176,6 +556,8 @@ struct sdw_wait;
  * @xfer_msg_async: the async version of transfer message callback
  */
 struct sdw_master_ops {
+	int (*read_prop)(struct sdw_bus *bus);
+
 	enum sdw_command_response (*xfer_msg)
 			(struct sdw_bus *bus, struct sdw_msg *msg, int page);
 	enum sdw_command_response (*xfer_msg_async)
@@ -222,6 +604,7 @@ struct sdw_wait {
  * @assigned: logical addresses assigned
  * @lock: bus lock
  * @ops: master callback ops
+ * @prop: master properties
  * @wait_msg: wait messages for async messages
  */
 struct sdw_bus {
@@ -233,6 +616,7 @@ struct sdw_bus {
 	bool assigned[SDW_MAX_DEVICES + 1];
 	spinlock_t lock;
 	const struct sdw_master_ops *ops;
+	struct sdw_master_prop prop;
 	struct sdw_wait wait_msg;
 };
 
