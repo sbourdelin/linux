@@ -205,6 +205,7 @@ enum cmd_frame_type {
 	CW_MODE_REQ,
 	PER_CMD_PKT,
 	ANT_SEL_FRAME = 0x20,
+	COMMON_DEV_CONFIG = 0x28,
 	RADIO_PARAMS_UPDATE = 0x29
 };
 
@@ -280,6 +281,102 @@ struct rsi_radio_caps {
 	__le16 ofdm_ack_tout;
 	__le16 cck_ack_tout;
 	__le16 preamble_type;
+} __packed;
+
+struct rsi_ulp_gpio_vals {
+#ifdef __LITTLE_ENDIAN
+	u8 motion_sensor_gpio_ulp_wakeup:1;
+	u8 sleep_ind_from_device:1;
+	u8 ulp_gpio_2:1;
+	u8 push_button_ulp_wakeup:1;
+	u8 reserved:4;
+#else
+	u8 reserved:4;
+	u8 push_button_ulp_wakeup:1;
+	u8 ulp_gpio_2:1;
+	u8 sleep_ind_from_device:1;
+	u8 motion_sensor_gpio_ulp_wakeup:1;
+#endif
+} __packed;
+
+struct rsi_soc_gpio_vals {
+#ifdef __LITTLE_ENDIAN
+	u32 pspi_csn_0:1;
+	u32 pspi_csn_1:1;
+	u32 host_wakeup_intr:1;
+	u32 pspi_data_0:1;
+	u32 pspi_data_1:1;
+	u32 pspi_data_2:1;
+	u32 pspi_data_3:1;
+	u32 i2c_scl:1;
+	u32 i2c_sda:1;
+	u32 uart1_rx:1;
+	u32 uart1_tx:1;
+	u32 uart1_rts_i2s_clk:1;
+	u32 uart1_cts_i2s_ws:1;
+	u32 dbg_uart_rx_i2s_din:1;
+	u32 dbg_uart_tx_i2s_dout:1;
+	u32 lp_wakeup_boot_bypass:1;
+	u32 led_0:1;
+	u32 btcoex_wlan_active_ext_pa_ant_sel_A:1;
+	u32 btcoex_bt_priority_ext_pa_ant_sel_B:1;
+	u32 btcoex_bt_active_ext_pa_on_off:1;
+	u32 rf_reset:1;
+	u32 sleep_ind_from_device:1;
+#else
+	u32 sleep_ind_from_device:1;
+	u32 rf_reset:1;
+	u32 btcoex_bt_active_ext_pa_on_off:1;
+	u32 btcoex_bt_priority_ext_pa_ant_sel_B:1;
+	u32 btcoex_wlan_active_ext_pa_ant_sel_A:1;
+	u32 led_0:1;
+	u32 lp_wakeup_boot_bypass:1;
+	u32 dbg_uart_tx_i2s_dout:1;
+	u32 dbg_uart_rx_i2s_din:1;
+	u32 uart1_cts_i2s_ws:1;
+	u32 uart1_rts_i2s_clk:1;
+	u32 uart1_tx:1;
+	u32 uart1_rx:1;
+	u32 i2c_sda:1;
+	u32 i2c_scl:1;
+	u32 pspi_data_3:1;
+	u32 pspi_data_2:1;
+	u32 pspi_data_1:1;
+	u32 pspi_data_0:1;
+	u32 host_wakeup_intr:1;
+	u32 pspi_csn_1:1;
+	u32 pspi_csn_0:1;
+#endif
+} __packed;
+
+struct rsi_config_vals {
+#ifdef __LITTLE_ENDIAN
+	u16 len:12;
+	u16 q_no:4;
+#else
+	u16 q_no:4;
+	u16 len:12;
+#endif
+	u8 pkt_type;
+	u8 misc_flags;
+	__le16 reserved1[6];
+	u8 lp_ps_handshake;
+	u8 ulp_ps_handshake;
+	u8 sleep_config_params; /* 0 for no handshake,
+				 * 1 for GPIO based handshake,
+				 * 2 packet handshake
+				 */
+	u8 unused_ulp_gpio;
+	u32 unused_soc_gpio_bitmap;
+	u8 ext_pa_or_bt_coex_en;
+	u8 opermode;
+	u8 wlan_rf_pwr_mode;
+	u8 bt_rf_pwr_mode;
+	u8 zigbee_rf_pwr_mode;
+	u8 driver_mode;
+	u8 region_code;
+	u8 antenna_sel_val;
+	u8 reserved2[16];
 } __packed;
 
 static inline u32 rsi_get_queueno(u8 *addr, u16 offset)

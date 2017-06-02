@@ -206,6 +206,39 @@ static struct bootup_params boot_params_40 = {
 	.beacon_resedue_alg_en = 0,
 };
 
+#define UNUSED_GPIO	1
+#define USED_GPIO	0
+static struct rsi_ulp_gpio_vals unused_ulp_gpio_bitmap = {
+	.motion_sensor_gpio_ulp_wakeup = UNUSED_GPIO,
+	.sleep_ind_from_device = UNUSED_GPIO,
+	.ulp_gpio_2 = UNUSED_GPIO,
+	.push_button_ulp_wakeup = UNUSED_GPIO,
+};
+
+static struct rsi_soc_gpio_vals unused_soc_gpio_bitmap = {
+	.pspi_csn_0		= USED_GPIO,	//GPIO_0
+	.pspi_csn_1		= USED_GPIO,	//GPIO_1
+	.host_wakeup_intr	= USED_GPIO,	//GPIO_2
+	.pspi_data_0		= USED_GPIO,	//GPIO_3
+	.pspi_data_1		= USED_GPIO,	//GPIO_4
+	.pspi_data_2		= USED_GPIO,	//GPIO_5
+	.pspi_data_3		= USED_GPIO,	//GPIO_6
+	.i2c_scl		= USED_GPIO,	//GPIO_7
+	.i2c_sda		= USED_GPIO,	//GPIO_8
+	.uart1_rx		= UNUSED_GPIO,	//GPIO_9
+	.uart1_tx		= UNUSED_GPIO,	//GPIO_10
+	.uart1_rts_i2s_clk	= UNUSED_GPIO,	//GPIO_11
+	.uart1_cts_i2s_ws	= UNUSED_GPIO,	//GPIO_12
+	.dbg_uart_rx_i2s_din	= UNUSED_GPIO,	//GPIO_13
+	.dbg_uart_tx_i2s_dout	= UNUSED_GPIO,	//GPIO_14
+	.lp_wakeup_boot_bypass	= UNUSED_GPIO,	//GPIO_15
+	.led_0			= USED_GPIO,	//GPIO_16
+	.btcoex_wlan_active_ext_pa_ant_sel_A = UNUSED_GPIO, //GPIO_17
+	.btcoex_bt_priority_ext_pa_ant_sel_B = UNUSED_GPIO, //GPIO_18
+	.btcoex_bt_active_ext_pa_on_off = UNUSED_GPIO, //GPIO_19
+	.rf_reset		= USED_GPIO, //GPIO_20
+	.sleep_ind_from_device	= UNUSED_GPIO,
+};
 static u16 mcs[] = {13, 26, 39, 52, 78, 104, 117, 130};
 
 /**
@@ -224,6 +257,12 @@ static void rsi_set_default_parameters(struct rsi_common *common)
 	common->fsm_state = FSM_CARD_NOT_READY;
 	common->iface_down = true;
 	common->endpoint = EP_2GHZ_20MHZ;
+	common->driver_mode = 1; /* End to end mode */
+	common->lp_ps_handshake_mode = 0; /* Default no handShake mode*/
+	common->ulp_ps_handshake_mode = 2; /* Default PKT handShake mode*/
+	common->rf_power_val = 0; /* Default 1.9V */
+	common->wlan_rf_power_mode = 0;
+	common->obm_ant_sel_val = 2;
 }
 
 /**
@@ -757,6 +796,52 @@ int rsi_hal_load_key(struct rsi_common *common,
 	memcpy(set_key->rx_mic_key, &data[24], 8);
 
 	skb_put(skb, sizeof(struct rsi_set_key));
+
+	return rsi_send_internal_mgmt_frame(common, skb);
+}
+
+/*
+ * This function sends the common device configuration parameters to device.
+ * This frame includes the useful information to make device works on
+ * specific operating mode.
+ */
+static int rsi_send_common_dev_params(struct rsi_common *common)
+{
+	struct sk_buff *skb;
+	u32 frame_len;
+	struct rsi_config_vals *dev_cfgs;
+
+	frame_len = sizeof(struct rsi_config_vals);
+
+	rsi_dbg(MGMT_TX_ZONE, "Sending common device config params\n");
+	skb = dev_alloc_skb(frame_len);
+	if (!skb) {
+		rsi_dbg(ERR_ZONE, "%s: Unable to allocate skb\n", __func__);
+		return -ENOMEM;
+	}
+
+	memset(skb->data, 0, frame_len);
+
+	dev_cfgs = (struct rsi_config_vals *)skb->data;
+	memset(dev_cfgs, 0, (sizeof(struct rsi_config_vals)));
+
+	dev_cfgs->len = frame_len - FRAME_DESC_SZ;
+	dev_cfgs->q_no = RSI_COEX_Q;
+	dev_cfgs->pkt_type = COMMON_DEV_CONFIG;
+
+	dev_cfgs->lp_ps_handshake = common->lp_ps_handshake_mode;
+	dev_cfgs->ulp_ps_handshake = common->ulp_ps_handshake_mode;
+
+	dev_cfgs->unused_ulp_gpio = *(u8 *)&unused_ulp_gpio_bitmap;
+	dev_cfgs->unused_soc_gpio_bitmap = *(u32 *)&unused_soc_gpio_bitmap;
+
+	dev_cfgs->opermode = common->oper_mode;
+	dev_cfgs->wlan_rf_pwr_mode = common->wlan_rf_power_mode;
+	dev_cfgs->driver_mode = common->driver_mode;
+	dev_cfgs->region_code = NL80211_DFS_FCC;
+	dev_cfgs->antenna_sel_val = common->obm_ant_sel_val;
+
+	skb_put(skb, frame_len);
 
 	return rsi_send_internal_mgmt_frame(common, skb);
 }
@@ -1493,6 +1578,40 @@ out:
 	return -EINVAL;
 }
 
+static int rsi_handle_card_ready(struct rsi_common *common, u8 *msg)
+{
+	switch (common->fsm_state) {
+	case FSM_CARD_NOT_READY:
+		rsi_dbg(INIT_ZONE, "Card ready indication from Common HAL\n");
+		rsi_set_default_parameters(common);
+		if (rsi_send_common_dev_params(common) < 0)
+			return -EINVAL;
+		common->fsm_state = FSM_COMMON_DEV_PARAMS_SENT;
+		break;
+	case FSM_COMMON_DEV_PARAMS_SENT:
+		rsi_dbg(INIT_ZONE, "Card ready indication from WLAN HAL\n");
+
+		/* Get usb buffer status register address */
+		common->priv->usb_buffer_status_reg = *(u32 *)&msg[8];
+		rsi_dbg(INFO_ZONE, "USB buffer status register = %x\n",
+			common->priv->usb_buffer_status_reg);
+
+		if (rsi_load_bootup_params(common)) {
+			common->fsm_state = FSM_CARD_NOT_READY;
+			return -EINVAL;
+		}
+		common->fsm_state = FSM_BOOT_PARAMS_SENT;
+		break;
+	default:
+		rsi_dbg(ERR_ZONE,
+			"%s: card ready indication in invalid state %d.\n",
+			__func__, common->fsm_state);
+		return -EINVAL;
+	}
+
+	return 0;
+}
+
 /**
  * rsi_mgmt_pkt_recv() - This function processes the management packets
  *			 recieved from the hardware.
@@ -1505,7 +1624,6 @@ int rsi_mgmt_pkt_recv(struct rsi_common *common, u8 *msg)
 {
 	s32 msg_len = (le16_to_cpu(*(__le16 *)&msg[0]) & 0x0fff);
 	u16 msg_type = (msg[2]);
-	int ret;
 
 	rsi_dbg(FSM_ZONE, "%s: Msg Len: %d, Msg Type: %4x\n",
 		__func__, msg_len, msg_type);
@@ -1515,17 +1633,7 @@ int rsi_mgmt_pkt_recv(struct rsi_common *common, u8 *msg)
 	} else if (msg_type == CARD_READY_IND) {
 		rsi_dbg(FSM_ZONE, "%s: Card ready indication received\n",
 			__func__);
-		if (common->fsm_state == FSM_CARD_NOT_READY) {
-			rsi_set_default_parameters(common);
-
-			ret = rsi_load_bootup_params(common);
-			if (ret)
-				return ret;
-			else
-				common->fsm_state = FSM_BOOT_PARAMS_SENT;
-		} else {
-			return -EINVAL;
-		}
+		return rsi_handle_card_ready(common, msg);
 	} else if (msg_type == TX_STATUS_IND) {
 		if (msg[15] == PROBEREQ_CONFIRM) {
 			common->mgmt_q_block = false;
