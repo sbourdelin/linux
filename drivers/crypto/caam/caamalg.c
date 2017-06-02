@@ -1209,12 +1209,17 @@ static struct aead_edesc *aead_edesc_alloc(struct aead_request *req,
 	struct crypto_aead *aead = crypto_aead_reqtfm(req);
 	struct caam_ctx *ctx = crypto_aead_ctx(aead);
 	struct device *jrdev = ctx->jrdev;
-	gfp_t flags = (req->base.flags & (CRYPTO_TFM_REQ_MAY_BACKLOG |
-		       CRYPTO_TFM_REQ_MAY_SLEEP)) ? GFP_KERNEL : GFP_ATOMIC;
+	gfp_t flags;
 	int src_nents, mapped_src_nents, dst_nents = 0, mapped_dst_nents = 0;
 	struct aead_edesc *edesc;
 	int sec4_sg_index, sec4_sg_len, sec4_sg_bytes;
 	unsigned int authsize = ctx->authsize;
+
+	if (!in_interrupt() && req->base.flags & (CRYPTO_TFM_REQ_MAY_BACKLOG |
+						  CRYPTO_TFM_REQ_MAY_SLEEP))
+		flags = GFP_KERNEL;
+	else
+		flags = GFP_ATOMIC;
 
 	if (unlikely(req->dst != req->src)) {
 		src_nents = sg_nents_for_len(req->src, req->assoclen +
@@ -1497,15 +1502,19 @@ static struct ablkcipher_edesc *ablkcipher_edesc_alloc(struct ablkcipher_request
 	struct crypto_ablkcipher *ablkcipher = crypto_ablkcipher_reqtfm(req);
 	struct caam_ctx *ctx = crypto_ablkcipher_ctx(ablkcipher);
 	struct device *jrdev = ctx->jrdev;
-	gfp_t flags = (req->base.flags & (CRYPTO_TFM_REQ_MAY_BACKLOG |
-					  CRYPTO_TFM_REQ_MAY_SLEEP)) ?
-		       GFP_KERNEL : GFP_ATOMIC;
+	gfp_t flags;
 	int src_nents, mapped_src_nents, dst_nents = 0, mapped_dst_nents = 0;
 	struct ablkcipher_edesc *edesc;
 	dma_addr_t iv_dma = 0;
 	bool in_contig;
 	int ivsize = crypto_ablkcipher_ivsize(ablkcipher);
 	int dst_sg_idx, sec4_sg_ents, sec4_sg_bytes;
+
+	if (!in_interrupt() && req->base.flags & (CRYPTO_TFM_REQ_MAY_BACKLOG |
+						  CRYPTO_TFM_REQ_MAY_SLEEP))
+		flags = GFP_KERNEL;
+	else
+		flags = GFP_ATOMIC;
 
 	src_nents = sg_nents_for_len(req->src, req->nbytes);
 	if (unlikely(src_nents < 0)) {
@@ -1703,15 +1712,19 @@ static struct ablkcipher_edesc *ablkcipher_giv_edesc_alloc(
 	struct crypto_ablkcipher *ablkcipher = crypto_ablkcipher_reqtfm(req);
 	struct caam_ctx *ctx = crypto_ablkcipher_ctx(ablkcipher);
 	struct device *jrdev = ctx->jrdev;
-	gfp_t flags = (req->base.flags & (CRYPTO_TFM_REQ_MAY_BACKLOG |
-					  CRYPTO_TFM_REQ_MAY_SLEEP)) ?
-		       GFP_KERNEL : GFP_ATOMIC;
+	gfp_t flags;
 	int src_nents, mapped_src_nents, dst_nents, mapped_dst_nents;
 	struct ablkcipher_edesc *edesc;
 	dma_addr_t iv_dma = 0;
 	bool out_contig;
 	int ivsize = crypto_ablkcipher_ivsize(ablkcipher);
 	int dst_sg_idx, sec4_sg_ents, sec4_sg_bytes;
+
+	if (!in_interrupt() && req->base.flags & (CRYPTO_TFM_REQ_MAY_BACKLOG |
+						  CRYPTO_TFM_REQ_MAY_SLEEP))
+		flags = GFP_KERNEL;
+	else
+		flags = GFP_ATOMIC;
 
 	src_nents = sg_nents_for_len(req->src, req->nbytes);
 	if (unlikely(src_nents < 0)) {
