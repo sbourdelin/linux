@@ -3049,6 +3049,38 @@ static int __init init_printk_kthreads(void)
 }
 late_initcall(init_printk_kthreads);
 
+#ifdef CONFIG_SYSCTL
+static DEFINE_MUTEX(printk_kthread_proc_mutex);
+unsigned long *printk_cpumask_bits = cpumask_bits(&printk_cpumask);
+
+/*
+ * Update printk kthread cpumask, so user can limit the number of printk
+ * kthreads we wake up during printing offloading.
+ */
+int proc_printk_cpumask(struct ctl_table *table, int write,
+			void __user *buffer, size_t *lenp, loff_t *ppos)
+{
+	int err;
+
+	mutex_lock(&printk_kthread_proc_mutex);
+
+	if (printk_enforce_emergency)
+		goto out;
+
+	err = proc_do_large_bitmap(table, write, buffer, lenp, ppos);
+	if (!err && write) {
+		if (smpboot_update_cpumask_percpu_thread(&printk_kthreads,
+							 &printk_cpumask)) {
+			printk_enforce_emergency = true;
+			pr_err("printk: can't update cpumask\n");
+		}
+	}
+out:
+	mutex_unlock(&printk_kthread_proc_mutex);
+	return err;
+}
+#endif
+
 void wake_up_klogd(void)
 {
 	preempt_disable();

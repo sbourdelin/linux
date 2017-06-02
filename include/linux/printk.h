@@ -81,6 +81,7 @@ static inline void console_verbose(void)
 #define DEVKMSG_STR_MAX_SIZE 10
 extern char devkmsg_log_str[];
 struct ctl_table;
+extern unsigned long *printk_cpumask_bits;
 
 struct va_format {
 	const char *fmt;
@@ -195,6 +196,9 @@ devkmsg_sysctl_set_loglvl(struct ctl_table *table, int write, void __user *buf,
 			  size_t *lenp, loff_t *ppos);
 
 extern void wake_up_klogd(void);
+
+extern int proc_printk_cpumask(struct ctl_table *table, int write,
+			  void __user *buffer, size_t *lenp, loff_t *ppos);
 
 char *log_buf_addr_get(void);
 u32 log_buf_len_get(void);

@@ -853,6 +853,13 @@ static struct ctl_table kern_table[] = {
 		.extra1		= &zero,
 		.extra2		= &two,
 	},
+	{
+		.procname	= "printk_cpumask",
+		.data		= &printk_cpumask_bits,
+		.maxlen		= NR_CPUS,
+		.mode		= 0644,
+		.proc_handler	= proc_printk_cpumask,
+	},
 #endif
 	{
 		.procname	= "ngroups_max",
