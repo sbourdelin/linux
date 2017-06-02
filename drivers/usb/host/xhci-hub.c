@@ -398,17 +398,26 @@ static int xhci_stop_device(struct xhci_hcd *xhci, int slot_id, int suspend)
 	spin_lock_irqsave(&xhci->lock, flags);
 	for (i = LAST_EP_INDEX; i > 0; i--) {
 		if (virt_dev->eps[i].ring && virt_dev->eps[i].ring->dequeue) {
-			struct xhci_command *command;
-			command = xhci_alloc_command(xhci, false, false,
-						     GFP_NOWAIT);
-			if (!command) {
-				spin_unlock_irqrestore(&xhci->lock, flags);
-				xhci_free_command(xhci, cmd);
-				return -ENOMEM;
+			//get the output EP context and stop only those EP
+			// which are running
+			struct xhci_ep_ctx *ep_ctx;
 
+			ep_ctx = xhci_get_ep_ctx(xhci, virt_dev->out_ctx, i);
+
+			if (GET_EP_CTX_STATE(ep_ctx) ==  EP_STATE_RUNNING) {
+				struct xhci_command *command;
+
+				command = xhci_alloc_command(xhci, false, false,
+							     GFP_NOWAIT);
+				if (!command) {
+					spin_unlock_irqrestore(&xhci->lock,
+							       flags);
+					xhci_free_command(xhci, cmd);
+					return -ENOMEM;
+				}
+				xhci_queue_stop_endpoint(xhci, command,
+							 slot_id, i, suspend);
 			}
-			xhci_queue_stop_endpoint(xhci, command, slot_id, i,
-						 suspend);
 		}
 	}
 	xhci_queue_stop_endpoint(xhci, cmd, slot_id, 0, suspend);
