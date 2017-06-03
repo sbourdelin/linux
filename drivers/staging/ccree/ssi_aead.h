@@ -14,8 +14,9 @@
  * along with this program; if not, see <http://www.gnu.org/licenses/>.
  */
 
-/* \file ssi_aead.h
-   ARM CryptoCell AEAD Crypto API
+/*
+ * \file ssi_aead.h
+ *  ARM CryptoCell AEAD Crypto API
  */
 
 #ifndef __SSI_AEAD_H__
