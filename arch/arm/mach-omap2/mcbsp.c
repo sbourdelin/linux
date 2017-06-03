@@ -59,7 +59,7 @@ static int __init omap_init_mcbsp(struct omap_hwmod *oh, void *unused)
 	int id, count = 1;
 	char *name = "omap-mcbsp";
 	struct omap_hwmod *oh_device[2];
-	struct omap_mcbsp_platform_data *pdata = NULL;
+	struct omap_mcbsp_platform_data *pdata;
 	struct platform_device *pdev;
 
 	sscanf(oh->name, "mcbsp%d", &id);
