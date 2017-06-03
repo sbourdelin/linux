@@ -11,7 +11,7 @@
  *
  */
 
-#include <linux/module.h>
+#include <linux/init.h>
 #include <linux/device.h>
 #include <linux/i2c.h>
 #include <linux/err.h>
@@ -46,15 +46,6 @@ static int da9055_i2c_probe(struct i2c_client *i2c,
 	return da9055_device_init(da9055);
 }
 
-static int da9055_i2c_remove(struct i2c_client *i2c)
-{
-	struct da9055 *da9055 = i2c_get_clientdata(i2c);
-
-	da9055_device_exit(da9055);
-
-	return 0;
-}
-
 /*
  * DO NOT change the device Ids. The naming is intentionally specific as both
  * the PMIC and CODEC parts of this chip are instantiated separately as I2C
@@ -66,7 +57,6 @@ static struct i2c_device_id da9055_i2c_id[] = {
 	{"da9055-pmic", 0},
 	{ }
 };
-MODULE_DEVICE_TABLE(i2c, da9055_i2c_id);
 
 static const struct of_device_id da9055_of_match[] = {
 	{ .compatible = "dlg,da9055-pmic", },
@@ -75,11 +65,11 @@ static const struct of_device_id da9055_of_match[] = {
 
 static struct i2c_driver da9055_i2c_driver = {
 	.probe = da9055_i2c_probe,
-	.remove = da9055_i2c_remove,
 	.id_table = da9055_i2c_id,
 	.driver = {
 		.name = "da9055-pmic",
 		.of_match_table = of_match_ptr(da9055_of_match),
+		.suppress_bind_attrs = true,
 	},
 };
 
@@ -96,13 +86,3 @@ static int __init da9055_i2c_init(void)
 	return 0;
 }
 subsys_initcall(da9055_i2c_init);
-
-static void __exit da9055_i2c_exit(void)
-{
-	i2c_del_driver(&da9055_i2c_driver);
-}
-module_exit(da9055_i2c_exit);
-
-MODULE_AUTHOR("David Dajun Chen <dchen@diasemi.com>");
-MODULE_DESCRIPTION("I2C driver for Dialog DA9055 PMIC");
-MODULE_LICENSE("GPL");
