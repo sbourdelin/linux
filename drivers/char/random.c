@@ -1466,7 +1466,10 @@ static ssize_t extract_entropy_user(struct entropy_store *r, void __user *buf,
  * number of good random numbers, suitable for key generation, seeding
  * TCP sequence numbers, etc.  It does not rely on the hardware random
  * number generator.  For random bytes direct from the hardware RNG
- * (when available), use get_random_bytes_arch().
+ * (when available), use get_random_bytes_arch(). In order to ensure
+ * that the randomness provided by this function is okay, the function
+ * wait_for_random_bytes() should be called and return 0 at least once
+ * at any point prior.
  */
 void get_random_bytes(void *buf, int nbytes)
 {
@@ -1494,6 +1497,42 @@ void get_random_bytes(void *buf, int nbytes)
 	memzero_explicit(tmp, sizeof(tmp));
 }
 EXPORT_SYMBOL(get_random_bytes);
+
+/*
+ * Wait for the urandom pool to be seeded and thus guaranteed to supply
+ * cryptographically secure random numbers. This applies to: the /dev/urandom
+ * device, the get_random_bytes function, and the get_random_{u32,u64,int,long}
+ * family of functions. Using any of these functions without first calling
+ * this function forfeits the guarantee of security.
+ *
+ * If is_interruptable is true, then this uses wait_event_interruptable.
+ * Otherwise the calling process will not respond to signals. If timeout is
+ * 0, then, unless interrupted, this function will wait potentially forever.
+ * Otherwise, timeout is a measure in jiffies.
+ *
+ * Returns: 0 if the urandom pool has been seeded.
+ *          -ERESTARTSYS if the function was interrupted or timed out.
+ *          Other return values of the wait_event_* functions.
+ */
+int wait_for_random_bytes(bool is_interruptable, unsigned long timeout)
+{
+	if (likely(crng_ready()))
+		return 0;
+	if (is_interruptable && timeout)
+		return wait_event_interruptible_timeout(crng_init_wait, crng_ready(), timeout);
+	if (is_interruptable && !timeout)
+		return wait_event_interruptible(crng_init_wait, crng_ready());
+	if (!is_interruptable && timeout)
+		return wait_event_timeout(crng_init_wait, crng_ready(), timeout);
+	if (!is_interruptable && !timeout) {
+		wait_event(crng_init_wait, crng_ready());
+		return 0;
+	}
+
+	BUG(); /* This BUG() should be compiled out as unreachable code, but just in case... */
+	return -EINVAL;
+}
+EXPORT_SYMBOL(wait_for_random_bytes);
 
 /*
  * Add a callback function that will be invoked when the nonblocking
@@ -2023,7 +2062,10 @@ struct batched_entropy {
 /*
  * Get a random word for internal kernel use only. The quality of the random
  * number is either as good as RDRAND or as good as /dev/urandom, with the
- * goal of being quite fast and not depleting entropy.
+ * goal of being quite fast and not depleting entropy. In order to ensure
+ * that the randomness provided by this function is okay, the function
+ * wait_for_random_bytes() should be called and return 0 at least once
+ * at any point prior.
  */
 static DEFINE_PER_CPU(struct batched_entropy, batched_entropy_u64);
 u64 get_random_u64(void)
