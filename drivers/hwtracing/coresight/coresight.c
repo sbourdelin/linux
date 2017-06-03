@@ -138,6 +138,13 @@ static int coresight_enable_sink(struct coresight_device *csdev, u32 mode)
 			if (ret)
 				return ret;
 		}
+
+		/* Add kernel panic callback */
+		if (sink_ops(csdev)->panic_cb) {
+			ret = coresight_add_panic_cb(csdev);
+			if (ret)
+				return ret;
+		}
 		csdev->enable = true;
 	}
 
@@ -149,6 +156,10 @@ static int coresight_enable_sink(struct coresight_device *csdev, u32 mode)
 static void coresight_disable_sink(struct coresight_device *csdev)
 {
 	if (atomic_dec_return(csdev->refcnt) == 0) {
+		/* Remove kernel panic callback */
+		if (sink_ops(csdev)->panic_cb)
+			coresight_del_panic_cb(csdev);
+
 		if (sink_ops(csdev)->disable) {
 			sink_ops(csdev)->disable(csdev);
 			csdev->enable = false;
