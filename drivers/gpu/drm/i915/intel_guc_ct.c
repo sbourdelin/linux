@@ -199,6 +199,7 @@ static int ctch_open(struct intel_guc *guc,
 		if (unlikely(err))
 			goto err_out;
 	}
+	GEM_BUG_ON(!ctch->vma);
 
 	/* vma should be already allocated and map'ed */
 	base = guc_ggtt_offset(ctch->vma);
