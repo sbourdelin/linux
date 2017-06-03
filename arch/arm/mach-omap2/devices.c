@@ -79,10 +79,8 @@ static int __init omap_mcspi_init(struct omap_hwmod *oh, void *unused)
 	struct omap2_mcspi_dev_attr *mcspi_attrib = oh->dev_attr;
 
 	pdata = kzalloc(sizeof(*pdata), GFP_KERNEL);
-	if (!pdata) {
-		pr_err("Memory allocation for McSPI device failed\n");
+	if (!pdata)
 		return -ENOMEM;
-	}
 
 	pdata->num_cs = mcspi_attrib->num_chipselect;
 	switch (oh->class->rev) {
