@@ -12,22 +12,150 @@
 #include <linux/vmalloc.h>
 #include <linux/init.h>
 #include <linux/mm.h>
+#include <linux/cpuhotplug.h>
 #include <asm/page.h>
 #include <asm/code-patching.h>
 #include <linux/uaccess.h>
 #include <linux/kprobes.h>
+#include <asm/pgtable.h>
+#include <asm/tlbflush.h>
 
+static DEFINE_PER_CPU(struct vm_struct *, text_poke_area);
+static unsigned int text_area_patch_avail;
+
+static int text_area_cpu_up(unsigned int cpu)
+{
+	struct vm_struct *area;
+
+	area = get_vm_area(PAGE_SIZE, VM_ALLOC);
+	if (!area) {
+		WARN_ONCE(1, "Failed to create text area for cpu %d\n",
+			cpu);
+		return -1;
+	}
+	this_cpu_write(text_poke_area, area);
+	return 0;
+}
+
+static int text_area_cpu_down(unsigned int cpu)
+{
+	free_vm_area(this_cpu_read(text_poke_area));
+	return 0;
+}
+
+/*
+ * This is an early_initcall and early_initcalls happen at the right time
+ * for us, after slab is enabled and before we mark ro pages R/O. In the
+ * future if get_vm_area is randomized, this will be more flexible than
+ * fixmap
+ */
+static int __init setup_text_poke_area(void)
+{
+	struct vm_struct *area;
+	int cpu;
+
+	for_each_online_cpu(cpu) {
+		area = get_vm_area(PAGE_SIZE, VM_ALLOC);
+		if (!area) {
+			WARN_ONCE(1, "Failed to create text area for cpu %d\n",
+				cpu);
+			/* Should we disable strict rwx? */
+			continue;
+		}
+		this_cpu_write(text_poke_area, area);
+	}
+	cpuhp_setup_state_nocalls(CPUHP_AP_ONLINE_DYN,
+		"powerpc/text_poke:online", text_area_cpu_up,
+		text_area_cpu_down);
+	text_area_patch_avail = 1;
+	/*
+	 * The barrier here ensures the write is visible to
+	 * patch_instruction()
+	 */
+	smp_wmb();
+	pr_info("text_poke area ready...\n");
+	return 0;
+}
+
+/*
+ * This can be called for kernel text or a module.
+ */
+static int kernel_map_addr(void *addr)
+{
+	unsigned long pfn;
+	int err;
+
+	if (is_vmalloc_addr(addr))
+		pfn = vmalloc_to_pfn(addr);
+	else
+		pfn = __pa_symbol(addr) >> PAGE_SHIFT;
+
+	err = map_kernel_page(
+			(unsigned long)__this_cpu_read(text_poke_area)->addr,
+			(pfn << PAGE_SHIFT), _PAGE_KERNEL_RW | _PAGE_PRESENT);
+	pr_devel("Mapped addr %p with pfn %lx\n",
+			__this_cpu_read(text_poke_area)->addr, pfn);
+	if (err)
+		return -1;
+	return 0;
+}
+
+static inline void kernel_unmap_addr(void *addr)
+{
+	pte_t *pte;
+	unsigned long kaddr = (unsigned long)addr;
+
+	pte = pte_offset_kernel(pmd_offset(pud_offset(pgd_offset_k(kaddr),
+				kaddr), kaddr), kaddr);
+	pr_devel("clearing mm %p, pte %p, kaddr %lx\n", &init_mm, pte, kaddr);
+	pte_clear(&init_mm, kaddr, pte);
+	flush_tlb_kernel_range(kaddr, kaddr + PAGE_SIZE);
+}
 
 int patch_instruction(unsigned int *addr, unsigned int instr)
 {
 	int err;
+	unsigned int *dest = NULL;
+	unsigned long flags;
+	unsigned long kaddr = (unsigned long)addr;
 
-	__put_user_size(instr, addr, 4, err);
-	if (err)
-		return err;
-	asm ("dcbst 0, %0; sync; icbi 0,%0; sync; isync" : : "r" (addr));
-	return 0;
+	/*
+	 * Make sure we can see any write of text_area_patch_avail
+	 */
+	smp_rmb();
+
+	/*
+	 * During early early boot patch_instruction is called
+	 * when text_poke_area is not ready, but we still need
+	 * to allow patching. We just do the plain old patching
+	 * We use text_area_patch_avail, since per cpu read
+	 * via __this_cpu_read of text_poke_area might not
+	 * yet be available.
+	 * TODO: Make text_area_patch_avail per cpu?
+	 */
+	if (!text_area_patch_avail) {
+		__put_user_size(instr, addr, 4, err);
+		asm ("dcbst 0, %0; sync; icbi 0,%0; sync; isync" :: "r" (addr));
+		return 0;
+	}
+
+	local_irq_save(flags);
+	if (kernel_map_addr(addr)) {
+		err = -1;
+		goto out;
+	}
+
+	dest = (unsigned int *)(__this_cpu_read(text_poke_area)->addr) +
+		((kaddr & ~PAGE_MASK) / sizeof(unsigned int));
+	__put_user_size(instr, dest, 4, err);
+	asm ("dcbst 0, %0; sync; icbi 0,%0; icbi 0,%1; sync; isync"
+		::"r" (dest), "r"(addr));
+	kernel_unmap_addr(__this_cpu_read(text_poke_area)->addr);
+out:
+	local_irq_restore(flags);
+	return err;
 }
+NOKPROBE_SYMBOL(patch_instruction);
 
 int patch_branch(unsigned int *addr, unsigned long target, int flags)
 {
@@ -514,3 +642,4 @@ static int __init test_code_patching(void)
 late_initcall(test_code_patching);
 
 #endif /* CONFIG_CODE_PATCHING_SELFTEST */
+early_initcall(setup_text_poke_area);
