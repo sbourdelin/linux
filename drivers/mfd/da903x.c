@@ -13,7 +13,7 @@
  */
 
 #include <linux/kernel.h>
-#include <linux/module.h>
+#include <linux/init.h>
 #include <linux/interrupt.h>
 #include <linux/platform_device.h>
 #include <linux/i2c.h>
@@ -446,7 +446,6 @@ static const struct i2c_device_id da903x_id_table[] = {
 	{ "da9034", 1 },
 	{ },
 };
-MODULE_DEVICE_TABLE(i2c, da903x_id_table);
 
 static int __remove_subdev(struct device *dev, void *unused)
 {
@@ -535,20 +534,12 @@ static int da903x_probe(struct i2c_client *client,
 	return da903x_add_subdevs(chip, pdata);
 }
 
-static int da903x_remove(struct i2c_client *client)
-{
-	struct da903x_chip *chip = i2c_get_clientdata(client);
-
-	da903x_remove_subdevs(chip);
-	return 0;
-}
-
 static struct i2c_driver da903x_driver = {
 	.driver	= {
-		.name	= "da903x",
+		.name			= "da903x",
+		.suppress_bind_attrs	= true,
 	},
 	.probe		= da903x_probe,
-	.remove		= da903x_remove,
 	.id_table	= da903x_id_table,
 };
 
@@ -557,14 +548,3 @@ static int __init da903x_init(void)
 	return i2c_add_driver(&da903x_driver);
 }
 subsys_initcall(da903x_init);
-
-static void __exit da903x_exit(void)
-{
-	i2c_del_driver(&da903x_driver);
-}
-module_exit(da903x_exit);
-
-MODULE_DESCRIPTION("PMIC Driver for Dialog Semiconductor DA9034");
-MODULE_AUTHOR("Eric Miao <eric.miao@marvell.com>");
-MODULE_AUTHOR("Mike Rapoport <mike@compulab.co.il>");
-MODULE_LICENSE("GPL v2");
