@@ -199,4 +199,7 @@ int __ovs_vport_ops_register(struct vport_ops *ops);
 void ovs_vport_ops_unregister(struct vport_ops *ops);
 void ovs_vport_send(struct vport *vport, struct sk_buff *skb, u8 mac_proto);
 
+#define MODULE_ALIAS_VPORT_TYPE(type) \
+	MODULE_ALIAS("vport-type-" __stringify(type))
+
 #endif /* vport.h */
