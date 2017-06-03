@@ -718,10 +718,8 @@ static int __init omap_timer_init(struct omap_hwmod *oh, void *unused)
 			return ret;
 
 	pdata = kzalloc(sizeof(*pdata), GFP_KERNEL);
-	if (!pdata) {
-		pr_err("%s: No memory for [%s]\n", __func__, oh->name);
+	if (!pdata)
 		return -ENOMEM;
-	}
 
 	/*
 	 * Extract the IDs from name field in hwmod database
