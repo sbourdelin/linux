@@ -108,6 +108,13 @@ set_the_pte:
 	return 0;
 }
 
+#ifdef CONFIG_STRICT_KERNEL_RWX
+void radix__mark_rodata_ro(void)
+{
+	pr_warn("Not yet implemented for radix\n");
+}
+#endif
+
 static inline void __meminit print_mapping(unsigned long start,
 					   unsigned long end,
 					   unsigned long size)
