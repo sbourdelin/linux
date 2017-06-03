@@ -473,6 +473,21 @@ static void etb_update_buffer(struct coresight_device *csdev,
 	CS_LOCK(drvdata->base);
 }
 
+static int etb_panic_cb(struct coresight_device *csdev)
+{
+	struct etb_drvdata *drvdata = dev_get_drvdata(csdev->dev.parent);
+	unsigned long flags;
+
+	spin_lock_irqsave(&drvdata->spinlock, flags);
+	etb_disable_hw(drvdata);
+	etb_dump_hw(drvdata);
+	spin_unlock_irqrestore(&drvdata->spinlock, flags);
+
+	dev_err(drvdata->dev, "Dump ETB buffer 0x%x@0x%p\n",
+		drvdata->buffer_depth, drvdata->buf);
+	return 0;
+}
+
 static const struct coresight_ops_sink etb_sink_ops = {
 	.enable		= etb_enable,
 	.disable	= etb_disable,
@@ -481,6 +496,7 @@ static const struct coresight_ops_sink etb_sink_ops = {
 	.set_buffer	= etb_set_buffer,
 	.reset_buffer	= etb_reset_buffer,
 	.update_buffer	= etb_update_buffer,
+	.panic_cb	= etb_panic_cb,
 };
 
 static const struct coresight_ops etb_cs_ops = {
