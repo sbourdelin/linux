@@ -103,4 +103,14 @@ config CORESIGHT_CPU_DEBUG
 	  properly, please refer Documentation/trace/coresight-cpu-debug.txt
 	  for detailed description and the example for usage.
 
+config CORESIGHT_PANIC_DUMP
+	bool "CoreSight Panic Dump driver"
+	depends on ARM || ARM64
+	depends on CORESIGHT_LINKS_AND_SINKS
+	help
+	  This driver provides panic dump functionality for coresight
+	  devices; when kernel panic happens, we can use callback functions
+	  to save trace data to memory. Finally can rely on kdump to extract
+	  out these trace data from kernel dump file.
+
 endif

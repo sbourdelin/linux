@@ -122,4 +122,14 @@ static inline int etm_readl_cp14(u32 off, unsigned int *val) { return 0; }
 static inline int etm_writel_cp14(u32 off, u32 val) { return 0; }
 #endif
 
+#ifdef CONFIG_CORESIGHT_PANIC_DUMP
+extern int coresight_add_panic_cb(struct coresight_device *csdev);
+extern void coresight_del_panic_cb(struct coresight_device *csdev);
+#else
+static inline int coresight_add_panic_cb(struct coresight_device *csdev)
+{ return 0; }
+static inline void coresight_del_panic_cb(struct coresight_device *csdev)
+{ return; }
+#endif
+
 #endif

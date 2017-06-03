@@ -189,6 +189,7 @@ struct coresight_device {
  * @set_buffer:		initialises buffer mechanic before a trace session.
  * @reset_buffer:	finalises buffer mechanic after a trace session.
  * @update_buffer:	update buffer pointers after a trace session.
+ * @panic_cb:		hooks callback function for panic notifier.
  */
 struct coresight_ops_sink {
 	int (*enable)(struct coresight_device *csdev, u32 mode);
@@ -205,6 +206,7 @@ struct coresight_ops_sink {
 	void (*update_buffer)(struct coresight_device *csdev,
 			      struct perf_output_handle *handle,
 			      void *sink_config);
+	int (*panic_cb)(struct coresight_device *csdev);
 };
 
 /**
