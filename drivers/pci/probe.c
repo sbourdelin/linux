@@ -1701,6 +1701,16 @@ static void pci_configure_extended_tags(struct pci_dev *dev)
 					 PCI_EXP_DEVCTL_EXT_TAG);
 }
 
+static void pci_configure_relaxed_ordering(struct pci_dev *dev)
+{
+	int ret;
+
+	if (dev && (dev->dev_flags & PCI_DEV_FLAGS_NO_RELAXED_ORDERING))
+		pcie_set_relaxed_ordering(dev);
+	else
+		pcie_clear_relaxed_ordering(dev);
+}
+
 static void pci_configure_device(struct pci_dev *dev)
 {
 	struct hotplug_params hpp;
@@ -1708,6 +1718,7 @@ static void pci_configure_device(struct pci_dev *dev)
 
 	pci_configure_mps(dev);
 	pci_configure_extended_tags(dev);
+	pci_configure_relaxed_ordering(dev);
 
 	memset(&hpp, 0, sizeof(hpp));
 	ret = pci_get_hp_params(dev, &hpp);
