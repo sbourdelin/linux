@@ -13,7 +13,7 @@
  */
 
 #include <linux/device.h>
-#include <linux/module.h>
+#include <linux/init.h>
 #include <linux/input.h>
 #include <linux/mfd/core.h>
 #include <linux/spi/spi.h>
@@ -59,14 +59,6 @@ static int da9052_spi_probe(struct spi_device *spi)
 	return da9052_device_init(da9052, id->driver_data);
 }
 
-static int da9052_spi_remove(struct spi_device *spi)
-{
-	struct da9052 *da9052 = spi_get_drvdata(spi);
-
-	da9052_device_exit(da9052);
-	return 0;
-}
-
 static struct spi_device_id da9052_spi_id[] = {
 	{"da9052", DA9052},
 	{"da9053-aa", DA9053_AA},
@@ -78,10 +70,10 @@ static struct spi_device_id da9052_spi_id[] = {
 
 static struct spi_driver da9052_spi_driver = {
 	.probe = da9052_spi_probe,
-	.remove = da9052_spi_remove,
 	.id_table = da9052_spi_id,
 	.driver = {
 		.name = "da9052",
+		.suppress_bind_attrs = true,
 	},
 };
 
@@ -98,13 +90,3 @@ static int __init da9052_spi_init(void)
 	return 0;
 }
 subsys_initcall(da9052_spi_init);
-
-static void __exit da9052_spi_exit(void)
-{
-	spi_unregister_driver(&da9052_spi_driver);
-}
-module_exit(da9052_spi_exit);
-
-MODULE_AUTHOR("David Dajun Chen <dchen@diasemi.com>");
-MODULE_DESCRIPTION("SPI driver for Dialog DA9052 PMIC");
-MODULE_LICENSE("GPL");

@@ -13,7 +13,7 @@
  */
 
 #include <linux/device.h>
-#include <linux/module.h>
+#include <linux/init.h>
 #include <linux/input.h>
 #include <linux/mfd/core.h>
 #include <linux/i2c.h>
@@ -177,20 +177,12 @@ static int da9052_i2c_probe(struct i2c_client *client,
 	return da9052_device_init(da9052, id->driver_data);
 }
 
-static int da9052_i2c_remove(struct i2c_client *client)
-{
-	struct da9052 *da9052 = i2c_get_clientdata(client);
-
-	da9052_device_exit(da9052);
-	return 0;
-}
-
 static struct i2c_driver da9052_i2c_driver = {
 	.probe = da9052_i2c_probe,
-	.remove = da9052_i2c_remove,
 	.id_table = da9052_i2c_id,
 	.driver = {
 		.name = "da9052",
+		.suppress_bind_attrs = true,
 #ifdef CONFIG_OF
 		.of_match_table = dialog_dt_ids,
 #endif
@@ -210,13 +202,3 @@ static int __init da9052_i2c_init(void)
 	return 0;
 }
 subsys_initcall(da9052_i2c_init);
-
-static void __exit da9052_i2c_exit(void)
-{
-	i2c_del_driver(&da9052_i2c_driver);
-}
-module_exit(da9052_i2c_exit);
-
-MODULE_AUTHOR("David Dajun Chen <dchen@diasemi.com>");
-MODULE_DESCRIPTION("I2C driver for Dialog DA9052 PMIC");
-MODULE_LICENSE("GPL");

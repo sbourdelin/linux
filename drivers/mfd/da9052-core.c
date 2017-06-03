@@ -17,7 +17,6 @@
 #include <linux/interrupt.h>
 #include <linux/mfd/core.h>
 #include <linux/slab.h>
-#include <linux/module.h>
 
 #include <linux/mfd/da9052/da9052.h>
 #include <linux/mfd/da9052/pdata.h>
@@ -626,13 +625,3 @@ err:
 
 	return ret;
 }
-
-void da9052_device_exit(struct da9052 *da9052)
-{
-	mfd_remove_devices(da9052->dev);
-	da9052_irq_exit(da9052);
-}
-
-MODULE_AUTHOR("David Dajun Chen <dchen@diasemi.com>");
-MODULE_DESCRIPTION("DA9052 MFD Core");
-MODULE_LICENSE("GPL");
