@@ -64,7 +64,7 @@ static int __init omap_init_mcbsp(struct omap_hwmod *oh, void *unused)
 
 	sscanf(oh->name, "mcbsp%d", &id);
 
-	pdata = kzalloc(sizeof(struct omap_mcbsp_platform_data), GFP_KERNEL);
+	pdata = kzalloc(sizeof(*pdata), GFP_KERNEL);
 	if (!pdata) {
 		pr_err("%s: No memory for mcbsp\n", __func__);
 		return -ENOMEM;
