@@ -88,6 +88,11 @@
 #define SUN8I_MIXER_CHAN_UI_LAYER_ATTR_FBFMT_RGB888	(8 << 8)
 #define SUN8I_MIXER_CHAN_UI_LAYER_ATTR_ALPHA_DEF	(0xff << 24)
 
+/* The DCSC sub-engine is used to do color space conversation */
+#define SUN8I_MIXER_DCSC_EN			0xb0000
+#define SUN8I_MIXER_DCSC_COEF_REG(x)		(0xb0010 + 0x4 * x)
+#define SUN8I_MIXER_DCSC_COEF_ALPHA		0xb0040
+
 /*
  * These sub-engines are still unknown now, the EN registers are here only to
  * be used to disable these sub-engines.
@@ -102,7 +107,6 @@
 #define SUN8I_MIXER_PEAK_EN			0xa6000
 #define SUN8I_MIXER_ASE_EN			0xa8000
 #define SUN8I_MIXER_FCC_EN			0xaa000
-#define SUN8I_MIXER_DCSC_EN			0xb0000
 
 struct sun8i_mixer_cfg {
 	int		vi_num;
