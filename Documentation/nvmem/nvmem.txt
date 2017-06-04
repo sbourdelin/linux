@@ -37,6 +37,7 @@ and write the non-volatile memory.
 A NVMEM provider can register with NVMEM core by supplying relevant
 nvmem configuration to nvmem_register(), on success core would return a valid
 nvmem_device pointer.
+devm_nvmem_register() is a device-managed version of nvmem_register.
 
 nvmem_unregister(nvmem) is used to unregister a previously registered provider.
 

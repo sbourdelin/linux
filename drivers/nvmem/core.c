@@ -534,6 +534,41 @@ int nvmem_unregister(struct nvmem_device *nvmem)
 }
 EXPORT_SYMBOL_GPL(nvmem_unregister);
 
+static void devm_nvmem_release(struct device *dev, void *res)
+{
+	nvmem_unregister(*(struct nvmem_device **)res);
+}
+
+/**
+ * devm_nvmem_register() - managed version of nvmem_register
+ *
+ * @config: nvmem device configuration with which nvmem device is created.
+ *
+ * Return: Will be an ERR_PTR() on error or a valid pointer to nvmem_device
+ * on success.
+ */
+
+struct nvmem_device *devm_nvmem_register(const struct nvmem_config *config)
+{
+	struct nvmem_device *nv, **dr;
+
+	dr = devres_alloc(devm_nvmem_release, sizeof(*dr), GFP_KERNEL);
+	if (!dr)
+		return ERR_PTR(-ENOMEM);
+
+	nv = nvmem_register(config);
+	if (IS_ERR(nv)) {
+		devres_free(dr);
+		return nv;
+	}
+
+	*dr = nv;
+	devres_add(config->dev, dr);
+
+	return nv;
+}
+EXPORT_SYMBOL_GPL(devm_nvmem_register);
+
 static struct nvmem_device *__nvmem_device_get(struct device_node *np,
 					       struct nvmem_cell **cellp,
 					       const char *cell_id)

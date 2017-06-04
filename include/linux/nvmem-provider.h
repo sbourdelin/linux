@@ -42,11 +42,18 @@ struct nvmem_config {
 #if IS_ENABLED(CONFIG_NVMEM)
 
 struct nvmem_device *nvmem_register(const struct nvmem_config *cfg);
+struct nvmem_device *devm_nvmem_register(const struct nvmem_config *cfg);
 int nvmem_unregister(struct nvmem_device *nvmem);
 
 #else
 
 static inline struct nvmem_device *nvmem_register(const struct nvmem_config *c)
+{
+	return ERR_PTR(-ENOSYS);
+}
+
+static inline struct nvmem_device *
+			devm_nvmem_register(const struct nvmem_config *c)
 {
 	return ERR_PTR(-ENOSYS);
 }
