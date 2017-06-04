@@ -69,6 +69,40 @@ static const char *uvc_query_name(__u8 query)
 	}
 }
 
+static void uvc_fixup_query_ctrl_len(const struct uvc_device *dev, __u8 unit,
+	__u8 cs, void *data)
+{
+	struct uvc_ctrl_fixup {
+		struct usb_device_id id;
+		u8 unit;
+		u8 selector;
+		u16 len;
+	};
+
+	static const struct uvc_ctrl_fixup fixups[] = {
+		// Dino-Lite Premier (AM4111T)
+		{ { USB_DEVICE(0xa168, 0x0870) }, 4, 3, 3 },
+	};
+
+	unsigned int i;
+
+	for (i = 0; i < ARRAY_SIZE(fixups); ++i) {
+		if (!usb_match_one_id(dev->intf, &fixups[i].id))
+			continue;
+
+		if (!(fixups[i].unit == unit && fixups[i].selector == cs))
+			continue;
+
+		uvc_trace(UVC_TRACE_CONTROL,
+			  "Fixing USB %04x:%04x %u/%u GET_LEN: %u -> %u",
+			  fixups[i].id.idVendor, fixups[i].id.idProduct,
+			  unit, cs,
+			  le16_to_cpup((__le16 *)data), fixups[i].len);
+		*((__le16 *)data) = cpu_to_le16(fixups[i].len);
+		break;
+	}
+}
+
 int uvc_query_ctrl(struct uvc_device *dev, __u8 query, __u8 unit,
 			__u8 intfnum, __u8 cs, void *data, __u16 size)
 {
@@ -82,6 +116,9 @@ int uvc_query_ctrl(struct uvc_device *dev, __u8 query, __u8 unit,
 			unit, ret, size);
 		return -EIO;
 	}
+
+	if (query == UVC_GET_LEN && size == 2)
+		uvc_fixup_query_ctrl_len(dev, unit, cs, data);
 
 	return 0;
 }
