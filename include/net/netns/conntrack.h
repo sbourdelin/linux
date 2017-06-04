@@ -111,6 +111,9 @@ struct netns_ct {
 	int			sysctl_tstamp;
 	int			sysctl_checksum;
 
+#if IS_ENABLED(CONFIG_NF_CT_NETLINK_HELPER)
+	struct list_head	nfnl_cthelper_list;
+#endif
 	unsigned int		nf_ct_helper_count;
 
 	struct ct_pcpu __percpu *pcpu_lists;

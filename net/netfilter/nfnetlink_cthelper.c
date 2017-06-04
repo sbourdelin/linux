@@ -33,11 +33,9 @@ MODULE_AUTHOR("Pablo Neira Ayuso <pablo@netfilter.org>");
 MODULE_DESCRIPTION("nfnl_cthelper: User-space connection tracking helpers");
 
 struct nfnl_cthelper {
-	struct list_head		list;
 	struct nf_conntrack_helper	helper;
+	struct list_head		list;
 };
-
-static LIST_HEAD(nfnl_cthelper_list);
 
 static int
 nfnl_userspace_cthelper(struct sk_buff *skb, unsigned int protoff,
@@ -214,7 +212,8 @@ err:
 
 static int
 nfnl_cthelper_create(const struct nlattr * const tb[],
-		     struct nf_conntrack_tuple *tuple)
+		     struct nf_conntrack_tuple *tuple,
+		     struct net *net)
 {
 	struct nf_conntrack_helper *helper;
 	struct nfnl_cthelper *nfcth;
@@ -265,11 +264,11 @@ nfnl_cthelper_create(const struct nlattr * const tb[],
 		}
 	}
 
-	ret = nf_conntrack_helper_register(&init_net, helper);
+	ret = nf_conntrack_helper_register(net, helper);
 	if (ret < 0)
 		goto err2;
 
-	list_add_tail(&nfcth->list, &nfnl_cthelper_list);
+	list_add_tail(&nfcth->list, &net->ct.nfnl_cthelper_list);
 	return 0;
 err2:
 	kfree(helper->expect_policy);
@@ -415,7 +414,7 @@ static int nfnl_cthelper_new(struct net *net, struct sock *nfnl,
 	if (ret < 0)
 		return ret;
 
-	list_for_each_entry(nlcth, &nfnl_cthelper_list, list) {
+	list_for_each_entry(nlcth, &net->ct.nfnl_cthelper_list, list) {
 		cur = &nlcth->helper;
 
 		if (strncmp(cur->name, helper_name, NF_CT_HELPER_NAME_LEN))
@@ -433,7 +432,7 @@ static int nfnl_cthelper_new(struct net *net, struct sock *nfnl,
 	}
 
 	if (helper == NULL)
-		ret = nfnl_cthelper_create(tb, &tuple);
+		ret = nfnl_cthelper_create(tb, &tuple, net);
 	else
 		ret = nfnl_cthelper_update(tb, helper);
 
@@ -561,6 +560,7 @@ static int
 nfnl_cthelper_dump_table(struct sk_buff *skb, struct netlink_callback *cb)
 {
 	struct nf_conntrack_helper *cur, *last;
+	struct net *net = sock_net(skb->sk);
 
 	rcu_read_lock();
 	last = (struct nf_conntrack_helper *)cb->args[1];
@@ -568,6 +568,8 @@ nfnl_cthelper_dump_table(struct sk_buff *skb, struct netlink_callback *cb)
 restart:
 		hlist_for_each_entry_rcu(cur,
 				&nf_ct_helper_hash[cb->args[0]], hnode) {
+			if (!net_eq(net, nf_ct_helper_net(cur)))
+				continue;
 
 			/* skip non-userspace conntrack helpers. */
 			if (!(cur->flags & NF_CT_HELPER_F_USERSPACE))
@@ -627,7 +629,7 @@ static int nfnl_cthelper_get(struct net *net, struct sock *nfnl,
 		tuple_set = true;
 	}
 
-	list_for_each_entry(nlcth, &nfnl_cthelper_list, list) {
+	list_for_each_entry(nlcth, &net->ct.nfnl_cthelper_list, list) {
 		cur = &nlcth->helper;
 		if (helper_name &&
 		    strncmp(cur->name, helper_name, NF_CT_HELPER_NAME_LEN))
@@ -687,7 +689,7 @@ static int nfnl_cthelper_del(struct net *net, struct sock *nfnl,
 	}
 
 	ret = -ENOENT;
-	list_for_each_entry_safe(nlcth, n, &nfnl_cthelper_list, list) {
+	list_for_each_entry_safe(nlcth, n, &net->ct.nfnl_cthelper_list, list) {
 		cur = &nlcth->helper;
 		j++;
 
@@ -743,9 +745,41 @@ static const struct nfnetlink_subsystem nfnl_cthelper_subsys = {
 
 MODULE_ALIAS_NFNL_SUBSYS(NFNL_SUBSYS_CTHELPER);
 
+static int __net_init nfnl_cthelper_net_init(struct net *net)
+{
+	INIT_LIST_HEAD(&net->ct.nfnl_cthelper_list);
+	return 0;
+}
+
+static void __net_exit nfnl_cthelper_net_exit(struct net *net)
+{
+	struct nf_conntrack_helper *cur;
+	struct nfnl_cthelper *nlcth, *n;
+
+	list_for_each_entry_safe(nlcth, n, &net->ct.nfnl_cthelper_list, list) {
+		cur = &nlcth->helper;
+
+		nf_conntrack_helper_unregister(net, cur);
+		list_del(&nlcth->list);
+
+		nf_ct_helper_put(cur);
+	}
+}
+
+static struct pernet_operations nfnl_cthelper_net_ops = {
+	.init	= nfnl_cthelper_net_init,
+	.exit	= nfnl_cthelper_net_exit,
+};
+
 static int __init nfnl_cthelper_init(void)
 {
 	int ret;
+
+	BUILD_BUG_ON(offsetof(struct nfnl_cthelper, helper) != 0);
+
+	ret = register_pernet_subsys(&nfnl_cthelper_net_ops);
+	if (ret < 0)
+		return ret;
 
 	ret = nfnetlink_subsys_register(&nfnl_cthelper_subsys);
 	if (ret < 0) {
@@ -753,24 +787,16 @@ static int __init nfnl_cthelper_init(void)
 		goto err_out;
 	}
 	return 0;
+
 err_out:
+	unregister_pernet_subsys(&nfnl_cthelper_net_ops);
 	return ret;
 }
 
 static void __exit nfnl_cthelper_exit(void)
 {
-	struct nf_conntrack_helper *cur;
-	struct nfnl_cthelper *nlcth, *n;
-
 	nfnetlink_subsys_unregister(&nfnl_cthelper_subsys);
-
-	list_for_each_entry_safe(nlcth, n, &nfnl_cthelper_list, list) {
-		cur = &nlcth->helper;
-
-		nf_conntrack_helper_unregister(&init_net, cur);
-		kfree(cur->expect_policy);
-		kfree(nlcth);
-	}
+	unregister_pernet_subsys(&nfnl_cthelper_net_ops);
 }
 
 module_init(nfnl_cthelper_init);

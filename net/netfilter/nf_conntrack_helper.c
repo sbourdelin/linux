@@ -201,8 +201,8 @@ EXPORT_SYMBOL_GPL(nf_conntrack_helper_try_module_get);
 
 void nf_conntrack_helper_put(struct nf_conntrack_helper *helper)
 {
-	refcount_dec(&helper->refcnt);
 	module_put(helper->me);
+	nf_ct_helper_put(helper);
 }
 EXPORT_SYMBOL_GPL(nf_conntrack_helper_put);
 

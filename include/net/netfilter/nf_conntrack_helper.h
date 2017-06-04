@@ -82,6 +82,16 @@ static inline struct net *nf_ct_helper_net(struct nf_conntrack_helper *helper)
 	return read_pnet(&helper->net);
 }
 
+static inline void nf_ct_helper_put(struct nf_conntrack_helper *helper)
+{
+	if (refcount_dec_and_test(&helper->refcnt)) {
+		if (helper->flags & NF_CT_HELPER_F_USERSPACE) {
+			kfree(helper->expect_policy);
+			kfree(helper);
+		}
+	}
+}
+
 struct nf_conntrack_helper *__nf_conntrack_helper_find(struct net *net,
 						       const char *name,
 						       u16 l3num, u8 protonum);
