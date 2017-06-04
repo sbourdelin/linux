@@ -321,6 +321,16 @@ int trace_event_reg(struct trace_event_call *call,
 }
 EXPORT_SYMBOL_GPL(trace_event_reg);
 
+static bool trace_event_file_cmd_record(struct trace_event_file *file)
+{
+	return !!(file->flags & EVENT_FILE_FL_RECORDED_CMD);
+}
+
+static bool trace_event_file_tgid_record(struct trace_event_file *file)
+{
+	return !!(file->flags & EVENT_FILE_FL_RECORDED_TGID);
+}
+
 void trace_event_enable_cmd_record(bool enable)
 {
 	struct trace_event_file *file;
@@ -328,16 +338,49 @@ void trace_event_enable_cmd_record(bool enable)
 
 	mutex_lock(&event_mutex);
 	do_for_each_event_file(tr, file) {
+		bool cmd_record = trace_event_file_cmd_record(file);
 
 		if (!(file->flags & EVENT_FILE_FL_ENABLED))
 			continue;
 
 		if (enable) {
-			tracing_start_cmdline_record();
+			if (cmd_record)
+				continue;
+			tracing_start_taskinfo_record(true, false);
 			set_bit(EVENT_FILE_FL_RECORDED_CMD_BIT, &file->flags);
 		} else {
-			tracing_stop_cmdline_record();
+			if (!cmd_record)
+				continue;
+			tracing_stop_taskinfo_record(true, false);
 			clear_bit(EVENT_FILE_FL_RECORDED_CMD_BIT, &file->flags);
+		}
+	} while_for_each_event_file();
+	mutex_unlock(&event_mutex);
+}
+
+void trace_event_enable_tgid_record(bool enable)
+{
+	struct trace_event_file *file;
+	struct trace_array *tr;
+
+	mutex_lock(&event_mutex);
+	do_for_each_event_file(tr, file) {
+		bool tgid_record = trace_event_file_tgid_record(file);
+
+		if (!(file->flags & EVENT_FILE_FL_ENABLED))
+			continue;
+
+		if (enable) {
+			if (tgid_record)
+				continue;
+			tracing_start_taskinfo_record(false, true);
+			set_bit(EVENT_FILE_FL_RECORDED_TGID_BIT, &file->flags);
+		} else {
+			if (!tgid_record)
+				continue;
+			tracing_stop_taskinfo_record(false, true);
+			clear_bit(EVENT_FILE_FL_RECORDED_TGID_BIT,
+				  &file->flags);
 		}
 	} while_for_each_event_file();
 	mutex_unlock(&event_mutex);
@@ -351,6 +394,7 @@ static int __ftrace_event_enable_disable(struct trace_event_file *file,
 	unsigned long file_flags = file->flags;
 	int ret = 0;
 	int disable;
+	bool cmd_record, tgid_record;
 
 	switch (enable) {
 	case 0:
@@ -377,10 +421,18 @@ static int __ftrace_event_enable_disable(struct trace_event_file *file,
 
 		if (disable && (file->flags & EVENT_FILE_FL_ENABLED)) {
 			clear_bit(EVENT_FILE_FL_ENABLED_BIT, &file->flags);
-			if (file->flags & EVENT_FILE_FL_RECORDED_CMD) {
-				tracing_stop_cmdline_record();
-				clear_bit(EVENT_FILE_FL_RECORDED_CMD_BIT, &file->flags);
-			}
+
+			cmd_record = trace_event_file_cmd_record(file);
+			tgid_record = trace_event_file_tgid_record(file);
+
+			tracing_stop_taskinfo_record(cmd_record, tgid_record);
+			if (cmd_record)
+				clear_bit(EVENT_FILE_FL_RECORDED_CMD_BIT,
+					  &file->flags);
+			if (tgid_record)
+				clear_bit(EVENT_FILE_FL_RECORDED_TGID_BIT,
+					  &file->flags);
+
 			call->class->reg(call, TRACE_REG_UNREGISTER, file);
 		}
 		/* If in SOFT_MODE, just set the SOFT_DISABLE_BIT, else clear it */
@@ -407,18 +459,25 @@ static int __ftrace_event_enable_disable(struct trace_event_file *file,
 		}
 
 		if (!(file->flags & EVENT_FILE_FL_ENABLED)) {
-
 			/* Keep the event disabled, when going to SOFT_MODE. */
 			if (soft_disable)
 				set_bit(EVENT_FILE_FL_SOFT_DISABLED_BIT, &file->flags);
 
-			if (tr->trace_flags & TRACE_ITER_RECORD_CMD) {
-				tracing_start_cmdline_record();
-				set_bit(EVENT_FILE_FL_RECORDED_CMD_BIT, &file->flags);
-			}
+			cmd_record = tr->trace_flags & TRACE_ITER_RECORD_CMD;
+			tgid_record = tr->trace_flags & TRACE_ITER_RECORD_TGID;
+
+			tracing_start_taskinfo_record(cmd_record, tgid_record);
+			if (cmd_record)
+				set_bit(EVENT_FILE_FL_RECORDED_CMD_BIT,
+					&file->flags);
+			if (tgid_record)
+				set_bit(EVENT_FILE_FL_RECORDED_TGID_BIT,
+					&file->flags);
+
 			ret = call->class->reg(call, TRACE_REG_REGISTER, file);
 			if (ret) {
-				tracing_stop_cmdline_record();
+				tracing_stop_taskinfo_record(cmd_record,
+							     tgid_record);
 				pr_info("event trace: Could not enable event "
 					"%s\n", trace_event_name(call));
 				break;

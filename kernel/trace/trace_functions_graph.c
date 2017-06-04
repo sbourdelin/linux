@@ -524,14 +524,14 @@ static int graph_trace_init(struct trace_array *tr)
 					    &trace_graph_entry);
 	if (ret)
 		return ret;
-	tracing_start_cmdline_record();
+	tracing_start_taskinfo_record(true, false);
 
 	return 0;
 }
 
 static void graph_trace_reset(struct trace_array *tr)
 {
-	tracing_stop_cmdline_record();
+	tracing_stop_taskinfo_record(true, false);
 	unregister_ftrace_graph();
 }
 

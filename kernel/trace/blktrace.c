@@ -236,7 +236,7 @@ static void __blk_add_trace(struct blk_trace *bt, sector_t sector, int bytes,
 	cpu = raw_smp_processor_id();
 
 	if (blk_tracer) {
-		tracing_record_cmdline(current);
+		tracing_record_taskinfo_single(current, true, false);
 
 		buffer = blk_tr->trace_buffer.buffer;
 		pc = preempt_count();

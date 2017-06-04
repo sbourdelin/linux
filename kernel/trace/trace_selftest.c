@@ -770,7 +770,7 @@ trace_selftest_startup_function_graph(struct tracer *trace,
 		warn_failed_init_tracer(trace, ret);
 		goto out;
 	}
-	tracing_start_cmdline_record();
+	tracing_start_taskinfo_record(true, false);
 
 	/* Sleep for a 1/10 of a second */
 	msleep(100);
