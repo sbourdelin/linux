@@ -55,7 +55,6 @@ struct nvmem_cell {
 	struct list_head	node;
 };
 
-static DEFINE_MUTEX(nvmem_mutex);
 static DEFINE_IDA(nvmem_ida);
 
 static LIST_HEAD(nvmem_cells);
@@ -538,14 +537,10 @@ static struct nvmem_device *__nvmem_device_get(struct device_node *np,
 {
 	struct nvmem_device *nvmem = NULL;
 
-	mutex_lock(&nvmem_mutex);
-
 	if (np) {
 		nvmem = of_nvmem_find(np);
-		if (!nvmem) {
-			mutex_unlock(&nvmem_mutex);
+		if (!nvmem)
 			return ERR_PTR(-EPROBE_DEFER);
-		}
 	} else {
 		struct nvmem_cell *cell = nvmem_find_cell(cell_id);
 
@@ -554,13 +549,9 @@ static struct nvmem_device *__nvmem_device_get(struct device_node *np,
 			*cellp = cell;
 		}
 
-		if (!nvmem) {
-			mutex_unlock(&nvmem_mutex);
+		if (!nvmem)
 			return ERR_PTR(-ENOENT);
-		}
 	}
-
-	mutex_unlock(&nvmem_mutex);
 
 	if (!try_module_get(nvmem->owner)) {
 		dev_err(&nvmem->dev,
