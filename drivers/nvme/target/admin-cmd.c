@@ -367,6 +367,56 @@ out:
 	nvmet_req_complete(req, status);
 }
 
+static void nvmet_execute_identify_desclist(struct nvmet_req *req)
+{
+	struct nvmet_ns *ns;
+	struct nvme_ns_identifier_hdr hdr;
+	u16 status = 0;
+	off_t off = 0;
+
+	ns = nvmet_find_namespace(req->sq->ctrl, req->cmd->identify.nsid);
+	if (!ns) {
+		status = NVME_SC_INVALID_NS | NVME_SC_DNR;
+		goto out;
+	}
+
+	if (memchr_inv(&ns->uuid, 0, sizeof(ns->uuid))) {
+		memset(&hdr, 0, sizeof(hdr));
+		hdr.nidt = NVME_NIDT_UUID;
+		hdr.nidl = NVME_NIDT_UUID_LEN;
+		status = nvmet_copy_to_sgl(req, off, &hdr, sizeof(hdr));
+		if (status)
+			goto out_put_ns;
+		off += sizeof(hdr);
+
+		status = nvmet_copy_to_sgl(req, off, &ns->uuid,
+					   sizeof(ns->uuid));
+		if (status)
+			goto out_put_ns;
+		off += sizeof(ns->uuid);
+	}
+	if (memchr_inv(ns->nguid, 0, sizeof(ns->nguid))) {
+		memset(&hdr, 0, sizeof(hdr));
+		hdr.nidt = NVME_NIDT_NGUID;
+		hdr.nidl = NVME_NIDT_NGUID_LEN;
+		status = nvmet_copy_to_sgl(req, off, &hdr, sizeof(hdr));
+		if (status)
+			goto out_put_ns;
+		off += sizeof(hdr);
+
+		status = nvmet_copy_to_sgl(req, off, &ns->nguid,
+					   sizeof(ns->nguid));
+		if (status)
+			goto out_put_ns;
+		off += sizeof(ns->nguid);
+	}
+
+out_put_ns:
+	nvmet_put_namespace(ns);
+out:
+	nvmet_req_complete(req, status);
+}
+
 /*
  * A "mimimum viable" abort implementation: the command is mandatory in the
  * spec, but we are not required to do any useful work.  We couldn't really
@@ -514,6 +564,9 @@ u16 nvmet_parse_admin_cmd(struct nvmet_req *req)
 			return 0;
 		case NVME_ID_CNS_NS_ACTIVE_LIST:
 			req->execute = nvmet_execute_identify_nslist;
+			return 0;
+		case NVME_ID_CNS_NS_DESC_LIST:
+			req->execute = nvmet_execute_identify_desclist;
 			return 0;
 		}
 		break;
