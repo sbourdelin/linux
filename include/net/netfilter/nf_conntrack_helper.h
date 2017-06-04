@@ -55,6 +55,8 @@ struct nf_conntrack_helper {
 	unsigned int queue_num;
 	/* length of userspace private data stored in nf_conn_help->data */
 	u16 data_len;
+
+	const struct nf_conntrack_helper *orig_helper;
 };
 
 /* Must be kept in sync with the classes defined by helpers */
@@ -85,10 +87,8 @@ static inline struct net *nf_ct_helper_net(struct nf_conntrack_helper *helper)
 static inline void nf_ct_helper_put(struct nf_conntrack_helper *helper)
 {
 	if (refcount_dec_and_test(&helper->refcnt)) {
-		if (helper->flags & NF_CT_HELPER_F_USERSPACE) {
-			kfree(helper->expect_policy);
-			kfree(helper);
-		}
+		kfree(helper->expect_policy);
+		kfree(helper);
 	}
 }
 
@@ -114,8 +114,12 @@ void nf_ct_helper_init(struct nf_conntrack_helper *helper,
 					  struct nf_conn *ct),
 		       struct module *module);
 
+int __nf_conntrack_helper_register(struct net *net,
+				   struct nf_conntrack_helper *me);
 int nf_conntrack_helper_register(struct net *net,
 				 struct nf_conntrack_helper *me);
+void __nf_conntrack_helper_unregister(struct net *net,
+				      struct nf_conntrack_helper *me);
 void nf_conntrack_helper_unregister(struct net *net,
 				    struct nf_conntrack_helper *me);
 

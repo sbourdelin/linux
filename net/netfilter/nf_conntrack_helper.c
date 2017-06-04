@@ -406,16 +406,13 @@ void nf_ct_helper_log(struct sk_buff *skb, const struct nf_conn *ct,
 }
 EXPORT_SYMBOL_GPL(nf_ct_helper_log);
 
-int nf_conntrack_helper_register(struct net *net,
-				 struct nf_conntrack_helper *me)
+int __nf_conntrack_helper_register(struct net *net,
+				   struct nf_conntrack_helper *me)
 {
 	struct nf_conntrack_tuple_mask mask = { .src.u.all = htons(0xFFFF) };
 	unsigned int h = helper_hash(net, &me->tuple);
 	struct nf_conntrack_helper *cur;
 	int ret = 0, i;
-
-	if (!net_eq(net, &init_net))
-		return 0;
 
 	BUG_ON(me->expect_policy == NULL);
 	BUG_ON(me->expect_class_max >= NF_CT_MAX_EXPECT_CLASSES);
@@ -462,22 +459,43 @@ out:
 	mutex_unlock(&nf_ct_helper_mutex);
 	return ret;
 }
+EXPORT_SYMBOL_GPL(__nf_conntrack_helper_register);
+
+int nf_conntrack_helper_register(struct net *net,
+				 struct nf_conntrack_helper *me)
+{
+	struct nf_conntrack_helper *helper;
+	int epol_sz, ret;
+
+	helper = kmemdup(me, sizeof(*me), GFP_KERNEL);
+	if (!helper)
+		return -ENOMEM;
+
+	epol_sz = (me->expect_class_max + 1) * sizeof(*me->expect_policy);
+	helper->expect_policy = kmemdup(me->expect_policy, epol_sz,
+					GFP_KERNEL);
+	if (!helper->expect_policy) {
+		kfree(helper);
+		return -ENOMEM;
+	}
+
+	helper->orig_helper = me;
+	ret = __nf_conntrack_helper_register(net, helper);
+	if (ret) {
+		kfree(helper->expect_policy);
+		kfree(helper);
+	}
+
+	return ret;
+}
 EXPORT_SYMBOL_GPL(nf_conntrack_helper_register);
 
-void nf_conntrack_helper_unregister(struct net *net,
-				    struct nf_conntrack_helper *me)
+static void nf_conntrack_helper_cleanup(struct net *net,
+					struct nf_conntrack_helper *me)
 {
 	struct nf_conntrack_expect *exp;
 	const struct hlist_node *next;
 	unsigned int i;
-
-	if (!net_eq(net, &init_net))
-		return 0;
-
-	mutex_lock(&nf_ct_helper_mutex);
-	hlist_del_rcu(&me->hnode);
-	net->ct.nf_ct_helper_count--;
-	mutex_unlock(&nf_ct_helper_mutex);
 
 	/* Make sure every nothing is still using the helper unless its a
 	 * connection in the hash.
@@ -500,6 +518,50 @@ void nf_conntrack_helper_unregister(struct net *net,
 	spin_unlock_bh(&nf_conntrack_expect_lock);
 
 	nf_ct_iterate_cleanup_net(net, unhelp, me, 0, 0);
+}
+
+void __nf_conntrack_helper_unregister(struct net *net,
+				      struct nf_conntrack_helper *me)
+{
+	mutex_lock(&nf_ct_helper_mutex);
+	hlist_del_rcu(&me->hnode);
+	net->ct.nf_ct_helper_count--;
+	mutex_unlock(&nf_ct_helper_mutex);
+
+	nf_conntrack_helper_cleanup(net, me);
+}
+EXPORT_SYMBOL_GPL(__nf_conntrack_helper_unregister);
+
+void nf_conntrack_helper_unregister(struct net *net,
+				    struct nf_conntrack_helper *me)
+{
+	struct nf_conntrack_helper *helper;
+	bool found = false;
+	int i;
+
+	mutex_lock(&nf_ct_helper_mutex);
+	for (i = 0; i < nf_ct_helper_hsize; i++) {
+		hlist_for_each_entry(helper, &nf_ct_helper_hash[i], hnode) {
+			if (net_eq(net, nf_ct_helper_net(helper)) &&
+			    helper->orig_helper == me) {
+				found = true;
+				goto out;
+			}
+		}
+	}
+out:
+	if (!found) {
+		WARN_ON_ONCE(1);
+		mutex_unlock(&nf_ct_helper_mutex);
+		return;
+	}
+
+	hlist_del_rcu(&helper->hnode);
+	net->ct.nf_ct_helper_count--;
+	mutex_unlock(&nf_ct_helper_mutex);
+
+	nf_conntrack_helper_cleanup(net, helper);
+	nf_ct_helper_put(helper);
 }
 EXPORT_SYMBOL_GPL(nf_conntrack_helper_unregister);
 

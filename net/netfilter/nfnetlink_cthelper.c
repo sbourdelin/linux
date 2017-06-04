@@ -264,7 +264,7 @@ nfnl_cthelper_create(const struct nlattr * const tb[],
 		}
 	}
 
-	ret = nf_conntrack_helper_register(net, helper);
+	ret = __nf_conntrack_helper_register(net, helper);
 	if (ret < 0)
 		goto err2;
 
@@ -704,7 +704,7 @@ static int nfnl_cthelper_del(struct net *net, struct sock *nfnl,
 
 		if (refcount_dec_if_one(&cur->refcnt)) {
 			found = true;
-			nf_conntrack_helper_unregister(net, cur);
+			__nf_conntrack_helper_unregister(net, cur);
 			kfree(cur->expect_policy);
 
 			list_del(&nlcth->list);
@@ -759,7 +759,7 @@ static void __net_exit nfnl_cthelper_net_exit(struct net *net)
 	list_for_each_entry_safe(nlcth, n, &net->ct.nfnl_cthelper_list, list) {
 		cur = &nlcth->helper;
 
-		nf_conntrack_helper_unregister(net, cur);
+		__nf_conntrack_helper_unregister(net, cur);
 		list_del(&nlcth->list);
 
 		nf_ct_helper_put(cur);
