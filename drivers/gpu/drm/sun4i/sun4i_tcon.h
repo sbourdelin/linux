@@ -146,6 +146,8 @@
 struct sun4i_tcon_quirks {
 	bool	has_unknown_mux; /* sun5i has undocumented mux */
 	bool	has_channel_1;	/* a33 does not have channel 1 */
+	/* Some DE2 can swap the mixer<->TCON connection */
+	bool	swappable_input;
 };
 
 struct sun4i_tcon {

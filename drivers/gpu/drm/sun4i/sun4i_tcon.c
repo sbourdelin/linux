@@ -464,7 +464,8 @@ static int sun4i_tcon_init_regmap(struct device *dev,
  * requested via the get_id function of the engine.
  */
 static struct sunxi_engine *sun4i_tcon_find_engine(struct sun4i_drv *drv,
-						   struct device_node *node)
+						   struct device_node *node,
+						   bool skip_bonus_ep)
 {
 	struct device_node *port, *ep, *remote;
 	struct sunxi_engine *engine;
@@ -478,6 +479,42 @@ static struct sunxi_engine *sun4i_tcon_find_engine(struct sun4i_drv *drv,
 		if (!remote)
 			continue;
 
+		if (skip_bonus_ep) {
+			struct device_node *remote_ep_node;
+			struct of_endpoint local_endpoint, remote_endpoint;
+
+			remote_ep_node = of_graph_get_remote_endpoint(ep);
+			if (!remote_ep_node) {
+				DRM_DEBUG_DRIVER("Couldn't get remote endpoint\n");
+				of_node_put(remote);
+				continue;
+			}
+
+			if (of_graph_parse_endpoint(ep, &local_endpoint)) {
+				DRM_DEBUG_DRIVER("Couldn't parse local endpoint\n");
+				of_node_put(remote);
+				of_node_put(remote_ep_node);
+				continue;
+			}
+
+			if (of_graph_parse_endpoint(remote_ep_node,
+						    &remote_endpoint)) {
+				DRM_DEBUG_DRIVER("Couldn't parse remote endpoint\n");
+				of_node_put(remote);
+				of_node_put(remote_ep_node);
+				continue;
+			}
+
+			if (local_endpoint.id != remote_endpoint.id) {
+				DRM_DEBUG_DRIVER("Skipping bonus mixer->TCON connection when searching engine\n");
+				of_node_put(remote);
+				of_node_put(remote_ep_node);
+				continue;
+			}
+
+			of_node_put(remote_ep_node);
+		}
+
 		/* does this node match any registered engines? */
 		list_for_each_entry(engine, &drv->engine_list, list) {
 			if (remote == engine->node) {
@@ -488,7 +525,7 @@ static struct sunxi_engine *sun4i_tcon_find_engine(struct sun4i_drv *drv,
 		}
 
 		/* keep looking through upstream ports */
-		engine = sun4i_tcon_find_engine(drv, remote);
+		engine = sun4i_tcon_find_engine(drv, remote, skip_bonus_ep);
 		if (!IS_ERR(engine)) {
 			of_node_put(remote);
 			of_node_put(port);
@@ -508,20 +545,26 @@ static int sun4i_tcon_bind(struct device *dev, struct device *master,
 	struct sun4i_tcon *tcon;
 	int ret;
 
-	engine = sun4i_tcon_find_engine(drv, dev->of_node);
-	if (IS_ERR(engine)) {
-		dev_err(dev, "Couldn't find matching engine\n");
-		return -EPROBE_DEFER;
-	}
-
 	tcon = devm_kzalloc(dev, sizeof(*tcon), GFP_KERNEL);
 	if (!tcon)
 		return -ENOMEM;
 	dev_set_drvdata(dev, tcon);
 	tcon->drm = drm;
 	tcon->dev = dev;
-	tcon->id = engine->id;
 	tcon->quirks = of_device_get_match_data(dev);
+
+	/*
+	 * As we keep the connection between DE2 mixer and TCON not swapped,
+	 * skip the bonus endpoints (which stand for swapped connection)
+	 * when finding the correspoing engine.
+	 */
+	engine = sun4i_tcon_find_engine(drv, dev->of_node,
+					tcon->quirks->swappable_input);
+	if (IS_ERR(engine)) {
+		dev_err(dev, "Couldn't find matching engine\n");
+		return -EPROBE_DEFER;
+	}
+	tcon->id = engine->id;
 
 	tcon->lcd_rst = devm_reset_control_get(dev, "lcd");
 	if (IS_ERR(tcon->lcd_rst)) {

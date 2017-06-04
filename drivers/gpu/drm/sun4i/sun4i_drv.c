@@ -178,6 +178,13 @@ static bool sun4i_drv_node_is_frontend(struct device_node *node)
 		of_device_is_compatible(node, "allwinner,sun8i-a33-display-frontend");
 }
 
+static bool sun4i_drv_node_is_swappable_de2_mixer(struct device_node *node)
+{
+	/* The V3s has only one mixer-tcon pair, so it's not listed here. */
+	return of_device_is_compatible(node, "allwinner,sun8i-h3-de2-mixer0") ||
+		of_device_is_compatible(node, "allwinner,sun8i-h3-de2-mixer1");
+}
+
 static bool sun4i_drv_node_is_tcon(struct device_node *node)
 {
 	return of_device_is_compatible(node, "allwinner,sun5i-a13-tcon") ||
@@ -259,6 +266,44 @@ static int sun4i_drv_add_endpoints(struct device *dev,
 				DRM_DEBUG_DRIVER("Endpoint is our panel... skipping\n");
 				continue;
 			}
+		}
+
+		/*
+		 * The second endpoint of the output of a swappable DE2 mixer
+		 * is the TCON after connection swapping.
+		 * Ignore it now, as we now hardcode mixer0->tcon0,
+		 * mixer1->tcon1 connection.
+		 */
+		if (sun4i_drv_node_is_swappable_de2_mixer(node)) {
+			struct device_node *remote_ep_node;
+			struct of_endpoint local_endpoint, remote_endpoint;
+
+			remote_ep_node = of_graph_get_remote_endpoint(ep);
+			if (!remote_ep_node) {
+				DRM_DEBUG_DRIVER("Couldn't get remote endpoint\n");
+				continue;
+			}
+
+			if (of_graph_parse_endpoint(ep, &local_endpoint)) {
+				DRM_DEBUG_DRIVER("Couldn't parse local endpoint\n");
+				of_node_put(remote_ep_node);
+				continue;
+			}
+
+			if (of_graph_parse_endpoint(remote_ep_node,
+						    &remote_endpoint)) {
+				DRM_DEBUG_DRIVER("Couldn't parse remote endpoint\n");
+				of_node_put(remote_ep_node);
+				continue;
+			}
+
+			if (local_endpoint.id != remote_endpoint.id) {
+				DRM_DEBUG_DRIVER("Endpoint is an unused connection for DE2 mixer... skipping\n");
+				of_node_put(remote_ep_node);
+				continue;
+			}
+
+			of_node_put(remote_ep_node);
 		}
 
 		/* Walk down our tree */
