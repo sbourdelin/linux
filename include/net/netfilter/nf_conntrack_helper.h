@@ -26,6 +26,8 @@ enum nf_ct_helper_flags {
 struct nf_conntrack_helper {
 	struct hlist_node hnode;	/* Internal use. */
 
+	possible_net_t net;
+
 	char name[NF_CT_HELPER_NAME_LEN]; /* name of the module */
 	refcount_t refcnt;
 	struct module *me;		/* pointer to self */
@@ -75,10 +77,17 @@ struct nf_conn_help {
 #define NF_CT_HELPER_BUILD_BUG_ON(structsize) \
 	BUILD_BUG_ON((structsize) > FIELD_SIZEOF(struct nf_conn_help, data))
 
-struct nf_conntrack_helper *__nf_conntrack_helper_find(const char *name,
+static inline struct net *nf_ct_helper_net(struct nf_conntrack_helper *helper)
+{
+	return read_pnet(&helper->net);
+}
+
+struct nf_conntrack_helper *__nf_conntrack_helper_find(struct net *net,
+						       const char *name,
 						       u16 l3num, u8 protonum);
 
-struct nf_conntrack_helper *nf_conntrack_helper_try_module_get(const char *name,
+struct nf_conntrack_helper *nf_conntrack_helper_try_module_get(struct net *net,
+							       const char *name,
 							       u16 l3num,
 							       u8 protonum);
 void nf_conntrack_helper_put(struct nf_conntrack_helper *helper);

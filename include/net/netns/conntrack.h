@@ -111,6 +111,8 @@ struct netns_ct {
 	int			sysctl_tstamp;
 	int			sysctl_checksum;
 
+	unsigned int		nf_ct_helper_count;
+
 	struct ct_pcpu __percpu *pcpu_lists;
 	struct ip_conntrack_stat __percpu *stat;
 	struct nf_ct_event_notifier __rcu *nf_conntrack_event_cb;

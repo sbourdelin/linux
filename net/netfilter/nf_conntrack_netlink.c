@@ -1529,7 +1529,8 @@ static int ctnetlink_change_helper(struct nf_conn *ct,
 	}
 
 	rcu_read_lock();
-	helper = __nf_conntrack_helper_find(helpname, nf_ct_l3num(ct),
+	helper = __nf_conntrack_helper_find(nf_ct_net(ct),
+					    helpname, nf_ct_l3num(ct),
 					    nf_ct_protonum(ct));
 	if (helper == NULL) {
 		rcu_read_unlock();
@@ -1777,7 +1778,8 @@ ctnetlink_create_conntrack(struct net *net,
  		if (err < 0)
 			goto err2;
 
-		helper = __nf_conntrack_helper_find(helpname, nf_ct_l3num(ct),
+		helper = __nf_conntrack_helper_find(net,
+						    helpname, nf_ct_l3num(ct),
 						    nf_ct_protonum(ct));
 		if (helper == NULL) {
 			rcu_read_unlock();
@@ -1788,7 +1790,7 @@ ctnetlink_create_conntrack(struct net *net,
 			}
 
 			rcu_read_lock();
-			helper = __nf_conntrack_helper_find(helpname,
+			helper = __nf_conntrack_helper_find(net, helpname,
 							    nf_ct_l3num(ct),
 							    nf_ct_protonum(ct));
 			if (helper) {
@@ -2409,7 +2411,8 @@ ctnetlink_glue_attach_expect(const struct nlattr *attr, struct nf_conn *ct,
 	if (cda[CTA_EXPECT_HELP_NAME]) {
 		const char *helpname = nla_data(cda[CTA_EXPECT_HELP_NAME]);
 
-		helper = __nf_conntrack_helper_find(helpname, nf_ct_l3num(ct),
+		helper = __nf_conntrack_helper_find(nf_ct_net(ct),
+						    helpname, nf_ct_l3num(ct),
 						    nf_ct_protonum(ct));
 		if (helper == NULL)
 			return -EOPNOTSUPP;
@@ -3145,7 +3148,7 @@ ctnetlink_create_expect(struct net *net,
 	if (cda[CTA_EXPECT_HELP_NAME]) {
 		const char *helpname = nla_data(cda[CTA_EXPECT_HELP_NAME]);
 
-		helper = __nf_conntrack_helper_find(helpname, u3,
+		helper = __nf_conntrack_helper_find(net, helpname, u3,
 						    nf_ct_protonum(ct));
 		if (helper == NULL) {
 			rcu_read_unlock();
@@ -3155,7 +3158,7 @@ ctnetlink_create_expect(struct net *net,
 				goto err_ct;
 			}
 			rcu_read_lock();
-			helper = __nf_conntrack_helper_find(helpname, u3,
+			helper = __nf_conntrack_helper_find(net, helpname, u3,
 							    nf_ct_protonum(ct));
 			if (helper) {
 				err = -EAGAIN;

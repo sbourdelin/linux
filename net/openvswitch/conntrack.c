@@ -1108,13 +1108,14 @@ int ovs_ct_execute(struct net *net, struct sk_buff *skb,
 	return err;
 }
 
-static int ovs_ct_add_helper(struct ovs_conntrack_info *info, const char *name,
+static int ovs_ct_add_helper(struct net *net,
+			     struct ovs_conntrack_info *info, const char *name,
 			     const struct sw_flow_key *key, bool log)
 {
 	struct nf_conntrack_helper *helper;
 	struct nf_conn_help *help;
 
-	helper = nf_conntrack_helper_try_module_get(name, info->family,
+	helper = nf_conntrack_helper_try_module_get(net, name, info->family,
 						    key->ip.proto);
 	if (!helper) {
 		OVS_NLERR(log, "Unknown helper \"%s\"", name);
@@ -1447,7 +1448,7 @@ int ovs_ct_copy_action(struct net *net, const struct nlattr *attr,
 	nf_conntrack_get(&ct_info.ct->ct_general);
 
 	if (helper) {
-		err = ovs_ct_add_helper(&ct_info, helper, key, log);
+		err = ovs_ct_add_helper(net, &ct_info, helper, key, log);
 		if (err)
 			goto err_free_ct;
 	}

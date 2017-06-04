@@ -789,22 +789,26 @@ static int nft_ct_helper_obj_init(const struct nft_ctx *ctx,
 		if (ctx->afi->family == NFPROTO_IPV6)
 			return -EINVAL;
 
-		help4 = nf_conntrack_helper_try_module_get(name, family,
+		help4 = nf_conntrack_helper_try_module_get(ctx->net,
+							   name, family,
 							   priv->l4proto);
 		break;
 	case NFPROTO_IPV6:
 		if (ctx->afi->family == NFPROTO_IPV4)
 			return -EINVAL;
 
-		help6 = nf_conntrack_helper_try_module_get(name, family,
+		help6 = nf_conntrack_helper_try_module_get(ctx->net,
+							   name, family,
 							   priv->l4proto);
 		break;
 	case NFPROTO_NETDEV: /* fallthrough */
 	case NFPROTO_BRIDGE: /* same */
 	case NFPROTO_INET:
-		help4 = nf_conntrack_helper_try_module_get(name, NFPROTO_IPV4,
+		help4 = nf_conntrack_helper_try_module_get(ctx->net,
+							   name, NFPROTO_IPV4,
 							   priv->l4proto);
-		help6 = nf_conntrack_helper_try_module_get(name, NFPROTO_IPV6,
+		help6 = nf_conntrack_helper_try_module_get(ctx->net,
+							   name, NFPROTO_IPV6,
 							   priv->l4proto);
 		break;
 	default:

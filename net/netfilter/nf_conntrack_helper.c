@@ -36,7 +36,6 @@ struct hlist_head *nf_ct_helper_hash __read_mostly;
 EXPORT_SYMBOL_GPL(nf_ct_helper_hash);
 unsigned int nf_ct_helper_hsize __read_mostly;
 EXPORT_SYMBOL_GPL(nf_ct_helper_hsize);
-static unsigned int nf_ct_helper_count __read_mostly;
 
 static bool nf_ct_auto_assign_helper __read_mostly = false;
 module_param_named(nf_conntrack_helper, nf_ct_auto_assign_helper, bool, 0644);
@@ -106,24 +105,33 @@ static void nf_conntrack_helper_fini_sysctl(struct net *net)
 
 /* Stupid hash, but collision free for the default registrations of the
  * helpers currently in the kernel. */
-static unsigned int helper_hash(const struct nf_conntrack_tuple *tuple)
+static unsigned int helper_hash(struct net *net,
+				const struct nf_conntrack_tuple *tuple)
 {
-	return (((tuple->src.l3num << 8) | tuple->dst.protonum) ^
-		(__force __u16)tuple->src.u.all) % nf_ct_helper_hsize;
+	unsigned int hash;
+
+	hash = ((tuple->src.l3num << 8) | tuple->dst.protonum) ^
+	       (__force __u16)tuple->src.u.all;
+	hash ^= net_hash_mix(net);
+
+	return hash % nf_ct_helper_hsize;
 }
 
 static struct nf_conntrack_helper *
-__nf_ct_helper_find(const struct nf_conntrack_tuple *tuple)
+__nf_ct_helper_find(struct net *net, const struct nf_conntrack_tuple *tuple)
 {
 	struct nf_conntrack_helper *helper;
 	struct nf_conntrack_tuple_mask mask = { .src.u.all = htons(0xFFFF) };
 	unsigned int h;
 
-	if (!nf_ct_helper_count)
+	if (!net->ct.nf_ct_helper_count)
 		return NULL;
 
-	h = helper_hash(tuple);
+	h = helper_hash(net, tuple);
 	hlist_for_each_entry_rcu(helper, &nf_ct_helper_hash[h], hnode) {
+		if (!net_eq(net, nf_ct_helper_net(helper)))
+			continue;
+
 		if (nf_ct_tuple_src_mask_cmp(tuple, &helper->tuple, &mask))
 			return helper;
 	}
@@ -131,13 +139,17 @@ __nf_ct_helper_find(const struct nf_conntrack_tuple *tuple)
 }
 
 struct nf_conntrack_helper *
-__nf_conntrack_helper_find(const char *name, u16 l3num, u8 protonum)
+__nf_conntrack_helper_find(struct net *net, const char *name,
+			   u16 l3num, u8 protonum)
 {
 	struct nf_conntrack_helper *h;
 	unsigned int i;
 
 	for (i = 0; i < nf_ct_helper_hsize; i++) {
 		hlist_for_each_entry_rcu(h, &nf_ct_helper_hash[i], hnode) {
+			if (!net_eq(net, nf_ct_helper_net(h)))
+				continue;
+
 			if (strcmp(h->name, name))
 				continue;
 
@@ -154,19 +166,21 @@ __nf_conntrack_helper_find(const char *name, u16 l3num, u8 protonum)
 EXPORT_SYMBOL_GPL(__nf_conntrack_helper_find);
 
 struct nf_conntrack_helper *
-nf_conntrack_helper_try_module_get(const char *name, u16 l3num, u8 protonum)
+nf_conntrack_helper_try_module_get(struct net *net, const char *name,
+				   u16 l3num, u8 protonum)
 {
 	struct nf_conntrack_helper *h;
 
 	rcu_read_lock();
 
-	h = __nf_conntrack_helper_find(name, l3num, protonum);
+	h = __nf_conntrack_helper_find(net, name, l3num, protonum);
 #ifdef CONFIG_MODULES
 	if (h == NULL) {
 		rcu_read_unlock();
 		if (request_module("nfct-helper-%s", name) == 0) {
 			rcu_read_lock();
-			h = __nf_conntrack_helper_find(name, l3num, protonum);
+			h = __nf_conntrack_helper_find(net, name, l3num,
+						       protonum);
 		} else {
 			return h;
 		}
@@ -213,7 +227,8 @@ nf_ct_lookup_helper(struct nf_conn *ct, struct net *net)
 	if (!net->ct.sysctl_auto_assign_helper) {
 		if (net->ct.auto_assign_helper_warned)
 			return NULL;
-		if (!__nf_ct_helper_find(&ct->tuplehash[IP_CT_DIR_REPLY].tuple))
+		if (!__nf_ct_helper_find(net,
+					 &ct->tuplehash[IP_CT_DIR_REPLY].tuple))
 			return NULL;
 		pr_info("nf_conntrack: default automatic helper assignment "
 			"has been turned off for security reasons and CT-based "
@@ -223,7 +238,7 @@ nf_ct_lookup_helper(struct nf_conn *ct, struct net *net)
 		return NULL;
 	}
 
-	return __nf_ct_helper_find(&ct->tuplehash[IP_CT_DIR_REPLY].tuple);
+	return __nf_ct_helper_find(net, &ct->tuplehash[IP_CT_DIR_REPLY].tuple);
 }
 
 
@@ -395,7 +410,7 @@ int nf_conntrack_helper_register(struct net *net,
 				 struct nf_conntrack_helper *me)
 {
 	struct nf_conntrack_tuple_mask mask = { .src.u.all = htons(0xFFFF) };
-	unsigned int h = helper_hash(&me->tuple);
+	unsigned int h = helper_hash(net, &me->tuple);
 	struct nf_conntrack_helper *cur;
 	int ret = 0, i;
 
@@ -412,6 +427,9 @@ int nf_conntrack_helper_register(struct net *net,
 	mutex_lock(&nf_ct_helper_mutex);
 	for (i = 0; i < nf_ct_helper_hsize; i++) {
 		hlist_for_each_entry(cur, &nf_ct_helper_hash[i], hnode) {
+			if (!net_eq(net, nf_ct_helper_net(cur)))
+				continue;
+
 			if (!strcmp(cur->name, me->name) &&
 			    (cur->tuple.src.l3num == NFPROTO_UNSPEC ||
 			     cur->tuple.src.l3num == me->tuple.src.l3num) &&
@@ -425,6 +443,9 @@ int nf_conntrack_helper_register(struct net *net,
 	/* avoid unpredictable behaviour for auto_assign_helper */
 	if (!(me->flags & NF_CT_HELPER_F_USERSPACE)) {
 		hlist_for_each_entry(cur, &nf_ct_helper_hash[h], hnode) {
+			if (!net_eq(net, nf_ct_helper_net(cur)))
+				continue;
+
 			if (nf_ct_tuple_src_mask_cmp(&cur->tuple, &me->tuple,
 						     &mask)) {
 				ret = -EEXIST;
@@ -432,9 +453,11 @@ int nf_conntrack_helper_register(struct net *net,
 			}
 		}
 	}
+
+	write_pnet(&me->net, net);
 	refcount_set(&me->refcnt, 1);
 	hlist_add_head_rcu(&me->hnode, &nf_ct_helper_hash[h]);
-	nf_ct_helper_count++;
+	net->ct.nf_ct_helper_count++;
 out:
 	mutex_unlock(&nf_ct_helper_mutex);
 	return ret;
@@ -453,7 +476,7 @@ void nf_conntrack_helper_unregister(struct net *net,
 
 	mutex_lock(&nf_ct_helper_mutex);
 	hlist_del_rcu(&me->hnode);
-	nf_ct_helper_count--;
+	net->ct.nf_ct_helper_count--;
 	mutex_unlock(&nf_ct_helper_mutex);
 
 	/* Make sure every nothing is still using the helper unless its a
@@ -476,7 +499,7 @@ void nf_conntrack_helper_unregister(struct net *net,
 	}
 	spin_unlock_bh(&nf_conntrack_expect_lock);
 
-	nf_ct_iterate_destroy(unhelp, me);
+	nf_ct_iterate_cleanup_net(net, unhelp, me, 0, 0);
 }
 EXPORT_SYMBOL_GPL(nf_conntrack_helper_unregister);
 

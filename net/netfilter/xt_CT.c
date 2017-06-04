@@ -87,7 +87,8 @@ xt_ct_set_helper(struct nf_conn *ct, const char *helper_name,
 		return -ENOENT;
 	}
 
-	helper = nf_conntrack_helper_try_module_get(helper_name, par->family,
+	helper = nf_conntrack_helper_try_module_get(par->net,
+						    helper_name, par->family,
 						    proto);
 	if (helper == NULL) {
 		pr_info("No such helper \"%s\"\n", helper_name);
