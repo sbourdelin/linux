@@ -32,8 +32,7 @@ static const struct mfd_cell lp873x_cells[] = {
 	{ .name = "lp873x-gpio", },
 };
 
-static int lp873x_probe(struct i2c_client *client,
-			const struct i2c_device_id *ids)
+static int lp873x_probe(struct i2c_client *client)
 {
 	struct lp873x *lp873;
 	int ret;
@@ -76,19 +75,12 @@ static const struct of_device_id of_lp873x_match_table[] = {
 };
 MODULE_DEVICE_TABLE(of, of_lp873x_match_table);
 
-static const struct i2c_device_id lp873x_id_table[] = {
-	{ "lp873x", 0 },
-	{ },
-};
-MODULE_DEVICE_TABLE(i2c, lp873x_id_table);
-
 static struct i2c_driver lp873x_driver = {
 	.driver	= {
 		.name	= "lp873x",
 		.of_match_table = of_lp873x_match_table,
 	},
-	.probe		= lp873x_probe,
-	.id_table	= lp873x_id_table,
+	.probe_new	= lp873x_probe,
 };
 module_i2c_driver(lp873x_driver);
 
