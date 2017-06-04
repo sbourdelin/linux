@@ -612,16 +612,31 @@ static struct nf_conntrack_helper pptp __read_mostly = {
 	.expect_policy		= &pptp_exp_policy,
 };
 
+static int __net_init pptp_net_init(struct net *net)
+{
+	return nf_conntrack_helper_register(net, &pptp);
+}
+
+static void __net_exit pptp_net_exit(struct net *net)
+{
+	nf_conntrack_helper_unregister(net, &pptp);
+}
+
+static struct pernet_operations pptp_net_ops = {
+	.init	= pptp_net_init,
+	.exit	= pptp_net_exit,
+};
+
 static int __init nf_conntrack_pptp_init(void)
 {
 	NF_CT_HELPER_BUILD_BUG_ON(sizeof(struct nf_ct_pptp_master));
 
-	return nf_conntrack_helper_register(&pptp);
+	return register_pernet_subsys(&pptp_net_ops);
 }
 
 static void __exit nf_conntrack_pptp_fini(void)
 {
-	nf_conntrack_helper_unregister(&pptp);
+	unregister_pernet_subsys(&pptp_net_ops);
 }
 
 module_init(nf_conntrack_pptp_init);

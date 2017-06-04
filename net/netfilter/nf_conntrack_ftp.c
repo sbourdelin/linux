@@ -566,10 +566,25 @@ static const struct nf_conntrack_expect_policy ftp_exp_policy = {
 	.timeout	= 5 * 60,
 };
 
+static int __net_init ftp_net_init(struct net *net)
+{
+	return nf_conntrack_helpers_register(net, ftp, ports_c * 2);
+}
+
+static void __net_exit ftp_net_exit(struct net *net)
+{
+	nf_conntrack_helpers_unregister(net, ftp, ports_c * 2);
+}
+
+static struct pernet_operations ftp_net_ops = {
+	.init	= ftp_net_init,
+	.exit	= ftp_net_exit,
+};
+
 /* don't make this __exit, since it's called from __init ! */
 static void nf_conntrack_ftp_fini(void)
 {
-	nf_conntrack_helpers_unregister(ftp, ports_c * 2);
+	unregister_pernet_subsys(&ftp_net_ops);
 	kfree(ftp_buffer);
 }
 
@@ -597,7 +612,7 @@ static int __init nf_conntrack_ftp_init(void)
 				  0, help, nf_ct_ftp_from_nlattr, THIS_MODULE);
 	}
 
-	ret = nf_conntrack_helpers_register(ftp, ports_c * 2);
+	ret = register_pernet_subsys(&ftp_net_ops);
 	if (ret < 0) {
 		pr_err("failed to register helpers\n");
 		kfree(ftp_buffer);

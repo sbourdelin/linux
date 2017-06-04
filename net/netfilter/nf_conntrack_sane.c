@@ -173,10 +173,25 @@ static const struct nf_conntrack_expect_policy sane_exp_policy = {
 	.timeout	= 5 * 60,
 };
 
+static int __net_init sane_net_init(struct net *net)
+{
+	return nf_conntrack_helpers_register(net, sane, ports_c * 2);
+}
+
+static void __net_exit sane_net_exit(struct net *net)
+{
+	nf_conntrack_helpers_unregister(net, sane, ports_c * 2);
+}
+
+static struct pernet_operations sane_net_ops = {
+	.init	= sane_net_init,
+	.exit	= sane_net_exit,
+};
+
 /* don't make this __exit, since it's called from __init ! */
 static void nf_conntrack_sane_fini(void)
 {
-	nf_conntrack_helpers_unregister(sane, ports_c * 2);
+	unregister_pernet_subsys(&sane_net_ops);
 	kfree(sane_buffer);
 }
 
@@ -206,7 +221,7 @@ static int __init nf_conntrack_sane_init(void)
 				  THIS_MODULE);
 	}
 
-	ret = nf_conntrack_helpers_register(sane, ports_c * 2);
+	ret = register_pernet_subsys(&sane_net_ops);
 	if (ret < 0) {
 		pr_err("failed to register helpers\n");
 		kfree(sane_buffer);

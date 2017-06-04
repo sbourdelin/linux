@@ -1613,9 +1613,24 @@ static const struct nf_conntrack_expect_policy sip_exp_policy[SIP_EXPECT_MAX + 1
 	},
 };
 
+static int __net_init sip_net_init(struct net *net)
+{
+	return nf_conntrack_helpers_register(net, sip, ports_c * 4);
+}
+
+static void __net_exit sip_net_exit(struct net *net)
+{
+	nf_conntrack_helpers_unregister(net, sip, ports_c * 4);
+}
+
+static struct pernet_operations sip_net_ops = {
+	.init	= sip_net_init,
+	.exit	= sip_net_exit,
+};
+
 static void nf_conntrack_sip_fini(void)
 {
-	nf_conntrack_helpers_unregister(sip, ports_c * 4);
+	unregister_pernet_subsys(&sip_net_ops);
 }
 
 static int __init nf_conntrack_sip_init(void)
@@ -1646,7 +1661,7 @@ static int __init nf_conntrack_sip_init(void)
 				  NULL, THIS_MODULE);
 	}
 
-	ret = nf_conntrack_helpers_register(sip, ports_c * 4);
+	ret = register_pernet_subsys(&sip_net_ops);
 	if (ret < 0) {
 		pr_err("failed to register helpers\n");
 		return ret;

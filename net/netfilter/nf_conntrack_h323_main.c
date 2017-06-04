@@ -1815,44 +1815,51 @@ static struct nf_conntrack_helper nf_conntrack_helper_ras[] __read_mostly = {
 	},
 };
 
-static int __init h323_helper_init(void)
+static int __net_init h323_net_init(struct net *net)
 {
 	int ret;
 
-	ret = nf_conntrack_helper_register(&nf_conntrack_helper_h245);
+	ret = nf_conntrack_helper_register(net, &nf_conntrack_helper_h245);
 	if (ret < 0)
 		return ret;
-	ret = nf_conntrack_helpers_register(nf_conntrack_helper_q931,
+	ret = nf_conntrack_helpers_register(net, nf_conntrack_helper_q931,
 					ARRAY_SIZE(nf_conntrack_helper_q931));
 	if (ret < 0)
 		goto err1;
-	ret = nf_conntrack_helpers_register(nf_conntrack_helper_ras,
+	ret = nf_conntrack_helpers_register(net, nf_conntrack_helper_ras,
 					ARRAY_SIZE(nf_conntrack_helper_ras));
 	if (ret < 0)
 		goto err2;
 
 	return 0;
+
 err2:
-	nf_conntrack_helpers_unregister(nf_conntrack_helper_q931,
+	nf_conntrack_helpers_unregister(net, nf_conntrack_helper_q931,
 					ARRAY_SIZE(nf_conntrack_helper_q931));
 err1:
-	nf_conntrack_helper_unregister(&nf_conntrack_helper_h245);
+	nf_conntrack_helper_unregister(net, &nf_conntrack_helper_h245);
 	return ret;
+
 }
 
-static void __exit h323_helper_exit(void)
+static void __net_exit h323_net_exit(struct net *net)
 {
-	nf_conntrack_helpers_unregister(nf_conntrack_helper_ras,
+	nf_conntrack_helpers_unregister(net, nf_conntrack_helper_ras,
 					ARRAY_SIZE(nf_conntrack_helper_ras));
-	nf_conntrack_helpers_unregister(nf_conntrack_helper_q931,
+	nf_conntrack_helpers_unregister(net, nf_conntrack_helper_q931,
 					ARRAY_SIZE(nf_conntrack_helper_q931));
-	nf_conntrack_helper_unregister(&nf_conntrack_helper_h245);
+	nf_conntrack_helper_unregister(net, &nf_conntrack_helper_h245);
 }
+
+static struct pernet_operations h323_net_ops = {
+	.init	= h323_net_init,
+	.exit	= h323_net_exit,
+};
 
 /****************************************************************************/
 static void __exit nf_conntrack_h323_fini(void)
 {
-	h323_helper_exit();
+	unregister_pernet_subsys(&h323_net_ops);
 	kfree(h323_buffer);
 	pr_debug("nf_ct_h323: fini\n");
 }
@@ -1867,7 +1874,7 @@ static int __init nf_conntrack_h323_init(void)
 	h323_buffer = kmalloc(65536, GFP_KERNEL);
 	if (!h323_buffer)
 		return -ENOMEM;
-	ret = h323_helper_init();
+	ret = register_pernet_subsys(&h323_net_ops);
 	if (ret < 0)
 		goto err1;
 	pr_debug("nf_ct_h323: init success\n");

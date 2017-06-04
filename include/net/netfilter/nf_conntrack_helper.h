@@ -95,12 +95,17 @@ void nf_ct_helper_init(struct nf_conntrack_helper *helper,
 					  struct nf_conn *ct),
 		       struct module *module);
 
-int nf_conntrack_helper_register(struct nf_conntrack_helper *);
-void nf_conntrack_helper_unregister(struct nf_conntrack_helper *);
+int nf_conntrack_helper_register(struct net *net,
+				 struct nf_conntrack_helper *me);
+void nf_conntrack_helper_unregister(struct net *net,
+				    struct nf_conntrack_helper *me);
 
-int nf_conntrack_helpers_register(struct nf_conntrack_helper *, unsigned int);
-void nf_conntrack_helpers_unregister(struct nf_conntrack_helper *,
-				     unsigned int);
+int nf_conntrack_helpers_register(struct net *net,
+				  struct nf_conntrack_helper *helper,
+				  unsigned int n);
+void nf_conntrack_helpers_unregister(struct net *net,
+				     struct nf_conntrack_helper *helper,
+				     unsigned int n);
 
 struct nf_conn_help *nf_ct_helper_ext_add(struct nf_conn *ct,
 					  struct nf_conntrack_helper *helper,

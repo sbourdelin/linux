@@ -391,12 +391,16 @@ void nf_ct_helper_log(struct sk_buff *skb, const struct nf_conn *ct,
 }
 EXPORT_SYMBOL_GPL(nf_ct_helper_log);
 
-int nf_conntrack_helper_register(struct nf_conntrack_helper *me)
+int nf_conntrack_helper_register(struct net *net,
+				 struct nf_conntrack_helper *me)
 {
 	struct nf_conntrack_tuple_mask mask = { .src.u.all = htons(0xFFFF) };
 	unsigned int h = helper_hash(&me->tuple);
 	struct nf_conntrack_helper *cur;
 	int ret = 0, i;
+
+	if (!net_eq(net, &init_net))
+		return 0;
 
 	BUG_ON(me->expect_policy == NULL);
 	BUG_ON(me->expect_class_max >= NF_CT_MAX_EXPECT_CLASSES);
@@ -437,11 +441,15 @@ out:
 }
 EXPORT_SYMBOL_GPL(nf_conntrack_helper_register);
 
-void nf_conntrack_helper_unregister(struct nf_conntrack_helper *me)
+void nf_conntrack_helper_unregister(struct net *net,
+				    struct nf_conntrack_helper *me)
 {
 	struct nf_conntrack_expect *exp;
 	const struct hlist_node *next;
 	unsigned int i;
+
+	if (!net_eq(net, &init_net))
+		return 0;
 
 	mutex_lock(&nf_ct_helper_mutex);
 	hlist_del_rcu(&me->hnode);
@@ -500,14 +508,15 @@ void nf_ct_helper_init(struct nf_conntrack_helper *helper,
 }
 EXPORT_SYMBOL_GPL(nf_ct_helper_init);
 
-int nf_conntrack_helpers_register(struct nf_conntrack_helper *helper,
+int nf_conntrack_helpers_register(struct net *net,
+				  struct nf_conntrack_helper *helper,
 				  unsigned int n)
 {
 	unsigned int i;
 	int err = 0;
 
 	for (i = 0; i < n; i++) {
-		err = nf_conntrack_helper_register(&helper[i]);
+		err = nf_conntrack_helper_register(net, &helper[i]);
 		if (err < 0)
 			goto err;
 	}
@@ -515,16 +524,17 @@ int nf_conntrack_helpers_register(struct nf_conntrack_helper *helper,
 	return err;
 err:
 	if (i > 0)
-		nf_conntrack_helpers_unregister(helper, i);
+		nf_conntrack_helpers_unregister(net, helper, i);
 	return err;
 }
 EXPORT_SYMBOL_GPL(nf_conntrack_helpers_register);
 
-void nf_conntrack_helpers_unregister(struct nf_conntrack_helper *helper,
-				unsigned int n)
+void nf_conntrack_helpers_unregister(struct net *net,
+				     struct nf_conntrack_helper *helper,
+				     unsigned int n)
 {
 	while (n-- > 0)
-		nf_conntrack_helper_unregister(&helper[n]);
+		nf_conntrack_helper_unregister(net, &helper[n]);
 }
 EXPORT_SYMBOL_GPL(nf_conntrack_helpers_unregister);
 

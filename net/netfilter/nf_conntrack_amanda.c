@@ -193,12 +193,28 @@ static struct nf_conntrack_helper amanda_helper[2] __read_mostly = {
 	},
 };
 
+static int __net_init amanda_net_init(struct net *net)
+{
+	return nf_conntrack_helpers_register(net, amanda_helper,
+					     ARRAY_SIZE(amanda_helper));
+}
+
+static void __net_exit amanda_net_exit(struct net *net)
+{
+	nf_conntrack_helpers_unregister(net, amanda_helper,
+					ARRAY_SIZE(amanda_helper));
+}
+
+static struct pernet_operations amanda_net_ops = {
+	.init	= amanda_net_init,
+	.exit	= amanda_net_exit,
+};
+
 static void __exit nf_conntrack_amanda_fini(void)
 {
 	int i;
 
-	nf_conntrack_helpers_unregister(amanda_helper,
-					ARRAY_SIZE(amanda_helper));
+	unregister_pernet_subsys(&amanda_net_ops);
 	for (i = 0; i < ARRAY_SIZE(search); i++)
 		textsearch_destroy(search[i].ts);
 }
@@ -218,8 +234,7 @@ static int __init nf_conntrack_amanda_init(void)
 			goto err1;
 		}
 	}
-	ret = nf_conntrack_helpers_register(amanda_helper,
-					    ARRAY_SIZE(amanda_helper));
+	ret = register_pernet_subsys(&amanda_net_ops);
 	if (ret < 0)
 		goto err1;
 	return 0;

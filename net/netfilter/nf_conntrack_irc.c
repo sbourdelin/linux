@@ -232,6 +232,21 @@ static int help(struct sk_buff *skb, unsigned int protoff,
 static struct nf_conntrack_helper irc[MAX_PORTS] __read_mostly;
 static struct nf_conntrack_expect_policy irc_exp_policy;
 
+static int __net_init irc_net_init(struct net *net)
+{
+	return nf_conntrack_helpers_register(net, irc, ports_c);
+}
+
+static void __net_exit irc_net_exit(struct net *net)
+{
+	nf_conntrack_helpers_unregister(net, irc, ports_c);
+}
+
+static struct pernet_operations irc_net_ops = {
+	.init	= irc_net_init,
+	.exit	= irc_net_exit,
+};
+
 static void nf_conntrack_irc_fini(void);
 
 static int __init nf_conntrack_irc_init(void)
@@ -266,7 +281,7 @@ static int __init nf_conntrack_irc_init(void)
 				  0, help, NULL, THIS_MODULE);
 	}
 
-	ret = nf_conntrack_helpers_register(&irc[0], ports_c);
+	ret = register_pernet_subsys(&irc_net_ops);
 	if (ret) {
 		pr_err("failed to register helpers\n");
 		kfree(irc_buffer);
@@ -280,7 +295,7 @@ static int __init nf_conntrack_irc_init(void)
  * it is needed by the init function */
 static void nf_conntrack_irc_fini(void)
 {
-	nf_conntrack_helpers_unregister(irc, ports_c);
+	unregister_pernet_subsys(&irc_net_ops);
 	kfree(irc_buffer);
 }
 

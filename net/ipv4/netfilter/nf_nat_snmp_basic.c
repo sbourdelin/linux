@@ -1259,6 +1259,21 @@ static struct nf_conntrack_helper snmp_trap_helper __read_mostly = {
 	.tuple.dst.protonum	= IPPROTO_UDP,
 };
 
+static int __net_init snmp_trap_net_init(struct net *net)
+{
+	return nf_conntrack_helper_register(net, &snmp_trap_helper);
+}
+
+static void __net_exit snmp_trap_net_exit(struct net *net)
+{
+	nf_conntrack_helper_unregister(net, &snmp_trap_helper);
+}
+
+static struct pernet_operations snmp_trap_net_ops = {
+	.init	= snmp_trap_net_init,
+	.exit	= snmp_trap_net_exit,
+};
+
 /*****************************************************************************
  *
  * Module stuff.
@@ -1270,14 +1285,14 @@ static int __init nf_nat_snmp_basic_init(void)
 	BUG_ON(nf_nat_snmp_hook != NULL);
 	RCU_INIT_POINTER(nf_nat_snmp_hook, help);
 
-	return nf_conntrack_helper_register(&snmp_trap_helper);
+	return register_pernet_subsys(&snmp_trap_net_ops);
 }
 
 static void __exit nf_nat_snmp_basic_fini(void)
 {
 	RCU_INIT_POINTER(nf_nat_snmp_hook, NULL);
 	synchronize_rcu();
-	nf_conntrack_helper_unregister(&snmp_trap_helper);
+	unregister_pernet_subsys(&snmp_trap_net_ops);
 }
 
 module_init(nf_nat_snmp_basic_init);

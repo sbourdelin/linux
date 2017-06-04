@@ -104,9 +104,24 @@ static const struct nf_conntrack_expect_policy tftp_exp_policy = {
 	.timeout	= 5 * 60,
 };
 
+static int __net_init tftp_net_init(struct net *net)
+{
+	return nf_conntrack_helpers_register(net, tftp, ports_c * 2);
+}
+
+static void __net_exit tftp_net_exit(struct net *net)
+{
+	nf_conntrack_helpers_unregister(net, tftp, ports_c * 2);
+}
+
+static struct pernet_operations tftp_net_ops = {
+	.init	= tftp_net_init,
+	.exit	= tftp_net_exit,
+};
+
 static void nf_conntrack_tftp_fini(void)
 {
-	nf_conntrack_helpers_unregister(tftp, ports_c * 2);
+	unregister_pernet_subsys(&tftp_net_ops);
 }
 
 static int __init nf_conntrack_tftp_init(void)
@@ -127,7 +142,7 @@ static int __init nf_conntrack_tftp_init(void)
 				  0, tftp_help, NULL, THIS_MODULE);
 	}
 
-	ret = nf_conntrack_helpers_register(tftp, ports_c * 2);
+	ret = register_pernet_subsys(&tftp_net_ops);
 	if (ret < 0) {
 		pr_err("failed to register helpers\n");
 		return ret;

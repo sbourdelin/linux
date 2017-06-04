@@ -63,15 +63,30 @@ static struct nf_conntrack_helper helper __read_mostly = {
 	.expect_policy		= &exp_policy,
 };
 
+static int __net_init snmp_net_init(struct net *net)
+{
+	return nf_conntrack_helper_register(net, &helper);
+}
+
+static void __net_exit snmp_net_exit(struct net *net)
+{
+	nf_conntrack_helper_unregister(net, &helper);
+}
+
+static struct pernet_operations snmp_net_ops = {
+	.init	= snmp_net_init,
+	.exit	= snmp_net_exit,
+};
+
 static int __init nf_conntrack_snmp_init(void)
 {
 	exp_policy.timeout = timeout;
-	return nf_conntrack_helper_register(&helper);
+	return register_pernet_subsys(&snmp_net_ops);
 }
 
 static void __exit nf_conntrack_snmp_fini(void)
 {
-	nf_conntrack_helper_unregister(&helper);
+	unregister_pernet_subsys(&snmp_net_ops);
 }
 
 module_init(nf_conntrack_snmp_init);
