@@ -1711,6 +1711,7 @@ void d_set_d_op(struct dentry *dentry, const struct dentry_operations *op)
 				DCACHE_OP_REVALIDATE	|
 				DCACHE_OP_WEAK_REVALIDATE	|
 				DCACHE_OP_DELETE	|
+				DCACHE_OP_PRUNE	|
 				DCACHE_OP_REAL));
 	dentry->d_op = op;
 	if (!op)
