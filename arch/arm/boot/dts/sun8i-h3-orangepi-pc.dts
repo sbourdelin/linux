@@ -98,6 +98,10 @@
 	status = "okay";
 };
 
+&de {
+	status = "okay";
+};
+
 &ehci0 {
 	status = "okay";
 };
@@ -174,6 +178,14 @@
 
 &reg_usb0_vbus {
 	gpio = <&r_pio 0 2 GPIO_ACTIVE_HIGH>; /* PL2 */
+	status = "okay";
+};
+
+&tcon1 {
+	status = "okay";
+};
+
+&tve0 {
 	status = "okay";
 };
 
