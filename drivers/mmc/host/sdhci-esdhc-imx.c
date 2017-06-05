@@ -1250,9 +1250,17 @@ static int sdhci_esdhc_imx_probe(struct platform_device *pdev)
 
 	pltfm_host->clk = imx_data->clk_per;
 	pltfm_host->clock = clk_get_rate(pltfm_host->clk);
-	clk_prepare_enable(imx_data->clk_per);
-	clk_prepare_enable(imx_data->clk_ipg);
-	clk_prepare_enable(imx_data->clk_ahb);
+	err = clk_prepare_enable(imx_data->clk_per);
+	if (err)
+		goto free_sdhci;
+
+	err = clk_prepare_enable(imx_data->clk_ipg);
+	if (err)
+		goto free_clk_per;
+
+	err = clk_prepare_enable(imx_data->clk_ahb);
+	if (err)
+		goto free_clk_ipg;
 
 	imx_data->pinctrl = devm_pinctrl_get(&pdev->dev);
 	if (IS_ERR(imx_data->pinctrl)) {
@@ -1314,9 +1322,11 @@ static int sdhci_esdhc_imx_probe(struct platform_device *pdev)
 	return 0;
 
 disable_clk:
-	clk_disable_unprepare(imx_data->clk_per);
-	clk_disable_unprepare(imx_data->clk_ipg);
 	clk_disable_unprepare(imx_data->clk_ahb);
+free_clk_ipg:
+	clk_disable_unprepare(imx_data->clk_ipg);
+free_clk_per:
+	clk_disable_unprepare(imx_data->clk_per);
 free_sdhci:
 	sdhci_pltfm_free(pdev);
 	return err;
@@ -1393,14 +1403,28 @@ static int sdhci_esdhc_runtime_resume(struct device *dev)
 	struct sdhci_host *host = dev_get_drvdata(dev);
 	struct sdhci_pltfm_host *pltfm_host = sdhci_priv(host);
 	struct pltfm_imx_data *imx_data = sdhci_pltfm_priv(pltfm_host);
+	int ret;
 
 	if (!sdhci_sdio_irq_enabled(host)) {
-		clk_prepare_enable(imx_data->clk_per);
-		clk_prepare_enable(imx_data->clk_ipg);
+		ret = clk_prepare_enable(imx_data->clk_per);
+		if (ret)
+			return ret;
+		ret = clk_prepare_enable(imx_data->clk_ipg);
+		if (ret)
+			goto free_clk_per;
 	}
-	clk_prepare_enable(imx_data->clk_ahb);
+	ret = clk_prepare_enable(imx_data->clk_ahb);
+	if (ret)
+		goto free_clk_ipg;
 
 	return sdhci_runtime_resume_host(host);
+
+free_clk_ipg:
+	clk_disable_unprepare(imx_data->clk_ipg);
+free_clk_per:
+	clk_disable_unprepare(imx_data->clk_per);
+	return ret;
+
 }
 #endif
 
