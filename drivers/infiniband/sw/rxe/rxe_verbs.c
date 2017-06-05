@@ -740,11 +740,7 @@ static int init_send_wqe(struct rxe_qp *qp, struct ib_send_wr *ibwr,
 
 		sge = ibwr->sg_list;
 		for (i = 0; i < num_sge; i++, sge++) {
-			if (qp->is_user && copy_from_user(p, (__user void *)
-					    (uintptr_t)sge->addr, sge->length))
-				return -EFAULT;
-
-			else if (!qp->is_user)
+			if (!qp->is_user)
 				memcpy(p, (void *)(uintptr_t)sge->addr,
 				       sge->length);
 
