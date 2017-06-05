@@ -1395,6 +1395,12 @@ static int kill_something_info(int sig, struct siginfo *info, pid_t pid)
 
 	read_lock(&tasklist_lock);
 	if (pid != -1) {
+		/*
+	 	 * -INT_MIN is undefined, it need to exclude following case to 
+ 		 * avoid the UBSAN detection.
+		 */
+		if (pid == INT_MIN)
+			return -ESRCH;
 		ret = __kill_pgrp_info(sig, info,
 				pid ? find_vpid(-pid) : task_pgrp(current));
 	} else {
