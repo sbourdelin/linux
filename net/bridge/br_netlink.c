@@ -776,7 +776,7 @@ int br_setlink(struct net_device *dev, struct nlmsghdr *nlh, u16 flags)
 			goto out;
 	}
 
-	if (afspec) {
+	if (p && afspec) {
 		err = br_afspec((struct net_bridge *)netdev_priv(dev), p,
 				afspec, RTM_SETLINK);
 	}
