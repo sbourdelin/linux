@@ -329,7 +329,7 @@ static bool __intel_engine_add_wait(struct intel_engine_cs *engine,
 {
 	struct intel_breadcrumbs *b = &engine->breadcrumbs;
 	struct rb_node **p, *parent, *completed;
-	bool first;
+	bool first, irq_armed;
 	u32 seqno;
 
 	/* Insert the request into the retirement ordered list
@@ -344,6 +344,7 @@ static bool __intel_engine_add_wait(struct intel_engine_cs *engine,
 	 * removing stale elements in the tree, we may be able to reduce the
 	 * ping-pong between the old bottom-half and ourselves as first-waiter.
 	 */
+	irq_armed = false;
 	first = true;
 	parent = NULL;
 	completed = NULL;
@@ -390,6 +391,7 @@ static bool __intel_engine_add_wait(struct intel_engine_cs *engine,
 
 	if (first) {
 		spin_lock(&b->irq_lock);
+		irq_armed = !b->irq_armed;
 		b->irq_wait = wait;
 		/* After assigning ourselves as the new bottom-half, we must
 		 * perform a cursory check to prevent a missed interrupt.
@@ -426,20 +428,24 @@ static bool __intel_engine_add_wait(struct intel_engine_cs *engine,
 	GEM_BUG_ON(!b->irq_armed);
 	GEM_BUG_ON(rb_first(&b->waiters) != &b->irq_wait->node);
 
-	return first;
+	return irq_armed;
 }
 
 bool intel_engine_add_wait(struct intel_engine_cs *engine,
 			   struct intel_wait *wait)
 {
 	struct intel_breadcrumbs *b = &engine->breadcrumbs;
-	bool first;
+	bool irq_armed;
 
 	spin_lock_irq(&b->rb_lock);
-	first = __intel_engine_add_wait(engine, wait);
+	irq_armed = __intel_engine_add_wait(engine, wait);
 	spin_unlock_irq(&b->rb_lock);
+	if (irq_armed)
+		return irq_armed;
 
-	return first;
+	/* Make the caller recheck if its request has already started. */
+	return i915_seqno_passed(intel_engine_get_seqno(engine),
+				 wait->seqno - 1);
 }
 
 static inline bool chain_wakeup(struct rb_node *rb, int priority)
