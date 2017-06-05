@@ -226,7 +226,7 @@ RTY_SEND_CMD:
 				return STATUS_FAIL;
 			}
 			if (rty_cnt < SD_MAX_RETRY_COUNT) {
-				wait_timeout(20);
+				mdelay(20);
 				rty_cnt++;
 				goto RTY_SEND_CMD;
 			} else {
