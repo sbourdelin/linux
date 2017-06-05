@@ -1034,17 +1034,25 @@ static void __init init_cpu_send_mondo_info(struct trap_per_cpu *tb)
 {
 #ifdef CONFIG_SMP
 	unsigned long page;
+	void *mondo;
 
-	BUILD_BUG_ON((NR_CPUS * sizeof(u16)) > (PAGE_SIZE - 64));
+	BUILD_BUG_ON((NR_CPUS * sizeof(u16)) > PAGE_SIZE);
+
+	/* Make sure mondo block is 64byte aligned */
+	mondo = kzalloc(64, GFP_KERNEL);
+	if (!mondo) {
+		prom_printf("SUN4V: Error, cannot allocate mondo block.\n");
+		prom_halt();
+	}
+	tb->cpu_mondo_block_pa = __pa(mondo);
 
 	page = get_zeroed_page(GFP_KERNEL);
 	if (!page) {
-		prom_printf("SUN4V: Error, cannot allocate cpu mondo page.\n");
+		prom_printf("SUN4V: Error, cannot allocate cpu list page.\n");
 		prom_halt();
 	}
 
-	tb->cpu_mondo_block_pa = __pa(page);
-	tb->cpu_list_pa = __pa(page + 64);
+	tb->cpu_list_pa = __pa(page);
 #endif
 }
 
