@@ -154,6 +154,19 @@ config CPU_THERMAL
 
 	  If you want this support, you should say Y here.
 
+config CPU_IDLE_THERMAL
+	tristate "generic cpu idle cooling support"
+	depends on CPU_FREQ
+	help
+	  This implements the generic cpu cooling mechanism through idle
+	  injection.
+
+	  This will throttle cpu by injecting specified idle time in
+	  a fixed cycle. All cpu in same cluster will enter idle synchronously
+	  to reach deepest idle state when injecting idle.
+
+	  If you want this support, you should say Y here.
+
 config CLOCK_THERMAL
 	bool "Generic clock cooling support"
 	depends on COMMON_CLK
