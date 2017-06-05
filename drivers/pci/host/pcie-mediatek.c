@@ -373,7 +373,7 @@ static int mtk_pcie_parse_and_add_res(struct mtk_pcie *pcie)
 	struct of_pci_range_parser parser;
 	struct of_pci_range range;
 	struct resource res;
-	int err, linkup = 0;
+	int err;
 
 	/* parse shared resources */
 	err = mtk_pcie_handle_shared_resource(pcie);
@@ -444,11 +444,11 @@ static int mtk_pcie_parse_and_add_res(struct mtk_pcie *pcie)
 
 		/* enable each port, and then check link status */
 		err = mtk_pcie_enable_ports(port);
-		if (!err)
-			linkup++;
+		if (err)
+			return err;
 	}
 
-	return !linkup;
+	return 0;
 }
 
 static int mtk_pcie_request_resources(struct mtk_pcie *pcie)
