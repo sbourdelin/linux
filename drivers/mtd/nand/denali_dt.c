@@ -45,10 +45,41 @@ static const struct denali_dt_data denali_socfpga_data = {
 	},
 };
 
+static const int denali_uniphier_strengths[] = {8, 16, 24};
+static const struct denali_dt_data denali_uniphier_v5a_data = {
+	.caps = DENALI_CAP_HW_ECC_FIXUP |
+		DENALI_CAP_DMA_64BIT,
+	.stepinfo = {
+		.stepsize = 1024,
+		.strengths = denali_uniphier_strengths,
+		.nstrengths = ARRAY_SIZE(denali_uniphier_strengths),
+	},
+};
+
+static const struct denali_dt_data denali_uniphier_v5b_data = {
+	.revision = 0x0501,
+	.caps = DENALI_CAP_HW_ECC_FIXUP |
+		DENALI_CAP_DMA_64BIT,
+	.stepinfo = {
+		.stepsize = 1024,
+		.strengths = denali_uniphier_strengths,
+		/* no support for strength=24 */
+		.nstrengths = ARRAY_SIZE(denali_uniphier_strengths) - 1,
+	},
+};
+
 static const struct of_device_id denali_nand_dt_ids[] = {
 	{
 		.compatible = "altr,socfpga-denali-nand",
 		.data = &denali_socfpga_data,
+	},
+	{
+		.compatible = "socionext,uniphier-denali-nand-v5a",
+		.data = &denali_uniphier_v5a_data,
+	},
+	{
+		.compatible = "socionext,uniphier-denali-nand-v5b",
+		.data = &denali_uniphier_v5b_data,
 	},
 	{ /* sentinel */ }
 };
