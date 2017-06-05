@@ -49,6 +49,7 @@
 #include <xen/interface/physdev.h>
 #include <xen/interface/platform.h>
 #include <xen/interface/xen-mca.h>
+#include <xen/interface/hvm/dm_op.h>
 
 /*
  * The hypercall asms have to meet several constraints:
@@ -474,7 +475,7 @@ HYPERVISOR_xenpmu_op(unsigned int op, void *arg)
 
 static inline int
 HYPERVISOR_dm_op(
-	domid_t dom, unsigned int nr_bufs, void *bufs)
+	domid_t dom, unsigned int nr_bufs, struct xen_dm_op_buf *bufs)
 {
 	return _hypercall3(int, dm_op, dom, nr_bufs, bufs);
 }
