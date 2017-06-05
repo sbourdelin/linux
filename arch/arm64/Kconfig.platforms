@@ -79,6 +79,7 @@ config ARCH_LG1K
 config ARCH_HISI
 	bool "Hisilicon SoC Family"
 	select ARM_TIMER_SP804
+	select COMMON_CLK_HI655X
 	select HISILICON_IRQ_MBIGEN if PCI
 	select PINCTRL
 	help
