@@ -281,6 +281,8 @@ void mmc_remove_host_debugfs(struct mmc_host *host)
 	debugfs_remove_recursive(host->debugfs_root);
 }
 
+#if IS_ENABLED(CONFIG_MMC_BLOCK)
+
 static int mmc_dbg_card_status_get(void *data, u64 *val)
 {
 	struct mmc_card	*card = data;
@@ -360,6 +362,32 @@ static const struct file_operations mmc_dbg_ext_csd_fops = {
 	.llseek		= default_llseek,
 };
 
+static int mmc_add_block_debugfs(struct mmc_card *card, struct dentry *root)
+{
+	if (mmc_card_mmc(card) || mmc_card_sd(card)) {
+		if (!debugfs_create_file("status", S_IRUSR, root, card,
+					 &mmc_dbg_card_status_fops))
+			return -EIO;
+	}
+
+	if (mmc_card_mmc(card)) {
+		if (!debugfs_create_file("ext_csd", S_IRUSR, root, card,
+					 &mmc_dbg_ext_csd_fops))
+			return -EIO;
+	}
+
+	return 0;
+}
+
+#else /* !IS_ENABLED(CONFIG_MMC_BLOCK) */
+
+static int mmc_add_block_debugfs(struct mmc_card *card, struct dentry *root)
+{
+	return 0;
+}
+
+#endif
+
 void mmc_add_card_debugfs(struct mmc_card *card)
 {
 	struct mmc_host	*host = card->host;
@@ -382,15 +410,8 @@ void mmc_add_card_debugfs(struct mmc_card *card)
 	if (!debugfs_create_x32("state", S_IRUSR, root, &card->state))
 		goto err;
 
-	if (mmc_card_mmc(card) || mmc_card_sd(card))
-		if (!debugfs_create_file("status", S_IRUSR, root, card,
-					&mmc_dbg_card_status_fops))
-			goto err;
-
-	if (mmc_card_mmc(card))
-		if (!debugfs_create_file("ext_csd", S_IRUSR, root, card,
-					&mmc_dbg_ext_csd_fops))
-			goto err;
+	if (mmc_add_block_debugfs(card, root))
+		goto err;
 
 	return;
 
