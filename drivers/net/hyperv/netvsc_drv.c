@@ -62,24 +62,26 @@ static void do_set_multicast(struct work_struct *w)
 		container_of(w, struct net_device_context, work);
 	struct hv_device *device_obj = ndevctx->device_ctx;
 	struct net_device *ndev = hv_get_drvdata(device_obj);
-	struct netvsc_device *nvdev = rcu_dereference(ndevctx->nvdev);
+	struct netvsc_device *nvdev;
 	struct rndis_device *rdev;
 
-	if (!nvdev)
-		return;
+	rtnl_lock();
+	nvdev = rtnl_dereference(ndevctx->nvdev);
+	if (nvdev)
+		rdev = nvdev->extension;
 
-	rdev = nvdev->extension;
-	if (rdev == NULL)
-		return;
-
-	if (ndev->flags & IFF_PROMISC)
-		rndis_filter_set_packet_filter(rdev,
-			NDIS_PACKET_TYPE_PROMISCUOUS);
-	else
-		rndis_filter_set_packet_filter(rdev,
-			NDIS_PACKET_TYPE_BROADCAST |
-			NDIS_PACKET_TYPE_ALL_MULTICAST |
-			NDIS_PACKET_TYPE_DIRECTED);
+		if (rdev) {
+			if (ndev->flags & IFF_PROMISC)
+				rndis_filter_set_packet_filter(rdev,
+							       NDIS_PACKET_TYPE_PROMISCUOUS);
+			else
+				rndis_filter_set_packet_filter(rdev,
+							       NDIS_PACKET_TYPE_BROADCAST |
+							       NDIS_PACKET_TYPE_ALL_MULTICAST |
+							       NDIS_PACKET_TYPE_DIRECTED);
+		}
+	}
+	rtnl_unlock();
 }
 
 static void netvsc_set_multicast_list(struct net_device *net)
