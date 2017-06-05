@@ -1384,7 +1384,7 @@ EXPORT_SYMBOL_GPL(kill_pid_info_as_cred);
 
 static int kill_something_info(int sig, struct siginfo *info, pid_t pid)
 {
-	int ret;
+	int ret, vpid;
 
 	if (pid > 0) {
 		rcu_read_lock();
@@ -1395,8 +1395,12 @@ static int kill_something_info(int sig, struct siginfo *info, pid_t pid)
 
 	read_lock(&tasklist_lock);
 	if (pid != -1) {
+		if (pid == INT_MIN)
+			vpid = INT_MAX;
+		else
+			vpid = -pid;
 		ret = __kill_pgrp_info(sig, info,
-				pid ? find_vpid(-pid) : task_pgrp(current));
+				pid ? find_vpid(vpid) : task_pgrp(current));
 	} else {
 		int retval = 0, count = 0;
 		struct task_struct * p;
