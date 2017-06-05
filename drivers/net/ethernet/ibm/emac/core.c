@@ -343,6 +343,7 @@ static int emac_reset(struct emac_instance *dev)
 {
 	struct emac_regs __iomem *p = dev->emacp;
 	int n = 20;
+	bool try_internal_clock = false;
 
 	DBG(dev, "reset" NL);
 
@@ -355,6 +356,7 @@ static int emac_reset(struct emac_instance *dev)
 	}
 
 #ifdef CONFIG_PPC_DCR_NATIVE
+do_retry:
 	/*
 	 * PPC460EX/GT Embedded Processor Advanced User's Manual
 	 * section 28.10.1 Mode Register 0 (EMACx_MR0) states:
@@ -362,10 +364,19 @@ static int emac_reset(struct emac_instance *dev)
 	 * of the EMAC. If none is present, select the internal clock
 	 * (SDR0_ETH_CFG[EMACx_PHY_CLK] = 1).
 	 * After a soft reset, select the external clock.
+	 *
+	 * The AR8035-A PHY Meraki MR24 does not provide a TX Clk if the
+	 * ethernet cable is not attached. This causes the reset to timeout
+	 * and the PHY detection code in emac_init_phy() is unable to
+	 * communicate and detect the AR8035-A PHY. As a result, the emac
+	 * driver bails out early and the user has no ethernet.
+	 * In order to stay compatible with existing configurations, the
+	 * driver will fall back to and switch to the internal clock, after
+	 * the first reset fails.
 	 */
 	if (emac_has_feature(dev, EMAC_FTR_460EX_PHY_CLK_FIX)) {
-		if (dev->phy_address == 0xffffffff &&
-		    dev->phy_map == 0xffffffff) {
+		if (try_internal_clock || (dev->phy_address == 0xffffffff &&
+					   dev->phy_map == 0xffffffff)) {
 			/* No PHY: select internal loop clock before reset */
 			dcri_clrset(SDR0, SDR0_ETH_CFG,
 				    0, SDR0_ETH_CFG_ECS << dev->cell_index);
@@ -383,8 +394,8 @@ static int emac_reset(struct emac_instance *dev)
 
 #ifdef CONFIG_PPC_DCR_NATIVE
 	if (emac_has_feature(dev, EMAC_FTR_460EX_PHY_CLK_FIX)) {
-		if (dev->phy_address == 0xffffffff &&
-		    dev->phy_map == 0xffffffff) {
+		if (try_internal_clock || (dev->phy_address == 0xffffffff &&
+					   dev->phy_map == 0xffffffff)) {
 			/* No PHY: restore external clock source after reset */
 			dcri_clrset(SDR0, SDR0_ETH_CFG,
 				    SDR0_ETH_CFG_ECS << dev->cell_index, 0);
@@ -396,9 +407,16 @@ static int emac_reset(struct emac_instance *dev)
 		dev->reset_failed = 0;
 		return 0;
 	} else {
-		emac_report_timeout_error(dev, "reset timeout");
-		dev->reset_failed = 1;
-		return -ETIMEDOUT;
+		if (emac_has_feature(dev, EMAC_FTR_460EX_PHY_CLK_FIX) &&
+		    !try_internal_clock) {
+			/* do a retry with the internal clock */
+			try_internal_clock = true;
+			goto do_retry;
+		} else {
+			emac_report_timeout_error(dev, "reset timeout");
+			dev->reset_failed = 1;
+			return -ETIMEDOUT;
+		}
 	}
 }
 
