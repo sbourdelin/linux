@@ -183,17 +183,19 @@ int bnxt_re_modify_device(struct ib_device *ibdev,
 
 static void __to_ib_speed_width(struct net_device *netdev, u8 *speed, u8 *width)
 {
-	struct ethtool_link_ksettings lksettings;
-	u32 espeed;
+	u32 espeed = SPEED_UNKNOWN;
 
 	if (netdev->ethtool_ops && netdev->ethtool_ops->get_link_ksettings) {
-		memset(&lksettings, 0, sizeof(lksettings));
+		struct ethtool_link_ksettings lksettings = {0};
+		int rc;
+
 		rtnl_lock();
-		netdev->ethtool_ops->get_link_ksettings(netdev, &lksettings);
+		rc = netdev->ethtool_ops->get_link_ksettings(netdev,
+							     &lksettings);
 		rtnl_unlock();
-		espeed = lksettings.base.speed;
-	} else {
-		espeed = SPEED_UNKNOWN;
+
+		if (!rc)
+			espeed = lksettings.base.speed;
 	}
 	switch (espeed) {
 	case SPEED_1000:
