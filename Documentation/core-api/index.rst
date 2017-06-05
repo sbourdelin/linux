@@ -19,6 +19,7 @@ Core utilities
    workqueue
    genericirq
    flexible-arrays
+   filesystems/seq_file
 
 Interfaces for kernel debugging
 ===============================
