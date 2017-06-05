@@ -50,6 +50,7 @@ struct of_overlay {
 	int id;
 	struct list_head node;
 	int count;
+	struct device_node *tree;
 	struct of_overlay_info *ovinfo_tab;
 	struct of_changeset cset;
 };
@@ -422,6 +423,8 @@ int of_overlay_create(struct device_node *tree)
 	/* add to the tail of the overlay list */
 	list_add_tail(&ov->node, &ov_list);
 
+	ov->tree = tree;
+
 	of_overlay_notify(ov, OF_OVERLAY_POST_APPLY);
 
 	mutex_unlock(&of_mutex);
@@ -524,6 +527,7 @@ int of_overlay_destroy(int id)
 {
 	struct of_overlay *ov;
 	int err;
+	phandle phandle;
 
 	mutex_lock(&of_mutex);
 
@@ -540,6 +544,8 @@ int of_overlay_destroy(int id)
 		goto out;
 	}
 
+	phandle = ov->tree->phandle;
+
 	of_overlay_notify(ov, OF_OVERLAY_PRE_REMOVE);
 	list_del(&ov->node);
 	__of_changeset_revert(&ov->cset);
@@ -548,6 +554,19 @@ int of_overlay_destroy(int id)
 	idr_remove(&ov_idr, id);
 	of_changeset_destroy(&ov->cset);
 	kfree(ov);
+
+	if (phandle) {
+		struct device_node *node;
+		unsigned long flags;
+
+		raw_spin_lock_irqsave(&devtree_lock, flags);
+		for_each_of_allnodes(node) {
+			if (node->phandle >= phandle)
+				node->phandle = 0;
+		}
+		raw_spin_unlock_irqrestore(&devtree_lock, flags);
+	}
+
 
 	err = 0;
 

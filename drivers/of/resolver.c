@@ -286,13 +286,14 @@ static int adjust_local_phandle_references(struct device_node *local_fixups,
 int of_resolve_phandles(struct device_node *overlay)
 {
 	struct device_node *child, *local_fixups, *refnode;
-	struct device_node *tree_symbols, *overlay_fixups;
+	struct device_node *tree_symbols, *ext_symbols, *overlay_fixups;
 	struct property *prop;
 	const char *refpath;
 	phandle phandle, phandle_delta;
 	int err;
 
 	tree_symbols = NULL;
+	ext_symbols = NULL;
 
 	if (!overlay) {
 		pr_err("null overlay\n");
@@ -321,6 +322,9 @@ int of_resolve_phandles(struct device_node *overlay)
 	for_each_child_of_node(overlay, child) {
 		if (!of_node_cmp(child->name, "__fixups__"))
 			overlay_fixups = child;
+		else
+		if (!of_node_cmp(child->name, "__external_symbols__"))
+			ext_symbols = child;
 	}
 
 	if (!overlay_fixups) {
@@ -329,11 +333,13 @@ int of_resolve_phandles(struct device_node *overlay)
 	}
 
 	tree_symbols = of_find_node_by_path("/__symbols__");
-	if (!tree_symbols) {
-		pr_err("no symbols in root of device tree.\n");
+	if (!tree_symbols && !ext_symbols) {
+		pr_err("no symbols for resolve in device tree.\n");
 		err = -EINVAL;
 		goto out;
 	}
+
+	phandle_delta = live_tree_max_phandle() + 1;
 
 	for_each_property_of_node(overlay_fixups, prop) {
 
@@ -341,8 +347,16 @@ int of_resolve_phandles(struct device_node *overlay)
 		if (!of_prop_cmp(prop->name, "name"))
 			continue;
 
-		err = of_property_read_string(tree_symbols,
-				prop->name, &refpath);
+		err = -1;
+
+		if (ext_symbols)
+			err = of_property_read_string(ext_symbols,
+					prop->name, &refpath);
+
+		if (err && tree_symbols)
+			err = of_property_read_string(tree_symbols,
+					prop->name, &refpath);
+
 		if (err)
 			goto out;
 
@@ -351,6 +365,9 @@ int of_resolve_phandles(struct device_node *overlay)
 			err = -ENOENT;
 			goto out;
 		}
+
+		if (!refnode->phandle)
+			refnode->phandle = ++phandle_delta;
 
 		phandle = refnode->phandle;
 		of_node_put(refnode);
