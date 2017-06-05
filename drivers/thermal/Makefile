@@ -26,6 +26,9 @@ thermal_sys-$(CONFIG_CLOCK_THERMAL)	+= clock_cooling.o
 # devfreq cooling
 thermal_sys-$(CONFIG_DEVFREQ_THERMAL) += devfreq_cooling.o
 
+# cpu idle cooling
+obj-$(CONFIG_CPU_IDLE_THERMAL)	+= cpu_idle_cooling.o
+
 # platform thermal drivers
 obj-y				+= broadcom/
 obj-$(CONFIG_QCOM_SPMI_TEMP_ALARM)	+= qcom-spmi-temp-alarm.o
