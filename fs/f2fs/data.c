@@ -1962,7 +1962,7 @@ repeat:
 			err = PTR_ERR(bio);
 			goto fail;
 		}
-		bio->bi_opf = REQ_OP_READ;
+		bio_set_op_attrs(bio, REQ_OP_READ, 0);
 		if (bio_add_page(bio, page, PAGE_SIZE, 0) < PAGE_SIZE) {
 			bio_put(bio);
 			err = -EFAULT;
