@@ -25,8 +25,93 @@
 
 static LIST_HEAD(target_list);
 static LIST_HEAD(initiator_list);
+LIST_HEAD(locality_list);
 
 static bool bad_hmem;
+
+static int add_performance_attributes(struct memory_target *tgt)
+{
+	struct attribute_group performance_attribute_group = {
+		.attrs = performance_attributes,
+	};
+	struct kobject *init_kobj, *tgt_kobj;
+	struct device *init_dev, *tgt_dev;
+	char via_init[128], via_tgt[128];
+	int ret;
+
+	if (!tgt->local_init)
+		return 0;
+
+	init_dev = &tgt->local_init->dev;
+	tgt_dev = &tgt->dev;
+	init_kobj = &init_dev->kobj;
+	tgt_kobj = &tgt_dev->kobj;
+
+	snprintf(via_init, 128, "via_%s", dev_name(init_dev));
+	snprintf(via_tgt, 128, "via_%s", dev_name(tgt_dev));
+
+	/* Create entries for initiator/target pair in the target.  */
+	performance_attribute_group.name = via_init;
+	ret = sysfs_create_group(tgt_kobj, &performance_attribute_group);
+	if (ret < 0)
+		return ret;
+
+	ret = sysfs_add_link_to_group(tgt_kobj, via_init, init_kobj,
+			dev_name(init_dev));
+	if (ret < 0)
+		goto err;
+
+	ret = sysfs_add_link_to_group(tgt_kobj, via_init, tgt_kobj,
+			dev_name(tgt_dev));
+	if (ret < 0)
+		goto err;
+
+	/* Create a link in the initiator to the performance attributes. */
+	ret = sysfs_add_group_link(init_kobj, tgt_kobj, via_init, via_tgt);
+	if (ret < 0)
+		goto err;
+
+	tgt->has_perf_attributes = true;
+	return 0;
+err:
+	/* Removals of links that haven't been added yet are harmless. */
+	sysfs_remove_link_from_group(tgt_kobj, via_init, dev_name(init_dev));
+	sysfs_remove_link_from_group(tgt_kobj, via_init, dev_name(tgt_dev));
+	sysfs_remove_group(tgt_kobj, &performance_attribute_group);
+	return ret;
+}
+
+static void remove_performance_attributes(struct memory_target *tgt)
+{
+	struct attribute_group performance_attribute_group = {
+		.attrs = performance_attributes,
+	};
+	struct kobject *init_kobj, *tgt_kobj;
+	struct device *init_dev, *tgt_dev;
+	char via_init[128], via_tgt[128];
+
+	if (!tgt->local_init)
+		return;
+
+	init_dev = &tgt->local_init->dev;
+	tgt_dev = &tgt->dev;
+	init_kobj = &init_dev->kobj;
+	tgt_kobj = &tgt_dev->kobj;
+
+	snprintf(via_init, 128, "via_%s", dev_name(init_dev));
+	snprintf(via_tgt, 128, "via_%s", dev_name(tgt_dev));
+
+	performance_attribute_group.name = via_init;
+
+	/* Remove entries for initiator/target pair in the target.  */
+	sysfs_remove_link_from_group(tgt_kobj, via_init, dev_name(init_dev));
+	sysfs_remove_link_from_group(tgt_kobj, via_init, dev_name(tgt_dev));
+
+	/* Remove the initiator's link to the performance attributes. */
+	sysfs_remove_link(init_kobj, via_tgt);
+
+	sysfs_remove_group(tgt_kobj, &performance_attribute_group);
+}
 
 static int link_node_for_kobj(unsigned int node, struct kobject *kobj)
 {
@@ -168,6 +253,9 @@ static void release_memory_target(struct device *dev)
 
 static void __init remove_memory_target(struct memory_target *tgt)
 {
+	if (tgt->has_perf_attributes)
+		remove_performance_attributes(tgt);
+
 	if (tgt->is_registered) {
 		remove_node_for_kobj(pxm_to_node(tgt->ma->proximity_domain),
 				&tgt->dev.kobj);
@@ -297,6 +385,38 @@ hmat_parse_address_range(struct acpi_subtable_header *header,
 err:
 	bad_hmem = true;
 	return -EINVAL;
+}
+
+static int __init hmat_parse_locality(struct acpi_subtable_header *header,
+		const unsigned long end)
+{
+	struct acpi_hmat_locality *hmat_loc;
+	struct memory_locality *loc;
+
+	if (bad_hmem)
+		return 0;
+
+	hmat_loc = (struct acpi_hmat_locality *)header;
+	if (!hmat_loc) {
+		pr_err("HMEM: NULL table entry\n");
+		bad_hmem = true;
+		return -EINVAL;
+	}
+
+	/* We don't report cached performance information in sysfs. */
+	if (hmat_loc->flags == ACPI_HMAT_MEMORY ||
+			hmat_loc->flags == ACPI_HMAT_LAST_LEVEL_CACHE) {
+		loc = kzalloc(sizeof(*loc), GFP_KERNEL);
+		if (!loc) {
+			bad_hmem = true;
+			return -ENOMEM;
+		}
+
+		loc->hmat_loc = hmat_loc;
+		list_add_tail(&loc->list, &locality_list);
+	}
+
+	return 0;
 }
 
 static int __init hmat_parse_cache(struct acpi_subtable_header *header,
@@ -442,6 +562,7 @@ srat_parse_memory_affinity(struct acpi_subtable_header *header,
 static void hmem_cleanup(void)
 {
 	struct memory_initiator *init, *init_iter;
+	struct memory_locality *loc, *loc_iter;
 	struct memory_target *tgt, *tgt_iter;
 
 	list_for_each_entry_safe(tgt, tgt_iter, &target_list, list)
@@ -449,6 +570,11 @@ static void hmem_cleanup(void)
 
 	list_for_each_entry_safe(init, init_iter, &initiator_list, list)
 		remove_memory_initiator(init);
+
+	list_for_each_entry_safe(loc, loc_iter, &locality_list, list) {
+		list_del(&loc->list);
+		kfree(loc);
+	}
 }
 
 static int __init hmem_init(void)
@@ -499,13 +625,15 @@ static int __init hmem_init(void)
 	}
 
 	if (!acpi_table_parse(ACPI_SIG_HMAT, hmem_noop_parse)) {
-		struct acpi_subtable_proc hmat_proc[2];
+		struct acpi_subtable_proc hmat_proc[3];
 
 		memset(hmat_proc, 0, sizeof(hmat_proc));
 		hmat_proc[0].id = ACPI_HMAT_TYPE_ADDRESS_RANGE;
 		hmat_proc[0].handler = hmat_parse_address_range;
 		hmat_proc[1].id = ACPI_HMAT_TYPE_CACHE;
 		hmat_proc[1].handler = hmat_parse_cache;
+		hmat_proc[2].id = ACPI_HMAT_TYPE_LOCALITY;
+		hmat_proc[2].handler = hmat_parse_locality;
 
 		acpi_table_parse_entries_array(ACPI_SIG_HMAT,
 					sizeof(struct acpi_table_hmat),
@@ -525,6 +653,10 @@ static int __init hmem_init(void)
 
 	list_for_each_entry(tgt, &target_list, list) {
 		ret = register_memory_target(tgt);
+		if (ret)
+			goto err;
+
+		ret = add_performance_attributes(tgt);
 		if (ret)
 			goto err;
 	}
