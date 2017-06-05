@@ -97,7 +97,9 @@ static int rxe_query_port(struct ib_device *dev,
 	if (rxe->ndev->ethtool_ops->get_link_ksettings) {
 		struct ethtool_link_ksettings ks;
 
+		rtnl_lock();
 		rc = rxe->ndev->ethtool_ops->get_link_ksettings(rxe->ndev, &ks);
+		rtnl_unlock();
 		speed = ks.base.speed;
 	} else if (rxe->ndev->ethtool_ops->get_settings) {
 		struct ethtool_cmd cmd;
