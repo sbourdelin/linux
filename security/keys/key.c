@@ -134,15 +134,18 @@ void key_user_put(struct key_user *user)
  * Allocate a serial number for a key.  These are assigned randomly to avoid
  * security issues through covert channel problems.
  */
-static inline void key_alloc_serial(struct key *key)
+static inline int key_alloc_serial(struct key *key)
 {
 	struct rb_node *parent, **p;
 	struct key *xkey;
+	int ret;
 
 	/* propose a random serial number and look for a hole for it in the
 	 * serial number tree */
 	do {
-		get_random_bytes(&key->serial, sizeof(key->serial));
+		ret = get_random_bytes_wait(&key->serial, sizeof(key->serial));
+		if (unlikely(ret))
+			return ret;
 
 		key->serial >>= 1; /* negative numbers are not permitted */
 	} while (key->serial < 3);
@@ -170,7 +173,7 @@ attempt_insertion:
 	rb_insert_color(&key->serial_node, &key_serial_tree);
 
 	spin_unlock(&key_serial_lock);
-	return;
+	return 0;
 
 	/* we found a key with the proposed serial number - walk the tree from
 	 * that point looking for the next unused serial number */
@@ -314,7 +317,9 @@ struct key *key_alloc(struct key_type *type, const char *desc,
 
 	/* publish the key by giving it a serial number */
 	atomic_inc(&user->nkeys);
-	key_alloc_serial(key);
+	ret = key_alloc_serial(key);
+	if (ret < 0)
+		goto security_error;
 
 error:
 	return key;
