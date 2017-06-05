@@ -46,7 +46,7 @@ extern unsigned int fcoe_debug_logging;
 #define FCOE_NETDEV_LOGGING 0x02 /* Netdevice logging */
 
 #define FCOE_CHECK_LOGGING(LEVEL, CMD)					\
-do {                                                            	\
+do {									\
 	if (unlikely(fcoe_debug_logging & LEVEL))			\
 		do {							\
 			CMD;						\
