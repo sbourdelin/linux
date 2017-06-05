@@ -109,6 +109,7 @@
  */
 #define MAX_MSI_IRQS			32
 #define MAX_MSI_CTRLS			(MAX_MSI_IRQS / 32)
+#define MSI_DEF_NUM_VECTORS		32
 
 struct pcie_port;
 struct dw_pcie;
@@ -140,6 +141,7 @@ struct dw_pcie_host_ops {
 	phys_addr_t (*get_msi_addr)(struct pcie_port *pp);
 	u32 (*get_msi_data)(struct pcie_port *pp, int pos);
 	void (*scan_bus)(struct pcie_port *pp);
+	void (*set_num_vectors)(struct pcie_port *pp);
 	int (*msi_host_init)(struct pcie_port *pp, struct msi_controller *chip);
 };
 
@@ -165,7 +167,11 @@ struct pcie_port {
 	struct dw_pcie_host_ops	*ops;
 	int			msi_irq;
 	struct irq_domain	*irq_domain;
+	struct irq_domain	*msi_domain;
 	unsigned long		msi_data;
+	u32			num_vectors;
+	u32			irq_status[MAX_MSI_CTRLS];
+	spinlock_t		lock;
 	DECLARE_BITMAP(msi_irq_in_use, MAX_MSI_IRQS);
 };
 
@@ -282,8 +288,10 @@ static inline u32 dw_pcie_readl_dbi2(struct dw_pcie *pci, u32 reg)
 #ifdef CONFIG_PCIE_DW_HOST
 irqreturn_t dw_handle_msi_irq(struct pcie_port *pp);
 void dw_pcie_msi_init(struct pcie_port *pp);
+void dw_pcie_free_msi(struct pcie_port *pp);
 void dw_pcie_setup_rc(struct pcie_port *pp);
 int dw_pcie_host_init(struct pcie_port *pp);
+int dw_pcie_allocate_domains(struct dw_pcie *pci);
 #else
 static inline irqreturn_t dw_handle_msi_irq(struct pcie_port *pp)
 {
@@ -294,11 +302,20 @@ static inline void dw_pcie_msi_init(struct pcie_port *pp)
 {
 }
 
+static inline void dw_pcie_free_msi(struct pcie_port *pp)
+{
+}
+
 static inline void dw_pcie_setup_rc(struct pcie_port *pp)
 {
 }
 
 static inline int dw_pcie_host_init(struct pcie_port *pp)
+{
+	return 0;
+}
+
+static inline int dw_pcie_allocate_domains(struct dw_pcie *pci)
 {
 	return 0;
 }
