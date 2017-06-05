@@ -140,6 +140,7 @@ ENDPROC(cpu_v7_set_pte_ext)
 	 * otherwise booting secondary CPUs would end up using TTBR1 for the
 	 * identity mapping set up in TTBR0.
 	 */
+	bichi	\tmp, \tmp, #(1 << 16)				@ clear TTBCR.T1SZ
 	orrls	\tmp, \tmp, #TTBR1_SIZE				@ TTBCR.T1SZ
 	mcr	p15, 0, \tmp, c2, c0, 2				@ TTBCR
 	mov	\tmp, \ttbr1, lsr #20
