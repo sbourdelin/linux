@@ -69,6 +69,17 @@ config SCSI_UFS_DWC_TC_PCI
 
 	  If unsure, say N.
 
+config SCSI_UFSHCD_INTEL_PCI
+	tristate "Intel PCI bus based UFS Controller support"
+	depends on SCSI_UFSHCD && PCI
+	---help---
+	This selects the Intel PCI UFS Host Controller Interface. Select this if
+	you have Intel UFS Host Controller with PCI Interface.
+
+	  If you have a controller with this interface, say Y or M here.
+
+	  If unsure, say N.
+
 config SCSI_UFSHCD_PLATFORM
 	tristate "Platform bus based UFS Controller support"
 	depends on SCSI_UFSHCD
