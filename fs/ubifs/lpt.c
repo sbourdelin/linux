@@ -1268,7 +1268,7 @@ static int read_pnode(struct ubifs_info *c, struct ubifs_nnode *parent, int iip)
 	branch = &parent->nbranch[iip];
 	lnum = branch->lnum;
 	offs = branch->offs;
-	pnode = kzalloc(sizeof(struct ubifs_pnode), GFP_NOFS);
+	pnode = kzalloc(sizeof(struct ubifs_pnode), GFP_ATOMIC);
 	if (!pnode)
 		return -ENOMEM;
 
