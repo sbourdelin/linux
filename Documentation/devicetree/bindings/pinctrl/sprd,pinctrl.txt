@@ -1,0 +1,56 @@
+* Spreadtrum Pin Controller
+
+The Spreadtrum pin controller are organized in 3 blocks (types).
+
+The first block comprises some global control registers, and each
+register contains several bit fields with one bit or several bits
+to configure for some global common configuration, such as domain
+pad driving level, system control select and so on. We recognise
+every fields comprising one bit or several bits in one global control
+register as one pin, thus we should record every pin's bit offset,
+bit width and register offset to configure this field (pin). Since
+this type pins' configuration are very tricky and different for each
+register, we introduce "sprd,ctrl" property to set the various global
+control configuration.
+
+The second block comprises some common registers which have unified
+register definition, and each register described one pin is used
+to configure the pin sleep mode and function select. Now we have 4
+systems on SC9860 SoC: AP system, PUBCP system, TGLDSP system and
+AGDSP system. In some situation we have some pin-sleep related
+configuration need to set when one of system goes into deep sleep
+mode. For example, if we set the pin sleep mode as AP_SLEEP, which
+means when AP system goes into deep sleep mode, this pin's sleep
+related properties (input/output or pullup/down) will be set
+automatically. Thus we intoduce "sprd,sleep_mode" to set pin sleep
+mode.
+
+The last block comprises some misc registers which also have unified
+register definition, and each register described one pin is used to
+configure drive strength, pull up/down and so on. Especially for pull
+up, we introduce "sprd,pullup" property for two kind configuration:
+PULLUP_20K or PULLUP_4_7K, which means the pullup resistor is 20K or
+4.7K.
+
+Required properties for Spreadtrum pin controller:
+- compatible: "sprd,<soc>-pinctrl"
+  Please refer to each sprd,<soc>-pinctrl.txt binding doc for supported SoCs.
+- reg: The register address of pin controller device.
+- pins : An array of pin names.
+
+Optional properties:
+- function: Specified the function name.
+- drive-strength: Drive strength in mA.
+- input-schmitt-disable: Enable schmitt-trigger mode.
+- input-schmitt-enable: Disable schmitt-trigger mode.
+- bias-disable: Disable pin bias.
+- bias-pull-down: Pull down on pin.
+- sprd,ctrl: Control values referring to databook for global control pins.
+- sprd,sleep_mode: Sleep mode selection.
+- sprd,pullup: Pull up on pin.
+- sprd,input-sleep: Input enable when system goes into deep sleep mode.
+- sprd,output-sleep: Output enable when system goes into deep sleep mode.
+- sprd,pullup_sleep: Pull up enable when system goes into deep sleep mode.
+- sprd,pulldown_sleep: Pull down enable when system goes into deep sleep mode.
+
+Please refer to each sprd,<soc>-pinctrl.txt binding doc for supported values.
