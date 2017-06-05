@@ -2333,7 +2333,7 @@ found:
 
 void nfs_access_add_cache(struct inode *inode, struct nfs_access_entry *set)
 {
-	struct nfs_access_entry *cache = kmalloc(sizeof(*cache), GFP_KERNEL);
+	struct nfs_access_entry *cache = kmalloc(sizeof(*cache), GFP_ATOMIC);
 	if (cache == NULL)
 		return;
 	RB_CLEAR_NODE(&cache->rb_node);
