@@ -582,8 +582,10 @@ again:
 
 	if (ip) {
 		error = xfs_iget_cache_hit(pag, ip, ino, flags, lock_flags);
-		if (error)
+		if (error) {
+			rcu_read_unlock();
 			goto out_error_or_again;
+		}
 	} else {
 		rcu_read_unlock();
 		XFS_STATS_INC(mp, xs_ig_missed);
