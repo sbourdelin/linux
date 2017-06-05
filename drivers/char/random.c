@@ -285,7 +285,6 @@
 #define SEC_XFER_SIZE		512
 #define EXTRACT_SIZE		10
 
-#define DEBUG_RANDOM_BOOT 0
 
 #define LONGS(x) (((x) + sizeof(unsigned long) - 1)/sizeof(unsigned long))
 
@@ -1474,7 +1473,7 @@ void get_random_bytes(void *buf, int nbytes)
 {
 	__u8 tmp[CHACHA20_BLOCK_SIZE];
 
-#if DEBUG_RANDOM_BOOT > 0
+#ifdef CONFIG_WARN_UNSEEDED_RANDOM
 	if (!crng_ready())
 		printk(KERN_NOTICE "random: %pF get_random_bytes called "
 		       "with crng_init = %d\n", (void *) _RET_IP_, crng_init);
