@@ -22,6 +22,7 @@
 #include "core.h"
 #include "card.h"
 #include "host.h"
+#include "block.h"
 #include "mmc_ops.h"
 
 #ifdef CONFIG_FAIL_MMC_REQUEST
@@ -285,19 +286,7 @@ void mmc_remove_host_debugfs(struct mmc_host *host)
 
 static int mmc_dbg_card_status_get(void *data, u64 *val)
 {
-	struct mmc_card	*card = data;
-	u32		status;
-	int		ret;
-
-	mmc_get_card(card);
-
-	ret = mmc_send_status(data, &status);
-	if (!ret)
-		*val = status;
-
-	mmc_put_card(card);
-
-	return ret;
+	return mmc_blk_card_status_get(data, val);
 }
 DEFINE_SIMPLE_ATTRIBUTE(mmc_dbg_card_status_fops, mmc_dbg_card_status_get,
 		NULL, "%08llx\n");
