@@ -72,7 +72,7 @@ void i915_check_vgpu(struct drm_i915_private *dev_priv)
 	version = INTEL_VGT_IF_VERSION_ENCODE(
 		__raw_i915_read16(dev_priv, vgtif_reg(version_major)),
 		__raw_i915_read16(dev_priv, vgtif_reg(version_minor)));
-	if (version != INTEL_VGT_IF_VERSION) {
+	if (version < INTEL_VGT_IF_VERSION_REQUIRED) {
 		DRM_INFO("VGT interface version mismatch!\n");
 		return;
 	}

@@ -37,7 +37,8 @@
 #define VGT_VERSION_MINOR 0
 
 #define INTEL_VGT_IF_VERSION_ENCODE(major, minor) ((major) << 16 | (minor))
-#define INTEL_VGT_IF_VERSION \
+/* minimal required PVINFO version */
+#define INTEL_VGT_IF_VERSION_REQUIRED \
 	INTEL_VGT_IF_VERSION_ENCODE(VGT_VERSION_MAJOR, VGT_VERSION_MINOR)
 
 /*
