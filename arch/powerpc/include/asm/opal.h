@@ -346,6 +346,9 @@ static inline int opal_get_async_rc(struct opal_msg msg)
 
 void opal_wake_poller(void);
 
+int64_t opal_occ_command(int chip_id, struct opal_occ_cmd_rsp_msg *msg,
+			 bool retry);
+
 #endif /* __ASSEMBLY__ */
 
 #endif /* _ASM_POWERPC_OPAL_H */
