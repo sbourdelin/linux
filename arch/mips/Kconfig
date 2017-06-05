@@ -7,7 +7,6 @@ config MIPS
 	select ARCH_HAS_ELF_RANDOMIZE
 	select ARCH_HAS_TICK_BROADCAST if GENERIC_CLOCKEVENTS_BROADCAST
 	select ARCH_MIGHT_HAVE_PC_PARPORT
-	select ARCH_MIGHT_HAVE_PC_SERIO
 	select ARCH_SUPPORTS_UPROBES
 	select ARCH_USE_BUILTIN_BSWAP
 	select ARCH_USE_CMPXCHG_LOCKREF if 64BIT
@@ -347,6 +346,7 @@ config MACH_JAZZ
 	select I8253
 	select I8259
 	select ISA
+	select ARCH_MIGHT_HAVE_PC_SERIO
 	select SYS_HAS_CPU_R4X00
 	select SYS_SUPPORTS_32BIT_KERNEL
 	select SYS_SUPPORTS_64BIT_KERNEL
@@ -424,6 +424,7 @@ config MACH_LOONGSON32
 
 config MACH_LOONGSON64
 	bool "Loongson-2/3 family of machines"
+	select ARCH_MIGHT_HAVE_PC_SERIO
 	select SYS_SUPPORTS_ZBOOT
 	help
 	  This enables the support of Loongson-2/3 family of machines.
@@ -1295,6 +1296,7 @@ config SGI_HAS_ZILOG
 	bool
 
 config SGI_HAS_I8042
+	select ARCH_MIGHT_HAVE_PC_SERIO
 	bool
 
 config DEFAULT_SGI_PARTITION
