@@ -1205,7 +1205,7 @@ int ubifs_read_nnode(struct ubifs_info *c, struct ubifs_nnode *parent, int iip)
 		lnum = c->lpt_lnum;
 		offs = c->lpt_offs;
 	}
-	nnode = kzalloc(sizeof(struct ubifs_nnode), GFP_NOFS);
+	nnode = kzalloc(sizeof(struct ubifs_nnode), GFP_ATOMIC);
 	if (!nnode) {
 		err = -ENOMEM;
 		goto out;
