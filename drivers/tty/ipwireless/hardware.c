@@ -1515,6 +1515,13 @@ static void ipw_send_setup_packet(struct ipw_hardware *hw)
 			sizeof(struct ipw_setup_get_version_query_packet),
 			ADDR_SETUP_PROT, TL_PROTOCOLID_SETUP,
 			TL_SETUP_SIGNO_GET_VERSION_QRY);
+
+	if (!ver_packet) {
+		pr_err(IPWIRELESS_PCCARD_NAME
+		       ": Not enough memory to send packet\n");
+		return;
+	}
+
 	ver_packet->header.length = sizeof(struct tl_setup_get_version_qry);
 
 	/*
