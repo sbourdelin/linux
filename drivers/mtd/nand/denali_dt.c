@@ -32,10 +32,17 @@ struct denali_dt {
 struct denali_dt_data {
 	unsigned int revision;
 	unsigned int caps;
+	struct nand_ecc_step_info stepinfo;
 };
 
+static const int denali_socfpga_strengths[] = {8, 15};
 static const struct denali_dt_data denali_socfpga_data = {
 	.caps = DENALI_CAP_HW_ECC_FIXUP,
+	.stepinfo = {
+		.stepsize = 512,
+		.strengths = denali_socfpga_strengths,
+		.nstrengths = ARRAY_SIZE(denali_socfpga_strengths),
+	},
 };
 
 static const struct of_device_id denali_nand_dt_ids[] = {
@@ -64,6 +71,7 @@ static int denali_dt_probe(struct platform_device *pdev)
 	if (data) {
 		denali->revision = data->revision;
 		denali->caps = data->caps;
+		denali->stepinfo = &data->stepinfo;
 	}
 
 	denali->platform = DT;
