@@ -31,6 +31,7 @@
 #include <linux/slab.h>
 #include <linux/cpu.h>
 #include <linux/cpu_cooling.h>
+#include <linux/cpu_idle_cooling.h>
 
 #include <trace/events/thermal.h>
 
@@ -649,6 +650,31 @@ out:
 	return ret;
 }
 
+#ifdef CONFIG_CPU_THERMAL_COMBO
+static void idle_cooling_freq_adjust(
+			struct cpufreq_cooling_device *cpufreq_device,
+			u32 power, unsigned int *target_freq)
+{
+	unsigned long target_load, max_idle_ratio;
+	unsigned int idle_freq;
+	s32 cur_dyn_power;
+
+	max_idle_ratio = get_max_idle_state(&cpufreq_device->allowed_cpus);
+	cur_dyn_power = power * 100 / (100 - max_idle_ratio);
+	idle_freq = cpu_power_to_freq(cpufreq_device, cur_dyn_power);
+
+	cur_dyn_power = cpu_freq_to_power(cpufreq_device, idle_freq);
+	target_load = (power * 100) / cur_dyn_power;
+	if (target_load < 100
+		&& ((idle_freq * target_load) >= ((*target_freq) * 100))) {
+		*target_freq = idle_freq;
+	} else {
+		target_load = 100;
+	}
+	set_idle_state(&cpufreq_device->allowed_cpus, 100 - target_load);
+}
+#endif
+
 /**
  * cpufreq_power2state() - convert power to a cooling device state
  * @cdev:	&thermal_cooling_device pointer
@@ -695,6 +721,11 @@ static int cpufreq_power2state(struct thermal_cooling_device *cdev,
 	last_load = cpufreq_device->last_load ?: 1;
 	normalised_power = (dyn_power * 100) / last_load;
 	target_freq = cpu_power_to_freq(cpufreq_device, normalised_power);
+
+#ifdef CONFIG_CPU_THERMAL_COMBO
+	idle_cooling_freq_adjust(cpufreq_device,
+			normalised_power, &target_freq);
+#endif
 
 	*state = cpufreq_cooling_get_level(cpu, target_freq);
 	if (*state == THERMAL_CSTATE_INVALID) {

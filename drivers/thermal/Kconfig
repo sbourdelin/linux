@@ -167,6 +167,23 @@ config CPU_IDLE_THERMAL
 
 	  If you want this support, you should say Y here.
 
+config CPU_THERMAL_COMBO
+	bool "precise cpu cooling support"
+	depends on CPU_THERMAL
+	depends on CPU_IDLE_THERMAL
+	help
+	  This implements precise cpu thermal control through the cooperation
+	  between idle cooling and cpu cooling.
+
+	  This will prevent cpu cooling scaling down cpu frequency when idle
+	  injection can meet the power budget.
+
+	  This can bring a smoother temperature curve and performance
+	  improvement in some case when there are big power gaps between cpu
+	  OPPs.
+
+	  If you want this support, you should say Y here.
+
 config CLOCK_THERMAL
 	bool "Generic clock cooling support"
 	depends on COMMON_CLK

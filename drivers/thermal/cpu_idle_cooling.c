@@ -28,6 +28,7 @@
 #include <linux/cpumask.h>
 #include <linux/cpuidle.h>
 #include <linux/thermal.h>
+#include <linux/cpu_idle_cooling.h>
 #include <linux/sched.h>
 #include <uapi/linux/sched/types.h>
 #include <linux/slab.h>
@@ -35,7 +36,11 @@
 #include <linux/wait.h>
 #include <linux/sched/rt.h>
 
+#ifdef CONFIG_CPU_THERMAL_COMBO
+#define MAX_TARGET_RATIO		(20U)
+#else
 #define MAX_TARGET_RATIO		(50U)
+#endif
 
 #define DEFAULT_WINDOW_SIZE		(1)
 #define DEFAULT_DURATION_JIFFIES	(20)
