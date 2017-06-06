@@ -628,8 +628,8 @@ void iser_unreg_rdma_mem(struct iscsi_iser_task *task,
 			 enum iser_data_dir dir);
 
 int  iser_connect(struct iser_conn *iser_conn,
-		  struct sockaddr *src_addr,
-		  struct sockaddr *dst_addr,
+		  struct sockaddr_storage *src_addr,
+		  struct sockaddr_storage *dst_addr,
 		  int non_blocking);
 
 void iser_unreg_mem_fmr(struct iscsi_iser_task *iser_task,

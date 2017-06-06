@@ -59,6 +59,7 @@
 #include <linux/delay.h>
 #include <linux/slab.h>
 #include <linux/module.h>
+#include <linux/inet.h>
 
 #include <net/sock.h>
 
@@ -808,12 +809,16 @@ static int iscsi_iser_get_ep_param(struct iscsi_endpoint *ep,
  *         if fails.
  */
 static struct iscsi_endpoint *
-iscsi_iser_ep_connect(struct Scsi_Host *shost, struct sockaddr *dst_addr,
-		      int non_blocking)
+iscsi_iser_ep_connect(struct Scsi_Host *shost, struct sockaddr_storage *dst_addr,
+		      int non_blocking, struct iface_rec *iface)
 {
 	int err;
 	struct iser_conn *iser_conn;
 	struct iscsi_endpoint *ep;
+	struct sockaddr_storage src_addr;
+	struct sockaddr_in *tmp_addr;
+	struct sockaddr_in6 *tmp_addr6;
+	memset(&src_addr, 0, sizeof(src_addr));
 
 	ep = iscsi_create_endpoint(0);
 	if (!ep)
@@ -828,8 +833,28 @@ iscsi_iser_ep_connect(struct Scsi_Host *shost, struct sockaddr *dst_addr,
 	ep->dd_data = iser_conn;
 	iser_conn->ep = ep;
 	iser_conn_init(iser_conn);
-
-	err = iser_connect(iser_conn, NULL, dst_addr, non_blocking);
+	if (iface && iface->ipaddress[0]) {
+		if (strchr(iface->ipaddress, ':')) {
+			tmp_addr6 = (struct sockaddr_in6 *)&src_addr;
+			tmp_addr6->sin6_family = AF_INET6;
+			if(!in6_pton(iface->ipaddress, -1,
+				 tmp_addr6->sin6_addr.s6_addr,
+				 -1, NULL)) {
+				err = -EINVAL;
+				goto failure;
+			}
+		} else {
+			tmp_addr = (struct sockaddr_in *)&src_addr;
+			tmp_addr->sin_family = AF_INET;
+			if (!in4_pton(iface->ipaddress, -1,
+				 (u8 *)&tmp_addr->sin_addr.s_addr,
+				 -1, NULL)) {
+				err = -EINVAL;
+				goto failure;
+			}
+		}
+	}
+	err = iser_connect(iser_conn, &src_addr, dst_addr, non_blocking);
 	if (err)
 		goto failure;
 

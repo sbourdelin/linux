@@ -36,6 +36,7 @@
 #include <linux/mm.h>
 #include <linux/highmem.h>
 #include <linux/scatterlist.h>
+#include <linux/if.h>
 
 #include "iscsi_iser.h"
 static

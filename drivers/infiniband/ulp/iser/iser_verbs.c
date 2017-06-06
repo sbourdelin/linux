@@ -35,6 +35,7 @@
 #include <linux/module.h>
 #include <linux/slab.h>
 #include <linux/delay.h>
+#include <linux/if.h>
 
 #include "iscsi_iser.h"
 
@@ -941,8 +942,8 @@ void iser_conn_init(struct iser_conn *iser_conn)
  * sleeps until the connection is established or rejected
  */
 int iser_connect(struct iser_conn   *iser_conn,
-		 struct sockaddr    *src_addr,
-		 struct sockaddr    *dst_addr,
+		 struct sockaddr_storage *src_addr,
+		 struct sockaddr_storage *dst_addr,
 		 int                 non_blocking)
 {
 	struct ib_conn *ib_conn = &iser_conn->ib_conn;
@@ -968,7 +969,8 @@ int iser_connect(struct iser_conn   *iser_conn,
 		goto id_failure;
 	}
 
-	err = rdma_resolve_addr(ib_conn->cma_id, src_addr, dst_addr, 1000);
+	err = rdma_resolve_addr(ib_conn->cma_id, (struct sockaddr *)src_addr,
+		       		(struct sockaddr *)dst_addr, 1000);
 	if (err) {
 		iser_err("rdma_resolve_addr failed: %d\n", err);
 		goto addr_failure;

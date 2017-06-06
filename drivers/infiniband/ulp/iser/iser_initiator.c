@@ -35,6 +35,7 @@
 #include <linux/mm.h>
 #include <linux/scatterlist.h>
 #include <linux/kfifo.h>
+#include <linux/if.h>
 #include <scsi/scsi_cmnd.h>
 #include <scsi/scsi_host.h>
 
