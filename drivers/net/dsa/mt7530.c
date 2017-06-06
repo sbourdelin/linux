@@ -907,6 +907,7 @@ static int
 mt7530_setup(struct dsa_switch *ds)
 {
 	struct mt7530_priv *priv = ds->priv;
+	struct dsa_port *cpu_dp;
 	int ret, i;
 	u32 id, val;
 	struct device_node *dn;
@@ -916,7 +917,8 @@ mt7530_setup(struct dsa_switch *ds)
 	 * controller also is the container for two GMACs nodes representing
 	 * as two netdev instances.
 	 */
-	dn = ds->dst->cpu_dp->netdev->dev.of_node->parent;
+	cpu_dp = dsa_ds_get_cpu_dp(ds);
+	dn = cpu_dp->netdev->dev.of_node->parent;
 	priv->ethernet = syscon_node_to_regmap(dn);
 	if (IS_ERR(priv->ethernet))
 		return PTR_ERR(priv->ethernet);
