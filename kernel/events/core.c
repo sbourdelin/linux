@@ -2674,6 +2674,16 @@ void perf_event_addr_filters_sync(struct perf_event *event)
 }
 EXPORT_SYMBOL_GPL(perf_event_addr_filters_sync);
 
+static int _perf_event_count_records(struct perf_event *event)
+{
+	if (event->attr.inherit || !is_sampling_event(event))
+		return -EINVAL;
+
+	event->count_records = 1;
+
+	return 0;
+}
+
 static int _perf_event_refresh(struct perf_event *event, int refresh)
 {
 	/*
@@ -4698,6 +4708,9 @@ static long _perf_ioctl(struct perf_event *event, unsigned int cmd, unsigned lon
 	case PERF_EVENT_IOC_RESET:
 		func = _perf_event_reset;
 		break;
+
+	case PERF_EVENT_IOC_COUNT_RECORDS:
+		return _perf_event_count_records(event);
 
 	case PERF_EVENT_IOC_REFRESH:
 		return _perf_event_refresh(event, arg);
@@ -7342,7 +7355,8 @@ static int __perf_event_overflow(struct perf_event *event,
 	 */
 
 	event->pending_kill = POLL_IN;
-	if (events && atomic_dec_and_test(&event->event_limit)) {
+	if (events && !event->count_records &&
+			atomic_dec_and_test(&event->event_limit)) {
 		ret = 1;
 		event->pending_kill = POLL_HUP;
 

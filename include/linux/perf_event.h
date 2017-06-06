@@ -683,6 +683,7 @@ struct perf_event {
 	struct irq_work			pending;
 
 	atomic_t			event_limit;
+	bool				count_records;
 
 	/* address range filters */
 	struct perf_addr_filters_head	addr_filters;
