@@ -22,6 +22,63 @@
 #define RIC_FLUSH_PWC 1
 #define RIC_FLUSH_ALL 2
 
+static inline void __tlbiel_all_isa300(unsigned int set, unsigned int is,
+					unsigned int ric, unsigned int prs)
+{
+	unsigned int r = 1; /* radix format */
+	unsigned long rb;
+	unsigned long rs = 0;
+
+	rb = (set << PPC_BITLSHIFT(51)) | (is << PPC_BITLSHIFT(53));
+
+	asm volatile(PPC_TLBIEL(%0, %4, %3, %2, %1)
+		     : : "r"(rb), "i"(r), "i"(prs), "i"(ric), "r"(rs) : "memory");
+}
+
+static void tlbiel_all_isa300(unsigned int num_sets, unsigned int is)
+{
+	unsigned int set;
+
+	asm volatile("ptesync": : :"memory");
+
+	/*
+	 * Flush the first set of the TLB, and the entire Page Walk Cache.
+	 * Then flush the remaining sets of the TLB.
+	 */
+	__tlbiel_all_isa300(0, is, RIC_FLUSH_ALL, 1);
+	for (set = 1; set < num_sets; set++)
+		__tlbiel_all_isa300(set, is, RIC_FLUSH_TLB, 1);
+
+	/* Do the same for partitioned scoped entries. */
+	__tlbiel_all_isa300(0, is, RIC_FLUSH_ALL, 0);
+	for (set = 1; set < num_sets; set++)
+		__tlbiel_all_isa300(set, is, RIC_FLUSH_TLB, 0);
+
+	asm volatile("ptesync": : :"memory");
+}
+
+void radix__tlbiel_all(unsigned int action)
+{
+	unsigned int is;
+
+	switch (action) {
+	case TLB_INVAL_SCOPE_GLOBAL:
+		is = 3;
+		break;
+	case TLB_INVAL_SCOPE_LPID:
+		is = 2;
+		break;
+	default:
+		BUG();
+	}
+
+	if (cpu_has_feature(CPU_FTR_ARCH_300))
+		tlbiel_all_isa300(POWER9_TLB_SETS_RADIX, is);
+	else
+		WARN(1, "%s called on pre-POWER9 CPU\n", __func__);
+	asm volatile(PPC_INVALIDATE_ERAT "; isync" : : :"memory");
+}
+
 static inline void __tlbiel_pid(unsigned long pid, int set,
 				unsigned long ric)
 {

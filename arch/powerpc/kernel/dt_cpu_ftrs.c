@@ -76,8 +76,6 @@ struct dt_cpu_feature {
  * Set up the base CPU
  */
 
-extern void __flush_tlb_power8(unsigned int action);
-extern void __flush_tlb_power9(unsigned int action);
 extern long __machine_check_early_realmode_p8(struct pt_regs *regs);
 extern long __machine_check_early_realmode_p9(struct pt_regs *regs);
 
@@ -90,39 +88,6 @@ static struct {
 } system_registers;
 
 static void (*init_pmu_registers)(void);
-
-static void cpufeatures_flush_tlb(void)
-{
-	unsigned long rb;
-	unsigned int i, num_sets;
-
-	/*
-	 * This is a temporary measure to keep equivalent TLB flush as the
-	 * cputable based setup code.
-	 */
-	switch (PVR_VER(mfspr(SPRN_PVR))) {
-	case PVR_POWER8:
-	case PVR_POWER8E:
-	case PVR_POWER8NVL:
-		num_sets = POWER8_TLB_SETS;
-		break;
-	case PVR_POWER9:
-		num_sets = POWER9_TLB_SETS_HASH;
-		break;
-	default:
-		num_sets = 1;
-		pr_err("unknown CPU version for boot TLB flush\n");
-		break;
-	}
-
-	asm volatile("ptesync" : : : "memory");
-	rb = TLBIEL_INVAL_SET;
-	for (i = 0; i < num_sets; i++) {
-		asm volatile("tlbiel %0" : : "r" (rb));
-		rb += 1 << TLBIEL_INVAL_SET_SHIFT;
-	}
-	asm volatile("ptesync" : : : "memory");
-}
 
 static void __restore_cpu_cpufeatures(void)
 {
@@ -148,8 +113,6 @@ static void __restore_cpu_cpufeatures(void)
 
 	if (init_pmu_registers)
 		init_pmu_registers();
-
-	cpufeatures_flush_tlb();
 }
 
 static char dt_cpu_name[64];
@@ -168,7 +131,6 @@ static struct cpu_spec __initdata base_cpu_spec = {
 	.oprofile_type		= PPC_OPROFILE_INVALID,
 	.cpu_setup		= NULL,
 	.cpu_restore		= __restore_cpu_cpufeatures,
-	.flush_tlb		= NULL,
 	.machine_check_early	= NULL,
 	.platform		= NULL,
 };
@@ -423,7 +385,6 @@ static void init_pmu_power8(void)
 static int __init feat_enable_mce_power8(struct dt_cpu_feature *f)
 {
 	cur_cpu_spec->platform = "power8";
-	cur_cpu_spec->flush_tlb = __flush_tlb_power8;
 	cur_cpu_spec->machine_check_early = __machine_check_early_realmode_p8;
 
 	return 1;
@@ -462,7 +423,6 @@ static void init_pmu_power9(void)
 static int __init feat_enable_mce_power9(struct dt_cpu_feature *f)
 {
 	cur_cpu_spec->platform = "power9";
-	cur_cpu_spec->flush_tlb = __flush_tlb_power9;
 	cur_cpu_spec->machine_check_early = __machine_check_early_realmode_p9;
 
 	return 1;
@@ -749,8 +709,6 @@ static void __init cpufeatures_setup_finished(void)
 	system_registers.lpcr = mfspr(SPRN_LPCR);
 	system_registers.hfscr = mfspr(SPRN_HFSCR);
 	system_registers.fscr = mfspr(SPRN_FSCR);
-
-	cpufeatures_flush_tlb();
 
 	pr_info("final cpu/mmu features = 0x%016lx 0x%08x\n",
 		cur_cpu_spec->cpu_features, cur_cpu_spec->mmu_features);

@@ -426,6 +426,8 @@ void __init radix__early_init_mmu(void)
 
 	radix_init_iamr();
 	radix_init_pgtable();
+
+	tlbiel_all();
 }
 
 void radix__early_init_mmu_secondary(void)
@@ -447,6 +449,8 @@ void radix__early_init_mmu_secondary(void)
 		radix_init_amor();
 	}
 	radix_init_iamr();
+
+	tlbiel_all();
 }
 
 void radix__mmu_cleanup_all(void)

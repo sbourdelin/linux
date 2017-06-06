@@ -1044,6 +1044,8 @@ void __init hash__early_init_mmu(void)
 	pr_info("Initializing hash mmu with SLB\n");
 	/* Initialize SLB management */
 	slb_initialize();
+
+	tlbiel_all();
 }
 
 #ifdef CONFIG_SMP
@@ -1063,6 +1065,8 @@ void hash__early_init_mmu_secondary(void)
 	}
 	/* Initialize SLB */
 	slb_initialize();
+
+	tlbiel_all();
 }
 #endif /* CONFIG_SMP */
 

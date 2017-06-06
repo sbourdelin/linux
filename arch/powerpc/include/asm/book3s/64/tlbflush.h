@@ -7,6 +7,40 @@
 #include <asm/book3s/64/tlbflush-hash.h>
 #include <asm/book3s/64/tlbflush-radix.h>
 
+/* TLB flush actions. Used as argument to tlbiel_all() */
+enum {
+	TLB_INVAL_SCOPE_GLOBAL = 0,	/* invalidate all TLBs */
+	TLB_INVAL_SCOPE_LPID = 1,	/* invalidate TLBs for current LPID */
+};
+
+static inline void tlbiel_all(void)
+{
+	/*
+	 * This is used for host machine check and bootup.
+	 *
+	 * This could be reimplemented more robustly without using the
+	 * radix_is_enabled(), cpu_feature(), etc. calls. However these
+	 * should be set up before relocation starts to be used at boot,
+	 * so we shouldn't see TLB machine checks before then.
+	 */
+	if (radix_enabled())
+		radix__tlbiel_all(TLB_INVAL_SCOPE_GLOBAL);
+	else
+		hash__tlbiel_all(TLB_INVAL_SCOPE_GLOBAL);
+}
+
+static inline void tlbiel_all_lpid(bool radix)
+{
+	/*
+	 * This is used for guest machine check.
+	 */
+	if (radix)
+		radix__tlbiel_all(TLB_INVAL_SCOPE_LPID);
+	else
+		hash__tlbiel_all(TLB_INVAL_SCOPE_LPID);
+}
+
+
 #define __HAVE_ARCH_FLUSH_PMD_TLB_RANGE
 static inline void flush_pmd_tlb_range(struct vm_area_struct *vma,
 				       unsigned long start, unsigned long end)
