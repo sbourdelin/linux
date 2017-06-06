@@ -16,8 +16,10 @@
  */
 
 #include <linux/slab.h>
+#include <linux/if.h>
 #include <scsi/scsi_tcq.h>
 #include <scsi/libiscsi.h>
+#include <scsi/scsi_transport_iscsi.h>
 #include "bnx2i.h"
 
 struct scsi_transport_template *bnx2i_scsi_xport_template;
@@ -1771,8 +1773,9 @@ static int bnx2i_tear_down_conn(struct bnx2i_hba *hba,
  *	sending down option-2 request to complete TCP 3-way handshake
  */
 static struct iscsi_endpoint *bnx2i_ep_connect(struct Scsi_Host *shost,
-					       struct sockaddr *dst_addr,
-					       int non_blocking)
+					       struct sockaddr_storage *dst_addr,
+					       int non_blocking,
+					       struct iface_rec *iface)
 {
 	u32 iscsi_cid = BNX2I_CID_RESERVED;
 	struct sockaddr_in *desti = (struct sockaddr_in *) dst_addr;
@@ -1792,7 +1795,7 @@ static struct iscsi_endpoint *bnx2i_ep_connect(struct Scsi_Host *shost,
 		 * check if the given destination can be reached through
 		 * a iscsi capable NetXtreme2 device
 		 */
-		hba = bnx2i_check_route(dst_addr);
+		hba = bnx2i_check_route((struct sockaddr *)dst_addr);
 
 	if (!hba) {
 		rc = -EINVAL;
@@ -1887,11 +1890,11 @@ static struct iscsi_endpoint *bnx2i_ep_connect(struct Scsi_Host *shost,
 	clear_bit(SK_TCP_TIMESTAMP, &bnx2i_ep->cm_sk->tcp_flags);
 
 	memset(&saddr, 0, sizeof(saddr));
-	if (dst_addr->sa_family == AF_INET) {
+	if (dst_addr->ss_family == AF_INET) {
 		desti = (struct sockaddr_in *) dst_addr;
 		saddr.remote.v4 = *desti;
 		saddr.local.v4.sin_family = desti->sin_family;
-	} else if (dst_addr->sa_family == AF_INET6) {
+	} else if (dst_addr->ss_family == AF_INET6) {
 		desti6 = (struct sockaddr_in6 *) dst_addr;
 		saddr.remote.v6 = *desti6;
 		saddr.local.v6.sin6_family = desti6->sin6_family;

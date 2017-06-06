@@ -15,6 +15,7 @@
  */
 
 #include <linux/gfp.h>
+#include <linux/if.h>
 #include <scsi/scsi_tcq.h>
 #include <scsi/libiscsi.h>
 #include "bnx2i.h"
