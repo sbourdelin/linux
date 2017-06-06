@@ -429,7 +429,7 @@ skl_get_buf_trans_edp(struct drm_i915_private *dev_priv, int *n_entries)
 		}
 	}
 
-	if (IS_KABYLAKE(dev_priv))
+	if (IS_KABYLAKE(dev_priv) || IS_COFFEELAKE(dev_priv))
 		return kbl_get_buf_trans_dp(dev_priv, n_entries);
 	else
 		return skl_get_buf_trans_dp(dev_priv, n_entries);
@@ -485,7 +485,7 @@ static const struct ddi_buf_trans *
 intel_ddi_get_buf_trans_dp(struct drm_i915_private *dev_priv,
 			   int *n_entries)
 {
-	if (IS_KABYLAKE(dev_priv)) {
+	if (IS_KABYLAKE(dev_priv) || IS_COFFEELAKE(dev_priv)) {
 		return kbl_get_buf_trans_dp(dev_priv, n_entries);
 	} else if (IS_SKYLAKE(dev_priv)) {
 		return skl_get_buf_trans_dp(dev_priv, n_entries);
@@ -1478,7 +1478,7 @@ static void skl_ddi_set_iboost(struct intel_encoder *encoder, u32 level)
 		if (dp_iboost) {
 			iboost = dp_iboost;
 		} else {
-			if (IS_KABYLAKE(dev_priv))
+			if (IS_KABYLAKE(dev_priv) || IS_COFFEELAKE(dev_priv))
 				ddi_translations = kbl_get_buf_trans_dp(dev_priv,
 									&n_entries);
 			else
