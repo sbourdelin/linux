@@ -12,6 +12,7 @@
  *
  */
 
+#include <linux/if.h>
 #include <scsi/libiscsi.h>
 #include <scsi/scsi_transport_iscsi.h>
 #include <scsi/scsi_transport.h>
@@ -1161,8 +1162,8 @@ static int beiscsi_open_conn(struct iscsi_endpoint *ep,
  * This routines first asks chip to create a connection and then allocates an EP
  */
 struct iscsi_endpoint *
-beiscsi_ep_connect(struct Scsi_Host *shost, struct sockaddr *dst_addr,
-		   int non_blocking)
+beiscsi_ep_connect(struct Scsi_Host *shost, struct sockaddr_storage *dst_addr,
+		   int non_blocking, struct iface_rec *iface)
 {
 	struct beiscsi_hba *phba;
 	struct beiscsi_endpoint *beiscsi_ep;
@@ -1198,7 +1199,8 @@ beiscsi_ep_connect(struct Scsi_Host *shost, struct sockaddr *dst_addr,
 	beiscsi_ep = ep->dd_data;
 	beiscsi_ep->phba = phba;
 	beiscsi_ep->openiscsi_ep = ep;
-	ret = beiscsi_open_conn(ep, NULL, dst_addr, non_blocking);
+	ret = beiscsi_open_conn(ep, NULL, (struct sockaddr *)dst_addr,
+		       		non_blocking);
 	if (ret) {
 		beiscsi_log(phba, KERN_ERR, BEISCSI_LOG_CONFIG,
 			    "BS_%d : Failed in beiscsi_open_conn\n");

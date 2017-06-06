@@ -13,6 +13,7 @@
  */
 
 #include <scsi/iscsi_proto.h>
+#include <linux/if.h>
 
 #include "be_main.h"
 #include "be.h"

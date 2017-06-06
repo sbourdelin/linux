@@ -13,6 +13,7 @@
  */
 
 #include <linux/bsg-lib.h>
+#include <linux/if.h>
 #include <scsi/scsi_transport_iscsi.h>
 #include <scsi/scsi_bsg_iscsi.h>
 #include "be_mgmt.h"

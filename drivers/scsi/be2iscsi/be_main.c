@@ -25,6 +25,7 @@
 #include <linux/module.h>
 #include <linux/bsg-lib.h>
 #include <linux/irq_poll.h>
+#include <linux/if.h>
 
 #include <scsi/libiscsi.h>
 #include <scsi/scsi_bsg_iscsi.h>
