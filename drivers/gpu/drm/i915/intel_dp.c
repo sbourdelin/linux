@@ -633,13 +633,8 @@ bxt_power_sequencer_idx(struct intel_dp *intel_dp)
 	/* We should never land here with regular DP ports */
 	WARN_ON(!is_edp(intel_dp));
 
-	/*
-	 * TODO: BXT has 2 PPS instances. The correct port->PPS instance
-	 * mapping needs to be retrieved from VBT, for now just hard-code to
-	 * use instance #0 always.
-	 */
 	if (!intel_dp->pps_reset)
-		return 0;
+		return dev_priv->vbt.backlight.controller;
 
 	intel_dp->pps_reset = false;
 
