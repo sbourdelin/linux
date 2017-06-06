@@ -72,26 +72,50 @@ static inline int notify_page_fault(struct pt_regs *regs)
 /*
  * Check whether the instruction at regs->nip is a store using
  * an update addressing form which will update r1.
+ * If no, returns 0 with mmap_sem released
+ * If yes, returns 1 if mmap_sem hasn't been released
+ * If yes, returns 2 if mmap_sem has been released
  */
 static int store_updates_sp(struct pt_regs *regs)
 {
 	unsigned int inst;
+	unsigned int __user *nip = (unsigned int __user *)regs->nip;
+	int ret;
+	bool is_mm_locked = true;
 
-	if (get_user(inst, (unsigned int __user *)regs->nip))
-		return 0;
+	/*
+	 * We want to do this outside mmap_sem, because reading code around nip
+	 * can result in fault, which will cause a deadlock when called with
+	 * mmap_sem held. However, we do a first try with pagefault disabled as
+	 * a fault here is very unlikely.
+	 */
+	if (!access_ok(VERIFY_READ, nip, sizeof(inst)))
+		goto failed;
+
+	pagefault_disable();
+	ret = __get_user_inatomic(inst, nip);
+	pagefault_enable();
+	if (ret) {
+		up_read(&current->mm->mmap_sem);
+		is_mm_locked = false;
+		if (__get_user(inst, nip))
+			goto failed;
+	}
+
 	/* check for 1 in the rA field */
 	if (((inst >> 16) & 0x1f) != 1)
-		return 0;
+		goto failed;
 	/* check major opcode */
 	switch (inst >> 26) {
+	case 62:	/* std or stdu */
+		if ((inst & 3) == 0)
+			break;
 	case 37:	/* stwu */
 	case 39:	/* stbu */
 	case 45:	/* sthu */
 	case 53:	/* stfsu */
 	case 55:	/* stfdu */
-		return 1;
-	case 62:	/* std or stdu */
-		return (inst & 3) == 1;
+		return is_mm_locked ? 1 : 2;
 	case 31:
 		/* check minor opcode */
 		switch ((inst >> 1) & 0x3ff) {
@@ -101,9 +125,13 @@ static int store_updates_sp(struct pt_regs *regs)
 		case 439:	/* sthux */
 		case 695:	/* stfsux */
 		case 759:	/* stfdux */
-			return 1;
+			return is_mm_locked ? 1 : 2;
 		}
 	}
+failed:
+	if (is_mm_locked)
+		up_read(&current->mm->mmap_sem);
+
 	return 0;
 }
 /*
@@ -283,14 +311,6 @@ int do_page_fault(struct pt_regs *regs, unsigned long address,
 
 	perf_sw_event(PERF_COUNT_SW_PAGE_FAULTS, 1, regs, address);
 
-	/*
-	 * We want to do this outside mmap_sem, because reading code around nip
-	 * can result in fault, which will cause a deadlock when called with
-	 * mmap_sem held
-	 */
-	if (is_write && is_user)
-		store_update_sp = store_updates_sp(regs);
-
 	if (is_user)
 		flags |= FAULT_FLAG_USER;
 
@@ -359,8 +379,14 @@ retry:
 		 * between the last mapped region and the stack will
 		 * expand the stack rather than segfaulting.
 		 */
-		if (address + 2048 < uregs->gpr[1] && !store_update_sp)
-			goto bad_area;
+		if (is_write && is_user && address + 2048 < uregs->gpr[1] &&
+		    !store_update_sp) {
+			store_update_sp = store_updates_sp(regs);
+			if (store_update_sp == 2)
+				goto retry;
+			if (store_update_sp == 0)
+				goto bad_area_nosemaphore;
+		}
 	}
 	if (expand_stack(vma, address))
 		goto bad_area;
