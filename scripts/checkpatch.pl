@@ -56,7 +56,7 @@ my $codespell = 0;
 my $codespellfile = "/usr/share/codespell/dictionary.txt";
 my $conststructsfile = "$D/const_structs.checkpatch";
 my $typedefsfile = "";
-my $color = 1;
+my $color = "auto";
 my $allow_c99_comments = 1;
 
 sub help {
@@ -115,7 +115,8 @@ Options:
                              (default:/usr/share/codespell/dictionary.txt)
   --codespellfile            Use this codespell dictionary
   --typedefsfile             Read additional types from this file
-  --color                    Use colors when output is STDOUT (default: on)
+  --color[=WHEN]             Use colors 'always', 'never', or only when output
+                             is a terminal ('auto'). Default is 'auto'.
   -h, --help, --version      display this help and exit
 
 When FILE is - read standard input.
@@ -181,6 +182,14 @@ if (-f $conf) {
 	unshift(@ARGV, @conf_args) if @conf_args;
 }
 
+# Perl's Getopt::Long allows options to take optional arguments after a space.
+# Prevent --color by itself from consuming other arguments
+foreach (@ARGV) {
+	if ($_ eq "--color") {
+		$_ = "--color=$color";
+	}
+}
+
 GetOptions(
 	'q|quiet+'	=> \$quiet,
 	'tree!'		=> \$tree,
@@ -211,7 +220,7 @@ GetOptions(
 	'codespell!'	=> \$codespell,
 	'codespellfile=s'	=> \$codespellfile,
 	'typedefsfile=s'	=> \$typedefsfile,
-	'color!'	=> \$color,
+	'color:s'	=> \$color,
 	'h|help'	=> \$help,
 	'version'	=> \$help
 ) or help(1);
@@ -235,6 +244,16 @@ if ($^V && $^V lt $minimum_perl_version) {
 #if no filenames are given, push '-' to read patch from stdin
 if ($#ARGV < 0) {
 	push(@ARGV, '-');
+}
+
+if ($color eq "always") {
+	$color = 1;
+} elsif ($color eq "never") {
+	$color = 0;
+} elsif ($color eq "auto") {
+	$color = (-t STDOUT);
+} else {
+	die "Invalid color mode: $color\n";
 }
 
 sub hash_save_array_words {
@@ -1881,7 +1900,7 @@ sub report {
 		return 0;
 	}
 	my $output = '';
-	if (-t STDOUT && $color) {
+	if ($color) {
 		if ($level eq 'ERROR') {
 			$output .= RED;
 		} elsif ($level eq 'WARNING') {
@@ -1892,10 +1911,10 @@ sub report {
 	}
 	$output .= $prefix . $level . ':';
 	if ($show_types) {
-		$output .= BLUE if (-t STDOUT && $color);
+		$output .= BLUE if ($color);
 		$output .= "$type:";
 	}
-	$output .= RESET if (-t STDOUT && $color);
+	$output .= RESET if ($color);
 	$output .= ' ' . $msg . "\n";
 
 	if ($showfile) {
