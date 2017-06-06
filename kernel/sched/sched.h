@@ -132,7 +132,8 @@ static inline int fair_policy(int policy)
 
 static inline int rt_policy(int policy)
 {
-	return policy == SCHED_FIFO || policy == SCHED_RR;
+	return IS_ENABLED(CONFIG_SCHED_RT) &&
+	       (policy == SCHED_FIFO || policy == SCHED_RR);
 }
 
 static inline int dl_policy(int policy)
@@ -398,8 +399,6 @@ extern void __refill_cfs_bandwidth_runtime(struct cfs_bandwidth *cfs_b);
 extern void start_cfs_bandwidth(struct cfs_bandwidth *cfs_b);
 extern void unthrottle_cfs_rq(struct cfs_rq *cfs_rq);
 
-extern void free_rt_sched_group(struct task_group *tg);
-extern int alloc_rt_sched_group(struct task_group *tg, struct task_group *parent);
 extern void init_tg_rt_entry(struct task_group *tg, struct rt_rq *rt_rq,
 		struct sched_rt_entity *rt_se, int cpu,
 		struct sched_rt_entity *parent);
@@ -518,7 +517,7 @@ struct cfs_rq {
 
 static inline int rt_bandwidth_enabled(void)
 {
-	return sysctl_sched_rt_runtime >= 0;
+	return IS_ENABLED(CONFIG_SCHED_RT) && sysctl_sched_rt_runtime >= 0;
 }
 
 /* RT IPI pull logic requires IRQ_WORK */
@@ -566,6 +565,24 @@ struct rt_rq {
 	struct task_group *tg;
 #endif
 };
+
+extern struct rt_bandwidth def_rt_bandwidth;
+
+#ifdef CONFIG_SCHED_RT
+#define rt_rr_nr_running(rq)		(rq)->rt.rr_nr_running
+#define rt_rt_nr_running(rq)		(rq)->rt.rt_nr_running
+extern int alloc_rt_sched_group(struct task_group *tg, struct task_group *parent);
+extern void free_rt_sched_group(struct task_group *tg);
+extern void init_sched_rt_class(void);
+extern void init_rt_bandwidth(struct rt_bandwidth *rt_b, u64 period, u64 runtime);
+#else
+#define rt_rr_nr_running(rq)		0
+#define rt_rt_nr_running(rq)		0
+#define alloc_rt_sched_group(...)	1
+#define free_rt_sched_group(tg)		do { } while (0)
+#define init_sched_rt_class()		do {  } while (0)
+#define init_rt_bandwidth(...)		do { } while (0)
+#endif
 
 /* Deadline class' related fields in a runqueue */
 struct dl_rq {
@@ -1470,8 +1487,10 @@ static inline void set_curr_task(struct rq *rq, struct task_struct *curr)
 #define sched_class_highest (&stop_sched_class)
 #elif defined(CONFIG_SCHED_DL)
 #define sched_class_highest (&dl_sched_class)
-#else
+#elif defined(CONFIG_SCHED_RT)
 #define sched_class_highest (&rt_sched_class)
+#else
+#define sched_class_highest (&fair_sched_class)
 #endif
 
 #define for_each_class(class) \
@@ -1524,14 +1543,10 @@ extern void sysrq_sched_debug_show(void);
 extern void sched_init_granularity(void);
 extern void update_max_interval(void);
 
-extern void init_sched_rt_class(void);
 extern void init_sched_fair_class(void);
 
 extern void resched_curr(struct rq *rq);
 extern void resched_cpu(int cpu);
-
-extern struct rt_bandwidth def_rt_bandwidth;
-extern void init_rt_bandwidth(struct rt_bandwidth *rt_b, u64 period, u64 runtime);
 
 extern void init_dl_task_timer(struct sched_dl_entity *dl_se);
 

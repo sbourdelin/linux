@@ -687,7 +687,7 @@ config TREE_RCU_TRACE
 
 config RCU_BOOST
 	bool "Enable RCU priority boosting"
-	depends on RT_MUTEXES && PREEMPT_RCU && RCU_EXPERT
+	depends on SCHED_RT && RT_MUTEXES && PREEMPT_RCU && RCU_EXPERT
 	default n
 	help
 	  This option boosts the priority of preempted RCU readers that
@@ -1090,7 +1090,7 @@ config CFS_BANDWIDTH
 
 config RT_GROUP_SCHED
 	bool "Group scheduling for SCHED_RR/FIFO"
-	depends on CGROUP_SCHED
+	depends on CGROUP_SCHED && SCHED_RT
 	default n
 	help
 	  This feature lets you explicitly allocate real CPU bandwidth
@@ -1302,6 +1302,14 @@ config SCHED_AUTOGROUP
 	  of workloads isolates aggressive CPU burners (like build jobs) from
 	  desktop applications.  Task group autogeneration is currently based
 	  upon task session.
+
+config SCHED_RT
+	bool "Real Time Task Scheduling" if EXPERT
+	default y
+	help
+	  This adds the sched_rt scheduling class to the kernel providing
+ 	  support for the SCHED_FIFO and SCHED_RR policies. You might want
+	  to disable this to reduce the kernel size. If unsure say y.
 
 config SCHED_DL
 	bool "Deadline Task Scheduling" if EXPERT
@@ -1635,7 +1643,7 @@ config FUTEX
 
 config FUTEX_PI
 	bool
-	depends on FUTEX && RT_MUTEXES
+	depends on FUTEX && RT_MUTEXES && SCHED_RT
 	default y
 
 config HAVE_FUTEX_CMPXCHG

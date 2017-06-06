@@ -642,8 +642,8 @@ bool sched_can_stop_tick(struct rq *rq)
 	 * If there are more than one RR tasks, we need the tick to effect the
 	 * actual RR behaviour.
 	 */
-	if (rq->rt.rr_nr_running) {
-		if (rq->rt.rr_nr_running == 1)
+	if (rt_rr_nr_running(rq)) {
+		if (rt_rr_nr_running(rq) == 1)
 			return true;
 		else
 			return false;
@@ -653,7 +653,7 @@ bool sched_can_stop_tick(struct rq *rq)
 	 * If there's no RR tasks, but FIFO tasks, we can skip the tick, no
 	 * forced preemption between FIFO tasks.
 	 */
-	fifo_nr_running = rq->rt.rt_nr_running - rq->rt.rr_nr_running;
+	fifo_nr_running = rt_rt_nr_running(rq) - rt_rr_nr_running(rq);
 	if (fifo_nr_running)
 		return true;
 
@@ -1584,7 +1584,7 @@ void sched_set_stop_task(int cpu, struct task_struct *stop)
 		 * Reset it back to a normal scheduling class so that
 		 * it can die in pieces.
 		 */
-		old_stop->sched_class = &rt_sched_class;
+		old_stop->sched_class = stop_sched_class.next;
 	}
 }
 
@@ -2180,11 +2180,13 @@ static void __sched_fork(unsigned long clone_flags, struct task_struct *p)
 	__dl_clear_params(p);
 #endif
 
+#ifdef CONFIG_SCHED_RT
 	INIT_LIST_HEAD(&p->rt.run_list);
 	p->rt.timeout		= 0;
 	p->rt.time_slice	= sched_rr_timeslice;
 	p->rt.on_rq		= 0;
 	p->rt.on_list		= 0;
+#endif
 
 #ifdef CONFIG_PREEMPT_NOTIFIERS
 	INIT_HLIST_HEAD(&p->preempt_notifiers);
@@ -3595,7 +3597,7 @@ int default_wake_function(wait_queue_t *curr, unsigned mode, int wake_flags,
 }
 EXPORT_SYMBOL(default_wake_function);
 
-#ifdef CONFIG_RT_MUTEXES
+#if defined(CONFIG_RT_MUTEXES) && defined(CONFIG_SCHED_RT)
 
 static inline int __rt_effective_prio(struct task_struct *pi_task, int prio)
 {
@@ -3994,6 +3996,23 @@ static int __sched_setscheduler(struct task_struct *p,
 
 	/* May grab non-irq protected spin_locks: */
 	BUG_ON(in_interrupt());
+
+	/*
+	 * When the RT scheduling class is disabled, let's make sure kernel threads
+	 * wanting RT still get lowest nice value to give them highest available
+	 * priority rather than simply returning an error. Obviously we can't test
+	 * rt_policy() here as it is always false in that case.
+	 */
+	if (!IS_ENABLED(CONFIG_SCHED_RT) && !user &&
+	    (policy == SCHED_FIFO || policy == SCHED_RR)) {
+		static const struct sched_attr k_attr = {
+			.sched_policy = SCHED_NORMAL,
+			.sched_nice = MIN_NICE,
+		};
+		attr = &k_attr;
+		policy = SCHED_NORMAL;
+	}
+
 recheck:
 	/* Double check policy once rq lock held: */
 	if (policy < 0) {
@@ -5857,7 +5876,10 @@ void __init sched_init(void)
 		rq->calc_load_active = 0;
 		rq->calc_load_update = jiffies + LOAD_FREQ;
 		init_cfs_rq(&rq->cfs);
+#ifdef CONFIG_SCHED_RT
 		init_rt_rq(&rq->rt);
+		rq->rt.rt_runtime = def_rt_bandwidth.rt_runtime;
+#endif
 		init_dl_rq(&rq->dl);
 #ifdef CONFIG_FAIR_GROUP_SCHED
 		root_task_group.shares = ROOT_TASK_GROUP_LOAD;
@@ -5886,7 +5908,6 @@ void __init sched_init(void)
 		init_tg_cfs_entry(&root_task_group, &rq->cfs, NULL, i, NULL);
 #endif /* CONFIG_FAIR_GROUP_SCHED */
 
-		rq->rt.rt_runtime = def_rt_bandwidth.rt_runtime;
 #ifdef CONFIG_RT_GROUP_SCHED
 		init_tg_rt_entry(&root_task_group, &rq->rt, NULL, i, NULL);
 #endif

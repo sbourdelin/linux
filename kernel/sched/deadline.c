@@ -1825,7 +1825,11 @@ static void prio_changed_dl(struct rq *rq, struct task_struct *p,
 }
 
 const struct sched_class dl_sched_class = {
+#ifdef CONFIG_SCHED_RT
 	.next			= &rt_sched_class,
+#else
+	.next			= &fair_sched_class,
+#endif
 	.enqueue_task		= enqueue_task_dl,
 	.dequeue_task		= dequeue_task_dl,
 	.yield_task		= yield_task_dl,

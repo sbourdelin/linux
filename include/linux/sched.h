@@ -518,7 +518,9 @@ struct task_struct {
 
 	const struct sched_class	*sched_class;
 	struct sched_entity		se;
+#ifdef CONFIG_SCHED_RT
 	struct sched_rt_entity		rt;
+#endif
 #ifdef CONFIG_CGROUP_SCHED
 	struct task_group		*sched_task_group;
 #endif

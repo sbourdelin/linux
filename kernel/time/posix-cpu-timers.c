@@ -4,6 +4,7 @@
 
 #include <linux/sched/signal.h>
 #include <linux/sched/cputime.h>
+#include <linux/sched/rt.h>
 #include <linux/posix-timers.h>
 #include <linux/errno.h>
 #include <linux/math64.h>
@@ -814,13 +815,14 @@ static void check_thread_timers(struct task_struct *tsk,
 	/*
 	 * Check for the special case thread timers.
 	 */
-	soft = READ_ONCE(sig->rlim[RLIMIT_RTTIME].rlim_cur);
+	soft = IS_ENABLED(CONFIG_SCHED_RT) ?
+		READ_ONCE(sig->rlim[RLIMIT_RTTIME].rlim_cur) : RLIM_INFINITY;
 	if (soft != RLIM_INFINITY) {
 		unsigned long hard =
 			READ_ONCE(sig->rlim[RLIMIT_RTTIME].rlim_max);
 
 		if (hard != RLIM_INFINITY &&
-		    tsk->rt.timeout > DIV_ROUND_UP(hard, USEC_PER_SEC/HZ)) {
+		    rt_timeout(tsk) > DIV_ROUND_UP(hard, USEC_PER_SEC/HZ)) {
 			/*
 			 * At the hard limit, we just die.
 			 * No need to calculate anything else now.
@@ -832,7 +834,7 @@ static void check_thread_timers(struct task_struct *tsk,
 			__group_send_sig_info(SIGKILL, SEND_SIG_PRIV, tsk);
 			return;
 		}
-		if (tsk->rt.timeout > DIV_ROUND_UP(soft, USEC_PER_SEC/HZ)) {
+		if (rt_timeout(tsk) > DIV_ROUND_UP(soft, USEC_PER_SEC/HZ)) {
 			/*
 			 * At the soft limit, send a SIGXCPU every second.
 			 */

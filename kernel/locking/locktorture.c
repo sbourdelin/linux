@@ -446,7 +446,7 @@ static struct lock_torture_ops ww_mutex_lock_ops = {
 	.name		= "ww_mutex_lock"
 };
 
-#ifdef CONFIG_RT_MUTEXES
+#if defined(CONFIG_RT_MUTEXES) && defined(CONFIG_SCHED_RT)
 static DEFINE_RT_MUTEX(torture_rtmutex);
 
 static int torture_rtmutex_lock(void) __acquires(torture_rtmutex)
@@ -872,7 +872,7 @@ static int __init lock_torture_init(void)
 		&rw_lock_ops, &rw_lock_irq_ops,
 		&mutex_lock_ops,
 		&ww_mutex_lock_ops,
-#ifdef CONFIG_RT_MUTEXES
+#if defined(CONFIG_RT_MUTEXES) && defined(CONFIG_SCHED_RT)
 		&rtmutex_lock_ops,
 #endif
 		&rwsem_lock_ops,

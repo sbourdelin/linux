@@ -12,7 +12,7 @@
 #ifndef __LINUX_RT_MUTEX_H
 #define __LINUX_RT_MUTEX_H
 
-#if 1 /* will become def CONFIG_SCHED_RT later */
+#ifdef CONFIG_SCHED_RT
 
 #include <linux/linkage.h>
 #include <linux/rbtree.h>
