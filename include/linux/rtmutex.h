@@ -12,6 +12,8 @@
 #ifndef __LINUX_RT_MUTEX_H
 #define __LINUX_RT_MUTEX_H
 
+#if 1 /* will become def CONFIG_SCHED_RT later */
+
 #include <linux/linkage.h>
 #include <linux/rbtree.h>
 #include <linux/spinlock_types.h>
@@ -97,5 +99,72 @@ extern int rt_mutex_timed_lock(struct rt_mutex *lock,
 extern int rt_mutex_trylock(struct rt_mutex *lock);
 
 extern void rt_mutex_unlock(struct rt_mutex *lock);
+
+#else /* CONFIG_SCHED_RT */
+
+/*
+ * We have no realtime task support and therefore no priority inversion
+ * may occur. Let's map RT mutexes using regular mutexes.
+ */
+
+#include <linux/mutex.h>
+
+struct rt_mutex {
+	struct mutex m;
+};
+
+#define __RT_MUTEX_INITIALIZER(m) \
+	{ .m = __MUTEX_INITIALIZER(m) }
+
+#define DEFINE_RT_MUTEX(mutexname) \
+	struct rt_mutex mutexname = __RT_MUTEX_INITIALIZER(mutexname)
+
+static inline void __rt_mutex_init(struct rt_mutex *lock, const char *name)
+{
+	static struct lock_class_key __key;
+	__mutex_init(&lock->m, name, &__key);
+}
+
+#define rt_mutex_init(mutex)	__rt_mutex_init(mutex, #mutex)
+
+static inline int rt_mutex_is_locked(struct rt_mutex *lock)
+{
+	return mutex_is_locked(&lock->m);
+}
+
+static inline void rt_mutex_destroy(struct rt_mutex *lock)
+{
+	mutex_destroy(&lock->m);
+}
+
+static inline void rt_mutex_lock(struct rt_mutex *lock)
+{
+	mutex_lock(&lock->m);
+}
+
+static inline int rt_mutex_lock_interruptible(struct rt_mutex *lock)
+{
+	return mutex_lock_interruptible(&lock->m);
+}
+
+static inline int rt_mutex_trylock(struct rt_mutex *lock)
+{
+	return mutex_trylock(&lock->m);
+}
+
+static inline void rt_mutex_unlock(struct rt_mutex *lock)
+{
+	mutex_unlock(&lock->m);
+}
+
+static inline int rt_mutex_debug_check_no_locks_freed(const void *from,
+						      unsigned long len)
+{
+	return 0;
+}
+#define rt_mutex_debug_check_no_locks_held(task)	do { } while (0)
+#define rt_mutex_debug_task_free(t)			do { } while (0)
+
+#endif /* CONFIG_SCHED_RT */
 
 #endif
