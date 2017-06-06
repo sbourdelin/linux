@@ -29,14 +29,23 @@
 #include <asm/numa.h>
 
 static int cpus_in_srat;
+static int its_in_srat;
 
 struct __node_cpu_hwid {
 	u32 node_id;    /* logical node containing this CPU */
 	u64 cpu_hwid;   /* MPIDR for this CPU */
 };
 
+struct __node_its_id {
+	u32 node_id;    /* numa node id */
+	u32 its_id ;   /* GIC ITS ID */
+};
+
 static struct __node_cpu_hwid early_node_cpu_hwid[NR_CPUS] = {
 [0 ... NR_CPUS - 1] = {NUMA_NO_NODE, PHYS_CPUID_INVALID} };
+
+static struct __node_its_id early_node_its_id[MAX_NUMNODES] = {
+[0 ... MAX_NUMNODES - 1] = {NUMA_NO_NODE, UINT_MAX} };
 
 int acpi_numa_get_nid(unsigned int cpu, u64 hwid)
 {
@@ -45,6 +54,18 @@ int acpi_numa_get_nid(unsigned int cpu, u64 hwid)
 	for (i = 0; i < cpus_in_srat; i++) {
 		if (hwid == early_node_cpu_hwid[i].cpu_hwid)
 			return early_node_cpu_hwid[i].node_id;
+	}
+
+	return NUMA_NO_NODE;
+}
+
+int acpi_numa_get_its_nid(u32 its_id)
+{
+	int i;
+
+	for (i = 0; i < its_in_srat; i++) {
+		if (its_id == early_node_its_id[i].its_id)
+			return early_node_its_id[i].node_id;
 	}
 
 	return NUMA_NO_NODE;
@@ -98,6 +119,44 @@ void __init acpi_numa_gicc_affinity_init(struct acpi_srat_gicc_affinity *pa)
 	cpus_in_srat++;
 	pr_info("SRAT: PXM %d -> MPIDR 0x%Lx -> Node %d\n",
 		pxm, mpidr, node);
+}
+
+/* Callback for ITS ACPI Proximity Domain mapping */
+void __init acpi_numa_its_affinity_init(struct acpi_srat_its_affinity *pa)
+{
+	int pxm, node;
+
+	if (srat_disabled())
+		return;
+
+	if (pa->header.length < sizeof(struct acpi_srat_its_affinity)) {
+		pr_err("SRAT: Invalid SRAT header length: %d\n",
+			pa->header.length);
+		bad_srat();
+		return;
+	}
+
+	if (its_in_srat >= MAX_NUMNODES) {
+		pr_warn_once("SRAT: its count exceeding max count[%d]\n",
+			     MAX_NUMNODES);
+		return;
+	}
+
+	pxm = pa->proximity_domain;
+	node = acpi_map_pxm_to_node(pxm);
+
+	if (node == NUMA_NO_NODE || node >= MAX_NUMNODES) {
+		pr_err("SRAT: Too many proximity domains %d\n", pxm);
+		bad_srat();
+		return;
+	}
+
+	early_node_its_id[its_in_srat].node_id = node;
+	early_node_its_id[its_in_srat].its_id =  its_in_srat;
+	node_set(node, numa_nodes_parsed);
+	pr_info("SRAT: PXM %d -> ITS %d -> Node %d\n",
+		pxm, its_in_srat, node);
+	its_in_srat++;
 }
 
 int __init arm64_acpi_numa_init(void)

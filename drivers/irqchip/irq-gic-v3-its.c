@@ -1861,7 +1861,8 @@ static int __init gic_acpi_parse_madt_its(struct acpi_subtable_header *header,
 		goto dom_err;
 	}
 
-	err = its_probe_one(&res, dom_handle, NUMA_NO_NODE);
+	err = its_probe_one(&res, dom_handle,
+			acpi_numa_get_its_nid(its_entry->translation_id));
 	if (!err)
 		return 0;
 
