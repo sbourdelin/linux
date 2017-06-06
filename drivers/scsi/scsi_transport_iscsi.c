@@ -34,6 +34,7 @@
 #include <scsi/iscsi_if.h>
 #include <scsi/scsi_cmnd.h>
 #include <scsi/scsi_bsg_iscsi.h>
+#include <linux/inet.h>
 
 #define ISCSI_TRANSPORT_VERSION "2.0-870"
 
@@ -2794,7 +2795,8 @@ static int iscsi_if_ep_connect(struct iscsi_transport *transport,
 			       struct iscsi_uevent *ev, int msg_type)
 {
 	struct iscsi_endpoint *ep;
-	struct sockaddr *dst_addr;
+	struct sockaddr_storage *dst_addr;
+	struct iface_rec *iface;
 	struct Scsi_Host *shost = NULL;
 	int non_blocking, err = 0;
 
@@ -2813,8 +2815,9 @@ static int iscsi_if_ep_connect(struct iscsi_transport *transport,
 	} else
 		non_blocking = ev->u.ep_connect.non_blocking;
 
-	dst_addr = (struct sockaddr *)((char*)ev + sizeof(*ev));
-	ep = transport->ep_connect(shost, dst_addr, non_blocking);
+	dst_addr = (struct sockaddr_storage *)((char*)ev + sizeof(*ev));
+	iface = (struct iface_rec *)((char*)ev + sizeof(*ev) + sizeof(*dst_addr));
+	ep = transport->ep_connect(shost, dst_addr, non_blocking, iface);
 	if (IS_ERR(ep)) {
 		err = PTR_ERR(ep);
 		goto release_host;
