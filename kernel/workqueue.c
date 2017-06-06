@@ -3354,6 +3354,9 @@ static struct worker_pool *get_unbound_pool(const struct workqueue_attrs *attrs)
 	copy_workqueue_attrs(pool->attrs, attrs);
 	pool->node = target_node;
 
+	if (!cpumask_weight(pool->attrs->cpumask))
+		cpumask_copy(pool->attrs->cpumask, cpumask_of(smp_processor_id()));
+
 	/*
 	 * no_numa isn't a worker_pool attribute, always clear it.  See
 	 * 'struct workqueue_attrs' comments for detail.
@@ -3545,13 +3548,13 @@ static struct pool_workqueue *alloc_unbound_pwq(struct workqueue_struct *wq,
  * stable.
  *
  * Return: %true if the resulting @cpumask is different from @attrs->cpumask,
- * %false if equal.
+ * %false if equal.  On %false return, the content of @cpumask is undefined.
  */
 static bool wq_calc_node_cpumask(const struct workqueue_attrs *attrs, int node,
 				 int cpu_going_down, cpumask_t *cpumask)
 {
 	if (!wq_numa_enabled || attrs->no_numa)
-		goto use_dfl;
+		return false;
 
 	/* does @node have any online CPUs @attrs wants? */
 	cpumask_and(cpumask, cpumask_of_node(node), attrs->cpumask);
@@ -3559,15 +3562,13 @@ static bool wq_calc_node_cpumask(const struct workqueue_attrs *attrs, int node,
 		cpumask_clear_cpu(cpu_going_down, cpumask);
 
 	if (cpumask_empty(cpumask))
-		goto use_dfl;
+		return false;
 
 	/* yeap, return possible CPUs in @node that @attrs wants */
 	cpumask_and(cpumask, attrs->cpumask, wq_numa_possible_cpumask[node]);
-	return !cpumask_equal(cpumask, attrs->cpumask);
 
-use_dfl:
-	cpumask_copy(cpumask, attrs->cpumask);
-	return false;
+	return !cpumask_empty(cpumask) &&
+		!cpumask_equal(cpumask, attrs->cpumask);
 }
 
 /* install @pwq into @wq's numa_pwq_tbl[] for @node and return the old pwq */
