@@ -635,7 +635,7 @@ bool sched_can_stop_tick(struct rq *rq)
 	int fifo_nr_running;
 
 	/* Deadline tasks, even if single, need the tick */
-	if (rq->dl.dl_nr_running)
+	if (dl_nr_running(rq))
 		return false;
 
 	/*
@@ -2174,9 +2174,11 @@ static void __sched_fork(unsigned long clone_flags, struct task_struct *p)
 	memset(&p->se.statistics, 0, sizeof(p->se.statistics));
 #endif
 
+#ifdef CONFIG_SCHED_DL
 	RB_CLEAR_NODE(&p->dl.rb_node);
 	init_dl_task_timer(&p->dl);
 	__dl_clear_params(p);
+#endif
 
 	INIT_LIST_HEAD(&p->rt.run_list);
 	p->rt.timeout		= 0;
@@ -3702,20 +3704,20 @@ void rt_mutex_setprio(struct task_struct *p, struct task_struct *pi_task)
 	if (dl_prio(prio)) {
 		if (!dl_prio(p->normal_prio) ||
 		    (pi_task && dl_entity_preempt(&pi_task->dl, &p->dl))) {
-			p->dl.dl_boosted = 1;
+			dl_boosted(p) = 1;
 			queue_flag |= ENQUEUE_REPLENISH;
 		} else
-			p->dl.dl_boosted = 0;
+			dl_boosted(p) = 0;
 		p->sched_class = &dl_sched_class;
 	} else if (rt_prio(prio)) {
 		if (dl_prio(oldprio))
-			p->dl.dl_boosted = 0;
+			dl_boosted(p) = 0;
 		if (oldprio < prio)
 			queue_flag |= ENQUEUE_HEAD;
 		p->sched_class = &rt_sched_class;
 	} else {
 		if (dl_prio(oldprio))
-			p->dl.dl_boosted = 0;
+			dl_boosted(p) = 0;
 		if (rt_prio(oldprio))
 			p->rt.timeout = 0;
 		p->sched_class = &fair_sched_class;
@@ -5266,7 +5268,8 @@ int cpuset_cpumask_can_shrink(const struct cpumask *cur,
 	if (!cpumask_weight(cur))
 		return ret;
 
-	ret = dl_cpuset_cpumask_can_shrink(cur, trial);
+	if (IS_ENABLED(CONFIG_SCHED_DL))
+		ret = dl_cpuset_cpumask_can_shrink(cur, trial);
 
 	return ret;
 }

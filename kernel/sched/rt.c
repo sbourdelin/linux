@@ -1545,7 +1545,7 @@ pick_next_task_rt(struct rq *rq, struct task_struct *prev, struct rq_flags *rf)
 		 * to re-start task selection.
 		 */
 		if (unlikely((rq->stop && task_on_rq_queued(rq->stop)) ||
-			     rq->dl.dl_nr_running))
+			     dl_nr_running(rq)))
 			return RETRY_TASK;
 	}
 
@@ -2705,16 +2705,19 @@ int sched_rt_handler(struct ctl_table *table, int write,
 		if (ret)
 			goto undo;
 
-		ret = sched_dl_global_validate();
-		if (ret)
-			goto undo;
+		if (IS_ENABLED(CONFIG_SCHED_DL)) {
+			ret = sched_dl_global_validate();
+			if (ret)
+				goto undo;
+		}
 
 		ret = sched_rt_global_constraints();
 		if (ret)
 			goto undo;
 
 		sched_rt_do_global();
-		sched_dl_do_global();
+		if (IS_ENABLED(CONFIG_SCHED_DL))
+			sched_dl_do_global();
 	}
 	if (0) {
 undo:

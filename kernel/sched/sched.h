@@ -137,7 +137,7 @@ static inline int rt_policy(int policy)
 
 static inline int dl_policy(int policy)
 {
-	return policy == SCHED_DEADLINE;
+	return IS_ENABLED(CONFIG_SCHED_DL) && policy == SCHED_DEADLINE;
 }
 static inline bool valid_policy(int policy)
 {
@@ -158,11 +158,15 @@ static inline int task_has_dl_policy(struct task_struct *p)
 /*
  * Tells if entity @a should preempt entity @b.
  */
+#ifdef CONFIG_SCHED_DL
 static inline bool
 dl_entity_preempt(struct sched_dl_entity *a, struct sched_dl_entity *b)
 {
 	return dl_time_before(a->deadline, b->deadline);
 }
+#else
+#define dl_entity_preempt(a, b)	false
+#endif
 
 /*
  * This is the priority-queue data structure of the RT scheduling class:
@@ -244,7 +248,6 @@ bool __dl_overflow(struct dl_bw *dl_b, int cpus, u64 old_bw, u64 new_bw)
 	       dl_b->bw * cpus < dl_b->total_bw - old_bw + new_bw;
 }
 
-extern void init_dl_bw(struct dl_bw *dl_b);
 extern int sched_dl_global_validate(void);
 extern void sched_dl_do_global(void);
 extern int sched_dl_overflow(struct task_struct *p, int policy,
@@ -258,7 +261,27 @@ extern int dl_task_can_attach(struct task_struct *p,
 			      const struct cpumask *cs_cpus_allowed);
 extern int dl_cpuset_cpumask_can_shrink(const struct cpumask *cur,
 					const struct cpumask *trial);
+extern struct dl_bandwidth def_dl_bandwidth;
+
+struct dl_rq;
+
+#ifdef CONFIG_SCHED_DL
+#define dl_nr_running(rq)	(rq)->dl.dl_nr_running
+#define dl_boosted(tsk)		(tsk)->dl.dl_boosted
 extern bool dl_cpu_busy(unsigned int cpu);
+extern void init_dl_bw(struct dl_bw *dl_b);
+extern void init_sched_dl_class(void);
+extern void init_dl_bandwidth(struct dl_bandwidth *dl_b, u64 period, u64 runtime);
+extern void init_dl_rq(struct dl_rq *dl_rq);
+#else
+#define dl_nr_running(rq)	0
+#define dl_boosted(tsk)		(*(int *)0)
+#define dl_cpu_busy(cpu)	false
+#define init_dl_bw(dl_b)	do { } while (0)
+#define init_sched_dl_class()	do { } while (0)
+#define init_dl_bandwidth(...)	do { } while (0)
+#define init_dl_rq(dl_rq)	do { } while (0)
+#endif
 
 #ifdef CONFIG_CGROUP_SCHED
 
@@ -672,7 +695,9 @@ struct rq {
 
 	struct cfs_rq cfs;
 	struct rt_rq rt;
+#ifdef CONFIG_SCHED_DL
 	struct dl_rq dl;
+#endif
 
 #ifdef CONFIG_FAIR_GROUP_SCHED
 	/* list of leaf cfs_rq on this cpu: */
@@ -1443,9 +1468,12 @@ static inline void set_curr_task(struct rq *rq, struct task_struct *curr)
 
 #ifdef CONFIG_SMP
 #define sched_class_highest (&stop_sched_class)
-#else
+#elif defined(CONFIG_SCHED_DL)
 #define sched_class_highest (&dl_sched_class)
+#else
+#define sched_class_highest (&rt_sched_class)
 #endif
+
 #define for_each_class(class) \
    for (class = sched_class_highest; class; class = class->next)
 
@@ -1496,7 +1524,6 @@ extern void sysrq_sched_debug_show(void);
 extern void sched_init_granularity(void);
 extern void update_max_interval(void);
 
-extern void init_sched_dl_class(void);
 extern void init_sched_rt_class(void);
 extern void init_sched_fair_class(void);
 
@@ -1506,8 +1533,6 @@ extern void resched_cpu(int cpu);
 extern struct rt_bandwidth def_rt_bandwidth;
 extern void init_rt_bandwidth(struct rt_bandwidth *rt_b, u64 period, u64 runtime);
 
-extern struct dl_bandwidth def_dl_bandwidth;
-extern void init_dl_bandwidth(struct dl_bandwidth *dl_b, u64 period, u64 runtime);
 extern void init_dl_task_timer(struct sched_dl_entity *dl_se);
 
 unsigned long to_ratio(u64 period, u64 runtime);
@@ -1933,7 +1958,6 @@ print_numa_stats(struct seq_file *m, int node, unsigned long tsf,
 
 extern void init_cfs_rq(struct cfs_rq *cfs_rq);
 extern void init_rt_rq(struct rt_rq *rt_rq);
-extern void init_dl_rq(struct dl_rq *dl_rq);
 
 extern void cfs_bandwidth_usage_inc(void);
 extern void cfs_bandwidth_usage_dec(void);
