@@ -3320,7 +3320,7 @@ enum i915_mm_subclass { /* lockdep subclass for obj->mm.lock */
 
 void __i915_gem_object_put_pages(struct drm_i915_gem_object *obj,
 				 enum i915_mm_subclass subclass);
-void __i915_gem_object_invalidate(struct drm_i915_gem_object *obj);
+void __i915_gem_object_truncate(struct drm_i915_gem_object *obj);
 
 enum i915_map_type {
 	I915_MAP_WB = 0,
