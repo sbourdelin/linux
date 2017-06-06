@@ -765,28 +765,29 @@ static void debug_print_if_state(input_formatter_state_t *state, const char *id)
 
 	val = state->fsm_sync_status;
 
-	if (val > 7)
+	if (val > 7) {
 		fsm_sync_status_str = "ERROR";
-
-	switch (val & 0x7) {
-	case 0:
-		fsm_sync_status_str = "idle";
-		break;
-	case 1:
-		fsm_sync_status_str = "request frame";
-		break;
-	case 2:
-		fsm_sync_status_str = "request lines";
-		break;
-	case 3:
-		fsm_sync_status_str = "request vectors";
-		break;
-	case 4:
-		fsm_sync_status_str = "send acknowledge";
-		break;
-	default:
-		fsm_sync_status_str = "unknown";
-		break;
+	} else {
+		switch (val & 0x7) {
+		case 0:
+			fsm_sync_status_str = "idle";
+			break;
+		case 1:
+			fsm_sync_status_str = "request frame";
+			break;
+		case 2:
+			fsm_sync_status_str = "request lines";
+			break;
+		case 3:
+			fsm_sync_status_str = "request vectors";
+			break;
+		case 4:
+			fsm_sync_status_str = "send acknowledge";
+			break;
+		default:
+			fsm_sync_status_str = "unknown";
+			break;
+		}
 	}
 
 	ia_css_debug_dtrace(2, "\t\t%-32s: (0x%X: %s)\n",
@@ -799,34 +800,35 @@ static void debug_print_if_state(input_formatter_state_t *state, const char *id)
 
 	val = state->fsm_crop_status;
 
-	if (val > 7)
+	if (val > 7) {
 		fsm_crop_status_str = "ERROR";
-
-	switch (val & 0x7) {
-	case 0:
-		fsm_crop_status_str = "idle";
-		break;
-	case 1:
-		fsm_crop_status_str = "wait line";
-		break;
-	case 2:
-		fsm_crop_status_str = "crop line";
-		break;
-	case 3:
-		fsm_crop_status_str = "crop pixel";
-		break;
-	case 4:
-		fsm_crop_status_str = "pass pixel";
-		break;
-	case 5:
-		fsm_crop_status_str = "pass line";
-		break;
-	case 6:
-		fsm_crop_status_str = "lost line";
-		break;
-	default:
-		fsm_crop_status_str = "unknown";
-		break;
+	} else {
+		switch (val & 0x7) {
+		case 0:
+			fsm_crop_status_str = "idle";
+			break;
+		case 1:
+			fsm_crop_status_str = "wait line";
+			break;
+		case 2:
+			fsm_crop_status_str = "crop line";
+			break;
+		case 3:
+			fsm_crop_status_str = "crop pixel";
+			break;
+		case 4:
+			fsm_crop_status_str = "pass pixel";
+			break;
+		case 5:
+			fsm_crop_status_str = "pass line";
+			break;
+		case 6:
+			fsm_crop_status_str = "lost line";
+			break;
+		default:
+			fsm_crop_status_str = "unknown";
+			break;
+		}
 	}
 	ia_css_debug_dtrace(2, "\t\t%-32s: (0x%X: %s)\n",
 			    "FSM Crop Status", val, fsm_crop_status_str);
@@ -852,28 +854,29 @@ static void debug_print_if_state(input_formatter_state_t *state, const char *id)
 
 	val = state->fsm_padding_status;
 
-	if (val > 7)
+	if (val > 7) {
 		fsm_padding_status_str = "ERROR";
-
-	switch (val & 0x7) {
-	case 0:
-		fsm_padding_status_str = "idle";
-		break;
-	case 1:
-		fsm_padding_status_str = "left pad";
-		break;
-	case 2:
-		fsm_padding_status_str = "write";
-		break;
-	case 3:
-		fsm_padding_status_str = "right pad";
-		break;
-	case 4:
-		fsm_padding_status_str = "send end of line";
-		break;
-	default:
-		fsm_padding_status_str = "unknown";
-		break;
+	} else {
+		switch (val & 0x7) {
+		case 0:
+			fsm_padding_status_str = "idle";
+			break;
+		case 1:
+			fsm_padding_status_str = "left pad";
+			break;
+		case 2:
+			fsm_padding_status_str = "write";
+			break;
+		case 3:
+			fsm_padding_status_str = "right pad";
+			break;
+		case 4:
+			fsm_padding_status_str = "send end of line";
+			break;
+		default:
+			fsm_padding_status_str = "unknown";
+			break;
+		}
 	}
 
 	ia_css_debug_dtrace(2, "\t\t%-32s: (0x%X: %s)\n", "FSM Padding Status",
