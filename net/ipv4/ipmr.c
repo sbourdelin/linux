@@ -2528,6 +2528,117 @@ static int ipmr_rtm_route(struct sk_buff *skb, struct nlmsghdr *nlh,
 		return ipmr_mfc_delete(tbl, &mfcc, parent);
 }
 
+static int ipmr_fill_vif(struct mr_table *mrt, int vifid, struct sk_buff *skb)
+{
+	struct vif_device *vif = &mrt->vif_table[vifid];
+	struct ipmr_nl_vif nlvif;
+
+	/* previous existence check should've confirmed it but in case it's
+	 * missing warn and do not signal error so the caller can move on
+	 */
+	if (WARN_ON(!vif->dev))
+		return 0;
+
+	memset(&nlvif, 0, sizeof(nlvif));
+	nlvif.ifindex = vif->dev->ifindex;
+	nlvif.vif_id = vifid;
+	nlvif.flags = vif->flags;
+	nlvif.threshold = vif->threshold;
+	nlvif.local = vif->local;
+	nlvif.remote = vif->remote;
+	nlvif.bytes_in = vif->bytes_in;
+	nlvif.bytes_out = vif->bytes_out;
+	nlvif.packets_in = vif->pkt_in;
+	nlvif.packets_out = vif->pkt_out;
+	nlvif.rate_limit = vif->rate_limit;
+
+	return nla_put(skb, IPMR_NL_VIF_ENTRY, sizeof(nlvif), &nlvif);
+}
+
+static int ipmr_rtm_dumplink(struct sk_buff *skb, struct netlink_callback *cb)
+{
+	struct net *net = sock_net(skb->sk);
+	struct nlmsghdr *nlh = NULL;
+	unsigned int t = 0, s_t;
+	unsigned int e = 0, s_e;
+	struct mr_table *mrt;
+
+	s_t = cb->args[0];
+	s_e = cb->args[1];
+
+	ipmr_for_each_table(mrt, net) {
+		struct nlattr *vifs, *af;
+		struct ipmr_nl_tbl tbl;
+		struct ifinfomsg *hdr;
+		u32 queue_len;
+		int i;
+
+		if (t < s_t)
+			goto skip_table;
+		nlh = nlmsg_put(skb, NETLINK_CB(cb->skb).portid,
+				cb->nlh->nlmsg_seq, RTM_GETLINK,
+				sizeof(*hdr), NLM_F_MULTI);
+		if (!nlh)
+			break;
+
+		hdr = nlmsg_data(nlh);
+		memset(hdr, 0, sizeof(*hdr));
+		hdr->ifi_family = RTNL_FAMILY_IPMR;
+
+		af = nla_nest_start(skb, IFLA_AF_SPEC);
+		if (!af) {
+			nlmsg_cancel(skb, nlh);
+			goto out;
+		}
+
+		if (!s_e) {
+			memset(&tbl, 0, sizeof(tbl));
+			tbl.id = mrt->id;
+			queue_len = atomic_read(&mrt->cache_resolve_queue_len);
+			tbl.cache_resolve_queue_len = queue_len;
+			tbl.mroute_reg_vif_num = mrt->mroute_reg_vif_num;
+			if (nla_put(skb, IPMR_NL_TABLE, sizeof(tbl), &tbl)) {
+				nlmsg_cancel(skb, nlh);
+				goto out;
+			}
+		}
+
+		vifs = nla_nest_start(skb, IPMR_NL_TABLE_VIFS);
+		if (!vifs) {
+			nla_nest_end(skb, af);
+			nlmsg_end(skb, nlh);
+			goto out;
+		}
+		for (i = 0; i < mrt->maxvif; i++) {
+			if (!VIF_EXISTS(mrt, i))
+				continue;
+			if (e < s_e)
+				goto skip_entry;
+			if (ipmr_fill_vif(mrt, i, skb)) {
+				nla_nest_end(skb, vifs);
+				nla_nest_end(skb, af);
+				nlmsg_end(skb, nlh);
+				goto out;
+			}
+skip_entry:
+			e++;
+		}
+		s_e = 0;
+		e = 0;
+		nla_nest_end(skb, vifs);
+		nla_nest_end(skb, af);
+		nlmsg_end(skb, nlh);
+skip_table:
+		t++;
+	}
+
+out:
+	cb->args[1] = e;
+	cb->args[0] = t;
+
+	return skb->len;
+}
+
 #ifdef CONFIG_PROC_FS
 /* The /proc interfaces to multicast routing :
  * /proc/net/ip_mr_cache & /proc/net/ip_mr_vif
@@ -2870,6 +2981,9 @@ int __init ip_mr_init(void)
 		      ipmr_rtm_route, NULL, NULL);
 	rtnl_register(RTNL_FAMILY_IPMR, RTM_DELROUTE,
 		      ipmr_rtm_route, NULL, NULL);
+
+	rtnl_register(RTNL_FAMILY_IPMR, RTM_GETLINK,
+		      NULL, ipmr_rtm_dumplink, NULL);
 	return 0;
 
 #ifdef CONFIG_IP_PIMSM_V2

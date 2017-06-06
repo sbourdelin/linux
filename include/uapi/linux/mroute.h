@@ -110,6 +110,44 @@ struct igmpmsg {
 	struct in_addr im_src,im_dst;
 };
 
+/* netlink table attribute format */
+enum {
+	IPMR_NL_TABLE_UNSPEC,
+	IPMR_NL_TABLE,
+	IPMR_NL_TABLE_VIFS,
+	__IPMR_NL_TABLE_MAX
+};
+#define IPMR_NL_TABLE_MAX (__IPMR_NL_TABLE_MAX - 1)
+
+struct ipmr_nl_tbl {
+	__u32 id;
+	__u32 cache_resolve_queue_len;
+	int mroute_reg_vif_num;
+	__u32 unused;
+};
+
+/* netlink vif attribute format */
+enum {
+	IPMR_NL_VIF_UNSPEC,
+	IPMR_NL_VIF_ENTRY,
+	__IPMR_NL_VIF_MAX
+};
+#define IPMR_NL_VIF_MAX (__IPMR_NL_VIF_MAX - 1)
+
+struct ipmr_nl_vif {
+	unsigned long bytes_in;
+	unsigned long bytes_out;
+	unsigned long packets_in;
+	unsigned long packets_out;
+	unsigned long rate_limit;
+	__u32 ifindex;
+	__u16 vif_id;
+	__u16 flags;
+	__be32 local;
+	__be32 remote;
+	__u8 threshold;
+};
+
 /* That's all usermode folks */
 
 #define MFC_ASSERT_THRESH (3*HZ)		/* Maximal freq. of asserts */
