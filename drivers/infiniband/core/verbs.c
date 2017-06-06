@@ -1253,6 +1253,58 @@ out:
 }
 EXPORT_SYMBOL(ib_resolve_eth_dmac);
 
+void ib_get_speed(struct net_device *netdev, u8 *speed, u8 *width)
+{
+	int rc;
+	u32 netdev_speed = SPEED_UNKNOWN;
+
+	if (netdev->ethtool_ops->get_link_ksettings) {
+		struct ethtool_link_ksettings lksettings;
+
+		rtnl_lock();
+		rc = netdev->ethtool_ops->get_link_ksettings(netdev,
+							     &lksettings);
+		rtnl_unlock();
+
+		if (!rc)
+			netdev_speed = lksettings.base.speed;
+	} else if (netdev->ethtool_ops->get_settings) {
+		struct ethtool_cmd cmd;
+
+		rc = netdev->ethtool_ops->get_settings(netdev, &cmd);
+
+		if (!rc)
+			netdev_speed = cmd.speed;
+	}
+
+	if (netdev_speed == SPEED_UNKNOWN) {
+		netdev_speed = SPEED_1000;
+		pr_warn("%s speed is unknown, defaulting to %d\n", netdev->name,
+			netdev_speed);
+	}
+
+	if (netdev_speed <= SPEED_1000) {
+		*width = IB_WIDTH_1X;
+		*speed = IB_SPEED_SDR;
+	} else if (netdev_speed <= SPEED_10000) {
+		*width = IB_WIDTH_1X;
+		*speed = IB_SPEED_FDR10;
+	} else if (netdev_speed <= SPEED_20000) {
+		*width = IB_WIDTH_4X;
+		*speed = IB_SPEED_DDR;
+	} else if (netdev_speed <= SPEED_25000) {
+		*width = IB_WIDTH_1X;
+		*speed = IB_SPEED_EDR;
+	} else if (netdev_speed <= SPEED_40000) {
+		*width = IB_WIDTH_4X;
+		*speed = IB_SPEED_FDR10;
+	} else {
+		*width = IB_WIDTH_4X;
+		*speed = IB_SPEED_EDR;
+	}
+}
+EXPORT_SYMBOL(ib_get_speed);
+
 int ib_modify_qp(struct ib_qp *qp,
 		 struct ib_qp_attr *qp_attr,
 		 int qp_attr_mask)

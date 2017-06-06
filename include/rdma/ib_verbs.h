@@ -3488,6 +3488,7 @@ void ib_drain_qp(struct ib_qp *qp);
 
 int ib_resolve_eth_dmac(struct ib_device *device,
 			struct rdma_ah_attr *ah_attr);
+void ib_get_speed(struct net_device *netdev, u8 *speed, u8 *width);
 
 static inline u8 *rdma_ah_retrieve_dmac(struct rdma_ah_attr *attr)
 {
