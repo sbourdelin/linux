@@ -133,6 +133,7 @@
 #include <linux/atomic.h>
 #include <linux/blkdev.h>
 #include "../../scsi/scsi.h"
+#include <scsi/scsi_cmnd.h>
 #include <scsi/scsi_host.h>
 
 #include "microtek.h"
