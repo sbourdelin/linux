@@ -1342,7 +1342,7 @@ config MFD_TPS65217
 
 config MFD_TI_LP873X
 	tristate "TI LP873X Power Management IC"
-	depends on I2C
+	depends on I2C && OF
 	select MFD_CORE
 	select REGMAP_I2C
 	help
