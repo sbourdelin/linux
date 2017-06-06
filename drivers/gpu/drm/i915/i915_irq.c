@@ -2722,6 +2722,8 @@ void i915_handle_error(struct drm_i915_private *dev_priv,
 		       u32 engine_mask,
 		       const char *fmt, ...)
 {
+	struct intel_engine_cs *engine;
+	unsigned int tmp;
 	va_list args;
 	char error_msg[80];
 
@@ -2744,11 +2746,54 @@ void i915_handle_error(struct drm_i915_private *dev_priv,
 	if (!engine_mask)
 		goto out;
 
+	/*
+	 * Try engine reset when available. We fall back to full reset if
+	 * single reset fails.
+	 */
+	if (intel_has_reset_engine(dev_priv)) {
+		for_each_engine_masked(engine, dev_priv, engine_mask, tmp) {
+			BUILD_BUG_ON(I915_RESET_HANDOFF >= I915_RESET_ENGINE);
+			if (test_and_set_bit(I915_RESET_ENGINE + engine->id,
+					     &dev_priv->gpu_error.flags))
+				continue;
+
+			if (i915_reset_engine(engine) == 0)
+				engine_mask &= ~engine_mask;
+
+			/*
+			 * Clear unconditionally because full reset won't
+			 * care about reset-engine flags.
+			 */
+			clear_bit(I915_RESET_ENGINE + engine->id,
+				  &dev_priv->gpu_error.flags);
+			wake_up_bit(&dev_priv->gpu_error.flags,
+				    I915_RESET_ENGINE + engine->id);
+		}
+
+		if (!engine_mask)
+			goto out;
+	}
+
+	/* full reset needs the mutex, stop any other user trying to do so */
 	if (test_and_set_bit(I915_RESET_BACKOFF,
 			     &dev_priv->gpu_error.flags))
 		goto out;
 
+	/* prevent any other reset-engine attempt */
+	for_each_engine(engine, dev_priv, tmp) {
+		while (test_and_set_bit(I915_RESET_ENGINE + engine->id,
+					&dev_priv->gpu_error.flags))
+			wait_on_bit(&dev_priv->gpu_error.flags,
+				    I915_RESET_ENGINE + engine->id,
+				    TASK_UNINTERRUPTIBLE);
+	}
+
 	i915_reset_and_wakeup(dev_priv);
+
+	for_each_engine(engine, dev_priv, tmp) {
+		clear_bit(I915_RESET_ENGINE + engine->id,
+			  &dev_priv->gpu_error.flags);
+	}
 
 out:
 	intel_runtime_pm_put(dev_priv);
