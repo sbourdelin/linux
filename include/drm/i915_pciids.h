@@ -334,4 +334,14 @@
 	INTEL_KBL_GT3_IDS(info), \
 	INTEL_KBL_GT4_IDS(info)
 
+#define INTEL_CFL_U_IDS(info) \
+	INTEL_VGA_DEVICE(0x3EA6, info), /* ULT GT3 */ \
+	INTEL_VGA_DEVICE(0x3EA7, info), /* ULT GT3 */ \
+	INTEL_VGA_DEVICE(0x3EA8, info), /* ULT GT3 */ \
+	INTEL_VGA_DEVICE(0x3EA5, info)  /* ULT GT3 */
+
+
+#define INTEL_CFL_IDS(info) \
+	INTEL_CFL_U_IDS(info)
+
 #endif /* _I915_PCIIDS_H */
