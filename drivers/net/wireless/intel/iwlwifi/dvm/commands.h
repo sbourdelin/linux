@@ -1446,13 +1446,6 @@ struct agg_tx_status {
  *   or rate table color was changed during frame retries
  * refer tlc rate info
  */
-
-#define IWL50_TX_RES_INIT_RATE_INDEX_POS	0
-#define IWL50_TX_RES_INIT_RATE_INDEX_MSK	0x0f
-#define IWL50_TX_RES_RATE_TABLE_COLOR_POS	4
-#define IWL50_TX_RES_RATE_TABLE_COLOR_MSK	0x70
-#define IWL50_TX_RES_INV_RATE_INDEX_MSK	0x80
-
 /* refer to ra_tid */
 #define IWLAGN_TX_RES_TID_POS	0
 #define IWLAGN_TX_RES_TID_MSK	0x0f
