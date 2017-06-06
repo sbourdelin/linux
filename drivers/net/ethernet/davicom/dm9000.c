@@ -327,20 +327,12 @@ dm9000_phy_read(struct net_device *dev, int phy_reg_unused, int reg)
 	return ret;
 }
 
-/* Write a word to phyxcer */
 static void
-dm9000_phy_write(struct net_device *dev,
-		 int phyaddr_unused, int reg, int value)
+dm9000_phy_write_reg(struct net_device *dev,
+		     int phyaddr_unused, int reg, int value)
 {
 	struct board_info *db = netdev_priv(dev);
-	unsigned long flags;
 	unsigned long reg_save;
-
-	dm9000_dbg(db, 5, "phy_write[%02x] = %04x\n", reg, value);
-	if (!db->in_timeout)
-		mutex_lock(&db->addr_lock);
-
-	spin_lock_irqsave(&db->lock, flags);
 
 	/* Save previous register address */
 	reg_save = readb(db->io_addr);
@@ -356,17 +348,32 @@ dm9000_phy_write(struct net_device *dev,
 	iow(db, DM9000_EPCR, EPCR_EPOS | EPCR_ERPRW);
 
 	writeb(reg_save, db->io_addr);
-	spin_unlock_irqrestore(&db->lock, flags);
 
-	dm9000_msleep(db, 1);		/* Wait write complete */
+	mdelay(1);	/* Wait write complete */
 
-	spin_lock_irqsave(&db->lock, flags);
 	reg_save = readb(db->io_addr);
 
 	iow(db, DM9000_EPCR, 0x0);	/* Clear phyxcer write command */
 
 	/* restore the previous address */
 	writeb(reg_save, db->io_addr);
+}
+
+/* Write a word to phyxcer */
+static void
+dm9000_phy_write(struct net_device *dev,
+		 int phyaddr_unused, int reg, int value)
+{
+	struct board_info *db = netdev_priv(dev);
+	unsigned long flags;
+
+	dm9000_dbg(db, 5, "phy_write[%02x] = %04x\n", reg, value);
+	if (!db->in_timeout)
+		mutex_lock(&db->addr_lock);
+
+	spin_lock_irqsave(&db->lock, flags);
+
+	dm9000_phy_write_reg(dev, phyaddr_unused, reg, value);
 
 	spin_unlock_irqrestore(&db->lock, flags);
 	if (!db->in_timeout)
@@ -933,8 +940,8 @@ dm9000_init_dm9000(struct net_device *dev)
 	 * manual phy reset, and setting init params.
 	 */
 	if (db->type == TYPE_DM9000B) {
-		dm9000_phy_write(dev, 0, MII_BMCR, BMCR_RESET);
-		dm9000_phy_write(dev, 0, MII_DM_DSPCR, DSPCR_INIT_PARAM);
+		dm9000_phy_write_reg(dev, 0, MII_BMCR, BMCR_RESET);
+		dm9000_phy_write_reg(dev, 0, MII_DM_DSPCR, DSPCR_INIT_PARAM);
 	}
 
 	ncr = (db->flags & DM9000_PLATF_EXT_PHY) ? NCR_EXT_PHY : 0;
