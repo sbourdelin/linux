@@ -327,6 +327,9 @@ static long restore_sigcontext(struct task_struct *tsk, sigset_t *set, int sig,
 	unsigned long save_r13 = 0;
 	unsigned long msr;
 	struct pt_regs *regs = tsk->thread.regs;
+#ifdef CONFIG_PPC64_MEMORY_PROTECTION_KEYS
+	unsigned long amr;
+#endif /* CONFIG_PPC64_MEMORY_PROTECTION_KEYS */
 #ifdef CONFIG_VSX
 	int i;
 #endif
@@ -406,6 +409,14 @@ static long restore_sigcontext(struct task_struct *tsk, sigset_t *set, int sig,
 			tsk->thread.fp_state.fpr[i][TS_VSRLOWOFFSET] = 0;
 	}
 #endif
+
+#ifdef CONFIG_PPC64_MEMORY_PROTECTION_KEYS
+	amr = regs->amr;
+	err |= __get_user(regs->amr, &sc->gp_regs[PT_AMR]);
+	if (!err && amr != regs->amr)
+		mtspr(SPRN_AMR, regs->amr);
+#endif /* CONFIG_PPC64_MEMORY_PROTECTION_KEYS */
+
 	return err;
 }
 

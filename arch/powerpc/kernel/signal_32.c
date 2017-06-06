@@ -141,9 +141,11 @@ static inline int save_general_regs(struct pt_regs *regs,
 
 	WARN_ON(!FULL_REGS(regs));
 
-	for (i = 0; i <= PT_RESULT; i ++) {
+	for (i = 0; i <= PT_REGS_COUNT; i++) {
 		if (i == 14 && !FULL_REGS(regs))
 			i = 32;
+		if (i == PT_DSCR)
+			continue;
 		if (__put_user((unsigned int)gregs[i], &frame->mc_gregs[i]))
 			return -EFAULT;
 	}
@@ -156,8 +158,8 @@ static inline int restore_general_regs(struct pt_regs *regs,
 	elf_greg_t64 *gregs = (elf_greg_t64 *)regs;
 	int i;
 
-	for (i = 0; i <= PT_RESULT; i++) {
-		if ((i == PT_MSR) || (i == PT_SOFTE))
+	for (i = 0; i <= PT_REGS_COUNT; i++) {
+		if ((i == PT_MSR) || (i == PT_SOFTE) || (i == PT_DSCR))
 			continue;
 		if (__get_user(gregs[i], &sr->mc_gregs[i]))
 			return -EFAULT;
@@ -661,6 +663,9 @@ static long restore_user_regs(struct pt_regs *regs,
 	long err;
 	unsigned int save_r2 = 0;
 	unsigned long msr;
+#ifdef CONFIG_PPC64_MEMORY_PROTECTION_KEYS
+	unsigned long amr;
+#endif /* CONFIG_PPC64_MEMORY_PROTECTION_KEYS */
 #ifdef CONFIG_VSX
 	int i;
 #endif
@@ -749,6 +754,13 @@ static long restore_user_regs(struct pt_regs *regs,
 	if (__get_user(current->thread.spefscr, (u32 __user *)&sr->mc_vregs + ELF_NEVRREG))
 		return 1;
 #endif /* CONFIG_SPE */
+
+#ifdef CONFIG_PPC64_MEMORY_PROTECTION_KEYS
+	amr = regs->amr;
+	err |= __get_user(regs->amr, &sr->mc_gregs[PT_AMR]);
+	if (!err && amr != regs->amr)
+		mtspr(SPRN_AMR, regs->amr);
+#endif /* CONFIG_PPC64_MEMORY_PROTECTION_KEYS */
 
 	return 0;
 }

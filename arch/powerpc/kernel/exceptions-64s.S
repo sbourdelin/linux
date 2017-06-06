@@ -493,6 +493,10 @@ EXC_COMMON_BEGIN(data_access_common)
 	ld	r12,_MSR(r1)
 	ld	r3,PACA_EXGEN+EX_DAR(r13)
 	lwz	r4,PACA_EXGEN+EX_DSISR(r13)
+#ifdef CONFIG_PPC64_MEMORY_PROTECTION_KEYS
+	mfspr	r5,SPRN_AMR
+	std	r5,_AMR(r1)
+#endif /*  CONFIG_PPC64_MEMORY_PROTECTION_KEYS */
 	li	r5,0x300
 	std	r3,_DAR(r1)
 	std	r4,_DSISR(r1)
@@ -561,6 +565,10 @@ EXC_COMMON_BEGIN(instruction_access_common)
 	ld	r12,_MSR(r1)
 	ld	r3,_NIP(r1)
 	andis.	r4,r12,0x5820
+#ifdef CONFIG_PPC64_MEMORY_PROTECTION_KEYS
+	mfspr	r5,SPRN_AMR
+	std	r5,_AMR(r1)
+#endif /*  CONFIG_PPC64_MEMORY_PROTECTION_KEYS */
 	li	r5,0x400
 	std	r3,_DAR(r1)
 	std	r4,_DSISR(r1)
