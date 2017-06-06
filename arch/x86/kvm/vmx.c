@@ -556,6 +556,29 @@ static inline int pi_test_sn(struct pi_desc *pi_desc)
 			(unsigned long *)&pi_desc->control);
 }
 
+/* Note that this is not an atomic operation.  */
+static inline void __pi_set_ndst(struct pi_desc *pi_desc, unsigned cpu)
+{
+	unsigned dest = cpu_physical_id(cpu);
+
+	if (x2apic_enabled())
+		pi_desc->ndst = dest;
+	else
+		pi_desc->ndst = (dest << 8) & 0xFF00;
+}
+
+static inline bool pi_try_cmpxchg_control(struct pi_desc *pi_desc,
+					  struct pi_desc *old,
+					  struct pi_desc *new)
+{
+	if (cmpxchg(&pi_desc->control, old->control,
+		    new->control) == old->control)
+		return true;
+
+	old->control = READ_ONCE(pi_desc->control);
+	return false;
+}
+
 struct vcpu_vmx {
 	struct kvm_vcpu       vcpu;
 	unsigned long         host_rsp;
@@ -2182,7 +2205,6 @@ static void vmx_vcpu_pi_load(struct kvm_vcpu *vcpu, int cpu)
 {
 	struct pi_desc *pi_desc = vcpu_to_pi_desc(vcpu);
 	struct pi_desc old, new;
-	unsigned int dest;
 
 	/*
 	 * In case of hot-plug or hot-unplug, we may have to undo
@@ -2209,19 +2231,12 @@ static void vmx_vcpu_pi_load(struct kvm_vcpu *vcpu, int cpu)
 	}
 
 	/* The full case.  */
+	old.control = pi_desc->control;
 	do {
-		old.control = new.control = pi_desc->control;
-
-		dest = cpu_physical_id(cpu);
-
-		if (x2apic_enabled())
-			new.ndst = dest;
-		else
-			new.ndst = (dest << 8) & 0xFF00;
-
+		new.control = old.control;
+		__pi_set_ndst(&new, cpu);
 		new.sn = 0;
-	} while (cmpxchg(&pi_desc->control, old.control,
-			new.control) != old.control);
+	} while (!pi_try_cmpxchg_control(pi_desc, &old, &new));
 }
 
 static void decache_tsc_multiplier(struct vcpu_vmx *vmx)
@@ -11226,24 +11241,16 @@ static void __pi_post_block(struct kvm_vcpu *vcpu)
 {
 	struct pi_desc *pi_desc = vcpu_to_pi_desc(vcpu);
 	struct pi_desc old, new;
-	unsigned int dest;
 
+	old.control = pi_desc->control;
 	do {
-		old.control = new.control = pi_desc->control;
 		WARN(old.nv != POSTED_INTR_WAKEUP_VECTOR,
 		     "Wakeup handler not enabled while the VCPU is blocked\n");
 
-		dest = cpu_physical_id(vcpu->cpu);
-
-		if (x2apic_enabled())
-			new.ndst = dest;
-		else
-			new.ndst = (dest << 8) & 0xFF00;
-
-		/* set 'NV' to 'notification vector' */
+		new.control = old.control;
+		__pi_set_ndst(&new, vcpu->cpu);
 		new.nv = POSTED_INTR_VECTOR;
-	} while (cmpxchg(&pi_desc->control, old.control,
-			new.control) != old.control);
+	} while (!pi_try_cmpxchg_control(pi_desc, &old, &new));
 
 	if (!WARN_ON_ONCE(vcpu->pre_pcpu == -1)) {
 		spin_lock(&per_cpu(blocked_vcpu_on_cpu_lock, vcpu->pre_pcpu));
@@ -11251,6 +11258,7 @@ static void __pi_post_block(struct kvm_vcpu *vcpu)
 		spin_unlock(&per_cpu(blocked_vcpu_on_cpu_lock, vcpu->pre_pcpu));
 		vcpu->pre_pcpu = -1;
 	}
+
 }
 
 /*
@@ -11268,7 +11276,6 @@ static void __pi_post_block(struct kvm_vcpu *vcpu)
  */
 static int pi_pre_block(struct kvm_vcpu *vcpu)
 {
-	unsigned int dest;
 	struct pi_desc old, new;
 	struct pi_desc *pi_desc = vcpu_to_pi_desc(vcpu);
 
@@ -11288,32 +11295,22 @@ static int pi_pre_block(struct kvm_vcpu *vcpu)
 		spin_unlock(&per_cpu(blocked_vcpu_on_cpu_lock, vcpu->pre_pcpu));
 	}
 
+	old.control = pi_desc->control;
 	do {
-		old.control = new.control = pi_desc->control;
-
 		WARN((pi_desc->sn == 1),
 		     "Warning: SN field of posted-interrupts "
 		     "is set before blocking\n");
 
 		/*
-		 * Since vCPU can be preempted during this process,
-		 * vcpu->cpu could be different with pre_pcpu, we
-		 * need to set pre_pcpu as the destination of wakeup
-		 * notification event, then we can find the right vCPU
-		 * to wakeup in wakeup handler if interrupts happen
-		 * when the vCPU is in blocked state.
+		 * The wakeup_handler expects the VCPU to be on the
+		 * blocked_vcpu_list that matches ndst.  Interrupts
+		 * are disabled so no preemption should happen, but
+		 * err on the side of safety.
 		 */
-		dest = cpu_physical_id(vcpu->pre_pcpu);
-
-		if (x2apic_enabled())
-			new.ndst = dest;
-		else
-			new.ndst = (dest << 8) & 0xFF00;
-
-		/* set 'NV' to 'wakeup vector' */
+		new.control = old.control;
+		__pi_set_ndst(&new, vcpu->pre_pcpu);
 		new.nv = POSTED_INTR_WAKEUP_VECTOR;
-	} while (cmpxchg(&pi_desc->control, old.control,
-			new.control) != old.control);
+	} while (!pi_try_cmpxchg_control(pi_desc, &old, &new));
 
 	/* We should not block the vCPU if an interrupt is posted for it.  */
 	if (pi_test_on(pi_desc) == 1)
