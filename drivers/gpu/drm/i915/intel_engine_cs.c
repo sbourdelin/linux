@@ -1076,6 +1076,30 @@ static int bxt_init_workarounds(struct intel_engine_cs *engine)
 	return 0;
 }
 
+static int cnl_init_workarounds(struct intel_engine_cs *engine)
+{
+	struct drm_i915_private *dev_priv = engine->i915;
+	int ret;
+
+	/* WaInPlaceDecompressionHang:cnl */
+	WA_SET_BIT(GEN9_GAMT_ECO_REG_RW_IA,
+		   GAMT_ECO_ENABLE_IN_PLACE_DECOMPRESS);
+
+	/* WaEnablePreemptionGranularityControlByUMD:cnl */
+	ret= wa_ring_whitelist_reg(engine, GEN8_CS_CHICKEN1);
+	if (ret)
+		return ret;
+
+	/* WaAllowUMDToModifyHDCChicken1:cnl (pre-prod) */
+	if (IS_CNL_REVID(dev_priv, CNL_REVID_A0, CNL_REVID_A0)) {
+		ret = wa_ring_whitelist_reg(engine, GEN8_HDC_CHICKEN1);
+		if (ret)
+			return ret;
+	}
+
+	return 0;
+}
+
 static int kbl_init_workarounds(struct intel_engine_cs *engine)
 {
 	struct drm_i915_private *dev_priv = engine->i915;
@@ -1162,6 +1186,8 @@ int init_workarounds_ring(struct intel_engine_cs *engine)
 		err = kbl_init_workarounds(engine);
 	else if (IS_GEMINILAKE(dev_priv))
 		err =  glk_init_workarounds(engine);
+	else if (IS_CANNONLAKE(dev_priv))
+		err = cnl_init_workarounds(engine);
 	else
 		err = 0;
 	if (err)
