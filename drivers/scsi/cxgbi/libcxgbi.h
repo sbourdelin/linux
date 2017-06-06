@@ -596,7 +596,7 @@ int cxgbi_set_host_param(struct Scsi_Host *,
 			enum iscsi_host_param, char *, int);
 int cxgbi_get_host_param(struct Scsi_Host *, enum iscsi_host_param, char *);
 struct iscsi_endpoint *cxgbi_ep_connect(struct Scsi_Host *,
-			struct sockaddr *, int);
+			struct sockaddr_storage *, int, struct iface_rec *);
 int cxgbi_ep_poll(struct iscsi_endpoint *, int);
 void cxgbi_ep_disconnect(struct iscsi_endpoint *);
 

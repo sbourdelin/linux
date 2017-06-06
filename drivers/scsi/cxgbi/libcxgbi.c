@@ -2499,8 +2499,9 @@ int cxgbi_get_host_param(struct Scsi_Host *shost, enum iscsi_host_param param,
 EXPORT_SYMBOL_GPL(cxgbi_get_host_param);
 
 struct iscsi_endpoint *cxgbi_ep_connect(struct Scsi_Host *shost,
-					struct sockaddr *dst_addr,
-					int non_blocking)
+					struct sockaddr_storage *dst_addr,
+					int non_blocking,
+					struct iface_rec *iface)
 {
 	struct iscsi_endpoint *ep;
 	struct cxgbi_endpoint *cep;
@@ -2520,15 +2521,15 @@ struct iscsi_endpoint *cxgbi_ep_connect(struct Scsi_Host *shost,
 		}
 	}
 
-	if (dst_addr->sa_family == AF_INET) {
-		csk = cxgbi_check_route(dst_addr);
+	if (dst_addr->ss_family == AF_INET) {
+		csk = cxgbi_check_route((struct sockaddr *)dst_addr);
 #if IS_ENABLED(CONFIG_IPV6)
-	} else if (dst_addr->sa_family == AF_INET6) {
-		csk = cxgbi_check_route6(dst_addr);
+	} else if (dst_addr->ss_family == AF_INET6) {
+		csk = cxgbi_check_route6((struct sockaddr *)dst_addr);
 #endif
 	} else {
 		pr_info("address family 0x%x NOT supported.\n",
-			dst_addr->sa_family);
+			dst_addr->ss_family);
 		err = -EAFNOSUPPORT;
 		return (struct iscsi_endpoint *)ERR_PTR(err);
 	}
