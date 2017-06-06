@@ -1207,7 +1207,7 @@ config MFD_DM355EVM_MSP
 
 config MFD_LP3943
 	tristate "TI/National Semiconductor LP3943 MFD Driver"
-	depends on I2C
+	depends on I2C && OF
 	select MFD_CORE
 	select REGMAP_I2C
 	help
