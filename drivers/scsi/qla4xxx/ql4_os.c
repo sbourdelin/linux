@@ -119,8 +119,9 @@ static int qla4xxx_get_iface_param(struct iscsi_iface *iface,
 				   int param, char *buf);
 static enum blk_eh_timer_return qla4xxx_eh_cmd_timed_out(struct scsi_cmnd *sc);
 static struct iscsi_endpoint *qla4xxx_ep_connect(struct Scsi_Host *shost,
-						 struct sockaddr *dst_addr,
-						 int non_blocking);
+						 struct sockaddr_storage *dst_addr,
+						 int non_blocking,
+						 struct iface_rec *iface);
 static int qla4xxx_ep_poll(struct iscsi_endpoint *ep, int timeout_ms);
 static void qla4xxx_ep_disconnect(struct iscsi_endpoint *ep);
 static int qla4xxx_get_ep_param(struct iscsi_endpoint *ep,
@@ -1656,8 +1657,8 @@ static int qla4xxx_get_iface_param(struct iscsi_iface *iface,
 }
 
 static struct iscsi_endpoint *
-qla4xxx_ep_connect(struct Scsi_Host *shost, struct sockaddr *dst_addr,
-		   int non_blocking)
+qla4xxx_ep_connect(struct Scsi_Host *shost, struct sockaddr_storage *dst_addr,
+		   int non_blocking, struct iface_rec *iface)
 {
 	int ret;
 	struct iscsi_endpoint *ep;
@@ -1681,12 +1682,12 @@ qla4xxx_ep_connect(struct Scsi_Host *shost, struct sockaddr *dst_addr,
 
 	qla_ep = ep->dd_data;
 	memset(qla_ep, 0, sizeof(struct qla_endpoint));
-	if (dst_addr->sa_family == AF_INET) {
+	if (dst_addr->ss_family == AF_INET) {
 		memcpy(&qla_ep->dst_addr, dst_addr, sizeof(struct sockaddr_in));
 		addr = (struct sockaddr_in *)&qla_ep->dst_addr;
 		DEBUG2(ql4_printk(KERN_INFO, ha, "%s: %pI4\n", __func__,
 				  (char *)&addr->sin_addr));
-	} else if (dst_addr->sa_family == AF_INET6) {
+	} else if (dst_addr->ss_family == AF_INET6) {
 		memcpy(&qla_ep->dst_addr, dst_addr,
 		       sizeof(struct sockaddr_in6));
 		addr6 = (struct sockaddr_in6 *)&qla_ep->dst_addr;
@@ -6569,7 +6570,7 @@ static struct iscsi_endpoint *qla4xxx_get_ep_fwdb(struct scsi_qla_host *ha,
 		addr->sin_port = htons(le16_to_cpu(fw_ddb_entry->port));
 	}
 
-	ep = qla4xxx_ep_connect(ha->host, (struct sockaddr *)dst_addr, 0);
+	ep = qla4xxx_ep_connect(ha->host, dst_addr, 0, NULL);
 	vfree(dst_addr);
 	return ep;
 }
