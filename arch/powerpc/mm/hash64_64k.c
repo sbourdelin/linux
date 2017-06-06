@@ -15,34 +15,13 @@
 #include <linux/mm.h>
 #include <asm/machdep.h>
 #include <asm/mmu.h>
+
 /*
  * index from 0 - 15
  */
 bool __rpte_sub_valid(real_pte_t rpte, unsigned long index)
 {
-	unsigned long g_idx;
-	unsigned long ptev = pte_val(rpte.pte);
-
-	g_idx = (ptev & H_PAGE_COMBO_VALID) >> H_PAGE_F_GIX_SHIFT;
-	index = index >> 2;
-	if (g_idx & (0x1 << index))
-		return true;
-	else
-		return false;
-}
-/*
- * index from 0 - 15
- */
-static unsigned long mark_subptegroup_valid(unsigned long ptev, unsigned long index)
-{
-	unsigned long g_idx;
-
-	if (!(ptev & H_PAGE_COMBO))
-		return ptev;
-	index = index >> 2;
-	g_idx = 0x1 << index;
-
-	return ptev | (g_idx << H_PAGE_F_GIX_SHIFT);
+	return !(HPTE_SOFT_INVALID(rpte.hidx >> (index << 2)));
 }
 
 int __hash_page_4K(unsigned long ea, unsigned long access, unsigned long vsid,
@@ -50,10 +29,9 @@ int __hash_page_4K(unsigned long ea, unsigned long access, unsigned long vsid,
 		   int ssize, int subpg_prot)
 {
 	real_pte_t rpte;
-	unsigned long *hidxp;
 	unsigned long hpte_group;
 	unsigned int subpg_index;
-	unsigned long rflags, pa, hidx;
+	unsigned long rflags, pa;
 	unsigned long old_pte, new_pte, subpg_pte;
 	unsigned long vpn, hash, slot;
 	unsigned long shift = mmu_psize_defs[MMU_PAGE_4K].shift;
@@ -116,8 +94,9 @@ int __hash_page_4K(unsigned long ea, unsigned long access, unsigned long vsid,
 		 * On hash insert failure we use old pte value and we don't
 		 * want slot information there if we have a insert failure.
 		 */
-		old_pte &= ~(H_PAGE_HASHPTE | H_PAGE_F_GIX | H_PAGE_F_SECOND);
-		new_pte &= ~(H_PAGE_HASHPTE | H_PAGE_F_GIX | H_PAGE_F_SECOND);
+		old_pte &= ~(H_PAGE_HASHPTE);
+		new_pte &= ~(H_PAGE_HASHPTE);
+		rpte.hidx = INIT_HIDX;
 		goto htab_insert_hpte;
 	}
 	/*
@@ -126,18 +105,12 @@ int __hash_page_4K(unsigned long ea, unsigned long access, unsigned long vsid,
 	if (__rpte_sub_valid(rpte, subpg_index)) {
 		int ret;
 
-		hash = hpt_hash(vpn, shift, ssize);
-		hidx = __rpte_to_hidx(rpte, subpg_index);
-		if (hidx & _PTEIDX_SECONDARY)
-			hash = ~hash;
-		slot = (hash & htab_hash_mask) * HPTES_PER_GROUP;
-		slot += hidx & _PTEIDX_GROUP_IX;
-
+		slot = get_hidx_slot(vpn, shift, ssize, rpte, subpg_index);
 		ret = mmu_hash_ops.hpte_updatepp(slot, rflags, vpn,
 						 MMU_PAGE_4K, MMU_PAGE_4K,
 						 ssize, flags);
 		/*
-		 *if we failed because typically the HPTE wasn't really here
+		 * if we failed because typically the HPTE wasn't really here
 		 * we try an insertion.
 		 */
 		if (ret == -1)
@@ -177,8 +150,14 @@ repeat:
 						rflags, HPTE_V_SECONDARY,
 						MMU_PAGE_4K, MMU_PAGE_4K,
 						ssize);
-		if (slot == -1) {
-			if (mftb() & 0x1)
+		if (unlikely(HPTE_SOFT_INVALID(slot)))
+			mmu_hash_ops.hpte_invalidate(slot, vpn,
+				MMU_PAGE_4K, MMU_PAGE_4K,
+				ssize, (flags & HPTE_LOCAL_UPDATE));
+
+		if (unlikely(slot == -1 || HPTE_SOFT_INVALID(slot))) {
+			if (HPTE_SOFT_INVALID(slot) || (mftb() & 0x1))
+
 				hpte_group = ((hash & htab_hash_mask) *
 					      HPTES_PER_GROUP) & ~0x7UL;
 			mmu_hash_ops.hpte_remove(hpte_group);
@@ -204,11 +183,9 @@ repeat:
 	 * Since we have H_PAGE_BUSY set on ptep, we can be sure
 	 * nobody is undating hidx.
 	 */
-	hidxp = (unsigned long *)(ptep + PTRS_PER_PTE);
-	rpte.hidx &= ~(0xfUL << (subpg_index << 2));
-	*hidxp = rpte.hidx  | (slot << (subpg_index << 2));
-	new_pte = mark_subptegroup_valid(new_pte, subpg_index);
-	new_pte |=  H_PAGE_HASHPTE;
+	new_pte |= set_hidx_slot(ptep, rpte, subpg_index, slot);
+	new_pte |= H_PAGE_HASHPTE;
+
 	/*
 	 * check __real_pte for details on matching smp_rmb()
 	 */
@@ -221,6 +198,7 @@ int __hash_page_64K(unsigned long ea, unsigned long access,
 		    unsigned long vsid, pte_t *ptep, unsigned long trap,
 		    unsigned long flags, int ssize)
 {
+	real_pte_t rpte;
 	unsigned long hpte_group;
 	unsigned long rflags, pa;
 	unsigned long old_pte, new_pte;
@@ -257,6 +235,7 @@ int __hash_page_64K(unsigned long ea, unsigned long access,
 	} while (!pte_xchg(ptep, __pte(old_pte), __pte(new_pte)));
 
 	rflags = htab_convert_pte_flags(new_pte);
+	rpte = __real_pte(__pte(old_pte), ptep);
 
 	if (cpu_has_feature(CPU_FTR_NOEXECUTE) &&
 	    !cpu_has_feature(CPU_FTR_COHERENT_ICACHE))
@@ -267,12 +246,7 @@ int __hash_page_64K(unsigned long ea, unsigned long access,
 		/*
 		 * There MIGHT be an HPTE for this pte
 		 */
-		hash = hpt_hash(vpn, shift, ssize);
-		if (old_pte & H_PAGE_F_SECOND)
-			hash = ~hash;
-		slot = (hash & htab_hash_mask) * HPTES_PER_GROUP;
-		slot += (old_pte & H_PAGE_F_GIX) >> H_PAGE_F_GIX_SHIFT;
-
+		slot = get_hidx_slot(vpn, shift, ssize, rpte, 0);
 		if (mmu_hash_ops.hpte_updatepp(slot, rflags, vpn, MMU_PAGE_64K,
 					       MMU_PAGE_64K, ssize,
 					       flags) == -1)
@@ -322,9 +296,8 @@ repeat:
 					   MMU_PAGE_64K, MMU_PAGE_64K, old_pte);
 			return -1;
 		}
+		set_hidx_slot(ptep, rpte, 0, slot);
 		new_pte = (new_pte & ~_PAGE_HPTEFLAGS) | H_PAGE_HASHPTE;
-		new_pte |= (slot << H_PAGE_F_GIX_SHIFT) &
-			(H_PAGE_F_SECOND | H_PAGE_F_GIX);
 	}
 	*ptep = __pte(new_pte & ~H_PAGE_BUSY);
 	return 0;

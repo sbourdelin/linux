@@ -16,6 +16,18 @@
 #define H_PUD_TABLE_SIZE	(sizeof(pud_t) << H_PUD_INDEX_SIZE)
 #define H_PGD_TABLE_SIZE	(sizeof(pgd_t) << H_PGD_INDEX_SIZE)
 
+
+/*
+ * Only supported by 4k linux page size
+ */
+#define H_PAGE_F_SECOND        _RPAGE_RSV2     /* HPTE is in 2ndary HPTEG */
+#define H_PAGE_F_GIX           (_RPAGE_RSV3 | _RPAGE_RSV4 | _RPAGE_RPN44)
+#define H_PAGE_F_GIX_SHIFT     56
+
+#define H_PAGE_BUSY	_RPAGE_RSV1     /* software: PTE & hash are busy */
+#define H_PAGE_HASHPTE	_RPAGE_RPN43    /* PTE has associated HPTE */
+
+
 /* PTE flags to conserve for HPTE identification */
 #define _PAGE_HPTEFLAGS (H_PAGE_BUSY | H_PAGE_HASHPTE | \
 			 H_PAGE_F_SECOND | H_PAGE_F_GIX)

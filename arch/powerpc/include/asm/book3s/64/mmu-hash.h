@@ -435,6 +435,11 @@ extern int __hash_page_4K(unsigned long ea, unsigned long access,
 extern int __hash_page_64K(unsigned long ea, unsigned long access,
 			   unsigned long vsid, pte_t *ptep, unsigned long trap,
 			   unsigned long flags, int ssize);
+extern unsigned long set_hidx_slot(pte_t *ptep, real_pte_t rpte,
+			unsigned int subpg_index, unsigned long slot);
+extern unsigned long get_hidx_slot(unsigned long vpn, unsigned long shift,
+			int ssize, real_pte_t rpte, unsigned int subpg_index);
+
 struct mm_struct;
 unsigned int hash_page_do_lazy_icache(unsigned int pp, pte_t pte, int trap);
 extern int hash_page_mm(struct mm_struct *mm, unsigned long ea,
