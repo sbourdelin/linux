@@ -52,7 +52,7 @@
 #define int_tofp(X) ((int64_t)(X) << FRAC_BITS)
 #define fp_toint(X) ((X) >> FRAC_BITS)
 
-#define EXT_BITS 6
+#define EXT_BITS 7
 #define EXT_FRAC_BITS (EXT_BITS + FRAC_BITS)
 #define fp_ext_toint(X) ((X) >> EXT_FRAC_BITS)
 #define int_ext_tofp(X) ((int64_t)(X) << EXT_FRAC_BITS)
