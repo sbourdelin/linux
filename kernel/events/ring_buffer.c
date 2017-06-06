@@ -126,6 +126,7 @@ __perf_output_begin(struct perf_output_handle *handle,
 		u64			 id;
 		u64			 lost;
 	} lost_event;
+	int events = atomic_read(&event->event_limit);
 
 	rcu_read_lock();
 	/*
@@ -196,6 +197,14 @@ __perf_output_begin(struct perf_output_handle *handle,
 
 	if (unlikely(head - local_read(&rb->wakeup) > rb->watermark))
 		local_add(rb->watermark, &rb->wakeup);
+
+	if (events && event->count_records &&
+			atomic_dec_and_test(&event->event_limit)) {
+		event->pending_kill = POLL_HUP;
+		local_inc(&rb->wakeup);
+
+		perf_event_disable_inatomic(event);
+	}
 
 	page_shift = PAGE_SHIFT + page_order(rb);
 
