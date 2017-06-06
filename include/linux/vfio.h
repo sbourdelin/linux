@@ -150,7 +150,7 @@ extern int vfio_set_irqs_validate_and_prepare(struct vfio_irq_set *hdr,
 					      size_t *data_size);
 
 struct pci_dev;
-#ifdef CONFIG_EEH
+#ifdef CONFIG_VFIO_SPAPR_EEH
 extern void vfio_spapr_pci_eeh_open(struct pci_dev *pdev);
 extern void vfio_spapr_pci_eeh_release(struct pci_dev *pdev);
 extern long vfio_spapr_iommu_eeh_ioctl(struct iommu_group *group,
@@ -171,7 +171,7 @@ static inline long vfio_spapr_iommu_eeh_ioctl(struct iommu_group *group,
 {
 	return -ENOTTY;
 }
-#endif /* CONFIG_EEH */
+#endif /* CONFIG_VFIO_SPAPR_EEH */
 
 /*
  * IRQfd - generic
