@@ -642,15 +642,27 @@ static irqreturn_t mv64x60_mc_isr(int irq, void *dev_id)
 static void get_total_mem(struct mv64x60_mc_pdata *pdata)
 {
 	struct device_node *np = NULL;
-	const unsigned int *reg;
+	const unsigned int *reg, *reg_end;
+	int len, sw, aw;
+	unsigned long start, size, total_mem = 0;
 
-	np = of_find_node_by_type(NULL, "memory");
-	if (!np)
-		return;
+	for_each_node_by_type(np, "memory") {
+		aw = of_n_addr_cells(np);
+		sw = of_n_size_cells(np);
+		reg = of_get_property(np, "reg", &len);
+		reg_end = reg + (len / sizeof(u32));
 
-	reg = of_get_property(np, "reg", NULL);
+		total_mem = 0;
+		do {
+			start = of_read_number(reg, aw);
+			reg += aw;
+			size = of_read_number(reg, sw);
+			reg += sw;
+			total_mem += size;
+		} while (reg < reg_end);
+	}
 
-	pdata->total_mem = reg[1];
+	pdata->total_mem = total_mem;
 }
 
 static void mv64x60_init_csrows(struct mem_ctl_info *mci,
