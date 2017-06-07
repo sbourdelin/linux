@@ -801,18 +801,27 @@ static void end_workqueue_bio(struct bio *bio)
 	end_io_wq->error = bio->bi_error;
 
 	if (bio_op(bio) == REQ_OP_WRITE) {
-		if (end_io_wq->metadata == BTRFS_WQ_ENDIO_METADATA) {
-			wq = fs_info->endio_meta_write_workers;
-			func = btrfs_endio_meta_write_helper;
-		} else if (end_io_wq->metadata == BTRFS_WQ_ENDIO_FREE_SPACE) {
-			wq = fs_info->endio_freespace_worker;
-			func = btrfs_freespace_write_helper;
-		} else if (end_io_wq->metadata == BTRFS_WQ_ENDIO_RAID56) {
-			wq = fs_info->endio_raid56_workers;
-			func = btrfs_endio_raid56_helper;
-		} else {
+		switch (end_io_wq->metadata) {
+		case BTRFS_WQ_ENDIO_DATA:
 			wq = fs_info->endio_write_workers;
 			func = btrfs_endio_write_helper;
+			break;
+		case BTRFS_WQ_ENDIO_METADATA:
+			wq = fs_info->endio_meta_write_workers;
+			func = btrfs_endio_meta_write_helper;
+			break;
+		case BTRFS_WQ_ENDIO_FREE_SPACE:
+			wq = fs_info->endio_freespace_worker;
+			func = btrfs_freespace_write_helper;
+			break;
+		case BTRFS_WQ_ENDIO_RAID56:
+			wq = fs_info->endio_raid56_workers;
+			func = btrfs_endio_raid56_helper;
+			break;
+		case BTRFS_WQ_ENDIO_DIO_REPAIR:
+			wq = fs_info->endio_write_workers;
+			func = btrfs_endio_write_helper;
+			break;
 		}
 	} else {
 		if (unlikely(end_io_wq->metadata ==
