@@ -71,16 +71,17 @@ struct inode_defrag {
 static int __compare_inode_defrag(struct inode_defrag *defrag1,
 				  struct inode_defrag *defrag2)
 {
-	if (defrag1->root > defrag2->root)
-		return 1;
-	else if (defrag1->root < defrag2->root)
+	if (defrag1->root != defrag2->root) {
+		if (defrag1->root > defrag2->root)
+			return 1;
 		return -1;
-	else if (defrag1->ino > defrag2->ino)
-		return 1;
-	else if (defrag1->ino < defrag2->ino)
+	}
+	if (defrag1->ino != defrag2->ino) {
+		if (defrag1->ino > defrag2->ino)
+			return 1;
 		return -1;
-	else
-		return 0;
+	}
+	return 0;
 }
 
 /* pop a record for an inode into the defrag tree.  The lock
