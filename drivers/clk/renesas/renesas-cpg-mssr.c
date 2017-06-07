@@ -106,6 +106,8 @@ static const u16 srcr[] = {
  * @num_core_clks: Number of Core Clocks in clks[]
  * @num_mod_clks: Number of Module Clocks in clks[]
  * @last_dt_core_clk: ID of the last Core Clock exported to DT
+ * @smstpcr_shadow[].mask: Mask of SMSTPCR[] bits ever written to
+ * @smstpcr_shadow[].val: Last bit values written to SMSTPCR[]
  */
 struct cpg_mssr_priv {
 #ifdef CONFIG_RESET_CONTROLLER
@@ -119,6 +121,11 @@ struct cpg_mssr_priv {
 	unsigned int num_core_clks;
 	unsigned int num_mod_clks;
 	unsigned int last_dt_core_clk;
+
+	struct {
+		u32 mask;
+		u32 val;
+	} smstpcr_shadow[ARRAY_SIZE(smstpcr)];
 };
 
 
@@ -160,6 +167,12 @@ static int cpg_mstp_clock_endisable(struct clk_hw *hw, bool enable)
 	writel(value, priv->base + SMSTPCR(reg));
 
 	spin_unlock_irqrestore(&priv->rmw_lock, flags);
+
+	priv->smstpcr_shadow[reg].mask |= bitmask;
+	if (enable)
+		priv->smstpcr_shadow[reg].val &= ~bitmask;
+	else
+		priv->smstpcr_shadow[reg].val |= bitmask;
 
 	if (!enable)
 		return 0;
@@ -723,6 +736,7 @@ static int __init cpg_mssr_probe(struct platform_device *pdev)
 	if (!clks)
 		return -ENOMEM;
 
+	dev_set_drvdata(dev, priv);
 	priv->clks = clks;
 	priv->num_core_clks = info->num_total_core_clks;
 	priv->num_mod_clks = info->num_hw_mod_clks;
@@ -759,10 +773,52 @@ static int __init cpg_mssr_probe(struct platform_device *pdev)
 	return 0;
 }
 
+static int cpg_mssr_resume_noirq(struct device *dev)
+{
+	struct cpg_mssr_priv *priv = dev_get_drvdata(dev);
+	unsigned int reg, i;
+	u32 value, mask;
+
+	for (reg = 0; reg < ARRAY_SIZE(priv->smstpcr_shadow); reg++) {
+		/* Restore bits ever written to */
+		mask = priv->smstpcr_shadow[reg].mask;
+		if (!mask)
+			continue;
+
+		value = readl(priv->base + SMSTPCR(reg));
+		value &= ~mask;
+		value |= priv->smstpcr_shadow[reg].val;
+		writel(value, priv->base + SMSTPCR(reg));
+
+		/* Wait until enabled clocks are really enabled */
+		mask &= ~priv->smstpcr_shadow[reg].val;
+		if (!mask)
+			continue;
+
+		for (i = 1000; i > 0; --i) {
+			value = readl(priv->base + MSTPSR(reg));
+			if (!(value & mask))
+				break;
+			cpu_relax();
+		}
+
+		if (!i)
+			dev_warn(dev, "Failed to enable SMSTP %p[0x%x]\n",
+				 priv->base + SMSTPCR(reg), value & mask);
+	}
+
+	return 0;
+}
+
+static const struct dev_pm_ops cpg_mssr_pm = {
+	SET_NOIRQ_SYSTEM_SLEEP_PM_OPS(NULL, cpg_mssr_resume_noirq)
+};
+
 static struct platform_driver cpg_mssr_driver = {
 	.driver		= {
 		.name	= "renesas-cpg-mssr",
 		.of_match_table = cpg_mssr_match,
+		.pm = &cpg_mssr_pm,
 	},
 };
 
