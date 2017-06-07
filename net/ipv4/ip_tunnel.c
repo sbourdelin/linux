@@ -386,6 +386,9 @@ int ip_tunnel_rcv(struct ip_tunnel *tunnel, struct sk_buff *skb,
 	const struct iphdr *iph = ip_hdr(skb);
 	int err;
 
+	if (tun_dst)
+		skb_dst_set(skb, (struct dst_entry *)tun_dst);
+
 #ifdef CONFIG_NET_IPGRE_BROADCAST
 	if (ipv4_is_multicast(iph->daddr)) {
 		tunnel->dev->stats.multicast++;
@@ -438,9 +441,6 @@ int ip_tunnel_rcv(struct ip_tunnel *tunnel, struct sk_buff *skb,
 	} else {
 		skb->dev = tunnel->dev;
 	}
-
-	if (tun_dst)
-		skb_dst_set(skb, (struct dst_entry *)tun_dst);
 
 	gro_cells_receive(&tunnel->gro_cells, skb);
 	return 0;
