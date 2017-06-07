@@ -8,11 +8,8 @@ enum bq27xxx_chip {
 	BQ27000 = 1, /* bq27000, bq27200 */
 	BQ27010, /* bq27010, bq27210 */
 	BQ2750X, /* bq27500 deprecated alias */
-	BQ2751X, /* bq27510, bq27520 deprecated alias */
-	BQ27500, /* bq27500/1 */
-	BQ27510G1, /* bq27510G1 */
-	BQ27510G2, /* bq27510G2 */
-	BQ27510G3, /* bq27510G3 */
+	BQ27500, /* bq27500/1, bq27510G1, bq27510G2 */
+	BQ27510G3, /* bq27510G3, bq27510, bq27520 */
 	BQ27520G1, /* bq27520G1 */
 	BQ27520G2, /* bq27520G2 */
 	BQ27520G3, /* bq27520G3 */
@@ -23,7 +20,10 @@ enum bq27xxx_chip {
 	BQ27421, /* bq27421, bq27425, bq27441, bq27621 */
 	BQ27MAX,
 
-	BQ2752X, /* deprecated alias */
+	BQ2751X, /* bq27510 deprecated alias */
+	BQ2752X, /* bq27520 deprecated alias */
+	BQ27510G1,
+	BQ27510G2,
 	BQ27531,
 	BQ27542,
 	BQ27546,
