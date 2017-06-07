@@ -710,7 +710,7 @@ skip_rio:
 
 		ha->isp_ops->fw_dump(vha, 1);
 		ha->flags.fw_init_done = 0;
-		ha->flags.fw_started = 0;
+		QLA_FW_STOPPED(ha);
 
 		if (IS_FWI2_CAPABLE(ha)) {
 			if (mb[1] == 0 && mb[2] == 0) {
@@ -2759,7 +2759,7 @@ void qla24xx_process_response_queue(struct scsi_qla_host *vha,
 	struct sts_entry_24xx *pkt;
 	struct qla_hw_data *ha = vha->hw;
 
-	if (!ha->flags.fw_started)
+	if (!rsp->qpair->fw_started)
 		return;
 
 	if (rsp->qpair->cpuid != smp_processor_id())
