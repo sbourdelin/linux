@@ -662,7 +662,7 @@ class TracepointProvider(Provider):
         self.setup_traces()
         self.fields = self._fields
 
-    def read(self):
+    def read(self, by_guest=0):
         """Returns 'event name: current value' for all enabled events."""
         ret = defaultdict(int)
         for group in self.group_leaders:
@@ -677,7 +677,7 @@ class TracepointProvider(Provider):
             for event in group.events:
                 event.reset()
 
-    def restore(self):
+    def restore(self, by_guest):
         """No historic data available that we could restore"""
         pass
 
@@ -733,7 +733,7 @@ class DebugfsProvider(Provider):
             self.do_read = True
         self.reset()
 
-    def read(self, reset=0):
+    def read(self, reset=0, by_guest=0):
         """Returns a dict with format:'file name / field -> current value'.
 
         Parameter 'reset':
@@ -764,8 +764,16 @@ class DebugfsProvider(Provider):
                     self._baseline[key] = 0
                 if self._baseline.get(key, -1) == -1:
                     self._baseline[key] = value
-                results[field] = (results.get(field, 0) + value -
-                                  self._baseline.get(key, 0))
+                increment = (results.get(field, 0) + value -
+                             self._baseline.get(key, 0))
+                if by_guest:
+                    pid = key.split('-')[0]
+                    if pid in results:
+                        results[pid] += increment
+                    else:
+                        results[pid] = increment
+                else:
+                    results[field] = increment
 
         return results
 
@@ -784,10 +792,10 @@ class DebugfsProvider(Provider):
         self._baseline = {}
         self.read(1)
 
-    def restore(self):
+    def restore(self, by_guest):
         """Reset field counters"""
         self._baseline = {}
-        self.read(2)
+        self.read(2, by_guest)
 
 
 class Stats(object):
@@ -829,14 +837,14 @@ class Stats(object):
         for provider in self.providers:
             provider.reset()
 
-    def restore(self):
+    def restore(self, by_guests):
         """Restore providers' field counters"""
         self.values = {}
         for provider in self.providers:
-            provider.restore()
+            provider.restore(by_guests)
         # Updates oldval (see get()) for all fields to prevent the totals from
         # being displayed in the 'CurAvg/s' column on next refresh
-        self.get()
+        self.get(by_guests)
 
     @property
     def fields_filter(self):
@@ -860,17 +868,40 @@ class Stats(object):
             for provider in self.providers:
                 provider.pid = self._pid_filter
 
-    def get(self):
+    def get(self, by_guest=0):
         """Returns a dict with field -> (value, delta to last value) of all
         provider data."""
         for provider in self.providers:
-            new = provider.read()
-            for key in provider.fields:
+            new = provider.read(by_guest=by_guest)
+            for key in new if by_guest else provider.fields:
                 oldval = self.values.get(key, (0, 0))[0]
                 newval = new.get(key, 0)
                 newdelta = newval - oldval
                 self.values[key] = (newval, newdelta)
         return self.values
+
+    def toggle_display_guests(self, to_pid):
+        """Toggle between collection of stats by individual event and by
+        guest pid
+
+        Events reported by DebugfsProvider change when switching to/from
+        reading by guest values. Hence we have to remove the excess event
+        names from self.values.
+
+        """
+        if to_pid:
+            for provider in self.providers:
+                if isinstance(provider, DebugfsProvider):
+                    for key in provider.fields:
+                        if key in self.values:
+                            del self.values[key]
+        else:
+            oldvals = self.values.copy()
+            for key in oldvals:
+                if key.isdigit():
+                    del self.values[key]
+        # Update oldval (see get())
+        self.get(to_pid)
 
 DELAY_DEFAULT = 3.0
 MAX_GUEST_NAME_LEN = 48
@@ -887,6 +918,7 @@ class Tui(object):
         self._delay_initial = 0.25
         self._delay_regular = DELAY_DEFAULT
         self._sorting = SORT_DEFAULT
+        self._display_guests = 0
 
     def __enter__(self):
         """Initialises curses for later use.  Based on curses.wrapper
@@ -1022,7 +1054,7 @@ class Tui(object):
         row = 3
         self.screen.move(row, 0)
         self.screen.clrtobot()
-        stats = self.stats.get()
+        stats = self.stats.get(self._display_guests)
 
         def sortCurAvg(x):
             # sort by current events if available
@@ -1050,6 +1082,8 @@ class Tui(object):
                 break
             if values[0] is not None:
                 cur = int(round(values[1] / sleeptime)) if values[1] else ''
+                if self._display_guests and key.isdigit():
+                    key = self.get_gname_from_pid(key)
                 self.screen.addstr(row, 1, '%-40s %10d%7.1f %8s' %
                                    (key, values[0], values[0] * 100 / total,
                                     cur))
@@ -1060,7 +1094,9 @@ class Tui(object):
 
     def show_help_interactive(self):
         """Display help with list of interactive commands"""
-        msg = ('   c     clear filter',
+        msg = ('   b     toggle events by guests (debugfs only, honors'
+               ' filters)',
+               '   c     clear filter',
                '   f     filter by regular expression',
                '   g     filter by guest name',
                '   h     display interactive commands reference',
@@ -1240,6 +1276,9 @@ class Tui(object):
             sleeptime = self._delay_regular
             try:
                 char = self.screen.getkey()
+                if char == 'b':
+                    self._display_guests = not self._display_guests
+                    self.stats.toggle_display_guests(self._display_guests)
                 if char == 'c':
                     self.stats.fields_filter = DEFAULT_REGEX
                     self.refresh_header(0)
@@ -1273,7 +1312,7 @@ class Tui(object):
                     curses.curs_set(0)
                     sleeptime = self._delay_initial
                 if char == 't':
-                    self.stats.restore()
+                    self.stats.restore(self._display_guests)
                 if char == 'x':
                     self.update_drilldown()
                     # prevents display of current values on next refresh
@@ -1345,6 +1384,7 @@ Requirements:
   the large number of files that are possibly opened.
 
 Interactive Commands:
+   b     toggle events by guests (debugfs only, honors filters)
    c     clear filter
    f     filter by regular expression
    g     filter by guest name
