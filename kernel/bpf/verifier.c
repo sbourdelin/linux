@@ -1573,6 +1573,8 @@ static void coerce_reg_to_32(struct bpf_reg_state *reg)
 /* Handles arithmetic on a pointer and a scalar: computes new min/max and align.
  * Caller must check_reg_overflow all argument regs beforehand.
  * Caller should also handle BPF_MOV case separately.
+ * If we return -EACCES, caller may want to try again treating pointer as a
+ * scalar.  So we only emit a diagnostic if !env->allow_ptr_leaks.
  */
 static int adjust_ptr_min_max_vals(struct bpf_verifier_env *env,
 				   struct bpf_insn *insn,
@@ -1595,43 +1597,29 @@ static int adjust_ptr_min_max_vals(struct bpf_verifier_env *env,
 
 	if (BPF_CLASS(insn->code) != BPF_ALU64) {
 		/* 32-bit ALU ops on pointers produce (meaningless) scalars */
-		if (!env->allow_ptr_leaks) {
+		if (!env->allow_ptr_leaks)
 			verbose("R%d 32-bit pointer arithmetic prohibited\n",
 				dst);
-			return -EACCES;
-		}
-		__mark_reg_unknown(dst_reg);
-		/* High bits are known zero */
-		dst_reg->align.mask = (u32)-1;
-		return 0;
+		return -EACCES;
 	}
 
 	if (ptr_reg->type == PTR_TO_MAP_VALUE_OR_NULL) {
-		if (!env->allow_ptr_leaks) {
+		if (!env->allow_ptr_leaks)
 			verbose("R%d pointer arithmetic on PTR_TO_MAP_VALUE_OR_NULL prohibited, null-check it first\n",
 				dst);
-			return -EACCES;
-		}
-		__mark_reg_unknown(dst_reg);
-		return 0;
+		return -EACCES;
 	}
 	if (ptr_reg->type == CONST_PTR_TO_MAP) {
-		if (!env->allow_ptr_leaks) {
+		if (!env->allow_ptr_leaks)
 			verbose("R%d pointer arithmetic on CONST_PTR_TO_MAP prohibited\n",
 				dst);
-			return -EACCES;
-		}
-		__mark_reg_unknown(dst_reg);
-		return 0;
+		return -EACCES;
 	}
 	if (ptr_reg->type == PTR_TO_PACKET_END) {
-		if (!env->allow_ptr_leaks) {
+		if (!env->allow_ptr_leaks)
 			verbose("R%d pointer arithmetic on PTR_TO_PACKET_END prohibited\n",
 				dst);
-			return -EACCES;
-		}
-		__mark_reg_unknown(dst_reg);
-		return 0;
+		return -EACCES;
 	}
 
 	/* In case of 'scalar += pointer', dst_reg inherits pointer type and id.
@@ -1655,8 +1643,9 @@ static int adjust_ptr_min_max_vals(struct bpf_verifier_env *env,
 			break;
 		}
 		if (max_val == BPF_REGISTER_MAX_RANGE) {
-			verbose("R%d tried to add unbounded value to pointer\n",
-				dst);
+			if (!env->allow_ptr_leaks)
+				verbose("R%d tried to add unbounded value to pointer\n",
+					dst);
 			return -EACCES;
 		}
 		/* A new variable offset is created.  Note that off_reg->off
@@ -1683,28 +1672,20 @@ static int adjust_ptr_min_max_vals(struct bpf_verifier_env *env,
 	case BPF_SUB:
 		if (dst_reg == off_reg) {
 			/* scalar -= pointer.  Creates an unknown scalar */
-			if (!env->allow_ptr_leaks) {
+			if (!env->allow_ptr_leaks)
 				verbose("R%d tried to subtract pointer from scalar\n",
 					dst);
-				return -EACCES;
-			}
-			/* Make it an unknown scalar */
-			__mark_reg_unknown(dst_reg);
-			break;
+			return -EACCES;
 		}
 		/* We don't allow subtraction from FP, because (according to
 		 * test_verifier.c test "invalid fp arithmetic", JITs might not
 		 * be able to deal with it.
 		 */
 		if (ptr_reg->type == PTR_TO_STACK) {
-			if (!env->allow_ptr_leaks) {
+			if (!env->allow_ptr_leaks)
 				verbose("R%d subtraction from stack pointer prohibited\n",
 					dst);
-				return -EACCES;
-			}
-			/* Make it an unknown scalar */
-			__mark_reg_unknown(dst_reg);
-			break;
+			return -EACCES;
 		}
 		if (known && (ptr_reg->off - min_val ==
 			      (s64)(s32)(ptr_reg->off - min_val))) {
@@ -1720,14 +1701,10 @@ static int adjust_ptr_min_max_vals(struct bpf_verifier_env *env,
 		 * This can happen if off_reg is an immediate.
 		 */
 		if ((s64)max_val < 0) {
-			if (!env->allow_ptr_leaks) {
+			if (!env->allow_ptr_leaks)
 				verbose("R%d tried to subtract negative max_val %lld from pointer\n",
 					dst, (s64)max_val);
-				return -EACCES;
-			}
-			/* Make it an unknown scalar */
-			__mark_reg_unknown(dst_reg);
-			break;
+			return -EACCES;
 		}
 		/* A new variable offset is created.  If the subtrahend is known
 		 * nonnegative, then any reg->range we had before is still good.
@@ -1754,99 +1731,37 @@ static int adjust_ptr_min_max_vals(struct bpf_verifier_env *env,
 		 * (However, in principle we could allow some cases, e.g.
 		 * ptr &= ~3 which would reduce min_value by 3.)
 		 */
-		if (!env->allow_ptr_leaks) {
+		if (!env->allow_ptr_leaks)
 			verbose("R%d bitwise operator %s on pointer prohibited\n",
 				dst, bpf_alu_string[opcode >> 4]);
-			return -EACCES;
-		}
-		/* Make it an unknown scalar */
-		__mark_reg_unknown(dst_reg);
+		return -EACCES;
 	default:
 		/* other operators (e.g. MUL,LSH) produce non-pointer results */
-		if (!env->allow_ptr_leaks) {
+		if (!env->allow_ptr_leaks)
 			verbose("R%d pointer arithmetic with %s operator prohibited\n",
 				dst, bpf_alu_string[opcode >> 4]);
-			return -EACCES;
-		}
-		/* Make it an unknown scalar */
-		__mark_reg_unknown(dst_reg);
+		return -EACCES;
 	}
 
 	check_reg_overflow(dst_reg);
 	return 0;
 }
 
-/* Handles ALU ops other than BPF_END, BPF_NEG and BPF_MOV: computes new min/max
- * and align.
- * TODO: check this is legit for ALU32, particularly around negatives
- */
-static int adjust_reg_min_max_vals(struct bpf_verifier_env *env,
-				   struct bpf_insn *insn)
+static int adjust_scalar_min_max_vals(struct bpf_verifier_env *env,
+				      struct bpf_insn *insn,
+				      struct bpf_reg_state *dst_reg,
+				      struct bpf_reg_state *src_reg)
 {
-	struct bpf_reg_state *regs = env->cur_state.regs, *dst_reg, *src_reg;
-	struct bpf_reg_state *ptr_reg = NULL, off_reg = {0};
+	struct bpf_reg_state *regs = env->cur_state.regs;
 	s64 min_val = BPF_REGISTER_MIN_RANGE;
 	u64 max_val = BPF_REGISTER_MAX_RANGE;
 	u8 opcode = BPF_OP(insn->code);
 	bool src_known, dst_known;
 
-	dst_reg = &regs[insn->dst_reg];
-	check_reg_overflow(dst_reg);
-	src_reg = NULL;
-	if (dst_reg->type != SCALAR_VALUE)
-		ptr_reg = dst_reg;
-	if (BPF_SRC(insn->code) == BPF_X) {
-		src_reg = &regs[insn->src_reg];
-		check_reg_overflow(src_reg);
-
-		if (src_reg->type != SCALAR_VALUE) {
-			if (dst_reg->type != SCALAR_VALUE) {
-				/* Combining two pointers by any ALU op yields
-				 * an arbitrary scalar.
-				 */
-				if (!env->allow_ptr_leaks) {
-					verbose("R%d pointer %s pointer prohibited\n",
-						insn->dst_reg,
-						bpf_alu_string[opcode >> 4]);
-					return -EACCES;
-				}
-				mark_reg_unknown(regs, insn->dst_reg);
-				return 0;
-			} else {
-				/* scalar += pointer
-				 * This is legal, but we have to reverse our
-				 * src/dest handling in computing the range
-				 */
-				return adjust_ptr_min_max_vals(env, insn,
-							       src_reg, dst_reg);
-			}
-		} else if (ptr_reg) {
-			/* pointer += scalar */
-			return adjust_ptr_min_max_vals(env, insn,
-						       dst_reg, src_reg);
-		}
-	} else {
-		/* Pretend the src is a reg with a known value, since we only
-		 * need to be able to read from this state.
-		 */
-		off_reg.type = SCALAR_VALUE;
-		off_reg.align = tn_const(insn->imm);
-		off_reg.min_value = insn->imm;
-		off_reg.max_value = insn->imm;
-		src_reg = &off_reg;
-		if (ptr_reg) /* pointer += K */
-			return adjust_ptr_min_max_vals(env, insn,
-						       ptr_reg, src_reg);
-	}
-
-	/* Got here implies adding two SCALAR_VALUEs */
-	if (WARN_ON_ONCE(ptr_reg)) {
-		verbose("verifier internal error\n");
-		return -EINVAL;
-	}
-	if (WARN_ON(!src_reg)) {
-		verbose("verifier internal error\n");
-		return -EINVAL;
+	if (BPF_CLASS(insn->code) != BPF_ALU64) {
+		/* 32-bit ALU ops are (32,32)->64 */
+		coerce_reg_to_32(dst_reg);
+		coerce_reg_to_32(src_reg);
 	}
 	if (BPF_CLASS(insn->code) != BPF_ALU64) {
 		/* 32-bit ALU ops are (32,32)->64 */
@@ -1995,6 +1910,101 @@ static int adjust_reg_min_max_vals(struct bpf_verifier_env *env,
 
 	check_reg_overflow(dst_reg);
 	return 0;
+}
+
+/* Handles ALU ops other than BPF_END, BPF_NEG and BPF_MOV: computes new min/max
+ * and align.
+ */
+static int adjust_reg_min_max_vals(struct bpf_verifier_env *env,
+				   struct bpf_insn *insn)
+{
+	struct bpf_reg_state *regs = env->cur_state.regs, *dst_reg, *src_reg;
+	struct bpf_reg_state *ptr_reg = NULL, off_reg = {0};
+	u8 opcode = BPF_OP(insn->code);
+	int rc;
+
+	dst_reg = &regs[insn->dst_reg];
+	check_reg_overflow(dst_reg);
+	src_reg = NULL;
+	if (dst_reg->type != SCALAR_VALUE)
+		ptr_reg = dst_reg;
+	if (BPF_SRC(insn->code) == BPF_X) {
+		src_reg = &regs[insn->src_reg];
+		check_reg_overflow(src_reg);
+
+		if (src_reg->type != SCALAR_VALUE) {
+			if (dst_reg->type != SCALAR_VALUE) {
+				/* Combining two pointers by any ALU op yields
+				 * an arbitrary scalar.
+				 */
+				if (!env->allow_ptr_leaks) {
+					verbose("R%d pointer %s pointer prohibited\n",
+						insn->dst_reg,
+						bpf_alu_string[opcode >> 4]);
+					return -EACCES;
+				}
+				mark_reg_unknown(regs, insn->dst_reg);
+				return 0;
+			} else {
+				/* scalar += pointer
+				 * This is legal, but we have to reverse our
+				 * src/dest handling in computing the range
+				 */
+				rc = adjust_ptr_min_max_vals(env, insn,
+							     src_reg, dst_reg);
+				if (rc == -EACCES && env->allow_ptr_leaks) {
+					/* scalar += unknown scalar */
+					__mark_reg_unknown(&off_reg);
+					return adjust_scalar_min_max_vals(
+							env, insn,
+							dst_reg, &off_reg);
+				}
+				return rc;
+			}
+		} else if (ptr_reg) {
+			/* pointer += scalar */
+			rc = adjust_ptr_min_max_vals(env, insn,
+						     dst_reg, src_reg);
+			if (rc == -EACCES && env->allow_ptr_leaks) {
+				/* unknown scalar += scalar */
+				__mark_reg_unknown(dst_reg);
+				return adjust_scalar_min_max_vals(
+						env, insn, dst_reg, src_reg);
+			}
+			return rc;
+		}
+	} else {
+		/* Pretend the src is a reg with a known value, since we only
+		 * need to be able to read from this state.
+		 */
+		off_reg.type = SCALAR_VALUE;
+		off_reg.align = tn_const(insn->imm);
+		off_reg.min_value = insn->imm;
+		off_reg.max_value = insn->imm;
+		src_reg = &off_reg;
+		if (ptr_reg) { /* pointer += K */
+			rc = adjust_ptr_min_max_vals(env, insn,
+						     ptr_reg, src_reg);
+			if (rc == -EACCES && env->allow_ptr_leaks) {
+				/* unknown scalar += K */
+				__mark_reg_unknown(dst_reg);
+				return adjust_scalar_min_max_vals(
+						env, insn, dst_reg, &off_reg);
+			}
+			return rc;
+		}
+	}
+
+	/* Got here implies adding two SCALAR_VALUEs */
+	if (WARN_ON_ONCE(ptr_reg)) {
+		verbose("verifier internal error\n");
+		return -EINVAL;
+	}
+	if (WARN_ON(!src_reg)) {
+		verbose("verifier internal error\n");
+		return -EINVAL;
+	}
+	return adjust_scalar_min_max_vals(env, insn, dst_reg, src_reg);
 }
 
 /* check validity of 32-bit and 64-bit arithmetic operations */
