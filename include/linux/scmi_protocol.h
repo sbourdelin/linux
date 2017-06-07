@@ -99,6 +99,21 @@ struct scmi_power_ops {
 };
 
 /**
+ * struct scmi_sensor_ops - represents the various operations provided
+ *	by SCMI Sensor Protocol
+ *
+ * @configuration_set: control notifications on cross-over events for
+ *	the trip-points
+ * @trip_point_set: selects and configures a trip-point of interest
+ * @reading_get: gets the current value of the sensor
+ */
+struct scmi_sensor_ops {
+	int (*configuration_set)(struct scmi_handle *, u32);
+	int (*trip_point_set)(struct scmi_handle *, u32, u8, u64);
+	int (*reading_get)(struct scmi_handle *, u32, bool, u64 *);
+};
+
+/**
  * struct scmi_handle - Handle returned to ARM SCMI clients for usage.
  *
  * @dev: pointer to the SCMI device
@@ -106,6 +121,7 @@ struct scmi_power_ops {
  * @power_ops: pointer to set of power protocol operations
  * @perf_ops: pointer to set of performance protocol operations
  * @clk_ops: pointer to set of clock protocol operations
+ * @sensor_ops: pointer to set of sensor protocol operations
  */
 struct scmi_handle {
 	struct device *dev;
@@ -113,6 +129,7 @@ struct scmi_handle {
 	struct scmi_power_ops *power_ops;
 	struct scmi_perf_ops *perf_ops;
 	struct scmi_clk_ops *clk_ops;
+	struct scmi_sensor_ops *sensor_ops;
 };
 
 struct scmi_opp {
