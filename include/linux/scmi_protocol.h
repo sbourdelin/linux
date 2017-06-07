@@ -84,16 +84,33 @@ struct scmi_perf_ops {
 };
 
 /**
+ * struct scmi_power_ops - represents the various operations provided
+ *	by SCMI Power Protocol
+ *
+ * @state_set: sets the power state of a power domain
+ * @state_get: gets the power state of a power domain
+ * @state_notify_enable: request notifications from the platform for
+ *	state changes in a specific power domain
+ */
+struct scmi_power_ops {
+	int (*state_set)(struct scmi_handle *, u32, u32);
+	int (*state_get)(struct scmi_handle *, u32, u32 *);
+	int (*state_notify_enable)(struct scmi_handle *, u32, bool);
+};
+
+/**
  * struct scmi_handle - Handle returned to ARM SCMI clients for usage.
  *
  * @dev: pointer to the SCMI device
  * @version: pointer to the structure containing SCMI version information
+ * @power_ops: pointer to set of power protocol operations
  * @perf_ops: pointer to set of performance protocol operations
  * @clk_ops: pointer to set of clock protocol operations
  */
 struct scmi_handle {
 	struct device *dev;
 	struct scmi_revision_info *version;
+	struct scmi_power_ops *power_ops;
 	struct scmi_perf_ops *perf_ops;
 	struct scmi_clk_ops *clk_ops;
 };
