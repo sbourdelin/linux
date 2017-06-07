@@ -31,6 +31,7 @@
 #define PROTOCOL_REV_MINOR(x)	((x) & PROTOCOL_REV_MINOR_MASK)
 #define MAX_PROTOCOLS_IMP	16
 #define MAX_OPPS		16
+#define MAX_NUM_RATES		16
 
 enum scmi_std_protocol {
 	SCMI_PROTOCOL_BASE = 0x10,

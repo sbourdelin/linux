@@ -46,6 +46,22 @@ struct scmi_revision_info {
 struct scmi_handle;
 
 /**
+ * struct scmi_clk_ops - represents the various operations provided
+ *	by SCMI Clock Protocol
+ *
+ * @rate_get: request the current clock rate of a clock
+ * @rate_set: set the clock rate of a clock
+ * @enable: enables the specified clock
+ * @disable: disables the specified clock
+ */
+struct scmi_clk_ops {
+	int (*rate_get)(struct scmi_handle *, u32, u64*);
+	int (*rate_set)(struct scmi_handle *, u32, u32, u64);
+	int (*enable)(struct scmi_handle *, u32);
+	int (*disable)(struct scmi_handle *, u32);
+};
+
+/**
  * struct scmi_perf_ops - represents the various operations provided
  *	by SCMI Performance Protocol
  *
@@ -73,11 +89,13 @@ struct scmi_perf_ops {
  * @dev: pointer to the SCMI device
  * @version: pointer to the structure containing SCMI version information
  * @perf_ops: pointer to set of performance protocol operations
+ * @clk_ops: pointer to set of clock protocol operations
  */
 struct scmi_handle {
 	struct device *dev;
 	struct scmi_revision_info *version;
 	struct scmi_perf_ops *perf_ops;
+	struct scmi_clk_ops *clk_ops;
 };
 
 struct scmi_opp {
