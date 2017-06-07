@@ -432,8 +432,14 @@ static void acpi_bus_notify(acpi_handle handle, u32 type, void *data)
 	    (driver->flags & ACPI_DRIVER_ALL_NOTIFY_EVENTS))
 		driver->ops.notify(adev, type);
 
-	if (hotplug_event && ACPI_SUCCESS(acpi_hotplug_schedule(adev, type)))
-		return;
+	if (hotplug_event) {
+		if (ACPI_FAILURE(acpi_hotplug_schedule(adev, type))) {
+			acpi_bus_put_acpi_device(adev);
+			goto err;
+		} else {
+			return;
+		}
+	}
 
 	acpi_bus_put_acpi_device(adev);
 	return;
