@@ -506,15 +506,18 @@ static int imx6_pcie_establish_link(struct imx6_pcie *imx6_pcie)
 	u32 tmp;
 	int ret;
 
-	/*
-	 * Force Gen1 operation when starting the link.  In case the link is
-	 * started in Gen2 mode, there is a possibility the devices on the
-	 * bus will not be detected at all.  This happens with PCIe switches.
-	 */
-	tmp = dw_pcie_readl_dbi(pci, PCIE_RC_LCR);
-	tmp &= ~PCIE_RC_LCR_MAX_LINK_SPEEDS_MASK;
-	tmp |= PCIE_RC_LCR_MAX_LINK_SPEEDS_GEN1;
-	dw_pcie_writel_dbi(pci, PCIE_RC_LCR, tmp);
+	if (!IS_ENABLED(CONFIG_PCI_IMX6_COMPLIANCE_TEST)) {
+		/*
+		 * Force Gen1 operation when starting the link.  In case the
+		 * link is started in Gen2 mode, there is a possibility the
+		 * devices on the bus will not be detected at all.  This
+		 * happens with PCIe switches.
+		 */
+		tmp = dw_pcie_readl_dbi(pci, PCIE_RC_LCR);
+		tmp &= ~PCIE_RC_LCR_MAX_LINK_SPEEDS_MASK;
+		tmp |= PCIE_RC_LCR_MAX_LINK_SPEEDS_GEN1;
+		dw_pcie_writel_dbi(pci, PCIE_RC_LCR, tmp);
+	}
 
 	/* Start LTSSM. */
 	if (imx6_pcie->variant == IMX7D)
