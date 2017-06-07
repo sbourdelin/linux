@@ -305,18 +305,21 @@ static int process_msg(void)
 					req->body = state.body;
 					req->state = xb_req_state_got_reply;
 					list_del(&req->list);
+					mutex_unlock(&xb_write_mutex);
 					req->cb(req);
 				} else {
 					list_del(&req->list);
+					mutex_unlock(&xb_write_mutex);
 					kfree(req);
 				}
 				err = 0;
 				break;
 			}
 		}
-		mutex_unlock(&xb_write_mutex);
-		if (err)
+		if (err) {
+			mutex_unlock(&xb_write_mutex);
 			goto out;
+		}
 	}
 
 	mutex_unlock(&xs_response_mutex);
