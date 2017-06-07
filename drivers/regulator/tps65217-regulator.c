@@ -263,9 +263,16 @@ static int tps65217_regulator_probe(struct platform_device *pdev)
 	return 0;
 }
 
+static const struct of_device_id tps65217_regulator_match_table[] = {
+	{ .compatible = "ti,tps65217-pmic", },
+	{ /* sentinel */ }
+};
+MODULE_DEVICE_TABLE(of, tps65217_regulator_match_table);
+
 static struct platform_driver tps65217_regulator_driver = {
 	.driver = {
 		.name = "tps65217-pmic",
+		.of_match_table = tps65217_regulator_match_table,
 	},
 	.probe = tps65217_regulator_probe,
 };
