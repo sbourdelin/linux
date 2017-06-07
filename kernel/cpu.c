@@ -776,6 +776,10 @@ static int __ref _cpu_down(unsigned int cpu, int tasks_frozen,
 	cpu_hotplug_begin();
 
 	cpuhp_tasks_frozen = tasks_frozen;
+	
+	cpu_hotplug.active_writer = NULL;
+	atomic_inc(&cpu_hotplug.refcount);
+	mutex_unlock(&cpu_hotplug.lock);
 
 	prev_state = st->state;
 	st->target = target;
@@ -810,6 +814,9 @@ static int __ref _cpu_down(unsigned int cpu, int tasks_frozen,
 		cpuhp_kick_ap_work(cpu);
 	}
 
+	put_online_cpus();
+
+	return ret;
 out:
 	cpu_hotplug_done();
 	return ret;
@@ -939,7 +946,14 @@ static int _cpu_up(unsigned int cpu, int tasks_frozen, enum cpuhp_state target)
 	 * responsible for bringing it up to the target state.
 	 */
 	target = min((int)target, CPUHP_BRINGUP_CPU);
+
+	cpu_hotplug.active_writer = NULL;
+	atomic_inc(&cpu_hotplug.refcount);
+	mutex_unlock(&cpu_hotplug.lock);
 	ret = cpuhp_up_callbacks(cpu, st, target);
+	put_online_cpus();
+
+	return ret;
 out:
 	cpu_hotplug_done();
 	return ret;
