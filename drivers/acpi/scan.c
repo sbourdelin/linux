@@ -364,8 +364,11 @@ static int acpi_scan_bus_check(struct acpi_device *adev)
 	return 0;
 }
 
-static int acpi_generic_hotplug_event(struct acpi_device *adev, u32 type)
+static int acpi_generic_hotplug_event(struct acpi_device *adev, u32 type,
+				      u32 *ost_code)
 {
+	int error = -EINVAL;
+
 	switch (type) {
 	case ACPI_NOTIFY_BUS_CHECK:
 		return acpi_scan_bus_check(adev);
@@ -379,9 +382,11 @@ static int acpi_generic_hotplug_event(struct acpi_device *adev, u32 type)
 		}
 		acpi_evaluate_ost(adev->handle, ACPI_NOTIFY_EJECT_REQUEST,
 				  ACPI_OST_SC_EJECT_IN_PROGRESS, NULL);
-		return acpi_scan_hot_remove(adev);
+		error = acpi_scan_hot_remove(adev);
+		if (error == -EBUSY && ost_code)
+			*ost_code = ACPI_OST_SC_DEVICE_BUSY;
 	}
-	return -EINVAL;
+	return error;
 }
 
 void acpi_device_hotplug(struct acpi_device *adev, u32 src)
@@ -403,7 +408,7 @@ void acpi_device_hotplug(struct acpi_device *adev, u32 src)
 	if (adev->flags.is_dock_station) {
 		error = dock_notify(adev, src);
 	} else if (adev->flags.hotplug_notify) {
-		error = acpi_generic_hotplug_event(adev, src);
+		error = acpi_generic_hotplug_event(adev, src, &ost_code);
 		if (error == -EPERM) {
 			ost_code = ACPI_OST_SC_EJECT_NOT_SUPPORTED;
 			goto err_out;
