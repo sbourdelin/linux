@@ -677,6 +677,10 @@ class TracepointProvider(Provider):
             for event in group.events:
                 event.reset()
 
+    def restore(self):
+        """No historic data available that we could restore"""
+        pass
+
 
 class DebugfsProvider(Provider):
     """Provides data from the files that KVM creates in the kvm debugfs
@@ -730,7 +734,14 @@ class DebugfsProvider(Provider):
         self.reset()
 
     def read(self, reset=0):
-        """Returns a dict with format:'file name / field -> current value'."""
+        """Returns a dict with format:'file name / field -> current value'.
+
+        Parameter 'reset':
+          0   plain read
+          1   reset field counts to 0
+          2   restore the original field counts
+
+        """
         results = {}
 
         # If no debugfs filtering support is available, then don't read.
@@ -747,8 +758,10 @@ class DebugfsProvider(Provider):
             for field in self._fields:
                 value = self.read_field(field, path)
                 key = path + field
-                if reset:
+                if reset == 1:
                     self._baseline[key] = value
+                if reset == 2:
+                    self._baseline[key] = 0
                 if self._baseline.get(key, -1) == -1:
                     self._baseline[key] = value
                 results[field] = (results.get(field, 0) + value -
@@ -770,6 +783,11 @@ class DebugfsProvider(Provider):
         """Reset field counters"""
         self._baseline = {}
         self.read(1)
+
+    def restore(self):
+        """Reset field counters"""
+        self._baseline = {}
+        self.read(2)
 
 
 class Stats(object):
@@ -806,9 +824,19 @@ class Stats(object):
             provider.update_fields(self._fields_filter)
 
     def reset(self):
+        """Reset providers' field counters"""
         self.values = {}
         for provider in self.providers:
             provider.reset()
+
+    def restore(self):
+        """Restore providers' field counters"""
+        self.values = {}
+        for provider in self.providers:
+            provider.restore()
+        # Updates oldval (see get()) for all fields to prevent the totals from
+        # being displayed in the 'CurAvg/s' column on next refresh
+        self.get()
 
     @property
     def fields_filter(self):
@@ -1029,6 +1057,7 @@ class Tui(object):
                '   q     quit',
                '   r     reset stats',
                '   s     set update interval',
+               '   t     show total available stats (debugfs only)',
                '   x     toggle reporting of stats for individual child trace'
                ' events',
                'Any other key refreshes statistics immediately')
@@ -1229,8 +1258,12 @@ class Tui(object):
                     self.show_set_update_interval()
                     curses.curs_set(0)
                     sleeptime = self._delay_initial
+                if char == 't':
+                    self.stats.restore()
                 if char == 'x':
                     self.update_drilldown()
+                    # prevents display of current values on next refresh
+                    self.stats.get()
             except KeyboardInterrupt:
                 break
             except curses.error:
@@ -1306,6 +1339,7 @@ Interactive Commands:
    q     quit
    r     reset stats
    s     set update interval
+   t     show total available stats (debugfs only)
    x     toggle reporting of stats for individual child trace events
 Press any other key to refresh statistics immediately.
 """

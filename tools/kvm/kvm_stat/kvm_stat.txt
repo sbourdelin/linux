@@ -45,6 +45,8 @@ INTERACTIVE COMMANDS
 
 *s*::   set update interval
 
+*t*::   show total available stats (debugfs only)
+
 *x*::	toggle reporting of stats for child trace events
 
 Press any other key to refresh statistics immediately.
