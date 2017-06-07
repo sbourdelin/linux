@@ -416,9 +416,19 @@ acpi_tb_get_table(struct acpi_table_desc *table_desc,
 		}
 	}
 
-	table_desc->validation_count++;
-	if (table_desc->validation_count == 0) {
-		table_desc->validation_count--;
+	if (table_desc->validation_count < ACPI_MAX_TABLE_VALIDATIONS) {
+		table_desc->validation_count++;
+
+		/*
+		 * Ensure the warning message can only be displayed once. The
+		 * warning message occurs when the "get" operations are performed
+		 * more than "put" operations, causing count overflow.
+		 */
+		if (table_desc->validation_count >= ACPI_MAX_TABLE_VALIDATIONS) {
+			ACPI_WARNING((AE_INFO,
+				      "Table %p, Validation count overflows\n",
+				      table_desc));
+		}
 	}
 
 	*out_table = table_desc->pointer;
@@ -445,13 +455,21 @@ void acpi_tb_put_table(struct acpi_table_desc *table_desc)
 
 	ACPI_FUNCTION_TRACE(acpi_tb_put_table);
 
-	if (table_desc->validation_count == 0) {
-		ACPI_WARNING((AE_INFO,
-			      "Table %p, Validation count is zero before decrement\n",
-			      table_desc));
-		return_VOID;
+	if (table_desc->validation_count < ACPI_MAX_TABLE_VALIDATIONS) {
+		table_desc->validation_count--;
+
+		/*
+		 * Ensure the warning message can only be displayed once. The
+		 * warning message occurs when the "put" operations are performed
+		 * more than "get" operations, causing count underflow.
+		 */
+		if (table_desc->validation_count >= ACPI_MAX_TABLE_VALIDATIONS) {
+			ACPI_WARNING((AE_INFO,
+				      "Table %p, Validation count underflows\n",
+				      table_desc));
+			return_VOID;
+		}
 	}
-	table_desc->validation_count--;
 
 	if (table_desc->validation_count == 0) {
 

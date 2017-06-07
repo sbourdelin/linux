@@ -374,6 +374,19 @@ struct acpi_table_desc {
 	u16 validation_count;
 };
 
+/*
+ * Maximum validation count, when it is reached, validation count can no
+ * longer be changed. Which means, the table can no longer be invalidated.
+ * This mechanism is implemented for backward compatibility, where in OS
+ * late stage, old drivers are not facilitated with paired validations and
+ * invalidations.
+ * The maximum validation count can be defined to any value, but should be
+ * greater than the maximum number of OS early stage mapping slots as it
+ * must be ensured that no early stage mappings can be leaked to the late
+ * stage.
+ */
+#define ACPI_MAX_TABLE_VALIDATIONS          ACPI_UINT16_MAX
+
 /* Masks for Flags field above */
 
 #define ACPI_TABLE_ORIGIN_EXTERNAL_VIRTUAL  (0)	/* Virtual address, external maintained */
