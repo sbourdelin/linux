@@ -1978,87 +1978,6 @@ void *vmalloc_32_user(unsigned long size)
 }
 EXPORT_SYMBOL(vmalloc_32_user);
 
-/*
- * small helper routine , copy contents to buf from addr.
- * If the page is not present, fill zero.
- */
-
-static int aligned_vread(char *buf, char *addr, unsigned long count)
-{
-	struct page *p;
-	int copied = 0;
-
-	while (count) {
-		unsigned long offset, length;
-
-		offset = offset_in_page(addr);
-		length = PAGE_SIZE - offset;
-		if (length > count)
-			length = count;
-		p = vmalloc_to_page(addr);
-		/*
-		 * To do safe access to this _mapped_ area, we need
-		 * lock. But adding lock here means that we need to add
-		 * overhead of vmalloc()/vfree() calles for this _debug_
-		 * interface, rarely used. Instead of that, we'll use
-		 * kmap() and get small overhead in this access function.
-		 */
-		if (p) {
-			/*
-			 * we can expect USER0 is not used (see vread/vwrite's
-			 * function description)
-			 */
-			void *map = kmap_atomic(p);
-			memcpy(buf, map + offset, length);
-			kunmap_atomic(map);
-		} else
-			memset(buf, 0, length);
-
-		addr += length;
-		buf += length;
-		copied += length;
-		count -= length;
-	}
-	return copied;
-}
-
-static int aligned_vwrite(char *buf, char *addr, unsigned long count)
-{
-	struct page *p;
-	int copied = 0;
-
-	while (count) {
-		unsigned long offset, length;
-
-		offset = offset_in_page(addr);
-		length = PAGE_SIZE - offset;
-		if (length > count)
-			length = count;
-		p = vmalloc_to_page(addr);
-		/*
-		 * To do safe access to this _mapped_ area, we need
-		 * lock. But adding lock here means that we need to add
-		 * overhead of vmalloc()/vfree() calles for this _debug_
-		 * interface, rarely used. Instead of that, we'll use
-		 * kmap() and get small overhead in this access function.
-		 */
-		if (p) {
-			/*
-			 * we can expect USER0 is not used (see vread/vwrite's
-			 * function description)
-			 */
-			void *map = kmap_atomic(p);
-			memcpy(map + offset, buf, length);
-			kunmap_atomic(map);
-		}
-		addr += length;
-		buf += length;
-		copied += length;
-		count -= length;
-	}
-	return copied;
-}
-
 /**
  *	vread() -  read vmalloc area in a safe way.
  *	@buf:		buffer for reading data
@@ -2078,10 +1997,8 @@ static int aligned_vwrite(char *buf, char *addr, unsigned long count)
  *	If [addr...addr+count) doesn't includes any intersects with alive
  *	vm_struct area, returns 0. @buf should be kernel's buffer.
  *
- *	Note: In usual ops, vread() is never necessary because the caller
- *	should know vmalloc() area is valid and can use memcpy().
- *	This is for routines which have to access vmalloc area without
- *	any informaion, as /dev/kmem.
+ *	Note: This routine executes with the vmap_area_lock spinlock held,
+ *	which means it can safely access mappings at their virtual address.
  *
  */
 
@@ -2120,8 +2037,9 @@ long vread(char *buf, char *addr, unsigned long count)
 		n = vaddr + get_vm_area_size(vm) - addr;
 		if (n > count)
 			n = count;
-		if (!(vm->flags & VM_IOREMAP))
-			aligned_vread(buf, addr, n);
+		if (!(vm->flags & VM_IOREMAP) &&
+		    kern_addr_valid((unsigned long)addr))
+			memcpy(buf, addr, n);
 		else /* IOREMAP area is treated as memory hole */
 			memset(buf, 0, n);
 		buf += n;
@@ -2160,10 +2078,8 @@ finished:
  *	If [addr...addr+count) doesn't includes any intersects with alive
  *	vm_struct area, returns 0. @buf should be kernel's buffer.
  *
- *	Note: In usual ops, vwrite() is never necessary because the caller
- *	should know vmalloc() area is valid and can use memcpy().
- *	This is for routines which have to access vmalloc area without
- *	any informaion, as /dev/kmem.
+ *	Note: This routine executes with the vmap_area_lock spinlock held,
+ *	which means it can safely access mappings at their virtual address.
  */
 
 long vwrite(char *buf, char *addr, unsigned long count)
@@ -2201,8 +2117,9 @@ long vwrite(char *buf, char *addr, unsigned long count)
 		n = vaddr + get_vm_area_size(vm) - addr;
 		if (n > count)
 			n = count;
-		if (!(vm->flags & VM_IOREMAP)) {
-			aligned_vwrite(buf, addr, n);
+		if (!(vm->flags & VM_IOREMAP) &&
+		    kern_addr_valid((unsigned long)addr)) {
+			memcpy(addr, buf, n);
 			copied++;
 		}
 		buf += n;
