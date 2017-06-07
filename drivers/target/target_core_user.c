@@ -1299,7 +1299,7 @@ static int tcmu_configure_device(struct se_device *dev)
 	kref_get(&udev->kref);
 
 	ret = tcmu_netlink_event(TCMU_CMD_ADDED_DEVICE, udev->uio_info.name,
-				 udev->uio_info.uio_dev->minor);
+				 udev->uio_info.uio_dev.minor);
 	if (ret)
 		goto err_netlink;
 
@@ -1332,7 +1332,7 @@ static int tcmu_check_and_free_pending_cmd(struct tcmu_cmd *cmd)
 
 static bool tcmu_dev_configured(struct tcmu_dev *udev)
 {
-	return udev->uio_info.uio_dev ? true : false;
+	return !!(udev->se_dev.dev_flags & DF_CONFIGURED);
 }
 
 static void tcmu_blocks_release(struct tcmu_dev *udev)
@@ -1381,7 +1381,7 @@ static void tcmu_free_device(struct se_device *dev)
 
 	if (tcmu_dev_configured(udev)) {
 		tcmu_netlink_event(TCMU_CMD_REMOVED_DEVICE, udev->uio_info.name,
-				   udev->uio_info.uio_dev->minor);
+				   udev->uio_info.uio_dev.minor);
 
 		uio_unregister_device(&udev->uio_info);
 	}

@@ -399,7 +399,7 @@ static void uio_free_minor(struct uio_device *idev)
  */
 void uio_event_notify(struct uio_info *info)
 {
-	struct uio_device *idev = info->uio_dev;
+	struct uio_device *idev = &info->uio_dev;
 
 	atomic_inc(&idev->event);
 	wake_up_interruptible(&idev->wait);
@@ -812,13 +812,8 @@ int __uio_register_device(struct module *owner,
 	if (!parent || !info || !info->name || !info->version)
 		return -EINVAL;
 
-	info->uio_dev = NULL;
-
-	idev = devm_kzalloc(parent, sizeof(*idev), GFP_KERNEL);
-	if (!idev) {
-		return -ENOMEM;
-	}
-
+	idev = &info->uio_dev;
+	memset(idev, 0, sizeof(*idev));
 	idev->owner = owner;
 	idev->info = info;
 	init_waitqueue_head(&idev->wait);
@@ -840,8 +835,6 @@ int __uio_register_device(struct module *owner,
 	ret = uio_dev_add_attributes(idev);
 	if (ret)
 		goto err_uio_dev_add_attributes;
-
-	info->uio_dev = idev;
 
 	if (info->irq && (info->irq != UIO_IRQ_CUSTOM)) {
 		/*
@@ -879,10 +872,10 @@ void uio_unregister_device(struct uio_info *info)
 {
 	struct uio_device *idev;
 
-	if (!info || !info->uio_dev)
+	if (!info)
 		return;
 
-	idev = info->uio_dev;
+	idev = &info->uio_dev;
 
 	uio_free_minor(idev);
 

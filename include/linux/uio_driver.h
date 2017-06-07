@@ -95,7 +95,7 @@ struct uio_device {
  * @irqcontrol:		disable/enable irqs when 0/1 is written to /dev/uioX
  */
 struct uio_info {
-	struct uio_device	*uio_dev;
+	struct uio_device	uio_dev;
 	const char		*name;
 	const char		*version;
 	struct uio_mem		mem[MAX_UIO_MAPS];
