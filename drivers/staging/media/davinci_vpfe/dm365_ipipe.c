@@ -1286,15 +1286,20 @@ static int ipipe_s_config(struct v4l2_subdev *sd, struct vpfe_ipipe_config *cfg)
 			if (to && from && size) {
 				if (copy_from_user(to, from, size)) {
 					rval = -EFAULT;
+					kfree(params);
 					break;
 				}
 				rval = module_if->set(ipipe, to);
-				if (rval)
+				if (rval) {
+					kfree(params);
 					goto error;
+				}
 			} else if (to && !from && size) {
 				rval = module_if->set(ipipe, NULL);
-				if (rval)
+				if (rval) {
+					kfree(params);
 					goto error;
+				}
 			}
 			kfree(params);
 		}
@@ -1328,10 +1333,13 @@ static int ipipe_g_config(struct v4l2_subdev *sd, struct vpfe_ipipe_config *cfg)
 
 			if (to && from && size) {
 				rval = module_if->get(ipipe, from);
-				if (rval)
+				if (rval) {
+					kfree(params);
 					goto error;
+				}
 				if (copy_to_user(to, from, size)) {
 					rval = -EFAULT;
+					kfree(params);
 					break;
 				}
 			}
