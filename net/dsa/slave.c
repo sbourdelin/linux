@@ -1139,9 +1139,11 @@ int dsa_slave_create(struct dsa_switch *ds, struct device *parent,
 	struct net_device *master;
 	struct net_device *slave_dev;
 	struct dsa_slave_priv *p;
+	struct dsa_port *cpu_dp;
 	int ret;
 
-	master = ds->dst->cpu_dp->netdev;
+	cpu_dp = ds->dst->cpu_dp;
+	master = cpu_dp->netdev;
 
 	slave_dev = alloc_netdev(sizeof(struct dsa_slave_priv), name,
 				 NET_NAME_UNKNOWN, ether_setup);
@@ -1176,6 +1178,7 @@ int dsa_slave_create(struct dsa_switch *ds, struct device *parent,
 	p->old_duplex = -1;
 
 	ds->ports[port].netdev = slave_dev;
+	p->dp->cpu_dp = cpu_dp;
 	ret = register_netdev(slave_dev);
 	if (ret) {
 		netdev_err(master, "error %d registering interface %s\n",
