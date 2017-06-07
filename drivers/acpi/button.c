@@ -56,9 +56,8 @@
 #define ACPI_BUTTON_DEVICE_NAME_LID	"Lid Switch"
 #define ACPI_BUTTON_TYPE_LID		0x05
 
-#define ACPI_BUTTON_LID_INIT_IGNORE	0x00
+#define ACPI_BUTTON_LID_INIT_METHOD	0x00
 #define ACPI_BUTTON_LID_INIT_OPEN	0x01
-#define ACPI_BUTTON_LID_INIT_METHOD	0x02
 
 #define _COMPONENT		ACPI_BUTTON_COMPONENT
 ACPI_MODULE_NAME("button");
@@ -109,22 +108,19 @@ struct acpi_button {
 	struct timer_list lid_timer;
 	char phys[32];			/* for input device */
 	unsigned long pushed;
-	int last_state;
-	ktime_t last_time;
 	bool suspended;
 };
 
+static DEFINE_MUTEX(lid_device_lock);
 static BLOCKING_NOTIFIER_HEAD(acpi_lid_notifier);
 static struct acpi_device *lid_device;
 static u8 lid_init_state = ACPI_BUTTON_LID_INIT_METHOD;
 
-static unsigned long lid_report_interval __read_mostly = 500;
-module_param(lid_report_interval, ulong, 0644);
-MODULE_PARM_DESC(lid_report_interval, "Interval (ms) between lid key events");
-
 static unsigned long lid_update_interval __read_mostly = 10 * MSEC_PER_SEC;
 module_param(lid_update_interval, ulong, 0644);
 MODULE_PARM_DESC(lid_update_interval, "Interval (ms) between lid state updates");
+
+static bool lid_unreliable __read_mostly = false;
 
 /* --------------------------------------------------------------------------
                               FS Interface (/proc)
@@ -149,79 +145,12 @@ static int acpi_lid_notify_state(struct acpi_device *device, int state)
 {
 	struct acpi_button *button = acpi_driver_data(device);
 	int ret;
-	ktime_t next_report;
-	bool do_update;
 
-	/*
-	 * In lid_init_state=ignore mode, if user opens/closes lid
-	 * frequently with "open" missing, and "last_time" is also updated
-	 * frequently, "close" cannot be delivered to the userspace.
-	 * So "last_time" is only updated after a timeout or an actual
-	 * switch.
-	 */
-	if (lid_init_state != ACPI_BUTTON_LID_INIT_IGNORE ||
-	    button->last_state != !!state)
-		do_update = true;
-	else
-		do_update = false;
+	if (lid_unreliable)
+		input_report_switch(button->input, SW_LID, 0);
 
-	next_report = ktime_add(button->last_time,
-				ms_to_ktime(lid_report_interval));
-	if (button->last_state == !!state &&
-	    ktime_after(ktime_get(), next_report)) {
-		/* Complain the buggy firmware */
-		pr_warn_once("The lid device is not compliant to SW_LID.\n");
-
-		/*
-		 * Send the unreliable complement switch event:
-		 *
-		 * On most platforms, the lid device is reliable. However
-		 * there are exceptions:
-		 * 1. Platforms returning initial lid state as "close" by
-		 *    default after booting/resuming:
-		 *     https://bugzilla.kernel.org/show_bug.cgi?id=89211
-		 *     https://bugzilla.kernel.org/show_bug.cgi?id=106151
-		 * 2. Platforms never reporting "open" events:
-		 *     https://bugzilla.kernel.org/show_bug.cgi?id=106941
-		 * On these buggy platforms, the usage model of the ACPI
-		 * lid device actually is:
-		 * 1. The initial returning value of _LID may not be
-		 *    reliable.
-		 * 2. The open event may not be reliable.
-		 * 3. The close event is reliable.
-		 *
-		 * But SW_LID is typed as input switch event, the input
-		 * layer checks if the event is redundant. Hence if the
-		 * state is not switched, the userspace cannot see this
-		 * platform triggered reliable event. By inserting a
-		 * complement switch event, it then is guaranteed that the
-		 * platform triggered reliable one can always be seen by
-		 * the userspace.
-		 */
-		if (lid_init_state == ACPI_BUTTON_LID_INIT_IGNORE) {
-			do_update = true;
-			/*
-			 * Do generate complement switch event for "close"
-			 * as "close" is reliable and wrong "open" won't
-			 * trigger unexpected behaviors.
-			 * Do not generate complement switch event for
-			 * "open" as "open" is not reliable and wrong
-			 * "close" will trigger unexpected behaviors.
-			 */
-			if (!state) {
-				input_report_switch(button->input,
-						    SW_LID, state);
-				input_sync(button->input);
-			}
-		}
-	}
-	/* Send the platform triggered reliable event */
-	if (do_update) {
-		input_report_switch(button->input, SW_LID, !state);
-		input_sync(button->input);
-		button->last_state = !!state;
-		button->last_time = ktime_get();
-	}
+	input_report_switch(button->input, SW_LID, !state);
+	input_sync(button->input);
 
 	if (state)
 		pm_wakeup_event(&device->dev, 0);
@@ -382,22 +311,25 @@ static void acpi_lid_tick(struct acpi_device *device)
 {
 	struct acpi_button *button = acpi_driver_data(device);
 
-	mod_timer(&button->lid_timer,
-		  jiffies + msecs_to_jiffies(lid_update_interval));
+	if (!lid_unreliable)
+		mod_timer(&button->lid_timer,
+			  jiffies + msecs_to_jiffies(lid_update_interval));
 }
 
 static void acpi_lid_timeout(ulong arg)
 {
 	struct acpi_device *device = (struct acpi_device *)arg;
 
-	switch (lid_init_state) {
-	case ACPI_BUTTON_LID_INIT_OPEN:
-		(void)acpi_lid_notify_state(device, 1);
-		break;
-	case ACPI_BUTTON_LID_INIT_METHOD:
-		acpi_lid_update_state(device);
-		acpi_lid_tick(device);
-		break;
+	if (!lid_unreliable) {
+		switch (lid_init_state) {
+		case ACPI_BUTTON_LID_INIT_OPEN:
+			(void)acpi_lid_notify_state(device, 1);
+			break;
+		case ACPI_BUTTON_LID_INIT_METHOD:
+			acpi_lid_update_state(device);
+			acpi_lid_tick(device);
+			break;
+		}
 	}
 }
 
@@ -506,8 +438,6 @@ static int acpi_button_add(struct acpi_device *device)
 		strcpy(name, ACPI_BUTTON_DEVICE_NAME_LID);
 		sprintf(class, "%s/%s",
 			ACPI_BUTTON_CLASS, ACPI_BUTTON_SUBCLASS_LID);
-		button->last_state = !!acpi_lid_evaluate_state(device);
-		button->last_time = ktime_get();
 		setup_timer(&button->lid_timer,
 			    acpi_lid_timeout, (ulong)device);
 	} else {
@@ -551,7 +481,10 @@ static int acpi_button_add(struct acpi_device *device)
 		 * This assumes there's only one lid device, or if there are
 		 * more we only care about the last one...
 		 */
+		mutex_lock(&lid_device_lock);
+		get_device(&device->dev);
 		lid_device = device;
+		mutex_unlock(&lid_device_lock);
 	}
 
 	printk(KERN_INFO PREFIX "%s [%s]\n", name, acpi_device_bid(device));
@@ -570,8 +503,15 @@ static int acpi_button_remove(struct acpi_device *device)
 {
 	struct acpi_button *button = acpi_driver_data(device);
 
-	if (button->type == ACPI_BUTTON_TYPE_LID)
+	if (button->type == ACPI_BUTTON_TYPE_LID) {
 		del_timer(&button->lid_timer);
+		mutex_lock(&lid_device_lock);
+		if (device == lid_device) {
+			put_device(&device->dev);
+			lid_device = NULL;
+		}
+		mutex_unlock(&lid_device_lock);
+	}
 	acpi_button_remove_fs(device);
 	input_unregister_device(button->input);
 	kfree(button);
@@ -588,9 +528,6 @@ static int param_set_lid_init_state(const char *val, struct kernel_param *kp)
 	} else if (!strncmp(val, "method", sizeof("method") - 1)) {
 		lid_init_state = ACPI_BUTTON_LID_INIT_METHOD;
 		pr_info("Notify initial lid state with _LID return value\n");
-	} else if (!strncmp(val, "ignore", sizeof("ignore") - 1)) {
-		lid_init_state = ACPI_BUTTON_LID_INIT_IGNORE;
-		pr_info("Do not notify initial lid state\n");
 	} else
 		result = -EINVAL;
 	return result;
@@ -603,17 +540,48 @@ static int param_get_lid_init_state(char *buffer, struct kernel_param *kp)
 		return sprintf(buffer, "open");
 	case ACPI_BUTTON_LID_INIT_METHOD:
 		return sprintf(buffer, "method");
-	case ACPI_BUTTON_LID_INIT_IGNORE:
-		return sprintf(buffer, "ignore");
 	default:
 		return sprintf(buffer, "invalid");
 	}
 	return 0;
 }
 
+static int param_set_lid_unreliable(const char *val, struct kernel_param *kp)
+{
+	int result = 0;
+	struct device *dev;
+	struct acpi_device *device;
+	struct acpi_button *button;
+
+	result = param_set_bool(val, kp);
+	if (result)
+		return result;
+
+	mutex_lock(&lid_device_lock);
+	if (lid_device) {
+		dev = get_device(&lid_device->dev);
+		mutex_unlock(&lid_device_lock);
+		device = to_acpi_device(dev);
+		button = acpi_driver_data(device);
+		if (lid_unreliable)
+			del_timer(&button->lid_timer);
+		else
+			acpi_lid_tick(device);
+		put_device(&device->dev);
+		mutex_lock(&lid_device_lock);
+	}
+	mutex_unlock(&lid_device_lock);
+	return result;
+}
+
 module_param_call(lid_init_state,
 		  param_set_lid_init_state, param_get_lid_init_state,
 		  NULL, 0644);
 MODULE_PARM_DESC(lid_init_state, "Behavior for reporting LID initial state");
+
+module_param_call(lid_unreliable,
+		 param_set_lid_unreliable, param_get_bool,
+		 &lid_unreliable, 0644);
+MODULE_PARM_DESC(lid_unreliable, "Mark lid device as unreliable");
 
 module_acpi_driver(acpi_button_driver);
