@@ -7,6 +7,7 @@ menuconfig ARCH_MXC
 	select GPIOLIB
 	select PINCTRL
 	select PM_OPP if PM
+	select REGMAP_MMIO
 	select SOC_BUS
 	select SRAM
 	help
