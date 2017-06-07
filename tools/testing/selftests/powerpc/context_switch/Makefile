@@ -1,4 +1,4 @@
-TEST_GEN_PROGS := cp_abort
+TEST_GEN_PROGS := cp_abort copy_paste
 
 include ../../lib.mk
 
