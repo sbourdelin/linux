@@ -527,8 +527,8 @@ static struct cpu_spec __initdata cpu_specs[] = {
 		.machine_check_early	= __machine_check_early_realmode_p8,
 		.platform		= "power8",
 	},
-	{	/* Power9 DD1*/
-		.pvr_mask		= 0xffffff00,
+	{	/* Power9 DD1. Bits 48:51 represent chip type so mask these */
+		.pvr_mask		= 0xffff0f00,
 		.pvr_value		= 0x004e0100,
 		.cpu_name		= "POWER9 (raw)",
 		.cpu_features		= CPU_FTRS_POWER9_DD1,
