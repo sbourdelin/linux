@@ -120,25 +120,29 @@ static void ref_root_free(struct ref_root *ref_tree)
  */
 static int ref_node_cmp(struct ref_node *a, struct ref_node *b)
 {
-	if (a->root_id < b->root_id)
-		return -1;
-	else if (a->root_id > b->root_id)
+	if (a->root_id != b->root_id) {
+		if (a->root_id < b->root_id)
+			return -1;
 		return 1;
+	}
 
-	if (a->object_id < b->object_id)
-		return -1;
-	else if (a->object_id > b->object_id)
+	if (a->object_id != b->object_id) {
+		if (a->object_id < b->object_id)
+			return -1;
 		return 1;
+	}
 
-	if (a->offset < b->offset)
-		return -1;
-	else if (a->offset > b->offset)
+	if (a->offset != b->offset) {
+		if (a->offset < b->offset)
+			return -1;
 		return 1;
+	}
 
-	if (a->parent < b->parent)
-		return -1;
-	else if (a->parent > b->parent)
+	if (a->parent != b->parent) {
+		if (a->parent < b->parent)
+			return -1;
 		return 1;
+	}
 
 	return 0;
 }
