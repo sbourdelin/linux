@@ -460,15 +460,17 @@ __tree_mod_log_insert(struct btrfs_fs_info *fs_info, struct tree_mod_elem *tm)
 	while (*new) {
 		cur = rb_entry(*new, struct tree_mod_elem, node);
 		parent = *new;
-		if (cur->logical < tm->logical)
-			new = &((*new)->rb_left);
-		else if (cur->logical > tm->logical)
-			new = &((*new)->rb_right);
-		else if (cur->seq < tm->seq)
-			new = &((*new)->rb_left);
-		else if (cur->seq > tm->seq)
-			new = &((*new)->rb_right);
-		else
+		if (cur->logical != tm->logical) {
+			if (cur->logical < tm->logical)
+				new = &((*new)->rb_left);
+			else
+				new = &((*new)->rb_right);
+		} else if (cur->seq != tm->seq) {
+			if (cur->seq < tm->seq)
+				new = &((*new)->rb_left);
+			else
+				new = &((*new)->rb_right);
+		} else
 			return -EEXIST;
 	}
 
