@@ -469,7 +469,7 @@ lstcon_rpc_trans_interpreter(struct lstcon_rpc_trans *trans,
 {
 	struct list_head tmp;
 	struct list_head __user *next;
-	struct lstcon_rpc_ent *ent;
+	struct lstcon_rpc_ent __user *ent;
 	struct srpc_generic_reply *rep;
 	struct lstcon_rpc *crpc;
 	struct srpc_msg *msg;
