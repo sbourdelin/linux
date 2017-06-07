@@ -18,7 +18,7 @@
 #include <linux/posix_acl.h>
 #include <linux/gfs2_ondisk.h>
 #include <linux/crc32.h>
-#include <linux/fiemap.h>
+#include <linux/iomap.h>
 #include <linux/security.h>
 #include <linux/uaccess.h>
 
@@ -1996,16 +1996,23 @@ static int gfs2_getattr(const struct path *path, struct kstat *stat,
 	return 0;
 }
 
+static int gfs2_iomap_begin(struct inode *inode, loff_t offset,
+			    loff_t length, unsigned flags,
+			    struct iomap *iomap)
+{
+	return gfs2_get_iomap(inode, offset, length, flags, iomap);
+}
+
+const struct iomap_ops gfs2_iomap_ops = {
+	.iomap_begin = gfs2_iomap_begin,
+};
+
 static int gfs2_fiemap(struct inode *inode, struct fiemap_extent_info *fieinfo,
 		       u64 start, u64 len)
 {
 	struct gfs2_inode *ip = GFS2_I(inode);
 	struct gfs2_holder gh;
 	int ret;
-
-	ret = fiemap_check_flags(fieinfo, FIEMAP_FLAG_SYNC);
-	if (ret)
-		return ret;
 
 	inode_lock(inode);
 
@@ -2018,6 +2025,7 @@ static int gfs2_fiemap(struct inode *inode, struct fiemap_extent_info *fieinfo,
 		u64 size = i_size_read(inode);
 		u32 flags = FIEMAP_EXTENT_LAST|FIEMAP_EXTENT_NOT_ALIGNED|
 			    FIEMAP_EXTENT_DATA_INLINE;
+
 		phys += sizeof(struct gfs2_dinode);
 		phys += start;
 		if (start + len > size)
@@ -2028,11 +2036,11 @@ static int gfs2_fiemap(struct inode *inode, struct fiemap_extent_info *fieinfo,
 		if (ret == 1)
 			ret = 0;
 	} else {
-		ret = __generic_block_fiemap(inode, fieinfo, start, len,
-					     gfs2_block_map);
+		ret = iomap_fiemap(inode, fieinfo, start, len, &gfs2_iomap_ops);
 	}
 
 	gfs2_glock_dq_uninit(&gh);
+
 out:
 	inode_unlock(inode);
 	return ret;
