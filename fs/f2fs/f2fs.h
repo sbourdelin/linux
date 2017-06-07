@@ -88,6 +88,11 @@ extern char *fault_name[FAULT_MAX];
 #define F2FS_MOUNT_FAULT_INJECTION	0x00010000
 #define F2FS_MOUNT_ADAPTIVE		0x00020000
 #define F2FS_MOUNT_LFS			0x00040000
+#ifdef CONFIG_FS_DAX
+#define F2FS_MOUNT_DAX			0x00080000 /* Direct Access */
+#else
+#define F2FS_MOUNT_DAX			0
+#endif
 
 #define clear_opt(sbi, option)	((sbi)->mount_opt.opt &= ~F2FS_MOUNT_##option)
 #define set_opt(sbi, option)	((sbi)->mount_opt.opt |= F2FS_MOUNT_##option)
@@ -2385,6 +2390,9 @@ int f2fs_release_page(struct page *page, gfp_t wait);
 #ifdef CONFIG_MIGRATION
 int f2fs_migrate_page(struct address_space *mapping, struct page *newpage,
 			struct page *page, enum migrate_mode mode);
+#endif
+#ifdef CONFIG_FS_DAX
+extern struct iomap_ops f2fs_iomap_ops;
 #endif
 
 /*

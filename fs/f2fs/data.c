@@ -2255,3 +2255,96 @@ const struct address_space_operations f2fs_dblock_aops = {
 	.migratepage    = f2fs_migrate_page,
 #endif
 };
+
+#ifdef CONFIG_FS_DAX
+#include <linux/iomap.h>
+#include <linux/dax.h>
+
+static int f2fs_iomap_begin(struct inode *inode, loff_t offset,
+	loff_t length, unsigned int flags, struct iomap *iomap)
+{
+	struct block_device *bdev;
+	unsigned long first_block = F2FS_BYTES_TO_BLK(offset);
+	unsigned long last_block = F2FS_BYTES_TO_BLK(offset + length - 1);
+	struct f2fs_map_blocks map;
+	int ret;
+	loff_t original_i_size = i_size_read(inode);
+
+	if (WARN_ON_ONCE(f2fs_has_inline_data(inode)))
+		return -ERANGE;
+
+	map.m_lblk = first_block;
+	map.m_len = last_block - first_block + 1;
+	map.m_next_pgofs = NULL;
+
+	if (!(flags & IOMAP_WRITE))
+		ret = f2fs_map_blocks(inode, &map, 0, F2FS_GET_BLOCK_READ);
+	else {
+		ret = f2fs_map_blocks(inode, &map, 1, F2FS_GET_BLOCK_PRE_DIO);
+	/* i_size should be kept here and changed later in f2fs_iomap_end */
+		if (i_size_read(inode) != original_i_size)
+			f2fs_i_size_write(inode, original_i_size);
+	}
+
+	if (ret)
+		return ret;
+
+	iomap->flags = 0;
+	bdev = inode->i_sb->s_bdev;
+	iomap->bdev = bdev;
+	if (blk_queue_dax(bdev->bd_queue))
+		iomap->dax_dev = dax_get_by_host(bdev->bd_disk->disk_name);
+	else
+		iomap->dax_dev = NULL;
+	iomap->offset = F2FS_BLK_TO_BYTES((u64)first_block);
+
+	if (map.m_len == 0) {
+		iomap->type = IOMAP_HOLE;
+		iomap->blkno = IOMAP_NULL_BLOCK;
+		iomap->length = F2FS_BLKSIZE;
+	} else {
+		if (map.m_flags & F2FS_MAP_MAPPED) {
+			iomap->type = IOMAP_MAPPED;
+		} else if (map.m_flags & F2FS_MAP_UNWRITTEN) {
+			iomap->type = IOMAP_UNWRITTEN;
+		} else {
+			WARN_ON_ONCE(1);
+			return -EIO;
+		}
+		iomap->blkno =
+			(sector_t)map.m_pblk << F2FS_LOG_SECTORS_PER_BLOCK;
+		iomap->length = F2FS_BLK_TO_BYTES((u64)map.m_len);
+	}
+
+	if (map.m_flags & F2FS_MAP_NEW)
+		iomap->flags |= IOMAP_F_NEW;
+	return 0;
+}
+
+static int f2fs_iomap_end(struct inode *inode, loff_t offset, loff_t length,
+	ssize_t written, unsigned int flags, struct iomap *iomap)
+{
+	put_dax(iomap->dax_dev);
+	if (!(flags & IOMAP_WRITE) || (flags & IOMAP_FAULT))
+		return 0;
+
+	if (offset + written > i_size_read(inode))
+		f2fs_i_size_write(inode, offset + written);
+
+	if (iomap->offset + iomap->length >
+			ALIGN(i_size_read(inode), F2FS_BLKSIZE)) {
+		block_t written_blk = F2FS_BYTES_TO_BLK(offset + written);
+		block_t end_blk = F2FS_BYTES_TO_BLK(offset + length);
+
+		if (written_blk < end_blk)
+			f2fs_write_failed(inode->i_mapping, offset + length);
+	}
+
+	return 0;
+}
+
+struct iomap_ops f2fs_iomap_ops = {
+	.iomap_begin	= f2fs_iomap_begin,
+	.iomap_end	= f2fs_iomap_end,
+};
+#endif

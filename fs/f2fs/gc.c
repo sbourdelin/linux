@@ -16,6 +16,7 @@
 #include <linux/kthread.h>
 #include <linux/delay.h>
 #include <linux/freezer.h>
+#include <linux/dax.h>
 
 #include "f2fs.h"
 #include "node.h"
@@ -700,6 +701,88 @@ out:
 	f2fs_put_page(page, 1);
 }
 
+static void dax_move_data_page(struct inode *inode, block_t bidx,
+				unsigned int segno, int off)
+{
+	struct block_device *bdev = inode->i_sb->s_bdev;
+	struct dax_device *dax_dev;
+	struct dnode_of_data dn;
+	struct f2fs_sb_info *sbi = F2FS_I_SB(inode);
+	struct f2fs_summary sum;
+	struct node_info ni;
+	block_t old_blkaddr, new_blkaddr;
+	int err, id;
+	long map_len;
+	pgoff_t pgoff;
+	void *kaddr_old, *kaddr_new;
+	pfn_t pfn;
+
+	if (blk_queue_dax(bdev->bd_queue))
+		dax_dev = dax_get_by_host(bdev->bd_disk->disk_name);
+	else
+		return;
+
+	if (!check_valid_map(sbi, segno, off))
+		return;
+
+	if (f2fs_is_atomic_file(inode))
+		return;
+
+	if (!down_write_trylock(&F2FS_I(inode)->i_mmap_sem))
+		return;
+
+	unmap_mapping_range(inode->i_mapping, (loff_t)bidx << PAGE_SHIFT,
+			PAGE_SIZE, 1);
+	/* find the old block address */
+	set_new_dnode(&dn, inode, NULL, NULL, 0);
+	err = get_dnode_of_data(&dn, bidx, LOOKUP_NODE);
+	if (err)
+		goto out_map;
+	old_blkaddr = dn.data_blkaddr;
+	/* This page is already truncated */
+	if (old_blkaddr == NULL_ADDR) {
+		f2fs_put_dnode(&dn);
+		goto out_map;
+	}
+
+	/* allocate a new block address */
+	get_node_info(sbi, dn.nid, &ni);
+	set_summary(&sum, dn.nid, dn.ofs_in_node, ni.version);
+	allocate_data_block(sbi, NULL, old_blkaddr, &new_blkaddr,
+			&sum, CURSEG_COLD_DATA, NULL, false);
+
+	/* copy data page from old to new address in dax_bdev */
+	id = dax_read_lock();
+	err = bdev_dax_pgoff(bdev, SECTOR_FROM_BLOCK(old_blkaddr),
+			PAGE_SIZE, &pgoff);
+	if (err)
+		goto unlock;
+	map_len = dax_direct_access(dax_dev, pgoff, 1, &kaddr_old, &pfn);
+	if (map_len < 0)
+		goto unlock;
+	err = bdev_dax_pgoff(bdev, SECTOR_FROM_BLOCK(new_blkaddr),
+			PAGE_SIZE, &pgoff);
+	if (err)
+		goto unlock;
+	map_len = dax_direct_access(dax_dev, pgoff, 1, &kaddr_new, &pfn);
+	if (map_len < 0)
+		goto unlock;
+	copy_page((void __force *)kaddr_new, (void __force *)kaddr_old);
+
+	f2fs_update_data_blkaddr(&dn, new_blkaddr);
+	set_inode_flag(inode, FI_APPEND_WRITE);
+	if (bidx == 0)
+		set_inode_flag(inode, FI_FIRST_BLOCK_WRITTEN);
+	f2fs_put_dnode(&dn);
+
+unlock:
+	dax_read_unlock(id);
+out_map:
+	unmap_mapping_range(inode->i_mapping, (loff_t)bidx << PAGE_SHIFT,
+			PAGE_SIZE, 1);
+	up_write(&F2FS_I(inode)->i_mmap_sem);
+}
+
 static void move_data_page(struct inode *inode, block_t bidx, int gc_type,
 							unsigned int segno, int off)
 {
@@ -818,9 +901,9 @@ next_step:
 			if (IS_ERR(inode) || is_bad_inode(inode))
 				continue;
 
-			/* if encrypted inode, let's go phase 3 */
-			if (f2fs_encrypted_inode(inode) &&
-						S_ISREG(inode->i_mode)) {
+			/* if DAX or encrypted inode, let's go phase 3 */
+			if (IS_DAX(inode) || (f2fs_encrypted_inode(inode) &&
+						S_ISREG(inode->i_mode))) {
 				add_gc_inode(gc_list, inode);
 				continue;
 			}
@@ -858,7 +941,9 @@ next_step:
 
 			start_bidx = start_bidx_of_node(nofs, inode)
 								+ ofs_in_node;
-			if (f2fs_encrypted_inode(inode) && S_ISREG(inode->i_mode))
+			if (IS_DAX(inode))
+				dax_move_data_page(inode, start_bidx, segno, off);
+			else if (f2fs_encrypted_inode(inode) && S_ISREG(inode->i_mode))
 				move_encrypted_block(inode, start_bidx, segno, off);
 			else
 				move_data_page(inode, start_bidx, gc_type, segno, off);

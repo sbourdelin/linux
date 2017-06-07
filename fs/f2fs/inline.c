@@ -28,6 +28,10 @@ bool f2fs_may_inline_data(struct inode *inode)
 	if (f2fs_encrypted_inode(inode) && S_ISREG(inode->i_mode))
 		return false;
 
+#ifdef CONFIG_FS_DAX
+	if (IS_DAX(inode))
+		return false;
+#endif
 	return true;
 }
 

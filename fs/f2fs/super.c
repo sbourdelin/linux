@@ -108,6 +108,7 @@ enum {
 	Opt_fault_injection,
 	Opt_lazytime,
 	Opt_nolazytime,
+	Opt_dax,
 	Opt_err,
 };
 
@@ -143,6 +144,7 @@ static match_table_t f2fs_tokens = {
 	{Opt_fault_injection, "fault_injection=%u"},
 	{Opt_lazytime, "lazytime"},
 	{Opt_nolazytime, "nolazytime"},
+	{Opt_dax, "dax"},
 	{Opt_err, NULL},
 };
 
@@ -488,6 +490,15 @@ static int parse_options(struct super_block *sb, char *options)
 			break;
 		case Opt_noacl:
 			f2fs_msg(sb, KERN_INFO, "noacl options not supported");
+			break;
+#endif
+#ifdef CONFIG_FS_DAX
+		case Opt_dax:
+			set_opt(sbi, DAX);
+			break;
+#else
+		case Opt_dax:
+			f2fs_msg(sb, KERN_INFO, "dax options not supported");
 			break;
 #endif
 		case Opt_active_logs:
@@ -984,6 +995,10 @@ static int f2fs_show_options(struct seq_file *seq, struct dentry *root)
 #ifdef CONFIG_F2FS_FAULT_INJECTION
 	if (test_opt(sbi, FAULT_INJECTION))
 		seq_puts(seq, ",fault_injection");
+#endif
+#ifdef CONFIG_FS_DAX
+	if (test_opt(sbi, DAX))
+		seq_puts(seq, ",dax");
 #endif
 
 	return 0;

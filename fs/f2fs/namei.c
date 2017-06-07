@@ -60,6 +60,12 @@ static struct inode *f2fs_new_inode(struct inode *dir, umode_t mode)
 	if (f2fs_encrypted_inode(dir) && f2fs_may_encrypt(inode))
 		f2fs_set_encrypted_inode(inode);
 
+#ifdef CONFIG_FS_DAX
+	if (test_opt(sbi, DAX) && S_ISREG(inode->i_mode) &&
+	!f2fs_has_inline_data(inode) && !f2fs_encrypted_inode(inode))
+		inode->i_flags |= S_DAX;
+#endif
+
 	set_inode_flag(inode, FI_NEW_INODE);
 
 	if (test_opt(sbi, INLINE_XATTR))
