@@ -16,6 +16,11 @@
 	interrupt-controller;
 	#interrupt-cells = <1>;
 
+	backlight {
+		compatible = "ti,tps65217-bl";
+		status = "disabled";
+	};
+
 	charger {
 		compatible = "ti,tps65217-charger";
 		status = "disabled";
@@ -27,6 +32,7 @@
 	};
 
 	regulators {
+		compatible = "ti,tps65217-pmic";
 		#address-cells = <1>;
 		#size-cells = <0>;
 
