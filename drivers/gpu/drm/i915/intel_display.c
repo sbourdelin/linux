@@ -14773,6 +14773,21 @@ static int intel_framebuffer_init(struct intel_framebuffer *intel_fb,
 			goto err;
 		}
 		break;
+	case DRM_FORMAT_NV12:
+		if (!mode_cmd->offsets[1])
+			DRM_ERROR("uv start offset not set\n");
+		if (mode_cmd->pitches[0] != mode_cmd->pitches[1] ||
+			mode_cmd->handles[0] != mode_cmd->handles[1])
+			DRM_ERROR("y & uv subplanes have different params\n");
+		if (mode_cmd->modifier[1] == I915_FORMAT_MOD_Yf_TILED &&
+			(mode_cmd->offsets[1] & 0xFFF))
+			DRM_ERROR("tile-Yf uv offset 0x%x isn't starting on new tile-row\n",
+				mode_cmd->offsets[1]);
+		if (mode_cmd->modifier[1] == I915_FORMAT_MOD_Y_TILED &&
+			((mode_cmd->offsets[1] / mode_cmd->pitches[1]) % 4))
+			DRM_ERROR("tile-Y uv offset 0x%x isn't 4-line aligned\n",
+				mode_cmd->offsets[1]);
+		break;
 	default:
 		DRM_DEBUG_KMS("unsupported pixel format: %s\n",
 			      drm_get_format_name(mode_cmd->pixel_format, &format_name));
