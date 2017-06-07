@@ -684,6 +684,23 @@ static int scmi_xfer_info_init(struct scmi_info *sinfo)
 	return 0;
 }
 
+static const struct of_device_id scmi_protocol_match[] = {
+	{
+		.compatible = "arm,scmi-perf-domains",
+		.data = scmi_perf_protocol_init,
+	}, {
+		.compatible = "arm,scmi-clocks",
+		.data = scmi_clock_protocol_init,
+	}, {
+		.compatible = "arm,scmi-power-domains",
+		.data = scmi_power_protocol_init,
+	}, {
+		.compatible = "arm,scmi-sensors",
+		.data = scmi_sensors_protocol_init,
+	},
+	{}
+};
+
 static int scmi_probe(struct platform_device *pdev)
 {
 	int ret = -EINVAL;
@@ -694,7 +711,7 @@ static int scmi_probe(struct platform_device *pdev)
 	const struct scmi_desc *desc;
 	struct scmi_info *info = NULL;
 	struct device *dev = &pdev->dev;
-	struct device_node *shmem, *np = dev->of_node;
+	struct device_node *child, *shmem, *np = dev->of_node;
 
 	desc = of_match_device(scmi_of_match, dev)->data;
 
@@ -753,6 +770,17 @@ static int scmi_probe(struct platform_device *pdev)
 	if (ret) {
 		dev_err(dev, "unable to communicate with SCMI(%d)\n", ret);
 		goto out;
+	}
+
+	for_each_available_child_of_node(np, child) {
+		scmi_init_fn_t fn;
+		const struct of_device_id *match;
+
+		match = of_match_node(scmi_protocol_match, child);
+		if (!match)
+			continue;
+		fn = match->data;
+		fn(handle);
 	}
 
 	mutex_lock(&scmi_list_mutex);

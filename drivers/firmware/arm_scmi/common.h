@@ -119,4 +119,9 @@ int scmi_version_get(struct scmi_handle *h, u8 protocol, u32 *version);
 bool scmi_is_protocol_implemented(struct scmi_handle *h, u8 prot_id);
 void scmi_setup_protocol_implemented(struct scmi_handle *handle, u8 *prot_imp);
 
+typedef int (*scmi_init_fn_t)(struct scmi_handle *);
 int scmi_base_protocol_init(struct scmi_handle *h);
+int scmi_perf_protocol_init(struct scmi_handle *h);
+int scmi_sensors_protocol_init(struct scmi_handle *h);
+int scmi_power_protocol_init(struct scmi_handle *h);
+int scmi_clock_protocol_init(struct scmi_handle *h);
