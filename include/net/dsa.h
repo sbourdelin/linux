@@ -11,6 +11,7 @@
 #ifndef __LINUX_NET_DSA_H
 #define __LINUX_NET_DSA_H
 
+#include <linux/bitops.h>
 #include <linux/if.h>
 #include <linux/if_ether.h>
 #include <linux/list.h>
@@ -259,6 +260,11 @@ static inline bool dsa_is_normal_port(struct dsa_switch *ds, int p)
 static inline bool dsa_is_port_initialized(struct dsa_switch *ds, int p)
 {
 	return ds->enabled_port_mask & (1 << p) && ds->ports[p].netdev;
+}
+
+static inline struct dsa_port *dsa_ds_get_cpu_dp(struct dsa_switch *ds)
+{
+	return &ds->ports[fls(ds->cpu_port_mask) - 1];
 }
 
 static inline u8 dsa_upstream_port(struct dsa_switch *ds)

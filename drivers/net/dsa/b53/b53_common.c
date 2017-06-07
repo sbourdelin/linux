@@ -1341,7 +1341,7 @@ EXPORT_SYMBOL(b53_fdb_dump);
 int b53_br_join(struct dsa_switch *ds, int port, struct net_device *br)
 {
 	struct b53_device *dev = ds->priv;
-	s8 cpu_port = ds->dst->cpu_dp->index;
+	s8 cpu_port = dev->cpu_port;
 	u16 pvlan, reg;
 	unsigned int i;
 
@@ -1387,7 +1387,7 @@ void b53_br_leave(struct dsa_switch *ds, int port, struct net_device *br)
 {
 	struct b53_device *dev = ds->priv;
 	struct b53_vlan *vl = &dev->vlans[0];
-	s8 cpu_port = ds->dst->cpu_dp->index;
+	s8 cpu_port = dev->cpu_port;
 	unsigned int i;
 	u16 pvlan, reg, pvid;
 

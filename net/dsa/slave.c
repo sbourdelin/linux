@@ -1179,7 +1179,6 @@ int dsa_slave_create(struct dsa_switch *ds, struct device *parent,
 	p->old_duplex = -1;
 
 	ds->ports[port].netdev = slave_dev;
-	p->dp->cpu_dp = cpu_dp;
 	ret = register_netdev(slave_dev);
 	if (ret) {
 		netdev_err(master, "error %d registering interface %s\n",
