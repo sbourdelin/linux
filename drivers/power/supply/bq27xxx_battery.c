@@ -1931,6 +1931,25 @@ static void bq27xxx_external_power_changed(struct power_supply *psy)
 	schedule_delayed_work(&di->work, 0);
 }
 
+#ifdef DEBUG
+static void bq27xxx_battery_dbg_regs_dupes(struct bq27xxx_device_info *di)
+{
+	const size_t max = ARRAY_SIZE(bq27xxx_regs);
+	int a, b;
+
+	for (a = 1; a < max-1; a++) {
+		for (b = a+1; b < max; b++) {
+			if (!memcmp(bq27xxx_regs[a], bq27xxx_regs[b],
+				    sizeof(bq27xxx_regs[0])))
+				dev_warn(di->dev,
+					"bq27xxx_regs[%d] & [%d] are identical\n", a, b);
+		}
+	}
+}
+#else
+static inline void bq27xxx_battery_dbg_regs_dupes(struct bq27xxx_device_info *di) {}
+#endif
+
 int bq27xxx_battery_setup(struct bq27xxx_device_info *di)
 {
 	struct power_supply_desc *psy_desc;
@@ -1938,6 +1957,8 @@ int bq27xxx_battery_setup(struct bq27xxx_device_info *di)
 		.of_node = di->dev->of_node,
 		.drv_data = di,
 	};
+
+	bq27xxx_battery_dbg_regs_dupes(di);
 
 	di->ram_chip = di->real_chip == BQ27421 ||
 		       di->real_chip == BQ27441 ||
