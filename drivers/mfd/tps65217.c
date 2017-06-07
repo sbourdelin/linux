@@ -33,14 +33,7 @@
 #include <linux/mfd/core.h>
 #include <linux/mfd/tps65217.h>
 
-static struct resource charger_resources[] = {
-	DEFINE_RES_IRQ_NAMED(TPS65217_IRQ_AC, "AC"),
-	DEFINE_RES_IRQ_NAMED(TPS65217_IRQ_USB, "USB"),
-};
-
-static struct resource pb_resources[] = {
-	DEFINE_RES_IRQ_NAMED(TPS65217_IRQ_PB, "PB"),
-};
+#define TPS65217_NUM_IRQ	3
 
 static void tps65217_irq_lock(struct irq_data *data)
 {
@@ -84,29 +77,6 @@ static struct irq_chip tps65217_irq_chip = {
 	.irq_bus_sync_unlock	= tps65217_irq_sync_unlock,
 	.irq_enable		= tps65217_irq_enable,
 	.irq_disable		= tps65217_irq_disable,
-};
-
-static struct mfd_cell tps65217s[] = {
-	{
-		.name = "tps65217-pmic",
-		.of_compatible = "ti,tps65217-pmic",
-	},
-	{
-		.name = "tps65217-bl",
-		.of_compatible = "ti,tps65217-bl",
-	},
-	{
-		.name = "tps65217-charger",
-		.num_resources = ARRAY_SIZE(charger_resources),
-		.resources = charger_resources,
-		.of_compatible = "ti,tps65217-charger",
-	},
-	{
-		.name = "tps65217-pwrbutton",
-		.num_resources = ARRAY_SIZE(pb_resources),
-		.resources = pb_resources,
-		.of_compatible = "ti,tps65217-pwrbutton",
-	},
 };
 
 static irqreturn_t tps65217_irq_thread(int irq, void *data)
@@ -359,28 +329,20 @@ static int tps65217_probe(struct i2c_client *client,
 		return ret;
 	}
 
-	if (client->irq) {
+	if (client->irq)
 		tps65217_irq_init(tps, client->irq);
-	} else {
-		int i;
-
-		/* Don't tell children about IRQ resources which won't fire */
-		for (i = 0; i < ARRAY_SIZE(tps65217s); i++)
-			tps65217s[i].num_resources = 0;
-	}
-
-	ret = devm_mfd_add_devices(tps->dev, -1, tps65217s,
-				   ARRAY_SIZE(tps65217s), NULL, 0,
-				   tps->irq_domain);
-	if (ret < 0) {
-		dev_err(tps->dev, "mfd_add_devices failed: %d\n", ret);
-		return ret;
-	}
 
 	ret = tps65217_reg_read(tps, TPS65217_REG_CHIPID, &version);
 	if (ret < 0) {
 		dev_err(tps->dev, "Failed to read revision register: %d\n",
 			ret);
+		return ret;
+	}
+
+	ret = of_platform_populate(client->dev.of_node, NULL, NULL,
+				   &client->dev);
+	if (ret) {
+		dev_err(&client->dev, "Failed to register sub-devices\n");
 		return ret;
 	}
 
