@@ -1472,9 +1472,10 @@ void hisi_sas_rescan_topology(struct hisi_hba *hisi_hba, u32 old_state,
 }
 EXPORT_SYMBOL_GPL(hisi_sas_rescan_topology);
 
-static struct scsi_transport_template *hisi_sas_stt;
+struct scsi_transport_template *hisi_sas_stt;
+EXPORT_SYMBOL_GPL(hisi_sas_stt);
 
-static struct scsi_host_template hisi_sas_sht = {
+static struct scsi_host_template _hisi_sas_sht = {
 	.module			= THIS_MODULE,
 	.name			= DRV_NAME,
 	.queuecommand		= sas_queuecommand,
@@ -1494,6 +1495,8 @@ static struct scsi_host_template hisi_sas_sht = {
 	.target_destroy		= sas_target_destroy,
 	.ioctl			= sas_ioctl,
 };
+struct scsi_host_template *hisi_sas_sht = &_hisi_sas_sht;
+EXPORT_SYMBOL_GPL(hisi_sas_sht);
 
 static struct sas_domain_function_template hisi_sas_transport_ops = {
 	.lldd_dev_found		= hisi_sas_dev_found,
@@ -1541,7 +1544,7 @@ void hisi_sas_init_mem(struct hisi_hba *hisi_hba)
 }
 EXPORT_SYMBOL_GPL(hisi_sas_init_mem);
 
-static int hisi_sas_alloc(struct hisi_hba *hisi_hba, struct Scsi_Host *shost)
+int hisi_sas_alloc(struct hisi_hba *hisi_hba, struct Scsi_Host *shost)
 {
 	struct device *dev = hisi_hba->dev;
 	int i, s, max_command_entries = hisi_hba->hw->max_command_entries;
@@ -1660,8 +1663,9 @@ static int hisi_sas_alloc(struct hisi_hba *hisi_hba, struct Scsi_Host *shost)
 err_out:
 	return -ENOMEM;
 }
+EXPORT_SYMBOL_GPL(hisi_sas_alloc);
 
-static void hisi_sas_free(struct hisi_hba *hisi_hba)
+void hisi_sas_free(struct hisi_hba *hisi_hba)
 {
 	struct device *dev = hisi_hba->dev;
 	int i, s, max_command_entries = hisi_hba->hw->max_command_entries;
@@ -1716,6 +1720,7 @@ static void hisi_sas_free(struct hisi_hba *hisi_hba)
 	if (hisi_hba->wq)
 		destroy_workqueue(hisi_hba->wq);
 }
+EXPORT_SYMBOL_GPL(hisi_sas_free);
 
 static void hisi_sas_rst_work_handler(struct work_struct *work)
 {
@@ -1801,7 +1806,7 @@ static struct Scsi_Host *hisi_sas_shost_alloc(struct platform_device *pdev,
 	struct hisi_hba *hisi_hba;
 	struct device *dev = &pdev->dev;
 
-	shost = scsi_host_alloc(&hisi_sas_sht, sizeof(*hisi_hba));
+	shost = scsi_host_alloc(hisi_sas_sht, sizeof(*hisi_hba));
 	if (!shost) {
 		dev_err(dev, "scsi host alloc failed\n");
 		return NULL;
@@ -1843,7 +1848,7 @@ err_out:
 	return NULL;
 }
 
-static void hisi_sas_init_add(struct hisi_hba *hisi_hba)
+void hisi_sas_init_add(struct hisi_hba *hisi_hba)
 {
 	int i;
 
@@ -1852,6 +1857,7 @@ static void hisi_sas_init_add(struct hisi_hba *hisi_hba)
 		       hisi_hba->sas_addr,
 		       SAS_ADDR_SIZE);
 }
+EXPORT_SYMBOL_GPL(hisi_sas_init_add);
 
 int hisi_sas_probe(struct platform_device *pdev,
 			 const struct hisi_sas_hw *hw)
