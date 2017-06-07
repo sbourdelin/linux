@@ -66,6 +66,8 @@ struct fuse_file *fuse_file_alloc(struct fuse_conn *fc)
 	ff->kh = ++fc->khctr;
 	spin_unlock(&fc->lock);
 
+	ff->flock = false;
+
 	return ff;
 }
 
