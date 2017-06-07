@@ -169,7 +169,8 @@ static int bq27xxx_battery_i2c_probe(struct i2c_client *client,
 
 	di->id = num;
 	di->dev = &client->dev;
-	di->chip = id->driver_data;
+	di->real_chip = id->driver_data >> 16;
+	di->chip = (u16) id->driver_data;
 	di->name = name;
 
 	di->bus.read = bq27xxx_battery_i2c_read;
@@ -226,30 +227,31 @@ static int bq27xxx_battery_i2c_remove(struct i2c_client *client)
 }
 
 static const struct i2c_device_id bq27xxx_i2c_id_table[] = {
-	{ "bq27200", BQ27000 },
-	{ "bq27210", BQ27010 },
-	{ "bq27500", BQ2750X },
-	{ "bq27510", BQ2751X },
-	{ "bq27520", BQ2751X },
-	{ "bq27500-1", BQ27500 },
-	{ "bq27510g1", BQ27510G1 },
-	{ "bq27510g2", BQ27510G2 },
-	{ "bq27510g3", BQ27510G3 },
-	{ "bq27520g1", BQ27520G1 },
-	{ "bq27520g2", BQ27520G2 },
-	{ "bq27520g3", BQ27520G3 },
-	{ "bq27520g4", BQ27520G4 },
-	{ "bq27530", BQ27530 },
-	{ "bq27531", BQ27530 },
-	{ "bq27541", BQ27541 },
-	{ "bq27542", BQ27541 },
-	{ "bq27546", BQ27541 },
-	{ "bq27742", BQ27541 },
-	{ "bq27545", BQ27545 },
-	{ "bq27421", BQ27421 },
-	{ "bq27425", BQ27421 },
-	{ "bq27441", BQ27421 },
-	{ "bq27621", BQ27421 },
+	/* dest.    di->real_chip       di->chip      */
+	{ "bq27200",   (BQ27000   << 16) |  BQ27000   },
+	{ "bq27210",   (BQ27010   << 16) |  BQ27010   },
+	{ "bq27500",   (BQ2750X   << 16) |  BQ2750X   },
+	{ "bq27510",   (BQ2751X   << 16) |  BQ2751X   },
+	{ "bq27520",   (BQ2752X   << 16) |  BQ2751X   },
+	{ "bq27500-1", (BQ27500   << 16) |  BQ27500   },
+	{ "bq27510g1", (BQ27510G1 << 16) |  BQ27510G1 },
+	{ "bq27510g2", (BQ27510G2 << 16) |  BQ27510G2 },
+	{ "bq27510g3", (BQ27510G3 << 16) |  BQ27510G3 },
+	{ "bq27520g1", (BQ27520G1 << 16) |  BQ27520G1 },
+	{ "bq27520g2", (BQ27520G2 << 16) |  BQ27520G2 },
+	{ "bq27520g3", (BQ27520G3 << 16) |  BQ27520G3 },
+	{ "bq27520g4", (BQ27520G4 << 16) |  BQ27520G4 },
+	{ "bq27530",   (BQ27530   << 16) |  BQ27530   },
+	{ "bq27531",   (BQ27531   << 16) |  BQ27530   },
+	{ "bq27541",   (BQ27541   << 16) |  BQ27541   },
+	{ "bq27542",   (BQ27542   << 16) |  BQ27541   },
+	{ "bq27546",   (BQ27546   << 16) |  BQ27541   },
+	{ "bq27742",   (BQ27742   << 16) |  BQ27541   },
+	{ "bq27545",   (BQ27545   << 16) |  BQ27545   },
+	{ "bq27421",   (BQ27421   << 16) |  BQ27421   },
+	{ "bq27425",   (BQ27425   << 16) |  BQ27421   },
+	{ "bq27441",   (BQ27441   << 16) |  BQ27421   },
+	{ "bq27621",   (BQ27621   << 16) |  BQ27421   },
 	{},
 };
 MODULE_DEVICE_TABLE(i2c, bq27xxx_i2c_id_table);
