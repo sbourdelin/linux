@@ -929,7 +929,7 @@ nvme_fc_connect_admin_queue(struct nvme_fc_ctrl *ctrl,
 
 	if (fcret) {
 		ret = -EBADF;
-		dev_err(ctrl->dev,
+		dev_err(ctrl->device,
 			"q %d connect failed: %s\n",
 			queue->qnum, validation_errors[fcret]);
 	} else {
@@ -944,7 +944,7 @@ out_free_buffer:
 	kfree(lsop);
 out_no_memory:
 	if (ret)
-		dev_err(ctrl->dev,
+		dev_err(ctrl->device,
 			"queue %d connect admin queue failed (%d).\n",
 			queue->qnum, ret);
 	return ret;
@@ -1028,7 +1028,7 @@ nvme_fc_connect_queue(struct nvme_fc_ctrl *ctrl, struct nvme_fc_queue *queue,
 
 	if (fcret) {
 		ret = -EBADF;
-		dev_err(ctrl->dev,
+		dev_err(ctrl->device,
 			"q %d connect failed: %s\n",
 			queue->qnum, validation_errors[fcret]);
 	} else {
@@ -1041,7 +1041,7 @@ out_free_buffer:
 	kfree(lsop);
 out_no_memory:
 	if (ret)
-		dev_err(ctrl->dev,
+		dev_err(ctrl->device,
 			"queue %d connect command failed (%d).\n",
 			queue->qnum, ret);
 	return ret;
@@ -1409,7 +1409,7 @@ __nvme_fc_init_request(struct nvme_fc_ctrl *ctrl,
 	op->fcp_req.cmddma = fc_dma_map_single(ctrl->lport->dev,
 				&op->cmd_iu, sizeof(op->cmd_iu), DMA_TO_DEVICE);
 	if (fc_dma_mapping_error(ctrl->lport->dev, op->fcp_req.cmddma)) {
-		dev_err(ctrl->dev,
+		dev_err(ctrl->device,
 			"FCP Op failed - cmdiu dma mapping failed.\n");
 		ret = EFAULT;
 		goto out_on_error;
@@ -1419,7 +1419,7 @@ __nvme_fc_init_request(struct nvme_fc_ctrl *ctrl,
 				&op->rsp_iu, sizeof(op->rsp_iu),
 				DMA_FROM_DEVICE);
 	if (fc_dma_mapping_error(ctrl->lport->dev, op->fcp_req.rspdma)) {
-		dev_err(ctrl->dev,
+		dev_err(ctrl->device,
 			"FCP Op failed - rspiu dma mapping failed.\n");
 		ret = EFAULT;
 	}
