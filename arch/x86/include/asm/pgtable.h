@@ -1185,6 +1185,28 @@ static inline u16 pte_flags_pkey(unsigned long pte_flags)
 #endif
 }
 
+/*
+ * The current flushing context - we pass it instead of 5 arguments:
+ */
+struct cpa_data {
+	unsigned long	*vaddr;
+	pgd_t		*pgd;
+	pgprot_t	mask_set;
+	pgprot_t	mask_clr;
+	unsigned long	numpages;
+	int		flags;
+	unsigned long	pfn;
+	unsigned	force_split : 1;
+	int		curpage;
+	struct page	**pages;
+};
+
+int
+try_preserve_large_page(pte_t *kpte, unsigned long address,
+			struct cpa_data *cpa);
+int split_large_page(struct cpa_data *cpa, pte_t *kpte,
+		     unsigned long address);
+
 #include <asm-generic/pgtable.h>
 #endif	/* __ASSEMBLY__ */
 
