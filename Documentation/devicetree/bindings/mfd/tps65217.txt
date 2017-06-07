@@ -1,33 +1,52 @@
-Texas Instruments TPS65217 family of regulators
-
-This module is part of the TPS65217. For more details about the whole
-TPS65217 chip see Documentation/devicetree/bindings/mfd/tps65217.txt.
+Texas Instruments TPS65217 Single-Chip PMIC for Battery-Powered Systems
 
 Required properties:
-- compatible: "ti,tps65217-pmic"
-- regulators: list of regulators provided by this controller, must be named
-  after their hardware counterparts: dcdc[1-3] and ldo[1-4]
-- regulators: This is the list of child nodes that specify the regulator
-  initialization data for defined regulators. Not all regulators for the given
-  device need to be present. The definition for each of these nodes is defined
-  using the standard binding for regulators found at
-  Documentation/devicetree/bindings/regulator/regulator.txt.
+- compatible: "ti,tps65217"
+- reg: I2C slave address.
+- interrupt-controller: Marks the device node as an interrupt controller.
+- #interrupt-cells: The number of cells to describe an IRQ, this should be 1.
+- backlight: Child node that specify the backlight regulator sub-device. See:
+	Documentation/devicetree/bindings/leds/backlight/tps65217-backlight.txt
+- charger: Child node that specify the charger sub-device. See:
+	Documentation/devicetree/bindings/power/supply/tps65217_charger.txt
+- pwrbutton: Child node that specify the power button sub-device. See:
+	Documentation/devicetree/bindings/input/tps65218-pwrbutton.txt
+- regulators: List of child nodes that specify the regulator initialization
+	data. See:
+	Documentation/devicetree/bindings/regulator/tps65217.txt.
 
 Optional properties:
 - ti,pmic-shutdown-controller: Telling the PMIC to shutdown on PWR_EN toggle.
-
-  The valid names for regulators are:
-  tps65217: dcdc1, dcdc2, dcdc3, ldo1, ldo2, ldo3 and ldo4
-
-Each regulator is defined using the standard binding for regulators.
 
 Example:
 
 	tps: tps@24 {
 		compatible = "ti,tps65217";
+		interrupt-controller;
+		#interrupt-cells = <1>;
+
 		ti,pmic-shutdown-controller;
 
+		backlight {
+			compatible = "ti,tps65217-bl";
+			status = "disabled";
+		};
+
+		charger {
+			compatible = "ti,tps65217-charger";
+			status = "disabled";
+		};
+
+		pwrbutton {
+			compatible = "ti,tps65217-pwrbutton";
+			status = "disabled";
+		};
+
 		regulators {
+			compatible = "ti,tps65217-pmic";
+			#address-cells = <1>;
+			#size-cells = <0>;
+
 			dcdc1_reg: dcdc1 {
 				regulator-min-microvolt = <900000>;
 				regulator-max-microvolt = <1800000>;
@@ -78,3 +97,4 @@ Example:
 			};
 		};
 	};
+

@@ -1,11 +1,13 @@
-TPS65217 family of regulators
+Texas Instruments TPS65217 backlight regulator
+
+This module is part of the TPS65217. For more details about the whole
+TPS65217 chip see Documentation/devicetree/bindings/mfd/tps65217.txt.
 
 The TPS65217 chip contains a boost converter and current sinks which can be
 used to drive LEDs for use as backlights.
 
 Required properties:
-- compatible: "ti,tps65217"
-- reg: I2C slave address
+- compatible: "ti,tps65217-bl"
 - backlight: node for specifying WLED1 and WLED2 lines in TPS65217
 - isel: selection bit, valid values: 1 for ISEL1 (low-level) and 2 for ISEL2 (high-level)
 - fdim: PWM dimming frequency, valid values: 100, 200, 500, 1000
@@ -15,13 +17,13 @@ Each regulator is defined using the standard binding for regulators.
 
 Example:
 
-	tps: tps@24 {
-		reg = <0x24>;
-		compatible = "ti,tps65217";
-		backlight {
-			isel = <1>;  /* 1 - ISET1, 2 ISET2 */
-			fdim = <100>; /* TPS65217_BL_FDIM_100HZ */
-			default-brightness = <50>;
-		};
+&tps {
+	backlight {
+		compatible = "ti,tps65217-bl";
+		status = "okay";
+		isel = <1>;  /* 1 - ISET1, 2 ISET2 */
+		fdim = <100>; /* TPS65217_BL_FDIM_100HZ */
+		default-brightness = <50>;
 	};
+};
 
