@@ -584,6 +584,61 @@ int iomap_fiemap(struct inode *inode, struct fiemap_extent_info *fi,
 }
 EXPORT_SYMBOL_GPL(iomap_fiemap);
 
+static loff_t
+iomap_seek_hole_actor(struct inode *inode, loff_t offset, loff_t length,
+		      void *data, struct iomap *iomap)
+{
+	if (iomap->type == IOMAP_HOLE)
+		return 0;
+	return iomap->offset + iomap->length - offset;
+}
+
+static loff_t
+iomap_seek_data_actor(struct inode *inode, loff_t offset, loff_t length,
+		      void *data, struct iomap *iomap)
+{
+	if (iomap->type != IOMAP_HOLE)
+		return 0;
+	return iomap->offset + iomap->length - offset;
+}
+
+loff_t
+iomap_seek_hole_data(struct inode *inode, loff_t offset, int whence,
+		     const struct iomap_ops *ops)
+{
+	static loff_t (*actor)(struct inode *, loff_t, loff_t, void *, struct iomap *);
+	loff_t len = i_size_read(inode) - offset;
+	loff_t ret;
+
+	if (len <= 0)
+		return -ENXIO;
+
+	switch(whence) {
+	case SEEK_HOLE:
+		actor = iomap_seek_hole_actor;
+		break;
+
+	case SEEK_DATA:
+		actor = iomap_seek_data_actor;
+		break;
+	}
+
+	while (len > 0) {
+		ret = iomap_apply(inode, offset, len, IOMAP_REPORT, ops, NULL, actor);
+		if (ret <= 0)
+			break;
+		offset += ret;
+		len -= ret;
+	}
+	if (ret < 0)
+		return ret;
+	ret = offset;
+	if (len <= 0 && whence == SEEK_DATA)
+		ret = -ENXIO;
+	return ret;
+}
+EXPORT_SYMBOL_GPL(iomap_seek_hole_data);
+
 /*
  * Private flags for iomap_dio, must not overlap with the public ones in
  * iomap.h:
