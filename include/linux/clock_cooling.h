@@ -20,8 +20,8 @@
  *  General Public License for more details.
  */
 
-#ifndef __CPU_COOLING_H__
-#define __CPU_COOLING_H__
+#ifndef __CLOCK_COOLING_H__
+#define __CLOCK_COOLING_H__
 
 #include <linux/of.h>
 #include <linux/thermal.h>
@@ -62,4 +62,4 @@ unsigned long clock_cooling_get_level(struct thermal_cooling_device *cdev,
 }
 #endif	/* CONFIG_CLOCK_THERMAL */
 
-#endif /* __CPU_COOLING_H__ */
+#endif /* __CLOCK_COOLING_H__ */
