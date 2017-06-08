@@ -1003,6 +1003,12 @@ enum {
 	XIVE_DUMP_EMU_STATE	= 5,
 };
 
+/* In-Memory Collection Counters Type */
+enum {
+	IMC_COUNTER_PER_CHIP            = 0x10,
+	IMC_COUNTER_PER_SOCKET          = 0x20,
+};
+
 #endif /* __ASSEMBLY__ */
 
 #endif /* __OPAL_API_H */
