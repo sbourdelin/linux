@@ -1270,6 +1270,31 @@ static struct hid_ll_driver usb_hid_driver = {
 	.idle = usbhid_idle,
 };
 
+static bool usbhid_usage_is_consumer(struct hid_device *hid)
+{
+	int i;
+	struct hid_report_enum *input_report_enum =
+			hid->report_enum + HID_INPUT_REPORT;
+	struct list_head *report_list = &input_report_enum->report_list;
+	struct hid_report *report;
+	unsigned int usage_page;
+
+	if (list_empty(report_list))
+		return false;
+
+	list_for_each_entry(report, report_list, list) {
+		for (i = 0; i < report->maxfield; i++) {
+			/* only checks Application field */
+			usage_page =
+				report->field[i]->application & HID_USAGE_PAGE;
+			if (usage_page != HID_UP_CONSUMER)
+				return false;
+		}
+	}
+
+	return true;
+}
+
 static int usbhid_probe(struct usb_interface *intf, const struct usb_device_id *id)
 {
 	struct usb_host_interface *interface = intf->cur_altsetting;
@@ -1361,6 +1386,18 @@ static int usbhid_probe(struct usb_interface *intf, const struct usb_device_id *
 		if (ret != -ENODEV)
 			hid_err(intf, "can't add hid device: %d\n", ret);
 		goto err_free;
+	}
+
+	/*
+	 * Autosuspend interfaces which have only consumer usage page inputs.
+	 * This allows autosuspending devices which adhere to the Android USB
+	 * headset spec while not autosuspending general keyboards, mice, and
+	 * joysticks which may misbehave.
+	 */
+	if (usbhid_usage_is_consumer(hid)) {
+		intf->needs_remote_wakeup = true;
+		usb_allow_interface_autosuspend(intf);
+		hid_info(hid, "autosuspend enabled on the hid interface\n");
 	}
 
 	return 0;
