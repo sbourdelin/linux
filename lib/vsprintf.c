@@ -811,10 +811,6 @@ char *hex_string(char *buf, char *end, u8 *addr, struct printf_spec spec,
 		/* nothing to print */
 		return buf;
 
-	if (ZERO_OR_NULL_PTR(addr))
-		/* NULL pointer */
-		return string(buf, end, NULL, spec);
-
 	switch (fmt[1]) {
 	case 'C':
 		separator = ':';
@@ -1253,10 +1249,6 @@ char *escaped_string(char *buf, char *end, u8 *addr, struct printf_spec spec,
 	if (spec.field_width == 0)
 		return buf;				/* nothing to print */
 
-	if (ZERO_OR_NULL_PTR(addr))
-		return string(buf, end, NULL, spec);	/* NULL pointer */
-
-
 	do {
 		switch (fmt[count++]) {
 		case 'a':
@@ -1387,9 +1379,6 @@ static noinline_for_stack
 char *clock(char *buf, char *end, struct clk *clk, struct printf_spec spec,
 	    const char *fmt)
 {
-	if (!IS_ENABLED(CONFIG_HAVE_CLK) || !clk)
-		return string(buf, end, NULL, spec);
-
 	switch (fmt[1]) {
 	case 'r':
 		return number(buf, end, clk_get_rate(clk), spec);
