@@ -58,11 +58,22 @@
 
 #define UART_OFFSET(addr)	((addr) & 0x00ffffff)
 
+/*
+ * Definition of ZIMAGE is in arch/arm/boot/compressed/Makefile.
+ * Place the following block in .text section only when this file is
+ * included by arch/arm/boot/compressed/* to make it possible to
+ * enable CONFIG_DEBUG_UNCOMPRESS and DEBUG in arch/arm/boot/compressed/head.S
+ * on OMAP2+ SoCs.
+ */
+#ifndef ZIMAGE
 		.pushsection .data
+#endif
 omap_uart_phys:	.word	0
 omap_uart_virt:	.word	0
 omap_uart_lsr:	.word	0
+#ifndef ZIMAGE
 		.popsection
+#endif
 
 		.macro	addruart, rp, rv, tmp
 
