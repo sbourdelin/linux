@@ -109,10 +109,10 @@ Optional properties:
 			  [Attention] Queue 0 is reserved for legacy traffic
 			  and so no AVB is available in this queue.
 		- Configure Credit Base Shaper (if AVB Mode selected):
-			- snps,send_slope: enable Low Power Interface
-			- snps,idle_slope: unlock on WoL
-			- snps,high_credit: max write outstanding req. limit
-			- snps,low_credit: max read outstanding req. limit
+			- snps,send_slope: Send Slope Credit value
+			- snps,idle_slope:  Idle Slope Credit value
+			- snps,high_credit: High Credit value
+			- snps,low_credit: Low Credit value
 		- snps,priority: TX queue priority (Range: 0x0 to 0xF)
 Examples:
 
@@ -143,10 +143,18 @@ Examples:
 
 		queue1 {
 			snps,avb-algorithm;
-			snps,send_slope = <0x1000>;
-			snps,idle_slope = <0x1000>;
-			snps,high_credit = <0x3E800>;
-			snps,low_credit = <0xFFC18000>;
+			/*
+			 *  Example AVB parameters based on:
+			 *   Allocated Bandwidth: 40%
+			 *   Maximum Frame size: 1000 bytes
+			 *   Maximum Interference size: 1500 bytes
+			 *   Port Transmit Rate: 8
+			 *   Scaling Factor: 1024
+			 */
+			snps,idle_slope = <0xCCC>;
+			snps,send_slope = <0x1333>;
+			snps,high_credit = <0x4B0000>;
+			snps,low_credit = <0xFFB50000>;
 			snps,priority = <0x1>;
 		};
 	};
