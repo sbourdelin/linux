@@ -275,6 +275,23 @@ struct va_format:
 
 	Passed by reference.
 
+struct rtc_time:
+
+	%pt		YYYY-mm-dd HH:MM:SS
+	%ptd		YYYY-mm-dd
+	%ptt		HH:MM:SS
+	%pt[dt][rv]
+
+	For printing date and time as represented by struct rtc_time
+	structure in human readable format.
+
+	By default year will be incremented by 1900 and month by 1. Use
+	'r' (raw) to suppress this behaviour. On the other hand when
+	'v' is applied validation mechanism will be in use, i.e. numbers
+	out of range will be replaced by '**' or '****'.
+
+	Passed by reference.
+
 struct clk:
 
 	%pC	pll1

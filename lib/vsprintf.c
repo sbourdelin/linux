@@ -30,6 +30,7 @@
 #include <linux/ioport.h>
 #include <linux/dcache.h>
 #include <linux/cred.h>
+#include <linux/rtc.h>
 #include <linux/uuid.h>
 #include <net/addrconf.h>
 #ifdef CONFIG_BLOCK
@@ -699,6 +700,20 @@ static const struct printf_spec default_str_spec = {
 static const struct printf_spec default_dec_spec = {
 	.base = 10,
 	.precision = -1,
+};
+
+static const struct printf_spec default_dec02_spec = {
+	.base = 10,
+	.field_width = 2,
+	.precision = -1,
+	.flags = ZEROPAD,
+};
+
+static const struct printf_spec default_dec04_spec = {
+	.base = 10,
+	.field_width = 4,
+	.precision = -1,
+	.flags = ZEROPAD,
 };
 
 static noinline_for_stack
@@ -1378,6 +1393,112 @@ char *address_val(char *buf, char *end, const void *addr, const char *fmt)
 }
 
 static noinline_for_stack
+char *date_string(char *buf, char *end, const struct rtc_time *tm, bool v, bool r)
+{
+	int year = tm->tm_year + (r ? 0 : 1900);
+	int mon = tm->tm_mon + (r ? 0 : 1);
+
+	if (unlikely(v && (unsigned int)tm->tm_year > 200))
+		buf = string(buf, end, "****", default_str_spec);
+	else
+		buf = number(buf, end, year, default_dec04_spec);
+
+	if (buf < end)
+		*buf = '-';
+	buf++;
+
+	if (unlikely(v && (unsigned int)tm->tm_mon > 11))
+		buf = string(buf, end, "**", default_str_spec);
+	else
+		buf = number(buf, end, mon, default_dec02_spec);
+
+	if (buf < end)
+		*buf = '-';
+	buf++;
+
+	if (unlikely(v && (unsigned int)tm->tm_mday > 31))
+		buf = string(buf, end, "**", default_str_spec);
+	else
+		buf = number(buf, end, tm->tm_mday, default_dec02_spec);
+
+	return buf;
+}
+
+static noinline_for_stack
+char *time_string(char *buf, char *end, const struct rtc_time *tm, bool v, bool r)
+{
+	if (unlikely(v && (unsigned int)tm->tm_hour > 24))
+		buf = string(buf, end, "**", default_str_spec);
+	else
+		buf = number(buf, end, tm->tm_hour, default_dec02_spec);
+
+	if (buf < end)
+		*buf = ':';
+	buf++;
+
+	if (unlikely(v && (unsigned int)tm->tm_min > 59))
+		buf = string(buf, end, "**", default_str_spec);
+	else
+		buf = number(buf, end, tm->tm_min, default_dec02_spec);
+
+	if (buf < end)
+		*buf = ':';
+	buf++;
+
+	if (unlikely(v && (unsigned int)tm->tm_sec > 59))
+		buf = string(buf, end, "**", default_str_spec);
+	else
+		buf = number(buf, end, tm->tm_sec, default_dec02_spec);
+
+	return buf;
+}
+
+static noinline_for_stack
+char *timeanddate(char *buf, char *end, const struct rtc_time *tm, const char *fmt)
+{
+	bool have_t = true, have_d = true;
+	bool validate = false;
+	bool raw = false;
+	int count = 0;
+	bool found;
+
+	switch (fmt[++count]) {
+	case 'd':
+		have_t = false;
+		break;
+	case 't':
+		have_d = false;
+		break;
+	}
+
+	/* No %pt[dt] supplied */
+	if (have_t && have_d)
+		--count;
+
+	found = true;
+	do {
+		switch (fmt[++count]) {
+		case 'r':
+			raw = true;
+			break;
+		case 'v':
+			validate = true;
+			break;
+		default:
+			found = false;
+			break;
+		}
+	} while (found);
+
+	if (have_d)
+		buf = date_string(buf, end, tm, validate, raw);
+	if (have_t)
+		buf = time_string(buf, end, tm, validate, raw);
+
+	return buf;
+}
+
+static noinline_for_stack
 char *clock(char *buf, char *end, struct clk *clk, struct printf_spec spec,
 	    const char *fmt)
 {
@@ -1543,6 +1664,7 @@ int kptr_restrict __read_mostly;
  * - 'd[234]' For a dentry name (optionally 2-4 last components)
  * - 'D[234]' Same as 'd' but for a struct file
  * - 'g' For block_device name (gendisk + partition number)
+ * - 't[dt][rv]' For time and date as represented in struct rtc_time
  * - 'C' For a clock, it prints the name (Common Clock Framework) or address
  *       (legacy clock framework) of the clock
  * - 'Cn' For a clock, it prints the name (Common Clock Framework) or address
@@ -1695,6 +1817,8 @@ char *pointer(const char *fmt, char *buf, char *end, void *ptr,
 		return address_val(buf, end, ptr, fmt);
 	case 'd':
 		return dentry_name(buf, end, ptr, spec, fmt);
+	case 't':
+		return timeanddate(buf, end, (const struct rtc_time *)ptr, fmt);
 	case 'C':
 		return clock(buf, end, ptr, spec, fmt);
 	case 'D':
