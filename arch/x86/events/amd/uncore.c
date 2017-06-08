@@ -400,11 +400,22 @@ static int amd_uncore_cpu_starting(unsigned int cpu)
 
 	if (amd_uncore_llc) {
 		unsigned int apicid = cpu_data(cpu).apicid;
-		unsigned int nshared;
+		unsigned int nshared, cache_topology, prev_eax = 0;
 
 		uncore = *per_cpu_ptr(amd_uncore_llc, cpu);
-		cpuid_count(0x8000001d, 2, &eax, &ebx, &ecx, &edx);
-		nshared = ((eax >> 14) & 0xfff) + 1;
+		/*
+		 * Iterate over Cache Topology Definition leaves until no
+		 * more cache descriptions are available
+		 */
+		for(cache_topology = 0; cache_topology < 5; cache_topology++) {
+			cpuid_count(0x8000001d, cache_topology, &eax, &ebx, &ecx, &edx);
+
+			if ((eax & 0x1f) == 0) /* EAX[0:4] gives type of cache */
+				break;
+
+			prev_eax = eax;
+		}
+		nshared = ((prev_eax >> 14) & 0xfff) + 1;
 		uncore->id = apicid - (apicid % nshared);
 
 		uncore = amd_uncore_find_online_sibling(uncore, amd_uncore_llc);
