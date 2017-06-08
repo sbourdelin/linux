@@ -30,3 +30,13 @@ config OPAL_PRD
 	help
 	  This enables the opal-prd driver, a facility to run processor
 	  recovery diagnostics on OpenPower machines
+
+config HV_PERF_IMC_CTRS
+       bool "Hypervisor supplied In Memory Collection PMU events (Nest & Core)"
+       default y
+       depends on PERF_EVENTS && PPC_POWERNV
+       help
+	  Enable access to hypervisor supplied in-memory collection counters
+	  in perf. IMC counters are available from Power9 systems.
+
+          If unsure, select Y.

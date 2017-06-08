@@ -14,6 +14,7 @@
 #include <linux/printk.h>
 #include <linux/types.h>
 #include <linux/of.h>
+#include <linux/of_address.h>
 #include <linux/of_fdt.h>
 #include <linux/of_platform.h>
 #include <linux/interrupt.h>
@@ -30,6 +31,7 @@
 #include <asm/opal.h>
 #include <asm/firmware.h>
 #include <asm/mce.h>
+#include <asm/imc-pmu.h>
 
 #include "powernv.h"
 
@@ -705,6 +707,17 @@ static void opal_pdev_init(const char *compatible)
 		of_platform_device_create(np, NULL, NULL);
 }
 
+#ifdef CONFIG_HV_PERF_IMC_CTRS
+static void __init opal_imc_init_dev(void)
+{
+	struct device_node *np;
+
+	np = of_find_compatible_node(NULL, NULL, IMC_DTB_COMPAT);
+	if (np)
+		of_platform_device_create(np, NULL, NULL);
+}
+#endif
+
 static int kopald(void *unused)
 {
 	unsigned long timeout = msecs_to_jiffies(opal_heartbeat) + 1;
@@ -777,6 +790,11 @@ static int __init opal_init(void)
 
 	/* Setup a heatbeat thread if requested by OPAL */
 	opal_init_heartbeat();
+
+#ifdef CONFIG_HV_PERF_IMC_CTRS
+	/* Detect IMC pmu counters support and create PMUs */
+	opal_imc_init_dev();
+#endif
 
 	/* Create leds platform devices */
 	leds = of_find_node_by_path("/ibm,opal/leds");
