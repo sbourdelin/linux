@@ -140,7 +140,7 @@ static inline void gic_map_to_vpe(unsigned int intr, unsigned int vpe)
 }
 
 #ifdef CONFIG_CLKSRC_MIPS_GIC
-u64 gic_read_count(void)
+notrace u64 gic_read_count(void)
 {
 	unsigned int hi, hi2, lo;
 
@@ -167,7 +167,7 @@ unsigned int gic_get_count_width(void)
 	return bits;
 }
 
-void gic_write_compare(u64 cnt)
+notrace void gic_write_compare(u64 cnt)
 {
 	if (mips_cm_is64) {
 		gic_write(GIC_REG(VPE_LOCAL, GIC_VPE_COMPARE), cnt);
@@ -179,7 +179,7 @@ void gic_write_compare(u64 cnt)
 	}
 }
 
-void gic_write_cpu_compare(u64 cnt, int cpu)
+notrace void gic_write_cpu_compare(u64 cnt, int cpu)
 {
 	unsigned long flags;
 
