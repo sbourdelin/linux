@@ -16,6 +16,9 @@
  *	implements the IMA hooks: ima_bprm_check, ima_file_mmap,
  *	and ima_file_check.
  */
+
+#define pr_fmt(fmt) KBUILD_MODNAME ": " fmt
+
 #include <linux/module.h>
 #include <linux/file.h>
 #include <linux/binfmts.h>
@@ -155,12 +158,66 @@ void ima_file_free(struct file *file)
 	ima_check_last_writer(iint, inode, file);
 }
 
+static int measure_and_appraise(struct file *file, char *buf, loff_t size,
+				enum ima_hooks func, int opened, int action,
+				struct integrity_iint_cache *iint,
+				struct evm_ima_xattr_data **xattr_value_,
+				int *xattr_len_, const char *pathname,
+				bool appended_sig)
+{
+	struct ima_template_desc *template_desc;
+	struct evm_ima_xattr_data *xattr_value = NULL;
+	enum hash_algo hash_algo;
+	int rc, xattr_len = 0;
+
+	template_desc = ima_template_desc_current();
+	if (action & IMA_APPRAISE_SUBMASK ||
+	    strcmp(template_desc->name, IMA_TEMPLATE_IMA_NAME) != 0) {
+		if (appended_sig) {
+			/* Shouldn't happen. */
+			if (WARN_ONCE(!buf || !size,
+				      "%s doesn't support modsig\n",
+				      func_tokens[func]))
+				return -ENOTSUPP;
+
+			rc = ima_read_modsig(buf, &size, &xattr_value,
+					     &xattr_len);
+			if (rc)
+				return rc;
+		} else
+			/* read 'security.ima' */
+			xattr_len = ima_read_xattr(file_dentry(file),
+						   &xattr_value);
+	}
+
+	hash_algo = ima_get_hash_algo(xattr_value, xattr_len);
+
+	rc = ima_collect_measurement(iint, file, buf, size, hash_algo);
+	if (rc != 0) {
+		if (file->f_flags & O_DIRECT)
+			rc = (iint->flags & IMA_PERMIT_DIRECTIO) ? 0 : -EACCES;
+		goto out;
+	}
+
+	if (action & IMA_APPRAISE_SUBMASK)
+		rc = ima_appraise_measurement(func, iint, file, pathname,
+					      xattr_value, xattr_len, opened);
+out:
+	if (rc)
+		ima_free_xattr_data(xattr_value);
+	else {
+		*xattr_value_ = xattr_value;
+		*xattr_len_ = xattr_len;
+	}
+
+	return rc;
+}
+
 static int process_measurement(struct file *file, char *buf, loff_t size,
 			       int mask, enum ima_hooks func, int opened)
 {
 	struct inode *inode = file_inode(file);
 	struct integrity_iint_cache *iint = NULL;
-	struct ima_template_desc *template_desc;
 	char *pathbuf = NULL;
 	char filename[NAME_MAX];
 	const char *pathname = NULL;
@@ -169,7 +226,6 @@ static int process_measurement(struct file *file, char *buf, loff_t size,
 	struct evm_ima_xattr_data *xattr_value = NULL;
 	int xattr_len = 0;
 	bool violation_check;
-	enum hash_algo hash_algo;
 
 	if (!ima_policy_flag || !S_ISREG(inode->i_mode))
 		return 0;
@@ -226,30 +282,23 @@ static int process_measurement(struct file *file, char *buf, loff_t size,
 		goto out_digsig;
 	}
 
-	template_desc = ima_template_desc_current();
-	if ((action & IMA_APPRAISE_SUBMASK) ||
-		    strcmp(template_desc->name, IMA_TEMPLATE_IMA_NAME) != 0)
-		/* read 'security.ima' */
-		xattr_len = ima_read_xattr(file_dentry(file), &xattr_value);
-
-	hash_algo = ima_get_hash_algo(xattr_value, xattr_len);
-
-	rc = ima_collect_measurement(iint, file, buf, size, hash_algo);
-	if (rc != 0) {
-		if (file->f_flags & O_DIRECT)
-			rc = (iint->flags & IMA_PERMIT_DIRECTIO) ? 0 : -EACCES;
-		goto out_digsig;
-	}
-
 	if (!pathbuf)	/* ima_rdwr_violation possibly pre-fetched */
 		pathname = ima_d_path(&file->f_path, &pathbuf, filename);
+
+	if (iint->flags & IMA_MODSIG_ALLOWED)
+		rc = measure_and_appraise(file, buf, size, func, opened, action,
+					  iint, &xattr_value, &xattr_len,
+					  pathname, true);
+	if (!xattr_len)
+		rc = measure_and_appraise(file, buf, size, func, opened, action,
+					  iint, &xattr_value, &xattr_len,
+					  pathname, false);
+	if (rc)
+		goto out_digsig;
 
 	if (action & IMA_MEASURE)
 		ima_store_measurement(iint, file, pathname,
 				      xattr_value, xattr_len, pcr);
-	if (action & IMA_APPRAISE_SUBMASK)
-		rc = ima_appraise_measurement(func, iint, file, pathname,
-					      xattr_value, xattr_len, opened);
 	if (action & IMA_AUDIT)
 		ima_audit_measurement(iint, pathname);
 
@@ -257,7 +306,7 @@ out_digsig:
 	if ((mask & MAY_WRITE) && (iint->flags & IMA_DIGSIG) &&
 	     !(iint->flags & IMA_NEW_FILE))
 		rc = -EACCES;
-	kfree(xattr_value);
+	ima_free_xattr_data(xattr_value);
 out_free:
 	if (pathbuf)
 		__putname(pathbuf);

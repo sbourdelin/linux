@@ -204,7 +204,7 @@ int ima_collect_measurement(struct integrity_iint_cache *iint,
 		char digest[IMA_MAX_DIGEST_SIZE];
 	} hash;
 
-	if (!(iint->flags & IMA_COLLECTED)) {
+	if (!(iint->flags & IMA_COLLECTED) || iint->ima_hash->algo != algo) {
 		u64 i_version = file_inode(file)->i_version;
 
 		if (file->f_flags & O_DIRECT) {

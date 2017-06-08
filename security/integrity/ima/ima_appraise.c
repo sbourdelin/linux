@@ -172,6 +172,11 @@ enum hash_algo ima_get_hash_algo(struct evm_ima_xattr_data *xattr_value,
 		} else if (xattr_len == 17)
 			return HASH_ALGO_MD5;
 		break;
+	case IMA_MODSIG:
+		ret = ima_get_modsig_hash_algo(xattr_value);
+		if (ret < HASH_ALGO__LAST)
+			return ret;
+		break;
 	}
 
 	/* return default hash algo */
@@ -229,10 +234,14 @@ int ima_appraise_measurement(enum ima_hooks func,
 		goto out;
 	}
 
-	status = evm_verifyxattr(dentry, XATTR_NAME_IMA, xattr_value, rc, iint);
-	if ((status != INTEGRITY_PASS) && (status != INTEGRITY_UNKNOWN)) {
-		if ((status == INTEGRITY_NOLABEL)
-		    || (status == INTEGRITY_NOXATTRS))
+	/* Appended signatures aren't protected by EVM. */
+	status = evm_verifyxattr(dentry, XATTR_NAME_IMA,
+				 xattr_value->type == IMA_MODSIG ?
+				 NULL : xattr_value, rc, iint);
+	if (status != INTEGRITY_PASS && status != INTEGRITY_UNKNOWN &&
+	    !(xattr_value->type == IMA_MODSIG &&
+	      (status == INTEGRITY_NOLABEL || status == INTEGRITY_NOXATTRS))) {
+		if (status == INTEGRITY_NOLABEL || status == INTEGRITY_NOXATTRS)
 			cause = "missing-HMAC";
 		else if (status == INTEGRITY_FAIL)
 			cause = "invalid-HMAC";
@@ -267,11 +276,18 @@ int ima_appraise_measurement(enum ima_hooks func,
 		status = INTEGRITY_PASS;
 		break;
 	case EVM_IMA_XATTR_DIGSIG:
+	case IMA_MODSIG:
 		iint->flags |= IMA_DIGSIG;
-		rc = integrity_digsig_verify(INTEGRITY_KEYRING_IMA,
-					     (const char *)xattr_value, rc,
-					     iint->ima_hash->digest,
-					     iint->ima_hash->length);
+
+		if (xattr_value->type == EVM_IMA_XATTR_DIGSIG)
+			rc = integrity_digsig_verify(INTEGRITY_KEYRING_IMA,
+						     (const char *)xattr_value,
+						     rc, iint->ima_hash->digest,
+						     iint->ima_hash->length);
+		else
+			rc = ima_modsig_verify(INTEGRITY_KEYRING_IMA,
+					       xattr_value);
+
 		if (rc == -EOPNOTSUPP) {
 			status = INTEGRITY_UNKNOWN;
 		} else if (rc) {
@@ -291,13 +307,15 @@ out:
 	if (status != INTEGRITY_PASS) {
 		if ((ima_appraise & IMA_APPRAISE_FIX) &&
 		    (!xattr_value ||
-		     xattr_value->type != EVM_IMA_XATTR_DIGSIG)) {
+		     (xattr_value->type != EVM_IMA_XATTR_DIGSIG &&
+		      xattr_value->type != IMA_MODSIG))) {
 			if (!ima_fix_xattr(dentry, iint))
 				status = INTEGRITY_PASS;
 		} else if ((inode->i_size == 0) &&
 			   (iint->flags & IMA_NEW_FILE) &&
 			   (xattr_value &&
-			    xattr_value->type == EVM_IMA_XATTR_DIGSIG)) {
+			    (xattr_value->type == EVM_IMA_XATTR_DIGSIG ||
+			     xattr_value->type == IMA_MODSIG))) {
 			status = INTEGRITY_PASS;
 		}
 		integrity_audit_msg(AUDIT_INTEGRITY_DATA, inode, filename,
@@ -406,7 +424,8 @@ int ima_inode_setxattr(struct dentry *dentry, const char *xattr_name,
 		if (!xattr_value_len || (xvalue->type >= IMA_XATTR_LAST))
 			return -EINVAL;
 		ima_reset_appraise_flags(d_backing_inode(dentry),
-			 (xvalue->type == EVM_IMA_XATTR_DIGSIG) ? 1 : 0);
+					 xvalue->type == EVM_IMA_XATTR_DIGSIG ||
+					 xvalue->type == IMA_MODSIG);
 		result = 0;
 	}
 	return result;

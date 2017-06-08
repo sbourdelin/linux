@@ -190,6 +190,8 @@ enum ima_hooks {
 	__ima_hooks(__ima_hook_enumify)
 };
 
+extern const char *const func_tokens[];
+
 /* LIM API function definitions */
 int ima_get_action(struct inode *inode, int mask,
 		   enum ima_hooks func, int *pcr);
@@ -248,6 +250,19 @@ enum hash_algo ima_get_hash_algo(struct evm_ima_xattr_data *xattr_value,
 int ima_read_xattr(struct dentry *dentry,
 		   struct evm_ima_xattr_data **xattr_value);
 
+#ifdef CONFIG_IMA_APPRAISE_MODSIG
+bool ima_hook_supports_modsig(enum ima_hooks func);
+int ima_read_modsig(const void *buf, loff_t *buf_len,
+		    struct evm_ima_xattr_data **xattr_value,
+		    int *xattr_len);
+enum hash_algo ima_get_modsig_hash_algo(struct evm_ima_xattr_data *hdr);
+int ima_modsig_serialize_data(struct evm_ima_xattr_data *hdr,
+			      struct evm_ima_xattr_data **data, int *data_len);
+int ima_modsig_verify(const unsigned int keyring_id,
+		      struct evm_ima_xattr_data *hdr);
+void ima_free_xattr_data(struct evm_ima_xattr_data *hdr);
+#endif
+
 #else
 static inline int ima_appraise_measurement(enum ima_hooks func,
 					   struct integrity_iint_cache *iint,
@@ -290,6 +305,44 @@ static inline int ima_read_xattr(struct dentry *dentry,
 }
 
 #endif /* CONFIG_IMA_APPRAISE */
+
+#ifndef CONFIG_IMA_APPRAISE_MODSIG
+static inline bool ima_hook_supports_modsig(enum ima_hooks func)
+{
+	return false;
+}
+
+static inline int ima_read_modsig(const void *buf, loff_t *buf_len,
+				  struct evm_ima_xattr_data **xattr_value,
+				  int *xattr_len)
+{
+	return -ENOTSUPP;
+}
+
+static inline enum hash_algo ima_get_modsig_hash_algo(
+						struct evm_ima_xattr_data *hdr)
+{
+	return HASH_ALGO__LAST;
+}
+
+static inline int ima_modsig_serialize_data(struct evm_ima_xattr_data *hdr,
+					    struct evm_ima_xattr_data **data,
+					    int *data_len)
+{
+	return -ENOTSUPP;
+}
+
+static inline int ima_modsig_verify(const unsigned int keyring_id,
+				    struct evm_ima_xattr_data *hdr)
+{
+	return -ENOTSUPP;
+}
+
+static inline void ima_free_xattr_data(struct evm_ima_xattr_data *hdr)
+{
+	kfree(hdr);
+}
+#endif
 
 /* LSM based policy rules require audit */
 #ifdef CONFIG_IMA_LSM_RULES
