@@ -18,6 +18,9 @@
 #include <asm/smp.h>
 #include <linux/string.h>
 
+/* Maintains base address for all the cpus */
+static DEFINE_PER_CPU(u64 *, thread_imc_mem);
+
 /* Needed for sanity check */
 extern u64 nest_max_offset;
 extern u64 core_max_offset;
@@ -39,6 +42,7 @@ static struct cpumask imc_result_mask;
 static DEFINE_MUTEX(imc_control_mutex);
 
 struct imc_pmu *core_imc_pmu;
+static int thread_imc_mem_size;
 
 struct imc_pmu *imc_event_to_pmu(struct perf_event *event)
 {
@@ -317,18 +321,59 @@ bool is_core_imc_mem_inited(int cpu)
 }
 
 /*
- * imc_mem_init : Function to support memory allocation for core imc.
+ * Allocates a page of memory for each of the online cpus, and, writes the
+ * physical base address of that page to the LDBAR for that cpu. This starts
+ * the thread IMC counters.
+ */
+static int thread_imc_mem_alloc(int cpu_id, int size)
+{
+	u64 ldbar_value, *local_mem;
+	int phys_id = topology_physical_package_id(cpu_id);
+
+	if (per_cpu(thread_imc_mem, cpu_id) != NULL)
+		return 0;
+
+	local_mem = alloc_pages_exact_nid(phys_id,
+				(size_t)size, GFP_KERNEL | __GFP_ZERO);
+	if (!local_mem)
+		return -ENOMEM;
+
+	per_cpu(thread_imc_mem, cpu_id) = local_mem;
+
+	ldbar_value = ((u64)local_mem & (u64)THREAD_IMC_LDBAR_MASK) |
+						(u64)THREAD_IMC_ENABLE;
+
+	mtspr(SPRN_LDBAR, ldbar_value);
+	return 0;
+}
+
+/*
+ * imc_mem_init : Function to support memory allocation for core and thread imc.
  */
 static int imc_mem_init(struct imc_pmu *pmu_ptr)
 {
-	int nr_cores;
+	int nr_cores, cpu, res;
 
 	if (pmu_ptr->imc_counter_mmaped)
 		return 0;
-	nr_cores = num_present_cpus() / threads_per_core;
-	pmu_ptr->mem_info = kzalloc((sizeof(struct imc_mem_info) * nr_cores), GFP_KERNEL);
-	if (!pmu_ptr->mem_info)
-		return -ENOMEM;
+	switch (pmu_ptr->domain) {
+	case IMC_DOMAIN_CORE:
+		nr_cores = num_present_cpus() / threads_per_core;
+		pmu_ptr->mem_info = kzalloc((sizeof(struct imc_mem_info) * nr_cores), GFP_KERNEL);
+		if (!pmu_ptr->mem_info)
+			return -ENOMEM;
+		break;
+	case IMC_DOMAIN_THREAD:
+		thread_imc_mem_size = pmu_ptr->counter_mem_size;
+		for_each_online_cpu(cpu) {
+			res = thread_imc_mem_alloc(cpu, pmu_ptr->counter_mem_size);
+			if (res)
+				return res;
+		}
+		break;
+	default:
+		return -EINVAL;
+	}
 	return 0;
 }
 
@@ -522,6 +567,75 @@ static int core_imc_event_init(struct perf_event *event)
 	return 0;
 }
 
+static int thread_imc_event_init(struct perf_event *event)
+{
+	int rc;
+	struct task_struct *target;
+
+	if (event->attr.type != event->pmu->type)
+		return -ENOENT;
+
+	/* Sampling not supported */
+	if (event->hw.sample_period)
+		return -EINVAL;
+
+	event->hw.idx = -1;
+
+	/* Sanity check for config (event offset) */
+	if (event->attr.config > thread_max_offset)
+		return -EINVAL;
+
+	target = event->hw.target;
+
+	if (!target)
+		return -EINVAL;
+
+	if (!is_core_imc_mem_inited(event->cpu))
+		return -ENODEV;
+
+	event->pmu->task_ctx_nr = perf_sw_context;
+	/*
+	 * Core pmu units are enabled only when it is used.
+	 * See if this is triggered for the first time.
+	 * If yes, take the mutex lock and enable the core counters.
+	 * If not, just increment the count in core_events.
+	 */
+	if (atomic_inc_return(&core_events) == 1) {
+		mutex_lock(&imc_core_reserve);
+		rc = imc_control(OPAL_IMC_COUNTERS_CORE, true);
+		mutex_unlock(&imc_core_reserve);
+		if (rc) {
+			atomic_dec_return(&core_events);
+			pr_err("IMC: Unable to start the counters\n");
+			return -ENODEV;
+		}
+	}
+	event->destroy = core_imc_counters_release;
+	return 0;
+}
+
+static void thread_imc_read_counter(struct perf_event *event)
+{
+	u64 *addr, data;
+
+	addr = per_cpu(thread_imc_mem, smp_processor_id()) + event->attr.config;
+	data = __be64_to_cpu(READ_ONCE(*addr));
+	local64_set(&event->hw.prev_count, data);
+}
+
+static void thread_imc_perf_event_update(struct perf_event *event)
+{
+	u64 counter_prev, counter_new, final_count, *addr;
+
+	addr = per_cpu(thread_imc_mem, smp_processor_id()) + event->attr.config;
+	counter_prev = local64_read(&event->hw.prev_count);
+	counter_new = __be64_to_cpu(READ_ONCE(*addr));
+	final_count = counter_new - counter_prev;
+
+	local64_set(&event->hw.prev_count, counter_new);
+	local64_add(final_count, &event->count);
+}
+
 static void imc_read_counter(struct perf_event *event)
 {
 	u64 *addr, data;
@@ -583,6 +697,53 @@ static int imc_event_add(struct perf_event *event, int flags)
 	return 0;
 }
 
+static void thread_imc_event_start(struct perf_event *event, int flags)
+{
+	thread_imc_read_counter(event);
+}
+
+static void thread_imc_event_stop(struct perf_event *event, int flags)
+{
+	thread_imc_perf_event_update(event);
+}
+
+static void thread_imc_event_del(struct perf_event *event, int flags)
+{
+	thread_imc_perf_event_update(event);
+}
+
+static int thread_imc_event_add(struct perf_event *event, int flags)
+{
+	thread_imc_event_start(event, flags);
+
+	return 0;
+}
+
+static void thread_imc_pmu_start_txn(struct pmu *pmu,
+				     unsigned int txn_flags)
+{
+	if (txn_flags & ~PERF_PMU_TXN_ADD)
+		return;
+	perf_pmu_disable(pmu);
+}
+
+static void thread_imc_pmu_cancel_txn(struct pmu *pmu)
+{
+	perf_pmu_enable(pmu);
+}
+
+static int thread_imc_pmu_commit_txn(struct pmu *pmu)
+{
+	perf_pmu_enable(pmu);
+	return 0;
+}
+
+static void thread_imc_pmu_sched_task(struct perf_event_context *ctx,
+				  bool sched_in)
+{
+	return;
+}
+
 /* update_pmu_ops : Populate the appropriate operations for "pmu" */
 static int update_pmu_ops(struct imc_pmu *pmu)
 {
@@ -603,7 +764,26 @@ static int update_pmu_ops(struct imc_pmu *pmu)
 	pmu->attr_groups[IMC_CPUMASK_ATTR] = &imc_pmu_cpumask_attr_group;
 	pmu->attr_groups[IMC_FORMAT_ATTR] = &imc_format_group;
 	pmu->pmu.attr_groups = pmu->attr_groups;
+	if (pmu->domain == IMC_DOMAIN_THREAD) {
+		pmu->pmu.event_init = thread_imc_event_init;
+		pmu->pmu.start = thread_imc_event_start;
+		pmu->pmu.add = thread_imc_event_add;
+		pmu->pmu.del = thread_imc_event_del;
+		pmu->pmu.stop = thread_imc_event_stop;
+		pmu->pmu.read = thread_imc_perf_event_update;
+		pmu->pmu.start_txn = thread_imc_pmu_start_txn;
+		pmu->pmu.cancel_txn = thread_imc_pmu_cancel_txn;
+		pmu->pmu.commit_txn = thread_imc_pmu_commit_txn;
+		pmu->pmu.sched_task = thread_imc_pmu_sched_task;
 
+		/*
+		 * Since thread_imc does not have any CPUMASK attr,
+		 * this may drop the "events" attr all together.
+		 * So swap the IMC_EVENT_ATTR slot with IMC_CPUMASK_ATTR.
+		 */
+		pmu->attr_groups[IMC_CPUMASK_ATTR] = pmu->attr_groups[IMC_EVENT_ATTR];
+		pmu->attr_groups[IMC_EVENT_ATTR] = NULL;
+	}
 	return 0;
 }
 
@@ -662,6 +842,27 @@ static int update_events_in_group(struct imc_events *events,
 	/* Save the event attribute */
 	pmu->attr_groups[IMC_EVENT_ATTR] = attr_group;
 	return 0;
+}
+
+static void thread_imc_ldbar_disable(void *dummy)
+{
+	/* LDBAR spr is a per-thread */
+	mtspr(SPRN_LDBAR, 0);
+}
+
+void thread_imc_disable(void)
+{
+	on_each_cpu(thread_imc_ldbar_disable, NULL, 1);
+}
+
+static void cleanup_all_thread_imc_memory(void)
+{
+	int i;
+
+	for_each_online_cpu(i) {
+		if (per_cpu(thread_imc_mem, cpu))
+			free_pages(per_cpu(thread_imc_mem, cpu), 0);
+	}
 }
 
 /*
@@ -730,6 +931,10 @@ err_free:
 		cleanup_all_core_imc_memory(pmu_ptr);
 		cpuhp_remove_state(CPUHP_AP_PERF_POWERPC_CORE_IMC_ONLINE);
 	}
+
+	/* For thread_imc, we have allocated memory, we need to free it */
+	if (pmu_ptr->domain == IMC_DOMAIN_THREAD)
+		cleanup_all_thread_imc_memory();
 
 	return ret;
 }

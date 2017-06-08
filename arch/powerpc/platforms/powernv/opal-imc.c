@@ -542,6 +542,8 @@ static void opal_imc_counters_shutdown(struct platform_device *pdev)
 {
 	/* Disable the IMC Core functions */
 	imc_control(OPAL_IMC_COUNTERS_CORE, false);
+	/* Disable the IMC Thread functions */
+	thread_imc_disable();
 }
 
 static const struct of_device_id opal_imc_match[] = {
