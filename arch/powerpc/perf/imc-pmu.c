@@ -377,6 +377,37 @@ static int imc_mem_init(struct imc_pmu *pmu_ptr)
 	return 0;
 }
 
+static int ppc_thread_imc_cpu_online(unsigned int cpu)
+{
+	int rc = 0;
+	u64 ldbar_value;
+
+	if (per_cpu(thread_imc_mem, cpu) == NULL)
+		rc = thread_imc_mem_alloc(cpu, thread_imc_mem_size);
+
+	if (rc)
+		mtspr(SPRN_LDBAR, 0);
+
+	ldbar_value = ((u64)per_cpu(thread_imc_mem, cpu) & (u64)THREAD_IMC_LDBAR_MASK) |
+							(u64)THREAD_IMC_ENABLE;
+	mtspr(SPRN_LDBAR, ldbar_value);
+	return 0;
+}
+
+static int ppc_thread_imc_cpu_offline(unsigned int cpu)
+{
+	mtspr(SPRN_LDBAR, 0);
+	return 0;
+}
+
+void thread_imc_cpu_init(void)
+{
+	cpuhp_setup_state(CPUHP_AP_PERF_POWERPC_THREAD_IMC_ONLINE,
+			  "perf/powerpc/imc_thread:online",
+			  ppc_thread_imc_cpu_online,
+			  ppc_thread_imc_cpu_offline);
+}
+
 static int ppc_core_imc_cpu_online(unsigned int cpu)
 {
 	const struct cpumask *l_cpumask;
@@ -860,8 +891,8 @@ static void cleanup_all_thread_imc_memory(void)
 	int i;
 
 	for_each_online_cpu(i) {
-		if (per_cpu(thread_imc_mem, cpu))
-			free_pages(per_cpu(thread_imc_mem, cpu), 0);
+		if (per_cpu(thread_imc_mem, i))
+			free_pages((u64)per_cpu(thread_imc_mem, i), 0);
 	}
 }
 
@@ -899,6 +930,9 @@ int __init init_imc_pmu(struct imc_events *events, int idx,
 		if (ret)
 			return ret;
 		break;
+	case IMC_DOMAIN_THREAD:
+		thread_imc_cpu_init();
+		break;
 	default:
 		return -1;  /* Unknown domain */
 	}
@@ -933,8 +967,10 @@ err_free:
 	}
 
 	/* For thread_imc, we have allocated memory, we need to free it */
-	if (pmu_ptr->domain == IMC_DOMAIN_THREAD)
+	if (pmu_ptr->domain == IMC_DOMAIN_THREAD) {
 		cleanup_all_thread_imc_memory();
+		cpuhp_remove_state(CPUHP_AP_PERF_POWERPC_THREAD_IMC_ONLINE);
+	}
 
 	return ret;
 }
