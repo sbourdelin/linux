@@ -10,8 +10,10 @@
 
 enum stat_item {
 	ALLOC_FASTPATH,		/* Allocation from cpu slab */
+	ALLOC_ALT_FASTPATH,	/* Allocation from alternate cpu slab */
 	ALLOC_SLOWPATH,		/* Allocation by getting a new cpu slab */
 	FREE_FASTPATH,		/* Free to cpu slab */
+	FREE_ALT_FASTPATH,	/* Free to alternate cpu slab */
 	FREE_SLOWPATH,		/* Freeing not to cpu slab */
 	FREE_FROZEN,		/* Freeing to frozen slab */
 	FREE_ADD_PARTIAL,	/* Freeing moves slab to partial list */
@@ -42,6 +44,12 @@ struct kmem_cache_cpu {
 	unsigned long tid;	/* Globally unique transaction id */
 	struct page *page;	/* The slab from which we are allocating */
 	struct page *partial;	/* Partially allocated frozen slabs */
+	/*
+	 * The following fields have identical uses to those above */
+	void **alt_freelist;
+	unsigned long alt_tid;
+	struct page *alt_partial;
+	struct page *alt_page;
 #ifdef CONFIG_SLUB_STATS
 	unsigned stat[NR_SLUB_STAT_ITEMS];
 #endif

@@ -132,10 +132,24 @@ void *fixup_red_left(struct kmem_cache *s, void *p)
 	return p;
 }
 
+#define SLAB_NO_PARTIAL (SLAB_CONSISTENCY_CHECKS | SLAB_STORE_USER | \
+                               SLAB_TRACE)
+
+
+static inline bool kmem_cache_use_alt_partial(struct kmem_cache *s)
+{
+#ifdef CONFIG_SLUB_CPU_PARTIAL
+	return s->flags & (SLAB_RED_ZONE | SLAB_POISON) &&
+		!(s->flags & SLAB_NO_PARTIAL);
+#else
+	return false;
+#endif
+}
+
 static inline bool kmem_cache_has_cpu_partial(struct kmem_cache *s)
 {
 #ifdef CONFIG_SLUB_CPU_PARTIAL
-	return !kmem_cache_debug(s);
+	return !(s->flags & SLAB_NO_PARTIAL);
 #else
 	return false;
 #endif
@@ -1786,6 +1800,7 @@ static inline void *acquire_slab(struct kmem_cache *s,
 }
 
 static void put_cpu_partial(struct kmem_cache *s, struct page *page, int drain);
+static void put_cpu_partial_alt(struct kmem_cache *s, struct page *page, int drain);
 static inline bool pfmemalloc_match(struct page *page, gfp_t gfpflags);
 
 /*
@@ -1821,11 +1836,17 @@ static void *get_partial_node(struct kmem_cache *s, struct kmem_cache_node *n,
 
 		available += objects;
 		if (!object) {
-			c->page = page;
+			if (kmem_cache_use_alt_partial(s))
+				c->alt_page = page;
+			else
+				c->page = page;
 			stat(s, ALLOC_FROM_PARTIAL);
 			object = t;
 		} else {
-			put_cpu_partial(s, page, 0);
+			if (kmem_cache_use_alt_partial(s))
+				put_cpu_partial_alt(s, page, 0);
+			else
+				put_cpu_partial(s, page, 0);
 			stat(s, CPU_PARTIAL_NODE);
 		}
 		if (!kmem_cache_has_cpu_partial(s)
@@ -2147,12 +2168,16 @@ static void unfreeze_partials(struct kmem_cache *s,
 #ifdef CONFIG_SLUB_CPU_PARTIAL
 	struct kmem_cache_node *n = NULL, *n2 = NULL;
 	struct page *page, *discard_page = NULL;
+	bool alt = kmem_cache_use_alt_partial(s);
 
-	while ((page = c->partial)) {
+	while ((page = alt ? c->alt_partial : c->partial)) {
 		struct page new;
 		struct page old;
 
-		c->partial = page->next;
+		if (alt)
+			c->alt_partial = page->next;
+		else
+			c->partial = page->next;
 
 		n2 = get_node(s, page_to_nid(page));
 		if (n != n2) {
@@ -2263,6 +2288,58 @@ static void put_cpu_partial(struct kmem_cache *s, struct page *page, int drain)
 #endif
 }
 
+static void put_cpu_partial_alt(struct kmem_cache *s, struct page *page, int drain)
+{
+#ifdef CONFIG_SLUB_CPU_PARTIAL
+	struct page *oldpage;
+	int pages;
+	int pobjects;
+
+	preempt_disable();
+	do {
+		pages = 0;
+		pobjects = 0;
+		oldpage = this_cpu_read(s->cpu_slab->alt_partial);
+
+		if (oldpage) {
+			pobjects = oldpage->pobjects;
+			pages = oldpage->pages;
+			if (drain && pobjects > s->cpu_partial) {
+				unsigned long flags;
+				/*
+				 * partial array is full. Move the existing
+				 * set to the per node partial list.
+				 */
+				local_irq_save(flags);
+				unfreeze_partials(s, this_cpu_ptr(s->cpu_slab));
+				local_irq_restore(flags);
+				oldpage = NULL;
+				pobjects = 0;
+				pages = 0;
+				stat(s, CPU_PARTIAL_DRAIN);
+			}
+		}
+
+		pages++;
+		pobjects += page->objects - page->inuse;
+
+		page->pages = pages;
+		page->pobjects = pobjects;
+		page->next = oldpage;
+
+	} while (this_cpu_cmpxchg(s->cpu_slab->alt_partial, oldpage, page)
+								!= oldpage);
+	if (unlikely(!s->cpu_partial)) {
+		unsigned long flags;
+
+		local_irq_save(flags);
+		unfreeze_partials(s, this_cpu_ptr(s->cpu_slab));
+		local_irq_restore(flags);
+	}
+	preempt_enable();
+#endif
+}
+
 static inline void flush_slab(struct kmem_cache *s, struct kmem_cache_cpu *c)
 {
 	stat(s, CPUSLAB_FLUSH);
@@ -2271,6 +2348,16 @@ static inline void flush_slab(struct kmem_cache *s, struct kmem_cache_cpu *c)
 	c->tid = next_tid(c->tid);
 	c->page = NULL;
 	c->freelist = NULL;
+}
+
+static inline void flush_slab_alt(struct kmem_cache *s, struct kmem_cache_cpu *c)
+{
+	stat(s, CPUSLAB_FLUSH);
+	deactivate_slab(s, c->alt_page, c->alt_freelist);
+
+	c->alt_tid = next_tid(c->alt_tid);
+	c->alt_page = NULL;
+	c->alt_freelist = NULL;
 }
 
 /*
@@ -2285,6 +2372,8 @@ static inline void __flush_cpu_slab(struct kmem_cache *s, int cpu)
 	if (likely(c)) {
 		if (c->page)
 			flush_slab(s, c);
+		if (c->alt_page)
+			flush_slab_alt(s, c);
 
 		unfreeze_partials(s, c);
 	}
@@ -2302,7 +2391,7 @@ static bool has_cpu_slab(int cpu, void *info)
 	struct kmem_cache *s = info;
 	struct kmem_cache_cpu *c = per_cpu_ptr(s->cpu_slab, cpu);
 
-	return c->page || c->partial;
+	return c->page || c->partial || c->alt_page || c->alt_partial;
 }
 
 static void flush_all(struct kmem_cache *s)
@@ -2425,6 +2514,8 @@ static inline void *new_slab_objects(struct kmem_cache *s, gfp_t flags,
 		if (c->page)
 			flush_slab(s, c);
 
+		if (c->alt_page)
+			flush_slab_alt(s, c);
 		/*
 		 * No other reference to the page yet so we can
 		 * muck around with it freely without cmpxchg
@@ -2433,7 +2524,10 @@ static inline void *new_slab_objects(struct kmem_cache *s, gfp_t flags,
 		page->freelist = NULL;
 
 		stat(s, ALLOC_SLAB);
-		c->page = page;
+		if (kmem_cache_use_alt_partial(s))
+			c->alt_page = page;
+		else
+			c->page = page;
 		*pc = c;
 	} else
 		freelist = NULL;
@@ -2507,10 +2601,14 @@ static void *___slab_alloc(struct kmem_cache *s, gfp_t gfpflags, int node,
 {
 	void *freelist;
 	struct page *page;
+	bool alt = kmem_cache_use_alt_partial(s);
 
 	page = c->page;
-	if (!page)
-		goto new_slab;
+	if (!page) {
+		page = c->alt_page;
+		if (!page)
+			goto new_slab;
+	}
 redo:
 
 	if (unlikely(!node_match(page, node))) {
@@ -2541,14 +2639,18 @@ redo:
 	}
 
 	/* must check again c->freelist in case of cpu migration or IRQ */
-	freelist = c->freelist;
+	freelist = alt ? c->alt_freelist : c->freelist;
 	if (freelist)
 		goto load_freelist;
 
 	freelist = get_freelist(s, page);
 
+
 	if (!freelist) {
-		c->page = NULL;
+		if (alt)
+			c->alt_page = NULL;
+		else
+			c->page = NULL;
 		stat(s, DEACTIVATE_BYPASS);
 		goto new_slab;
 	}
@@ -2561,9 +2663,16 @@ load_freelist:
 	 * page is pointing to the page from which the objects are obtained.
 	 * That page must be frozen for per cpu allocations to work.
 	 */
-	VM_BUG_ON(!c->page->frozen);
-	c->freelist = get_freepointer(s, freelist);
-	c->tid = next_tid(c->tid);
+	if (alt) {
+		VM_BUG_ON(!c->alt_page->frozen);
+		c->alt_freelist = get_freepointer(s, freelist);
+		c->alt_tid = next_tid(c->alt_tid);
+		init_object(s, freelist, SLUB_RED_ACTIVE);
+	} else {
+		VM_BUG_ON(!c->page->frozen);
+		c->freelist = get_freepointer(s, freelist);
+		c->tid = next_tid(c->tid);
+	}
 	return freelist;
 
 new_slab:
@@ -2576,6 +2685,14 @@ new_slab:
 		goto redo;
 	}
 
+	if (c->alt_partial) {
+		page = c->alt_page = c->alt_partial;
+		c->alt_partial = page->next;
+		stat(s, CPU_PARTIAL_ALLOC);
+		c->alt_freelist = NULL;
+		goto redo;
+	}
+
 	freelist = new_slab_objects(s, gfpflags, node, &c);
 
 	if (unlikely(!freelist)) {
@@ -2583,19 +2700,21 @@ new_slab:
 		return NULL;
 	}
 
-	page = c->page;
-	if (likely(!kmem_cache_debug(s) && pfmemalloc_match(page, gfpflags)))
-		goto load_freelist;
-
+	page = alt ? c->alt_page : c->page;
 	/* Only entered in the debug case */
-	if (kmem_cache_debug(s) &&
-			!alloc_debug_processing(s, page, freelist, addr))
-		goto new_slab;	/* Slab failed checks. Next slab needed */
+	if (kmem_cache_debug(s)) {
+		if (!alloc_debug_processing(s, page, freelist, addr))
+			goto new_slab;	/* Slab failed checks. Next slab needed */
 
-	deactivate_slab(s, page, get_freepointer(s, freelist));
-	c->page = NULL;
-	c->freelist = NULL;
-	return freelist;
+		if (!kmem_cache_use_alt_partial(s)) {
+			deactivate_slab(s, page, get_freepointer(s, freelist));
+			c->page = NULL;
+			c->freelist = NULL;
+			return freelist;
+		}
+	}
+	/* XXX Fix this flow */
+	goto load_freelist;
 }
 
 /*
@@ -2621,6 +2740,39 @@ static void *__slab_alloc(struct kmem_cache *s, gfp_t gfpflags, int node,
 	p = ___slab_alloc(s, gfpflags, node, addr, c);
 	local_irq_restore(flags);
 	return p;
+}
+
+static void *__slab_alloc_alt_path(struct kmem_cache *s)
+{
+	void *object;
+	void *next_object;
+	struct kmem_cache_cpu *c;
+	unsigned long tid;
+
+	do {
+		tid = this_cpu_read(s->cpu_slab->alt_tid);
+		c = raw_cpu_ptr(s->cpu_slab);
+	} while (IS_ENABLED(CONFIG_PREEMPT) &&
+		 unlikely(tid != READ_ONCE(c->alt_tid)));
+
+	barrier();
+
+	object = c->alt_freelist;
+
+	if (!object)
+		return NULL;
+
+	next_object = get_freepointer_safe(s, object);
+
+	if (unlikely(!this_cpu_cmpxchg_double(
+			s->cpu_slab->alt_freelist, s->cpu_slab->alt_tid,
+			object, tid,
+			next_object, next_tid(tid))))
+		return NULL;
+
+	init_object(s, object, SLUB_RED_ACTIVE);
+	stat(s, ALLOC_ALT_FASTPATH);
+	return object;
 }
 
 /*
@@ -2681,7 +2833,10 @@ redo:
 	object = c->freelist;
 	page = c->page;
 	if (unlikely(!object || !node_match(page, node))) {
-		object = __slab_alloc(s, gfpflags, node, addr, c);
+		if (kmem_cache_use_alt_partial(s))
+			object = __slab_alloc_alt_path(s);
+		if (!object)
+			object = __slab_alloc(s, gfpflags, node, addr, c);
 		stat(s, ALLOC_SLOWPATH);
 	} else {
 		void *next_object = get_freepointer_safe(s, object);
@@ -2777,6 +2932,50 @@ EXPORT_SYMBOL(kmem_cache_alloc_node_trace);
 #endif
 #endif
 
+static bool __slab_free_alt_path(struct kmem_cache *s, struct page *page,
+				void *head, void *tail)
+{
+	unsigned long tid;
+	struct kmem_cache_cpu *c;
+	void *object = head;
+
+	do {
+		tid = this_cpu_read(s->cpu_slab->alt_tid);
+		c = raw_cpu_ptr(s->cpu_slab);
+	} while (IS_ENABLED(CONFIG_PREEMPT) &&
+		 unlikely(tid != READ_ONCE(c->alt_tid)));
+
+	barrier();
+
+	/*
+	 * XXX How to avoid duplicating the initialization?
+	 */
+next_object:
+	init_object(s, object, SLUB_RED_INACTIVE);
+	if (object != tail) {
+		object = get_freepointer(s, object);
+		goto next_object;
+	}
+
+	if (likely(page == c->alt_page)) {
+		set_freepointer(s, tail, c->alt_freelist);
+
+		if (unlikely(!this_cpu_cmpxchg_double(
+				s->cpu_slab->alt_freelist, s->cpu_slab->alt_tid,
+				c->alt_freelist, tid,
+				head, next_tid(tid)))) {
+
+			note_cmpxchg_failure("slab_free", s, tid);
+			return false;
+		}
+
+		stat(s, FREE_ALT_FASTPATH);
+		return true;
+	}
+
+	return false;
+}
+
 /*
  * Slow path handling. This may still be called frequently since objects
  * have a longer lifetime than the cpu slabs in most processing loads.
@@ -2798,6 +2997,9 @@ static void __slab_free(struct kmem_cache *s, struct page *page,
 	unsigned long uninitialized_var(flags);
 
 	stat(s, FREE_SLOWPATH);
+
+	if (kmem_cache_use_alt_partial(s) && __slab_free_alt_path(s, page, head, tail))
+		return;
 
 	if (kmem_cache_debug(s) &&
 	    !free_debug_processing(s, page, head, tail, cnt, addr))
@@ -2854,7 +3056,10 @@ static void __slab_free(struct kmem_cache *s, struct page *page,
 		 * per cpu partial list.
 		 */
 		if (new.frozen && !was_frozen) {
-			put_cpu_partial(s, page, 1);
+			if (kmem_cache_use_alt_partial(s))
+				put_cpu_partial_alt(s, page, 1);
+			else
+				put_cpu_partial(s, page, 1);
 			stat(s, CPU_PARTIAL_FREE);
 		}
 		/*
@@ -5317,9 +5522,11 @@ static ssize_t text##_store(struct kmem_cache *s,		\
 }								\
 SLAB_ATTR(text);						\
 
+STAT_ATTR(ALLOC_ALT_FASTPATH, alloc_alt_fastpath);
 STAT_ATTR(ALLOC_FASTPATH, alloc_fastpath);
 STAT_ATTR(ALLOC_SLOWPATH, alloc_slowpath);
 STAT_ATTR(FREE_FASTPATH, free_fastpath);
+STAT_ATTR(FREE_ALT_FASTPATH, free_alt_fastpath);
 STAT_ATTR(FREE_SLOWPATH, free_slowpath);
 STAT_ATTR(FREE_FROZEN, free_frozen);
 STAT_ATTR(FREE_ADD_PARTIAL, free_add_partial);
@@ -5385,8 +5592,10 @@ static struct attribute *slab_attrs[] = {
 #endif
 #ifdef CONFIG_SLUB_STATS
 	&alloc_fastpath_attr.attr,
+	&alloc_alt_fastpath_attr.attr,
 	&alloc_slowpath_attr.attr,
 	&free_fastpath_attr.attr,
+	&free_alt_fastpath_attr.attr,
 	&free_slowpath_attr.attr,
 	&free_frozen_attr.attr,
 	&free_add_partial_attr.attr,
