@@ -1456,7 +1456,7 @@ struct dev_info {
  * @adapter:		Adapter device information.
  * @port:		Port information.
  * @monitor_time_info:	Timer to monitor ports.
- * @proc_sem:		Semaphore for proc accessing.
+ * @proc_mutex:		Mutex for proc accessing.
  * @id:			Device ID.
  * @mii_if:		MII interface information.
  * @advertising:	Temporary variable to store advertised settings.
@@ -1470,7 +1470,7 @@ struct dev_priv {
 	struct ksz_port port;
 	struct ksz_timer_info monitor_timer_info;
 
-	struct semaphore proc_sem;
+	struct mutex proc_mutex;
 	int id;
 
 	struct mii_if_info mii_if;
@@ -5842,7 +5842,7 @@ static int netdev_ioctl(struct net_device *dev, struct ifreq *ifr, int cmd)
 	int result = 0;
 	struct mii_ioctl_data *data = if_mii(ifr);
 
-	if (down_interruptible(&priv->proc_sem))
+	if (mutex_lock_interruptible(&priv->proc_mutex))
 		return -ERESTARTSYS;
 
 	switch (cmd) {
@@ -5876,7 +5876,7 @@ static int netdev_ioctl(struct net_device *dev, struct ifreq *ifr, int cmd)
 		result = -EOPNOTSUPP;
 	}
 
-	up(&priv->proc_sem);
+	mutex_unlock(&priv->proc_mutex);
 
 	return result;
 }
@@ -6805,7 +6805,7 @@ static int __init netdev_init(struct net_device *dev)
 
 	dev->features |= dev->hw_features;
 
-	sema_init(&priv->proc_sem, 1);
+	mutex_init(&priv->proc_mutex);
 
 	priv->mii_if.phy_id_mask = 0x1;
 	priv->mii_if.reg_num_mask = 0x7;
