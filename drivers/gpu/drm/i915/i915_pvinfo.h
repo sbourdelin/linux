@@ -36,10 +36,6 @@
 #define VGT_VERSION_MAJOR 1
 #define VGT_VERSION_MINOR 0
 
-#define INTEL_VGT_IF_VERSION_ENCODE(major, minor) ((major) << 16 | (minor))
-#define INTEL_VGT_IF_VERSION \
-	INTEL_VGT_IF_VERSION_ENCODE(VGT_VERSION_MAJOR, VGT_VERSION_MINOR)
-
 /*
  * notifications from guest to vgpu device model
  */
