@@ -30,7 +30,7 @@ struct i915_params i915 __read_mostly = {
 	.panel_ignore_lid = 1,
 	.semaphores = -1,
 	.lvds_channel_mode = 0,
-	.panel_use_ssc = -1,
+	.lvds_use_ssc = -1,
 	.vbt_sdvo_panel_type = -1,
 	.enable_rc6 = -1,
 	.enable_dc = -1,
@@ -105,7 +105,7 @@ MODULE_PARM_DESC(lvds_channel_mode,
 	 "Specify LVDS channel mode "
 	 "(0=probe BIOS [default], 1=single-channel, 2=dual-channel)");
 
-module_param_named_unsafe(lvds_use_ssc, i915.panel_use_ssc, int, 0600);
+module_param_named_unsafe(lvds_use_ssc, i915.lvds_use_ssc, int, 0600);
 MODULE_PARM_DESC(lvds_use_ssc,
 	"Use Spread Spectrum Clock with panels [LVDS/eDP] "
 	"(default: auto from VBT)");

@@ -32,7 +32,7 @@
 	func(int, panel_ignore_lid); \
 	func(int, semaphores); \
 	func(int, lvds_channel_mode); \
-	func(int, panel_use_ssc); \
+	func(int, lvds_use_ssc); \
 	func(int, vbt_sdvo_panel_type); \
 	func(int, enable_rc6); \
 	func(int, enable_dc); \

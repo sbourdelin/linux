@@ -6337,8 +6337,8 @@ intel_link_compute_m_n(int bits_per_pixel, int nlanes,
 
 static inline bool intel_panel_use_ssc(struct drm_i915_private *dev_priv)
 {
-	if (i915.panel_use_ssc >= 0)
-		return i915.panel_use_ssc != 0;
+	if (i915.lvds_use_ssc >= 0)
+		return i915.lvds_use_ssc != 0;
 	return dev_priv->vbt.lvds_use_ssc
 		&& !(dev_priv->quirks & QUIRK_LVDS_SSC_DISABLE);
 }
