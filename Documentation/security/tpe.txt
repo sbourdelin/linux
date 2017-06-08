@@ -1,0 +1,59 @@
+Trusted Path Execution is a Linux Security Module that generally requires
+programs to be run from a trusted path. A trusted path is one that is owned by
+root and is not group/world writable. This prevents an attacker from executing
+their own malicious binaries from an unprivileged user on the system. This
+feature is enabled with CONFIG_SECURITY_TPE. When enabled, a set of sysctls
+are created in /proc/sys/kernel/tpe.
+
+---------------------------------------------------------------------------
+
+Trusted Path Execution introduces the following Kconfig options and sysctls.
+
+CONFIG_SECURITY_TPE (sysctl=kernel.tpe.enabled)
+
+default: n
+
+This option enables Trusted Path Execution. TPE blocks *untrusted*
+users from executing files that meet the following conditions:
+
+* file is not in a root-owned directory
+* file is writable by a user other than root
+
+NOTE: By default root is not restricted by TPE.
+
+CONFIG_SECURITY_TPE_GID (sysctl=kernel.tpe.gid)
+
+default: 0
+
+This option defines a group id that, by default, is the trusted group.
+If a user is not trusted then it has the checks described in
+CONFIG_SECURITY_TPE applied. Otherwise, the user is trusted and the
+checks are not applied. You can disable the trusted gid option by
+setting it to 0. This makes all non-root users untrusted.
+
+CONFIG_SECURITY_TPE_STRICT (sysctl=kernel.tpe.strict)
+
+default: n
+
+This option applies another set of restrictions to all non-root users
+even if they are trusted. This only allows execution under the
+following conditions:
+
+* file is in a directory owned by the user that is not group or
+  world-writable
+* file is in a directory owned by root and writable only by root
+
+CONFIG_SECURITY_TPE_RESTRICT_ROOT (sysctl=kernel.tpe.restrict_root)
+
+default: n
+
+This option applies TPE restrictions to root.
+
+CONFIG_SECURITY_TPE_INVERT_GID (sysctl=kernel.tpe.invert_gid)
+
+default: n
+
+This option reverses the trust logic of the gid option and makes
+kernel.tpe.gid into the untrusted group. This means that all other groups
+become trusted. This sysctl is helpful when you want TPE restrictions
+to be limited to a small subset of users.

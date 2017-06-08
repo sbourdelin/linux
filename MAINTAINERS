@@ -11574,6 +11574,11 @@ T:	git git://git.kernel.org/pub/scm/linux/kernel/git/kees/linux.git yama/tip
 S:	Supported
 F:	security/yama/
 
+TPE SECURITY MODULE
+M:	Matt Brown <matt@nmatt.com>
+S:	Supported
+F:	security/tpe/
+
 SENSABLE PHANTOM
 M:	Jiri Slaby <jirislaby@gmail.com>
 S:	Maintained

@@ -1,0 +1,64 @@
+config SECURITY_TPE
+	bool "Trusted Path Execution (TPE)"
+	default n
+	help
+	  If you say Y here, you will be able to choose a gid to add to the
+	  supplementary groups of users you want to mark as "trusted."
+	  Untrusted users will not be able to execute any files that are not in
+	  root-owned directories writable only by root.  If the sysctl option
+	  is enabled, a sysctl option with name "tpe.enabled" is created.
+
+config SECURITY_TPE_GID
+	int
+	default SECURITY_TPE_TRUSTED_GID if (SECURITY_TPE && !SECURITY_TPE_INVERT_GID)
+	default SECURITY_TPE_UNTRUSTED_GID if (SECURITY_TPE && SECURITY_TPE_INVERT_GID)
+
+config SECURITY_TPE_TRUSTED_GID
+	int "GID for TPE-trusted users"
+	depends on SECURITY_TPE && !SECURITY_TPE_INVERT_GID
+	default 0
+	help
+	  Setting this GID determines what group TPE restrictions will be
+	  *disabled* for. If the sysctl option is enabled, a sysctl option
+	  with name "tpe.gid" is created.
+
+config SECURITY_TPE_UNTRUSTED_GID
+	int "GID for TPE-untrusted users"
+	depends on SECURITY_TPE && SECURITY_TPE_INVERT_GID
+	default 0
+	help
+	  Setting this GID determines what group TPE restrictions will be
+	  *enabled* for. If the sysctl option is enabled, a sysctl option
+	  with name "tpe.gid" is created.
+
+config SECURITY_TPE_INVERT_GID
+	bool "Invert GID option"
+	depends on SECURITY_TPE
+	help
+	  If you say Y here, the group you specify in the TPE configuration will
+	  decide what group TPE restrictions will be *enabled* for.  This
+	  option is useful if you want TPE restrictions to be restricted to a
+	  small subset of users. If the sysctl option is enabled, a sysctl option
+	  with name "tpe.invert_gid" is created.
+
+config SECURITY_TPE_STRICT
+	bool "Partially restrict all non-root users"
+	depends on SECURITY_TPE
+	help
+	  If you say Y here, all non-root users will be covered under
+	  a weaker TPE restriction.  This is separate from, and in addition to,
+	  the main TPE options that you have selected elsewhere.  Thus, if a
+	  "trusted" GID is chosen, this restriction applies to even that GID.
+	  Under this restriction, all non-root users will only be allowed to
+	  execute files in directories they own that are not group or
+	  world-writable, or in directories owned by root and writable only by
+	  root.  If the sysctl option is enabled, a sysctl option with name
+	  "tpe.strict" is created.
+
+config SECURITY_TPE_RESTRICT_ROOT
+	bool "Restrict root"
+	depends on SECURITY_TPE
+	help
+	  If you say Y here, root will be marked as untrusted. This will require
+	  root to pass all the same checks as any other untrusted user.
+
