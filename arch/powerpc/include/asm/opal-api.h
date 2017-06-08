@@ -1008,6 +1008,9 @@ enum {
 
 /* In-Memory Collection Counters Type */
 enum {
+	IMC_COUNTER_PER_SUB_CORE	= 0x2,
+	IMC_COUNTER_PER_CORE		= 0x4,
+	IMC_COUNTER_PER_QUAD		= 0x8,
 	IMC_COUNTER_PER_CHIP		= 0x10,
 	IMC_COUNTER_PER_SOCKET		= 0x20,
 };

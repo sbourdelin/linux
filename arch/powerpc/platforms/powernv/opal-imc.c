@@ -35,6 +35,7 @@
 #include <asm/imc-pmu.h>
 
 u64 nest_max_offset;
+u64 core_max_offset;
 
 static int imc_event_prop_update(char *name, struct imc_events *events)
 {
@@ -114,6 +115,10 @@ static void update_max_value(u32 value, int pmu_domain)
 	case IMC_DOMAIN_NEST:
 		if (nest_max_offset < value)
 			nest_max_offset = value;
+		break;
+	case IMC_DOMAIN_CORE:
+		if (core_max_offset < value)
+			core_max_offset = value;
 		break;
 	default:
 		/* Unknown domain, return */
@@ -399,7 +404,7 @@ static int imc_get_mem_addr_nest(struct device_node *node,
 /*
  * imc_pmu_create : Takes the parent device which is the pmu unit, pmu_index
  *		    and domain as the inputs.
- * Allocates memory for the pmu, sets up its domain (NEST), and
+ * Allocates memory for the pmu, sets up its domain (NEST/CORE), and
  * calls imc_events_setup() to allocate memory for the events supported
  * by this pmu. Assigns a name for the pmu.
  *
@@ -426,7 +431,10 @@ static int imc_pmu_create(struct device_node *parent, int pmu_index, int domain)
 	pmu_ptr->domain = domain;
 
 	/* Needed for hotplug/migration */
-	per_nest_pmu_arr[pmu_index] = pmu_ptr;
+	if (pmu_ptr->domain == IMC_DOMAIN_CORE)
+		core_imc_pmu = pmu_ptr;
+	else if (pmu_ptr->domain == IMC_DOMAIN_NEST)
+		per_nest_pmu_arr[pmu_index] = pmu_ptr;
 
 	pp = of_find_property(parent, "name", NULL);
 	if (!pp) {
@@ -447,7 +455,10 @@ static int imc_pmu_create(struct device_node *parent, int pmu_index, int domain)
 		goto free_pmu;
 	}
 	/* Save the name to register it later */
-	sprintf(buf, "nest_%s", (char *)pp->value);
+	if (pmu_ptr->domain == IMC_DOMAIN_NEST)
+		sprintf(buf, "nest_%s", (char *)pp->value);
+	else
+		sprintf(buf, "%s_imc", (char *)pp->value);
 	pmu_ptr->pmu.name = (char *)buf;
 
 	if (of_property_read_u32(parent, "size", &pmu_ptr->counter_mem_size))
@@ -510,6 +521,8 @@ static int opal_imc_counters_probe(struct platform_device *pdev)
 			continue;
 		if (type == IMC_COUNTER_PER_CHIP)
 			domain = IMC_DOMAIN_NEST;
+		else if (type == IMC_COUNTER_PER_CORE)
+			domain = IMC_DOMAIN_CORE;
 		else
 			continue;
 		if (!imc_pmu_create(imc_dev, pmu_count, domain))

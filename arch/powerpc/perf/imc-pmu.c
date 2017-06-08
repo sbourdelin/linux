@@ -20,6 +20,8 @@
 
 /* Needed for sanity check */
 extern u64 nest_max_offset;
+extern u64 core_max_offset;
+
 struct imc_pmu *per_nest_pmu_arr[IMC_MAX_PMUS];
 static cpumask_t nest_imc_cpumask;
 static int nest_imc_cpumask_initialized;
@@ -30,6 +32,8 @@ static DEFINE_MUTEX(imc_nest_reserve);
 
 static struct cpumask imc_result_mask;
 static DEFINE_MUTEX(imc_control_mutex);
+
+struct imc_pmu *core_imc_pmu;
 
 struct imc_pmu *imc_event_to_pmu(struct perf_event *event)
 {
