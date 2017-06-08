@@ -1505,6 +1505,13 @@ static void __init aurora_of_parse(const struct device_node *np,
 		mask |= AURORA_ACR_FORCE_WRITE_POLICY_MASK;
 	}
 
+	if (of_property_read_bool(np, "arm,ecc-enable")) {
+		mask |= L2C_AUX_CTRL_EVTMON_ENABLE;
+		val |= L2C_AUX_CTRL_EVTMON_ENABLE;
+	} else if (of_property_read_bool(np, "arm,ecc-disable")) {
+		mask |= L2C_AUX_CTRL_EVTMON_ENABLE;
+	}
+
 	if (of_property_read_bool(np, "arm,parity-enable")) {
 		mask |= L2C_AUX_CTRL_PARITY_ENABLE;
 		val |= L2C_AUX_CTRL_PARITY_ENABLE;
