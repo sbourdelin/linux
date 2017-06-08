@@ -24,6 +24,7 @@
 #include <linux/pci.h>
 #include <linux/platform_device.h>
 #include <linux/regmap.h>
+#include <linux/regulator/consumer.h>
 #include <linux/resource.h>
 #include <linux/signal.h>
 #include <linux/types.h>
@@ -59,6 +60,7 @@ struct imx6_pcie {
 	u32			tx_swing_full;
 	u32			tx_swing_low;
 	int			link_gen;
+	struct regulator	*vpcie;
 };
 
 /* Parameters for the waiting for PCIe PHY PLL to lock on i.MX7 */
@@ -283,6 +285,13 @@ static void imx6_pcie_assert_core_reset(struct imx6_pcie *imx6_pcie)
 				   IMX6Q_GPR1_PCIE_REF_CLK_EN, 0 << 16);
 		break;
 	}
+
+	if (imx6_pcie->vpcie && regulator_is_enabled(imx6_pcie->vpcie) > 0) {
+		int ret = regulator_disable(imx6_pcie->vpcie);
+
+		if (ret)
+			pr_err("failed to disable vpcie regulator: %d\n", ret);
+	}
 }
 
 static int imx6_pcie_enable_ref_clk(struct imx6_pcie *imx6_pcie)
@@ -349,10 +358,19 @@ static void imx6_pcie_deassert_core_reset(struct imx6_pcie *imx6_pcie)
 	struct device *dev = pci->dev;
 	int ret;
 
+	if (imx6_pcie->vpcie && !regulator_is_enabled(imx6_pcie->vpcie)) {
+		ret = regulator_enable(imx6_pcie->vpcie);
+		if (ret) {
+			dev_err(dev, "failed to enable vpcie regulator: %d\n",
+				ret);
+			return;
+		}
+	}
+
 	ret = clk_prepare_enable(imx6_pcie->pcie_phy);
 	if (ret) {
 		dev_err(dev, "unable to enable pcie_phy clock\n");
-		return;
+		goto err_pcie_phy;
 	}
 
 	ret = clk_prepare_enable(imx6_pcie->pcie_bus);
@@ -412,6 +430,13 @@ err_pcie:
 	clk_disable_unprepare(imx6_pcie->pcie_bus);
 err_pcie_bus:
 	clk_disable_unprepare(imx6_pcie->pcie_phy);
+err_pcie_phy:
+	if (imx6_pcie->vpcie && regulator_is_enabled(imx6_pcie->vpcie) > 0) {
+		ret = regulator_disable(imx6_pcie->vpcie);
+		if (ret)
+			dev_err(dev, "failed to disable vpcie regulator: %d\n",
+				ret);
+	}
 }
 
 static void imx6_pcie_init_phy(struct imx6_pcie *imx6_pcie)
@@ -774,6 +799,13 @@ static int imx6_pcie_probe(struct platform_device *pdev)
 				   &imx6_pcie->link_gen);
 	if (ret)
 		imx6_pcie->link_gen = 1;
+
+	imx6_pcie->vpcie = devm_regulator_get_optional(&pdev->dev, "vpcie");
+	if (IS_ERR(imx6_pcie->vpcie)) {
+		if (PTR_ERR(imx6_pcie->vpcie) == -EPROBE_DEFER)
+			return -EPROBE_DEFER;
+		imx6_pcie->vpcie = NULL;
+	}
 
 	platform_set_drvdata(pdev, imx6_pcie);
 
