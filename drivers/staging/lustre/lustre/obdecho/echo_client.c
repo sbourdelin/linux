@@ -1428,7 +1428,7 @@ static int echo_client_brw_ioctl(const struct lu_env *env, int rw,
 	oa->o_valid &= ~OBD_MD_FLHANDLE;
 
 	/* OFD/obdfilter works only via prep/commit */
-	test_mode = (long)data->ioc_pbuf1;
+	test_mode = (__force long)data->ioc_pbuf1;
 	if (test_mode == 1)
 		async = 0;
 
