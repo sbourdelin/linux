@@ -184,6 +184,7 @@ static int snd_usb_create_stream(struct snd_usb_audio *chip, int ctrlif, int int
 			return -EINVAL;
 		}
 		usb_driver_claim_interface(&usb_audio_driver, iface, (void *)-1L);
+		usb_allow_interface_autosuspend(iface);
 
 		return 0;
 	}
@@ -206,6 +207,7 @@ static int snd_usb_create_stream(struct snd_usb_audio *chip, int ctrlif, int int
 	if (! snd_usb_parse_audio_interface(chip, interface)) {
 		usb_set_interface(dev, interface, 0); /* reset the current interface */
 		usb_driver_claim_interface(&usb_audio_driver, iface, (void *)-1L);
+		usb_allow_interface_autosuspend(iface);
 	}
 
 	return 0;
@@ -618,6 +620,7 @@ static int usb_audio_probe(struct usb_interface *intf,
 	usb_chip[chip->index] = chip;
 	chip->num_interfaces++;
 	usb_set_intfdata(intf, chip);
+	usb_allow_interface_autosuspend(intf);
 	atomic_dec(&chip->active);
 	mutex_unlock(&register_mutex);
 	return 0;
