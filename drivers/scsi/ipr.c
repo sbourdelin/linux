@@ -8414,7 +8414,6 @@ static int ipr_reset_next_stage(struct ipr_cmnd *ipr_cmd)
 static int ipr_reset_enable_ioa(struct ipr_cmnd *ipr_cmd)
 {
 	struct ipr_ioa_cfg *ioa_cfg = ipr_cmd->ioa_cfg;
-	volatile u32 int_reg;
 	volatile u64 maskval;
 	int i;
 
@@ -8431,15 +8430,14 @@ static int ipr_reset_enable_ioa(struct ipr_cmnd *ipr_cmd)
 	if (ioa_cfg->sis64) {
 		/* Set the adapter to the correct endian mode. */
 		writel(IPR_ENDIAN_SWAP_KEY, ioa_cfg->regs.endian_swap_reg);
-		int_reg = readl(ioa_cfg->regs.endian_swap_reg);
+		readl(ioa_cfg->regs.endian_swap_reg);
 	}
 
-	int_reg = readl(ioa_cfg->regs.sense_interrupt_reg32);
-
-	if (int_reg & IPR_PCII_IOA_TRANS_TO_OPER) {
+	if (readl(ioa_cfg->regs.sense_interrupt_reg32) &
+	    IPR_PCII_IOA_TRANS_TO_OPER) {
 		writel((IPR_PCII_ERROR_INTERRUPTS | IPR_PCII_HRRQ_UPDATED),
 		       ioa_cfg->regs.clr_interrupt_mask_reg32);
-		int_reg = readl(ioa_cfg->regs.sense_interrupt_mask_reg);
+		readl(ioa_cfg->regs.sense_interrupt_mask_reg);
 		return IPR_RC_JOB_CONTINUE;
 	}
 
@@ -8453,7 +8451,7 @@ static int ipr_reset_enable_ioa(struct ipr_cmnd *ipr_cmd)
 	} else
 		writel(IPR_PCII_OPER_INTERRUPTS, ioa_cfg->regs.clr_interrupt_mask_reg32);
 
-	int_reg = readl(ioa_cfg->regs.sense_interrupt_mask_reg);
+	readl(ioa_cfg->regs.sense_interrupt_mask_reg);
 
 	dev_info(&ioa_cfg->pdev->dev, "Initializing IOA.\n");
 
