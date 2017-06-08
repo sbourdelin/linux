@@ -454,7 +454,7 @@ static bool match_llc(struct cpuinfo_x86 *c, struct cpuinfo_x86 *o)
 
 	if (per_cpu(cpu_llc_id, cpu1) != BAD_APICID &&
 	    per_cpu(cpu_llc_id, cpu1) == per_cpu(cpu_llc_id, cpu2))
-		return topology_sane(c, o, "llc");
+		return true;
 
 	return false;
 }
@@ -494,7 +494,8 @@ static struct sched_domain_topology_level x86_topology[] = {
 
 /*
  * Set if a package/die has multiple NUMA nodes inside.
- * AMD Magny-Cours and Intel Cluster-on-Die have this.
+ * AMD Magny-Cours, Intel Cluster-on-Die, and Intel
+ * Sub-NUMA Clustering have this.
  */
 static bool x86_has_numa_in_package;
 
@@ -522,9 +523,13 @@ void set_cpu_sibling_map(int cpu)
 		if ((i == cpu) || (has_smt && match_smt(c, o)))
 			link_mask(topology_sibling_cpumask, cpu, i);
 
-		if ((i == cpu) || (has_mp && match_llc(c, o)))
-			link_mask(cpu_llc_shared_mask, cpu, i);
-
+		if ((i == cpu) || (has_mp && match_llc(c, o))) {
+			/* LLC may be shared across NUMA nodes */
+			if (topology_same_node(c, o))
+				link_mask(cpu_llc_shared_mask, cpu, i);
+			else
+				x86_has_numa_in_package = true;
+		}
 	}
 
 	/*
