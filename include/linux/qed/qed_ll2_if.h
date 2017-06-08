@@ -79,6 +79,31 @@ struct qed_ll2_stats {
 	u64 sent_bcast_pkts;
 };
 
+struct qed_ll2_comp_rx_data {
+	u8 connection_handle;
+	void *cookie;
+	dma_addr_t rx_buf_addr;
+	u16 parse_flags;
+	u16 vlan;
+	bool b_last_packet;
+
+	union {
+		u8 placement_offset;
+		u8 data_length_error;
+	} u;
+	union {
+		u16 packet_length;
+		u16 data_length;
+	} length;
+
+	u32 opaque_data_0;
+	u32 opaque_data_1;
+
+	/* GSI only */
+	u32 gid_dst[4];
+	u16 qp_id;
+};
+
 struct qed_ll2_tx_pkt_info {
 	u8 num_of_bds;
 	u16 vlan;
