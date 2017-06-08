@@ -1176,6 +1176,7 @@ static void mmc_blk_issue_drv_op(struct mmc_queue *mq, struct request *req)
 	struct mmc_card *card = mq->card;
 	struct mmc_blk_data *md = mq->blkdata;
 	struct mmc_blk_ioc_data **idata;
+	u32 status;
 	int ret;
 	int i;
 
@@ -1204,6 +1205,11 @@ static void mmc_blk_issue_drv_op(struct mmc_queue *mq, struct request *req)
 		else
 			card->ext_csd.boot_ro_lock |=
 				EXT_CSD_BOOT_WP_B_PWR_WP_EN;
+		break;
+	case MMC_DRV_OP_GET_CARD_STATUS:
+		ret = mmc_send_status(card, &status);
+		if (!ret)
+			ret = status;
 		break;
 	default:
 		pr_err("%s: unknown driver specific operation\n",
@@ -1953,6 +1959,28 @@ out:
 	if (!mq->qcnt)
 		mmc_put_card(card);
 }
+
+/* Called from debugfs for MMC/SD cards */
+int mmc_blk_card_status_get(struct mmc_card *card, u64 *val)
+{
+	struct mmc_blk_data *md = dev_get_drvdata(&card->dev);
+	struct mmc_queue *mq = &md->queue;
+	struct request *req;
+	int ret;
+
+	/* Ask the block layer about the card status */
+	req = blk_get_request(mq->queue, REQ_OP_DRV_IN, __GFP_RECLAIM);
+	req_to_mmc_queue_req(req)->drv_op = MMC_DRV_OP_GET_CARD_STATUS;
+	blk_execute_rq(mq->queue, NULL, req, 0);
+	ret = req_to_mmc_queue_req(req)->drv_op_result;
+	if (ret >= 0) {
+		*val = ret;
+		ret = 0;
+	}
+
+	return ret;
+}
+EXPORT_SYMBOL(mmc_blk_card_status_get);
 
 static inline int mmc_blk_readonly(struct mmc_card *card)
 {
