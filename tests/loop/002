@@ -1,0 +1,77 @@
+#!/bin/bash
+#
+# Test if close()ing a unbound loop device is too slow
+# Copyright (C) 2017 James Wang
+#
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with this program.  If not, see <http://www.gnu.org/licenses/>.
+
+DESCRIPTION="Test if close()ing a unbound loop device is too slow"
+
+QUICK=1
+
+function run_test() {
+	TIMEFORMAT='%5R'
+	time {
+		for f in `ls /dev/loop[0-9]*|sort`; do dd if=$f of=/dev/null  bs=512 count=1 >/dev/null 2>&1; done
+	}
+}
+function clean_up() {
+	if lsmod | grep loop >/dev/null 2>&1; then
+		umount /dev/loop* >/dev/null 2>&1
+		losetup -D
+		sleep 5
+		
+		if ! rmmod loop;then
+			return 2;
+		fi
+	fi
+}
+
+function prepare() {
+	modprobe loop max_loop=64
+	dd if=/dev/zero of=${TMPDIR}/disk bs=512 count=200K >/dev/null 2>&1
+	for((i=0;i<4;i++))
+	do
+	        losetup -f ${TMPDIR}/disk;
+	done
+	mkfs.ext4 -F /dev/loop0 >/dev/null 2>&1
+	for((i=0;i<4;i++))
+	do
+	        mkdir -p t$i;
+	        mount /dev/loop$i t$i;
+	done
+
+}
+
+
+test() {
+	echo "Running ${TEST_NAME}"
+
+	prepare
+	SECONDS=0
+	run_test >/dev/null 2>&1
+	DURATION=${SECONDS}
+
+	clean_up
+	if ! clean_up; then
+		echo "Test complete"
+		return 2
+	fi
+	echo "Test complete"
+	if [[ "${DURATION}" -gt 1 ]]; then
+		return 1
+	else
+		return 0
+	fi
+}
