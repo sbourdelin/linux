@@ -288,7 +288,7 @@ static void node_device_release(struct device *dev)
  *
  * Initialize and register the node device.
  */
-static int register_node(struct node *node, int num, struct node *parent)
+static int register_node(struct node *node, int num)
 {
 	int error;
 
@@ -582,17 +582,11 @@ int register_one_node(int nid)
 	int cpu;
 
 	if (node_online(nid)) {
-		int p_node = parent_node(nid);
-		struct node *parent = NULL;
-
-		if (p_node != nid)
-			parent = node_devices[p_node];
-
 		node_devices[nid] = kzalloc(sizeof(struct node), GFP_KERNEL);
 		if (!node_devices[nid])
 			return -ENOMEM;
 
-		error = register_node(node_devices[nid], nid, parent);
+		error = register_node(node_devices[nid], nid);
 
 		/* link cpu under this node */
 		for_each_present_cpu(cpu) {
