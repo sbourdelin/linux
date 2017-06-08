@@ -1018,6 +1018,7 @@ enum {
 /* Argument to OPAL_IMC_COUNTERS_*  */
 enum {
 	OPAL_IMC_COUNTERS_NEST = 1,
+	OPAL_IMC_COUNTERS_CORE = 2,
 };
 
 #endif /* __ASSEMBLY__ */

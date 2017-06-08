@@ -1,5 +1,5 @@
 /*
- * Nest Performance Monitor counter support.
+ * IMC Performance Monitor counter support.
  *
  * Copyright (C) 2017 Madhavan Srinivasan, IBM Corporation.
  *           (C) 2017 Anju T Sudhakar, IBM Corporation.
@@ -24,11 +24,15 @@ extern u64 core_max_offset;
 
 struct imc_pmu *per_nest_pmu_arr[IMC_MAX_PMUS];
 static cpumask_t nest_imc_cpumask;
+static cpumask_t core_imc_cpumask;
 static int nest_imc_cpumask_initialized;
 
 static atomic_t nest_events;
+static atomic_t core_events;
 /* Used to avoid races in calling enable/disable nest-pmu units */
 static DEFINE_MUTEX(imc_nest_reserve);
+/* Used to avoid races in calling enable/disable nest-pmu units */
+static DEFINE_MUTEX(imc_core_reserve);
 
 static struct cpumask imc_result_mask;
 static DEFINE_MUTEX(imc_control_mutex);
@@ -56,9 +60,15 @@ static ssize_t imc_pmu_cpumask_get_attr(struct device *dev,
 					struct device_attribute *attr,
 					char *buf)
 {
+	struct pmu *pmu = dev_get_drvdata(dev);
 	cpumask_t *active_mask;
 
-	active_mask = &nest_imc_cpumask;
+	if (!strncmp(pmu->name, "nest_", strlen("nest_")))
+		active_mask = &nest_imc_cpumask;
+	else if (!strncmp(pmu->name, "core_", strlen("core_")))
+		active_mask = &core_imc_cpumask;
+	else
+		return 0;
 	return cpumap_print_to_pagebuf(true, buf, active_mask);
 }
 
@@ -106,6 +116,9 @@ int imc_control(unsigned long type, bool operation)
 	switch (type) {
 	case OPAL_IMC_COUNTERS_NEST:
 		imc_domain_mask = &nest_imc_cpumask;
+		break;
+	case OPAL_IMC_COUNTERS_CORE:
+		imc_domain_mask = &core_imc_cpumask;
 		break;
 	default:
 		res = -EINVAL;
@@ -223,6 +236,160 @@ static void nest_imc_counters_release(struct perf_event *event)
 	}
 }
 
+static void cleanup_all_core_imc_memory(struct imc_pmu *pmu_ptr)
+{
+	struct imc_mem_info *ptr;
+
+	for (ptr = pmu_ptr->mem_info; ptr; ptr++) {
+		if (ptr->vbase[0])
+			free_pages((u64)ptr->vbase[0], 0);
+	}
+
+	kfree(pmu_ptr->mem_info);
+}
+
+static void core_imc_counters_release(struct perf_event *event)
+{
+	int rc;
+	/*
+	 * See if we need to disable the IMC PMU.
+	 * If no events are currently in use, then we have to take a
+	 * mutex to ensure that we don't race with another task doing
+	 * enable or disable the core counters.
+	 */
+	if (atomic_dec_return(&core_events) == 0) {
+		mutex_lock(&imc_core_reserve);
+		rc = imc_control(OPAL_IMC_COUNTERS_CORE, false);
+		mutex_unlock(&imc_core_reserve);
+		if (rc)
+			pr_err("IMC: Disable counters failed\n");
+	}
+}
+
+/*
+ * core_imc_mem_init : Initializes memory for the current core.
+ *
+ * Uses alloc_pages_exact_nid() and uses the returned address as an argument to
+ * an opal call to configure the pdbar. The address sent as an argument is
+ * converted to physical address before the opal call is made. This is the
+ * base address at which the core imc counters are populated.
+ */
+static int  __meminit core_imc_mem_init(int cpu, int size)
+{
+	int phys_id, rc = 0, core_id = (cpu / threads_per_core);
+	struct imc_mem_info *mem_info;
+
+	/*
+	 * alloc_pages_exact_nid() will allocate memory for core in the
+	 * local node only.
+	 */
+	phys_id = topology_physical_package_id(cpu);
+	mem_info = &core_imc_pmu->mem_info[core_id];
+	mem_info->id = core_id;
+	mem_info->vbase[0] = alloc_pages_exact_nid(phys_id,
+				(size_t)size, GFP_KERNEL | __GFP_ZERO);
+
+	if (!mem_info->vbase[0])
+		return -ENOMEM;
+
+	rc = opal_imc_counters_init(OPAL_IMC_COUNTERS_CORE,
+				(u64)virt_to_phys((void *)mem_info->vbase[0]),
+				get_hard_smp_processor_id(cpu));
+	if (rc) {
+		free_pages((u64)mem_info->vbase[0], get_order(size));
+		mem_info->vbase[0] = NULL;
+	}
+
+	return rc;
+}
+
+bool is_core_imc_mem_inited(int cpu)
+{
+	struct imc_mem_info *mem_info;
+	int core_id = (cpu / threads_per_core);
+
+	mem_info = &core_imc_pmu->mem_info[core_id];
+	if ((mem_info->id == core_id) && (mem_info->vbase[0] != NULL))
+		return true;
+
+	return false;
+}
+
+/*
+ * imc_mem_init : Function to support memory allocation for core imc.
+ */
+static int imc_mem_init(struct imc_pmu *pmu_ptr)
+{
+	int nr_cores;
+
+	if (pmu_ptr->imc_counter_mmaped)
+		return 0;
+	nr_cores = num_present_cpus() / threads_per_core;
+	pmu_ptr->mem_info = kzalloc((sizeof(struct imc_mem_info) * nr_cores), GFP_KERNEL);
+	if (!pmu_ptr->mem_info)
+		return -ENOMEM;
+	return 0;
+}
+
+static int ppc_core_imc_cpu_online(unsigned int cpu)
+{
+	const struct cpumask *l_cpumask;
+	static struct cpumask tmp_mask;
+	int ret = 0;
+
+	/* Get the cpumask for this core */
+	l_cpumask = cpu_sibling_mask(cpu);
+
+	/* If a cpu for this core is already set, then, don't do anything */
+	if (cpumask_and(&tmp_mask, l_cpumask, &core_imc_cpumask))
+		return 0;
+
+	if (!is_core_imc_mem_inited(cpu)) {
+		ret = core_imc_mem_init(cpu, core_imc_pmu->counter_mem_size);
+		if (ret) {
+			pr_info("core_imc memory allocation for cpu %d failed\n", cpu);
+			return ret;
+		}
+	} else {
+		opal_imc_counters_stop(OPAL_IMC_COUNTERS_CORE);
+	}
+
+	/* set the cpu in the mask, and change the context */
+	cpumask_set_cpu(cpu, &core_imc_cpumask);
+	return 0;
+}
+
+static int ppc_core_imc_cpu_offline(unsigned int cpu)
+{
+	unsigned int ncpu;
+
+	/*
+	 * clear this cpu out of the mask, if not present in the mask,
+	 * don't bother doing anything.
+	 */
+	if (!cpumask_test_and_clear_cpu(cpu, &core_imc_cpumask))
+		return 0;
+
+	/* Find any online cpu in that core except the current "cpu" */
+	ncpu = cpumask_any_but(cpu_sibling_mask(cpu), cpu);
+
+	if (ncpu >= 0 && ncpu < nr_cpu_ids) {
+		cpumask_set_cpu(ncpu, &core_imc_cpumask);
+		perf_pmu_migrate_context(&core_imc_pmu->pmu, cpu, ncpu);
+	} else {
+		opal_imc_counters_stop(OPAL_IMC_COUNTERS_CORE);
+	}
+	return 0;
+}
+
+static int core_imc_pmu_cpumask_init(void)
+{
+	return cpuhp_setup_state(CPUHP_AP_PERF_POWERPC_CORE_IMC_ONLINE,
+				 "perf/powerpc/imc_core:online",
+				 ppc_core_imc_cpu_online,
+				 ppc_core_imc_cpu_offline);
+}
+
 static int nest_imc_event_init(struct perf_event *event)
 {
 	int chip_id, rc;
@@ -289,6 +456,68 @@ static int nest_imc_event_init(struct perf_event *event)
 		}
 	}
 	event->destroy = nest_imc_counters_release;
+	return 0;
+}
+
+static int core_imc_event_init(struct perf_event *event)
+{
+	int core_id, rc;
+	u64 config = event->attr.config;
+	struct imc_mem_info *pcmi;
+	struct imc_pmu *pmu;
+
+	if (event->attr.type != event->pmu->type)
+		return -ENOENT;
+
+	/* Sampling not supported */
+	if (event->hw.sample_period)
+		return -EINVAL;
+
+	/* unsupported modes and filters */
+	if (event->attr.exclude_user   ||
+	    event->attr.exclude_kernel ||
+	    event->attr.exclude_hv     ||
+	    event->attr.exclude_idle   ||
+	    event->attr.exclude_host   ||
+	    event->attr.exclude_guest)
+		return -EINVAL;
+
+	if (event->cpu < 0)
+		return -EINVAL;
+
+	event->hw.idx = -1;
+
+	/* Sanity check for config (event offset) */
+	if (config > core_max_offset)
+		return -EINVAL;
+
+	if (!is_core_imc_mem_inited(event->cpu))
+		return -ENODEV;
+
+	pmu = imc_event_to_pmu(event);
+	core_id = event->cpu / threads_per_core;
+	pcmi = &pmu->mem_info[core_id];
+	if ((pcmi->id != core_id) || (!pcmi->vbase[0]))
+		return -ENODEV;
+
+	event->hw.event_base = (u64)pcmi->vbase[0] + config;
+	/*
+	 * Core pmu units are enabled only when it is used.
+	 * See if this is triggered for the first time.
+	 * If yes, take the mutex lock and enable the core counters.
+	 * If not, just increment the count in core_events.
+	 */
+	if (atomic_inc_return(&core_events) == 1) {
+		mutex_lock(&imc_core_reserve);
+		rc = imc_control(OPAL_IMC_COUNTERS_CORE, true);
+		mutex_unlock(&imc_core_reserve);
+		if (rc) {
+			atomic_dec_return(&core_events);
+			pr_err("IMC: Unable to start the counters\n");
+			return -ENODEV;
+		}
+	}
+	event->destroy = core_imc_counters_release;
 	return 0;
 }
 
@@ -360,7 +589,11 @@ static int update_pmu_ops(struct imc_pmu *pmu)
 		return -EINVAL;
 
 	pmu->pmu.task_ctx_nr = perf_invalid_context;
-	pmu->pmu.event_init = nest_imc_event_init;
+	if (pmu->domain == IMC_DOMAIN_NEST) {
+		pmu->pmu.event_init = nest_imc_event_init;
+	} else if (pmu->domain == IMC_DOMAIN_CORE) {
+		pmu->pmu.event_init = core_imc_event_init;
+	}
 	pmu->pmu.add = imc_event_add;
 	pmu->pmu.del = imc_event_stop;
 	pmu->pmu.start = imc_event_start;
@@ -445,12 +678,27 @@ int __init init_imc_pmu(struct imc_events *events, int idx,
 {
 	int ret = -ENODEV;
 
+	ret = imc_mem_init(pmu_ptr);
+	if (ret)
+		goto err_free;
+
 	/* Add cpumask and register for hotplug notification */
-	if (!nest_imc_cpumask_initialized) {
-		ret = nest_pmu_cpumask_init();
+	switch (pmu_ptr->domain) {
+	case IMC_DOMAIN_NEST:
+		if (!nest_imc_cpumask_initialized) {
+			ret = nest_pmu_cpumask_init();
+			if (ret)
+				return ret;
+			nest_imc_cpumask_initialized = 1;
+		}
+		break;
+	case IMC_DOMAIN_CORE:
+		ret = core_imc_pmu_cpumask_init();
 		if (ret)
 			return ret;
-		nest_imc_cpumask_initialized = 1;
+		break;
+	default:
+		return -1;  /* Unknown domain */
 	}
 	ret = update_events_in_group(events, idx, pmu_ptr);
 	if (ret)
@@ -475,6 +723,11 @@ err_free:
 		if (pmu_ptr->attr_groups[IMC_EVENT_ATTR]->attrs)
 			kfree(pmu_ptr->attr_groups[IMC_EVENT_ATTR]->attrs);
 		kfree(pmu_ptr->attr_groups[IMC_EVENT_ATTR]);
+	}
+	/* For core_imc, we have allocated memory, we need to free it */
+	if (pmu_ptr->domain == IMC_DOMAIN_CORE) {
+		cleanup_all_core_imc_memory(pmu_ptr);
+		cpuhp_remove_state(CPUHP_AP_PERF_POWERPC_CORE_IMC_ONLINE);
 	}
 
 	return ret;
