@@ -138,6 +138,8 @@
 				cache-level = <2>;
 				cache-unified;
 				wt-override;
+				arm,parity-enable;
+				arm,ecc-enable;
 			};
 
 			gpio0: gpio@18100 {
