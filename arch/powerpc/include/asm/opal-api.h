@@ -190,7 +190,10 @@
 #define OPAL_NPU_INIT_CONTEXT			146
 #define OPAL_NPU_DESTROY_CONTEXT		147
 #define OPAL_NPU_MAP_LPAR			148
-#define OPAL_LAST				148
+#define OPAL_IMC_COUNTERS_INIT			149
+#define OPAL_IMC_COUNTERS_START			150
+#define OPAL_IMC_COUNTERS_STOP			151
+#define OPAL_LAST				151
 
 /* Device tree flags */
 
@@ -1005,8 +1008,13 @@ enum {
 
 /* In-Memory Collection Counters Type */
 enum {
-	IMC_COUNTER_PER_CHIP            = 0x10,
-	IMC_COUNTER_PER_SOCKET          = 0x20,
+	IMC_COUNTER_PER_CHIP		= 0x10,
+	IMC_COUNTER_PER_SOCKET		= 0x20,
+};
+
+/* Argument to OPAL_IMC_COUNTERS_*  */
+enum {
+	OPAL_IMC_COUNTERS_NEST = 1,
 };
 
 #endif /* __ASSEMBLY__ */
