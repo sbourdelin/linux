@@ -560,7 +560,7 @@ static int ngene_command_stream_control(struct ngene *dev, u8 stream,
 	u16 BsSPI = ((stream & 1) ? 0x9800 : 0x9700);
 	u16 BsSDO = 0x9B00;
 
-	down(&dev->stream_mutex);
+	mutex_lock(&dev->stream_mutex);
 	memset(&com, 0, sizeof(com));
 	com.cmd.hdr.Opcode = CMD_CONTROL;
 	com.cmd.hdr.Length = sizeof(struct FW_STREAM_CONTROL) - 2;
@@ -587,16 +587,16 @@ static int ngene_command_stream_control(struct ngene *dev, u8 stream,
 			chan->HWState = HWSTATE_STOP;
 			spin_unlock_irq(&chan->state_lock);
 			if (ngene_command(dev, &com) < 0) {
-				up(&dev->stream_mutex);
+				mutex_unlock(&dev->stream_mutex);
 				return -1;
 			}
 			/* clear_buffers(chan); */
 			flush_buffers(chan);
-			up(&dev->stream_mutex);
+			mutex_unlock(&dev->stream_mutex);
 			return 0;
 		}
 		spin_unlock_irq(&chan->state_lock);
-		up(&dev->stream_mutex);
+		mutex_unlock(&dev->stream_mutex);
 		return 0;
 	}
 
@@ -693,10 +693,10 @@ static int ngene_command_stream_control(struct ngene *dev, u8 stream,
 	spin_unlock_irq(&chan->state_lock);
 
 	if (ngene_command(dev, &com) < 0) {
-		up(&dev->stream_mutex);
+		mutex_unlock(&dev->stream_mutex);
 		return -1;
 	}
-	up(&dev->stream_mutex);
+	mutex_unlock(&dev->stream_mutex);
 	return 0;
 }
 
@@ -1347,7 +1347,7 @@ static int ngene_start(struct ngene *dev)
 	init_waitqueue_head(&dev->tx_wq);
 	init_waitqueue_head(&dev->rx_wq);
 	mutex_init(&dev->cmd_mutex);
-	sema_init(&dev->stream_mutex, 1);
+	mutex_init(&dev->stream_mutex);
 	sema_init(&dev->pll_mutex, 1);
 	sema_init(&dev->i2c_switch_mutex, 1);
 	spin_lock_init(&dev->cmd_lock);
