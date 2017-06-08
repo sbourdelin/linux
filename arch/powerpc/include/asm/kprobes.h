@@ -113,6 +113,10 @@ static inline int skip_singlestep(struct kprobe *p, struct pt_regs *regs,
 	return 0;
 }
 #endif
+#if defined(CONFIG_KPROBES_SANITY_TEST) && defined(CONFIG_PPC64)
+#define HAVE_KPROBES_REGS_SANITY_TEST
+void arch_kprobe_regs_set_ptregs(struct pt_regs *regs);
+#endif
 #else
 static inline int kprobe_handler(struct pt_regs *regs) { return 0; }
 static inline int kprobe_post_handler(struct pt_regs *regs) { return 0; }

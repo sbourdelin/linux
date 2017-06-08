@@ -253,6 +253,17 @@ static inline void kretprobe_assert(struct kretprobe_instance *ri,
 
 #ifdef CONFIG_KPROBES_SANITY_TEST
 extern int init_test_probes(void);
+#ifdef HAVE_KPROBES_REGS_SANITY_TEST
+extern void arch_kprobe_regs_function(void);
+extern void arch_kprobe_regs_probepoint(void);
+extern int arch_kprobe_regs_pre_handler(struct kprobe *p, struct pt_regs *regs);
+extern int arch_kprobe_regs_post_handler(struct kprobe *p, struct pt_regs *regs,
+						unsigned long flags);
+#ifdef CONFIG_KPROBES_ON_FTRACE
+extern void kprobe_regs_kp_on_ftrace_target(void);
+extern int arch_kp_on_ftrace_pre_handler(struct kprobe *p, struct pt_regs *regs);
+#endif
+#endif
 #else
 static inline int init_test_probes(void)
 {

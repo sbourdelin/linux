@@ -19,6 +19,7 @@
 #include <linux/kernel.h>
 #include <linux/kprobes.h>
 #include <linux/random.h>
+#include <linux/workqueue.h>
 
 #define div_factor 3
 
@@ -334,6 +335,166 @@ static int test_kretprobes(void)
 }
 #endif /* CONFIG_KRETPROBES */
 
+#ifdef HAVE_KPROBES_REGS_SANITY_TEST
+static int kprobe_regs_pre_handler(struct kprobe *p, struct pt_regs *regs)
+{
+	/* architectural helper returns 0 if validation fails */
+	preh_val = arch_kprobe_regs_pre_handler(p, regs);
+	return 0;
+}
+
+static void kprobe_regs_post_handler(struct kprobe *p, struct pt_regs *regs,
+						unsigned long flags)
+{
+	posth_val = arch_kprobe_regs_post_handler(p, regs, flags);
+}
+
+static struct kprobe kpr = {
+	.symbol_name = "arch_kprobe_regs_probepoint",
+	.pre_handler = kprobe_regs_pre_handler,
+	.post_handler = kprobe_regs_post_handler,
+};
+
+static int test_kprobe_regs(void)
+{
+	int ret;
+	kprobe_opcode_t *addr;
+
+	preh_val = 0;
+	posth_val = 0;
+
+	ret = register_kprobe(&kpr);
+	if (ret < 0) {
+		pr_err("register_kprobe returned %d\n", ret);
+		return ret;
+	}
+
+	/* Let's see if this probe was optimized */
+	addr = kprobe_lookup_name(kpr.symbol_name, 0);
+	if (addr && *addr != BREAKPOINT_INSTRUCTION) {
+		pr_err("kprobe with post_handler optimized\n");
+		unregister_kprobe(&kpr);
+		return -1;
+	}
+
+	arch_kprobe_regs_function();
+	unregister_kprobe(&kpr);
+
+	if (preh_val == 0) {
+		pr_err("kprobe pre_handler regs validation failed\n");
+		handler_errors++;
+	}
+
+	if (posth_val == 0) {
+		pr_err("kprobe post_handler not called\n");
+		handler_errors++;
+	}
+
+	return 0;
+}
+
+#ifdef CONFIG_KPROBES_ON_FTRACE
+void kprobe_regs_kp_on_ftrace_target(void)
+{
+	posth_val = preh_val + div_factor;
+}
+
+static int kp_on_ftrace_pre_handler(struct kprobe *p, struct pt_regs *regs)
+{
+	/* architectural helper returns 0 if validation fails */
+	preh_val = arch_kp_on_ftrace_pre_handler(p, regs);
+	return 0;
+}
+
+static struct kprobe kprf = {
+	.symbol_name = "kprobe_regs_kp_on_ftrace_target",
+	.pre_handler = kp_on_ftrace_pre_handler,
+};
+
+static int test_kp_on_ftrace_regs(void)
+{
+	int ret;
+
+	preh_val = 0;
+
+	ret = register_kprobe(&kprf);
+	if (ret < 0) {
+		pr_err("register_kprobe returned %d\n", ret);
+		return ret;
+	}
+
+	arch_kprobe_regs_function();
+	unregister_kprobe(&kprf);
+
+	if (preh_val == 0) {
+		pr_err("kp_on_ftrace pre_handler regs validation failed\n");
+		handler_errors++;
+	}
+
+	return 0;
+}
+#endif
+
+#ifdef CONFIG_OPTPROBES
+static void test_optprobe_regs(struct work_struct *work);
+static DECLARE_DELAYED_WORK(test_optprobe_regs_work, test_optprobe_regs);
+int kprobe_registered;
+
+static struct kprobe kpor = {
+	.symbol_name = "arch_kprobe_regs_probepoint",
+	.pre_handler = kprobe_regs_pre_handler,
+};
+
+static void test_optprobe_regs_setup(void)
+{
+	int ret;
+
+	ret = register_kprobe(&kpor);
+	if (ret < 0) {
+		pr_err("register_kprobe returned %d\n", ret);
+		return;
+	}
+
+	kprobe_registered = 1;
+}
+
+static void test_optprobe_regs(struct work_struct *work)
+{
+	kprobe_opcode_t *addr;
+
+	if (!kprobe_registered) {
+		errors++;
+		goto summary;
+	}
+
+	/* Let's see if this probe was optimized */
+	addr = kprobe_lookup_name(kpor.symbol_name, 0);
+	if (addr && *addr == BREAKPOINT_INSTRUCTION) {
+		pr_info("kprobe not optimized yet... skipping optprobe test\n");
+		unregister_kprobe(&kpor);
+		goto summary;
+	}
+
+	preh_val = 0;
+	arch_kprobe_regs_function();
+	unregister_kprobe(&kpor);
+
+	if (preh_val == 0) {
+		pr_err("optprobe pre_handler regs validation failed\n");
+		handler_errors++;
+	}
+
+summary:
+	if (errors)
+		pr_err("BUG: %d out of %d tests failed\n", errors, num_tests);
+	else if (handler_errors)
+		pr_err("BUG: %d error(s) running handlers\n", handler_errors);
+	else
+		pr_info("passed successfully\n");
+}
+#endif
+#endif
+
 int init_test_probes(void)
 {
 	int ret;
@@ -378,12 +539,34 @@ int init_test_probes(void)
 		errors++;
 #endif /* CONFIG_KRETPROBES */
 
+#ifdef HAVE_KPROBES_REGS_SANITY_TEST
+	num_tests++;
+	ret = test_kprobe_regs();
+	if (ret < 0)
+		errors++;
+
+#ifdef CONFIG_KPROBES_ON_FTRACE
+	num_tests++;
+	ret = test_kp_on_ftrace_regs();
+	if (ret < 0)
+		errors++;
+#endif
+
+#ifdef CONFIG_OPTPROBES
+	num_tests++;
+	test_optprobe_regs_setup();
+	schedule_delayed_work(&test_optprobe_regs_work, 10);
+#endif
+#endif
+
+#if !defined(HAVE_KPROBES_REGS_SANITY_TEST) || !defined(CONFIG_OPTPROBES)
 	if (errors)
 		pr_err("BUG: %d out of %d tests failed\n", errors, num_tests);
 	else if (handler_errors)
 		pr_err("BUG: %d error(s) running handlers\n", handler_errors);
 	else
 		pr_info("passed successfully\n");
+#endif
 
 	return 0;
 }
