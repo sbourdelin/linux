@@ -1546,6 +1546,61 @@ void usb_disable_autosuspend(struct usb_device *udev)
 EXPORT_SYMBOL_GPL(usb_disable_autosuspend);
 
 /**
+ * usb_allow_interface_autosuspend - allow autosuspend for the interface
+ * @intf: the USB interface which may be autosuspended
+ *
+ * This routine votes the interface to allow autosuspend. If all interfaces
+ * of the active configuration of the usb device allow autosuspend, autosuspend
+ * is enabled on the usb device through usb_enable_autosuspend().
+ *
+ * The only interface driver that will enable autosuspend on the
+ * USB device is the last in loop during interface driver probe, or midway
+ * through life if an interface changes its autosuspend status, and all other
+ * interfaces have already said yes.
+ *
+ * The caller must hold @udev's device lock.
+ */
+void usb_allow_interface_autosuspend(struct usb_interface *intf)
+{
+	struct usb_device	*udev = interface_to_usbdev(intf);
+	struct usb_host_config	*actconfig = udev->actconfig;
+	int			i;
+	bool			udev_autosuspend = true;
+
+	intf->autosuspend = 1;
+
+	for (i = 0; i < actconfig->desc.bNumInterfaces; ++i) {
+		if (!actconfig->interface[i]->autosuspend) {
+			udev_autosuspend = false;
+			break;
+		}
+	}
+
+	if (udev_autosuspend)
+		usb_enable_autosuspend(udev);
+}
+EXPORT_SYMBOL_GPL(usb_allow_interface_autosuspend);
+
+/**
+ * usb_disallow_interface_autosuspend - disallow autosuspend for the interface
+ * @intf: the USB interface which may not be autosuspended
+ *
+ * This routine votes the interface to disallow autosuspend. This immediately
+ * disables autosuspend on the usb device through usb_enable_autosuspend().
+ *
+ * The caller must hold @udev's device lock.
+ */
+void usb_disallow_interface_autosuspend(struct usb_interface *intf)
+{
+	struct usb_device	*udev = interface_to_usbdev(intf);
+
+	intf->autosuspend = 0;
+
+	usb_disable_autosuspend(udev);
+}
+EXPORT_SYMBOL_GPL(usb_disallow_interface_autosuspend);
+
+/**
  * usb_autosuspend_device - delayed autosuspend of a USB device and its interfaces
  * @udev: the usb_device to autosuspend
  *

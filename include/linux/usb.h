@@ -253,6 +253,7 @@ struct usb_interface {
 	unsigned needs_binding:1;	/* needs delayed unbind/rebind */
 	unsigned resetting_device:1;	/* true: bandwidth alloc after reset */
 	unsigned authorized:1;		/* used for interface authorization */
+	unsigned autosuspend:1;		/* interface allows autosuspend */
 
 	struct device dev;		/* interface specific device info */
 	struct device *usb_dev;
@@ -741,6 +742,9 @@ static inline bool usb_acpi_power_manageable(struct usb_device *hdev, int index)
 extern void usb_enable_autosuspend(struct usb_device *udev);
 extern void usb_disable_autosuspend(struct usb_device *udev);
 
+extern void usb_allow_interface_autosuspend(struct usb_interface *intf);
+extern void usb_disallow_interface_autosuspend(struct usb_interface *intf);
+
 extern int usb_autopm_get_interface(struct usb_interface *intf);
 extern void usb_autopm_put_interface(struct usb_interface *intf);
 extern int usb_autopm_get_interface_async(struct usb_interface *intf);
@@ -759,6 +763,12 @@ static inline int usb_enable_autosuspend(struct usb_device *udev)
 { return 0; }
 static inline int usb_disable_autosuspend(struct usb_device *udev)
 { return 0; }
+
+static inline void usb_allow_interface_autosuspend(struct usb_interface *intf)
+{ }
+static inline void usb_disallow_interface_autosuspend(
+		struct usb_interface *intf)
+{ }
 
 static inline int usb_autopm_get_interface(struct usb_interface *intf)
 { return 0; }
