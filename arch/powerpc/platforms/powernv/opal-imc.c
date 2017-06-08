@@ -36,6 +36,7 @@
 
 u64 nest_max_offset;
 u64 core_max_offset;
+u64 thread_max_offset;
 
 static int imc_event_prop_update(char *name, struct imc_events *events)
 {
@@ -119,6 +120,10 @@ static void update_max_value(u32 value, int pmu_domain)
 	case IMC_DOMAIN_CORE:
 		if (core_max_offset < value)
 			core_max_offset = value;
+		break;
+	case IMC_DOMAIN_THREAD:
+		if (thread_max_offset < value)
+			thread_max_offset = value;
 		break;
 	default:
 		/* Unknown domain, return */
@@ -404,7 +409,7 @@ static int imc_get_mem_addr_nest(struct device_node *node,
 /*
  * imc_pmu_create : Takes the parent device which is the pmu unit, pmu_index
  *		    and domain as the inputs.
- * Allocates memory for the pmu, sets up its domain (NEST/CORE), and
+ * Allocates memory for the pmu, sets up its domain (NEST/CORE/THREAD), and
  * calls imc_events_setup() to allocate memory for the events supported
  * by this pmu. Assigns a name for the pmu.
  *
@@ -523,6 +528,8 @@ static int opal_imc_counters_probe(struct platform_device *pdev)
 			domain = IMC_DOMAIN_NEST;
 		else if (type == IMC_COUNTER_PER_CORE)
 			domain = IMC_DOMAIN_CORE;
+		else if (type == IMC_COUNTER_PER_THREAD)
+			domain = IMC_DOMAIN_THREAD;
 		else
 			continue;
 		if (!imc_pmu_create(imc_dev, pmu_count, domain))
