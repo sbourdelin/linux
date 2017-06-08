@@ -1031,7 +1031,7 @@ static ssize_t scrub_store(struct device *dev,
 	if (nd_desc) {
 		struct acpi_nfit_desc *acpi_desc = to_acpi_desc(nd_desc);
 
-		rc = acpi_nfit_ars_rescan(acpi_desc);
+		rc = acpi_nfit_ars_rescan(acpi_desc, 0);
 	}
 	device_unlock(dev);
 	if (rc)
@@ -2057,6 +2057,10 @@ static int ars_start(struct acpi_nfit_desc *acpi_desc, struct nfit_spa *nfit_spa
 		ars_start.type = ND_ARS_VOLATILE;
 	else
 		return -ENOTTY;
+	if (nfit_spa->ars_prev_data) {
+		ars_start.flags |= ND_ARS_RETURN_PREV_DATA;
+		nfit_spa->ars_prev_data = 0;
+	}
 
 	rc = nd_desc->ndctl(nd_desc, NULL, ND_CMD_ARS_START, &ars_start,
 			sizeof(ars_start), &cmd_rc);
@@ -2817,7 +2821,7 @@ static int acpi_nfit_clear_to_send(struct nvdimm_bus_descriptor *nd_desc,
 	return 0;
 }
 
-int acpi_nfit_ars_rescan(struct acpi_nfit_desc *acpi_desc)
+int acpi_nfit_ars_rescan(struct acpi_nfit_desc *acpi_desc, int flags)
 {
 	struct device *dev = acpi_desc->dev;
 	struct nfit_spa *nfit_spa;
@@ -2838,6 +2842,8 @@ int acpi_nfit_ars_rescan(struct acpi_nfit_desc *acpi_desc)
 			continue;
 
 		nfit_spa->ars_required = 1;
+		if (flags & ND_ARS_RETURN_PREV_DATA)
+			nfit_spa->ars_prev_data = 1;
 	}
 	queue_work(nfit_wq, &acpi_desc->work);
 	dev_dbg(dev, "%s: ars_scan triggered\n", __func__);
@@ -3015,8 +3021,10 @@ static void acpi_nfit_update_notify(struct device *dev, acpi_handle handle)
 static void acpi_nfit_uc_error_notify(struct device *dev, acpi_handle handle)
 {
 	struct acpi_nfit_desc *acpi_desc = dev_get_drvdata(dev);
+	int flags = (acpi_desc->scrub_mode == HW_ERROR_SCRUB_ON) ?
+			0 : ND_ARS_RETURN_PREV_DATA;
 
-	acpi_nfit_ars_rescan(acpi_desc);
+	acpi_nfit_ars_rescan(acpi_desc, flags);
 }
 
 void __acpi_nfit_notify(struct device *dev, acpi_handle handle, u32 event)

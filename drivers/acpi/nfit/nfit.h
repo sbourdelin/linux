@@ -91,6 +91,7 @@ struct nfit_spa {
 	struct list_head list;
 	struct nd_region *nd_region;
 	unsigned int ars_required:1;
+	unsigned int ars_prev_data:1;
 	u32 clear_err_unit;
 	u32 max_ars;
 	struct acpi_nfit_system_address spa[0];
@@ -208,7 +209,7 @@ struct nfit_blk {
 
 extern struct list_head acpi_descs;
 extern struct mutex acpi_desc_lock;
-int acpi_nfit_ars_rescan(struct acpi_nfit_desc *acpi_desc);
+int acpi_nfit_ars_rescan(struct acpi_nfit_desc *acpi_desc, int flags);
 
 #ifdef CONFIG_X86_MCE
 void nfit_mce_register(void);
