@@ -705,13 +705,19 @@ static int omap_rtc_probe(struct platform_device *pdev)
 	else
 		rtc->clk = devm_clk_get(&pdev->dev, "int-clk");
 
-	if (!IS_ERR(rtc->clk))
-		clk_prepare_enable(rtc->clk);
+	if (IS_ERR(rtc->clk))
+		return PTR_ERR(rtc->clk);
+
+	ret = clk_prepare_enable(rtc->clk);
+	if (ret)
+		return ret;
 
 	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
 	rtc->base = devm_ioremap_resource(&pdev->dev, res);
-	if (IS_ERR(rtc->base))
-		return PTR_ERR(rtc->base);
+	if (IS_ERR(rtc->base)) {
+		ret = PTR_ERR(rtc->base);
+		goto err_clk;
+	}
 
 	platform_set_drvdata(pdev, rtc);
 
@@ -830,7 +836,8 @@ static int omap_rtc_probe(struct platform_device *pdev)
 	rtc->pctldev = pinctrl_register(&rtc_pinctrl_desc, &pdev->dev, rtc);
 	if (IS_ERR(rtc->pctldev)) {
 		dev_err(&pdev->dev, "Couldn't register pinctrl driver\n");
-		return PTR_ERR(rtc->pctldev);
+		ret = PTR_ERR(rtc->pctldev);
+		goto err;
 	}
 
 	return 0;
@@ -841,6 +848,8 @@ err:
 	pm_runtime_put_sync(&pdev->dev);
 	pm_runtime_disable(&pdev->dev);
 
+err_clk:
+	clk_disable_unprepare(rtc->clk);
 	return ret;
 }
 
