@@ -4,7 +4,7 @@
 *!
 *! DESCRIPTION: Implements an interface for the DS1302 RTC
 *!
-*! Functions exported: ds1302_readreg, ds1302_writereg, ds1302_init, get_rtc_status
+*! Functions exported: ds1302_readreg, ds1302_writereg, ds1302_init
 *!
 *! ---------------------------------------------------------------------------
 *!
@@ -257,31 +257,6 @@ static long rtc_ioctl(struct file *file, unsigned int cmd, unsigned long arg)
 	}
 }
 
-int
-get_rtc_status(char *buf)
-{
-	char *p;
-	struct rtc_time tm;
-
-	p = buf;
-
-	get_rtc_time(&tm);
-
-	/*
-	 * There is no way to tell if the luser has the RTC set for local
-	 * time or for Universal Standard Time (GMT). Probably local though.
-	 */
-
-	p += sprintf(p,
-		"rtc_time\t: %02d:%02d:%02d\n"
-		"rtc_date\t: %04d-%02d-%02d\n",
-		tm.tm_hour, tm.tm_min, tm.tm_sec,
-		tm.tm_year + 1900, tm.tm_mon + 1, tm.tm_mday);
-
-	return  p - buf;
-}
-
-
 /* The various file operations we support. */
 
 static const struct file_operations rtc_fops = {
@@ -298,6 +273,7 @@ static int __init
 ds1302_probe(void)
 {
 	int retval, res, baur;
+	struct rtc_time tm;
 
 	baur=(boot_cpu_data.bus_clock/(2*1000*1000));
 
@@ -319,8 +295,14 @@ ds1302_probe(void)
 		char buf[100];
 		ds1302_wdisable();
 		printk("%s: RTC found.\n", ds1302_name);
-		get_rtc_status(buf);
-		printk(buf);
+		/*
+		 * There is no way to tell if the luser has the RTC set
+		 * for local time or for Universal Standard Time (GMT).
+		 * Probably local though.
+		 */
+		get_rtc_time(&tm);
+		printk("rtc_time\t: %ptt\n", &tm);
+		printk("rtc_date\t: %ptd\n", &tm);
 		retval = 1;
 	} else {
 		printk("%s: RTC not found.\n", ds1302_name);
