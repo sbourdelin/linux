@@ -121,8 +121,6 @@ struct page *follow_huge_pmd(struct mm_struct *mm, unsigned long address,
 				pmd_t *pmd, int flags);
 struct page *follow_huge_pud(struct mm_struct *mm, unsigned long address,
 				pud_t *pud, int flags);
-int pmd_huge(pmd_t pmd);
-int pud_huge(pud_t pud);
 unsigned long hugetlb_change_protection(struct vm_area_struct *vma,
 		unsigned long address, unsigned long end, pgprot_t newprot);
 
@@ -150,8 +148,6 @@ static inline void hugetlb_show_meminfo(void)
 #define follow_huge_pmd(mm, addr, pmd, flags)	NULL
 #define follow_huge_pud(mm, addr, pud, flags)	NULL
 #define prepare_hugepage_range(file, addr, len)	(-EINVAL)
-#define pmd_huge(x)	0
-#define pud_huge(x)	0
 #define is_hugepage_only_range(mm, addr, len)	0
 #define hugetlb_free_pgd_range(tlb, addr, end, floor, ceiling) ({BUG(); 0; })
 #define hugetlb_fault(mm, vma, addr, flags)	({ BUG(); 0; })
@@ -190,6 +186,15 @@ static inline void __unmap_hugepage_range(struct mmu_gather *tlb,
 }
 
 #endif /* !CONFIG_HUGETLB_PAGE */
+
+#if defined(CONFIG_HUGETLB_PAGE) || defined(CONFIG_HAVE_ARCH_HUGE_VMAP)
+int pmd_huge(pmd_t pmd);
+int pud_huge(pud_t pud);
+#else
+#define pmd_huge(x)	0
+#define pud_huge(x)	0
+#endif
+
 /*
  * hugepages at page global directory. If arch support
  * hugepages at pgd level, they need to define this.
