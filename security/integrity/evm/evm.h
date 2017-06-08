@@ -24,6 +24,11 @@
 #define EVM_INIT_HMAC	0x0001
 #define EVM_INIT_X509	0x0002
 
+struct evm_hmac_xattr {
+	u8 type;	/* Should be EVM_XATTR_HMAC. */
+	u8 digest[SHA1_DIGEST_SIZE];
+} __packed;
+
 extern int evm_initialized;
 extern char *evm_hmac;
 extern char *evm_hash;

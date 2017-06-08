@@ -63,7 +63,7 @@ enum evm_ima_xattr_type {
 
 struct evm_ima_xattr_data {
 	u8 type;
-	u8 digest[SHA1_DIGEST_SIZE];
+	u8 data[];
 } __packed;
 
 #define IMA_MAX_DIGEST_SIZE	64
