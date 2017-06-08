@@ -818,6 +818,9 @@ KBUILD_CFLAGS   += $(call cc-option,-Werror=designated-init)
 # use the deterministic mode of AR if available
 KBUILD_ARFLAGS := $(call ar-option,D)
 
+# must use thin archives.
+KBUILD_ARFLAGS :=$(KBUILD_ARFLAGS)TP
+
 include scripts/Makefile.kasan
 include scripts/Makefile.extrawarn
 include scripts/Makefile.ubsan
