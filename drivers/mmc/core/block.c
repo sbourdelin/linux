@@ -1176,6 +1176,7 @@ static void mmc_blk_issue_drv_op(struct mmc_queue *mq, struct request *req)
 	struct mmc_card *card = mq->card;
 	struct mmc_blk_data *md = mq->blkdata;
 	struct mmc_blk_ioc_data **idata;
+	u8 **ext_csd;
 	u32 status;
 	int ret;
 	int i;
@@ -1210,6 +1211,10 @@ static void mmc_blk_issue_drv_op(struct mmc_queue *mq, struct request *req)
 		ret = mmc_send_status(card, &status);
 		if (!ret)
 			ret = status;
+		break;
+	case MMC_DRV_OP_GET_EXT_CSD:
+		ext_csd = mq_rq->drv_op_data;
+		ret = mmc_get_ext_csd(card, ext_csd);
 		break;
 	default:
 		pr_err("%s: unknown driver specific operation\n",
@@ -1981,6 +1986,22 @@ int mmc_blk_card_status_get(struct mmc_card *card, u64 *val)
 	return ret;
 }
 EXPORT_SYMBOL(mmc_blk_card_status_get);
+
+/* Called from debugfs for MMC cards */
+int mmc_blk_get_ext_csd(struct mmc_card *card, u8 **ext_csd)
+{
+	struct mmc_blk_data *md = dev_get_drvdata(&card->dev);
+	struct mmc_queue *mq = &md->queue;
+	struct request *req;
+
+	/* Ask the block layer about the EXT CSD */
+	req = blk_get_request(mq->queue, REQ_OP_DRV_IN, __GFP_RECLAIM);
+	req_to_mmc_queue_req(req)->drv_op = MMC_DRV_OP_GET_EXT_CSD;
+	req_to_mmc_queue_req(req)->drv_op_data = ext_csd;
+	blk_execute_rq(mq->queue, NULL, req, 0);
+	return req_to_mmc_queue_req(req)->drv_op_result;
+}
+EXPORT_SYMBOL(mmc_blk_get_ext_csd);
 
 static inline int mmc_blk_readonly(struct mmc_card *card)
 {

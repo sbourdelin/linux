@@ -305,9 +305,7 @@ static int mmc_ext_csd_open(struct inode *inode, struct file *filp)
 	if (!buf)
 		return -ENOMEM;
 
-	mmc_get_card(card);
-	err = mmc_get_ext_csd(card, &ext_csd);
-	mmc_put_card(card);
+	err = mmc_blk_get_ext_csd(card, &ext_csd);
 	if (err)
 		goto out_free;
 
