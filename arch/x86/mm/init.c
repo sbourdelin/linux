@@ -170,6 +170,10 @@ static void __init probe_page_size_mask(void)
 	 */
 	if (boot_cpu_has(X86_FEATURE_PSE) && !debug_pagealloc_enabled())
 		page_size_mask |= 1 << PG_LEVEL_2M;
+	else
+		direct_gbpages = 0;
+#else
+	direct_gbpages = 0;
 #endif
 
 	/* Enable PSE if available */
