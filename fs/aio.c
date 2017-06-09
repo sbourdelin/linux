@@ -899,7 +899,11 @@ static void put_reqs_available(struct kioctx *ctx, unsigned nr)
 	struct kioctx_cpu *kcpu;
 	unsigned long flags;
 
-	local_irq_save(flags);
+	local_irq_save(flags); /* Implies rcu_read_lock_sched() */
+	if (atomic_read(&ctx->dead)) {
+		atomic_add(nr, &ctx->reqs_available);
+		goto unlock;
+	}
 	kcpu = this_cpu_ptr(ctx->cpu);
 	kcpu->reqs_available += nr;
 
@@ -907,8 +911,8 @@ static void put_reqs_available(struct kioctx *ctx, unsigned nr)
 		kcpu->reqs_available -= ctx->req_batch;
 		atomic_add(ctx->req_batch, &ctx->reqs_available);
 	}
-
-	local_irq_restore(flags);
+unlock:
+	local_irq_restore(flags); /* Implies rcu_read_unlock_sched() */
 }
 
 static bool get_reqs_available(struct kioctx *ctx)
@@ -917,7 +921,9 @@ static bool get_reqs_available(struct kioctx *ctx)
 	bool ret = false;
 	unsigned long flags;
 
-	local_irq_save(flags);
+	local_irq_save(flags); /* Implies rcu_read_lock_sched() */
+	if (atomic_read(&ctx->dead))
+		goto out;
 	kcpu = this_cpu_ptr(ctx->cpu);
 	if (!kcpu->reqs_available) {
 		int old, avail = atomic_read(&ctx->reqs_available);
@@ -937,7 +943,7 @@ static bool get_reqs_available(struct kioctx *ctx)
 	ret = true;
 	kcpu->reqs_available--;
 out:
-	local_irq_restore(flags);
+	local_irq_restore(flags); /* Implies rcu_read_unlock_sched() */
 	return ret;
 }
 
@@ -1533,6 +1539,58 @@ static ssize_t aio_write(struct kiocb *req, struct iocb *iocb, bool vectored,
 	return ret;
 }
 
+static bool reqs_completed(struct kioctx *ctx)
+{
+	unsigned available;
+	spin_lock_irq(&ctx->completion_lock);
+	available = atomic_read(&ctx->reqs_available) + ctx->completed_events;
+	spin_unlock_irq(&ctx->completion_lock);
+
+	return (available == ctx->nr_events - 1);
+}
+
+static int aio_wait_all(struct kioctx *ctx)
+{
+	unsigned users, reqs = 0;
+	struct kioctx_cpu *kcpu;
+	int cpu, ret;
+
+	if (atomic_xchg(&ctx->dead, 1))
+		return -EBUSY;
+
+	users = atomic_read(&current->mm->mm_users);
+	if (users > 1) {
+		/*
+		 * Wait till concurrent threads and aio_complete() see
+		 * dead flag. Implies full memory barrier on all cpus.
+		 */
+		synchronize_sched();
+	} else {
+		/*
+		 * Sync with aio_complete() to be sure it puts reqs_available,
+		 * when dead flag is already seen.
+		 */
+		spin_lock_irq(&ctx->completion_lock);
+	}
+
+	for_each_possible_cpu(cpu) {
+		kcpu = per_cpu_ptr(ctx->cpu, cpu);
+		reqs += kcpu->reqs_available;
+		kcpu->reqs_available = 0;
+	}
+
+	if (users == 1)
+		spin_unlock_irq(&ctx->completion_lock);
+
+	atomic_add(reqs, &ctx->reqs_available);
+
+	ret = wait_event_interruptible(ctx->wait, reqs_completed(ctx));
+
+	atomic_set(&ctx->dead, 0);
+
+	return ret;
+}
+
 static int io_submit_one(struct kioctx *ctx, struct iocb __user *user_iocb,
 			 struct iocb *iocb, bool compat)
 {
@@ -1555,6 +1613,9 @@ static int io_submit_one(struct kioctx *ctx, struct iocb __user *user_iocb,
 		pr_debug("EINVAL: overflow check\n");
 		return -EINVAL;
 	}
+
+	if (iocb->aio_lio_opcode == IOCB_CMD_WAIT_ALL)
+		return aio_wait_all(ctx);
 
 	req = aio_get_req(ctx);
 	if (unlikely(!req))
