@@ -993,6 +993,42 @@ static struct omap_hwmod_ocp_if omap44xx_l3_main_2__aes1 = {
 };
 
 /*
+ * 'des' class for DES3DES module
+ */
+static struct omap_hwmod_class_sysconfig omap44xx_des_sysc = {
+	.rev_offs	= 0x30,
+	.sysc_offs	= 0x34,
+	.syss_offs	= 0x38,
+	.sysc_flags	= SYSS_HAS_RESET_STATUS,
+};
+
+static struct omap_hwmod_class omap44xx_des_hwmod_class = {
+	.name		= "des",
+	.sysc		= &omap44xx_des_sysc,
+};
+
+static struct omap_hwmod omap44xx_des_hwmod = {
+	.name		= "des",
+	.class		= &omap44xx_des_hwmod_class,
+	.clkdm_name	= "l4_secure_clkdm",
+	.main_clk	= "des_fck",
+	.prcm		= {
+		.omap4	= {
+			.context_offs	= OMAP4_RM_L4SEC_DES3DES_CONTEXT_OFFSET,
+			.clkctrl_offs	= OMAP4_CM_L4SEC_DES3DES_CLKCTRL_OFFSET,
+			.modulemode	= MODULEMODE_SWCTRL,
+		},
+	},
+};
+
+struct omap_hwmod_ocp_if omap44xx_l4_per__des = {
+	.master		= &omap44xx_l4_per_hwmod,
+	.slave		= &omap44xx_des_hwmod,
+	.clk		= "des_fck",
+	.user		= OCP_USER_MPU | OCP_USER_SDMA,
+};
+
+/*
  * 'fdif' class
  * face detection hw accelerator module
  */
@@ -4834,6 +4870,7 @@ static struct omap_hwmod_ocp_if *omap44xx_hwmod_ocp_ifs[] __initdata = {
 	&omap44xx_mpu__emif1,
 	&omap44xx_mpu__emif2,
 	&omap44xx_l3_main_2__aes1,
+	&omap44xx_l4_per__des,
 	NULL,
 };
 
