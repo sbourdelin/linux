@@ -236,10 +236,22 @@ static int ccdc_update_raw_params(struct ccdc_config_params_raw *raw_params)
 {
 	struct ccdc_config_params_raw *config_params =
 				&ccdc_cfg.bayer.config_params;
-	unsigned int *fpc_virtaddr = NULL;
-	unsigned int *fpc_physaddr = NULL;
+	unsigned int *fpc_virtaddr;
+	phys_addr_t fpc_physaddr;
 
 	memcpy(config_params, raw_params, sizeof(*raw_params));
+
+	/*
+	 * FIXME: the code to copy the fault_pxl settings was present
+	 *	  in the original version but clearly could never
+	 *	  work and will interpret user-provided data in
+	 * 	  dangerous ways. Let's disable it completely to be
+	 *        on the safe side.
+	 */
+	config_params->fault_pxl.enable = 0;
+	config_params->fault_pxl.fp_num = 0;
+	config_params->fault_pxl.fpc_table_addr = 0;
+
 	/*
 	 * allocate memory for fault pixel table and copy the user
 	 * values to the table
@@ -247,16 +259,15 @@ static int ccdc_update_raw_params(struct ccdc_config_params_raw *raw_params)
 	if (!config_params->fault_pxl.enable)
 		return 0;
 
-	fpc_physaddr = (unsigned int *)config_params->fault_pxl.fpc_table_addr;
-	fpc_virtaddr = (unsigned int *)phys_to_virt(
-				(unsigned long)fpc_physaddr);
+	fpc_physaddr = config_params->fault_pxl.fpc_table_addr;
+	fpc_virtaddr = (unsigned int *)phys_to_virt(fpc_physaddr);
 	/*
 	 * Allocate memory for FPC table if current
 	 * FPC table buffer is not big enough to
 	 * accommodate FPC Number requested
 	 */
 	if (raw_params->fault_pxl.fp_num != config_params->fault_pxl.fp_num) {
-		if (fpc_physaddr != NULL) {
+		if (fpc_physaddr) {
 			free_pages((unsigned long)fpc_virtaddr,
 				   get_order
 				   (config_params->fault_pxl.fp_num *
@@ -270,13 +281,12 @@ static int ccdc_update_raw_params(struct ccdc_config_params_raw *raw_params)
 							 fault_pxl.fp_num *
 							 FP_NUM_BYTES));
 
-		if (fpc_virtaddr == NULL) {
+		if (fpc_virtaddr) {
 			dev_dbg(ccdc_cfg.dev,
 				"\nUnable to allocate memory for FPC");
 			return -EFAULT;
 		}
-		fpc_physaddr =
-		    (unsigned int *)virt_to_phys((void *)fpc_virtaddr);
+		fpc_physaddr = virt_to_phys(fpc_virtaddr);
 	}
 
 	/* Copy number of fault pixels and FPC table */
@@ -287,7 +297,7 @@ static int ccdc_update_raw_params(struct ccdc_config_params_raw *raw_params)
 		dev_dbg(ccdc_cfg.dev, "\n copy_from_user failed");
 		return -EFAULT;
 	}
-	config_params->fault_pxl.fpc_table_addr = (unsigned long)fpc_physaddr;
+	config_params->fault_pxl.fpc_table_addr = fpc_physaddr;
 	return 0;
 }
 
@@ -295,13 +305,13 @@ static int ccdc_close(struct device *dev)
 {
 	struct ccdc_config_params_raw *config_params =
 				&ccdc_cfg.bayer.config_params;
-	unsigned int *fpc_physaddr = NULL, *fpc_virtaddr = NULL;
+	phys_addr_t fpc_physaddr;
+	unsigned int *fpc_virtaddr;
 
-	fpc_physaddr = (unsigned int *)config_params->fault_pxl.fpc_table_addr;
+	fpc_physaddr = config_params->fault_pxl.fpc_table_addr;
 
-	if (fpc_physaddr != NULL) {
-		fpc_virtaddr = (unsigned int *)
-		    phys_to_virt((unsigned long)fpc_physaddr);
+	if (fpc_physaddr) {
+		fpc_virtaddr = phys_to_virt(fpc_physaddr);
 		free_pages((unsigned long)fpc_virtaddr,
 			   get_order(config_params->fault_pxl.fp_num *
 			   FP_NUM_BYTES));
