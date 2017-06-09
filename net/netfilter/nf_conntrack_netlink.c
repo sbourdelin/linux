@@ -1763,9 +1763,6 @@ ctnetlink_create_conntrack(struct net *net,
 	if (IS_ERR(ct))
 		return ERR_PTR(-ENOMEM);
 
-	if (!cda[CTA_TIMEOUT])
-		goto err1;
-
 	ct->timeout = nfct_time_stamp + ntohl(nla_get_be32(cda[CTA_TIMEOUT])) * HZ;
 
 	rcu_read_lock();
@@ -1939,7 +1936,7 @@ static int ctnetlink_new_conntrack(struct net *net, struct sock *ctnl,
 		if (nlh->nlmsg_flags & NLM_F_CREATE) {
 			enum ip_conntrack_events events;
 
-			if (!cda[CTA_TUPLE_ORIG] || !cda[CTA_TUPLE_REPLY])
+			if (!cda[CTA_TUPLE_ORIG] || !cda[CTA_TUPLE_REPLY] || !cda[CTA_TIMEOUT])
 				return -EINVAL;
 			if (otuple.dst.protonum != rtuple.dst.protonum)
 				return -EINVAL;
