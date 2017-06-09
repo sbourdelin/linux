@@ -304,15 +304,13 @@ static ssize_t set_attr_textmode(struct device *dev,
 	struct usb_sevsegdev *mydev = usb_get_intfdata(intf);
 	int i;
 
-	for (i = 0; display_textmodes[i]; i++) {
-		if (sysfs_streq(display_textmodes[i], buf)) {
-			mydev->textmode = i;
-			update_display_visual(mydev, GFP_KERNEL);
-			return count;
-		}
-	}
+	i = __sysfs_match_string(display_textmodes, -1, buf);
+	if (i < 0)
+		return i;
 
-	return -EINVAL;
+	mydev->textmode = i;
+	update_display_visual(mydev, GFP_KERNEL);
+	return count;
 }
 
 static DEVICE_ATTR(textmode, S_IRUGO | S_IWUSR, show_attr_textmode, set_attr_textmode);
