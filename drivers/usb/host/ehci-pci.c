@@ -181,6 +181,8 @@ static int ehci_pci_setup(struct usb_hcd *hcd)
 		if (pdev->device == 0x7808) {
 			ehci->use_dummy_qh = 1;
 			ehci_info(ehci, "applying AMD SB700/SB800/Hudson-2/3 EHCI dummy qh workaround\n");
+
+			pdev->dev_flags |= PCI_DEV_FLAGS_NO_D3;
 		}
 		break;
 	case PCI_VENDOR_ID_VIA:
