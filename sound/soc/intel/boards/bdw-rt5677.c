@@ -347,8 +347,7 @@ static int bdw_rt5677_probe(struct platform_device *pdev)
 		return -ENOMEM;
 	}
 
-	ret = acpi_dev_add_driver_gpios(ACPI_COMPANION(&pdev->dev),
-			bdw_rt5677_gpios);
+	ret = devm_acpi_dev_add_driver_gpios(&pdev->dev, bdw_rt5677_gpios);
 	if (ret)
 		dev_warn(&pdev->dev, "Failed to add driver gpios\n");
 
