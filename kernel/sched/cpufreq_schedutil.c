@@ -117,6 +117,17 @@ static void sugov_update_commit(struct sugov_policy *sg_policy, u64 time,
 	}
 }
 
+static unsigned int resolve_freq(struct sugov_policy *sg_policy,
+				 unsigned int freq)
+{
+	if (freq == sg_policy->cached_raw_freq &&
+	    sg_policy->next_freq != UINT_MAX)
+		return sg_policy->next_freq;
+
+	sg_policy->cached_raw_freq = freq;
+	return cpufreq_driver_resolve_freq(sg_policy->policy, freq);
+}
+
 /**
  * get_next_freq - Compute a new frequency for a given cpufreq policy.
  * @sg_policy: schedutil policy object to compute the new frequency for.
@@ -145,6 +156,7 @@ static unsigned int get_next_freq(struct sugov_policy *sg_policy,
 	struct cpufreq_policy *policy = sg_policy->policy;
 	unsigned int freq = arch_scale_freq_invariant() ?
 				policy->cpuinfo.max_freq : policy->cur;
+	unsigned int target, original = 0;
 
 	freq = (freq + (freq >> 2)) * util / max;
 
@@ -156,13 +168,24 @@ static unsigned int get_next_freq(struct sugov_policy *sg_policy,
 	if (freq < policy->min)
 		freq = policy->min;
 
-	if (sg_policy->next_freq > freq)
+	if (sg_policy->next_freq > freq) {
+		original = freq;
 		freq = (sg_policy->next_freq + freq) >> 1;
+	}
 
-	if (freq == sg_policy->cached_raw_freq && sg_policy->next_freq != UINT_MAX)
-		return sg_policy->next_freq;
-	sg_policy->cached_raw_freq = freq;
-	return cpufreq_driver_resolve_freq(policy, freq);
+	target = resolve_freq(sg_policy, freq);
+
+	/*
+	 * While reducing frequency if there are no frequencies available
+	 * between "original" and "next_freq", resolve_freq() will return
+	 * next_freq because we always try to find the lowest frequency greater
+	 * than equal to the "freq". Fix that by going directly to the
+	 * "original" frequency in that case.
+	 */
+	if (unlikely(original && target == sg_policy->next_freq))
+		target = resolve_freq(sg_policy, original);
+
+	return target;
 }
 
 static void sugov_get_util(unsigned long *util, unsigned long *max)
