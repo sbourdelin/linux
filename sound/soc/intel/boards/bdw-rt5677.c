@@ -16,6 +16,7 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
+#include <linux/acpi.h>
 #include <linux/module.h>
 #include <linux/platform_device.h>
 #include <linux/gpio/consumer.h>
@@ -118,6 +119,26 @@ static struct snd_soc_jack_gpio mic_jack_gpio = {
 	.report			= SND_JACK_MICROPHONE,
 	.debounce_time		= 200,
 	.invert			= 1,
+};
+
+/* GPIO indexes defined by ACPI */
+enum {
+	RT5677_GPIO_PLUG_DET		= 0,
+	RT5677_GPIO_MIC_PRESENT_L	= 1,
+	RT5677_GPIO_HOTWORD_DET_L	= 2,
+	RT5677_GPIO_DSP_INT		= 3,
+	RT5677_GPIO_HP_AMP_SHDN_L	= 4,
+};
+
+static const struct acpi_gpio_params plug_det_gpio = { RT5677_GPIO_PLUG_DET, 0, false };
+static const struct acpi_gpio_params mic_present_gpio = { RT5677_GPIO_MIC_PRESENT_L, 0, false };
+static const struct acpi_gpio_params headphone_enable_gpio = { RT5677_GPIO_HP_AMP_SHDN_L, 0, false };
+
+static const struct acpi_gpio_mapping bdw_rt5677_gpios[] = {
+	{ "plug-det-gpios", &plug_det_gpio, 1 },
+	{ "mic-present-gpios", &mic_present_gpio, 1 },
+	{ "headphone-enable-gpios", &headphone_enable_gpio, 1 },
+	{ NULL },
 };
 
 static int broadwell_ssp0_fixup(struct snd_soc_pcm_runtime *rtd,
@@ -314,6 +335,7 @@ static struct snd_soc_card bdw_rt5677_card = {
 static int bdw_rt5677_probe(struct platform_device *pdev)
 {
 	struct bdw_rt5677_priv *bdw_rt5677;
+	int ret;
 
 	bdw_rt5677_card.dev = &pdev->dev;
 
@@ -324,6 +346,11 @@ static int bdw_rt5677_probe(struct platform_device *pdev)
 		dev_err(&pdev->dev, "Can't allocate bdw_rt5677\n");
 		return -ENOMEM;
 	}
+
+	ret = acpi_dev_add_driver_gpios(ACPI_COMPANION(&pdev->dev),
+			bdw_rt5677_gpios);
+	if (ret)
+		dev_warn(&pdev->dev, "Failed to add driver gpios\n");
 
 	snd_soc_card_set_drvdata(&bdw_rt5677_card, bdw_rt5677);
 
