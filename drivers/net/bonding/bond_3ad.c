@@ -322,6 +322,9 @@ static u16 __get_link_speed(struct port *port)
 
 		default:
 			/* unknown speed value from ethtool. shouldn't happen */
+			pr_warn("%s: unknown speed (%d) for port %d (set it to 0)\n",
+				slave->bond->dev->name, slave->speed,
+				port->actor_port_number);
 			speed = 0;
 			break;
 		}
