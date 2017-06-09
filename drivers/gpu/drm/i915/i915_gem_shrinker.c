@@ -127,6 +127,59 @@ static bool unsafe_drop_pages(struct drm_i915_gem_object *obj)
 	return !READ_ONCE(obj->mm.pages);
 }
 
+static void __start_writeback(struct drm_i915_gem_object *obj)
+{
+	struct address_space *mapping;
+	struct writeback_control wbc = {
+		.sync_mode = WB_SYNC_NONE,
+		.nr_to_write = SWAP_CLUSTER_MAX,
+		.range_start = 0,
+		.range_end = LLONG_MAX,
+		.for_reclaim = 1,
+	};
+	unsigned long i;
+
+	lockdep_assert_held(&obj->mm.lock);
+	GEM_BUG_ON(obj->mm.pages);
+
+	switch (obj->mm.madv) {
+	case I915_MADV_DONTNEED:
+		__i915_gem_object_truncate(obj);
+	case __I915_MADV_PURGED:
+		return;
+	}
+
+	if (!obj->base.filp)
+		return;
+
+	/* Force any other users of this object to refault */
+	mapping = obj->base.filp->f_mapping;
+	unmap_mapping_range(mapping, 0, (loff_t)-1, 0);
+
+	/* Begin writeback on each dirty page */
+	for (i = 0; i < obj->base.size >> PAGE_SHIFT; i++) {
+		struct page *page;
+
+		page = find_lock_entry(mapping, i);
+		if (!page || radix_tree_exceptional_entry(page))
+			continue;
+
+		if (!page_mapped(page) && clear_page_dirty_for_io(page)) {
+			int ret;
+
+			SetPageReclaim(page);
+			ret = mapping->a_ops->writepage(page, &wbc);
+			if (!PageWriteback(page))
+				ClearPageReclaim(page);
+			if (!ret)
+				goto put;
+		}
+		unlock_page(page);
+put:
+		put_page(page);
+	}
+}
+
 /**
  * i915_gem_shrink - Shrink buffer object caches
  * @dev_priv: i915 device
@@ -239,7 +292,7 @@ i915_gem_shrink(struct drm_i915_private *dev_priv,
 				mutex_lock_nested(&obj->mm.lock,
 						  I915_MM_SHRINKER);
 				if (!obj->mm.pages) {
-					__i915_gem_object_invalidate(obj);
+					__start_writeback(obj);
 					list_del_init(&obj->global_link);
 					count += obj->base.size >> PAGE_SHIFT;
 				}
