@@ -555,9 +555,9 @@ static __always_inline void err_print_param(struct drm_i915_error_state_buf *m,
 		err_printf(m, "i915.%s=%s\n", name, yesno(*(const bool *)x));
 	else if (!__builtin_strcmp(type, "int"))
 		err_printf(m, "i915.%s=%d\n", name, *(const int *)x);
-	else if (!__builtin_strcmp(type, "unsigned int"))
+	else if (!__builtin_strcmp(type, "uint"))
 		err_printf(m, "i915.%s=%u\n", name, *(const unsigned int *)x);
-	else if (!__builtin_strcmp(type, "char *"))
+	else if (!__builtin_strcmp(type, "charp"))
 		err_printf(m, "i915.%s=%s\n", name, *(const char **)x);
 	else
 		BUILD_BUG();
@@ -566,7 +566,7 @@ static __always_inline void err_print_param(struct drm_i915_error_state_buf *m,
 static void err_print_params(struct drm_i915_error_state_buf *m,
 			     const struct i915_params *p)
 {
-#define PRINT(T, x) err_print_param(m, #x, #T, &p->x);
+#define PRINT(T, X, V, M, S, B, D) err_print_param(m, #X, #T, &p->X);
 	I915_PARAMS_FOR_EACH(PRINT);
 #undef PRINT
 }
@@ -860,7 +860,7 @@ void __i915_gpu_state_free(struct kref *error_ref)
 	kfree(error->overlay);
 	kfree(error->display);
 
-#define FREE(T, x) free_param(#T, &error->params.x);
+#define FREE(T, X, V, M, S, B, D) free_param(#T, &error->params.X);
 	I915_PARAMS_FOR_EACH(FREE);
 #undef FREE
 
@@ -1694,7 +1694,7 @@ static int capture(void *data)
 					   error->i915->gt.last_init_time));
 
 	error->params = i915;
-#define DUP(T, x) dup_param(#T, &error->params.x);
+#define DUP(T, X, V, M, S, B, D) dup_param(#T, &error->params.X);
 	I915_PARAMS_FOR_EACH(DUP);
 #undef DUP
 

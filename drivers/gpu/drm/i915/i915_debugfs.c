@@ -44,9 +44,9 @@ static __always_inline void seq_print_param(struct seq_file *m,
 		seq_printf(m, "i915.%s=%s\n", name, yesno(*(const bool *)x));
 	else if (!__builtin_strcmp(type, "int"))
 		seq_printf(m, "i915.%s=%d\n", name, *(const int *)x);
-	else if (!__builtin_strcmp(type, "unsigned int"))
+	else if (!__builtin_strcmp(type, "uint"))
 		seq_printf(m, "i915.%s=%u\n", name, *(const unsigned int *)x);
-	else if (!__builtin_strcmp(type, "char *"))
+	else if (!__builtin_strcmp(type, "charp"))
 		seq_printf(m, "i915.%s=%s\n", name, *(const char **)x);
 	else
 		BUILD_BUG();
@@ -66,7 +66,7 @@ static int i915_capabilities(struct seq_file *m, void *data)
 #undef PRINT_FLAG
 
 	kernel_param_lock(THIS_MODULE);
-#define PRINT_PARAM(T, x) seq_print_param(m, #x, #T, &i915.x);
+#define PRINT_PARAM(T, X, V, M, S, B, D) seq_print_param(m, #X, #T, &i915.X);
 	I915_PARAMS_FOR_EACH(PRINT_PARAM);
 #undef PRINT_PARAM
 	kernel_param_unlock(THIS_MODULE);
