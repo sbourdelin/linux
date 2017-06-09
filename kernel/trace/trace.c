@@ -87,7 +87,7 @@ dummy_set_flag(struct trace_array *tr, u32 old_flags, u32 bit, int set)
  * tracing is active, only save the comm when a trace event
  * occurred.
  */
-static DEFINE_PER_CPU(bool, trace_cmdline_save);
+static DEFINE_PER_CPU(bool, trace_taskinfo_save);
 
 /*
  * Kill all tracing for good (never come back).
@@ -790,7 +790,7 @@ EXPORT_SYMBOL_GPL(tracing_on);
 static __always_inline void
 __buffer_unlock_commit(struct ring_buffer *buffer, struct ring_buffer_event *event)
 {
-	__this_cpu_write(trace_cmdline_save, true);
+	__this_cpu_write(trace_taskinfo_save, true);
 
 	/* If this is the temp buffer, we need to commit fully */
 	if (this_cpu_read(trace_buffered_event) == event) {
@@ -1709,6 +1709,18 @@ void tracing_reset_all_online_cpus(void)
 	}
 }
 
+static int *tgid_map;
+
+void tracing_alloc_tgid_map(void)
+{
+	if (tgid_map)
+		return;
+
+	tgid_map = kzalloc((PID_MAX_DEFAULT + 1) * sizeof(*tgid_map),
+			   GFP_KERNEL);
+	WARN_ONCE(!tgid_map, "Allocation of tgid_map failed\n");
+}
+
 #define SAVED_CMDLINES_DEFAULT 128
 #define NO_CMDLINE_MAP UINT_MAX
 static arch_spinlock_t trace_cmdline_lock = __ARCH_SPIN_LOCK_UNLOCKED;
@@ -1722,7 +1734,7 @@ struct saved_cmdlines_buffer {
 static struct saved_cmdlines_buffer *savedcmd;
 
 /* temporary disable recording */
-static atomic_t trace_record_cmdline_disabled __read_mostly;
+static atomic_t trace_record_taskinfo_disabled __read_mostly;
 
 static inline char *get_saved_cmdlines(int idx)
 {
@@ -1990,16 +2002,83 @@ void trace_find_cmdline(int pid, char comm[])
 	preempt_enable();
 }
 
-void tracing_record_cmdline(struct task_struct *tsk)
+int trace_find_tgid(int pid)
 {
-	if (atomic_read(&trace_record_cmdline_disabled) || !tracing_is_on())
+	if (!tgid_map || pid <= 0 || pid > PID_MAX_DEFAULT)
+		return 0;
+
+	return tgid_map[pid];
+}
+
+static int trace_save_tgid(struct task_struct *tsk)
+{
+	if (!tgid_map || tsk->pid <= 0 || tsk->pid > PID_MAX_DEFAULT)
+		return 0;
+
+	tgid_map[tsk->pid] = tsk->tgid;
+	return 1;
+}
+
+/**
+ * tracing_record_taskinfo - record the task information of multiple tasks
+ *
+ * @tasks - list of tasks (array of task_struct pointers)
+ * @len   - length of the list of tasks
+ * @flags - TRACE_RECORD_CMDLINE for recording comm
+ *          TRACE_RECORD_TGID for recording tgid
+ */
+void tracing_record_taskinfo(struct task_struct **tasks, int len, int flags)
+{
+	int i;
+	bool cmdline, tgid;
+
+	tgid = !!(flags & TRACE_RECORD_TGID);
+	cmdline = !!(flags & TRACE_RECORD_CMDLINE);
+
+	if (unlikely(!cmdline && !tgid))
 		return;
 
-	if (!__this_cpu_read(trace_cmdline_save))
+	if (atomic_read(&trace_record_taskinfo_disabled) || !tracing_is_on())
 		return;
 
-	if (trace_save_cmdline(tsk))
-		__this_cpu_write(trace_cmdline_save, false);
+	if (!__this_cpu_read(trace_taskinfo_save))
+		return;
+
+	for (i = 0; i < len; i++) {
+		if (cmdline && !trace_save_cmdline(tasks[i]))
+			break;
+		if (tgid && !trace_save_tgid(tasks[i]))
+			break;
+	}
+
+	if (i == len)
+		__this_cpu_write(trace_taskinfo_save, false);
+}
+
+/**
+ * tracing_record_taskinfo_single - record the task info of single task
+ *
+ * @task  - task to record
+ * @flags - TRACE_RECORD_CMDLINE for recording comm
+ *        - TRACE_RECORD_TGID for recording tgid
+ */
+void tracing_record_taskinfo_single(struct task_struct *task, int flags)
+{
+	struct task_struct *tasks[1];
+
+	tasks[0] = task;
+	tracing_record_taskinfo(tasks, 1, flags);
+}
+
+/* Helpers to record a specific task information */
+void tracing_record_cmdline(struct task_struct *task)
+{
+	tracing_record_taskinfo_single(task, TRACE_RECORD_CMDLINE);
+}
+
+void tracing_record_tgid(struct task_struct *task)
+{
+	tracing_record_taskinfo_single(task, TRACE_RECORD_TGID);
 }
 
 /*
@@ -3144,7 +3223,7 @@ static void *s_start(struct seq_file *m, loff_t *pos)
 #endif
 
 	if (!iter->snapshot)
-		atomic_inc(&trace_record_cmdline_disabled);
+		atomic_inc(&trace_record_taskinfo_disabled);
 
 	if (*pos != iter->pos) {
 		iter->ent = NULL;
@@ -3189,7 +3268,7 @@ static void s_stop(struct seq_file *m, void *p)
 #endif
 
 	if (!iter->snapshot)
-		atomic_dec(&trace_record_cmdline_disabled);
+		atomic_dec(&trace_record_taskinfo_disabled);
 
 	trace_access_unlock(iter->cpu_file);
 	trace_event_read_unlock();
@@ -4235,6 +4314,9 @@ int set_tracer_flag(struct trace_array *tr, unsigned int mask, int enabled)
 
 	if (mask == TRACE_ITER_RECORD_CMD)
 		trace_event_enable_cmd_record(enabled);
+
+	if (mask == TRACE_ITER_RECORD_TGID)
+		trace_event_enable_tgid_record(enabled);
 
 	if (mask == TRACE_ITER_EVENT_FORK)
 		trace_event_follow_fork(tr, enabled);
