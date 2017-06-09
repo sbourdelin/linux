@@ -101,8 +101,8 @@ static struct mr_table *ipmr_new_table(struct net *net, u32 id);
 static void ipmr_free_table(struct mr_table *mrt);
 
 static void ip_mr_forward(struct net *net, struct mr_table *mrt,
-			  struct sk_buff *skb, struct mfc_cache *cache,
-			  int local);
+			  struct net_device *dev, struct sk_buff *skb,
+                          struct mfc_cache *cache, int local);
 static int ipmr_cache_report(struct mr_table *mrt,
 			     struct sk_buff *pkt, vifi_t vifi, int assert);
 static int __ipmr_fill_mroute(struct mr_table *mrt, struct sk_buff *skb,
@@ -988,7 +988,16 @@ static void ipmr_cache_resolve(struct net *net, struct mr_table *mrt,
 
 			rtnl_unicast(skb, net, NETLINK_CB(skb).portid);
 		} else {
-			ip_mr_forward(net, mrt, skb, c, 0);
+                        struct net_device *dev = skb->dev;
+
+                        if (netif_is_l3_master(dev)) {
+                                dev = __dev_get_by_index(net, IPCB(skb)->iif);
+                                if (!dev) {
+                                        kfree_skb(skb);
+                                        continue;
+                                }
+                        }
+                        ip_mr_forward(net, mrt, dev, skb, c, 0);
 		}
 	}
 }
@@ -1828,10 +1837,10 @@ static int ipmr_find_vif(struct mr_table *mrt, struct net_device *dev)
 
 /* "local" means that we should preserve one skb (for local delivery) */
 static void ip_mr_forward(struct net *net, struct mr_table *mrt,
-			  struct sk_buff *skb, struct mfc_cache *cache,
-			  int local)
+			  struct net_device *dev, struct sk_buff *skb,
+                          struct mfc_cache *cache, int local)
 {
-	int true_vifi = ipmr_find_vif(mrt, skb->dev);
+	int true_vifi = ipmr_find_vif(mrt, dev);
 	int psend = -1;
 	int vif, ct;
 
@@ -1853,11 +1862,11 @@ static void ip_mr_forward(struct net *net, struct mr_table *mrt,
 	}
 
 	/* Wrong interface: drop packet and (maybe) send PIM assert. */
-	if (mrt->vif_table[vif].dev != skb->dev) {
+	if (mrt->vif_table[vif].dev != dev) {
 		struct net_device *mdev;
 
 		mdev = l3mdev_master_dev_rcu(mrt->vif_table[vif].dev);
-		if (mdev == skb->dev)
+		if (mdev == dev)
 			goto forward;
 
 		if (rt_is_output_route(skb_rtable(skb))) {
@@ -2064,7 +2073,7 @@ int ip_mr_input(struct sk_buff *skb)
 	}
 
 	read_lock(&mrt_lock);
-	ip_mr_forward(net, mrt, skb, cache, local);
+	ip_mr_forward(net, mrt, dev, skb, cache, local);
 	read_unlock(&mrt_lock);
 
 	if (local)
