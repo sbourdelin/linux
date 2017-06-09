@@ -2053,6 +2053,18 @@ static void hci_power_on(struct work_struct *work)
 
 	BT_DBG("%s", hdev->name);
 
+	/* Bluetooth is a big user of cryptography and thus needs to have a
+	 * good random number generator, especially for the SMP protocol.
+	 * Thus, we ensure we have good randomness before powering up.
+	 */
+	err = wait_for_random_bytes();
+	if (err < 0) {
+		hci_dev_lock(hdev);
+		mgmt_set_powered_failed(hdev, err);
+		hci_dev_unlock(hdev);
+		return;
+	}
+
 	if (test_bit(HCI_UP, &hdev->flags) &&
 	    hci_dev_test_flag(hdev, HCI_MGMT) &&
 	    hci_dev_test_and_clear_flag(hdev, HCI_AUTO_OFF)) {
