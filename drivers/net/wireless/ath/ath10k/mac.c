@@ -4436,6 +4436,14 @@ static struct ieee80211_sta_vht_cap ath10k_create_vht_cap(struct ath10k *ar)
 			vht_cap.vht_mcs.rx_highest = 1560;
 			vht_cap.vht_mcs.tx_highest = 1560;
 			break;
+		case QCA9888_2_0_DEVICE_ID:
+			/* Can do only 1x1 VHT160 or 80+80.
+			 * 780Mbps is 2x2 80Mhz or 1x1 160Mhz,
+			 * long-guard-interval
+			 */
+			vht_cap.vht_mcs.rx_highest = 780;
+			vht_cap.vht_mcs.tx_highest = 780;
+			break;
 		}
 	}
 
