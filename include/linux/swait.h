@@ -79,6 +79,33 @@ extern void __init_swait_queue_head(struct swait_queue_head *q, const char *name
 	DECLARE_SWAIT_QUEUE_HEAD(name)
 #endif
 
+/**
+ * swait_active -- locklessly test for waiters on the queue
+ * @q: the swait_queue to test for waiters
+ *
+ * returns true if the wait list is not empty
+ *
+ * NOTE: this function is lockless and requires care, incorrect usage _will_
+ * lead to sporadic and non-obvious failure.
+ *
+ * Use either while holding swait_queue_head_t::lock or when used for wakeups
+ * with an extra smp_mb() like:
+ *
+ *      CPU0 - waker                    CPU1 - waiter
+ *
+ *      @cond = true;
+ *      smp_mb();
+ *      if (swait_active(wq))           swait_event(wq, cond);
+ *        swake_up(wq);
+ *
+ *
+ * Because without the explicit smp_mb() it's possible for the
+ * swait_active() load to get hoisted over the @cond store such that we'll
+ * observe an empty wait list while the waiter might not observe @cond.
+ *
+ * Also note that this 'optimization' trades a spin_lock() for an smp_mb(),
+ * which (when the lock is uncontended) are of roughly equal cost.
+ */
 static inline int swait_active(struct swait_queue_head *q)
 {
 	return !list_empty(&q->task_list);

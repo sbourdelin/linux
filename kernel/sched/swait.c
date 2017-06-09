@@ -29,6 +29,16 @@ void swake_up_locked(struct swait_queue_head *q)
 }
 EXPORT_SYMBOL(swake_up_locked);
 
+/**
+ * swake_up - wake up a waiter on a simple waitqueue
+ * @q: the simple wait queue head
+ *
+ * In order for this to function properly, since it uses swait_active()
+ * internally, some kind of memory barrier must occur prior to calling this.
+ * Typically, this will be smp_mb__after_atomic(), but if the value is
+ * manipulated non-atomically, one may need to use a less regular barrier, such
+ * as smp_mb().  spin_unlock() does not guarantee a memory barrier.
+ */
 void swake_up(struct swait_queue_head *q)
 {
 	unsigned long flags;
@@ -45,6 +55,12 @@ EXPORT_SYMBOL(swake_up);
 /*
  * Does not allow usage from IRQ disabled, since we must be able to
  * release IRQs to guarantee bounded hold time.
+ *
+ * In order for this to function properly, since it uses swait_active()
+ * internally, some kind of memory barrier must occur prior to calling this.
+ * Typically, this will be smp_mb__after_atomic(), but if the value is
+ * manipulated non-atomically, one may need to use a less regular barrier, such
+ * as smp_mb().  spin_unlock() does not guarantee a memory barrier.
  */
 void swake_up_all(struct swait_queue_head *q)
 {
