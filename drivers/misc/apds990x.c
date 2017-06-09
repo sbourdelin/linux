@@ -856,13 +856,13 @@ static ssize_t apds990x_prox_reporting_mode_store(struct device *dev,
 				  const char *buf, size_t len)
 {
 	struct apds990x_chip *chip =  dev_get_drvdata(dev);
+	int ret;
 
-	if (sysfs_streq(buf, reporting_modes[0]))
-		chip->prox_continuous_mode = 0;
-	else if (sysfs_streq(buf, reporting_modes[1]))
-		chip->prox_continuous_mode = 1;
-	else
-		return -EINVAL;
+	ret = sysfs_match_string(reporting_modes, buf);
+	if (ret < 0)
+		return ret;
+
+	chip->prox_continuous_mode = ret;
 	return len;
 }
 
