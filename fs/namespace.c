@@ -274,7 +274,7 @@ int __mnt_is_readonly(struct vfsmount *mnt)
 {
 	if (mnt->mnt_flags & MNT_READONLY)
 		return 1;
-	if (mnt->mnt_sb->s_flags & MS_RDONLY)
+	if (mnt->mnt_sb->s_flags & SB_RDONLY)
 		return 1;
 	return 0;
 }
@@ -970,7 +970,7 @@ vfs_kern_mount(struct file_system_type *type, int flags, const char *name, void 
 	if (!mnt)
 		return ERR_PTR(-ENOMEM);
 
-	if (flags & MS_KERNMOUNT)
+	if (flags & SB_KERNMOUNT)
 		mnt->mnt.mnt_flags = MNT_INTERNAL;
 
 	root = mount_fs(type, flags, name, data);
@@ -1002,7 +1002,7 @@ vfs_submount(const struct dentry *mountpoint, struct file_system_type *type,
 	if (mountpoint->d_sb->s_user_ns != &init_user_ns)
 		return ERR_PTR(-EPERM);
 
-	return vfs_kern_mount(type, MS_SUBMOUNT, name, data);
+	return vfs_kern_mount(type, SB_SUBMOUNT, name, data);
 }
 EXPORT_SYMBOL_GPL(vfs_submount);
 
@@ -1592,8 +1592,8 @@ static int do_umount(struct mount *mnt, int flags)
 		if (!capable(CAP_SYS_ADMIN))
 			return -EPERM;
 		down_write(&sb->s_umount);
-		if (!(sb->s_flags & MS_RDONLY))
-			retval = do_remount_sb(sb, MS_RDONLY, NULL, 0);
+		if (!(sb->s_flags & SB_RDONLY))
+			retval = do_remount_sb(sb, SB_RDONLY, NULL, 0);
 		up_write(&sb->s_umount);
 		return retval;
 	}
@@ -2117,7 +2117,7 @@ static void unlock_mount(struct mountpoint *where)
 
 static int graft_tree(struct mount *mnt, struct mount *p, struct mountpoint *mp)
 {
-	if (mnt->mnt.mnt_sb->s_flags & MS_NOUSER)
+	if (mnt->mnt.mnt_sb->s_flags & SB_NOUSER)
 		return -EINVAL;
 
 	if (d_is_dir(mp->m_dentry) !=
@@ -2133,7 +2133,7 @@ static int graft_tree(struct mount *mnt, struct mount *p, struct mountpoint *mp)
 
 static int flags_to_propagation_type(int flags)
 {
-	int type = flags & ~(MS_REC | MS_SILENT);
+	int type = flags & ~(MS_REC | SB_SILENT);
 
 	/* Fail if any non-propagation flags are set */
 	if (type & ~(MS_SHARED | MS_PRIVATE | MS_SLAVE | MS_UNBINDABLE))
@@ -2263,7 +2263,7 @@ static int change_mount_flags(struct vfsmount *mnt, int ms_flags)
 	int error = 0;
 	int readonly_request = 0;
 
-	if (ms_flags & MS_RDONLY)
+	if (ms_flags & SB_RDONLY)
 		readonly_request = 1;
 	if (readonly_request == __mnt_is_readonly(mnt))
 		return 0;
@@ -2784,7 +2784,7 @@ long do_mount(const char *dev_name, const char __user *dir_name,
 				   type_page, flags, data_page);
 	if (!retval && !may_mount())
 		retval = -EPERM;
-	if (!retval && (flags & MS_MANDLOCK) && !may_mandlock())
+	if (!retval && (flags & SB_MANDLOCK) && !may_mandlock())
 		retval = -EPERM;
 	if (retval)
 		goto dput_out;
@@ -2806,7 +2806,7 @@ long do_mount(const char *dev_name, const char __user *dir_name,
 		mnt_flags |= MNT_NODIRATIME;
 	if (flags & MS_STRICTATIME)
 		mnt_flags &= ~(MNT_RELATIME | MNT_NOATIME);
-	if (flags & MS_RDONLY)
+	if (flags & SB_RDONLY)
 		mnt_flags |= MNT_READONLY;
 
 	/* The default atime for remount is preservation */
@@ -2817,9 +2817,9 @@ long do_mount(const char *dev_name, const char __user *dir_name,
 		mnt_flags |= path.mnt->mnt_flags & MNT_ATIME_MASK;
 	}
 
-	flags &= ~(MS_NOSUID | MS_NOEXEC | MS_NODEV | MS_ACTIVE | MS_BORN |
-		   MS_NOATIME | MS_NODIRATIME | MS_RELATIME| MS_KERNMOUNT |
-		   MS_STRICTATIME | MS_NOREMOTELOCK | MS_SUBMOUNT);
+	flags &= ~(MS_NOSUID | MS_NOEXEC | MS_NODEV | SB_ACTIVE | SB_BORN |
+		   MS_NOATIME | MS_NODIRATIME | MS_RELATIME| SB_KERNMOUNT |
+		   MS_STRICTATIME | SB_NOREMOTELOCK | SB_SUBMOUNT);
 
 	if (flags & MS_REMOUNT)
 		retval = do_remount(&path, flags & ~MS_REMOUNT, mnt_flags,
@@ -3287,7 +3287,7 @@ void put_mnt_ns(struct mnt_namespace *ns)
 struct vfsmount *kern_mount_data(struct file_system_type *type, void *data)
 {
 	struct vfsmount *mnt;
-	mnt = vfs_kern_mount(type, MS_KERNMOUNT, type->name, data);
+	mnt = vfs_kern_mount(type, SB_KERNMOUNT, type->name, data);
 	if (!IS_ERR(mnt)) {
 		/*
 		 * it is a longterm mount, don't release mnt until
@@ -3364,7 +3364,7 @@ static bool mnt_already_visible(struct mnt_namespace *ns, struct vfsmount *new,
 		mnt_flags = mnt->mnt.mnt_flags;
 
 		/* Don't miss readonly hidden in the superblock flags */
-		if (mnt->mnt.mnt_sb->s_flags & MS_RDONLY)
+		if (mnt->mnt.mnt_sb->s_flags & SB_RDONLY)
 			mnt_flags |= MNT_LOCK_READONLY;
 
 		/* Verify the mount flags are equal to or more permissive

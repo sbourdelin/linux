@@ -376,7 +376,7 @@ static int ext4_file_open(struct inode * inode, struct file * filp)
 		return -EIO;
 
 	if (unlikely(!(sbi->s_mount_flags & EXT4_MF_MNTDIR_SAMPLED) &&
-		     !(sb->s_flags & MS_RDONLY))) {
+		     !(sb->s_flags & SB_RDONLY))) {
 		sbi->s_mount_flags |= EXT4_MF_MNTDIR_SAMPLED;
 		/*
 		 * Sample where the filesystem has been mounted and

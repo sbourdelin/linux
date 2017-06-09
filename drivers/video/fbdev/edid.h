@@ -131,7 +131,7 @@
 #define MAX_PIXEL_CLOCK         (((int)block[ 9 ]) * 10)
 #define GTF_SUPPORT		block[10]
 
-#define DPMS_ACTIVE_OFF		(1 << 5)
+#define DPSB_ACTIVE_OFF		(1 << 5)
 #define DPMS_SUSPEND		(1 << 6)
 #define DPMS_STANDBY		(1 << 7)
 

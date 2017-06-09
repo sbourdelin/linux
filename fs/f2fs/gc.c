@@ -965,7 +965,7 @@ int f2fs_gc(struct f2fs_sb_info *sbi, bool sync,
 
 	cpc.reason = __get_cp_reason(sbi);
 gc_more:
-	if (unlikely(!(sbi->sb->s_flags & MS_ACTIVE)))
+	if (unlikely(!(sbi->sb->s_flags & SB_ACTIVE)))
 		goto stop;
 	if (unlikely(f2fs_cp_error(sbi))) {
 		ret = -EIO;

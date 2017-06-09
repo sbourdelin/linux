@@ -256,7 +256,7 @@ static int ovl_remount(struct super_block *sb, int *flags, char *data)
 {
 	struct ovl_fs *ufs = sb->s_fs_info;
 
-	if (!(*flags & MS_RDONLY) && (!ufs->upper_mnt || !ufs->workdir))
+	if (!(*flags & SB_RDONLY) && (!ufs->upper_mnt || !ufs->workdir))
 		return -EROFS;
 
 	return 0;
@@ -778,7 +778,7 @@ static int ovl_fill_super(struct super_block *sb, void *data, int silent)
 			goto out_free_config;
 
 		/* Upper fs should not be r/o */
-		if (upperpath.mnt->mnt_sb->s_flags & MS_RDONLY) {
+		if (upperpath.mnt->mnt_sb->s_flags & SB_RDONLY) {
 			pr_err("overlayfs: upper fs is r/o, try multi-lower layers mount\n");
 			err = -EINVAL;
 			goto out_put_upperpath;
@@ -859,7 +859,7 @@ static int ovl_fill_super(struct super_block *sb, void *data, int silent)
 		if (IS_ERR(ufs->workdir)) {
 			pr_warn("overlayfs: failed to create directory %s/%s (errno: %i); mounting read-only\n",
 				ufs->config.workdir, OVL_WORKDIR_NAME, -err);
-			sb->s_flags |= MS_RDONLY;
+			sb->s_flags |= SB_RDONLY;
 			ufs->workdir = NULL;
 		}
 
@@ -937,7 +937,7 @@ static int ovl_fill_super(struct super_block *sb, void *data, int silent)
 
 	/* If the upper fs is nonexistent, we mark overlayfs r/o too */
 	if (!ufs->upper_mnt)
-		sb->s_flags |= MS_RDONLY;
+		sb->s_flags |= SB_RDONLY;
 	else if (ufs->upper_mnt->mnt_sb != ufs->same_sb)
 		ufs->same_sb = NULL;
 
@@ -962,7 +962,7 @@ static int ovl_fill_super(struct super_block *sb, void *data, int silent)
 	sb->s_op = &ovl_super_operations;
 	sb->s_xattr = ovl_xattr_handlers;
 	sb->s_fs_info = ufs;
-	sb->s_flags |= MS_POSIXACL | MS_NOREMOTELOCK;
+	sb->s_flags |= SB_POSIXACL | SB_NOREMOTELOCK;
 
 	root_dentry = d_make_root(ovl_new_inode(sb, S_IFDIR, 0));
 	if (!root_dentry)

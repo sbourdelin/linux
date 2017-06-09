@@ -1202,7 +1202,7 @@ again:
 	if (!i_done || ret)
 		goto out;
 
-	if (!(inode->i_sb->s_flags & MS_ACTIVE))
+	if (!(inode->i_sb->s_flags & SB_ACTIVE))
 		goto out;
 
 	/*
@@ -1359,7 +1359,7 @@ int btrfs_defrag_file(struct inode *inode, struct file *file,
 		 * make sure we stop running if someone unmounts
 		 * the FS
 		 */
-		if (!(inode->i_sb->s_flags & MS_ACTIVE))
+		if (!(inode->i_sb->s_flags & SB_ACTIVE))
 			break;
 
 		if (btrfs_defrag_cancelled(fs_info)) {
@@ -4435,7 +4435,7 @@ static long btrfs_ioctl_dev_replace(struct btrfs_fs_info *fs_info,
 
 	switch (p->cmd) {
 	case BTRFS_IOCTL_DEV_REPLACE_CMD_START:
-		if (fs_info->sb->s_flags & MS_RDONLY) {
+		if (fs_info->sb->s_flags & SB_RDONLY) {
 			ret = -EROFS;
 			goto out;
 		}

@@ -311,14 +311,14 @@ static void get_dpms_capabilities(unsigned char flags,
 				  struct fb_monspecs *specs)
 {
 	specs->dpms = 0;
-	if (flags & DPMS_ACTIVE_OFF)
-		specs->dpms |= FB_DPMS_ACTIVE_OFF;
+	if (flags & DPSB_ACTIVE_OFF)
+		specs->dpms |= FB_DPSB_ACTIVE_OFF;
 	if (flags & DPMS_SUSPEND)
 		specs->dpms |= FB_DPMS_SUSPEND;
 	if (flags & DPMS_STANDBY)
 		specs->dpms |= FB_DPMS_STANDBY;
 	DPRINTK("      DPMS: Active %s, Suspend %s, Standby %s\n",
-	       (flags & DPMS_ACTIVE_OFF) ? "yes" : "no",
+	       (flags & DPSB_ACTIVE_OFF) ? "yes" : "no",
 	       (flags & DPMS_SUSPEND)    ? "yes" : "no",
 	       (flags & DPMS_STANDBY)    ? "yes" : "no");
 }

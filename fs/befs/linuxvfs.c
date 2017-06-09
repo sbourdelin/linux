@@ -820,10 +820,10 @@ befs_fill_super(struct super_block *sb, void *data, int silent)
 
 	befs_debug(sb, "---> %s", __func__);
 
-	if (!(sb->s_flags & MS_RDONLY)) {
+	if (!(sb->s_flags & SB_RDONLY)) {
 		befs_warning(sb,
 			     "No write support. Marking filesystem read-only");
-		sb->s_flags |= MS_RDONLY;
+		sb->s_flags |= SB_RDONLY;
 	}
 
 	/*
@@ -930,7 +930,7 @@ static int
 befs_remount(struct super_block *sb, int *flags, char *data)
 {
 	sync_filesystem(sb);
-	if (!(*flags & MS_RDONLY))
+	if (!(*flags & SB_RDONLY))
 		return -EINVAL;
 	return 0;
 }

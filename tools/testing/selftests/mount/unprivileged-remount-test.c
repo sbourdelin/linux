@@ -129,7 +129,7 @@ static int read_mnt_flags(const char *path)
 	}
 	mnt_flags = 0;
 	if (stat.f_flag & ST_RDONLY)
-		mnt_flags |= MS_RDONLY;
+		mnt_flags |= SB_RDONLY;
 	if (stat.f_flag & ST_NOSUID)
 		mnt_flags |= MS_NOSUID;
 	if (stat.f_flag & ST_NODEV)
@@ -143,7 +143,7 @@ static int read_mnt_flags(const char *path)
 	if (stat.f_flag & ST_RELATIME)
 		mnt_flags |= MS_RELATIME;
 	if (stat.f_flag & ST_SYNCHRONOUS)
-		mnt_flags |= MS_SYNCHRONOUS;
+		mnt_flags |= SB_SYNCHRONOUS;
 	if (stat.f_flag & ST_MANDLOCK)
 		mnt_flags |= ST_MANDLOCK;
 
@@ -317,8 +317,8 @@ static bool test_priv_mount_unpriv_remount(void)
 
 int main(int argc, char **argv)
 {
-	if (!test_unpriv_remount_simple(MS_RDONLY)) {
-		die("MS_RDONLY malfunctions\n");
+	if (!test_unpriv_remount_simple(SB_RDONLY)) {
+		die("SB_RDONLY malfunctions\n");
 	}
 	if (!test_unpriv_remount("devpts", "newinstance", MS_NODEV, MS_NODEV, 0)) {
 		die("MS_NODEV malfunctions\n");

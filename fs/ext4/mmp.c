@@ -185,7 +185,7 @@ static int kmmpd(void *data)
 			goto exit_thread;
 		}
 
-		if (sb->s_flags & MS_RDONLY) {
+		if (sb->s_flags & SB_RDONLY) {
 			ext4_warning(sb, "kmmpd being stopped since filesystem "
 				     "has been remounted as readonly.");
 			goto exit_thread;

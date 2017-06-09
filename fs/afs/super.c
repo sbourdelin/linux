@@ -427,10 +427,10 @@ static struct dentry *afs_mount(struct file_system_type *fs_type,
 			goto error;
 		}
 		save_mount_options(sb, new_opts);
-		sb->s_flags |= MS_ACTIVE;
+		sb->s_flags |= SB_ACTIVE;
 	} else {
 		_debug("reuse");
-		ASSERTCMP(sb->s_flags, &, MS_ACTIVE);
+		ASSERTCMP(sb->s_flags, &, SB_ACTIVE);
 		afs_put_volume(vol);
 		kfree(as);
 	}

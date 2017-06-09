@@ -23,7 +23,7 @@ struct videomode;
 struct device_node;
 
 /* Definitions below are used in the parsed monitor specs */
-#define FB_DPMS_ACTIVE_OFF	1
+#define FB_DPSB_ACTIVE_OFF	1
 #define FB_DPMS_SUSPEND		2
 #define FB_DPMS_STANDBY		4
 
