@@ -101,9 +101,6 @@ static void sugov_update_commit(struct sugov_policy *sg_policy, u64 time,
 	if (sg_policy->next_freq == next_freq)
 		return;
 
-	if (sg_policy->next_freq > next_freq)
-		next_freq = (sg_policy->next_freq + next_freq) >> 1;
-
 	sg_policy->next_freq = next_freq;
 	sg_policy->last_freq_update_time = time;
 
@@ -150,6 +147,17 @@ static unsigned int get_next_freq(struct sugov_policy *sg_policy,
 				policy->cpuinfo.max_freq : policy->cur;
 
 	freq = (freq + (freq >> 2)) * util / max;
+
+	/*
+	 * Reduce frequency gradually to avoid undesirable performance drops.
+	 * Before that we need to make sure that freq >= policy->min, else we
+	 * may still end up reducing frequency rapidly.
+	 */
+	if (freq < policy->min)
+		freq = policy->min;
+
+	if (sg_policy->next_freq > freq)
+		freq = (sg_policy->next_freq + freq) >> 1;
 
 	if (freq == sg_policy->cached_raw_freq && sg_policy->next_freq != UINT_MAX)
 		return sg_policy->next_freq;
