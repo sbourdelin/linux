@@ -985,6 +985,14 @@
 		reg = <0x15a8>;
 	};
 
+	des_fck: des_fck@15b0 {
+		#clock-cells = <0>;
+		compatible = "ti,gate-clock";
+		clocks = <&l3_div_ck>;
+		ti,bit-shift = <1>;
+		reg = <0x15b0>;
+	};
+
 	dss_sys_clk: dss_sys_clk@1120 {
 		#clock-cells = <0>;
 		compatible = "ti,gate-clock";
