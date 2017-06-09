@@ -332,10 +332,13 @@ static int flow_cache_percpu_empty(struct flow_cache *fc, int cpu)
 	struct flow_cache_percpu *fcp;
 	unsigned int i;
 
-	fcp = per_cpu_ptr(fc->percpu, cpu);
-	for (i = 0; i < flow_cache_hash_size(fc); i++)
-		if (!hlist_empty(&fcp->hash_table[i]))
-			return 0;
+	if (fc->percpu) {
+		fcp = per_cpu_ptr(fc->percpu, cpu);
+		for (i = 0; i < flow_cache_hash_size(fc); i++)
+			if (!hlist_empty(&fcp->hash_table[i]))
+				return 0;
+	}
+
 	return 1;
 }
 
