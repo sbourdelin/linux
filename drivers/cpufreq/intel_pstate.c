@@ -2216,6 +2216,19 @@ static int intel_cpufreq_target(struct cpufreq_policy *policy,
 	return 0;
 }
 
+unsigned int intel_cpufreq_resolve_freq(struct cpufreq_policy *policy,
+					unsigned int target_freq)
+{
+	struct cpudata *cpu = all_cpu_data[policy->cpu];
+	int target_pstate;
+
+	update_turbo_state();
+
+	target_pstate = DIV_ROUND_UP(target_freq, cpu->pstate.scaling);
+	target_pstate = intel_pstate_prepare_request(cpu, target_pstate);
+	return target_pstate * cpu->pstate.scaling;
+}
+
 static unsigned int intel_cpufreq_fast_switch(struct cpufreq_policy *policy,
 					      unsigned int target_freq)
 {
@@ -2249,6 +2262,7 @@ static struct cpufreq_driver intel_cpufreq = {
 	.flags		= CPUFREQ_CONST_LOOPS,
 	.verify		= intel_cpufreq_verify_policy,
 	.target		= intel_cpufreq_target,
+	.resolve_freq	= intel_cpufreq_resolve_freq,
 	.fast_switch	= intel_cpufreq_fast_switch,
 	.init		= intel_cpufreq_cpu_init,
 	.exit		= intel_pstate_cpu_exit,
