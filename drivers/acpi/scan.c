@@ -384,6 +384,20 @@ static int acpi_generic_hotplug_event(struct acpi_device *adev, u32 type)
 	return -EINVAL;
 }
 
+static int acpi_ost_status_code(u32 src, int error)
+{
+	switch (src) {
+	case ACPI_NOTIFY_EJECT_REQUEST:
+	case ACPI_OST_EC_OSPM_EJECT:
+		if (error == -EPERM)
+			return ACPI_OST_SC_EJECT_NOT_SUPPORTED;
+		else if (error == -EBUSY)
+			return ACPI_OST_SC_DEVICE_BUSY;
+		break;
+	}
+	return error ? ACPI_OST_SC_NON_SPECIFIC_FAILURE : ACPI_OST_SC_SUCCESS;
+}
+
 void acpi_device_hotplug(struct acpi_device *adev, u32 src)
 {
 	u32 ost_code = ACPI_OST_SC_NON_SPECIFIC_FAILURE;
@@ -404,10 +418,6 @@ void acpi_device_hotplug(struct acpi_device *adev, u32 src)
 		error = dock_notify(adev, src);
 	} else if (adev->flags.hotplug_notify) {
 		error = acpi_generic_hotplug_event(adev, src);
-		if (error == -EPERM) {
-			ost_code = ACPI_OST_SC_EJECT_NOT_SUPPORTED;
-			goto err_out;
-		}
 	} else {
 		int (*notify)(struct acpi_device *, u32);
 
@@ -423,9 +433,8 @@ void acpi_device_hotplug(struct acpi_device *adev, u32 src)
 		else
 			goto out;
 	}
-	if (!error)
-		ost_code = ACPI_OST_SC_SUCCESS;
 
+	ost_code = acpi_ost_status_code(src, error);
  err_out:
 	acpi_evaluate_ost(adev->handle, src, ost_code, NULL);
 
