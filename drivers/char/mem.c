@@ -408,6 +408,10 @@ static ssize_t read_kmem(struct file *file, char __user *buf,
 	char *kbuf; /* k-addr because vread() takes vmlist_lock rwlock */
 	int err = 0;
 
+	/* the code below assumes VMALLOC_START > PAGE_OFFSET */
+	if (WARN_ON_ONCE(VMALLOC_START < PAGE_OFFSET))
+		return -ENXIO;
+
 	read = 0;
 	if (p < (unsigned long) high_memory) {
 		low_count = count;
@@ -483,6 +487,10 @@ static ssize_t do_write_kmem(unsigned long p, const char __user *buf,
 {
 	ssize_t written, sz;
 	unsigned long copied;
+
+	/* the code below assumes VMALLOC_START > PAGE_OFFSET */
+	if (WARN_ON_ONCE(VMALLOC_START < PAGE_OFFSET))
+		return -ENXIO;
 
 	written = 0;
 #ifdef __ARCH_HAS_NO_PAGE_ZERO_MAPPED
