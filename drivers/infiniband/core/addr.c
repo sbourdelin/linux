@@ -454,10 +454,10 @@ static int addr6_resolve(struct sockaddr_in6 *src_in,
 					 &fl6.daddr, 0, &fl6.saddr);
 		if (ret)
 			goto put;
-
-		src_in->sin6_family = AF_INET6;
-		src_in->sin6_addr = fl6.saddr;
 	}
+
+	src_in->sin6_family = AF_INET6;
+	src_in->sin6_addr = fl6.saddr;
 
 	/* If there's a gateway and type of device not ARPHRD_INFINIBAND, we're
 	 * definitely in RoCE v2 (as RoCE v1 isn't routable) set the network
