@@ -953,6 +953,46 @@ static struct omap_hwmod omap44xx_emif2_hwmod = {
 };
 
 /*
+    Crypto modules AES0/1 belong to:
+	PD_L4_PER power domain
+	CD_L4_SEC clock domain
+	On the L3, the AES modules are mapped to
+	L3_CLK2: Peripherals and multimedia sub clock domain
+*/
+static struct omap_hwmod_class_sysconfig omap44xx_aes1_sysc = {
+	.rev_offs	= 0x80,
+	.sysc_offs	= 0x84,
+	.syss_offs	= 0x88,
+	.sysc_flags	= SYSS_HAS_RESET_STATUS,
+};
+
+static struct omap_hwmod_class omap44xx_aes1_hwmod_class = {
+	.name		= "aes1",
+	.sysc		= &omap44xx_aes1_sysc,
+};
+
+static struct omap_hwmod omap44xx_aes1_hwmod = {
+	.name		= "aes",
+	.class		= &omap44xx_aes1_hwmod_class,
+	.clkdm_name	= "l4_secure_clkdm",
+	.main_clk	= "aes1_fck",
+	.prcm		= {
+		.omap4	= {
+			.context_offs	= OMAP4_RM_L4SEC_AES1_CONTEXT_OFFSET,
+			.clkctrl_offs	= OMAP4_CM_L4SEC_AES1_CLKCTRL_OFFSET,
+			.modulemode	= MODULEMODE_SWCTRL,
+		},
+	},
+};
+
+static struct omap_hwmod_ocp_if omap44xx_l3_main_2__aes1 = {
+	.master		= &omap44xx_l4_per_hwmod,
+	.slave		= &omap44xx_aes1_hwmod,
+	.clk		= "l4_div_ck",
+	.user		= OCP_USER_MPU | OCP_USER_SDMA,
+};
+
+/*
  * 'fdif' class
  * face detection hw accelerator module
  */
@@ -4793,6 +4833,7 @@ static struct omap_hwmod_ocp_if *omap44xx_hwmod_ocp_ifs[] __initdata = {
 	&omap44xx_l4_abe__wd_timer3_dma,
 	&omap44xx_mpu__emif1,
 	&omap44xx_mpu__emif2,
+	&omap44xx_l3_main_2__aes1,
 	NULL,
 };
 
