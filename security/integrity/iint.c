@@ -202,6 +202,9 @@ int integrity_kernel_read(struct file *file, loff_t offset,
 
 	if (file->f_op->integrity_read) {
 		ret = file->f_op->integrity_read(&kiocb, &iter);
+	} else if (file->f_op->read_iter &&
+		   file->f_op->read_iter == generic_file_read_iter) {
+		ret = file->f_op->read_iter(&kiocb, &iter);
 	} else if (file->f_op->read) {
 		mm_segment_t old_fs;
 		char __user *buf = (char __user *)addr;
