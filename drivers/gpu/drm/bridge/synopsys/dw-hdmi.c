@@ -1097,7 +1097,7 @@ static int dw_hdmi_phy_power_on(struct dw_hdmi *hdmi)
  * information the DWC MHL PHY has the same register layout and is thus also
  * supported by this function.
  */
-static int hdmi_phy_configure_dwc_hdmi_3d_tx(struct dw_hdmi *hdmi,
+int hdmi_phy_configure_dwc_hdmi_3d_tx(struct dw_hdmi *hdmi,
 		const struct dw_hdmi_plat_data *pdata,
 		unsigned long mpixelclock)
 {
@@ -1146,6 +1146,7 @@ static int hdmi_phy_configure_dwc_hdmi_3d_tx(struct dw_hdmi *hdmi,
 
 	return 0;
 }
+EXPORT_SYMBOL_GPL(hdmi_phy_configure_dwc_hdmi_3d_tx);
 
 static int hdmi_phy_configure(struct dw_hdmi *hdmi)
 {
