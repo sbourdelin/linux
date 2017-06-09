@@ -3488,62 +3488,48 @@ static void btrfs_end_empty_barrier(struct bio *bio)
 }
 
 /*
- * trigger flushes for one the devices.  If you pass wait == 0, the flushes are
- * sent down.  With wait == 1, it waits for the previous flush.
- *
- * any device where the flush fails with eopnotsupp are flagged as not-barrier
- * capable
+ * trigger flushes for one the devices.
  */
-static int write_dev_flush(struct btrfs_device *device, int wait)
+static void write_dev_flush(struct btrfs_device *device)
 {
 	struct request_queue *q = bdev_get_queue(device->bdev);
 	struct bio *bio;
-	int ret = 0;
 
 	if (!test_bit(QUEUE_FLAG_WC, &q->queue_flags))
-		return 0;
+		return;
 
-	if (wait) {
-		bio = device->flush_bio;
-		if (!bio)
-			/*
-			 * This means the alloc has failed with ENOMEM, however
-			 * here we return 0, as its not a device error.
-			 */
-			return 0;
-
-		wait_for_completion(&device->flush_wait);
-
-		if (bio->bi_error) {
-			ret = bio->bi_error;
-			btrfs_dev_stat_inc_and_print(device,
-				BTRFS_DEV_STAT_FLUSH_ERRS);
-		}
-
-		/* drop the reference from the wait == 0 run */
-		bio_put(bio);
-		device->flush_bio = NULL;
-
-		return ret;
-	}
-
-	/*
-	 * one reference for us, and we leave it for the
-	 * caller
-	 */
-	device->flush_bio = NULL;
 	bio = btrfs_io_bio_alloc(GFP_NOFS, 0);
 	bio->bi_end_io = btrfs_end_empty_barrier;
 	bio->bi_bdev = device->bdev;
 	bio->bi_opf = REQ_OP_WRITE | REQ_SYNC | REQ_PREFLUSH;
 	init_completion(&device->flush_wait);
 	bio->bi_private = &device->flush_wait;
+
 	device->flush_bio = bio;
 
 	bio_get(bio);
 	btrfsic_submit_bio(bio);
+}
 
-	return 0;
+static int wait_dev_flush(struct btrfs_device *device)
+{
+	int ret;
+	struct bio *bio = device->flush_bio;
+
+	if (!bio)
+		return 0;
+
+	wait_for_completion(&device->flush_wait);
+
+	ret = bio->bi_error;
+	if (ret)
+		btrfs_dev_stat_inc_and_print(device,
+				BTRFS_DEV_STAT_FLUSH_ERRS);
+
+	bio_put(bio);
+	device->flush_bio = NULL;
+
+	return ret;
 }
 
 static int check_barrier_error(struct btrfs_fs_devices *fsdevs)
@@ -3559,9 +3545,7 @@ static int check_barrier_error(struct btrfs_fs_devices *fsdevs)
 			dev_flush_error++;
 			continue;
 		}
-		if (dev->last_flush_error == -ENOMEM)
-			submit_flush_error++;
-		if (dev->last_flush_error && dev->last_flush_error != -ENOMEM)
+		if (dev->last_flush_error)
 			dev_flush_error++;
 	}
 
@@ -3596,10 +3580,8 @@ static int barrier_all_devices(struct btrfs_fs_info *info)
 		if (!dev->in_fs_metadata || !dev->writeable)
 			continue;
 
-		ret = write_dev_flush(dev, 0);
-		if (ret)
-			errors_send++;
-		dev->last_flush_error = ret;
+		write_dev_flush(dev);
+		dev->last_flush_error = 0;
 	}
 
 	/* wait for all the barriers */
@@ -3613,23 +3595,13 @@ static int barrier_all_devices(struct btrfs_fs_info *info)
 		if (!dev->in_fs_metadata || !dev->writeable)
 			continue;
 
-		ret = write_dev_flush(dev, 1);
+		ret = wait_dev_flush(dev);
 		if (ret) {
 			dev->last_flush_error = ret;
 			errors_wait++;
 		}
 	}
 
-	/*
-	 * Try hard in case of flush. Lets say, in RAID1 we have
-	 * the following situation
-	 *  dev1: EIO dev2: ENOMEM
-	 * this is not a fatal error as we hope to recover from
-	 * ENOMEM in the next attempt to flush.
-	 * But the following is considered as fatal
-	 *  dev1: ENOMEM dev2: ENOMEM
-	 *  dev1: bdev == NULL dev2: ENOMEM
-	 */
 	if (errors_send || errors_wait) {
 		/*
 		 * At some point we need the status of all disks
