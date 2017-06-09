@@ -181,6 +181,26 @@ gpio-controller@00000000 {
 		"poweroff", "reset";
 }
 
+Optionally, a GPIO controller may have a "gpio-lines-initial-states" property.
+This is an array of values that specifies the initial state of each line. When
+a value is set to one, the corresponding line will be initialized to the input
+(pulled-up) state. When the values is set to two, the line will be initialized
+the low-level output state. If values is set to zero the line will be
+initialized to the input state.
+If the property is not specified no specific configuration will be set. Driver
+should reuse HW configuration provided by bootloader or other system.
+
+Example:
+
+gpio-controller@00000000 {
+	compatible = "foo";
+	reg = <0x00000000 0x1000>;
+	gpio-controller;
+	#gpio-cells = <2>;
+	ngpios = <9>;
+	gpio-lines-initial-states = <0>, <1>, <2>, <0>, <0>, <2>, <2>, <1>, <1>;
+}
+
 The GPIO chip may contain GPIO hog definitions. GPIO hogging is a mechanism
 providing automatic GPIO request and configuration as part of the
 gpio-controller's driver probe function.
