@@ -35,20 +35,41 @@ static inline struct drm_i915_private *node_to_i915(struct drm_info_node *node)
 	return to_i915(node->minor->dev);
 }
 
+static inline const char *param_diagnostic(bool is_default, bool is_unsafe)
+{
+	if (is_default)
+		return "";
+	if (is_unsafe)
+		return " [modified *unsafe*]";
+	return " [modified]";
+}
+
 static __always_inline void seq_print_param(struct seq_file *m,
 					    const char *name,
 					    const char *type,
-					    const void *x)
+					    const void *x,
+					    const void *v,
+					    bool is_unsafe)
 {
-	if (!__builtin_strcmp(type, "bool"))
-		seq_printf(m, "i915.%s=%s\n", name, yesno(*(const bool *)x));
-	else if (!__builtin_strcmp(type, "int"))
-		seq_printf(m, "i915.%s=%d\n", name, *(const int *)x);
-	else if (!__builtin_strcmp(type, "uint"))
-		seq_printf(m, "i915.%s=%u\n", name, *(const unsigned int *)x);
-	else if (!__builtin_strcmp(type, "charp"))
-		seq_printf(m, "i915.%s=%s\n", name, *(const char **)x);
-	else
+	if (!__builtin_strcmp(type, "bool")) {
+		bool is_default = *(const bool *)x == *(const bool *)v;
+		seq_printf(m, "i915.%s=%s%s\n", name, yesno(*(const bool *)x),
+			   param_diagnostic(is_default, is_unsafe));
+	} else if (!__builtin_strcmp(type, "int")) {
+		bool is_default = *(const int *)x == *(const int *)v;
+		seq_printf(m, "i915.%s=%d%s\n", name, *(const int *)x,
+			   param_diagnostic(is_default, is_unsafe));
+	} else if (!__builtin_strcmp(type, "uint")) {
+		bool is_default = *(const uint *)x == *(const uint *)v;
+		seq_printf(m, "i915.%s=%u%s\n", name, *(const unsigned int *)x,
+			   param_diagnostic(is_default, is_unsafe));
+	} else if (!__builtin_strcmp(type, "charp")) {
+		const char *new = *(const char **)x;
+		const char *old = *(const char **)v;
+		bool is_default = old && new ? !strcmp(old, new) : old == new;
+		seq_printf(m, "i915.%s=%s%s\n", name, *(const char **)x,
+			   param_diagnostic(is_default, is_unsafe));
+	} else
 		BUILD_BUG();
 }
 
@@ -66,9 +87,16 @@ static int i915_capabilities(struct seq_file *m, void *data)
 #undef PRINT_FLAG
 
 	kernel_param_lock(THIS_MODULE);
-#define PRINT_PARAM(T, X, V, M, S, B, D) seq_print_param(m, #X, #T, &i915.X);
+#define FLAG false
+#define FLAG_unsafe true
+#define PRINT_PARAM(T, X, V, M, S, B, D) do { \
+		typeof(i915.X) __v = V; \
+		seq_print_param(m, #X, #T, &i915.X, &__v, FLAG##S); \
+	} while(0);
 	I915_PARAMS_FOR_EACH(PRINT_PARAM);
 #undef PRINT_PARAM
+#undef FLAG
+#undef FLAG_unsafe
 	kernel_param_unlock(THIS_MODULE);
 
 	return 0;
