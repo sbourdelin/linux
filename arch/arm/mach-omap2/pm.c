@@ -240,6 +240,9 @@ omap_postcore_initcall(omap2_common_pm_init);
 
 int __init omap2_common_pm_late_init(void)
 {
+	if (!twl_rev())
+		return -ENODEV;
+
 	/* Init the voltage layer */
 	omap3_twl_init();
 	omap4_twl_init();
