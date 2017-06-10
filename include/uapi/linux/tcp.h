@@ -233,6 +233,12 @@ enum {
 
 /* for TCP_MD5SIG socket option */
 #define TCP_MD5SIG_MAXKEYLEN	80
+/* original struct stopped at tcpm_key and must still be considered valid */
+#define TCP_MD5SIG_LEGACY_LEN	(offsetof(struct tcp_md5sig, tcpm_key) + \
+				 TCP_MD5SIG_MAXKEYLEN)
+
+/* tcp_md5sig flags */
+#define TCP_MD5SIG_FLAG_PREFIX		1	/* address prefix length */
 
 struct tcp_md5sig {
 	struct __kernel_sockaddr_storage tcpm_addr;	/* address associated */
@@ -240,6 +246,8 @@ struct tcp_md5sig {
 	__u16	tcpm_keylen;				/* key length */
 	__u32	__tcpm_pad2;				/* zero */
 	__u8	tcpm_key[TCP_MD5SIG_MAXKEYLEN];		/* key (binary) */
+	__u8    tcpm_flags;				/* flags */
+	__u8    tcpm_prefixlen;				/* address prefix */
 };
 
 #endif /* _UAPI_LINUX_TCP_H */
