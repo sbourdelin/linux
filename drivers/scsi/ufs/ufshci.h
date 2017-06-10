@@ -151,6 +151,9 @@ enum {
 				CONTROLLER_FATAL_ERROR |\
 				SYSTEM_BUS_FATAL_ERROR)
 
+/* AHIT - Auto-Hibernate Idle Timer */
+#define UFS_AHIT_AH8ITV_MASK			0x3FF
+
 /* HCS - Host Controller Status 30h */
 #define DEVICE_PRESENT				UFS_BIT(0)
 #define UTP_TRANSFER_REQ_LIST_READY		UFS_BIT(1)
