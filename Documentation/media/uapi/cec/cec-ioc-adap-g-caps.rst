@@ -56,7 +56,7 @@ returns the information to the application. The ioctl never fails.
 	:ref:`cec-capabilities`.
     * - __u32
       - ``version``
-      - CEC Framework API version, formatted with the ``KERNEL_VERSION()``
+      - CEC Framework API version, formatted with the ``MEDIA_REVISION()``
 	macro.
 
 

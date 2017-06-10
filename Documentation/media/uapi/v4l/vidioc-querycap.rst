@@ -90,13 +90,13 @@ specification the ioctl returns an ``EINVAL`` error code.
 	example, a stable or distribution-modified kernel uses the V4L2
 	stack from a newer kernel.
 
-	The version number is formatted using the ``KERNEL_VERSION()``
+	The version number is formatted using the ``MEDIA_REVISION()``
 	macro:
     * - :cspan:`2`
 
-	``#define KERNEL_VERSION(a,b,c) (((a) << 16) + ((b) << 8) + (c))``
+	``#define MEDIA_REVISION(a,b,c) (((a) << 16) + ((b) << 8) + (c))``
 
-	``__u32 version = KERNEL_VERSION(0, 8, 1);``
+	``__u32 version = MEDIA_REVISION(0, 8, 1);``
 
 	``printf ("Version: %u.%u.%u\\n",``
 

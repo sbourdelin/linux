@@ -96,7 +96,7 @@ ioctl never fails.
 
        -  ``media_version``
 
-       -  Media API version, formatted with the ``KERNEL_VERSION()`` macro.
+       -  Media API version, formatted with the ``MEDIA_REVISION()`` macro.
 
     -  .. row 6
 
@@ -113,7 +113,7 @@ ioctl never fails.
        -  ``driver_version``
 
        -  Media device driver version, formatted with the
-	  ``KERNEL_VERSION()`` macro. Together with the ``driver`` field
+	  ``MEDIA_REVISION()`` macro. Together with the ``driver`` field
 	  this identifies a particular driver.
 
     -  .. row 8
