@@ -95,11 +95,6 @@ static void *__dma_alloc_coherent(struct device *dev, size_t size,
 				  dma_addr_t *dma_handle, gfp_t flags,
 				  unsigned long attrs)
 {
-	if (dev == NULL) {
-		WARN_ONCE(1, "Use an actual device structure for DMA allocation\n");
-		return NULL;
-	}
-
 	if (IS_ENABLED(CONFIG_ZONE_DMA) &&
 	    dev->coherent_dma_mask <= DMA_BIT_MASK(32))
 		flags |= GFP_DMA;
@@ -128,10 +123,6 @@ static void __dma_free_coherent(struct device *dev, size_t size,
 	bool freed;
 	phys_addr_t paddr = dma_to_phys(dev, dma_handle);
 
-	if (dev == NULL) {
-		WARN_ONCE(1, "Use an actual device structure for DMA allocation\n");
-		return;
-	}
 
 	freed = dma_release_from_contiguous(dev,
 					phys_to_page(paddr),
@@ -148,6 +139,11 @@ static void *__dma_alloc(struct device *dev, size_t size,
 	void *ptr, *coherent_ptr;
 	bool coherent = is_device_dma_coherent(dev);
 	pgprot_t prot = __get_dma_pgprot(attrs, PAGE_KERNEL, false);
+
+	if (!dev) {
+		WARN_ONCE(1, "Use an actual device structure for DMA allocation\n");
+		return NULL;
+	}
 
 	size = PAGE_ALIGN(size);
 
@@ -192,8 +188,13 @@ static void __dma_free(struct device *dev, size_t size,
 		       void *vaddr, dma_addr_t dma_handle,
 		       unsigned long attrs)
 {
-	void *swiotlb_addr = phys_to_virt(dma_to_phys(dev, dma_handle));
+	void *swiotlb_addr;
 
+	if (!dev) {
+		WARN_ONCE(1, "Use an actual device structure for DMA free\n");
+		return;
+	}
+	swiotlb_addr = phys_to_virt(dma_to_phys(dev, dma_handle));
 	size = PAGE_ALIGN(size);
 
 	if (!is_device_dma_coherent(dev)) {
