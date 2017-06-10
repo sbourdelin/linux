@@ -113,6 +113,7 @@
 #include <linux/interrupt.h>
 #include <linux/slab.h>
 #include <linux/uaccess.h>
+#include <linux/media.h>
 
 #ifdef CONFIG_PPC_PMAC
 #include <asm/machdep.h>
@@ -1091,7 +1092,7 @@ static int matroxfb_ioctl(struct fb_info *info,
 				strcpy(r.driver, "matroxfb");
 				strcpy(r.card, "Matrox");
 				sprintf(r.bus_info, "PCI:%s", pci_name(minfo->pcidev));
-				r.version = KERNEL_VERSION(1,0,0);
+				r.version = MEDIA_REVISION(1, 0, 0);
 				r.capabilities = V4L2_CAP_VIDEO_OUTPUT;
 				if (copy_to_user(argp, &r, sizeof(r)))
 					return -EFAULT;
