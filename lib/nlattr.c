@@ -27,6 +27,21 @@ static const u8 nla_attr_minlen[NLA_TYPE_MAX+1] = {
 	[NLA_S64]	= sizeof(s64),
 };
 
+static int validate_nla_bit_flags(const struct nlattr *nla, void *valid_data)
+{
+	const struct nla_bit_flags *nbf = nla_data(nla);
+	u32 *valid_flags_mask = valid_data;
+
+	if (!valid_data)
+		return -EINVAL;
+
+
+	if (nbf->nla_flag_values & ~*valid_flags_mask)
+		return -EINVAL;
+
+	return 0;
+}
+
 static int validate_nla(const struct nlattr *nla, int maxtype,
 			const struct nla_policy *policy)
 {
@@ -44,6 +59,13 @@ static int validate_nla(const struct nlattr *nla, int maxtype,
 	case NLA_FLAG:
 		if (attrlen > 0)
 			return -ERANGE;
+		break;
+
+	case NLA_FLAG_BITS:
+		if (attrlen != 8) /* 2 x 32 bits */
+			return -ERANGE;
+
+		return validate_nla_bit_flags(nla, pt->validation_data);
 		break;
 
 	case NLA_NUL_STRING:
@@ -102,6 +124,9 @@ static int validate_nla(const struct nlattr *nla, int maxtype,
 		if (attrlen < minlen)
 			return -ERANGE;
 	}
+
+	if (pt->validate_content)
+		return pt->validate_content(nla, pt->validation_data);
 
 	return 0;
 }

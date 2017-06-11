@@ -6,6 +6,11 @@
 #include <linux/jiffies.h>
 #include <linux/in6.h>
 
+struct nla_bit_flags {
+	u32 nla_flag_values;
+	u32 nla_flag_selector;
+};
+
 /* ========================================================================
  *         Netlink Messages and Attributes Interface (As Seen On TV)
  * ------------------------------------------------------------------------
@@ -178,6 +183,7 @@ enum {
 	NLA_S16,
 	NLA_S32,
 	NLA_S64,
+	NLA_FLAG_BITS,
 	__NLA_TYPE_MAX,
 };
 
@@ -206,6 +212,7 @@ enum {
  *    NLA_MSECS            Leaving the length field zero will verify the
  *                         given type fits, using it verifies minimum length
  *                         just like "All other"
+ *    NLA_FLAG_BITS        A bitmap/bitselector attribute
  *    All other            Minimum length of attribute payload
  *
  * Example:
@@ -213,11 +220,15 @@ enum {
  * 	[ATTR_FOO] = { .type = NLA_U16 },
  *	[ATTR_BAR] = { .type = NLA_STRING, .len = BARSIZ },
  *	[ATTR_BAZ] = { .len = sizeof(struct mystruct) },
+ *	[ATTR_GOO] = { .type = NLA_FLAG_BITS, .validation_data = &myvalidflags },
  * };
  */
 struct nla_policy {
 	u16		type;
 	u16		len;
+	void            *validation_data;
+	int             (*validate_content)(const struct nlattr *nla,
+					    const void *validation_data);
 };
 
 /**
