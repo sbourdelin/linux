@@ -601,6 +601,7 @@ static unsigned int verify_patch_size(u8 family, u32 patch_size,
 		max_size = F15H_MPB_MAX_SIZE;
 		break;
 	case 0x16:
+	case 0x17:
 		max_size = F16H_MPB_MAX_SIZE;
 		break;
 	default:
