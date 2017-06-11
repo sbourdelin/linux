@@ -329,14 +329,20 @@ kvm_novcpu_exit:
  * We come in here when wakened from nap mode.
  * Relocation is off and most register values are lost.
  * r13 points to the PACA.
+ * r3 contains the SRR1 wakeup value, SRR1 is trashed.
  */
 	.globl	kvm_start_guest
 kvm_start_guest:
-
 	/* Set runlatch bit the minute you wake up from nap */
 	mfspr	r0, SPRN_CTRLF
 	ori 	r0, r0, 1
 	mtspr	SPRN_CTRLT, r0
+
+	/*
+	 * Could avoid this and pass it through in r3. For now,
+	 * code expects it to be in SRR1.
+	 */
+	mtspr	r3,SPRN_SRR1
 
 	ld	r2,PACATOC(r13)
 
