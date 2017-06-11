@@ -236,15 +236,26 @@ END_FTR_SECTION_NESTED(ftr,ftr,943)
 #define kvmppc_interrupt kvmppc_interrupt_pr
 #endif
 
+/*
+ * Branch to label using its 0xC000 address. This gives the same real address
+ * when relocation is off, but allows mtmsr to set MSR[IR|DR]=1.
+ * This could set the 0xc bits for !RELOCATABLE rather than load KBASE for
+ * a slight optimisation.
+ */
+#define BRANCH_TO_C000(reg, label)					\
+	__LOAD_HANDLER(reg, label);					\
+	mtctr	reg;							\
+	bctr
+
 #ifdef CONFIG_RELOCATABLE
 #define BRANCH_TO_COMMON(reg, label)					\
 	__LOAD_HANDLER(reg, label);					\
 	mtctr	reg;							\
 	bctr
 
-#define BRANCH_LINK_TO_FAR(label)					\
-	__LOAD_FAR_HANDLER(r12, label);					\
-	mtctr	r12;							\
+#define BRANCH_LINK_TO_FAR(reg, label)					\
+	__LOAD_FAR_HANDLER(reg, label);					\
+	mtctr	reg;							\
 	bctrl
 
 /*
