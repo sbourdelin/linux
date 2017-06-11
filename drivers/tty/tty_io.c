@@ -106,6 +106,8 @@
 #include <linux/kmod.h>
 #include <linux/nsproxy.h>
 
+#include <linux/seq_file.h>
+
 #undef TTY_DEBUG_HANGUP
 #ifdef TTY_DEBUG_HANGUP
 # define tty_debug_hangup(tty, f, args...)	tty_debug(tty, f, ##args)
@@ -412,6 +414,16 @@ static int hung_up_tty_fasync(int fd, struct file *file, int on)
 	return -ENOTTY;
 }
 
+#ifdef CONFIG_PROC_FS
+static void tty_show_fdinfo(struct seq_file *m, struct file *file)
+{
+	struct tty_struct *tty = file_tty(file);
+
+	if (tty && tty->ops && tty->ops->show_fdinfo)
+		tty->ops->show_fdinfo(tty, m);
+}
+#endif
+
 static const struct file_operations tty_fops = {
 	.llseek		= no_llseek,
 	.read		= tty_read,
@@ -422,6 +434,9 @@ static const struct file_operations tty_fops = {
 	.open		= tty_open,
 	.release	= tty_release,
 	.fasync		= tty_fasync,
+#ifdef CONFIG_PROC_FS
+	.show_fdinfo	= tty_show_fdinfo,
+#endif
 };
 
 static const struct file_operations console_fops = {
