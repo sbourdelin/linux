@@ -1982,6 +1982,7 @@ static int dwc3_gadget_init_endpoints(struct dwc3 *dwc, u8 num)
 
 	for (epnum = 0; epnum < num; epnum++) {
 		bool			direction = epnum & 1;
+		u8			inout = epnum >> 1;
 
 		dep = kzalloc(sizeof(*dep), GFP_KERNEL);
 		if (!dep)
@@ -1993,7 +1994,7 @@ static int dwc3_gadget_init_endpoints(struct dwc3 *dwc, u8 num)
 		dep->regs = dwc->regs + DWC3_DEP_BASE(epnum);
 		dwc->eps[epnum] = dep;
 
-		snprintf(dep->name, sizeof(dep->name), "ep%d%s", epnum >> 1,
+		snprintf(dep->name, sizeof(dep->name), "ep%u%s", inout,
 				direction ? "in" : "out");
 
 		dep->endpoint.name = dep->name;
@@ -2005,11 +2006,11 @@ static int dwc3_gadget_init_endpoints(struct dwc3 *dwc, u8 num)
 
 		spin_lock_init(&dep->lock);
 
-		if (epnum == 0 || epnum == 1) {
+		if (inout == 0) {
 			usb_ep_set_maxpacket_limit(&dep->endpoint, 512);
 			dep->endpoint.maxburst = 1;
 			dep->endpoint.ops = &dwc3_gadget_ep0_ops;
-			if (!epnum)
+			if (!direction)
 				dwc->gadget.ep0 = &dep->endpoint;
 		} else if (direction) {
 			int mdwidth;
@@ -2021,7 +2022,7 @@ static int dwc3_gadget_init_endpoints(struct dwc3 *dwc, u8 num)
 			/* MDWIDTH is represented in bits, we need it in bytes */
 			mdwidth /= 8;
 
-			size = dwc3_readl(dwc->regs, DWC3_GTXFIFOSIZ(epnum >> 1));
+			size = dwc3_readl(dwc->regs, DWC3_GTXFIFOSIZ(inout));
 			size = DWC3_GTXFIFOSIZ_TXFDEF(size);
 
 			/* FIFO Depth is in MDWDITH bytes. Multiply */
@@ -2063,7 +2064,7 @@ static int dwc3_gadget_init_endpoints(struct dwc3 *dwc, u8 num)
 				return ret;
 		}
 
-		if (epnum == 0 || epnum == 1) {
+		if (inout == 0) {
 			dep->endpoint.caps.type_control = true;
 		} else {
 			dep->endpoint.caps.type_iso = true;
