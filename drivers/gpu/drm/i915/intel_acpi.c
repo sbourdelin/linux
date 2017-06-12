@@ -10,6 +10,8 @@
 
 #define INTEL_DSM_REVISION_ID 1 /* For Calpella anyway... */
 #define INTEL_DSM_FN_PLATFORM_MUX_INFO 1 /* No args */
+#define INTEL_DSM_SET_HPD_WAKEUP 17
+#define HPD_WAKEUP_EN_VAL 0xFCF0
 
 static struct intel_dsm_priv {
 	acpi_handle dhandle;
@@ -118,6 +120,30 @@ static void intel_dsm_platform_mux_info(void)
 	ACPI_FREE(pkg);
 }
 
+static void intel_dsm_set_hpd_wakeup(const u8 *guid)
+{
+	union acpi_object *obj;
+	union acpi_object argv = {
+		.integer.type = ACPI_TYPE_INTEGER,
+		.integer.value = HPD_WAKEUP_EN_VAL,
+	};
+	union acpi_object argv4;
+
+	argv4.type = ACPI_TYPE_PACKAGE;
+	argv4.package.count = 1;
+	argv4.package.elements = &argv;
+
+	obj = acpi_evaluate_dsm(intel_dsm_priv.dhandle, guid,
+			INTEL_DSM_REVISION_ID, INTEL_DSM_SET_HPD_WAKEUP,
+			&argv4);
+
+	if (!obj)
+		DRM_DEBUG_DRIVER("failed to evaluate _DSM\n");
+
+	ACPI_FREE(obj);
+}
+
+
 static bool intel_dsm_pci_probe(struct pci_dev *pdev)
 {
 	acpi_handle dhandle;
@@ -131,11 +157,12 @@ static bool intel_dsm_pci_probe(struct pci_dev *pdev)
 	intel_dsm_priv.dhandle = dhandle;
 
 	if (IS_BROXTON(dev_priv)) {
-		union acpi_object *obj;
-
-		obj = acpi_evaluate_dsm(dhandle, intel_dsm_guid_bxt,
-					INTEL_DSM_REVISION_ID, 0, NULL);
-		if (!obj)
+		if (dev_priv->vbt.hpd_wakeup_enabled &&
+		    acpi_check_dsm(dhandle, intel_dsm_guid_bxt,
+				   INTEL_DSM_REVISION_ID,
+				   1 << INTEL_DSM_SET_HPD_WAKEUP))
+			intel_dsm_set_hpd_wakeup(intel_dsm_guid_bxt);
+		else
 			return false;
 	} else {
 		if (acpi_check_dsm(dhandle, intel_dsm_guid,
