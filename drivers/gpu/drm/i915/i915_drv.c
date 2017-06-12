@@ -2451,6 +2451,9 @@ static int intel_runtime_suspend(struct device *kdev)
 	if (!IS_VALLEYVIEW(dev_priv) && !IS_CHERRYVIEW(dev_priv))
 		intel_hpd_poll_init(dev_priv);
 
+	if (dev_priv->vbt.hpd_wakeup_enabled)
+		pci_save_state(pdev);
+
 	DRM_DEBUG_KMS("Device suspended\n");
 	return 0;
 }
@@ -2466,6 +2469,8 @@ static int intel_runtime_resume(struct device *kdev)
 		return -ENODEV;
 
 	DRM_DEBUG_KMS("Resuming device\n");
+
+	pci_restore_state(pdev);
 
 	WARN_ON_ONCE(atomic_read(&dev_priv->pm.wakeref_count));
 	disable_rpm_wakeref_asserts(dev_priv);
