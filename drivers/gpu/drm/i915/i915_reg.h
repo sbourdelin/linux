@@ -6637,6 +6637,14 @@ enum {
 #define GEN8_PCU_IIR _MMIO(0x444e8)
 #define GEN8_PCU_IER _MMIO(0x444ec)
 
+/* BXT PCU DC9 hotplug control */
+#define BXT_PCU_DC9_HP_DDIA		(1<<31)
+#define BXT_PCU_DC9_HP_DDIB		(1<<30)
+#define BXT_PCU_DC9_HP_DDIC		(1<<29)
+#define BXT_PCU_DC9_HOTPLUG_MASK	(BXT_PCU_DC9_HP_DDIA | \
+					 BXT_PCU_DC9_HP_DDIB | \
+					 BXT_PCU_DC9_HP_DDIC)
+
 #define ILK_DISPLAY_CHICKEN2	_MMIO(0x42004)
 /* Required on all Ironlake and Sandybridge according to the B-Spec. */
 #define  ILK_ELPIN_409_SELECT	(1 << 25)

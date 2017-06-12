@@ -550,7 +550,8 @@ static void assert_can_enable_dc9(struct drm_i915_private *dev_priv)
 	WARN_ONCE(I915_READ(DC_STATE_EN) & DC_STATE_EN_UPTO_DC5,
 		  "DC5 still not disabled to enable DC9.\n");
 	WARN_ONCE(I915_READ(HSW_PWR_WELL_DRIVER), "Power well on.\n");
-	WARN_ONCE(intel_irqs_enabled(dev_priv),
+	if (!dev_priv->vbt.hpd_wakeup_enabled)
+		WARN_ONCE(intel_irqs_enabled(dev_priv),
 		  "Interrupts not disabled yet.\n");
 
 	 /*
