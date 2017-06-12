@@ -152,7 +152,7 @@
  * %SKL_TKN_U32_CAPS_SIZE:      Caps size
  *
  * %SKL_TKN_U32_PROC_DOMAIN:    Specify processing domain
- *
+
  * %SKL_TKN_U32_LIB_COUNT:      Specifies the number of libraries
  *
  * %SKL_TKN_STR_LIB_NAME:       Specifies the library name
@@ -160,6 +160,8 @@
  * %SKL_TKN_U32_PMODE:		Specifies the power mode for pipe
  *
  * %SKL_TKL_U32_D0I3_CAPS:	Specifies the D0i3 capability for module
+ *
+ * %SKL_TKN_U32_DMA_BUF_SIZE:	DMA buffer size in millisec
  *
  * module_id and loadable flags dont have tokens as these values will be
  * read from the DSP FW manifest
@@ -215,7 +217,8 @@ enum SKL_TKNS {
 	SKL_TKN_U32_PMODE,
 	SKL_TKL_U32_D0I3_CAPS, /* Typo added at v4.10 */
 	SKL_TKN_U32_D0I3_CAPS = SKL_TKL_U32_D0I3_CAPS,
-	SKL_TKN_MAX = SKL_TKN_U32_D0I3_CAPS,
+	SKL_TKN_U32_DMA_BUF_SIZE,
+	SKL_TKN_MAX = SKL_TKN_U32_DMA_BUF_SIZE,
 };
 
 #endif
