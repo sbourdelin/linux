@@ -17,6 +17,7 @@
 #include "include/sara_data.h"
 #include "include/securityfs.h"
 #include "include/usb_filtering.h"
+#include "include/wxprot.h"
 
 static const int sara_version = SARA_VERSION;
 
@@ -89,6 +90,11 @@ void __init sara_init(void)
 
 	if (sara_usb_filtering_init()) {
 		pr_crit("impossible to initialize usb filtering.\n");
+		goto error;
+	}
+
+	if (sara_wxprot_init()) {
+		pr_crit("impossible to initialize WX protections.\n");
 		goto error;
 	}
 
