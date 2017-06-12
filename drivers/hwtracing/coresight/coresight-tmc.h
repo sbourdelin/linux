@@ -98,6 +98,12 @@ enum tmc_mem_intf_width {
  * value.
  */
 #define TMC_CAP_ETR_SAVE_RESTORE	(1U << 1)
+/*
+ * TMC_CAP_ETR_SWFIFO2_MODE - ETR supports a new mode, SWFIFO2, which
+ * allows streaming the trace data with optionally raising an interrupt
+ * when the buffer fill level reaches a programmed watermark.
+ */
+#define TMC_CAP_ETR_SWFIFO2_MODE	(1U << 2)
 
 /**
  * struct tmc_cap - Describes the capabilities of the TMC.
@@ -108,6 +114,8 @@ struct tmc_caps {
 };
 
 #define CORESIGHT_SOC_400_TMC_CAPS	(TMC_CAP_ETR_SG_UNIT)
+#define CORESIGHT_SOC_600_ETR_CAPS	(TMC_CAP_ETR_SAVE_RESTORE | \
+					 TMC_CAP_ETR_SWFIFO2_MODE)
 
 /**
  * struct tmc_drvdata - specifics associated to an TMC component

@@ -409,12 +409,32 @@ static struct tmc_caps coresight_soc_400_tmc_caps = {
 	.caps = CORESIGHT_SOC_400_TMC_CAPS,
 };
 
+static struct tmc_caps coresight_soc_600_etr_caps = {
+	.caps = CORESIGHT_SOC_600_ETR_CAPS,
+};
+
 static struct amba_id tmc_ids[] = {
 	{
 		/* Coresight SoC 400 TMC */
 		.id     = 0x000bb961,
 		.mask   = 0x000fffff,
 		.data	= &coresight_soc_400_tmc_caps,
+	},
+	{
+		/* Coresight SoC 600 TMC-ETR/ETS */
+		.id	= 0x000bb9e8,
+		.mask	= 0x000fffff,
+		.data	= &coresight_soc_600_etr_caps,
+	},
+	{
+		/* Coresight SoC 600 TMC-ETB */
+		.id	= 0x000bb9e9,
+		.mask	= 0x000fffff,
+	},
+	{
+		/* Coresight SoC 600 TMC-ETF */
+		.id	= 0x000bb9ea,
+		.mask	= 0x000fffff,
 	},
 	{},
 };
