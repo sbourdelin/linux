@@ -833,6 +833,9 @@ retry:
 	if (!timr)
 		return -EINVAL;
 
+	if (rtn)
+		memset(rtn, 0, sizeof(*rtn));
+
 	kc = timr->kclock;
 	if (WARN_ON_ONCE(!kc || !kc->timer_set))
 		error = -EINVAL;
