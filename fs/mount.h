@@ -82,6 +82,11 @@ static inline int mnt_has_parent(struct mount *mnt)
 	return mnt != mnt->mnt_parent;
 }
 
+static inline int mnt_is_covering(struct mount *mnt)
+{
+	return (mnt->mnt_mountpoint == mnt->mnt_parent->mnt.mnt_root);
+}
+
 static inline int is_mounted(struct vfsmount *mnt)
 {
 	/* neither detached nor internal? */

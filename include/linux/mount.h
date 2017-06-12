@@ -34,6 +34,9 @@ struct mnt_namespace;
 
 #define MNT_SHARED	0x1000	/* if the vfsmount is a shared mount */
 #define MNT_UNBINDABLE	0x2000	/* if the vfsmount is a unbindable mount */
+#define MNT_TUCKED	0x8000	/* am i tucked ? */
+#define MNT_TUCK_START	0x10000 /* state of the parent when I got tucked */
+#define MNT_TUCK_END	0x20000 /* state of the child when I got tucked */
 /*
  * MNT_SHARED_MASK is the set of flags that should be cleared when a
  * mount becomes shared.  Currently, this is only the flag that says a

@@ -18,8 +18,17 @@
 #define IS_MNT_UNBINDABLE(m) ((m)->mnt.mnt_flags & MNT_UNBINDABLE)
 #define IS_MNT_MARKED(m) ((m)->mnt.mnt_flags & MNT_MARKED)
 #define SET_MNT_MARK(m) ((m)->mnt.mnt_flags |= MNT_MARKED)
+#define SET_MNT_TUCKED(m) ((m)->mnt.mnt_flags |= MNT_TUCKED)
+#define SET_MNT_TUCK_END(m) ((m)->mnt.mnt_flags |= MNT_TUCK_END)
+#define SET_MNT_TUCK_START(m) ((m)->mnt.mnt_flags |= MNT_TUCK_START)
 #define CLEAR_MNT_MARK(m) ((m)->mnt.mnt_flags &= ~MNT_MARKED)
+#define CLEAR_MNT_TUCKED(m) ((m)->mnt.mnt_flags &= ~MNT_TUCKED)
+#define CLEAR_MNT_TUCK_END(m) ((m)->mnt.mnt_flags &= ~MNT_TUCK_END)
+#define CLEAR_MNT_TUCK_START(m) ((m)->mnt.mnt_flags &= ~MNT_TUCK_START)
 #define IS_MNT_LOCKED(m) ((m)->mnt.mnt_flags & MNT_LOCKED)
+#define IS_MNT_TUCKED(m) ((m)->mnt.mnt_flags & MNT_TUCKED)
+#define IS_MNT_TUCK_END(m) ((m)->mnt.mnt_flags & MNT_TUCK_END)
+#define IS_MNT_TUCK_START(m) ((m)->mnt.mnt_flags & MNT_TUCK_START)
 
 #define CL_EXPIRE    		0x01
 #define CL_SLAVE     		0x02
@@ -55,4 +64,6 @@ struct mount *copy_tree(struct mount *, struct dentry *, int);
 bool is_path_reachable(struct mount *, struct dentry *,
 			 const struct path *root);
 int count_mounts(struct mnt_namespace *ns, struct mount *mnt);
+void prep_for_tuck(struct mount *mnt);
+void prep_for_untuck(struct mount *mnt);
 #endif /* _LINUX_PNODE_H */

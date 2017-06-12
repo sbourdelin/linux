@@ -166,6 +166,10 @@ static int show_mountinfo(struct seq_file *m, struct vfsmount *mnt)
 	}
 	if (IS_MNT_UNBINDABLE(r))
 		seq_puts(m, " unbindable");
+	if (IS_MNT_TUCK_START(r))
+		seq_puts(m, " tuckstart");
+	if (IS_MNT_TUCK_END(r))
+		seq_puts(m, " tuckend");
 
 	/* Filesystem specific data */
 	seq_puts(m, " - ");

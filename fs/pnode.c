@@ -322,19 +322,9 @@ out:
 	return ret;
 }
 
-static struct mount *find_topper(struct mount *mnt)
+static struct mount *find_covering_child(struct mount *m)
 {
-	/* If there is exactly one mount covering mnt completely return it. */
-	struct mount *child;
-
-	if (!list_is_singular(&mnt->mnt_mounts))
-		return NULL;
-
-	child = list_first_entry(&mnt->mnt_mounts, struct mount, mnt_child);
-	if (child->mnt_mountpoint != mnt->mnt.mnt_root)
-		return NULL;
-
-	return child;
+	return __lookup_mnt(&m->mnt, m->mnt.mnt_root);
 }
 
 /*
@@ -357,8 +347,10 @@ static inline int do_refcount_check(struct mount *mnt, int count)
  */
 int propagate_mount_busy(struct mount *mnt, int refcnt)
 {
-	struct mount *m, *child, *topper;
+	struct mount *m, *child;
 	struct mount *parent = mnt->mnt_parent;
+	bool tucks_can_ignore = !(IS_MNT_TUCK_END(parent) &&
+				mnt->mnt_mountpoint == parent->mnt.mnt_root);
 
 	if (mnt == parent)
 		return do_refcount_check(mnt, refcnt);
@@ -372,19 +364,19 @@ int propagate_mount_busy(struct mount *mnt, int refcnt)
 		return 1;
 
 	for (m = propagation_next(parent, parent); m;
-	     		m = propagation_next(m, parent)) {
+			m = propagation_next(m, parent)) {
 		int count = 1;
-		child = __lookup_mnt(&m->mnt, mnt->mnt_mountpoint);
-		if (!child)
+
+		/*
+		 * read the comment in __propagate_umount()
+		 */
+		if (tucks_can_ignore &&
+			IS_MNT_TUCK_END(m) &&
+			(mnt->mnt_mountpoint == m->mnt.mnt_root))
 			continue;
 
-		/* Is there exactly one mount on the child that covers
-		 * it completely whose reference should be ignored?
-		 */
-		topper = find_topper(child);
-		if (topper)
-			count += 1;
-		else if (!list_empty(&child->mnt_mounts))
+		child = __lookup_mnt(&m->mnt, mnt->mnt_mountpoint);
+		if (!child || !list_empty(&child->mnt_mounts))
 			continue;
 
 		if (do_refcount_check(child, count))
@@ -403,7 +395,7 @@ void propagate_mount_unlock(struct mount *mnt)
 	struct mount *parent = mnt->mnt_parent;
 	struct mount *m, *child;
 
-	BUG_ON(parent == mnt);
+	WARN_ON(parent == mnt);
 
 	for (m = propagation_next(parent, parent); m;
 			m = propagation_next(m, parent)) {
@@ -421,7 +413,7 @@ static void mark_umount_candidates(struct mount *mnt)
 	struct mount *parent = mnt->mnt_parent;
 	struct mount *m;
 
-	BUG_ON(parent == mnt);
+	WARN_ON(parent == mnt);
 
 	for (m = propagation_next(parent, parent); m;
 			m = propagation_next(m, parent)) {
@@ -436,6 +428,98 @@ static void mark_umount_candidates(struct mount *mnt)
 }
 
 /*
+ * Ready the mnt for a tuck between  parent and child.
+ * The mnt must not be in the hash of its  parent yet.
+ * Neither should the child be in the hash of the mnt.
+ */
+void prep_for_tuck(struct mount *mnt)
+{
+	struct mount *parent = mnt->mnt_parent;
+
+	/*
+	 * Tucks can  only  occur  due  to   propagation.
+	 * There  is  no  way  to  refer a   tree if its
+	 * root dentry  is  hidden.  Clone  of this tree
+	 * will  also  have their  root dentries exposed.
+	 * Hence there cannot be a covering child on mnt.
+	 */
+	WARN_ON(find_covering_child(mnt));
+
+	if (IS_MNT_TUCK_END(parent) && mnt_is_covering(mnt)) {
+		CLEAR_MNT_TUCK_END(parent);
+		SET_MNT_TUCK_END(mnt);
+		return;
+	}
+
+	/* this is the start of a new TUCK pair */
+	SET_MNT_TUCK_END(mnt);
+	SET_MNT_TUCK_START(mnt);
+}
+
+static inline void reset_tuck_pair(struct mount *mnt)
+{
+	int count = 1;
+
+	WARN_ON(!IS_MNT_TUCK_END(mnt));
+	CLEAR_MNT_TUCK_END(mnt);
+	if (IS_MNT_TUCK_START(mnt))
+		count--;
+	while (!(count == 0 && IS_MNT_TUCK_START(mnt))) {
+
+		/* we should not reach the root mount.
+		 * root mount was never a tucked one.
+		 */
+		WARN_ON(mnt == mnt->mnt_parent);
+
+		/*
+		 * if we are walking up the TUCK_END,
+		 * TUCK_START series, the mnt better
+		 * be covering.
+		 */
+		WARN_ON(!mnt_is_covering(mnt));
+
+		mnt = mnt->mnt_parent;
+		if (IS_MNT_TUCK_END(mnt))
+			count++;
+		if (IS_MNT_TUCK_START(mnt))
+			count--;
+	}
+	CLEAR_MNT_TUCK_START(mnt);
+}
+
+void prep_for_untuck(struct mount *mnt)
+{
+	struct mount *covering_child = find_covering_child(mnt);
+
+	if (IS_MNT_TUCK_START(mnt) &&
+		       IS_MNT_TUCK_END(mnt)) {
+		CLEAR_MNT_TUCK_START(mnt);
+		CLEAR_MNT_TUCK_END(mnt);
+
+		if (mnt_is_covering(mnt) && IS_MNT_TUCK_END(mnt->mnt_parent))
+			reset_tuck_pair(mnt->mnt_parent);
+
+	} else if (IS_MNT_TUCK_END(mnt)) {
+		SET_MNT_TUCK_END(mnt->mnt_parent);
+		CLEAR_MNT_TUCK_END(mnt);
+	} else if (IS_MNT_TUCK_START(mnt)) {
+		/*
+		 * There has to be a covering child.
+		 * otherwise TUCK_START would'nt be set
+		 * without a TUCK_END.
+		 */
+		WARN_ON(!covering_child);
+		SET_MNT_TUCK_START(covering_child);
+		CLEAR_MNT_TUCK_START(mnt);
+	} else if (mnt_is_covering(mnt) && IS_MNT_TUCK_END(mnt->mnt_parent))
+		reset_tuck_pair(mnt->mnt_parent);
+
+	if (covering_child)
+		mnt_change_mountpoint(mnt->mnt_parent,
+			mnt->mnt_mp, covering_child);
+}
+
+/*
  * NOTE: unmounting 'mnt' naturally propagates to all other mounts its
  * parent propagates to.
  */
@@ -443,36 +527,62 @@ static void __propagate_umount(struct mount *mnt)
 {
 	struct mount *parent = mnt->mnt_parent;
 	struct mount *m;
+	bool tucks_can_ignore = !(IS_MNT_TUCK_END(parent) &&
+				mnt->mnt_mountpoint == parent->mnt.mnt_root);
 
-	BUG_ON(parent == mnt);
+	WARN_ON(parent == mnt);
 
 	for (m = propagation_next(parent, parent); m;
 			m = propagation_next(m, parent)) {
-		struct mount *topper;
-		struct mount *child = __lookup_mnt(&m->mnt,
-						mnt->mnt_mountpoint);
-		/*
-		 * umount the child only if the child has no children
-		 * and the child is marked safe to unmount.
+		struct mount *child;
+
+		/* Ideally we should traverse the propagation tree of a nearest
+		 * ancestor which is not a tuck-mount. Reason: 'mnt' and its
+		 * peer-cousins existed even before its tucked parents existed.
+		 * 'mnt' and its peer-cousins were mounted traversing the
+		 * then-parent propagation tree, which has now become an
+		 * anscestor propagation tree, thanks to the tucks.  However
+		 * since the parent tree and the actual ancestor tree have
+		 * exactly the same tree structure, we shall optimize our walk,
+		 * and walk the parents' propagation tree.
+		 *
+		 * There is one catch. A parent on the propagation tree; if
+		 * tucked, should ignore the umount event to its covering
+		 * child.  Reason -- the child was born before the tucked
+		 * parent.  However if the parent of 'mnt' is itself a child of
+		 * a tucked parent, than there is an anscestor that existed
+		 * when the 'mnt' and its peer-cousins were created.  Hence
+		 * unmount event must not be ignored by all tucked parents
+		 * residing on the parent propagation tree.
 		 */
+		if (tucks_can_ignore &&
+				IS_MNT_TUCK_END(m) &&
+				(mnt->mnt_mountpoint == m->mnt.mnt_root))
+			continue;
+
+		child = __lookup_mnt(&m->mnt, mnt->mnt_mountpoint);
+
 		if (!child || !IS_MNT_MARKED(child))
 			continue;
+
 		CLEAR_MNT_MARK(child);
 
-		/* If there is exactly one mount covering all of child
-		 * replace child with that mount.
-		 */
-		topper = find_topper(child);
-		if (topper)
-			mnt_change_mountpoint(child->mnt_parent, child->mnt_mp,
-					      topper);
+		prep_for_untuck(child);
 
-		if (list_empty(&child->mnt_mounts)) {
-			list_del_init(&child->mnt_child);
-			child->mnt.mnt_flags |= MNT_UMOUNT;
-			list_move_tail(&child->mnt_list, &mnt->mnt_list);
-		}
+		/* Yes we expect no children. None. */
+		WARN_ON(!list_empty(&child->mnt_mounts));
+
+		list_del_init(&child->mnt_child);
+		child->mnt.mnt_flags |= MNT_UMOUNT;
+		list_move_tail(&child->mnt_list, &mnt->mnt_list);
 	}
+
+	/*
+	 * This explicit umount operation is exposing the parent.
+	 * In case the parent was a 'tucked' mount, it cannot be so
+	 * anymore.
+	 */
+	prep_for_untuck(mnt);
 }
 
 /*
