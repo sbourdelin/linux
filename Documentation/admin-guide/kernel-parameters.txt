@@ -3693,6 +3693,46 @@
 			1 -- enable.
 			Default value is set via kernel config option.
 
+	sara=		[SARA] Disable or enable S.A.R.A. at boot time.
+			If disabled this way S.A.R.A. can't be enabled
+			again.
+			Format: { "0" | "1" }
+			See security/sara/Kconfig help text
+			0 -- disable.
+			1 -- enable.
+			Default value is set via kernel config option.
+
+	sara_usb_filtering= [SARA]
+			Disable or enable S.A.R.A. USB Filtering at boot
+			time.
+			Format: { "0" | "1" }
+			See security/sara/Kconfig help text
+			0 -- disable.
+			1 -- enable.
+			Default value is 1.
+
+	sara_usb_filtering_default= [SARA]
+			Set S.A.R.A. USB Filtering default action.
+			Format: { "a" | "d" }
+			See security/sara/Kconfig help text
+			a -- allow.
+			d -- deny.
+			Default value is set via kernel config option.
+
+	sara_wxprot=	[SARA] Disable or enable S.A.R.A. WX Protection
+			at boot time.
+			Format: { "0" | "1" }
+			See security/sara/Kconfig help text
+			0 -- disable.
+			1 -- enable.
+			Default value is 1.
+
+	sara_wxprot_default_flags= [SARA]
+			Set S.A.R.A. WX Protection default flags.
+			Format: <integer>
+			See S.A.R.A. documentation.
+			Default value is set via kernel config option.
+
 	serialnumber	[BUGS=X86-32]
 
 	shapers=	[NET]
