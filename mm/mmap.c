@@ -1363,6 +1363,9 @@ unsigned long do_mmap(struct file *file, unsigned long addr,
 	vm_flags |= calc_vm_prot_bits(prot, pkey) | calc_vm_flag_bits(flags) |
 			mm->def_flags | VM_MAYREAD | VM_MAYWRITE | VM_MAYEXEC;
 
+	if (security_check_vmflags(vm_flags))
+		return -EPERM;
+
 	if (flags & MAP_LOCKED)
 		if (!can_do_mlock())
 			return -EPERM;
@@ -2833,6 +2836,9 @@ static int do_brk_flags(unsigned long addr, unsigned long request, unsigned long
 		return -EINVAL;
 	flags |= VM_DATA_DEFAULT_FLAGS | VM_ACCOUNT | mm->def_flags;
 
+	if (security_check_vmflags(flags))
+		return -EPERM;
+
 	error = get_unmapped_area(NULL, addr, len, 0, MAP_FIXED);
 	if (offset_in_page(error))
 		return error;
@@ -3207,6 +3213,9 @@ static struct vm_area_struct *__install_special_mapping(
 {
 	int ret;
 	struct vm_area_struct *vma;
+
+	if (security_check_vmflags(vm_flags))
+		return ERR_PTR(-EPERM);
 
 	vma = kmem_cache_zalloc(vm_area_cachep, GFP_KERNEL);
 	if (unlikely(vma == NULL))
