@@ -97,6 +97,7 @@
 #define SUN4I_HDMI_DDC_CTRL_START_CMD		BIT(30)
 #define SUN4I_HDMI_DDC_CTRL_FIFO_DIR_MASK	BIT(8)
 #define SUN4I_HDMI_DDC_CTRL_FIFO_DIR_READ	(0 << 8)
+#define SUN4I_HDMI_DDC_CTRL_FIFO_DIR_WRITE	(1 << 8)
 #define SUN4I_HDMI_DDC_CTRL_RESET		BIT(0)
 
 #define SUN4I_HDMI_DDC_ADDR_REG		0x504
@@ -105,6 +106,10 @@
 #define SUN4I_HDMI_DDC_ADDR_OFFSET(off)		(((off) & 0xff) << 8)
 #define SUN4I_HDMI_DDC_ADDR_SLAVE(addr)		((addr) & 0xff)
 
+#define SUN4I_HDMI_DDC_INTERRUPT_STATUS_REG	0x50c
+#define SUN4I_HDMI_DDC_INTERRUPT_STATUS_FIFO_REQUEST	BIT(4)
+#define SUN4I_HDMI_DDC_INTERRUPT_STATUS_TRANSFER_COMPLETE	BIT(0)
+
 #define SUN4I_HDMI_DDC_FIFO_CTRL_REG	0x510
 #define SUN4I_HDMI_DDC_FIFO_CTRL_CLEAR		BIT(31)
 
@@ -112,7 +117,8 @@
 #define SUN4I_HDMI_DDC_BYTE_COUNT_REG	0x51c
 
 #define SUN4I_HDMI_DDC_CMD_REG		0x520
-#define SUN4I_HDMI_DDC_CMD_EXPLICIT_EDDC_READ	6
+#define SUN4I_HDMI_DDC_CMD_IMPLICIT_WRITE	3
+#define SUN4I_HDMI_DDC_CMD_IMPLICIT_READ	5
 
 #define SUN4I_HDMI_DDC_CLK_REG		0x528
 #define SUN4I_HDMI_DDC_CLK_M(m)			(((m) & 0x7) << 3)
@@ -146,6 +152,8 @@ struct sun4i_hdmi {
 	struct clk		*ddc_clk;
 	struct clk		*tmds_clk;
 
+	struct i2c_adapter	*i2c;
+
 	struct sun4i_drv	*drv;
 
 	bool			hdmi_monitor;
@@ -153,5 +161,6 @@ struct sun4i_hdmi {
 
 int sun4i_ddc_create(struct sun4i_hdmi *hdmi, struct clk *clk);
 int sun4i_tmds_create(struct sun4i_hdmi *hdmi);
+int sun4i_hdmi_i2c_create(struct sun4i_hdmi *hdmi);
 
 #endif /* _SUN4I_HDMI_H_ */
