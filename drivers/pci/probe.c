@@ -1701,6 +1701,46 @@ static void pci_configure_extended_tags(struct pci_dev *dev)
 					 PCI_EXP_DEVCTL_EXT_TAG);
 }
 
+/**
+ * pci_dev_should_disable_relaxed_ordering - check if the PCI device
+ * should disable the relaxed ordering attribute.
+ * @dev: PCI device
+ *
+ * Return true if any of the PCI devices above us do not support
+ * relaxed ordering.
+ */ 
+static bool pci_dev_should_disable_relaxed_ordering(struct pci_dev *dev)
+{
+	bool ro_disabled = false;
+
+	while (dev) {
+		if (dev->dev_flags & PCI_DEV_FLAGS_NO_RELAXED_ORDERING) {
+			ro_disabled = true;
+			break;
+		}
+		dev = dev->bus->self;
+	}
+
+	return ro_disabled;
+}
+
+static void pci_configure_relaxed_ordering(struct pci_dev *dev)
+{
+	struct pci_dev *bridge = pci_upstream_bridge(dev);
+
+	if (!pci_is_pcie(dev) || !bridge || !pci_is_pcie(bridge))
+		return;
+
+	/* If the releaxed ordering enable bit is not set, do nothing. */
+	if (!pcie_relaxed_ordering_supported(dev))
+		return;
+
+	if (pci_dev_should_disable_relaxed_ordering(dev)) {
+		pcie_clear_relaxed_ordering(dev);
+		dev_info(&dev->dev, "Disable Relaxed Ordering\n");
+	}
+}
+
 static void pci_configure_device(struct pci_dev *dev)
 {
 	struct hotplug_params hpp;
@@ -1708,6 +1748,7 @@ static void pci_configure_device(struct pci_dev *dev)
 
 	pci_configure_mps(dev);
 	pci_configure_extended_tags(dev);
+	pci_configure_relaxed_ordering(dev);
 
 	memset(&hpp, 0, sizeof(hpp));
 	ret = pci_get_hp_params(dev, &hpp);
