@@ -34,7 +34,9 @@ its hardware characteristcs.
 		- Embedded Trace Macrocell (version 4.x):
 			"arm,coresight-etm4x", "arm,primecell";
 
-		- Qualcomm Configurable Replicator (version 1.x):
+		- Coresight programmable Replicator (version 1.x):
+			"arm,coresight-dynamic-replicator", "arm,primecell";
+				OR
 			"qcom,coresight-replicator1x", "arm,primecell";
 
 		- System Trace Macrocell:
