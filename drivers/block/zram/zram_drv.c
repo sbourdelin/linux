@@ -271,6 +271,163 @@ static ssize_t mem_used_max_store(struct device *dev,
 	return len;
 }
 
+#ifdef CONFIG_ZRAM_WRITEBACK
+static bool zram_wb_enabled(struct zram *zram)
+{
+	return zram->backing_dev;
+}
+
+static void reset_bdev(struct zram *zram)
+{
+	struct inode *inode;
+	struct address_space *mapping;
+	struct block_device *bdev;
+
+	if (!zram_wb_enabled(zram))
+		return;
+
+	mapping = zram->backing_dev->f_mapping;
+	inode = mapping->host;
+	bdev = I_BDEV(inode);
+
+	if (zram->old_block_size)
+		set_blocksize(bdev, zram->old_block_size);
+	blkdev_put(bdev, FMODE_READ|FMODE_WRITE|FMODE_EXCL);
+	/* hope filp_close flush all of IO */
+	filp_close(zram->backing_dev, NULL);
+	zram->backing_dev = NULL;
+	zram->old_block_size = 0;
+	zram->bdev = NULL;
+}
+
+static ssize_t backing_dev_show(struct device *dev,
+		struct device_attribute *attr, char *buf)
+{
+	struct zram *zram = dev_to_zram(dev);
+	struct file *file = zram->backing_dev;
+	char *p;
+	ssize_t ret;
+
+	down_read(&zram->init_lock);
+	if (!zram_wb_enabled(zram)) {
+		memcpy(buf, "none\n", 5);
+		up_read(&zram->init_lock);
+		return 5;
+	}
+
+	p = file_path(file, buf, PAGE_SIZE - 1);
+	if (IS_ERR(p)) {
+		ret = PTR_ERR(p);
+		goto out;
+	}
+
+	ret = strlen(p);
+	memmove(buf, p, ret);
+	buf[ret++] = '\n';
+out:
+	up_read(&zram->init_lock);
+	return ret;
+}
+
+static ssize_t backing_dev_store(struct device *dev,
+		struct device_attribute *attr, const char *buf, size_t len)
+{
+	char *file_name;
+	struct filename *name = NULL;
+	struct file *backing_dev = NULL;
+	struct inode *inode;
+	struct address_space *mapping;
+	unsigned int old_block_size = 0;
+	struct block_device *bdev = NULL;
+	int err;
+	size_t sz;
+	struct zram *zram = dev_to_zram(dev);
+
+	file_name = kmalloc(PATH_MAX, GFP_KERNEL);
+	if (!file_name)
+		return -ENOMEM;
+
+	down_write(&zram->init_lock);
+	if (init_done(zram)) {
+		pr_info("Can't setup backing device for initialized device\n");
+		err = -EBUSY;
+		goto out;
+	}
+
+	strlcpy(file_name, buf, len);
+	/* ignore trailing newline */
+	sz = strlen(file_name);
+	if (sz > 0 && file_name[sz - 1] == '\n')
+		file_name[sz - 1] = 0x00;
+
+	name = getname_kernel(file_name);
+	if (IS_ERR(name)) {
+		err = PTR_ERR(name);
+		name = NULL;
+		goto out;
+	}
+
+	backing_dev = file_open_name(name, O_RDWR|O_LARGEFILE, 0);
+	if (IS_ERR(backing_dev)) {
+		err = PTR_ERR(backing_dev);
+		backing_dev = NULL;
+		goto out;
+	}
+
+	mapping = backing_dev->f_mapping;
+	inode = mapping->host;
+
+	/* Support only block device in this moment */
+	if (!S_ISBLK(inode->i_mode)) {
+		err = -ENOTBLK;
+		goto out;
+	}
+
+	bdev = bdgrab(I_BDEV(inode));
+	err = blkdev_get(bdev, FMODE_READ | FMODE_WRITE | FMODE_EXCL, zram);
+	if (err < 0)
+		goto out;
+
+	old_block_size = block_size(bdev);
+	err = set_blocksize(bdev, PAGE_SIZE);
+	if (err)
+		goto out;
+
+	reset_bdev(zram);
+
+	zram->old_block_size = old_block_size;
+	zram->bdev = bdev;
+	zram->backing_dev = backing_dev;
+	up_write(&zram->init_lock);
+
+	pr_info("setup backing device %s\n", file_name);
+
+	putname(name);
+	kfree(file_name);
+
+	return len;
+out:
+	if (bdev)
+		blkdev_put(bdev, FMODE_READ | FMODE_WRITE | FMODE_EXCL);
+
+	if (backing_dev)
+		filp_close(backing_dev, NULL);
+
+	if (name)
+		putname(name);
+	up_write(&zram->init_lock);
+
+	kfree(file_name);
+
+	return err;
+}
+
+#else
+static bool zram_wb_enabled(struct zram *zram) { return false; }
+static void reset_bdev(struct zram *zram) {};
+#endif
+
+
 /*
  * We switched to per-cpu streams and this attr is not needed anymore.
  * However, we will keep it around for some time, because:
@@ -1198,6 +1355,9 @@ static DEVICE_ATTR_RW(use_dedup);
 #else
 static DEVICE_ATTR_RO(use_dedup);
 #endif
+#ifdef CONFIG_ZRAM_WRITEBACK
+static DEVICE_ATTR_RW(backing_dev);
+#endif
 
 static struct attribute *zram_disk_attrs[] = {
 	&dev_attr_disksize.attr,
@@ -1209,6 +1369,9 @@ static struct attribute *zram_disk_attrs[] = {
 	&dev_attr_max_comp_streams.attr,
 	&dev_attr_comp_algorithm.attr,
 	&dev_attr_use_dedup.attr,
+#ifdef CONFIG_ZRAM_WRITEBACK
+	&dev_attr_backing_dev.attr,
+#endif
 	&dev_attr_io_stat.attr,
 	&dev_attr_mm_stat.attr,
 	&dev_attr_debug_stat.attr,
