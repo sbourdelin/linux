@@ -185,7 +185,7 @@ int prism2mgmt_scan(struct wlandevice *wlandev, void *msgp)
 
 	/* set up the txrate to be 2MBPS. Should be fastest basicrate... */
 	word = HFA384x_RATEBIT_2;
-	scanreq.tx_rate = cpu_to_le16(word);
+	scanreq.tx_rate = (__force u16)cpu_to_le16(word);
 
 	/* set up the channel list */
 	word = 0;
@@ -197,10 +197,10 @@ int prism2mgmt_scan(struct wlandevice *wlandev, void *msgp)
 		/* channel 1 is BIT 0 ... channel 14 is BIT 13 */
 		word |= (1 << (channel - 1));
 	}
-	scanreq.channel_list = cpu_to_le16(word);
+	scanreq.channel_list = (__force u16)cpu_to_le16(word);
 
 	/* set up the ssid, if present. */
-	scanreq.ssid.len = cpu_to_le16(msg->ssid.data.len);
+	scanreq.ssid.len = (__force u16)cpu_to_le16(msg->ssid.data.len);
 	memcpy(scanreq.ssid.data, msg->ssid.data.data, msg->ssid.data.len);
 
 	/* Enable the MAC port if it's not already enabled  */
@@ -229,7 +229,7 @@ int prism2mgmt_scan(struct wlandevice *wlandev, void *msgp)
 		/* Construct a bogus SSID and assign it to OwnSSID and
 		 * DesiredSSID
 		 */
-		wordbuf[0] = cpu_to_le16(WLAN_SSID_MAXLEN);
+		wordbuf[0] = (__force u16)cpu_to_le16(WLAN_SSID_MAXLEN);
 		get_random_bytes(&wordbuf[1], WLAN_SSID_MAXLEN);
 		result = hfa384x_drvr_setconfig(hw, HFA384x_RID_CNFOWNSSID,
 						wordbuf,
@@ -405,8 +405,8 @@ int prism2mgmt_scan_results(struct wlandevice *wlandev, void *msgp)
 	/* signal and noise */
 	req->signal.status = P80211ENUM_msgitem_status_data_ok;
 	req->noise.status = P80211ENUM_msgitem_status_data_ok;
-	req->signal.data = le16_to_cpu(item->sl);
-	req->noise.data = le16_to_cpu(item->anl);
+	req->signal.data = le16_to_cpu((__force __le16)item->sl);
+	req->noise.data = le16_to_cpu((__force __le16)item->anl);
 
 	/* BSSID */
 	req->bssid.status = P80211ENUM_msgitem_status_data_ok;
@@ -415,7 +415,7 @@ int prism2mgmt_scan_results(struct wlandevice *wlandev, void *msgp)
 
 	/* SSID */
 	req->ssid.status = P80211ENUM_msgitem_status_data_ok;
-	req->ssid.data.len = le16_to_cpu(item->ssid.len);
+	req->ssid.data.len = le16_to_cpu((__force __le16)item->ssid.len);
 	req->ssid.data.len = min_t(u16, req->ssid.data.len, WLAN_SSID_MAXLEN);
 	memcpy(req->ssid.data.data, item->ssid.data, req->ssid.data.len);
 
@@ -463,7 +463,7 @@ int prism2mgmt_scan_results(struct wlandevice *wlandev, void *msgp)
 
 	/* beacon period */
 	req->beaconperiod.status = P80211ENUM_msgitem_status_data_ok;
-	req->beaconperiod.data = le16_to_cpu(item->bcnint);
+	req->beaconperiod.data = le16_to_cpu((__force __le16)item->bcnint);
 
 	/* timestamps */
 	req->timestamp.status = P80211ENUM_msgitem_status_data_ok;
@@ -473,14 +473,14 @@ int prism2mgmt_scan_results(struct wlandevice *wlandev, void *msgp)
 
 	/* atim window */
 	req->ibssatimwindow.status = P80211ENUM_msgitem_status_data_ok;
-	req->ibssatimwindow.data = le16_to_cpu(item->atim);
+	req->ibssatimwindow.data = le16_to_cpu((__force __le16)item->atim);
 
 	/* Channel */
 	req->dschannel.status = P80211ENUM_msgitem_status_data_ok;
-	req->dschannel.data = le16_to_cpu(item->chid);
+	req->dschannel.data = le16_to_cpu((__force __le16)item->chid);
 
 	/* capinfo bits */
-	count = le16_to_cpu(item->capinfo);
+	count = le16_to_cpu((__force __le16)item->capinfo);
 	req->capinfo.status = P80211ENUM_msgitem_status_data_ok;
 	req->capinfo.data = count;
 
