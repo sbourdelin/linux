@@ -692,22 +692,45 @@ out:
 	return ret;
 }
 
-static int zram_compress(struct zram *zram, struct zcomp_strm **zstrm,
-			struct page *page, struct zram_entry **out_entry,
-			unsigned int *out_comp_len)
+static int __zram_bvec_write(struct zram *zram, struct bio_vec *bvec, u32 index)
 {
 	int ret;
-	unsigned int comp_len;
-	void *src;
+	struct zram_entry *uninitialized_var(entry);
+	unsigned int uninitialized_var(comp_len);
+	void *src, *dst, *mem;
+	struct zcomp_strm *zstrm;
+	struct page *page = bvec->bv_page;
+	u32 checksum;
+	enum zram_pageflags flags = 0;
+	unsigned long uninitialized_var(element);
 	unsigned long alloced_pages;
-	struct zram_entry *entry = NULL;
+
+	mem = kmap_atomic(page);
+	if (page_same_filled(mem, &element)) {
+		kunmap_atomic(mem);
+		/* Free memory associated with this sector now. */
+		flags = ZRAM_SAME;
+		atomic64_inc(&zram->stats.same_pages);
+		goto out;
+	}
+	kunmap_atomic(mem);
+
+	entry = zram_dedup_find(zram, page, &checksum);
+	if (entry) {
+		comp_len = entry->len;
+		flags = ZRAM_DUP;
+		atomic64_add(comp_len, &zram->stats.dup_data_size);
+		goto out;
+	}
 
 compress_again:
+	zstrm = zcomp_stream_get(zram->comp);
 	src = kmap_atomic(page);
-	ret = zcomp_compress(*zstrm, src, &comp_len);
+	ret = zcomp_compress(zstrm, src, &comp_len);
 	kunmap_atomic(src);
 
 	if (unlikely(ret)) {
+		zcomp_stream_put(zram->comp);
 		pr_err("Compression failed! err=%d\n", ret);
 		if (entry)
 			zram_entry_free(zram, entry);
@@ -742,7 +765,6 @@ compress_again:
 		entry = zram_entry_alloc(zram, comp_len,
 				GFP_NOIO | __GFP_HIGHMEM |
 				__GFP_MOVABLE);
-		*zstrm = zcomp_stream_get(zram->comp);
 		if (entry)
 			goto compress_again;
 		return -ENOMEM;
@@ -752,50 +774,9 @@ compress_again:
 	update_used_max(zram, alloced_pages);
 
 	if (zram->limit_pages && alloced_pages > zram->limit_pages) {
+		zcomp_stream_put(zram->comp);
 		zram_entry_free(zram, entry);
 		return -ENOMEM;
-	}
-
-	*out_entry = entry;
-	*out_comp_len = comp_len;
-	return 0;
-}
-
-static int __zram_bvec_write(struct zram *zram, struct bio_vec *bvec, u32 index)
-{
-	int ret;
-	struct zram_entry *uninitialized_var(entry);
-	unsigned int uninitialized_var(comp_len);
-	void *src, *dst, *mem;
-	struct zcomp_strm *zstrm;
-	struct page *page = bvec->bv_page;
-	u32 checksum;
-	enum zram_pageflags flags = 0;
-	unsigned long uninitialized_var(element);
-
-	mem = kmap_atomic(page);
-	if (page_same_filled(mem, &element)) {
-		kunmap_atomic(mem);
-		/* Free memory associated with this sector now. */
-		flags = ZRAM_SAME;
-		atomic64_inc(&zram->stats.same_pages);
-		goto out;
-	}
-	kunmap_atomic(mem);
-
-	entry = zram_dedup_find(zram, page, &checksum);
-	if (entry) {
-		comp_len = entry->len;
-		flags = ZRAM_DUP;
-		atomic64_add(comp_len, &zram->stats.dup_data_size);
-		goto out;
-	}
-
-	zstrm = zcomp_stream_get(zram->comp);
-	ret = zram_compress(zram, &zstrm, page, &entry, &comp_len);
-	if (ret) {
-		zcomp_stream_put(zram->comp);
-		return ret;
 	}
 
 	dst = zs_map_object(zram->mem_pool,
