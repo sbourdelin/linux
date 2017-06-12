@@ -9,8 +9,10 @@ enum xen_domain_type {
 
 #ifdef CONFIG_XEN
 extern enum xen_domain_type xen_domain_type;
+extern const char *xen_guest_type;
 #else
 #define xen_domain_type		XEN_NATIVE
+#define xen_guest_type		"native"
 #endif
 
 #define xen_domain()		(xen_domain_type != XEN_NATIVE)
