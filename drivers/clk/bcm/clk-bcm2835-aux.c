@@ -37,9 +37,22 @@ static int bcm2835_aux_clk_probe(struct platform_device *pdev)
 	parent = __clk_get_name(parent_clk);
 
 	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
-	reg = devm_ioremap_resource(dev, res);
-	if (IS_ERR(reg))
-		return PTR_ERR(reg);
+	/*
+	 * If the MEM resource is only 4 bytes long it covers just the
+	 * AUXENB register, otherwise it is the entire AUX block.
+	 */
+	if (resource_size(res) == 4) {
+		reg = devm_ioremap_resource(dev, res);
+		if (IS_ERR(reg))
+			return PTR_ERR(reg);
+		gate = reg;
+	} else {
+		reg = devm_ioremap(dev, res->start, resource_size(res));
+		if (IS_ERR(reg))
+			return PTR_ERR(reg);
+		gate = reg + BCM2835_AUXENB;
+	}
+
 
 	onecell = devm_kmalloc(dev, sizeof(*onecell) + sizeof(*onecell->hws) *
 			       BCM2835_AUX_CLOCK_COUNT, GFP_KERNEL);
@@ -47,7 +60,6 @@ static int bcm2835_aux_clk_probe(struct platform_device *pdev)
 		return -ENOMEM;
 	onecell->num = BCM2835_AUX_CLOCK_COUNT;
 
-	gate = reg + BCM2835_AUXENB;
 	onecell->hws[BCM2835_AUX_CLOCK_UART] =
 		clk_hw_register_gate(dev, "aux_uart", parent, 0, gate, 0, 0, NULL);
 
