@@ -1,6 +1,7 @@
 #include <dt-bindings/pinctrl/bcm2835.h>
 #include <dt-bindings/clock/bcm2835.h>
 #include <dt-bindings/clock/bcm2835-aux.h>
+#include <dt-bindings/interrupt-controller/bcm2835-aux-intc.h>
 #include <dt-bindings/gpio/gpio.h>
 
 /* firmware-provided startup stubs live here, where the secondary CPUs are
@@ -459,7 +460,22 @@
 			status = "disabled";
 		};
 
-		aux: aux@0x7e215000 {
+		auxintc: interrupt-controller@7e215000 {
+			compatible = "brcm,bcm2835-aux-intc";
+			reg = <0x7e215000 0x4>;
+			interrupts = <1 29>;
+			interrupt-controller;
+			#interrupt-cells = <1>;
+		};
+
+		/*
+		 * N.B. This node overlaps with the previous node,
+		 * but the updated driver remaps the region without
+		 * reserving it. After a suitable period this
+		 * node can be reduced to cover only the single word
+		 * at 7e215004.
+		 */
+		aux: aux@7e215000 {
 			compatible = "brcm,bcm2835-aux";
 			#clock-cells = <1>;
 			reg = <0x7e215000 0x8>;
@@ -469,7 +485,8 @@
 		uart1: serial@7e215040 {
 			compatible = "brcm,bcm2835-aux-uart";
 			reg = <0x7e215040 0x40>;
-			interrupts = <1 29>;
+			interrupt-parent = <&auxintc>;
+			interrupts = <BCM2835_AUX_IRQ_UART>;
 			clocks = <&aux BCM2835_AUX_CLOCK_UART>;
 			status = "disabled";
 		};
@@ -477,7 +494,8 @@
 		spi1: spi@7e215080 {
 			compatible = "brcm,bcm2835-aux-spi";
 			reg = <0x7e215080 0x40>;
-			interrupts = <1 29>;
+			interrupt-parent = <&auxintc>;
+			interrupts = <BCM2835_AUX_IRQ_SPI1>;
 			clocks = <&aux BCM2835_AUX_CLOCK_SPI1>;
 			#address-cells = <1>;
 			#size-cells = <0>;
@@ -487,7 +505,8 @@
 		spi2: spi@7e2150c0 {
 			compatible = "brcm,bcm2835-aux-spi";
 			reg = <0x7e2150c0 0x40>;
-			interrupts = <1 29>;
+			interrupt-parent = <&auxintc>;
+			interrupts = <BCM2835_AUX_IRQ_SPI2>;
 			clocks = <&aux BCM2835_AUX_CLOCK_SPI2>;
 			#address-cells = <1>;
 			#size-cells = <0>;
