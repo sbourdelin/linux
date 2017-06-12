@@ -388,6 +388,9 @@ static void option_instat_callback(struct urb *urb);
 /* SpeedUp SU9800 usb 3g modem */
 #define SPEEDUP_PRODUCT_SU9800			0x9800
 
+/* Telewell */
+#define TELEWELL_PRODUCT_TW_3G_HSPAP		0x9801
+
 /* Haier products */
 #define HAIER_VENDOR_ID				0x201e
 #define HAIER_PRODUCT_CE81B			0x10f8
@@ -1877,6 +1880,7 @@ static const struct usb_device_id option_ids[] = {
 	  .driver_info = (kernel_ulong_t)&four_g_w100_blacklist
 	},
 	{ USB_DEVICE_INTERFACE_CLASS(LONGCHEER_VENDOR_ID, SPEEDUP_PRODUCT_SU9800, 0xff) },
+	{ USB_DEVICE_INTERFACE_CLASS(LONGCHEER_VENDOR_ID, TELEWELL_PRODUCT_TW_3G_HSPAP, 0xff) },
 	{ USB_DEVICE(LONGCHEER_VENDOR_ID, ZOOM_PRODUCT_4597) },
 	{ USB_DEVICE(LONGCHEER_VENDOR_ID, IBALL_3_5G_CONNECT) },
 	{ USB_DEVICE(HAIER_VENDOR_ID, HAIER_PRODUCT_CE100) },
