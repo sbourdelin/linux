@@ -90,6 +90,14 @@ enum tmc_mem_intf_width {
 };
 
 #define TMC_CAP_ETR_SG_UNIT			(1U << 0)
+/*
+ * TMC_CAP_ETR_SAVE_RESTORE - Values of RRP/RWP/STS.Full are
+ * retained when TMC leaves Disabled state, allowing us to continue
+ * the tracing from a point where we stopped. This also implies that
+ * the RRP/RWP/STS.Full should always be programmed to the correct
+ * value.
+ */
+#define TMC_CAP_ETR_SAVE_RESTORE	(1U << 1)
 
 /**
  * struct tmc_cap - Describes the capabilities of the TMC.
