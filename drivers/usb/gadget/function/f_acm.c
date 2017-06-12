@@ -19,6 +19,7 @@
 #include <linux/module.h>
 #include <linux/device.h>
 #include <linux/err.h>
+#include <uapi/linux/usb/f_acm.h>
 
 #include "u_serial.h"
 
@@ -611,6 +612,23 @@ static int acm_send_break(struct gserial *port, int duration)
 	return acm_notify_serial_state(acm);
 }
 
+static int acm_ioctl(struct gserial *port, unsigned int cmd, unsigned long arg)
+{
+	struct f_acm	*acm = port_to_acm(port);
+	int 		ret = -ENOIOCTLCMD;
+
+	switch (cmd) {
+	case USB_F_ACM_GET_LINE_CODING:
+		if (copy_to_user((__user void *)arg, &acm->port_line_coding,
+				sizeof(acm->port_line_coding)))
+			ret = -EFAULT;
+		else
+			ret = 0;
+		break;
+	}
+	return ret;
+}
+
 /*-------------------------------------------------------------------------*/
 
 /* ACM function driver setup/binding */
@@ -749,6 +767,7 @@ static struct usb_function *acm_alloc_func(struct usb_function_instance *fi)
 	acm->port.connect = acm_connect;
 	acm->port.disconnect = acm_disconnect;
 	acm->port.send_break = acm_send_break;
+	acm->port.ioctl = acm_ioctl;
 
 	acm->port.func.name = "acm";
 	acm->port.func.strings = acm_strings;
@@ -764,10 +783,10 @@ static struct usb_function *acm_alloc_func(struct usb_function_instance *fi)
 	acm->port.func.free_func = acm_free_func;
 
 	/* initialize port_line_coding with something that makes sense */
-	coding.dwDTERate = cpu_to_le32(9600);
-	coding.bCharFormat = USB_CDC_1_STOP_BITS;
-	coding.bParityType = USB_CDC_NO_PARITY;
-	coding.bDataBits = 8;
+	acm->port_line_coding.dwDTERate = cpu_to_le32(9600);
+	acm->port_line_coding.bCharFormat = USB_CDC_1_STOP_BITS;
+	acm->port_line_coding.bParityType = USB_CDC_NO_PARITY;
+	acm->port_line_coding.bDataBits = 8;
 
 	return &acm->port.func;
 }
