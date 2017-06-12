@@ -39,4 +39,45 @@ config SECURITY_SARA_NO_RUNTIME_ENABLE
 
 	  If unsure, answer Y.
 
+config SECURITY_SARA_USB_FILTERING
+	bool "USB Filtering"
+	depends on SECURITY_SARA && USB_SUPPORT
+	default y
+	help
+	  Enable S.A.R.A. USB filtering capability. To prevent the connection
+	  of unwanted USB devices, e.g. custom USB devices designed to
+	  exploit vulnerabilities found in device drivers.
+	  User-space utilities can be used to manage the configuration file.
+	  Further information can be found in Documentation/security/SARA.rst.
+
+	  If unsure, answer Y.
+
+config SECURITY_SARA_USB_FILTERING_DENY
+	bool "Default action for new USB devices is DENY"
+	depends on SECURITY_SARA_USB_FILTERING
+	default n
+	help
+	  If you say Y here any device that is not explicitly allowed via the
+	  configuration will be blocked. If you don't enable this option
+	  any USB device connected at boot will be allowed, regardless of
+	  your settings. However, if you enable this and you don't
+	  set your user-space utilities adequately your machine could become
+	  unusable (e.g. your USB keyboard will be disabled).
+	  This option can be overridden at boot time via
+	  "sara_usb_filtering_default=[d|a]" kernel parameter.
+
+	  If unsure, answer N.
+
+config SECURITY_SARA_USB_FILTERING_DISABLED
+	bool "USB filtering will be disabled at boot."
+	depends on SECURITY_SARA_USB_FILTERING
+	default n
+	help
+	  If you say Y here USB filtering won't be enabled at startup. You can
+	  override this option via user-space utilities or at boot time via
+	  "sara_usb_filtering=[0|1]" kernel parameter.
+	  This option is useful for distro kernels.
+
+	  If unsure, answer N.
+
 endmenu

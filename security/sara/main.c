@@ -15,6 +15,7 @@
 
 #include "include/sara.h"
 #include "include/securityfs.h"
+#include "include/usb_filtering.h"
 
 static const int sara_version = SARA_VERSION;
 
@@ -77,6 +78,11 @@ void __init sara_init(void)
 					main_fs,
 					ARRAY_SIZE(main_fs))) {
 		pr_crit("impossible to register main fs.\n");
+		goto error;
+	}
+
+	if (sara_usb_filtering_init()) {
+		pr_crit("impossible to initialize usb filtering.\n");
 		goto error;
 	}
 
