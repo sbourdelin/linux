@@ -15,6 +15,7 @@
 
 #include <linux/clk.h>
 #include <linux/dmaengine.h>
+#include <linux/gpio.h>
 #include <linux/module.h>
 #include <linux/of.h>
 #include <linux/pinctrl/consumer.h>
@@ -201,6 +202,10 @@ struct rockchip_spi {
 	struct dma_slave_caps dma_caps;
 };
 
+struct rockchip_spi_data {
+	bool cs_gpio_requested;
+};
+
 static inline void spi_enable_chip(struct rockchip_spi *rs, int enable)
 {
 	writel_relaxed((enable ? 1 : 0), rs->regs + ROCKCHIP_SPI_SSIENR);
@@ -295,6 +300,50 @@ static void rockchip_spi_set_cs(struct spi_device *spi, bool enable)
 	writel_relaxed(ser, rs->regs + ROCKCHIP_SPI_SER);
 
 	pm_runtime_put_sync(rs->dev);
+}
+
+static int rockchip_spi_setup(struct spi_device *spi)
+{
+	int ret = 0;
+	unsigned long flags = (spi->mode & SPI_CS_HIGH) ?
+			      GPIOF_OUT_INIT_LOW : GPIOF_OUT_INIT_HIGH;
+	struct rockchip_spi_data *data = spi_get_ctldata(spi);
+
+	if (!gpio_is_valid(spi->cs_gpio))
+		return 0;
+
+	if (!data) {
+		data = kzalloc(sizeof(*data), GFP_KERNEL);
+		if (!data)
+			return -ENOMEM;
+		spi_set_ctldata(spi, data);
+	}
+
+	if (!data->cs_gpio_requested) {
+		ret = gpio_request_one(spi->cs_gpio, flags,
+				       dev_name(&spi->dev));
+		if (!ret)
+			data->cs_gpio_requested = 1;
+	} else
+		ret = gpio_direction_output(spi->cs_gpio, flags);
+
+	if (ret < 0)
+		dev_err(&spi->dev, "Failed to setup cs gpio(%d): %d\n",
+			spi->cs_gpio, ret);
+
+	return ret;
+}
+
+static void rockchip_spi_cleanup(struct spi_device *spi)
+{
+	struct rockchip_spi_data *data = spi_get_ctldata(spi);
+
+	if (data) {
+		if (data->cs_gpio_requested)
+			gpio_free(spi->cs_gpio);
+		kfree(data);
+		spi_set_ctldata(spi, NULL);
+	}
 }
 
 static int rockchip_spi_prepare_message(struct spi_master *master,
@@ -744,11 +793,14 @@ static int rockchip_spi_probe(struct platform_device *pdev)
 	master->bits_per_word_mask = SPI_BPW_MASK(16) | SPI_BPW_MASK(8);
 
 	master->set_cs = rockchip_spi_set_cs;
+	master->setup = rockchip_spi_setup;
+	master->cleanup = rockchip_spi_cleanup;
 	master->prepare_message = rockchip_spi_prepare_message;
 	master->unprepare_message = rockchip_spi_unprepare_message;
 	master->transfer_one = rockchip_spi_transfer_one;
 	master->max_transfer_size = rockchip_spi_max_transfer_size;
 	master->handle_err = rockchip_spi_handle_err;
+	master->flags = SPI_MASTER_GPIO_SS;
 
 	rs->dma_tx.ch = dma_request_chan(rs->dev, "tx");
 	if (IS_ERR(rs->dma_tx.ch)) {

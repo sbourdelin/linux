@@ -17,6 +17,7 @@ Required Properties:
        region.
 - interrupts: The interrupt number to the cpu. The interrupt specifier format
               depends on the interrupt controller.
+- cs-gpios : Specifies the gpio pins to be used for chipselects.
 - clocks: Must contain an entry for each entry in clock-names.
 - clock-names: Shall be "spiclk" for the transfer-clock, and "apb_pclk" for
 			   the peripheral clock.
@@ -48,6 +49,7 @@ Example:
 		#address-cells = <1>;
 		#size-cells = <0>;
 		interrupts = <GIC_SPI 44 IRQ_TYPE_LEVEL_HIGH>;
+		cs-gpios = <&gpio2 23 GPIO_ACTIVE_HIGH>;
 		clocks = <&cru SCLK_SPI0>, <&cru PCLK_SPI0>;
 		clock-names = "spiclk", "apb_pclk";
 		pinctrl-0 = <&spi1_pins>;
