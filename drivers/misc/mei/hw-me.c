@@ -1376,36 +1376,56 @@ static bool mei_me_fw_type_sps(struct pci_dev *pdev)
 	.fw_status.status[5] = PCI_CFG_HFS_6
 
 /* ICH Legacy devices */
-const struct mei_cfg mei_me_legacy_cfg = {
+static const struct mei_cfg mei_me_legacy_cfg = {
 	MEI_CFG_LEGACY_HFS,
 };
 
 /* ICH devices */
-const struct mei_cfg mei_me_ich_cfg = {
+static const struct mei_cfg mei_me_ich_cfg = {
 	MEI_CFG_ICH_HFS,
 };
 
 /* PCH devices */
-const struct mei_cfg mei_me_pch_cfg = {
+static const struct mei_cfg mei_me_pch_cfg = {
 	MEI_CFG_PCH_HFS,
 };
 
 
 /* PCH Cougar Point and Patsburg with quirk for Node Manager exclusion */
-const struct mei_cfg mei_me_pch_cpt_pbg_cfg = {
+static const struct mei_cfg mei_me_pch_cpt_pbg_cfg = {
 	MEI_CFG_PCH_HFS,
 	MEI_CFG_FW_NM,
 };
 
 /* PCH8 Lynx Point and newer devices */
-const struct mei_cfg mei_me_pch8_cfg = {
+static const struct mei_cfg mei_me_pch8_cfg = {
 	MEI_CFG_PCH8_HFS,
 };
 
 /* PCH8 Lynx Point with quirk for SPS Firmware exclusion */
-const struct mei_cfg mei_me_pch8_sps_cfg = {
+static const struct mei_cfg mei_me_pch8_sps_cfg = {
 	MEI_CFG_PCH8_HFS,
 	MEI_CFG_FW_SPS,
+};
+
+static const struct mei_cfg *const mei_cfg_list[] = {
+	NULL,
+	&mei_me_legacy_cfg,
+	&mei_me_ich_cfg,
+	&mei_me_pch_cfg,
+	&mei_me_pch_cpt_pbg_cfg,
+	&mei_me_pch8_cfg,
+	&mei_me_pch8_sps_cfg,
+};
+
+const struct mei_cfg *mei_me_get_cfg(kernel_ulong_t idx)
+{
+	BUILD_BUG_ON(ARRAY_SIZE(mei_cfg_list) != MEI_ME_NUM_CFG);
+
+	if (idx >= MEI_ME_NUM_CFG)
+		return NULL;
+
+	return mei_cfg_list[idx];
 };
 
 /**
