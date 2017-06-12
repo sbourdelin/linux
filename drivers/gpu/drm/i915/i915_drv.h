@@ -1672,6 +1672,9 @@ struct intel_vbt_data {
 		const u8 *sequence[MIPI_SEQ_MAX];
 	} dsi;
 
+	/* HPD as wakesoure for DC9 BXT */
+	bool hpd_wakeup_enabled;
+
 	int crt_ddc_pin;
 
 	int child_dev_num;
