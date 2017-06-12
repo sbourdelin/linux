@@ -66,6 +66,7 @@ enum zram_pageflags {
 	ZRAM_SAME = ZRAM_FLAG_SHIFT,
 	ZRAM_DUP,
 	ZRAM_ACCESS,	/* page is now accessed */
+	ZRAM_WB,	/* page is stored on backing_device */
 
 	__NR_ZRAM_PAGEFLAGS,
 };
