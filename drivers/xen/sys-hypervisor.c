@@ -339,12 +339,41 @@ static ssize_t features_show(struct hyp_sysfs_attr *attr, char *buffer)
 
 HYPERVISOR_ATTR_RO(features);
 
+static ssize_t buildid_show(struct hyp_sysfs_attr *attr, char *buffer)
+{
+	ssize_t ret;
+	struct xen_build_id dummy;
+	struct xen_build_id *buildid;
+
+	dummy.len = 0;
+	ret = HYPERVISOR_xen_version(XENVER_get_features, &dummy);
+	if (ret < 0) {
+		if (ret == -EPERM)
+			ret = sprintf(buffer, "<denied>");
+		return ret;
+	}
+
+	buildid = kmalloc(sizeof(*buildid) + dummy.len, GFP_KERNEL);
+	if (!buildid)
+		return -ENOMEM;
+
+	ret = HYPERVISOR_xen_version(XENVER_get_features, buildid);
+	if (ret > 0)
+		ret = sprintf(buffer, "%s", buildid->buf);
+	kfree(buildid);
+
+	return ret;
+}
+
+HYPERVISOR_ATTR_RO(buildid);
+
 static struct attribute *xen_properties_attrs[] = {
 	&capabilities_attr.attr,
 	&changeset_attr.attr,
 	&virtual_start_attr.attr,
 	&pagesize_attr.attr,
 	&features_attr.attr,
+	&buildid_attr.attr,
 	NULL
 };
 
