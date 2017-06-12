@@ -1,0 +1,65 @@
+GENERIC SYSTEM INTERCONNECT CONTROLLER SUBSYSTEM
+===============================================
+
+1. Introduction
+---------------
+This framework is designed to provide a standard kernel interface to control
+the settings of the interconnects on a SoC. These settings can be throughput,
+latency and priority between multiple interconnected devices. This can be
+controlled dynamically in order to save power or provide maximum performance.
+
+The interconnect controller is a hardware with configurable parameters, which
+can be set on a data path according to the requests received from various
+drivers. An example of interconnect controllers are the interconnects between
+various components on chipsets. There can be multiple interconnects on a SoC
+that can be multi-tiered.
+
+Below is a simplified diagram of a real-world SoC topology. The interconnect
+providers are the memory front end and the NoCs.
+
++----------------+    +----------------+
+| HW Accelerator |--->|      M NoC     |<---------------+
++----------------+    +----------------+                |
+                        |      |                    +------------+
+          +-------------+      V       +------+     |            |
+          |                +--------+  | PCIe |     |            |
+          |                | Slaves |  +------+     |            |
+          |                +--------+     |         |   C NoC    |
+          V                               V         |            |
++------------------+   +------------------------+   |            |   +-----+
+|                  |-->|                        |-->|            |-->| CPU |
+|                  |-->|                        |<--|            |   +-----+
+|      Memory      |   |         S NoC          |   +------------+
+|                  |<--|                        |---------+    |
+|                  |<--|                        |<------+ |    |   +--------+
++------------------+   +------------------------+       | |    +-->| Slaves |
+   ^     ^    ^           ^                             | |        +--------+
+   |     |    |           |                             | V
++-----+  |  +-----+    +-----+  +---------+   +----------------+   +--------+
+| CPU |  |  | GPU |    | DSP |  | Masters |-->|       P NoC    |-->| Slaves |
++-----+  |  +-----+    +-----+  +---------+   +----------------+   +--------+
+         |
+     +-------+
+     | Modem |
+     +-------+
+
+2. Interconnect providers
+------------------------
+Interconnect provider is an entity that implements methods to initialize and
+configure a interconnect controller hardware.
+
+An interconnect controller should register with the interconnect provider core
+with interconnect_add_provider().
+
+A previously registered interconnect provider is unregistered with
+interconnect_del_provider().
+
+3. Interconnect consumers
+------------------------
+Interconnect consumers are the entities which make use of the data paths exposed
+by the providers. The consumers send requests to providers requesting various
+throughput, latency and priority. Usually the consumers are device drivers, that
+send request based on their needs.
+
+The interconnect framework consumer API functions are documented in
+include/linux/interconnect-consumer.h
