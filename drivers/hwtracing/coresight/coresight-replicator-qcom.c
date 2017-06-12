@@ -202,6 +202,12 @@ static struct amba_id replicator_ids[] = {
 		.mask   = 0x000bffff,
 		.data	= "REPLICATOR 1.0",
 	},
+	{
+		/* Coresight SoC-600 */
+		.id     = 0x000bb9ec,
+		.mask   = 0x000fffff,
+		.data	= "REPLICATOR 1.0",
+	},
 	{ 0, 0 },
 };
 
