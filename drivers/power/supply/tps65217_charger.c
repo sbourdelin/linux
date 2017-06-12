@@ -203,6 +203,23 @@ static int tps65217_charger_probe(struct platform_device *pdev)
 	int ret;
 	int i;
 
+	/*
+	 * By default the charger is enabled but if device is disabled stop
+	 * the charger accordingly to the configuration.
+	 */
+	if (!of_device_is_available(pdev->dev.of_node)) {
+		dev_dbg(&pdev->dev, "charger disabled\n");
+		ret = tps65217_clear_bits(tps, TPS65217_REG_CHGCONFIG1,
+					  TPS65217_CHGCONFIG1_CHG_EN,
+					  TPS65217_PROTECT_NONE);
+		if (ret) {
+			dev_err(&pdev->dev, "Error writing in reg 0x%x: %d\n",
+				TPS65217_REG_CHGCONFIG1, ret);
+			return ret;
+		}
+		return -ENODEV;
+	}
+
 	charger = devm_kzalloc(&pdev->dev, sizeof(*charger), GFP_KERNEL);
 	if (!charger)
 		return -ENOMEM;
