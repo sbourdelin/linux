@@ -1920,7 +1920,8 @@ static int kvm_guest_time_update(struct kvm_vcpu *v)
 
 	/* If the host uses TSC clocksource, then it is stable */
 	pvclock_flags = 0;
-	if (use_master_clock)
+	if (use_master_clock &&
+		!(v->kvm->arch.kvmclock_migration_unstable_tsc))
 		pvclock_flags |= PVCLOCK_TSC_STABLE_BIT;
 
 	vcpu->hv_clock.flags = pvclock_flags;
@@ -4184,8 +4185,8 @@ long kvm_arch_vm_ioctl(struct file *filp,
 			goto out;
 
 		r = -EINVAL;
-		if (user_ns.flags)
-			goto out;
+		if (user_ns.flags & MIGRATION_PVCLOCK_TSC_UNSTABLE_BIT)
+			kvm->arch.kvmclock_migration_unstable_tsc = true;
 
 		r = 0;
 		now_ns = get_kvmclock_ns(kvm);

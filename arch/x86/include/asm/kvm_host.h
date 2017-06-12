@@ -783,6 +783,7 @@ struct kvm_arch {
 
 	spinlock_t pvclock_gtod_sync_lock;
 	bool use_master_clock;
+	bool kvmclock_migration_unstable_tsc;
 	u64 master_kernel_ns;
 	u64 master_cycle_now;
 	struct delayed_work kvmclock_update_work;
