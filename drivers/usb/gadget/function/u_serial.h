@@ -12,6 +12,7 @@
 #ifndef __U_SERIAL_H
 #define __U_SERIAL_H
 
+#include <linux/poll.h>
 #include <linux/usb/composite.h>
 #include <linux/usb/cdc.h>
 
@@ -50,6 +51,8 @@ struct gserial {
 	void (*connect)(struct gserial *p);
 	void (*disconnect)(struct gserial *p);
 	int (*send_break)(struct gserial *p, int duration);
+	unsigned int (*poll)(struct gserial *p, struct file *file,
+				poll_table *wait);
 };
 
 /* utilities to allocate/free request and buffer */
