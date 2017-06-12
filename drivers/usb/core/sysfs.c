@@ -17,6 +17,7 @@
 #include <linux/usb.h>
 #include <linux/usb/quirks.h>
 #include <linux/of.h>
+#include <linux/security.h>
 #include "usb.h"
 
 /* Active configuration fields */
@@ -742,8 +743,11 @@ static ssize_t authorized_store(struct device *dev,
 		result = -EINVAL;
 	else if (val == 0)
 		result = usb_deauthorize_device(usb_dev);
-	else
+	else {
+		if (security_usb_device_auth(usb_dev))
+			return -EPERM;
 		result = usb_authorize_device(usb_dev);
+	}
 	return result < 0 ? result : size;
 }
 static DEVICE_ATTR_IGNORE_LOCKDEP(authorized, S_IRUGO | S_IWUSR,

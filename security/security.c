@@ -233,6 +233,11 @@ int security_ptrace_traceme(struct task_struct *parent)
 	return call_int_hook(ptrace_traceme, 0, parent);
 }
 
+int security_usb_device_auth(const struct usb_device *udev)
+{
+	return call_int_hook(usb_device_auth, 0, udev);
+}
+
 int security_capget(struct task_struct *target,
 		     kernel_cap_t *effective,
 		     kernel_cap_t *inheritable,

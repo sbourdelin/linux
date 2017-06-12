@@ -1189,6 +1189,10 @@
  *	to the @parent process for tracing.
  *	@parent contains the task_struct structure for debugger process.
  *	Return 0 if permission is granted.
+ * @usb_device_auth:
+ *	Check if @udev device should be authorized or not.
+ *	@udev contains the usb_device structure for the USB device.
+ *	Return 0 if the device is allowed.
  * @capget:
  *	Get the @effective, @inheritable, and @permitted capability sets for
  *	the @target process.  The hook may also perform permission checking to
@@ -1352,6 +1356,7 @@ union security_list_options {
 	int (*ptrace_access_check)(struct task_struct *child,
 					unsigned int mode);
 	int (*ptrace_traceme)(struct task_struct *parent);
+	int (*usb_device_auth)(const struct usb_device *udev);
 	int (*capget)(struct task_struct *target, kernel_cap_t *effective,
 			kernel_cap_t *inheritable, kernel_cap_t *permitted);
 	int (*capset)(struct cred *new, const struct cred *old,
@@ -1670,6 +1675,7 @@ struct security_hook_heads {
 	struct list_head binder_transfer_file;
 	struct list_head ptrace_access_check;
 	struct list_head ptrace_traceme;
+	struct list_head usb_device_auth;
 	struct list_head capget;
 	struct list_head capset;
 	struct list_head capable;

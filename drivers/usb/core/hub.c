@@ -28,6 +28,7 @@
 #include <linux/mutex.h>
 #include <linux/random.h>
 #include <linux/pm_qos.h>
+#include <linux/security.h>
 
 #include <linux/uaccess.h>
 #include <asm/byteorder.h>
@@ -4830,6 +4831,9 @@ static void hub_port_connect(struct usb_hub *hub, int port1, u16 portstatus,
 
 		if (udev->quirks & USB_QUIRK_DELAY_INIT)
 			msleep(1000);
+
+		if (security_usb_device_auth(udev))
+			usb_deauthorize_device(udev);
 
 		/* consecutive bus-powered hubs aren't reliable; they can
 		 * violate the voltage drop budget.  if the new child has

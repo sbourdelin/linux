@@ -30,6 +30,7 @@
 #include <linux/string.h>
 #include <linux/mm.h>
 #include <linux/fs.h>
+#include <linux/usb.h>
 
 struct linux_binprm;
 struct cred;
@@ -196,6 +197,7 @@ int security_binder_transfer_file(struct task_struct *from,
 				  struct task_struct *to, struct file *file);
 int security_ptrace_access_check(struct task_struct *child, unsigned int mode);
 int security_ptrace_traceme(struct task_struct *parent);
+int security_usb_device_auth(const struct usb_device *udev);
 int security_capget(struct task_struct *target,
 		    kernel_cap_t *effective,
 		    kernel_cap_t *inheritable,
@@ -432,6 +434,11 @@ static inline int security_ptrace_access_check(struct task_struct *child,
 static inline int security_ptrace_traceme(struct task_struct *parent)
 {
 	return cap_ptrace_traceme(parent);
+}
+
+static inline int security_usb_device_auth(const struct usb_device *udev)
+{
+	return 0;
 }
 
 static inline int security_capget(struct task_struct *target,
