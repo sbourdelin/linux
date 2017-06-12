@@ -643,7 +643,7 @@ static int alarm_timer_set(struct k_itimer *timr, int flags,
 			   struct itimerspec64 *new_setting,
 			   struct itimerspec64 *old_setting)
 {
-	ktime_t exp;
+	ktime_t exp, interval;
 
 	if (!rtcdev)
 		return -ENOTSUPP;
@@ -654,12 +654,6 @@ static int alarm_timer_set(struct k_itimer *timr, int flags,
 	if (old_setting)
 		alarm_timer_get(timr, old_setting);
 
-	/* If the timer was already set, cancel it */
-	if (alarm_try_to_cancel(&timr->it.alarm.alarmtimer) < 0)
-		return TIMER_RETRY;
-
-	/* start the timer */
-	timr->it.alarm.interval = timespec64_to_ktime(new_setting->it_interval);
 	exp = timespec64_to_ktime(new_setting->it_value);
 	/* Convert (if necessary) to absolute time */
 	if (flags != TIMER_ABSTIME) {
@@ -668,7 +662,19 @@ static int alarm_timer_set(struct k_itimer *timr, int flags,
 		now = alarm_bases[timr->it.alarm.alarmtimer.type].gettime();
 		exp = ktime_add(now, exp);
 	}
+	if (exp < 0)
+		exp = KTIME_MAX;
 
+	interval = timespec64_to_ktime(new_setting->it_interval);
+	if (interval < 0)
+		interval = KTIME_MAX;
+
+	/* If the timer was already set, cancel it */
+	if (alarm_try_to_cancel(&timr->it.alarm.alarmtimer) < 0)
+		return TIMER_RETRY;
+
+	/* start the timer */
+	timr->it.alarm.interval = interval;
 	alarm_start(&timr->it.alarm.alarmtimer, exp);
 	return 0;
 }
