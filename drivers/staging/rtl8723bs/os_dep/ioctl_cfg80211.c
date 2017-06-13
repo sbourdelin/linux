@@ -1464,7 +1464,7 @@ void rtw_cfg80211_surveydone_event_callback(struct adapter *padapter)
 		if (phead == plist)
 			break;
 
-		pnetwork = LIST_CONTAINOR(plist, struct wlan_network, list);
+		pnetwork = container_of(plist, struct wlan_network, list);
 
 		/* report network only if the current channel set contains the channel to which this network belongs */
 		if (rtw_ch_set_search_ch(padapter->mlmeextpriv.channel_set, pnetwork->network.Configuration.DSConfig) >= 0
@@ -2935,7 +2935,7 @@ static int cfg80211_rtw_del_station(struct wiphy *wiphy, struct net_device *ndev
 	/* check asoc_queue */
 	while (phead != plist)
 	{
-		psta = LIST_CONTAINOR(plist, struct sta_info, asoc_list);
+		psta = container_of(plist, struct sta_info, asoc_list);
 
 		plist = get_next(plist);
 
@@ -2994,7 +2994,7 @@ static struct sta_info *rtw_sta_info_get_by_idx(const int idx, struct sta_priv *
 	/* check asoc_queue */
 	while (phead != plist)
 	{
-		if (idx == i) psta = LIST_CONTAINOR(plist, struct sta_info, asoc_list);
+		if (idx == i) psta = container_of(plist, struct sta_info, asoc_list);
 		plist = get_next(plist);
 		i++;
 	}

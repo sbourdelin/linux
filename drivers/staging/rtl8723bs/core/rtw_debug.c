@@ -461,7 +461,7 @@ int proc_get_survey_info(struct seq_file *m, void *v)
 		if (phead == plist)
 			break;
 
-		pnetwork = LIST_CONTAINOR(plist, struct wlan_network, list);
+		pnetwork = container_of(plist, struct wlan_network, list);
 
 		if (!pnetwork)
 			break;
@@ -1286,7 +1286,7 @@ int proc_get_all_sta_info(struct seq_file *m, void *v)
 		plist = get_next(phead);
 
 		while (phead != plist) {
-			psta = LIST_CONTAINOR(plist, struct sta_info, hash_list);
+			psta = container_of(plist, struct sta_info, hash_list);
 
 			plist = get_next(plist);
 

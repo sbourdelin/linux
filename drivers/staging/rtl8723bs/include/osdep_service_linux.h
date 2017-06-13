@@ -85,9 +85,6 @@ __inline static struct list_head	*get_list_head(struct __queue	*queue)
 }
 
 
-#define LIST_CONTAINOR(ptr, type, member) \
-	container_of(ptr, type, member)
-
 #define RTW_TIMER_HDL_ARGS void *FunctionContext
 
 __inline static void _init_timer(_timer *ptimer, _nic_hdl nic_hdl, void *pfunc, void* cntx)
