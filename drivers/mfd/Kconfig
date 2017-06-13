@@ -750,6 +750,22 @@ config MFD_MAX8998
 	  additional drivers must be enabled in order to use the functionality
 	  of the device.
 
+config MFD_MAX7360
+	tristate "Maxim Semiconductor MAX7360 support"
+	depends on I2C && OF
+	select MFD_CORE
+	select REGMAP_I2C
+	select IRQ_DOMAIN
+	help
+	  Say yes here to add support for Maxim Semiconductor MAX7360.
+	  This provides microprocessors with management of up to 64 key switches,
+	  with an additional eight LED drivers/GPIOs that feature constant-current,
+	  PWM intensity control, and rotary switch control options.
+
+	  This driver provides common support for accessing the device,
+	  additional drivers must be enabled in order to use the functionality
+	  of the device.
+
 config MFD_MT6397
 	tristate "MediaTek MT6397 PMIC Support"
 	select MFD_CORE
