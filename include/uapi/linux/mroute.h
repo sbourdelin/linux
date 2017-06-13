@@ -152,6 +152,17 @@ enum {
 };
 #define IPMRA_VIFA_MAX (__IPMRA_VIFA_MAX - 1)
 
+/* ipmr netlink cache report attributes */
+enum {
+	IPMRA_CACHEREPORTA_MSGTYPE,
+	IPMRA_CACHEREPORTA_VIF_ID,
+	IPMRA_CACHEREPORTA_SRC_ADDR,
+	IPMRA_CACHEREPORTA_DST_ADDR,
+	IPMRA_CACHEREPORTA_PKT,
+	__IPMRA_CACHEREPORTA_MAX
+};
+#define IPMRA_CACHEREPORTA_MAX (__IPMRA_CACHEREPORTA_MAX - 1)
+
 /* That's all usermode folks */
 
 #define MFC_ASSERT_THRESH (3*HZ)		/* Maximal freq. of asserts */
