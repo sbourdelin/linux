@@ -240,6 +240,10 @@ omap_postcore_initcall(omap2_common_pm_init);
 
 int __init omap2_common_pm_late_init(void)
 {
+#if IS_BUILTIN(CONFIG_TWL6040_CORE) || IS_BUILTIN(CONFIG_TWL4030_CORE)
+	if (!twl_rev())
+		goto no_twl;
+
 	/* Init the voltage layer */
 	omap3_twl_init();
 	omap4_twl_init();
@@ -253,4 +257,9 @@ int __init omap2_common_pm_late_init(void)
 	omap_devinit_smartreflex();
 
 	return 0;
+
+no_twl:
+#endif
+	pr_err("OMAP4 PM not supported!\n");
+	return -ENODEV;
 }
