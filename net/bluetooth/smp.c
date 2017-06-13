@@ -814,7 +814,10 @@ static void smp_failure(struct l2cap_conn *conn, u8 reason)
 		smp_send_cmd(conn, SMP_CMD_PAIRING_FAIL, sizeof(reason),
 			     &reason);
 
-	mgmt_auth_failed(hcon, MGMT_STATUS_AUTH_FAILED);
+	if (reason == SMP_PAIRING_NOTSUPP)
+		mgmt_auth_failed(hcon, MGMT_STATUS_NOT_SUPPORTED);
+	else
+		mgmt_auth_failed(hcon, MGMT_STATUS_AUTH_FAILED);
 
 	if (chan->data)
 		smp_chan_destroy(conn);
@@ -1867,6 +1870,17 @@ static u8 smp_cmd_pairing_req(struct l2cap_conn *conn, struct sk_buff *skb)
 	return 0;
 }
 
+static u8 smp_cmd_pairing_fail(struct l2cap_conn *conn, struct sk_buff *skb)
+{
+	struct smp_cmd_pairing_fail *rsp = (void *) skb->data;
+
+	if (skb->len < sizeof(*rsp))
+		return SMP_INVALID_PARAMS;
+
+	skb_pull(skb, sizeof(*rsp));
+	return rsp->reason;
+}
+
 static u8 sc_send_public_key(struct smp_chan *smp)
 {
 	struct hci_dev *hdev = smp->conn->hcon->hdev;
@@ -2865,8 +2879,11 @@ static int smp_sig_channel(struct l2cap_chan *chan, struct sk_buff *skb)
 		break;
 
 	case SMP_CMD_PAIRING_FAIL:
-		smp_failure(conn, 0);
-		err = -EPERM;
+		reason = smp_cmd_pairing_fail(conn, skb);
+		if (reason != SMP_PAIRING_NOTSUPP) {
+			smp_failure(conn, 0);
+			err = -EPERM;
+		}
 		break;
 
 	case SMP_CMD_PAIRING_RSP:
