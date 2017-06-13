@@ -125,7 +125,7 @@ static const struct ieee80211_regdomain *_rtw_regdomain_select(struct
 
 static void _rtw_regd_init_wiphy(struct rtw_regulatory *reg,
 				struct wiphy *wiphy,
-				void (*reg_notifier) (struct wiphy * wiphy,
+				void (*reg_notifier)(struct wiphy *wiphy,
 						     struct regulatory_request *
 						     request))
 {
@@ -145,7 +145,7 @@ static void _rtw_regd_init_wiphy(struct rtw_regulatory *reg,
 }
 
 int rtw_regd_init(struct adapter *padapter,
-		  void (*reg_notifier) (struct wiphy * wiphy,
+		  void (*reg_notifier)(struct wiphy *wiphy,
 				       struct regulatory_request *request))
 {
 	struct wiphy *wiphy = padapter->rtw_wdev->wiphy;
