@@ -790,6 +790,8 @@ ap_i2c_audio: &i2c8 {
 &spi5 {
 	status = "okay";
 
+	cs-gpios = <&gpio2 23 GPIO_ACTIVE_HIGH>;
+
 	cros_ec: ec@0 {
 		compatible = "google,cros-ec-spi";
 		reg = <0>;
@@ -811,6 +813,10 @@ ap_i2c_audio: &i2c8 {
 			#pwm-cells = <1>;
 		};
 	};
+};
+
+&spi5_cs0 {
+	rockchip,pins = <RK_GPIO2 23 RK_FUNC_GPIO &pcfg_output_high>;
 };
 
 &tsadc {
