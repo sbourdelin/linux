@@ -583,10 +583,10 @@ next:
 			ret = btrfs_next_old_item(root, path, time_seq);
 	}
 
-	if (ret > 0)
-		ret = 0;
-	else if (ret < 0)
+	if (ret < 0)
 		free_inode_elem_list(eie);
+	else
+		ret = 0;
 	return ret;
 }
 
