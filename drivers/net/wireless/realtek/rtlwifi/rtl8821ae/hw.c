@@ -1360,7 +1360,6 @@ static bool _rtl8821ae_reset_pcie_interface_dma(struct ieee80211_hw *hw,
 static void _rtl8821ae_get_wakeup_reason(struct ieee80211_hw *hw)
 {
 	struct rtl_priv *rtlpriv = rtl_priv(hw);
-	struct rtl_hal *rtlhal = rtl_hal(rtl_priv(hw));
 	struct rtl_ps_ctl *ppsc = rtl_psc(rtlpriv);
 	u8 fw_reason = 0;
 	struct timeval ts;
@@ -1371,8 +1370,6 @@ static void _rtl8821ae_get_wakeup_reason(struct ieee80211_hw *hw)
 		 fw_reason);
 
 	ppsc->wakeup_reason = 0;
-
-	rtlhal->last_suspend_sec = ts.tv_sec;
 
 	switch (fw_reason) {
 	case FW_WOW_V2_PTK_UPDATE_EVENT:
