@@ -44,9 +44,6 @@ struct gserial {
 	struct usb_ep			*in;
 	struct usb_ep			*out;
 
-	/* REVISIT avoid this CDC-ACM support harder ... */
-	struct usb_cdc_line_coding port_line_coding;	/* 9600-8-N-1 etc */
-
 	/* notification callbacks */
 	void (*connect)(struct gserial *p);
 	void (*disconnect)(struct gserial *p);

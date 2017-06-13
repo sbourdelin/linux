@@ -129,9 +129,6 @@ struct gs_port {
 	wait_queue_head_t	drain_wait;	/* wait while writes drain */
 	bool                    write_busy;
 	wait_queue_head_t	close_wait;
-
-	/* REVISIT this state ... */
-	struct usb_cdc_line_coding port_line_coding;	/* 8-N-1 etc */
 };
 
 static struct portmaster {
@@ -1314,7 +1311,7 @@ static void gserial_console_exit(void)
 #endif
 
 static int
-gs_port_alloc(unsigned port_num, struct usb_cdc_line_coding *coding)
+gs_port_alloc(unsigned port_num)
 {
 	struct gs_port	*port;
 	int		ret = 0;
@@ -1343,7 +1340,6 @@ gs_port_alloc(unsigned port_num, struct usb_cdc_line_coding *coding)
 	INIT_LIST_HEAD(&port->write_pool);
 
 	port->port_num = port_num;
-	port->port_line_coding = *coding;
 
 	ports[port_num].port = port;
 out:
@@ -1392,18 +1388,12 @@ EXPORT_SYMBOL_GPL(gserial_free_line);
 
 int gserial_alloc_line(unsigned char *line_num)
 {
-	struct usb_cdc_line_coding	coding;
 	struct device			*tty_dev;
 	int				ret;
 	int				port_num;
 
-	coding.dwDTERate = cpu_to_le32(9600);
-	coding.bCharFormat = 8;
-	coding.bParityType = USB_CDC_NO_PARITY;
-	coding.bDataBits = USB_CDC_1_STOP_BITS;
-
 	for (port_num = 0; port_num < MAX_U_SERIAL_PORTS; port_num++) {
-		ret = gs_port_alloc(port_num, &coding);
+		ret = gs_port_alloc(port_num);
 		if (ret == -EBUSY)
 			continue;
 		if (ret)
@@ -1491,11 +1481,6 @@ int gserial_connect(struct gserial *gser, u8 port_num)
 	gser->ioport = port;
 	port->port_usb = gser;
 
-	/* REVISIT unclear how best to handle this state...
-	 * we don't really couple it with the Linux TTY.
-	 */
-	gser->port_line_coding = port->port_line_coding;
-
 	/* REVISIT if waiting on "carrier detect", signal. */
 
 	/* if it's already open, start I/O ... and notify the serial
@@ -1542,9 +1527,6 @@ void gserial_disconnect(struct gserial *gser)
 
 	/* tell the TTY glue not to do I/O here any more */
 	spin_lock_irqsave(&port->port_lock, flags);
-
-	/* REVISIT as above: how best to track this? */
-	port->port_line_coding = gser->port_line_coding;
 
 	port->port_usb = NULL;
 	gser->ioport = NULL;
