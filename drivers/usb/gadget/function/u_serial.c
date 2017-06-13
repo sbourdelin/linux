@@ -1040,6 +1040,20 @@ static unsigned int gs_poll(struct tty_struct *tty, struct file *file,
 	return mask;
 }
 
+static int gs_ioctl(struct tty_struct *tty, unsigned int cmd, unsigned long arg)
+{
+	struct gs_port *port = tty->driver_data;
+	struct gserial *gser;
+	int ret = -ENOIOCTLCMD;
+
+	spin_lock_irq(&port->port_lock);
+	gser = port->port_usb;
+	if (gser && gser->ioctl)
+		ret = gser->ioctl(gser, cmd, arg);
+	spin_unlock_irq(&port->port_lock);
+	return ret;
+}
+
 static const struct tty_operations gs_tty_ops = {
 	.open =			gs_open,
 	.close =		gs_close,
@@ -1051,6 +1065,7 @@ static const struct tty_operations gs_tty_ops = {
 	.unthrottle =		gs_unthrottle,
 	.break_ctl =		gs_break_ctl,
 	.poll =			gs_poll,
+	.ioctl =		gs_ioctl,
 };
 
 /*-------------------------------------------------------------------------*/

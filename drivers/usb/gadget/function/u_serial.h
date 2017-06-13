@@ -53,6 +53,7 @@ struct gserial {
 	int (*send_break)(struct gserial *p, int duration);
 	unsigned int (*poll)(struct gserial *p, struct file *file,
 				poll_table *wait);
+	int (*ioctl)(struct gserial *p, unsigned int cmd, unsigned long arg);
 };
 
 /* utilities to allocate/free request and buffer */
