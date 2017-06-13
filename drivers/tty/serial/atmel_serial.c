@@ -228,21 +228,6 @@ static inline void atmel_uart_writel(struct uart_port *port, u32 reg, u32 value)
 	__raw_writel(value, port->membase + reg);
 }
 
-#ifdef CONFIG_AVR32
-
-/* AVR32 cannot handle 8 or 16bit I/O accesses but only 32bit I/O accesses */
-static inline u8 atmel_uart_read_char(struct uart_port *port)
-{
-	return __raw_readl(port->membase + ATMEL_US_RHR);
-}
-
-static inline void atmel_uart_write_char(struct uart_port *port, u8 value)
-{
-	__raw_writel(value, port->membase + ATMEL_US_THR);
-}
-
-#else
-
 static inline u8 atmel_uart_read_char(struct uart_port *port)
 {
 	return __raw_readb(port->membase + ATMEL_US_RHR);
@@ -252,8 +237,6 @@ static inline void atmel_uart_write_char(struct uart_port *port, u8 value)
 {
 	__raw_writeb(value, port->membase + ATMEL_US_THR);
 }
-
-#endif
 
 #ifdef CONFIG_SERIAL_ATMEL_PDC
 static bool atmel_use_pdc_rx(struct uart_port *port)
