@@ -264,7 +264,7 @@ if ($arch eq "x86_64") {
     $ld .= " -m shlelf_linux";
     $objcopy .= " -O elf32-sh-linux";
 
-} elsif ($arch eq "powerpc") {
+} elsif ($arch eq "powerpc" || $arch eq "ppc64le") {
     $local_regex = "^[0-9a-fA-F]+\\s+t\\s+(\\.?\\S+)";
     # See comment in the sparc64 section for why we use '\w'.
     $function_regex = "^([0-9a-fA-F]+)\\s+<(\\.?\\w*?)>:";
