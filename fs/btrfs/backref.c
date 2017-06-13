@@ -285,7 +285,7 @@ static int ref_tree_add(struct ref_root *ref_tree, u64 root_id, u64 object_id,
 
 	if (node->ref_mod > 0)
 		ref_tree->unique_refs += origin_count > 0 ? 0 : 1;
-	else if (node->ref_mod <= 0)
+	else
 		ref_tree->unique_refs += origin_count > 0 ? -1 : 0;
 
 	if (!node->ref_mod)
