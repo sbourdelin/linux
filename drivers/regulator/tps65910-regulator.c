@@ -1082,7 +1082,8 @@ static int tps65910_probe(struct platform_device *pdev)
 	struct tps65910_reg *pmic;
 	struct tps65910_board *pmic_plat_data;
 	struct of_regulator_match *tps65910_reg_matches = NULL;
-	int i, err;
+	bool made_progress;
+	int i, err, pending;
 
 	pmic_plat_data = dev_get_platdata(tps65910->dev);
 	if (!pmic_plat_data && tps65910->dev->of_node)
@@ -1146,6 +1147,7 @@ static int tps65910_probe(struct platform_device *pdev)
 	if (!pmic->rdev)
 		return -ENOMEM;
 
+	/* prepare regulator description */
 	for (i = 0; i < pmic->num_regulators; i++, info++) {
 		/* Register the regulators */
 		pmic->info[i] = info;
@@ -1196,18 +1198,32 @@ static int tps65910_probe(struct platform_device *pdev)
 		pmic->desc[i].owner = THIS_MODULE;
 		pmic->desc[i].enable_reg = pmic->get_ctrl_reg(i);
 		pmic->desc[i].enable_mask = TPS65910_SUPPLY_STATE_ENABLED;
+	}
 
-		config.dev = tps65910->dev;
+	/* Register regulators - loop, as one regulator's output
+	 * might be anothers input */
+
+	config.dev = pmic->mfd->dev;
+	config.driver_data = pmic;
+	config.regmap = pmic->mfd->regmap;
+	pending = pmic->num_regulators;
+
+reg_retry:
+	made_progress = false;
+	for (i = 0; i < pmic->num_regulators; i++) {
+		if (pmic->rdev[i])
+			continue;
+
 		config.init_data = pmic_plat_data->tps65910_pmic_init_data[i];
-		config.driver_data = pmic;
-		config.regmap = tps65910->regmap;
-
 		if (tps65910_reg_matches)
 			config.of_node = tps65910_reg_matches[i].of_node;
 
 		rdev = devm_regulator_register(&pdev->dev, &pmic->desc[i],
 					       &config);
 		if (IS_ERR(rdev)) {
+			if (PTR_ERR(rdev) == -EPROBE_DEFER)
+				continue;
+
 			dev_err(tps65910->dev,
 				"failed to register %s regulator\n",
 				pdev->name);
@@ -1216,8 +1232,19 @@ static int tps65910_probe(struct platform_device *pdev)
 
 		/* Save regulator for cleanup */
 		pmic->rdev[i] = rdev;
+
+		made_progress = true;
+		--pending;
 	}
-	return 0;
+
+	/* all done? */
+	if (!pending)
+		return 0;
+
+	if (made_progress)
+		goto reg_retry;
+
+	return -EPROBE_DEFER;
 }
 
 static void tps65910_shutdown(struct platform_device *pdev)
