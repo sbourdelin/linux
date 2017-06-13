@@ -8,9 +8,20 @@ Required properties:
  - reg: physical base address of the controller and length of memory mapped
    region
 
+Optional properties:
+ - external-signal: If the property is present then an external signal is to
+   be generated on watchdog timeout.  If absent, external signal is not
+   generated.
+
+ - no-system-reset: If the property is present then system will not be reset
+   on watchdog timeout. In this case one of the other watchdogs will handle
+   reset.  If absent then the watchdog resets the system on timeout.
+
 Example:
 
 	wdt1: watchdog@1e785000 {
 		compatible = "aspeed,ast2400-wdt";
 		reg = <0x1e785000 0x1c>;
+		external-signal;
+		no-system-reset;
 	};
