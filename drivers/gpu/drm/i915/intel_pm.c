@@ -2727,6 +2727,40 @@ static void ilk_compute_wm_level(const struct drm_i915_private *dev_priv,
 	result->enable = true;
 }
 
+static uint_fixed_16_16_t
+intel_get_linetime_us(const struct intel_crtc_state *cstate)
+{
+	uint32_t pixel_rate;
+	uint32_t crtc_htotal;
+	uint_fixed_16_16_t linetime_us;
+
+	if (!cstate->base.active)
+		return u32_to_fixed16(0);
+
+	pixel_rate = cstate->pixel_rate;
+
+	if (WARN_ON(pixel_rate == 0))
+		return u32_to_fixed16(0);
+
+	crtc_htotal = cstate->base.adjusted_mode.crtc_htotal;
+	linetime_us = div_fixed16(crtc_htotal * 1000, pixel_rate);
+
+	return linetime_us;
+}
+
+static uint32_t
+intel_compute_linetime_wm(const struct intel_crtc_state *cstate)
+{
+	uint_fixed_16_16_t linetime_us;
+
+	linetime_us = intel_get_linetime_us(cstate);
+
+	if (is_fixed16_zero(linetime_us))
+		return 0;
+
+	return fixed16_to_u32_round_up(mul_u32_fixed16(8, linetime_us));
+}
+
 static uint32_t
 hsw_compute_linetime_wm(const struct intel_crtc_state *cstate)
 {
@@ -2746,8 +2780,7 @@ hsw_compute_linetime_wm(const struct intel_crtc_state *cstate)
 	/* The WM are computed with base on how long it takes to fill a single
 	 * row at the given clock rate, multiplied by 8.
 	 * */
-	linetime = DIV_ROUND_CLOSEST(adjusted_mode->crtc_htotal * 1000 * 8,
-				     adjusted_mode->crtc_clock);
+	linetime = intel_compute_linetime_wm(cstate);
 	ips_linetime = DIV_ROUND_CLOSEST(adjusted_mode->crtc_htotal * 1000 * 8,
 					 intel_state->cdclk.logical.cdclk);
 
@@ -4381,27 +4414,6 @@ static uint_fixed_16_16_t skl_wm_method2(uint32_t pixel_rate,
 	return ret;
 }
 
-static uint_fixed_16_16_t
-intel_get_linetime_us(struct intel_crtc_state *cstate)
-{
-	uint32_t pixel_rate;
-	uint32_t crtc_htotal;
-	uint_fixed_16_16_t linetime_us;
-
-	if (!cstate->base.active)
-		return u32_to_fixed16(0);
-
-	pixel_rate = cstate->pixel_rate;
-
-	if (WARN_ON(pixel_rate == 0))
-		return u32_to_fixed16(0);
-
-	crtc_htotal = cstate->base.adjusted_mode.crtc_htotal;
-	linetime_us = div_fixed16(crtc_htotal * 1000, pixel_rate);
-
-	return linetime_us;
-}
-
 static uint32_t
 skl_adjusted_plane_pixel_rate(const struct intel_crtc_state *cstate,
 			      const struct intel_plane_state *pstate)
@@ -4609,15 +4621,9 @@ skl_compute_linetime_wm(struct intel_crtc_state *cstate)
 {
 	struct drm_atomic_state *state = cstate->base.state;
 	struct drm_i915_private *dev_priv = to_i915(state->dev);
-	uint_fixed_16_16_t linetime_us;
 	uint32_t linetime_wm;
 
-	linetime_us = intel_get_linetime_us(cstate);
-
-	if (is_fixed16_zero(linetime_us))
-		return 0;
-
-	linetime_wm = fixed16_to_u32_round_up(mul_u32_fixed16(8, linetime_us));
+	linetime_wm = intel_compute_linetime_wm(cstate);
 
 	/* Display WA #1135: bxt. */
 	if (IS_BROXTON(dev_priv) && dev_priv->ipc_enabled)
