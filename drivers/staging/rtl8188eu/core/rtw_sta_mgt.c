@@ -68,7 +68,8 @@ u32	_rtw_init_sta_priv(struct	sta_priv *pstapriv)
 	struct sta_info *psta;
 	s32 i;
 
-	pstapriv->pallocated_stainfo_buf = vzalloc(sizeof(struct sta_info) * NUM_STA + 4);
+	pstapriv->pallocated_stainfo_buf = vzalloc(sizeof(struct sta_info) *
+						   NUM_STA + 4);
 
 	if (!pstapriv->pallocated_stainfo_buf)
 		return _FAIL;
@@ -91,7 +92,8 @@ u32	_rtw_init_sta_priv(struct	sta_priv *pstapriv)
 
 		INIT_LIST_HEAD(&pstapriv->sta_hash[i]);
 
-		list_add_tail(&psta->list, get_list_head(&pstapriv->free_sta_queue));
+		list_add_tail(&psta->list,
+			      get_list_head(&pstapriv->free_sta_queue));
 
 		psta++;
 	}
@@ -119,20 +121,25 @@ u32	_rtw_init_sta_priv(struct	sta_priv *pstapriv)
 
 inline int rtw_stainfo_offset(struct sta_priv *stapriv, struct sta_info *sta)
 {
-	int offset = (((u8 *)sta) - stapriv->pstainfo_buf)/sizeof(struct sta_info);
+	int offset = (((u8 *)sta) - stapriv->pstainfo_buf) /
+		      sizeof(struct sta_info);
 
 	if (!stainfo_offset_valid(offset))
-		DBG_88E("%s invalid offset(%d), out of range!!!", __func__, offset);
+		DBG_88E("%s invalid offset(%d), out of range!!!",
+			__func__, offset);
 
 	return offset;
 }
 
-inline struct sta_info *rtw_get_stainfo_by_offset(struct sta_priv *stapriv, int offset)
+inline struct sta_info *rtw_get_stainfo_by_offset(struct sta_priv *stapriv,
+						  int offset)
 {
 	if (!stainfo_offset_valid(offset))
-		DBG_88E("%s invalid offset(%d), out of range!!!", __func__, offset);
+		DBG_88E("%s invalid offset(%d), out of range!!!",
+			__func__, offset);
 
-	return (struct sta_info *)(stapriv->pstainfo_buf + offset * sizeof(struct sta_info));
+	return (struct sta_info *)(stapriv->pstainfo_buf +
+				   offset * sizeof(struct sta_info));
 }
 
 u32	_rtw_free_sta_priv(struct	sta_priv *pstapriv)
@@ -157,7 +164,8 @@ u32	_rtw_free_sta_priv(struct	sta_priv *pstapriv)
 				plist = plist->next;
 
 				for (i = 0; i < 16; i++) {
-					preorder_ctrl = &psta->recvreorder_ctrl[i];
+					preorder_ctrl =
+						&psta->recvreorder_ctrl[i];
 					del_timer_sync(&preorder_ctrl->reordering_ctrl_timer);
 				}
 			}
@@ -194,9 +202,11 @@ struct sta_info *rtw_alloc_stainfo(struct sta_priv *pstapriv, u8 *hwaddr)
 		_rtw_init_stainfo(psta);
 		memcpy(psta->hwaddr, hwaddr, ETH_ALEN);
 		index = wifi_mac_hash(hwaddr);
-		RT_TRACE(_module_rtl871x_sta_mgt_c_, _drv_info_, ("rtw_alloc_stainfo: index=%x", index));
+		RT_TRACE(_module_rtl871x_sta_mgt_c_, _drv_info_,
+			 ("rtw_alloc_stainfo: index=%x", index));
 		if (index >= NUM_STA) {
-			RT_TRACE(_module_rtl871x_sta_mgt_c_, _drv_err_, ("ERROR => rtw_alloc_stainfo: index >= NUM_STA"));
+			RT_TRACE(_module_rtl871x_sta_mgt_c_, _drv_err_,
+				 ("ERROR => rtw_alloc_stainfo: index >= NUM_STA"));
 			psta = NULL;
 			goto exit;
 		}
@@ -208,12 +218,16 @@ struct sta_info *rtw_alloc_stainfo(struct sta_priv *pstapriv, u8 *hwaddr)
 		spin_unlock_bh(&pstapriv->sta_hash_lock);
 
 /*  Commented by Albert 2009/08/13 */
-/*  For the SMC router, the sequence number of first packet of WPS handshake will be 0. */
-/*  In this case, this packet will be dropped by recv_decache function if we use the 0x00 as the default value for tid_rxseq variable. */
-/*  So, we initialize the tid_rxseq variable as the 0xffff. */
+/*  For the SMC router, the sequence number of first packet of WPS handshake
+ *  will be 0.
+ *  In this case, this packet will be dropped by recv_decache function if we use
+ *  the 0x00 as the default value for tid_rxseq variable.
+ *  So, we initialize the tid_rxseq variable as the 0xffff.
+ */
 
 		for (i = 0; i < 16; i++)
-			memcpy(&psta->sta_recvpriv.rxcache.tid_rxseq[i], &wRxSeqInitialValue, 2);
+			memcpy(&psta->sta_recvpriv.rxcache.tid_rxseq[i],
+			       &wRxSeqInitialValue, 2);
 
 		RT_TRACE(_module_rtl871x_sta_mgt_c_, _drv_info_,
 			 ("alloc number_%d stainfo  with hwaddr = %pM\n",
@@ -304,18 +318,22 @@ u32	rtw_free_stainfo(struct adapter *padapter, struct sta_info *psta)
 
 	del_timer_sync(&psta->addba_retry_timer);
 
-	/* for A-MPDU Rx reordering buffer control, cancel reordering_ctrl_timer */
+	/* for A-MPDU Rx reordering buffer control,
+	 * cancel reordering_ctrl_timer
+	 */
 	for (i = 0; i < 16; i++) {
 		struct list_head *phead, *plist;
 		struct recv_frame *prframe;
 		struct __queue *ppending_recvframe_queue;
-		struct __queue *pfree_recv_queue = &padapter->recvpriv.free_recv_queue;
+		struct __queue *pfree_recv_queue =
+			&padapter->recvpriv.free_recv_queue;
 
 		preorder_ctrl = &psta->recvreorder_ctrl[i];
 
 		del_timer_sync(&preorder_ctrl->reordering_ctrl_timer);
 
-		ppending_recvframe_queue = &preorder_ctrl->pending_recvframe_queue;
+		ppending_recvframe_queue =
+			&preorder_ctrl->pending_recvframe_queue;
 
 		spin_lock_bh(&ppending_recvframe_queue->lock);
 
@@ -453,14 +471,16 @@ u32 rtw_init_bcmc_stainfo(struct adapter *padapter)
 {
 	struct sta_info		*psta;
 	u32 res = _SUCCESS;
-	unsigned char bcast_addr[ETH_ALEN] = {0xff, 0xff, 0xff, 0xff, 0xff, 0xff};
+	unsigned char bcast_addr[ETH_ALEN] = {0xff, 0xff, 0xff, 0xff, 0xff,
+					      0xff};
 	struct	sta_priv *pstapriv = &padapter->stapriv;
 
 	psta = rtw_alloc_stainfo(pstapriv, bcast_addr);
 
 	if (!psta) {
 		res = _FAIL;
-		RT_TRACE(_module_rtl871x_sta_mgt_c_, _drv_err_, ("rtw_alloc_stainfo fail"));
+		RT_TRACE(_module_rtl871x_sta_mgt_c_, _drv_err_,
+			 ("rtw_alloc_stainfo fail"));
 		goto exit;
 	}
 
