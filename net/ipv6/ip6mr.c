@@ -116,6 +116,7 @@ static int __ip6mr_fill_mroute(struct mr6_table *mrt, struct sk_buff *skb,
 			       struct mfc6_cache *c, struct rtmsg *rtm);
 static void mr6_netlink_event(struct mr6_table *mrt, struct mfc6_cache *mfc,
 			      int cmd);
+static void mrt6msg_netlink_event(struct mr6_table *mrt, struct sk_buff *pkt);
 static int ip6mr_rtm_dumproute(struct sk_buff *skb,
 			       struct netlink_callback *cb);
 static void mroute_clean_tables(struct mr6_table *mrt, bool all);
@@ -1123,8 +1124,7 @@ static void ip6mr_cache_resolve(struct net *net, struct mr6_table *mrt,
 }
 
 /*
- *	Bounce a cache query up to pim6sd. We could use netlink for this but pim6sd
- *	expects the following bizarre scheme.
+ *	Bounce a cache query up to pim6sd and netlink.
  *
  *	Called under mrt_lock.
  */
@@ -1205,6 +1205,8 @@ static int ip6mr_cache_report(struct mr6_table *mrt, struct sk_buff *pkt,
 		kfree_skb(skb);
 		return -EINVAL;
 	}
+
+	mrt6msg_netlink_event(mrt, skb);
 
 	/*
 	 *	Deliver to user space multicast routing algorithms
@@ -2453,6 +2455,63 @@ errout:
 	kfree_skb(skb);
 	if (err < 0)
 		rtnl_set_sk_err(net, RTNLGRP_IPV6_MROUTE, err);
+}
+
+static void mrt6msg_netlink_event(struct mr6_table *mrt, struct sk_buff *pkt)
+{
+	struct net *net = read_pnet(&mrt->net);
+	struct nlmsghdr *nlh;
+	struct rtgenmsg *rtgenm;
+	struct mrt6msg *msg;
+	struct sk_buff *skb;
+	int payloadlen;
+	int msgsize;
+
+	payloadlen = pkt->len - sizeof(struct mrt6msg);
+	msg = (struct mrt6msg *)skb_transport_header(pkt);
+	msgsize = NLMSG_ALIGN(sizeof(struct rtgenmsg))
+			+ nla_total_size(1)
+					/* IP6MRA_CACHEREPORTA_MSGTYPE */
+			+ nla_total_size(2)
+					/* IP6MRA_CACHEREPORTA_MIF_ID */
+			+ nla_total_size(sizeof(struct in6_addr))
+					/* IP6MRA_CACHEREPORTA_SRC_ADDR */
+			+ nla_total_size(sizeof(struct in6_addr))
+					/* IP6MRA_CACHEREPORTA_DST_ADDR */
+			+ nla_total_size(payloadlen)
+					/* IP6MRA_CACHEREPORTA_PKT */
+			;
+
+	skb = nlmsg_new(msgsize, GFP_ATOMIC);
+	if (!skb)
+		goto errout;
+
+	nlh = nlmsg_put(skb, 0, 0, RTM_NEWCACHEREPORT,
+			sizeof(struct rtgenmsg), 0);
+	if (!nlh)
+		goto errout;
+	rtgenm = nlmsg_data(nlh);
+	rtgenm->rtgen_family = RTNL_FAMILY_IP6MR;
+	if (nla_put_u8(skb, IP6MRA_CACHEREPORTA_MSGTYPE, msg->im6_msgtype) ||
+	    nla_put_u16(skb, IP6MRA_CACHEREPORTA_MIF_ID, msg->im6_mif) ||
+	    nla_put_in6_addr(skb, IP6MRA_CACHEREPORTA_SRC_ADDR,
+			     &msg->im6_src) ||
+	    nla_put_in6_addr(skb, IP6MRA_CACHEREPORTA_DST_ADDR,
+			     &msg->im6_dst) ||
+	    nla_put(skb, IP6MRA_CACHEREPORTA_PKT, payloadlen,
+		    pkt->data + sizeof(struct mrt6msg)))
+		goto nla_put_failure;
+
+	nlmsg_end(skb, nlh);
+
+	rtnl_notify(skb, net, 0, RTNLGRP_IPV6_MROUTE, NULL, GFP_ATOMIC);
+	return;
+
+nla_put_failure:
+	nlmsg_cancel(skb, nlh);
+errout:
+	kfree_skb(skb);
+	rtnl_set_sk_err(net, RTNLGRP_IPV6_MROUTE, -ENOBUFS);
 }
 
 static int ip6mr_rtm_dumproute(struct sk_buff *skb, struct netlink_callback *cb)
