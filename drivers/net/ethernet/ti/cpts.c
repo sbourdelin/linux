@@ -245,7 +245,8 @@ static void cpts_overflow_check(struct work_struct *work)
 
 	cpts_ptp_gettime(&cpts->info, &ts);
 	pr_debug("cpts overflow check at %lld.%09lu\n", ts.tv_sec, ts.tv_nsec);
-	schedule_delayed_work(&cpts->overflow_work, cpts->ov_check_period);
+	queue_delayed_work(cpts->workwq, &cpts->overflow_work,
+			   cpts->ov_check_period);
 }
 
 static int cpts_match(struct sk_buff *skb, unsigned int ptp_class,
@@ -378,7 +379,8 @@ int cpts_register(struct cpts *cpts)
 	}
 	cpts->phc_index = ptp_clock_index(cpts->clock);
 
-	schedule_delayed_work(&cpts->overflow_work, cpts->ov_check_period);
+	queue_delayed_work(cpts->workwq, &cpts->overflow_work,
+			   cpts->ov_check_period);
 	return 0;
 
 err_ptp:
@@ -477,6 +479,11 @@ struct cpts *cpts_create(struct device *dev, void __iomem *regs,
 	cpts->reg = (struct cpsw_cpts __iomem *)regs;
 	spin_lock_init(&cpts->lock);
 	INIT_DELAYED_WORK(&cpts->overflow_work, cpts_overflow_check);
+	cpts->workwq = alloc_ordered_workqueue("cpts_ptp",
+					       WQ_MEM_RECLAIM | WQ_HIGHPRI);
+	if (!cpts->workwq)
+		return ERR_PTR(-ENOMEM);
+
 
 	ret = cpts_of_parse(cpts, node);
 	if (ret)
