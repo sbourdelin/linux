@@ -11,6 +11,14 @@ else
         KBUILD_DEFCONFIG := $(ARCH)_defconfig
 endif
 
+# Handle different option names for specifying stack alignment with gcc and
+# clang.
+ifeq ($(cc-name),clang)
+	stack_align_opt := -mstack-alignment
+else
+	stack_align_opt := -mpreferred-stack-boundary
+endif
+
 # How to compile the 16-bit code.  Note we always compile for -march=i386;
 # that way we can complain to the user if the CPU is insufficient.
 #
@@ -28,7 +36,7 @@ REALMODE_CFLAGS	:= $(M16_CFLAGS) -g -Os -D__KERNEL__ \
 
 REALMODE_CFLAGS += $(call cc-option-no-kbuild, $(REALMODE_CFLAGS), -ffreestanding)
 REALMODE_CFLAGS += $(call cc-option-no-kbuild, $(REALMODE_CFLAGS), -fno-stack-protector)
-REALMODE_CFLAGS += $(call cc-option-no-kbuild, $(REALMODE_CFLAGS), -mpreferred-stack-boundary=2)
+REALMODE_CFLAGS += $(call cc-option-no-kbuild, $(REALMODE_CFLAGS), $(stack_align_opt)=2)
 export REALMODE_CFLAGS
 
 # BITS is used as extension for files which are available in a 32 bit
@@ -65,8 +73,8 @@ ifeq ($(CONFIG_X86_32),y)
         # with nonstandard options
         KBUILD_CFLAGS += -fno-pic
 
-        # prevent gcc from keeping the stack 16 byte aligned
-        KBUILD_CFLAGS += $(call cc-option,-mpreferred-stack-boundary=2)
+        # prevent the compiler from keeping the stack 16 byte aligned
+        KBUILD_CFLAGS += $(call cc-option,$(stack_align_opt)=2)
 
         # Disable unit-at-a-time mode on pre-gcc-4.0 compilers, it makes gcc use
         # a lot more stack due to the lack of sharing of stacklots:
@@ -98,8 +106,8 @@ else
         KBUILD_CFLAGS += $(call cc-option,-mno-80387)
         KBUILD_CFLAGS += $(call cc-option,-mno-fp-ret-in-387)
 
-	# Use -mpreferred-stack-boundary=3 if supported.
-	KBUILD_CFLAGS += $(call cc-option,-mpreferred-stack-boundary=3)
+	# Align the stack to 8 bytes if supported.
+	KBUILD_CFLAGS += $(call cc-option,$(stack_align_opt)=3)
 
 	# Use -mskip-rax-setup if supported.
 	KBUILD_CFLAGS += $(call cc-option,-mskip-rax-setup)
