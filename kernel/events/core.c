@@ -5954,7 +5954,7 @@ void perf_output_sample(struct perf_output_handle *handle,
 		}
 	}
 
-	if (!event->attr.watermark) {
+	if (!event->attr.count_sb_events && !event->attr.watermark) {
 		int wakeup_events = event->attr.wakeup_events;
 
 		if (wakeup_events) {

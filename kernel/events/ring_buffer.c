@@ -197,6 +197,19 @@ __perf_output_begin(struct perf_output_handle *handle,
 	 * none of the data stores below can be lifted up by the compiler.
 	 */
 
+	if (event->attr.count_sb_events && !event->attr.watermark) {
+		int wakeup_events = event->attr.wakeup_events;
+
+		if (wakeup_events) {
+			int events = local_inc_return(&rb->events);
+
+			if (events >= wakeup_events) {
+				local_sub(wakeup_events, &rb->events);
+				local_inc(&rb->wakeup);
+			}
+		}
+	}
+
 	if (unlikely(head - local_read(&rb->wakeup) > rb->watermark))
 		local_add(rb->watermark, &rb->wakeup);
 
