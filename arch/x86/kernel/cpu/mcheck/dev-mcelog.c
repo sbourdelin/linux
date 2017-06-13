@@ -14,6 +14,7 @@
 #include <linux/slab.h>
 #include <linux/kmod.h>
 #include <linux/poll.h>
+#include <xen/xen.h>
 
 #include "mce-internal.h"
 
@@ -387,10 +388,13 @@ static __init int dev_mcelog_init_device(void)
 
 	/* register character device /dev/mcelog */
 	err = misc_register(&mce_chrdev_device);
-	if (err) {
+	/* Xen dom0 might have registered the device already. */
+	if (err && (err != -EBUSY || !xen_initial_domain() ||
+		    !IS_ENABLED(CONFIG_XEN_MCE_LOG))) {
 		pr_err("Unable to init device /dev/mcelog (rc: %d)\n", err);
 		return err;
 	}
+
 	mce_register_decode_chain(&dev_mcelog_nb);
 	return 0;
 }
