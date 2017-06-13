@@ -4163,6 +4163,15 @@ skl_enable_plane_wm_levels(const struct drm_i915_private *dev_priv,
 			level_wm->plane_en = true;
 		}
 	}
+
+	/*
+	 * Unsupported GEN will have plane_res_b = 0 & transition WM for
+	 * them will get disabled here.
+	 */
+	if (wm->trans_wm.plane_res_b && wm->trans_wm.plane_res_b < plane_ddb)
+		wm->trans_wm.plane_en = true;
+	else
+		wm->trans_wm.plane_en = false;
 }
 
 static int
@@ -4639,13 +4648,48 @@ skl_compute_linetime_wm(struct intel_crtc_state *cstate)
 }
 
 static void skl_compute_transition_wm(struct intel_crtc_state *cstate,
+				      struct skl_wm_params *wp,
+				      struct skl_wm_level *wm_l0,
 				      struct skl_wm_level *trans_wm /* out */)
 {
+	struct drm_device *dev = cstate->base.crtc->dev;
+	const struct drm_i915_private *dev_priv = to_i915(dev);
+	uint16_t trans_min, trans_y_tile_min;
+	uint16_t trans_amount = 0; /* This is configurable amount */
+	uint16_t trans_offset_b, res_blocks;
+
 	if (!cstate->base.active)
 		return;
 
-	/* Until we know more, just disable transition WMs */
-	trans_wm->plane_en = false;
+	/* Transition WM are not recommended by HW team for GEN9 */
+	if (INTEL_GEN(dev_priv) <= 9)
+		return;
+
+	/* Transition WM don't have any impact if ipc is disabled */
+	if (!dev_priv->ipc_enabled)
+		return;
+
+	if (INTEL_GEN(dev_priv) >= 10)
+		trans_min = 4;
+
+	trans_offset_b = trans_min + trans_amount;
+	trans_y_tile_min = (uint16_t) mul_round_up_u32_fixed16(2,
+							wp->y_tile_minimum);
+
+	if (wp->y_tiled) {
+		res_blocks = max(wm_l0->plane_res_b, trans_y_tile_min) +
+				trans_offset_b;
+	} else {
+		res_blocks = wm_l0->plane_res_b + trans_offset_b;
+	}
+
+	res_blocks += 1;
+
+	/* WA BUG:1938466 add one block for non y-tile planes */
+	if (!wp->y_tiled && IS_CNL_REVID(dev_priv, CNL_REVID_A0, CNL_REVID_A0))
+		res_blocks += 1;
+
+	trans_wm->plane_res_b = res_blocks;
 }
 
 static int skl_build_pipe_wm(struct intel_crtc_state *cstate,
@@ -4684,7 +4728,8 @@ static int skl_build_pipe_wm(struct intel_crtc_state *cstate,
 					    &wm_params, wm);
 		if (ret)
 			return ret;
-		skl_compute_transition_wm(cstate, &wm->trans_wm);
+		skl_compute_transition_wm(cstate, &wm_params, &wm->wm[0],
+					  &wm->trans_wm);
 	}
 	pipe_wm->linetime = skl_compute_linetime_wm(cstate);
 
