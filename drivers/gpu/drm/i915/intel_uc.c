@@ -501,7 +501,10 @@ int intel_guc_send_mmio(struct intel_guc *guc, const u32 *action, u32 len)
 					   guc_send_reg(guc, 0),
 					   INTEL_GUC_RECV_MASK,
 					   INTEL_GUC_RECV_MASK,
-					   10, 10, &status);
+					   10,
+					   DRM_I915_TIMEOUT_GUC_REQUEST,
+					   &status);
+
 	if (status != INTEL_GUC_STATUS_SUCCESS) {
 		/*
 		 * Either the GuC explicitly returned an error (which

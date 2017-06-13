@@ -1487,6 +1487,19 @@ struct drm_i915_error_state_buf {
 #define I915_ENGINE_DEAD_TIMEOUT  (4 * HZ)  /* Seqno, head and subunits dead */
 #define I915_SEQNO_DEAD_TIMEOUT   (12 * HZ) /* Seqno dead with active head */
 
+#ifndef CONFIG_DRM_I915_TIMEOUT_GUC_LOAD
+#define DRM_I915_TIMEOUT_GUC_LOAD 100
+#else
+#define DRM_I915_TIMEOUT_GUC_LOAD CONFIG_DRM_I915_TIMEOUT_GUC_LOAD
+#endif
+
+#ifndef CONFIG_DRM_I915_TIMEOUT_GUC_REQUEST
+#define DRM_I915_TIMEOUT_GUC_REQUEST 10
+#else
+#define DRM_I915_TIMEOUT_GUC_REQUEST CONFIG_DRM_I915_TIMEOUT_GUC_REQUEST
+#endif
+
+
 struct i915_gpu_error {
 	/* For hangcheck timer */
 #define DRM_I915_HANGCHECK_PERIOD 1500 /* in ms */

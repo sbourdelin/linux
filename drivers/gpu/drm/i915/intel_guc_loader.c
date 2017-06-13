@@ -235,7 +235,8 @@ static int guc_ucode_xfer_dma(struct drm_i915_private *dev_priv,
 	 * (Higher levels of the driver will attempt to fall back to
 	 * execlist mode if this happens.)
 	 */
-	ret = wait_for(guc_ucode_response(dev_priv, &status), 100);
+	ret = wait_for(guc_ucode_response(dev_priv, &status),
+			DRM_I915_TIMEOUT_GUC_LOAD);
 
 	DRM_DEBUG_DRIVER("DMA status 0x%x, GuC status 0x%x\n",
 			I915_READ(DMA_CTRL), status);

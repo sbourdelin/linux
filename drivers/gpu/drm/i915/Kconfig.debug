@@ -112,3 +112,43 @@ config DRM_I915_DEBUG_VBLANK_EVADE
 	  the vblank.
 
 	  If in doubt, say "N".
+
+config DRM_I915_OVERRIDE_TIMEOUTS
+	bool "Enable timeout overrides"
+        depends on DRM_I915
+        default n
+        help
+          Enable this option to allow overriding of selected timeouts in the
+	  driver i915.
+
+	  Timeouts should only be overridden for debug and not in normal use.
+
+	  If in doubt, say "N".
+
+config DRM_I915_TIMEOUT_GUC_LOAD
+	int "Set the value of the GuC load timeout"
+        depends on DRM_I915_OVERRIDE_TIMEOUTS
+        default 100
+        range 0 10000
+        help
+	  Set this option to select the value of the timeout in ms for how long
+	  the GuC FW load should take.
+
+	  The valid range is 0 to 10000
+
+	  The default timeout will work in normal use. This option is provided
+	  for debug.
+
+config DRM_I915_TIMEOUT_GUC_REQUEST
+	int "Set the value of the GuC request timeout"
+        depends on DRM_I915_OVERRIDE_TIMEOUTS
+	default 10
+	range 0 1000
+	help
+          Set this option to select the value of the timeout in ms for how long
+	  a request to the GuC should take.
+
+	  The valid range is 0 to 1000
+
+	  The default timeout will work in normal use. This option is provided
+	  for debug.
