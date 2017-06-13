@@ -1701,6 +1701,10 @@ SYSCALL_DEFINE4(wait4, pid_t, upid, int __user *, stat_addr,
 	if (upid == -1)
 		type = PIDTYPE_MAX;
 	else if (upid < 0) {
+		/* -INT_MIN is not defined */
+		if (upid == INT_MIN)
+			return -ESRCH;
+
 		type = PIDTYPE_PGID;
 		pid = find_get_pid(-upid);
 	} else if (upid == 0) {
