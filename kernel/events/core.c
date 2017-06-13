@@ -7361,12 +7361,14 @@ static int __perf_event_overflow(struct perf_event *event,
 	 * events
 	 */
 
-	event->pending_kill = POLL_IN;
-	if (events && atomic_dec_and_test(&event->event_limit)) {
-		ret = 1;
-		event->pending_kill = POLL_HUP;
+	if (!event->attr.signal_on_wakeup) {
+		event->pending_kill = POLL_IN;
+		if (events && atomic_dec_and_test(&event->event_limit)) {
+			ret = 1;
+			event->pending_kill = POLL_HUP;
 
-		perf_event_disable_inatomic(event);
+			perf_event_disable_inatomic(event);
+		}
 	}
 
 	READ_ONCE(event->overflow_handler)(event, data, regs);
