@@ -128,6 +128,11 @@ cc-option-yn = $(call try-run,\
 cc-option-align = $(subst -functions=0,,\
 	$(call cc-option,-falign-functions=0,-malign-functions=0))
 
+# cc-option-no-kbuild
+# Usage: cflags-no-kbuild-y += $(call cc-option-no-kbuild,<other flags>,-march=winchip-c6,-march=i586)
+cc-option-no-kbuild = $(call try-run,\
+	$(CC) -Werror $(filter-out $(GCC_PLUGINS_CFLAGS),$(1)) $(2) -c -x c /dev/null -o "$$TMP",$(2),$(3))
+
 # cc-disable-warning
 # Usage: cflags-y += $(call cc-disable-warning,unused-but-set-variable)
 cc-disable-warning = $(call try-run,\
