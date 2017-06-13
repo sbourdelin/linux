@@ -140,6 +140,7 @@ static int aspeed_wdt_probe(struct platform_device *pdev)
 {
 	struct aspeed_wdt *wdt;
 	struct resource *res;
+	struct device_node *np;
 	int ret;
 
 	wdt = devm_kzalloc(&pdev->dev, sizeof(*wdt), GFP_KERNEL);
@@ -170,8 +171,16 @@ static int aspeed_wdt_probe(struct platform_device *pdev)
 	 * the SOC and not the full chip
 	 */
 	wdt->ctrl = WDT_CTRL_RESET_MODE_SOC |
-		WDT_CTRL_1MHZ_CLK |
-		WDT_CTRL_RESET_SYSTEM;
+		WDT_CTRL_1MHZ_CLK;
+
+	np = pdev->dev.of_node;
+	if (np && !of_get_property(np, "no-system-reset", NULL))
+		wdt->ctrl |= WDT_CTRL_RESET_SYSTEM;
+
+	if (np && of_get_property(np, "external-signal", NULL))
+		wdt->ctrl |= WDT_CTRL_WDT_EXT;
+
+	writel(wdt->ctrl, wdt->base + WDT_CTRL);
 
 	if (readl(wdt->base + WDT_CTRL) & WDT_CTRL_ENABLE)  {
 		aspeed_wdt_start(&wdt->wdd);
