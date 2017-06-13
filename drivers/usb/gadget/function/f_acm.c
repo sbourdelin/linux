@@ -326,13 +326,22 @@ static void acm_complete_set_line_coding(struct usb_ep *ep,
 		struct usb_cdc_line_coding	*value = req->buf;
 
 		/* REVISIT:  we currently just remember this data.
-		 * If we change that, (a) validate it first, then
-		 * (b) update whatever hardware needs updating,
-		 * (c) worry about locking.  This is information on
-		 * the order of 9600-8-N-1 ... most of which means
-		 * nothing unless we control a real RS232 line.
-		 */
-		acm->port_line_coding = *value;
+		* If we change that,
+		* (a) update whatever hardware needs updating,
+		* (b) worry about locking.  This is information on
+		* the order of 9600-8-N-1 ... most of which means
+		* nothing unless we control a real RS232 line.
+		*/
+		dev_dbg(&cdev->gadget->dev,
+			"acm ttyGS%d set_line_coding: %d %d %d %d\n",
+			acm->port_num, le32_to_cpu(value->dwDTERate),
+			value->bCharFormat, value->bParityType,
+			value->bDataBits);
+		if (value->bCharFormat > 2 || value->bParityType > 4 ||
+				value->bDataBits < 5 || value->bDataBits > 8)
+			usb_ep_set_halt(ep);
+		else
+			acm->port_line_coding = *value;
 	}
 }
 
