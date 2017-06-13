@@ -486,6 +486,7 @@ struct hv_host_device {
 	unsigned int port;
 	unsigned char path;
 	unsigned char target;
+	bool is_fc;
 };
 
 struct storvsc_scan_work {
@@ -1495,6 +1496,11 @@ static int storvsc_host_reset_handler(struct scsi_cmnd *scmnd)
  */
 static enum blk_eh_timer_return storvsc_eh_timed_out(struct scsi_cmnd *scmnd)
 {
+	struct hv_host_device *host_dev = shost_priv(scmnd->device->host);
+
+	if (host_dev->is_fc)
+		return BLK_EH_NOT_HANDLED;
+
 	return BLK_EH_RESET_TIMER;
 }
 
@@ -1738,6 +1744,7 @@ static int storvsc_probe(struct hv_device *device,
 
 	host_dev->port = host->host_no;
 	host_dev->dev = device;
+	host_dev->is_fc = is_fc;
 
 
 	stor_device = kzalloc(sizeof(struct storvsc_device), GFP_KERNEL);
