@@ -235,9 +235,7 @@ static struct drm_gem_object *a5xx_ucode_load_bo(struct msm_gpu *gpu,
 	struct drm_gem_object *bo;
 	void *ptr;
 
-	mutex_lock(&drm->struct_mutex);
 	bo = msm_gem_new(drm, fw->size - 4, MSM_BO_UNCACHED);
-	mutex_unlock(&drm->struct_mutex);
 
 	if (IS_ERR(bo))
 		return bo;
