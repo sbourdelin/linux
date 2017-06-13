@@ -2413,51 +2413,45 @@ void register_console(struct console *newcon)
 	unsigned long flags;
 	struct console *bcon = NULL;
 	struct console_cmdline *c;
-	static bool has_preferred;
+	bool have_real_console = false;
 
-	if (console_drivers)
-		for_each_console(bcon)
+	if (console_drivers) {
+		for_each_console(bcon) {
 			if (WARN(bcon == newcon,
 					"console '%s%d' already registered\n",
 					bcon->name, bcon->index))
 				return;
 
-	/*
-	 * before we register a new CON_BOOT console, make sure we don't
-	 * already have a valid console
-	 */
-	if (console_drivers && newcon->flags & CON_BOOT) {
-		/* find the last or real console */
-		for_each_console(bcon) {
-			if (!(bcon->flags & CON_BOOT)) {
-				pr_info("Too late to register bootconsole %s%d\n",
-					newcon->name, newcon->index);
-				return;
-			}
+			if (!(bcon->flags & CON_BOOT))
+				have_real_console = true;
 		}
 	}
 
+	if (have_real_console && newcon->flags & CON_BOOT) {
+		pr_info("Too late to register bootconsole %s%d\n",
+			newcon->name, newcon->index);
+		return;
+	}
+
+	/*
+	 * We have not registered the real preferred console if a boot
+	 * console is still the first one.
+	 */
 	if (console_drivers && console_drivers->flags & CON_BOOT)
 		bcon = console_drivers;
 
-	if (!has_preferred || bcon || !console_drivers)
-		has_preferred = preferred_console >= 0;
-
 	/*
-	 *	See if we want to use this console driver. If we
-	 *	didn't select a console we take the first one
-	 *	that registers here.
+	 * Enable any boot console and the first real one when
+	 * consoles are not configured.
 	 */
-	if (!has_preferred) {
+	if (!have_real_console && preferred_console < 0) {
 		if (newcon->index < 0)
 			newcon->index = 0;
 		if (newcon->setup == NULL ||
 		    newcon->setup(newcon, NULL) == 0) {
 			newcon->flags |= CON_ENABLED;
-			if (newcon->device) {
+			if (newcon->device)
 				newcon->flags |= CON_CONSDEV;
-				has_preferred = true;
-			}
 		}
 	}
 
