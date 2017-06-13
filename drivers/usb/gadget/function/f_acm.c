@@ -58,6 +58,9 @@ struct f_acm {
 	struct usb_request		*notify_req;
 
 	struct usb_cdc_line_coding	port_line_coding;	/* 8-N-1 etc */
+	/* we have a SetLineCoding request that the user haven't read yet */
+	bool set_line_coding_pending;
+	wait_queue_head_t set_line_coding_waitq;
 
 	/* SetControlLineState request -- CDC 1.1 section 6.2.14 (INPUT) */
 	u16				port_handshake_bits;
@@ -326,23 +329,19 @@ static void acm_complete_set_line_coding(struct usb_ep *ep,
 	} else {
 		struct usb_cdc_line_coding	*value = req->buf;
 
-		/* REVISIT:  we currently just remember this data.
-		* If we change that,
-		* (a) update whatever hardware needs updating,
-		* (b) worry about locking.  This is information on
-		* the order of 9600-8-N-1 ... most of which means
-		* nothing unless we control a real RS232 line.
-		*/
 		dev_dbg(&cdev->gadget->dev,
 			"acm ttyGS%d set_line_coding: %d %d %d %d\n",
 			acm->port_num, le32_to_cpu(value->dwDTERate),
 			value->bCharFormat, value->bParityType,
 			value->bDataBits);
 		if (value->bCharFormat > 2 || value->bParityType > 4 ||
-				value->bDataBits < 5 || value->bDataBits > 8)
+				value->bDataBits < 5 || value->bDataBits > 8) {
 			usb_ep_set_halt(ep);
-		else
+		} else {
 			acm->port_line_coding = *value;
+			acm->set_line_coding_pending = true;
+			wake_up_interruptible(&acm->set_line_coding_waitq);
+		}
 	}
 }
 
@@ -598,6 +597,19 @@ static void acm_disconnect(struct gserial *port)
 	acm_notify_serial_state(acm);
 }
 
+static unsigned int acm_poll(struct gserial *port, struct file *file,
+	poll_table *wait)
+{
+	unsigned int mask = 0;
+	struct f_acm *acm = port_to_acm(port);
+
+	poll_wait(file, &acm->set_line_coding_waitq, wait);
+	if (acm->set_line_coding_pending)
+		mask |= POLLPRI;
+	return mask;
+}
+
+
 static int acm_send_break(struct gserial *port, int duration)
 {
 	struct f_acm		*acm = port_to_acm(port);
@@ -620,10 +632,12 @@ static int acm_ioctl(struct gserial *port, unsigned int cmd, unsigned long arg)
 	switch (cmd) {
 	case USB_F_ACM_GET_LINE_CODING:
 		if (copy_to_user((__user void *)arg, &acm->port_line_coding,
-				sizeof(acm->port_line_coding)))
+				sizeof(acm->port_line_coding))) {
 			ret = -EFAULT;
-		else
+		} else {
 			ret = 0;
+			acm->set_line_coding_pending = false;
+		}
 		break;
 	}
 	return ret;
@@ -763,11 +777,13 @@ static struct usb_function *acm_alloc_func(struct usb_function_instance *fi)
 		return ERR_PTR(-ENOMEM);
 
 	spin_lock_init(&acm->lock);
+	init_waitqueue_head(&acm->set_line_coding_waitq);
 
 	acm->port.connect = acm_connect;
 	acm->port.disconnect = acm_disconnect;
 	acm->port.send_break = acm_send_break;
 	acm->port.ioctl = acm_ioctl;
+	acm->port.poll = acm_poll;
 
 	acm->port.func.name = "acm";
 	acm->port.func.strings = acm_strings;
