@@ -146,13 +146,13 @@ enum cvmx_usb_status {
  *			status call.
  */
 struct cvmx_usb_port_status {
-	u32 reserved			: 25;
-	u32 port_enabled		: 1;
-	u32 port_over_current		: 1;
-	u32 port_powered		: 1;
-	enum cvmx_usb_speed port_speed	: 2;
-	u32 connected			: 1;
-	u32 connect_change		: 1;
+	u32 reserved:25;
+	u32 port_enabled:1;
+	u32 port_over_current:1;
+	u32 port_powered:1;
+	enum cvmx_usb_speed port_speed:2;
+	u32 connected:1;
+	u32 connect_change:1;
 };
 
 /**
