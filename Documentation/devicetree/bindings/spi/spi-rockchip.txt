@@ -25,6 +25,7 @@ Required Properties:
 
 Optional Properties:
 
+- cs-gpios : Specifies the gpio pins to be used for chipselects.
 - dmas: DMA specifiers for tx and rx dma. See the DMA client binding,
 		Documentation/devicetree/bindings/dma/dma.txt
 - dma-names: DMA request names should include "tx" and "rx" if present.
@@ -48,6 +49,7 @@ Example:
 		#address-cells = <1>;
 		#size-cells = <0>;
 		interrupts = <GIC_SPI 44 IRQ_TYPE_LEVEL_HIGH>;
+		cs-gpios = <&gpio2 23 GPIO_ACTIVE_HIGH>;
 		clocks = <&cru SCLK_SPI0>, <&cru PCLK_SPI0>;
 		clock-names = "spiclk", "apb_pclk";
 		pinctrl-0 = <&spi1_pins>;
