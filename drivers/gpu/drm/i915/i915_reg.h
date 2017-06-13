@@ -48,11 +48,11 @@ static inline bool i915_mmio_reg_valid(i915_reg_t reg)
 	return !i915_mmio_reg_equal(reg, INVALID_MMIO_REG);
 }
 
-#define _PICK(__index, ...) (((const u32 []){ __VA_ARGS__ })[__index])
+#define _PICK3(__index, ...) (((const u32 []){ __VA_ARGS__ })[__index])
 
 #define _PIPE(pipe, a, b) ((a) + (pipe)*((b)-(a)))
 #define _MMIO_PIPE(pipe, a, b) _MMIO(_PIPE(pipe, a, b))
-#define _MMIO_PIPE3(pipe, ...) _MMIO(_PICK(pipe, __VA_ARGS__))
+#define _MMIO_PIPE3(pipe, ...) _MMIO(_PICK3(pipe, __VA_ARGS__))
 
 #define _PLANE(plane, a, b) _PIPE(plane, a, b)
 #define _MMIO_PLANE(plane, a, b) _MMIO_PIPE(plane, a, b)
@@ -62,15 +62,14 @@ static inline bool i915_mmio_reg_valid(i915_reg_t reg)
 
 #define _PORT(port, a, b) ((a) + (port)*((b)-(a)))
 #define _MMIO_PORT(port, a, b) _MMIO(_PORT(port, a, b))
-#define _MMIO_PORT3(port, ...) _MMIO(_PICK(port, __VA_ARGS__))
-#define _MMIO_PORT6(port, ...) _MMIO(_PICK(port, __VA_ARGS__))
-#define _MMIO_PORT6_LN(port, ln, a0, a1, b, c, d, e, f)			\
-	_MMIO(_PICK(port, a0, b, c, d, e, f) + (ln * (a1 - a0)))
+#define _MMIO_PORT3(port, ...) _MMIO(_PICK3(port, __VA_ARGS__))
+#define _MMIO_PORT3_LN(port, ln, a0, a1, b, c, d, e, f)			\
+	_MMIO(_PICK3(port, a0, b, c, d, e, f) + (ln * (a1 - a0)))
 
 #define _PLL(pll, a, b) ((a) + (pll)*((b)-(a)))
 #define _MMIO_PLL(pll, a, b) _MMIO(_PLL(pll, a, b))
 
-#define _PHY3(phy, ...) _PICK(phy, __VA_ARGS__)
+#define _PHY3(phy, ...) _PICK3(phy, __VA_ARGS__)
 #define _MMIO_PHY3(phy, ...) _MMIO(_PHY3(phy, __VA_ARGS__))
 
 #define _MASKED_FIELD(mask, value) ({					   \
@@ -1709,14 +1708,14 @@ enum skl_disp_power_wells {
 #define _CNL_PORT_PCS_DW1_LN0_C		0x162C04
 #define _CNL_PORT_PCS_DW1_LN0_D		0x162E04
 #define _CNL_PORT_PCS_DW1_LN0_F		0x162804
-#define CNL_PORT_PCS_DW1_GRP(port)	_MMIO_PORT6(port, \
+#define CNL_PORT_PCS_DW1_GRP(port)	_MMIO_PORT3(port, \
 						    _CNL_PORT_PCS_DW1_GRP_AE, \
 						    _CNL_PORT_PCS_DW1_GRP_B, \
 						    _CNL_PORT_PCS_DW1_GRP_C, \
 						    _CNL_PORT_PCS_DW1_GRP_D, \
 						    _CNL_PORT_PCS_DW1_GRP_AE, \
 						    _CNL_PORT_PCS_DW1_GRP_F)
-#define CNL_PORT_PCS_DW1_LN0(port)	_MMIO_PORT6(port, \
+#define CNL_PORT_PCS_DW1_LN0(port)	_MMIO_PORT3(port, \
 						    _CNL_PORT_PCS_DW1_LN0_AE, \
 						    _CNL_PORT_PCS_DW1_LN0_B, \
 						    _CNL_PORT_PCS_DW1_LN0_C, \
@@ -1735,14 +1734,14 @@ enum skl_disp_power_wells {
 #define _CNL_PORT_TX_DW2_LN0_C		0x162C48
 #define _CNL_PORT_TX_DW2_LN0_D		0x162E48
 #define _CNL_PORT_TX_DW2_LN0_F		0x162A48
-#define CNL_PORT_TX_DW2_GRP(port)	_MMIO_PORT6(port, \
+#define CNL_PORT_TX_DW2_GRP(port)	_MMIO_PORT3(port, \
 						    _CNL_PORT_TX_DW2_GRP_AE, \
 						    _CNL_PORT_TX_DW2_GRP_B, \
 						    _CNL_PORT_TX_DW2_GRP_C, \
 						    _CNL_PORT_TX_DW2_GRP_D, \
 						    _CNL_PORT_TX_DW2_GRP_AE, \
 						    _CNL_PORT_TX_DW2_GRP_F)
-#define CNL_PORT_TX_DW2_LN0(port)	_MMIO_PORT6(port, \
+#define CNL_PORT_TX_DW2_LN0(port)	_MMIO_PORT3(port, \
 						    _CNL_PORT_TX_DW2_LN0_AE, \
 						    _CNL_PORT_TX_DW2_LN0_B, \
 						    _CNL_PORT_TX_DW2_LN0_C, \
@@ -1764,14 +1763,14 @@ enum skl_disp_power_wells {
 #define _CNL_PORT_TX_DW4_LN0_C		0x162C50
 #define _CNL_PORT_TX_DW4_LN0_D		0x162E50
 #define _CNL_PORT_TX_DW4_LN0_F		0x162850
-#define CNL_PORT_TX_DW4_GRP(port)       _MMIO_PORT6(port, \
+#define CNL_PORT_TX_DW4_GRP(port)       _MMIO_PORT3(port, \
 						    _CNL_PORT_TX_DW4_GRP_AE, \
 						    _CNL_PORT_TX_DW4_GRP_B, \
 						    _CNL_PORT_TX_DW4_GRP_C, \
 						    _CNL_PORT_TX_DW4_GRP_D, \
 						    _CNL_PORT_TX_DW4_GRP_AE, \
 						    _CNL_PORT_TX_DW4_GRP_F)
-#define CNL_PORT_TX_DW4_LN(port, ln)       _MMIO_PORT6_LN(port, ln,	\
+#define CNL_PORT_TX_DW4_LN(port, ln)       _MMIO_PORT3_LN(port, ln,	\
 						    _CNL_PORT_TX_DW4_LN0_AE, \
 						    _CNL_PORT_TX_DW4_LN1_AE, \
 						    _CNL_PORT_TX_DW4_LN0_B, \
@@ -1794,14 +1793,14 @@ enum skl_disp_power_wells {
 #define _CNL_PORT_TX_DW5_LN0_C		0x162C54
 #define _CNL_PORT_TX_DW5_LN0_D		0x162ED4
 #define _CNL_PORT_TX_DW5_LN0_F		0x162854
-#define CNL_PORT_TX_DW5_GRP(port)	_MMIO_PORT6(port, \
+#define CNL_PORT_TX_DW5_GRP(port)	_MMIO_PORT3(port, \
 						    _CNL_PORT_TX_DW5_GRP_AE, \
 						    _CNL_PORT_TX_DW5_GRP_B, \
 						    _CNL_PORT_TX_DW5_GRP_C, \
 						    _CNL_PORT_TX_DW5_GRP_D, \
 						    _CNL_PORT_TX_DW5_GRP_AE, \
 						    _CNL_PORT_TX_DW5_GRP_F)
-#define CNL_PORT_TX_DW5_LN0(port)	_MMIO_PORT6(port, \
+#define CNL_PORT_TX_DW5_LN0(port)	_MMIO_PORT3(port, \
 						    _CNL_PORT_TX_DW5_LN0_AE, \
 						    _CNL_PORT_TX_DW5_LN0_B, \
 						    _CNL_PORT_TX_DW5_LN0_C, \
@@ -1823,14 +1822,14 @@ enum skl_disp_power_wells {
 #define _CNL_PORT_TX_DW7_LN0_C		0x162C5C
 #define _CNL_PORT_TX_DW7_LN0_D		0x162EDC
 #define _CNL_PORT_TX_DW7_LN0_F		0x16285C
-#define CNL_PORT_TX_DW7_GRP(port)	_MMIO_PORT6(port, \
+#define CNL_PORT_TX_DW7_GRP(port)	_MMIO_PORT3(port, \
 						    _CNL_PORT_TX_DW7_GRP_AE, \
 						    _CNL_PORT_TX_DW7_GRP_B, \
 						    _CNL_PORT_TX_DW7_GRP_C, \
 						    _CNL_PORT_TX_DW7_GRP_D, \
 						    _CNL_PORT_TX_DW7_GRP_AE, \
 						    _CNL_PORT_TX_DW7_GRP_F)
-#define CNL_PORT_TX_DW7_LN0(port)	_MMIO_PORT6(port, \
+#define CNL_PORT_TX_DW7_LN0(port)	_MMIO_PORT3(port, \
 						    _CNL_PORT_TX_DW7_LN0_AE, \
 						    _CNL_PORT_TX_DW7_LN0_B, \
 						    _CNL_PORT_TX_DW7_LN0_C, \
