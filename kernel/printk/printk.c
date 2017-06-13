@@ -2489,10 +2489,8 @@ void register_console(struct console *newcon)
 		}
 
 		newcon->flags |= CON_ENABLED;
-		if (i == preferred_console) {
+		if (i == preferred_console)
 			newcon->flags |= CON_CONSDEV;
-			has_preferred = true;
-		}
 		break;
 	}
 
