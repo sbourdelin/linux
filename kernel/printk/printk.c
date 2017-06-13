@@ -2483,7 +2483,7 @@ void register_console(struct console *newcon)
 		}
 
 		newcon->flags |= CON_ENABLED;
-		if (i == preferred_console)
+		if (i == preferred_console || !console_drivers)
 			newcon->flags |= CON_CONSDEV;
 		break;
 	}
