@@ -2394,6 +2394,8 @@ static unsigned int n_tty_poll(struct tty_struct *tty, struct file *file,
 			tty_chars_in_buffer(tty) < WAKEUP_CHARS &&
 			tty_write_room(tty) > 0)
 		mask |= POLLOUT | POLLWRNORM;
+	if (tty->ops->poll)
+		mask |= tty->ops->poll(tty, file, wait);
 	return mask;
 }
 

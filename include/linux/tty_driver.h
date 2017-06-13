@@ -243,6 +243,7 @@
 #include <linux/list.h>
 #include <linux/cdev.h>
 #include <linux/termios.h>
+#include <linux/poll.h>
 
 struct tty_struct;
 struct tty_driver;
@@ -285,6 +286,8 @@ struct tty_operations {
 	int (*set_termiox)(struct tty_struct *tty, struct termiox *tnew);
 	int (*get_icount)(struct tty_struct *tty,
 				struct serial_icounter_struct *icount);
+	unsigned int (*poll)(struct tty_struct *tty, struct file *file,
+				poll_table *wait);
 #ifdef CONFIG_CONSOLE_POLL
 	int (*poll_init)(struct tty_driver *driver, int line, char *options);
 	int (*poll_get_char)(struct tty_driver *driver, int line);
