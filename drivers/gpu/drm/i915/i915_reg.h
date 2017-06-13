@@ -49,13 +49,14 @@ static inline bool i915_mmio_reg_valid(i915_reg_t reg)
 }
 
 #define _PICK(__index, a, b) ((a) + (__index) * ((b) - (a)))
+#define _PICK2(__index, __offsets, a) (__offsets[__index] - __offsets[0] + \
+				       (a) + dev_priv->info.display_mmio_offset)
 #define _PICK3(__index, ...) (((const u32 []){ __VA_ARGS__ })[__index])
 
 #define _PIPE(pipe, a, b) _PICK(pipe, a, b)
 #define _MMIO_PIPE(pipe, a, b) _MMIO(_PIPE(pipe, a, b))
-#define _MMIO_PIPE2(pipe, reg) _MMIO(dev_priv->info.pipe_offsets[pipe] - \
-	dev_priv->info.pipe_offsets[PIPE_A] + (reg) + \
-	dev_priv->info.display_mmio_offset)
+#define _MMIO_PIPE2(pipe, reg) _MMIO(_PICK2(pipe, dev_priv->info.pipe_offsets, \
+					    reg))
 #define _MMIO_PIPE3(pipe, ...) _MMIO(_PICK3(pipe, __VA_ARGS__))
 
 #define _PLANE(plane, a, b) _PICK(plane, a, b)
@@ -63,9 +64,8 @@ static inline bool i915_mmio_reg_valid(i915_reg_t reg)
 
 #define _TRANS(tran, a, b) _PICK(tran, a, b)
 #define _MMIO_TRANS(tran, a, b) _MMIO(_TRANS(tran, a, b))
-#define _MMIO_TRANS2(pipe, reg) _MMIO(dev_priv->info.trans_offsets[(pipe)] - \
-	dev_priv->info.trans_offsets[TRANSCODER_A] + (reg) + \
-	dev_priv->info.display_mmio_offset)
+#define _MMIO_TRANS2(tran, reg) _MMIO(_PICK2(tran, \
+					     dev_priv->info.trans_offsets, reg))
 
 #define _PORT(port, a, b) _PICK(port, a, b)
 #define _MMIO_PORT(port, a, b) _MMIO(_PORT(port, a, b))
