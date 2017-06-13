@@ -25,4 +25,10 @@
 	oppnitro@1000000000 {
 		opp-supported-hw = <0x06 0x0100>;
 	};
+
+	pwm7: dmtimer-pwm {
+		compatible = "ti,omap-dmtimer-pwm";
+		ti,timers = <&timer7>;
+		#pwm-cells = <3>;
+	};
 };

@@ -164,6 +164,13 @@
 			system-clock-frequency = <12000000>;
 		};
 	};
+
+	pwm7: dmtimer-pwm {
+		compatible = "ti,omap-dmtimer-pwm";
+		ti,timers = <&timer7>;
+		#pwm-cells = <3>;
+	};
+
 };
 
 &am33xx_pinmux {

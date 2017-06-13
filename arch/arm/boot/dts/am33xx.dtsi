@@ -864,6 +864,7 @@
 			ranges;
 			syscon = <&scm_conf>;
 			status = "disabled";
+			cpts-ext-ts-inputs = <4>;
 
 			davinci_mdio: mdio@4a101000 {
 				compatible = "ti,cpsw-mdio","ti,davinci_mdio";
