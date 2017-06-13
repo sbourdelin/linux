@@ -3897,8 +3897,13 @@ static void smi_recv_tasklet(unsigned long val)
 	}
 	if (!run_to_completion)
 		spin_unlock_irqrestore(&intf->xmit_msgs_lock, flags);
-	if (newmsg)
-		intf->handlers->sender(intf->send_info, newmsg);
+
+	if (newmsg) {
+		rcu_read_lock();
+		if (!intf->in_shutdown)
+			intf->handlers->sender(intf->send_info, newmsg);
+		rcu_read_unlock();
+	}
 
 	handle_new_recv_msgs(intf);
 }
