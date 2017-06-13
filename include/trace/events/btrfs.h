@@ -1418,7 +1418,7 @@ DECLARE_EVENT_CLASS(btrfs__qgroup_data_map,
 
 	TP_STRUCT__entry_btrfs(
 		__field(	u64,		rootid		)
-		__field(	unsigned long,	ino		)
+		__field(	ino_t,		ino		)
 		__field(	u64,		free_reserved	)
 	),
 
@@ -1459,7 +1459,7 @@ DECLARE_EVENT_CLASS(btrfs__qgroup_rsv_data,
 
 	TP_STRUCT__entry_btrfs(
 		__field(	u64,		rootid		)
-		__field(	unsigned long,	ino		)
+		__field(	ino_t,		ino		)
 		__field(	u64,		start		)
 		__field(	u64,		len		)
 		__field(	u64,		reserved	)
