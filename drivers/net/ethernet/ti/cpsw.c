@@ -143,7 +143,7 @@ do {								\
 #define cpsw_slave_index(cpsw, priv)				\
 		((cpsw->data.dual_emac) ? priv->emac_port :	\
 		cpsw->data.active_slave)
-#define IRQ_NUM			2
+#define IRQ_NUM			3
 #define CPSW_MAX_QUEUES		8
 #define CPSW_CPDMA_DESCS_POOL_SIZE_DEFAULT 256
 
@@ -730,12 +730,13 @@ static void cpsw_rx_handler(void *token, int len, int status)
 	if (new_skb) {
 		skb_copy_queue_mapping(new_skb, skb);
 		skb_put(skb, len);
-		cpts_rx_timestamp(cpsw->cpts, skb);
+		ret = cpts_rx_timestamp(cpsw->cpts, skb);
 		skb->protocol = eth_type_trans(skb, ndev);
-		netif_receive_skb(skb);
 		ndev->stats.rx_bytes += len;
 		ndev->stats.rx_packets++;
 		kmemleak_not_leak(new_skb);
+		if (!ret)
+			netif_receive_skb(skb);
 	} else {
 		ndev->stats.rx_dropped++;
 		new_skb = skb;
@@ -870,6 +871,14 @@ static irqreturn_t cpsw_rx_interrupt(int irq, void *dev_id)
 	}
 
 	napi_schedule(&cpsw->napi_rx);
+	return IRQ_HANDLED;
+}
+
+static irqreturn_t cpsw_misc_interrupt(int irq, void *dev_id)
+{
+	struct cpsw_common *cpsw = dev_id;
+
+	cpdma_ctlr_eoi(cpsw->dma, CPDMA_EOI_MISC);
 	return IRQ_HANDLED;
 }
 
@@ -1194,6 +1203,9 @@ static void cpsw_get_strings(struct net_device *ndev, u32 stringset, u8 *data)
 
 		cpsw_add_ch_strings(&p, cpsw->rx_ch_num, 1);
 		cpsw_add_ch_strings(&p, cpsw->tx_ch_num, 0);
+		dev_err(cpsw->dev, "cpts stats: tx_tmo:%d event_tmo:%d, fail_rx:%d\n",
+			cpsw->cpts->tx_tmo, cpsw->cpts->event_tmo,
+			cpsw->cpts->fail_rx);
 		break;
 	}
 }
@@ -2879,7 +2891,7 @@ static int cpsw_probe(struct platform_device *pdev)
 	u32 slave_offset, sliver_offset, slave_size;
 	struct cpsw_common		*cpsw;
 	int ret = 0, i;
-	int irq;
+	int irq, misc_irq;
 
 	cpsw = devm_kzalloc(&pdev->dev, sizeof(struct cpsw_common), GFP_KERNEL);
 	if (!cpsw)
@@ -2981,6 +2993,13 @@ static int cpsw_probe(struct platform_device *pdev)
 		goto clean_dt_ret;
 	}
 
+	/* get misc irq*/
+	misc_irq = platform_get_irq(pdev, 3);
+	if (misc_irq < 0) {
+		ret = misc_irq;
+		goto clean_dt_ret;
+	}
+
 	memset(&dma_params, 0, sizeof(dma_params));
 	memset(&ale_params, 0, sizeof(ale_params));
 
@@ -3069,7 +3088,8 @@ static int cpsw_probe(struct platform_device *pdev)
 		goto clean_dma_ret;
 	}
 
-	cpsw->cpts = cpts_create(cpsw->dev, cpts_regs, cpsw->dev->of_node);
+	cpsw->cpts = cpts_create(cpsw->dev, cpts_regs, cpsw->dev->of_node,
+				 misc_irq);
 	if (IS_ERR(cpsw->cpts)) {
 		ret = PTR_ERR(cpsw->cpts);
 		goto clean_ale_ret;
@@ -3126,6 +3146,18 @@ static int cpsw_probe(struct platform_device *pdev)
 		dev_err(priv->dev, "error attaching irq (%d)\n", ret);
 		goto clean_ale_ret;
 	}
+
+	cpsw->irqs_table[2] = misc_irq;
+	ret = devm_request_irq(&pdev->dev, misc_irq, cpsw_misc_interrupt,
+			       IRQF_ONESHOT | IRQF_SHARED,
+			       dev_name(&pdev->dev), cpsw);
+	if (ret < 0) {
+		dev_err(priv->dev, "error attaching misc irq (%d)\n", ret);
+		goto clean_ale_ret;
+	}
+
+	/* Enable misc CPTS evnt_pend IRQ */
+	writel(0x10, &cpsw->wr_regs->misc_en);
 
 	ndev->features |= NETIF_F_HW_VLAN_CTAG_FILTER;
 

@@ -105,6 +105,7 @@ struct cpts_event {
 	unsigned long tmo;
 	u32 high;
 	u32 low;
+	u64 timestamp;
 };
 
 struct cpts {
@@ -126,14 +127,27 @@ struct cpts {
 	struct cpts_event pool_data[CPTS_MAX_EVENTS];
 	unsigned long ov_check_period;
 	struct workqueue_struct *workwq;
+	struct mutex ptp_clk_mutex; /* sync PTP interface with works */
+
+	int irq;
+	u64 cur_timestamp;
+	struct completion	ts_push_complete;
+
+	u32 tx_tmo;
+	u32 event_tmo;
+	u32 fail_rx;
+
+	struct work_struct ts_work;
+	struct sk_buff_head txq;
+	struct sk_buff_head rxq;
 };
 
-void cpts_rx_timestamp(struct cpts *cpts, struct sk_buff *skb);
+int cpts_rx_timestamp(struct cpts *cpts, struct sk_buff *skb);
 void cpts_tx_timestamp(struct cpts *cpts, struct sk_buff *skb);
 int cpts_register(struct cpts *cpts);
 void cpts_unregister(struct cpts *cpts);
 struct cpts *cpts_create(struct device *dev, void __iomem *regs,
-			 struct device_node *node);
+			 struct device_node *node, int irq);
 void cpts_release(struct cpts *cpts);
 
 static inline void cpts_rx_enable(struct cpts *cpts, int enable)
