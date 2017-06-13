@@ -18,7 +18,8 @@ config MIPS
 	select HAVE_ARCH_MMAP_RND_COMPAT_BITS if MMU && COMPAT
 	select HAVE_ARCH_SECCOMP_FILTER
 	select HAVE_ARCH_TRACEHOOK
-	select HAVE_CBPF_JIT if !CPU_MICROMIPS
+	select HAVE_CBPF_JIT if (!64BIT && !CPU_MICROMIPS)
+	select HAVE_EBPF_JIT if (64BIT && !CPU_MICROMIPS)
 	select HAVE_FUNCTION_TRACER
 	select HAVE_DYNAMIC_FTRACE
 	select HAVE_FTRACE_MCOUNT_RECORD
@@ -1177,6 +1178,15 @@ config SYS_SUPPORTS_RELOCATABLE
 	 Selected if the platform supports relocating the kernel.
 	 The platform must provide plat_get_fdt() if it selects CONFIG_USE_OF
 	 to allow access to command line and entropy sources.
+
+config MIPS_CBPF_JIT
+	def_bool y
+	depends on BPF_JIT && HAVE_CBPF_JIT
+
+config MIPS_EBPF_JIT
+	def_bool y
+	depends on BPF_JIT && HAVE_EBPF_JIT
+
 
 #
 # Endianness selection.  Sufficiently obscure so many users don't know what to
