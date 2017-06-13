@@ -2440,7 +2440,7 @@ static void hci_auth_complete_evt(struct hci_dev *hdev, struct sk_buff *skb)
 		if (ev->status == HCI_ERROR_PIN_OR_KEY_MISSING)
 			set_bit(HCI_CONN_AUTH_FAILURE, &conn->flags);
 
-		mgmt_auth_failed(conn, ev->status);
+		mgmt_auth_failed(conn, mgmt_status(ev->status));
 	}
 
 	clear_bit(HCI_CONN_AUTH_PEND, &conn->flags);
@@ -4232,7 +4232,7 @@ static void hci_simple_pair_complete_evt(struct hci_dev *hdev,
 	 * event gets always produced as initiator and is also mapped to
 	 * the mgmt_auth_failed event */
 	if (!test_bit(HCI_CONN_AUTH_PEND, &conn->flags) && ev->status)
-		mgmt_auth_failed(conn, ev->status);
+		mgmt_auth_failed(conn, mgmt_status(ev->status));
 
 	hci_conn_drop(conn);
 

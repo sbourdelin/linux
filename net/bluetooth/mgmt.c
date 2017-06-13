@@ -7142,15 +7142,14 @@ int mgmt_user_passkey_notify(struct hci_dev *hdev, bdaddr_t *bdaddr,
 	return mgmt_event(MGMT_EV_PASSKEY_NOTIFY, hdev, &ev, sizeof(ev), NULL);
 }
 
-void mgmt_auth_failed(struct hci_conn *conn, u8 hci_status)
+void mgmt_auth_failed(struct hci_conn *conn, u8 mgmt_status)
 {
 	struct mgmt_ev_auth_failed ev;
 	struct mgmt_pending_cmd *cmd;
-	u8 status = mgmt_status(hci_status);
 
 	bacpy(&ev.addr.bdaddr, &conn->dst);
 	ev.addr.type = link_to_bdaddr(conn->type, conn->dst_type);
-	ev.status = status;
+	ev.status = mgmt_status;
 
 	cmd = find_pairing(conn);
 
@@ -7158,7 +7157,7 @@ void mgmt_auth_failed(struct hci_conn *conn, u8 hci_status)
 		    cmd ? cmd->sk : NULL);
 
 	if (cmd) {
-		cmd->cmd_complete(cmd, status);
+		cmd->cmd_complete(cmd, mgmt_status);
 		mgmt_pending_remove(cmd);
 	}
 }

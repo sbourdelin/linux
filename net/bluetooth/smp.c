@@ -814,7 +814,7 @@ static void smp_failure(struct l2cap_conn *conn, u8 reason)
 		smp_send_cmd(conn, SMP_CMD_PAIRING_FAIL, sizeof(reason),
 			     &reason);
 
-	mgmt_auth_failed(hcon, HCI_ERROR_AUTH_FAILURE);
+	mgmt_auth_failed(hcon, MGMT_STATUS_AUTH_FAILED);
 
 	if (chan->data)
 		smp_chan_destroy(conn);
