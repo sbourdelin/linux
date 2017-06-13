@@ -48,25 +48,26 @@ static inline bool i915_mmio_reg_valid(i915_reg_t reg)
 	return !i915_mmio_reg_equal(reg, INVALID_MMIO_REG);
 }
 
+#define _PICK(__index, a, b) ((a) + (__index) * ((b) - (a)))
 #define _PICK3(__index, ...) (((const u32 []){ __VA_ARGS__ })[__index])
 
-#define _PIPE(pipe, a, b) ((a) + (pipe)*((b)-(a)))
+#define _PIPE(pipe, a, b) _PICK(pipe, a, b)
 #define _MMIO_PIPE(pipe, a, b) _MMIO(_PIPE(pipe, a, b))
 #define _MMIO_PIPE3(pipe, ...) _MMIO(_PICK3(pipe, __VA_ARGS__))
 
-#define _PLANE(plane, a, b) _PIPE(plane, a, b)
-#define _MMIO_PLANE(plane, a, b) _MMIO_PIPE(plane, a, b)
+#define _PLANE(plane, a, b) _PICK(plane, a, b)
+#define _MMIO_PLANE(plane, a, b) _MMIO(_PLANE(plane, a, b))
 
-#define _TRANS(tran, a, b) ((a) + (tran)*((b)-(a)))
+#define _TRANS(tran, a, b) _PICK(tran, a, b)
 #define _MMIO_TRANS(tran, a, b) _MMIO(_TRANS(tran, a, b))
 
-#define _PORT(port, a, b) ((a) + (port)*((b)-(a)))
+#define _PORT(port, a, b) _PICK(port, a, b)
 #define _MMIO_PORT(port, a, b) _MMIO(_PORT(port, a, b))
 #define _MMIO_PORT3(port, ...) _MMIO(_PICK3(port, __VA_ARGS__))
 #define _MMIO_PORT3_LN(port, ln, a0, a1, b, c, d, e, f)			\
 	_MMIO(_PICK3(port, a0, b, c, d, e, f) + (ln * (a1 - a0)))
 
-#define _PLL(pll, a, b) ((a) + (pll)*((b)-(a)))
+#define _PLL(pll, a, b) _PICK(pll, a, b)
 #define _MMIO_PLL(pll, a, b) _MMIO(_PLL(pll, a, b))
 
 #define _PHY3(phy, ...) _PICK3(phy, __VA_ARGS__)
@@ -6415,7 +6416,7 @@ enum {
 #define _PS_ECC_STAT_2B     0x68AD0
 #define _PS_ECC_STAT_1C     0x691D0
 
-#define _ID(id, a, b) ((a) + (id)*((b)-(a)))
+#define _ID(id, a, b) _PICK(id, a, b)
 #define SKL_PS_CTRL(pipe, id) _MMIO_PIPE(pipe,        \
 			_ID(id, _PS_1A_CTRL, _PS_2A_CTRL),       \
 			_ID(id, _PS_1B_CTRL, _PS_2B_CTRL))
