@@ -1579,6 +1579,10 @@ doorbell_super_common_msgclr:
  * Note: While MSR:EE is off, we need to make sure that _MSR
  * in the generated frame has EE set to 1 or the exception
  * handler will not properly re-enable them.
+ *
+ * Note that we don't specify LR as the NIP (return address) for
+ * the interrupt because that would unbalance the return branch
+ * predictor.
  */
 _GLOBAL(__replay_interrupt)
 	/* We are going to jump to the exception common code which
@@ -1586,7 +1590,7 @@ _GLOBAL(__replay_interrupt)
 	 * we don't give a damn about, so we don't bother storing them.
 	 */
 	mfmsr	r12
-	mflr	r11
+	LOAD_REG_ADDR(r11, .L__replay_interrupt_return)
 	mfcr	r9
 	ori	r12,r12,MSR_EE
 	cmpwi	r3,0x900
@@ -1604,4 +1608,6 @@ FTR_SECTION_ELSE
 	cmpwi	r3,0xa00
 	beq	doorbell_super_common_msgclr
 ALT_FTR_SECTION_END_IFSET(CPU_FTR_HVMODE)
+.L__replay_interrupt_return:
 	blr
+
