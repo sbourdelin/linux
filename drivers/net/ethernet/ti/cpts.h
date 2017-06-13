@@ -100,6 +100,8 @@ enum {
 #define CPTS_FIFO_DEPTH 16
 #define CPTS_MAX_EVENTS 32
 
+#define CPTS_EVENT_RX_TX_TIMEOUT 20 /* ms */
+
 struct cpts_event {
 	struct list_head list;
 	unsigned long tmo;
@@ -140,6 +142,8 @@ struct cpts {
 	struct work_struct ts_work;
 	struct sk_buff_head txq;
 	struct sk_buff_head rxq;
+	u32 ext_ts_inputs;
+	u32 hw_ts_enable;
 };
 
 int cpts_rx_timestamp(struct cpts *cpts, struct sk_buff *skb);

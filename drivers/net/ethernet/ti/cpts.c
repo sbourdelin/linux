@@ -39,6 +39,11 @@ struct cpts_skb_cb_data {
 #define cpts_read32(c, r)	readl_relaxed(&c->reg->r)
 #define cpts_write32(c, v, r)	writel_relaxed(v, &c->reg->r)
 
+static int cpts_event_port(struct cpts_event *event)
+{
+	return (event->high >> PORT_NUMBER_SHIFT) & PORT_NUMBER_MASK;
+}
+
 static int event_expired(struct cpts_event *event)
 {
 	return time_after(jiffies, event->tmo);
@@ -181,9 +186,46 @@ static int cpts_ptp_settime(struct ptp_clock_info *ptp,
 	return 0;
 }
 
+/* HW TS */
+static int cpts_extts_enable(struct cpts *cpts, u32 index, int on)
+{
+	u32 v;
+
+	if (index >= cpts->info.n_ext_ts)
+		return -ENXIO;
+
+	if (((cpts->hw_ts_enable & BIT(index)) >> index) == on)
+		return 0;
+
+	mutex_lock(&cpts->ptp_clk_mutex);
+
+	v = cpts_read32(cpts, control);
+	if (on) {
+		v |= BIT(8 + index);
+		cpts->hw_ts_enable |= BIT(index);
+	} else {
+		v &= ~BIT(8 + index);
+		cpts->hw_ts_enable &= ~BIT(index);
+	}
+	cpts_write32(cpts, v, control);
+
+	mutex_unlock(&cpts->ptp_clk_mutex);
+
+	return 0;
+}
+
 static int cpts_ptp_enable(struct ptp_clock_info *ptp,
 			   struct ptp_clock_request *rq, int on)
 {
+	struct cpts *cpts = container_of(ptp, struct cpts, info);
+
+	switch (rq->type) {
+	case PTP_CLK_REQ_EXTTS:
+		return cpts_extts_enable(cpts, rq->extts.index, on);
+	default:
+		break;
+	}
+
 	return -EOPNOTSUPP;
 }
 
@@ -203,12 +245,12 @@ static struct ptp_clock_info cpts_info = {
 
 static void cpts_overflow_check(struct work_struct *work)
 {
-	struct timespec64 ts;
 	struct cpts *cpts = container_of(work, struct cpts, overflow_work.work);
 	struct timespec64 ts;
 	unsigned long flags;
 
 	cpts_ptp_gettime(&cpts->info, &ts);
+
 	pr_debug("cpts overflow check at %lld.%09lu\n", ts.tv_sec, ts.tv_nsec);
 	queue_delayed_work(cpts->workwq, &cpts->overflow_work,
 			   cpts->ov_check_period);
@@ -222,6 +264,7 @@ static void cpts_overflow_check(struct work_struct *work)
 
 static irqreturn_t cpts_misc_interrupt(int irq, void *dev_id)
 {
+	struct ptp_clock_event pevent;
 	struct cpts *cpts = dev_id;
 	unsigned long flags;
 	int i, type = -1;
@@ -264,7 +307,12 @@ static irqreturn_t cpts_misc_interrupt(int irq, void *dev_id)
 			break;
 		case CPTS_EV_ROLL:
 		case CPTS_EV_HALF:
+			break;
 		case CPTS_EV_HW:
+			pevent.timestamp = timecounter_cyc2time(&cpts->tc, event->low);
+			pevent.type = PTP_CLOCK_EXTTS;
+			pevent.index = cpts_event_port(event) - 1;
+			ptp_clock_event(cpts->clock, &pevent);
 			break;
 		default:
 			dev_err(cpts->dev, "unknown event type\n");
@@ -573,6 +621,7 @@ static void cpts_calc_mult_shift(struct cpts *cpts)
 
 	/* Calc overflow check period (maxsec / 2) */
 	cpts->ov_check_period = (HZ * maxsec) / 2;
+
 	dev_info(cpts->dev, "cpts: overflow check period %lu (jiffies)\n",
 		 cpts->ov_check_period);
 
@@ -604,6 +653,9 @@ static int cpts_of_parse(struct cpts *cpts, struct device_node *node)
 	if ((cpts->cc.mult && !cpts->cc.shift) ||
 	    (!cpts->cc.mult && cpts->cc.shift))
 		goto of_error;
+
+	if (!of_property_read_u32(node, "cpts-ext-ts-inputs", &prop))
+		cpts->ext_ts_inputs = prop;
 
 	return 0;
 
@@ -651,6 +703,9 @@ struct cpts *cpts_create(struct device *dev, void __iomem *regs,
 	cpts->cc.read = cpts_systim_read_irq;
 	cpts->cc.mask = CLOCKSOURCE_MASK(32);
 	cpts->info = cpts_info;
+
+	if (cpts->ext_ts_inputs)
+		cpts->info.n_ext_ts = cpts->ext_ts_inputs;
 
 	cpts_calc_mult_shift(cpts);
 	/* save cc.mult original value as it can be modified
