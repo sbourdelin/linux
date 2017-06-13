@@ -53,6 +53,9 @@ static inline bool i915_mmio_reg_valid(i915_reg_t reg)
 
 #define _PIPE(pipe, a, b) _PICK(pipe, a, b)
 #define _MMIO_PIPE(pipe, a, b) _MMIO(_PIPE(pipe, a, b))
+#define _MMIO_PIPE2(pipe, reg) _MMIO(dev_priv->info.pipe_offsets[pipe] - \
+	dev_priv->info.pipe_offsets[PIPE_A] + (reg) + \
+	dev_priv->info.display_mmio_offset)
 #define _MMIO_PIPE3(pipe, ...) _MMIO(_PICK3(pipe, __VA_ARGS__))
 
 #define _PLANE(plane, a, b) _PICK(plane, a, b)
@@ -60,6 +63,9 @@ static inline bool i915_mmio_reg_valid(i915_reg_t reg)
 
 #define _TRANS(tran, a, b) _PICK(tran, a, b)
 #define _MMIO_TRANS(tran, a, b) _MMIO(_TRANS(tran, a, b))
+#define _MMIO_TRANS2(pipe, reg) _MMIO(dev_priv->info.trans_offsets[(pipe)] - \
+	dev_priv->info.trans_offsets[TRANSCODER_A] + (reg) + \
+	dev_priv->info.display_mmio_offset)
 
 #define _PORT(port, a, b) _PICK(port, a, b)
 #define _MMIO_PORT(port, a, b) _MMIO(_PORT(port, a, b))
@@ -3700,10 +3706,6 @@ enum {
 #define CHV_TRANSCODER_C_OFFSET 0x63000
 #define TRANSCODER_EDP_OFFSET 0x6f000
 
-#define _MMIO_TRANS2(pipe, reg) _MMIO(dev_priv->info.trans_offsets[(pipe)] - \
-	dev_priv->info.trans_offsets[TRANSCODER_A] + (reg) + \
-	dev_priv->info.display_mmio_offset)
-
 #define HTOTAL(trans)		_MMIO_TRANS2(trans, _HTOTAL_A)
 #define HBLANK(trans)		_MMIO_TRANS2(trans, _HBLANK_A)
 #define HSYNC(trans)		_MMIO_TRANS2(trans, _HSYNC_A)
@@ -5188,10 +5190,6 @@ enum {
  * to access such registers in transcoder EDP.
  */
 #define PIPE_EDP_OFFSET	0x7f000
-
-#define _MMIO_PIPE2(pipe, reg) _MMIO(dev_priv->info.pipe_offsets[pipe] - \
-	dev_priv->info.pipe_offsets[PIPE_A] + (reg) + \
-	dev_priv->info.display_mmio_offset)
 
 #define PIPECONF(pipe)		_MMIO_PIPE2(pipe, _PIPEACONF)
 #define PIPEDSL(pipe)		_MMIO_PIPE2(pipe, _PIPEADSL)
