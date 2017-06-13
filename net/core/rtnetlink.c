@@ -1262,8 +1262,11 @@ static u8 rtnl_xdp_attached_mode(struct net_device *dev, u32 *prog_id)
 		*prog_id = generic_xdp_prog->aux->id;
 		return XDP_ATTACHED_SKB;
 	}
-	if (ops->ndo_xdp && __dev_xdp_attached(dev, ops->ndo_xdp, prog_id))
-		return XDP_ATTACHED_DRV;
+	if (ops->ndo_xdp) {
+		*prog_id = __dev_xdp_attached(dev, ops->ndo_xdp);
+		if (*prog_id)
+			return XDP_ATTACHED_DRV;
+	}
 
 	return XDP_ATTACHED_NONE;
 }
