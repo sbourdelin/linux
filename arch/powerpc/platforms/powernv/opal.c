@@ -815,6 +815,9 @@ static int __init opal_init(void)
 	opal_pdev_init("ibm,opal-flash");
 	opal_pdev_init("ibm,opal-prd");
 
+	/* Initialize platform device: OCC_OPAL command-response interface */
+	opal_pdev_init("ibm,opal-occ-cmd-rsp-interface");
+
 	/* Initialise platform device: oppanel interface */
 	opal_pdev_init("ibm,opal-oppanel");
 
@@ -859,6 +862,7 @@ EXPORT_SYMBOL_GPL(opal_flash_read);
 EXPORT_SYMBOL_GPL(opal_flash_write);
 EXPORT_SYMBOL_GPL(opal_flash_erase);
 EXPORT_SYMBOL_GPL(opal_prd_msg);
+EXPORT_SYMBOL_GPL(opal_occ_command);
 
 /* Convert a region of vmalloc memory to an opal sg list */
 struct opal_sg_list *opal_vmalloc_to_sg_list(void *vmalloc_addr,
@@ -937,6 +941,10 @@ int opal_error_code(int rc)
 	case OPAL_UNSUPPORTED:		return -EIO;
 	case OPAL_HARDWARE:		return -EIO;
 	case OPAL_INTERNAL_ERROR:	return -EIO;
+	case OPAL_OCC_BUSY:		return -EBUSY;
+	case OPAL_OCC_INVALID_STATE:
+	case OPAL_OCC_CMD_TIMEOUT:
+	case OPAL_OCC_RSP_MISMATCH:	return -EIO;
 	default:
 		pr_err("%s: unexpected OPAL error %d\n", __func__, rc);
 		return -EIO;

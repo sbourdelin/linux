@@ -42,6 +42,10 @@
 #define OPAL_I2C_STOP_ERR	-24
 #define OPAL_XIVE_PROVISIONING	-31
 #define OPAL_XIVE_FREE_ACTIVE	-32
+#define OPAL_OCC_INVALID_STATE	-33
+#define OPAL_OCC_BUSY		-34
+#define OPAL_OCC_CMD_TIMEOUT	-35
+#define OPAL_OCC_RSP_MISMATCH	-36
 
 /* API Tokens (in r0) */
 #define OPAL_INVALID_CALL		       -1
@@ -190,7 +194,8 @@
 #define OPAL_NPU_INIT_CONTEXT			146
 #define OPAL_NPU_DESTROY_CONTEXT		147
 #define OPAL_NPU_MAP_LPAR			148
-#define OPAL_LAST				148
+#define OPAL_OCC_COMMAND			149
+#define OPAL_LAST				149
 
 /* Device tree flags */
 
@@ -828,6 +833,40 @@ struct opal_prd_msg_header {
 };
 
 struct opal_prd_msg;
+
+enum occ_cmd {
+	OCC_CMD_AMESTER_PASS_THRU = 0,
+	OCC_CMD_CLEAR_SENSOR_DATA,
+	OCC_CMD_SET_POWER_CAP,
+	OCC_CMD_SET_POWER_SHIFTING_RATIO,
+	OCC_CMD_SELECT_SENSOR_GROUPS,
+	OCC_CMD_LAST
+};
+
+struct opal_occ_cmd_rsp_msg {
+	__be64 cdata;
+	__be64 rdata;
+	__be16 cdata_size;
+	__be16 rdata_size;
+	u8 cmd;
+	u8 request_id;
+	u8 status;
+};
+
+struct opal_occ_cmd_data {
+	__be16 size;
+	u8 cmd;
+	u8 data[];
+};
+
+struct opal_occ_rsp_data {
+	__be16 size;
+	u8 status;
+	u8 data[];
+};
+
+#define MAX_OPAL_CMD_DATA_LENGTH        4090
+#define MAX_OCC_RSP_DATA_LENGTH         8698
 
 #define OCC_RESET                       0
 #define OCC_LOAD                        1
