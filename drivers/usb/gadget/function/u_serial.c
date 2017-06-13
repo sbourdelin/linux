@@ -1025,6 +1025,21 @@ static int gs_break_ctl(struct tty_struct *tty, int duration)
 	return status;
 }
 
+static unsigned int gs_poll(struct tty_struct *tty, struct file *file,
+	poll_table *wait)
+{
+	struct gs_port *port = tty->driver_data;
+	struct gserial *gser;
+	unsigned int mask = 0;
+
+	spin_lock_irq(&port->port_lock);
+	gser = port->port_usb;
+	if (gser && gser->poll)
+		mask |= gser->poll(gser, file, wait);
+	spin_unlock_irq(&port->port_lock);
+	return mask;
+}
+
 static const struct tty_operations gs_tty_ops = {
 	.open =			gs_open,
 	.close =		gs_close,
@@ -1035,6 +1050,7 @@ static const struct tty_operations gs_tty_ops = {
 	.chars_in_buffer =	gs_chars_in_buffer,
 	.unthrottle =		gs_unthrottle,
 	.break_ctl =		gs_break_ctl,
+	.poll =			gs_poll,
 };
 
 /*-------------------------------------------------------------------------*/
