@@ -123,6 +123,10 @@ CC_OPTION_CFLAGS = $(filter-out $(GCC_PLUGINS_CFLAGS),$(KBUILD_CFLAGS))
 cc-option = $(call cc-option-raw, $(CC), $(KBUILD_CPPFLAGS) $(CC_OPTION_CFLAGS),\
 	$(1), $(2))
 
+# hostcc-option
+# Usage: HOSTCFLAGS += $(call hostcc-option, -fno-delete-null-pointer-checks,)
+hostcc-option = $(call cc-option-raw, $(HOSTCC), $(HOSTCFLAGS), $(1), $(2))
+
 # cc-option-yn
 # Usage: flag := $(call cc-option-yn,-march=winchip-c6)
 cc-option-yn = $(call try-run,\
