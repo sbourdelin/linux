@@ -763,6 +763,12 @@ static struct usb_function *acm_alloc_func(struct usb_function_instance *fi)
 	acm->port.func.unbind = acm_unbind;
 	acm->port.func.free_func = acm_free_func;
 
+	/* initialize port_line_coding with something that makes sense */
+	acm->port_line_coding.dwDTERate = cpu_to_le32(9600);
+	acm->port_line_coding.bCharFormat = USB_CDC_1_STOP_BITS;
+	acm->port_line_coding.bParityType = USB_CDC_NO_PARITY;
+	acm->port_line_coding.bDataBits = 8;
+
 	return &acm->port.func;
 }
 
