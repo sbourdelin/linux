@@ -48,6 +48,7 @@ struct iommu_group {
 	struct list_head devices;
 	struct mutex mutex;
 	struct blocking_notifier_head notifier;
+	struct blocking_notifier_head fault_notifier;
 	void *iommu_data;
 	void (*iommu_data_release)(void *iommu_data);
 	char *name;
@@ -345,6 +346,7 @@ struct iommu_group *iommu_group_alloc(void)
 	mutex_init(&group->mutex);
 	INIT_LIST_HEAD(&group->devices);
 	BLOCKING_INIT_NOTIFIER_HEAD(&group->notifier);
+	BLOCKING_INIT_NOTIFIER_HEAD(&group->fault_notifier);
 
 	ret = ida_simple_get(&iommu_group_ida, 0, 0, GFP_KERNEL);
 	if (ret < 0) {
@@ -788,6 +790,67 @@ int iommu_group_unregister_notifier(struct iommu_group *group,
 	return blocking_notifier_chain_unregister(&group->notifier, nb);
 }
 EXPORT_SYMBOL_GPL(iommu_group_unregister_notifier);
+
+/**
+ * iommu_register_fault_notifier - Register a notifier for fault reporting
+ * @dev: device to notify fault events
+ * @nb: notifier block to signal
+ *
+ */
+int iommu_register_fault_notifier(struct device *dev,
+				struct notifier_block *nb)
+{
+	int ret;
+	struct iommu_group *group = iommu_group_get(dev);
+
+	if (!group)
+		return -EINVAL;
+
+	ret = blocking_notifier_chain_register(&group->fault_notifier, nb);
+	iommu_group_put(group);
+
+	return ret;
+
+}
+EXPORT_SYMBOL_GPL(iommu_register_fault_notifier);
+
+/**
+ * iommu_unregister_fault_notifier - Unregister a notifier for fault reporting
+ * @domain: the domain to watch
+ * @nb: notifier block to signal
+ *
+ */
+int iommu_unregister_fault_notifier(struct device *dev,
+				  struct notifier_block *nb)
+{
+	int ret;
+	struct iommu_group *group = iommu_group_get(dev);
+
+	if (!group)
+		return -EINVAL;
+
+	ret = blocking_notifier_chain_unregister(&group->fault_notifier, nb);
+	iommu_group_put(group);
+
+	return ret;
+}
+EXPORT_SYMBOL_GPL(iommu_unregister_fault_notifier);
+
+int iommu_fault_notifier_call_chain(struct iommu_fault_event *event)
+{
+	int ret;
+	struct iommu_group *group = iommu_group_get(event->dev);
+
+	if (!group)
+		return -EINVAL;
+	/* caller provide generic data related to the event, TBD */
+	ret = (blocking_notifier_call_chain(&group->fault_notifier, 0, (void *)event)
+		== NOTIFY_BAD) ? -EINVAL : 0;
+	iommu_group_put(group);
+
+	return ret;
+}
+EXPORT_SYMBOL(iommu_fault_notifier_call_chain);
 
 /**
  * iommu_group_id - Return ID for a group

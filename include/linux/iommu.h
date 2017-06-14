@@ -42,6 +42,7 @@
  * if the IOMMU page table format is equivalent.
  */
 #define IOMMU_PRIV	(1 << 5)
+#define IOMMU_EXEC	(1 << 6)
 
 struct iommu_ops;
 struct iommu_group;
@@ -95,6 +96,36 @@ struct iommu_domain {
 	void *handler_token;
 	struct iommu_domain_geometry geometry;
 	void *iova_cookie;
+};
+
+/*
+ * Generic fault event notification data, used by all IOMMU architectures.
+ *
+ * - PCI and non-PCI devices
+ * - Recoverable faults (e.g. page request) & un-recoverable faults
+ * - DMA remapping and IRQ remapping faults
+ *
+ * @dev The device which faults are reported by IOMMU
+ * @addr tells the offending address
+ * @pasid contains process address space ID, used in shared virtual memory (SVM)
+ * @prot page access protection flag, e.g. IOMMU_READ, IOMMU_WRITE
+ * @flags contains fault type, etc.
+ * @length tells the size of the buf
+ * @buf contains any raw or arch specific data
+ *
+ */
+struct iommu_fault_event {
+	struct device *dev;
+	__u64 addr;
+	__u32 pasid;
+	__u32 prot;
+	__u32 flags;
+#define IOMMU_FAULT_PAGE_REQ	BIT(0)
+#define IOMMU_FAULT_UNRECOV	BIT(1)
+#define IOMMU_FAULT_IRQ_REMAP	BIT(2)
+#define IOMMU_FAULT_INVAL	BIT(3)
+	__u32 length;
+	__u8  buf[];
 };
 
 enum iommu_cap {
@@ -341,6 +372,12 @@ extern int iommu_group_register_notifier(struct iommu_group *group,
 					 struct notifier_block *nb);
 extern int iommu_group_unregister_notifier(struct iommu_group *group,
 					   struct notifier_block *nb);
+extern int iommu_register_fault_notifier(struct device *dev,
+					 struct notifier_block *nb);
+extern int iommu_unregister_fault_notifier(struct device *dev,
+					 struct notifier_block *nb);
+extern int iommu_fault_notifier_call_chain(struct iommu_fault_event *event);
+
 extern int iommu_group_id(struct iommu_group *group);
 extern struct iommu_group *iommu_group_get_for_dev(struct device *dev);
 extern struct iommu_domain *iommu_group_default_domain(struct iommu_group *);
@@ -569,6 +606,23 @@ static inline int iommu_group_register_notifier(struct iommu_group *group,
 
 static inline int iommu_group_unregister_notifier(struct iommu_group *group,
 						  struct notifier_block *nb)
+{
+	return 0;
+}
+
+static inline int iommu_register_fault_notifier(struct device *dev,
+						  struct notifier_block *nb)
+{
+	return 0;
+}
+
+static inline int iommu_unregister_fault_notifier(struct device *dev,
+						  struct notifier_block *nb)
+{
+	return 0;
+}
+
+static inline int iommu_fault_notifier_call_chain(struct iommu_fault_event *event)
 {
 	return 0;
 }
