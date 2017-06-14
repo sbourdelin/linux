@@ -329,7 +329,7 @@ static int helene_write_regs(struct helene_priv *priv,
 	return 0;
 }
 
-static int helene_write_reg(struct helene_priv *priv, u8 reg, u8 val)
+static noinline_if_stackbloat int helene_write_reg(struct helene_priv *priv, u8 reg, u8 val)
 {
 	return helene_write_regs(priv, reg, &val, 1);
 }
@@ -374,7 +374,7 @@ static int helene_read_regs(struct helene_priv *priv,
 	return 0;
 }
 
-static int helene_read_reg(struct helene_priv *priv, u8 reg, u8 *val)
+static noinline_if_stackbloat int helene_read_reg(struct helene_priv *priv, u8 reg, u8 *val)
 {
 	return helene_read_regs(priv, reg, val, 1);
 }

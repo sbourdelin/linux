@@ -130,7 +130,7 @@ static inline int zl10039_readreg(struct zl10039_state *state,
 	return zl10039_read(state, reg, val, 1);
 }
 
-static inline int zl10039_writereg(struct zl10039_state *state,
+static noinline_if_stackbloat int zl10039_writereg(struct zl10039_state *state,
 				const enum zl10039_reg_addr reg,
 				const u8 val)
 {

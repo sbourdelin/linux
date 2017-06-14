@@ -139,7 +139,7 @@ static inline int mt312_readreg(struct mt312_state *state,
 	return mt312_read(state, reg, val, 1);
 }
 
-static inline int mt312_writereg(struct mt312_state *state,
+static noinline_if_stackbloat int mt312_writereg(struct mt312_state *state,
 				 const enum mt312_reg_addr reg, const u8 val)
 {
 	return mt312_write(state, reg, &val, 1);

@@ -224,7 +224,7 @@ static int stb6100_write_reg_range(struct stb6100_state *state, u8 buf[], int st
 	return 0;
 }
 
-static int stb6100_write_reg(struct stb6100_state *state, u8 reg, u8 data)
+static noinline_if_stackbloat int stb6100_write_reg(struct stb6100_state *state, u8 reg, u8 data)
 {
 	if (unlikely(reg >= STB6100_NUMREGS)) {
 		dprintk(verbose, FE_ERROR, 1, "Invalid register offset 0x%x", reg);

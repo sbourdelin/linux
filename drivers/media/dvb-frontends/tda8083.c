@@ -88,7 +88,7 @@ static int tda8083_readregs (struct tda8083_state* state, u8 reg1, u8 *b, u8 len
 	return ret == 2 ? 0 : -1;
 }
 
-static inline u8 tda8083_readreg (struct tda8083_state* state, u8 reg)
+static noinline_if_stackbloat u8 tda8083_readreg (struct tda8083_state* state, u8 reg)
 {
 	u8 val;
 

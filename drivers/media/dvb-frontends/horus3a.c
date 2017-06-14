@@ -87,7 +87,7 @@ static int horus3a_write_regs(struct horus3a_priv *priv,
 	return 0;
 }
 
-static int horus3a_write_reg(struct horus3a_priv *priv, u8 reg, u8 val)
+static noinline_if_stackbloat int horus3a_write_reg(struct horus3a_priv *priv, u8 reg, u8 val)
 {
 	return horus3a_write_regs(priv, reg, &val, 1);
 }

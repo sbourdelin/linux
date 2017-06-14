@@ -798,7 +798,7 @@ int stv0367_writeregs(struct stv0367_state *state, u16 reg, u8 *data, int len)
 	return (ret != 1) ? -EREMOTEIO : 0;
 }
 
-static int stv0367_writereg(struct stv0367_state *state, u16 reg, u8 data)
+static noinline_if_stackbloat int stv0367_writereg(struct stv0367_state *state, u16 reg, u8 data)
 {
 	return stv0367_writeregs(state, reg, &data, 1);
 }
