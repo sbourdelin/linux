@@ -4269,21 +4269,32 @@ static void
 intel_dp_check_link_status(struct intel_dp *intel_dp)
 {
 	struct intel_encoder *intel_encoder = &dp_to_dig_port(intel_dp)->base;
-	struct drm_device *dev = intel_dp_to_dev(intel_dp);
 	u8 link_status[DP_LINK_STATUS_SIZE];
+	struct intel_connector *intel_connector = intel_dp->attached_connector;
+	struct drm_crtc *crtc;
 
-	WARN_ON(!drm_modeset_is_locked(&dev->mode_config.connection_mutex));
+	crtc = intel_connector->base.state->crtc;
+	if (!crtc)
+		return;
+
+	WARN_ON(!drm_modeset_is_locked(&crtc->mutex));
+
+	if (!crtc->state->active)
+		return;
+
+	if (drm_atomic_crtc_needs_modeset(crtc->state)) {
+		int ret;
+
+		/* wait for atomic modeset to complete */
+		ret = drm_atomic_helper_wait_for_hw_done(crtc);
+		if (ret < 0)
+			DRM_ERROR("Waiting for hw_done timed out\n");
+	}
 
 	if (!intel_dp_get_link_status(intel_dp, link_status)) {
 		DRM_ERROR("Failed to get link status\n");
 		return;
 	}
-
-	if (!intel_encoder->base.crtc)
-		return;
-
-	if (!to_intel_crtc(intel_encoder->base.crtc)->active)
-		return;
 
 	/*
 	 * Validate the cached values of intel_dp->link_rate and
@@ -4317,7 +4328,6 @@ intel_dp_check_link_status(struct intel_dp *intel_dp)
 static bool
 intel_dp_short_pulse(struct intel_dp *intel_dp)
 {
-	struct drm_device *dev = intel_dp_to_dev(intel_dp);
 	struct intel_encoder *intel_encoder = &dp_to_dig_port(intel_dp)->base;
 	u8 sink_irq_vector = 0;
 	u8 old_sink_count = intel_dp->sink_count;
@@ -4357,9 +4367,8 @@ intel_dp_short_pulse(struct intel_dp *intel_dp)
 			DRM_DEBUG_DRIVER("CP or sink specific irq unhandled\n");
 	}
 
-	drm_modeset_lock(&dev->mode_config.connection_mutex, NULL);
 	intel_dp_check_link_status(intel_dp);
-	drm_modeset_unlock(&dev->mode_config.connection_mutex);
+
 	if (intel_dp->compliance.test_type == DP_TEST_LINK_TRAINING) {
 		DRM_DEBUG_KMS("Link Training Compliance Test requested\n");
 		/* Send a Hotplug Uevent to userspace to start modeset */
@@ -4760,8 +4769,19 @@ intel_dp_detect(struct drm_connector *connector,
 		      connector->base.id, connector->name);
 
 	/* If full detect is not performed yet, do a full detect */
-	if (!intel_dp->detect_done)
+	if (!intel_dp->detect_done) {
+		struct drm_crtc *crtc;
+		int ret;
+
+		crtc = connector->state->crtc;
+		if (crtc) {
+			ret = drm_modeset_lock(&crtc->mutex, ctx);
+			if (ret)
+				return ret;
+		}
+
 		status = intel_dp_long_pulse(intel_dp->attached_connector);
+	}
 
 	intel_dp->detect_done = false;
 
@@ -5053,10 +5073,38 @@ intel_dp_hpd_pulse(struct intel_digital_port *intel_dig_port, bool long_hpd)
 	}
 
 	if (!intel_dp->is_mst) {
+		struct drm_modeset_acquire_ctx ctx;
+		struct drm_connector *connector = &intel_dp->attached_connector->base;
+		struct drm_crtc *crtc;
+		int iret;
+
+		drm_modeset_acquire_init(&ctx, 0);
+retry:
+		iret = drm_modeset_lock(&dev->mode_config.connection_mutex, &ctx);
+		if (iret)
+			goto err;
+
+		crtc = connector->state->crtc;
+		if (crtc) {
+			iret = drm_modeset_lock(&crtc->mutex, &ctx);
+			if (iret)
+				goto err;
+		}
+
 		if (!intel_dp_short_pulse(intel_dp)) {
 			intel_dp->detect_done = false;
 			goto put_power;
 		}
+
+err:
+		if (iret == -EDEADLK) {
+			drm_modeset_backoff(&ctx);
+			goto retry;
+		}
+
+		drm_modeset_drop_locks(&ctx);
+		drm_modeset_acquire_fini(&ctx);
+		WARN(iret, "Acquiring modeset locks failed with %i\n", iret);
 	}
 
 	ret = IRQ_HANDLED;
