@@ -1700,7 +1700,7 @@ out2:
 	return ret;
 }
 
-static int clone_verify_area(struct file *file, loff_t pos, u64 len, bool write)
+static int rw64_verify_area(struct file *file, loff_t pos, u64 len, bool write)
 {
 	struct inode *inode = file_inode(file);
 
@@ -1721,6 +1721,142 @@ static int clone_verify_area(struct file *file, loff_t pos, u64 len, bool write)
 	}
 
 	return security_file_permission(file, write ? MAY_WRITE : MAY_READ);
+}
+
+u64 vfs_copy_file_range64(struct file *file_in, loff_t pos_in,
+			    struct file *file_out, loff_t pos_out,
+			    u64 len, unsigned int flags)
+{
+	struct inode *inode_in = file_inode(file_in);
+	struct inode *inode_out = file_inode(file_out);
+	u64 ret;
+
+	if (flags != 0)
+		return -EINVAL;
+
+	if (S_ISDIR(inode_in->i_mode) || S_ISDIR(inode_out->i_mode))
+		return -EISDIR;
+	if (!S_ISREG(inode_in->i_mode) || !S_ISREG(inode_out->i_mode))
+		return -EINVAL;
+
+	ret = rw64_verify_area(file_in, pos_in, len, false);
+	if (unlikely(ret))
+		return ret;
+
+	ret = rw64_verify_area(file_out, pos_out, len, true);
+	if (unlikely(ret))
+		return ret;
+
+	if (!(file_in->f_mode & FMODE_READ) ||
+	    !(file_out->f_mode & FMODE_WRITE) ||
+	    (file_out->f_flags & O_APPEND))
+		return -EBADF;
+
+	if (len == 0)
+		return 0;
+
+	file_start_write(file_out);
+
+	/*
+	 * Try cloning first, this is supported by more file systems, and
+	 * more efficient if both clone and copy are supported (e.g. NFS).
+	 */
+	if (file_in->f_op->clone_file_range) {
+		ret = file_in->f_op->clone_file_range(file_in, pos_in,
+				file_out, pos_out, len);
+		if (ret == 0) {
+			ret = len;
+			goto done;
+		}
+	}
+
+	if (file_out->f_op->copy_file_range64) {
+		ret = file_out->f_op->copy_file_range64(file_in, pos_in,
+					file_out, pos_out, len, flags);
+		if (ret != -EOPNOTSUPP)
+			goto done;
+	}
+
+	ret = do_splice_direct(file_in, &pos_in, file_out, &pos_out,
+			len > MAX_RW_COUNT ? MAX_RW_COUNT : len, 0);
+
+done:
+	if (ret > 0) {
+		fsnotify_access(file_in);
+		add_rchar(current, ret);
+		fsnotify_modify(file_out);
+		add_wchar(current, ret);
+	}
+
+	inc_syscr(current);
+	inc_syscw(current);
+
+	file_end_write(file_out);
+
+	return ret;
+}
+EXPORT_SYMBOL(vfs_copy_file_range64);
+
+SYSCALL_DEFINE6(copy_file_range64, int, fd_in, loff_t __user *, off_in,
+		int, fd_out, loff_t __user *, off_out,
+		u64, len, unsigned int, flags)
+{
+	loff_t pos_in;
+	loff_t pos_out;
+	struct fd f_in;
+	struct fd f_out;
+	u64 ret = -EBADF;
+
+	f_in = fdget(fd_in);
+	if (!f_in.file)
+		goto out2;
+
+	f_out = fdget(fd_out);
+	if (!f_out.file)
+		goto out1;
+
+	ret = -EFAULT;
+	if (off_in) {
+		if (copy_from_user(&pos_in, off_in, sizeof(loff_t)))
+			goto out;
+	} else {
+		pos_in = f_in.file->f_pos;
+	}
+
+	if (off_out) {
+		if (copy_from_user(&pos_out, off_out, sizeof(loff_t)))
+			goto out;
+	} else {
+		pos_out = f_out.file->f_pos;
+	}
+
+	ret = vfs_copy_file_range64(f_in.file, pos_in, f_out.file, pos_out, len,
+				  flags);
+	if (ret > 0) {
+		pos_in += ret;
+		pos_out += ret;
+
+		if (off_in) {
+			if (copy_to_user(off_in, &pos_in, sizeof(loff_t)))
+				ret = -EFAULT;
+		} else {
+			f_in.file->f_pos = pos_in;
+		}
+
+		if (off_out) {
+			if (copy_to_user(off_out, &pos_out, sizeof(loff_t)))
+				ret = -EFAULT;
+		} else {
+			f_out.file->f_pos = pos_out;
+		}
+	}
+
+out:
+	fdput(f_out);
+out1:
+	fdput(f_in);
+out2:
+	return ret;
 }
 
 /*
@@ -1860,11 +1996,11 @@ int vfs_clone_file_range(struct file *file_in, loff_t pos_in,
 	if (!file_in->f_op->clone_file_range)
 		return -EOPNOTSUPP;
 
-	ret = clone_verify_area(file_in, pos_in, len, false);
+	ret = rw64_verify_area(file_in, pos_in, len, false);
 	if (ret)
 		return ret;
 
-	ret = clone_verify_area(file_out, pos_out, len, true);
+	ret = rw64_verify_area(file_out, pos_out, len, true);
 	if (ret)
 		return ret;
 
@@ -2009,7 +2145,7 @@ int vfs_dedupe_file_range(struct file *file, struct file_dedupe_range *same)
 	if (!S_ISREG(src->i_mode))
 		goto out;
 
-	ret = clone_verify_area(file, off, len, false);
+	ret = rw64_verify_area(file, off, len, false);
 	if (ret < 0)
 		goto out;
 	ret = 0;
@@ -2041,7 +2177,7 @@ int vfs_dedupe_file_range(struct file *file, struct file_dedupe_range *same)
 		}
 
 		dst_off = info->dest_offset;
-		ret = clone_verify_area(dst_file, dst_off, len, true);
+		ret = rw64_verify_area(dst_file, dst_off, len, true);
 		if (ret < 0) {
 			info->status = ret;
 			goto next_file;

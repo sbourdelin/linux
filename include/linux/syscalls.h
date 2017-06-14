@@ -905,5 +905,8 @@ asmlinkage long sys_pkey_alloc(unsigned long flags, unsigned long init_val);
 asmlinkage long sys_pkey_free(int pkey);
 asmlinkage long sys_statx(int dfd, const char __user *path, unsigned flags,
 			  unsigned mask, struct statx __user *buffer);
+asmlinkage long sys_copy_file_range64(int fd_in, loff_t __user *off_in,
+				    int fd_out, loff_t __user *off_out,
+				    u64 len, unsigned int flags);
 
 #endif
