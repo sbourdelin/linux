@@ -301,13 +301,13 @@ int kbd_rate(struct kbd_repeat *rpt)
 /*
  * Helper Functions.
  */
-static void put_queue(struct vc_data *vc, int ch)
+static noinline_if_stackbloat void put_queue(struct vc_data *vc, int ch)
 {
 	tty_insert_flip_char(&vc->port, ch, 0);
 	tty_schedule_flip(&vc->port);
 }
 
-static void puts_queue(struct vc_data *vc, char *cp)
+static noinline_if_stackbloat void puts_queue(struct vc_data *vc, char *cp)
 {
 	while (*cp) {
 		tty_insert_flip_char(&vc->port, *cp, 0);
@@ -555,7 +555,7 @@ static void fn_inc_console(struct vc_data *vc)
 	set_console(i);
 }
 
-static void fn_send_intr(struct vc_data *vc)
+static noinline_if_stackbloat void fn_send_intr(struct vc_data *vc)
 {
 	tty_insert_flip_char(&vc->port, 0, TTY_BREAK);
 	tty_schedule_flip(&vc->port);
