@@ -8103,6 +8103,15 @@ static void haswell_set_pipemisc(struct drm_crtc *crtc)
 		if (intel_crtc->config->dither)
 			val |= PIPEMISC_DITHER_ENABLE | PIPEMISC_DITHER_TYPE_SP;
 
+		if (hdmi_out > DRM_HDMI_OUTPUT_DEFAULT_RGB) {
+			val |= PIPEMISC_OUTPUT_YCBCR;
+
+			if (hdmi_out == DRM_HDMI_OUTPUT_YCBCR420) {
+				val |= PIPEMISC_YCBCR420_ENABLE |
+				       PIPEMISC_YCBCR420_MODE_BLEND;
+			}
+		}
+
 		I915_WRITE(PIPEMISC(intel_crtc->pipe), val);
 	}
 }
