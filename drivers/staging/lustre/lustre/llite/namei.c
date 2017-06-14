@@ -281,6 +281,7 @@ int ll_md_blocking_ast(struct ldlm_lock *lock, struct ldlm_lock_desc *desc,
 			truncate_inode_pages(inode->i_mapping, 0);
 
 			if (unlikely(!fid_is_zero(&lli->lli_pfid))) {
+				struct ll_sb_info *sbi = ll_i2sbi(inode);
 				struct inode *master_inode = NULL;
 				unsigned long hash;
 
@@ -295,7 +296,7 @@ int ll_md_blocking_ast(struct ldlm_lock *lock, struct ldlm_lock_desc *desc,
 				       PFID(&lli->lli_pfid));
 
 				hash = cl_fid_build_ino(&lli->lli_pfid,
-							ll_need_32bit_api(ll_i2sbi(inode)));
+							ll_need_32bit_api(sbi));
 				/*
 				 * Do not lookup the inode with ilookup5,
 				 * otherwise it will cause dead lock,
@@ -738,7 +739,8 @@ static int ll_atomic_open(struct inode *dir, struct dentry *dentry,
 
 			*opened |= FILE_CREATED;
 		}
-		if (d_really_is_positive(dentry) && it_disposition(it, DISP_OPEN_OPEN)) {
+		if (d_really_is_positive(dentry) &&
+		    it_disposition(it, DISP_OPEN_OPEN)) {
 			/* Open dentry. */
 			if (S_ISFIFO(d_inode(dentry)->i_mode)) {
 				/* We cannot call open here as it might

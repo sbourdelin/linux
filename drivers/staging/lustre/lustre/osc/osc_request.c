@@ -1229,7 +1229,7 @@ static int check_write_checksum(struct obdo *oa,
 
 	LCONSOLE_ERROR_MSG(0x132, "BAD WRITE CHECKSUM: %s: from %s inode " DFID " object " DOSTID " extent [%llu-%llu]\n",
 			   msg, libcfs_nid2str(peer->nid),
-			   oa->o_valid & OBD_MD_FLFID ? oa->o_parent_seq : (__u64)0,
+			   oa->o_valid & OBD_MD_FLFID ? oa->o_parent_seq : 0ULL,
 			   oa->o_valid & OBD_MD_FLFID ? oa->o_parent_oid : 0,
 			   oa->o_valid & OBD_MD_FLFID ? oa->o_parent_ver : 0,
 			   POSTID(&oa->o_oi), pga[0]->off,
@@ -1266,7 +1266,9 @@ static int osc_brw_fini_request(struct ptlrpc_request *req, int rc)
 	/* set/clear over quota flag for a uid/gid */
 	if (lustre_msg_get_opc(req->rq_reqmsg) == OST_WRITE &&
 	    body->oa.o_valid & (OBD_MD_FLUSRQUOTA | OBD_MD_FLGRPQUOTA)) {
-		unsigned int qid[MAXQUOTAS] = { body->oa.o_uid, body->oa.o_gid };
+		unsigned int qid[MAXQUOTAS] = {
+			body->oa.o_uid, body->oa.o_gid
+		};
 
 		CDEBUG(D_QUOTA, "setdq for [%u %u] with valid %#llx, flags %x\n",
 		       body->oa.o_uid, body->oa.o_gid, body->oa.o_valid,
@@ -1431,10 +1433,11 @@ static int osc_brw_redo_request(struct ptlrpc_request *request,
 	/* cap resend delay to the current request timeout, this is similar to
 	 * what ptlrpc does (see after_reply())
 	 */
+	new_req->rq_sent = ktime_get_real_seconds();
 	if (aa->aa_resends > new_req->rq_timeout)
-		new_req->rq_sent = ktime_get_real_seconds() + new_req->rq_timeout;
+		new_req->rq_sent += new_req->rq_timeout;
 	else
-		new_req->rq_sent = ktime_get_real_seconds() + aa->aa_resends;
+		new_req->rq_sent += aa->aa_resends;
 	new_req->rq_generation_set = 1;
 	new_req->rq_import_generation = request->rq_import_generation;
 
@@ -1486,7 +1489,8 @@ static void sort_brw_pages(struct brw_page **array, int num)
 		for (i = stride ; i < num ; i++) {
 			tmp = array[i];
 			j = i;
-			while (j >= stride && array[j - stride]->off > tmp->off) {
+			while (array[j - stride]->off > tmp->off &&
+			       j >= stride) {
 				array[j] = array[j - stride];
 				j -= stride;
 			}

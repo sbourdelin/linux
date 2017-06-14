@@ -1304,7 +1304,8 @@ static int echo_client_kbrw(struct echo_device *ed, int rw, struct obdo *oa,
 
 			vrc = echo_client_page_debug_check(pgp->pg,
 							   ostid_id(&oa->o_oi),
-							   pgp->off, pgp->count);
+							   pgp->off,
+							   pgp->count);
 			if (vrc != 0 && rc == 0)
 				rc = vrc;
 		}

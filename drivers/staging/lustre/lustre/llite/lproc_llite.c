@@ -380,7 +380,8 @@ static ssize_t ll_max_cached_mb_seq_write(struct file *file,
 					  const char __user *buffer,
 					  size_t count, loff_t *off)
 {
-	struct super_block *sb = ((struct seq_file *)file->private_data)->private;
+	struct seq_file *seq = file->private_data;
+	struct super_block *sb = seq->private;
 	struct ll_sb_info *sbi = ll_s2sbi(sb);
 	struct cl_client_cache *cache = sbi->ll_cache;
 	struct lu_env *env;
@@ -895,7 +896,8 @@ static ssize_t ll_unstable_stats_seq_write(struct file *file,
 					   const char __user *buffer,
 					   size_t count, loff_t *off)
 {
-	struct super_block *sb = ((struct seq_file *)file->private_data)->private;
+	struct seq_file *seq = file->private_data;
+	struct super_block *sb = seq->private;
 	struct ll_sb_info *sbi = ll_s2sbi(sb);
 	char kernbuf[128];
 	int val, rc;

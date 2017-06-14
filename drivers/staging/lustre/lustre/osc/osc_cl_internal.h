@@ -138,7 +138,9 @@ struct osc_object {
 	 * Manage write(dirty) extents.
 	 */
 	struct list_head	   oo_hp_exts; /* list of hp extents */
-	struct list_head	   oo_urgent_exts; /* list of writeback extents */
+	struct list_head	   oo_urgent_exts; /* list of writeback
+						    * extents
+						    */
 	struct list_head	   oo_rpc_exts;
 
 	struct list_head	   oo_reading_exts;

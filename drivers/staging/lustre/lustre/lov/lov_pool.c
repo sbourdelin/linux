@@ -106,7 +106,8 @@ static void *pool_key(struct hlist_node *hnode)
 	return pool->pool_name;
 }
 
-static int pool_hashkey_keycmp(const void *key, struct hlist_node *compared_hnode)
+static int pool_hashkey_keycmp(const void *key,
+			       struct hlist_node *compared_hnode)
 {
 	char *pool_name;
 	struct pool_desc *pool;
@@ -367,8 +368,12 @@ int lov_ost_pool_remove(struct ost_pool *op, __u32 idx)
 
 	for (i = 0; i < op->op_count; i++) {
 		if (op->op_array[i] == idx) {
+			size_t array_size;
+
+			array_size = (op->op_count - i - 1) *
+				     sizeof(op->op_array[0]);
 			memmove(&op->op_array[i], &op->op_array[i + 1],
-				(op->op_count - i - 1) * sizeof(op->op_array[0]));
+				array_size);
 			op->op_count--;
 			up_write(&op->op_rw_sem);
 			return 0;

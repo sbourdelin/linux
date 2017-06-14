@@ -1022,8 +1022,8 @@ EXPORT_SYMBOL(RMF_LAYOUT_INTENT);
  * OST request field.
  */
 struct req_msg_field RMF_OST_BODY =
-	DEFINE_MSGF("ost_body", 0,
-		    sizeof(struct ost_body), lustre_swab_ost_body, dump_ost_body);
+	DEFINE_MSGF("ost_body", 0, sizeof(struct ost_body),
+		    lustre_swab_ost_body, dump_ost_body);
 EXPORT_SYMBOL(RMF_OST_BODY);
 
 struct req_msg_field RMF_OBD_IOOBJ =
@@ -2142,9 +2142,10 @@ void req_capsule_extend(struct req_capsule *pill, const struct req_format *fmt)
 	for (i = 0; i < RCL_NR; ++i) {
 		LASSERT(fmt->rf_fields[i].nr >= old->rf_fields[i].nr);
 		for (j = 0; j < old->rf_fields[i].nr - 1; ++j) {
-			const struct req_msg_field *ofield = FMT_FIELD(old, i, j);
+			const struct req_msg_field *ofield;
 
 			/* "opaque" fields can be transmogrified */
+			ofield = FMT_FIELD(old, i, j);
 			if (!ofield->rmf_swabber &&
 			    (ofield->rmf_flags & ~RMF_F_NO_SIZE_CHECK) == 0 &&
 			    (ofield->rmf_size == -1 ||

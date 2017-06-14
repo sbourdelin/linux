@@ -670,7 +670,8 @@ static void ras_stride_increase_window(struct ll_readahead_state *ras,
 
 	LASSERT(ras->ras_stride_length > 0);
 	LASSERTF(ras->ras_window_start + ras->ras_window_len
-		 >= ras->ras_stride_offset, "window_start %lu, window_len %lu stride_offset %lu\n",
+		 >= ras->ras_stride_offset,
+		 "window_start %lu, window_len %lu stride_offset %lu\n",
 		 ras->ras_window_start,
 		 ras->ras_window_len, ras->ras_stride_offset);
 
@@ -766,7 +767,8 @@ static void ras_update(struct ll_sb_info *sbi, struct inode *inode,
 			    PAGE_SHIFT;
 
 		CDEBUG(D_READA, "kmsp %llu mwp %lu mp %lu\n", kms_pages,
-		       ra->ra_max_read_ahead_whole_pages, ra->ra_max_pages_per_file);
+		       ra->ra_max_read_ahead_whole_pages,
+		       ra->ra_max_pages_per_file);
 
 		if (kms_pages &&
 		    kms_pages <= ra->ra_max_read_ahead_whole_pages) {

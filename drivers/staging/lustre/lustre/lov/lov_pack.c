@@ -350,7 +350,8 @@ int lov_getstripe(struct lov_object *obj, struct lov_stripe_md *lsm,
 	/* FIXME: Bug 1185 - copy fields properly when structs change */
 	/* struct lov_user_md_v3 and struct lov_mds_md_v3 must be the same */
 	BUILD_BUG_ON(sizeof(lum) != sizeof(struct lov_mds_md_v3));
-	BUILD_BUG_ON(sizeof(lum.lmm_objects[0]) != sizeof(lmmk->lmm_objects[0]));
+	BUILD_BUG_ON(sizeof(lum.lmm_objects[0]) !=
+		     sizeof(lmmk->lmm_objects[0]));
 
 	if (cpu_to_le32(LOV_MAGIC) != LOV_MAGIC &&
 	    (lmmk->lmm_magic == cpu_to_le32(LOV_MAGIC_V1) ||

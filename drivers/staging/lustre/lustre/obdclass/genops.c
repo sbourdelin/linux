@@ -73,7 +73,8 @@ static struct obd_device *obd_device_alloc(void)
 
 static void obd_device_free(struct obd_device *obd)
 {
-	LASSERTF(obd->obd_magic == OBD_DEVICE_MAGIC, "obd %p obd_magic %08x != %08x\n",
+	LASSERTF(obd->obd_magic == OBD_DEVICE_MAGIC,
+		 "obd %p obd_magic %08x != %08x\n",
 		 obd, obd->obd_magic, OBD_DEVICE_MAGIC);
 	if (obd->obd_namespace) {
 		CERROR("obd %p: namespace %p was not properly cleaned up (obd_force=%d)!\n",
@@ -346,7 +347,8 @@ void class_release_dev(struct obd_device *obd)
 {
 	struct obd_type *obd_type = obd->obd_type;
 
-	LASSERTF(obd->obd_magic == OBD_DEVICE_MAGIC, "%p obd_magic %08x != %08x\n",
+	LASSERTF(obd->obd_magic == OBD_DEVICE_MAGIC,
+		 "%p obd_magic %08x != %08x\n",
 		 obd, obd->obd_magic, OBD_DEVICE_MAGIC);
 	LASSERTF(obd == obd_devs[obd->obd_minor], "obd %p != obd_devs[%d] %p\n",
 		 obd, obd->obd_minor, obd_devs[obd->obd_minor]);

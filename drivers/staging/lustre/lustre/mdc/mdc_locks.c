@@ -587,7 +587,7 @@ static int mdc_finish_enqueue(struct obd_export *exp,
 			mdc_set_open_replay_data(NULL, NULL, it);
 		}
 
-		if ((body->mbo_valid & (OBD_MD_FLDIREA | OBD_MD_FLEASIZE)) != 0) {
+		if (body->mbo_valid & (OBD_MD_FLDIREA | OBD_MD_FLEASIZE)) {
 			void *eadata;
 
 			mdc_update_max_ea_from_body(exp, body);
@@ -634,7 +634,8 @@ static int mdc_finish_enqueue(struct obd_export *exp,
 
 				lmm = req_capsule_client_get(pill, &RMF_EADATA);
 				if (lmm)
-					memcpy(lmm, eadata, body->mbo_eadatasize);
+					memcpy(lmm, eadata,
+					       body->mbo_eadatasize);
 			}
 		}
 	} else if (it->it_op & IT_LAYOUT) {

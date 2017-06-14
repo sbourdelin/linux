@@ -196,8 +196,8 @@ struct ptlrpc_bulk_desc *ptlrpc_prep_bulk_imp(struct ptlrpc_request *req,
 }
 EXPORT_SYMBOL(ptlrpc_prep_bulk_imp);
 
-void __ptlrpc_prep_bulk_page(struct ptlrpc_bulk_desc *desc,
-			     struct page *page, int pageoffset, int len, int pin)
+void __ptlrpc_prep_bulk_page(struct ptlrpc_bulk_desc *desc, struct page *page,
+			     int pageoffset, int len, int pin)
 {
 	struct bio_vec *kiov;
 
@@ -336,7 +336,8 @@ static void ptlrpc_at_adj_service(struct ptlrpc_request *req,
 	oldse = at_measured(&at->iat_service_estimate[idx], serv_est);
 	if (oldse != 0)
 		CDEBUG(D_ADAPTTO, "The RPC service estimate for %s ptl %d has changed from %d to %d\n",
-		       req->rq_import->imp_obd->obd_name, req->rq_request_portal,
+		       req->rq_import->imp_obd->obd_name,
+		       req->rq_request_portal,
 		       oldse, at_get(&at->iat_service_estimate[idx]));
 }
 
@@ -1138,7 +1139,9 @@ static int ptlrpc_import_delay_req(struct obd_import *imp,
 			  D_HA : D_ERROR, req, "IMP_CLOSED ");
 		*status = -EIO;
 	} else if (ptlrpc_send_limit_expired(req)) {
-		/* probably doesn't need to be a D_ERROR after initial testing */
+		/* probably doesn't need to be a D_ERROR after initial
+		 * testing
+		 */
 		DEBUG_REQ(D_HA, req, "send limit expired ");
 		*status = -ETIMEDOUT;
 	} else if (req->rq_send_state == LUSTRE_IMP_CONNECTING &&
@@ -1840,7 +1843,9 @@ int ptlrpc_check_set(const struct lu_env *env, struct ptlrpc_request_set *set)
 				spin_unlock(&req->rq_lock);
 
 				if (req->rq_timedout || req->rq_resend) {
-					/* This is re-sending anyway, let's mark req as resend. */
+					/* This is re-sending anyway,
+					 * let's mark req as resend.
+					 */
 					spin_lock(&req->rq_lock);
 					req->rq_resend = 1;
 					spin_unlock(&req->rq_lock);
@@ -2296,8 +2301,8 @@ int ptlrpc_set_wait(struct ptlrpc_request_set *set)
 			lwi = LWI_TIMEOUT(cfs_time_seconds(timeout ? timeout : 1),
 					  ptlrpc_expired_set, set);
 
-		rc = l_wait_event(set->set_waitq, ptlrpc_check_set(NULL, set), &lwi);
-
+		rc = l_wait_event(set->set_waitq, ptlrpc_check_set(NULL, set),
+				  &lwi);
 		/*
 		 * LU-769 - if we ignored the signal because it was already
 		 * pending when we started, we need to handle it now or we risk
@@ -3075,7 +3080,7 @@ void ptlrpc_init_xid(void)
 	}
 
 	/* Always need to be aligned to a power-of-two for multi-bulk BRW */
-	BUILD_BUG_ON(((PTLRPC_BULK_OPS_COUNT - 1) & PTLRPC_BULK_OPS_COUNT) != 0);
+	BUILD_BUG_ON((PTLRPC_BULK_OPS_COUNT - 1) & PTLRPC_BULK_OPS_COUNT);
 	ptlrpc_last_xid &= PTLRPC_BULK_OPS_MASK;
 }
 

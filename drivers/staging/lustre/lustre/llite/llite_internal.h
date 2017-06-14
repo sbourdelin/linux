@@ -84,7 +84,9 @@ struct ll_dentry_data {
 
 struct ll_getname_data {
 	struct dir_context ctx;
-	char	    *lgd_name;      /* points to a buffer with NAME_MAX+1 size */
+	char		*lgd_name;	/* points to a buffer with NAME_MAX + 1
+					 * size
+					 */
 	struct lu_fid    lgd_fid;       /* target fid we are looking for */
 	int	      lgd_found;     /* inode matched? */
 };
@@ -637,7 +639,8 @@ static inline int ll_need_32bit_api(struct ll_sb_info *sbi)
 #if BITS_PER_LONG == 32
 	return 1;
 #elif defined(CONFIG_COMPAT)
-	return unlikely(in_compat_syscall() || (sbi->ll_flags & LL_SBI_32BIT_API));
+	return unlikely(in_compat_syscall() ||
+			(sbi->ll_flags & LL_SBI_32BIT_API));
 #else
 	return unlikely(sbi->ll_flags & LL_SBI_32BIT_API);
 #endif
@@ -1065,7 +1068,8 @@ struct ll_statahead_info {
 					     * hidden entries
 					     */
 				sai_agl_valid:1,/* AGL is valid for the dir */
-				sai_in_readpage:1;/* statahead is in readdir() */
+				sai_in_readpage:1;/* statahead is in readdir()
+						   */
 	wait_queue_head_t	sai_waitq;      /* stat-ahead wait queue */
 	struct ptlrpc_thread    sai_thread;     /* stat-ahead thread */
 	struct ptlrpc_thread    sai_agl_thread; /* AGL thread */

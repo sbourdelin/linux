@@ -571,7 +571,8 @@ static void sa_instantiate(struct ll_statahead_info *sai,
 	child = entry->se_inode;
 	if (child) {
 		/* revalidate; unlinked and re-created with the same name */
-		if (unlikely(!lu_fid_eq(&minfo->mi_data.op_fid2, &body->mbo_fid1))) {
+		if (unlikely(!lu_fid_eq(&minfo->mi_data.op_fid2,
+					&body->mbo_fid1))) {
 			entry->se_inode = NULL;
 			iput(child);
 			child = NULL;
@@ -1082,7 +1083,8 @@ static int ll_statahead_thread(void *arg)
 					struct ll_inode_info *clli;
 
 					clli = list_entry(sai->sai_agls.next,
-							  struct ll_inode_info, lli_agl_list);
+							  struct ll_inode_info,
+							  lli_agl_list);
 					list_del_init(&clli->lli_agl_list);
 					spin_unlock(&lli->lli_agl_lock);
 
@@ -1447,7 +1449,8 @@ static int revalidate_statahead_dentry(struct inode *dir,
 	if (entry->se_state == SA_ENTRY_SUCC && entry->se_inode) {
 		struct inode *inode = entry->se_inode;
 		struct lookup_intent it = { .it_op = IT_GETATTR,
-					    .it_lock_handle = entry->se_handle };
+					    .it_lock_handle = entry->se_handle
+		};
 		__u64 bits;
 
 		rc = md_revalidate_lock(ll_i2mdexp(dir), &it,

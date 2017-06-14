@@ -517,7 +517,8 @@ static int sptlrpc_req_replace_dead_ctx(struct ptlrpc_request *req)
 
 		set_current_state(TASK_INTERRUPTIBLE);
 		schedule_timeout(msecs_to_jiffies(MSEC_PER_SEC));
-	} else if (unlikely(!test_bit(PTLRPC_CTX_UPTODATE_BIT, &newctx->cc_flags))) {
+	} else if (unlikely(!test_bit(PTLRPC_CTX_UPTODATE_BIT,
+				      &newctx->cc_flags))) {
 		/*
 		 * new ctx not up to date yet
 		 */

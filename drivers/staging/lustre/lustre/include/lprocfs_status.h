@@ -577,7 +577,8 @@ static const struct file_operations name##_fops = {			\
 	{								\
 		return lprocfs_wr_##type(file, buffer, count, off);	\
 	}								\
-	static int name##_##type##_open(struct inode *inode, struct file *file) \
+	static int name##_##type##_open(struct inode *inode,		\
+					struct file *file)		\
 	{								\
 		return single_open(file, NULL, inode->i_private);	\
 	}								\

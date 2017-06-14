@@ -198,7 +198,8 @@ static ssize_t osc_cached_mb_seq_write(struct file *file,
 				       const char __user *buffer,
 				       size_t count, loff_t *off)
 {
-	struct obd_device *dev = ((struct seq_file *)file->private_data)->private;
+	struct seq_file *seq = file->private_data;
+	struct obd_device *dev = seq->private;
 	struct client_obd *cli = &dev->u.cli;
 	long pages_number, rc;
 	char kernbuf[128];
@@ -413,7 +414,8 @@ static ssize_t osc_checksum_type_seq_write(struct file *file,
 					   const char __user *buffer,
 					   size_t count, loff_t *off)
 {
-	struct obd_device *obd = ((struct seq_file *)file->private_data)->private;
+	struct seq_file *seq = file->private_data;
+	struct obd_device *obd = seq->private;
 	int i;
 
 	DECLARE_CKSUM_NAME;

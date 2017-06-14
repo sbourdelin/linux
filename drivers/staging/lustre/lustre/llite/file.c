@@ -605,7 +605,8 @@ restart:
 			 * to get file with different fid.
 			 */
 			it->it_flags |= MDS_OPEN_LOCK | MDS_OPEN_BY_FID;
-			rc = ll_intent_file_open(file->f_path.dentry, NULL, 0, it);
+			rc = ll_intent_file_open(file->f_path.dentry, NULL, 0,
+						 it);
 			if (rc)
 				goto out_openerr;
 

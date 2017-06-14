@@ -1141,8 +1141,9 @@ static int osc_extent_make_ready(const struct lu_env *env,
 	 * the size of file.
 	 */
 	if (!(last->oap_async_flags & ASYNC_COUNT_STABLE)) {
-		int last_oap_count = osc_refresh_count(env, last, OBD_BRW_WRITE);
+		int last_oap_count;
 
+		last_oap_count = osc_refresh_count(env, last, OBD_BRW_WRITE);
 		LASSERT(last_oap_count > 0);
 		LASSERT(last->oap_page_off + last_oap_count <= PAGE_SIZE);
 		last->oap_count = last_oap_count;
@@ -1619,7 +1620,9 @@ static int osc_enter_cache(const struct lu_env *env, struct client_obd *cli,
 		spin_lock(&cli->cl_loi_list_lock);
 
 		if (rc < 0) {
-			/* l_wait_event is interrupted by signal, or timed out */
+			/* l_wait_event is interrupted by signal, or
+			 * timed out
+			 */
 			list_del_init(&ocw.ocw_entry);
 			break;
 		}
@@ -1781,7 +1784,8 @@ static int osc_makes_hprpc(struct osc_object *obj)
 	return !list_empty(&obj->oo_hp_exts);
 }
 
-static void on_list(struct list_head *item, struct list_head *list, int should_be_on)
+static void on_list(struct list_head *item, struct list_head *list,
+		    int should_be_on)
 {
 	if (list_empty(item) && should_be_on)
 		list_add_tail(item, list);

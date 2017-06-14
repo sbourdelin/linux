@@ -94,7 +94,8 @@ int mgc_fsname2resid(char *fsname, struct ldlm_res_id *res_id, int type)
 }
 EXPORT_SYMBOL(mgc_fsname2resid);
 
-static int mgc_logname2resid(char *logname, struct ldlm_res_id *res_id, int type)
+static int mgc_logname2resid(char *logname, struct ldlm_res_id *res_id,
+			     int type)
 {
 	char *name_end;
 	int len;

@@ -222,7 +222,8 @@ int lmv_revalidate_slaves(struct obd_export *exp,
 						      &RMF_MDT_BODY);
 			if (!body) {
 				if (it.it_lock_mode && lockh) {
-					ldlm_lock_decref(lockh, it.it_lock_mode);
+					ldlm_lock_decref(lockh,
+							 it.it_lock_mode);
 					it.it_lock_mode = 0;
 				}
 

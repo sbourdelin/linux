@@ -1834,8 +1834,8 @@ static int lmv_early_cancel(struct obd_export *exp, struct lmv_tgt_desc *tgt,
 }
 
 /*
- * llite passes fid of an target inode in op_data->op_fid1 and id of directory in
- * op_data->op_fid2
+ * llite passes fid of an target inode in op_data->op_fid1 and id of directory
+ * in op_data->op_fid2
  */
 static int lmv_link(struct obd_export *exp, struct md_op_data *op_data,
 		    struct ptlrpc_request **request)
@@ -1916,7 +1916,8 @@ static int lmv_rename(struct obd_export *exp, struct md_op_data *op_data,
 	op_data->op_cap = cfs_curproc_cap_pack();
 
 	if (op_data->op_cli_flags & CLI_MIGRATE) {
-		LASSERTF(fid_is_sane(&op_data->op_fid3), "invalid FID " DFID "\n",
+		LASSERTF(fid_is_sane(&op_data->op_fid3),
+			 "invalid FID " DFID "\n",
 			 PFID(&op_data->op_fid3));
 
 		if (op_data->op_mea1) {
@@ -2415,7 +2416,8 @@ static int lmv_read_page(struct obd_export *exp, struct md_op_data *op_data,
 		return rc;
 
 	if (unlikely(lsm))
-		return lmv_read_striped_page(exp, op_data, cb_op, offset, ppage);
+		return lmv_read_striped_page(exp, op_data, cb_op, offset,
+					     ppage);
 
 	tgt = lmv_find_target(lmv, &op_data->op_fid1);
 	if (IS_ERR(tgt))
