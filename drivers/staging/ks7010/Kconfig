@@ -1,5 +1,7 @@
 config KS7010
 	tristate "KeyStream KS7010 SDIO support"
+	depends on CFG80211
+        depends on MMC
 	---help---
 	  This is a driver for KeyStream KS7010 based SDIO WIFI cards. It is
 	  found on at least later Spectec SDW-821 (FCC-ID "S2Y-WLAN-11G-K" only,
