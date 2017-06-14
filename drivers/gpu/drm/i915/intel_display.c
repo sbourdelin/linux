@@ -6261,6 +6261,29 @@ static void intel_crtc_compute_pixel_rate(struct intel_crtc_state *crtc_state)
 			ilk_pipe_pixel_rate(crtc_state);
 }
 
+static int intel_crtc_ycbcr_config(struct intel_crtc_state *state)
+{
+	struct drm_crtc_state *drm_state = &state->base;
+	struct drm_i915_private *dev_priv = to_i915(drm_state->crtc->dev);
+
+	/* YCBCR420 is supported only in HDMI 2.0 controllers */
+	if ((state->hdmi_output == DRM_HDMI_OUTPUT_YCBCR420) &&
+		!IS_GEMINILAKE(dev_priv)) {
+		DRM_ERROR("YCBCR420 output is not supported\n");
+		return -EINVAL;
+	}
+
+	/* We need CSC for output conversion from RGB->YCBCR */
+	if (drm_state->ctm) {
+		DRM_ERROR("YCBCR output and CTM is not possible together\n");
+		return -EINVAL;
+	}
+
+	DRM_DEBUG_DRIVER("Output %s can be supported\n",
+			 drm_get_hdmi_output_name(state->hdmi_output));
+	return 0;
+}
+
 static int intel_crtc_compute_config(struct intel_crtc *crtc,
 				     struct intel_crtc_state *pipe_config)
 {
@@ -6288,6 +6311,14 @@ static int intel_crtc_compute_config(struct intel_crtc *crtc,
 			      adjusted_mode->crtc_clock, clock_limit,
 			      yesno(pipe_config->double_wide));
 		return -EINVAL;
+	}
+
+	/* YCBCR output check */
+	if (pipe_config->hdmi_output > DRM_HDMI_OUTPUT_DEFAULT_RGB) {
+		if (intel_crtc_ycbcr_config(pipe_config)) {
+			DRM_ERROR("Cant enable HDMI YCBCR output\n");
+			return -EINVAL;
+		}
 	}
 
 	/*
@@ -11649,6 +11680,7 @@ encoder_retry:
 			DRM_DEBUG_KMS("Encoder config failure\n");
 			goto fail;
 		}
+
 	}
 
 	/* Set default port clock if not overwritten by the encoder. Needs to be
