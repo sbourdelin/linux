@@ -152,9 +152,9 @@ static int igt_overcommit(void *arg)
 	list_move(&obj->global_link, &i915->mm.unbound_list);
 
 	vma = i915_gem_object_ggtt_pin(obj, NULL, 0, 0, 0);
-	if (!IS_ERR(vma) || PTR_ERR(vma) != -ENOSPC) {
+	if (IS_ERR(vma) && PTR_ERR(vma) != -ENOSPC) {
 		pr_err("Failed to evict+insert, i915_gem_object_ggtt_pin returned err=%d\n", (int)PTR_ERR(vma));
-		err = -EINVAL;
+		err = PTR_ERR(vma);
 		goto cleanup;
 	}
 
