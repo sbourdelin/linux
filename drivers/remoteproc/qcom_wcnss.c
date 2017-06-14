@@ -159,6 +159,7 @@ static int wcnss_load(struct rproc *rproc, const struct firmware *fw)
 static const struct rproc_fw_ops wcnss_fw_ops = {
 	.find_rsc_table = qcom_mdt_find_rsc_table,
 	.load = wcnss_load,
+	.register_segments = qcom_register_dump_segments,
 };
 
 static void wcnss_indicate_nv_download(struct qcom_wcnss *wcnss)

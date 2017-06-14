@@ -85,6 +85,7 @@ static int adsp_load(struct rproc *rproc, const struct firmware *fw)
 static const struct rproc_fw_ops adsp_fw_ops = {
 	.find_rsc_table = qcom_mdt_find_rsc_table,
 	.load = adsp_load,
+	.register_segments = qcom_register_dump_segments,
 };
 
 static int adsp_start(struct rproc *rproc)
