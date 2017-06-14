@@ -728,6 +728,15 @@ struct drm_connector {
 	bool interlace_allowed;
 	bool doublescan_allowed;
 	bool stereo_allowed;
+
+	/**
+	 * @is_hdmi2_src : This bool indicates if this connector is a HDMI 2.0
+	 * capable source. While handling the EDID functions (specially HDMI
+	 * 2.0 specific capabilities like YCBCR420 handling), its important to
+	 * know if the source is capable of driving a HDMI 2.0 display.
+	 */
+	bool is_hdmi2_src;
+
 	/**
 	 * @registered: Is this connector exposed (registered) with userspace?
 	 * Protected by @mutex.
