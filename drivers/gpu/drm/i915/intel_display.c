@@ -11921,6 +11921,7 @@ intel_pipe_config_compare(struct drm_i915_private *dev_priv,
 	PIPE_CONF_CHECK_I(hdmi_scrambling);
 	PIPE_CONF_CHECK_I(hdmi_high_tmds_clock_ratio);
 	PIPE_CONF_CHECK_I(has_infoframe);
+	PIPE_CONF_CHECK_I(hdmi_output);
 
 	PIPE_CONF_CHECK_I(has_audio);
 

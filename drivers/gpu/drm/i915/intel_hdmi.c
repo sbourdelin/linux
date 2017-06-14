@@ -1317,7 +1317,8 @@ intel_hdmi_mode_valid(struct drm_connector *connector,
 	return status;
 }
 
-static bool hdmi_12bpc_possible(struct intel_crtc_state *crtc_state)
+static bool hdmi_12bpc_possible(struct intel_crtc_state *crtc_state,
+				enum drm_hdmi_output_type hdmi_out)
 {
 	struct drm_i915_private *dev_priv =
 		to_i915(crtc_state->base.crtc->dev);
@@ -1328,6 +1329,16 @@ static bool hdmi_12bpc_possible(struct intel_crtc_state *crtc_state)
 
 	if (HAS_GMCH_DISPLAY(dev_priv))
 		return false;
+
+	if (hdmi_out == DRM_HDMI_OUTPUT_YCBCR422) {
+		/*
+		 * HDMI spec says YCBCR422 is 12bpc, but its not a deep
+		 * color format. So respect the spec, and not allow this
+		 * to be deep color
+		 */
+		DRM_DEBUG_KMS("Not allowing deep color for YCBCR422 output\n");
+		return false;
+	}
 
 	/*
 	 * HDMI 12bpc affects the clocks, so it's only possible
@@ -1342,6 +1353,12 @@ static bool hdmi_12bpc_possible(struct intel_crtc_state *crtc_state)
 		if (connector_state->crtc != crtc_state->base.crtc)
 			continue;
 
+		if (hdmi_out == DRM_HDMI_OUTPUT_YCBCR420) {
+			if (!(info->hdmi.ycbcr420_dc_modes &
+					DRM_EDID_YCBCR420_DC_36))
+				return false;
+		}
+
 		if ((info->edid_hdmi_dc_modes & DRM_EDID_HDMI_DC_36) == 0)
 			return false;
 	}
@@ -1354,6 +1371,65 @@ static bool hdmi_12bpc_possible(struct intel_crtc_state *crtc_state)
 	return true;
 }
 
+static u8
+intel_hdmi_get_src_output_support(struct drm_connector *connector)
+{
+	struct drm_i915_private *dev_priv = connector->dev->dev_private;
+	u8 supported_outputs = DRM_COLOR_FORMAT_RGB444;
+
+	if (dev_priv->info.gen < 7)
+		return supported_outputs;
+
+	/* Gen 7 and above support HDMI 1.4b outputs */
+	supported_outputs |= (DRM_COLOR_FORMAT_YCRCB444 |
+				DRM_COLOR_FORMAT_YCRCB422);
+
+	if (IS_GEMINILAKE(dev_priv))
+		supported_outputs |= DRM_COLOR_FORMAT_YCRCB420;
+
+	return supported_outputs;
+}
+
+static enum drm_hdmi_output_type
+intel_hdmi_compute_ycbcr_config(struct drm_connector_state *conn_state,
+			       struct intel_crtc_state *config,
+			       int *clock_12bpc, int *clock_8bpc)
+{
+	struct drm_connector *connector = conn_state->connector;
+	struct drm_display_mode *mode = &config->base.adjusted_mode;
+	enum drm_hdmi_output_type type = conn_state->hdmi_output;
+	u8 src_output_cap = intel_hdmi_get_src_output_support(connector);
+
+	/*
+	 * Can we support any YCBCR output based on these parameters ?
+	 * current source capabilities +
+	 * current sink capabilities +
+	 * given video mode +
+	 * current user's choice for HDMI output (from connector property)
+	 */
+	type = drm_find_hdmi_output_type(connector, mode, type, src_output_cap);
+	if ((type == DRM_HDMI_OUTPUT_INVALID) ||
+		(type == DRM_HDMI_OUTPUT_DEFAULT_RGB)) {
+		DRM_DEBUG_KMS("Can't support YCBCR output\n");
+		return type;
+	}
+
+	if (type == DRM_HDMI_OUTPUT_YCBCR420) {
+
+		/* YCBCR420 TMDS rate requirement is half the pixel clock */
+		config->hdmi_output = DRM_HDMI_OUTPUT_YCBCR420;
+		config->port_clock /= 2;
+		*clock_12bpc /= 2;
+		*clock_8bpc /= 2;
+
+	}
+
+	/* Encoder is capable of this output, lets commit to CRTC */
+	config->hdmi_output = type;
+	DRM_DEBUG_KMS("HDMI output: %s\n", drm_get_hdmi_output_name(type));
+	return type;
+}
+
 bool intel_hdmi_compute_config(struct intel_encoder *encoder,
 			       struct intel_crtc_state *pipe_config,
 			       struct drm_connector_state *conn_state)
@@ -1361,13 +1437,15 @@ bool intel_hdmi_compute_config(struct intel_encoder *encoder,
 	struct intel_hdmi *intel_hdmi = enc_to_intel_hdmi(&encoder->base);
 	struct drm_i915_private *dev_priv = to_i915(encoder->base.dev);
 	struct drm_display_mode *adjusted_mode = &pipe_config->base.adjusted_mode;
-	struct drm_scdc *scdc = &conn_state->connector->display_info.hdmi.scdc;
+	struct drm_connector *connector = conn_state->connector;
+	struct drm_scdc *scdc = &connector->display_info.hdmi.scdc;
 	struct intel_digital_connector_state *intel_conn_state =
 		to_intel_digital_connector_state(conn_state);
 	int clock_8bpc = pipe_config->base.adjusted_mode.crtc_clock;
 	int clock_12bpc = clock_8bpc * 3 / 2;
 	int desired_bpp;
 	bool force_dvi = intel_conn_state->force_audio == HDMI_AUDIO_OFF_DVI;
+	enum drm_hdmi_output_type hdmi_out = conn_state->hdmi_output;
 
 	pipe_config->has_hdmi_sink = !force_dvi && intel_hdmi->has_hdmi_sink;
 
@@ -1391,6 +1469,15 @@ bool intel_hdmi_compute_config(struct intel_encoder *encoder,
 		clock_12bpc *= 2;
 	}
 
+	/* Check if YCBCR HDMI output handling is required */
+	hdmi_out = intel_hdmi_compute_ycbcr_config(conn_state,
+					   pipe_config, &clock_12bpc,
+					   &clock_8bpc);
+	if (hdmi_out == DRM_HDMI_OUTPUT_INVALID) {
+		DRM_ERROR("Can't support desired HDMI output\n");
+		return false;
+	}
+
 	if (HAS_PCH_SPLIT(dev_priv) && !HAS_DDI(dev_priv))
 		pipe_config->has_pch_encoder = true;
 
@@ -1410,7 +1497,7 @@ bool intel_hdmi_compute_config(struct intel_encoder *encoder,
 	 */
 	if (pipe_config->pipe_bpp > 8*3 && pipe_config->has_hdmi_sink && !force_dvi &&
 	    hdmi_port_clock_valid(intel_hdmi, clock_12bpc, true, force_dvi) == MODE_OK &&
-	    hdmi_12bpc_possible(pipe_config)) {
+	    hdmi_12bpc_possible(pipe_config, hdmi_out)) {
 		DRM_DEBUG_KMS("picking bpc to 12 for HDMI output\n");
 		desired_bpp = 12*3;
 
