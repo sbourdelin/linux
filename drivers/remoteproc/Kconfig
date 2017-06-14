@@ -130,6 +130,14 @@ config ST_SLIM_REMOTEPROC
 	tristate
 	depends on REMOTEPROC
 
+config IMX_REMOTEPROC
+	tristate "IMX6/7 remoteproc support"
+	depends on SOC_IMX6SX || SOC_IMX7D
+	depends on REMOTEPROC
+	help
+	  TODO, write some thing here
+	  This can be either built-in or a loadable module.
+
 endif # REMOTEPROC
 
 endmenu
