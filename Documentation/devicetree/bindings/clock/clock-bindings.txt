@@ -18,6 +18,9 @@ Required properties:
 		   with a single clock output and 1 for nodes with multiple
 		   clock outputs.
 
+		   There's one exception, please see the description for
+		   clock-indices below.
+
 Optional properties:
 clock-output-names: Recommended to be a list of strings of clock output signal
 		    names indexed by the first cell in the clock specifier.
@@ -47,6 +50,13 @@ For example:
 clock-indices:	   If the identifying number for the clocks in the node
 		   is not linear from zero, then this allows the mapping of
 		   identifiers into the clock-output-names array.
+
+		   This property not only servers for clocks with multiple
+		   clock outputs, but also for clocks with a single clock
+		   output whose identifying number is not zero.
+
+		   So long as clock-indices is set, clock-cells cannot be
+		   set zero.
 
 For example, if we have two clocks <&oscillator 1> and <&oscillator 3>:
 
