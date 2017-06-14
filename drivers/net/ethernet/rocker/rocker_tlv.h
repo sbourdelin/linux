@@ -139,38 +139,38 @@ rocker_tlv_start(struct rocker_desc_info *desc_info)
 int rocker_tlv_put(struct rocker_desc_info *desc_info,
 		   int attrtype, int attrlen, const void *data);
 
-static inline int rocker_tlv_put_u8(struct rocker_desc_info *desc_info,
-				    int attrtype, u8 value)
+static noinline_if_stackbloat int
+rocker_tlv_put_u8(struct rocker_desc_info *desc_info, int attrtype, u8 value)
 {
 	return rocker_tlv_put(desc_info, attrtype, sizeof(u8), &value);
 }
 
-static inline int rocker_tlv_put_u16(struct rocker_desc_info *desc_info,
-				     int attrtype, u16 value)
+static noinline_if_stackbloat int
+rocker_tlv_put_u16(struct rocker_desc_info *desc_info, int attrtype, u16 value)
 {
 	return rocker_tlv_put(desc_info, attrtype, sizeof(u16), &value);
 }
 
-static inline int rocker_tlv_put_be16(struct rocker_desc_info *desc_info,
-				      int attrtype, __be16 value)
+static noinline_if_stackbloat int
+rocker_tlv_put_be16(struct rocker_desc_info *desc_info, int attrtype, __be16 value)
 {
 	return rocker_tlv_put(desc_info, attrtype, sizeof(__be16), &value);
 }
 
-static inline int rocker_tlv_put_u32(struct rocker_desc_info *desc_info,
-				     int attrtype, u32 value)
+static noinline_if_stackbloat int
+rocker_tlv_put_u32(struct rocker_desc_info *desc_info, int attrtype, u32 value)
 {
 	return rocker_tlv_put(desc_info, attrtype, sizeof(u32), &value);
 }
 
-static inline int rocker_tlv_put_be32(struct rocker_desc_info *desc_info,
-				      int attrtype, __be32 value)
+static noinline_if_stackbloat int
+rocker_tlv_put_be32(struct rocker_desc_info *desc_info, int attrtype, __be32 value)
 {
 	return rocker_tlv_put(desc_info, attrtype, sizeof(__be32), &value);
 }
 
-static inline int rocker_tlv_put_u64(struct rocker_desc_info *desc_info,
-				     int attrtype, u64 value)
+static noinline_if_stackbloat int
+rocker_tlv_put_u64(struct rocker_desc_info *desc_info, int attrtype, u64 value)
 {
 	return rocker_tlv_put(desc_info, attrtype, sizeof(u64), &value);
 }
