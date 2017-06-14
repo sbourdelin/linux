@@ -822,7 +822,9 @@ static struct domain_device *sas_ex_discover_end_dev(
 
 		list_add_tail(&child->disco_list_node, &parent->port->disco_list);
 
+		sas_wait_discover_event_init(child->port);
 		res = sas_discover_sata(child);
+		sas_wait_for_discover_event_finish(child->port);
 		if (res) {
 			SAS_DPRINTK("sas_discover_sata() for device %16llx at "
 				    "%016llx:0x%x returned 0x%x\n",
@@ -847,7 +849,9 @@ static struct domain_device *sas_ex_discover_end_dev(
 
 		list_add_tail(&child->disco_list_node, &parent->port->disco_list);
 
+		sas_wait_discover_event_init(child->port);
 		res = sas_discover_end_dev(child);
+		sas_wait_for_discover_event_finish(child->port);
 		if (res) {
 			SAS_DPRINTK("sas_discover_end_dev() for device %16llx "
 				    "at %016llx:0x%x returned 0x%x\n",
@@ -1890,8 +1894,11 @@ static void sas_unregister_devs_sas_addr(struct domain_device *parent,
 				if (child->dev_type == SAS_EDGE_EXPANDER_DEVICE ||
 				    child->dev_type == SAS_FANOUT_EXPANDER_DEVICE)
 					sas_unregister_ex_tree(parent->port, child);
-				else
+				else {
+					sas_wait_discover_event_init(parent->port);
 					sas_unregister_dev(parent->port, child);
+					sas_wait_for_discover_event_finish(parent->port);
+				}
 				found = child;
 				break;
 			}

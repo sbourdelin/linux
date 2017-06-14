@@ -100,6 +100,67 @@ void sas_free_device(struct kref *kref);
 extern const work_func_t sas_phy_event_fns[PHY_NUM_EVENTS];
 extern const work_func_t sas_port_event_fns[PORT_NUM_EVENTS];
 
+static inline void sas_wait_discover_event_init(struct asd_sas_port *port)
+{
+	if (port) {
+		init_completion(&port->disc.completion);
+		port->disc.wait = 1;
+		port->disc.busy = 0;
+	}
+}
+
+static inline void sas_wait_for_discover_event_finish(
+		struct asd_sas_port *port)
+{
+	if (port && port->disc.busy > 0)
+		wait_for_completion(&port->disc.completion);
+}
+
+static inline void sas_wait_sas_event_init(struct asd_sas_port *port)
+{
+	if (port) {
+		init_completion(&port->completion);
+		kref_init(&port->ref);
+	}
+}
+
+static inline void sas_wait_for_sas_event_finish(
+		struct asd_sas_port *port)
+{
+	if (port && (kref_read(&port->ref) > 1))
+		wait_for_completion(&port->completion);
+}
+
+static inline void sas_busy_port(struct asd_sas_port *port)
+{
+	if (port)
+		kref_get(&port->ref);
+
+	if (port->disc.wait == 1)
+		port->disc.busy++;
+}
+
+static void sas_complete_event(struct kref *kref)
+{
+	struct asd_sas_port *port = container_of(kref, struct asd_sas_port, ref);
+
+	complete(&port->completion);
+}
+
+static inline void sas_unbusy_port(struct asd_sas_port *port)
+{
+	if (!port)
+		return;
+
+	kref_put(&port->ref, sas_complete_event);
+
+	if (port->disc.wait == 1) {
+		complete(&port->disc.completion);
+		port->disc.wait = 0;
+		port->disc.busy = 0;
+	}
+}
+
 #ifdef CONFIG_SCSI_SAS_HOST_SMP
 extern int sas_smp_host_handler(struct Scsi_Host *shost, struct request *req,
 				struct request *rsp);

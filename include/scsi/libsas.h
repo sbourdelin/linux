@@ -240,6 +240,7 @@ static inline void INIT_SAS_WORK(struct sas_work *sw, void (*fn)(struct work_str
 struct sas_discovery_event {
 	struct sas_work work;
 	struct asd_sas_port *port;
+	enum discover_event	type;
 };
 
 static inline struct sas_discovery_event *to_sas_discovery_event(struct work_struct *work)
@@ -256,6 +257,9 @@ struct sas_discovery {
 	u8     eeds_a[8];
 	u8     eeds_b[8];
 	int    max_level;
+	int    wait;
+	int    busy;
+	struct completion completion;
 };
 
 /* The port struct is Class:RW, driver:RO */
@@ -273,6 +277,8 @@ struct asd_sas_port {
 
 	struct sas_work work;
 	int suspended;
+	struct kref ref;
+	struct completion completion;
 
 /* public: */
 	int id;
@@ -387,6 +393,7 @@ struct sas_ha_struct {
 	int		  eh_active;
 	wait_queue_head_t eh_wait_q;
 	struct list_head  eh_dev_q;
+	int       id; /* for create workqueue */
 
 	struct mutex disco_mutex;
 
@@ -396,6 +403,8 @@ struct sas_ha_struct {
 	char *sas_ha_name;
 	struct device *dev;	  /* should be set */
 	struct module *lldd_module; /* should be set */
+	struct workqueue_struct	*event_q;
+	struct workqueue_struct	*disc_q;
 
 	u8 *sas_addr;		  /* must be set */
 	u8 hashed_sas_addr[HASHED_SAS_ADDR_SIZE];
