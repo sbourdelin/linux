@@ -1347,6 +1347,19 @@ int iommu_unbind_pasid_table(struct iommu_domain *domain, struct device *dev)
 }
 EXPORT_SYMBOL_GPL(iommu_unbind_pasid_table);
 
+int iommu_do_invalidate(struct iommu_domain *domain,
+		struct device *dev, struct tlb_invalidate_info *inv_info)
+{
+	int ret = 0;
+
+	if (unlikely(domain->ops->do_invalidate == NULL))
+		return -ENODEV;
+
+	ret = domain->ops->do_invalidate(domain, dev, inv_info);
+	return ret;
+}
+EXPORT_SYMBOL_GPL(iommu_do_invalidate);
+
 static void __iommu_detach_device(struct iommu_domain *domain,
 				  struct device *dev)
 {

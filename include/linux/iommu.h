@@ -232,6 +232,8 @@ struct iommu_ops {
 				struct pasid_table_info *pasidt_binfo);
 	int (*unbind_pasid_table)(struct iommu_domain *domain,
 				struct device *dev);
+	int (*do_invalidate)(struct iommu_domain *domain,
+		struct device *dev, struct tlb_invalidate_info *inv_info);
 
 	unsigned long pgsize_bitmap;
 };
@@ -293,6 +295,9 @@ extern int iommu_bind_pasid_table(struct iommu_domain *domain,
 		struct device *dev, struct pasid_table_info *pasidt_binfo);
 extern int iommu_unbind_pasid_table(struct iommu_domain *domain,
 				struct device *dev);
+extern int iommu_do_invalidate(struct iommu_domain *domain,
+		struct device *dev, struct tlb_invalidate_info *inv_info);
+
 extern struct iommu_domain *iommu_get_domain_for_dev(struct device *dev);
 extern int iommu_map(struct iommu_domain *domain, unsigned long iova,
 		     phys_addr_t paddr, size_t size, int prot);
@@ -656,6 +661,12 @@ int iommu_bind_pasid_table(struct iommu_domain *domain, struct device *dev,
 }
 static inline
 int iommu_unbind_pasid_table(struct iommu_domain *domain, struct device *dev)
+{
+	return -EINVAL;
+}
+
+static inline int iommu_do_invalidate(struct iommu_domain *domain,
+		struct device *dev, struct tlb_invalidate_info *inv_info)
 {
 	return -EINVAL;
 }

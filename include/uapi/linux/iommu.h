@@ -29,5 +29,9 @@ struct pasid_table_info {
 	__u8	opaque[];
 };
 
+struct tlb_invalidate_info {
+	__u32	model;
+	__u8	opaque[];
+};
 
 #endif /* _UAPI_IOMMU_H */
