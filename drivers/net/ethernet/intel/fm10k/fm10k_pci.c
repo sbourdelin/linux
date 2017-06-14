@@ -91,6 +91,65 @@ static int fm10k_hw_ready(struct fm10k_intfc *interface)
 	return FM10K_REMOVED(hw->hw_addr) ? -ENODEV : 0;
 }
 
+/**
+ * fm10k_macvlan_schedule - Schedule MAC/VLAN queue task
+ * @interface: fm10k private interface structure
+ *
+ * Schedule the MAC/VLAN queue monitor task. If the MAC/VLAN task cannot be
+ * started immediately, request that it be restarted when possible.
+ */
+void fm10k_macvlan_schedule(struct fm10k_intfc *interface)
+{
+	/* Avoid processing the MAC/VLAN queue when the service task is
+	 * disabled, or when we're resetting the device.
+	 */
+	if (!test_bit(__FM10K_SERVICE_DISABLE, interface->state) &&
+	    !test_bit(__FM10K_RESETTING, interface->state) &&
+	    !test_and_set_bit(__FM10K_MACVLAN_SCHED, interface->state)) {
+		clear_bit(__FM10K_MACVLAN_REQUEST, interface->state);
+		/* We delay the actual start of execution in order to allow
+		 * multiple MAC/VLAN updates to accumulate before handling
+		 * them, and to allow some time to let the mailbox drain
+		 * between runs.
+		 */
+		queue_delayed_work(fm10k_workqueue,
+				   &interface->macvlan_task, 10);
+	} else {
+		set_bit(__FM10K_MACVLAN_REQUEST, interface->state);
+	}
+}
+
+/**
+ * fm10k_stop_macvlan_task - Stop the MAC/VLAN queue monitor
+ * @interface: fm10k private interface structure
+ *
+ * Wait until the MAC/VLAN queue task has stopped, and cancel any future
+ * requests. Expects to be called with either the __FM10K_SERVICE_DISBABLE or
+ * __FM10K_RESETTING status bits set, as otherwise the task may be rescheduled
+ * at any time.
+ *
+ * There is no fm10k_start_macvlan_task as there is more than one flow for
+ * re-enabling the task.
+ */
+static void fm10k_stop_macvlan_task(struct fm10k_intfc *interface)
+{
+	/* It is a bug to call this function except when we're resetting or
+	 * the service task is disabled.
+	 */
+	WARN_ON(!test_bit(__FM10K_SERVICE_DISABLE, interface->state) &&
+		!test_bit(__FM10K_RESETTING, interface->state));
+
+	cancel_delayed_work_sync(&interface->macvlan_task);
+
+	/* We set the __FM10K_MACVLAN_SCHED bit when we schedule the task.
+	 * However, it may not be unset of the MAC/VLAN task never actually
+	 * got a chance to run. Since we've canceled the task here, and it
+	 * cannot be rescheuled right now, we need to ensure the scheduled bit
+	 * gets unset.
+	 */
+	clear_bit(__FM10K_MACVLAN_SCHED, interface->state);
+}
+
 void fm10k_service_event_schedule(struct fm10k_intfc *interface)
 {
 	if (!test_bit(__FM10K_SERVICE_DISABLE, interface->state) &&
@@ -165,6 +224,12 @@ static void fm10k_prepare_for_reset(struct fm10k_intfc *interface)
 	/* Nothing to do if a reset is already in progress */
 	if (test_and_set_bit(__FM10K_RESETTING, interface->state))
 		return;
+
+	/* As the MAC/VLAN task will be accessing registers it must not be
+	 * running while we reset. Although the task will not be scheduled
+	 * once we start resetting it may already be running
+	 */
+	fm10k_stop_macvlan_task(interface);
 
 	rtnl_lock();
 
@@ -249,6 +314,12 @@ static int fm10k_handle_reset(struct fm10k_intfc *interface)
 	rtnl_unlock();
 
 	clear_bit(__FM10K_RESETTING, interface->state);
+
+	/* We might have received a MAC/VLAN request while resetting. If so,
+	 * kick off the queue now.
+	 */
+	if (test_bit(__FM10K_MACVLAN_REQUEST, interface->state))
+		fm10k_macvlan_schedule(interface);
 
 	return err;
 err_open:
@@ -656,6 +727,112 @@ static void fm10k_service_task(struct work_struct *work)
 
 	/* release lock on service events to allow scheduling next event */
 	fm10k_service_event_complete(interface);
+}
+
+/**
+ * fm10k_macvlan_task - send queued MAC/VLAN requests to switch manager
+ * @work: pointer to work_struct containing our data
+ *
+ * This work item handles sending MAC/VLAN updates to the switch manager. When
+ * the interface is up, it will attempt to queue mailbox messages to the
+ * switch manager requesting updates for MAC/VLAN pairs. If the Tx fifo of the
+ * mailbox is full, it will reschedule itself to try again in a short while.
+ * This ensures that the driver does not overload the switch mailbox with too
+ * many simultaneous requests, causing an unnecessary reset.
+ **/
+static void fm10k_macvlan_task(struct work_struct *work)
+{
+	struct fm10k_macvlan_request *item;
+	struct fm10k_intfc *interface;
+	struct delayed_work *dwork;
+	struct list_head *requests;
+	struct fm10k_hw *hw;
+	unsigned long flags;
+
+	dwork = to_delayed_work(work);
+	interface = container_of(dwork, struct fm10k_intfc, macvlan_task);
+	hw = &interface->hw;
+	requests = &interface->macvlan_requests;
+
+	do {
+		/* Pop the first item off the list */
+		spin_lock_irqsave(&interface->macvlan_lock, flags);
+		item = list_first_entry_or_null(requests,
+						struct fm10k_macvlan_request,
+						list);
+		if (item)
+			list_del_init(&item->list);
+
+		spin_unlock_irqrestore(&interface->macvlan_lock, flags);
+
+		/* We have no more items to process */
+		if (!item)
+			goto done;
+
+		fm10k_mbx_lock(interface);
+
+		/* Check that we have plenty of space to send the message. We
+		 * want to ensure that the mailbox stays low enough to avoid a
+		 * change in the host state, otherwise we may see spurious
+		 * link up / link down notifications.
+		 */
+		if (!hw->mbx.ops.tx_ready(&hw->mbx, FM10K_VFMBX_MSG_MTU + 5)) {
+			hw->mbx.ops.process(hw, &hw->mbx);
+			set_bit(__FM10K_MACVLAN_REQUEST, interface->state);
+			fm10k_mbx_unlock(interface);
+
+			/* Put the request back on the list */
+			spin_lock_irqsave(&interface->macvlan_lock, flags);
+			list_add(&item->list, requests);
+			spin_unlock_irqrestore(&interface->macvlan_lock, flags);
+			break;
+		}
+
+		switch (item->type) {
+		case FM10K_MC_MAC_REQUEST:
+			hw->mac.ops.update_mc_addr(hw,
+						   item->mac.glort,
+						   item->mac.addr,
+						   item->mac.vid,
+						   item->set);
+			break;
+		case FM10K_UC_MAC_REQUEST:
+			hw->mac.ops.update_uc_addr(hw,
+						   item->mac.glort,
+						   item->mac.addr,
+						   item->mac.vid,
+						   item->set,
+						   0);
+			break;
+		case FM10K_VLAN_REQUEST:
+			hw->mac.ops.update_vlan(hw,
+						item->vlan.vid,
+						item->vlan.vsi,
+						item->set);
+			break;
+		default:
+			break;
+		}
+
+		fm10k_mbx_unlock(interface);
+
+		/* Free the item now that we've sent the update */
+		kfree(item);
+	} while (true);
+
+done:
+	WARN_ON(!test_bit(__FM10K_MACVLAN_SCHED, interface->state));
+
+	/* flush memory to make sure state is correct */
+	smp_mb__before_atomic();
+	clear_bit(__FM10K_MACVLAN_SCHED, interface->state);
+
+	/* If a MAC/VLAN request was scheduled since we started, we should
+	 * re-schedule. However, there is no reason to re-schedule if there is
+	 * no work to do.
+	 */
+	if (test_bit(__FM10K_MACVLAN_REQUEST, interface->state))
+		fm10k_macvlan_schedule(interface);
 }
 
 /**
@@ -1890,11 +2067,15 @@ static int fm10k_sw_init(struct fm10k_intfc *interface,
 	INIT_LIST_HEAD(&interface->vxlan_port);
 	INIT_LIST_HEAD(&interface->geneve_port);
 
+	/* Initialize the MAC/VLAN queue */
+	INIT_LIST_HEAD(&interface->macvlan_requests);
+
 	netdev_rss_key_fill(rss_key, sizeof(rss_key));
 	memcpy(interface->rssrk, rss_key, sizeof(rss_key));
 
 	/* Initialize the mailbox lock */
 	spin_lock_init(&interface->mbx_lock);
+	spin_lock_init(&interface->macvlan_lock);
 
 	/* Start off interface as being down */
 	set_bit(__FM10K_DOWN, interface->state);
@@ -2103,6 +2284,9 @@ static int fm10k_probe(struct pci_dev *pdev, const struct pci_device_id *ent)
 		    (unsigned long)interface);
 	INIT_WORK(&interface->service_task, fm10k_service_task);
 
+	/* Setup the MAC/VLAN queue */
+	INIT_DELAYED_WORK(&interface->macvlan_task, fm10k_macvlan_task);
+
 	/* kick off service timer now, even when interface is down */
 	mod_timer(&interface->service_timer, (HZ * 2) + jiffies);
 
@@ -2156,6 +2340,10 @@ static void fm10k_remove(struct pci_dev *pdev)
 	del_timer_sync(&interface->service_timer);
 
 	fm10k_stop_service_event(interface);
+	fm10k_stop_macvlan_task(interface);
+
+	/* Remove all pending MAC/VLAN requests */
+	fm10k_clear_macvlan_queue(interface, interface->glort, true);
 
 	/* free netdev, this may bounce the interrupts due to setup_tc */
 	if (netdev->reg_state == NETREG_REGISTERED)
@@ -2192,6 +2380,9 @@ static void fm10k_prepare_suspend(struct fm10k_intfc *interface)
 	 * a surprise remove if the PCIe device is disabled while we're
 	 * stopped. We stop the watchdog task until after we resume software
 	 * activity.
+	 *
+	 * Note that the MAC/VLAN task will be stopped as part of preparing
+	 * for reset so we don't need to handle it here.
 	 */
 	fm10k_stop_service_event(interface);
 
@@ -2222,6 +2413,9 @@ static int fm10k_handle_resume(struct fm10k_intfc *interface)
 
 	/* restart the service task */
 	fm10k_start_service_event(interface);
+
+	/* Restart the MAC/VLAN request queue in-case of outstanding events */
+	fm10k_macvlan_schedule(interface);
 
 	return err;
 }
