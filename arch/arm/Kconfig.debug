@@ -662,7 +662,7 @@ choice
 		  and 3517evm.
 
 	config DEBUG_OMAP4UART3
-		bool "Kernel low-level debugging messages via OMAP4/5 UART3 (omap4 blaze, panda, omap5 sevm)"
+		bool "Kernel low-level debugging messages via OMAP4/5 UART3 (omap4-evm, blaze, panda, omap5-uevm)"
 		depends on ARCH_OMAP2PLUS
 		select DEBUG_UART_8250
 
@@ -716,7 +716,7 @@ choice
 		select DEBUG_UART_8250
 
 	config DEBUG_AM33XXUART1
-		bool "Kernel low-level debugging messages via AM33XX UART1"
+		bool "Kernel low-level debugging messages via AM33XX/AM437X UART1"
 		depends on ARCH_OMAP2PLUS
 		select DEBUG_UART_8250
 
