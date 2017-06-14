@@ -1587,11 +1587,43 @@ void dmar_msi_read(int irq, struct msi_msg *msg)
 	raw_spin_unlock_irqrestore(&iommu->register_lock, flag);
 }
 
+static int dmar_unrecov_fault_notify(u8 fault_reason, u16 source_id,
+			unsigned long long addr)
+{
+	int ret;
+	struct pci_dev *pdev;
+	struct iommu_fault_event *event;
+
+	pdev = pci_get_bus_and_slot(source_id >> 8, source_id & 0xFF);
+	if (!pdev)
+		return -ENODEV;
+	pr_debug("Notify PCI device fault [%02x:%02x.%d]\n",
+		source_id >> 8, PCI_SLOT(source_id & 0xff),
+		PCI_FUNC(source_id & 0xff));
+	event = kzalloc(sizeof(*event) + sizeof(fault_reason), GFP_KERNEL);
+	if (!event)
+		return -ENOMEM;
+
+	pci_dev_get(pdev);
+	event->dev = &pdev->dev;
+	event->buf[0] = fault_reason;
+	event->addr = addr;
+	event->length = sizeof(fault_reason);
+	event->flags = IOMMU_FAULT_UNRECOV;
+	ret = iommu_fault_notifier_call_chain(event);
+
+	pci_dev_put(pdev);
+	kfree(event);
+
+	return ret;
+}
+
 static int dmar_fault_do_one(struct intel_iommu *iommu, int type,
 		u8 fault_reason, u16 source_id, unsigned long long addr)
 {
 	const char *reason;
 	int fault_type;
+	int ret = 0;
 
 	reason = dmar_get_fault_reason(fault_reason, &fault_type);
 
@@ -1600,11 +1632,14 @@ static int dmar_fault_do_one(struct intel_iommu *iommu, int type,
 			source_id >> 8, PCI_SLOT(source_id & 0xFF),
 			PCI_FUNC(source_id & 0xFF), addr >> 48,
 			fault_reason, reason);
-	else
+	else {
 		pr_err("[%s] Request device [%02x:%02x.%d] fault addr %llx [fault reason %02d] %s\n",
 		       type ? "DMA Read" : "DMA Write",
 		       source_id >> 8, PCI_SLOT(source_id & 0xFF),
 		       PCI_FUNC(source_id & 0xFF), addr, fault_reason, reason);
+		ret = dmar_unrecov_fault_notify(fault_reason, source_id, addr);
+	}
+
 	return 0;
 }
 
