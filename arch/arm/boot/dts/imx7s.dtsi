@@ -566,6 +566,14 @@
 			};
 		};
 
+		imx_rproc: imx7d-rp0@0 {
+			compatible	= "fsl,imx7d-rproc";
+			reg		= <0x00180000 0x4000>, <0x00184000 0x4000>;
+			reg-names	= "imem", "dmem";
+			syscon		= <&src>;
+			clocks		= <&clks IMX7D_ARM_M4_ROOT_CLK>;
+		};
+
 		aips2: aips-bus@30400000 {
 			compatible = "fsl,aips-bus", "simple-bus";
 			#address-cells = <1>;
