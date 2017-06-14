@@ -459,11 +459,14 @@ static void intel_hdmi_set_avi_infoframe(struct drm_encoder *encoder,
 	struct intel_hdmi *intel_hdmi = enc_to_intel_hdmi(encoder);
 	const struct drm_display_mode *adjusted_mode =
 		&crtc_state->base.adjusted_mode;
+	struct drm_connector *connector = &intel_hdmi->attached_connector->base;
+	bool is_hdmi2_sink = connector->display_info.hdmi.scdc.supported;
 	union hdmi_infoframe frame;
 	int ret;
 
 	ret = drm_hdmi_avi_infoframe_from_display_mode(&frame.avi,
-						       adjusted_mode);
+						       adjusted_mode,
+						       is_hdmi2_sink);
 	if (ret < 0) {
 		DRM_ERROR("couldn't fill AVI infoframe\n");
 		return;
@@ -816,6 +819,8 @@ static void hsw_set_infoframes(struct drm_encoder *encoder,
 {
 	struct drm_i915_private *dev_priv = to_i915(encoder->dev);
 	struct intel_hdmi *intel_hdmi = enc_to_intel_hdmi(encoder);
+	struct drm_hdmi_info *hdmi = &conn_state->connector->display_info.hdmi;
+	const struct drm_display_mode *mode = &crtc_state->base.adjusted_mode;
 	i915_reg_t reg = HSW_TVIDEO_DIP_CTL(crtc_state->cpu_transcoder);
 	u32 val = I915_READ(reg);
 
@@ -839,6 +844,16 @@ static void hsw_set_infoframes(struct drm_encoder *encoder,
 
 	intel_hdmi_set_avi_infoframe(encoder, crtc_state);
 	intel_hdmi_set_spd_infoframe(encoder, crtc_state);
+
+	/*
+	 * CEA-861-F added new VICs for 4k video modes, due to which
+	 * HDMI 2.0 sinks need HDMI IF only for S3D information (Not for
+	 * 4k VICs). So for a HDMI 2.0 sink, if the video mode is not 3D,
+	 * don't bother sending HDMI IF.
+	 */
+	if (hdmi->scdc.supported && !(mode->flags & DRM_MODE_FLAG_3D_MASK))
+		return;
+
 	intel_hdmi_set_hdmi_infoframe(encoder, crtc_state);
 }
 
