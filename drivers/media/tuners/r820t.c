@@ -396,7 +396,7 @@ static int r820t_write(struct r820t_priv *priv, u8 reg, const u8 *val,
 	return 0;
 }
 
-static int r820t_write_reg(struct r820t_priv *priv, u8 reg, u8 val)
+static noinline_if_stackbloat int r820t_write_reg(struct r820t_priv *priv, u8 reg, u8 val)
 {
 	return r820t_write(priv, reg, &val, 1);
 }
@@ -411,7 +411,7 @@ static int r820t_read_cache_reg(struct r820t_priv *priv, int reg)
 		return -EINVAL;
 }
 
-static int r820t_write_reg_mask(struct r820t_priv *priv, u8 reg, u8 val,
+static noinline_if_stackbloat int r820t_write_reg_mask(struct r820t_priv *priv, u8 reg, u8 val,
 				u8 bit_mask)
 {
 	int rc = r820t_read_cache_reg(priv, reg);
