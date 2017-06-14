@@ -74,6 +74,8 @@ Optional properties
 - flash: phandle referring to the flash driver chip. A flash driver may
   have multiple flashes connected to it.
 
+- lens-focus: A phandle to the node of the focus lens controller.
+
 
 Optional endpoint properties
 ----------------------------
