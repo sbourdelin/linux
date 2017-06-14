@@ -555,6 +555,80 @@ static bool access_error(struct vm_area_struct *vma, struct page_req_dsc *req)
 	return (requested & ~vma->vm_flags) != 0;
 }
 
+static int prq_to_iommu_prot(struct page_req_dsc *req)
+{
+	int prot = 0;
+
+	if (req->rd_req)
+		prot |= IOMMU_READ;
+	if (req->wr_req)
+		prot |= IOMMU_WRITE;
+	if (req->exe_req)
+		prot |= IOMMU_EXEC;
+	if (req->priv_req)
+		prot |= IOMMU_PRIV;
+
+	return prot;
+}
+
+static int intel_svm_prq_notify(struct device *dev, struct page_req_dsc *desc)
+{
+	int ret = 0;
+	struct iommu_fault_event *event;
+	struct pci_dev *pdev;
+	struct device_domain_info *info;
+	unsigned long buf_offset;
+
+	/**
+	 * If caller does not provide struct device, this is the case where
+	 * guest PASID table is bond to the device. So we need to retrieve
+	 * struct device from the page request deescriptor then proceed.
+	 */
+	if (!dev) {
+		pdev = pci_get_bus_and_slot(desc->bus, desc->devfn);
+		if (!pdev) {
+			pr_err("No PCI device found for PRQ [%02x:%02x.%d]\n",
+				desc->bus, PCI_SLOT(desc->devfn),
+				PCI_FUNC(desc->devfn));
+			return -ENODEV;
+		}
+		/**
+		 * Make sure PASID table pointer is bond to guest, if yes notify
+		 * handler in the guest, e.g. via VFIO.
+		 */
+		info = pdev->dev.archdata.iommu;
+		if (!info || !info->pasid_tbl_bond) {
+			pr_debug("PRQ device pasid table not bond.\n");
+			return -EINVAL;
+		}
+		dev = &pdev->dev;
+	}
+
+	pr_debug("Notify PRQ device [%02x:%02x.%d]\n",
+		desc->bus, PCI_SLOT(desc->devfn),
+		PCI_FUNC(desc->devfn));
+	event = kzalloc(sizeof(*event) + sizeof(*desc), GFP_KERNEL);
+	if (!event)
+		return -ENOMEM;
+
+	get_device(dev);
+	/* Fill in event data for device specific processing */
+	event->dev = dev;
+	buf_offset = offsetofend(struct iommu_fault_event, length);
+	memcpy(buf_offset + event, desc, sizeof(*desc));
+	event->addr = desc->addr;
+	event->pasid = desc->pasid;
+	event->prot = prq_to_iommu_prot(desc);
+	event->length = sizeof(*desc);
+	event->flags = IOMMU_FAULT_PAGE_REQ;
+
+	ret = iommu_fault_notifier_call_chain(event);
+	put_device(dev);
+	kfree(event);
+
+	return ret;
+}
+
 static irqreturn_t prq_event_thread(int irq, void *d)
 {
 	struct intel_iommu *iommu = d;
@@ -578,7 +652,12 @@ static irqreturn_t prq_event_thread(int irq, void *d)
 		handled = 1;
 
 		req = &iommu->prq[head / sizeof(*req)];
-
+		/**
+		 * If prq is to be handled outside iommu driver via receiver of
+		 * the fault notifiers, we skip the page response here.
+		 */
+		if (!intel_svm_prq_notify(NULL, req))
+			continue;
 		result = QI_RESP_FAILURE;
 		address = (u64)req->addr << VTD_PAGE_SHIFT;
 		if (!req->pasid_present) {
