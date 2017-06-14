@@ -76,6 +76,9 @@ Optional properties
 
 - lens-focus: A phandle to the node of the focus lens controller.
 
+- eeprom: A phandle to the node of the EEPROM describing the camera sensor
+  (i.e. device specific calibration data), in case it differs from the
+  sensor node.
 
 Optional endpoint properties
 ----------------------------
