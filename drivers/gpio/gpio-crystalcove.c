@@ -134,6 +134,9 @@ static void crystalcove_update_irq_ctrl(struct crystalcove_gpio *cg, int gpio)
 {
 	int reg = to_reg(gpio, CTRL_IN);
 
+	if (reg < 0)
+		return;
+
 	regmap_update_bits(cg->regmap, reg, CTLI_INTCNT_BE, cg->intcnt_value);
 }
 
