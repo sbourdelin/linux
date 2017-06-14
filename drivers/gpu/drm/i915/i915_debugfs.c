@@ -35,21 +35,21 @@ static inline struct drm_i915_private *node_to_i915(struct drm_info_node *node)
 	return to_i915(node->minor->dev);
 }
 
-static __always_inline void seq_print_param(struct seq_file *m,
-					    const char *name,
-					    const char *type,
-					    const void *x)
+#define seq_print_param_bool(m, name, x, tags) \
+	seq_printf(m, "i915.%s=%s%s\n", name, yesno(x), tags)
+#define seq_print_param_int(m, name, x, tags) \
+	seq_printf(m, "i915.%s=%d%s\n", name, x, tags)
+#define seq_print_param_uint(m, name, x, tags) \
+	seq_printf(m, "i915.%s=%u%s\n", name, x, tags)
+#define seq_print_param_charp(m, name, x, tags) \
+	seq_printf(m, "i915.%s=%s%s\n", name, x, tags)
+
+static inline const char *param_tags(bool is_default, bool is_unsafe)
 {
-	if (!__builtin_strcmp(type, "bool"))
-		seq_printf(m, "i915.%s=%s\n", name, yesno(*(const bool *)x));
-	else if (!__builtin_strcmp(type, "int"))
-		seq_printf(m, "i915.%s=%d\n", name, *(const int *)x);
-	else if (!__builtin_strcmp(type, "uint"))
-		seq_printf(m, "i915.%s=%u\n", name, *(const unsigned int *)x);
-	else if (!__builtin_strcmp(type, "charp"))
-		seq_printf(m, "i915.%s=%s\n", name, *(const char **)x);
-	else
-		BUILD_BUG();
+	if (is_default)
+		return "";
+
+	return is_unsafe ? " [modified *unsafe*]": " [modified]";
 }
 
 static int i915_capabilities(struct seq_file *m, void *data)
@@ -66,9 +66,15 @@ static int i915_capabilities(struct seq_file *m, void *data)
 #undef PRINT_FLAG
 
 	kernel_param_lock(THIS_MODULE);
-#define PRINT_PARAM(X, T, V, U, M, B, D) seq_print_param(m, #X, #T, &i915.X);
+#define FLAG false
+#define FLAG_unsafe true
+#define PRINT_PARAM(X, T, V, U, M, B, D) \
+	seq_print_param_##T(m, #X, i915.X, \
+			    param_tags(is_equal_##T(i915.X, V), FLAG##U));
 	I915_PARAMS_FOR_EACH(PRINT_PARAM);
 #undef PRINT_PARAM
+#undef FLAG
+#undef FLAG_unsafe
 	kernel_param_unlock(THIS_MODULE);
 
 	return 0;
