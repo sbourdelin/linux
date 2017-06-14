@@ -126,6 +126,12 @@ SYSCALL_DEFINE1(iopl, unsigned int, level)
 	regs->flags = (regs->flags & ~X86_EFLAGS_IOPL) |
 		(level << X86_EFLAGS_IOPL_BIT);
 	t->iopl = level << X86_EFLAGS_IOPL_BIT;
+	if (paravirt_iopl()) {
+		if (level > 0)
+			set_thread_flag(TIF_PV_IOPL);
+		else
+			clear_thread_flag(TIF_PV_IOPL);
+	}
 	set_iopl_mask(t->iopl);
 
 	return 0;

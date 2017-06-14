@@ -523,6 +523,7 @@ static inline void load_sp0(struct tss_struct *tss,
 	native_load_sp0(tss, thread);
 }
 
+static inline bool paravirt_iopl(void) { return false; }
 static inline void set_iopl_mask(unsigned mask) { }
 #endif /* CONFIG_PARAVIRT */
 

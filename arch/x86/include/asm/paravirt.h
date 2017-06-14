@@ -265,6 +265,12 @@ static inline void write_idt_entry(gate_desc *dt, int entry, const gate_desc *g)
 {
 	PVOP_VCALL3(pv_cpu_ops.write_idt_entry, dt, entry, g);
 }
+
+static inline bool paravirt_iopl(void)
+{
+	return pv_cpu_ops.set_iopl_mask != paravirt_nop;
+}
+
 static inline void set_iopl_mask(unsigned mask)
 {
 	PVOP_VCALL1(pv_cpu_ops.set_iopl_mask, mask);

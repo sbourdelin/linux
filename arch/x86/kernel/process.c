@@ -296,6 +296,14 @@ void __switch_to_xtra(struct task_struct *prev_p, struct task_struct *next_p,
 
 	if ((tifp ^ tifn) & _TIF_NOCPUID)
 		set_cpuid_faulting(!!(tifn & _TIF_NOCPUID));
+
+	/*
+	 * On Xen PV, IOPL bits in pt_regs->flags have no effect, and
+	 * current_pt_regs()->flags may not match the current task's
+	 * intended IOPL.  We need to switch it manually.
+	 */
+	if (prev->iopl != next->iopl)
+		set_iopl_mask(next->iopl);
 }
 
 /*
