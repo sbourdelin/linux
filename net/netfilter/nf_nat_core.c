@@ -328,6 +328,7 @@ get_unique_tuple(struct nf_conntrack_tuple *tuple,
 	const struct nf_conntrack_zone *zone;
 	const struct nf_nat_l3proto *l3proto;
 	const struct nf_nat_l4proto *l4proto;
+	const struct nf_conntrack_l4proto *ct_l4proto;
 	struct net *net = nf_ct_net(ct);
 
 	zone = nf_ct_zone(ct);
@@ -336,6 +337,7 @@ get_unique_tuple(struct nf_conntrack_tuple *tuple,
 	l3proto = __nf_nat_l3proto_find(orig_tuple->src.l3num);
 	l4proto = __nf_nat_l4proto_find(orig_tuple->src.l3num,
 					orig_tuple->dst.protonum);
+	ct_l4proto = __nf_ct_l4proto_find(nf_ct_l3num(ct), nf_ct_protonum(ct));
 
 	/* 1) If this srcip/proto/src-proto-part is currently mapped,
 	 * and that same mapping gives a unique tuple within the given
@@ -349,7 +351,7 @@ get_unique_tuple(struct nf_conntrack_tuple *tuple,
 	    !(range->flags & NF_NAT_RANGE_PROTO_RANDOM_ALL)) {
 		/* try the original tuple first */
 		if (in_range(l3proto, l4proto, orig_tuple, range)) {
-			if (!nf_nat_used_tuple(orig_tuple, ct)) {
+			if (!nf_nat_used_tuple(orig_tuple, ct) || ct_l4proto->allow_clash) {
 				*tuple = *orig_tuple;
 				goto out;
 			}
