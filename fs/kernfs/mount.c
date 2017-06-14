@@ -16,6 +16,7 @@
 #include <linux/pagemap.h>
 #include <linux/namei.h>
 #include <linux/seq_file.h>
+#include <linux/exportfs.h>
 
 #include "kernfs-internal.h"
 
@@ -62,6 +63,107 @@ const struct super_operations kernfs_sops = {
 	.remount_fs	= kernfs_sop_remount_fs,
 	.show_options	= kernfs_sop_show_options,
 	.show_path	= kernfs_sop_show_path,
+};
+
+static int kernfs_encode_fh(struct inode *inode, __u32 *fh, int *max_len,
+                        struct inode *parent)
+{
+	struct kernfs_fid *fid = (struct kernfs_fid *)fh;
+
+	if (parent && (*max_len) < KERNFS_FID_WITH_PARENT_LEN) {
+		*max_len = KERNFS_FID_WITH_PARENT_LEN;
+		return FILEID_INVALID;
+	} else if ((*max_len) < KERNFS_FID_WITHOUT_PARENT_LEN) {
+		*max_len = KERNFS_FID_WITHOUT_PARENT_LEN;
+		return FILEID_INVALID;
+	}
+
+	fid->ino = inode->i_ino;
+	fid->gen = inode->i_generation;
+	if (parent) {
+		fid->parent_ino = parent->i_ino;
+		fid->parent_gen = parent->i_generation;
+		*max_len = KERNFS_FID_WITH_PARENT_LEN;
+		return FILEID_KERNFS_WITH_PARENT;
+	} else {
+		*max_len = KERNFS_FID_WITHOUT_PARENT_LEN;
+		return FILEID_KERNFS_WITHOUT_PARENT;
+	}
+}
+
+static struct inode *kernfs_fh_get_inode(struct super_block *sb,
+		u64 ino, u32 generation)
+{
+	struct kernfs_super_info *info = kernfs_info(sb);
+	struct inode *inode;
+	struct kernfs_node *kn;
+
+	if (ino == 0)
+		return ERR_PTR(-ESTALE);
+
+	kn = kernfs_find_and_get_node_by_ino(info->root, ino);
+	if (!kn)
+		return ERR_PTR(-ESTALE);
+	inode = kernfs_get_inode(sb, kn);
+	kernfs_put(kn);
+	if (IS_ERR(inode))
+		return ERR_CAST(inode);
+
+	if (inode->i_generation != generation) {
+		/* we didn't find the right inode.. */
+		iput(inode);
+		return ERR_PTR(-ESTALE);
+	}
+	return inode;
+}
+
+static struct dentry *kernfs_fh_to_dentry(struct super_block *sb, struct fid *fid,
+		int fh_len, int fh_type)
+{
+	struct kernfs_fid *kfid = (struct kernfs_fid *)fid;
+	struct inode *inode = NULL;
+
+	if (fh_len < KERNFS_FID_WITHOUT_PARENT_LEN)
+		return NULL;
+
+	switch (fh_type) {
+	case FILEID_KERNFS_WITHOUT_PARENT:
+	case FILEID_KERNFS_WITH_PARENT:
+		inode = kernfs_fh_get_inode(sb, kfid->ino, kfid->gen);
+		break;
+	}
+
+	return d_obtain_alias(inode);
+}
+
+static struct dentry *kernfs_fh_to_parent(struct super_block *sb, struct fid *fid,
+		int fh_len, int fh_type)
+{
+	struct kernfs_fid *kfid = (struct kernfs_fid *)fid;
+	struct inode *inode = NULL;
+
+	if (fh_len < KERNFS_FID_WITH_PARENT_LEN)
+		return NULL;
+
+	if (fh_type == FILEID_KERNFS_WITH_PARENT)
+		inode = kernfs_fh_get_inode(sb, kfid->parent_ino,
+					    kfid->parent_gen);
+
+	return d_obtain_alias(inode);
+}
+
+static struct dentry *kernfs_get_parent_dentry(struct dentry *child)
+{
+	struct kernfs_node *kn = kernfs_dentry_node(child);
+
+	return d_obtain_alias(kernfs_get_inode(child->d_sb, kn->parent));
+}
+
+static const struct export_operations kernfs_export_ops = {
+	.encode_fh	= kernfs_encode_fh,
+	.fh_to_dentry	= kernfs_fh_to_dentry,
+	.fh_to_parent	= kernfs_fh_to_parent,
+	.get_parent	= kernfs_get_parent_dentry,
 };
 
 /**
@@ -145,7 +247,8 @@ struct dentry *kernfs_node_dentry(struct kernfs_node *kn,
 	} while (true);
 }
 
-static int kernfs_fill_super(struct super_block *sb, unsigned long magic)
+static int kernfs_fill_super(struct super_block *sb, unsigned long magic,
+			     bool enable_expop)
 {
 	struct kernfs_super_info *info = kernfs_info(sb);
 	struct inode *inode;
@@ -159,6 +262,8 @@ static int kernfs_fill_super(struct super_block *sb, unsigned long magic)
 	sb->s_magic = magic;
 	sb->s_op = &kernfs_sops;
 	sb->s_xattr = kernfs_xattr_handlers;
+	if (enable_expop)
+		sb->s_export_op = &kernfs_export_ops;
 	sb->s_time_gran = 1;
 
 	/* get root inode, initialize and unlock it */
@@ -219,6 +324,7 @@ const void *kernfs_super_ns(struct super_block *sb)
  * @magic: file system specific magic number
  * @new_sb_created: tell the caller if we allocated a new superblock
  * @ns: optional namespace tag of the mount
+ * @enable_expop: if adding fhandle support
  *
  * This is to be called from each kernfs user's file_system_type->mount()
  * implementation, which should pass through the specified @fs_type and
@@ -229,7 +335,8 @@ const void *kernfs_super_ns(struct super_block *sb)
  */
 struct dentry *kernfs_mount_ns(struct file_system_type *fs_type, int flags,
 				struct kernfs_root *root, unsigned long magic,
-				bool *new_sb_created, const void *ns)
+				bool *new_sb_created, const void *ns,
+				bool enable_expop)
 {
 	struct super_block *sb;
 	struct kernfs_super_info *info;
@@ -255,7 +362,7 @@ struct dentry *kernfs_mount_ns(struct file_system_type *fs_type, int flags,
 	if (!sb->s_root) {
 		struct kernfs_super_info *info = kernfs_info(sb);
 
-		error = kernfs_fill_super(sb, magic);
+		error = kernfs_fill_super(sb, magic, enable_expop);
 		if (error) {
 			deactivate_locked_super(sb);
 			return ERR_PTR(error);

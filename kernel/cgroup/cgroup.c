@@ -1749,7 +1749,8 @@ struct dentry *cgroup_do_mount(struct file_system_type *fs_type, int flags,
 	struct dentry *dentry;
 	bool new_sb;
 
-	dentry = kernfs_mount(fs_type, flags, root->kf_root, magic, &new_sb);
+	dentry = kernfs_mount(fs_type, flags, root->kf_root, magic, &new_sb,
+			      true);
 
 	/*
 	 * In non-init cgroup namespace, instead of root cgroup's dentry,

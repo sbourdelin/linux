@@ -101,6 +101,20 @@ struct kernfs_node_id {
 	u32			generation;
 } __attribute__((packed));
 
+struct kernfs_fid {
+	/*
+	 * the first two fields should have the identical layout as
+	 * kernfs_node_id
+	 */
+	u64			ino;
+	u32			gen;
+	u32			parent_gen;
+	u64			parent_ino;
+} __attribute__((packed));
+#define KERNFS_FID_WITHOUT_PARENT_LEN (offsetof(struct kernfs_fid, \
+			parent_gen) / 4)
+#define KERNFS_FID_WITH_PARENT_LEN (sizeof(struct kernfs_fid) / 4)
+
 /*
  * kernfs_node - the building block of kernfs hierarchy.  Each and every
  * kernfs node is represented by single kernfs_node.  Most fields are
@@ -337,7 +351,8 @@ void kernfs_notify(struct kernfs_node *kn);
 const void *kernfs_super_ns(struct super_block *sb);
 struct dentry *kernfs_mount_ns(struct file_system_type *fs_type, int flags,
 			       struct kernfs_root *root, unsigned long magic,
-			       bool *new_sb_created, const void *ns);
+			       bool *new_sb_created, const void *ns,
+			       bool enable_expop);
 void kernfs_kill_sb(struct super_block *sb);
 struct super_block *kernfs_pin_sb(struct kernfs_root *root, const void *ns);
 
@@ -440,7 +455,7 @@ static inline const void *kernfs_super_ns(struct super_block *sb)
 static inline struct dentry *
 kernfs_mount_ns(struct file_system_type *fs_type, int flags,
 		struct kernfs_root *root, unsigned long magic,
-		bool *new_sb_created, const void *ns)
+		bool *new_sb_created, const void *ns, bool enable_expop)
 { return ERR_PTR(-ENOSYS); }
 
 static inline void kernfs_kill_sb(struct super_block *sb) { }
@@ -521,10 +536,10 @@ static inline int kernfs_rename(struct kernfs_node *kn,
 static inline struct dentry *
 kernfs_mount(struct file_system_type *fs_type, int flags,
 		struct kernfs_root *root, unsigned long magic,
-		bool *new_sb_created)
+		bool *new_sb_created, bool enable_expop)
 {
 	return kernfs_mount_ns(fs_type, flags, root,
-				magic, new_sb_created, NULL);
+				magic, new_sb_created, NULL, enable_expop);
 }
 
 #endif	/* __LINUX_KERNFS_H */

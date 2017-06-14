@@ -104,6 +104,17 @@ enum fid_type {
 	FILEID_LUSTRE = 0x97,
 
 	/*
+	 * 64 bit inode number, 32 bit generation number
+	 */
+	FILEID_KERNFS_WITHOUT_PARENT = 0x91,
+
+	/*
+	 * 64 bit inode number, 32 bit generation number
+	 * 32 bit parent generation bumber, 64 bit parent inode number
+	 */
+	FILEID_KERNFS_WITH_PARENT = 0x92,
+
+	/*
 	 * Filesystems must not use 0xff file ID.
 	 */
 	FILEID_INVALID = 0xff,
