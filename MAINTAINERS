@@ -7428,6 +7428,13 @@ F:	Documentation/auxdisplay/ks0108
 F:	drivers/auxdisplay/ks0108.c
 F:	include/linux/ks0108.h
 
+KS7010 KEYSTREAM DRIVER
+M:	Tobin C. Harding <me@tobin.cc>
+L:	driverdev-devel@linuxdriverproject.org
+T:	git git://git.kernel.org/pub/scm/linux/kernel/git/gregkh/staging.git
+S:	Maintained
+F:	drivers/staging/ks7010/
+
 L3MDEV
 M:	David Ahern <dsa@cumulusnetworks.com>
 L:	netdev@vger.kernel.org
