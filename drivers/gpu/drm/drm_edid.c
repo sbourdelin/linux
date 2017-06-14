@@ -4213,6 +4213,19 @@ drm_default_rgb_quant_range(const struct drm_display_mode *mode)
 }
 EXPORT_SYMBOL(drm_default_rgb_quant_range);
 
+static void drm_parse_ycbcr420_deep_color_info(struct drm_connector *connector,
+					     const u8 *db)
+{
+	struct drm_hdmi_info *info = &connector->display_info.hdmi;
+
+	if (db[7] & DRM_EDID_YCBCR420_DC_48)
+		info->ycbcr420_dc_modes |= DRM_EDID_YCBCR420_DC_48;
+	if (db[7] & DRM_EDID_YCBCR420_DC_36)
+		info->ycbcr420_dc_modes |= DRM_EDID_YCBCR420_DC_36;
+	if (db[7] & DRM_EDID_YCBCR420_DC_30)
+		info->ycbcr420_dc_modes |= DRM_EDID_YCBCR420_DC_30;
+}
+
 static void drm_parse_hdmi_forum_vsdb(struct drm_connector *connector,
 				 const u8 *hf_vsdb)
 {
@@ -4253,6 +4266,8 @@ static void drm_parse_hdmi_forum_vsdb(struct drm_connector *connector,
 				scdc->scrambling.low_rates = true;
 		}
 	}
+
+	drm_parse_ycbcr420_deep_color_info(connector, hf_vsdb);
 }
 
 static void drm_parse_hdmi_deep_color_info(struct drm_connector *connector,
