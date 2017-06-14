@@ -18,7 +18,7 @@
 #include <media/v4l2-flash-led-class.h>
 
 #define has_flash_op(v4l2_flash, op)				\
-	(v4l2_flash && v4l2_flash->ops->op)
+	(v4l2_flash && v4l2_flash->ops && v4l2_flash->ops->op)
 
 #define call_flash_op(v4l2_flash, op, arg)			\
 		(has_flash_op(v4l2_flash, op) ?			\
@@ -618,7 +618,7 @@ struct v4l2_flash *v4l2_flash_init(
 	struct v4l2_subdev *sd;
 	int ret;
 
-	if (!fled_cdev || !ops || !config)
+	if (!fled_cdev || !config)
 		return ERR_PTR(-EINVAL);
 
 	led_cdev = &fled_cdev->led_cdev;
