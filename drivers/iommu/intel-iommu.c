@@ -5115,6 +5115,46 @@ static void intel_iommu_detach_device(struct iommu_domain *domain,
 	dmar_remove_one_dev_info(to_dmar_domain(domain), dev);
 }
 
+static int intel_iommu_do_invalidate(struct iommu_domain *domain,
+		struct device *dev, struct tlb_invalidate_info *inv_info)
+{
+	struct intel_iommu *iommu;
+	struct dmar_domain *dmar_domain = to_dmar_domain(domain);
+	struct intel_invalidate_data *inv_data;
+	struct qi_desc *qi;
+	u16 did;
+	u8 bus, devfn;
+
+	if (!inv_info || !dmar_domain || (inv_info->model != INTEL_IOMMU))
+		return -EINVAL;
+
+	iommu = device_to_iommu(dev, &bus, &devfn);
+	if (!iommu)
+		return -ENODEV;
+
+	inv_data = (struct intel_invalidate_data *)&inv_info->opaque;
+
+	/* check SID */
+	if (PCI_DEVID(bus, devfn) != inv_data->sid)
+		return 0;
+
+	qi = &inv_data->inv_desc;
+
+	switch (qi->low & QI_TYPE_MASK) {
+	case QI_DIOTLB_TYPE:
+	case QI_DEIOTLB_TYPE:
+		/* for device IOTLB, we just let it pass through */
+		break;
+	default:
+		did = dmar_domain->iommu_did[iommu->seq_id];
+		qi->low &= ~QI_DID_MASK;
+		qi->low |= QI_DID(did);
+		break;
+	}
+
+	return qi_submit_sync(qi, iommu);
+}
+
 static int intel_iommu_map(struct iommu_domain *domain,
 			   unsigned long iova, phys_addr_t hpa,
 			   size_t size, int iommu_prot)
@@ -5534,6 +5574,7 @@ const struct iommu_ops intel_iommu_ops = {
 #ifdef CONFIG_INTEL_IOMMU_SVM
 	.bind_pasid_table	= intel_iommu_bind_pasid_table,
 	.unbind_pasid_table	= intel_iommu_unbind_pasid_table,
+	.do_invalidate		= intel_iommu_do_invalidate,
 #endif
 	.map			= intel_iommu_map,
 	.unmap			= intel_iommu_unmap,
