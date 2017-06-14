@@ -367,7 +367,7 @@ __visible struct pv_cpu_ops pv_cpu_ops = {
 	.iret = native_iret,
 	.swapgs = native_swapgs,
 
-	.set_iopl_mask = native_set_iopl_mask,
+	.set_iopl_mask = paravirt_nop,
 	.io_delay = native_io_delay,
 
 	.start_context_switch = paravirt_nop,

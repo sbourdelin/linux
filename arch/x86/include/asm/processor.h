@@ -482,25 +482,6 @@ struct thread_struct {
  */
 #define TS_COMPAT		0x0002	/* 32bit syscall active (64BIT)*/
 
-/*
- * Set IOPL bits in EFLAGS from given mask
- */
-static inline void native_set_iopl_mask(unsigned mask)
-{
-#ifdef CONFIG_X86_32
-	unsigned int reg;
-
-	asm volatile ("pushfl;"
-		      "popl %0;"
-		      "andl %1, %0;"
-		      "orl %2, %0;"
-		      "pushl %0;"
-		      "popfl"
-		      : "=&r" (reg)
-		      : "i" (~X86_EFLAGS_IOPL), "r" (mask));
-#endif
-}
-
 static inline void
 native_load_sp0(struct tss_struct *tss, struct thread_struct *thread)
 {
@@ -542,7 +523,7 @@ static inline void load_sp0(struct tss_struct *tss,
 	native_load_sp0(tss, thread);
 }
 
-#define set_iopl_mask native_set_iopl_mask
+static inline void set_iopl_mask(unsigned mask) { }
 #endif /* CONFIG_PARAVIRT */
 
 /* Free all resources held by a thread. */
