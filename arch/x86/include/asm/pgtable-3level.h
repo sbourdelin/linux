@@ -176,8 +176,25 @@ static inline pmd_t native_pmdp_get_and_clear(pmd_t *pmdp)
 
 	return res.pmd;
 }
+
+#define pmdp_mknotpresent pmdp_mknotpresent
+static inline void pmdp_mknotpresent(pmd_t *pmdp)
+{
+	union split_pmd *p, old, new;
+
+	p = (union split_pmd *)pmdp;
+	{
+		old = *p;
+		new.pmd = pmd_mknotpresent(old.pmd);
+	} while (cmpxchg(&p->pmd_low, old.pmd_low, new.pmd_low) != old.pmd_low);
+}
 #else
 #define native_pmdp_get_and_clear(xp) native_local_pmdp_get_and_clear(xp)
+
+static inline void pmdp_mknotpresent(pmd_t *pmdp)
+{
+	*pmdp = pmd_mknotpresent(*pmdp);
+}
 #endif
 
 #ifdef CONFIG_SMP

@@ -1092,6 +1092,19 @@ static inline void pmdp_set_wrprotect(struct mm_struct *mm,
 	clear_bit(_PAGE_BIT_RW, (unsigned long *)pmdp);
 }
 
+#ifndef pmdp_mknotpresent
+#define pmdp_mknotpresent pmdp_mknotpresent
+static inline void pmdp_mknotpresent(pmd_t *pmdp)
+{
+	pmd_t old, new;
+
+	{
+		old = *pmdp;
+		new = pmd_mknotpresent(old);
+	} while (pmd_val(cmpxchg(pmdp, old, new)) != pmd_val(old));
+}
+#endif
+
 /*
  * clone_pgd_range(pgd_t *dst, pgd_t *src, int count);
  *
