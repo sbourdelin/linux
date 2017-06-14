@@ -334,6 +334,7 @@ static int spi_qup_do_dma(struct spi_master *master, struct spi_transfer *xfer,
 			  unsigned long timeout)
 {
 	struct spi_qup *qup = spi_master_get_devdata(master);
+	dma_async_tx_callback done = qup->qup_v1 ? NULL : spi_qup_dma_done;
 	int ret;
 
 	/* before issuing the descriptors, set the QUP to run */
@@ -346,7 +347,7 @@ static int spi_qup_do_dma(struct spi_master *master, struct spi_transfer *xfer,
 
 	if (xfer->rx_buf) {
 		ret = spi_qup_prep_sg(master, xfer, DMA_DEV_TO_MEM,
-					spi_qup_dma_done, &qup->rxc);
+					done, &qup->rxc);
 		if (ret)
 			return ret;
 
@@ -355,7 +356,7 @@ static int spi_qup_do_dma(struct spi_master *master, struct spi_transfer *xfer,
 
 	if (xfer->tx_buf) {
 		ret = spi_qup_prep_sg(master, xfer, DMA_MEM_TO_DEV,
-					spi_qup_dma_done, &qup->txc);
+					done, &qup->txc);
 		if (ret)
 			return ret;
 
