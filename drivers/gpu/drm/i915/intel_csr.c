@@ -411,8 +411,6 @@ static void csr_load_work_fn(struct work_struct *work)
 	if (dev_priv->csr.dmc_payload) {
 		intel_csr_load_program(dev_priv);
 
-		intel_display_power_put(dev_priv, POWER_DOMAIN_INIT);
-
 		DRM_INFO("Finished loading DMC firmware %s (v%u.%u)\n",
 			 dev_priv->csr.fw_path,
 			 CSR_VERSION_MAJOR(csr->version),
@@ -420,9 +418,10 @@ static void csr_load_work_fn(struct work_struct *work)
 	} else {
 		dev_notice(dev_priv->drm.dev,
 			   "Failed to load DMC firmware"
-			   " [" FIRMWARE_URL "],"
-			   " disabling runtime power management.\n");
+			   " [" FIRMWARE_URL "]");
 	}
+
+	intel_display_power_put(dev_priv, POWER_DOMAIN_INIT);
 
 	release_firmware(fw);
 }
