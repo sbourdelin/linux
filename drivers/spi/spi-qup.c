@@ -496,13 +496,13 @@ static irqreturn_t spi_qup_qup_irq(int irq, void *dev_id)
 	struct spi_qup *controller = dev_id;
 	struct spi_transfer *xfer;
 	u32 opflags, qup_err, spi_err;
-	unsigned long flags;
 	int error = 0;
+	bool done = 0;
 
-	spin_lock_irqsave(&controller->lock, flags);
+	spin_lock(&controller->lock);
 	xfer = controller->xfer;
 	controller->xfer = NULL;
-	spin_unlock_irqrestore(&controller->lock, flags);
+	spin_unlock(&controller->lock);
 
 	qup_err = readl_relaxed(controller->base + QUP_ERROR_FLAGS);
 	spi_err = readl_relaxed(controller->base + SPI_ERROR_FLAGS);
@@ -556,16 +556,19 @@ static irqreturn_t spi_qup_qup_irq(int irq, void *dev_id)
 			spi_qup_write(controller, xfer);
 	}
 
-	spin_lock_irqsave(&controller->lock, flags);
-	controller->error = error;
-	controller->xfer = xfer;
-	spin_unlock_irqrestore(&controller->lock, flags);
-
 	/* re-read opflags as flags may have changed due to actions above */
 	opflags = readl_relaxed(controller->base + QUP_OPERATIONAL);
 
 	if ((controller->rx_bytes == xfer->len &&
 		(opflags & QUP_OP_MAX_INPUT_DONE_FLAG)) ||  error)
+		done = true;
+
+	spin_lock(&controller->lock);
+	controller->error = error;
+	controller->xfer = done ? NULL : xfer;
+	spin_unlock(&controller->lock);
+
+	if (done)
 		complete(&controller->done);
 
 	return IRQ_HANDLED;
@@ -765,7 +768,6 @@ static int spi_qup_transfer_one(struct spi_master *master,
 exit:
 	spi_qup_set_state(controller, QUP_STATE_RESET);
 	spin_lock_irqsave(&controller->lock, flags);
-	controller->xfer = NULL;
 	if (!ret)
 		ret = controller->error;
 	spin_unlock_irqrestore(&controller->lock, flags);
