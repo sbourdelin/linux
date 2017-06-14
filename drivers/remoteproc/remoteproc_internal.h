@@ -43,6 +43,8 @@ struct rproc_fw_ops {
 	int (*load)(struct rproc *rproc, const struct firmware *fw);
 	int (*sanity_check)(struct rproc *rproc, const struct firmware *fw);
 	u32 (*get_boot_addr)(struct rproc *rproc, const struct firmware *fw);
+	int (*register_segments)(struct rproc *rproc,
+				 const struct firmware *fw);
 };
 
 /* from remoteproc_core.c */
@@ -89,6 +91,15 @@ u32 rproc_get_boot_addr(struct rproc *rproc, const struct firmware *fw)
 {
 	if (rproc->fw_ops->get_boot_addr)
 		return rproc->fw_ops->get_boot_addr(rproc, fw);
+
+	return 0;
+}
+
+static inline
+int rproc_register_segments(struct rproc *rproc, const struct firmware *fw)
+{
+	if (rproc->fw_ops->register_segments)
+		return rproc->fw_ops->register_segments(rproc, fw);
 
 	return 0;
 }

@@ -33,6 +33,7 @@
 #include <linux/firmware.h>
 #include <linux/string.h>
 #include <linux/debugfs.h>
+#include <linux/devcoredump.h>
 #include <linux/remoteproc.h>
 #include <linux/iommu.h>
 #include <linux/idr.h>
@@ -91,6 +92,21 @@ static int rproc_iommu_fault(struct iommu_domain *domain, struct device *dev,
 	 * we just used it as a recovery trigger.
 	 */
 	return -ENOSYS;
+}
+
+/**
+ * rproc_unregister_segments() - clean up the segment entries from
+ * dump_segments list
+ * @rproc: the remote processor handle
+ */
+static void rproc_unregister_segments(struct rproc *rproc)
+{
+	struct rproc_dump_segment *entry, *tmp;
+
+	list_for_each_entry_safe(entry, tmp, &rproc->dump_segments, node) {
+		list_del(&entry->node);
+		kfree(entry);
+	}
 }
 
 static int rproc_enable_iommu(struct rproc *rproc)
@@ -867,6 +883,12 @@ static int rproc_start(struct rproc *rproc, const struct firmware *fw)
 		return ret;
 	}
 
+	ret = rproc_register_segments(rproc, fw);
+	if (ret) {
+		dev_err(dev, "Failed to register coredump segments: %d\n", ret);
+		return ret;
+	}
+
 	/*
 	 * The starting device has been given the rproc->cached_table as the
 	 * resource table. The address of the vring along with the other
@@ -975,6 +997,7 @@ clean_up:
 	rproc->cached_table = NULL;
 	rproc->table_ptr = NULL;
 
+	rproc_unregister_segments(rproc);
 	rproc_disable_iommu(rproc);
 	return ret;
 }
@@ -1039,6 +1062,139 @@ static int rproc_stop(struct rproc *rproc)
 	return 0;
 }
 
+static ssize_t rproc_coredump_dump(char *buffer, loff_t offset, size_t count,
+				   void *data, size_t datalen)
+{
+	struct rproc *rproc = (struct rproc *)data;
+	struct rproc_dump_segment *segment;
+	char *header = rproc->dump_header;
+	bool out_of_range = true;
+	size_t adj_offset;
+	void *ptr;
+
+	if (!count)
+		return 0;
+
+	if (offset < rproc->dump_header_size) {
+		if (count > rproc->dump_header_size - offset)
+			count = rproc->dump_header_size - offset;
+
+		memcpy(buffer, header + offset, count);
+		return count;
+	}
+
+	adj_offset = offset - rproc->dump_header_size;
+
+	list_for_each_entry(segment, &rproc->dump_segments, node) {
+		if (adj_offset < segment->size) {
+			out_of_range = false;
+			break;
+		}
+		adj_offset -= segment->size;
+	}
+
+	/* check whether it's the end of the list */
+	if (out_of_range) {
+		dev_info(&rproc->dev, "read offset out of range\n");
+		return 0;
+	}
+
+	if (count > (segment->size - adj_offset))
+		count = segment->size - adj_offset;
+
+	ptr = rproc_da_to_va(rproc, segment->da, segment->size);
+	if (!ptr) {
+		dev_err(&rproc->dev, "segment addr outside memory range\n");
+		return -EINVAL;
+	}
+
+	memcpy(buffer, ptr + adj_offset, count);
+	return count;
+}
+
+/**
+ * rproc_coredump_free() - complete the dump_complete completion
+ * @data:	rproc handle
+ *
+ * This callback will be called when there occurs a write to the
+ * data node on devcoredump or after the devcoredump timeout.
+ */
+static void rproc_coredump_free(void *data)
+{
+	struct rproc *rproc = (struct rproc *)data;
+
+	complete_all(&rproc->dump_complete);
+
+	/*
+	 *  We do not need to free the dump_header data here.
+	 *  We already do it after completing dump_complete
+	 */
+}
+
+/**
+ * rproc_coredump_add_header() - add the coredump header information
+ * @rproc:	rproc handle
+ *
+ * Returns 0 on success, negative errno otherwise.
+ *
+ * This function creates a devcoredump device associated with rproc
+ * and registers the read() and free() callbacks with this device.
+ */
+static int rproc_coredump_add_header(struct rproc *rproc)
+{
+	struct rproc_dump_segment *entry;
+	struct elf32_phdr *phdr;
+	struct elf32_hdr *ehdr;
+	int nsegments = 0;
+	size_t offset;
+
+	list_for_each_entry(entry, &rproc->dump_segments, node)
+		nsegments++;
+
+	rproc->dump_header_size = sizeof(*ehdr) + sizeof(*phdr) * nsegments;
+	ehdr = kzalloc(rproc->dump_header_size, GFP_KERNEL);
+	rproc->dump_header = (char *)ehdr;
+	if (!rproc->dump_header)
+		return -ENOMEM;
+
+	memcpy(ehdr->e_ident, ELFMAG, SELFMAG);
+	ehdr->e_ident[EI_CLASS] = ELFCLASS32;
+	ehdr->e_ident[EI_DATA] = ELFDATA2LSB;
+	ehdr->e_ident[EI_VERSION] = EV_CURRENT;
+	ehdr->e_ident[EI_OSABI] = ELFOSABI_NONE;
+	ehdr->e_type = ET_CORE;
+	ehdr->e_version = EV_CURRENT;
+	ehdr->e_phoff = sizeof(*ehdr);
+	ehdr->e_ehsize = sizeof(*ehdr);
+	ehdr->e_phentsize = sizeof(*phdr);
+	ehdr->e_phnum = nsegments;
+
+	offset = rproc->dump_header_size;
+	phdr = (struct elf32_phdr *)(ehdr + 1);
+	list_for_each_entry(entry, &rproc->dump_segments, node) {
+		phdr->p_type = PT_LOAD;
+		phdr->p_offset = offset;
+		phdr->p_vaddr = phdr->p_paddr = entry->da;
+		phdr->p_filesz = phdr->p_memsz = entry->size;
+		phdr->p_flags = PF_R | PF_W | PF_X;
+		phdr->p_align = 0;
+		offset += phdr->p_filesz;
+		phdr++;
+	}
+
+	dev_coredumpm(&rproc->dev, NULL, (void *)rproc, rproc->dump_header_size,
+		      GFP_KERNEL, rproc_coredump_dump, rproc_coredump_free);
+
+	wait_for_completion_interruptible(&rproc->dump_complete);
+
+	/* clean up the resources */
+	kfree(rproc->dump_header);
+	rproc->dump_header = NULL;
+	rproc_unregister_segments(rproc);
+
+	return 0;
+}
+
 /**
  * rproc_trigger_recovery() - recover a remoteproc
  * @rproc: the remote processor
@@ -1057,6 +1213,7 @@ int rproc_trigger_recovery(struct rproc *rproc)
 
 	dev_err(dev, "recovering %s\n", rproc->name);
 
+	init_completion(&rproc->dump_complete);
 	init_completion(&rproc->crash_comp);
 
 	ret = mutex_lock_interruptible(&rproc->lock);
@@ -1069,6 +1226,13 @@ int rproc_trigger_recovery(struct rproc *rproc)
 
 	/* wait until there is no more rproc users */
 	wait_for_completion(&rproc->crash_comp);
+
+	/* set up the coredump */
+	ret = rproc_coredump_add_header(rproc);
+	if (ret) {
+		dev_err(dev, "setting up the coredump failed: %d\n", ret);
+		goto unlock_mutex;
+	}
 
 	/* load firmware */
 	ret = request_firmware(&firmware_p, rproc->firmware, dev);
@@ -1233,6 +1397,8 @@ void rproc_shutdown(struct rproc *rproc)
 
 	/* clean up all acquired resources */
 	rproc_resource_cleanup(rproc);
+
+	rproc_unregister_segments(rproc);
 
 	rproc_disable_iommu(rproc);
 
@@ -1465,8 +1631,10 @@ struct rproc *rproc_alloc(struct device *dev, const char *name,
 	INIT_LIST_HEAD(&rproc->traces);
 	INIT_LIST_HEAD(&rproc->rvdevs);
 	INIT_LIST_HEAD(&rproc->subdevs);
+	INIT_LIST_HEAD(&rproc->dump_segments);
 
 	INIT_WORK(&rproc->crash_handler, rproc_crash_handler_work);
+	init_completion(&rproc->dump_complete);
 	init_completion(&rproc->crash_comp);
 
 	rproc->state = RPROC_OFFLINE;

@@ -25,7 +25,7 @@
 #include <linux/slab.h>
 #include <linux/soc/qcom/mdt_loader.h>
 
-static bool mdt_phdr_valid(const struct elf32_phdr *phdr)
+bool mdt_phdr_valid(const struct elf32_phdr *phdr)
 {
 	if (phdr->p_type != PT_LOAD)
 		return false;
@@ -38,6 +38,7 @@ static bool mdt_phdr_valid(const struct elf32_phdr *phdr)
 
 	return true;
 }
+EXPORT_SYMBOL_GPL(mdt_phdr_valid);
 
 /**
  * qcom_mdt_get_size() - acquire size of the memory region needed to load mdt

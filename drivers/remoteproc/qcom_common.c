@@ -20,6 +20,7 @@
 #include <linux/module.h>
 #include <linux/remoteproc.h>
 #include <linux/rpmsg/qcom_smd.h>
+#include <linux/soc/qcom/mdt_loader.h>
 
 #include "remoteproc_internal.h"
 #include "qcom_common.h"
@@ -44,6 +45,47 @@ struct resource_table *qcom_mdt_find_rsc_table(struct rproc *rproc,
 	return &table;
 }
 EXPORT_SYMBOL_GPL(qcom_mdt_find_rsc_table);
+
+/**
+ * qcom_register_dump_segments() - register segments with remoteproc
+ * framework for coredump collection
+ *
+ * @rproc:	remoteproc handle
+ * @fw:		firmware header
+ *
+ * returns 0 on success, negative error code otherwise.
+ */
+int qcom_register_dump_segments(struct rproc *rproc,
+				const struct firmware *fw)
+{
+	struct rproc_dump_segment *segment;
+	const struct elf32_phdr *phdrs;
+	const struct elf32_phdr *phdr;
+	const struct elf32_hdr *ehdr;
+	int i;
+
+	ehdr = (struct elf32_hdr *)fw->data;
+	phdrs = (struct elf32_phdr *)(ehdr + 1);
+
+	for (i = 0; i < ehdr->e_phnum; i++) {
+		phdr = &phdrs[i];
+
+		if (!mdt_phdr_valid(phdr))
+			continue;
+
+		segment = kzalloc(sizeof(*segment), GFP_KERNEL);
+		if (!segment)
+			return -ENOMEM;
+
+		segment->da = phdr->p_paddr;
+		segment->size = phdr->p_memsz;
+
+		list_add_tail(&segment->node, &rproc->dump_segments);
+	}
+
+	return 0;
+}
+EXPORT_SYMBOL_GPL(qcom_register_dump_segments);
 
 static int smd_subdev_probe(struct rproc_subdev *subdev)
 {

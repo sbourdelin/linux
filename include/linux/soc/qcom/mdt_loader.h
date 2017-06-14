@@ -10,6 +10,7 @@
 struct device;
 struct firmware;
 
+bool mdt_phdr_valid(const struct elf32_phdr *phdr);
 ssize_t qcom_mdt_get_size(const struct firmware *fw);
 int qcom_mdt_load(struct device *dev, const struct firmware *fw,
 		  const char *fw_name, int pas_id, void *mem_region,

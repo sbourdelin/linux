@@ -16,6 +16,8 @@ struct resource_table *qcom_mdt_find_rsc_table(struct rproc *rproc,
 					       const struct firmware *fw,
 					       int *tablesz);
 
+int qcom_register_dump_segments(struct rproc *rproc, const struct firmware *fw);
+
 void qcom_add_smd_subdev(struct rproc *rproc, struct qcom_rproc_subdev *smd);
 void qcom_remove_smd_subdev(struct rproc *rproc, struct qcom_rproc_subdev *smd);
 
