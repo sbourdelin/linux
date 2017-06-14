@@ -658,5 +658,18 @@ acpi_status acpi_ps_parse_loop(struct acpi_walk_state *walk_state)
 	}			/* while parser_state->Aml */
 
 	status = acpi_ps_complete_final_op(walk_state, op, status);
+	if (ACPI_FAILURE(status)) {
+		/* Flush pushed op objects */
+
+		do {
+			acpi_ps_pop_scope(&(walk_state->parser_state), &op,
+					  &walk_state->arg_types,
+					  &walk_state->arg_count);
+			if (op) {
+				acpi_ps_complete_this_op(walk_state, op);
+			}
+		} while (op);
+	}
+
 	return_ACPI_STATUS(status);
 }
