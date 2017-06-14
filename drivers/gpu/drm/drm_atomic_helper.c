@@ -1991,6 +1991,41 @@ void drm_atomic_helper_cleanup_planes(struct drm_device *dev,
 EXPORT_SYMBOL(drm_atomic_helper_cleanup_planes);
 
 /**
+ * drm_atomic_helper_wait_for_hw_done - wait for all previous hw updates to complete.
+ * @crtc: crtc to wait on.
+ *
+ * This function waits for all previous hardware updates queued on @crtc
+ * to complete.
+ *
+ * Returns:
+ * 0 on success, negative error code on failure.
+ */
+int drm_atomic_helper_wait_for_hw_done(struct drm_crtc *crtc)
+{
+	struct drm_crtc_commit *commit;
+	long ret;
+
+	spin_lock(&crtc->commit_lock);
+	commit = list_first_entry_or_null(&crtc->commit_list,
+			struct drm_crtc_commit, commit_entry);
+	if (commit)
+		drm_crtc_commit_get(commit);
+	spin_unlock(&crtc->commit_lock);
+
+	if (!commit)
+		return 0;
+
+	ret = wait_for_completion_timeout(&commit->hw_done, 10 * HZ);
+	drm_crtc_commit_put(commit);
+
+	if (ret == 0)
+		return -EBUSY;
+
+	return ret > 0 ? 0 : ret;
+}
+EXPORT_SYMBOL(drm_atomic_helper_wait_for_hw_done);
+
+/**
  * drm_atomic_helper_swap_state - store atomic state into current sw state
  * @state: atomic state
  * @stall: stall for proceeding commits
@@ -2031,28 +2066,16 @@ void drm_atomic_helper_swap_state(struct drm_atomic_state *state,
 	struct drm_crtc_state *old_crtc_state, *new_crtc_state;
 	struct drm_plane *plane;
 	struct drm_plane_state *old_plane_state, *new_plane_state;
-	struct drm_crtc_commit *commit;
 	void *obj, *obj_state;
 	const struct drm_private_state_funcs *funcs;
 
 	if (stall) {
 		for_each_new_crtc_in_state(state, crtc, new_crtc_state, i) {
-			spin_lock(&crtc->commit_lock);
-			commit = list_first_entry_or_null(&crtc->commit_list,
-					struct drm_crtc_commit, commit_entry);
-			if (commit)
-				drm_crtc_commit_get(commit);
-			spin_unlock(&crtc->commit_lock);
+			ret = drm_atomic_helper_wait_for_hw_done(crtc);
 
-			if (!commit)
-				continue;
-
-			ret = wait_for_completion_timeout(&commit->hw_done,
-							  10*HZ);
-			if (ret == 0)
+			if (ret < 0)
 				DRM_ERROR("[CRTC:%d:%s] hw_done timed out\n",
 					  crtc->base.id, crtc->name);
-			drm_crtc_commit_put(commit);
 		}
 	}
 

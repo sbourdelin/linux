@@ -77,6 +77,7 @@ void
 drm_atomic_helper_disable_planes_on_crtc(struct drm_crtc_state *old_crtc_state,
 					 bool atomic);
 
+int drm_atomic_helper_wait_for_hw_done(struct drm_crtc *crtc);
 void drm_atomic_helper_swap_state(struct drm_atomic_state *state,
 				  bool stall);
 
