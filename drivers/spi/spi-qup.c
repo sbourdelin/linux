@@ -510,9 +510,9 @@ static irqreturn_t spi_qup_qup_irq(int irq, void *dev_id)
 
 	writel_relaxed(qup_err, controller->base + QUP_ERROR_FLAGS);
 	writel_relaxed(spi_err, controller->base + SPI_ERROR_FLAGS);
-	writel_relaxed(opflags, controller->base + QUP_OPERATIONAL);
 
 	if (!xfer) {
+		writel_relaxed(opflags, controller->base + QUP_OPERATIONAL);
 		dev_err_ratelimited(controller->dev, "unexpected irq %08x %08x %08x\n",
 				    qup_err, spi_err, opflags);
 		return IRQ_HANDLED;
@@ -540,7 +540,15 @@ static irqreturn_t spi_qup_qup_irq(int irq, void *dev_id)
 		error = -EIO;
 	}
 
-	if (!spi_qup_is_dma_xfer(controller->mode)) {
+	if (spi_qup_is_dma_xfer(controller->mode)) {
+		writel_relaxed(opflags, controller->base + QUP_OPERATIONAL);
+		if (opflags & QUP_OP_IN_SERVICE_FLAG &&
+		    opflags & QUP_OP_MAX_INPUT_DONE_FLAG)
+			complete(&controller->rxc);
+		if (opflags & QUP_OP_OUT_SERVICE_FLAG &&
+		    opflags & QUP_OP_MAX_OUTPUT_DONE_FLAG)
+			complete(&controller->txc);
+	} else {
 		if (opflags & QUP_OP_IN_SERVICE_FLAG)
 			spi_qup_read(controller, xfer);
 
@@ -552,6 +560,9 @@ static irqreturn_t spi_qup_qup_irq(int irq, void *dev_id)
 	controller->error = error;
 	controller->xfer = xfer;
 	spin_unlock_irqrestore(&controller->lock, flags);
+
+	/* re-read opflags as flags may have changed due to actions above */
+	opflags = readl_relaxed(controller->base + QUP_OPERATIONAL);
 
 	if ((controller->rx_bytes == xfer->len &&
 		(opflags & QUP_OP_MAX_INPUT_DONE_FLAG)) ||  error)
