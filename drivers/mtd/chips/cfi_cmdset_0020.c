@@ -244,7 +244,7 @@ static struct mtd_info *cfi_staa_setup(struct map_info *map)
 }
 
 
-static inline int do_read_onechip(struct map_info *map, struct flchip *chip, loff_t adr, size_t len, u_char *buf)
+static noinline_if_stackbloat int do_read_onechip(struct map_info *map, struct flchip *chip, loff_t adr, size_t len, u_char *buf)
 {
 	map_word status, status_OK;
 	unsigned long timeo;
@@ -728,7 +728,7 @@ write_error:
 }
 
 
-static inline int do_erase_oneblock(struct map_info *map, struct flchip *chip, unsigned long adr)
+static noinline_if_stackbloat int do_erase_oneblock(struct map_info *map, struct flchip *chip, unsigned long adr)
 {
 	struct cfi_private *cfi = map->fldrv_priv;
 	map_word status, status_OK;
@@ -1029,7 +1029,7 @@ static void cfi_staa_sync (struct mtd_info *mtd)
 	}
 }
 
-static inline int do_lock_oneblock(struct map_info *map, struct flchip *chip, unsigned long adr)
+static noinline_if_stackbloat int do_lock_oneblock(struct map_info *map, struct flchip *chip, unsigned long adr)
 {
 	struct cfi_private *cfi = map->fldrv_priv;
 	map_word status, status_OK;
@@ -1175,7 +1175,7 @@ static int cfi_staa_lock(struct mtd_info *mtd, loff_t ofs, uint64_t len)
 	}
 	return 0;
 }
-static inline int do_unlock_oneblock(struct map_info *map, struct flchip *chip, unsigned long adr)
+static noinline_if_stackbloat int do_unlock_oneblock(struct map_info *map, struct flchip *chip, unsigned long adr)
 {
 	struct cfi_private *cfi = map->fldrv_priv;
 	map_word status, status_OK;

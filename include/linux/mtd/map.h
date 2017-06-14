@@ -316,7 +316,7 @@ static inline map_word map_word_or(struct map_info *map, map_word val1, map_word
 	return r;
 }
 
-static inline int map_word_andequal(struct map_info *map, map_word val1, map_word val2, map_word val3)
+static noinline_if_stackbloat int map_word_andequal(struct map_info *map, map_word val1, map_word val2, map_word val3)
 {
 	int i;
 
@@ -328,7 +328,7 @@ static inline int map_word_andequal(struct map_info *map, map_word val1, map_wor
 	return 1;
 }
 
-static inline int map_word_bitsset(struct map_info *map, map_word val1, map_word val2)
+static noinline_if_stackbloat int map_word_bitsset(struct map_info *map, map_word val1, map_word val2)
 {
 	int i;
 
@@ -362,7 +362,7 @@ static inline map_word map_word_load(struct map_info *map, const void *ptr)
 	return r;
 }
 
-static inline map_word map_word_load_partial(struct map_info *map, map_word orig, const unsigned char *buf, int start, int len)
+static noinline_if_stackbloat map_word map_word_load_partial(struct map_info *map, map_word orig, const unsigned char *buf, int start, int len)
 {
 	int i;
 
@@ -392,7 +392,7 @@ static inline map_word map_word_load_partial(struct map_info *map, map_word orig
 #define MAP_FF_LIMIT 8
 #endif
 
-static inline map_word map_word_ff(struct map_info *map)
+static noinline_if_stackbloat map_word map_word_ff(struct map_info *map)
 {
 	map_word r;
 	int i;
