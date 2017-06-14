@@ -227,6 +227,11 @@ int drm_connector_init(struct drm_device *dev,
 					      config->edid_property,
 					      0);
 
+	if (connector_type != DRM_MODE_CONNECTOR_VIRTUAL)
+		drm_object_attach_property(&connector->base,
+					   config->hdmi_output_property,
+					   0);
+
 	drm_object_attach_property(&connector->base,
 				      config->dpms_property, 0);
 
@@ -617,6 +622,26 @@ static const struct drm_prop_enum_list drm_link_status_enum_list[] = {
 };
 DRM_ENUM_NAME_FN(drm_get_link_status_name, drm_link_status_enum_list)
 
+static const struct drm_prop_enum_list drm_hdmi_output_enum_list[] = {
+	{ DRM_HDMI_OUTPUT_DEFAULT_RGB, "output_rgb" },
+	{ DRM_HDMI_OUTPUT_YCBCR444, "output_ycbcr444" },
+	{ DRM_HDMI_OUTPUT_YCBCR422, "output_ycbcr422" },
+	{ DRM_HDMI_OUTPUT_YCBCR420, "output_ycbcr420" },
+	{ DRM_HDMI_OUTPUT_YCBCR_HQ, "output_ycbcr_high_subsampling" },
+	{ DRM_HDMI_OUTPUT_YCBCR_LQ, "output_ycbcr_low_subsampling" },
+	{ DRM_HDMI_OUTPUT_INVALID, "invalid_output" },
+};
+
+/**
+ * drm_get_hdmi_output_name - return a string for a given hdmi output enum
+ * @type: enum of output type
+ */
+const char *drm_get_hdmi_output_name(enum drm_hdmi_output_type type)
+{
+	return drm_hdmi_output_enum_list[type].name;
+}
+EXPORT_SYMBOL(drm_get_hdmi_output_name);
+
 /**
  * drm_display_info_set_bus_formats - set the supported bus formats
  * @info: display info to store bus formats in
@@ -788,6 +813,13 @@ int drm_connector_create_standard_properties(struct drm_device *dev)
 	if (!prop)
 		return -ENOMEM;
 	dev->mode_config.link_status_property = prop;
+
+	prop = drm_property_create_enum(dev, 0, "hdmi_output_format",
+					drm_hdmi_output_enum_list,
+					ARRAY_SIZE(drm_hdmi_output_enum_list));
+	if (!prop)
+		return -ENOMEM;
+	dev->mode_config.hdmi_output_property = prop;
 
 	return 0;
 }

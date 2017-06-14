@@ -321,6 +321,17 @@ struct drm_tv_connector_state {
 	unsigned int hue;
 };
 
+/* HDMI output pixel format */
+enum drm_hdmi_output_type {
+	DRM_HDMI_OUTPUT_DEFAULT_RGB, /* default RGB */
+	DRM_HDMI_OUTPUT_YCBCR444, /* YCBCR 444 */
+	DRM_HDMI_OUTPUT_YCBCR422, /* YCBCR 422 */
+	DRM_HDMI_OUTPUT_YCBCR420, /* YCBCR 420 */
+	DRM_HDMI_OUTPUT_YCBCR_HQ, /* Highest subsampled YUV */
+	DRM_HDMI_OUTPUT_YCBCR_LQ, /* Lowest subsampled YUV */
+	DRM_HDMI_OUTPUT_INVALID, /* Guess what ? */
+};
+
 /**
  * struct drm_connector_state - mutable connector state
  * @connector: backpointer to the connector
@@ -365,6 +376,12 @@ struct drm_connector_state {
 	 * upscaling, mostly used for built-in panels.
 	 */
 	unsigned int scaling_mode;
+
+	/**
+	 * @hdmi_output: Connector property to control the
+	 * HDMI output mode (RGB/YCBCR444/422/420).
+	 */
+	enum drm_hdmi_output_type hdmi_output;
 };
 
 /**
@@ -993,6 +1010,7 @@ static inline void drm_connector_unreference(struct drm_connector *connector)
 
 const char *drm_get_connector_status_name(enum drm_connector_status status);
 const char *drm_get_subpixel_order_name(enum subpixel_order order);
+const char *drm_get_hdmi_output_name(enum drm_hdmi_output_type type);
 const char *drm_get_dpms_name(int val);
 const char *drm_get_dvi_i_subconnector_name(int val);
 const char *drm_get_dvi_i_select_name(int val);
