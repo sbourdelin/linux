@@ -50,12 +50,14 @@ struct w1_slave;
  * @add_slave: add_slave
  * @remove_slave: remove_slave
  * @groups: sysfs group
+ * @hwmon_groups: hwmon sysfs group
  */
 struct w1_family_ops
 {
 	int  (* add_slave)(struct w1_slave *);
 	void (* remove_slave)(struct w1_slave *);
 	const struct attribute_group **groups;
+	const struct attribute_group **hwmon_groups;
 };
 
 /**

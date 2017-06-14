@@ -25,6 +25,7 @@
 #include <linux/sched.h>
 #include <linux/kthread.h>
 #include <linux/freezer.h>
+#include <linux/hwmon.h>
 
 #include <linux/atomic.h>
 
@@ -651,13 +652,30 @@ static int w1_family_notify(unsigned long action, struct w1_slave *sl)
 				return err;
 			}
 		}
-
+#ifdef CONFIG_HWMON
+		if (fops->hwmon_groups && sl->hwmon) {
+			struct device *hwmon
+				= hwmon_device_register_with_groups(&sl->dev,
+						"w1_slave_temp", sl,
+						fops->hwmon_groups);
+			if (IS_ERR(hwmon)) {
+				dev_warn(&sl->dev,
+					 "could not create hwmon device\n");
+			} else {
+				sl->hwmon = hwmon;
+			}
+		}
+#endif
 		break;
 	case BUS_NOTIFY_DEL_DEVICE:
 		if (fops->remove_slave)
 			sl->family->fops->remove_slave(sl);
 		if (fops->groups)
 			sysfs_remove_groups(&sl->dev.kobj, fops->groups);
+#ifdef CONFIG_HWMON
+		if (fops->hwmon_groups && sl->hwmon)
+			hwmon_device_unregister(sl->hwmon);
+#endif
 		break;
 	}
 	return 0;
