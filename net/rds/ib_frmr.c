@@ -38,7 +38,7 @@ static struct rds_ib_mr *rds_ib_alloc_frmr(struct rds_ib_device *rds_ibdev,
 	struct rds_ib_mr_pool *pool;
 	struct rds_ib_mr *ibmr = NULL;
 	struct rds_ib_frmr *frmr;
-	int err = 0;
+	int err;
 
 	if (npages <= RDS_MR_8K_MSG_SIZE)
 		pool = rds_ibdev->mr_8k_pool;
@@ -61,6 +61,7 @@ static struct rds_ib_mr *rds_ib_alloc_frmr(struct rds_ib_device *rds_ibdev,
 			 pool->fmr_attr.max_pages);
 	if (IS_ERR(frmr->mr)) {
 		pr_warn("RDS/IB: %s failed to allocate MR", __func__);
+		err = -ENOMEM;
 		goto out_no_cigar;
 	}
 
