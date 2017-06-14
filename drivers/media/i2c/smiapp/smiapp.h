@@ -20,6 +20,7 @@
 #define __SMIAPP_PRIV_H_
 
 #include <linux/mutex.h>
+#include <media/v4l2-async.h>
 #include <media/v4l2-ctrls.h>
 #include <media/v4l2-subdev.h>
 #include <media/i2c/smiapp.h>
@@ -143,6 +144,9 @@ struct smiapp_csi_data_format {
 	u8 pixel_order;
 };
 
+/* Lens, EEPROM and a flash LEDs? */
+#define SMIAPP_MAX_ASYNC_SUBDEVS	3
+
 #define SMIAPP_SUBDEVS			3
 
 #define SMIAPP_PA_PAD_SRC		0
@@ -189,6 +193,7 @@ struct smiapp_sensor {
 	struct regulator *vana;
 	struct clk *ext_clk;
 	struct gpio_desc *xshutdown;
+	struct v4l2_async_notifier notifier;
 	u32 limits[SMIAPP_LIMIT_LAST];
 	u8 nbinning_subtypes;
 	struct smiapp_binning_subtype binning_subtypes[SMIAPP_BINNING_SUBTYPES];

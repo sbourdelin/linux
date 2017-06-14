@@ -2551,6 +2551,22 @@ static int smiapp_register_subdev(struct smiapp_sensor *sensor,
 	return 0;
 }
 
+static int smiapp_subdev_notifier_bound(struct v4l2_async_notifier *notifier,
+					struct v4l2_subdev *sd,
+					struct v4l2_async_subdev *asd)
+{
+	return 0;
+}
+
+static int smiapp_subdev_notifier_complete(
+	struct v4l2_async_notifier *notifier)
+{
+	struct smiapp_sensor *sensor =
+		container_of(notifier, struct smiapp_sensor, notifier);
+
+	return v4l2_device_register_subdev_nodes(sensor->src->sd.v4l2_dev);
+}
+
 static void smiapp_unregistered(struct v4l2_subdev *subdev)
 {
 	struct smiapp_sensor *sensor = to_smiapp_sensor(subdev);
@@ -2558,6 +2574,8 @@ static void smiapp_unregistered(struct v4l2_subdev *subdev)
 
 	for (i = 1; i < sensor->ssds_used; i++)
 		v4l2_device_unregister_subdev(&sensor->ssds[i].sd);
+
+	v4l2_async_subnotifier_unregister(&sensor->notifier);
 }
 
 static int smiapp_registered(struct v4l2_subdev *subdev)
@@ -2578,6 +2596,15 @@ static int smiapp_registered(struct v4l2_subdev *subdev)
 		sensor, sensor->pixel_array, sensor->binner,
 		SMIAPP_PA_PAD_SRC, SMIAPP_PAD_SINK,
 		MEDIA_LNK_FL_ENABLED | MEDIA_LNK_FL_IMMUTABLE);
+	if (rval)
+		goto out_err;
+
+	if (!sensor->notifier.num_subdevs)
+		return 0;
+
+	sensor->notifier.bound = smiapp_subdev_notifier_bound;
+	sensor->notifier.complete = smiapp_subdev_notifier_complete;
+	rval = v4l2_async_subnotifier_register(subdev, &sensor->notifier);
 	if (rval)
 		goto out_err;
 
@@ -2782,13 +2809,15 @@ static int __maybe_unused smiapp_resume(struct device *dev)
 	return rval;
 }
 
-static struct smiapp_hwconfig *smiapp_get_hwconfig(struct device *dev)
+static struct smiapp_hwconfig *smiapp_get_hwconfig(struct device *dev,
+						   struct smiapp_sensor *sensor)
 {
+	static const char *props[] = { "flash", "lens", "eeprom" };
 	struct smiapp_hwconfig *hwcfg;
 	struct v4l2_fwnode_endpoint *bus_cfg;
 	struct fwnode_handle *ep;
 	struct fwnode_handle *fwnode = dev_fwnode(dev);
-	int i;
+	unsigned int i;
 	int rval;
 
 	if (!fwnode)
@@ -2849,6 +2878,45 @@ static struct smiapp_hwconfig *smiapp_get_hwconfig(struct device *dev)
 
 	v4l2_fwnode_endpoint_free(bus_cfg);
 	fwnode_handle_put(ep);
+
+	sensor->notifier.subdevs =
+		devm_kcalloc(dev, SMIAPP_MAX_ASYNC_SUBDEVS,
+			     sizeof(struct v4l2_async_subdev *), GFP_KERNEL);
+	if (!sensor->notifier.subdevs)
+		goto out_err;
+
+	for (i = 0; i < ARRAY_SIZE(props); i++) {
+		struct device_node *node;
+		unsigned int j = 0;
+
+		while ((node = of_parse_phandle(dev->of_node, props[i], j++))) {
+			struct v4l2_async_subdev **asd =
+				 &sensor->notifier.subdevs[
+					 sensor->notifier.num_subdevs];
+
+			if (WARN_ON(sensor->notifier.num_subdevs >=
+				    SMIAPP_MAX_ASYNC_SUBDEVS)) {
+				of_node_put(node);
+				goto out;
+			}
+
+			*asd = devm_kzalloc(
+				dev, sizeof(struct v4l2_async_subdev),
+				GFP_KERNEL);
+			if (!*asd) {
+				of_node_put(node);
+				goto out_err;
+			}
+
+			(*asd)->match.fwnode.fwnode = of_fwnode_handle(node);
+			(*asd)->match_type = V4L2_ASYNC_MATCH_FWNODE;
+			sensor->notifier.num_subdevs++;
+
+			of_node_put(node);
+		}
+	}
+
+out:
 	return hwcfg;
 
 out_err:
@@ -2861,18 +2929,17 @@ static int smiapp_probe(struct i2c_client *client,
 			const struct i2c_device_id *devid)
 {
 	struct smiapp_sensor *sensor;
-	struct smiapp_hwconfig *hwcfg = smiapp_get_hwconfig(&client->dev);
 	unsigned int i;
 	int rval;
-
-	if (hwcfg == NULL)
-		return -ENODEV;
 
 	sensor = devm_kzalloc(&client->dev, sizeof(*sensor), GFP_KERNEL);
 	if (sensor == NULL)
 		return -ENOMEM;
 
-	sensor->hwcfg = hwcfg;
+	sensor->hwcfg = smiapp_get_hwconfig(&client->dev, sensor);
+	if (sensor->hwcfg == NULL)
+		return -ENODEV;
+
 	mutex_init(&sensor->mutex);
 	sensor->src = &sensor->ssds[sensor->ssds_used];
 
