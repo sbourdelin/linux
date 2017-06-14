@@ -4799,6 +4799,46 @@ drm_hdmi_avi_infoframe_from_display_mode(struct hdmi_avi_infoframe *frame,
 EXPORT_SYMBOL(drm_hdmi_avi_infoframe_from_display_mode);
 
 /**
+ * drm_hdmi_avi_infoframe_set_colorspace - fill an HDMI AVI infoframe with
+ * colorspace data of the output type
+ *
+ * @frame: HDMI AVI infoframe
+ * @mode: DRM display mode
+ * @hdmi_output: HDMI output colorspace
+ *
+ * Return: 0 on success or a negative error code on failure.
+ */
+int
+drm_hdmi_avi_infoframe_set_colorspace(struct hdmi_avi_infoframe *frame,
+					 const struct drm_display_mode *mode,
+					 enum drm_hdmi_output_type hdmi_output)
+{
+	switch (hdmi_output) {
+	case DRM_HDMI_OUTPUT_YCBCR444:
+		frame->colorspace = HDMI_COLORSPACE_YUV444;
+		break;
+	case DRM_HDMI_OUTPUT_YCBCR422:
+		frame->colorspace = HDMI_COLORSPACE_YUV422;
+		break;
+	case DRM_HDMI_OUTPUT_YCBCR420:
+		frame->colorspace = HDMI_COLORSPACE_YUV420;
+		frame->pixel_repeat = 0;
+		break;
+	case DRM_HDMI_OUTPUT_DEFAULT_RGB:
+		frame->colorspace = HDMI_COLORSPACE_RGB;
+		break;
+	case DRM_HDMI_OUTPUT_YCBCR_HQ:
+	case DRM_HDMI_OUTPUT_YCBCR_LQ:
+	case DRM_HDMI_OUTPUT_INVALID:
+		DRM_ERROR("Invalid HDMI output type\n");
+		return -EINVAL;
+	}
+
+	return 0;
+}
+EXPORT_SYMBOL(drm_hdmi_avi_infoframe_set_colorspace);
+
+/**
  * drm_hdmi_avi_infoframe_quant_range() - fill the HDMI AVI infoframe
  *                                        quantization range information
  * @frame: HDMI AVI infoframe
