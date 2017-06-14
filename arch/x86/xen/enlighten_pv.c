@@ -1350,8 +1350,10 @@ asmlinkage __visible void __init xen_start_kernel(void)
 
 #ifdef CONFIG_X86_32
 	pv_info.kernel_rpl = 1;
-	if (xen_feature(XENFEAT_supervisor_mode_kernel))
+	if (xen_feature(XENFEAT_supervisor_mode_kernel)) {
 		pv_info.kernel_rpl = 0;
+		pv_cpu_ops.set_iopl_mask = paravirt_nop;
+	}
 #else
 	pv_info.kernel_rpl = 0;
 #endif

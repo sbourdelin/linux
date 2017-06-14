@@ -263,7 +263,7 @@ __switch_to(struct task_struct *prev_p, struct task_struct *next_p)
 	 * is running virtualized at a non-zero CPL, the popf will
 	 * not restore flags, so it must be done in a separate step.
 	 */
-	if (get_kernel_rpl() && unlikely(prev->iopl != next->iopl))
+	if (unlikely(prev->iopl != next->iopl))
 		set_iopl_mask(next->iopl);
 
 	/*
