@@ -2225,11 +2225,9 @@ static int hid_device_probe(struct device *dev)
 	const struct hid_device_id *id;
 	int ret = 0;
 
-	if (down_interruptible(&hdev->driver_lock))
-		return -EINTR;
 	if (down_interruptible(&hdev->driver_input_lock)) {
 		ret = -EINTR;
-		goto unlock_driver_lock;
+		goto end;
 	}
 	hdev->io_started = false;
 
@@ -2256,8 +2254,7 @@ static int hid_device_probe(struct device *dev)
 unlock:
 	if (!hdev->io_started)
 		up(&hdev->driver_input_lock);
-unlock_driver_lock:
-	up(&hdev->driver_lock);
+end:
 	return ret;
 }
 
@@ -2267,11 +2264,9 @@ static int hid_device_remove(struct device *dev)
 	struct hid_driver *hdrv;
 	int ret = 0;
 
-	if (down_interruptible(&hdev->driver_lock))
-		return -EINTR;
 	if (down_interruptible(&hdev->driver_input_lock)) {
 		ret = -EINTR;
-		goto unlock_driver_lock;
+		goto end;
 	}
 	hdev->io_started = false;
 
@@ -2287,8 +2282,7 @@ static int hid_device_remove(struct device *dev)
 
 	if (!hdev->io_started)
 		up(&hdev->driver_input_lock);
-unlock_driver_lock:
-	up(&hdev->driver_lock);
+end:
 	return ret;
 }
 
@@ -2745,7 +2739,6 @@ struct hid_device *hid_allocate_device(void)
 	init_waitqueue_head(&hdev->debug_wait);
 	INIT_LIST_HEAD(&hdev->debug_list);
 	spin_lock_init(&hdev->debug_list_lock);
-	sema_init(&hdev->driver_lock, 1);
 	sema_init(&hdev->driver_input_lock, 1);
 
 	return hdev;
