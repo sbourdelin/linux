@@ -3271,11 +3271,14 @@ static int cpuid_interception(struct vcpu_svm *svm)
 
 static int iret_interception(struct vcpu_svm *svm)
 {
-	++svm->vcpu.stat.nmi_window_exits;
 	clr_intercept(svm, INTERCEPT_IRET);
-	svm->vcpu.arch.hflags |= HF_IRET_MASK;
-	svm->nmi_iret_rip = kvm_rip_read(&svm->vcpu);
-	kvm_make_request(KVM_REQ_EVENT, &svm->vcpu);
+
+	if (svm->vcpu.arch.hflags & HF_NMI_MASK) {
+		++svm->vcpu.stat.nmi_window_exits;
+		svm->vcpu.arch.hflags |= HF_IRET_MASK;
+		svm->nmi_iret_rip = kvm_rip_read(&svm->vcpu);
+		kvm_make_request(KVM_REQ_EVENT, &svm->vcpu);
+	}
 	return 1;
 }
 
@@ -4822,6 +4825,22 @@ static void svm_vcpu_run(struct kvm_vcpu *vcpu)
 	 */
 	if (unlikely(svm->nested.exit_required))
 		return;
+
+	/*
+	 * Disable singlestep if we're injecting an interrupt/exception.
+	 * We don't want our modified rflags to be pushed on the stack where
+	 * we might not be able to easily reset them if we disabled NMI
+	 * singlestep later.
+	 */
+	if (svm->nmi_singlestep && svm->vmcb->control.event_inj) {
+		/*
+		 * We enabled NMI singlestepping because the NMI window was
+		 * closed. It's unlikely that injecting another event will make
+		 * it any better. Try again later, on next iret at the latest.
+		 */
+		disable_nmi_singlestep(svm);
+		set_intercept(svm, INTERCEPT_IRET);
+	}
 
 	pre_svm_run(svm);
 
