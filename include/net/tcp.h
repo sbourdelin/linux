@@ -2018,4 +2018,15 @@ static inline int tcp_call_bpf(struct sock *sk, bool is_req_sock, int op)
 }
 #endif
 
+static inline u32 tcp_timeout_init(struct sock *sk, bool is_req_sock)
+{
+	int timeout;
+
+	timeout = tcp_call_bpf(sk, is_req_sock, BPF_SOCKET_OPS_TIMEOUT_INIT);
+
+	if (timeout <= 0)
+		timeout = TCP_TIMEOUT_INIT;
+	return timeout;
+}
+
 #endif	/* _TCP_H */
