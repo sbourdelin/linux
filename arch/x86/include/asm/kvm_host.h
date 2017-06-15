@@ -545,6 +545,7 @@ struct kvm_vcpu_arch {
 		bool reinject;
 		u8 nr;
 		u32 error_code;
+		bool async_page_fault;
 	} exception;
 
 	struct kvm_queued_interrupt {
@@ -645,6 +646,7 @@ struct kvm_vcpu_arch {
 		u64 msr_val;
 		u32 id;
 		bool send_user_only;
+		unsigned long nested_apf_token;
 	} apf;
 
 	/* OSVW MSRs (AMD only) */
