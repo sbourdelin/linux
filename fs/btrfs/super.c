@@ -1343,6 +1343,13 @@ static char *setup_root_args(char *args)
 	return buf;
 }
 
+static void print_mount_info(struct btrfs_fs_info *info, int flag, char *opt,
+		char *prefix)
+{
+	btrfs_notice(info, "%s: flags=%s opt=%s\n",
+			prefix, flag & MS_RDONLY ? "ro":"rw", opt);
+}
+
 static struct dentry *mount_subvol(const char *subvol_name, u64 subvol_objectid,
 				   int flags, const char *device_name,
 				   char *data)
@@ -1435,6 +1442,8 @@ static struct dentry *mount_subvol(const char *subvol_name, u64 subvol_objectid,
 			dput(root);
 			root = ERR_PTR(ret);
 			deactivate_locked_super(s);
+		} else {
+			print_mount_info(fs_info, flags, data, "mount");
 		}
 	}
 
@@ -1813,6 +1822,9 @@ static int btrfs_remount(struct super_block *sb, int *flags, char *data)
 out:
 	wake_up_process(fs_info->transaction_kthread);
 	btrfs_remount_cleanup(fs_info, old_opts);
+
+	print_mount_info(fs_info, *flags, data, "remount");
+
 	return 0;
 
 restore:
@@ -2149,6 +2161,7 @@ static int btrfs_statfs(struct dentry *dentry, struct kstatfs *buf)
 static void btrfs_kill_super(struct super_block *sb)
 {
 	struct btrfs_fs_info *fs_info = btrfs_sb(sb);
+	btrfs_notice(fs_info, "%s\n", "unmount");
 	kill_anon_super(sb);
 	free_fs_info(fs_info);
 }
