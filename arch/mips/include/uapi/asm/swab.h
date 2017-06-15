@@ -13,7 +13,7 @@
 
 #define __SWAB_64_THRU_32__
 
-#if !defined(__mips16) &&					\
+#if !defined(__mips16) && !defined(__EMITTING_BPF__) &&			\
 	((defined(__mips_isa_rev) && (__mips_isa_rev >= 2)) ||	\
 	 defined(_MIPS_ARCH_LOONGSON3A))
 

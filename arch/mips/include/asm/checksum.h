@@ -12,7 +12,7 @@
 #ifndef _ASM_CHECKSUM_H
 #define _ASM_CHECKSUM_H
 
-#ifdef CONFIG_GENERIC_CSUM
+#if defined(CONFIG_GENERIC_CSUM) || defined(__EMITTING_BPF__)
 #include <asm-generic/checksum.h>
 #else
 
