@@ -2029,4 +2029,14 @@ static inline u32 tcp_timeout_init(struct sock *sk, bool is_req_sock)
 	return timeout;
 }
 
+static inline u32 tcp_rwnd_init_bpf(struct sock *sk, bool is_req_sock)
+{
+	int rwnd;
+
+	rwnd = tcp_call_bpf(sk, is_req_sock, BPF_SOCKET_OPS_RWND_INIT);
+
+	if (rwnd < 0)
+		rwnd = 0;
+	return rwnd;
+}
 #endif	/* _TCP_H */
