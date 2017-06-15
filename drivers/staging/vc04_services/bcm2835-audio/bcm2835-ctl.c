@@ -72,11 +72,13 @@ static int toggle_mute(struct bcm2835_chip *chip, int nmute)
 	/* if the sound is muted then we need to unmute */
 	if (chip->mute == CTRL_VOL_MUTE) {
 		chip->volume = chip->old_volume; /* copy the old volume back */
-		audio_info("Unmuting, old_volume = %d, volume = %d ...\n", chip->old_volume, chip->volume);
+		audio_info("Unmuting, old_volume = %d, volume = %d ...\n",
+			   chip->old_volume, chip->volume);
 	} else /* otherwise we mute */ {
 		chip->old_volume = chip->volume;
 		chip->volume = 26214; /* set volume to minimum level AKA mute */
-		audio_info("Muting, old_volume = %d, volume = %d ...\n", chip->old_volume, chip->volume);
+		audio_info("Muting, old_volume = %d, volume = %d ...\n",
+			   chip->old_volume, chip->volume);
 	}
 
 	chip->mute = nmute;
@@ -114,10 +116,15 @@ static int snd_bcm2835_ctl_put(struct snd_kcontrol *kcontrol,
 		return -EINTR;
 
 	if (kcontrol->private_value == PCM_PLAYBACK_VOLUME) {
-		audio_info("Volume change attempted.. volume = %d new_volume = %d\n", chip->volume, (int)ucontrol->value.integer.value[0]);
+		audio_info("Volume change attempted.. volume = %d new_volume = %d\n",
+			   chip->volume, (int)ucontrol->value.integer.value[0]);
 		if (chip->mute == CTRL_VOL_MUTE) {
 			/* changed = toggle_mute(chip, CTRL_VOL_UNMUTE); */
-			changed = 1; /* should return 0 to signify no change but the mixer takes this as the opposite sign (no idea why) */
+			changed = 1; /* should return 0 to signify
+				      * no change but the mixer
+				      * takes this as the opposite
+				      * sign (no idea why)
+				      */
 			goto unlock;
 		}
 		if (changed || (ucontrol->value.integer.value[0] != chip2alsa(chip->volume))) {
@@ -152,7 +159,8 @@ static struct snd_kcontrol_new snd_bcm2835_ctl[] = {
 		.iface = SNDRV_CTL_ELEM_IFACE_MIXER,
 		.name = "PCM Playback Volume",
 		.index = 0,
-		.access = SNDRV_CTL_ELEM_ACCESS_READWRITE | SNDRV_CTL_ELEM_ACCESS_TLV_READ,
+		.access = SNDRV_CTL_ELEM_ACCESS_READWRITE |
+			  SNDRV_CTL_ELEM_ACCESS_TLV_READ,
 		.private_value = PCM_PLAYBACK_VOLUME,
 		.info = snd_bcm2835_ctl_info,
 		.get = snd_bcm2835_ctl_get,
