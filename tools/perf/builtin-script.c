@@ -85,6 +85,7 @@ enum perf_output_field {
 	PERF_OUTPUT_INSN	    = 1U << 21,
 	PERF_OUTPUT_INSNLEN	    = 1U << 22,
 	PERF_OUTPUT_BRSTACKINSN	    = 1U << 23,
+	PERF_OUTPUT_SKID_IP	    = 1U << 24,
 };
 
 struct output_option {
@@ -115,6 +116,7 @@ struct output_option {
 	{.str = "insn", .field = PERF_OUTPUT_INSN},
 	{.str = "insnlen", .field = PERF_OUTPUT_INSNLEN},
 	{.str = "brstackinsn", .field = PERF_OUTPUT_BRSTACKINSN},
+	{.str = "skid_ip", .field = PERF_OUTPUT_SKID_IP},
 };
 
 /* default set to maintain compatibility with current format */
@@ -1125,6 +1127,11 @@ static size_t data_src__printf(u64 data_src)
 	return printf("%-*s", maxlen, out);
 }
 
+static void print_sample_skid_ip(struct perf_sample *sample)
+{
+	printf(" %"PRIx64" ", sample->skid_ip);
+}
+
 static void process_event(struct perf_script *script,
 			  struct perf_sample *sample, struct perf_evsel *evsel,
 			  struct addr_location *al,
@@ -1193,7 +1200,10 @@ static void process_event(struct perf_script *script,
 
 	if (perf_evsel__is_bpf_output(evsel) && PRINT_FIELD(BPF_OUTPUT))
 		print_sample_bpf_output(sample);
-	print_insn(sample, attr, thread, machine);
+
+	if (PRINT_FIELD(SKID_IP))
+		print_sample_skid_ip(sample);
+
 	printf("\n");
 }
 

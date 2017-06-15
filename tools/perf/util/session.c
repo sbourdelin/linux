@@ -1125,7 +1125,7 @@ static void dump_sample(struct perf_evsel *evsel, union perf_event *event,
 		sample_read__printf(sample, evsel->attr.read_format);
 
 	if (sample_type & PERF_SAMPLE_SKID_IP)
-		printf("... skid_ip: %" PRIu64 "\n", sample->skid_ip);
+		printf("... skid_ip: 0x%" PRIx64 "\n", sample->skid_ip);
 }
 
 static struct machine *machines__find_for_cpumode(struct machines *machines,
