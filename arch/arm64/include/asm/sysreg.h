@@ -20,6 +20,8 @@
 #ifndef __ASM_SYSREG_H
 #define __ASM_SYSREG_H
 
+#ifndef __EMITTING_BPF__
+
 #include <linux/stringify.h>
 
 /*
@@ -506,5 +508,5 @@ static inline void config_sctlr_el1(u32 clear, u32 set)
 }
 
 #endif
-
+#endif  /* __EMITTING_BPF__ */
 #endif	/* __ASM_SYSREG_H */
