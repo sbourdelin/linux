@@ -46,6 +46,9 @@
 #include <linux/seq_file.h>
 #include <linux/memcontrol.h>
 
+#include <linux/bpf.h>
+#include <linux/filter.h>
+
 extern struct inet_hashinfo tcp_hashinfo;
 
 extern struct percpu_counter tcp_orphan_count;
@@ -1990,5 +1993,29 @@ static inline void tcp_listendrop(const struct sock *sk)
 }
 
 enum hrtimer_restart tcp_pace_kick(struct hrtimer *timer);
+
+/* Call BPF_SOCKET_OPS program that returns an int. If the return value
+ * is < 0, then the BPF op failed (for example if the loaded BPF
+ * program does not support the chosen operation or there is no BPF
+ * program loaded).
+ */
+#ifdef CONFIG_BPF
+static inline int tcp_call_bpf(struct sock *sk, bool is_req_sock, int op)
+{
+	struct bpf_socket_ops_kern socket_ops;
+
+	memset(&socket_ops, 0, sizeof(socket_ops));
+	socket_ops.sk = sk;
+	socket_ops.is_req_sock = is_req_sock ? 1 : 0;
+	socket_ops.op = op;
+
+	return bpf_socket_ops_call(&socket_ops);
+}
+#else
+static inline int tcp_call_bpf(struct sock *sk, bool is_req_sock, int op)
+{
+	return -1;
+}
+#endif
 
 #endif	/* _TCP_H */

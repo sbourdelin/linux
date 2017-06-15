@@ -1458,6 +1458,8 @@ SYSCALL_DEFINE3(bpf, int, cmd, union bpf_attr __user *, uattr, unsigned int, siz
 		break;
 	case BPF_OBJ_GET_INFO_BY_FD:
 		err = bpf_obj_get_info_by_fd(&attr, uattr);
+	case BPF_PROG_LOAD_SOCKET_OPS:
+		err = bpf_socket_ops_set_prog(attr.bpf_fd);
 		break;
 	default:
 		err = -EINVAL;
