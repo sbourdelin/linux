@@ -162,6 +162,19 @@ struct mmc_host_ops {
 				  unsigned int direction, int blk_size);
 };
 
+struct mmc_cqe_ops {
+	int	(*cqe_enable)(struct mmc_host *host, struct mmc_card *card);
+	void	(*cqe_disable)(struct mmc_host *host);
+	int	(*cqe_request)(struct mmc_host *host, struct mmc_request *mrq);
+	void	(*cqe_post_req)(struct mmc_host *host, struct mmc_request *mrq);
+	void	(*cqe_off)(struct mmc_host *host);
+	int	(*cqe_wait_for_idle)(struct mmc_host *host);
+	bool	(*cqe_timeout)(struct mmc_host *host, struct mmc_request *mrq,
+			       bool *recovery_needed);
+	void	(*cqe_recovery_start)(struct mmc_host *host);
+	void	(*cqe_recovery_finish)(struct mmc_host *host);
+};
+
 struct mmc_async_req {
 	/* active mmc request */
 	struct mmc_request	*mrq;
@@ -307,6 +320,8 @@ struct mmc_host {
 #define MMC_CAP2_HS400_ES	(1 << 20)	/* Host supports enhanced strobe */
 #define MMC_CAP2_NO_SD		(1 << 21)	/* Do not send SD commands during initialization */
 #define MMC_CAP2_NO_MMC		(1 << 22)	/* Do not send (e)MMC commands during initialization */
+#define MMC_CAP2_CQE		(1 << 23)	/* Has eMMC command queue engine */
+#define MMC_CAP2_CQE_DCMD	(1 << 24)	/* CQE can issue a direct command */
 
 	mmc_pm_flag_t		pm_caps;	/* supported pm features */
 
@@ -392,6 +407,15 @@ struct mmc_host {
 
 	int			dsr_req;	/* DSR value is valid */
 	u32			dsr;	/* optional driver stage (DSR) value */
+
+	/* Command Queue Engine (CQE) support */
+	const struct mmc_cqe_ops *cqe_ops;
+	void			*cqe_private;
+	void			(*cqe_recovery_notifier)(struct mmc_host *,
+							 struct mmc_request *);
+	int			cqe_qdepth;
+	bool			cqe_enabled;
+	bool			cqe_on;
 
 	unsigned long		private[0] ____cacheline_aligned;
 };
