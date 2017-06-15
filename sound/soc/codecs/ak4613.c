@@ -70,6 +70,7 @@
 #define FMT_MASK	(0xf8)
 
 /* CTRL2 */
+#define CKS_MASK		(3 << 4)
 #define DFS_MASK		(3 << 2)
 #define DFS_NORMAL_SPEED	(0 << 2)
 #define DFS_DOUBLE_SPEED	(1 << 2)
@@ -371,7 +372,9 @@ static int ak4613_dai_hw_params(struct snd_pcm_substream *substream,
 	fmt_ctrl = AUDIO_IFACE_TO_VAL(iface);
 
 	snd_soc_update_bits(codec, CTRL1, FMT_MASK, fmt_ctrl);
-	snd_soc_update_bits(codec, CTRL2, DFS_MASK, ctrl2);
+
+	/* CKS = 00 */
+	snd_soc_update_bits(codec, CTRL2, (CKS_MASK | DFS_MASK), ctrl2);
 
 	snd_soc_update_bits(codec, ICTRL, ICTRL_MASK, priv->ic);
 	snd_soc_update_bits(codec, OCTRL, OCTRL_MASK, priv->oc);
