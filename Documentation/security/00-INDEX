@@ -10,6 +10,8 @@ Yama.txt
 	- documentation on the Yama Linux Security Module.
 apparmor.txt
 	- documentation on the AppArmor security extension.
+SARA.rst
+	- documentation on the S.A.R.A. Linux Security Module.
 credentials.txt
 	- documentation about credentials in Linux.
 keys-ecryptfs.txt
