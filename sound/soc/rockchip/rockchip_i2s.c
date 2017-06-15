@@ -641,7 +641,7 @@ static int rockchip_i2s_probe(struct platform_device *pdev)
 			goto err_pm_disable;
 	}
 
-	soc_dai = devm_kmemdup(&pdev->dev, &rockchip_i2s_dai
+	soc_dai = devm_kmemdup(&pdev->dev, &rockchip_i2s_dai,
 			       sizeof(*soc_dai), GFP_KERNEL);
 	if (!soc_dai) {
 		err = -ENOMEM;
