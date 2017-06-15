@@ -937,6 +937,9 @@ void perf_evsel__config(struct perf_evsel *evsel, struct record_opts *opts,
 	if (opts->sample_weight)
 		perf_evsel__set_sample_bit(evsel, WEIGHT);
 
+	if (opts->skid_ip)
+		perf_evsel__set_sample_bit(evsel, SKID_IP);
+
 	attr->task  = track;
 	attr->mmap  = track;
 	attr->mmap2 = track && !perf_missing_features.mmap2;
@@ -1319,7 +1322,7 @@ static void __p_sample_type(char *buf, size_t size, u64 value)
 		bit_name(PERIOD), bit_name(STREAM_ID), bit_name(RAW),
 		bit_name(BRANCH_STACK), bit_name(REGS_USER), bit_name(STACK_USER),
 		bit_name(IDENTIFIER), bit_name(REGS_INTR), bit_name(DATA_SRC),
-		bit_name(WEIGHT),
+		bit_name(WEIGHT), bit_name(SKID_IP),
 		{ .name = NULL, }
 	};
 #undef bit_name
@@ -2041,6 +2044,12 @@ int perf_evsel__parse_sample(struct perf_evsel *evsel, union perf_event *event,
 			data->intr_regs.regs = (u64 *)array;
 			array = (void *)array + sz;
 		}
+	}
+
+	data->skid_ip = 0;
+	if (type & PERF_SAMPLE_SKID_IP) {
+		data->skid_ip = *array;
+		array++;
 	}
 
 	return 0;

@@ -199,6 +199,7 @@ struct perf_sample {
 	u32 cpu;
 	u32 raw_size;
 	u64 data_src;
+	u64 skid_ip;
 	u32 flags;
 	u16 insn_len;
 	u8  cpumode;
