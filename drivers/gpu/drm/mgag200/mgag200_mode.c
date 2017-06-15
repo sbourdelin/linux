@@ -923,7 +923,6 @@ static int mga_crtc_mode_set(struct drm_crtc *crtc,
 	int pitch;
 	int option = 0, option2 = 0;
 	int i;
-	unsigned char misc = 0;
 	unsigned char ext_vga[6];
 	u8 bppshift;
 
@@ -997,11 +996,6 @@ static int mga_crtc_mode_set(struct drm_crtc *crtc,
 		dacvalue[MGA1064_MUL_CTL] = MGA1064_MUL_CTL_32_24bits;
 		break;
 	}
-
-	if (mode->flags & DRM_MODE_FLAG_NHSYNC)
-		misc |= 0x40;
-	if (mode->flags & DRM_MODE_FLAG_NVSYNC)
-		misc |= 0x80;
 
 
 	for (i = 0; i < sizeof(dacvalue); i++) {
@@ -1124,8 +1118,7 @@ static int mga_crtc_mode_set(struct drm_crtc *crtc,
 		ext_vga[1] |= 0x88;
 
 	/* Set pixel clocks */
-	misc = 0x2d;
-	WREG8(MGA_MISC_OUT, misc);
+	WREG8(MGA_MISC_OUT, 0x2d);
 
 	mga_crtc_set_plls(mdev, mode->clock);
 
@@ -1145,9 +1138,7 @@ static int mga_crtc_mode_set(struct drm_crtc *crtc,
 
 	WREG_ECRT(0, ext_vga[0]);
 	/* Enable mga pixel clock */
-	misc = 0x2d;
-
-	WREG8(MGA_MISC_OUT, misc);
+	WREG8(MGA_MISC_OUT, 0x2d);
 
 	if (adjusted_mode)
 		memcpy(&mdev->mode, mode, sizeof(struct drm_display_mode));
