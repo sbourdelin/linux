@@ -749,6 +749,7 @@ void pcibios_remove_bus(struct pci_bus *bus)
 
 	zpci_exit_slot(zdev);
 	zpci_cleanup_bus_resources(zdev);
+	zpci_destroy_iommu(zdev);
 	zpci_free_domain(zdev);
 
 	spin_lock(&zpci_list_lock);
@@ -819,6 +820,10 @@ int zpci_create_device(struct zpci_dev *zdev)
 	rc = zpci_alloc_domain(zdev);
 	if (rc)
 		goto out;
+
+	rc = zpci_init_iommu(zdev);
+	if (rc)
+		goto out_free;
 
 	mutex_init(&zdev->lock);
 	if (zdev->state == ZPCI_FN_STATE_CONFIGURED) {
