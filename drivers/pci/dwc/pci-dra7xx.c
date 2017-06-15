@@ -48,7 +48,7 @@
 #define	LINK_UP_EVT					BIT(12)
 #define	CFG_BME_EVT					BIT(13)
 #define	CFG_MSE_EVT					BIT(14)
-#define	INTERRUPTS (ERR_SYS | ERR_FATAL | ERR_NONFATAL | ERR_COR | ERR_AXI | \
+#define	INTERRUPTS (u32)(ERR_SYS | ERR_FATAL | ERR_NONFATAL | ERR_COR | ERR_AXI | \
 			ERR_ECRC | PME_TURN_OFF | PME_TO_ACK | PM_PME | \
 			LINK_REQ_RST | LINK_UP_EVT | CFG_BME_EVT | CFG_MSE_EVT)
 
@@ -58,8 +58,8 @@
 #define	INTB						BIT(1)
 #define	INTC						BIT(2)
 #define	INTD						BIT(3)
-#define	MSI						BIT(4)
-#define	LEG_EP_INTERRUPTS (INTA | INTB | INTC | INTD)
+#define	MSI						(u32)(BIT(4))
+#define	LEG_EP_INTERRUPTS (u32)(INTA | INTB | INTC | INTD)
 
 #define	PCIECTRL_TI_CONF_DEVICE_TYPE			0x0100
 #define	DEVICE_TYPE_EP					0x0
