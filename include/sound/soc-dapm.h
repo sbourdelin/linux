@@ -510,6 +510,7 @@ enum snd_soc_dapm_type {
 	snd_soc_dapm_dai_out,
 	snd_soc_dapm_dai_link,		/* link between two DAI structures */
 	snd_soc_dapm_kcontrol,		/* Auto-disabled kcontrol */
+	snd_soc_dapm_dsp_component,	/* DSP internal component */
 };
 
 enum snd_soc_dapm_subclass {

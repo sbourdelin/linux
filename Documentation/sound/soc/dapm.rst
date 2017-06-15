@@ -105,6 +105,10 @@ Pre
 	Special PRE widget (exec before all others)
 Post
 	Special POST widget (exec after all others)
+DSP Component
+	Internal DSP component not used by the ASoC core but may be used
+	by DSP driver and DSP firmware.
+
 
 (Widgets are defined in include/sound/soc-dapm.h)
 
