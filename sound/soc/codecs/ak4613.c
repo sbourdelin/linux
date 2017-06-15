@@ -95,6 +95,8 @@ struct ak4613_interface {
 struct ak4613_priv {
 	struct mutex lock;
 	const struct ak4613_interface *iface;
+	struct snd_pcm_hw_constraint_list constraint;
+	unsigned int sysclk;
 
 	unsigned int fmt;
 	u8 oc;
@@ -253,6 +255,56 @@ static void ak4613_dai_shutdown(struct snd_pcm_substream *substream,
 	mutex_unlock(&priv->lock);
 }
 
+static void ak4613_hw_constraints(struct ak4613_priv *priv,
+				  struct snd_pcm_runtime *runtime)
+{
+	static const unsigned int ak4613_rates[] = {
+		 32000,
+		 44100,
+		 48000,
+		 88200,
+		 96000,
+		176400,
+		192000,
+	};
+	unsigned int ak4613_rates_min[] = {
+		 32000,
+		 32000,
+		 32000,
+		 64000,
+		 64000,
+		128000,
+		128000,
+	};
+	struct snd_pcm_hw_constraint_list *constraint = &priv->constraint;
+	unsigned int fs;
+	int i;
+
+	constraint->list	= ak4613_rates;
+	constraint->mask	= 0;
+	constraint->count	= 0;
+
+	/*
+	 * constraint will use ak4613_rates,
+	 * but use ak4613_rates_min for calculation
+	 */
+
+	for (i = 0; i < ARRAY_SIZE(ak4613_rates); i++) {
+		/*
+		 * minimum fs on each range
+		 * see CTRL2 settings on ak4613_dai_hw_params
+		 */
+		fs = (ak4613_rates[i] <=  96000) ? 256 : 128;
+
+		/* calculate and consider by *min* rates */
+		if (priv->sysclk >= ak4613_rates_min[i] * fs)
+			constraint->count = i + 1;
+	}
+
+	snd_pcm_hw_constraint_list(runtime, 0,
+				SNDRV_PCM_HW_PARAM_RATE, constraint);
+}
+
 static int ak4613_dai_startup(struct snd_pcm_substream *substream,
 			      struct snd_soc_dai *dai)
 {
@@ -260,6 +312,19 @@ static int ak4613_dai_startup(struct snd_pcm_substream *substream,
 	struct ak4613_priv *priv = snd_soc_codec_get_drvdata(codec);
 
 	priv->cnt++;
+
+	ak4613_hw_constraints(priv, substream->runtime);
+
+	return 0;
+}
+
+static int ak4613_dai_set_sysclk(struct snd_soc_dai *codec_dai,
+				 int clk_id, unsigned int freq, int dir)
+{
+	struct snd_soc_codec *codec = codec_dai->codec;
+	struct ak4613_priv *priv = snd_soc_codec_get_drvdata(codec);
+
+	priv->sysclk = freq;
 
 	return 0;
 }
@@ -373,7 +438,7 @@ static int ak4613_dai_hw_params(struct snd_pcm_substream *substream,
 
 	snd_soc_update_bits(codec, CTRL1, FMT_MASK, fmt_ctrl);
 
-	/* CKS = 00 */
+	/* CKS = 00. see ak4613_hw_constraints */
 	snd_soc_update_bits(codec, CTRL2, (CKS_MASK | DFS_MASK), ctrl2);
 
 	snd_soc_update_bits(codec, ICTRL, ICTRL_MASK, priv->ic);
@@ -414,6 +479,7 @@ static int ak4613_set_bias_level(struct snd_soc_codec *codec,
 static const struct snd_soc_dai_ops ak4613_dai_ops = {
 	.startup	= ak4613_dai_startup,
 	.shutdown	= ak4613_dai_shutdown,
+	.set_sysclk	= ak4613_dai_set_sysclk,
 	.set_fmt	= ak4613_dai_set_fmt,
 	.hw_params	= ak4613_dai_hw_params,
 };
@@ -532,6 +598,7 @@ static int ak4613_i2c_probe(struct i2c_client *i2c,
 
 	priv->iface		= NULL;
 	priv->cnt		= 0;
+	priv->sysclk		= 0;
 
 	mutex_init(&priv->lock);
 
