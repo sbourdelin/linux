@@ -1562,6 +1562,9 @@ static void __perf_event_header_size(struct perf_event *event, u64 sample_type)
 	if (sample_type & PERF_SAMPLE_TRANSACTION)
 		size += sizeof(data->txn);
 
+	if (sample_type & PERF_SAMPLE_SKID_IP)
+		size += sizeof(data->skid_ip);
+
 	event->header_size = size;
 }
 
@@ -5954,6 +5957,9 @@ void perf_output_sample(struct perf_output_handle *handle,
 		}
 	}
 
+	if (sample_type & PERF_SAMPLE_SKID_IP)
+		perf_output_put(handle, data->skid_ip);
+
 	if (!event->attr.watermark) {
 		int wakeup_events = event->attr.wakeup_events;
 
@@ -5986,6 +5992,14 @@ void perf_prepare_sample(struct perf_event_header *header,
 
 	if (sample_type & PERF_SAMPLE_IP)
 		data->ip = perf_instruction_pointer(regs);
+
+	/*
+	 * if skid_ip has not been set by arch specific code, then
+	 * we initialize it to IP as interrupt-based sampling has
+	 * skid
+	 */
+	if (!data->skid_ip && (sample_type & PERF_SAMPLE_SKID_IP))
+		data->skid_ip = perf_instruction_pointer(regs);
 
 	if (sample_type & PERF_SAMPLE_CALLCHAIN) {
 		int size = 1;
