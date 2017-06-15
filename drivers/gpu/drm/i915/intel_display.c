@@ -13387,6 +13387,10 @@ intel_prepare_plane_fb(struct drm_plane *plane,
 	if (!obj)
 		return 0;
 
+	ret = i915_gem_object_pin_pages(obj);
+	if (ret)
+		return ret;
+
 	ret = mutex_lock_interruptible(&dev_priv->drm.struct_mutex);
 	if (ret) {
 		i915_gem_object_unpin_pages(obj);
@@ -13411,6 +13415,7 @@ intel_prepare_plane_fb(struct drm_plane *plane,
 	}
 
 	mutex_unlock(&dev_priv->drm.struct_mutex);
+	i915_gem_object_unpin_pages(obj);
 	if (ret)
 		return ret;
 
