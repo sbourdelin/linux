@@ -1169,6 +1169,13 @@ static void setup_pebs_sample_data(struct perf_event *event,
 	    x86_pmu.intel_cap.pebs_format >= 1)
 		data->addr = pebs->dla;
 
+	/*
+	 * unmodified, skid IP which is guaranteed to be the next
+	 * dyanmic instruction
+	 */
+	if (sample_type & PERF_SAMPLE_SKID_IP)
+		data->skid_ip = pebs->ip;
+
 	if (x86_pmu.intel_cap.pebs_format >= 2) {
 		/* Only set the TSX weight when no memory weight. */
 		if ((sample_type & PERF_SAMPLE_WEIGHT) && !fll)
