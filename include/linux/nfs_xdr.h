@@ -1533,6 +1533,7 @@ struct nfs_renamedata {
 	struct nfs_fattr	new_fattr;
 	void (*complete)(struct rpc_task *, struct nfs_renamedata *);
 	long timeout;
+	unsigned int cancelled : 1;
 };
 
 struct nfs_access_entry;
