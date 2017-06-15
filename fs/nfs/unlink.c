@@ -288,6 +288,13 @@ static void nfs_async_rename_release(void *calldata)
 	if (d_really_is_positive(data->old_dentry))
 		nfs_mark_for_revalidate(d_inode(data->old_dentry));
 
+	/* The result of the rename is unknown. Play it safe by
+	 * forcing a new lookup */
+	if (data->cancelled) {
+		nfs_force_lookup_revalidate(data->old_dir);
+		nfs_force_lookup_revalidate(data->new_dir);
+	}
+
 	dput(data->old_dentry);
 	dput(data->new_dentry);
 	iput(data->old_dir);

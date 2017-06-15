@@ -2037,6 +2037,8 @@ int nfs_rename(struct inode *old_dir, struct dentry *old_dentry,
 	error = rpc_wait_for_completion_task(task);
 	if (error == 0)
 		error = task->tk_status;
+	else
+		((struct nfs_renamedata *)task->tk_calldata)->cancelled = 1;
 	rpc_put_task(task);
 	nfs_mark_for_revalidate(old_inode);
 out:
