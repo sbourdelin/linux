@@ -854,7 +854,7 @@ static struct dentry *rdt_mount(struct file_system_type *fs_type,
 	}
 
 	dentry = kernfs_mount(fs_type, flags, rdt_root,
-			      RDTGROUP_SUPER_MAGIC, NULL);
+			      RDTGROUP_SUPER_MAGIC, NULL, false);
 	if (IS_ERR(dentry))
 		goto out_cdp;
 

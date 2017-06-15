@@ -97,6 +97,7 @@ struct kernfs_elem_attr {
 
 /* represent a kernfs node */
 struct kernfs_node_id {
+	/* the layout must match 'struct fid' */
 	u32			ino;
 	u32			generation;
 } __attribute__((packed));
@@ -337,7 +338,8 @@ void kernfs_notify(struct kernfs_node *kn);
 const void *kernfs_super_ns(struct super_block *sb);
 struct dentry *kernfs_mount_ns(struct file_system_type *fs_type, int flags,
 			       struct kernfs_root *root, unsigned long magic,
-			       bool *new_sb_created, const void *ns);
+			       bool *new_sb_created, const void *ns,
+			       bool enable_expop);
 void kernfs_kill_sb(struct super_block *sb);
 struct super_block *kernfs_pin_sb(struct kernfs_root *root, const void *ns);
 
@@ -440,7 +442,7 @@ static inline const void *kernfs_super_ns(struct super_block *sb)
 static inline struct dentry *
 kernfs_mount_ns(struct file_system_type *fs_type, int flags,
 		struct kernfs_root *root, unsigned long magic,
-		bool *new_sb_created, const void *ns)
+		bool *new_sb_created, const void *ns, bool enable_expop)
 { return ERR_PTR(-ENOSYS); }
 
 static inline void kernfs_kill_sb(struct super_block *sb) { }
@@ -521,10 +523,10 @@ static inline int kernfs_rename(struct kernfs_node *kn,
 static inline struct dentry *
 kernfs_mount(struct file_system_type *fs_type, int flags,
 		struct kernfs_root *root, unsigned long magic,
-		bool *new_sb_created)
+		bool *new_sb_created, bool enable_expop)
 {
 	return kernfs_mount_ns(fs_type, flags, root,
-				magic, new_sb_created, NULL);
+				magic, new_sb_created, NULL, enable_expop);
 }
 
 #endif	/* __LINUX_KERNFS_H */
