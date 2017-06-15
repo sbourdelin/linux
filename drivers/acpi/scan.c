@@ -1745,20 +1745,27 @@ static int acpi_check_spi_i2c_slave(struct acpi_resource *ares, void *data)
 	return -1;
 }
 
-static void acpi_default_enumeration(struct acpi_device *device)
+static bool acpi_is_spi_i2c_slave(struct acpi_device *device)
 {
 	struct list_head resource_list;
 	bool is_spi_i2c_slave = false;
 
-	/*
-	 * Do not enumerate SPI/I2C slaves as they will be enumerated by their
-	 * respective parents.
-	 */
 	INIT_LIST_HEAD(&resource_list);
 	acpi_dev_get_resources(device, &resource_list, acpi_check_spi_i2c_slave,
 			       &is_spi_i2c_slave);
 	acpi_dev_free_resource_list(&resource_list);
-	if (!is_spi_i2c_slave) {
+
+	return is_spi_i2c_slave;
+}
+
+static void acpi_default_enumeration(struct acpi_device *device,
+				     bool spi_i2c_slave)
+{
+	/*
+	 * Do not enumerate SPI/I2C slaves as they will be enumerated by their
+	 * respective parents.
+	 */
+	if (!spi_i2c_slave) {
 		acpi_create_platform_device(device, NULL);
 		acpi_device_set_enumerated(device);
 	} else {
@@ -1780,7 +1787,7 @@ static int acpi_generic_device_attach(struct acpi_device *adev,
 	 * below can be unconditional.
 	 */
 	if (adev->data.of_compatible)
-		acpi_default_enumeration(adev);
+		acpi_default_enumeration(adev, acpi_is_spi_i2c_slave(adev));
 
 	return 1;
 }
@@ -1823,6 +1830,7 @@ static void acpi_bus_attach(struct acpi_device *device)
 {
 	struct acpi_device *child;
 	acpi_handle ejd;
+	bool spi_i2c_slave;
 	int ret;
 
 	if (ACPI_SUCCESS(acpi_bus_get_ejd(device->handle, &ejd)))
@@ -1853,8 +1861,9 @@ static void acpi_bus_attach(struct acpi_device *device)
 	if (ret < 0)
 		return;
 
+	spi_i2c_slave = acpi_is_spi_i2c_slave(device);
 	device->flags.match_driver = true;
-	if (ret > 0) {
+	if (ret > 0 && !spi_i2c_slave) {
 		acpi_device_set_enumerated(device);
 		goto ok;
 	}
@@ -1863,10 +1872,10 @@ static void acpi_bus_attach(struct acpi_device *device)
 	if (ret < 0)
 		return;
 
-	if (device->pnp.type.platform_id)
-		acpi_default_enumeration(device);
-	else
+	if (!device->pnp.type.platform_id && !spi_i2c_slave)
 		acpi_device_set_enumerated(device);
+	else
+		acpi_default_enumeration(device, spi_i2c_slave);
 
  ok:
 	list_for_each_entry(child, &device->children, node)
