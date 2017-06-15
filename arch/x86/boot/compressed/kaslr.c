@@ -37,7 +37,9 @@
 #include <linux/uts.h>
 #include <linux/utsname.h>
 #include <linux/ctype.h>
+#include <linux/efi.h>
 #include <generated/utsrelease.h>
+#include <asm/efi.h>
 
 /* Macros used by the included decompressor code below. */
 #define STATIC
@@ -558,6 +560,73 @@ static void process_mem_region(struct mem_vector *entry,
 	}
 }
 
+/* This variable marks if efi mirror regions have been handled. */
+bool efi_mirror_found = false;
+
+static void process_efi_entry(unsigned long minimum, unsigned long image_size)
+{
+	struct efi_info *e = &boot_params->efi_info;
+	efi_memory_desc_t *md;
+	struct mem_vector region;
+	unsigned long pmap;
+	bool is_efi = false;
+	u32 nr_desc;
+	int i;
+	unsigned long addr;
+	u64 end;
+	char *cmdline = (char *)get_cmd_line_ptr();
+	char *str;
+	char *signature;
+
+
+#ifdef CONFIG_EFI
+	signature = (char *)&boot_params->efi_info.efi_loader_signature;
+#endif
+	if (strncmp(signature, EFI32_LOADER_SIGNATURE, 4) &&
+	    strncmp(signature, EFI64_LOADER_SIGNATURE, 4))
+		return;
+
+	/*
+	 * Mirrored regions are meaningful only if "kernelcore=mirror"
+	 * specified.
+	 */
+	str = strstr(cmdline, "kernelcore=");
+	if (!str)
+		return;
+	str += strlen("kernelcore=");
+	if (strncmp(str, "mirror", 6))
+		return;
+
+#ifdef CONFIG_X86_32
+       /* Can't handle data above 4GB at this time */
+       if (e->efi_memmap_hi) {
+                warn("Memory map is above 4GB, disabling EFI.\n");
+                return -EINVAL;
+        }
+        pmap =  e->efi_memmap;
+#else
+        pmap = (e->efi_memmap | ((__u64)e->efi_memmap_hi << 32));
+#endif
+
+	nr_desc = e->efi_memmap_size / e->efi_memdesc_size;
+	for (i = 0; i < nr_desc; i++) {
+		md = (efi_memory_desc_t *)(pmap + (i * e->efi_memdesc_size));
+		if (md->attribute & EFI_MEMORY_MORE_RELIABLE) {
+			region.start = md->phys_addr;
+			region.size = md->num_pages << EFI_PAGE_SHIFT;
+			process_mem_region(&region, minimum, image_size);
+			efi_mirror_found = true;
+		}
+		debug_putaddr(i);
+		debug_putaddr(md->attribute);
+		debug_putaddr(md->phys_addr);
+		end = md->phys_addr + (md->num_pages << EFI_PAGE_SHIFT) - 1;
+		debug_putaddr(end);
+       }
+
+       return;
+}
+
 static void process_e820_entry(unsigned long minimum,unsigned long image_size)
 {
 	int i;
@@ -591,6 +660,10 @@ static unsigned long find_random_phys_addr(unsigned long minimum,
 
 	/* Make sure minimum is aligned. */
 	minimum = ALIGN(minimum, CONFIG_PHYSICAL_ALIGN);
+
+	process_efi_entry(minimum, image_size);
+	if (efi_mirror_found)
+		return slots_fetch_random();
 
 	process_e820_entry(minimum, image_size);
 	return slots_fetch_random();
