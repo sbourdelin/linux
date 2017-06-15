@@ -477,6 +477,14 @@ config terms. For example: 'cycles/overwrite/' and 'instructions/no-overwrite/'.
 
 Implies --tail-synthesize.
 
+--skid-ip::
+Capture the unmodified interrupt instruction pointer (IP) in each sample. Usually
+with event-based sampling, the ip has skid and rarely points to the instruction which
+caused the event to overflow. On some architectures, the hardware can eliminate the
+skid and perf_events returns it as the IP when precise sampling is enabled. But for
+certain measurements, it may be useful to have both the corrected and skid ip. This
+option enables capturing the skid ip in addition to the corrected ip. Default: off
+
 SEE ALSO
 --------
 linkperf:perf-stat[1], linkperf:perf-list[1]

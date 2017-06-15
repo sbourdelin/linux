@@ -1669,6 +1669,8 @@ static struct option __record_options[] = {
 			  "signal"),
 	OPT_BOOLEAN(0, "dry-run", &dry_run,
 		    "Parse options then exit"),
+	OPT_BOOLEAN(0, "skid-ip", &record.opts.skid_ip,
+		    "capture skid ip in addition to ip"),
 	OPT_END()
 };
 
