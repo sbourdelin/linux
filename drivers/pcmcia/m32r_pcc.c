@@ -315,7 +315,8 @@ static void add_pcc_socket(ulong base, int irq, ulong mapaddr,
 
 	/* add pcc */
 	if (t->base > 0) {
-		request_region(t->base, 0x20, "m32r-pcc");
+		if (!request_region(t->base, 0x20, "m32r-pcc"))
+			return -EBUSY;
 	}
 
 	printk(KERN_INFO "  %s ", pcc[pcc_sockets].name);
