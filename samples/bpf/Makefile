@@ -193,12 +193,12 @@ $(src)/*.c: verify_target_bpf
 
 $(obj)/tracex5_kern.o: $(obj)/syscall_nrs.h
 
-# asm/sysreg.h - inline assembly used by it is incompatible with llvm.
-# But, there is no easy way to fix it, so just exclude it since it is
-# useless for BPF samples.
+# __EMITTING_BPF__ used to exclude inline assembly, which cannot be
+# emitted in BPF code.
 $(obj)/%.o: $(src)/%.c
 	$(CLANG) $(NOSTDINC_FLAGS) $(LINUXINCLUDE) $(EXTRA_CFLAGS) \
-		-D__KERNEL__ -D__ASM_SYSREG_H -Wno-unused-value -Wno-pointer-sign \
+		-D__KERNEL__ -D__EMITTING_BPF__ \
+		-Wno-unused-value -Wno-pointer-sign \
 		-Wno-compare-distinct-pointer-types \
 		-Wno-gnu-variable-sized-type-not-at-end \
 		-Wno-address-of-packed-member -Wno-tautological-compare \
