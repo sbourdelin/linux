@@ -2800,42 +2800,37 @@ static int si_enable_smc_cac(struct radeon_device *rdev,
 {
 	struct ni_power_info *ni_pi = ni_get_pi(rdev);
 	struct si_power_info *si_pi = si_get_pi(rdev);
-	PPSMC_Result smc_result;
 	int ret = 0;
 
 	if (ni_pi->enable_cac) {
-		if (enable) {
-			if (!si_should_disable_uvd_powertune(rdev, radeon_new_state)) {
-				if (ni_pi->support_cac_long_term_average) {
-					smc_result = si_send_msg_to_smc(rdev, PPSMC_CACLongTermAvgEnable);
-					if (smc_result != PPSMC_Result_OK)
-						ni_pi->support_cac_long_term_average = false;
-				}
+		if (enable &&
+		    !si_should_disable_uvd_powertune(rdev, radeon_new_state)) {
+			if (ni_pi->support_cac_long_term_average &&
+			    PPSMC_Result_OK !=
+			    si_send_msg_to_smc(rdev, PPSMC_CACLongTermAvgEnable))
+				ni_pi->support_cac_long_term_average = false;
 
-				smc_result = si_send_msg_to_smc(rdev, PPSMC_MSG_EnableCac);
-				if (smc_result != PPSMC_Result_OK) {
-					ret = -EINVAL;
-					ni_pi->cac_enabled = false;
-				} else {
-					ni_pi->cac_enabled = true;
-				}
-
-				if (si_pi->enable_dte) {
-					smc_result = si_send_msg_to_smc(rdev, PPSMC_MSG_EnableDTE);
-					if (smc_result != PPSMC_Result_OK)
-						ret = -EINVAL;
-				}
+			if (si_send_msg_to_smc(rdev, PPSMC_MSG_EnableCac) !=
+			    PPSMC_Result_OK) {
+				ret = -EINVAL;
+				ni_pi->cac_enabled = false;
+			} else {
+				ni_pi->cac_enabled = true;
 			}
-		} else if (ni_pi->cac_enabled) {
+
+			if (si_pi->enable_dte &&
+			    si_send_msg_to_smc(rdev, PPSMC_MSG_EnableDTE) !=
+			    PPSMC_Result_OK)
+				ret = -EINVAL;
+		} else if (!enable && ni_pi->cac_enabled) {
 			if (si_pi->enable_dte)
-				smc_result = si_send_msg_to_smc(rdev, PPSMC_MSG_DisableDTE);
+				si_send_msg_to_smc(rdev, PPSMC_MSG_DisableDTE);
 
-			smc_result = si_send_msg_to_smc(rdev, PPSMC_MSG_DisableCac);
-
+			si_send_msg_to_smc(rdev, PPSMC_MSG_DisableCac);
 			ni_pi->cac_enabled = false;
 
 			if (ni_pi->support_cac_long_term_average)
-				smc_result = si_send_msg_to_smc(rdev, PPSMC_CACLongTermAvgDisable);
+				si_send_msg_to_smc(rdev, PPSMC_CACLongTermAvgDisable);
 		}
 	}
 	return ret;
