@@ -77,6 +77,16 @@
 #define USB_INTEL_USB3_PSSEN   0xD8
 #define USB_INTEL_USB3PRM      0xDC
 
+/*ASMEDIA quirk use*/
+#define ASMT_DATA_WRITE0_REG	0xF8
+#define ASMT_DATA_WRITE1_REG	0xFC
+#define ASMT_CONTROL_REG	0xE0
+#define ASMT_CONTROL_WRITE_BIT	0x02
+#define ASMT_WRITEREG_CMD	0x10423
+#define ASMT_FLOWCTL_ADDR	0xFA30
+#define ASMT_FLOWCTL_DATA	0xBA
+#define ASMT_PSEUDO_DATA	0
+
 /*
  * amd_chipset_gen values represent AMD different chipset generations
  */
@@ -411,6 +421,58 @@ void usb_amd_quirk_pll_disable(void)
 	usb_amd_quirk_pll(1);
 }
 EXPORT_SYMBOL_GPL(usb_amd_quirk_pll_disable);
+
+void usb_asmedia_modifyflowcontrol(struct pci_dev *pdev)
+{
+	unsigned char value;
+	unsigned long wait_time_count;
+
+	/*check device can accept command*/
+	wait_time_count = 1000;
+	while (wait_time_count) {
+		pci_read_config_byte(pdev, ASMT_CONTROL_REG, &value);
+		if (value == 0xff) {
+			dev_dbg(&pdev->dev, "%s: check_ready ERROR", __func__);
+			goto err_exit;
+		}
+		if ((value & ASMT_CONTROL_WRITE_BIT) == 0)
+			break;
+		wait_time_count--;
+		usleep(50);
+	}
+	if (wait_time_count == 0) {
+		dev_dbg(&pdev->dev, "%s: check_write_ready timeout", __func__);
+		goto err_exit;
+	}
+	/* send command and address to device */
+	pci_write_config_dword(pdev, ASMT_DATA_WRITE0_REG, ASMT_WRITEREG_CMD);
+	pci_write_config_dword(pdev, ASMT_DATA_WRITE1_REG, ASMT_FLOWCTL_ADDR);
+	pci_write_config_byte(pdev, ASMT_CONTROL_REG, ASMT_CONTROL_WRITE_BIT);
+	wait_time_count = 1000;
+	/* wait device receive the data */
+	while (wait_time_count) {
+		pci_read_config_byte(pdev, ASMT_CONTROL_REG, &value);
+		if (value == 0xff) {
+			dev_dbg(&pdev->dev, "%s: wait_ready ERROR", __func__);
+			goto err_exit;
+		}
+		if ((value & ASMT_CONTROL_WRITE_BIT) == 0)
+			break;
+		wait_time_count--;
+		usleep(50);
+	}
+	if (wait_time_count == 0) {
+		dev_dbg(&pdev->dev, "%s: wait_write_ready timeout", __func__);
+		goto err_exit;
+	}
+	/* send data to device */
+	pci_write_config_dword(pdev, ASMT_DATA_WRITE0_REG, ASMT_FLOWCTL_DATA);
+	pci_write_config_dword(pdev, ASMT_DATA_WRITE1_REG, ASMT_PSEUDO_DATA);
+	pci_write_config_byte(pdev, ASMT_CONTROL_REG, ASMT_CONTROL_WRITE_BIT);
+err_exit:
+	return;
+}
+EXPORT_SYMBOL_GPL(usb_asmedia_modifyflowcontrol);
 
 void usb_amd_quirk_pll_enable(void)
 {
