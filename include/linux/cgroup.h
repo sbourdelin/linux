@@ -613,6 +613,9 @@ static inline struct kernfs_node_id *cgroup_get_node_id(struct cgroup *cgrp)
 {
 	return &cgrp->kn->id;
 }
+
+void cgroup_path_from_node_id(const struct kernfs_node_id *id,
+					char *buf, size_t buflen);
 #else /* !CONFIG_CGROUPS */
 
 struct cgroup_subsys_state;
@@ -645,6 +648,9 @@ static inline bool task_under_cgroup_hierarchy(struct task_struct *task,
 {
 	return true;
 }
+
+static inline void cgroup_path_from_node_id(const struct kernfs_node_id *id,
+	char *buf, size_t buflen) {}
 #endif /* !CONFIG_CGROUPS */
 
 /*
