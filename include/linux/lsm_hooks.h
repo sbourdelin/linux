@@ -488,6 +488,11 @@
  *	@vmflags contains requested the vmflags.
  *	Return 0 if the operation is allowed to continue otherwise return
  *	the appropriate error code.
+ * @pagefault_handler_x86:
+ *	Handle pagefaults on x86.
+ *	@regs contains process' registers.
+ *	@error_code contains error code for the pagefault.
+ *	@address contains the address that caused the pagefault.
  * @file_lock:
  *	Check permission before performing file locking operations.
  *	Note: this hook mediates both flock and fcntl style locks.
@@ -1483,6 +1488,9 @@ union security_list_options {
 	int (*file_mprotect)(struct vm_area_struct *vma, unsigned long reqprot,
 				unsigned long prot);
 	int (*check_vmflags)(vm_flags_t vmflags);
+	int (*pagefault_handler_x86)(struct pt_regs *regs,
+				     unsigned long error_code,
+				     unsigned long address);
 	int (*file_lock)(struct file *file, unsigned int cmd);
 	int (*file_fcntl)(struct file *file, unsigned int cmd,
 				unsigned long arg);
@@ -1754,6 +1762,7 @@ struct security_hook_heads {
 	struct list_head mmap_file;
 	struct list_head file_mprotect;
 	struct list_head check_vmflags;
+	struct list_head pagefault_handler_x86;
 	struct list_head file_lock;
 	struct list_head file_fcntl;
 	struct list_head file_set_fowner;
