@@ -12990,7 +12990,23 @@ static void intel_atomic_helper_free_state_worker(struct work_struct *work)
 	intel_atomic_helper_free_state(dev_priv);
 }
 
-static void intel_atomic_commit_tail(struct drm_atomic_state *state)
+static void intel_atomic_commit_cleanup(struct work_struct *work)
+{
+	struct drm_atomic_state *state =
+		container_of(work, struct drm_atomic_state, commit_work);
+	struct drm_device *dev = state->dev;
+	struct drm_i915_private *dev_priv = to_i915(dev);
+
+	drm_atomic_helper_cleanup_planes(dev, state);
+	drm_atomic_helper_commit_cleanup_done(state);
+
+	drm_atomic_state_put(state);
+
+	intel_atomic_helper_free_state(dev_priv);
+}
+
+static void intel_atomic_commit_tail(struct drm_atomic_state *state,
+				     bool nonblock)
 {
 	struct drm_device *dev = state->dev;
 	struct intel_atomic_state *intel_state = to_intel_atomic_state(state);
@@ -13142,13 +13158,12 @@ static void intel_atomic_commit_tail(struct drm_atomic_state *state)
 		intel_display_power_put(dev_priv, POWER_DOMAIN_MODESET);
 	}
 
-	drm_atomic_helper_cleanup_planes(dev, state);
-
-	drm_atomic_helper_commit_cleanup_done(state);
-
-	drm_atomic_state_put(state);
-
-	intel_atomic_helper_free_state(dev_priv);
+	if (!nonblock) {
+		INIT_WORK(&state->commit_work, intel_atomic_commit_cleanup);
+		schedule_work(&state->commit_work);
+	} else {
+		intel_atomic_commit_cleanup(&state->commit_work);
+	}
 }
 
 static void intel_atomic_commit_work(struct work_struct *work)
@@ -13156,7 +13171,7 @@ static void intel_atomic_commit_work(struct work_struct *work)
 	struct drm_atomic_state *state =
 		container_of(work, struct drm_atomic_state, commit_work);
 
-	intel_atomic_commit_tail(state);
+	intel_atomic_commit_tail(state, true);
 }
 
 static int __i915_sw_fence_call
@@ -13196,6 +13211,23 @@ static void intel_atomic_track_fbs(struct drm_atomic_state *state)
 		i915_gem_track_fb(intel_fb_obj(old_plane_state->fb),
 				  intel_fb_obj(new_plane_state->fb),
 				  to_intel_plane(plane)->frontbuffer_bit);
+}
+
+static void intel_atomic_state_wait_for_flips(struct intel_atomic_state *state)
+{
+	struct drm_crtc *crtc;
+	struct drm_crtc_state *crtc_state;
+	int i;
+
+	for_each_new_crtc_in_state(&state->base, crtc, crtc_state, i) {
+		struct drm_crtc_commit *commit = state->base.crtcs[i].commit;
+		long ret;
+
+		ret = wait_for_completion_timeout(&commit->flip_done, HZ);
+		if (ret == 0)
+			DRM_ERROR("[CRTC:%d:%s] flip_done timed out\n",
+				  crtc->base.id, crtc->name);
+	}
 }
 
 /**
@@ -13273,7 +13305,8 @@ static int intel_atomic_commit(struct drm_device *dev,
 	i915_sw_fence_commit(&intel_state->commit_ready);
 	if (!nonblock) {
 		i915_sw_fence_wait(&intel_state->commit_ready);
-		intel_atomic_commit_tail(state);
+		intel_atomic_commit_tail(state, false);
+		intel_atomic_state_wait_for_flips(intel_state);
 	}
 
 	return 0;
