@@ -247,6 +247,7 @@ static int generic_NCR5380_init_one(struct scsi_host_template *tpnt,
 	case BOARD_DTC3181E:
 		ports = dtc_3181e_ports;
 		magic = ncr_53c400a_magic;
+		tpnt->sg_tablesize = 1;
 		break;
 	}
 
