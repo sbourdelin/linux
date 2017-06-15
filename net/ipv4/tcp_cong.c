@@ -189,8 +189,8 @@ void tcp_init_congestion_control(struct sock *sk)
 		INET_ECN_dontxmit(sk);
 }
 
-static void tcp_reinit_congestion_control(struct sock *sk,
-					  const struct tcp_congestion_ops *ca)
+void tcp_reinit_congestion_control(struct sock *sk,
+				   const struct tcp_congestion_ops *ca)
 {
 	struct inet_connection_sock *icsk = inet_csk(sk);
 
@@ -334,7 +334,7 @@ out:
 }
 
 /* Change congestion control for socket */
-int tcp_set_congestion_control(struct sock *sk, const char *name)
+int tcp_set_congestion_control(struct sock *sk, const char *name, bool load)
 {
 	struct inet_connection_sock *icsk = inet_csk(sk);
 	const struct tcp_congestion_ops *ca;
@@ -344,7 +344,10 @@ int tcp_set_congestion_control(struct sock *sk, const char *name)
 		return -EPERM;
 
 	rcu_read_lock();
-	ca = __tcp_ca_find_autoload(name);
+	if (!load)
+		ca = tcp_ca_find(name);
+	else
+		ca = __tcp_ca_find_autoload(name);
 	/* No change asking for existing value */
 	if (ca == icsk->icsk_ca_ops) {
 		icsk->icsk_ca_setsockopt = 1;
@@ -352,8 +355,10 @@ int tcp_set_congestion_control(struct sock *sk, const char *name)
 	}
 	if (!ca)
 		err = -ENOENT;
+	else if (!load)
+		icsk->icsk_ca_ops = ca;
 	else if (!((ca->flags & TCP_CONG_NON_RESTRICTED) ||
-		   ns_capable(sock_net(sk)->user_ns, CAP_NET_ADMIN)))
+			   ns_capable(sock_net(sk)->user_ns, CAP_NET_ADMIN)))
 		err = -EPERM;
 	else if (!try_module_get(ca->owner))
 		err = -EBUSY;
