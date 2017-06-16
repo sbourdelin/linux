@@ -468,18 +468,14 @@ skd_prep_rw_cdb(struct skd_scsi_request *scsi_req,
 		unsigned count)
 {
 	if (data_dir == READ)
-		scsi_req->cdb[0] = 0x28;
+		scsi_req->cdb[0] = READ_10;
 	else
-		scsi_req->cdb[0] = 0x2a;
+		scsi_req->cdb[0] = WRITE_10;
 
 	scsi_req->cdb[1] = 0;
-	scsi_req->cdb[2] = (lba & 0xff000000) >> 24;
-	scsi_req->cdb[3] = (lba & 0xff0000) >> 16;
-	scsi_req->cdb[4] = (lba & 0xff00) >> 8;
-	scsi_req->cdb[5] = (lba & 0xff);
+	put_unaligned_be32(lba, &scsi_req->cdb[2]);
 	scsi_req->cdb[6] = 0;
-	scsi_req->cdb[7] = (count & 0xff00) >> 8;
-	scsi_req->cdb[8] = count & 0xff;
+	put_unaligned_be16(count, &scsi_req->cdb[7]);
 	scsi_req->cdb[9] = 0;
 }
 
@@ -489,7 +485,7 @@ skd_prep_zerosize_flush_cdb(struct skd_scsi_request *scsi_req,
 {
 	skreq->flush_cmd = 1;
 
-	scsi_req->cdb[0] = 0x35;
+	scsi_req->cdb[0] = SYNCHRONIZE_CACHE;
 	scsi_req->cdb[1] = 0;
 	scsi_req->cdb[2] = 0;
 	scsi_req->cdb[3] = 0;
