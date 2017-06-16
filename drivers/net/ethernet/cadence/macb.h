@@ -928,7 +928,7 @@ struct macb {
 	dma_addr_t		rx_buffers_dma;
 
 	struct macb_or_gem_ops	macbgem_ops;
-
+	struct device_node	*phy_node;
 	struct mii_bus		*mii_bus;
 	int 			link;
 	int 			speed;

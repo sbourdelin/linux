@@ -425,6 +425,16 @@ static int macb_mii_probe(struct net_device *dev)
 	int phy_irq;
 	int ret;
 
+	if (bp->phy_node) {
+		phydev = of_phy_connect(dev, bp->phy_node,
+					&macb_handle_link_change, 0,
+					bp->phy_interface);
+		if (!phydev)
+			return -ENODEV;
+
+		return 0;
+	}
+
 	phydev = phy_find_first(bp->mii_bus);
 	if (!phydev) {
 		netdev_err(dev, "no PHY found\n");
@@ -498,6 +508,17 @@ static int macb_mii_init(struct macb *bp)
 	dev_set_drvdata(&bp->dev->dev, bp->mii_bus);
 
 	np = bp->pdev->dev.of_node;
+	if (of_phy_is_fixed_link(np)) {
+		if (of_phy_register_fixed_link(np) < 0) {
+			dev_err(&bp->pdev->dev,
+				"broken fixed-link specification\n");
+			goto err_out_unregister_bus;
+		}
+		bp->phy_node = of_node_get(np);
+
+		np = NULL;
+	}
+
 	if (np) {
 		/* try dt phy registration */
 		err = of_mdiobus_register(bp->mii_bus, np);
