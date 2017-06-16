@@ -48,12 +48,6 @@ enum {
 	STEC_LINK_UNKNOWN = 0xFF
 };
 
-enum {
-	SKD_FLUSH_INITIALIZER,
-	SKD_FLUSH_ZERO_SIZE_FIRST,
-	SKD_FLUSH_DATA_SECOND,
-};
-
 #define SKD_ASSERT(expr) \
 	do { \
 		if (unlikely(!(expr))) { \
@@ -541,7 +535,6 @@ static void skd_request_fn(struct request_queue *q)
 	struct skd_request_context *skreq;
 	struct request *req = NULL;
 	struct skd_scsi_request *scsi_req;
-	unsigned long io_flags;
 	u32 lba;
 	u32 count;
 	int data_dir;
@@ -549,7 +542,6 @@ static void skd_request_fn(struct request_queue *q)
 	u64 cmdctxt;
 	u32 timo_slot;
 	void *cmd_ptr;
-	int flush, fua;
 
 	if (skdev->state != SKD_DRVR_STATE_ONLINE) {
 		skd_request_fn_not_online(q);
@@ -574,9 +566,6 @@ static void skd_request_fn(struct request_queue *q)
 	 *  - There are no more FIT msg buffers
 	 */
 	for (;; ) {
-
-		flush = fua = 0;
-
 		req = blk_peek_request(q);
 
 		/* Are there any native requests to start? */
@@ -586,13 +575,6 @@ static void skd_request_fn(struct request_queue *q)
 		lba = (u32)blk_rq_pos(req);
 		count = blk_rq_sectors(req);
 		data_dir = rq_data_dir(req);
-		io_flags = req->cmd_flags;
-
-		if (req_op(req) == REQ_OP_FLUSH)
-			flush++;
-
-		if (io_flags & REQ_FUA)
-			fua++;
 
 		pr_debug("%s new req=%p lba=%u(0x%x) count=%u(0x%x) dir=%d\n",
 			 skdev->name, req, lba, lba, count, count, data_dir);
@@ -688,7 +670,7 @@ static void skd_request_fn(struct request_queue *q)
 		else
 			skreq->sg_data_dir = SKD_DATA_DIR_HOST_TO_CARD;
 
-		if (flush == SKD_FLUSH_ZERO_SIZE_FIRST) {
+		if (req_op(req) == REQ_OP_FLUSH) {
 			skd_prep_zerosize_flush_cdb(scsi_req, skreq);
 			SKD_ASSERT(skreq->flush_cmd == 1);
 
@@ -696,7 +678,7 @@ static void skd_request_fn(struct request_queue *q)
 			skd_prep_rw_cdb(scsi_req, data_dir, lba, count);
 		}
 
-		if (fua)
+		if (req->cmd_flags & REQ_FUA)
 			scsi_req->cdb[1] |= SKD_FUA_NV;
 
 		if (!req->bio)
