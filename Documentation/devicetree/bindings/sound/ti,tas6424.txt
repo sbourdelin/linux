@@ -1,0 +1,31 @@
+Texas Instruments TAS6424 Quad-Channel Audio amplifier
+
+The TAS6424 serial control bus communicates through I2C protocols.
+
+Required properties:
+	- compatible - One of: "ti,tas6424" - TAS6424
+	- reg - I2C slave address
+	- sound-dai-cells: must be equal to 0
+
+Optional properties:
+	- pinctrl-names, pinctrl-0 - Please refer to pinctrl-bindings.txt
+	- interrupts-extended - describe the interrupt line used to inform the
+	  host. Please refer to interrupt-controller/interrupts.txt
+
+Example:
+
+tas6424: tas6424@6a {
+	#sound-dai-cells = <0>;
+
+	status = "okay";
+
+	compatible = "ti,tas6424";
+	reg = <0x6a>;
+
+	pinctrl-names = "default";
+	pinctrl-0 = <&tas6424_int_pin>;
+	interrupts-extended = <&gpio1 28 IRQ_TYPE_EDGE_FALLING>;
+};
+
+For more product information please see the link below:
+http://www.ti.com/product/TAS6424-Q1
