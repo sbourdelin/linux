@@ -1849,7 +1849,7 @@ static void skd_completion_worker(struct work_struct *work)
 	 * process everything in compq
 	 */
 	skd_isr_completion_posted(skdev, 0, &flush_enqueued);
-	skd_request_fn(skdev->queue);
+	__blk_run_queue(skdev->queue);
 
 	spin_unlock_irqrestore(&skdev->lock, flags);
 }
@@ -1926,12 +1926,12 @@ skd_isr(int irq, void *ptr)
 	}
 
 	if (unlikely(flush_enqueued))
-		skd_request_fn(skdev->queue);
+		__blk_run_queue(skdev->queue);
 
 	if (deferred)
 		schedule_work(&skdev->completion_worker);
 	else if (!flush_enqueued)
-		skd_request_fn(skdev->queue);
+		__blk_run_queue(skdev->queue);
 
 	spin_unlock(&skdev->lock);
 
@@ -2620,12 +2620,12 @@ static irqreturn_t skd_comp_q(int irq, void *skd_host_data)
 	deferred = skd_isr_completion_posted(skdev, skd_isr_comp_limit,
 						&flush_enqueued);
 	if (flush_enqueued)
-		skd_request_fn(skdev->queue);
+		__blk_run_queue(skdev->queue);
 
 	if (deferred)
 		schedule_work(&skdev->completion_worker);
 	else if (!flush_enqueued)
-		skd_request_fn(skdev->queue);
+		__blk_run_queue(skdev->queue);
 
 	spin_unlock_irqrestore(&skdev->lock, flags);
 
