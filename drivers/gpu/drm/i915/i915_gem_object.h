@@ -35,6 +35,13 @@
 
 #include "i915_selftest.h"
 
+struct i915_lut_handle {
+	struct list_head obj_link;
+	struct list_head ctx_link;
+	struct i915_gem_context *ctx;
+	u32 handle;
+};
+
 struct drm_i915_gem_object_ops {
 	unsigned int flags;
 #define I915_GEM_OBJECT_HAS_STRUCT_PAGE BIT(0)
@@ -86,7 +93,8 @@ struct drm_i915_gem_object {
 	 * They are also added to @vma_list for easy iteration.
 	 */
 	struct rb_root vma_tree;
-	struct i915_vma *vma_hashed;
+
+	struct list_head lut_list;
 
 	/** Stolen memory for this object, instead of being backed by shmem. */
 	struct drm_mm_node *stolen;

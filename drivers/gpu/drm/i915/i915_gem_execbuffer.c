@@ -637,19 +637,6 @@ static int eb_reserve(struct i915_execbuffer *eb)
 	} while (1);
 }
 
-static inline struct hlist_head *
-ht_head(const  struct i915_gem_context_vma_lut *lut, u32 handle)
-{
-	return &lut->ht[hash_32(handle, lut->ht_bits)];
-}
-
-static inline bool
-ht_needs_resize(const struct i915_gem_context_vma_lut *lut)
-{
-	return (4*lut->ht_count > 3*lut->ht_size ||
-		4*lut->ht_count + 1 < lut->ht_size);
-}
-
 static unsigned int eb_batch_index(const struct i915_execbuffer *eb)
 {
 	if (eb->args->flags & I915_EXEC_BATCH_FIRST)
@@ -684,31 +671,22 @@ static int eb_select_context(struct i915_execbuffer *eb)
 
 static int eb_lookup_vmas(struct i915_execbuffer *eb, unsigned int flags)
 {
-	struct i915_gem_context_vma_lut *lut = &eb->ctx->vma_lut;
-	struct drm_i915_gem_object *uninitialized_var(obj);
+	struct drm_i915_gem_object *obj;
+	struct radix_tree_root *handles_vma = &eb->ctx->handles_vma;
 	unsigned int i;
 	int err;
 
 	INIT_LIST_HEAD(&eb->relocs);
 	INIT_LIST_HEAD(&eb->unbound);
 
-	if (unlikely(lut->ht_size & I915_CTX_RESIZE_IN_PROGRESS))
-		flush_work(&lut->resize);
-	GEM_BUG_ON(lut->ht_size & I915_CTX_RESIZE_IN_PROGRESS);
-
 	for (i = 0; i < eb->buffer_count; i++) {
 		u32 handle = eb->exec[i].handle;
-		struct hlist_head *hl = ht_head(lut, handle);
 		struct i915_vma *vma;
+		struct i915_lut_handle *lut;
 
-		hlist_for_each_entry(vma, hl, ctx_node) {
-			GEM_BUG_ON(vma->ctx != eb->ctx);
-
-			if (vma->ctx_handle != handle)
-				continue;
-
+		vma = radix_tree_lookup(handles_vma, handle);
+		if (likely(vma))
 			goto add_vma;
-		}
 
 		obj = i915_gem_object_lookup(eb->file, handle);
 		if (unlikely(!obj)) {
@@ -716,41 +694,34 @@ static int eb_lookup_vmas(struct i915_execbuffer *eb, unsigned int flags)
 			goto err_vma;
 		}
 
-		flags |= __EXEC_OBJECT_HAS_REF;
-
 		vma = i915_vma_instance(obj, eb->vm, NULL);
 		if (unlikely(IS_ERR(vma))) {
 			err = PTR_ERR(vma);
 			goto err_obj;
 		}
 
-		/* First come, first served */
-		if (!vma->ctx) {
-			vma->ctx = eb->ctx;
-			vma->ctx_handle = handle;
-			hlist_add_head(&vma->ctx_node, hl);
-			lut->ht_count++;
-			lut->ht_size |= I915_CTX_RESIZE_IN_PROGRESS;
-			if (i915_vma_is_ggtt(vma)) {
-				GEM_BUG_ON(obj->vma_hashed);
-				obj->vma_hashed = vma;
-			}
-
-			/* transfer ref to ctx */
-			flags &= ~__EXEC_OBJECT_HAS_REF;
+		lut = kmem_cache_alloc(eb->i915->luts, GFP_KERNEL);
+		if (unlikely(!lut)) {
+			err = -ENOMEM;
+			goto err_obj;
 		}
+
+		/* transfer ref to ctx */
+		err = radix_tree_insert(handles_vma, handle, vma);
+		if (unlikely(err)) {
+			kfree(lut);
+			goto err_obj;
+		}
+
+		list_add(&lut->obj_link, &obj->lut_list);
+		list_add(&lut->ctx_link, &eb->ctx->handles_list);
+		lut->ctx = eb->ctx;
+		lut->handle = handle;
 
 add_vma:
 		err = eb_add_vma(eb, i, vma, flags);
 		if (unlikely(err))
 			goto err_vma;
-	}
-
-	if (lut->ht_size & I915_CTX_RESIZE_IN_PROGRESS) {
-		if (ht_needs_resize(lut))
-			queue_work(system_highpri_wq, &lut->resize);
-		else
-			lut->ht_size &= ~I915_CTX_RESIZE_IN_PROGRESS;
 	}
 
 	/* take note of the batch buffer before we might reorder the lists */
@@ -778,7 +749,6 @@ err_obj:
 	i915_gem_object_put(obj);
 err_vma:
 	eb->vma[i] = NULL;
-	lut->ht_size &= ~I915_CTX_RESIZE_IN_PROGRESS;
 	return err;
 }
 
