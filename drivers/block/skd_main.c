@@ -13,6 +13,7 @@
 #include <linux/slab.h>
 #include <linux/spinlock.h>
 #include <linux/blkdev.h>
+#include <linux/blk-mq.h>
 #include <linux/sched.h>
 #include <linux/interrupt.h>
 #include <linux/compiler.h>
@@ -164,8 +165,6 @@ enum skd_check_status_action {
 struct skd_fitmsg_context {
 	enum skd_fit_msg_state state;
 
-	struct skd_fitmsg_context *next;
-
 	u32 id;
 	u16 outstanding;
 
@@ -178,8 +177,6 @@ struct skd_fitmsg_context {
 
 struct skd_request_context {
 	enum skd_req_state state;
-
-	struct skd_request_context *next;
 
 	u16 id;
 	u32 fitmsg_id;
@@ -260,12 +257,8 @@ struct skd_device {
 
 	u32 timeout_slot[SKD_N_TIMEOUT_SLOT];
 	u32 timeout_stamp;
-	struct skd_fitmsg_context *skmsg_free_list;
 	struct skd_fitmsg_context *skmsg_table;
-
-	struct skd_request_context *skreq_free_list;
 	struct skd_request_context *skreq_table;
-
 	struct skd_special_context internal_skspcl;
 	u32 read_cap_blocksize;
 	u32 read_cap_last_lba;
@@ -512,6 +505,7 @@ static void skd_request_fn(struct request_queue *q)
 	__be64 be_dmaa;
 	u64 cmdctxt;
 	u32 timo_slot;
+	u32 tag;
 	void *cmd_ptr;
 
 	if (skdev->state != SKD_DRVR_STATE_ONLINE) {
@@ -536,6 +530,8 @@ static void skd_request_fn(struct request_queue *q)
 		lba = (u32)blk_rq_pos(req);
 		count = blk_rq_sectors(req);
 		data_dir = rq_data_dir(req);
+		tag = blk_mq_unique_tag(req);
+		BUG_ON(tag > skd_max_queue_depth);
 
 		pr_debug("%s new req=%p lba=%u(0x%x) count=%u(0x%x) dir=%d\n",
 			 skdev->name, req, lba, lba, count, count, data_dir);
@@ -549,22 +545,9 @@ static void skd_request_fn(struct request_queue *q)
 			break;
 		}
 
-		/* Is a skd_request_context available? */
-		skreq = skdev->skreq_free_list;
-		if (skreq == NULL) {
-			pr_debug("%s Out of req=%p\n", skdev->name, q);
-			break;
-		}
+		skreq = &skdev->skreq_table[tag];
 		SKD_ASSERT(skreq->state == SKD_REQ_STATE_IDLE);
 		SKD_ASSERT((skreq->id & SKD_ID_INCR) == 0);
-
-		/* Now we check to see if we can get a fit msg */
-		if (skmsg == NULL) {
-			if (skdev->skmsg_free_list == NULL) {
-				pr_debug("%s Out of msg\n", skdev->name);
-				break;
-			}
-		}
 
 		skreq->flush_cmd = 0;
 		skreq->n_sg = 0;
@@ -581,29 +564,18 @@ static void skd_request_fn(struct request_queue *q)
 		skreq->req = req;
 		skreq->fitmsg_id = 0;
 
-		/* Either a FIT msg is in progress or we have to start one. */
-		if (skmsg == NULL) {
-			/* Are there any FIT msg buffers available? */
-			skmsg = skdev->skmsg_free_list;
-			if (skmsg == NULL) {
-				pr_debug("%s Out of msg skdev=%p\n",
-					 skdev->name, skdev);
-				break;
-			}
-			SKD_ASSERT(skmsg->state == SKD_MSG_STATE_IDLE);
-			SKD_ASSERT((skmsg->id & SKD_ID_INCR) == 0);
+		skmsg = &skdev->skmsg_table[tag];
+		SKD_ASSERT(skmsg->state == SKD_MSG_STATE_IDLE);
+		SKD_ASSERT((skmsg->id & SKD_ID_INCR) == 0);
 
-			skdev->skmsg_free_list = skmsg->next;
+		skmsg->state = SKD_MSG_STATE_BUSY;
+		skmsg->id += SKD_ID_INCR;
 
-			skmsg->state = SKD_MSG_STATE_BUSY;
-			skmsg->id += SKD_ID_INCR;
-
-			/* Initialize the FIT msg header */
-			fmh = (struct fit_msg_hdr *)skmsg->msg_buf;
-			memset(fmh, 0, sizeof(*fmh));
-			fmh->protocol_id = FIT_PROTOCOL_ID_SOFIT;
-			skmsg->length = sizeof(*fmh);
-		}
+		/* Initialize the FIT msg header */
+		fmh = (struct fit_msg_hdr *)skmsg->msg_buf;
+		memset(fmh, 0, sizeof(*fmh));
+		fmh->protocol_id = FIT_PROTOCOL_ID_SOFIT;
+		skmsg->length = sizeof(*fmh);
 
 		skreq->fitmsg_id = skmsg->id;
 
@@ -665,7 +637,6 @@ skip_sg:
 			cpu_to_be32(skreq->sg_byte_count);
 
 		/* Complete resource allocations. */
-		skdev->skreq_free_list = skreq->next;
 		skreq->state = SKD_REQ_STATE_BUSY;
 		skreq->id += SKD_ID_INCR;
 
@@ -707,8 +678,6 @@ skip_sg:
 			 */
 			skmsg->state = SKD_MSG_STATE_IDLE;
 			skmsg->id += SKD_ID_INCR;
-			skmsg->next = skdev->skmsg_free_list;
-			skdev->skmsg_free_list = skmsg;
 		}
 		skmsg = NULL;
 		fmh = NULL;
@@ -726,8 +695,6 @@ static void skd_end_request(struct skd_device *skdev,
 		struct skd_request_context *skreq, blk_status_t error)
 {
 	if (blk_queue_stopped(skdev->queue) &&
-	    skdev->skmsg_free_list &&
-	    skdev->skreq_free_list &&
 	    skdev->in_flight < skdev->queue_low_water_mark)
 		blk_start_queue_async(skdev->queue);
 
@@ -1621,8 +1588,6 @@ static void skd_release_skreq(struct skd_device *skdev,
 		if (skmsg->outstanding == 0) {
 			skmsg->state = SKD_MSG_STATE_IDLE;
 			skmsg->id += SKD_ID_INCR;
-			skmsg->next = skdev->skmsg_free_list;
-			skdev->skmsg_free_list = skmsg;
 		}
 	}
 
@@ -1647,8 +1612,6 @@ static void skd_release_skreq(struct skd_device *skdev,
 	 */
 	skreq->state = SKD_REQ_STATE_IDLE;
 	skreq->id += SKD_ID_INCR;
-	skreq->next = skdev->skreq_free_list;
-	skdev->skreq_free_list = skreq;
 }
 
 #define DRIVER_INQ_EVPD_PAGE_CODE   0xDA
@@ -2139,11 +2102,7 @@ static void skd_recover_requests(struct skd_device *skdev, int requeue)
 			skreq->state = SKD_REQ_STATE_IDLE;
 			skreq->id += SKD_ID_INCR;
 		}
-		if (i > 0)
-			skreq[-1].next = skreq;
-		skreq->next = NULL;
 	}
-	skdev->skreq_free_list = skdev->skreq_table;
 
 	for (i = 0; i < skdev->num_fitmsg_context; i++) {
 		struct skd_fitmsg_context *skmsg = &skdev->skmsg_table[i];
@@ -2154,11 +2113,7 @@ static void skd_recover_requests(struct skd_device *skdev, int requeue)
 			skmsg->state = SKD_MSG_STATE_IDLE;
 			skmsg->id += SKD_ID_INCR;
 		}
-		if (i > 0)
-			skmsg[-1].next = skmsg;
-		skmsg->next = NULL;
 	}
-	skdev->skmsg_free_list = skdev->skmsg_table;
 
 	for (i = 0; i < SKD_N_TIMEOUT_SLOT; i++)
 		skdev->timeout_slot[i] = 0;
@@ -2932,13 +2887,7 @@ static int skd_cons_skmsg(struct skd_device *skdev)
 		skmsg->mb_dma_address += ~FIT_QCMD_BASE_ADDRESS_MASK;
 		skmsg->mb_dma_address &= FIT_QCMD_BASE_ADDRESS_MASK;
 		memset(skmsg->msg_buf, 0, SKD_N_FITMSG_BYTES);
-
-		skmsg->next = &skmsg[1];
 	}
-
-	/* Free list is in order starting with the 0th entry. */
-	skdev->skmsg_table[i - 1].next = NULL;
-	skdev->skmsg_free_list = skdev->skmsg_table;
 
 err_out:
 	return rc;
@@ -3019,13 +2968,7 @@ static int skd_cons_skreq(struct skd_device *skdev)
 			rc = -ENOMEM;
 			goto err_out;
 		}
-
-		skreq->next = &skreq[1];
 	}
-
-	/* Free list is in order starting with the 0th entry. */
-	skdev->skreq_table[i - 1].next = NULL;
-	skdev->skreq_free_list = skdev->skreq_table;
 
 err_out:
 	return rc;
@@ -3101,7 +3044,9 @@ static int skd_cons_disk(struct skd_device *skdev)
 		rc = -ENOMEM;
 		goto del_gendisk;
 	}
-
+	q->nr_requests = skd_max_queue_depth / 2;
+	blk_queue_init_tags(q, skd_max_queue_depth, NULL, BLK_TAG_ALLOC_FIFO);
+	
 	skdev->queue = q;
 	disk->queue = q;
 	q->queuedata = skdev;
