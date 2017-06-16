@@ -95,7 +95,7 @@
  *         __entry->bar.x = y;
 
  *   __array: There are three fields (type, name, size). The type is the
- *         type of elements in teh array, the name is the name of the array.
+ *         type of elements in the array, the name is the name of the array.
  *         size is the number of items in the array (not the total size).
  *
  *         __array( char, foo, 10) is the same as saying: char foo[10];
@@ -112,7 +112,7 @@
  *         type is the type of the element, name is the name of the array.
  *         The size is different than __array. It is not a static number,
  *         but the algorithm to figure out the length of the array for the
- *         specific instance of tracepoint. Again, size is the numebr of
+ *         specific instance of tracepoint. Again, size is the number of
  *         items in the array, not the total length in bytes.
  *
  *         __dynamic_array( int, foo, bar) is similar to: int foo[bar];
@@ -125,9 +125,9 @@
  *         Notice, that "__entry" is not needed here.
  *
  *   __string: This is a special kind of __dynamic_array. It expects to
- *         have a nul terminated character array passed to it (it allows
+ *         have a null terminated character array passed to it (it allows
  *         for NULL too, which would be converted into "(null)"). __string
- *         takes two paramenter (name, src), where name is the name of
+ *         takes two parameter (name, src), where name is the name of
  *         the string saved, and src is the string to copy into the
  *         ring buffer.
  *
@@ -225,26 +225,36 @@ TRACE_DEFINE_ENUM(TRACE_SAMPLE_FOO);
 TRACE_DEFINE_ENUM(TRACE_SAMPLE_BAR);
 TRACE_DEFINE_ENUM(TRACE_SAMPLE_ZOO);
 
+/*
+ * The same problem as above applies to sizeof(), so there is also
+ * a macro to solve that problem. In the case show below, foo_bar/format
+ * contains a string "__print_array(...,sizeof(phys_addr_t))" for which
+ * the sizeof() result varies depending on the kernel. Adding the following
+ * macro decodes the size before transferring it to user space.
+ */
+
+TRACE_DEFINE_SIZEOF(phys_addr_t);
+
 TRACE_EVENT(foo_bar,
 
-	TP_PROTO(const char *foo, int bar, const int *lst,
+	TP_PROTO(const char *foo, int bar, const phys_addr_t *lst,
 		 const char *string, const struct cpumask *mask),
 
 	TP_ARGS(foo, bar, lst, string, mask),
 
 	TP_STRUCT__entry(
-		__array(	char,	foo,    10		)
-		__field(	int,	bar			)
-		__dynamic_array(int,	list,   __length_of(lst))
-		__string(	str,	string			)
-		__bitmask(	cpus,	num_possible_cpus()	)
+		__array(	char,	     foo,    10			)
+		__field(	int,	     bar			)
+		__dynamic_array(phys_addr_t, list,   __length_of(lst)	)
+		__string(	str,	     string			)
+		__bitmask(	cpus,	     num_possible_cpus()	)
 	),
 
 	TP_fast_assign(
 		strlcpy(__entry->foo, foo, 10);
 		__entry->bar	= bar;
 		memcpy(__get_dynamic_array(list), lst,
-		       __length_of(lst) * sizeof(int));
+		       __length_of(lst) * sizeof(phys_addr_t));
 		__assign_str(str, string);
 		__assign_bitmask(cpus, cpumask_bits(mask), num_possible_cpus());
 	),
@@ -291,8 +301,8 @@ TRACE_EVENT(foo_bar,
  *    This prints out the array that is defined by __array in a nice format.
  */
 		  __print_array(__get_dynamic_array(list),
-				__get_dynamic_array_len(list) / sizeof(int),
-				sizeof(int)),
+				__get_dynamic_array_len(list) / sizeof(phys_addr_t),
+				sizeof(phys_addr_t)),
 		  __get_str(str), __get_bitmask(cpus))
 );
 
@@ -444,7 +454,7 @@ DECLARE_EVENT_CLASS(foo_template,
 
 /*
  * Here's a better way for the previous samples (except, the first
- * exmaple had more fields and could not be used here).
+ * example had more fields and could not be used here).
  */
 DEFINE_EVENT(foo_template, foo_with_template_simple,
 	TP_PROTO(const char *foo, int bar),
