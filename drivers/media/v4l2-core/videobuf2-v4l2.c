@@ -204,8 +204,13 @@ static void __fill_v4l2_buffer(struct vb2_buffer *vb, void *pb)
 	b->timestamp = ns_to_timeval(vb->timestamp);
 	b->timecode = vbuf->timecode;
 	b->sequence = vbuf->sequence;
-	b->fence_fd = -1;
+	b->fence_fd = vb->out_fence_fd;
 	b->reserved = 0;
+
+	if (vb->sync_file) {
+		fd_install(vb->out_fence_fd, vb->sync_file->file);
+		vb->sync_file = NULL;
+	}
 
 	if (q->is_multiplanar) {
 		/*
@@ -578,6 +583,21 @@ int vb2_qbuf(struct vb2_queue *q, struct v4l2_buffer *b)
 		if (!fence) {
 			dprintk(1, "failed to get in-fence from fd\n");
 			return -EINVAL;
+		}
+	}
+
+	if (b->flags & V4L2_BUF_FLAG_OUT_FENCE) {
+		if (!q->ordered) {
+			dprintk(1, "can't use out-fences with unordered queues\n");
+			dma_fence_put(fence);
+			return -EINVAL;
+		}
+
+		ret = vb2_setup_out_fence(q, b->index);
+		if (ret) {
+			dprintk(1, "failed to set up out-fence\n");
+			dma_fence_put(fence);
+			return ret;
 		}
 	}
 
