@@ -1367,6 +1367,34 @@ static int vb2_start_streaming(struct vb2_queue *q)
 	return ret;
 }
 
+static int __vb2_core_qbuf(struct vb2_buffer *vb, struct vb2_queue *q)
+{
+	int ret;
+
+	/*
+	 * If already streaming, give the buffer to driver for processing.
+	 * If not, the buffer will be given to driver on next streamon.
+	 */
+	if (q->start_streaming_called)
+		__enqueue_in_driver(vb);
+
+	/*
+	 * If streamon has been called, and we haven't yet called
+	 * start_streaming() since not enough buffers were queued, and
+	 * we now have reached the minimum number of queued buffers,
+	 * then we can finally call start_streaming().
+	 */
+	if (q->streaming && !q->start_streaming_called &&
+	    q->queued_count >= q->min_buffers_needed) {
+		ret = vb2_start_streaming(q);
+		if (ret)
+			return ret;
+	}
+
+	dprintk(1, "qbuf of buffer %d succeeded\n", vb->index);
+	return 0;
+}
+
 int vb2_core_qbuf(struct vb2_queue *q, unsigned int index, void *pb)
 {
 	struct vb2_buffer *vb;
@@ -1404,32 +1432,11 @@ int vb2_core_qbuf(struct vb2_queue *q, unsigned int index, void *pb)
 
 	trace_vb2_qbuf(q, vb);
 
-	/*
-	 * If already streaming, give the buffer to driver for processing.
-	 * If not, the buffer will be given to driver on next streamon.
-	 */
-	if (q->start_streaming_called)
-		__enqueue_in_driver(vb);
-
 	/* Fill buffer information for the userspace */
 	if (pb)
 		call_void_bufop(q, fill_user_buffer, vb, pb);
 
-	/*
-	 * If streamon has been called, and we haven't yet called
-	 * start_streaming() since not enough buffers were queued, and
-	 * we now have reached the minimum number of queued buffers,
-	 * then we can finally call start_streaming().
-	 */
-	if (q->streaming && !q->start_streaming_called &&
-	    q->queued_count >= q->min_buffers_needed) {
-		ret = vb2_start_streaming(q);
-		if (ret)
-			return ret;
-	}
-
-	dprintk(1, "qbuf of buffer %d succeeded\n", vb->index);
-	return 0;
+	return __vb2_core_qbuf(vb, q);
 }
 EXPORT_SYMBOL_GPL(vb2_core_qbuf);
 
