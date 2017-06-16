@@ -546,27 +546,25 @@ static void err_print_capabilities(struct drm_i915_error_state_buf *m,
 #undef PRINT_FLAG
 }
 
-static __always_inline void err_print_param(struct drm_i915_error_state_buf *m,
-					    const char *name,
-					    const char *type,
-					    const void *x)
+#define err_print_param_int(m, name, x, flag) \
+	err_printf(m, "i915.%s=%d%s\n", name, x, flag);
+#define err_print_param_uint(m, name, x, flag) \
+	err_printf(m, "i915.%s=%u%s\n", name, x, flag);
+#define err_print_param_bool(m, name, x, flag) \
+	err_printf(m, "i915.%s=%s%s\n", name, yesno(x), flag);
+#define err_print_param_charp(m, name, x, flag) \
+	err_printf(m, "i915.%s=%s%s\n", name, x, flag);
+
+static inline const char *param_flag(bool modified)
 {
-	if (!__builtin_strcmp(type, "bool"))
-		err_printf(m, "i915.%s=%s\n", name, yesno(*(const bool *)x));
-	else if (!__builtin_strcmp(type, "int"))
-		err_printf(m, "i915.%s=%d\n", name, *(const int *)x);
-	else if (!__builtin_strcmp(type, "uint"))
-		err_printf(m, "i915.%s=%u\n", name, *(const unsigned int *)x);
-	else if (!__builtin_strcmp(type, "charp"))
-		err_printf(m, "i915.%s=%s\n", name, *(const char **)x);
-	else
-		BUILD_BUG();
+	return modified ? " [modified]" : "";
 }
 
 static void err_print_params(struct drm_i915_error_state_buf *m,
 			     const struct i915_params *p)
 {
-#define PRINT(X, T, V, U, M, B, D) err_print_param(m, #X, #T, &p->X);
+#define PRINT(X, T, V, U, M, B, D) \
+	err_print_param_##T(m, #X, p->X, param_flag(!is_equal_##T(V, p->X)));
 	I915_PARAMS_FOR_EACH(PRINT);
 #undef PRINT
 }

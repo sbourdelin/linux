@@ -252,6 +252,26 @@ static inline const char *enableddisabled(bool v)
 	return v ? "enabled" : "disabled";
 }
 
+static inline bool is_equal_int(int a, int b)
+{
+	return a == b;
+}
+
+static inline bool is_equal_uint(unsigned int a, unsigned int b)
+{
+	return a == b;
+}
+
+static inline bool is_equal_bool(bool a, bool b)
+{
+	return a == b;
+}
+
+static inline bool is_equal_charp(const char *a, const char *b)
+{
+	return a && b ? !strcmp(a, b) : a == b;
+}
+
 enum pipe {
 	INVALID_PIPE = -1,
 	PIPE_A = 0,
