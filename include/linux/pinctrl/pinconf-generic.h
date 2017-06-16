@@ -79,6 +79,8 @@
  *	operation, if several modes of operation are supported these can be
  *	passed in the argument on a custom form, else just use argument 1
  *	to indicate low power mode, argument 0 turns low power mode off.
+ * @PIN_CONFIG_OUTPUT_ENABLE: this will enable the pin's output mode
+ * 	without driving a value there. 1 enables output mode, 0 disables it.
  * @PIN_CONFIG_OUTPUT: this will configure the pin as an output. Use argument
  *	1 to indicate high level, argument 0 to indicate low level. (Please
  *	see Documentation/pinctrl.txt, section "GPIO mode pitfalls" for a
@@ -109,6 +111,7 @@ enum pin_config_param {
 	PIN_CONFIG_INPUT_SCHMITT,
 	PIN_CONFIG_INPUT_SCHMITT_ENABLE,
 	PIN_CONFIG_LOW_POWER_MODE,
+	PIN_CONFIG_OUTPUT_ENABLE,
 	PIN_CONFIG_OUTPUT,
 	PIN_CONFIG_POWER_SOURCE,
 	PIN_CONFIG_SLEW_RATE,
