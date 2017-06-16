@@ -27,6 +27,7 @@
 #include <linux/irqbypass.h>
 #include <linux/swait.h>
 #include <linux/refcount.h>
+#include <linux/uuid.h>
 #include <asm/signal.h>
 
 #include <linux/kvm.h>
@@ -438,6 +439,8 @@ struct kvm {
 	struct kvm_stat_data **debugfs_stat_data;
 	struct srcu_struct srcu;
 	struct srcu_struct irq_srcu;
+
+	uuid_le uuid;
 };
 
 #define kvm_err(fmt, ...) \
@@ -551,6 +554,7 @@ int kvm_init(void *opaque, unsigned vcpu_size, unsigned vcpu_align,
 void kvm_exit(void);
 void kvm_enum(int (*enum_cb) (const struct kvm *kvm, void *param),
 	      void *param);
+struct kvm *kvm_from_uuid(const uuid_le *uuid);
 
 void kvm_get_kvm(struct kvm *kvm);
 void kvm_put_kvm(struct kvm *kvm);

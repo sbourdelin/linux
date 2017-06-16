@@ -2924,6 +2924,7 @@ static long kvm_vm_ioctl_check_extension_generic(struct kvm *kvm, long arg)
 #endif
 	case KVM_CAP_IOEVENTFD_ANY_LENGTH:
 	case KVM_CAP_CHECK_EXTENSION_VM:
+	case KVM_CAP_VM_UUID:
 		return 1;
 #ifdef CONFIG_KVM_MMIO
 	case KVM_CAP_COALESCED_MMIO:
@@ -3105,6 +3106,13 @@ out_free_irq_routing:
 	}
 	case KVM_CHECK_EXTENSION:
 		r = kvm_vm_ioctl_check_extension_generic(kvm, arg);
+		break;
+	case KVM_SET_VM_UUID:
+		r = -EFAULT;
+		if (copy_from_user(&kvm->uuid, argp, sizeof(kvm->uuid)))
+			goto out;
+
+		r = 0;
 		break;
 	default:
 		r = kvm_arch_vm_ioctl(filp, ioctl, arg);
@@ -4057,4 +4065,22 @@ void kvm_enum(int (*enum_cb) (const struct kvm *kvm, void *param), void *param)
 			break;
 	}
 	spin_unlock(&kvm_lock);
+}
+
+/* Make sure to call kvm_put_kvm() when done */
+struct kvm *kvm_from_uuid(const uuid_le *uuid)
+{
+	struct kvm *kvm;
+	struct kvm *found = NULL;
+
+	spin_lock(&kvm_lock);
+	list_for_each_entry(kvm, &vm_list, vm_list) {
+		if (!memcmp(&kvm->uuid, uuid, sizeof(kvm->uuid))) {
+			kvm_get_kvm(kvm);
+			found = kvm;
+			break;
+		}
+	}
+	spin_unlock(&kvm_lock);
+	return found;
 }
