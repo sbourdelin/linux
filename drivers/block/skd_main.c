@@ -372,8 +372,7 @@ static int skd_max_req_per_msg = SKD_MAX_REQ_PER_MSG_DEFAULT;
 
 module_param(skd_max_req_per_msg, int, 0444);
 MODULE_PARM_DESC(skd_max_req_per_msg,
-		 "Maximum SCSI requests packed in a single message."
-		 " (1-14, default==1)");
+		 "Maximum SCSI requests packed in a single message. IGNORED.");
 
 #define SKD_MAX_QUEUE_DEPTH_DEFAULT 64
 #define SKD_MAX_QUEUE_DEPTH_DEFAULT_STR "64"
@@ -712,15 +711,9 @@ skip_sg:
 		pr_debug("%s req=0x%x busy=%d\n", skdev->name, skreq->id,
 			 skdev->in_flight);
 
-		/*
-		 * If the FIT msg buffer is full send it.
-		 */
-		if (skmsg->length >= SKD_N_FITMSG_BYTES ||
-		    fmh->num_protocol_cmds_coalesced >= skd_max_req_per_msg) {
-			skd_send_fitmsg(skdev, skmsg);
-			skmsg = NULL;
-			fmh = NULL;
-		}
+		skd_send_fitmsg(skdev, skmsg);
+		skmsg = NULL;
+		fmh = NULL;
 	}
 
 	/*
@@ -5034,6 +5027,8 @@ static int __init skd_init(void)
 		       skd_max_req_per_msg, SKD_MAX_REQ_PER_MSG_DEFAULT);
 		skd_max_req_per_msg = SKD_MAX_REQ_PER_MSG_DEFAULT;
 	}
+
+	WARN_ON_ONCE(skd_max_req_per_msg != 1);
 
 	if (skd_sgs_per_request < 1 || skd_sgs_per_request > 4096) {
 		pr_err(PFX "skd_sg_per_request %d invalid, re-set to %d\n",
