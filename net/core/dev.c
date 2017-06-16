@@ -7017,7 +7017,9 @@ int dev_change_xdp_fd(struct net_device *dev, struct netlink_ext_ack *extack,
  *	@net: the applicable net namespace
  *
  *	Returns a suitable unique value for a new device interface
- *	number.  The caller must hold the rtnl semaphore or the
+ *	number or zero in case of no free indexes in net namespace.
+ *
+ *	The caller must hold the rtnl mutex or the
  *	dev_base_lock to be sure it remains unique.
  */
 static int dev_new_index(struct net *net)
@@ -7026,7 +7028,7 @@ static int dev_new_index(struct net *net)
 
 	for (;;) {
 		if (++ifindex <= 0)
-			ifindex = 1;
+			return 0;
 		if (!__dev_get_by_index(net, ifindex))
 			return net->ifindex = ifindex;
 	}
@@ -7494,9 +7496,12 @@ int register_netdevice(struct net_device *dev)
 	}
 
 	ret = -EBUSY;
-	if (dev->ifindex <= 0)
-		dev->ifindex = dev_new_index(net);
-	else if (__dev_get_by_index(net, dev->ifindex))
+	if (dev->ifindex <= 0) {
+		int ifindex = dev_new_index(net);
+		if (!ifindex)
+			goto err_uninit;
+		dev->ifindex = ifindex;
+	} else if (__dev_get_by_index(net, dev->ifindex))
 		goto err_uninit;
 
 	/* Transfer changeable features to wanted_features and enable
@@ -8177,6 +8182,7 @@ EXPORT_SYMBOL(unregister_netdev);
 
 int dev_change_net_namespace(struct net_device *dev, struct net *net, const char *pat)
 {
+	int ifindex = 0;
 	int err;
 
 	ASSERT_RTNL();
@@ -8194,6 +8200,14 @@ int dev_change_net_namespace(struct net_device *dev, struct net *net, const char
 	err = 0;
 	if (net_eq(dev_net(dev), net))
 		goto out;
+
+	/* If there is an ifindex conflict assign a new one */
+	err = -EBUSY;
+	if (__dev_get_by_index(net, dev->ifindex)) {
+		ifindex = dev_new_index(net);
+		if (!ifindex)
+			goto out;
+	}
 
 	/* Pick the destination device name, and ensure
 	 * we can use it in the destination network namespace.
@@ -8248,9 +8262,9 @@ int dev_change_net_namespace(struct net_device *dev, struct net *net, const char
 	/* Actually switch the network namespace */
 	dev_net_set(dev, net);
 
-	/* If there is an ifindex conflict assign a new one */
-	if (__dev_get_by_index(net, dev->ifindex))
-		dev->ifindex = dev_new_index(net);
+	/* Actually change the ifindex */
+	if (ifindex)
+		dev->ifindex = ifindex;
 
 	/* Send a netdev-add uevent to the new namespace */
 	kobject_uevent(&dev->dev.kobj, KOBJ_ADD);
