@@ -1,12 +1,24 @@
+#include <linux/err.h>
 #include "unwind.h"
 #include "thread.h"
 #include "session.h"
 #include "debug.h"
 #include "arch/common.h"
 
-struct unwind_libunwind_ops __weak *local_unwind_libunwind_ops;
-struct unwind_libunwind_ops __weak *x86_32_unwind_libunwind_ops;
-struct unwind_libunwind_ops __weak *arm64_unwind_libunwind_ops;
+enum {
+	ERR_LOCAL  = 0,
+	ERR_X86_32 = 1,
+	ERR_ARM64  = 2,
+};
+
+/*
+ * Set default error values, so we can warn appropriately when
+ * the support is not compiled in. Using negative values so we
+ * can use ERR macros.
+ */
+struct unwind_libunwind_ops __weak *local_unwind_libunwind_ops  = (void *) -ERR_LOCAL;
+struct unwind_libunwind_ops __weak *x86_32_unwind_libunwind_ops = (void *) -ERR_X86_32;
+struct unwind_libunwind_ops __weak *arm64_unwind_libunwind_ops  = (void *) -ERR_ARM64;
 
 static void unwind__register_ops(struct thread *thread,
 			  struct unwind_libunwind_ops *ops)
@@ -48,8 +60,15 @@ int unwind__prepare_access(struct thread *thread, struct map *map,
 			ops = arm64_unwind_libunwind_ops;
 	}
 
-	if (!ops) {
-		pr_err("unwind: target platform=%s is not supported\n", arch);
+	if (IS_ERR(ops)) {
+		static unsigned long warned;
+		long bit = -PTR_ERR(ops);
+
+		if (!test_and_set_bit(bit, &warned)) {
+			pr_err("unwind: target platform=%s %dbit is not supported\n",
+				arch, dso_type == DSO__TYPE_64BIT ? 64 : 32);
+		}
+
 		return -1;
 	}
 out_register:
