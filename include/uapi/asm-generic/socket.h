@@ -100,4 +100,6 @@
 
 #define SO_COOKIE		57
 
+#define SO_PEERGROUPS		58
+
 #endif /* __ASM_GENERIC_SOCKET_H */

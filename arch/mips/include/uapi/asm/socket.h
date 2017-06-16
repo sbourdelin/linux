@@ -116,4 +116,6 @@
 
 #define SO_COOKIE		57
 
+#define SO_PEERGROUPS		58
+
 #endif /* _UAPI_ASM_SOCKET_H */
