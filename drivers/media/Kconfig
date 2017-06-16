@@ -11,6 +11,7 @@ config CEC_NOTIFIER
 menuconfig MEDIA_SUPPORT
 	tristate "Multimedia support"
 	depends on HAS_IOMEM
+	select SYNC_FILE
 	help
 	  If you want to use Webcams, Video grabber devices and/or TV devices
 	  enable this option and other options below.

@@ -1279,6 +1279,22 @@ static int __buf_prepare(struct vb2_buffer *vb, const void *pb)
 	return 0;
 }
 
+static int __get_num_ready_buffers(struct vb2_queue *q)
+{
+	struct vb2_buffer *vb;
+	int ready_count = 0;
+
+	/* count num of buffers ready in front of the queued_list */
+	list_for_each_entry(vb, &q->queued_list, queued_entry) {
+		if (vb->in_fence && !dma_fence_is_signaled(vb->in_fence))
+			break;
+
+		ready_count++;
+	}
+
+	return ready_count;
+}
+
 int vb2_core_prepare_buf(struct vb2_queue *q, unsigned int index, void *pb)
 {
 	struct vb2_buffer *vb;
@@ -1324,8 +1340,15 @@ static int vb2_start_streaming(struct vb2_queue *q)
 	 * If any buffers were queued before streamon,
 	 * we can now pass them to driver for processing.
 	 */
-	list_for_each_entry(vb, &q->queued_list, queued_entry)
+	list_for_each_entry(vb, &q->queued_list, queued_entry) {
+		if (vb->state != VB2_BUF_STATE_QUEUED)
+			continue;
+
+		if (vb->in_fence && !dma_fence_is_signaled(vb->in_fence))
+			break;
+
 		__enqueue_in_driver(vb);
+	}
 
 	/* Tell the driver to start streaming */
 	q->start_streaming_called = 1;
@@ -1369,33 +1392,55 @@ static int vb2_start_streaming(struct vb2_queue *q)
 
 static int __vb2_core_qbuf(struct vb2_buffer *vb, struct vb2_queue *q)
 {
+	struct vb2_buffer *b;
 	int ret;
 
 	/*
 	 * If already streaming, give the buffer to driver for processing.
 	 * If not, the buffer will be given to driver on next streamon.
 	 */
-	if (q->start_streaming_called)
-		__enqueue_in_driver(vb);
 
-	/*
-	 * If streamon has been called, and we haven't yet called
-	 * start_streaming() since not enough buffers were queued, and
-	 * we now have reached the minimum number of queued buffers,
-	 * then we can finally call start_streaming().
-	 */
-	if (q->streaming && !q->start_streaming_called &&
-	    q->queued_count >= q->min_buffers_needed) {
-		ret = vb2_start_streaming(q);
-		if (ret)
-			return ret;
+	if (q->start_streaming_called) {
+		list_for_each_entry(b, &q->queued_list, queued_entry) {
+			if (b->state != VB2_BUF_STATE_QUEUED)
+				continue;
+
+			if (b->in_fence && !dma_fence_is_signaled(b->in_fence))
+				break;
+
+			__enqueue_in_driver(b);
+		}
+	} else {
+		/*
+		 * If streamon has been called, and we haven't yet called
+		 * start_streaming() since not enough buffers were queued, and
+		 * we now have reached the minimum number of queued buffers
+		 * that are ready, then we can finally call start_streaming().
+		 */
+		if (q->streaming &&
+		    __get_num_ready_buffers(q) >= q->min_buffers_needed) {
+			ret = vb2_start_streaming(q);
+			if (ret)
+				return ret;
+		}
 	}
 
 	dprintk(1, "qbuf of buffer %d succeeded\n", vb->index);
 	return 0;
 }
 
-int vb2_core_qbuf(struct vb2_queue *q, unsigned int index, void *pb)
+static void vb2_qbuf_fence_cb(struct dma_fence *f, struct dma_fence_cb *cb)
+{
+	struct vb2_buffer *vb = container_of(cb, struct vb2_buffer, fence_cb);
+
+	dma_fence_put(vb->in_fence);
+	vb->in_fence = NULL;
+
+	__vb2_core_qbuf(vb, vb->vb2_queue);
+}
+
+int vb2_core_qbuf(struct vb2_queue *q, unsigned int index, void *pb,
+		  struct dma_fence *fence)
 {
 	struct vb2_buffer *vb;
 	int ret;
@@ -1435,6 +1480,11 @@ int vb2_core_qbuf(struct vb2_queue *q, unsigned int index, void *pb)
 	/* Fill buffer information for the userspace */
 	if (pb)
 		call_void_bufop(q, fill_user_buffer, vb, pb);
+
+	vb->in_fence = fence;
+	if (fence && !dma_fence_add_callback(fence, &vb->fence_cb,
+					     vb2_qbuf_fence_cb))
+		return 0;
 
 	return __vb2_core_qbuf(vb, q);
 }
@@ -1647,6 +1697,7 @@ EXPORT_SYMBOL_GPL(vb2_core_dqbuf);
 static void __vb2_queue_cancel(struct vb2_queue *q)
 {
 	unsigned int i;
+	struct vb2_buffer *vb;
 
 	/*
 	 * Tell driver to stop all transactions and release all queued
@@ -1667,6 +1718,14 @@ static void __vb2_queue_cancel(struct vb2_queue *q)
 				vb2_buffer_done(q->bufs[i], VB2_BUF_STATE_ERROR);
 		/* Must be zero now */
 		WARN_ON(atomic_read(&q->owned_by_drv_count));
+	}
+
+	list_for_each_entry(vb, &q->queued_list, queued_entry) {
+		if (vb->in_fence) {
+			dma_fence_remove_callback(vb->in_fence, &vb->fence_cb);
+			dma_fence_put(vb->in_fence);
+			vb->in_fence = NULL;
+		}
 	}
 
 	q->streaming = 0;
@@ -1735,7 +1794,7 @@ int vb2_core_streamon(struct vb2_queue *q, unsigned int type)
 	 * Tell driver to start streaming provided sufficient buffers
 	 * are available.
 	 */
-	if (q->queued_count >= q->min_buffers_needed) {
+	if (__get_num_ready_buffers(q) >= q->min_buffers_needed) {
 		ret = v4l_vb2q_enable_media_source(q);
 		if (ret)
 			return ret;
@@ -2250,7 +2309,7 @@ static int __vb2_init_fileio(struct vb2_queue *q, int read)
 		 * Queue all buffers.
 		 */
 		for (i = 0; i < q->num_buffers; i++) {
-			ret = vb2_core_qbuf(q, i, NULL);
+			ret = vb2_core_qbuf(q, i, NULL, NULL);
 			if (ret)
 				goto err_reqbufs;
 			fileio->bufs[i].queued = 1;
@@ -2429,7 +2488,7 @@ static size_t __vb2_perform_fileio(struct vb2_queue *q, char __user *data, size_
 
 		if (copy_timestamp)
 			b->timestamp = ktime_get_ns();
-		ret = vb2_core_qbuf(q, index, NULL);
+		ret = vb2_core_qbuf(q, index, NULL, NULL);
 		dprintk(5, "vb2_dbuf result: %d\n", ret);
 		if (ret)
 			return ret;
@@ -2532,7 +2591,7 @@ static int vb2_thread(void *data)
 		if (copy_timestamp)
 			vb->timestamp = ktime_get_ns();;
 		if (!threadio->stop)
-			ret = vb2_core_qbuf(q, vb->index, NULL);
+			ret = vb2_core_qbuf(q, vb->index, NULL, NULL);
 		call_void_qop(q, wait_prepare, q);
 		if (ret || threadio->stop)
 			break;

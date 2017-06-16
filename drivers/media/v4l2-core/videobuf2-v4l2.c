@@ -23,6 +23,7 @@
 #include <linux/sched.h>
 #include <linux/freezer.h>
 #include <linux/kthread.h>
+#include <linux/sync_file.h>
 
 #include <media/v4l2-dev.h>
 #include <media/v4l2-fh.h>
@@ -560,6 +561,7 @@ EXPORT_SYMBOL_GPL(vb2_create_bufs);
 
 int vb2_qbuf(struct vb2_queue *q, struct v4l2_buffer *b)
 {
+	struct dma_fence *fence = NULL;
 	int ret;
 
 	if (vb2_fileio_is_active(q)) {
@@ -568,7 +570,18 @@ int vb2_qbuf(struct vb2_queue *q, struct v4l2_buffer *b)
 	}
 
 	ret = vb2_queue_or_prepare_buf(q, b, "qbuf");
-	return ret ? ret : vb2_core_qbuf(q, b->index, b);
+	if (ret)
+		return ret;
+
+	if (b->flags & V4L2_BUF_FLAG_IN_FENCE) {
+		fence = sync_file_get_fence(b->fence_fd);
+		if (!fence) {
+			dprintk(1, "failed to get in-fence from fd\n");
+			return -EINVAL;
+		}
+	}
+
+	return ret ? ret : vb2_core_qbuf(q, b->index, b, fence);
 }
 EXPORT_SYMBOL_GPL(vb2_qbuf);
 
