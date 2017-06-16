@@ -203,4 +203,7 @@ void kvm_mmu_gfn_allow_lpage(struct kvm_memory_slot *slot, gfn_t gfn);
 bool kvm_mmu_slot_gfn_write_protect(struct kvm *kvm,
 				    struct kvm_memory_slot *slot, u64 gfn);
 int kvm_arch_write_log_dirty(struct kvm_vcpu *vcpu);
+u64 kvm_mmu_get_spte(struct kvm *kvm, struct kvm_vcpu *vcpu, gpa_t gpa);
+int kvm_mmu_set_spte(struct kvm *kvm, struct kvm_vcpu *vcpu, gpa_t gpa,
+		     unsigned int r, unsigned int w, unsigned int x);
 #endif

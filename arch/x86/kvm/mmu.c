@@ -5347,3 +5347,78 @@ void kvm_mmu_module_exit(void)
 	unregister_shrinker(&mmu_shrinker);
 	mmu_audit_disable();
 }
+
+u64 kvm_mmu_get_spte(struct kvm *kvm, struct kvm_vcpu *vcpu, gpa_t gpa)
+{
+	u64 spte = -1;
+	unsigned int c = 0;
+	const u64 mask = PT_PRESENT_MASK | PT_WRITABLE_MASK | PT_USER_MASK;
+	struct kvm_shadow_walk_iterator iterator;
+
+	spin_lock(&kvm->mmu_lock);
+	if (!VALID_PAGE(vcpu->arch.mmu.root_hpa))
+		goto error;
+	for_each_shadow_entry(vcpu, gpa & PAGE_MASK, iterator) {
+		u64 __spte = *iterator.sptep;
+
+		if (!(__spte & mask))
+			break;
+		else if (++c == PT64_ROOT_LEVEL) {
+			spte = __spte;
+			break;
+		}
+	}
+	if (spte == (u64) -1)
+		goto error;
+	spin_unlock(&kvm->mmu_lock);
+	return spte & mask;
+error:
+	spin_unlock(&kvm->mmu_lock);
+	return -ENOENT;
+}
+
+int kvm_mmu_set_spte(struct kvm *kvm, struct kvm_vcpu *vcpu, gpa_t gpa,
+		     unsigned int r, unsigned int w, unsigned int x)
+{
+	int flush = 0;
+	u64 *pspte[4] = { };
+	u64 spte;
+	u64 old_spte;
+	unsigned int c = 0;
+	const u64 mask = PT_PRESENT_MASK | PT_WRITABLE_MASK | PT_USER_MASK;
+	struct kvm_shadow_walk_iterator iterator;
+
+	spin_lock(&kvm->mmu_lock);
+	if (!VALID_PAGE(vcpu->arch.mmu.root_hpa))
+		goto error;
+	for_each_shadow_entry(vcpu, gpa & PAGE_MASK, iterator) {
+		u64 __spte = *iterator.sptep;
+
+		if (!(__spte & mask))
+			break;
+		pspte[c++] = iterator.sptep;
+	}
+	if (c < PT64_ROOT_LEVEL || !pspte[c - 1])
+		goto error;
+	c--;
+	old_spte = *pspte[c];
+	spte = old_spte & ~mask;
+	if (r)
+		spte |= PT_PRESENT_MASK;
+	if (w)
+		spte |= PT_WRITABLE_MASK;
+	if (x)
+		spte |= PT_USER_MASK;
+	if (old_spte != spte)
+		flush |= mmu_spte_update(pspte[c], spte);
+	while (c-- > 0) {
+		spte = *pspte[c];
+		if ((spte & mask) != mask)
+			flush |= mmu_spte_update(pspte[c], spte | mask);
+	}
+	spin_unlock(&kvm->mmu_lock);
+	return flush;
+error:
+	spin_unlock(&kvm->mmu_lock);
+	return -ENOENT;
+}
