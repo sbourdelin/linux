@@ -1434,4 +1434,6 @@ static inline int kvm_cpu_get_apicid(int mps_cpu)
 }
 
 void kvm_arch_msr_intercept(unsigned int msr, bool enable);
+int kvm_breakpoint(struct kvm_vcpu *vcpu);
+
 #endif /* _ASM_X86_KVM_HOST_H */

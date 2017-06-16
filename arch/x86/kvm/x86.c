@@ -54,6 +54,7 @@
 #include <linux/kvm_irqfd.h>
 #include <linux/irqbypass.h>
 #include <linux/sched/stat.h>
+#include "../../../../virt/kvm/kvmi.h"
 
 #include <trace/events/kvm.h>
 
@@ -8740,6 +8741,19 @@ void kvm_arch_msr_intercept(unsigned int msr, bool enable)
 	kvm_x86_ops->msr_intercept(msr, enable);
 }
 EXPORT_SYMBOL_GPL(kvm_arch_msr_intercept);
+
+int kvm_breakpoint(struct kvm_vcpu *vcpu)
+{
+	gpa_t gpa;
+	struct kvm_segment cs;
+
+	kvm_get_segment(vcpu, &cs, VCPU_SREG_CS);
+	gpa = kvm_mmu_gva_to_gpa_read(vcpu, cs.base + kvm_rip_read(vcpu), NULL);
+	if (kvmi_breakpoint_event(vcpu, gpa))
+		return 0;
+	return 1;
+}
+EXPORT_SYMBOL_GPL(kvm_breakpoint);
 
 EXPORT_TRACEPOINT_SYMBOL_GPL(kvm_exit);
 EXPORT_TRACEPOINT_SYMBOL_GPL(kvm_fast_mmio);

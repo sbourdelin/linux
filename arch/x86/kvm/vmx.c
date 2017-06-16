@@ -5682,6 +5682,9 @@ static int handle_exception(struct kvm_vcpu *vcpu)
 		kvm_run->debug.arch.dr7 = vmcs_readl(GUEST_DR7);
 		/* fall through */
 	case BP_VECTOR:
+		if (kvm_breakpoint(vcpu))
+			return 1;
+
 		/*
 		 * Update instruction length as we may reinject #BP from
 		 * user space while in guest debugging mode. Reading it for
