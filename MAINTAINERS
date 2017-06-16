@@ -11768,6 +11768,12 @@ F:	lib/siphash.c
 F:	lib/test_siphash.c
 F:	include/linux/siphash.h
 
+STEC S1220 SKD DRIVER
+M:	Bart Van Assche <bart.vanassche@wdc.com>
+L:	linux-block@vger.kernel.org
+S:	Maintained
+F:	drivers/block/skd*[ch]
+
 TI DAVINCI MACHINE SUPPORT
 M:	Sekhar Nori <nsekhar@ti.com>
 M:	Kevin Hilman <khilman@kernel.org>
