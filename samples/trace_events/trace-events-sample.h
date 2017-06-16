@@ -225,26 +225,36 @@ TRACE_DEFINE_ENUM(TRACE_SAMPLE_FOO);
 TRACE_DEFINE_ENUM(TRACE_SAMPLE_BAR);
 TRACE_DEFINE_ENUM(TRACE_SAMPLE_ZOO);
 
+/*
+ * The same problem as above applies to sizeof(), so there is also
+ * a macro to solve that problem. In the case show below, foo_bar/format
+ * contains a string "__print_array(...,sizeof(phys_addr_t))" for which
+ * the sizeof() result varies depending on the kernel. Adding the following
+ * macro decodes the size before transferring it to user space.
+ */
+
+TRACE_DEFINE_SIZEOF(phys_addr_t);
+
 TRACE_EVENT(foo_bar,
 
-	TP_PROTO(const char *foo, int bar, const int *lst,
+	TP_PROTO(const char *foo, int bar, const phys_addr_t *lst,
 		 const char *string, const struct cpumask *mask),
 
 	TP_ARGS(foo, bar, lst, string, mask),
 
 	TP_STRUCT__entry(
-		__array(	char,	foo,    10		)
-		__field(	int,	bar			)
-		__dynamic_array(int,	list,   __length_of(lst))
-		__string(	str,	string			)
-		__bitmask(	cpus,	num_possible_cpus()	)
+		__array(	char,	     foo,    10			)
+		__field(	int,	     bar			)
+		__dynamic_array(phys_addr_t, list,   __length_of(lst)	)
+		__string(	str,	     string			)
+		__bitmask(	cpus,	     num_possible_cpus()	)
 	),
 
 	TP_fast_assign(
 		strlcpy(__entry->foo, foo, 10);
 		__entry->bar	= bar;
 		memcpy(__get_dynamic_array(list), lst,
-		       __length_of(lst) * sizeof(int));
+		       __length_of(lst) * sizeof(phys_addr_t));
 		__assign_str(str, string);
 		__assign_bitmask(cpus, cpumask_bits(mask), num_possible_cpus());
 	),
@@ -291,8 +301,8 @@ TRACE_EVENT(foo_bar,
  *    This prints out the array that is defined by __array in a nice format.
  */
 		  __print_array(__get_dynamic_array(list),
-				__get_dynamic_array_len(list) / sizeof(int),
-				sizeof(int)),
+				__get_dynamic_array_len(list) / sizeof(phys_addr_t),
+				sizeof(phys_addr_t)),
 		  __get_str(str), __get_bitmask(cpus))
 );
 
