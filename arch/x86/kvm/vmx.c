@@ -5653,7 +5653,8 @@ static int handle_exception(struct kvm_vcpu *vcpu)
 
 		if (kvm_event_needs_reinjection(vcpu))
 			kvm_mmu_unprotect_page_virt(vcpu, cr2);
-		return kvm_mmu_page_fault(vcpu, cr2, error_code, NULL, 0);
+		return kvm_mmu_page_fault(vcpu, cr2, error_code, NULL, 0, 0,
+					  false);
 	}
 
 	ex_no = intr_info & INTR_INFO_VECTOR_MASK;
@@ -6204,6 +6205,8 @@ static int handle_task_switch(struct kvm_vcpu *vcpu)
 
 static int handle_ept_violation(struct kvm_vcpu *vcpu)
 {
+	bool pf = false;
+	unsigned long gla = 0;
 	unsigned long exit_qualification;
 	gpa_t gpa;
 	u32 error_code;
@@ -6234,6 +6237,21 @@ static int handle_ept_violation(struct kvm_vcpu *vcpu)
 	gpa = vmcs_read64(GUEST_PHYSICAL_ADDRESS);
 	trace_kvm_page_fault(gpa, exit_qualification);
 
+	if ((exit_qualification & EPT_VIOLATION_GVA_TRANSLATED)) {
+		pf  = true;
+		gla = vmcs_readl(GUEST_LINEAR_ADDRESS);
+
+		/*
+		 * It can happen for kvm_read_cr3() to return 0 event though
+		 * the page fault took place as a result of a guest page table
+		 * translation
+		 *
+		 * TODO: Fix kvm_read_cr3(). The problem is in is_paging()
+		 */
+		vcpu->arch.cr3 = vmcs_readl(GUEST_CR3);
+		__set_bit(VCPU_EXREG_CR3, (ulong *)&vcpu->arch.regs_avail);
+	}
+
 	/* Is it a read fault? */
 	error_code = (exit_qualification & EPT_VIOLATION_ACC_READ)
 		     ? PFERR_USER_MASK : 0;
@@ -6252,7 +6270,7 @@ static int handle_ept_violation(struct kvm_vcpu *vcpu)
 	vcpu->arch.gpa_available = true;
 	vcpu->arch.exit_qualification = exit_qualification;
 
-	return kvm_mmu_page_fault(vcpu, gpa, error_code, NULL, 0);
+	return kvm_mmu_page_fault(vcpu, gpa, error_code, NULL, 0, gla, pf);
 }
 
 static int handle_ept_misconfig(struct kvm_vcpu *vcpu)
@@ -6273,7 +6291,7 @@ static int handle_ept_misconfig(struct kvm_vcpu *vcpu)
 					      EMULATE_DONE;
 
 	if (unlikely(ret == RET_MMIO_PF_INVALID))
-		return kvm_mmu_page_fault(vcpu, gpa, 0, NULL, 0);
+		return kvm_mmu_page_fault(vcpu, gpa, 0, NULL, 0, 0, false);
 
 	if (unlikely(ret == RET_MMIO_PF_RETRY))
 		return 1;

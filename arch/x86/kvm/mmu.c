@@ -40,6 +40,8 @@
 #include <linux/uaccess.h>
 #include <linux/hash.h>
 #include <linux/kern_levels.h>
+#include <linux/kvmi.h>
+#include "../../../../virt/kvm/kvmi.h"
 
 #include <asm/page.h>
 #include <asm/cmpxchg.h>
@@ -4720,11 +4722,46 @@ static void make_mmu_pages_available(struct kvm_vcpu *vcpu)
 	kvm_mmu_commit_zap_page(vcpu->kvm, &invalid_list);
 }
 
+static enum emulation_result __kvm_mmu_page_fault(struct kvm_vcpu *vcpu,
+						  gpa_t gpa, unsigned long gva,
+						  bool *again)
+{
+	unsigned int opts = 0;
+	unsigned long eq = vcpu->arch.exit_qualification;
+	u64 spte = kvm_mmu_get_spte(vcpu->kvm, vcpu, gpa);
+	enum emulation_result er = EMULATE_FAIL;
+
+	if (spte == -ENOENT) {
+		/* The SPTE is not present */
+		*again = true;
+		return EMULATE_FAIL;
+	}
+
+	if (!kvmi_page_fault(vcpu, gpa, gva, eq, &opts))
+		return EMULATE_FAIL;
+
+	if (opts & KVMI_EVENT_NOEMU)
+		er = EMULATE_DONE;
+	else {
+		er = x86_emulate_instruction(vcpu, gpa, 0, NULL, 0);
+
+		vcpu->ctx_size = 0;
+		vcpu->ctx_pos = 0;
+
+		if (er != EMULATE_DONE)
+			kvm_err("%s: emulate failed (err: %d, gpa: %llX)\n",
+			     __func__, er, gpa);
+	}
+
+	return er;
+}
+
 int kvm_mmu_page_fault(struct kvm_vcpu *vcpu, gva_t cr2, u64 error_code,
-		       void *insn, int insn_len)
+		       void *insn, int insn_len, unsigned long gva, bool pf)
 {
 	int r, emulation_type = EMULTYPE_RETRY;
 	enum emulation_result er;
+	bool again = false;
 	bool direct = vcpu->arch.mmu.direct_map || mmu_is_nested(vcpu);
 
 	if (unlikely(error_code & PFERR_RSVD_MASK)) {
@@ -4739,12 +4776,21 @@ int kvm_mmu_page_fault(struct kvm_vcpu *vcpu, gva_t cr2, u64 error_code,
 			return r;
 	}
 
+	if (pf) {
+		er = __kvm_mmu_page_fault(vcpu, cr2, gva, &again);
+		if (er != EMULATE_FAIL)
+			goto check_er;
+	}
+
 	r = vcpu->arch.mmu.page_fault(vcpu, cr2, lower_32_bits(error_code),
 				      false);
 	if (r < 0)
 		return r;
-	if (!r)
+	if (!r) {
+		if (again)
+			__kvm_mmu_page_fault(vcpu, cr2, gva, &again);
 		return 1;
+	}
 
 	/*
 	 * Before emulating the instruction, check if the error code
@@ -4766,6 +4812,7 @@ int kvm_mmu_page_fault(struct kvm_vcpu *vcpu, gva_t cr2, u64 error_code,
 emulate:
 	er = x86_emulate_instruction(vcpu, cr2, emulation_type, insn, insn_len);
 
+check_er:
 	switch (er) {
 	case EMULATE_DONE:
 		return 1;
