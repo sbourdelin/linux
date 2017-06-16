@@ -1,0 +1,8 @@
+config VIDEO_DWC_HDMI_PHY_E405
+	tristate "Synopsys Designware HDMI RX PHY e405 driver"
+	depends on VIDEO_V4L2 && VIDEO_V4L2_SUBDEV_API
+	help
+	  Support for Synopsys Designware HDMI RX PHY. Version is e405.
+
+	  To compile this driver as a module, choose M here. The module
+	  will be called dw-hdmi-phy-e405.
