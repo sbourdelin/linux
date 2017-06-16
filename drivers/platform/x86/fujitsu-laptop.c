@@ -406,9 +406,6 @@ static int acpi_fujitsu_bl_add(struct acpi_device *device)
 	if (acpi_video_get_backlight_type() != acpi_backlight_vendor)
 		return -ENODEV;
 
-	if (!device)
-		return -EINVAL;
-
 	priv = devm_kzalloc(&device->dev, sizeof(*priv), GFP_KERNEL);
 	if (!priv)
 		return -ENOMEM;
@@ -796,9 +793,6 @@ static int acpi_fujitsu_laptop_add(struct acpi_device *device)
 	int error;
 	int i;
 
-	if (!device)
-		return -EINVAL;
-
 	priv = devm_kzalloc(&device->dev, sizeof(*priv), GFP_KERNEL);
 	if (!priv)
 		return -ENOMEM;
@@ -992,9 +986,6 @@ MODULE_DEVICE_TABLE(acpi, fujitsu_ids);
 static int __init fujitsu_init(void)
 {
 	int ret;
-
-	if (acpi_disabled)
-		return -ENODEV;
 
 	ret = acpi_bus_register_driver(&acpi_fujitsu_bl_driver);
 	if (ret)
