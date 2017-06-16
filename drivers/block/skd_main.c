@@ -1,19 +1,9 @@
-/* Copyright 2012 STEC, Inc.
+/*
+ * Driver for STEC s1220 PCIe SSDs. STEC was acquired in 2013 by HGST and HGST
+ * was acquired by Western Digital in 2012.
  *
- * This file is licensed under the terms of the 3-clause
- * BSD License (http://opensource.org/licenses/BSD-3-Clause)
- * or the GNU GPL-2.0 (http://www.gnu.org/licenses/gpl-2.0.html),
- * at your option. Both licenses are also available in the LICENSE file
- * distributed with this project. This file may not be copied, modified,
- * or distributed except in accordance with those terms.
- * Gordoni Waidhofer <gwaidhofer@stec-inc.com>
- * Initial Driver Design!
- * Thomas Swann <tswann@stec-inc.com>
- * Interrupt handling.
- * Ramprasad Chinthekindi <rchinthekindi@stec-inc.com>
- * biomode implementation.
- * Akhil Bhansali <abhansali@stec-inc.com>
- * Added support for DISCARD / FLUSH and FUA.
+ * Copyright 2012 STEC, Inc.
+ * Copyright (c) 2017 Western Digital Corporation or its affiliates.
  */
 
 #include <linux/kernel.h>
@@ -80,7 +70,7 @@ enum {
 #define DRV_VER_COMPL   "2.2.1." DRV_BUILD_ID
 
 MODULE_AUTHOR("bug-reports: support@stec-inc.com");
-MODULE_LICENSE("Dual BSD/GPL");
+MODULE_LICENSE("GPL");
 
 MODULE_DESCRIPTION("STEC s1120 PCIe SSD block driver (b" DRV_BUILD_ID ")");
 MODULE_VERSION(DRV_VERSION "-" DRV_BUILD_ID);
