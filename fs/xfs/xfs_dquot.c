@@ -39,6 +39,7 @@
 #include "xfs_trace.h"
 #include "xfs_log.h"
 #include "xfs_bmap_btree.h"
+#include "xfs_iomap.h"
 
 /*
  * Lock order:
@@ -726,8 +727,8 @@ xfs_dq_get_next_id(
 	quotip = xfs_quota_inode(mp, type);
 	lock = xfs_ilock_data_map_shared(quotip);
 
-	offset = __xfs_seek_hole_data(VFS_I(quotip), XFS_FSB_TO_B(mp, start),
-				      eof, SEEK_DATA);
+	offset = __iomap_seek_hole_data(VFS_I(quotip), XFS_FSB_TO_B(mp, start), eof,
+					SEEK_DATA, &xfs_iomap_ops);
 	if (offset < 0)
 		error = offset;
 
