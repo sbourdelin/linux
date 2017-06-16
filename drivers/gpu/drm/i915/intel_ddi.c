@@ -1802,6 +1802,7 @@ static void cnl_ddi_vswing_program(struct drm_i915_private *dev_priv,
 	}
 
 	if (ddi_translations == NULL) {
+		DRM_DEBUG_KMS("Missing DDI translation table for type %d with voltage %d\n", type, voltage);
 		MISSING_CASE(voltage);
 		return;
 	}
