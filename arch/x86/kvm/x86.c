@@ -4480,6 +4480,10 @@ static int kvm_read_guest_virt_system(struct x86_emulate_ctxt *ctxt,
 				      struct x86_exception *exception)
 {
 	struct kvm_vcpu *vcpu = emul_to_vcpu(ctxt);
+
+	if (vcpu->ctx_size)
+		return kvmi_patch_emul_instr(vcpu, val, bytes);
+
 	return kvm_read_guest_virt_helper(addr, val, bytes, vcpu, 0, exception);
 }
 
@@ -4487,7 +4491,12 @@ static int kvm_read_guest_phys_system(struct x86_emulate_ctxt *ctxt,
 		unsigned long addr, void *val, unsigned int bytes)
 {
 	struct kvm_vcpu *vcpu = emul_to_vcpu(ctxt);
-	int r = kvm_vcpu_read_guest(vcpu, addr, val, bytes);
+	int r;
+
+	if (vcpu->ctx_size)
+		return kvmi_patch_emul_instr(vcpu, val, bytes);
+
+	r = kvm_vcpu_read_guest(vcpu, addr, val, bytes);
 
 	return r < 0 ? X86EMUL_IO_NEEDED : X86EMUL_CONTINUE;
 }
@@ -4773,6 +4782,11 @@ static int emulator_read_emulated(struct x86_emulate_ctxt *ctxt,
 				  unsigned int bytes,
 				  struct x86_exception *exception)
 {
+	struct kvm_vcpu *vcpu = emul_to_vcpu(ctxt);
+
+	if (vcpu->ctx_size)
+		return kvmi_patch_emul_instr(vcpu, val, bytes);
+
 	return emulator_read_write(ctxt, addr, val, bytes,
 				   exception, &read_emultor);
 }
