@@ -584,6 +584,87 @@ int iomap_fiemap(struct inode *inode, struct fiemap_extent_info *fi,
 }
 EXPORT_SYMBOL_GPL(iomap_fiemap);
 
+static loff_t
+iomap_seek_hole_actor(struct inode *inode, loff_t offset, loff_t length,
+		      void *data, struct iomap *iomap)
+{
+	if (iomap->type == IOMAP_HOLE)
+		return 0;
+	return iomap->offset + iomap->length - offset;
+}
+
+static loff_t
+iomap_seek_data_actor(struct inode *inode, loff_t offset, loff_t length,
+		      void *data, struct iomap *iomap)
+{
+	if (iomap->type != IOMAP_HOLE)
+		return 0;
+	return iomap->offset + iomap->length - offset;
+}
+
+loff_t
+__iomap_seek_hole_data(struct inode *inode, loff_t offset, loff_t size,
+		       int whence, const struct iomap_ops *ops)
+{
+	static loff_t (*actor)(struct inode *, loff_t, loff_t, void *,
+			       struct iomap *);
+	loff_t len = size - offset;
+	loff_t ret;
+
+	/* Nothing to be found beyond the end of the file. */
+	if (len <= 0)
+		return -ENXIO;
+
+	switch(whence) {
+	case SEEK_HOLE:
+		actor = iomap_seek_hole_actor;
+		break;
+
+	case SEEK_DATA:
+		actor = iomap_seek_data_actor;
+		break;
+	}
+
+	while (len > 0) {
+		ret = iomap_apply(inode, offset, len, IOMAP_REPORT, ops,
+				  NULL, actor);
+		if (ret <= 0) {
+			if (ret < 0)
+				return ret;
+			break;
+		}
+		offset += ret;
+		len -= ret;
+	}
+
+	if (len <= 0) {
+		/* There is an implicit hole at the end of the file. */
+		if (whence != SEEK_HOLE)
+			offset = -ENXIO;
+
+		/* The last segment can extend beyond the end of the file. */
+		if (offset > size)
+			offset = size;
+	}
+
+	return offset;
+}
+EXPORT_SYMBOL_GPL(__iomap_seek_hole_data);
+
+loff_t
+iomap_seek_hole_data(struct file *file, loff_t offset, int whence,
+		     const struct iomap_ops *ops)
+{
+	struct inode *inode = file->f_mapping->host;
+
+	offset = __iomap_seek_hole_data(inode, offset, i_size_read(inode),
+					whence, ops);
+	if (offset <= 0)
+		return offset;
+	return vfs_setpos(file, offset, inode->i_sb->s_maxbytes);
+}
+EXPORT_SYMBOL_GPL(iomap_seek_hole_data);
+
 /*
  * Private flags for iomap_dio, must not overlap with the public ones in
  * iomap.h:

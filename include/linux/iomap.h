@@ -85,6 +85,12 @@ int iomap_page_mkwrite(struct vm_fault *vmf, const struct iomap_ops *ops);
 int iomap_fiemap(struct inode *inode, struct fiemap_extent_info *fieinfo,
 		loff_t start, loff_t len, const struct iomap_ops *ops);
 
+struct file;
+loff_t __iomap_seek_hole_data(struct inode *inode, loff_t pos, loff_t size,
+			      int whence, const struct iomap_ops *ops);
+loff_t iomap_seek_hole_data(struct file *file, loff_t pos,
+			    int whence, const struct iomap_ops *ops);
+
 /*
  * Flags for direct I/O ->end_io:
  */
