@@ -1,0 +1,127 @@
+/*
+ * ALSA SoC Texas Instruments TAS6424 Quad-Channel Audio Amplifier
+ *
+ * Copyright (C)2016 Texas Instruments Incorporated -  http://www.ti.com
+ * Author: Andreas Dannenberg <dannenberg@ti.com>
+ *
+ * This program is free software; you can redistribute it and/or
+ * modify it under the terms of the GNU General Public License
+ * version 2 as published by the Free Software Foundation.
+ *
+ * This program is distributed in the hope that it will be useful, but
+ * WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+ * General Public License for more details.
+ */
+
+#ifndef __TAS6424_H__
+#define __TAS6424_H__
+
+/* Register Address Map */
+#define TAS6424_MODE_CTRL_REG		0x00
+#define TAS6424_MISC_CTRL1_REG		0x01
+#define TAS6424_MISC_CTRL2_REG		0x02
+#define TAS6424_SAP_CTRL_REG		0x03
+#define TAS6424_CH_STATE_CTRL_REG	0x04
+#define TAS6424_CH1_VOL_CTRL_REG	0x05
+#define TAS6424_CH2_VOL_CTRL_REG	0x06
+#define TAS6424_CH3_VOL_CTRL_REG	0x07
+#define TAS6424_CH4_VOL_CTRL_REG	0x08
+#define TAS6424_DC_DIAG_CTRL1_REG	0x09
+#define TAS6424_DC_DIAG_CTRL2_REG	0x0A
+#define TAS6424_DC_DIAG_CTRL3_REG	0x0B
+#define TAS6424_DC_LOAD_DIAG_REP12_REG	0x0C
+#define TAS6424_DC_LOAD_DIAG_REP34_REG	0x0D
+#define TAS6424_DC_LOAD_DIAG_REPLO_REG	0x0E
+#define TAS6424_CHANNEL_STATE_REG	0x0F
+#define TAS6424_CHANNEL_FAULT_REG	0x10
+#define TAS6424_GLOB_FAULT1_REG		0x11
+#define TAS6424_GLOB_FAULT2_REG		0x12
+#define TAS6424_WARN_REG		0x13
+#define TAS6424_PIN_CTRL_REG		0x14
+#define TAS6424_AC_DIAG_CTRL_REG	0x15
+#define TAS6424_AC_LOAD_DIAG_REP1_REG	0x17
+#define TAS6424_AC_LOAD_DIAG_REP2_REG	0x18
+#define TAS6424_AC_LOAD_DIAG_REP3_REG	0x19
+#define TAS6424_AC_LOAD_DIAG_REP4_REG	0x1A
+#define TAS6424_MISC_CTRL3_REG		0x21
+#define TAS6424_CLIP_CTRL_REG		0x22
+#define TAS6424_CLIP_WINDOW_REG		0x23
+#define TAS6424_CLIP_WARN_REG		0x24
+#define TAS6424_CBC_STAT_REG		0x25
+#define TAS6424_MISC_CTRL4_REG		0x26
+#define TAS6424_MAX_REG			TAS6424_MISC_CTRL4_REG
+
+/* TAS6424_MODE_CTRL_REG */
+#define TAS6424_RESET			BIT(7)
+
+/* TAS6424_SAP_CTRL_REG */
+#define TAS6424_SAP_RATE_44100		(0x0 << 6)
+#define TAS6424_SAP_RATE_48000		(0x1 << 6)
+#define TAS6424_SAP_RATE_96000		(0x2 << 6)
+#define TAS6424_SAP_RATE_MASK		GENMASK(7, 6)
+#define TAS6424_SAP_TDM_SLOT_LAST	BIT(5)
+#define TAS6424_SAP_TDM_SLOT_SZ_16	BIT(4)
+#define TAS6424_SAP_TDM_SLOT_SWAP	BIT(3)
+#define TAS6424_SAP_RIGHTJ_24		(0x0)
+#define TAS6424_SAP_RIGHTJ_20		(0x1)
+#define TAS6424_SAP_RIGHTJ_18		(0x2)
+#define TAS6424_SAP_RIGHTJ_16		(0x3)
+#define TAS6424_SAP_I2S			(0x4)
+#define TAS6424_SAP_LEFTJ		(0x5)
+#define TAS6424_SAP_DSP			(0x6)
+#define TAS6424_SAP_FMT_MASK		GENMASK(2, 0)
+
+/* TAS6424_CH_STATE_CTRL_REG */
+#define TAS6424_CH1_STATE_PLAY		(0x0 << 6)
+#define TAS6424_CH1_STATE_HIZ		(0x1 << 6)
+#define TAS6424_CH1_STATE_MUTE		(0x2 << 6)
+#define TAS6424_CH1_STATE_DIAG		(0x3 << 6)
+#define TAS6424_CH1_STATE_MASK		GENMASK(7, 6)
+#define TAS6424_CH2_STATE_PLAY		(0x0 << 4)
+#define TAS6424_CH2_STATE_HIZ		(0x1 << 4)
+#define TAS6424_CH2_STATE_MUTE		(0x2 << 4)
+#define TAS6424_CH2_STATE_DIAG		(0x3 << 4)
+#define TAS6424_CH2_STATE_MASK		GENMASK(5, 4)
+#define TAS6424_CH3_STATE_PLAY		(0x0 << 2)
+#define TAS6424_CH3_STATE_HIZ		(0x1 << 2)
+#define TAS6424_CH3_STATE_MUTE		(0x2 << 2)
+#define TAS6424_CH3_STATE_DIAG		(0x3 << 2)
+#define TAS6424_CH3_STATE_MASK		GENMASK(3, 2)
+#define TAS6424_CH4_STATE_PLAY		(0x0)
+#define TAS6424_CH4_STATE_HIZ		(0x1)
+#define TAS6424_CH4_STATE_MUTE		(0x2)
+#define TAS6424_CH4_STATE_DIAG		(0x3)
+#define TAS6424_CH4_STATE_MASK		GENMASK(1, 0)
+
+/* TAS6424_GLOB_FAULT1_REG */
+#define TAS6424_FAULT_CLOCK		BIT(4)
+#define TAS6424_FAULT_PVDD_OV		BIT(3)
+#define TAS6424_FAULT_VBAT_OV		BIT(2)
+#define TAS6424_FAULT_PVDD_UV		BIT(1)
+#define TAS6424_FAULT_VBAT_UV		BIT(0)
+
+/* TAS6424_GLOB_FAULT2_REG */
+#define TAS6424_FAULT_OTSD		BIT(4)
+#define TAS6424_FAULT_OTSD_CH1		BIT(3)
+#define TAS6424_FAULT_OTSD_CH2		BIT(2)
+#define TAS6424_FAULT_OTSD_CH3		BIT(1)
+#define TAS6424_FAULT_OTSD_CH4		BIT(0)
+
+/* TAS6424_WARN_REG */
+#define TAS6424_WARN_VDD_UV		BIT(6)
+#define TAS6424_WARN_VDD_POR		BIT(5)
+#define TAS6424_WARN_VDD_OTW		BIT(4)
+#define TAS6424_WARN_VDD_OTW_CH1	BIT(3)
+#define TAS6424_WARN_VDD_OTW_CH2	BIT(2)
+#define TAS6424_WARN_VDD_OTW_CH3	BIT(1)
+#define TAS6424_WARN_VDD_OTW_CH4	BIT(0)
+
+/* TAS6424_MISC_CTRL3_REG */
+#define TAS6424_CLEAR_FAULT		BIT(7)
+#define TAS6424_PBTL_CH_SEL		BIT(6)
+#define TAS6424_MASK_CBC_WARN		BIT(5)
+#define TAS6424_MASK_VDD_UV		BIT(4)
+#define TAS6424_OTSD_AUTO_RECOVERY	BIT(3)
+
+#endif /* __TAS6424_H__ */
