@@ -28,6 +28,8 @@
 #include <linux/swait.h>
 #include <linux/refcount.h>
 #include <linux/uuid.h>
+#include <linux/mutex.h>
+#include <linux/radix-tree.h>
 #include <asm/signal.h>
 
 #include <linux/kvm.h>
@@ -268,6 +270,19 @@ struct kvm_vcpu {
 	bool preempted;
 	struct kvm_vcpu_arch arch;
 	struct dentry *debugfs_dentry;
+	size_t pause_count;
+	u8 ctx_data[256];
+	u32 ctx_size;
+	u32 ctx_pos;
+	struct semaphore sock_sem;
+	unsigned long sem_requests;
+	u8 sock_cmd_buf[960];
+	void *sock_cmd_ctx;
+	void *sock_rsp_buf;
+	size_t sock_rsp_size;
+	size_t sock_rsp_received;
+	u32 sock_rsp_seq;
+	bool sock_rsp_waiting;
 };
 
 static inline int kvm_vcpu_exiting_guest_mode(struct kvm_vcpu *vcpu)
@@ -441,6 +456,19 @@ struct kvm {
 	struct srcu_struct irq_srcu;
 
 	uuid_le uuid;
+	atomic_t event_mask;
+	unsigned long cr_mask;
+	struct {
+		unsigned long low[BITS_TO_LONGS(8192)];
+		unsigned long hypervisor[BITS_TO_LONGS(8192)];
+		unsigned long high[BITS_TO_LONGS(8192)];
+	} msr_mask;
+	unsigned long introduced;
+	struct radix_tree_root access_tree;
+	struct mutex access_tree_lock;
+	struct list_head access_list;
+	void *socket_ctx;
+	rwlock_t socket_ctx_lock;
 };
 
 #define kvm_err(fmt, ...) \

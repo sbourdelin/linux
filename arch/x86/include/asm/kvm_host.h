@@ -70,6 +70,7 @@
 #define KVM_REQ_HV_RESET          28
 #define KVM_REQ_HV_EXIT           29
 #define KVM_REQ_HV_STIMER         30
+#define KVM_REQ_INTROSPECTION     31
 
 #define CR0_RESERVED_BITS                                               \
 	(~(unsigned long)(X86_CR0_PE | X86_CR0_MP | X86_CR0_EM | X86_CR0_TS \
@@ -678,6 +679,8 @@ struct kvm_vcpu_arch {
 
 	/* GPA available (AMD only) */
 	bool gpa_available;
+
+	atomic_t next_interrupt_enabled;
 };
 
 struct kvm_lpage_info {

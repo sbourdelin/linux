@@ -61,6 +61,7 @@
 #include "coalesced_mmio.h"
 #include "async_pf.h"
 #include "vfio.h"
+#include "kvmi.h"
 
 #define CREATE_TRACE_POINTS
 #include <trace/events/kvm.h>
@@ -278,6 +279,8 @@ int kvm_vcpu_init(struct kvm_vcpu *vcpu, struct kvm *kvm, unsigned id)
 	kvm_vcpu_set_in_spin_loop(vcpu, false);
 	kvm_vcpu_set_dy_eligible(vcpu, false);
 	vcpu->preempted = false;
+
+	sema_init(&vcpu->sock_sem, 0);
 
 	r = kvm_arch_vcpu_init(vcpu);
 	if (r < 0)
@@ -690,6 +693,11 @@ static struct kvm *kvm_create_vm(unsigned long type)
 
 	preempt_notifier_inc();
 
+	INIT_LIST_HEAD(&kvm->access_list);
+	mutex_init(&kvm->access_tree_lock);
+	rwlock_init(&kvm->socket_ctx_lock);
+	INIT_RADIX_TREE(&kvm->access_tree, GFP_KERNEL);
+
 	return kvm;
 
 out_err:
@@ -728,6 +736,7 @@ static void kvm_destroy_vm(struct kvm *kvm)
 	int i;
 	struct mm_struct *mm = kvm->mm;
 
+	mutex_destroy(&kvm->access_tree_lock);
 	kvm_destroy_vm_debugfs(kvm);
 	kvm_arch_sync_events(kvm);
 	spin_lock(&kvm_lock);
@@ -4011,6 +4020,9 @@ int kvm_init(void *opaque, unsigned vcpu_size, unsigned vcpu_align,
 	r = kvm_vfio_ops_init();
 	WARN_ON(r);
 
+	r = kvmi_init();
+	WARN_ON(r);
+
 	return 0;
 
 out_undebugfs:
@@ -4039,6 +4051,7 @@ EXPORT_SYMBOL_GPL(kvm_init);
 
 void kvm_exit(void)
 {
+	kvmi_uninit();
 	debugfs_remove_recursive(kvm_debugfs_dir);
 	misc_deregister(&kvm_dev);
 	kmem_cache_destroy(kvm_vcpu_cache);
