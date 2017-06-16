@@ -4084,3 +4084,30 @@ struct kvm *kvm_from_uuid(const uuid_le *uuid)
 	spin_unlock(&kvm_lock);
 	return found;
 }
+
+static int kvm_vcpu_kill(int sig, struct kvm_vcpu *vcpu)
+{
+	int err = -ESRCH;
+	struct pid *pid;
+	struct siginfo siginfo[1] = { };
+
+	rcu_read_lock();
+	pid = rcu_dereference(vcpu->pid);
+	if (pid)
+		err = kill_pid_info(sig, siginfo, pid);
+	rcu_read_unlock();
+
+	return err;
+}
+
+void kvm_vm_shutdown(struct kvm *kvm)
+{
+	int i;
+	struct kvm_vcpu *vcpu;
+
+	mutex_lock(&kvm->lock);
+	kvm_for_each_vcpu(i, vcpu, kvm) {
+		kvm_vcpu_kill(SIGTERM, vcpu);
+	}
+	mutex_unlock(&kvm->lock);
+}

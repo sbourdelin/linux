@@ -555,6 +555,7 @@ void kvm_exit(void);
 void kvm_enum(int (*enum_cb) (const struct kvm *kvm, void *param),
 	      void *param);
 struct kvm *kvm_from_uuid(const uuid_le *uuid);
+void kvm_vm_shutdown(struct kvm *kvm);
 
 void kvm_get_kvm(struct kvm *kvm);
 void kvm_put_kvm(struct kvm *kvm);
