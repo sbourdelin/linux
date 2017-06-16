@@ -23,8 +23,11 @@
 #include <linux/sched.h>
 #include <linux/freezer.h>
 #include <linux/kthread.h>
+#include <linux/sync_file.h>
+#include <linux/dma-fence.h>
 
 #include <media/videobuf2-core.h>
+#include <media/videobuf2-fence.h>
 #include <media/v4l2-event.h>
 #include <media/v4l2-mc.h>
 
@@ -1334,6 +1337,34 @@ int vb2_core_prepare_buf(struct vb2_queue *q, unsigned int index, void *pb)
 	return ret;
 }
 EXPORT_SYMBOL_GPL(vb2_core_prepare_buf);
+
+int vb2_setup_out_fence(struct vb2_queue *q, unsigned int index)
+{
+	struct vb2_buffer *vb = q->bufs[index];
+
+	vb->out_fence_fd = get_unused_fd_flags(O_CLOEXEC);
+	if (vb->out_fence_fd < 0)
+		return vb->out_fence_fd;
+
+	vb->out_fence = vb2_fence_alloc();
+	if (!vb->out_fence)
+		goto err;
+
+	vb->sync_file = sync_file_create(vb->out_fence);
+	if (!vb->sync_file) {
+		dma_fence_put(vb->out_fence);
+		vb->out_fence = NULL;
+		goto err;
+	}
+
+	return 0;
+
+err:
+	put_unused_fd(vb->out_fence_fd);
+	vb->out_fence_fd = -1;
+	return -ENOMEM;
+}
+EXPORT_SYMBOL_GPL(vb2_setup_out_fence);
 
 /**
  * vb2_start_streaming() - Attempt to start streaming.

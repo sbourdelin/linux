@@ -263,6 +263,10 @@ struct vb2_buffer {
 
 	struct dma_fence	*in_fence;
 	struct dma_fence_cb	fence_cb;
+
+	struct dma_fence	*out_fence;
+	struct sync_file	*sync_file;
+	int			out_fence_fd;
 #ifdef CONFIG_VIDEO_ADV_DEBUG
 	/*
 	 * Counters for how often these buffer-related ops are
@@ -714,6 +718,7 @@ int vb2_core_create_bufs(struct vb2_queue *q, enum vb2_memory memory,
  */
 int vb2_core_prepare_buf(struct vb2_queue *q, unsigned int index, void *pb);
 
+int vb2_setup_out_fence(struct vb2_queue *q, unsigned int index);
 /**
  * vb2_core_qbuf() - Queue a buffer from userspace
  *
