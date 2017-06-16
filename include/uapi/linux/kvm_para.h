@@ -25,6 +25,10 @@
 #define KVM_HC_MIPS_EXIT_VM		7
 #define KVM_HC_MIPS_CONSOLE_OUTPUT	8
 #define KVM_HC_CLOCK_PAIRING		9
+#define KVM_HC_XEN_HVM_OP		34
+/* Matches Xen's __HYPERVISOR_hvm_op */
+
+#define KVM_HC_XEN_HVM_OP_GUEST_REQUEST_VM_EVENT 24
 
 /*
  * hypercalls use architecture specific

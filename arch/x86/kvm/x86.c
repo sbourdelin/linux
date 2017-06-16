@@ -6302,6 +6302,21 @@ int kvm_emulate_hypercall(struct kvm_vcpu *vcpu)
 		ret = kvm_pv_clock_pairing(vcpu, a0, a1);
 		break;
 #endif
+	case KVM_HC_XEN_HVM_OP:{
+		unsigned long subop;
+
+		if (op_64_bit) {
+			subop = kvm_register_read(vcpu, VCPU_REGS_RDI);
+			subop &= 0xFFFFFFFF;
+		} else
+			subop = a0;
+
+		if (subop == KVM_HC_XEN_HVM_OP_GUEST_REQUEST_VM_EVENT)
+			kvmi_vmcall_event(vcpu);
+
+		ret = kvm_register_read(vcpu, VCPU_REGS_RAX);
+		break;
+	}
 	default:
 		ret = -KVM_ENOSYS;
 		break;
