@@ -25,6 +25,7 @@
 #include <linux/kthread.h>
 
 #include <media/videobuf2-core.h>
+#include <media/v4l2-event.h>
 #include <media/v4l2-mc.h>
 
 #include <trace/events/vb2.h>
@@ -1221,6 +1222,18 @@ err:
 	return ret;
 }
 
+static void vb2_buffer_queued_event(struct vb2_buffer *vb)
+{
+	struct video_device *vdev = to_video_device(vb->vb2_queue->dev);
+	struct v4l2_event event;
+
+	memset(&event, 0, sizeof(event));
+	event.type = V4L2_EVENT_BUF_QUEUED;
+	event.u.buf_queued.index = vb->index;
+
+	v4l2_event_queue(vdev, &event);
+}
+
 /**
  * __enqueue_in_driver() - enqueue a vb2_buffer in driver for processing
  */
@@ -1234,6 +1247,8 @@ static void __enqueue_in_driver(struct vb2_buffer *vb)
 	trace_vb2_buf_queue(q, vb);
 
 	call_void_vb_qop(vb, buf_queue, vb);
+
+	vb2_buffer_queued_event(vb);
 }
 
 static int __buf_prepare(struct vb2_buffer *vb, const void *pb)
