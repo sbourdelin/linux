@@ -47,16 +47,16 @@ enum {
 #define DBG_FORCE_RELOC 0 /* choose one of the above! */
 };
 
-#define __EXEC_OBJECT_HAS_REF		BIT(31)
-#define __EXEC_OBJECT_HAS_PIN		BIT(30)
-#define __EXEC_OBJECT_HAS_FENCE		BIT(29)
-#define __EXEC_OBJECT_NEEDS_MAP		BIT(28)
-#define __EXEC_OBJECT_NEEDS_BIAS	BIT(27)
-#define __EXEC_OBJECT_INTERNAL_FLAGS	(~0u << 27) /* all of the above */
+#define __EXEC_OBJECT_VALIDATED		BIT(31)
+#define __EXEC_OBJECT_HAS_REF		BIT(30)
+#define __EXEC_OBJECT_HAS_PIN		BIT(29)
+#define __EXEC_OBJECT_HAS_FENCE		BIT(28)
+#define __EXEC_OBJECT_NEEDS_MAP		BIT(27)
+#define __EXEC_OBJECT_NEEDS_BIAS	BIT(26)
+#define __EXEC_OBJECT_INTERNAL_FLAGS	(~0u << 26) /* all of the above */
 #define __EXEC_OBJECT_RESERVED (__EXEC_OBJECT_HAS_PIN | __EXEC_OBJECT_HAS_FENCE)
 
 #define __EXEC_HAS_RELOC	BIT(31)
-#define __EXEC_VALIDATED	BIT(30)
 #define UPDATE			PIN_OFFSET_FIXED
 
 #define BATCH_OFFSET_BIAS (256*1024)
@@ -429,14 +429,16 @@ eb_validate_vma(struct i915_execbuffer *eb,
 }
 
 static int
-eb_add_vma(struct i915_execbuffer *eb, unsigned int i, struct i915_vma *vma)
+eb_add_vma(struct i915_execbuffer *eb,
+	   unsigned int i, struct i915_vma *vma,
+	   unsigned int flags)
 {
 	struct drm_i915_gem_exec_object2 *entry = &eb->exec[i];
 	int err;
 
 	GEM_BUG_ON(i915_vma_is_closed(vma));
 
-	if (!(eb->args->flags & __EXEC_VALIDATED)) {
+	if (!(flags & __EXEC_OBJECT_VALIDATED)) {
 		err = eb_validate_vma(eb, entry, vma);
 		if (unlikely(err))
 			return err;
@@ -471,7 +473,7 @@ eb_add_vma(struct i915_execbuffer *eb, unsigned int i, struct i915_vma *vma)
 	 * to find the right target VMA when doing relocations.
 	 */
 	eb->vma[i] = vma;
-	eb->flags[i] = entry->flags;
+	eb->flags[i] = entry->flags | flags;
 	vma->exec_flags = &eb->flags[i];
 
 	err = 0;
@@ -680,15 +682,11 @@ static int eb_select_context(struct i915_execbuffer *eb)
 	return 0;
 }
 
-static int eb_lookup_vmas(struct i915_execbuffer *eb)
+static int eb_lookup_vmas(struct i915_execbuffer *eb, unsigned int flags)
 {
-#define INTERMEDIATE BIT(0)
-	const unsigned int count = eb->buffer_count;
 	struct i915_gem_context_vma_lut *lut = &eb->ctx->vma_lut;
-	struct i915_vma *vma;
-	struct idr *idr;
+	struct drm_i915_gem_object *uninitialized_var(obj);
 	unsigned int i;
-	int slow_pass = -1;
 	int err;
 
 	INIT_LIST_HEAD(&eb->relocs);
@@ -698,85 +696,39 @@ static int eb_lookup_vmas(struct i915_execbuffer *eb)
 		flush_work(&lut->resize);
 	GEM_BUG_ON(lut->ht_size & I915_CTX_RESIZE_IN_PROGRESS);
 
-	for (i = 0; i < count; i++) {
-		hlist_for_each_entry(vma,
-				     ht_head(lut, eb->exec[i].handle),
-				     ctx_node) {
-			if (vma->ctx_handle != eb->exec[i].handle)
+	for (i = 0; i < eb->buffer_count; i++) {
+		u32 handle = eb->exec[i].handle;
+		struct hlist_head *hl = ht_head(lut, handle);
+		struct i915_vma *vma;
+
+		hlist_for_each_entry(vma, hl, ctx_node) {
+			GEM_BUG_ON(vma->ctx != eb->ctx);
+
+			if (vma->ctx_handle != handle)
 				continue;
 
-			err = eb_add_vma(eb, i, vma);
-			if (unlikely(err))
-				return err;
-			goto next_vma;
+			goto add_vma;
 		}
 
-		if (slow_pass < 0)
-			slow_pass = i;
-
-		eb->vma[i] = NULL;
-
-next_vma: ;
-	}
-
-	if (slow_pass < 0)
-		goto out;
-
-	spin_lock(&eb->file->table_lock);
-	/*
-	 * Grab a reference to the object and release the lock so we can lookup
-	 * or create the VMA without using GFP_ATOMIC
-	 */
-	idr = &eb->file->object_idr;
-	for (i = slow_pass; i < count; i++) {
-		struct drm_i915_gem_object *obj;
-
-		if (eb->vma[i])
-			continue;
-
-		obj = to_intel_bo(idr_find(idr, eb->exec[i].handle));
+		obj = i915_gem_object_lookup(eb->file, handle);
 		if (unlikely(!obj)) {
-			spin_unlock(&eb->file->table_lock);
-			DRM_DEBUG("Invalid object handle %d at index %d\n",
-				  eb->exec[i].handle, i);
 			err = -ENOENT;
-			goto err;
+			goto err_vma;
 		}
 
-		eb->vma[i] =
-			(struct i915_vma *)ptr_pack_bits(obj, INTERMEDIATE, 1);
-	}
-	spin_unlock(&eb->file->table_lock);
+		flags |= __EXEC_OBJECT_HAS_REF;
 
-	for (i = slow_pass; i < count; i++) {
-		struct drm_i915_gem_object *obj;
-		unsigned int is_obj;
-
-		obj = (typeof(obj))ptr_unpack_bits(eb->vma[i], &is_obj, 1);
-		if (!is_obj)
-			continue;
-
-		/*
-		 * NOTE: We can leak any vmas created here when something fails
-		 * later on. But that's no issue since vma_unbind can deal with
-		 * vmas which are not actually bound. And since only
-		 * lookup_or_create exists as an interface to get at the vma
-		 * from the (obj, vm) we don't run the risk of creating
-		 * duplicated vmas for the same vm.
-		 */
 		vma = i915_vma_instance(obj, eb->vm, NULL);
 		if (unlikely(IS_ERR(vma))) {
-			DRM_DEBUG("Failed to lookup VMA\n");
 			err = PTR_ERR(vma);
-			goto err;
+			goto err_obj;
 		}
 
 		/* First come, first served */
 		if (!vma->ctx) {
 			vma->ctx = eb->ctx;
-			vma->ctx_handle = eb->exec[i].handle;
-			hlist_add_head(&vma->ctx_node,
-				       ht_head(lut, eb->exec[i].handle));
+			vma->ctx_handle = handle;
+			hlist_add_head(&vma->ctx_node, hl);
 			lut->ht_count++;
 			lut->ht_size |= I915_CTX_RESIZE_IN_PROGRESS;
 			if (i915_vma_is_ggtt(vma)) {
@@ -784,18 +736,14 @@ next_vma: ;
 				obj->vma_hashed = vma;
 			}
 
-			i915_vma_get(vma);
+			/* transfer ref to ctx */
+			flags &= ~__EXEC_OBJECT_HAS_REF;
 		}
 
-		err = eb_add_vma(eb, i, vma);
+add_vma:
+		err = eb_add_vma(eb, i, vma, flags);
 		if (unlikely(err))
-			goto err;
-
-		/* Only after we validated the user didn't use our bits */
-		if (vma->ctx != eb->ctx) {
-			i915_vma_get(vma);
-			eb->flags[i] |= __EXEC_OBJECT_HAS_REF;
-		}
+			goto err_vma;
 	}
 
 	if (lut->ht_size & I915_CTX_RESIZE_IN_PROGRESS) {
@@ -805,7 +753,6 @@ next_vma: ;
 			lut->ht_size &= ~I915_CTX_RESIZE_IN_PROGRESS;
 	}
 
-out:
 	/* take note of the batch buffer before we might reorder the lists */
 	i = eb_batch_index(eb);
 	eb->batch = eb->vma[i];
@@ -825,17 +772,14 @@ out:
 	if (eb->reloc_cache.has_fence)
 		eb->exec[i].flags |= EXEC_OBJECT_NEEDS_FENCE;
 
-	eb->args->flags |= __EXEC_VALIDATED;
 	return eb_reserve(eb);
 
-err:
-	for (i = slow_pass; i < count; i++) {
-		if (ptr_unmask_bits(eb->vma[i], 1))
-			eb->vma[i] = NULL;
-	}
+err_obj:
+	i915_gem_object_put(obj);
+err_vma:
+	eb->vma[i] = NULL;
 	lut->ht_size &= ~I915_CTX_RESIZE_IN_PROGRESS;
 	return err;
-#undef INTERMEDIATE
 }
 
 static struct i915_vma *
@@ -868,7 +812,7 @@ static void eb_release_vmas(const struct i915_execbuffer *eb)
 		unsigned int flags = eb->flags[i];
 
 		if (!vma)
-			continue;
+			break;
 
 		GEM_BUG_ON(vma->exec_flags != &eb->flags[i]);
 		vma->exec_flags = NULL;
@@ -1714,7 +1658,7 @@ repeat:
 	}
 
 	/* reacquire the objects */
-	err = eb_lookup_vmas(eb);
+	err = eb_lookup_vmas(eb, __EXEC_OBJECT_VALIDATED);
 	if (err)
 		goto err;
 
@@ -1768,7 +1712,7 @@ out:
 
 static int eb_relocate(struct i915_execbuffer *eb)
 {
-	if (eb_lookup_vmas(eb))
+	if (eb_lookup_vmas(eb, 0))
 		goto slow;
 
 	/* The objects are in their final locations, apply the relocations. */
