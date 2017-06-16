@@ -3099,7 +3099,7 @@ static int skd_cons_disk(struct skd_device *skdev)
 	q = blk_init_queue(skd_request_fn, &skdev->lock);
 	if (!q) {
 		rc = -ENOMEM;
-		goto err_out;
+		goto del_gendisk;
 	}
 
 	skdev->queue = q;
@@ -3120,6 +3120,18 @@ static int skd_cons_disk(struct skd_device *skdev)
 	pr_debug("%s stopping %s queue\n", skdev->name, skdev->name);
 	blk_stop_queue(skdev->queue);
 	spin_unlock_irqrestore(&skdev->lock, flags);
+
+	rc = bsg_register_queue(q, disk_to_dev(disk), NULL, NULL);
+	if (rc < 0)
+		goto cleanup_queue;
+
+	return rc;
+
+cleanup_queue:
+	blk_cleanup_queue(q);
+
+del_gendisk:
+	del_gendisk(disk);
 
 err_out:
 	return rc;
@@ -3321,17 +3333,14 @@ static void skd_free_sksb(struct skd_device *skdev)
 static void skd_free_disk(struct skd_device *skdev)
 {
 	struct gendisk *disk = skdev->disk;
+	struct request_queue *q = skdev->queue;
 
-	if (disk != NULL) {
-		struct request_queue *q = disk->queue;
-
-		if (disk->flags & GENHD_FL_UP)
-			del_gendisk(disk);
-		if (q)
-			blk_cleanup_queue(q);
-		put_disk(disk);
+	if (q) {
+		bsg_unregister_queue(q);
+		blk_cleanup_queue(q);
 	}
-	skdev->disk = NULL;
+	if (disk)
+		del_gendisk(disk);
 }
 
 static void skd_destruct(struct skd_device *skdev)
