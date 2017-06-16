@@ -9,7 +9,8 @@ TEST_GEN_PROGS = posix_timers nanosleep nsleep-lat set-timer-lat mqueue-lat \
 
 TEST_GEN_PROGS_EXTENDED = alarmtimer-suspend valid-adjtimex adjtick change_skew \
 		      skew_consistency clocksource-switch leap-a-day \
-		      leapcrash set-tai set-2038 set-tz rtctest_setdate
+		      leapcrash set-tai set-2038 set-tz rtctest_setdate \
+		      rtctest-2038
 
 
 include ../lib.mk
@@ -29,4 +30,5 @@ run_destructive_tests: run_tests
 	./set-tz
 	./set-tai
 	./set-2038
+	./rtctest-2038
 
