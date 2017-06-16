@@ -896,6 +896,7 @@ struct kvm_ppc_resize_hpt {
 #define KVM_CAP_X86_GUEST_MWAIT 143
 #define KVM_CAP_ARM_USER_IRQ 144
 #define KVM_CAP_HYPERV_SYNIC2 145
+#define KVM_CAP_HYPERV_VP_INDEX 146
 
 #ifdef KVM_CAP_IRQ_ROUTING
 
