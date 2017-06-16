@@ -1070,7 +1070,7 @@ static int vivid_create_instance(struct platform_device *pdev, int inst)
 		q->timestamp_flags = V4L2_BUF_FLAG_TIMESTAMP_MONOTONIC;
 		q->min_buffers_needed = 2;
 		q->lock = &dev->mutex;
-		q->dev = dev->v4l2_dev.dev;
+		q->dev = &dev->vid_cap_dev.dev;
 
 		ret = vb2_queue_init(q);
 		if (ret)
@@ -1090,7 +1090,7 @@ static int vivid_create_instance(struct platform_device *pdev, int inst)
 		q->timestamp_flags = V4L2_BUF_FLAG_TIMESTAMP_MONOTONIC;
 		q->min_buffers_needed = 2;
 		q->lock = &dev->mutex;
-		q->dev = dev->v4l2_dev.dev;
+		q->dev = &dev->vid_out_dev.dev;
 
 		ret = vb2_queue_init(q);
 		if (ret)
@@ -1110,7 +1110,7 @@ static int vivid_create_instance(struct platform_device *pdev, int inst)
 		q->timestamp_flags = V4L2_BUF_FLAG_TIMESTAMP_MONOTONIC;
 		q->min_buffers_needed = 2;
 		q->lock = &dev->mutex;
-		q->dev = dev->v4l2_dev.dev;
+		q->dev = &dev->vbi_cap_dev.dev;
 
 		ret = vb2_queue_init(q);
 		if (ret)
@@ -1130,7 +1130,7 @@ static int vivid_create_instance(struct platform_device *pdev, int inst)
 		q->timestamp_flags = V4L2_BUF_FLAG_TIMESTAMP_MONOTONIC;
 		q->min_buffers_needed = 2;
 		q->lock = &dev->mutex;
-		q->dev = dev->v4l2_dev.dev;
+		q->dev = &dev->vbi_out_dev.dev;
 
 		ret = vb2_queue_init(q);
 		if (ret)
@@ -1149,7 +1149,7 @@ static int vivid_create_instance(struct platform_device *pdev, int inst)
 		q->timestamp_flags = V4L2_BUF_FLAG_TIMESTAMP_MONOTONIC;
 		q->min_buffers_needed = 8;
 		q->lock = &dev->mutex;
-		q->dev = dev->v4l2_dev.dev;
+		q->dev = &dev->sdr_cap_dev.dev;
 
 		ret = vb2_queue_init(q);
 		if (ret)
