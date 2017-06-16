@@ -564,17 +564,14 @@ static void skd_request_fn(struct request_queue *q)
 		if (io_flags & REQ_FUA)
 			fua++;
 
-		pr_debug("%s:%s:%d new req=%p lba=%u(0x%x) "
-			 "count=%u(0x%x) dir=%d\n",
-			 skdev->name, __func__, __LINE__,
-			 req, lba, lba, count, count, data_dir);
+		pr_debug("%s new req=%p lba=%u(0x%x) count=%u(0x%x) dir=%d\n",
+			 skdev->name, req, lba, lba, count, count, data_dir);
 
 		/* At this point we know there is a request */
 
 		/* Are too many requets already in progress? */
 		if (skdev->in_flight >= skdev->cur_max_queue_depth) {
-			pr_debug("%s:%s:%d qdepth %d, limit %d\n",
-				 skdev->name, __func__, __LINE__,
+			pr_debug("%s qdepth %d, limit %d\n", skdev->name,
 				 skdev->in_flight, skdev->cur_max_queue_depth);
 			break;
 		}
@@ -582,8 +579,7 @@ static void skd_request_fn(struct request_queue *q)
 		/* Is a skd_request_context available? */
 		skreq = skdev->skreq_free_list;
 		if (skreq == NULL) {
-			pr_debug("%s:%s:%d Out of req=%p\n",
-				 skdev->name, __func__, __LINE__, q);
+			pr_debug("%s Out of req=%p\n", skdev->name, q);
 			break;
 		}
 		SKD_ASSERT(skreq->state == SKD_REQ_STATE_IDLE);
@@ -592,8 +588,7 @@ static void skd_request_fn(struct request_queue *q)
 		/* Now we check to see if we can get a fit msg */
 		if (skmsg == NULL) {
 			if (skdev->skmsg_free_list == NULL) {
-				pr_debug("%s:%s:%d Out of msg\n",
-					 skdev->name, __func__, __LINE__);
+				pr_debug("%s Out of msg\n", skdev->name);
 				break;
 			}
 		}
@@ -618,9 +613,8 @@ static void skd_request_fn(struct request_queue *q)
 			/* Are there any FIT msg buffers available? */
 			skmsg = skdev->skmsg_free_list;
 			if (skmsg == NULL) {
-				pr_debug("%s:%s:%d Out of msg skdev=%p\n",
-					 skdev->name, __func__, __LINE__,
-					 skdev);
+				pr_debug("%s Out of msg skdev=%p\n",
+					 skdev->name, skdev);
 				break;
 			}
 			SKD_ASSERT(skmsg->state == SKD_MSG_STATE_IDLE);
@@ -688,8 +682,7 @@ static void skd_request_fn(struct request_queue *q)
 			 * only resource that has been allocated but might
 			 * not be used is that the FIT msg could be empty.
 			 */
-			pr_debug("%s:%s:%d error Out\n",
-				 skdev->name, __func__, __LINE__);
+			pr_debug("%s error Out\n", skdev->name);
 			skd_end_request(skdev, skreq, BLK_STS_RESOURCE);
 			continue;
 		}
@@ -714,9 +707,8 @@ skip_sg:
 		timo_slot = skreq->timeout_stamp & SKD_TIMEOUT_SLOT_MASK;
 		skdev->timeout_slot[timo_slot]++;
 		skdev->in_flight++;
-		pr_debug("%s:%s:%d req=0x%x busy=%d\n",
-			 skdev->name, __func__, __LINE__,
-			 skreq->id, skdev->in_flight);
+		pr_debug("%s req=0x%x busy=%d\n", skdev->name, skreq->id,
+			 skdev->in_flight);
 
 		/*
 		 * If the FIT msg buffer is full send it.
@@ -738,8 +730,7 @@ skip_sg:
 	if (skmsg != NULL) {
 		/* Bigger than just a FIT msg header? */
 		if (skmsg->length > sizeof(struct fit_msg_hdr)) {
-			pr_debug("%s:%s:%d sending msg=%p, len %d\n",
-				 skdev->name, __func__, __LINE__,
+			pr_debug("%s sending msg=%p, len %d\n", skdev->name,
 				 skmsg, skmsg->length);
 			skd_send_fitmsg(skdev, skmsg);
 		} else {
@@ -776,8 +767,8 @@ static void skd_end_request(struct skd_device *skdev,
 		pr_err("(%s): Error cmd=%s sect=%u count=%u id=0x%x\n",
 		       skd_name(skdev), cmd, lba, count, skreq->id);
 	} else
-		pr_debug("%s:%s:%d id=0x%x error=%d\n",
-			 skdev->name, __func__, __LINE__, skreq->id, error);
+		pr_debug("%s id=0x%x error=%d\n", skdev->name, skreq->id,
+			 error);
 
 	__blk_end_request_all(skreq->req, error);
 }
@@ -829,15 +820,13 @@ static bool skd_preop_sg_list(struct skd_device *skdev,
 	skreq->sksg_list[n_sg - 1].control = FIT_SGD_CONTROL_LAST;
 
 	if (unlikely(skdev->dbg_level > 1)) {
-		pr_debug("%s:%s:%d skreq=%x sksg_list=%p sksg_dma=%llx\n",
-			 skdev->name, __func__, __LINE__,
-			 skreq->id, skreq->sksg_list, skreq->sksg_dma_address);
+		pr_debug("%s skreq=%x sksg_list=%p sksg_dma=%llx\n",
+			 skdev->name, skreq->id, skreq->sksg_list,
+			 skreq->sksg_dma_address);
 		for (i = 0; i < n_sg; i++) {
 			struct fit_sg_descriptor *sgd = &skreq->sksg_list[i];
-			pr_debug("%s:%s:%d   sg[%d] count=%u ctrl=0x%x "
-				 "addr=0x%llx next=0x%llx\n",
-				 skdev->name, __func__, __LINE__,
-				 i, sgd->byte_count, sgd->control,
+			pr_debug("%s   sg[%d] count=%u ctrl=0x%x addr=0x%llx next=0x%llx\n",
+				 skdev->name, i, sgd->byte_count, sgd->control,
 				 sgd->host_side_addr, sgd->next_desc_ptr);
 		}
 	}
@@ -948,8 +937,7 @@ static void skd_timer_tick(ulong arg)
 		goto timer_func_out;
 
 	/* Something is overdue */
-	pr_debug("%s:%s:%d found %d timeouts, draining busy=%d\n",
-		 skdev->name, __func__, __LINE__,
+	pr_debug("%s found %d timeouts, draining busy=%d\n", skdev->name,
 		 skdev->timeout_slot[timo_slot], skdev->in_flight);
 	pr_err("(%s): Overdue IOs (%d), busy %d\n",
 	       skd_name(skdev), skdev->timeout_slot[timo_slot],
@@ -973,9 +961,8 @@ static void skd_timer_tick_not_online(struct skd_device *skdev)
 	case SKD_DRVR_STATE_LOAD:
 		break;
 	case SKD_DRVR_STATE_BUSY_SANITIZE:
-		pr_debug("%s:%s:%d drive busy sanitize[%x], driver[%x]\n",
-			 skdev->name, __func__, __LINE__,
-			 skdev->drive_state, skdev->state);
+		pr_debug("%s drive busy sanitize[%x], driver[%x]\n",
+			 skdev->name, skdev->drive_state, skdev->state);
 		/* If we've been in sanitize for 3 seconds, we figure we're not
 		 * going to get anymore completions, so recover requests now
 		 */
@@ -989,16 +976,14 @@ static void skd_timer_tick_not_online(struct skd_device *skdev)
 	case SKD_DRVR_STATE_BUSY:
 	case SKD_DRVR_STATE_BUSY_IMMINENT:
 	case SKD_DRVR_STATE_BUSY_ERASE:
-		pr_debug("%s:%s:%d busy[%x], countdown=%d\n",
-			 skdev->name, __func__, __LINE__,
+		pr_debug("%s busy[%x], countdown=%d\n", skdev->name,
 			 skdev->state, skdev->timer_countdown);
 		if (skdev->timer_countdown > 0) {
 			skdev->timer_countdown--;
 			return;
 		}
-		pr_debug("%s:%s:%d busy[%x], timedout=%d, restarting device.",
-			 skdev->name, __func__, __LINE__,
-			 skdev->state, skdev->timer_countdown);
+		pr_debug("%s busy[%x], timedout=%d, restarting device.",
+			 skdev->name, skdev->state, skdev->timer_countdown);
 		skd_restart_device(skdev);
 		break;
 
@@ -1031,17 +1016,14 @@ static void skd_timer_tick_not_online(struct skd_device *skdev)
 		break;
 
 	case SKD_DRVR_STATE_DRAINING_TIMEOUT:
-		pr_debug("%s:%s:%d "
-			 "draining busy [%d] tick[%d] qdb[%d] tmls[%d]\n",
-			 skdev->name, __func__, __LINE__,
-			 skdev->timo_slot,
-			 skdev->timer_countdown,
+		pr_debug("%s draining busy [%d] tick[%d] qdb[%d] tmls[%d]\n",
+			 skdev->name, skdev->timo_slot, skdev->timer_countdown,
 			 skdev->in_flight,
 			 skdev->timeout_slot[skdev->timo_slot]);
 		/* if the slot has cleared we can let the I/O continue */
 		if (skdev->timeout_slot[skdev->timo_slot] == 0) {
-			pr_debug("%s:%s:%d Slot drained, starting queue.\n",
-				 skdev->name, __func__, __LINE__);
+			pr_debug("%s Slot drained, starting queue.\n",
+				 skdev->name);
 			skdev->state = SKD_DRVR_STATE_ONLINE;
 			blk_start_queue(skdev->queue);
 			return;
@@ -1165,9 +1147,9 @@ static int skd_bdev_ioctl(struct block_device *bdev, fmode_t mode,
 	struct skd_device *skdev = disk->private_data;
 	int __user *p = (int __user *)arg;
 
-	pr_debug("%s:%s:%d %s: CMD[%s] ioctl  mode 0x%x, cmd 0x%x arg %0lx\n",
-		 skdev->name, __func__, __LINE__,
-		 disk->disk_name, current->comm, mode, cmd_in, arg);
+	pr_debug("%s %s: CMD[%s] ioctl  mode 0x%x, cmd 0x%x arg %0lx\n",
+		 skdev->name, disk->disk_name, current->comm, mode, cmd_in,
+		 arg);
 
 	if (!capable(CAP_SYS_ADMIN))
 		return -EPERM;
@@ -1193,8 +1175,8 @@ static int skd_bdev_ioctl(struct block_device *bdev, fmode_t mode,
 		break;
 	}
 
-	pr_debug("%s:%s:%d %s:  completion rc %d\n",
-		 skdev->name, __func__, __LINE__, disk->disk_name, rc);
+	pr_debug("%s %s:  completion rc %d\n", skdev->name, disk->disk_name,
+		 rc);
 	return rc;
 }
 
@@ -1215,8 +1197,7 @@ static int skd_ioctl_sg_io(struct skd_device *skdev, fmode_t mode,
 		break;
 
 	default:
-		pr_debug("%s:%s:%d drive not online\n",
-			 skdev->name, __func__, __LINE__);
+		pr_debug("%s drive not online\n", skdev->name);
 		rc = -ENXIO;
 		goto out;
 	}
@@ -1270,38 +1251,36 @@ static int skd_sg_io_get_and_check_args(struct skd_device *skdev,
 	int i;
 
 	if (!access_ok(VERIFY_WRITE, sksgio->argp, sizeof(sg_io_hdr_t))) {
-		pr_debug("%s:%s:%d access sg failed %p\n",
-			 skdev->name, __func__, __LINE__, sksgio->argp);
+		pr_debug("%s access sg failed %p\n", skdev->name, sksgio->argp);
 		return -EFAULT;
 	}
 
 	if (__copy_from_user(sgp, sksgio->argp, sizeof(sg_io_hdr_t))) {
-		pr_debug("%s:%s:%d copy_from_user sg failed %p\n",
-			 skdev->name, __func__, __LINE__, sksgio->argp);
+		pr_debug("%s copy_from_user sg failed %p\n", skdev->name,
+			 sksgio->argp);
 		return -EFAULT;
 	}
 
 	if (sgp->interface_id != SG_INTERFACE_ID_ORIG) {
-		pr_debug("%s:%s:%d interface_id invalid 0x%x\n",
-			 skdev->name, __func__, __LINE__, sgp->interface_id);
+		pr_debug("%s interface_id invalid 0x%x\n", skdev->name,
+			 sgp->interface_id);
 		return -EINVAL;
 	}
 
 	if (sgp->cmd_len > sizeof(sksgio->cdb)) {
-		pr_debug("%s:%s:%d cmd_len invalid %d\n",
-			 skdev->name, __func__, __LINE__, sgp->cmd_len);
+		pr_debug("%s cmd_len invalid %d\n", skdev->name, sgp->cmd_len);
 		return -EINVAL;
 	}
 
 	if (sgp->iovec_count > 256) {
-		pr_debug("%s:%s:%d iovec_count invalid %d\n",
-			 skdev->name, __func__, __LINE__, sgp->iovec_count);
+		pr_debug("%s iovec_count invalid %d\n", skdev->name,
+			 sgp->iovec_count);
 		return -EINVAL;
 	}
 
 	if (sgp->dxfer_len > (PAGE_SIZE * SKD_N_SG_PER_SPECIAL)) {
-		pr_debug("%s:%s:%d dxfer_len invalid %d\n",
-			 skdev->name, __func__, __LINE__, sgp->dxfer_len);
+		pr_debug("%s dxfer_len invalid %d\n", skdev->name,
+			 sgp->dxfer_len);
 		return -EINVAL;
 	}
 
@@ -1317,21 +1296,21 @@ static int skd_sg_io_get_and_check_args(struct skd_device *skdev,
 		break;
 
 	default:
-		pr_debug("%s:%s:%d dxfer_dir invalid %d\n",
-			 skdev->name, __func__, __LINE__, sgp->dxfer_direction);
+		pr_debug("%s dxfer_dir invalid %d\n", skdev->name,
+			 sgp->dxfer_direction);
 		return -EINVAL;
 	}
 
 	if (copy_from_user(sksgio->cdb, sgp->cmdp, sgp->cmd_len)) {
-		pr_debug("%s:%s:%d copy_from_user cmdp failed %p\n",
-			 skdev->name, __func__, __LINE__, sgp->cmdp);
+		pr_debug("%s copy_from_user cmdp failed %p\n", skdev->name,
+			 sgp->cmdp);
 		return -EFAULT;
 	}
 
 	if (sgp->mx_sb_len != 0) {
 		if (!access_ok(VERIFY_WRITE, sgp->sbp, sgp->mx_sb_len)) {
-			pr_debug("%s:%s:%d access sbp failed %p\n",
-				 skdev->name, __func__, __LINE__, sgp->sbp);
+			pr_debug("%s access sbp failed %p\n", skdev->name,
+				 sgp->sbp);
 			return -EFAULT;
 		}
 	}
@@ -1348,8 +1327,7 @@ static int skd_sg_io_get_and_check_args(struct skd_device *skdev,
 
 		iov = kmalloc(nbytes, GFP_KERNEL);
 		if (iov == NULL) {
-			pr_debug("%s:%s:%d alloc iovec failed %d\n",
-				 skdev->name, __func__, __LINE__,
+			pr_debug("%s alloc iovec failed %d\n", skdev->name,
 				 sgp->iovec_count);
 			return -ENOMEM;
 		}
@@ -1357,8 +1335,8 @@ static int skd_sg_io_get_and_check_args(struct skd_device *skdev,
 		sksgio->iovcnt = sgp->iovec_count;
 
 		if (copy_from_user(iov, sgp->dxferp, nbytes)) {
-			pr_debug("%s:%s:%d copy_from_user iovec failed %p\n",
-				 skdev->name, __func__, __LINE__, sgp->dxferp);
+			pr_debug("%s copy_from_user iovec failed %p\n",
+				 skdev->name, sgp->dxferp);
 			return -EFAULT;
 		}
 
@@ -1386,9 +1364,9 @@ static int skd_sg_io_get_and_check_args(struct skd_device *skdev,
 		struct sg_iovec *iov = sksgio->iov;
 		for (i = 0; i < sksgio->iovcnt; i++, iov++) {
 			if (!access_ok(acc, iov->iov_base, iov->iov_len)) {
-				pr_debug("%s:%s:%d access data failed %p/%d\n",
-					 skdev->name, __func__, __LINE__,
-					 iov->iov_base, (int)iov->iov_len);
+				pr_debug("%s access data failed %p/%zd\n",
+					 skdev->name, iov->iov_base,
+					 iov->iov_len);
 				return -EFAULT;
 			}
 		}
@@ -1423,16 +1401,14 @@ static int skd_sg_io_obtain_skspcl(struct skd_device *skdev,
 			break;
 		}
 
-		pr_debug("%s:%s:%d blocking\n",
-			 skdev->name, __func__, __LINE__);
+		pr_debug("%s blocking\n", skdev->name);
 
 		rc = wait_event_interruptible_timeout(
 				skdev->waitq,
 				(skdev->skspcl_free_list != NULL),
 				msecs_to_jiffies(sksgio->sg.timeout));
 
-		pr_debug("%s:%s:%d unblocking, rc=%d\n",
-			 skdev->name, __func__, __LINE__, rc);
+		pr_debug("%s unblocking, rc=%d\n", skdev->name, rc);
 
 		if (rc <= 0) {
 			if (rc == 0)
@@ -1509,16 +1485,14 @@ static int skd_skreq_prep_buffering(struct skd_device *skdev,
 	if (unlikely(skdev->dbg_level > 1)) {
 		u32 i;
 
-		pr_debug("%s:%s:%d skreq=%x sksg_list=%p sksg_dma=%llx\n",
-			 skdev->name, __func__, __LINE__,
-			 skreq->id, skreq->sksg_list, skreq->sksg_dma_address);
+		pr_debug("%s skreq=%x sksg_list=%p sksg_dma=%llx\n",
+			 skdev->name, skreq->id, skreq->sksg_list,
+			 skreq->sksg_dma_address);
 		for (i = 0; i < skreq->n_sg; i++) {
 			struct fit_sg_descriptor *sgd = &skreq->sksg_list[i];
 
-			pr_debug("%s:%s:%d   sg[%d] count=%u ctrl=0x%x "
-				 "addr=0x%llx next=0x%llx\n",
-				 skdev->name, __func__, __LINE__,
-				 i, sgd->byte_count, sgd->control,
+			pr_debug("%s   sg[%d] count=%u ctrl=0x%x addr=0x%llx next=0x%llx\n",
+				 skdev->name, i, sgd->byte_count, sgd->control,
 				 sgd->host_side_addr, sgd->next_desc_ptr);
 		}
 	}
@@ -1641,8 +1615,7 @@ static int skd_sg_io_await(struct skd_device *skdev, struct skd_sg_io *sksgio)
 	spin_lock_irqsave(&skdev->lock, flags);
 
 	if (sksgio->skspcl->req.state == SKD_REQ_STATE_ABORTED) {
-		pr_debug("%s:%s:%d skspcl %p aborted\n",
-			 skdev->name, __func__, __LINE__, sksgio->skspcl);
+		pr_debug("%s skspcl %p aborted\n", skdev->name, sksgio->skspcl);
 
 		/* Build check cond, sense and let command finish. */
 		/* For a timeout, we must fabricate completion and sense
@@ -1667,13 +1640,11 @@ static int skd_sg_io_await(struct skd_device *skdev, struct skd_sg_io *sksgio)
 		sksgio->skspcl->orphaned = 1;
 		sksgio->skspcl = NULL;
 		if (rc == 0) {
-			pr_debug("%s:%s:%d timed out %p (%u ms)\n",
-				 skdev->name, __func__, __LINE__,
+			pr_debug("%s timed out %p (%u ms)\n", skdev->name,
 				 sksgio, sksgio->sg.timeout);
 			rc = -ETIMEDOUT;
 		} else {
-			pr_debug("%s:%s:%d cntlc %p\n",
-				 skdev->name, __func__, __LINE__, sksgio);
+			pr_debug("%s cntlc %p\n", skdev->name, sksgio);
 			rc = -EINTR;
 		}
 	}
@@ -1703,8 +1674,7 @@ static int skd_sg_io_put_status(struct skd_device *skdev,
 	if (sgp->masked_status || sgp->host_status || sgp->driver_status)
 		sgp->info |= SG_INFO_CHECK;
 
-	pr_debug("%s:%s:%d status %x masked %x resid 0x%x\n",
-		 skdev->name, __func__, __LINE__,
+	pr_debug("%s status %x masked %x resid 0x%x\n", skdev->name,
 		 sgp->status, sgp->masked_status, sgp->resid);
 
 	if (sgp->masked_status == SAM_STAT_CHECK_CONDITION) {
@@ -1717,17 +1687,16 @@ static int skd_sg_io_put_status(struct skd_device *skdev,
 			sgp->sb_len_wr = nbytes;
 
 			if (__copy_to_user(sgp->sbp, ei, nbytes)) {
-				pr_debug("%s:%s:%d copy_to_user sense failed %p\n",
-					 skdev->name, __func__, __LINE__,
-					 sgp->sbp);
+				pr_debug("%s copy_to_user sense failed %p\n",
+					 skdev->name, sgp->sbp);
 				return -EFAULT;
 			}
 		}
 	}
 
 	if (__copy_to_user(sksgio->argp, sgp, sizeof(sg_io_hdr_t))) {
-		pr_debug("%s:%s:%d copy_to_user sg failed %p\n",
-			 skdev->name, __func__, __LINE__, sksgio->argp);
+		pr_debug("%s copy_to_user sg failed %p\n", skdev->name,
+			 sksgio->argp);
 		return -EFAULT;
 	}
 
@@ -1915,8 +1884,7 @@ static void skd_complete_internal(struct skd_device *skdev,
 
 	SKD_ASSERT(skspcl == &skdev->internal_skspcl);
 
-	pr_debug("%s:%s:%d complete internal %x\n",
-		 skdev->name, __func__, __LINE__, scsi->cdb[0]);
+	pr_debug("%s complete internal %x\n", skdev->name, scsi->cdb[0]);
 
 	skspcl->req.completion = *skcomp;
 	skspcl->req.state = SKD_REQ_STATE_IDLE;
@@ -1936,13 +1904,12 @@ static void skd_complete_internal(struct skd_device *skdev,
 			skd_send_internal_skspcl(skdev, skspcl, WRITE_BUFFER);
 		else {
 			if (skdev->state == SKD_DRVR_STATE_STOPPING) {
-				pr_debug("%s:%s:%d TUR failed, don't send anymore state 0x%x\n",
-					 skdev->name, __func__, __LINE__,
-					 skdev->state);
+				pr_debug("%s TUR failed, don't send anymore state 0x%x\n",
+					 skdev->name, skdev->state);
 				return;
 			}
-			pr_debug("%s:%s:%d **** TUR failed, retry skerr\n",
-				 skdev->name, __func__, __LINE__);
+			pr_debug("%s **** TUR failed, retry skerr\n",
+				 skdev->name);
 			skd_send_internal_skspcl(skdev, skspcl, 0x00);
 		}
 		break;
@@ -1952,13 +1919,12 @@ static void skd_complete_internal(struct skd_device *skdev,
 			skd_send_internal_skspcl(skdev, skspcl, READ_BUFFER);
 		else {
 			if (skdev->state == SKD_DRVR_STATE_STOPPING) {
-				pr_debug("%s:%s:%d write buffer failed, don't send anymore state 0x%x\n",
-					 skdev->name, __func__, __LINE__,
-					 skdev->state);
+				pr_debug("%s write buffer failed, don't send anymore state 0x%x\n",
+					 skdev->name, skdev->state);
 				return;
 			}
-			pr_debug("%s:%s:%d **** write buffer failed, retry skerr\n",
-				 skdev->name, __func__, __LINE__);
+			pr_debug("%s **** write buffer failed, retry skerr\n",
+				 skdev->name);
 			skd_send_internal_skspcl(skdev, skspcl, 0x00);
 		}
 		break;
@@ -1986,15 +1952,12 @@ static void skd_complete_internal(struct skd_device *skdev,
 
 		} else {
 			if (skdev->state == SKD_DRVR_STATE_STOPPING) {
-				pr_debug("%s:%s:%d "
-					 "read buffer failed, don't send anymore state 0x%x\n",
-					 skdev->name, __func__, __LINE__,
-					 skdev->state);
+				pr_debug("%s read buffer failed, don't send anymore state 0x%x\n",
+					 skdev->name, skdev->state);
 				return;
 			}
-			pr_debug("%s:%s:%d "
-				 "**** read buffer failed, retry skerr\n",
-				 skdev->name, __func__, __LINE__);
+			pr_debug("%s **** read buffer failed, retry skerr\n",
+				 skdev->name);
 			skd_send_internal_skspcl(skdev, skspcl, 0x00);
 		}
 		break;
@@ -2009,8 +1972,7 @@ static void skd_complete_internal(struct skd_device *skdev,
 				(buf[4] << 24) | (buf[5] << 16) |
 				(buf[6] << 8) | buf[7];
 
-			pr_debug("%s:%s:%d last lba %d, bs %d\n",
-				 skdev->name, __func__, __LINE__,
+			pr_debug("%s last lba %d, bs %d\n", skdev->name,
 				 skdev->read_cap_last_lba,
 				 skdev->read_cap_blocksize);
 
@@ -2023,13 +1985,12 @@ static void skd_complete_internal(struct skd_device *skdev,
 			   (skerr->key == MEDIUM_ERROR)) {
 			skdev->read_cap_last_lba = ~0;
 			set_capacity(skdev->disk, skdev->read_cap_last_lba + 1);
-			pr_debug("%s:%s:%d "
-				 "**** MEDIUM ERROR caused READCAP to fail, ignore failure and continue to inquiry\n",
-				 skdev->name, __func__, __LINE__);
+			pr_debug("%s **** MEDIUM ERROR caused READCAP to fail, ignore failure and continue to inquiry\n",
+				 skdev->name);
 			skd_send_internal_skspcl(skdev, skspcl, INQUIRY);
 		} else {
-			pr_debug("%s:%s:%d **** READCAP failed, retry TUR\n",
-				 skdev->name, __func__, __LINE__);
+			pr_debug("%s **** READCAP failed, retry TUR\n",
+				 skdev->name);
 			skd_send_internal_skspcl(skdev, skspcl,
 						 TEST_UNIT_READY);
 		}
@@ -2046,8 +2007,8 @@ static void skd_complete_internal(struct skd_device *skdev,
 		}
 
 		if (skd_unquiesce_dev(skdev) < 0)
-			pr_debug("%s:%s:%d **** failed, to ONLINE device\n",
-				 skdev->name, __func__, __LINE__);
+			pr_debug("%s **** failed, to ONLINE device\n",
+				 skdev->name);
 		 /* connection is complete */
 		skdev->connect_retries = 0;
 		break;
@@ -2077,12 +2038,10 @@ static void skd_send_fitmsg(struct skd_device *skdev,
 	u64 qcmd;
 	struct fit_msg_hdr *fmh;
 
-	pr_debug("%s:%s:%d dma address 0x%llx, busy=%d\n",
-		 skdev->name, __func__, __LINE__,
+	pr_debug("%s dma address 0x%llx, busy=%d\n", skdev->name,
 		 skmsg->mb_dma_address, skdev->in_flight);
-	pr_debug("%s:%s:%d msg_buf 0x%p, offset %x\n",
-		 skdev->name, __func__, __LINE__,
-		 skmsg->msg_buf, skmsg->offset);
+	pr_debug("%s msg_buf 0x%p, offset %x\n", skdev->name, skmsg->msg_buf,
+		 skmsg->offset);
 
 	qcmd = skmsg->mb_dma_address;
 	qcmd |= FIT_QCMD_QID_NORMAL;
@@ -2094,8 +2053,7 @@ static void skd_send_fitmsg(struct skd_device *skdev,
 		u8 *bp = (u8 *)skmsg->msg_buf;
 		int i;
 		for (i = 0; i < skmsg->length; i += 8) {
-			pr_debug("%s:%s:%d msg[%2d] %8ph\n",
-				 skdev->name, __func__, __LINE__, i, &bp[i]);
+			pr_debug("%s msg[%2d] %8ph\n", skdev->name, i, &bp[i]);
 			if (i == 0)
 				i = 64 - 8;
 		}
@@ -2128,24 +2086,21 @@ static void skd_send_special_fitmsg(struct skd_device *skdev,
 		int i;
 
 		for (i = 0; i < SKD_N_SPECIAL_FITMSG_BYTES; i += 8) {
-			pr_debug("%s:%s:%d  spcl[%2d] %8ph\n",
-				 skdev->name, __func__, __LINE__, i, &bp[i]);
+			pr_debug("%s  spcl[%2d] %8ph\n", skdev->name, i,
+				 &bp[i]);
 			if (i == 0)
 				i = 64 - 8;
 		}
 
-		pr_debug("%s:%s:%d skspcl=%p id=%04x sksg_list=%p sksg_dma=%llx\n",
-			 skdev->name, __func__, __LINE__,
-			 skspcl, skspcl->req.id, skspcl->req.sksg_list,
-			 skspcl->req.sksg_dma_address);
+		pr_debug("%s skspcl=%p id=%04x sksg_list=%p sksg_dma=%llx\n",
+			 skdev->name, skspcl, skspcl->req.id,
+			 skspcl->req.sksg_list, skspcl->req.sksg_dma_address);
 		for (i = 0; i < skspcl->req.n_sg; i++) {
 			struct fit_sg_descriptor *sgd =
 				&skspcl->req.sksg_list[i];
 
-			pr_debug("%s:%s:%d   sg[%d] count=%u ctrl=0x%x "
-				 "addr=0x%llx next=0x%llx\n",
-				 skdev->name, __func__, __LINE__,
-				 i, sgd->byte_count, sgd->control,
+			pr_debug("%s   sg[%d] count=%u ctrl=0x%x addr=0x%llx next=0x%llx\n",
+				 skdev->name, i, sgd->byte_count, sgd->control,
 				 sgd->host_side_addr, sgd->next_desc_ptr);
 		}
 	}
@@ -2225,9 +2180,9 @@ skd_check_status(struct skd_device *skdev,
 	       skd_name(skdev), skerr->key, skerr->code, skerr->qual,
 	       skerr->fruc);
 
-	pr_debug("%s:%s:%d stat: t=%02x stat=%02x k=%02x c=%02x q=%02x fruc=%02x\n",
-		 skdev->name, __func__, __LINE__, skerr->type, cmp_status,
-		 skerr->key, skerr->code, skerr->qual, skerr->fruc);
+	pr_debug("%s stat: t=%02x stat=%02x k=%02x c=%02x q=%02x fruc=%02x\n",
+		 skdev->name, skerr->type, cmp_status, skerr->key, skerr->code,
+		 skerr->qual, skerr->fruc);
 
 	/* Does the info match an entry in the good category? */
 	n = sizeof(skd_chkstat_table) / sizeof(skd_chkstat_table[0]);
@@ -2267,13 +2222,11 @@ skd_check_status(struct skd_device *skdev,
 	 * zero status means good
 	 */
 	if (cmp_status) {
-		pr_debug("%s:%s:%d status check: error\n",
-			 skdev->name, __func__, __LINE__);
+		pr_debug("%s status check: error\n", skdev->name);
 		return SKD_CHECK_STATUS_REPORT_ERROR;
 	}
 
-	pr_debug("%s:%s:%d status check good default\n",
-		 skdev->name, __func__, __LINE__);
+	pr_debug("%s status check good default\n", skdev->name);
 	return SKD_CHECK_STATUS_REPORT_GOOD;
 }
 
@@ -2391,8 +2344,8 @@ static void skd_do_inq_page_00(struct skd_device *skdev,
 	/* Caller requested "supported pages".  The driver needs to insert
 	 * its page.
 	 */
-	pr_debug("%s:%s:%d skd_do_driver_inquiry: modify supported pages.\n",
-		 skdev->name, __func__, __LINE__);
+	pr_debug("%s skd_do_driver_inquiry: modify supported pages.\n",
+		 skdev->name);
 
 	/* If the device rejected the request because the CDB was
 	 * improperly formed, then just leave.
@@ -2488,8 +2441,7 @@ static void skd_do_inq_page_da(struct skd_device *skdev,
 	struct driver_inquiry_data inq;
 	u16 val;
 
-	pr_debug("%s:%s:%d skd_do_driver_inquiry: return driver page\n",
-		 skdev->name, __func__, __LINE__);
+	pr_debug("%s skd_do_driver_inquiry: return driver page\n", skdev->name);
 
 	memset(&inq, 0, sizeof(inq));
 
@@ -2605,16 +2557,13 @@ static int skd_isr_completion_posted(struct skd_device *skdev,
 
 		skerr = &skdev->skerr_table[skdev->skcomp_ix];
 
-		pr_debug("%s:%s:%d "
-			 "cycle=%d ix=%d got cycle=%d cmdctxt=0x%x stat=%d "
-			 "busy=%d rbytes=0x%x proto=%d\n",
-			 skdev->name, __func__, __LINE__, skdev->skcomp_cycle,
-			 skdev->skcomp_ix, cmp_cycle, cmp_cntxt, cmp_status,
-			 skdev->in_flight, cmp_bytes, skdev->proto_ver);
+		pr_debug("%s cycle=%d ix=%d got cycle=%d cmdctxt=0x%x stat=%d busy=%d rbytes=0x%x proto=%d\n",
+			 skdev->name, skdev->skcomp_cycle, skdev->skcomp_ix,
+			 cmp_cycle, cmp_cntxt, cmp_status, skdev->in_flight,
+			 cmp_bytes, skdev->proto_ver);
 
 		if (cmp_cycle != skdev->skcomp_cycle) {
-			pr_debug("%s:%s:%d end of completions\n",
-				 skdev->name, __func__, __LINE__);
+			pr_debug("%s end of completions\n", skdev->name);
 			break;
 		}
 		/*
@@ -2650,15 +2599,12 @@ static int skd_isr_completion_posted(struct skd_device *skdev,
 		 * Make sure the request ID for the slot matches.
 		 */
 		if (skreq->id != req_id) {
-			pr_debug("%s:%s:%d mismatch comp_id=0x%x req_id=0x%x\n",
-				 skdev->name, __func__, __LINE__,
-				 req_id, skreq->id);
+			pr_debug("%s mismatch comp_id=0x%x req_id=0x%x\n",
+				 skdev->name, req_id, skreq->id);
 			{
 				u16 new_id = cmp_cntxt;
-				pr_err("(%s): Completion mismatch "
-				       "comp_id=0x%04x skreq=0x%04x new=0x%04x\n",
-				       skd_name(skdev), req_id,
-				       skreq->id, new_id);
+				pr_err("(%s): Completion mismatch comp_id=0x%04x skreq=0x%04x new=0x%04x\n",
+				       skd_name(skdev), req_id, skreq->id, new_id);
 
 				continue;
 			}
@@ -2667,8 +2613,8 @@ static int skd_isr_completion_posted(struct skd_device *skdev,
 		SKD_ASSERT(skreq->state == SKD_REQ_STATE_BUSY);
 
 		if (skreq->state == SKD_REQ_STATE_ABORTED) {
-			pr_debug("%s:%s:%d reclaim req %p id=%04x\n",
-				 skdev->name, __func__, __LINE__,
+			pr_debug("%s reclaim req %p id=%04x\n",
+				 skdev->name,
 				 skreq, skreq->id);
 			/* a previously timed out command can
 			 * now be cleaned up */
@@ -2688,10 +2634,8 @@ static int skd_isr_completion_posted(struct skd_device *skdev,
 			skd_postop_sg_list(skdev, skreq);
 
 		if (!skreq->req) {
-			pr_debug("%s:%s:%d NULL backptr skdreq %p, "
-				 "req=0x%x req_id=0x%x\n",
-				 skdev->name, __func__, __LINE__,
-				 skreq, skreq->id, req_id);
+			pr_debug("%s NULL backptr skdreq %p, req=0x%x req_id=0x%x\n",
+				 skdev->name, skreq, skreq->id, req_id);
 		} else {
 			/*
 			 * Capture the outcome and post it back to the
@@ -2740,9 +2684,8 @@ static void skd_complete_other(struct skd_device *skdev,
 	req_table = req_id & SKD_ID_TABLE_MASK;
 	req_slot = req_id & SKD_ID_SLOT_MASK;
 
-	pr_debug("%s:%s:%d table=0x%x id=0x%x slot=%d\n",
-		 skdev->name, __func__, __LINE__,
-		 req_table, req_id, req_slot);
+	pr_debug("%s table=0x%x id=0x%x slot=%d\n", skdev->name, req_table,
+		 req_id, req_slot);
 
 	/*
 	 * Based on the request id, determine how to dispatch this completion.
@@ -2810,14 +2753,12 @@ static void skd_complete_special(struct skd_device *skdev,
 				 volatile struct fit_comp_error_info *skerr,
 				 struct skd_special_context *skspcl)
 {
-	pr_debug("%s:%s:%d  completing special request %p\n",
-		 skdev->name, __func__, __LINE__, skspcl);
+	pr_debug("%s  completing special request %p\n", skdev->name, skspcl);
 	if (skspcl->orphaned) {
 		/* Discard orphaned request */
 		/* ?: Can this release directly or does it need
 		 * to use a worker? */
-		pr_debug("%s:%s:%d release orphaned %p\n",
-			 skdev->name, __func__, __LINE__, skspcl);
+		pr_debug("%s release orphaned %p\n", skdev->name, skspcl);
 		skd_release_special(skdev, skspcl);
 		return;
 	}
@@ -2854,8 +2795,7 @@ static void skd_release_special(struct skd_device *skdev,
 	skdev->skspcl_free_list = (struct skd_special_context *)skspcl;
 
 	if (was_depleted) {
-		pr_debug("%s:%s:%d skspcl was depleted\n",
-			 skdev->name, __func__, __LINE__);
+		pr_debug("%s skspcl was depleted\n", skdev->name);
 		/* Free list was depleted. Their might be waiters. */
 		wake_up_interruptible(&skdev->waitq);
 	}
@@ -2920,8 +2860,8 @@ skd_isr(int irq, void *ptr)
 		ack = FIT_INT_DEF_MASK;
 		ack &= intstat;
 
-		pr_debug("%s:%s:%d intstat=0x%x ack=0x%x\n",
-			 skdev->name, __func__, __LINE__, intstat, ack);
+		pr_debug("%s intstat=0x%x ack=0x%x\n", skdev->name, intstat,
+			 ack);
 
 		/* As long as there is an int pending on device, keep
 		 * running loop.  When none, get out, but if we've never
@@ -3081,8 +3021,8 @@ static void skd_isr_fwstate(struct skd_device *skdev)
 		}
 		break;
 	case FIT_SR_DRIVE_FW_BOOTING:
-		pr_debug("%s:%s:%d ISR FIT_SR_DRIVE_FW_BOOTING %s\n",
-			 skdev->name, __func__, __LINE__, skdev->name);
+		pr_debug("%s ISR FIT_SR_DRIVE_FW_BOOTING %s\n", skdev->name,
+			 skdev->name);
 		skdev->state = SKD_DRVR_STATE_WAIT_BOOT;
 		skdev->timer_countdown = SKD_WAIT_BOOT_TIMO;
 		break;
@@ -3180,13 +3120,11 @@ static void skd_recover_requests(struct skd_device *skdev, int requeue)
 		 */
 		if (skspcl->req.state == SKD_REQ_STATE_BUSY) {
 			if (skspcl->orphaned) {
-				pr_debug("%s:%s:%d orphaned %p\n",
-					 skdev->name, __func__, __LINE__,
+				pr_debug("%s orphaned %p\n", skdev->name,
 					 skspcl);
 				skd_release_special(skdev, skspcl);
 			} else {
-				pr_debug("%s:%s:%d not orphaned %p\n",
-					 skdev->name, __func__, __LINE__,
+				pr_debug("%s not orphaned %p\n", skdev->name,
 					 skspcl);
 				skspcl->req.state = SKD_REQ_STATE_ABORTED;
 			}
@@ -3208,8 +3146,8 @@ static void skd_isr_msg_from_dev(struct skd_device *skdev)
 
 	mfd = SKD_READL(skdev, FIT_MSG_FROM_DEVICE);
 
-	pr_debug("%s:%s:%d mfd=0x%x last_mtd=0x%x\n",
-		 skdev->name, __func__, __LINE__, mfd, skdev->last_mtd);
+	pr_debug("%s mfd=0x%x last_mtd=0x%x\n", skdev->name, mfd,
+		 skdev->last_mtd);
 
 	/* ignore any mtd that is an ack for something we didn't send */
 	if (FIT_MXD_TYPE(mfd) != FIT_MXD_TYPE(skdev->last_mtd))
@@ -3304,8 +3242,7 @@ static void skd_disable_interrupts(struct skd_device *skdev)
 	sense = SKD_READL(skdev, FIT_CONTROL);
 	sense &= ~FIT_CR_ENABLE_INTERRUPTS;
 	SKD_WRITEL(skdev, sense, FIT_CONTROL);
-	pr_debug("%s:%s:%d sense 0x%x\n",
-		 skdev->name, __func__, __LINE__, sense);
+	pr_debug("%s sense 0x%x\n", skdev->name, sense);
 
 	/* Note that the 1s is written. A 1-bit means
 	 * disable, a 0 means enable.
@@ -3324,13 +3261,11 @@ static void skd_enable_interrupts(struct skd_device *skdev)
 	/* Note that the compliment of mask is written. A 1-bit means
 	 * disable, a 0 means enable. */
 	SKD_WRITEL(skdev, ~val, FIT_INT_MASK_HOST);
-	pr_debug("%s:%s:%d interrupt mask=0x%x\n",
-		 skdev->name, __func__, __LINE__, ~val);
+	pr_debug("%s interrupt mask=0x%x\n", skdev->name, ~val);
 
 	val = SKD_READL(skdev, FIT_CONTROL);
 	val |= FIT_CR_ENABLE_INTERRUPTS;
-	pr_debug("%s:%s:%d control=0x%x\n",
-		 skdev->name, __func__, __LINE__, val);
+	pr_debug("%s control=0x%x\n", skdev->name, val);
 	SKD_WRITEL(skdev, val, FIT_CONTROL);
 }
 
@@ -3346,8 +3281,7 @@ static void skd_soft_reset(struct skd_device *skdev)
 
 	val = SKD_READL(skdev, FIT_CONTROL);
 	val |= (FIT_CR_SOFT_RESET);
-	pr_debug("%s:%s:%d control=0x%x\n",
-		 skdev->name, __func__, __LINE__, val);
+	pr_debug("%s control=0x%x\n", skdev->name, val);
 	SKD_WRITEL(skdev, val, FIT_CONTROL);
 }
 
@@ -3364,8 +3298,7 @@ static void skd_start_device(struct skd_device *skdev)
 
 	sense = SKD_READL(skdev, FIT_STATUS);
 
-	pr_debug("%s:%s:%d initial status=0x%x\n",
-		 skdev->name, __func__, __LINE__, sense);
+	pr_debug("%s initial status=0x%x\n", skdev->name, sense);
 
 	state = sense & FIT_SR_DRIVE_STATE_MASK;
 	skdev->drive_state = state;
@@ -3382,8 +3315,8 @@ static void skd_start_device(struct skd_device *skdev)
 		break;
 
 	case FIT_SR_DRIVE_FW_BOOTING:
-		pr_debug("%s:%s:%d FIT_SR_DRIVE_FW_BOOTING %s\n",
-			 skdev->name, __func__, __LINE__, skdev->name);
+		pr_debug("%s FIT_SR_DRIVE_FW_BOOTING %s\n", skdev->name,
+			 skdev->name);
 		skdev->state = SKD_DRVR_STATE_WAIT_BOOT;
 		skdev->timer_countdown = SKD_WAIT_BOOT_TIMO;
 		break;
@@ -3424,8 +3357,7 @@ static void skd_start_device(struct skd_device *skdev)
 		 */
 		skd_drive_fault(skdev);
 		/*start the queue so we can respond with error to requests */
-		pr_debug("%s:%s:%d starting %s queue\n",
-			 skdev->name, __func__, __LINE__, skdev->name);
+		pr_debug("%s starting %s queue\n", skdev->name, skdev->name);
 		blk_start_queue(skdev->queue);
 		skdev->gendisk_on = -1;
 		wake_up_interruptible(&skdev->waitq);
@@ -3436,8 +3368,8 @@ static void skd_start_device(struct skd_device *skdev)
 		 * to the BAR1 addresses. */
 		skd_drive_disappeared(skdev);
 		/*start the queue so we can respond with error to requests */
-		pr_debug("%s:%s:%d starting %s queue to error-out reqs\n",
-			 skdev->name, __func__, __LINE__, skdev->name);
+		pr_debug("%s starting %s queue to error-out reqs\n",
+			 skdev->name, skdev->name);
 		blk_start_queue(skdev->queue);
 		skdev->gendisk_on = -1;
 		wake_up_interruptible(&skdev->waitq);
@@ -3450,24 +3382,19 @@ static void skd_start_device(struct skd_device *skdev)
 	}
 
 	state = SKD_READL(skdev, FIT_CONTROL);
-	pr_debug("%s:%s:%d FIT Control Status=0x%x\n",
-		 skdev->name, __func__, __LINE__, state);
+	pr_debug("%s FIT Control Status=0x%x\n", skdev->name, state);
 
 	state = SKD_READL(skdev, FIT_INT_STATUS_HOST);
-	pr_debug("%s:%s:%d Intr Status=0x%x\n",
-		 skdev->name, __func__, __LINE__, state);
+	pr_debug("%s Intr Status=0x%x\n", skdev->name, state);
 
 	state = SKD_READL(skdev, FIT_INT_MASK_HOST);
-	pr_debug("%s:%s:%d Intr Mask=0x%x\n",
-		 skdev->name, __func__, __LINE__, state);
+	pr_debug("%s Intr Mask=0x%x\n", skdev->name, state);
 
 	state = SKD_READL(skdev, FIT_MSG_FROM_DEVICE);
-	pr_debug("%s:%s:%d Msg from Dev=0x%x\n",
-		 skdev->name, __func__, __LINE__, state);
+	pr_debug("%s Msg from Dev=0x%x\n", skdev->name, state);
 
 	state = SKD_READL(skdev, FIT_HW_VERSION);
-	pr_debug("%s:%s:%d HW version=0x%x\n",
-		 skdev->name, __func__, __LINE__, state);
+	pr_debug("%s HW version=0x%x\n", skdev->name, state);
 
 	spin_unlock_irqrestore(&skdev->lock, flags);
 }
@@ -3560,8 +3487,7 @@ static void skd_restart_device(struct skd_device *skdev)
 
 	state = SKD_READL(skdev, FIT_STATUS);
 
-	pr_debug("%s:%s:%d drive status=0x%x\n",
-		 skdev->name, __func__, __LINE__, state);
+	pr_debug("%s drive status=0x%x\n", skdev->name, state);
 
 	state &= FIT_SR_DRIVE_STATE_MASK;
 	skdev->drive_state = state;
@@ -3581,8 +3507,7 @@ static int skd_quiesce_dev(struct skd_device *skdev)
 	switch (skdev->state) {
 	case SKD_DRVR_STATE_BUSY:
 	case SKD_DRVR_STATE_BUSY_IMMINENT:
-		pr_debug("%s:%s:%d stopping %s queue\n",
-			 skdev->name, __func__, __LINE__, skdev->name);
+		pr_debug("%s stopping %s queue\n", skdev->name, skdev->name);
 		blk_stop_queue(skdev->queue);
 		break;
 	case SKD_DRVR_STATE_ONLINE:
@@ -3595,8 +3520,8 @@ static int skd_quiesce_dev(struct skd_device *skdev)
 	case SKD_DRVR_STATE_RESUMING:
 	default:
 		rc = -EINVAL;
-		pr_debug("%s:%s:%d state [%d] not implemented\n",
-			 skdev->name, __func__, __LINE__, skdev->state);
+		pr_debug("%s state [%d] not implemented\n", skdev->name,
+			 skdev->state);
 	}
 	return rc;
 }
@@ -3608,8 +3533,7 @@ static int skd_unquiesce_dev(struct skd_device *skdev)
 
 	skd_log_skdev(skdev, "unquiesce");
 	if (skdev->state == SKD_DRVR_STATE_ONLINE) {
-		pr_debug("%s:%s:%d **** device already ONLINE\n",
-			 skdev->name, __func__, __LINE__);
+		pr_debug("%s **** device already ONLINE\n", skdev->name);
 		return 0;
 	}
 	if (skdev->drive_state != FIT_SR_DRIVE_ONLINE) {
@@ -3622,8 +3546,7 @@ static int skd_unquiesce_dev(struct skd_device *skdev)
 		 * to become available.
 		 */
 		skdev->state = SKD_DRVR_STATE_BUSY;
-		pr_debug("%s:%s:%d drive BUSY state\n",
-			 skdev->name, __func__, __LINE__);
+		pr_debug("%s drive BUSY state\n", skdev->name);
 		return 0;
 	}
 
@@ -3647,10 +3570,9 @@ static int skd_unquiesce_dev(struct skd_device *skdev)
 		       skd_skdev_state_to_str(prev_driver_state),
 		       prev_driver_state, skd_skdev_state_to_str(skdev->state),
 		       skdev->state);
-		pr_debug("%s:%s:%d **** device ONLINE...starting block queue\n",
-			 skdev->name, __func__, __LINE__);
-		pr_debug("%s:%s:%d starting %s queue\n",
-			 skdev->name, __func__, __LINE__, skdev->name);
+		pr_debug("%s **** device ONLINE...starting block queue\n",
+			 skdev->name);
+		pr_debug("%s starting %s queue\n", skdev->name, skdev->name);
 		pr_info("(%s): STEC s1120 ONLINE\n", skd_name(skdev));
 		blk_start_queue(skdev->queue);
 		skdev->gendisk_on = 1;
@@ -3659,9 +3581,8 @@ static int skd_unquiesce_dev(struct skd_device *skdev)
 
 	case SKD_DRVR_STATE_DISAPPEARED:
 	default:
-		pr_debug("%s:%s:%d **** driver state %d, not implemented \n",
-			 skdev->name, __func__, __LINE__,
-			 skdev->state);
+		pr_debug("%s **** driver state %d, not implemented \n",
+			 skdev->name, skdev->state);
 		return -EBUSY;
 	}
 	return 0;
@@ -3679,11 +3600,10 @@ static irqreturn_t skd_reserved_isr(int irq, void *skd_host_data)
 	unsigned long flags;
 
 	spin_lock_irqsave(&skdev->lock, flags);
-	pr_debug("%s:%s:%d MSIX = 0x%x\n",
-		 skdev->name, __func__, __LINE__,
+	pr_debug("%s MSIX = 0x%x\n", skdev->name,
 		 SKD_READL(skdev, FIT_INT_STATUS_HOST));
-	pr_err("(%s): MSIX reserved irq %d = 0x%x\n", skd_name(skdev),
-	       irq, SKD_READL(skdev, FIT_INT_STATUS_HOST));
+	pr_err("(%s): MSIX reserved irq %d = 0x%x\n", skd_name(skdev), irq,
+	       SKD_READL(skdev, FIT_INT_STATUS_HOST));
 	SKD_WRITEL(skdev, FIT_INT_RESERVED_MASK, FIT_INT_STATUS_HOST);
 	spin_unlock_irqrestore(&skdev->lock, flags);
 	return IRQ_HANDLED;
@@ -3695,8 +3615,7 @@ static irqreturn_t skd_statec_isr(int irq, void *skd_host_data)
 	unsigned long flags;
 
 	spin_lock_irqsave(&skdev->lock, flags);
-	pr_debug("%s:%s:%d MSIX = 0x%x\n",
-		 skdev->name, __func__, __LINE__,
+	pr_debug("%s MSIX = 0x%x\n", skdev->name,
 		 SKD_READL(skdev, FIT_INT_STATUS_HOST));
 	SKD_WRITEL(skdev, FIT_ISH_FW_STATE_CHANGE, FIT_INT_STATUS_HOST);
 	skd_isr_fwstate(skdev);
@@ -3712,8 +3631,7 @@ static irqreturn_t skd_comp_q(int irq, void *skd_host_data)
 	int deferred;
 
 	spin_lock_irqsave(&skdev->lock, flags);
-	pr_debug("%s:%s:%d MSIX = 0x%x\n",
-		 skdev->name, __func__, __LINE__,
+	pr_debug("%s MSIX = 0x%x\n", skdev->name,
 		 SKD_READL(skdev, FIT_INT_STATUS_HOST));
 	SKD_WRITEL(skdev, FIT_ISH_COMPLETION_POSTED, FIT_INT_STATUS_HOST);
 	deferred = skd_isr_completion_posted(skdev, skd_isr_comp_limit,
@@ -3737,8 +3655,7 @@ static irqreturn_t skd_msg_isr(int irq, void *skd_host_data)
 	unsigned long flags;
 
 	spin_lock_irqsave(&skdev->lock, flags);
-	pr_debug("%s:%s:%d MSIX = 0x%x\n",
-		 skdev->name, __func__, __LINE__,
+	pr_debug("%s MSIX = 0x%x\n", skdev->name,
 		 SKD_READL(skdev, FIT_INT_STATUS_HOST));
 	SKD_WRITEL(skdev, FIT_ISH_MSG_FROM_DEV, FIT_INT_STATUS_HOST);
 	skd_isr_msg_from_dev(skdev);
@@ -3752,8 +3669,7 @@ static irqreturn_t skd_qfull_isr(int irq, void *skd_host_data)
 	unsigned long flags;
 
 	spin_lock_irqsave(&skdev->lock, flags);
-	pr_debug("%s:%s:%d MSIX = 0x%x\n",
-		 skdev->name, __func__, __LINE__,
+	pr_debug("%s MSIX = 0x%x\n", skdev->name,
 		 SKD_READL(skdev, FIT_INT_STATUS_HOST));
 	SKD_WRITEL(skdev, FIT_INT_QUEUE_FULL, FIT_INT_STATUS_HOST);
 	spin_unlock_irqrestore(&skdev->lock, flags);
@@ -3837,8 +3753,7 @@ static int skd_acquire_msix(struct skd_device *skdev)
 		}
 	}
 
-	pr_debug("%s:%s:%d %s: <%s> msix %d irq(s) enabled\n",
-		 skdev->name, __func__, __LINE__,
+	pr_debug("%s %s: <%s> msix %d irq(s) enabled\n", skdev->name,
 		 pci_name(pdev), skdev->name, SKD_MAX_MSIX_COUNT);
 	return 0;
 
@@ -3927,8 +3842,7 @@ static int skd_cons_skcomp(struct skd_device *skdev)
 	nbytes = sizeof(*skcomp) * SKD_N_COMPLETION_ENTRY;
 	nbytes += sizeof(struct fit_comp_error_info) * SKD_N_COMPLETION_ENTRY;
 
-	pr_debug("%s:%s:%d comp pci_alloc, total bytes %d entries %d\n",
-		 skdev->name, __func__, __LINE__,
+	pr_debug("%s comp pci_alloc, total bytes %d entries %d\n", skdev->name,
 		 nbytes, SKD_N_COMPLETION_ENTRY);
 
 	skcomp = pci_zalloc_consistent(skdev->pdev, nbytes,
@@ -3953,9 +3867,8 @@ static int skd_cons_skmsg(struct skd_device *skdev)
 	int rc = 0;
 	u32 i;
 
-	pr_debug("%s:%s:%d skmsg_table kzalloc, struct %lu, count %u total %lu\n",
-		 skdev->name, __func__, __LINE__,
-		 sizeof(struct skd_fitmsg_context),
+	pr_debug("%s skmsg_table kzalloc, struct %lu, count %u total %lu\n",
+		 skdev->name, sizeof(struct skd_fitmsg_context),
 		 skdev->num_fitmsg_context,
 		 sizeof(struct skd_fitmsg_context) * skdev->num_fitmsg_context);
 
@@ -4037,9 +3950,8 @@ static int skd_cons_skreq(struct skd_device *skdev)
 	int rc = 0;
 	u32 i;
 
-	pr_debug("%s:%s:%d skreq_table kzalloc, struct %lu, count %u total %lu\n",
-		 skdev->name, __func__, __LINE__,
-		 sizeof(struct skd_request_context),
+	pr_debug("%s skreq_table kzalloc, struct %lu, count %u total %lu\n",
+		 skdev->name, sizeof(struct skd_request_context),
 		 skdev->num_req_context,
 		 sizeof(struct skd_request_context) * skdev->num_req_context);
 
@@ -4050,8 +3962,8 @@ static int skd_cons_skreq(struct skd_device *skdev)
 		goto err_out;
 	}
 
-	pr_debug("%s:%s:%d alloc sg_table sg_per_req %u scatlist %lu total %lu\n",
-		 skdev->name, __func__, __LINE__,
+	pr_debug("%s alloc sg_table sg_per_req %u scatlist %lu total %lu\n",
+		 skdev->name,
 		 skdev->sgs_per_request, sizeof(struct scatterlist),
 		 skdev->sgs_per_request * sizeof(struct scatterlist));
 
@@ -4096,9 +4008,8 @@ static int skd_cons_skspcl(struct skd_device *skdev)
 	int rc = 0;
 	u32 i, nbytes;
 
-	pr_debug("%s:%s:%d skspcl_table kzalloc, struct %lu, count %u total %lu\n",
-		 skdev->name, __func__, __LINE__,
-		 sizeof(struct skd_special_context),
+	pr_debug("%s skspcl_table kzalloc, struct %lu, count %u total %lu\n",
+		 skdev->name, sizeof(struct skd_special_context),
 		 skdev->n_special,
 		 sizeof(struct skd_special_context) * skdev->n_special);
 
@@ -4242,8 +4153,7 @@ static int skd_cons_disk(struct skd_device *skdev)
 	queue_flag_clear_unlocked(QUEUE_FLAG_ADD_RANDOM, q);
 
 	spin_lock_irqsave(&skdev->lock, flags);
-	pr_debug("%s:%s:%d stopping %s queue\n",
-		 skdev->name, __func__, __LINE__, skdev->name);
+	pr_debug("%s stopping %s queue\n", skdev->name, skdev->name);
 	blk_stop_queue(skdev->queue);
 	spin_unlock_irqrestore(&skdev->lock, flags);
 
@@ -4290,42 +4200,41 @@ static struct skd_device *skd_construct(struct pci_dev *pdev)
 
 	INIT_WORK(&skdev->completion_worker, skd_completion_worker);
 
-	pr_debug("%s:%s:%d skcomp\n", skdev->name, __func__, __LINE__);
+	pr_debug("%s skcomp\n", skdev->name);
 	rc = skd_cons_skcomp(skdev);
 	if (rc < 0)
 		goto err_out;
 
-	pr_debug("%s:%s:%d skmsg\n", skdev->name, __func__, __LINE__);
+	pr_debug("%s skmsg\n", skdev->name);
 	rc = skd_cons_skmsg(skdev);
 	if (rc < 0)
 		goto err_out;
 
-	pr_debug("%s:%s:%d skreq\n", skdev->name, __func__, __LINE__);
+	pr_debug("%s skreq\n", skdev->name);
 	rc = skd_cons_skreq(skdev);
 	if (rc < 0)
 		goto err_out;
 
-	pr_debug("%s:%s:%d skspcl\n", skdev->name, __func__, __LINE__);
+	pr_debug("%s skspcl\n", skdev->name);
 	rc = skd_cons_skspcl(skdev);
 	if (rc < 0)
 		goto err_out;
 
-	pr_debug("%s:%s:%d sksb\n", skdev->name, __func__, __LINE__);
+	pr_debug("%s sksb\n", skdev->name);
 	rc = skd_cons_sksb(skdev);
 	if (rc < 0)
 		goto err_out;
 
-	pr_debug("%s:%s:%d disk\n", skdev->name, __func__, __LINE__);
+	pr_debug("%s disk\n", skdev->name);
 	rc = skd_cons_disk(skdev);
 	if (rc < 0)
 		goto err_out;
 
-	pr_debug("%s:%s:%d VICTORY\n", skdev->name, __func__, __LINE__);
+	pr_debug("%s VICTORY\n", skdev->name);
 	return skdev;
 
 err_out:
-	pr_debug("%s:%s:%d construct failed\n",
-		 skdev->name, __func__, __LINE__);
+	pr_debug("%s construct failed\n", skdev->name);
 	skd_destruct(skdev);
 	return NULL;
 }
@@ -4509,25 +4418,25 @@ static void skd_destruct(struct skd_device *skdev)
 		return;
 
 
-	pr_debug("%s:%s:%d disk\n", skdev->name, __func__, __LINE__);
+	pr_debug("%s disk\n", skdev->name);
 	skd_free_disk(skdev);
 
-	pr_debug("%s:%s:%d sksb\n", skdev->name, __func__, __LINE__);
+	pr_debug("%s sksb\n", skdev->name);
 	skd_free_sksb(skdev);
 
-	pr_debug("%s:%s:%d skspcl\n", skdev->name, __func__, __LINE__);
+	pr_debug("%s skspcl\n", skdev->name);
 	skd_free_skspcl(skdev);
 
-	pr_debug("%s:%s:%d skreq\n", skdev->name, __func__, __LINE__);
+	pr_debug("%s skreq\n", skdev->name);
 	skd_free_skreq(skdev);
 
-	pr_debug("%s:%s:%d skmsg\n", skdev->name, __func__, __LINE__);
+	pr_debug("%s skmsg\n", skdev->name);
 	skd_free_skmsg(skdev);
 
-	pr_debug("%s:%s:%d skcomp\n", skdev->name, __func__, __LINE__);
+	pr_debug("%s skcomp\n", skdev->name);
 	skd_free_skcomp(skdev);
 
-	pr_debug("%s:%s:%d skdev\n", skdev->name, __func__, __LINE__);
+	pr_debug("%s skdev\n", skdev->name);
 	kfree(skdev);
 }
 
@@ -4544,8 +4453,7 @@ static int skd_bdev_getgeo(struct block_device *bdev, struct hd_geometry *geo)
 
 	skdev = bdev->bd_disk->private_data;
 
-	pr_debug("%s:%s:%d %s: CMD[%s] getgeo device\n",
-		 skdev->name, __func__, __LINE__,
+	pr_debug("%s %s: CMD[%s] getgeo device\n", skdev->name,
 		 bdev->bd_disk->disk_name, current->comm);
 
 	if (skdev->read_cap_is_valid) {
@@ -4561,7 +4469,7 @@ static int skd_bdev_getgeo(struct block_device *bdev, struct hd_geometry *geo)
 
 static int skd_bdev_attach(struct device *parent, struct skd_device *skdev)
 {
-	pr_debug("%s:%s:%d add_disk\n", skdev->name, __func__, __LINE__);
+	pr_debug("%s add_disk\n", skdev->name);
 	device_add_disk(parent, skdev->disk);
 	return 0;
 }
@@ -4692,10 +4600,9 @@ static int skd_pci_probe(struct pci_dev *pdev, const struct pci_device_id *ent)
 			rc = -ENODEV;
 			goto err_out_iounmap;
 		}
-		pr_debug("%s:%s:%d mem_map=%p, phyd=%016llx, size=%d\n",
-			 skdev->name, __func__, __LINE__,
-			 skdev->mem_map[i],
-			 (uint64_t)skdev->mem_phys[i], skdev->mem_size[i]);
+		pr_debug("%s mem_map=%p, phyd=%016llx, size=%d\n", skdev->name,
+			 skdev->mem_map[i], (uint64_t)skdev->mem_phys[i],
+			 skdev->mem_size[i]);
 	}
 
 	rc = skd_acquire_irq(skdev);
@@ -4875,10 +4782,9 @@ static int skd_pci_resume(struct pci_dev *pdev)
 			rc = -ENODEV;
 			goto err_out_iounmap;
 		}
-		pr_debug("%s:%s:%d mem_map=%p, phyd=%016llx, size=%d\n",
-			 skdev->name, __func__, __LINE__,
-			 skdev->mem_map[i],
-			 (uint64_t)skdev->mem_phys[i], skdev->mem_size[i]);
+		pr_debug("%s mem_map=%p, phyd=%016llx, size=%d\n", skdev->name,
+			 skdev->mem_map[i], (uint64_t)skdev->mem_phys[i],
+			 skdev->mem_size[i]);
 	}
 	rc = skd_acquire_irq(skdev);
 	if (rc) {
@@ -5078,43 +4984,37 @@ static const char *skd_skreq_state_to_str(enum skd_req_state state)
 
 static void skd_log_skdev(struct skd_device *skdev, const char *event)
 {
-	pr_debug("%s:%s:%d (%s) skdev=%p event='%s'\n",
-		 skdev->name, __func__, __LINE__, skdev->name, skdev, event);
-	pr_debug("%s:%s:%d   drive_state=%s(%d) driver_state=%s(%d)\n",
-		 skdev->name, __func__, __LINE__,
+	pr_debug("%s (%s) skdev=%p event='%s'\n", skdev->name, skdev->name,
+		 skdev, event);
+	pr_debug("%s   drive_state=%s(%d) driver_state=%s(%d)\n", skdev->name,
 		 skd_drive_state_to_str(skdev->drive_state), skdev->drive_state,
 		 skd_skdev_state_to_str(skdev->state), skdev->state);
-	pr_debug("%s:%s:%d   busy=%d limit=%d dev=%d lowat=%d\n",
-		 skdev->name, __func__, __LINE__,
+	pr_debug("%s   busy=%d limit=%d dev=%d lowat=%d\n", skdev->name,
 		 skdev->in_flight, skdev->cur_max_queue_depth,
 		 skdev->dev_max_queue_depth, skdev->queue_low_water_mark);
-	pr_debug("%s:%s:%d   timestamp=0x%x cycle=%d cycle_ix=%d\n",
-		 skdev->name, __func__, __LINE__,
+	pr_debug("%s   timestamp=0x%x cycle=%d cycle_ix=%d\n", skdev->name,
 		 skdev->timeout_stamp, skdev->skcomp_cycle, skdev->skcomp_ix);
 }
 
 static void skd_log_skmsg(struct skd_device *skdev,
 			  struct skd_fitmsg_context *skmsg, const char *event)
 {
-	pr_debug("%s:%s:%d (%s) skmsg=%p event='%s'\n",
-		 skdev->name, __func__, __LINE__, skdev->name, skmsg, event);
-	pr_debug("%s:%s:%d   state=%s(%d) id=0x%04x length=%d\n",
-		 skdev->name, __func__, __LINE__,
-		 skd_skmsg_state_to_str(skmsg->state), skmsg->state,
-		 skmsg->id, skmsg->length);
+	pr_debug("%s (%s) skmsg=%p event='%s'\n", skdev->name, skdev->name,
+		 skmsg, event);
+	pr_debug("%s   state=%s(%d) id=0x%04x length=%d\n", skdev->name,
+		 skd_skmsg_state_to_str(skmsg->state), skmsg->state, skmsg->id,
+		 skmsg->length);
 }
 
 static void skd_log_skreq(struct skd_device *skdev,
 			  struct skd_request_context *skreq, const char *event)
 {
-	pr_debug("%s:%s:%d (%s) skreq=%p event='%s'\n",
-		 skdev->name, __func__, __LINE__, skdev->name, skreq, event);
-	pr_debug("%s:%s:%d   state=%s(%d) id=0x%04x fitmsg=0x%04x\n",
-		 skdev->name, __func__, __LINE__,
-		 skd_skreq_state_to_str(skreq->state), skreq->state,
-		 skreq->id, skreq->fitmsg_id);
-	pr_debug("%s:%s:%d   timo=0x%x sg_dir=%d n_sg=%d\n",
-		 skdev->name, __func__, __LINE__,
+	pr_debug("%s (%s) skreq=%p event='%s'\n", skdev->name, skdev->name,
+		 skreq, event);
+	pr_debug("%s   state=%s(%d) id=0x%04x fitmsg=0x%04x\n",
+		 skdev->name, skd_skreq_state_to_str(skreq->state),
+		 skreq->state, skreq->id, skreq->fitmsg_id);
+	pr_debug("%s   timo=0x%x sg_dir=%d n_sg=%d\n", skdev->name,
 		 skreq->timeout_stamp, skreq->sg_data_dir, skreq->n_sg);
 
 	if (skreq->req != NULL) {
@@ -5122,14 +5022,11 @@ static void skd_log_skreq(struct skd_device *skdev,
 		u32 lba = (u32)blk_rq_pos(req);
 		u32 count = blk_rq_sectors(req);
 
-		pr_debug("%s:%s:%d "
-			 "req=%p lba=%u(0x%x) count=%u(0x%x) dir=%d\n",
-			 skdev->name, __func__, __LINE__,
-			 req, lba, lba, count, count,
+		pr_debug("%s req=%p lba=%u(0x%x) count=%u(0x%x) dir=%d\n",
+			 skdev->name, req, lba, lba, count, count,
 			 (int)rq_data_dir(req));
 	} else
-		pr_debug("%s:%s:%d req=NULL\n",
-			 skdev->name, __func__, __LINE__);
+		pr_debug("%s req=NULL\n", skdev->name);
 }
 
 /*
