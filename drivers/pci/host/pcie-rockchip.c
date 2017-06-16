@@ -15,6 +15,7 @@
  * (at your option) any later version.
  */
 
+#include <linux/bitrev.h>
 #include <linux/clk.h>
 #include <linux/delay.h>
 #include <linux/gpio/consumer.h>
@@ -111,6 +112,9 @@
 #define   PCIE_CORE_TXCREDIT_CFG1_MUI_SHIFT	16
 #define   PCIE_CORE_TXCREDIT_CFG1_MUI_ENCODE(x) \
 		(((x) >> 3) << PCIE_CORE_TXCREDIT_CFG1_MUI_SHIFT)
+#define PCIE_CORE_LANE_MAP		(PCIE_CORE_CTRL_MGMT_BASE + 0x200)
+#define   PCIE_CORE_LANE_MAP_MASK		0x0000000f
+#define   PCIE_CORE_LANE_MAP_REVERSE		BIT(16)
 #define PCIE_CORE_INT_STATUS		(PCIE_CORE_CTRL_MGMT_BASE + 0x20c)
 #define   PCIE_CORE_INT_PRFPE			BIT(0)
 #define   PCIE_CORE_INT_CRFPE			BIT(1)
@@ -290,6 +294,19 @@ static int rockchip_pcie_valid_device(struct rockchip_pcie *rockchip,
 		return 0;
 
 	return 1;
+}
+
+
+static u8 rockchip_pcie_lane_map(struct rockchip_pcie *rockchip)
+{
+	u32 val = rockchip_pcie_read(rockchip, PCIE_CORE_LANE_MAP);
+	u8 map = val & PCIE_CORE_LANE_MAP_MASK;
+
+	/* The link may be using a reverse-indexed mapping. */
+	if (val & PCIE_CORE_LANE_MAP_REVERSE)
+		map = bitrev8(map) >> 4;
+
+	return map;
 }
 
 static int rockchip_pcie_rd_own_conf(struct rockchip_pcie *rockchip,
@@ -645,6 +662,9 @@ static int rockchip_pcie_init_port(struct rockchip_pcie *rockchip)
 	status = 0x1 << ((status & PCIE_CORE_PL_CONF_LANE_MASK) >>
 			  PCIE_CORE_PL_CONF_LANE_SHIFT);
 	dev_dbg(dev, "current link width is x%d\n", status);
+
+	/* Pass on the lane map for phy to do some power-saving work */
+	phy_set_mode(rockchip->phy, rockchip_pcie_lane_map(rockchip));
 
 	rockchip_pcie_write(rockchip, ROCKCHIP_VENDOR_ID,
 			    PCIE_CORE_CONFIG_VENDOR);
