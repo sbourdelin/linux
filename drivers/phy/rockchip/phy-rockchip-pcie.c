@@ -255,11 +255,33 @@ static int rockchip_pcie_phy_exit(struct phy *phy)
 	return 0;
 }
 
+static int rockchip_pcie_phy_set_mode(struct phy *phy, enum phy_mode mode)
+{
+	struct rockchip_pcie_phy *rk_phy = phy_get_drvdata(phy);
+	u8 map = (u8)mode;
+	int i;
+
+	for (i = 0; i < PHY_MAX_LANE_NUM; i++) {
+		if (map & BIT(i))
+			continue;
+
+		dev_dbg(&phy->dev, "idling lane %d\n", i);
+		regmap_write(rk_phy->reg_base,
+			     rk_phy->phy_data->pcie_laneoff,
+			     HIWORD_UPDATE(PHY_LANE_IDLE_OFF,
+			     PHY_LANE_IDLE_MASK,
+			     PHY_LANE_IDLE_A_SHIFT + i));
+	}
+
+	return 0;
+}
+
 static const struct phy_ops ops = {
 	.init		= rockchip_pcie_phy_init,
 	.exit		= rockchip_pcie_phy_exit,
 	.power_on	= rockchip_pcie_phy_power_on,
 	.power_off	= rockchip_pcie_phy_power_off,
+	.set_mode	= rockchip_pcie_phy_set_mode,
 	.owner		= THIS_MODULE,
 };
 
