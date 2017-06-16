@@ -1090,6 +1090,23 @@ EXPORT_SYMBOL_GPL(kvm_enable_efer_bits);
  */
 int kvm_set_msr(struct kvm_vcpu *vcpu, struct msr_data *msr)
 {
+	if (!msr->host_initiated) {
+		struct msr_data __msr;
+
+		memset(&__msr, 0, sizeof(__msr));
+		__msr.host_initiated = true;
+		__msr.index = msr->index;
+
+		if (!kvm_get_msr(vcpu, &__msr)) {
+			u64 data = msr->data;
+
+			if (kvmi_msr_event(vcpu, msr->index, __msr.data, &data))
+				msr->data = data;
+			else
+				return 0;
+		}
+	}
+
 	switch (msr->index) {
 	case MSR_FS_BASE:
 	case MSR_GS_BASE:
