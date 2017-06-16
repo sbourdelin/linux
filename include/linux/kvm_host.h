@@ -549,6 +549,8 @@ static inline void kvm_irqfd_exit(void)
 int kvm_init(void *opaque, unsigned vcpu_size, unsigned vcpu_align,
 		  struct module *module);
 void kvm_exit(void);
+void kvm_enum(int (*enum_cb) (const struct kvm *kvm, void *param),
+	      void *param);
 
 void kvm_get_kvm(struct kvm *kvm);
 void kvm_put_kvm(struct kvm *kvm);

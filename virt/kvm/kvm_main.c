@@ -4046,3 +4046,15 @@ void kvm_exit(void)
 	kvm_vfio_ops_exit();
 }
 EXPORT_SYMBOL_GPL(kvm_exit);
+
+void kvm_enum(int (*enum_cb) (const struct kvm *kvm, void *param), void *param)
+{
+	struct kvm *kvm;
+
+	spin_lock(&kvm_lock);
+	list_for_each_entry(kvm, &vm_list, vm_list) {
+		if (enum_cb(kvm, param))
+			break;
+	}
+	spin_unlock(&kvm_lock);
+}
