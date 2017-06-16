@@ -6928,6 +6928,30 @@ static int vcpu_enter_guest(struct kvm_vcpu *vcpu)
 		vcpu->arch.switch_db_regs &= ~KVM_DEBUGREG_RELOAD;
 	}
 
+	if (atomic_read(&vcpu->arch.next_interrupt_enabled)) {
+		if (vcpu->arch.exception.pending) {
+			unsigned int nr = vcpu->arch.exception.nr;
+			unsigned int type;
+
+			if (kvm_exception_is_soft(nr))
+				type = INTR_TYPE_SOFT_EXCEPTION;
+			else
+				type = INTR_TYPE_HARD_EXCEPTION;
+			kvmi_trap_event(vcpu, nr, type,
+					vcpu->arch.exception.error_code,
+					vcpu->arch.cr2);
+		} else if (vcpu->arch.interrupt.pending) {
+			unsigned int nr = vcpu->arch.interrupt.nr;
+			unsigned int type;
+
+			if (vcpu->arch.interrupt.soft)
+				type = INTR_TYPE_SOFT_INTR;
+			else
+				type = INTR_TYPE_EXT_INTR;
+			kvmi_trap_event(vcpu, nr, type, 0, vcpu->arch.cr2);
+		}
+	}
+
 	kvm_x86_ops->run(vcpu);
 
 	/*
