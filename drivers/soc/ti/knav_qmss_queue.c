@@ -1813,7 +1813,7 @@ static int knav_queue_remove(struct platform_device *pdev)
 }
 
 /* Match table for of_platform binding */
-static struct of_device_id keystone_qmss_of_match[] = {
+static const struct of_device_id keystone_qmss_of_match[] = {
 	{ .compatible = "ti,keystone-navigator-qmss", },
 	{},
 };
