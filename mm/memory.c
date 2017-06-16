@@ -1776,6 +1776,75 @@ int vm_insert_mixed(struct vm_area_struct *vma, unsigned long addr,
 }
 EXPORT_SYMBOL(vm_insert_mixed);
 
+/**
+ * vm_replace_page - given a page-sized VMA, drop the currently
+ *                   referenced page and place the specified one
+ *                   in its stead
+ * @vma: the remote user VMA in which the replace takes place
+ * @page: the page with which we make the replacement
+ */
+int vm_replace_page(struct vm_area_struct *vma, struct page *page)
+{
+	unsigned long mmun_start;
+	unsigned long mmun_end;
+	struct mm_struct *mm = vma->vm_mm;
+	pmd_t *pmd;
+	struct page *old_page;
+	pte_t *ptep;
+	spinlock_t *ptl;
+
+	/* Make sure the area is page aligned */
+	if (vma->vm_start % PAGE_SIZE)
+		return -EINVAL;
+
+	/* Make sure the area is page-sized */
+	if ((vma->vm_end - vma->vm_start) != PAGE_SIZE)
+		return -EINVAL;
+
+	old_page = follow_page(vma, vma->vm_start, 0);
+	if (IS_ERR_OR_NULL(old_page))
+		return old_page ? PTR_ERR(old_page) : -ENOENT;
+
+	pmd = mm_find_pmd(mm, vma->vm_start);
+	if (!pmd)
+		return -ENOENT;
+
+	mmun_start = vma->vm_start;
+	mmun_end = mmun_start + PAGE_SIZE;
+	mmu_notifier_invalidate_range_start(mm, mmun_start, mmun_end);
+
+	ptep = pte_offset_map_lock(mm, pmd, vma->vm_start, &ptl);
+
+	get_page(page);
+	page_add_anon_rmap(page, vma, vma->vm_start, false);
+
+	flush_cache_page(vma, vma->vm_start, pte_pfn(*ptep));
+	ptep_clear_flush_notify(vma, vma->vm_start, ptep);
+
+	/*
+	 * TODO: Find why we can't do:
+	 *       set_pte_at_notify(mm, vma->vm_start, ptep,
+	 *                         mk_pte(page, vma->vm_page_prot))
+	 */
+	set_pte_at_notify(mm, vma->vm_start, ptep,
+			  mk_pte(page,
+				 __pgprot(_PAGE_PRESENT | _PAGE_RW |
+					  _PAGE_BIT_NX)));
+
+	/* Drop the old page */
+	page_remove_rmap(old_page, false);
+	if (!page_mapped(old_page))
+		try_to_free_swap(old_page);
+	put_page(old_page);
+
+	pte_unmap_unlock(ptep, ptl);
+
+	mmu_notifier_invalidate_range_end(mm, mmun_start, mmun_end);
+
+	return 0;
+}
+EXPORT_SYMBOL_GPL(vm_replace_page);
+
 /*
  * maps a range of physical memory into the requested pages. the old
  * mappings are removed. any references to nonexistent pages results
