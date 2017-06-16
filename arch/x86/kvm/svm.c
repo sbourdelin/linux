@@ -5262,6 +5262,11 @@ static void svm_setup_mce(struct kvm_vcpu *vcpu)
 	vcpu->arch.mcg_cap &= 0x1ff;
 }
 
+static void svm_msr_intercept(unsigned int msr, bool enable)
+{
+	set_msr_interception(msrpm, msr, enable, enable);
+}
+
 static struct kvm_x86_ops svm_x86_ops __ro_after_init = {
 	.cpu_has_kvm_support = has_svm,
 	.disabled_by_bios = is_disabled,
@@ -5374,6 +5379,8 @@ static struct kvm_x86_ops svm_x86_ops __ro_after_init = {
 	.deliver_posted_interrupt = svm_deliver_avic_intr,
 	.update_pi_irte = svm_update_pi_irte,
 	.setup_mce = svm_setup_mce,
+
+	.msr_intercept = svm_msr_intercept,
 };
 
 static int __init svm_init(void)

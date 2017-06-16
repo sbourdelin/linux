@@ -1048,6 +1048,7 @@ struct kvm_x86_ops {
 	void (*cancel_hv_timer)(struct kvm_vcpu *vcpu);
 
 	void (*setup_mce)(struct kvm_vcpu *vcpu);
+	void (*msr_intercept)(unsigned int msr, bool enable);
 };
 
 struct kvm_arch_async_pf {
@@ -1429,4 +1430,5 @@ static inline int kvm_cpu_get_apicid(int mps_cpu)
 #endif
 }
 
+void kvm_arch_msr_intercept(unsigned int msr, bool enable);
 #endif /* _ASM_X86_KVM_HOST_H */
