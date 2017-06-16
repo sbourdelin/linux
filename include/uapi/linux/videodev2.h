@@ -2150,6 +2150,7 @@ struct v4l2_streamparm {
 #define V4L2_EVENT_FRAME_SYNC			4
 #define V4L2_EVENT_SOURCE_CHANGE		5
 #define V4L2_EVENT_MOTION_DET			6
+#define V4L2_EVENT_BUF_QUEUED			7
 #define V4L2_EVENT_PRIVATE_START		0x08000000
 
 /* Payload for V4L2_EVENT_VSYNC */
@@ -2202,6 +2203,10 @@ struct v4l2_event_motion_det {
 	__u32 region_mask;
 };
 
+struct v4l2_event_buf_queued {
+	__u32 index;
+};
+
 struct v4l2_event {
 	__u32				type;
 	union {
@@ -2210,6 +2215,7 @@ struct v4l2_event {
 		struct v4l2_event_frame_sync	frame_sync;
 		struct v4l2_event_src_change	src_change;
 		struct v4l2_event_motion_det	motion_det;
+		struct v4l2_event_buf_queued	buf_queued;
 		__u8				data[64];
 	} u;
 	__u32				pending;
