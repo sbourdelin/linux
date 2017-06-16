@@ -784,6 +784,7 @@ static int kvm_vm_release(struct inode *inode, struct file *filp)
 {
 	struct kvm *kvm = filp->private_data;
 
+	kvmi_vm_powered_off(kvm);
 	kvm_irqfd_release(kvm);
 
 	kvm_put_kvm(kvm);
@@ -2574,6 +2575,8 @@ static long kvm_vcpu_ioctl(struct file *filp,
 				synchronize_rcu();
 			put_pid(oldpid);
 		}
+		if (!test_and_set_bit(0, &vcpu->kvm->introduced))
+			kvmi_vm_powered_on(vcpu->kvm);
 		r = kvm_arch_vcpu_ioctl_run(vcpu, vcpu->run);
 		trace_kvm_userspace_exit(vcpu->run->exit_reason, r);
 		break;
