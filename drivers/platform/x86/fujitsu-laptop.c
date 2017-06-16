@@ -58,7 +58,6 @@
 #include <linux/fb.h>
 #include <linux/input.h>
 #include <linux/input/sparse-keymap.h>
-#include <linux/kfifo.h>
 #include <linux/leds.h>
 #include <linux/platform_device.h>
 #include <linux/slab.h>
@@ -110,7 +109,6 @@
 #define KEY5_CODE	0x420
 
 #define MAX_HOTKEY_RINGBUFFER_SIZE 100
-#define RINGBUFFERSIZE 40
 
 /* Debugging */
 #define FUJLAPTOP_DBG_ERROR	  0x0001
@@ -146,8 +144,8 @@ struct fujitsu_laptop {
 	struct input_dev *input;
 	char phys[32];
 	struct platform_device *pf_device;
-	struct kfifo fifo;
-	spinlock_t fifo_lock;
+	int scancode_buf[40];
+	int scancode_count;
 	int flags_supported;
 	int flags_state;
 };
@@ -813,23 +811,14 @@ static int acpi_fujitsu_laptop_add(struct acpi_device *device)
 	sprintf(acpi_device_class(device), "%s", ACPI_FUJITSU_CLASS);
 	device->driver_data = priv;
 
-	/* kfifo */
-	spin_lock_init(&priv->fifo_lock);
-	error = kfifo_alloc(&priv->fifo, RINGBUFFERSIZE * sizeof(int),
-			    GFP_KERNEL);
-	if (error) {
-		pr_err("kfifo_alloc failed\n");
-		goto err_stop;
-	}
-
 	error = acpi_fujitsu_laptop_input_setup(device);
 	if (error)
-		goto err_free_fifo;
+		return error;
 
 	error = acpi_bus_update_power(device->handle, &state);
 	if (error) {
 		pr_err("Error reading power state\n");
-		goto err_free_fifo;
+		return error;
 	}
 
 	pr_info("ACPI: %s [%s] (%s)\n",
@@ -877,27 +866,18 @@ static int acpi_fujitsu_laptop_add(struct acpi_device *device)
 
 	error = acpi_fujitsu_laptop_leds_register(device);
 	if (error)
-		goto err_free_fifo;
+		return error;
 
 	error = fujitsu_laptop_platform_add(device);
 	if (error)
-		goto err_free_fifo;
+		return error;
 
 	return 0;
-
-err_free_fifo:
-	kfifo_free(&priv->fifo);
-err_stop:
-	return error;
 }
 
 static int acpi_fujitsu_laptop_remove(struct acpi_device *device)
 {
-	struct fujitsu_laptop *priv = acpi_driver_data(device);
-
 	fujitsu_laptop_platform_remove(device);
-
-	kfifo_free(&priv->fifo);
 
 	return 0;
 }
@@ -905,34 +885,28 @@ static int acpi_fujitsu_laptop_remove(struct acpi_device *device)
 static void acpi_fujitsu_laptop_press(struct acpi_device *device, int scancode)
 {
 	struct fujitsu_laptop *priv = acpi_driver_data(device);
-	int status;
 
-	status = kfifo_in_locked(&priv->fifo, (unsigned char *)&scancode,
-				 sizeof(scancode), &priv->fifo_lock);
-	if (status != sizeof(scancode)) {
+	if (priv->scancode_count == ARRAY_SIZE(priv->scancode_buf)) {
 		vdbg_printk(FUJLAPTOP_DBG_WARN,
 			    "Could not push scancode [0x%x]\n", scancode);
 		return;
 	}
+	priv->scancode_buf[priv->scancode_count++] = scancode;
 	sparse_keymap_report_event(priv->input, scancode, 1, false);
 	vdbg_printk(FUJLAPTOP_DBG_TRACE,
-		    "Push scancode into ringbuffer [0x%x]\n", scancode);
+		    "Push scancode into buffer [0x%x]\n", scancode);
 }
 
 static void acpi_fujitsu_laptop_release(struct acpi_device *device)
 {
 	struct fujitsu_laptop *priv = acpi_driver_data(device);
-	int scancode, status;
+	int scancode;
 
-	while (true) {
-		status = kfifo_out_locked(&priv->fifo,
-					  (unsigned char *)&scancode,
-					  sizeof(scancode), &priv->fifo_lock);
-		if (status != sizeof(scancode))
-			return;
+	while (priv->scancode_count > 0) {
+		scancode = priv->scancode_buf[--priv->scancode_count];
 		sparse_keymap_report_event(priv->input, scancode, 0, false);
 		vdbg_printk(FUJLAPTOP_DBG_TRACE,
-			    "Pop scancode from ringbuffer [0x%x]\n", scancode);
+			    "Pop scancode from buffer [0x%x]\n", scancode);
 	}
 }
 
