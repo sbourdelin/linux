@@ -548,16 +548,6 @@ static void skd_request_fn(struct request_queue *q)
 		return;
 	}
 
-	if (blk_queue_stopped(skdev->queue)) {
-		if (skdev->skmsg_free_list == NULL ||
-		    skdev->skreq_free_list == NULL ||
-		    skdev->in_flight >= skdev->queue_low_water_mark)
-			/* There is still some kind of shortage */
-			return;
-
-		queue_flag_clear(QUEUE_FLAG_STOPPED, skdev->queue);
-	}
-
 	/*
 	 * Stop conditions:
 	 *  - There are no more native requests
@@ -770,6 +760,12 @@ skip_sg:
 static void skd_end_request(struct skd_device *skdev,
 		struct skd_request_context *skreq, blk_status_t error)
 {
+	if (blk_queue_stopped(skdev->queue) &&
+	    skdev->skmsg_free_list &&
+	    skdev->skreq_free_list &&
+	    skdev->in_flight < skdev->queue_low_water_mark)
+		blk_start_queue_async(skdev->queue);
+
 	if (unlikely(error)) {
 		struct request *req = skreq->req;
 		char *cmd = (rq_data_dir(req) == READ) ? "read" : "write";
