@@ -1510,7 +1510,11 @@ static void kbd_init(void)
 	ret = kbd_init_info();
 	kbd_init_tokens();
 
-	if (kbd_token_bits != 0 || ret == 0)
+	/*
+	 * If KBD_LED_OFF_TOKEN is the only token,
+	 * consider there is no keyboard backlight.
+	 */
+	if ((kbd_token_bits & ~BIT(5)) != 0 || ret == 0)
 		kbd_led_present = true;
 }
 
