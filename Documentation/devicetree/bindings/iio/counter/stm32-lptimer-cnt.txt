@@ -1,0 +1,25 @@
+STMicroelectronics STM32 Low Power Timer quadrature encoder and counter
+
+STM32 LP Timer provides several counter modes. It can be used as:
+- quadrature encoder to detect angular position and direction of rotary
+  elements, from IN1 and IN2 input signals.
+- simple counter from IN1 input signal.
+
+Must be a sub-node of an STM32 LP Timer device tree node.
+See ../mfd/stm32-lptimer.txt for details about the parent node.
+
+Required properties:
+- compatible: Must be "st,stm32-lptimer-counter".
+- A pinctrl state named "default" can be defined to set IN1/IN2 pins in mode
+  of operation for LP Timer input signals on external pin.
+
+Example:
+	lptimer1: lptimer@0x40002400 {
+		compatible = "st,stm32-lptimer";
+		...
+		counter {
+			compatible = "st,stm32-lptimer-counter";
+			pinctrl-names = "default";
+			pinctrl-0 = <&lptim1_in_pins>;
+		};
+	};
