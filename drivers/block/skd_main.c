@@ -5164,6 +5164,12 @@ static void skd_log_skreq(struct skd_device *skdev,
 
 static int __init skd_init(void)
 {
+	BUILD_BUG_ON(sizeof(struct fit_completion_entry_v1) != 8);
+	BUILD_BUG_ON(sizeof(struct fit_comp_error_info) != 32);
+	BUILD_BUG_ON(sizeof(struct skd_command_header) != 16);
+	BUILD_BUG_ON(sizeof(struct skd_scsi_request) != 16 + 16);
+	BUILD_BUG_ON(sizeof(struct driver_inquiry_data) != 44);
+
 	pr_info(PFX " v%s-b%s loaded\n", DRV_VERSION, DRV_BUILD_ID);
 
 	switch (skd_isr_type) {
