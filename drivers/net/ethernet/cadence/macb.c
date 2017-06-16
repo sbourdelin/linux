@@ -79,33 +79,84 @@
 #define MACB_HALT_TIMEOUT	1230
 
 /* DMA buffer descriptor might be different size
- * depends on hardware configuration.
+ * depends on hardware configuration:
+ *
+ * 1. dma address width 32 bits:
+ *    word 1: 32 bit address of Data Buffer
+ *    word 2: control
+ *
+ * 2. dma address width 64 bits:
+ *    word 1: 32 bit address of Data Buffer
+ *    word 2: control
+ *    word 3: upper 32 bit address of Data Buffer
+ *    word 4: unused
+ *
+ * 3. dma address width 32 bits with hardware timestamping:
+ *    word 1: 32 bit address of Data Buffer
+ *    word 2: control
+ *    word 3: timestamp word 1
+ *    word 4: timestamp word 2
+ *
+ * 4. dma address width 64 bits with hardware timestamping:
+ *    word 1: 32 bit address of Data Buffer
+ *    word 2: control
+ *    word 3: upper 32 bit address of Data Buffer
+ *    word 4: unused
+ *    word 5: timestamp word 1
+ *    word 6: timestamp word 2
  */
 static unsigned int macb_dma_desc_get_size(struct macb *bp)
 {
-#ifdef CONFIG_ARCH_DMA_ADDR_T_64BIT
-	if (bp->hw_dma_cap == HW_DMA_CAP_64B)
-		return sizeof(struct macb_dma_desc) + sizeof(struct macb_dma_desc_64);
+#ifdef MACB_EXT_DESC
+	unsigned int desc_size;
+
+	switch (bp->hw_dma_cap) {
+	case HW_DMA_CAP_64B:
+		desc_size = sizeof(struct macb_dma_desc)
+			+ sizeof(struct macb_dma_desc_64);
+		break;
+	case HW_DMA_CAP_PTP:
+		desc_size = sizeof(struct macb_dma_desc)
+			+ sizeof(struct macb_dma_desc_ptp);
+		break;
+	case HW_DMA_CAP_64B_PTP:
+		desc_size = sizeof(struct macb_dma_desc)
+			+ sizeof(struct macb_dma_desc_64)
+			+ sizeof(struct macb_dma_desc_ptp);
+		break;
+	default:
+		desc_size = sizeof(struct macb_dma_desc);
+	}
+	return desc_size;
 #endif
 	return sizeof(struct macb_dma_desc);
 }
 
-static unsigned int macb_adj_dma_desc_idx(struct macb *bp, unsigned int idx)
+static unsigned int macb_adj_dma_desc_idx(struct macb *bp, unsigned int desc_idx)
 {
-#ifdef CONFIG_ARCH_DMA_ADDR_T_64BIT
-	/* Dma buffer descriptor is 4 words length (instead of 2 words)
-	 * for 64b GEM.
-	 */
-	if (bp->hw_dma_cap == HW_DMA_CAP_64B)
-		idx <<= 1;
+#ifdef MACB_EXT_DESC
+	switch (bp->hw_dma_cap) {
+	case HW_DMA_CAP_64B:
+	case HW_DMA_CAP_PTP:
+		desc_idx <<= 1;
+		break;
+	case HW_DMA_CAP_64B_PTP:
+		desc_idx *= 3;
+		break;
+	default:
+		break;
+	}
+	return desc_idx;
 #endif
-	return idx;
+	return desc_idx;
 }
 
 #ifdef CONFIG_ARCH_DMA_ADDR_T_64BIT
 static struct macb_dma_desc_64 *macb_64b_desc(struct macb *bp, struct macb_dma_desc *desc)
 {
-	return (struct macb_dma_desc_64 *)((void *)desc + sizeof(struct macb_dma_desc));
+	if (bp->hw_dma_cap & HW_DMA_CAP_64B)
+		return (struct macb_dma_desc_64 *)((void *)desc + sizeof(struct macb_dma_desc));
+	return NULL;
 }
 #endif
 
@@ -602,7 +653,7 @@ static void macb_set_addr(struct macb *bp, struct macb_dma_desc *desc, dma_addr_
 #ifdef CONFIG_ARCH_DMA_ADDR_T_64BIT
 	struct macb_dma_desc_64 *desc_64;
 
-	if (bp->hw_dma_cap == HW_DMA_CAP_64B) {
+	if (bp->hw_dma_cap & HW_DMA_CAP_64B) {
 		desc_64 = macb_64b_desc(bp, desc);
 		desc_64->addrh = upper_32_bits(addr);
 	}
@@ -616,7 +667,7 @@ static dma_addr_t macb_get_addr(struct macb *bp, struct macb_dma_desc *desc)
 #ifdef CONFIG_ARCH_DMA_ADDR_T_64BIT
 	struct macb_dma_desc_64 *desc_64;
 
-	if (bp->hw_dma_cap == HW_DMA_CAP_64B) {
+	if (bp->hw_dma_cap & HW_DMA_CAP_64B) {
 		desc_64 = macb_64b_desc(bp, desc);
 		addr = ((u64)(desc_64->addrh) << 32);
 	}
@@ -715,7 +766,7 @@ static void macb_tx_error_task(struct work_struct *work)
 	/* Reinitialize the TX desc queue */
 	queue_writel(queue, TBQP, lower_32_bits(queue->tx_ring_dma));
 #ifdef CONFIG_ARCH_DMA_ADDR_T_64BIT
-	if (bp->hw_dma_cap == HW_DMA_CAP_64B)
+	if (bp->hw_dma_cap & HW_DMA_CAP_64B)
 		queue_writel(queue, TBQPH, upper_32_bits(queue->tx_ring_dma));
 #endif
 	/* Make TX ring reflect state of hardware */
@@ -1923,8 +1974,12 @@ static void macb_configure_dma(struct macb *bp)
 			dmacfg &= ~GEM_BIT(TXCOEN);
 
 #ifdef CONFIG_ARCH_DMA_ADDR_T_64BIT
-		if (bp->hw_dma_cap == HW_DMA_CAP_64B)
+		if (bp->hw_dma_cap & HW_DMA_CAP_64B)
 			dmacfg |= GEM_BIT(ADDR64);
+#endif
+#ifdef CONFIG_MACB_USE_HWSTAMP
+		if (bp->hw_dma_cap & HW_DMA_CAP_PTP)
+			dmacfg |= GEM_BIT(RXEXT) | GEM_BIT(TXEXT);
 #endif
 		netdev_dbg(bp->dev, "Cadence configure DMA with 0x%08x\n",
 			   dmacfg);
@@ -1973,13 +2028,13 @@ static void macb_init_hw(struct macb *bp)
 	/* Initialize TX and RX buffers */
 	macb_writel(bp, RBQP, lower_32_bits(bp->rx_ring_dma));
 #ifdef CONFIG_ARCH_DMA_ADDR_T_64BIT
-	if (bp->hw_dma_cap == HW_DMA_CAP_64B)
+	if (bp->hw_dma_cap & HW_DMA_CAP_64B)
 		macb_writel(bp, RBQPH, upper_32_bits(bp->rx_ring_dma));
 #endif
 	for (q = 0, queue = bp->queues; q < bp->num_queues; ++q, ++queue) {
 		queue_writel(queue, TBQP, lower_32_bits(queue->tx_ring_dma));
 #ifdef CONFIG_ARCH_DMA_ADDR_T_64BIT
-		if (bp->hw_dma_cap == HW_DMA_CAP_64B)
+		if (bp->hw_dma_cap & HW_DMA_CAP_64B)
 			queue_writel(queue, TBQPH, upper_32_bits(queue->tx_ring_dma));
 #endif
 
@@ -2581,6 +2636,12 @@ static void macb_configure_caps(struct macb *bp,
 		dcfg = gem_readl(bp, DCFG2);
 		if ((dcfg & (GEM_BIT(RX_PKT_BUFF) | GEM_BIT(TX_PKT_BUFF))) == 0)
 			bp->caps |= MACB_CAPS_FIFO_MODE;
+		if (IS_ENABLED(CONFIG_MACB_USE_HWSTAMP) && gem_has_ptp(bp)) {
+			if (!GEM_BFEXT(TSU, gem_readl(bp, DCFG5)))
+				pr_err("GEM doesn't support hardware ptp.\n");
+			else
+				bp->hw_dma_cap |= HW_DMA_CAP_PTP;
+		}
 	}
 
 	dev_dbg(&bp->pdev->dev, "Cadence caps 0x%08x\n", bp->caps);
@@ -2718,7 +2779,7 @@ static int macb_init(struct platform_device *pdev)
 			queue->IMR  = GEM_IMR(hw_q - 1);
 			queue->TBQP = GEM_TBQP(hw_q - 1);
 #ifdef CONFIG_ARCH_DMA_ADDR_T_64BIT
-			if (bp->hw_dma_cap == HW_DMA_CAP_64B)
+			if (bp->hw_dma_cap & HW_DMA_CAP_64B)
 				queue->TBQPH = GEM_TBQPH(hw_q - 1);
 #endif
 		} else {
@@ -2729,7 +2790,7 @@ static int macb_init(struct platform_device *pdev)
 			queue->IMR  = MACB_IMR;
 			queue->TBQP = MACB_TBQP;
 #ifdef CONFIG_ARCH_DMA_ADDR_T_64BIT
-			if (bp->hw_dma_cap == HW_DMA_CAP_64B)
+			if (bp->hw_dma_cap & HW_DMA_CAP_64B)
 				queue->TBQPH = MACB_TBQPH;
 #endif
 		}
@@ -3309,19 +3370,17 @@ static int macb_probe(struct platform_device *pdev)
 		bp->wol |= MACB_WOL_HAS_MAGIC_PACKET;
 	device_init_wakeup(&pdev->dev, bp->wol & MACB_WOL_HAS_MAGIC_PACKET);
 
-#ifdef CONFIG_ARCH_DMA_ADDR_T_64BIT
-	if (GEM_BFEXT(DAW64, gem_readl(bp, DCFG6))) {
-		dma_set_mask(&pdev->dev, DMA_BIT_MASK(44));
-		bp->hw_dma_cap = HW_DMA_CAP_64B;
-	} else
-		bp->hw_dma_cap = HW_DMA_CAP_32B;
-#endif
-
 	spin_lock_init(&bp->lock);
 
 	/* setup capabilities */
 	macb_configure_caps(bp, macb_config);
 
+#ifdef CONFIG_ARCH_DMA_ADDR_T_64BIT
+	if (GEM_BFEXT(DAW64, gem_readl(bp, DCFG6))) {
+		dma_set_mask(&pdev->dev, DMA_BIT_MASK(44));
+		bp->hw_dma_cap |= HW_DMA_CAP_64B;
+	}
+#endif
 	platform_set_drvdata(pdev, dev);
 
 	dev->irq = platform_get_irq(pdev, 0);
