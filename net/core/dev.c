@@ -7494,7 +7494,7 @@ int register_netdevice(struct net_device *dev)
 	}
 
 	ret = -EBUSY;
-	if (!dev->ifindex)
+	if (dev->ifindex <= 0)
 		dev->ifindex = dev_new_index(net);
 	else if (__dev_get_by_index(net, dev->ifindex))
 		goto err_uninit;
