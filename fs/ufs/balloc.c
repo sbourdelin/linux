@@ -459,7 +459,7 @@ u64 ufs_new_fragments(struct inode *inode, void *p, u64 fragment,
 	    case UFS_OPTSPACE:
 		request = newcount;
 		if (uspi->s_minfree < 5 || uspi->cs_total.cs_nffree
-		    > uspi->s_dsize * uspi->s_minfree / (2 * 100))
+		    > div_u64(uspi->s_dsize * uspi->s_minfree, 2 * 100))
 			break;
 		usb1->fs_optim = cpu_to_fs32(sb, UFS_OPTTIME);
 		break;
@@ -468,8 +468,8 @@ u64 ufs_new_fragments(struct inode *inode, void *p, u64 fragment,
 	
 	    case UFS_OPTTIME:
 		request = uspi->s_fpb;
-		if (uspi->cs_total.cs_nffree < uspi->s_dsize *
-		    (uspi->s_minfree - 2) / 100)
+		if (uspi->cs_total.cs_nffree <
+		    div_u64(uspi->s_dsize * (uspi->s_minfree - 2), 100))
 			break;
 		usb1->fs_optim = cpu_to_fs32(sb, UFS_OPTTIME);
 		break;
