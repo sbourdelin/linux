@@ -4385,13 +4385,18 @@ static void regulator_summary_show_subtree(struct seq_file *s,
 	struct regulation_constraints *c;
 	struct regulator *consumer;
 	struct summary_data summary_data;
+	int is_enabled;
 
 	if (!rdev)
 		return;
 
-	seq_printf(s, "%*s%-*s %3d %4d %6d ",
+	mutex_lock(&rdev->mutex);
+	is_enabled = _regulator_is_enabled(rdev);
+	mutex_unlock(&rdev->mutex);
+
+	seq_printf(s, "%*s%-*s %3d %3d %4d %6d ",
 		   level * 3 + 1, "",
-		   30 - level * 3, rdev_get_name(rdev),
+		   30 - level * 3, rdev_get_name(rdev), is_enabled,
 		   rdev->use_count, rdev->open_count, rdev->bypass_count);
 
 	seq_printf(s, "%5dmV ", _regulator_get_voltage(rdev) / 1000);
@@ -4456,8 +4461,8 @@ static int regulator_summary_show_roots(struct device *dev, void *data)
 
 static int regulator_summary_show(struct seq_file *s, void *data)
 {
-	seq_puts(s, " regulator                      use open bypass voltage current     min     max\n");
-	seq_puts(s, "-------------------------------------------------------------------------------\n");
+	seq_puts(s, " regulator                      ena use open bypass voltage current     min     max\n");
+	seq_puts(s, "-----------------------------------------------------------------------------------\n");
 
 	class_for_each_device(&regulator_class, NULL, s,
 			      regulator_summary_show_roots);
