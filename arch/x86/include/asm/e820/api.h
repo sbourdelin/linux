@@ -5,6 +5,7 @@
 
 extern struct e820_table *e820_table;
 extern struct e820_table *e820_table_firmware;
+extern struct e820_table *e820_table_ori;
 
 extern unsigned long pci_mem_start;
 

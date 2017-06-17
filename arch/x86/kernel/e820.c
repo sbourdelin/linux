@@ -20,7 +20,7 @@
 #include <asm/setup.h>
 
 /*
- * We organize the E820 table into two main data structures:
+ * We organize the E820 table into three main data structures:
  *
  * - 'e820_table_firmware': the original firmware version passed to us by the
  *   bootloader - not modified by the kernel. We use this to:
@@ -28,13 +28,17 @@
  *       - inform the user about the firmware's notion of memory layout
  *         via /sys/firmware/memmap
  *
- *       - the hibernation code uses it to generate a kernel-independent MD5
- *         fingerprint of the physical memory layout of a system.
- *
  *       - kexec, which is a bootloader in disguise, uses the original E820
  *         layout to pass to the kexec-ed kernel. This way the original kernel
  *         can have a restricted E820 map while the kexec()-ed kexec-kernel
  *         can have access to full memory - etc.
+ *
+ * - 'e820_table_ori': the original firmware version passed to us by the
+ *   bootloader - not modified by the kernel or the efi boot stub.
+ *   We use this to:
+ *
+ *       - the hibernation code uses it to generate a kernel-independent MD5
+ *         fingerprint of the physical memory layout of a system.
  *
  * - 'e820_table': this is the main E820 table that is massaged by the
  *   low level x86 platform code, or modified by boot parameters, before
@@ -47,9 +51,11 @@
  */
 static struct e820_table e820_table_init		__initdata;
 static struct e820_table e820_table_firmware_init	__initdata;
+static struct e820_table e820_table_ori_init		__initdata;
 
 struct e820_table *e820_table __refdata			= &e820_table_init;
 struct e820_table *e820_table_firmware __refdata	= &e820_table_firmware_init;
+struct e820_table *e820_table_ori __refdata		= &e820_table_ori_init;
 
 /* For PCI or other memory-mapped resources */
 unsigned long pci_mem_start = 0xaeedbabe;
@@ -648,6 +654,12 @@ __init void e820__reallocate_tables(void)
 	BUG_ON(!n);
 	memcpy(n, e820_table_firmware, size);
 	e820_table_firmware = n;
+
+	size = offsetof(struct e820_table, entries) + sizeof(struct e820_entry)*e820_table_ori->nr_entries;
+	n = kmalloc(size, GFP_KERNEL);
+	BUG_ON(!n);
+	memcpy(n, e820_table_ori, size);
+	e820_table_ori = n;
 }
 
 /*
@@ -668,6 +680,9 @@ void __init e820__memory_setup_extended(u64 phys_addr, u32 data_len)
 
 	__append_e820_table(extmap, entries);
 	e820__update_table(e820_table);
+
+	/* Update the original table if there's any extended memory. */
+	memcpy(e820_table_ori, e820_table, sizeof(*e820_table_ori));
 
 	early_memunmap(sdata, data_len);
 	pr_info("e820: extended physical RAM map:\n");
@@ -1176,6 +1191,7 @@ void __init e820__memory_setup(void)
 	who = x86_init.resources.memory_setup();
 
 	memcpy(e820_table_firmware, e820_table, sizeof(*e820_table_firmware));
+	memcpy(e820_table_ori, e820_table, sizeof(*e820_table_ori));
 
 	pr_info("e820: BIOS-provided physical RAM map:\n");
 	e820__print_table(who);
