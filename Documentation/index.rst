@@ -87,6 +87,17 @@ implementation.
 
    sh/index
 
+Unsorted documentation
+----------------------
+
+The books in this section are unsorded and need to be moved to some
+other books, after being updated.
+
+.. toctree::
+   :maxdepth: 2
+
+   unsorted/index
+
 Korean translations
 -------------------
 
