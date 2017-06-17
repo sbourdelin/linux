@@ -426,7 +426,12 @@ static void drm_fbdev_cma_defio_fini(struct fb_info *fbi)
 	kfree(fbi->fbops);
 }
 
-static int
+/**
+ * drm_fbdev_cma_create() - Default fb_probe() function for fb_cma_helper_funcs
+ * @helper: The fb_helper to create a cma for
+ * @sizes: The fbdev sizes
+ */
+int
 drm_fbdev_cma_create(struct drm_fb_helper *helper,
 	struct drm_fb_helper_surface_size *sizes)
 {
@@ -507,23 +512,28 @@ err_gem_free_object:
 	drm_gem_object_put_unlocked(&obj->base);
 	return ret;
 }
+EXPORT_SYMBOL_GPL(drm_fbdev_cma_create);
 
 static const struct drm_fb_helper_funcs drm_fb_cma_helper_funcs = {
 	.fb_probe = drm_fbdev_cma_create,
 };
 
 /**
- * drm_fbdev_cma_init_with_funcs() - Allocate and initializes a drm_fbdev_cma struct
+ * drm_fbdev_cma_init_with_funcs2() - Allocate and initializes a drm_fbdev_cma struct
  * @dev: DRM device
  * @preferred_bpp: Preferred bits per pixel for the device
  * @max_conn_count: Maximum number of connectors
- * @funcs: fb helper functions, in particular a custom dirty() callback
+ * @framebuffer_funcs: framebuffer functions, in particular a custom dirty() callback
+ * @fb_helper_funcs: fb helper functions, in particular custom gamma_set() and gamma_get() callbacks
+ *
+ * If framebuffer_funcs or fb_helper_funcs are NULL, default functions are used.
  *
  * Returns a newly allocated drm_fbdev_cma struct or a ERR_PTR.
  */
-struct drm_fbdev_cma *drm_fbdev_cma_init_with_funcs(struct drm_device *dev,
+struct drm_fbdev_cma *drm_fbdev_cma_init_with_funcs2(struct drm_device *dev,
 	unsigned int preferred_bpp, unsigned int max_conn_count,
-	const struct drm_framebuffer_funcs *funcs)
+	const struct drm_framebuffer_funcs *framebuffer_funcs,
+	const struct drm_fb_helper_funcs *fb_helper_funcs)
 {
 	struct drm_fbdev_cma *fbdev_cma;
 	struct drm_fb_helper *helper;
@@ -534,11 +544,17 @@ struct drm_fbdev_cma *drm_fbdev_cma_init_with_funcs(struct drm_device *dev,
 		dev_err(dev->dev, "Failed to allocate drm fbdev.\n");
 		return ERR_PTR(-ENOMEM);
 	}
-	fbdev_cma->fb_funcs = funcs;
+
+	if (!framebuffer_funcs)
+		framebuffer_funcs = &drm_fb_cma_funcs;
+	if (!fb_helper_funcs)
+		fb_helper_funcs = &drm_fb_cma_helper_funcs;
+
+	fbdev_cma->fb_funcs = framebuffer_funcs;
 
 	helper = &fbdev_cma->fb_helper;
 
-	drm_fb_helper_prepare(dev, helper, &drm_fb_cma_helper_funcs);
+	drm_fb_helper_prepare(dev, helper, fb_helper_funcs);
 
 	ret = drm_fb_helper_init(dev, helper, max_conn_count);
 	if (ret < 0) {
@@ -568,6 +584,25 @@ err_free:
 
 	return ERR_PTR(ret);
 }
+EXPORT_SYMBOL_GPL(drm_fbdev_cma_init_with_funcs2);
+
+/**
+ * drm_fbdev_cma_init_with_funcs() - Allocate and initializes a drm_fbdev_cma struct
+ * @dev: DRM device
+ * @preferred_bpp: Preferred bits per pixel for the device
+ * @max_conn_count: Maximum number of connectors
+ * @framebuffer_funcs: framebuffer functions, in particular a custom dirty() callback
+ *
+ * Returns a newly allocated drm_fbdev_cma struct or a ERR_PTR.
+ */
+struct drm_fbdev_cma *drm_fbdev_cma_init_with_funcs(struct drm_device *dev,
+	unsigned int preferred_bpp, unsigned int max_conn_count,
+	const struct drm_framebuffer_funcs *framebuffer_funcs)
+{
+	return drm_fbdev_cma_init_with_funcs2(dev, preferred_bpp,
+					      max_conn_count,
+					      framebuffer_funcs, NULL);
+}
 EXPORT_SYMBOL_GPL(drm_fbdev_cma_init_with_funcs);
 
 /**
@@ -581,9 +616,9 @@ EXPORT_SYMBOL_GPL(drm_fbdev_cma_init_with_funcs);
 struct drm_fbdev_cma *drm_fbdev_cma_init(struct drm_device *dev,
 	unsigned int preferred_bpp, unsigned int max_conn_count)
 {
-	return drm_fbdev_cma_init_with_funcs(dev, preferred_bpp,
-					     max_conn_count,
-					     &drm_fb_cma_funcs);
+	return drm_fbdev_cma_init_with_funcs2(dev, preferred_bpp,
+					      max_conn_count,
+					      NULL, NULL);
 }
 EXPORT_SYMBOL_GPL(drm_fbdev_cma_init);
 
