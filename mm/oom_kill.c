@@ -470,38 +470,9 @@ static bool __oom_reap_task_mm(struct task_struct *tsk, struct mm_struct *mm)
 {
 	struct mmu_gather tlb;
 	struct vm_area_struct *vma;
-	bool ret = true;
 
-	/*
-	 * We have to make sure to not race with the victim exit path
-	 * and cause premature new oom victim selection:
-	 * __oom_reap_task_mm		exit_mm
-	 *   mmget_not_zero
-	 *				  mmput
-	 *				    atomic_dec_and_test
-	 *				  exit_oom_victim
-	 *				[...]
-	 *				out_of_memory
-	 *				  select_bad_process
-	 *				    # no TIF_MEMDIE task selects new victim
-	 *  unmap_page_range # frees some memory
-	 */
-	mutex_lock(&oom_lock);
-
-	if (!down_read_trylock(&mm->mmap_sem)) {
-		ret = false;
-		goto unlock_oom;
-	}
-
-	/*
-	 * increase mm_users only after we know we will reap something so
-	 * that the mmput_async is called only when we have reaped something
-	 * and delayed __mmput doesn't matter that much
-	 */
-	if (!mmget_not_zero(mm)) {
-		up_read(&mm->mmap_sem);
-		goto unlock_oom;
-	}
+	if (!down_read_trylock(&mm->mmap_sem))
+		return false;
 
 	/*
 	 * Tell all users of get_user/copy_from_user etc... that the content
@@ -537,16 +508,7 @@ static bool __oom_reap_task_mm(struct task_struct *tsk, struct mm_struct *mm)
 			K(get_mm_counter(mm, MM_FILEPAGES)),
 			K(get_mm_counter(mm, MM_SHMEMPAGES)));
 	up_read(&mm->mmap_sem);
-
-	/*
-	 * Drop our reference but make sure the mmput slow path is called from a
-	 * different context because we shouldn't risk we get stuck there and
-	 * put the oom_reaper out of the way.
-	 */
-	mmput_async(mm);
-unlock_oom:
-	mutex_unlock(&oom_lock);
-	return ret;
+	return true;
 }
 
 #define MAX_OOM_REAP_RETRIES 10
@@ -569,12 +531,31 @@ static void oom_reap_task(struct task_struct *tsk)
 
 done:
 	tsk->oom_reaper_list = NULL;
+	/*
+	 * Drop a mm_users reference taken by mark_oom_victim().
+	 * A mm_count reference taken by mark_oom_victim() remains.
+	 */
+	mmput_async(mm);
 
 	/*
 	 * Hide this mm from OOM killer because it has been either reaped or
 	 * somebody can't call up_write(mmap_sem).
+	 *
+	 * Serialize setting of MMF_OOM_SKIP using oom_lock in order to
+	 * avoid race with select_bad_process() which causes premature
+	 * new oom victim selection.
+	 *
+	 * The OOM reaper:           An allocating task:
+	 *                             Failed get_page_from_freelist().
+	 *                             Enters into out_of_memory().
+	 *   Reaped memory enough to make get_page_from_freelist() succeed.
+	 *   Sets MMF_OOM_SKIP to mm.
+	 *                               Enters into select_bad_process().
+	 *                                 # MMF_OOM_SKIP mm selects new victim.
 	 */
+	mutex_lock(&oom_lock);
 	set_bit(MMF_OOM_SKIP, &mm->flags);
+	mutex_unlock(&oom_lock);
 
 	/* Drop a reference taken by wake_oom_reaper */
 	put_task_struct(tsk);
@@ -602,12 +583,16 @@ static int oom_reaper(void *unused)
 
 static void wake_oom_reaper(struct task_struct *tsk)
 {
-	if (!oom_reaper_th)
+	if (!oom_reaper_th) {
+		mmput_async(tsk->signal->oom_mm);
 		return;
+	}
 
 	/* tsk is already queued? */
-	if (tsk == oom_reaper_list || tsk->oom_reaper_list)
+	if (tsk == oom_reaper_list || tsk->oom_reaper_list) {
+		mmput_async(tsk->signal->oom_mm);
 		return;
+	}
 
 	get_task_struct(tsk);
 
@@ -650,12 +635,32 @@ static void mark_oom_victim(struct task_struct *tsk)
 	struct mm_struct *mm = tsk->mm;
 
 	WARN_ON(oom_killer_disabled);
+#ifdef CONFIG_MMU
+	/*
+	 * Take a mm_users reference so that __oom_reap_task_mm() can unmap
+	 * pages without risking a race condition where final mmput() from
+	 * exit_mm() from do_exit() triggered __mmput() and gets stuck there
+	 * (but __oom_reap_task_mm() cannot unmap pages due to mm_users == 0).
+	 *
+	 * Since all callers guarantee that this mm is stable (hold task_lock
+	 * or task is current), we can safely use mmget() here.
+	 *
+	 * When dropping this reference, mmput_async() has to be used because
+	 * __mmput() can get stuck which in turn keeps the OOM killer/reaper
+	 * disabled forever.
+	 */
+	mmget(mm);
+#endif
 	/* OOM killer might race with memcg OOM */
 	if (test_and_set_tsk_thread_flag(tsk, TIF_MEMDIE))
 		return;
 
 	/* oom_mm is bound to the signal struct life time. */
 	if (!cmpxchg(&tsk->signal->oom_mm, NULL, mm))
+		/*
+		 * Take a mm_count reference so that we can examine flags value
+		 * when tsk_is_oom_victim() is true.
+		 */
 		mmgrab(tsk->signal->oom_mm);
 
 	/*
@@ -913,6 +918,9 @@ static void oom_kill_process(struct oom_control *oc, const char *message)
 		if (is_global_init(p)) {
 			can_oom_reap = false;
 			set_bit(MMF_OOM_SKIP, &mm->flags);
+#ifdef CONFIG_MMU
+			mmput_async(mm);
+#endif
 			pr_info("oom killer %d (%s) has mm pinned by %d (%s)\n",
 					task_pid_nr(victim), victim->comm,
 					task_pid_nr(p), p->comm);
