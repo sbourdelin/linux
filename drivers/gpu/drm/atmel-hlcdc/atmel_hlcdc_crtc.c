@@ -140,6 +140,58 @@ static void atmel_hlcdc_crtc_mode_set_nofb(struct drm_crtc *c)
 			   cfg);
 }
 
+static void
+atmel_hlcdc_crtc_load_lut(struct drm_crtc *c)
+{
+	struct atmel_hlcdc_crtc *crtc = drm_crtc_to_atmel_hlcdc_crtc(c);
+	struct atmel_hlcdc_dc *dc = crtc->dc;
+	uint16_t *red = c->gamma_store;
+	uint16_t *green = red + c->gamma_size;
+	uint16_t *blue = green + c->gamma_size;
+	int layer;
+	int idx;
+
+	for (layer = 0; layer < ATMEL_HLCDC_MAX_LAYERS; layer++) {
+		if (!dc->layers[layer])
+			continue;
+
+		for (idx = 0; idx < ATMEL_HLCDC_CLUT_SIZE; idx++) {
+			u32 val = ((red[idx] << 8) & 0xff0000) |
+				(green[idx] & 0xff00) |
+				(blue[idx] >> 8);
+
+			atmel_hlcdc_layer_write_clut(dc->layers[layer],
+						     idx, val);
+		}
+	}
+}
+
+void atmel_hlcdc_gamma_set(struct drm_crtc *c,
+			   u16 r, u16 g, u16 b, int idx)
+{
+	if (idx < 0 || idx >= c->gamma_size)
+		return;
+
+	c->gamma_store[idx] = r;
+	idx += c->gamma_size;
+	c->gamma_store[idx] = g;
+	idx += c->gamma_size;
+	c->gamma_store[idx] = b;
+}
+
+void atmel_hlcdc_gamma_get(struct drm_crtc *c,
+			   u16 *r, u16 *g, u16 *b, int idx)
+{
+	if (idx < 0 || idx >= c->gamma_size)
+		return;
+
+	*r = c->gamma_store[idx];
+	idx += c->gamma_size;
+	*g = c->gamma_store[idx];
+	idx += c->gamma_size;
+	*b = c->gamma_store[idx];
+}
+
 static enum drm_mode_status
 atmel_hlcdc_crtc_mode_valid(struct drm_crtc *c,
 			    const struct drm_display_mode *mode)
@@ -319,6 +371,7 @@ static const struct drm_crtc_helper_funcs lcdc_crtc_helper_funcs = {
 	.mode_set = drm_helper_crtc_mode_set,
 	.mode_set_nofb = atmel_hlcdc_crtc_mode_set_nofb,
 	.mode_set_base = drm_helper_crtc_mode_set_base,
+	.load_lut = atmel_hlcdc_crtc_load_lut,
 	.disable = atmel_hlcdc_crtc_disable,
 	.enable = atmel_hlcdc_crtc_enable,
 	.atomic_check = atmel_hlcdc_crtc_atomic_check,
