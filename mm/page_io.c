@@ -244,6 +244,37 @@ bad_bmap:
 	goto out;
 }
 
+static int daxfile_check(sector_t block, unsigned long page_no,
+		enum bmap_check type, void *none)
+{
+	if (type == BMAP_WALK_DONE)
+		return 0;
+
+	/*
+	 * Unlike the swapfile case, fail daxfile_activate() if any file
+	 * extent is not page aligned.
+	 */
+	if (type != BMAP_WALK_FULLPAGE)
+		return -EINVAL;
+	return 0;
+}
+
+int daxfile_activate(struct file *daxfile, unsigned align)
+{
+	int rc;
+
+	if (!align)
+		align = PAGE_SIZE;
+
+	if (align < PAGE_SIZE || !is_power_of_2(align))
+		return -EINVAL;
+
+	rc = bmap_walk(daxfile, align, ULONG_MAX, NULL, daxfile_check, NULL);
+	if (rc)
+		pr_debug("daxctl: daxfile has holes\n");
+	return rc;
+}
+
 static int swapfile_check(sector_t block, unsigned long page_no,
 		enum bmap_check type, void *_sis)
 {

@@ -1823,8 +1823,10 @@ struct super_operations {
 #define S_NOSEC		4096	/* no suid or xattr security attributes */
 #ifdef CONFIG_FS_DAX
 #define S_DAX		8192	/* Direct Access, avoiding the page cache */
+#define S_DAXFILE	16384	/* no truncate (swapfile) semantics + dax */
 #else
 #define S_DAX		0	/* Make all the DAX code disappear */
+#define S_DAXFILE	0
 #endif
 
 /*
@@ -1864,6 +1866,7 @@ struct super_operations {
 #define IS_AUTOMOUNT(inode)	((inode)->i_flags & S_AUTOMOUNT)
 #define IS_NOSEC(inode)		((inode)->i_flags & S_NOSEC)
 #define IS_DAX(inode)		((inode)->i_flags & S_DAX)
+#define IS_DAXFILE(inode)	((inode)->i_flags & S_DAXFILE)
 
 #define IS_WHITEOUT(inode)	(S_ISCHR(inode->i_mode) && \
 				 (inode)->i_rdev == WHITEOUT_DEV)

@@ -701,6 +701,7 @@ asmlinkage long sys_prctl(int option, unsigned long arg2, unsigned long arg3,
 			unsigned long arg4, unsigned long arg5);
 asmlinkage long sys_swapon(const char __user *specialfile, int swap_flags);
 asmlinkage long sys_swapoff(const char __user *specialfile);
+asmlinkage long sys_daxctl(const char __user *path, int flags, int align);
 asmlinkage long sys_sysctl(struct __sysctl_args __user *args);
 asmlinkage long sys_sysinfo(struct sysinfo __user *info);
 asmlinkage long sys_sysfs(int option,

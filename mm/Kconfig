@@ -450,6 +450,11 @@ config	TRANSPARENT_HUGE_PAGECACHE
 	def_bool y
 	depends on TRANSPARENT_HUGEPAGE
 
+config DAXFILE
+	def_bool y
+	depends on FS_DAX
+	depends on SWAP
+
 #
 # UP and nommu archs use km based percpu allocator
 #

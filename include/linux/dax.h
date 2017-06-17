@@ -4,7 +4,16 @@
 #include <linux/fs.h>
 #include <linux/mm.h>
 #include <linux/radix-tree.h>
+#include <uapi/linux/dax.h>
 #include <asm/pgtable.h>
+
+/*
+ * TODO: make sys_daxctl() be the generic interface for toggling S_DAX
+ * across filesystems. For now, mark DAXCTL_F_DAX as an invalid flag
+ */
+#define DAXCTL_VALID_FLAGS (DAXCTL_F_GET | DAXCTL_F_STATIC)
+
+int daxfile_activate(struct file *daxfile, unsigned align);
 
 struct iomap_ops;
 struct dax_device;
