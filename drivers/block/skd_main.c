@@ -162,6 +162,11 @@ enum skd_check_status_action {
 	SKD_CHECK_STATUS_BUSY_IMMINENT,
 };
 
+struct skd_msg_buf {
+	struct fit_msg_hdr	fmh;
+	struct skd_scsi_request	scsi;
+};
+
 struct skd_fitmsg_context {
 	enum skd_fit_msg_state state;
 
@@ -171,7 +176,7 @@ struct skd_fitmsg_context {
 	u32 length;
 	u32 offset;
 
-	u8 *msg_buf;
+	struct skd_msg_buf *msg_buf;
 	dma_addr_t mb_dma_address;
 };
 
@@ -209,7 +214,7 @@ struct skd_special_context {
 	void *data_buf;
 	dma_addr_t db_dma_address;
 
-	u8 *msg_buf;
+	struct skd_msg_buf *msg_buf;
 	dma_addr_t mb_dma_address;
 };
 
@@ -572,7 +577,7 @@ static void skd_request_fn(struct request_queue *q)
 		skmsg->id += SKD_ID_INCR;
 
 		/* Initialize the FIT msg header */
-		fmh = (struct fit_msg_hdr *)skmsg->msg_buf;
+		fmh = &skmsg->msg_buf->fmh;
 		memset(fmh, 0, sizeof(*fmh));
 		fmh->protocol_id = FIT_PROTOCOL_ID_SOFIT;
 		skmsg->length = sizeof(*fmh);
@@ -1021,11 +1026,11 @@ static int skd_format_internal_skspcl(struct skd_device *skdev)
 	uint64_t dma_address;
 	struct skd_scsi_request *scsi;
 
-	fmh = (struct fit_msg_hdr *)&skspcl->msg_buf[0];
+	fmh = &skspcl->msg_buf->fmh;
 	fmh->protocol_id = FIT_PROTOCOL_ID_SOFIT;
 	fmh->num_protocol_cmds_coalesced = 1;
 
-	scsi = (struct skd_scsi_request *)&skspcl->msg_buf[64];
+	scsi = &skspcl->msg_buf->scsi;
 	memset(scsi, 0, sizeof(*scsi));
 	dma_address = skspcl->req.sksg_dma_address;
 	scsi->hdr.sg_list_dma_address = cpu_to_be64(dma_address);
@@ -1060,7 +1065,7 @@ static void skd_send_internal_skspcl(struct skd_device *skdev,
 	skspcl->req.state = SKD_REQ_STATE_BUSY;
 	skspcl->req.id += SKD_ID_INCR;
 
-	scsi = (struct skd_scsi_request *)&skspcl->msg_buf[64];
+	scsi = &skspcl->msg_buf->scsi;
 	scsi->hdr.tag = skspcl->req.id;
 
 	memset(scsi->cdb, 0, sizeof(scsi->cdb));
@@ -1165,8 +1170,7 @@ static void skd_complete_internal(struct skd_device *skdev,
 	u8 *buf = skspcl->data_buf;
 	u8 status;
 	int i;
-	struct skd_scsi_request *scsi =
-		(struct skd_scsi_request *)&skspcl->msg_buf[64];
+	struct skd_scsi_request *scsi = &skspcl->msg_buf->scsi;
 
 	SKD_ASSERT(skspcl == &skdev->internal_skspcl);
 
@@ -1332,7 +1336,7 @@ static void skd_send_fitmsg(struct skd_device *skdev,
 	qcmd = skmsg->mb_dma_address;
 	qcmd |= FIT_QCMD_QID_NORMAL;
 
-	fmh = (struct fit_msg_hdr *)skmsg->msg_buf;
+	fmh = &skmsg->msg_buf->fmh;
 	skmsg->outstanding = fmh->num_protocol_cmds_coalesced;
 
 	if (unlikely(skdev->dbg_level > 1)) {
@@ -2882,7 +2886,7 @@ static int skd_cons_skmsg(struct skd_device *skdev)
 		skmsg->offset = (u32)((u64)skmsg->msg_buf &
 				      (~FIT_QCMD_BASE_ADDRESS_MASK));
 		skmsg->msg_buf += ~FIT_QCMD_BASE_ADDRESS_MASK;
-		skmsg->msg_buf = (u8 *)((u64)skmsg->msg_buf &
+		skmsg->msg_buf = (void *)((u64)skmsg->msg_buf &
 				       FIT_QCMD_BASE_ADDRESS_MASK);
 		skmsg->mb_dma_address += ~FIT_QCMD_BASE_ADDRESS_MASK;
 		skmsg->mb_dma_address &= FIT_QCMD_BASE_ADDRESS_MASK;
