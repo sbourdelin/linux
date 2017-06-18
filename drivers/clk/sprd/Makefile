@@ -1,3 +1,3 @@
 ifneq ($(CONFIG_OF),)
-obj-y	+= ccu_common.o ccu_gate.o
+obj-y	+= ccu_common.o ccu_gate.o ccu_mux.o
 endif
