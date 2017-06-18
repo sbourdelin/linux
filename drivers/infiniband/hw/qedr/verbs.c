@@ -335,6 +335,9 @@ static bool qedr_search_mmap(struct qedr_ucontext *uctx, u64 phy_addr,
 	return found;
 }
 
+#define QEDR_LIB_UCXT_SUPPORT(field, udata, value)			      \
+	((offsetof(struct qedr_alloc_ucontext_resp, field) < udata->outlen) ? \
+	 (value) : 0)
 struct ib_ucontext *qedr_alloc_ucontext(struct ib_device *ibdev,
 					struct ib_udata *udata)
 {
@@ -367,6 +370,9 @@ struct ib_ucontext *qedr_alloc_ucontext(struct ib_device *ibdev,
 	mutex_init(&ctx->mm_list_lock);
 
 	memset(&uresp, 0, sizeof(uresp));
+
+	uresp.dpm_enabled = QEDR_LIB_UCXT_SUPPORT(dpm_enabled, udata,
+						  dev->user_dpm_enabled);
 
 	uresp.db_pa = ctx->dpi_phys_addr;
 	uresp.db_size = ctx->dpi_size;
