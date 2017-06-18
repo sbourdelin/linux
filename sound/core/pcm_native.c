@@ -249,6 +249,27 @@ static bool hw_support_mmap(struct snd_pcm_substream *substream)
 	return true;
 }
 
+static int constrain_params_with_precondition(struct snd_pcm_substream *substream,
+					      struct snd_pcm_hw_params *params)
+{
+	struct snd_mask *mask;
+
+	/*
+	 * When drivers require applications' cooperation to report current
+	 * appl_ptr and the applications voluntarily perform it, mmap operation
+	 * is allowed. Else, read/write operations are allowed.
+	 */
+	if ((substream->runtime->hw.info & SNDRV_PCM_INFO_ACK_APPLPTR) &&
+	    !(params->flags & SNDRV_PCM_HW_PARAMS_ACK_APPLPTR)) {
+		mask = hw_param_mask(params, SNDRV_PCM_HW_PARAM_ACCESS);
+		snd_mask_reset(mask, SNDRV_PCM_ACCESS_MMAP_INTERLEAVED);
+		snd_mask_reset(mask, SNDRV_PCM_ACCESS_MMAP_NONINTERLEAVED);
+		snd_mask_reset(mask, SNDRV_PCM_ACCESS_MMAP_COMPLEX);
+	}
+
+	return 0;
+}
+
 static int constrain_mask_params(struct snd_pcm_substream *substream,
 				 struct snd_pcm_hw_params *params)
 {
@@ -494,6 +515,10 @@ int snd_pcm_hw_refine(struct snd_pcm_substream *substream,
 		params->rate_num = 0;
 		params->rate_den = 0;
 	}
+
+	err = constrain_params_with_precondition(substream, params);
+	if (err < 0)
+		return err;
 
 	err = constrain_mask_params(substream, params);
 	if (err < 0)

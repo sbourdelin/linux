@@ -152,7 +152,7 @@ struct snd_hwdep_dsp_image {
  *                                                                           *
  *****************************************************************************/
 
-#define SNDRV_PCM_VERSION		SNDRV_PROTOCOL_VERSION(2, 0, 13)
+#define SNDRV_PCM_VERSION		SNDRV_PROTOCOL_VERSION(2, 0, 14)
 
 typedef unsigned long snd_pcm_uframes_t;
 typedef signed long snd_pcm_sframes_t;
@@ -268,6 +268,8 @@ typedef int __bitwise snd_pcm_subformat_t;
 #define SNDRV_PCM_INFO_MMAP_VALID	0x00000002	/* period data are valid during transfer */
 #define SNDRV_PCM_INFO_DOUBLE		0x00000004	/* Double buffering needed for PCM start/stop */
 #define SNDRV_PCM_INFO_BATCH		0x00000010	/* double buffering */
+/* Driver/hardware acknowledge current appl_ptr for specific purposes. */
+#define SNDRV_PCM_INFO_ACK_APPLPTR	0x00000012
 #define SNDRV_PCM_INFO_INTERLEAVED	0x00000100	/* channels are interleaved */
 #define SNDRV_PCM_INFO_NONINTERLEAVED	0x00000200	/* channels are not interleaved */
 #define SNDRV_PCM_INFO_COMPLEX		0x00000400	/* complex frame organization (mmap only) */
@@ -365,6 +367,13 @@ typedef int snd_pcm_hw_param_t;
 #define SNDRV_PCM_HW_PARAMS_NORESAMPLE	(1<<0)	/* avoid rate resampling */
 #define SNDRV_PCM_HW_PARAMS_EXPORT_BUFFER	(1<<1)	/* export buffer */
 #define SNDRV_PCM_HW_PARAMS_NO_PERIOD_WAKEUP	(1<<2)	/* disable period wakeups */
+/*
+ * When applications are programmed to execute ioctl(2) with
+ * SNDRV_PCM_IOCTL_SYNC_PTR for notification of current appl_ptr after handling
+ * any frames on mapped PCM buffer for driver/hardware with
+ * SNDRV_PCM_INFO_ACK_APPLPTR, this should be set.
+ */
+#define SNDRV_PCM_HW_PARAMS_ACK_APPLPTR	(1<<3)
 
 struct snd_interval {
 	unsigned int min, max;
