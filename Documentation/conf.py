@@ -271,8 +271,6 @@ latex_elements = {
 
 # Additional stuff for the LaTeX preamble.
     'preamble': '''
-	% Adjust margins
-	\\usepackage[margin=0.5in, top=1in, bottom=1in]{geometry}
         \\usepackage{ifthen}
 
         % Allow generate some pages in landscape
