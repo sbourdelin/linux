@@ -373,6 +373,9 @@ struct ib_ucontext *qedr_alloc_ucontext(struct ib_device *ibdev,
 
 	uresp.dpm_enabled = QEDR_LIB_UCXT_SUPPORT(dpm_enabled, udata,
 						  dev->user_dpm_enabled);
+	uresp.wids_enabled = QEDR_LIB_UCXT_SUPPORT(wids_enabled, udata, 1);
+	uresp.wid_count = QEDR_LIB_UCXT_SUPPORT(wid_count, udata,
+						oparams.wid_count);
 
 	uresp.db_pa = ctx->dpi_phys_addr;
 	uresp.db_size = ctx->dpi_size;
