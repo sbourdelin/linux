@@ -1,0 +1,67 @@
+/*
+ * Spreadtrum SC9860 SoC CCU
+ *
+ * Copyright (C) 2017, Spreadtrum Communications Inc.
+ *
+ * SPDX-License-Identifier: (GPL-2.0+ OR MIT)
+ */
+
+&soc {
+	ext_26m: ext-26m {
+		compatible = "fixed-clock";
+		#clock-cells = <0>;
+		clock-frequency = <26000000>;
+		clock-output-names = "ext-26m";
+	};
+
+	ext_32m_sine0: ext-32m-sine0 {
+		compatible = "fixed-clock";
+		#clock-cells = <0>;
+		clock-frequency = <32000000>;
+		clock-output-names = "ext-32m-sine0";
+	};
+
+	ext_32m_sine1: ext-32m-sine1 {
+		compatible = "fixed-clock";
+		#clock-cells = <0>;
+		clock-frequency = <32000000>;
+		clock-output-names = "ext-32m-sine1";
+	};
+
+	ext_rco_100m: ext-rco-100m {
+		compatible = "fixed-clock";
+		#clock-cells = <0>;
+		clock-frequency = <100000000>;
+		clock-output-names = "ext-rco-100m";
+	};
+
+	ext_32k: ext-32k {
+		compatible = "fixed-clock";
+		#clock-cells = <0>;
+		clock-frequency = <32768>;
+		clock-output-names = "ext-32k";
+	};
+
+	ccu: clk {
+		compatible = "sprd,sc9860-ccu";
+		#clock-cells = <1>;
+		reg = <0 0x20000000 0 0x400>,
+		      <0 0x20210000 0 0x3000>,
+		      <0 0x402b0000 0 0x4000>,
+		      <0 0x402d0000 0 0x400>,
+		      <0 0x402e0000 0 0x4000>,
+		      <0 0x40400000 0 0x400>,
+		      <0 0x40880000 0 0x400>,
+		      <0 0x415e0000 0 0x400>,
+		      <0 0x60200000 0 0x400>,
+		      <0 0x61000000 0 0x400>,
+		      <0 0x61100000 0 0x3000>,
+		      <0 0x62000000 0 0x4000>,
+		      <0 0x62100000 0 0x4000>,
+		      <0 0x63000000 0 0x400>,
+		      <0 0x63100000 0 0x3000>,
+		      <0 0x70b00000 0 0x3000>;
+		clocks = <&ext_26m>, <&ext_rco_100m>, <&ext_32k>;
+		clock-names = "ext-26m", "ext-rco-100m", "ext-32k";
+	};
+};

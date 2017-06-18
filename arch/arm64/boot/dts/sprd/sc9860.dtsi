@@ -7,7 +7,9 @@
  */
 
 #include <dt-bindings/interrupt-controller/arm-gic.h>
+#include <dt-bindings/clock/sc9860-ccu.h>
 #include "whale2.dtsi"
+#include "sc9860-ccu.dtsi"
 
 / {
 	cpus {
