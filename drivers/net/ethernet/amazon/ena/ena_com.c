@@ -100,7 +100,7 @@ static inline int ena_com_mem_addr_set(struct ena_com_dev *ena_dev,
 	}
 
 	ena_addr->mem_addr_low = (u32)addr;
-	ena_addr->mem_addr_high = (u64)addr >> 32;
+	ena_addr->mem_addr_high = (u16)((u64)addr >> 32);
 
 	return 0;
 }
