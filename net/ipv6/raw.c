@@ -183,7 +183,6 @@ static bool ipv6_raw_deliver(struct sk_buff *skb, int nexthdr)
 	while (sk) {
 		int filtered;
 
-		delivered = true;
 		switch (nexthdr) {
 		case IPPROTO_ICMPV6:
 			filtered = icmpv6_filter(sk, skb);
@@ -218,7 +217,8 @@ static bool ipv6_raw_deliver(struct sk_buff *skb, int nexthdr)
 			/* Not releasing hash table! */
 			if (clone) {
 				nf_reset(clone);
-				rawv6_rcv(sk, clone);
+				if (rawv6_rcv(sk, clone) == NET_RX_SUCCESS)
+					delivered = true;
 			}
 		}
 		sk = __raw_v6_lookup(net, sk_next(sk), nexthdr, daddr, saddr,
