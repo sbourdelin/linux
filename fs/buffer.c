@@ -864,9 +864,9 @@ int remove_inode_buffers(struct inode *inode)
  * which may not fail from ordinary buffer allocations.
  */
 struct buffer_head *alloc_page_buffers(struct page *page, unsigned long size,
-		int retry)
+		int retry, int circular, unsigned long b_state)
 {
-	struct buffer_head *bh, *head;
+	struct buffer_head *bh, *head, *tail;
 	long offset;
 
 try_again:
@@ -879,13 +879,21 @@ try_again:
 
 		bh->b_this_page = head;
 		bh->b_blocknr = -1;
-		head = bh;
 
+		if (head == NULL)
+			tail = bh;
+
+		head = bh;
+		bh->b_state = b_state;
 		bh->b_size = size;
 
 		/* Link the buffer to its page */
 		set_bh_page(bh, page, offset);
 	}
+
+	if (circular)
+		tail->b_this_page = head;
+
 	return head;
 /*
  * In case anything failed, we just free everything we got.
@@ -922,14 +930,6 @@ EXPORT_SYMBOL_GPL(alloc_page_buffers);
 static inline void
 link_dev_buffers(struct page *page, struct buffer_head *head)
 {
-	struct buffer_head *bh, *tail;
-
-	bh = head;
-	do {
-		tail = bh;
-		bh = bh->b_this_page;
-	} while (bh);
-	tail->b_this_page = head;
 	attach_page_buffers(page, head);
 }
 
@@ -1024,7 +1024,7 @@ grow_dev_page(struct block_device *bdev, sector_t block,
 	/*
 	 * Allocate some buffers for this page
 	 */
-	bh = alloc_page_buffers(page, size, 0);
+	bh = alloc_page_buffers(page, size, 0, 1, 0);
 	if (!bh)
 		goto failed;
 
@@ -1578,16 +1578,9 @@ EXPORT_SYMBOL(block_invalidatepage);
 void create_empty_buffers(struct page *page,
 			unsigned long blocksize, unsigned long b_state)
 {
-	struct buffer_head *bh, *head, *tail;
+	struct buffer_head *bh, *head;
 
-	head = alloc_page_buffers(page, blocksize, 1);
-	bh = head;
-	do {
-		bh->b_state |= b_state;
-		tail = bh;
-		bh = bh->b_this_page;
-	} while (bh);
-	tail->b_this_page = head;
+	head = alloc_page_buffers(page, blocksize, 1, 1, b_state);
 
 	spin_lock(&page->mapping->private_lock);
 	if (PageUptodate(page) || PageDirty(page)) {
@@ -2642,7 +2635,7 @@ int nobh_write_begin(struct address_space *mapping,
 	 * Be careful: the buffer linked list is a NULL terminated one, rather
 	 * than the circular one we're used to.
 	 */
-	head = alloc_page_buffers(page, blocksize, 0);
+	head = alloc_page_buffers(page, blocksize, 0, 0, 0);
 	if (!head) {
 		ret = -ENOMEM;
 		goto out_release;
