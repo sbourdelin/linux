@@ -1701,9 +1701,11 @@ static void enic_free_intr(struct enic *enic)
 		break;
 	case VNIC_DEV_INTR_MODE_MSIX:
 		for (i = 0; i < ARRAY_SIZE(enic->msix); i++)
-			if (enic->msix[i].requested)
+			if (enic->msix[i].requested) {
 				free_irq(enic->msix_entry[i].vector,
 					enic->msix[i].devid);
+				kfree(enic->msix[i].devname);
+			}
 		break;
 	default:
 		break;
@@ -1735,9 +1737,12 @@ static int enic_request_intr(struct enic *enic)
 
 		for (i = 0; i < enic->rq_count; i++) {
 			intr = enic_msix_rq_intr(enic, i);
-			snprintf(enic->msix[intr].devname,
-				sizeof(enic->msix[intr].devname),
-				"%.11s-rx-%u", netdev->name, i);
+			enic->msix[intr].devname = kasprintf(GFP_KERNEL,
+							     "%s-rx-%u",
+							     netdev->name, i);
+			if (!enic->msix[intr].devname)
+				netdev_warn(netdev, "name alloc failed for intr %d",
+					    intr);
 			enic->msix[intr].isr = enic_isr_msix;
 			enic->msix[intr].devid = &enic->napi[i];
 		}
@@ -1746,24 +1751,31 @@ static int enic_request_intr(struct enic *enic)
 			int wq = enic_cq_wq(enic, i);
 
 			intr = enic_msix_wq_intr(enic, i);
-			snprintf(enic->msix[intr].devname,
-				sizeof(enic->msix[intr].devname),
-				"%.11s-tx-%u", netdev->name, i);
+			enic->msix[intr].devname = kasprintf(GFP_KERNEL,
+							     "%s-tx-%u",
+							     netdev->name, i);
+			if (!enic->msix[intr].devname)
+				netdev_warn(netdev, "name alloc failed for intr %d",
+					    intr);
 			enic->msix[intr].isr = enic_isr_msix;
 			enic->msix[intr].devid = &enic->napi[wq];
 		}
 
 		intr = enic_msix_err_intr(enic);
-		snprintf(enic->msix[intr].devname,
-			sizeof(enic->msix[intr].devname),
-			"%.11s-err", netdev->name);
+		enic->msix[intr].devname = kasprintf(GFP_KERNEL, "%s-err",
+						     netdev->name);
+		if (!enic->msix[intr].devname)
+			netdev_warn(netdev, "name alloc failed for intr %d",
+				    intr);
 		enic->msix[intr].isr = enic_isr_msix_err;
 		enic->msix[intr].devid = enic;
 
 		intr = enic_msix_notify_intr(enic);
-		snprintf(enic->msix[intr].devname,
-			sizeof(enic->msix[intr].devname),
-			"%.11s-notify", netdev->name);
+		enic->msix[intr].devname = kasprintf(GFP_KERNEL, "%s-notify",
+						     netdev->name);
+		if (!enic->msix[intr].devname)
+			netdev_warn(netdev, "name alloc failed for intr %d",
+				    intr);
 		enic->msix[intr].isr = enic_isr_msix_notify;
 		enic->msix[intr].devid = enic;
 
