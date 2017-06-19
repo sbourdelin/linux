@@ -22,4 +22,9 @@
  * directives.  Suppress the warning in clang as well.
  */
 #undef inline
+#if !defined(CONFIG_ARCH_SUPPORTS_OPTIMIZED_INLINING) ||		\
+    !defined(CONFIG_OPTIMIZE_INLINING)
+#define inline inline __attribute__((always_inline)) __attribute__((unused)) notrace
+#else
 #define inline inline __attribute__((unused)) notrace
+#endif
