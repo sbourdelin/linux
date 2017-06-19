@@ -442,6 +442,7 @@ static void _rtl_usb_rx_process_agg(struct ieee80211_hw *hw,
 				    struct sk_buff *skb)
 {
 	struct rtl_priv *rtlpriv = rtl_priv(hw);
+	struct rtl_hal_ops *ops = rtlpriv->cfg->ops;
 	u8 *rxdesc = skb->data;
 	struct ieee80211_hdr *hdr;
 	bool unicast = false;
@@ -453,7 +454,7 @@ static void _rtl_usb_rx_process_agg(struct ieee80211_hw *hw,
 	};
 
 	skb_pull(skb, RTL_RX_DESC_SIZE);
-	rtlpriv->cfg->ops->query_rx_desc(hw, &stats, &rx_status, rxdesc, skb);
+	ops->query_rx_desc(hw, &stats, &rx_status, rxdesc, skb);
 	skb_pull(skb, (stats.rx_drvinfo_size + stats.rx_bufshift));
 	hdr = (struct ieee80211_hdr *)(skb->data);
 	fc = hdr->frame_control;
@@ -470,7 +471,7 @@ static void _rtl_usb_rx_process_agg(struct ieee80211_hw *hw,
 		}
 
 		if (ieee80211_is_data(fc)) {
-			rtlpriv->cfg->ops->led_control(hw, LED_CTL_RX);
+			ops->led_control(hw, LED_CTL_RX);
 
 			if (unicast)
 				rtlpriv->link_info.num_rx_inperiod++;
@@ -484,6 +485,7 @@ static void _rtl_usb_rx_process_noagg(struct ieee80211_hw *hw,
 				      struct sk_buff *skb)
 {
 	struct rtl_priv *rtlpriv = rtl_priv(hw);
+	struct rtl_hal_ops *ops = rtlpriv->cfg->ops;
 	u8 *rxdesc = skb->data;
 	struct ieee80211_hdr *hdr;
 	bool unicast = false;
@@ -495,7 +497,7 @@ static void _rtl_usb_rx_process_noagg(struct ieee80211_hw *hw,
 	};
 
 	skb_pull(skb, RTL_RX_DESC_SIZE);
-	rtlpriv->cfg->ops->query_rx_desc(hw, &stats, &rx_status, rxdesc, skb);
+	ops->query_rx_desc(hw, &stats, &rx_status, rxdesc, skb);
 	skb_pull(skb, (stats.rx_drvinfo_size + stats.rx_bufshift));
 	hdr = (struct ieee80211_hdr *)(skb->data);
 	fc = hdr->frame_control;
@@ -512,7 +514,7 @@ static void _rtl_usb_rx_process_noagg(struct ieee80211_hw *hw,
 		}
 
 		if (ieee80211_is_data(fc)) {
-			rtlpriv->cfg->ops->led_control(hw, LED_CTL_RX);
+			ops->led_control(hw, LED_CTL_RX);
 
 			if (unicast)
 				rtlpriv->link_info.num_rx_inperiod++;
@@ -755,10 +757,11 @@ static int rtl_usb_start(struct ieee80211_hw *hw)
 {
 	int err;
 	struct rtl_priv *rtlpriv = rtl_priv(hw);
+	struct rtl_hal_ops *ops = rtlpriv->cfg->ops;
 	struct rtl_hal *rtlhal = rtl_hal(rtl_priv(hw));
 	struct rtl_usb *rtlusb = rtl_usbdev(rtl_usbpriv(hw));
 
-	err = rtlpriv->cfg->ops->hw_init(hw);
+	err = ops->hw_init(hw);
 	if (!err) {
 		rtl_init_rx_config(hw);
 
@@ -816,6 +819,7 @@ static void rtl_usb_deinit(struct ieee80211_hw *hw)
 static void rtl_usb_stop(struct ieee80211_hw *hw)
 {
 	struct rtl_priv *rtlpriv = rtl_priv(hw);
+	struct rtl_hal_ops *ops = rtlpriv->cfg->ops;
 	struct rtl_hal *rtlhal = rtl_hal(rtl_priv(hw));
 	struct rtl_usb *rtlusb = rtl_usbdev(rtl_usbpriv(hw));
 	struct urb *urb;
@@ -842,7 +846,7 @@ static void rtl_usb_stop(struct ieee80211_hw *hw)
 		usb_free_urb(urb);
 	}
 
-	rtlpriv->cfg->ops->hw_disable(hw);
+	ops->hw_disable(hw);
 }
 
 static void _rtl_submit_tx_urb(struct ieee80211_hw *hw, struct urb *_urb)
@@ -952,6 +956,7 @@ static void _rtl_usb_tx_preprocess(struct ieee80211_hw *hw,
 				   u16 hw_queue)
 {
 	struct rtl_priv *rtlpriv = rtl_priv(hw);
+	struct rtl_hal_ops *ops = rtlpriv->cfg->ops;
 	struct rtl_mac *mac = rtl_mac(rtl_priv(hw));
 	struct ieee80211_tx_info *info = IEEE80211_SKB_CB(skb);
 	struct rtl_tx_desc *pdesc = NULL;
@@ -991,14 +996,14 @@ static void _rtl_usb_tx_preprocess(struct ieee80211_hw *hw,
 		seq_number += 1;
 		seq_number <<= 4;
 	}
-	rtlpriv->cfg->ops->fill_tx_desc(hw, hdr, (u8 *)pdesc, NULL, info, sta, skb,
-					hw_queue, &tcb_desc);
+	ops->fill_tx_desc(hw, hdr, (u8 *)pdesc, NULL, info, sta, skb,
+			  hw_queue, &tcb_desc);
 	if (!ieee80211_has_morefrags(hdr->frame_control)) {
 		if (qc)
 			mac->tids[tid].seq_number = seq_number;
 	}
 	if (ieee80211_is_data(fc))
-		rtlpriv->cfg->ops->led_control(hw, LED_CTL_TX);
+		ops->led_control(hw, LED_CTL_TX);
 }
 
 static int rtl_usb_tx(struct ieee80211_hw *hw,
@@ -1037,8 +1042,9 @@ static void rtl_fill_h2c_cmd_work_callback(struct work_struct *work)
 	    container_of(work, struct rtl_works, fill_h2c_cmd);
 	struct ieee80211_hw *hw = rtlworks->hw;
 	struct rtl_priv *rtlpriv = rtl_priv(hw);
+	struct rtl_hal_ops *ops = rtlpriv->cfg->ops;
 
-	rtlpriv->cfg->ops->fill_h2c_cmd(hw, H2C_RA_MASK, 5, rtlpriv->rate_mask);
+	ops->fill_h2c_cmd(hw, H2C_RA_MASK, 5, rtlpriv->rate_mask);
 }
 
 static const struct rtl_intf_ops rtl_usb_ops = {
@@ -1055,6 +1061,7 @@ int rtl_usb_probe(struct usb_interface *intf,
 	int err;
 	struct ieee80211_hw *hw = NULL;
 	struct rtl_priv *rtlpriv = NULL;
+	struct rtl_hal_ops *ops = rtlpriv->cfg->ops;
 	struct usb_device	*udev;
 	struct rtl_usb_priv *usb_priv;
 
@@ -1094,9 +1101,9 @@ int rtl_usb_probe(struct usb_interface *intf,
 	rtlpriv->intf_ops = &rtl_usb_ops;
 	/* Init IO handler */
 	_rtl_usb_io_handler_init(&udev->dev, hw);
-	rtlpriv->cfg->ops->read_chip_version(hw);
+	ops->read_chip_version(hw);
 	/*like read eeprom and so on */
-	rtlpriv->cfg->ops->read_eeprom_info(hw);
+	ops->read_eeprom_info(hw);
 	err = _rtl_usb_init(hw);
 	if (err)
 		goto error_out;
@@ -1107,11 +1114,11 @@ int rtl_usb_probe(struct usb_interface *intf,
 		pr_err("Can't allocate sw for mac80211\n");
 		goto error_out;
 	}
-	if (rtlpriv->cfg->ops->init_sw_vars(hw)) {
+	if (ops->init_sw_vars(hw)) {
 		pr_err("Can't init_sw_vars\n");
 		goto error_out;
 	}
-	rtlpriv->cfg->ops->init_sw_leds(hw);
+	ops->init_sw_leds(hw);
 
 	err = ieee80211_register_hw(hw);
 	if (err) {
@@ -1137,6 +1144,7 @@ void rtl_usb_disconnect(struct usb_interface *intf)
 {
 	struct ieee80211_hw *hw = usb_get_intfdata(intf);
 	struct rtl_priv *rtlpriv = rtl_priv(hw);
+	struct rtl_hal_ops *ops = rtlpriv->cfg->ops;
 	struct rtl_mac *rtlmac = rtl_mac(rtl_priv(hw));
 	struct rtl_usb *rtlusb = rtl_usbdev(rtl_usbpriv(hw));
 
@@ -1158,8 +1166,8 @@ void rtl_usb_disconnect(struct usb_interface *intf)
 	rtl_usb_deinit(hw);
 	rtl_deinit_core(hw);
 	kfree(rtlpriv->usb_data);
-	rtlpriv->cfg->ops->deinit_sw_leds(hw);
-	rtlpriv->cfg->ops->deinit_sw_vars(hw);
+	ops->deinit_sw_leds(hw);
+	ops->deinit_sw_vars(hw);
 	_rtl_usb_io_handler_release(hw);
 	usb_put_dev(rtlusb->udev);
 	usb_set_intfdata(intf, NULL);

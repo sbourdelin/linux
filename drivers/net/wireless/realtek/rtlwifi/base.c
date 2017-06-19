@@ -498,7 +498,7 @@ EXPORT_SYMBOL_GPL(rtl_deinit_deferred_work);
 void rtl_init_rfkill(struct ieee80211_hw *hw)
 {
 	struct rtl_priv *rtlpriv = rtl_priv(hw);
-
+	struct rtl_hal_ops *ops = rtlpriv->cfg->ops;
 	bool radio_state;
 	bool blocked;
 	u8 valid = 0;
@@ -507,7 +507,7 @@ void rtl_init_rfkill(struct ieee80211_hw *hw)
 	rtlpriv->rfkill.rfkill_state = true;
 	wiphy_rfkill_set_hw_state(hw->wiphy, 0);
 
-	radio_state = rtlpriv->cfg->ops->radio_onoff_checking(hw, &valid);
+	radio_state = ops->radio_onoff_checking(hw, &valid);
 
 	if (valid) {
 		pr_info("rtlwifi: wireless switch is %s\n",
@@ -588,8 +588,9 @@ void rtl_init_rx_config(struct ieee80211_hw *hw)
 {
 	struct rtl_priv *rtlpriv = rtl_priv(hw);
 	struct rtl_mac *mac = rtl_mac(rtl_priv(hw));
+	struct rtl_hal_ops *ops = rtlpriv->cfg->ops;
 
-	rtlpriv->cfg->ops->get_hw_reg(hw, HW_VAR_RCR, (u8 *) (&mac->rx_conf));
+	ops->get_hw_reg(hw, HW_VAR_RCR, (u8 *)&mac->rx_conf);
 }
 EXPORT_SYMBOL_GPL(rtl_init_rx_config);
 
@@ -1178,13 +1179,14 @@ bool rtl_tx_mgmt_proc(struct ieee80211_hw *hw, struct sk_buff *skb)
 {
 	struct rtl_mac *mac = rtl_mac(rtl_priv(hw));
 	struct rtl_priv *rtlpriv = rtl_priv(hw);
+	struct rtl_hal_ops *ops = rtlpriv->cfg->ops;
 	__le16 fc = rtl_get_fc(skb);
 
 	if (rtlpriv->dm.supp_phymode_switch &&
 	    mac->link_state < MAC80211_LINKED &&
 	    (ieee80211_is_auth(fc) || ieee80211_is_probe_req(fc))) {
-		if (rtlpriv->cfg->ops->chk_switch_dmdp)
-			rtlpriv->cfg->ops->chk_switch_dmdp(hw);
+		if (ops->chk_switch_dmdp)
+			ops->chk_switch_dmdp(hw);
 	}
 	if (ieee80211_is_auth(fc)) {
 		RT_TRACE(rtlpriv, COMP_SEND, DBG_DMESG, "MAC80211_LINKING\n");
@@ -1309,11 +1311,12 @@ EXPORT_SYMBOL_GPL(rtl_action_proc);
 static void setup_arp_tx(struct rtl_priv *rtlpriv, struct rtl_ps_ctl *ppsc)
 {
 	struct ieee80211_hw *hw = rtlpriv->hw;
+	struct rtl_hal_ops *ops = rtlpriv->cfg->ops;
 
 	rtlpriv->ra.is_special_data = true;
-	if (rtlpriv->cfg->ops->get_btc_status())
+	if (ops->get_btc_status())
 		rtlpriv->btcoexist.btc_ops->btc_special_packet_notify(
-					rtlpriv, 1);
+			rtlpriv, 1);
 	rtl_lps_leave(hw);
 	ppsc->last_delaylps_stamp_jiffies = jiffies;
 }
@@ -1571,6 +1574,7 @@ void rtl_watchdog_wq_callback(void *data)
 							    watchdog_wq);
 	struct ieee80211_hw *hw = rtlworks->hw;
 	struct rtl_priv *rtlpriv = rtl_priv(hw);
+	struct rtl_hal_ops *ops = rtlpriv->cfg->ops;
 	struct rtl_hal *rtlhal = rtl_hal(rtl_priv(hw));
 	struct rtl_mac *mac = rtl_mac(rtl_priv(hw));
 	bool busytraffic = false;
@@ -1683,7 +1687,7 @@ void rtl_watchdog_wq_callback(void *data)
 
 	/* <3> DM */
 	if (!rtlpriv->cfg->mod_params->disable_watchdog)
-		rtlpriv->cfg->ops->dm_watchdog(hw);
+		ops->dm_watchdog(hw);
 
 	/* <4> roaming */
 	if (mac->link_state == MAC80211_LINKED &&
@@ -1709,7 +1713,7 @@ void rtl_watchdog_wq_callback(void *data)
 		}
 	}
 
-	if (rtlpriv->cfg->ops->get_btc_status())
+	if (ops->get_btc_status())
 		rtlpriv->btcoexist.btc_ops->btc_periodical(rtlpriv);
 
 	rtlpriv->link_info.bcn_rx_inperiod = 0;
@@ -1732,8 +1736,9 @@ void rtl_fwevt_wq_callback(void *data)
 		container_of_dwork_rtl(data, struct rtl_works, fwevt_wq);
 	struct ieee80211_hw *hw = rtlworks->hw;
 	struct rtl_priv *rtlpriv = rtl_priv(hw);
+	struct rtl_hal_ops *ops = rtlpriv->cfg->ops;
 
-	rtlpriv->cfg->ops->c2h_command_handle(hw);
+	ops->c2h_command_handle(hw);
 }
 
 void rtl_c2hcmd_enqueue(struct ieee80211_hw *hw, u8 tag, u8 len, u8 *val)
@@ -1783,6 +1788,7 @@ EXPORT_SYMBOL(rtl_c2hcmd_enqueue);
 void rtl_c2hcmd_launcher(struct ieee80211_hw *hw, int exec)
 {
 	struct rtl_priv *rtlpriv = rtl_priv(hw);
+	struct rtl_hal_ops *ops = rtlpriv->cfg->ops;
 	unsigned long flags;
 	struct rtl_c2hcmd *c2hcmd;
 	int i;
@@ -1803,9 +1809,9 @@ void rtl_c2hcmd_launcher(struct ieee80211_hw *hw, int exec)
 		if (!c2hcmd)
 			break;
 
-		if (rtlpriv->cfg->ops->c2h_content_parsing && exec)
-			rtlpriv->cfg->ops->c2h_content_parsing(hw,
-					c2hcmd->tag, c2hcmd->len, c2hcmd->val);
+		if (ops->c2h_content_parsing && exec)
+			ops->c2h_content_parsing(hw, c2hcmd->tag, c2hcmd->len,
+						 c2hcmd->val);
 
 		/* free */
 		kfree(c2hcmd->val);
@@ -1828,12 +1834,13 @@ void rtl_easy_concurrent_retrytimer_callback(unsigned long data)
 {
 	struct ieee80211_hw *hw = (struct ieee80211_hw *)data;
 	struct rtl_priv *rtlpriv = rtl_priv(hw);
+	struct rtl_hal_ops *ops = rtlpriv->cfg->ops;
 	struct rtl_priv *buddy_priv = rtlpriv->buddy_priv;
 
 	if (buddy_priv == NULL)
 		return;
 
-	rtlpriv->cfg->ops->dualmac_easy_concurrent(hw);
+	ops->dualmac_easy_concurrent(hw);
 }
 /*********************************************************
  *
@@ -1945,7 +1952,6 @@ int rtl_send_smps_action(struct ieee80211_hw *hw,
 		struct rtl_sta_info *sta_entry =
 			(struct rtl_sta_info *) sta->drv_priv;
 		sta_entry->mimo_ps = smps;
-		/* rtlpriv->cfg->ops->update_rate_tbl(hw, sta, 0); */
 
 		info->control.rates[0].idx = 0;
 		info->band = hw->conf.chandef.chan->band;
@@ -1961,6 +1967,7 @@ EXPORT_SYMBOL(rtl_send_smps_action);
 void rtl_phy_scan_operation_backup(struct ieee80211_hw *hw, u8 operation)
 {
 	struct rtl_priv *rtlpriv = rtl_priv(hw);
+	struct rtl_hal_ops *ops = rtlpriv->cfg->ops;
 	struct rtl_hal *rtlhal = rtl_hal(rtl_priv(hw));
 	enum io_type iotype;
 
@@ -1968,15 +1975,11 @@ void rtl_phy_scan_operation_backup(struct ieee80211_hw *hw, u8 operation)
 		switch (operation) {
 		case SCAN_OPT_BACKUP:
 			iotype = IO_CMD_PAUSE_DM_BY_SCAN;
-			rtlpriv->cfg->ops->set_hw_reg(hw,
-						      HW_VAR_IO_CMD,
-						      (u8 *)&iotype);
+			ops->set_hw_reg(hw, HW_VAR_IO_CMD, (u8 *)&iotype);
 			break;
 		case SCAN_OPT_RESTORE:
 			iotype = IO_CMD_RESUME_DM_BY_SCAN;
-			rtlpriv->cfg->ops->set_hw_reg(hw,
-						      HW_VAR_IO_CMD,
-						      (u8 *)&iotype);
+			ops->set_hw_reg(hw, HW_VAR_IO_CMD, (u8 *)&iotype);
 			break;
 		default:
 			pr_err("Unknown Scan Backup operation.\n");

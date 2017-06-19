@@ -32,6 +32,7 @@
 bool rtl_ps_enable_nic(struct ieee80211_hw *hw)
 {
 	struct rtl_priv *rtlpriv = rtl_priv(hw);
+	struct rtl_hal_ops *ops = rtlpriv->cfg->ops;
 	struct rtl_ps_ctl *ppsc = rtl_psc(rtl_priv(hw));
 	struct rtl_hal *rtlhal = rtl_hal(rtl_priv(hw));
 	struct rtl_mac *rtlmac = rtl_mac(rtl_priv(hw));
@@ -45,14 +46,14 @@ bool rtl_ps_enable_nic(struct ieee80211_hw *hw)
 			 "Driver is already down!\n");
 
 	/*<2> Enable Adapter */
-	if (rtlpriv->cfg->ops->hw_init(hw))
+	if (ops->hw_init(hw))
 		return false;
-	rtlpriv->cfg->ops->set_hw_reg(hw, HW_VAR_RETRY_LIMIT,
+	ops->set_hw_reg(hw, HW_VAR_RETRY_LIMIT,
 			&rtlmac->retry_long);
 	RT_CLEAR_PS_LEVEL(ppsc, RT_RF_OFF_LEVL_HALT_NIC);
 
 	/*<3> Enable Interrupt */
-	rtlpriv->cfg->ops->enable_interrupt(hw);
+	ops->enable_interrupt(hw);
 
 	/*<enable timer> */
 	rtl_watch_dog_timer_callback((unsigned long)hw);
@@ -64,16 +65,17 @@ EXPORT_SYMBOL(rtl_ps_enable_nic);
 bool rtl_ps_disable_nic(struct ieee80211_hw *hw)
 {
 	struct rtl_priv *rtlpriv = rtl_priv(hw);
+	struct rtl_hal_ops *ops = rtlpriv->cfg->ops;
 
 	/*<1> Stop all timer */
 	rtl_deinit_deferred_work(hw);
 
 	/*<2> Disable Interrupt */
-	rtlpriv->cfg->ops->disable_interrupt(hw);
+	ops->disable_interrupt(hw);
 	tasklet_kill(&rtlpriv->works.irq_tasklet);
 
 	/*<3> Disable Adapter */
-	rtlpriv->cfg->ops->hw_disable(hw);
+	ops->hw_disable(hw);
 
 	return true;
 }
@@ -84,6 +86,7 @@ static bool rtl_ps_set_rf_state(struct ieee80211_hw *hw,
 				u32 changesource)
 {
 	struct rtl_priv *rtlpriv = rtl_priv(hw);
+	struct rtl_hal_ops *ops = rtlpriv->cfg->ops;
 	struct rtl_ps_ctl *ppsc = rtl_psc(rtl_priv(hw));
 	enum rf_pwrstate rtstate;
 	bool actionallowed = false;
@@ -158,7 +161,7 @@ static bool rtl_ps_set_rf_state(struct ieee80211_hw *hw,
 	}
 
 	if (actionallowed)
-		rtlpriv->cfg->ops->set_rf_power_state(hw, state_toset);
+		ops->set_rf_power_state(hw, state_toset);
 
 	spin_lock(&rtlpriv->locks.rf_ps_lock);
 	ppsc->rfchange_inprogress = false;
@@ -206,6 +209,7 @@ void rtl_ips_nic_off_wq_callback(void *data)
 	    container_of_dwork_rtl(data, struct rtl_works, ips_nic_off_wq);
 	struct ieee80211_hw *hw = rtlworks->hw;
 	struct rtl_priv *rtlpriv = rtl_priv(hw);
+	struct rtl_hal_ops *ops = rtlpriv->cfg->ops;
 	struct rtl_hal *rtlhal = rtl_hal(rtl_priv(hw));
 	struct rtl_mac *mac = rtl_mac(rtl_priv(hw));
 	struct rtl_ps_ctl *ppsc = rtl_psc(rtl_priv(hw));
@@ -229,8 +233,8 @@ void rtl_ips_nic_off_wq_callback(void *data)
 	if (rtlpriv->sec.being_setkey)
 		return;
 
-	if (rtlpriv->cfg->ops->bt_coex_off_before_lps)
-		rtlpriv->cfg->ops->bt_coex_off_before_lps(hw);
+	if (ops->bt_coex_off_before_lps)
+		ops->bt_coex_off_before_lps(hw);
 
 	if (ppsc->inactiveps) {
 		rtstate = ppsc->rfpwr_state;
@@ -256,9 +260,9 @@ void rtl_ips_nic_off_wq_callback(void *data)
 			ppsc->in_powersavemode = true;
 
 			/* call before RF off */
-			if (rtlpriv->cfg->ops->get_btc_status())
+			if (ops->get_btc_status())
 				rtlpriv->btcoexist.btc_ops->btc_ips_notify(rtlpriv,
-									ppsc->inactive_pwrstate);
+									   ppsc->inactive_pwrstate);
 
 			/*rtl_pci_reset_trx_ring(hw); */
 			_rtl_ps_inactive_ps(hw);
@@ -284,6 +288,7 @@ void rtl_ips_nic_off(struct ieee80211_hw *hw)
 void rtl_ips_nic_on(struct ieee80211_hw *hw)
 {
 	struct rtl_priv *rtlpriv = rtl_priv(hw);
+	struct rtl_hal_ops *ops = rtlpriv->cfg->ops;
 	struct rtl_ps_ctl *ppsc = rtl_psc(rtl_priv(hw));
 	enum rf_pwrstate rtstate;
 
@@ -301,9 +306,9 @@ void rtl_ips_nic_on(struct ieee80211_hw *hw)
 			ppsc->in_powersavemode = false;
 			_rtl_ps_inactive_ps(hw);
 			/* call after RF on */
-			if (rtlpriv->cfg->ops->get_btc_status())
+			if (ops->get_btc_status())
 				rtlpriv->btcoexist.btc_ops->btc_ips_notify(rtlpriv,
-									ppsc->inactive_pwrstate);
+									   ppsc->inactive_pwrstate);
 		}
 	}
 	spin_unlock(&rtlpriv->locks.ips_lock);
@@ -346,6 +351,7 @@ static bool rtl_get_fwlps_doze(struct ieee80211_hw *hw)
 void rtl_lps_set_psmode(struct ieee80211_hw *hw, u8 rt_psmode)
 {
 	struct rtl_priv *rtlpriv = rtl_priv(hw);
+	struct rtl_hal_ops *ops = rtlpriv->cfg->ops;
 	struct rtl_mac *mac = rtl_mac(rtl_priv(hw));
 	struct rtl_ps_ctl *ppsc = rtl_psc(rtl_priv(hw));
 	bool enter_fwlps;
@@ -380,26 +386,26 @@ void rtl_lps_set_psmode(struct ieee80211_hw *hw, u8 rt_psmode)
 			enter_fwlps = false;
 			ppsc->pwr_mode = FW_PS_ACTIVE_MODE;
 			ppsc->smart_ps = 0;
-			rtlpriv->cfg->ops->set_hw_reg(hw, HW_VAR_FW_LPS_ACTION,
-						      (u8 *)(&enter_fwlps));
+			ops->set_hw_reg(hw, HW_VAR_FW_LPS_ACTION,
+					(u8 *)(&enter_fwlps));
 			if (ppsc->p2p_ps_info.opp_ps)
 				rtl_p2p_ps_cmd(hw , P2P_PS_ENABLE);
 
-			if (rtlpriv->cfg->ops->get_btc_status())
+			if (ops->get_btc_status())
 				rtlpriv->btcoexist.btc_ops->btc_lps_notify(rtlpriv, rt_psmode);
 		} else {
 			if (rtl_get_fwlps_doze(hw)) {
 				RT_TRACE(rtlpriv, COMP_RF, DBG_DMESG,
 					 "FW LPS enter ps_mode:%x\n",
 					 ppsc->fwctrl_psmode);
-				if (rtlpriv->cfg->ops->get_btc_status())
+				if (ops->get_btc_status())
 					rtlpriv->btcoexist.btc_ops->btc_lps_notify(rtlpriv, rt_psmode);
 				enter_fwlps = true;
 				ppsc->pwr_mode = ppsc->fwctrl_psmode;
 				ppsc->smart_ps = 2;
-				rtlpriv->cfg->ops->set_hw_reg(hw,
-							HW_VAR_FW_LPS_ACTION,
-							(u8 *)(&enter_fwlps));
+				ops->set_hw_reg(hw,
+						HW_VAR_FW_LPS_ACTION,
+						(u8 *)(&enter_fwlps));
 
 			} else {
 				/* Reset the power save related parameters. */
@@ -461,7 +467,7 @@ static void rtl_lps_leave_core(struct ieee80211_hw *hw)
 		if (ppsc->dot11_psmode != EACTIVE) {
 
 			/*FIX ME */
-			/*rtlpriv->cfg->ops->enable_interrupt(hw); */
+			/*ops->enable_interrupt(hw); */
 
 			if (ppsc->reg_rfps_level & RT_RF_LPS_LEVEL_ASPM &&
 			    RT_IN_PS_LEVEL(ppsc, RT_PS_LEVEL_ASPM) &&
@@ -914,6 +920,7 @@ static void rtl_p2p_action_ie(struct ieee80211_hw *hw, void *data,
 void rtl_p2p_ps_cmd(struct ieee80211_hw *hw , u8 p2p_ps_state)
 {
 	struct rtl_priv *rtlpriv = rtl_priv(hw);
+	struct rtl_hal_ops *ops = rtlpriv->cfg->ops;
 	struct rtl_ps_ctl *rtlps = rtl_psc(rtl_priv(hw));
 	struct rtl_p2p_ps_info  *p2pinfo = &(rtlpriv->psc.p2p_ps_info);
 
@@ -921,8 +928,8 @@ void rtl_p2p_ps_cmd(struct ieee80211_hw *hw , u8 p2p_ps_state)
 	switch (p2p_ps_state) {
 	case P2P_PS_DISABLE:
 		p2pinfo->p2p_ps_state = p2p_ps_state;
-		rtlpriv->cfg->ops->set_hw_reg(hw, HW_VAR_H2C_FW_P2P_PS_OFFLOAD,
-					      &p2p_ps_state);
+		ops->set_hw_reg(hw, HW_VAR_H2C_FW_P2P_PS_OFFLOAD,
+				&p2p_ps_state);
 		p2pinfo->noa_index = 0;
 		p2pinfo->ctwindow = 0;
 		p2pinfo->opp_ps = 0;
@@ -931,9 +938,9 @@ void rtl_p2p_ps_cmd(struct ieee80211_hw *hw , u8 p2p_ps_state)
 		if (rtlps->fw_current_inpsmode) {
 			if (rtlps->smart_ps == 0) {
 				rtlps->smart_ps = 2;
-				rtlpriv->cfg->ops->set_hw_reg(hw,
-					 HW_VAR_H2C_FW_PWRMODE,
-					 &rtlps->pwr_mode);
+				ops->set_hw_reg(hw,
+						HW_VAR_H2C_FW_PWRMODE,
+						&rtlps->pwr_mode);
 			}
 
 		}
@@ -945,14 +952,14 @@ void rtl_p2p_ps_cmd(struct ieee80211_hw *hw , u8 p2p_ps_state)
 			if (p2pinfo->ctwindow > 0) {
 				if (rtlps->smart_ps != 0) {
 					rtlps->smart_ps = 0;
-					rtlpriv->cfg->ops->set_hw_reg(hw,
-						 HW_VAR_H2C_FW_PWRMODE,
-						 &rtlps->pwr_mode);
+					ops->set_hw_reg(hw,
+							HW_VAR_H2C_FW_PWRMODE,
+							&rtlps->pwr_mode);
 				}
 			}
-			rtlpriv->cfg->ops->set_hw_reg(hw,
-				 HW_VAR_H2C_FW_P2P_PS_OFFLOAD,
-				 &p2p_ps_state);
+			ops->set_hw_reg(hw,
+					HW_VAR_H2C_FW_P2P_PS_OFFLOAD,
+					&p2p_ps_state);
 
 		}
 		break;
@@ -961,9 +968,9 @@ void rtl_p2p_ps_cmd(struct ieee80211_hw *hw , u8 p2p_ps_state)
 	case P2P_PS_ALLSTASLEEP:
 		if (p2pinfo->p2p_ps_mode > P2P_PS_NONE) {
 			p2pinfo->p2p_ps_state = p2p_ps_state;
-			rtlpriv->cfg->ops->set_hw_reg(hw,
-				 HW_VAR_H2C_FW_P2P_PS_OFFLOAD,
-				 &p2p_ps_state);
+			ops->set_hw_reg(hw,
+					HW_VAR_H2C_FW_P2P_PS_OFFLOAD,
+					&p2p_ps_state);
 		}
 		break;
 	default:

@@ -229,6 +229,7 @@ EXPORT_SYMBOL_GPL(read_efuse_byte);
 void read_efuse(struct ieee80211_hw *hw, u16 _offset, u16 _size_byte, u8 *pbuf)
 {
 	struct rtl_priv *rtlpriv = rtl_priv(hw);
+	struct rtl_hal_ops *ops = rtlpriv->cfg->ops;
 	struct rtl_efuse *rtlefuse = rtl_efuse(rtl_priv(hw));
 	u8 *efuse_tbl;
 	u8 rtemp8[1];
@@ -365,10 +366,10 @@ void read_efuse(struct ieee80211_hw *hw, u16 _offset, u16 _size_byte, u8 *pbuf)
 	rtlefuse->efuse_usedbytes = efuse_utilized;
 	efuse_usage = (u8) ((efuse_utilized * 100) / efuse_len);
 	rtlefuse->efuse_usedpercentage = efuse_usage;
-	rtlpriv->cfg->ops->set_hw_reg(hw, HW_VAR_EFUSE_BYTES,
-				      (u8 *)&efuse_utilized);
-	rtlpriv->cfg->ops->set_hw_reg(hw, HW_VAR_EFUSE_USAGE,
-				      &efuse_usage);
+	ops->set_hw_reg(hw, HW_VAR_EFUSE_BYTES,
+			(u8 *)&efuse_utilized);
+	ops->set_hw_reg(hw, HW_VAR_EFUSE_USAGE,
+			&efuse_usage);
 done:
 	for (i = 0; i < EFUSE_MAX_WORD_UNIT; i++)
 		kfree(efuse_word[i]);
