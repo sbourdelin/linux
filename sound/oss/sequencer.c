@@ -1211,7 +1211,9 @@ static void midi_outc(int dev, unsigned char data)
 
 	spin_lock_irqsave(&lock,flags);
  	while (n && !midi_devs[dev]->outputc(dev, data)) {
+		spin_unlock_irqrestore(&lock, flags);
 		oss_broken_sleep_on(&seq_sleeper, HZ/25);
+		spin_lock_irqsave(&lock, flags);
   		n--;
   	}
 	spin_unlock_irqrestore(&lock,flags);
