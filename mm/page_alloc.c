@@ -2215,9 +2215,8 @@ __rmqueue_fallback(struct zone *zone, unsigned int order, int start_migratetype)
 	bool can_steal;
 
 	/* Find the largest possible block of pages in the other list */
-	for (current_order = MAX_ORDER-1;
-				current_order >= order && current_order <= MAX_ORDER-1;
-				--current_order) {
+	for (current_order = MAX_ORDER-1; current_order >= order;
+							--current_order) {
 		area = &(zone->free_area[current_order]);
 		fallback_mt = find_suitable_fallback(area, current_order,
 				start_migratetype, false, &can_steal);
