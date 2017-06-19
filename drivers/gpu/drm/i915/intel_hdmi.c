@@ -1415,6 +1415,7 @@ intel_hdmi_compute_ycbcr_config(struct drm_connector_state *conn_state,
 	}
 
 	if (type == DRM_HDMI_OUTPUT_YCBCR420) {
+		struct intel_crtc *intel_crtc = to_intel_crtc(conn_state->crtc);
 
 		/* YCBCR420 TMDS rate requirement is half the pixel clock */
 		config->hdmi_output = DRM_HDMI_OUTPUT_YCBCR420;
@@ -1422,6 +1423,15 @@ intel_hdmi_compute_ycbcr_config(struct drm_connector_state *conn_state,
 		*clock_12bpc /= 2;
 		*clock_8bpc /= 2;
 
+		/* YCBCR 420 output conversion needs a scaler */
+		if (skl_update_scaler_crtc_hdmi_output(config)) {
+			DRM_ERROR("Scaler allocation for output failed\n");
+			return DRM_HDMI_OUTPUT_INVALID;
+		}
+
+		/* Bind this scaler to pipe */
+		intel_pch_panel_fitting(intel_crtc, config,
+					DRM_MODE_SCALE_FULLSCREEN);
 	}
 
 	/* Encoder is capable of this output, lets commit to CRTC */

@@ -4621,6 +4621,11 @@ skl_update_scaler(struct intel_crtc_state *crtc_state, bool force_detach,
 	 */
 	need_scaling = src_w != dst_w || src_h != dst_h;
 
+	if (crtc_state->hdmi_output == DRM_HDMI_OUTPUT_YCBCR420
+		&& scaler_user == SKL_HDMI_OUTPUT_INDEX)
+		/* YCBCR 444 -> 420 conversion needs a scaler */
+		need_scaling = true;
+
 	/*
 	 * if plane is being disabled or scaler is no more required or force detach
 	 *  - free scaler binded to this plane/crtc
@@ -4665,6 +4670,26 @@ skl_update_scaler(struct intel_crtc_state *crtc_state, bool force_detach,
 		scaler_state->scaler_users);
 
 	return 0;
+}
+
+/**
+ * skl_update_scaler_hdmi_output - Stages update to scaler state for HDMI.
+ * HDMI YCBCR 420 output needs a scaler, for downsampling.
+ *
+ * @state: crtc's scaler state
+ *
+ * Return
+ *     0 - scaler_usage updated successfully
+ *    error - requested scaling cannot be supported or other error condition
+ */
+int skl_update_scaler_crtc_hdmi_output(struct intel_crtc_state *state)
+{
+	const struct drm_display_mode *mode = &state->base.adjusted_mode;
+
+	return skl_update_scaler(state, !state->base.active,
+		SKL_HDMI_OUTPUT_INDEX, &state->scaler_state.scaler_id,
+		state->pipe_src_w, state->pipe_src_h,
+		mode->crtc_hdisplay, mode->crtc_vdisplay);
 }
 
 /**
@@ -8052,6 +8077,7 @@ static void haswell_set_pipemisc(struct drm_crtc *crtc)
 {
 	struct drm_i915_private *dev_priv = to_i915(crtc->dev);
 	struct intel_crtc *intel_crtc = to_intel_crtc(crtc);
+	enum drm_hdmi_output_type hdmi_out = intel_crtc->config->hdmi_output;
 
 	if (IS_BROADWELL(dev_priv) || INTEL_INFO(dev_priv)->gen >= 9) {
 		u32 val = 0;
