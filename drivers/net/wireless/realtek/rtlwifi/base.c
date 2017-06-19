@@ -1312,11 +1312,11 @@ static void setup_arp_tx(struct rtl_priv *rtlpriv, struct rtl_ps_ctl *ppsc)
 {
 	struct ieee80211_hw *hw = rtlpriv->hw;
 	struct rtl_hal_ops *ops = rtlpriv->cfg->ops;
+	struct rtl_btc_ops *btc_ops = rtlpriv->btcoexist.btc_ops;
 
 	rtlpriv->ra.is_special_data = true;
 	if (ops->get_btc_status())
-		rtlpriv->btcoexist.btc_ops->btc_special_packet_notify(
-			rtlpriv, 1);
+		btc_ops->btc_special_packet_notify(rtlpriv, 1);
 	rtl_lps_leave(hw);
 	ppsc->last_delaylps_stamp_jiffies = jiffies;
 }
@@ -1575,6 +1575,7 @@ void rtl_watchdog_wq_callback(void *data)
 	struct ieee80211_hw *hw = rtlworks->hw;
 	struct rtl_priv *rtlpriv = rtl_priv(hw);
 	struct rtl_hal_ops *ops = rtlpriv->cfg->ops;
+	struct rtl_btc_ops *btc_ops = rtlpriv->btcoexist.btc_ops;
 	struct rtl_hal *rtlhal = rtl_hal(rtl_priv(hw));
 	struct rtl_mac *mac = rtl_mac(rtl_priv(hw));
 	bool busytraffic = false;
@@ -1714,7 +1715,7 @@ void rtl_watchdog_wq_callback(void *data)
 	}
 
 	if (ops->get_btc_status())
-		rtlpriv->btcoexist.btc_ops->btc_periodical(rtlpriv);
+		btc_ops->btc_periodical(rtlpriv);
 
 	rtlpriv->link_info.bcn_rx_inperiod = 0;
 }

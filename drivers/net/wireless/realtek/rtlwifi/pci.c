@@ -1815,6 +1815,7 @@ static int rtl_pci_start(struct ieee80211_hw *hw)
 {
 	struct rtl_priv *rtlpriv = rtl_priv(hw);
 	struct rtl_hal_ops *ops = rtlpriv->cfg->ops;
+	struct rtl_btc_ops *btc_ops = rtlpriv->btcoexist.btc_ops;
 	struct rtl_hal *rtlhal = rtl_hal(rtl_priv(hw));
 	struct rtl_pci *rtlpci = rtl_pcidev(rtl_pcipriv(hw));
 	struct rtl_ps_ctl *ppsc = rtl_psc(rtl_priv(hw));
@@ -1827,8 +1828,8 @@ static int rtl_pci_start(struct ieee80211_hw *hw)
 	rtlpci->driver_is_goingto_unload = false;
 	if (ops->get_btc_status &&
 	    ops->get_btc_status()) {
-		rtlpriv->btcoexist.btc_ops->btc_init_variables(rtlpriv);
-		rtlpriv->btcoexist.btc_ops->btc_init_hal_vars(rtlpriv);
+		btc_ops->btc_init_variables(rtlpriv);
+		btc_ops->btc_init_hal_vars(rtlpriv);
 	}
 	err = ops->hw_init(hw);
 	if (err) {
@@ -1859,6 +1860,7 @@ static void rtl_pci_stop(struct ieee80211_hw *hw)
 {
 	struct rtl_priv *rtlpriv = rtl_priv(hw);
 	struct rtl_hal_ops *ops = rtlpriv->cfg->ops;
+	struct rtl_btc_ops *btc_ops = rtlpriv->btcoexist.btc_ops;
 	struct rtl_pci *rtlpci = rtl_pcidev(rtl_pcipriv(hw));
 	struct rtl_ps_ctl *ppsc = rtl_psc(rtl_priv(hw));
 	struct rtl_hal *rtlhal = rtl_hal(rtl_priv(hw));
@@ -1866,7 +1868,7 @@ static void rtl_pci_stop(struct ieee80211_hw *hw)
 	u8 RFInProgressTimeOut = 0;
 
 	if (ops->get_btc_status())
-		rtlpriv->btcoexist.btc_ops->btc_halt_notify();
+		btc_ops->btc_halt_notify();
 
 	/*
 	 *should be before disable interrupt&adapter

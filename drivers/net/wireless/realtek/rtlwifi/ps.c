@@ -210,6 +210,7 @@ void rtl_ips_nic_off_wq_callback(void *data)
 	struct ieee80211_hw *hw = rtlworks->hw;
 	struct rtl_priv *rtlpriv = rtl_priv(hw);
 	struct rtl_hal_ops *ops = rtlpriv->cfg->ops;
+	struct rtl_btc_ops *btc_ops = rtlpriv->btcoexist.btc_ops;
 	struct rtl_hal *rtlhal = rtl_hal(rtl_priv(hw));
 	struct rtl_mac *mac = rtl_mac(rtl_priv(hw));
 	struct rtl_ps_ctl *ppsc = rtl_psc(rtl_priv(hw));
@@ -261,8 +262,8 @@ void rtl_ips_nic_off_wq_callback(void *data)
 
 			/* call before RF off */
 			if (ops->get_btc_status())
-				rtlpriv->btcoexist.btc_ops->btc_ips_notify(rtlpriv,
-									   ppsc->inactive_pwrstate);
+				btc_ops->btc_ips_notify(rtlpriv,
+							ppsc->inactive_pwrstate);
 
 			/*rtl_pci_reset_trx_ring(hw); */
 			_rtl_ps_inactive_ps(hw);
@@ -289,6 +290,7 @@ void rtl_ips_nic_on(struct ieee80211_hw *hw)
 {
 	struct rtl_priv *rtlpriv = rtl_priv(hw);
 	struct rtl_hal_ops *ops = rtlpriv->cfg->ops;
+	struct rtl_btc_ops *btc_ops = rtlpriv->btcoexist.btc_ops;
 	struct rtl_ps_ctl *ppsc = rtl_psc(rtl_priv(hw));
 	enum rf_pwrstate rtstate;
 
@@ -307,8 +309,8 @@ void rtl_ips_nic_on(struct ieee80211_hw *hw)
 			_rtl_ps_inactive_ps(hw);
 			/* call after RF on */
 			if (ops->get_btc_status())
-				rtlpriv->btcoexist.btc_ops->btc_ips_notify(rtlpriv,
-									   ppsc->inactive_pwrstate);
+				btc_ops->btc_ips_notify(rtlpriv,
+							ppsc->inactive_pwrstate);
 		}
 	}
 	spin_unlock(&rtlpriv->locks.ips_lock);
@@ -352,6 +354,7 @@ void rtl_lps_set_psmode(struct ieee80211_hw *hw, u8 rt_psmode)
 {
 	struct rtl_priv *rtlpriv = rtl_priv(hw);
 	struct rtl_hal_ops *ops = rtlpriv->cfg->ops;
+	struct rtl_btc_ops *btc_ops = rtlpriv->btcoexist.btc_ops;
 	struct rtl_mac *mac = rtl_mac(rtl_priv(hw));
 	struct rtl_ps_ctl *ppsc = rtl_psc(rtl_priv(hw));
 	bool enter_fwlps;
@@ -392,14 +395,15 @@ void rtl_lps_set_psmode(struct ieee80211_hw *hw, u8 rt_psmode)
 				rtl_p2p_ps_cmd(hw , P2P_PS_ENABLE);
 
 			if (ops->get_btc_status())
-				rtlpriv->btcoexist.btc_ops->btc_lps_notify(rtlpriv, rt_psmode);
+				btc_ops->btc_lps_notify(rtlpriv, rt_psmode);
 		} else {
 			if (rtl_get_fwlps_doze(hw)) {
 				RT_TRACE(rtlpriv, COMP_RF, DBG_DMESG,
 					 "FW LPS enter ps_mode:%x\n",
 					 ppsc->fwctrl_psmode);
 				if (ops->get_btc_status())
-					rtlpriv->btcoexist.btc_ops->btc_lps_notify(rtlpriv, rt_psmode);
+					btc_ops->btc_lps_notify(rtlpriv,
+								rt_psmode);
 				enter_fwlps = true;
 				ppsc->pwr_mode = ppsc->fwctrl_psmode;
 				ppsc->smart_ps = 2;
