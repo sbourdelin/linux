@@ -2675,7 +2675,7 @@ static int _perf_event_refresh(struct perf_event *event, int refresh)
 	 * not supported on inherited events
 	 */
 	if (event->attr.inherit || event->attr.signal_on_wakeup ||
-			!is_sampling_event(event))
+			event->attr.count_sb_events || !is_sampling_event(event))
 		return -EINVAL;
 
 	atomic_add(refresh, &event->event_limit);
@@ -5955,7 +5955,7 @@ void perf_output_sample(struct perf_output_handle *handle,
 		}
 	}
 
-	if (!event->attr.watermark) {
+	if (!event->attr.count_sb_events && !event->attr.watermark) {
 		int wakeup_events = event->attr.wakeup_events;
 
 		if (wakeup_events) {

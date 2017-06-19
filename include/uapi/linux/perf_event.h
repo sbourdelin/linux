@@ -346,7 +346,8 @@ struct perf_event_attr {
 				write_backward :  1, /* Write ring buffer from end to beginning */
 				namespaces     :  1, /* include namespaces data */
 				signal_on_wakeup : 1, /* send signal on wakeup */
-				__reserved_1   : 34;
+				count_sb_events  : 1, /* wakeup_events also counts sideband events */
+				__reserved_1   : 33;
 
 	union {
 		__u32		wakeup_events;	  /* wakeup every n events */
