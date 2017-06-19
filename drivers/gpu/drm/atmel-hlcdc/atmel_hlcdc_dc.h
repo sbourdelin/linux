@@ -32,6 +32,7 @@
 #include <drm/drm_atomic_helper.h>
 #include <drm/drm_crtc.h>
 #include <drm/drm_crtc_helper.h>
+#include <drm/drm_fb_helper.h>
 #include <drm/drm_fb_cma_helper.h>
 #include <drm/drm_gem_cma_helper.h>
 #include <drm/drm_panel.h>
@@ -447,6 +448,9 @@ void atmel_hlcdc_plane_irq(struct atmel_hlcdc_plane *plane);
 
 int atmel_hlcdc_plane_prepare_disc_area(struct drm_crtc_state *c_state);
 int atmel_hlcdc_plane_prepare_ahb_routing(struct drm_crtc_state *c_state);
+
+void atmel_hlcdc_gamma_set(struct drm_crtc *c, u16 r, u16 g, u16 b, int idx);
+void atmel_hlcdc_gamma_get(struct drm_crtc *c, u16 *r, u16 *g, u16 *b, int idx);
 
 void atmel_hlcdc_crtc_irq(struct drm_crtc *c);
 

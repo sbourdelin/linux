@@ -601,6 +601,12 @@ static int atmel_hlcdc_dc_modeset_init(struct drm_device *dev)
 	return 0;
 }
 
+static const struct drm_fb_helper_funcs atmel_hlcdc_fb_cma_helper_funcs = {
+	.gamma_set	= atmel_hlcdc_gamma_set,
+	.gamma_get	= atmel_hlcdc_gamma_get,
+	.fb_probe	= drm_fbdev_cma_create,
+};
+
 static int atmel_hlcdc_dc_load(struct drm_device *dev)
 {
 	struct platform_device *pdev = to_platform_device(dev->dev);
@@ -664,8 +670,10 @@ static int atmel_hlcdc_dc_load(struct drm_device *dev)
 
 	platform_set_drvdata(pdev, dev);
 
-	dc->fbdev = drm_fbdev_cma_init(dev, 24,
-			dev->mode_config.num_connector);
+	dc->fbdev = drm_fbdev_cma_init_with_funcs2(dev, 24,
+			dev->mode_config.num_connector,
+			NULL,
+			&atmel_hlcdc_fb_cma_helper_funcs);
 	if (IS_ERR(dc->fbdev))
 		dc->fbdev = NULL;
 
