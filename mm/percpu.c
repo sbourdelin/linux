@@ -76,6 +76,8 @@
 #include <asm/tlbflush.h>
 #include <asm/io.h>
 
+#include "percpu-internal.h"
+
 #define PCPU_SLOT_BASE_SHIFT		5	/* 1-31 shares the same slot */
 #define PCPU_DFL_MAP_ALLOC		16	/* start a map with 16 ents */
 #define PCPU_ATOMIC_MAP_MARGIN_LOW	32
@@ -103,29 +105,11 @@
 #define __pcpu_ptr_to_addr(ptr)		(void __force *)(ptr)
 #endif	/* CONFIG_SMP */
 
-struct pcpu_chunk {
-	struct list_head	list;		/* linked to pcpu_slot lists */
-	int			free_size;	/* free bytes in the chunk */
-	int			contig_hint;	/* max contiguous size hint */
-	void			*base_addr;	/* base address of this chunk */
-
-	int			map_used;	/* # of map entries used before the sentry */
-	int			map_alloc;	/* # of map entries allocated */
-	int			*map;		/* allocation map */
-	struct list_head	map_extend_list;/* on pcpu_map_extend_chunks */
-
-	void			*data;		/* chunk data */
-	int			first_free;	/* no free below this */
-	bool			immutable;	/* no [de]population allowed */
-	int			nr_populated;	/* # of populated pages */
-	unsigned long		populated[];	/* populated bitmap */
-};
-
 static int pcpu_unit_pages __read_mostly;
 static int pcpu_unit_size __read_mostly;
 static int pcpu_nr_units __read_mostly;
 static int pcpu_atom_size __read_mostly;
-static int pcpu_nr_slots __read_mostly;
+int pcpu_nr_slots __read_mostly;
 static size_t pcpu_chunk_struct_size __read_mostly;
 
 /* cpus with the lowest and highest unit addresses */
@@ -149,7 +133,7 @@ static const size_t *pcpu_group_sizes __read_mostly;
  * chunks, this one can be allocated and mapped in several different
  * ways and thus often doesn't live in the vmalloc area.
  */
-static struct pcpu_chunk *pcpu_first_chunk;
+struct pcpu_chunk *pcpu_first_chunk;
 
 /*
  * Optional reserved chunk.  This chunk reserves part of the first
@@ -158,13 +142,13 @@ static struct pcpu_chunk *pcpu_first_chunk;
  * area doesn't exist, the following variables contain NULL and 0
  * respectively.
  */
-static struct pcpu_chunk *pcpu_reserved_chunk;
+struct pcpu_chunk *pcpu_reserved_chunk;
 static int pcpu_reserved_chunk_limit;
 
-static DEFINE_SPINLOCK(pcpu_lock);	/* all internal data structures */
+DEFINE_SPINLOCK(pcpu_lock);	/* all internal data structures */
 static DEFINE_MUTEX(pcpu_alloc_mutex);	/* chunk create/destroy, [de]pop, map ext */
 
-static struct list_head *pcpu_slot __read_mostly; /* chunk list slots */
+struct list_head *pcpu_slot __read_mostly; /* chunk list slots */
 
 /* chunks which need their map areas extended, protected by pcpu_lock */
 static LIST_HEAD(pcpu_map_extend_chunks);
