@@ -1148,6 +1148,15 @@ static const int kbd_tokens[] = {
 	KBD_LED_ON_TOKEN,
 };
 
+enum kbd_led_token_bit {
+	KBD_LED_TOKEN_BIT_OFF = 0,
+	KBD_LED_TOKEN_BIT_AUTO_25,
+	KBD_LED_TOKEN_BIT_AUTO_50,
+	KBD_LED_TOKEN_BIT_AUTO_75,
+	KBD_LED_TOKEN_BIT_AUTO_100,
+	KBD_LED_TOKEN_BIT_ON,
+};
+
 static u16 kbd_token_bits;
 
 static struct kbd_info kbd_info;
@@ -1510,7 +1519,12 @@ static void kbd_init(void)
 	ret = kbd_init_info();
 	kbd_init_tokens();
 
-	if (kbd_token_bits != 0 || ret == 0)
+	/*
+	 * If brightness level is 0, or KBD_LED_ON_TOKEN is the only token,
+	 * consider there is no keyboard backlight.
+	 */
+	if ((ret == 0 && (kbd_info.levels || kbd_mode_levels_count)) ||
+	    kbd_token_bits ^ BIT(KBD_LED_TOKEN_BIT_ON))
 		kbd_led_present = true;
 }
 
