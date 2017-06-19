@@ -1335,6 +1335,8 @@ int nfs4_state_mark_reclaim_nograce(struct nfs_client *clp, struct nfs4_state *s
 {
 	if (!nfs4_valid_open_stateid(state))
 		return 0;
+	if (test_bit(NFS_STATE_RECLAIM_INPROGRESS, &state->flags))
+		return 1;
 	set_bit(NFS_STATE_RECLAIM_NOGRACE, &state->flags);
 	clear_bit(NFS_STATE_RECLAIM_REBOOT, &state->flags);
 	set_bit(NFS_OWNER_RECLAIM_NOGRACE, &state->owner->so_flags);
@@ -1522,6 +1524,7 @@ restart:
 			continue;
 		atomic_inc(&state->count);
 		spin_unlock(&sp->so_lock);
+		set_bit(NFS_STATE_RECLAIM_INPROGRESS, &state->flags);
 		status = ops->recover_open(sp, state);
 		if (status >= 0) {
 			status = nfs4_reclaim_locks(state, ops);
@@ -1537,6 +1540,8 @@ restart:
 					spin_unlock(&state->state_lock);
 				}
 				clear_bit(NFS_STATE_RECLAIM_NOGRACE,
+					&state->flags);
+				clear_bit(NFS_STATE_RECLAIM_INPROGRESS,
 					&state->flags);
 				nfs4_put_open_state(state);
 				spin_lock(&sp->so_lock);
