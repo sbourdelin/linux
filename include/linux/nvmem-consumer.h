@@ -140,6 +140,7 @@ struct nvmem_cell *of_nvmem_cell_get(struct device_node *np,
 				     const char *name);
 struct nvmem_device *of_nvmem_device_get(struct device_node *np,
 					 const char *name);
+struct nvmem_device *of_nvmem_device_phandle_get(struct device_node *nvmem_np);
 #else
 static inline struct nvmem_cell *of_nvmem_cell_get(struct device_node *np,
 				     const char *name)
@@ -149,6 +150,11 @@ static inline struct nvmem_cell *of_nvmem_cell_get(struct device_node *np,
 
 static inline struct nvmem_device *of_nvmem_device_get(struct device_node *np,
 						       const char *name)
+{
+	return ERR_PTR(-ENOSYS);
+}
+
+static inline struct nvmem_device *of_nvmem_device_phandle_get(struct device_node *nvmem_np)
 {
 	return ERR_PTR(-ENOSYS);
 }

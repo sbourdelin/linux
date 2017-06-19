@@ -24,6 +24,7 @@
 #include <linux/slab.h>
 #include <linux/thermal.h>
 #include <linux/types.h>
+#include <linux/nvmem-consumer.h>
 
 #define REG_SET		0x4
 #define REG_CLR		0x8
@@ -55,8 +56,8 @@
 #define TEMPSENSE2_PANIC_VALUE_SHIFT	16
 #define TEMPSENSE2_PANIC_VALUE_MASK	0xfff0000
 
-#define OCOTP_MEM0			0x0480
-#define OCOTP_ANA1			0x04e0
+#define OCOTP_MEM0_OFFSET		32
+#define OCOTP_ANA1_OFFSET    		56
 
 /* The driver supports 1 passive trip point and 1 critical trip point */
 enum imx_thermal_trip {
@@ -347,29 +348,39 @@ static struct thermal_zone_device_ops imx_tz_ops = {
 static int imx_get_sensor_data(struct platform_device *pdev)
 {
 	struct imx_thermal_data *data = platform_get_drvdata(pdev);
-	struct regmap *map;
+	struct device_node *ocotp_np;
+	struct nvmem_device *ocotp;
 	int t1, n1;
 	int ret;
 	u32 val;
 	u64 temp64;
 
-	map = syscon_regmap_lookup_by_phandle(pdev->dev.of_node,
-					      "fsl,tempmon-data");
-	if (IS_ERR(map)) {
-		ret = PTR_ERR(map);
-		dev_err(&pdev->dev, "failed to get sensor regmap: %d\n", ret);
+	ocotp_np = of_parse_phandle(pdev->dev.of_node, "fsl,tempmon-data", 0);
+	if (IS_ERR(ocotp_np)) {
+		ret = PTR_ERR(ocotp_np);
+		dev_err(&pdev->dev, "failed to parse fsl,tempmon-data phandle: %d\n", ret);
+		return ret;
+	}
+	ocotp = of_nvmem_device_phandle_get(ocotp_np);
+	of_node_put(ocotp_np);
+	if (IS_ERR(ocotp)) {
+		ret = PTR_ERR(ocotp);
+		if (ret != -EPROBE_DEFER)
+			dev_err(&pdev->dev, "failed to get fsl,tempmon-data nvmem device: %d\n", ret);
 		return ret;
 	}
 
-	ret = regmap_read(map, OCOTP_ANA1, &val);
-	if (ret) {
+	ret = nvmem_device_read(ocotp, OCOTP_ANA1_OFFSET, sizeof(val), &val);
+	if (ret != sizeof(val)) {
 		dev_err(&pdev->dev, "failed to read sensor data: %d\n", ret);
-		return ret;
+		ret = -EIO;
+		goto out;
 	}
 
 	if (val == 0 || val == ~0) {
 		dev_err(&pdev->dev, "invalid sensor calibration data\n");
-		return -EINVAL;
+		ret = -EINVAL;
+		goto out;
 	}
 
 	/*
@@ -404,10 +415,11 @@ static int imx_get_sensor_data(struct platform_device *pdev)
 	data->c2 = n1 * data->c1 + 1000 * t1;
 
 	/* use OTP for thermal grade */
-	ret = regmap_read(map, OCOTP_MEM0, &val);
-	if (ret) {
-		dev_err(&pdev->dev, "failed to read temp grade: %d\n", ret);
-		return ret;
+	ret = nvmem_device_read(ocotp, OCOTP_MEM0_OFFSET, sizeof(val), &val);
+	if (ret != sizeof(val)) {
+		dev_err(&pdev->dev, "failed to read sensor data: %d\n", ret);
+		ret = -EIO;
+		goto out;
 	}
 
 	/* The maximum die temp is specified by the Temperature Grade */
@@ -437,7 +449,10 @@ static int imx_get_sensor_data(struct platform_device *pdev)
 	data->temp_critical = data->temp_max - (1000 * 5);
 	data->temp_passive = data->temp_max - (1000 * 10);
 
-	return 0;
+	ret = 0;
+out:
+	nvmem_device_put(ocotp);
+	return ret;
 }
 
 static irqreturn_t imx_thermal_alarm_irq(int irq, void *dev)
@@ -513,10 +528,8 @@ static int imx_thermal_probe(struct platform_device *pdev)
 	platform_set_drvdata(pdev, data);
 
 	ret = imx_get_sensor_data(pdev);
-	if (ret) {
-		dev_err(&pdev->dev, "failed to get sensor data\n");
+	if (ret)
 		return ret;
-	}
 
 	/* Make sure sensor is in known good state for measurements */
 	regmap_write(map, TEMPSENSE0 + REG_CLR, TEMPSENSE0_POWER_DOWN);

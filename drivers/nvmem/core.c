@@ -629,6 +629,21 @@ struct nvmem_device *of_nvmem_device_get(struct device_node *np, const char *id)
 	return __nvmem_device_get(nvmem_np, NULL, NULL);
 }
 EXPORT_SYMBOL_GPL(of_nvmem_device_get);
+
+/**
+ * of_nvmem_device_phandle_get() - Get nvmem device from a given phandle
+ *
+ * @nvmem_np: Device tree node for the nvmem device
+ *
+ * Return: ERR_PTR() on error or a valid pointer to a struct nvmem_device
+ * on success.
+ */
+struct nvmem_device *of_nvmem_device_phandle_get(struct device_node *nvmem_np)
+{
+
+	return __nvmem_device_get(nvmem_np, NULL, NULL);
+}
+EXPORT_SYMBOL_GPL(of_nvmem_device_phandle_get);
 #endif
 
 /**
