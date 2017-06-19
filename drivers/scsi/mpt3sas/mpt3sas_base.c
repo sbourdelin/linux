@@ -307,7 +307,7 @@ mpt3sas_base_stop_watchdog(struct MPT3SAS_ADAPTER *ioc)
  * Return nothing.
  */
 void
-mpt3sas_base_fault_info(struct MPT3SAS_ADAPTER *ioc , u16 fault_code)
+mpt3sas_base_fault_info(struct MPT3SAS_ADAPTER *ioc, u16 fault_code)
 {
 	pr_err(MPT3SAS_FMT "fault_state(0x%04x)!\n",
 	    ioc->name, fault_code);
@@ -334,7 +334,7 @@ mpt3sas_halt_firmware(struct MPT3SAS_ADAPTER *ioc)
 
 	doorbell = readl(&ioc->chip->Doorbell);
 	if ((doorbell & MPI2_IOC_STATE_MASK) == MPI2_IOC_STATE_FAULT)
-		mpt3sas_base_fault_info(ioc , doorbell);
+		mpt3sas_base_fault_info(ioc, doorbell);
 	else {
 		writel(0xC0FFEE00, &ioc->chip->Doorbell);
 		pr_err(MPT3SAS_FMT "Firmware is halted due to command timeout\n",
@@ -673,7 +673,7 @@ _base_display_event_data(struct MPT3SAS_ADAPTER *ioc,
  * Return nothing.
  */
 static void
-_base_sas_log_info(struct MPT3SAS_ADAPTER *ioc , u32 log_info)
+_base_sas_log_info(struct MPT3SAS_ADAPTER *ioc, u32 log_info)
 {
 	union loginfo_type {
 		u32	loginfo;
@@ -749,7 +749,7 @@ _base_display_reply_info(struct MPT3SAS_ADAPTER *ioc, u16 smid, u8 msix_index,
 
 	if ((ioc_status & MPI2_IOCSTATUS_MASK) &&
 	    (ioc->logging_level & MPT_DEBUG_REPLY)) {
-		_base_sas_ioc_info(ioc , mpi_reply,
+		_base_sas_ioc_info(ioc, mpi_reply,
 		   mpt3sas_base_get_msg_frame(ioc, smid));
 	}
 
@@ -3586,7 +3586,7 @@ _base_allocate_memory_pools(struct MPT3SAS_ADAPTER *ioc)
 	}
 	for (i = 0; i < ioc->chain_depth; i++) {
 		ioc->chain_lookup[i].chain_buffer = pci_pool_alloc(
-		    ioc->chain_dma_pool , GFP_KERNEL,
+		    ioc->chain_dma_pool, GFP_KERNEL,
 		    &ioc->chain_lookup[i].chain_buffer_dma);
 		if (!ioc->chain_lookup[i].chain_buffer) {
 			ioc->chain_depth = i;
@@ -3637,7 +3637,7 @@ _base_allocate_memory_pools(struct MPT3SAS_ADAPTER *ioc)
 		    ioc->name);
 		goto out;
 	}
-	ioc->sense = pci_pool_alloc(ioc->sense_dma_pool , GFP_KERNEL,
+	ioc->sense = pci_pool_alloc(ioc->sense_dma_pool, GFP_KERNEL,
 	    &ioc->sense_dma);
 	if (!ioc->sense) {
 		pr_err(MPT3SAS_FMT "sense pool: pci_pool_alloc failed\n",
@@ -3661,7 +3661,7 @@ _base_allocate_memory_pools(struct MPT3SAS_ADAPTER *ioc)
 		    ioc->name);
 		goto out;
 	}
-	ioc->reply = pci_pool_alloc(ioc->reply_dma_pool , GFP_KERNEL,
+	ioc->reply = pci_pool_alloc(ioc->reply_dma_pool, GFP_KERNEL,
 	    &ioc->reply_dma);
 	if (!ioc->reply) {
 		pr_err(MPT3SAS_FMT "reply pool: pci_pool_alloc failed\n",
@@ -3687,7 +3687,7 @@ _base_allocate_memory_pools(struct MPT3SAS_ADAPTER *ioc)
 			ioc->name);
 		goto out;
 	}
-	ioc->reply_free = pci_pool_alloc(ioc->reply_free_dma_pool , GFP_KERNEL,
+	ioc->reply_free = pci_pool_alloc(ioc->reply_free_dma_pool, GFP_KERNEL,
 	    &ioc->reply_free_dma);
 	if (!ioc->reply_free) {
 		pr_err(MPT3SAS_FMT "reply_free pool: pci_pool_alloc failed\n",
@@ -3877,7 +3877,7 @@ _base_wait_for_doorbell_ack(struct MPT3SAS_ADAPTER *ioc, int timeout)
 			doorbell = readl(&ioc->chip->Doorbell);
 			if ((doorbell & MPI2_IOC_STATE_MASK) ==
 			    MPI2_IOC_STATE_FAULT) {
-				mpt3sas_base_fault_info(ioc , doorbell);
+				mpt3sas_base_fault_info(ioc, doorbell);
 				return -EFAULT;
 			}
 		} else if (int_status == 0xFFFFFFFF)

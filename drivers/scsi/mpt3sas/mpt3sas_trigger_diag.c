@@ -251,7 +251,7 @@ mpt3sas_trigger_event(struct MPT3SAS_ADAPTER *ioc, u16 event,
 
 	/* check for the trigger condition */
 	event_trigger = ioc->diag_trigger_event.EventTriggerEntry;
-	for (i = 0 , found_match = 0; i < ioc->diag_trigger_event.ValidEntries
+	for (i = 0, found_match = 0; i < ioc->diag_trigger_event.ValidEntries
 	    && !found_match; i++, event_trigger++) {
 		if (event_trigger->EventValue != event)
 			continue;
@@ -331,7 +331,7 @@ mpt3sas_trigger_scsi(struct MPT3SAS_ADAPTER *ioc, u8 sense_key, u8 asc,
 
 	/* check for the trigger condition */
 	scsi_trigger = ioc->diag_trigger_scsi.SCSITriggerEntry;
-	for (i = 0 , found_match = 0; i < ioc->diag_trigger_scsi.ValidEntries
+	for (i = 0, found_match = 0; i < ioc->diag_trigger_scsi.ValidEntries
 	    && !found_match; i++, scsi_trigger++) {
 		if (scsi_trigger->SenseKey != sense_key)
 			continue;
@@ -405,7 +405,7 @@ mpt3sas_trigger_mpi(struct MPT3SAS_ADAPTER *ioc, u16 ioc_status, u32 loginfo)
 
 	/* check for the trigger condition */
 	mpi_trigger = ioc->diag_trigger_mpi.MPITriggerEntry;
-	for (i = 0 , found_match = 0; i < ioc->diag_trigger_mpi.ValidEntries
+	for (i = 0, found_match = 0; i < ioc->diag_trigger_mpi.ValidEntries
 	    && !found_match; i++, mpi_trigger++) {
 		if (mpi_trigger->IOCStatus != ioc_status)
 			continue;

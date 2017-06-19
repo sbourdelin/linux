@@ -831,7 +831,7 @@ mpt3sas_transport_port_remove(struct MPT3SAS_ADAPTER *ioc, u64 sas_address,
 
 	for (i = 0; i < sas_node->num_phys; i++) {
 		if (sas_node->phy[i].remote_identify.sas_address == sas_address)
-			memset(&sas_node->phy[i].remote_identify, 0 ,
+			memset(&sas_node->phy[i].remote_identify, 0,
 			    sizeof(struct sas_identify));
 	}
 
@@ -1027,7 +1027,7 @@ mpt3sas_transport_update_links(struct MPT3SAS_ADAPTER *ioc,
 		_transport_add_phy_to_an_existing_port(ioc, sas_node,
 		    mpt3sas_phy, mpt3sas_phy->remote_identify.sas_address);
 	} else
-		memset(&mpt3sas_phy->remote_identify, 0 , sizeof(struct
+		memset(&mpt3sas_phy->remote_identify, 0, sizeof(struct
 		    sas_identify));
 
 	if (mpt3sas_phy->phy)
