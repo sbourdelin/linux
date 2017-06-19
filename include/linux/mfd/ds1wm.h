@@ -1,5 +1,10 @@
 /* MFD cell driver data for the DS1WM driver */
 
+/* bus shift constants */
+#define BUSWIDTH8		0
+#define BUSWIDTH16		1
+#define BUSWIDTH32		2
+
 struct ds1wm_driver_data {
 	int active_high;
 	int clock_rate;
@@ -10,4 +15,9 @@ struct ds1wm_driver_data {
 	/* ds1wm implements the precise timings of*/
 	/* a reset pulse/presence detect sequence.*/
 	unsigned int reset_recover_delay;
+	/* Say 1 here for big endian Hardware
+	 * (only relevant with bus-shift > 0*/
+	int isHwBigEndian;
+	/* left shift of register number to get register address offsett */
+	int bus_shift;
 };
