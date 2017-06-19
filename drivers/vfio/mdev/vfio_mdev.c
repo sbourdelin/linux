@@ -131,11 +131,22 @@ struct mdev_driver vfio_mdev_driver = {
 
 static int __init vfio_mdev_init(void)
 {
-	return mdev_register_driver(&vfio_mdev_driver, THIS_MODULE);
+	int ret;
+
+	ret = mdev_register_driver(&vfio_mdev_driver, THIS_MODULE);
+	if (ret)
+		return ret;
+
+	ret = vfio_register_bus_driver(&vfio_mdev_driver.driver);
+	if (ret)
+		mdev_unregister_driver(&vfio_mdev_driver);
+
+	return ret;
 }
 
 static void __exit vfio_mdev_exit(void)
 {
+	vfio_unregister_bus_driver(&vfio_mdev_driver.driver);
 	mdev_unregister_driver(&vfio_mdev_driver);
 }
 
