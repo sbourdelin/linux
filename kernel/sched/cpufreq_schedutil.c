@@ -164,7 +164,7 @@ static void sugov_get_util(unsigned long *util, unsigned long *max)
 
 	cfs_max = arch_scale_cpu_capacity(NULL, smp_processor_id());
 
-	*util = min(rq->cfs.avg.util_avg, cfs_max);
+	*util = min(rq->cfs.avg.util_avg + rq->rt.avg.util_avg, cfs_max);
 	*max = cfs_max;
 }
 
