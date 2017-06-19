@@ -15,13 +15,19 @@ struct drm_mode_fb_cmd2;
 struct drm_plane;
 struct drm_plane_state;
 
+struct drm_fbdev_cma *drm_fbdev_cma_init_with_funcs2(struct drm_device *dev,
+	unsigned int preferred_bpp, unsigned int max_conn_count,
+	const struct drm_framebuffer_funcs *framebuffer_funcs,
+	const struct drm_fb_helper_funcs *fb_helper_funcs);
 struct drm_fbdev_cma *drm_fbdev_cma_init_with_funcs(struct drm_device *dev,
 	unsigned int preferred_bpp, unsigned int max_conn_count,
-	const struct drm_framebuffer_funcs *funcs);
+	const struct drm_framebuffer_funcs *framebuffer_funcs);
 struct drm_fbdev_cma *drm_fbdev_cma_init(struct drm_device *dev,
 	unsigned int preferred_bpp, unsigned int max_conn_count);
 void drm_fbdev_cma_fini(struct drm_fbdev_cma *fbdev_cma);
 
+int drm_fbdev_cma_create(struct drm_fb_helper *helper,
+	struct drm_fb_helper_surface_size *sizes);
 void drm_fbdev_cma_restore_mode(struct drm_fbdev_cma *fbdev_cma);
 void drm_fbdev_cma_hotplug_event(struct drm_fbdev_cma *fbdev_cma);
 void drm_fbdev_cma_set_suspend(struct drm_fbdev_cma *fbdev_cma, int state);
