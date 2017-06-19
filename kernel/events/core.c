@@ -2674,7 +2674,8 @@ static int _perf_event_refresh(struct perf_event *event, int refresh)
 	/*
 	 * not supported on inherited events
 	 */
-	if (event->attr.inherit || !is_sampling_event(event))
+	if (event->attr.inherit || event->attr.signal_on_wakeup ||
+			!is_sampling_event(event))
 		return -EINVAL;
 
 	atomic_add(refresh, &event->event_limit);
@@ -7338,7 +7339,6 @@ static int __perf_event_overflow(struct perf_event *event,
 				   int throttle, struct perf_sample_data *data,
 				   struct pt_regs *regs)
 {
-	int events = atomic_read(&event->event_limit);
 	int ret = 0;
 
 	/*
@@ -7361,12 +7361,15 @@ static int __perf_event_overflow(struct perf_event *event,
 	 * events
 	 */
 
-	event->pending_kill = POLL_IN;
-	if (events && atomic_dec_and_test(&event->event_limit)) {
-		ret = 1;
-		event->pending_kill = POLL_HUP;
+	if (!event->attr.signal_on_wakeup) {
+		int events = atomic_read(&event->event_limit);
+		event->pending_kill = POLL_IN;
+		if (events && atomic_dec_and_test(&event->event_limit)) {
+			ret = 1;
+			event->pending_kill = POLL_HUP;
 
-		perf_event_disable_inatomic(event);
+			perf_event_disable_inatomic(event);
+		}
 	}
 
 	READ_ONCE(event->overflow_handler)(event, data, regs);
@@ -10408,6 +10411,7 @@ perf_event_exit_event(struct perf_event *child_event,
 		perf_group_detach(child_event);
 	list_del_event(child_event, child_ctx);
 	child_event->state = PERF_EVENT_STATE_EXIT; /* is_event_hup() */
+	child_event->pending_kill = POLL_HUP;
 	raw_spin_unlock_irq(&child_ctx->lock);
 
 	/*

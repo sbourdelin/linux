@@ -21,6 +21,9 @@ static void perf_output_wakeup(struct perf_output_handle *handle)
 {
 	atomic_set(&handle->rb->poll, POLLIN);
 
+	if (handle->event->attr.signal_on_wakeup)
+		handle->event->pending_kill = POLL_IN;
+
 	handle->event->pending_wakeup = 1;
 	irq_work_queue(&handle->event->pending);
 }
