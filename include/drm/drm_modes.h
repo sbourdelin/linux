@@ -434,6 +434,11 @@ int drm_mode_convert_umode(struct drm_display_mode *out,
 void drm_mode_probed_add(struct drm_connector *connector, struct drm_display_mode *mode);
 void drm_mode_debug_printmodeline(const struct drm_display_mode *mode);
 
+enum drm_hdmi_output_type
+drm_find_hdmi_output_type(struct drm_connector *connector,
+			  struct drm_display_mode *mode,
+			  enum drm_hdmi_output_type type,
+			  u32 src_output_cap);
 struct drm_display_mode *drm_cvt_mode(struct drm_device *dev,
 				      int hdisplay, int vdisplay, int vrefresh,
 				      bool reduced, bool interlaced,
