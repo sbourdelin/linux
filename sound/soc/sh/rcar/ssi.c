@@ -258,7 +258,7 @@ static int rsnd_ssi_master_clk_start(struct rsnd_mod *mod,
 	struct rsnd_mod *ssi_parent_mod = rsnd_io_to_mod_ssip(io);
 	int chan = rsnd_runtime_channel_for_ssi(io);
 	int idx, ret;
-	unsigned int main_rate;
+	int main_rate;
 	unsigned int rate = rsnd_io_is_play(io) ?
 		rsnd_src_get_out_rate(priv, io) :
 		rsnd_src_get_in_rate(priv, io);
