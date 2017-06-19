@@ -322,6 +322,24 @@ PDF outputs, it is recommended to use version 1.4.6.
   functionalities required for ``XeLaTex`` to work. For PDF output you'll also
   need ``convert(1)`` from ImageMagick (https://www.imagemagick.org).
 
+Most distributions are shipped with Sphinx, but sometimes you may need
+to use a version different than the one shipped. For those cases, you
+can use Sphinx on a virtual environment. For example, if you want to
+install the Python 3 Sphinx version 1.4.9, do::
+
+       $ virtualenv-3 sphinx_1.4
+       $ . sphinx_1.4/bin/activate
+       $ pip install 'Sphinx==1.4.9'
+
+.. note::
+
+   #) It is recommended to use the RTD theme for html output. Depending
+      on the version, it should be installed  in separate,
+      with ``pip install sphinx_rtd_theme``.
+
+   #) The command ``. sphinx_1.4/bin/activate`` sets the environment to
+      use the virtual environment you just install. It should be called
+      when you start a new shell, before running ``make htmldocs``.
 
 Getting updated software
 ========================
