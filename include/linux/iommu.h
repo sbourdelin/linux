@@ -271,6 +271,7 @@ static inline void iommu_device_set_fwnode(struct iommu_device *iommu,
 #define IOMMU_GROUP_NOTIFY_BOUND_DRIVER		4 /* Post Driver bind */
 #define IOMMU_GROUP_NOTIFY_UNBIND_DRIVER	5 /* Pre Driver unbind */
 #define IOMMU_GROUP_NOTIFY_UNBOUND_DRIVER	6 /* Post Driver unbind */
+#define IOMMU_GROUP_NOTIFY_DRIVER_NOT_BOUND	7 /* Driver bind failed */
 
 extern int bus_set_iommu(struct bus_type *bus, const struct iommu_ops *ops);
 extern bool iommu_present(struct bus_type *bus);
