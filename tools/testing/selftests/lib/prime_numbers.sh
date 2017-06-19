@@ -1,8 +1,9 @@
 #!/bin/sh
 # Checks fast/slow prime_number generation for inconsistencies
 
-if ! /sbin/modprobe -q -r prime_numbers; then
-	echo "prime_numbers: [SKIP]"
+if ! find /lib/modules/$(uname -r) -type f -name prime_numbers.ko | grep -q .;
+then
+	echo "prime_numbers: prime_numbers.ko not found: [SKIP]"
 	exit 77
 fi
 
