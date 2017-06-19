@@ -386,7 +386,7 @@ qla4_82xx_wr_32(struct scsi_qla_host *ha, ulong off, u32 data)
 
 	if (rv == 1) {
 		write_lock_irqsave(&ha->hw_lock, flags);
-		qla4_82xx_crb_win_lock(ha);
+		qla4_82xx_crb_win_lock(ha, &flags);
 		qla4_82xx_pci_set_crbwindow_2M(ha, &off);
 	}
 
@@ -410,7 +410,7 @@ uint32_t qla4_82xx_rd_32(struct scsi_qla_host *ha, ulong off)
 
 	if (rv == 1) {
 		write_lock_irqsave(&ha->hw_lock, flags);
-		qla4_82xx_crb_win_lock(ha);
+		qla4_82xx_crb_win_lock(ha, &flags);
 		qla4_82xx_pci_set_crbwindow_2M(ha, &off);
 	}
 	data = readl((void __iomem *)off);
@@ -476,7 +476,7 @@ int qla4_82xx_md_wr_32(struct scsi_qla_host *ha, uint32_t off, uint32_t data)
 
 #define CRB_WIN_LOCK_TIMEOUT 100000000
 
-int qla4_82xx_crb_win_lock(struct scsi_qla_host *ha)
+int qla4_82xx_crb_win_lock(struct scsi_qla_host *ha, unsigned long *flags)
 {
 	int i;
 	int done = 0, timeout = 0;
@@ -491,6 +491,7 @@ int qla4_82xx_crb_win_lock(struct scsi_qla_host *ha)
 
 		timeout++;
 
+		write_unlock_irqrestore(&ha->hw_lock, *flags);
 		/* Yield CPU */
 		if (!in_interrupt())
 			schedule();
@@ -498,6 +499,7 @@ int qla4_82xx_crb_win_lock(struct scsi_qla_host *ha)
 			for (i = 0; i < 20; i++)
 				cpu_relax();    /*This a nop instr on i386*/
 		}
+		write_lock_irqsave(&ha->hw_lock, *flags);
 	}
 	qla4_82xx_wr_32(ha, QLA82XX_CRB_WIN_LOCK_ID, ha->func_num);
 	return 0;
