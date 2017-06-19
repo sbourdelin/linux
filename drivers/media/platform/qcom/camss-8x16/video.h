@@ -57,6 +57,8 @@ struct camss_video {
 	const struct camss_video_ops *ops;
 	struct mutex lock;
 	struct mutex q_lock;
+	unsigned int bpl_alignment;
+	unsigned int line_based;
 	enum camss_fmt_tag fmt_tag;
 };
 
