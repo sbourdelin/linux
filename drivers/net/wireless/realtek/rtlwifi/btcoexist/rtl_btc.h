@@ -44,7 +44,7 @@ bool rtl_btc_is_disable_edca_turbo(struct rtl_priv *rtlpriv);
 bool rtl_btc_is_bt_disabled(struct rtl_priv *rtlpriv);
 void rtl_btc_special_packet_notify(struct rtl_priv *rtlpriv, u8 pkt_type);
 
-struct rtl_btc_ops *rtl_btc_get_ops_pointer(void);
+const struct rtl_btc_ops *rtl_btc_get_ops_pointer(void);
 
 u8 rtl_get_hwpg_bt_exist(struct rtl_priv *rtlpriv);
 u8 rtl_get_hwpg_bt_type(struct rtl_priv *rtlpriv);

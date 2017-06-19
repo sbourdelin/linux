@@ -29,7 +29,7 @@
 #include "rtl_btc.h"
 #include "halbt_precomp.h"
 
-static struct rtl_btc_ops rtl_btc_operation = {
+static const struct rtl_btc_ops rtl_btc_operation = {
 	.btc_init_variables = rtl_btc_init_variables,
 	.btc_init_hal_vars = rtl_btc_init_hal_vars,
 	.btc_init_hw_config = rtl_btc_init_hw_config,
@@ -161,7 +161,7 @@ void rtl_btc_special_packet_notify(struct rtl_priv *rtlpriv, u8 pkt_type)
 	return exhalbtc_special_packet_notify(&gl_bt_coexist, pkt_type);
 }
 
-struct rtl_btc_ops *rtl_btc_get_ops_pointer(void)
+const struct rtl_btc_ops *rtl_btc_get_ops_pointer(void)
 {
 	return &rtl_btc_operation;
 }

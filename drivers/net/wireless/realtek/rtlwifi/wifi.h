@@ -2475,7 +2475,7 @@ struct rtl_btc_info {
 };
 
 struct bt_coexist_info {
-	struct rtl_btc_ops *btc_ops;
+	const struct rtl_btc_ops *btc_ops;
 	struct rtl_btc_info btc_info;
 	/* EEPROM BT info. */
 	u8 eeprom_bt_coexist;
