@@ -1767,9 +1767,7 @@ void rtl_8723e_c2h_command_handle(struct ieee80211_hw *hw)
 
 		rtl8723e_dm_bt_parse_bt_info(hw, ptmp_buf, c2h_event.cmd_len);
 
-		if (rtlpriv->cfg->ops->get_btc_status())
-			rtlpriv->btcoexist.btc_ops->btc_periodical(rtlpriv);
-
+		rtl_btc(rtlpriv, rtlpriv->cfg->ops, btc_periodical(rtlpriv));
 		break;
 	default:
 		break;

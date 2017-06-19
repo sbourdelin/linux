@@ -1879,10 +1879,8 @@ void rtl8821ae_c2h_content_parsing(struct ieee80211_hw *hw,
 	case C2H_8812_BT_INFO:
 		RT_TRACE(rtlpriv, COMP_FW, DBG_LOUD,
 			 "[C2H], C2H_8812_BT_INFO!!\n");
-		if (rtlpriv->cfg->ops->get_btc_status())
-			rtlpriv->btcoexist.btc_ops->btc_btinfo_notify(rtlpriv,
-								      tmp_buf,
-								      c2h_cmd_len);
+		rtl_btc(rtlpriv, rtlpriv->cfg->ops,
+			btc_btinfo_notify(rtlpriv, tmp_buf, c2h_cmd_len));
 		break;
 	default:
 		break;

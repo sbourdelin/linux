@@ -2719,8 +2719,7 @@ void rtl8723be_bt_hw_init(struct ieee80211_hw *hw)
 {
 	struct rtl_priv *rtlpriv = rtl_priv(hw);
 
-	if (rtlpriv->cfg->ops->get_btc_status())
-		rtlpriv->btcoexist.btc_ops->btc_init_hw_config(rtlpriv);
+	rtl_btc(rtlpriv, rtlpriv->cfg->ops, btc_init_hw_config(rtlpriv));
 
 }
 
