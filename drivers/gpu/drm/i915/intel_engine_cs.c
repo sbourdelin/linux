@@ -831,11 +831,6 @@ static int gen9_init_workarounds(struct intel_engine_cs *engine)
 			  FLOW_CONTROL_ENABLE |
 			  PARTIAL_INSTRUCTION_SHOOTDOWN_DISABLE);
 
-	/* Syncing dependencies between camera and graphics:skl,bxt,kbl */
-	if (!IS_COFFEELAKE(dev_priv))
-		WA_SET_BIT_MASKED(HALF_SLICE_CHICKEN3,
-				  GEN9_DISABLE_OCL_OOB_SUPPRESS_LOGIC);
-
 	/* WaDisableDgMirrorFixInHalfSliceChicken5:bxt */
 	if (IS_BXT_REVID(dev_priv, 0, BXT_REVID_A1))
 		WA_CLR_BIT_MASKED(GEN9_HALF_SLICE_CHICKEN5,
@@ -893,11 +888,6 @@ static int gen9_init_workarounds(struct intel_engine_cs *engine)
 	/* WaForceEnableNonCoherent:skl,bxt,kbl,cfl */
 	WA_SET_BIT_MASKED(HDC_CHICKEN0,
 			  HDC_FORCE_NON_COHERENT);
-
-	/* WaDisableHDCInvalidation:skl,bxt,kbl */
-	if (!IS_COFFEELAKE(dev_priv))
-		I915_WRITE(GAM_ECOCHK, I915_READ(GAM_ECOCHK) |
-			   BDW_DISABLE_HDC_INVALIDATION);
 
 	/* WaDisableSamplerPowerBypassForSOPingPong:skl,bxt,kbl,cfl */
 	if (IS_SKYLAKE(dev_priv) ||
@@ -1007,6 +997,14 @@ static int skl_init_workarounds(struct intel_engine_cs *engine)
 	if (ret)
 		return ret;
 
+	/* Syncing dependencies between camera and graphics:skl */
+	WA_SET_BIT_MASKED(HALF_SLICE_CHICKEN3,
+			  GEN9_DISABLE_OCL_OOB_SUPPRESS_LOGIC);
+
+	/* WaDisableHDCInvalidation:skl */
+	I915_WRITE(GAM_ECOCHK, I915_READ(GAM_ECOCHK) |
+		   BDW_DISABLE_HDC_INVALIDATION);
+
 	return skl_tune_iz_hashing(engine);
 }
 
@@ -1075,6 +1073,14 @@ static int bxt_init_workarounds(struct intel_engine_cs *engine)
 	if (IS_BXT_REVID(dev_priv, BXT_REVID_C0, REVID_FOREVER))
 		WA_SET_BIT(GEN9_GAMT_ECO_REG_RW_IA,
 			   GAMT_ECO_ENABLE_IN_PLACE_DECOMPRESS);
+
+	/* Syncing dependencies between camera and graphics:bxt */
+	WA_SET_BIT_MASKED(HALF_SLICE_CHICKEN3,
+			  GEN9_DISABLE_OCL_OOB_SUPPRESS_LOGIC);
+
+	/* WaDisableHDCInvalidation:bxt */
+	I915_WRITE(GAM_ECOCHK, I915_READ(GAM_ECOCHK) |
+		   BDW_DISABLE_HDC_INVALIDATION);
 
 	return 0;
 }
