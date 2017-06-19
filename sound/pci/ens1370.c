@@ -474,7 +474,7 @@ static struct snd_pcm_hw_constraint_list snd_es1370_hw_constraints_rates = {
 	.list = snd_es1370_fixed_rates,
 	.mask = 0,
 };
-static struct snd_ratnum es1370_clock = {
+static const struct snd_ratnum es1370_clock = {
 	.num = ES_1370_SRCLOCK,
 	.den_min = 29, 
 	.den_max = 353,
@@ -495,7 +495,7 @@ static struct snd_pcm_hw_constraint_ratdens snd_es1371_hw_constraints_dac_clock 
 	.nrats = 1,
 	.rats = &es1371_dac_clock,
 };
-static struct snd_ratnum es1371_adc_clock = {
+static const struct snd_ratnum es1371_adc_clock = {
 	.num = 48000 << 15,
 	.den_min = 32768, 
 	.den_max = 393216,
