@@ -547,7 +547,7 @@ static snd_pcm_uframes_t snd_gf1_pcm_playback_pointer(struct snd_pcm_substream *
 	return pos;
 }
 
-static struct snd_ratnum clock = {
+static const struct snd_ratnum clock = {
 	.num = 9878400/16,
 	.den_min = 2,
 	.den_max = 257,
