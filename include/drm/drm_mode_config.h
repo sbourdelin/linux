@@ -740,6 +740,11 @@ struct drm_mode_config {
 	 * the position of the output on the host's screen.
 	 */
 	struct drm_property *suggested_y_property;
+	/**
+	 * @hdmi_output_property: output pixel format from HDMI display
+	 * Default is set for RGB
+	 */
+	struct drm_property *hdmi_output_property;
 
 	/* dumb ioctl parameters */
 	uint32_t preferred_depth, prefer_shadow;
