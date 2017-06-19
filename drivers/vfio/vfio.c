@@ -36,6 +36,7 @@
 #include <linux/uuid.h>
 #include <linux/vfio.h>
 #include <linux/wait.h>
+#include <linux/amba/bus.h>
 
 #define DRIVER_VERSION	"0.3"
 #define DRIVER_AUTHOR	"Alex Williamson <alex.williamson@redhat.com>"
@@ -743,6 +744,11 @@ static char **vfio_find_driver_override(struct device *dev)
 	} else if (dev->bus == &platform_bus_type) {
 		struct platform_device *pdev = to_platform_device(dev);
 		return &pdev->driver_override;
+#ifdef CONFIG_ARM_AMBA
+	} else if (dev->bus == &amba_bustype) {
+		struct amba_device *adev = to_amba_device(dev);
+		return &adev->driver_override;
+#endif
 	}
 
 	return NULL;
