@@ -1860,15 +1860,13 @@ static void rtl_pci_stop(struct ieee80211_hw *hw)
 {
 	struct rtl_priv *rtlpriv = rtl_priv(hw);
 	struct rtl_hal_ops *ops = rtlpriv->cfg->ops;
-	struct rtl_btc_ops *btc_ops = rtlpriv->btcoexist.btc_ops;
 	struct rtl_pci *rtlpci = rtl_pcidev(rtl_pcipriv(hw));
 	struct rtl_ps_ctl *ppsc = rtl_psc(rtl_priv(hw));
 	struct rtl_hal *rtlhal = rtl_hal(rtl_priv(hw));
 	unsigned long flags;
 	u8 RFInProgressTimeOut = 0;
 
-	if (ops->get_btc_status())
-		btc_ops->btc_halt_notify();
+	rtl_btc(rtlpriv, ops, btc_halt_notify());
 
 	/*
 	 *should be before disable interrupt&adapter

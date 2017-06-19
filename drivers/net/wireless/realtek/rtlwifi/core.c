@@ -1046,7 +1046,6 @@ static void rtl_op_bss_info_changed(struct ieee80211_hw *hw,
 {
 	struct rtl_priv *rtlpriv = rtl_priv(hw);
 	struct rtl_hal_ops *ops = rtlpriv->cfg->ops;
-	struct rtl_btc_ops *btc_ops = rtlpriv->btcoexist.btc_ops;
 	struct rtl_hal *rtlhal = rtl_hal(rtlpriv);
 	struct rtl_mac *mac = rtl_mac(rtl_priv(hw));
 	struct rtl_ps_ctl *ppsc = rtl_psc(rtl_priv(hw));
@@ -1193,8 +1192,7 @@ static void rtl_op_bss_info_changed(struct ieee80211_hw *hw,
 		ppsc->report_linked = (mstatus == RT_MEDIA_CONNECT) ?
 				      true : false;
 
-		if (ops->get_btc_status())
-			btc_ops->btc_mediastatus_notify(rtlpriv, mstatus);
+		rtl_btc(rtlpriv, ops, btc_mediastatus_notify(rtlpriv, mstatus));
 	}
 
 	if (changed & BSS_CHANGED_ERP_CTS_PROT) {
@@ -1428,7 +1426,6 @@ static void rtl_op_sw_scan_start(struct ieee80211_hw *hw,
 {
 	struct rtl_priv *rtlpriv = rtl_priv(hw);
 	struct rtl_hal_ops *ops = rtlpriv->cfg->ops;
-	struct rtl_btc_ops *btc_ops = rtlpriv->btcoexist.btc_ops;
 	struct rtl_mac *mac = rtl_mac(rtl_priv(hw));
 
 	RT_TRACE(rtlpriv, COMP_MAC80211, DBG_LOUD, "\n");
@@ -1438,8 +1435,7 @@ static void rtl_op_sw_scan_start(struct ieee80211_hw *hw,
 		return;
 	}
 
-	if (ops->get_btc_status())
-		btc_ops->btc_scan_notify(rtlpriv, 1);
+	rtl_btc(rtlpriv, ops, btc_scan_notify(rtlpriv, 1));
 
 	if (rtlpriv->dm.supp_phymode_switch) {
 		if (ops->chk_switch_dmdp)
@@ -1465,7 +1461,6 @@ static void rtl_op_sw_scan_complete(struct ieee80211_hw *hw,
 {
 	struct rtl_priv *rtlpriv = rtl_priv(hw);
 	struct rtl_hal_ops *ops = rtlpriv->cfg->ops;
-	struct rtl_btc_ops *btc_ops = rtlpriv->btcoexist.btc_ops;
 	struct rtl_mac *mac = rtl_mac(rtl_priv(hw));
 
 	RT_TRACE(rtlpriv, COMP_MAC80211, DBG_LOUD, "\n");
@@ -1492,8 +1487,7 @@ static void rtl_op_sw_scan_complete(struct ieee80211_hw *hw,
 	}
 
 	ops->scan_operation_backup(hw, SCAN_OPT_RESTORE);
-	if (ops->get_btc_status())
-		btc_ops->btc_scan_notify(rtlpriv, 0);
+	rtl_btc(rtlpriv, ops, btc_scan_notify(rtlpriv, 0));
 }
 
 static int rtl_op_set_key(struct ieee80211_hw *hw, enum set_key_cmd cmd,

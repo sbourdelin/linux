@@ -2552,6 +2552,13 @@ struct rtl_btc_ops {
 					  u8 pkt_type);
 };
 
+/* Convenience macro for accessing rtl_btc_ops() functions */
+#define rtl_btc(rtlpriv, ops, func)					\
+do {									\
+	if ((ops)->get_btc_status())					\
+		(rtlpriv)->btcoexist.btc_ops->func;			\
+} while (0)
+
 struct proxim {
 	bool proxim_on;
 
