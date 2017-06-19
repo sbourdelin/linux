@@ -316,7 +316,7 @@ netxen_pcie_sem_lock(struct netxen_adapter *adapter, int sem, u32 id_reg)
 			break;
 		if (++timeout >= NETXEN_PCIE_SEM_TIMEOUT)
 			return -EIO;
-		msleep(1);
+		mdelay(1);
 	}
 
 	if (id_reg)
