@@ -3127,7 +3127,7 @@ ata_scsi_map_proto(u8 byte1)
  *	ata_scsi_pass_thru - convert ATA pass-thru CDB to taskfile
  *	@qc: command structure to be initialized
  *
- *	Handles either 12 or 16-byte versions of the CDB.
+ *	Handles either 12, 16, or 32-byte versions of the CDB.
  *
  *	RETURNS:
  *	Zero on success, non-zero on failure.
@@ -3140,13 +3140,36 @@ static unsigned int ata_scsi_pass_thru(struct ata_queued_cmd *qc)
 	const u8 *cdb = scmd->cmnd;
 	u16 fp;
 
-	if ((tf->protocol = ata_scsi_map_proto(cdb[1])) == ATA_PROT_UNKNOWN) {
+	/*
+	 * if SCSI operation code in cdb[0] is ATA_12 or ATA_16,
+	 * then cdb[1] will contain protocol of ATA PASS-THROUGH.
+	 * otherwise, Its operation code shall be ATA_32(7Fh).
+	 * in this case, cdb[10] will contain protocol of it.
+	 * we call this command as a variable-length cdb.
+	 */
+	if (cdb[0] == ATA_12 || cdb[0] == ATA_16)
+		tf->protocol = ata_scsi_map_proto(cdb[1]);
+	else
+		tf->protocol = ata_scsi_map_proto(cdb[10]);
+
+	if (tf->protocol == ATA_PROT_UNKNOWN) {
 		fp = 1;
 		goto invalid_fld;
 	}
 
-	if (ata_is_ncq(tf->protocol) && (cdb[2] & 0x3) == 0)
-		tf->protocol = ATA_PROT_NCQ_NODATA;
+	/*
+	 * if protocol has a NCQ property and transfer length is 0,
+	 * then the protocol will be marked as a NCQ_NODATA.
+	 * in case of ATA_12 and ATA_16, cdb[2] has a t_length field.
+	 * otherwise, cdb[11] will have a t_length field.
+	 */
+	if (cdb[0] == ATA_12 || cdb[0] == ATA_16) {
+		if (ata_is_ncq(tf->protocol) && (cdb[2] & 0x3) == 0)
+			tf->protocol = ATA_PROT_NCQ_NODATA;
+	} else {
+		if (ata_is_ncq(tf->protocol) && (cdb[11] & 0x3) == 0)
+			tf->protocol = ATA_PROT_NCQ_NODATA;
+	}
 
 	/* enable LBA */
 	tf->flags |= ATA_TFLAG_LBA;
@@ -3181,7 +3204,7 @@ static unsigned int ata_scsi_pass_thru(struct ata_queued_cmd *qc)
 		tf->lbah = cdb[12];
 		tf->device = cdb[13];
 		tf->command = cdb[14];
-	} else {
+	} else if (cdb[0] == ATA_12) {
 		/*
 		 * 12-byte CDB - incapable of extended commands.
 		 */
@@ -3194,6 +3217,31 @@ static unsigned int ata_scsi_pass_thru(struct ata_queued_cmd *qc)
 		tf->lbah = cdb[7];
 		tf->device = cdb[8];
 		tf->command = cdb[9];
+	} else {
+		/*
+		 * 32-byte CDB - may contain extended command fields.
+		 *
+		 * If that is the case, copy the upper byte register values.
+		 */
+		if (cdb[10] & 0x01) {
+			tf->hob_feature = cdb[20];
+			tf->hob_nsect = cdb[22];
+			tf->hob_lbal = cdb[16];
+			tf->hob_lbam = cdb[15];
+			tf->hob_lbah = cdb[14];
+			tf->flags |= ATA_TFLAG_LBA48;
+		} else
+			tf->flags &= ~ATA_TFLAG_LBA48;
+
+		tf->feature = cdb[21];
+		tf->nsect = cdb[23];
+		tf->lbal = cdb[19];
+		tf->lbam = cdb[18];
+		tf->lbah = cdb[17];
+		tf->device = cdb[24];
+		tf->command = cdb[25];
+		tf->auxiliary = (cdb[28] << 24) | (cdb[29] << 16)
+			| (cdb[30] << 8) | cdb[31];
 	}
 
 	/* For NCQ commands copy the tag value */
@@ -4068,6 +4116,33 @@ static unsigned int ata_scsi_mode_select_xlat(struct ata_queued_cmd *qc)
 }
 
 /**
+ *	ata_scsi_var_len_cdb_xlat - SATL Variable Length CDB to Handler
+ *	@qc: Command to be translated
+ *
+ *	Translate a SCSI variable length CDB to specified commands.
+ *	It checks a service action value in CDB to call corresponding handler.
+ *
+ *	RETURNS:
+ *	Zero on success, non-zero on failure
+ */
+
+static unsigned int ata_scsi_var_len_cdb_xlat(struct ata_queued_cmd *qc)
+{
+	struct scsi_cmnd *scmd = qc->scsicmd;
+	const u8 *cdb = scmd->cmnd;
+	const u16 sa = (cdb[8] << 8) | cdb[9];	/* service action */
+
+	// if service action represents a ata pass-thru(32) command,
+	// then pass it to ata_scsi_pass_thru handler.
+	if (sa == ATA_32)
+		return ata_scsi_pass_thru(qc);
+
+unspprt_sa:
+	/* unsupported service action */
+	return 1;
+}
+
+/**
  *	ata_get_xlat_func - check if SCSI to ATA translation is possible
  *	@dev: ATA device
  *	@cmd: SCSI command opcode to consider
@@ -4106,6 +4181,9 @@ static inline ata_xlat_func_t ata_get_xlat_func(struct ata_device *dev, u8 cmd)
 	case ATA_12:
 	case ATA_16:
 		return ata_scsi_pass_thru;
+
+	case VARIABLE_LENGTH_CMD:
+		return ata_scsi_var_len_cdb_xlat;
 
 	case MODE_SELECT:
 	case MODE_SELECT_10:
@@ -4385,7 +4463,12 @@ int ata_scsi_add_hosts(struct ata_host *host, struct scsi_host_template *sht)
 		shost->max_id = 16;
 		shost->max_lun = 1;
 		shost->max_channel = 1;
-		shost->max_cmd_len = 16;
+		/*
+		 * SPC-3, SPC-4: Definition of CDB
+		 * A CDB may have a fixed length of up to 16 bytes or
+		 * variable length of between 12 and 260 bytes.
+		 */
+		shost->max_cmd_len = 260;
 
 		/* Schedule policy is determined by ->qc_defer()
 		 * callback and it needs to see every deferred qc.
