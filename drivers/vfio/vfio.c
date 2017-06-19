@@ -25,6 +25,7 @@
 #include <linux/miscdevice.h>
 #include <linux/module.h>
 #include <linux/mutex.h>
+#include <linux/platform_device.h>
 #include <linux/pci.h>
 #include <linux/rwsem.h>
 #include <linux/sched.h>
@@ -32,6 +33,7 @@
 #include <linux/stat.h>
 #include <linux/string.h>
 #include <linux/uaccess.h>
+#include <linux/uuid.h>
 #include <linux/vfio.h>
 #include <linux/wait.h>
 
@@ -95,6 +97,7 @@ struct vfio_group {
 	bool				noiommu;
 	struct kvm			*kvm;
 	struct blocking_notifier_head	notifier;
+	unsigned char			uuid[16];
 };
 
 struct vfio_device {
@@ -351,6 +354,8 @@ static struct vfio_group *vfio_create_group(struct iommu_group *iommu_group)
 	BLOCKING_INIT_NOTIFIER_HEAD(&group->notifier);
 
 	group->nb.notifier_call = vfio_iommu_group_notifier;
+
+	generate_random_uuid(group->uuid);
 
 	/*
 	 * blocking notifiers acquire a rwsem around registering and hold
@@ -728,6 +733,111 @@ static int vfio_group_nb_verify(struct vfio_group *group, struct device *dev)
 	return vfio_dev_viable(dev, group);
 }
 
+#define VFIO_TAG_PREFIX "#vfio_group:"
+
+static char **vfio_find_driver_override(struct device *dev)
+{
+	if (dev_is_pci(dev)) {
+		struct pci_dev *pdev = to_pci_dev(dev);
+		return &pdev->driver_override;
+	} else if (dev->bus == &platform_bus_type) {
+		struct platform_device *pdev = to_platform_device(dev);
+		return &pdev->driver_override;
+	}
+
+	return NULL;
+}
+
+/*
+ * If we're about to bind to something other than a known whitelisted driver
+ * or known vfio bus driver, try to avert it with driver_override.
+ */
+static void vfio_group_nb_pre_bind(struct vfio_group *group, struct device *dev)
+{
+	struct vfio_bus_driver *driver;
+	struct device_driver *drv = ACCESS_ONCE(dev->driver);
+	char **driver_override;
+
+	if (vfio_dev_whitelisted(dev, drv))
+		return; /* Binding to known "innocuous" device/driver */
+
+	mutex_lock(&vfio.bus_drivers_lock);
+	list_for_each_entry(driver, &vfio.bus_drivers_list, vfio_next) {
+		if (driver->drv == drv) {
+			mutex_unlock(&vfio.bus_drivers_lock);
+			return; /* Binding to known vfio bus driver, ok */
+		}
+	}
+	mutex_unlock(&vfio.bus_drivers_lock);
+
+	/* Can we stall slightly to let users fall off? */
+	if (list_empty(&group->device_list)) {
+		if (wait_event_timeout(vfio.release_q,
+				!atomic_read(&group->container_users), HZ))
+			return;
+	}
+
+	driver_override = vfio_find_driver_override(dev);
+	if (driver_override) {
+		char tag[50], *new = NULL, *old = *driver_override;
+
+		snprintf(tag, sizeof(tag), "%s%pU",
+			 VFIO_TAG_PREFIX, group->uuid);
+
+		if (old && strstr(old, tag))
+			return; /* block already in place */
+
+		new = kasprintf(GFP_KERNEL, "%s%s", old ? old : "", tag);
+		if (new) {
+			*driver_override = new;
+			kfree(old);
+			vfio_group_get(group);
+			dev_warn(dev, "vfio: Blocking unsafe driver bind\n");
+			return;
+		}
+	}
+
+	dev_warn(dev, "vfio: Unsafe driver binding to in-use group!\n");
+}
+
+/* If we've mangled driver_override, remove it */
+static void vfio_group_nb_post_bind(struct vfio_group *group,
+				    struct device *dev)
+{
+	char **driver_override = vfio_find_driver_override(dev);
+
+	if (driver_override && *driver_override) {
+		char tag[50], *new, *start, *end, *old = *driver_override;
+
+		snprintf(tag, sizeof(tag), "%s%pU",
+			 VFIO_TAG_PREFIX, group->uuid);
+
+		start = strstr(old, tag);
+		if (start) {
+			end = start + strlen(tag);
+
+			if (old + strlen(old) > end)
+				memmove(start, end,
+					strlen(old) - (end - old) + 1);
+			else
+				*start = 0;
+
+			if (strlen(old)) {
+				new = kasprintf(GFP_KERNEL, "%s", old);
+				if (new) {
+					*driver_override = new;
+					kfree(old);
+				} /* else, in-place terminated, ok */
+			} else {
+				*driver_override = NULL;
+				kfree(old);
+			}
+
+			vfio_group_put(group);
+		}
+	}
+}
+
 static int vfio_iommu_group_notifier(struct notifier_block *nb,
 				     unsigned long action, void *data)
 {
@@ -757,14 +867,23 @@ static int vfio_iommu_group_notifier(struct notifier_block *nb,
 		 */
 		break;
 	case IOMMU_GROUP_NOTIFY_BIND_DRIVER:
-		pr_debug("%s: Device %s, group %d binding to driver\n",
+		pr_debug("%s: Device %s, group %d binding to driver %s\n",
 			 __func__, dev_name(dev),
-			 iommu_group_id(group->iommu_group));
+			 iommu_group_id(group->iommu_group), dev->driver->name);
+		if (vfio_group_nb_verify(group, dev))
+			vfio_group_nb_pre_bind(group, dev);
+		break;
+	case IOMMU_GROUP_NOTIFY_DRIVER_NOT_BOUND:
+		pr_debug("%s: Device %s, group %d binding fail to driver %s\n",
+			 __func__, dev_name(dev),
+			 iommu_group_id(group->iommu_group), dev->driver->name);
+		vfio_group_nb_post_bind(group, dev);
 		break;
 	case IOMMU_GROUP_NOTIFY_BOUND_DRIVER:
 		pr_debug("%s: Device %s, group %d bound to driver %s\n",
 			 __func__, dev_name(dev),
 			 iommu_group_id(group->iommu_group), dev->driver->name);
+		vfio_group_nb_post_bind(group, dev);
 		BUG_ON(vfio_group_nb_verify(group, dev));
 		break;
 	case IOMMU_GROUP_NOTIFY_UNBIND_DRIVER:
@@ -1351,6 +1470,7 @@ static int vfio_group_unset_container(struct vfio_group *group)
 	if (users != 1)
 		return -EBUSY;
 
+	wake_up(&vfio.release_q);
 	__vfio_group_unset_container(group);
 
 	return 0;
@@ -1364,7 +1484,11 @@ static int vfio_group_unset_container(struct vfio_group *group)
  */
 static void vfio_group_try_dissolve_container(struct vfio_group *group)
 {
-	if (0 == atomic_dec_if_positive(&group->container_users))
+	int users = atomic_dec_if_positive(&group->container_users);
+
+	wake_up(&vfio.release_q);
+
+	if (!users)
 		__vfio_group_unset_container(group);
 }
 
@@ -1433,19 +1557,26 @@ static bool vfio_group_viable(struct vfio_group *group)
 
 static int vfio_group_add_container_user(struct vfio_group *group)
 {
+	int ret;
+
 	if (!atomic_inc_not_zero(&group->container_users))
 		return -EINVAL;
 
 	if (group->noiommu) {
-		atomic_dec(&group->container_users);
-		return -EPERM;
+		ret = -EPERM;
+		goto out;
 	}
 	if (!group->container->iommu_driver || !vfio_group_viable(group)) {
-		atomic_dec(&group->container_users);
-		return -EINVAL;
+		ret = -EINVAL;
+		goto out;
 	}
 
 	return 0;
+
+out:
+	atomic_dec(&group->container_users);
+	wake_up(&vfio.release_q);
+	return ret;
 }
 
 static const struct file_operations vfio_device_fops;
