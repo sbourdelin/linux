@@ -1406,7 +1406,9 @@ netxen_nic_pci_mem_access_direct(struct netxen_adapter *adapter, u64 off,
 
 		mem_base = pci_resource_start(adapter->pdev, 0) +
 					(start & PAGE_MASK);
+		spin_unlock(&adapter->ahw.mem_lock);
 		mem_ptr = ioremap(mem_base, PAGE_SIZE);
+		spin_lock(&adapter->ahw.mem_lock);
 		if (mem_ptr == NULL) {
 			ret = -EIO;
 			goto unlock;
