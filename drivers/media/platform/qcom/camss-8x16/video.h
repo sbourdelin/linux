@@ -29,7 +29,7 @@
 
 struct camss_buffer {
 	struct vb2_v4l2_buffer vb;
-	dma_addr_t addr;
+	dma_addr_t addr[3];
 	struct list_head queue;
 };
 
@@ -39,6 +39,11 @@ struct camss_video_ops {
 	int (*queue_buffer)(struct camss_video *vid, struct camss_buffer *buf);
 	int (*flush_buffers)(struct camss_video *vid,
 			     enum vb2_buffer_state state);
+};
+
+enum camss_fmt_tag {
+	CAMSS_FMT_TAG_RDI = 1 << 0,
+	CAMSS_FMT_TAG_PIX = 1 << 1
 };
 
 struct camss_video {
@@ -52,6 +57,7 @@ struct camss_video {
 	const struct camss_video_ops *ops;
 	struct mutex lock;
 	struct mutex q_lock;
+	enum camss_fmt_tag fmt_tag;
 };
 
 void msm_video_stop_streaming(struct camss_video *video);

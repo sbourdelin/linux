@@ -27,72 +27,200 @@
 #include "video.h"
 #include "camss.h"
 
+struct fract {
+	u8 numerator;
+	u8 denominator;
+};
+
 /*
  * struct format_info - ISP media bus format information
  * @code: V4L2 media bus format code
  * @pixelformat: V4L2 pixel format FCC identifier
- * @bpp: Bits per pixel when stored in memory
+ * @hsub: Horizontal subsampling (for each plane)
+ * @vsub: Vertical subsampling (for each plane)
+ * @bpp: Bits per pixel when stored in memory (for each plane)
+ * @fmt_tags: Tags that indicate for which output this format can be used
  */
 static const struct format_info {
 	u32 code;
 	u32 pixelformat;
-	unsigned int bpp;
+	u8 planes;
+	struct fract hsub[3];
+	struct fract vsub[3];
+	unsigned int bpp[3];
+	u8 fmt_tags;
 } formats[] = {
-	{ MEDIA_BUS_FMT_UYVY8_2X8, V4L2_PIX_FMT_UYVY, 16 },
-	{ MEDIA_BUS_FMT_VYUY8_2X8, V4L2_PIX_FMT_VYUY, 16 },
-	{ MEDIA_BUS_FMT_YUYV8_2X8, V4L2_PIX_FMT_YUYV, 16 },
-	{ MEDIA_BUS_FMT_YVYU8_2X8, V4L2_PIX_FMT_YVYU, 16 },
-	{ MEDIA_BUS_FMT_SBGGR8_1X8, V4L2_PIX_FMT_SBGGR8, 8 },
-	{ MEDIA_BUS_FMT_SGBRG8_1X8, V4L2_PIX_FMT_SGBRG8, 8 },
-	{ MEDIA_BUS_FMT_SGRBG8_1X8, V4L2_PIX_FMT_SGRBG8, 8 },
-	{ MEDIA_BUS_FMT_SRGGB8_1X8, V4L2_PIX_FMT_SRGGB8, 8 },
-	{ MEDIA_BUS_FMT_SBGGR10_1X10, V4L2_PIX_FMT_SBGGR10P, 10 },
-	{ MEDIA_BUS_FMT_SGBRG10_1X10, V4L2_PIX_FMT_SGBRG10P, 10 },
-	{ MEDIA_BUS_FMT_SGRBG10_1X10, V4L2_PIX_FMT_SGRBG10P, 10 },
-	{ MEDIA_BUS_FMT_SRGGB10_1X10, V4L2_PIX_FMT_SRGGB10P, 10 },
-	{ MEDIA_BUS_FMT_SBGGR12_1X12, V4L2_PIX_FMT_SRGGB12P, 12 },
-	{ MEDIA_BUS_FMT_SGBRG12_1X12, V4L2_PIX_FMT_SGBRG12P, 12 },
-	{ MEDIA_BUS_FMT_SGRBG12_1X12, V4L2_PIX_FMT_SGRBG12P, 12 },
-	{ MEDIA_BUS_FMT_SRGGB12_1X12, V4L2_PIX_FMT_SRGGB12P, 12 }
+	{ MEDIA_BUS_FMT_UYVY8_2X8, V4L2_PIX_FMT_UYVY, 1,
+	  { { 1, 1 } }, { { 1, 1 } }, { 16 },
+	  CAMSS_FMT_TAG_RDI },
+	{ MEDIA_BUS_FMT_VYUY8_2X8, V4L2_PIX_FMT_VYUY, 1,
+	  { { 1, 1 } }, { { 1, 1 } }, { 16 },
+	  CAMSS_FMT_TAG_RDI },
+	{ MEDIA_BUS_FMT_YUYV8_2X8, V4L2_PIX_FMT_YUYV, 1,
+	  { { 1, 1 } }, { { 1, 1 } }, { 16 },
+	  CAMSS_FMT_TAG_RDI },
+	{ MEDIA_BUS_FMT_YVYU8_2X8, V4L2_PIX_FMT_YVYU, 1,
+	  { { 1, 1 } }, { { 1, 1 } }, { 16 },
+	  CAMSS_FMT_TAG_RDI },
+	{ MEDIA_BUS_FMT_SBGGR8_1X8, V4L2_PIX_FMT_SBGGR8, 1,
+	  { { 1, 1 } }, { { 1, 1 } }, { 8 },
+	  CAMSS_FMT_TAG_RDI },
+	{ MEDIA_BUS_FMT_SGBRG8_1X8, V4L2_PIX_FMT_SGBRG8, 1,
+	  { { 1, 1 } }, { { 1, 1 } }, { 8 },
+	  CAMSS_FMT_TAG_RDI },
+	{ MEDIA_BUS_FMT_SGRBG8_1X8, V4L2_PIX_FMT_SGRBG8, 1,
+	  { { 1, 1 } }, { { 1, 1 } }, { 8 },
+	  CAMSS_FMT_TAG_RDI },
+	{ MEDIA_BUS_FMT_SRGGB8_1X8, V4L2_PIX_FMT_SRGGB8, 1,
+	  { { 1, 1 } }, { { 1, 1 } }, { 8 },
+	  CAMSS_FMT_TAG_RDI },
+	{ MEDIA_BUS_FMT_SBGGR10_1X10, V4L2_PIX_FMT_SBGGR10P, 1,
+	  { { 1, 1 } }, { { 1, 1 } }, { 10 },
+	  CAMSS_FMT_TAG_RDI },
+	{ MEDIA_BUS_FMT_SGBRG10_1X10, V4L2_PIX_FMT_SGBRG10P, 1,
+	  { { 1, 1 } }, { { 1, 1 } }, { 10 },
+	  CAMSS_FMT_TAG_RDI },
+	{ MEDIA_BUS_FMT_SGRBG10_1X10, V4L2_PIX_FMT_SGRBG10P, 1,
+	  { { 1, 1 } }, { { 1, 1 } }, { 10 },
+	  CAMSS_FMT_TAG_RDI },
+	{ MEDIA_BUS_FMT_SRGGB10_1X10, V4L2_PIX_FMT_SRGGB10P, 1,
+	  { { 1, 1 } }, { { 1, 1 } }, { 10 },
+	  CAMSS_FMT_TAG_RDI },
+	{ MEDIA_BUS_FMT_SBGGR12_1X12, V4L2_PIX_FMT_SRGGB12P, 1,
+	  { { 1, 1 } }, { { 1, 1 } }, { 12 },
+	  CAMSS_FMT_TAG_RDI },
+	{ MEDIA_BUS_FMT_SGBRG12_1X12, V4L2_PIX_FMT_SGBRG12P, 1,
+	  { { 1, 1 } }, { { 1, 1 } }, { 12 },
+	  CAMSS_FMT_TAG_RDI },
+	{ MEDIA_BUS_FMT_SGRBG12_1X12, V4L2_PIX_FMT_SGRBG12P, 1,
+	  { { 1, 1 } }, { { 1, 1 } }, { 12 },
+	  CAMSS_FMT_TAG_RDI },
+	{ MEDIA_BUS_FMT_SRGGB12_1X12, V4L2_PIX_FMT_SRGGB12P, 1,
+	  { { 1, 1 } }, { { 1, 1 } }, { 12 },
+	  CAMSS_FMT_TAG_RDI },
+	{ MEDIA_BUS_FMT_YUYV8_1_5X8, V4L2_PIX_FMT_NV12, 1,
+	  { { 1, 1 } }, { { 2, 3 } }, { 8 },
+	  CAMSS_FMT_TAG_PIX },
+	{ MEDIA_BUS_FMT_YVYU8_1_5X8, V4L2_PIX_FMT_NV12, 1,
+	  { { 1, 1 } }, { { 2, 3 } }, { 8 },
+	  CAMSS_FMT_TAG_PIX },
+	{ MEDIA_BUS_FMT_UYVY8_1_5X8, V4L2_PIX_FMT_NV12, 1,
+	  { { 1, 1 } }, { { 2, 3 } }, { 8 },
+	  CAMSS_FMT_TAG_PIX },
+	{ MEDIA_BUS_FMT_VYUY8_1_5X8, V4L2_PIX_FMT_NV12, 1,
+	  { { 1, 1 } }, { { 2, 3 } }, { 8 },
+	  CAMSS_FMT_TAG_PIX },
+	{ MEDIA_BUS_FMT_YUYV8_1_5X8, V4L2_PIX_FMT_NV21, 1,
+	  { { 1, 1 } }, { { 2, 3 } }, { 8 },
+	  CAMSS_FMT_TAG_PIX },
+	{ MEDIA_BUS_FMT_YVYU8_1_5X8, V4L2_PIX_FMT_NV21, 1,
+	  { { 1, 1 } }, { { 2, 3 } }, { 8 },
+	  CAMSS_FMT_TAG_PIX },
+	{ MEDIA_BUS_FMT_UYVY8_1_5X8, V4L2_PIX_FMT_NV21, 1,
+	  { { 1, 1 } }, { { 2, 3 } }, { 8 },
+	  CAMSS_FMT_TAG_PIX },
+	{ MEDIA_BUS_FMT_VYUY8_1_5X8, V4L2_PIX_FMT_NV21, 1,
+	  { { 1, 1 } }, { { 2, 3 } }, { 8 },
+	  CAMSS_FMT_TAG_PIX },
+	{ MEDIA_BUS_FMT_YUYV8_2X8, V4L2_PIX_FMT_NV16, 1,
+	  { { 1, 1 } }, { { 1, 2 } }, { 8 },
+	  CAMSS_FMT_TAG_PIX },
+	{ MEDIA_BUS_FMT_YVYU8_2X8, V4L2_PIX_FMT_NV16, 1,
+	  { { 1, 1 } }, { { 1, 2 } }, { 8 },
+	  CAMSS_FMT_TAG_PIX },
+	{ MEDIA_BUS_FMT_UYVY8_2X8, V4L2_PIX_FMT_NV16, 1,
+	  { { 1, 1 } }, { { 1, 2 } }, { 8 },
+	  CAMSS_FMT_TAG_PIX },
+	{ MEDIA_BUS_FMT_VYUY8_2X8, V4L2_PIX_FMT_NV16, 1,
+	  { { 1, 1 } }, { { 1, 2 } }, { 8 },
+	  CAMSS_FMT_TAG_PIX },
+	{ MEDIA_BUS_FMT_YUYV8_2X8, V4L2_PIX_FMT_NV61, 1,
+	  { { 1, 1 } }, { { 1, 2 } }, { 8 },
+	  CAMSS_FMT_TAG_PIX },
+	{ MEDIA_BUS_FMT_YVYU8_2X8, V4L2_PIX_FMT_NV61, 1,
+	  { { 1, 1 } }, { { 1, 2 } }, { 8 },
+	  CAMSS_FMT_TAG_PIX },
+	{ MEDIA_BUS_FMT_UYVY8_2X8, V4L2_PIX_FMT_NV61, 1,
+	  { { 1, 1 } }, { { 1, 2 } }, { 8 },
+	  CAMSS_FMT_TAG_PIX },
+	{ MEDIA_BUS_FMT_VYUY8_2X8, V4L2_PIX_FMT_NV61, 1,
+	  { { 1, 1 } }, { { 1, 2 } }, { 8 },
+	  CAMSS_FMT_TAG_PIX },
 };
 
 /* -----------------------------------------------------------------------------
  * Helper functions
  */
 
+static int video_find_format(u32 code, u32 pixelformat, enum camss_fmt_tag tag)
+{
+	int i;
+
+	for (i = 0; i < ARRAY_SIZE(formats); i++) {
+		if (formats[i].code == code &&
+		    formats[i].fmt_tags & tag &&
+		    formats[i].pixelformat == pixelformat)
+			return i;
+	}
+
+	for (i = 0; i < ARRAY_SIZE(formats); i++)
+		if (formats[i].code == code &&
+		    formats[i].fmt_tags & tag)
+			return i;
+
+	WARN_ON(1);
+
+	return -EINVAL;
+}
+
+static int video_find_format_n(u32 code, u32 index, enum camss_fmt_tag tag)
+{
+	int i;
+	u32 n = 0;
+
+	for (i = 0; i < ARRAY_SIZE(formats); i++)
+		if (formats[i].code == code &&
+		    formats[i].fmt_tags & tag) {
+			if (n == index)
+				return i;
+			n++;
+		}
+
+	return -EINVAL;
+}
+
 /*
  * video_mbus_to_pix_mp - Convert v4l2_mbus_framefmt to v4l2_pix_format_mplane
- * @mbus: v4l2_mbus_framefmt format (input)
+ * @mbus: v4l2_mbus_framefmt format
  * @pix: v4l2_pix_format_mplane format (output)
+ * @index: index of an entry in formats array to be used for the conversion
  *
  * Fill the output pix structure with information from the input mbus format.
  *
  * Return 0 on success or a negative error code otherwise
  */
-static unsigned int video_mbus_to_pix_mp(const struct v4l2_mbus_framefmt *mbus,
-					 struct v4l2_pix_format_mplane *pix)
+static int video_mbus_to_pix_mp(const struct v4l2_mbus_framefmt *mbus,
+				struct v4l2_pix_format_mplane *pix, int index)
 {
+	const struct format_info *f;
 	unsigned int i;
 	u32 bytesperline;
 
+	f = &formats[index];
 	memset(pix, 0, sizeof(*pix));
 	pix->width = mbus->width;
 	pix->height = mbus->height;
-
-	for (i = 0; i < ARRAY_SIZE(formats); ++i) {
-		if (formats[i].code == mbus->code)
-			break;
+	pix->pixelformat = f->pixelformat;
+	pix->num_planes = f->planes;
+	for (i = 0; i < pix->num_planes; i++) {
+		bytesperline = pix->width / f->hsub[i].numerator *
+			f->hsub[i].denominator * f->bpp[i] / 8;
+		bytesperline = ALIGN(bytesperline, 8);
+		pix->plane_fmt[i].bytesperline = bytesperline;
+		pix->plane_fmt[i].sizeimage = pix->height /
+				f->vsub[i].numerator * f->vsub[i].denominator *
+				bytesperline;
 	}
-
-	if (WARN_ON(i == ARRAY_SIZE(formats)))
-		return -EINVAL;
-
-	pix->pixelformat = formats[i].pixelformat;
-	pix->num_planes = 1;
-	bytesperline = pix->width * formats[i].bpp / 8;
-	bytesperline = ALIGN(bytesperline, 8);
-	pix->plane_fmt[0].bytesperline = bytesperline;
-	pix->plane_fmt[0].sizeimage = bytesperline * pix->height;
 	pix->colorspace = mbus->colorspace;
 	pix->field = mbus->field;
 
@@ -135,7 +263,42 @@ static int video_get_subdev_format(struct camss_video *video,
 		return ret;
 
 	format->type = video->type;
-	return video_mbus_to_pix_mp(&fmt.format, &format->fmt.pix_mp);
+
+	ret = video_find_format(fmt.format.code,
+				format->fmt.pix_mp.pixelformat,
+				video->fmt_tag);
+	if (ret < 0)
+		return ret;
+
+	return video_mbus_to_pix_mp(&fmt.format, &format->fmt.pix_mp, ret);
+}
+
+static int video_get_pixelformat(struct camss_video *video, u32 *pixelformat,
+				 u32 index)
+{
+	struct v4l2_subdev_format fmt;
+	struct v4l2_subdev *subdev;
+	u32 pad;
+	int ret;
+
+	subdev = video_remote_subdev(video, &pad);
+	if (subdev == NULL)
+		return -EINVAL;
+
+	fmt.pad = pad;
+	fmt.which = V4L2_SUBDEV_FORMAT_ACTIVE;
+
+	ret = v4l2_subdev_call(subdev, pad, get_fmt, NULL, &fmt);
+	if (ret)
+		return ret;
+
+	ret = video_find_format_n(fmt.format.code, index, video->fmt_tag);
+	if (ret < 0)
+		return ret;
+
+	*pixelformat = formats[ret].pixelformat;
+
+	return 0;
 }
 
 /* -----------------------------------------------------------------------------
@@ -147,20 +310,55 @@ static int video_queue_setup(struct vb2_queue *q,
 	unsigned int sizes[], struct device *alloc_devs[])
 {
 	struct camss_video *video = vb2_get_drv_priv(q);
+	const struct v4l2_pix_format_mplane *format =
+						&video->active_fmt.fmt.pix_mp;
+	unsigned int i;
 
 	if (*num_planes) {
-		if (*num_planes != 1)
+		if (*num_planes != format->num_planes)
 			return -EINVAL;
 
-		if (sizes[0] < video->active_fmt.fmt.pix_mp.plane_fmt[0].sizeimage)
-			return -EINVAL;
+		for (i = 0; i < *num_planes; i++)
+			if (sizes[i] < format->plane_fmt[i].sizeimage)
+				return -EINVAL;
 
 		return 0;
 	}
 
-	*num_planes = 1;
+	*num_planes = format->num_planes;
 
-	sizes[0] = video->active_fmt.fmt.pix_mp.plane_fmt[0].sizeimage;
+	for (i = 0; i < *num_planes; i++)
+		sizes[i] = format->plane_fmt[i].sizeimage;
+
+	return 0;
+}
+
+static int video_buf_init(struct vb2_buffer *vb)
+{
+	struct vb2_v4l2_buffer *vbuf = to_vb2_v4l2_buffer(vb);
+	struct camss_video *video = vb2_get_drv_priv(vb->vb2_queue);
+	struct camss_buffer *buffer = container_of(vbuf, struct camss_buffer,
+						   vb);
+	const struct v4l2_pix_format_mplane *format =
+						&video->active_fmt.fmt.pix_mp;
+	struct sg_table *sgt;
+	unsigned int i;
+
+	for (i = 0; i < format->num_planes; i++) {
+		sgt = vb2_dma_sg_plane_desc(vb, i);
+		if (!sgt)
+			return -EFAULT;
+
+		buffer->addr[i] = sg_dma_address(sgt->sgl);
+	}
+
+	if (format->pixelformat == V4L2_PIX_FMT_NV12 ||
+			format->pixelformat == V4L2_PIX_FMT_NV21 ||
+			format->pixelformat == V4L2_PIX_FMT_NV16 ||
+			format->pixelformat == V4L2_PIX_FMT_NV61)
+		buffer->addr[1] = buffer->addr[0] +
+				format->plane_fmt[0].bytesperline *
+				format->height;
 
 	return 0;
 }
@@ -169,22 +367,16 @@ static int video_buf_prepare(struct vb2_buffer *vb)
 {
 	struct vb2_v4l2_buffer *vbuf = to_vb2_v4l2_buffer(vb);
 	struct camss_video *video = vb2_get_drv_priv(vb->vb2_queue);
-	struct camss_buffer *buffer = container_of(vbuf, struct camss_buffer,
-						   vb);
-	struct sg_table *sgt;
+	const struct v4l2_pix_format_mplane *format =
+						&video->active_fmt.fmt.pix_mp;
+	unsigned int i;
 
-	if (video->active_fmt.fmt.pix_mp.plane_fmt[0].sizeimage >
-							vb2_plane_size(vb, 0))
-		return -EINVAL;
+	for (i = 0; i < format->num_planes; i++) {
+		if (format->plane_fmt[i].sizeimage > vb2_plane_size(vb, i))
+			return -EINVAL;
 
-	vb2_set_plane_payload(vb, 0,
-			video->active_fmt.fmt.pix_mp.plane_fmt[0].sizeimage);
-
-	sgt = vb2_dma_sg_plane_desc(vb, 0);
-	if (!sgt)
-		return -EFAULT;
-
-	buffer->addr = sg_dma_address(sgt->sgl);
+		vb2_set_plane_payload(vb, i, format->plane_fmt[i].sizeimage);
+	}
 
 	vbuf->field = V4L2_FIELD_NONE;
 
@@ -206,21 +398,28 @@ static int video_check_format(struct camss_video *video)
 	struct v4l2_pix_format_mplane *pix = &video->active_fmt.fmt.pix_mp;
 	struct v4l2_pix_format_mplane *sd_pix;
 	struct v4l2_format format;
+	unsigned int i;
 	int ret;
 
+	sd_pix = &format.fmt.pix_mp;
+	sd_pix->pixelformat = pix->pixelformat;
 	ret = video_get_subdev_format(video, &format);
 	if (ret < 0)
 		return ret;
 
-	sd_pix = &format.fmt.pix_mp;
 	if (pix->pixelformat != sd_pix->pixelformat ||
 	    pix->height != sd_pix->height ||
 	    pix->width != sd_pix->width ||
 	    pix->num_planes != sd_pix->num_planes ||
-	    pix->plane_fmt[0].bytesperline != sd_pix->plane_fmt[0].bytesperline ||
-	    pix->plane_fmt[0].sizeimage != sd_pix->plane_fmt[0].sizeimage ||
 	    pix->field != format.fmt.pix_mp.field)
 		return -EINVAL;
+
+	for (i = 0; i < pix->num_planes; i++)
+		if (pix->plane_fmt[i].bytesperline !=
+				sd_pix->plane_fmt[i].bytesperline ||
+		    pix->plane_fmt[i].sizeimage !=
+				sd_pix->plane_fmt[i].sizeimage)
+			return -EINVAL;
 
 	return 0;
 }
@@ -277,7 +476,6 @@ static void video_stop_streaming(struct vb2_queue *q)
 	struct media_entity *entity;
 	struct media_pad *pad;
 	struct v4l2_subdev *subdev;
-	struct v4l2_subdev *subdev_vfe = NULL;
 
 	entity = &vdev->entity;
 	while (1) {
@@ -292,14 +490,7 @@ static void video_stop_streaming(struct vb2_queue *q)
 		entity = pad->entity;
 		subdev = media_entity_to_v4l2_subdev(entity);
 
-		if (strstr(subdev->name, "vfe")) {
-			subdev_vfe = subdev;
-		} else if (strstr(subdev->name, "ispif")) {
-			v4l2_subdev_call(subdev, video, s_stream, 0);
-			v4l2_subdev_call(subdev_vfe, video, s_stream, 0);
-		} else {
-			v4l2_subdev_call(subdev, video, s_stream, 0);
-		}
+		v4l2_subdev_call(subdev, video, s_stream, 0);
 	}
 
 	media_pipeline_stop(&vdev->entity);
@@ -311,6 +502,7 @@ static const struct vb2_ops msm_video_vb2_q_ops = {
 	.queue_setup     = video_queue_setup,
 	.wait_prepare    = vb2_ops_wait_prepare,
 	.wait_finish     = vb2_ops_wait_finish,
+	.buf_init        = video_buf_init,
 	.buf_prepare     = video_buf_prepare,
 	.buf_queue       = video_buf_queue,
 	.start_streaming = video_start_streaming,
@@ -337,22 +529,11 @@ static int video_querycap(struct file *file, void *fh,
 static int video_enum_fmt(struct file *file, void *fh, struct v4l2_fmtdesc *f)
 {
 	struct camss_video *video = video_drvdata(file);
-	struct v4l2_format format;
-	int ret;
 
 	if (f->type != video->type)
 		return -EINVAL;
 
-	if (f->index)
-		return -EINVAL;
-
-	ret = video_get_subdev_format(video, &format);
-	if (ret < 0)
-		return ret;
-
-	f->pixelformat = format.fmt.pix.pixelformat;
-
-	return 0;
+	return video_get_pixelformat(video, &f->pixelformat, f->index);
 }
 
 static int video_g_fmt(struct file *file, void *fh, struct v4l2_format *f)
