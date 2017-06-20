@@ -156,5 +156,12 @@
 			clock-names = "uartclk", "apb_pclk";
 			status = "disabled";
 		};
+
+		tsensor: tsensor {
+			compatible = "hisilicon,thermal-hi3660";
+			reg = <0x0 0xfff30000 0x0 0x1000>;
+			#thermal-sensor-cells = <1>;
+			status = "ok";
+		};
 	};
 };
