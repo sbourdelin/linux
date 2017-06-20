@@ -110,7 +110,7 @@ retry_failed:
 static int tegra_rtc_read_time(struct device *dev, struct rtc_time *tm)
 {
 	struct tegra_rtc_info *info = dev_get_drvdata(dev);
-	unsigned long sec, msec;
+	unsigned long long sec, msec;
 	unsigned long sl_irq_flags;
 
 	/* RTC hardware copies seconds to shadow seconds when a read
@@ -122,9 +122,9 @@ static int tegra_rtc_read_time(struct device *dev, struct rtc_time *tm)
 
 	spin_unlock_irqrestore(&info->tegra_rtc_lock, sl_irq_flags);
 
-	rtc_time_to_tm(sec, tm);
+	rtc_time64_to_tm(sec, tm);
 
-	dev_vdbg(dev, "time read as %lu. %d/%d/%d %d:%02u:%02u\n",
+	dev_vdbg(dev, "time read as %llu. %d/%d/%d %d:%02u:%02u\n",
 		sec,
 		tm->tm_mon + 1,
 		tm->tm_mday,
@@ -140,7 +140,7 @@ static int tegra_rtc_read_time(struct device *dev, struct rtc_time *tm)
 static int tegra_rtc_set_time(struct device *dev, struct rtc_time *tm)
 {
 	struct tegra_rtc_info *info = dev_get_drvdata(dev);
-	unsigned long sec;
+	unsigned long long sec;
 	int ret;
 
 	/* convert tm to seconds. */
@@ -148,9 +148,9 @@ static int tegra_rtc_set_time(struct device *dev, struct rtc_time *tm)
 	if (ret)
 		return ret;
 
-	rtc_tm_to_time(tm, &sec);
+	sec = rtc_tm_to_time64(tm);
 
-	dev_vdbg(dev, "time set to %lu. %d/%d/%d %d:%02u:%02u\n",
+	dev_vdbg(dev, "time set to %llu. %d/%d/%d %d:%02u:%02u\n",
 		sec,
 		tm->tm_mon+1,
 		tm->tm_mday,
@@ -174,7 +174,7 @@ static int tegra_rtc_set_time(struct device *dev, struct rtc_time *tm)
 static int tegra_rtc_read_alarm(struct device *dev, struct rtc_wkalrm *alarm)
 {
 	struct tegra_rtc_info *info = dev_get_drvdata(dev);
-	unsigned long sec;
+	unsigned long long sec;
 	unsigned tmp;
 
 	sec = readl(info->rtc_base + TEGRA_RTC_REG_SECONDS_ALARM0);
@@ -185,7 +185,7 @@ static int tegra_rtc_read_alarm(struct device *dev, struct rtc_wkalrm *alarm)
 	} else {
 		/* alarm is enabled. */
 		alarm->enabled = 1;
-		rtc_time_to_tm(sec, &alarm->time);
+		rtc_time64_to_tm(sec, &alarm->time);
 	}
 
 	tmp = readl(info->rtc_base + TEGRA_RTC_REG_INTR_STATUS);
@@ -220,10 +220,10 @@ static int tegra_rtc_alarm_irq_enable(struct device *dev, unsigned int enabled)
 static int tegra_rtc_set_alarm(struct device *dev, struct rtc_wkalrm *alarm)
 {
 	struct tegra_rtc_info *info = dev_get_drvdata(dev);
-	unsigned long sec;
+	unsigned long long sec;
 
 	if (alarm->enabled)
-		rtc_tm_to_time(&alarm->time, &sec);
+		sec = rtc_tm_to_time64(&alarm->time);
 	else
 		sec = 0;
 
@@ -236,7 +236,7 @@ static int tegra_rtc_set_alarm(struct device *dev, struct rtc_wkalrm *alarm)
 	if (sec) {
 		tegra_rtc_alarm_irq_enable(dev, 1);
 
-		dev_vdbg(dev, "alarm set as %lu. %d/%d/%d %d:%02u:%02u\n",
+		dev_vdbg(dev, "alarm set as %llu. %d/%d/%d %d:%02u:%02u\n",
 			sec,
 			alarm->time.tm_mon+1,
 			alarm->time.tm_mday,
