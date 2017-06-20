@@ -138,12 +138,12 @@ static void vr41xx_rtc_release(struct device *dev)
 
 static int vr41xx_rtc_read_time(struct device *dev, struct rtc_time *time)
 {
-	unsigned long epoch_sec, elapsed_sec;
+	unsigned long long epoch_sec, elapsed_sec;
 
 	epoch_sec = mktime(epoch, 1, 1, 0, 0, 0);
 	elapsed_sec = read_elapsed_second();
 
-	rtc_time_to_tm(epoch_sec + elapsed_sec, time);
+	rtc_time64_to_tm(epoch_sec + elapsed_sec, time);
 
 	return 0;
 }
@@ -175,7 +175,7 @@ static int vr41xx_rtc_read_alarm(struct device *dev, struct rtc_wkalrm *wkalrm)
 
 	spin_unlock_irq(&rtc_lock);
 
-	rtc_time_to_tm((high << 17) | (mid << 1) | (low >> 15), time);
+	rtc_time64_to_tm((high << 17) | (mid << 1) | (low >> 15), time);
 
 	return 0;
 }
