@@ -358,7 +358,6 @@ qtnf_event_handle_freq_change(struct qtnf_wmac *mac,
 	struct wiphy *wiphy = priv_to_wiphy(mac);
 	struct cfg80211_chan_def chandef;
 	struct ieee80211_channel *chan;
-	struct qtnf_bss_config *bss_cfg;
 	struct qtnf_vif *vif;
 	int freq;
 	int i;
@@ -383,16 +382,14 @@ qtnf_event_handle_freq_change(struct qtnf_wmac *mac,
 	if (!cfg80211_chandef_valid(&chandef))
 		cfg80211_chandef_create(&chandef, chan, NL80211_CHAN_HT20);
 
+	memcpy(&mac->chandef, &chandef, sizeof(mac->chandef));
+
 	for (i = 0; i < QTNF_MAX_INTF; i++) {
 		vif = &mac->iflist[i];
 		if (vif->wdev.iftype == NL80211_IFTYPE_UNSPECIFIED)
 			continue;
 
 		if (vif->netdev) {
-			bss_cfg = &vif->bss_cfg;
-			memcpy(&bss_cfg->chandef, &chandef,
-			       sizeof(bss_cfg->chandef));
-
 			mutex_lock(&vif->wdev.mtx);
 			cfg80211_ch_switch_notify(vif->netdev, &chandef);
 			mutex_unlock(&vif->wdev.mtx);
