@@ -153,9 +153,9 @@ static int wm831x_rtc_readtime(struct device *dev, struct rtc_time *tm)
 			continue;
 
 		if (memcmp(time1, time2, sizeof(time1)) == 0) {
-			u32 time = (time1[0] << 16) | time1[1];
+			u64 time = (time1[0] << 16) | time1[1];
 
-			rtc_time_to_tm(time, tm);
+			rtc_time64_to_tm(time, tm);
 			return rtc_valid_tm(tm);
 		}
 
@@ -169,12 +169,12 @@ static int wm831x_rtc_readtime(struct device *dev, struct rtc_time *tm)
 /*
  * Set current time and date in RTC
  */
-static int wm831x_rtc_set_mmss(struct device *dev, unsigned long time)
+static int wm831x_rtc_set_mmss64(struct device *dev, time64_t time)
 {
 	struct wm831x_rtc *wm831x_rtc = dev_get_drvdata(dev);
 	struct wm831x *wm831x = wm831x_rtc->wm831x;
 	struct rtc_time new_tm;
-	unsigned long new_time;
+	unsigned long long new_time;
 	int ret;
 	int count = 0;
 
@@ -215,11 +215,7 @@ static int wm831x_rtc_set_mmss(struct device *dev, unsigned long time)
 	if (ret < 0)
 		return ret;
 
-	ret = rtc_tm_to_time(&new_tm, &new_time);
-	if (ret < 0) {
-		dev_err(dev, "Failed to convert time: %d\n", ret);
-		return ret;
-	}
+	new_time = rtc_tm_to_time64(&new_tm);
 
 	/* Allow a second of change in case of tick */
 	if (new_time - time > 1) {
@@ -238,7 +234,7 @@ static int wm831x_rtc_readalarm(struct device *dev, struct rtc_wkalrm *alrm)
 	struct wm831x_rtc *wm831x_rtc = dev_get_drvdata(dev);
 	int ret;
 	u16 data[2];
-	u32 time;
+	u64 time;
 
 	ret = wm831x_bulk_read(wm831x_rtc->wm831x, WM831X_RTC_ALARM_1,
 			       2, data);
@@ -249,7 +245,7 @@ static int wm831x_rtc_readalarm(struct device *dev, struct rtc_wkalrm *alrm)
 
 	time = (data[0] << 16) | data[1];
 
-	rtc_time_to_tm(time, &alrm->time);
+	rtc_time64_to_tm(time, &alrm->time);
 
 	ret = wm831x_reg_read(wm831x_rtc->wm831x, WM831X_RTC_CONTROL);
 	if (ret < 0) {
@@ -286,13 +282,9 @@ static int wm831x_rtc_setalarm(struct device *dev, struct rtc_wkalrm *alrm)
 	struct wm831x_rtc *wm831x_rtc = dev_get_drvdata(dev);
 	struct wm831x *wm831x = wm831x_rtc->wm831x;
 	int ret;
-	unsigned long time;
+	unsigned long long time;
 
-	ret = rtc_tm_to_time(&alrm->time, &time);
-	if (ret < 0) {
-		dev_err(dev, "Failed to convert time: %d\n", ret);
-		return ret;
-	}
+	time = rtc_tm_to_time64(&alrm->time);
 
 	ret = wm831x_rtc_stop_alarm(wm831x_rtc);
 	if (ret < 0) {
@@ -346,7 +338,7 @@ static irqreturn_t wm831x_alm_irq(int irq, void *data)
 
 static const struct rtc_class_ops wm831x_rtc_ops = {
 	.read_time = wm831x_rtc_readtime,
-	.set_mmss = wm831x_rtc_set_mmss,
+	.set_mmss64 = wm831x_rtc_set_mmss64,
 	.read_alarm = wm831x_rtc_readalarm,
 	.set_alarm = wm831x_rtc_setalarm,
 	.alarm_irq_enable = wm831x_rtc_alarm_irq_enable,
