@@ -374,7 +374,7 @@ static int vfb_mmap(struct fb_info *info,
 
 #ifndef MODULE
 /*
- * The virtual framebuffer driver is only enabled if explicitly
+ * The virtual framebuffer driver is only enabled if explicitely
  * requested by passing 'video=vfb:' (or any actual options).
  */
 static int __init vfb_setup(char *options)
