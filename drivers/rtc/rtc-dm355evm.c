@@ -78,17 +78,17 @@ static int dm355evm_rtc_read_time(struct device *dev, struct rtc_time *tm)
 
 	dev_dbg(dev, "read timestamp %08x\n", time.value);
 
-	rtc_time_to_tm(le32_to_cpu(time.value), tm);
+	rtc_time64_to_tm(le32_to_cpu(time.value), tm);
 	return 0;
 }
 
 static int dm355evm_rtc_set_time(struct device *dev, struct rtc_time *tm)
 {
 	union evm_time	time;
-	unsigned long	value;
+	unsigned long long value;
 	int		status;
 
-	rtc_tm_to_time(tm, &value);
+	value = rtc_tm_to_time64(tm);
 	time.value = cpu_to_le32(value);
 
 	dev_dbg(dev, "write timestamp %08x\n", time.value);
