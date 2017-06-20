@@ -58,11 +58,11 @@ static int xgene_rtc_read_time(struct device *dev, struct rtc_time *tm)
 {
 	struct xgene_rtc_dev *pdata = dev_get_drvdata(dev);
 
-	rtc_time_to_tm(readl(pdata->csr_base + RTC_CCVR), tm);
+	rtc_time64_to_tm(readl(pdata->csr_base + RTC_CCVR), tm);
 	return rtc_valid_tm(tm);
 }
 
-static int xgene_rtc_set_mmss(struct device *dev, unsigned long secs)
+static int xgene_rtc_set_mmss64(struct device *dev, time64_t secs)
 {
 	struct xgene_rtc_dev *pdata = dev_get_drvdata(dev);
 
@@ -80,7 +80,7 @@ static int xgene_rtc_read_alarm(struct device *dev, struct rtc_wkalrm *alrm)
 {
 	struct xgene_rtc_dev *pdata = dev_get_drvdata(dev);
 
-	rtc_time_to_tm(pdata->alarm_time, &alrm->time);
+	rtc_time64_to_tm(pdata->alarm_time, &alrm->time);
 	alrm->enabled = readl(pdata->csr_base + RTC_CCR) & RTC_CCR_IE;
 
 	return 0;
@@ -108,10 +108,10 @@ static int xgene_rtc_set_alarm(struct device *dev, struct rtc_wkalrm *alrm)
 {
 	struct xgene_rtc_dev *pdata = dev_get_drvdata(dev);
 	unsigned long rtc_time;
-	unsigned long alarm_time;
+	unsigned long long alarm_time;
 
 	rtc_time = readl(pdata->csr_base + RTC_CCVR);
-	rtc_tm_to_time(&alrm->time, &alarm_time);
+	alarm_time = rtc_tm_to_time64(&alrm->time);
 
 	pdata->alarm_time = alarm_time;
 	writel((u32) pdata->alarm_time, pdata->csr_base + RTC_CMR);
@@ -123,7 +123,7 @@ static int xgene_rtc_set_alarm(struct device *dev, struct rtc_wkalrm *alrm)
 
 static const struct rtc_class_ops xgene_rtc_ops = {
 	.read_time	= xgene_rtc_read_time,
-	.set_mmss	= xgene_rtc_set_mmss,
+	.set_mmss64	= xgene_rtc_set_mmss64,
 	.read_alarm	= xgene_rtc_read_alarm,
 	.set_alarm	= xgene_rtc_set_alarm,
 	.alarm_irq_enable = xgene_rtc_alarm_irq_enable,
