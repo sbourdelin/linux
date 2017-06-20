@@ -164,7 +164,7 @@ static int ds1374_read_time(struct device *dev, struct rtc_time *time)
 
 	ret = ds1374_read_rtc(client, &itime, DS1374_REG_TOD0, 4);
 	if (!ret)
-		rtc_time_to_tm(itime, time);
+		rtc_time64_to_tm((u64)itime, time);
 
 	return ret;
 }
@@ -172,9 +172,9 @@ static int ds1374_read_time(struct device *dev, struct rtc_time *time)
 static int ds1374_set_time(struct device *dev, struct rtc_time *time)
 {
 	struct i2c_client *client = to_i2c_client(dev);
-	unsigned long itime;
+	unsigned long long itime;
 
-	rtc_tm_to_time(time, &itime);
+	itime = rtc_tm_to_time64(time);
 	return ds1374_write_rtc(client, itime, DS1374_REG_TOD0, 4);
 }
 
