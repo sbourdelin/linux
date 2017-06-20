@@ -2599,6 +2599,40 @@ static irqreturn_t gen8_irq_handler(int irq, void *arg)
 	return ret;
 }
 
+struct wedge_me {
+	struct delayed_work work;
+	struct drm_i915_private *i915;
+	const char *name;
+};
+
+static void wedge_me(struct work_struct *work)
+{
+	struct wedge_me *w = container_of(work, typeof(*w), work.work);
+
+	DRM_ERROR("%s timed out, cancelling all in-flight rendering.\n",
+		  w->name);
+	i915_gem_set_wedged(w->i915);
+}
+
+static bool init_wedge_on_timeout(struct wedge_me *w,
+				  struct drm_i915_private *i915,
+				  long timeout,
+				  const char *name)
+{
+	w->i915 = i915;
+	w->name = name;
+	INIT_DELAYED_WORK_ONSTACK(&w->work, wedge_me);
+
+	schedule_delayed_work(&w->work, HZ);
+	return true;
+}
+
+static void destroy_wedge_on_timeout(struct wedge_me *w)
+{
+	cancel_delayed_work_sync(&w->work);
+	destroy_delayed_work_on_stack(&w->work);
+}
+
 /**
  * i915_reset_and_wakeup - do process context error handling work
  * @dev_priv: i915 device private
@@ -2612,13 +2646,17 @@ static void i915_reset_and_wakeup(struct drm_i915_private *dev_priv)
 	char *error_event[] = { I915_ERROR_UEVENT "=1", NULL };
 	char *reset_event[] = { I915_RESET_UEVENT "=1", NULL };
 	char *reset_done_event[] = { I915_ERROR_UEVENT "=0", NULL };
+	struct wedge_me w;
 
 	kobject_uevent_env(kobj, KOBJ_CHANGE, error_event);
 
 	DRM_DEBUG_DRIVER("resetting chip\n");
 	kobject_uevent_env(kobj, KOBJ_CHANGE, reset_event);
 
-	intel_prepare_reset(dev_priv);
+	if (init_wedge_on_timeout(&w, dev_priv, HZ, "intel_prepare_reset")) {
+		intel_prepare_reset(dev_priv);
+		destroy_wedge_on_timeout(&w);
+	}
 
 	set_bit(I915_RESET_HANDOFF, &dev_priv->gpu_error.flags);
 	wake_up_all(&dev_priv->gpu_error.wait_queue);
@@ -2642,6 +2680,7 @@ static void i915_reset_and_wakeup(struct drm_i915_private *dev_priv)
 				     HZ));
 
 	intel_finish_reset(dev_priv);
+	mod_delayed_work(dev_priv->wq, &dev_priv->gt.idle_work, 0);
 
 	if (!test_bit(I915_WEDGED, &dev_priv->gpu_error.flags))
 		kobject_uevent_env(kobj,
