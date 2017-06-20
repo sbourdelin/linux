@@ -324,23 +324,20 @@ static int ds1305_set_alarm(struct device *dev, struct rtc_wkalrm *alm)
 {
 	struct ds1305	*ds1305 = dev_get_drvdata(dev);
 	struct spi_device *spi = ds1305->spi;
-	unsigned long	now, later;
+	unsigned long long now, later;
 	struct rtc_time	tm;
 	int		status;
 	u8		buf[1 + DS1305_ALM_LEN];
 
 	/* convert desired alarm to time_t */
-	status = rtc_tm_to_time(&alm->time, &later);
-	if (status < 0)
-		return status;
+	later = rtc_tm_to_time64(&alm->time);
 
 	/* Read current time as time_t */
 	status = ds1305_get_time(dev, &tm);
 	if (status < 0)
 		return status;
-	status = rtc_tm_to_time(&tm, &now);
-	if (status < 0)
-		return status;
+
+	now = rtc_tm_to_time64(&tm);
 
 	/* make sure alarm fires within the next 24 hours */
 	if (later <= now)
