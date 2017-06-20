@@ -127,7 +127,7 @@ static int mv_rtc_read_alarm(struct device *dev, struct rtc_wkalrm *alm)
 
 	if (rtc_valid_tm(&alm->time) < 0) {
 		dev_err(dev, "retrieved alarm date/time is not valid.\n");
-		rtc_time_to_tm(0, &alm->time);
+		rtc_time64_to_tm(0, &alm->time);
 	}
 
 	alm->enabled = !!readl(ioaddr + RTC_ALARM_INTERRUPT_MASK_REG_OFFS);
