@@ -1100,6 +1100,7 @@ static int soc_bind_dai_link(struct snd_soc_card *card,
 		}
 
 		rtd->platform = platform;
+		rtd->platform_com = &platform->component;
 	}
 	if (!rtd->platform) {
 		dev_err(card->dev, "ASoC: platform %s not registered\n",
@@ -1172,11 +1173,14 @@ static void soc_remove_link_components(struct snd_soc_card *card,
 {
 	struct snd_soc_dai *cpu_dai = rtd->cpu_dai;
 	struct snd_soc_platform *platform = rtd->platform;
+	struct snd_soc_component *platform_com = rtd->platform_com;
 	struct snd_soc_component *component;
 	int i;
 
 	/* remove the platform */
-	if (platform && platform->component.driver->remove_order == order)
+	if (platform_com && platform_com->driver->remove_order == order)
+		soc_remove_component(platform_com);
+	else if (platform && platform->component.driver->remove_order == order)
 		soc_remove_component(&platform->component);
 
 	/* remove the CODEC-side CODEC */
@@ -1543,6 +1547,7 @@ static int soc_probe_link_components(struct snd_soc_card *card,
 				     int order)
 {
 	struct snd_soc_platform *platform = rtd->platform;
+	struct snd_soc_component *platform_com = rtd->platform_com;
 	struct snd_soc_component *component;
 	int i, ret;
 
@@ -1565,7 +1570,11 @@ static int soc_probe_link_components(struct snd_soc_card *card,
 	}
 
 	/* probe the platform */
-	if (platform->component.driver->probe_order == order) {
+	if (platform_com->driver->probe_order == order) {
+		ret = soc_probe_component(card, platform_com);
+		if (ret < 0)
+			return ret;
+	} else if (platform->component.driver->probe_order == order) {
 		ret = soc_probe_component(card, &platform->component);
 		if (ret < 0)
 			return ret;
@@ -3332,8 +3341,11 @@ static void snd_soc_platform_drv_remove(struct snd_soc_component *component)
 static int snd_soc_platform_drv_pcm_new(struct snd_soc_pcm_runtime *rtd)
 {
 	struct snd_soc_platform *platform = rtd->platform;
+	struct snd_soc_component *platform_com = rtd->platform_com;
 
-	if (platform->driver->pcm_new)
+	if (platform_com->driver->pcm_new)
+		return platform_com->driver->pcm_new(rtd);
+	else if (platform->driver->pcm_new)
 		return platform->driver->pcm_new(rtd);
 	else
 		return 0;
@@ -3343,8 +3355,11 @@ static void snd_soc_platform_drv_pcm_free(struct snd_pcm *pcm)
 {
 	struct snd_soc_pcm_runtime *rtd = pcm->private_data;
 	struct snd_soc_platform *platform = rtd->platform;
+	struct snd_soc_component *platform_com = rtd->platform_com;
 
-	if (platform->driver->pcm_free)
+	if (platform_com->driver->pcm_free)
+		platform_com->driver->pcm_free(pcm);
+	else if (platform->driver->pcm_free)
 		platform->driver->pcm_free(pcm);
 }
 

@@ -191,6 +191,7 @@ static void davinci_mcbsp_start(struct davinci_mcbsp_dev *dev,
 {
 	struct snd_soc_pcm_runtime *rtd = substream->private_data;
 	struct snd_soc_platform *platform = rtd->platform;
+	struct snd_soc_component *platform_com = rtd->platform_com;
 	int playback = (substream->stream == SNDRV_PCM_STREAM_PLAYBACK);
 	u32 spcr;
 	u32 mask = playback ? DAVINCI_MCBSP_SPCR_XRST : DAVINCI_MCBSP_SPCR_RRST;
@@ -211,7 +212,12 @@ static void davinci_mcbsp_start(struct davinci_mcbsp_dev *dev,
 	if (playback) {
 		/* Stop the DMA to avoid data loss */
 		/* while the transmitter is out of reset to handle XSYNCERR */
-		if (platform->driver->ops->trigger) {
+		if (platform_com->driver->ops->trigger) {
+			int ret = platform_com->driver->ops->trigger(substream,
+				SNDRV_PCM_TRIGGER_STOP);
+			if (ret < 0)
+				printk(KERN_DEBUG "Playback DMA stop failed\n");
+		} else if (platform->driver->ops->trigger) {
 			int ret = platform->driver->ops->trigger(substream,
 				SNDRV_PCM_TRIGGER_STOP);
 			if (ret < 0)
@@ -233,7 +239,12 @@ static void davinci_mcbsp_start(struct davinci_mcbsp_dev *dev,
 		toggle_clock(dev, playback);
 
 		/* Restart the DMA */
-		if (platform->driver->ops->trigger) {
+		if (platform_com->driver->ops->trigger) {
+			int ret = platform_com->driver->ops->trigger(substream,
+				SNDRV_PCM_TRIGGER_START);
+			if (ret < 0)
+				printk(KERN_DEBUG "Playback DMA start failed\n");
+		} else if (platform->driver->ops->trigger) {
 			int ret = platform->driver->ops->trigger(substream,
 				SNDRV_PCM_TRIGGER_START);
 			if (ret < 0)

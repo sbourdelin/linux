@@ -450,6 +450,7 @@ static int soc_pcm_open(struct snd_pcm_substream *substream)
 	struct snd_soc_pcm_runtime *rtd = substream->private_data;
 	struct snd_pcm_runtime *runtime = substream->runtime;
 	struct snd_soc_platform *platform = rtd->platform;
+	struct snd_soc_component *platform_com = rtd->platform_com;
 	struct snd_soc_dai *cpu_dai = rtd->cpu_dai;
 	struct snd_soc_dai *codec_dai;
 	const char *codec_dai_name = "multicodec";
@@ -475,7 +476,14 @@ static int soc_pcm_open(struct snd_pcm_substream *substream)
 		}
 	}
 
-	if (platform->driver->ops && platform->driver->ops->open) {
+	if (platform_com->driver->ops && platform_com->driver->ops->open) {
+		ret = platform_com->driver->ops->open(substream);
+		if (ret < 0) {
+			dev_err(platform_com->dev, "ASoC: can't open platform"
+				" %s: %d\n", platform_com->name, ret);
+			goto platform_err;
+		}
+	} else if (platform->driver->ops && platform->driver->ops->open) {
 		ret = platform->driver->ops->open(substream);
 		if (ret < 0) {
 			dev_err(platform->dev, "ASoC: can't open platform"
@@ -590,7 +598,9 @@ codec_dai_err:
 			codec_dai->driver->ops->shutdown(substream, codec_dai);
 	}
 
-	if (platform->driver->ops && platform->driver->ops->close)
+	if (platform_com->driver->ops && platform_com->driver->ops->close)
+		platform_com->driver->ops->close(substream);
+	else if (platform->driver->ops && platform->driver->ops->close)
 		platform->driver->ops->close(substream);
 
 platform_err:
@@ -655,6 +665,7 @@ static int soc_pcm_close(struct snd_pcm_substream *substream)
 {
 	struct snd_soc_pcm_runtime *rtd = substream->private_data;
 	struct snd_soc_platform *platform = rtd->platform;
+	struct snd_soc_component *platform_com = rtd->platform_com;
 	struct snd_soc_dai *cpu_dai = rtd->cpu_dai;
 	struct snd_soc_dai *codec_dai;
 	int i;
@@ -687,7 +698,9 @@ static int soc_pcm_close(struct snd_pcm_substream *substream)
 	if (rtd->dai_link->ops && rtd->dai_link->ops->shutdown)
 		rtd->dai_link->ops->shutdown(substream);
 
-	if (platform->driver->ops && platform->driver->ops->close)
+	if (platform_com->driver->ops && platform_com->driver->ops->close)
+		platform_com->driver->ops->close(substream);
+	else if (platform->driver->ops && platform->driver->ops->close)
 		platform->driver->ops->close(substream);
 
 	if (substream->stream == SNDRV_PCM_STREAM_PLAYBACK) {
@@ -741,6 +754,7 @@ static int soc_pcm_prepare(struct snd_pcm_substream *substream)
 {
 	struct snd_soc_pcm_runtime *rtd = substream->private_data;
 	struct snd_soc_platform *platform = rtd->platform;
+	struct snd_soc_component *platform_com = rtd->platform_com;
 	struct snd_soc_dai *cpu_dai = rtd->cpu_dai;
 	struct snd_soc_dai *codec_dai;
 	int i, ret = 0;
@@ -756,7 +770,14 @@ static int soc_pcm_prepare(struct snd_pcm_substream *substream)
 		}
 	}
 
-	if (platform->driver->ops && platform->driver->ops->prepare) {
+	if (platform_com->driver->ops && platform_com->driver->ops->prepare) {
+		ret = platform_com->driver->ops->prepare(substream);
+		if (ret < 0) {
+			dev_err(platform_com->dev, "ASoC: platform prepare error:"
+				" %d\n", ret);
+			goto out;
+		}
+	} else if (platform->driver->ops && platform->driver->ops->prepare) {
 		ret = platform->driver->ops->prepare(substream);
 		if (ret < 0) {
 			dev_err(platform->dev, "ASoC: platform prepare error:"
@@ -847,6 +868,7 @@ static int soc_pcm_hw_params(struct snd_pcm_substream *substream,
 {
 	struct snd_soc_pcm_runtime *rtd = substream->private_data;
 	struct snd_soc_platform *platform = rtd->platform;
+	struct snd_soc_component *platform_com = rtd->platform_com;
 	struct snd_soc_dai *cpu_dai = rtd->cpu_dai;
 	int i, ret = 0;
 
@@ -911,7 +933,14 @@ static int soc_pcm_hw_params(struct snd_pcm_substream *substream,
 	if (ret < 0)
 		goto interface_err;
 
-	if (platform->driver->ops && platform->driver->ops->hw_params) {
+	if (platform_com->driver->ops && platform_com->driver->ops->hw_params) {
+		ret = platform_com->driver->ops->hw_params(substream, params);
+		if (ret < 0) {
+			dev_err(platform_com->dev, "ASoC: %s hw params failed: %d\n",
+				platform_com->name, ret);
+			goto platform_err;
+		}
+	} else if (platform->driver->ops && platform->driver->ops->hw_params) {
 		ret = platform->driver->ops->hw_params(substream, params);
 		if (ret < 0) {
 			dev_err(platform->dev, "ASoC: %s hw params failed: %d\n",
@@ -959,6 +988,7 @@ static int soc_pcm_hw_free(struct snd_pcm_substream *substream)
 {
 	struct snd_soc_pcm_runtime *rtd = substream->private_data;
 	struct snd_soc_platform *platform = rtd->platform;
+	struct snd_soc_component *platform_com = rtd->platform_com;
 	struct snd_soc_dai *cpu_dai = rtd->cpu_dai;
 	struct snd_soc_dai *codec_dai;
 	bool playback = substream->stream == SNDRV_PCM_STREAM_PLAYBACK;
@@ -995,7 +1025,9 @@ static int soc_pcm_hw_free(struct snd_pcm_substream *substream)
 		rtd->dai_link->ops->hw_free(substream);
 
 	/* free any DMA resources */
-	if (platform->driver->ops && platform->driver->ops->hw_free)
+	if (platform_com->driver->ops && platform_com->driver->ops->hw_free)
+		platform_com->driver->ops->hw_free(substream);
+	else if (platform->driver->ops && platform->driver->ops->hw_free)
 		platform->driver->ops->hw_free(substream);
 
 	/* now free hw params for the DAIs  */
@@ -1016,6 +1048,7 @@ static int soc_pcm_trigger(struct snd_pcm_substream *substream, int cmd)
 {
 	struct snd_soc_pcm_runtime *rtd = substream->private_data;
 	struct snd_soc_platform *platform = rtd->platform;
+	struct snd_soc_component *platform_com = rtd->platform_com;
 	struct snd_soc_dai *cpu_dai = rtd->cpu_dai;
 	struct snd_soc_dai *codec_dai;
 	int i, ret;
@@ -1030,7 +1063,11 @@ static int soc_pcm_trigger(struct snd_pcm_substream *substream, int cmd)
 		}
 	}
 
-	if (platform->driver->ops && platform->driver->ops->trigger) {
+	if (platform_com->driver->ops && platform_com->driver->ops->trigger) {
+		ret = platform_com->driver->ops->trigger(substream, cmd);
+		if (ret < 0)
+			return ret;
+	} else if (platform->driver->ops && platform->driver->ops->trigger) {
 		ret = platform->driver->ops->trigger(substream, cmd);
 		if (ret < 0)
 			return ret;
@@ -1086,6 +1123,7 @@ static snd_pcm_uframes_t soc_pcm_pointer(struct snd_pcm_substream *substream)
 {
 	struct snd_soc_pcm_runtime *rtd = substream->private_data;
 	struct snd_soc_platform *platform = rtd->platform;
+	struct snd_soc_component *platform_com = rtd->platform_com;
 	struct snd_soc_dai *cpu_dai = rtd->cpu_dai;
 	struct snd_soc_dai *codec_dai;
 	struct snd_pcm_runtime *runtime = substream->runtime;
@@ -1094,7 +1132,9 @@ static snd_pcm_uframes_t soc_pcm_pointer(struct snd_pcm_substream *substream)
 	snd_pcm_sframes_t codec_delay = 0;
 	int i;
 
-	if (platform->driver->ops && platform->driver->ops->pointer)
+	if (platform_com->driver->ops && platform_com->driver->ops->pointer)
+		offset = platform_com->driver->ops->pointer(substream);
+	else if (platform->driver->ops && platform->driver->ops->pointer)
 		offset = platform->driver->ops->pointer(substream);
 
 	if (cpu_dai->driver->ops && cpu_dai->driver->ops->delay)
@@ -2281,9 +2321,13 @@ static int soc_pcm_ioctl(struct snd_pcm_substream *substream,
 {
 	struct snd_soc_pcm_runtime *rtd = substream->private_data;
 	struct snd_soc_platform *platform = rtd->platform;
+	struct snd_soc_component *platform_com = rtd->platform_com;
 
-	if (platform->driver->ops && platform->driver->ops->ioctl)
+	if (platform_com->driver->ops && platform_com->driver->ops->ioctl)
+		return platform_com->driver->ops->ioctl(substream, cmd, arg);
+	else if (platform->driver->ops && platform->driver->ops->ioctl)
 		return platform->driver->ops->ioctl(substream, cmd, arg);
+
 	return snd_pcm_lib_ioctl(substream, cmd, arg);
 }
 
@@ -2644,6 +2688,7 @@ static void soc_pcm_free(struct snd_pcm *pcm)
 int soc_new_pcm(struct snd_soc_pcm_runtime *rtd, int num)
 {
 	struct snd_soc_platform *platform = rtd->platform;
+	struct snd_soc_component *platform_com = rtd->platform_com;
 	struct snd_soc_dai *codec_dai;
 	struct snd_soc_dai *cpu_dai = rtd->cpu_dai;
 	struct snd_soc_component *component;
@@ -2741,7 +2786,13 @@ int soc_new_pcm(struct snd_soc_pcm_runtime *rtd, int num)
 		rtd->ops.ioctl		= soc_pcm_ioctl;
 	}
 
-	if (platform->driver->ops) {
+	if (platform_com->driver->ops) {
+		rtd->ops.ack		= platform_com->driver->ops->ack;
+		rtd->ops.copy		= platform_com->driver->ops->copy;
+		rtd->ops.silence	= platform_com->driver->ops->silence;
+		rtd->ops.page		= platform_com->driver->ops->page;
+		rtd->ops.mmap		= platform_com->driver->ops->mmap;
+	} else if (platform->driver->ops) {
 		rtd->ops.ack		= platform->driver->ops->ack;
 		rtd->ops.copy		= platform->driver->ops->copy;
 		rtd->ops.silence	= platform->driver->ops->silence;
