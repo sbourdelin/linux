@@ -201,16 +201,16 @@ static void ds2404_enable_osc(struct device *dev)
 
 static int ds2404_read_time(struct device *dev, struct rtc_time *dt)
 {
-	unsigned long time = 0;
+	unsigned long long time = 0;
 
 	ds2404_read_memory(dev, 0x203, 4, (u8 *)&time);
 	time = le32_to_cpu(time);
 
-	rtc_time_to_tm(time, dt);
+	rtc_time64_to_tm(time, dt);
 	return rtc_valid_tm(dt);
 }
 
-static int ds2404_set_mmss(struct device *dev, unsigned long secs)
+static int ds2404_set_mmss64(struct device *dev, time64_t secs)
 {
 	u32 time = cpu_to_le32(secs);
 	ds2404_write_memory(dev, 0x203, 4, (u8 *)&time);
@@ -219,7 +219,7 @@ static int ds2404_set_mmss(struct device *dev, unsigned long secs)
 
 static const struct rtc_class_ops ds2404_rtc_ops = {
 	.read_time	= ds2404_read_time,
-	.set_mmss	= ds2404_set_mmss,
+	.set_mmss64	= ds2404_set_mmss64,
 };
 
 static int rtc_probe(struct platform_device *pdev)
