@@ -61,7 +61,7 @@
 struct rtc_at32ap700x {
 	struct rtc_device	*rtc;
 	void __iomem		*regs;
-	unsigned long		alarm_time;
+	unsigned long long	alarm_time;
 	unsigned long		irq;
 	/* Protect against concurrent register access. */
 	spinlock_t		lock;
@@ -70,10 +70,10 @@ struct rtc_at32ap700x {
 static int at32_rtc_readtime(struct device *dev, struct rtc_time *tm)
 {
 	struct rtc_at32ap700x *rtc = dev_get_drvdata(dev);
-	unsigned long now;
+	unsigned long long now;
 
 	now = rtc_readl(rtc, VAL);
-	rtc_time_to_tm(now, tm);
+	rtc_time64_to_tm(now, tm);
 
 	return 0;
 }
@@ -81,14 +81,12 @@ static int at32_rtc_readtime(struct device *dev, struct rtc_time *tm)
 static int at32_rtc_settime(struct device *dev, struct rtc_time *tm)
 {
 	struct rtc_at32ap700x *rtc = dev_get_drvdata(dev);
-	unsigned long now;
-	int ret;
+	unsigned long long now;
 
-	ret = rtc_tm_to_time(tm, &now);
-	if (ret == 0)
-		rtc_writel(rtc, VAL, now);
+	now = rtc_tm_to_time64(tm);
+	rtc_writel(rtc, VAL, now);
 
-	return ret;
+	return 0;
 }
 
 static int at32_rtc_readalarm(struct device *dev, struct rtc_wkalrm *alrm)
@@ -96,7 +94,7 @@ static int at32_rtc_readalarm(struct device *dev, struct rtc_wkalrm *alrm)
 	struct rtc_at32ap700x *rtc = dev_get_drvdata(dev);
 
 	spin_lock_irq(&rtc->lock);
-	rtc_time_to_tm(rtc->alarm_time, &alrm->time);
+	rtc_time64_to_tm(rtc->alarm_time, &alrm->time);
 	alrm->enabled = rtc_readl(rtc, IMR) & RTC_BIT(IMR_TOPI) ? 1 : 0;
 	alrm->pending = rtc_readl(rtc, ISR) & RTC_BIT(ISR_TOPI) ? 1 : 0;
 	spin_unlock_irq(&rtc->lock);
@@ -107,15 +105,12 @@ static int at32_rtc_readalarm(struct device *dev, struct rtc_wkalrm *alrm)
 static int at32_rtc_setalarm(struct device *dev, struct rtc_wkalrm *alrm)
 {
 	struct rtc_at32ap700x *rtc = dev_get_drvdata(dev);
-	unsigned long rtc_unix_time;
-	unsigned long alarm_unix_time;
-	int ret;
+	unsigned long long rtc_unix_time;
+	unsigned long long alarm_unix_time;
 
 	rtc_unix_time = rtc_readl(rtc, VAL);
 
-	ret = rtc_tm_to_time(&alrm->time, &alarm_unix_time);
-	if (ret)
-		return ret;
+	alarm_unix_time = rtc_tm_to_time64(&alrm->time);
 
 	if (alarm_unix_time < rtc_unix_time)
 		return -EINVAL;
@@ -131,7 +126,7 @@ static int at32_rtc_setalarm(struct device *dev, struct rtc_wkalrm *alrm)
 				& ~RTC_BIT(CTRL_TOPEN));
 	spin_unlock_irq(&rtc->lock);
 
-	return ret;
+	return 0;
 }
 
 static int at32_rtc_alarm_irq_enable(struct device *dev, unsigned int enabled)
