@@ -154,6 +154,7 @@ enum qlink_cmd_type {
 	QLINK_CMD_UPDOWN_INTF		= 0x0018,
 	QLINK_CMD_REG_NOTIFY		= 0x0019,
 	QLINK_CMD_CHANS_INFO_GET	= 0x001A,
+	QLINK_CMD_CHAN_SWITCH		= 0x001B,
 	QLINK_CMD_CONFIG_AP		= 0x0020,
 	QLINK_CMD_START_AP		= 0x0021,
 	QLINK_CMD_STOP_AP		= 0x0022,
@@ -486,6 +487,22 @@ struct qlink_cmd_reg_notify {
 	u8 alpha2[2];
 	u8 initiator;
 	u8 user_reg_hint_type;
+} __packed;
+
+/**
+ * struct qlink_cmd_chan_switch - data for QLINK_CMD_CHAN_SWITCH command
+ *
+ * @channel: channel number according to 802.11 17.3.8.3.2 and Annex J
+ * @radar_required: whether radar detection is required on the new channel
+ * @block_tx: whether transmissions should be blocked while changing
+ * @beacon_count: number of beacons until switch
+ */
+struct qlink_cmd_chan_switch {
+	struct qlink_cmd chdr;
+	__le16 channel;
+	u8 radar_required;
+	u8 block_tx;
+	u8 beacon_count;
 } __packed;
 
 /* QLINK Command Responses messages related definitions
