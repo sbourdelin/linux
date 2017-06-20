@@ -1916,16 +1916,16 @@ static int config_gcm_context(struct aead_request *req)
 	if (req_ctx->plaintext_authenticate_only == false) {
 		__be64 temp64;
 		temp64 = cpu_to_be64(req->assoclen * 8);
-		memcpy (&req_ctx->gcm_len_block.lenA , &temp64, sizeof(temp64));
+		memcpy (&req_ctx->gcm_len_block.lenA, &temp64, sizeof(temp64));
 		temp64 = cpu_to_be64(cryptlen * 8);
-		memcpy (&req_ctx->gcm_len_block.lenC , &temp64, 8);
+		memcpy (&req_ctx->gcm_len_block.lenC, &temp64, 8);
 	}
 	else { //rfc4543=>  all data(AAD,IV,Plain) are considered additional data that is nothing is encrypted.
 		__be64 temp64;
 		temp64 = cpu_to_be64((req->assoclen+GCM_BLOCK_RFC4_IV_SIZE+cryptlen) * 8);
-		memcpy (&req_ctx->gcm_len_block.lenA , &temp64, sizeof(temp64));
+		memcpy (&req_ctx->gcm_len_block.lenA, &temp64, sizeof(temp64));
 		temp64 = 0;
-		memcpy (&req_ctx->gcm_len_block.lenC , &temp64, 8);
+		memcpy (&req_ctx->gcm_len_block.lenC, &temp64, 8);
 	}
 
 	return 0;
