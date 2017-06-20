@@ -90,7 +90,6 @@ enum qlink_iface_type {
  */
 struct qlink_intf_info {
 	__le16 if_type;
-	__le16 flags;
 	u8 mac_addr[ETH_ALEN];
 	u8 rsvd[2];
 } __packed;
@@ -350,6 +349,7 @@ struct qlink_cmd_change_sta {
 	struct qlink_cmd chdr;
 	__le32 sta_flags_mask;
 	__le32 sta_flags_set;
+	__le16 if_type;
 	u8 sta_addr[ETH_ALEN];
 } __packed;
 
@@ -823,7 +823,7 @@ struct qlink_tlv_hdr {
 
 struct qlink_iface_limit {
 	__le16 max_num;
-	__le16 type_mask;
+	__le16 type;
 } __packed;
 
 struct qlink_iface_comb_num {

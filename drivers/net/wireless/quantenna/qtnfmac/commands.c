@@ -995,7 +995,7 @@ static int qtnf_parse_variable_mac_info(struct qtnf_wmac *mac,
 	struct ieee80211_iface_limit *limits = NULL;
 	const struct qlink_iface_limit *limit_record;
 	size_t record_count = 0, rec = 0;
-	u16 tlv_type, tlv_value_len, mask;
+	u16 tlv_type, tlv_value_len;
 	struct qlink_iface_comb_num *comb;
 	size_t tlv_full_len;
 	const struct qlink_tlv_hdr *tlv;
@@ -1048,9 +1048,10 @@ static int qtnf_parse_variable_mac_info(struct qtnf_wmac *mac,
 
 			limit_record = (void *)tlv->val;
 			limits[rec].max = le16_to_cpu(limit_record->max_num);
-			mask = le16_to_cpu(limit_record->type_mask);
-			limits[rec].types = qlink_iface_type_mask_to_nl(mask);
-			/* only AP and STA modes are supported */
+			limits[rec].types = qlink_iface_type_to_nl_mask(
+				le16_to_cpu(limit_record->type));
+
+			/* supported modes: STA, AP */
 			limits[rec].types &= BIT(NL80211_IFTYPE_AP) |
 					     BIT(NL80211_IFTYPE_STATION);
 
@@ -1063,6 +1064,7 @@ static int qtnf_parse_variable_mac_info(struct qtnf_wmac *mac,
 		default:
 			break;
 		}
+
 		tlv_buf_size -= tlv_full_len;
 		tlv = (struct qlink_tlv_hdr *)(tlv->val + tlv_value_len);
 	}
@@ -1808,10 +1810,27 @@ int qtnf_cmd_send_change_sta(struct qtnf_vif *vif, const u8 *mac,
 
 	cmd = (struct qlink_cmd_change_sta *)cmd_skb->data;
 	ether_addr_copy(cmd->sta_addr, mac);
-	cmd->sta_flags_mask = cpu_to_le32(qtnf_encode_sta_flags(
-					  params->sta_flags_mask));
-	cmd->sta_flags_set = cpu_to_le32(qtnf_encode_sta_flags(
-					 params->sta_flags_set));
+
+	switch (vif->wdev.iftype) {
+	case NL80211_IFTYPE_AP:
+		cmd->if_type = cpu_to_le16(QLINK_IFTYPE_AP);
+		cmd->sta_flags_mask = cpu_to_le32(qtnf_encode_sta_flags(
+						  params->sta_flags_mask));
+		cmd->sta_flags_set = cpu_to_le32(qtnf_encode_sta_flags(
+						 params->sta_flags_set));
+		break;
+	case NL80211_IFTYPE_STATION:
+		cmd->if_type = cpu_to_le16(QLINK_IFTYPE_STATION);
+		cmd->sta_flags_mask = cpu_to_le32(qtnf_encode_sta_flags(
+						  params->sta_flags_mask));
+		cmd->sta_flags_set = cpu_to_le32(qtnf_encode_sta_flags(
+						 params->sta_flags_set));
+		break;
+	default:
+		pr_err("unsupported iftype %d\n", vif->wdev.iftype);
+		ret = -EINVAL;
+		goto out;
+	}
 
 	ret = qtnf_cmd_send(vif->mac->bus, cmd_skb, &res_code);
 	if (unlikely(ret))
