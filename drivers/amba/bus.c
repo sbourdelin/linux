@@ -197,6 +197,7 @@ struct bus_type amba_bustype = {
 	.uevent		= amba_uevent,
 	.pm		= &amba_pm,
 };
+EXPORT_SYMBOL_GPL(amba_bustype);
 
 static int __init amba_init(void)
 {
