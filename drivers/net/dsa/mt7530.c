@@ -1019,6 +1019,8 @@ static struct dsa_switch_ops mt7530_switch_ops = {
 	.port_fdb_add		= mt7530_port_fdb_add,
 	.port_fdb_del		= mt7530_port_fdb_del,
 	.port_fdb_dump		= mt7530_port_fdb_dump,
+	.hash_nh_off		= 4,
+	.hash_nh_proto		= 2,
 };
 
 static int
