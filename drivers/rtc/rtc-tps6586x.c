@@ -71,7 +71,7 @@ static int tps6586x_rtc_read_time(struct device *dev, struct rtc_time *tm)
 	struct tps6586x_rtc *rtc = dev_get_drvdata(dev);
 	struct device *tps_dev = to_tps6586x_dev(dev);
 	unsigned long long ticks = 0;
-	unsigned long seconds;
+	unsigned long long seconds;
 	u8 buff[6];
 	int ret;
 	int i;
@@ -89,7 +89,7 @@ static int tps6586x_rtc_read_time(struct device *dev, struct rtc_time *tm)
 
 	seconds = ticks >> 10;
 	seconds += rtc->epoch_start;
-	rtc_time_to_tm(seconds, tm);
+	rtc_time64_to_tm(seconds, tm);
 	return rtc_valid_tm(tm);
 }
 
@@ -98,18 +98,18 @@ static int tps6586x_rtc_set_time(struct device *dev, struct rtc_time *tm)
 	struct tps6586x_rtc *rtc = dev_get_drvdata(dev);
 	struct device *tps_dev = to_tps6586x_dev(dev);
 	unsigned long long ticks;
-	unsigned long seconds;
+	unsigned long long seconds;
 	u8 buff[5];
 	int ret;
 
-	rtc_tm_to_time(tm, &seconds);
+	seconds = rtc_tm_to_time64(tm);
 	if (seconds < rtc->epoch_start) {
 		dev_err(dev, "requested time unsupported\n");
 		return -EINVAL;
 	}
 	seconds -= rtc->epoch_start;
 
-	ticks = (unsigned long long)seconds << 10;
+	ticks = seconds << 10;
 	buff[0] = (ticks >> 32) & 0xff;
 	buff[1] = (ticks >> 24) & 0xff;
 	buff[2] = (ticks >> 16) & 0xff;
@@ -157,16 +157,16 @@ static int tps6586x_rtc_set_alarm(struct device *dev, struct rtc_wkalrm *alrm)
 {
 	struct tps6586x_rtc *rtc = dev_get_drvdata(dev);
 	struct device *tps_dev = to_tps6586x_dev(dev);
-	unsigned long seconds;
-	unsigned long ticks;
-	unsigned long rtc_current_time;
+	unsigned long long seconds;
+	unsigned long long ticks;
+	unsigned long long rtc_current_time;
 	unsigned long long rticks = 0;
 	u8 buff[3];
 	u8 rbuff[6];
 	int ret;
 	int i;
 
-	rtc_tm_to_time(&alrm->time, &seconds);
+	seconds = rtc_tm_to_time64(&alrm->time);
 
 	if (alrm->enabled && (seconds < rtc->epoch_start)) {
 		dev_err(dev, "can't set alarm to requested time\n");
@@ -196,7 +196,7 @@ static int tps6586x_rtc_set_alarm(struct device *dev, struct rtc_wkalrm *alrm)
 	if ((seconds - rtc_current_time) > ALM1_VALID_RANGE_IN_SEC)
 		seconds = rtc_current_time - 1;
 
-	ticks = (unsigned long long)seconds << 10;
+	ticks = seconds << 10;
 	buff[0] = (ticks >> 16) & 0xff;
 	buff[1] = (ticks >> 8) & 0xff;
 	buff[2] = ticks & 0xff;
@@ -212,8 +212,8 @@ static int tps6586x_rtc_read_alarm(struct device *dev, struct rtc_wkalrm *alrm)
 {
 	struct tps6586x_rtc *rtc = dev_get_drvdata(dev);
 	struct device *tps_dev = to_tps6586x_dev(dev);
-	unsigned long ticks;
-	unsigned long seconds;
+	unsigned long long ticks;
+	unsigned long long seconds;
 	u8 buff[3];
 	int ret;
 
@@ -227,7 +227,7 @@ static int tps6586x_rtc_read_alarm(struct device *dev, struct rtc_wkalrm *alrm)
 	seconds = ticks >> 10;
 	seconds += rtc->epoch_start;
 
-	rtc_time_to_tm(seconds, &alrm->time);
+	rtc_time64_to_tm(seconds, &alrm->time);
 	return 0;
 }
 
