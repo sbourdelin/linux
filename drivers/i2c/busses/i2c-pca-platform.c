@@ -197,7 +197,7 @@ static int i2c_pca_pf_probe(struct platform_device *pdev)
 	} else {
 		i2c->adap.timeout = HZ;
 		i2c->algo_data.i2c_clock = 59000;
-		i2c->gpio = -1;
+		i2c->gpio = -ENODEV;
 	}
 
 	i2c->algo_data.data = i2c;
@@ -220,8 +220,7 @@ static int i2c_pca_pf_probe(struct platform_device *pdev)
 		break;
 	}
 
-	/* Use gpio_is_valid() when in mainline */
-	if (i2c->gpio > -1) {
+	if (gpio_is_valid(i2c->gpio)) {
 		ret = gpio_request(i2c->gpio, i2c->adap.name);
 		if (ret == 0) {
 			gpio_direction_output(i2c->gpio, 1);
@@ -255,7 +254,7 @@ e_adapt:
 	if (irq)
 		free_irq(irq, i2c);
 e_reqirq:
-	if (i2c->gpio > -1)
+	if (gpio_is_valid(i2c->gpio))
 		gpio_free(i2c->gpio);
 
 	iounmap(i2c->reg_base);
@@ -277,7 +276,7 @@ static int i2c_pca_pf_remove(struct platform_device *pdev)
 	if (i2c->irq)
 		free_irq(i2c->irq, i2c);
 
-	if (i2c->gpio > -1)
+	if (gpio_is_valid(i2c->gpio))
 		gpio_free(i2c->gpio);
 
 	iounmap(i2c->reg_base);
