@@ -4447,8 +4447,6 @@ static bool show_mem_node_skip(unsigned int flags, int nid, nodemask_t *nodemask
 	return !node_isset(nid, *nodemask);
 }
 
-#define K(x) ((x) << (PAGE_SHIFT-10))
-
 static void show_migration_types(unsigned char type)
 {
 	static const char types[MIGRATE_TYPES] = {
@@ -4552,25 +4550,27 @@ void show_free_areas(unsigned int filter, nodemask_t *nodemask)
 			" all_unreclaimable? %s"
 			"\n",
 			pgdat->node_id,
-			K(node_page_state(pgdat, NR_ACTIVE_ANON)),
-			K(node_page_state(pgdat, NR_INACTIVE_ANON)),
-			K(node_page_state(pgdat, NR_ACTIVE_FILE)),
-			K(node_page_state(pgdat, NR_INACTIVE_FILE)),
-			K(node_page_state(pgdat, NR_UNEVICTABLE)),
-			K(node_page_state(pgdat, NR_ISOLATED_ANON)),
-			K(node_page_state(pgdat, NR_ISOLATED_FILE)),
-			K(node_page_state(pgdat, NR_FILE_MAPPED)),
-			K(node_page_state(pgdat, NR_FILE_DIRTY)),
-			K(node_page_state(pgdat, NR_WRITEBACK)),
-			K(node_page_state(pgdat, NR_SHMEM)),
+			PtoK(node_page_state(pgdat, NR_ACTIVE_ANON)),
+			PtoK(node_page_state(pgdat, NR_INACTIVE_ANON)),
+			PtoK(node_page_state(pgdat, NR_ACTIVE_FILE)),
+			PtoK(node_page_state(pgdat, NR_INACTIVE_FILE)),
+			PtoK(node_page_state(pgdat, NR_UNEVICTABLE)),
+			PtoK(node_page_state(pgdat, NR_ISOLATED_ANON)),
+			PtoK(node_page_state(pgdat, NR_ISOLATED_FILE)),
+			PtoK(node_page_state(pgdat, NR_FILE_MAPPED)),
+			PtoK(node_page_state(pgdat, NR_FILE_DIRTY)),
+			PtoK(node_page_state(pgdat, NR_WRITEBACK)),
+			PtoK(node_page_state(pgdat, NR_SHMEM)),
 #ifdef CONFIG_TRANSPARENT_HUGEPAGE
-			K(node_page_state(pgdat, NR_SHMEM_THPS) * HPAGE_PMD_NR),
-			K(node_page_state(pgdat, NR_SHMEM_PMDMAPPED)
+			PtoK(node_page_state(pgdat, NR_SHMEM_THPS) *
+			     HPAGE_PMD_NR),
+			PtoK(node_page_state(pgdat, NR_SHMEM_PMDMAPPED)
 					* HPAGE_PMD_NR),
-			K(node_page_state(pgdat, NR_ANON_THPS) * HPAGE_PMD_NR),
+			PtoK(node_page_state(pgdat, NR_ANON_THPS) *
+			     HPAGE_PMD_NR),
 #endif
-			K(node_page_state(pgdat, NR_WRITEBACK_TEMP)),
-			K(node_page_state(pgdat, NR_UNSTABLE_NFS)),
+			PtoK(node_page_state(pgdat, NR_WRITEBACK_TEMP)),
+			PtoK(node_page_state(pgdat, NR_UNSTABLE_NFS)),
 			pgdat->kswapd_failures >= MAX_RECLAIM_RETRIES ?
 				"yes" : "no");
 	}
@@ -4611,27 +4611,27 @@ void show_free_areas(unsigned int filter, nodemask_t *nodemask)
 			" free_cma:%lukB"
 			"\n",
 			zone->name,
-			K(zone_page_state(zone, NR_FREE_PAGES)),
-			K(min_wmark_pages(zone)),
-			K(low_wmark_pages(zone)),
-			K(high_wmark_pages(zone)),
-			K(zone_page_state(zone, NR_ZONE_ACTIVE_ANON)),
-			K(zone_page_state(zone, NR_ZONE_INACTIVE_ANON)),
-			K(zone_page_state(zone, NR_ZONE_ACTIVE_FILE)),
-			K(zone_page_state(zone, NR_ZONE_INACTIVE_FILE)),
-			K(zone_page_state(zone, NR_ZONE_UNEVICTABLE)),
-			K(zone_page_state(zone, NR_ZONE_WRITE_PENDING)),
-			K(zone->present_pages),
-			K(zone->managed_pages),
-			K(zone_page_state(zone, NR_MLOCK)),
-			K(zone_page_state(zone, NR_SLAB_RECLAIMABLE)),
-			K(zone_page_state(zone, NR_SLAB_UNRECLAIMABLE)),
+			PtoK(zone_page_state(zone, NR_FREE_PAGES)),
+			PtoK(min_wmark_pages(zone)),
+			PtoK(low_wmark_pages(zone)),
+			PtoK(high_wmark_pages(zone)),
+			PtoK(zone_page_state(zone, NR_ZONE_ACTIVE_ANON)),
+			PtoK(zone_page_state(zone, NR_ZONE_INACTIVE_ANON)),
+			PtoK(zone_page_state(zone, NR_ZONE_ACTIVE_FILE)),
+			PtoK(zone_page_state(zone, NR_ZONE_INACTIVE_FILE)),
+			PtoK(zone_page_state(zone, NR_ZONE_UNEVICTABLE)),
+			PtoK(zone_page_state(zone, NR_ZONE_WRITE_PENDING)),
+			PtoK(zone->present_pages),
+			PtoK(zone->managed_pages),
+			PtoK(zone_page_state(zone, NR_MLOCK)),
+			PtoK(zone_page_state(zone, NR_SLAB_RECLAIMABLE)),
+			PtoK(zone_page_state(zone, NR_SLAB_UNRECLAIMABLE)),
 			zone_page_state(zone, NR_KERNEL_STACK_KB),
-			K(zone_page_state(zone, NR_PAGETABLE)),
-			K(zone_page_state(zone, NR_BOUNCE)),
-			K(free_pcp),
-			K(this_cpu_read(zone->pageset->pcp.count)),
-			K(zone_page_state(zone, NR_FREE_CMA_PAGES)));
+			PtoK(zone_page_state(zone, NR_PAGETABLE)),
+			PtoK(zone_page_state(zone, NR_BOUNCE)),
+			PtoK(free_pcp),
+			PtoK(this_cpu_read(zone->pageset->pcp.count)),
+			PtoK(zone_page_state(zone, NR_FREE_CMA_PAGES)));
 		printk("lowmem_reserve[]:");
 		for (i = 0; i < MAX_NR_ZONES; i++)
 			printk(KERN_CONT " %ld", zone->lowmem_reserve[i]);
@@ -4665,11 +4665,11 @@ void show_free_areas(unsigned int filter, nodemask_t *nodemask)
 		spin_unlock_irqrestore(&zone->lock, flags);
 		for (order = 0; order < MAX_ORDER; order++) {
 			printk(KERN_CONT "%lu*%lukB ",
-			       nr[order], K(1UL) << order);
+			       nr[order], PtoK(1UL) << order);
 			if (nr[order])
 				show_migration_types(types[order]);
 		}
-		printk(KERN_CONT "= %lukB\n", K(total));
+		printk(KERN_CONT "= %lukB\n", PtoK(total));
 	}
 
 	hugetlb_show_meminfo();

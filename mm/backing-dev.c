@@ -67,7 +67,6 @@ static int bdi_debug_stats_show(struct seq_file *m, void *v)
 	global_dirty_limits(&background_thresh, &dirty_thresh);
 	wb_thresh = wb_calc_thresh(wb, dirty_thresh);
 
-#define K(x) ((x) << (PAGE_SHIFT - 10))
 	seq_printf(m,
 		   "BdiWriteback:       %10lu kB\n"
 		   "BdiReclaimable:     %10lu kB\n"
@@ -83,20 +82,19 @@ static int bdi_debug_stats_show(struct seq_file *m, void *v)
 		   "b_dirty_time:       %10lu\n"
 		   "bdi_list:           %10u\n"
 		   "state:              %10lx\n",
-		   (unsigned long) K(wb_stat(wb, WB_WRITEBACK)),
-		   (unsigned long) K(wb_stat(wb, WB_RECLAIMABLE)),
-		   K(wb_thresh),
-		   K(dirty_thresh),
-		   K(background_thresh),
-		   (unsigned long) K(wb_stat(wb, WB_DIRTIED)),
-		   (unsigned long) K(wb_stat(wb, WB_WRITTEN)),
-		   (unsigned long) K(wb->write_bandwidth),
+		   (unsigned long) PtoK(wb_stat(wb, WB_WRITEBACK)),
+		   (unsigned long) PtoK(wb_stat(wb, WB_RECLAIMABLE)),
+		   PtoK(wb_thresh),
+		   PtoK(dirty_thresh),
+		   PtoK(background_thresh),
+		   (unsigned long) PtoK(wb_stat(wb, WB_DIRTIED)),
+		   (unsigned long) PtoK(wb_stat(wb, WB_WRITTEN)),
+		   (unsigned long) PtoK(wb->write_bandwidth),
 		   nr_dirty,
 		   nr_io,
 		   nr_more_io,
 		   nr_dirty_time,
 		   !list_empty(&bdi->bdi_list), bdi->wb.state);
-#undef K
 
 	return 0;
 }
@@ -155,8 +153,6 @@ static ssize_t read_ahead_kb_store(struct device *dev,
 	return count;
 }
 
-#define K(pages) ((pages) << (PAGE_SHIFT - 10))
-
 #define BDI_SHOW(name, expr)						\
 static ssize_t name##_show(struct device *dev,				\
 			   struct device_attribute *attr, char *page)	\
@@ -167,7 +163,7 @@ static ssize_t name##_show(struct device *dev,				\
 }									\
 static DEVICE_ATTR_RW(name);
 
-BDI_SHOW(read_ahead_kb, K(bdi->ra_pages))
+BDI_SHOW(read_ahead_kb, PtoK(bdi->ra_pages))
 
 static ssize_t min_ratio_store(struct device *dev,
 		struct device_attribute *attr, const char *buf, size_t count)

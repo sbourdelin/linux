@@ -34,8 +34,6 @@
 #include <asm/tlbflush.h>
 #include <asm/homecache.h>
 
-#define K(x) ((x) << (PAGE_SHIFT-10))
-
 /**
  * shatter_huge_page() - ensure a given address is mapped by a small page.
  *

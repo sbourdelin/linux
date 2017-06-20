@@ -50,7 +50,6 @@ static inline ssize_t node_read_cpulist(struct device *dev,
 static DEVICE_ATTR(cpumap,  S_IRUGO, node_read_cpumask, NULL);
 static DEVICE_ATTR(cpulist, S_IRUGO, node_read_cpulist, NULL);
 
-#define K(x) ((x) << (PAGE_SHIFT - 10))
 static ssize_t node_read_meminfo(struct device *dev,
 			struct device_attribute *attr, char *buf)
 {
@@ -72,19 +71,19 @@ static ssize_t node_read_meminfo(struct device *dev,
 		       "Node %d Inactive(file): %8lu kB\n"
 		       "Node %d Unevictable:    %8lu kB\n"
 		       "Node %d Mlocked:        %8lu kB\n",
-		       nid, K(i.totalram),
-		       nid, K(i.freeram),
-		       nid, K(i.totalram - i.freeram),
-		       nid, K(node_page_state(pgdat, NR_ACTIVE_ANON) +
+		       nid, PtoK(i.totalram),
+		       nid, PtoK(i.freeram),
+		       nid, PtoK(i.totalram - i.freeram),
+		       nid, PtoK(node_page_state(pgdat, NR_ACTIVE_ANON) +
 				node_page_state(pgdat, NR_ACTIVE_FILE)),
-		       nid, K(node_page_state(pgdat, NR_INACTIVE_ANON) +
+		       nid, PtoK(node_page_state(pgdat, NR_INACTIVE_ANON) +
 				node_page_state(pgdat, NR_INACTIVE_FILE)),
-		       nid, K(node_page_state(pgdat, NR_ACTIVE_ANON)),
-		       nid, K(node_page_state(pgdat, NR_INACTIVE_ANON)),
-		       nid, K(node_page_state(pgdat, NR_ACTIVE_FILE)),
-		       nid, K(node_page_state(pgdat, NR_INACTIVE_FILE)),
-		       nid, K(node_page_state(pgdat, NR_UNEVICTABLE)),
-		       nid, K(sum_zone_node_page_state(nid, NR_MLOCK)));
+		       nid, PtoK(node_page_state(pgdat, NR_ACTIVE_ANON)),
+		       nid, PtoK(node_page_state(pgdat, NR_INACTIVE_ANON)),
+		       nid, PtoK(node_page_state(pgdat, NR_ACTIVE_FILE)),
+		       nid, PtoK(node_page_state(pgdat, NR_INACTIVE_FILE)),
+		       nid, PtoK(node_page_state(pgdat, NR_UNEVICTABLE)),
+		       nid, PtoK(sum_zone_node_page_state(nid, NR_MLOCK)));
 
 #ifdef CONFIG_HIGHMEM
 	n += sprintf(buf + n,
@@ -92,10 +91,10 @@ static ssize_t node_read_meminfo(struct device *dev,
 		       "Node %d HighFree:       %8lu kB\n"
 		       "Node %d LowTotal:       %8lu kB\n"
 		       "Node %d LowFree:        %8lu kB\n",
-		       nid, K(i.totalhigh),
-		       nid, K(i.freehigh),
-		       nid, K(i.totalram - i.totalhigh),
-		       nid, K(i.freeram - i.freehigh));
+		       nid, PtoK(i.totalhigh),
+		       nid, PtoK(i.freehigh),
+		       nid, PtoK(i.totalram - i.totalhigh),
+		       nid, PtoK(i.freeram - i.freehigh));
 #endif
 	n += sprintf(buf + n,
 		       "Node %d Dirty:          %8lu kB\n"
@@ -118,36 +117,35 @@ static ssize_t node_read_meminfo(struct device *dev,
 		       "Node %d ShmemPmdMapped: %8lu kB\n"
 #endif
 			,
-		       nid, K(node_page_state(pgdat, NR_FILE_DIRTY)),
-		       nid, K(node_page_state(pgdat, NR_WRITEBACK)),
-		       nid, K(node_page_state(pgdat, NR_FILE_PAGES)),
-		       nid, K(node_page_state(pgdat, NR_FILE_MAPPED)),
-		       nid, K(node_page_state(pgdat, NR_ANON_MAPPED)),
-		       nid, K(i.sharedram),
+		       nid, PtoK(node_page_state(pgdat, NR_FILE_DIRTY)),
+		       nid, PtoK(node_page_state(pgdat, NR_WRITEBACK)),
+		       nid, PtoK(node_page_state(pgdat, NR_FILE_PAGES)),
+		       nid, PtoK(node_page_state(pgdat, NR_FILE_MAPPED)),
+		       nid, PtoK(node_page_state(pgdat, NR_ANON_MAPPED)),
+		       nid, PtoK(i.sharedram),
 		       nid, sum_zone_node_page_state(nid, NR_KERNEL_STACK_KB),
-		       nid, K(sum_zone_node_page_state(nid, NR_PAGETABLE)),
-		       nid, K(node_page_state(pgdat, NR_UNSTABLE_NFS)),
-		       nid, K(sum_zone_node_page_state(nid, NR_BOUNCE)),
-		       nid, K(node_page_state(pgdat, NR_WRITEBACK_TEMP)),
-		       nid, K(sum_zone_node_page_state(nid, NR_SLAB_RECLAIMABLE) +
+		       nid, PtoK(sum_zone_node_page_state(nid, NR_PAGETABLE)),
+		       nid, PtoK(node_page_state(pgdat, NR_UNSTABLE_NFS)),
+		       nid, PtoK(sum_zone_node_page_state(nid, NR_BOUNCE)),
+		       nid, PtoK(node_page_state(pgdat, NR_WRITEBACK_TEMP)),
+		       nid, PtoK(sum_zone_node_page_state(nid, NR_SLAB_RECLAIMABLE) +
 				sum_zone_node_page_state(nid, NR_SLAB_UNRECLAIMABLE)),
-		       nid, K(sum_zone_node_page_state(nid, NR_SLAB_RECLAIMABLE)),
+		       nid, PtoK(sum_zone_node_page_state(nid, NR_SLAB_RECLAIMABLE)),
 #ifdef CONFIG_TRANSPARENT_HUGEPAGE
-		       nid, K(sum_zone_node_page_state(nid, NR_SLAB_UNRECLAIMABLE)),
-		       nid, K(node_page_state(pgdat, NR_ANON_THPS) *
+		       nid, PtoK(sum_zone_node_page_state(nid, NR_SLAB_UNRECLAIMABLE)),
+		       nid, PtoK(node_page_state(pgdat, NR_ANON_THPS) *
 				       HPAGE_PMD_NR),
-		       nid, K(node_page_state(pgdat, NR_SHMEM_THPS) *
+		       nid, PtoK(node_page_state(pgdat, NR_SHMEM_THPS) *
 				       HPAGE_PMD_NR),
-		       nid, K(node_page_state(pgdat, NR_SHMEM_PMDMAPPED) *
+		       nid, PtoK(node_page_state(pgdat, NR_SHMEM_PMDMAPPED) *
 				       HPAGE_PMD_NR));
 #else
-		       nid, K(sum_zone_node_page_state(nid, NR_SLAB_UNRECLAIMABLE)));
+		       nid, PtoK(sum_zone_node_page_state(nid, NR_SLAB_UNRECLAIMABLE)));
 #endif
 	n += hugetlb_report_node_meminfo(nid, buf + n);
 	return n;
 }
 
-#undef K
 static DEVICE_ATTR(meminfo, S_IRUGO, node_read_meminfo, NULL);
 
 static ssize_t node_read_numastat(struct device *dev,
