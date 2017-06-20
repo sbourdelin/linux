@@ -112,7 +112,7 @@ static const struct driver_info	prolific_info = {
 /*-------------------------------------------------------------------------*/
 
 /*
- * Proilific's name won't normally be on the cables, and
+ * Prolific's name won't normally be on the cables, and
  * may not be on the device.
  */
 
