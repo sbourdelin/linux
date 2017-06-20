@@ -50,7 +50,7 @@
 #define AA_BUG_FMT(X, fmt, args...)					\
 	WARN((X), "AppArmor WARN %s: (" #X "): " fmt, __func__, ##args)
 #else
-#define AA_BUG_FMT(X, fmt, args...)
+#define AA_BUG_FMT(X, fmt, args...) no_printk("%s" fmt, __func__, ##args)
 #endif
 
 #define AA_ERROR(fmt, args...)						\
