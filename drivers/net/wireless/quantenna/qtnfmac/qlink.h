@@ -390,7 +390,7 @@ enum qlink_sta_connect_flags {
 struct qlink_cmd_connect {
 	struct qlink_cmd chdr;
 	__le32 flags;
-	__le16 freq;
+	__le16 channel;
 	__le16 bg_scan_period;
 	u8 bssid[ETH_ALEN];
 	u8 payload[0];
@@ -673,6 +673,7 @@ enum qlink_event_type {
 	QLINK_EVENT_SCAN_COMPLETE	= 0x0025,
 	QLINK_EVENT_BSS_JOIN		= 0x0026,
 	QLINK_EVENT_BSS_LEAVE		= 0x0027,
+	QLINK_EVENT_FREQ_CHANGE		= 0x0028,
 };
 
 /**
@@ -739,7 +740,17 @@ struct qlink_event_bss_join {
  */
 struct qlink_event_bss_leave {
 	struct qlink_event ehdr;
-	u16 reason;
+	__le16 reason;
+} __packed;
+
+/**
+ * struct qlink_event_freq_change - data for QLINK_EVENT_FREQ_CHANGE event
+ *
+ * @freq: new operating frequency in MHz
+ */
+struct qlink_event_freq_change {
+	struct qlink_event ehdr;
+	__le32 freq;
 } __packed;
 
 enum qlink_rxmgmt_flags {
