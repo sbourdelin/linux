@@ -658,6 +658,7 @@ static int resolve_indirect_refs(struct btrfs_fs_info *fs_info,
 		prelim_ref_insert(fs_info, &preftrees->direct, ref);
 
 		ulist_reinit(parents);
+		cond_resched();
 	}
 out:
 	ulist_free(parents);
@@ -697,6 +698,7 @@ static int add_missing_keys(struct btrfs_fs_info *fs_info,
 			btrfs_node_key_to_cpu(eb, &ref->key_for_search, 0);
 		btrfs_tree_read_unlock(eb);
 		free_extent_buffer(eb);
+		cond_resched();
 	}
 	return 0;
 }
@@ -1236,6 +1238,7 @@ again:
 			}
 			eie = NULL;
 		}
+		cond_resched();
 	}
 
 out:
