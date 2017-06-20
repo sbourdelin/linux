@@ -104,17 +104,15 @@ static int da9052_read_alarm(struct da9052_rtc *rtc, struct rtc_time *rtc_tm)
 static int da9052_set_alarm(struct da9052_rtc *rtc, struct rtc_time *rtc_tm)
 {
 	struct da9052 *da9052 = rtc->da9052;
-	unsigned long alm_time;
+	unsigned long long alm_time;
 	int ret;
 	uint8_t v[3];
 
-	ret = rtc_tm_to_time(rtc_tm, &alm_time);
-	if (ret != 0)
-		return ret;
+	alm_time = rtc_tm_to_time64(rtc_tm);
 
 	if (rtc_tm->tm_sec > 0) {
 		alm_time += 60 - rtc_tm->tm_sec;
-		rtc_time_to_tm(alm_time, rtc_tm);
+		rtc_time64_to_tm(alm_time, rtc_tm);
 	}
 	BUG_ON(rtc_tm->tm_sec); /* it will cause repeated irqs if not zero */
 
