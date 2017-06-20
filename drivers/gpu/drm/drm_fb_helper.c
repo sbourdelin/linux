@@ -229,22 +229,6 @@ int drm_fb_helper_remove_one_connector(struct drm_fb_helper *fb_helper,
 }
 EXPORT_SYMBOL(drm_fb_helper_remove_one_connector);
 
-static void drm_fb_helper_save_lut_atomic(struct drm_crtc *crtc, struct drm_fb_helper *helper)
-{
-	uint16_t *r_base, *g_base, *b_base;
-	int i;
-
-	if (helper->funcs->gamma_get == NULL)
-		return;
-
-	r_base = crtc->gamma_store;
-	g_base = r_base + crtc->gamma_size;
-	b_base = g_base + crtc->gamma_size;
-
-	for (i = 0; i < crtc->gamma_size; i++)
-		helper->funcs->gamma_get(crtc, &r_base[i], &g_base[i], &b_base[i], i);
-}
-
 static void drm_fb_helper_restore_lut_atomic(struct drm_crtc *crtc)
 {
 	uint16_t *r_base, *g_base, *b_base;
@@ -285,7 +269,6 @@ int drm_fb_helper_debug_enter(struct fb_info *info)
 			if (drm_drv_uses_atomic_modeset(mode_set->crtc->dev))
 				continue;
 
-			drm_fb_helper_save_lut_atomic(mode_set->crtc, helper);
 			funcs->mode_set_base_atomic(mode_set->crtc,
 						    mode_set->fb,
 						    mode_set->x,
@@ -1167,50 +1150,6 @@ void drm_fb_helper_set_suspend_unlocked(struct drm_fb_helper *fb_helper,
 }
 EXPORT_SYMBOL(drm_fb_helper_set_suspend_unlocked);
 
-static int setcolreg(struct drm_crtc *crtc, u16 red, u16 green,
-		     u16 blue, u16 regno, struct fb_info *info)
-{
-	struct drm_fb_helper *fb_helper = info->par;
-	struct drm_framebuffer *fb = fb_helper->fb;
-
-	if (info->fix.visual == FB_VISUAL_TRUECOLOR) {
-		u32 *palette;
-		u32 value;
-		/* place color in psuedopalette */
-		if (regno > 16)
-			return -EINVAL;
-		palette = (u32 *)info->pseudo_palette;
-		red >>= (16 - info->var.red.length);
-		green >>= (16 - info->var.green.length);
-		blue >>= (16 - info->var.blue.length);
-		value = (red << info->var.red.offset) |
-			(green << info->var.green.offset) |
-			(blue << info->var.blue.offset);
-		if (info->var.transp.length > 0) {
-			u32 mask = (1 << info->var.transp.length) - 1;
-
-			mask <<= info->var.transp.offset;
-			value |= mask;
-		}
-		palette[regno] = value;
-		return 0;
-	}
-
-	/*
-	 * The driver really shouldn't advertise pseudo/directcolor
-	 * visuals if it can't deal with the palette.
-	 */
-	if (WARN_ON(!fb_helper->funcs->gamma_set ||
-		    !fb_helper->funcs->gamma_get))
-		return -EINVAL;
-
-	WARN_ON(fb->format->cpp[0] != 1);
-
-	fb_helper->funcs->gamma_set(crtc, red, green, blue, regno);
-
-	return 0;
-}
-
 /**
  * drm_fb_helper_setcmap - implementation for &fb_ops.fb_setcmap
  * @cmap: cmap to set
@@ -1220,51 +1159,61 @@ int drm_fb_helper_setcmap(struct fb_cmap *cmap, struct fb_info *info)
 {
 	struct drm_fb_helper *fb_helper = info->par;
 	struct drm_device *dev = fb_helper->dev;
-	const struct drm_crtc_helper_funcs *crtc_funcs;
-	u16 *red, *green, *blue, *transp;
+	struct drm_modeset_acquire_ctx ctx;
 	struct drm_crtc *crtc;
-	int i, j, rc = 0;
-	int start;
+	u16 *r, *g, *b;
+	int i, ret;
 
 	if (oops_in_progress)
 		return -EBUSY;
 
-	drm_modeset_lock_all(dev);
+	if (cmap->start + cmap->len < cmap->start)
+		return -EINVAL;
+
+	drm_modeset_acquire_init(&ctx, 0);
+retry:
+	ret = drm_modeset_lock_all_ctx(dev, &ctx);
+	if (ret)
+		goto out;
 	if (!drm_fb_helper_is_bound(fb_helper)) {
-		drm_modeset_unlock_all(dev);
-		return -EBUSY;
+		ret = -EBUSY;
+		goto out;
 	}
 
 	for (i = 0; i < fb_helper->crtc_count; i++) {
 		crtc = fb_helper->crtc_info[i].mode_set.crtc;
-		crtc_funcs = crtc->helper_private;
-
-		red = cmap->red;
-		green = cmap->green;
-		blue = cmap->blue;
-		transp = cmap->transp;
-		start = cmap->start;
-
-		for (j = 0; j < cmap->len; j++) {
-			u16 hred, hgreen, hblue, htransp = 0xffff;
-
-			hred = *red++;
-			hgreen = *green++;
-			hblue = *blue++;
-
-			if (transp)
-				htransp = *transp++;
-
-			rc = setcolreg(crtc, hred, hgreen, hblue, start++, info);
-			if (rc)
-				goto out;
+		if (!crtc->funcs->gamma_set || !crtc->gamma_size) {
+			ret = -EINVAL;
+			goto out;
 		}
-		if (crtc_funcs->load_lut)
-			crtc_funcs->load_lut(crtc);
+
+		if (cmap->start + cmap->len > crtc->gamma_size) {
+			ret = -EINVAL;
+			goto out;
+		}
+
+		r = crtc->gamma_store;
+		g = r + crtc->gamma_size;
+		b = g + crtc->gamma_size;
+
+		memcpy(r + cmap->start, cmap->red, cmap->len * sizeof(u16));
+		memcpy(g + cmap->start, cmap->green, cmap->len * sizeof(u16));
+		memcpy(b + cmap->start, cmap->blue, cmap->len * sizeof(u16));
+
+		ret = crtc->funcs->gamma_set(crtc, r, g, b,
+					     crtc->gamma_size, &ctx);
+		if (ret)
+			break;
 	}
- out:
-	drm_modeset_unlock_all(dev);
-	return rc;
+out:
+	if (ret == -EDEADLK) {
+		drm_modeset_backoff(&ctx);
+		goto retry;
+	}
+	drm_modeset_drop_locks(&ctx);
+	drm_modeset_acquire_fini(&ctx);
+
+	return ret;
 }
 EXPORT_SYMBOL(drm_fb_helper_setcmap);
 
