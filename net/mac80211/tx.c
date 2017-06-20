@@ -4,6 +4,7 @@
  * Copyright 2006-2007	Jiri Benc <jbenc@suse.cz>
  * Copyright 2007	Johannes Berg <johannes@sipsolutions.net>
  * Copyright 2013-2014  Intel Mobile Communications GmbH
+ * Copyright 2017	Intel Deutschland GmbH
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 as
@@ -1245,24 +1246,28 @@ static struct txq_info *ieee80211_get_txq(struct ieee80211_local *local,
 {
 	struct ieee80211_hdr *hdr = (struct ieee80211_hdr *) skb->data;
 	struct ieee80211_tx_info *info = IEEE80211_SKB_CB(skb);
-	struct ieee80211_txq *txq = NULL;
+	struct ieee80211_txq *txq;
 
 	if ((info->flags & IEEE80211_TX_CTL_SEND_AFTER_DTIM) ||
 	    (info->control.flags & IEEE80211_TX_CTRL_PS_RESPONSE))
 		return NULL;
 
-	if (!ieee80211_is_data(hdr->frame_control))
+	if (!vif) {
 		return NULL;
+	} else if (!sta) {
+		txq = vif->txq;
+	} else if (!ieee80211_is_data(hdr->frame_control)) {
+		if (!sta->uploaded)
+			return NULL;
 
-	if (sta) {
+		txq = sta->sta.txq[IEEE80211_NUM_TIDS];
+	} else {
 		u8 tid = skb->priority & IEEE80211_QOS_CTL_TID_MASK;
 
 		if (!sta->uploaded)
 			return NULL;
 
 		txq = sta->sta.txq[tid];
-	} else if (vif) {
-		txq = vif->txq;
 	}
 
 	if (!txq)
@@ -1410,7 +1415,10 @@ void ieee80211_txq_init(struct ieee80211_sub_if_data *sdata,
 		txqi->txq.sta = &sta->sta;
 		sta->sta.txq[tid] = &txqi->txq;
 		txqi->txq.tid = tid;
-		txqi->txq.ac = ieee80211_ac_from_tid(tid);
+		if (tid == IEEE80211_NUM_TIDS + 1)
+			txqi->txq.ac = IEEE80211_AC_VO;
+		else
+			txqi->txq.ac = ieee80211_ac_from_tid(tid);
 	} else {
 		sdata->vif.txq = &txqi->txq;
 		txqi->txq.tid = 0;

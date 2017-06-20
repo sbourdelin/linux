@@ -1834,7 +1834,7 @@ struct ieee80211_sta {
 	bool support_p2p_ps;
 	u16 max_rc_amsdu_len;
 
-	struct ieee80211_txq *txq[IEEE80211_NUM_TIDS];
+	struct ieee80211_txq *txq[IEEE80211_NUM_TIDS + 1];
 
 	/* must be last */
 	u8 drv_priv[0] __aligned(sizeof(void *));
@@ -1868,7 +1868,8 @@ struct ieee80211_tx_control {
  *
  * @vif: &struct ieee80211_vif pointer from the add_interface callback.
  * @sta: station table entry, %NULL for per-vif queue
- * @tid: the TID for this queue (unused for per-vif queue)
+ * @tid: the TID for this queue (unused for per-vif queue),
+ *	%IEEE80211_NUM_TIDS for non-data (if enabled)
  * @ac: the AC for this queue
  * @drv_priv: driver private area, sized by hw->txq_data_size
  *
@@ -2067,6 +2068,9 @@ struct ieee80211_txq {
  *	The stack will not do fragmentation.
  *	The callback for @set_frag_threshold should be set as well.
  *
+ * @IEEE80211_HW_WANT_NONDATA_TXQ: The driver/hardware wants to have a TXQ
+ *	(&struct ieee80211_txq) for non-data frames
+ *
  * @NUM_IEEE80211_HW_FLAGS: number of hardware flags, used for sizing arrays
  */
 enum ieee80211_hw_flags {
@@ -2109,6 +2113,7 @@ enum ieee80211_hw_flags {
 	IEEE80211_HW_TX_FRAG_LIST,
 	IEEE80211_HW_REPORTS_LOW_ACK,
 	IEEE80211_HW_SUPPORTS_TX_FRAG,
+	IEEE80211_HW_WANT_NONDATA_TXQ,
 
 	/* keep last, obviously */
 	NUM_IEEE80211_HW_FLAGS

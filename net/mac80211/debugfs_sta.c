@@ -156,7 +156,9 @@ static ssize_t sta_aqm_read(struct file *file, char __user *userbuf,
 		       bufsz+buf-p,
 		       "tid ac backlog-bytes backlog-packets new-flows drops marks overlimit collisions tx-bytes tx-packets\n");
 
-	for (i = 0; i < IEEE80211_NUM_TIDS; i++) {
+	for (i = 0; i < ARRAY_SIZE(sta->sta.txq); i++) {
+		if (!sta->sta.txq[i])
+			continue;
 		txqi = to_txq_info(sta->sta.txq[i]);
 		p += scnprintf(p, bufsz+buf-p,
 			       "%d %d %u %u %u %u %u %u %u %u %u\n",

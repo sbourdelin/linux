@@ -111,7 +111,12 @@ static void __cleanup_single_sta(struct sta_info *sta)
 
 	if (sta->sta.txq[0]) {
 		for (i = 0; i < ARRAY_SIZE(sta->sta.txq); i++) {
-			struct txq_info *txqi = to_txq_info(sta->sta.txq[i]);
+			struct txq_info *txqi;
+
+			if (!sta->sta.txq[i])
+				continue;
+
+			txqi = to_txq_info(sta->sta.txq[i]);
 
 			spin_lock_bh(&fq->lock);
 			ieee80211_txq_purge(local, txqi);
@@ -358,15 +363,19 @@ struct sta_info *sta_info_alloc(struct ieee80211_sub_if_data *sdata,
 		ewma_signal_init(&sta->rx_stats_avg.chain_signal[i]);
 
 	if (local->ops->wake_tx_queue) {
+		int num_queues = IEEE80211_NUM_TIDS;
 		void *txq_data;
 		int size = sizeof(struct txq_info) +
 			   ALIGN(hw->txq_data_size, sizeof(void *));
 
-		txq_data = kcalloc(ARRAY_SIZE(sta->sta.txq), size, gfp);
+		if (ieee80211_hw_check(&local->hw, WANT_NONDATA_TXQ))
+			num_queues++;
+
+		txq_data = kcalloc(num_queues, size, gfp);
 		if (!txq_data)
 			goto free;
 
-		for (i = 0; i < ARRAY_SIZE(sta->sta.txq); i++) {
+		for (i = 0; i < num_queues; i++) {
 			struct txq_info *txq = txq_data + i * size;
 
 			ieee80211_txq_init(sdata, sta, txq, i);
