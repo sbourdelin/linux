@@ -362,4 +362,10 @@ extern const struct bpf_func_proto bpf_get_stackid_proto;
 void bpf_user_rnd_init_once(void);
 u64 bpf_user_rnd_u32(u64 r1, u64 r2, u64 r3, u64 r4, u64 r5);
 
+/* sock_ops related */
+struct bpf_sock_ops_kern;
+
+int bpf_sock_ops_attach_global_prog(int fd);
+int bpf_sock_ops_detach_global_prog(void);
+int bpf_sock_ops_call(struct bpf_sock_ops_kern *bpf_sock);
 #endif /* _LINUX_BPF_H */

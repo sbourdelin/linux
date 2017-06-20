@@ -1041,22 +1041,16 @@ static int bpf_obj_get(const union bpf_attr *attr)
 	return bpf_obj_get_user(u64_to_user_ptr(attr->pathname));
 }
 
-#ifdef CONFIG_CGROUP_BPF
-
 #define BPF_PROG_ATTACH_LAST_FIELD attach_flags
 
-static int bpf_prog_attach(const union bpf_attr *attr)
+#ifdef CONFIG_CGROUP_BPF
+
+static int bpf_prog_attach_cgroup(const union bpf_attr *attr)
 {
 	enum bpf_prog_type ptype;
 	struct bpf_prog *prog;
 	struct cgroup *cgrp;
 	int ret;
-
-	if (!capable(CAP_NET_ADMIN))
-		return -EPERM;
-
-	if (CHECK_ATTR(BPF_PROG_ATTACH))
-		return -EINVAL;
 
 	if (attr->attach_flags & ~BPF_F_ALLOW_OVERRIDE)
 		return -EINVAL;
@@ -1092,9 +1086,32 @@ static int bpf_prog_attach(const union bpf_attr *attr)
 	return ret;
 }
 
+#else
+static int bpf_prog_attach_cgroup(const union bpf_attr *attr)
+{
+	return -EINVAL;
+}
+#endif
+
+static int bpf_prog_attach(const union bpf_attr *attr)
+{
+	if (!capable(CAP_NET_ADMIN))
+		return -EPERM;
+
+	if (CHECK_ATTR(BPF_PROG_ATTACH))
+		return -EINVAL;
+
+	if (attr->attach_type == BPF_GLOBAL_SOCK_OPS)
+		return bpf_sock_ops_attach_global_prog(attr->attach_bpf_fd);
+	else
+		return bpf_prog_attach_cgroup(attr);
+}
+
 #define BPF_PROG_DETACH_LAST_FIELD attach_type
 
-static int bpf_prog_detach(const union bpf_attr *attr)
+#ifdef CONFIG_CGROUP_BPF
+
+static int bpf_prog_detach_cgroup(const union bpf_attr *attr)
 {
 	struct cgroup *cgrp;
 	int ret;
@@ -1116,14 +1133,33 @@ static int bpf_prog_detach(const union bpf_attr *attr)
 		ret = cgroup_bpf_update(cgrp, NULL, attr->attach_type, false);
 		cgroup_put(cgrp);
 		break;
-
 	default:
 		return -EINVAL;
 	}
 
 	return ret;
 }
-#endif /* CONFIG_CGROUP_BPF */
+
+#else
+static int bpf_prog_detach_cgroup(const union bpf_attr *attr)
+{
+	return -EINVAL;
+}
+#endif
+
+static int bpf_prog_detach(const union bpf_attr *attr)
+{
+	if (!capable(CAP_NET_ADMIN))
+		return -EPERM;
+
+	if (CHECK_ATTR(BPF_PROG_DETACH))
+		return -EINVAL;
+
+	if (attr->attach_type == BPF_GLOBAL_SOCK_OPS)
+		return bpf_sock_ops_detach_global_prog();
+	else
+		return bpf_prog_detach_cgroup(attr);
+}
 
 #define BPF_PROG_TEST_RUN_LAST_FIELD test.duration
 
@@ -1431,14 +1467,12 @@ SYSCALL_DEFINE3(bpf, int, cmd, union bpf_attr __user *, uattr, unsigned int, siz
 	case BPF_OBJ_GET:
 		err = bpf_obj_get(&attr);
 		break;
-#ifdef CONFIG_CGROUP_BPF
 	case BPF_PROG_ATTACH:
 		err = bpf_prog_attach(&attr);
 		break;
 	case BPF_PROG_DETACH:
 		err = bpf_prog_detach(&attr);
 		break;
-#endif
 	case BPF_PROG_TEST_RUN:
 		err = bpf_prog_test_run(&attr, uattr);
 		break;
