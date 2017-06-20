@@ -22,6 +22,7 @@
 #include <linux/of_fdt.h>
 
 #include <asm/bootinfo.h>
+#include <asm/mips_machine.h>
 #include <asm/prom.h>
 
 #include <asm/mach-jz4740/base.h>
@@ -53,16 +54,34 @@ static void __init jz4740_detect_mem(void)
 	add_memory_region(0, size, BOOT_MEM_RAM);
 }
 
+static unsigned long __init get_board_mach_type(const void *fdt)
+{
+	const struct mips_machine *mach;
+
+	for (mach = (struct mips_machine *)&__mips_machines_start;
+			mach < (struct mips_machine *)&__mips_machines_end;
+			mach++) {
+		if (!fdt_node_check_compatible(fdt, 0, mach->mach_id))
+			return mach->mach_type;
+	}
+
+	return MACH_INGENIC_JZ4740;
+}
+
 void __init plat_mem_setup(void)
 {
 	int offset;
 
+	if (!early_init_dt_scan(__dtb_start))
+		return;
+
 	jz4740_reset_init();
-	__dt_setup_arch(__dtb_start);
 
 	offset = fdt_path_offset(__dtb_start, "/memory");
 	if (offset < 0)
 		jz4740_detect_mem();
+
+	mips_machtype = get_board_mach_type(__dtb_start);
 }
 
 void __init device_tree_init(void)
@@ -75,13 +94,18 @@ void __init device_tree_init(void)
 
 const char *get_system_type(void)
 {
-	if (IS_ENABLED(CONFIG_MACH_JZ4780))
-		return "JZ4780";
-
-	return "JZ4740";
+	return mips_get_machine_name();
 }
 
 void __init arch_init_irq(void)
 {
 	irqchip_init();
 }
+
+static int __init jz4740_machine_setup(void)
+{
+	mips_machine_setup();
+
+	return 0;
+}
+arch_initcall(jz4740_machine_setup);
