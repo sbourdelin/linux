@@ -1277,8 +1277,14 @@ static int imx_startup(struct uart_port *port)
 
 	writel(temp & ~UCR4_DREN, sport->port.membase + UCR4);
 
-	/* Can we enable the DMA support? */
-	if (!uart_console(port) && !sport->dma_is_inited)
+	/*
+	 * Can we enable the DMA support?
+	 * RS-485 DMA is broken on i.MX6D/Q SMP systems. Do not use DMA on
+	 * UARTs with RTS/CTS to prevent misbehavior until the bug is fixed.
+	 */
+	if (!uart_console(port) && !sport->dma_is_inited &&
+	    !(sport->have_rtscts && is_imx6q_uart(sport) &&
+	      IS_ENABLED(CONFIG_SMP)))
 		imx_uart_dma_init(sport);
 
 	spin_lock_irqsave(&sport->port.lock, flags);
