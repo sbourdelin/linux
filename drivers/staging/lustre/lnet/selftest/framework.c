@@ -869,7 +869,7 @@ sfw_test_rpc_done(struct srpc_client_rpc *rpc)
 {
 	struct sfw_test_unit *tsu = rpc->crpc_priv;
 	struct sfw_test_instance *tsi = tsu->tsu_instance;
-	int done = 0;
+	bool done = false;
 
 	tsi->tsi_ops->tso_done_rpc(tsu, rpc);
 
@@ -883,7 +883,7 @@ sfw_test_rpc_done(struct srpc_client_rpc *rpc)
 	/* batch is stopping or loop is done or get error */
 	if (tsi->tsi_stopping || !tsu->tsu_loop ||
 	    (rpc->crpc_status && tsi->tsi_stoptsu_onerr))
-		done = 1;
+		done = true;
 
 	/* dec ref for poster */
 	srpc_client_rpc_decref(rpc);
