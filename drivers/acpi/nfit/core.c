@@ -1624,6 +1624,7 @@ static void acpi_nfit_init_dsms(struct acpi_nfit_desc *acpi_desc)
 	struct nvdimm_bus_descriptor *nd_desc = &acpi_desc->nd_desc;
 	const u8 *uuid = to_nfit_uuid(NFIT_DEV_BUS);
 	struct acpi_device *adev;
+	unsigned long dsm_mask;
 	int i;
 
 	nd_desc->cmd_mask = acpi_desc->bus_cmd_force_en;
@@ -1635,7 +1636,11 @@ static void acpi_nfit_init_dsms(struct acpi_nfit_desc *acpi_desc)
 		if (acpi_check_dsm(adev->handle, uuid, 1, 1ULL << i))
 			set_bit(i, &nd_desc->cmd_mask);
 	set_bit(ND_CMD_CALL, &nd_desc->cmd_mask);
-	for (i = 0; i < ND_CMD_CALL; i++)
+
+	dsm_mask = 0x3bf;
+	if (override_dsm_mask)
+		dsm_mask = override_dsm_mask;
+	for_each_set_bit(i, &dsm_mask, BITS_PER_LONG)
 		if (acpi_check_dsm(adev->handle, uuid, 1, 1ULL << i))
 			set_bit(i, &nd_desc->bus_dsm_mask);
 }
