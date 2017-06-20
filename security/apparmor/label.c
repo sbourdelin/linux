@@ -2051,8 +2051,9 @@ static struct aa_label *__label_update(struct aa_label *label)
 			write_lock_irqsave(&ls->lock, flags);
 			goto remove;
 		}
-	} else
+	} else {
 		AA_BUG(labels_ns(label) != labels_ns(new));
+	}
 
 	tmp = __label_insert(labels_set(label), new, true);
 remove:
