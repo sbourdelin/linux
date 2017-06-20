@@ -925,6 +925,10 @@ static int pm_genpd_suspend_noirq(struct device *dev)
 			return ret;
 	}
 
+	ret = pm_generic_suspend_noirq(dev);
+	if (ret)
+		return ret;
+
 	genpd_lock(genpd);
 	genpd->suspended_count++;
 	genpd_sync_power_off(genpd, true, 0);
@@ -957,6 +961,10 @@ static int pm_genpd_resume_noirq(struct device *dev)
 	genpd_sync_power_on(genpd, true, 0);
 	genpd->suspended_count--;
 	genpd_unlock(genpd);
+
+	ret = pm_generic_resume_noirq(dev);
+	if (ret)
+		return ret;
 
 	if (genpd->dev_ops.stop && genpd->dev_ops.start)
 		ret = pm_runtime_force_resume(dev);
