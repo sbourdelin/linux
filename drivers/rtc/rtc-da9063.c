@@ -227,8 +227,8 @@ static int da9063_rtc_read_time(struct device *dev, struct rtc_time *tm)
 {
 	struct da9063_compatible_rtc *rtc = dev_get_drvdata(dev);
 	const struct da9063_compatible_rtc_regmap *config = rtc->config;
-	unsigned long tm_secs;
-	unsigned long al_secs;
+	unsigned long long tm_secs;
+	unsigned long long al_secs;
 	u8 data[RTC_DATA_LEN];
 	int ret;
 
@@ -247,8 +247,8 @@ static int da9063_rtc_read_time(struct device *dev, struct rtc_time *tm)
 
 	da9063_data_to_tm(data, tm, rtc);
 
-	rtc_tm_to_time(tm, &tm_secs);
-	rtc_tm_to_time(&rtc->alarm_time, &al_secs);
+	tm_secs = rtc_tm_to_time64(tm);
+	al_secs = rtc_tm_to_time64(&rtc->alarm_time);
 
 	/* handle the rtc synchronisation delay */
 	if (rtc->rtc_sync == true && al_secs - tm_secs == 1)
