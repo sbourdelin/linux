@@ -30,7 +30,7 @@ static struct i2c_driver ds1672_driver;
  */
 static int ds1672_get_datetime(struct i2c_client *client, struct rtc_time *tm)
 {
-	unsigned long time;
+	unsigned long long time;
 	unsigned char addr = DS1672_REG_CNT_BASE;
 	unsigned char buf[4];
 
@@ -60,7 +60,7 @@ static int ds1672_get_datetime(struct i2c_client *client, struct rtc_time *tm)
 
 	time = (buf[3] << 24) | (buf[2] << 16) | (buf[1] << 8) | buf[0];
 
-	rtc_time_to_tm(time, tm);
+	rtc_time64_to_tm(time, tm);
 
 	dev_dbg(&client->dev, "%s: tm is secs=%d, mins=%d, hours=%d, "
 		"mday=%d, mon=%d, year=%d, wday=%d\n",
@@ -96,7 +96,7 @@ static int ds1672_rtc_read_time(struct device *dev, struct rtc_time *tm)
 	return ds1672_get_datetime(to_i2c_client(dev), tm);
 }
 
-static int ds1672_rtc_set_mmss(struct device *dev, unsigned long secs)
+static int ds1672_rtc_set_mmss64(struct device *dev, time64_t secs)
 {
 	return ds1672_set_mmss(to_i2c_client(dev), secs);
 }
@@ -148,7 +148,7 @@ static DEVICE_ATTR(control, S_IRUGO, show_control, NULL);
 
 static const struct rtc_class_ops ds1672_rtc_ops = {
 	.read_time = ds1672_rtc_read_time,
-	.set_mmss = ds1672_rtc_set_mmss,
+	.set_mmss64 = ds1672_rtc_set_mmss64,
 };
 
 static int ds1672_probe(struct i2c_client *client,
