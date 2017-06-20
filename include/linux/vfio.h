@@ -92,6 +92,9 @@ extern int vfio_register_iommu_driver(const struct vfio_iommu_driver_ops *ops);
 extern void vfio_unregister_iommu_driver(
 				const struct vfio_iommu_driver_ops *ops);
 
+extern int vfio_register_bus_driver(struct device_driver *drv);
+extern void vfio_unregister_bus_driver(struct device_driver *drv);
+
 /*
  * External user API
  */

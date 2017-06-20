@@ -43,6 +43,8 @@ static struct vfio {
 	struct class			*class;
 	struct list_head		iommu_drivers_list;
 	struct mutex			iommu_drivers_lock;
+	struct list_head		bus_drivers_list;
+	struct mutex			bus_drivers_lock;
 	struct list_head		group_list;
 	struct idr			group_idr;
 	struct mutex			group_lock;
@@ -50,6 +52,11 @@ static struct vfio {
 	dev_t				group_devt;
 	wait_queue_head_t		release_q;
 } vfio;
+
+struct vfio_bus_driver {
+	struct device_driver		*drv;
+	struct list_head		vfio_next;
+};
 
 struct vfio_iommu_driver {
 	const struct vfio_iommu_driver_ops	*ops;
@@ -2243,6 +2250,52 @@ int vfio_unregister_notifier(struct device *dev, enum vfio_notify_type type,
 }
 EXPORT_SYMBOL(vfio_unregister_notifier);
 
+int vfio_register_bus_driver(struct device_driver *drv)
+{
+	struct vfio_bus_driver *driver, *tmp;
+
+	driver = kzalloc(sizeof(*driver), GFP_KERNEL);
+	if (!driver)
+		return -ENOMEM;
+
+	driver->drv = drv;
+
+	mutex_lock(&vfio.bus_drivers_lock);
+
+	/* Check for duplicates */
+	list_for_each_entry(tmp, &vfio.bus_drivers_list, vfio_next) {
+		if (tmp->drv == drv) {
+			mutex_unlock(&vfio.bus_drivers_lock);
+			kfree(driver);
+			return -EINVAL;
+		}
+	}
+
+	list_add(&driver->vfio_next, &vfio.bus_drivers_list);
+
+	mutex_unlock(&vfio.bus_drivers_lock);
+
+	return 0;
+}
+EXPORT_SYMBOL_GPL(vfio_register_bus_driver);
+
+void vfio_unregister_bus_driver(struct device_driver *drv)
+{
+	struct vfio_bus_driver *driver;
+
+	mutex_lock(&vfio.bus_drivers_lock);
+	list_for_each_entry(driver, &vfio.bus_drivers_list, vfio_next) {
+		if (driver->drv == drv) {
+			list_del(&driver->vfio_next);
+			mutex_unlock(&vfio.bus_drivers_lock);
+			kfree(driver);
+			return;
+		}
+	}
+	mutex_unlock(&vfio.bus_drivers_lock);
+}
+EXPORT_SYMBOL_GPL(vfio_unregister_bus_driver);
+
 /**
  * Module/class support
  */
@@ -2266,8 +2319,10 @@ static int __init vfio_init(void)
 	idr_init(&vfio.group_idr);
 	mutex_init(&vfio.group_lock);
 	mutex_init(&vfio.iommu_drivers_lock);
+	mutex_init(&vfio.bus_drivers_lock);
 	INIT_LIST_HEAD(&vfio.group_list);
 	INIT_LIST_HEAD(&vfio.iommu_drivers_list);
+	INIT_LIST_HEAD(&vfio.bus_drivers_list);
 	init_waitqueue_head(&vfio.release_q);
 
 	ret = misc_register(&vfio_dev);
