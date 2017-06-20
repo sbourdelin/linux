@@ -36,6 +36,7 @@ hostprogs-y += lwt_len_hist
 hostprogs-y += xdp_tx_iptunnel
 hostprogs-y += test_map_in_map
 hostprogs-y += per_socket_stats_example
+hostprogs-y += tcp_bpf
 
 # Libbpf dependencies
 LIBBPF := ../../tools/lib/bpf/bpf.o
@@ -52,6 +53,7 @@ tracex3-objs := bpf_load.o $(LIBBPF) tracex3_user.o
 tracex4-objs := bpf_load.o $(LIBBPF) tracex4_user.o
 tracex5-objs := bpf_load.o $(LIBBPF) tracex5_user.o
 tracex6-objs := bpf_load.o $(LIBBPF) tracex6_user.o
+tcp_bpf-objs := bpf_load.o $(LIBBPF) tcp_bpf.o
 test_probe_write_user-objs := bpf_load.o $(LIBBPF) test_probe_write_user_user.o
 trace_output-objs := bpf_load.o $(LIBBPF) trace_output_user.o
 lathist-objs := bpf_load.o $(LIBBPF) lathist_user.o
@@ -130,6 +132,7 @@ HOSTLOADLIBES_tracex4 += -lelf -lrt
 HOSTLOADLIBES_tracex5 += -lelf
 HOSTLOADLIBES_tracex6 += -lelf
 HOSTLOADLIBES_test_cgrp2_sock2 += -lelf
+HOSTLOADLIBES_tcp_bpf += -lelf
 HOSTLOADLIBES_test_probe_write_user += -lelf
 HOSTLOADLIBES_trace_output += -lelf -lrt
 HOSTLOADLIBES_lathist += -lelf
