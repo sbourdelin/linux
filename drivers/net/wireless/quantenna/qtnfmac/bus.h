@@ -52,6 +52,7 @@ struct qtnf_bus {
 	enum qtnf_fw_state fw_state;
 	u32 chip;
 	u32 chiprev;
+	u8 dyn_vlan_tagged;
 	const struct qtnf_bus_ops *bus_ops;
 	struct qtnf_wmac *mac[QTNF_MAX_MAC];
 	struct qtnf_qlink_transport trans;

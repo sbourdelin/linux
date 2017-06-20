@@ -719,6 +719,10 @@ static int qtnf_cmd_send_add_change_intf(struct qtnf_vif *vif,
 	case NL80211_IFTYPE_STATION:
 		cmd->intf_info.if_type = cpu_to_le16(QLINK_IFTYPE_STATION);
 		break;
+	case NL80211_IFTYPE_AP_VLAN:
+		cmd->intf_info.if_type = cpu_to_le16(QLINK_IFTYPE_AP_VLAN);
+		cmd->intf_info.vlanid = cpu_to_le16(vif->u.vlan.vlanid);
+		break;
 	default:
 		pr_err("VIF%u.%u: unsupported type %d\n", vif->mac->macid,
 		       vif->vifid, iftype);
@@ -745,7 +749,15 @@ static int qtnf_cmd_send_add_change_intf(struct qtnf_vif *vif,
 	}
 
 	resp = (const struct qlink_resp_manage_intf *)resp_skb->data;
-	ether_addr_copy(vif->mac_addr, resp->intf_info.mac_addr);
+
+	switch (iftype) {
+	case NL80211_IFTYPE_AP:
+	case NL80211_IFTYPE_STATION:
+		ether_addr_copy(vif->mac_addr, resp->intf_info.mac_addr);
+		break;
+	default:
+		break;
+	}
 
 out:
 	qtnf_bus_unlock(vif->mac->bus);
@@ -791,6 +803,10 @@ int qtnf_cmd_send_del_intf(struct qtnf_vif *vif)
 		break;
 	case NL80211_IFTYPE_STATION:
 		cmd->intf_info.if_type = cpu_to_le16(QLINK_IFTYPE_STATION);
+		break;
+	case NL80211_IFTYPE_AP_VLAN:
+		cmd->intf_info.if_type = cpu_to_le16(QLINK_IFTYPE_AP_VLAN);
+		cmd->intf_info.vlanid = cpu_to_le16(vif->u.vlan.vlanid);
 		break;
 	default:
 		pr_warn("VIF%u.%u: unsupported iftype %d\n", vif->mac->macid,
@@ -1051,8 +1067,9 @@ static int qtnf_parse_variable_mac_info(struct qtnf_wmac *mac,
 			limits[rec].types = qlink_iface_type_to_nl_mask(
 				le16_to_cpu(limit_record->type));
 
-			/* supported modes: STA, AP */
+			/* supported modes: STA, AP, AP_VLAN */
 			limits[rec].types &= BIT(NL80211_IFTYPE_AP) |
+					     BIT(NL80211_IFTYPE_AP_VLAN) |
 					     BIT(NL80211_IFTYPE_STATION);
 
 			pr_debug("MAC%u: MAX: %u; TYPES: %.4X\n", mac->macid,
@@ -1645,6 +1662,9 @@ int qtnf_cmd_send_add_key(struct qtnf_vif *vif, u8 key_index, bool pairwise,
 					 params->seq,
 					 params->seq_len);
 
+	if (vif->wdev.iftype == NL80211_IFTYPE_AP_VLAN)
+		cmd->vlanid = cpu_to_le16(vif->u.vlan.vlanid);
+
 	ret = qtnf_cmd_send(vif->mac->bus, cmd_skb, &res_code);
 	if (unlikely(ret))
 		goto out;
@@ -1825,6 +1845,10 @@ int qtnf_cmd_send_change_sta(struct qtnf_vif *vif, const u8 *mac,
 						  params->sta_flags_mask));
 		cmd->sta_flags_set = cpu_to_le32(qtnf_encode_sta_flags(
 						 params->sta_flags_set));
+		break;
+	case NL80211_IFTYPE_AP_VLAN:
+		cmd->if_type = cpu_to_le16(QLINK_IFTYPE_AP_VLAN);
+		cmd->vlanid = cpu_to_le16(vif->u.vlan.vlanid);
 		break;
 	default:
 		pr_err("unsupported iftype %d\n", vif->wdev.iftype);

@@ -16,16 +16,7 @@
 
 #include "util.h"
 
-void qtnf_sta_list_init(struct qtnf_sta_list *list)
-{
-	if (unlikely(!list))
-		return;
-
-	INIT_LIST_HEAD(&list->head);
-	atomic_set(&list->size, 0);
-}
-
-struct qtnf_sta_node *qtnf_sta_list_lookup(struct qtnf_sta_list *list,
+struct qtnf_sta_node *qtnf_sta_list_lookup(struct qtnf_list *list,
 					   const u8 *mac)
 {
 	struct qtnf_sta_node *node;
@@ -41,12 +32,12 @@ struct qtnf_sta_node *qtnf_sta_list_lookup(struct qtnf_sta_list *list,
 	return NULL;
 }
 
-struct qtnf_sta_node *qtnf_sta_list_lookup_index(struct qtnf_sta_list *list,
+struct qtnf_sta_node *qtnf_sta_list_lookup_index(struct qtnf_list *list,
 						 size_t index)
 {
 	struct qtnf_sta_node *node;
 
-	if (qtnf_sta_list_size(list) <= index)
+	if (qtnf_list_size(list) <= index)
 		return NULL;
 
 	list_for_each_entry(node, &list->head, list) {
@@ -57,8 +48,7 @@ struct qtnf_sta_node *qtnf_sta_list_lookup_index(struct qtnf_sta_list *list,
 	return NULL;
 }
 
-struct qtnf_sta_node *qtnf_sta_list_add(struct qtnf_sta_list *list,
-					const u8 *mac)
+struct qtnf_sta_node *qtnf_sta_list_add(struct qtnf_list *list, const u8 *mac)
 {
 	struct qtnf_sta_node *node;
 
@@ -82,10 +72,10 @@ done:
 	return node;
 }
 
-bool qtnf_sta_list_del(struct qtnf_sta_list *list, const u8 *mac)
+int qtnf_sta_list_del(struct qtnf_list *list, const u8 *mac)
 {
 	struct qtnf_sta_node *node;
-	bool ret = false;
+	int ret = 0;
 
 	node = qtnf_sta_list_lookup(list, mac);
 
@@ -93,13 +83,13 @@ bool qtnf_sta_list_del(struct qtnf_sta_list *list, const u8 *mac)
 		list_del(&node->list);
 		atomic_dec(&list->size);
 		kfree(node);
-		ret = true;
+		ret = 1;
 	}
 
 	return ret;
 }
 
-void qtnf_sta_list_free(struct qtnf_sta_list *list)
+void qtnf_sta_list_free(struct qtnf_list *list)
 {
 	struct qtnf_sta_node *node, *tmp;
 
@@ -111,4 +101,52 @@ void qtnf_sta_list_free(struct qtnf_sta_list *list)
 	}
 
 	INIT_LIST_HEAD(&list->head);
+}
+
+struct qtnf_vif *qtnf_vlan_list_lookup(struct qtnf_list *list, const u16 vlanid)
+{
+	struct qtnf_vif *node;
+
+	list_for_each_entry(node, &list->head, u.vlan.list) {
+		if (node->u.vlan.vlanid ==  vlanid)
+			return node;
+	}
+
+	return NULL;
+}
+
+struct qtnf_vif *qtnf_vlan_list_add(struct qtnf_list *list, const u16 vlanid)
+{
+	struct qtnf_vif *node;
+
+	/* don't use existing vlan vif */
+	node = qtnf_vlan_list_lookup(list, vlanid);
+	if (node)
+		return NULL;
+
+	node = kzalloc(sizeof(*node), GFP_KERNEL);
+	if (unlikely(!node))
+		return NULL;
+
+	list_add_tail(&node->u.vlan.list, &list->head);
+	atomic_inc(&list->size);
+
+	return node;
+}
+
+int qtnf_vlan_list_del(struct qtnf_list *list, const u16 vlanid)
+{
+	struct qtnf_vif *node;
+	int ret = 0;
+
+	node = qtnf_vlan_list_lookup(list, vlanid);
+
+	if (node) {
+		list_del(&node->u.vlan.list);
+		atomic_dec(&list->size);
+		kfree(node);
+		ret = 1;
+	}
+
+	return ret;
 }

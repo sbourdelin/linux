@@ -16,6 +16,7 @@
 
 #include <linux/kernel.h>
 #include <linux/module.h>
+#include <linux/if_vlan.h>
 #include <linux/if_ether.h>
 
 #include "core.h"
@@ -59,6 +60,18 @@ struct qtnf_wmac *qtnf_core_get_mac(const struct qtnf_bus *bus, u8 macid)
  */
 static int qtnf_netdev_open(struct net_device *ndev)
 {
+	struct qtnf_vif *vif = qtnf_netdev_get_priv(ndev);
+
+	if (unlikely(!vif || !vif->mac || !vif->mac->bus)) {
+		pr_warn("invalid network device\n");
+		return -ENODEV;
+	}
+
+	if (vif->wdev.iftype == NL80211_IFTYPE_AP_VLAN) {
+		netif_carrier_on(ndev);
+		return 0;
+	}
+
 	netif_carrier_off(ndev);
 	qtnf_netdev_updown(ndev, 1);
 	return 0;
@@ -68,8 +81,14 @@ static int qtnf_netdev_open(struct net_device *ndev)
  */
 static int qtnf_netdev_close(struct net_device *ndev)
 {
+	struct qtnf_vif *vif = qtnf_netdev_get_priv(ndev);
+
 	netif_carrier_off(ndev);
-	qtnf_virtual_intf_cleanup(ndev);
+
+	if (vif->wdev.iftype == NL80211_IFTYPE_AP_VLAN)
+		return 0;
+
+	qtnf_virtual_intf_cleanup(vif);
 	qtnf_netdev_updown(ndev, 0);
 	return 0;
 }
@@ -111,6 +130,19 @@ qtnf_netdev_hard_start_xmit(struct sk_buff *skb, struct net_device *ndev)
 		return 0;
 	}
 
+	if (vif->wdev.iftype == NL80211_IFTYPE_AP_VLAN) {
+		if (!mac->bus->dyn_vlan_tagged) {
+			skb = vlan_insert_tag(skb, htons(ETH_P_8021Q),
+					      vif->u.vlan.vlanid);
+			if (unlikely(!skb)) {
+				pr_err_ratelimited("failed to insert VLAN %d\n",
+						   vif->u.vlan.vlanid);
+				ndev->stats.tx_dropped++;
+				return 0;
+			}
+		}
+	}
+
 	/* tx path is enabled: reset vif timeout */
 	vif->cons_tx_timeout_cnt = 0;
 
@@ -150,13 +182,29 @@ static void qtnf_netdev_tx_timeout(struct net_device *ndev)
 	}
 }
 
+static int qtnf_netdev_set_mac_address(struct net_device *ndev, void *addr)
+{
+	struct qtnf_vif *vif = qtnf_netdev_get_priv(ndev);
+	struct sockaddr *sa = addr;
+	int ret;
+
+	if (vif->wdev.iftype == NL80211_IFTYPE_AP_VLAN) {
+		ret = eth_mac_addr(ndev, sa);
+		if (ret == 0)
+			ether_addr_copy(vif->mac_addr, sa->sa_data);
+	}
+
+	return 0;
+}
+
 /* Network device ops handlers */
-const struct net_device_ops qtnf_netdev_ops = {
+const struct net_device_ops qtnf_bss_netdev_ops = {
 	.ndo_open = qtnf_netdev_open,
 	.ndo_stop = qtnf_netdev_close,
 	.ndo_start_xmit = qtnf_netdev_hard_start_xmit,
 	.ndo_tx_timeout = qtnf_netdev_tx_timeout,
 	.ndo_get_stats = qtnf_netdev_get_stats,
+	.ndo_set_mac_address = qtnf_netdev_set_mac_address,
 };
 
 static int qtnf_mac_init_single_band(struct wiphy *wiphy,
@@ -180,7 +228,6 @@ static int qtnf_mac_init_single_band(struct wiphy *wiphy,
 
 	qtnf_band_init_rates(wiphy->bands[band]);
 	qtnf_band_setup_htvht_caps(&mac->macinfo, wiphy->bands[band]);
-
 	return 0;
 }
 
@@ -287,7 +334,8 @@ static struct qtnf_wmac *qtnf_core_mac_alloc(struct qtnf_bus *bus,
 		mac->iflist[i].wdev.iftype = NL80211_IFTYPE_UNSPECIFIED;
 		mac->iflist[i].mac = mac;
 		mac->iflist[i].vifid = i;
-		qtnf_sta_list_init(&mac->iflist[i].sta_list);
+		qtnf_list_init(&mac->iflist[i].sta_list);
+		qtnf_list_init(&mac->iflist[i].vlan_list);
 	}
 
 	qtnf_mac_init_primary_intf(mac);
@@ -314,8 +362,8 @@ int qtnf_core_net_attach(struct qtnf_wmac *mac, struct qtnf_vif *vif,
 	}
 
 	vif->netdev = dev;
+	dev->netdev_ops = &qtnf_bss_netdev_ops;
 
-	dev->netdev_ops = &qtnf_netdev_ops;
 	dev->destructor = free_netdev;
 	dev_net_set(dev, wiphy_net(wiphy));
 	dev->ieee80211_ptr = &vif->wdev;
@@ -360,7 +408,7 @@ static void qtnf_core_mac_detach(struct qtnf_bus *bus, unsigned int macid)
 		rtnl_lock();
 		if (vif->netdev &&
 		    vif->wdev.iftype != NL80211_IFTYPE_UNSPECIFIED) {
-			qtnf_virtual_intf_cleanup(vif->netdev);
+			qtnf_virtual_intf_cleanup(vif);
 			qtnf_del_virtual_intf(wiphy, &vif->wdev);
 		}
 		rtnl_unlock();
@@ -567,6 +615,8 @@ struct net_device *qtnf_classify_skb(struct qtnf_bus *bus, struct sk_buff *skb)
 	struct net_device *ndev = NULL;
 	struct qtnf_wmac *mac;
 	struct qtnf_vif *vif;
+	struct qtnf_vif *vlan_vif;
+	u16 vlanid;
 
 	meta = (struct qtnf_frame_meta_info *)
 		(skb_tail_pointer(skb) - sizeof(*meta));
@@ -602,6 +652,22 @@ struct net_device *qtnf_classify_skb(struct qtnf_bus *bus, struct sk_buff *skb)
 	}
 
 	ndev = vif->netdev;
+
+	if (!qtnf_list_empty(&vif->vlan_list)) {
+		if (__vlan_get_tag(skb, &vlanid) == 0) {
+			vlan_vif = qtnf_vlan_list_lookup(
+				&vif->vlan_list, vlanid & VLAN_VID_MASK);
+			if (vlan_vif) {
+				ndev = vlan_vif->netdev;
+				if (!mac->bus->dyn_vlan_tagged) {
+					/* remove tag */
+					memmove(skb->data + VLAN_HLEN,
+						skb->data, ETH_ALEN * 2);
+					skb_pull(skb, VLAN_HLEN);
+				}
+			}
+		}
+	}
 
 	if (unlikely(!ndev)) {
 		pr_err_ratelimited("netdev for wlan%u.%u does not exists\n",

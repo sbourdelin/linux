@@ -19,7 +19,7 @@
 
 #include <linux/ieee80211.h>
 
-#define QLINK_PROTO_VER		4
+#define QLINK_PROTO_VER		5
 
 #define QLINK_MACID_RSVD		0xFF
 #define QLINK_VIFID_RSVD		0xFF
@@ -77,6 +77,7 @@ enum qlink_iface_type {
 	QLINK_IFTYPE_ADHOC	= 3,
 	QLINK_IFTYPE_MONITOR	= 4,
 	QLINK_IFTYPE_WDS	= 5,
+	QLINK_IFTYPE_AP_VLAN	= 6,
 };
 
 /**
@@ -85,11 +86,12 @@ enum qlink_iface_type {
  * Data describing a single virtual interface.
  *
  * @if_type: Mode of interface operation, one of &enum qlink_iface_type
- * @flags: interface flagsmap.
+ * @vlanid: VLAN ID for AP_VLAN interface type
  * @mac_addr: MAC address of virtual interface.
  */
 struct qlink_intf_info {
 	__le16 if_type;
+	__le16 vlanid;
 	u8 mac_addr[ETH_ALEN];
 	u8 rsvd[2];
 } __packed;
@@ -297,6 +299,7 @@ struct qlink_cmd_add_key {
 	u8 pairwise;
 	u8 addr[ETH_ALEN];
 	__le32 cipher;
+	__le16 vlanid;
 	u8 key_data[0];
 } __packed;
 
@@ -343,6 +346,8 @@ struct qlink_cmd_set_def_mgmt_key {
  *
  * @sta_flags_mask: STA flags mask, bitmap of &enum qlink_sta_flags
  * @sta_flags_set: STA flags values, bitmap of &enum qlink_sta_flags
+ * @if_type: Mode of interface operation, one of &enum qlink_iface_type
+ * @vlanid: VLAN ID to assign to specific STA
  * @sta_addr: address of the STA for which parameters are set.
  */
 struct qlink_cmd_change_sta {
@@ -350,6 +355,7 @@ struct qlink_cmd_change_sta {
 	__le32 sta_flags_mask;
 	__le32 sta_flags_set;
 	__le16 if_type;
+	__le16 vlanid;
 	u8 sta_addr[ETH_ALEN];
 } __packed;
 

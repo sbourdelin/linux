@@ -20,26 +20,36 @@
 #include <linux/kernel.h>
 #include "core.h"
 
-void qtnf_sta_list_init(struct qtnf_sta_list *list);
+static inline void qtnf_list_init(struct qtnf_list *list)
+{
+	if (unlikely(!list))
+		return;
 
-struct qtnf_sta_node *qtnf_sta_list_lookup(struct qtnf_sta_list *list,
-					   const u8 *mac);
-struct qtnf_sta_node *qtnf_sta_list_lookup_index(struct qtnf_sta_list *list,
-						 size_t index);
-struct qtnf_sta_node *qtnf_sta_list_add(struct qtnf_sta_list *list,
-					const u8 *mac);
-bool qtnf_sta_list_del(struct qtnf_sta_list *list, const u8 *mac);
+	INIT_LIST_HEAD(&list->head);
+	atomic_set(&list->size, 0);
+}
 
-void qtnf_sta_list_free(struct qtnf_sta_list *list);
-
-static inline size_t qtnf_sta_list_size(const struct qtnf_sta_list *list)
+static inline size_t qtnf_list_size(const struct qtnf_list *list)
 {
 	return atomic_read(&list->size);
 }
 
-static inline bool qtnf_sta_list_empty(const struct qtnf_sta_list *list)
+static inline int qtnf_list_empty(const struct qtnf_list *list)
 {
 	return list_empty(&list->head);
 }
+
+struct qtnf_sta_node *qtnf_sta_list_lookup(struct qtnf_list *list,
+					   const u8 *mac);
+struct qtnf_sta_node *qtnf_sta_list_lookup_index(struct qtnf_list *list,
+						 size_t index);
+struct qtnf_sta_node *qtnf_sta_list_add(struct qtnf_list *list, const u8 *mac);
+int qtnf_sta_list_del(struct qtnf_list *list, const u8 *mac);
+void qtnf_sta_list_free(struct qtnf_list *list);
+
+struct qtnf_vif *qtnf_vlan_list_lookup(struct qtnf_list *list,
+				       const u16 vlanid);
+struct qtnf_vif *qtnf_vlan_list_add(struct qtnf_list *list, const u16 vlanid);
+int qtnf_vlan_list_del(struct qtnf_list *list, const u16 vlanid);
 
 #endif /* QTNFMAC_UTIL_H */

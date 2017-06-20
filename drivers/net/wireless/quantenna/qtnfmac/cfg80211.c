@@ -77,6 +77,35 @@ qtnf_mgmt_stypes[NUM_NL80211_IFTYPES] = {
 	},
 };
 
+static int qtnf_vlan_vif_exists(struct qtnf_vif *vif, u16 vlanid)
+{
+	struct qtnf_vif *vlan_vif;
+
+	vlan_vif = qtnf_vlan_list_lookup(&vif->vlan_list, vlanid);
+	if (vlan_vif)
+		return 1;
+
+	return 0;
+}
+
+static struct qtnf_vif *qtnf_add_vlan_vif(struct qtnf_vif *vif, u16 vlanid)
+{
+	struct qtnf_vif *vlan_vif;
+
+	vlan_vif = qtnf_vlan_list_add(&vif->vlan_list, vlanid);
+	if (vlan_vif) {
+		vlan_vif->u.vlan.parent = vif;
+		vlan_vif->u.vlan.vlanid = vlanid;
+	}
+
+	return vlan_vif;
+}
+
+static int qtnf_del_vlan_vif(struct qtnf_vif *vif, u16 vlanid)
+{
+	return qtnf_vlan_list_del(&vif->vlan_list, vlanid);
+}
+
 static int
 qtnf_change_virtual_intf(struct wiphy *wiphy,
 			 struct net_device *dev,
@@ -92,7 +121,15 @@ qtnf_change_virtual_intf(struct wiphy *wiphy,
 	else
 		mac_addr = NULL;
 
-	qtnf_scan_done(vif->mac, true);
+	switch (type) {
+	case NL80211_IFTYPE_STATION:
+	case NL80211_IFTYPE_AP:
+		qtnf_scan_done(vif->mac, true);
+		break;
+	default:
+		pr_err("unsupported virtual interface type (%d)\n", type);
+		return -ENOTSUPP;
+	}
 
 	ret = qtnf_cmd_send_change_intf_type(vif, type, mac_addr);
 	if (ret) {
@@ -108,29 +145,57 @@ qtnf_change_virtual_intf(struct wiphy *wiphy,
 int qtnf_del_virtual_intf(struct wiphy *wiphy, struct wireless_dev *wdev)
 {
 	struct net_device *netdev =  wdev->netdev;
+	struct qtnf_vif *parent;
 	struct qtnf_vif *vif;
+	u16 vlanid;
 
 	if (WARN_ON(!netdev))
 		return -EFAULT;
 
+	netif_tx_stop_all_queues(netdev);
+	if (netif_carrier_ok(netdev))
+		netif_carrier_off(netdev);
+
 	vif = qtnf_netdev_get_priv(wdev->netdev);
+
+	switch (wdev->iftype) {
+	case NL80211_IFTYPE_STATION:
+	case NL80211_IFTYPE_AP:
+		qtnf_virtual_intf_cleanup(vif);
+		break;
+	case NL80211_IFTYPE_AP_VLAN:
+		break;
+	default:
+		pr_err("unsupported virtual interface type (%d)\n",
+		       wdev->iftype);
+		return -ENOTSUPP;
+	}
 
 	if (qtnf_cmd_send_del_intf(vif))
 		pr_err("VIF%u.%u: failed to delete VIF\n", vif->mac->macid,
 		       vif->vifid);
 
-	/* Stop data */
-	netif_tx_stop_all_queues(netdev);
-	if (netif_carrier_ok(netdev))
-		netif_carrier_off(netdev);
-
 	if (netdev->reg_state == NETREG_REGISTERED)
 		unregister_netdevice(netdev);
 
-	vif->netdev->ieee80211_ptr = NULL;
-	vif->netdev = NULL;
-	vif->wdev.iftype = NL80211_IFTYPE_UNSPECIFIED;
-	eth_zero_addr(vif->mac_addr);
+	switch (wdev->iftype) {
+	case NL80211_IFTYPE_STATION:
+	case NL80211_IFTYPE_AP:
+		vif->netdev->ieee80211_ptr = NULL;
+		vif->netdev = NULL;
+		vif->wdev.iftype = NL80211_IFTYPE_UNSPECIFIED;
+		eth_zero_addr(vif->mac_addr);
+		break;
+	case NL80211_IFTYPE_AP_VLAN:
+		parent = vif->u.vlan.parent;
+		vlanid = vif->u.vlan.vlanid;
+		if (!qtnf_del_vlan_vif(parent, vlanid))
+			pr_warn("failed to delete AP_VLAN for VLAN tag %u",
+				vlanid);
+		break;
+	default:
+		break;
+	}
 
 	return 0;
 }
@@ -143,7 +208,12 @@ static struct wireless_dev *qtnf_add_virtual_intf(struct wiphy *wiphy,
 {
 	struct qtnf_wmac *mac;
 	struct qtnf_vif *vif;
+	struct qtnf_vif *parent_vif;
 	u8 *mac_addr = NULL;
+	u32 vlanid = 0;
+	u32 macid;
+	u32 vifid;
+	int ret;
 
 	mac = wiphy_priv(wiphy);
 
@@ -164,24 +234,86 @@ static struct wireless_dev *qtnf_add_virtual_intf(struct wiphy *wiphy,
 		vif->wdev.wiphy = wiphy;
 		vif->wdev.iftype = type;
 		vif->sta_state = QTNF_STA_DISCONNECTED;
+
+		if (params)
+			mac_addr = params->macaddr;
+
+		if (qtnf_cmd_send_add_intf(vif, type, mac_addr)) {
+			pr_err("VIF%u.%u: failed to add VIF\n", mac->macid,
+			       vif->vifid);
+			goto err_cmd;
+		}
+
+		if (!is_valid_ether_addr(vif->mac_addr)) {
+			pr_err("VIF%u.%u: FW reported bad MAC: %pM\n",
+			       mac->macid, vif->vifid, vif->mac_addr);
+			goto err_mac;
+		}
+
+		break;
+	case NL80211_IFTYPE_AP_VLAN:
+		/* Note: expect two valid inputs:
+		 *   wlan%d.%d -> macid/vlanid
+		 *   wlan%d_%d.%d -> macid/vifid/vlanid
+		 * Note: don't care about macid since wiphy is known
+		 */
+		ret = sscanf(name, "wlan%u_%u.%u", &macid, &vifid, &vlanid);
+		if (ret != 3) {
+			ret = sscanf(name, "wlan%u.%u", &macid, &vlanid);
+			if (ret != 2) {
+				pr_err("unsupported AP_VLAN interface naming");
+				return ERR_PTR(-ENOTSUPP);
+			}
+
+			vifid = 0;
+		}
+
+		if (vifid >= QTNF_MAX_INTF) {
+			pr_err("VIF index %d is out of range\n", vifid);
+			return ERR_PTR(-EINVAL);
+		}
+
+		macid = mac->macid;
+
+		pr_debug("add AP_VLAN with tag %u to mac/vif %u/%u\n",
+			 vlanid, macid, vifid);
+
+		parent_vif = &mac->iflist[vifid];
+		if (parent_vif->wdev.iftype != NL80211_IFTYPE_AP) {
+			pr_err("only AP supports VLAN virtual iterface\n");
+			return ERR_PTR(-ENOTSUPP);
+		}
+
+		if (qtnf_vlan_vif_exists(parent_vif, vlanid)) {
+			pr_err("AP_VLAN for tag %u already exists for %s\n",
+			       vlanid, name);
+			return ERR_PTR(-EEXIST);
+		}
+
+		vif = qtnf_add_vlan_vif(parent_vif, vlanid);
+		if (!vif) {
+			pr_err("couldn't create VLAN vif for tag %u\n", vlanid);
+			return ERR_PTR(-EFAULT);
+		}
+
+		vif->mac = mac;
+		vif->vifid = vifid;
+
+		eth_zero_addr(vif->mac_addr);
+		vif->bss_priority = QTNF_DEF_BSS_PRIORITY;
+		vif->wdev.wiphy = wiphy;
+		vif->wdev.iftype = type;
+		vif->sta_state = QTNF_STA_DISCONNECTED;
+
+		if (qtnf_cmd_send_add_intf(vif, type, NULL)) {
+			pr_err("failed to send add_intf command\n");
+			goto err_cmd;
+		}
+
 		break;
 	default:
 		pr_err("MAC%u: unsupported IF type %d\n", mac->macid, type);
 		return ERR_PTR(-ENOTSUPP);
-	}
-
-	if (params)
-		mac_addr = params->macaddr;
-
-	if (qtnf_cmd_send_add_intf(vif, type, mac_addr)) {
-		pr_err("VIF%u.%u: failed to add VIF\n", mac->macid, vif->vifid);
-		goto err_cmd;
-	}
-
-	if (!is_valid_ether_addr(vif->mac_addr)) {
-		pr_err("VIF%u.%u: FW reported bad MAC: %pM\n",
-		       mac->macid, vif->vifid, vif->mac_addr);
-		goto err_mac;
 	}
 
 	if (qtnf_core_net_attach(mac, vif, name, name_assign_t, type)) {
@@ -198,7 +330,17 @@ err_net:
 err_mac:
 	qtnf_cmd_send_del_intf(vif);
 err_cmd:
-	vif->wdev.iftype = NL80211_IFTYPE_UNSPECIFIED;
+	switch (type) {
+	case NL80211_IFTYPE_STATION:
+	case NL80211_IFTYPE_AP:
+		vif->wdev.iftype = NL80211_IFTYPE_UNSPECIFIED;
+		break;
+	case NL80211_IFTYPE_AP_VLAN:
+		qtnf_del_vlan_vif(vif->u.vlan.parent, vlanid);
+		break;
+	default:
+		break;
+	}
 
 	return ERR_PTR(-EFAULT);
 }
@@ -541,7 +683,27 @@ qtnf_change_station(struct wiphy *wiphy, struct net_device *dev,
 		    const u8 *mac, struct station_parameters *params)
 {
 	struct qtnf_vif *vif = qtnf_netdev_get_priv(dev);
+	struct qtnf_sta_node *sta_node;
 	int ret;
+
+	if (mac && params && params->vlan) {
+		sta_node = qtnf_sta_list_lookup(&vif->sta_list, mac);
+		if (unlikely(!sta_node)) {
+			pr_err("VIF%u.%u: STA %pM does not exist\n",
+			       vif->mac->macid, vif->vifid, mac);
+			return -ENOENT;
+		}
+
+		vif = qtnf_netdev_get_priv(params->vlan);
+		if (vif->wdev.iftype != NL80211_IFTYPE_AP_VLAN) {
+			pr_err("VIF%u.%u: interface %s: unexpected type %d\n",
+			       vif->mac->macid, vif->vifid, params->vlan->name,
+			       vif->wdev.iftype);
+			return -EINVAL;
+		}
+
+		sta_node->ndev = params->vlan;
+	}
 
 	ret = qtnf_cmd_send_change_sta(vif, mac, params);
 	if (ret)
@@ -898,14 +1060,26 @@ void qtnf_netdev_updown(struct net_device *ndev, bool up)
 {
 	struct qtnf_vif *vif = qtnf_netdev_get_priv(ndev);
 
-	if (qtnf_cmd_send_updown_intf(vif, up))
-		pr_err("failed to send up/down command to FW\n");
+	switch (vif->wdev.iftype) {
+	case NL80211_IFTYPE_STATION:
+	case NL80211_IFTYPE_AP:
+		if (qtnf_cmd_send_updown_intf(vif, up))
+			pr_err("failed to send up/down command to FW\n");
+		break;
+	default:
+		pr_err("unsupported virtual interface type (%d)\n",
+		       vif->wdev.iftype);
+		break;
+	}
 }
 
-void qtnf_virtual_intf_cleanup(struct net_device *ndev)
+void qtnf_virtual_intf_cleanup(struct qtnf_vif *vif)
 {
-	struct qtnf_vif *vif = qtnf_netdev_get_priv(ndev);
 	struct qtnf_wmac *mac = wiphy_priv(vif->wdev.wiphy);
+	struct qtnf_sta_node *sta;
+	struct qtnf_vif *vlan;
+	struct qtnf_vif *tmp;
+	struct qtnf_list *list;
 
 	if (vif->wdev.iftype == NL80211_IFTYPE_STATION) {
 		switch (vif->sta_state) {
@@ -917,20 +1091,31 @@ void qtnf_virtual_intf_cleanup(struct net_device *ndev)
 						NULL, 0,
 						WLAN_STATUS_UNSPECIFIED_FAILURE,
 						GFP_KERNEL);
-			qtnf_disconnect(vif->wdev.wiphy, ndev,
+			qtnf_disconnect(vif->wdev.wiphy, vif->netdev,
 					WLAN_REASON_DEAUTH_LEAVING);
 			break;
 		case QTNF_STA_CONNECTED:
 			cfg80211_disconnected(vif->netdev,
 					      WLAN_REASON_DEAUTH_LEAVING,
 					      NULL, 0, 1, GFP_KERNEL);
-			qtnf_disconnect(vif->wdev.wiphy, ndev,
+			qtnf_disconnect(vif->wdev.wiphy, vif->netdev,
 					WLAN_REASON_DEAUTH_LEAVING);
 			break;
 		}
 
 		vif->sta_state = QTNF_STA_DISCONNECTED;
 		qtnf_scan_done(mac, true);
+	} else if (vif->wdev.iftype == NL80211_IFTYPE_AP) {
+		if (qtnf_list_empty(&vif->vlan_list))
+			return;
+
+		list = &vif->vlan_list;
+		list_for_each_entry_safe(vlan, tmp, &list->head, u.vlan.list)
+			qtnf_del_virtual_intf(vlan->wdev.wiphy, &vlan->wdev);
+
+		list = &vif->sta_list;
+		list_for_each_entry(sta, &list->head, list)
+			sta->ndev = NULL;
 	}
 }
 

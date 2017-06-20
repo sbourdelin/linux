@@ -52,6 +52,10 @@ static u8 flashboot = 1;
 module_param(flashboot, byte, 0644);
 MODULE_PARM_DESC(flashboot, "set to 0 to use FW binary file on FS");
 
+static u8 dyn_vlan_tagged;
+module_param(dyn_vlan_tagged, byte, 0444);
+MODULE_PARM_DESC(dyn_vlan_tagged, "enable tagged traffic on AP_VLAN ports");
+
 #define DRV_NAME	"qtnfmac_pearl_pcie"
 
 static inline void qtnf_non_posted_write(u32 val, void __iomem *basereg)
@@ -1151,6 +1155,7 @@ static int qtnf_pcie_probe(struct pci_dev *pdev, const struct pci_device_id *id)
 	bus->bus_ops = &qtnf_pcie_bus_ops;
 	bus->dev = &pdev->dev;
 	bus->fw_state = QTNF_FW_STATE_RESET;
+	bus->dyn_vlan_tagged = dyn_vlan_tagged;
 	pcie_priv->pdev = pdev;
 
 	strcpy(bus->fwname, QTN_PCI_PEARL_FW_NAME);

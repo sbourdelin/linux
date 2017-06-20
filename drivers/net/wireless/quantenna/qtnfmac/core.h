@@ -54,7 +54,8 @@
 #define QTNF_STATE_AP_CONFIG		BIT(2)
 #define QTNF_STATE_AP_START		BIT(1)
 
-extern const struct net_device_ops qtnf_netdev_ops;
+extern const struct net_device_ops qtnf_bss_netdev_ops;
+
 struct qtnf_bus;
 struct qtnf_vif;
 
@@ -76,9 +77,10 @@ struct qtnf_bss_config {
 struct qtnf_sta_node {
 	struct list_head list;
 	u8 mac_addr[ETH_ALEN];
+	struct net_device *ndev;
 };
 
-struct qtnf_sta_list {
+struct qtnf_list {
 	struct list_head head;
 	atomic_t size;
 };
@@ -87,6 +89,12 @@ enum qtnf_sta_state {
 	QTNF_STA_DISCONNECTED,
 	QTNF_STA_CONNECTING,
 	QTNF_STA_CONNECTED
+};
+
+struct qtnf_vif_vlan {
+	struct qtnf_vif *parent;
+	struct list_head list;
+	u16 vlanid;
 };
 
 struct qtnf_vif {
@@ -101,8 +109,14 @@ struct qtnf_vif {
 	u8 mac_addr[ETH_ALEN];
 	struct work_struct reset_work;
 	struct qtnf_bss_config bss_cfg;
-	struct qtnf_sta_list sta_list;
 	unsigned long cons_tx_timeout_cnt;
+
+	struct qtnf_list sta_list;
+	struct qtnf_list vlan_list;
+
+	union {
+		struct qtnf_vif_vlan vlan;
+	} u;
 };
 
 struct qtnf_mac_info {
@@ -151,16 +165,15 @@ struct wiphy *qtnf_wiphy_allocate(struct qtnf_bus *bus);
 int qtnf_core_net_attach(struct qtnf_wmac *mac, struct qtnf_vif *priv,
 			 const char *name, unsigned char name_assign_type,
 			 enum nl80211_iftype iftype);
+
 void qtnf_main_work_queue(struct work_struct *work);
 int qtnf_cmd_send_update_phy_params(struct qtnf_wmac *mac, u32 changed);
 int qtnf_cmd_send_get_phy_params(struct qtnf_wmac *mac);
 
 struct qtnf_wmac *qtnf_core_get_mac(const struct qtnf_bus *bus, u8 macid);
 struct net_device *qtnf_classify_skb(struct qtnf_bus *bus, struct sk_buff *skb);
-struct net_device *qtnf_classify_skb_no_mbss(struct qtnf_bus *bus,
-					     struct sk_buff *skb);
 
-void qtnf_virtual_intf_cleanup(struct net_device *ndev);
+void qtnf_virtual_intf_cleanup(struct qtnf_vif *vif);
 
 void qtnf_netdev_updown(struct net_device *ndev, bool up);
 
