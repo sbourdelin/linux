@@ -103,7 +103,7 @@ static inline unsigned long rtc_bfin_to_time(u32 rtc_bfin)
 }
 static inline void rtc_bfin_to_tm(u32 rtc_bfin, struct rtc_time *tm)
 {
-	rtc_time_to_tm(rtc_bfin_to_time(rtc_bfin), tm);
+	rtc_time64_to_tm(rtc_bfin_to_time(rtc_bfin), tm);
 }
 
 /**
@@ -271,20 +271,17 @@ static int bfin_rtc_read_time(struct device *dev, struct rtc_time *tm)
 static int bfin_rtc_set_time(struct device *dev, struct rtc_time *tm)
 {
 	struct bfin_rtc *rtc = dev_get_drvdata(dev);
-	int ret;
-	unsigned long now;
+	unsigned long long now;
 
 	dev_dbg_stamp(dev);
 
-	ret = rtc_tm_to_time(tm, &now);
-	if (ret == 0) {
-		if (rtc->rtc_wrote_regs & 0x1)
-			bfin_rtc_sync_pending(dev);
-		bfin_write_RTC_STAT(rtc_time_to_bfin(now));
-		rtc->rtc_wrote_regs = 0x1;
-	}
+	now = rtc_tm_to_time64(tm);
+	if (rtc->rtc_wrote_regs & 0x1)
+		bfin_rtc_sync_pending(dev);
+	bfin_write_RTC_STAT(rtc_time_to_bfin(now));
+	rtc->rtc_wrote_regs = 0x1;
 
-	return ret;
+	return 0;
 }
 
 static int bfin_rtc_read_alarm(struct device *dev, struct rtc_wkalrm *alrm)
@@ -300,12 +297,11 @@ static int bfin_rtc_read_alarm(struct device *dev, struct rtc_wkalrm *alrm)
 static int bfin_rtc_set_alarm(struct device *dev, struct rtc_wkalrm *alrm)
 {
 	struct bfin_rtc *rtc = dev_get_drvdata(dev);
-	unsigned long rtc_alarm;
+	unsigned long long rtc_alarm;
 
 	dev_dbg_stamp(dev);
 
-	if (rtc_tm_to_time(&alrm->time, &rtc_alarm))
-		return -EINVAL;
+	rtc_alarm = rtc_tm_to_time64(&alrm->time);
 
 	rtc->rtc_alarm = alrm->time;
 
