@@ -71,7 +71,7 @@ static int gemini_rtc_read_time(struct device *dev, struct rtc_time *tm)
 	struct gemini_rtc *rtc = dev_get_drvdata(dev);
 
 	unsigned int  days, hour, min, sec;
-	unsigned long offset, time;
+	unsigned long long offset, time;
 
 	sec  = readl(rtc->rtc_base + GEMINI_RTC_SECOND);
 	min  = readl(rtc->rtc_base + GEMINI_RTC_MINUTE);
@@ -81,7 +81,7 @@ static int gemini_rtc_read_time(struct device *dev, struct rtc_time *tm)
 
 	time = offset + days * 86400 + hour * 3600 + min * 60 + sec;
 
-	rtc_time_to_tm(time, tm);
+	rtc_time64_to_tm(time, tm);
 
 	return 0;
 }
@@ -90,12 +90,12 @@ static int gemini_rtc_set_time(struct device *dev, struct rtc_time *tm)
 {
 	struct gemini_rtc *rtc = dev_get_drvdata(dev);
 	unsigned int sec, min, hour, day;
-	unsigned long offset, time;
+	unsigned long long offset, time;
 
 	if (tm->tm_year >= 2148)	/* EPOCH Year + 179 */
 		return -EINVAL;
 
-	rtc_tm_to_time(tm, &time);
+	time = rtc_tm_to_time64(tm);
 
 	sec = readl(rtc->rtc_base + GEMINI_RTC_SECOND);
 	min = readl(rtc->rtc_base + GEMINI_RTC_MINUTE);
