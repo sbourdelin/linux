@@ -432,7 +432,7 @@ static void omap_rtc_power_off(void)
 {
 	struct omap_rtc *rtc = omap_rtc_power_off_rtc;
 	struct rtc_time tm;
-	unsigned long now;
+	unsigned long long now;
 	u32 val;
 
 	rtc->type->unlock(rtc);
@@ -443,8 +443,8 @@ static void omap_rtc_power_off(void)
 	/* set alarm two seconds from now */
 	omap_rtc_read_time_raw(rtc, &tm);
 	bcd2tm(&tm);
-	rtc_tm_to_time(&tm, &now);
-	rtc_time_to_tm(now + 2, &tm);
+	now = rtc_tm_to_time64(&tm);
+	rtc_time64_to_tm(now + 2, &tm);
 
 	if (tm2bcd(&tm) < 0) {
 		dev_err(&rtc->rtc->dev, "power off failed\n");
