@@ -107,8 +107,7 @@ static int sst_platform_compr_set_params(struct snd_compr_stream *cstream,
 	struct snd_sst_params str_params;
 	struct sst_compress_cb cb;
 	struct snd_soc_pcm_runtime *rtd = cstream->private_data;
-	struct snd_soc_platform *platform = rtd->platform;
-	struct sst_data *ctx = snd_soc_platform_get_drvdata(platform);
+	struct sst_data *ctx = snd_soc_component_get_drvdata(rtd->platform_com);
 
 	stream = cstream->runtime->private_data;
 	/* construct fw structure for this*/
