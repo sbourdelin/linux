@@ -791,7 +791,7 @@ ssi_aead_process_authenc_data_desc(
 		u32 mlli_nents = areq_ctx->assoc.mlli_nents;
 
 		if (likely(areq_ctx->is_single_pass == true)) {
-			if (direct == DRV_CRYPTO_DIRECTION_ENCRYPT){
+			if (direct == DRV_CRYPTO_DIRECTION_ENCRYPT) {
 				mlli_addr = areq_ctx->dst.sram_addr;
 				mlli_nents = areq_ctx->dst.mlli_nents;
 			} else {
@@ -1715,7 +1715,7 @@ static inline void ssi_aead_gcm_setup_gctr_desc(
 	set_flow_mode(&desc[idx], S_DIN_to_AES);
 	idx++;
 
-	if ((req_ctx->cryptlen != 0) && (req_ctx->plaintext_authenticate_only == false)){
+	if ((req_ctx->cryptlen != 0) && (req_ctx->plaintext_authenticate_only == false)) {
 		/* load AES/CTR initial CTR value inc by 2*/
 		hw_desc_init(&desc[idx]);
 		set_cipher_mode(&desc[idx], DRV_CIPHER_GCTR);
@@ -1815,7 +1815,7 @@ static inline int ssi_aead_gcm(
 
 
 	//in RFC4543 no data to encrypt. just copy data from src to dest.
-	if (req_ctx->plaintext_authenticate_only == true){
+	if (req_ctx->plaintext_authenticate_only == true) {
 		ssi_aead_process_cipher_data_desc(req, BYPASS, desc, seq_size);
 		ssi_aead_gcm_setup_ghash_desc(req, desc, seq_size);
 		/* process(ghash) assoc data */
