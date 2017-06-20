@@ -181,7 +181,7 @@ static void sun4i_rgb_encoder_mode_set(struct drm_encoder *encoder,
 	clk_set_phase(tcon->dclk, 120);
 }
 
-static struct drm_encoder_helper_funcs sun4i_rgb_enc_helper_funcs = {
+static const struct drm_encoder_helper_funcs sun4i_rgb_enc_helper_funcs = {
 	.atomic_check	= sun4i_rgb_atomic_check,
 	.mode_set	= sun4i_rgb_encoder_mode_set,
 	.disable	= sun4i_rgb_encoder_disable,

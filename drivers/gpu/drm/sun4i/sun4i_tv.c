@@ -488,7 +488,7 @@ static void sun4i_tv_mode_set(struct drm_encoder *encoder,
 	regmap_write(tv->regs, SUN4I_TVE_SLAVE_REG, 0);
 }
 
-static struct drm_encoder_helper_funcs sun4i_tv_helper_funcs = {
+static const struct drm_encoder_helper_funcs sun4i_tv_helper_funcs = {
 	.atomic_check	= sun4i_tv_atomic_check,
 	.disable	= sun4i_tv_disable,
 	.enable		= sun4i_tv_enable,
