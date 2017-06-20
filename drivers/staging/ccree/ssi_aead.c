@@ -1588,7 +1588,7 @@ static int config_ccm_adata(struct aead_request *req)
 	req_ctx->ccm_hdr_size = format_ccm_a0 (a0, req->assoclen);
 
 	memset(req->iv + 15 - req->iv[0], 0, req->iv[0] + 1);
-	req->iv [15] = 1;
+	req->iv[15] = 1;
 
 	memcpy(ctr_count_0, req->iv, AES_BLOCK_SIZE) ;
 	ctr_count_0[15] = 0;
