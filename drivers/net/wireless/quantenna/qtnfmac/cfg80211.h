@@ -34,10 +34,14 @@ static inline void qtnf_scan_done(struct qtnf_wmac *mac, bool aborted)
 		.aborted = aborted,
 	};
 
+	qtnf_wmac_lock(mac);
+
 	if (mac->scan_req) {
 		cfg80211_scan_done(mac->scan_req, &info);
 		mac->scan_req = NULL;
 	}
+
+	qtnf_wmac_unlock(mac);
 }
 
 #endif /* _QTN_FMAC_CFG80211_H_ */
