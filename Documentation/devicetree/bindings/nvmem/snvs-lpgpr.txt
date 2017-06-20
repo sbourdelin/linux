@@ -5,8 +5,9 @@ This DT node should be represented as a sub-node of a "syscon",
 "simple-mfd" node.
 
 Required properties:
-- compatible: should be:
+- compatible: should be one of fallowing variants:
 	"fsl,imx6q-snvs-lpgpr" for Freescale i.MX6Q/D/DL/S
+	"fsl,imx6ul-snvs-lpgpr" for Freescale i.MX6UL
 
 Example:
 snvs: snvs@020cc000 {
