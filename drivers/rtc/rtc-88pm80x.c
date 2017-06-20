@@ -90,8 +90,8 @@ static int pm80x_rtc_alarm_irq_enable(struct device *dev, unsigned int enabled)
 static void rtc_next_alarm_time(struct rtc_time *next, struct rtc_time *now,
 				struct rtc_time *alrm)
 {
-	unsigned long next_time;
-	unsigned long now_time;
+	unsigned long long next_time;
+	unsigned long long now_time;
 
 	next->tm_year = now->tm_year;
 	next->tm_mon = now->tm_mon;
@@ -100,13 +100,13 @@ static void rtc_next_alarm_time(struct rtc_time *next, struct rtc_time *now,
 	next->tm_min = alrm->tm_min;
 	next->tm_sec = alrm->tm_sec;
 
-	rtc_tm_to_time(now, &now_time);
-	rtc_tm_to_time(next, &next_time);
+	now_time = rtc_tm_to_time64(now);
+	next_time = rtc_tm_to_time64(next);
 
 	if (next_time < now_time) {
 		/* Advance one day */
 		next_time += 60 * 60 * 24;
-		rtc_time_to_tm(next_time, next);
+		rtc_time64_to_tm(next_time, next);
 	}
 }
 
@@ -114,7 +114,7 @@ static int pm80x_rtc_read_time(struct device *dev, struct rtc_time *tm)
 {
 	struct pm80x_rtc_info *info = dev_get_drvdata(dev);
 	unsigned char buf[4];
-	unsigned long ticks, base, data;
+	unsigned long long ticks, base, data;
 	regmap_raw_read(info->map, PM800_RTC_EXPIRE2_1, buf, 4);
 	base = (buf[3] << 24) | (buf[2] << 16) | (buf[1] << 8) | buf[0];
 	dev_dbg(info->dev, "%x-%x-%x-%x\n", buf[0], buf[1], buf[2], buf[3]);
@@ -123,9 +123,9 @@ static int pm80x_rtc_read_time(struct device *dev, struct rtc_time *tm)
 	regmap_raw_read(info->map, PM800_RTC_COUNTER1, buf, 4);
 	data = (buf[3] << 24) | (buf[2] << 16) | (buf[1] << 8) | buf[0];
 	ticks = base + data;
-	dev_dbg(info->dev, "get base:0x%lx, RO count:0x%lx, ticks:0x%lx\n",
+	dev_dbg(info->dev, "get base:0x%llx, RO count:0x%llx, ticks:0x%llx\n",
 		base, data, ticks);
-	rtc_time_to_tm(ticks, tm);
+	rtc_time64_to_tm(ticks, tm);
 	return 0;
 }
 
@@ -133,20 +133,20 @@ static int pm80x_rtc_set_time(struct device *dev, struct rtc_time *tm)
 {
 	struct pm80x_rtc_info *info = dev_get_drvdata(dev);
 	unsigned char buf[4];
-	unsigned long ticks, base, data;
+	unsigned long long ticks, base, data;
 	if ((tm->tm_year < 70) || (tm->tm_year > 138)) {
 		dev_dbg(info->dev,
 			"Set time %d out of range. Please set time between 1970 to 2038.\n",
 			1900 + tm->tm_year);
 		return -EINVAL;
 	}
-	rtc_tm_to_time(tm, &ticks);
+	ticks = rtc_tm_to_time64(tm);
 
 	/* load 32-bit read-only counter */
 	regmap_raw_read(info->map, PM800_RTC_COUNTER1, buf, 4);
 	data = (buf[3] << 24) | (buf[2] << 16) | (buf[1] << 8) | buf[0];
 	base = ticks - data;
-	dev_dbg(info->dev, "set base:0x%lx, RO count:0x%lx, ticks:0x%lx\n",
+	dev_dbg(info->dev, "set base:0x%llx, RO count:0x%llx, ticks:0x%llx\n",
 		base, data, ticks);
 	buf[0] = base & 0xFF;
 	buf[1] = (base >> 8) & 0xFF;
@@ -161,7 +161,7 @@ static int pm80x_rtc_read_alarm(struct device *dev, struct rtc_wkalrm *alrm)
 {
 	struct pm80x_rtc_info *info = dev_get_drvdata(dev);
 	unsigned char buf[4];
-	unsigned long ticks, base, data;
+	unsigned long long ticks, base, data;
 	int ret;
 
 	regmap_raw_read(info->map, PM800_RTC_EXPIRE2_1, buf, 4);
@@ -171,10 +171,10 @@ static int pm80x_rtc_read_alarm(struct device *dev, struct rtc_wkalrm *alrm)
 	regmap_raw_read(info->map, PM800_RTC_EXPIRE1_1, buf, 4);
 	data = (buf[3] << 24) | (buf[2] << 16) | (buf[1] << 8) | buf[0];
 	ticks = base + data;
-	dev_dbg(info->dev, "get base:0x%lx, RO count:0x%lx, ticks:0x%lx\n",
+	dev_dbg(info->dev, "get base:0x%llx, RO count:0x%llx, ticks:0x%llx\n",
 		base, data, ticks);
 
-	rtc_time_to_tm(ticks, &alrm->time);
+	rtc_time64_to_tm(ticks, &alrm->time);
 	regmap_read(info->map, PM800_RTC_CONTROL, &ret);
 	alrm->enabled = (ret & PM800_ALARM1_EN) ? 1 : 0;
 	alrm->pending = (ret & (PM800_ALARM | PM800_ALARM_WAKEUP)) ? 1 : 0;
@@ -185,7 +185,7 @@ static int pm80x_rtc_set_alarm(struct device *dev, struct rtc_wkalrm *alrm)
 {
 	struct pm80x_rtc_info *info = dev_get_drvdata(dev);
 	struct rtc_time now_tm, alarm_tm;
-	unsigned long ticks, base, data;
+	unsigned long long ticks, base, data;
 	unsigned char buf[4];
 	int mask;
 
@@ -199,15 +199,15 @@ static int pm80x_rtc_set_alarm(struct device *dev, struct rtc_wkalrm *alrm)
 	regmap_raw_read(info->map, PM800_RTC_COUNTER1, buf, 4);
 	data = (buf[3] << 24) | (buf[2] << 16) | (buf[1] << 8) | buf[0];
 	ticks = base + data;
-	dev_dbg(info->dev, "get base:0x%lx, RO count:0x%lx, ticks:0x%lx\n",
+	dev_dbg(info->dev, "get base:0x%llx, RO count:0x%llx, ticks:0x%llx\n",
 		base, data, ticks);
 
-	rtc_time_to_tm(ticks, &now_tm);
-	dev_dbg(info->dev, "%s, now time : %lu\n", __func__, ticks);
+	rtc_time64_to_tm(ticks, &now_tm);
+	dev_dbg(info->dev, "%s, now time : %llu\n", __func__, ticks);
 	rtc_next_alarm_time(&alarm_tm, &now_tm, &alrm->time);
 	/* get new ticks for alarm in 24 hours */
-	rtc_tm_to_time(&alarm_tm, &ticks);
-	dev_dbg(info->dev, "%s, alarm time: %lu\n", __func__, ticks);
+	ticks = rtc_tm_to_time64(&alarm_tm);
+	dev_dbg(info->dev, "%s, alarm time: %llu\n", __func__, ticks);
 	data = ticks - base;
 
 	buf[0] = data & 0xff;
@@ -255,7 +255,7 @@ static int pm80x_rtc_probe(struct platform_device *pdev)
 	struct pm80x_rtc_info *info;
 	struct device_node *node = pdev->dev.of_node;
 	struct rtc_time tm;
-	unsigned long ticks = 0;
+	unsigned long long ticks = 0;
 	int ret;
 
 	if (!pdata && !node) {
@@ -320,7 +320,7 @@ static int pm80x_rtc_probe(struct platform_device *pdev)
 			goto out_rtc;
 		}
 	}
-	rtc_tm_to_time(&tm, &ticks);
+	ticks = rtc_tm_to_time64(&tm);
 
 	info->rtc_dev = devm_rtc_device_register(&pdev->dev, "88pm80x-rtc",
 					    &pm80x_rtc_ops, THIS_MODULE);
