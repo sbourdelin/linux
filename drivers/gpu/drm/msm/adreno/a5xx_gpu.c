@@ -51,11 +51,13 @@ static int zap_shader_load_mdt(struct device *dev, const char *fwname)
 	}
 
 	/* Allocate memory for the firmware image */
-	mem_region = dmam_alloc_coherent(dev, mem_size, &mem_phys, GFP_KERNEL);
+	mem_region = (void *)devm_get_free_pages(dev, GFP_KERNEL,
+			get_order(mem_size));
 	if (!mem_region) {
 		ret = -ENOMEM;
 		goto out;
 	}
+	mem_phys = virt_to_phys(mem_region);
 
 	/* Load the rest of the MDT */
 	ret = qcom_mdt_load(dev, fw, fwname, GPU_PAS_ID, mem_region, mem_phys,
