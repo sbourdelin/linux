@@ -137,7 +137,7 @@ rs5c348_rtc_read_time(struct device *dev, struct rtc_time *tm)
 
 	if (rtc_valid_tm(tm) < 0) {
 		dev_err(&spi->dev, "retrieved date/time is not valid.\n");
-		rtc_time_to_tm(0, tm);
+		rtc_time64_to_tm(0, tm);
 	}
 
 	return 0;
@@ -183,7 +183,7 @@ static int rs5c348_probe(struct spi_device *spi)
 			dev_warn(&spi->dev, "voltage-low detected.\n");
 		if (ret & RS5C348_BIT_XSTP)
 			dev_warn(&spi->dev, "oscillator-stop detected.\n");
-		rtc_time_to_tm(0, &tm);	/* 1970/1/1 */
+		rtc_time64_to_tm(0, &tm);	/* 1970/1/1 */
 		ret = rs5c348_rtc_set_time(&spi->dev, &tm);
 		if (ret < 0)
 			goto kfree_exit;
