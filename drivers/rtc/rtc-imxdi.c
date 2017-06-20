@@ -549,10 +549,10 @@ out:
 static int dryice_rtc_read_time(struct device *dev, struct rtc_time *tm)
 {
 	struct imxdi_dev *imxdi = dev_get_drvdata(dev);
-	unsigned long now;
+	unsigned long long now;
 
 	now = readl(imxdi->ioaddr + DTCMR);
-	rtc_time_to_tm(now, tm);
+	rtc_time64_to_tm(now, tm);
 
 	return 0;
 }
@@ -561,7 +561,7 @@ static int dryice_rtc_read_time(struct device *dev, struct rtc_time *tm)
  * set the seconds portion of dryice time counter and clear the
  * fractional part.
  */
-static int dryice_rtc_set_mmss(struct device *dev, unsigned long secs)
+static int dryice_rtc_set_mmss64(struct device *dev, time64_t secs)
 {
 	struct imxdi_dev *imxdi = dev_get_drvdata(dev);
 	u32 dcr, dsr;
@@ -618,7 +618,7 @@ static int dryice_rtc_read_alarm(struct device *dev, struct rtc_wkalrm *alarm)
 	u32 dcamr;
 
 	dcamr = readl(imxdi->ioaddr + DCAMR);
-	rtc_time_to_tm(dcamr, &alarm->time);
+	rtc_time64_to_tm((u64)dcamr, &alarm->time);
 
 	/* alarm is enabled if the interrupt is enabled */
 	alarm->enabled = (readl(imxdi->ioaddr + DIER) & DIER_CAIE) != 0;
@@ -641,12 +641,10 @@ static int dryice_rtc_set_alarm(struct device *dev, struct rtc_wkalrm *alarm)
 {
 	struct imxdi_dev *imxdi = dev_get_drvdata(dev);
 	unsigned long now;
-	unsigned long alarm_time;
+	unsigned long long alarm_time;
 	int rc;
 
-	rc = rtc_tm_to_time(&alarm->time, &alarm_time);
-	if (rc)
-		return rc;
+	alarm_time = rtc_tm_to_time64(&alarm->time);
 
 	/* don't allow setting alarm in the past */
 	now = readl(imxdi->ioaddr + DTCMR);
@@ -668,7 +666,7 @@ static int dryice_rtc_set_alarm(struct device *dev, struct rtc_wkalrm *alarm)
 
 static const struct rtc_class_ops dryice_rtc_ops = {
 	.read_time		= dryice_rtc_read_time,
-	.set_mmss		= dryice_rtc_set_mmss,
+	.set_mmss64		= dryice_rtc_set_mmss64,
 	.alarm_irq_enable	= dryice_rtc_alarm_irq_enable,
 	.read_alarm		= dryice_rtc_read_alarm,
 	.set_alarm		= dryice_rtc_set_alarm,
