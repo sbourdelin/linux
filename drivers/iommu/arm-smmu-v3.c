@@ -728,7 +728,7 @@ static void queue_inc_prod(struct arm_smmu_queue *q)
 	u32 prod = (Q_WRP(q, q->prod) | Q_IDX(q, q->prod)) + 1;
 
 	q->prod = Q_OVF(q, q->prod) | Q_WRP(q, prod) | Q_IDX(q, prod);
-	writel(q->prod, q->prod_reg);
+	writel_relaxed(q->prod, q->prod_reg);
 }
 
 /*
