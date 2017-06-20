@@ -1397,6 +1397,7 @@ put_devs:
 
 static void __exit vfio_pci_cleanup(void)
 {
+	vfio_unregister_bus_driver(&vfio_pci_driver.driver);
 	pci_unregister_driver(&vfio_pci_driver);
 	vfio_pci_uninit_perm_bits();
 }
@@ -1455,6 +1456,12 @@ static int __init vfio_pci_init(void)
 	ret = pci_register_driver(&vfio_pci_driver);
 	if (ret)
 		goto out_driver;
+
+	ret = vfio_register_bus_driver(&vfio_pci_driver.driver);
+	if (ret) {
+		pci_unregister_driver(&vfio_pci_driver);
+		goto out_driver;
+	}
 
 	vfio_pci_fill_ids();
 

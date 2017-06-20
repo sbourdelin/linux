@@ -100,7 +100,29 @@ static struct platform_driver vfio_platform_driver = {
 	},
 };
 
-module_platform_driver(vfio_platform_driver);
+static void __exit vfio_platform_exit(void)
+{
+	vfio_unregister_bus_driver(&vfio_platform_driver.driver);
+	platform_driver_unregister(&vfio_platform_driver);
+}
+
+static int __init vfio_platform_init(void)
+{
+	int ret;
+
+	ret = platform_driver_register(&vfio_platform_driver);
+	if (ret)
+		return ret;
+
+	ret = vfio_register_bus_driver(&vfio_platform_driver.driver);
+	if (ret)
+		platform_driver_unregister(&vfio_platform_driver);
+
+	return ret;
+}
+
+module_init(vfio_platform_init);
+module_exit(vfio_platform_exit);
 
 MODULE_VERSION(DRIVER_VERSION);
 MODULE_LICENSE("GPL v2");

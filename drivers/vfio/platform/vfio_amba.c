@@ -109,7 +109,29 @@ static struct amba_driver vfio_amba_driver = {
 	},
 };
 
-module_amba_driver(vfio_amba_driver);
+static void __exit vfio_amba_exit(void)
+{
+	vfio_unregister_bus_driver(&vfio_amba_driver.drv);
+	amba_driver_unregister(&vfio_amba_driver);
+}
+
+static int __init vfio_amba_init(void)
+{
+	int ret;
+
+	ret = amba_driver_register(&vfio_amba_driver);
+	if (ret)
+		return ret;
+
+	ret = vfio_register_bus_driver(&vfio_amba_driver.drv);
+	if (ret)
+		amba_driver_unregister(&vfio_amba_driver);
+
+	return ret;
+}
+
+module_init(vfio_amba_init);
+module_exit(vfio_amba_exit);
 
 MODULE_VERSION(DRIVER_VERSION);
 MODULE_LICENSE("GPL v2");
