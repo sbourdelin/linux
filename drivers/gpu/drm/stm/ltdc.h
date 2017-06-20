@@ -27,7 +27,6 @@ struct ltdc_device {
 	struct drm_panel *panel;
 	struct mutex err_lock;	/* protecting error_status */
 	struct ltdc_caps caps;
-	u32 clut[256];		/* color look up table */
 	u32 error_status;
 	u32 irq_status;
 };
