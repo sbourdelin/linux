@@ -442,6 +442,12 @@ struct dsa_switch_ops {
 					 int port, struct net_device *br);
 	void	(*crosschip_bridge_leave)(struct dsa_switch *ds, int sw_index,
 					  int port, struct net_device *br);
+
+	/*
+	 * Network header and 802.3 protocol offsets
+	 */
+	int	hash_nh_off;
+	int	hash_proto_off;
 };
 
 struct dsa_switch_driver {
