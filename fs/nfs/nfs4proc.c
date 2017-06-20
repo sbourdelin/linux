@@ -1034,11 +1034,11 @@ struct nfs4_opendata {
 	struct nfs4_state *state;
 	struct iattr attrs;
 	unsigned long timestamp;
-	unsigned int rpc_done : 1;
-	unsigned int file_created : 1;
-	unsigned int is_recover : 1;
+	bool rpc_done;
+	bool file_created;
+	bool is_recover;
+	bool cancelled;
 	int rpc_status;
-	int cancelled;
 };
 
 static bool nfs4_clear_cap_atomic_open_v1(struct nfs_server *server,
@@ -1962,7 +1962,7 @@ static void nfs4_open_confirm_done(struct rpc_task *task, void *calldata)
 		nfs4_stateid_copy(&data->o_res.stateid, &data->c_res.stateid);
 		nfs_confirm_seqid(&data->owner->so_seqid, 0);
 		renew_lease(data->o_res.server, data->timestamp);
-		data->rpc_done = 1;
+		data->rpc_done = true;
 	}
 }
 
@@ -1972,7 +1972,7 @@ static void nfs4_open_confirm_release(void *calldata)
 	struct nfs4_state *state = NULL;
 
 	/* If this request hasn't been cancelled, do nothing */
-	if (data->cancelled == 0)
+	if (!data->cancelled)
 		goto out_free;
 	/* In case of error, no cleanup! */
 	if (!data->rpc_done)
@@ -2015,7 +2015,7 @@ static int _nfs4_proc_open_confirm(struct nfs4_opendata *data)
 
 	nfs4_init_sequence(&data->c_arg.seq_args, &data->c_res.seq_res, 1);
 	kref_get(&data->kref);
-	data->rpc_done = 0;
+	data->rpc_done = false;
 	data->rpc_status = 0;
 	data->timestamp = jiffies;
 	if (data->is_recover)
@@ -2025,7 +2025,7 @@ static int _nfs4_proc_open_confirm(struct nfs4_opendata *data)
 		return PTR_ERR(task);
 	status = rpc_wait_for_completion_task(task);
 	if (status != 0) {
-		data->cancelled = 1;
+		data->cancelled = true;
 		smp_wmb();
 	} else
 		status = data->rpc_status;
@@ -2124,7 +2124,7 @@ static void nfs4_open_done(struct rpc_task *task, void *calldata)
 		if (!(data->o_res.rflags & NFS4_OPEN_RESULT_CONFIRM))
 			nfs_confirm_seqid(&data->owner->so_seqid, 0);
 	}
-	data->rpc_done = 1;
+	data->rpc_done = true;
 }
 
 static void nfs4_open_release(void *calldata)
@@ -2133,7 +2133,7 @@ static void nfs4_open_release(void *calldata)
 	struct nfs4_state *state = NULL;
 
 	/* If this request hasn't been cancelled, do nothing */
-	if (data->cancelled == 0)
+	if (!data->cancelled)
 		goto out_free;
 	/* In case of error, no cleanup! */
 	if (data->rpc_status != 0 || !data->rpc_done)
@@ -2179,20 +2179,20 @@ static int nfs4_run_open_task(struct nfs4_opendata *data, int isrecover)
 
 	nfs4_init_sequence(&o_arg->seq_args, &o_res->seq_res, 1);
 	kref_get(&data->kref);
-	data->rpc_done = 0;
+	data->rpc_done = false;
 	data->rpc_status = 0;
-	data->cancelled = 0;
-	data->is_recover = 0;
+	data->cancelled = false;
+	data->is_recover = false;
 	if (isrecover) {
 		nfs4_set_sequence_privileged(&o_arg->seq_args);
-		data->is_recover = 1;
+		data->is_recover = true;
 	}
 	task = rpc_run_task(&task_setup_data);
 	if (IS_ERR(task))
 		return PTR_ERR(task);
 	status = rpc_wait_for_completion_task(task);
 	if (status != 0) {
-		data->cancelled = 1;
+		data->cancelled = true;
 		smp_wmb();
 	} else
 		status = data->rpc_status;
@@ -2287,9 +2287,9 @@ static int _nfs4_proc_open(struct nfs4_opendata *data)
 
 	if (o_arg->open_flags & O_CREAT) {
 		if (o_arg->open_flags & O_EXCL)
-			data->file_created = 1;
+			data->file_created = true;
 		else if (o_res->cinfo.before != o_res->cinfo.after)
-			data->file_created = 1;
+			data->file_created = true;
 		if (data->file_created || dir->i_version != o_res->cinfo.after)
 			update_changeattr(dir, &o_res->cinfo,
 					o_res->f_attr->time_start);
@@ -4273,7 +4273,7 @@ static int nfs4_proc_mkdir(struct inode *dir, struct dentry *dentry,
 }
 
 static int _nfs4_proc_readdir(struct dentry *dentry, struct rpc_cred *cred,
-		u64 cookie, struct page **pages, unsigned int count, int plus)
+		u64 cookie, struct page **pages, unsigned int count, bool plus)
 {
 	struct inode		*dir = d_inode(dentry);
 	struct nfs4_readdir_arg args = {
@@ -4311,7 +4311,7 @@ static int _nfs4_proc_readdir(struct dentry *dentry, struct rpc_cred *cred,
 }
 
 static int nfs4_proc_readdir(struct dentry *dentry, struct rpc_cred *cred,
-		u64 cookie, struct page **pages, unsigned int count, int plus)
+		u64 cookie, struct page **pages, unsigned int count, bool plus)
 {
 	struct nfs4_exception exception = { };
 	int err;
@@ -6135,7 +6135,7 @@ static void nfs4_lock_release(void *calldata)
 
 	dprintk("%s: begin!\n", __func__);
 	nfs_free_seqid(data->arg.open_seqid);
-	if (data->cancelled != 0) {
+	if (data->cancelled) {
 		struct rpc_task *task;
 		task = nfs4_do_unlck(&data->fl, data->ctx, data->lsp,
 				data->arg.lock_seqid);
@@ -6218,7 +6218,7 @@ static int _nfs4_do_setlk(struct nfs4_state *state, int cmd, struct file_lock *f
 			nfs4_handle_setlk_error(data->server, data->lsp,
 					data->arg.new_lock_owner, ret);
 	} else
-		data->cancelled = 1;
+		data->cancelled = true;
 	rpc_put_task(task);
 	dprintk("%s: done, ret = %d!\n", __func__, ret);
 	trace_nfs4_set_lock(fl, state, &data->res.stateid, cmd, ret);
