@@ -87,20 +87,30 @@ int x509_get_sig_params(struct x509_certificate *cert)
 	if (ret < 0)
 		goto error_2;
 
-	ret = is_hash_blacklisted(sig->digest, sig->digest_size, "tbs");
-	if (ret == -EKEYREJECTED) {
-		pr_err("Cert %*phN is blacklisted\n",
-		       sig->digest_size, sig->digest);
-		cert->blacklisted = true;
-		ret = 0;
-	}
+	ret = is_hash_blacklisted(sig->digest, sig->digest_size, "tbs",
+				  sig->hash_algo);
+	if (ret == -EKEYREJECTED)
+		goto blacklisted;
+	if (ret < 0)
+		goto error_2;
 
+	ret = is_data_blacklisted(cert->tbs, cert->tbs_size, "tbs",
+				  sig->hash_algo);
+	if (ret == -EKEYREJECTED)
+		goto blacklisted;
+	
 error_2:
 	kfree(desc);
 error:
 	crypto_free_shash(tfm);
 	pr_devel("<==%s() = %d\n", __func__, ret);
 	return ret;
+
+blacklisted:
+	pr_err("Cert %*phN is blacklisted\n", sig->digest_size, sig->digest);
+	cert->blacklisted = true;
+	ret = 0;
+	goto error_2;
 }
 
 /*

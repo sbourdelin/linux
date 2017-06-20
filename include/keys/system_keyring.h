@@ -38,10 +38,17 @@ extern int restrict_link_by_builtin_and_secondary_trusted(
 #ifdef CONFIG_SYSTEM_BLACKLIST_KEYRING
 extern int mark_hash_blacklisted(const char *hash);
 extern int is_hash_blacklisted(const u8 *hash, size_t hash_len,
-			       const char *type);
+			       const char *type, const char *hash_algo);
+extern int is_data_blacklisted(const void *data, size_t data_len,
+			       const char *type, const char *skip_hash);
 #else
 static inline int is_hash_blacklisted(const u8 *hash, size_t hash_len,
-				      const char *type)
+				      const char *type, const char *hash_algo)
+{
+	return 0;
+}
+static inline int is_data_blacklisted(const void *data, size_t data_len,
+				      const char *type, const char *skip_hash)
 {
 	return 0;
 }
