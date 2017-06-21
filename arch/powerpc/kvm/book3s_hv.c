@@ -3185,7 +3185,7 @@ static void kvmppc_setup_partition_table(struct kvm *kvm)
 	} else {
 		dw0 = PATB_HR | radix__get_tree_size() |
 			__pa(kvm->arch.pgtable) | RADIX_PGD_INDEX_SIZE;
-		dw1 = PATB_GR | kvm->arch.process_table;
+		dw1 = kvm->arch.process_table;
 	}
 
 	mmu_partition_table_set_entry(kvm->arch.lpid, dw0, dw1);
@@ -3838,10 +3838,6 @@ static int kvmhv_configure_mmu(struct kvm *kvm, struct kvm_ppc_mmuv3_cfg *cfg)
 	/* We can't change a guest to/from radix yet */
 	radix = !!(cfg->flags & KVM_PPC_MMUV3_RADIX);
 	if (radix != kvm_is_radix(kvm))
-		return -EINVAL;
-
-	/* GR (guest radix) bit in process_table field must match */
-	if (!!(cfg->process_table & PATB_GR) != radix)
 		return -EINVAL;
 
 	/* Process table size field must be reasonable, i.e. <= 24 */

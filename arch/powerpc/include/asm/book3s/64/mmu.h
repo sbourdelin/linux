@@ -55,7 +55,6 @@ extern struct patb_entry *partition_tb;
 #define RPDS_MASK	0x1f		/* root page dir. size field */
 
 /* Bits in patb1 field */
-#define PATB_GR		(1UL << 63)	/* guest uses radix; must match HR */
 #define PRTS_MASK	0x1f		/* process table size field */
 #define PRTB_MASK	0x0ffffffffffff000UL
 

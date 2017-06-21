@@ -26,7 +26,7 @@
 static int native_register_process_table(unsigned long base, unsigned long pg_sz,
 					 unsigned long table_size)
 {
-	unsigned long patb1 = base | table_size | PATB_GR;
+	unsigned long patb1 = base | table_size;
 
 	partition_tb->patb1 = cpu_to_be64(patb1);
 	return 0;
