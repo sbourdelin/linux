@@ -154,8 +154,24 @@ void ath9k_wake_tx_queue(struct ieee80211_hw *hw, struct ieee80211_txq *queue)
 {
 	struct ath_softc *sc = hw->priv;
 	struct ath_common *common = ath9k_hw_common(sc->sc_ah);
-	struct ath_atx_tid *tid = (struct ath_atx_tid *) queue->drv_priv;
-	struct ath_txq *txq = tid->txq;
+	struct ath_atx_tid *tid;
+	struct ath_txq *txq;
+
+	if (unlikely(queue->tid == IEEE80211_NUM_TIDS)) {
+		struct sk_buff *skb = ieee80211_tx_dequeue(hw, queue);
+		struct ieee80211_tx_control control = {
+			.sta = queue->sta,
+		};
+
+		if (WARN_ON(!skb))
+			return;
+
+		ath9k_tx(hw, &control, skb);
+		return;
+	}
+
+	tid = (struct ath_atx_tid *) queue->drv_priv;
+	txq = tid->txq;
 
 	ath_dbg(common, QUEUE, "Waking TX queue: %pM (%d)\n",
 		queue->sta ? queue->sta->addr : queue->vif->addr,

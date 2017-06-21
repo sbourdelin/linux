@@ -4237,6 +4237,19 @@ static void ath10k_mac_op_wake_tx_queue(struct ieee80211_hw *hw,
 	int ret = 0;
 	int max = 16;
 
+	if (unlikely(txq->tid == IEEE80211_NUM_TIDS)) {
+		struct sk_buff *skb = ieee80211_tx_dequeue(hw, txq);
+		struct ieee80211_tx_control control = {
+			.sta = txq->sta,
+		};
+
+		if (WARN_ON(!skb))
+			return;
+
+		ath10k_mac_op_tx(hw, &control, skb);
+		return;
+	}
+
 	spin_lock_bh(&ar->txqs_lock);
 	if (list_empty(&artxq->list))
 		list_add_tail(&artxq->list, &ar->txqs);

@@ -740,9 +740,8 @@ static int ath9k_start(struct ieee80211_hw *hw)
 	return 0;
 }
 
-static void ath9k_tx(struct ieee80211_hw *hw,
-		     struct ieee80211_tx_control *control,
-		     struct sk_buff *skb)
+void ath9k_tx(struct ieee80211_hw *hw, struct ieee80211_tx_control *control,
+	      struct sk_buff *skb)
 {
 	struct ath_softc *sc = hw->priv;
 	struct ath_common *common = ath9k_hw_common(sc->sc_ah);

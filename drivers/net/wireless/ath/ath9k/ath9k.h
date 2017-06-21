@@ -618,6 +618,8 @@ void ath9k_release_buffered_frames(struct ieee80211_hw *hw,
 				   u16 tids, int nframes,
 				   enum ieee80211_frame_release_type reason,
 				   bool more_data);
+void ath9k_tx(struct ieee80211_hw *hw, struct ieee80211_tx_control *control,
+	      struct sk_buff *skb);
 void ath9k_wake_tx_queue(struct ieee80211_hw *hw, struct ieee80211_txq *queue);
 
 /********/
