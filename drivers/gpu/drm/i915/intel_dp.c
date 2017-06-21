@@ -5117,6 +5117,7 @@ intel_pps_readout_hw_state(struct drm_i915_private *dev_priv,
 			   struct intel_dp *intel_dp, struct edp_power_seq *seq)
 {
 	u32 pp_on, pp_off, pp_div = 0, pp_ctl = 0;
+	u16 pp_cycle_delay = 0;
 	struct pps_registers regs;
 
 	intel_pps_get_registers(dev_priv, intel_dp, &regs);
@@ -5145,17 +5146,16 @@ intel_pps_readout_hw_state(struct drm_i915_private *dev_priv,
 	seq->t10 = (pp_off & PANEL_POWER_DOWN_DELAY_MASK) >>
 		   PANEL_POWER_DOWN_DELAY_SHIFT;
 
-	if (IS_GEN9_LP(dev_priv) || HAS_PCH_CNP(dev_priv)) {
-		u16 tmp = (pp_ctl & BXT_POWER_CYCLE_DELAY_MASK) >>
+	if (IS_GEN9_LP(dev_priv) || HAS_PCH_CNP(dev_priv))
+		pp_cycle_delay =  (pp_ctl & BXT_POWER_CYCLE_DELAY_MASK) >>
 			BXT_POWER_CYCLE_DELAY_SHIFT;
-		if (tmp > 0)
-			seq->t11_t12 = (tmp - 1) * 1000;
-		else
-			seq->t11_t12 = 0;
-	} else {
-		seq->t11_t12 = ((pp_div & PANEL_POWER_CYCLE_DELAY_MASK) >>
-		       PANEL_POWER_CYCLE_DELAY_SHIFT) * 1000;
-	}
+	else
+		pp_cycle_delay = (pp_div & PANEL_POWER_CYCLE_DELAY_MASK) >>
+			PANEL_POWER_CYCLE_DELAY_SHIFT;
+	if (pp_cycle_delay > 0)
+		seq->t11_t12 = (pp_cycle_delay - 1) * 1000;
+	else
+		seq->t11_t12 = 0;
 }
 
 static void
@@ -5309,7 +5309,7 @@ intel_dp_init_panel_power_sequencer_registers(struct drm_device *dev,
 				<< BXT_POWER_CYCLE_DELAY_SHIFT);
 	} else {
 		pp_div = ((100 * div)/2 - 1) << PP_REFERENCE_DIVIDER_SHIFT;
-		pp_div |= (DIV_ROUND_UP(seq->t11_t12, 1000)
+		pp_div |= (DIV_ROUND_UP(seq->t11_t12 + 1, 1000)
 				<< PANEL_POWER_CYCLE_DELAY_SHIFT);
 	}
 
