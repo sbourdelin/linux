@@ -80,6 +80,8 @@ static int gup_huge_pmd(pmd_t *pmdp, pmd_t pmd, unsigned long addr,
 	refs = 0;
 	head = pmd_page(pmd);
 	page = head + ((addr & ~PMD_MASK) >> PAGE_SHIFT);
+	if (PageTail(head))
+		head = compound_head(head);
 	do {
 		VM_BUG_ON(compound_head(page) != head);
 		pages[*nr] = page;
