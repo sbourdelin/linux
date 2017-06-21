@@ -151,5 +151,7 @@ void vnet_port_reset(struct vnet_port *port);
 bool sunvnet_port_is_up_common(struct vnet_port *vnet);
 void sunvnet_port_add_txq_common(struct vnet_port *port);
 void sunvnet_port_rm_txq_common(struct vnet_port *port);
+int sunvnet_get_settings(struct net_device *netdev,
+			 struct ethtool_cmd *ecmd);
 
 #endif /* _SUNVNETCOMMON_H */

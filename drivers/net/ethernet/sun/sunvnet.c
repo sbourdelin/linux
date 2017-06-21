@@ -189,6 +189,7 @@ static void vnet_get_ethtool_stats(struct net_device *dev,
 }
 
 static const struct ethtool_ops vnet_ethtool_ops = {
+	.get_settings		= sunvnet_get_settings,
 	.get_drvinfo		= vnet_get_drvinfo,
 	.get_msglevel		= vnet_get_msglevel,
 	.set_msglevel		= vnet_set_msglevel,

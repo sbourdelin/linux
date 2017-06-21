@@ -88,6 +88,7 @@ static void vsw_set_msglevel(struct net_device *dev, u32 value)
 }
 
 static const struct ethtool_ops vsw_ethtool_ops = {
+	.get_settings		= sunvnet_get_settings,
 	.get_drvinfo		= vsw_get_drvinfo,
 	.get_msglevel		= vsw_get_msglevel,
 	.set_msglevel		= vsw_set_msglevel,

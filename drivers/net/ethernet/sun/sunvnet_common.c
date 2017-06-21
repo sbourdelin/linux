@@ -1759,3 +1759,14 @@ void sunvnet_port_rm_txq_common(struct vnet_port *port)
 	port->q_index = 0;
 }
 EXPORT_SYMBOL_GPL(sunvnet_port_rm_txq_common);
+
+int sunvnet_get_settings(struct net_device *netdev,
+			 struct ethtool_cmd *ecmd)
+{
+	ethtool_cmd_speed_set(ecmd, 0);
+	ecmd->duplex = DUPLEX_FULL;
+	ecmd->port = PORT_NONE;
+
+	return 0;
+}
+EXPORT_SYMBOL_GPL(sunvnet_get_settings);
