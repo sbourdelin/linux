@@ -88,7 +88,7 @@ int sctp_ulpevent_is_notification(const struct sctp_ulpevent *event)
 /* Hold the association in case the msg_name needs read out of
  * the association.
  */
-static inline void sctp_ulpevent_set_owner(struct sctp_ulpevent *event,
+static void sctp_ulpevent_set_owner(struct sctp_ulpevent *event,
 					   const struct sctp_association *asoc)
 {
 	struct sctp_chunk *chunk = event->chunk;
