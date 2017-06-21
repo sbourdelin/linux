@@ -184,6 +184,9 @@ static void free_resource(struct resource *res)
 	if (!res)
 		return;
 
+	if (!(res->flags & IORESOURCE_ALLOCATED))
+		return;
+
 	if (!PageSlab(virt_to_head_page(res))) {
 		spin_lock(&bootmem_resource_lock);
 		res->sibling = bootmem_resource_free;
@@ -209,6 +212,8 @@ static struct resource *alloc_resource(gfp_t flags)
 		memset(res, 0, sizeof(struct resource));
 	else
 		res = kzalloc(sizeof(struct resource), flags);
+
+	res->flags = IORESOURCE_ALLOCATED;
 
 	return res;
 }
@@ -1117,26 +1122,15 @@ resource_size_t resource_alignment(struct resource *res)
 static DECLARE_WAIT_QUEUE_HEAD(muxed_resource_wait);
 
 /**
- * __request_region - create a new busy resource region
+ * __request_declared_region - create a new busy resource region
  * @parent: parent resource descriptor
- * @start: resource start address
- * @n: resource region size
- * @name: reserving caller's ID string
+ * @res: child resource descriptor
  * @flags: IO resource flags
  */
-struct resource * __request_region(struct resource *parent,
-				   resource_size_t start, resource_size_t n,
-				   const char *name, int flags)
+struct resource * __request_declared_region(struct resource *parent,
+				   struct resource *res, int flags)
 {
 	DECLARE_WAITQUEUE(wait, current);
-	struct resource *res = alloc_resource(GFP_KERNEL);
-
-	if (!res)
-		return NULL;
-
-	res->name = name;
-	res->start = start;
-	res->end = start + n - 1;
 
 	write_lock(&resource_lock);
 
@@ -1166,11 +1160,40 @@ struct resource * __request_region(struct resource *parent,
 			continue;
 		}
 		/* Uhhuh, that didn't work out.. */
-		free_resource(res);
 		res = NULL;
 		break;
 	}
 	write_unlock(&resource_lock);
+	return res;
+}
+EXPORT_SYMBOL(__request_declared_region);
+
+/**
+ * __request_region - create a new busy resource region
+ * @parent: parent resource descriptor
+ * @start: resource start address
+ * @n: resource region size
+ * @name: reserving caller's ID string
+ * @flags: IO resource flags
+ */
+struct resource * __request_region(struct resource *parent,
+				   resource_size_t start, resource_size_t n,
+				   const char *name, int flags)
+{
+	struct resource *res = alloc_resource(GFP_KERNEL);
+
+	if (!res)
+		return NULL;
+
+	res->name = name;
+	res->start = start;
+	res->end = start + n - 1;
+
+	if (!__request_declared_region(parent, res, flags)) {
+		free_resource(res);
+		res = NULL;
+	}
+
 	return res;
 }
 EXPORT_SYMBOL(__request_region);
