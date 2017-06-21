@@ -734,4 +734,7 @@ bool intel_engines_are_idle(struct drm_i915_private *dev_priv);
 void intel_engines_mark_idle(struct drm_i915_private *i915);
 void intel_engines_reset_default_submission(struct drm_i915_private *i915);
 
+struct intel_engine_cs *
+intel_engine_lookup(struct drm_i915_private *i915, u8 class, u8 instance);
+
 #endif /* _INTEL_RINGBUFFER_H_ */

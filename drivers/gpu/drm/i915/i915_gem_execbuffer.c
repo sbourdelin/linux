@@ -2048,6 +2048,30 @@ gen8_dispatch_bsd_engine(struct drm_i915_private *dev_priv,
 	return file_priv->bsd_engine;
 }
 
+static u8 user_class_map[I915_ENGINE_CLASS_MAX] = {
+	[I915_ENGINE_CLASS_OTHER] = OTHER_CLASS,
+	[I915_ENGINE_CLASS_RENDER] = RENDER_CLASS,
+	[I915_ENGINE_CLASS_COPY] = COPY_ENGINE_CLASS,
+	[I915_ENGINE_CLASS_VIDEO] = VIDEO_DECODE_CLASS,
+	[I915_ENGINE_CLASS_VIDEO_ENHANCE] = VIDEO_ENHANCEMENT_CLASS,
+};
+
+static struct intel_engine_cs *
+eb_select_engine_class_instance(struct drm_i915_private *i915,
+				struct drm_i915_gem_execbuffer2 *args)
+{
+	u8 class = args->flags & I915_EXEC_RING_MASK;
+	u8 instance;
+
+	if (class >= ARRAY_SIZE(user_class_map))
+		return NULL;
+
+	instance = (args->flags & I915_EXEC_INSTANCE_MASK) >>
+		   I915_EXEC_INSTANCE_SHIFT;
+
+	return intel_engine_lookup(i915, user_class_map[class], instance);
+}
+
 #define I915_USER_RINGS (4)
 
 static const enum intel_engine_id user_ring_map[I915_USER_RINGS + 1] = {
@@ -2065,6 +2089,9 @@ eb_select_engine(struct drm_i915_private *dev_priv,
 {
 	unsigned int user_ring_id = args->flags & I915_EXEC_RING_MASK;
 	struct intel_engine_cs *engine;
+
+	if (args->flags & I915_EXEC_CLASS_INSTANCE)
+		return eb_select_engine_class_instance(dev_priv, args);
 
 	if (user_ring_id > I915_USER_RINGS) {
 		DRM_DEBUG("execbuf with unknown ring: %u\n", user_ring_id);

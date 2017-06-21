@@ -197,6 +197,15 @@ intel_engine_setup(struct drm_i915_private *dev_priv,
 	GEM_BUG_ON(info->class >= ARRAY_SIZE(intel_engine_classes));
 	class_info = &intel_engine_classes[info->class];
 
+	if (GEM_WARN_ON(info->class > MAX_ENGINE_CLASS))
+		return -EINVAL;
+
+	if (GEM_WARN_ON(info->instance > MAX_ENGINE_INSTANCE))
+		return -EINVAL;
+
+	if (GEM_WARN_ON(dev_priv->engine_class[info->class][info->instance]))
+		return -EINVAL;
+
 	GEM_BUG_ON(dev_priv->engine[id]);
 	engine = kzalloc(sizeof(*engine), GFP_KERNEL);
 	if (!engine)
@@ -224,7 +233,9 @@ intel_engine_setup(struct drm_i915_private *dev_priv,
 
 	ATOMIC_INIT_NOTIFIER_HEAD(&engine->context_status_notifier);
 
+	dev_priv->engine_class[info->class][info->instance] = engine;
 	dev_priv->engine[id] = engine;
+
 	return 0;
 }
 
@@ -1342,6 +1353,15 @@ void intel_engines_mark_idle(struct drm_i915_private *i915)
 		i915_gem_batch_pool_fini(&engine->batch_pool);
 		engine->no_priolist = false;
 	}
+}
+
+struct intel_engine_cs *
+intel_engine_lookup(struct drm_i915_private *i915, u8 class, u8 instance)
+{
+	if (class > MAX_ENGINE_CLASS || instance > MAX_ENGINE_INSTANCE)
+		return NULL;
+
+	return i915->engine_class[class][instance];
 }
 
 #if IS_ENABLED(CONFIG_DRM_I915_SELFTEST)

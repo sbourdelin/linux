@@ -927,13 +927,33 @@ struct drm_i915_gem_execbuffer2 {
  * element).
  */
 #define I915_EXEC_BATCH_FIRST		(1<<18)
-#define __I915_EXEC_UNKNOWN_FLAGS (-(I915_EXEC_BATCH_FIRST<<1))
+
+#define I915_EXEC_CLASS_INSTANCE	(1<<19)
+
+#define I915_EXEC_INSTANCE_SHIFT	(20)
+#define I915_EXEC_INSTANCE_MASK		(0xff << I915_EXEC_INSTANCE_SHIFT)
+
+#define __I915_EXEC_UNKNOWN_FLAGS (-((1 << 27) << 1))
 
 #define I915_EXEC_CONTEXT_ID_MASK	(0xffffffff)
 #define i915_execbuffer2_set_context_id(eb2, context) \
 	(eb2).rsvd1 = context & I915_EXEC_CONTEXT_ID_MASK
 #define i915_execbuffer2_get_context_id(eb2) \
 	((eb2).rsvd1 & I915_EXEC_CONTEXT_ID_MASK)
+
+enum drm_i915_gem_engine_class {
+	I915_ENGINE_CLASS_OTHER = 0,
+	I915_ENGINE_CLASS_RENDER = 1,
+	I915_ENGINE_CLASS_COPY = 2,
+	I915_ENGINE_CLASS_VIDEO = 3,
+	I915_ENGINE_CLASS_VIDEO_ENHANCE = 4,
+	I915_ENGINE_CLASS_MAX /* non-ABI */
+};
+
+#define i915_execbuffer2_engine(class, instance) \
+	(I915_EXEC_CLASS_INSTANCE | \
+	(class) | \
+	((instance) << I915_EXEC_INSTANCE_SHIFT))
 
 struct drm_i915_gem_pin {
 	/** Handle of the buffer to be pinned. */
