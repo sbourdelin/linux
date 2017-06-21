@@ -16,6 +16,7 @@
 		keypad,num-rows = <8>;
 		keypad,num-columns = <13>;
 		google,needs-ghost-filter;
+		wakeup-source;
 
 		linux,keymap = <
 			MATRIX_KEY(0x00, 0x01, KEY_LEFTMETA)
