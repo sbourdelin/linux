@@ -452,24 +452,20 @@ static int faraday_pci_probe(struct platform_device *pdev)
 
 	/* Retrieve and enable optional clocks */
 	clk = devm_clk_get(dev, "PCLK");
-	if (IS_ERR(clk)) {
-		dev_err(dev, "no PCLK available\n");
-	} else {
-		ret = clk_prepare_enable(clk);
-		if (ret) {
-			dev_err(dev, "could not prepare PCLK\n");
-			return ret;
-		}
+	if (IS_ERR(clk))
+		return PTR_ERR(clk);
+	ret = clk_prepare_enable(clk);
+	if (ret) {
+		dev_err(dev, "could not prepare PCLK\n");
+		return ret;
 	}
 	p->bus_clk = devm_clk_get(dev, "PCICLK");
-	if (IS_ERR(p->bus_clk)) {
-		dev_err(dev, "no PCICLK available\n");
-	} else {
-		ret = clk_prepare_enable(p->bus_clk);
-		if (ret) {
-			dev_err(dev, "could not prepare PCICLK\n");
-			return ret;
-		}
+	if (IS_ERR(p->bus_clk))
+		return PTR_ERR(clk);
+	ret = clk_prepare_enable(p->bus_clk);
+	if (ret) {
+		dev_err(dev, "could not prepare PCICLK\n");
+		return ret;
 	}
 
 	regs = platform_get_resource(pdev, IORESOURCE_MEM, 0);
