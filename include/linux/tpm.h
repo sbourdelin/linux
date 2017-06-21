@@ -22,6 +22,8 @@
 #ifndef __LINUX_TPM_H__
 #define __LINUX_TPM_H__
 
+#include <crypto/hash_info.h>
+
 #define TPM_DIGEST_SIZE 20	/* Max TPM v1.2 PCR size */
 
 /*
@@ -37,6 +39,17 @@ enum TPM_OPS_FLAGS {
 	TPM_OPS_AUTO_STARTUP = BIT(0),
 };
 
+enum tpm2_algorithms {
+	TPM2_ALG_ERROR		= 0x0000,
+	TPM2_ALG_SHA1		= 0x0004,
+	TPM2_ALG_KEYEDHASH	= 0x0008,
+	TPM2_ALG_SHA256		= 0x000B,
+	TPM2_ALG_SHA384		= 0x000C,
+	TPM2_ALG_SHA512		= 0x000D,
+	TPM2_ALG_NULL		= 0x0010,
+	TPM2_ALG_SM3_256	= 0x0012,
+};
+
 struct tpm_class_ops {
 	unsigned int flags;
 	const u8 req_complete_mask;
@@ -50,6 +63,12 @@ struct tpm_class_ops {
 				unsigned long *timeout_cap);
 	int (*request_locality)(struct tpm_chip *chip, int loc);
 	void (*relinquish_locality)(struct tpm_chip *chip, int loc);
+};
+
+struct tpm_pcr_bank_info {
+	enum tpm2_algorithms alg_id;
+	enum hash_algo crypto_id;
+	u32 digest_size;
 };
 
 #if defined(CONFIG_TCG_TPM) || defined(CONFIG_TCG_TPM_MODULE)

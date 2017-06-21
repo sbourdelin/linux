@@ -992,6 +992,36 @@ int tpm2_probe(struct tpm_chip *chip)
 }
 EXPORT_SYMBOL_GPL(tpm2_probe);
 
+static int tpm2_init_pcr_bank_info(struct tpm_chip *chip, u16 alg_id,
+				   struct tpm_pcr_bank_info *active_bank)
+{
+	struct tpm_buf buf;
+	struct tpm2_pcr_read_out *pcrread_out;
+	int rc = 0;
+	int i;
+
+	active_bank->alg_id = alg_id;
+
+	rc = tpm2_pcr_read_tpm_buf(chip, 0, alg_id, &buf, NULL);
+	if (rc)
+		goto out;
+
+	pcrread_out = (struct tpm2_pcr_read_out *)&buf.data[TPM_HEADER_SIZE];
+
+	active_bank->digest_size = be16_to_cpu(pcrread_out->digest_size);
+	active_bank->crypto_id = HASH_ALGO__LAST;
+
+	for (i = 0; i < ARRAY_SIZE(tpm2_hash_map); i++) {
+		if (active_bank->alg_id != tpm2_hash_map[i].tpm_id)
+			continue;
+
+		active_bank->crypto_id = tpm2_hash_map[i].crypto_id;
+	}
+out:
+	tpm_buf_destroy(&buf);
+	return rc;
+}
+
 struct tpm2_pcr_selection {
 	__be16  hash_alg;
 	u8  size_of_select;
