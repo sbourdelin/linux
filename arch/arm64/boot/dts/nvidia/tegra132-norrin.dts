@@ -758,6 +758,7 @@
 			reg = <0>;
 
 			google,cros-ec-spi-msg-delay = <2000>;
+			wakeup-source;
 
 			i2c_20: i2c-tunnel {
 				compatible = "google,cros-ec-i2c-tunnel";
