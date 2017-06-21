@@ -992,6 +992,13 @@ bool out_of_memory(struct oom_control *oc)
 	if (oom_killer_disabled)
 		return false;
 
+	/*
+	 * If there are oom victims in flight, we don't need to select
+	 * a new victim.
+	 */
+	if (atomic_read(&oom_victims) > 0)
+		return true;
+
 	if (!is_memcg_oom(oc)) {
 		blocking_notifier_call_chain(&oom_notify_list, 0, &freed);
 		if (freed > 0)
