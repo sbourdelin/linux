@@ -244,7 +244,7 @@ void ieee80211_propagate_queue_wake(struct ieee80211_local *local, int queue)
 	struct ieee80211_sub_if_data *sdata;
 	int n_acs = IEEE80211_NUM_ACS;
 
-	if (local->ops->wake_tx_queue)
+	if (local->ops->wake_tx_queue != ieee80211_wake_tx_queue)
 		return;
 
 	if (local->hw.queues < IEEE80211_NUM_ACS)
@@ -350,7 +350,7 @@ static void __ieee80211_stop_queue(struct ieee80211_hw *hw, int queue,
 	if (__test_and_set_bit(reason, &local->queue_stop_reasons[queue]))
 		return;
 
-	if (local->ops->wake_tx_queue)
+	if (local->ops->wake_tx_queue != ieee80211_wake_tx_queue)
 		return;
 
 	if (local->hw.queues < IEEE80211_NUM_ACS)

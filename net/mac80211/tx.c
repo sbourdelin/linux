@@ -1248,7 +1248,8 @@ static struct txq_info *ieee80211_get_txq(struct ieee80211_local *local,
 	struct ieee80211_tx_info *info = IEEE80211_SKB_CB(skb);
 	struct ieee80211_txq *txq;
 
-	if ((info->flags & IEEE80211_TX_CTL_SEND_AFTER_DTIM) ||
+	if (vif->type == NL80211_IFTYPE_MONITOR ||
+	    (info->flags & IEEE80211_TX_CTL_SEND_AFTER_DTIM) ||
 	    (info->control.flags & IEEE80211_TX_CTRL_PS_RESPONSE)) {
 		txq = NULL;
 	} else if (!ieee80211_is_data_present(hdr->frame_control)) {
@@ -1448,9 +1449,6 @@ int ieee80211_txq_setup_flows(struct ieee80211_local *local)
 	bool supp_vht = false;
 	enum nl80211_band band;
 
-	if (!local->ops->wake_tx_queue)
-		return 0;
-
 	ret = fq_init(fq, 4096);
 	if (ret)
 		return ret;
@@ -1496,9 +1494,6 @@ void ieee80211_txq_teardown_flows(struct ieee80211_local *local)
 {
 	struct fq *fq = &local->fq;
 
-	if (!local->ops->wake_tx_queue)
-		return;
-
 	kfree(local->cvars);
 	local->cvars = NULL;
 
@@ -1509,16 +1504,12 @@ void ieee80211_txq_teardown_flows(struct ieee80211_local *local)
 
 static bool ieee80211_queue_skb(struct ieee80211_local *local,
 				struct ieee80211_sub_if_data *sdata,
-				struct sta_info *sta,
-				struct sk_buff *skb)
+				struct sta_info *sta, struct sk_buff *skb,
+				bool txpending)
 {
 	struct fq *fq = &local->fq;
 	struct ieee80211_vif *vif;
 	struct txq_info *txqi;
-
-	if (!local->ops->wake_tx_queue ||
-	    sdata->vif.type == NL80211_IFTYPE_MONITOR)
-		return false;
 
 	if (sdata->vif.type == NL80211_IFTYPE_AP_VLAN)
 		sdata = container_of(sdata->bss,
@@ -1527,16 +1518,23 @@ static bool ieee80211_queue_skb(struct ieee80211_local *local,
 	vif = &sdata->vif;
 	txqi = ieee80211_get_txq(local, vif, sta, skb);
 
-	if (WARN_ON(!txqi))
-		return false;
+	if (WARN_ON(!txqi)) {
+		ieee80211_free_txskb(&local->hw, skb);
+		return true;
+	}
 
 	spin_lock_bh(&fq->lock);
 	ieee80211_txq_enqueue(local, txqi, skb);
 	spin_unlock_bh(&fq->lock);
 
+	if (txpending)
+		set_bit(IEEE80211_TXQ_PENDING, &txqi->flags);
+	else
+		clear_bit(IEEE80211_TXQ_PENDING, &txqi->flags);
+	set_bit(IEEE80211_TXQ_RESULT, &txqi->flags);
 	drv_wake_tx_queue(local, txqi);
-
-	return true;
+	clear_bit(IEEE80211_TXQ_PENDING, &txqi->flags);
+	return test_bit(IEEE80211_TXQ_RESULT, &txqi->flags);
 }
 
 static bool ieee80211_tx_frags(struct ieee80211_local *local,
@@ -1820,8 +1818,6 @@ static bool ieee80211_tx(struct ieee80211_sub_if_data *sdata,
 	struct ieee80211_tx_data tx;
 	ieee80211_tx_result res_prepare;
 	struct ieee80211_tx_info *info = IEEE80211_SKB_CB(skb);
-	bool result = true;
-	int led_len;
 
 	if (unlikely(skb->len < 10)) {
 		dev_kfree_skb(skb);
@@ -1829,7 +1825,6 @@ static bool ieee80211_tx(struct ieee80211_sub_if_data *sdata,
 	}
 
 	/* initialises tx */
-	led_len = skb->len;
 	res_prepare = ieee80211_tx_prepare(sdata, &tx, sta, skb);
 
 	if (unlikely(res_prepare == TX_DROP)) {
@@ -1848,14 +1843,7 @@ static bool ieee80211_tx(struct ieee80211_sub_if_data *sdata,
 	if (invoke_tx_handlers_early(&tx))
 		return false;
 
-	if (ieee80211_queue_skb(local, sdata, tx.sta, tx.skb))
-		return true;
-
-	if (!invoke_tx_handlers_late(&tx))
-		result = __ieee80211_tx(local, &tx.skbs, led_len,
-					tx.sta, txpending);
-
-	return result;
+	return ieee80211_queue_skb(local, sdata, tx.sta, tx.skb, txpending);
 }
 
 /* device xmit handlers */
@@ -3300,6 +3288,8 @@ static bool ieee80211_xmit_fast(struct ieee80211_sub_if_data *sdata,
 	struct tid_ampdu_tx *tid_tx = NULL;
 	u8 tid = IEEE80211_NUM_TIDS;
 
+	return false;
+
 	/* control port protocol needs a lot of special handling */
 	if (cpu_to_be16(ethertype) == sdata->control_port_protocol)
 		return false;
@@ -3392,18 +3382,8 @@ static bool ieee80211_xmit_fast(struct ieee80211_sub_if_data *sdata,
 		}
 	}
 
-	if (ieee80211_queue_skb(local, sdata, sta, skb))
-		return true;
+	ieee80211_queue_skb(local, sdata, sta, skb, false);
 
-	ieee80211_xmit_fast_finish(sdata, sta, fast_tx->pn_offs,
-				   fast_tx->key, skb);
-
-	if (sdata->vif.type == NL80211_IFTYPE_AP_VLAN)
-		sdata = container_of(sdata->bss,
-				     struct ieee80211_sub_if_data, u.ap);
-
-	__skb_queue_tail(&tx.skbs, skb);
-	ieee80211_tx_frags(local, &sdata->vif, &sta->sta, &tx.skbs, false);
 	return true;
 }
 
@@ -4712,3 +4692,28 @@ void __ieee80211_tx_skb_tid_band(struct ieee80211_sub_if_data *sdata,
 	ieee80211_xmit(sdata, NULL, skb);
 	local_bh_enable();
 }
+
+void ieee80211_wake_tx_queue(struct ieee80211_hw *hw,
+			     struct ieee80211_txq *txq)
+{
+	struct ieee80211_local *local = hw_to_local(hw);
+	struct txq_info *txqi = container_of(txq, struct txq_info, txq);
+	struct sk_buff *skb;
+	struct sk_buff_head skbs;
+	struct sta_info *sta = NULL;
+
+	if (txq->sta)
+		sta = container_of(txq->sta, struct sta_info, sta);
+
+	while ((skb = ieee80211_tx_dequeue(hw, txq))) {
+		__skb_queue_head_init(&skbs);
+		__skb_queue_head(&skbs, skb);
+		skb_queue_splice_tail_init(&txqi->frags, &skbs);
+
+		/* use approximate length for fragmented frames for LED blinking */
+		if (!__ieee80211_tx(local, &skbs, skbs.qlen * skb->len, sta,
+				    test_bit(IEEE80211_TXQ_PENDING, &txqi->flags)))
+			clear_bit(IEEE80211_TXQ_RESULT, &txqi->flags);
+	}
+}
+EXPORT_SYMBOL_GPL(ieee80211_wake_tx_queue);

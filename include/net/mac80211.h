@@ -97,7 +97,8 @@
  * Other frames (e.g. control or management) are still pushed using drv_tx().
  *
  * Drivers indicate that they use this model by implementing the .wake_tx_queue
- * driver operation.
+ * driver operation; if they don't want to use this model they need to set the
+ * .wake_tx_queue operation to point to ieee80211_wake_tx_queue().
  *
  * Intermediate queues (struct ieee80211_txq) are kept per-sta per-tid, with
  * another per-sta for non-data/non-mgmt and bufferable management frames, and
@@ -5866,6 +5867,9 @@ void ieee80211_unreserve_tid(struct ieee80211_sta *sta, u8 tid);
  */
 struct sk_buff *ieee80211_tx_dequeue(struct ieee80211_hw *hw,
 				     struct ieee80211_txq *txq);
+
+void ieee80211_wake_tx_queue(struct ieee80211_hw *hw,
+			     struct ieee80211_txq *txq);
 
 /**
  * ieee80211_txq_get_depth - get pending frame/byte count of given txq

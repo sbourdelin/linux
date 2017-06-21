@@ -373,7 +373,7 @@ void debugfs_hw_add(struct ieee80211_local *local)
 	DEBUGFS_ADD(user_power);
 	DEBUGFS_ADD(power);
 
-	if (local->ops->wake_tx_queue)
+	if (local->ops->wake_tx_queue != ieee80211_wake_tx_queue)
 		DEBUGFS_ADD_MODE(aqm, 0600);
 
 	statsd = debugfs_create_dir("statistics", phyd);

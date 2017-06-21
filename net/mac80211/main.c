@@ -508,6 +508,9 @@ struct ieee80211_hw *ieee80211_alloc_hw_nm(size_t priv_data_len,
 		return NULL;
 	use_chanctx = i == 5;
 
+	if (WARN_ON(!ops->wake_tx_queue))
+		return NULL;
+
 	/* Ensure 32-byte alignment of our private data and hw private data.
 	 * We use the wiphy priv data for both our ieee80211_local and for
 	 * the driver's private data
@@ -848,6 +851,11 @@ int ieee80211_register_hw(struct ieee80211_hw *hw)
 	if (hw->wiphy->wowlan && (!local->ops->suspend || !local->ops->resume))
 		return -EINVAL;
 #endif
+
+	if (local->ops->wake_tx_queue == ieee80211_wake_tx_queue) {
+		if (WARN_ON(local->hw.txq_data_size))
+			return -EINVAL;
+	}
 
 	if (!local->use_chanctx) {
 		for (i = 0; i < local->hw.wiphy->n_iface_combinations; i++) {
