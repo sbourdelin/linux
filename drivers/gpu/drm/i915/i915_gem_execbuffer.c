@@ -2061,6 +2061,9 @@ eb_select_engine_class_instance(struct drm_i915_private *i915,
 				struct drm_i915_gem_execbuffer2 *args)
 {
 	u8 class = args->flags & I915_EXEC_RING_MASK;
+	u8 caps = (args->flags & I915_EXEC_ENGINE_CAP_MASK) >>
+		  I915_EXEC_ENGINE_CAP_SHIFT;
+	struct intel_engine_cs *engine;
 	u8 instance;
 
 	if (class >= ARRAY_SIZE(user_class_map))
@@ -2069,7 +2072,12 @@ eb_select_engine_class_instance(struct drm_i915_private *i915,
 	instance = (args->flags & I915_EXEC_INSTANCE_MASK) >>
 		   I915_EXEC_INSTANCE_SHIFT;
 
-	return intel_engine_lookup(i915, user_class_map[class], instance);
+	engine = intel_engine_lookup(i915, user_class_map[class], instance);
+
+	if (!engine || ((caps & engine->caps) != caps))
+		return NULL;
+
+	return engine;
 }
 
 #define I915_USER_RINGS (4)
