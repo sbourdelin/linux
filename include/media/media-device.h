@@ -247,9 +247,9 @@ void media_device_cleanup(struct media_device *mdev);
  *
  *  - &media_entity.hw_revision is the hardware device revision in a
  *    driver-specific format. When possible the revision should be formatted
- *    with the KERNEL_VERSION() macro.
+ *    with the MEDIA_REVISION() macro.
  *
- *  - &media_entity.driver_version is formatted with the KERNEL_VERSION()
+ *  - &media_entity.driver_version is formatted with the MEDIA_REVISION()
  *    macro. The version minor must be incremented when new features are added
  *    to the userspace API without breaking binary compatibility. The version
  *    major must be incremented when binary compatibility is broken.
@@ -264,7 +264,6 @@ void media_device_cleanup(struct media_device *mdev);
  */
 int __must_check __media_device_register(struct media_device *mdev,
 					 struct module *owner);
-
 
 /**
  * media_device_register() - Registers a media device element
