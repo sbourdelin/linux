@@ -556,8 +556,18 @@ static void oom_reap_task(struct task_struct *tsk)
 	struct mm_struct *mm = tsk->signal->oom_mm;
 
 	/* Retry the down_read_trylock(mmap_sem) a few times */
-	while (attempts++ < MAX_OOM_REAP_RETRIES && !__oom_reap_task_mm(tsk, mm))
+	while (attempts++ < MAX_OOM_REAP_RETRIES &&
+	       !__oom_reap_task_mm(tsk, mm)) {
+
+		/*
+		 * If the task has no access to the memory reserves,
+		 * grant it to help the task to exit.
+		 */
+		if (!test_tsk_thread_flag(tsk, TIF_MEMDIE))
+			set_tsk_thread_flag(tsk, TIF_MEMDIE);
+
 		schedule_timeout_idle(HZ/10);
+	}
 
 	if (attempts <= MAX_OOM_REAP_RETRIES)
 		goto done;
@@ -647,16 +657,13 @@ static inline void wake_oom_reaper(struct task_struct *tsk)
  */
 static void mark_oom_victim(struct task_struct *tsk)
 {
-	struct mm_struct *mm = tsk->mm;
-
 	WARN_ON(oom_killer_disabled);
-	/* OOM killer might race with memcg OOM */
-	if (test_and_set_tsk_thread_flag(tsk, TIF_MEMDIE))
-		return;
 
 	/* oom_mm is bound to the signal struct life time. */
-	if (!cmpxchg(&tsk->signal->oom_mm, NULL, mm))
-		mmgrab(tsk->signal->oom_mm);
+	if (cmpxchg(&tsk->signal->oom_mm, NULL, tsk->mm) != NULL)
+		return;
+
+	mmgrab(tsk->signal->oom_mm);
 
 	/*
 	 * Make sure that the task is woken up from uninterruptible sleep
@@ -665,7 +672,13 @@ static void mark_oom_victim(struct task_struct *tsk)
 	 * that TIF_MEMDIE tasks should be ignored.
 	 */
 	__thaw_task(tsk);
-	atomic_inc(&oom_victims);
+
+	/*
+	 * If there are no oom victims in flight,
+	 * give the task an access to the memory reserves.
+	 */
+	if (atomic_inc_return(&oom_victims) == 1)
+		set_tsk_thread_flag(tsk, TIF_MEMDIE);
 }
 
 /**
