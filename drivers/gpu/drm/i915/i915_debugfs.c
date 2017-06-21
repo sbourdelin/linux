@@ -3792,13 +3792,18 @@ static int i915_displayport_test_active_show(struct seq_file *m, void *data)
 
 	drm_connector_list_iter_begin(dev, &conn_iter);
 	drm_for_each_connector_iter(connector, &conn_iter) {
+		struct intel_encoder *encoder;
+
 		if (connector->connector_type !=
 		    DRM_MODE_CONNECTOR_DisplayPort)
 			continue;
 
-		if (connector->status == connector_status_connected &&
-		    connector->encoder != NULL) {
-			intel_dp = enc_to_intel_dp(connector->encoder);
+		encoder = to_intel_encoder(connector->encoder);
+		if (encoder && encoder->type == INTEL_OUTPUT_DP_MST)
+			continue;
+
+		if (encoder && connector->status == connector_status_connected) {
+			intel_dp = enc_to_intel_dp(&encoder->base);
 			if (intel_dp->compliance.test_active)
 				seq_puts(m, "1");
 			else
@@ -3838,13 +3843,18 @@ static int i915_displayport_test_data_show(struct seq_file *m, void *data)
 
 	drm_connector_list_iter_begin(dev, &conn_iter);
 	drm_for_each_connector_iter(connector, &conn_iter) {
+		struct intel_encoder *encoder;
+
 		if (connector->connector_type !=
 		    DRM_MODE_CONNECTOR_DisplayPort)
 			continue;
 
-		if (connector->status == connector_status_connected &&
-		    connector->encoder != NULL) {
-			intel_dp = enc_to_intel_dp(connector->encoder);
+		encoder = to_intel_encoder(connector->encoder);
+		if (encoder && encoder->type == INTEL_OUTPUT_DP_MST)
+			continue;
+
+		if (encoder && connector->status == connector_status_connected) {
+			intel_dp = enc_to_intel_dp(&encoder->base);
 			if (intel_dp->compliance.test_type ==
 			    DP_TEST_LINK_EDID_READ)
 				seq_printf(m, "%lx",
@@ -3891,13 +3901,18 @@ static int i915_displayport_test_type_show(struct seq_file *m, void *data)
 
 	drm_connector_list_iter_begin(dev, &conn_iter);
 	drm_for_each_connector_iter(connector, &conn_iter) {
+		struct intel_encoder *encoder;
+
 		if (connector->connector_type !=
 		    DRM_MODE_CONNECTOR_DisplayPort)
 			continue;
 
-		if (connector->status == connector_status_connected &&
-		    connector->encoder != NULL) {
-			intel_dp = enc_to_intel_dp(connector->encoder);
+		encoder = to_intel_encoder(connector->encoder);
+		if (encoder && encoder->type == INTEL_OUTPUT_DP_MST)
+			continue;
+
+		if (encoder && connector->status == connector_status_connected) {
+			intel_dp = enc_to_intel_dp(&encoder->base);
 			seq_printf(m, "%02lx", intel_dp->compliance.test_type);
 		} else
 			seq_puts(m, "0");
