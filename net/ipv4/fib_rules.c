@@ -402,7 +402,13 @@ static int fib_default_rules_init(struct fib_rules_ops *ops)
 int __net_init fib4_rules_init(struct net *net)
 {
 	int err;
+	unsigned int h;
+	struct fib_table *main_table;
 	struct fib_rules_ops *ops;
+
+	main_table = fib_trie_table(RT_TABLE_MAIN, NULL);
+	if (!main_table)
+		return -ENOMEM;
 
 	ops = fib_rules_register(&fib4_rules_ops_template, net);
 	if (IS_ERR(ops))
@@ -413,11 +419,16 @@ int __net_init fib4_rules_init(struct net *net)
 		goto fail;
 	net->ipv4.rules_ops = ops;
 	net->ipv4.fib_has_custom_rules = false;
+
+	rcu_assign_pointer(net->ipv4.fib_main, main_table);
+	h = RT_TABLE_MAIN & (FIB_TABLE_HASHSZ - 1);
+	hlist_add_head_rcu(&main_table->tb_hlist, &net->ipv4.fib_table_hash[h]);
 	return 0;
 
 fail:
 	/* also cleans all rules already added */
 	fib_rules_unregister(ops);
+	fib_free_table(main_table);
 	return err;
 }
 
