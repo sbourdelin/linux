@@ -82,7 +82,7 @@ int udl_handle_damage(struct udl_framebuffer *fb, int x, int y,
 {
 	struct drm_device *dev = fb->base.dev;
 	struct udl_device *udl = dev->dev_private;
-	int i, ret;
+	int i, ret = 0;
 	char *cmd;
 	cycles_t start_cycles, end_cycles;
 	int bytes_sent = 0;
@@ -91,18 +91,22 @@ int udl_handle_damage(struct udl_framebuffer *fb, int x, int y,
 	int aligned_x;
 	int bpp = fb->base.format->cpp[0];
 
+	mutex_lock(&udl->transfer_lock);
+
 	if (!fb->active_16)
-		return 0;
+		goto out;
 
 	if (!fb->obj->vmapping) {
 		ret = udl_gem_vmap(fb->obj);
 		if (ret == -ENOMEM) {
 			DRM_ERROR("failed to vmap fb\n");
-			return 0;
+			ret = 0;
+			goto out;
 		}
 		if (!fb->obj->vmapping) {
 			DRM_ERROR("failed to vmapping\n");
-			return 0;
+			ret = 0;
+			goto out;
 		}
 	}
 
@@ -112,14 +116,18 @@ int udl_handle_damage(struct udl_framebuffer *fb, int x, int y,
 
 	if ((width <= 0) ||
 	    (x + width > fb->base.width) ||
-	    (y + height > fb->base.height))
-		return -EINVAL;
+	    (y + height > fb->base.height)) {
+		ret = -EINVAL;
+		goto out;
+	}
 
 	start_cycles = get_cycles();
 
 	urb = udl_get_urb(dev);
-	if (!urb)
-		return 0;
+	if (!urb) {
+		ret = 0;
+		goto out;
+	}
 	cmd = urb->transfer_buffer;
 
 	for (i = y; i < y + height ; i++) {
@@ -151,7 +159,9 @@ error:
 		    >> 10)), /* Kcycles */
 		   &udl->cpu_kcycles_used);
 
-	return 0;
+out:
+	mutex_unlock(&udl->transfer_lock);
+	return ret;
 }
 
 static int udl_fb_mmap(struct fb_info *info, struct vm_area_struct *vma)
