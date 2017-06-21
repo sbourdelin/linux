@@ -73,6 +73,52 @@ int opal_async_get_token_interruptible(void)
 }
 EXPORT_SYMBOL_GPL(opal_async_get_token_interruptible);
 
+static int __opal_async_get_new_token(int last_token)
+{
+	unsigned long flags;
+	int token;
+
+	spin_lock_irqsave(&opal_async_comp_lock, flags);
+	token = find_next_bit(opal_async_complete_map, opal_max_async_tokens,
+			      last_token + 1);
+	if (token >= opal_max_async_tokens) {
+		token = find_first_bit(opal_async_complete_map,
+				       opal_max_async_tokens);
+		if (token >= opal_max_async_tokens || token == last_token) {
+			token = -EBUSY;
+			goto out;
+		}
+	}
+
+	pr_debug("%s token = %d\n", __func__, token);
+	if (__test_and_set_bit(token, opal_async_token_map)) {
+		token = -EBUSY;
+		goto out;
+	}
+
+	__clear_bit(token, opal_async_complete_map);
+
+out:
+	spin_unlock_irqrestore(&opal_async_comp_lock, flags);
+	return token;
+}
+
+int opal_async_get_unique_token_interruptible(int last_token)
+{
+	int token;
+
+	/* Wait until a token is available */
+	if (down_interruptible(&opal_async_sem))
+		return -ERESTARTSYS;
+
+	token = __opal_async_get_new_token(last_token);
+	if (token < 0)
+		up(&opal_async_sem);
+
+	return token;
+}
+EXPORT_SYMBOL_GPL(opal_async_get_unique_token_interruptible);
+
 int __opal_async_release_token(int token)
 {
 	unsigned long flags;

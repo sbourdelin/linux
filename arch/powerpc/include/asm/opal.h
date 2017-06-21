@@ -293,6 +293,7 @@ extern void opal_notifier_update_evt(uint64_t evt_mask, uint64_t evt_val);
 
 extern int __opal_async_get_token(void);
 extern int opal_async_get_token_interruptible(void);
+extern int opal_async_get_unique_token_interruptible(int last_token);
 extern int __opal_async_release_token(int token);
 extern int opal_async_release_token(int token);
 extern int opal_async_wait_response(uint64_t token, struct opal_msg *msg);
