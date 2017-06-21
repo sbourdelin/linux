@@ -236,8 +236,8 @@ ieee80211_rx_frame_mgmt(struct ieee80211_device *ieee, struct sk_buff *skb,
 
 	#ifdef NOT_YET
 	if (ieee->iw_mode == IW_MODE_MASTER) {
-		printk(KERN_DEBUG "%s: Master mode not yet supported.\n",
-		       ieee->dev->name);
+		pr_debug("%s: Master mode not yet supported.\n",
+			 ieee->dev->name);
 		return 0;
 /*
   hostap_update_sta_ps(ieee, (struct hostap_ieee80211_hdr_4addr *)
@@ -265,9 +265,8 @@ ieee80211_rx_frame_mgmt(struct ieee80211_device *ieee, struct sk_buff *skb,
 
 	    if (ieee->iw_mode == IW_MODE_MASTER) {
 		if (type != WLAN_FC_TYPE_MGMT && type != WLAN_FC_TYPE_CTRL) {
-			printk(KERN_DEBUG "%s: unknown management frame "
-			       "(type=0x%02x, stype=0x%02x) dropped\n",
-			       skb->dev->name, type, stype);
+			pr_debug("%s: unknown management frame (type=0x%02x, stype=0x%02x) dropped\n",
+				 skb->dev->name, type, stype);
 			return -1;
 		}
 
@@ -275,8 +274,8 @@ ieee80211_rx_frame_mgmt(struct ieee80211_device *ieee, struct sk_buff *skb,
 		return 0;
 	}
 
-	printk(KERN_DEBUG "%s: hostap_rx_frame_mgmt: management frame "
-	       "received in non-Host AP mode\n", skb->dev->name);
+	pr_debug("%s: hostap_rx_frame_mgmt: management frame received in non-Host AP mode\n",
+		 skb->dev->name);
 	return -1;
 	#endif
 }
@@ -354,9 +353,8 @@ ieee80211_rx_frame_decrypt(struct ieee80211_device *ieee, struct sk_buff *skb,
 	if (ieee->tkip_countermeasures &&
 	    strcmp(crypt->ops->name, "TKIP") == 0) {
 		if (net_ratelimit()) {
-			printk(KERN_DEBUG "%s: TKIP countermeasures: dropped "
-			       "received packet from %pM\n",
-			       ieee->dev->name, hdr->addr2);
+			pr_debug("%s: TKIP countermeasures: dropped received packet from %pM\n",
+				 ieee->dev->name, hdr->addr2);
 		}
 		return -1;
 	}
@@ -403,9 +401,8 @@ ieee80211_rx_frame_decrypt_msdu(struct ieee80211_device *ieee, struct sk_buff *s
 	res = crypt->ops->decrypt_msdu(skb, keyidx, hdrlen, crypt->priv);
 	atomic_dec(&crypt->refcnt);
 	if (res < 0) {
-		printk(KERN_DEBUG "%s: MSDU decryption/MIC verification failed"
-		       " (SA=%pM keyidx=%d)\n",
-		       ieee->dev->name, hdr->addr2, keyidx);
+		pr_debug("%s: MSDU decryption/MIC verification failed (SA=%pM keyidx=%d)\n",
+			 ieee->dev->name, hdr->addr2, keyidx);
 		return -1;
 	}
 
@@ -923,8 +920,7 @@ int ieee80211_rx(struct ieee80211_device *ieee, struct sk_buff *skb,
 	stats = &ieee->stats;
 
 	if (skb->len < 10) {
-		printk(KERN_INFO "%s: SKB length < 10\n",
-		       dev->name);
+		pr_info("%s: SKB length < 10\n", dev->name);
 		goto rx_dropped;
 	}
 
@@ -1170,9 +1166,8 @@ int ieee80211_rx(struct ieee80211_device *ieee, struct sk_buff *skb,
 			flen -= hdrlen;
 
 		if (frag_skb->tail + flen > frag_skb->end) {
-			printk(KERN_WARNING "%s: host decrypted and "
-			       "reassembled frame did not fit skb\n",
-			       dev->name);
+			pr_warn("%s: host decrypted and reassembled frame did not fit skb\n",
+				dev->name);
 			ieee80211_frag_cache_invalidate(ieee, hdr);
 			goto rx_dropped;
 		}
@@ -2049,8 +2044,7 @@ int ieee80211_parse_info_param(struct ieee80211_device *ieee,
 			}
 			break;
 		case MFIE_TYPE_QOS_PARAMETER:
-			printk(KERN_ERR
-			       "QoS Error need to parse QOS_PARAMETER IE\n");
+			pr_err("QoS Error need to parse QOS_PARAMETER IE\n");
 			break;
 
 		case MFIE_TYPE_COUNTRY:
