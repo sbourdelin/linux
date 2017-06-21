@@ -6,10 +6,18 @@ Required properties:
 
 Optional properties:
  - reg = <processor index>;	: index for the processor this OCC device is on
+ - <child nodes>		: Drivers for devices which communicate with
+				  this OCC. Child nodes have no required or
+				  optional properties that the OCC driver will
+				  use.
 
 Examples:
 
     occ@1 {
         compatible = "ibm,p9-occ";
         reg = <1>;
+
+	occ-hwmon@1 {
+		compatible = "ibm,p9-occ-hwmon";
+	};
     };
