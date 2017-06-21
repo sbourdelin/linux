@@ -231,14 +231,36 @@ static const u8 tpm2_ordinal_duration[TPM2_CC_LAST - TPM2_CC_FIRST + 1] = {
 	(sizeof(struct tpm_input_header) + \
 	 sizeof(struct tpm2_pcr_read_in))
 
-#define TPM2_PCR_READ_RESP_BODY_SIZE \
-	 sizeof(struct tpm2_pcr_read_out)
-
 static const struct tpm_input_header tpm2_pcrread_header = {
 	.tag = cpu_to_be16(TPM2_ST_NO_SESSIONS),
 	.length = cpu_to_be32(TPM2_PCR_READ_IN_SIZE),
 	.ordinal = cpu_to_be32(TPM2_CC_PCR_READ)
 };
+
+static int tpm2_pcr_read_tpm_buf(struct tpm_chip *chip, int pcr_idx,
+				 enum tpm2_algorithms algo, struct tpm_buf *buf,
+				 char *msg)
+{
+	int rc;
+	u8 pcr_select[TPM2_PCR_SELECT_MIN] = {0};
+
+	if (pcr_idx >= TPM2_PLATFORM_PCR)
+		return -EINVAL;
+
+	rc = tpm_buf_init(buf, TPM2_ST_NO_SESSIONS, TPM2_CC_PCR_READ);
+	if (rc)
+		return rc;
+
+	pcr_select[pcr_idx >> 3] = 1 << (pcr_idx & 0x7);
+
+	tpm_buf_append_u32(buf, 1);
+	tpm_buf_append_u16(buf, algo);
+	tpm_buf_append_u8(buf, TPM2_PCR_SELECT_MIN);
+	tpm_buf_append(buf, (const unsigned char *)pcr_select,
+		       sizeof(pcr_select));
+
+	return tpm_transmit_cmd(chip, NULL, buf->data, PAGE_SIZE, 0, 0, msg);
+}
 
 /**
  * tpm2_pcr_read() - read a PCR value
@@ -251,29 +273,17 @@ static const struct tpm_input_header tpm2_pcrread_header = {
 int tpm2_pcr_read(struct tpm_chip *chip, int pcr_idx, u8 *res_buf)
 {
 	int rc;
-	struct tpm2_cmd cmd;
-	u8 *buf;
+	struct tpm_buf buf;
+	struct tpm2_pcr_read_out *out;
 
-	if (pcr_idx >= TPM2_PLATFORM_PCR)
-		return -EINVAL;
-
-	cmd.header.in = tpm2_pcrread_header;
-	cmd.params.pcrread_in.pcr_selects_cnt = cpu_to_be32(1);
-	cmd.params.pcrread_in.hash_alg = cpu_to_be16(TPM2_ALG_SHA1);
-	cmd.params.pcrread_in.pcr_select_size = TPM2_PCR_SELECT_MIN;
-
-	memset(cmd.params.pcrread_in.pcr_select, 0,
-	       sizeof(cmd.params.pcrread_in.pcr_select));
-	cmd.params.pcrread_in.pcr_select[pcr_idx >> 3] = 1 << (pcr_idx & 0x7);
-
-	rc = tpm_transmit_cmd(chip, NULL, &cmd, sizeof(cmd),
-			      TPM2_PCR_READ_RESP_BODY_SIZE,
-			      0, "attempting to read a pcr value");
+	rc = tpm2_pcr_read_tpm_buf(chip, pcr_idx, TPM2_ALG_SHA1, &buf,
+				   "attempting to read a pcr value");
 	if (rc == 0) {
-		buf = cmd.params.pcrread_out.digest;
-		memcpy(res_buf, buf, TPM_DIGEST_SIZE);
+		out = (struct tpm2_pcr_read_out *)&buf.data[TPM_HEADER_SIZE];
+		memcpy(res_buf, out->digest, TPM_DIGEST_SIZE);
 	}
 
+	tpm_buf_destroy(&buf);
 	return rc;
 }
 
