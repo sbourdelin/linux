@@ -22,6 +22,8 @@
 #include <linux/bcd.h>
 #include <linux/slab.h>
 #include <linux/regmap.h>
+#include <linux/hwmon.h>
+#include <linux/hwmon-sysfs.h>
 
 #define DS3232_REG_SECONDS      0x00
 #define DS3232_REG_MINUTES      0x01
@@ -275,6 +277,86 @@ static int ds3232_update_alarm(struct device *dev, unsigned int enabled)
 	return ret;
 }
 
+/*----------------------------------------------------------------------*/
+
+#ifdef CONFIG_RTC_DRV_DS3232_HWMON
+
+/*
+ * Temperature sensor support for ds3232/ds3234 devices.
+ */
+
+#define DS3232_REG_TEMPERATURE	0x11
+
+/*
+ * A user-initiated temperature conversion is not started by this function,
+ * so the temperature is updated once every 64 seconds.
+ */
+static int ds3232_hwmon_read_temp(struct device *dev, s32 *mC)
+{
+	struct ds3232 *ds3232 = dev_get_drvdata(dev);
+	u8 temp_buf[2];
+	s16 temp;
+	int ret;
+
+	ret = regmap_bulk_read(ds3232->regmap, DS3232_REG_TEMPERATURE, temp_buf,
+				sizeof(temp_buf));
+
+	if (ret < 0)
+		return ret;
+
+	/*
+	 * Temperature is represented as a 10-bit code with a resolution of
+	 * 0.25 degree celsius and encoded in two's complement format.
+	 */
+	temp = (temp_buf[0] << 8) | temp_buf[1];
+	temp >>= 6;
+	*mC = temp * 250;
+
+	return 0;
+}
+
+static ssize_t ds3232_hwmon_show_temp(struct device *dev,
+				struct device_attribute *attr, char *buf)
+{
+	int ret;
+	s32 temp;
+
+	ret = ds3232_hwmon_read_temp(dev, &temp);
+	if (ret < 0)
+		return ret;
+
+	return sprintf(buf, "%d\n", temp);
+}
+static SENSOR_DEVICE_ATTR(temp1_input, S_IRUGO, ds3232_hwmon_show_temp,
+			NULL, 0);
+
+static struct attribute *ds3232_hwmon_attrs[] = {
+	&sensor_dev_attr_temp1_input.dev_attr.attr,
+	NULL,
+};
+ATTRIBUTE_GROUPS(ds3232_hwmon);
+
+static void ds3232_hwmon_register(struct device *dev, const char *name)
+{
+	struct ds3232 *ds3232 = dev_get_drvdata(dev);
+	struct device *hwmon_dev;
+
+	hwmon_dev = devm_hwmon_device_register_with_groups(dev, name, ds3232,
+							   ds3232_hwmon_groups);
+	if (IS_ERR(hwmon_dev)) {
+		dev_warn(dev, "unable to register hwmon device %ld\n",
+			 PTR_ERR(hwmon_dev));
+	}
+}
+
+#else
+
+static void ds3232_hwmon_register(struct ds3232 *ds3232)
+{
+}
+
+#endif
+
 static int ds3232_alarm_irq_enable(struct device *dev, unsigned int enabled)
 {
 	struct ds3232 *ds3232 = dev_get_drvdata(dev);
@@ -365,6 +447,8 @@ static int ds3232_probe(struct device *dev, struct regmap *regmap, int irq,
 
 	if (ds3232->irq > 0)
 		device_init_wakeup(dev, 1);
+
+	ds3232_hwmon_register(dev, name);
 
 	ds3232->rtc = devm_rtc_device_register(dev, name, &ds3232_rtc_ops,
 						THIS_MODULE);
