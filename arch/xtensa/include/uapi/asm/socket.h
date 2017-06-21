@@ -111,4 +111,6 @@
 
 #define SCM_TIMESTAMPING_PKTINFO	58
 
+#define SO_ZEROCOPY		59
+
 #endif	/* _XTENSA_SOCKET_H */
