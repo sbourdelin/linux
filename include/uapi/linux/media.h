@@ -30,7 +30,9 @@
 #include <linux/types.h>
 #include <linux/version.h>
 
-#define MEDIA_API_VERSION	KERNEL_VERSION(0, 1, 0)
+#define MEDIA_REVISION(a,b,c) (((a) << 16) + ((b) << 8) + (c))
+
+#define MEDIA_API_VERSION	MEDIA_REVISION(0, 1, 0)
 
 struct media_device_info {
 	char driver[16];
