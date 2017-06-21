@@ -2669,7 +2669,15 @@ bool mem_cgroup_select_oom_victim(struct oom_control *oc)
 
 	if (!cgroup_subsys_on_dfl(memory_cgrp_subsys))
 		return false;
+
+	pr_info("Choosing a victim memcg because of the %s",
+		oc->memcg ?
+		"memory limit reached of cgroup " :
+		"system-wide OOM\n");
 	if (oc->memcg) {
+		pr_cont_cgroup_path(oc->memcg->css.cgroup);
+		pr_cont("\n");
+
 		chosen_memcg = oc->memcg;
 		parent = oc->memcg;
 	}
@@ -2682,6 +2690,10 @@ bool mem_cgroup_select_oom_victim(struct oom_control *oc)
 			iter = mem_cgroup_from_css(css);
 
 			points = mem_cgroup_oom_badness(iter, oc->nodemask);
+
+			pr_info("Cgroup ");
+			pr_cont_cgroup_path(iter->css.cgroup);
+			pr_cont(": %ld\n", points);
 
 			if (points > chosen_memcg_points) {
 				chosen_memcg = iter;
@@ -2731,6 +2743,10 @@ bool mem_cgroup_select_oom_victim(struct oom_control *oc)
 			oc->chosen_memcg = chosen_memcg;
 		}
 
+		pr_info("Chosen cgroup ");
+		pr_cont_cgroup_path(chosen_memcg->css.cgroup);
+		pr_cont(": %ld\n", oc->chosen_points);
+
 		/*
 		 * Even if we have to kill all tasks in the cgroup,
 		 * we need to select the biggest task to start with.
@@ -2739,7 +2755,9 @@ bool mem_cgroup_select_oom_victim(struct oom_control *oc)
 		 */
 		oc->chosen_points = 0;
 		mem_cgroup_scan_tasks(chosen_memcg, oom_evaluate_task, oc);
-	}
+	} else if (oc->chosen)
+		pr_info("Chosen task %s (%d) in root cgroup: %ld\n",
+			oc->chosen->comm, oc->chosen->pid, oc->chosen_points);
 
 	rcu_read_unlock();
 
