@@ -62,8 +62,15 @@ static struct vio_version vsw_versions[] = {
 static void vsw_get_drvinfo(struct net_device *dev,
 			    struct ethtool_drvinfo *info)
 {
+	struct vnet_port *port = netdev_priv(dev);
+
 	strlcpy(info->driver, DRV_MODULE_NAME, sizeof(info->driver));
 	strlcpy(info->version, DRV_MODULE_VERSION, sizeof(info->version));
+
+	snprintf(info->fw_version, sizeof(info->fw_version),
+		 "vio %d.%d", port->vio.ver.major, port->vio.ver.minor);
+	snprintf(info->bus_info, sizeof(info->bus_info),
+		 "remote-mac %pM", port->raddr);
 }
 
 static u32 vsw_get_msglevel(struct net_device *dev)
