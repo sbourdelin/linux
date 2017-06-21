@@ -293,6 +293,9 @@ static int cros_ec_keyb_work(struct notifier_block *nb,
 		return NOTIFY_DONE;
 	}
 
+	if (device_may_wakeup(ckdev->dev))
+		pm_wakeup_event(ckdev->dev, 0);
+
 	return NOTIFY_OK;
 }
 
@@ -639,6 +642,9 @@ static int cros_ec_keyb_probe(struct platform_device *pdev)
 		return err;
 	}
 
+	if (device_property_read_bool(dev, "wakeup-source"))
+		device_init_wakeup(dev, true);
+
 	return 0;
 }
 
@@ -648,6 +654,8 @@ static int cros_ec_keyb_remove(struct platform_device *pdev)
 
 	blocking_notifier_chain_unregister(&ckdev->ec->event_notifier,
 					   &ckdev->notifier);
+
+	device_init_wakeup(&pdev->dev, false);
 
 	return 0;
 }
