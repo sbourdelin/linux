@@ -343,6 +343,26 @@ int asoc_simple_card_canonicalize_dailink(struct snd_soc_dai_link *dai_link)
 }
 EXPORT_SYMBOL_GPL(asoc_simple_card_canonicalize_dailink);
 
+void asoc_simple_card_of_canonicalize_cpu(struct snd_soc_dai_link *dai_link)
+{
+	/*
+	 * soc_bind_dai_link() will check cpu name after
+	 * of_node matching if dai_link has cpu_dai_name.
+	 * but, it will never match if name was created by
+	 * fmt_single_name(). remove cpu_dai_name if cpu_args
+	 * was 0. See:
+	 *	fmt_single_name()
+	 *	fmt_multiple_name()
+	 *
+	 * simple card utils assumes if driver has many endpoint,
+	 * it is using fmt_multiple_name()
+	 */
+
+	if (of_graph_get_endpoint_count(dai_link->cpu_of_node) == 1)
+		dai_link->cpu_dai_name = NULL;
+}
+EXPORT_SYMBOL_GPL(asoc_simple_card_of_canonicalize_cpu);
+
 void asoc_simple_card_canonicalize_cpu(struct snd_soc_dai_link *dai_link,
 				       int is_single_links)
 {
