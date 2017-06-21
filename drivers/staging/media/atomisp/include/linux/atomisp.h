@@ -30,9 +30,9 @@
 
 /* struct media_device_info.driver_version */
 #define ATOMISP_CSS_VERSION_MASK	0x00ffffff
-#define ATOMISP_CSS_VERSION_15		KERNEL_VERSION(1, 5, 0)
-#define ATOMISP_CSS_VERSION_20		KERNEL_VERSION(2, 0, 0)
-#define ATOMISP_CSS_VERSION_21		KERNEL_VERSION(2, 1, 0)
+#define ATOMISP_CSS_VERSION_15		MEDIA_REVISION(1, 5, 0)
+#define ATOMISP_CSS_VERSION_20		MEDIA_REVISION(2, 0, 0)
+#define ATOMISP_CSS_VERSION_21		MEDIA_REVISION(2, 1, 0)
 
 /* struct media_device_info.hw_revision */
 #define ATOMISP_HW_REVISION_MASK	0x0000ff00
