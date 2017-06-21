@@ -507,6 +507,7 @@ skip_ctx_setup:
 
 void bnxt_qplib_free_rcfw_channel(struct bnxt_qplib_rcfw *rcfw)
 {
+	kfree(rcfw->qp_tbl);
 	kfree(rcfw->crsqe_tbl);
 	bnxt_qplib_free_hwq(rcfw->pdev, &rcfw->cmdq);
 	bnxt_qplib_free_hwq(rcfw->pdev, &rcfw->creq);
@@ -514,7 +515,8 @@ void bnxt_qplib_free_rcfw_channel(struct bnxt_qplib_rcfw *rcfw)
 }
 
 int bnxt_qplib_alloc_rcfw_channel(struct pci_dev *pdev,
-				  struct bnxt_qplib_rcfw *rcfw)
+				  struct bnxt_qplib_rcfw *rcfw,
+				  int qp_tbl_sz)
 {
 	rcfw->pdev = pdev;
 	rcfw->creq.max_elements = BNXT_QPLIB_CREQE_MAX_CNT;
@@ -539,6 +541,12 @@ int bnxt_qplib_alloc_rcfw_channel(struct pci_dev *pdev,
 	rcfw->crsqe_tbl = kcalloc(rcfw->cmdq.max_elements,
 				  sizeof(*rcfw->crsqe_tbl), GFP_KERNEL);
 	if (!rcfw->crsqe_tbl)
+		goto fail;
+
+	rcfw->qp_tbl_size = qp_tbl_sz;
+	rcfw->qp_tbl = kcalloc(qp_tbl_sz, sizeof(struct bnxt_qplib_qp_node),
+			       GFP_KERNEL);
+	if (!rcfw->qp_tbl)
 		goto fail;
 
 	return 0;
