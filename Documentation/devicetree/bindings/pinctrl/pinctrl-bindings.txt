@@ -261,6 +261,18 @@ low-power-enable	- enable low power mode
 low-power-disable	- disable low power mode
 output-low		- set the pin to output mode with low level
 output-high		- set the pin to output mode with high level
+sleep-bias-pull-up	- pull up the pin when the specified system goes into
+			  deep sleep mode
+sleep-bias-pull-down	- pull down the pin when the specified system goes into
+			  deep sleep mode
+sleep-input-enable	- enable input on pin when the specified system goes
+			  into deep sleep mode (no effect on output)
+sleep-intput-disable	- disable input on pin when the specified system goes
+			  into deep sleep mode (no effect on output)
+sleep-output-low	- set the pin to output mode with low level when the
+			  specified system goes into deep sleep mode
+sleep-output-high	- set the pin to output mode with high level when the
+			  specified system goes into deep sleep mode
 slew-rate		- set the slew rate
 
 For example:

@@ -46,6 +46,10 @@ static const struct pin_config_item conf_items[] = {
 	PCONFDUMP(PIN_CONFIG_LOW_POWER_MODE, "pin low power", "mode", true),
 	PCONFDUMP(PIN_CONFIG_OUTPUT, "pin output", "level", true),
 	PCONFDUMP(PIN_CONFIG_POWER_SOURCE, "pin power source", "selector", true),
+	PCONFDUMP(PIN_CONFIG_SLEEP_BIAS_PULL_DOWN, "sleep input bias pull down", NULL, false),
+	PCONFDUMP(PIN_CONFIG_SLEEP_BIAS_PULL_UP, "sleep input bias pull up", NULL, false),
+	PCONFDUMP(PIN_CONFIG_SLEEP_INPUT_ENABLE, "sleep input enabled", NULL, false),
+	PCONFDUMP(PIN_CONFIG_SLEEP_OUTPUT, "sleep pin output", NULL, true),
 	PCONFDUMP(PIN_CONFIG_SLEW_RATE, "slew rate", NULL, true),
 };
 
@@ -175,6 +179,12 @@ static const struct pinconf_generic_params dt_params[] = {
 	{ "output-high", PIN_CONFIG_OUTPUT, 1, },
 	{ "output-low", PIN_CONFIG_OUTPUT, 0, },
 	{ "power-source", PIN_CONFIG_POWER_SOURCE, 0 },
+	{ "sleep-bias-pull-down", PIN_CONFIG_SLEEP_BIAS_PULL_DOWN, 1 },
+	{ "sleep-bias-pull-up", PIN_CONFIG_SLEEP_BIAS_PULL_UP, 1 },
+	{ "sleep-input-disable", PIN_CONFIG_SLEEP_INPUT_ENABLE, 0 },
+	{ "sleep-input-enable", PIN_CONFIG_SLEEP_INPUT_ENABLE, 1 },
+	{ "sleep-output-high", PIN_CONFIG_SLEEP_OUTPUT, 1 },
+	{ "sleep-output-low", PIN_CONFIG_SLEEP_OUTPUT, 0 },
 	{ "slew-rate", PIN_CONFIG_SLEW_RATE, 0 },
 };
 
