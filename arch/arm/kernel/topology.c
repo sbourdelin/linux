@@ -111,7 +111,7 @@ static void __init parse_dt_topology(void)
 			continue;
 		}
 
-		if (topology_parse_cpu_capacity(cn, cpu)) {
+		if (!topology_parse_cpu_capacity(cn, cpu)) {
 			of_node_put(cn);
 			continue;
 		}
