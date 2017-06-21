@@ -5333,6 +5333,36 @@ static ssize_t memory_oom_kill_all_tasks_write(struct kernfs_open_file *of,
 	return nbytes;
 }
 
+static int memory_oom_score_adj_show(struct seq_file *m, void *v)
+{
+	struct mem_cgroup *memcg = mem_cgroup_from_css(seq_css(m));
+	short oom_score_adj = memcg->oom_score_adj;
+
+	seq_printf(m, "%d\n", oom_score_adj);
+
+	return 0;
+}
+
+static ssize_t memory_oom_score_adj_write(struct kernfs_open_file *of,
+				char *buf, size_t nbytes, loff_t off)
+{
+	struct mem_cgroup *memcg = mem_cgroup_from_css(of_css(of));
+	int oom_score_adj;
+	int err;
+
+	err = kstrtoint(strstrip(buf), 0, &oom_score_adj);
+	if (err)
+		return err;
+
+	if (oom_score_adj < OOM_SCORE_ADJ_MIN ||
+			oom_score_adj > OOM_SCORE_ADJ_MAX)
+		return -EINVAL;
+
+	memcg->oom_score_adj = (short)oom_score_adj;
+
+	return nbytes;
+}
+
 static int memory_events_show(struct seq_file *m, void *v)
 {
 	struct mem_cgroup *memcg = mem_cgroup_from_css(seq_css(m));
@@ -5457,6 +5487,12 @@ static struct cftype memory_files[] = {
 		.flags = CFTYPE_NOT_ON_ROOT,
 		.seq_show = memory_oom_kill_all_tasks_show,
 		.write = memory_oom_kill_all_tasks_write,
+	},
+	{
+		.name = "oom_score_adj",
+		.flags = CFTYPE_NOT_ON_ROOT,
+		.seq_show = memory_oom_score_adj_show,
+		.write = memory_oom_score_adj_write,
 	},
 	{
 		.name = "events",

@@ -203,6 +203,9 @@ struct mem_cgroup {
 	/* kill all tasks in the subtree in case of OOM */
 	bool oom_kill_all_tasks;
 
+	/* OOM kill score adjustment */
+	short oom_score_adj;
+
 	/* handle for "memory.events" */
 	struct cgroup_file events_file;
 
