@@ -897,8 +897,8 @@ int tpm_pcr_extend(u32 chip_num, int pcr_idx, const u8 *hash)
 		memset(digest_list, 0, sizeof(digest_list));
 
 		for (i = 0; i < ARRAY_SIZE(chip->active_banks) &&
-			    chip->active_banks[i] != TPM2_ALG_ERROR; i++) {
-			digest_list[i].alg_id = chip->active_banks[i];
+		     chip->active_banks[i].alg_id != TPM2_ALG_ERROR; i++) {
+			digest_list[i].alg_id = chip->active_banks[i].alg_id;
 			memcpy(digest_list[i].digest, hash, TPM_DIGEST_SIZE);
 			count++;
 		}
