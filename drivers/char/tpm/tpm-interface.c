@@ -871,44 +871,79 @@ static int tpm1_pcr_extend(struct tpm_chip *chip, int pcr_idx, const u8 *hash,
 	return rc;
 }
 
+static u32 tpm_get_digest_size(struct tpm_chip *chip, enum tpm2_algorithms algo)
+{
+	int i;
+
+	for (i = 0; i < ARRAY_SIZE(chip->active_banks) &&
+	     chip->active_banks[i].alg_id != TPM2_ALG_ERROR; i++)
+		if (chip->active_banks[i].alg_id == algo)
+			return chip->active_banks[i].digest_size;
+
+	/* Callers should have checked which algorithms the TPM supports,
+	 * or should have provided a SHA1 digest, which is always supported.
+	 * If the passed algorithm is unknown, return the size of SHA1.
+	 */
+	return hash_digest_size[HASH_ALGO_SHA1];
+}
+
 /**
  * tpm_pcr_extend - extend pcr value with hash
  * @chip_num:	tpm idx # or AN&
  * @pcr_idx:	pcr idx to extend
- * @hash:	hash value used to extend pcr value
+ * @count:	number of digests
+ * @digests:	array of digests
  *
  * The TPM driver should be built-in, but for whatever reason it
  * isn't, protect against the chip disappearing, by incrementing
  * the module usage count.
  */
-int tpm_pcr_extend(u32 chip_num, int pcr_idx, const u8 *hash)
+int tpm_pcr_extend(u32 chip_num, int pcr_idx, u32 count,
+		   struct tpm2_digest *digests)
 {
 	int rc;
 	struct tpm_chip *chip;
 	struct tpm2_digest digest_list[ARRAY_SIZE(chip->active_banks)];
-	u32 count = 0;
-	int i;
+	u32 first_digest_size;
+	int i, j;
+
+	if (count == 0)
+		return -EINVAL;
 
 	chip = tpm_chip_find_get(chip_num);
 	if (chip == NULL)
 		return -ENODEV;
+
+	first_digest_size = tpm_get_digest_size(chip, digests[0].alg_id);
 
 	if (chip->flags & TPM_CHIP_FLAG_TPM2) {
 		memset(digest_list, 0, sizeof(digest_list));
 
 		for (i = 0; i < ARRAY_SIZE(chip->active_banks) &&
 		     chip->active_banks[i].alg_id != TPM2_ALG_ERROR; i++) {
+			struct tpm_pcr_bank_info *bank = &chip->active_banks[i];
+			u8 *cur_digest = digests[0].digest;
+			u32 cur_digest_size = first_digest_size;
+
+			for (j = 0; j < count; j++) {
+				if (digests[j].alg_id == bank->alg_id) {
+					cur_digest = digests[j].digest;
+					cur_digest_size = bank->digest_size;
+					break;
+				}
+			}
+
 			digest_list[i].alg_id = chip->active_banks[i].alg_id;
-			memcpy(digest_list[i].digest, hash, TPM_DIGEST_SIZE);
-			count++;
+			memcpy(digest_list[i].digest, cur_digest,
+			       cur_digest_size);
 		}
 
-		rc = tpm2_pcr_extend(chip, pcr_idx, count, digest_list);
+		rc = tpm2_pcr_extend(chip, pcr_idx, i, digest_list);
 		tpm_put_ops(chip);
 		return rc;
 	}
 
-	rc = tpm1_pcr_extend(chip, pcr_idx, hash,
+	rc = tpm1_pcr_extend(chip, pcr_idx, digests[0].digest,
 			     "attempting extend a PCR value");
 	tpm_put_ops(chip);
 	return rc;

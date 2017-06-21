@@ -377,15 +377,15 @@ static int trusted_tpm_send(const u32 chip_num, unsigned char *cmd,
  */
 static int pcrlock(const int pcrnum)
 {
-	unsigned char hash[SHA1_DIGEST_SIZE];
+	struct tpm2_digest digestarg = {.alg_id = TPM2_ALG_SHA1};
 	int ret;
 
 	if (!capable(CAP_SYS_ADMIN))
 		return -EPERM;
-	ret = tpm_get_random(TPM_ANY_NUM, hash, SHA1_DIGEST_SIZE);
+	ret = tpm_get_random(TPM_ANY_NUM, digestarg.digest, SHA1_DIGEST_SIZE);
 	if (ret != SHA1_DIGEST_SIZE)
 		return ret;
-	return tpm_pcr_extend(TPM_ANY_NUM, pcrnum, hash) ? -EINVAL : 0;
+	return tpm_pcr_extend(TPM_ANY_NUM, pcrnum, 1, &digestarg) ? -EINVAL : 0;
 }
 
 /*

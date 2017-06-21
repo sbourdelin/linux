@@ -36,6 +36,11 @@ struct tpm_chip;
 struct trusted_key_payload;
 struct trusted_key_options;
 
+struct tpm2_digest {
+	u16 alg_id;
+	u8 digest[SHA512_DIGEST_SIZE];
+} __packed;
+
 enum TPM_OPS_FLAGS {
 	TPM_OPS_AUTO_STARTUP = BIT(0),
 };
@@ -76,7 +81,8 @@ struct tpm_pcr_bank_info {
 
 extern int tpm_is_tpm2(u32 chip_num);
 extern int tpm_pcr_read(u32 chip_num, int pcr_idx, u8 *res_buf);
-extern int tpm_pcr_extend(u32 chip_num, int pcr_idx, const u8 *hash);
+extern int tpm_pcr_extend(u32 chip_num, int pcr_idx, u32 count,
+			  struct tpm2_digest *digests);
 extern int tpm_get_pcr_banks_info(u32 chip_num,
 				  struct tpm_pcr_bank_info *active_banks);
 extern int tpm_send(u32 chip_num, void *cmd, size_t buflen);
@@ -95,7 +101,9 @@ static inline int tpm_is_tpm2(u32 chip_num)
 static inline int tpm_pcr_read(u32 chip_num, int pcr_idx, u8 *res_buf) {
 	return -ENODEV;
 }
-static inline int tpm_pcr_extend(u32 chip_num, int pcr_idx, const u8 *hash) {
+static inline int tpm_pcr_extend(u32 chip_num, int pcr_idx, u32 count,
+				 struct tpm2_digest *digests)
+{
 	return -ENODEV;
 }
 static inline int tpm_get_pcr_banks_info(u32 chip_num,

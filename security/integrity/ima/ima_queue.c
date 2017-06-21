@@ -140,12 +140,14 @@ unsigned long ima_get_binary_runtime_size(void)
 
 static int ima_pcr_extend(const u8 *hash, int pcr)
 {
+	struct tpm2_digest digestarg = {.alg_id = TPM2_ALG_SHA1};
 	int result = 0;
 
 	if (!ima_used_chip)
 		return result;
 
-	result = tpm_pcr_extend(TPM_ANY_NUM, pcr, hash);
+	memcpy(digestarg.digest, hash, IMA_DIGEST_SIZE);
+	result = tpm_pcr_extend(TPM_ANY_NUM, pcr, 1, &digestarg);
 	if (result != 0)
 		pr_err("Error Communicating to TPM chip, result: %d\n", result);
 	return result;
