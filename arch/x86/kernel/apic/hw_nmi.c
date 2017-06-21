@@ -20,9 +20,15 @@
 #include <linux/delay.h>
 
 #ifdef CONFIG_HARDLOCKUP_DETECTOR
+/*
+ * The NMI watchdog relies on PERF_COUNT_HW_CPU_CYCLES event, which
+ * can tick faster than the measured CPU Frequency due to Turbo mode.
+ * That can lead to spurious timeouts.
+ * To workaround the issue, extending the period by 3 times.
+ */
 u64 hw_nmi_get_sample_period(int watchdog_thresh)
 {
-	return (u64)(cpu_khz) * 1000 * watchdog_thresh;
+	return (u64)(cpu_khz) * 1000 * watchdog_thresh * 3;
 }
 #endif
 
