@@ -161,7 +161,6 @@ int __init topology_parse_cpu_capacity(struct device_node *cpu_node, int cpu)
 
 #ifdef CONFIG_CPU_FREQ
 static cpumask_var_t cpus_to_visit;
-static bool cap_parsing_done;
 static void parsing_done_workfn(struct work_struct *work);
 static DECLARE_WORK(parsing_done_work, parsing_done_workfn);
 
@@ -173,7 +172,7 @@ init_cpu_capacity_callback(struct notifier_block *nb,
 	struct cpufreq_policy *policy = data;
 	int cpu;
 
-	if (cap_parsing_failed || cap_parsing_done)
+	if (cap_parsing_failed)
 		return 0;
 
 	switch (val) {
@@ -193,7 +192,7 @@ init_cpu_capacity_callback(struct notifier_block *nb,
 			topology_normalize_cpu_scale();
 			kfree(raw_capacity);
 			pr_debug("cpu_capacity: parsing done\n");
-			cap_parsing_done = true;
+			cap_parsing_failed = true;
 			schedule_work(&parsing_done_work);
 		}
 	}
