@@ -126,6 +126,14 @@ static unsigned long lid_notify_timeout __read_mostly = 10;
 module_param(lid_notify_timeout, ulong, 0644);
 MODULE_PARM_DESC(lid_notify_timeout, "Timeout (s) before receiving lid notification");
 
+static bool lid_periodic_update __read_mostly = false;
+module_param(lid_periodic_update, bool, 0644);
+MODULE_PARM_DESC(lid_periodic_update, "Periodically sending lid state updates");
+
+static unsigned long lid_update_interval __read_mostly = 1 * MSEC_PER_SEC;
+module_param(lid_update_interval, ulong, 0644);
+MODULE_PARM_DESC(lid_update_interval, "Interval (ms) between lid periodic updates");
+
 /* --------------------------------------------------------------------------
                               FS Interface (/proc)
    -------------------------------------------------------------------------- */
@@ -395,6 +403,8 @@ static void acpi_lid_initialize_state(struct acpi_device *device)
 		break;
 	case ACPI_BUTTON_LID_INIT_METHOD:
 		(void)acpi_lid_update_state(device);
+		if (lid_periodic_update)
+			acpi_lid_start_timer(device, lid_update_interval);
 		break;
 	case ACPI_BUTTON_LID_INIT_IGNORE:
 	default:
@@ -560,8 +570,11 @@ static int acpi_button_add(struct acpi_device *device)
 		 * more we only care about the last one...
 		 */
 		lid_device = device;
-		acpi_lid_start_timer(device,
-			lid_notify_timeout * MSEC_PER_SEC);
+		if (lid_periodic_update)
+			acpi_lid_initialize_state(device);
+		else
+			acpi_lid_start_timer(device,
+				lid_notify_timeout * MSEC_PER_SEC);
 	}
 
 	printk(KERN_INFO PREFIX "%s [%s]\n", name, acpi_device_bid(device));
