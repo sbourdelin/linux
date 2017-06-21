@@ -916,6 +916,39 @@ int tpm_pcr_extend(u32 chip_num, int pcr_idx, const u8 *hash)
 EXPORT_SYMBOL_GPL(tpm_pcr_extend);
 
 /**
+ * tpm_get_pcr_banks_info() - get PCR banks information
+ * @chip_num:		tpm idx # or ANY
+ * @active_banks:	array of tpm_pcr_bank_info structures
+ *
+ * Return: < 0 on error, and the number of active PCR banks on success.
+ */
+int tpm_get_pcr_banks_info(u32 chip_num, struct tpm_pcr_bank_info *active_banks)
+{
+	struct tpm_chip *chip;
+	int count = 1;
+
+	chip = tpm_chip_find_get(chip_num);
+	if (chip == NULL)
+		return -ENODEV;
+
+	if (!(chip->flags & TPM_CHIP_FLAG_TPM2)) {
+		active_banks[0].alg_id = TPM2_ALG_SHA1;
+		active_banks[0].crypto_id = HASH_ALGO_SHA1;
+		active_banks[0].digest_size = hash_digest_size[HASH_ALGO_SHA1];
+		goto out;
+	}
+
+	for (count = 0; count < ARRAY_SIZE(chip->active_banks) &&
+	     chip->active_banks[count].alg_id != TPM2_ALG_ERROR; count++)
+		memcpy(&active_banks[count], &chip->active_banks[count],
+		       sizeof(*active_banks));
+out:
+	tpm_put_ops(chip);
+	return count;
+}
+EXPORT_SYMBOL_GPL(tpm_get_pcr_banks_info);
+
+/**
  * tpm_do_selftest - have the TPM continue its selftest and wait until it
  *                   can receive further commands
  * @chip: TPM chip to use

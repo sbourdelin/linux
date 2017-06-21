@@ -208,7 +208,7 @@ struct tpm_chip {
 	const struct attribute_group *groups[3];
 	unsigned int groups_cnt;
 
-	struct tpm_pcr_bank_info active_banks[7];
+	struct tpm_pcr_bank_info active_banks[TPM_ACTIVE_BANKS_MAX];
 #ifdef CONFIG_ACPI
 	acpi_handle acpi_dev_handle;
 	char ppi_version[TPM_PPI_VERSION_LEN + 1];
