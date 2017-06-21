@@ -546,11 +546,16 @@ int spi_add_device(struct spi_device *spi)
 
 	/* Device may be bound to an active driver when this returns */
 	status = device_add(&spi->dev);
-	if (status < 0)
+	if (status < 0) {
 		dev_err(dev, "can't add %s, status %d\n",
-				dev_name(&spi->dev), status);
-	else
-		dev_dbg(dev, "registered child %s\n", dev_name(&spi->dev));
+			dev_name(&spi->dev), status);
+		goto done;
+	}
+
+	dev_dbg(dev, "registered child %s\n", dev_name(&spi->dev));
+
+	if (device_property_read_bool(&spi->dev, "wakeup-source"))
+		device_init_wakeup(&spi->dev, true);
 
 done:
 	mutex_unlock(&spi_add_lock);
@@ -636,6 +641,8 @@ void spi_unregister_device(struct spi_device *spi)
 {
 	if (!spi)
 		return;
+
+	device_init_wakeup(&spi->dev, false);
 
 	if (spi->dev.of_node) {
 		of_node_clear_flag(spi->dev.of_node, OF_POPULATED);
