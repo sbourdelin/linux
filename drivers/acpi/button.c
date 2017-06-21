@@ -107,11 +107,13 @@ struct acpi_button {
 	unsigned int type;
 	struct input_dev *input;
 	struct timer_list lid_timer;
+	bool lid_reliable;
 	char phys[32];			/* for input device */
 	unsigned long pushed;
 	bool suspended;
 };
 
+static DEFINE_MUTEX(lid_input_lock);
 static BLOCKING_NOTIFIER_HEAD(acpi_lid_notifier);
 static struct acpi_device *lid_device;
 static u8 lid_init_state = ACPI_BUTTON_LID_INIT_METHOD;
@@ -127,6 +129,10 @@ MODULE_PARM_DESC(lid_periodic_update, "Periodically sending lid state updates");
 static unsigned long lid_update_interval __read_mostly = 1 * MSEC_PER_SEC;
 module_param(lid_update_interval, ulong, 0644);
 MODULE_PARM_DESC(lid_update_interval, "Interval (ms) between lid periodic updates");
+
+static bool lid_unreliable __read_mostly = false;
+module_param(lid_unreliable, bool, 0644);
+MODULE_PARM_DESC(lid_unreliable, "Dynamically adding/removing input node for unreliable lids");
 
 /* --------------------------------------------------------------------------
                               FS Interface (/proc)
@@ -151,6 +157,9 @@ static int acpi_lid_notify_state(struct acpi_device *device, int state)
 {
 	struct acpi_button *button = acpi_driver_data(device);
 	int ret;
+
+	if (!button->input)
+		return -EINVAL;
 
 	if (lid_init_state == ACPI_BUTTON_LID_INIT_IGNORE)
 		input_report_switch(button->input, SW_LID, 0);
@@ -306,6 +315,8 @@ static void acpi_button_remove_input(struct acpi_device *device)
 {
 	struct acpi_button *button = acpi_driver_data(device);
 
+	if (!button->input)
+		return;
 	input_unregister_device(button->input);
 	button->input = NULL;
 }
@@ -315,6 +326,9 @@ static int acpi_button_add_input(struct acpi_device *device)
 	struct acpi_button *button = acpi_driver_data(device);
 	struct input_dev *input;
 	int error;
+
+	if (button->input)
+		return 0;
 
 	input = input_allocate_device();
 	if (!input) {
@@ -378,8 +392,10 @@ static void acpi_lid_initialize_state(struct acpi_device *device)
 		break;
 	case ACPI_BUTTON_LID_INIT_METHOD:
 		(void)acpi_lid_update_state(device);
+		mutex_unlock(&lid_input_lock);
 		if (lid_periodic_update)
 			acpi_lid_start_timer(device, lid_update_interval);
+		mutex_lock(&lid_input_lock);
 		break;
 	case ACPI_BUTTON_LID_INIT_IGNORE:
 	default:
@@ -391,7 +407,9 @@ static void acpi_lid_timeout(ulong arg)
 {
 	struct acpi_device *device = (struct acpi_device *)arg;
 
+	mutex_lock(&lid_input_lock);
 	acpi_lid_initialize_state(device);
+	mutex_unlock(&lid_input_lock);
 }
 
 static void acpi_button_notify(struct acpi_device *device, u32 event)
@@ -406,7 +424,11 @@ static void acpi_button_notify(struct acpi_device *device, u32 event)
 	case ACPI_BUTTON_NOTIFY_STATUS:
 		input = button->input;
 		if (button->type == ACPI_BUTTON_TYPE_LID) {
+			mutex_lock(&lid_input_lock);
+			if (!button->input)
+				acpi_button_add_input(device);
 			acpi_lid_update_state(device);
+			mutex_unlock(&lid_input_lock);
 		} else {
 			int keycode;
 
@@ -440,8 +462,13 @@ static int acpi_button_suspend(struct device *dev)
 	struct acpi_device *device = to_acpi_device(dev);
 	struct acpi_button *button = acpi_driver_data(device);
 
-	if (button->type == ACPI_BUTTON_TYPE_LID)
+	if (button->type == ACPI_BUTTON_TYPE_LID) {
+		mutex_lock(&lid_input_lock);
+		if (!button->lid_reliable)
+			acpi_button_remove_input(device);
+		mutex_unlock(&lid_input_lock);
 		del_timer(&button->lid_timer);
+	}
 	button->suspended = true;
 	return 0;
 }
@@ -458,6 +485,38 @@ static int acpi_button_resume(struct device *dev)
 	return 0;
 }
 #endif
+
+static ssize_t lid_reliable_show(struct device *dev,
+				 struct device_attribute *attr, char *buf)
+{
+	struct acpi_device *device = to_acpi_device(dev);
+	struct acpi_button *button = acpi_driver_data(device);
+
+	return snprintf(buf, PAGE_SIZE, "%d\n", button->lid_reliable);
+}
+static ssize_t lid_reliable_store(struct device *dev,
+				  struct device_attribute *attr,
+				  const char *buf, size_t count)
+{
+	struct acpi_device *device = to_acpi_device(dev);
+	struct acpi_button *button = acpi_driver_data(device);
+
+	mutex_lock(&lid_input_lock);
+	if (strtobool(buf, &button->lid_reliable) < 0) {
+		mutex_unlock(&lid_input_lock);
+		return -EINVAL;
+	}
+	if (button->lid_reliable)
+		acpi_button_add_input(device);
+	else {
+		lid_init_state = ACPI_BUTTON_LID_INIT_IGNORE;
+		acpi_button_remove_input(device);
+	}
+	acpi_lid_initialize_state(device);
+	mutex_unlock(&lid_input_lock);
+	return count;
+}
+static DEVICE_ATTR_RW(lid_reliable);
 
 static int acpi_button_add(struct acpi_device *device)
 {
@@ -507,21 +566,37 @@ static int acpi_button_add(struct acpi_device *device)
 
 	snprintf(button->phys, sizeof(button->phys), "%s/button/input0", hid);
 
-	error = acpi_button_add_input(device);
-	if (error)
-		goto err_remove_fs;
-
 	if (button->type == ACPI_BUTTON_TYPE_LID) {
 		/*
 		 * This assumes there's only one lid device, or if there are
 		 * more we only care about the last one...
 		 */
 		lid_device = device;
+		device_create_file(&device->dev, &dev_attr_lid_reliable);
+		mutex_lock(&lid_input_lock);
+		error = acpi_button_add_input(device);
+		if (error) {
+			mutex_unlock(&lid_input_lock);
+			goto err_remove_fs;
+		}
+		if (lid_unreliable) {
+			lid_init_state = ACPI_BUTTON_LID_INIT_IGNORE;
+			button->lid_reliable = false;
+		} else
+			button->lid_reliable = true;
 		if (lid_periodic_update)
 			acpi_lid_initialize_state(device);
-		else
+		else {
+			mutex_unlock(&lid_input_lock);
 			acpi_lid_start_timer(device,
 				lid_notify_timeout * MSEC_PER_SEC);
+			mutex_lock(&lid_input_lock);
+		}
+		mutex_unlock(&lid_input_lock);
+	} else {
+		error = acpi_button_add_input(device);
+		if (error)
+			goto err_remove_fs;
 	}
 
 	printk(KERN_INFO PREFIX "%s [%s]\n", name, acpi_device_bid(device));
@@ -539,9 +614,14 @@ static int acpi_button_remove(struct acpi_device *device)
 	struct acpi_button *button = acpi_driver_data(device);
 
 	acpi_button_remove_fs(device);
-	if (button->type == ACPI_BUTTON_TYPE_LID)
+	if (button->type == ACPI_BUTTON_TYPE_LID) {
+		mutex_lock(&lid_input_lock);
+		acpi_button_remove_input(device);
+		mutex_unlock(&lid_input_lock);
 		del_timer_sync(&button->lid_timer);
-	acpi_button_remove_input(device);
+		device_remove_file(&device->dev, &dev_attr_lid_reliable);
+	} else
+		acpi_button_remove_input(device);
 	kfree(button);
 	return 0;
 }
