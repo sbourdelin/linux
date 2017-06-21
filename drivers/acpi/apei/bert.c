@@ -62,13 +62,6 @@ static void __init bert_print_all(struct acpi_bert_region *region,
 
 		cper_estatus_print(KERN_INFO HW_ERR, estatus);
 
-		/*
-		 * Because the boot error source is "one-time polled" type,
-		 * clear Block Status of current Generic Error Status Block,
-		 * once it's printed.
-		 */
-		estatus->block_status = 0;
-
 		estatus = (void *)estatus + estatus_len;
 		/* No more error records. */
 		if (!estatus->block_status)
