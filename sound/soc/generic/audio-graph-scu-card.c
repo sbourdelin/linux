@@ -123,9 +123,7 @@ static int asoc_graph_card_dai_link_of(struct device_node *ep,
 		if (ret < 0)
 			return ret;
 
-		/* card->num_links includes Codec */
-		asoc_simple_card_canonicalize_cpu(dai_link,
-					(card->num_links - 1) == 1);
+		asoc_simple_card_of_canonicalize_cpu(dai_link);
 	} else {
 		/* FE is dummy */
 		dai_link->cpu_of_node		= NULL;
