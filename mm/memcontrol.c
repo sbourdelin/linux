@@ -2625,6 +2625,128 @@ static inline bool memcg_has_children(struct mem_cgroup *memcg)
 	return ret;
 }
 
+static long mem_cgroup_oom_badness(struct mem_cgroup *memcg,
+				   const nodemask_t *nodemask)
+{
+	long points = 0;
+	int nid;
+	struct mem_cgroup *iter;
+
+	for_each_mem_cgroup_tree(iter, memcg) {
+		for_each_node_state(nid, N_MEMORY) {
+			if (nodemask && !node_isset(nid, *nodemask))
+				continue;
+
+			points += mem_cgroup_node_nr_lru_pages(iter, nid,
+					LRU_ALL_ANON | BIT(LRU_UNEVICTABLE));
+		}
+
+		points += memcg_page_state(iter, MEMCG_KERNEL_STACK_KB) /
+			(PAGE_SIZE / 1024);
+		points += memcg_page_state(iter, NR_SLAB_UNRECLAIMABLE);
+		points += memcg_page_state(iter, MEMCG_SOCK);
+		points += memcg_page_state(iter, MEMCG_SWAP);
+	}
+
+	return points;
+}
+
+bool mem_cgroup_select_oom_victim(struct oom_control *oc)
+{
+	struct cgroup_subsys_state *css = NULL;
+	struct mem_cgroup *iter = NULL;
+	struct mem_cgroup *chosen_memcg = NULL;
+	struct mem_cgroup *parent = root_mem_cgroup;
+	unsigned long totalpages = oc->totalpages;
+	long chosen_memcg_points = 0;
+	long points = 0;
+
+	oc->chosen = NULL;
+	oc->chosen_memcg = NULL;
+
+	if (mem_cgroup_disabled())
+		return false;
+
+	if (!cgroup_subsys_on_dfl(memory_cgrp_subsys))
+		return false;
+	if (oc->memcg) {
+		chosen_memcg = oc->memcg;
+		parent = oc->memcg;
+	}
+
+	rcu_read_lock();
+
+	for (;;) {
+		css = css_next_child(css, &parent->css);
+		if (css) {
+			iter = mem_cgroup_from_css(css);
+
+			points = mem_cgroup_oom_badness(iter, oc->nodemask);
+
+			if (points > chosen_memcg_points) {
+				chosen_memcg = iter;
+				chosen_memcg_points = points;
+				oc->chosen_points = points;
+			}
+
+			continue;
+		}
+
+		if (chosen_memcg && !chosen_memcg->oom_kill_all_tasks) {
+			/* Go deeper in the cgroup hierarchy */
+			totalpages = chosen_memcg_points;
+			chosen_memcg_points = 0;
+
+			parent = chosen_memcg;
+			chosen_memcg = NULL;
+
+			continue;
+		}
+
+		if (!chosen_memcg && parent != root_mem_cgroup)
+			chosen_memcg = parent;
+
+		break;
+	}
+
+	if (!oc->memcg) {
+		/*
+		 * We should also consider tasks in the root cgroup
+		 * with badness larger than oc->chosen_points
+		 */
+
+		struct css_task_iter it;
+		struct task_struct *task;
+		int ret = 0;
+
+		css_task_iter_start(&root_mem_cgroup->css, &it);
+		while (!ret && (task = css_task_iter_next(&it)))
+			ret = oom_evaluate_task(task, oc);
+		css_task_iter_end(&it);
+	}
+
+	if (!oc->chosen && chosen_memcg) {
+		if (chosen_memcg->oom_kill_all_tasks) {
+			css_get(&chosen_memcg->css);
+			oc->chosen_memcg = chosen_memcg;
+		}
+
+		/*
+		 * Even if we have to kill all tasks in the cgroup,
+		 * we need to select the biggest task to start with.
+		 * This task will receive an access to the memory
+		 * reserves.
+		 */
+		oc->chosen_points = 0;
+		mem_cgroup_scan_tasks(chosen_memcg, oom_evaluate_task, oc);
+	}
+
+	rcu_read_unlock();
+
+	oc->chosen_points = 0;
+	return !!oc->chosen || !!oc->chosen_memcg;
+}
+
 /*
  * Reclaims as many pages from the given memcg as possible.
  *
@@ -5166,6 +5288,33 @@ static ssize_t memory_max_write(struct kernfs_open_file *of,
 	return nbytes;
 }
 
+static int memory_oom_kill_all_tasks_show(struct seq_file *m, void *v)
+{
+	struct mem_cgroup *memcg = mem_cgroup_from_css(seq_css(m));
+	bool oom_kill_all_tasks = memcg->oom_kill_all_tasks;
+
+	seq_printf(m, "%d\n", oom_kill_all_tasks);
+
+	return 0;
+}
+
+static ssize_t memory_oom_kill_all_tasks_write(struct kernfs_open_file *of,
+					       char *buf, size_t nbytes,
+					       loff_t off)
+{
+	struct mem_cgroup *memcg = mem_cgroup_from_css(of_css(of));
+	int oom_kill_all_tasks;
+	int err;
+
+	err = kstrtoint(strstrip(buf), 0, &oom_kill_all_tasks);
+	if (err)
+		return err;
+
+	memcg->oom_kill_all_tasks = !!oom_kill_all_tasks;
+
+	return nbytes;
+}
+
 static int memory_events_show(struct seq_file *m, void *v)
 {
 	struct mem_cgroup *memcg = mem_cgroup_from_css(seq_css(m));
@@ -5284,6 +5433,12 @@ static struct cftype memory_files[] = {
 		.flags = CFTYPE_NOT_ON_ROOT,
 		.seq_show = memory_max_show,
 		.write = memory_max_write,
+	},
+	{
+		.name = "oom_kill_all_tasks",
+		.flags = CFTYPE_NOT_ON_ROOT,
+		.seq_show = memory_oom_kill_all_tasks_show,
+		.write = memory_oom_kill_all_tasks_write,
 	},
 	{
 		.name = "events",
