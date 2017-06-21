@@ -370,7 +370,7 @@ struct sta_info *sta_info_alloc(struct ieee80211_sub_if_data *sdata,
 		for (i = 0; i < ARRAY_SIZE(sta->sta.txq); i++) {
 			struct txq_info *txq = txq_data + i * size;
 
-			ieee80211_txq_init(sdata, sta, txq, i);
+			ieee80211_txq_init(local, sdata, sta, txq, i);
 		}
 	}
 

@@ -4237,16 +4237,14 @@ static void ath10k_mac_op_wake_tx_queue(struct ieee80211_hw *hw,
 	int ret = 0;
 	int max = 16;
 
-	if (unlikely(txq->tid == IEEE80211_NUM_TIDS)) {
-		struct sk_buff *skb = ieee80211_tx_dequeue(hw, txq);
+	if (unlikely(txq == hw->txq || txq->tid == IEEE80211_NUM_TIDS)) {
 		struct ieee80211_tx_control control = {
 			.sta = txq->sta,
 		};
+		struct sk_buff *skb;
 
-		if (WARN_ON(!skb))
-			return;
-
-		ath10k_mac_op_tx(hw, &control, skb);
+		while ((skb = ieee80211_tx_dequeue(hw, txq)))
+			ath10k_mac_op_tx(hw, &control, skb);
 		return;
 	}
 

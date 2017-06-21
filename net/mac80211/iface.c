@@ -1813,7 +1813,7 @@ int ieee80211_if_add(struct ieee80211_local *local, const char *name,
 
 		if (txq_size) {
 			txqi = netdev_priv(ndev) + size;
-			ieee80211_txq_init(sdata, NULL, txqi, 0);
+			ieee80211_txq_init(local, sdata, NULL, txqi, 0);
 		}
 
 		sdata->dev = ndev;

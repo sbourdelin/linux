@@ -157,16 +157,14 @@ void ath9k_wake_tx_queue(struct ieee80211_hw *hw, struct ieee80211_txq *queue)
 	struct ath_atx_tid *tid;
 	struct ath_txq *txq;
 
-	if (unlikely(queue->tid == IEEE80211_NUM_TIDS)) {
-		struct sk_buff *skb = ieee80211_tx_dequeue(hw, queue);
+	if (unlikely(queue == hw->txq || queue->tid == IEEE80211_NUM_TIDS)) {
 		struct ieee80211_tx_control control = {
 			.sta = queue->sta,
 		};
+		struct sk_buff *skb;
 
-		if (WARN_ON(!skb))
-			return;
-
-		ath9k_tx(hw, &control, skb);
+		while ((skb = ieee80211_tx_dequeue(hw, queue)))
+			ath9k_tx(hw, &control, skb);
 		return;
 	}
 

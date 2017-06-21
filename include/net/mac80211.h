@@ -101,10 +101,12 @@
  *
  * Intermediate queues (struct ieee80211_txq) are kept per-sta per-tid, with
  * another per-sta for non-data/non-mgmt and bufferable management frames, and
- * a single per-vif queue for multicast data frames.
+ * a single per-vif queue for multicast data frames and one additional queue
+ * for the HW for all other frames.
  *
  * The driver is expected to initialize its private per-queue data for stations
- * and interfaces in the .add_interface and .sta_add ops.
+ * and interfaces in the .add_interface and .sta_add ops or before calling
+ * ieee80211_register_hw() (for the general HW queue).
  *
  * The driver can't access the queue directly. To dequeue a frame, it calls
  * ieee80211_tx_dequeue(). Whenever mac80211 adds a new frame to a queue, it
@@ -1857,7 +1859,9 @@ struct ieee80211_tx_control {
 /**
  * struct ieee80211_txq - Software intermediate tx queue
  *
- * @vif: &struct ieee80211_vif pointer from the add_interface callback.
+ * @hw: &struct ieee80211_hw pointer for the device this is used on
+ * @vif: &struct ieee80211_vif pointer from the add_interface callback,
+ *	%NULL for the "fallback" TXQ (in &struct ieee80211_hw)
  * @sta: station table entry, %NULL for per-vif queue
  * @tid: the TID for this queue (unused for per-vif queue),
  *	%IEEE80211_NUM_TIDS for non-data (if enabled)
@@ -1868,6 +1872,7 @@ struct ieee80211_tx_control {
  * ieee80211_tx_dequeue().
  */
 struct ieee80211_txq {
+	struct ieee80211_hw *hw;
 	struct ieee80211_vif *vif;
 	struct ieee80211_sta *sta;
 	u8 tid;
@@ -2216,6 +2221,8 @@ enum ieee80211_hw_flags {
  *	supported by HW.
  * @max_nan_de_entries: maximum number of NAN DE functions supported by the
  *	device.
+ *
+ * @txq: TXQ for (management) frames not otherwise handled on station/vif TXQs
  */
 struct ieee80211_hw {
 	struct ieee80211_conf conf;
@@ -2251,6 +2258,8 @@ struct ieee80211_hw {
 	u8 n_cipher_schemes;
 	const struct ieee80211_cipher_scheme *cipher_schemes;
 	u8 max_nan_de_entries;
+
+	struct ieee80211_txq *txq;
 };
 
 static inline bool _ieee80211_hw_check(struct ieee80211_hw *hw,

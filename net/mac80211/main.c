@@ -666,6 +666,17 @@ struct ieee80211_hw *ieee80211_alloc_hw_nm(size_t priv_data_len,
 	local->hw.radiotap_timestamp.units_pos = -1;
 	local->hw.radiotap_timestamp.accuracy = -1;
 
+	if (ops->wake_tx_queue) {
+		int txq_size = sizeof(struct txq_info) +
+			       local->hw.txq_data_size;
+		struct txq_info *txqi;
+
+		txqi = kzalloc(txq_size, GFP_KERNEL);
+		if (!txqi)
+			goto err_free;
+		ieee80211_txq_init(local, NULL, NULL, txqi, 0);
+	}
+
 	return &local->hw;
  err_free:
 	wiphy_free(wiphy);
@@ -1233,6 +1244,13 @@ void ieee80211_free_hw(struct ieee80211_hw *hw)
 	sta_info_stop(local);
 
 	ieee80211_free_led_names(local);
+
+	if (local->hw.txq) {
+		struct txq_info *txqi = to_txq_info(local->hw.txq);
+
+		ieee80211_txq_purge(local, txqi);
+		kfree(txqi);
+	}
 
 	wiphy_free(local->hw.wiphy);
 }

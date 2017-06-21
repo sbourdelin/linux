@@ -1246,27 +1246,33 @@ static struct txq_info *ieee80211_get_txq(struct ieee80211_local *local,
 {
 	struct ieee80211_hdr *hdr = (struct ieee80211_hdr *) skb->data;
 	struct ieee80211_tx_info *info = IEEE80211_SKB_CB(skb);
-	struct ieee80211_txq *txq = NULL;
+	struct ieee80211_txq *txq;
 
 	if ((info->flags & IEEE80211_TX_CTL_SEND_AFTER_DTIM) ||
-	    (info->control.flags & IEEE80211_TX_CTRL_PS_RESPONSE))
-		return NULL;
-
-	if (!ieee80211_is_data_present(hdr->frame_control)) {
+	    (info->control.flags & IEEE80211_TX_CTRL_PS_RESPONSE)) {
+		txq = NULL;
+	} else if (!ieee80211_is_data_present(hdr->frame_control)) {
 		if ((!ieee80211_is_mgmt(hdr->frame_control) ||
 		     ieee80211_is_bufferable_mmpdu(hdr->frame_control)) &&
 		    sta && sta->uploaded)
 			txq = sta->sta.txq[IEEE80211_NUM_TIDS];
+		else
+			txq = NULL;
 	} else if (sta) {
 		u8 tid = skb->priority & IEEE80211_QOS_CTL_TID_MASK;
 
-		if (!sta->uploaded)
-			return NULL;
-
-		txq = sta->sta.txq[tid];
+		if (sta->uploaded)
+			txq = sta->sta.txq[tid];
+		else
+			txq = NULL;
 	} else if (vif) {
 		txq = vif->txq;
+	} else {
+		txq = NULL;
 	}
+
+	if (!txq)
+		txq = local->hw.txq;
 
 	if (!txq)
 		return NULL;
@@ -1295,14 +1301,10 @@ static codel_time_t codel_skb_time_func(const struct sk_buff *skb)
 static struct sk_buff *codel_dequeue_func(struct codel_vars *cvars,
 					  void *ctx)
 {
-	struct ieee80211_local *local;
-	struct txq_info *txqi;
-	struct fq *fq;
+	struct txq_info *txqi = ctx;
+	struct ieee80211_local *local = hw_to_local(txqi->txq.hw);
+	struct fq *fq = &local->fq;
 	struct fq_flow *flow;
-
-	txqi = ctx;
-	local = vif_to_sdata(txqi->txq.vif)->local;
-	fq = &local->fq;
 
 	if (cvars == &txqi->def_cvars)
 		flow = &txqi->def_flow;
@@ -1315,15 +1317,9 @@ static struct sk_buff *codel_dequeue_func(struct codel_vars *cvars,
 static void codel_drop_func(struct sk_buff *skb,
 			    void *ctx)
 {
-	struct ieee80211_local *local;
-	struct ieee80211_hw *hw;
-	struct txq_info *txqi;
+	struct txq_info *txqi = ctx;
 
-	txqi = ctx;
-	local = vif_to_sdata(txqi->txq.vif)->local;
-	hw = &local->hw;
-
-	ieee80211_free_txskb(hw, skb);
+	ieee80211_free_txskb(txqi->txq.hw, skb);
 }
 
 static struct sk_buff *fq_tin_dequeue_func(struct fq *fq,
@@ -1399,7 +1395,8 @@ static void ieee80211_txq_enqueue(struct ieee80211_local *local,
 		       fq_flow_get_default_func);
 }
 
-void ieee80211_txq_init(struct ieee80211_sub_if_data *sdata,
+void ieee80211_txq_init(struct ieee80211_local *local,
+			struct ieee80211_sub_if_data *sdata,
 			struct sta_info *sta,
 			struct txq_info *txqi, int tid)
 {
@@ -1409,7 +1406,10 @@ void ieee80211_txq_init(struct ieee80211_sub_if_data *sdata,
 	codel_stats_init(&txqi->cstats);
 	__skb_queue_head_init(&txqi->frags);
 
-	txqi->txq.vif = &sdata->vif;
+	txqi->txq.hw = &local->hw;
+
+	if (sdata)
+		txqi->txq.vif = &sdata->vif;
 
 	if (sta) {
 		txqi->txq.sta = &sta->sta;
@@ -1419,8 +1419,12 @@ void ieee80211_txq_init(struct ieee80211_sub_if_data *sdata,
 			txqi->txq.ac = IEEE80211_AC_VO;
 		else
 			txqi->txq.ac = ieee80211_ac_from_tid(tid);
-	} else {
+	} else if (sdata) {
 		sdata->vif.txq = &txqi->txq;
+		txqi->txq.tid = 0;
+		txqi->txq.ac = IEEE80211_AC_BE;
+	} else {
+		local->hw.txq = &txqi->txq;
 		txqi->txq.tid = 0;
 		txqi->txq.ac = IEEE80211_AC_BE;
 	}
@@ -1523,7 +1527,7 @@ static bool ieee80211_queue_skb(struct ieee80211_local *local,
 	vif = &sdata->vif;
 	txqi = ieee80211_get_txq(local, vif, sta, skb);
 
-	if (!txqi)
+	if (WARN_ON(!txqi))
 		return false;
 
 	spin_lock_bh(&fq->lock);

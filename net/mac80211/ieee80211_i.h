@@ -2000,7 +2000,8 @@ static inline bool ieee80211_can_run_worker(struct ieee80211_local *local)
 
 int ieee80211_txq_setup_flows(struct ieee80211_local *local);
 void ieee80211_txq_teardown_flows(struct ieee80211_local *local);
-void ieee80211_txq_init(struct ieee80211_sub_if_data *sdata,
+void ieee80211_txq_init(struct ieee80211_local *local,
+			struct ieee80211_sub_if_data *sdata,
 			struct sta_info *sta,
 			struct txq_info *txq, int tid);
 void ieee80211_txq_purge(struct ieee80211_local *local,
