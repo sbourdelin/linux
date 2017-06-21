@@ -1,0 +1,38 @@
+#
+# Goodix touchscreen driver configuration
+#
+menuconfig TOUCHSCREEN_GOODIX_GTX5
+	tristate "Goodix GTx5 touchscreen"
+	depends on I2C && OF
+	depends on GPIOLIB
+	help
+	  Say Y here if you have a Goodix GTx5xx touchscreen connected
+	  to your system.
+
+	  If unsure, say N.
+
+if TOUCHSCREEN_GOODIX_GTX5
+
+config TOUCHSCREEN_GOODIX_GTX5_UPDATE
+	tristate "Goodix GTx5xx firmware update module"
+	help
+	  Say Y here to enable support for doing firmware update.
+
+	  If unsure, say N.
+
+	  If you want support firmware update function say yes,
+	  this module will create some sysfs node for firmware
+	  update.
+
+config TOUCHSCREEN_GOODIX_GTX5_TOOLS
+	tristate "Goodix touch tools support"
+	help
+	  Say Y here to enable debug tools.
+
+	  If unsure, say N.
+
+	  Say yes here if you want to support controller debug
+	  and any other extended functionality. In most condition
+	  you may not need this feature.
+
+endif
