@@ -1680,9 +1680,7 @@ void drm_atomic_helper_commit_hw_done(struct drm_atomic_state *old_state)
 
 		/* backend must have consumed any event by now */
 		WARN_ON(new_crtc_state->event);
-		spin_lock(&crtc->commit_lock);
 		complete_all(&commit->hw_done);
-		spin_unlock(&crtc->commit_lock);
 	}
 }
 EXPORT_SYMBOL(drm_atomic_helper_commit_hw_done);
@@ -1711,7 +1709,6 @@ void drm_atomic_helper_commit_cleanup_done(struct drm_atomic_state *old_state)
 		if (WARN_ON(!commit))
 			continue;
 
-		spin_lock(&crtc->commit_lock);
 		complete_all(&commit->cleanup_done);
 		WARN_ON(!try_wait_for_completion(&commit->hw_done));
 
@@ -1720,8 +1717,6 @@ void drm_atomic_helper_commit_cleanup_done(struct drm_atomic_state *old_state)
 		 * completed, otherwise subsequent commits won't stall properly. */
 		if (try_wait_for_completion(&commit->flip_done))
 			goto del_commit;
-
-		spin_unlock(&crtc->commit_lock);
 
 		/* We must wait for the vblank event to signal our completion
 		 * before releasing our reference, since the vblank work does
@@ -1732,8 +1727,8 @@ void drm_atomic_helper_commit_cleanup_done(struct drm_atomic_state *old_state)
 			DRM_ERROR("[CRTC:%d:%s] flip_done timed out\n",
 				  crtc->base.id, crtc->name);
 
-		spin_lock(&crtc->commit_lock);
 del_commit:
+		spin_lock(&crtc->commit_lock);
 		list_del(&commit->commit_entry);
 		spin_unlock(&crtc->commit_lock);
 	}
