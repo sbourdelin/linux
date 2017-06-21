@@ -4406,6 +4406,8 @@ static int emit_fiemap_extent(struct fiemap_extent_info *fieinfo,
 {
 	int ret = 0;
 
+	pr_info("%s: entered: offset=%llu phys=%llu len=%llu flags=0x%x\n",
+		__func__, offset, phys, len, flags);
 	if (!cache->cached)
 		goto assign;
 
@@ -4417,7 +4419,7 @@ static int emit_fiemap_extent(struct fiemap_extent_info *fieinfo,
 	 * NOTE: Physical address can overlap, due to compression
 	 */
 	if (cache->offset + cache->len > offset) {
-		WARN_ON(1);
+		pr_info("%s: Sanity check failed\n", __func__);
 		return -EINVAL;
 	}
 
@@ -4438,16 +4440,23 @@ static int emit_fiemap_extent(struct fiemap_extent_info *fieinfo,
 			(flags & ~FIEMAP_EXTENT_LAST)) {
 		cache->len += len;
 		cache->flags |= flags;
+		pr_info("%s: merged, new offset=%llu len=%llu flags=0x%x\n", __func__,
+			cache->offset, cache->len, cache->flags);
 		goto try_submit_last;
 	}
 
+	pr_info("%s: submit cached fiemap: offset=%llu len=%llu flags=0x%x\n",
+		__func__, cache->offset, cache->len, cache->flags);
 	/* Not mergeable, need to submit cached one */
 	ret = fiemap_fill_next_extent(fieinfo, cache->offset, cache->phys,
 				      cache->len, cache->flags);
 	cache->cached = false;
-	if (ret)
+	if (ret) {
+		pr_info("%s: cached submit exit ret=%d\n", __func__, ret);
 		return ret;
+	}
 assign:
+	pr_info("%s: assigning new fiemap\n", __func__);
 	cache->cached = true;
 	cache->offset = offset;
 	cache->phys = phys;
@@ -4455,10 +4464,13 @@ assign:
 	cache->flags = flags;
 try_submit_last:
 	if (cache->flags & FIEMAP_EXTENT_LAST) {
+		pr_info("%s: submit last fiemap: offset=%llu len=%llu flags=0x%x\n",
+			__func__, cache->offset, cache->len, cache->flags);
 		ret = fiemap_fill_next_extent(fieinfo, cache->offset,
 				cache->phys, cache->len, cache->flags);
 		cache->cached = false;
 	}
+	pr_info("%s: last exit ret=%d\n", __func__, ret);
 	return ret;
 }
 
@@ -4525,6 +4537,9 @@ int extent_fiemap(struct inode *inode, struct fiemap_extent_info *fieinfo,
 		return -ENOMEM;
 	path->leave_spinning = 1;
 
+	pr_info("%s: enter: root=%llu inode=%llu start=%llu len=%llu\n",
+		__func__, root->objectid, btrfs_ino(BTRFS_I(inode)),
+		start, len);
 	start = round_down(start, btrfs_inode_sectorsize(inode));
 	len = round_up(max, btrfs_inode_sectorsize(inode)) - start;
 
@@ -4696,6 +4711,7 @@ int extent_fiemap(struct inode *inode, struct fiemap_extent_info *fieinfo,
 		if (ret) {
 			if (ret == 1)
 				ret = 0;
+			pr_info("%s: out_free after emit_fiemap_extent\n", __func__);
 			goto out_free;
 		}
 	}
@@ -4707,6 +4723,9 @@ out:
 	btrfs_free_path(path);
 	unlock_extent_cached(&BTRFS_I(inode)->io_tree, start, start + len - 1,
 			     &cached_state, GFP_NOFS);
+	pr_info("%s: exit: ret=%d root=%llu inode=%llu start=%llu len=%llu\n",
+		__func__, ret, root->objectid, btrfs_ino(BTRFS_I(inode)),
+		start, len);
 	return ret;
 }
 
