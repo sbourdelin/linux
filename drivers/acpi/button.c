@@ -302,6 +302,54 @@ int acpi_lid_open(void)
 }
 EXPORT_SYMBOL(acpi_lid_open);
 
+static void acpi_button_remove_input(struct acpi_device *device)
+{
+	struct acpi_button *button = acpi_driver_data(device);
+
+	input_unregister_device(button->input);
+	button->input = NULL;
+}
+
+static int acpi_button_add_input(struct acpi_device *device)
+{
+	struct acpi_button *button = acpi_driver_data(device);
+	struct input_dev *input;
+	int error;
+
+	input = input_allocate_device();
+	if (!input) {
+		error = -ENOMEM;
+		goto err;
+	}
+
+	input->name = acpi_device_name(device);
+	input->phys = button->phys;
+	input->id.bustype = BUS_HOST;
+	input->id.product = button->type;
+	input->dev.parent = &device->dev;
+	switch (button->type) {
+	case ACPI_BUTTON_TYPE_POWER:
+		input_set_capability(input, EV_KEY, KEY_POWER);
+		break;
+	case ACPI_BUTTON_TYPE_SLEEP:
+		input_set_capability(input, EV_KEY, KEY_SLEEP);
+		break;
+	case ACPI_BUTTON_TYPE_LID:
+		input_set_capability(input, EV_SW, SW_LID);
+		break;
+	}
+
+	error = input_register_device(input);
+	if (error)
+		goto err;
+
+	button->input = input;
+	return 0;
+ err:
+	input_free_device(input);
+	return error;
+}
+
 static int acpi_lid_update_state(struct acpi_device *device)
 {
 	int state;
@@ -414,7 +462,6 @@ static int acpi_button_resume(struct device *dev)
 static int acpi_button_add(struct acpi_device *device)
 {
 	struct acpi_button *button;
-	struct input_dev *input;
 	const char *hid = acpi_device_hid(device);
 	char *name, *class;
 	int error;
@@ -424,12 +471,6 @@ static int acpi_button_add(struct acpi_device *device)
 		return -ENOMEM;
 
 	device->driver_data = button;
-
-	button->input = input = input_allocate_device();
-	if (!input) {
-		error = -ENOMEM;
-		goto err_free_button;
-	}
 
 	name = acpi_device_name(device);
 	class = acpi_device_class(device);
@@ -457,38 +498,19 @@ static int acpi_button_add(struct acpi_device *device)
 	} else {
 		printk(KERN_ERR PREFIX "Unsupported hid [%s]\n", hid);
 		error = -ENODEV;
-		goto err_free_input;
+		goto err_free_button;
 	}
 
 	error = acpi_button_add_fs(device);
 	if (error)
-		goto err_free_input;
+		goto err_free_button;
 
 	snprintf(button->phys, sizeof(button->phys), "%s/button/input0", hid);
 
-	input->name = name;
-	input->phys = button->phys;
-	input->id.bustype = BUS_HOST;
-	input->id.product = button->type;
-	input->dev.parent = &device->dev;
-
-	switch (button->type) {
-	case ACPI_BUTTON_TYPE_POWER:
-		input_set_capability(input, EV_KEY, KEY_POWER);
-		break;
-
-	case ACPI_BUTTON_TYPE_SLEEP:
-		input_set_capability(input, EV_KEY, KEY_SLEEP);
-		break;
-
-	case ACPI_BUTTON_TYPE_LID:
-		input_set_capability(input, EV_SW, SW_LID);
-		break;
-	}
-
-	error = input_register_device(input);
+	error = acpi_button_add_input(device);
 	if (error)
 		goto err_remove_fs;
+
 	if (button->type == ACPI_BUTTON_TYPE_LID) {
 		/*
 		 * This assumes there's only one lid device, or if there are
@@ -507,8 +529,6 @@ static int acpi_button_add(struct acpi_device *device)
 
  err_remove_fs:
 	acpi_button_remove_fs(device);
- err_free_input:
-	input_free_device(input);
  err_free_button:
 	kfree(button);
 	return error;
@@ -521,7 +541,7 @@ static int acpi_button_remove(struct acpi_device *device)
 	acpi_button_remove_fs(device);
 	if (button->type == ACPI_BUTTON_TYPE_LID)
 		del_timer_sync(&button->lid_timer);
-	input_unregister_device(button->input);
+	acpi_button_remove_input(device);
 	kfree(button);
 	return 0;
 }
