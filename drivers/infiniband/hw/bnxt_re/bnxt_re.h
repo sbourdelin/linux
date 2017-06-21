@@ -84,11 +84,13 @@ struct bnxt_re_dev {
 	struct ib_device		ibdev;
 	struct list_head		list;
 	unsigned long			flags;
-#define BNXT_RE_FLAG_NETDEV_REGISTERED	0
-#define BNXT_RE_FLAG_IBDEV_REGISTERED	1
-#define BNXT_RE_FLAG_GOT_MSIX		2
-#define BNXT_RE_FLAG_RCFW_CHANNEL_EN	8
-#define BNXT_RE_FLAG_QOS_WORK_REG	16
+#define BNXT_RE_FLAG_NETDEV_REGISTERED         0
+#define BNXT_RE_FLAG_IBDEV_REGISTERED          1
+#define BNXT_RE_FLAG_GOT_MSIX                  2
+#define BNXT_RE_FLAG_RCFW_CHANNEL_EN           4
+#define BNXT_RE_FLAG_QOS_WORK_REG              5
+#define BNXT_RE_FLAG_NETDEV_REG_IN_PROG        6
+
 	struct net_device		*netdev;
 	unsigned int			version, major, minor;
 	struct bnxt_en_dev		*en_dev;
@@ -131,6 +133,7 @@ struct bnxt_re_dev {
 	struct bnxt_re_qp		*qp1_sqp;
 	struct bnxt_re_ah		*sqp_ah;
 	struct bnxt_re_sqp_entries sqp_tbl[1024];
+	u32 espeed;
 };
 
 #define to_bnxt_re_dev(ptr, member)	\
