@@ -1150,7 +1150,9 @@ struct resource * __request_declared_region(struct resource *parent,
 				continue;
 			}
 		}
-		if (conflict->flags & flags & IORESOURCE_MUXED) {
+		if (flags & IORESOURCE_MUXED) {
+			if (!(conflict->flags & IORESOURCE_MUXED))
+				printk(KERN_ERR "Resource conflict between muxed \"%s\" and non-muxed \"%s\" I/O regions!\n", res->name, conflict->name);
 			add_wait_queue(&muxed_resource_wait, &wait);
 			write_unlock(&resource_lock);
 			set_current_state(TASK_UNINTERRUPTIBLE);
