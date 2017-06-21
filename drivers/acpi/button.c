@@ -28,6 +28,7 @@
 #include <linux/proc_fs.h>
 #include <linux/seq_file.h>
 #include <linux/input.h>
+#include <linux/timer.h>
 #include <linux/slab.h>
 #include <linux/acpi.h>
 #include <acpi/button.h>
@@ -79,6 +80,7 @@ MODULE_DEVICE_TABLE(acpi, button_device_ids);
 static int acpi_button_add(struct acpi_device *device);
 static int acpi_button_remove(struct acpi_device *device);
 static void acpi_button_notify(struct acpi_device *device, u32 event);
+static void acpi_lid_timeout(ulong arg);
 
 #ifdef CONFIG_PM_SLEEP
 static int acpi_button_suspend(struct device *dev);
@@ -104,6 +106,7 @@ static struct acpi_driver acpi_button_driver = {
 struct acpi_button {
 	unsigned int type;
 	struct input_dev *input;
+	struct timer_list lid_timer;
 	char phys[32];			/* for input device */
 	unsigned long pushed;
 	int last_state;
@@ -118,6 +121,10 @@ static u8 lid_init_state = ACPI_BUTTON_LID_INIT_METHOD;
 static unsigned long lid_report_interval __read_mostly = 500;
 module_param(lid_report_interval, ulong, 0644);
 MODULE_PARM_DESC(lid_report_interval, "Interval (ms) between lid key events");
+
+static unsigned long lid_notify_timeout __read_mostly = 10;
+module_param(lid_notify_timeout, ulong, 0644);
+MODULE_PARM_DESC(lid_notify_timeout, "Timeout (s) before receiving lid notification");
 
 /* --------------------------------------------------------------------------
                               FS Interface (/proc)
@@ -371,6 +378,15 @@ static int acpi_lid_update_state(struct acpi_device *device)
 	return acpi_lid_notify_state(device, state);
 }
 
+static void acpi_lid_start_timer(struct acpi_device *device,
+				 unsigned long msecs)
+{
+	struct acpi_button *button = acpi_driver_data(device);
+
+	mod_timer(&button->lid_timer,
+		  jiffies + msecs_to_jiffies(msecs));
+}
+
 static void acpi_lid_initialize_state(struct acpi_device *device)
 {
 	switch (lid_init_state) {
@@ -384,6 +400,13 @@ static void acpi_lid_initialize_state(struct acpi_device *device)
 	default:
 		break;
 	}
+}
+
+static void acpi_lid_timeout(ulong arg)
+{
+	struct acpi_device *device = (struct acpi_device *)arg;
+
+	acpi_lid_initialize_state(device);
 }
 
 static void acpi_button_notify(struct acpi_device *device, u32 event)
@@ -432,6 +455,8 @@ static int acpi_button_suspend(struct device *dev)
 	struct acpi_device *device = to_acpi_device(dev);
 	struct acpi_button *button = acpi_driver_data(device);
 
+	if (button->type == ACPI_BUTTON_TYPE_LID)
+		del_timer(&button->lid_timer);
 	button->suspended = true;
 	return 0;
 }
@@ -443,7 +468,8 @@ static int acpi_button_resume(struct device *dev)
 
 	button->suspended = false;
 	if (button->type == ACPI_BUTTON_TYPE_LID)
-		acpi_lid_initialize_state(device);
+		acpi_lid_start_timer(device,
+			lid_notify_timeout * MSEC_PER_SEC);
 	return 0;
 }
 #endif
@@ -490,6 +516,9 @@ static int acpi_button_add(struct acpi_device *device)
 			ACPI_BUTTON_CLASS, ACPI_BUTTON_SUBCLASS_LID);
 		button->last_state = !!acpi_lid_evaluate_state(device);
 		button->last_time = ktime_get();
+		init_timer(&button->lid_timer);
+		setup_timer(&button->lid_timer,
+			    acpi_lid_timeout, (ulong)device);
 	} else {
 		printk(KERN_ERR PREFIX "Unsupported hid [%s]\n", hid);
 		error = -ENODEV;
@@ -526,12 +555,13 @@ static int acpi_button_add(struct acpi_device *device)
 	if (error)
 		goto err_remove_fs;
 	if (button->type == ACPI_BUTTON_TYPE_LID) {
-		acpi_lid_initialize_state(device);
 		/*
 		 * This assumes there's only one lid device, or if there are
 		 * more we only care about the last one...
 		 */
 		lid_device = device;
+		acpi_lid_start_timer(device,
+			lid_notify_timeout * MSEC_PER_SEC);
 	}
 
 	printk(KERN_INFO PREFIX "%s [%s]\n", name, acpi_device_bid(device));
@@ -551,6 +581,8 @@ static int acpi_button_remove(struct acpi_device *device)
 	struct acpi_button *button = acpi_driver_data(device);
 
 	acpi_button_remove_fs(device);
+	if (button->type == ACPI_BUTTON_TYPE_LID)
+		del_timer_sync(&button->lid_timer);
 	input_unregister_device(button->input);
 	kfree(button);
 	return 0;
