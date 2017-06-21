@@ -23,6 +23,7 @@ struct x86_exception {
 	u16 error_code;
 	bool nested_page_fault;
 	u64 address; /* cr2 or nested page fault gpa */
+	bool async_page_fault;
 };
 
 /*
