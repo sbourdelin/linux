@@ -20,29 +20,7 @@
  */
 bool __rpte_sub_valid(real_pte_t rpte, unsigned long index)
 {
-	unsigned long g_idx;
-	unsigned long ptev = pte_val(rpte.pte);
-
-	g_idx = (ptev & H_PAGE_COMBO_VALID) >> H_PAGE_F_GIX_SHIFT;
-	index = index >> 2;
-	if (g_idx & (0x1 << index))
-		return true;
-	else
-		return false;
-}
-/*
- * index from 0 - 15
- */
-static unsigned long mark_subptegroup_valid(unsigned long ptev, unsigned long index)
-{
-	unsigned long g_idx;
-
-	if (!(ptev & H_PAGE_COMBO))
-		return ptev;
-	index = index >> 2;
-	g_idx = 0x1 << index;
-
-	return ptev | (g_idx << H_PAGE_F_GIX_SHIFT);
+	return !(hpte_soft_invalid(rpte.hidx >> (index << 2)));
 }
 
 int __hash_page_4K(unsigned long ea, unsigned long access, unsigned long vsid,
@@ -50,12 +28,11 @@ int __hash_page_4K(unsigned long ea, unsigned long access, unsigned long vsid,
 		   int ssize, int subpg_prot)
 {
 	real_pte_t rpte;
-	unsigned long *hidxp;
 	unsigned long hpte_group;
 	unsigned int subpg_index;
-	unsigned long rflags, pa, hidx;
+	unsigned long rflags, pa;
 	unsigned long old_pte, new_pte, subpg_pte;
-	unsigned long vpn, hash, slot;
+	unsigned long vpn, hash, slot, gslot;
 	unsigned long shift = mmu_psize_defs[MMU_PAGE_4K].shift;
 
 	/*
@@ -116,8 +93,8 @@ int __hash_page_4K(unsigned long ea, unsigned long access, unsigned long vsid,
 		 * On hash insert failure we use old pte value and we don't
 		 * want slot information there if we have a insert failure.
 		 */
-		old_pte &= ~(H_PAGE_HASHPTE | H_PAGE_F_GIX | H_PAGE_F_SECOND);
-		new_pte &= ~(H_PAGE_HASHPTE | H_PAGE_F_GIX | H_PAGE_F_SECOND);
+		old_pte &= ~(H_PAGE_HASHPTE);
+		new_pte &= ~(H_PAGE_HASHPTE);
 		goto htab_insert_hpte;
 	}
 	/*
@@ -148,6 +125,15 @@ int __hash_page_4K(unsigned long ea, unsigned long access, unsigned long vsid,
 	}
 
 htab_insert_hpte:
+
+	/*
+	 * initialize all hidx entries to a invalid value,
+	 * the first time the PTE is about to allocate
+	 * a 4K hpte
+	 */
+	if (!(old_pte & H_PAGE_COMBO))
+		rpte.hidx = INIT_HIDX;
+
 	/*
 	 * handle H_PAGE_4K_PFN case
 	 */
@@ -172,15 +158,39 @@ repeat:
 	 * Primary is full, try the secondary
 	 */
 	if (unlikely(slot == -1)) {
+		bool soft_invalid;
+
 		hpte_group = ((~hash & htab_hash_mask) * HPTES_PER_GROUP) & ~0x7UL;
 		slot = mmu_hash_ops.hpte_insert(hpte_group, vpn, pa,
 						rflags, HPTE_V_SECONDARY,
 						MMU_PAGE_4K, MMU_PAGE_4K,
 						ssize);
-		if (slot == -1) {
-			if (mftb() & 0x1)
+
+		soft_invalid = hpte_soft_invalid(slot);
+		if (unlikely(soft_invalid)) {
+			/* we got a valid slot from a hardware point of view.
+			 * but we cannot use it, because we use this special
+			 * value; as defined by hpte_soft_invalid(),
+			 * to track invalid slots. We cannot use it.
+			 * So invalidate it.
+			 */
+			gslot = slot & _PTEIDX_GROUP_IX;
+			mmu_hash_ops.hpte_invalidate(hpte_group+gslot, vpn,
+				MMU_PAGE_4K, MMU_PAGE_4K,
+				ssize, 0);
+		}
+
+		if (unlikely(slot == -1 || soft_invalid)) {
+			/* for soft invalid slot lets ensure that we
+			 * release a slot from the primary, with the
+			 * hope that we will acquire that slot next
+			 * time we try. This will ensure that we dont
+			 * get the same soft-invalid slot.
+			 */
+			if (soft_invalid || (mftb() & 0x1))
 				hpte_group = ((hash & htab_hash_mask) *
 					      HPTES_PER_GROUP) & ~0x7UL;
+
 			mmu_hash_ops.hpte_remove(hpte_group);
 			/*
 			 * FIXME!! Should be try the group from which we removed ?

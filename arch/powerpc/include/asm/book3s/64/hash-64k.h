@@ -10,19 +10,20 @@
  * 64k aligned address free up few of the lower bits of RPN for us
  * We steal that here. For more deatils look at pte_pfn/pfn_pte()
  */
-#define H_PAGE_COMBO	_RPAGE_RPN0 /* this is a combo 4k page */
-#define H_PAGE_4K_PFN	_RPAGE_RPN1 /* PFN is for a single 4k page */
+#define H_PAGE_COMBO   _RPAGE_RPN0 /* this is a combo 4k page */
+#define H_PAGE_4K_PFN  _RPAGE_RPN1 /* PFN is for a single 4k page */
+#define H_PAGE_F_SECOND	_RPAGE_RSV2	/* HPTE is in 2ndary HPTEG */
+#define H_PAGE_F_GIX	(_RPAGE_RSV3 | _RPAGE_RSV4 | _RPAGE_RPN44)
+#define H_PAGE_F_GIX_SHIFT	56
+
+#define H_PAGE_BUSY	_RPAGE_RPN42     /* software: PTE & hash are busy */
+#define H_PAGE_HASHPTE	_RPAGE_RPN43    /* PTE has associated HPTE */
+
 /*
  * We need to differentiate between explicit huge page and THP huge
  * page, since THP huge page also need to track real subpage details
  */
 #define H_PAGE_THP_HUGE  H_PAGE_4K_PFN
-
-/*
- * Used to track subpage group valid if H_PAGE_COMBO is set
- * This overloads H_PAGE_F_GIX and H_PAGE_F_SECOND
- */
-#define H_PAGE_COMBO_VALID	(H_PAGE_F_GIX | H_PAGE_F_SECOND)
 
 /* PTE flags to conserve for HPTE identification */
 #define _PAGE_HPTEFLAGS (H_PAGE_BUSY | H_PAGE_F_SECOND | \

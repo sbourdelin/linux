@@ -8,11 +8,8 @@
  *
  */
 #define H_PTE_NONE_MASK		_PAGE_HPTEFLAGS
-#define H_PAGE_F_GIX_SHIFT	56
-#define H_PAGE_BUSY		_RPAGE_RSV1 /* software: PTE & hash are busy */
-#define H_PAGE_F_SECOND		_RPAGE_RSV2	/* HPTE is in 2ndary HPTEG */
-#define H_PAGE_F_GIX		(_RPAGE_RSV3 | _RPAGE_RSV4 | _RPAGE_RPN44)
-#define H_PAGE_HASHPTE		_RPAGE_RPN43	/* PTE has associated HPTE */
+
+#define INIT_HIDX (~0x0UL)
 
 #ifdef CONFIG_PPC_64K_PAGES
 #include <asm/book3s/64/hash-64k.h>
@@ -158,6 +155,11 @@ static inline int hash__pte_same(pte_t pte_a, pte_t pte_b)
 static inline int hash__pte_none(pte_t pte)
 {
 	return (pte_val(pte) & ~H_PTE_NONE_MASK) == 0;
+}
+
+static inline bool hpte_soft_invalid(unsigned long slot)
+{
+	return ((slot & 0xfUL) == 0xfUL);
 }
 
 /* This low level function performs the actual PTE insertion
