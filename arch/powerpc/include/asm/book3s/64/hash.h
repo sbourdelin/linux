@@ -162,6 +162,9 @@ static inline bool hpte_soft_invalid(unsigned long slot)
 	return ((slot & 0xfUL) == 0xfUL);
 }
 
+unsigned long get_hidx_gslot(unsigned long vpn, unsigned long shift,
+		int ssize, real_pte_t rpte, unsigned int subpg_index);
+
 /* This low level function performs the actual PTE insertion
  * Setting the PTE depends on the MMU type and other factors. It's
  * an horrible mess that I'm not going to try to clean up now but
