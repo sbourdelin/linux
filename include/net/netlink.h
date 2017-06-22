@@ -766,7 +766,7 @@ static inline int nla_parse_nested(struct nlattr *tb[], int maxtype,
  * @attrtype: attribute type
  * @value: numeric value
  */
-static inline int nla_put_u8(struct sk_buff *skb, int attrtype, u8 value)
+static noinline_if_stackbloat int nla_put_u8(struct sk_buff *skb, int attrtype, u8 value)
 {
 	return nla_put(skb, attrtype, sizeof(u8), &value);
 }
@@ -777,7 +777,7 @@ static inline int nla_put_u8(struct sk_buff *skb, int attrtype, u8 value)
  * @attrtype: attribute type
  * @value: numeric value
  */
-static inline int nla_put_u16(struct sk_buff *skb, int attrtype, u16 value)
+static noinline_if_stackbloat int nla_put_u16(struct sk_buff *skb, int attrtype, u16 value)
 {
 	return nla_put(skb, attrtype, sizeof(u16), &value);
 }
@@ -788,7 +788,7 @@ static inline int nla_put_u16(struct sk_buff *skb, int attrtype, u16 value)
  * @attrtype: attribute type
  * @value: numeric value
  */
-static inline int nla_put_be16(struct sk_buff *skb, int attrtype, __be16 value)
+static noinline_if_stackbloat int nla_put_be16(struct sk_buff *skb, int attrtype, __be16 value)
 {
 	return nla_put(skb, attrtype, sizeof(__be16), &value);
 }
@@ -799,7 +799,7 @@ static inline int nla_put_be16(struct sk_buff *skb, int attrtype, __be16 value)
  * @attrtype: attribute type
  * @value: numeric value
  */
-static inline int nla_put_net16(struct sk_buff *skb, int attrtype, __be16 value)
+static noinline_if_stackbloat int nla_put_net16(struct sk_buff *skb, int attrtype, __be16 value)
 {
 	return nla_put_be16(skb, attrtype | NLA_F_NET_BYTEORDER, value);
 }
@@ -810,7 +810,7 @@ static inline int nla_put_net16(struct sk_buff *skb, int attrtype, __be16 value)
  * @attrtype: attribute type
  * @value: numeric value
  */
-static inline int nla_put_le16(struct sk_buff *skb, int attrtype, __le16 value)
+static noinline_if_stackbloat int nla_put_le16(struct sk_buff *skb, int attrtype, __le16 value)
 {
 	return nla_put(skb, attrtype, sizeof(__le16), &value);
 }
@@ -821,7 +821,7 @@ static inline int nla_put_le16(struct sk_buff *skb, int attrtype, __le16 value)
  * @attrtype: attribute type
  * @value: numeric value
  */
-static inline int nla_put_u32(struct sk_buff *skb, int attrtype, u32 value)
+static noinline_if_stackbloat int nla_put_u32(struct sk_buff *skb, int attrtype, u32 value)
 {
 	return nla_put(skb, attrtype, sizeof(u32), &value);
 }
@@ -832,7 +832,7 @@ static inline int nla_put_u32(struct sk_buff *skb, int attrtype, u32 value)
  * @attrtype: attribute type
  * @value: numeric value
  */
-static inline int nla_put_be32(struct sk_buff *skb, int attrtype, __be32 value)
+static noinline_if_stackbloat int nla_put_be32(struct sk_buff *skb, int attrtype, __be32 value)
 {
 	return nla_put(skb, attrtype, sizeof(__be32), &value);
 }
@@ -843,7 +843,7 @@ static inline int nla_put_be32(struct sk_buff *skb, int attrtype, __be32 value)
  * @attrtype: attribute type
  * @value: numeric value
  */
-static inline int nla_put_net32(struct sk_buff *skb, int attrtype, __be32 value)
+static noinline_if_stackbloat int nla_put_net32(struct sk_buff *skb, int attrtype, __be32 value)
 {
 	return nla_put_be32(skb, attrtype | NLA_F_NET_BYTEORDER, value);
 }
@@ -854,7 +854,7 @@ static inline int nla_put_net32(struct sk_buff *skb, int attrtype, __be32 value)
  * @attrtype: attribute type
  * @value: numeric value
  */
-static inline int nla_put_le32(struct sk_buff *skb, int attrtype, __le32 value)
+static noinline_if_stackbloat int nla_put_le32(struct sk_buff *skb, int attrtype, __le32 value)
 {
 	return nla_put(skb, attrtype, sizeof(__le32), &value);
 }
@@ -866,7 +866,7 @@ static inline int nla_put_le32(struct sk_buff *skb, int attrtype, __le32 value)
  * @value: numeric value
  * @padattr: attribute type for the padding
  */
-static inline int nla_put_u64_64bit(struct sk_buff *skb, int attrtype,
+static noinline_if_stackbloat int nla_put_u64_64bit(struct sk_buff *skb, int attrtype,
 				    u64 value, int padattr)
 {
 	return nla_put_64bit(skb, attrtype, sizeof(u64), &value, padattr);
@@ -879,7 +879,7 @@ static inline int nla_put_u64_64bit(struct sk_buff *skb, int attrtype,
  * @value: numeric value
  * @padattr: attribute type for the padding
  */
-static inline int nla_put_be64(struct sk_buff *skb, int attrtype, __be64 value,
+static noinline_if_stackbloat int nla_put_be64(struct sk_buff *skb, int attrtype, __be64 value,
 			       int padattr)
 {
 	return nla_put_64bit(skb, attrtype, sizeof(__be64), &value, padattr);
@@ -892,7 +892,7 @@ static inline int nla_put_be64(struct sk_buff *skb, int attrtype, __be64 value,
  * @value: numeric value
  * @padattr: attribute type for the padding
  */
-static inline int nla_put_net64(struct sk_buff *skb, int attrtype, __be64 value,
+static noinline_if_stackbloat int nla_put_net64(struct sk_buff *skb, int attrtype, __be64 value,
 				int padattr)
 {
 	return nla_put_be64(skb, attrtype | NLA_F_NET_BYTEORDER, value,
@@ -906,7 +906,7 @@ static inline int nla_put_net64(struct sk_buff *skb, int attrtype, __be64 value,
  * @value: numeric value
  * @padattr: attribute type for the padding
  */
-static inline int nla_put_le64(struct sk_buff *skb, int attrtype, __le64 value,
+static noinline_if_stackbloat int nla_put_le64(struct sk_buff *skb, int attrtype, __le64 value,
 			       int padattr)
 {
 	return nla_put_64bit(skb, attrtype, sizeof(__le64), &value, padattr);
@@ -918,7 +918,7 @@ static inline int nla_put_le64(struct sk_buff *skb, int attrtype, __le64 value,
  * @attrtype: attribute type
  * @value: numeric value
  */
-static inline int nla_put_s8(struct sk_buff *skb, int attrtype, s8 value)
+static noinline_if_stackbloat int nla_put_s8(struct sk_buff *skb, int attrtype, s8 value)
 {
 	return nla_put(skb, attrtype, sizeof(s8), &value);
 }
@@ -929,7 +929,7 @@ static inline int nla_put_s8(struct sk_buff *skb, int attrtype, s8 value)
  * @attrtype: attribute type
  * @value: numeric value
  */
-static inline int nla_put_s16(struct sk_buff *skb, int attrtype, s16 value)
+static noinline_if_stackbloat int nla_put_s16(struct sk_buff *skb, int attrtype, s16 value)
 {
 	return nla_put(skb, attrtype, sizeof(s16), &value);
 }
@@ -940,7 +940,7 @@ static inline int nla_put_s16(struct sk_buff *skb, int attrtype, s16 value)
  * @attrtype: attribute type
  * @value: numeric value
  */
-static inline int nla_put_s32(struct sk_buff *skb, int attrtype, s32 value)
+static noinline_if_stackbloat int nla_put_s32(struct sk_buff *skb, int attrtype, s32 value)
 {
 	return nla_put(skb, attrtype, sizeof(s32), &value);
 }
@@ -952,7 +952,7 @@ static inline int nla_put_s32(struct sk_buff *skb, int attrtype, s32 value)
  * @value: numeric value
  * @padattr: attribute type for the padding
  */
-static inline int nla_put_s64(struct sk_buff *skb, int attrtype, s64 value,
+static noinline_if_stackbloat int nla_put_s64(struct sk_buff *skb, int attrtype, s64 value,
 			      int padattr)
 {
 	return nla_put_64bit(skb, attrtype, sizeof(s64), &value, padattr);
@@ -987,7 +987,7 @@ static inline int nla_put_flag(struct sk_buff *skb, int attrtype)
  * @njiffies: number of jiffies to convert to msecs
  * @padattr: attribute type for the padding
  */
-static inline int nla_put_msecs(struct sk_buff *skb, int attrtype,
+static noinline_if_stackbloat int nla_put_msecs(struct sk_buff *skb, int attrtype,
 				unsigned long njiffies, int padattr)
 {
 	u64 tmp = jiffies_to_msecs(njiffies);
