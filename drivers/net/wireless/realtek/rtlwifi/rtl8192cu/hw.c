@@ -835,7 +835,7 @@ static int _rtl92cu_init_mac(struct ieee80211_hw *hw)
 	struct rtl_usb_priv *usb_priv = rtl_usbpriv(hw);
 	struct rtl_usb *rtlusb = rtl_usbdev(usb_priv);
 	int err = 0;
-	u32	boundary = 0;
+	u32	boundary = TX_PAGE_BOUNDARY;
 	u8 wmm_enable = false; /* TODO */
 	u8 out_ep_nums = rtlusb->out_ep_nums;
 	u8 queue_sel = rtlusb->out_queue_sel;
@@ -844,13 +844,6 @@ static int _rtl92cu_init_mac(struct ieee80211_hw *hw)
 	if (err) {
 		pr_err("Failed to init power on!\n");
 		return err;
-	}
-	if (!wmm_enable) {
-		boundary = TX_PAGE_BOUNDARY;
-	} else { /* for WMM */
-		boundary = (IS_NORMAL_CHIP(rtlhal->version))
-					? WMM_CHIP_B_TX_PAGE_BOUNDARY
-					: WMM_CHIP_A_TX_PAGE_BOUNDARY;
 	}
 	if (false == rtl92c_init_llt_table(hw, boundary)) {
 		pr_err("Failed to init LLT Table!\n");
