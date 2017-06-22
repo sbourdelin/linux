@@ -71,6 +71,33 @@
 #include "ssi_pm.h"
 #include "ssi_fips_local.h"
 
+struct cc_hw_data {
+	char *name;
+	enum cc_hw_rev rev;
+	u32 sig;
+};
+
+/* Hardware revisions defs. */
+
+static const struct cc_hw_data cc712_hw = {
+	.name = "712", .rev = CC_HW_REV_712, .sig =  0xDCC71200U
+};
+
+static const struct cc_hw_data cc710_hw = {
+	.name = "710", .rev = CC_HW_REV_710, .sig =  0xDCC63200U
+};
+
+static const struct cc_hw_data cc630p_hw = {
+	.name = "630P", .rev = CC_HW_REV_630, .sig = 0xDCC63000U
+};
+
+static const struct of_device_id arm_ccree_dev_of_match[] = {
+	{ .compatible = "arm,cryptocell-712-ree", .data = &cc712_hw },
+	{ .compatible = "arm,cryptocell-710-ree", .data = &cc710_hw },
+	{ .compatible = "arm,cryptocell-630p-ree", .data = &cc630p_hw },
+	{}
+};
+MODULE_DEVICE_TABLE(of, arm_ccree_dev_of_match);
 
 #ifdef DX_DUMP_BYTES
 void dump_byte_array(const char *name, const u8 *the_array, unsigned long size)
@@ -185,8 +212,12 @@ int init_cc_regs(struct ssi_drvdata *drvdata, bool is_probe)
 	CC_HAL_WRITE_REGISTER(CC_REG_OFFSET(HOST_RGF, HOST_ICR), val);
 
 	/* Unmask relevant interrupt cause */
-	val = (~(SSI_COMP_IRQ_MASK | SSI_AXI_ERR_IRQ_MASK | SSI_GPR0_IRQ_MASK));
-	CC_HAL_WRITE_REGISTER(CC_REG_OFFSET(HOST_RGF, HOST_IMR), val);
+	val = (SSI_COMP_IRQ_MASK | SSI_AXI_ERR_IRQ_MASK);
+
+	if (drvdata->hw_rev >= CC_HW_REV_712)
+		val |= SSI_GPR0_IRQ_MASK;
+
+	CC_HAL_WRITE_REGISTER(CC_REG_OFFSET(HOST_RGF, HOST_IMR), ~val);
 
 #ifdef DX_HOST_IRQ_TIMER_INIT_VAL_REG_OFFSET
 #ifdef DX_IRQ_DELAY
@@ -215,17 +246,36 @@ int init_cc_regs(struct ssi_drvdata *drvdata, bool is_probe)
 
 static int init_cc_resources(struct platform_device *plat_dev)
 {
-	struct resource *req_mem_cc_regs = NULL;
+	struct resource *cc_regs_res = NULL;
 	void __iomem *cc_base = NULL;
 	bool irq_registered = false;
 	struct ssi_drvdata *new_drvdata = kzalloc(sizeof(struct ssi_drvdata), GFP_KERNEL);
 	u32 signature_val;
+	struct device *dev = &plat_dev->dev;
+	struct device_node *np = dev->of_node;
+	const struct cc_hw_data *hw_rev;
+	const struct of_device_id *dev_id;
 	int rc = 0;
 
 	if (unlikely(new_drvdata == NULL)) {
 		SSI_LOG_ERR("Failed to allocate drvdata");
 		rc = -ENOMEM;
 		goto init_cc_res_err;
+	}
+
+	dev_id = of_match_node(arm_ccree_dev_of_match, np);
+	if (!dev_id)
+		return -ENODEV;
+	hw_rev = (struct cc_hw_data *)dev_id->data;
+	new_drvdata->hw_rev_name = hw_rev->name;
+	new_drvdata->hw_rev = hw_rev->rev;
+
+	if (hw_rev->rev >= CC_HW_REV_712) {
+		new_drvdata->hash_len_sz = HASH_LEN_SIZE_712;
+		new_drvdata->axim_mon_offset = AXIM_MON_BASE_712_OFFSET;
+	} else {
+		new_drvdata->hash_len_sz = HASH_LEN_SIZE_630;
+		new_drvdata->axim_mon_offset = AXIM_MON_BASE_630_OFFSET;
 	}
 
 	/*Initialize inflight counter used in dx_ablkcipher_secure_complete used for count of BYSPASS blocks operations*/
@@ -245,8 +295,10 @@ static int init_cc_resources(struct platform_device *plat_dev)
 		(unsigned long long)new_drvdata->res_mem->start,
 		(unsigned long long)new_drvdata->res_mem->end);
 	/* Map registers space */
-	req_mem_cc_regs = request_mem_region(new_drvdata->res_mem->start, resource_size(new_drvdata->res_mem), "arm_cc7x_regs");
-	if (unlikely(req_mem_cc_regs == NULL)) {
+	cc_regs_res = request_mem_region(new_drvdata->res_mem->start,
+					 resource_size(new_drvdata->res_mem),
+					 "arm_ccree_regs");
+	if (unlikely(!cc_regs_res)) {
 		SSI_LOG_ERR("Couldn't allocate registers memory region at "
 			     "0x%08X\n", (unsigned int)new_drvdata->res_mem->start);
 		rc = -EBUSY;
@@ -271,7 +323,7 @@ static int init_cc_resources(struct platform_device *plat_dev)
 		goto init_cc_res_err;
 	}
 	rc = request_irq(new_drvdata->res_irq->start, cc_isr,
-			 IRQF_SHARED, "arm_cc7x", new_drvdata);
+			 IRQF_SHARED, "arm_ccree", new_drvdata);
 	if (unlikely(rc != 0)) {
 		SSI_LOG_ERR("Could not register to interrupt %llu\n",
 			(unsigned long long)new_drvdata->res_irq->start);
@@ -297,17 +349,19 @@ static int init_cc_resources(struct platform_device *plat_dev)
 
 	/* Verify correct mapping */
 	signature_val = CC_HAL_READ_REGISTER(CC_REG_OFFSET(HOST_RGF, HOST_SIGNATURE));
-	if (signature_val != DX_DEV_SIGNATURE) {
-		SSI_LOG_ERR("Invalid CC signature: SIGNATURE=0x%08X != expected=0x%08X\n",
-			signature_val, (u32)DX_DEV_SIGNATURE);
+	if (signature_val != hw_rev->sig) {
+		SSI_LOG_ERR("Signature mismatch: expected 0x%08X got 0x%08X\n",
+			    signature_val, hw_rev->sig);
 		rc = -EINVAL;
 		goto init_cc_res_err;
 	}
 	SSI_LOG_DEBUG("CC SIGNATURE=0x%08X\n", signature_val);
 
 	/* Display HW versions */
-	SSI_LOG(KERN_INFO, "ARM CryptoCell %s Driver: HW version 0x%08X, Driver version %s\n", SSI_DEV_NAME_STR,
-		CC_HAL_READ_REGISTER(CC_REG_OFFSET(HOST_RGF, HOST_VERSION)), DRV_MODULE_VERSION);
+	SSI_LOG(KERN_INFO, "ARM CryptoCell %s (HW ver 0x%08X, SW version %s)\n",
+		hw_rev->name,
+		CC_HAL_READ_REGISTER(CC_REG_OFFSET(HOST_RGF, HOST_VERSION)),
+		DRV_MODULE_VERSION);
 
 	rc = init_cc_regs(new_drvdata, true);
 	if (unlikely(rc != 0)) {
@@ -406,7 +460,7 @@ init_cc_res_err:
 		ssi_sysfs_fini();
 #endif
 
-		if (req_mem_cc_regs != NULL) {
+		if (cc_regs_res) {
 			if (irq_registered) {
 				free_irq(new_drvdata->res_irq->start, new_drvdata);
 				new_drvdata->res_irq = NULL;
@@ -470,7 +524,7 @@ static void cleanup_cc_resources(struct platform_device *plat_dev)
 	dev_set_drvdata(&plat_dev->dev, NULL);
 }
 
-static int cc7x_probe(struct platform_device *plat_dev)
+static int ccree_probe(struct platform_device *plat_dev)
 {
 	int rc;
 #if defined(CONFIG_ARM) && defined(CC_DEBUG)
@@ -492,54 +546,43 @@ static int cc7x_probe(struct platform_device *plat_dev)
 	if (rc != 0)
 		return rc;
 
-	SSI_LOG(KERN_INFO, "ARM cc7x_ree device initialized\n");
+	SSI_LOG(KERN_INFO, "ARM CryptoCell REE device initialized\n");
 
 	return 0;
 }
 
-static int cc7x_remove(struct platform_device *plat_dev)
+static int ccree_remove(struct platform_device *plat_dev)
 {
-	SSI_LOG_DEBUG("Releasing cc7x resources...\n");
+	SSI_LOG_DEBUG("Releasing resources...\n");
 
 	cleanup_cc_resources(plat_dev);
 
-	SSI_LOG(KERN_INFO, "ARM cc7x_ree device terminated\n");
+	SSI_LOG(KERN_INFO, "ARM CryptoCell REE device unloaded\n");
 
 	return 0;
 }
 #if defined (CONFIG_PM_RUNTIME) || defined (CONFIG_PM_SLEEP)
-static struct dev_pm_ops arm_cc7x_driver_pm = {
+static const struct dev_pm_ops arm_ccree_driver_pm = {
 	SET_RUNTIME_PM_OPS(ssi_power_mgr_runtime_suspend, ssi_power_mgr_runtime_resume, NULL)
 };
 #endif
 
 #if defined (CONFIG_PM_RUNTIME) || defined (CONFIG_PM_SLEEP)
-#define	DX_DRIVER_RUNTIME_PM	(&arm_cc7x_driver_pm)
+#define	DX_DRIVER_RUNTIME_PM	(&arm_ccree_driver_pm)
 #else
 #define	DX_DRIVER_RUNTIME_PM	NULL
 #endif
 
-
-#ifdef CONFIG_OF
-static const struct of_device_id arm_cc7x_dev_of_match[] = {
-	{.compatible = "arm,cryptocell-712-ree"},
-	{}
-};
-MODULE_DEVICE_TABLE(of, arm_cc7x_dev_of_match);
-#endif
-
-static struct platform_driver cc7x_driver = {
+static struct platform_driver ccree_driver = {
 	.driver = {
-		   .name = "cc7xree",
-#ifdef CONFIG_OF
-		   .of_match_table = arm_cc7x_dev_of_match,
-#endif
+		   .name = "ccree",
+		   .of_match_table = arm_ccree_dev_of_match,
 		   .pm = DX_DRIVER_RUNTIME_PM,
 	},
-	.probe = cc7x_probe,
-	.remove = cc7x_remove,
+	.probe = ccree_probe,
+	.remove = ccree_remove,
 };
-module_platform_driver(cc7x_driver);
+module_platform_driver(ccree_driver);
 
 /* Module description */
 MODULE_DESCRIPTION("ARM TrustZone CryptoCell REE Driver");

@@ -152,7 +152,7 @@ int request_mgr_init(struct ssi_drvdata *drvdata)
 	set_dout_dlli(&req_mgr_h->compl_desc, req_mgr_h->dummy_comp_buff_dma,
 		      sizeof(u32), NS_BIT, 1);
 	set_flow_mode(&req_mgr_h->compl_desc, BYPASS);
-	set_queue_last_ind(&req_mgr_h->compl_desc);
+	set_queue_last_ind(drvdata, &req_mgr_h->compl_desc);
 
 	return 0;
 
@@ -414,7 +414,7 @@ int send_request_init(
 	if (unlikely(rc != 0 )) {
 		return rc;
 	}
-	set_queue_last_ind(&desc[(len - 1)]);
+	set_queue_last_ind(drvdata, &desc[(len - 1)]);
 
 	enqueue_seq(cc_base, desc, len);
 
@@ -500,13 +500,15 @@ static void proc_completions(struct ssi_drvdata *drvdata)
 	}
 }
 
-static inline u32 cc_axi_comp_count(void __iomem *cc_base)
+static inline u32 cc_axi_comp_count(struct ssi_drvdata *drvdata)
 {
 	/* The CC_HAL_READ_REGISTER macro implictly requires and uses
 	 * a base MMIO register address variable named cc_base.
 	 */
+	void __iomem *cc_base = drvdata->cc_base;
+
 	return FIELD_GET(AXIM_MON_COMP_VALUE,
-			 CC_HAL_READ_REGISTER(AXIM_MON_BASE_OFFSET));
+			 CC_HAL_READ_REGISTER(drvdata->axim_mon_offset));
 }
 
 /* Deferred service handler, run as interrupt-fired tasklet */
@@ -516,10 +518,7 @@ static void comp_handler(unsigned long devarg)
 	void __iomem *cc_base = drvdata->cc_base;
 	struct ssi_request_mgr_handle * request_mgr_handle =
 						drvdata->request_mgr_handle;
-
 	u32 irq;
-
-
 
 	irq = (drvdata->irq & SSI_COMP_IRQ_MASK);
 
@@ -529,7 +528,7 @@ static void comp_handler(unsigned long devarg)
 
 		/* Avoid race with above clear: Test completion counter once more */
 		request_mgr_handle->axi_completed +=
-				cc_axi_comp_count(cc_base);
+				cc_axi_comp_count(drvdata);
 
 		while (request_mgr_handle->axi_completed) {
 			do {
@@ -538,7 +537,7 @@ static void comp_handler(unsigned long devarg)
 				 * request_mgr_handle->axi_completed is 0.
 				 */
 				request_mgr_handle->axi_completed =
-						cc_axi_comp_count(cc_base);
+						cc_axi_comp_count(drvdata);
 			} while (request_mgr_handle->axi_completed > 0);
 
 			/* To avoid the interrupt from firing as we unmask it, we clear it now */
@@ -546,7 +545,7 @@ static void comp_handler(unsigned long devarg)
 
 			/* Avoid race with above clear: Test completion counter once more */
 			request_mgr_handle->axi_completed +=
-					cc_axi_comp_count(cc_base);
+					cc_axi_comp_count(drvdata);
 		}
 
 	}

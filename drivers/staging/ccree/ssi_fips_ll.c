@@ -35,13 +35,11 @@ static const u32 sha1_init[] = {
 static const u32 sha256_init[] = {
 	SHA256_H7, SHA256_H6, SHA256_H5, SHA256_H4,
 	SHA256_H3, SHA256_H2, SHA256_H1, SHA256_H0 };
-#if (CC_SUPPORT_SHA > 256)
 static const u32 digest_len_sha512_init[] = {
 	0x00000080, 0x00000000, 0x00000000, 0x00000000 };
 static const u64 sha512_init[] = {
 	SHA512_H7, SHA512_H6, SHA512_H5, SHA512_H4,
 	SHA512_H3, SHA512_H2, SHA512_H1, SHA512_H0 };
-#endif
 
 
 #define NIST_CIPHER_AES_MAX_VECTOR_SIZE      32
@@ -102,7 +100,7 @@ struct fips_hmac_ctx {
 	u8 initial_digest[CC_DIGEST_SIZE_MAX];
 	u8 key[CC_HMAC_BLOCK_SIZE_MAX];
 	u8 k0[CC_HMAC_BLOCK_SIZE_MAX];
-	u8 digest_bytes_len[HASH_LEN_SIZE];
+	u8 digest_bytes_len[HASH_MAX_LEN_SIZE];
 	u8 tmp_digest[CC_DIGEST_SIZE_MAX];
 	u8 din[NIST_HMAC_MSG_SIZE];
 	u8 mac_res[CC_DIGEST_SIZE_MAX];
@@ -213,10 +211,8 @@ static const FipsCipherData FipsCipherDataTable[] = {
 	{ 1, RFC3962_AES_128_KEY,  CC_AES_128_BIT_KEY_SIZE, RFC3962_AES_CBC_CTS_IV, DRV_CRYPTO_DIRECTION_DECRYPT, DRV_CIPHER_CBC_CTS, RFC3962_AES_128_CBC_CTS_CIPHER, RFC3962_AES_PLAIN_DATA, RFC3962_AES_VECTOR_SIZE },
 	{ 1, NIST_AES_256_XTS_KEY, CC_AES_256_BIT_KEY_SIZE,   NIST_AES_256_XTS_IV,  DRV_CRYPTO_DIRECTION_ENCRYPT, DRV_CIPHER_XTS,     NIST_AES_256_XTS_PLAIN, NIST_AES_256_XTS_CIPHER, NIST_AES_256_XTS_VECTOR_SIZE },
 	{ 1, NIST_AES_256_XTS_KEY, CC_AES_256_BIT_KEY_SIZE,   NIST_AES_256_XTS_IV,  DRV_CRYPTO_DIRECTION_DECRYPT, DRV_CIPHER_XTS,     NIST_AES_256_XTS_CIPHER, NIST_AES_256_XTS_PLAIN, NIST_AES_256_XTS_VECTOR_SIZE },
-#if (CC_SUPPORT_SHA > 256)
 	{ 1, NIST_AES_512_XTS_KEY, 2*CC_AES_256_BIT_KEY_SIZE, NIST_AES_512_XTS_IV,  DRV_CRYPTO_DIRECTION_ENCRYPT, DRV_CIPHER_XTS,     NIST_AES_512_XTS_PLAIN, NIST_AES_512_XTS_CIPHER, NIST_AES_512_XTS_VECTOR_SIZE },
 	{ 1, NIST_AES_512_XTS_KEY, 2*CC_AES_256_BIT_KEY_SIZE, NIST_AES_512_XTS_IV,  DRV_CRYPTO_DIRECTION_DECRYPT, DRV_CIPHER_XTS,     NIST_AES_512_XTS_CIPHER, NIST_AES_512_XTS_PLAIN, NIST_AES_512_XTS_VECTOR_SIZE },
-#endif
 	/* DES */
 	{ 0, NIST_TDES_ECB3_KEY, CC_DRV_DES_TRIPLE_KEY_SIZE, NIST_TDES_ECB_IV, DRV_CRYPTO_DIRECTION_ENCRYPT, DRV_CIPHER_ECB, NIST_TDES_ECB3_PLAIN_DATA, NIST_TDES_ECB3_CIPHER, NIST_TDES_VECTOR_SIZE },
 	{ 0, NIST_TDES_ECB3_KEY, CC_DRV_DES_TRIPLE_KEY_SIZE, NIST_TDES_ECB_IV, DRV_CRYPTO_DIRECTION_DECRYPT, DRV_CIPHER_ECB, NIST_TDES_ECB3_CIPHER, NIST_TDES_ECB3_PLAIN_DATA, NIST_TDES_VECTOR_SIZE },
@@ -235,18 +231,16 @@ static const FipsCmacData FipsCmacDataTable[] = {
 static const FipsHashData FipsHashDataTable[] = {
         { DRV_HASH_SHA1,   NIST_SHA_1_MSG,   NIST_SHA_MSG_SIZE, NIST_SHA_1_MD },
         { DRV_HASH_SHA256, NIST_SHA_256_MSG, NIST_SHA_MSG_SIZE, NIST_SHA_256_MD },
-#if (CC_SUPPORT_SHA > 256)
-//        { DRV_HASH_SHA512, NIST_SHA_512_MSG, NIST_SHA_MSG_SIZE, NIST_SHA_512_MD },
-#endif
+	{ DRV_HASH_SHA512, NIST_SHA_512_MSG, NIST_SHA_MSG_SIZE,
+		NIST_SHA_512_MD },
 };
 #define FIPS_HASH_NUM_OF_TESTS        (sizeof(FipsHashDataTable) / sizeof(FipsHashData))
 
 static const FipsHmacData FipsHmacDataTable[] = {
         { DRV_HASH_SHA1,   NIST_HMAC_SHA1_KEY,   NIST_HMAC_SHA1_KEY_SIZE,   NIST_HMAC_SHA1_MSG,   NIST_HMAC_MSG_SIZE, NIST_HMAC_SHA1_MD },
         { DRV_HASH_SHA256, NIST_HMAC_SHA256_KEY, NIST_HMAC_SHA256_KEY_SIZE, NIST_HMAC_SHA256_MSG, NIST_HMAC_MSG_SIZE, NIST_HMAC_SHA256_MD },
-#if (CC_SUPPORT_SHA > 256)
-//        { DRV_HASH_SHA512, NIST_HMAC_SHA512_KEY, NIST_HMAC_SHA512_KEY_SIZE, NIST_HMAC_SHA512_MSG, NIST_HMAC_MSG_SIZE, NIST_HMAC_SHA512_MD },
-#endif
+	{ DRV_HASH_SHA512, NIST_HMAC_SHA512_KEY, NIST_HMAC_SHA512_KEY_SIZE,
+		NIST_HMAC_SHA512_MSG, NIST_HMAC_MSG_SIZE, NIST_HMAC_SHA512_MD },
 };
 #define FIPS_HMAC_NUM_OF_TESTS        (sizeof(FipsHmacDataTable) / sizeof(FipsHmacData))
 
@@ -434,6 +428,11 @@ ssi_cipher_fips_power_up_tests(struct ssi_drvdata *drvdata, void *cpu_addr_buffe
 		int rc = 0;
 		size_t iv_size = cipherData->isAes ? NIST_AES_IV_SIZE : NIST_TDES_IV_SIZE ;
 
+		/* AES 512 was introduced in 712 */
+		if ((cipherDara->keySize > CC_AES_256_BIT_KEY_SIZE) &&
+		    (drvdata->hw_rev < CC_HW_REV_712))
+			continue;
+
 		memset(cpu_addr_buffer, 0, sizeof(struct fips_cipher_ctx));
 
 		/* copy into the allocated buffer */
@@ -612,10 +611,8 @@ FIPS_HashToFipsError(enum drv_hash_mode hash_mode)
 		return CC_REE_FIPS_ERROR_SHA1_PUT;
 	case DRV_HASH_SHA256:
 		return CC_REE_FIPS_ERROR_SHA256_PUT;
-#if (CC_SUPPORT_SHA > 256)
 	case DRV_HASH_SHA512:
 		return CC_REE_FIPS_ERROR_SHA512_PUT;
-#endif
 	default:
 		return CC_REE_FIPS_ERROR_GENERAL;
 	}
@@ -654,7 +651,7 @@ ssi_hash_fips_run_test(struct ssi_drvdata *drvdata,
 	/* Load the hash current length */
 	hw_desc_init(&desc[idx]);
 	set_cipher_mode(&desc[idx], hw_mode);
-	set_din_const(&desc[idx], 0, HASH_LEN_SIZE);
+	set_din_const(&desc[idx], 0, drvdata->hash_len_sz);
 	set_cipher_config1(&desc[idx], HASH_PADDING_ENABLED);
 	set_flow_mode(&desc[idx], S_DIN_to_HASH);
 	set_setup_mode(&desc[idx], SETUP_LOAD_KEY0);
@@ -726,14 +723,15 @@ ssi_hash_fips_power_up_tests(struct ssi_drvdata *drvdata, void *cpu_addr_buffer,
 			inter_digestsize = CC_SHA256_DIGEST_SIZE;
 			memcpy(virt_ctx->initial_digest, (void*)sha256_init, CC_SHA256_DIGEST_SIZE);
 			break;
-#if (CC_SUPPORT_SHA > 256)
 		case DRV_HASH_SHA512:
+			/* SHA 512 was introduced in CC 712 */
+			if (drvdata->hw_rev < CC_HW_REV_712)
+				continue;
 			hw_mode = DRV_HASH_HW_SHA512;
 			digest_size = CC_SHA512_DIGEST_SIZE;
 			inter_digestsize = CC_SHA512_DIGEST_SIZE;
 			memcpy(virt_ctx->initial_digest, (void*)sha512_init, CC_SHA512_DIGEST_SIZE);
 			break;
-#endif
 		default:
 			error = FIPS_HashToFipsError(hash_data->hash_mode);
 			break;
@@ -788,10 +786,8 @@ FIPS_HmacToFipsError(enum drv_hash_mode hash_mode)
 		return CC_REE_FIPS_ERROR_HMAC_SHA1_PUT;
 	case DRV_HASH_SHA256:
 		return CC_REE_FIPS_ERROR_HMAC_SHA256_PUT;
-#if (CC_SUPPORT_SHA > 256)
 	case DRV_HASH_SHA512:
 		return CC_REE_FIPS_ERROR_HMAC_SHA512_PUT;
-#endif
 	default:
 		return CC_REE_FIPS_ERROR_GENERAL;
 	}
@@ -871,7 +867,7 @@ ssi_hmac_fips_run_test(struct ssi_drvdata *drvdata,
 		/* Load the hash current length*/
 		hw_desc_init(&desc[idx]);
 		set_cipher_mode(&desc[idx], hw_mode);
-		set_din_const(&desc[idx], 0, HASH_LEN_SIZE);
+		set_din_const(&desc[idx], 0, drvdata->hash_len_sz);
 		set_flow_mode(&desc[idx], S_DIN_to_HASH);
 		set_setup_mode(&desc[idx], SETUP_LOAD_KEY0);
 		idx++;
@@ -923,7 +919,7 @@ ssi_hmac_fips_run_test(struct ssi_drvdata *drvdata,
 	/* HW last hash block padding (aka. "DO_PAD") */
 	hw_desc_init(&desc[idx]);
 	set_cipher_mode(&desc[idx], hw_mode);
-	set_dout_dlli(&desc[idx], k0_dma_addr, HASH_LEN_SIZE, NS_BIT, 0);
+	set_dout_dlli(&desc[idx], k0_dma_addr, drvdata->hash_len_sz, NS_BIT, 0);
 	set_flow_mode(&desc[idx], S_HASH_to_DOUT);
 	set_setup_mode(&desc[idx], SETUP_WRITE_STATE1);
 	set_cipher_do(&desc[idx], DO_PAD);
@@ -963,7 +959,7 @@ ssi_hmac_fips_run_test(struct ssi_drvdata *drvdata,
 	hw_desc_init(&desc[idx]);
 	set_cipher_mode(&desc[idx], hw_mode);
 	set_din_type(&desc[idx], DMA_DLLI, digest_bytes_len_dma_addr,
-		     HASH_LEN_SIZE, NS_BIT);
+		     drvdata->hash_len_sz, NS_BIT);
 	set_cipher_config1(&desc[idx], HASH_PADDING_ENABLED);
 	set_flow_mode(&desc[idx], S_DIN_to_HASH);
 	set_setup_mode(&desc[idx], SETUP_LOAD_KEY0);
@@ -1039,27 +1035,32 @@ ssi_hmac_fips_power_up_tests(struct ssi_drvdata *drvdata, void *cpu_addr_buffer,
 			digest_size = CC_SHA1_DIGEST_SIZE;
 			block_size = CC_SHA1_BLOCK_SIZE;
 			inter_digestsize = CC_SHA1_DIGEST_SIZE;
-			memcpy(virt_ctx->initial_digest, (void*)sha1_init, CC_SHA1_DIGEST_SIZE);
-			memcpy(virt_ctx->digest_bytes_len, digest_len_init, HASH_LEN_SIZE);
+			memcpy(virt_ctx->initial_digest, (void *)sha1_init,
+			       CC_SHA1_DIGEST_SIZE);
+			memcpy(virt_ctx->digest_bytes_len, digest_len_init,
+			       drvdata->hash_len_sz);
 			break;
 		case DRV_HASH_SHA256:
 			hw_mode = DRV_HASH_HW_SHA256;
 			digest_size = CC_SHA256_DIGEST_SIZE;
 			block_size = CC_SHA256_BLOCK_SIZE;
 			inter_digestsize = CC_SHA256_DIGEST_SIZE;
-			memcpy(virt_ctx->initial_digest, (void*)sha256_init, CC_SHA256_DIGEST_SIZE);
-			memcpy(virt_ctx->digest_bytes_len, digest_len_init, HASH_LEN_SIZE);
+			memcpy(virt_ctx->initial_digest, (void *)sha256_init,
+			       CC_SHA256_DIGEST_SIZE);
+			memcpy(virt_ctx->digest_bytes_len, digest_len_init,
+			       drvdata->hash_len_sz);
 			break;
-#if (CC_SUPPORT_SHA > 256)
 		case DRV_HASH_SHA512:
 			hw_mode = DRV_HASH_HW_SHA512;
 			digest_size = CC_SHA512_DIGEST_SIZE;
 			block_size = CC_SHA512_BLOCK_SIZE;
 			inter_digestsize = CC_SHA512_DIGEST_SIZE;
-			memcpy(virt_ctx->initial_digest, (void*)sha512_init, CC_SHA512_DIGEST_SIZE);
-			memcpy(virt_ctx->digest_bytes_len, digest_len_sha512_init, HASH_LEN_SIZE);
+			memcpy(virt_ctx->initial_digest, (void *)sha512_init,
+			       CC_SHA512_DIGEST_SIZE);
+			memcpy(virt_ctx->digest_bytes_len,
+			       digest_len_sha512_init,
+			       drvdata->hash_len_sz);
 			break;
-#endif
 		default:
 			error = FIPS_HmacToFipsError(hmac_data->hash_mode);
 			break;

@@ -53,6 +53,8 @@ void ssi_sram_mgr_fini(struct ssi_drvdata *drvdata)
 int ssi_sram_mgr_init(struct ssi_drvdata *drvdata)
 {
 	struct ssi_sram_mgr_ctx *smgr_ctx;
+	void *cc_base = drvdata->cc_base;
+	dma_addr_t start = 0;
 	int rc;
 
 	/* Allocate "this" context */
@@ -66,9 +68,18 @@ int ssi_sram_mgr_init(struct ssi_drvdata *drvdata)
 	}
 	smgr_ctx = drvdata->sram_mgr_handle;
 
-	/* Pool starts at start of SRAM */
-	smgr_ctx->sram_free_offset = 0;
+	if (drvdata->hw_rev < CC_HW_REV_712) {
+		/* Pool starts after ROM bytes */
+		start = (dma_addr_t)CC_HAL_READ_REGISTER(CC_REG_OFFSET(HOST_RGF,
+HOST_SEP_SRAM_THRESHOLD));
+		if ((start & 0x3) != 0) {
+			SSI_LOG_ERR("Invalid SRAM offset 0x%x\n", start);
+			rc = -ENODEV;
+			goto out;
+		}
+	}
 
+	smgr_ctx->sram_free_offset = start;
 	return 0;
 
 out:

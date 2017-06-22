@@ -43,7 +43,6 @@
 #include "cc_regs.h"
 #include "dx_reg_common.h"
 #include "cc_hal.h"
-#define CC_SUPPORT_SHA DX_DEV_SHA_MAX
 #include "cc_crypto_ctx.h"
 #include "ssi_sysfs.h"
 #include "hash_defs.h"
@@ -51,9 +50,14 @@
 #include "cc_hw_queue_defs.h"
 #include "ssi_sram_mgr.h"
 
-#define DRV_MODULE_VERSION "3.0"
+#define DRV_MODULE_VERSION "4.0"
 
-#define SSI_DEV_NAME_STR "cc715ree"
+enum cc_hw_rev {
+	CC_HW_REV_630 = 630,
+	CC_HW_REV_710 = 710,
+	CC_HW_REV_712 = 712
+};
+
 #define SSI_CC_HAS_AES_CCM 1
 #define SSI_CC_HAS_AES_GCM 1
 #define SSI_CC_HAS_AES_XTS 1
@@ -90,7 +94,7 @@
 
 /* Logging macros */
 #define SSI_LOG(level, format, ...) \
-	printk(level "cc715ree::%s: " format , __func__, ##__VA_ARGS__)
+	printk(level "ccree::%s: " format, __func__, ##__VA_ARGS__)
 #define SSI_LOG_ERR(format, ...) SSI_LOG(KERN_ERR, format, ##__VA_ARGS__)
 #define SSI_LOG_WARNING(format, ...) SSI_LOG(KERN_WARNING, format, ##__VA_ARGS__)
 #define SSI_LOG_NOTICE(format, ...) SSI_LOG(KERN_NOTICE, format, ##__VA_ARGS__)
@@ -148,7 +152,10 @@ struct ssi_drvdata {
 	void *ivgen_handle;
 	void *sram_mgr_handle;
 	u32 inflight_counter;
-
+	char *hw_rev_name;
+	enum cc_hw_rev hw_rev;
+	u32 hash_len_sz;
+	u32 axim_mon_offset;
 };
 
 struct ssi_crypto_alg {
@@ -176,6 +183,7 @@ struct ssi_alg_template {
 	int cipher_mode;
 	int flow_mode; /* Note: currently, refers to the cipher mode only. */
 	int auth_mode;
+	u32 min_hw_rev;
 	struct ssi_drvdata *drvdata;
 };
 
@@ -193,6 +201,13 @@ void dump_byte_array(const char *name, const u8 *the_array, unsigned long size);
 
 int init_cc_regs(struct ssi_drvdata *drvdata, bool is_probe);
 void fini_cc_regs(struct ssi_drvdata *drvdata);
+
+static inline void set_queue_last_ind(struct ssi_drvdata *drvdata,
+				      struct cc_hw_desc *pdesc)
+{
+	if (drvdata->hw_rev >= CC_HW_REV_712)
+		set_queue_last_ind_bit(pdesc);
+}
 
 #endif /*__SSI_DRIVER_H__*/
 

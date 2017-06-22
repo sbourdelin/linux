@@ -23,7 +23,7 @@
 
 #include <linux/version.h>
 
-#define DISABLE_COHERENT_DMA_OPS
+//#define DISABLE_COHERENT_DMA_OPS
 //#define FLUSH_CACHE_ALL
 //#define COMPLETION_DELAY
 //#define DX_DUMP_DESCS

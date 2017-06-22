@@ -21,6 +21,4 @@
 
 #define CC_HW_VERSION 0xef840015UL
 
-#define DX_DEV_SHA_MAX 512
-
 #endif /*__DX_REG_COMMON_H__*/

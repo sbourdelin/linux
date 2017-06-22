@@ -663,7 +663,7 @@ ssi_blkcipher_create_data_desc(
 		set_dout_dlli(&desc[*seq_size], sg_dma_address(dst),
 			      nbytes, NS_BIT, (!areq ? 0 : 1));
 		if (areq != NULL) {
-			set_queue_last_ind(&desc[*seq_size]);
+			set_queue_last_ind(ctx_p->drvdata, &desc[*seq_size]);
 		}
 		set_flow_mode(&desc[*seq_size], flow_mode);
 		(*seq_size)++;
@@ -712,7 +712,7 @@ ssi_blkcipher_create_data_desc(
 				      (!areq ? 0 : 1));
 		}
 		if (areq != NULL) {
-			set_queue_last_ind(&desc[*seq_size]);
+			set_queue_last_ind(ctx_p->drvdata, &desc[*seq_size]);
 		}
 		set_flow_mode(&desc[*seq_size], flow_mode);
 		(*seq_size)++;
@@ -950,6 +950,7 @@ static struct ssi_alg_template blkcipher_algs[] = {
 			},
 		.cipher_mode = DRV_CIPHER_XTS,
 		.flow_mode = S_DIN_to_AES,
+		.min_hw_rev = CC_HW_REV_630,
 	},
 	{
 		.name = "xts(aes)",
@@ -966,6 +967,7 @@ static struct ssi_alg_template blkcipher_algs[] = {
 			},
 		.cipher_mode = DRV_CIPHER_XTS,
 		.flow_mode = S_DIN_to_AES,
+		.min_hw_rev = CC_HW_REV_712,
 	},
 	{
 		.name = "xts(aes)",
@@ -982,6 +984,7 @@ static struct ssi_alg_template blkcipher_algs[] = {
 			},
 		.cipher_mode = DRV_CIPHER_XTS,
 		.flow_mode = S_DIN_to_AES,
+		.min_hw_rev = CC_HW_REV_712,
 	},
 #endif /*SSI_CC_HAS_AES_XTS*/
 #if SSI_CC_HAS_AES_ESSIV
@@ -1000,6 +1003,7 @@ static struct ssi_alg_template blkcipher_algs[] = {
 			},
 		.cipher_mode = DRV_CIPHER_ESSIV,
 		.flow_mode = S_DIN_to_AES,
+		.min_hw_rev = CC_HW_REV_712,
 	},
 	{
 		.name = "essiv(aes)",
@@ -1016,6 +1020,7 @@ static struct ssi_alg_template blkcipher_algs[] = {
 			},
 		.cipher_mode = DRV_CIPHER_ESSIV,
 		.flow_mode = S_DIN_to_AES,
+		.min_hw_rev = CC_HW_REV_712,
 	},
 	{
 		.name = "essiv(aes)",
@@ -1032,6 +1037,7 @@ static struct ssi_alg_template blkcipher_algs[] = {
 			},
 		.cipher_mode = DRV_CIPHER_ESSIV,
 		.flow_mode = S_DIN_to_AES,
+		.min_hw_rev = CC_HW_REV_712,
 	},
 #endif /*SSI_CC_HAS_AES_ESSIV*/
 #if SSI_CC_HAS_AES_BITLOCKER
@@ -1050,6 +1056,7 @@ static struct ssi_alg_template blkcipher_algs[] = {
 			},
 		.cipher_mode = DRV_CIPHER_BITLOCKER,
 		.flow_mode = S_DIN_to_AES,
+		.min_hw_rev = CC_HW_REV_712,
 	},
 	{
 		.name = "bitlocker(aes)",
@@ -1066,6 +1073,7 @@ static struct ssi_alg_template blkcipher_algs[] = {
 			},
 		.cipher_mode = DRV_CIPHER_BITLOCKER,
 		.flow_mode = S_DIN_to_AES,
+		.min_hw_rev = CC_HW_REV_712,
 	},
 	{
 		.name = "bitlocker(aes)",
@@ -1082,6 +1090,7 @@ static struct ssi_alg_template blkcipher_algs[] = {
 			},
 		.cipher_mode = DRV_CIPHER_BITLOCKER,
 		.flow_mode = S_DIN_to_AES,
+		.min_hw_rev = CC_HW_REV_712,
 	},
 #endif /*SSI_CC_HAS_AES_BITLOCKER*/
 	{
@@ -1099,6 +1108,7 @@ static struct ssi_alg_template blkcipher_algs[] = {
 			},
 		.cipher_mode = DRV_CIPHER_ECB,
 		.flow_mode = S_DIN_to_AES,
+		.min_hw_rev = CC_HW_REV_630,
 	},
 	{
 		.name = "cbc(aes)",
@@ -1115,6 +1125,7 @@ static struct ssi_alg_template blkcipher_algs[] = {
 		},
 		.cipher_mode = DRV_CIPHER_CBC,
 		.flow_mode = S_DIN_to_AES,
+		.min_hw_rev = CC_HW_REV_630,
 	},
 	{
 		.name = "ofb(aes)",
@@ -1131,6 +1142,7 @@ static struct ssi_alg_template blkcipher_algs[] = {
 			},
 		.cipher_mode = DRV_CIPHER_OFB,
 		.flow_mode = S_DIN_to_AES,
+		.min_hw_rev = CC_HW_REV_630,
 	},
 #if SSI_CC_HAS_AES_CTS
 	{
@@ -1148,6 +1160,7 @@ static struct ssi_alg_template blkcipher_algs[] = {
 			},
 		.cipher_mode = DRV_CIPHER_CBC_CTS,
 		.flow_mode = S_DIN_to_AES,
+		.min_hw_rev = CC_HW_REV_630,
 	},
 #endif
 	{
@@ -1165,6 +1178,7 @@ static struct ssi_alg_template blkcipher_algs[] = {
 			},
 		.cipher_mode = DRV_CIPHER_CTR,
 		.flow_mode = S_DIN_to_AES,
+		.min_hw_rev = CC_HW_REV_630,
 	},
 	{
 		.name = "cbc(des3_ede)",
@@ -1181,6 +1195,7 @@ static struct ssi_alg_template blkcipher_algs[] = {
 			},
 		.cipher_mode = DRV_CIPHER_CBC,
 		.flow_mode = S_DIN_to_DES,
+		.min_hw_rev = CC_HW_REV_630,
 	},
 	{
 		.name = "ecb(des3_ede)",
@@ -1197,6 +1212,7 @@ static struct ssi_alg_template blkcipher_algs[] = {
 			},
 		.cipher_mode = DRV_CIPHER_ECB,
 		.flow_mode = S_DIN_to_DES,
+		.min_hw_rev = CC_HW_REV_630,
 	},
 	{
 		.name = "cbc(des)",
@@ -1213,6 +1229,7 @@ static struct ssi_alg_template blkcipher_algs[] = {
 			},
 		.cipher_mode = DRV_CIPHER_CBC,
 		.flow_mode = S_DIN_to_DES,
+		.min_hw_rev = CC_HW_REV_630,
 	},
 	{
 		.name = "ecb(des)",
@@ -1229,6 +1246,7 @@ static struct ssi_alg_template blkcipher_algs[] = {
 			},
 		.cipher_mode = DRV_CIPHER_ECB,
 		.flow_mode = S_DIN_to_DES,
+		.min_hw_rev = CC_HW_REV_630,
 	},
 #if SSI_CC_HAS_MULTI2
 	{
@@ -1246,6 +1264,7 @@ static struct ssi_alg_template blkcipher_algs[] = {
 			},
 		.cipher_mode = DRV_MULTI2_CBC,
 		.flow_mode = S_DIN_to_MULTI2,
+		.min_hw_rev = CC_HW_REV_630,
 	},
 	{
 		.name = "ofb(multi2)",
@@ -1262,6 +1281,7 @@ static struct ssi_alg_template blkcipher_algs[] = {
 			},
 		.cipher_mode = DRV_MULTI2_OFB,
 		.flow_mode = S_DIN_to_MULTI2,
+		.min_hw_rev = CC_HW_REV_630,
 	},
 #endif /*SSI_CC_HAS_MULTI2*/
 };
@@ -1346,6 +1366,9 @@ int ssi_ablkcipher_alloc(struct ssi_drvdata *drvdata)
 	/* Linux crypto */
 	SSI_LOG_DEBUG("Number of algorithms = %zu\n", ARRAY_SIZE(blkcipher_algs));
 	for (alg = 0; alg < ARRAY_SIZE(blkcipher_algs); alg++) {
+		if (blkcipher_algs[alg].min_hw_rev > drvdata->hw_rev)
+			continue;
+
 		SSI_LOG_DEBUG("creating %s\n", blkcipher_algs[alg].driver_name);
 		t_alg = ssi_ablkcipher_create_alg(&blkcipher_algs[alg]);
 		if (IS_ERR(t_alg)) {
