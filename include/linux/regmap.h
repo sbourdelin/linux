@@ -984,6 +984,10 @@ struct regmap_irq_chip {
 
 struct regmap_irq_chip_data;
 
+int dev_regmap_add_irq_chip(struct device *dev, struct regmap *map, int irq,
+			int irq_flags, int irq_base,
+			const struct regmap_irq_chip *chip,
+			struct regmap_irq_chip_data **data);
 int regmap_add_irq_chip(struct regmap *map, int irq, int irq_flags,
 			int irq_base, const struct regmap_irq_chip *chip,
 			struct regmap_irq_chip_data **data);
