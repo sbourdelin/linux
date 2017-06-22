@@ -330,6 +330,7 @@ static void kvm_guest_cpu_init(void)
 #ifdef CONFIG_PREEMPT
 		pa |= KVM_ASYNC_PF_SEND_ALWAYS;
 #endif
+		pa |= KVM_ASYNC_PF_DELIVERY_AS_PF_VMEXIT;
 		wrmsrl(MSR_KVM_ASYNC_PF_EN, pa | KVM_ASYNC_PF_ENABLED);
 		__this_cpu_write(apf_reason.enabled, 1);
 		printk(KERN_INFO"KVM setup async PF for cpu %d\n",
