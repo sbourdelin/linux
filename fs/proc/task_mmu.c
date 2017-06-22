@@ -1,4 +1,6 @@
 #include <linux/mm.h>
+#include <linux/pkeys.h>
+#include <linux/huge_mm.h>
 #include <linux/vmacache.h>
 #include <linux/hugetlb.h>
 #include <linux/huge_mm.h>
@@ -666,22 +668,20 @@ static void show_smap_vma_flags(struct seq_file *m, struct vm_area_struct *vma)
 		[ilog2(VM_MERGEABLE)]	= "mg",
 		[ilog2(VM_UFFD_MISSING)]= "um",
 		[ilog2(VM_UFFD_WP)]	= "uw",
-#ifdef CONFIG_ARCH_HAS_PKEYS
-		/* These come out via ProtectionKey: */
-		[ilog2(VM_PKEY_BIT0)]	= "",
-		[ilog2(VM_PKEY_BIT1)]	= "",
-		[ilog2(VM_PKEY_BIT2)]	= "",
-		[ilog2(VM_PKEY_BIT3)]	= "",
-#endif /* CONFIG_ARCH_HAS_PKEYS */
-#ifdef CONFIG_PPC64_MEMORY_PROTECTION_KEYS
-		/* Additional bit in ProtectionKey: */
-		[ilog2(VM_PKEY_BIT4)]	= "",
-#endif
 	};
 	size_t i;
 
 	seq_puts(m, "VmFlags: ");
 	for (i = 0; i < BITS_PER_LONG; i++) {
+#ifdef CONFIG_ARCH_HAS_PKEYS
+		if (i == ilog2(VM_PKEY_BIT0)) {
+			int keyvalue = vma_pkey(vma);
+
+			i += ilog2(arch_max_pkey())-1;
+			seq_printf(m, "key=%d ", keyvalue);
+			continue;
+		}
+#endif /* CONFIG_ARCH_HAS_PKEYS */
 		if (!mnemonics[i][0])
 			continue;
 		if (vma->vm_flags & (1UL << i)) {
