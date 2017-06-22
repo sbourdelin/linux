@@ -793,6 +793,9 @@ fastsleep_workaround_at_exit:
  */
 .global pnv_wakeup_loss
 pnv_wakeup_loss:
+BEGIN_FTR_SECTION
+	PPC_INVALIDATE_ERAT
+END_FTR_SECTION_IFSET(CPU_FTR_ARCH_300)
 	ld	r1,PACAR1(r13)
 BEGIN_FTR_SECTION
 	CHECK_HMI_INTERRUPT
