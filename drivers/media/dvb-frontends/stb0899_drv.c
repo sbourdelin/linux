@@ -537,7 +537,7 @@ int stb0899_write_regs(struct stb0899_state *state, unsigned int reg, u8 *data, 
 	return 0;
 }
 
-int stb0899_write_reg(struct stb0899_state *state, unsigned int reg, u8 data)
+noinline_if_stackbloat int stb0899_write_reg(struct stb0899_state *state, unsigned int reg, u8 data)
 {
 	return stb0899_write_regs(state, reg, &data, 1);
 }

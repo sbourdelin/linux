@@ -93,7 +93,7 @@ static int itd1000_read_reg(struct itd1000_state *state, u8 reg)
 	return val;
 }
 
-static inline int itd1000_write_reg(struct itd1000_state *state, u8 r, u8 v)
+static noinline_if_stackbloat int itd1000_write_reg(struct itd1000_state *state, u8 r, u8 v)
 {
 	int ret = itd1000_write_regs(state, r, &v, 1);
 	state->shadow[r] = v;

@@ -95,7 +95,7 @@ static int stv6110x_write_regs(struct stv6110x_state *stv6110x, int start, u8 da
 	return 0;
 }
 
-static int stv6110x_write_reg(struct stv6110x_state *stv6110x, u8 reg, u8 data)
+static noinline_if_stackbloat int stv6110x_write_reg(struct stv6110x_state *stv6110x, u8 reg, u8 data)
 {
 	return stv6110x_write_regs(stv6110x, reg, &data, 1);
 }

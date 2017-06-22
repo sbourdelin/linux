@@ -1516,7 +1516,7 @@ static int drxdap_fasi_read_block(struct i2c_device_addr *dev_addr,
 *
 ******************************/
 
-static int drxdap_fasi_read_reg16(struct i2c_device_addr *dev_addr,
+static noinline_if_stackbloat int drxdap_fasi_read_reg16(struct i2c_device_addr *dev_addr,
 					 u32 addr,
 					 u16 *data, u32 flags)
 {
@@ -1549,7 +1549,7 @@ static int drxdap_fasi_read_reg16(struct i2c_device_addr *dev_addr,
 *
 ******************************/
 
-static int drxdap_fasi_read_reg32(struct i2c_device_addr *dev_addr,
+static noinline_if_stackbloat int drxdap_fasi_read_reg32(struct i2c_device_addr *dev_addr,
 					 u32 addr,
 					 u32 *data, u32 flags)
 {
@@ -1722,7 +1722,7 @@ static int drxdap_fasi_write_block(struct i2c_device_addr *dev_addr,
 *
 ******************************/
 
-static int drxdap_fasi_write_reg16(struct i2c_device_addr *dev_addr,
+static noinline_if_stackbloat int drxdap_fasi_write_reg16(struct i2c_device_addr *dev_addr,
 					  u32 addr,
 					  u16 data, u32 flags)
 {
@@ -1795,7 +1795,7 @@ static int drxdap_fasi_read_modify_write_reg16(struct i2c_device_addr *dev_addr,
 *
 ******************************/
 
-static int drxdap_fasi_write_reg32(struct i2c_device_addr *dev_addr,
+static noinline_if_stackbloat int drxdap_fasi_write_reg32(struct i2c_device_addr *dev_addr,
 					  u32 addr,
 					  u32 data, u32 flags)
 {
@@ -2172,7 +2172,7 @@ rw_error:
 * \fn int drxj_dap_atomic_read_reg32()
 * \brief Atomic read of 32 bits words
 */
-static
+static noinline_if_stackbloat
 int drxj_dap_atomic_read_reg32(struct i2c_device_addr *dev_addr,
 				     u32 addr,
 				     u32 *data, u32 flags)
@@ -4192,7 +4192,7 @@ rw_error:
 * \fn int DRXJ_DAP_AtomicReadReg16()
 * \brief Atomic read of 16 bits words
 */
-static
+static noinline_if_stackbloat
 int drxj_dap_scu_atomic_read_reg16(struct i2c_device_addr *dev_addr,
 					 u32 addr,
 					 u16 *data, u32 flags)
@@ -4220,7 +4220,7 @@ int drxj_dap_scu_atomic_read_reg16(struct i2c_device_addr *dev_addr,
 * \fn int drxj_dap_scu_atomic_write_reg16()
 * \brief Atomic read of 16 bits words
 */
-static
+static noinline_if_stackbloat
 int drxj_dap_scu_atomic_write_reg16(struct i2c_device_addr *dev_addr,
 					  u32 addr,
 					  u16 data, u32 flags)

@@ -153,7 +153,8 @@ static int ascot2e_write_regs(struct ascot2e_priv *priv,
 	return 0;
 }
 
-static int ascot2e_write_reg(struct ascot2e_priv *priv, u8 reg, u8 val)
+static noinline_if_stackbloat int ascot2e_write_reg(struct ascot2e_priv *priv,
+						u8 reg, u8 val)
 {
 	return ascot2e_write_regs(priv, reg, &val, 1);
 }

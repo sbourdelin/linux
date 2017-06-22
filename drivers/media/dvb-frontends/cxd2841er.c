@@ -258,7 +258,7 @@ static int cxd2841er_write_regs(struct cxd2841er_priv *priv,
 	return 0;
 }
 
-static int cxd2841er_write_reg(struct cxd2841er_priv *priv,
+static noinline_if_stackbloat int cxd2841er_write_reg(struct cxd2841er_priv *priv,
 			       u8 addr, u8 reg, u8 val)
 {
 	return cxd2841er_write_regs(priv, addr, reg, &val, 1);
@@ -306,7 +306,7 @@ static int cxd2841er_read_regs(struct cxd2841er_priv *priv,
 	return 0;
 }
 
-static int cxd2841er_read_reg(struct cxd2841er_priv *priv,
+static noinline_if_stackbloat int cxd2841er_read_reg(struct cxd2841er_priv *priv,
 			      u8 addr, u8 reg, u8 *val)
 {
 	return cxd2841er_read_regs(priv, addr, reg, val, 1);

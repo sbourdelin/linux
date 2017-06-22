@@ -753,7 +753,7 @@ static int stv090x_write_regs(struct stv090x_state *state, unsigned int reg, u8 
 	return 0;
 }
 
-static int stv090x_write_reg(struct stv090x_state *state, unsigned int reg, u8 data)
+static noinline_if_stackbloat int stv090x_write_reg(struct stv090x_state *state, unsigned int reg, u8 data)
 {
 	return stv090x_write_regs(state, reg, &data, 1);
 }

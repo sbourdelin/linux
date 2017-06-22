@@ -137,7 +137,7 @@ static int stv6110_read_regs(struct dvb_frontend *fe, u8 regs[],
 	return 0;
 }
 
-static int stv6110_read_reg(struct dvb_frontend *fe, int start)
+static noinline_if_stackbloat int stv6110_read_reg(struct dvb_frontend *fe, int start)
 {
 	u8 buf[] = { 0 };
 	stv6110_read_regs(fe, buf, start, 1);

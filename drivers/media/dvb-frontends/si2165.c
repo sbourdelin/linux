@@ -140,7 +140,7 @@ static int si2165_read(struct si2165_state *state,
 	return 0;
 }
 
-static int si2165_readreg8(struct si2165_state *state,
+static noinline_if_stackbloat int si2165_readreg8(struct si2165_state *state,
 		       const u16 reg, u8 *val)
 {
 	unsigned int val_tmp;
@@ -150,7 +150,7 @@ static int si2165_readreg8(struct si2165_state *state,
 	return ret;
 }
 
-static int si2165_readreg16(struct si2165_state *state,
+static noinline_if_stackbloat int si2165_readreg16(struct si2165_state *state,
 		       const u16 reg, u16 *val)
 {
 	u8 buf[2];
@@ -161,26 +161,26 @@ static int si2165_readreg16(struct si2165_state *state,
 	return ret;
 }
 
-static int si2165_writereg8(struct si2165_state *state, const u16 reg, u8 val)
+static noinline_if_stackbloat int si2165_writereg8(struct si2165_state *state, const u16 reg, u8 val)
 {
 	return regmap_write(state->regmap, reg, val);
 }
 
-static int si2165_writereg16(struct si2165_state *state, const u16 reg, u16 val)
+static noinline_if_stackbloat int si2165_writereg16(struct si2165_state *state, const u16 reg, u16 val)
 {
 	u8 buf[2] = { val & 0xff, (val >> 8) & 0xff };
 
 	return si2165_write(state, reg, buf, 2);
 }
 
-static int si2165_writereg24(struct si2165_state *state, const u16 reg, u32 val)
+static noinline_if_stackbloat int si2165_writereg24(struct si2165_state *state, const u16 reg, u32 val)
 {
 	u8 buf[3] = { val & 0xff, (val >> 8) & 0xff, (val >> 16) & 0xff };
 
 	return si2165_write(state, reg, buf, 3);
 }
 
-static int si2165_writereg32(struct si2165_state *state, const u16 reg, u32 val)
+static noinline_if_stackbloat int si2165_writereg32(struct si2165_state *state, const u16 reg, u32 val)
 {
 	u8 buf[4] = {
 		val & 0xff,
@@ -191,7 +191,7 @@ static int si2165_writereg32(struct si2165_state *state, const u16 reg, u32 val)
 	return si2165_write(state, reg, buf, 4);
 }
 
-static int si2165_writereg_mask8(struct si2165_state *state, const u16 reg,
+static noinline_if_stackbloat int si2165_writereg_mask8(struct si2165_state *state, const u16 reg,
 				 u8 val, u8 mask)
 {
 	if (mask != 0xff) {
