@@ -171,15 +171,15 @@ Under each memory block, you can see 5 files:
                     block is removable and a value of 0 indicates that
                     it is not removable. A memory block is removable only if
                     every section in the block is removable.
-'valid_zones'     : read-only: designed to show which zones this memory block
-		    can be onlined to.
-		    The first column shows it's default zone.
+'valid_zones'     : read-only: shows different information based on state.
+		    When state is online, it is designed to show the
+		    zone name this memory block is onlined to.
+		    When state is offline, it is designed to show which zones
+		    this memory block can be onlined to.  The first column
+		    shows it's default zone.
 		    "memory6/valid_zones: Normal Movable" shows this memoryblock
 		    can be onlined to ZONE_NORMAL by default and to ZONE_MOVABLE
 		    by online_movable.
-		    "memory7/valid_zones: Movable Normal" shows this memoryblock
-		    can be onlined to ZONE_MOVABLE by default and to ZONE_NORMAL
-		    by online_kernel.
 
 NOTE:
   These directories/files appear after physical memory hotplug phase.
