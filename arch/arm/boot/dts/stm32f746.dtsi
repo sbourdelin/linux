@@ -326,6 +326,23 @@
 					bias-disable;
 				};
 			};
+
+			dcmi_pins: dcmi_pins@0 {
+				pins {
+					pinmux = <STM32F746_PA4_FUNC_DCMI_HSYNC>,
+						 <STM32F746_PG9_FUNC_DCMI_VSYNC>,
+						 <STM32F746_PA6_FUNC_DCMI_PIXCLK>,
+						 <STM32F746_PH9_FUNC_DCMI_D0>,
+						 <STM32F746_PH10_FUNC_DCMI_D1>,
+						 <STM32F746_PH11_FUNC_DCMI_D2>,
+						 <STM32F746_PH12_FUNC_DCMI_D3>,
+						 <STM32F746_PH14_FUNC_DCMI_D4>,
+						 <STM32F746_PD3_FUNC_DCMI_D5>,
+						 <STM32F746_PE5_FUNC_DCMI_D6>,
+						 <STM32F746_PE6_FUNC_DCMI_D7>;
+					slew-rate = <3>;
+				};
+			};
 		};
 
 		crc: crc@40023000 {
@@ -343,6 +360,20 @@
 			st,syscfg = <&pwrcfg>;
 			assigned-clocks = <&rcc 1 CLK_HSE_RTC>;
 			assigned-clock-rates = <1000000>;
+		};
+
+		dcmi: dcmi@50050000 {
+			compatible = "st,stm32-dcmi";
+			reg = <0x50050000 0x400>;
+			interrupts = <78>;
+			resets = <&rcc STM32F7_AHB2_RESET(DCMI)>;
+			clocks = <&rcc 0 STM32F7_AHB2_CLOCK(DCMI)>;
+			clock-names = "mclk";
+			pinctrl-names = "default";
+			pinctrl-0 = <&dcmi_pins>;
+			dmas = <&dma2 1 1 0x414 0x3>;
+			dma-names = "tx";
+			status = "disabled";
 		};
 	};
 };
