@@ -853,7 +853,7 @@ static struct attribute *cciss_host_attrs[] = {
 	NULL
 };
 
-static struct attribute_group cciss_host_attr_group = {
+static const struct attribute_group cciss_host_attr_group = {
 	.attrs = cciss_host_attrs,
 };
 
@@ -879,7 +879,7 @@ static struct attribute *cciss_dev_attrs[] = {
 	NULL
 };
 
-static struct attribute_group cciss_dev_attr_group = {
+static const struct attribute_group cciss_dev_attr_group = {
 	.attrs = cciss_dev_attrs,
 };
 
