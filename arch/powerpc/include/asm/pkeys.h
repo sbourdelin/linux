@@ -14,6 +14,19 @@
 			VM_PKEY_BIT3 | \
 			VM_PKEY_BIT4)
 
+#define pkey_to_vmflag_bits(key) (((key & 0x1UL) ? VM_PKEY_BIT0 : 0x0UL) | \
+			((key & 0x2UL) ? VM_PKEY_BIT1 : 0x0UL) |	\
+			((key & 0x4UL) ? VM_PKEY_BIT2 : 0x0UL) |	\
+			((key & 0x8UL) ? VM_PKEY_BIT3 : 0x0UL) |	\
+			((key & 0x10UL) ? VM_PKEY_BIT4 : 0x0UL))
+
+#define vmflag_to_page_pkey_bits(vm_flags)  \
+		(((vm_flags & VM_PKEY_BIT0) ? H_PAGE_PKEY_BIT4 : 0x0UL)|     \
+		((vm_flags & VM_PKEY_BIT1) ? H_PAGE_PKEY_BIT3 : 0x0UL) |     \
+		((vm_flags & VM_PKEY_BIT2) ? H_PAGE_PKEY_BIT2 : 0x0UL) |     \
+		((vm_flags & VM_PKEY_BIT3) ? H_PAGE_PKEY_BIT1 : 0x0UL) |     \
+		((vm_flags & VM_PKEY_BIT4) ? H_PAGE_PKEY_BIT0 : 0x0UL))
+
 /*
  * Bits are in BE format.
  * NOTE: key 31, 1, 0 are not used.
@@ -41,6 +54,12 @@
 
 #define mm_set_pkey_is_reserved(mm, pkey) (PKEY_INITIAL_ALLOCAION & \
 					pkeybit_mask(pkey))
+
+
+static inline int vma_pkey(struct vm_area_struct *vma)
+{
+	return (vma->vm_flags & ARCH_VM_PKEY_FLAGS) >> VM_PKEY_SHIFT;
+}
 
 static inline bool mm_pkey_is_allocated(struct mm_struct *mm, int pkey)
 {
@@ -114,7 +133,7 @@ static inline int arch_set_user_pkey_access(struct task_struct *tsk, int pkey,
 	return __arch_set_user_pkey_access(tsk, pkey, init_val);
 }
 
-static inline pkey_mm_init(struct mm_struct *mm)
+static inline void pkey_mm_init(struct mm_struct *mm)
 {
 	mm_pkey_allocation_map(mm) = PKEY_INITIAL_ALLOCAION;
 	/* -1 means unallocated or invalid */
