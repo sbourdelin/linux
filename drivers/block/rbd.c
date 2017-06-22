@@ -802,7 +802,7 @@ enum {
 	Opt_err
 };
 
-static match_table_t rbd_opts_tokens = {
+static const match_table_t rbd_opts_tokens = {
 	{Opt_queue_depth, "queue_depth=%d"},
 	/* int args above */
 	/* string args above */
@@ -4672,7 +4672,7 @@ static struct attribute *rbd_attrs[] = {
 	NULL
 };
 
-static struct attribute_group rbd_attr_group = {
+static const struct attribute_group rbd_attr_group = {
 	.attrs = rbd_attrs,
 };
 
