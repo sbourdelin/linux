@@ -416,6 +416,17 @@ static __always_inline void __write_once_size(volatile void *p, void *res, int s
  */
 #define noinline_for_stack noinline
 
+/*
+ * CONFIG_KASAN can lead to extreme stack usage with certain patterns when
+ * one function gets inlined many times and each instance requires a stack
+ * ckeck.
+ */
+#ifdef CONFIG_KASAN
+#define noinline_if_stackbloat noinline __maybe_unused
+#else
+#define noinline_if_stackbloat inline
+#endif
+
 #ifndef __always_inline
 #define __always_inline inline
 #endif
