@@ -1770,10 +1770,6 @@ qla2xxx_start_scsi_mq(srb_t *sp)
 	struct qla_hw_data *ha = vha->hw;
 	struct qla_qpair *qpair = sp->qpair;
 
-	/* Setup qpair pointers */
-	rsp = qpair->rsp;
-	req = qpair->req;
-
 	/* So we know we haven't pci_map'ed anything yet */
 	tot_dsds = 0;
 
@@ -1787,6 +1783,10 @@ qla2xxx_start_scsi_mq(srb_t *sp)
 
 	/* Acquire qpair specific lock */
 	spin_lock_irqsave(&qpair->qp_lock, flags);
+
+	/* Setup qpair pointers */
+	rsp = qpair->rsp;
+	req = qpair->req;
 
 	/* Check for room in outstanding command list. */
 	handle = req->current_outstanding_cmd;
@@ -1924,23 +1924,32 @@ qla2xxx_dif_start_scsi_mq(srb_t *sp)
 
 #define QDSS_GOT_Q_SPACE	BIT_0
 
+	/* Acquire ring specific lock */
+	spin_lock_irqsave(&qpair->qp_lock, flags);
+
 	/* Check for host side state */
 	if (!qpair->online) {
 		cmd->result = DID_NO_CONNECT << 16;
+		spin_unlock_irqrestore(&qpair->qp_lock, flags);
 		return QLA_INTERFACE_ERROR;
 	}
 
 	if (!qpair->difdix_supported &&
 		scsi_get_prot_op(cmd) != SCSI_PROT_NORMAL) {
 		cmd->result = DID_NO_CONNECT << 16;
+		spin_unlock_irqrestore(&qpair->qp_lock, flags);
 		return QLA_INTERFACE_ERROR;
 	}
+
+	spin_unlock_irqrestore(&qpair->qp_lock, flags);
 
 	/* Only process protection or >16 cdb in this routine */
 	if (scsi_get_prot_op(cmd) == SCSI_PROT_NORMAL) {
 		if (cmd->cmd_len <= 16)
 			return qla2xxx_start_scsi_mq(sp);
 	}
+
+	spin_lock_irqsave(&qpair->qp_lock, flags);
 
 	/* Setup qpair pointers */
 	rsp = qpair->rsp;
@@ -1956,9 +1965,6 @@ qla2xxx_dif_start_scsi_mq(srb_t *sp)
 			return QLA_FUNCTION_FAILED;
 		vha->marker_needed = 0;
 	}
-
-	/* Acquire ring specific lock */
-	spin_lock_irqsave(&qpair->qp_lock, flags);
 
 	/* Check for room in outstanding command list. */
 	handle = req->current_outstanding_cmd;
