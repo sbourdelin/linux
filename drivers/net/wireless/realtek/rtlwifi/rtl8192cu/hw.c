@@ -845,13 +845,7 @@ static int _rtl92cu_init_mac(struct ieee80211_hw *hw)
 		pr_err("Failed to init power on!\n");
 		return err;
 	}
-	if (!wmm_enable) {
 		boundary = TX_PAGE_BOUNDARY;
-	} else { /* for WMM */
-		boundary = (IS_NORMAL_CHIP(rtlhal->version))
-					? WMM_CHIP_B_TX_PAGE_BOUNDARY
-					: WMM_CHIP_A_TX_PAGE_BOUNDARY;
-	}
 	if (false == rtl92c_init_llt_table(hw, boundary)) {
 		pr_err("Failed to init LLT Table!\n");
 		return -EINVAL;
