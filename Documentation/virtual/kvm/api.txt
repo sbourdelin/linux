@@ -832,7 +832,7 @@ struct kvm_vcpu_events {
 		__u8 injected;
 		__u8 nr;
 		__u8 has_error_code;
-		__u8 pad;
+		__u8 async_page_fault;
 		__u32 error_code;
 	} exception;
 	struct {
@@ -857,13 +857,16 @@ struct kvm_vcpu_events {
 	} smi;
 };
 
-Only two fields are defined in the flags field:
+Only three fields are defined in the flags field:
 
 - KVM_VCPUEVENT_VALID_SHADOW may be set in the flags field to signal that
   interrupt.shadow contains a valid state.
 
 - KVM_VCPUEVENT_VALID_SMM may be set in the flags field to signal that
   smi contains a valid state.
+
+- KVM_VCPUEVENT_VALID_ASYNC_PF may be set in the flags field to signal that
+  the exception is an async page fault.
 
 4.32 KVM_SET_VCPU_EVENTS
 
@@ -887,6 +890,7 @@ suppress overwriting the current in-kernel state. The bits are:
 KVM_VCPUEVENT_VALID_NMI_PENDING - transfer nmi.pending to the kernel
 KVM_VCPUEVENT_VALID_SIPI_VECTOR - transfer sipi_vector
 KVM_VCPUEVENT_VALID_SMM         - transfer the smi sub-struct.
+KVM_VCPUEVENT_VALID_ASYNC_PF    - transfer async page fault
 
 If KVM_CAP_INTR_SHADOW is available, KVM_VCPUEVENT_VALID_SHADOW can be set in
 the flags field to signal that interrupt.shadow contains a valid state and
