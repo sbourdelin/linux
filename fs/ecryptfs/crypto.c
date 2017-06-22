@@ -1389,19 +1389,36 @@ out:
 int ecryptfs_read_and_validate_xattr_region(struct dentry *dentry,
 					    struct inode *inode)
 {
-	u8 file_size[ECRYPTFS_SIZE_AND_MARKER_BYTES];
-	u8 *marker = file_size + ECRYPTFS_FILE_SIZE_BYTES;
+	char *page_virt;
 	int rc;
 
+	page_virt = kmem_cache_alloc(ecryptfs_header_cache, GFP_USER);
+	if (!page_virt) {
+		rc = -ENOMEM;
+		printk(KERN_ERR "%s: Unable to allocate page_virt\n",
+		       __func__);
+		goto out;
+	}
 	rc = ecryptfs_getxattr_lower(ecryptfs_dentry_to_lower(dentry),
 				     ecryptfs_inode_to_lower(inode),
-				     ECRYPTFS_XATTR_NAME, file_size,
-				     ECRYPTFS_SIZE_AND_MARKER_BYTES);
-	if (rc < ECRYPTFS_SIZE_AND_MARKER_BYTES)
-		return rc >= 0 ? -EINVAL : rc;
-	rc = ecryptfs_validate_marker(marker);
+				     ECRYPTFS_XATTR_NAME, page_virt,
+				     ECRYPTFS_DEFAULT_EXTENT_SIZE);
+	if (rc < 0) {
+		if (unlikely(ecryptfs_verbosity > 0))
+			printk(KERN_INFO "Error attempting to read the [%s] "
+			       "xattr from the lower file; return value = "
+			       "[%d]\n", ECRYPTFS_XATTR_NAME, rc);
+		rc = -EINVAL;
+		goto out;
+	}
+	rc = ecryptfs_validate_marker(page_virt + ECRYPTFS_FILE_SIZE_BYTES);
 	if (!rc)
-		ecryptfs_i_size_init(file_size, inode);
+		ecryptfs_i_size_init(page_virt, inode);
+out:
+	if (page_virt) {
+		memset(page_virt, 0, PAGE_SIZE);
+		kmem_cache_free(ecryptfs_header_cache, page_virt);
+	}
 	return rc;
 }
 
