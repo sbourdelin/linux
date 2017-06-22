@@ -3208,7 +3208,10 @@ static int cxd2841er_get_frontend(struct dvb_frontend *fe,
 	else if (priv->state == STATE_ACTIVE_TC)
 		cxd2841er_read_status_tc(fe, &status);
 
-	cxd2841er_read_signal_strength(fe);
+	if (status & FE_HAS_SYNC)
+		cxd2841er_read_signal_strength(fe);
+	else
+		p->strength.stat[0].scale = FE_SCALE_NOT_AVAILABLE;
 
 	if (status & FE_HAS_LOCK) {
 		cxd2841er_read_snr(fe);
