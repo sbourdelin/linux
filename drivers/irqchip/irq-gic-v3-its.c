@@ -688,9 +688,11 @@ static struct irq_chip its_irq_chip = {
  */
 #define IRQS_PER_CHUNK_SHIFT	5
 #define IRQS_PER_CHUNK		(1 << IRQS_PER_CHUNK_SHIFT)
+#define ITS_MAX_LPI_NRBITS	(17) /* 128K LPIs */
 
 static unsigned long *lpi_bitmap;
 static u32 lpi_chunks;
+static u32 lpi_nrbits;
 static DEFINE_SPINLOCK(lpi_lock);
 
 static int its_lpi_to_chunk(int lpi)
@@ -786,26 +788,19 @@ static void its_lpi_free(struct event_lpi_map *map)
 }
 
 /*
- * We allocate 64kB for PROPBASE. That gives us at most 64K LPIs to
+ * We allocate memory for PROPBASE to cover 2 ^ lpi_nrbits LPIs to
  * deal with (one configuration byte per interrupt). PENDBASE has to
  * be 64kB aligned (one bit per LPI, plus 8192 bits for SPI/PPI/SGI).
  */
-#define LPI_PROPBASE_SZ		SZ_64K
-#define LPI_PENDBASE_SZ		(LPI_PROPBASE_SZ / 8 + SZ_1K)
-
-/*
- * This is how many bits of ID we need, including the useless ones.
- */
-#define LPI_NRBITS		ilog2(LPI_PROPBASE_SZ + SZ_8K)
 
 #define LPI_PROP_DEFAULT_PRIO	0xa0
 
 static int __init its_alloc_lpi_tables(void)
 {
+	u32 size = ALIGN(BIT(lpi_nrbits), SZ_64K);
 	phys_addr_t paddr;
 
-	gic_rdists->prop_page = alloc_pages(GFP_NOWAIT,
-					   get_order(LPI_PROPBASE_SZ));
+	gic_rdists->prop_page = alloc_pages(GFP_NOWAIT, get_order(size));
 	if (!gic_rdists->prop_page) {
 		pr_err("Failed to allocate PROPBASE\n");
 		return -ENOMEM;
@@ -817,10 +812,10 @@ static int __init its_alloc_lpi_tables(void)
 	/* Priority 0xa0, Group-1, disabled */
 	memset(page_address(gic_rdists->prop_page),
 	       LPI_PROP_DEFAULT_PRIO | LPI_PROP_GROUP1,
-	       LPI_PROPBASE_SZ);
+	       size);
 
 	/* Make sure the GIC will observe the written configuration */
-	gic_flush_dcache_to_poc(page_address(gic_rdists->prop_page), LPI_PROPBASE_SZ);
+	gic_flush_dcache_to_poc(page_address(gic_rdists->prop_page), size);
 
 	return 0;
 }
@@ -1092,12 +1087,14 @@ static void its_cpu_init_lpis(void)
 	pend_page = gic_data_rdist()->pend_page;
 	if (!pend_page) {
 		phys_addr_t paddr;
+		u32 size;
 		/*
-		 * The pending pages have to be at least 64kB aligned,
-		 * hence the 'max(LPI_PENDBASE_SZ, SZ_64K)' below.
+		 * The pending pages have to be at least 64kB aligned
+		 * hence the 'ALIGN(BIT(lpi_nrbits)/8, SZ_64K)' below.
 		 */
+		size = ALIGN(BIT(lpi_nrbits)/8, SZ_64K);
 		pend_page = alloc_pages(GFP_NOWAIT | __GFP_ZERO,
-					get_order(max(LPI_PENDBASE_SZ, SZ_64K)));
+					get_order(size));
 		if (!pend_page) {
 			pr_err("Failed to allocate PENDBASE for CPU%d\n",
 			       smp_processor_id());
@@ -1105,7 +1102,7 @@ static void its_cpu_init_lpis(void)
 		}
 
 		/* Make sure the GIC will observe the zero-ed page */
-		gic_flush_dcache_to_poc(page_address(pend_page), LPI_PENDBASE_SZ);
+		gic_flush_dcache_to_poc(page_address(pend_page), size);
 
 		paddr = page_to_phys(pend_page);
 		pr_info("CPU%d: using LPI pending table @%pa\n",
@@ -1127,7 +1124,7 @@ static void its_cpu_init_lpis(void)
 	val = (page_to_phys(gic_rdists->prop_page) |
 	       GICR_PROPBASER_InnerShareable |
 	       GICR_PROPBASER_RaWaWb |
-	       ((LPI_NRBITS - 1) & GICR_PROPBASER_IDBITS_MASK));
+	       ((lpi_nrbits - 1) & GICR_PROPBASER_IDBITS_MASK));
 
 	gicr_write_propbaser(val, rbase + GICR_PROPBASER);
 	tmp = gicr_read_propbaser(rbase + GICR_PROPBASER);
@@ -1897,9 +1894,10 @@ int __init its_init(struct fwnode_handle *handle, struct rdists *rdists,
 		return -ENXIO;
 	}
 
+	lpi_nrbits = min_t(u32, rdists->id_bits, ITS_MAX_LPI_NRBITS);
 	gic_rdists = rdists;
 	its_alloc_lpi_tables();
-	its_lpi_init(rdists->id_bits);
+	its_lpi_init(lpi_nrbits);
 
 	return 0;
 }
