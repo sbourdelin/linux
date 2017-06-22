@@ -9,6 +9,7 @@
 
 #include "common.h"
 #include <linux/init.h>
+#include <linux/hwmon.h>
 #include <linux/module.h>
 #include <linux/platform_device.h>
 #include <linux/occ.h>
@@ -33,7 +34,7 @@ static int p9_sbe_occ_send_cmd(struct occ *occ, u8 *cmd)
 retry:
 	client = occ_drv_open(p9_sbe_occ->sbe, 0);
 	if (!client)
-		return -ENODEV;
+		return -ENODEV;		/* don't increment error counter */
 
 	/* skip first byte (sequence number), OCC driver handles it */
 	rc = occ_drv_write(client, (const char *)&cmd[1], 7);
@@ -75,15 +76,21 @@ retry:
 		rc = -EFAULT;
 	}
 
+	occ->error = resp->return_status;
+
 	if (rc < 0) {
+		occ->error_count++;
 		dev_warn(occ->bus_dev, "occ bad response: %d\n",
 			 resp->return_status);
 		return rc;
 	}
 
+	occ->error_count = 0;
 	return 0;
 
 err:
+	occ->error_count++;
+	occ->error = rc;
 	occ_drv_release(client);
 	dev_err(occ->bus_dev, "occ bus op failed rc: %d\n", rc);
 	return rc;

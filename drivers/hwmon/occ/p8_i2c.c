@@ -161,7 +161,10 @@ retry:
 		rc = -EFAULT;
 	}
 
+	occ->error = resp->return_status;
+
 	if (rc < 0) {
+		occ->error_count++;
 		dev_warn(&client->dev, "occ bad response: %d\n",
 			 resp->return_status);
 		return rc;
@@ -169,9 +172,11 @@ retry:
 
 	data_length = get_unaligned_be16(&resp->data_length_be);
 	if (data_length > OCC_RESP_DATA_BYTES) {
+		occ->error_count++;
+		occ->error = -EDOM;
 		dev_warn(&client->dev, "occ bad data length: %d\n",
 			 data_length);
-		return -EDOM;
+		return occ->error;
 	}
 
 	/* read remaining response */
@@ -181,9 +186,12 @@ retry:
 			goto err;
 	}
 
+	occ->error_count = 0;
 	return data_length + 7;
 
 err:
+	occ->error_count++;
+	occ->error = rc;
 	dev_err(&client->dev, "i2c scom op failed rc: %d\n", rc);
 	return rc;
 }

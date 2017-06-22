@@ -11,6 +11,9 @@
 #include "common.h"
 #include <linux/hwmon.h>
 
+/* counter so we can verify against count from OCC response */
+static atomic_t occ_num_occs = ATOMIC_INIT(0);
+
 /* OCC sensor type and version definitions */
 
 struct temp_sensor_1 {
@@ -112,6 +115,9 @@ struct extended_sensor {
 
 static int occ_poll(struct occ *occ)
 {
+	int rc;
+	struct occ_poll_response_header *header =
+		(struct occ_poll_response_header *)occ->resp.data;
 	u16 checksum = occ->poll_cmd_data + 1;
 	u8 cmd[8];
 
@@ -126,7 +132,32 @@ static int occ_poll(struct occ *occ)
 	cmd[7] = 0;
 
 	/* mutex should already be locked if necessary */
-	return occ->send_cmd(occ, cmd);
+	rc = occ->send_cmd(occ, cmd);
+	if (rc < 0)
+		return rc;
+
+	/* check for "safe" state */
+	if (header->occ_state == OCC_STATE_SAFE) {
+		if (occ->last_safe) {
+			if (time_after(jiffies,
+				       occ->last_safe + OCC_SAFE_TIMEOUT))
+				occ->error = -EHOSTDOWN;
+		} else
+			occ->last_safe = jiffies;
+	} else
+		occ->last_safe = 0;
+
+	/* verify number of present OCCs */
+	if (header->status & OCC_STAT_MASTER) {
+		if (hweight8(header->occs_present) !=
+		    atomic_read(&occ_num_occs)) {
+			occ->error = -EXDEV;
+			occ->bad_present_count++;
+		} else
+			occ->bad_present_count = 0;
+	}
+
+	return rc;
 }
 
 static int occ_set_user_power_cap(struct occ *occ, u16 user_power_cap)
@@ -993,6 +1024,19 @@ static int occ_setup_sensor_attrs(struct occ *occ)
 	return 0;
 }
 
+static ssize_t occ_show_error(struct device *dev,
+			      struct device_attribute *attr, char *buf)
+{
+	int error = 0;
+	struct occ *occ = dev_get_drvdata(dev);
+
+	if (occ->error_count > OCC_ERROR_COUNT_THRESHOLD || occ->last_safe ||
+	    occ->bad_present_count > OCC_ERROR_COUNT_THRESHOLD)
+		error = occ->error;
+
+	return snprintf(buf, PAGE_SIZE - 1, "%d\n", error);
+}
+
 static ssize_t occ_show_status(struct device *dev,
 			       struct device_attribute *attr, char *buf)
 {
@@ -1078,6 +1122,10 @@ static int occ_create_status_attrs(struct occ *occ)
 		(struct sensor_device_attribute)SENSOR_ATTR(occ_status, 0444,
 							    occ_show_status,
 							    NULL, 6);
+	occ->status_attrs[7] =
+		(struct sensor_device_attribute)SENSOR_ATTR(occ_error, 0444,
+							    occ_show_error,
+							    NULL, 0);
 
 	for (i = 0; i < OCC_NUM_STATUS_ATTRS; ++i) {
 		rc = device_create_file(dev, &occ->status_attrs[i].dev_attr);
@@ -1140,6 +1188,7 @@ int occ_setup(struct occ *occ, const char *name)
 {
 	int rc;
 
+	atomic_inc(&occ_num_occs);
 	mutex_init(&occ->lock);
 	occ->groups[0] = &occ->group;
 
@@ -1186,6 +1235,8 @@ int occ_shutdown(struct occ *occ)
 	for (i = 0; i < OCC_NUM_STATUS_ATTRS; ++i)
 		device_remove_file(occ->bus_dev,
 				   &occ->status_attrs[i].dev_attr);
+
+	atomic_dec(&occ_num_occs);
 
 	return 0;
 }
