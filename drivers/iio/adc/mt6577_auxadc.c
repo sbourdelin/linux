@@ -308,6 +308,7 @@ static const struct dev_pm_ops mt6577_auxadc_pm_ops = {
 static const struct of_device_id mt6577_auxadc_of_match[] = {
 	{ .compatible = "mediatek,mt2701-auxadc", },
 	{ .compatible = "mediatek,mt8173-auxadc", },
+	{ .compatible = "mediatek,mt7622-auxadc", },
 	{ }
 };
 MODULE_DEVICE_TABLE(of, mt6577_auxadc_of_match);
