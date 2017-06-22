@@ -14,6 +14,15 @@
 			VM_PKEY_BIT3 | \
 			VM_PKEY_BIT4)
 
+static inline u16 pte_flags_to_pkey(unsigned long pte_flags)
+{
+	return ((pte_flags & H_PAGE_PKEY_BIT4) ? 0x1 : 0x0) |
+		((pte_flags & H_PAGE_PKEY_BIT3) ? 0x2 : 0x0) |
+		((pte_flags & H_PAGE_PKEY_BIT2) ? 0x4 : 0x0) |
+		((pte_flags & H_PAGE_PKEY_BIT1) ? 0x8 : 0x0) |
+		((pte_flags & H_PAGE_PKEY_BIT0) ? 0x10 : 0x0);
+}
+
 #define pkey_to_vmflag_bits(key) (((key & 0x1UL) ? VM_PKEY_BIT0 : 0x0UL) | \
 			((key & 0x2UL) ? VM_PKEY_BIT1 : 0x0UL) |	\
 			((key & 0x4UL) ? VM_PKEY_BIT2 : 0x0UL) |	\

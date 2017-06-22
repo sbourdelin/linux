@@ -27,6 +27,37 @@ static inline bool pkey_allows_readwrite(int pkey)
 	return !(read_amr() & ((AMR_AD_BIT|AMR_WD_BIT) << pkey_shift));
 }
 
+static inline bool pkey_allows_read(int pkey)
+{
+	int pkey_shift = (arch_max_pkey()-pkey-1) * AMR_BITS_PER_PKEY;
+
+	if (!(read_uamor() & (0x3ul << pkey_shift)))
+		return true;
+
+	return !(read_amr() & (AMR_AD_BIT << pkey_shift));
+}
+
+static inline bool pkey_allows_write(int pkey)
+{
+	int pkey_shift = (arch_max_pkey()-pkey-1) * AMR_BITS_PER_PKEY;
+
+	if (!(read_uamor() & (0x3ul << pkey_shift)))
+		return true;
+
+	return !(read_amr() & (AMR_WD_BIT << pkey_shift));
+}
+
+static inline bool pkey_allows_execute(int pkey)
+{
+	int pkey_shift = (arch_max_pkey()-pkey-1) * AMR_BITS_PER_PKEY;
+
+	if (!(read_uamor() & (0x3ul << pkey_shift)))
+		return true;
+
+	return !(read_iamr() & (IAMR_EX_BIT << pkey_shift));
+}
+
+
 /*
  * set the access right in AMR IAMR and UAMOR register
  * for @pkey to that specified in @init_val.
@@ -174,4 +205,63 @@ int __arch_override_mprotect_pkey(struct vm_area_struct *vma, int prot,
 	 * are working on.
 	 */
 	return vma_pkey(vma);
+}
+
+bool arch_pte_access_permitted(pte_t pte, bool write)
+{
+	int pkey = pte_flags_to_pkey(pte_val(pte));
+
+	if (!pkey_allows_read(pkey))
+		return false;
+	if (write && !pkey_allows_write(pkey))
+		return false;
+	return true;
+}
+
+/*
+ * We only want to enforce protection keys on the current process
+ * because we effectively have no access to AMR/IAMR for other
+ * processes or any way to tell *which * AMR/IAMR in a threaded
+ * process we could use.
+ *
+ * So do not enforce things if the VMA is not from the current
+ * mm, or if we are in a kernel thread.
+ */
+static inline bool vma_is_foreign(struct vm_area_struct *vma)
+{
+	if (!current->mm)
+		return true;
+	/*
+	 * if the VMA is from another process, then AMR/IAMR has no
+	 * relevance and should not be enforced.
+	 */
+	if (current->mm != vma->vm_mm)
+		return true;
+
+	return false;
+}
+
+bool arch_vma_access_permitted(struct vm_area_struct *vma,
+		bool write, bool execute, bool foreign)
+{
+	int pkey;
+	/* allow access if the VMA is not one from this process */
+	if (foreign || vma_is_foreign(vma))
+		return true;
+
+	pkey = vma_pkey(vma);
+
+	if (!pkey)
+		return true;
+
+	if (execute)
+		return pkey_allows_execute(pkey);
+
+	if (!pkey_allows_read(pkey))
+		return false;
+
+	if (write)
+		return pkey_allows_write(pkey);
+
+	return true;
 }
