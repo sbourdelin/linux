@@ -59,6 +59,8 @@ enum cc_hw_rev {
 	CC_HW_REV_712 = 712
 };
 
+#define CC_COHERENT_CACHE_PARAMS 0xEEE
+
 #define SSI_CC_HAS_AES_CCM 1
 #define SSI_CC_HAS_AES_GCM 1
 #define SSI_CC_HAS_AES_XTS 1
@@ -158,6 +160,7 @@ struct ssi_drvdata {
 	u32 hash_len_sz;
 	u32 axim_mon_offset;
 	struct clk *clk;
+	bool coherent;
 };
 
 struct ssi_crypto_alg {

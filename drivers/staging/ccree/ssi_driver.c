@@ -58,6 +58,7 @@
 #include <linux/random.h>
 #include <linux/of.h>
 #include <linux/clk.h>
+#include <linux/of_address.h>
 
 #include "ssi_config.h"
 #include "ssi_driver.h"
@@ -199,7 +200,7 @@ static irqreturn_t cc_isr(int irq, void *dev_id)
 
 int init_cc_regs(struct ssi_drvdata *drvdata, bool is_probe)
 {
-	unsigned int val;
+	unsigned int val, cache_params;
 	void __iomem *cc_base = drvdata->cc_base;
 
 	/* Unmask all AXI interrupt sources AXI_CFG1 register */
@@ -232,14 +233,18 @@ int init_cc_regs(struct ssi_drvdata *drvdata, bool is_probe)
 	}
 #endif
 
+	cache_params = (drvdata->coherent ? CC_COHERENT_CACHE_PARAMS : 0x0);
+
 	val = CC_HAL_READ_REGISTER(CC_REG_OFFSET(CRY_KERNEL, AXIM_CACHE_PARAMS));
 	if (is_probe == true) {
 		SSI_LOG_INFO("Cache params previous: 0x%08X\n", val);
 	}
-	CC_HAL_WRITE_REGISTER(CC_REG_OFFSET(CRY_KERNEL, AXIM_CACHE_PARAMS), SSI_CACHE_PARAMS);
+	CC_HAL_WRITE_REGISTER(CC_REG_OFFSET(CRY_KERNEL, AXIM_CACHE_PARAMS),
+			      cache_params);
 	val = CC_HAL_READ_REGISTER(CC_REG_OFFSET(CRY_KERNEL, AXIM_CACHE_PARAMS));
 	if (is_probe == true) {
-		SSI_LOG_INFO("Cache params current: 0x%08X  (expected: 0x%08X)\n", val, SSI_CACHE_PARAMS);
+		SSI_LOG_INFO("Cache params current: 0x%08X (expect: 0x%08X)\n",
+			     val, cache_params);
 	}
 
 	return 0;
@@ -271,6 +276,7 @@ static int init_cc_resources(struct platform_device *plat_dev)
 	new_drvdata->hw_rev_name = hw_rev->name;
 	new_drvdata->hw_rev = hw_rev->rev;
 	new_drvdata->clk = of_clk_get(np, 0);
+	new_drvdata->coherent = of_dma_is_coherent(np);
 
 	if (hw_rev->rev >= CC_HW_REV_712) {
 		new_drvdata->hash_len_sz = HASH_LEN_SIZE_712;
@@ -533,7 +539,7 @@ int cc_clk_on(struct ssi_drvdata *drvdata)
 	struct clk *clk = drvdata->clk;
 
 	if (IS_ERR(clk))
-	/* No all devices have a clock associated with CCREE */
+	/* Not all devices have a clock associated with CCREE */
 		goto out;
 
 	rc = clk_prepare_enable(clk);
