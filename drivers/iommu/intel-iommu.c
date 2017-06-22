@@ -4900,11 +4900,19 @@ int __init intel_iommu_init(void)
 	init_iommu_pm_ops();
 
 	for_each_active_iommu(iommu, drhd) {
-		iommu_device_sysfs_add(&iommu->iommu, NULL,
+		ret = iommu_device_sysfs_add(&iommu->iommu, NULL,
 				       intel_iommu_groups,
 				       "%s", iommu->name);
+		if (ret) {
+			pr_err("Failed to register iommu in sysfs\n");
+			goto out_free_reserved_range;
+		}
 		iommu_device_set_ops(&iommu->iommu, &intel_iommu_ops);
-		iommu_device_register(&iommu->iommu);
+		ret = iommu_device_register(&iommu->iommu);
+		if (ret) {
+			pr_err("Failed to register iommu\n");
+			goto out_free_reserved_range;
+		}
 	}
 
 	bus_set_iommu(&pci_bus_type, &intel_iommu_ops);
