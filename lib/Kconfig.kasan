@@ -5,7 +5,7 @@ if HAVE_ARCH_KASAN
 
 config KASAN
 	bool "KASan: runtime memory debugger"
-	depends on SLUB || (SLAB && !DEBUG_SLAB)
+	depends on SLUB || SLAB
 	select CONSTRUCTORS
 	select STACKDEPOT
 	help
@@ -19,6 +19,15 @@ config KASAN
 	  For better error detection enable CONFIG_STACKTRACE.
 	  Currently CONFIG_KASAN doesn't work with CONFIG_DEBUG_SLAB
 	  (the resulting kernel does not boot).
+
+config KASAN_EXTRA
+	bool "KAsan: extra checks"
+	depends on KASAN && !COMPILE_TEST
+	help
+	  This enables further checks in the kernel address sanitizer, for now
+	  it only includes the address-use-after-scope check that can lead
+	  to excessive kernel stack usage, frame size warnings and longer
+	  compile time.
 
 choice
 	prompt "Instrumentation type"
