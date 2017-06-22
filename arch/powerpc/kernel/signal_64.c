@@ -174,6 +174,10 @@ static long setup_sigcontext(struct sigcontext __user *sc,
 	if (set != NULL)
 		err |=  __put_user(set->sig[0], &sc->oldmask);
 
+#ifdef CONFIG_PPC64_MEMORY_PROTECTION_KEYS
+	err |= __put_user(get_paca()->paca_amr, &sc->gp_regs[PT_AMR]);
+#endif /*  CONFIG_PPC64_MEMORY_PROTECTION_KEYS */
+
 	return err;
 }
 
@@ -327,6 +331,9 @@ static long restore_sigcontext(struct task_struct *tsk, sigset_t *set, int sig,
 	unsigned long save_r13 = 0;
 	unsigned long msr;
 	struct pt_regs *regs = tsk->thread.regs;
+#ifdef CONFIG_PPC64_MEMORY_PROTECTION_KEYS
+	unsigned long amr;
+#endif /* CONFIG_PPC64_MEMORY_PROTECTION_KEYS */
 #ifdef CONFIG_VSX
 	int i;
 #endif
@@ -406,6 +413,13 @@ static long restore_sigcontext(struct task_struct *tsk, sigset_t *set, int sig,
 			tsk->thread.fp_state.fpr[i][TS_VSRLOWOFFSET] = 0;
 	}
 #endif
+
+#ifdef CONFIG_PPC64_MEMORY_PROTECTION_KEYS
+	err |= __get_user(amr, &sc->gp_regs[PT_AMR]);
+	if (!err && amr != get_paca()->paca_amr)
+		write_amr(amr);
+#endif /* CONFIG_PPC64_MEMORY_PROTECTION_KEYS */
+
 	return err;
 }
 

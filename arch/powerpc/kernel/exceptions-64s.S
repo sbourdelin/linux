@@ -493,9 +493,15 @@ EXC_COMMON_BEGIN(data_access_common)
 	ld	r12,_MSR(r1)
 	ld	r3,PACA_EXGEN+EX_DAR(r13)
 	lwz	r4,PACA_EXGEN+EX_DSISR(r13)
-	li	r5,0x300
 	std	r3,_DAR(r1)
 	std	r4,_DSISR(r1)
+#ifdef CONFIG_PPC64_MEMORY_PROTECTION_KEYS
+	andis.  r0,r4,DSISR_KEYFAULT@h /* save AMR only if its a key fault */
+	beq+	1f
+	mfspr	r5,SPRN_AMR
+	std	r5,PACA_AMR(r13)
+#endif /*  CONFIG_PPC64_MEMORY_PROTECTION_KEYS */
+1:	li	r5,0x300
 BEGIN_MMU_FTR_SECTION
 	b	do_hash_page		/* Try to handle as hpte fault */
 MMU_FTR_SECTION_ELSE
@@ -561,9 +567,15 @@ EXC_COMMON_BEGIN(instruction_access_common)
 	ld	r12,_MSR(r1)
 	ld	r3,_NIP(r1)
 	andis.	r4,r12,0x5820
-	li	r5,0x400
 	std	r3,_DAR(r1)
 	std	r4,_DSISR(r1)
+#ifdef CONFIG_PPC64_MEMORY_PROTECTION_KEYS
+	andis.  r0,r4,DSISR_KEYFAULT@h /* save AMR only if its a key fault */
+	beq+	1f
+	mfspr	r5,SPRN_AMR
+	std	r5,PACA_AMR(r13)
+#endif /*  CONFIG_PPC64_MEMORY_PROTECTION_KEYS */
+1:	li	r5,0x400
 BEGIN_MMU_FTR_SECTION
 	b	do_hash_page		/* Try to handle as hpte fault */
 MMU_FTR_SECTION_ELSE

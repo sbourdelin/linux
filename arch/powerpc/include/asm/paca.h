@@ -92,6 +92,7 @@ struct paca_struct {
 	struct dtl_entry *dispatch_log_end;
 #endif /* CONFIG_PPC_STD_MMU_64 */
 	u64 dscr_default;		/* per-CPU default DSCR */
+	u64 paca_amr;			/* value of amr at exception */
 
 #ifdef CONFIG_PPC_STD_MMU_64
 	/*

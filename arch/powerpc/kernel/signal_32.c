@@ -500,6 +500,11 @@ static int save_user_regs(struct pt_regs *regs, struct mcontext __user *frame,
 				   (unsigned long) &frame->tramp[2]);
 	}
 
+#ifdef CONFIG_PPC64_MEMORY_PROTECTION_KEYS
+	if (__put_user(get_paca()->paca_amr, &frame->mc_gregs[PT_AMR]))
+		return 1;
+#endif /*  CONFIG_PPC64_MEMORY_PROTECTION_KEYS */
+
 	return 0;
 }
 
@@ -661,6 +666,9 @@ static long restore_user_regs(struct pt_regs *regs,
 	long err;
 	unsigned int save_r2 = 0;
 	unsigned long msr;
+#ifdef CONFIG_PPC64_MEMORY_PROTECTION_KEYS
+	unsigned long amr;
+#endif /* CONFIG_PPC64_MEMORY_PROTECTION_KEYS */
 #ifdef CONFIG_VSX
 	int i;
 #endif
@@ -749,6 +757,12 @@ static long restore_user_regs(struct pt_regs *regs,
 	if (__get_user(current->thread.spefscr, (u32 __user *)&sr->mc_vregs + ELF_NEVRREG))
 		return 1;
 #endif /* CONFIG_SPE */
+
+#ifdef CONFIG_PPC64_MEMORY_PROTECTION_KEYS
+	err |= __get_user(amr, &sr->mc_gregs[PT_AMR]);
+	if (!err && amr != get_paca()->paca_amr)
+		write_amr(amr);
+#endif /* CONFIG_PPC64_MEMORY_PROTECTION_KEYS */
 
 	return 0;
 }
