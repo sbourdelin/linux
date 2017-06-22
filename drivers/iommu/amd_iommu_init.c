@@ -1535,7 +1535,7 @@ static struct attribute *amd_iommu_attrs[] = {
 	NULL,
 };
 
-static struct attribute_group amd_iommu_group = {
+static const struct attribute_group amd_iommu_group = {
 	.name = "amd-iommu",
 	.attrs = amd_iommu_attrs,
 };
