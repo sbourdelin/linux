@@ -871,6 +871,21 @@ config SECCOMP
 
 	  If unsure, say Y. Only embedded should say N here.
 
+config PPC64_MEMORY_PROTECTION_KEYS
+	prompt "PowerPC Memory Protection Keys"
+	def_bool y
+	# Note: only available in 64-bit mode
+	depends on PPC64 && PPC_64K_PAGES
+	select ARCH_USES_HIGH_VMA_FLAGS
+	select ARCH_HAS_PKEYS
+	---help---
+	  Memory Protection Keys provides a mechanism for enforcing
+	  page-based protections, but without requiring modification of the
+	  page tables when an application changes protection domains.
+
+	  For details, see Documentation/powerpc/protection-keys.txt
+
+	  If unsure, say y.
 endmenu
 
 config ISA_DMA_API

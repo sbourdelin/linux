@@ -16,6 +16,7 @@
 #include <linux/string.h>
 #include <linux/types.h>
 #include <linux/mm.h>
+#include <linux/pkeys.h>
 #include <linux/spinlock.h>
 #include <linux/idr.h>
 #include <linux/export.h>
@@ -119,6 +120,10 @@ static int hash__init_new_context(struct mm_struct *mm)
 		slice_set_user_psize(mm, mmu_virtual_psize);
 
 	subpage_prot_init_new_context(mm);
+
+#ifdef CONFIG_PPC64_MEMORY_PROTECTION_KEYS
+	pkey_mm_init(mm);
+#endif /* CONFIG_PPC64_MEMORY_PROTECTION_KEYS */
 
 	return index;
 }
