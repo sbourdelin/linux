@@ -57,6 +57,7 @@
 #include <linux/sched.h>
 #include <linux/random.h>
 #include <linux/of.h>
+#include <linux/clk.h>
 
 #include "ssi_config.h"
 #include "ssi_driver.h"
@@ -269,6 +270,7 @@ static int init_cc_resources(struct platform_device *plat_dev)
 	hw_rev = (struct cc_hw_data *)dev_id->data;
 	new_drvdata->hw_rev_name = hw_rev->name;
 	new_drvdata->hw_rev = hw_rev->rev;
+	new_drvdata->clk = of_clk_get(np, 0);
 
 	if (hw_rev->rev >= CC_HW_REV_712) {
 		new_drvdata->hash_len_sz = HASH_LEN_SIZE_712;
@@ -337,6 +339,10 @@ static int init_cc_resources(struct platform_device *plat_dev)
 		(unsigned long long)new_drvdata->res_irq->start);
 
 	new_drvdata->plat_dev = plat_dev;
+
+	rc = cc_clk_on(new_drvdata);
+	if (rc)
+		goto init_cc_res_err;
 
 	if(new_drvdata->plat_dev->dev.dma_mask == NULL)
 	{
@@ -504,13 +510,10 @@ static void cleanup_cc_resources(struct platform_device *plat_dev)
 	ssi_sysfs_fini();
 #endif
 
-	/* Mask all interrupts */
-	WRITE_REGISTER(drvdata->cc_base + CC_REG_OFFSET(HOST_RGF, HOST_IMR),
-		0xFFFFFFFF);
+	fini_cc_regs(drvdata);
+	cc_clk_off(drvdata);
 	free_irq(drvdata->res_irq->start, drvdata);
 	drvdata->res_irq = NULL;
-
-	fini_cc_regs(drvdata);
 
 	if (drvdata->cc_base != NULL) {
 		iounmap(drvdata->cc_base);
@@ -522,6 +525,36 @@ static void cleanup_cc_resources(struct platform_device *plat_dev)
 
 	kfree(drvdata);
 	dev_set_drvdata(&plat_dev->dev, NULL);
+}
+
+int cc_clk_on(struct ssi_drvdata *drvdata)
+{
+	int rc = 0;
+	struct clk *clk = drvdata->clk;
+
+	if (IS_ERR(clk))
+	/* No all devices have a clock associated with CCREE */
+		goto out;
+
+	rc = clk_prepare_enable(clk);
+	if (rc) {
+		SSI_LOG_ERR("error enabling clock\n");
+		clk_disable_unprepare(clk);
+	}
+
+out:
+	return rc;
+}
+
+void cc_clk_off(struct ssi_drvdata *drvdata)
+{
+	struct clk *clk = drvdata->clk;
+
+	if (IS_ERR(clk))
+		/* No all devices have a clock associated with CCREE */
+		return;
+
+	clk_disable_unprepare(clk);
 }
 
 static int ccree_probe(struct platform_device *plat_dev)

@@ -36,6 +36,7 @@
 #include <crypto/authenc.h>
 #include <crypto/hash.h>
 #include <linux/version.h>
+#include <linux/clk.h>
 
 /* Registers definitions from shared/hw/ree_include */
 #include "dx_reg_base_host.h"
@@ -156,6 +157,7 @@ struct ssi_drvdata {
 	enum cc_hw_rev hw_rev;
 	u32 hash_len_sz;
 	u32 axim_mon_offset;
+	struct clk *clk;
 };
 
 struct ssi_crypto_alg {
@@ -201,6 +203,8 @@ void dump_byte_array(const char *name, const u8 *the_array, unsigned long size);
 
 int init_cc_regs(struct ssi_drvdata *drvdata, bool is_probe);
 void fini_cc_regs(struct ssi_drvdata *drvdata);
+int cc_clk_on(struct ssi_drvdata *drvdata);
+void cc_clk_off(struct ssi_drvdata *drvdata);
 
 static inline void set_queue_last_ind(struct ssi_drvdata *drvdata,
 				      struct cc_hw_desc *pdesc)
