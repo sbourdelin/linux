@@ -15,6 +15,7 @@
 
 #define OCC_RESP_DATA_BYTES		4089
 
+#define OCC_UPDATE_FREQUENCY		msecs_to_jiffies(1000)
 #define OCC_TIMEOUT_MS			5000
 #define OCC_CMD_IN_PRG_MS		100
 
@@ -101,6 +102,9 @@ struct occ {
 
 	u8 poll_cmd_data;		/* to perform OCC poll command */
 	int (*send_cmd)(struct occ *occ, u8 *cmd);
+
+	unsigned long last_update;
+	struct mutex lock;
 };
 
 int occ_setup(struct occ *occ, const char *name);
