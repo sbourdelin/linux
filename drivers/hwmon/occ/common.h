@@ -15,6 +15,19 @@
 
 #define OCC_RESP_DATA_BYTES		4089
 
+#define OCC_TIMEOUT_MS			5000
+#define OCC_CMD_IN_PRG_MS		100
+
+/* OCC return codes */
+#define RESP_RETURN_CMD_IN_PRG		0xFF
+#define RESP_RETURN_SUCCESS		0
+#define RESP_RETURN_CMD_INVAL		0x11
+#define RESP_RETURN_CMD_LEN		0x12
+#define RESP_RETURN_DATA_INVAL		0x13
+#define RESP_RETURN_CHKSUM		0x14
+#define RESP_RETURN_OCC_ERR		0x15
+#define RESP_RETURN_STATE		0x16
+
 /* Same response format for all OCC versions.
  * Allocate the largest possible response.
  */

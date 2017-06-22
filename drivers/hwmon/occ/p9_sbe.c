@@ -22,7 +22,71 @@ struct p9_sbe_occ {
 
 static int p9_sbe_occ_send_cmd(struct occ *occ, u8 *cmd)
 {
-	return -EOPNOTSUPP;
+	int rc;
+	unsigned long start;
+	struct occ_client *client;
+	struct occ_response *resp = &occ->resp;
+	struct p9_sbe_occ *p9_sbe_occ = to_p9_sbe_occ(occ);
+
+	start = jiffies;
+
+retry:
+	client = occ_drv_open(p9_sbe_occ->sbe, 0);
+	if (!client)
+		return -ENODEV;
+
+	/* skip first byte (sequence number), OCC driver handles it */
+	rc = occ_drv_write(client, (const char *)&cmd[1], 7);
+	if (rc < 0)
+		goto err;
+
+	rc = occ_drv_read(client, (char *)resp, sizeof(*resp));
+	if (rc < 0)
+		goto err;
+
+	occ_drv_release(client);
+
+	/* check the OCC response */
+	switch (resp->return_status) {
+	case RESP_RETURN_CMD_IN_PRG:
+		if (time_after(jiffies,
+			       start + msecs_to_jiffies(OCC_TIMEOUT_MS)))
+			rc = -EALREADY;
+		else {
+			set_current_state(TASK_INTERRUPTIBLE);
+			schedule_timeout(msecs_to_jiffies(OCC_CMD_IN_PRG_MS));
+
+			goto retry;
+		}
+		break;
+	case RESP_RETURN_SUCCESS:
+		rc = 0;
+		break;
+	case RESP_RETURN_CMD_INVAL:
+	case RESP_RETURN_CMD_LEN:
+	case RESP_RETURN_DATA_INVAL:
+	case RESP_RETURN_CHKSUM:
+		rc = -EINVAL;
+		break;
+	case RESP_RETURN_OCC_ERR:
+		rc = -EREMOTE;
+		break;
+	default:
+		rc = -EFAULT;
+	}
+
+	if (rc < 0) {
+		dev_warn(occ->bus_dev, "occ bad response: %d\n",
+			 resp->return_status);
+		return rc;
+	}
+
+	return 0;
+
+err:
+	occ_drv_release(client);
+	dev_err(occ->bus_dev, "occ bus op failed rc: %d\n", rc);
+	return rc;
 }
 
 static int p9_sbe_occ_probe(struct platform_device *pdev)
