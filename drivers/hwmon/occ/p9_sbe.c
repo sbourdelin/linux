@@ -109,6 +109,13 @@ static int p9_sbe_occ_probe(struct platform_device *pdev)
 	return occ_setup(occ, "p9_occ");
 }
 
+static int p9_sbe_occ_remove(struct platform_device *pdev)
+{
+	struct occ *occ = platform_get_drvdata(pdev);
+
+	return occ_shutdown(occ);
+}
+
 static const struct of_device_id p9_sbe_occ_of_match[] = {
 	{ .compatible = "ibm,p9-occ-hwmon" },
 	{ },
@@ -120,6 +127,7 @@ static struct platform_driver p9_sbe_occ_driver = {
 		.of_match_table	= p9_sbe_occ_of_match,
 	},
 	.probe	= p9_sbe_occ_probe,
+	.remove = p9_sbe_occ_remove,
 };
 
 module_platform_driver(p9_sbe_occ_driver);

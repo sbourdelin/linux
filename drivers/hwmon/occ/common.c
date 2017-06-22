@@ -993,6 +993,102 @@ static int occ_setup_sensor_attrs(struct occ *occ)
 	return 0;
 }
 
+static ssize_t occ_show_status(struct device *dev,
+			       struct device_attribute *attr, char *buf)
+{
+	int rc;
+	int val;
+	struct occ *occ = dev_get_drvdata(dev);
+	struct occ_poll_response_header *header;
+	struct sensor_device_attribute *sattr = to_sensor_dev_attr(attr);
+
+	rc = occ_update_response(occ);
+	if (rc)
+		return rc;
+
+	header = (struct occ_poll_response_header *)occ->resp.data;
+
+	switch (sattr->index) {
+	case 0:
+		val = (header->status & OCC_STAT_MASTER) ? 1 : 0;
+		break;
+	case 1:
+		val = (header->status & OCC_STAT_ACTIVE) ? 1 : 0;
+		break;
+	case 2:
+		val = (header->ext_status & OCC_EXT_STAT_DVFS_OT) ? 1 : 0;
+		break;
+	case 3:
+		val = (header->ext_status & OCC_EXT_STAT_DVFS_POWER) ? 1 : 0;
+		break;
+	case 4:
+		val = (header->ext_status & OCC_EXT_STAT_MEM_THROTTLE) ? 1 : 0;
+		break;
+	case 5:
+		val = (header->ext_status & OCC_EXT_STAT_QUICK_DROP) ? 1 : 0;
+		break;
+	case 6:
+		val = header->occ_state;
+		break;
+	default:
+		return -EINVAL;
+	}
+
+	return snprintf(buf, PAGE_SIZE - 1, "%d\n", val);
+}
+
+static int occ_create_status_attrs(struct occ *occ)
+{
+	int rc, i;
+	struct device *dev = occ->bus_dev;
+
+	occ->status_attrs = devm_kzalloc(dev, sizeof(*occ->status_attrs) *
+					 OCC_NUM_STATUS_ATTRS, GFP_KERNEL);
+	if (!occ->status_attrs)
+		return -ENOMEM;
+
+	occ->status_attrs[0] =
+		(struct sensor_device_attribute)SENSOR_ATTR(occ_master, 0444,
+							    occ_show_status,
+							    NULL, 0);
+	occ->status_attrs[1] =
+		(struct sensor_device_attribute)SENSOR_ATTR(occ_active, 0444,
+							    occ_show_status,
+							    NULL, 1);
+	occ->status_attrs[2] =
+		(struct sensor_device_attribute)SENSOR_ATTR(occ_dvfs_ot, 0444,
+							    occ_show_status,
+							    NULL, 2);
+	occ->status_attrs[3] =
+		(struct sensor_device_attribute)SENSOR_ATTR(occ_dvfs_power,
+							    0444,
+							    occ_show_status,
+							    NULL, 3);
+	occ->status_attrs[4] =
+		(struct sensor_device_attribute)SENSOR_ATTR(occ_mem_throttle,
+							    0444,
+							    occ_show_status,
+							    NULL, 4);
+	occ->status_attrs[5] =
+		(struct sensor_device_attribute)SENSOR_ATTR(occ_quick_drop,
+							    0444,
+							    occ_show_status,
+							    NULL, 5);
+	occ->status_attrs[6] =
+		(struct sensor_device_attribute)SENSOR_ATTR(occ_status, 0444,
+							    occ_show_status,
+							    NULL, 6);
+
+	for (i = 0; i < OCC_NUM_STATUS_ATTRS; ++i) {
+		rc = device_create_file(dev, &occ->status_attrs[i].dev_attr);
+		if (rc)
+			dev_warn(dev, "error %d creating status attr %d\n", rc,
+				 i);
+	}
+
+	return 0;
+}
+
 /* only need to do this once at startup, as OCC won't change sensors on us */
 static void occ_parse_poll_response(struct occ *occ)
 {
@@ -1072,6 +1168,24 @@ int occ_setup(struct occ *occ, const char *name)
 			rc);
 		return rc;
 	}
+
+	rc = occ_create_status_attrs(occ);
+	if (rc) {
+		dev_err(occ->bus_dev, "failed to setup status attrs: %d\n",
+			rc);
+		return rc;
+	}
+
+	return 0;
+}
+
+int occ_shutdown(struct occ *occ)
+{
+	int i;
+
+	for (i = 0; i < OCC_NUM_STATUS_ATTRS; ++i)
+		device_remove_file(occ->bus_dev,
+				   &occ->status_attrs[i].dev_attr);
 
 	return 0;
 }

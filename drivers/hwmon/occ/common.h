@@ -13,6 +13,8 @@
 #include <linux/hwmon-sysfs.h>
 #include <linux/sysfs.h>
 
+#define OCC_NUM_STATUS_ATTRS		7
+
 #define OCC_RESP_DATA_BYTES		4089
 
 #define OCC_UPDATE_FREQUENCY		msecs_to_jiffies(1000)
@@ -28,6 +30,14 @@
 #define RESP_RETURN_CHKSUM		0x14
 #define RESP_RETURN_OCC_ERR		0x15
 #define RESP_RETURN_STATE		0x16
+
+/* OCC status bits */
+#define OCC_STAT_MASTER			0x80
+#define OCC_STAT_ACTIVE			0x01
+#define OCC_EXT_STAT_DVFS_OT		0x80
+#define OCC_EXT_STAT_DVFS_POWER		0x40
+#define OCC_EXT_STAT_MEM_THROTTLE	0x20
+#define OCC_EXT_STAT_QUICK_DROP		0x10
 
 /* Same response format for all OCC versions.
  * Allocate the largest possible response.
@@ -119,8 +129,12 @@ struct occ {
 	struct occ_attribute *attrs;
 	struct attribute_group group;
 	const struct attribute_group *groups[2];
+
+	/* non-hwmon attributes for more OCC properties */
+	struct sensor_device_attribute *status_attrs;
 };
 
 int occ_setup(struct occ *occ, const char *name);
+int occ_shutdown(struct occ *occ);
 
 #endif /* OCC_COMMON_H */
