@@ -1125,6 +1125,7 @@ resource_size_t resource_alignment(struct resource *res)
  *
  * request_declared_muxed_region creates a new shared busy region
  * described in an existing resource descriptor.
+ * It only returns if it succeeded.
  *
  * release_region releases a matching busy region.
  * The region is only freed if it was allocated.
@@ -1191,7 +1192,10 @@ struct resource *__request_declared_region(struct resource *parent,
 				continue;
 			}
 		}
-		if (conflict->flags & flags & IORESOURCE_MUXED) {
+		if (flags & IORESOURCE_MUXED) {
+			if (!(conflict->flags & IORESOURCE_MUXED))
+				pr_err("Resource conflict between muxed \"%s\" and non-muxed \"%s\" I/O regions!\n",
+					res->name, conflict->name);
 			add_wait_queue(&muxed_resource_wait, &wait);
 			write_unlock(&resource_lock);
 			set_current_state(TASK_UNINTERRUPTIBLE);
