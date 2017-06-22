@@ -630,7 +630,7 @@ struct pqi_encryption_info {
 };
 
 #define PQI_MAX_OUTSTANDING_REQUESTS	((u32)~0)
-#define PQI_MAX_TRANSFER_SIZE		(4 * 1024U * 1024U)
+#define PQI_MAX_TRANSFER_SIZE		(1024U * 1024U)
 
 #define RAID_MAP_MAX_ENTRIES		1024
 
