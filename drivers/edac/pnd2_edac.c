@@ -173,7 +173,7 @@ static int apl_rd_reg(int port, int off, int op, void *data, size_t sz, char *na
 	edac_dbg(2, "Read %s port=%x off=%x op=%x\n", name, port, off, op);
 	switch (sz) {
 	case 8:
-		ret = sbi_send(port, off + 4, op, (u32 *)(data + 4));
+		sbi_send(port, off + 4, op, (u32 *)(data + 4));
 		/* fall through */
 	case 4:
 		ret = sbi_send(port, off, op, (u32 *)data);
