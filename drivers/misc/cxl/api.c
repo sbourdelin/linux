@@ -332,8 +332,17 @@ int cxl_start_context(struct cxl_context *ctx, u64 wed,
 		cxl_context_mm_count_get(ctx);
 
 		/* decrement the use count */
-		if (ctx->mm)
+		if (ctx->mm) {
 			mmput(ctx->mm);
+#ifdef CONFIG_PPC_BOOK3S_64
+			mm_context_set_global_tlbi(&ctx->mm->context);
+			/*
+			 * Barrier guarantees that the device will
+			 * receive all TLBIs from that point on
+			 */
+			smp_wmb();
+#endif
+		}
 	}
 
 	cxl_ctx_get();
@@ -347,7 +356,6 @@ int cxl_start_context(struct cxl_context *ctx, u64 wed,
 			cxl_context_mm_count_put(ctx);
 		goto out;
 	}
-
 	ctx->status = STARTED;
 out:
 	mutex_unlock(&ctx->status_mutex);
