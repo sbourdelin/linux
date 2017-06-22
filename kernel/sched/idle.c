@@ -74,6 +74,7 @@ static noinline int __cpuidle cpu_idle_poll(void)
 }
 
 /* Weak implementations for optional arch specific functions */
+void __weak arch_cpu_idle_poll(void) { }
 void __weak arch_cpu_idle_prepare(void) { }
 void __weak arch_cpu_idle_enter(void) { }
 void __weak arch_cpu_idle_exit(void) { }
@@ -219,6 +220,8 @@ static void do_idle(void)
 	 */
 
 	__current_set_polling();
+	arch_cpu_idle_poll();
+
 	tick_nohz_idle_enter();
 
 	while (!need_resched()) {

@@ -39,6 +39,10 @@
 #include <asm/desc.h>
 #include <asm/prctl.h>
 
+#ifdef CONFIG_HYPERVISOR_GUEST
+unsigned long poll_threshold_ns;
+#endif
+
 /*
  * per-CPU TSS segments. Threads are completely 'soft' on Linux,
  * no more per-task TSS's. The TSS size is kept cacheline-aligned
@@ -310,6 +314,23 @@ static void (*x86_idle)(void);
 static inline void play_dead(void)
 {
 	BUG();
+}
+#endif
+
+#ifdef CONFIG_HYPERVISOR_GUEST
+void arch_cpu_idle_poll(void)
+{
+	ktime_t start, cur, stop;
+
+	if (poll_threshold_ns) {
+		start = cur = ktime_get();
+		stop = ktime_add_ns(ktime_get(), poll_threshold_ns);
+		do {
+			if (need_resched())
+				break;
+			cur = ktime_get();
+		} while (ktime_before(cur, stop));
+	}
 }
 #endif
 
