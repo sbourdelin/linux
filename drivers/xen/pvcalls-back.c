@@ -51,12 +51,131 @@ struct pvcalls_fedata {
 	struct work_struct register_work;
 };
 
+static int pvcalls_back_socket(struct xenbus_device *dev,
+		struct xen_pvcalls_request *req)
+{
+	return 0;
+}
+
+static int pvcalls_back_connect(struct xenbus_device *dev,
+				struct xen_pvcalls_request *req)
+{
+	return 0;
+}
+
+static int pvcalls_back_release(struct xenbus_device *dev,
+				struct xen_pvcalls_request *req)
+{
+	return 0;
+}
+
+static int pvcalls_back_bind(struct xenbus_device *dev,
+			     struct xen_pvcalls_request *req)
+{
+	return 0;
+}
+
+static int pvcalls_back_listen(struct xenbus_device *dev,
+			       struct xen_pvcalls_request *req)
+{
+	return 0;
+}
+
+static int pvcalls_back_accept(struct xenbus_device *dev,
+			       struct xen_pvcalls_request *req)
+{
+	return 0;
+}
+
+static int pvcalls_back_poll(struct xenbus_device *dev,
+			     struct xen_pvcalls_request *req)
+{
+	return 0;
+}
+
+static int pvcalls_back_handle_cmd(struct xenbus_device *dev,
+				   struct xen_pvcalls_request *req)
+{
+	int ret = 0;
+
+	switch (req->cmd) {
+	case PVCALLS_SOCKET:
+		ret = pvcalls_back_socket(dev, req);
+		break;
+	case PVCALLS_CONNECT:
+		ret = pvcalls_back_connect(dev, req);
+		break;
+	case PVCALLS_RELEASE:
+		ret = pvcalls_back_release(dev, req);
+		break;
+	case PVCALLS_BIND:
+		ret = pvcalls_back_bind(dev, req);
+		break;
+	case PVCALLS_LISTEN:
+		ret = pvcalls_back_listen(dev, req);
+		break;
+	case PVCALLS_ACCEPT:
+		ret = pvcalls_back_accept(dev, req);
+		break;
+	case PVCALLS_POLL:
+		ret = pvcalls_back_poll(dev, req);
+		break;
+	default:
+		ret = -ENOTSUPP;
+		break;
+	}
+	return ret;
+}
+
 static void pvcalls_back_work(struct work_struct *work)
 {
+	struct pvcalls_fedata *fedata = container_of(work,
+		struct pvcalls_fedata, register_work);
+	int notify, notify_all = 0, more = 1;
+	struct xen_pvcalls_request req;
+	struct xenbus_device *dev = fedata->dev;
+
+	while (more) {
+		while (RING_HAS_UNCONSUMED_REQUESTS(&fedata->ring)) {
+			RING_COPY_REQUEST(&fedata->ring,
+					  fedata->ring.req_cons++,
+					  &req);
+
+			if (!pvcalls_back_handle_cmd(dev, &req)) {
+				RING_PUSH_RESPONSES_AND_CHECK_NOTIFY(
+					&fedata->ring, notify);
+				notify_all += notify;
+			}
+		}
+
+		if (notify_all)
+			notify_remote_via_irq(fedata->irq);
+
+		RING_FINAL_CHECK_FOR_REQUESTS(&fedata->ring, more);
+	}
 }
 
 static irqreturn_t pvcalls_back_event(int irq, void *dev_id)
 {
+	struct xenbus_device *dev = dev_id;
+	struct pvcalls_fedata *fedata = NULL;
+
+	if (dev == NULL)
+		return IRQ_HANDLED;
+
+	fedata = dev_get_drvdata(&dev->dev);
+	if (fedata == NULL)
+		return IRQ_HANDLED;
+
+	/*
+	 * TODO: a small theoretical race exists if we try to queue work
+	 * after pvcalls_back_work checked for final requests and before
+	 * it returns. The queuing will fail, and pvcalls_back_work
+	 * won't do the work because it is about to return. In that
+	 * case, we lose the notification.
+	 */
+	queue_work(fedata->wq, &fedata->register_work);
+
 	return IRQ_HANDLED;
 }
 
