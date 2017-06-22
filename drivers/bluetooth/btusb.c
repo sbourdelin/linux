@@ -3255,11 +3255,12 @@ static int btusb_suspend(struct usb_interface *intf, pm_message_t message)
 
 static void play_deferred(struct btusb_data *data)
 {
+	struct hci_dev *hdev = data->hdev;
 	struct urb *urb;
 	int err;
 
 	while ((urb = usb_get_from_anchor(&data->deferred))) {
-		err = usb_submit_urb(urb, GFP_ATOMIC);
+		err = submit_tx_urb(hdev, urb);
 		if (err < 0)
 			break;
 
