@@ -25,6 +25,7 @@ struct regmap_irq_chip_data {
 	struct mutex lock;
 	struct irq_chip irq_chip;
 
+	struct device *dev;
 	struct regmap *map;
 	const struct regmap_irq_chip *chip;
 
@@ -63,16 +64,16 @@ static void regmap_irq_lock(struct irq_data *data)
 static void regmap_irq_sync_unlock(struct irq_data *data)
 {
 	struct regmap_irq_chip_data *d = irq_data_get_irq_chip_data(data);
+	struct device *dev = d->dev;
 	struct regmap *map = d->map;
 	int i, ret;
 	u32 reg;
 	u32 unmask_offset;
 
 	if (d->chip->runtime_pm) {
-		ret = pm_runtime_get_sync(map->dev);
+		ret = pm_runtime_get_sync(dev);
 		if (ret < 0)
-			dev_err(map->dev, "IRQ sync failed to resume: %d\n",
-				ret);
+			dev_err(dev, "IRQ sync failed to resume: %d\n", ret);
 	}
 
 	/*
@@ -106,8 +107,7 @@ static void regmap_irq_sync_unlock(struct irq_data *data)
 					 d->mask_buf_def[i], d->mask_buf[i]);
 		}
 		if (ret != 0)
-			dev_err(d->map->dev, "Failed to sync masks in %x\n",
-				reg);
+			dev_err(dev, "Failed to sync masks in %x\n", reg);
 
 		reg = d->chip->wake_base +
 			(i * map->reg_stride * d->irq_reg_stride);
@@ -121,8 +121,7 @@ static void regmap_irq_sync_unlock(struct irq_data *data)
 							 d->mask_buf_def[i],
 							 d->wake_buf[i]);
 			if (ret != 0)
-				dev_err(d->map->dev,
-					"Failed to sync wakes in %x: %d\n",
+				dev_err(dev, "Failed to sync wakes in %x: %d\n",
 					reg, ret);
 		}
 
@@ -142,7 +141,7 @@ static void regmap_irq_sync_unlock(struct irq_data *data)
 			else
 				ret = regmap_write(map, reg, d->mask_buf[i]);
 			if (ret != 0)
-				dev_err(d->map->dev, "Failed to ack 0x%x: %d\n",
+				dev_err(dev, "Failed to ack 0x%x: %d\n",
 					reg, ret);
 		}
 	}
@@ -164,7 +163,7 @@ static void regmap_irq_sync_unlock(struct irq_data *data)
 	}
 
 	if (d->chip->runtime_pm)
-		pm_runtime_put(map->dev);
+		pm_runtime_put(dev);
 
 	/* If we've changed our wakeup count propagate it to the parent */
 	if (d->wake_count < 0)
@@ -263,6 +262,7 @@ static irqreturn_t regmap_irq_thread(int irq, void *d)
 {
 	struct regmap_irq_chip_data *data = d;
 	const struct regmap_irq_chip *chip = data->chip;
+	struct device *dev = data->dev;
 	struct regmap *map = data->map;
 	int ret, i;
 	bool handled = false;
@@ -272,11 +272,10 @@ static irqreturn_t regmap_irq_thread(int irq, void *d)
 		chip->handle_pre_irq(chip->irq_drv_data);
 
 	if (chip->runtime_pm) {
-		ret = pm_runtime_get_sync(map->dev);
+		ret = pm_runtime_get_sync(dev);
 		if (ret < 0) {
-			dev_err(map->dev, "IRQ thread failed to resume: %d\n",
-				ret);
-			pm_runtime_put(map->dev);
+			dev_err(dev, "IRQ thread failed to resume: %d\n", ret);
+			pm_runtime_put(dev);
 			goto exit;
 		}
 	}
@@ -297,8 +296,7 @@ static irqreturn_t regmap_irq_thread(int irq, void *d)
 				       data->status_reg_buf,
 				       chip->num_regs);
 		if (ret != 0) {
-			dev_err(map->dev, "Failed to read IRQ status: %d\n",
-				ret);
+			dev_err(dev, "Failed to read IRQ status: %d\n", ret);
 			goto exit;
 		}
 
@@ -327,11 +325,10 @@ static irqreturn_t regmap_irq_thread(int irq, void *d)
 					  &data->status_buf[i]);
 
 			if (ret != 0) {
-				dev_err(map->dev,
-					"Failed to read IRQ status: %d\n",
+				dev_err(dev, "Failed to read IRQ status: %d\n",
 					ret);
 				if (chip->runtime_pm)
-					pm_runtime_put(map->dev);
+					pm_runtime_put(dev);
 				goto exit;
 			}
 		}
@@ -352,7 +349,7 @@ static irqreturn_t regmap_irq_thread(int irq, void *d)
 				(i * map->reg_stride * data->irq_reg_stride);
 			ret = regmap_write(map, reg, data->status_buf[i]);
 			if (ret != 0)
-				dev_err(map->dev, "Failed to ack 0x%x: %d\n",
+				dev_err(dev, "Failed to ack 0x%x: %d\n",
 					reg, ret);
 		}
 	}
@@ -366,7 +363,7 @@ static irqreturn_t regmap_irq_thread(int irq, void *d)
 	}
 
 	if (chip->runtime_pm)
-		pm_runtime_put(map->dev);
+		pm_runtime_put(data->dev);
 
 exit:
 	if (chip->handle_post_irq)
@@ -398,8 +395,9 @@ static const struct irq_domain_ops regmap_domain_ops = {
 };
 
 /**
- * regmap_add_irq_chip() - Use standard regmap IRQ controller handling
+ * dev_regmap_add_irq_chip() - Use standard regmap IRQ controller handling
  *
+ * @dev: Device for the irq_chip.
  * @map: The regmap for the device.
  * @irq: The IRQ the device uses to signal interrupts.
  * @irq_flags: The IRQF_ flags to use for the primary interrupt.
@@ -413,9 +411,10 @@ static const struct irq_domain_ops regmap_domain_ops = {
  * register cache.  The chip driver is responsible for restoring the
  * register values used by the IRQ controller over suspend and resume.
  */
-int regmap_add_irq_chip(struct regmap *map, int irq, int irq_flags,
-			int irq_base, const struct regmap_irq_chip *chip,
-			struct regmap_irq_chip_data **data)
+int dev_regmap_add_irq_chip(struct device *dev, struct regmap *map, int irq,
+			    int irq_flags, int irq_base,
+			    const struct regmap_irq_chip *chip,
+			    struct regmap_irq_chip_data **data)
 {
 	struct regmap_irq_chip_data *d;
 	int i;
@@ -437,7 +436,7 @@ int regmap_add_irq_chip(struct regmap *map, int irq, int irq_flags,
 	if (irq_base) {
 		irq_base = irq_alloc_descs(irq_base, 0, chip->num_irqs, 0);
 		if (irq_base < 0) {
-			dev_warn(map->dev, "Failed to allocate IRQs: %d\n",
+			dev_warn(dev, "Failed to allocate IRQs: %d\n",
 				 irq_base);
 			return irq_base;
 		}
@@ -484,6 +483,7 @@ int regmap_add_irq_chip(struct regmap *map, int irq, int irq_flags,
 	d->irq_chip = regmap_irq_chip;
 	d->irq_chip.name = chip->name;
 	d->irq = irq;
+	d->dev = dev;
 	d->map = map;
 	d->chip = chip;
 	d->irq_base = irq_base;
@@ -532,7 +532,7 @@ int regmap_add_irq_chip(struct regmap *map, int irq, int irq_flags,
 			ret = regmap_update_bits(map, reg,
 					 d->mask_buf[i], d->mask_buf[i]);
 		if (ret != 0) {
-			dev_err(map->dev, "Failed to set masks in 0x%x: %d\n",
+			dev_err(dev, "Failed to set masks in 0x%x: %d\n",
 				reg, ret);
 			goto err_alloc;
 		}
@@ -545,8 +545,7 @@ int regmap_add_irq_chip(struct regmap *map, int irq, int irq_flags,
 			(i * map->reg_stride * d->irq_reg_stride);
 		ret = regmap_read(map, reg, &d->status_buf[i]);
 		if (ret != 0) {
-			dev_err(map->dev, "Failed to read IRQ status: %d\n",
-				ret);
+			dev_err(dev, "Failed to read IRQ status: %d\n", ret);
 			goto err_alloc;
 		}
 
@@ -560,7 +559,7 @@ int regmap_add_irq_chip(struct regmap *map, int irq, int irq_flags,
 				ret = regmap_write(map, reg,
 					d->status_buf[i] & d->mask_buf[i]);
 			if (ret != 0) {
-				dev_err(map->dev, "Failed to ack 0x%x: %d\n",
+				dev_err(dev, "Failed to ack 0x%x: %d\n",
 					reg, ret);
 				goto err_alloc;
 			}
@@ -583,7 +582,7 @@ int regmap_add_irq_chip(struct regmap *map, int irq, int irq_flags,
 							 d->mask_buf_def[i],
 							 d->wake_buf[i]);
 			if (ret != 0) {
-				dev_err(map->dev, "Failed to set masks in 0x%x: %d\n",
+				dev_err(dev, "Failed to set masks in 0x%x: %d\n",
 					reg, ret);
 				goto err_alloc;
 			}
@@ -618,15 +617,15 @@ int regmap_add_irq_chip(struct regmap *map, int irq, int irq_flags,
 	}
 
 	if (irq_base)
-		d->domain = irq_domain_add_legacy(map->dev->of_node,
+		d->domain = irq_domain_add_legacy(dev->of_node,
 						  chip->num_irqs, irq_base, 0,
 						  &regmap_domain_ops, d);
 	else
-		d->domain = irq_domain_add_linear(map->dev->of_node,
+		d->domain = irq_domain_add_linear(dev->of_node,
 						  chip->num_irqs,
 						  &regmap_domain_ops, d);
 	if (!d->domain) {
-		dev_err(map->dev, "Failed to create IRQ domain\n");
+		dev_err(dev, "Failed to create IRQ domain\n");
 		ret = -ENOMEM;
 		goto err_alloc;
 	}
@@ -635,8 +634,8 @@ int regmap_add_irq_chip(struct regmap *map, int irq, int irq_flags,
 				   irq_flags | IRQF_ONESHOT,
 				   chip->name, d);
 	if (ret != 0) {
-		dev_err(map->dev, "Failed to request IRQ %d for %s: %d\n",
-			irq, chip->name, ret);
+		dev_err(dev, "Failed to request IRQ %d for %s: %d\n", irq,
+			chip->name, ret);
 		goto err_domain;
 	}
 
@@ -656,6 +655,30 @@ err_alloc:
 	kfree(d->status_reg_buf);
 	kfree(d);
 	return ret;
+}
+EXPORT_SYMBOL_GPL(dev_regmap_add_irq_chip);
+
+/**
+ * regmap_add_irq_chip(): Use standard regmap IRQ controller handling
+ *
+ * @map: The regmap for the device.
+ * @irq: The IRQ the device uses to signal interrupts
+ * @irq_flags: The IRQF_ flags to use for the primary interrupt.
+ * @chip: Configuration for the interrupt controller.
+ * @data: Runtime data structure for the controller, allocated on success
+ *
+ * Returns 0 on success or an errno on failure.
+ *
+ * In order for this to be efficient the chip really should use a
+ * register cache.  The chip driver is responsible for restoring the
+ * register values used by the IRQ controller over suspend and resume.
+ */
+int regmap_add_irq_chip(struct regmap *map, int irq, int irq_flags,
+			int irq_base, const struct regmap_irq_chip *chip,
+			struct regmap_irq_chip_data **data)
+{
+	return dev_regmap_add_irq_chip(map->dev, map, irq, irq_flags, irq_base,
+				       chip, data);
 }
 EXPORT_SYMBOL_GPL(regmap_add_irq_chip);
 
