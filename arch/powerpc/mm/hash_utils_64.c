@@ -35,6 +35,7 @@
 #include <linux/memblock.h>
 #include <linux/context_tracking.h>
 #include <linux/libfdt.h>
+#include <linux/pkeys.h>
 
 #include <asm/debugfs.h>
 #include <asm/processor.h>
@@ -229,6 +230,10 @@ unsigned long htab_convert_pte_flags(unsigned long pteflags)
 		 * Add memory coherence if cache inhibited is not set
 		 */
 		rflags |= HPTE_R_M;
+
+#ifdef CONFIG_PPC64_MEMORY_PROTECTION_KEYS
+	rflags |= pte_to_hpte_pkey_bits(pteflags);
+#endif
 
 	return rflags;
 }
