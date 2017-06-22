@@ -25,12 +25,28 @@ extern atomic_t cxl_use_count;
 
 static inline bool cxl_ctx_in_use(void)
 {
-       return (atomic_read(&cxl_use_count) != 0);
+	/*
+	 * This is called when sending an TLBI, to know whether it
+	 * should be global or local.
+	 *
+	 * We need to make sure the PTE update is happening before
+	 * reading the context global flag. Otherwise, reading the
+	 * flag may be re-ordered and happen first, and we could end
+	 * up in a situation where the old PTE is seen by the device,
+	 * but the TLBI is not global.
+	 */
+	smp_mb();
+	return (atomic_read(&cxl_use_count) != 0);
 }
 
 static inline void cxl_ctx_get(void)
 {
        atomic_inc(&cxl_use_count);
+       /*
+	* Barrier guarantees that the device will receive all TLBIs
+	* from that point on
+	*/
+       smp_wmb();
 }
 
 static inline void cxl_ctx_put(void)
