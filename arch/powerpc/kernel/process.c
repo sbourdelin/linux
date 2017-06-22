@@ -494,10 +494,6 @@ void giveup_all(struct task_struct *tsk)
 	if (usermsr & MSR_VEC)
 		__giveup_altivec(tsk);
 #endif
-#ifdef CONFIG_VSX
-	if (usermsr & MSR_VSX)
-		__giveup_vsx(tsk);
-#endif
 #ifdef CONFIG_SPE
 	if (usermsr & MSR_SPE)
 		__giveup_spe(tsk);
