@@ -63,6 +63,8 @@ show up in /proc/sys/kernel:
 - perf_event_max_stack
 - perf_event_max_contexts_per_stack
 - pid_max
+- poll_grow                [ X86 only ]
+- poll_shrink              [ X86 only ]
 - poll_threshold_ns        [ X86 only ]
 - powersave-nap               [ PPC only ]
 - printk
@@ -703,6 +705,18 @@ kernel tries to allocate a number starting from this one.
 
 ==============================================================
 
+poll_grow: (X86 only)
+
+This parameter is multiplied in the grow_poll_ns() to increase the poll time.
+By default, the values is 2.
+
+==============================================================
+poll_shrink: (X86 only)
+
+This parameter is divided in the shrink_poll_ns() to reduce the poll time.
+By default, the values is 2.
+
+==============================================================
 poll_threshold_ns: (X86 only)
 
 This parameter used to control the max wait time to poll before going

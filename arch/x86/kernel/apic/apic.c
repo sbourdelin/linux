@@ -962,6 +962,7 @@ __visible void __irq_entry smp_apic_timer_interrupt(struct pt_regs *regs)
 	 * interrupt lock, which is the WrongThing (tm) to do.
 	 */
 	entering_ack_irq();
+	check_poll();
 	local_apic_timer_interrupt();
 	exiting_irq();
 
@@ -981,6 +982,7 @@ __visible void __irq_entry smp_trace_apic_timer_interrupt(struct pt_regs *regs)
 	 * interrupt lock, which is the WrongThing (tm) to do.
 	 */
 	entering_ack_irq();
+	check_poll();
 	trace_local_timer_entry(LOCAL_TIMER_VECTOR);
 	local_apic_timer_interrupt();
 	trace_local_timer_exit(LOCAL_TIMER_VECTOR);
@@ -1863,6 +1865,7 @@ static void __smp_spurious_interrupt(u8 vector)
 __visible void __irq_entry smp_spurious_interrupt(struct pt_regs *regs)
 {
 	entering_irq();
+	check_poll();
 	__smp_spurious_interrupt(~regs->orig_ax);
 	exiting_irq();
 }
@@ -1872,6 +1875,7 @@ __visible void __irq_entry smp_trace_spurious_interrupt(struct pt_regs *regs)
 	u8 vector = ~regs->orig_ax;
 
 	entering_irq();
+	check_poll();
 	trace_spurious_apic_entry(vector);
 	__smp_spurious_interrupt(vector);
 	trace_spurious_apic_exit(vector);
@@ -1921,6 +1925,7 @@ static void __smp_error_interrupt(struct pt_regs *regs)
 __visible void __irq_entry smp_error_interrupt(struct pt_regs *regs)
 {
 	entering_irq();
+	check_poll();
 	__smp_error_interrupt(regs);
 	exiting_irq();
 }
@@ -1928,6 +1933,7 @@ __visible void __irq_entry smp_error_interrupt(struct pt_regs *regs)
 __visible void __irq_entry smp_trace_error_interrupt(struct pt_regs *regs)
 {
 	entering_irq();
+	check_poll();
 	trace_error_apic_entry(ERROR_APIC_VECTOR);
 	__smp_error_interrupt(regs);
 	trace_error_apic_exit(ERROR_APIC_VECTOR);

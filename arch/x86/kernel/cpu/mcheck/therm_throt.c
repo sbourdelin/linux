@@ -400,6 +400,7 @@ asmlinkage __visible void __irq_entry
 smp_thermal_interrupt(struct pt_regs *regs)
 {
 	entering_irq();
+	check_poll();
 	__smp_thermal_interrupt();
 	exiting_ack_irq();
 }
@@ -408,6 +409,7 @@ asmlinkage __visible void __irq_entry
 smp_trace_thermal_interrupt(struct pt_regs *regs)
 {
 	entering_irq();
+	check_poll();
 	trace_thermal_apic_entry(THERMAL_APIC_VECTOR);
 	__smp_thermal_interrupt();
 	trace_thermal_apic_exit(THERMAL_APIC_VECTOR);

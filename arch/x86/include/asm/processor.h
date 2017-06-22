@@ -931,4 +931,10 @@ bool xen_set_default_idle(void);
 
 void stop_this_cpu(void *dummy);
 void df_debug(struct pt_regs *regs, long error_code);
+#ifdef CONFIG_HYPERVISOR_GUEST
+extern void check_poll(void);
+#else
+static inline void check_poll(void) {}
+#endif
+
 #endif /* _ASM_X86_PROCESSOR_H */

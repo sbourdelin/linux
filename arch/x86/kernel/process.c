@@ -41,6 +41,10 @@
 
 #ifdef CONFIG_HYPERVISOR_GUEST
 unsigned long poll_threshold_ns;
+unsigned int poll_shrink = 2;
+unsigned int poll_grow = 2;
+DEFINE_PER_CPU(unsigned long, poll_begin_ns);
+DEFINE_PER_CPU(unsigned long, poll_ns);
 #endif
 
 /*
@@ -318,6 +322,57 @@ static inline void play_dead(void)
 #endif
 
 #ifdef CONFIG_HYPERVISOR_GUEST
+static unsigned int grow_poll_ns(unsigned int old, unsigned int grow,
+				      unsigned int max)
+{
+	unsigned int val;
+
+	/* 10us as base poll duration */
+	if (old == 0 && grow)
+		return 10000;
+
+	val = old * grow;
+	if (val > max)
+		val = max;
+
+	return val;
+}
+
+static unsigned int shrink_poll_ns(unsigned int old, unsigned int shrink)
+{
+	if (shrink == 0)
+		return 0;
+
+	return old / shrink;
+}
+
+void check_poll(void)
+{
+	unsigned int val, poll_duration;
+	unsigned long begin_ns, now_ns;
+
+	if (!poll_threshold_ns)
+		return;
+
+	begin_ns = this_cpu_read(poll_begin_ns);
+	/* Not from halt state */
+	if (!begin_ns)
+		return;
+
+	now_ns = ktime_to_ns(ktime_get());
+	poll_duration = this_cpu_read(poll_ns);
+
+	if (poll_duration && now_ns - begin_ns > poll_threshold_ns)
+		val = shrink_poll_ns(poll_duration, poll_shrink);
+	else if (poll_duration < poll_threshold_ns &&
+		 now_ns - begin_ns < poll_threshold_ns)
+		val = grow_poll_ns(poll_duration, poll_grow, poll_threshold_ns);
+
+	this_cpu_write(poll_ns, val);
+	this_cpu_write(poll_begin_ns, 0);
+
+}
+
 void arch_cpu_idle_poll(void)
 {
 	ktime_t start, cur, stop;
@@ -359,6 +414,10 @@ void arch_cpu_idle(void)
 void __cpuidle default_idle(void)
 {
 	trace_cpu_idle_rcuidle(1, smp_processor_id());
+#ifdef CONFIG_HYPERVISOR_GUEST
+	if (poll_threshold_ns)
+		this_cpu_write(poll_begin_ns, ktime_to_ns(ktime_get()));
+#endif
 	safe_halt();
 	trace_cpu_idle_rcuidle(PWR_EVENT_EXIT, smp_processor_id());
 }

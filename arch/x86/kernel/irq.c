@@ -230,6 +230,7 @@ __visible unsigned int __irq_entry do_IRQ(struct pt_regs *regs)
 
 	entering_irq();
 
+	check_poll();
 	/* entering_irq() tells RCU that we're not quiescent.  Check it. */
 	RCU_LOCKDEP_WARN(!rcu_is_watching(), "IRQ failed to wake up RCU");
 
@@ -269,6 +270,7 @@ __visible void __irq_entry smp_x86_platform_ipi(struct pt_regs *regs)
 	struct pt_regs *old_regs = set_irq_regs(regs);
 
 	entering_ack_irq();
+	check_poll();
 	__smp_x86_platform_ipi();
 	exiting_irq();
 	set_irq_regs(old_regs);
@@ -295,6 +297,7 @@ __visible void smp_kvm_posted_intr_ipi(struct pt_regs *regs)
 	struct pt_regs *old_regs = set_irq_regs(regs);
 
 	entering_ack_irq();
+	check_poll();
 	inc_irq_stat(kvm_posted_intr_ipis);
 	exiting_irq();
 	set_irq_regs(old_regs);
@@ -308,6 +311,7 @@ __visible void smp_kvm_posted_intr_wakeup_ipi(struct pt_regs *regs)
 	struct pt_regs *old_regs = set_irq_regs(regs);
 
 	entering_ack_irq();
+	check_poll();
 	inc_irq_stat(kvm_posted_intr_wakeup_ipis);
 	kvm_posted_intr_wakeup_handler();
 	exiting_irq();
@@ -320,6 +324,7 @@ __visible void __irq_entry smp_trace_x86_platform_ipi(struct pt_regs *regs)
 	struct pt_regs *old_regs = set_irq_regs(regs);
 
 	entering_ack_irq();
+	check_poll();
 	trace_x86_platform_ipi_entry(X86_PLATFORM_IPI_VECTOR);
 	__smp_x86_platform_ipi();
 	trace_x86_platform_ipi_exit(X86_PLATFORM_IPI_VECTOR);

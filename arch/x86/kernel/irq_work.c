@@ -20,6 +20,7 @@ static inline void __smp_irq_work_interrupt(void)
 __visible void __irq_entry smp_irq_work_interrupt(struct pt_regs *regs)
 {
 	ipi_entering_ack_irq();
+	check_poll();
 	__smp_irq_work_interrupt();
 	exiting_irq();
 }
@@ -27,6 +28,7 @@ __visible void __irq_entry smp_irq_work_interrupt(struct pt_regs *regs)
 __visible void __irq_entry smp_trace_irq_work_interrupt(struct pt_regs *regs)
 {
 	ipi_entering_ack_irq();
+	check_poll();
 	trace_irq_work_entry(IRQ_WORK_VECTOR);
 	__smp_irq_work_interrupt();
 	trace_irq_work_exit(IRQ_WORK_VECTOR);

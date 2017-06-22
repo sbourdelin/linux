@@ -564,6 +564,7 @@ asmlinkage __visible void __irq_entry smp_irq_move_cleanup_interrupt(void)
 	unsigned vector, me;
 
 	entering_ack_irq();
+	check_poll();
 
 	/* Prevent vectors vanishing under us */
 	raw_spin_lock(&vector_lock);

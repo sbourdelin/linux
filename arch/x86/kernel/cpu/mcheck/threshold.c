@@ -26,6 +26,7 @@ static inline void __smp_threshold_interrupt(void)
 asmlinkage __visible void __irq_entry smp_threshold_interrupt(void)
 {
 	entering_irq();
+	check_poll();
 	__smp_threshold_interrupt();
 	exiting_ack_irq();
 }
@@ -33,6 +34,7 @@ asmlinkage __visible void __irq_entry smp_threshold_interrupt(void)
 asmlinkage __visible void __irq_entry smp_trace_threshold_interrupt(void)
 {
 	entering_irq();
+	check_poll();
 	trace_threshold_apic_entry(THRESHOLD_APIC_VECTOR);
 	__smp_threshold_interrupt();
 	trace_threshold_apic_exit(THRESHOLD_APIC_VECTOR);

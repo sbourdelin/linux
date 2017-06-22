@@ -462,6 +462,8 @@ extern int sysctl_panic_on_stackoverflow;
 extern bool crash_kexec_post_notifiers;
 #ifdef CONFIG_HYPERVISOR_GUEST
 extern unsigned long poll_threshold_ns;
+extern unsigned int poll_shrink;
+extern unsigned int poll_grow;
 #endif
 
 /*
