@@ -81,6 +81,7 @@ struct i915_vma {
 #define I915_VMA_GGTT		BIT(8)
 #define I915_VMA_CAN_FENCE	BIT(9)
 #define I915_VMA_CLOSED		BIT(10)
+#define I915_VMA_USERFAULT	BIT(11)
 
 	unsigned int active;
 	struct i915_gem_active last_read[I915_NUM_ENGINES];
@@ -141,6 +142,11 @@ static inline bool i915_vma_is_map_and_fenceable(const struct i915_vma *vma)
 static inline bool i915_vma_is_closed(const struct i915_vma *vma)
 {
 	return vma->flags & I915_VMA_CLOSED;
+}
+
+static inline bool i915_vma_has_userfault(const struct i915_vma *vma)
+{
+	return vma->flags & I915_VMA_USERFAULT;
 }
 
 static inline unsigned int i915_vma_get_active(const struct i915_vma *vma)

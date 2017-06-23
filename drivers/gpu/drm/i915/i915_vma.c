@@ -695,7 +695,8 @@ int i915_vma_unbind(struct i915_vma *vma)
 			return ret;
 
 		/* Force a pagefault for domain tracking on next user access */
-		i915_gem_release_mmap(obj);
+		if (i915_vma_has_userfault(vma))
+			i915_gem_release_mmap(obj);
 
 		__i915_vma_iounmap(vma);
 		vma->flags &= ~I915_VMA_CAN_FENCE;
