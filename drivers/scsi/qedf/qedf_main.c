@@ -617,16 +617,20 @@ out:
 	return rc;
 }
 
-static int qedf_eh_target_reset(struct scsi_cmnd *sc_cmd)
+static int qedf_eh_target_reset(struct scsi_target *starget)
 {
+	struct fc_rport *rport = starget_to_rport(starget);
+
 	QEDF_ERR(NULL, "TARGET RESET Issued...");
-	return qedf_initiate_tmf(sc_cmd, FCP_TMF_TGT_RESET);
+	return qedf_initiate_tmf(rport, 0, FCP_TMF_TGT_RESET);
 }
 
 static int qedf_eh_device_reset(struct scsi_cmnd *sc_cmd)
 {
+	struct fc_rport *rport = starget_to_rport(scsi_target(sc_cmd->device));
+
 	QEDF_ERR(NULL, "LUN RESET Issued...\n");
-	return qedf_initiate_tmf(sc_cmd, FCP_TMF_LUN_RESET);
+	return qedf_initiate_tmf(rport, sc_cmd->device->lun, FCP_TMF_LUN_RESET);
 }
 
 void qedf_wait_for_upload(struct qedf_ctx *qedf)

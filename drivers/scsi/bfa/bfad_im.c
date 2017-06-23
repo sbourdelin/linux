@@ -376,22 +376,26 @@ out:
  * Scsi_Host template entry, resets the target and abort all commands.
  */
 static int
-bfad_im_reset_target_handler(struct scsi_cmnd *cmnd)
+bfad_im_reset_target_handler(struct scsi_target *starget)
 {
-	struct Scsi_Host *shost = cmnd->device->host;
-	struct scsi_target *starget = scsi_target(cmnd->device);
+	struct fc_rport *rport = starget_to_rport(starget);
+	struct Scsi_Host *shost = rport_to_shost(rport);
+	struct bfad_itnim_data_s *itnim_data;
+	struct bfad_itnim_s *itnim;
 	struct bfad_im_port_s *im_port =
 				(struct bfad_im_port_s *) shost->hostdata[0];
 	struct bfad_s         *bfad = im_port->bfad;
-	struct bfad_itnim_s   *itnim;
 	unsigned long   flags;
 	u32        rc, rtn = FAILED;
 	DECLARE_WAIT_QUEUE_HEAD_ONSTACK(wq);
 	enum bfi_tskim_status task_status;
+	struct scsi_cmnd tmf_cmnd, *cmnd = &tmf_cmnd;
 
 	spin_lock_irqsave(&bfad->bfad_lock, flags);
-	itnim = bfad_get_itnim(im_port, starget->id);
-	if (itnim) {
+	if (rport->dd_data) {
+		itnim_data = rport->dd_data;
+		itnim = itnim_data->itnim;
+
 		cmnd->SCp.ptr = (char *)&wq;
 		rc = bfad_im_target_reset_send(bfad, cmnd, itnim);
 		if (rc == BFA_STATUS_OK) {
