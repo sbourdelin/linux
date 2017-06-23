@@ -358,7 +358,7 @@ struct hfa384x_bytestr {
 } __packed;
 
 struct hfa384x_bytestr32 {
-	u16 len;
+	__le16 len;
 	u8 data[32];
 } __packed;
 
@@ -399,8 +399,8 @@ struct hfa384x_caplevel {
 
 /*-- Configuration Record: HostScanRequest (data portion only) --*/
 struct hfa384x_host_scan_request_data {
-	u16 channel_list;
-	u16 tx_rate;
+	__le16 channel_list;
+	__le16 tx_rate;
 	struct hfa384x_bytestr32 ssid;
 } __packed;
 
