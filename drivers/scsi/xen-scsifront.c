@@ -212,7 +212,8 @@ static int scsifront_do_request(struct vscsifrnt_info *info,
 	memcpy(ring_req->cmnd, sc->cmnd, sc->cmd_len);
 
 	ring_req->sc_data_direction   = (uint8_t)sc->sc_data_direction;
-	ring_req->timeout_per_command = sc->request->timeout / HZ;
+	ring_req->timeout_per_command =
+		sc->request ? sc->request->timeout / HZ : 30 * HZ;
 
 	for (i = 0; i < (shadow->nr_segments & ~VSCSIIF_SG_GRANT); i++)
 		ring_req->seg[i] = shadow->seg[i];
@@ -645,10 +646,15 @@ static int scsifront_eh_abort_handler(struct scsi_cmnd *sc)
 	return scsifront_action_handler(sc, VSCSIIF_ACT_SCSI_ABORT);
 }
 
-static int scsifront_dev_reset_handler(struct scsi_cmnd *sc)
+static int scsifront_dev_reset_handler(struct scsi_device *sdev)
 {
+	struct scsi_cmnd sc;
+
 	pr_debug("%s\n", __func__);
-	return scsifront_action_handler(sc, VSCSIIF_ACT_SCSI_RESET);
+	memset(&sc, 0, sizeof(sc));
+	sc->device = sdev;
+	sc->cmd_len = 6;
+	return scsifront_action_handler(&sc, VSCSIIF_ACT_SCSI_RESET);
 }
 
 static int scsifront_sdev_configure(struct scsi_device *sdev)

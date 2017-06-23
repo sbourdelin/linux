@@ -299,12 +299,12 @@ out:
  *
  */
 static int
-bfad_im_reset_lun_handler(struct scsi_cmnd *cmnd)
+bfad_im_reset_lun_handler(struct scsi_device *sdev)
 {
-	struct Scsi_Host *shost = cmnd->device->host;
+	struct Scsi_Host *shost = sdev->host;
 	struct bfad_im_port_s *im_port =
 			(struct bfad_im_port_s *) shost->hostdata[0];
-	struct bfad_itnim_data_s *itnim_data = cmnd->device->hostdata;
+	struct bfad_itnim_data_s *itnim_data = sdev->hostdata;
 	struct bfad_s         *bfad = im_port->bfad;
 	struct bfa_tskim_s *tskim;
 	struct bfad_itnim_s   *itnim;
@@ -314,6 +314,7 @@ bfad_im_reset_lun_handler(struct scsi_cmnd *cmnd)
 	unsigned long   flags;
 	enum bfi_tskim_status task_status;
 	struct scsi_lun scsilun;
+	struct scsi_cmnd tmf_cmnd, *cmnd = &tmf_cmnd;
 
 	spin_lock_irqsave(&bfad->bfad_lock, flags);
 	itnim = itnim_data->itnim;
@@ -339,6 +340,8 @@ bfad_im_reset_lun_handler(struct scsi_cmnd *cmnd)
 	cmnd->host_scribble = NULL;
 	cmnd->SCp.ptr = (char *)&wq;
 	cmnd->SCp.Status = 0;
+	cmnd->device = sdev;
+	cmnd->request = NULL;
 	bfa_itnim = bfa_fcs_itnim_get_halitn(&itnim->fcs_itnim);
 	/*
 	 * bfa_itnim can be NULL if the port gets disconnected and the bfa

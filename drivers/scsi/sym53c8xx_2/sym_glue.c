@@ -616,19 +616,7 @@ static int sym_eh_handler(int op, char *opname, struct scsi_cmnd *cmd)
 		}
 	}
 
-	/* Try to proceed the operation we have been asked for */
-	sts = -1;
-	switch(op) {
-	case SYM_EH_ABORT:
-		sts = sym_abort_scsiio(np, cmd, 1);
-		break;
-	case SYM_EH_DEVICE_RESET:
-		sts = sym_reset_scsi_target(np, cmd->device->id);
-		break;
-	default:
-		break;
-	}
-
+	sts = sym_abort_scsiio(np, cmd, 1);
 	/* On error, restore everything and cross fingers :) */
 	if (sts)
 		cmd_queued = 0;
@@ -659,9 +647,51 @@ static int sym53c8xx_eh_abort_handler(struct scsi_cmnd *cmd)
 	return sym_eh_handler(SYM_EH_ABORT, "ABORT", cmd);
 }
 
-static int sym53c8xx_eh_device_reset_handler(struct scsi_cmnd *cmd)
+static int sym53c8xx_eh_device_reset_handler(struct scsi_device *sdev)
 {
-	return sym_eh_handler(SYM_EH_DEVICE_RESET, "DEVICE RESET", cmd);
+	struct sym_data *sym_data = shost_priv(sdev->host);
+	struct pci_dev *pdev = sym_data->pdev;
+	struct sym_hcb *np = sym_data->ncb;
+	SYM_QUEHEAD *qp;
+	int sts;
+	struct completion eh_done;
+
+	sdev_printk(KERN_WARNING, sdev, "DEVICE RESET operation started\n");
+
+	/*
+	 * Escalate to host reset if the PCI bus went down
+	 */
+	if (pci_channel_offline(pdev))
+		return SCSI_FAILED;
+
+	spin_lock_irq(sdev->host->host_lock);
+	sts = sym_reset_scsi_target(np, sdev->id);
+	if (!sts) {
+		FOR_EACH_QUEUED_ELEMENT(&np->busy_ccbq, qp) {
+			struct sym_ccb *cp = sym_que_entry(qp, struct sym_ccb,
+							   link_ccbq);
+			struct scsi_cmnd *cmd = cp->cmd;
+			struct sym_ucmd *ucmd;
+
+			if (!cmd || cmd->device != sdev)
+				continue;
+
+			ucmd = SYM_UCMD_PTR(cmd);
+			init_completion(&eh_done);
+			ucmd->eh_done = &eh_done;
+			spin_unlock_irq(sdev->host->host_lock);
+			if (!wait_for_completion_timeout(&eh_done, 5*HZ)) {
+				ucmd->eh_done = NULL;
+				sts = -2;
+			}
+			spin_lock_irq(sdev->host->host_lock);
+		}
+	}
+	spin_unlock_irq(sdev->host->host_lock);
+
+	sdev_printk(KERN_WARNING, sdev, "DEVICE RESET operation %s.\n",
+			sts==0 ? "complete" :sts==-2 ? "timed-out" : "failed");
+	return SCSI_SUCCESS;
 }
 
 static int sym53c8xx_eh_bus_reset_handler(struct Scsi_Host *shost, int channel)
