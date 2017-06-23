@@ -4060,6 +4060,9 @@ static int xhci_set_usb2_hardware_lpm(struct usb_hcd *hcd,
 			!udev->lpm_capable)
 		return -EPERM;
 
+	if (xhci->quirks & XHCI_HW_LPM_DISABLE)
+		return -EPERM;
+
 	if (!udev->parent || udev->parent->parent ||
 			udev->descriptor.bDeviceClass == USB_CLASS_HUB)
 		return -EPERM;
