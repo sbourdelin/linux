@@ -21,6 +21,11 @@ platforms.
 	Value type: <u32>
 	Definition: as described in mailbox.txt, must be 1
 
+- #clock-cells:
+	Usage: required for msm8916 platforms
+	Value type: <u32>
+	Definition: as described in clock-bindings.txt, must be 0
+
 
 = EXAMPLE
 The following example describes the APCS HMSS found in MSM8996 and part of the
