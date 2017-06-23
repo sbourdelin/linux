@@ -1448,6 +1448,7 @@ struct tcp_md5sig_key *tcp_v4_md5_lookup(const struct sock *sk,
 struct tcp_md5sig_key *tcp_md5_do_lookup(const struct sock *sk,
 					 const union tcp_md5_addr *addr,
 					 int family);
+int tcp_md5_seq_show(struct seq_file *seq, void *v);
 #define tcp_twsk_md5_key(twsk)	((twsk)->tw_md5_key)
 #else
 static inline struct tcp_md5sig_key *tcp_md5_do_lookup(const struct sock *sk,

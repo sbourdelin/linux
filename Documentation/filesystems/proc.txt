@@ -1105,6 +1105,7 @@ Table 1-8: IPv6 info in /proc/net
  File       Content                                               
  udp6       UDP sockets (IPv6)                                    
  tcp6       TCP sockets (IPv6)                                    
+ tcp6md5    MD5 signature keys configured on IPv6 TCP sockets
  raw6       Raw device statistics (IPv6)                          
  igmp6      IP multicast addresses, which this host joined (IPv6) 
  if_inet6   List of IPv6 interface addresses                      
@@ -1136,6 +1137,7 @@ Table 1-9: Network info in /proc/net
  snmp          SNMP data                                                       
  sockstat      Socket statistics                                               
  tcp           TCP  sockets                                                    
+ tcpmd5        MD5 signature keys configured on IPv4 TCP sockets
  udp           UDP sockets                                                     
  unix          UNIX domain sockets                                             
  wireless      Wireless interface data (Wavelan etc)                           

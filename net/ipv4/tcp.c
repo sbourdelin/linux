@@ -3287,6 +3287,61 @@ int tcp_md5_hash_key(struct tcp_md5sig_pool *hp, const struct tcp_md5sig_key *ke
 }
 EXPORT_SYMBOL(tcp_md5_hash_key);
 
+static void do_md5_seq_print_key(struct seq_file *seq,
+				 const struct tcp_iter_state *st,
+				 const struct tcp_md5sig_key *key,
+				 unsigned long ino)
+{
+	if (key->keylen == 0)
+		return;
+
+	seq_printf(seq, "%4d: %6lu ", st->num, ino);
+	if (key->family == AF_INET)
+		seq_printf(seq, "%39pI4/%-3u ", &key->addr.a4, key->prefixlen);
+	else
+		seq_printf(seq, "%39pI6c/%-3u ", &key->addr.a6, key->prefixlen);
+	seq_printf(seq, "%*pE\n", key->keylen, key->key);
+}
+
+int tcp_md5_seq_show(struct seq_file *seq, void *v)
+{
+	struct sock *sp = v;
+	const struct tcp_sock *tp = tcp_sk(sp);
+	const struct tcp_iter_state *st = seq->private;
+	const struct tcp_md5sig_info *md5sig;
+	const struct tcp_md5sig_key *key;
+	unsigned long ino;
+
+	if (v == SEQ_START_TOKEN) {
+		seq_puts(seq, "  sl  inode  addr                                        key\n");
+		goto out;
+	}
+
+	if (sp->sk_state == TCP_TIME_WAIT) {
+		const struct tcp_timewait_sock *tcptw = tcp_twsk(sp);
+
+		key = tcptw->tw_md5_key;
+		if (key)
+			do_md5_seq_print_key(seq, st, key, 0);
+		goto out;
+	}
+
+	ino = sock_i_ino(sp);
+	rcu_read_lock();
+	md5sig = rcu_dereference(tp->md5sig_info);
+	if (!md5sig)
+		goto out_unlock;
+
+	hlist_for_each_entry_rcu(key, &md5sig->head, node) {
+		do_md5_seq_print_key(seq, st, key, ino);
+	}
+
+out_unlock:
+	rcu_read_unlock();
+out:
+	return 0;
+}
+EXPORT_SYMBOL(tcp_md5_seq_show);
 #endif
 
 void tcp_done(struct sock *sk)

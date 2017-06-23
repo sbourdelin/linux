@@ -1875,13 +1875,40 @@ static struct tcp_seq_afinfo tcp6_seq_afinfo = {
 	},
 };
 
+#ifdef CONFIG_TCP_MD5SIG
+static struct tcp_seq_afinfo tcp6_md5_seq_afinfo = {
+	.name = "tcp6md5",
+	.family = AF_INET6,
+	.seq_fops = &tcp6_afinfo_seq_fops,
+	.seq_ops = {
+		.show = tcp_md5_seq_show,
+	}
+};
+#endif
+
 int __net_init tcp6_proc_init(struct net *net)
 {
-	return tcp_proc_register(net, &tcp6_seq_afinfo, S_IRUGO);
+	if (tcp_proc_register(net, &tcp6_seq_afinfo, S_IRUGO))
+		goto out_tcp6;
+#ifdef CONFIG_TCP_MD5SIG
+	if (tcp_proc_register(net, &tcp6_md5_seq_afinfo, S_IRUSR))
+		goto out_tcp6md5;
+#endif
+	return 0;
+
+#ifdef CONFIG_TCP_MD5SIG
+out_tcp6md5:
+	tcp_proc_unregister(net, &tcp6_seq_afinfo);
+#endif
+out_tcp6:
+	return -ENOMEM;
 }
 
 void tcp6_proc_exit(struct net *net)
 {
+#ifdef CONFIG_TCP_MD5SIG
+	tcp_proc_unregister(net, &tcp6_md5_seq_afinfo);
+#endif
 	tcp_proc_unregister(net, &tcp6_seq_afinfo);
 }
 #endif
