@@ -16,6 +16,9 @@ Optional properties:
 - resets: Reference to a reset controller asserting the DMA controller
 - st,mem2mem: boolean; if defined, it indicates that the controller supports
   memory-to-memory transfer
+- st,dmamux: boolean; if defined, it indicates that the controller is behind a
+  DMA multiplexer. In that case, using dma instances doesn't work for DMA
+  clients. They have to use dma-router instances.
 
 Example:
 
@@ -39,7 +42,7 @@ Example:
 * DMA client
 
 DMA clients connected to the STM32 DMA controller must use the format
-described in the dma.txt file, using a five-cell specifier for each
+described in the dma.txt file, using a four-cell specifier for each
 channel: a phandle to the DMA controller plus the following four integer cells:
 
 1. The channel id
