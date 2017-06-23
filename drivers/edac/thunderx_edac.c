@@ -1094,6 +1094,8 @@ struct thunderx_ocx {
 
 	unsigned long link_ring_head;
 	unsigned long link_ring_tail;
+
+	void *pmu_data;
 };
 
 #define OCX_MESSAGE_SIZE	SZ_1K
@@ -1491,6 +1493,8 @@ static int thunderx_ocx_probe(struct pci_dev *pdev,
 
 	writeq(OCX_COM_INT_ENA_ALL, ocx->regs + OCX_COM_INT_ENA_W1S);
 
+	ocx->pmu_data = cvm_pmu_probe(pdev, ocx->regs, CVM_PMU_TLK);
+
 	return 0;
 err_free:
 	edac_device_free_ctl_info(edac_dev);
@@ -1503,6 +1507,8 @@ static void thunderx_ocx_remove(struct pci_dev *pdev)
 	struct edac_device_ctl_info *edac_dev = pci_get_drvdata(pdev);
 	struct thunderx_ocx *ocx = edac_dev->pvt_info;
 	int i;
+
+	cvm_pmu_remove(pdev, ocx->pmu_data, CVM_PMU_TLK);
 
 	writeq(OCX_COM_INT_ENA_ALL, ocx->regs + OCX_COM_INT_ENA_W1C);
 

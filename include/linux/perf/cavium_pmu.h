@@ -6,6 +6,7 @@
 
 enum cvm_pmu_type {
 	CVM_PMU_LMC,
+	CVM_PMU_TLK,
 };
 
 #ifdef CONFIG_CAVIUM_PMU
