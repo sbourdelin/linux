@@ -20,7 +20,7 @@
 #include <linux/atomic.h>
 #include <linux/bitfield.h>
 #include <linux/circ_buf.h>
-
+#include <linux/perf/cavium_pmu.h>
 #include <asm/page.h>
 
 #include "edac_module.h"
@@ -209,6 +209,8 @@ struct thunderx_lmc {
 	struct lmc_err_ctx err_ctx[RING_ENTRIES];
 	unsigned long ring_head;
 	unsigned long ring_tail;
+
+	void *pmu_data;
 };
 
 #define ring_pos(pos, size) ((pos) & (size - 1))
@@ -810,6 +812,7 @@ static int thunderx_lmc_probe(struct pci_dev *pdev,
 		}
 	}
 
+	lmc->pmu_data = cvm_pmu_probe(pdev, lmc->regs, CVM_PMU_LMC);
 	return 0;
 
 err_free:
@@ -823,6 +826,8 @@ static void thunderx_lmc_remove(struct pci_dev *pdev)
 {
 	struct mem_ctl_info *mci = pci_get_drvdata(pdev);
 	struct thunderx_lmc *lmc = mci->pvt_info;
+
+	cvm_pmu_remove(pdev, lmc->pmu_data, CVM_PMU_LMC);
 
 	writeq(LMC_INT_ENA_ALL, lmc->regs + LMC_INT_ENA_W1C);
 

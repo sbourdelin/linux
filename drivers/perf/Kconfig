@@ -42,4 +42,13 @@ config XGENE_PMU
         help
           Say y if you want to use APM X-Gene SoC performance monitors.
 
+config CAVIUM_PMU
+	bool "Cavium SOC PMU"
+	default y
+	depends on EDAC_THUNDERX && PERF_EVENTS
+	help
+	  Provides access to various performance counters on Caviums
+	  ARM64 SOCs. Adds support for memory controller (LMC) and
+	  interconnect link (OCX TLK) counters.
+
 endmenu
