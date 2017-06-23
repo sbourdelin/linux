@@ -2046,6 +2046,41 @@ out:
 	return ret;
 }
 
+loff_t gfs2_seek_hole_data(struct file *file, loff_t offset, int whence)
+{
+	struct inode *inode = file->f_mapping->host;
+	struct gfs2_inode *ip = GFS2_I(inode);
+	struct gfs2_holder gh;
+	loff_t ret;
+
+	inode_lock(inode);
+	ret = gfs2_glock_nq_init(ip->i_gl, LM_ST_SHARED, 0, &gh);
+	if (ret)
+		goto out;
+	if (gfs2_is_stuffed(ip)) {
+		u64 size = i_size_read(inode);
+
+		if (offset >= size) {
+			ret = -ENXIO;
+			goto out_dequeue;
+		}
+		ret = offset;
+		if (whence == SEEK_HOLE)
+			ret = size;
+	} else {
+		ret = iomap_seek_hole_data(inode, offset, whence, &gfs2_iomap_ops);
+	}
+
+out_dequeue:
+	gfs2_glock_dq_uninit(&gh);
+out:
+	inode_unlock(inode);
+
+	if (ret < 0)
+		return ret;
+	return vfs_setpos(file, ret, inode->i_sb->s_maxbytes);
+}
+
 const struct inode_operations gfs2_file_iops = {
 	.permission = gfs2_permission,
 	.setattr = gfs2_setattr,
