@@ -361,6 +361,10 @@ config XILINX_GMII2RGMII
          the Reduced Gigabit Media Independent Interface(RGMII) between
          Ethernet physical media devices and the Gigabit Ethernet controller.
 
+config ROCKCHIP_MAC_PHY
+	tristate "Drivers for ROCKCHIP MAC PHY"
+	---help---
+	  Currently supports the mac internal ephy.
 endif # PHYLIB
 
 config MICREL_KS8995MA
