@@ -2163,7 +2163,8 @@ int tcp_seq_open(struct inode *inode, struct file *file)
 }
 EXPORT_SYMBOL(tcp_seq_open);
 
-int tcp_proc_register(struct net *net, struct tcp_seq_afinfo *afinfo)
+int tcp_proc_register(struct net *net, struct tcp_seq_afinfo *afinfo,
+		      umode_t mode)
 {
 	int rc = 0;
 	struct proc_dir_entry *p;
@@ -2172,7 +2173,7 @@ int tcp_proc_register(struct net *net, struct tcp_seq_afinfo *afinfo)
 	afinfo->seq_ops.next		= tcp_seq_next;
 	afinfo->seq_ops.stop		= tcp_seq_stop;
 
-	p = proc_create_data(afinfo->name, S_IRUGO, net->proc_net,
+	p = proc_create_data(afinfo->name, mode, net->proc_net,
 			     afinfo->seq_fops, afinfo);
 	if (!p)
 		rc = -ENOMEM;
@@ -2338,7 +2339,7 @@ static struct tcp_seq_afinfo tcp4_seq_afinfo = {
 
 static int __net_init tcp4_proc_init_net(struct net *net)
 {
-	return tcp_proc_register(net, &tcp4_seq_afinfo);
+	return tcp_proc_register(net, &tcp4_seq_afinfo, S_IRUGO);
 }
 
 static void __net_exit tcp4_proc_exit_net(struct net *net)

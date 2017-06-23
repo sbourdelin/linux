@@ -1877,7 +1877,7 @@ static struct tcp_seq_afinfo tcp6_seq_afinfo = {
 
 int __net_init tcp6_proc_init(struct net *net)
 {
-	return tcp_proc_register(net, &tcp6_seq_afinfo);
+	return tcp_proc_register(net, &tcp6_seq_afinfo, S_IRUGO);
 }
 
 void tcp6_proc_exit(struct net *net)

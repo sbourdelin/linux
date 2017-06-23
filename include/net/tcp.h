@@ -1751,7 +1751,8 @@ struct tcp_iter_state {
 	loff_t			last_pos;
 };
 
-int tcp_proc_register(struct net *net, struct tcp_seq_afinfo *afinfo);
+int tcp_proc_register(struct net *net, struct tcp_seq_afinfo *afinfo,
+		      umode_t mode);
 void tcp_proc_unregister(struct net *net, struct tcp_seq_afinfo *afinfo);
 
 extern struct request_sock_ops tcp_request_sock_ops;
