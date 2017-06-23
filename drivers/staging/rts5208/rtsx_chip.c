@@ -616,8 +616,10 @@ int rtsx_reset_chip(struct rtsx_chip *chip)
 		else
 			retval = rtsx_pre_handle_sdio_new(chip);
 
-		dev_dbg(rtsx_dev(chip), "chip->need_reset = 0x%x (rtsx_reset_chip)\n",
-			(unsigned int)(chip->need_reset));
+		dev_dbg(rtsx_dev(chip), "%s = 0x%x (%s)\n",
+				"chip->need_reset",
+				(unsigned int)(chip->need_reset),
+				"rtsx_reset_chip");
 #else  /* HW_AUTO_SWITCH_SD_BUS */
 		retval = rtsx_pre_handle_sdio_old(chip);
 #endif  /* HW_AUTO_SWITCH_SD_BUS */

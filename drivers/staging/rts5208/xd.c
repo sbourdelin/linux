@@ -885,8 +885,9 @@ static int xd_init_l2p_tbl(struct rtsx_chip *chip)
 	struct xd_info *xd_card = &chip->xd_card;
 	int size, i;
 
-	dev_dbg(rtsx_dev(chip), "xd_init_l2p_tbl: zone_cnt = %d\n",
-		xd_card->zone_cnt);
+	dev_dbg(rtsx_dev(chip), "%s: zone_cnt = %d\n",
+			"xd_init_l2p_tbl",
+			xd_card->zone_cnt);
 
 	if (xd_card->zone_cnt < 1) {
 		rtsx_trace(chip);
@@ -1026,7 +1027,8 @@ static u32 xd_get_l2p_tbl(struct rtsx_chip *chip, int zone_no, u16 log_off)
 #ifdef XD_DELAY_WRITE
 		retval = xd_delay_write(chip);
 		if (retval != STATUS_SUCCESS) {
-			dev_dbg(rtsx_dev(chip), "In xd_get_l2p_tbl, delay write fail!\n");
+			dev_dbg(rtsx_dev(chip), "In %s, delay write fail!\n",
+					"xd_get_l2p_tbl");
 			return BLK_NOT_FOUND;
 		}
 #endif
@@ -1434,7 +1436,7 @@ static int xd_build_l2p_tbl(struct rtsx_chip *chip, int zone_no)
 	u16 cur_lst_page_logoff, ent_lst_page_logoff;
 	u8 redunt[11];
 
-	dev_dbg(rtsx_dev(chip), "xd_build_l2p_tbl: %d\n", zone_no);
+	dev_dbg(rtsx_dev(chip), "%s: %d\n", "xd_build_l2p_tbl", zone_no);
 
 	if (!xd_card->zone) {
 		retval = xd_init_l2p_tbl(chip);
@@ -1901,7 +1903,9 @@ static int xd_write_multiple_pages(struct rtsx_chip *chip, u32 old_blk,
 
 	retval = rtsx_transfer_data_partial(chip, XD_CARD, buf, page_cnt * 512,
 					    scsi_sg_count(chip->srb),
-					    index, offset, DMA_TO_DEVICE, chip->xd_timeout);
+					    index, offset,
+					    DMA_TO_DEVICE,
+					    chip->xd_timeout);
 	if (retval < 0) {
 		rtsx_clear_xd_error(chip);
 
@@ -1960,7 +1964,7 @@ int xd_delay_write(struct rtsx_chip *chip)
 	int retval;
 
 	if (delay_write->delay_write_flag) {
-		dev_dbg(rtsx_dev(chip), "xd_delay_write\n");
+		dev_dbg(rtsx_dev(chip), "%s\n", "xd_delay_write");
 		retval = xd_switch_clock(chip);
 		if (retval != STATUS_SUCCESS) {
 			rtsx_trace(chip);
@@ -2049,7 +2053,7 @@ int xd_rw(struct scsi_cmnd *srb, struct rtsx_chip *chip,
 						      start_page);
 				if (retval != STATUS_SUCCESS) {
 					set_sense_type(chip, lun,
-						       SENSE_TYPE_MEDIA_WRITE_ERR);
+						SENSE_TYPE_MEDIA_WRITE_ERR);
 					rtsx_trace(chip);
 					return STATUS_FAIL;
 				}
@@ -2087,7 +2091,7 @@ int xd_rw(struct scsi_cmnd *srb, struct rtsx_chip *chip,
 				if (detect_card_cd(chip, XD_CARD) !=
 					STATUS_SUCCESS) {
 					set_sense_type(chip, lun,
-						       SENSE_TYPE_MEDIA_NOT_PRESENT);
+						SENSE_TYPE_MEDIA_NOT_PRESENT);
 					rtsx_trace(chip);
 					return STATUS_FAIL;
 				}
@@ -2147,7 +2151,7 @@ int xd_rw(struct scsi_cmnd *srb, struct rtsx_chip *chip,
 							ptr, &index, &offset);
 			if (retval != STATUS_SUCCESS) {
 				set_sense_type(chip, lun,
-					       SENSE_TYPE_MEDIA_UNRECOVER_READ_ERR);
+					SENSE_TYPE_MEDIA_UNRECOVER_READ_ERR);
 				rtsx_trace(chip);
 				return STATUS_FAIL;
 			}
@@ -2190,10 +2194,10 @@ int xd_rw(struct scsi_cmnd *srb, struct rtsx_chip *chip,
 		if (old_blk == BLK_NOT_FOUND) {
 			if (srb->sc_data_direction == DMA_FROM_DEVICE)
 				set_sense_type(chip, lun,
-					       SENSE_TYPE_MEDIA_UNRECOVER_READ_ERR);
+					SENSE_TYPE_MEDIA_UNRECOVER_READ_ERR);
 			else
 				set_sense_type(chip, lun,
-					       SENSE_TYPE_MEDIA_WRITE_ERR);
+					SENSE_TYPE_MEDIA_WRITE_ERR);
 
 			rtsx_trace(chip);
 			return STATUS_FAIL;
