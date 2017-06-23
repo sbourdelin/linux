@@ -689,11 +689,28 @@ acpi_ps_complete_final_op(struct acpi_walk_state *walk_state,
 
 				else if (ACPI_FAILURE(status)) {
 
-					/* First error is most important */
+					/*
+					 * First error is most important and
+					 * clean up
+					 */
+					do {
+						if (op) {
+							(void)
+							    acpi_ps_complete_this_op
+							    (walk_state, op);
+						}
 
-					(void)
-					    acpi_ps_complete_this_op(walk_state,
-								     op);
+						acpi_ps_pop_scope(&
+								  (walk_state->
+								   parser_state),
+								  &op,
+								  &walk_state->
+								  arg_types,
+								  &walk_state->
+								  arg_count);
+
+					} while (op);
+
 					return_ACPI_STATUS(status);
 				}
 			}
