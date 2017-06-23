@@ -416,6 +416,7 @@ struct amdgpu_bo {
 	u32				prefered_domains;
 	u32				allowed_domains;
 	struct ttm_place		placements[AMDGPU_GEM_DOMAIN_MAX + 1];
+	struct ttm_place		busy_placements[AMDGPU_GEM_DOMAIN_MAX + 1];
 	struct ttm_placement		placement;
 	struct ttm_buffer_object	tbo;
 	struct ttm_bo_kmap_obj		kmap;

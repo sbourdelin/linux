@@ -116,9 +116,11 @@ bool amdgpu_ttm_bo_is_amdgpu_bo(struct ttm_buffer_object *bo)
 static void amdgpu_ttm_placement_init(struct amdgpu_device *adev,
 				      struct ttm_placement *placement,
 				      struct ttm_place *places,
+				      struct ttm_place *busy_places,
 				      u32 domain, u64 flags)
 {
 	u32 c = 0;
+	u32 bc = 0;
 
 	if (domain & AMDGPU_GEM_DOMAIN_VRAM) {
 		unsigned visible_pfn = adev->mc.visible_vram_size >> PAGE_SHIFT;
@@ -135,7 +137,8 @@ static void amdgpu_ttm_placement_init(struct amdgpu_device *adev,
 
 		if (flags & AMDGPU_GEM_CREATE_VRAM_CONTIGUOUS)
 			places[c].flags |= TTM_PL_FLAG_CONTIGUOUS;
-		c++;
+
+		busy_places[bc++] = places[c++];
 	}
 
 	if (domain & AMDGPU_GEM_DOMAIN_GTT) {
@@ -147,7 +150,8 @@ static void amdgpu_ttm_placement_init(struct amdgpu_device *adev,
 				TTM_PL_FLAG_UNCACHED;
 		else
 			places[c].flags |= TTM_PL_FLAG_CACHED;
-		c++;
+
+		busy_places[bc++] = places[c++];
 	}
 
 	if (domain & AMDGPU_GEM_DOMAIN_CPU) {
@@ -159,42 +163,47 @@ static void amdgpu_ttm_placement_init(struct amdgpu_device *adev,
 				TTM_PL_FLAG_UNCACHED;
 		else
 			places[c].flags |= TTM_PL_FLAG_CACHED;
-		c++;
+
+		busy_places[bc++] = places[c++];
 	}
 
 	if (domain & AMDGPU_GEM_DOMAIN_GDS) {
 		places[c].fpfn = 0;
 		places[c].lpfn = 0;
 		places[c].flags = TTM_PL_FLAG_UNCACHED | AMDGPU_PL_FLAG_GDS;
-		c++;
+
+		busy_places[bc++] = places[c++];
 	}
 
 	if (domain & AMDGPU_GEM_DOMAIN_GWS) {
 		places[c].fpfn = 0;
 		places[c].lpfn = 0;
 		places[c].flags = TTM_PL_FLAG_UNCACHED | AMDGPU_PL_FLAG_GWS;
-		c++;
+
+		busy_places[bc++] = places[c++];
 	}
 
 	if (domain & AMDGPU_GEM_DOMAIN_OA) {
 		places[c].fpfn = 0;
 		places[c].lpfn = 0;
 		places[c].flags = TTM_PL_FLAG_UNCACHED | AMDGPU_PL_FLAG_OA;
-		c++;
+
+		busy_places[bc++] = places[c++];
 	}
 
 	if (!c) {
 		places[c].fpfn = 0;
 		places[c].lpfn = 0;
 		places[c].flags = TTM_PL_MASK_CACHING | TTM_PL_FLAG_SYSTEM;
-		c++;
+
+		busy_places[bc++] = places[c++];
 	}
 
 	placement->num_placement = c;
 	placement->placement = places;
 
-	placement->num_busy_placement = c;
-	placement->busy_placement = places;
+	placement->num_busy_placement = bc;
+	placement->busy_placement = busy_places;
 }
 
 void amdgpu_ttm_placement_from_domain(struct amdgpu_bo *abo, u32 domain)
@@ -202,7 +211,7 @@ void amdgpu_ttm_placement_from_domain(struct amdgpu_bo *abo, u32 domain)
 	struct amdgpu_device *adev = amdgpu_ttm_adev(abo->tbo.bdev);
 
 	amdgpu_ttm_placement_init(adev, &abo->placement, abo->placements,
-				  domain, abo->flags);
+				  abo->busy_placements, domain, abo->flags);
 }
 
 static void amdgpu_fill_placement_to_bo(struct amdgpu_bo *bo,
@@ -212,10 +221,12 @@ static void amdgpu_fill_placement_to_bo(struct amdgpu_bo *bo,
 
 	memcpy(bo->placements, placement->placement,
 	       placement->num_placement * sizeof(struct ttm_place));
+	memcpy(bo->busy_placements, placement->busy_placement,
+	       placement->num_busy_placement * sizeof(struct ttm_place));
 	bo->placement.num_placement = placement->num_placement;
 	bo->placement.num_busy_placement = placement->num_busy_placement;
 	bo->placement.placement = bo->placements;
-	bo->placement.busy_placement = bo->placements;
+	bo->placement.busy_placement = bo->busy_placements;
 }
 
 /**
@@ -441,6 +452,7 @@ static int amdgpu_bo_create_shadow(struct amdgpu_device *adev,
 {
 	struct ttm_placement placement = {0};
 	struct ttm_place placements[AMDGPU_GEM_DOMAIN_MAX + 1];
+	struct ttm_place busy_placements[AMDGPU_GEM_DOMAIN_MAX + 1];
 	int r;
 
 	if (bo->shadow)
@@ -449,9 +461,12 @@ static int amdgpu_bo_create_shadow(struct amdgpu_device *adev,
 	bo->flags |= AMDGPU_GEM_CREATE_SHADOW;
 	memset(&placements, 0,
 	       (AMDGPU_GEM_DOMAIN_MAX + 1) * sizeof(struct ttm_place));
+	memset(&busy_placements, 0,
+	       (AMDGPU_GEM_DOMAIN_MAX + 1) * sizeof(struct ttm_place));
 
 	amdgpu_ttm_placement_init(adev, &placement,
-				  placements, AMDGPU_GEM_DOMAIN_GTT,
+				  placements, busy_placements,
+				  AMDGPU_GEM_DOMAIN_GTT,
 				  AMDGPU_GEM_CREATE_CPU_GTT_USWC);
 
 	r = amdgpu_bo_create_restricted(adev, size, byte_align, true,
@@ -479,13 +494,16 @@ int amdgpu_bo_create(struct amdgpu_device *adev,
 {
 	struct ttm_placement placement = {0};
 	struct ttm_place placements[AMDGPU_GEM_DOMAIN_MAX + 1];
+	struct ttm_place busy_placements[AMDGPU_GEM_DOMAIN_MAX + 1];
 	int r;
 
 	memset(&placements, 0,
 	       (AMDGPU_GEM_DOMAIN_MAX + 1) * sizeof(struct ttm_place));
+	memset(&busy_placements, 0,
+	       (AMDGPU_GEM_DOMAIN_MAX + 1) * sizeof(struct ttm_place));
 
-	amdgpu_ttm_placement_init(adev, &placement,
-				  placements, domain, flags);
+	amdgpu_ttm_placement_init(adev, &placement, placements,
+				  busy_placements, domain, flags);
 
 	r = amdgpu_bo_create_restricted(adev, size, byte_align, kernel,
 					domain, flags, sg, &placement,
@@ -718,6 +736,8 @@ int amdgpu_bo_pin_restricted(struct amdgpu_bo *bo, u32 domain,
 			bo->placements[i].lpfn = lpfn;
 		bo->placements[i].flags |= TTM_PL_FLAG_NO_EVICT;
 	}
+	bo->placement.busy_placement = bo->placement.placement;
+	bo->placement.num_busy_placement = bo->placement.num_placement;
 
 	r = ttm_bo_validate(&bo->tbo, &bo->placement, false, false);
 	if (unlikely(r)) {
@@ -970,6 +990,8 @@ int amdgpu_bo_fault_reserve_notify(struct ttm_buffer_object *bo)
 		     abo->placements[i].lpfn > lpfn))
 			abo->placements[i].lpfn = lpfn;
 	}
+	abo->placement.busy_placement = abo->placement.placement;
+	abo->placement.num_busy_placement = abo->placement.num_placement;
 	r = ttm_bo_validate(bo, &abo->placement, false, false);
 	if (unlikely(r == -ENOMEM)) {
 		amdgpu_ttm_placement_from_domain(abo, AMDGPU_GEM_DOMAIN_GTT);
