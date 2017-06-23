@@ -109,6 +109,7 @@
 			reg = <0x0 0x0>;
 			enable-method = "psci";
 			#cooling-cells = <2>; /* min followed by max */
+			dynamic-power-coefficient = <100>;
 			clocks = <&cru ARMCLKL>;
 		};
 
@@ -142,6 +143,7 @@
 			reg = <0x0 0x100>;
 			enable-method = "psci";
 			#cooling-cells = <2>; /* min followed by max */
+			dynamic-power-coefficient = <100>;
 			clocks = <&cru ARMCLKB>;
 		};
 
