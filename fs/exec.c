@@ -226,6 +226,14 @@ static struct page *get_arg_page(struct linux_binprm *bprm, unsigned long pos,
 		/*
 		 * Since the stack will hold pointers to the strings, we
 		 * must account for them as well.
+		 *
+		 * The size calculation is the entire vma while each arg page is
+		 * built, so each time we get here it's calculating how far it
+		 * is currently (rather than each call being just the newly
+		 * added size from the arg page).  As a result, we need to
+		 * always add the entire size of the pointers, so that on the
+		 * last call to get_arg_page() we'll actually have the entire
+		 * correct size.
 		 */
 		ptr_size = (bprm->argc + bprm->envc) * sizeof(void *);
 		if (ptr_size > ULONG_MAX - size)
