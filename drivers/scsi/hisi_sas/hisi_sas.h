@@ -49,8 +49,8 @@
 struct hisi_hba;
 
 enum {
-	PORT_TYPE_SAS = (1U << 1),
-	PORT_TYPE_SATA = (1U << 0),
+	PORT_TYPE_SAS = (1ULL << 1),
+	PORT_TYPE_SATA = (1ULL << 0),
 };
 
 enum dev_status {
