@@ -148,7 +148,7 @@ static void __fw_state_set(struct fw_state *fw_st,
 	WRITE_ONCE(fw_st->status, status);
 
 	if (status == FW_STATUS_DONE || status == FW_STATUS_ABORTED)
-		swake_up(&fw_st->wq);
+		swake_up_all(&fw_st->wq);
 }
 
 #define fw_state_start(fw_st)					\
