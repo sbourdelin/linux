@@ -2248,6 +2248,12 @@ static void rockchip_irq_disable(struct irq_data *d)
 	clk_disable(bank->clk);
 }
 
+static void rockchip_irq_shutdown(struct irq_data *d)
+{
+	if (!irqd_irq_disabled(d))
+		rockchip_irq_disable(d);
+}
+
 static void rockchip_irq_bus_lock(struct irq_data *d)
 {
 	struct irq_chip_generic *gc = irq_data_get_irq_chip_data(d);
@@ -2338,6 +2344,7 @@ static int rockchip_interrupts_register(struct platform_device *pdev,
 		gc->chip_types[0].chip.irq_unmask = irq_gc_mask_clr_bit;
 		gc->chip_types[0].chip.irq_enable = rockchip_irq_enable;
 		gc->chip_types[0].chip.irq_disable = rockchip_irq_disable;
+		gc->chip_types[0].chip.irq_shutdown = rockchip_irq_shutdown;
 		gc->chip_types[0].chip.irq_set_wake = irq_gc_set_wake;
 		gc->chip_types[0].chip.irq_suspend = rockchip_irq_suspend;
 		gc->chip_types[0].chip.irq_resume = rockchip_irq_resume;
