@@ -13,6 +13,7 @@
 #include <linux/delay.h>
 #include <linux/dmaengine.h>
 #include <linux/dma-mapping.h>
+#include <linux/dma/stm32-dmamux.h>
 #include <linux/err.h>
 #include <linux/init.h>
 #include <linux/jiffies.h>
@@ -179,6 +180,7 @@ struct stm32_dma_device {
 	struct clk *clk;
 	struct reset_control *rst;
 	bool mem2mem;
+	bool dmamux;
 	struct stm32_dma_chan chan[STM32_DMA_MAX_CHANNELS];
 };
 
@@ -272,12 +274,18 @@ static int stm32_dma_slave_config(struct dma_chan *c,
 				  struct dma_slave_config *config)
 {
 	struct stm32_dma_chan *chan = to_stm32_dma_chan(c);
+	int ret = 0;
 
 	memcpy(&chan->dma_sconfig, config, sizeof(*config));
 
-	chan->config_init = true;
+	if (c->router)
+		ret = stm32_dmamux_set_config(c->router->dev, c->route_data,
+					      c->chan_id);
 
-	return 0;
+	if (!ret)
+		chan->config_init = true;
+
+	return ret;
 }
 
 static u32 stm32_dma_irq_status(struct stm32_dma_chan *chan)
@@ -998,18 +1006,26 @@ static struct dma_chan *stm32_dma_of_xlate(struct of_phandle_args *dma_spec,
 	cfg.stream_config = dma_spec->args[2];
 	cfg.threshold = dma_spec->args[3];
 
-	if ((cfg.channel_id >= STM32_DMA_MAX_CHANNELS) ||
-	    (cfg.request_line >= STM32_DMA_MAX_REQUEST_ID)) {
-		dev_err(dev, "Bad channel and/or request id\n");
-		return NULL;
-	}
+	if (dmadev->dmamux) {
+		c = dma_get_any_slave_channel(&dmadev->ddev);
+		if (!c) {
+			dev_err(dev, "No more channel avalaible\n");
+			return NULL;
+		}
+		chan = &dmadev->chan[c->chan_id];
+	} else {
+		if ((cfg.channel_id >= STM32_DMA_MAX_CHANNELS) ||
+		    (cfg.request_line >= STM32_DMA_MAX_REQUEST_ID)) {
+			dev_err(dev, "Bad channel and/or request id\n");
+			return NULL;
+		}
 
-	chan = &dmadev->chan[cfg.channel_id];
-
-	c = dma_get_slave_channel(&chan->vchan.chan);
-	if (!c) {
-		dev_err(dev, "No more channels available\n");
-		return NULL;
+		chan = &dmadev->chan[cfg.channel_id];
+		c = dma_get_slave_channel(&chan->vchan.chan);
+		if (!c) {
+			dev_err(dev, "No more channel avalaible\n");
+			return NULL;
+		}
 	}
 
 	stm32_dma_set_config(chan, &cfg);
@@ -1057,6 +1073,8 @@ static int stm32_dma_probe(struct platform_device *pdev)
 
 	dmadev->mem2mem = of_property_read_bool(pdev->dev.of_node,
 						"st,mem2mem");
+
+	dmadev->dmamux = of_property_read_bool(pdev->dev.of_node, "st,dmamux");
 
 	dmadev->rst = devm_reset_control_get(&pdev->dev, NULL);
 	if (!IS_ERR(dmadev->rst)) {
