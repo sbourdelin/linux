@@ -981,10 +981,11 @@ int amdgpu_bo_fault_reserve_notify(struct ttm_buffer_object *bo)
 
 	/* hurrah the memory is not visible ! */
 	atomic64_inc(&adev->num_vram_cpu_page_faults);
-	amdgpu_ttm_placement_from_domain(abo, AMDGPU_GEM_DOMAIN_VRAM);
+	amdgpu_ttm_placement_from_domain(abo, AMDGPU_GEM_DOMAIN_VRAM |
+					 AMDGPU_GEM_DOMAIN_GTT);
 	lpfn =	adev->mc.visible_vram_size >> PAGE_SHIFT;
 	for (i = 0; i < abo->placement.num_placement; i++) {
-		/* Force into visible VRAM */
+		/* Try to move the BO into visible VRAM */
 		if ((abo->placements[i].flags & TTM_PL_FLAG_VRAM) &&
 		    (!abo->placements[i].lpfn ||
 		     abo->placements[i].lpfn > lpfn))
@@ -993,16 +994,13 @@ int amdgpu_bo_fault_reserve_notify(struct ttm_buffer_object *bo)
 	abo->placement.busy_placement = abo->placement.placement;
 	abo->placement.num_busy_placement = abo->placement.num_placement;
 	r = ttm_bo_validate(bo, &abo->placement, false, false);
-	if (unlikely(r == -ENOMEM)) {
-		amdgpu_ttm_placement_from_domain(abo, AMDGPU_GEM_DOMAIN_GTT);
-		return ttm_bo_validate(bo, &abo->placement, false, false);
-	} else if (unlikely(r != 0)) {
+	if (unlikely(r != 0))
 		return r;
-	}
 
 	offset = bo->mem.start << PAGE_SHIFT;
 	/* this should never happen */
-	if ((offset + size) > adev->mc.visible_vram_size)
+	if (bo->mem.mem_type == TTM_PL_VRAM &&
+	    (offset + size) > adev->mc.visible_vram_size)
 		return -EINVAL;
 
 	return 0;
