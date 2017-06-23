@@ -1316,29 +1316,18 @@ xfs_seek_hole_data(
 	struct xfs_inode	*ip = XFS_I(inode);
 	struct xfs_mount	*mp = ip->i_mount;
 	uint			lock;
-	loff_t			offset, end;
-	int			error = 0;
+	loff_t			offset;
 
 	if (XFS_FORCED_SHUTDOWN(mp))
 		return -EIO;
 
 	lock = xfs_ilock_data_map_shared(ip);
-
-	end = i_size_read(inode);
-	offset = __xfs_seek_hole_data(inode, start, end, whence);
-	if (offset < 0) {
-		error = offset;
-		goto out_unlock;
-	}
-
-	offset = vfs_setpos(file, offset, inode->i_sb->s_maxbytes);
-
-out_unlock:
+	offset = iomap_seek_hole_data(inode, start, whence, &xfs_iomap_ops);
 	xfs_iunlock(ip, lock);
 
-	if (error)
-		return error;
-	return offset;
+	if (offset < 0)
+		return offset;
+	return vfs_setpos(file, offset, inode->i_sb->s_maxbytes);
 }
 
 STATIC loff_t
