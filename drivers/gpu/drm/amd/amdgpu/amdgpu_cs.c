@@ -338,14 +338,16 @@ static int amdgpu_cs_bo_validate(struct amdgpu_cs_parser *p,
 	if (p->bytes_moved < p->bytes_moved_threshold) {
 		if (adev->mc.visible_vram_size < adev->mc.real_vram_size &&
 		    (bo->flags & AMDGPU_GEM_CREATE_CPU_ACCESS_REQUIRED)) {
-			/* And don't move a CPU_ACCESS_REQUIRED BO to limited
-			 * visible VRAM if we've depleted our allowance to do
-			 * that.
+			/* Move CPU_ACCESS_REQUIRED BOs to limited visible VRAM
+			 * asynchronously, if we're allowed.
 			 */
-			if (p->bytes_moved_vis < p->bytes_moved_vis_threshold)
-				domain = bo->prefered_domains;
-			else
+			if (p->bytes_moved_vis < p->bytes_moved_vis_threshold) {
+				queue_work(adev->vis_vram_wq,
+					   &bo->move_vis_vram_work);
+				return 0;
+			} else {
 				domain = bo->allowed_domains;
+			}
 		} else {
 			domain = bo->prefered_domains;
 		}

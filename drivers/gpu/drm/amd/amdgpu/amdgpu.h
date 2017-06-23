@@ -436,6 +436,10 @@ struct amdgpu_bo {
 	 * is associated to
 	 */
 	struct list_head		va;
+
+	/* Work item for moving this BO to visible VRAM asynchronously */
+	struct work_struct		move_vis_vram_work;
+
 	/* Constant after initialization */
 	struct drm_gem_object		gem_base;
 	struct amdgpu_bo		*parent;
@@ -1578,6 +1582,7 @@ struct amdgpu_device {
 	struct amdgpu_mman		mman;
 	struct amdgpu_vram_scratch	vram_scratch;
 	struct amdgpu_wb		wb;
+	struct workqueue_struct		*vis_vram_wq;
 	atomic64_t			vram_usage;
 	atomic64_t			vram_vis_usage;
 	atomic64_t			gtt_usage;

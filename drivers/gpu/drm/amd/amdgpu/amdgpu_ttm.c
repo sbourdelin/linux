@@ -1120,6 +1120,13 @@ int amdgpu_ttm_init(struct amdgpu_device *adev)
 		return r;
 	}
 
+	/* Initialize workqueue for asynchronously moving BOs to visible VRAM.
+	 * We want to avoid lock contention (and therefore concurrency), so set
+	 * max_active = 1, and set unbound to disable concurrency management
+	 * (which can interleave sleeping workers).
+	 */
+	adev->vis_vram_wq = alloc_workqueue("amdgpu_vis_vram", WQ_UNBOUND, 1);
+
 	/* Reduce size of CPU-visible VRAM if requested */
 	vis_vram_limit = amdgpu_vis_vram_limit * 1024 * 1024;
 	if (amdgpu_vis_vram_limit > 0 &&

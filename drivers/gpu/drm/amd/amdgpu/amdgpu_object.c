@@ -93,6 +93,8 @@ static void amdgpu_ttm_bo_destroy(struct ttm_buffer_object *tbo)
 
 	bo = container_of(tbo, struct amdgpu_bo, tbo);
 
+	cancel_work_sync(&bo->move_vis_vram_work);
+
 	amdgpu_update_memory_usage(adev, &bo->tbo.mem, NULL);
 
 	drm_gem_object_release(&bo->gem_base);
@@ -330,6 +332,47 @@ void amdgpu_bo_free_kernel(struct amdgpu_bo **bo, u64 *gpu_addr,
 		*cpu_addr = NULL;
 }
 
+static void amdgpu_bo_move_vis_vram_work_func(struct work_struct *work)
+{
+	struct amdgpu_bo *bo = container_of(work, struct amdgpu_bo,
+					    move_vis_vram_work);
+	struct amdgpu_device *adev = amdgpu_ttm_adev(bo->tbo.bdev);
+	u64 initial_bytes_moved, bytes_moved;
+	uint32_t old_mem;
+	int r;
+
+	spin_lock(&adev->mm_stats.lock);
+	if (adev->mm_stats.accum_us_vis <= 0 ||
+	    adev->mm_stats.accum_us <= 0) {
+		spin_unlock(&adev->mm_stats.lock);
+		return;
+	}
+	spin_unlock(&adev->mm_stats.lock);
+
+	r = amdgpu_bo_reserve(bo, true);
+	if (r != 0)
+		return;
+
+	amdgpu_bo_clear_cpu_access_required(bo);
+
+	if (!(bo->flags & AMDGPU_GEM_CREATE_CPU_ACCESS_REQUIRED))
+		goto out;
+
+	amdgpu_ttm_placement_from_domain(bo, AMDGPU_GEM_DOMAIN_VRAM);
+	old_mem = bo->tbo.mem.mem_type;
+	initial_bytes_moved = atomic64_read(&adev->num_bytes_moved);
+	ttm_bo_validate(&bo->tbo, &bo->placement, false, false);
+	bytes_moved = atomic64_read(&adev->num_bytes_moved) -
+				    initial_bytes_moved;
+	amdgpu_cs_report_moved_bytes(adev, bytes_moved, bytes_moved);
+
+	if (bo->tbo.mem.mem_type != old_mem)
+		bo->last_cs_move_jiffies = jiffies;
+
+out:
+	amdgpu_bo_unreserve(bo);
+}
+
 int amdgpu_bo_create_restricted(struct amdgpu_device *adev,
 				unsigned long size, int byte_align,
 				bool kernel, u32 domain, u64 flags,
@@ -381,6 +424,8 @@ int amdgpu_bo_create_restricted(struct amdgpu_device *adev,
 		bo->allowed_domains |= AMDGPU_GEM_DOMAIN_GTT;
 
 	bo->flags = flags;
+
+	INIT_WORK(&bo->move_vis_vram_work, amdgpu_bo_move_vis_vram_work_func);
 
 #ifdef CONFIG_X86_32
 	/* XXX: Write-combined CPU mappings of GTT seem broken on 32-bit
