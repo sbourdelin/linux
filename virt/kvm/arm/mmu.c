@@ -860,6 +860,10 @@ static pud_t *stage2_get_pud(struct kvm *kvm, struct kvm_mmu_memory_cache *cache
 	pgd_t *pgd;
 	pud_t *pud;
 
+	/* Do we clash with kvm_free_stage2_pgd()? */
+	if (!kvm->arch.pgd)
+		return NULL;
+
 	pgd = kvm->arch.pgd + stage2_pgd_index(addr);
 	if (WARN_ON(stage2_pgd_none(*pgd))) {
 		if (!cache)
