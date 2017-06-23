@@ -1504,12 +1504,17 @@ static void cancel_hv_timer(struct kvm_lapic *apic)
 static bool start_hv_timer(struct kvm_lapic *apic)
 {
 	u64 tscdeadline = apic->lapic_timer.tscdeadline;
+	int ret = 0;
 
 	if ((atomic_read(&apic->lapic_timer.pending) &&
 		!apic_lvtt_period(apic)) ||
-		kvm_x86_ops->set_hv_timer(apic->vcpu, tscdeadline)) {
+		(ret = kvm_x86_ops->set_hv_timer(apic->vcpu, tscdeadline))) {
 		if (apic->lapic_timer.hv_timer_in_use)
 			cancel_hv_timer(apic);
+		if (ret == 1) {
+			apic_timer_expired(apic);
+			return true;
+		}
 	} else {
 		apic->lapic_timer.hv_timer_in_use = true;
 		hrtimer_cancel(&apic->lapic_timer.timer);
