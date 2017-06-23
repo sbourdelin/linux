@@ -138,7 +138,15 @@ static void amdgpu_ttm_placement_init(struct amdgpu_device *adev,
 		if (flags & AMDGPU_GEM_CREATE_VRAM_CONTIGUOUS)
 			places[c].flags |= TTM_PL_FLAG_CONTIGUOUS;
 
-		busy_places[bc++] = places[c++];
+		/* Don't set limited visible VRAM as a busy placement if we can
+		 * use GTT instead
+		 */
+		if (!((flags & AMDGPU_GEM_CREATE_CPU_ACCESS_REQUIRED) &&
+		      adev->mc.visible_vram_size < adev->mc.real_vram_size &&
+		      (domain & AMDGPU_GEM_DOMAIN_GTT)))
+			busy_places[bc++] = places[c];
+
+		c++;
 	}
 
 	if (domain & AMDGPU_GEM_DOMAIN_GTT) {
