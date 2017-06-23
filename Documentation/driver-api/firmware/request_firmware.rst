@@ -25,11 +25,6 @@ request_firmware_direct
 .. kernel-doc:: drivers/base/firmware_class.c
    :functions: request_firmware_direct
 
-request_firmware_into_buf
--------------------------
-.. kernel-doc:: drivers/base/firmware_class.c
-   :functions: request_firmware_into_buf
-
 Asynchronous firmware requests
 ==============================
 

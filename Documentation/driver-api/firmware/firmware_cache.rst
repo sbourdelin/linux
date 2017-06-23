@@ -24,7 +24,7 @@ root filesystem mounts.
 Some implementation details about the firmware cache setup:
 
 * The firmware cache is setup by adding a devres entry for each device that
-  uses all synchronous call except :c:func:`request_firmware_into_buf`.
+  uses a synchronous call.
 
 * If an asynchronous call is used the firmware cache is only set up for a
   device if if the second argument (uevent) to request_firmware_nowait() is

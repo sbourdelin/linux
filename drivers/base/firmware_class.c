@@ -196,7 +196,6 @@ static int __fw_state_check(struct fw_state *fw_st, enum fw_status status)
 #define FW_OPT_FALLBACK		0
 #endif
 #define FW_OPT_NO_WARN	(1U << 3)
-#define FW_OPT_NOCACHE	(1U << 4)
 
 struct firmware_cache {
 	/* firmware_buf instance will be added into the below list */
@@ -1143,16 +1142,14 @@ static int assign_firmware_buf(struct firmware *fw, struct device *device,
 	 * should be fixed in devres or driver core.
 	 */
 	/* don't cache firmware handled without uevent */
-	if (device && (opt_flags & FW_OPT_UEVENT) &&
-	    !(opt_flags & FW_OPT_NOCACHE))
+	if (device && (opt_flags & FW_OPT_UEVENT))
 		fw_add_devm_name(device, buf->fw_id);
 
 	/*
 	 * After caching firmware image is started, let it piggyback
 	 * on request firmware.
 	 */
-	if (!(opt_flags & FW_OPT_NOCACHE) &&
-	    buf->fwc->state == FW_LOADER_START_CACHE) {
+	if (buf->fwc->state == FW_LOADER_START_CACHE) {
 		if (fw_cache_piggyback_on_request(buf->fw_id))
 			kref_get(&buf->ref);
 	}
@@ -1290,36 +1287,6 @@ int request_firmware_direct(const struct firmware **firmware_p,
 	return ret;
 }
 EXPORT_SYMBOL_GPL(request_firmware_direct);
-
-/**
- * request_firmware_into_buf - load firmware into a previously allocated buffer
- * @firmware_p: pointer to firmware image
- * @name: name of firmware file
- * @device: device for which firmware is being loaded and DMA region allocated
- * @buf: address of buffer to load firmware into
- * @size: size of buffer
- *
- * This function works pretty much like request_firmware(), but it doesn't
- * allocate a buffer to hold the firmware data. Instead, the firmware
- * is loaded directly into the buffer pointed to by @buf and the @firmware_p
- * data member is pointed at @buf.
- *
- * This function doesn't cache firmware either.
- */
-int
-request_firmware_into_buf(const struct firmware **firmware_p, const char *name,
-			  struct device *device, void *buf, size_t size)
-{
-	int ret;
-
-	__module_get(THIS_MODULE);
-	ret = _request_firmware(firmware_p, name, device, buf, size,
-				FW_OPT_UEVENT | FW_OPT_FALLBACK |
-				FW_OPT_NOCACHE);
-	module_put(THIS_MODULE);
-	return ret;
-}
-EXPORT_SYMBOL(request_firmware_into_buf);
 
 /**
  * release_firmware: - release the resource associated with a firmware image

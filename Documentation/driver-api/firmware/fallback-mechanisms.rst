@@ -38,8 +38,7 @@ fallback mechanism:
 * Race against access with the root filesystem upon bootup.
 
 * Races upon resume from suspend. This is resolved by the firmware cache, but
-  the firmware cache is only supported if you use uevents, and its not
-  supported for request_firmware_into_buf().
+  the firmware cache is only supported if you use uevents.
 
 * Firmware is not accessible through typical means:
         * It cannot be installed into the root filesystem
