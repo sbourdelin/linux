@@ -923,10 +923,8 @@ static int aac_eh_lun_reset(struct scsi_cmnd * cmd)
  *	@scsi_cmd:	SCSI command block causing the reset
  *
  */
-static int aac_eh_reset(struct scsi_cmnd* cmd)
+static int aac_eh_reset(struct Scsi_Host * host)
 {
-	struct scsi_device * dev = cmd->device;
-	struct Scsi_Host * host = dev->host;
 	struct aac_dev * aac = (struct aac_dev *)host->hostdata;
 	int status = 0;
 	int count;

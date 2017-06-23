@@ -986,11 +986,11 @@ static void imm_reset_pulse(unsigned int base)
 	w_ctr(base, 0x04);
 }
 
-static int imm_reset(struct scsi_cmnd *cmd)
+static int imm_reset(struct Scsi_Host *shost)
 {
-	imm_struct *dev = imm_dev(cmd->device->host);
+	imm_struct *dev = imm_dev(shost);
 
-	if (cmd->SCp.phase)
+	if (dev->cur_cmd->SCp.phase)
 		imm_disconnect(dev);
 	dev->cur_cmd = NULL;	/* Forget the problem */
 
@@ -1106,7 +1106,6 @@ static struct scsi_host_template imm_template = {
 	.name			= "Iomega VPI2 (imm) interface",
 	.queuecommand		= imm_queuecommand,
 	.eh_abort_handler	= imm_abort,
-	.eh_bus_reset_handler	= imm_reset,
 	.eh_host_reset_handler	= imm_reset,
 	.bios_param		= imm_biosparam,
 	.this_id		= 7,

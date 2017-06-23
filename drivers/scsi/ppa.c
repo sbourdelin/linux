@@ -857,11 +857,11 @@ static void ppa_reset_pulse(unsigned int base)
 	w_ctr(base, 0xc);
 }
 
-static int ppa_reset(struct scsi_cmnd *cmd)
+static int ppa_reset(struct Scsi_Host *shost)
 {
-	ppa_struct *dev = ppa_dev(cmd->device->host);
+	ppa_struct *dev = ppa_dev(shost);
 
-	if (cmd->SCp.phase)
+	if (dev->cur_cmd->SCp.phase)
 		ppa_disconnect(dev);
 	dev->cur_cmd = NULL;	/* Forget the problem */
 
@@ -970,7 +970,6 @@ static struct scsi_host_template ppa_template = {
 	.name			= "Iomega VPI0 (ppa) interface",
 	.queuecommand		= ppa_queuecommand,
 	.eh_abort_handler	= ppa_abort,
-	.eh_bus_reset_handler	= ppa_reset,
 	.eh_host_reset_handler	= ppa_reset,
 	.bios_param		= ppa_biosparam,
 	.this_id		= -1,

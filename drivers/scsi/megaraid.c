@@ -1887,13 +1887,13 @@ megaraid_abort(Scsi_Cmnd *cmd)
 
 
 static int
-megaraid_reset(struct scsi_cmnd *cmd)
+megaraid_reset(struct Scsi_Host *shost)
 {
 	adapter_t	*adapter;
 	megacmd_t	mc;
 	int		rval;
 
-	adapter = (adapter_t *)cmd->device->host->hostdata;
+	adapter = (adapter_t *)shost->hostdata;
 
 #if MEGA_HAVE_CLUSTERING
 	mc.cmd = MEGA_CLUSTER_CMD;
@@ -1909,7 +1909,7 @@ megaraid_reset(struct scsi_cmnd *cmd)
 
 	spin_lock_irq(&adapter->lock);
 
-	rval =  megaraid_abort_and_reset(adapter, cmd, SCB_RESET);
+	rval =  megaraid_abort_and_reset(adapter, NULL, SCB_RESET);
 
 	/*
 	 * This is required here to complete any completed requests
@@ -1948,7 +1948,7 @@ megaraid_abort_and_reset(adapter_t *adapter, Scsi_Cmnd *cmd, int aor)
 
 		scb = list_entry(pos, scb_t, list);
 
-		if (scb->cmd == cmd) { /* Found command */
+		if (!cmd || scb->cmd == cmd) { /* Found command */
 
 			scb->state |= aor;
 
@@ -1977,7 +1977,7 @@ megaraid_abort_and_reset(adapter_t *adapter, Scsi_Cmnd *cmd, int aor)
 					"%s-[%x], driver owner\n",
 					(aor==SCB_ABORT) ? "ABORTING":"RESET",
 					scb->idx);
-
+				cmd = scb->cmd;
 				mega_free_scb(adapter, scb);
 
 				if( aor == SCB_ABORT ) {
@@ -4180,8 +4180,6 @@ static struct scsi_host_template megaraid_template = {
 	.cmd_per_lun			= DEF_CMD_PER_LUN,
 	.use_clustering			= ENABLE_CLUSTERING,
 	.eh_abort_handler		= megaraid_abort,
-	.eh_device_reset_handler	= megaraid_reset,
-	.eh_bus_reset_handler		= megaraid_reset,
 	.eh_host_reset_handler		= megaraid_reset,
 	.no_write_same			= 1,
 };

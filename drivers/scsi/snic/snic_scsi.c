@@ -2230,11 +2230,12 @@ dev_rst_end:
  * snic_issue_hba_reset : Queues FW Reset Request.
  */
 static int
-snic_issue_hba_reset(struct snic *snic, struct scsi_cmnd *sc)
+snic_issue_hba_reset(struct snic *snic)
 {
 	struct snic_req_info *rqi = NULL;
 	struct snic_host_req *req = NULL;
 	spinlock_t *io_lock = NULL;
+	struct scsi_cmnd snic_reset_cmd, *sc;
 	DECLARE_COMPLETION_ONSTACK(wait);
 	unsigned long flags;
 	int ret = -ENOMEM;
@@ -2246,18 +2247,15 @@ snic_issue_hba_reset(struct snic *snic, struct scsi_cmnd *sc)
 		goto hba_rst_end;
 	}
 
-	if (snic_cmd_tag(sc) == SCSI_NO_TAG) {
-		memset(scsi_cmd_priv(sc), 0,
-			sizeof(struct snic_internal_io_state));
-		SNIC_HOST_INFO(snic->shost, "issu_hr:Host reset thru ioctl.\n");
-		rqi->sc = sc;
-	}
+	sc = &snic_reset_cmd;
+	memset(scsi_cmd_priv(sc), 0,
+	       sizeof(struct snic_internal_io_state));
+	rqi->sc = sc;
 
 	req = rqi_to_req(rqi);
 
-	io_lock = snic_io_lock_hash(snic, sc);
+	io_lock = snic_io_lock_tag(snic, SCSI_NO_TAG);
 	spin_lock_irqsave(io_lock, flags);
-	SNIC_BUG_ON(CMD_SP(sc) != NULL);
 	CMD_STATE(sc) = SNIC_IOREQ_PENDING;
 	CMD_SP(sc) = (char *) rqi;
 	CMD_FLAGS(sc) |= SNIC_IO_INITIALIZED;
@@ -2265,7 +2263,7 @@ snic_issue_hba_reset(struct snic *snic, struct scsi_cmnd *sc)
 	spin_unlock_irqrestore(io_lock, flags);
 
 	/* Initialize Request */
-	snic_io_hdr_enc(&req->hdr, SNIC_REQ_HBA_RESET, 0, snic_cmd_tag(sc),
+	snic_io_hdr_enc(&req->hdr, SNIC_REQ_HBA_RESET, 0, SCSI_NO_TAG,
 			snic->config.hid, 0, (ulong) rqi);
 
 	req->u.reset.flags = 0;
@@ -2327,12 +2325,16 @@ hba_rst_end:
 } /* end of snic_issue_hba_reset */
 
 int
-snic_reset(struct Scsi_Host *shost, struct scsi_cmnd *sc)
+snic_reset(struct Scsi_Host *shost)
 {
 	struct snic *snic = shost_priv(shost);
 	enum snic_state sv_state;
 	unsigned long flags;
 	int ret = FAILED;
+	u32 start_time  = jiffies;
+
+	SNIC_SCSI_DBG(shost,
+		      "host reset\n");
 
 	/* Set snic state as SNIC_FWRESET*/
 	sv_state = snic_get_state(snic);
@@ -2356,7 +2358,7 @@ snic_reset(struct Scsi_Host *shost, struct scsi_cmnd *sc)
 	while (atomic_read(&snic->ios_inflight))
 		schedule_timeout(msecs_to_jiffies(1));
 
-	ret = snic_issue_hba_reset(snic, sc);
+	ret = snic_issue_hba_reset(snic);
 	if (ret) {
 		SNIC_HOST_ERR(shost,
 			      "reset:Host Reset Failed w/ err %d.\n",
@@ -2373,36 +2375,11 @@ snic_reset(struct Scsi_Host *shost, struct scsi_cmnd *sc)
 	ret = SUCCESS;
 
 reset_end:
+	SNIC_TRC(shost->host_no, SCSI_NO_TAG, 0,
+		 jiffies_to_msecs(jiffies - start_time),
+		 0, 0, 0);
 	return ret;
 } /* end of snic_reset */
-
-/*
- * SCSI Error handling calls driver's eh_host_reset if all prior
- * error handling levels return FAILED.
- *
- * Host Reset is the highest level of error recovery. If this fails, then
- * host is offlined by SCSI.
- */
-int
-snic_host_reset(struct scsi_cmnd *sc)
-{
-	struct Scsi_Host *shost = sc->device->host;
-	u32 start_time  = jiffies;
-	int ret = FAILED;
-
-	SNIC_SCSI_DBG(shost,
-		      "host reset:sc %p sc_cmd 0x%x req %p tag %d flags 0x%llx\n",
-		      sc, sc->cmnd[0], sc->request,
-		      snic_cmd_tag(sc), CMD_FLAGS(sc));
-
-	ret = snic_reset(shost, sc);
-
-	SNIC_TRC(shost->host_no, snic_cmd_tag(sc), (ulong) sc,
-		 jiffies_to_msecs(jiffies - start_time),
-		 0, SNIC_TRC_CMD(sc), SNIC_TRC_CMD_STATE_FLAGS(sc));
-
-	return ret;
-} /* end of snic_host_reset */
 
 /*
  * snic_cmpl_pending_tmreq : Caller should hold io_lock
