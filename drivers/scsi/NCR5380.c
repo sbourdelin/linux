@@ -2296,24 +2296,24 @@ out:
 
 
 /**
- * NCR5380_bus_reset - reset the SCSI bus
+ * NCR5380_host_reset - reset the SCSI host
  * @cmd: SCSI command undergoing EH
  *
  * Returns SUCCESS
  */
 
-static int NCR5380_bus_reset(struct scsi_cmnd *cmd)
+static int NCR5380_host_reset(struct scsi_cmnd *cmd)
 {
 	struct Scsi_Host *instance = cmd->device->host;
 	struct NCR5380_hostdata *hostdata = shost_priv(instance);
 	int i;
 	unsigned long flags;
-	struct NCR5380_cmd *ncmd;
+	struct NCR5380_cmd *ncmd, *tmp;
 
 	spin_lock_irqsave(&hostdata->lock, flags);
 
 #if (NDEBUG & NDEBUG_ANY)
-	scmd_printk(KERN_INFO, cmd, __func__);
+	shost_printk(KERN_INFO, instance, __func__);
 #endif
 	NCR5380_dprint(NDEBUG_ANY, instance);
 	NCR5380_dprint_phase(NDEBUG_ANY, instance);
@@ -2331,7 +2331,10 @@ static int NCR5380_bus_reset(struct scsi_cmnd *cmd)
 	 * commands!
 	 */
 
-	if (list_del_cmd(&hostdata->unissued, cmd)) {
+	list_for_each_entry_safe(ncmd, tmp, &hostdata->unissued, list) {
+		struct scsi_cmnd *cmd = NCR5380_to_scmd(ncmd);
+
+		list_del_init(&ncmd->list);
 		cmd->result = DID_RESET << 16;
 		cmd->scsi_done(cmd);
 	}
