@@ -591,6 +591,95 @@ int iomap_fiemap(struct inode *inode, struct fiemap_extent_info *fi,
 }
 EXPORT_SYMBOL_GPL(iomap_fiemap);
 
+static loff_t
+iomap_seek_hole_actor(struct inode *inode, loff_t offset, loff_t length,
+		      void *data, struct iomap *iomap)
+{
+	if (iomap->type == IOMAP_HOLE)
+		goto found;
+	length = iomap->offset + iomap->length - offset;
+	if (iomap->type != IOMAP_UNWRITTEN)
+		return length;
+	offset = page_cache_seek_hole_data(inode, offset, length, SEEK_HOLE);
+	if (offset < 0)
+		return length;
+found:
+	*(loff_t *)data = offset;
+	return 0;
+}
+
+static loff_t
+iomap_seek_data_actor(struct inode *inode, loff_t offset, loff_t length,
+		      void *data, struct iomap *iomap)
+{
+	if (iomap->type != IOMAP_HOLE && iomap->type != IOMAP_UNWRITTEN)
+		goto found;
+	length = iomap->offset + iomap->length - offset;
+	if (iomap->type != IOMAP_UNWRITTEN)
+		return length;
+	offset = page_cache_seek_hole_data(inode, offset, length, SEEK_DATA);
+	if (offset < 0)
+		return length;
+found:
+	*(loff_t *)data = offset;
+	return 0;
+}
+
+/*
+ * Filesystem helper for lseek SEEK_HOLE / SEEK_DATA.
+ */
+loff_t
+iomap_seek_hole_data(struct inode *inode, loff_t offset,
+		     int whence, const struct iomap_ops *ops)
+{
+	static loff_t (*actor)(struct inode *, loff_t, loff_t, void *,
+			       struct iomap *);
+	loff_t size = i_size_read(inode);
+	loff_t length;
+
+	/* Nothing to be found beyond the end of the file. */
+	if (offset >= size)
+		return -ENXIO;
+	length = size - offset;
+
+	switch(whence) {
+	case SEEK_HOLE:
+		actor = iomap_seek_hole_actor;
+		break;
+
+	case SEEK_DATA:
+		actor = iomap_seek_data_actor;
+		break;
+	}
+
+	while (length > 0) {
+		loff_t ret;
+
+		ret = iomap_apply(inode, offset, length, IOMAP_REPORT, ops,
+				  &offset, actor);
+		if (ret <= 0) {
+			if (ret < 0)
+				return ret;
+			break;
+		}
+		offset += ret;
+		length -= ret;
+	}
+
+	if (length <= 0) {
+		/* There is an implicit hole at the end of the file. */
+		if (whence != SEEK_HOLE)
+			return -ENXIO;
+
+		/* The last segment can extend beyond the end of the file. */
+		if (offset > size)
+			offset = size;
+	}
+
+	return offset;
+}
+EXPORT_SYMBOL_GPL(iomap_seek_hole_data);
+
 /*
  * Private flags for iomap_dio, must not overlap with the public ones in
  * iomap.h:
