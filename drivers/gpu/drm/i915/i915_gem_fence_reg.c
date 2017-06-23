@@ -240,7 +240,7 @@ static int fence_update(struct drm_i915_fence_reg *fence,
 		/* Ensure that all userspace CPU access is completed before
 		 * stealing the fence.
 		 */
-		i915_gem_release_mmap(fence->vma->obj);
+		i915_vma_revoke_mmap(fence->vma);
 
 		fence->vma->fence = NULL;
 		fence->vma = NULL;
@@ -379,7 +379,7 @@ void i915_gem_revoke_fences(struct drm_i915_private *dev_priv)
 		struct drm_i915_fence_reg *fence = &dev_priv->fence_regs[i];
 
 		if (fence->vma)
-			i915_gem_release_mmap(fence->vma->obj);
+			i915_vma_revoke_mmap(fence->vma);
 	}
 }
 
