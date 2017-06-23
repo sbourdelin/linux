@@ -1,0 +1,41 @@
+Maxim Integrated DS4422/DS4424 DAC device driver
+
+Required properties:
+	- compatible: Must be "maxim,ds4422" or "maxim,ds4424"
+	- reg: Should contain the DAC I2C address
+	- min_rfs, max_rfs: In order to get the correct processed data values,
+		   these resistor values should be changed to the correct values
+		   that match the user's system resistor values for RFS0 to RFS1.
+		   Resistance values for rfs_resistor are listed in 100 Ohm units;
+		   ie, 800 is 80K. Acceptable RFS values are 40K to 160K.
+	- ifs_scale: 61000*100 = 6100000 = 100,000,000 * .976/16
+	- max_picoamp: Should contain DAC maximum pico amper value.
+	- rfs_resistor: Should contain reference resistor
+	- iio map: Should contain IIO Map info
+
+Optional properties:
+	- vcc-supply: Power supply us optional. If not defined, driver will ignore it.
+
+Example:
+	ds4224@10 {
+		compatible = "maxim,ds4424";
+		reg = <0x10>; /* When A0, A1 pins are ground */
+		vcc-supply = "dac_vcc_3v3";
+		max-picoamp = <200000000>; /* 200uA */
+		ifs-scale = <61000>;
+		/* In order to get the correct processed data values,
+		   these resistor values should be changed to the correct values that match the
+		   user's system resistor values for RFS0 to RFS1.
+		   Resistance values for rfs_resistor are listed in 100 Ohm units;
+		   ie, 800 is 80K. Acceptable RFS values are 40K to 160K.
+		*/
+		min-rfs = <400>;
+		max-rfs = <1600>;
+		rfs-resistors = <400 800 1000 1600>;
+		dac-iio-map =
+		/*	consumer_dev_name, consumer_channel, adc_channel_label */
+			"ds4424_dac-consumer-dev_name-1", "ds4424_dac1", "OUT1",
+			"ds4424_dac-consumer-dev_name-2", "ds4424_dac2", "OUT2",
+			"ds4424_dac-consumer-dev_name-3", "ds4424_dac3", "OUT3",
+			"ds4424_dac-consumer-dev_name-4", "ds4424_dac4", "OUT4";
+	};
