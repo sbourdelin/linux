@@ -1,0 +1,74 @@
+Cavium ThunderX and OcteonTx Performance Monitoring Unit (PMU)
+==============================================================
+
+Cavium SoCs contain various system devices such as L2 caches, processor
+interconnect and memory controllers. Unfortunately the PMU counters
+are not following a common design so each device has a slightly different
+approach how to control and use the PMU counters.
+
+Common properties of all devices carrying PMU counters:
+- The devices are PCI devices and the counters are embedded somewhere
+  in the PCI register space.
+- All counters are 64 bit wide.
+- There are no overflow interrupts (unnecessary because of the 64 bit wide counters).
+
+Properties depending on the device type:
+- How to start/stop the counters
+- Programmable vs. fixed purpose counters
+- Stoppable vs. always running counters
+- Independent vs. grouped counters
+- Read-only vs. writable counters
+- PCI device to PMU group relationship
+
+
+Devices with PMU counters
+-------------------------
+
+Memory controller (LMC):
+- one PCI device per LMC
+- fixed-purpose counters
+- always running counters without start/stop/reset control
+- read-only counters
+
+CCPI interface controller (OCX) Transmit link (TLK) counters:
+- writable counters
+- only one PCI device exposes multiple TLK units (3 units on T88)
+- start/stop control per unit
+- only present on multi-socket systems
+
+PMU (perf) driver
+-----------------
+
+The cavium-pmu driver registers several perf PMU drivers. Each of the perf
+driver provides description of its available events and configuration options
+in sysfs, see /sys/devices/<lmcX/ocx_tlkX>/.
+
+The "format" directory describes format of the config (event ID),
+The "events" directory shows the names of the events and provides configuration
+templates for all supported event types that can be used with perf tool. For
+example, "lmc0/dclk_cnt/" is an equivalent of "lmc0/config=2/".
+
+Each perf driver also provides a "cpumask" sysfs attribute, which contains a
+single CPU ID of the processor which will be used to handle all the PMU events.
+
+Example for perf tool use:
+
+ / # perf list | grep -e lmc
+   lmc0/bank_conflict1/                               [Kernel PMU event]
+   lmc0/bank_conflict2/                               [Kernel PMU event]
+   lmc0/dclk_cnt/                                     [Kernel PMU event]
+   lmc0/ifb_cnt/                                      [Kernel PMU event]
+   lmc0/ops_cnt/                                      [Kernel PMU event]
+
+ / # perf stat -a -e lmc0/ops_cnt/,lmc0/dclk_cnt/ -- sleep 1
+
+   Performance counter stats for 'system wide':
+
+             176,133      lmc0/ops_cnt/                                               
+         670,243,653      lmc0/dclk_cnt/                                              
+
+         1.005479295 seconds time elapsed
+
+The driver does not support sampling, therefore "perf record" will
+not work. System wide mode ("-a") must be used as per-task (without "-a")
+perf sessions are not supported.
