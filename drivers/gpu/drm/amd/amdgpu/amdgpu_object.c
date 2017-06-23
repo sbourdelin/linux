@@ -337,9 +337,15 @@ static void amdgpu_bo_move_vis_vram_work_func(struct work_struct *work)
 	struct amdgpu_bo *bo = container_of(work, struct amdgpu_bo,
 					    move_vis_vram_work);
 	struct amdgpu_device *adev = amdgpu_ttm_adev(bo->tbo.bdev);
+	struct ttm_placement placement;
+	struct ttm_mem_reg mem;
+	struct ttm_mem_type_manager *man = &bo->tbo.bdev->man[TTM_PL_VRAM];
 	u64 initial_bytes_moved, bytes_moved;
 	uint32_t old_mem;
+	uint32_t new_flags;
 	int r;
+
+	mem.mm_node = NULL;
 
 	spin_lock(&adev->mm_stats.lock);
 	if (adev->mm_stats.accum_us_vis <= 0 ||
@@ -359,17 +365,97 @@ static void amdgpu_bo_move_vis_vram_work_func(struct work_struct *work)
 		goto out;
 
 	amdgpu_ttm_placement_from_domain(bo, AMDGPU_GEM_DOMAIN_VRAM);
+	placement = bo->placement;
+
+	if (ttm_bo_mem_compat(&placement, &bo->tbo.mem, &new_flags))
+		goto out;
+
+	mem.num_pages = bo->tbo.num_pages;
+	mem.size = mem.num_pages << PAGE_SHIFT;
+	mem.page_alignment = bo->tbo.mem.page_alignment;
+	mem.bus.io_reserved_vm = false;
+	mem.bus.io_reserved_count = 0;
+
+	placement.num_busy_placement = 0;
+
 	old_mem = bo->tbo.mem.mem_type;
 	initial_bytes_moved = atomic64_read(&adev->num_bytes_moved);
-	ttm_bo_validate(&bo->tbo, &bo->placement, false, false);
+
+	r = ttm_bo_mem_space(&bo->tbo, &placement, &mem, false, false);
+	if (r == -ENOMEM) {
+		/* Unreserve the BO while we make space for it */
+		struct ttm_bo_device *bdev = bo->tbo.bdev;
+
+		amdgpu_bo_unreserve(bo);
+		do {
+			r = (*man->func->get_node)(man, NULL,
+						   &placement.placement[0],
+						   &mem);
+			if (unlikely(r != 0))
+				return;
+
+			if (mem.mm_node)
+				break;
+
+			r = ttm_mem_evict_first(bdev, TTM_PL_VRAM,
+						&placement.placement[0], false,
+						false);
+			if (unlikely(r != 0))
+				return;
+
+			/* Sleep to give other threads the opportunity to grab
+			 * lru_lock
+			 */
+			msleep(20);
+		} while (1);
+
+		if (!kref_read(&bo->tbo.kref)) {
+			/* The BO was deleted since we last held it. Abort. */
+			if (mem.mm_node)
+				(*man->func->put_node)(man, &mem);
+			return;
+		}
+
+		r = amdgpu_bo_reserve(bo, true);
+		if (r != 0) {
+			if (mem.mm_node)
+				(*man->func->put_node)(man, &mem);
+			return;
+		}
+
+		mem.mem_type = TTM_PL_VRAM;
+
+		r = ttm_bo_add_move_fence(&bo->tbo, man, &mem);
+		if (unlikely(r != 0))
+			goto out;
+
+		mem.placement = TTM_PL_FLAG_VRAM;
+		mem.placement |= (placement.placement[0].flags &
+				  man->available_caching);
+		mem.placement |= ttm_bo_select_caching(man,
+						       bo->tbo.mem.placement,
+						       mem.placement);
+		ttm_flag_masked(&mem.placement, placement.placement[0].flags,
+				~TTM_PL_MASK_MEMTYPE);
+	} else if (unlikely(r != 0)) {
+		goto out;
+	}
+
+	r = ttm_bo_handle_move_mem(&bo->tbo, &mem, false, false, false);
+
 	bytes_moved = atomic64_read(&adev->num_bytes_moved) -
 				    initial_bytes_moved;
 	amdgpu_cs_report_moved_bytes(adev, bytes_moved, bytes_moved);
+
+	if (unlikely(r != 0))
+		goto out;
 
 	if (bo->tbo.mem.mem_type != old_mem)
 		bo->last_cs_move_jiffies = jiffies;
 
 out:
+	if (r && mem.mm_node)
+		ttm_bo_mem_put(&bo->tbo, &mem);
 	amdgpu_bo_unreserve(bo);
 }
 

@@ -730,6 +730,11 @@ extern int ttm_bo_mem_space(struct ttm_buffer_object *bo,
 				bool interruptible,
 				bool no_wait_gpu);
 
+extern int ttm_mem_evict_first(struct ttm_bo_device *bdev,
+			       uint32_t mem_type,
+			       const struct ttm_place *place,
+			       bool interruptible, bool no_wait_gpu);
+
 extern void ttm_bo_mem_put(struct ttm_buffer_object *bo,
 			   struct ttm_mem_reg *mem);
 extern void ttm_bo_mem_put_locked(struct ttm_buffer_object *bo,
@@ -739,6 +744,14 @@ extern void ttm_bo_global_release(struct drm_global_reference *ref);
 extern int ttm_bo_global_init(struct drm_global_reference *ref);
 
 extern int ttm_bo_device_release(struct ttm_bo_device *bdev);
+
+extern int ttm_bo_handle_move_mem(struct ttm_buffer_object *bo,
+				  struct ttm_mem_reg *mem,
+				  bool evict, bool interruptible,
+				  bool no_wait_gpu);
+extern int ttm_bo_add_move_fence(struct ttm_buffer_object *bo,
+				 struct ttm_mem_type_manager *man,
+				 struct ttm_mem_reg *mem);
 
 /**
  * ttm_bo_device_init

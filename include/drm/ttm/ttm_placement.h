@@ -105,4 +105,10 @@ struct ttm_placement {
 	const struct ttm_place	*busy_placement;
 };
 
+struct ttm_mem_type_manager;
+
+extern uint32_t ttm_bo_select_caching(struct ttm_mem_type_manager *man,
+				      uint32_t cur_placement,
+				      uint32_t proposed_placement);
+
 #endif

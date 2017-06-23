@@ -268,10 +268,10 @@ static int ttm_bo_add_ttm(struct ttm_buffer_object *bo, bool zero_alloc)
 	return ret;
 }
 
-static int ttm_bo_handle_move_mem(struct ttm_buffer_object *bo,
-				  struct ttm_mem_reg *mem,
-				  bool evict, bool interruptible,
-				  bool no_wait_gpu)
+int ttm_bo_handle_move_mem(struct ttm_buffer_object *bo,
+			   struct ttm_mem_reg *mem,
+			   bool evict, bool interruptible,
+			   bool no_wait_gpu)
 {
 	struct ttm_bo_device *bdev = bo->bdev;
 	bool old_is_pci = ttm_mem_reg_is_pci(bdev, &bo->mem);
@@ -373,6 +373,7 @@ out_err:
 
 	return ret;
 }
+EXPORT_SYMBOL(ttm_bo_handle_move_mem);
 
 /**
  * Call bo::reserved.
@@ -695,11 +696,11 @@ bool ttm_bo_eviction_valuable(struct ttm_buffer_object *bo,
 }
 EXPORT_SYMBOL(ttm_bo_eviction_valuable);
 
-static int ttm_mem_evict_first(struct ttm_bo_device *bdev,
-				uint32_t mem_type,
-				const struct ttm_place *place,
-				bool interruptible,
-				bool no_wait_gpu)
+int ttm_mem_evict_first(struct ttm_bo_device *bdev,
+			uint32_t mem_type,
+			const struct ttm_place *place,
+			bool interruptible,
+			bool no_wait_gpu)
 {
 	struct ttm_bo_global *glob = bdev->glob;
 	struct ttm_mem_type_manager *man = &bdev->man[mem_type];
@@ -753,6 +754,7 @@ static int ttm_mem_evict_first(struct ttm_bo_device *bdev,
 	kref_put(&bo->list_kref, ttm_bo_release_list);
 	return ret;
 }
+EXPORT_SYMBOL(ttm_mem_evict_first);
 
 void ttm_bo_mem_put(struct ttm_buffer_object *bo, struct ttm_mem_reg *mem)
 {
@@ -766,9 +768,9 @@ EXPORT_SYMBOL(ttm_bo_mem_put);
 /**
  * Add the last move fence to the BO and reserve a new shared slot.
  */
-static int ttm_bo_add_move_fence(struct ttm_buffer_object *bo,
-				 struct ttm_mem_type_manager *man,
-				 struct ttm_mem_reg *mem)
+int ttm_bo_add_move_fence(struct ttm_buffer_object *bo,
+			  struct ttm_mem_type_manager *man,
+			  struct ttm_mem_reg *mem)
 {
 	struct dma_fence *fence;
 	int ret;
@@ -790,6 +792,7 @@ static int ttm_bo_add_move_fence(struct ttm_buffer_object *bo,
 
 	return 0;
 }
+EXPORT_SYMBOL(ttm_bo_add_move_fence);
 
 /**
  * Repeatedly evict memory from the LRU for @mem_type until we create enough
@@ -821,9 +824,9 @@ static int ttm_bo_mem_force_space(struct ttm_buffer_object *bo,
 	return ttm_bo_add_move_fence(bo, man, mem);
 }
 
-static uint32_t ttm_bo_select_caching(struct ttm_mem_type_manager *man,
-				      uint32_t cur_placement,
-				      uint32_t proposed_placement)
+uint32_t ttm_bo_select_caching(struct ttm_mem_type_manager *man,
+			       uint32_t cur_placement,
+			       uint32_t proposed_placement)
 {
 	uint32_t caching = proposed_placement & TTM_PL_MASK_CACHING;
 	uint32_t result = proposed_placement & ~TTM_PL_MASK_CACHING;
@@ -845,6 +848,7 @@ static uint32_t ttm_bo_select_caching(struct ttm_mem_type_manager *man,
 
 	return result;
 }
+EXPORT_SYMBOL(ttm_bo_select_caching);
 
 static bool ttm_bo_mt_compatible(struct ttm_mem_type_manager *man,
 				 uint32_t mem_type,
