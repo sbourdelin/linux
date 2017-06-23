@@ -317,6 +317,7 @@ static int amdgpu_cs_bo_validate(struct amdgpu_cs_parser *p,
 	else
 		domain = bo->allowed_domains;
 
+	amdgpu_bo_clear_cpu_access_required(bo);
 retry:
 	amdgpu_ttm_placement_from_domain(bo, domain);
 	initial_bytes_moved = atomic64_read(&adev->num_bytes_moved);
