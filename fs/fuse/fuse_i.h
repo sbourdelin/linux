@@ -249,6 +249,7 @@ struct fuse_io_priv {
 	size_t size;
 	__u64 offset;
 	bool write;
+	bool should_dirty;
 	int err;
 	struct kiocb *iocb;
 	struct file *file;
@@ -261,6 +262,7 @@ struct fuse_io_priv {
 	.refcnt = KREF_INIT(1),		\
 	.async = 0,			\
 	.file = f,			\
+	.should_dirty = true,           \
 }
 
 /**
