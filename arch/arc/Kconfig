@@ -430,6 +430,11 @@ config LINUX_LINK_BASE
 	  However some customers have peripherals mapped at this addr, so
 	  Linux needs to be scooted a bit.
 	  If you don't know what the above means, leave this setting alone.
+
+config KERNEL_RAM_BASE_ADDRESS
+	hex "Linux ram base address"
+	default LINUX_LINK_BASE
+	help
 	  This needs to match memory start address specified in Device Tree
 
 config HIGHMEM
