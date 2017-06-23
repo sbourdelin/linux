@@ -2845,21 +2845,21 @@ static int nsp32_eh_abort(struct scsi_cmnd *SCpnt)
 	return SUCCESS;
 }
 
-static int nsp32_eh_bus_reset(struct scsi_cmnd *SCpnt)
+static int nsp32_eh_bus_reset(struct Scsi_Host *host, int channel)
 {
-	nsp32_hw_data *data = (nsp32_hw_data *)SCpnt->device->host->hostdata;
-	unsigned int   base = SCpnt->device->host->io_port;
+	nsp32_hw_data *data = (nsp32_hw_data *)host->hostdata;
+	unsigned int   base = host->io_port;
 
-	spin_lock_irq(SCpnt->device->host->host_lock);
+	spin_lock_irq(host->host_lock);
 
-	nsp32_msg(KERN_INFO, "Bus Reset");	
+	nsp32_msg(KERN_INFO, "Bus Reset");
 	nsp32_dbg(NSP32_DEBUG_BUSRESET, "SCpnt=0x%x", SCpnt);
 
 	nsp32_write2(base, IRQ_CONTROL, IRQ_CONTROL_ALL_IRQ_MASK);
 	nsp32_do_bus_reset(data);
 	nsp32_write2(base, IRQ_CONTROL, 0);
 
-	spin_unlock_irq(SCpnt->device->host->host_lock);
+	spin_unlock_irq(host->host_lock);
 	return SUCCESS;	/* SCSI bus reset is succeeded at any time. */
 }
 

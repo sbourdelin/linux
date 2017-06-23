@@ -502,9 +502,9 @@ int qlogicfas408_abort(struct scsi_cmnd *cmd)
  *	the PCMCIA qlogic_stub code. This wants fixing
  */
 
-int qlogicfas408_bus_reset(struct scsi_cmnd *cmd)
+int qlogicfas408_host_reset(struct Scsi_Host *shost)
 {
-	struct qlogicfas408_priv *priv = get_priv_by_cmd(cmd);
+	struct qlogicfas408_priv *priv = get_priv_by_host(shost);
 	unsigned long flags;
 
 	priv->qabort = 2;

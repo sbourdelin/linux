@@ -168,7 +168,7 @@ MODULE_LICENSE("GPL");
 
 STATIC int NCR_700_queuecommand(struct Scsi_Host *h, struct scsi_cmnd *);
 STATIC int NCR_700_abort(struct scsi_cmnd * SCpnt);
-STATIC int NCR_700_bus_reset(struct scsi_cmnd * SCpnt);
+STATIC int NCR_700_bus_reset(struct Scsi_Host *host, int channel);
 STATIC int NCR_700_host_reset(struct Scsi_Host *host);
 STATIC void NCR_700_chip_setup(struct Scsi_Host *host);
 STATIC void NCR_700_chip_reset(struct Scsi_Host *host);
@@ -1938,39 +1938,41 @@ NCR_700_abort(struct scsi_cmnd * SCp)
 }
 
 STATIC int
-NCR_700_bus_reset(struct scsi_cmnd * SCp)
+NCR_700_bus_reset(struct Scsi_Host *shost, int channel)
 {
 	DECLARE_COMPLETION_ONSTACK(complete);
-	struct NCR_700_Host_Parameters *hostdata = 
-		(struct NCR_700_Host_Parameters *)SCp->device->host->hostdata[0];
+	struct NCR_700_Host_Parameters *hostdata =
+		(struct NCR_700_Host_Parameters *)shost->hostdata[0];
+	struct scsi_device *sdev;
 
-	scmd_printk(KERN_INFO, SCp,
-		"New error handler wants BUS reset, cmd %p\n\t", SCp);
-	scsi_print_command(SCp);
+	shost_printk(KERN_INFO, shost,
+		"New error handler wants BUS reset\n");
 
 	/* In theory, eh_complete should always be null because the
 	 * eh is single threaded, but just in case we're handling a
 	 * reset via sg or something */
-	spin_lock_irq(SCp->device->host->host_lock);
+	spin_lock_irq(shost->host_lock);
 	while (hostdata->eh_complete != NULL) {
-		spin_unlock_irq(SCp->device->host->host_lock);
+		spin_unlock_irq(shost->host_lock);
 		msleep_interruptible(100);
-		spin_lock_irq(SCp->device->host->host_lock);
+		spin_lock_irq(shost->host_lock);
 	}
 
 	hostdata->eh_complete = &complete;
-	NCR_700_internal_bus_reset(SCp->device->host);
+	NCR_700_internal_bus_reset(shost);
 
-	spin_unlock_irq(SCp->device->host->host_lock);
+	spin_unlock_irq(shost->host_lock);
 	wait_for_completion(&complete);
-	spin_lock_irq(SCp->device->host->host_lock);
+	spin_lock_irq(shost->host_lock);
 
 	hostdata->eh_complete = NULL;
-	/* Revalidate the transport parameters of the failing device */
-	if(hostdata->fast)
-		spi_schedule_dv_device(SCp->device);
+	/* Revalidate the transport parameters of the attached devices */
+	if(hostdata->fast) {
+		shost_for_each_device(sdev, shost)
+			spi_schedule_dv_device(sdev);
+	}
 
-	spin_unlock_irq(SCp->device->host->host_lock);
+	spin_unlock_irq(shost->host_lock);
 	return SUCCESS;
 }
 
