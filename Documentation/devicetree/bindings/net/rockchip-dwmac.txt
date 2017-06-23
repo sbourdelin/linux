@@ -22,6 +22,7 @@ Required properties:
 	   <&cru SCLK_MACREF_OUT> clock gate for RMII reference clock output
 	   <&cru ACLK_GMAC>: AXI clock gate for GMAC
 	   <&cru PCLK_GMAC>: APB clock gate for GMAC
+	   <&cru MAC_PHY>: clock for internal macphy
  - clock-names: One name for each entry in the clocks property.
  - phy-mode: See ethernet.txt file in the same directory.
  - pinctrl-names: Names corresponding to the numbered pinctrl states.
@@ -35,6 +36,8 @@ Required properties:
  - assigned-clocks: main clock, should be <&cru SCLK_MAC>;
  - assigned-clock-parents = parent of main clock.
    can be <&ext_gmac> or <&cru SCLK_MAC_PLL>.
+ - phy-type: For internal phy, it must be "internal"; For external phy, no need
+   to configure this.
 
 Optional properties:
  - tx_delay: Delay value for TXD timing. Range value is 0~0x7F, 0x30 as default.
