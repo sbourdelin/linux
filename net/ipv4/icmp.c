@@ -97,6 +97,10 @@
 #include <net/inet_common.h>
 #include <net/ip_fib.h>
 #include <net/l3mdev.h>
+#if IS_ENABLED(CONFIG_NF_CONNTRACK)
+#include <net/netfilter/nf_conntrack.h>
+#include <net/netfilter/nf_nat_core.h>
+#endif
 
 /*
  *	Build xmit assembly blocks
@@ -586,6 +590,10 @@ void icmp_send(struct sk_buff *skb_in, int type, int code, __be32 info)
 	u32 mark;
 	struct net *net;
 	struct sock *sk;
+#if IS_ENABLED(CONFIG_NF_CONNTRACK)
+	enum ip_conntrack_info ctinfo;
+	struct nf_conn *ct;
+#endif
 
 	if (!rt)
 		goto out;
@@ -602,6 +610,19 @@ void icmp_send(struct sk_buff *skb_in, int type, int code, __be32 info)
 	    (skb_network_header(skb_in) + sizeof(*iph)) >
 	    skb_tail_pointer(skb_in))
 		goto out;
+
+	/*
+	 * 	If this function is called after the skb has already been
+	 * 	NAT transformed, the ratelimiting will apply to the wrong
+	 * 	saddr, and the reply will will be marked as coming from the
+	 * 	wrong host. So, we fix it up here in case connection tracking
+	 * 	enables that.
+	 */
+#if IS_ENABLED(CONFIG_NF_CONNTRACK)
+	ct = nf_ct_get(skb_in, &ctinfo);
+	if (ct)
+		iph->saddr = ct->tuplehash[0].tuple.src.u3.ip;
+#endif
 
 	/*
 	 *	No replies to physical multicast/broadcast

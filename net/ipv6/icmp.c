@@ -69,6 +69,10 @@
 #include <net/inet_common.h>
 #include <net/dsfield.h>
 #include <net/l3mdev.h>
+#if IS_ENABLED(CONFIG_NF_CONNTRACK)
+#include <net/netfilter/nf_conntrack.h>
+#include <net/netfilter/nf_nat_core.h>
+#endif
 
 #include <linux/uaccess.h>
 
@@ -422,10 +426,27 @@ static void icmp6_send(struct sk_buff *skb, u8 type, u8 code, __u32 info,
 	int len;
 	int err = 0;
 	u32 mark = IP6_REPLY_MARK(net, skb->mark);
+#if IS_ENABLED(CONFIG_NF_CONNTRACK)
+	enum ip_conntrack_info ctinfo;
+	struct nf_conn *ct;
+#endif
 
 	if ((u8 *)hdr < skb->head ||
 	    (skb_network_header(skb) + sizeof(*hdr)) > skb_tail_pointer(skb))
 		return;
+
+	/*
+	 * 	If this function is called after the skb has already been
+	 * 	NAT transformed, the ratelimiting will apply to the wrong
+	 * 	saddr, and the reply will will be marked as coming from the
+	 * 	wrong host. So, we fix it up here in case connection tracking
+	 * 	enables that.
+	 */
+#if IS_ENABLED(CONFIG_NF_CONNTRACK)
+	ct = nf_ct_get(skb, &ctinfo);
+	if (ct)
+		hdr->saddr = ct->tuplehash[0].tuple.src.u3.in6;
+#endif
 
 	/*
 	 *	Make sure we respect the rules
