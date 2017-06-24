@@ -471,6 +471,22 @@ __EXTERN_INLINE void apecs_iowrite32(u32 b, void __iomem *xaddr)
 	*(vuip)addr = b;
 }
 
+__EXTERN_INLINE u64 apecs_ioread64(void __iomem *xaddr)
+{
+	unsigned long addr = (unsigned long) xaddr;
+	if (addr < APECS_DENSE_MEM)
+		addr = ((addr - APECS_IO) << 5) + APECS_IO + 0x78;
+	return *(vulp)addr;
+}
+
+__EXTERN_INLINE void apecs_iowrite64(u64 b, void __iomem *xaddr)
+{
+	unsigned long addr = (unsigned long) xaddr;
+	if (addr < APECS_DENSE_MEM)
+		addr = ((addr - APECS_IO) << 5) + APECS_IO + 0x78;
+	*(vulp)addr = b;
+}
+
 __EXTERN_INLINE void __iomem *apecs_ioportmap(unsigned long addr)
 {
 	return (void __iomem *)(addr + APECS_IO);

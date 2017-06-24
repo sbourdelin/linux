@@ -419,6 +419,22 @@ __EXTERN_INLINE void cia_iowrite32(u32 b, void __iomem *xaddr)
 	*(vuip)addr = b;
 }
 
+__EXTERN_INLINE u64 cia_ioread64(void __iomem *xaddr)
+{
+	unsigned long addr = (unsigned long) xaddr;
+	if (addr < CIA_DENSE_MEM)
+		addr = ((addr - CIA_IO) << 5) + CIA_IO + 0x78;
+	return *(vulp)addr;
+}
+
+__EXTERN_INLINE void cia_iowrite64(u64 b, void __iomem *xaddr)
+{
+	unsigned long addr = (unsigned long) xaddr;
+	if (addr < CIA_DENSE_MEM)
+		addr = ((addr - CIA_IO) << 5) + CIA_IO + 0x78;
+	*(vulp)addr = b;
+}
+
 __EXTERN_INLINE void __iomem *cia_ioportmap(unsigned long addr)
 {
 	return (void __iomem *)(addr + CIA_IO);

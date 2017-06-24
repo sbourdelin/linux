@@ -48,10 +48,12 @@ struct alpha_machine_vector
 	unsigned int (*mv_ioread8)(void __iomem *);
 	unsigned int (*mv_ioread16)(void __iomem *);
 	unsigned int (*mv_ioread32)(void __iomem *);
+	u64 (*mv_ioread64)(void __iomem *);
 
 	void (*mv_iowrite8)(u8, void __iomem *);
 	void (*mv_iowrite16)(u16, void __iomem *);
 	void (*mv_iowrite32)(u32, void __iomem *);
+	void (*mv_iowrite64)(u64, void __iomem *);
 
 	u8 (*mv_readb)(const volatile void __iomem *);
 	u16 (*mv_readw)(const volatile void __iomem *);

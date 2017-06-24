@@ -158,6 +158,7 @@ static inline void generic_##NAME(TYPE b, QUAL void __iomem *addr)	\
 REMAP1(unsigned int, ioread8, /**/)
 REMAP1(unsigned int, ioread16, /**/)
 REMAP1(unsigned int, ioread32, /**/)
+REMAP1(u64, ioread64, /**/)
 REMAP1(u8, readb, const volatile)
 REMAP1(u16, readw, const volatile)
 REMAP1(u32, readl, const volatile)
@@ -166,6 +167,7 @@ REMAP1(u64, readq, const volatile)
 REMAP2(u8, iowrite8, /**/)
 REMAP2(u16, iowrite16, /**/)
 REMAP2(u32, iowrite32, /**/)
+REMAP2(u64, iowrite64, /**/)
 REMAP2(u8, writeb, volatile)
 REMAP2(u16, writew, volatile)
 REMAP2(u32, writel, volatile)
@@ -384,6 +386,19 @@ extern inline void iowrite32(u32 b, void __iomem *addr)
 	mb();
 }
 
+extern inline u64 ioread64(void __iomem *addr)
+{
+	unsigned int ret = IO_CONCAT(__IO_PREFIX,ioread64)(addr);
+	mb();
+	return ret;
+}
+
+extern inline void iowrite64(u64 b, void __iomem *addr)
+{
+	IO_CONCAT(__IO_PREFIX,iowrite64)(b, addr);
+	mb();
+}
+
 extern inline u32 inl(unsigned long port)
 {
 	return ioread32(ioport_map(port, 4));
@@ -392,6 +407,16 @@ extern inline u32 inl(unsigned long port)
 extern inline void outl(u32 b, unsigned long port)
 {
 	iowrite32(b, ioport_map(port, 4));
+}
+
+extern inline u64 inq(unsigned long port)
+{
+	return ioread64(ioport_map(port, 8));
+}
+
+extern inline void outq(u64 b, unsigned long port)
+{
+	iowrite64(b, ioport_map(port, 8));
 }
 #endif
 
@@ -493,8 +518,10 @@ extern inline void writeq(u64 b, volatile void __iomem *addr)
 
 #define ioread16be(p) be16_to_cpu(ioread16(p))
 #define ioread32be(p) be32_to_cpu(ioread32(p))
+#define ioread64be(p) be64_to_cpu(ioread64(p))
 #define iowrite16be(v,p) iowrite16(cpu_to_be16(v), (p))
 #define iowrite32be(v,p) iowrite32(cpu_to_be32(v), (p))
+#define iowrite64be(v,p) iowrite64(cpu_to_be64(v), (p))
 
 #define inb_p		inb
 #define inw_p		inw

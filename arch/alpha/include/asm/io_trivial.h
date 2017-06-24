@@ -37,10 +37,22 @@ IO_CONCAT(__IO_PREFIX,ioread32)(void __iomem *a)
 	return *(volatile u32 __force *)a;
 }
 
+__EXTERN_INLINE u64
+IO_CONCAT(__IO_PREFIX,ioread64)(void __iomem *a)
+{
+	return *(volatile u64 __force *)a;
+}
+
 __EXTERN_INLINE void
 IO_CONCAT(__IO_PREFIX,iowrite32)(u32 b, void __iomem *a)
 {
 	*(volatile u32 __force *)a = b;
+}
+
+__EXTERN_INLINE void
+IO_CONCAT(__IO_PREFIX,iowrite64)(u64 b, void __iomem *a)
+{
+	*(volatile u64 __force *)a = b;
 }
 #endif
 

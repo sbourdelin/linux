@@ -317,6 +317,22 @@ __EXTERN_INLINE void lca_iowrite32(u32 b, void __iomem *xaddr)
 	*(vuip)addr = b;
 }
 
+__EXTERN_INLINE u64 lca_ioread64(void __iomem *xaddr)
+{
+	unsigned long addr = (unsigned long) xaddr;
+	if (addr < LCA_DENSE_MEM)
+		addr = ((addr - LCA_IO) << 5) + LCA_IO + 0x78;
+	return *(vulp)addr;
+}
+
+__EXTERN_INLINE void lca_iowrite64(u64 b, void __iomem *xaddr)
+{
+	unsigned long addr = (unsigned long) xaddr;
+	if (addr < LCA_DENSE_MEM)
+		addr = ((addr - LCA_IO) << 5) + LCA_IO + 0x78;
+	*(vulp)addr = b;
+}
+
 __EXTERN_INLINE void __iomem *lca_ioportmap(unsigned long addr)
 {
 	return (void __iomem *)(addr + LCA_IO);

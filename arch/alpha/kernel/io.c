@@ -34,6 +34,13 @@ unsigned int ioread32(void __iomem *addr)
 	return ret;
 }
 
+u64 ioread64(void __iomem *addr)
+{
+	u64 ret = IO_CONCAT(__IO_PREFIX,ioread64)(addr);
+	mb();
+	return ret;
+}
+
 void iowrite8(u8 b, void __iomem *addr)
 {
 	IO_CONCAT(__IO_PREFIX,iowrite8)(b, addr);
@@ -52,12 +59,20 @@ void iowrite32(u32 b, void __iomem *addr)
 	mb();
 }
 
+void iowrite64(u64 b, void __iomem *addr)
+{
+	IO_CONCAT(__IO_PREFIX,iowrite64)(b, addr);
+	mb();
+}
+
 EXPORT_SYMBOL(ioread8);
 EXPORT_SYMBOL(ioread16);
 EXPORT_SYMBOL(ioread32);
+EXPORT_SYMBOL(ioread64);
 EXPORT_SYMBOL(iowrite8);
 EXPORT_SYMBOL(iowrite16);
 EXPORT_SYMBOL(iowrite32);
+EXPORT_SYMBOL(iowrite64);
 
 u8 inb(unsigned long port)
 {
@@ -72,6 +87,11 @@ u16 inw(unsigned long port)
 u32 inl(unsigned long port)
 {
 	return ioread32(ioport_map(port, 4));
+}
+
+u64 inq(unsigned long port)
+{
+	return ioread64(ioport_map(port, 8));
 }
 
 void outb(u8 b, unsigned long port)
@@ -89,12 +109,19 @@ void outl(u32 b, unsigned long port)
 	iowrite32(b, ioport_map(port, 4));
 }
 
+void outq(u64 b, unsigned long port)
+{
+	iowrite64(b, ioport_map(port, 8));
+}
+
 EXPORT_SYMBOL(inb);
 EXPORT_SYMBOL(inw);
 EXPORT_SYMBOL(inl);
+EXPORT_SYMBOL(inq);
 EXPORT_SYMBOL(outb);
 EXPORT_SYMBOL(outw);
 EXPORT_SYMBOL(outl);
+EXPORT_SYMBOL(outq);
 
 u8 __raw_readb(const volatile void __iomem *addr)
 {

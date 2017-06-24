@@ -182,6 +182,17 @@ __EXTERN_INLINE u32 jensen_inl(unsigned long addr)
 	return *(vuip) ((addr << 7) + EISA_IO + 0x60);
 }
 
+__EXTERN_INLINE u64 jensen_inq(unsigned long addr)
+{
+	unsigned long ioaddr = (addr << 7) + EISA_IO + 0x60;
+	unsigned long l, h;
+
+	jensen_set_hae(0);
+	l = *(vuip)ioaddr;
+	h = *(vuip)(ioaddr + (4 << 7));
+	return h << 32 | l;
+}
+
 __EXTERN_INLINE void jensen_outw(u16 b, unsigned long addr)
 {
 	jensen_set_hae(0);
@@ -193,6 +204,16 @@ __EXTERN_INLINE void jensen_outl(u32 b, unsigned long addr)
 {
 	jensen_set_hae(0);
 	*(vuip) ((addr << 7) + EISA_IO + 0x60) = b;
+	mb();
+}
+
+__EXTERN_INLINE void jensen_outq(u64 b, unsigned long addr)
+{
+	unsigned long ioaddr = (addr << 7) + EISA_IO + 0x60;
+
+	jensen_set_hae(0);
+	*(vuip)ioaddr = b;
+	*(vuip)(ioaddr + (4 << 7)) = b >> 32;
 	mb();
 }
 
@@ -303,8 +324,8 @@ __EXTERN_INLINE int jensen_is_mmio(const volatile void __iomem *addr)
 /* New-style ioread interface.  All the routines are so ugly for Jensen
    that it doesn't make sense to merge them.  */
 
-#define IOPORT(OS, NS)							\
-__EXTERN_INLINE unsigned int jensen_ioread##NS(void __iomem *xaddr)	\
+#define IOPORT(OS, NS, RT)						\
+__EXTERN_INLINE RT jensen_ioread##NS(void __iomem *xaddr)		\
 {									\
 	if (jensen_is_mmio(xaddr))					\
 		return jensen_read##OS(xaddr - 0x100000000ul);		\
@@ -319,9 +340,10 @@ __EXTERN_INLINE void jensen_iowrite##NS(u##NS b, void __iomem *xaddr)	\
 		jensen_out##OS(b, (unsigned long)xaddr);		\
 }
 
-IOPORT(b, 8)
-IOPORT(w, 16)
-IOPORT(l, 32)
+IOPORT(b, 8, unsigned int)
+IOPORT(w, 16, unsigned int)
+IOPORT(l, 32, unsigned int)
+IOPORT(q, 64, u64)
 
 #undef IOPORT
 

@@ -247,6 +247,7 @@ struct el_MCPCIA_uncorrected_frame_mcheck {
 
 #define vip	volatile int __force *
 #define vuip	volatile unsigned int __force *
+#define vulp	volatile unsigned long __force *
 
 #ifndef MCPCIA_ONE_HAE_WINDOW
 #define MCPCIA_FROB_MMIO						\
@@ -334,6 +335,25 @@ __EXTERN_INLINE void mcpcia_iowrite32(u32 b, void __iomem *xaddr)
 	*(vuip)addr = b;
 }
 
+__EXTERN_INLINE u64 mcpcia_ioread64(void __iomem *xaddr)
+{
+	unsigned long addr = (unsigned long)xaddr;
+
+	if (!__mcpcia_is_mmio(addr))
+		addr = ((addr & 0xffff) << 5) + (addr & ~0xfffful) + 0x78;
+
+	return *(vulp)addr;
+}
+
+__EXTERN_INLINE void mcpcia_iowrite64(u64 b, void __iomem *xaddr)
+{
+	unsigned long addr = (unsigned long)xaddr;
+
+	if (!__mcpcia_is_mmio(addr))
+		addr = ((addr & 0xffff) << 5) + (addr & ~0xfffful) + 0x78;
+
+	*(vulp)addr = b;
+}
 
 __EXTERN_INLINE void __iomem *mcpcia_ioportmap(unsigned long addr)
 {
@@ -361,6 +381,7 @@ __EXTERN_INLINE int mcpcia_is_mmio(const volatile void __iomem *xaddr)
 
 #undef vip
 #undef vuip
+#undef vulp
 
 #undef __IO_PREFIX
 #define __IO_PREFIX		mcpcia
