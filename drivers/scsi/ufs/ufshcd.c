@@ -6373,6 +6373,14 @@ static int ufshcd_probe_hba(struct ufs_hba *hba)
 					__func__, ret);
 			goto out;
 		}
+
+		/*
+		 * Some device lost link after switch to HS mode. Check if
+		 * connect is established here.
+		 */
+		ret = ufshcd_verify_dev_init(hba);
+		if (ret)
+			goto out;
 	}
 
 	/* set the state as operational after switching to desired gear */
