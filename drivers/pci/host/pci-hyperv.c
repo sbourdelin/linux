@@ -810,7 +810,8 @@ static void hv_irq_unmask(struct irq_data *data)
 	params->vector = cfg->vector;
 
 	for_each_cpu_and(cpu, dest, cpu_online_mask)
-		params->vp_mask |= (1ULL << vmbus_cpu_number_to_vp_number(cpu));
+		__set_bit(hv_cpu_number_to_vp_number(cpu),
+			  (unsigned long *)params->vp_mask);
 
 	hv_do_hypercall(HVCALL_RETARGET_INTERRUPT, params, NULL);
 
@@ -903,10 +904,9 @@ static void hv_compose_msi_msg(struct irq_data *data, struct msi_msg *msg)
 	if (cpumask_weight(affinity) >= 32) {
 		int_pkt->int_desc.cpu_mask = CPU_AFFINITY_ALL;
 	} else {
-		for_each_cpu_and(cpu, affinity, cpu_online_mask) {
-			int_pkt->int_desc.cpu_mask |=
-				(1ULL << vmbus_cpu_number_to_vp_number(cpu));
-		}
+		for_each_cpu_and(cpu, affinity, cpu_online_mask)
+			__set_bit(hv_cpu_number_to_vp_number(cpu),
+				  (unsigned long *)int_pkt->int_desc.cpu_mask);
 	}
 
 	ret = vmbus_sendpacket(hpdev->hbus->hdev->channel, int_pkt,
