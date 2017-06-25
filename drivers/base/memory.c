@@ -31,7 +31,8 @@ static DEFINE_MUTEX(mem_sysfs_mutex);
 
 #define to_memory_block(dev) container_of(dev, struct memory_block, dev)
 
-static int sections_per_block;
+int sections_per_block;
+EXPORT_SYMBOL(sections_per_block);
 
 static inline int base_memory_block_id(int section_nr)
 {

@@ -1187,11 +1187,12 @@ static int check_hotplug_memory_range(u64 start, u64 size)
 {
 	u64 start_pfn = PFN_DOWN(start);
 	u64 nr_pages = size >> PAGE_SHIFT;
+	u64 page_per_block = sections_per_block * PAGES_PER_SECTION;
 
-	/* Memory range must be aligned with section */
-	if ((start_pfn & ~PAGE_SECTION_MASK) ||
-	    (nr_pages % PAGES_PER_SECTION) || (!nr_pages)) {
-		pr_err("Section-unaligned hotplug range: start 0x%llx, size 0x%llx\n",
+	/* Memory range must be aligned with memory_block */
+	if ((start_pfn & (page_per_block - 1)) ||
+	    (nr_pages % page_per_block) || (!nr_pages)) {
+		pr_err("Memory_block-unaligned hotplug range: start 0x%llx, size 0x%llx\n",
 				(unsigned long long)start,
 				(unsigned long long)size);
 		return -EINVAL;

@@ -142,4 +142,6 @@ extern struct memory_block *find_memory_block(struct mem_section *);
  */
 extern struct mutex text_mutex;
 
+extern int sections_per_block;
+
 #endif /* _LINUX_MEMORY_H_ */
