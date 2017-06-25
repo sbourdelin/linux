@@ -179,6 +179,9 @@ extern int lirc_register_driver(struct lirc_driver *d);
 
 extern void lirc_unregister_driver(struct lirc_driver *d);
 
+/* Must be called in the open fop before lirc_get_pdata() can be used */
+void lirc_init_pdata(struct inode *inode, struct file *file);
+
 /* Returns the private data stored in the lirc_driver
  * associated with the given device file pointer.
  */
