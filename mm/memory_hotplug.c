@@ -1849,17 +1849,11 @@ int walk_memory_range(unsigned long start_pfn, unsigned long end_pfn,
 	unsigned long pfn, section_nr;
 	int ret;
 
-	for (pfn = start_pfn; pfn < end_pfn; pfn += PAGES_PER_SECTION) {
+	for (pfn = start_pfn; pfn < end_pfn;
+		pfn += PAGES_PER_SECTION * sections_per_block) {
 		section_nr = pfn_to_section_nr(pfn);
-		if (!present_section_nr(section_nr))
-			continue;
 
 		section = __nr_to_section(section_nr);
-		/* same memblock? */
-		if (mem)
-			if ((section_nr >= mem->start_section_nr) &&
-			    (section_nr <= mem->end_section_nr))
-				continue;
 
 		mem = find_memory_block_hinted(section, mem);
 		if (!mem)
