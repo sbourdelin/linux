@@ -645,7 +645,7 @@ int register_memory(struct memory_block *memory)
 }
 
 static int init_memory_block(struct memory_block **memory,
-			     struct mem_section *section, unsigned long state)
+			     int start_section_nr, unsigned long state)
 {
 	struct memory_block *mem;
 	unsigned long start_pfn;
@@ -656,9 +656,7 @@ static int init_memory_block(struct memory_block **memory,
 	if (!mem)
 		return -ENOMEM;
 
-	scn_nr = __section_nr(section);
-	mem->start_section_nr =
-			base_memory_block_id(scn_nr) * sections_per_block;
+	mem->start_section_nr = start_section_nr;
 	mem->end_section_nr = mem->start_section_nr + sections_per_block - 1;
 	mem->state = state;
 	start_pfn = section_nr_to_pfn(mem->start_section_nr);
@@ -673,21 +671,19 @@ static int init_memory_block(struct memory_block **memory,
 static int add_memory_block(int base_section_nr)
 {
 	struct memory_block *mem;
-	int i, ret, section_count = 0, section_nr;
+	int i, ret, section_count = 0;
 
 	for (i = base_section_nr;
 	     (i < base_section_nr + sections_per_block) && i < NR_MEM_SECTIONS;
 	     i++) {
 		if (!present_section_nr(i))
 			continue;
-		if (section_count == 0)
-			section_nr = i;
 		section_count++;
 	}
 
 	if (section_count == 0)
 		return 0;
-	ret = init_memory_block(&mem, __nr_to_section(section_nr), MEM_ONLINE);
+	ret = init_memory_block(&mem, base_section_nr, MEM_ONLINE);
 	if (ret)
 		return ret;
 	mem->section_count = section_count;
@@ -698,14 +694,14 @@ static int add_memory_block(int base_section_nr)
  * need an interface for the VM to add new memory regions,
  * but without onlining it.
  */
-int register_new_memory(int nid, struct mem_section *section)
+int register_new_memory(int nid, int start_section_nr)
 {
 	int ret = 0;
 	struct memory_block *mem;
 
 	mutex_lock(&mem_sysfs_mutex);
 
-	ret = init_memory_block(&mem, section, MEM_OFFLINE);
+	ret = init_memory_block(&mem, start_section_nr, MEM_OFFLINE);
 	if (ret)
 		goto out;
 	mem->section_count = sections_per_block;

@@ -346,7 +346,7 @@ static int __meminit __add_memory_block(int nid, unsigned long phys_start_pfn,
 	if (!want_memblock)
 		return 0;
 
-	return register_new_memory(nid, __pfn_to_section(phys_start_pfn));
+	return register_new_memory(nid, pfn_to_section_nr(phys_start_pfn));
 }
 
 /*
