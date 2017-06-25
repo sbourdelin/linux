@@ -376,7 +376,7 @@ ssize_t lirc_dev_fop_read(struct file *file,
 			  loff_t *ppos)
 {
 	struct irctl *ir = file->private_data;
-	unsigned char *buf;
+	unsigned char buf[ir->buf->chunk_size];
 	int ret = 0, written = 0;
 	DECLARE_WAITQUEUE(wait, current);
 
@@ -384,10 +384,6 @@ ssize_t lirc_dev_fop_read(struct file *file,
 		return -EINVAL;
 
 	dev_dbg(ir->d.dev, LOGHEAD "read called\n", ir->d.name, ir->d.minor);
-
-	buf = kzalloc(ir->buf->chunk_size, GFP_KERNEL);
-	if (!buf)
-		return -ENOMEM;
 
 	if (mutex_lock_interruptible(&ir->irctl_lock)) {
 		ret = -ERESTARTSYS;
@@ -464,8 +460,6 @@ out_locked:
 	mutex_unlock(&ir->irctl_lock);
 
 out_unlocked:
-	kfree(buf);
-
 	return ret ? ret : written;
 }
 EXPORT_SYMBOL(lirc_dev_fop_read);
