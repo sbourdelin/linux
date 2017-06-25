@@ -18,7 +18,6 @@
 #define pr_fmt(fmt) KBUILD_MODNAME ": " fmt
 
 #include <linux/module.h>
-#include <linux/sched/signal.h>
 #include <linux/poll.h>
 #include <linux/mutex.h>
 #include <linux/device.h>
@@ -28,8 +27,6 @@
 #include <media/rc-core.h>
 #include <media/lirc.h>
 #include <media/lirc_dev.h>
-
-#define LOGHEAD		"lirc_dev (%s[%d]): "
 
 static dev_t lirc_base_dev;
 
@@ -192,11 +189,8 @@ void lirc_unregister_device(struct lirc_dev *d)
 	mutex_lock(&d->mutex);
 
 	d->attached = false;
-	if (d->open) {
-		dev_dbg(&d->dev, LOGHEAD "releasing opened driver\n",
-			d->name, d->minor);
+	if (d->open)
 		wake_up_interruptible(&d->buf->wait_poll);
-	}
 
 	mutex_unlock(&d->mutex);
 
@@ -205,185 +199,6 @@ void lirc_unregister_device(struct lirc_dev *d)
 	put_device(&d->dev);
 }
 EXPORT_SYMBOL(lirc_unregister_device);
-
-int lirc_dev_fop_open(struct inode *inode, struct file *file)
-{
-	struct lirc_dev *d = container_of(inode->i_cdev, struct lirc_dev, cdev);
-	int retval;
-
-	dev_dbg(&d->dev, LOGHEAD "open called\n", d->name, d->minor);
-
-	retval = mutex_lock_interruptible(&d->mutex);
-	if (retval)
-		return retval;
-
-	if (!d->attached) {
-		retval = -ENODEV;
-		goto out;
-	}
-
-	if (d->open) {
-		retval = -EBUSY;
-		goto out;
-	}
-
-	if (d->rdev) {
-		retval = rc_open(d->rdev);
-		if (retval)
-			goto out;
-	}
-
-	if (d->buf)
-		lirc_buffer_clear(d->buf);
-
-	d->open++;
-
-	lirc_init_pdata(inode, file);
-	nonseekable_open(inode, file);
-	mutex_unlock(&d->mutex);
-
-	return 0;
-
-out:
-	mutex_unlock(&d->mutex);
-	return retval;
-}
-EXPORT_SYMBOL(lirc_dev_fop_open);
-
-int lirc_dev_fop_close(struct inode *inode, struct file *file)
-{
-	struct lirc_dev *d = file->private_data;
-
-	mutex_lock(&d->mutex);
-
-	rc_close(d->rdev);
-	d->open--;
-
-	mutex_unlock(&d->mutex);
-
-	return 0;
-}
-EXPORT_SYMBOL(lirc_dev_fop_close);
-
-unsigned int lirc_dev_fop_poll(struct file *file, poll_table *wait)
-{
-	struct lirc_dev *d = file->private_data;
-	unsigned int ret;
-
-	if (!d->attached)
-		return POLLHUP | POLLERR;
-
-	if (d->buf) {
-		poll_wait(file, &d->buf->wait_poll, wait);
-
-		if (lirc_buffer_empty(d->buf))
-			ret = 0;
-		else
-			ret = POLLIN | POLLRDNORM;
-	} else
-		ret = POLLERR;
-
-	dev_dbg(&d->dev, LOGHEAD "poll result = %d\n", d->name, d->minor, ret);
-
-	return ret;
-}
-EXPORT_SYMBOL(lirc_dev_fop_poll);
-
-ssize_t lirc_dev_fop_read(struct file *file,
-			  char __user *buffer,
-			  size_t length,
-			  loff_t *ppos)
-{
-	struct lirc_dev *d = file->private_data;
-	unsigned char buf[d->buf->chunk_size];
-	int ret, written = 0;
-	DECLARE_WAITQUEUE(wait, current);
-
-	dev_dbg(&d->dev, LOGHEAD "read called\n", d->name, d->minor);
-
-	ret = mutex_lock_interruptible(&d->mutex);
-	if (ret)
-		return ret;
-
-	if (!d->attached) {
-		ret = -ENODEV;
-		goto out_locked;
-	}
-
-	if (!LIRC_CAN_REC(d->features)) {
-		ret = -EINVAL;
-		goto out_locked;
-	}
-
-	if (length % d->buf->chunk_size) {
-		ret = -EINVAL;
-		goto out_locked;
-	}
-
-	/*
-	 * we add ourselves to the task queue before buffer check
-	 * to avoid losing scan code (in case when queue is awaken somewhere
-	 * between while condition checking and scheduling)
-	 */
-	add_wait_queue(&d->buf->wait_poll, &wait);
-
-	/*
-	 * while we didn't provide 'length' bytes, device is opened in blocking
-	 * mode and 'copy_to_user' is happy, wait for data.
-	 */
-	while (written < length && ret == 0) {
-		if (lirc_buffer_empty(d->buf)) {
-			/* According to the read(2) man page, 'written' can be
-			 * returned as less than 'length', instead of blocking
-			 * again, returning -EWOULDBLOCK, or returning
-			 * -ERESTARTSYS
-			 */
-			if (written)
-				break;
-			if (file->f_flags & O_NONBLOCK) {
-				ret = -EWOULDBLOCK;
-				break;
-			}
-			if (signal_pending(current)) {
-				ret = -ERESTARTSYS;
-				break;
-			}
-
-			mutex_unlock(&d->mutex);
-			set_current_state(TASK_INTERRUPTIBLE);
-			schedule();
-			set_current_state(TASK_RUNNING);
-
-			ret = mutex_lock_interruptible(&d->mutex);
-			if (ret) {
-				remove_wait_queue(&d->buf->wait_poll, &wait);
-				goto out_unlocked;
-			}
-
-			if (!d->attached) {
-				ret = -ENODEV;
-				goto out_locked;
-			}
-		} else {
-			lirc_buffer_read(d->buf, buf);
-			ret = copy_to_user((void __user *)buffer+written, buf,
-					   d->buf->chunk_size);
-			if (!ret)
-				written += d->buf->chunk_size;
-			else
-				ret = -EFAULT;
-		}
-	}
-
-	remove_wait_queue(&d->buf->wait_poll, &wait);
-
-out_locked:
-	mutex_unlock(&d->mutex);
-
-out_unlocked:
-	return ret ? ret : written;
-}
-EXPORT_SYMBOL(lirc_dev_fop_read);
 
 void lirc_init_pdata(struct inode *inode, struct file *file)
 {

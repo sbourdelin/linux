@@ -178,12 +178,4 @@ void lirc_init_pdata(struct inode *inode, struct file *file);
  */
 void *lirc_get_pdata(struct file *file);
 
-/* default file operations
- * used by drivers if they override only some operations
- */
-int lirc_dev_fop_open(struct inode *inode, struct file *file);
-int lirc_dev_fop_close(struct inode *inode, struct file *file);
-unsigned int lirc_dev_fop_poll(struct file *file, poll_table *wait);
-ssize_t lirc_dev_fop_read(struct file *file, char __user *buffer, size_t length,
-			  loff_t *ppos);
 #endif
