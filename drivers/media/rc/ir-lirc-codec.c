@@ -178,12 +178,13 @@ out:
 }
 
 static long ir_lirc_ioctl(struct file *filep, unsigned int cmd,
-			unsigned long arg)
+			  unsigned long arg)
 {
 	struct lirc_codec *lirc;
 	struct rc_dev *dev;
+	struct lirc_dev *d;
 	u32 __user *argp = (u32 __user *)(arg);
-	int ret = 0;
+	int ret;
 	__u32 val = 0, tmp;
 
 	lirc = lirc_get_pdata(filep);
@@ -194,10 +195,23 @@ static long ir_lirc_ioctl(struct file *filep, unsigned int cmd,
 	if (!dev)
 		return -EFAULT;
 
+	d = lirc->ldev;
+	if (!d)
+		return -EFAULT;
+
+	ret = mutex_lock_interruptible(&d->mutex);
+	if (ret)
+		return ret;
+
+	if (!d->attached) {
+		ret = -ENODEV;
+		goto out;
+	}
+
 	if (_IOC_DIR(cmd) & _IOC_WRITE) {
 		ret = get_user(val, argp);
 		if (ret)
-			return ret;
+			goto out;
 	}
 
 	switch (cmd) {
@@ -205,125 +219,153 @@ static long ir_lirc_ioctl(struct file *filep, unsigned int cmd,
 	/* legacy support */
 	case LIRC_GET_SEND_MODE:
 		if (!dev->tx_ir)
-			return -ENOTTY;
-
-		val = LIRC_MODE_PULSE;
+			ret = -ENOTTY;
+		else
+			val = LIRC_MODE_PULSE;
 		break;
 
 	case LIRC_SET_SEND_MODE:
 		if (!dev->tx_ir)
-			return -ENOTTY;
-
-		if (val != LIRC_MODE_PULSE)
-			return -EINVAL;
-		return 0;
+			ret = -ENOTTY;
+		else if (val != LIRC_MODE_PULSE)
+			ret = -EINVAL;
+		break;
 
 	/* TX settings */
 	case LIRC_SET_TRANSMITTER_MASK:
 		if (!dev->s_tx_mask)
-			return -ENOTTY;
-
-		return dev->s_tx_mask(dev, val);
+			ret = -ENOTTY;
+		else
+			ret = dev->s_tx_mask(dev, val);
+		break;
 
 	case LIRC_SET_SEND_CARRIER:
 		if (!dev->s_tx_carrier)
-			return -ENOTTY;
-
-		return dev->s_tx_carrier(dev, val);
+			ret = -ENOTTY;
+		else
+			ret = dev->s_tx_carrier(dev, val);
+		break;
 
 	case LIRC_SET_SEND_DUTY_CYCLE:
 		if (!dev->s_tx_duty_cycle)
-			return -ENOTTY;
-
-		if (val <= 0 || val >= 100)
-			return -EINVAL;
-
-		return dev->s_tx_duty_cycle(dev, val);
+			ret = -ENOTTY;
+		else if (val <= 0 || val >= 100)
+			ret = -EINVAL;
+		else
+			ret = dev->s_tx_duty_cycle(dev, val);
+		break;
 
 	/* RX settings */
 	case LIRC_SET_REC_CARRIER:
 		if (!dev->s_rx_carrier_range)
-			return -ENOTTY;
-
-		if (val <= 0)
-			return -EINVAL;
-
-		return dev->s_rx_carrier_range(dev,
-					       dev->raw->lirc.carrier_low,
-					       val);
+			ret = -ENOTTY;
+		else if (val <= 0)
+			ret = -EINVAL;
+		else
+			ret = dev->s_rx_carrier_range(dev,
+						      dev->raw->lirc.carrier_low,
+						      val);
+		break;
 
 	case LIRC_SET_REC_CARRIER_RANGE:
 		if (!dev->s_rx_carrier_range)
-			return -ENOTTY;
-
-		if (val <= 0)
-			return -EINVAL;
-
-		dev->raw->lirc.carrier_low = val;
-		return 0;
+			ret = -ENOTTY;
+		else if (val <= 0)
+			ret = -EINVAL;
+		else
+			dev->raw->lirc.carrier_low = val;
+		break;
 
 	case LIRC_GET_REC_RESOLUTION:
 		if (!dev->rx_resolution)
-			return -ENOTTY;
-
-		val = dev->rx_resolution;
+			ret = -ENOTTY;
+		else
+			val = dev->rx_resolution;
 		break;
 
 	case LIRC_SET_WIDEBAND_RECEIVER:
 		if (!dev->s_learning_mode)
-			return -ENOTTY;
-
-		return dev->s_learning_mode(dev, !!val);
+			ret = -ENOTTY;
+		else
+			ret = dev->s_learning_mode(dev, !!val);
+		break;
 
 	case LIRC_SET_MEASURE_CARRIER_MODE:
 		if (!dev->s_carrier_report)
-			return -ENOTTY;
-
-		return dev->s_carrier_report(dev, !!val);
+			ret = -ENOTTY;
+		else
+			ret = dev->s_carrier_report(dev, !!val);
+		break;
 
 	/* Generic timeout support */
 	case LIRC_GET_MIN_TIMEOUT:
 		if (!dev->max_timeout)
-			return -ENOTTY;
-		val = DIV_ROUND_UP(dev->min_timeout, 1000);
+			ret = -ENOTTY;
+		else
+			val = DIV_ROUND_UP(dev->min_timeout, 1000);
 		break;
 
 	case LIRC_GET_MAX_TIMEOUT:
 		if (!dev->max_timeout)
-			return -ENOTTY;
-		val = dev->max_timeout / 1000;
+			ret = -ENOTTY;
+		else
+			val = dev->max_timeout / 1000;
 		break;
 
 	case LIRC_SET_REC_TIMEOUT:
-		if (!dev->max_timeout)
-			return -ENOTTY;
-
 		tmp = val * 1000;
 
-		if (tmp < dev->min_timeout ||
-		    tmp > dev->max_timeout)
-				return -EINVAL;
-
-		if (dev->s_timeout)
+		if (!dev->max_timeout)
+			ret = -ENOTTY;
+		else if (tmp < dev->min_timeout)
+			ret = -EINVAL;
+		else if (tmp > dev->max_timeout)
+			ret = -EINVAL;
+		else if (dev->s_timeout)
 			ret = dev->s_timeout(dev, tmp);
+
 		if (!ret)
 			dev->timeout = tmp;
 		break;
 
 	case LIRC_SET_REC_TIMEOUT_REPORTS:
 		if (!dev->timeout)
-			return -ENOTTY;
+			ret = -ENOTTY;
+		else
+			lirc->send_timeout_reports = !!val;
+		break;
 
-		lirc->send_timeout_reports = !!val;
+	case LIRC_GET_FEATURES:
+		val = d->features;
+		break;
+
+	case LIRC_GET_REC_MODE:
+		if (!LIRC_CAN_REC(d->features))
+			ret = -ENOTTY;
+		else
+			val = LIRC_REC2MODE(d->features & LIRC_CAN_REC_MASK);
+		break;
+
+	case LIRC_SET_REC_MODE:
+		if (!LIRC_CAN_REC(d->features))
+			ret = -ENOTTY;
+		else if (!(LIRC_MODE2REC(val) & d->features))
+			ret = -EINVAL;
+		break;
+
+	case LIRC_GET_LENGTH:
+		val = d->code_length;
 		break;
 
 	default:
-		return lirc_dev_fop_ioctl(filep, cmd, arg);
+		ret = -ENOTTY;
 	}
 
-	if (_IOC_DIR(cmd) & _IOC_READ)
+	if (!ret && (_IOC_DIR(cmd) & _IOC_READ))
 		ret = put_user(val, argp);
 
+out:
+	mutex_unlock(&d->mutex);
 	return ret;
 }
 
