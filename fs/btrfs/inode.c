@@ -60,6 +60,7 @@
 #include "props.h"
 #include "qgroup.h"
 #include "dedupe.h"
+#include "heuristic.h"
 
 struct btrfs_iget_args {
 	struct btrfs_key *location;
@@ -458,16 +459,16 @@ static noinline void compress_file_range(struct inode *inode,
 	unsigned long total_compressed = 0;
 	unsigned long total_in = 0;
 	int i;
-	int will_compress;
+	bool will_compress;
 	int compress_type = fs_info->compress_type;
-	int redirty = 0;
+	bool redirty = false;
 
 	inode_should_defrag(BTRFS_I(inode), start, end, end - start + 1,
 			SZ_16K);
 
 	actual_end = min_t(u64, isize, end + 1);
 again:
-	will_compress = 0;
+	will_compress = false;
 	nr_pages = (end >> PAGE_SHIFT) - (start >> PAGE_SHIFT) + 1;
 	BUILD_BUG_ON((BTRFS_MAX_COMPRESSED % PAGE_SIZE) != 0);
 	nr_pages = min_t(unsigned long, nr_pages,
@@ -510,15 +511,6 @@ again:
 	 */
 	if (inode_need_compress(inode)) {
 		WARN_ON(pages);
-		pages = kcalloc(nr_pages, sizeof(struct page *), GFP_NOFS);
-		if (!pages) {
-			/* just bail out to the uncompressed code */
-			goto cont;
-		}
-
-		if (BTRFS_I(inode)->force_compress)
-			compress_type = BTRFS_I(inode)->force_compress;
-
 		/*
 		 * we need to call clear_page_dirty_for_io on each
 		 * page in the range.  Otherwise applications with the file
@@ -529,13 +521,30 @@ again:
 		 * dirty again later on.
 		 */
 		extent_range_clear_dirty_for_io(inode, start, end);
-		redirty = 1;
+		redirty = true;
+
+		ret = btrfs_compress_heuristic(inode, start, end);
+
+		/* Heuristic say: dont try compress that */
+		if (!ret)
+			goto cont;
+
+		pages = kcalloc(nr_pages, sizeof(struct page *), GFP_NOFS);
+		if (!pages) {
+			/* just bail out to the uncompressed code */
+			goto cont;
+		}
+
+		if (BTRFS_I(inode)->force_compress)
+			compress_type = BTRFS_I(inode)->force_compress;
+
+
 		ret = btrfs_compress_pages(compress_type,
-					   inode->i_mapping, start,
-					   pages,
-					   &nr_pages,
-					   &total_in,
-					   &total_compressed);
+				   inode->i_mapping, start,
+				   pages,
+				   &nr_pages,
+				   &total_in,
+				   &total_compressed);
 
 		if (!ret) {
 			unsigned long offset = total_compressed &
@@ -552,7 +561,7 @@ again:
 				       PAGE_SIZE - offset);
 				kunmap_atomic(kaddr);
 			}
-			will_compress = 1;
+			will_compress = true;
 		}
 	}
 cont:
