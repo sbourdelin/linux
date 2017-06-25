@@ -132,12 +132,6 @@ static inline unsigned int lirc_buffer_write(struct lirc_buffer *buf,
  * @data:		it may point to any driver data and this pointer will
  *			be passed to all callback functions.
  *
- * @min_timeout:	Minimum timeout for record. Valid only if
- *			LIRC_CAN_SET_REC_TIMEOUT is defined.
- *
- * @max_timeout:	Maximum timeout for record. Valid only if
- *			LIRC_CAN_SET_REC_TIMEOUT is defined.
- *
  * @rbuf:		if not NULL, it will be used as a read buffer, you will
  *			have to write to the buffer by other means, like irq's
  *			(see also lirc_serial.c).
@@ -168,8 +162,6 @@ struct lirc_driver {
 	unsigned int chunk_size;
 
 	void *data;
-	int min_timeout;
-	int max_timeout;
 	struct lirc_buffer *rbuf;
 	struct rc_dev *rdev;
 	const struct file_operations *fops;
