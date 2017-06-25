@@ -302,8 +302,7 @@ void __init register_page_bootmem_info_node(struct pglist_data *pgdat)
 }
 #endif /* CONFIG_HAVE_BOOTMEM_INFO_NODE */
 
-static int __meminit __add_section(int nid, unsigned long phys_start_pfn,
-		bool want_memblock)
+static int __meminit __add_section(int nid, unsigned long phys_start_pfn)
 {
 	int ret;
 	int i;
@@ -332,6 +331,18 @@ static int __meminit __add_section(int nid, unsigned long phys_start_pfn,
 		SetPageReserved(page);
 	}
 
+	return 0;
+}
+
+static int __meminit __add_memory_block(int nid, unsigned long phys_start_pfn,
+		bool want_memblock)
+{
+	int ret;
+
+	ret = __add_section(nid, phys_start_pfn);
+	if (ret)
+		return ret;
+
 	if (!want_memblock)
 		return 0;
 
@@ -347,14 +358,9 @@ static int __meminit __add_section(int nid, unsigned long phys_start_pfn,
 int __ref __add_pages(int nid, unsigned long phys_start_pfn,
 			unsigned long nr_pages, bool want_memblock)
 {
-	unsigned long i;
+	unsigned long pfn;
 	int err = 0;
-	int start_sec, end_sec;
 	struct vmem_altmap *altmap;
-
-	/* during initialize mem_map, align hot-added range to section */
-	start_sec = pfn_to_section_nr(phys_start_pfn);
-	end_sec = pfn_to_section_nr(phys_start_pfn + nr_pages - 1);
 
 	altmap = to_vmem_altmap((unsigned long) pfn_to_page(phys_start_pfn));
 	if (altmap) {
@@ -370,8 +376,9 @@ int __ref __add_pages(int nid, unsigned long phys_start_pfn,
 		altmap->alloc = 0;
 	}
 
-	for (i = start_sec; i <= end_sec; i++) {
-		err = __add_section(nid, section_nr_to_pfn(i), want_memblock);
+	for (pfn; pfn < phys_start_pfn + nr_pages;
+			pfn += sections_per_block * PAGES_PER_SECTION) {
+		err = __add_memory_block(nid, pfn, want_memblock);
 
 		/*
 		 * EEXIST is finally dealt with by ioresource collision

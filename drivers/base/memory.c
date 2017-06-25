@@ -705,19 +705,12 @@ int register_new_memory(int nid, struct mem_section *section)
 
 	mutex_lock(&mem_sysfs_mutex);
 
-	mem = find_memory_block(section);
-	if (mem) {
-		mem->section_count++;
-		put_device(&mem->dev);
-	} else {
-		ret = init_memory_block(&mem, section, MEM_OFFLINE);
-		if (ret)
-			goto out;
-		mem->section_count++;
-	}
+	ret = init_memory_block(&mem, section, MEM_OFFLINE);
+	if (ret)
+		goto out;
+	mem->section_count = sections_per_block;
 
-	if (mem->section_count == sections_per_block)
-		ret = register_mem_sect_under_node(mem, nid);
+	ret = register_mem_sect_under_node(mem, nid);
 out:
 	mutex_unlock(&mem_sysfs_mutex);
 	return ret;
