@@ -534,8 +534,8 @@ static int debug_shrink_get(void *data, u64 *val)
 	return 0;
 }
 
-DEFINE_SIMPLE_ATTRIBUTE(debug_shrink_fops, debug_shrink_get,
-			debug_shrink_set, "%llu\n");
+DEFINE_DEBUGFS_ATTRIBUTE(debug_shrink_fops, debug_shrink_get,
+			 debug_shrink_set, "%llu\n");
 
 void ion_device_add_heap(struct ion_heap *heap)
 {
@@ -569,7 +569,7 @@ void ion_device_add_heap(struct ion_heap *heap)
 		char debug_name[64];
 
 		snprintf(debug_name, 64, "%s_shrink", heap->name);
-		debug_file = debugfs_create_file(
+		debug_file = debugfs_create_file_unsafe(
 			debug_name, 0644, dev->debug_root, heap,
 			&debug_shrink_fops);
 		if (!debug_file) {
