@@ -145,9 +145,8 @@ int lirc_register_device(struct lirc_dev *d)
 		return -EINVAL;
 	}
 
-	if (d->code_length < 1 || d->code_length > (BUFLEN * 8)) {
-		dev_err(d->dev, "code length must be less than %d bits\n",
-								BUFLEN * 8);
+	if (d->code_length < 1 || d->code_length > 128) {
+		dev_err(d->dev, "invalid code_length!\n");
 		return -EBADRQC;
 	}
 

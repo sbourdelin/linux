@@ -9,8 +9,6 @@
 #ifndef _LINUX_LIRC_DEV_H
 #define _LINUX_LIRC_DEV_H
 
-#define BUFLEN            16
-
 #include <linux/slab.h>
 #include <linux/fs.h>
 #include <linux/ioctl.h>

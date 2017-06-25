@@ -64,6 +64,9 @@
 /* Max transfer size done by I2C transfer functions */
 #define MAX_XFER_SIZE  64
 
+/* LIRC buffer size */
+#define BUFLEN            16
+
 struct IR;
 
 struct IR_rx {
