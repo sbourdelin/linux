@@ -595,8 +595,7 @@ static int ir_lirc_register(struct rc_dev *dev)
 	if (dev->max_timeout)
 		features |= LIRC_CAN_SET_REC_TIMEOUT;
 
-	snprintf(ldev->name, sizeof(ldev->name), "ir-lirc-codec (%s)",
-		 dev->driver_name);
+	snprintf(ldev->name, sizeof(ldev->name), "%s", dev->input_name);
 	ldev->features = features;
 	ldev->data = &dev->raw->lirc;
 	ldev->buf = NULL;

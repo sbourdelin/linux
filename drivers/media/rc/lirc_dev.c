@@ -105,6 +105,7 @@ int lirc_register_device(struct lirc_dev *d)
 {
 	int minor;
 	int err;
+	const char *path;
 
 	if (!d) {
 		pr_err("driver pointer must be not NULL!\n");
@@ -171,8 +172,9 @@ int lirc_register_device(struct lirc_dev *d)
 		return err;
 	}
 
-	dev_info(&d->dev, "lirc_dev: driver %s registered at minor = %d\n",
-		 d->name, d->minor);
+	path = kobject_get_path(&d->dev.kobj, GFP_KERNEL);
+	dev_info(&d->dev, "%s as %s\n", d->name, path ?: "N/A");
+	kfree(path);
 
 	return 0;
 }
