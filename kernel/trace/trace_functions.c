@@ -27,6 +27,7 @@ static void
 function_stack_trace_call(unsigned long ip, unsigned long parent_ip,
 			  struct ftrace_ops *op, struct pt_regs *pt_regs);
 static struct tracer_flags func_flags;
+static bool tgid_recorded;
 
 /* Our option */
 enum {
@@ -104,6 +105,11 @@ static int function_trace_init(struct trace_array *tr)
 	put_cpu();
 
 	tracing_start_cmdline_record();
+
+	if (tr->trace_flags & TRACE_ITER_RECORD_TGID) {
+		tgid_recorded = true;
+		tracing_start_tgid_record();
+	}
 	tracing_start_function_trace(tr);
 	return 0;
 }
@@ -112,6 +118,10 @@ static void function_trace_reset(struct trace_array *tr)
 {
 	tracing_stop_function_trace(tr);
 	tracing_stop_cmdline_record();
+	if (tgid_recorded) {
+		tracing_stop_tgid_record();
+		tgid_recorded = false;
+	}
 	ftrace_reset_array_ops(tr);
 }
 
@@ -252,6 +262,21 @@ func_set_flag(struct trace_array *tr, u32 old_flags, u32 bit, int set)
 	return 0;
 }
 
+static int
+func_tracer_flag_changed(struct trace_array *tr, unsigned int mask,
+			 int enabled)
+{
+	if (mask == TRACE_ITER_RECORD_TGID) {
+		tgid_recorded = !!enabled;
+		if (enabled)
+			tracing_start_tgid_record();
+		else
+			tracing_stop_tgid_record();
+	}
+
+	return 0;
+}
+
 static struct tracer function_trace __tracer_data =
 {
 	.name		= "function",
@@ -260,6 +285,7 @@ static struct tracer function_trace __tracer_data =
 	.start		= function_trace_start,
 	.flags		= &func_flags,
 	.set_flag	= func_set_flag,
+	.flag_changed	= func_tracer_flag_changed,
 	.allow_instances = true,
 #ifdef CONFIG_FTRACE_SELFTEST
 	.selftest	= trace_selftest_startup_function,
