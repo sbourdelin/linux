@@ -108,6 +108,7 @@ struct tmc_caps {
 };
 
 #define CORESIGHT_SOC_400_TMC_CAPS	(TMC_CAP_ETR_SG_UNIT)
+#define CORESIGHT_SOC_600_ETR_CAPS	(TMC_CAP_ETR_SAVE_RESTORE)
 
 /**
  * struct tmc_drvdata - specifics associated to an TMC component
