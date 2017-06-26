@@ -1226,7 +1226,7 @@ void __init adjust_lowmem_bounds(void)
 	if (memblock_limit)
 		memblock_limit = round_down(memblock_limit, PMD_SIZE);
 	if (!memblock_limit)
-		memblock_limit = arm_lowmem_limit;
+		memblock_limit = round_down(arm_lowmem_limit, PMD_SIZE);
 
 	if (!IS_ENABLED(CONFIG_HIGHMEM) || cache_is_vipt_aliasing()) {
 		if (memblock_end_of_DRAM() > arm_lowmem_limit) {
