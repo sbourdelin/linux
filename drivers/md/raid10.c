@@ -1995,6 +1995,24 @@ static void end_sync_write(struct bio *bio)
 	end_sync_request(r10_bio);
 }
 
+/* called after bio_reset() */
+static void reset_bvec_table(struct bio *bio, struct resync_pages *rp, int size)
+{
+	/* initialize bvec table again */
+	rp->idx = 0;
+	do {
+		struct page *page = resync_fetch_page(rp, rp->idx++);
+		int len = min_t(int, size, PAGE_SIZE);
+
+		/*
+		 * won't fail because the vec table is big
+		 * enough to hold all these pages
+		 */
+		bio_add_page(bio, page, len, 0);
+		size -= len;
+	} while (rp->idx < RESYNC_PAGES && size > 0);
+}
+
 /*
  * Note: sync and recover and handled very differently for raid10
  * This code is for resync.
@@ -2087,8 +2105,8 @@ static void sync_request_write(struct mddev *mddev, struct r10bio *r10_bio)
 		rp = get_resync_pages(tbio);
 		bio_reset(tbio);
 
-		tbio->bi_vcnt = vcnt;
-		tbio->bi_iter.bi_size = fbio->bi_iter.bi_size;
+		reset_bvec_table(tbio, rp, fbio->bi_iter.bi_size);
+
 		rp->raid_bio = r10_bio;
 		tbio->bi_private = rp;
 		tbio->bi_iter.bi_sector = r10_bio->devs[i].addr;
