@@ -809,6 +809,8 @@ struct snd_soc_component_driver {
 		int subseq);
 	int (*stream_event)(struct snd_soc_component *, int event);
 
+	const struct snd_pcm_ops *ops;
+
 	/* probe ordering - for components with runtime dependencies */
 	int probe_order;
 	int remove_order;
@@ -1230,7 +1232,7 @@ struct snd_soc_pcm_runtime {
 	struct snd_pcm *pcm;
 	struct snd_compr *compr;
 	struct snd_soc_codec *codec;
-	struct snd_soc_platform *platform;
+	struct snd_soc_platform *platform; /* will be removed */
 	struct snd_soc_dai *codec_dai;
 	struct snd_soc_dai *cpu_dai;
 
