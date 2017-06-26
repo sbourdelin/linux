@@ -64,9 +64,8 @@ EXPORT_SYMBOL(register_gifconf);
  *	Thus we will need a 'compatibility mode'.
  */
 
-static int dev_ifconf(struct net *net, char __user *arg)
+int dev_ifconf(struct net *net, struct ifconf *ifc, int size)
 {
-	struct ifconf ifc;
 	struct net_device *dev;
 	char __user *pos;
 	int len;
@@ -77,11 +76,8 @@ static int dev_ifconf(struct net *net, char __user *arg)
 	 *	Fetch the caller's info block.
 	 */
 
-	if (copy_from_user(&ifc, arg, sizeof(struct ifconf)))
-		return -EFAULT;
-
-	pos = ifc.ifc_buf;
-	len = ifc.ifc_len;
+	pos = ifc->ifc_buf;
+	len = ifc->ifc_len;
 
 	/*
 	 *	Loop over the interfaces, and write an info block for each.
@@ -93,10 +89,10 @@ static int dev_ifconf(struct net *net, char __user *arg)
 			if (gifconf_list[i]) {
 				int done;
 				if (!pos)
-					done = gifconf_list[i](dev, NULL, 0);
+					done = gifconf_list[i](dev, NULL, 0, size);
 				else
 					done = gifconf_list[i](dev, pos + total,
-							       len - total);
+							       len - total, size);
 				if (done < 0)
 					return -EFAULT;
 				total += done;
@@ -107,12 +103,12 @@ static int dev_ifconf(struct net *net, char __user *arg)
 	/*
 	 *	All done.  Write the updated control block back to the caller.
 	 */
-	ifc.ifc_len = total;
+	ifc->ifc_len = total;
 
 	/*
 	 * 	Both BSD and Solaris return 0 here, so we do too.
 	 */
-	return copy_to_user(arg, &ifc, sizeof(struct ifconf)) ? -EFAULT : 0;
+	return 0;
 }
 
 /*
@@ -396,17 +392,6 @@ int dev_ioctl(struct net *net, unsigned int cmd, void __user *arg)
 	int ret;
 	char *colon;
 
-	/* One special case: SIOCGIFCONF takes ifconf argument
-	   and requires shared lock, because it sleeps writing
-	   to user space.
-	 */
-
-	if (cmd == SIOCGIFCONF) {
-		rtnl_lock();
-		ret = dev_ifconf(net, (char __user *) arg);
-		rtnl_unlock();
-		return ret;
-	}
 	if (cmd == SIOCGIFNAME)
 		return dev_ifname(net, (struct ifreq __user *)arg);
 
