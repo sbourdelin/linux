@@ -206,4 +206,18 @@ static inline void bvec_iter_advance_mp(const struct bio_vec *bv,
 #define bvec_for_each_sp_bvec(sp_bvl, mp_bvec, iter)			\
 	__bvec_for_each_sp_bvec(sp_bvl, mp_bvec, iter, BVEC_ITER_ALL_INIT)
 
+/*
+ * get the last page from the multipage bvec and store it
+ * in @sp_bv
+ */
+static inline void bvec_get_last_page(struct bio_vec *mp_bv,
+				      struct bio_vec *sp_bv)
+{
+	struct bvec_iter iter;
+
+	*sp_bv = *mp_bv;
+	bvec_for_each_sp_bvec(*sp_bv, mp_bv, iter)
+		;
+}
+
 #endif /* __LINUX_BVEC_ITER_H */
