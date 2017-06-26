@@ -34,7 +34,8 @@
 /* Maximum number of letters for an LSM name string */
 #define SECURITY_NAME_MAX	10
 
-struct security_hook_heads security_hook_heads __lsm_ro_after_init;
+static struct list_head hook_heads[LSM_MAX_HOOK_INDEX]
+	__lsm_ro_after_init;
 static ATOMIC_NOTIFIER_HEAD(lsm_notifier_chain);
 
 char *lsm_names;
@@ -59,12 +60,10 @@ static void __init do_security_initcalls(void)
  */
 int __init security_init(void)
 {
-	int i;
-	struct list_head *list = (struct list_head *) &security_hook_heads;
+	enum security_hook_index i;
 
-	for (i = 0; i < sizeof(security_hook_heads) / sizeof(struct list_head);
-	     i++)
-		INIT_LIST_HEAD(&list[i]);
+	for (i = 0; i < LSM_MAX_HOOK_INDEX; i++)
+		INIT_LIST_HEAD(&hook_heads[i]);
 	pr_info("Security Framework initialized\n");
 
 	/*
@@ -161,8 +160,12 @@ void __init security_add_hooks(struct security_hook_list *hooks, int count,
 	int i;
 
 	for (i = 0; i < count; i++) {
+		enum security_hook_index idx = hooks[i].idx;
+
 		hooks[i].lsm = lsm;
-		list_add_tail_rcu(&hooks[i].list, hooks[i].head);
+		/* Can't hit this BUG_ON() unless LSM_HOOK_INIT() is broken. */
+		BUG_ON(idx < 0 || idx >= LSM_MAX_HOOK_INDEX);
+		list_add_tail_rcu(&hooks[i].list, &hook_heads[idx]);
 	}
 	if (lsm_append(lsm, &lsm_names) < 0)
 		panic("%s - Cannot get early memory.\n", __func__);
@@ -200,7 +203,7 @@ EXPORT_SYMBOL(unregister_lsm_notifier);
 	do {							\
 		struct security_hook_list *P;			\
 								\
-		list_for_each_entry(P, &security_hook_heads.FUNC, list)	\
+		list_for_each_entry(P, &hook_heads[LSM_##FUNC], list)	\
 			P->hook.FUNC(__VA_ARGS__);		\
 	} while (0)
 
@@ -209,7 +212,7 @@ EXPORT_SYMBOL(unregister_lsm_notifier);
 	do {							\
 		struct security_hook_list *P;			\
 								\
-		list_for_each_entry(P, &security_hook_heads.FUNC, list) { \
+		list_for_each_entry(P, &hook_heads[LSM_##FUNC], list) {	\
 			RC = P->hook.FUNC(__VA_ARGS__);		\
 			if (RC != 0)				\
 				break;				\
@@ -316,7 +319,7 @@ int security_vm_enough_memory_mm(struct mm_struct *mm, long pages)
 	 * agree that it should be set it will. If any module
 	 * thinks it should not be set it won't.
 	 */
-	list_for_each_entry(hp, &security_hook_heads.vm_enough_memory, list) {
+	list_for_each_entry(hp, &hook_heads[LSM_vm_enough_memory], list) {
 		rc = hp->hook.vm_enough_memory(mm, pages);
 		if (rc <= 0) {
 			cap_sys_admin = 0;
@@ -809,7 +812,7 @@ int security_inode_getsecurity(struct inode *inode, const char *name, void **buf
 	/*
 	 * Only one module will provide an attribute with a given name.
 	 */
-	list_for_each_entry(hp, &security_hook_heads.inode_getsecurity, list) {
+	list_for_each_entry(hp, &hook_heads[LSM_inode_getsecurity], list) {
 		rc = hp->hook.inode_getsecurity(inode, name, buffer, alloc);
 		if (rc != -EOPNOTSUPP)
 			return rc;
@@ -827,7 +830,7 @@ int security_inode_setsecurity(struct inode *inode, const char *name, const void
 	/*
 	 * Only one module will provide an attribute with a given name.
 	 */
-	list_for_each_entry(hp, &security_hook_heads.inode_setsecurity, list) {
+	list_for_each_entry(hp, &hook_heads[LSM_inode_setsecurity], list) {
 		rc = hp->hook.inode_setsecurity(inode, name, value, size,
 								flags);
 		if (rc != -EOPNOTSUPP)
@@ -1135,7 +1138,7 @@ int security_task_prctl(int option, unsigned long arg2, unsigned long arg3,
 	int rc = -ENOSYS;
 	struct security_hook_list *hp;
 
-	list_for_each_entry(hp, &security_hook_heads.task_prctl, list) {
+	list_for_each_entry(hp, &hook_heads[LSM_task_prctl], list) {
 		thisrc = hp->hook.task_prctl(option, arg2, arg3, arg4, arg5);
 		if (thisrc != -ENOSYS) {
 			rc = thisrc;
@@ -1638,7 +1641,7 @@ int security_xfrm_state_pol_flow_match(struct xfrm_state *x,
 	 * For speed optimization, we explicitly break the loop rather than
 	 * using the macro
 	 */
-	list_for_each_entry(hp, &security_hook_heads.xfrm_state_pol_flow_match,
+	list_for_each_entry(hp, &hook_heads[LSM_xfrm_state_pol_flow_match],
 				list) {
 		rc = hp->hook.xfrm_state_pol_flow_match(x, xp, fl);
 		break;
