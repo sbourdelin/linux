@@ -497,6 +497,8 @@ EXPORT_SYMBOL(jbd2_journal_free_reserved);
 /**
  * int jbd2_journal_start_reserved(handle_t *handle) - start reserved handle
  * @handle: handle to start
+ * @type: type of handle
+ * @line_no: line number of handle
  *
  * Start handle that has been previously reserved with jbd2_journal_reserve().
  * This attaches @handle to the running transaction (or creates one if there's
