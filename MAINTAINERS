@@ -648,6 +648,13 @@ L:	linux-gpio@vger.kernel.org
 S:	Maintained
 F:	drivers/gpio/gpio-altera.c
 
+ALTERA QUADSPI FLASH DRIVER
+M:	Matthew Gerlach <matthew.gerlach@linux.intel.com>
+L:	linux-mtd@lists.infradead.org
+S:	Maintained
+F:	drivers/mtd/spi-nor/altera-quadspi.c
+F:	inclulde/linux/mtd/altera-quadspi.h
+
 ALTERA SYSTEM RESOURCE DRIVER FOR ARRIA10 DEVKIT
 M:	Thor Thayer <thor.thayer@linux.intel.com>
 S:	Maintained

@@ -113,4 +113,9 @@ config SPI_STM32_QUADSPI
 	  This enables support for the STM32 Quad SPI controller.
 	  We only connect the NOR to this controller.
 
+config SPI_ALTERA_QUADSPI
+        tristate "Altera Quad SPI Flash Controller II"
+        help
+          Enable support for version 2 of Altera Quad SPI Flash Controller.
+
 endif # MTD_SPI_NOR
