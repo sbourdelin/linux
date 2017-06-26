@@ -89,6 +89,18 @@ enum tmc_mem_intf_width {
 	TMC_MEM_INTF_WIDTH_256BITS	= 8,
 };
 
+#define TMC_CAP_ETR_SG_UNIT			(1U << 0)
+
+/**
+ * struct tmc_cap - Describes the capabilities of the TMC.
+ * @caps:	- Bitmask of the capacities
+ */
+struct tmc_caps {
+	u32	caps;
+};
+
+#define CORESIGHT_SOC_400_TMC_CAPS	(TMC_CAP_ETR_SG_UNIT)
+
 /**
  * struct tmc_drvdata - specifics associated to an TMC component
  * @base:	memory mapped base address for this component.
@@ -110,6 +122,7 @@ struct tmc_drvdata {
 	void __iomem		*base;
 	struct device		*dev;
 	struct coresight_device	*csdev;
+	struct tmc_caps		caps;
 	struct miscdevice	miscdev;
 	spinlock_t		spinlock;
 	bool			reading;
@@ -157,5 +170,10 @@ tmc_write_##name(struct tmc_drvdata *drvdata, u64 val)			\
 TMC_REG_PAIR(rrp, TMC_RRP, TMC_RRPHI)
 TMC_REG_PAIR(rwp, TMC_RWP, TMC_RWPHI)
 TMC_REG_PAIR(dba, TMC_DBALO, TMC_DBAHI)
+
+static inline bool tmc_has_cap(struct tmc_drvdata *drvdata, u32 cap)
+{
+	return !!(drvdata->caps.caps & cap);
+}
 
 #endif

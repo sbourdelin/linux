@@ -399,16 +399,24 @@ static int tmc_probe(struct amba_device *adev, const struct amba_id *id)
 	ret = misc_register(&drvdata->miscdev);
 	if (ret)
 		coresight_unregister(drvdata->csdev);
+	else if (id->data)
+		drvdata->caps = *(struct tmc_caps *)id->data;
 out:
 	return ret;
 }
 
+static struct tmc_caps coresight_soc_400_tmc_caps = {
+	.caps = CORESIGHT_SOC_400_TMC_CAPS,
+};
+
 static struct amba_id tmc_ids[] = {
 	{
+		/* Coresight SoC 400 TMC */
 		.id     = 0x000bb961,
 		.mask   = 0x000fffff,
+		.data	= &coresight_soc_400_tmc_caps,
 	},
-	{ 0, 0},
+	{},
 };
 
 static struct amba_driver tmc_driver = {
