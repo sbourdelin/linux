@@ -19,6 +19,8 @@
 #include <sound/soc.h>
 #include <linux/dmaengine.h>
 
+#define SND_DMAENGINE_NAME "snd_dmaengine_pcm"
+
 /**
  * snd_pcm_substream_to_dma_direction - Get dma_transfer_direction for a PCM
  *   substream
