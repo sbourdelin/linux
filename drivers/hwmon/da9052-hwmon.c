@@ -20,13 +20,17 @@
 #include <linux/module.h>
 #include <linux/slab.h>
 #include <linux/platform_device.h>
+#include <linux/property.h>
 
 #include <linux/mfd/da9052/da9052.h>
 #include <linux/mfd/da9052/reg.h>
 
 struct da9052_hwmon {
-	struct da9052	*da9052;
-	struct mutex	hwmon_lock;
+	struct da9052		*da9052;
+	struct mutex		hwmon_lock;
+	bool			tsi_as_adc;
+	int			tsiref_mv;
+	struct completion	tsidone;
 };
 
 static const char * const input_names[] = {
@@ -37,6 +41,10 @@ static const char * const input_names[] = {
 	[DA9052_ADC_IN4]	=	"ADC IN4",
 	[DA9052_ADC_IN5]	=	"ADC IN5",
 	[DA9052_ADC_IN6]	=	"ADC IN6",
+	[DA9052_ADC_TSI_XP]	=	"ADC TS X+",
+	[DA9052_ADC_TSI_YP]	=	"ADC TS Y+",
+	[DA9052_ADC_TSI_XN]	=	"ADC TS X-",
+	[DA9052_ADC_TSI_YN]	=	"ADC TS Y-",
 	[DA9052_ADC_TJUNC]	=	"BATTERY JUNCTION TEMP",
 	[DA9052_ADC_VBBAT]	=	"BACK-UP BATTERY VOLTAGE",
 };
@@ -57,6 +65,11 @@ static inline int input_reg_to_mv(int value)
 static inline int vbbat_reg_to_mv(int value)
 {
 	return DIV_ROUND_CLOSEST(value * 5000, 1023);
+}
+
+static inline int input_tsireg_to_mv(struct da9052_hwmon *hwmon, int value)
+{
+	return DIV_ROUND_CLOSEST(value * hwmon->tsiref_mv, 1023);
 }
 
 static inline int da9052_enable_vddout_channel(struct da9052 *da9052)
@@ -154,6 +167,103 @@ static ssize_t da9052_read_misc_channel(struct device *dev,
 	return sprintf(buf, "%d\n", input_reg_to_mv(ret));
 }
 
+static int da9052_request_tsi_read(struct da9052_hwmon *hwmon, int channel)
+{
+	u8 val = BIT(6); /* TSI_MAN */
+
+	switch (channel) {
+	case DA9052_ADC_TSI_XP:
+		val |= (0 << 4); /* TSI_MUX */
+		break;
+	case DA9052_ADC_TSI_YP:
+		val |= (1 << 4); /* TSI_MUX */
+		break;
+	case DA9052_ADC_TSI_XN:
+		val |= (2 << 4); /* TSI_MUX */
+		break;
+	case DA9052_ADC_TSI_YN:
+		val |= (3 << 4); /* TSI_MUX */
+		break;
+	}
+
+	return da9052_reg_write(hwmon->da9052, DA9052_TSI_CONT_B_REG, val);
+}
+
+static int da9052_get_tsi_result(struct da9052_hwmon *hwmon, int channel)
+{
+	int msb, lsb;
+
+	switch (channel) {
+	case DA9052_ADC_TSI_XP:
+	case DA9052_ADC_TSI_XN:
+		msb = da9052_reg_read(hwmon->da9052, DA9052_TSI_X_MSB_REG);
+		if (msb < 0)
+			return msb;
+
+		lsb = da9052_reg_read(hwmon->da9052, DA9052_TSI_LSB_REG);
+		if (lsb < 0)
+			return lsb;
+
+		break;
+	case DA9052_ADC_TSI_YP:
+	case DA9052_ADC_TSI_YN:
+		msb = da9052_reg_read(hwmon->da9052, DA9052_TSI_Y_MSB_REG);
+		if (msb < 0)
+			return msb;
+
+		lsb = da9052_reg_read(hwmon->da9052, DA9052_TSI_LSB_REG);
+		if (lsb < 0)
+			return lsb;
+		lsb >>= 2;
+
+		break;
+	default:
+		return -ENXIO;
+	}
+
+	return (msb << 2) | (lsb & 0x3);
+}
+
+
+static ssize_t __da9052_read_tsi(struct device *dev, int channel)
+{
+	struct da9052_hwmon *hwmon = dev_get_drvdata(dev);
+	int ret;
+
+	reinit_completion(&hwmon->tsidone);
+
+	ret = da9052_request_tsi_read(hwmon, channel);
+	if (ret < 0)
+		return ret;
+
+	/* Wait for an conversion done interrupt */
+	if (!wait_for_completion_timeout(&hwmon->tsidone,
+					 msecs_to_jiffies(500))) {
+		dev_err(dev, "timeout waiting for TSI conversion interrupt\n");
+		return -ETIMEDOUT;
+	}
+
+	return da9052_get_tsi_result(hwmon, channel);
+}
+
+static ssize_t da9052_read_tsi(struct device *dev,
+			       struct device_attribute *devattr,
+			       char *buf)
+{
+	struct da9052_hwmon *hwmon = dev_get_drvdata(dev);
+	int channel = to_sensor_dev_attr(devattr)->index;
+	int ret;
+
+	mutex_lock(&hwmon->hwmon_lock);
+	ret = __da9052_read_tsi(dev, channel);
+	mutex_unlock(&hwmon->hwmon_lock);
+
+	if (ret < 0)
+		return ret;
+	else
+		return sprintf(buf, "%d\n", input_tsireg_to_mv(hwmon, ret));
+}
+
 static ssize_t da9052_read_tjunc(struct device *dev,
 				 struct device_attribute *devattr, char *buf)
 {
@@ -196,6 +306,28 @@ static ssize_t show_label(struct device *dev,
 		       input_names[to_sensor_dev_attr(devattr)->index]);
 }
 
+static umode_t da9052_channel_is_visible(struct kobject *kobj,
+					 struct attribute *a, int index)
+{
+	struct device *dev = container_of(kobj, struct device, kobj);
+	struct da9052_hwmon *hwmon = dev_get_drvdata(dev);
+
+	switch (index) {
+	case DA9052_ADC_TSI_XP:
+	case DA9052_ADC_TSI_YP:
+	case DA9052_ADC_TSI_XN:
+	case DA9052_ADC_TSI_YN:
+		break;
+	default:
+		return a->mode;
+	}
+
+	if (!hwmon->tsi_as_adc)
+		return 0;
+
+	return a->mode;
+}
+
 static SENSOR_DEVICE_ATTR(in0_input, S_IRUGO, da9052_read_vddout, NULL,
 			  DA9052_ADC_VDDOUT);
 static SENSOR_DEVICE_ATTR(in0_label, S_IRUGO, show_label, NULL,
@@ -220,6 +352,23 @@ static SENSOR_DEVICE_ATTR(in9_input, S_IRUGO, da9052_read_vbbat, NULL,
 			  DA9052_ADC_VBBAT);
 static SENSOR_DEVICE_ATTR(in9_label, S_IRUGO, show_label, NULL,
 			  DA9052_ADC_VBBAT);
+
+static SENSOR_DEVICE_ATTR(in70_input, S_IRUGO, da9052_read_tsi, NULL,
+			  DA9052_ADC_TSI_XP);
+static SENSOR_DEVICE_ATTR(in70_label, S_IRUGO, show_label, NULL,
+			  DA9052_ADC_TSI_XP);
+static SENSOR_DEVICE_ATTR(in71_input, S_IRUGO, da9052_read_tsi, NULL,
+			  DA9052_ADC_TSI_XN);
+static SENSOR_DEVICE_ATTR(in71_label, S_IRUGO, show_label, NULL,
+			  DA9052_ADC_TSI_XN);
+static SENSOR_DEVICE_ATTR(in72_input, S_IRUGO, da9052_read_tsi, NULL,
+			  DA9052_ADC_TSI_YP);
+static SENSOR_DEVICE_ATTR(in72_label, S_IRUGO, show_label, NULL,
+			  DA9052_ADC_TSI_YP);
+static SENSOR_DEVICE_ATTR(in73_input, S_IRUGO, da9052_read_tsi, NULL,
+			  DA9052_ADC_TSI_YN);
+static SENSOR_DEVICE_ATTR(in73_label, S_IRUGO, show_label, NULL,
+			  DA9052_ADC_TSI_YN);
 
 static SENSOR_DEVICE_ATTR(curr1_input, S_IRUGO, da9052_read_ich, NULL,
 			  DA9052_ADC_ICH);
@@ -246,6 +395,14 @@ static struct attribute *da9052_attrs[] = {
 	&sensor_dev_attr_in5_label.dev_attr.attr,
 	&sensor_dev_attr_in6_input.dev_attr.attr,
 	&sensor_dev_attr_in6_label.dev_attr.attr,
+	&sensor_dev_attr_in70_input.dev_attr.attr,
+	&sensor_dev_attr_in70_label.dev_attr.attr,
+	&sensor_dev_attr_in71_input.dev_attr.attr,
+	&sensor_dev_attr_in71_label.dev_attr.attr,
+	&sensor_dev_attr_in72_input.dev_attr.attr,
+	&sensor_dev_attr_in72_label.dev_attr.attr,
+	&sensor_dev_attr_in73_input.dev_attr.attr,
+	&sensor_dev_attr_in73_label.dev_attr.attr,
 	&sensor_dev_attr_in9_input.dev_attr.attr,
 	&sensor_dev_attr_in9_label.dev_attr.attr,
 	&sensor_dev_attr_curr1_input.dev_attr.attr,
@@ -257,29 +414,93 @@ static struct attribute *da9052_attrs[] = {
 	NULL
 };
 
-ATTRIBUTE_GROUPS(da9052);
+static const struct attribute_group da9052_group = {
+	.attrs = da9052_attrs,
+	.is_visible = da9052_channel_is_visible,
+};
+__ATTRIBUTE_GROUPS(da9052);
+
+static irqreturn_t da9052_tsi_datardy_irq(int irq, void *data)
+{
+	struct da9052_hwmon *hwmon = data;
+	complete(&hwmon->tsidone);
+	return IRQ_HANDLED;
+}
 
 static int da9052_hwmon_probe(struct platform_device *pdev)
 {
 	struct device *dev = &pdev->dev;
 	struct da9052_hwmon *hwmon;
 	struct device *hwmon_dev;
+	int err;
 
 	hwmon = devm_kzalloc(dev, sizeof(struct da9052_hwmon), GFP_KERNEL);
 	if (!hwmon)
 		return -ENOMEM;
 
+	platform_set_drvdata(pdev, hwmon);
+
 	mutex_init(&hwmon->hwmon_lock);
 	hwmon->da9052 = dev_get_drvdata(pdev->dev.parent);
+
+	init_completion(&hwmon->tsidone);
+
+	hwmon->tsi_as_adc =
+		device_property_read_bool(pdev->dev.parent, "diag,tsi-as-adc");
+
+	/* get tsiref from DT, default to 2.5 Volt (typ. value in datasheet) */
+	hwmon->tsiref_mv = 2500000;
+	device_property_read_u32(pdev->dev.parent, "diag,tsiref-microvolt",
+				 &hwmon->tsiref_mv);
+
+	/* convert from microvolt (DT) to millivolt (hwmon) */
+	hwmon->tsiref_mv /= 1000;
+
+	/* TSIREF must be between 1.8 and 2.6 Volt according to datasheet */
+	if (hwmon->tsiref_mv < 1800 || hwmon->tsiref_mv > 2600) {
+		dev_err(hwmon->da9052->dev, "invalid TSIREF voltage: %d\n",
+			hwmon->tsiref_mv);
+		return -ENXIO;
+	}
+
+	if (hwmon->tsi_as_adc) {
+		/* disable touchscreen features */
+		da9052_reg_write(hwmon->da9052, DA9052_TSI_CONT_A_REG, 0x00);
+
+		err = da9052_request_irq(hwmon->da9052, DA9052_IRQ_TSIREADY,
+					 "tsiready-irq", da9052_tsi_datardy_irq,
+					 hwmon);
+		if (err) {
+			dev_err(hwmon->da9052->dev,
+				"Failed to register TSIRDY IRQ: %d\n", err);
+			return err;
+		}
+	}
 
 	hwmon_dev = devm_hwmon_device_register_with_groups(dev, "da9052",
 							   hwmon,
 							   da9052_groups);
-	return PTR_ERR_OR_ZERO(hwmon_dev);
+	err = PTR_ERR_OR_ZERO(hwmon_dev);
+	if (err) {
+		if (hwmon->tsi_as_adc)
+			da9052_free_irq(hwmon->da9052, DA9052_IRQ_TSIREADY, hwmon);
+		return err;
+	}
+
+	return 0;
+}
+
+static int da9052_hwmon_remove(struct platform_device *pdev)
+{
+	struct da9052_hwmon *hwmon = platform_get_drvdata(pdev);
+	if (hwmon->tsi_as_adc)
+		da9052_free_irq(hwmon->da9052, DA9052_IRQ_TSIREADY, hwmon);
+	return 0;
 }
 
 static struct platform_driver da9052_hwmon_driver = {
 	.probe = da9052_hwmon_probe,
+	.remove = da9052_hwmon_remove,
 	.driver = {
 		.name = "da9052-hwmon",
 	},
