@@ -5,10 +5,10 @@ Description:
 		The attributes:
 
 		c_chmask - capture channel mask
-		c_srate - capture sampling rate
+		c_srate - list of capture sampling rates (comma-separataed)
 		c_ssize - capture sample size (bytes)
 		p_chmask - playback channel mask
-		p_srate - playback sampling rate
+		p_srate - list of playback sampling rates (comma-separated)
 		p_ssize - playback sample size (bytes)
 		req_number - the number of pre-allocated request
 			for both capture and playback
