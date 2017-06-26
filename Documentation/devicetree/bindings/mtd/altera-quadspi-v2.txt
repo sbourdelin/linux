@@ -1,0 +1,37 @@
+* Altera Quad SPI Controller Version 2
+
+Required properties:
+- compatible : Should be "altr,quadspi-v2".
+- reg : Contains at least two entries, and possibly three entries, each of
+	which is a tuple consisting of a physical address and length.
+- reg-names : Should contain the names "avl_csr" and "avl_mem" corresponding
+	      to the control and status registers and qspi memory, respectively.
+
+
+The Altera Quad SPI Controller Version 2 can be paired with a windowed bridge
+in order to reduce the footprint of the memory interface.  When a windowed
+bridge is used, reads and writes of data must be 32 bits wide.
+
+Optional properties:
+- reg-names : Should contain the name "avl_window", if the windowed bridge
+	      is used.  This name corresponds to the register space that
+	      controls the window.
+- window-size : The size of the window which must be an even power of 2.
+- read-bit-reverse : A boolean indicating the data read from the flash should
+		     be bit reversed on a byte by byte basis before being
+		     delivered to the MTD layer.
+- write-bit-reverse : A boolean indicating the data written to the flash should
+		      be bit reversed on a byte by byte basis.
+
+Example:
+
+qspi: spi@a0001000 {
+	compatible = "altr,quadspi-v2";
+	reg = <0xa0001000 0x40>, <0xb0000000 0x4000000>;
+	reg-names = "avl_csr", "avl_mem";
+
+	flash@0 {
+		reg = <0>;
+		label = "FPGA Image";
+	};
+};
