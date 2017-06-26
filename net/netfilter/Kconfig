@@ -145,6 +145,13 @@ config NF_CONNTRACK_LABELS
 	  This option enables support for assigning user-defined flag bits
 	  to connection tracking entries.  It selected by the connlabel match.
 
+config NF_CONNTRACK_EXPAND
+	tristate  'Connection tracking expand'
+	default y
+	help
+	  This option enables support for dynamic adding new extensions in runtime but
+	  not need to predefine an id in enum nf_ct_ext_id.
+
 config NF_CT_PROTO_DCCP
 	bool 'DCCP protocol connection tracking support'
 	depends on NETFILTER_ADVANCED
