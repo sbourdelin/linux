@@ -1215,7 +1215,6 @@ static ssize_t fadump_register_store(struct kobject *kobj,
 		break;
 	case '1':
 		if (fw_dump.dump_registered == 1) {
-			ret = -EEXIST;
 			goto unlock_out;
 		}
 		/* Register Firmware-assisted dump */
