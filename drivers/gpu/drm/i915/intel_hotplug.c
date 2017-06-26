@@ -218,9 +218,13 @@ static void intel_hpd_irq_storm_reenable_work(struct work_struct *work)
 			struct intel_connector *intel_connector = to_intel_connector(connector);
 
 			if (intel_connector->encoder->hpd_pin == i) {
-				if (connector->polled != intel_connector->polled)
+				if (connector->polled != intel_connector->polled) {
 					DRM_DEBUG_DRIVER("Reenabling HPD on connector %s\n",
 							 connector->name);
+
+					dev_priv->hotplug.event_bits |= (1 << i);
+				}
+
 				connector->polled = intel_connector->polled;
 				if (!connector->polled)
 					connector->polled = DRM_CONNECTOR_POLL_HPD;
@@ -231,6 +235,8 @@ static void intel_hpd_irq_storm_reenable_work(struct work_struct *work)
 	if (dev_priv->display_irqs_enabled && dev_priv->display.hpd_irq_setup)
 		dev_priv->display.hpd_irq_setup(dev_priv);
 	spin_unlock_irq(&dev_priv->irq_lock);
+
+	schedule_work(&dev_priv->hotplug.hotplug_work);
 
 	intel_runtime_pm_put(dev_priv);
 }
