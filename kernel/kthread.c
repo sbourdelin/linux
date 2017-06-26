@@ -171,9 +171,20 @@ static void __kthread_parkme(struct kthread *self)
 {
 	__set_current_state(TASK_PARKED);
 	while (test_bit(KTHREAD_SHOULD_PARK, &self->flags)) {
+		/*
+		 * Why the preempt_disable?
+		 * Hotplug needs to ensure that 'self' is off of the runqueue
+		 * as well, before scheduling the stopper thread that will
+		 * migrate tasks off of the runqeue that 'self' was running on.
+		 * This avoids unnecessary migration work and also ensures that
+		 * kthread_unpark in the cpu_up path doesn't race with
+		 * __kthread_parkme.
+		 */
+		preempt_disable();
 		if (!test_and_set_bit(KTHREAD_IS_PARKED, &self->flags))
 			complete(&self->parked);
-		schedule();
+		schedule_preempt_disabled();
+		preempt_enable();
 		__set_current_state(TASK_PARKED);
 	}
 	clear_bit(KTHREAD_IS_PARKED, &self->flags);
