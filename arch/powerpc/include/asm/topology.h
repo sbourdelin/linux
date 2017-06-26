@@ -78,6 +78,23 @@ static inline int prrn_is_enabled(void)
 }
 #endif /* CONFIG_NUMA && CONFIG_PPC_SPLPAR */
 
+#if defined(CONFIG_HOTPLUG_CPU)
+#if defined(CONFIG_NUMA) && defined(CONFIG_PPC_SPLPAR)
+extern int timed_topology_update(int nsecs);
+#else
+static int timed_topology_update(int nsecs)
+{
+	return 0;
+}
+#endif /* CONFIG_NUMA && CONFIG_PPC_SPLPAR */
+#endif /* CONFIG_HOTPLUG_CPU */
+
+#if defined(CONFIG_PPC_SPLPAR)
+extern void shared_topology_update(void);
+#else
+#define	shared_topology_update()	0
+#endif /* CONFIG_PPC_SPLPAR */
+
 #include <asm-generic/topology.h>
 
 #ifdef CONFIG_SMP
