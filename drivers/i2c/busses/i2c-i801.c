@@ -1406,33 +1406,42 @@ i801_acpi_io_handler(u32 function, acpi_physical_address address, u32 bits,
 {
 	struct i801_priv *priv = handler_context;
 	struct pci_dev *pdev = priv->pci_dev;
+	struct device *dev = &pdev->dev;
 	acpi_status status;
+	int err;
 
-	/*
-	 * Once BIOS AML code touches the OpRegion we warn and inhibit any
-	 * further access from the driver itself. This device is now owned
-	 * by the system firmware.
-	 */
 	mutex_lock(&priv->acpi_lock);
 
-	if (!priv->acpi_reserved) {
-		priv->acpi_reserved = true;
+	/*
+	 * BIOS AML code should never actually touch the SMBus registers,
+	 * however crappy firmware (mainly Lenovo's) can make the mistake of
+	 * mapping things over the SMBus region that should definitely not be
+	 * there (such as the OpRegion for Intel GPUs).
+	 * This is extremely bad firmware behavior, but it is unlikely this will
+	 * ever get fixed by Lenovo.
+	 */
+	dev_warn_once(dev,
+		      FW_BUG "OpRegion overlaps with SMBus registers, working around\n");
 
-		dev_warn(&pdev->dev, "BIOS is accessing SMBus registers\n");
-		dev_warn(&pdev->dev, "Driver SMBus register access inhibited\n");
-
-		/*
-		 * BIOS is accessing the host controller so prevent it from
-		 * suspending automatically from now on.
-		 */
-		pm_runtime_get_sync(&pdev->dev);
-	}
+	pm_runtime_get_sync(dev);
+	pcim_iounmap_regions(pdev, 1 << SMBBAR);
 
 	if ((function & ACPI_IO_MASK) == ACPI_READ)
 		status = acpi_os_read_port(address, (u32 *)value, bits);
 	else
 		status = acpi_os_write_port(address, (u32)*value, bits);
 
+	err = pcim_iomap_regions(pdev, 1 << SMBBAR,
+				 dev_driver_string(&pdev->dev));
+	if (err) {
+		dev_err(&pdev->dev,
+			FW_BUG "Failed to restore SMBus region 0x%lx-0x%Lx. SMBus is now broken.\n",
+			priv->smba,
+			(unsigned long long)pci_resource_end(pdev, SMBBAR));
+		priv->acpi_reserved = true;
+	}
+
+	pm_runtime_put(dev);
 	mutex_unlock(&priv->acpi_lock);
 
 	return status;
