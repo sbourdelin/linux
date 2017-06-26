@@ -186,6 +186,8 @@ struct dma_interleaved_template {
  *  on the result of this operation
  * @DMA_CTRL_REUSE: client can reuse the descriptor and submit again till
  *  cleared or freed
+ * @DMA_PREP_CMD: tell the driver that the data passed to DMA API is in command
+ *  format and it will be used for configuring the peripheral registers.
  */
 enum dma_ctrl_flags {
 	DMA_PREP_INTERRUPT = (1 << 0),
@@ -195,6 +197,7 @@ enum dma_ctrl_flags {
 	DMA_PREP_CONTINUE = (1 << 4),
 	DMA_PREP_FENCE = (1 << 5),
 	DMA_CTRL_REUSE = (1 << 6),
+	DMA_PREP_CMD = (1 << 7),
 };
 
 /**
