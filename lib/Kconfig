@@ -278,6 +278,7 @@ config DECOMPRESS_LZ4
 # Generic allocator support is selected if needed
 #
 config GENERIC_ALLOCATOR
+	depends on ARCH_HAS_SET_MEMORY
 	bool
 
 #

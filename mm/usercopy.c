@@ -195,22 +195,28 @@ static inline const char *check_page_span(const void *ptr, unsigned long n,
 	return NULL;
 }
 
+extern const char *__pmalloc_check_object(const void *ptr, unsigned long n);
+
 static inline const char *check_heap_object(const void *ptr, unsigned long n,
 					    bool to_user)
 {
 	struct page *page;
 
-	if (!virt_addr_valid(ptr))
-		return NULL;
+	if (virt_addr_valid(ptr)) {
+		page = virt_to_head_page(ptr);
 
-	page = virt_to_head_page(ptr);
-
-	/* Check slab allocator for flags and size. */
-	if (PageSlab(page))
-		return __check_heap_object(ptr, n, page);
-
+		/* Check slab allocator for flags and size. */
+		if (PageSlab(page))
+			return __check_heap_object(ptr, n, page);
 	/* Verify object does not incorrectly span multiple pages. */
-	return check_page_span(ptr, n, page, to_user);
+		return check_page_span(ptr, n, page, to_user);
+	}
+	if (likely(is_vmalloc_addr(ptr))) {
+		page = vmalloc_to_page(ptr);
+		if (unlikely(page && PagePmalloc(page)))
+			return __pmalloc_check_object(ptr, n);
+	}
+	return NULL;
 }
 
 /*

@@ -100,6 +100,7 @@ static int kernel_init(void *);
 extern void init_IRQ(void);
 extern void fork_init(void);
 extern void radix_tree_init(void);
+int __init pmalloc_init(void);
 
 /*
  * Debug helper: via this flag we know that we are in 'early bootup code'
@@ -674,6 +675,7 @@ asmlinkage __visible void __init start_kernel(void)
 	proc_caches_init();
 	buffer_init();
 	key_init();
+	pmalloc_init();
 	security_init();
 	dbg_late_init();
 	vfs_caches_init();
