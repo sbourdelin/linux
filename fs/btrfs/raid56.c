@@ -1141,6 +1141,7 @@ static void index_rbio_pages(struct btrfs_raid_bio *rbio)
 	unsigned long stripe_offset;
 	unsigned long page_index;
 	int i;
+	struct bvec_iter_all bia;
 
 	spin_lock_irq(&rbio->bio_list_lock);
 	bio_list_for_each(bio, &rbio->bio_list) {
@@ -1148,7 +1149,7 @@ static void index_rbio_pages(struct btrfs_raid_bio *rbio)
 		stripe_offset = start - rbio->bbio->raid_map[0];
 		page_index = stripe_offset >> PAGE_SHIFT;
 
-		bio_for_each_segment_all(bvec, bio, i)
+		bio_for_each_segment_all_sp(bvec, bio, i, bia)
 			rbio->bio_pages[page_index + i] = bvec->bv_page;
 	}
 	spin_unlock_irq(&rbio->bio_list_lock);
@@ -1425,8 +1426,9 @@ static void set_bio_pages_uptodate(struct bio *bio)
 {
 	struct bio_vec *bvec;
 	int i;
+	struct bvec_iter_all bia;
 
-	bio_for_each_segment_all(bvec, bio, i)
+	bio_for_each_segment_all_sp(bvec, bio, i, bia)
 		SetPageUptodate(bvec->bv_page);
 }
 
