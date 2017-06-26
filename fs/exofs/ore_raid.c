@@ -429,6 +429,7 @@ static void _mark_read4write_pages_uptodate(struct ore_io_state *ios, int ret)
 {
 	struct bio_vec *bv;
 	unsigned i, d;
+	struct bvec_iter_all bia;
 
 	/* loop on all devices all pages */
 	for (d = 0; d < ios->numdevs; d++) {
@@ -437,7 +438,7 @@ static void _mark_read4write_pages_uptodate(struct ore_io_state *ios, int ret)
 		if (!bio)
 			continue;
 
-		bio_for_each_segment_all(bv, bio, i) {
+		bio_for_each_segment_all_sp(bv, bio, i, bia) {
 			struct page *page = bv->bv_page;
 
 			SetPageUptodate(page);
