@@ -118,4 +118,9 @@ config SPI_ALTERA_QUADSPI
         help
           Enable support for version 2 of Altera Quad SPI Flash Controller.
 
+config SPI_ALTERA_QUADSPI_PLATFORM
+	tristate "Platform support for Altera Quad SPI Flash Controller II"
+	help
+	  Platform driver support for  Altera Quad SPI Flash Controller II"
+
 endif # MTD_SPI_NOR
