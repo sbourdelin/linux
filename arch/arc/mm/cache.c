@@ -1113,7 +1113,7 @@ noinline void __init arc_ioc_setup(void)
 	 * For now we assume IOC aperture to cover all the memory used by the
 	 * kernel.
 	 */
-	ap_base = CONFIG_LINUX_LINK_BASE;
+	ap_base = CONFIG_KERNEL_RAM_BASE_ADDRESS;
 
 	if (ap_base % ap_size != 0)
 		panic("IOC Aperture start must be aligned to the size of the aperture");
