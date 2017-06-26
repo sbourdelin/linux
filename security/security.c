@@ -27,6 +27,7 @@
 #include <linux/personality.h>
 #include <linux/backing-dev.h>
 #include <linux/string.h>
+#include <linux/pmalloc.h>
 #include <net/flow.h>
 
 #define MAX_LSM_EVM_XATTR	2
@@ -34,10 +35,19 @@
 /* Maximum number of letters for an LSM name string */
 #define SECURITY_NAME_MAX	10
 
-static struct list_head hook_heads[LSM_MAX_HOOK_INDEX]
-	__lsm_ro_after_init;
 static ATOMIC_NOTIFIER_HEAD(lsm_notifier_chain);
 
+static int dynamic_lsm = IS_ENABLED(CONFIG_SECURITY_SELINUX_DISABLE);
+
+static __init int set_dynamic_lsm(char *str)
+{
+	get_option(&str, &dynamic_lsm);
+	return 0;
+}
+early_param("dynamic_lsm", set_dynamic_lsm);
+
+static struct list_head *hook_heads;
+static struct gen_pool *sec_pool;
 char *lsm_names;
 /* Boot-time LSM user choice */
 static __initdata char chosen_lsm[SECURITY_NAME_MAX + 1] =
@@ -62,6 +72,11 @@ int __init security_init(void)
 {
 	enum security_hook_index i;
 
+	sec_pool = pmalloc_create_pool("security", PMALLOC_DEFAULT_ALLOC_ORDER);
+	BUG_ON(!sec_pool);
+	hook_heads = pmalloc(sec_pool,
+			     sizeof(struct list_head) * LSM_MAX_HOOK_INDEX);
+	BUG_ON(!hook_heads);
 	for (i = 0; i < LSM_MAX_HOOK_INDEX; i++)
 		INIT_LIST_HEAD(&hook_heads[i]);
 	pr_info("Security Framework initialized\n");
@@ -77,7 +92,8 @@ int __init security_init(void)
 	 * Load all the remaining security modules.
 	 */
 	do_security_initcalls();
-
+	if (!dynamic_lsm)
+		pmalloc_protect_pool(sec_pool);
 	return 0;
 }
 
