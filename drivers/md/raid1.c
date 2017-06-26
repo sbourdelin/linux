@@ -2086,10 +2086,8 @@ static void process_checks(struct r1bio *r1_bio)
 	/* Fix variable parts of all bios */
 	vcnt = (r1_bio->sectors + PAGE_SIZE / 512 - 1) >> (PAGE_SHIFT - 9);
 	for (i = 0; i < conf->raid_disks * 2; i++) {
-		int j;
 		int size;
 		blk_status_t status;
-		struct bio_vec *bi;
 		struct bio *b = r1_bio->bios[i];
 		struct resync_pages *rp = get_resync_pages(b);
 		if (b->bi_end_io != end_sync_read)
@@ -2098,8 +2096,6 @@ static void process_checks(struct r1bio *r1_bio)
 		status = b->bi_status;
 		bio_reset(b);
 		b->bi_status = status;
-		b->bi_vcnt = vcnt;
-		b->bi_iter.bi_size = r1_bio->sectors << 9;
 		b->bi_iter.bi_sector = r1_bio->sector +
 			conf->mirrors[i].rdev->data_offset;
 		b->bi_bdev = conf->mirrors[i].rdev->bdev;
@@ -2107,15 +2103,20 @@ static void process_checks(struct r1bio *r1_bio)
 		rp->raid_bio = r1_bio;
 		b->bi_private = rp;
 
-		size = b->bi_iter.bi_size;
-		bio_for_each_segment_all(bi, b, j) {
-			bi->bv_offset = 0;
-			if (size > PAGE_SIZE)
-				bi->bv_len = PAGE_SIZE;
-			else
-				bi->bv_len = size;
-			size -= PAGE_SIZE;
-		}
+		/* initialize bvec table again */
+		rp->idx = 0;
+		size = r1_bio->sectors << 9;
+		do {
+			struct page *page = resync_fetch_page(rp, rp->idx++);
+			int len = min_t(int, size, PAGE_SIZE);
+
+			/*
+			 * won't fail because the vec table is big
+			 * enough to hold all these pages
+			 */
+			bio_add_page(b, page, len, 0);
+			size -= len;
+		} while (rp->idx < RESYNC_PAGES && size > 0);
 	}
 	for (primary = 0; primary < conf->raid_disks * 2; primary++)
 		if (r1_bio->bios[primary]->bi_end_io == end_sync_read &&
