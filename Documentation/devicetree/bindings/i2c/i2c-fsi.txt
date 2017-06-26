@@ -1,0 +1,31 @@
+Device-tree bindings for FSI-attached I2C master driver
+-------------------------------------------------------
+
+Required properties:
+ - compatible = "ibm,i2cm-fsi";
+ - reg = < address size >;		: The FSI CFAM address and address space
+					  size.
+ - #address-cells = <1>;		: Number of address cells in child nodes
+ - #size-cells = <0>;			: Number of size cells in child nodes.
+ - child nodes				: Nodes to describe ports off the I2C
+					  master.
+
+Child node required properties:
+ - reg = < port number >		: The port number on the I2C master.
+
+Examples:
+
+    i2cm@1800 {
+        compatible = "ibm,i2cm-fsi";
+        reg = < 0x1800 0x400 >;
+        #address-cells = <1>;
+        #size-cells = <0>;
+
+        port@0 {
+            reg = <0>;
+        };
+
+        port@1 {
+            reg = <1>;
+        };
+    };
