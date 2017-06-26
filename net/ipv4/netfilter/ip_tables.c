@@ -967,7 +967,7 @@ static int get_info(struct net *net, void __user *user,
 		struct xt_table_info tmp;
 
 		if (compat) {
-			ret = compat_table_info(private, &tmp);
+			compat_table_info(private, &tmp);
 			xt_compat_flush_offsets(AF_INET);
 			private = &tmp;
 		}
