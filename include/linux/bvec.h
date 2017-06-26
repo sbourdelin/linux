@@ -22,6 +22,7 @@
 
 #include <linux/kernel.h>
 #include <linux/bug.h>
+#include <linux/mm.h>
 
 /*
  * What is multipage bvecs(segment)?
@@ -95,14 +96,25 @@ struct bvec_iter {
 #define bvec_iter_offset_mp(bvec, iter)				\
 	(__bvec_iter_bvec((bvec), (iter))->bv_offset + (iter).bi_bvec_done)
 
+#define bvec_iter_page_idx_mp(bvec, iter)			\
+	(bvec_iter_offset_mp((bvec), (iter)) / PAGE_SIZE)
+
+
 /*
  * <page, offset,length> of singlepage(sp) segment.
  *
  * This helpers will be implemented for building sp bvec in flight.
  */
-#define bvec_iter_offset_sp(bvec, iter)	bvec_iter_offset_mp((bvec), (iter))
-#define bvec_iter_len_sp(bvec, iter)	bvec_iter_len_mp((bvec), (iter))
-#define bvec_iter_page_sp(bvec, iter)	bvec_iter_page_mp((bvec), (iter))
+#define bvec_iter_offset_sp(bvec, iter)					\
+	(bvec_iter_offset_mp((bvec), (iter)) % PAGE_SIZE)
+
+#define bvec_iter_len_sp(bvec, iter)					\
+	min_t(unsigned, bvec_iter_len_mp((bvec), (iter)),		\
+	    (PAGE_SIZE - (bvec_iter_offset_sp((bvec), (iter)))))
+
+#define bvec_iter_page_sp(bvec, iter)					\
+	nth_page(bvec_iter_page_mp((bvec), (iter)),			\
+		 bvec_iter_page_idx_mp((bvec), (iter)))
 
 /* current interfaces support sp style at default */
 #define bvec_iter_page(bvec, iter)	bvec_iter_page_sp((bvec), (iter))
