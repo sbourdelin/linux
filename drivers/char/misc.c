@@ -188,8 +188,6 @@ int misc_register(struct miscdevice *misc)
 	int err = 0;
 	bool is_dynamic = (misc->minor == MISC_DYNAMIC_MINOR);
 
-	INIT_LIST_HEAD(&misc->list);
-
 	mutex_lock(&misc_mtx);
 
 	if (is_dynamic) {
@@ -233,6 +231,7 @@ int misc_register(struct miscdevice *misc)
 	 * Add it to the front, so that later devices can "override"
 	 * earlier defaults
 	 */
+	INIT_LIST_HEAD(&misc->list);
 	list_add(&misc->list, &misc_list);
  out:
 	mutex_unlock(&misc_mtx);
