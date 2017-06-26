@@ -290,6 +290,85 @@ static int replay_entries_cmp(void *priv, struct list_head *a,
 	return -1;
 }
 
+static void inspect_xattr_nodes(struct ubifs_info *c, struct replay_entry *pos)
+{
+	int n, found;
+	struct ubifs_znode *znode;
+	struct replay_entry *r, *r1, *r2, *r3;
+
+	r1 = pos;
+
+	/* Don't wrap around. */
+	if (list_is_last(&r1->list, &c->replay_list))
+		return;
+
+	r2 = list_next_entry(r1, list);
+
+	if (list_is_last(&r2->list, &c->replay_list))
+		return;
+
+	r3 = list_next_entry(r2, list);
+
+	if (key_type(c, &r2->key) != UBIFS_INO_KEY) {
+		/* We always write a xent node, followed by two ino nodes. */
+		ubifs_err(c, "Expected ino node, got: %i", key_type(c, &r2->key));
+		return;
+	}
+
+	if (key_type(c, &r3->key) != UBIFS_INO_KEY) {
+		/* We always write a xent node, followed by two ino nodes. */
+		ubifs_err(c, "Expected ino node, got: %i", key_type(c, &r3->key));
+		return;
+	}
+
+	/*
+	 * If the replay list container another reference to the host inode, @r3,
+	 * we can assume that the xattr is not orphaned.
+	 */
+	list_for_each_entry(r, &c->replay_list, list) {
+		if (key_type(c, &r->key) == UBIFS_INO_KEY &&
+		    key_inum(c, &r->key) == key_inum(c, &r3->key) &&
+		    r->sqnum != r3->sqnum)
+			return;
+	}
+
+	/*
+	 * Also make sure that the TNC does not know the host inode.
+	 */
+	found = ubifs_lookup_level0(c, &r3->key, &znode, &n);
+	if (found)
+		return;
+
+	/* The xattr is really an orphan, mark all three nodes for deletion. */
+	r1->deletion = 1;
+	r2->deletion = 1;
+	r3->deletion = 1;
+}
+
+/**
+ * kill_orphan_xattrs - search and kill orphaned xattr nodes.
+ * @c: UBIFS file-system description object
+ *
+ * Creating a xattr is an independent journal transaction and the xattr
+ * code assumes that there is always a valid host inode present when a
+ * new xattr is created.
+ * This assumption is not correct for LSM and fscrypt, for these users
+ * UBIFS creates the xattr before the host inode is created and visible to
+ * the user. Since these are two journal transactions it can happen that
+ * due to a power-cut only the xattr is present but not the host inode
+ * nor a directory entry for it. To deal with that problem we have to
+ * scan the replay list for such orphans and kill them.
+ */
+static void kill_orphan_xattrs(struct ubifs_info *c)
+{
+	struct replay_entry *r;
+
+	list_for_each_entry(r, &c->replay_list, list) {
+		if (!r->deletion && key_type(c, &r->key) == UBIFS_XENT_KEY)
+			inspect_xattr_nodes(c, r);
+	}
+}
+
 /**
  * apply_replay_list - apply the replay list to the TNC.
  * @c: UBIFS file-system description object
@@ -303,6 +382,8 @@ static int apply_replay_list(struct ubifs_info *c)
 	int err;
 
 	list_sort(c, &c->replay_list, &replay_entries_cmp);
+
+	kill_orphan_xattrs(c);
 
 	list_for_each_entry(r, &c->replay_list, list) {
 		cond_resched();
