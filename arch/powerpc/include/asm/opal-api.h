@@ -190,7 +190,8 @@
 #define OPAL_NPU_INIT_CONTEXT			146
 #define OPAL_NPU_DESTROY_CONTEXT		147
 #define OPAL_NPU_MAP_LPAR			148
-#define OPAL_LAST				148
+#define OPAL_PCI_SET_P2P			149
+#define OPAL_LAST				149
 
 /* Device tree flags */
 
@@ -1002,6 +1003,11 @@ enum {
 	XIVE_DUMP_VP		= 4,
 	XIVE_DUMP_EMU_STATE	= 5,
 };
+
+/* PCI p2p descriptor */
+#define OPAL_PCI_P2P_ENABLE		0x1
+#define OPAL_PCI_P2P_LOAD		0x2
+#define OPAL_PCI_P2P_STORE		0x4
 
 #endif /* __ASSEMBLY__ */
 

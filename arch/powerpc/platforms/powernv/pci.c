@@ -37,6 +37,8 @@
 #include "powernv.h"
 #include "pci.h"
 
+static DEFINE_MUTEX(p2p_mutex);
+
 int pnv_pci_get_slot_id(struct device_node *np, uint64_t *id)
 {
 	struct device_node *parent = np;
@@ -900,6 +902,72 @@ void pnv_pci_dma_bus_setup(struct pci_bus *bus)
 		}
 	}
 }
+
+int pnv_pci_set_p2p(struct pci_dev *initiator, struct pci_dev *target,
+		uint64_t desc)
+{
+	struct pci_controller *hose;
+	struct pnv_phb *phb_init, *phb_target;
+	struct pnv_ioda_pe *pe_init;
+	int rc;
+
+	if (!opal_check_token(OPAL_PCI_SET_P2P))
+		return -ENXIO;
+
+	hose = pci_bus_to_host(initiator->bus);
+	phb_init = hose->private_data;
+
+	hose = pci_bus_to_host(target->bus);
+	phb_target = hose->private_data;
+
+	pe_init = pnv_ioda_get_pe(initiator);
+	if (!pe_init)
+		return -ENODEV;
+	/*
+	 * Configuring the initiator's PHB requires to adjust its
+	 * TVE#1 setting. Since the same device can be an initiator
+	 * several times for different target devices, we need to keep
+	 * a reference count to know when we can restore the default
+	 * bypass setting on its TVE#1 when disabling.
+	 *
+	 * Opal is not tracking PE states, so we add a reference count
+	 * on the PE in linux. To handle concurrent calls to
+	 * pnv_pci_set_p2p(), it also requires to take a lock covering
+	 * the call to opal and the handling of the reference
+	 * count. Such a lock should really be per PE, but since this
+	 * API is only meant to be called once at setup time, it seems
+	 * like an overkill, so keep it at the API level, i.e. only
+	 * one call can proceed at a time.
+	 *
+	 * A much simpler alternative could be to not restore the TVE
+	 * setting in bypass mode when disabling... thus slightly
+	 * increasing the chance of checkstop if a device tries to
+	 * access a bogus pci address in what should be pretty rare
+	 * conditions. For the record, I was tempted...
+	 */
+	mutex_lock(&p2p_mutex);
+	rc = opal_pci_set_p2p(phb_init->opal_id, phb_target->opal_id,
+			desc, pe_init->pe_number);
+	if (rc != OPAL_SUCCESS) {
+		rc = -EIO;
+		goto out;
+	}
+
+	if (desc & OPAL_PCI_P2P_ENABLE) {
+		pe_init->p2p_initiator_count++;
+	} else {
+		if (pe_init->p2p_initiator_count > 0) {
+			pe_init->p2p_initiator_count--;
+			if (!pe_init->p2p_initiator_count)
+				pnv_pci_ioda2_set_bypass(pe_init, true);
+		}
+	}
+	rc = 0;
+out:
+	mutex_unlock(&p2p_mutex);
+	return rc;
+}
+EXPORT_SYMBOL_GPL(pnv_pci_set_p2p);
 
 void pnv_pci_shutdown(void)
 {
