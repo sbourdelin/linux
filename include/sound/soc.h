@@ -474,7 +474,12 @@ int snd_soc_register_component(struct device *dev,
 int devm_snd_soc_register_component(struct device *dev,
 			 const struct snd_soc_component_driver *cmpnt_drv,
 			 struct snd_soc_dai_driver *dai_drv, int num_dai);
-void snd_soc_unregister_component(struct device *dev);
+#define snd_soc_unregister_component(dev) snd_soc_unregister_component_exp(dev, NULL)
+void snd_soc_unregister_component_exp(struct device *dev,
+				const char *driver_name);
+void snd_soc_remove_component(struct snd_soc_component *component);
+struct snd_soc_component *snd_soc_lookup_component(struct device *dev,
+				const char *driver_name);
 int snd_soc_cache_init(struct snd_soc_codec *codec);
 int snd_soc_cache_exit(struct snd_soc_codec *codec);
 

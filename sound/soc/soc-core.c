@@ -3294,26 +3294,54 @@ EXPORT_SYMBOL_GPL(snd_soc_register_component);
  *
  * @dev: The device to unregister
  */
-void snd_soc_unregister_component(struct device *dev)
+void snd_soc_unregister_component_exp(struct device *dev,
+				      const char *driver_name)
 {
-	struct snd_soc_component *cmpnt;
+	struct snd_soc_component *component;
 
+	component = snd_soc_lookup_component(dev, driver_name);
+	if (!component || !component->registered_as_component)
+		return;
+
+	snd_soc_remove_component(component);
+}
+EXPORT_SYMBOL_GPL(snd_soc_unregister_component_exp);
+
+void snd_soc_remove_component(struct snd_soc_component *component)
+{
 	mutex_lock(&client_mutex);
-	list_for_each_entry(cmpnt, &component_list, list) {
-		if (dev == cmpnt->dev && cmpnt->registered_as_component)
-			goto found;
+	snd_soc_tplg_component_remove(component, SND_SOC_TPLG_INDEX_ALL);
+	snd_soc_component_del_unlocked(component);
+	mutex_unlock(&client_mutex);
+
+	snd_soc_component_cleanup(component);
+	kfree(component);
+}
+EXPORT_SYMBOL_GPL(snd_soc_remove_component);
+
+struct snd_soc_component *snd_soc_lookup_component(struct device *dev,
+					const char *driver_name)
+{
+	struct snd_soc_component *component;
+	struct snd_soc_component *ret;
+
+	ret = NULL;
+	mutex_lock(&client_mutex);
+	list_for_each_entry(component, &component_list, list) {
+		if (dev != component->dev)
+			continue;
+
+		if (driver_name && (driver_name != component->driver->name))
+			continue;
+
+		ret = component;
+		break;
 	}
 	mutex_unlock(&client_mutex);
-	return;
 
-found:
-	snd_soc_tplg_component_remove(cmpnt, SND_SOC_TPLG_INDEX_ALL);
-	snd_soc_component_del_unlocked(cmpnt);
-	mutex_unlock(&client_mutex);
-	snd_soc_component_cleanup(cmpnt);
-	kfree(cmpnt);
+	return ret;
 }
-EXPORT_SYMBOL_GPL(snd_soc_unregister_component);
+EXPORT_SYMBOL_GPL(snd_soc_lookup_component);
 
 static int snd_soc_platform_drv_probe(struct snd_soc_component *component)
 {
