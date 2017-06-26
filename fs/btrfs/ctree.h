@@ -586,6 +586,11 @@ struct btrfs_block_group_cache {
 	unsigned int iref:1;
 	unsigned int has_caching_ctl:1;
 	unsigned int removed:1;
+	/*
+	 * Does the block group need to be added to the free space tree?
+	 * Protected by free_space_lock.
+	 */
+	unsigned int needs_free_space:1;
 
 	int disk_cache_state;
 
@@ -608,6 +613,8 @@ struct btrfs_block_group_cache {
 	/* usage count */
 	atomic_t count;
 
+	atomic_t trimming;
+
 	/* List of struct btrfs_free_clusters for this block group.
 	 * Today it will only have one thing on it, but that may change
 	 */
@@ -618,8 +625,6 @@ struct btrfs_block_group_cache {
 
 	/* For read-only block groups */
 	struct list_head ro_list;
-
-	atomic_t trimming;
 
 	/* For dirty block groups */
 	struct list_head dirty_list;
@@ -651,11 +656,6 @@ struct btrfs_block_group_cache {
 	/* Lock for free space tree operations. */
 	struct mutex free_space_lock;
 
-	/*
-	 * Does the block group need to be added to the free space tree?
-	 * Protected by free_space_lock.
-	 */
-	int needs_free_space;
 
 	/* Record locked full stripes for RAID5/6 block group */
 	struct btrfs_full_stripe_locks_tree full_stripe_locks_root;
