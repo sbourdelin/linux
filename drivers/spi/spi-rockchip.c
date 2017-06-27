@@ -264,7 +264,7 @@ static inline u32 rx_max(struct rockchip_spi *rs)
 
 static void rockchip_spi_set_cs(struct spi_device *spi, bool enable)
 {
-	u32 ser;
+	u32 ser, new_ser;
 	struct spi_master *master = spi->master;
 	struct rockchip_spi *rs = spi_master_get_devdata(master);
 
@@ -288,13 +288,26 @@ static void rockchip_spi_set_cs(struct spi_device *spi, bool enable)
 	 * Note: enable(rockchip_spi_set_cs) = !enable(spi_set_cs)
 	 */
 	if (!enable)
-		ser |= 1 << spi->chip_select;
+		new_ser = ser | BIT(spi->chip_select);
 	else
-		ser &= ~(1 << spi->chip_select);
+		new_ser = ser & ~BIT(spi->chip_select);
 
-	writel_relaxed(ser, rs->regs + ROCKCHIP_SPI_SER);
+	if (new_ser != ser) {
+		writel_relaxed(new_ser, rs->regs + ROCKCHIP_SPI_SER);
 
-	pm_runtime_put_sync(rs->dev);
+		/*
+		 * The rockchip spi would stop driving all pins when powered
+		 * down.
+		 * So hold a runtime PM reference as long as CS is asserted.
+		 */
+		if (!enable)
+			return;
+
+		/* Drop reference from when we first asserted CS */
+		pm_runtime_put(rs->dev);
+	}
+
+	pm_runtime_put(rs->dev);
 }
 
 static int rockchip_spi_prepare_message(struct spi_master *master,
