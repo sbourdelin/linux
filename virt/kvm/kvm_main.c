@@ -3194,6 +3194,7 @@ static int kvm_dev_ioctl_create_vm(unsigned long type)
 	if (kvm_create_vm_debugfs(kvm, r) < 0) {
 		put_unused_fd(r);
 		fput(file);
+		kvm_put_kvm(kvm);
 		return -ENOMEM;
 	}
 
