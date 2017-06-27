@@ -1097,7 +1097,7 @@ static int ovs_flow_cmd_set(struct sk_buff *skb, struct genl_info *info)
 	struct ovs_header *ovs_header = info->userhdr;
 	struct sw_flow_key key;
 	struct sw_flow *flow;
-	struct sw_flow_mask mask;
+	struct sw_flow_mask *mask;
 	struct sk_buff *reply = NULL;
 	struct datapath *dp;
 	struct sw_flow_actions *old_acts = NULL, *acts = NULL;
@@ -1110,7 +1110,11 @@ static int ovs_flow_cmd_set(struct sk_buff *skb, struct genl_info *info)
 
 	ufid_present = ovs_nla_get_ufid(&sfid, a[OVS_FLOW_ATTR_UFID], log);
 	if (a[OVS_FLOW_ATTR_KEY]) {
-		ovs_match_init(&match, &key, true, &mask);
+		mask = kmalloc(sizeof(struct sw_flow_mask), GFP_KERNEL);
+		if (!mask)
+			return -ENOMEM;
+
+		ovs_match_init(&match, &key, true, mask);
 		error = ovs_nla_get_match(net, &match, a[OVS_FLOW_ATTR_KEY],
 					  a[OVS_FLOW_ATTR_MASK], log);
 	} else if (!ufid_present) {
@@ -1131,7 +1135,7 @@ static int ovs_flow_cmd_set(struct sk_buff *skb, struct genl_info *info)
 		}
 
 		acts = get_flow_actions(net, a[OVS_FLOW_ATTR_ACTIONS], &key,
-					&mask, log);
+					mask, log);
 		if (IS_ERR(acts)) {
 			error = PTR_ERR(acts);
 			goto error;
@@ -1206,6 +1210,7 @@ err_unlock_ovs:
 err_kfree_acts:
 	ovs_nla_free_flow_actions(acts);
 error:
+	kfree(mask);
 	return error;
 }
 
