@@ -618,6 +618,7 @@ struct vcpu_vmx {
 	bool emulation_required;
 
 	u32 exit_reason;
+	u32 apf_reason;
 
 	/* Posted interrupt descriptor */
 	struct pi_desc pi_desc;
@@ -5657,14 +5658,31 @@ static int handle_exception(struct kvm_vcpu *vcpu)
 	}
 
 	if (is_page_fault(intr_info)) {
-		/* EPT won't cause page fault directly */
-		BUG_ON(enable_ept);
 		cr2 = vmcs_readl(EXIT_QUALIFICATION);
-		trace_kvm_page_fault(cr2, error_code);
+		switch (vmx->apf_reason) {
+		default:
+			/* EPT won't cause page fault directly */
+			BUG_ON(enable_ept);
+			trace_kvm_page_fault(cr2, error_code);
 
-		if (kvm_event_needs_reinjection(vcpu))
-			kvm_mmu_unprotect_page_virt(vcpu, cr2);
-		return kvm_mmu_page_fault(vcpu, cr2, error_code, NULL, 0);
+			if (kvm_event_needs_reinjection(vcpu))
+				kvm_mmu_unprotect_page_virt(vcpu, cr2);
+			return kvm_mmu_page_fault(vcpu, cr2, error_code, NULL, 0);
+			break;
+		case KVM_PV_REASON_PAGE_NOT_PRESENT:
+			vmx->apf_reason = 0;
+			local_irq_disable();
+			kvm_async_pf_task_wait(cr2);
+			local_irq_enable();
+			break;
+		case KVM_PV_REASON_PAGE_READY:
+			vmx->apf_reason = 0;
+			local_irq_disable();
+			kvm_async_pf_task_wake(cr2);
+			local_irq_enable();
+			break;
+		}
+		return 0;
 	}
 
 	ex_no = intr_info & INTR_INFO_VECTOR_MASK;
@@ -8610,6 +8628,10 @@ static void vmx_complete_atomic_exit(struct vcpu_vmx *vmx)
 
 	vmx->exit_intr_info = vmcs_read32(VM_EXIT_INTR_INFO);
 	exit_intr_info = vmx->exit_intr_info;
+
+	/* if exit due to PF check for async PF */
+	if (is_page_fault(exit_intr_info))
+		vmx->apf_reason = kvm_read_and_reset_pf_reason();
 
 	/* Handle machine checks before interrupts are enabled */
 	if (is_machine_check(exit_intr_info))
