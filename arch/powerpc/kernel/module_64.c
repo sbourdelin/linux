@@ -102,10 +102,16 @@ static unsigned int local_entry_offset(const Elf64_Sym *sym)
    jump, actually, to reset r2 (TOC+0x8000). */
 struct ppc64_stub_entry
 {
-	/* 28 byte jump instruction sequence (7 instructions). We only
-	 * need 6 instructions on ABIv2 but we always allocate 7 so
-	 * so we don't have to modify the trampoline load instruction. */
-	u32 jump[7];
+	/* 28 byte jump instruction sequence (7 instructions) and only
+	 * 6 instructions are needed on ABIv2 to create trampoline.
+	 * Trampoline for livepatch symbol needs extra 7 instructions
+	 * to save and restore LR, TOC values.
+	 *
+	 * To accommodate extra instructions required for livepatch
+	 * entry, we allocate 15 instructions so we don't have to
+	 * modify the trampoline load instruction.
+	 */
+	u32 jump[15];
 	/* Used by ftrace to identify stubs */
 	u32 magic;
 	/* Data for the above code */
@@ -131,13 +137,31 @@ static u32 ppc64_stub_insns[] = {
 	0x396b0000,			/* addi    r11,r11, <low> */
 	/* Save current r2 value in magic place on the stack. */
 	0xf8410000|R2_STACK_OFFSET,	/* std     r2,R2_STACK_OFFSET(r1) */
-	0xe98b0020,			/* ld      r12,32(r11) */
+	0xe98b0040,			/* ld      r12,64(r11) */
 #ifdef PPC64_ELF_ABI_v1
 	/* Set up new r2 from function descriptor */
 	0xe84b0028,			/* ld      r2,40(r11) */
 #endif
 	0x7d8903a6,			/* mtctr   r12 */
 	0x4e800420			/* bctr */
+};
+
+static u32 ppc64_klp_stub_insns[] = {
+	0x3d620000,                     /* addis   r11,r2, <high>	*/
+	0x396b0000,                     /* addi    r11,r11, <low>	*/
+	0x7c0802a6,                     /* mflr    r0			*/
+	0xf8010010,                     /* std     r0,16(r1)		*/
+	/* Save current r2 value in magic place on the stack. */
+	0xf8410000|R2_STACK_OFFSET,     /* std     r2,R2_STACK_OFFSET(r1) */
+	0xe98b0040,			/* ld	   r12,64(r11)		*/
+	0xf821ffe1,                     /* stdu    r1,-32(r1)		*/
+	0x7d8903a6,                     /* mtctr   r12			*/
+	0x4e800421,                     /* bctrl			*/
+	0x38210020,                     /* addi    r1,r1,32		*/
+	0xe8010010,                     /* ld      r0,16(r1)		*/
+	0xe8410000|R2_STACK_OFFSET,     /* ld      r2,R2_STACK_OFFSET(r1) */
+	0x7c0803a6,                     /* mtlr    r0			*/
+	0x4e800020                      /* blr				*/
 };
 
 #ifdef CONFIG_DYNAMIC_FTRACE
@@ -392,11 +416,16 @@ static inline unsigned long my_r2(const Elf64_Shdr *sechdrs, struct module *me)
 static inline int create_stub(const Elf64_Shdr *sechdrs,
 			      struct ppc64_stub_entry *entry,
 			      unsigned long addr,
-			      struct module *me)
+			      struct module *me, int klp_symbol)
 {
 	long reladdr;
 
-	memcpy(entry->jump, ppc64_stub_insns, sizeof(ppc64_stub_insns));
+	memset(entry, 0, sizeof(*entry));
+	if (klp_symbol)
+		memcpy(entry->jump, ppc64_klp_stub_insns,
+				sizeof(ppc64_klp_stub_insns));
+	else
+		memcpy(entry->jump, ppc64_stub_insns, sizeof(ppc64_stub_insns));
 
 	/* Stub uses address relative to r2. */
 	reladdr = (unsigned long)entry - my_r2(sechdrs, me);
@@ -419,7 +448,7 @@ static inline int create_stub(const Elf64_Shdr *sechdrs,
    stub to set up the TOC ptr (r2) for the function. */
 static unsigned long stub_for_addr(const Elf64_Shdr *sechdrs,
 				   unsigned long addr,
-				   struct module *me)
+				   struct module *me, int klp_symbol)
 {
 	struct ppc64_stub_entry *stubs;
 	unsigned int i, num_stubs;
@@ -435,7 +464,7 @@ static unsigned long stub_for_addr(const Elf64_Shdr *sechdrs,
 			return (unsigned long)&stubs[i];
 	}
 
-	if (!create_stub(sechdrs, &stubs[i], addr, me))
+	if (!create_stub(sechdrs, &stubs[i], addr, me, klp_symbol))
 		return 0;
 
 	return (unsigned long)&stubs[i];
@@ -615,13 +644,17 @@ int apply_relocate_add(Elf64_Shdr *sechdrs,
 			/* FIXME: Handle weak symbols here --RR */
 			if (sym->st_shndx == SHN_UNDEF) {
 				/* External: go via stub */
-				value = stub_for_addr(sechdrs, value, me);
+				value = stub_for_addr(sechdrs, value, me, 0);
 				if (!value)
 					return -ENOENT;
 				if (!restore_r2((u32 *)location + 1, me))
 					return -ENOEXEC;
 
 				squash_toc_save_inst(strtab + sym->st_name, value);
+			} else if (sym->st_shndx == SHN_LIVEPATCH) {
+				value = stub_for_addr(sechdrs, value, me, 1);
+				if (!value)
+					return -ENOENT;
 			} else
 				value += local_entry_offset(sym);
 
@@ -775,7 +808,7 @@ static unsigned long create_ftrace_stub(const Elf64_Shdr *sechdrs, struct module
 #else
 static unsigned long create_ftrace_stub(const Elf64_Shdr *sechdrs, struct module *me)
 {
-	return stub_for_addr(sechdrs, (unsigned long)ftrace_caller, me);
+	return stub_for_addr(sechdrs, (unsigned long)ftrace_caller, me, 0);
 }
 #endif
 
