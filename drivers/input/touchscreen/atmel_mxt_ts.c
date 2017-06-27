@@ -28,6 +28,7 @@
 #include <linux/interrupt.h>
 #include <linux/of.h>
 #include <linux/slab.h>
+#include <linux/gpio/consumer.h>
 #include <asm/unaligned.h>
 #include <media/v4l2-device.h>
 #include <media/v4l2-ioctl.h>
@@ -300,6 +301,7 @@ struct mxt_data {
 	u8 multitouch;
 	struct t7_config t7_cfg;
 	struct mxt_dbg dbg;
+	struct gpio_desc *reset_gpio;
 
 	/* Cached parameters from object table */
 	u16 T5_address;
@@ -3134,12 +3136,26 @@ static int mxt_probe(struct i2c_client *client, const struct i2c_device_id *id)
 	init_completion(&data->reset_completion);
 	init_completion(&data->crc_completion);
 
+	data->reset_gpio = gpiod_get_optional(&client->dev, "reset",
+					      GPIOD_OUT_LOW);
+	if (IS_ERR(data->reset_gpio)) {
+		error = PTR_ERR(data->reset_gpio);
+		dev_err(&client->dev, "Failed to get reset gpio: %d\n", error);
+		goto err_free_mem;
+	}
+
+	if (data->reset_gpio) {
+		msleep(MXT_RESET_TIME);
+		gpiod_set_value(data->reset_gpio, 1);
+		msleep(MXT_RESET_TIME);
+	}
+
 	error = request_threaded_irq(client->irq, NULL, mxt_interrupt,
 				     pdata->irqflags | IRQF_ONESHOT,
 				     client->name, data);
 	if (error) {
 		dev_err(&client->dev, "Failed to register interrupt\n");
-		goto err_free_mem;
+		goto err_free_gpio;
 	}
 
 	disable_irq(client->irq);
@@ -3162,6 +3178,11 @@ err_free_object:
 	mxt_free_object_table(data);
 err_free_irq:
 	free_irq(client->irq, data);
+err_free_gpio:
+	if (data->reset_gpio) {
+		gpiod_set_value(data->reset_gpio, 0);
+		gpiod_put(data->reset_gpio);
+	}
 err_free_mem:
 	kfree(data);
 	return error;
@@ -3173,6 +3194,10 @@ static int mxt_remove(struct i2c_client *client)
 
 	sysfs_remove_group(&client->dev.kobj, &mxt_attr_group);
 	free_irq(data->irq, data);
+	if (data->reset_gpio) {
+		gpiod_set_value(data->reset_gpio, 0);
+		gpiod_put(data->reset_gpio);
+	}
 	mxt_free_input_device(data);
 	mxt_free_object_table(data);
 	kfree(data);
