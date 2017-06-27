@@ -11,6 +11,7 @@
 #include <linux/kernel.h>
 #include <linux/delay.h>
 #include <linux/dmi.h>
+#include <linux/idr.h>
 #include <linux/init.h>
 #include <linux/of.h>
 #include <linux/of_pci.h>
@@ -5340,17 +5341,23 @@ static void pci_no_domains(void)
 }
 
 #ifdef CONFIG_PCI_DOMAINS
-static atomic_t __domain_nr = ATOMIC_INIT(-1);
+static DEFINE_IDA(__domain_nr);
 
 int pci_get_new_domain_nr(void)
 {
-	return atomic_inc_return(&__domain_nr);
+	return ida_simple_get(&__domain_nr, 0, sizeof(u64), GFP_KERNEL);
+}
+
+static int use_dt_domains = -1;
+void pci_put_domain_nr(struct pci_bus *bus)
+{
+	if (acpi_disabled && use_dt_domains != 1)
+		ida_simple_remove(&__domain_nr, bus->domain_nr);
 }
 
 #ifdef CONFIG_PCI_DOMAINS_GENERIC
 static int of_pci_bus_find_domain_nr(struct device *parent)
 {
-	static int use_dt_domains = -1;
 	int domain = -1;
 
 	if (parent)

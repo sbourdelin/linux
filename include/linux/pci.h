@@ -511,7 +511,7 @@ struct pci_bus {
 	unsigned char	primary;	/* number of primary bridge */
 	unsigned char	max_bus_speed;	/* enum pci_bus_speed */
 	unsigned char	cur_bus_speed;	/* enum pci_bus_speed */
-#ifdef CONFIG_PCI_DOMAINS_GENERIC
+#ifdef CONFIG_PCI_DOMAINS
 	int		domain_nr;
 #endif
 
@@ -1447,11 +1447,14 @@ void pci_cfg_access_unlock(struct pci_dev *dev);
 #ifdef CONFIG_PCI_DOMAINS
 extern int pci_domains_supported;
 int pci_get_new_domain_nr(void);
+void pci_put_domain_nr(struct pci_bus *bus);
 #else
 enum { pci_domains_supported = 0 };
 static inline int pci_domain_nr(struct pci_bus *bus) { return 0; }
 static inline int pci_proc_domain(struct pci_bus *bus) { return 0; }
-static inline int pci_get_new_domain_nr(void) { return -ENOSYS; }
+static inline int pci_get_new_domain_nr(void)
+{ return -ENOSYS; }
+static inline void pci_put_domain_nr(struct pci_bus *bus) { }
 #endif /* CONFIG_PCI_DOMAINS */
 
 /*
