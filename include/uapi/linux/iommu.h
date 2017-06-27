@@ -48,4 +48,38 @@ struct tlb_invalidate_info {
 	__u8	opaque[];
 };
 
+/*
+ * Generic fault event notification data, used by all IOMMU models
+ *
+ * - PCI and non-PCI devices
+ * - Recoverable faults (e.g. page request) & un-recoverable faults
+ * - DMA remapping and IRQ remapping faults
+ *
+ * @dev The device which faults are reported by IOMMU
+ * @addr tells the offending address
+ * @pasid contains process address space ID, used in shared virtual memory (SVM)
+ * @prot page access protection flag, e.g. IOMMU_READ, IOMMU_WRITE
+ * @flags contains fault type, etc.
+ * @length tells the size of the buf in bytes
+ * @buf contains any raw or arch specific data
+ *
+ */
+struct iommu_fault_event {
+	struct device *dev;
+	__u64 addr;
+	__u32 pasid;
+	__u32 prot;
+	__u32 flags;
+/* page request as result of recoverable translation fault */
+#define IOMMU_FAULT_PAGE_REQ	BIT(0)
+/* unrecoverable fault, e.g. invalid device context  */
+#define IOMMU_FAULT_UNRECOV	BIT(1)
+/* unrecoverable fault related to interrupt remapping */
+#define IOMMU_FAULT_IRQ_REMAP	BIT(2)
+/* unrecoverable fault on invalidation of translation caches */
+#define IOMMU_FAULT_INVAL	BIT(3)
+	__u32 length;
+	__u8  buf[];
+};
+
 #endif /* _UAPI_IOMMU_H */
