@@ -431,6 +431,7 @@ static struct page **__iommu_dma_alloc_pages(unsigned int count,
 {
 	struct page **pages;
 	unsigned int i = 0, array_size = count * sizeof(*pages);
+	const gfp_t high_order_gfp = __GFP_NOWARN | __GFP_NORETRY;
 
 	order_mask &= (2U << MAX_ORDER) - 1;
 	if (!order_mask)
@@ -450,8 +451,6 @@ static struct page **__iommu_dma_alloc_pages(unsigned int count,
 	if (!(gfp & (__GFP_DMA | __GFP_DMA32)))
 		gfp |= __GFP_HIGHMEM;
 
-	gfp |= __GFP_NOWARN;
-
 	while (count) {
 		struct page *page = NULL;
 		unsigned int order_size;
@@ -467,7 +466,7 @@ static struct page **__iommu_dma_alloc_pages(unsigned int count,
 
 			order_size = 1U << order;
 			page = alloc_pages((order_mask - order_size) ?
-					   gfp | __GFP_NORETRY : gfp, order);
+					   gfp | high_order_gfp : gfp, order);
 			if (!page)
 				continue;
 			if (!order)
