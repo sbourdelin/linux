@@ -67,6 +67,7 @@ static inline void kref_get(struct kref *kref)
 static inline int kref_put(struct kref *kref, void (*release)(struct kref *kref))
 {
 	if (refcount_dec_and_test(&kref->refcount)) {
+		BUG_ON(release == NULL);
 		release(kref);
 		return 1;
 	}
@@ -78,6 +79,7 @@ static inline int kref_put_mutex(struct kref *kref,
 				 struct mutex *lock)
 {
 	if (refcount_dec_and_mutex_lock(&kref->refcount, lock)) {
+		BUG_ON(release == NULL);
 		release(kref);
 		return 1;
 	}
@@ -89,6 +91,7 @@ static inline int kref_put_lock(struct kref *kref,
 				spinlock_t *lock)
 {
 	if (refcount_dec_and_lock(&kref->refcount, lock)) {
+		BUG_ON(release == NULL);
 		release(kref);
 		return 1;
 	}
