@@ -16,6 +16,7 @@
 #include <linux/delay.h>
 #include <linux/platform_device.h>
 #include <linux/interrupt.h>
+#include <linux/property.h>
 
 #include <linux/mfd/da9052/reg.h>
 #include <linux/mfd/da9052/da9052.h>
@@ -237,6 +238,10 @@ static int da9052_ts_probe(struct platform_device *pdev)
 	da9052 = dev_get_drvdata(pdev->dev.parent);
 	if (!da9052)
 		return -EINVAL;
+
+	/* check if pins are used as general purpose ADC input */
+	if (device_property_read_bool(pdev->dev.parent, "diag,tsi-as-adc"))
+		return -ENODEV;
 
 	tsi = kzalloc(sizeof(struct da9052_tsi), GFP_KERNEL);
 	input_dev = input_allocate_device();
