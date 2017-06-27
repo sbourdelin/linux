@@ -31,7 +31,6 @@
 #include <linux/list.h>
 #include <linux/iommu.h>
 #include <linux/io-64-nonatomic-lo-hi.h>
-
 #include <asm/cacheflush.h>
 #include <asm/iommu.h>
 
@@ -257,6 +256,10 @@ enum {
 #define QI_DEIOTLB_TYPE		0x8
 #define QI_PGRP_RESP_TYPE	0x9
 #define QI_PSTRM_RESP_TYPE	0xa
+
+#define QI_DID(did)		(((u64)did & 0xffff) << 16)
+#define QI_DID_MASK		GENMASK(31, 16)
+#define QI_TYPE_MASK		GENMASK(3, 0)
 
 #define QI_IEC_SELECTIVE	(((u64)1) << 4)
 #define QI_IEC_IIDEX(idx)	(((u64)(idx & 0xffff) << 32))
@@ -488,6 +491,12 @@ struct intel_svm {
 extern int intel_iommu_enable_pasid(struct intel_iommu *iommu, struct intel_svm_dev *sdev);
 extern struct intel_iommu *intel_svm_device_to_iommu(struct device *dev);
 #endif
+
+struct intel_invalidate_data {
+	u16 sid;
+	u32 pasid;
+	struct qi_desc inv_desc;
+};
 
 extern const struct attribute_group *intel_iommu_groups[];
 
