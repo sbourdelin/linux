@@ -338,6 +338,7 @@ static ssize_t f_hidg_write(struct file *file, const char __user *buffer,
 			    size_t count, loff_t *offp)
 {
 	struct f_hidg *hidg  = file->private_data;
+	struct usb_composite_dev *cdev = hidg->func.config->cdev;
 	struct usb_request *req;
 	unsigned long flags;
 	ssize_t status = -ENOMEM;
@@ -345,6 +346,7 @@ static ssize_t f_hidg_write(struct file *file, const char __user *buffer,
 	if (!access_ok(VERIFY_READ, buffer, count))
 		return -EFAULT;
 
+	usb_gadget_wakeup(cdev->gadget);
 	spin_lock_irqsave(&hidg->write_spinlock, flags);
 
 #define WRITE_COND (!hidg->write_pending)
