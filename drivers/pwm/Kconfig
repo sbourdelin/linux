@@ -74,6 +74,15 @@ config PWM_ATMEL_TCB
 	  To compile this driver as a module, choose M here: the module
 	  will be called pwm-atmel-tcb.
 
+config PWM_AXI_TIMER
+	tristate "AXI Timer PWM support"
+	depends on ARCH_ZYNQ || MICROBLAZE
+	help
+	  Generic PWM framework driver for Xilinx's AXI Timer
+
+	  To compile this driver as a module, choose M here: the module
+	  will be called pwm-axi-timer.
+
 config PWM_BCM_IPROC
 	tristate "iProc PWM support"
 	depends on ARCH_BCM_IPROC || COMPILE_TEST
