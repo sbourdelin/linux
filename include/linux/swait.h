@@ -29,7 +29,10 @@
  *
  * As a side effect of this; the data structures are slimmer.
  *
- * One would recommend using this wait queue where possible.
+ * NOTE: swait is for cases of extreme memory considerations and some very
+ * special realtime issues, where it saves a couple of bytes in structures that
+ * need close packing. As such its very special-use. Consider using regular
+ * waits queues from wait.h instead *first*.
  */
 
 struct task_struct;
