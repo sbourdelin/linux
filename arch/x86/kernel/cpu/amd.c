@@ -306,6 +306,29 @@ static int nearby_node(int apicid)
 
 #ifdef CONFIG_SMP
 
+static void amd_get_llc_id(struct cpuinfo_x86 *c)
+{
+	int cpu = smp_processor_id();
+
+	/* Default LLC is at the node level. */
+	per_cpu(cpu_llc_id, cpu) = c->phys_proc_id;
+
+	/*
+	 * We may have multiple LLCs per die if L3 caches exist.
+	 * Currently, the only case where LLC (L3) is not
+	 * at the die level is when LLC is at the core complex (CCX) level.
+	 * So, enumerate cpu_llc_id using ccx_id.
+	 */
+	if (l3_num_threads_sharing &&
+	    l3_num_threads_sharing < (c->x86_max_cores * smp_num_siblings)) {
+		u32 cpu_id = (c->phys_proc_id * c->x86_max_cores) + c->cpu_core_id;
+		u32 ccx_id = cpu_id * smp_num_siblings / l3_num_threads_sharing;
+
+		per_cpu(cpu_llc_id, cpu) = ccx_id;
+		pr_debug("Use ccx ID as llc ID: %#x\n", ccx_id);
+	}
+}
+
 /*
  * Per Documentation/x86/topology.c, the kernel works with
  *  {packages, cores, threads}, and we will map:
@@ -321,12 +344,9 @@ static int nearby_node(int apicid)
  *     Assumption: Number of cores in each internal node is the same.
  * (2) cpu_core_id is derived from either CPUID topology extension
  *     or initial APIC_ID.
- * (3) cpu_llc_id is either L3 or per-node
  */
 static void amd_get_topology(struct cpuinfo_x86 *c)
 {
-	int cpu = smp_processor_id();
-
 	if (boot_cpu_has(X86_FEATURE_TOPOEXT)) {
 		u32 eax, ebx, ecx, edx;
 
@@ -405,19 +425,6 @@ static void amd_get_topology(struct cpuinfo_x86 *c)
 
 	/* core id has to be in the [0 .. cores_per_die - 1] range */
 	c->cpu_core_id %= c->x86_max_cores;
-
-	/* Default LLC is at the die level. */
-	per_cpu(cpu_llc_id, cpu) = c->phys_proc_id;
-
-	/*
-	 * We may have multiple LLCs if L3 caches exist, so check if we
-	 * have an L3 cache by looking at the L3 cache CPUID leaf.
-	 * For family17h, LLC is at the core complex level.
-	 * Core complex id is ApicId[3].
-	 */
-	if (cpuid_edx(0x80000006) && c->x86 == 0x17)
-		per_cpu(cpu_llc_id, cpu) = c->apicid >> 3;
-
 }
 #endif
 
@@ -799,6 +806,7 @@ static void init_amd(struct cpuinfo_x86 *c)
 #ifdef CONFIG_SMP
 	if (c->extended_cpuid_level >= 0x80000008) {
 		amd_get_topology(c);
+		amd_get_llc_id(c);
 		srat_detect_node(c);
 	}
 #endif
