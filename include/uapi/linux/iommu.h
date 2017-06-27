@@ -34,5 +34,18 @@ struct pasid_table_info {
 	__u8	opaque[];
 };
 
+/*
+ * Translation cache invalidation information, contains IOMMU model specific
+ * data which can be parsed based on model ID by model specific drivers.
+ *
+ * @model	iommu_model number
+ * @length	length of the opaque data in bytes
+ * @opaque	model specific IOMMU data
+ */
+struct tlb_invalidate_info {
+	__u32	model;
+	__u32	length;
+	__u8	opaque[];
+};
 
 #endif /* _UAPI_IOMMU_H */
