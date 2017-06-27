@@ -171,7 +171,7 @@ static int command_abort(struct scsi_cmnd *srb)
 	struct rtsx_dev *dev = host_to_rtsx(host);
 	struct rtsx_chip *chip = dev->chip;
 
-	dev_info(&dev->pci->dev, "%s called\n", __func__);
+	dev_dbg(&dev->pci->dev, "%s called\n", __func__);
 
 	scsi_lock(host);
 
@@ -200,7 +200,7 @@ static int device_reset(struct scsi_cmnd *srb)
 {
 	struct rtsx_dev *dev = host_to_rtsx(srb->device->host);
 
-	dev_info(&dev->pci->dev, "%s called\n", __func__);
+	dev_dbg(&dev->pci->dev, "%s called\n", __func__);
 
 	return SUCCESS;
 }
@@ -210,7 +210,7 @@ static int bus_reset(struct scsi_cmnd *srb)
 {
 	struct rtsx_dev *dev = host_to_rtsx(srb->device->host);
 
-	dev_info(&dev->pci->dev, "%s called\n", __func__);
+	dev_dbg(&dev->pci->dev, "%s called\n", __func__);
 
 	return SUCCESS;
 }
@@ -1009,7 +1009,7 @@ static void rtsx_remove(struct pci_dev *pci)
 {
 	struct rtsx_dev *dev = pci_get_drvdata(pci);
 
-	dev_info(&pci->dev, "rtsx_remove() called\n");
+	dev_dbg(&pci->dev, "%s called\n", __func__);
 
 	quiesce_and_remove_host(dev);
 	release_everything(dev);

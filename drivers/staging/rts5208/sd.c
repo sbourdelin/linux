@@ -910,8 +910,8 @@ static int sd_change_phase(struct rtsx_chip *chip, u8 sample_point, u8 tune_dir)
 	int retval;
 	bool ddr_rx = false;
 
-	dev_dbg(rtsx_dev(chip), "sd_change_phase (sample_point = %d, tune_dir = %d)\n",
-		sample_point, tune_dir);
+	dev_dbg(rtsx_dev(chip), "%s (sample_point = %d, tune_dir = %d)\n",
+		__func__, sample_point, tune_dir);
 
 	if (tune_dir == TUNE_RX) {
 		SD_VP_CTL = SD_VPRX_CTL;
@@ -3575,8 +3575,8 @@ static int reset_mmc_only(struct rtsx_chip *chip)
 		return STATUS_FAIL;
 	}
 
-	dev_dbg(rtsx_dev(chip), "In reset_mmc_only, sd_card->sd_type = 0x%x\n",
-		sd_card->sd_type);
+	dev_dbg(rtsx_dev(chip), "In %s, sd_card->sd_type = 0x%x\n",
+		__func__, sd_card->sd_type);
 
 	return STATUS_SUCCESS;
 }
