@@ -4119,14 +4119,11 @@ static int osst_int_ioctl(struct osst_tape * STp, struct osst_request ** aSRpnt,
 		   printk(OSST_DEB_MSG "%s:D: Skipping %lu blocks %s from logical block %d\n",
 				name, arg, cmd_in==MTFSR?"forward":"backward", logical_blk_num);
 #endif
-		if (cmd_in == MTFSR) {
-		   logical_blk_num += arg;
-		   if (blkno >= 0) blkno += arg;
-		}
-		else {
-		   logical_blk_num -= arg;
-		   if (blkno >= 0) blkno -= arg;
-		}
+		if (cmd_in == MTFSR)
+			logical_blk_num += arg;
+		else
+			logical_blk_num -= arg;
+
 		ioctl_result = osst_seek_logical_blk(STp, &SRpnt, logical_blk_num);
 		fileno = STps->drv_file;
 		blkno  = STps->drv_block;
