@@ -443,8 +443,14 @@ static struct page **__iommu_dma_alloc_pages(unsigned int count,
 	if (!pages)
 		return NULL;
 
-	/* IOMMU can map any pages, so himem can also be used here */
-	gfp |= __GFP_NOWARN | __GFP_HIGHMEM;
+	/*
+	 * IOMMU can map any pages, so himem can also be used here,
+	 * unless another DMA zone is explicitly requested.
+	 */
+	if (!(gfp & (__GFP_DMA | __GFP_DMA32)))
+		gfp |= __GFP_HIGHMEM;
+
+	gfp |= __GFP_NOWARN;
 
 	while (count) {
 		struct page *page = NULL;
