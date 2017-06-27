@@ -21,7 +21,6 @@ config OMAP_REMOTEPROC
 	depends on REMOTEPROC
 	select MAILBOX
 	select OMAP2PLUS_MBOX
-	select RPMSG_VIRTIO
 	help
 	  Say y here to support OMAP's remote processors (dual M3
 	  and DSP on OMAP4) via the remote processor framework.
@@ -53,7 +52,6 @@ config DA8XX_REMOTEPROC
 	depends on ARCH_DAVINCI_DA8XX
 	depends on REMOTEPROC
 	depends on DMA_CMA
-	select RPMSG_VIRTIO
 	help
 	  Say y here to support DA8xx/OMAP-L13x remote processors via the
 	  remote processor framework.
@@ -76,7 +74,6 @@ config KEYSTONE_REMOTEPROC
 	depends on ARCH_KEYSTONE
 	depends on RESET_CONTROLLER
 	depends on REMOTEPROC
-	select RPMSG_VIRTIO
 	help
 	  Say Y here here to support Keystone remote processors (DSP)
 	  via the remote processor framework.
@@ -133,7 +130,6 @@ config ST_REMOTEPROC
 	depends on REMOTEPROC
 	select MAILBOX
 	select STI_MBOX
-	select RPMSG_VIRTIO
 	help
 	  Say y here to support ST's adjunct processors via the remote
 	  processor framework.

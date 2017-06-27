@@ -1,8 +1,5 @@
-menu "Rpmsg drivers"
-
-# RPMSG always gets selected by whoever wants it
-config RPMSG
-	tristate
+menuconfig RPMSG
+	tristate "Rpmsg drivers"
 
 config RPMSG_CHAR
 	tristate "RPMSG device interface"
@@ -15,7 +12,7 @@ config RPMSG_CHAR
 
 config RPMSG_QCOM_GLINK_RPM
 	tristate "Qualcomm RPM Glink driver"
-	select RPMSG
+	depends on RPMSG
 	depends on HAS_IOMEM
 	depends on MAILBOX
 	help
@@ -26,16 +23,17 @@ config RPMSG_QCOM_GLINK_RPM
 config RPMSG_QCOM_SMD
 	tristate "Qualcomm Shared Memory Driver (SMD)"
 	depends on QCOM_SMEM
-	select RPMSG
+	depends on RPMSG
 	help
 	  Say y here to enable support for the Qualcomm Shared Memory Driver
 	  providing communication channels to remote processors in Qualcomm
 	  platforms.
 
 config RPMSG_VIRTIO
-	tristate
-	select RPMSG
+	tristate "Virtio remote processor messaging driver (RPMSG)"
+	depends on RPMSG
 	select VIRTIO
 	select VIRTUALIZATION
-
-endmenu
+	help
+	  Say y here to enable support for the Virtio remote processor
+	  messaging protocol (RPMSG).
