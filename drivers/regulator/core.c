@@ -1489,10 +1489,6 @@ static struct regulator_dev *regulator_dev_lookup(struct device *dev,
 	if (dev)
 		devname = dev_name(dev);
 
-	r = regulator_lookup_by_name(supply);
-	if (r)
-		return r;
-
 	mutex_lock(&regulator_list_mutex);
 	list_for_each_entry(map, &regulator_map_list, list) {
 		/* If the mapping has a device set up it must match */
@@ -1508,6 +1504,7 @@ static struct regulator_dev *regulator_dev_lookup(struct device *dev,
 	}
 	mutex_unlock(&regulator_list_mutex);
 
+	r = regulator_lookup_by_name(supply);
 	if (r)
 		return r;
 
