@@ -60,11 +60,13 @@ int venus_boot(struct device *parent, struct device *fw_dev, const char *fwname)
 
 	mem_size = VENUS_FW_MEM_SIZE;
 
-	mem_va = dmam_alloc_coherent(fw_dev, mem_size, &mem_phys, GFP_KERNEL);
+	mem_va = (void *)devm_get_free_pages(parent, GFP_KERNEL,
+					     get_order(mem_size));
 	if (!mem_va) {
 		ret = -ENOMEM;
 		goto err_unreg_device;
 	}
+	mem_phys = virt_to_phys(mem_va);
 
 	ret = request_firmware(&mdt, fwname, fw_dev);
 	if (ret < 0)
