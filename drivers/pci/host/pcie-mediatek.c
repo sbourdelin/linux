@@ -482,11 +482,9 @@ static int mtk_pcie_register_host(struct pci_host_bridge *host)
 	host->dev.parent = pcie->dev;
 	host->ops = &mtk_pcie_ops;
 
-	err = pci_register_host_bridge(host);
+	err = pci_scan_root_bus_bridge(host);
 	if (err < 0)
 		return err;
-
-	pci_scan_child_bus(host->bus);
 
 	pci_fixup_irqs(pci_common_swizzle, of_irq_parse_and_map_pci);
 	pci_bus_size_bridges(host->bus);
@@ -506,7 +504,7 @@ static int mtk_pcie_probe(struct platform_device *pdev)
 	struct pci_host_bridge *host;
 	int err;
 
-	host = pci_alloc_host_bridge(sizeof(*pcie));
+	host = devm_pci_alloc_host_bridge(&pdev->dev, sizeof(*pcie));
 	if (!host)
 		return -ENOMEM;
 
