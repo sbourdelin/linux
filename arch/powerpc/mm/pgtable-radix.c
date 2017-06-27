@@ -11,6 +11,7 @@
 #include <linux/sched/mm.h>
 #include <linux/memblock.h>
 #include <linux/of_fdt.h>
+#include <linux/mm.h>
 
 #include <asm/pgtable.h>
 #include <asm/pgalloc.h>
@@ -22,6 +23,8 @@
 #include <asm/sections.h>
 
 #include <trace/events/thp.h>
+
+int mmu_radix_linear_psize = PAGE_SIZE;
 
 static int native_register_process_table(unsigned long base, unsigned long pg_sz,
 					 unsigned long table_size)
@@ -112,7 +115,53 @@ set_the_pte:
 #ifdef CONFIG_STRICT_KERNEL_RWX
 void radix__mark_rodata_ro(void)
 {
-	pr_warn("Not yet implemented for radix\n");
+	unsigned long start = (unsigned long)_stext;
+	unsigned long end = (unsigned long)__init_begin;
+	unsigned long idx;
+	unsigned int step, shift;
+	pgd_t *pgdp;
+	pud_t *pudp;
+	pmd_t *pmdp;
+	pte_t *ptep;
+
+	if (!mmu_has_feature(MMU_FTR_KERNEL_RO)) {
+		pr_info("R/O rodata not supported\n");
+		return;
+	}
+
+	shift = mmu_psize_defs[mmu_radix_linear_psize].shift;
+	step = 1 << shift;
+
+	start = ((start + step - 1) >> shift) << shift;
+	end = (end >> shift) << shift;
+
+	pr_devel("marking ro start %lx, end %lx, step %x\n",
+			start, end, step);
+
+	for (idx = start; idx < end; idx += step) {
+		pgdp = pgd_offset_k(idx);
+		pudp = pud_alloc(&init_mm, pgdp, idx);
+		if (!pudp)
+			continue;
+		if (pud_huge(*pudp)) {
+			ptep = (pte_t *)pudp;
+			goto update_the_pte;
+		}
+		pmdp = pmd_alloc(&init_mm, pudp, idx);
+		if (!pmdp)
+			continue;
+		if (pmd_huge(*pmdp)) {
+			ptep = pmdp_ptep(pmdp);
+			goto update_the_pte;
+		}
+		ptep = pte_alloc_kernel(pmdp, idx);
+		if (!ptep)
+			continue;
+update_the_pte:
+		radix__pte_update(&init_mm, idx, ptep, _PAGE_WRITE, 0, 0);
+	}
+	radix__flush_tlb_kernel_range(start, end);
+
 }
 #endif
 
@@ -131,6 +180,7 @@ static int __meminit create_physical_mapping(unsigned long start,
 {
 	unsigned long vaddr, addr, mapping_size = 0;
 	pgprot_t prot;
+	unsigned long max_mapping_size;
 
 	start = _ALIGN_UP(start, PAGE_SIZE);
 	for (addr = start; addr < end; addr += mapping_size) {
@@ -139,15 +189,29 @@ static int __meminit create_physical_mapping(unsigned long start,
 
 		gap = end - addr;
 		previous_size = mapping_size;
+		max_mapping_size = PUD_SIZE;
 
+retry:
 		if (IS_ALIGNED(addr, PUD_SIZE) && gap >= PUD_SIZE &&
-		    mmu_psize_defs[MMU_PAGE_1G].shift)
+		    mmu_psize_defs[MMU_PAGE_1G].shift &&
+		    PUD_SIZE <= max_mapping_size)
 			mapping_size = PUD_SIZE;
 		else if (IS_ALIGNED(addr, PMD_SIZE) && gap >= PMD_SIZE &&
 			 mmu_psize_defs[MMU_PAGE_2M].shift)
 			mapping_size = PMD_SIZE;
 		else
 			mapping_size = PAGE_SIZE;
+
+		if (mapping_size == PUD_SIZE &&
+			addr <= __pa_symbol(__init_begin) &&
+			(addr + mapping_size) >= __pa_symbol(_stext)) {
+			max_mapping_size = PMD_SIZE;
+			goto retry;
+		}
+
+		if (addr <= __pa_symbol(__init_begin) &&
+			(addr + mapping_size) >= __pa_symbol(_stext))
+			mmu_radix_linear_psize = mapping_size;
 
 		if (mapping_size != previous_size) {
 			print_mapping(start, addr, previous_size);
