@@ -1,3 +1,5 @@
+#define pr_fmt(fmt) "x86/AMD: " fmt
+
 #include <linux/export.h>
 #include <linux/bitops.h>
 #include <linux/elf.h>
@@ -31,6 +33,12 @@ static bool cpu_has_amd_erratum(struct cpuinfo_x86 *cpu, const int *erratum);
  * Node Identifiers[10:8]
  */
 static u32 nodes_per_socket = 1;
+
+/*
+ * l3_num_threads_sharing: Stores the number of threads sharing L3 cache.
+ * Refer to CPUID_Fn8000001D_EAX_x03 [Cache Properties (L3)] NumSharingCache.
+ */
+static u32 l3_num_threads_sharing;
 
 static inline int rdmsrl_amd_safe(unsigned msr, unsigned long long *p)
 {
@@ -296,96 +304,122 @@ static int nearby_node(int apicid)
 }
 #endif
 
-/*
- * Fixup core topology information for
- * (1) AMD multi-node processors
- *     Assumption: Number of cores in each internal node is the same.
- * (2) AMD processors supporting compute units
- */
 #ifdef CONFIG_SMP
+
+/*
+ * Per Documentation/x86/topology.c, the kernel works with
+ *  {packages, cores, threads}, and we will map:
+ *
+ *  thread  = core in compute-unit (CMT), or thread in core (SMT)
+ *  core    = compute-unit (CMT), or core (SMT)
+ *  package = node (die)
+ *
+ * Discover topology based on available information from CPUID first,
+ * and only derive them as needed.
+ *
+ * (1) phys_proc_id is die ID in AMD multi-die processors.
+ *     Assumption: Number of cores in each internal node is the same.
+ * (2) cpu_core_id is derived from either CPUID topology extension
+ *     or initial APIC_ID.
+ * (3) cpu_llc_id is either L3 or per-node
+ */
 static void amd_get_topology(struct cpuinfo_x86 *c)
 {
-	u8 node_id;
 	int cpu = smp_processor_id();
 
-	/* get information required for multi-node processors */
 	if (boot_cpu_has(X86_FEATURE_TOPOEXT)) {
 		u32 eax, ebx, ecx, edx;
 
 		cpuid(0x8000001e, &eax, &ebx, &ecx, &edx);
 
-		node_id  = ecx & 0xff;
+		c->phys_proc_id = ecx & 0xff;
 		smp_num_siblings = ((ebx >> 8) & 0xff) + 1;
 
-		if (c->x86 == 0x15)
-			c->cu_id = ebx & 0xff;
-
-		if (c->x86 >= 0x17) {
-			c->cpu_core_id = ebx & 0xff;
-
-			if (smp_num_siblings > 1)
-				c->x86_max_cores /= smp_num_siblings;
-		}
+		/* Adjustment to get core per die */
+		c->x86_max_cores /= smp_num_siblings;
 
 		/*
-		 * We may have multiple LLCs if L3 caches exist, so check if we
-		 * have an L3 cache by looking at the L3 cache CPUID leaf.
+		 * For family15h/16h, this is ComputeUnitId per socket
+		 * For family17h, this is CoreId per socket
 		 */
+		c->cpu_core_id = (ebx & 0xff);
+
 		if (cpuid_edx(0x80000006)) {
-			if (c->x86 == 0x17) {
-				/*
-				 * LLC is at the core complex level.
-				 * Core complex id is ApicId[3].
-				 */
-				per_cpu(cpu_llc_id, cpu) = c->apicid >> 3;
-			} else {
-				/* LLC is at the node level. */
-				per_cpu(cpu_llc_id, cpu) = node_id;
-			}
+			cpuid_count(0x8000001d, 3, &eax, &ebx, &ecx, &edx);
+			l3_num_threads_sharing = ((eax >> 14) & 0xfff) + 1;
 		}
-	} else if (cpu_has(c, X86_FEATURE_NODEID_MSR)) {
-		u64 value;
 
-		rdmsrl(MSR_FAM10H_NODE_ID, value);
-		node_id = value & 7;
+		if (c->x86 == 0x17) {
+			/*
+			 * In family 17h, the CPUID_Fn8000001E_EBX[7:0] (CoreId)
+			 * is non-contiguous in down-coring and non-SMT cases.
+			 * This logic fixes up the cpu_core_id to be contiguous
+			 * for cores within the die.
+			 */
+			u32 tmp = c->cpu_core_id;
+			u32 die_offset, ccx_offset, cpu_offset;
 
-		per_cpu(cpu_llc_id, cpu) = node_id;
-	} else
-		return;
+			if (smp_num_siblings == 1) {
+				/*
+				 * For SMT-disabled case, the CoreId bit-encoding is
+				 * [7:4] : die
+				 * [3]   : ccx
+				 * [2:0] : core
+				 */
+				die_offset = ((tmp >> 4) & 0xf) * c->x86_max_cores;
+				ccx_offset = ((tmp >> 3) & 1) * l3_num_threads_sharing;
+				cpu_offset = tmp & 7;
+			} else {
+				/*
+				 * For SMT-enabled case, the CoreId bit-encoding is
+				 * [7:3] : die
+				 * [2]   : ccx
+				 * [1:0] : core
+				 */
+				die_offset = ((tmp >> 3) & 0x1f) * c->x86_max_cores;
+				ccx_offset = ((tmp >> 2) & 1) * l3_num_threads_sharing / smp_num_siblings;
+				cpu_offset = tmp & 3;
+			}
+			c->cpu_core_id = die_offset + ccx_offset + cpu_offset;
+			pr_debug("Fixup CoreId:%#x to cpu_core_id:%#x\n", tmp, c->cpu_core_id);
+		}
+	} else {
+		if (cpu_has(c, X86_FEATURE_NODEID_MSR)) {
+			u64 value;
 
-	/* fixup multi-node processor information */
-	if (nodes_per_socket > 1) {
-		u32 cus_per_node;
+			/* Use MSR provided node ID */
+			rdmsrl(MSR_FAM10H_NODE_ID, value);
+			c->phys_proc_id = value & 7;
+		} else {
+			/*
+			 * On older AMD dual core setup the lower
+			 * bits of the APIC id distinguish the cores.
+			 * Assumes number of cores is a power of two.
+			 */
+			c->phys_proc_id = c->initial_apicid >> c->x86_coreid_bits;
+		}
 
-		set_cpu_cap(c, X86_FEATURE_AMD_DCM);
-		cus_per_node = c->x86_max_cores / nodes_per_socket;
-
-		/* core id has to be in the [0 .. cores_per_node - 1] range */
-		c->cpu_core_id %= cus_per_node;
+		/* Get core id from APIC */
+		c->cpu_core_id = c->initial_apicid & ((1 << c->x86_coreid_bits) - 1);
 	}
-}
-#endif
 
-/*
- * On a AMD dual core setup the lower bits of the APIC id distinguish the cores.
- * Assumes number of cores is a power of two.
- */
-static void amd_detect_cmp(struct cpuinfo_x86 *c)
-{
-#ifdef CONFIG_SMP
-	unsigned bits;
-	int cpu = smp_processor_id();
+	/* core id has to be in the [0 .. cores_per_die - 1] range */
+	c->cpu_core_id %= c->x86_max_cores;
 
-	bits = c->x86_coreid_bits;
-	/* Low order bits define the core id (index of core in socket) */
-	c->cpu_core_id = c->initial_apicid & ((1 << bits)-1);
-	/* Convert the initial APIC ID into the socket ID */
-	c->phys_proc_id = c->initial_apicid >> bits;
-	/* use socket ID also for last level cache */
+	/* Default LLC is at the die level. */
 	per_cpu(cpu_llc_id, cpu) = c->phys_proc_id;
-	amd_get_topology(c);
-#endif
+
+	/*
+	 * We may have multiple LLCs if L3 caches exist, so check if we
+	 * have an L3 cache by looking at the L3 cache CPUID leaf.
+	 * For family17h, LLC is at the core complex level.
+	 * Core complex id is ApicId[3].
+	 */
+	if (cpuid_edx(0x80000006) && c->x86 == 0x17)
+		per_cpu(cpu_llc_id, cpu) = c->apicid >> 3;
+
 }
+#endif
 
 u16 amd_get_nb_id(int cpu)
 {
@@ -412,7 +446,7 @@ static void srat_detect_node(struct cpuinfo_x86 *c)
 
 	node = numa_cpu_node(cpu);
 	if (node == NUMA_NO_NODE)
-		node = per_cpu(cpu_llc_id, cpu);
+		node = c->phys_proc_id;
 
 	/*
 	 * On multi-fabric platform (e.g. Numascale NumaChip) a
@@ -457,26 +491,23 @@ static void srat_detect_node(struct cpuinfo_x86 *c)
 static void early_init_amd_mc(struct cpuinfo_x86 *c)
 {
 #ifdef CONFIG_SMP
-	unsigned bits, ecx;
+	u32 threads_per_socket;
 
 	/* Multi core CPU? */
 	if (c->extended_cpuid_level < 0x80000008)
 		return;
 
-	ecx = cpuid_ecx(0x80000008);
+	/* Threads per socket */
+	threads_per_socket = (cpuid_ecx(0x80000008) & 0xff) + 1;
+	/* Thread per die */
+	c->x86_max_cores = threads_per_socket / nodes_per_socket;
 
-	c->x86_max_cores = (ecx & 0xff) + 1;
-
-	/* CPU telling us the core id bits shift? */
-	bits = (ecx >> 12) & 0xF;
-
-	/* Otherwise recompute */
-	if (bits == 0) {
-		while ((1 << bits) < c->x86_max_cores)
-			bits++;
-	}
-
-	c->x86_coreid_bits = bits;
+	/*
+	 * This is per socket, and should only be used to decode APIC ID,
+	 * which is needed on older systems where X86_FEATURE_TOPOEXT
+	 * is not supported.
+	 */
+	c->x86_coreid_bits = get_count_order(threads_per_socket);
 #endif
 }
 
@@ -765,11 +796,15 @@ static void init_amd(struct cpuinfo_x86 *c)
 
 	cpu_detect_cache_sizes(c);
 
-	/* Multi core CPU? */
+#ifdef CONFIG_SMP
 	if (c->extended_cpuid_level >= 0x80000008) {
-		amd_detect_cmp(c);
+		amd_get_topology(c);
 		srat_detect_node(c);
 	}
+#endif
+	/* Multi-die? */
+	if (nodes_per_socket > 1)
+		set_cpu_cap(c, X86_FEATURE_AMD_DCM);
 
 #ifdef CONFIG_X86_32
 	detect_ht(c);
