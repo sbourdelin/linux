@@ -141,6 +141,7 @@ int tnum_strn(char *str, size_t size, struct tnum a)
 {
 	return snprintf(str, size, "(%#llx; %#llx)", a.value, a.mask);
 }
+EXPORT_SYMBOL_GPL(tnum_strn);
 
 int tnum_sbin(char *str, size_t size, struct tnum a)
 {
