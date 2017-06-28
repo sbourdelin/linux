@@ -55,6 +55,55 @@ struct nfp_flower_table {
 	struct rcu_head rcu;
 };
 
+static int nfp_release_stats_entry(struct nfp_app *app, u32 stats_context_id)
+{
+	struct nfp_flower_priv *priv = app->priv;
+	struct circ_buf *ring;
+
+	ring = &priv->stats_ids.free_list;
+	/* Check if buffer is full. */
+	if (!CIRC_SPACE(ring->head, ring->tail, NFP_FL_STATS_ENTRY_RS *
+			NFP_FL_STATS_ELEM_RS -
+			NFP_FL_STATS_ELEM_RS + 1))
+		return -ENOBUFS;
+
+	memcpy(&ring->buf[ring->head], &stats_context_id, NFP_FL_STATS_ELEM_RS);
+	ring->head = (ring->head + NFP_FL_STATS_ELEM_RS) %
+		     (NFP_FL_STATS_ENTRY_RS * NFP_FL_STATS_ELEM_RS);
+
+	return 0;
+}
+
+static int nfp_get_stats_entry(struct nfp_app *app, u32 *stats_context_id)
+{
+	struct nfp_flower_priv *priv = app->priv;
+	u32 freed_stats_id, temp_stats_id;
+	struct circ_buf *ring;
+
+	ring = &priv->stats_ids.free_list;
+	freed_stats_id = NFP_FL_STATS_ENTRY_RS;
+	/* Check for unallocated entries first. */
+	if (priv->stats_ids.init_unalloc > 0) {
+		*stats_context_id = priv->stats_ids.init_unalloc - 1;
+		priv->stats_ids.init_unalloc--;
+		return 0;
+	}
+
+	/* Check if buffer is empty. */
+	if (ring->head == ring->tail) {
+		*stats_context_id = freed_stats_id;
+		return -ENOENT;
+	}
+
+	memcpy(&temp_stats_id, &ring->buf[ring->tail], NFP_FL_STATS_ELEM_RS);
+	*stats_context_id = temp_stats_id;
+	memcpy(&ring->buf[ring->tail], &freed_stats_id, NFP_FL_STATS_ELEM_RS);
+	ring->tail = (ring->tail + NFP_FL_STATS_ELEM_RS) %
+		     (NFP_FL_STATS_ENTRY_RS * NFP_FL_STATS_ELEM_RS);
+
+	return 0;
+}
+
 static struct nfp_flower_table *
 nfp_flower_search_fl_table(struct nfp_app *app, unsigned long tc_flower_cookie)
 {
@@ -67,6 +116,46 @@ nfp_flower_search_fl_table(struct nfp_app *app, unsigned long tc_flower_cookie)
 			return flower_entry;
 
 	return NULL;
+}
+
+static void
+nfp_flower_update_stats(struct nfp_app *app, struct nfp_fl_stats_frame *stats)
+{
+	struct nfp_fl_payload *nfp_flow;
+	unsigned long flower_cookie;
+
+	flower_cookie = be64_to_cpu(stats->stats_cookie);
+
+	rcu_read_lock();
+	nfp_flow = nfp_flower_find_in_fl_table(app, flower_cookie);
+	if (!nfp_flow)
+		goto exit_rcu_unlock;
+
+	if (nfp_flow->meta.host_ctx_id != stats->stats_con_id)
+		goto exit_rcu_unlock;
+
+	spin_lock(&nfp_flow->lock);
+	nfp_flow->stats.pkts += be32_to_cpu(stats->pkt_count);
+	nfp_flow->stats.bytes += be64_to_cpu(stats->byte_count);
+	nfp_flow->stats.used = jiffies;
+	spin_unlock(&nfp_flow->lock);
+
+exit_rcu_unlock:
+	rcu_read_unlock();
+}
+
+void nfp_flower_rx_flow_stats(struct nfp_app *app, struct sk_buff *skb)
+{
+	unsigned int msg_len = skb->len - NFP_FLOWER_CMSG_HLEN;
+	struct nfp_fl_stats_frame *stats_frame;
+	unsigned char *msg;
+	int i;
+
+	msg = nfp_flower_cmsg_get_data(skb);
+
+	stats_frame = (struct nfp_fl_stats_frame *)msg;
+	for (i = 0; i < msg_len / sizeof(*stats_frame); i++)
+		nfp_flower_update_stats(app, stats_frame + i);
 }
 
 static int
@@ -291,22 +380,39 @@ int nfp_compile_flow_metadata(struct nfp_app *app,
 {
 	struct nfp_flower_priv *priv = app->priv;
 	u8 new_mask_id;
+	u32 stats_cxt;
 	int err;
+
+	err = nfp_get_stats_entry(app, &stats_cxt);
+	if (err < 0)
+		return err;
+
+	nfp_flow->meta.host_ctx_id = cpu_to_be32(stats_cxt);
+	nfp_flow->meta.host_cookie = cpu_to_be64(flow->cookie);
 
 	new_mask_id = 0;
 	if (!nfp_check_mask_add(app, nfp_flow->mask_data,
 				nfp_flow->meta.mask_len,
-				&nfp_flow->meta.flags, &new_mask_id))
+				&nfp_flow->meta.flags, &new_mask_id)) {
+		if (nfp_release_stats_entry(app, stats_cxt))
+			return -EINVAL;
 		return -ENOENT;
+	}
 
 	nfp_flow->meta.flow_version = cpu_to_be64(priv->flower_version);
 	priv->flower_version++;
 
 	/* Update flow payload with mask ids. */
 	nfp_flow->unmasked_data[NFP_FL_MASK_ID_LOCATION] = new_mask_id;
+	nfp_flow->stats.pkts = 0;
+	nfp_flow->stats.bytes = 0;
+	nfp_flow->stats.used = jiffies;
 
 	err = nfp_flower_add_fl_table(app, flow->cookie, nfp_flow);
 	if (err < 0) {
+		if (nfp_release_stats_entry(app, stats_cxt))
+			return -EINVAL;
+
 		if (!nfp_check_mask_remove(app, nfp_flow->mask_data,
 					   nfp_flow->meta.mask_len,
 					   NULL, &new_mask_id))
@@ -323,6 +429,7 @@ int nfp_modify_flow_metadata(struct nfp_app *app,
 {
 	struct nfp_flower_priv *priv = app->priv;
 	u8 new_mask_id = 0;
+	u32 temp_ctx_id;
 
 	nfp_check_mask_remove(app, nfp_flow->mask_data,
 			      nfp_flow->meta.mask_len, &nfp_flow->meta.flags,
@@ -334,7 +441,10 @@ int nfp_modify_flow_metadata(struct nfp_app *app,
 	/* Update flow payload with mask ids. */
 	nfp_flow->unmasked_data[NFP_FL_MASK_ID_LOCATION] = new_mask_id;
 
-	return 0;
+	/* Release the stats ctx id. */
+	temp_ctx_id = be32_to_cpu(nfp_flow->meta.host_ctx_id);
+
+	return nfp_release_stats_entry(app, temp_ctx_id);
 }
 
 int nfp_flower_metadata_init(struct nfp_app *app)
@@ -362,6 +472,15 @@ int nfp_flower_metadata_init(struct nfp_app *app)
 		return -ENOMEM;
 	}
 
+	/* Init ring buffer and unallocated stats_ids. */
+	priv->stats_ids.free_list.buf =
+		vmalloc(NFP_FL_STATS_ENTRY_RS * NFP_FL_STATS_ELEM_RS);
+	if (!priv->stats_ids.free_list.buf) {
+		vfree(priv->mask_ids.mask_id_free_list.buf);
+		return -ENOMEM;
+	}
+	priv->stats_ids.init_unalloc = NFP_FL_REPEATED_HASH_MAX;
+
 	return 0;
 }
 
@@ -374,4 +493,5 @@ void nfp_flower_metadata_cleanup(struct nfp_app *app)
 
 	kfree(priv->mask_ids.mask_id_free_list.buf);
 	kfree(priv->mask_ids.last_used);
+	vfree(priv->stats_ids.free_list.buf);
 }
