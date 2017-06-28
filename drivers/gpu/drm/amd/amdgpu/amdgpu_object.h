@@ -182,6 +182,7 @@ int amdgpu_bo_restore_from_shadow(struct amdgpu_device *adev,
 				  struct reservation_object *resv,
 				  struct dma_fence **fence,
 				  bool direct);
+void amdgpu_bo_clear_cpu_access_required(struct amdgpu_bo *bo);
 
 
 /*

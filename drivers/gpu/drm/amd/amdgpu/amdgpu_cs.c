@@ -341,6 +341,8 @@ static int amdgpu_cs_bo_validate(struct amdgpu_cs_parser *p,
 	if (bo->pin_count)
 		return 0;
 
+	amdgpu_bo_clear_cpu_access_required(bo);
+
 	/* Don't move this buffer if we have depleted our allowance
 	 * to move it. Don't move anything if the threshold is zero.
 	 */

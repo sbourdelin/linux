@@ -943,8 +943,8 @@ int amdgpu_bo_fault_reserve_notify(struct ttm_buffer_object *bo)
 {
 	struct amdgpu_device *adev = amdgpu_ttm_adev(bo->bdev);
 	struct amdgpu_bo *abo;
-	unsigned long offset, size, lpfn;
-	int i, r;
+	unsigned long offset, size;
+	int r;
 
 	if (!amdgpu_ttm_bo_is_amdgpu_bo(bo))
 		return 0;
@@ -967,15 +967,9 @@ int amdgpu_bo_fault_reserve_notify(struct ttm_buffer_object *bo)
 
 	/* hurrah the memory is not visible ! */
 	atomic64_inc(&adev->num_vram_cpu_page_faults);
+	abo->flags |= AMDGPU_GEM_CREATE_CPU_ACCESS_REQUIRED;
 	amdgpu_ttm_placement_from_domain(abo, AMDGPU_GEM_DOMAIN_VRAM);
-	lpfn =	adev->mc.visible_vram_size >> PAGE_SHIFT;
-	for (i = 0; i < abo->placement.num_placement; i++) {
-		/* Force into visible VRAM */
-		if ((abo->placements[i].flags & TTM_PL_FLAG_VRAM) &&
-		    (!abo->placements[i].lpfn ||
-		     abo->placements[i].lpfn > lpfn))
-			abo->placements[i].lpfn = lpfn;
-	}
+
 	r = ttm_bo_validate(bo, &abo->placement, false, false);
 	if (unlikely(r == -ENOMEM)) {
 		amdgpu_ttm_placement_from_domain(abo, AMDGPU_GEM_DOMAIN_GTT);
@@ -1032,4 +1026,35 @@ u64 amdgpu_bo_gpu_offset(struct amdgpu_bo *bo)
 		     !(bo->flags & AMDGPU_GEM_CREATE_VRAM_CONTIGUOUS));
 
 	return bo->tbo.offset;
+}
+
+/**
+ * amdgpu_bo_clear_cpu_access_required
+ * @bo: BO to update
+ *
+ * Clears CPU_ACCESS_REQUIRED flag if the BO hasn't had a page fault in a while
+ * and it didn't have a page fault too soon after the last time it was moved to
+ * VRAM.
+ *
+ * Caller should have bo reserved.
+ *
+ */
+void amdgpu_bo_clear_cpu_access_required(struct amdgpu_bo *bo)
+{
+	const unsigned int page_fault_timeout_ms = 10000;
+	const unsigned int min_period_ms = 500;
+	unsigned int ms_since_pf, period_ms;
+
+	ms_since_pf = jiffies_to_msecs(jiffies - bo->last_page_fault_jiffies);
+	period_ms = jiffies_to_msecs(abs(bo->last_page_fault_jiffies -
+					 bo->last_cs_move_jiffies));
+
+	/*
+	 * Try to avoid a revolving door between GTT and VRAM. Clearing the
+	 * flag may move this BO back to VRAM, so don't clear it if it's likely
+	 * to page fault and go right back to GTT.
+	 */
+	if ((!bo->last_page_fault_jiffies || !bo->last_cs_move_jiffies) ||
+	    (ms_since_pf > page_fault_timeout_ms && period_ms > min_period_ms))
+		bo->flags &= ~AMDGPU_GEM_CREATE_CPU_ACCESS_REQUIRED;
 }
