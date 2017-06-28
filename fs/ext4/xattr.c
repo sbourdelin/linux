@@ -845,6 +845,9 @@ static int __ext4_xattr_set_credits(struct super_block *sb,
 	 */
 	credits = 5;
 
+	/* Quota updates. */
+	credits += EXT4_MAXQUOTAS_TRANS_BLOCKS(sb);
+
 	/* We are done if ea_inode feature is not enabled. */
 	if (!ext4_has_feature_ea_inode(sb))
 		return credits;
@@ -877,9 +880,6 @@ static int __ext4_xattr_set_credits(struct super_block *sb,
 
 	/* Block bitmap and group descriptor updates for each block. */
 	credits += blocks * 2;
-
-	/* Quota updates. */
-	credits += EXT4_MAXQUOTAS_TRANS_BLOCKS(sb);
 
 	/* We may need to clone the existing xattr block in which case we need
 	 * to increment ref counts for existing ea_inodes referenced by it.
