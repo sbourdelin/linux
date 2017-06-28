@@ -53,6 +53,7 @@ enum dln2_handle {
 	DLN2_HANDLE_GPIO,
 	DLN2_HANDLE_I2C,
 	DLN2_HANDLE_SPI,
+	DLN2_HANDLE_ADC,
 	DLN2_HANDLES
 };
 
@@ -663,6 +664,12 @@ static struct dln2_platform_data dln2_pdata_spi = {
 	.port = 0,
 };
 
+/* Only one ADC port supported */
+static struct dln2_platform_data dln2_pdata_adc = {
+	.handle = DLN2_HANDLE_ADC,
+	.port = 0,
+};
+
 static const struct mfd_cell dln2_devs[] = {
 	{
 		.name = "dln2-gpio",
@@ -677,6 +684,11 @@ static const struct mfd_cell dln2_devs[] = {
 	{
 		.name = "dln2-spi",
 		.platform_data = &dln2_pdata_spi,
+		.pdata_size = sizeof(struct dln2_platform_data),
+	},
+	{
+		.name = "dln2-adc",
+		.platform_data = &dln2_pdata_adc,
 		.pdata_size = sizeof(struct dln2_platform_data),
 	},
 };
