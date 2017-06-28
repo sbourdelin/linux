@@ -1009,8 +1009,6 @@ static void rtsx_remove(struct pci_dev *pci)
 {
 	struct rtsx_dev *dev = pci_get_drvdata(pci);
 
-	dev_info(&pci->dev, "rtsx_remove() called\n");
-
 	quiesce_and_remove_host(dev);
 	release_everything(dev);
 }

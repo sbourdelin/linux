@@ -885,8 +885,8 @@ static int xd_init_l2p_tbl(struct rtsx_chip *chip)
 	struct xd_info *xd_card = &chip->xd_card;
 	int size, i;
 
-	dev_dbg(rtsx_dev(chip), "xd_init_l2p_tbl: zone_cnt = %d\n",
-		xd_card->zone_cnt);
+	dev_dbg(rtsx_dev(chip), "%s: zone_cnt = %d\n",
+		__func__, xd_card->zone_cnt);
 
 	if (xd_card->zone_cnt < 1) {
 		rtsx_trace(chip);
@@ -1026,7 +1026,8 @@ static u32 xd_get_l2p_tbl(struct rtsx_chip *chip, int zone_no, u16 log_off)
 #ifdef XD_DELAY_WRITE
 		retval = xd_delay_write(chip);
 		if (retval != STATUS_SUCCESS) {
-			dev_dbg(rtsx_dev(chip), "In xd_get_l2p_tbl, delay write fail!\n");
+			dev_dbg(rtsx_dev(chip), "In %s, delay write fail!\n",
+				__func__);
 			return BLK_NOT_FOUND;
 		}
 #endif
@@ -1434,7 +1435,7 @@ static int xd_build_l2p_tbl(struct rtsx_chip *chip, int zone_no)
 	u16 cur_lst_page_logoff, ent_lst_page_logoff;
 	u8 redunt[11];
 
-	dev_dbg(rtsx_dev(chip), "xd_build_l2p_tbl: %d\n", zone_no);
+	dev_dbg(rtsx_dev(chip), "%s: %d\n", __func__, zone_no);
 
 	if (!xd_card->zone) {
 		retval = xd_init_l2p_tbl(chip);
@@ -1960,7 +1961,7 @@ int xd_delay_write(struct rtsx_chip *chip)
 	int retval;
 
 	if (delay_write->delay_write_flag) {
-		dev_dbg(rtsx_dev(chip), "xd_delay_write\n");
+		dev_dbg(rtsx_dev(chip), "%s\n", __func__);
 		retval = xd_switch_clock(chip);
 		if (retval != STATUS_SUCCESS) {
 			rtsx_trace(chip);
