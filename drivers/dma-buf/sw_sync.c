@@ -142,7 +142,7 @@ static void sync_timeline_signal(struct sync_timeline *obj, unsigned int inc)
 
 	spin_lock_irqsave(&obj->child_list_lock, flags);
 
-	obj->value += inc;
+	obj->value += min(inc, ~0x0U - obj->value);
 
 	list_for_each_entry_safe(pt, next, &obj->active_list_head,
 				 active_list) {
@@ -178,6 +178,11 @@ static struct sync_pt *sync_pt_create(struct sync_timeline *obj, int size,
 		return NULL;
 
 	spin_lock_irqsave(&obj->child_list_lock, flags);
+	if (value < obj->value) {
+		spin_unlock_irqrestore(&obj->child_list_lock, flags);
+		return NULL;
+	}
+
 	sync_timeline_get(obj);
 	dma_fence_init(&pt->base, &timeline_fence_ops, &obj->child_list_lock,
 		       obj->context, value);
