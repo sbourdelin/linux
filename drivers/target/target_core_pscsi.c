@@ -1065,6 +1065,8 @@ static void pscsi_req_done(struct request *req, int uptodate)
 			pt->pscsi_result);
 	}
 
+	memcpy(pt->pscsi_sense, scsi_req(req)->sense, TRANSPORT_SENSE_BUFFER);
+
 	switch (host_byte(pt->pscsi_result)) {
 	case DID_OK:
 		target_complete_cmd(cmd, cmd->scsi_status);
@@ -1077,7 +1079,6 @@ static void pscsi_req_done(struct request *req, int uptodate)
 		break;
 	}
 
-	memcpy(pt->pscsi_sense, scsi_req(req)->sense, TRANSPORT_SENSE_BUFFER);
 	__blk_put_request(req->q, req);
 	kfree(pt);
 }
