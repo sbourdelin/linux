@@ -428,6 +428,9 @@ struct amdgpu_bo {
 	void				*metadata;
 	u32				metadata_size;
 	unsigned			prime_shared_count;
+	unsigned long			last_page_fault_jiffies;
+	unsigned long			last_cs_move_jiffies;
+
 	/* list of all virtual address to which this bo
 	 * is associated to
 	 */

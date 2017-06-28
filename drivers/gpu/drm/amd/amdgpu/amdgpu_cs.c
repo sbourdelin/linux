@@ -335,6 +335,7 @@ static int amdgpu_cs_bo_validate(struct amdgpu_cs_parser *p,
 	struct amdgpu_device *adev = amdgpu_ttm_adev(bo->tbo.bdev);
 	u64 initial_bytes_moved, bytes_moved;
 	uint32_t domain;
+	uint32_t old_mem;
 	int r;
 
 	if (bo->pin_count)
@@ -364,6 +365,7 @@ static int amdgpu_cs_bo_validate(struct amdgpu_cs_parser *p,
 retry:
 	amdgpu_ttm_placement_from_domain(bo, domain);
 	initial_bytes_moved = atomic64_read(&adev->num_bytes_moved);
+	old_mem = bo->tbo.mem.mem_type;
 	r = ttm_bo_validate(&bo->tbo, &bo->placement, true, false);
 	bytes_moved = atomic64_read(&adev->num_bytes_moved) -
 		      initial_bytes_moved;
@@ -376,6 +378,9 @@ retry:
 		domain = bo->allowed_domains;
 		goto retry;
 	}
+
+	if (bo->tbo.mem.mem_type != old_mem)
+		bo->last_cs_move_jiffies = jiffies;
 
 	return r;
 }

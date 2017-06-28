@@ -953,6 +953,8 @@ int amdgpu_bo_fault_reserve_notify(struct ttm_buffer_object *bo)
 	if (bo->mem.mem_type != TTM_PL_VRAM)
 		return 0;
 
+	abo->last_page_fault_jiffies = jiffies;
+
 	size = bo->mem.num_pages << PAGE_SHIFT;
 	offset = bo->mem.start << PAGE_SHIFT;
 	/* TODO: figure out how to map scattered VRAM to the CPU */
