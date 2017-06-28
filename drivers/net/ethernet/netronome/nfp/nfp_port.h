@@ -35,6 +35,7 @@
 #define _NFP_PORT_H_
 
 #include <net/devlink.h>
+#include <net/switchdev.h>
 
 struct net_device;
 struct nfp_app;
@@ -105,6 +106,8 @@ struct nfp_port {
 
 	struct list_head port_list;
 };
+
+extern const struct switchdev_ops nfp_port_switchdev_ops;
 
 struct nfp_port *nfp_port_from_netdev(struct net_device *netdev);
 struct nfp_port *
