@@ -272,12 +272,14 @@ static int __init sirfsoc_of_timer_init(struct device_node *np)
 	sirfsoc_timer_irq.irq = irq_of_parse_and_map(np, 0);
 	if (!sirfsoc_timer_irq.irq) {
 		pr_err("No irq passed for timer0 via DT\n");
+		iounmap(sirfsoc_timer_base);
 		return -EINVAL;
 	}
 
 	sirfsoc_timer1_irq.irq = irq_of_parse_and_map(np, 1);
 	if (!sirfsoc_timer1_irq.irq) {
 		pr_err("No irq passed for timer1 via DT\n");
+		iounmap(sirfsoc_timer_base);
 		return -EINVAL;
 	}
 
