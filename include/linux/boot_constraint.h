@@ -13,7 +13,14 @@
 struct device;
 
 enum boot_constraint_type {
-	BOOT_CONSTRAINT_NONE,
+	BOOT_CONSTRAINT_SUPPLY,
+};
+
+struct boot_constraint_supply_info {
+	bool enable;
+	const char *name;
+	unsigned long u_volt_min;
+	unsigned long u_volt_max;
 };
 
 #ifdef CONFIG_BOOT_CONSTRAINTS
