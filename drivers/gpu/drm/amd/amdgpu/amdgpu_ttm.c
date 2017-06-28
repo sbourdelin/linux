@@ -1095,6 +1095,7 @@ static struct ttm_bo_driver amdgpu_bo_driver = {
 int amdgpu_ttm_init(struct amdgpu_device *adev)
 {
 	int r;
+	u64 vis_vram_limit;
 
 	r = amdgpu_ttm_global_init(adev);
 	if (r) {
@@ -1118,6 +1119,13 @@ int amdgpu_ttm_init(struct amdgpu_device *adev)
 		DRM_ERROR("Failed initializing VRAM heap.\n");
 		return r;
 	}
+
+	/* Reduce size of CPU-visible VRAM if requested */
+	vis_vram_limit = (u64)amdgpu_vis_vram_limit * 1024 * 1024;
+	if (amdgpu_vis_vram_limit > 0 &&
+	    vis_vram_limit <= adev->mc.visible_vram_size)
+		adev->mc.visible_vram_size = vis_vram_limit;
+
 	/* Change the size here instead of the init above so only lpfn is affected */
 	amdgpu_ttm_set_active_vram_size(adev, adev->mc.visible_vram_size);
 
