@@ -1,0 +1,156 @@
+Shadow Variables
+================
+
+Shadow variables are a simple way for livepatch modules to associate new
+"shadow" data to existing data structures.  Original data structures
+(both their definition and storage) are left unmodified and "new" data
+is allocated separately.  A shadow variable hashtable associates a
+string key, enumeration pair with a pointer to the new data.
+
+
+Brief API summary
+-----------------
+
+See the full API usage docbook notes in the livepatch/shadow.c
+implementation.
+
+An in-kernel hashtable references all of the shadow variables.  These
+references are stored/retrieved through a <obj, num> key pair.
+
+* The klp_shadow variable data structure encapsulates both tracking
+meta-data and shadow-data:
+  - meta-data
+    - obj - pointer to original data
+    - num - numerical description of new data
+  - new_data[] - storage for shadow data
+
+* klp_shadow_attach() - allocate and add a new shadow variable:
+  - allocate a new shadow variable
+  - push a <obj, num> key pair into hashtable
+
+* klp_shadow_get() - retrieve a shadow variable new_data pointer
+  - search hashtable for <obj, num> key pair
+
+* klp_shadow_get_or_attach() - get existing or attach a new shadow variable
+  - search hashtable for <obj, num> key pair
+  - if not found, call klp_shadow_attach()
+
+* klp_shadow_detach() - detach and free a <obj, num> shadow variable
+  - find and remove any <obj, num> references from hashtable
+    - if found, release shadow variable
+
+* klp_shadow_detach() - detach and free all <*, num> shadow variables
+  - find and remove any <*, num> references from hashtable
+    - if found, release shadow variable
+
+
+Use cases
+---------
+
+See the example shadow variable livepatch modules in samples/livepatch
+for full working demonstrations.
+
+Example 1: Commit 1d147bfa6429 ("mac80211: fix AP powersave TX vs.
+wakeup race") added a spinlock to net/mac80211/sta_info.h :: struct
+sta_info.  Implementing this change with a shadow variable is
+straightforward.
+
+Allocation - when a host sta_info structure is allocated, attach a
+shadow variable copy of the ps_lock:
+
+#define PS_LOCK 1
+struct sta_info *sta_info_alloc(struct ieee80211_sub_if_data *sdata,
+				const u8 *addr, gfp_t gfp)
+{
+	struct sta_info *sta;
+	spinlock_t *ps_lock;
+	...
+	sta = kzalloc(sizeof(*sta) + hw->sta_data_size, gfp);
+	...
+	ps_lock = klp_shadow_attach(sta, PS_LOCK, NULL, sizeof(*ps_lock), gfp);
+	if (!ps_lock)
+		goto shadow_fail;
+	spin_lock_init(ps_lock);
+	...
+
+Usage - when using the shadow spinlock, query the shadow variable API to
+retrieve it:
+
+void ieee80211_sta_ps_deliver_wakeup(struct sta_info *sta)
+{
+	spinlock_t *ps_lock;
+	...
+	/* sync with ieee80211_tx_h_unicast_ps_buf */
+	ps_lock = klp_shadow_get(sta, "ps_lock");
+	if (ps_lock)
+		spin_lock(ps_lock);
+	...
+	if (ps_lock)
+		spin_unlock(ps_lock);
+	...
+
+Release - when the host sta_info structure is freed, first detach the
+shadow variable and then free the shadow spinlock:
+
+void sta_info_free(struct ieee80211_local *local, struct sta_info *sta)
+{
+	spinlock_t *ps_lock;
+	...
+	ps_lock = klp_shadow_get(sta, "ps_lock");
+	if (ps_lock)
+		klp_shadow_detach(sta, "ps_lock");
+
+	kfree(sta);
+
+
+Example 2: Commit 82486aa6f1b9 ("ipv4: restore rt->fi for reference
+counting") added a struct fib_info pointer to include/net/route.h ::
+struct rtable. A shadow variable can be used to implement the new
+pointer.
+
+This implementation diverges from the original commit, as it can attach
+the shadow variable when the code actually uses it:
+
+#define FIB_INFO 1
+static void rt_init_metrics(struct rtable *rt, struct fib_info *fi)
+{
+	if (fi->fib_metrics != (u32 *)dst_default_metrics) {
+		fib_info_hold(&fi);
+		klp_shadow_attach(rt, FIB_INFO, &fi, sizeof(fi), GFP_KERNEL)
+	}
+
+	dst_init_metrics(&rt->dst, fi->fib_metrics, true);
+}
+
+The shadow variable can be detached when it's no longer needed:
+
+static void ipv4_dst_destroy(struct dst_entry *dst)
+{
+	struct rtable *rt = (struct rtable *) dst;
+	struct fib_info *shadow_fi;
+
+	shadow_fi = klp_shadow_get(rt, "fi");
+	if (shadow_fi) {
+		klp_shadow_detach(rt, "fi");
+		fib_info_put(shadow_fi);
+	}
+
+
+Other examples: shadow variables can also be used as a simple flag
+indicating that a data structure had been allocated by new, livepatched
+code.  In this case, it doesn't matter what new_data value the shadow
+variable holds, its existence can be keyed off of to handle the data
+structure accordingly.
+
+
+Reference
+==========
+
+* https://github.com/dynup/kpatch
+The livepatch implementation is based on the kpatch version of shadow
+variables.
+
+* http://files.mkgnu.net/files/dynamos/doc/papers/dynamos_eurosys_07.pdf
+Dynamic and Adaptive Updates of Non-Quiescent Subsystems in Commodity
+Operating System Kernels (Kritis Makris, Kyung Dong Ryu 2007) presented
+a datatype update technique called "shadow data structures".

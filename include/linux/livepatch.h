@@ -164,6 +164,14 @@ static inline bool klp_have_reliable_stack(void)
 	       IS_ENABLED(CONFIG_HAVE_RELIABLE_STACKTRACE);
 }
 
+void *klp_shadow_get(void *obj, unsigned long num);
+void *klp_shadow_attach(void *obj, unsigned long num, void *new_data,
+			size_t new_size, gfp_t gfp_flags);
+void *klp_shadow_get_or_attach(void *obj, unsigned long num, void *new_data,
+			       size_t new_size, gfp_t gfp_flags);
+void klp_shadow_detach(void *obj, unsigned long num);
+void klp_shadow_detach_all(unsigned long num);
+
 #else /* !CONFIG_LIVEPATCH */
 
 static inline int klp_module_coming(struct module *mod) { return 0; }
