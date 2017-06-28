@@ -171,7 +171,10 @@ enum tk_offsets {
 };
 
 extern ktime_t ktime_get(void);
+extern ktime_t ktime_get_with_cycles(u64 *cycles);
 extern ktime_t ktime_get_with_offset(enum tk_offsets offs, u64 *cycles);
+extern const seqcount_t* get_tk_seq(void);
+extern int get_tk_mono_clock_mode(void);
 extern ktime_t ktime_mono_to_any(ktime_t tmono, enum tk_offsets offs);
 extern ktime_t ktime_get_raw(void);
 extern u32 ktime_get_resolution_ns(void);
@@ -184,6 +187,10 @@ static inline ktime_t ktime_get_real(void)
 	return ktime_get_with_offset(TK_OFFS_REAL, NULL);
 }
 
+static inline ktime_t ktime_get_real_with_cycles(u64 *cycles)
+{
+	return ktime_get_with_offset(TK_OFFS_REAL, cycles);
+}
 /**
  * ktime_get_boottime - Returns monotonic time since boot in ktime_t format
  *
@@ -220,9 +227,19 @@ static inline u64 ktime_get_ns(void)
 	return ktime_to_ns(ktime_get());
 }
 
+static inline u64 ktime_get_ns_with_cycles(u64 *cycles)
+{
+	return ktime_to_ns(ktime_get_with_cycles(cycles));
+}
+
 static inline u64 ktime_get_real_ns(void)
 {
 	return ktime_to_ns(ktime_get_real());
+}
+
+static inline u64 ktime_get_real_ns_with_cycles(u64 *cycles)
+{
+	return ktime_to_ns(ktime_get_real_with_cycles(cycles));
 }
 
 static inline u64 ktime_get_boot_ns(void)
@@ -230,7 +247,7 @@ static inline u64 ktime_get_boot_ns(void)
 	return ktime_to_ns(ktime_get_boottime());
 }
 
-static inline u64 ktime_get_boot_ns_and_cycles(u64 *cycles)
+static inline u64 ktime_get_boot_ns_with_cycles(u64 *cycles)
 {
 	return ktime_to_ns(ktime_get_boottime_and_cycles(cycles));
 }

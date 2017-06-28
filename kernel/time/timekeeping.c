@@ -717,6 +717,12 @@ EXPORT_SYMBOL(getnstimeofday64);
 
 ktime_t ktime_get(void)
 {
+	return ktime_get_with_cycles(NULL);
+}
+EXPORT_SYMBOL_GPL(ktime_get);
+
+ktime_t ktime_get_with_cycles(u64 *cycles)
+{
 	struct timekeeper *tk = &tk_core.timekeeper;
 	unsigned int seq;
 	ktime_t base;
@@ -727,13 +733,13 @@ ktime_t ktime_get(void)
 	do {
 		seq = read_seqcount_begin(&tk_core.seq);
 		base = tk->tkr_mono.base;
-		nsecs = timekeeping_get_ns(&tk->tkr_mono, NULL);
+		nsecs = timekeeping_get_ns(&tk->tkr_mono, cycles);
 
 	} while (read_seqcount_retry(&tk_core.seq, seq));
 
 	return ktime_add_ns(base, nsecs);
 }
-EXPORT_SYMBOL_GPL(ktime_get);
+EXPORT_SYMBOL_GPL(ktime_get_with_cycles);
 
 u32 ktime_get_resolution_ns(void)
 {
@@ -778,6 +784,18 @@ ktime_t ktime_get_with_offset(enum tk_offsets offs, u64 *tsc_stamp)
 
 }
 EXPORT_SYMBOL_GPL(ktime_get_with_offset);
+
+const seqcount_t* get_tk_seq()
+{
+	return &tk_core.seq;
+}
+EXPORT_SYMBOL(get_tk_seq);
+
+int get_tk_mono_clock_mode()
+{
+	return tk_core.timekeeper.tkr_mono.clock->archdata.vclock_mode;
+}
+EXPORT_SYMBOL(get_tk_mono_clock_mode);
 
 /**
  * ktime_mono_to_any() - convert mononotic time to any other time
