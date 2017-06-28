@@ -562,7 +562,6 @@ struct xfrm_policy {
 	atomic_t		refcnt;
 	struct timer_list	timer;
 
-	struct flow_cache_object flo;
 	atomic_t		genid;
 	u32			priority;
 	u32			index;
@@ -977,7 +976,6 @@ struct xfrm_dst {
 		struct rt6_info		rt6;
 	} u;
 	struct dst_entry *route;
-	struct flow_cache_object flo;
 	struct xfrm_policy *pols[XFRM_POLICY_TYPE_MAX];
 	int num_pols, num_xfrms;
 	u32 xfrm_genid;
@@ -1225,9 +1223,6 @@ static inline void xfrm_sk_free_policy(struct sock *sk)
 	}
 }
 
-void xfrm_garbage_collect(struct net *net);
-void xfrm_garbage_collect_deferred(struct net *net);
-
 #else
 
 static inline void xfrm_sk_free_policy(struct sock *sk) {}
@@ -1261,9 +1256,6 @@ static inline int xfrm6_policy_check_reverse(struct sock *sk, int dir,
 					     struct sk_buff *skb)
 {
 	return 1;
-}
-static inline void xfrm_garbage_collect(struct net *net)
-{
 }
 #endif
 
