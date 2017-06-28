@@ -6089,6 +6089,21 @@ void perf_prepare_sample(struct perf_event_header *header,
 	}
 }
 
+static bool sample_is_allowed(struct perf_event *event, struct pt_regs *regs)
+{
+	/*
+	 * Due to interrupt latency (AKA "skid"), we may enter the
+	 * kernel before taking an overflow, even if the PMU is only
+	 * counting user events.
+	 * To avoid leaking information to userspace, we must always
+	 * reject kernel samples when exclude_kernel is set.
+	 */
+	if (event->attr.exclude_kernel && !user_mode(regs))
+		return false;
+
+	return true;
+}
+
 static void __always_inline
 __perf_event_output(struct perf_event *event,
 		    struct perf_sample_data *data,
@@ -6099,6 +6114,12 @@ __perf_event_output(struct perf_event *event,
 {
 	struct perf_output_handle handle;
 	struct perf_event_header header;
+
+	/*
+	 * For security, drop the skid kernel samples if necessary.
+	 */
+	if (!sample_is_allowed(event, regs))
+		return ret;
 
 	/* protect the callchain buffers */
 	rcu_read_lock();
@@ -7315,21 +7336,6 @@ int perf_event_account_interrupt(struct perf_event *event)
 	return __perf_event_account_interrupt(event, 1);
 }
 
-static bool sample_is_allowed(struct perf_event *event, struct pt_regs *regs)
-{
-	/*
-	 * Due to interrupt latency (AKA "skid"), we may enter the
-	 * kernel before taking an overflow, even if the PMU is only
-	 * counting user events.
-	 * To avoid leaking information to userspace, we must always
-	 * reject kernel samples when exclude_kernel is set.
-	 */
-	if (event->attr.exclude_kernel && !user_mode(regs))
-		return false;
-
-	return true;
-}
-
 /*
  * Generic event overflow handling, sampling.
  */
@@ -7351,12 +7357,6 @@ static int __perf_event_overflow(struct perf_event *event,
 	ret = __perf_event_account_interrupt(event, throttle);
 
 	/*
-	 * For security, drop the skid kernel samples if necessary.
-	 */
-	if (!sample_is_allowed(event, regs))
-		return ret;
-
-	/*
 	 * XXX event_limit might not quite work as expected on inherited
 	 * events
 	 */
@@ -7371,6 +7371,10 @@ static int __perf_event_overflow(struct perf_event *event,
 
 	READ_ONCE(event->overflow_handler)(event, data, regs);
 
+	/*
+	 * We must generate a wakeup regardless of whether we actually
+	 * generated a sample. This is relied upon by rr.
+	 */
 	if (*perf_event_fasync(event) && event->pending_kill) {
 		event->pending_wakeup = 1;
 		irq_work_queue(&event->pending);
