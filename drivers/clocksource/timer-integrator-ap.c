@@ -183,6 +183,7 @@ static int __init integrator_ap_timer_init_of(struct device_node *node)
 	unsigned long rate;
 	struct device_node *pri_node;
 	struct device_node *sec_node;
+	struct resource res;
 
 	base = of_io_request_and_map(node, 0, "integrator-timer");
 	if (IS_ERR(base))
@@ -191,9 +192,13 @@ static int __init integrator_ap_timer_init_of(struct device_node *node)
 	clk = of_clk_get(node, 0);
 	if (IS_ERR(clk)) {
 		pr_err("No clock for %s\n", node->name);
-		return PTR_ERR(clk);
+		err = PTR_ERR(clk);
+		goto err_mem;
 	}
-	clk_prepare_enable(clk);
+	err = clk_prepare_enable(clk);
+	if (err)
+		goto err_clk_put;
+
 	rate = clk_get_rate(clk);
 	writel(0, base + TIMER_CTRL);
 
@@ -201,7 +206,7 @@ static int __init integrator_ap_timer_init_of(struct device_node *node)
 				"arm,timer-primary", &path);
 	if (err) {
 		pr_warn("Failed to read property\n");
-		return err;
+		goto err_clk_disable;
 	}
 
 	pri_node = of_find_node_by_path(path);
@@ -210,7 +215,7 @@ static int __init integrator_ap_timer_init_of(struct device_node *node)
 				"arm,timer-secondary", &path);
 	if (err) {
 		pr_warn("Failed to read property\n");
-		return err;
+		goto err_clk_disable;
 	}
 
 
@@ -230,6 +235,16 @@ static int __init integrator_ap_timer_init_of(struct device_node *node)
 	clk_disable_unprepare(clk);
 
 	return 0;
+
+err_clk_disable:
+	clk_disable_unprepare(clk);
+err_clk_put:
+	clk_put(clk);
+err_mem:
+	iounmap(base);
+	of_address_to_resource(node, 0, &res);
+	release_mem_region(res.start, resource_size(&res));
+	return err;
 }
 
 CLOCKSOURCE_OF_DECLARE(integrator_ap_timer, "arm,integrator-timer",
