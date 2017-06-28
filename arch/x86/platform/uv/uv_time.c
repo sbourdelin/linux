@@ -30,7 +30,7 @@
 
 #define RTC_NAME		"sgi_rtc"
 
-static u64 uv_read_rtc(struct clocksource *cs);
+static u64 uv_read_rtc(struct clocksource *cs, u64 *tsc_stamp);
 static int uv_rtc_next_event(unsigned long, struct clock_event_device *);
 static int uv_rtc_shutdown(struct clock_event_device *evt);
 
@@ -133,7 +133,7 @@ static int uv_setup_intr(int cpu, u64 expires)
 	/* Initialize comparator value */
 	uv_write_global_mmr64(pnode, UVH_INT_CMPB, expires);
 
-	if (uv_read_rtc(NULL) <= expires)
+	if (uv_read_rtc(NULL, NULL) <= expires)
 		return 0;
 
 	return !uv_intr_pending(pnode);
@@ -269,7 +269,7 @@ static int uv_rtc_unset_timer(int cpu, int force)
 
 	spin_lock_irqsave(&head->lock, flags);
 
-	if ((head->next_cpu == bcpu && uv_read_rtc(NULL) >= *t) || force)
+	if ((head->next_cpu == bcpu && uv_read_rtc(NULL, NULL) >= *t) || force)
 		rc = 1;
 
 	if (rc) {
@@ -296,7 +296,7 @@ static int uv_rtc_unset_timer(int cpu, int force)
  * cachelines of it's own page.  This allows faster simultaneous reads
  * from a given socket.
  */
-static u64 uv_read_rtc(struct clocksource *cs)
+static u64 uv_read_rtc(struct clocksource *cs, u64 *tsc_stamp)
 {
 	unsigned long offset;
 
@@ -316,7 +316,7 @@ static int uv_rtc_next_event(unsigned long delta,
 {
 	int ced_cpu = cpumask_first(ced->cpumask);
 
-	return uv_rtc_set_timer(ced_cpu, delta + uv_read_rtc(NULL));
+	return uv_rtc_set_timer(ced_cpu, delta + uv_read_rtc(NULL, NULL));
 }
 
 /*

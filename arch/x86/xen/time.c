@@ -39,21 +39,21 @@ static unsigned long xen_tsc_khz(void)
 	return pvclock_tsc_khz(info);
 }
 
-u64 xen_clocksource_read(void)
+u64 xen_clocksource_read(u64 *tsc_stamp)
 {
         struct pvclock_vcpu_time_info *src;
 	u64 ret;
 
 	preempt_disable_notrace();
 	src = &__this_cpu_read(xen_vcpu)->time;
-	ret = pvclock_clocksource_read(src);
+	ret = pvclock_clocksource_read(src, tsc_stamp);
 	preempt_enable_notrace();
 	return ret;
 }
 
-static u64 xen_clocksource_get_cycles(struct clocksource *cs)
+static u64 xen_clocksource_get_cycles(struct clocksource *cs, u64 *tsc_stamp)
 {
-	return xen_clocksource_read();
+	return xen_clocksource_read(tsc_stamp);
 }
 
 static void xen_read_wallclock(struct timespec *ts)
@@ -105,12 +105,12 @@ again:
 		op.u.settime64.mbz = 0;
 		op.u.settime64.secs = now.tv_sec;
 		op.u.settime64.nsecs = now.tv_nsec;
-		op.u.settime64.system_time = xen_clocksource_read();
+		op.u.settime64.system_time = xen_clocksource_read(NULL);
 	} else {
 		op.cmd = XENPF_settime32;
 		op.u.settime32.secs = now.tv_sec;
 		op.u.settime32.nsecs = now.tv_nsec;
-		op.u.settime32.system_time = xen_clocksource_read();
+		op.u.settime32.system_time = xen_clocksource_read(NULL);
 	}
 
 	ret = HYPERVISOR_platform_op(&op);
@@ -178,7 +178,7 @@ static struct clocksource xen_clocksource __read_mostly = {
 */
 static s64 get_abs_timeout(unsigned long delta)
 {
-	return xen_clocksource_read() + delta;
+	return xen_clocksource_read(NULL) + delta;
 }
 
 static int xen_timerop_shutdown(struct clock_event_device *evt)
@@ -366,8 +366,13 @@ void xen_timer_resume(void)
 	}
 }
 
+static u64 xen_clocksource_read_data(void)
+{
+	return xen_clocksource_read(NULL);
+}
+
 static const struct pv_time_ops xen_time_ops __initconst = {
-	.sched_clock = xen_clocksource_read,
+	.sched_clock = xen_clocksource_read_data,
 	.steal_clock = xen_steal_clock,
 };
 

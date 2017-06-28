@@ -48,7 +48,7 @@
 #define JIFFIES_SHIFT	8
 #endif
 
-static u64 jiffies_read(struct clocksource *cs)
+static u64 jiffies_read(struct clocksource *cs, u64 *tsc_stamp)
 {
 	return (u64) jiffies;
 }

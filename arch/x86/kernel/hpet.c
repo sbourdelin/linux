@@ -792,7 +792,7 @@ static union hpet_lock hpet __cacheline_aligned = {
 	{ .lock = __ARCH_SPIN_LOCK_UNLOCKED, },
 };
 
-static u64 read_hpet(struct clocksource *cs)
+static u64 read_hpet(struct clocksource *cs, u64 *tsc_stamp)
 {
 	unsigned long flags;
 	union hpet_lock old, new;
@@ -850,7 +850,7 @@ contended:
 /*
  * For UP or 32-bit.
  */
-static u64 read_hpet(struct clocksource *cs)
+static u64 read_hpet(struct clocksource *cs, u64 *tsc_stamp)
 {
 	return (u64)hpet_readl(HPET_COUNTER);
 }

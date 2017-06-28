@@ -48,7 +48,12 @@ struct module;
  *			400-499: Perfect
  *				The ideal clocksource. A must-use where
  *				available.
- * @read:		returns a cycle value, passes clocksource as argument
+ * @read:		returns a cycle value, passes clocksource and
+ * 			a pointer where tsc value is stored which was used in
+ * 			calcualtion of the cycle value if any,
+ * 			otherwise the pointer value is untouched. Must check
+ * 			if the pointer is not-NULL
+ * 			this value is used in kvm code for storing tsc_timestamp
  * @enable:		optional function to enable the clocksource
  * @disable:		optional function to disable the clocksource
  * @mask:		bitmask for two's complement
@@ -77,7 +82,7 @@ struct module;
  * structure.
  */
 struct clocksource {
-	u64 (*read)(struct clocksource *cs);
+	u64 (*read)(struct clocksource *cs, u64 *tsc_stamp);
 	u64 mask;
 	u32 mult;
 	u32 shift;

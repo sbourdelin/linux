@@ -171,7 +171,7 @@ enum tk_offsets {
 };
 
 extern ktime_t ktime_get(void);
-extern ktime_t ktime_get_with_offset(enum tk_offsets offs);
+extern ktime_t ktime_get_with_offset(enum tk_offsets offs, u64 *cycles);
 extern ktime_t ktime_mono_to_any(ktime_t tmono, enum tk_offsets offs);
 extern ktime_t ktime_get_raw(void);
 extern u32 ktime_get_resolution_ns(void);
@@ -181,7 +181,7 @@ extern u32 ktime_get_resolution_ns(void);
  */
 static inline ktime_t ktime_get_real(void)
 {
-	return ktime_get_with_offset(TK_OFFS_REAL);
+	return ktime_get_with_offset(TK_OFFS_REAL, NULL);
 }
 
 /**
@@ -192,15 +192,19 @@ static inline ktime_t ktime_get_real(void)
  */
 static inline ktime_t ktime_get_boottime(void)
 {
-	return ktime_get_with_offset(TK_OFFS_BOOT);
+	return ktime_get_with_offset(TK_OFFS_BOOT, NULL);
 }
 
+static inline ktime_t ktime_get_boottime_and_cycles(u64 *cycles)
+{
+	return ktime_get_with_offset(TK_OFFS_BOOT, cycles);
+}
 /**
  * ktime_get_clocktai - Returns the TAI time of day in ktime_t format
  */
 static inline ktime_t ktime_get_clocktai(void)
 {
-	return ktime_get_with_offset(TK_OFFS_TAI);
+	return ktime_get_with_offset(TK_OFFS_TAI, NULL);
 }
 
 /**
@@ -224,6 +228,11 @@ static inline u64 ktime_get_real_ns(void)
 static inline u64 ktime_get_boot_ns(void)
 {
 	return ktime_to_ns(ktime_get_boottime());
+}
+
+static inline u64 ktime_get_boot_ns_and_cycles(u64 *cycles)
+{
+	return ktime_to_ns(ktime_get_boottime_and_cycles(cycles));
 }
 
 static inline u64 ktime_get_tai_ns(void)

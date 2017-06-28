@@ -82,7 +82,7 @@ static int kvm_set_wallclock(const struct timespec *now)
 	return -1;
 }
 
-static u64 kvm_clock_read(void)
+static u64 kvm_clock_read(u64 *tsc_stamp)
 {
 	struct pvclock_vcpu_time_info *src;
 	u64 ret;
@@ -91,30 +91,35 @@ static u64 kvm_clock_read(void)
 	preempt_disable_notrace();
 	cpu = smp_processor_id();
 	src = &hv_clock[cpu].pvti;
-	ret = pvclock_clocksource_read(src);
+	ret = pvclock_clocksource_read(src, tsc_stamp);
 	preempt_enable_notrace();
 	return ret;
 }
 
-static u64 kvm_clock_get_cycles(struct clocksource *cs)
+static u64 kvm_clock_get_cycles(struct clocksource *cs, u64 *tsc_stamp)
 {
-	return kvm_clock_read();
+	return kvm_clock_read(tsc_stamp);
+}
+
+static u64 kvm_clock_read_single(void)
+{
+	return kvm_clock_read(NULL);
 }
 
 static u64 kvm_sched_clock_read(void)
 {
-	return kvm_clock_read() - kvm_sched_clock_offset;
+	return kvm_clock_read_single() - kvm_sched_clock_offset;
 }
 
 static inline void kvm_sched_clock_init(bool stable)
 {
 	if (!stable) {
-		pv_time_ops.sched_clock = kvm_clock_read;
+		pv_time_ops.sched_clock = kvm_clock_read_single;
 		clear_sched_clock_stable();
 		return;
 	}
 
-	kvm_sched_clock_offset = kvm_clock_read();
+	kvm_sched_clock_offset = kvm_clock_read_single();
 	pv_time_ops.sched_clock = kvm_sched_clock_read;
 
 	printk(KERN_INFO "kvm-clock: using sched offset of %llu cycles\n",
