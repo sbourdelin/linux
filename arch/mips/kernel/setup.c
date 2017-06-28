@@ -79,6 +79,15 @@ const unsigned long mips_io_port_base = -1;
 EXPORT_SYMBOL(mips_io_port_base);
 
 /*
+ * Here we blacklist all MIPS boards which do not have i8042 controller
+ */
+static const struct of_device_id i8042_blacklist_of_match[] = {
+	{ .compatible = "mti,ranchu", },
+	{},
+};
+#define I8042_DATA_REG	0x60
+
+/*
  * Check for existence of legacy devices
  *
  * Some drivers may try to probe some I/O ports which can lead to
@@ -90,9 +99,16 @@ EXPORT_SYMBOL(mips_io_port_base);
  */
 int check_legacy_ioport(unsigned long base_port)
 {
+	struct device_node *np;
 	int ret = 0;
 
 	switch (base_port) {
+	case I8042_DATA_REG:
+		np = of_find_matching_node(NULL, i8042_blacklist_of_match);
+		if (np)
+			ret = -ENODEV;
+		of_node_put(np);
+		break;
 	default:
 		/* We will assume that the I/O device port exists if
 		 * not explicitly added to the blacklist match table
