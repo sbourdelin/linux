@@ -57,6 +57,9 @@ OPTIONS
 			 FP mode, "dwarf" for DWARF mode, "lbr" for LBR mode and
 			 "no" for disable callgraph.
 	  - 'stack-size': user stack size for dwarf mode
+	  - 'branch_type': Configure branch types.
+			   See --branch-filter for acceptable branch types.
+			   "no" for disable branch sampling
 
           See the linkperf:perf-list[1] man page for more parameters.
 
