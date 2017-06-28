@@ -1,6 +1,6 @@
 BUILD_FLAGS = -DKTEST
 CFLAGS += -O3 -Wl,-no-as-needed -Wall $(BUILD_FLAGS)
-LDFLAGS += -lrt -lpthread
+LDLIBS += -lrt -lpthread
 
 # these are all "safe" tests that don't modify
 # system time or require escalated privileges
