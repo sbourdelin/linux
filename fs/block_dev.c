@@ -264,6 +264,10 @@ __blkdev_direct_IO_simple(struct kiocb *iocb, struct iov_iter *iter,
 
 	if (unlikely(bio.bi_error))
 		return bio.bi_error;
+
+	if (bio_integrity(&bio))
+		bio_integrity_free(&bio);
+
 	return ret;
 }
 
