@@ -1828,6 +1828,8 @@ again:
 	}
 
 	blk_throtl_bio_endio(bio);
+	/* release cgroup/integrity info */
+	__bio_free(bio);
 	if (bio->bi_end_io)
 		bio->bi_end_io(bio);
 }
