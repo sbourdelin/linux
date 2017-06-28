@@ -343,7 +343,7 @@ struct page *realmode_pfn_to_page(unsigned long pfn)
 }
 EXPORT_SYMBOL_GPL(realmode_pfn_to_page);
 
-#elif defined(CONFIG_FLATMEM)
+#else
 
 struct page *realmode_pfn_to_page(unsigned long pfn)
 {
