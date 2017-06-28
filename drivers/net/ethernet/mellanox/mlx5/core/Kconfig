@@ -6,6 +6,7 @@ config MLX5_CORE
 	tristate "Mellanox Technologies ConnectX-4 and Connect-IB core driver"
 	depends on MAY_USE_DEVLINK
 	depends on PCI
+	select MLXFW
 	default n
 	---help---
 	  Core driver for low level functionality of the ConnectX-4 and
