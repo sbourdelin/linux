@@ -78,6 +78,31 @@ static char __initdata builtin_cmdline[COMMAND_LINE_SIZE] = CONFIG_CMDLINE;
 const unsigned long mips_io_port_base = -1;
 EXPORT_SYMBOL(mips_io_port_base);
 
+/*
+ * Check for existence of legacy devices
+ *
+ * Some drivers may try to probe some I/O ports which can lead to
+ * kernel panic if the device is not present and mapped. This method
+ * should check for existence of such devices and return 0 for MIPS
+ * boards which actually have them, otherwise it will return -ENODEV
+ * and the affected device driver should never try to read/write the
+ * requested I/O port.
+ */
+int check_legacy_ioport(unsigned long base_port)
+{
+	int ret = 0;
+
+	switch (base_port) {
+	default:
+		/* We will assume that the I/O device port exists if
+		 * not explicitly added to the blacklist match table
+		 */
+		break;
+	}
+	return ret;
+}
+EXPORT_SYMBOL(check_legacy_ioport);
+
 static struct resource code_resource = { .name = "Kernel code", };
 static struct resource data_resource = { .name = "Kernel data", };
 

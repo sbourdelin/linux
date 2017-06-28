@@ -78,6 +78,11 @@ static inline void set_io_port_base(unsigned long base)
 }
 
 /*
+ * Check for existence of legacy devices
+ */
+extern int check_legacy_ioport(unsigned long base_port);
+
+/*
  * Thanks to James van Artsdalen for a better timing-fix than
  * the two short jumps: using outb's to a nonexistent port seems
  * to guarantee better timings even on fast machines.
