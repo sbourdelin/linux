@@ -5,7 +5,7 @@ obj-y			:= component.o core.o bus.o dd.o syscore.o \
 			   cpu.o firmware.o init.o map.o devres.o \
 			   attribute_container.o transport_class.o \
 			   topology.o container.o property.o cacheinfo.o
-obj-$(CONFIG_BOOT_CONSTRAINTS) += boot_constraint.o
+obj-$(CONFIG_BOOT_CONSTRAINTS) += boot_constraint.o test_plat_boot_constraint.o
 obj-$(CONFIG_DEVTMPFS)	+= devtmpfs.o
 obj-$(CONFIG_DMA_CMA) += dma-contiguous.o
 obj-y			+= power/
