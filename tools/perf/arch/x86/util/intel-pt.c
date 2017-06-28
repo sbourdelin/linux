@@ -545,6 +545,22 @@ static int intel_pt_validate_config(struct perf_pmu *intel_pt_pmu,
 					evsel->attr.config);
 }
 
+static int add_no_lbr_config_term(struct list_head *config_terms)
+{
+	struct perf_evsel_config_term *lbr_term;
+
+	lbr_term = zalloc(sizeof(*lbr_term));
+	if (!lbr_term)
+		return -ENOMEM;
+
+	INIT_LIST_HEAD(&lbr_term->list);
+	lbr_term->type = PERF_EVSEL__CONFIG_TERM_BRANCH;
+	lbr_term->val.branch = strdup("no");
+	list_add_tail(&lbr_term->list, config_terms);
+
+	return 0;
+}
+
 static int intel_pt_recording_options(struct auxtrace_record *itr,
 				      struct perf_evlist *evlist,
 				      struct record_opts *opts)
@@ -702,6 +718,8 @@ static int intel_pt_recording_options(struct auxtrace_record *itr,
 				perf_evsel__set_sample_bit(switch_evsel, TIME);
 				perf_evsel__set_sample_bit(switch_evsel, CPU);
 
+				add_no_lbr_config_term(&switch_evsel->config_terms);
+
 				opts->record_switch_events = false;
 				ptr->have_sched_switch = 3;
 			} else {
@@ -761,6 +779,7 @@ static int intel_pt_recording_options(struct auxtrace_record *itr,
 			/* And the CPU for switch events */
 			perf_evsel__set_sample_bit(tracking_evsel, CPU);
 		}
+		add_no_lbr_config_term(&tracking_evsel->config_terms);
 	}
 
 	/*
