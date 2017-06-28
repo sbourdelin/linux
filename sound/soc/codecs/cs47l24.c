@@ -78,6 +78,7 @@ static int cs47l24_adsp_power_ev(struct snd_soc_dapm_widget *w,
 
 static DECLARE_TLV_DB_SCALE(eq_tlv, -1200, 100, 0);
 static DECLARE_TLV_DB_SCALE(digital_tlv, -6400, 50, 0);
+static DECLARE_TLV_DB_SCALE(vol_limit_tlv, -600, 50, 0);
 static DECLARE_TLV_DB_SCALE(noise_tlv, -13200, 600, 0);
 static DECLARE_TLV_DB_SCALE(ng_tlv, -10200, 600, 0);
 
@@ -202,6 +203,13 @@ SOC_DOUBLE_R_TLV("HPOUT1 Digital Volume", ARIZONA_DAC_DIGITAL_VOLUME_1L,
 SOC_SINGLE_TLV("Speaker Digital Volume", ARIZONA_DAC_DIGITAL_VOLUME_4L,
 		 ARIZONA_OUT4L_VOL_SHIFT,
 		 0xbf, 0, digital_tlv),
+
+SOC_DOUBLE_R_RANGE_TLV("HPOUT1 Volume Limit", ARIZONA_DAC_VOLUME_LIMIT_1L,
+		       ARIZONA_DAC_VOLUME_LIMIT_1R, ARIZONA_OUT1L_VOL_LIM_SHIFT,
+		       0x74, 0x8C, 0, vol_limit_tlv),
+SOC_DOUBLE_R_RANGE_TLV("Speaker Volume Limit", ARIZONA_OUT_VOLUME_4L,
+		       ARIZONA_OUT_VOLUME_4R, ARIZONA_OUT4L_VOL_LIM_SHIFT,
+		       0x74, 0x8C, 0, vol_limit_tlv),
 
 SOC_ENUM("Output Ramp Up", arizona_out_vi_ramp),
 SOC_ENUM("Output Ramp Down", arizona_out_vd_ramp),
