@@ -139,6 +139,7 @@ struct tmio_nand_data {
 	struct nand_bbt_descr	*badblock_pattern;
 	struct mtd_partition	*partition;
 	unsigned int		num_partitions;
+	const char *const	*types;	/* names of parsers to use if any */
 };
 
 #define FBIO_TMIO_ACC_WRITE	0x7C639300
