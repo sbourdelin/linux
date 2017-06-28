@@ -68,6 +68,7 @@
 #include <linux/kd.h>
 #include <linux/slab.h>
 #include <linux/fb.h>
+#include <linux/fbcon.h>
 #include <linux/vt_kern.h>
 #include <linux/selection.h>
 #include <linux/font.h>
@@ -3630,6 +3631,13 @@ static int __init fb_console_init(void)
 	fbcon_start();
 	return 0;
 }
+
+/*
+ * Dummy export to force a hard depency between fbcon and fbdev core if fbcon is
+ * enabled.
+ */
+int fbcon_is_available = 1;
+EXPORT_SYMBOL(fbcon_is_available);
 
 fs_initcall(fb_console_init);
 

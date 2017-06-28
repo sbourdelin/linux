@@ -32,6 +32,7 @@
 #include <linux/device.h>
 #include <linux/efi.h>
 #include <linux/fb.h>
+#include <linux/fbcon.h>
 
 #include <asm/fb.h>
 
@@ -1796,6 +1797,9 @@ int
 register_framebuffer(struct fb_info *fb_info)
 {
 	int ret;
+#ifdef CONFIG_FRAMEBUFFER_CONSOLE
+	WARN_ON(!fbcon_is_available);
+#endif
 
 	mutex_lock(&registration_lock);
 	ret = do_register_framebuffer(fb_info);
