@@ -306,7 +306,8 @@ static int __init integrator_cp_of_init(struct device_node *np)
 	clk = of_clk_get(np, 0);
 	if (IS_ERR(clk)) {
 		pr_err("Failed to get clock\n");
-		return PTR_ERR(clk);
+		ret = PTR_ERR(clk);
+		goto err;
 	}
 
 	/* Ensure timer is disabled */
