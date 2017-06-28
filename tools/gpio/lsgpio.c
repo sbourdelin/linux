@@ -77,7 +77,7 @@ int list_device(const char *device_name)
 	int ret;
 	int i;
 
-	ret = asprintf(&chrdev_name, "/dev/%s", device_name);
+	ret = asprintf(&chrdev_name, "/sys/class/gpio/%s", device_name);
 	if (ret < 0)
 		return -ENOMEM;
 
@@ -169,7 +169,7 @@ int main(int argc, char **argv)
 		DIR *dp;
 
 		/* List all GPIO devices one at a time */
-		dp = opendir("/dev");
+		dp = opendir("/sys/class/gpio");
 		if (!dp) {
 			ret = -errno;
 			goto error_out;
