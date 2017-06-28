@@ -231,6 +231,14 @@ retry:
 		else
 			prot = PAGE_KERNEL;
 
+		/*
+		 * See the comment in hash_utils_64.c
+		 */
+		if ((PHYSICAL_START > MEMORY_START) &&
+			overlaps_interrupt_vector_text(vaddr,
+							vaddr + mapping_size))
+			prot = PAGE_KERNEL_X;
+
 		rc = radix__map_kernel_page(vaddr, addr, prot, mapping_size);
 		if (rc)
 			return rc;
