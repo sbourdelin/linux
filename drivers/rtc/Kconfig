@@ -1753,5 +1753,11 @@ config RTC_DRV_HID_SENSOR_TIME
 	  If this driver is compiled as a module, it will be named
 	  rtc-hid-sensor-time.
 
+config RTC_DRV_GOLDFISH
+	tristate "Goldfish Real Time Clock"
+	depends on MIPS
+	depends on GOLDFISH
+	help
+	  Say yes here to build support for the Goldfish RTC.
 
 endif # RTC_CLASS
