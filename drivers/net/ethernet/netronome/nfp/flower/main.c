@@ -50,14 +50,6 @@
 
 #define NFP_FLOWER_ALLOWED_VER 0x0001000000010000UL
 
-/**
- * struct nfp_flower_priv - Flower APP per-vNIC priv data
- * @nn:		     Pointer to vNIC
- */
-struct nfp_flower_priv {
-	struct nfp_net *nn;
-};
-
 static const char *nfp_flower_extra_cap(struct nfp_app *app, struct nfp_net *nn)
 {
 	return "FLOWER";
@@ -350,6 +342,12 @@ static int nfp_flower_init(struct nfp_app *app)
 	app->priv = kzalloc(sizeof(struct nfp_flower_priv), GFP_KERNEL);
 	if (!app->priv)
 		return -ENOMEM;
+
+	err = nfp_flower_metadata_init(app);
+	if (nfp_flower_metadata_init(app)) {
+		kfree(app->priv);
+		return err;
+	}
 
 	return 0;
 }

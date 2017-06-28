@@ -230,8 +230,14 @@ nfp_flower_add_offload(struct nfp_app *app, struct net_device *netdev,
 	if (err)
 		goto err_destroy_flow;
 
-	/* TODO: Complete flower_add_offload. */
-	err = -EOPNOTSUPP;
+	err = nfp_compile_flow_metadata(app, flow, flow_pay);
+	if (err)
+		goto err_destroy_flow;
+
+	/* Deallocate flow payload when flower rule has been destroyed. */
+	kfree(key_layer);
+
+	return 0;
 
 err_destroy_flow:
 	nfp_flower_deallocate_nfp(flow_pay);
@@ -256,7 +262,17 @@ static int
 nfp_flower_del_offload(struct nfp_app *app, struct net_device *netdev,
 		       struct tc_cls_flower_offload *flow)
 {
-	return -EOPNOTSUPP;
+	struct nfp_fl_payload *nfp_flow;
+	int err;
+
+	nfp_flow = nfp_flower_remove_fl_table(app, flow->cookie);
+	if (!nfp_flow)
+		return -ENOENT;
+
+	err = nfp_modify_flow_metadata(app, nfp_flow);
+
+	nfp_flower_deallocate_nfp(nfp_flow);
+	return err;
 }
 
 /**
