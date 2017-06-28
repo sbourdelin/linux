@@ -58,11 +58,18 @@ extern void udelay(unsigned long usecs);
 	typeof(condition) __ret;                                               \
 	unsigned long __loops = tb_ticks_per_usec * timeout;                   \
 	unsigned long __start = get_tbl();                                     \
-	while (!(__ret = (condition)) && (tb_ticks_since(__start) <= __loops)) \
-		if (delay)                                                     \
+                                                                               \
+	if (delay) {                                                           \
+		while (!(__ret = (condition)) &&                               \
+				(tb_ticks_since(__start) <= __loops))          \
 			udelay(delay);                                         \
-		else                                                           \
-			cpu_relax();                                           \
+	} else {                                                               \
+		spin_begin();                                                  \
+		while (!(__ret = (condition)) &&                               \
+				(tb_ticks_since(__start) <= __loops))          \
+			spin_cpu_relax();                                      \
+		spin_end();                                                    \
+	}                                                                      \
 	if (!__ret)                                                            \
 		__ret = (condition);                                           \
 	__ret;		                                                       \
