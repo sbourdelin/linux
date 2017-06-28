@@ -44,6 +44,7 @@ struct xfrm_flo {
 	u8 flags;
 };
 
+static DEFINE_PER_CPU(struct xfrm_dst *, xfrm_last_dst);
 static DEFINE_SPINLOCK(xfrm_policy_afinfo_lock);
 static struct xfrm_policy_afinfo const __rcu *xfrm_policy_afinfo[AF_INET6 + 1]
 						__read_mostly;
@@ -1700,6 +1701,34 @@ static int xfrm_expand_policies(const struct flowi *fl, u16 family,
 
 }
 
+void xfrm_policy_dev_unreg(void)
+{
+	int cpu;
+
+	local_bh_disable();
+	rcu_read_lock();
+	for_each_possible_cpu(cpu) {
+		struct xfrm_dst *tmp, *old;
+
+		old = per_cpu(xfrm_last_dst, cpu);
+		if (!old || xfrm_bundle_ok(old))
+			continue;
+
+		tmp = cmpxchg(&(per_cpu(xfrm_last_dst, cpu)), old, NULL);
+		if (tmp == old)
+			dst_release(&old->u.dst);
+	}
+	rcu_read_unlock();
+	local_bh_enable();
+}
+
+static void xfrm_last_dst_update(struct xfrm_dst *xdst)
+{
+	struct xfrm_dst *old = this_cpu_xchg(xfrm_last_dst, xdst);
+	if (old)
+		dst_release(&old->u.dst);
+}
+
 static struct xfrm_dst *
 xfrm_resolve_and_create_bundle(struct xfrm_policy **pols, int num_pols,
 			       const struct flowi *fl, u16 family,
@@ -1711,17 +1740,29 @@ xfrm_resolve_and_create_bundle(struct xfrm_policy **pols, int num_pols,
 	struct xfrm_dst *xdst;
 	int err;
 
+	xdst = this_cpu_read(xfrm_last_dst);
+	if (xdst &&
+	    xdst->u.dst.dev == dst_orig->dev &&
+	    xdst->num_pols == num_pols &&
+	    memcmp(xdst->pols, pols,
+		   sizeof(struct xfrm_policy *) * num_pols) == 0 &&
+	    xfrm_bundle_ok(xdst) &&
+	    dst_hold_safe(&xdst->u.dst))
+		return xdst;
+
 	/* Try to instantiate a bundle */
 	err = xfrm_tmpl_resolve(pols, num_pols, fl, xfrm, family);
 	if (err <= 0) {
 		if (err != 0 && err != -EAGAIN)
 			XFRM_INC_STATS(net, LINUX_MIB_XFRMOUTPOLERROR);
+		xfrm_last_dst_update(NULL);
 		return ERR_PTR(err);
 	}
 
 	dst = xfrm_bundle_create(pols[0], xfrm, err, fl, dst_orig);
 	if (IS_ERR(dst)) {
 		XFRM_INC_STATS(net, LINUX_MIB_XFRMOUTBUNDLEGENERROR);
+		xfrm_last_dst_update(NULL);
 		return ERR_CAST(dst);
 	}
 
@@ -1730,6 +1771,9 @@ xfrm_resolve_and_create_bundle(struct xfrm_policy **pols, int num_pols,
 	xdst->num_pols = num_pols;
 	memcpy(xdst->pols, pols, sizeof(struct xfrm_policy *) * num_pols);
 	xdst->policy_genid = atomic_read(&pols[0]->genid);
+
+	atomic_set(&xdst->u.dst.__refcnt, 2);
+	xfrm_last_dst_update(xdst);
 
 	return xdst;
 }

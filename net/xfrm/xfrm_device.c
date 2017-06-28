@@ -151,6 +151,7 @@ static int xfrm_dev_register(struct net_device *dev)
 
 static int xfrm_dev_unregister(struct net_device *dev)
 {
+	xfrm_policy_dev_unreg();
 	return NOTIFY_DONE;
 }
 
