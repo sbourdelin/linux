@@ -448,7 +448,10 @@ define archhelp
 	echo '  If you are targeting a system supported by generic kernels you may'
 	echo '  configure the kernel for a given architecture target like so:'
 	echo
-	echo '  {micro32,32,64}{r1,r2,r6}{el,}_defconfig <BOARDS="list of boards">'
+	echo '  {micro32,32,64}{r1,r2,r6}{el,}_defconfig <BOARDS="list of boards"> <OS=android>'
+	echo
+	echo '  By setting OS=android, the generic kernel configuration will enable common'
+	echo '  prerequisites for running Android OS.'
 	echo
 	echo '  Otherwise, the following default configurations are available:'
 endef
@@ -488,7 +491,8 @@ $(eval $(call gen_generic_defconfigs,micro32,r2,eb el))
 $(generic_defconfigs):
 	$(Q)$(CONFIG_SHELL) $(srctree)/scripts/kconfig/merge_config.sh \
 		-m -O $(objtree) $(srctree)/arch/$(ARCH)/configs/generic_defconfig $^ \
-		$(foreach board,$(BOARDS),$(generic_config_dir)/board-$(board).config)
+		$(foreach board,$(BOARDS),$(generic_config_dir)/board-$(board).config) \
+		$(foreach os,$(OS),$(generic_config_dir)/$(os).config)
 	$(Q)$(MAKE) -f $(srctree)/Makefile olddefconfig
 
 #
