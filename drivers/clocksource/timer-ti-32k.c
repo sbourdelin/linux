@@ -116,6 +116,7 @@ static int __init ti_32k_timer_init(struct device_node *np)
 	ret = clocksource_register_hz(&ti_32k_timer.cs, 32768);
 	if (ret) {
 		pr_err("32k_counter: can't register clocksource\n");
+		iounmap(ti_32k_timer.base);
 		return ret;
 	}
 
