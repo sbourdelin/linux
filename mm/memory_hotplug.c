@@ -864,8 +864,8 @@ bool allow_online_pfn_range(int nid, unsigned long pfn, unsigned long nr_pages, 
 	return online_type == MMOP_ONLINE_KEEP;
 }
 
-static void __meminit resize_zone_range(struct zone *zone, unsigned long start_pfn,
-		unsigned long nr_pages)
+static void __meminit upsize_zone_range(struct zone *zone,
+		unsigned long start_pfn, unsigned long nr_pages)
 {
 	unsigned long old_end_pfn = zone_end_pfn(zone);
 
@@ -875,8 +875,21 @@ static void __meminit resize_zone_range(struct zone *zone, unsigned long start_p
 	zone->spanned_pages = max(start_pfn + nr_pages, old_end_pfn) - zone->zone_start_pfn;
 }
 
-static void __meminit resize_pgdat_range(struct pglist_data *pgdat, unsigned long start_pfn,
-                                     unsigned long nr_pages)
+static void __meminit downsize_zone_range(struct zone *zone,
+		unsigned long start_pfn, unsigned long nr_pages)
+{
+	unsigned long old_end_pfn = zone_end_pfn(zone);
+
+	if (start_pfn == zone->zone_start_pfn
+		|| old_end_pfn == (start_pfn + nr_pages))
+		zone->spanned_pages -= nr_pages;
+
+	if (start_pfn == zone->zone_start_pfn)
+		zone->zone_start_pfn += nr_pages;
+}
+
+static void __meminit upsize_pgdat_range(struct pglist_data *pgdat,
+		unsigned long start_pfn, unsigned long nr_pages)
 {
 	unsigned long old_end_pfn = pgdat_end_pfn(pgdat);
 
@@ -884,6 +897,19 @@ static void __meminit resize_pgdat_range(struct pglist_data *pgdat, unsigned lon
 		pgdat->node_start_pfn = start_pfn;
 
 	pgdat->node_spanned_pages = max(start_pfn + nr_pages, old_end_pfn) - pgdat->node_start_pfn;
+}
+
+static void __meminit downsize_pgdat_range(struct pglist_data *pgdat,
+		unsigned long start_pfn, unsigned long nr_pages)
+{
+	unsigned long old_end_pfn = pgdat_end_pfn(pgdat);
+
+	if (pgdat->node_start_pfn == start_pfn)
+		pgdat->node_start_pfn = start_pfn;
+
+	if (pgdat->node_start_pfn == start_pfn
+		|| old_end_pfn == (start_pfn + nr_pages))
+		pgdat->node_spanned_pages -= nr_pages;
 }
 
 void __ref move_pfn_range_to_zone(struct zone *zone,
@@ -902,9 +928,9 @@ void __ref move_pfn_range_to_zone(struct zone *zone,
 	/* TODO Huh pgdat is irqsave while zone is not. It used to be like that before */
 	pgdat_resize_lock(pgdat, &flags);
 	zone_span_writelock(zone);
-	resize_zone_range(zone, start_pfn, nr_pages);
+	upsize_zone_range(zone, start_pfn, nr_pages);
 	zone_span_writeunlock(zone);
-	resize_pgdat_range(pgdat, start_pfn, nr_pages);
+	upsize_pgdat_range(pgdat, start_pfn, nr_pages);
 	pgdat_resize_unlock(pgdat, &flags);
 
 	/*
@@ -1782,7 +1808,11 @@ repeat:
 	zone->present_pages -= offlined_pages;
 
 	pgdat_resize_lock(zone->zone_pgdat, &flags);
+	zone_span_writelock(zone);
+	downsize_zone_range(zone, start_pfn, nr_pages);
+	zone_span_writeunlock(zone);
 	zone->zone_pgdat->node_present_pages -= offlined_pages;
+	downsize_pgdat_range(zone->zone_pgdat, start_pfn, nr_pages);
 	pgdat_resize_unlock(zone->zone_pgdat, &flags);
 
 	init_per_zone_wmark_min();
