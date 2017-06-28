@@ -2717,8 +2717,15 @@ BPF_CALL_5(bpf_setsockopt, struct bpf_sock_ops_kern *, bpf_sock,
 		}
 	} else if (level == SOL_TCP &&
 		   sk->sk_prot->setsockopt == tcp_setsockopt) {
-		/* Place holder */
-		ret = -EINVAL;
+		if (optname == TCP_CONGESTION) {
+			ret = tcp_set_congestion_control(sk, optval, false);
+			if (!ret && bpf_sock->op > BPF_SOCK_OPS_NEEDS_ECN)
+				/* replacing an existing ca */
+				tcp_reinit_congestion_control(sk,
+					inet_csk(sk)->icsk_ca_ops);
+		} else {
+			ret = -EINVAL;
+		}
 	} else {
 		ret = -EINVAL;
 	}
