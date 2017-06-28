@@ -332,8 +332,6 @@ int parse_optarg_string(char *s)
 		fprintf(stderr, "no digits in \"%s\"\n", s);
 		usage();
 	}
-	if (i == LONG_MIN || i == LONG_MAX)
-		errx(-1, "%s", s);
 
 	if (i > 0xFF)
 		errx(-1, "%d (0x%x) must be < 256", i, i);
