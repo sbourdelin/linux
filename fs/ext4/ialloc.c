@@ -1073,7 +1073,7 @@ got:
 		goto out;
 	}
 	spin_lock(&sbi->s_next_gen_lock);
-	inode->i_generation = sbi->s_next_generation++;
+	ext4_inode_set_gen(inode, sbi);
 	spin_unlock(&sbi->s_next_gen_lock);
 
 	/* Precompute checksum seed for inode metadata */

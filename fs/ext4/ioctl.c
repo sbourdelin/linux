@@ -160,8 +160,8 @@ static long swap_inode_boot_loader(struct super_block *sb,
 	inode->i_ctime = inode_bl->i_ctime = current_time(inode);
 
 	spin_lock(&sbi->s_next_gen_lock);
-	inode->i_generation = sbi->s_next_generation++;
-	inode_bl->i_generation = sbi->s_next_generation++;
+	ext4_inode_set_gen(inode, sbi);
+	ext4_inode_set_gen(inode_bl, sbi);
 	spin_unlock(&sbi->s_next_gen_lock);
 
 	ext4_discard_preallocations(inode);

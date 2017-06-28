@@ -1553,6 +1553,14 @@ static inline int ext4_valid_inum(struct super_block *sb, unsigned long ino)
 		 ino <= le32_to_cpu(EXT4_SB(sb)->s_es->s_inodes_count));
 }
 
+static inline void ext4_inode_set_gen(struct inode *inode,
+				      struct ext4_sb_info *sbi)
+{
+	inode->i_generation = sbi->s_next_generation++;
+	if (!inode->i_generation)
+		inode->i_generation = sbi->s_next_generation++;
+}
+
 /*
  * Inode dynamic state flags
  */
