@@ -339,4 +339,15 @@ config CMA_ALIGNMENT
 
 endif
 
+config BOOT_CONSTRAINTS
+	bool "Boot constraints for devices"
+	default y
+	help
+	  This enables boot constraints detection for devices. These constraints
+	  are (normally) set by the Bootloader and must be satisfied by the
+	  kernel until the relevant device driver is probed. Once the driver is
+	  probed, the constraint is dropped.
+
+	  If unsure, say Y.
+
 endmenu

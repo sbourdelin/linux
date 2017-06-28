@@ -17,6 +17,7 @@
  * This file is released under the GPLv2
  */
 
+#include <linux/boot_constraint.h>
 #include <linux/device.h>
 #include <linux/delay.h>
 #include <linux/dma-mapping.h>
@@ -381,15 +382,20 @@ re_probe:
 	 */
 	devices_kset_move_last(dev);
 
-	if (dev->bus->probe) {
+	if (dev->bus->probe)
 		ret = dev->bus->probe(dev);
-		if (ret)
-			goto probe_failed;
-	} else if (drv->probe) {
+	else if (drv->probe)
 		ret = drv->probe(dev);
-		if (ret)
-			goto probe_failed;
-	}
+
+	/*
+	 * Remove boot constraints for both successful and unsuccessful probe(),
+	 * except for the case where EPROBE_DEFER is returned by probe().
+	 */
+	if (ret != -EPROBE_DEFER)
+		boot_constraints_remove(dev);
+
+	if (ret)
+		goto probe_failed;
 
 	if (test_remove) {
 		test_remove = false;
