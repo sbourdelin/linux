@@ -2652,6 +2652,7 @@ static inline void account_numa_dequeue(struct rq *rq, struct task_struct *p)
 {
 }
 
+struct sched_domain;
 static inline bool numa_wake_affine(struct sched_domain *sd,
 				    struct task_struct *p, int this_cpu,
 				    int prev_cpu, int sync)
