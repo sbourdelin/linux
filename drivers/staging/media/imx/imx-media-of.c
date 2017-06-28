@@ -115,7 +115,7 @@ of_parse_subdev(struct imx_media_dev *imxmd, struct device_node *sd_np,
 
 	/* register this subdev with async notifier */
 	imxsd = imx_media_add_async_subdev(imxmd, sd_np, NULL);
-	if (IS_ERR_OR_NULL(imxsd))
+	if (IS_ERR(imxsd))
 		return imxsd;
 
 	if (is_csi_port) {
