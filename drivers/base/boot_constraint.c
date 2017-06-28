@@ -45,6 +45,17 @@ static DEFINE_MUTEX(constraint_devices_mutex);
 static int constraint_supply_add(struct constraint *constraint, void *data);
 static void constraint_supply_remove(struct constraint *constraint);
 
+static bool constraints_disabled;
+
+static int __init constraints_disable(char *str)
+{
+	constraints_disabled = true;
+	pr_debug("disabled\n");
+
+	return 0;
+}
+early_param("boot_constraints_disable", constraints_disable);
+
 
 /* Boot constraints core */
 
@@ -152,6 +163,9 @@ int boot_constraint_add(struct device *dev, enum boot_constraint_type type,
 	struct constraint *constraint;
 	int ret;
 
+	if (constraints_disabled)
+		return -ENODEV;
+
 	mutex_lock(&constraint_devices_mutex);
 
 	/* Find or add the cdev type first */
@@ -201,6 +215,9 @@ void boot_constraints_remove(struct device *dev)
 {
 	struct constraint_dev *cdev;
 	struct constraint *constraint, *temp;
+
+	if (constraints_disabled)
+		return;
 
 	mutex_lock(&constraint_devices_mutex);
 
