@@ -27,6 +27,7 @@
 #define PWM_DUTY_NEGATIVE	(0 << 3)
 #define PWM_INACTIVE_NEGATIVE	(0 << 4)
 #define PWM_INACTIVE_POSITIVE	(1 << 4)
+#define PWM_POLARITY_MASK	(PWM_DUTY_POSITIVE | PWM_INACTIVE_POSITIVE)
 #define PWM_OUTPUT_LEFT		(0 << 5)
 #define PWM_LP_DISABLE		(0 << 8)
 
@@ -52,10 +53,12 @@ struct rockchip_pwm_data {
 	const struct pwm_ops *ops;
 
 	void (*set_enable)(struct pwm_chip *chip,
-			   struct pwm_device *pwm, bool enable,
-			   enum pwm_polarity polarity);
+			   struct pwm_device *pwm, bool enable);
 	void (*get_state)(struct pwm_chip *chip, struct pwm_device *pwm,
 			  struct pwm_state *state);
+	void (*pwm_config)(struct pwm_chip *chip, struct pwm_device *pwm,
+			   int duty_ns, int period_ns,
+			   enum pwm_polarity polarity);
 };
 
 static inline struct rockchip_pwm_chip *to_rockchip_pwm_chip(struct pwm_chip *c)
@@ -64,8 +67,7 @@ static inline struct rockchip_pwm_chip *to_rockchip_pwm_chip(struct pwm_chip *c)
 }
 
 static void rockchip_pwm_set_enable_v1(struct pwm_chip *chip,
-				       struct pwm_device *pwm, bool enable,
-				       enum pwm_polarity polarity)
+				       struct pwm_device *pwm, bool enable)
 {
 	struct rockchip_pwm_chip *pc = to_rockchip_pwm_chip(chip);
 	u32 enable_conf = PWM_CTRL_OUTPUT_EN | PWM_CTRL_TIMER_EN;
@@ -95,18 +97,12 @@ static void rockchip_pwm_get_state_v1(struct pwm_chip *chip,
 }
 
 static void rockchip_pwm_set_enable_v2(struct pwm_chip *chip,
-				       struct pwm_device *pwm, bool enable,
-				       enum pwm_polarity polarity)
+				       struct pwm_device *pwm, bool enable)
 {
 	struct rockchip_pwm_chip *pc = to_rockchip_pwm_chip(chip);
 	u32 enable_conf = PWM_OUTPUT_LEFT | PWM_LP_DISABLE | PWM_ENABLE |
 			  PWM_CONTINUOUS;
 	u32 val;
-
-	if (polarity == PWM_POLARITY_INVERSED)
-		enable_conf |= PWM_DUTY_NEGATIVE | PWM_INACTIVE_POSITIVE;
-	else
-		enable_conf |= PWM_DUTY_POSITIVE | PWM_INACTIVE_NEGATIVE;
 
 	val = readl_relaxed(pc->base + pc->data->regs.ctrl);
 
@@ -165,8 +161,10 @@ static void rockchip_pwm_get_state(struct pwm_chip *chip,
 	clk_disable(pc->pclk);
 }
 
-static void rockchip_pwm_config(struct pwm_chip *chip, struct pwm_device *pwm,
-			       int duty_ns, int period_ns)
+static void rockchip_pwm_config_v1(struct pwm_chip *chip,
+				   struct pwm_device *pwm,
+				   int duty_ns, int period_ns,
+				   enum pwm_polarity polarity)
 {
 	struct rockchip_pwm_chip *pc = to_rockchip_pwm_chip(chip);
 	unsigned long period, duty;
@@ -190,10 +188,46 @@ static void rockchip_pwm_config(struct pwm_chip *chip, struct pwm_device *pwm,
 	writel(duty, pc->base + pc->data->regs.duty);
 }
 
+static void rockchip_pwm_config_v2(struct pwm_chip *chip,
+				   struct pwm_device *pwm,
+				   int duty_ns, int period_ns,
+				   enum pwm_polarity polarity)
+{
+	struct rockchip_pwm_chip *pc = to_rockchip_pwm_chip(chip);
+	unsigned long period, duty;
+	u64 clk_rate, div;
+	u32 ctrl;
+
+	clk_rate = clk_get_rate(pc->clk);
+
+	/*
+	 * Since period and duty cycle registers have a width of 32
+	 * bits, every possible input period can be obtained using the
+	 * default prescaler value for all practical clock rate values.
+	 */
+	div = clk_rate * period_ns;
+	period = DIV_ROUND_CLOSEST_ULL(div,
+				       pc->data->prescaler * NSEC_PER_SEC);
+
+	div = clk_rate * duty_ns;
+	duty = DIV_ROUND_CLOSEST_ULL(div, pc->data->prescaler * NSEC_PER_SEC);
+
+	writel(period, pc->base + pc->data->regs.period);
+	writel(duty, pc->base + pc->data->regs.duty);
+
+	ctrl = readl_relaxed(pc->base + pc->data->regs.ctrl);
+	ctrl &= ~PWM_POLARITY_MASK;
+	if (polarity == PWM_POLARITY_INVERSED)
+		ctrl |= PWM_DUTY_NEGATIVE | PWM_INACTIVE_POSITIVE;
+	else
+		ctrl |= PWM_DUTY_POSITIVE | PWM_INACTIVE_NEGATIVE;
+
+	writel(ctrl, pc->base + pc->data->regs.ctrl);
+}
+
 static int rockchip_pwm_enable(struct pwm_chip *chip,
 			 struct pwm_device *pwm,
-			 bool enable,
-			 enum pwm_polarity polarity)
+			 bool enable)
 {
 	struct rockchip_pwm_chip *pc = to_rockchip_pwm_chip(chip);
 	int ret;
@@ -204,7 +238,7 @@ static int rockchip_pwm_enable(struct pwm_chip *chip,
 			return ret;
 	}
 
-	pc->data->set_enable(chip, pwm, enable, polarity);
+	pc->data->set_enable(chip, pwm, enable);
 
 	if (!enable)
 		clk_disable(pc->clk);
@@ -228,17 +262,17 @@ static int rockchip_pwm_apply(struct pwm_chip *chip, struct pwm_device *pwm,
 		return ret;
 
 	if (state->polarity != curstate.polarity && enabled) {
-		ret = rockchip_pwm_enable(chip, pwm, false, state->polarity);
+		ret = rockchip_pwm_enable(chip, pwm, false);
 		if (ret)
 			goto out;
 		enabled = false;
 	}
 
-	rockchip_pwm_config(chip, pwm, state->duty_cycle, state->period);
+	pc->data->pwm_config(chip, pwm, state->duty_cycle,
+			  state->period, state->polarity);
 
 	if (state->enabled != enabled) {
-		ret = rockchip_pwm_enable(chip, pwm, state->enabled,
-				    state->polarity);
+		ret = rockchip_pwm_enable(chip, pwm, state->enabled);
 		if (ret)
 			goto out;
 	}
@@ -278,6 +312,7 @@ static const struct rockchip_pwm_data pwm_data_v1 = {
 	.ops = &rockchip_pwm_ops_v1,
 	.set_enable = rockchip_pwm_set_enable_v1,
 	.get_state = rockchip_pwm_get_state_v1,
+	.pwm_config = rockchip_pwm_config_v1,
 };
 
 static const struct rockchip_pwm_data pwm_data_v2 = {
@@ -292,6 +327,7 @@ static const struct rockchip_pwm_data pwm_data_v2 = {
 	.ops = &rockchip_pwm_ops_v2,
 	.set_enable = rockchip_pwm_set_enable_v2,
 	.get_state = rockchip_pwm_get_state_v2,
+	.pwm_config = rockchip_pwm_config_v2,
 };
 
 static const struct rockchip_pwm_data pwm_data_vop = {
@@ -306,6 +342,7 @@ static const struct rockchip_pwm_data pwm_data_vop = {
 	.ops = &rockchip_pwm_ops_v2,
 	.set_enable = rockchip_pwm_set_enable_v2,
 	.get_state = rockchip_pwm_get_state_v2,
+	.pwm_config = rockchip_pwm_config_v2,
 };
 
 static const struct of_device_id rockchip_pwm_dt_ids[] = {
