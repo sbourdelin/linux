@@ -50,6 +50,7 @@ struct at24_platform_data {
 #define AT24_FLAG_TAKE8ADDR	BIT(4)	/* take always 8 addresses (24c00) */
 #define AT24_FLAG_SERIAL	BIT(3)	/* factory-programmed serial number */
 #define AT24_FLAG_MAC		BIT(2)	/* factory-programmed mac address */
+	u8		offset;
 
 	void		(*setup)(struct nvmem_device *nvmem, void *context);
 	void		*context;
