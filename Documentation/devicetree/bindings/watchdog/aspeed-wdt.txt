@@ -8,9 +8,33 @@ Required properties:
  - reg: physical base address of the controller and length of memory mapped
    region
 
+Optional properties:
+   Signal behavior - Whenever a timeout occurs the watchdog can be programmed
+   to generate/not generate 6 types of signals:
+
+ - aspeed,arm-reset:	If property is present then reset ARM CPU only.
+			If not specified no ARM CPU reset is done.
+
+ - aspeed,no-soc-reset: If property is present then do not reset SOC.
+			If not specified then SOC reset is done.
+
+ - aspeed,no-sys-reset: If property is present then do not reset system.
+			Typcally used in tandem with 'aspeed-external-signal'
+			If not specified then system reset is done.
+
+ - aspeed,interrupt:	If property is present then interrupt CPU.
+			If not specified then don't interrupt CPU.
+
+ - aspeed,external-signal: If property is present then signal is sent to
+			external reset counter (only WDT1 and WDT2). If not
+			specified no external signal is sent.
+ - aspeed,alt-boot:    If property is present then boot from alternate block.
+
 Example:
 
 	wdt1: watchdog@1e785000 {
 		compatible = "aspeed,ast2400-wdt";
 		reg = <0x1e785000 0x1c>;
+		aspeed,no-sys-reset;
+		aspeed,external-signal;
 	};
