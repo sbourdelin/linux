@@ -262,6 +262,42 @@ is called. After all subdevices have been located the .complete() callback is
 called. When a subdevice is removed from the system the .unbind() method is
 called. All three callbacks are optional.
 
+Streaming control
+^^^^^^^^^^^^^^^^^
+
+Starting and stopping the stream are somewhat complex operations that
+often require walking the media graph to enable streaming on
+sub-devices which the pipeline consists of. This involves interaction
+between multiple drivers, sometimes more than two.
+
+The ``.s_stream()`` core op is responsible for starting and stopping
+the stream on the sub-device it is called on. Additionally, if there
+are sub-devices further up in the pipeline, i.e. connected to that
+sub-device's sink pads through enabled links, the sub-device driver
+must call the ``.s_stream()`` core op of all such sub-devices. The
+sub-device driver is thus in control of whether the upstream
+sub-devices start (or stop) streaming before or after the sub-device
+itself is set up for streaming.
+
+.. note::
+
+   As the ``.s_stream()`` callback is called recursively through the
+   sub-devices along the pipeline, it is important to keep the
+   recursion as short as possible. To this end, drivers are encouraged
+   not to internally call ``.s_stream()`` recursively in order to make
+   only a single additional recursion per driver in the pipeline. This
+   greatly reduces stack usage.
+
+Stopping the transmitter
+^^^^^^^^^^^^^^^^^^^^^^^^
+
+A transmitter stops sending the stream of images as a result of
+calling the ``.s_stream()`` callback. Some transmitters may stop the
+stream at a frame boundary whereas others stop immediately,
+effectively leaving the current frame unfinished. The receiver driver
+should not make assumptions either way, but function properly in both
+cases.
+
 V4L2 sub-device userspace API
 -----------------------------
 
