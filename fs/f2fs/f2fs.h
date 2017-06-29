@@ -22,6 +22,7 @@
 #include <linux/vmalloc.h>
 #include <linux/bio.h>
 #include <linux/blkdev.h>
+#include <linux/quotaops.h>
 #ifdef CONFIG_F2FS_FS_ENCRYPTION
 #include <linux/fscrypt_supp.h>
 #else
@@ -88,6 +89,8 @@ extern char *fault_name[FAULT_MAX];
 #define F2FS_MOUNT_FAULT_INJECTION	0x00010000
 #define F2FS_MOUNT_ADAPTIVE		0x00020000
 #define F2FS_MOUNT_LFS			0x00040000
+#define F2FS_MOUNT_USRQUOTA		0x00080000
+#define F2FS_MOUNT_GRPQUOTA		0x00100000
 
 #define clear_opt(sbi, option)	((sbi)->mount_opt.opt &= ~F2FS_MOUNT_##option)
 #define set_opt(sbi, option)	((sbi)->mount_opt.opt |= F2FS_MOUNT_##option)
@@ -521,6 +524,12 @@ struct f2fs_inode_info {
 	nid_t i_xattr_nid;		/* node id that contains xattrs */
 	loff_t	last_disk_size;		/* lastly written file size */
 
+#ifdef CONFIG_QUOTA
+	struct dquot *i_dquot[MAXQUOTAS];
+
+	/* quota space reservation, managed internally by quota code */
+	qsize_t i_reserved_quota;
+#endif
 	struct list_head dirty_list;	/* dirty list for dirs and files */
 	struct list_head gdirty_list;	/* linked in global dirty list */
 	struct list_head inmem_pages;	/* inmemory pages managed by f2fs */
@@ -1050,8 +1059,13 @@ struct f2fs_sb_info {
 		__func__, __builtin_return_address(0))
 static inline bool time_to_inject(struct f2fs_sb_info *sbi, int type)
 {
-	struct f2fs_fault_info *ffi = &sbi->fault_info;
+	struct f2fs_fault_info *ffi;
 
+	/* bd_inode->i_sb->s_fs_info is NULL, just skip */
+	if (!sbi)
+		return false;
+
+	ffi = &sbi->fault_info;
 	if (!ffi->inject_rate)
 		return false;
 
@@ -1370,17 +1384,23 @@ static inline bool f2fs_has_xattr_block(unsigned int ofs)
 	return ofs == XATTR_NODE_OFFSET;
 }
 
-static inline void f2fs_i_blocks_write(struct inode *, block_t, bool);
-static inline bool inc_valid_block_count(struct f2fs_sb_info *sbi,
+static inline void f2fs_i_blocks_write(struct inode *, block_t, bool, bool);
+static inline int inc_valid_block_count(struct f2fs_sb_info *sbi,
 				 struct inode *inode, blkcnt_t *count)
 {
-	blkcnt_t diff;
+	blkcnt_t diff = 0, release = 0;
 	block_t avail_user_block_count;
+	int ret;
+
+	ret = dquot_reserve_block(inode, *count);
+	if (ret)
+		return ret;
 
 #ifdef CONFIG_F2FS_FAULT_INJECTION
 	if (time_to_inject(sbi, FAULT_BLOCK)) {
 		f2fs_show_injection_info(FAULT_BLOCK);
-		return false;
+		release = *count;
+		goto enospc;
 	}
 #endif
 	/*
@@ -1395,17 +1415,24 @@ static inline bool inc_valid_block_count(struct f2fs_sb_info *sbi,
 	if (unlikely(sbi->total_valid_block_count > avail_user_block_count)) {
 		diff = sbi->total_valid_block_count - avail_user_block_count;
 		*count -= diff;
+		release = diff;
 		sbi->total_valid_block_count = avail_user_block_count;
 		if (!*count) {
 			spin_unlock(&sbi->stat_lock);
 			percpu_counter_sub(&sbi->alloc_valid_block_count, diff);
-			return false;
+			goto enospc;
 		}
 	}
 	spin_unlock(&sbi->stat_lock);
 
-	f2fs_i_blocks_write(inode, *count, true);
-	return true;
+	if (release)
+		dquot_release_reservation_block(inode, release);
+	f2fs_i_blocks_write(inode, *count, true, true);
+	return 0;
+
+enospc:
+	dquot_release_reservation_block(inode, release);
+	return -ENOSPC;
 }
 
 static inline void dec_valid_block_count(struct f2fs_sb_info *sbi,
@@ -1419,7 +1446,7 @@ static inline void dec_valid_block_count(struct f2fs_sb_info *sbi,
 	f2fs_bug_on(sbi, inode->i_blocks < sectors);
 	sbi->total_valid_block_count -= (block_t)count;
 	spin_unlock(&sbi->stat_lock);
-	f2fs_i_blocks_write(inode, count, false);
+	f2fs_i_blocks_write(inode, count, false, true);
 }
 
 static inline void inc_page_count(struct f2fs_sb_info *sbi, int count_type)
@@ -1548,11 +1575,18 @@ static inline block_t __start_sum_addr(struct f2fs_sb_info *sbi)
 	return le32_to_cpu(F2FS_CKPT(sbi)->cp_pack_start_sum);
 }
 
-static inline bool inc_valid_node_count(struct f2fs_sb_info *sbi,
+static inline int inc_valid_node_count(struct f2fs_sb_info *sbi,
 					struct inode *inode, bool is_inode)
 {
 	block_t	valid_block_count;
 	unsigned int valid_node_count;
+	bool quota = inode && !is_inode;
+
+	if (quota) {
+		int ret = dquot_reserve_block(inode, 1);
+		if (ret)
+			return ret;
+	}
 
 	spin_lock(&sbi->stat_lock);
 
@@ -1560,28 +1594,33 @@ static inline bool inc_valid_node_count(struct f2fs_sb_info *sbi,
 	if (unlikely(valid_block_count + sbi->reserved_blocks >
 						sbi->user_block_count)) {
 		spin_unlock(&sbi->stat_lock);
-		return false;
+		goto enospc;
 	}
 
 	valid_node_count = sbi->total_valid_node_count + 1;
 	if (unlikely(valid_node_count > sbi->total_node_count)) {
 		spin_unlock(&sbi->stat_lock);
-		return false;
-	}
-
-	if (inode) {
-		if (is_inode)
-			f2fs_mark_inode_dirty_sync(inode, true);
-		else
-			f2fs_i_blocks_write(inode, 1, true);
+		goto enospc;
 	}
 
 	sbi->total_valid_node_count++;
 	sbi->total_valid_block_count++;
 	spin_unlock(&sbi->stat_lock);
 
+	if (inode) {
+		if (is_inode)
+			f2fs_mark_inode_dirty_sync(inode, true);
+		else
+			f2fs_i_blocks_write(inode, 1, true, true);
+	}
+
 	percpu_counter_inc(&sbi->alloc_valid_block_count);
-	return true;
+	return 0;
+
+enospc:
+	if (quota)
+		dquot_release_reservation_block(inode, 1);
+	return -ENOSPC;
 }
 
 static inline void dec_valid_node_count(struct f2fs_sb_info *sbi,
@@ -1593,12 +1632,13 @@ static inline void dec_valid_node_count(struct f2fs_sb_info *sbi,
 	f2fs_bug_on(sbi, !sbi->total_valid_node_count);
 	f2fs_bug_on(sbi, !is_inode && !inode->i_blocks);
 
-	if (!is_inode)
-		f2fs_i_blocks_write(inode, 1, false);
 	sbi->total_valid_node_count--;
 	sbi->total_valid_block_count--;
 
 	spin_unlock(&sbi->stat_lock);
+
+	if (!is_inode)
+		f2fs_i_blocks_write(inode, 1, false, true);
 }
 
 static inline unsigned int valid_node_count(struct f2fs_sb_info *sbi)
@@ -1873,14 +1913,21 @@ static inline void f2fs_i_links_write(struct inode *inode, bool inc)
 }
 
 static inline void f2fs_i_blocks_write(struct inode *inode,
-					block_t diff, bool add)
+					block_t diff, bool add, bool claim)
 {
 	bool clean = !is_inode_flag_set(inode, FI_DIRTY_INODE);
 	bool recover = is_inode_flag_set(inode, FI_AUTO_RECOVER);
-	blkcnt_t sectors = diff << F2FS_LOG_SECTORS_PER_BLOCK;
 
-	inode->i_blocks = add ? inode->i_blocks + sectors :
-				inode->i_blocks - sectors;
+	/* add = 1, claim = 1 should be dquot_reserve_block in pair */
+	if (add) {
+		if (claim)
+			dquot_claim_block(inode, diff);
+		else
+			dquot_alloc_block_nofail(inode, diff);
+	} else {
+		dquot_free_block(inode, diff);
+	}
+
 	f2fs_mark_inode_dirty_sync(inode, true);
 	if (clean || recover)
 		set_inode_flag(inode, FI_AUTO_RECOVER);
@@ -2225,7 +2272,7 @@ static inline int f2fs_add_link(struct dentry *dentry, struct inode *inode)
 int f2fs_inode_dirtied(struct inode *inode, bool sync);
 void f2fs_inode_synced(struct inode *inode);
 int f2fs_commit_super(struct f2fs_sb_info *sbi, bool recover);
-int f2fs_sync_fs(struct super_block *sb, int sync);
+int f2fs_do_sync_fs(struct super_block *sb);
 extern __printf(3, 4)
 void f2fs_msg(struct super_block *sb, const char *level, const char *fmt, ...);
 int sanity_check_ckpt(struct f2fs_sb_info *sbi);

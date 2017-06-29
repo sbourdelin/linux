@@ -435,7 +435,7 @@ void f2fs_balance_fs_bg(struct f2fs_sb_info *sbi)
 			sync_dirty_inodes(sbi, FILE_INODE);
 			blk_finish_plug(&plug);
 		}
-		f2fs_sync_fs(sbi->sb, true);
+		f2fs_do_sync_fs(sbi->sb);
 		stat_inc_bg_cp_count(sbi->stat_info);
 	}
 }
