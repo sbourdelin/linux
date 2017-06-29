@@ -16,6 +16,7 @@
 #ifdef CONFIG_CPU_FREQ
 struct update_util_data {
        void (*func)(struct update_util_data *data, u64 time, unsigned int flags);
+       unsigned int cpu;
 };
 
 void cpufreq_add_update_util_hook(int cpu, struct update_util_data *data,
