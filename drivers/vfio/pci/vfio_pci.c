@@ -559,15 +559,8 @@ static int msix_sparse_mmap_cap(struct vfio_pci_device *vdev,
 				struct vfio_info_cap *caps)
 {
 	struct vfio_region_info_cap_sparse_mmap *sparse;
-	size_t end, size;
-	int nr_areas = 2, i = 0, ret;
-
-	end = pci_resource_len(vdev->pdev, vdev->msix_bar);
-
-	/* If MSI-X table is aligned to the start or end, only one area */
-	if (((vdev->msix_offset & PAGE_MASK) == 0) ||
-	    (PAGE_ALIGN(vdev->msix_offset + vdev->msix_size) >= end))
-		nr_areas = 1;
+	size_t size;
+	int nr_areas = 1, i = 0, ret;
 
 	size = sizeof(*sparse) + (nr_areas * sizeof(*sparse->areas));
 
@@ -577,18 +570,8 @@ static int msix_sparse_mmap_cap(struct vfio_pci_device *vdev,
 
 	sparse->nr_areas = nr_areas;
 
-	if (vdev->msix_offset & PAGE_MASK) {
-		sparse->areas[i].offset = 0;
-		sparse->areas[i].size = vdev->msix_offset & PAGE_MASK;
-		i++;
-	}
-
-	if (PAGE_ALIGN(vdev->msix_offset + vdev->msix_size) < end) {
-		sparse->areas[i].offset = PAGE_ALIGN(vdev->msix_offset +
-						     vdev->msix_size);
-		sparse->areas[i].size = end - sparse->areas[i].offset;
-		i++;
-	}
+	sparse->areas[i].offset = 0;
+	sparse->areas[i].size = pci_resource_len(vdev->pdev, vdev->msix_bar);
 
 	ret = vfio_info_add_capability(caps, VFIO_REGION_INFO_CAP_SPARSE_MMAP,
 				       sparse);
@@ -1114,22 +1097,6 @@ static int vfio_pci_mmap(void *device_data, struct vm_area_struct *vma)
 
 	if (req_start + req_len > phys_len)
 		return -EINVAL;
-
-	if (index == vdev->msix_bar) {
-		/*
-		 * Disallow mmaps overlapping the MSI-X table; users don't
-		 * get to touch this directly.  We could find somewhere
-		 * else to map the overlap, but page granularity is only
-		 * a recommendation, not a requirement, so the user needs
-		 * to know which bits are real.  Requiring them to mmap
-		 * around the table makes that clear.
-		 */
-
-		/* If neither entirely above nor below, then it overlaps */
-		if (!(req_start >= vdev->msix_offset + vdev->msix_size ||
-		      req_start + req_len <= vdev->msix_offset))
-			return -EINVAL;
-	}
 
 	/*
 	 * Even though we don't make use of the barmap for the mmap,
