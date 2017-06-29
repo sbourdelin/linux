@@ -240,11 +240,13 @@ struct __packed vmcs12 {
 	u64 virtual_apic_page_addr;
 	u64 apic_access_addr;
 	u64 posted_intr_desc_addr;
+	u64 vm_function_control;
 	u64 ept_pointer;
 	u64 eoi_exit_bitmap0;
 	u64 eoi_exit_bitmap1;
 	u64 eoi_exit_bitmap2;
 	u64 eoi_exit_bitmap3;
+	u64 eptp_list_address;
 	u64 xss_exit_bitmap;
 	u64 guest_physical_address;
 	u64 vmcs_link_pointer;
@@ -441,6 +443,7 @@ struct nested_vmx {
 	struct page *apic_access_page;
 	struct page *virtual_apic_page;
 	struct page *pi_desc_page;
+	struct page *shadow_eptp_list;
 	struct pi_desc *pi_desc;
 	bool pi_pending;
 	u16 posted_intr_nv;
@@ -481,6 +484,7 @@ struct nested_vmx {
 	u64 nested_vmx_cr4_fixed0;
 	u64 nested_vmx_cr4_fixed1;
 	u64 nested_vmx_vmcs_enum;
+	u64 nested_vmx_vmfunc_controls;
 };
 
 #define POSTED_INTR_ON  0
@@ -1314,6 +1318,22 @@ static inline bool cpu_has_vmx_tsc_scaling(void)
 		SECONDARY_EXEC_TSC_SCALING;
 }
 
+static inline bool cpu_has_vmx_vmfunc(void)
+{
+	return vmcs_config.cpu_based_exec_ctrl &
+		SECONDARY_EXEC_ENABLE_VMFUNC;
+}
+
+static inline u64 vmx_vmfunc_controls(void)
+{
+	u64 controls = 0;
+
+	if (cpu_has_vmx_vmfunc())
+		rdmsrl(MSR_IA32_VMX_VMFUNC, controls);
+
+	return controls;
+}
+
 static inline bool report_flexpriority(void)
 {
 	return flexpriority_enabled;
@@ -1386,6 +1406,18 @@ static inline bool nested_cpu_has_vid(struct vmcs12 *vmcs12)
 static inline bool nested_cpu_has_posted_intr(struct vmcs12 *vmcs12)
 {
 	return vmcs12->pin_based_vm_exec_control & PIN_BASED_POSTED_INTR;
+}
+
+static inline bool nested_cpu_has_vmfunc(struct vmcs12 *vmcs12)
+{
+	return nested_cpu_has2(vmcs12, SECONDARY_EXEC_ENABLE_VMFUNC);
+}
+
+static inline bool nested_cpu_has_eptp_switching(struct vmcs12 *vmcs12)
+{
+	return nested_cpu_has_vmfunc(vmcs12) &&
+		(vmcs12->vm_function_control &
+		 VMX_VMFUNC_EPTP_SWITCHING);
 }
 
 static inline bool is_nmi(u32 intr_info)
@@ -3142,6 +3174,9 @@ static int vmx_get_vmx_msr(struct kvm_vcpu *vcpu, u32 msr_index, u64 *pdata)
 	case MSR_IA32_VMX_EPT_VPID_CAP:
 		*pdata = vmx->nested.nested_vmx_ept_caps |
 			((u64)vmx->nested.nested_vmx_vpid_caps << 32);
+		break;
+	case MSR_IA32_VMX_VMFUNC:
+		*pdata = vmx->nested.nested_vmx_vmfunc_controls;
 		break;
 	default:
 		return 1;
@@ -6961,6 +6996,14 @@ static int enter_vmx_operation(struct kvm_vcpu *vcpu)
 		vmx->vmcs01.shadow_vmcs = shadow_vmcs;
 	}
 
+	if (vmx_vmfunc_controls() & 1) {
+		struct page *page = alloc_page(GFP_KERNEL | __GFP_ZERO);
+
+		if (!page)
+			goto out_shadow_vmcs;
+		vmx->nested.shadow_eptp_list = page;
+	}
+
 	INIT_LIST_HEAD(&(vmx->nested.vmcs02_pool));
 	vmx->nested.vmcs02_num = 0;
 
@@ -7130,6 +7173,11 @@ static void free_nested(struct vcpu_vmx *vmx)
 		vmx->vmcs01.shadow_vmcs = NULL;
 	}
 	kfree(vmx->nested.cached_vmcs12);
+
+	if (vmx->nested.shadow_eptp_list) {
+		__free_page(vmx->nested.shadow_eptp_list);
+		vmx->nested.shadow_eptp_list = NULL;
+	}
 	/* Unpin physical memory we referred to in current vmcs02 */
 	if (vmx->nested.apic_access_page) {
 		nested_release_page(vmx->nested.apic_access_page);
@@ -7742,6 +7790,61 @@ static int handle_preemption_timer(struct kvm_vcpu *vcpu)
 	return 1;
 }
 
+static int handle_vmfunc(struct kvm_vcpu *vcpu)
+{
+	struct vcpu_vmx *vmx = to_vmx(vcpu);
+	struct vmcs12 *vmcs12;
+	struct page *page = NULL,
+		*shadow_page = vmx->nested.shadow_eptp_list;
+	u64 *l1_eptp_list, *shadow_eptp_list;
+	u32 index = vcpu->arch.regs[VCPU_REGS_RCX];
+	u32 function = vcpu->arch.regs[VCPU_REGS_RAX];
+
+	if (is_guest_mode(vcpu)) {
+		vmcs12 = get_vmcs12(vcpu);
+		if (!nested_cpu_has_ept(vmcs12) ||
+		    !nested_cpu_has_eptp_switching(vmcs12))
+			goto fail;
+
+		/*
+		 * Only function 0 is valid, everything upto 63 injects VMFUNC
+		 * exit reason to L1, and #UD thereafter
+		 */
+		if (function || !vmcs12->eptp_list_address ||
+		    index >= VMFUNC_EPTP_ENTRIES)
+			goto fail;
+
+		page = nested_get_page(vcpu, vmcs12->eptp_list_address);
+		if (!page)
+			goto fail;
+
+		l1_eptp_list = kmap(page);
+		if (!l1_eptp_list[index])
+			goto fail;
+
+		kvm_mmu_unload(vcpu);
+		/*
+		 * TODO: Verify that guest ept satisfies vmentry prereqs
+		 */
+		vmcs12->ept_pointer = l1_eptp_list[index];
+		shadow_eptp_list = phys_to_virt(page_to_phys(shadow_page));
+		kvm_mmu_reload(vcpu);
+		shadow_eptp_list[index] =
+			construct_eptp(vcpu->arch.mmu.root_hpa);
+		kunmap(page);
+
+		return kvm_skip_emulated_instruction(vcpu);
+	}
+
+fail:
+	if (page)
+		kunmap(page);
+	nested_vmx_vmexit(vcpu, vmx->exit_reason,
+			  vmcs_read32(VM_EXIT_INTR_INFO),
+			  vmcs_readl(EXIT_QUALIFICATION));
+	return 1;
+}
+
 /*
  * The exit handlers return 1 if the exit was handled fully and guest execution
  * may resume.  Otherwise they set the kvm_run parameter to indicate what needs
@@ -7792,6 +7895,7 @@ static int (*const kvm_vmx_exit_handlers[])(struct kvm_vcpu *vcpu) = {
 	[EXIT_REASON_XSAVES]                  = handle_xsaves,
 	[EXIT_REASON_XRSTORS]                 = handle_xrstors,
 	[EXIT_REASON_PML_FULL]		      = handle_pml_full,
+	[EXIT_REASON_VMFUNC]                  = handle_vmfunc,
 	[EXIT_REASON_PREEMPTION_TIMER]	      = handle_preemption_timer,
 };
 
