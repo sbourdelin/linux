@@ -1112,7 +1112,7 @@ static int sa1111_remove(struct platform_device *pdev)
 	return 0;
 }
 
-static struct dev_pm_ops sa1111_pm_ops = {
+static const struct dev_pm_ops sa1111_pm_ops = {
 	.suspend_noirq = sa1111_suspend_noirq,
 	.resume_noirq = sa1111_resume_noirq,
 };
