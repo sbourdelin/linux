@@ -52,9 +52,9 @@ int is_current_kprobe_addr(unsigned long addr)
 void __init arch_populate_kprobe_blacklist(void)
 {
 	insert_kprobe_blacklist((unsigned long)__kprobes_text_start,
-				(unsigned long)__kprobes_text_end);
+				(unsigned long)__kprobes_text_end, "[__kprobes]");
 	insert_kprobe_blacklist((unsigned long)_stext,
-				(unsigned long)__head_end);
+				(unsigned long)__head_end, "[__exceptions]");
 }
 
 kprobe_opcode_t *kprobe_lookup_name(const char *name, unsigned int offset)

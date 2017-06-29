@@ -2125,7 +2125,8 @@ NOKPROBE_SYMBOL(dump_kprobe);
 extern unsigned long __start_kprobe_blacklist[];
 extern unsigned long __stop_kprobe_blacklist[];
 
-void __init insert_kprobe_blacklist(unsigned long start, unsigned long end)
+void __init insert_kprobe_blacklist(unsigned long start, unsigned long end,
+						const char *name)
 {
 	struct kprobe_blacklist_entry *ent;
 
@@ -2137,6 +2138,7 @@ void __init insert_kprobe_blacklist(unsigned long start, unsigned long end)
 
 	ent->start_addr = start;
 	ent->end_addr = end;
+	ent->name = kstrdup(name, GFP_KERNEL);
 	INIT_LIST_HEAD(&ent->list);
 	list_add_tail(&ent->list, &kprobe_blacklist);
 }
@@ -2145,7 +2147,7 @@ void __weak __init arch_populate_kprobe_blacklist(void)
 {
 	/* The __kprobes marked functions and entry code must not be probed */
 	insert_kprobe_blacklist((unsigned long)__kprobes_text_start,
-				(unsigned long)__kprobes_text_end);
+				(unsigned long)__kprobes_text_end, "[__kprobes]");
 }
 
 static void __init populate_kprobe_blacklist(void)
@@ -2165,7 +2167,7 @@ static void __init populate_kprobe_blacklist(void)
 			continue;
 		}
 
-		insert_kprobe_blacklist(entry, entry + size);
+		insert_kprobe_blacklist(entry, entry + size, NULL);
 	}
 
 	/* Let architectures add their own entries as well */
@@ -2378,8 +2380,13 @@ static int kprobe_blacklist_seq_show(struct seq_file *m, void *v)
 	struct kprobe_blacklist_entry *ent =
 		list_entry(v, struct kprobe_blacklist_entry, list);
 
-	seq_printf(m, "0x%p-0x%p\t%ps\n", (void *)ent->start_addr,
-		   (void *)ent->end_addr, (void *)ent->start_addr);
+	if (ent->name)
+		seq_printf(m, "0x%p-0x%p\t%s\n", (void *)ent->start_addr,
+			   (void *)ent->end_addr, ent->name);
+	else
+		seq_printf(m, "0x%p-0x%p\t%ps\n", (void *)ent->start_addr,
+			   (void *)ent->end_addr, (void *)ent->start_addr);
+
 	return 0;
 }
 

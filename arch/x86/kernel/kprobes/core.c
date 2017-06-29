@@ -1144,9 +1144,9 @@ NOKPROBE_SYMBOL(longjmp_break_handler);
 void __init arch_populate_kprobe_blacklist(void)
 {
 	insert_kprobe_blacklist((unsigned long)__kprobes_text_start,
-				(unsigned long)__kprobes_text_end);
+				(unsigned long)__kprobes_text_end, "[__kprobes]");
 	insert_kprobe_blacklist((unsigned long)__entry_text_start,
-				(unsigned long)__entry_text_end);
+				(unsigned long)__entry_text_end, "[__entry]");
 }
 
 int __init arch_init_kprobes(void)

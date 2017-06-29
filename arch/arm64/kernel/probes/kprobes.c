@@ -544,17 +544,17 @@ bool arch_within_kprobe_blacklist(unsigned long addr)
 void __init arch_populate_kprobe_blacklist(void)
 {
 	insert_kprobe_blacklist((unsigned long)__kprobes_text_start,
-				(unsigned long)__kprobes_text_end);
+				(unsigned long)__kprobes_text_end, "[__kprobes]");
 	insert_kprobe_blacklist((unsigned long)__entry_text_start,
-				(unsigned long)__entry_text_end);
+				(unsigned long)__entry_text_end, "[__entry]");
 	insert_kprobe_blacklist((unsigned long)__idmap_text_start,
-				(unsigned long)__idmap_text_end);
+				(unsigned long)__idmap_text_end, "[__idmap]");
 
 	if (!is_kernel_in_hyp_mode()) {
 		insert_kprobe_blacklist((unsigned long)__hyp_text_start,
-					(unsigned long)__hyp_text_end);
+					(unsigned long)__hyp_text_end, "[__hyp]");
 		insert_kprobe_blacklist((unsigned long)__hyp_idmap_text_start,
-					(unsigned long)__hyp_idmap_text_end);
+					(unsigned long)__hyp_idmap_text_end, "[__hyp_idmap]");
 	}
 }
 
