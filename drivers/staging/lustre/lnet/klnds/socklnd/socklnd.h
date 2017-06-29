@@ -521,13 +521,7 @@ extern struct ksock_proto ksocknal_protocol_v3x;
 
 static inline __u32 ksocknal_csum(__u32 crc, unsigned char const *p, size_t len)
 {
-#if 1
 	return crc32_le(crc, p, len);
-#else
-	while (len-- > 0)
-		crc = ((crc + 0x100) & ~0xff) | ((crc + *p++) & 0xff) ;
-	return crc;
-#endif
 }
 
 static inline int
