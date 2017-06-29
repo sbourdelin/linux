@@ -930,7 +930,9 @@ static int acpi_thermal_register_thermal_zone(struct acpi_thermal *tz)
 	if (ACPI_FAILURE(status))
 		return -ENODEV;
 
-	tz->tz_enabled = 1;
+	result = thermal_set_mode(tz->thermal_zone, THERMAL_DEVICE_ENABLED);
+	if (result)
+		return result;
 
 	dev_info(&tz->device->dev, "registered as thermal_zone%d\n",
 		 tz->thermal_zone->id);
