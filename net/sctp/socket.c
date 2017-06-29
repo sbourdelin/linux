@@ -4933,20 +4933,12 @@ int sctp_do_peeloff(struct sock *sk, sctp_assoc_t id, struct socket **sockp)
 }
 EXPORT_SYMBOL(sctp_do_peeloff);
 
-static int sctp_getsockopt_peeloff(struct sock *sk, int len, char __user *optval, int __user *optlen)
+static int sctp_getsockopt_peeloff_common(struct sock *sk, sctp_peeloff_arg_t *peeloff, struct file **newfile, unsigned flags)
 {
-	sctp_peeloff_arg_t peeloff;
 	struct socket *newsock;
-	struct file *newfile;
 	int retval = 0;
 
-	if (len < sizeof(sctp_peeloff_arg_t))
-		return -EINVAL;
-	len = sizeof(sctp_peeloff_arg_t);
-	if (copy_from_user(&peeloff, optval, len))
-		return -EFAULT;
-
-	retval = sctp_do_peeloff(sk, peeloff.associd, &newsock);
+	retval = sctp_do_peeloff(sk, peeloff->associd, &newsock);
 	if (retval < 0)
 		goto out;
 
@@ -4957,25 +4949,90 @@ static int sctp_getsockopt_peeloff(struct sock *sk, int len, char __user *optval
 		goto out;
 	}
 
-	newfile = sock_alloc_file(newsock, 0, NULL);
-	if (IS_ERR(newfile)) {
+	*newfile = sock_alloc_file(newsock, 0, NULL);
+	if (IS_ERR(*newfile)) {
 		put_unused_fd(retval);
 		sock_release(newsock);
-		return PTR_ERR(newfile);
+		retval = PTR_ERR(*newfile);
+		*newfile = NULL;
+		return retval;
 	}
 
 	pr_debug("%s: sk:%p, newsk:%p, sd:%d\n", __func__, sk, newsock->sk,
 		 retval);
+	
+	peeloff->sd = retval;
+
+	set_close_on_exec(peeloff->sd, !!(flags & SOCK_CLOEXEC));
+
+	if (flags & SOCK_NONBLOCK)
+		(*newfile)->f_flags |= O_NONBLOCK;
+out:
+	return retval;
+}
+
+static int sctp_getsockopt_peeloff(struct sock *sk, int len, char __user *optval, int __user *optlen)
+{
+	sctp_peeloff_arg_t peeloff;
+	struct file *newfile = NULL;
+	int retval = 0;
+
+	if (len < sizeof(sctp_peeloff_arg_t))
+		return -EINVAL;
+	len = sizeof(sctp_peeloff_arg_t);
+	if (copy_from_user(&peeloff, optval, len))
+		return -EFAULT;
+
+	retval = sctp_getsockopt_peeloff_common(sk, &peeloff, &newfile, 0);
+	if (retval < 0)
+		goto out;
 
 	/* Return the fd mapped to the new socket.  */
 	if (put_user(len, optlen)) {
-		fput(newfile);
+		if (newfile)
+			fput(newfile);
 		put_unused_fd(retval);
 		return -EFAULT;
 	}
-	peeloff.sd = retval;
+
 	if (copy_to_user(optval, &peeloff, len)) {
-		fput(newfile);
+		if (newfile)
+			fput(newfile);
+		put_unused_fd(retval);
+		return -EFAULT;
+	}
+	fd_install(retval, newfile);
+out:
+	return retval;
+}
+
+static int sctp_getsockopt_peeloff_flags(struct sock *sk, int len, char __user *optval, int __user *optlen)
+{
+	sctp_peeloff_flags_arg_t peeloff;
+	struct file *newfile = NULL;
+	int retval = 0;
+
+	if (len < sizeof(sctp_peeloff_flags_arg_t))
+		return -EINVAL;
+	len = sizeof(sctp_peeloff_flags_arg_t);
+	if (copy_from_user(&peeloff, optval, len))
+		return -EFAULT;
+
+	retval = sctp_getsockopt_peeloff_common(sk, &peeloff.p_arg, &newfile, peeloff.flags);
+	if (retval < 0)
+		goto out;
+
+	/* Return the fd mapped to the new socket.  */
+	if (put_user(len, optlen)) {
+		if (newfile)
+			fput(newfile);
+		put_unused_fd(retval);
+		return -EFAULT;
+	}
+
+	if (copy_to_user(optval, &peeloff, len)) {
+		if (newfile)
+			fput(newfile);
 		put_unused_fd(retval);
 		return -EFAULT;
 	}
@@ -6757,6 +6814,9 @@ static int sctp_getsockopt(struct sock *sk, int level, int optname,
 		break;
 	case SCTP_SOCKOPT_PEELOFF:
 		retval = sctp_getsockopt_peeloff(sk, len, optval, optlen);
+		break;
+	case SCTP_SOCKOPT_PEELOFF_FLAGS:
+		retval = sctp_getsockopt_peeloff_flags(sk, len, optval, optlen);
 		break;
 	case SCTP_PEER_ADDR_PARAMS:
 		retval = sctp_getsockopt_peer_addr_params(sk, len, optval,
