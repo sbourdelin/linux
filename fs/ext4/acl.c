@@ -231,18 +231,18 @@ int
 ext4_set_acl(struct inode *inode, struct posix_acl *acl, int type)
 {
 	handle_t *handle;
-	int error, credits, retries = 0;
-	size_t acl_size = acl ? ext4_acl_size(acl->a_count) : 0;
+	int error, retries = 0;
 
 	error = dquot_initialize(inode);
 	if (error)
 		return error;
 retry:
-	error = ext4_xattr_set_credits(inode, acl_size, &credits);
-	if (error)
-		return error;
-
-	handle = ext4_journal_start(inode, EXT4_HT_XATTR, credits);
+	/*
+	 * Allocate 1 journal credit to allow __ext4_set_acl() update inode
+	 * before calling ext4_xattr_set_handle(). Extended attribute related
+	 * credits are allocated by ext4_xattr_set_handle() itself.
+	 */
+	handle = ext4_journal_start(inode, EXT4_HT_XATTR, 1 /* credits */);
 	if (IS_ERR(handle))
 		return PTR_ERR(handle);
 
