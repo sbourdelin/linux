@@ -29,6 +29,7 @@
 #define PWM_INACTIVE_POSITIVE	(1 << 4)
 #define PWM_POLARITY_MASK	(PWM_DUTY_POSITIVE | PWM_INACTIVE_POSITIVE)
 #define PWM_OUTPUT_LEFT		(0 << 5)
+#define PWM_LOCK_EN		(1 << 6)
 #define PWM_LP_DISABLE		(0 << 8)
 
 struct rockchip_pwm_chip {
@@ -50,6 +51,7 @@ struct rockchip_pwm_data {
 	struct rockchip_pwm_regs regs;
 	unsigned int prescaler;
 	bool supports_polarity;
+	bool supports_atomic_update;
 	const struct pwm_ops *ops;
 
 	void (*set_enable)(struct pwm_chip *chip,
@@ -201,6 +203,14 @@ static void rockchip_pwm_config_v2(struct pwm_chip *chip,
 	clk_rate = clk_get_rate(pc->clk);
 
 	/*
+	 * Lock the period and duty of previous configuration, then
+	 * change the duty and period, that would not be effective.
+	 */
+	ctrl = readl_relaxed(pc->base + pc->data->regs.ctrl);
+	ctrl |= PWM_LOCK_EN;
+	writel_relaxed(ctrl, pc->base + pc->data->regs.ctrl);
+
+	/*
 	 * Since period and duty cycle registers have a width of 32
 	 * bits, every possible input period can be obtained using the
 	 * default prescaler value for all practical clock rate values.
@@ -222,6 +232,12 @@ static void rockchip_pwm_config_v2(struct pwm_chip *chip,
 	else
 		ctrl |= PWM_DUTY_POSITIVE | PWM_INACTIVE_NEGATIVE;
 
+	/*
+	 * Unlock and set polarity at the same time,
+	 * the configuration of duty, period and polarity
+	 * would be effective together at next period.
+	 */
+	ctrl &= ~PWM_LOCK_EN;
 	writel(ctrl, pc->base + pc->data->regs.ctrl);
 }
 
@@ -261,11 +277,18 @@ static int rockchip_pwm_apply(struct pwm_chip *chip, struct pwm_device *pwm,
 	if (ret)
 		return ret;
 
-	if (state->polarity != curstate.polarity && enabled) {
-		ret = rockchip_pwm_enable(chip, pwm, false);
-		if (ret)
-			goto out;
-		enabled = false;
+	/*
+	 * If the atomic update is supported, then go to the pwm config,
+	 * no need to do this, it could ensure the atomic update for polarity
+	 * changed.
+	 */
+	if (pc->data->supports_atomic_update) {
+		if (state->polarity != curstate.polarity && enabled) {
+			ret = rockchip_pwm_enable(chip, pwm, false);
+			if (ret)
+				goto out;
+			enabled = false;
+		}
 	}
 
 	pc->data->pwm_config(chip, pwm, state->duty_cycle,
@@ -345,9 +368,26 @@ static const struct rockchip_pwm_data pwm_data_vop = {
 	.pwm_config = rockchip_pwm_config_v2,
 };
 
+static const struct rockchip_pwm_data pwm_data_v3 = {
+	.regs = {
+		.duty = 0x08,
+		.period = 0x04,
+		.cntr = 0x00,
+		.ctrl = 0x0c,
+	},
+	.prescaler = 1,
+	.supports_polarity = true,
+	.supports_atomic_update = true,
+	.ops = &rockchip_pwm_ops_v2,
+	.set_enable = rockchip_pwm_set_enable_v2,
+	.get_state = rockchip_pwm_get_state_v2,
+	.pwm_config = rockchip_pwm_config_v2,
+};
+
 static const struct of_device_id rockchip_pwm_dt_ids[] = {
 	{ .compatible = "rockchip,rk2928-pwm", .data = &pwm_data_v1},
 	{ .compatible = "rockchip,rk3288-pwm", .data = &pwm_data_v2},
+	{ .compatible = "rockchip,rk3328-pwm", .data = &pwm_data_v3},
 	{ .compatible = "rockchip,vop-pwm", .data = &pwm_data_vop},
 	{ /* sentinel */ }
 };
