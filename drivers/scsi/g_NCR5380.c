@@ -49,8 +49,8 @@
 	int board
 
 #define NCR5380_dma_xfer_len            generic_NCR5380_dma_xfer_len
-#define NCR5380_dma_recv_setup          generic_NCR5380_pread
-#define NCR5380_dma_send_setup          generic_NCR5380_pwrite
+#define NCR5380_dma_recv_setup          generic_NCR5380_precv
+#define NCR5380_dma_send_setup          generic_NCR5380_psend
 #define NCR5380_dma_residual            generic_NCR5380_dma_residual
 
 #define NCR5380_intr                    generic_NCR5380_intr
@@ -507,7 +507,7 @@ static void wait_for_53c80_access(struct NCR5380_hostdata *hostdata)
 }
 
 /**
- * generic_NCR5380_pread - pseudo DMA read
+ * generic_NCR5380_precv - pseudo DMA receive
  * @hostdata: scsi host private data
  * @dst: buffer to write into
  * @len: transfer size
@@ -515,7 +515,7 @@ static void wait_for_53c80_access(struct NCR5380_hostdata *hostdata)
  * Perform a pseudo DMA mode receive from a 53C400 or equivalent device.
  */
 
-static inline int generic_NCR5380_pread(struct NCR5380_hostdata *hostdata,
+static inline int generic_NCR5380_precv(struct NCR5380_hostdata *hostdata,
                                         unsigned char *dst, int len)
 {
 	int residual;
@@ -574,7 +574,7 @@ static inline int generic_NCR5380_pread(struct NCR5380_hostdata *hostdata,
 }
 
 /**
- * generic_NCR5380_pwrite - pseudo DMA write
+ * generic_NCR5380_psend - pseudo DMA send
  * @hostdata: scsi host private data
  * @src: buffer to read from
  * @len: transfer size
@@ -582,8 +582,8 @@ static inline int generic_NCR5380_pread(struct NCR5380_hostdata *hostdata,
  * Perform a pseudo DMA mode send to a 53C400 or equivalent device.
  */
 
-static inline int generic_NCR5380_pwrite(struct NCR5380_hostdata *hostdata,
-                                         unsigned char *src, int len)
+static inline int generic_NCR5380_psend(struct NCR5380_hostdata *hostdata,
+                                        unsigned char *src, int len)
 {
 	int residual;
 	int start = 0;
