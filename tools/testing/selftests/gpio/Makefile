@@ -17,8 +17,8 @@ override define CLEAN
 	$(RM) -r $(EXTRA_DIRS)
 endef
 
-CFLAGS += -O2 -g -std=gnu99 -Wall -I../../../../usr/include/
-LDLIBS += -lmount -I/usr/include/libmount
+CFLAGS += -O2 -g -std=gnu99 -Wall -I../../../../usr/include/ $(shell pkg-config --cflags mount)
+LDLIBS += $(shell pkg-config --libs mount)
 
 $(BINARIES): ../../../gpio/gpio-utils.o ../../../../usr/include/linux/gpio.h
 
