@@ -1150,7 +1150,7 @@ static int ext4_set_context(struct inode *inode, const void *ctx, size_t len,
 							void *fs_data)
 {
 	handle_t *handle = fs_data;
-	int res, res2, credits, retries = 0;
+	int res, res2, retries = 0;
 
 	/*
 	 * Encrypting the root directory is not allowed because e2fsck expects
@@ -1194,11 +1194,8 @@ static int ext4_set_context(struct inode *inode, const void *ctx, size_t len,
 	if (res)
 		return res;
 retry:
-	res = ext4_xattr_set_credits(inode, len, &credits);
-	if (res)
-		return res;
-
-	handle = ext4_journal_start(inode, EXT4_HT_MISC, credits);
+	/* ext4_xattr_set_handle() allocates journal credits if necessary. */
+	handle = ext4_journal_start(inode, EXT4_HT_MISC, 0 /* credits */);
 	if (IS_ERR(handle))
 		return PTR_ERR(handle);
 

@@ -2253,7 +2253,11 @@ ext4_xattr_set_handle(handle_t *handle, struct inode *inode, int name_index,
 		credits = __ext4_xattr_set_credits(inode->i_sb, bh, value_len);
 		brelse(bh);
 
-		if (!ext4_handle_has_enough_credits(handle, credits)) {
+		if (ext4_xattr_ensure_credits(
+					handle, inode,
+					handle->h_buffer_credits + credits,
+					NULL /* bh */, false /* dirty */,
+					false /* block_csum */)) {
 			error = -ENOSPC;
 			goto cleanup;
 		}
@@ -2357,31 +2361,6 @@ cleanup:
 	return error;
 }
 
-int ext4_xattr_set_credits(struct inode *inode, size_t value_len, int *credits)
-{
-	struct buffer_head *bh;
-	int err;
-
-	*credits = 0;
-
-	if (!EXT4_SB(inode->i_sb)->s_journal)
-		return 0;
-
-	down_read(&EXT4_I(inode)->xattr_sem);
-
-	bh = ext4_xattr_get_block(inode);
-	if (IS_ERR(bh)) {
-		err = PTR_ERR(bh);
-	} else {
-		*credits = __ext4_xattr_set_credits(inode->i_sb, bh, value_len);
-		brelse(bh);
-		err = 0;
-	}
-
-	up_read(&EXT4_I(inode)->xattr_sem);
-	return err;
-}
-
 /*
  * ext4_xattr_set()
  *
@@ -2397,18 +2376,14 @@ ext4_xattr_set(struct inode *inode, int name_index, const char *name,
 	handle_t *handle;
 	struct super_block *sb = inode->i_sb;
 	int error, retries = 0;
-	int credits;
 
 	error = dquot_initialize(inode);
 	if (error)
 		return error;
 
 retry:
-	error = ext4_xattr_set_credits(inode, value_len, &credits);
-	if (error)
-		return error;
-
-	handle = ext4_journal_start(inode, EXT4_HT_XATTR, credits);
+	/* ext4_xattr_set_handle() allocates journal credits if necessary. */
+	handle = ext4_journal_start(inode, EXT4_HT_XATTR, 0 /* credits */);
 	if (IS_ERR(handle)) {
 		error = PTR_ERR(handle);
 	} else {
