@@ -292,6 +292,17 @@ static void thermal_unregister_governors(void)
 static void thermal_zone_device_set_polling(struct thermal_zone_device *tz,
 					    int delay)
 {
+	enum thermal_device_mode mode;
+
+	if (tz->ops->get_mode) {
+		/* When the thermal zone is disabled stop the polling */
+		tz->ops->get_mode(tz, &mode);
+		if (mode == THERMAL_DEVICE_DISABLED) {
+			cancel_delayed_work(&tz->poll_queue);
+			return;
+		}
+	}
+
 	if (delay > 1000)
 		mod_delayed_work(system_freezable_wq, &tz->poll_queue,
 				 round_jiffies(msecs_to_jiffies(delay)));
