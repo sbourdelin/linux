@@ -815,6 +815,9 @@ static int skl_probe(struct pci_dev *pci,
 
 	schedule_work(&skl->probe_work);
 
+	/* init debugfs */
+	skl->debugfs = skl_debugfs_init(skl);
+
 	return 0;
 
 out_dsp_free:
@@ -866,6 +869,8 @@ static void skl_remove(struct pci_dev *pci)
 	/* codec removal, invoke bus_device_remove */
 	snd_hdac_ext_bus_device_remove(ebus);
 
+	skl_debugfs_exit(skl->debugfs);
+	skl->debugfs = NULL;
 	skl_platform_unregister(&pci->dev);
 	skl_free_dsp(skl);
 	skl_machine_device_unregister(skl);
