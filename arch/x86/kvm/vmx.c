@@ -767,11 +767,13 @@ static const unsigned short vmcs_field_to_offset_table[] = {
 	FIELD64(VIRTUAL_APIC_PAGE_ADDR, virtual_apic_page_addr),
 	FIELD64(APIC_ACCESS_ADDR, apic_access_addr),
 	FIELD64(POSTED_INTR_DESC_ADDR, posted_intr_desc_addr),
+	FIELD64(VM_FUNCTION_CONTROL, vm_function_control),
 	FIELD64(EPT_POINTER, ept_pointer),
 	FIELD64(EOI_EXIT_BITMAP0, eoi_exit_bitmap0),
 	FIELD64(EOI_EXIT_BITMAP1, eoi_exit_bitmap1),
 	FIELD64(EOI_EXIT_BITMAP2, eoi_exit_bitmap2),
 	FIELD64(EOI_EXIT_BITMAP3, eoi_exit_bitmap3),
+	FIELD64(EPTP_LIST_ADDRESS, eptp_list_address),
 	FIELD64(XSS_EXIT_BITMAP, xss_exit_bitmap),
 	FIELD64(GUEST_PHYSICAL_ADDRESS, guest_physical_address),
 	FIELD64(VMCS_LINK_POINTER, vmcs_link_pointer),
@@ -2805,6 +2807,13 @@ static void nested_vmx_setup_ctls_msrs(struct vcpu_vmx *vmx)
 		}
 	} else
 		vmx->nested.nested_vmx_ept_caps = 0;
+
+	if (cpu_has_vmx_vmfunc()) {
+		vmx->nested.nested_vmx_secondary_ctls_high |=
+			SECONDARY_EXEC_ENABLE_VMFUNC;
+		vmx->nested.nested_vmx_vmfunc_controls =
+			vmx_vmfunc_controls() & 1;
+	}
 
 	/*
 	 * Old versions of KVM use the single-context version without
@@ -8217,6 +8226,8 @@ static bool nested_vmx_exit_handled(struct kvm_vcpu *vcpu)
 	case EXIT_REASON_PML_FULL:
 		/* We emulate PML support to L1. */
 		return false;
+	case EXIT_REASON_VMFUNC:
+		return false;
 	default:
 		return true;
 	}
@@ -10309,6 +10320,13 @@ static int prepare_vmcs02(struct kvm_vcpu *vcpu, struct vmcs12 *vmcs12,
 	} else if (nested_cpu_has2(vmcs12,
 				   SECONDARY_EXEC_VIRTUALIZE_APIC_ACCESSES)) {
 		vmx_flush_tlb_ept_only(vcpu);
+	}
+
+	if (nested_cpu_has_eptp_switching(vmcs12)) {
+		vmcs_write64(VM_FUNCTION_CONTROL,
+			     vmcs12->vm_function_control & 1);
+		vmcs_write64(EPTP_LIST_ADDRESS,
+			     page_to_phys(vmx->nested.shadow_eptp_list));
 	}
 
 	/*
