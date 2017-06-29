@@ -535,24 +535,27 @@ int __kprobes longjmp_break_handler(struct kprobe *p, struct pt_regs *regs)
 
 bool arch_within_kprobe_blacklist(unsigned long addr)
 {
-	if ((addr >= (unsigned long)__kprobes_text_start &&
-	    addr < (unsigned long)__kprobes_text_end) ||
-	    (addr >= (unsigned long)__entry_text_start &&
-	    addr < (unsigned long)__entry_text_end) ||
-	    (addr >= (unsigned long)__idmap_text_start &&
-	    addr < (unsigned long)__idmap_text_end) ||
-	    !!search_exception_tables(addr))
+	if (!!search_exception_tables(addr))
 		return true;
 
-	if (!is_kernel_in_hyp_mode()) {
-		if ((addr >= (unsigned long)__hyp_text_start &&
-		    addr < (unsigned long)__hyp_text_end) ||
-		    (addr >= (unsigned long)__hyp_idmap_text_start &&
-		    addr < (unsigned long)__hyp_idmap_text_end))
-			return true;
-	}
-
 	return false;
+}
+
+void __init arch_populate_kprobe_blacklist(void)
+{
+	insert_kprobe_blacklist((unsigned long)__kprobes_text_start,
+				(unsigned long)__kprobes_text_end);
+	insert_kprobe_blacklist((unsigned long)__entry_text_start,
+				(unsigned long)__entry_text_end);
+	insert_kprobe_blacklist((unsigned long)__idmap_text_start,
+				(unsigned long)__idmap_text_end);
+
+	if (!is_kernel_in_hyp_mode()) {
+		insert_kprobe_blacklist((unsigned long)__hyp_text_start,
+					(unsigned long)__hyp_text_end);
+		insert_kprobe_blacklist((unsigned long)__hyp_idmap_text_start,
+					(unsigned long)__hyp_idmap_text_end);
+	}
 }
 
 void __kprobes __used *trampoline_probe_handler(struct pt_regs *regs)

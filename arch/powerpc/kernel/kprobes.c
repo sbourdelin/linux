@@ -49,12 +49,12 @@ int is_current_kprobe_addr(unsigned long addr)
 	return (p && (unsigned long)p->addr == addr) ? 1 : 0;
 }
 
-bool arch_within_kprobe_blacklist(unsigned long addr)
+void __init arch_populate_kprobe_blacklist(void)
 {
-	return  (addr >= (unsigned long)__kprobes_text_start &&
-		 addr < (unsigned long)__kprobes_text_end) ||
-		(addr >= (unsigned long)_stext &&
-		 addr < (unsigned long)__head_end);
+	insert_kprobe_blacklist((unsigned long)__kprobes_text_start,
+				(unsigned long)__kprobes_text_end);
+	insert_kprobe_blacklist((unsigned long)_stext,
+				(unsigned long)__head_end);
 }
 
 kprobe_opcode_t *kprobe_lookup_name(const char *name, unsigned int offset)

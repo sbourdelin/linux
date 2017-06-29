@@ -1141,12 +1141,12 @@ int longjmp_break_handler(struct kprobe *p, struct pt_regs *regs)
 }
 NOKPROBE_SYMBOL(longjmp_break_handler);
 
-bool arch_within_kprobe_blacklist(unsigned long addr)
+void __init arch_populate_kprobe_blacklist(void)
 {
-	return  (addr >= (unsigned long)__kprobes_text_start &&
-		 addr < (unsigned long)__kprobes_text_end) ||
-		(addr >= (unsigned long)__entry_text_start &&
-		 addr < (unsigned long)__entry_text_end);
+	insert_kprobe_blacklist((unsigned long)__kprobes_text_start,
+				(unsigned long)__kprobes_text_end);
+	insert_kprobe_blacklist((unsigned long)__entry_text_start,
+				(unsigned long)__entry_text_end);
 }
 
 int __init arch_init_kprobes(void)

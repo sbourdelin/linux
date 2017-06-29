@@ -1364,12 +1364,7 @@ out:
 	return ret;
 }
 
-bool __weak arch_within_kprobe_blacklist(unsigned long addr)
-{
-	/* The __kprobes marked functions and entry code must not be probed */
-	return addr >= (unsigned long)__kprobes_text_start &&
-	       addr < (unsigned long)__kprobes_text_end;
-}
+bool __weak arch_within_kprobe_blacklist(unsigned long addr) { return false; }
 
 bool within_kprobe_blacklist(unsigned long addr)
 {
@@ -2125,12 +2120,40 @@ NOKPROBE_SYMBOL(dump_kprobe);
  * since a kprobe need not necessarily be at the beginning
  * of a function.
  */
-static int __init populate_kprobe_blacklist(unsigned long *start,
-					     unsigned long *end)
+
+/* Markers of _kprobe_blacklist section */
+extern unsigned long __start_kprobe_blacklist[];
+extern unsigned long __stop_kprobe_blacklist[];
+
+void __init insert_kprobe_blacklist(unsigned long start, unsigned long end)
+{
+	struct kprobe_blacklist_entry *ent;
+
+	ent = kmalloc(sizeof(*ent), GFP_KERNEL);
+	if (!ent) {
+		pr_err_once("kprobes: failed to populate blacklist: %d\n", -ENOMEM);
+		pr_err_once("Please take care of using kprobes.\n");
+	}
+
+	ent->start_addr = start;
+	ent->end_addr = end;
+	INIT_LIST_HEAD(&ent->list);
+	list_add_tail(&ent->list, &kprobe_blacklist);
+}
+
+void __weak __init arch_populate_kprobe_blacklist(void)
+{
+	/* The __kprobes marked functions and entry code must not be probed */
+	insert_kprobe_blacklist((unsigned long)__kprobes_text_start,
+				(unsigned long)__kprobes_text_end);
+}
+
+static void __init populate_kprobe_blacklist(void)
 {
 	unsigned long *iter;
-	struct kprobe_blacklist_entry *ent;
 	unsigned long entry, offset = 0, size = 0;
+	unsigned long *start = __start_kprobe_blacklist;
+	unsigned long *end = __stop_kprobe_blacklist;
 
 	for (iter = start; iter < end; iter++) {
 		entry = arch_deref_entry_point((void *)*iter);
@@ -2142,15 +2165,11 @@ static int __init populate_kprobe_blacklist(unsigned long *start,
 			continue;
 		}
 
-		ent = kmalloc(sizeof(*ent), GFP_KERNEL);
-		if (!ent)
-			return -ENOMEM;
-		ent->start_addr = entry;
-		ent->end_addr = entry + size;
-		INIT_LIST_HEAD(&ent->list);
-		list_add_tail(&ent->list, &kprobe_blacklist);
+		insert_kprobe_blacklist(entry, entry + size);
 	}
-	return 0;
+
+	/* Let architectures add their own entries as well */
+	arch_populate_kprobe_blacklist();
 }
 
 /* Module notifier call back, checking kprobes on the module */
@@ -2202,10 +2221,6 @@ static struct notifier_block kprobe_module_nb = {
 	.priority = 0
 };
 
-/* Markers of _kprobe_blacklist section */
-extern unsigned long __start_kprobe_blacklist[];
-extern unsigned long __stop_kprobe_blacklist[];
-
 static int __init init_kprobes(void)
 {
 	int i, err = 0;
@@ -2218,12 +2233,7 @@ static int __init init_kprobes(void)
 		raw_spin_lock_init(&(kretprobe_table_locks[i].lock));
 	}
 
-	err = populate_kprobe_blacklist(__start_kprobe_blacklist,
-					__stop_kprobe_blacklist);
-	if (err) {
-		pr_err("kprobes: failed to populate blacklist: %d\n", err);
-		pr_err("Please take care of using kprobes.\n");
-	}
+	populate_kprobe_blacklist();
 
 	if (kretprobe_blacklist_size) {
 		/* lookup the function address from its name */
