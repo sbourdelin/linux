@@ -2307,9 +2307,6 @@ static int spi_nor_parse_sfdp(struct spi_nor *nor,
 		default:
 			break;
 		}
-
-		if (err)
-			goto exit;
 	}
 
 exit:
