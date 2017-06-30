@@ -120,9 +120,7 @@ struct stv {
 	int   is_vcm;
 
 	u32   cur_scrambling_code;
-	u32   force_scrambling_code;
 	u32   scrambling_code;
-	u32   default_input_stream_id;
 
 	u32   last_bernumerator;
 	u32   last_berdenominator;
@@ -970,6 +968,7 @@ static int start(struct stv *state, struct dtv_frontend_properties *p)
 	s32 freq;
 	u8  reg_dmdcfgmd;
 	u16 symb;
+	u32 scrambling_code = 1;
 
 	if (p->symbol_rate < 100000 || p->symbol_rate > 70000000)
 		return -EINVAL;
@@ -982,6 +981,28 @@ static int start(struct stv *state, struct dtv_frontend_properties *p)
 		write_reg(state, RSTV0910_P2_DMDISTATE + state->regoff, 0x5C);
 
 	init_search_param(state);
+
+	if (p->stream_id != NO_STREAM_ID_FILTER) {
+		/* Backwards compatibility to "crazy" API.
+		 * PRBS X root cannot be 0, so this should always work.
+		 */
+		if (p->stream_id & 0xffffff00)
+			scrambling_code = p->stream_id >> 8;
+		write_reg(state, RSTV0910_P2_ISIENTRY + state->regoff,
+			  p->stream_id & 0xff);
+		write_reg(state, RSTV0910_P2_ISIBITENA + state->regoff,
+			  0xff);
+	}
+
+	if (scrambling_code != state->cur_scrambling_code) {
+		write_reg(state, RSTV0910_P2_PLROOT0 + state->regoff,
+			  scrambling_code & 0xff);
+		write_reg(state, RSTV0910_P2_PLROOT1 + state->regoff,
+			  (scrambling_code >> 8) & 0xff);
+		write_reg(state, RSTV0910_P2_PLROOT2 + state->regoff,
+			  (scrambling_code >> 16) & 0x07);
+		state->cur_scrambling_code = scrambling_code;
+	}
 
 	if (p->symbol_rate <= 1000000) {  /* SR <=1Msps */
 		state->demod_timeout = 3000;
@@ -1600,7 +1621,8 @@ static struct dvb_frontend_ops stv0910_ops = {
 		.caps			= FE_CAN_INVERSION_AUTO |
 					  FE_CAN_FEC_AUTO       |
 					  FE_CAN_QPSK           |
-					  FE_CAN_2G_MODULATION
+					  FE_CAN_2G_MODULATION  |
+					  FE_CAN_MULTISTREAM
 	},
 	.sleep				= sleep,
 	.release                        = release,
@@ -1658,9 +1680,7 @@ struct dvb_frontend *stv0910_attach(struct i2c_adapter *i2c,
 	state->search_range = 16000000;
 	state->demod_bits = 0x10;     /* Inversion : Auto with reset to 0 */
 	state->receive_mode   = RCVMODE_NONE;
-	state->cur_scrambling_code = (u32) -1;
-	state->force_scrambling_code = (u32) -1;
-	state->default_input_stream_id = (u32) -1;
+	state->cur_scrambling_code = (~0U);
 	state->single = cfg->single ? 1 : 0;
 
 	base = match_base(i2c, cfg->adr);
