@@ -550,7 +550,8 @@ static void ks_sdio_interrupt(struct sdio_func *func)
 			if (atomic_read(&priv->psstatus.status) == PS_SNOOZE) {
 				if (cnt_txqbody(priv)) {
 					ks_wlan_hw_wakeup_request(priv);
-					queue_delayed_work(priv->wq, &priv->rw_dwork, 1);
+					queue_delayed_work(priv->wq,
+							   &priv->rw_dwork, 1);
 					return;
 				}
 			} else {
@@ -695,15 +696,18 @@ static int ks7010_upload_firmware(struct ks_sdio_card *card)
 		memcpy(rom_buf, fw_entry->data + n, size);
 
 		offset = n;
-		ret = ks7010_sdio_update_index(priv, KS7010_IRAM_ADDRESS + offset);
+		ret = ks7010_sdio_update_index(priv,
+					       KS7010_IRAM_ADDRESS + offset);
 		if (ret)
 			goto release_firmware;
 
-		ret = ks7010_sdio_write(priv, DATA_WINDOW, rom_buf, size);
+		ret = ks7010_sdio_write(priv,
+					DATA_WINDOW, rom_buf, size);
 		if (ret)
 			goto release_firmware;
 
-		ret = ks7010_sdio_data_compare(priv, DATA_WINDOW, rom_buf, size);
+		ret = ks7010_sdio_data_compare(priv,
+					       DATA_WINDOW, rom_buf, size);
 		if (ret)
 			goto release_firmware;
 
@@ -891,7 +895,7 @@ static int ks7010_sdio_probe(struct sdio_func *func,
 	priv = netdev_priv(netdev);
 
 	card->priv = priv;
-	SET_NETDEV_DEV(netdev, &card->func->dev);	/* for create sysfs symlinks */
+	SET_NETDEV_DEV(netdev, &card->func->dev);/* for create sysfs symlinks */
 
 	/* private memory initialize */
 	priv->ks_sdio_card = card;
@@ -925,7 +929,7 @@ static int ks7010_sdio_probe(struct sdio_func *func,
 	}
 
 	/* interrupt setting */
-	/* clear Interrupt status write (ARMtoSD_InterruptPending FN1:00_0024) */
+	/* clear Interrupt status write (ARMtoSD_InterruptPending FN1:00_0024)*/
 	sdio_claim_host(func);
 	ret = ks7010_sdio_writeb(priv, INT_PENDING, 0xff);
 	sdio_release_host(func);
@@ -1008,7 +1012,7 @@ static void ks7010_sdio_remove(struct sdio_func *func)
 	struct ks_sdio_card *card;
 	struct ks_wlan_private *priv;
 
-	DPRINTK(1, "ks7010_sdio_remove()\n");
+	DPRINTK(1, "%s()\n", __func__);
 
 	card = sdio_get_drvdata(func);
 
