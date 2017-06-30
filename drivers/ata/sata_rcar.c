@@ -872,8 +872,10 @@ static int sata_rcar_probe(struct platform_device *pdev)
 	int ret = 0;
 
 	irq = platform_get_irq(pdev, 0);
-	if (irq <= 0)
-		return -EINVAL;
+	if (irq < 0) {
+		dev_err(&pdev->dev, "failed to get IRQ\n");
+		return irq;
+	}
 
 	priv = devm_kzalloc(&pdev->dev, sizeof(struct sata_rcar_priv),
 			   GFP_KERNEL);
