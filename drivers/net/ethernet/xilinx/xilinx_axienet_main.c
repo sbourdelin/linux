@@ -1648,7 +1648,11 @@ static int axienet_open(struct net_device *ndev)
 		return ret;
 
 	if (lp->phy_node) {
-		if (lp->phy_type == XAE_PHY_TYPE_GMII) {
+		if (lp->phy_type == XAE_PHY_TYPE_MII) {
+			phydev = of_phy_connect(lp->ndev, lp->phy_node,
+						axienet_adjust_link, 0,
+						PHY_INTERFACE_MODE_MII);
+		} else if (lp->phy_type == XAE_PHY_TYPE_GMII) {
 			phydev = of_phy_connect(lp->ndev, lp->phy_node,
 						axienet_adjust_link, 0,
 						PHY_INTERFACE_MODE_GMII);
