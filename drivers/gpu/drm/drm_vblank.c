@@ -864,7 +864,7 @@ void drm_crtc_arm_vblank_event(struct drm_crtc *crtc,
 	assert_spin_locked(&dev->event_lock);
 
 	e->pipe = pipe;
-	e->event.sequence = drm_vblank_count(dev, pipe);
+	e->event.sequence = drm_vblank_count(dev, pipe) + 1;
 	e->event.crtc_id = crtc->base.id;
 	list_add_tail(&e->base.link, &dev->vblank_event_list);
 }
