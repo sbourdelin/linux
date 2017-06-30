@@ -786,6 +786,11 @@ static int zx_dma_probe(struct platform_device *op)
 	}
 
 	d->irq = platform_get_irq(op, 0);
+	if (d->irq < 0) {
+		dev_err(&op->dev, "failed to get IRQ: %d\n", d->irq);
+		return d->irq;
+	}
+
 	ret = devm_request_irq(&op->dev, d->irq, zx_dma_int_handler,
 			       0, DRIVER_NAME, d);
 	if (ret)
