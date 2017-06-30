@@ -814,6 +814,8 @@ void post_init_entity_util_avg(struct sched_entity *se)
 			 * expected state.
 			 */
 			se->avg.last_update_time = cfs_rq_clock_task(cfs_rq);
+			se->avg.sleep_remainder = 0;
+			se->avg.run_remainder = 0;
 			return;
 		}
 	}
@@ -2946,14 +2948,19 @@ ___update_load_avg(u64 now, int cpu, struct sched_avg *sa,
 		  unsigned long weight, int running, struct cfs_rq *cfs_rq)
 {
 	u64 delta;
+	u32 remainder = running ? sa->run_remainder : sa->sleep_remainder;
 
-	delta = now - sa->last_update_time;
+	delta = now - sa->last_update_time + remainder;
 	/*
 	 * This should only happen when time goes backwards, which it
 	 * unfortunately does during sched clock init when we swap over to TSC.
 	 */
 	if ((s64)delta < 0) {
 		sa->last_update_time = now;
+		if (running)
+			sa->run_remainder = 0;
+		else
+			sa->sleep_remainder = 0;
 		return 0;
 	}
 
@@ -2961,11 +2968,15 @@ ___update_load_avg(u64 now, int cpu, struct sched_avg *sa,
 	 * Use 1024ns as the unit of measurement since it's a reasonable
 	 * approximation of 1us and fast to compute.
 	 */
+	remainder = delta & (1023UL);
+	sa->last_update_time = now;
+	if (running)
+		sa->run_remainder = remainder;
+	else
+		sa->sleep_remainder = remainder;
 	delta >>= 10;
 	if (!delta)
 		return 0;
-
-	sa->last_update_time += delta << 10;
 
 	/*
 	 * Now we know we crossed measurement unit boundaries. The *_avg
@@ -6001,6 +6012,8 @@ static void migrate_task_rq_fair(struct task_struct *p)
 
 	/* Tell new CPU we are migrated */
 	p->se.avg.last_update_time = 0;
+	p->se.avg.sleep_remainder = 0;
+	p->se.avg.run_remainder = 0;
 
 	/* We have migrated, no longer consider this task hot */
 	p->se.exec_start = 0;
@@ -9194,6 +9207,8 @@ static void task_move_group_fair(struct task_struct *p)
 #ifdef CONFIG_SMP
 	/* Tell se's cfs_rq has been changed -- migrated */
 	p->se.avg.last_update_time = 0;
+	p->se.avg.sleep_remainder = 0;
+	p->se.avg.run_remainder = 0;
 #endif
 	attach_task_cfs_rq(p);
 }

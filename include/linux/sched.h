@@ -316,6 +316,8 @@ struct sched_avg {
 	u64				load_sum;
 	u32				util_sum;
 	u32				period_contrib;
+	u32				sleep_remainder;
+	u32				run_remainder;
 	unsigned long			load_avg;
 	unsigned long			util_avg;
 };
