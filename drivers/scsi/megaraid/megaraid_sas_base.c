@@ -1891,7 +1891,8 @@ static void megasas_set_static_target_properties(struct scsi_device *sdev,
 	if (instance->nvme_page_size && max_io_size_kb)
 		megasas_set_nvme_device_properties(sdev, (max_io_size_kb << 10));
 
-	scsi_change_queue_depth(sdev, device_qd);
+	if (!shost_use_blk_mq(sdev->host))
+		scsi_change_queue_depth(sdev, device_qd);
 
 }
 
@@ -5914,6 +5915,9 @@ static int megasas_io_attach(struct megasas_instance *instance)
 	host->max_id = MEGASAS_MAX_DEV_PER_CHANNEL;
 	host->max_lun = MEGASAS_MAX_LUN;
 	host->max_cmd_len = 16;
+
+	if (shost_use_blk_mq(host))
+		host->cmd_per_lun = host->can_queue;
 
 	/*
 	 * Notify the mid-layer about the new controller
