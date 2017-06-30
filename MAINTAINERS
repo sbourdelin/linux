@@ -8284,7 +8284,6 @@ L:	linux-scsi@vger.kernel.org
 W:	http://www.avagotech.com/support/
 S:	Maintained
 F:	Documentation/scsi/megaraid.txt
-F:	drivers/scsi/megaraid.*
 F:	drivers/scsi/megaraid/
 
 MELFAS MIP4 TOUCHSCREEN DRIVER
