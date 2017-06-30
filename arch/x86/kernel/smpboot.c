@@ -1287,8 +1287,6 @@ void __init native_smp_prepare_cpus(unsigned int max_cpus)
 	set_sched_topology(x86_topology);
 
 	set_cpu_sibling_map(0);
-
-	x86_init.irqs.intr_mode_init();
 	smp_sanity_check();
 
 	switch (apic_intr_mode) {
