@@ -17,6 +17,11 @@ Optional properties:
                "pwms" property (see PWM binding[0])
   - enable-gpios: contains a single GPIO specifier for the GPIO which enables
                   and disables the backlight (see GPIO binding[1])
+  - pwm-delay-us: delay between setting an initial (non-zero) PWM value and
+                  enabling the backlight, and also the delay between disabling
+                  the backlight and setting PWM value to 0.
+                  The 1st cell is the pre-delay in micro seconds.
+                  The 2nd cell is the post-delay in micro seconds.
 
 [0]: Documentation/devicetree/bindings/pwm/pwm.txt
 [1]: Documentation/devicetree/bindings/gpio/gpio.txt
@@ -32,4 +37,5 @@ Example:
 
 		power-supply = <&vdd_bl_reg>;
 		enable-gpios = <&gpio 58 0>;
+		pwm-delay-us = <10000 10000>;
 	};
