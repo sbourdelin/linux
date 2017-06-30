@@ -96,7 +96,7 @@
 		pinctrl-names = "default";
 		pinctrl-0 = <&bl_en>;
 		pwms = <&pwm0 0 1000000 0>;
-		pwm-delay-us = <10000>;
+		pwm-delay-us = <10000 10000>;
 	};
 
 	gpio-charger {
