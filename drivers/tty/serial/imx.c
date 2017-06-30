@@ -1402,44 +1402,44 @@ static void imx_shutdown(struct uart_port *port)
 	unsigned long temp;
 	unsigned long flags;
 
-	if (sport->dma_is_enabled) {
-		sport->dma_is_rxing = 0;
-		sport->dma_is_txing = 0;
-		dmaengine_terminate_sync(sport->dma_chan_tx);
-		dmaengine_terminate_sync(sport->dma_chan_rx);
-
+	if (!sport->port.suspended) {
 		spin_lock_irqsave(&sport->port.lock, flags);
 		imx_stop_tx(port);
 		imx_stop_rx(port);
-		imx_disable_dma(sport);
 		spin_unlock_irqrestore(&sport->port.lock, flags);
+	}
+
+	if (sport->dma_is_inited) {
+		if (sport->dma_is_enabled) {
+			spin_lock_irqsave(&sport->port.lock, flags);
+			imx_disable_dma(sport);
+			spin_unlock_irqrestore(&sport->port.lock, flags);
+		}
 		imx_uart_dma_exit(sport);
 	}
 
-	mctrl_gpio_disable_ms(sport->gpios);
-
 	spin_lock_irqsave(&sport->port.lock, flags);
 	temp = readl(sport->port.membase + UCR2);
-	temp &= ~(UCR2_TXEN);
+	temp &= ~(UCR2_TXEN | UCR2_RXEN);
 	writel(temp, sport->port.membase + UCR2);
+	temp = readl(sport->port.membase + UCR4);
+	temp &= ~UCR4_OREN;
+	writel(temp, sport->port.membase + UCR4);
 	spin_unlock_irqrestore(&sport->port.lock, flags);
 
-	/*
-	 * Stop our timer.
-	 */
+	mctrl_gpio_disable_ms(sport->gpios);
+
+	/* Stop our timer. */
 	del_timer_sync(&sport->timer);
 
-	/*
-	 * Disable all interrupts, port and break condition.
-	 */
-
+	/* Disable port. */
 	spin_lock_irqsave(&sport->port.lock, flags);
 	temp = readl(sport->port.membase + UCR1);
-	temp &= ~(UCR1_TXMPTYEN | UCR1_RRDYEN | UCR1_RTSDEN | UCR1_UARTEN);
-
+	temp &= ~UCR1_UARTEN;
 	writel(temp, sport->port.membase + UCR1);
 	spin_unlock_irqrestore(&sport->port.lock, flags);
 
+	/* Disable clocks. */
 	clk_disable_unprepare(sport->clk_per);
 	clk_disable_unprepare(sport->clk_ipg);
 }
