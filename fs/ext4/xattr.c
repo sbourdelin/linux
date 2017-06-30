@@ -1305,10 +1305,8 @@ retry:
 		csize = (bufsize - wsize) > blocksize ? blocksize :
 								bufsize - wsize;
 		bh = ext4_getblk(handle, ea_inode, block, 0);
-		if (IS_ERR(bh)) {
-			ret = PTR_ERR(bh);
-			goto out;
-		}
+		if (IS_ERR(bh))
+			return PTR_ERR(bh);
 		ret = ext4_journal_get_write_access(handle, bh);
 		if (ret)
 			goto out;
