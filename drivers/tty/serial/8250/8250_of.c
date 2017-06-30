@@ -88,7 +88,7 @@ static int of_platform_serial_setup(struct platform_device *ofdev,
 	ret = of_address_to_resource(np, 0, &resource);
 	if (ret) {
 		dev_warn(&ofdev->dev, "invalid address\n");
-		goto out;
+		goto err_address;
 	}
 
 	spin_lock_init(&port->lock);
@@ -130,7 +130,7 @@ static int of_platform_serial_setup(struct platform_device *ofdev,
 			dev_warn(&ofdev->dev, "unsupported reg-io-width (%d)\n",
 				 prop);
 			ret = -EINVAL;
-			goto out;
+			goto err_regio;
 		}
 	}
 
@@ -167,7 +167,10 @@ static int of_platform_serial_setup(struct platform_device *ofdev,
 		port->handle_irq = fsl8250_handle_irq;
 
 	return 0;
-out:
+
+err_regio:
+	irq_dispose_mapping(port->irq);
+err_address:
 	if (info->clk)
 		clk_disable_unprepare(info->clk);
 	return ret;
@@ -201,7 +204,7 @@ static int of_platform_serial_probe(struct platform_device *ofdev)
 	memset(&port8250, 0, sizeof(port8250));
 	ret = of_platform_serial_setup(ofdev, port_type, &port8250.port, info);
 	if (ret)
-		goto out;
+		goto err_setup;
 
 	if (port8250.port.fifosize)
 		port8250.capabilities = UART_CAP_FIFO;
@@ -217,15 +220,18 @@ static int of_platform_serial_probe(struct platform_device *ofdev)
 
 	ret = serial8250_register_8250_port(&port8250);
 	if (ret < 0)
-		goto out;
+		goto err_register;
 
 	info->type = port_type;
 	info->line = ret;
 	platform_set_drvdata(ofdev, info);
 	return 0;
-out:
-	kfree(info);
+err_register:
 	irq_dispose_mapping(port8250.port.irq);
+	if (info->clk)
+		clk_disable_unprepare(info->clk);
+err_setup:
+	kfree(info);
 	return ret;
 }
 
