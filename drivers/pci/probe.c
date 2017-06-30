@@ -17,6 +17,7 @@
 #include <linux/acpi.h>
 #include <linux/irqdomain.h>
 #include <linux/pm_runtime.h>
+#include <linux/iommu.h>
 #include "pci.h"
 
 #define CARDBUS_LATENCY_TIMER	176	/* secondary latency timer */
