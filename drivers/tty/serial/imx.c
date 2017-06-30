@@ -1225,6 +1225,9 @@ static void imx_enable_dma(struct imx_port *sport)
 
 	imx_setup_ufcr(sport, TXTL_DMA, RXTL_DMA);
 
+	sport->dma_is_rxing = 0;
+	sport->dma_is_txing = 0;
+
 	sport->dma_is_enabled = 1;
 }
 
