@@ -339,8 +339,14 @@ int intel_uc_init_hw(struct drm_i915_private *dev_priv)
 	guc_disable_communication(guc);
 	gen9_reset_guc_interrupts(dev_priv);
 
-	/* We need to notify the guc whenever we change the GGTT */
-	i915_ggtt_enable_guc(dev_priv);
+	/*
+	 * We need to notify the guc whenever we change the GGTT; but if we
+	 * are reloading the firmware (after full gpu reset or suspend/resume),
+	 * we should skip this since gtt->invalidate was already set (or we hit
+	 * an assert).
+	 */
+	if (!dev_priv->guc.execbuf_client)
+		i915_ggtt_enable_guc(dev_priv);
 
 	if (i915.enable_guc_submission) {
 		/*
