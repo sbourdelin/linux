@@ -123,6 +123,7 @@
 			240 241 242 243 244 245 246 247
 			248 249 250 251 252 253 254 255>;
 	power-supply = <&backlight_regulator>;
+	pwm-delay-us = <200000 200000>;
 };
 
 &emmc {
