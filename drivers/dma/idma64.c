@@ -637,8 +637,10 @@ static int idma64_platform_probe(struct platform_device *pdev)
 		return -ENOMEM;
 
 	chip->irq = platform_get_irq(pdev, 0);
-	if (chip->irq < 0)
+	if (chip->irq < 0) {
+		dev_err(dev, "failed to get IRQ: %d\n", chip->irq);
 		return chip->irq;
+	}
 
 	mem = platform_get_resource(pdev, IORESOURCE_MEM, 0);
 	chip->regs = devm_ioremap_resource(dev, mem);
