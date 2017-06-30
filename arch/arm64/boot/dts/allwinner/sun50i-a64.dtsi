@@ -162,6 +162,15 @@
 				clock-indices = <0>;
 				clock-output-names = "cpu_clk";
 			};
+
+			scpi_clk: scpi_clocks {
+				compatible = "arm,scpi-variable-clocks";
+				#clock-cells = <1>;
+				clock-indices = <75>, <76>,
+						<77>;
+				clock-output-names = "mmc0_clk", "mmc1_clk",
+						     "mmc2_clk";
+			};
 		};
 
 		scpi_sensors0: sensors {
