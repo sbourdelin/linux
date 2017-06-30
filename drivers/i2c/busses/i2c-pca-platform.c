@@ -176,13 +176,12 @@ static int i2c_pca_pf_probe(struct platform_device *pdev)
 	if (platform_data) {
 		i2c->adap.timeout = platform_data->timeout;
 		i2c->algo_data.i2c_clock = platform_data->i2c_clock_speed;
-	} else if (np) {
-		i2c->adap.timeout = HZ;
-		of_property_read_u32_index(np, "clock-frequency", 0,
-					   &i2c->algo_data.i2c_clock);
 	} else {
 		i2c->adap.timeout = HZ;
-		i2c->algo_data.i2c_clock = 59000;
+		ret = device_property_read_u32(&pdev->dev, "clock-frequency",
+					       &i2c->algo_data.i2c_clock);
+		if (ret)
+			i2c->algo_data.i2c_clock = 59000;
 	}
 
 	i2c->gpio = devm_gpiod_get_optional(&pdev->dev, "reset-gpios", GPIOD_OUT_LOW);
