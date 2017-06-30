@@ -43,10 +43,10 @@
 #define EXT4_XATTR_TRANS_BLOCKS		6U
 
 /* Define the minimum size for a transaction which modifies data.  This
- * needs to take into account the fact that we may end up modifying two
- * quota files too (one for the group, one for the user quota).  The
- * superblock only gets updated once, of course, so don't bother
- * counting that again for the quota updates. */
+ * needs to take into account the fact that we may end up modifying three
+ * quota files too (one for the group, one for the user quota, one for the
+ * project).  The superblock only gets updated once, of course, so don't
+ * bother counting that again for the quota updates. */
 
 #define EXT4_DATA_TRANS_BLOCKS(sb)	(EXT4_SINGLEDATA_TRANS_BLOCKS(sb) + \
 					 EXT4_XATTR_TRANS_BLOCKS - 2 + \
