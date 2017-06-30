@@ -716,28 +716,6 @@ static int __init genpd_power_off_unused(void)
 }
 late_initcall(genpd_power_off_unused);
 
-#if defined(CONFIG_PM_SLEEP) || defined(CONFIG_PM_GENERIC_DOMAINS_OF)
-
-/**
- * pm_genpd_present - Check if the given PM domain has been initialized.
- * @genpd: PM domain to check.
- */
-static bool pm_genpd_present(const struct generic_pm_domain *genpd)
-{
-	const struct generic_pm_domain *gpd;
-
-	if (IS_ERR_OR_NULL(genpd))
-		return false;
-
-	list_for_each_entry(gpd, &gpd_list, gpd_list_node)
-		if (gpd == genpd)
-			return true;
-
-	return false;
-}
-
-#endif
-
 #ifdef CONFIG_PM_SLEEP
 
 static bool genpd_dev_active_wakeup(const struct generic_pm_domain *genpd,
@@ -1625,6 +1603,24 @@ struct of_genpd_provider {
 static LIST_HEAD(of_genpd_providers);
 /* Mutex to protect the list above. */
 static DEFINE_MUTEX(of_genpd_mutex);
+
+/**
+ * pm_genpd_present - Check if the given PM domain has been initialized.
+ * @genpd: PM domain to check.
+ */
+static bool pm_genpd_present(const struct generic_pm_domain *genpd)
+{
+	const struct generic_pm_domain *gpd;
+
+	if (IS_ERR_OR_NULL(genpd))
+		return false;
+
+	list_for_each_entry(gpd, &gpd_list, gpd_list_node)
+		if (gpd == genpd)
+			return true;
+
+	return false;
+}
 
 /**
  * genpd_xlate_simple() - Xlate function for direct node-domain mapping
