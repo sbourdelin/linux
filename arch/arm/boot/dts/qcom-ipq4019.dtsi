@@ -96,6 +96,11 @@
 			clock-frequency = <32768>;
 			#clock-cells = <0>;
 		};
+		xo: xo {
+			compatible = "fixed-clock";
+			clock-frequency = <48000000>;
+			#clock-cells = <0>;
+		};
 	};
 
 	soc {
@@ -103,6 +108,15 @@
 		#size-cells = <1>;
 		ranges;
 		compatible = "simple-bus";
+
+		timer {
+			compatible = "arm,armv7-timer";
+			interrupts = <1 2 0xf08>,
+				     <1 3 0xf08>,
+				     <1 4 0xf08>,
+				     <1 1 0xf08>;
+			clock-frequency = <48000000>;
+		};
 
 		intc: interrupt-controller@b000000 {
 			compatible = "qcom,msm-qgic2";
