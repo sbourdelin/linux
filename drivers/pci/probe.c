@@ -802,6 +802,9 @@ static int pci_register_host_bridge(struct pci_host_bridge *bridge)
 	pci_set_bus_of_node(bus);
 	pci_set_bus_msi_domain(bus);
 
+	if (iommu_capable(&pci_bus_type, IOMMU_CAP_INTR_REMAP))
+		b->bus_flags |= PCI_BUS_FLAGS_MSI_REMAP;
+
 	if (!parent)
 		set_dev_node(bus->bridge, pcibus_to_node(bus));
 
