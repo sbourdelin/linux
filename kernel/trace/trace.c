@@ -4598,6 +4598,7 @@ static const struct file_operations tracing_readme_fops = {
 static void *saved_cmdlines_next(struct seq_file *m, void *v, loff_t *pos)
 {
 	unsigned int *ptr = v;
+	long tgid_check = (long) m->private;
 
 	if (*pos || m->count)
 		ptr++;
@@ -4607,6 +4608,8 @@ static void *saved_cmdlines_next(struct seq_file *m, void *v, loff_t *pos)
 	for (; ptr < &savedcmd->map_cmdline_to_pid[savedcmd->cmdline_num];
 	     ptr++) {
 		if (*ptr == -1 || *ptr == NO_CMDLINE_MAP)
+			continue;
+		if (tgid_check && !trace_find_tgid(*ptr))
 			continue;
 
 		return ptr;
@@ -4619,6 +4622,10 @@ static void *saved_cmdlines_start(struct seq_file *m, loff_t *pos)
 {
 	void *v;
 	loff_t l = 0;
+	long tgid_check = (long) m->private;
+
+	if (tgid_check && !tgid_map)
+		return NULL;
 
 	preempt_disable();
 	arch_spin_lock(&trace_cmdline_lock);
@@ -4649,6 +4656,14 @@ static int saved_cmdlines_show(struct seq_file *m, void *v)
 	return 0;
 }
 
+static int saved_tgids_show(struct seq_file *m, void *v)
+{
+	unsigned int *pid = v;
+
+	seq_printf(m, "%d %d\n", *pid, trace_find_tgid(*pid));
+	return 0;
+}
+
 static const struct seq_operations tracing_saved_cmdlines_seq_ops = {
 	.start		= saved_cmdlines_start,
 	.next		= saved_cmdlines_next,
@@ -4656,16 +4671,56 @@ static const struct seq_operations tracing_saved_cmdlines_seq_ops = {
 	.show		= saved_cmdlines_show,
 };
 
+static const struct seq_operations tracing_saved_tgids_seq_ops = {
+	.start		= saved_cmdlines_start,
+	.next		= saved_cmdlines_next,
+	.stop		= saved_cmdlines_stop,
+	.show		= saved_tgids_show,
+};
+
 static int tracing_saved_cmdlines_open(struct inode *inode, struct file *filp)
 {
+	int ret;
+
 	if (tracing_disabled)
 		return -ENODEV;
 
-	return seq_open(filp, &tracing_saved_cmdlines_seq_ops);
+	ret = seq_open(filp, &tracing_saved_cmdlines_seq_ops);
+	if (!ret) {
+		struct seq_file *m = filp->private_data;
+
+		m->private = (void *) 0; /* Do not check for valid tgids */
+	}
+
+	return ret;
+}
+
+static int tracing_saved_tgids_open(struct inode *inode, struct file *filp)
+{
+	int ret;
+
+	if (tracing_disabled)
+		return -ENODEV;
+
+	ret = seq_open(filp, &tracing_saved_tgids_seq_ops);
+	if (!ret) {
+		struct seq_file *m = filp->private_data;
+
+		m->private = (void *) 1; /* Check for valid tgids */
+	}
+
+	return ret;
 }
 
 static const struct file_operations tracing_saved_cmdlines_fops = {
 	.open		= tracing_saved_cmdlines_open,
+	.read		= seq_read,
+	.llseek		= seq_lseek,
+	.release	= seq_release,
+};
+
+static const struct file_operations tracing_saved_tgids_fops = {
+	.open		= tracing_saved_tgids_open,
 	.read		= seq_read,
 	.llseek		= seq_lseek,
 	.release	= seq_release,
@@ -7838,6 +7893,9 @@ static __init int tracer_init_tracefs(void)
 
 	trace_create_file("saved_cmdlines_size", 0644, d_tracer,
 			  NULL, &tracing_saved_cmdlines_size_fops);
+
+	trace_create_file("saved_tgids", 0444, d_tracer,
+			NULL, &tracing_saved_tgids_fops);
 
 	trace_eval_init();
 
