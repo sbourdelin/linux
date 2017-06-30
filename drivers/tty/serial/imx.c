@@ -1208,6 +1208,24 @@ err:
 	return ret;
 }
 
+static void imx_stop_tx_dma(struct imx_port *sport)
+{
+	unsigned long temp;
+
+	temp = readl(sport->port.membase + UCR1);
+	temp &= ~UCR1_TDMAEN;
+	writel(temp, sport->port.membase + UCR1);
+}
+
+static void imx_stop_rx_dma(struct imx_port *sport)
+{
+	unsigned long temp;
+
+	temp = readl(sport->port.membase + UCR1);
+	temp &= ~(UCR1_RDMAEN | UCR1_ATDMAEN);
+	writel(temp, sport->port.membase + UCR1);
+}
+
 static void imx_enable_dma(struct imx_port *sport)
 {
 	unsigned long temp;
@@ -1233,17 +1251,8 @@ static void imx_enable_dma(struct imx_port *sport)
 
 static void imx_disable_dma(struct imx_port *sport)
 {
-	unsigned long temp;
-
-	/* clear UCR1 */
-	temp = readl(sport->port.membase + UCR1);
-	temp &= ~(UCR1_RDMAEN | UCR1_TDMAEN | UCR1_ATDMAEN);
-	writel(temp, sport->port.membase + UCR1);
-
-	/* clear UCR2 */
-	temp = readl(sport->port.membase + UCR2);
-	temp &= ~(UCR2_CTSC | UCR2_CTS | UCR2_ATEN);
-	writel(temp, sport->port.membase + UCR2);
+	imx_stop_rx_dma(sport);
+	imx_stop_tx_dma(sport);
 
 	imx_setup_ufcr(sport, TXTL_DEFAULT, RXTL_DEFAULT);
 
