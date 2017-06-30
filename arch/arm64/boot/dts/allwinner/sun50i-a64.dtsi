@@ -163,6 +163,11 @@
 				clock-output-names = "cpu_clk";
 			};
 		};
+
+		scpi_sensors0: sensors {
+			compatible = "arm,scpi-sensors";
+			#thermal-sensor-cells = <1>;
+		};
 	};
 
 	soc {
@@ -307,6 +312,8 @@
 			clock-names = "hosc", "losc";
 			#clock-cells = <1>;
 			#reset-cells = <1>;
+			assigned-clocks = <&ccu CLK_THS>;
+			assigned-clock-rates = <4000000>;
 		};
 
 		pio: pinctrl@1c20800 {
