@@ -1007,8 +1007,11 @@ static int zynqmp_dma_chan_probe(struct zynqmp_dma_device *zdev,
 
 	zynqmp_dma_init(chan);
 	chan->irq = platform_get_irq(pdev, 0);
-	if (chan->irq < 0)
-		return -ENXIO;
+	if (chan->irq < 0) {
+		dev_err(&pdev->dev, "failed to get IRQ: %d\n", chan->irq);
+		return chan->irq;
+	}
+
 	err = devm_request_irq(&pdev->dev, chan->irq, zynqmp_dma_irq_handler, 0,
 			       "zynqmp-dma", chan);
 	if (err)
