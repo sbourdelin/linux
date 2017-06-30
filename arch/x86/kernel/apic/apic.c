@@ -2359,8 +2359,6 @@ int __init apic_bsp_setup(bool upmode)
 	end_local_APIC_setup();
 	irq_remap_enable_fault_handling();
 	setup_IO_APIC();
-	/* Setup local timer */
-	x86_init.timers.setup_percpu_clockev();
 	return id;
 }
 
@@ -2400,6 +2398,8 @@ int __init APIC_init_uniprocessor(void)
 
 	default_setup_apic_routing();
 	apic_bsp_setup(true);
+	/* Setup local timer */
+	x86_init.timers.setup_percpu_clockev();
 	return 0;
 }
 
