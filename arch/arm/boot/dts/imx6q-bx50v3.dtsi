@@ -284,3 +284,7 @@
 		tcxo-clock-frequency = <26000000>;
 	};
 };
+
+&usdhc2 {
+	status = "disabled";
+};
