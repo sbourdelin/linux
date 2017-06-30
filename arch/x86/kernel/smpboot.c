@@ -1347,8 +1347,11 @@ void __init native_smp_prepare_cpus(unsigned int max_cpus)
 	}
 
 	default_setup_apic_routing();
-	cpu0_logical_apicid = apic_bsp_setup(false);
-
+	apic_bsp_setup(false);
+	if (x2apic_mode)
+		cpu0_logical_apicid = apic_read(APIC_LDR);
+	else
+		cpu0_logical_apicid = GET_APIC_LOGICAL_ID(apic_read(APIC_LDR));
 	/* Setup local timer */
 	x86_init.timers.setup_percpu_clockev();
 
