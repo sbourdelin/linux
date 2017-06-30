@@ -719,11 +719,11 @@ out:
 	return IRQ_HANDLED;
 }
 
-static void imx_disable_rx_int(struct imx_port *sport)
+static void imx_disable_rx_int(struct imx_port *sport, bool is_rxing)
 {
 	unsigned long temp;
 
-	sport->dma_is_rxing = 1;
+	sport->dma_is_rxing = is_rxing;
 
 	/* disable the receiver ready and aging timer interrupts */
 	temp = readl(sport->port.membase + UCR1);
@@ -756,7 +756,7 @@ static void imx_dma_rxint(struct imx_port *sport)
 	temp = readl(sport->port.membase + USR2);
 	if ((temp & USR2_RDR) && !sport->dma_is_rxing) {
 
-		imx_disable_rx_int(sport);
+		imx_disable_rx_int(sport, false);
 
 		/* tell the DMA to receive the data. */
 		start_rx_dma(sport);
@@ -1083,6 +1083,7 @@ static int start_rx_dma(struct imx_port *sport)
 	desc->callback_param = sport;
 
 	dev_dbg(dev, "RX: prepare for the DMA.\n");
+	sport->dma_is_rxing = 1;
 	sport->rx_cookie = dmaengine_submit(desc);
 	dma_async_issue_pending(chan);
 	return 0;
@@ -1360,7 +1361,7 @@ static int imx_startup(struct uart_port *port)
 		spin_unlock(&tty->files_lock);
 
 		if (readcnt > 0) {
-			imx_disable_rx_int(sport);
+			imx_disable_rx_int(sport, true);
 			start_rx_dma(sport);
 		}
 	}
