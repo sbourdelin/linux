@@ -184,6 +184,8 @@ static int start_readonly;
  */
 static bool create_on_open = true;
 
+static int md_numa_node = NUMA_NO_NODE;
+
 /* bio_clone_mddev
  * like bio_clone, but with a local bio set
  */
@@ -575,7 +577,7 @@ static struct mddev *mddev_find(dev_t unit)
 	}
 	spin_unlock(&all_mddevs_lock);
 
-	new = kzalloc(sizeof(*new), GFP_KERNEL);
+	new = kzalloc_node(sizeof(*new), GFP_KERNEL, md_numa_node);
 	if (!new)
 		return NULL;
 
@@ -585,6 +587,7 @@ static struct mddev *mddev_find(dev_t unit)
 	else
 		new->md_minor = MINOR(unit) >> MdpMinorShift;
 
+	new->numa_node_id = md_numa_node;
 	mddev_init(new);
 
 	goto retry;
@@ -3374,7 +3377,7 @@ static struct md_rdev *md_import_device(dev_t newdev, int super_format, int supe
 	struct md_rdev *rdev;
 	sector_t size;
 
-	rdev = kzalloc(sizeof(*rdev), GFP_KERNEL);
+	rdev = kzalloc_node(sizeof(*rdev), GFP_KERNEL, md_numa_node);
 	if (!rdev)
 		return ERR_PTR(-ENOMEM);
 
@@ -5243,7 +5246,7 @@ static int md_alloc(dev_t dev, char *name)
 		mddev->hold_active = UNTIL_STOP;
 
 	error = -ENOMEM;
-	mddev->queue = blk_alloc_queue(GFP_KERNEL);
+	mddev->queue = blk_alloc_queue_node(GFP_KERNEL, md_numa_node);
 	if (!mddev->queue)
 		goto abort;
 	mddev->queue->queuedata = mddev;
@@ -5251,7 +5254,7 @@ static int md_alloc(dev_t dev, char *name)
 	blk_queue_make_request(mddev->queue, md_make_request);
 	blk_set_stacking_limits(&mddev->queue->limits);
 
-	disk = alloc_disk(1 << shift);
+	disk = alloc_disk_node(1 << shift, md_numa_node);
 	if (!disk) {
 		blk_cleanup_queue(mddev->queue);
 		mddev->queue = NULL;
@@ -9227,6 +9230,8 @@ module_param_call(start_ro, set_ro, get_ro, NULL, S_IRUSR|S_IWUSR);
 module_param(start_dirty_degraded, int, S_IRUGO|S_IWUSR);
 module_param_call(new_array, add_named_array, NULL, NULL, S_IWUSR);
 module_param(create_on_open, bool, S_IRUSR|S_IWUSR);
+module_param(md_numa_node, int, S_IRUGO | S_IWUSR);
+MODULE_PARM_DESC(md_numa_node, "NUMA node for md device memory allocations");
 
 MODULE_LICENSE("GPL");
 MODULE_DESCRIPTION("MD RAID framework");
