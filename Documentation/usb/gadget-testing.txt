@@ -629,10 +629,10 @@ The function name to use when creating the function directory is "uac2".
 The uac2 function provides these attributes in its function directory:
 
 	c_chmask - capture channel mask
-	c_srate - capture sampling rate
+	c_srate - list of capture sampling rates (comma-separated)
 	c_ssize - capture sample size (bytes)
 	p_chmask - playback channel mask
-	p_srate - playback sampling rate
+	p_srate - list of playback sampling rates (comma-separated)
 	p_ssize - playback sample size (bytes)
 	req_number - the number of pre-allocated request for both capture
 		     and playback
@@ -790,10 +790,10 @@ The function name to use when creating the function directory is "uac1".
 The uac1 function provides these attributes in its function directory:
 
 	c_chmask - capture channel mask
-	c_srate - capture sampling rate
+	c_srate - list of capture sampling rates (comma-separated)
 	c_ssize - capture sample size (bytes)
 	p_chmask - playback channel mask
-	p_srate - playback sampling rate
+	p_srate - list of playback sampling rates (comma-separated)
 	p_ssize - playback sample size (bytes)
 	req_number - the number of pre-allocated request for both capture
 		     and playback
