@@ -1,11 +1,11 @@
 config MEGARAID_NEWGEN
-	bool "LSI Logic New Generation RAID Device Drivers"
+	bool "LSI Logic RAID Device Drivers"
 	depends on PCI && SCSI
 	help
 	LSI Logic RAID Device Drivers
 
 config MEGARAID_MM
-	tristate "LSI Logic Management Module (New Driver)"
+	tristate "LSI Logic Management Module"
 	depends on PCI && SCSI && MEGARAID_NEWGEN
 	help
 	Management Module provides ioctl, sysfs support for LSI Logic
@@ -15,7 +15,7 @@ config MEGARAID_MM
 
 
 config MEGARAID_MAILBOX
-	tristate "LSI Logic MegaRAID Driver (New Driver)"
+	tristate "LSI Logic MegaRAID Driver"
 	depends on PCI && SCSI && MEGARAID_MM
 	help
 	List of supported controllers
