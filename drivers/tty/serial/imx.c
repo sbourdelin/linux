@@ -1215,6 +1215,12 @@ static void imx_stop_tx_dma(struct imx_port *sport)
 	temp = readl(sport->port.membase + UCR1);
 	temp &= ~UCR1_TDMAEN;
 	writel(temp, sport->port.membase + UCR1);
+
+	if (sport->dma_is_txing) {
+		dma_unmap_sg(sport->port.dev, &sport->tx_sgl[0],
+		sport->dma_tx_nents, DMA_TO_DEVICE);
+		sport->dma_is_txing = 0;
+	}
 }
 
 static void imx_stop_rx_dma(struct imx_port *sport)
@@ -1224,6 +1230,12 @@ static void imx_stop_rx_dma(struct imx_port *sport)
 	temp = readl(sport->port.membase + UCR1);
 	temp &= ~(UCR1_RDMAEN | UCR1_ATDMAEN);
 	writel(temp, sport->port.membase + UCR1);
+
+	if (sport->dma_is_rxing) {
+		dma_unmap_sg(sport->port.dev, &sport->rx_sgl, 1,
+			DMA_FROM_DEVICE);
+		sport->dma_is_rxing = 0;
+	}
 }
 
 static void imx_enable_dma(struct imx_port *sport)
