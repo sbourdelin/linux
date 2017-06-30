@@ -106,6 +106,7 @@ static const char netdev_features_strings[NETDEV_FEATURE_COUNT][ETH_GSTRING_LEN]
 	[NETIF_F_HW_TC_BIT] =		 "hw-tc-offload",
 	[NETIF_F_HW_ESP_BIT] =		 "esp-hw-offload",
 	[NETIF_F_HW_ESP_TX_CSUM_BIT] =	 "esp-tx-csum-hw-offload",
+	[NETIF_F_TUNNEL_OFFLOAD_BIT] =	 "tunnel-offload",
 };
 
 static const char

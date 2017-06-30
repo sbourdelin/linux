@@ -7505,6 +7505,12 @@ int register_netdevice(struct net_device *dev)
 	 */
 	dev->hw_features |= NETIF_F_SOFT_FEATURES;
 	dev->features |= NETIF_F_SOFT_FEATURES;
+
+	if (dev->netdev_ops->ndo_udp_tunnel_add) {
+		dev->features |= NETIF_F_TUNNEL_OFFLOAD;
+		dev->hw_features |= NETIF_F_TUNNEL_OFFLOAD;
+	}
+
 	dev->wanted_features = dev->features & dev->hw_features;
 
 	if (!(dev->flags & IFF_LOOPBACK))
