@@ -34,16 +34,12 @@ int main(int argc, char **argv)
 	fd1 = open(kpath, O_RDWR | O_CREAT | O_TRUNC, 0644);
 	pid1 = getpid();
 
-	if (fd1 < 0) {
-		perror("Can't create file");
-		ksft_exit_fail();
-	}
+	if (fd1 < 0)
+		ksft_exit_fail_msg("Can't create file: %s\n", strerror(errno));
 
 	pid2 = fork();
-	if (pid2 < 0) {
-		perror("fork failed");
-		ksft_exit_fail();
-	}
+	if (pid2 < 0)
+		ksft_exit_fail_msg("fork() failed: %s\n", strerror(errno));
 
 	if (!pid2) {
 		int pid2 = getpid();
@@ -51,14 +47,14 @@ int main(int argc, char **argv)
 
 		fd2 = open(kpath, O_RDWR, 0644);
 		if (fd2 < 0) {
-			perror("Can't open file");
-			ksft_exit_fail();
+			ksft_print_msg("Can't open file: %s\n",
+				strerror(errno));
+			exit(KSFT_FAIL);
 		}
 
 		/* An example of output and arguments */
-		printf("pid1: %6d pid2: %6d FD: %2ld FILES: %2ld VM: %2ld "
-		       "FS: %2ld SIGHAND: %2ld IO: %2ld SYSVSEM: %2ld "
-		       "INV: %2ld\n",
+		ksft_print_msg(
+			"pid1: %6d pid2: %6d FD: %2ld\n  FILES: %2ld VM: %2ld FS: %2ld SIGHAND: %2ld\n  IO: %2ld SYSVSEM: %2ld INV: %2ld\n",
 		       pid1, pid2,
 		       sys_kcmp(pid1, pid2, KCMP_FILE,		fd1, fd2),
 		       sys_kcmp(pid1, pid2, KCMP_FILES,		0, 0),
@@ -74,28 +70,22 @@ int main(int argc, char **argv)
 		/* This one should return same fd */
 		ret = sys_kcmp(pid1, pid2, KCMP_FILE, fd1, fd1);
 		if (ret) {
-			printf("FAIL: 0 expected but %d returned (%s)\n",
+			ksft_test_result_fail(
+				"0 expected but %d returned (%s)\n",
 				ret, strerror(errno));
-			ksft_inc_fail_cnt();
 			ret = -1;
-		} else {
-			printf("PASS: 0 returned as expected\n");
-			ksft_inc_pass_cnt();
-		}
+		} else
+			ksft_test_result_pass("0 returned as expected\n");
 
 		/* Compare with self */
 		ret = sys_kcmp(pid1, pid1, KCMP_VM, 0, 0);
 		if (ret) {
-			printf("FAIL: 0 expected but %d returned (%s)\n",
+			ksft_test_result_fail(
+				"0 expected but %d returned (%s)\n",
 				ret, strerror(errno));
-			ksft_inc_fail_cnt();
 			ret = -1;
-		} else {
-			printf("PASS: 0 returned as expected\n");
-			ksft_inc_pass_cnt();
-		}
-
-		ksft_print_cnts();
+		} else
+			ksft_test_result_pass("0 returned as expected\n");
 
 		if (ret)
 			ksft_exit_fail();
@@ -104,6 +94,4 @@ int main(int argc, char **argv)
 	}
 
 	waitpid(pid2, &status, P_ALL);
-
-	return ksft_exit_pass();
 }
