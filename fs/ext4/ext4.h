@@ -2477,6 +2477,9 @@ int ext4_walk_page_buffers(handle_t *handle,
 			   int *partial,
 			   int (*fn)(handle_t *handle,
 				     struct buffer_head *bh));
+int ext4_expand_extra_isize(struct inode *inode,
+			    unsigned int new_extra_isize,
+			    struct ext4_iloc iloc, handle_t *handle);
 int do_journal_get_write_access(handle_t *handle,
 				struct buffer_head *bh);
 #define FALL_BACK_TO_NONDELALLOC 1

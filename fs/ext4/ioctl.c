@@ -319,6 +319,7 @@ static int ext4_ioctl_setproject(struct file *filp, __u32 projid)
 	struct ext4_iloc iloc;
 	struct ext4_inode *raw_inode;
 	struct dquot *transfer_to[MAXQUOTAS] = { };
+	bool need_expand = false;
 
 	if (!ext4_has_feature_project(sb)) {
 		if (projid != EXT4_DEF_PROJID)
@@ -350,7 +351,10 @@ static int ext4_ioctl_setproject(struct file *filp, __u32 projid)
 		goto out_unlock;
 
 	raw_inode = ext4_raw_inode(&iloc);
-	if (!EXT4_FITS_IN_INODE(raw_inode, ei, i_projid)) {
+	if (!EXT4_FITS_IN_INODE(raw_inode, ei, i_projid) &&
+	    !ext4_test_inode_state(inode, EXT4_STATE_NO_EXPAND)) {
+		need_expand = true;
+	} else if (!EXT4_FITS_IN_INODE(raw_inode, ei, i_projid)) {
 		err = -EOVERFLOW;
 		brelse(iloc.bh);
 		goto out_unlock;
@@ -361,10 +365,19 @@ static int ext4_ioctl_setproject(struct file *filp, __u32 projid)
 
 	handle = ext4_journal_start(inode, EXT4_HT_QUOTA,
 		EXT4_QUOTA_INIT_BLOCKS(sb) +
-		EXT4_QUOTA_DEL_BLOCKS(sb) + 3);
+		EXT4_QUOTA_DEL_BLOCKS(sb) + 3 +
+		need_expand ? EXT4_DATA_TRANS_BLOCKS(sb) : 0);
 	if (IS_ERR(handle)) {
 		err = PTR_ERR(handle);
 		goto out_unlock;
+	}
+
+	if (need_expand) {
+		err = ext4_expand_extra_isize(inode,
+				      EXT4_SB(sb)->s_want_extra_isize,
+				      iloc, handle);
+		if (err)
+			goto out_stop;
 	}
 
 	err = ext4_reserve_inode_write(handle, inode, &iloc);
