@@ -996,6 +996,7 @@ struct intel_dp {
 	struct drm_dp_aux aux;
 	enum intel_display_power_domain aux_power_domain;
 	uint8_t train_set[4];
+	bool train_set_valid;
 	int panel_power_up_delay;
 	int panel_power_down_delay;
 	int panel_power_cycle_delay;
@@ -1571,6 +1572,7 @@ static inline unsigned int intel_dp_unused_lane_mask(int lane_count)
 }
 
 bool intel_dp_read_dpcd(struct intel_dp *intel_dp);
+bool is_edp(struct intel_dp *intel_dp);
 int intel_dp_link_required(int pixel_clock, int bpp);
 int intel_dp_max_data_rate(int max_link_clock, int max_lanes);
 bool intel_digital_port_connected(struct drm_i915_private *dev_priv,
