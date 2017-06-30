@@ -124,6 +124,32 @@
 			(GIC_CPU_MASK_SIMPLE(4) | IRQ_TYPE_LEVEL_HIGH)>;
 	};
 
+	mailbox: mbox@0 {
+		compatible = "arm,smc-mbox";
+		#mbox-cells = <1>;
+		arm,smc-func-ids = <0x82000001>;
+	};
+
+	sram: sram@10000{
+		compatible = "mmio-sram";
+		reg = <0x10000 0x8000>;
+
+		#address-cells = <1>;
+		#size-cells = <1>;
+		ranges = <0 0x10000 0x8000>;
+
+		cpu_scp_mem: scp-shmem@7e00 {
+			compatible = "mmio-sram";
+			reg = <0x7e00 0x200>;
+		};
+	};
+
+	scpi {
+		compatible = "arm,scpi";
+		mboxes = <&mailbox 0>;
+		shmem = <&cpu_scp_mem>;
+	};
+
 	soc {
 		compatible = "simple-bus";
 		#address-cells = <1>;
