@@ -1641,6 +1641,8 @@ static void acpi_nfit_init_dsms(struct acpi_nfit_desc *acpi_desc)
 	set_bit(ND_CMD_CALL, &nd_desc->cmd_mask);
 
 	dsm_mask = 0x3bf;
+	if (override_dsm_mask)
+		dsm_mask = override_dsm_mask;
 	for_each_set_bit(i, &dsm_mask, BITS_PER_LONG)
 		if (acpi_check_dsm(adev->handle, uuid, 1, 1ULL << i))
 			set_bit(i, &nd_desc->bus_dsm_mask);
