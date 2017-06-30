@@ -796,8 +796,8 @@ xpc_create_kthreads(struct xpc_channel *ch, int needed,
 		if (ignore_disconnecting) {
 			if (!atomic_inc_not_zero(&ch->kthreads_assigned)) {
 				/* kthreads assigned had gone to zero */
-				BUG_ON(!(ch->flags &
-					 XPC_C_DISCONNECTINGCALLOUT_MADE));
+				WARN_ON(!(ch->flags &
+					  XPC_C_DISCONNECTINGCALLOUT_MADE));
 				break;
 			}
 

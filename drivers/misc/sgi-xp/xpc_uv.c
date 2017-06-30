@@ -193,10 +193,10 @@ xpc_gru_mq_watchlist_free_uv(struct xpc_gru_mq_uv *mq)
 
 #if defined CONFIG_X86_64
 	ret = uv_bios_mq_watchlist_free(mmr_pnode, mq->watchlist_num);
-	BUG_ON(ret != BIOS_STATUS_SUCCESS);
+	WARN_ON(ret != BIOS_STATUS_SUCCESS);
 #elif defined CONFIG_IA64_GENERIC || defined CONFIG_IA64_SGI_UV
 	ret = sn_mq_watchlist_free(mmr_pnode, mq->watchlist_num);
-	BUG_ON(ret != SALRET_OK);
+	WARN_ON(ret != SALRET_OK);
 #else
 	#error not a supported configuration
 #endif
@@ -314,7 +314,7 @@ xpc_destroy_gru_mq_uv(struct xpc_gru_mq_uv *mq)
 	/* disallow other partitions to access GRU mq */
 	mq_size = 1UL << mq->order;
 	ret = xp_restrict_memprotect(xp_pa(mq->address), mq_size);
-	BUG_ON(ret != xpSuccess);
+	WARN_ON(ret != xpSuccess);
 
 	/* unregister irq handler and release mq irq/vector mapping */
 	free_irq(mq->irq, NULL);
@@ -383,7 +383,7 @@ xpc_process_activate_IRQ_rcvd_uv(void)
 			continue;
 
 		xpc_activate_IRQ_rcvd--;
-		BUG_ON(xpc_activate_IRQ_rcvd < 0);
+		WARN_ON(xpc_activate_IRQ_rcvd < 0);
 
 		act_state_req = part->sn.uv.act_state_req;
 		part->sn.uv.act_state_req = 0;
@@ -974,7 +974,7 @@ xpc_get_fifo_entry_uv(struct xpc_fifo_head_uv *head)
 			head->last = NULL;
 
 		head->n_entries--;
-		BUG_ON(head->n_entries < 0);
+		WARN_ON(head->n_entries < 0);
 
 		first->next = NULL;
 	}
@@ -1393,7 +1393,7 @@ xpc_handle_notify_mq_ack_uv(struct xpc_channel *ch,
 
 	msg_slot = &ch->sn.uv.send_msg_slots[entry];
 
-	BUG_ON(msg_slot->msg_slot_number != msg->hdr.msg_slot_number);
+	WARN_ON(msg_slot->msg_slot_number != msg->hdr.msg_slot_number);
 	msg_slot->msg_slot_number += ch->local_nentries;
 
 	if (msg_slot->func != NULL)
@@ -1451,7 +1451,7 @@ xpc_handle_notify_mq_msg_uv(struct xpc_partition *part,
 	msg_slot = ch_uv->recv_msg_slots +
 	    (msg->hdr.msg_slot_number % ch->remote_nentries) * ch->entry_size;
 
-	BUG_ON(msg_slot->hdr.size != 0);
+	WARN_ON(msg_slot->hdr.size != 0);
 
 	memcpy(msg_slot, msg, msg->hdr.size);
 

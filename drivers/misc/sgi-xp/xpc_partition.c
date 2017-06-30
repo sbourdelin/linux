@@ -155,7 +155,7 @@ xpc_setup_rsvd_page(void)
 		/* SAL_versions < 3 had a SAL_partid defined as a u8 */
 		rp->SAL_partid &= 0xff;
 	}
-	BUG_ON(rp->SAL_partid != xp_partition_id);
+	WARN_ON(rp->SAL_partid != xp_partition_id);
 
 	if (rp->SAL_partid < 0 || rp->SAL_partid >= xp_max_npartitions) {
 		dev_err(xpc_part, "the reserved page's partid of %d is outside "
