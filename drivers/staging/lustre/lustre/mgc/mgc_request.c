@@ -65,7 +65,7 @@ static int mgc_name2resid(char *name, int len, struct ldlm_res_id *res_id,
 
 	/* Always use the same endianness for the resid */
 	memset(res_id, 0, sizeof(*res_id));
-	res_id->name[0] = cpu_to_le64(resname);
+	res_id->name[0] = resname;
 	/* XXX: unfortunately, sptlprc and config llog share one lock */
 	switch (type) {
 	case CONFIG_T_CONFIG:
@@ -79,7 +79,7 @@ static int mgc_name2resid(char *name, int len, struct ldlm_res_id *res_id,
 	default:
 		LBUG();
 	}
-	res_id->name[1] = cpu_to_le64(resname);
+	res_id->name[1] = resname;
 	CDEBUG(D_MGC, "log %s to resid %#llx/%#llx (%.8s)\n", name,
 	       res_id->name[0], res_id->name[1], (char *)&res_id->name[0]);
 	return 0;
