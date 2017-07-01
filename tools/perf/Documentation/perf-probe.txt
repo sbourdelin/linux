@@ -130,6 +130,11 @@ OPTIONS
 --max-probes=NUM::
 	Set the maximum number of probe points for an event. Default is 128.
 
+--target-ns=PID:
+	Obtain mount namespace information from the target pid.  This is
+	used when creating a uprobe for a process that resides in a
+	different mount namespace from the perf(1) utility.
+
 -x::
 --exec=PATH::
 	Specify path to the executable or shared library file for user
