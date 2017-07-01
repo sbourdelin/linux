@@ -124,7 +124,6 @@ static enum vmpressure_levels vmpressure_level(unsigned long pressure)
 static enum vmpressure_levels vmpressure_calc_level(unsigned long scanned,
 						    unsigned long reclaimed)
 {
-	unsigned long scale = scanned + reclaimed;
 	unsigned long pressure = 0;
 
 	/*
@@ -141,8 +140,7 @@ static enum vmpressure_levels vmpressure_calc_level(unsigned long scanned,
 	 * scanned. This makes it possible to set desired reaction time
 	 * and serves as a ratelimit.
 	 */
-	pressure = scale - (reclaimed * scale / scanned);
-	pressure = pressure * 100 / scale;
+	pressure = (scanned - reclaimed) * 100 / scanned;
 
 out:
 	pr_debug("%s: %3lu  (s: %lu  r: %lu)\n", __func__, pressure,
