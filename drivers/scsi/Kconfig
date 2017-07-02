@@ -240,8 +240,11 @@ config SCSI_SCAN_ASYNC
 	  Note that this setting also affects whether resuming from
 	  system suspend will be performed asynchronously.
 
-menu "SCSI Transports"
+menuconfig SCSI_TRANSPORTS
+	tristate "SCSI Transports"
 	depends on SCSI
+
+if SCSI_TRANSPORTS
 
 config SCSI_SPI_ATTRS
 	tristate "Parallel SCSI (SPI) Transport Attributes"
@@ -286,7 +289,7 @@ config SCSI_SRP_ATTRS
 	  If you wish to export transport-specific information about
 	  each attached SRP device to sysfs, say Y.
 
-endmenu
+endif # SCSI_TRANSPORTS
 
 menuconfig SCSI_LOWLEVEL
 	bool "SCSI low-level drivers"
