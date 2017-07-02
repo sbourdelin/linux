@@ -175,7 +175,7 @@ static void set_master_clock(unsigned int frequency)
 		}
 
 		sm750_set_current_gate(reg);
-		}
+	}
 }
 
 unsigned int ddk750_get_vm_size(void)
