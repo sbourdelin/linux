@@ -97,7 +97,7 @@ static void tcrypt_complete(struct crypto_async_request *req, int err)
 
 static inline int do_one_aead_op(struct aead_request *req, int ret)
 {
-	if (ret == -EINPROGRESS || ret == -EBUSY) {
+	if (ret == -EINPROGRESS || ret == -EIOCBQUEUED) {
 		struct tcrypt_result *tr = req->base.data;
 
 		ret = wait_for_completion_interruptible(&tr->completion);
@@ -397,7 +397,7 @@ static void test_hash_sg_init(struct scatterlist *sg)
 
 static inline int do_one_ahash_op(struct ahash_request *req, int ret)
 {
-	if (ret == -EINPROGRESS || ret == -EBUSY) {
+	if (ret == -EINPROGRESS || ret == -EIOCBQUEUED) {
 		struct tcrypt_result *tr = req->base.data;
 
 		wait_for_completion(&tr->completion);
@@ -765,7 +765,7 @@ static void test_hash_speed(const char *algo, unsigned int secs,
 
 static inline int do_one_acipher_op(struct skcipher_request *req, int ret)
 {
-	if (ret == -EINPROGRESS || ret == -EBUSY) {
+	if (ret == -EINPROGRESS || ret == -EIOCBQUEUED) {
 		struct tcrypt_result *tr = req->base.data;
 
 		wait_for_completion(&tr->completion);

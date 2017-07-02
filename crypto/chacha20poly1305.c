@@ -79,7 +79,7 @@ static inline void async_done_continue(struct aead_request *req, int err,
 	if (!err)
 		err = cont(req);
 
-	if (err != -EINPROGRESS && err != -EBUSY)
+	if (err != -EINPROGRESS && err != -EIOCBQUEUED)
 		aead_request_complete(req, err);
 }
 

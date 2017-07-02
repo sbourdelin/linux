@@ -484,7 +484,7 @@ int af_alg_wait_for_completion(int err, struct af_alg_completion *completion)
 {
 	switch (err) {
 	case -EINPROGRESS:
-	case -EBUSY:
+	case -EIOCBQUEUED:
 		wait_for_completion(&completion->completion);
 		reinit_completion(&completion->completion);
 		err = completion->err;

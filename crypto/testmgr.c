@@ -195,7 +195,7 @@ static void testmgr_free_buf(char *buf[XBUFSIZE])
 
 static int wait_async_op(struct tcrypt_result *tr, int ret)
 {
-	if (ret == -EINPROGRESS || ret == -EBUSY) {
+	if (ret == -EINPROGRESS || ret == -EIOCBQUEUED) {
 		wait_for_completion(&tr->completion);
 		reinit_completion(&tr->completion);
 		ret = tr->err;
@@ -425,7 +425,7 @@ static int __test_hash(struct crypto_ahash *tfm,
 		case 0:
 			break;
 		case -EINPROGRESS:
-		case -EBUSY:
+		case -EIOCBQUEUED:
 			wait_for_completion(&tresult.completion);
 			reinit_completion(&tresult.completion);
 			ret = tresult.err;
@@ -723,7 +723,7 @@ static int __test_aead(struct crypto_aead *tfm, int enc,
 			}
 			break;
 		case -EINPROGRESS:
-		case -EBUSY:
+		case -EIOCBQUEUED:
 			wait_for_completion(&result.completion);
 			reinit_completion(&result.completion);
 			ret = result.err;
@@ -880,7 +880,7 @@ static int __test_aead(struct crypto_aead *tfm, int enc,
 			}
 			break;
 		case -EINPROGRESS:
-		case -EBUSY:
+		case -EIOCBQUEUED:
 			wait_for_completion(&result.completion);
 			reinit_completion(&result.completion);
 			ret = result.err;
@@ -1171,7 +1171,7 @@ static int __test_skcipher(struct crypto_skcipher *tfm, int enc,
 		case 0:
 			break;
 		case -EINPROGRESS:
-		case -EBUSY:
+		case -EIOCBQUEUED:
 			wait_for_completion(&result.completion);
 			reinit_completion(&result.completion);
 			ret = result.err;
@@ -1279,7 +1279,7 @@ static int __test_skcipher(struct crypto_skcipher *tfm, int enc,
 		case 0:
 			break;
 		case -EINPROGRESS:
-		case -EBUSY:
+		case -EIOCBQUEUED:
 			wait_for_completion(&result.completion);
 			reinit_completion(&result.completion);
 			ret = result.err;
