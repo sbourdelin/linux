@@ -2082,7 +2082,7 @@ static int keyhash(struct crypto_ahash *tfm, const u8 *key, unsigned int keylen,
 	case 0:
 		break;
 	case -EINPROGRESS:
-	case -EBUSY:
+	case -EIOCBQUEUED:
 		ret = wait_for_completion_interruptible(
 			&hresult.completion);
 		if (!ret)
