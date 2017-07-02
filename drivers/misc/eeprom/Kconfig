@@ -1,8 +1,9 @@
-menu "EEPROM support"
+menuconfig EEPROM
+	tristate  "EEPROM support"
 
 config EEPROM_AT24
 	tristate "I2C EEPROMs / RAMs / ROMs from most vendors"
-	depends on I2C && SYSFS
+	depends on EEPROM && I2C && SYSFS
 	select NVMEM
 	help
 	  Enable this driver to get read/write support to most I2C EEPROMs
@@ -30,7 +31,7 @@ config EEPROM_AT24
 
 config EEPROM_AT25
 	tristate "SPI EEPROMs from most vendors"
-	depends on SPI && SYSFS
+	depends on EEPROM && SPI && SYSFS
 	select NVMEM
 	help
 	  Enable this driver to get read/write support to most SPI EEPROMs,
@@ -42,7 +43,7 @@ config EEPROM_AT25
 
 config EEPROM_LEGACY
 	tristate "Old I2C EEPROM reader"
-	depends on I2C && SYSFS
+	depends on EEPROM && I2C && SYSFS
 	help
 	  If you say yes here you get read-only access to the EEPROM data
 	  available on modern memory DIMMs and Sony Vaio laptops via I2C. Such
@@ -53,7 +54,7 @@ config EEPROM_LEGACY
 
 config EEPROM_MAX6875
 	tristate "Maxim MAX6874/5 power supply supervisor"
-	depends on I2C
+	depends on EEPROM && I2C
 	help
 	  If you say yes here you get read-only support for the user EEPROM of
 	  the Maxim MAX6874/5 EEPROM-programmable, quad power-supply
@@ -67,6 +68,7 @@ config EEPROM_MAX6875
 
 config EEPROM_93CX6
 	tristate "EEPROM 93CX6 support"
+	depends on EEPROM
 	help
 	  This is a driver for the EEPROM chipsets 93c46 and 93c66.
 	  The driver supports both read as well as write commands.
@@ -75,7 +77,7 @@ config EEPROM_93CX6
 
 config EEPROM_93XX46
 	tristate "Microwire EEPROM 93XX46 support"
-	depends on SPI && SYSFS
+	depends on EEPROM && SPI && SYSFS
 	select REGMAP
 	select NVMEM
 	help
@@ -90,7 +92,7 @@ config EEPROM_93XX46
 
 config EEPROM_DIGSY_MTC_CFG
 	bool "DigsyMTC display configuration EEPROMs device"
-	depends on GPIO_MPC5200 && SPI_GPIO
+	depends on EEPROM && GPIO_MPC5200 && SPI_GPIO
 	help
 	  This option enables access to display configuration EEPROMs
 	  on digsy_mtc board. You have to additionally select Microwire
@@ -102,12 +104,10 @@ config EEPROM_DIGSY_MTC_CFG
 
 config EEPROM_IDT_89HPESX
 	tristate "IDT 89HPESx PCIe-swtiches EEPROM / CSR support"
-	depends on I2C && SYSFS
+	depends on EEPROM && I2C && SYSFS
 	help
 	  Enable this driver to get read/write access to EEPROM / CSRs
 	  over IDT PCIe-swtich i2c-slave interface.
 
 	  This driver can also be built as a module. If so, the module
 	  will be called idt_89hpesx.
-
-endmenu
