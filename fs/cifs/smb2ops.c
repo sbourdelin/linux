@@ -1934,7 +1934,7 @@ crypt_message(struct TCP_Server_Info *server, struct smb_rqst *rqst, int enc)
 
 	rc = enc ? crypto_aead_encrypt(req) : crypto_aead_decrypt(req);
 
-	if (rc == -EINPROGRESS || rc == -EBUSY) {
+	if (rc == -EINPROGRESS || rc == -EIOCBQUEUED) {
 		wait_for_completion(&result.completion);
 		rc = result.err;
 	}
