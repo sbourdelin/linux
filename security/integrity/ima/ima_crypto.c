@@ -212,7 +212,7 @@ static int ahash_wait(int err, struct ahash_completion *res)
 	case 0:
 		break;
 	case -EINPROGRESS:
-	case -EBUSY:
+	case -EIOCBQUEUED:
 		wait_for_completion(&res->completion);
 		reinit_completion(&res->completion);
 		err = res->err;
