@@ -86,28 +86,24 @@ static void primary_wait_vertical_sync(int delay)
 
 static void swPanelPowerSequence(int disp, int delay)
 {
-	unsigned int reg;
+	u32 reg;
+	u32 opt[] = {
+		PANEL_DISPLAY_CTRL_FPEN, PANEL_DISPLAY_CTRL_DATA,
+		PANEL_DISPLAY_CTRL_VBIASEN, PANEL_DISPLAY_CTRL_FPEN,
+	};
+	u32 size, i;
+
+	if (disp == 0)
+		return;
+
+	size = sizeof(opt) / sizeof(u32);
 
 	/* disp should be 1 to open sequence */
-	reg = peek32(PANEL_DISPLAY_CTRL);
-	reg |= (disp ? PANEL_DISPLAY_CTRL_FPEN : 0);
-	poke32(PANEL_DISPLAY_CTRL, reg);
-	primary_wait_vertical_sync(delay);
-
-	reg = peek32(PANEL_DISPLAY_CTRL);
-	reg |= (disp ? PANEL_DISPLAY_CTRL_DATA : 0);
-	poke32(PANEL_DISPLAY_CTRL, reg);
-	primary_wait_vertical_sync(delay);
-
-	reg = peek32(PANEL_DISPLAY_CTRL);
-	reg |= (disp ? PANEL_DISPLAY_CTRL_VBIASEN : 0);
-	poke32(PANEL_DISPLAY_CTRL, reg);
-	primary_wait_vertical_sync(delay);
-
-	reg = peek32(PANEL_DISPLAY_CTRL);
-	reg |= (disp ? PANEL_DISPLAY_CTRL_FPEN : 0);
-	poke32(PANEL_DISPLAY_CTRL, reg);
-	primary_wait_vertical_sync(delay);
+	for (i = 0; i < size; i++) {
+		reg = peek32(PANEL_DISPLAY_CTRL) | opt[i];
+		poke32(PANEL_DISPLAY_CTRL, reg);
+		primary_wait_vertical_sync(delay);
+	}
 }
 
 void ddk750_setLogicalDispOut(disp_output_t output)
