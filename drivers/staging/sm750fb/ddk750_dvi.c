@@ -42,14 +42,19 @@ int dviInit(
 	unsigned char pllFilterValue
 			)
 {
+#ifdef DVI_CTRL_SII164
 	dvi_ctrl_device_t *pCurrentDviCtrl;
 
 	pCurrentDviCtrl = g_dcftSupportedDviController;
-	if (pCurrentDviCtrl->pfnInit) {
-		return pCurrentDviCtrl->pfnInit(edgeSelect, busSelect, dualEdgeClkSelect, hsyncEnable,
-						vsyncEnable, deskewEnable, deskewSetting, continuousSyncEnable,
-						pllFilterEnable, pllFilterValue);
-	}
+
+	return pCurrentDviCtrl->pfnInit(
+		edgeSelect, busSelect, dualEdgeClkSelect,
+		hsyncEnable, vsyncEnable, deskewEnable,
+		deskewSetting, continuousSyncEnable,
+		pllFilterEnable, pllFilterValue
+	);
+#endif
+
 	return -1; /* error */
 }
 
