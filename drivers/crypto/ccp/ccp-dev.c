@@ -269,7 +269,7 @@ EXPORT_SYMBOL_GPL(ccp_version);
  * Queue a cmd to be processed by the CCP. If queueing the cmd
  * would exceed the defined length of the cmd queue the cmd will
  * only be queued if the CCP_CMD_MAY_BACKLOG flag is set and will
- * result in a return code of -EBUSY.
+ * result in a return code of -EIOCBQUEUED;
  *
  * The callback routine specified in the ccp_cmd struct will be
  * called to notify the caller of completion (if the cmd was not
@@ -280,7 +280,7 @@ EXPORT_SYMBOL_GPL(ccp_version);
  *
  * The cmd has been successfully queued if:
  *   the return code is -EINPROGRESS or
- *   the return code is -EBUSY and CCP_CMD_MAY_BACKLOG flag is set
+ *   the return code is -EIOCBQUEUED
  */
 int ccp_enqueue_cmd(struct ccp_cmd *cmd)
 {
@@ -307,8 +307,10 @@ int ccp_enqueue_cmd(struct ccp_cmd *cmd)
 
 	if (ccp->cmd_count >= MAX_CMD_QLEN) {
 		ret = -EBUSY;
-		if (cmd->flags & CCP_CMD_MAY_BACKLOG)
+		if (cmd->flags & CCP_CMD_MAY_BACKLOG) {
 			list_add_tail(&cmd->entry, &ccp->backlog);
+			ret = -EIOCBQUEUED;
+		}
 	} else {
 		ret = -EINPROGRESS;
 		ccp->cmd_count++;

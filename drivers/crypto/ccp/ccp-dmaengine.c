@@ -146,7 +146,7 @@ static int ccp_issue_next_cmd(struct ccp_dma_desc *desc)
 		desc->tx_desc.cookie, cmd);
 
 	ret = ccp_enqueue_cmd(&cmd->ccp_cmd);
-	if (!ret || (ret == -EINPROGRESS) || (ret == -EBUSY))
+	if (!ret || (ret == -EINPROGRESS) || (ret == -EIOCBQUEUED))
 		return 0;
 
 	dev_dbg(desc->ccp->dev, "%s - error: ret=%d, tx %d, cmd=%p\n", __func__,

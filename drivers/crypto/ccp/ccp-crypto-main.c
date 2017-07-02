@@ -84,7 +84,7 @@ struct ccp_crypto_cpu {
 
 static inline bool ccp_crypto_success(int err)
 {
-	if (err && (err != -EINPROGRESS) && (err != -EBUSY))
+	if (err && (err != -EINPROGRESS) && (err != -EIOCBQUEUED))
 		return false;
 
 	return true;
@@ -148,7 +148,7 @@ static void ccp_crypto_complete(void *data, int err)
 
 	if (err == -EINPROGRESS) {
 		/* Only propagate the -EINPROGRESS if necessary */
-		if (crypto_cmd->ret == -EBUSY) {
+		if (crypto_cmd->ret == -EIOCBQUEUED) {
 			crypto_cmd->ret = -EINPROGRESS;
 			req->complete(req, -EINPROGRESS);
 		}
@@ -166,8 +166,8 @@ static void ccp_crypto_complete(void *data, int err)
 		backlog->req->complete(backlog->req, -EINPROGRESS);
 	}
 
-	/* Transition the state from -EBUSY to -EINPROGRESS first */
-	if (crypto_cmd->ret == -EBUSY)
+	/* Transition the state from -EIOCBQUEUED to -EINPROGRESS first */
+	if (crypto_cmd->ret == -EIOCBQUEUED)
 		req->complete(req, -EINPROGRESS);
 
 	/* Completion callbacks */
@@ -243,7 +243,7 @@ static int ccp_crypto_enqueue_cmd(struct ccp_crypto_cmd *crypto_cmd)
 	}
 
 	if (req_queue.cmd_count >= CCP_CRYPTO_MAX_QLEN) {
-		ret = -EBUSY;
+		ret = -EIOCBQUEUED;
 		if (req_queue.backlog == &req_queue.cmds)
 			req_queue.backlog = &crypto_cmd->entry;
 	}
