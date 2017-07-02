@@ -116,7 +116,7 @@ static inline int verity_complete_op(struct verity_result *res, int ret)
 		break;
 
 	case -EINPROGRESS:
-	case -EBUSY:
+	case -EIOCBQUEUED:
 		ret = wait_for_completion_interruptible(&res->completion);
 		if (!ret)
 			ret = res->err;
