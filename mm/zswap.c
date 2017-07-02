@@ -49,6 +49,8 @@
 static u64 zswap_pool_total_size;
 /* The number of compressed pages currently stored in zswap */
 static atomic_t zswap_stored_pages = ATOMIC_INIT(0);
+/* The number of zero filled pages swapped out to zswap */
+static atomic_t zswap_zero_pages = ATOMIC_INIT(0);
 
 /*
  * The statistics below are not protected from concurrent access for
@@ -145,7 +147,7 @@ struct zswap_pool {
  *            be held while changing the refcount.  Since the lock must
  *            be held, there is no reason to also make refcount atomic.
  * length - the length in bytes of the compressed page data.  Needed during
- *          decompression
+ *          decompression. For a zero page length is 0.
  * pool - the zswap_pool the entry's data is in
  * handle - zpool allocation handle that stores the compressed page data
  */
@@ -320,8 +322,12 @@ static void zswap_rb_erase(struct rb_root *root, struct zswap_entry *entry)
  */
 static void zswap_free_entry(struct zswap_entry *entry)
 {
-	zpool_free(entry->pool->zpool, entry->handle);
-	zswap_pool_put(entry->pool);
+	if (!entry->length)
+		atomic_dec(&zswap_zero_pages);
+	else {
+		zpool_free(entry->pool->zpool, entry->handle);
+		zswap_pool_put(entry->pool);
+	}
 	zswap_entry_cache_free(entry);
 	atomic_dec(&zswap_stored_pages);
 	zswap_update_total_size();
@@ -953,6 +959,19 @@ static int zswap_shrink(void)
 	return ret;
 }
 
+static int zswap_is_page_zero_filled(void *ptr)
+{
+	unsigned int pos;
+	unsigned long *page;
+
+	page = (unsigned long *)ptr;
+	for (pos = 0; pos != PAGE_SIZE / sizeof(*page); pos++) {
+		if (page[pos])
+			return 0;
+	}
+	return 1;
+}
+
 /*********************************
 * frontswap hooks
 **********************************/
@@ -993,6 +1012,15 @@ static int zswap_frontswap_store(unsigned type, pgoff_t offset,
 		goto reject;
 	}
 
+	src = kmap_atomic(page);
+	if (zswap_is_page_zero_filled(src)) {
+		kunmap_atomic(src);
+		entry->offset = offset;
+		entry->length = 0;
+		atomic_inc(&zswap_zero_pages);
+		goto insert_entry;
+	}
+
 	/* if entry is successfully added, it keeps the reference */
 	entry->pool = zswap_pool_current_get();
 	if (!entry->pool) {
@@ -1003,7 +1031,6 @@ static int zswap_frontswap_store(unsigned type, pgoff_t offset,
 	/* compress */
 	dst = get_cpu_var(zswap_dstmem);
 	tfm = *get_cpu_ptr(entry->pool->tfm);
-	src = kmap_atomic(page);
 	ret = crypto_comp_compress(tfm, src, PAGE_SIZE, dst, &dlen);
 	kunmap_atomic(src);
 	put_cpu_ptr(entry->pool->tfm);
@@ -1037,6 +1064,7 @@ static int zswap_frontswap_store(unsigned type, pgoff_t offset,
 	entry->handle = handle;
 	entry->length = dlen;
 
+insert_entry:
 	/* map */
 	spin_lock(&tree->lock);
 	do {
@@ -1089,6 +1117,13 @@ static int zswap_frontswap_load(unsigned type, pgoff_t offset,
 	}
 	spin_unlock(&tree->lock);
 
+	if (!entry->length) {
+		dst = kmap_atomic(page);
+		memset(dst, 0, PAGE_SIZE);
+		kunmap_atomic(dst);
+		goto freeentry;
+	}
+
 	/* decompress */
 	dlen = PAGE_SIZE;
 	src = (u8 *)zpool_map_handle(entry->pool->zpool, entry->handle,
@@ -1101,6 +1136,7 @@ static int zswap_frontswap_load(unsigned type, pgoff_t offset,
 	zpool_unmap_handle(entry->pool->zpool, entry->handle);
 	BUG_ON(ret);
 
+freeentry:
 	spin_lock(&tree->lock);
 	zswap_entry_put(tree, entry);
 	spin_unlock(&tree->lock);
@@ -1209,6 +1245,8 @@ static int __init zswap_debugfs_init(void)
 			zswap_debugfs_root, &zswap_pool_total_size);
 	debugfs_create_atomic_t("stored_pages", S_IRUGO,
 			zswap_debugfs_root, &zswap_stored_pages);
+	debugfs_create_atomic_t("zero_pages", 0444,
+			zswap_debugfs_root, &zswap_zero_pages);
 
 	return 0;
 }
