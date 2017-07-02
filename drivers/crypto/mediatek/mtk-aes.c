@@ -1012,7 +1012,7 @@ static int mtk_aes_gcm_setkey(struct crypto_aead *aead, const u8 *key,
 				   AES_BLOCK_SIZE, data->iv);
 
 	err = crypto_skcipher_encrypt(&data->req);
-	if (err == -EINPROGRESS || err == -EBUSY) {
+	if (err == -EINPROGRESS || err == -EIOCBQUEUED) {
 		err = wait_for_completion_interruptible(
 			&data->result.completion);
 		if (!err)
