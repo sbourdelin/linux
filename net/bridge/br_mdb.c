@@ -5,6 +5,7 @@
 #include <linux/rculist.h>
 #include <linux/skbuff.h>
 #include <linux/if_ether.h>
+#include <linux/kmemleak.h>
 #include <net/ip.h>
 #include <net/netlink.h>
 #include <net/switchdev.h>
@@ -319,6 +320,8 @@ static void __br_mdb_notify(struct net_device *dev, struct net_bridge_port *p,
 	if (port_dev && type == RTM_NEWMDB) {
 		complete_info = kmalloc(sizeof(*complete_info), GFP_ATOMIC);
 		if (complete_info) {
+			/* This pointer is freed in br_mdb_complete() */
+			kmemleak_not_leak(complete_info);
 			complete_info->port = p;
 			__mdb_entry_to_br_ip(entry, &complete_info->ip);
 			mdb.obj.complete_priv = complete_info;
