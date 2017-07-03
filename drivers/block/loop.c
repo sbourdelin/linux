@@ -791,7 +791,7 @@ static struct attribute *loop_attrs[] = {
 	NULL,
 };
 
-static struct attribute_group loop_attribute_group = {
+static const struct attribute_group loop_attribute_group = {
 	.name = "loop",
 	.attrs= loop_attrs,
 };
