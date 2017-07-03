@@ -1655,6 +1655,8 @@ err_registerdev:
 		mwifiex_shutdown_drv(adapter);
 	}
 err_kmalloc:
+	if (adapter->irq_wakeup >= 0)
+		device_init_wakeup(adapter->dev, false);
 	mwifiex_free_adapter(adapter);
 
 err_init_sw:
