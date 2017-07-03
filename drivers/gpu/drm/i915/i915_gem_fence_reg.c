@@ -340,7 +340,7 @@ int i915_vma_put_fence(struct i915_vma *vma)
 
 	GEM_BUG_ON(fence->vma != vma);
 
-	if (fence->pin_count)
+	if (atomic_read(&fence->pin_count))
 		return -EBUSY;
 
 	return fence_update(fence, NULL);
@@ -353,7 +353,7 @@ static struct drm_i915_fence_reg *fence_find(struct drm_i915_private *dev_priv)
 	list_for_each_entry(fence, &dev_priv->mm.fence_list, link) {
 		GEM_BUG_ON(fence->vma && fence->vma->fence != fence);
 
-		if (fence->pin_count)
+		if (atomic_read(&fence->pin_count))
 			continue;
 
 		return fence;
@@ -400,7 +400,7 @@ i915_vma_pin_fence(struct i915_vma *vma)
 	fence = vma->fence;
 	if (fence) {
 		GEM_BUG_ON(fence->vma != vma);
-		fence->pin_count++;
+		atomic_inc(&fence->pin_count);
 		if (!fence->dirty) {
 			err = i915_gem_active_retire(&fence->pipelined,
 						     &fence->i915->drm.struct_mutex);
@@ -415,7 +415,8 @@ i915_vma_pin_fence(struct i915_vma *vma)
 		fence = fence_find(vma->vm->i915);
 		if (IS_ERR(fence))
 			return PTR_ERR(fence);
-		fence->pin_count++;
+
+		atomic_inc(&fence->pin_count);
 	} else
 		return 0;
 
@@ -426,7 +427,7 @@ i915_vma_pin_fence(struct i915_vma *vma)
 	return 0;
 
 err_unpin:
-	fence->pin_count--;
+	atomic_dec(&fence->pin_count);
 	return err;
 }
 
@@ -459,7 +460,7 @@ int i915_vma_reserve_fence(struct i915_vma *vma)
 		fence->vma = vma;
 		fence->dirty = true;
 	}
-	fence->pin_count++;
+	atomic_inc(&fence->pin_count);
 	list_move_tail(&fence->link, &fence->i915->mm.fence_list);
 
 	GEM_BUG_ON(!i915_gem_object_is_tiled(vma->obj));
@@ -478,7 +479,7 @@ int i915_vma_emit_pipelined_fence(struct i915_vma *vma,
 	int err;
 
 	lockdep_assert_held(&vma->vm->i915->drm.struct_mutex);
-	GEM_BUG_ON(fence && !fence->pin_count);
+	GEM_BUG_ON(fence && !atomic_read(&fence->pin_count));
 
 	if (!fence)
 		goto out;

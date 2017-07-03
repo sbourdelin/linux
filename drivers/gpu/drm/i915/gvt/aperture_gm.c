@@ -196,7 +196,7 @@ static int alloc_vgpu_fence(struct intel_vgpu *vgpu)
 	i = 0;
 	list_for_each_safe(pos, q, &dev_priv->mm.fence_list) {
 		reg = list_entry(pos, struct drm_i915_fence_reg, link);
-		if (reg->pin_count || reg->vma)
+		if (atomic_read(&reg->pin_count) || reg->vma)
 			continue;
 		list_del(pos);
 		vgpu->fence.regs[i] = reg;
