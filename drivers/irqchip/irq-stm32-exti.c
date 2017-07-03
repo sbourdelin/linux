@@ -122,7 +122,7 @@ static void stm32_exti_free(struct irq_domain *d, unsigned int virq,
 	irq_domain_reset_irq_data(data);
 }
 
-struct irq_domain_ops irq_exti_domain_ops = {
+static const struct irq_domain_ops irq_exti_domain_ops = {
 	.map	= irq_map_generic_chip,
 	.xlate	= irq_domain_xlate_onetwocell,
 	.alloc  = stm32_exti_alloc,
