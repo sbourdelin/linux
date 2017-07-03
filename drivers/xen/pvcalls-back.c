@@ -47,16 +47,135 @@ struct pvcalls_fedata {
 	struct list_head socket_mappings;
 	struct radix_tree_root socketpass_mappings;
 	struct semaphore socket_lock;
-	struct workqueue_struct *wq;
-	struct work_struct register_work;
 };
 
-static void pvcalls_back_work(struct work_struct *work)
+static int pvcalls_back_socket(struct xenbus_device *dev,
+		struct xen_pvcalls_request *req)
 {
+	return 0;
+}
+
+static int pvcalls_back_connect(struct xenbus_device *dev,
+				struct xen_pvcalls_request *req)
+{
+	return 0;
+}
+
+static int pvcalls_back_release(struct xenbus_device *dev,
+				struct xen_pvcalls_request *req)
+{
+	return 0;
+}
+
+static int pvcalls_back_bind(struct xenbus_device *dev,
+			     struct xen_pvcalls_request *req)
+{
+	return 0;
+}
+
+static int pvcalls_back_listen(struct xenbus_device *dev,
+			       struct xen_pvcalls_request *req)
+{
+	return 0;
+}
+
+static int pvcalls_back_accept(struct xenbus_device *dev,
+			       struct xen_pvcalls_request *req)
+{
+	return 0;
+}
+
+static int pvcalls_back_poll(struct xenbus_device *dev,
+			     struct xen_pvcalls_request *req)
+{
+	return 0;
+}
+
+static int pvcalls_back_handle_cmd(struct xenbus_device *dev,
+				   struct xen_pvcalls_request *req)
+{
+	int ret = 0;
+
+	switch (req->cmd) {
+	case PVCALLS_SOCKET:
+		ret = pvcalls_back_socket(dev, req);
+		break;
+	case PVCALLS_CONNECT:
+		ret = pvcalls_back_connect(dev, req);
+		break;
+	case PVCALLS_RELEASE:
+		ret = pvcalls_back_release(dev, req);
+		break;
+	case PVCALLS_BIND:
+		ret = pvcalls_back_bind(dev, req);
+		break;
+	case PVCALLS_LISTEN:
+		ret = pvcalls_back_listen(dev, req);
+		break;
+	case PVCALLS_ACCEPT:
+		ret = pvcalls_back_accept(dev, req);
+		break;
+	case PVCALLS_POLL:
+		ret = pvcalls_back_poll(dev, req);
+		break;
+	default:
+	{
+		struct pvcalls_fedata *fedata;
+		struct xen_pvcalls_response *rsp;
+
+		fedata = dev_get_drvdata(&dev->dev);
+		rsp = RING_GET_RESPONSE(
+				&fedata->ring, fedata->ring.rsp_prod_pvt++);
+		rsp->req_id = req->req_id;
+		rsp->cmd = req->cmd;
+		rsp->ret = -ENOTSUPP;
+		break;
+	}
+	}
+	return ret;
+}
+
+static void pvcalls_back_work(struct pvcalls_fedata *fedata)
+{
+	int notify, notify_all = 0, more = 1;
+	struct xen_pvcalls_request req;
+	struct xenbus_device *dev = fedata->dev;
+
+	while (more) {
+		while (RING_HAS_UNCONSUMED_REQUESTS(&fedata->ring)) {
+			RING_COPY_REQUEST(&fedata->ring,
+					  fedata->ring.req_cons++,
+					  &req);
+
+			if (!pvcalls_back_handle_cmd(dev, &req)) {
+				RING_PUSH_RESPONSES_AND_CHECK_NOTIFY(
+					&fedata->ring, notify);
+				notify_all += notify;
+			}
+		}
+
+		if (notify_all) {
+			notify_remote_via_irq(fedata->irq);
+			notify_all = 0;
+		}
+
+		RING_FINAL_CHECK_FOR_REQUESTS(&fedata->ring, more);
+	}
 }
 
 static irqreturn_t pvcalls_back_event(int irq, void *dev_id)
 {
+	struct xenbus_device *dev = dev_id;
+	struct pvcalls_fedata *fedata = NULL;
+
+	if (dev == NULL)
+		return IRQ_HANDLED;
+
+	fedata = dev_get_drvdata(&dev->dev);
+	if (fedata == NULL)
+		return IRQ_HANDLED;
+
+	pvcalls_back_work(fedata);
 	return IRQ_HANDLED;
 }
 
@@ -87,18 +206,15 @@ static int backend_connect(struct xenbus_device *dev)
 		goto error;
 	}
 
-	err = bind_interdomain_evtchn_to_irqhandler(dev->otherend_id, evtchn,
-						    pvcalls_back_event, 0,
-						    "pvcalls-backend", dev);
+	err = bind_interdomain_evtchn_to_irq(dev->otherend_id, evtchn);
 	if (err < 0)
 		goto error;
 	fedata->irq = err;
-
-	fedata->wq = alloc_workqueue("pvcalls_back_wq", WQ_UNBOUND, 1);
-	if (!fedata->wq) {
-		err = -ENOMEM;
+	
+	err = request_threaded_irq(fedata->irq, NULL, pvcalls_back_event,
+				   IRQF_ONESHOT, "pvcalls-back", dev);
+	if (err < 0)
 		goto error;
-	}
 
 	err = xenbus_map_ring_valloc(dev, &ring_ref, 1, (void**)&fedata->sring);
 	if (err < 0)
@@ -107,7 +223,6 @@ static int backend_connect(struct xenbus_device *dev)
 	BACK_RING_INIT(&fedata->ring, fedata->sring, XEN_PAGE_SIZE * 1);
 	fedata->dev = dev;
 
-	INIT_WORK(&fedata->register_work, pvcalls_back_work);
 	INIT_LIST_HEAD(&fedata->socket_mappings);
 	INIT_RADIX_TREE(&fedata->socketpass_mappings, GFP_KERNEL);
 	sema_init(&fedata->socket_lock, 1);
@@ -116,15 +231,14 @@ static int backend_connect(struct xenbus_device *dev)
 	down(&pvcalls_back_global.frontends_lock);
 	list_add_tail(&fedata->list, &pvcalls_back_global.frontends);
 	up(&pvcalls_back_global.frontends_lock);
-	queue_work(fedata->wq, &fedata->register_work);
+
+	pvcalls_back_work(fedata);
 
 	return 0;
 
  error:
 	if (fedata->sring != NULL)
 		xenbus_unmap_ring_vfree(dev, fedata->sring);
-	if (fedata->wq)
-		destroy_workqueue(fedata->wq);
 	unbind_from_irqhandler(fedata->irq, dev);
 	kfree(fedata);
 	return err;
