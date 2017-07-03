@@ -365,12 +365,12 @@ eb_pin_vma(struct i915_execbuffer *eb,
 		return;
 
 	if (unlikely(entry->flags & EXEC_OBJECT_NEEDS_FENCE)) {
-		if (unlikely(i915_vma_get_fence(vma))) {
+		if (unlikely(i915_vma_pin_fence(vma))) {
 			i915_vma_unpin(vma);
 			return;
 		}
 
-		if (i915_vma_pin_fence(vma))
+		if (vma->fence)
 			entry->flags |= __EXEC_OBJECT_HAS_FENCE;
 	}
 
@@ -384,7 +384,7 @@ __eb_unreserve_vma(struct i915_vma *vma,
 	GEM_BUG_ON(!(entry->flags & __EXEC_OBJECT_HAS_PIN));
 
 	if (unlikely(entry->flags & __EXEC_OBJECT_HAS_FENCE))
-		i915_vma_unpin_fence(vma);
+		__i915_vma_unpin_fence(vma);
 
 	__i915_vma_unpin(vma);
 }
@@ -564,13 +564,13 @@ static int eb_reserve_vma(const struct i915_execbuffer *eb,
 	GEM_BUG_ON(eb_vma_misplaced(entry, vma));
 
 	if (unlikely(entry->flags & EXEC_OBJECT_NEEDS_FENCE)) {
-		err = i915_vma_get_fence(vma);
+		err = i915_vma_pin_fence(vma);
 		if (unlikely(err)) {
 			i915_vma_unpin(vma);
 			return err;
 		}
 
-		if (i915_vma_pin_fence(vma))
+		if (vma->fence)
 			entry->flags |= __EXEC_OBJECT_HAS_FENCE;
 	}
 
