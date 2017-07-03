@@ -1171,11 +1171,16 @@ static int __init lynxfb_setup(char *options)
 	 */
 	while ((opt = strsep(&options, ":")) != NULL) {
 		/* options that mean for any lynx chips are configured here */
-		if (!strncmp(opt, "noaccel", strlen("noaccel"))) {
+
+		/*
+		 * NOTE: the length of options is hard-coded
+		 * if any of those options changed  please update its length
+		 */
+		if (!g_noaccel && !strncmp(opt, "noaccel", 7)) {
 			g_noaccel = 1;
-		} else if (!strncmp(opt, "nomtrr", strlen("nomtrr"))) {
+		} else if (!g_nomtrr && !strncmp(opt, "nomtrr", 6)) {
 			g_nomtrr = 1;
-		} else if (!strncmp(opt, "dual", strlen("dual"))) {
+		} else if (!g_dualview && !strncmp(opt, "dual", 4)) {
 			g_dualview = 1;
 		} else {
 			strcat(tmp, opt);
