@@ -6776,6 +6776,25 @@ int ata_platform_remove_one(struct platform_device *pdev)
 	return 0;
 }
 
+/**
+ *	ata_platform_shutdown_one - Platform layer callback for device shutdown
+ *	@pdev: Platform device being shutdown
+ *
+ *	Platform layer indicates to libata via this hook that shutdown is
+ *	in progress and the input device should be quiesced. Functionally this
+ *	is equivalent to ata_platform_remove_one(), however devres_release_all()
+ *	is not called on the shutdown path as it is for remove so releasing the
+ *	resources associated with the device must instead be initiated directly.
+ */
+void ata_platform_shutdown_one(struct platform_device *pdev)
+{
+	struct ata_host *host = platform_get_drvdata(pdev);
+
+	ata_host_detach(host);
+	devres_release(&pdev->dev, ata_host_stop, NULL, NULL);
+	devres_release(&pdev->dev, ata_host_release, NULL, NULL);
+}
+
 static int __init ata_parse_force_one(char **cur,
 				      struct ata_force_ent *force_ent,
 				      const char **reason)
@@ -7296,6 +7315,7 @@ EXPORT_SYMBOL_GPL(ata_pci_device_resume);
 #endif /* CONFIG_PCI */
 
 EXPORT_SYMBOL_GPL(ata_platform_remove_one);
+EXPORT_SYMBOL_GPL(ata_platform_shutdown_one);
 
 EXPORT_SYMBOL_GPL(__ata_ehi_push_desc);
 EXPORT_SYMBOL_GPL(ata_ehi_push_desc);
