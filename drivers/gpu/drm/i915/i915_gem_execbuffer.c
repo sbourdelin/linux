@@ -365,11 +365,12 @@ eb_pin_vma(struct i915_execbuffer *eb,
 		return;
 
 	if (unlikely(entry->flags & EXEC_OBJECT_NEEDS_FENCE)) {
-		if (unlikely(i915_vma_pin_fence(vma))) {
+		if (unlikely(i915_vma_reserve_fence(vma))) {
 			i915_vma_unpin(vma);
 			return;
 		}
 
+		entry->flags &= ~EXEC_OBJECT_ASYNC;
 		if (vma->fence)
 			entry->flags |= __EXEC_OBJECT_HAS_FENCE;
 	}
@@ -564,12 +565,13 @@ static int eb_reserve_vma(const struct i915_execbuffer *eb,
 	GEM_BUG_ON(eb_vma_misplaced(entry, vma));
 
 	if (unlikely(entry->flags & EXEC_OBJECT_NEEDS_FENCE)) {
-		err = i915_vma_pin_fence(vma);
+		err = i915_vma_reserve_fence(vma);
 		if (unlikely(err)) {
 			i915_vma_unpin(vma);
 			return err;
 		}
 
+		entry->flags &= ~EXEC_OBJECT_ASYNC;
 		if (vma->fence)
 			entry->flags |= __EXEC_OBJECT_HAS_FENCE;
 	}
@@ -1847,6 +1849,12 @@ static int eb_move_to_gpu(struct i915_execbuffer *eb)
 		if (unlikely(obj->cache_dirty && !obj->cache_coherent))
 			i915_gem_clflush_object(obj, 0);
 
+		if (unlikely(entry->flags & EXEC_OBJECT_NEEDS_FENCE)) {
+			err = i915_vma_emit_pipelined_fence(vma, eb->request);
+			if (err)
+				return err;
+		}
+
 		err = i915_gem_request_await_object
 			(eb->request, obj, entry->flags & EXEC_OBJECT_WRITE);
 		if (err)
@@ -1931,9 +1939,6 @@ void i915_vma_move_to_active(struct i915_vma *vma,
 		obj->base.read_domains = 0;
 	}
 	obj->base.read_domains |= I915_GEM_GPU_DOMAINS;
-
-	if (flags & EXEC_OBJECT_NEEDS_FENCE)
-		i915_gem_active_set(&vma->last_fence, req);
 }
 
 static int i915_reset_gen7_sol_offsets(struct drm_i915_gem_request *req)

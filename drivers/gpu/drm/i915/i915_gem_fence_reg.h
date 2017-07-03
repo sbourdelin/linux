@@ -47,6 +47,7 @@ struct drm_i915_fence_reg {
 	 * command (such as BLT on gen2/3), as a "fence".
 	 */
 	bool dirty;
+	struct i915_gem_active pipelined;
 };
 
 #endif

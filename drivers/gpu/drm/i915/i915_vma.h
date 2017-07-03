@@ -367,5 +367,9 @@ i915_vma_unpin_fence(struct i915_vma *vma)
 		__i915_vma_unpin_fence(vma);
 }
 
+int __must_check i915_vma_reserve_fence(struct i915_vma *vma);
+int i915_vma_emit_pipelined_fence(struct i915_vma *vma,
+				  struct drm_i915_gem_request *rq);
+
 #endif
 
