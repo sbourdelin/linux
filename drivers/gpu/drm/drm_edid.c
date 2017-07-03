@@ -2566,7 +2566,7 @@ add_detailed_modes(struct drm_connector *connector, struct edid *edid,
 #define VIDEO_BLOCK     0x02
 #define VENDOR_BLOCK    0x03
 #define SPEAKER_BLOCK	0x04
-#define VIDEO_CAPABILITY_BLOCK	0x07
+#define CEA_EXTENDED_TAG	0x07
 #define EDID_BASIC_AUDIO	(1 << 6)
 #define EDID_CEA_YCRCB444	(1 << 5)
 #define EDID_CEA_YCRCB422	(1 << 4)
@@ -3793,7 +3793,7 @@ bool drm_rgb_quant_range_selectable(struct edid *edid)
 		return false;
 
 	for_each_cea_db(edid_ext, i, start, end) {
-		if (cea_db_tag(&edid_ext[i]) == VIDEO_CAPABILITY_BLOCK &&
+		if (cea_db_tag(&edid_ext[i]) == CEA_EXTENDED_TAG &&
 		    cea_db_payload_len(&edid_ext[i]) == 2) {
 			DRM_DEBUG_KMS("CEA VCDB 0x%02x\n", edid_ext[i + 2]);
 			return edid_ext[i + 2] & EDID_CEA_VCDB_QS;
