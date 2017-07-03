@@ -120,7 +120,7 @@ int drm_fb_cma_create_handle(struct drm_framebuffer *fb,
 }
 EXPORT_SYMBOL(drm_fb_cma_create_handle);
 
-static struct drm_framebuffer_funcs drm_fb_cma_funcs = {
+static const struct drm_framebuffer_funcs drm_fb_cma_funcs = {
 	.destroy	= drm_fb_cma_destroy,
 	.create_handle	= drm_fb_cma_create_handle,
 };
