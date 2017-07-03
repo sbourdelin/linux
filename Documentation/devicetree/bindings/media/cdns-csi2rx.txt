@@ -1,0 +1,87 @@
+Cadence CSI2RX controller
+=========================
+
+The Cadence CSI2RX controller is a CSI-2 bridge supporting up to 4 CSI
+lanes in input, and 4 different pixel streams in output.
+
+Required properties:
+  - compatible: must be set to "cdns,csi2rx"
+  - reg: base address and size of the memory mapped region
+  - clocks: phandles to the clocks driving the controller
+  - clock-names: must contain:
+    * sys_clk: main clock
+    * p_clk: register bank clock
+    * p_free_clk: free running register bank clock
+    * pixel_ifX_clk: pixel stream output clock, one for each stream
+                     implemented in hardware, between 0 and 3
+    * dphy_rx_clk: D-PHY byte clock, if implemented in hardware
+  - phys: phandle to the external D-PHY
+  - phy-names: must contain dphy, if the implementation uses an
+               external D-PHY
+
+Required subnodes:
+  - ports: A ports node with endpoint definitions as defined in
+           Documentation/devicetree/bindings/media/video-interfaces.txt. The
+           first port subnode should be the input endpoint, the second one the
+           outputs
+
+  The output port should have as many endpoints as stream supported by
+  the hardware implementation, between 1 and 4, their ID being the
+  stream output number used in the implementation.
+
+Example:
+
+csi2rx: csi-bridge@0d060000 {
+	compatible = "cdns,csi2rx";
+	reg = <0x0d060000 0x1000>;
+	clocks = <&byteclock>, <&byteclock>, <&byteclock>,
+		 <&coreclock>, <&coreclock>,
+		 <&coreclock>, <&coreclock>;
+	clock-names = "sys_clk", "p_clk", "p_free_clk",
+		      "pixel_if0_clk", "pixel_if1_clk",
+		      "pixel_if2_clk", "pixel_if3_clk";
+
+	ports {
+		#address-cells = <1>;
+		#size-cells = <0>;
+
+		port@0 {
+			#address-cells = <1>;
+			#size-cells = <0>;
+			reg = <0>;
+
+			csi2rx_in_sensor: endpoint@0 {
+				reg = <0>;
+				remote-endpoint = <&sensor_out_csi2rx>;
+				clock-lanes = <0>;
+				data-lanes = <1 2>;
+			};
+		};
+
+		port@1 {
+			#address-cells = <1>;
+			#size-cells = <0>;
+			reg = <1>;
+
+			csi2rx_out_grabber0: endpoint@0 {
+				reg = <0>;
+				remote-endpoint = <&grabber0_in_csi2rx>;
+			};
+
+			csi2rx_out_grabber1: endpoint@1 {
+				reg = <1>;
+				remote-endpoint = <&grabber1_in_csi2rx>;
+			};
+
+			csi2rx_out_grabber2: endpoint@2 {
+				reg = <2>;
+				remote-endpoint = <&grabber2_in_csi2rx>;
+			};
+
+			csi2rx_out_grabber3: endpoint@3 {
+				reg = <3>;
+				remote-endpoint = <&grabber3_in_csi2rx>;
+			};
+		};
+	};
+};
