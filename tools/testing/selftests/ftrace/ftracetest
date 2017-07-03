@@ -15,6 +15,7 @@ echo "		-h|--help  Show help message"
 echo "		-k|--keep  Keep passed test logs"
 echo "		-v|--verbose Increase verbosity of test messages"
 echo "		-vv        Alias of -v -v (Show all results in stdout)"
+echo "		-vvv       Alias of -v -v -v (Show all commands immediately)"
 echo "		-d|--debug Debug mode (trace all shell commands)"
 echo "		-l|--logdir <dir> Save logs on the <dir>"
 exit $1
@@ -56,9 +57,10 @@ parse_opts() { # opts
       KEEP_LOG=1
       shift 1
     ;;
-    --verbose|-v|-vv)
+    --verbose|-v|-vv|-vvv)
       VERBOSE=$((VERBOSE + 1))
       [ $1 = '-vv' ] && VERBOSE=$((VERBOSE + 1))
+      [ $1 = '-vvv' ] && VERBOSE=$((VERBOSE + 2))
       shift 1
     ;;
     --debug|-d)
@@ -252,7 +254,9 @@ run_test() { # testfile
   testcase $1
   echo "execute$INSTANCE: "$1 > $testlog
   SIG_RESULT=0
-  if [ $VERBOSE -ge 2 ]; then
+  if [ $VERBOSE -ge 3 ]; then
+    __run_test $1 | tee -a $testlog 2>&1
+  elif [ $VERBOSE -eq 2 ]; then
     __run_test $1 2>> $testlog | tee -a $testlog
   else
     __run_test $1 >> $testlog 2>&1
