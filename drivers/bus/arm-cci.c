@@ -1445,16 +1445,16 @@ static struct attribute *pmu_attrs[] = {
 	NULL,
 };
 
-static struct attribute_group pmu_attr_group = {
+static const struct attribute_group pmu_attr_group = {
 	.attrs = pmu_attrs,
 };
 
-static struct attribute_group pmu_format_attr_group = {
+static const struct attribute_group pmu_format_attr_group = {
 	.name = "format",
 	.attrs = NULL,		/* Filled in cci_pmu_init_attrs */
 };
 
-static struct attribute_group pmu_event_attr_group = {
+static const struct attribute_group pmu_event_attr_group = {
 	.name = "events",
 	.attrs = NULL,		/* Filled in cci_pmu_init_attrs */
 };
