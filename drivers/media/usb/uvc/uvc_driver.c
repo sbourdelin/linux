@@ -1995,7 +1995,7 @@ static int uvc_register_chains(struct uvc_device *dev)
 #ifdef CONFIG_MEDIA_CONTROLLER
 		ret = uvc_mc_register_entities(chain);
 		if (ret < 0) {
-			uvc_printk(KERN_INFO, "Failed to register entites "
+			uvc_printk(KERN_INFO, "Failed to register entities "
 				"(%d).\n", ret);
 		}
 #endif
