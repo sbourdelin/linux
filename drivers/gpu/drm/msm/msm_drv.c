@@ -360,6 +360,24 @@ static int msm_init_vram(struct drm_device *dev)
 	return ret;
 }
 
+static void msm_kick_out_firmware_fb(void)
+{
+	struct apertures_struct *ap;
+
+	ap = alloc_apertures(1);
+	if (!ap)
+		return;
+
+	/* Since msm is a UMA device, the simplefb or efifb node may
+	 * have been located anywhere in memory.
+	 */
+	ap->ranges[0].base = 0;
+	ap->ranges[0].size = MAX_RESOURCE;
+
+	drm_fb_helper_remove_conflicting_framebuffers(ap, FB_NAME, false);
+	kfree(ap);
+}
+
 static int msm_drm_init(struct device *dev, struct drm_driver *drv)
 {
 	struct platform_device *pdev = to_platform_device(dev);
@@ -411,6 +429,8 @@ static int msm_drm_init(struct device *dev, struct drm_driver *drv)
 		drm_dev_unref(ddev);
 		return ret;
 	}
+
+	msm_kick_out_firmware_fb();
 
 	ret = msm_init_vram(ddev);
 	if (ret)
