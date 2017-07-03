@@ -18,6 +18,19 @@ struct dma_coherent_mem {
 	spinlock_t	spinlock;
 };
 
+static struct dma_coherent_mem **dma_coherent_default_area;
+
+static inline struct dma_coherent_mem *dev_get_dma_area(struct device *dev)
+{
+	if (dev && dev->dma_mem)
+		return dev->dma_mem;
+#ifdef CONFIG_CMA
+	if (dev && dev->cma_area)
+		return NULL;
+#endif
+	return dma_coherent_default_area ? *dma_coherent_default_area : NULL;
+}
+
 static bool dma_init_coherent_memory(
 	phys_addr_t phys_addr, dma_addr_t device_addr, size_t size, int flags,
 	struct dma_coherent_mem **mem)
@@ -111,7 +124,7 @@ EXPORT_SYMBOL(dma_declare_coherent_memory);
 
 void dma_release_declared_memory(struct device *dev)
 {
-	struct dma_coherent_mem *mem = dev->dma_mem;
+	struct dma_coherent_mem *mem = dev_get_dma_area(dev);
 
 	if (!mem)
 		return;
@@ -123,7 +136,7 @@ EXPORT_SYMBOL(dma_release_declared_memory);
 void *dma_mark_declared_memory_occupied(struct device *dev,
 					dma_addr_t device_addr, size_t size)
 {
-	struct dma_coherent_mem *mem = dev->dma_mem;
+	struct dma_coherent_mem *mem = dev_get_dma_area(dev);
 	unsigned long flags;
 	int pos, err;
 
@@ -167,9 +180,7 @@ int dma_alloc_from_coherent(struct device *dev, ssize_t size,
 	int pageno;
 	int dma_memory_map;
 
-	if (!dev)
-		return 0;
-	mem = dev->dma_mem;
+	mem = dev_get_dma_area(dev);
 	if (!mem)
 		return 0;
 
@@ -223,7 +234,7 @@ EXPORT_SYMBOL(dma_alloc_from_coherent);
  */
 int dma_release_from_coherent(struct device *dev, int order, void *vaddr)
 {
-	struct dma_coherent_mem *mem = dev ? dev->dma_mem : NULL;
+	struct dma_coherent_mem *mem = dev_get_dma_area(dev);
 
 	if (mem && vaddr >= mem->virt_base && vaddr <
 		   (mem->virt_base + (mem->size << PAGE_SHIFT))) {
@@ -257,7 +268,7 @@ EXPORT_SYMBOL(dma_release_from_coherent);
 int dma_mmap_from_coherent(struct device *dev, struct vm_area_struct *vma,
 			   void *vaddr, size_t size, int *ret)
 {
-	struct dma_coherent_mem *mem = dev ? dev->dma_mem : NULL;
+	struct dma_coherent_mem *mem = dev_get_dma_area(dev);
 
 	if (mem && vaddr >= mem->virt_base && vaddr + size <=
 		   (mem->virt_base + (mem->size << PAGE_SHIFT))) {
@@ -328,6 +339,10 @@ static int __init rmem_dma_setup(struct reserved_mem *rmem)
 		return -EINVAL;
 	}
 #endif
+
+	if (of_get_flat_dt_prop(node, "linux,dma-default", NULL))
+		dma_coherent_default_area =
+			(struct dma_coherent_mem **)&rmem->priv;
 
 	rmem->ops = &rmem_dma_ops;
 	pr_info("Reserved memory: created DMA memory pool at %pa, size %ld MiB\n",
