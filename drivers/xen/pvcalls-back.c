@@ -33,9 +33,101 @@ struct pvcalls_back_global {
 	struct semaphore frontends_lock;
 } pvcalls_back_global;
 
+/*
+ * Per-frontend data structure. It contains pointers to the command
+ * ring, its event channel, a list of active sockets and a tree of
+ * passive sockets.
+ */
+struct pvcalls_fedata {
+	struct list_head list;
+	struct xenbus_device *dev;
+	struct xen_pvcalls_sring *sring;
+	struct xen_pvcalls_back_ring ring;
+	int irq;
+	struct list_head socket_mappings;
+	struct radix_tree_root socketpass_mappings;
+	struct semaphore socket_lock;
+	struct workqueue_struct *wq;
+	struct work_struct register_work;
+};
+
+static void pvcalls_back_work(struct work_struct *work)
+{
+}
+
+static irqreturn_t pvcalls_back_event(int irq, void *dev_id)
+{
+	return IRQ_HANDLED;
+}
+
 static int backend_connect(struct xenbus_device *dev)
 {
+	int err, evtchn;
+	grant_ref_t ring_ref;
+	struct pvcalls_fedata *fedata = NULL;
+
+	fedata = kzalloc(sizeof(struct pvcalls_fedata), GFP_KERNEL);
+	if (!fedata)
+		return -ENOMEM;
+
+	err = xenbus_scanf(XBT_NIL, dev->otherend, "port", "%u",
+			   &evtchn);
+	if (err != 1) {
+		err = -EINVAL;
+		xenbus_dev_fatal(dev, err, "reading %s/event-channel",
+				 dev->otherend);
+		goto error;
+	}
+
+	err = xenbus_scanf(XBT_NIL, dev->otherend, "ring-ref", "%u", &ring_ref);
+	if (err != 1) {
+		err = -EINVAL;
+		xenbus_dev_fatal(dev, err, "reading %s/ring-ref",
+				 dev->otherend);
+		goto error;
+	}
+
+	err = bind_interdomain_evtchn_to_irqhandler(dev->otherend_id, evtchn,
+						    pvcalls_back_event, 0,
+						    "pvcalls-backend", dev);
+	if (err < 0)
+		goto error;
+	fedata->irq = err;
+
+	fedata->wq = alloc_workqueue("pvcalls_back_wq", WQ_UNBOUND, 1);
+	if (!fedata->wq) {
+		err = -ENOMEM;
+		goto error;
+	}
+
+	err = xenbus_map_ring_valloc(dev, &ring_ref, 1, (void**)&fedata->sring);
+	if (err < 0)
+		goto error;
+
+	BACK_RING_INIT(&fedata->ring, fedata->sring, XEN_PAGE_SIZE * 1);
+	fedata->dev = dev;
+
+	INIT_WORK(&fedata->register_work, pvcalls_back_work);
+	INIT_LIST_HEAD(&fedata->socket_mappings);
+	INIT_RADIX_TREE(&fedata->socketpass_mappings, GFP_KERNEL);
+	sema_init(&fedata->socket_lock, 1);
+	dev_set_drvdata(&dev->dev, fedata);
+
+	down(&pvcalls_back_global.frontends_lock);
+	list_add_tail(&fedata->list, &pvcalls_back_global.frontends);
+	up(&pvcalls_back_global.frontends_lock);
+	queue_work(fedata->wq, &fedata->register_work);
+
 	return 0;
+
+ error:
+	if (fedata->sring != NULL)
+		xenbus_unmap_ring_vfree(dev, fedata->sring);
+	if (fedata->wq)
+		destroy_workqueue(fedata->wq);
+	unbind_from_irqhandler(fedata->irq, dev);
+	kfree(fedata);
+	return err;
 }
 
 static int backend_disconnect(struct xenbus_device *dev)
