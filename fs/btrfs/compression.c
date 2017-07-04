@@ -1098,3 +1098,25 @@ int btrfs_decompress_buf2page(const char *buf, unsigned long buf_start,
 
 	return 1;
 }
+
+/*
+ * Heuristic skeleton
+ * For now just would be a naive and very optimistic 'return true'.
+ */
+int btrfs_compress_heuristic(struct inode *inode, u64 start, u64 end)
+{
+	u64 index = start >> PAGE_SHIFT;
+	u64 end_index = end >> PAGE_SHIFT;
+	struct page *page;
+	int ret = 1;
+
+	while (index <= end_index) {
+		page = find_get_page(inode->i_mapping, index);
+		kmap(page);
+		kunmap(page);
+		put_page(page);
+		index++;
+	}
+
+	return ret;
+}

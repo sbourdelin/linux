@@ -510,15 +510,6 @@ again:
 	 */
 	if (inode_need_compress(inode)) {
 		WARN_ON(pages);
-		pages = kcalloc(nr_pages, sizeof(struct page *), GFP_NOFS);
-		if (!pages) {
-			/* just bail out to the uncompressed code */
-			goto cont;
-		}
-
-		if (BTRFS_I(inode)->force_compress)
-			compress_type = BTRFS_I(inode)->force_compress;
-
 		/*
 		 * we need to call clear_page_dirty_for_io on each
 		 * page in the range.  Otherwise applications with the file
@@ -530,6 +521,22 @@ again:
 		 */
 		extent_range_clear_dirty_for_io(inode, start, end);
 		redirty = 1;
+
+		ret = btrfs_compress_heuristic(inode, start, end);
+
+		/* Heuristic say: dont try compress that */
+		if (ret == 0)
+			goto cont;
+
+		pages = kcalloc(nr_pages, sizeof(struct page *), GFP_NOFS);
+		if (!pages) {
+			/* just bail out to the uncompressed code */
+			goto cont;
+		}
+
+		if (BTRFS_I(inode)->force_compress)
+			compress_type = BTRFS_I(inode)->force_compress;
+
 		ret = btrfs_compress_pages(compress_type,
 					   inode->i_mapping, start,
 					   pages,
