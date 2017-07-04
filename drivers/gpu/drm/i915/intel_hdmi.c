@@ -472,6 +472,14 @@ static void intel_hdmi_set_avi_infoframe(struct drm_encoder *encoder,
 		return;
 	}
 
+	ret = drm_hdmi_avi_infoframe_set_colorspace(&frame.avi,
+						    adjusted_mode,
+						    crtc_state->hdmi_output);
+	if (ret < 0) {
+		DRM_ERROR("couldn't fill AVI colorspace\n");
+		return;
+	}
+
 	drm_hdmi_avi_infoframe_quant_range(&frame.avi, adjusted_mode,
 					   crtc_state->limited_color_range ?
 					   HDMI_QUANTIZATION_RANGE_LIMITED :
