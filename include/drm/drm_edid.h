@@ -477,4 +477,5 @@ void drm_edid_get_monitor_name(struct edid *edid, char *name,
 struct drm_display_mode *drm_mode_find_dmt(struct drm_device *dev,
 					   int hsize, int vsize, int fresh,
 					   bool rb);
+bool drm_valid_cea_vic(u8 vic);
 #endif /* __DRM_EDID_H__ */
