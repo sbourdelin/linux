@@ -1,0 +1,14 @@
+config SPRD_WCN
+	tristate "Support for Spreadtrum's WCN SoCs"
+	depends on ARCH_SPRD
+	default n
+	help
+	  This enables Spreadtrum's WCN (wireless connectivity network)
+	  SoCs. In general, Spreadtrum's WCN SoCs consisted of some
+	  modules, such as FM, bluetooth, wifi, GPS, etc.
+
+if SPRD_WCN
+
+source "drivers/misc/sprd-wcn/radio/Kconfig"
+
+endif

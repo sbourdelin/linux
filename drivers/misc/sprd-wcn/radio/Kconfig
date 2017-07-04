@@ -1,0 +1,8 @@
+## Spreadtrum SC2332 FM drivers
+
+config SPRD_RADIO_SC2332
+	tristate "Support for the Spreadtrum Radio SC2332"
+	default n
+	---help---
+	  Say Y to enable built-in FM radio controller for the
+	  Spreadtrum SC2332 SoC.
