@@ -259,6 +259,40 @@ int alloc_bootmem_huge_page(struct hstate *hstate)
 
 	return 1;
 }
+#else /* !PPC_FSL_BOOK3E */
+
+/* Build list of addresses of gigantic pages.  This function is used in early
+ * boot before the buddy allocator is setup.
+ */
+void add_gpage(u64 addr, u64 page_size, unsigned long number_of_pages)
+{
+	if (!addr)
+		return;
+	while (number_of_pages > 0) {
+		gpage_freearray[nr_gpages] = addr;
+		nr_gpages++;
+		number_of_pages--;
+		addr += page_size;
+	}
+}
+
+/* Moves the gigantic page addresses from the temporary list to the
+ * huge_boot_pages list.
+ */
+int alloc_bootmem_huge_page(struct hstate *hstate)
+{
+	struct huge_bootmem_page *m;
+	if (nr_gpages == 0)
+		return 0;
+	m = phys_to_virt(gpage_freearray[--nr_gpages]);
+	gpage_freearray[nr_gpages] = 0;
+	list_add(&m->list, &huge_boot_pages);
+	m->hstate = hstate;
+	return 1;
+}
+#endif
+
+#if defined(CONFIG_PPC_FSL_BOOK3E) || defined(CONFIG_PPC_8xx) || defined(CONFIG_PPC_POWERNV)
 /*
  * Scan the command line hugepagesz= options for gigantic pages; store those in
  * a list that we use to allocate the memory once all options are parsed.
@@ -339,38 +373,6 @@ void __init reserve_hugetlb_gpages(void)
 					   MEMBLOCK_ALLOC_ANYWHERE);
 		add_gpage(base, size, gpage_npages[i]);
 	}
-}
-
-#else /* !PPC_FSL_BOOK3E */
-
-/* Build list of addresses of gigantic pages.  This function is used in early
- * boot before the buddy allocator is setup.
- */
-void add_gpage(u64 addr, u64 page_size, unsigned long number_of_pages)
-{
-	if (!addr)
-		return;
-	while (number_of_pages > 0) {
-		gpage_freearray[nr_gpages] = addr;
-		nr_gpages++;
-		number_of_pages--;
-		addr += page_size;
-	}
-}
-
-/* Moves the gigantic page addresses from the temporary list to the
- * huge_boot_pages list.
- */
-int alloc_bootmem_huge_page(struct hstate *hstate)
-{
-	struct huge_bootmem_page *m;
-	if (nr_gpages == 0)
-		return 0;
-	m = phys_to_virt(gpage_freearray[--nr_gpages]);
-	gpage_freearray[nr_gpages] = 0;
-	list_add(&m->list, &huge_boot_pages);
-	m->hstate = hstate;
-	return 1;
 }
 #endif
 

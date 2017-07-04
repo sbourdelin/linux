@@ -224,7 +224,7 @@ static inline pte_t *hugepte_offset(hugepd_t hpd, unsigned long addr,
  * the .dts as on IBM platforms.
  */
 #if defined(CONFIG_HUGETLB_PAGE) && (defined(CONFIG_PPC_FSL_BOOK3E) || \
-    defined(CONFIG_PPC_8xx))
+    defined(CONFIG_PPC_8xx) || defined(CONFIG_PPC_POWERNV))
 extern void __init reserve_hugetlb_gpages(void);
 #else
 static inline void reserve_hugetlb_gpages(void)

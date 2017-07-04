@@ -473,7 +473,7 @@ static int __init htab_dt_scan_page_sizes(unsigned long node,
 	return 1;
 }
 
-#ifdef CONFIG_HUGETLB_PAGE
+#if defined(CONFIG_HUGETLB_PAGE) && !defined(CONFIG_PPC_POWERNV)
 /* Scan for 16G memory blocks that have been set aside for huge pages
  * and reserve those blocks for 16G huge pages.
  */
@@ -513,7 +513,7 @@ static int __init htab_dt_scan_hugepage_blocks(unsigned long node,
 	}
 	return 0;
 }
-#endif /* CONFIG_HUGETLB_PAGE */
+#endif /* CONFIG_HUGETLB_PAGE && !CONFIG_PPC_POWERNV*/
 
 static void mmu_psize_set_default_penc(void)
 {
@@ -566,10 +566,10 @@ static void __init htab_scan_page_sizes(void)
 		       sizeof(mmu_psize_defaults_gp));
 	}
 
-#ifdef CONFIG_HUGETLB_PAGE
+#if defined(CONFIG_HUGETLB_PAGE) && !defined(CONFIG_PPC_POWERNV)
 	/* Reserve 16G huge page memory sections for huge pages */
 	of_scan_flat_dt(htab_dt_scan_hugepage_blocks, NULL);
-#endif /* CONFIG_HUGETLB_PAGE */
+#endif /* CONFIG_HUGETLB_PAGE && !CONFIG_PPC_POWERNV */
 }
 
 /*
