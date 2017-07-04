@@ -8,7 +8,7 @@ static ssize_t edac_fake_inject_write(struct file *file,
 {
 	struct device *dev = file->private_data;
 	struct mem_ctl_info *mci = to_mci(dev);
-	static enum hw_event_mc_err_type type;
+	enum hw_event_mc_err_type type;
 	u16 errcount = mci->fake_inject_count;
 
 	if (!errcount)
