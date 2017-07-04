@@ -308,10 +308,9 @@ static void sugov_update_shared(struct update_util_data *hook, u64 time,
 	if (unlikely(current == sg_policy->thread))
 		return;
 
-	sugov_get_util(&util, &max);
-
 	raw_spin_lock(&sg_policy->update_lock);
 
+	sugov_get_util(&util, &max);
 	sg_cpu->util = util;
 	sg_cpu->max = max;
 
