@@ -292,7 +292,8 @@ static int rmem_dma_device_init(struct reserved_mem *rmem, struct device *dev)
 	struct dma_coherent_mem *mem = rmem->priv;
 
 	if (!mem &&
-	    !dma_init_coherent_memory(rmem->base, rmem->base, rmem->size,
+	    !dma_init_coherent_memory(rmem->base, phys_to_dma(dev, rmem->base),
+				      rmem->size,
 				      DMA_MEMORY_MAP | DMA_MEMORY_EXCLUSIVE,
 				      &mem)) {
 		pr_err("Reserved memory: failed to init DMA memory pool at %pa, size %ld MiB\n",
