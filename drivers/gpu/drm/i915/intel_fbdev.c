@@ -537,6 +537,7 @@ static void intel_fbdev_destroy(struct intel_fbdev *ifbdev)
 
 	if (ifbdev->fb) {
 		mutex_lock(&ifbdev->helper.dev->struct_mutex);
+		i915_vma_unpin_iomap(ifbdev->vma);
 		intel_unpin_fb_vma(ifbdev->vma);
 		mutex_unlock(&ifbdev->helper.dev->struct_mutex);
 
