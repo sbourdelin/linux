@@ -648,6 +648,7 @@ static int compat_drm_agp_info(struct file *file, unsigned int cmd,
 
 	i32.agp_version_major = info.agp_version_major;
 	i32.agp_version_minor = info.agp_version_minor;
+	i32.mode = info.mode;
 	i32.aperture_base = info.aperture_base;
 	i32.aperture_size = info.aperture_size;
 	i32.memory_allowed = info.memory_allowed;
