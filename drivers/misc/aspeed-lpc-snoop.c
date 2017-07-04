@@ -241,6 +241,7 @@ static int aspeed_lpc_snoop_remove(struct platform_device *pdev)
 
 static const struct of_device_id aspeed_lpc_snoop_match[] = {
 	{ .compatible = "aspeed,ast2500-lpc-snoop" },
+	{ .compatible = "aspeed,ast2400-lpc-snoop" },
 	{ },
 };
 
