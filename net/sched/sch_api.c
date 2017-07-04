@@ -533,6 +533,8 @@ static int qdisc_dump_stab(struct sk_buff *skb, struct qdisc_size_table *stab)
 		goto nla_put_failure;
 	if (nla_put(skb, TCA_STAB_BASE, sizeof(stab->szopts), &stab->szopts))
 		goto nla_put_failure;
+	if (nla_put(skb, TCA_STAB_DATA, sizeof(stab->szopts)*sizeof(u16), &stab->data))
+		goto nla_put_failure;
 	nla_nest_end(skb, nest);
 
 	return skb->len;

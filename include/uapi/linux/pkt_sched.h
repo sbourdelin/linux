@@ -82,6 +82,7 @@ enum tc_link_layer {
 	TC_LINKLAYER_UNAWARE, /* Indicate unaware old iproute2 util */
 	TC_LINKLAYER_ETHERNET,
 	TC_LINKLAYER_ATM,
+	TC_LINKLAYER_CUSTOM,
 };
 #define TC_LINKLAYER_MASK 0x0F /* limit use to lower 4 bits */
 
