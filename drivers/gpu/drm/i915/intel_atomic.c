@@ -264,6 +264,12 @@ int intel_atomic_setup_scalers(struct drm_i915_private *dev_priv,
 
 			/* panel fitter case: assign as a crtc scaler */
 			scaler_id = &scaler_state->scaler_id;
+		} else if (i == SKL_HDMI_OUTPUT_INDEX) {
+			name = "HDMI-OUTPUT";
+			idx = intel_crtc->base.base.id;
+
+			/* hdmi output case: needs a pipe scaler */
+			scaler_id = &scaler_state->scaler_id;
 		} else {
 			name = "PLANE";
 
