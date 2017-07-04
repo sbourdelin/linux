@@ -6,3 +6,18 @@ config VIDEO_DWC_HDMI_PHY_E405
 
 	  To compile this driver as a module, choose M here. The module
 	  will be called dw-hdmi-phy-e405.
+
+config VIDEO_DWC_HDMI_RX
+	tristate "Synopsys Designware HDMI Receiver driver"
+	depends on VIDEO_V4L2 && VIDEO_V4L2_SUBDEV_API
+	help
+	  Support for Synopsys Designware HDMI RX controller.
+
+	  To compile this driver as a module, choose M here. The module
+	  will be called dw-hdmi-rx.
+
+config VIDEO_DWC_HDMI_RX_CEC
+	bool
+	depends on VIDEO_DWC_HDMI_RX
+	select CEC_CORE
+	select CEC_NOTIFIER
