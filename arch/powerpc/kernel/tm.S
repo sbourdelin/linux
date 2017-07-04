@@ -259,9 +259,17 @@ _GLOBAL(tm_reclaim)
 
 	addi	r7, r3, THREAD_CKVRSTATE
 	SAVE_32VRS(0, r6, r7)	/* r6 scratch, r7 transact vr state */
+
+	/* Corrupting v0 (vs32). Should restore it later. */
 	mfvscr	v0
 	li	r6, VRSTATE_VSCR
 	stvx	v0, r7, r6
+
+	/* Restore v0 (vs32) from ckvr_state.vr[0], otherwise we might
+	 * recheckpoint the wrong live value.
+	 */
+	LXVD2X_ROT(32, R0, R7)
+
 dont_backup_vec:
 	mfspr	r0, SPRN_VRSAVE
 	std	r0, THREAD_CKVRSAVE(r3)
@@ -272,8 +280,14 @@ dont_backup_vec:
 	addi	r7, r3, THREAD_CKFPSTATE
 	SAVE_32FPRS_VSRS(0, R6, R7)	/* r6 scratch, r7 transact fp state */
 
+	/* Corrupting fr0 (vs0). Should restore it later. */
 	mffs    fr0
 	stfd    fr0,FPSTATE_FPSCR(r7)
+
+	/* Restore fr0 (vs0) from ckfp_state.fpr[0], otherwise we might
+	 * recheckpoint the wrong live value.
+	 */
+	LXVD2X_ROT(0, R0, R7)
 
 dont_backup_fp:
 
