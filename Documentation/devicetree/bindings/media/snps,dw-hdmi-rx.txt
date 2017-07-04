@@ -1,0 +1,70 @@
+Synopsys DesignWare HDMI RX Decoder
+===================================
+
+This document defines device tree properties for the Synopsys DesignWare HDMI
+RX Decoder (DWC HDMI RX). It doesn't constitute a device tree binding
+specification by itself but is meant to be referenced by platform-specific
+device tree bindings.
+
+When referenced from platform device tree bindings the properties defined in
+this document are defined as follows.
+
+- compatible: Shall be "snps,dw-hdmi-rx".
+
+- reg: Memory mapped base address and length of the DWC HDMI RX registers.
+
+- interrupts: Reference to the DWC HDMI RX interrupt and 5v sense interrupt.
+
+- clocks: Phandle to the config clock block.
+
+- clock-names: Shall be "cfg".
+
+- edid-phandle: phandle to the EDID handler block.
+
+- #address-cells: Shall be 1.
+
+- #size-cells: Shall be 0.
+
+You also have to create a subnode for phy driver. Phy properties are as follows.
+
+- compatible: Shall be "snps,dw-hdmi-phy-e405".
+
+- reg: Shall be JTAG address of phy.
+
+- clocks: Phandle for cfg clock.
+
+- clock-names:Shall be "cfg".
+
+A sample binding is now provided. The compatible string is for a SoC which has
+has a Synopsys DesignWare HDMI RX decoder inside.
+
+Example:
+
+dw_hdmi_soc: dw-hdmi-soc@0 {
+	compatible = "snps,dw-hdmi-soc";
+	reg = <0x11c00 0x1000>; /* EDIDs */
+	#address-cells = <1>;
+	#size-cells = <1>;
+	ranges;
+
+	hdmi-rx@0 {
+		compatible = "snps,dw-hdmi-rx";
+		reg = <0x0 0x10000>;
+		interrupts = <1 2>;
+		edid-phandle = <&dw_hdmi_soc>;
+
+		clocks = <&dw_hdmi_refclk>;
+		clock-names = "cfg";
+
+		#address-cells = <1>;
+		#size-cells = <0>;
+
+		hdmi-phy@fc {
+			compatible = "snps,dw-hdmi-phy-e405";
+			reg = <0xfc>;
+
+			clocks = <&dw_hdmi_refclk>;
+			clock-names = "cfg";
+		};
+	};
+};
