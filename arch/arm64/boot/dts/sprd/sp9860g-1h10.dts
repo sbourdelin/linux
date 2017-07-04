@@ -37,6 +37,10 @@
 		#size-cells = <2>;
 		ranges;
 	};
+
+	sprd-fm {
+		compatible  = "sprd,marlin2-fm";
+	};
 };
 
 &uart0 {
