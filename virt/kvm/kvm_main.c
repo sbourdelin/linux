@@ -130,6 +130,10 @@ EXPORT_SYMBOL_GPL(kvm_rebooting);
 
 static bool largepages_enabled = true;
 
+static void kvm_uevent_notify_change(u64 created, u64 active);
+static u64 kvm_createvm_count;
+static u64 kvm_active_vms;
+
 bool kvm_is_reserved_pfn(kvm_pfn_t pfn)
 {
 	if (pfn_valid(pfn))
@@ -627,6 +631,7 @@ static struct kvm *kvm_create_vm(unsigned long type)
 {
 	int r, i;
 	struct kvm *kvm = kvm_arch_alloc_vm();
+	u64 activevms, createdvms;
 
 	if (!kvm)
 		return ERR_PTR(-ENOMEM);
@@ -686,9 +691,12 @@ static struct kvm *kvm_create_vm(unsigned long type)
 
 	spin_lock(&kvm_lock);
 	list_add(&kvm->vm_list, &vm_list);
+	createdvms = ++kvm_createvm_count;
+	activevms = ++kvm_active_vms;
 	spin_unlock(&kvm_lock);
 
 	preempt_notifier_inc();
+	kvm_uevent_notify_change(createdvms, activevms);
 
 	return kvm;
 
@@ -727,11 +735,14 @@ static void kvm_destroy_vm(struct kvm *kvm)
 {
 	int i;
 	struct mm_struct *mm = kvm->mm;
+	u64 activevms, createdvms;
 
 	kvm_destroy_vm_debugfs(kvm);
 	kvm_arch_sync_events(kvm);
 	spin_lock(&kvm_lock);
 	list_del(&kvm->vm_list);
+	activevms = --kvm_active_vms;
+	createdvms = kvm_createvm_count;
 	spin_unlock(&kvm_lock);
 	kvm_free_irq_routing(kvm);
 	for (i = 0; i < KVM_NR_BUSES; i++) {
@@ -755,6 +766,7 @@ static void kvm_destroy_vm(struct kvm *kvm)
 	preempt_notifier_dec();
 	hardware_disable_all();
 	mmdrop(mm);
+	kvm_uevent_notify_change(createdvms, activevms);
 }
 
 void kvm_get_kvm(struct kvm *kvm)
@@ -3853,6 +3865,19 @@ static const struct file_operations *stat_fops[] = {
 	[KVM_STAT_VCPU] = &vcpu_stat_fops,
 	[KVM_STAT_VM]   = &vm_stat_fops,
 };
+
+static void kvm_uevent_notify_change(u64 created, u64 active)
+{
+	char createvm_buf[40];
+	char activevm_buf[40];
+	char *ptr[3] = {createvm_buf, activevm_buf, NULL};
+
+	if (!kvm_dev.this_device)
+		return;
+	snprintf(createvm_buf, 40, "KVM_VM_CREATED=%llu", created);
+	snprintf(activevm_buf, 40, "KVM_VM_ACTIVE=%llu", active);
+	kobject_uevent_env(&kvm_dev.this_device->kobj, KOBJ_CHANGE, ptr);
+}
 
 static int kvm_init_debug(void)
 {
