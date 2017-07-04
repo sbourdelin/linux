@@ -1151,7 +1151,7 @@ xpc_allocate_recv_msg_slot_uv(struct xpc_channel *ch)
 static enum xp_retval
 xpc_setup_msg_structures_uv(struct xpc_channel *ch)
 {
-	static enum xp_retval ret;
+	enum xp_retval ret;
 	struct xpc_channel_uv *ch_uv = &ch->sn.uv;
 
 	DBUG_ON(ch->flags & XPC_C_SETUP);
