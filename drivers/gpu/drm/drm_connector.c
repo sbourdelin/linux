@@ -227,6 +227,11 @@ int drm_connector_init(struct drm_device *dev,
 					      config->edid_property,
 					      0);
 
+	if (connector_type != DRM_MODE_CONNECTOR_VIRTUAL)
+		drm_object_attach_property(&connector->base,
+					   config->hdmi_output_property,
+					   0);
+
 	drm_object_attach_property(&connector->base,
 				      config->dpms_property, 0);
 
@@ -617,6 +622,26 @@ static const struct drm_prop_enum_list drm_link_status_enum_list[] = {
 };
 DRM_ENUM_NAME_FN(drm_get_link_status_name, drm_link_status_enum_list)
 
+static const struct drm_prop_enum_list drm_hdmi_output_enum_list[] = {
+	{ DRM_HDMI_OUTPUT_DEFAULT_RGB, "output_rgb" },
+	{ DRM_HDMI_OUTPUT_YCBCR444, "output_ycbcr444" },
+	{ DRM_HDMI_OUTPUT_YCBCR422, "output_ycbcr422" },
+	{ DRM_HDMI_OUTPUT_YCBCR420, "output_ycbcr420" },
+	{ DRM_HDMI_OUTPUT_YCBCR_HQ, "output_ycbcr_high_subsampling" },
+	{ DRM_HDMI_OUTPUT_YCBCR_LQ, "output_ycbcr_low_subsampling" },
+	{ DRM_HDMI_OUTPUT_INVALID, "invalid_output" },
+};
+
+/**
+ * drm_get_hdmi_output_name - return a string for a given hdmi output enum
+ * @type: enum of output type
+ */
+const char *drm_get_hdmi_output_name(enum drm_hdmi_output_type type)
+{
+	return drm_hdmi_output_enum_list[type].name;
+}
+EXPORT_SYMBOL(drm_get_hdmi_output_name);
+
 /**
  * drm_display_info_set_bus_formats - set the supported bus formats
  * @info: display info to store bus formats in
@@ -697,7 +722,36 @@ static const struct drm_prop_enum_list drm_tv_subconnector_enum_list[] = {
 	{ DRM_MODE_SUBCONNECTOR_SCART,     "SCART"     }, /* TV-out */
 };
 DRM_ENUM_NAME_FN(drm_get_tv_subconnector_name,
-		 drm_tv_subconnector_enum_list)
+		 drm_tv_subconnector_enum_list);
+
+/**
+ * DOC: hdmi_output_format
+ *
+ * hdmi_output_format:
+ *	Enum property which allows a userspace to provide its preference for a
+ *	HDMI output format. Standard HDMI 1.4b outputs can support RGB/YCBCR444
+ *	YCBCR422 output formats, whereas HDMI 2.0 outputs can additionally
+ *	support YCBCR420 output. Default value of the property is HDMI output
+ *	RGB.
+ *
+ *	A driver can attach to this property, and then handle the HDMI output
+ *	based on its capabilities and sink support. There are few helper
+ *	functions available in drm_modes.c which can help in finding the best
+ *	suitable output considering a sink/source/mode combination. Refer to
+ *	drm_modes.c:drm_display_info_hdmi_output_type()
+ */
+int drm_connector_create_hdmi_properties(struct drm_device *dev)
+{
+	struct drm_property *prop;
+
+	prop = drm_property_create_enum(dev, 0, "hdmi_output_format",
+					drm_hdmi_output_enum_list,
+					ARRAY_SIZE(drm_hdmi_output_enum_list));
+	if (!prop)
+		return -ENOMEM;
+	dev->mode_config.hdmi_output_property = prop;
+	return 0;
+}
 
 /**
  * DOC: standard connector properties
@@ -1023,6 +1077,19 @@ int drm_connector_attach_scaling_mode_property(struct drm_connector *connector,
 	return 0;
 }
 EXPORT_SYMBOL(drm_connector_attach_scaling_mode_property);
+
+
+/**
+ * DOC: aspect ratio property
+ *
+ * aspect ratio:
+ *	Enum property to override the HDMI output's aspect ratio.
+ *	When this property is set, the aspect ratio of the frame in
+ *	AVI infoframes is set as per the property value. For example
+ *	if userspace sets the property value to DRM_MODE_PICTURE_ASPECT_4_3
+ *	the output aspect ratio is set to 4:3 (regardless of the PAR of mode)
+ *
+ */
 
 /**
  * drm_mode_create_aspect_ratio_property - create aspect ratio property

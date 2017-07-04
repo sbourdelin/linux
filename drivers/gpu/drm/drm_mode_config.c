@@ -210,6 +210,10 @@ static int drm_mode_create_standard_properties(struct drm_device *dev)
 	if (ret)
 		return ret;
 
+	ret = drm_connector_create_hdmi_properties(dev);
+	if (ret)
+		return ret;
+
 	prop = drm_property_create_enum(dev, DRM_MODE_PROP_IMMUTABLE,
 					"type", drm_plane_type_enum_list,
 					ARRAY_SIZE(drm_plane_type_enum_list));

@@ -140,6 +140,7 @@ int drm_mode_connector_set_obj_prop(struct drm_mode_object *obj,
 				    struct drm_property *property,
 				    uint64_t value);
 int drm_connector_create_standard_properties(struct drm_device *dev);
+int drm_connector_create_hdmi_properties(struct drm_device *dev);
 const char *drm_get_connector_force_name(enum drm_connector_force force);
 
 /* IOCTL */

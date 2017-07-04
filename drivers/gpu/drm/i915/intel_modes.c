@@ -104,6 +104,19 @@ static const struct drm_prop_enum_list broadcast_rgb_names[] = {
 	{ INTEL_BROADCAST_RGB_LIMITED, "Limited 16:235" },
 };
 
+/**
+ * DOC: Broadcast RGB property
+ *
+ * Broadcast RGB:
+ *	Enum property to indicate RGB color range of a HDMI output.
+ *	For limited range RGB outputs, a remapping of pixel values from 0-255
+ *	should be remaped to a range of 16-235. When this property is set to
+ *	Limited 16:235 and CTM is set, the hardware will be programmed with the
+ *	result of the multiplication of CTM by the limited  range matrix, to
+ *	ensure the pixels normaly in the range 0..1.0 are remapped to the range
+ *	16/255..235/255.
+ *
+ */
 void
 intel_attach_broadcast_rgb_property(struct drm_connector *connector)
 {

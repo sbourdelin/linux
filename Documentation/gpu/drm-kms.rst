@@ -508,6 +508,18 @@ Standard Connector Properties
 .. kernel-doc:: drivers/gpu/drm/drm_connector.c
    :doc: standard connector properties
 
+Standard HDMI Properties
+-----------------------------
+
+.. kernel-doc:: drivers/gpu/drm/drm_connector.c
+   :doc: hdmi_output_format
+
+.. kernel-doc:: drivers/gpu/drm/drm_connector.c
+   :doc: aspect ratio property
+
+.. kernel-doc:: drivers/gpu/drm/i915/intel_modes.c
+   :doc: Broadcast RGB property
+
 Plane Composition Properties
 ----------------------------
 
