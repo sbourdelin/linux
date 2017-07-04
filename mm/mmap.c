@@ -2243,7 +2243,14 @@ int expand_upwards(struct vm_area_struct *vma, unsigned long address)
 	if (gap_addr < address || gap_addr > TASK_SIZE)
 		gap_addr = TASK_SIZE;
 
-	next = vma->vm_next;
+	/*
+	 * Allow VM_NONE mappings in the gap as some applications try
+	 * to make their own stack guards
+	 */
+	for (next = vma->vm_next;
+	     next && !(next->vm_flags & (VM_READ | VM_WRITE | VM_EXEC));
+	     next = next->vm_next)
+		;
 	if (next && next->vm_start < gap_addr) {
 		if (!(next->vm_flags & VM_GROWSUP))
 			return -ENOMEM;
@@ -2323,11 +2330,17 @@ int expand_downwards(struct vm_area_struct *vma,
 	if (error)
 		return error;
 
-	/* Enforce stack_guard_gap */
+	/*
+	 * Enforce stack_guard_gap, but allow VM_NONE mappings in the gap
+	 * as some applications try to make their own stack guards
+	 */
 	gap_addr = address - stack_guard_gap;
 	if (gap_addr > address)
 		return -ENOMEM;
-	prev = vma->vm_prev;
+	for (prev = vma->vm_prev;
+	     prev && !(prev->vm_flags & (VM_READ | VM_WRITE | VM_EXEC));
+	     prev = prev->vm_prev)
+		;
 	if (prev && prev->vm_end > gap_addr) {
 		if (!(prev->vm_flags & VM_GROWSDOWN))
 			return -ENOMEM;
