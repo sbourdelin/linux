@@ -124,7 +124,6 @@ static enum vmpressure_levels vmpressure_level(unsigned long pressure)
 static enum vmpressure_levels vmpressure_calc_level(unsigned long scanned,
 						    unsigned long reclaimed)
 {
-	unsigned long scale = scanned + reclaimed;
 	unsigned long pressure = 0;
 
 	/*
@@ -136,13 +135,12 @@ static enum vmpressure_levels vmpressure_calc_level(unsigned long scanned,
 		goto out;
 	/*
 	 * We calculate the ratio (in percents) of how many pages were
-	 * scanned vs. reclaimed in a given time frame (window). Note that
-	 * time is in VM reclaimer's "ticks", i.e. number of pages
+	 * unsuccessful reclaimed to scanned in a given time frame (window).
+	 * Note that time is in VM reclaimer's "ticks", i.e. number of pages
 	 * scanned. This makes it possible to set desired reaction time
 	 * and serves as a ratelimit.
 	 */
-	pressure = scale - (reclaimed * scale / scanned);
-	pressure = pressure * 100 / scale;
+	pressure = (scanned - reclaimed) * 100 / scanned;
 
 out:
 	pr_debug("%s: %3lu  (s: %lu  r: %lu)\n", __func__, pressure,
