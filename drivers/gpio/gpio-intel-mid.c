@@ -23,6 +23,8 @@
 #include <linux/init.h>
 #include <linux/interrupt.h>
 #include <linux/io.h>
+#include <linux/irq.h>
+#include <linux/irqdomain.h>
 #include <linux/gpio/driver.h>
 #include <linux/kernel.h>
 #include <linux/module.h>

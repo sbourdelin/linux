@@ -12,8 +12,11 @@
 #include <linux/gpio/driver.h>
 #include <linux/of.h>
 #include <linux/interrupt.h>
+#include <linux/irq.h>
+#include <linux/irqdomain.h>
 #include <linux/mfd/tc3589x.h>
 #include <linux/bitops.h>
+#include <linux/pinctrl/pinconf-generic.h>
 
 /*
  * These registers are modified under the irq bus lock and cached to avoid

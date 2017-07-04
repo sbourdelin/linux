@@ -17,6 +17,7 @@
 #include <linux/gpio/driver.h>
 #include <linux/module.h>
 #include <linux/mutex.h>
+#include <linux/of.h>
 #include <linux/spi/spi.h>
 
 #define DEFAULT_NGPIO 8

@@ -14,6 +14,7 @@
 #include <linux/errno.h>
 #include <linux/gpio/driver.h>
 #include <linux/irqchip/chained_irq.h>
+#include <linux/irqdomain.h>
 #include <linux/init.h>
 #include <linux/of.h>
 #include <linux/pinctrl/consumer.h>

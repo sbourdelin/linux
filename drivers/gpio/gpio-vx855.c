@@ -28,6 +28,7 @@
 #include <linux/gpio.h>
 #include <linux/slab.h>
 #include <linux/device.h>
+#include <linux/pinctrl/pinconf-generic.h>
 #include <linux/platform_device.h>
 #include <linux/pci.h>
 #include <linux/io.h>

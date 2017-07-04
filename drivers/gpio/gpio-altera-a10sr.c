@@ -21,6 +21,8 @@
 #include <linux/gpio/driver.h>
 #include <linux/mfd/altera-a10sr.h>
 #include <linux/module.h>
+#include <linux/of.h>
+#include <linux/platform_device.h>
 
 /**
  * struct altr_a10sr_gpio - Altera Max5 GPIO device private data structure

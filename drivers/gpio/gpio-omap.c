@@ -19,6 +19,8 @@
 #include <linux/err.h>
 #include <linux/clk.h>
 #include <linux/io.h>
+#include <linux/irq.h>
+#include <linux/irqdomain.h>
 #include <linux/device.h>
 #include <linux/pm_runtime.h>
 #include <linux/pm.h>
@@ -26,6 +28,7 @@
 #include <linux/of_device.h>
 #include <linux/gpio.h>
 #include <linux/bitops.h>
+#include <linux/pinctrl/pinconf-generic.h>
 #include <linux/platform_data/gpio-omap.h>
 
 #define OFF_MODE	1

@@ -16,6 +16,7 @@
 
 #include <linux/gpio.h>
 #include <linux/module.h>
+#include <linux/pinctrl/pinconf-generic.h>
 #include <linux/platform_device.h>
 #include <linux/regmap.h>
 

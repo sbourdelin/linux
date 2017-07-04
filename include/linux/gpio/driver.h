@@ -1,21 +1,22 @@
 #ifndef __LINUX_GPIO_DRIVER_H
 #define __LINUX_GPIO_DRIVER_H
 
-#include <linux/device.h>
 #include <linux/types.h>
-#include <linux/irq.h>
-#include <linux/irqchip/chained_irq.h>
-#include <linux/irqdomain.h>
+#include <linux/irqhandler.h>
 #include <linux/lockdep.h>
 #include <linux/pinctrl/pinctrl.h>
-#include <linux/pinctrl/pinconf-generic.h>
+#include <linux/spinlock_types.h>
 
 struct gpio_desc;
 struct of_phandle_args;
+struct device;
 struct device_node;
+struct irq_chip;
+struct irq_domain;
 struct seq_file;
 struct gpio_device;
 struct module;
+struct pinctrl_dev;
 
 #ifdef CONFIG_GPIOLIB
 

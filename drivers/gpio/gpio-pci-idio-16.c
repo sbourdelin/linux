@@ -16,7 +16,9 @@
 #include <linux/errno.h>
 #include <linux/gpio/driver.h>
 #include <linux/interrupt.h>
+#include <linux/irq.h>
 #include <linux/irqdesc.h>
+#include <linux/irqdomain.h>
 #include <linux/kernel.h>
 #include <linux/module.h>
 #include <linux/pci.h>

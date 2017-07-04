@@ -22,6 +22,7 @@
 #include <linux/ioport.h>
 #include <linux/interrupt.h>
 #include <linux/irqdesc.h>
+#include <linux/irqdomain.h>
 #include <linux/isa.h>
 #include <linux/kernel.h>
 #include <linux/module.h>

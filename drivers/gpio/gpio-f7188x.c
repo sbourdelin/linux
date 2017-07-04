@@ -17,6 +17,7 @@
 #include <linux/io.h>
 #include <linux/gpio/driver.h>
 #include <linux/bitops.h>
+#include <linux/pinctrl/pinconf-generic.h>
 
 #define DRVNAME "gpio-f7188x"
 

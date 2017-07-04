@@ -29,6 +29,7 @@
 #include <linux/irqdomain.h>
 #include <linux/irqchip/chained_irq.h>
 #include <linux/pinctrl/consumer.h>
+#include <linux/pinctrl/pinconf-generic.h>
 #include <linux/pm.h>
 
 #define GPIO_BANK(x)		((x) >> 5)

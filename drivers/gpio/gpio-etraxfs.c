@@ -4,6 +4,7 @@
 #include <linux/of_gpio.h>
 #include <linux/io.h>
 #include <linux/interrupt.h>
+#include <linux/irq.h>
 #include <linux/platform_device.h>
 
 #define ETRAX_FS_rw_pa_dout	0

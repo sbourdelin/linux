@@ -14,8 +14,12 @@
 #include <linux/init.h>
 #include <linux/interrupt.h>
 #include <linux/io.h>
+#include <linux/irq.h>
+#include <linux/irqchip/chained_irq.h>
+#include <linux/irqdomain.h>
 #include <linux/module.h>
 #include <linux/pci.h>
+#include <linux/pinctrl/pinconf-generic.h>
 #include <linux/pinctrl/consumer.h>
 
 #define GCCR		0x000	/* controller configuration */

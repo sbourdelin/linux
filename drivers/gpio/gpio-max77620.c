@@ -12,6 +12,7 @@
 #include <linux/interrupt.h>
 #include <linux/mfd/max77620.h>
 #include <linux/module.h>
+#include <linux/pinctrl/pinconf-generic.h>
 #include <linux/platform_device.h>
 #include <linux/regmap.h>
 

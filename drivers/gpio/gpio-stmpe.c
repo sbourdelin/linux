@@ -10,6 +10,8 @@
 #include <linux/slab.h>
 #include <linux/gpio.h>
 #include <linux/interrupt.h>
+#include <linux/irq.h>
+#include <linux/irqdomain.h>
 #include <linux/of.h>
 #include <linux/mfd/stmpe.h>
 #include <linux/seq_file.h>

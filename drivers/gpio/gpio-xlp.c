@@ -17,6 +17,7 @@
 #include <linux/of_device.h>
 #include <linux/module.h>
 #include <linux/irq.h>
+#include <linux/irqdomain.h>
 #include <linux/interrupt.h>
 #include <linux/irqchip/chained_irq.h>
 #include <linux/acpi.h>
