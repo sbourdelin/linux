@@ -155,8 +155,9 @@ static int aspeed_lpc_enable_snoop(struct aspeed_lpc_snoop *lpc_snoop,
 	regmap_update_bits(lpc_snoop->regmap, HICR5, hicr5_en, hicr5_en);
 	regmap_update_bits(lpc_snoop->regmap, SNPWADR, snpwadr_mask,
 			   lpc_port << snpwadr_shift);
+#ifdef CONFIG_MACH_ASPEED_G5
 	regmap_update_bits(lpc_snoop->regmap, HICRB, hicrb_en, hicrb_en);
-
+#endif
 	return rc;
 }
 
@@ -241,6 +242,7 @@ static int aspeed_lpc_snoop_remove(struct platform_device *pdev)
 
 static const struct of_device_id aspeed_lpc_snoop_match[] = {
 	{ .compatible = "aspeed,ast2500-lpc-snoop" },
+	{ .compatible = "aspeed,ast2400-lpc-snoop" },
 	{ },
 };
 
