@@ -287,6 +287,7 @@ void *dma_common_pages_remap(struct page **pages, size_t size,
 
 	return area->addr;
 }
+EXPORT_SYMBOL(dma_common_pages_remap);
 
 /*
  * remaps an allocated contiguous region into another vm_area.
@@ -316,6 +317,7 @@ void *dma_common_contiguous_remap(struct page *page, size_t size,
 		return NULL;
 	return area->addr;
 }
+EXPORT_SYMBOL(dma_common_contiguous_remap);
 
 /*
  * unmaps a range previously mapped by dma_common_*_remap
@@ -332,6 +334,7 @@ void dma_common_free_remap(void *cpu_addr, size_t size, unsigned long vm_flags)
 	unmap_kernel_range((unsigned long)cpu_addr, PAGE_ALIGN(size));
 	vunmap(cpu_addr);
 }
+EXPORT_SYMBOL(dma_common_free_remap);
 #endif
 
 /*
