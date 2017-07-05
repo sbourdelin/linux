@@ -352,7 +352,7 @@ static struct attribute *gpio_keys_attrs[] = {
 	NULL,
 };
 
-static struct attribute_group gpio_keys_attr_group = {
+static const struct attribute_group gpio_keys_attr_group = {
 	.attrs = gpio_keys_attrs,
 };
 
