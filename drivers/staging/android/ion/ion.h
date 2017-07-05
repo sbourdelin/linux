@@ -358,4 +358,8 @@ long ion_ioctl(struct file *filp, unsigned int cmd, unsigned long arg);
 
 int ion_query_heaps(struct ion_heap_query *query);
 
+struct ion_heap *ion_chunk_heap_create(struct ion_platform_heap *heap_data);
+
+struct ion_heap *ion_carveout_heap_create(struct ion_platform_heap *heap_data);
+
 #endif /* _ION_H */
