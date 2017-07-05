@@ -276,6 +276,9 @@ static int avic;
 module_param(avic, int, S_IRUGO);
 #endif
 
+/* enable/disable Virtual VMLOAD VMSAVE */
+static bool has_vls = false;
+
 /* AVIC VM ID bit masks and lock */
 static DECLARE_BITMAP(avic_vm_id_bitmap, AVIC_VM_ID_NR);
 static DEFINE_SPINLOCK(avic_vm_id_lock);
@@ -1092,6 +1095,14 @@ static __init int svm_hardware_setup(void)
 		}
 	}
 
+	if (npt_enabled) {
+		if (boot_cpu_has(X86_FEATURE_VIRTUAL_VMLOAD_VMSAVE) &&
+		    IS_ENABLED(CONFIG_X86_64)) {
+			pr_info("Virtual VMLOAD VMSAVE supported\n");
+			has_vls = true;
+		}
+	}
+
 	return 0;
 
 err:
@@ -1278,6 +1289,16 @@ static void init_vmcb(struct vcpu_svm *svm)
 
 	if (avic)
 		avic_init_vmcb(svm);
+
+	/*
+	 * If hardware supports Virtual VMLOAD VMSAVE then enable it
+	 * in VMCB and clear intercepts to avoid #VMEXIT.
+	 */
+	if (has_vls) {
+		clr_intercept(svm, INTERCEPT_VMLOAD);
+		clr_intercept(svm, INTERCEPT_VMSAVE);
+		svm->vmcb->control.virt_ext |= VIRTUAL_VMLOAD_VMSAVE_ENABLE_MASK;
+	}
 
 	mark_all_dirty(svm->vmcb);
 
