@@ -544,7 +544,6 @@ static struct snd_soc_dai_driver sun4i_i2s_dai = {
 		.rates = SNDRV_PCM_RATE_8000_192000,
 		.formats = SNDRV_PCM_FMTBIT_S16_LE,
 	},
-	.ops = &sun4i_i2s_dai_ops,
 	.symmetric_rates = 1,
 };
 
@@ -655,15 +654,24 @@ static int sun4i_i2s_runtime_suspend(struct device *dev)
 }
 
 struct sun4i_i2s_quirks {
-	bool has_reset;
+	bool				has_reset;
+	unsigned int			reg_offset_txdata;	/* TX FIFO */
+	const struct regmap_config	*sun4i_i2s_regmap;
+	const struct snd_soc_dai_ops	*ops;
 };
 
 static const struct sun4i_i2s_quirks sun4i_a10_i2s_quirks = {
-	.has_reset	= false,
+	.has_reset		= false,
+	.reg_offset_txdata	= SUN4I_I2S_FIFO_TX_REG,
+	.sun4i_i2s_regmap	= &sun4i_i2s_regmap_config,
+	.ops			= &sun4i_i2s_dai_ops,
 };
 
 static const struct sun4i_i2s_quirks sun6i_a31_i2s_quirks = {
-	.has_reset	= true,
+	.has_reset		= true,
+	.reg_offset_txdata	= SUN4I_I2S_FIFO_TX_REG,
+	.sun4i_i2s_regmap	= &sun4i_i2s_regmap_config,
+	.ops			= &sun4i_i2s_dai_ops,
 };
 
 static int sun4i_i2s_probe(struct platform_device *pdev)
@@ -702,8 +710,14 @@ static int sun4i_i2s_probe(struct platform_device *pdev)
 		return PTR_ERR(i2s->bus_clk);
 	}
 
+	quirks = of_device_get_match_data(&pdev->dev);
+	if (quirks == NULL) {
+		dev_err(&pdev->dev, "Failed to determine the quirks to use\n");
+		return -ENODEV;
+	}
+
 	i2s->regmap = devm_regmap_init_mmio(&pdev->dev, regs,
-					    &sun4i_i2s_regmap_config);
+					    quirks->sun4i_i2s_regmap);
 	if (IS_ERR(i2s->regmap)) {
 		dev_err(&pdev->dev, "Regmap initialisation failed\n");
 		return PTR_ERR(i2s->regmap);
@@ -732,7 +746,7 @@ static int sun4i_i2s_probe(struct platform_device *pdev)
 		}
 	}
 
-	i2s->playback_dma_data.addr = res->start + SUN4I_I2S_FIFO_TX_REG;
+	i2s->playback_dma_data.addr = res->start + quirks->reg_offset_txdata;
 	i2s->playback_dma_data.maxburst = 8;
 
 	i2s->capture_dma_data.addr = res->start + SUN4I_I2S_FIFO_RX_REG;
@@ -745,6 +759,8 @@ static int sun4i_i2s_probe(struct platform_device *pdev)
 			goto err_pm_disable;
 	}
 
+	/* Register ops with dai */
+	sun4i_i2s_dai.ops = quirks->ops;
 	ret = devm_snd_soc_register_component(&pdev->dev,
 					      &sun4i_i2s_component,
 					      &sun4i_i2s_dai, 1);
