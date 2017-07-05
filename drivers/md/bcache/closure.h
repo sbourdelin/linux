@@ -249,8 +249,9 @@ static inline void set_closure_fn(struct closure *cl, closure_fn *fn,
 static inline void closure_queue(struct closure *cl)
 {
 	struct workqueue_struct *wq = cl->wq;
+	closure_fn		*fn = cl->fn;
 	if (wq) {
-		INIT_WORK(&cl->work, cl->work.func);
+		INIT_WORK(&cl->work, (work_func_t)fn);
 		BUG_ON(!queue_work(wq, &cl->work));
 	} else
 		cl->fn(cl);
