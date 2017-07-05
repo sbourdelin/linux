@@ -752,8 +752,10 @@ int machine_check_generic(struct pt_regs *regs)
 
 void machine_check_exception(struct pt_regs *regs)
 {
-	enum ctx_state prev_state = exception_enter();
 	int recover = 0;
+	bool nested = in_nmi();
+	if (!nested)
+		nmi_enter();
 
 	__this_cpu_inc(irq_stat.mce_exceptions);
 
@@ -783,10 +785,11 @@ void machine_check_exception(struct pt_regs *regs)
 
 	/* Must die if the interrupt is not recoverable */
 	if (!(regs->msr & MSR_RI))
-		panic("Unrecoverable Machine check");
+		nmi_panic("Unrecoverable Machine check");
 
 bail:
-	exception_exit(prev_state);
+	if (!nested)
+		nmi_exit();
 }
 
 void SMIException(struct pt_regs *regs)

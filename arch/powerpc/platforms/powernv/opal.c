@@ -449,7 +449,7 @@ int opal_machine_check(struct pt_regs *regs)
 
 	pnv_platform_error = "Unrecoverable Machine Check exception";
 
-	panic("Unrecoverable Machine Check exception");
+	nmi_panic("Unrecoverable Machine Check exception");
 }
 
 /* Early hmi handler called in real mode. */
