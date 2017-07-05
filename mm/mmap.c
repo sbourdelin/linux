@@ -2307,6 +2307,25 @@ int expand_upwards(struct vm_area_struct *vma, unsigned long address)
 }
 #endif /* CONFIG_STACK_GROWSUP || CONFIG_IA64 */
 
+unsigned long __vm_start_gap(struct vm_area_struct *vma)
+{
+	unsigned long stack_limit =
+		current->signal->rlim[RLIMIT_STACK].rlim_cur;
+	unsigned long vm_start;
+
+	if (stack_limit != RLIM_INFINITY &&
+	    vma->vm_end - vma->vm_start < stack_limit)
+		vm_start = vma->vm_end - PAGE_ALIGN(stack_limit);
+	else
+		vm_start = vma->vm_start;
+
+	vm_start -= stack_guard_gap;
+	if (vm_start > vma->vm_start)
+		vm_start = 0;
+
+	return vm_start;
+}
+
 /*
  * vma is the first one with address < vma->vm_start.  Have to extend vma.
  */
@@ -2323,11 +2342,16 @@ int expand_downwards(struct vm_area_struct *vma,
 	if (error)
 		return error;
 
-	/* Enforce stack_guard_gap */
+	/*
+	 * Enforce stack_guard_gap.  Some applications allocate a VM_NONE
+	 * mapping just below the stack, which we can safely ignore.
+	 */
 	gap_addr = address - stack_guard_gap;
 	if (gap_addr > address)
 		return -ENOMEM;
 	prev = vma->vm_prev;
+	if (prev && !(prev->vm_flags & (VM_READ | VM_WRITE | VM_EXEC)))
+		prev = prev->vm_prev;
 	if (prev && prev->vm_end > gap_addr) {
 		if (!(prev->vm_flags & VM_GROWSDOWN))
 			return -ENOMEM;
