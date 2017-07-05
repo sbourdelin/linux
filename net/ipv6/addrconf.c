@@ -3395,6 +3395,9 @@ static int addrconf_notify(struct notifier_block *this, unsigned long event,
 			break;
 		}
 
+		if (!(dev->flags & IFF_UP))
+			break;
+
 		/* allocate new idev */
 		idev = ipv6_add_dev(dev);
 		if (IS_ERR(idev))
