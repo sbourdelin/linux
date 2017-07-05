@@ -1175,7 +1175,7 @@ static void mmc_blk_issue_drv_op(struct mmc_queue *mq, struct request *req)
 	struct mmc_queue_req *mq_rq;
 	struct mmc_card *card = mq->card;
 	struct mmc_blk_data *md = mq->blkdata;
-	int ret;
+	int ret = -EINVAL;
 	int i;
 
 	mq_rq = req_to_mmc_queue_req(req);
@@ -1206,7 +1206,6 @@ static void mmc_blk_issue_drv_op(struct mmc_queue *mq, struct request *req)
 	default:
 		pr_err("%s: unknown driver specific operation\n",
 		       md->disk->disk_name);
-		ret = -EINVAL;
 		break;
 	}
 	mq_rq->drv_op_result = ret;
