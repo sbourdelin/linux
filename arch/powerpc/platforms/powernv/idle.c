@@ -194,6 +194,28 @@ static void pnv_alloc_idle_core_states(void)
 		}
 	}
 
+	/*
+	 * For each CPU, record its PACA address in each of it's
+	 * sibling thread's PACA at the slot corresponding to this
+	 * CPU's index in the core.
+	 */
+	if (cpu_has_feature(CPU_FTR_POWER9_DD1)) {
+		int cpu;
+
+		pr_info("powernv: idle: Saving PACA pointers of all CPUs in their thread sibling PACA\n");
+		for_each_possible_cpu(cpu) {
+			int base_cpu = cpu_first_thread_sibling(cpu);
+			int idx = cpu_thread_in_core(cpu);
+			int i;
+
+			for (i = 0; i < threads_per_core; i++) {
+				int j = base_cpu + i;
+
+				paca[j].thread_sibling_pacas[idx] = &paca[cpu];
+			}
+		}
+	}
+
 	update_subcore_sibling_mask();
 
 	if (supported_cpuidle_states & OPAL_PM_LOSE_FULL_CONTEXT)
@@ -898,30 +920,7 @@ static int __init pnv_init_idle_states(void)
 	if (pnv_probe_idle_states())
 		goto out;
 
-
 	pnv_alloc_idle_core_states();
-
-	/*
-	 * For each CPU, record its PACA address in each of it's
-	 * sibling thread's PACA at the slot corresponding to this
-	 * CPU's index in the core.
-	 */
-	if (cpu_has_feature(CPU_FTR_POWER9_DD1)) {
-		int cpu;
-
-		pr_info("powernv: idle: Saving PACA pointers of all CPUs in their thread sibling PACA\n");
-		for_each_possible_cpu(cpu) {
-			int base_cpu = cpu_first_thread_sibling(cpu);
-			int idx = cpu_thread_in_core(cpu);
-			int i;
-
-			for (i = 0; i < threads_per_core; i++) {
-				int j = base_cpu + i;
-
-				paca[j].thread_sibling_pacas[idx] = &paca[cpu];
-			}
-		}
-	}
 
 out:
 	return 0;
