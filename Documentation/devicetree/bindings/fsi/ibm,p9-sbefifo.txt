@@ -1,0 +1,20 @@
+Device-tree bindings for FSI-based SBEFIFO driver
+-------------------------------------------------
+
+Required properties:
+ - reg = < address size >		: FSI CFAM address for the SBE engine
+					  and address space size.
+
+Optional properties:
+ - <child nodes>			: Devices that are accessible through
+					  the SBEFIFO.
+
+Examples:
+
+    sbefifo@2400 {
+        reg = < 0x2400 0x400 >;
+
+        occ@1 {
+            ...
+        };
+    };

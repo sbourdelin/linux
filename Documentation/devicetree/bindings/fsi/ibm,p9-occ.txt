@@ -1,0 +1,15 @@
+Device-tree bindings for FSI-based On-Chip Controller driver
+------------------------------------------------------------
+
+Required properties:
+ - compatible = "ibm,p9-occ";
+
+Optional properties:
+ - reg = <processor index>;	: Index for the processor this OCC is on.
+
+Examples:
+
+    occ@1 {
+        compatible = "ibm,p9-occ";
+        reg = <1>;
+    };
