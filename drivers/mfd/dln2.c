@@ -40,6 +40,7 @@ struct dln2_response {
 #define DLN2_GENERIC_CMD(cmd)		DLN2_CMD(cmd, DLN2_GENERIC_MODULE_ID)
 #define CMD_GET_DEVICE_VER		DLN2_GENERIC_CMD(0x30)
 #define CMD_GET_DEVICE_SN		DLN2_GENERIC_CMD(0x31)
+#define CMD_RESTART			DLN2_GENERIC_CMD(0x43)
 
 #define DLN2_HW_ID			0x200
 #define DLN2_USB_TIMEOUT		200	/* in ms */
@@ -531,6 +532,12 @@ int dln2_transfer(struct platform_device *pdev, u16 cmd,
 }
 EXPORT_SYMBOL(dln2_transfer);
 
+static int dln2_restart(struct dln2_dev *dln2)
+{
+	return _dln2_transfer(dln2, DLN2_HANDLE_CTRL, CMD_RESTART,
+			      NULL, 0, NULL, NULL);
+}
+
 static int dln2_check_hw(struct dln2_dev *dln2)
 {
 	int ret;
@@ -782,7 +789,9 @@ static int dln2_probe(struct usb_interface *interface,
 
 	ret = dln2_hw_init(dln2);
 	if (ret < 0) {
-		dev_err(dev, "failed to initialize hardware\n");
+		dev_err(dev,
+			"failed to initialize hardware; attempting restart\n");
+		dln2_restart(dln2);
 		goto out_stop_rx;
 	}
 
