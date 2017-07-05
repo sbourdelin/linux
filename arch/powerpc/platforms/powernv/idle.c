@@ -58,6 +58,17 @@ static u64 pnv_deepest_stop_psscr_val;
 static u64 pnv_deepest_stop_psscr_mask;
 static bool deepest_stop_found;
 
+/*
+ * Data structure that stores details of
+ * all the platform idle states.
+ */
+struct pnv_idle_states pnv_idle;
+
+struct pnv_idle_states *get_pnv_idle_states(void)
+{
+	return &pnv_idle;
+}
+
 static int pnv_save_sprs_for_deep_states(void)
 {
 	int cpu;
@@ -435,9 +446,11 @@ unsigned long pnv_cpu_offline(unsigned int cpu)
  *	stop instruction
  */
 
-int validate_psscr_val_mask(u64 *psscr_val, u64 *psscr_mask, u32 flags)
+void validate_psscr_val_mask(int i)
 {
-	int err = 0;
+	u64 *psscr_val = &pnv_idle.states[i].ctrl_reg_val;
+	u64 *psscr_mask = &pnv_idle.states[i].ctrl_reg_mask;
+	u32 flags = pnv_idle.states[i].flags;
 
 	/*
 	 * psscr_mask == 0xf indicates an older firmware.
@@ -447,7 +460,8 @@ int validate_psscr_val_mask(u64 *psscr_val, u64 *psscr_mask, u32 flags)
 	if (*psscr_mask == 0xf) {
 		*psscr_val = *psscr_val | PSSCR_HV_DEFAULT_VAL;
 		*psscr_mask = PSSCR_HV_DEFAULT_MASK;
-		return err;
+		pnv_idle.states[i].valid = true;
+		return;
 	}
 
 	/*
@@ -458,13 +472,17 @@ int validate_psscr_val_mask(u64 *psscr_val, u64 *psscr_mask, u32 flags)
 	 * - ESL bit is set for all the deep stop states.
 	 */
 	if (GET_PSSCR_ESL(*psscr_val) != GET_PSSCR_EC(*psscr_val)) {
-		err = ERR_EC_ESL_MISMATCH;
+		pnv_idle.states[i].valid = false;
+		pr_warn("Invalid state:%s:psscr 0x%016llx: ESL,EC bits unequal\n",
+			pnv_idle.states[i].name, *psscr_val);
 	} else if ((flags & OPAL_PM_LOSE_FULL_CONTEXT) &&
 		GET_PSSCR_ESL(*psscr_val) == 0) {
-		err = ERR_DEEP_STATE_ESL_MISMATCH;
+		pnv_idle.states[i].valid = false;
+		pr_warn("Invalid state:%s:psscr 0x%016llx:ESL cleared for deep stop\n",
+			pnv_idle.states[i].name, *psscr_val);
+	} else {
+		pnv_idle.states[i].valid = true;
 	}
-
-	return err;
 }
 
 /*
@@ -472,53 +490,12 @@ int validate_psscr_val_mask(u64 *psscr_val, u64 *psscr_mask, u32 flags)
  *                        deep idle state and deepest idle state on
  *                        ISA 3.0 CPUs.
  *
- * @np: /ibm,opal/power-mgt device node
- * @flags: cpu-idle-state-flags array
- * @dt_idle_states: Number of idle state entries
- * Returns 0 on success
  */
-static int __init pnv_power9_idle_init(struct device_node *np, u32 *flags,
-					int dt_idle_states)
+static void __init pnv_power9_idle_init(void)
 {
-	u64 *psscr_val = NULL;
-	u64 *psscr_mask = NULL;
-	u32 *residency_ns = NULL;
 	u64 max_residency_ns = 0;
-	int rc = 0, i;
-
-	psscr_val = kcalloc(dt_idle_states, sizeof(*psscr_val), GFP_KERNEL);
-	psscr_mask = kcalloc(dt_idle_states, sizeof(*psscr_mask), GFP_KERNEL);
-	residency_ns = kcalloc(dt_idle_states, sizeof(*residency_ns),
-			       GFP_KERNEL);
-
-	if (!psscr_val || !psscr_mask || !residency_ns) {
-		rc = -1;
-		goto out;
-	}
-
-	if (of_property_read_u64_array(np,
-		"ibm,cpu-idle-state-psscr",
-		psscr_val, dt_idle_states)) {
-		pr_warn("cpuidle-powernv: missing ibm,cpu-idle-state-psscr in DT\n");
-		rc = -1;
-		goto out;
-	}
-
-	if (of_property_read_u64_array(np,
-				       "ibm,cpu-idle-state-psscr-mask",
-				       psscr_mask, dt_idle_states)) {
-		pr_warn("cpuidle-powernv: missing ibm,cpu-idle-state-psscr-mask in DT\n");
-		rc = -1;
-		goto out;
-	}
-
-	if (of_property_read_u32_array(np,
-				       "ibm,cpu-idle-state-residency-ns",
-					residency_ns, dt_idle_states)) {
-		pr_warn("cpuidle-powernv: missing ibm,cpu-idle-state-residency-ns in DT\n");
-		rc = -1;
-		goto out;
-	}
+	int i;
+	int dt_idle_states = pnv_idle.nr_states;
 
 	/*
 	 * Set pnv_first_deep_stop_state, pnv_deepest_stop_psscr_{val,mask},
@@ -535,31 +512,34 @@ static int __init pnv_power9_idle_init(struct device_node *np, u32 *flags,
 	 */
 	pnv_first_deep_stop_state = MAX_STOP_STATE;
 	for (i = 0; i < dt_idle_states; i++) {
-		int err;
-		u64 psscr_rl = psscr_val[i] & PSSCR_RL_MASK;
+		u64 psscr_rl, residency_ns, psscr_val, psscr_mask;
+		u32 flags;
 
-		if ((flags[i] & OPAL_PM_LOSE_FULL_CONTEXT) &&
-		     (pnv_first_deep_stop_state > psscr_rl))
-			pnv_first_deep_stop_state = psscr_rl;
-
-		err = validate_psscr_val_mask(&psscr_val[i], &psscr_mask[i],
-					      flags[i]);
-		if (err) {
-			report_invalid_psscr_val(psscr_val[i], err);
+		if (!pnv_idle.states[i].valid)
 			continue;
+
+		psscr_val = pnv_idle.states[i].ctrl_reg_val;
+		psscr_mask = pnv_idle.states[i].ctrl_reg_mask;
+		psscr_rl = psscr_val & PSSCR_RL_MASK;
+		flags = pnv_idle.states[i].flags;
+		residency_ns = pnv_idle.states[i].residency_ns;
+
+		if ((flags & OPAL_PM_LOSE_FULL_CONTEXT) &&
+		    (pnv_first_deep_stop_state > psscr_rl)) {
+			pnv_first_deep_stop_state = psscr_rl;
 		}
 
-		if (max_residency_ns < residency_ns[i]) {
-			max_residency_ns = residency_ns[i];
-			pnv_deepest_stop_psscr_val = psscr_val[i];
-			pnv_deepest_stop_psscr_mask = psscr_mask[i];
+		if (max_residency_ns < residency_ns) {
+			max_residency_ns = residency_ns;
+			pnv_deepest_stop_psscr_val = psscr_val;
+			pnv_deepest_stop_psscr_mask = psscr_mask;
 			deepest_stop_found = true;
 		}
 
 		if (!default_stop_found &&
-		    (flags[i] & OPAL_PM_STOP_INST_FAST)) {
-			pnv_default_stop_val = psscr_val[i];
-			pnv_default_stop_mask = psscr_mask[i];
+		    (flags & OPAL_PM_STOP_INST_FAST)) {
+			pnv_default_stop_val = psscr_val;
+			pnv_default_stop_mask = psscr_mask;
 			default_stop_found = true;
 		}
 	}
@@ -582,10 +562,251 @@ static int __init pnv_power9_idle_init(struct device_node *np, u32 *flags,
 
 	pr_info("cpuidle-powernv: Requested Level (RL) value of first deep stop = 0x%llx\n",
 		pnv_first_deep_stop_state);
+}
+
+/*
+ * Returns 0 if prop1_len == prop2_len. Else returns -1
+ */
+static inline int validate_dt_prop_sizes(const char *prop1, int prop1_len,
+					 const char *prop2, int prop2_len)
+{
+	if (prop1_len == prop2_len)
+		return 0;
+
+	pr_warn("cpuidle-powernv: array sizes don't match for %s and %s\n",
+		prop1, prop2);
+	return -1;
+}
+
+/**
+ * get_idle_prop_u32_array: Returns an array of u32 elements
+ *			    parsed from the device tree corresponding
+ *			    to the property provided in variable propname.
+ *
+ * @np: Pointer to device tree node "/ibm,opal/power-mgt"
+ * @nr_states: Expected number of elements.
+ * @propname : Name of the property whose values is an array of
+ *             u32 elements
+ *
+ * Returns a pointer to a u32 array of size nr_states on success.
+ * Returns NULL on failure.
+ */
+static inline u32 *get_idle_prop_u32_array(struct device_node *np,
+					   int nr_states,
+					   const char *propname)
+{
+	u32 *ret_array;
+	int rc, count;
+
+	count = of_property_count_u32_elems(np, propname);
+	rc = validate_dt_prop_sizes("ibm,cpu-idle-state-flags", nr_states,
+				    propname, count);
+	if (rc)
+		return NULL;
+
+	ret_array = kcalloc(nr_states, sizeof(*ret_array), GFP_KERNEL);
+	if (!ret_array)
+		return NULL;
+
+	rc = of_property_read_u32_array(np, propname, ret_array, nr_states);
+	if (!rc)
+		return ret_array;
+
+	kfree(ret_array);
+	return NULL;
+}
+
+/**
+ * get_idle_prop_u64_array: Returns an array of u64 elements
+ *			    parsed from the device tree corresponding
+ *			    to the property provided in variable propname.
+ *
+ * @np: Pointer to device tree node "/ibm,opal/power-mgt"
+ * @nr_states: Expected number of elements.
+ * @propname : Name of the property whose value is an array of
+ *             u64 elements
+ *
+ * Returns a pointer to a u64 array of size nr_states on success.
+ * Returns NULL on failure.
+ */
+static inline u64 *get_idle_prop_u64_array(struct device_node *np,
+					   int nr_states,
+					   const char *propname)
+{
+	u64 *ret_array;
+	int rc, count;
+
+	count = of_property_count_u64_elems(np, propname);
+	rc = validate_dt_prop_sizes("ibm,cpu-idle-state-flags", nr_states,
+				    propname, count);
+	if (rc)
+		return NULL;
+
+	ret_array = kcalloc(nr_states, sizeof(*ret_array), GFP_KERNEL);
+	if (!ret_array)
+		return NULL;
+
+	rc = of_property_read_u64_array(np, propname, ret_array, nr_states);
+	if (!rc)
+		return ret_array;
+
+	kfree(ret_array);
+	return NULL;
+}
+
+/**
+ * get_idle_prop_strings_array: Returns an array of string pointers
+ *			    parsed from the device tree corresponding
+ *			    to the property provided in variable propname.
+ *
+ * @np: Pointer to device tree node "/ibm,opal/power-mgt"
+ * @nr_states: Expected number of elements.
+ *
+ * @propname : Name of the property whose values is an array of string
+ *             pointers.
+ *
+ * Returns a pointer to an array of string pointers ofsize nr_states on success.
+ * Returns NULL on failure.
+ */
+static inline const char **get_idle_prop_strings_array(struct device_node *np,
+						       int nr_states,
+						       const char *propname)
+{
+	const char **ret_array;
+	int rc, count;
+
+	count = of_property_count_strings(np, propname);
+	rc = validate_dt_prop_sizes("ibm,cpu-idle-state-flags", nr_states,
+				    propname, count);
+	if (rc)
+		return NULL;
+
+	ret_array = kcalloc(nr_states, sizeof(*ret_array), GFP_KERNEL);
+	if (!ret_array)
+		return NULL;
+
+	rc = of_property_read_string_array(np, propname, ret_array, nr_states);
+	if (rc >= 0)
+		return ret_array;
+
+	kfree(ret_array);
+	return NULL;
+}
+
+static int __init pnv_idle_parse(struct  device_node *np, int dt_idle_states)
+{
+	int count;
+	u32 *latency_ns = NULL, *residency_ns = NULL, *flags = NULL;
+	u64 *psscr_vals = NULL, *psscr_masks = NULL;
+	const char **names = NULL;
+	u32 has_stop_states = 0;
+	int i, rc = -1;
+	bool residency_present = true;
+
+	pnv_idle.nr_states = 0;
+
+	flags = get_idle_prop_u32_array(np, dt_idle_states,
+					"ibm,cpu-idle-state-flags");
+	if (!flags)
+		goto out_err;
+
+	latency_ns = get_idle_prop_u32_array(np, dt_idle_states,
+					     "ibm,cpu-idle-state-latencies-ns");
+	if (!latency_ns)
+		goto out_err;
+
+	names = get_idle_prop_strings_array(np, dt_idle_states,
+					    "ibm,cpu-idle-state-names");
+	if (!names)
+		goto out_err;
+
+	/*
+	 * If the idle states use stop instruction, probe for psscr
+	 * values and psscr mask which are necessary to specify
+	 * required stop level.
+	 */
+	has_stop_states = (flags[0] &
+			   (OPAL_PM_STOP_INST_FAST | OPAL_PM_STOP_INST_DEEP));
+	if (has_stop_states) {
+		psscr_vals = get_idle_prop_u64_array(np, dt_idle_states,
+						     "ibm,cpu-idle-state-psscr");
+		if (!psscr_vals)
+			goto out_err;
+
+		psscr_masks = get_idle_prop_u64_array(np, dt_idle_states,
+						      "ibm,cpu-idle-state-psscr-mask");
+		if (!psscr_masks)
+			goto out_err;
+	}
+
+	count = of_property_count_u32_elems(np,
+					    "ibm,cpu-idle-state-residency-ns");
+	/*
+	 * On POWER8, on some of the older firmware, the residency
+	 * array can be absent. In this case we hardcode the values
+	 * for the nap and fastsleep states in the kernel.
+	 *
+	 * On POWER9, the cpu-idle-state-residency-ns is expected to be
+	 * provided by the firmware.
+	 */
+	if (count < 0) {
+		if (has_stop_states) {
+			pr_warn("cpuidle-powernv:Missing ibm,cpu-idle-state-residency in DT\n");
+			goto out_err;
+		} else {
+			residency_present = false;
+		}
+	} else {
+		residency_ns = get_idle_prop_u32_array(np, dt_idle_states,
+						       "ibm,cpu-idle-state-residency-ns");
+		if (!residency_ns)
+			goto out_err;
+	}
+
+	pnv_idle.states = kcalloc(dt_idle_states, sizeof(struct pnv_idle_state),
+				  GFP_KERNEL);
+	if (!pnv_idle.states)
+		goto out_err;
+
+	for (i = 0; i < dt_idle_states; i++) {
+		struct pnv_idle_state *state = &pnv_idle.states[i];
+
+		strlcpy(state->name, names[i], PNV_IDLE_NAME_LEN);
+		state->flags = flags[i];
+		state->latency_ns = latency_ns[i];
+
+		if (has_stop_states) {
+			state->residency_ns = residency_ns[i];
+			state->ctrl_reg_val = psscr_vals[i];
+			state->ctrl_reg_mask = psscr_masks[i];
+			validate_psscr_val_mask(i);
+		} else {
+			if (residency_present)
+				state->residency_ns = residency_ns[i];
+			else if (flags[i] & OPAL_PM_NAP_ENABLED)
+				state->residency_ns = 100000;
+			else if (flags[i] & OPAL_PM_SLEEP_ENABLED ||
+				 flags[i] & OPAL_PM_SLEEP_ENABLED_ER1)
+				state->residency_ns = 300000000;
+
+			state->valid = true;
+		}
+	}
+
+	pnv_idle.nr_states = dt_idle_states;
+	rc = 0;
+	goto out;
+
+out_err:
+	kfree(pnv_idle.states);
 out:
-	kfree(psscr_val);
-	kfree(psscr_mask);
+	kfree(names);
+	kfree(flags);
 	kfree(residency_ns);
+	kfree(latency_ns);
+	kfree(psscr_vals);
+	kfree(psscr_masks);
+
 	return rc;
 }
 
@@ -596,40 +817,33 @@ static void __init pnv_probe_idle_states(void)
 {
 	struct device_node *np;
 	int dt_idle_states;
-	u32 *flags = NULL;
 	int i;
 
 	np = of_find_node_by_path("/ibm,opal/power-mgt");
 	if (!np) {
 		pr_warn("opal: PowerMgmt Node not found\n");
-		goto out;
+		return;
 	}
 	dt_idle_states = of_property_count_u32_elems(np,
 			"ibm,cpu-idle-state-flags");
 	if (dt_idle_states < 0) {
 		pr_warn("cpuidle-powernv: no idle states found in the DT\n");
-		goto out;
+		return;
 	}
 
-	flags = kcalloc(dt_idle_states, sizeof(*flags),  GFP_KERNEL);
+	if (pnv_idle_parse(np, dt_idle_states))
+		return;
 
-	if (of_property_read_u32_array(np,
-			"ibm,cpu-idle-state-flags", flags, dt_idle_states)) {
-		pr_warn("cpuidle-powernv: missing ibm,cpu-idle-state-flags in DT\n");
-		goto out;
+	if (cpu_has_feature(CPU_FTR_ARCH_300))
+		pnv_power9_idle_init();
+
+	for (i = 0; i < dt_idle_states; i++) {
+		if (!pnv_idle.states[i].valid)
+			continue;
+		supported_cpuidle_states |= pnv_idle.states[i].flags;
 	}
-
-	if (cpu_has_feature(CPU_FTR_ARCH_300)) {
-		if (pnv_power9_idle_init(np, flags, dt_idle_states))
-			goto out;
-	}
-
-	for (i = 0; i < dt_idle_states; i++)
-		supported_cpuidle_states |= flags[i];
-
-out:
-	kfree(flags);
 }
+
 static int __init pnv_init_idle_states(void)
 {
 

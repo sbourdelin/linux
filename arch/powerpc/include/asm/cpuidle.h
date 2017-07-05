@@ -73,19 +73,25 @@ extern u32 pnv_fastsleep_workaround_at_exit[];
 extern u64 pnv_first_deep_stop_state;
 
 unsigned long pnv_cpu_offline(unsigned int cpu);
-int validate_psscr_val_mask(u64 *psscr_val, u64 *psscr_mask, u32 flags);
-static inline void report_invalid_psscr_val(u64 psscr_val, int err)
-{
-	switch (err) {
-	case ERR_EC_ESL_MISMATCH:
-		pr_warn("Invalid psscr 0x%016llx : ESL,EC bits unequal",
-			psscr_val);
-		break;
-	case ERR_DEEP_STATE_ESL_MISMATCH:
-		pr_warn("Invalid psscr 0x%016llx : ESL cleared for deep stop-state",
-			psscr_val);
-	}
-}
+
+#define PNV_IDLE_NAME_LEN     16
+struct pnv_idle_state {
+	char name[PNV_IDLE_NAME_LEN];
+	u32 flags;
+	u32 latency_ns;
+	u32 residency_ns;
+	u64 ctrl_reg_val;   /* The ctrl_reg on POWER8 would be pmicr. */
+	u64 ctrl_reg_mask;  /* On POWER9 it is psscr */
+	bool valid;
+};
+
+struct pnv_idle_states {
+	unsigned int nr_states;
+	struct pnv_idle_state *states;
+};
+
+struct pnv_idle_states *get_pnv_idle_states(void);
+
 #endif
 
 #endif
