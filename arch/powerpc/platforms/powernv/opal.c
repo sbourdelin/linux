@@ -30,6 +30,7 @@
 #include <asm/opal.h>
 #include <asm/firmware.h>
 #include <asm/mce.h>
+#include <asm/bug.h>
 
 #include "powernv.h"
 
@@ -407,15 +408,22 @@ static int opal_recover_mce(struct pt_regs *regs,
 		/* Fatal machine check */
 		pr_err("Machine check interrupt is fatal\n");
 		recovered = 0;
-	} else if ((evt->severity == MCE_SEV_ERROR_SYNC) &&
-			(user_mode(regs) && !is_global_init(current))) {
+	} else if (evt->severity == MCE_SEV_ERROR_SYNC) {
 		/*
-		 * For now, kill the task if we have received exception when
-		 * in userspace.
+		 * Try to kill processes if we get a synchronous machine check
+		 * (e.g., one caused by execution of this instruction). This
+		 * will devolve into a panic if we try to kill init or are in
+		 * an interrupt etc.
 		 *
 		 * TODO: Queue up this address for hwpoisioning later.
+		 * TODO: This is not quite right for d-side machine
+		 *       checks ->nip is not necessarily the important
+		 *       address.
 		 */
-		_exception(SIGBUS, regs, BUS_MCEERR_AR, regs->nip);
+		if ((user_mode(regs)))
+			_exception(SIGBUS, regs, BUS_MCEERR_AR, regs->nip);
+		else
+			die("Machine check", regs, SIGBUS);
 		recovered = 1;
 	}
 	return recovered;
