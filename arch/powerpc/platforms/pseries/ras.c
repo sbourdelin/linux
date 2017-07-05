@@ -421,19 +421,19 @@ static int recover_mce(struct pt_regs *regs, struct rtas_error_log *err)
 		       "be degraded\n");
 		recovered = 1;
 
-	} else if (user_mode(regs) && !is_global_init(current) &&
-		   rtas_error_severity(err) == RTAS_SEVERITY_ERROR_SYNC) {
-
+	} else if (rtas_error_severity(err) == RTAS_SEVERITY_ERROR_SYNC) {
 		/*
-		 * If we received a synchronous error when in userspace
-		 * kill the task. Firmware may report details of the fail
-		 * asynchronously, so we can't rely on the target and type
-		 * fields being valid here.
+		 * Firmware may report details of the fail asynchronously, so
+		 * we can't rely on the target and type fields being valid
+		 * here.
 		 */
-		printk(KERN_ERR "MCE: uncorrectable error, killing task "
-		       "%s:%d\n", current->comm, current->pid);
-
-		_exception(SIGBUS, regs, BUS_MCEERR_AR, regs->nip);
+		if ((user_mode(regs))) {
+			printk(KERN_ERR "MCE: uncorrectable error, killing task"
+				" %s:%d\n", current->comm, current->pid);
+			_exception(SIGBUS, regs, BUS_MCEERR_AR, regs->nip);
+		} else {
+			die("Machine check", regs, SIGBUS);
+		}
 		recovered = 1;
 	}
 
