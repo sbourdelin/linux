@@ -895,8 +895,13 @@ static void __dwc3_prepare_one_trb(struct dwc3_ep *dep, struct dwc3_trb *trb,
 			trb->ctrl = DWC3_TRBCTL_ISOCHRONOUS_FIRST;
 
 			if (speed == USB_SPEED_HIGH) {
-				struct usb_ep *ep = &dep->endpoint;
-				trb->size |= DWC3_TRB_SIZE_PCM1(ep->mult - 1);
+				unsigned int maxp = usb_endpoint_maxp(
+							dep->endpoint.desc);
+				unsigned int rem = length % maxp;
+				unsigned int mult = (length / maxp) & 0x3;
+
+				trb->size |= DWC3_TRB_SIZE_PCM1(
+						rem ? mult : mult - 1);
 			}
 		} else {
 			trb->ctrl = DWC3_TRBCTL_ISOCHRONOUS;
