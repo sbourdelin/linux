@@ -4439,9 +4439,13 @@ static void i915_gem_flush_free_objects(struct drm_i915_private *i915)
 {
 	struct llist_node *freed;
 
-	freed = llist_del_all(&i915->mm.free_list);
-	if (unlikely(freed))
+	freed = NULL;
+	if (!llist_empty(&i915->mm.free_list))
+		freed = llist_del_first(&i915->mm.free_list);
+	if (unlikely(freed)) {
+		freed->next = NULL;
 		__i915_gem_free_objects(i915, freed);
+	}
 }
 
 static void __i915_gem_free_work(struct work_struct *work)
