@@ -502,6 +502,36 @@ struct vfio_pci_hot_reset {
 
 #define VFIO_DEVICE_PCI_HOT_RESET	_IO(VFIO_TYPE, VFIO_BASE + 13)
 
+/**
+ * VFIO_DEVICE_QUERY_GFX_PLANE - _IOW(VFIO_TYPE, VFIO_BASE + 14,
+ *                           struct vfio_device_query_gfx_plane)
+ * Return: 0 on success, -errno on failure.
+ */
+
+struct vfio_device_gfx_plane_info {
+	__u64 start;
+	__u64 drm_format_mod;
+	__u32 drm_format;
+	__u32 width;
+	__u32 height;
+	__u32 stride;
+	__u32 size;
+	__u32 x_pos;
+	__u32 y_pos;
+};
+
+struct vfio_device_query_gfx_plane {
+	__u32 argsz;
+	__u32 flags;
+	struct vfio_device_gfx_plane_info plane_info;
+	__u32 plane_type;
+	__s32 fd; /* dma-buf fd */
+	__u32 plane_id;
+};
+
+#define VFIO_DEVICE_QUERY_GFX_PLANE _IO(VFIO_TYPE, VFIO_BASE + 14)
+
+
 /* -------- API for Type1 VFIO IOMMU -------- */
 
 /**
