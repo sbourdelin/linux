@@ -813,26 +813,27 @@ out:
 /*
  * Probe device tree for supported idle states
  */
-static void __init pnv_probe_idle_states(void)
+static int __init pnv_probe_idle_states(void)
 {
 	struct device_node *np;
 	int dt_idle_states;
-	int i;
+	int i, rc;
 
 	np = of_find_node_by_path("/ibm,opal/power-mgt");
 	if (!np) {
 		pr_warn("opal: PowerMgmt Node not found\n");
-		return;
+		return -ENODEV;
 	}
 	dt_idle_states = of_property_count_u32_elems(np,
 			"ibm,cpu-idle-state-flags");
 	if (dt_idle_states < 0) {
 		pr_warn("cpuidle-powernv: no idle states found in the DT\n");
-		return;
+		return -ENOENT;
 	}
 
-	if (pnv_idle_parse(np, dt_idle_states))
-		return;
+	rc = pnv_idle_parse(np, dt_idle_states);
+	if (rc)
+		return rc;
 
 	if (cpu_has_feature(CPU_FTR_ARCH_300))
 		pnv_power9_idle_init();
@@ -842,6 +843,8 @@ static void __init pnv_probe_idle_states(void)
 			continue;
 		supported_cpuidle_states |= pnv_idle.states[i].flags;
 	}
+
+	return 0;
 }
 
 static int __init pnv_init_idle_states(void)
@@ -852,7 +855,8 @@ static int __init pnv_init_idle_states(void)
 	if (cpuidle_disable != IDLE_NO_OVERRIDE)
 		goto out;
 
-	pnv_probe_idle_states();
+	if (pnv_probe_idle_states())
+		goto out;
 
 	if (!(supported_cpuidle_states & OPAL_PM_SLEEP_ENABLED_ER1)) {
 		patch_instruction(
