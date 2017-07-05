@@ -564,6 +564,44 @@ static void __init pnv_power9_idle_init(void)
 		pnv_first_deep_stop_state);
 }
 
+
+static void __init pnv_power8_idle_init(void)
+{
+	int i;
+	bool has_nap = false;
+	bool has_sleep_er1 = false;
+	int dt_idle_states = pnv_idle.nr_states;
+
+	for (i = 0; i < dt_idle_states; i++) {
+		struct pnv_idle_state *state = &pnv_idle.states[i];
+
+		if (state->flags & OPAL_PM_NAP_ENABLED)
+			has_nap = true;
+		if (state->flags & OPAL_PM_SLEEP_ENABLED_ER1)
+			has_sleep_er1 = true;
+	}
+
+	if (!has_sleep_er1) {
+		patch_instruction(
+			(unsigned int *)pnv_fastsleep_workaround_at_entry,
+			PPC_INST_NOP);
+		patch_instruction(
+			(unsigned int *)pnv_fastsleep_workaround_at_exit,
+			PPC_INST_NOP);
+	} else {
+		/*
+		 * OPAL_PM_SLEEP_ENABLED_ER1 is set. It indicates that
+		 * workaround is needed to use fastsleep. Provide sysfs
+		 * control to choose how this workaround has to be applied.
+		 */
+		device_create_file(cpu_subsys.dev_root,
+				&dev_attr_fastsleep_workaround_applyonce);
+	}
+
+	if (has_nap)
+		ppc_md.power_save = power7_idle;
+}
+
 /*
  * Returns 0 if prop1_len == prop2_len. Else returns -1
  */
@@ -837,6 +875,8 @@ static int __init pnv_probe_idle_states(void)
 
 	if (cpu_has_feature(CPU_FTR_ARCH_300))
 		pnv_power9_idle_init();
+	else
+		pnv_power8_idle_init();
 
 	for (i = 0; i < dt_idle_states; i++) {
 		if (!pnv_idle.states[i].valid)
@@ -858,22 +898,6 @@ static int __init pnv_init_idle_states(void)
 	if (pnv_probe_idle_states())
 		goto out;
 
-	if (!(supported_cpuidle_states & OPAL_PM_SLEEP_ENABLED_ER1)) {
-		patch_instruction(
-			(unsigned int *)pnv_fastsleep_workaround_at_entry,
-			PPC_INST_NOP);
-		patch_instruction(
-			(unsigned int *)pnv_fastsleep_workaround_at_exit,
-			PPC_INST_NOP);
-	} else {
-		/*
-		 * OPAL_PM_SLEEP_ENABLED_ER1 is set. It indicates that
-		 * workaround is needed to use fastsleep. Provide sysfs
-		 * control to choose how this workaround has to be applied.
-		 */
-		device_create_file(cpu_subsys.dev_root,
-				&dev_attr_fastsleep_workaround_applyonce);
-	}
 
 	pnv_alloc_idle_core_states();
 
@@ -898,9 +922,6 @@ static int __init pnv_init_idle_states(void)
 			}
 		}
 	}
-
-	if (supported_cpuidle_states & OPAL_PM_NAP_ENABLED)
-		ppc_md.power_save = power7_idle;
 
 out:
 	return 0;
