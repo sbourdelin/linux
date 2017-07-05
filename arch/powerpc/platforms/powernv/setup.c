@@ -125,9 +125,40 @@ static void pnv_prepare_going_down(void)
 	opal_flash_term_callback();
 }
 
+/*
+ * This can be set to have ppc_md.restart to request a
+ * OPAL_REBOOT_PLATFORM_ERROR reboot, which logs the error reason.
+ */
+const char *pnv_platform_error = NULL;
+
 static void  __noreturn pnv_restart(char *cmd)
 {
 	long rc = OPAL_BUSY;
+
+	if (pnv_platform_error) {
+		/*
+		 * Don't bother to shut things down because this will
+		 * xstop the system.
+		 */
+		rc = opal_cec_reboot2(OPAL_REBOOT_PLATFORM_ERROR,
+					pnv_platform_error);
+		if (rc == OPAL_UNSUPPORTED) {
+			pr_emerg("Reboot type %d not supported\n",
+					OPAL_REBOOT_PLATFORM_ERROR);
+			rc = OPAL_BUSY;
+		}
+		/*
+		 * We reached here. There can be three possibilities:
+		 * 1. We are running on a firmware level that do not support
+		 *    opal_cec_reboot2()
+		 * 2. We are running on a firmware level that do not support
+		 *    OPAL_REBOOT_PLATFORM_ERROR reboot type.
+		 * 3. We are running on FSP based system that does not need
+		 *    opal to trigger checkstop explicitly for error analysis.
+		 *    The FSP PRD component would have already got notified
+		 *    about this error through other channels.
+		 */
+	}
 
 	pnv_prepare_going_down();
 
