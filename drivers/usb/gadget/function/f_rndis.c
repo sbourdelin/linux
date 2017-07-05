@@ -593,6 +593,10 @@ static int rndis_set_alt(struct usb_function *f, unsigned intf, unsigned alt)
 		 */
 		rndis->port.cdc_filter = 0;
 
+		/* Setup DMA alignment workaround for UDC's that need it */
+		rndis->port.no_skb_reserve =
+				gadget_avoids_skb_reserve(cdev->gadget);
+
 		DBG(cdev, "RNDIS RX/TX early activation ... \n");
 		net = gether_connect(&rndis->port);
 		if (IS_ERR(net))
