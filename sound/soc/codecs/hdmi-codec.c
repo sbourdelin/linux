@@ -276,6 +276,7 @@ static const struct hdmi_codec_cea_spk_alloc hdmi_codec_channel_alloc[] = {
 	  .mask = FL | FR | LFE | FC | RL | RR | FLC | FRC },
 };
 
+#define ELD_NAME_SIZE	8
 struct hdmi_codec_priv {
 	struct hdmi_codec_pdata hcd;
 	struct snd_soc_dai_driver *daidrv;
@@ -284,7 +285,10 @@ struct hdmi_codec_priv {
 	struct snd_pcm_substream *current_stream;
 	uint8_t eld[MAX_ELD_BYTES];
 	struct snd_pcm_chmap *chmap_info;
+	struct snd_kcontrol_new control;
 	unsigned int chmap_idx;
+	int id;
+	char eld_name[ELD_NAME_SIZE];
 };
 
 static const struct snd_soc_dapm_widget hdmi_widgets[] = {
@@ -398,18 +402,6 @@ static int hdmi_codec_chmap_ctl_get(struct snd_kcontrol *kcontrol,
 
 	return 0;
 }
-
-
-static const struct snd_kcontrol_new hdmi_controls[] = {
-	{
-		.access = SNDRV_CTL_ELEM_ACCESS_READ |
-			  SNDRV_CTL_ELEM_ACCESS_VOLATILE,
-		.iface = SNDRV_CTL_ELEM_IFACE_PCM,
-		.name = "ELD",
-		.info = hdmi_eld_ctl_info,
-		.get = hdmi_eld_ctl_get,
-	},
-};
 
 static int hdmi_codec_new_stream(struct snd_pcm_substream *substream,
 				 struct snd_soc_dai *dai)
@@ -718,6 +710,45 @@ static const struct snd_soc_dai_driver hdmi_spdif_dai = {
 	.pcm_new = hdmi_codec_pcm_new,
 };
 
+static int hdmi_last_id = 0;
+static int hdmi_probe(struct snd_soc_component *component)
+{
+	struct hdmi_codec_priv *hcp = snd_soc_component_get_drvdata(component);
+	static struct snd_soc_component *component_1st = NULL;
+	char *name = "ELD";
+
+	/*
+	 * It will use "ELD"   if hdmi_codec was used from only 1 device.
+	 * It will use "ELD.x" if hdmi_codec was used from many devices.
+	 * Then, first "ELD" will be replaced to "ELD.0"
+	 */
+	snprintf(hcp->eld_name, ELD_NAME_SIZE, "ELD.%d", hcp->id);
+
+	if (hcp->id == 0)
+		component_1st = component;
+
+	if (hdmi_last_id > 1) {
+		name = hcp->eld_name;
+
+		if (component_1st) {
+			struct hdmi_codec_priv *hcp_1st;
+
+			/* replaced 1st "ELD" to "ELD.0" */
+			hcp_1st = snd_soc_component_get_drvdata(component_1st);
+			hcp_1st->control.name = hcp_1st->eld_name;
+		}
+	}
+
+	hcp->control.access	= SNDRV_CTL_ELEM_ACCESS_READ |
+				  SNDRV_CTL_ELEM_ACCESS_VOLATILE;
+	hcp->control.iface	= SNDRV_CTL_ELEM_IFACE_PCM;
+	hcp->control.name	= name;
+	hcp->control.info	= hdmi_eld_ctl_info;
+	hcp->control.get	= hdmi_eld_ctl_get;
+
+	return snd_soc_add_component_controls(component, &hcp->control, 1);
+}
+
 static int hdmi_of_xlate_dai_id(struct snd_soc_component *component,
 				 struct device_node *endpoint)
 {
@@ -732,8 +763,7 @@ static int hdmi_of_xlate_dai_id(struct snd_soc_component *component,
 
 static struct snd_soc_codec_driver hdmi_codec = {
 	.component_driver = {
-		.controls		= hdmi_controls,
-		.num_controls		= ARRAY_SIZE(hdmi_controls),
+		.probe			= hdmi_probe,
 		.dapm_widgets		= hdmi_widgets,
 		.num_dapm_widgets	= ARRAY_SIZE(hdmi_widgets),
 		.dapm_routes		= hdmi_routes,
@@ -768,6 +798,7 @@ static int hdmi_codec_probe(struct platform_device *pdev)
 	if (!hcp)
 		return -ENOMEM;
 
+	hcp->id = hdmi_last_id;
 	hcp->hcd = *hcd;
 	mutex_init(&hcp->current_stream_lock);
 
@@ -795,6 +826,7 @@ static int hdmi_codec_probe(struct platform_device *pdev)
 	}
 
 	dev_set_drvdata(dev, hcp);
+	hdmi_last_id++;
 	return 0;
 }
 
