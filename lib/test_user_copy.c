@@ -57,6 +57,8 @@ static int __init test_user_copy_init(void)
 	char __user *usermem;
 	char *bad_usermem;
 	unsigned long user_addr;
+	volatile int unconst = 0;
+	char charbuf[8];
 	u8 val_u8;
 	u16 val_u16;
 	u32 val_u32;
@@ -124,6 +126,7 @@ static int __init test_user_copy_init(void)
 	/* Prepare kernel memory with check values. */
 	memset(kmem, 0x5a, PAGE_SIZE);
 	memset(kmem + PAGE_SIZE, 0, PAGE_SIZE);
+	memset(charbuf, 0x6a, sizeof(charbuf));
 
 	/* Reject kernel-to-kernel copies through copy_from_user(). */
 	ret |= test(!copy_from_user(kmem, (char __user *)(kmem + PAGE_SIZE),
@@ -133,6 +136,15 @@ static int __init test_user_copy_init(void)
 	/* Destination half of buffer should have been zeroed. */
 	ret |= test(memcmp(kmem + PAGE_SIZE, kmem, PAGE_SIZE),
 		    "zeroing failure for illegal all-kernel copy_from_user");
+
+	/* Reject copies into too-small buffers. */
+	ret |= test(!copy_from_user(charbuf, usermem,
+				    sizeof(charbuf) + 1 + unconst),
+		    "illegal too-large copy_from_user passed");
+
+	/* Destination buffer should have been entirely zeroed. */
+	ret |= test(memcmp(kmem + PAGE_SIZE, charbuf, sizeof(charbuf)),
+		    "zeroing failure for illegal too-large copy_from_user");
 
 #if 0
 	/*

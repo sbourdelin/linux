@@ -152,9 +152,10 @@ copy_from_user(void *to, const void __user *from, unsigned long n)
 	if (likely(sz < 0 || sz >= n)) {
 		check_object_size(to, n, false);
 		n = _copy_from_user(to, from, n);
-	} else if (!__builtin_constant_p(n))
+	} else if (!__builtin_constant_p(n)) {
 		copy_user_overflow(sz, n);
-	else
+		memset(to, 0, sz);
+	} else
 		__bad_copy_user();
 
 	return n;
