@@ -80,6 +80,7 @@ int iommu_dma_init(void)
 {
 	return iova_cache_get();
 }
+EXPORT_SYMBOL(iommu_dma_init);
 
 /**
  * iommu_get_dma_cookie - Acquire DMA-API resources for a domain
@@ -357,6 +358,7 @@ int dma_info_to_prot(enum dma_data_direction dir, bool coherent,
 		return 0;
 	}
 }
+EXPORT_SYMBOL(dma_info_to_prot);
 
 static dma_addr_t iommu_dma_alloc_iova(struct iommu_domain *domain,
 		size_t size, dma_addr_t dma_limit, struct device *dev)
@@ -504,6 +506,7 @@ void iommu_dma_free(struct device *dev, struct page **pages, size_t size,
 	__iommu_dma_free_pages(pages, PAGE_ALIGN(size) >> PAGE_SHIFT);
 	*handle = IOMMU_MAPPING_ERROR;
 }
+EXPORT_SYMBOL(iommu_dma_free);
 
 /**
  * iommu_dma_alloc - Allocate and map a buffer contiguous in IOVA space
@@ -588,6 +591,7 @@ out_free_pages:
 	__iommu_dma_free_pages(pages, count);
 	return NULL;
 }
+EXPORT_SYMBOL(iommu_dma_alloc);
 
 /**
  * iommu_dma_mmap - Map a buffer into provided user VMA
@@ -613,6 +617,7 @@ int iommu_dma_mmap(struct page **pages, size_t size, struct vm_area_struct *vma)
 	}
 	return ret;
 }
+EXPORT_SYMBOL(iommu_dma_mmap);
 
 static dma_addr_t __iommu_dma_map(struct device *dev, phys_addr_t phys,
 		size_t size, int prot)
@@ -643,12 +648,14 @@ dma_addr_t iommu_dma_map_page(struct device *dev, struct page *page,
 {
 	return __iommu_dma_map(dev, page_to_phys(page) + offset, size, prot);
 }
+EXPORT_SYMBOL(iommu_dma_map_page);
 
 void iommu_dma_unmap_page(struct device *dev, dma_addr_t handle, size_t size,
 		enum dma_data_direction dir, unsigned long attrs)
 {
 	__iommu_dma_unmap(iommu_get_domain_for_dev(dev), handle, size);
 }
+EXPORT_SYMBOL(iommu_dma_unmap_page);
 
 /*
  * Prepare a successfully-mapped scatterlist to give back to the caller.
@@ -802,6 +809,7 @@ out_restore_sg:
 	__invalidate_sg(sg, nents);
 	return 0;
 }
+EXPORT_SYMBOL(iommu_dma_map_sg);
 
 void iommu_dma_unmap_sg(struct device *dev, struct scatterlist *sg, int nents,
 		enum dma_data_direction dir, unsigned long attrs)
@@ -822,6 +830,7 @@ void iommu_dma_unmap_sg(struct device *dev, struct scatterlist *sg, int nents,
 	end = sg_dma_address(sg) + sg_dma_len(sg);
 	__iommu_dma_unmap(iommu_get_domain_for_dev(dev), start, end - start);
 }
+EXPORT_SYMBOL(iommu_dma_unmap_sg);
 
 dma_addr_t iommu_dma_map_resource(struct device *dev, phys_addr_t phys,
 		size_t size, enum dma_data_direction dir, unsigned long attrs)
@@ -829,17 +838,20 @@ dma_addr_t iommu_dma_map_resource(struct device *dev, phys_addr_t phys,
 	return __iommu_dma_map(dev, phys, size,
 			dma_info_to_prot(dir, false, attrs) | IOMMU_MMIO);
 }
+EXPORT_SYMBOL(iommu_dma_map_resource);
 
 void iommu_dma_unmap_resource(struct device *dev, dma_addr_t handle,
 		size_t size, enum dma_data_direction dir, unsigned long attrs)
 {
 	__iommu_dma_unmap(iommu_get_domain_for_dev(dev), handle, size);
 }
+EXPORT_SYMBOL(iommu_dma_unmap_resource);
 
 int iommu_dma_mapping_error(struct device *dev, dma_addr_t dma_addr)
 {
 	return dma_addr == IOMMU_MAPPING_ERROR;
 }
+EXPORT_SYMBOL(iommu_dma_mapping_error);
 
 static struct iommu_dma_msi_page *iommu_dma_get_msi_page(struct device *dev,
 		phys_addr_t msi_addr, struct iommu_domain *domain)
@@ -913,3 +925,4 @@ void iommu_dma_map_msi_msg(int irq, struct msi_msg *msg)
 		msg->address_lo += lower_32_bits(msi_page->iova);
 	}
 }
+EXPORT_SYMBOL(iommu_dma_map_msi_msg);
