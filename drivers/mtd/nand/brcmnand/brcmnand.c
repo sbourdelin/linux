@@ -250,7 +250,7 @@ static const u16 brcmnand_regs_v40[] = {
 	[BRCMNAND_OOB_READ_10_BASE]	= 0x130,
 	[BRCMNAND_OOB_WRITE_BASE]	=  0x30,
 	[BRCMNAND_OOB_WRITE_10_BASE]	=     0,
-	[BRCMNAND_FC_BASE]		= 0x200,
+	[BRCMNAND_FC_BASE]		= 0x400,
 };
 
 /* BRCMNAND v5.0 */
@@ -280,7 +280,7 @@ static const u16 brcmnand_regs_v50[] = {
 	[BRCMNAND_OOB_READ_10_BASE]	= 0x130,
 	[BRCMNAND_OOB_WRITE_BASE]	=  0x30,
 	[BRCMNAND_OOB_WRITE_10_BASE]	= 0x140,
-	[BRCMNAND_FC_BASE]		= 0x200,
+	[BRCMNAND_FC_BASE]		= 0x400,
 };
 
 /* BRCMNAND v6.0 - v7.1 */
