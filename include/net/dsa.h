@@ -277,6 +277,13 @@ static inline u8 dsa_upstream_port(struct dsa_switch *ds)
 		return ds->rtable[dst->cpu_dp->ds->index];
 }
 
+struct dsa_slave_dump_ctx {
+	struct net_device *dev;
+	struct sk_buff *skb;
+	struct netlink_callback *cb;
+	int idx;
+};
+
 struct dsa_switch_ops {
 	/*
 	 * Legacy probing.
@@ -392,9 +399,7 @@ struct dsa_switch_ops {
 	int	(*port_fdb_del)(struct dsa_switch *ds, int port,
 				const unsigned char *addr, u16 vid);
 	int	(*port_fdb_dump)(struct dsa_switch *ds, int port,
-				 struct switchdev_obj_port_fdb *fdb,
-				  switchdev_obj_dump_cb_t *cb);
-
+				 struct dsa_slave_dump_ctx *dump);
 	/*
 	 * Multicast database
 	 */
@@ -457,6 +462,10 @@ static inline bool netdev_uses_dsa(struct net_device *dev)
 struct dsa_switch *dsa_switch_alloc(struct device *dev, size_t n);
 void dsa_unregister_switch(struct dsa_switch *ds);
 int dsa_register_switch(struct dsa_switch *ds);
+int dsa_slave_port_fdb_do_dump(struct dsa_slave_dump_ctx *dump,
+			       const unsigned char *addr, u16 vid,
+			       u16 ndm_state);
+
 #ifdef CONFIG_PM_SLEEP
 int dsa_switch_suspend(struct dsa_switch *ds);
 int dsa_switch_resume(struct dsa_switch *ds);

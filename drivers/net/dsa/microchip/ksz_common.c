@@ -805,8 +805,7 @@ static void convert_alu(struct alu_struct *alu, u32 *alu_table)
 }
 
 static int ksz_port_fdb_dump(struct dsa_switch *ds, int port,
-			     struct switchdev_obj_port_fdb *fdb,
-			     switchdev_obj_dump_cb_t *cb)
+			     struct dsa_slave_dump_ctx *dump)
 {
 	struct ksz_device *dev = ds->priv;
 	int ret = 0;
@@ -814,6 +813,7 @@ static int ksz_port_fdb_dump(struct dsa_switch *ds, int port,
 	u32 alu_table[4];
 	struct alu_struct alu;
 	int timeout;
+	u16 ndm_state;
 
 	mutex_lock(&dev->alu_mutex);
 
@@ -841,14 +841,12 @@ static int ksz_port_fdb_dump(struct dsa_switch *ds, int port,
 		convert_alu(&alu, alu_table);
 
 		if (alu.port_forward & BIT(port)) {
-			fdb->vid = alu.fid;
 			if (alu.is_static)
-				fdb->ndm_state = NUD_NOARP;
+				ndm_state = NUD_NOARP;
 			else
-				fdb->ndm_state = NUD_REACHABLE;
-			ether_addr_copy(fdb->addr, alu.mac);
-
-			ret = cb(&fdb->obj);
+				ndm_state = NUD_REACHABLE;
+			ret = dsa_slave_port_fdb_do_dump(dump, alu.mac,
+							 alu.fid, ndm_state);
 			if (ret)
 				goto exit;
 		}
