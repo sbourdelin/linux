@@ -716,6 +716,7 @@ static int gic_irq_domain_map(struct irq_domain *d, unsigned int virq,
 		if (err)
 			return err;
 
+		irq_set_handler(virq, handle_level_irq);
 		return gic_shared_irq_domain_map(d, virq, hwirq, 0);
 	}
 
