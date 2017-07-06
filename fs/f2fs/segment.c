@@ -1417,6 +1417,8 @@ static int create_discard_cmd_control(struct f2fs_sb_info *sbi)
 
 	if (SM_I(sbi)->dcc_info) {
 		dcc = SM_I(sbi)->dcc_info;
+		if (dcc->f2fs_issue_discard)
+			return err;
 		goto init_thread;
 	}
 
