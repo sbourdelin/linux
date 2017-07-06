@@ -1675,6 +1675,12 @@ static int exec_binprm(struct linux_binprm *bprm)
 	return ret;
 }
 
+static inline bool is_setuid_exec(struct linux_binprm *bprm)
+{
+	return (!uid_eq(bprm->cred->euid, current_euid()) ||
+		!gid_eq(bprm->cred->egid, current_egid()));
+}
+
 /*
  * sys_execve() executes a new program.
  */
@@ -1687,6 +1693,7 @@ static int do_execveat_common(int fd, struct filename *filename,
 	struct linux_binprm *bprm;
 	struct file *file;
 	struct files_struct *displaced;
+	struct rlimit saved_rlim[RLIM_NLIMITS];
 	int retval;
 
 	if (IS_ERR(filename))
@@ -1771,24 +1778,38 @@ static int do_execveat_common(int fd, struct filename *filename,
 	if (retval < 0)
 		goto out;
 
+	/*
+	 * From here forward, we've got credentials set up and we're
+	 * using resources, so do rlimit replacement before we start
+	 * copying strings. (Note that the RLIMIT_NPROC check has
+	 * already happened.)
+	 */
+	BUILD_BUG_ON(sizeof(saved_rlim) != sizeof(current->signal->rlim));
+	if (is_setuid_exec(bprm)) {
+		memcpy(saved_rlim, current->signal->rlim, sizeof(saved_rlim));
+		memcpy(current->signal->rlim,
+		       task_active_pid_ns(current)->child_reaper->signal->rlim,
+		       sizeof(current->signal->rlim));
+	}
+
 	retval = copy_strings_kernel(1, &bprm->filename, bprm);
 	if (retval < 0)
-		goto out;
+		goto out_restore;
 
 	bprm->exec = bprm->p;
 	retval = copy_strings(bprm->envc, envp, bprm);
 	if (retval < 0)
-		goto out;
+		goto out_restore;
 
 	retval = copy_strings(bprm->argc, argv, bprm);
 	if (retval < 0)
-		goto out;
+		goto out_restore;
 
 	would_dump(bprm, bprm->file);
 
 	retval = exec_binprm(bprm);
 	if (retval < 0)
-		goto out;
+		goto out_restore;
 
 	/* execve succeeded */
 	current->fs->in_exec = 0;
@@ -1801,6 +1822,11 @@ static int do_execveat_common(int fd, struct filename *filename,
 	if (displaced)
 		put_files_struct(displaced);
 	return retval;
+
+out_restore:
+	if (is_setuid_exec(bprm)) {
+		memcpy(current->signal->rlim, saved_rlim, sizeof(saved_rlim));
+	}
 
 out:
 	if (bprm->mm) {
