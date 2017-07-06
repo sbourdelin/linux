@@ -3762,6 +3762,43 @@ static void free_kvm_area(void)
 	}
 }
 
+enum vmcs_field_width {
+	VMCS_FIELD_WIDTH_U16 = 0,
+	VMCS_FIELD_WIDTH_U64 = 1,
+	VMCS_FIELD_WIDTH_U32 = 2,
+	VMCS_FIELD_WIDTH_NATURAL = 3,
+	VMCS_FIELD_WIDTHS = 4
+};
+
+enum vmcs_field_type {
+	VMCS_FIELD_TYPE_CONTROL = 0,
+	VMCS_FIELD_TYPE_DATA = 1,
+	VMCS_FIELD_TYPE_GUEST = 2,
+	VMCS_FIELD_TYPE_HOST = 3,
+	VMCS_FIELD_TYPES = 4
+};
+
+static inline short encoding(enum vmcs_field_width width,
+			     enum vmcs_field_type type,
+			     unsigned index, bool high)
+{
+	WARN_ON(index >= 1u << 9);
+	index &= (1u << 9) - 1;
+	return (width << 13) | (type << 10) | (index << 1) | (high ? 1 : 0);
+}
+
+static inline int vmcs_field_width(unsigned long field)
+{
+	if (0x1 & field)	/* the *_HIGH fields are all 32 bit */
+		return VMCS_FIELD_WIDTH_U32;
+	return (field >> 13) & 0x3;
+}
+
+static inline int vmcs_field_readonly(unsigned long field)
+{
+	return (((field >> 10) & 0x3) == 1);
+}
+
 static void init_vmcs_shadow_fields(void)
 {
 	int i, j;
@@ -3784,8 +3821,14 @@ static void init_vmcs_shadow_fields(void)
 
 	/* shadowed fields guest access without vmexit */
 	for (i = 0; i < max_shadow_fields; i++) {
+		int width = vmcs_field_width(shadow_fields[i]);
+
 		clear_bit(shadow_fields[i], vmx_vmwrite_bitmap);
 		clear_bit(shadow_fields[i], vmx_vmread_bitmap);
+		if (width == VMCS_FIELD_WIDTH_U64) {
+			clear_bit(shadow_fields[i] + 1, vmx_vmwrite_bitmap);
+			clear_bit(shadow_fields[i] + 1, vmx_vmread_bitmap);
+		}
 	}
 }
 
@@ -7197,33 +7240,6 @@ static int handle_vmresume(struct kvm_vcpu *vcpu)
 	return nested_vmx_run(vcpu, false);
 }
 
-enum vmcs_field_width {
-	VMCS_FIELD_WIDTH_U16 = 0,
-	VMCS_FIELD_WIDTH_U64 = 1,
-	VMCS_FIELD_WIDTH_U32 = 2,
-	VMCS_FIELD_WIDTH_NATURAL = 3,
-	VMCS_FIELD_WIDTHS = 4
-};
-
-enum vmcs_field_type {
-	VMCS_FIELD_TYPE_CONTROL = 0,
-	VMCS_FIELD_TYPE_DATA = 1,
-	VMCS_FIELD_TYPE_GUEST = 2,
-	VMCS_FIELD_TYPE_HOST = 3,
-	VMCS_FIELD_TYPES = 4
-};
-
-static inline int vmcs_field_width(unsigned long field)
-{
-	if (0x1 & field)	/* the *_HIGH fields are all 32 bit */
-		return VMCS_FIELD_WIDTH_U32;
-	return (field >> 13) & 0x3;
-}
-
-static inline int vmcs_field_readonly(unsigned long field)
-{
-	return (((field >> 10) & 0x3) == 1);
-}
 
 /*
  * Read a vmcs12 field. Since these can have varying lengths and we return
