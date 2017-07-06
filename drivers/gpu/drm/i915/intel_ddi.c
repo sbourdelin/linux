@@ -596,7 +596,7 @@ static int intel_ddi_hdmi_level(struct drm_i915_private *dev_priv, enum port por
 
 	hdmi_level = dev_priv->vbt.ddi_port_info[port].hdmi_level_shift;
 
-	if (IS_GEN9_LP(dev_priv))
+	if (IS_GEN9_LP(dev_priv) || INTEL_GEN(dev_priv) >= 10)
 		return hdmi_level;
 
 	if (IS_GEN9_BC(dev_priv)) {
@@ -688,7 +688,7 @@ static void intel_prepare_dp_ddi_buffers(struct intel_encoder *encoder)
 	enum port port = intel_ddi_get_encoder_port(encoder);
 	const struct ddi_buf_trans *ddi_translations;
 
-	if (IS_GEN9_LP(dev_priv))
+	if (IS_GEN9_LP(dev_priv) || INTEL_GEN(dev_priv) >= 10)
 		return;
 
 	switch (encoder->type) {
@@ -741,7 +741,7 @@ static void intel_prepare_hdmi_ddi_buffers(struct intel_encoder *encoder)
 	enum port port = intel_ddi_get_encoder_port(encoder);
 	const struct ddi_buf_trans *ddi_translations_hdmi;
 
-	if (IS_GEN9_LP(dev_priv))
+	if (IS_GEN9_LP(dev_priv) || INTEL_GEN(dev_priv) >= 10)
 		return;
 
 	hdmi_level = intel_ddi_hdmi_level(dev_priv, port);
