@@ -1519,7 +1519,7 @@ out_free:
 	return ret;
 }
 
-static struct acpi_device_id ov2680_acpi_match[] = {
+static const struct acpi_device_id ov2680_acpi_match[] = {
 	{"XXOV2680"},
 	{},
 };
