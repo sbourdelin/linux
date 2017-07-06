@@ -1641,11 +1641,6 @@ void intel_logical_ring_cleanup(struct intel_engine_cs *engine)
 	if (engine->cleanup)
 		engine->cleanup(engine);
 
-	if (engine->status_page.vma) {
-		i915_gem_object_unpin_map(engine->status_page.vma->obj);
-		engine->status_page.vma = NULL;
-	}
-
 	intel_engine_cleanup_common(engine);
 
 	lrc_destroy_wa_ctx(engine);
@@ -1692,24 +1687,6 @@ logical_ring_default_irqs(struct intel_engine_cs *engine)
 	engine->irq_keep_mask = GT_CONTEXT_SWITCH_INTERRUPT << shift;
 }
 
-static int
-lrc_setup_hws(struct intel_engine_cs *engine, struct i915_vma *vma)
-{
-	const int hws_offset = LRC_PPHWSP_PN * PAGE_SIZE;
-	void *hws;
-
-	/* The HWSP is part of the default context object in LRC mode. */
-	hws = i915_gem_object_pin_map(vma->obj, I915_MAP_WB);
-	if (IS_ERR(hws))
-		return PTR_ERR(hws);
-
-	engine->status_page.page_addr = hws + hws_offset;
-	engine->status_page.ggtt_offset = i915_ggtt_offset(vma) + hws_offset;
-	engine->status_page.vma = vma;
-
-	return 0;
-}
-
 static void
 logical_ring_setup(struct intel_engine_cs *engine)
 {
@@ -1742,27 +1719,14 @@ logical_ring_setup(struct intel_engine_cs *engine)
 	logical_ring_default_irqs(engine);
 }
 
-static int
-logical_ring_init(struct intel_engine_cs *engine)
+static int logical_ring_init(struct intel_engine_cs *engine)
 {
-	struct i915_gem_context *dctx = engine->i915->kernel_context;
-	int ret;
+	int ret = 0;
 
 	ret = intel_engine_init_common(engine);
 	if (ret)
-		goto error;
+		intel_logical_ring_cleanup(engine);
 
-	/* And setup the hardware status page. */
-	ret = lrc_setup_hws(engine, dctx->engine[engine->id].state);
-	if (ret) {
-		DRM_ERROR("Failed to set up hws %s: %d\n", engine->name, ret);
-		goto error;
-	}
-
-	return 0;
-
-error:
-	intel_logical_ring_cleanup(engine);
 	return ret;
 }
 
