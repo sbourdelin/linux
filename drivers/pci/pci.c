@@ -3816,10 +3816,16 @@ static void pci_flr_wait(struct pci_dev *dev)
 	int i = 0;
 	u32 id;
 
-	do {
-		msleep(100);
-		pci_read_config_dword(dev, PCI_COMMAND, &id);
-	} while (i++ < 10 && id == ~0);
+	if (dev->is_virtfn) {
+		do {
+			msleep(100);
+			pci_read_config_dword(dev, PCI_COMMAND, &id);
+		} while (i++ < 10 && id == ~0);
+	} else {
+		if (!pci_bus_read_dev_vendor_id(dev->bus, dev->devfn, &id,
+						60*1000))
+			id = ~0;
+	}
 
 	if (id == ~0)
 		dev_warn(&dev->dev, "Failed to return from FLR\n");
