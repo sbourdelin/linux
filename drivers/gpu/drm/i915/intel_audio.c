@@ -865,6 +865,21 @@ static int i915_audio_component_get_eld(struct device *kdev, int port,
 	return ret;
 }
 
+static void i915_audio_component_pin_buf(struct device *kdev, bool enable)
+{
+	struct drm_i915_private *dev_priv = kdev_to_i915(kdev);
+
+	if (!IS_CANNONLAKE(dev_priv))
+		return;
+
+	if (enable)
+		I915_WRITE(AUDIO_PIN_BUF_CTL, I915_READ(AUDIO_PIN_BUF_CTL) |
+			   AUDIO_PIN_BUF_ENABLE);
+	else
+		I915_WRITE(AUDIO_PIN_BUF_CTL, I915_READ(AUDIO_PIN_BUF_CTL) &
+			   ~AUDIO_PIN_BUF_ENABLE);
+}
+
 static const struct i915_audio_component_ops i915_audio_component_ops = {
 	.owner		= THIS_MODULE,
 	.get_power	= i915_audio_component_get_power,
@@ -873,6 +888,7 @@ static const struct i915_audio_component_ops i915_audio_component_ops = {
 	.get_cdclk_freq	= i915_audio_component_get_cdclk_freq,
 	.sync_audio_rate = i915_audio_component_sync_audio_rate,
 	.get_eld	= i915_audio_component_get_eld,
+	.pin_buf	= i915_audio_component_pin_buf,
 };
 
 static int i915_audio_component_bind(struct device *i915_kdev,

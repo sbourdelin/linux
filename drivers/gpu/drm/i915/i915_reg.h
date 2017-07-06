@@ -2643,6 +2643,9 @@ enum skl_disp_power_wells {
 #define I915_HDMI_LPE_AUDIO_BASE	(VLV_DISPLAY_BASE + 0x65000)
 #define I915_HDMI_LPE_AUDIO_SIZE	0x1000
 
+#define AUDIO_PIN_BUF_CTL		_MMIO(0x48414)
+#define AUDIO_PIN_BUF_ENABLE		(1 << 31)
+
 /* DisplayPort Audio w/ LPE */
 #define VLV_AUD_CHICKEN_BIT_REG		_MMIO(VLV_DISPLAY_BASE + 0x62F38)
 #define VLV_CHICKEN_BIT_DBG_ENABLE	(1 << 0)

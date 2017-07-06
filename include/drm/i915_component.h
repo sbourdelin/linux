@@ -79,6 +79,12 @@ struct i915_audio_component_ops {
 	 */
 	int (*get_eld)(struct device *, int port, int pipe, bool *enabled,
 		       unsigned char *buf, int max_bytes);
+	/**
+	 * @pin_buf: Enable or disable pin buffer.
+	 *
+	 * Allow audio driver the toggle pin buffer.
+	 */
+	void (*pin_buf)(struct device *, bool enable);
 };
 
 /**
