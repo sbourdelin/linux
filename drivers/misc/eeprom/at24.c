@@ -365,7 +365,7 @@ static ssize_t at24_eeprom_read_mac(struct at24_data *at24, char *buf,
 	memset(msg, 0, sizeof(msg));
 	msg[0].addr = client->addr;
 	msg[0].buf = addrbuf;
-	addrbuf[0] = 0x90 + offset;
+	addrbuf[0] = at24->chip.mac_offset + offset;
 	msg[0].len = 1;
 	msg[1].addr = client->addr;
 	msg[1].flags = I2C_M_RD;
@@ -581,6 +581,9 @@ static void at24_get_pdata(struct device *dev, struct at24_platform_data *chip)
 		 */
 		chip->page_size = 1;
 	}
+	err = device_property_read_u32(dev, "mac-offset", &chip->mac_offset);
+	if (err)
+		chip->mac_offset = 0x90;
 }
 
 static int at24_probe(struct i2c_client *client, const struct i2c_device_id *id)

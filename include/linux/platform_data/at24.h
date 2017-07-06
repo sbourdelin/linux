@@ -42,6 +42,7 @@
 
 struct at24_platform_data {
 	u32		byte_len;		/* size (sum of all addr) */
+	u32		mac_offset;
 	u16		page_size;		/* for writes */
 	u8		flags;
 #define AT24_FLAG_ADDR16	BIT(7)	/* address pointer is 16 bit */
