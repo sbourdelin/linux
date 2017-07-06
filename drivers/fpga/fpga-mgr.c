@@ -27,9 +27,38 @@
 #include <linux/slab.h>
 #include <linux/scatterlist.h>
 #include <linux/highmem.h>
+#include <linux/notifier.h>
 
 static DEFINE_IDA(fpga_mgr_ida);
 static struct class *fpga_mgr_class;
+
+static BLOCKING_NOTIFIER_HEAD(fpga_mgr_notifier_list);
+
+/**
+ * fpga_mgr_register_mgr_notifier() - register fpga manager notifier callback
+ * @nb: pointer to the notifier block for the callback events.
+ *
+ * Add a notifier callback for FPGA manager changes. These changes are
+ * either FPGA manager being added or removed.
+ */
+void fpga_mgr_register_mgr_notifier(struct notifier_block *nb)
+{
+	blocking_notifier_chain_register(&fpga_mgr_notifier_list, nb);
+}
+EXPORT_SYMBOL_GPL(fpga_mgr_register_mgr_notifier);
+
+/**
+ * fpga_mgr_unregister_mgr_notifier() - unregister a notifier callback
+ * @nb: pointer to the notifier block for the callback events.
+ *
+ * Remove a notifier callback. fpga_mgr_register_mgr_notifier() must have
+ * been previously called for this function to work properly.
+ */
+void fpga_mgr_unregister_mgr_notifier(struct notifier_block *nb)
+{
+	blocking_notifier_chain_unregister(&fpga_mgr_notifier_list, nb);
+}
+EXPORT_SYMBOL_GPL(fpga_mgr_unregister_mgr_notifier);
 
 /*
  * Call the low level driver's write_init function.  This will do the
@@ -518,6 +547,8 @@ int fpga_mgr_register(struct device *dev, const char *name,
 
 	dev_info(&mgr->dev, "%s registered\n", mgr->name);
 
+	blocking_notifier_call_chain(&fpga_mgr_notifier_list,
+				     FPGA_MGR_ADD, mgr);
 	return 0;
 
 error_device:
@@ -538,6 +569,9 @@ void fpga_mgr_unregister(struct device *dev)
 	struct fpga_manager *mgr = dev_get_drvdata(dev);
 
 	dev_info(&mgr->dev, "%s %s\n", __func__, mgr->name);
+
+	blocking_notifier_call_chain(&fpga_mgr_notifier_list,
+				     FPGA_MGR_REMOVE, mgr);
 
 	/*
 	 * If the low level driver provides a method for putting fpga into

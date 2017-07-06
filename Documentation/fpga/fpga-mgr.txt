@@ -73,6 +73,14 @@ Use of these two functions is described below in "How To Support a new FPGA
 device."
 
 
+To register or unregister the notifier callback for signalling
+about the low level FPGA-Managers being added or removed:
+----------------------------------------------------------
+
+	void fpga_mgr_register_mgr_notifier(struct notifier_block *nb);
+	void fpga_mgr_unregister_mgr_notifier(struct notifier_block *nb);
+
+
 How to write an image buffer to a supported FPGA
 ================================================
 /* Include to get the API */
