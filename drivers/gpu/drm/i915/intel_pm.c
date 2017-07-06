@@ -8242,6 +8242,9 @@ static void cannonlake_init_clock_gating(struct drm_i915_private *dev_priv)
 {
 	gen9_init_clock_gating(dev_priv);
 
+	I915_WRITE(_3D_CHICKEN3,
+		   _MASKED_BIT_ENABLE(_3D_CHICKEN3_AA_LINE_QUALITY_FIX_ENABLE));
+
 	/* WaFbcNukeOnHostModify:cnl */
 	I915_WRITE(ILK_DPFC_CHICKEN, I915_READ(ILK_DPFC_CHICKEN) |
 		   ILK_DPFC_NUKE_ON_ANY_MODIFICATION);
