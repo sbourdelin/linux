@@ -102,6 +102,7 @@ struct integrity_iint_cache {
 	struct rb_node rb_node;	/* rooted in integrity_iint_tree */
 	struct inode *inode;	/* back pointer to inode in question */
 	u64 version;		/* track inode changes */
+	struct timespec ctime;	/* track inode changes */
 	unsigned long flags;
 	unsigned long measured_pcrs;
 	enum integrity_status ima_file_status:4;

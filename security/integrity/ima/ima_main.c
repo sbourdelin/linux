@@ -113,6 +113,25 @@ static void ima_rdwr_violation_check(struct file *file,
 				  "invalid_pcr", "open_writers");
 }
 
+static bool ima_should_update_iint(struct integrity_iint_cache *iint,
+				struct inode *inode)
+{
+	if (atomic_read(&inode->i_writecount) != 1)
+		return false;
+	if (iint->flags & IMA_NEW_FILE)
+		return true;
+	if (IS_I_VERSION(inode)) {
+		if (iint->version != inode->i_version)
+			return true;
+	} else {
+		if (iint->ctime.tv_sec != inode->i_ctime.tv_sec)
+			return true;
+		if (iint->ctime.tv_nsec != inode->i_ctime.tv_nsec)
+			return true;
+	}
+	return false;
+}
+
 static void ima_check_last_writer(struct integrity_iint_cache *iint,
 				  struct inode *inode, struct file *file)
 {
@@ -122,14 +141,11 @@ static void ima_check_last_writer(struct integrity_iint_cache *iint,
 		return;
 
 	inode_lock(inode);
-	if (atomic_read(&inode->i_writecount) == 1) {
-		if ((iint->version != inode->i_version) ||
-		    (iint->flags & IMA_NEW_FILE)) {
-			iint->flags &= ~(IMA_DONE_MASK | IMA_NEW_FILE);
-			iint->measured_pcrs = 0;
-			if (iint->flags & IMA_APPRAISE)
-				ima_update_xattr(iint, file);
-		}
+	if (ima_should_update_iint(iint, inode)) {
+		iint->flags &= ~(IMA_DONE_MASK | IMA_NEW_FILE);
+		iint->measured_pcrs = 0;
+		if (iint->flags & IMA_APPRAISE)
+			ima_update_xattr(iint, file);
 	}
 	inode_unlock(inode);
 }

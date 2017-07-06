@@ -205,7 +205,8 @@ int ima_collect_measurement(struct integrity_iint_cache *iint,
 	} hash;
 
 	if (!(iint->flags & IMA_COLLECTED)) {
-		u64 i_version = file_inode(file)->i_version;
+		u64 i_version = inode->i_version;
+		struct timespec i_ctime = inode->i_ctime;
 
 		if (file->f_flags & O_DIRECT) {
 			audit_cause = "failed(directio)";
@@ -225,6 +226,7 @@ int ima_collect_measurement(struct integrity_iint_cache *iint,
 				iint->ima_hash = tmpbuf;
 				memcpy(iint->ima_hash, &hash, length);
 				iint->version = i_version;
+				iint->ctime = i_ctime;
 				iint->flags |= IMA_COLLECTED;
 			} else
 				result = -ENOMEM;
