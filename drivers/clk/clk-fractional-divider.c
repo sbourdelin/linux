@@ -56,9 +56,22 @@ static long clk_fd_round_rate(struct clk_hw *hw, unsigned long rate,
 	unsigned long scale;
 	unsigned long m, n;
 	u64 ret;
+	struct clk_hw *p_parent;
+	unsigned long p_rate, p_parent_rate;
 
 	if (!rate || rate >= *parent_rate)
 		return *parent_rate;
+
+	/*
+	 * fractional divider must set that denominator is 20 times larger than
+	 * numerator to generate precise clock frequency.
+	 */
+	p_rate = clk_hw_get_rate(clk_hw_get_parent(hw));
+	if ((rate * 20 > p_rate) && (p_rate % rate != 0)) {
+		p_parent = clk_hw_get_parent(clk_hw_get_parent(hw));
+		p_parent_rate = clk_hw_get_rate(p_parent);
+		*parent_rate = p_parent_rate;
+	}
 
 	/*
 	 * Get rate closer to *parent_rate to guarantee there is no overflow
