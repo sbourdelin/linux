@@ -2662,7 +2662,7 @@ static int __init printk_late_init(void)
 	int ret;
 
 	for_each_console(con) {
-		if (!keep_bootcon && con->flags & CON_BOOT) {
+		if (con->flags & CON_BOOT) {
 			/*
 			 * Make sure to unregister boot consoles whose data
 			 * resides in the init section before the init section
