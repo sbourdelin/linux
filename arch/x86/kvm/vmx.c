@@ -674,7 +674,7 @@ static struct pi_desc *vcpu_to_pi_desc(struct kvm_vcpu *vcpu)
 				[number##_HIGH] = VMCS12_OFFSET(name)+4
 
 
-static unsigned long shadow_read_only_fields[] = {
+static unsigned long shadow_fields[] = {
 	/*
 	 * We do NOT shadow fields that are modified when L0
 	 * traps and emulates any vmx instruction (e.g. VMPTRLD,
@@ -695,12 +695,7 @@ static unsigned long shadow_read_only_fields[] = {
 	VM_EXIT_INTR_ERROR_CODE,
 	EXIT_QUALIFICATION,
 	GUEST_LINEAR_ADDRESS,
-	GUEST_PHYSICAL_ADDRESS
-};
-static int max_shadow_read_only_fields =
-	ARRAY_SIZE(shadow_read_only_fields);
-
-static unsigned long shadow_read_write_fields[] = {
+	GUEST_PHYSICAL_ADDRESS,
 	TPR_THRESHOLD,
 	GUEST_RIP,
 	GUEST_RSP,
@@ -728,10 +723,9 @@ static unsigned long shadow_read_write_fields[] = {
 	HOST_FS_BASE,
 	HOST_GS_BASE,
 	HOST_FS_SELECTOR,
-	HOST_GS_SELECTOR
+	HOST_GS_SELECTOR,
 };
-static int max_shadow_read_write_fields =
-	ARRAY_SIZE(shadow_read_write_fields);
+static int max_shadow_fields = ARRAY_SIZE(shadow_fields);
 
 static const unsigned short vmcs_field_to_offset_table[] = {
 	FIELD(VIRTUAL_PROCESSOR_ID, virtual_processor_id),
@@ -2804,6 +2798,13 @@ static void nested_vmx_setup_ctls_msrs(struct vcpu_vmx *vmx)
 	vmx->nested.nested_vmx_misc_high = 0;
 
 	/*
+	 * We can emulate "VMWRITE to any supported field," even if
+	 * the hardware doesn't support it.
+	 */
+	vmx->nested.nested_vmx_misc_low |=
+		MSR_IA32_VMX_MISC_VMWRITE_SHADOW_RO_FIELDS;
+
+	/*
 	 * This MSR reports some information about VMX support. We
 	 * should return information about the VMX we emulate for the
 	 * guest, and the VMCS structure we give it - not about the
@@ -3765,10 +3766,8 @@ static void init_vmcs_shadow_fields(void)
 {
 	int i, j;
 
-	/* No checks for read only fields yet */
-
-	for (i = j = 0; i < max_shadow_read_write_fields; i++) {
-		switch (shadow_read_write_fields[i]) {
+	for (i = j = 0; i < max_shadow_fields; i++) {
+		switch (shadow_fields[i]) {
 		case GUEST_BNDCFGS:
 			if (!kvm_mpx_supported())
 				continue;
@@ -3778,22 +3777,16 @@ static void init_vmcs_shadow_fields(void)
 		}
 
 		if (j < i)
-			shadow_read_write_fields[j] =
-				shadow_read_write_fields[i];
+			shadow_fields[j] = shadow_fields[i];
 		j++;
 	}
-	max_shadow_read_write_fields = j;
+	max_shadow_fields = j;
 
 	/* shadowed fields guest access without vmexit */
-	for (i = 0; i < max_shadow_read_write_fields; i++) {
-		clear_bit(shadow_read_write_fields[i],
-			  vmx_vmwrite_bitmap);
-		clear_bit(shadow_read_write_fields[i],
-			  vmx_vmread_bitmap);
+	for (i = 0; i < max_shadow_fields; i++) {
+		clear_bit(shadow_fields[i], vmx_vmwrite_bitmap);
+		clear_bit(shadow_fields[i], vmx_vmread_bitmap);
 	}
-	for (i = 0; i < max_shadow_read_only_fields; i++)
-		clear_bit(shadow_read_only_fields[i],
-			  vmx_vmread_bitmap);
 }
 
 static __init int alloc_kvm_area(void)
@@ -7294,14 +7287,13 @@ static void copy_shadow_to_vmcs12(struct vcpu_vmx *vmx)
 	unsigned long field;
 	u64 field_value;
 	struct vmcs *shadow_vmcs = vmx->vmcs01.shadow_vmcs;
-	const unsigned long *fields = shadow_read_write_fields;
-	const int num_fields = max_shadow_read_write_fields;
+	unsigned long *fields = shadow_fields;
 
 	preempt_disable();
 
 	vmcs_load(shadow_vmcs);
 
-	for (i = 0; i < num_fields; i++) {
+	for (i = 0; i < max_shadow_fields; i++) {
 		field = fields[i];
 		switch (vmcs_field_type(field)) {
 		case VMCS_FIELD_TYPE_U16:
@@ -7331,43 +7323,31 @@ static void copy_shadow_to_vmcs12(struct vcpu_vmx *vmx)
 
 static void copy_vmcs12_to_shadow(struct vcpu_vmx *vmx)
 {
-	const unsigned long *fields[] = {
-		shadow_read_write_fields,
-		shadow_read_only_fields
-	};
-	const int max_fields[] = {
-		max_shadow_read_write_fields,
-		max_shadow_read_only_fields
-	};
-	int i, q;
+	int i;
 	unsigned long field;
 	u64 field_value = 0;
 	struct vmcs *shadow_vmcs = vmx->vmcs01.shadow_vmcs;
+	unsigned long *fields = shadow_fields;
 
 	vmcs_load(shadow_vmcs);
 
-	for (q = 0; q < ARRAY_SIZE(fields); q++) {
-		for (i = 0; i < max_fields[q]; i++) {
-			field = fields[q][i];
-			vmcs12_read_any(&vmx->vcpu, field, &field_value);
+	for (i = 0; i < max_shadow_fields; i++) {
+		field = fields[i];
+		vmcs12_read_any(&vmx->vcpu, field, &field_value);
 
-			switch (vmcs_field_type(field)) {
-			case VMCS_FIELD_TYPE_U16:
-				vmcs_write16(field, (u16)field_value);
-				break;
-			case VMCS_FIELD_TYPE_U32:
-				vmcs_write32(field, (u32)field_value);
-				break;
-			case VMCS_FIELD_TYPE_U64:
-				vmcs_write64(field, (u64)field_value);
-				break;
-			case VMCS_FIELD_TYPE_NATURAL_WIDTH:
-				vmcs_writel(field, (long)field_value);
-				break;
-			default:
-				WARN_ON(1);
-				break;
-			}
+		switch (vmcs_field_type(field)) {
+		case VMCS_FIELD_TYPE_U16:
+			vmcs_write16(field, (u16)field_value);
+			break;
+		case VMCS_FIELD_TYPE_U32:
+			vmcs_write32(field, (u32)field_value);
+			break;
+		case VMCS_FIELD_TYPE_U64:
+			vmcs_write64(field, (u64)field_value);
+			break;
+		case VMCS_FIELD_TYPE_NATURAL_WIDTH:
+			vmcs_writel(field, (long)field_value);
+			break;
 		}
 	}
 
@@ -7467,14 +7447,7 @@ static int handle_vmwrite(struct kvm_vcpu *vcpu)
 		}
 	}
 
-
 	field = kvm_register_readl(vcpu, (((vmx_instruction_info) >> 28) & 0xf));
-	if (vmcs_field_readonly(field)) {
-		nested_vmx_failValid(vcpu,
-			VMXERR_VMWRITE_READ_ONLY_VMCS_COMPONENT);
-		return kvm_skip_emulated_instruction(vcpu);
-	}
-
 	if (vmcs12_write_any(vcpu, field, field_value) < 0) {
 		nested_vmx_failValid(vcpu, VMXERR_UNSUPPORTED_VMCS_COMPONENT);
 		return kvm_skip_emulated_instruction(vcpu);
