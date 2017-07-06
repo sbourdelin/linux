@@ -7,9 +7,16 @@ Required properties:
   is higher than panic threshold, system will auto reboot by SRC module.
 - fsl,tempmon : phandle pointer to system controller that contains TEMPMON
   control registers, e.g. ANATOP on imx6q.
+
+Properties for OCOTP access:
 - fsl,tempmon-data : phandle pointer to fuse controller that contains TEMPMON
   calibration data, e.g. OCOTP on imx6q.  The details about calibration data
   can be found in SoC Reference Manual.
+Alternatively:
+- nvmem-cells: A phandle to the calibration cells provided by ocotp.
+- nvmem-cell-names: Should be "calib", "temp_grade".
+
+Direct access to OCOTP is deprecated, please use nvmem cells instead.
 
 Optional properties:
 - clocks : thermal sensor's clock source.
