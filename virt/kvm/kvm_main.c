@@ -130,6 +130,12 @@ EXPORT_SYMBOL_GPL(kvm_rebooting);
 
 static bool largepages_enabled = true;
 
+#define KVM_EVENT_CREATE_VM 0
+#define KVM_EVENT_DESTROY_VM 1
+static void kvm_uevent_notify_change(unsigned int type, struct kvm *kvm);
+static unsigned long long kvm_createvm_count;
+static unsigned long long kvm_active_vms;
+
 bool kvm_is_reserved_pfn(kvm_pfn_t pfn)
 {
 	if (pfn_valid(pfn))
@@ -728,6 +734,7 @@ static void kvm_destroy_vm(struct kvm *kvm)
 	int i;
 	struct mm_struct *mm = kvm->mm;
 
+	kvm_uevent_notify_change(KVM_EVENT_DESTROY_VM, kvm);
 	kvm_destroy_vm_debugfs(kvm);
 	kvm_arch_sync_events(kvm);
 	spin_lock(&kvm_lock);
@@ -3202,6 +3209,7 @@ static int kvm_dev_ioctl_create_vm(unsigned long type)
 		fput(file);
 		return -ENOMEM;
 	}
+	kvm_uevent_notify_change(KVM_EVENT_CREATE_VM, kvm);
 
 	fd_install(r, file);
 	return r;
@@ -3853,6 +3861,48 @@ static const struct file_operations *stat_fops[] = {
 	[KVM_STAT_VCPU] = &vcpu_stat_fops,
 	[KVM_STAT_VM]   = &vm_stat_fops,
 };
+
+static void kvm_uevent_notify_change(unsigned int type, struct kvm *kvm)
+{
+	char cbuf[40], abuf[40], pidbuf[40], pathvar[18] = "KVM_VM_STATS_PATH=";
+	char *ptr[5] = {cbuf, abuf, pidbuf, NULL, NULL};
+	char *tmp, *pathbuf;
+	unsigned long long created, active;
+
+	if (!kvm_dev.this_device || !kvm || !kvm->debugfs_dentry)
+		return;
+
+	spin_lock(&kvm_lock);
+	if (type == KVM_EVENT_CREATE_VM) {
+		kvm_createvm_count++;
+		kvm_active_vms++;
+	} else if (type == KVM_EVENT_DESTROY_VM) {
+		kvm_active_vms--;
+	}
+	created = kvm_createvm_count;
+	active = kvm_active_vms;
+	spin_unlock(&kvm_lock);
+
+	pathbuf = kmalloc(PATH_MAX, GFP_KERNEL);
+	if (pathbuf) {
+		tmp = dentry_path_raw(kvm->debugfs_dentry,
+				      pathbuf + sizeof(pathvar),
+				      PATH_MAX - sizeof(pathvar));
+		if (!IS_ERR(tmp)) {
+			memcpy(tmp - sizeof(pathvar), pathvar, sizeof(pathvar));
+			ptr[3] = tmp - sizeof(pathvar);
+		}
+	}
+	snprintf(cbuf, sizeof(cbuf), "KVM_VM_CREATED=%llu", created);
+	snprintf(abuf, sizeof(abuf), "KVM_VM_ACTIVE=%llu", active);
+	snprintf(pidbuf, sizeof(pidbuf), "KVM_VM_PID=%s",
+		 kvm->debugfs_dentry->d_name.name);
+	tmp = strchr(pidbuf, '-');
+	if (tmp)
+		*tmp = '\0';
+	kobject_uevent_env(&kvm_dev.this_device->kobj, KOBJ_CHANGE, ptr);
+	kfree(pathbuf);
+}
 
 static int kvm_init_debug(void)
 {
