@@ -7281,6 +7281,27 @@ static inline int vmcs12_write_any(struct kvm_vcpu *vcpu,
 
 }
 
+static u64 vmcs_read_any(unsigned long field)
+{
+	u64 field_value;
+
+	switch (vmcs_field_type(field)) {
+	case VMCS_FIELD_TYPE_U16:
+		field_value = vmcs_read16(field);
+		break;
+	case VMCS_FIELD_TYPE_U32:
+		field_value = vmcs_read32(field);
+		break;
+	case VMCS_FIELD_TYPE_U64:
+		field_value = vmcs_read64(field);
+		break;
+	case VMCS_FIELD_TYPE_NATURAL_WIDTH:
+		field_value = vmcs_readl(field);
+		break;
+	}
+	return field_value;
+}
+
 static void copy_shadow_to_vmcs12(struct vcpu_vmx *vmx)
 {
 	int i;
@@ -7295,23 +7316,7 @@ static void copy_shadow_to_vmcs12(struct vcpu_vmx *vmx)
 
 	for (i = 0; i < max_shadow_fields; i++) {
 		field = fields[i];
-		switch (vmcs_field_type(field)) {
-		case VMCS_FIELD_TYPE_U16:
-			field_value = vmcs_read16(field);
-			break;
-		case VMCS_FIELD_TYPE_U32:
-			field_value = vmcs_read32(field);
-			break;
-		case VMCS_FIELD_TYPE_U64:
-			field_value = vmcs_read64(field);
-			break;
-		case VMCS_FIELD_TYPE_NATURAL_WIDTH:
-			field_value = vmcs_readl(field);
-			break;
-		default:
-			WARN_ON(1);
-			continue;
-		}
+		field_value = vmcs_read_any(field);
 		vmcs12_write_any(&vmx->vcpu, field, field_value);
 	}
 
@@ -7319,6 +7324,24 @@ static void copy_shadow_to_vmcs12(struct vcpu_vmx *vmx)
 	vmcs_load(vmx->loaded_vmcs->vmcs);
 
 	preempt_enable();
+}
+
+static void vmcs_write_any(unsigned long field, u64 field_value)
+{
+	switch (vmcs_field_type(field)) {
+	case VMCS_FIELD_TYPE_U16:
+		vmcs_write16(field, (u16)field_value);
+		break;
+	case VMCS_FIELD_TYPE_U32:
+		vmcs_write32(field, (u32)field_value);
+		break;
+	case VMCS_FIELD_TYPE_U64:
+		vmcs_write64(field, (u64)field_value);
+		break;
+	case VMCS_FIELD_TYPE_NATURAL_WIDTH:
+		vmcs_writel(field, (long)field_value);
+		break;
+	}
 }
 
 static void copy_vmcs12_to_shadow(struct vcpu_vmx *vmx)
@@ -7334,21 +7357,7 @@ static void copy_vmcs12_to_shadow(struct vcpu_vmx *vmx)
 	for (i = 0; i < max_shadow_fields; i++) {
 		field = fields[i];
 		vmcs12_read_any(&vmx->vcpu, field, &field_value);
-
-		switch (vmcs_field_type(field)) {
-		case VMCS_FIELD_TYPE_U16:
-			vmcs_write16(field, (u16)field_value);
-			break;
-		case VMCS_FIELD_TYPE_U32:
-			vmcs_write32(field, (u32)field_value);
-			break;
-		case VMCS_FIELD_TYPE_U64:
-			vmcs_write64(field, (u64)field_value);
-			break;
-		case VMCS_FIELD_TYPE_NATURAL_WIDTH:
-			vmcs_writel(field, (long)field_value);
-			break;
-		}
+		vmcs_write_any(field, field_value);
 	}
 
 	vmcs_clear(shadow_vmcs);
