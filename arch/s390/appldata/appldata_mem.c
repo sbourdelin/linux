@@ -81,6 +81,7 @@ static void appldata_get_mem_data(void *data)
 	static struct sysinfo val;
 	unsigned long ev[NR_VM_EVENT_ITEMS];
 	struct appldata_mem_data *mem_data;
+	int order;
 
 	mem_data = data;
 	mem_data->sync_count_1++;
@@ -92,6 +93,12 @@ static void appldata_get_mem_data(void *data)
 	mem_data->pswpout    = ev[PSWPOUT];
 	mem_data->pgalloc    = ev[PGALLOC_NORMAL];
 	mem_data->pgalloc    += ev[PGALLOC_DMA];
+	for (order = 1; order < MAX_ORDER; ++order) {
+		mem_data->pgalloc +=
+			ev[PGALLOC_NORMAL + order * MAX_NR_ZONES] << order;
+		mem_data->pgalloc +=
+			 ev[PGALLOC_DMA + order * MAX_NR_ZONES] << order;
+	}
 	mem_data->pgfault    = ev[PGFAULT];
 	mem_data->pgmajfault = ev[PGMAJFAULT];
 

@@ -27,6 +27,7 @@
 #include <linux/mm_inline.h>
 #include <linux/page_ext.h>
 #include <linux/page_owner.h>
+#include <linux/mmzone.h>
 
 #include "internal.h"
 
@@ -34,18 +35,18 @@
 DEFINE_PER_CPU(struct vm_event_state, vm_event_states) = {{0}};
 EXPORT_PER_CPU_SYMBOL(vm_event_states);
 
-static void sum_vm_events(unsigned long *ret)
+static void sum_vm_events(unsigned long *ret, int off, size_t nr_events)
 {
 	int cpu;
 	int i;
 
-	memset(ret, 0, NR_VM_EVENT_ITEMS * sizeof(unsigned long));
+	memset(ret, 0, nr_events * sizeof(unsigned long));
 
 	for_each_online_cpu(cpu) {
 		struct vm_event_state *this = &per_cpu(vm_event_states, cpu);
 
-		for (i = 0; i < NR_VM_EVENT_ITEMS; i++)
-			ret[i] += this->event[i];
+		for (i = 0; i < nr_events; i++)
+			ret[i] += this->event[off + i];
 	}
 }
 
@@ -57,7 +58,7 @@ static void sum_vm_events(unsigned long *ret)
 void all_vm_events(unsigned long *ret)
 {
 	get_online_cpus();
-	sum_vm_events(ret);
+	sum_vm_events(ret, 0, NR_VM_EVENT_ITEMS);
 	put_online_cpus();
 }
 EXPORT_SYMBOL_GPL(all_vm_events);
@@ -915,8 +916,15 @@ int fragmentation_index(struct zone *zone, unsigned int order)
 #define TEXT_FOR_HIGHMEM(xx)
 #endif
 
+#ifdef CONFIG_ZONE_DEVICE
+#define TEXT_FOR_DEVICE(xx) xx "_device",
+#else
+#define TEXT_FOR_DEVICE(xx)
+#endif
+
 #define TEXTS_FOR_ZONES(xx) TEXT_FOR_DMA(xx) TEXT_FOR_DMA32(xx) xx "_normal", \
-					TEXT_FOR_HIGHMEM(xx) xx "_movable",
+					TEXT_FOR_HIGHMEM(xx) xx "_movable", \
+					TEXT_FOR_DEVICE(xx)
 
 const char * const vmstat_text[] = {
 	/* enum zone_stat_item countes */
@@ -1480,12 +1488,86 @@ enum writeback_stat_item {
 	NR_VM_WRITEBACK_STAT_ITEMS,
 };
 
+static void sum_alloc_events(unsigned long *v)
+{
+	int zid, order, index;
+
+	for (zid = 0; zid < MAX_NR_ZONES; ++zid) {
+		for (order = 1; order < MAX_ORDER; order++) {
+			index = PGALLOC_FIRST_ZONE + zid;
+			v[index] += v[index + order * MAX_NR_ZONES] << order;
+		}
+	}
+}
+
+static int allocinfo_show(struct seq_file *m, void *arg)
+{
+	unsigned long allocs[PGALLOC_EVENTS_SIZE];
+	unsigned int order;
+	int zid;
+
+	if (arg != SEQ_START_TOKEN)
+		return 0;
+
+	get_online_cpus();
+	sum_vm_events(allocs, PGALLOC_FIRST_ZONE, PGALLOC_EVENTS_SIZE);
+	put_online_cpus();
+
+	for (zid = 0; zid < MAX_NR_ZONES; ++zid) {
+		seq_printf(m, "%8s ", zone_name(zid));
+
+		for (order = 0; order < MAX_ORDER; order++)
+			seq_printf(m, "%10lu ",
+				   allocs[zid + order * MAX_NR_ZONES]);
+
+		seq_putc(m, '\n');
+	}
+
+	return 0;
+}
+
+static void *allocinfo_start(struct seq_file *m, loff_t *pos)
+{
+	if (*pos)
+		return NULL;
+	return SEQ_START_TOKEN;
+}
+
+static void *allocinfo_next(struct seq_file *m, void *arg, loff_t *pos)
+{
+	++*pos;
+	return NULL;
+}
+
+static void allocinfo_stop(struct seq_file *m, void *arg)
+{
+}
+
+static const struct seq_operations allocinfo_op = {
+	.start	= allocinfo_start,
+	.next	= allocinfo_next,
+	.stop	= allocinfo_stop,
+	.show	= allocinfo_show,
+};
+
+static int allocinfo_open(struct inode *inode, struct file *file)
+{
+	return seq_open(file, &allocinfo_op);
+}
+
+static const struct file_operations allocinfo_file_operations = {
+	.open		= allocinfo_open,
+	.read		= seq_read,
+	.llseek		= seq_lseek,
+	.release	= seq_release,
+};
+
 static void *vmstat_start(struct seq_file *m, loff_t *pos)
 {
 	unsigned long *v;
 	int i, stat_items_size;
 
-	if (*pos >= ARRAY_SIZE(vmstat_text))
+	if (*pos >= ARRAY_SIZE(vmstat_text) + PGALLOC_EVENTS_CUT_SIZE)
 		return NULL;
 	stat_items_size = NR_VM_ZONE_STAT_ITEMS * sizeof(unsigned long) +
 			  NR_VM_NODE_STAT_ITEMS * sizeof(unsigned long) +
@@ -1513,6 +1595,7 @@ static void *vmstat_start(struct seq_file *m, loff_t *pos)
 
 #ifdef CONFIG_VM_EVENT_COUNTERS
 	all_vm_events(v);
+	sum_alloc_events(v);
 	v[PGPGIN] /= 2;		/* sectors -> kbytes */
 	v[PGPGOUT] /= 2;
 #endif
@@ -1521,8 +1604,16 @@ static void *vmstat_start(struct seq_file *m, loff_t *pos)
 
 static void *vmstat_next(struct seq_file *m, void *arg, loff_t *pos)
 {
+	int alloc_event_start = NR_VM_ZONE_STAT_ITEMS +
+		NR_VM_NODE_STAT_ITEMS +
+		NR_VM_WRITEBACK_STAT_ITEMS +
+		PGALLOC_FIRST_ZONE;
+
 	(*pos)++;
-	if (*pos >= ARRAY_SIZE(vmstat_text))
+	if (*pos == alloc_event_start + MAX_NR_ZONES)
+		*(pos) += PGALLOC_EVENTS_CUT_SIZE;
+
+	if (*pos >= ARRAY_SIZE(vmstat_text) + PGALLOC_EVENTS_CUT_SIZE)
 		return NULL;
 	return (unsigned long *)m->private + *pos;
 }
@@ -1531,6 +1622,18 @@ static int vmstat_show(struct seq_file *m, void *arg)
 {
 	unsigned long *l = arg;
 	unsigned long off = l - (unsigned long *)m->private;
+	int alloc_event_start = NR_VM_ZONE_STAT_ITEMS +
+		NR_VM_NODE_STAT_ITEMS +
+		NR_VM_WRITEBACK_STAT_ITEMS +
+		PGALLOC_FIRST_ZONE;
+
+	if (off >= alloc_event_start + PGALLOC_EVENTS_SIZE)
+		off -= PGALLOC_EVENTS_CUT_SIZE;
+
+	if (unlikely(off >= sizeof(vmstat_text))) {
+		WARN_ON_ONCE(1);
+		return 0;
+	}
 
 	seq_puts(m, vmstat_text[off]);
 	seq_put_decimal_ull(m, " ", *l);
@@ -1790,6 +1893,7 @@ void __init init_mm_internals(void)
 #endif
 #ifdef CONFIG_PROC_FS
 	proc_create("buddyinfo", 0444, NULL, &buddyinfo_file_operations);
+	proc_create("allocinfo", 0444, NULL, &allocinfo_file_operations);
 	proc_create("pagetypeinfo", 0444, NULL, &pagetypeinfo_file_operations);
 	proc_create("vmstat", 0444, NULL, &vmstat_file_operations);
 	proc_create("zoneinfo", 0444, NULL, &zoneinfo_file_operations);

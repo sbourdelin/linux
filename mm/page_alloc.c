@@ -233,6 +233,13 @@ static char * const zone_names[MAX_NR_ZONES] = {
 #endif
 };
 
+const char *zone_name(int zid)
+{
+	if (zid < MAX_NR_ZONES)
+		return zone_names[zid];
+	return NULL;
+}
+
 char * const migratetype_names[MIGRATE_TYPES] = {
 	"Unmovable",
 	"Movable",
@@ -2779,7 +2786,7 @@ static struct page *rmqueue_pcplist(struct zone *preferred_zone,
 	list = &pcp->lists[migratetype];
 	page = __rmqueue_pcplist(zone,  migratetype, cold, pcp, list);
 	if (page) {
-		__count_zid_vm_events(PGALLOC, page_zonenum(page), 1 << order);
+		__count_alloc_event(page_zonenum(page), order);
 		zone_statistics(preferred_zone, zone);
 	}
 	local_irq_restore(flags);
@@ -2827,7 +2834,7 @@ struct page *rmqueue(struct zone *preferred_zone,
 	__mod_zone_freepage_state(zone, -(1 << order),
 				  get_pcppage_migratetype(page));
 
-	__count_zid_vm_events(PGALLOC, page_zonenum(page), 1 << order);
+	__count_alloc_event(page_zonenum(page), order);
 	zone_statistics(preferred_zone, zone);
 	local_irq_restore(flags);
 
