@@ -542,6 +542,7 @@ struct fec_enet_private {
 	int	phy_reset_duration;
 	int	phy_reset_post_delay;
 	bool	phy_reset_active_high;
+	bool	phy_reset_after_clk_enable;
 
 	struct	napi_struct napi;
 	int	csum_flags;

@@ -68,6 +68,7 @@
 
 static void set_multicast_list(struct net_device *ndev);
 static void fec_enet_itr_coal_init(struct net_device *ndev);
+static int fec_reset_phy(struct net_device *ndev);
 
 #define DRIVER_NAME	"fec"
 
@@ -1865,6 +1866,18 @@ static int fec_enet_clk_enable(struct net_device *ndev, bool enable)
 		ret = clk_prepare_enable(fep->clk_ref);
 		if (ret)
 			goto failed_clk_ref;
+
+		/* reset the phy after clk is enabled if it's configured */
+		if (fep->phy_reset_after_clk_enable) {
+			ret = fec_reset_phy(ndev);
+			if (ret)
+				goto failed_reset;
+			if (ndev->phydev) {
+				ret = phy_init_hw(ndev->phydev);
+				if (ret)
+					goto failed_reset;
+			}
+		}
 	} else {
 		clk_disable_unprepare(fep->clk_ahb);
 		clk_disable_unprepare(fep->clk_enet_out);
@@ -1879,6 +1892,7 @@ static int fec_enet_clk_enable(struct net_device *ndev, bool enable)
 
 	return 0;
 
+failed_reset:
 failed_clk_ref:
 	if (fep->clk_ref)
 		clk_disable_unprepare(fep->clk_ref);
@@ -3375,6 +3389,7 @@ fec_probe(struct platform_device *pdev)
 			fep->phy_reset_post_delay = 1;
 
 		fep->phy_reset_active_high =  of_property_read_bool(np, "phy-reset-active-high");
+		fep->phy_reset_after_clk_enable = of_property_read_bool(np, "phy-reset-after-clk-enable");
 
 		ret = devm_gpio_request_one(&pdev->dev, fep->phy_reset,
 					    fep->phy_reset_active_high ? GPIOF_OUT_INIT_HIGH : GPIOF_OUT_INIT_LOW,
@@ -3385,6 +3400,7 @@ fec_probe(struct platform_device *pdev)
 		}
 	} else {
 		fep->phy_reset = 0;
+		fep->phy_reset_after_clk_enable = false;
 	}
 
 	ret = of_get_phy_mode(pdev->dev.of_node);
