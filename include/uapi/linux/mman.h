@@ -3,8 +3,9 @@
 
 #include <asm/mman.h>
 
-#define MREMAP_MAYMOVE	1
-#define MREMAP_FIXED	2
+#define MREMAP_MAYMOVE	0x01
+#define MREMAP_FIXED	0x02
+#define MREMAP_MIRROR	0x04
 
 #define OVERCOMMIT_GUESS		0
 #define OVERCOMMIT_ALWAYS		1

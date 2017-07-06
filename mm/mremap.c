@@ -516,10 +516,11 @@ SYSCALL_DEFINE5(mremap, unsigned long, addr, unsigned long, old_len,
 	struct vm_userfaultfd_ctx uf = NULL_VM_UFFD_CTX;
 	LIST_HEAD(uf_unmap);
 
-	if (flags & ~(MREMAP_FIXED | MREMAP_MAYMOVE))
+	if (flags & ~(MREMAP_FIXED | MREMAP_MAYMOVE | MREMAP_MIRROR))
 		return ret;
 
-	if (flags & MREMAP_FIXED && !(flags & MREMAP_MAYMOVE))
+	if ((flags & MREMAP_FIXED || flags & MREMAP_MIRROR) &&
+	    !(flags & MREMAP_MAYMOVE))
 		return ret;
 
 	if (offset_in_page(addr))
@@ -528,13 +529,21 @@ SYSCALL_DEFINE5(mremap, unsigned long, addr, unsigned long, old_len,
 	old_len = PAGE_ALIGN(old_len);
 	new_len = PAGE_ALIGN(new_len);
 
-	/*
-	 * We allow a zero old-len as a special case
-	 * for DOS-emu "duplicate shm area" thing. But
-	 * a zero new-len is nonsensical.
-	 */
+	/* A zero new-len is nonsensical. */
 	if (!new_len)
 		return ret;
+
+	/*
+	 * For backward compatibility, we allow a zero old-len to imply
+	 * mirroring.  This was originally a special case for DOS-emu.
+	 */
+	if (!old_len)
+		flags |= MREMAP_MIRROR;
+	else if (flags & MREMAP_MIRROR) {
+		if (old_len != new_len)
+			return ret;
+		old_len = 0;
+	}
 
 	if (down_write_killable(&current->mm->mmap_sem))
 		return -EINTR;
