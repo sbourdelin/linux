@@ -29,13 +29,13 @@
 
 #include <asm/serial.h>
 
-static struct console early_con = {
+static struct console early_con __initdata = {
 	.name =		"uart",		/* fixed up at earlycon registration */
 	.flags =	CON_PRINTBUFFER | CON_BOOT,
 	.index =	0,
 };
 
-static struct earlycon_device early_console_dev = {
+static struct earlycon_device early_console_dev __initdata = {
 	.con = &early_con,
 };
 
