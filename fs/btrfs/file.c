@@ -1886,11 +1886,14 @@ static ssize_t btrfs_file_write_iter(struct kiocb *iocb,
 	loff_t oldsize;
 	int clean_page = 0;
 
-	if ((iocb->ki_flags & IOCB_NOWAIT) &&
-			(iocb->ki_flags & IOCB_DIRECT)) {
+	if (iocb->ki_flags & IOCB_NOWAIT) {
+		if (!(iocb->ki_flags & IOCB_DIRECT))
+			return -EOPNOTSUPP;
+
 		/* Don't sleep on inode rwsem */
 		if (!inode_trylock(inode))
 			return -EAGAIN;
+
 		/*
 		 * We will allocate space in case nodatacow is not set,
 		 * so bail
@@ -3100,7 +3103,7 @@ out:
 
 static int btrfs_file_open(struct inode *inode, struct file *filp)
 {
-	filp->f_mode |= FMODE_AIO_NOWAIT;
+	filp->f_mode |= FMODE_NOWAIT;
 	return generic_file_open(inode, filp);
 }
 
