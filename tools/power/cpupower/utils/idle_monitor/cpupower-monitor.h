@@ -15,7 +15,7 @@
 
 #define MONITORS_MAX 20
 #define MONITOR_NAME_LEN 20
-#define CSTATE_NAME_LEN 5
+#define CSTATE_NAME_LEN 16
 #define CSTATE_DESC_LEN 60
 
 int cpu_count;

@@ -88,7 +88,7 @@ void print_header(int topology_depth)
 	int state, need_len;
 	cstate_t s;
 	char buf[128] = "";
-	int percent_width = 4;
+	unsigned int percent_width = 6;
 
 	fill_string_with_spaces(buf, topology_depth * 5 - 1);
 	printf("%s|", buf);
@@ -116,17 +116,18 @@ void print_header(int topology_depth)
 	for (mon = 0; mon < avail_monitors; mon++) {
 		if (mon != 0)
 			printf("|| ");
-		else
-			printf(" ");
 		for (state = 0; state < monitors[mon]->hw_states_num; state++) {
 			if (state != 0)
-				printf(" | ");
+				printf("|");
 			s = monitors[mon]->hw_states[state];
 			sprintf(buf, "%s", s.name);
-			fill_string_with_spaces(buf, percent_width);
+			if (strlen(s.name) > percent_width)
+				fill_string_with_spaces(buf, strlen(s.name));
+			else
+				fill_string_with_spaces(buf, percent_width);
+
 			printf("%s", buf);
-		}
-		printf(" ");
+			}
 	}
 	printf("\n");
 }
@@ -139,7 +140,9 @@ void print_results(int topology_depth, int cpu)
 	double percent;
 	unsigned long long result;
 	cstate_t s;
-
+	char buf[128] = "";
+	unsigned int percent_width = 6;
+	unsigned int width;
 	/* Be careful CPUs may got resorted for pkg value do not just use cpu */
 	if (!bitmask_isbitset(cpus_chosen, cpu_top.core_info[cpu].cpu))
 		return;
@@ -163,7 +166,11 @@ void print_results(int topology_depth, int cpu)
 				printf("|");
 
 			s = monitors[mon]->hw_states[state];
-
+			if (strlen(s.name) > percent_width) {
+				width = strlen(s.name) - percent_width;
+				fill_string_with_spaces(buf, width);
+				printf("%s", buf);
+			}
 			if (s.get_count_percent) {
 				ret = s.get_count_percent(s.id, &percent,
 						  cpu_top.core_info[cpu].cpu);
