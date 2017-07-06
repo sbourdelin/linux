@@ -22,7 +22,7 @@ void calc_runnable_avg_yN_inv(void)
 
 	printf("static const u32 runnable_avg_yN_inv[] = {");
 	for (i = 0; i < HALFLIFE; i++) {
-		x = ((1UL<<32)-1)*pow(y, i);
+		x = ((1UL<<SHIFT)-1)*pow(y, i);
 
 		if (i % 6 == 0) printf("\n\t");
 		printf("0x%8x, ", x);
@@ -57,7 +57,7 @@ long max = 1024;
 
 void calc_converged_max(void)
 {
-	long last = 0, y_inv = ((1UL<<32)-1)*y;
+	long last = 0, y_inv = ((1UL<<SHIFT)-1)*y;
 
 	for (; ; n++) {
 		if (n > -1)
