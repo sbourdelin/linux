@@ -97,6 +97,9 @@ static const int bxt_rates[] = { 162000, 216000, 243000, 270000,
 				  324000, 432000, 540000 };
 static const int skl_rates[] = { 162000, 216000, 270000,
 				  324000, 432000, 540000 };
+static const int cnl_rates[] = { 162000, 216000, 270000,
+				 324000, 432000, 540000,
+				 648000, 810000 };
 static const int default_rates[] = { 162000, 270000, 540000 };
 
 /**
@@ -238,6 +241,9 @@ intel_dp_set_source_rates(struct intel_dp *intel_dp)
 	if (IS_GEN9_LP(dev_priv)) {
 		source_rates = bxt_rates;
 		size = ARRAY_SIZE(bxt_rates);
+	} else if (IS_CANNONLAKE(dev_priv)) {
+		source_rates = cnl_rates;
+		size = ARRAY_SIZE(cnl_rates);
 	} else if (IS_GEN9_BC(dev_priv)) {
 		source_rates = skl_rates;
 		size = ARRAY_SIZE(skl_rates);
