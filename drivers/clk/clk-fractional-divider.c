@@ -69,7 +69,7 @@ static long clk_fd_round_rate(struct clk_hw *hw, unsigned long rate,
 	if (scale > fd->nwidth)
 		rate <<= scale - fd->nwidth;
 
-	rational_best_approximation(rate, *parent_rate,
+	fd->approx(rate, *parent_rate,
 			GENMASK(fd->mwidth - 1, 0), GENMASK(fd->nwidth - 1, 0),
 			&m, &n);
 
@@ -87,7 +87,7 @@ static int clk_fd_set_rate(struct clk_hw *hw, unsigned long rate,
 	unsigned long m, n;
 	u32 val;
 
-	rational_best_approximation(rate, parent_rate,
+	fd->approx(rate, parent_rate,
 			GENMASK(fd->mwidth - 1, 0), GENMASK(fd->nwidth - 1, 0),
 			&m, &n);
 
@@ -116,10 +116,13 @@ const struct clk_ops clk_fractional_divider_ops = {
 };
 EXPORT_SYMBOL_GPL(clk_fractional_divider_ops);
 
-struct clk_hw *clk_hw_register_fractional_divider(struct device *dev,
+struct clk_hw *clk_hw_register_fractional_divider_custom(struct device *dev,
 		const char *name, const char *parent_name, unsigned long flags,
 		void __iomem *reg, u8 mshift, u8 mwidth, u8 nshift, u8 nwidth,
-		u8 clk_divider_flags, spinlock_t *lock)
+		u8 clk_divider_flags, spinlock_t *lock, void (*approx)
+				(unsigned long gnum, unsigned long gdenom,
+				 unsigned long mnum, unsigned long mdenom,
+				 unsigned long *bnum, unsigned long *bdenom))
 {
 	struct clk_fractional_divider *fd;
 	struct clk_init_data init;
@@ -145,6 +148,7 @@ struct clk_hw *clk_hw_register_fractional_divider(struct device *dev,
 	fd->nmask = GENMASK(nwidth - 1, 0) << nshift;
 	fd->flags = clk_divider_flags;
 	fd->lock = lock;
+	fd->approx = approx;
 	fd->hw.init = &init;
 
 	hw = &fd->hw;
@@ -156,7 +160,37 @@ struct clk_hw *clk_hw_register_fractional_divider(struct device *dev,
 
 	return hw;
 }
+EXPORT_SYMBOL_GPL(clk_hw_register_fractional_divider_custom);
+
+struct clk_hw *clk_hw_register_fractional_divider(struct device *dev,
+		const char *name, const char *parent_name, unsigned long flags,
+		void __iomem *reg, u8 mshift, u8 mwidth, u8 nshift, u8 nwidth,
+		u8 clk_divider_flags, spinlock_t *lock)
+{
+	return clk_hw_register_fractional_divider_custom(dev, name, parent_name,
+		flags, reg, mshift, mwidth, nshift, nwidth, clk_divider_flags,
+		lock, rational_best_approximation);
+}
 EXPORT_SYMBOL_GPL(clk_hw_register_fractional_divider);
+
+struct clk *clk_register_fractional_divider_custom(struct device *dev,
+		const char *name, const char *parent_name, unsigned long flags,
+		void __iomem *reg, u8 mshift, u8 mwidth, u8 nshift, u8 nwidth,
+		u8 clk_divider_flags, spinlock_t *lock, void (*approx)
+				(unsigned long gnum, unsigned long gdenom,
+				 unsigned long mnum, unsigned long mdenom,
+				 unsigned long *bnum, unsigned long *bdenom))
+{
+	struct clk_hw *hw;
+
+	hw = clk_hw_register_fractional_divider_custom(dev, name, parent_name,
+			flags, reg, mshift, mwidth, nshift, nwidth,
+			clk_divider_flags, lock, approx);
+	if (IS_ERR(hw))
+		return ERR_CAST(hw);
+	return hw->clk;
+}
+EXPORT_SYMBOL_GPL(clk_register_fractional_divider_custom);
 
 struct clk *clk_register_fractional_divider(struct device *dev,
 		const char *name, const char *parent_name, unsigned long flags,
