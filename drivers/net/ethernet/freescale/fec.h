@@ -538,6 +538,10 @@ struct fec_enet_private {
 	int	pause_flag;
 	int	wol_flag;
 	u32	quirks;
+	int	phy_reset;
+	int	phy_reset_duration;
+	int	phy_reset_post_delay;
+	bool	phy_reset_active_high;
 
 	struct	napi_struct napi;
 	int	csum_flags;
