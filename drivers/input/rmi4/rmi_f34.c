@@ -590,7 +590,7 @@ static int rmi_f34_probe(struct rmi_function *fn)
 
 	return 0;
 }
-
+#ifdef CONFIG_RMI4_F34
 int rmi_f34_create_sysfs(struct rmi_device *rmi_dev)
 {
 	return sysfs_create_group(&rmi_dev->dev.kobj, &rmi_firmware_attr_group);
@@ -600,7 +600,7 @@ void rmi_f34_remove_sysfs(struct rmi_device *rmi_dev)
 {
 	sysfs_remove_group(&rmi_dev->dev.kobj, &rmi_firmware_attr_group);
 }
-
+#endif
 struct rmi_function_handler rmi_f34_handler = {
 	.driver = {
 		.name = "rmi4_f34",
