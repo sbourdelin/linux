@@ -457,7 +457,7 @@ static void etm_addr_filters_sync(struct perf_event *event)
 
 	filters->nr_filters = i;
 }
-
+#ifdef CONFIG_CORESIGHT
 int etm_perf_symlink(struct coresight_device *csdev, bool link)
 {
 	char entry[sizeof("cpu9999999")];
@@ -482,7 +482,7 @@ int etm_perf_symlink(struct coresight_device *csdev, bool link)
 
 	return 0;
 }
-
+#endif
 static int __init etm_perf_init(void)
 {
 	int ret;
