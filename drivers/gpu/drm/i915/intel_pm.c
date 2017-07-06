@@ -58,24 +58,24 @@
 
 static void gen9_init_clock_gating(struct drm_i915_private *dev_priv)
 {
-	/* See Bspec note for PSR2_CTL bit 31, Wa#828:skl,bxt,kbl,cfl */
+	/* See Bspec note for PSR2_CTL bit 31, Wa#828:skl,bxt,kbl,cfl,cnl */
 	I915_WRITE(CHICKEN_PAR1_1,
 		   I915_READ(CHICKEN_PAR1_1) | SKL_EDP_PSR_FIX_RDWRAP);
 
 	I915_WRITE(GEN8_CONFIG0,
 		   I915_READ(GEN8_CONFIG0) | GEN9_DEFAULT_FIXES);
 
-	/* WaEnableChickenDCPR:skl,bxt,kbl,glk,cfl */
+	/* WaEnableChickenDCPR:skl,bxt,kbl,glk,cfl,cnl */
 	I915_WRITE(GEN8_CHICKEN_DCPR_1,
 		   I915_READ(GEN8_CHICKEN_DCPR_1) | MASK_WAKEMEM);
 
-	/* WaFbcTurnOffFbcWatermark:skl,bxt,kbl,cfl */
-	/* WaFbcWakeMemOn:skl,bxt,kbl,glk,cfl */
+	/* WaFbcTurnOffFbcWatermark:skl,bxt,kbl,cfl,cnl */
+	/* WaFbcWakeMemOn:skl,bxt,kbl,glk,cfl,cnl */
 	I915_WRITE(DISP_ARB_CTL, I915_READ(DISP_ARB_CTL) |
 		   DISP_FBC_WM_DIS |
 		   DISP_FBC_MEMORY_WAKE);
 
-	/* WaFbcHighMemBwCorruptionAvoidance:skl,bxt,kbl,cfl */
+	/* WaFbcHighMemBwCorruptionAvoidance:skl,bxt,kbl,cfl,cnl */
 	I915_WRITE(ILK_DPFC_CHICKEN, I915_READ(ILK_DPFC_CHICKEN) |
 		   ILK_DPFC_DISABLE_DUMMY0);
 }
@@ -8238,6 +8238,20 @@ static void gen8_set_l3sqc_credits(struct drm_i915_private *dev_priv,
 	I915_WRITE(GEN7_MISCCPCTL, misccpctl);
 }
 
+static void cannonlake_init_clock_gating(struct drm_i915_private *dev_priv)
+{
+	gen9_init_clock_gating(dev_priv);
+
+	/* WaFbcNukeOnHostModify:cnl */
+	I915_WRITE(ILK_DPFC_CHICKEN, I915_READ(ILK_DPFC_CHICKEN) |
+		   ILK_DPFC_NUKE_ON_ANY_MODIFICATION);
+
+	/* WaSarbUnitClockGatingDisable:cnl (pre-prod) */
+	if (IS_CNL_REVID(dev_priv, CNL_REVID_A0, CNL_REVID_B0))
+		I915_WRITE(SLICE_UNIT_LEVEL_CLKGATE, I915_READ(SLICE_UNIT_LEVEL_CLKGATE) |
+			   SARBUNIT_CLKGATE_DIS);
+}
+
 static void kabylake_init_clock_gating(struct drm_i915_private *dev_priv)
 {
 	gen9_init_clock_gating(dev_priv);
@@ -8718,7 +8732,9 @@ static void nop_init_clock_gating(struct drm_i915_private *dev_priv)
  */
 void intel_init_clock_gating_hooks(struct drm_i915_private *dev_priv)
 {
-	if (IS_SKYLAKE(dev_priv))
+	if (IS_CANNONLAKE(dev_priv))
+		dev_priv->display.init_clock_gating = cannonlake_init_clock_gating;
+	else if (IS_SKYLAKE(dev_priv))
 		dev_priv->display.init_clock_gating = skylake_init_clock_gating;
 	else if (IS_KABYLAKE(dev_priv) || IS_COFFEELAKE(dev_priv))
 		dev_priv->display.init_clock_gating = kabylake_init_clock_gating;
