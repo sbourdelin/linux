@@ -297,7 +297,7 @@ static int tpm_tis_acpi_remove(struct acpi_device *dev)
 	return 0;
 }
 
-static struct acpi_device_id tpm_acpi_tbl[] = {
+static const struct acpi_device_id tpm_acpi_tbl[] = {
 	{"MSFT0101", 0},	/* TPM 2.0 */
 	/* Add new here */
 	{"", 0},		/* User Specified */
