@@ -35,10 +35,13 @@ Optional properties:
 
   - read-only: this parameterless property disables writes to the eeprom
 
+  - mac-offset: offset in EEPROM where MAC address starts
+
 Example:
 
 eeprom@52 {
 	compatible = "atmel,24c32";
 	reg = <0x52>;
 	pagesize = <32>;
+	mac-offset = <0xf8>;
 };
