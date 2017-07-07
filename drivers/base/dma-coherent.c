@@ -25,6 +25,10 @@ static inline struct dma_coherent_mem *dev_get_coherent_memory(struct device *de
 {
 	if (dev && dev->dma_mem)
 		return dev->dma_mem;
+#ifdef CONFIG_DMA_CMA
+	if (dev && dev->cma_area)
+		return NULL;
+#endif
 	return dma_coherent_default_memory;
 }
 
