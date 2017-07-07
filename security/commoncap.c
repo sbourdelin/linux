@@ -624,12 +624,10 @@ skip:
  * Determine whether a secure execution is required, return 1 if it is, and 0
  * if it is not.
  *
- * The credentials have been committed by this point, and so are no longer
- * available through @bprm->cred.
  */
 int cap_bprm_secureexec(struct linux_binprm *bprm)
 {
-	const struct cred *cred = current_cred();
+	const struct cred *cred = bprm->cred;
 	kuid_t root_uid = make_kuid(cred->user_ns, 0);
 
 	if (!uid_eq(cred->uid, root_uid)) {

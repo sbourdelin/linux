@@ -1330,12 +1330,18 @@ EXPORT_SYMBOL(would_dump);
 
 void setup_new_exec(struct linux_binprm * bprm)
 {
+	/* This is the point of no return */
+
+	if (security_bprm_secureexec(bprm)) {
+		/* Record for AT_SECURE. */
+		bprm->secureexec = 1;
+	}
+
 	arch_pick_mmap_layout(current->mm);
 
-	/* This is the point of no return */
 	current->sas_ss_sp = current->sas_ss_size = 0;
 
-	if (uid_eq(current_euid(), current_uid()) && gid_eq(current_egid(), current_gid()))
+	if (!bprm->secureexec)
 		set_dumpable(current->mm, SUID_DUMP_USER);
 	else
 		set_dumpable(current->mm, suid_dumpable);
@@ -1350,9 +1356,8 @@ void setup_new_exec(struct linux_binprm * bprm)
 	 */
 	current->mm->task_size = TASK_SIZE;
 
-	/* install the new credentials */
-	if (!uid_eq(bprm->cred->uid, current_euid()) ||
-	    !gid_eq(bprm->cred->gid, current_egid())) {
+	/* prepare to install the new credentials */
+	if (bprm->secureexec) {
 		current->pdeath_signal = 0;
 	} else {
 		if (bprm->interp_flags & BINPRM_FLAGS_ENFORCE_NONDUMP)

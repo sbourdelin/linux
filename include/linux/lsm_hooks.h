@@ -75,7 +75,8 @@
  *	Return a boolean value (0 or 1) indicating whether a "secure exec"
  *	is required.  The flag is passed in the auxiliary table
  *	on the initial stack to the ELF interpreter to indicate whether libc
- *	should enable secure mode.
+ *	should enable secure mode. Called before bprm_committing_creds(),
+ *	so pending credentials are in @bprm->cred.
  *	@bprm contains the linux_binprm structure.
  *
  * Security hooks for filesystem operations.
