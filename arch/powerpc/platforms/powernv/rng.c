@@ -8,6 +8,7 @@
  */
 
 #define pr_fmt(fmt)	"powernv-rng: " fmt
+#define DARN_ERR 0xFFFFFFFFFFFFFFFFul
 
 #include <linux/kernel.h>
 #include <linux/of.h>
@@ -16,6 +17,7 @@
 #include <linux/slab.h>
 #include <linux/smp.h>
 #include <asm/archrandom.h>
+#include <asm/cputable.h>
 #include <asm/io.h>
 #include <asm/prom.h>
 #include <asm/machdep.h>
@@ -63,6 +65,21 @@ int powernv_get_random_real_mode(unsigned long *v)
 	rng = raw_cpu_read(powernv_rng);
 
 	*v = rng_whiten(rng, __raw_rm_readq(rng->regs_real));
+
+	return 1;
+}
+
+int powernv_get_random_darn(unsigned long *v)
+{
+	unsigned long val;
+
+	/* Using DARN with L=1 - conditioned random number */
+	asm (PPC_DARN(%0, 1)"\n" : "=r"(val) :);
+
+	if (val == DARN_ERR)
+		return 0;
+
+	*v = val;
 
 	return 1;
 }
@@ -136,6 +153,7 @@ static __init int rng_create(struct device_node *dn)
 static __init int rng_init(void)
 {
 	struct device_node *dn;
+	unsigned long drn_test;
 	int rc;
 
 	for_each_compatible_node(dn, NULL, "ibm,power-rng") {
@@ -149,6 +167,10 @@ static __init int rng_init(void)
 		/* Create devices for hwrng driver */
 		of_platform_device_create(dn, NULL, NULL);
 	}
+
+	if (cpu_has_feature(CPU_FTR_ARCH_300) &&
+	    powernv_get_random_darn(&drn_test))
+		ppc_md.get_random_seed = powernv_get_random_darn;
 
 	return 0;
 }
