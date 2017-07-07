@@ -358,6 +358,9 @@ static int ir_mce_kbd_register(struct rc_dev *dev)
 	struct input_dev *idev;
 	int i, ret;
 
+	if (dev->driver_type == RC_DRIVER_IR_RAW_TX)
+		return 0;
+
 	idev = input_allocate_device();
 	if (!idev)
 		return -ENOMEM;
