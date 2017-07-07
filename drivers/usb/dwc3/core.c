@@ -732,6 +732,10 @@ static int dwc3_core_init(struct dwc3 *dwc)
 	u32			reg;
 	int			ret;
 
+	ret = dwc3_phy_setup(dwc);
+	if (ret)
+		goto err0;
+
 	if (!dwc3_core_is_valid(dwc)) {
 		dev_err(dwc->dev, "this is not a DesignWare USB3 DRD Core\n");
 		ret = -ENODEV;
@@ -752,10 +756,6 @@ static int dwc3_core_init(struct dwc3 *dwc)
 	}
 
 	ret = dwc3_core_soft_reset(dwc);
-	if (ret)
-		goto err0;
-
-	ret = dwc3_phy_setup(dwc);
 	if (ret)
 		goto err0;
 
