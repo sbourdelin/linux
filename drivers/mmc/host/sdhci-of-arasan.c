@@ -33,7 +33,6 @@
 #include "sdhci-pltfm.h"
 #include <linux/of.h>
 
-#define SDHCI_ARASAN_CLK_CTRL_OFFSET	0x2c
 #define SDHCI_ARASAN_VENDOR_REGISTER	0x78
 
 #define VENDOR_ENHANCED_STROBE		BIT(0)
@@ -179,7 +178,7 @@ static unsigned int sdhci_arasan_get_timeout_clock(struct sdhci_host *host)
 	unsigned long freq;
 	struct sdhci_pltfm_host *pltfm_host = sdhci_priv(host);
 
-	div = readl(host->ioaddr + SDHCI_ARASAN_CLK_CTRL_OFFSET);
+	div = sdhci_readl(host, SDHCI_CLOCK_CONTROL);
 	div = (div & CLK_CTRL_TIMEOUT_MASK) >> CLK_CTRL_TIMEOUT_SHIFT;
 
 	freq = clk_get_rate(pltfm_host->clk);
@@ -451,13 +450,13 @@ static void sdhci_arasan_hs400_enhanced_strobe(struct mmc_host *mmc,
 	u32 vendor;
 	struct sdhci_host *host = mmc_priv(mmc);
 
-	vendor = readl(host->ioaddr + SDHCI_ARASAN_VENDOR_REGISTER);
+	vendor = sdhci_readl(host, SDHCI_ARASAN_VENDOR_REGISTER);
 	if (ios->enhanced_strobe)
 		vendor |= VENDOR_ENHANCED_STROBE;
 	else
 		vendor &= ~VENDOR_ENHANCED_STROBE;
 
-	writel(vendor, host->ioaddr + SDHCI_ARASAN_VENDOR_REGISTER);
+	sdhci_writel(host, vendor, SDHCI_ARASAN_VENDOR_REGISTER);
 }
 
 static void sdhci_arasan_reset(struct sdhci_host *host, u8 mask)
