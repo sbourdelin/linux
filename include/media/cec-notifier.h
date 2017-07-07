@@ -21,13 +21,13 @@
 #ifndef LINUX_CEC_NOTIFIER_H
 #define LINUX_CEC_NOTIFIER_H
 
-#include <linux/types.h>
-#include <media/cec.h>
-
 struct device;
 struct edid;
 struct cec_adapter;
 struct cec_notifier;
+
+#include <linux/types.h>
+#include <media/cec.h>
 
 #if IS_REACHABLE(CONFIG_CEC_CORE) && IS_ENABLED(CONFIG_CEC_NOTIFIER)
 
