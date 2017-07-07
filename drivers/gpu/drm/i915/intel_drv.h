@@ -780,6 +780,9 @@ struct intel_crtc_state {
 
 	/* HDMI High TMDS char rate ratio */
 	bool hdmi_high_tmds_clock_ratio;
+
+	/* HDMI output type */
+	bool ycbcr420;
 };
 
 struct intel_crtc {
