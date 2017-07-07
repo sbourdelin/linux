@@ -2408,6 +2408,11 @@ static int mtk_probe(struct platform_device *pdev)
 	int i;
 
 	match = of_match_device(of_mtk_match, &pdev->dev);
+	if (!match) {
+		dev_err(&pdev->dev, "failed to match device\n");
+		return -ENODEV;
+	}
+
 	soc = (struct mtk_soc_data *)match->data;
 
 	eth = devm_kzalloc(&pdev->dev, sizeof(*eth), GFP_KERNEL);
