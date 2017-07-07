@@ -47,6 +47,7 @@ struct urb_list {
 };
 
 struct udl_fbdev;
+struct udl_flip_queue;
 
 struct udl_device {
 	struct device *dev;
@@ -66,6 +67,9 @@ struct udl_device {
 	atomic_t bytes_identical; /* saved effort with backbuffer comparison */
 	atomic_t bytes_sent; /* to usb, after compression including overhead */
 	atomic_t cpu_kcycles_used; /* transpired during pixel processing */
+
+	struct udl_flip_queue *flip_queue;
+	struct mutex transfer_lock; /* to serialize transfers */
 };
 
 struct udl_gem_object {
