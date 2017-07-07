@@ -438,6 +438,9 @@ struct mux_control *mux_control_get(struct device *dev, const char *mux_name)
 	int index = 0;
 	int ret;
 
+	if (!np)
+		return ERR_PTR(-ENODEV);
+
 	if (mux_name) {
 		index = of_property_match_string(np, "mux-control-names",
 						 mux_name);
