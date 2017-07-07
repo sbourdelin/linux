@@ -1,0 +1,11 @@
+Device tree bindings for IR LED connected through gpio pin which is used as
+remote controller transmitter.
+
+Required properties:
+	- compatible: should be "gpio-ir-tx".
+
+Example:
+	irled@0 {
+		compatible = "gpio-ir-tx";
+		gpios = <&gpio1 2 GPIO_ACTIVE_HIGH>;
+	};
