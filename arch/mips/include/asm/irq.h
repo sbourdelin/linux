@@ -9,6 +9,7 @@
 #ifndef _ASM_IRQ_H
 #define _ASM_IRQ_H
 
+#include <asm/asm.h>
 #include <linux/linkage.h>
 #include <linux/smp.h>
 #include <linux/irqdomain.h>
@@ -17,8 +18,8 @@
 
 #include <irq.h>
 
-#define IRQ_STACK_SIZE			THREAD_SIZE
-#define IRQ_STACK_START			(IRQ_STACK_SIZE - sizeof(unsigned long))
+#define IRQ_STACK_SIZE	THREAD_SIZE
+#define IRQ_STACK_START	((IRQ_STACK_SIZE - sizeof(unsigned long)) & ALMASK)
 
 extern void *irq_stack[NR_CPUS];
 
