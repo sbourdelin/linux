@@ -28,5 +28,9 @@ void mux_control_put(struct mux_control *mux);
 
 struct mux_control *devm_mux_control_get(struct device *dev,
 					 const char *mux_name);
-
+struct mux_control *mux_control_get_by_index(const char *devname,
+		unsigned int chip_index, unsigned int ctrl_index);
+struct mux_control *devm_mux_control_get_by_index(struct device *dev,
+		const char *devname, unsigned int chip_index,
+		unsigned int ctrl_index);
 #endif /* _LINUX_MUX_CONSUMER_H */

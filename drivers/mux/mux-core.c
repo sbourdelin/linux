@@ -422,6 +422,87 @@ static struct mux_chip *of_find_mux_chip_by_node(struct device_node *np)
 	return dev ? to_mux_chip(dev) : NULL;
 }
 
+static int dev_parent_name_match(struct device *dev, const void *data)
+{
+	const char *devname = dev_name(dev->parent);
+	unsigned int i;
+
+	if (!devname || !data)
+		return 0;
+
+	for (i = 0; i < strlen(devname); i++) {
+		if (devname[i] == '.')
+			break;
+	}
+
+	return !strncmp(devname, data, i-1);
+}
+
+/**
+ * mux_chip_get_by_index() - Get the mux-chip associated with give device.
+ * @devname: Name of the device which registered the mux-chip.
+ * @index: Index of the mux chip.
+ *
+ * Return: A pointer to the mux-chip, or an ERR_PTR with a negative errno.
+ */
+static struct mux_chip *mux_chip_get_by_index(const char *devname, int index)
+{
+	struct device *dev;
+	int found = -1;
+
+	if (!devname)
+		return ERR_PTR(-EINVAL);
+
+	do {
+		dev = class_find_device(&mux_class, NULL, devname,
+					dev_parent_name_match);
+
+		if (dev != NULL)
+			found++;
+
+		if (found >= index)
+			break;
+	} while (dev != NULL);
+
+	if ((found == index) && dev)
+		return to_mux_chip(dev);
+
+	return ERR_PTR(-ENODEV);
+}
+
+/**
+ * mux_control_get_by_index() - Get the mux-control of given device based on
+ *				device name, chip and control index.
+ * @devname: Name of the device which registered the mux-chip.
+ * @chip_index: Index of the mux chip.
+ * @ctrl_index: Index of the mux controller.
+ *
+ * Return: A pointer to the mux-control, or an ERR_PTR with a negative errno.
+ */
+struct mux_control *mux_control_get_by_index(const char *devname,
+					     unsigned int chip_index,
+					     unsigned int ctrl_index)
+{
+	struct mux_chip *mux_chip;
+
+	mux_chip = mux_chip_get_by_index(devname, chip_index);
+
+	if (IS_ERR(mux_chip))
+		return ERR_PTR(PTR_ERR(mux_chip));
+
+	if (ctrl_index >= mux_chip->controllers) {
+		dev_err(&mux_chip->dev,
+				"Invalid controller index, maximum value is %d\n",
+				mux_chip->controllers);
+		return ERR_PTR(-EINVAL);
+	}
+
+	get_device(&mux_chip->dev);
+
+	return &mux_chip->mux[ctrl_index];
+}
+EXPORT_SYMBOL_GPL(mux_control_get_by_index);
+
 /**
  * mux_control_get() - Get the mux-control for a device.
  * @dev: The device that needs a mux-control.
@@ -532,6 +613,39 @@ struct mux_control *devm_mux_control_get(struct device *dev,
 	return mux;
 }
 EXPORT_SYMBOL_GPL(devm_mux_control_get);
+
+/**
+ * devm_mux_control_get_by_index() - Get the mux-control for a device of given
+ *				     index value.
+ * @dev: The device that needs a mux-control.
+ * @devname: Name of the device which registered the mux-chip.
+ * @chip_index: Index of the mux chip.
+ * @ctrl_index: Index of the mux controller.
+ *
+ * Return: Pointer to the mux-control, or an ERR_PTR with a negative errno.
+ */
+struct mux_control *devm_mux_control_get_by_index(struct device *dev,
+		const char *devname, unsigned int chip_index,
+		unsigned int ctrl_index)
+{
+	struct mux_control **ptr, *mux;
+
+	ptr = devres_alloc(devm_mux_control_release, sizeof(*ptr), GFP_KERNEL);
+	if (!ptr)
+		return ERR_PTR(-ENOMEM);
+
+	mux = mux_control_get_by_index(devname, chip_index, ctrl_index);
+	if (IS_ERR(mux)) {
+		devres_free(ptr);
+		return mux;
+	}
+
+	*ptr = mux;
+	devres_add(dev, ptr);
+
+	return mux;
+}
+EXPORT_SYMBOL_GPL(devm_mux_control_get_by_index);
 
 /*
  * Using subsys_initcall instead of module_init here to try to ensure - for
