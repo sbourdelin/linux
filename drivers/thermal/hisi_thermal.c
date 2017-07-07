@@ -187,6 +187,9 @@ static int hisi_thermal_get_temp(void *_sensor, int *temp)
 
 	dev_dbg(&data->pdev->dev, "id=%d, irq=%d, temp=%d, thres=%d\n",
 		sensor->id, data->irq_enabled, *temp, sensor->thres_temp);
+
+	printk("id=%d, irq=%d, temp=%d, thres=%d\n",
+		sensor->id, data->irq_enabled, *temp, sensor->thres_temp);
 	/*
 	 * Bind irq to sensor for two cases:
 	 *   Reenable alarm IRQ if temperature below threshold;
@@ -260,8 +263,6 @@ static int hisi_thermal_register_sensor(struct platform_device *pdev,
 	if (IS_ERR(sensor->tzd)) {
 		ret = PTR_ERR(sensor->tzd);
 		sensor->tzd = NULL;
-		dev_err(&pdev->dev, "failed to register sensor id %d: %d\n",
-			sensor->id, ret);
 		return ret;
 	}
 
@@ -352,10 +353,9 @@ static int hisi_thermal_probe(struct platform_device *pdev)
 		ret = hisi_thermal_register_sensor(pdev, data,
 						   &data->sensors[i], i);
 		if (ret)
-			dev_err(&pdev->dev,
-				"failed to register thermal sensor: %d\n", ret);
-		else
-			hisi_thermal_toggle_sensor(&data->sensors[i], true);
+			continue;
+
+		hisi_thermal_toggle_sensor(&data->sensors[i], true);
 	}
 
 	return 0;
