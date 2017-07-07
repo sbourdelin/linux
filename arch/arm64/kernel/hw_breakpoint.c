@@ -697,7 +697,7 @@ unlock:
 		}
 	}
 
-	return 0;
+	return 1;
 }
 NOKPROBE_SYMBOL(breakpoint_handler);
 
@@ -840,7 +840,7 @@ static int watchpoint_handler(unsigned long addr, unsigned int esr,
 		}
 	}
 
-	return 0;
+	return 1;
 }
 NOKPROBE_SYMBOL(watchpoint_handler);
 

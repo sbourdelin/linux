@@ -750,6 +750,13 @@ static struct fault_info __refdata debug_fault_info[] = {
 	{ do_bad,	SIGBUS,		0,		"unknown 7"		},
 };
 
+/*
+ * fn should return 0 from any software breakpoint and hw
+ * breakpoint/watchpoint handler if it does not expect a single step stage
+ * and 1 if it expects single step followed by its execution. A single step
+ * handler should always return 0. All handler should return a -ve error in
+ * any other case.
+ */
 void __init hook_debug_fault_code(int nr,
 				  int (*fn)(unsigned long, unsigned int, struct pt_regs *),
 				  int sig, int code, const char *name)
@@ -762,6 +769,8 @@ void __init hook_debug_fault_code(int nr,
 	debug_fault_info[nr].name	= name;
 }
 
+static DEFINE_PER_CPU(bool, irq_enable_needed);
+
 asmlinkage int __exception do_debug_exception(unsigned long addr,
 					      unsigned int esr,
 					      struct pt_regs *regs)
@@ -769,6 +778,7 @@ asmlinkage int __exception do_debug_exception(unsigned long addr,
 	const struct fault_info *inf = debug_fault_info + DBG_ESR_EVT(esr);
 	struct siginfo info;
 	int rv;
+	bool *irq_en_needed = this_cpu_ptr(&irq_enable_needed);
 
 	/*
 	 * Tell lockdep we disabled irqs in entry.S. Do nothing if they were
@@ -777,9 +787,8 @@ asmlinkage int __exception do_debug_exception(unsigned long addr,
 	if (interrupts_enabled(regs))
 		trace_hardirqs_off();
 
-	if (!inf->fn(addr, esr, regs)) {
-		rv = 1;
-	} else {
+	rv = inf->fn(addr, esr, regs);
+	if (rv < 0) {
 		pr_alert("Unhandled debug exception: %s (0x%08x) at 0x%016lx\n",
 			 inf->name, esr, addr);
 
@@ -788,7 +797,12 @@ asmlinkage int __exception do_debug_exception(unsigned long addr,
 		info.si_code  = inf->code;
 		info.si_addr  = (void __user *)addr;
 		arm64_notify_die("", regs, &info, 0);
-		rv = 0;
+	} else if (rv == 1 && interrupts_enabled(regs)) {
+		regs->pstate |= PSR_I_BIT;
+		*irq_en_needed = true;
+	} else if (rv == 0 && *irq_en_needed) {
+		regs->pstate &= ~PSR_I_BIT;
+		*irq_en_needed = false;
 	}
 
 	if (interrupts_enabled(regs))

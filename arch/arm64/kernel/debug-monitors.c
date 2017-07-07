@@ -325,6 +325,9 @@ static int brk_handler(unsigned long addr, unsigned int esr,
 		return -EFAULT;
 	}
 
+	if (kernel_active_single_step() || test_thread_flag(TIF_SINGLESTEP))
+		return 1;
+
 	return 0;
 }
 NOKPROBE_SYMBOL(brk_handler);
