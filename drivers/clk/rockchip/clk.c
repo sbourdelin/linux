@@ -210,7 +210,7 @@ static struct clk *rockchip_clk_register_frac_branch(
 	div->nwidth = 16;
 	div->nmask = GENMASK(div->nwidth - 1, 0) << div->nshift;
 	div->lock = lock;
-	div_ops = &clk_fractional_divider_ops;
+	div_ops = &clk_fractional_divider_special_ops;
 
 	clk = clk_register_composite(NULL, name, parent_names, num_parents,
 				     NULL, NULL,

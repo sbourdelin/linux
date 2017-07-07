@@ -158,6 +158,38 @@ struct clk_hw *clk_hw_register_fractional_divider(struct device *dev,
 }
 EXPORT_SYMBOL_GPL(clk_hw_register_fractional_divider);
 
+static long clk_fd_round_rate_special(struct clk_hw *hw, unsigned long rate,
+				      unsigned long *parent_rate)
+{
+	struct clk_hw *p_parent;
+	unsigned long p_rate, p_parent_rate;
+
+	if (!rate || rate >= *parent_rate)
+		return *parent_rate;
+
+	/*
+	 * Get rate closer to *parent_rate to guarantee there is no overflow
+	 * for m and n. In the result it will be the nearest rate left shifted
+	 * by (scale - fd->nwidth) bits.
+	 * fractional divider must set that denominator is 20 times larger than
+	 * numerator to generate precise clock frequency.
+	 */
+	p_rate = clk_hw_get_rate(clk_hw_get_parent(hw));
+	if ((rate * 20 > p_rate) && (p_rate % rate != 0)) {
+		p_parent = clk_hw_get_parent(clk_hw_get_parent(hw));
+		p_parent_rate = clk_hw_get_rate(p_parent);
+		*parent_rate = p_parent_rate;
+	}
+	return clk_fd_round_rate(hw, rate, parent_rate);
+}
+
+const struct clk_ops clk_fractional_divider_special_ops = {
+	.recalc_rate = clk_fd_recalc_rate,
+	.round_rate = clk_fd_round_rate_special,
+	.set_rate = clk_fd_set_rate,
+};
+EXPORT_SYMBOL_GPL(clk_fractional_divider_special_ops);
+
 struct clk *clk_register_fractional_divider(struct device *dev,
 		const char *name, const char *parent_name, unsigned long flags,
 		void __iomem *reg, u8 mshift, u8 mwidth, u8 nshift, u8 nwidth,
