@@ -461,6 +461,7 @@ static void intel_hdmi_set_avi_infoframe(struct drm_encoder *encoder,
 		&crtc_state->base.adjusted_mode;
 	struct drm_connector *connector = &intel_hdmi->attached_connector->base;
 	bool is_hdmi2_sink = connector->display_info.hdmi.scdc.supported;
+	enum hdmi_colorspace colorspace = HDMI_COLORSPACE_RGB;
 	union hdmi_infoframe frame;
 	int ret;
 
@@ -469,6 +470,17 @@ static void intel_hdmi_set_avi_infoframe(struct drm_encoder *encoder,
 						       is_hdmi2_sink);
 	if (ret < 0) {
 		DRM_ERROR("couldn't fill AVI infoframe\n");
+		return;
+	}
+
+	if (crtc_state->ycbcr420)
+		colorspace = HDMI_COLORSPACE_YUV420;
+
+	ret = drm_hdmi_avi_infoframe_set_colorspace(&frame.avi,
+						    adjusted_mode,
+						    colorspace);
+	if (ret < 0) {
+		DRM_ERROR("couldn't fill AVI colorspace\n");
 		return;
 	}
 
