@@ -186,7 +186,11 @@ extern int __printk_ratelimit(const char *func);
 extern bool printk_timed_ratelimit(unsigned long *caller_jiffies,
 				   unsigned int interval_msec);
 
+bool printk_suppress_message(int level);
+
 extern int printk_delay_msec;
+void printk_delay(int level);
+
 extern int dmesg_restrict;
 extern int kptr_restrict;
 
