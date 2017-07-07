@@ -404,6 +404,9 @@ config SND_SOC_BT_SCO
 config SND_SOC_CQ0093VC
 	tristate
 
+config SND_SOC_CPCAP
+	tristate "Motorola CPCAP codec"
+
 config SND_SOC_CS35L32
 	tristate "Cirrus Logic CS35L32 CODEC"
 	depends on I2C
