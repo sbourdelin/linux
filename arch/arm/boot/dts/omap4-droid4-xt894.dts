@@ -116,6 +116,50 @@
 
 		};
 	};
+
+	soundcard {
+		compatible = "simple-audio-card";
+		simple-audio-card,name = "Droid 4 Audio";
+
+		simple-audio-card,widgets =
+			"Speaker", "Earpiece",
+			"Speaker", "Loudspeaker",
+			"Headphone", "Headphone Jack",
+			"Microphone", "Internal Mic";
+
+		simple-audio-card,routing =
+			"Earpiece", "EP",
+			"Loudspeaker", "SPKR",
+			"Headphone Jack", "HSL",
+			"Headphone Jack", "HSR",
+			"MICR", "Internal Mic";
+
+		simple-audio-card,dai-link@0 {
+			format = "i2s";
+			frame-master = <&codec0>;
+			bitclock-master = <&codec0>;
+			cpu {
+				sound-dai = <&mcbsp2>;
+			};
+			codec0: codec {
+				sound-dai = <&cpcap_audio 0>;
+			};
+		};
+
+		simple-audio-card,dai-link@1 {
+			format = "dsp_a";
+			frame-master = <&codec1>;
+			bitclock-master = <&codec1>;
+			bitclock-inversion;
+
+			cpu {
+				sound-dai = <&mcbsp3>;
+			};
+			codec1: codec {
+				sound-dai = <&cpcap_audio 1>;
+			};
+		};
+	};
 };
 
 &dss {
@@ -479,6 +523,24 @@
 		OMAP4_IOPAD(0x112, PIN_OUTPUT_PULLUP | MUX_MODE5)	/* uart4_rts */
 		>;
 	};
+
+	mcbsp2_pins: pinmux_mcbsp2_pins {
+		pinctrl-single,pins = <
+		OMAP4_IOPAD(0x0f6, PIN_INPUT | MUX_MODE0)	/* abe_mcbsp2_clkx */
+		OMAP4_IOPAD(0x0f8, PIN_INPUT | MUX_MODE0)	/* abe_mcbsp2_dr */
+		OMAP4_IOPAD(0x0fa, PIN_OUTPUT | MUX_MODE0)	/* abe_mcbsp2_dx */
+		OMAP4_IOPAD(0x0fc, PIN_INPUT | MUX_MODE0)	/* abe_mcbsp2_fsx */
+		>;
+	};
+
+	mcbsp3_pins: pinmux_mcbsp3_pins {
+		pinctrl-single,pins = <
+		OMAP4_IOPAD(0x106, PIN_INPUT | MUX_MODE1)	/* abe_mcbsp3_dr */
+		OMAP4_IOPAD(0x108, PIN_OUTPUT | MUX_MODE1)	/* abe_mcbsp3_dx */
+		OMAP4_IOPAD(0x10a, PIN_INPUT | MUX_MODE1)	/* abe_mcbsp3_clkx */
+		OMAP4_IOPAD(0x10c, PIN_INPUT | MUX_MODE1)	/* abe_mcbsp3_fsx */
+		>;
+	};
 };
 
 &omap4_pmx_wkup {
@@ -551,4 +613,18 @@
 				  "1", "0", "0",
 				  "0", "0", "1";
 	};
+};
+
+&mcbsp2 {
+	#sound-dai-cells = <0>;
+	pinctrl-names = "default";
+	pinctrl-0 = <&mcbsp2_pins>;
+	status = "okay";
+};
+
+&mcbsp3 {
+	#sound-dai-cells = <0>;
+	pinctrl-names = "default";
+	pinctrl-0 = <&mcbsp3_pins>;
+	status = "okay";
 };
