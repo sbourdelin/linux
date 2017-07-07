@@ -1002,7 +1002,6 @@ void irq_gc_mask_clr_bit(struct irq_data *d);
 void irq_gc_unmask_enable_reg(struct irq_data *d);
 void irq_gc_ack_set_bit(struct irq_data *d);
 void irq_gc_ack_clr_bit(struct irq_data *d);
-void irq_gc_mask_disable_reg_and_ack(struct irq_data *d);
 void irq_gc_mask_disable_and_ack_set(struct irq_data *d);
 void irq_gc_mask_disable_and_ack_clr(struct irq_data *d);
 void irq_gc_mask_set_and_ack_set(struct irq_data *d);
