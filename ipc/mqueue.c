@@ -1237,15 +1237,15 @@ SYSCALL_DEFINE2(mq_notify, mqd_t, mqdes,
 			/* TODO: add a header? */
 			skb_put(nc, NOTIFY_COOKIE_LEN);
 			/* and attach it to the socket */
-retry:
 			f = fdget(notification.sigev_signo);
 			if (!f.file) {
 				ret = -EBADF;
 				goto out;
 			}
+retry:
 			sock = netlink_getsockbyfilp(f.file);
-			fdput(f);
 			if (IS_ERR(sock)) {
+				fdput(f);
 				ret = PTR_ERR(sock);
 				sock = NULL;
 				goto out;
@@ -1255,6 +1255,7 @@ retry:
 			ret = netlink_attachskb(sock, nc, &timeo, NULL);
 			if (ret == 1)
 				goto retry;
+			fdput(f);
 			if (ret) {
 				sock = NULL;
 				nc = NULL;
