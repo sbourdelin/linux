@@ -1752,12 +1752,13 @@ static int bdw_adjust_min_pipe_pixel_rate(struct intel_crtc_state *crtc_state,
 	    crtc_state->has_audio &&
 	    crtc_state->port_clock >= 540000 &&
 	    crtc_state->lane_count == 4) {
-		if (IS_CANNONLAKE(dev_priv))
-			pixel_rate = max(316800, pixel_rate);
-		else if (IS_GEMINILAKE(dev_priv))
+		if (IS_CANNONLAKE(dev_priv) || IS_GEMINILAKE(dev_priv)) {
+			/* Display WA #1145: glk,cnl */
 			pixel_rate = max(2 * 316800, pixel_rate);
-		else
+		} else if (IS_GEN9(dev_priv) || IS_BROADWELL(dev_priv)) {
+			/* Display WA #1144: skl,bxt */
 			pixel_rate = max(432000, pixel_rate);
+		}
 	}
 
 	/* According to BSpec, "The CD clock frequency must be at least twice
@@ -1766,7 +1767,7 @@ static int bdw_adjust_min_pipe_pixel_rate(struct intel_crtc_state *crtc_state,
 	 * two pixels per clock.
 	 */
 	if (crtc_state->has_audio && INTEL_GEN(dev_priv) >= 9) {
-		if (IS_GEMINILAKE(dev_priv))
+		if (IS_CANNONLAKE(dev_priv) || IS_GEMINILAKE(dev_priv))
 			pixel_rate = max(2 * 2 * 96000, pixel_rate);
 		else
 			pixel_rate = max(2 * 96000, pixel_rate);
@@ -1999,7 +2000,9 @@ static int intel_compute_max_dotclk(struct drm_i915_private *dev_priv)
 {
 	int max_cdclk_freq = dev_priv->max_cdclk_freq;
 
-	if (IS_GEMINILAKE(dev_priv))
+	if (IS_CANNONLAKE(dev_priv))
+		return 2 * max_cdclk_freq;
+	else if (IS_GEMINILAKE(dev_priv))
 		/*
 		 * FIXME: Limiting to 99% as a temporary workaround. See
 		 * glk_calc_cdclk() for details.
