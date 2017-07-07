@@ -283,6 +283,11 @@ static int vic_probe(struct platform_device *pdev)
 	int err;
 
 	match = of_match_device(vic_match, dev);
+	if (!match) {
+		dev_err(&pdev->dev, "failed to match device\n");
+		return -ENODEV;
+	}
+
 	vic_config = (struct vic_config *)match->data;
 
 	vic = devm_kzalloc(dev, sizeof(*vic), GFP_KERNEL);
