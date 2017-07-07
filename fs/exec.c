@@ -1335,6 +1335,16 @@ void setup_new_exec(struct linux_binprm * bprm)
 	if (security_bprm_secureexec(bprm)) {
 		/* Record for AT_SECURE. */
 		bprm->secureexec = 1;
+
+		/*
+		 * If this is a setuid execution, reset the stack limit to
+		 * sane default to avoid bad behavior from the prior rlimits.
+		 * This has to happen before arch_pick_mmap_layout(), which
+		 * examines RLIMIT_STACK, but after the point of not return
+		 * to avoid cleaning up the change on failure.
+		 */
+		if (current->signal->rlim[RLIMIT_STACK].rlim_cur > _STK_LIM)
+			current->signal->rlim[RLIMIT_STACK].rlim_cur = _STK_LIM;
 	}
 
 	arch_pick_mmap_layout(current->mm);
