@@ -332,6 +332,7 @@ struct cea_sad {
 struct drm_encoder;
 struct drm_connector;
 struct drm_display_mode;
+enum drm_hdmi_output_type;
 
 void drm_edid_to_eld(struct drm_connector *connector, struct edid *edid);
 int drm_edid_to_sad(struct edid *edid, struct cea_sad **sads);
@@ -353,6 +354,10 @@ int
 drm_hdmi_avi_infoframe_from_display_mode(struct hdmi_avi_infoframe *frame,
 					 const struct drm_display_mode *mode,
 					 bool is_hdmi2_sink);
+int
+drm_hdmi_avi_infoframe_set_colorspace(struct hdmi_avi_infoframe *frame,
+					 const struct drm_display_mode *mode,
+					 enum hdmi_colorspace colorspace);
 int
 drm_hdmi_vendor_infoframe_from_display_mode(struct hdmi_vendor_infoframe *frame,
 					    const struct drm_display_mode *mode);
