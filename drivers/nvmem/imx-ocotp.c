@@ -342,6 +342,11 @@ static int imx_ocotp_probe(struct platform_device *pdev)
 		return PTR_ERR(priv->clk);
 
 	of_id = of_match_device(imx_ocotp_dt_ids, dev);
+	if (!of_id) {
+		dev_err(dev, "failed to match device\n");
+		return -ENODEV;
+	}
+
 	priv->nregs = (unsigned long)of_id->data;
 	imx_ocotp_nvmem_config.size = 4 * priv->nregs;
 	imx_ocotp_nvmem_config.dev = dev;
