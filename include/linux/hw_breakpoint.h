@@ -38,6 +38,12 @@ static inline int hw_breakpoint_type(struct perf_event *bp)
 	return bp->attr.bp_type;
 }
 
+static inline bool
+hw_breakpoint_needs_single_step(struct perf_event *bp)
+{
+	return bp->attr.step_needed;
+}
+
 static inline unsigned long hw_breakpoint_len(struct perf_event *bp)
 {
 	return bp->attr.bp_len;
