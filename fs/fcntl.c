@@ -520,7 +520,7 @@ out:
 
 #ifdef CONFIG_COMPAT
 /* careful - don't use anywhere else */
-#define copy_flock_fields(from, to)		\
+#define copy_flock_fields(to, from)		\
 	(to).l_type = (from).l_type;		\
 	(to).l_whence = (from).l_whence;	\
 	(to).l_start = (from).l_start;		\
