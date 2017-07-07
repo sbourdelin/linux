@@ -80,6 +80,12 @@ static int huawei_cdc_ncm_bind(struct usbnet *usbnet_dev,
 	 * be at the end of the frame.
 	 */
 	drvflags |= CDC_NCM_FLAG_NDP_TO_END;
+
+	/* Additionally, it has been reported that some Huawei E3372H devices, with
+	 * firmware version 21.318.01.00.541, come out of reset in NDP32 mode, hence
+	 * needing to be set to NDP16 again.
+	 */
+	drvflags |= CDC_NCM_FLAG_RESET_NDP16;
 	ret = cdc_ncm_bind_common(usbnet_dev, intf, 1, drvflags);
 	if (ret)
 		goto err;
