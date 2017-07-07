@@ -1745,21 +1745,51 @@ static void program_hpp_type2(struct pci_dev *dev, struct hpp_type2 *hpp)
 	 */
 }
 
-static void pci_configure_extended_tags(struct pci_dev *dev)
+static int pcie_bus_discover_legacy(struct pci_dev *dev, void *data)
 {
+	bool *found = data;
+	int rc;
+	u16 flags;
+
+	if (!pci_is_pcie(dev))
+		return 0;
+
+	rc = pcie_capability_read_word(dev, PCI_EXP_FLAGS, &flags);
+	if (!rc && ((flags & PCI_EXP_FLAGS_VERS) < 2))
+		*found = true;
+
+	return 0;
+}
+
+static int pcie_bus_configure_exttags(struct pci_dev *dev, void *legacy)
+{
+	bool supported = !*(bool *)legacy;
 	u32 dev_cap;
+	u16 flags;
 	int ret;
 
 	if (!pci_is_pcie(dev))
-		return;
+		return 0;
+
+	ret = pcie_capability_read_word(dev, PCI_EXP_FLAGS, &flags);
+	if (ret || ((flags & PCI_EXP_FLAGS_VERS) < 2))
+		return 0;
 
 	ret = pcie_capability_read_dword(dev, PCI_EXP_DEVCAP, &dev_cap);
-	if (ret)
-		return;
+	if (ret || (!(dev_cap & PCI_EXP_DEVCAP_EXT_TAG)))
+		return 0;
 
-	if (dev_cap & PCI_EXP_DEVCAP_EXT_TAG)
+	if (supported) {
+		dev_dbg(&dev->dev, "setting extended tags capability\n");
 		pcie_capability_set_word(dev, PCI_EXP_DEVCTL,
 					 PCI_EXP_DEVCTL_EXT_TAG);
+	} else {
+		dev_dbg(&dev->dev, "clearing extended tags capability\n");
+		pcie_capability_clear_word(dev, PCI_EXP_DEVCTL,
+					   PCI_EXP_DEVCTL_EXT_TAG);
+	}
+
+	return 0;
 }
 
 static void pci_configure_device(struct pci_dev *dev)
@@ -1768,7 +1798,6 @@ static void pci_configure_device(struct pci_dev *dev)
 	int ret;
 
 	pci_configure_mps(dev);
-	pci_configure_extended_tags(dev);
 
 	memset(&hpp, 0, sizeof(hpp));
 	ret = pci_get_hp_params(dev, &hpp);
@@ -2262,6 +2291,7 @@ static int pcie_bus_configure_set(struct pci_dev *dev, void *data)
 void pcie_bus_configure_settings(struct pci_bus *bus)
 {
 	u8 smpss = 0;
+	bool legacy_found = false;
 
 	if (!bus->self)
 		return;
@@ -2285,6 +2315,9 @@ void pcie_bus_configure_settings(struct pci_bus *bus)
 
 	pcie_bus_configure_set(bus->self, &smpss);
 	pci_walk_bus(bus, pcie_bus_configure_set, &smpss);
+
+	pci_walk_bus(bus, pcie_bus_discover_legacy, &legacy_found);
+	pci_walk_bus(bus, pcie_bus_configure_exttags, &legacy_found);
 }
 EXPORT_SYMBOL_GPL(pcie_bus_configure_settings);
 
