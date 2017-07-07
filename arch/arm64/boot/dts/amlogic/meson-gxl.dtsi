@@ -490,6 +490,7 @@
 				compatible = "ethernet-phy-id0181.4400", "ethernet-phy-ieee802.3-c22";
 				reg = <8>;
 				max-speed = <100>;
+				eee-broken-100tx;
 			};
 		};
 
