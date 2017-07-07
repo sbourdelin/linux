@@ -2950,10 +2950,11 @@ u8 drm_match_cea_mode(const struct drm_display_mode *to_match)
 }
 EXPORT_SYMBOL(drm_match_cea_mode);
 
-static bool drm_valid_cea_vic(u8 vic)
+bool drm_valid_cea_vic(u8 vic)
 {
 	return vic > 0 && vic < ARRAY_SIZE(edid_cea_modes);
 }
+EXPORT_SYMBOL(drm_valid_cea_vic);
 
 /**
  * drm_get_cea_aspect_ratio - get the picture aspect ratio corresponding to
