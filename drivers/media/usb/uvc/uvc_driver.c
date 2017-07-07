@@ -1880,6 +1880,7 @@ static void uvc_unregister_video(struct uvc_device *dev)
 			continue;
 
 		video_unregister_device(&stream->vdev);
+		video_unregister_device(&stream->meta.vdev);
 
 		uvc_debugfs_cleanup_stream(stream);
 	}
@@ -1940,6 +1941,9 @@ static int uvc_register_video(struct uvc_device *dev,
 			   ret);
 		return ret;
 	}
+
+	/* Register a metadata node. */
+	uvc_meta_register(stream);
 
 	if (stream->type == V4L2_BUF_TYPE_VIDEO_CAPTURE)
 		stream->chain->caps |= V4L2_CAP_VIDEO_CAPTURE;

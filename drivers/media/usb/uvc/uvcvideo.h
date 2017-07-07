@@ -185,6 +185,7 @@
 #define UVC_QUIRK_RESTRICT_FRAME_RATE	0x00000200
 #define UVC_QUIRK_RESTORE_CTRLS_ON_INIT	0x00000400
 #define UVC_QUIRK_FORCE_Y8		0x00000800
+#define UVC_QUIRK_METADATA_NODE		0x00001000
 
 /* Format flags */
 #define UVC_FMT_FLAG_COMPRESSED		0x00000001
@@ -473,6 +474,13 @@ struct uvc_stats_stream {
 	unsigned int max_sof;		/* Maximum STC.SOF value */
 };
 
+struct uvc_meta_device {
+	struct video_device vdev;
+	struct uvc_video_queue queue;
+};
+
+#define UVC_METATADA_BUF_SIZE 1024
+
 struct uvc_streaming {
 	struct list_head list;
 	struct uvc_device *dev;
@@ -504,7 +512,9 @@ struct uvc_streaming {
 	unsigned int frozen : 1;
 	struct uvc_video_queue queue;
 	void (*decode) (struct urb *urb, struct uvc_streaming *video,
-			struct uvc_buffer *buf);
+			struct uvc_buffer *buf, struct uvc_buffer *meta_buf);
+
+	struct uvc_meta_device meta;
 
 	/* Context data used by the bulk completion handler. */
 	struct {
@@ -545,6 +555,8 @@ struct uvc_streaming {
 
 		u16 last_sof;
 		u16 sof_offset;
+
+		u8 last_scr[6];
 
 		spinlock_t lock;
 	} clock;
@@ -684,6 +696,12 @@ extern unsigned long uvc_queue_get_unmapped_area(struct uvc_video_queue *queue,
 		unsigned long pgoff);
 #endif
 extern int uvc_queue_allocated(struct uvc_video_queue *queue);
+extern int uvc_queue_setup(struct vb2_queue *vq,
+			   unsigned int *nbuffers, unsigned int *nplanes,
+			   unsigned int sizes[], struct device *alloc_devs[]);
+extern int uvc_buffer_prepare(struct vb2_buffer *vb);
+extern void uvc_buffer_queue(struct vb2_buffer *vb);
+extern void uvc_stop_streaming(struct vb2_queue *vq);
 static inline int uvc_queue_streaming(struct uvc_video_queue *queue)
 {
 	return vb2_is_streaming(&queue->queue);
@@ -709,6 +727,7 @@ extern int uvc_query_ctrl(struct uvc_device *dev, __u8 query, __u8 unit,
 void uvc_video_clock_update(struct uvc_streaming *stream,
 			    struct vb2_v4l2_buffer *vbuf,
 			    struct uvc_buffer *buf);
+int uvc_meta_register(struct uvc_streaming *stream);
 
 /* Status */
 extern int uvc_status_init(struct uvc_device *dev);
@@ -763,7 +782,7 @@ extern struct usb_host_endpoint *uvc_find_endpoint(
 
 /* Quirks support */
 void uvc_video_decode_isight(struct urb *urb, struct uvc_streaming *stream,
-		struct uvc_buffer *buf);
+		struct uvc_buffer *buf, struct uvc_buffer *meta_buf);
 
 /* debugfs and statistics */
 void uvc_debugfs_init(void);
