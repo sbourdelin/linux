@@ -5661,9 +5661,9 @@ int sched_cpu_dying(unsigned int cpu)
 	}
 	migrate_tasks(rq, &rf);
 	BUG_ON(rq->nr_running != 1);
+	calc_load_migrate(rq);
 	rq_unlock_irqrestore(rq, &rf);
 
-	calc_load_migrate(rq);
 	update_max_interval();
 	nohz_balance_exit_idle(cpu);
 	hrtick_clear(rq);

@@ -183,13 +183,16 @@ static inline int calc_load_read_idx(void)
 void calc_load_nohz_start(void)
 {
 	struct rq *this_rq = this_rq();
+	struct rq_flags rf;
 	long delta;
 
 	/*
 	 * We're going into NO_HZ mode, if there's any pending delta, fold it
 	 * into the pending NO_HZ delta.
 	 */
+	rq_lock(this_rq, &rf);
 	delta = calc_load_fold_active(this_rq, 0);
+	rq_unlock(this_rq, &rf);
 	if (delta) {
 		int idx = calc_load_write_idx();
 
