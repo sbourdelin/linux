@@ -2538,6 +2538,10 @@ static int tegra_sor_probe(struct platform_device *pdev)
 	int err;
 
 	match = of_match_device(tegra_sor_of_match, &pdev->dev);
+	if (!match) {
+		dev_err(&pdev->dev, "failed to match device\n");
+		return -ENODEV;
+	}
 
 	sor = devm_kzalloc(&pdev->dev, sizeof(*sor), GFP_KERNEL);
 	if (!sor)
