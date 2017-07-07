@@ -1754,7 +1754,7 @@ asmlinkage int vprintk_emit(int facility, int level,
 	if (dict)
 		lflags |= LOG_PREFIX|LOG_NEWLINE;
 
-	printed_len += log_output(facility, level, lflags, dict, dictlen, text, text_len);
+	printed_len = log_output(facility, level, lflags, dict, dictlen, text, text_len);
 
 	logbuf_unlock_irqrestore(flags);
 
