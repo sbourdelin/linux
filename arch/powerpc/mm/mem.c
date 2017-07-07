@@ -411,6 +411,7 @@ void free_initmem(void)
 {
 	ppc_md.progress = ppc_printk_progress;
 	free_initmem_default(POISON_FREE_INITMEM);
+	remap_init_ram();
 }
 
 #ifdef CONFIG_BLK_DEV_INITRD
