@@ -499,6 +499,97 @@ void tick_freeze(void)
 }
 
 /**
+ * tick_set_freeze_event - Set timer to wake up the CPU from freeze.
+ *
+ * @cpu:	CPU to set the clock event for
+ * @delta:	time to wait before waking the CPU
+ *
+ * Returns 0 on success and -EERROR on failure.
+ */
+int tick_set_freeze_event(int cpu, ktime_t delta)
+{
+	struct clock_event_device *dev = per_cpu(tick_cpu_device, cpu).evtdev;
+	u64 delta_ns;
+	int ret;
+
+	if (!dev->set_next_event ||
+	    !(dev->features & CLOCK_EVT_FEAT_FREEZE_NONSTOP)) {
+		printk_deferred(KERN_WARNING
+				"[%s] unsupported by clock event device\n",
+				__func__);
+		return -EPERM;
+	}
+
+	if (!clockevent_state_shutdown(dev)) {
+		printk_deferred(KERN_WARNING
+				"[%s] clock event device in use\n",
+				__func__);
+		return -EBUSY;
+	}
+
+	delta_ns = ktime_to_ns(delta);
+	if (delta_ns > dev->max_delta_ns || delta_ns < dev->min_delta_ns) {
+		printk_deferred(KERN_WARNING
+				"[%s] %lluns outside range: [%lluns, %lluns]\n",
+				__func__, delta_ns, dev->min_delta_ns,
+				dev->max_delta_ns);
+		return -ERANGE;
+	}
+
+	clockevents_tick_resume(dev);
+	clockevents_switch_state(dev, CLOCK_EVT_STATE_ONESHOT);
+	ret = dev->set_next_event((delta_ns * dev->mult) >> dev->shift, dev);
+	if (ret < 0) {
+		printk_deferred(KERN_WARNING
+				"Failed to program freeze event\n");
+		clockevents_shutdown(dev);
+	}
+
+	return ret;
+}
+EXPORT_SYMBOL_GPL(tick_set_freeze_event);
+
+/**
+ * tick_freeze_event_expired - Check if the programmed freeze event expired
+ *
+ * @cpu:	CPU to check the clock event device for an expired event
+ *
+ * Returns 1 if the event expired and 0 otherwise.
+ */
+int tick_freeze_event_expired(int cpu)
+{
+	struct clock_event_device *dev = per_cpu(tick_cpu_device, cpu).evtdev;
+
+	if (!(dev && dev->event_expired))
+		return 0;
+
+	return dev->event_expired(dev);
+}
+
+/**
+ * tick_clear_freeze_event - Shuts down the clock device after programming a
+ * freeze event.
+ *
+ * @cpu:	CPU to shutdown the clock device for
+ *
+ * Returns 0 on success and -EERROR otherwise.
+ */
+int tick_clear_freeze_event(int cpu)
+{
+	struct clock_event_device *dev = per_cpu(tick_cpu_device, cpu).evtdev;
+
+	if (!dev)
+		return -ENODEV;
+
+	if (!clockevent_state_oneshot(dev))
+		return -EBUSY;
+
+	clockevents_shutdown(dev);
+	return 0;
+}
+EXPORT_SYMBOL_GPL(tick_clear_freeze_event);
+
+/**
  * tick_unfreeze - Resume the local tick and (possibly) timekeeping.
  *
  * Check if this is the first CPU executing the function and if so, resume

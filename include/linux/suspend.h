@@ -248,6 +248,8 @@ static inline bool idle_should_freeze(void)
 }
 
 extern void __init pm_states_init(void);
+int tick_set_freeze_event(int cpu, ktime_t expires);
+int tick_clear_freeze_event(int cpu);
 extern void freeze_set_ops(const struct platform_freeze_ops *ops);
 extern void freeze_wake(void);
 
