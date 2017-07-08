@@ -602,7 +602,8 @@ static int ssi_hash_update(struct ahash_req_ctx *state,
 		return 0;
 	}
 
-	if (unlikely(rc = ssi_buffer_mgr_map_hash_request_update(ctx->drvdata, state, src, nbytes, block_size))) {
+	rc = ssi_buffer_mgr_map_hash_request_update(ctx->drvdata, state, src, nbytes, block_size);
+	if (unlikely(rc)) {
 		if (rc == 1) {
 			SSI_LOG_DEBUG(" data size not require HW update %x\n",
 				     nbytes);
@@ -1176,12 +1177,12 @@ static int ssi_xcbc_setkey(struct crypto_ahash *ahash,
 	CHECK_AND_RETURN_UPON_FIPS_ERROR();
 
 	switch (keylen) {
-		case AES_KEYSIZE_128:
-		case AES_KEYSIZE_192:
-		case AES_KEYSIZE_256:
-			break;
-		default:
-			return -EINVAL;
+	case AES_KEYSIZE_128:
+	case AES_KEYSIZE_192:
+	case AES_KEYSIZE_256:
+		break;
+	default:
+		return -EINVAL;
 	}
 
 	ctx->key_params.keylen = keylen;
@@ -1264,12 +1265,12 @@ static int ssi_cmac_setkey(struct crypto_ahash *ahash,
 	ctx->is_hmac = true;
 
 	switch (keylen) {
-		case AES_KEYSIZE_128:
-		case AES_KEYSIZE_192:
-		case AES_KEYSIZE_256:
-			break;
-		default:
-			return -EINVAL;
+	case AES_KEYSIZE_128:
+	case AES_KEYSIZE_192:
+	case AES_KEYSIZE_256:
+		break;
+	default:
+		return -EINVAL;
 	}
 
 	ctx->key_params.keylen = keylen;
@@ -1404,7 +1405,8 @@ static int ssi_mac_update(struct ahash_request *req)
 
 	state->xcbc_count++;
 
-	if (unlikely(rc = ssi_buffer_mgr_map_hash_request_update(ctx->drvdata, state, req->src, req->nbytes, block_size))) {
+	rc = ssi_buffer_mgr_map_hash_request_update(ctx->drvdata, state, req->src, req->nbytes, block_size);
+	if (unlikely(rc)) {
 		if (rc == 1) {
 			SSI_LOG_DEBUG(" data size not require HW update %x\n",
 				     req->nbytes);
@@ -2366,7 +2368,8 @@ int ssi_hash_free(struct ssi_drvdata *drvdata)
 
 static void ssi_hash_create_xcbc_setup(struct ahash_request *areq,
 				  struct cc_hw_desc desc[],
-				  unsigned int *seq_size) {
+				  unsigned int *seq_size)
+{
 	unsigned int idx = *seq_size;
 	struct ahash_req_ctx *state = ahash_request_ctx(areq);
 	struct crypto_ahash *tfm = crypto_ahash_reqtfm(areq);
