@@ -118,6 +118,24 @@ static int of_overlay_apply_single_property(struct of_overlay *ov,
 	return of_changeset_update_property(&ov->cset, target, propn);
 }
 
+static struct device_node *child_by_full_name(const struct device_node *np,
+		const char *cname)
+{
+	struct device_node *child;
+	struct device_node *prev;
+
+	child = np->child;
+	while (child) {
+		of_node_get(child);
+		if (!of_node_cmp(cname, kbasename(child->full_name)))
+			break;
+		prev = child;
+		child = child->sibling;
+		of_node_put(prev);
+	}
+	return child;
+}
+
 static int of_overlay_apply_single_device_node(struct of_overlay *ov,
 		struct device_node *target, struct device_node *child)
 {
@@ -130,7 +148,7 @@ static int of_overlay_apply_single_device_node(struct of_overlay *ov,
 		return -ENOMEM;
 
 	/* NOTE: Multiple mods of created nodes not supported */
-	tchild = of_get_child_by_name(target, cname);
+	tchild = child_by_full_name(target, cname);
 	if (tchild != NULL) {
 		/* new overlay phandle value conflicts with existing value */
 		if (child->phandle)
