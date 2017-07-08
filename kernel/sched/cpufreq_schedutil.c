@@ -53,7 +53,9 @@ struct sugov_cpu {
 	struct update_util_data update_util;
 	struct sugov_policy *sg_policy;
 
+	bool prev_iowait_boost;
 	unsigned long iowait_boost;
+	unsigned long iowait_boost_min;
 	unsigned long iowait_boost_max;
 	u64 last_update;
 
@@ -165,22 +167,47 @@ static void sugov_get_util(unsigned long *util, unsigned long *max)
 	*max = cfs_max;
 }
 
+static void sugov_decay_iowait_boost(struct sugov_cpu *sg_cpu)
+{
+	sg_cpu->iowait_boost >>= 1;
+
+	if (sg_cpu->iowait_boost < sg_cpu->iowait_boost_min)
+		sg_cpu->iowait_boost = 0;
+}
+
 static void sugov_set_iowait_boost(struct sugov_cpu *sg_cpu, u64 time,
 				   unsigned int flags)
 {
 	if (flags & SCHED_CPUFREQ_IOWAIT) {
-		sg_cpu->iowait_boost = sg_cpu->iowait_boost_max;
+		/* Remember for next time that we did an iowait boost */
+		sg_cpu->prev_iowait_boost = true;
+		if (sg_cpu->iowait_boost) {
+			sg_cpu->iowait_boost <<= 1;
+			sg_cpu->iowait_boost = min(sg_cpu->iowait_boost,
+						   sg_cpu->iowait_boost_max);
+		} else {
+			sg_cpu->iowait_boost = sg_cpu->iowait_boost_min;
+		}
 	} else if (sg_cpu->iowait_boost) {
 		s64 delta_ns = time - sg_cpu->last_update;
 
 		/* Clear iowait_boost if the CPU apprears to have been idle. */
 		if (delta_ns > TICK_NSEC)
 			sg_cpu->iowait_boost = 0;
+
+		/*
+		 * Since we don't decay iowait_boost when its consumed during
+		 * the previous SCHED_CPUFREQ_IOWAIT update, decay it now.
+		 */
+		if (sg_cpu->prev_iowait_boost) {
+			sugov_decay_iowait_boost(sg_cpu);
+			sg_cpu->prev_iowait_boost = false;
+		}
 	}
 }
 
 static void sugov_iowait_boost(struct sugov_cpu *sg_cpu, unsigned long *util,
-			       unsigned long *max)
+			       unsigned long *max, unsigned int flags)
 {
 	unsigned long boost_util = sg_cpu->iowait_boost;
 	unsigned long boost_max = sg_cpu->iowait_boost_max;
@@ -192,7 +219,16 @@ static void sugov_iowait_boost(struct sugov_cpu *sg_cpu, unsigned long *util,
 		*util = boost_util;
 		*max = boost_max;
 	}
-	sg_cpu->iowait_boost >>= 1;
+
+	/*
+	 * Incase iowait boost just happened on this CPU, don't reduce it right
+	 * away since then the iowait boost will never increase on subsequent
+	 * in_iowait wakeups.
+	 */
+	if (flags & SCHED_CPUFREQ_IOWAIT && this_cpu_ptr(&sugov_cpu) == sg_cpu)
+		return;
+
+	sugov_decay_iowait_boost(sg_cpu);
 }
 
 #ifdef CONFIG_NO_HZ_COMMON
@@ -230,7 +266,7 @@ static void sugov_update_single(struct update_util_data *hook, u64 time,
 		next_f = policy->cpuinfo.max_freq;
 	} else {
 		sugov_get_util(&util, &max);
-		sugov_iowait_boost(sg_cpu, &util, &max);
+		sugov_iowait_boost(sg_cpu, &util, &max, flags);
 		next_f = get_next_freq(sg_policy, util, max);
 		/*
 		 * Do not reduce the frequency if the CPU has not been idle
@@ -276,7 +312,7 @@ static unsigned int sugov_next_freq_shared(struct sugov_cpu *sg_cpu, u64 time)
 			max = j_max;
 		}
 
-		sugov_iowait_boost(j_sg_cpu, &util, &max);
+		sugov_iowait_boost(j_sg_cpu, &util, &max, flags);
 	}
 
 	return get_next_freq(sg_policy, util, max);
@@ -609,6 +645,7 @@ static int sugov_start(struct cpufreq_policy *policy)
 		memset(sg_cpu, 0, sizeof(*sg_cpu));
 		sg_cpu->sg_policy = sg_policy;
 		sg_cpu->flags = SCHED_CPUFREQ_RT;
+		sg_cpu->iowait_boost_min = policy->cpuinfo.min_freq;
 		sg_cpu->iowait_boost_max = policy->cpuinfo.max_freq;
 		cpufreq_add_update_util_hook(cpu, &sg_cpu->update_util,
 					     policy_is_shared(policy) ?
