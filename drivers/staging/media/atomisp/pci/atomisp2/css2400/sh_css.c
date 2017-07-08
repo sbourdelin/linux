@@ -1945,10 +1945,7 @@ void *sh_css_calloc(size_t N, size_t size)
 
 void sh_css_free(void *ptr)
 {
-	if (is_vmalloc_addr(ptr))
-		vfree(ptr);
-	else
-		kfree(ptr);
+	kvfree(ptr);
 }
 
 /* For Acceleration API: Flush FW (shared buffer pointer) arguments */
