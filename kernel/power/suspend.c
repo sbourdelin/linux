@@ -70,8 +70,10 @@ static void freeze_begin(void)
 	suspend_freeze_state = FREEZE_STATE_NONE;
 }
 
-static void freeze_enter(void)
+static int freeze_enter(void)
 {
+	int error = 0;
+
 	trace_suspend_resume(TPS("machine_suspend"), PM_SUSPEND_FREEZE, true);
 
 	spin_lock_irq(&suspend_freeze_lock);
@@ -82,7 +84,7 @@ static void freeze_enter(void)
 	spin_unlock_irq(&suspend_freeze_lock);
 
 	get_online_cpus();
-	cpuidle_resume();
+	cpuidle_prepare_freeze();
 
 	/* Push all the CPUs into the idle loop. */
 	wake_up_all_idle_cpus();
@@ -90,7 +92,7 @@ static void freeze_enter(void)
 	wait_event(suspend_freeze_wait_head,
 		   suspend_freeze_state == FREEZE_STATE_WAKE);
 
-	cpuidle_pause();
+	error = cpuidle_complete_freeze();
 	put_online_cpus();
 
 	spin_lock_irq(&suspend_freeze_lock);
@@ -100,14 +102,17 @@ static void freeze_enter(void)
 	spin_unlock_irq(&suspend_freeze_lock);
 
 	trace_suspend_resume(TPS("machine_suspend"), PM_SUSPEND_FREEZE, false);
+	return error;
 }
 
-static void s2idle_loop(void)
+static int s2idle_loop(void)
 {
+	int ret;
+
 	pr_debug("PM: suspend-to-idle\n");
 
 	do {
-		freeze_enter();
+		ret = freeze_enter();
 
 		if (freeze_ops && freeze_ops->wake)
 			freeze_ops->wake();
@@ -116,13 +121,14 @@ static void s2idle_loop(void)
 		if (freeze_ops && freeze_ops->sync)
 			freeze_ops->sync();
 
-		if (pm_wakeup_pending())
+		if (ret < 0 || pm_wakeup_pending())
 			break;
 
 		pm_wakeup_clear(false);
 	} while (!dpm_suspend_noirq(PMSG_SUSPEND));
 
 	pr_debug("PM: resume from suspend-to-idle\n");
+	return ret;
 }
 
 void freeze_wake(void)
@@ -396,7 +402,7 @@ static int suspend_enter(suspend_state_t state, bool *wakeup)
 	 * all the devices are suspended.
 	 */
 	if (state == PM_SUSPEND_FREEZE) {
-		s2idle_loop();
+		error = s2idle_loop();
 		goto Platform_early_resume;
 	}
 
