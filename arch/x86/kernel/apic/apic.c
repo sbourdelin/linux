@@ -478,6 +478,26 @@ static int lapic_next_deadline(unsigned long delta,
 	return 0;
 }
 
+static int lapic_event_expired(struct clock_event_device *evt)
+{
+	u32 cct;
+
+	cct = apic_read(APIC_TMCCT);
+	return cct == 0 ? 1 : 0;
+}
+
+static int lapic_deadline_expired(struct clock_event_device *evt)
+{
+	u64 msr;
+
+	/*
+	 * When the timer interrupt is triggered, the register is cleared, so a
+	 * non-zero value indicates a pending timer event.
+	 */
+	rdmsrl(MSR_IA32_TSC_DEADLINE, msr);
+	return msr == 0 ? 1 : 0;
+}
+
 static int lapic_timer_shutdown(struct clock_event_device *evt)
 {
 	unsigned int v;
@@ -532,7 +552,8 @@ static struct clock_event_device lapic_clockevent = {
 	.name				= "lapic",
 	.features			= CLOCK_EVT_FEAT_PERIODIC |
 					  CLOCK_EVT_FEAT_ONESHOT | CLOCK_EVT_FEAT_C3STOP
-					  | CLOCK_EVT_FEAT_DUMMY,
+					  | CLOCK_EVT_FEAT_DUMMY
+					  | CLOCK_EVT_FEAT_FREEZE_NONSTOP,
 	.shift				= 32,
 	.set_state_shutdown		= lapic_timer_shutdown,
 	.set_state_periodic		= lapic_timer_set_periodic,
@@ -566,6 +587,7 @@ static void setup_APIC_timer(void)
 		levt->features &= ~(CLOCK_EVT_FEAT_PERIODIC |
 				    CLOCK_EVT_FEAT_DUMMY);
 		levt->set_next_event = lapic_next_deadline;
+		levt->event_expired = lapic_deadline_expired;
 		clockevents_config_and_register(levt,
 						tsc_khz * (1000 / TSC_DIVISOR),
 						0xF, ~0UL);
