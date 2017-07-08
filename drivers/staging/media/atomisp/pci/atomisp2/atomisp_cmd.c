@@ -117,11 +117,7 @@ void *atomisp_kernel_zalloc(size_t bytes, bool zero_mem)
  */
 void atomisp_kernel_free(void *ptr)
 {
-	/* Verify if buffer was allocated by vmalloc() or kmalloc() */
-	if (is_vmalloc_addr(ptr))
-		vfree(ptr);
-	else
-		kfree(ptr);
+	kvfree(ptr);
 }
 
 /*
