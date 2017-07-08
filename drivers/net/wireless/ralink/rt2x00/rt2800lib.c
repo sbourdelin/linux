@@ -2063,6 +2063,9 @@ static void rt2800_config_lna_gain(struct rt2x00_dev *rt2x00dev,
 
 static inline bool rt2800_clk_is_20mhz(struct rt2x00_dev *rt2x00dev)
 {
+	if (!rt2x00dev->clk)
+		return 0;
+
 	return clk_get_rate(rt2x00dev->clk) == 20000000;
 }
 
