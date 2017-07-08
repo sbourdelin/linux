@@ -255,13 +255,7 @@ out:
 	return ret;
 }
 
-static const struct pwm_ops rockchip_pwm_ops_v1 = {
-	.get_state = rockchip_pwm_get_state,
-	.apply = rockchip_pwm_apply,
-	.owner = THIS_MODULE,
-};
-
-static const struct pwm_ops rockchip_pwm_ops_v2 = {
+static const struct pwm_ops rockchip_pwm_ops = {
 	.get_state = rockchip_pwm_get_state,
 	.apply = rockchip_pwm_apply,
 	.owner = THIS_MODULE,
@@ -275,7 +269,7 @@ static const struct rockchip_pwm_data pwm_data_v1 = {
 		.ctrl = 0x0c,
 	},
 	.prescaler = 2,
-	.ops = &rockchip_pwm_ops_v1,
+	.ops = &rockchip_pwm_ops,
 	.set_enable = rockchip_pwm_set_enable_v1,
 	.get_state = rockchip_pwm_get_state_v1,
 };
@@ -289,7 +283,7 @@ static const struct rockchip_pwm_data pwm_data_v2 = {
 	},
 	.prescaler = 1,
 	.supports_polarity = true,
-	.ops = &rockchip_pwm_ops_v2,
+	.ops = &rockchip_pwm_ops,
 	.set_enable = rockchip_pwm_set_enable_v2,
 	.get_state = rockchip_pwm_get_state_v2,
 };
@@ -303,7 +297,7 @@ static const struct rockchip_pwm_data pwm_data_vop = {
 	},
 	.prescaler = 1,
 	.supports_polarity = true,
-	.ops = &rockchip_pwm_ops_v2,
+	.ops = &rockchip_pwm_ops,
 	.set_enable = rockchip_pwm_set_enable_v2,
 	.get_state = rockchip_pwm_get_state_v2,
 };
