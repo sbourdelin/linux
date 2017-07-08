@@ -2010,6 +2010,7 @@ struct overlay_info {
 OVERLAY_INFO_EXTERN(overlay_base);
 OVERLAY_INFO_EXTERN(overlay);
 OVERLAY_INFO_EXTERN(overlay_bad_phandle);
+OVERLAY_INFO_EXTERN(overlay_bad_symbol);
 
 #ifdef CONFIG_OF_OVERLAY
 
@@ -2018,6 +2019,7 @@ static struct overlay_info overlays[] = {
 	OVERLAY_INFO(overlay_base, -9999),
 	OVERLAY_INFO(overlay, 0),
 	OVERLAY_INFO(overlay_bad_phandle, -EINVAL),
+	OVERLAY_INFO(overlay_bad_symbol, -EINVAL),
 	{}
 };
 
@@ -2289,6 +2291,10 @@ static __init void of_unittest_overlay_high_level(void)
 
 	unittest(overlay_data_add(2),
 		 "Adding overlay 'overlay_bad_phandle' failed\n");
+
+	unittest(overlay_data_add(3),
+		 "Adding overlay 'overlay_bad_symbol' failed\n");
+
 	return;
 
 err_unlock:
