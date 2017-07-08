@@ -53,7 +53,7 @@ void PHY_SetRF8256Bandwidth(struct net_device *dev, HT_CHANNEL_WIDTH Bandwidth)
 						(RF90_RADIO_PATH_E)eRFPath,
 						0x14, bMask12Bits, 0x5ab);
 				} else {
-					RT_TRACE(COMP_ERR, "PHY_SetRF8256Bandwidth(): unknown hardware version\n");
+					RT_TRACE(COMP_ERR, "%s: unknown hardware version\n", __func__);
 					}
 				break;
 		case HT_CHANNEL_WIDTH_20_40:
@@ -68,11 +68,11 @@ void PHY_SetRF8256Bandwidth(struct net_device *dev, HT_CHANNEL_WIDTH Bandwidth)
 					else
 						rtl8192_phy_SetRFReg(dev, (RF90_RADIO_PATH_E)eRFPath, 0x14, bMask12Bits, 0x5ab);
 				} else {
-					RT_TRACE(COMP_ERR, "PHY_SetRF8256Bandwidth(): unknown hardware version\n");
+					RT_TRACE(COMP_ERR, "%s: unknown hardware version\n", __func__);
 					}
 				break;
 		default:
-				RT_TRACE(COMP_ERR, "PHY_SetRF8256Bandwidth(): unknown Bandwidth: %#X\n", Bandwidth);
+				RT_TRACE(COMP_ERR, "%s: unknown Bandwidth: %#X\n", __func__, Bandwidth);
 				break;
 
 		}
@@ -152,7 +152,7 @@ void phy_RF8256_Config_ParaFile(struct net_device *dev)
 		 * TODO: this function should be removed on ASIC , Emily 2007.2.2
 		 */
 		if (rtl8192_phy_checkBBAndRF(dev, HW90_BLOCK_RF, (RF90_RADIO_PATH_E)eRFPath)) {
-			RT_TRACE(COMP_ERR, "PHY_RF8256_Config():Check Radio[%d] Fail!!\n", eRFPath);
+			RT_TRACE(COMP_ERR, "%s: Check Radio[%d] Fail!!\n", __func__, eRFPath);
 			goto phy_RF8256_Config_ParaFile_Fail;
 		}
 
@@ -207,7 +207,7 @@ void phy_RF8256_Config_ParaFile(struct net_device *dev)
 		}
 
 		if (ret) {
-			RT_TRACE(COMP_ERR, "phy_RF8256_Config_ParaFile():Radio[%d] Fail!!", eRFPath);
+			RT_TRACE(COMP_ERR, "%s: Radio[%d] Fail!!", __func__, eRFPath);
 			goto phy_RF8256_Config_ParaFile_Fail;
 		}
 
