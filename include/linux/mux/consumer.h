@@ -16,6 +16,7 @@
 struct device;
 struct mux_control;
 
+#if IS_ENABLED(CONFIG_MULTIPLEXER)
 unsigned int mux_control_states(struct mux_control *mux);
 int __must_check mux_control_select(struct mux_control *mux,
 				    unsigned int state);
@@ -28,5 +29,42 @@ void mux_control_put(struct mux_control *mux);
 
 struct mux_control *devm_mux_control_get(struct device *dev,
 					 const char *mux_name);
+
+#else
+unsigned int mux_control_states(struct mux_control *mux)
+{
+	return -ENODEV;
+}
+
+int __must_check mux_control_select(struct mux_control *mux,
+				    unsigned int state)
+{
+	return -ENODEV;
+}
+
+int __must_check mux_control_try_select(struct mux_control *mux,
+					unsigned int state)
+{
+	return -ENODEV;
+}
+
+int mux_control_deselect(struct mux_control *mux)
+{
+	return -ENODEV;
+}
+
+struct mux_control *mux_control_get(struct device *dev, const char *mux_name)
+{
+	return ERR_PTR(-ENODEV);
+}
+
+void mux_control_put(struct mux_control *mux) {}
+
+struct mux_control *devm_mux_control_get(struct device *dev,
+					 const char *mux_name)
+{
+	return ERR_PTR(-ENODEV);
+}
+#endif
 
 #endif /* _LINUX_MUX_CONSUMER_H */
