@@ -195,6 +195,8 @@ static inline const struct dma_map_ops *get_dma_ops(struct device *dev)
 {
 	return &bad_dma_ops;
 }
+static inline void set_dma_ops(struct device *dev,
+			       const struct dma_map_ops *dma_ops) {}
 #endif
 
 static inline dma_addr_t dma_map_single_attrs(struct device *dev, void *ptr,
