@@ -41,7 +41,7 @@
 #include "iomux-mx3.h"
 #include "ulpi.h"
 
-static int mx31_3ds_pins[] = {
+static const int mx31_3ds_pins[] = {
 	/* UART1 */
 	MX31_PIN_CTS1__CTS1,
 	MX31_PIN_RTS1__RTS1,
@@ -180,7 +180,7 @@ static struct l4f00242t03_pdata mx31_3ds_l4f00242t03_pdata = {
 #define MX31_3DS_GPIO_SDHC1_CD IOMUX_TO_GPIO(MX31_PIN_GPIO3_1)
 #define MX31_3DS_GPIO_SDHC1_BE IOMUX_TO_GPIO(MX31_PIN_GPIO3_0)
 
-static struct gpio mx31_3ds_sdhc1_gpios[] = {
+static const struct gpio mx31_3ds_sdhc1_gpios[] = {
 	{ MX31_3DS_GPIO_SDHC1_CD, GPIOF_IN, "sdhc1-card-detect" },
 	{ MX31_3DS_GPIO_SDHC1_BE, GPIOF_OUT_INIT_LOW, "sdhc1-bus-en" },
 };
