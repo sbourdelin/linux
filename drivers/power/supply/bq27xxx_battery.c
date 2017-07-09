@@ -883,7 +883,7 @@ static struct bq27xxx_dm_reg bq27621_dm_regs[] = {
 	.props = bq27##ref##_props,		\
 	.props_size = ARRAY_SIZE(bq27##ref##_props) }
 
-static struct {
+static struct bq27xxx_chip_datum {
 	u32 opts;
 	int acts_like; //todo drop this when opts fully implemented
 	u32 unseal_key;
@@ -917,6 +917,38 @@ static struct {
 	[BQ27441]   = BQ27XXX_DATA(441,   BQ27421, 0x80008000, BQ27XXX_O_CFGUP | BQ27XXX_O_RAM),
 	[BQ27621]   = BQ27XXX_DATA(621,   BQ27421, 0x80008000, BQ27XXX_O_CFGUP | BQ27XXX_O_RAM),
 };
+
+static void __maybe_unused bq27xxx_battery_dbg_dupes(struct bq27xxx_device_info *di)
+{
+	const size_t max = ARRAY_SIZE(bq27xxx_chip_data);
+	const char * const msg = "bq27xxx_chip_data[%d].%s & [%d].%s are identical\n";
+	struct bq27xxx_chip_datum *a, *b;
+	int i, j;
+
+	for (i = 1; i < max-1; i++) {
+		a = bq27xxx_chip_data + i;
+
+		for (j = i+1; j < max; j++) {
+			b = bq27xxx_chip_data + j;
+
+			if (a->regs != b->regs &&
+			    !memcmp(a->regs, b->regs, sizeof(bq27000_regs)))
+				dev_warn(di->dev, msg, i, "regs", j, "regs");
+
+			if (a->props != b->props &&
+			    a->props_size == b->props_size &&
+			    !memcmp(a->props, b->props, a->props_size))
+				dev_warn(di->dev, msg, i, "props", j, "props");
+
+			if (a->dm_regs != b->dm_regs &&
+			    !memcmp(a->dm_regs, b->dm_regs, sizeof(bq27500_dm_regs)))
+				dev_warn(di->dev, msg, i, "dm_regs", j, "dm_regs");
+		}
+	}
+}
+#ifndef DEBUG
+#define bq27xxx_battery_dbg_dupes(di)
+#endif
 
 static DEFINE_MUTEX(bq27xxx_list_lock);
 static LIST_HEAD(bq27xxx_battery_devices);
@@ -1988,6 +2020,8 @@ int bq27xxx_battery_setup(struct bq27xxx_device_info *di)
 		.of_node = di->dev->of_node,
 		.drv_data = di,
 	};
+
+	bq27xxx_battery_dbg_dupes(di);
 
 	INIT_DELAYED_WORK(&di->work, bq27xxx_battery_poll);
 	mutex_init(&di->lock);
