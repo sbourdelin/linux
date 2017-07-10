@@ -434,7 +434,7 @@ static struct attribute *qmi_wwan_sysfs_attrs[] = {
 	NULL,
 };
 
-static struct attribute_group qmi_wwan_sysfs_attr_group = {
+static const struct attribute_group qmi_wwan_sysfs_attr_group = {
 	.name = "qmi",
 	.attrs = qmi_wwan_sysfs_attrs,
 };
