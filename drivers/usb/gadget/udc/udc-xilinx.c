@@ -1217,14 +1217,13 @@ static const struct usb_ep_ops xusb_ep_ops = {
 static int xudc_get_frame(struct usb_gadget *gadget)
 {
 	struct xusb_udc *udc;
-	int frame;
 
 	if (!gadget)
 		return -ENODEV;
 
 	udc = to_udc(gadget);
-	frame = udc->read_fn(udc->addr + XUSB_FRAMENUM_OFFSET);
-	return frame;
+
+	return udc->read_fn(udc->addr + XUSB_FRAMENUM_OFFSET);
 }
 
 /**
