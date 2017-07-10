@@ -529,6 +529,49 @@ static int alua_tur(struct scsi_device *sdev)
 }
 
 /*
+ * alua_rtpg_print - Print REPORT TARGET GROUP STATES information
+ * 		     (without supported states)
+ * @sdev: the device evaluated (source of information).
+ * @pg: the port group associated with the information.
+ */
+static void alua_rtpg_print(struct scsi_device *sdev,
+			    struct alua_port_group *pg)
+{
+	lockdep_assert_held(&pg->lock);
+
+	sdev_printk(KERN_INFO, sdev,
+		    "%s: port group %02x state %c %s\n",
+		    ALUA_DH_NAME, pg->group_id, print_alua_state(pg->state),
+		    pg->pref ? "preferred" : "non-preferred");
+}
+
+/*
+ * alua_rtpg_print_supported - Print REPORT TARGET GROUP STATES information
+ * 			       (with supported states)
+ * @sdev: the device evaluated (source of information).
+ * @pg: the port group associated with the information.
+ * @supported_states: the supported states information.
+ */
+static void alua_rtpg_print_supported(struct scsi_device *sdev,
+				      struct alua_port_group *pg,
+				      int supported_states)
+{
+	lockdep_assert_held(&pg->lock);
+
+	sdev_printk(KERN_INFO, sdev,
+		    "%s: port group %02x state %c %s supports %c%c%c%c%c%c%c\n",
+		    ALUA_DH_NAME, pg->group_id, print_alua_state(pg->state),
+		    pg->pref ? "preferred" : "non-preferred",
+		    supported_states & TPGS_SUPPORT_TRANSITION    ? 'T' : 't',
+		    supported_states & TPGS_SUPPORT_OFFLINE       ? 'O' : 'o',
+		    supported_states & TPGS_SUPPORT_LBA_DEPENDENT ? 'L' : 'l',
+		    supported_states & TPGS_SUPPORT_UNAVAILABLE   ? 'U' : 'u',
+		    supported_states & TPGS_SUPPORT_STANDBY       ? 'S' : 's',
+		    supported_states & TPGS_SUPPORT_NONOPTIMIZED  ? 'N' : 'n',
+		    supported_states & TPGS_SUPPORT_OPTIMIZED     ? 'A' : 'a');
+}
+
+/*
  * alua_rtpg - Evaluate REPORT TARGET GROUP STATES
  * @sdev: the device to be evaluated.
  *
@@ -540,7 +583,7 @@ static int alua_rtpg(struct scsi_device *sdev, struct alua_port_group *pg)
 {
 	struct scsi_sense_hdr sense_hdr;
 	struct alua_port_group *tmp_pg;
-	int len, k, off, valid_states = 0, bufflen = ALUA_RTPG_SIZE;
+	int len, k, off, bufflen = ALUA_RTPG_SIZE;
 	unsigned char *desc, *buff;
 	unsigned err, retval;
 	unsigned int tpg_desc_tbl_off;
@@ -674,9 +717,12 @@ static int alua_rtpg(struct scsi_device *sdev, struct alua_port_group *pg)
 						h->sdev->access_state = desc[0];
 					}
 					rcu_read_unlock();
+
+					if (tmp_pg == pg)
+						alua_rtpg_print_supported(sdev, tmp_pg, desc[1]);
+					else
+						alua_rtpg_print(sdev, tmp_pg);
 				}
-				if (tmp_pg == pg)
-					valid_states = desc[1];
 				spin_unlock_irqrestore(&tmp_pg->lock, flags);
 			}
 			kref_put(&tmp_pg->kref, release_port_group);
@@ -685,17 +731,6 @@ static int alua_rtpg(struct scsi_device *sdev, struct alua_port_group *pg)
 	}
 
 	spin_lock_irqsave(&pg->lock, flags);
-	sdev_printk(KERN_INFO, sdev,
-		    "%s: port group %02x state %c %s supports %c%c%c%c%c%c%c\n",
-		    ALUA_DH_NAME, pg->group_id, print_alua_state(pg->state),
-		    pg->pref ? "preferred" : "non-preferred",
-		    valid_states&TPGS_SUPPORT_TRANSITION?'T':'t',
-		    valid_states&TPGS_SUPPORT_OFFLINE?'O':'o',
-		    valid_states&TPGS_SUPPORT_LBA_DEPENDENT?'L':'l',
-		    valid_states&TPGS_SUPPORT_UNAVAILABLE?'U':'u',
-		    valid_states&TPGS_SUPPORT_STANDBY?'S':'s',
-		    valid_states&TPGS_SUPPORT_NONOPTIMIZED?'N':'n',
-		    valid_states&TPGS_SUPPORT_OPTIMIZED?'A':'a');
 
 	switch (pg->state) {
 	case SCSI_ACCESS_STATE_TRANSITIONING:
