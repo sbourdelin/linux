@@ -165,10 +165,9 @@ fail_1:
 
 static int __enable_ep(struct usb_ep *ep, struct usb_endpoint_descriptor *desc)
 {
-	int err;
 	ep->desc = desc;
-	err = usb_ep_enable(ep);
-	return err;
+
+	return usb_ep_enable(ep);
 }
 
 static int dbgp_enable_ep(void)
