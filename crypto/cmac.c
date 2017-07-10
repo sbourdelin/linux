@@ -143,7 +143,7 @@ static int crypto_cmac_digest_update(struct shash_desc *pdesc, const u8 *p,
 	len -= bs - ctx->len;
 	p += bs - ctx->len;
 
-	crypto_xor(prev, odds, bs);
+	crypto_xor(prev, prev, odds, bs);
 	crypto_cipher_encrypt_one(tfm, prev, prev);
 
 	/* clearing the length */
@@ -151,7 +151,7 @@ static int crypto_cmac_digest_update(struct shash_desc *pdesc, const u8 *p,
 
 	/* encrypting the rest of data */
 	while (len > bs) {
-		crypto_xor(prev, p, bs);
+		crypto_xor(prev, prev, p, bs);
 		crypto_cipher_encrypt_one(tfm, prev, prev);
 		p += bs;
 		len -= bs;
@@ -194,8 +194,8 @@ static int crypto_cmac_digest_final(struct shash_desc *pdesc, u8 *out)
 		offset += bs;
 	}
 
-	crypto_xor(prev, odds, bs);
-	crypto_xor(prev, consts + offset, bs);
+	crypto_xor(prev, prev, odds, bs);
+	crypto_xor(prev, prev, consts + offset, bs);
 
 	crypto_cipher_encrypt_one(tfm, out, prev);
 

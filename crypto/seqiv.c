@@ -105,7 +105,7 @@ static int seqiv_aead_encrypt(struct aead_request *req)
 			       req->cryptlen - ivsize, info);
 	aead_request_set_ad(subreq, req->assoclen + ivsize);
 
-	crypto_xor(info, ctx->salt, ivsize);
+	crypto_xor(info, info, ctx->salt, ivsize);
 	scatterwalk_map_and_copy(info, req->dst, req->assoclen, ivsize, 1);
 
 	err = crypto_aead_encrypt(subreq);

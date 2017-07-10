@@ -194,20 +194,22 @@ static inline unsigned int crypto_queue_len(struct crypto_queue *queue)
 void crypto_inc(u8 *a, unsigned int size);
 void __crypto_xor(u8 *dst, const u8 *src1, const u8 *src2, unsigned int size);
 
-static inline void crypto_xor(u8 *dst, const u8 *src, unsigned int size)
+static inline void crypto_xor(u8 *dst, const u8 *src1, const u8 *src2,
+			      unsigned int size)
 {
 	if (IS_ENABLED(CONFIG_HAVE_EFFICIENT_UNALIGNED_ACCESS) &&
 	    __builtin_constant_p(size) &&
 	    (size % sizeof(unsigned long)) == 0) {
 		unsigned long *d = (unsigned long *)dst;
-		unsigned long *s = (unsigned long *)src;
+		unsigned long *s1 = (unsigned long *)src1;
+		unsigned long *s2 = (unsigned long *)src2;
 
 		while (size > 0) {
-			*d++ ^= *s++;
+			*d++ = *s1++ ^ *s2++;
 			size -= sizeof(unsigned long);
 		}
 	} else {
-		__crypto_xor(dst, dst, src, size);
+		__crypto_xor(dst, src1, src2, size);
 	}
 }
 

@@ -660,7 +660,7 @@ static int crypt_iv_lmk_post(struct crypt_config *cc, u8 *iv,
 
 	/* Tweak the first block of plaintext sector */
 	if (!r)
-		crypto_xor(dst + sg->offset, iv, cc->iv_size);
+		crypto_xor(dst + sg->offset, dst + sg->offset, iv, cc->iv_size);
 
 	kunmap_atomic(dst);
 	return r;
@@ -745,9 +745,8 @@ static int crypt_iv_tcw_whitening(struct crypt_config *cc,
 	int i, r;
 
 	/* xor whitening with sector number */
-	memcpy(buf, tcw->whitening, TCW_WHITENING_SIZE);
-	crypto_xor(buf, (u8 *)&sector, 8);
-	crypto_xor(&buf[8], (u8 *)&sector, 8);
+	crypto_xor(buf, tcw->whitening, (u8 *)&sector, 8);
+	crypto_xor(&buf[8], tcw->whitening + 8, (u8 *)&sector, 8);
 
 	/* calculate crc32 for every 32bit part and xor it */
 	desc->tfm = tcw->crc32_tfm;
@@ -763,12 +762,12 @@ static int crypt_iv_tcw_whitening(struct crypt_config *cc,
 		if (r)
 			goto out;
 	}
-	crypto_xor(&buf[0], &buf[12], 4);
-	crypto_xor(&buf[4], &buf[8], 4);
+	crypto_xor(&buf[0], &buf[0], &buf[12], 4);
+	crypto_xor(&buf[4], &buf[4], &buf[8], 4);
 
 	/* apply whitening (8 bytes) to whole sector */
 	for (i = 0; i < ((1 << SECTOR_SHIFT) / 8); i++)
-		crypto_xor(data + i * 8, buf, 8);
+		crypto_xor(data + i * 8, data + i * 8, buf, 8);
 out:
 	memzero_explicit(buf, sizeof(buf));
 	return r;
@@ -792,10 +791,10 @@ static int crypt_iv_tcw_gen(struct crypt_config *cc, u8 *iv,
 	}
 
 	/* Calculate IV */
-	memcpy(iv, tcw->iv_seed, cc->iv_size);
-	crypto_xor(iv, (u8 *)&sector, 8);
+	crypto_xor(iv, tcw->iv_seed, (u8 *)&sector, 8);
 	if (cc->iv_size > 8)
-		crypto_xor(&iv[8], (u8 *)&sector, cc->iv_size - 8);
+		crypto_xor(&iv[8], tcw->iv_seed + 8, (u8 *)&sector,
+			   cc->iv_size - 8);
 
 	return r;
 }

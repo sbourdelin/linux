@@ -74,7 +74,7 @@ static int ghash_update(struct shash_desc *desc,
 	}
 
 	while (srclen >= GHASH_BLOCK_SIZE) {
-		crypto_xor(dst, src, GHASH_BLOCK_SIZE);
+		crypto_xor(dst, dst, src, GHASH_BLOCK_SIZE);
 		gf128mul_4k_lle((be128 *)dst, ctx->gf128);
 		src += GHASH_BLOCK_SIZE;
 		srclen -= GHASH_BLOCK_SIZE;

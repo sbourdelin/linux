@@ -241,9 +241,7 @@ static int ctr_encrypt(struct skcipher_request *req)
 
 		aes_ctr_encrypt(tail, NULL, (u8 *)ctx->key_enc, rounds,
 				blocks, walk.iv, first);
-		if (tdst != tsrc)
-			memcpy(tdst, tsrc, nbytes);
-		crypto_xor(tdst, tail, nbytes);
+		crypto_xor(tdst, tsrc, tail, nbytes);
 		err = skcipher_walk_done(&walk, 0);
 	}
 	kernel_neon_end();
@@ -493,7 +491,9 @@ static int mac_update(struct shash_desc *desc, const u8 *p, unsigned int len)
 		l = min(len, AES_BLOCK_SIZE - ctx->len);
 
 		if (l <= AES_BLOCK_SIZE) {
-			crypto_xor(ctx->dg + ctx->len, p, l);
+			u8 *dg = ctx->dg + ctx->len;
+
+			crypto_xor(dg, dg, p, l);
 			ctx->len += l;
 			len -= l;
 			p += l;

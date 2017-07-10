@@ -28,7 +28,7 @@ static inline int crypto_cbc_encrypt_segment(
 	u8 *iv = walk->iv;
 
 	do {
-		crypto_xor(iv, src, bsize);
+		crypto_xor(iv, iv, src, bsize);
 		fn(tfm, iv, dst);
 		memcpy(iv, dst, bsize);
 
@@ -49,7 +49,7 @@ static inline int crypto_cbc_encrypt_inplace(
 	u8 *iv = walk->iv;
 
 	do {
-		crypto_xor(src, iv, bsize);
+		crypto_xor(src, src, iv, bsize);
 		fn(tfm, src, src);
 		iv = src;
 
@@ -94,7 +94,7 @@ static inline int crypto_cbc_decrypt_segment(
 
 	do {
 		fn(tfm, src, dst);
-		crypto_xor(dst, iv, bsize);
+		crypto_xor(dst, dst, iv, bsize);
 		iv = src;
 
 		src += bsize;
@@ -123,11 +123,11 @@ static inline int crypto_cbc_decrypt_inplace(
 		fn(tfm, src, src);
 		if ((nbytes -= bsize) < bsize)
 			break;
-		crypto_xor(src, src - bsize, bsize);
+		crypto_xor(src, src, src - bsize, bsize);
 		src -= bsize;
 	}
 
-	crypto_xor(src, walk->iv, bsize);
+	crypto_xor(src, src, walk->iv, bsize);
 	memcpy(walk->iv, last_iv, bsize);
 
 	return nbytes;

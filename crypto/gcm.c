@@ -457,7 +457,7 @@ static int gcm_enc_copy_hash(struct aead_request *req, u32 flags)
 	struct crypto_aead *aead = crypto_aead_reqtfm(req);
 	u8 *auth_tag = pctx->auth_tag;
 
-	crypto_xor(auth_tag, pctx->iauth_tag, 16);
+	crypto_xor(auth_tag, auth_tag, pctx->iauth_tag, 16);
 	scatterwalk_map_and_copy(auth_tag, req->dst,
 				 req->assoclen + req->cryptlen,
 				 crypto_aead_authsize(aead), 1);
@@ -514,7 +514,7 @@ static int crypto_gcm_verify(struct aead_request *req)
 	unsigned int authsize = crypto_aead_authsize(aead);
 	unsigned int cryptlen = req->cryptlen - authsize;
 
-	crypto_xor(auth_tag, iauth_tag, 16);
+	crypto_xor(auth_tag, auth_tag, iauth_tag, 16);
 	scatterwalk_map_and_copy(iauth_tag, req->src,
 				 req->assoclen + cryptlen, authsize, 0);
 	return crypto_memneq(iauth_tag, auth_tag, authsize) ? -EBADMSG : 0;

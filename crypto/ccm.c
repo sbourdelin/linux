@@ -888,7 +888,7 @@ static int crypto_cbcmac_digest_update(struct shash_desc *pdesc, const u8 *p,
 	while (len > 0) {
 		unsigned int l = min(len, bs - ctx->len);
 
-		crypto_xor(dg + ctx->len, p, l);
+		crypto_xor(dg + ctx->len, dg + ctx->len, p, l);
 		ctx->len +=l;
 		len -= l;
 		p += l;

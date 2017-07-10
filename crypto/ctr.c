@@ -65,8 +65,7 @@ static void crypto_ctr_crypt_final(struct blkcipher_walk *walk,
 	unsigned int nbytes = walk->nbytes;
 
 	crypto_cipher_encrypt_one(tfm, keystream, ctrblk);
-	crypto_xor(keystream, src, nbytes);
-	memcpy(dst, keystream, nbytes);
+	crypto_xor(dst, keystream, src, nbytes);
 
 	crypto_inc(ctrblk, bsize);
 }
@@ -85,7 +84,7 @@ static int crypto_ctr_crypt_segment(struct blkcipher_walk *walk,
 	do {
 		/* create keystream */
 		fn(crypto_cipher_tfm(tfm), dst, ctrblk);
-		crypto_xor(dst, src, bsize);
+		crypto_xor(dst, dst, src, bsize);
 
 		/* increment counter in counterblock */
 		crypto_inc(ctrblk, bsize);
@@ -113,7 +112,7 @@ static int crypto_ctr_crypt_inplace(struct blkcipher_walk *walk,
 	do {
 		/* create keystream */
 		fn(crypto_cipher_tfm(tfm), keystream, ctrblk);
-		crypto_xor(src, keystream, bsize);
+		crypto_xor(src, src, keystream, bsize);
 
 		/* increment counter in counterblock */
 		crypto_inc(ctrblk, bsize);

@@ -187,7 +187,7 @@ static int crypto_kw_decrypt(struct blkcipher_desc *desc,
 			/* perform KW operation: get counter as byte string */
 			crypto_kw_cpu_to_be64(t, tbe);
 			/* perform KW operation: modify IV with counter */
-			crypto_xor(block->A, tbe, SEMIBSIZE);
+			crypto_xor(block->A, block->A, tbe, SEMIBSIZE);
 			t--;
 			/* perform KW operation: decrypt block */
 			crypto_cipher_decrypt_one(child, (u8*)block,
@@ -279,7 +279,7 @@ static int crypto_kw_encrypt(struct blkcipher_desc *desc,
 			/* perform KW operation: get counter as byte string */
 			crypto_kw_cpu_to_be64(t, tbe);
 			/* perform KW operation: modify IV with counter */
-			crypto_xor(block->A, tbe, SEMIBSIZE);
+			crypto_xor(block->A, block->A, tbe, SEMIBSIZE);
 			t++;
 
 			/* Copy block->R into place */

@@ -218,12 +218,9 @@ static int ctr_encrypt(struct skcipher_request *req)
 				  ctx->rk, ctx->rounds, blocks, walk.iv, final);
 
 		if (final) {
-			u8 *dst = walk.dst.virt.addr + blocks * AES_BLOCK_SIZE;
-			u8 *src = walk.src.virt.addr + blocks * AES_BLOCK_SIZE;
-
-			if (dst != src)
-				memcpy(dst, src, walk.total % AES_BLOCK_SIZE);
-			crypto_xor(dst, final, walk.total % AES_BLOCK_SIZE);
+			crypto_xor(walk.dst.virt.addr + blocks * AES_BLOCK_SIZE,
+				   walk.src.virt.addr + blocks * AES_BLOCK_SIZE,
+				   final, walk.total % AES_BLOCK_SIZE);
 
 			err = skcipher_walk_done(&walk, 0);
 			break;

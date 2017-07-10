@@ -41,7 +41,7 @@ static int aes_s2v(struct crypto_shash *tfm,
 		/* D = dbl(D) xor AES_CMAC(K, Si) */
 		gf_mulx(d); /* dbl */
 		crypto_shash_digest(desc, addr[i], len[i], tmp);
-		crypto_xor(d, tmp, AES_BLOCK_SIZE);
+		crypto_xor(d, d, tmp, AES_BLOCK_SIZE);
 	}
 
 	crypto_shash_init(desc);
@@ -50,13 +50,13 @@ static int aes_s2v(struct crypto_shash *tfm,
 		/* len(Sn) >= 128 */
 		/* T = Sn xorend D */
 		crypto_shash_update(desc, addr[i], len[i] - AES_BLOCK_SIZE);
-		crypto_xor(d, addr[i] + len[i] - AES_BLOCK_SIZE,
+		crypto_xor(d, d, addr[i] + len[i] - AES_BLOCK_SIZE,
 			   AES_BLOCK_SIZE);
 	} else {
 		/* len(Sn) < 128 */
 		/* T = dbl(D) xor pad(Sn) */
 		gf_mulx(d); /* dbl */
-		crypto_xor(d, addr[i], len[i]);
+		crypto_xor(d, d, addr[i], len[i]);
 		d[len[i]] ^= 0x80;
 	}
 	/* V = AES-CMAC(K, T) */

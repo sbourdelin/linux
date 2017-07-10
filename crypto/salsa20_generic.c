@@ -152,11 +152,11 @@ static void salsa20_encrypt_bytes(struct salsa20_ctx *ctx, u8 *dst,
 			ctx->input[9]++;
 
 		if (bytes <= 64) {
-			crypto_xor(dst, buf, bytes);
+			crypto_xor(dst, dst, buf, bytes);
 			return;
 		}
 
-		crypto_xor(dst, buf, 64);
+		crypto_xor(dst, dst, buf, 64);
 		bytes -= 64;
 		dst += 64;
 	}
