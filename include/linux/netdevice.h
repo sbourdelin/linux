@@ -2040,6 +2040,17 @@ static inline void *netdev_priv(const struct net_device *dev)
 	return (char *)dev + ALIGN(sizeof(struct net_device), NETDEV_ALIGN);
 }
 
+/**
+ * 	netdev_pub - access network device from private pointer
+ * 	@priv: private data pointer of network device
+ *
+ * Get network device from a network device private data pointer
+ */
+static inline struct net_device *netdev_pub(void *priv)
+{
+	return (struct net_device *)((char *)priv - ALIGN(sizeof(struct net_device), NETDEV_ALIGN));
+}
+
 /* Set the sysfs physical device reference for the network logical device
  * if set prior to registration will cause a symlink during initialization.
  */
