@@ -402,6 +402,7 @@ struct sas_ha_struct {
 	char *sas_ha_name;
 	struct device *dev;	  /* should be set */
 	struct module *lldd_module; /* should be set */
+	struct workqueue_struct *event_q;
 
 	u8 *sas_addr;		  /* must be set */
 	u8 hashed_sas_addr[HASHED_SAS_ADDR_SIZE];

@@ -115,6 +115,7 @@ void sas_hae_reset(struct work_struct *work)
 
 int sas_register_ha(struct sas_ha_struct *sas_ha)
 {
+	char name[64];
 	int error = 0;
 
 	mutex_init(&sas_ha->disco_mutex);
@@ -145,6 +146,11 @@ int sas_register_ha(struct sas_ha_struct *sas_ha)
 		printk(KERN_NOTICE "couldn't start event thread:%d\n", error);
 		goto Undo_ports;
 	}
+
+	snprintf(name, 64, "%s_event_q", dev_name(sas_ha->dev));
+	sas_ha->event_q = create_singlethread_workqueue(name);
+	if (!sas_ha->event_q)
+		goto Undo_ports;
 
 	INIT_LIST_HEAD(&sas_ha->eh_done_q);
 	INIT_LIST_HEAD(&sas_ha->eh_ata_q);
@@ -180,6 +186,7 @@ int sas_unregister_ha(struct sas_ha_struct *sas_ha)
 	mutex_lock(&sas_ha->drain_mutex);
 	__sas_drain_work(sas_ha);
 	mutex_unlock(&sas_ha->drain_mutex);
+	destroy_workqueue(sas_ha->event_q);
 
 	return 0;
 }

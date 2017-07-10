@@ -46,7 +46,7 @@ int sas_queue_work(struct sas_ha_struct *ha, struct sas_work *sw)
 		if (list_empty(&sw->drain_node))
 			list_add(&sw->drain_node, &ha->defer_q);
 	} else
-		rc = scsi_queue_work(ha->core.shost, &sw->work);
+		rc = queue_work(ha->event_q, &sw->work);
 
 	return rc;
 }
@@ -69,7 +69,7 @@ void __sas_drain_work(struct sas_ha_struct *ha)
 {
 	int ret;
 	unsigned long flags;
-	struct workqueue_struct *wq = ha->core.shost->work_q;
+	struct workqueue_struct *wq = ha->event_q;
 	struct sas_work *sw, *_sw;
 
 	set_bit(SAS_HA_DRAINING, &ha->state);
