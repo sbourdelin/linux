@@ -146,6 +146,9 @@ ATTRIBUTE_GROUPS(efifb);
 
 static bool pci_dev_disabled;	/* FB base matches BAR of a disabled device */
 
+static struct resource *bar_resource;
+static u64 bar_offset;
+
 static int efifb_probe(struct platform_device *dev)
 {
 	struct fb_info *info;
@@ -198,6 +201,13 @@ static int efifb_probe(struct platform_device *dev)
 
 		ext_lfb_base = (u64)(unsigned long)screen_info.ext_lfb_base << 32;
 		efifb_fix.smem_start |= ext_lfb_base;
+	}
+
+	if (bar_resource &&
+	    bar_resource->start + bar_offset != efifb_fix.smem_start) {
+
+		pr_info("efifb: PCI BAR has moved, updating fb address\n");
+		efifb_fix.smem_start = bar_resource->start + bar_offset;
 	}
 
 	efifb_defined.bits_per_pixel = screen_info.lfb_depth;
@@ -364,11 +374,11 @@ static struct platform_driver efifb_driver = {
 
 builtin_platform_driver(efifb_driver);
 
-#if defined(CONFIG_PCI) && !defined(CONFIG_X86)
+#if defined(CONFIG_PCI)
 
 static bool pci_bar_found;	/* did we find a BAR matching the efifb base? */
 
-static void claim_efifb_bar(struct pci_dev *dev, int idx)
+static void record_efifb_bar_resource(struct pci_dev *dev, int idx, u64 offset)
 {
 	u16 word;
 
@@ -383,12 +393,8 @@ static void claim_efifb_bar(struct pci_dev *dev, int idx)
 		return;
 	}
 
-	if (pci_claim_resource(dev, idx)) {
-		pci_dev_disabled = true;
-		dev_err(&dev->dev,
-			"BAR %d: failed to claim resource for efifb!\n", idx);
-		return;
-	}
+	bar_resource = &dev->resource[idx];
+	bar_offset = offset;
 
 	dev_info(&dev->dev, "BAR %d: assigned to efifb\n", idx);
 }
@@ -415,7 +421,7 @@ static void efifb_fixup_resources(struct pci_dev *dev)
 			continue;
 
 		if (res->start <= base && res->end >= base + size - 1) {
-			claim_efifb_bar(dev, i);
+			record_efifb_bar_resource(dev, i, base - res->start);
 			break;
 		}
 	}
