@@ -2347,8 +2347,8 @@ static int fbcon_blank(struct vc_data *vc, int blank, int mode_switch)
 			ops->cursor_flash = (!blank);
 
 			if (!(info->flags & FBINFO_MISC_USEREVENT))
-				if (fb_blank(info, blank))
-					fbcon_generic_blank(vc, info, blank);
+				fb_blank(info, blank);
+				fbcon_generic_blank(vc, info, blank);
 		}
 
 		if (!blank)
