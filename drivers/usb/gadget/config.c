@@ -207,7 +207,6 @@ EXPORT_SYMBOL_GPL(usb_free_all_descriptors);
 struct usb_descriptor_header *usb_otg_descriptor_alloc(
 				struct usb_gadget *gadget)
 {
-	struct usb_descriptor_header *otg_desc;
 	unsigned length = 0;
 
 	if (gadget->otg_caps && (gadget->otg_caps->otg_rev >= 0x0200))
@@ -215,8 +214,7 @@ struct usb_descriptor_header *usb_otg_descriptor_alloc(
 	else
 		length = sizeof(struct usb_otg_descriptor);
 
-	otg_desc = kzalloc(length, GFP_KERNEL);
-	return otg_desc;
+	return kzalloc(length, GFP_KERNEL);
 }
 EXPORT_SYMBOL_GPL(usb_otg_descriptor_alloc);
 
