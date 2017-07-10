@@ -291,15 +291,21 @@ static irqreturn_t arche_platform_wd_irq(int irq, void *devid)
 		if (arche_pdata->wake_detect_state == WD_STATE_BOOT_INIT) {
 			if (time_before(jiffies,
 					arche_pdata->wake_detect_start +
-					msecs_to_jiffies(WD_COLDBOOT_PULSE_WIDTH_MS))) {
-				arche_platform_set_wake_detect_state(arche_pdata,
-								     WD_STATE_IDLE);
+					msecs_to_jiffies(
+						WD_COLDBOOT_PULSE_WIDTH_MS))) {
+				arche_platform_set_wake_detect_state(
+								arche_pdata,
+								WD_STATE_IDLE);
 			} else {
-				/* Check we are not in middle of irq thread already */
+				/*
+				 * Check we are not in middle of irq thread
+				 * already
+				 */
 				if (arche_pdata->wake_detect_state !=
 						WD_STATE_COLDBOOT_START) {
-					arche_platform_set_wake_detect_state(arche_pdata,
-									     WD_STATE_COLDBOOT_TRIG);
+					arche_platform_set_wake_detect_state(
+							arche_pdata,
+							WD_STATE_COLDBOOT_TRIG);
 					spin_unlock_irqrestore(
 						&arche_pdata->wake_lock,
 						flags);
@@ -318,8 +324,9 @@ static irqreturn_t arche_platform_wd_irq(int irq, void *devid)
 			 * beyond 30msec, then it is coldboot else fallback
 			 * to standby boot.
 			 */
-			arche_platform_set_wake_detect_state(arche_pdata,
-							     WD_STATE_BOOT_INIT);
+			arche_platform_set_wake_detect_state(
+							arche_pdata,
+							WD_STATE_BOOT_INIT);
 		}
 	}
 
@@ -793,12 +800,14 @@ static SIMPLE_DEV_PM_OPS(arche_platform_pm_ops,
 			arche_platform_resume);
 
 static const struct of_device_id arche_platform_of_match[] = {
-	{ .compatible = "google,arche-platform", }, /* Use PID/VID of SVC device */
+	/* Use PID/VID of SVC device */
+	{ .compatible = "google,arche-platform", },
 	{ },
 };
 
 static const struct of_device_id arche_combined_id[] = {
-	{ .compatible = "google,arche-platform", }, /* Use PID/VID of SVC device */
+	/* Use PID/VID of SVC device */
+	{ .compatible = "google,arche-platform", },
 	{ .compatible = "usbffff,2", },
 	{ },
 };
