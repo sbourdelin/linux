@@ -21,6 +21,7 @@
 #include <linux/sched/task_stack.h>
 #include <linux/thread_info.h>
 #include <asm/sections.h>
+#include "pmalloc_usercopy.h"
 
 /*
  * Checks if a given pointer and length is contained by the current
@@ -200,17 +201,21 @@ static inline const char *check_heap_object(const void *ptr, unsigned long n,
 {
 	struct page *page;
 
-	if (!virt_addr_valid(ptr))
-		return NULL;
+	if (virt_addr_valid(ptr)) {
+		page = virt_to_head_page(ptr);
 
-	page = virt_to_head_page(ptr);
-
-	/* Check slab allocator for flags and size. */
-	if (PageSlab(page))
-		return __check_heap_object(ptr, n, page);
-
+		/* Check slab allocator for flags and size. */
+		if (PageSlab(page))
+			return __check_heap_object(ptr, n, page);
 	/* Verify object does not incorrectly span multiple pages. */
-	return check_page_span(ptr, n, page, to_user);
+		return check_page_span(ptr, n, page, to_user);
+	}
+	if (likely(is_vmalloc_addr(ptr))) {
+		page = vmalloc_to_page(ptr);
+		if (is_pmalloc_page(page))
+			return pmalloc_check_range(ptr, n);
+	}
+	return NULL;
 }
 
 /*
