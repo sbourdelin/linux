@@ -422,6 +422,10 @@ static char print_alua_state(unsigned char state)
 static int alua_check_sense(struct scsi_device *sdev,
 			    struct scsi_sense_hdr *sense_hdr)
 {
+	sdev_dbg(sdev, "%s: %s(): Sense Key: 0x%x, ASC: 0x%x, ASCQ: 0x%x\n",
+		 ALUA_DH_NAME, __func__, sense_hdr->sense_key,
+		 sense_hdr->asc, sense_hdr->ascq);
+
 	switch (sense_hdr->sense_key) {
 	case NOT_READY:
 		if (sense_hdr->asc == 0x04 && sense_hdr->ascq == 0x0a) {
@@ -987,10 +991,13 @@ static bool alua_rtpg_queue(struct alua_port_group *pg,
 	spin_unlock_irqrestore(&pg->lock, flags);
 
 	if (start_queue) {
+
 		if (queue_delayed_work(alua_wq, &pg->rtpg_work,
-				msecs_to_jiffies(ALUA_RTPG_DELAY_MSECS)))
+				msecs_to_jiffies(ALUA_RTPG_DELAY_MSECS))) {
+			sdev_dbg(sdev, "%s: %s(): port group %02x\n",
+				 ALUA_DH_NAME, __func__, pg->group_id);
 			sdev = NULL;
-		else
+		} else
 			kref_put(&pg->kref, release_port_group);
 	}
 	if (sdev)
@@ -1099,6 +1106,9 @@ static int alua_activate(struct scsi_device *sdev,
 	}
 	rcu_read_unlock();
 	mutex_unlock(&h->init_mutex);
+
+	sdev_dbg(sdev, "%s: %s(): port group %02x, fn: %pf()\n",
+		 ALUA_DH_NAME, __func__, pg->group_id, fn);
 
 	if (alua_rtpg_queue(pg, sdev, qdata, true))
 		fn = NULL;
