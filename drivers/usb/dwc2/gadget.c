@@ -3189,6 +3189,9 @@ void dwc2_hsotg_disconnect(struct dwc2_hsotg *hsotg)
 		return;
 
 	hsotg->connected = 0;
+	/* On disconnect reset device address to zero */
+	__bic32(hsotg->regs + DCFG, DCFG_DEVADDR_MASK);
+
 	hsotg->test_mode = 0;
 
 	for (ep = 0; ep < hsotg->num_of_eps; ep++) {
