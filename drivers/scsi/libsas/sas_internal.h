@@ -100,6 +100,40 @@ void sas_free_device(struct kref *kref);
 extern const work_func_t sas_phy_event_fns[PHY_NUM_EVENTS];
 extern const work_func_t sas_port_event_fns[PORT_NUM_EVENTS];
 
+static void sas_complete_event(struct kref *kref)
+{
+	struct asd_sas_port *port = container_of(kref, struct asd_sas_port, ref);
+
+	complete_all(&port->completion);
+}
+
+static inline void sas_port_put(struct asd_sas_port *port)
+{
+	if (port->is_sync)
+		kref_put(&port->ref, sas_complete_event);
+}
+
+static inline void sas_port_wait_init(struct asd_sas_port *port)
+{
+	init_completion(&port->completion);
+	kref_init(&port->ref);
+	port->is_sync = true;
+}
+
+static inline void sas_port_wait_completion(
+		struct asd_sas_port *port)
+{
+	sas_port_put(port);
+	wait_for_completion(&port->completion);
+	port->is_sync = false;
+}
+
+static inline void sas_port_get(struct asd_sas_port *port)
+{
+	if (port && port->is_sync)
+		kref_get(&port->ref);
+}
+
 #ifdef CONFIG_SCSI_SAS_HOST_SMP
 extern int sas_smp_host_handler(struct Scsi_Host *shost, struct request *req,
 				struct request *rsp);

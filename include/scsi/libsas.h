@@ -242,6 +242,7 @@ static inline void INIT_SAS_WORK(struct sas_work *sw, void (*fn)(struct work_str
 struct sas_discovery_event {
 	struct sas_work work;
 	struct asd_sas_port *port;
+	enum discover_event	type;
 };
 
 static inline struct sas_discovery_event *to_sas_discovery_event(struct work_struct *work)
@@ -273,7 +274,9 @@ struct asd_sas_port {
 
 	struct sas_work work;
 	int suspended;
-
+	struct kref ref;
+	struct completion completion;
+	bool is_sync;
 /* public: */
 	int id;
 

@@ -525,16 +525,43 @@ static void sas_revalidate_domain(struct work_struct *work)
 	mutex_unlock(&ha->disco_mutex);
 }
 
+static const work_func_t sas_event_fns[DISC_NUM_EVENTS] = {
+	[DISCE_DISCOVER_DOMAIN] = sas_discover_domain,
+	[DISCE_REVALIDATE_DOMAIN] = sas_revalidate_domain,
+	[DISCE_PROBE] = sas_probe_devices,
+	[DISCE_SUSPEND] = sas_suspend_devices,
+	[DISCE_RESUME] = sas_resume_devices,
+	[DISCE_DESTRUCT] = sas_destruct_devices,
+};
+
+/* a simple wrapper for sas discover event funtions */
+static void sas_discover_common_fn(struct work_struct *work)
+{
+	struct sas_discovery_event *ev = to_sas_discovery_event(work);
+	struct asd_sas_port *port = ev->port;
+
+	sas_event_fns[ev->type](work);
+	sas_port_put(port);
+}
+
+
 /* ---------- Events ---------- */
 
 static void sas_chain_work(struct sas_ha_struct *ha, struct sas_work *sw)
 {
+	int ret;
+	struct sas_discovery_event *ev = to_sas_discovery_event(&sw->work);
+	struct asd_sas_port *port = ev->port;
+
 	/* chained work is not subject to SA_HA_DRAINING or
 	 * SAS_HA_REGISTERED, because it is either submitted in the
 	 * workqueue, or known to be submitted from a context that is
 	 * not racing against draining
 	 */
-	scsi_queue_work(ha->core.shost, &sw->work);
+	sas_port_get(port);
+	ret = scsi_queue_work(ha->core.shost, &sw->work);
+	if (ret != 1)
+		sas_port_put(port);
 }
 
 static void sas_chain_event(int event, unsigned long *pending,
@@ -575,18 +602,10 @@ void sas_init_disc(struct sas_discovery *disc, struct asd_sas_port *port)
 {
 	int i;
 
-	static const work_func_t sas_event_fns[DISC_NUM_EVENTS] = {
-		[DISCE_DISCOVER_DOMAIN] = sas_discover_domain,
-		[DISCE_REVALIDATE_DOMAIN] = sas_revalidate_domain,
-		[DISCE_PROBE] = sas_probe_devices,
-		[DISCE_SUSPEND] = sas_suspend_devices,
-		[DISCE_RESUME] = sas_resume_devices,
-		[DISCE_DESTRUCT] = sas_destruct_devices,
-	};
-
 	disc->pending = 0;
 	for (i = 0; i < DISC_NUM_EVENTS; i++) {
-		INIT_SAS_WORK(&disc->disc_work[i].work, sas_event_fns[i]);
+		INIT_SAS_WORK(&disc->disc_work[i].work, sas_discover_common_fn);
 		disc->disc_work[i].port = port;
+		disc->disc_work[i].type = i;
 	}
 }
