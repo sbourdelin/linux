@@ -281,6 +281,8 @@ static void cpuidle_generic(void)
  */
 static void do_idle(void)
 {
+	unsigned int predicted_idle_us;
+	unsigned int short_idle_threshold = jiffies_to_usecs(1) / 2;
 	/*
 	 * If the arch has a polling bit, we maintain an invariant:
 	 *
@@ -292,7 +294,12 @@ static void do_idle(void)
 
 	__current_set_polling();
 
-	cpuidle_generic();
+	predicted_idle_us = cpuidle_predict();
+
+	if (likely(predicted_idle_us < short_idle_threshold))
+		cpuidle_fast();
+	else
+		cpuidle_generic();
 
 	__current_clr_polling();
 
