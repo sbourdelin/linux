@@ -365,6 +365,14 @@ static inline int cec_phys_addr_validate(u16 phys_addr, u16 *parent, u16 *port)
 	return 0;
 }
 
+#ifndef CONFIG_CEC_NOTIFIER
+struct cec_notifier;
+static inline void cec_register_cec_notifier(struct cec_adapter *adap,
+					     struct cec_notifier *notifier)
+{
+}
+#endif
+
 #endif
 
 /**
