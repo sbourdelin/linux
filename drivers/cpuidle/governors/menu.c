@@ -199,9 +199,10 @@ static int menu_select(struct cpuidle_driver *drv, struct cpuidle_device *dev)
 	struct menu_device *data = this_cpu_ptr(&menu_devices);
 	struct device *device = get_cpu_device(dev->cpu);
 	int latency_req = pm_qos_request(PM_QOS_CPU_DMA_LATENCY);
+	struct cpuidle_governor_stat *gov_stat =
+		(struct cpuidle_governor_stat *)&(dev->gov_stat);
 	int i;
 	unsigned int interactivity_req;
-	unsigned int expected_interval;
 	unsigned long nr_iowaiters, cpu_load;
 	int resume_latency = dev_pm_qos_raw_read_value(device);
 
@@ -213,23 +214,7 @@ static int menu_select(struct cpuidle_driver *drv, struct cpuidle_device *dev)
 	if (unlikely(latency_req == 0))
 		return 0;
 
-	/* determine the expected residency time, round up */
-	data->next_timer_us = ktime_to_us(tick_nohz_get_sleep_length());
-
 	get_iowait_load(&nr_iowaiters, &cpu_load);
-	data->bucket = which_bucket(data->next_timer_us, nr_iowaiters);
-
-	/*
-	 * Force the result of multiplication to be 64 bits even if both
-	 * operands are 32 bits.
-	 * Make sure to round up for half microseconds.
-	 */
-	data->predicted_us = DIV_ROUND_CLOSEST_ULL((uint64_t)data->next_timer_us *
-					 data->correction_factor[data->bucket],
-					 RESOLUTION * DECAY);
-
-	expected_interval = get_typical_interval(data);
-	expected_interval = min(expected_interval, data->next_timer_us);
 
 	if (CPUIDLE_DRIVER_STATE_START > 0) {
 		struct cpuidle_state *s = &drv->states[CPUIDLE_DRIVER_STATE_START];
@@ -252,15 +237,11 @@ static int menu_select(struct cpuidle_driver *drv, struct cpuidle_device *dev)
 	}
 
 	/*
-	 * Use the lowest expected idle interval to pick the idle state.
-	 */
-	data->predicted_us = min(data->predicted_us, expected_interval);
-
-	/*
 	 * Use the performance multiplier and the user-configurable
 	 * latency_req to determine the maximum exit latency.
 	 */
-	interactivity_req = data->predicted_us / performance_multiplier(nr_iowaiters, cpu_load);
+	interactivity_req = gov_stat->predicted_us /
+				performance_multiplier(nr_iowaiters, cpu_load);
 	if (latency_req > interactivity_req)
 		latency_req = interactivity_req;
 
@@ -274,7 +255,7 @@ static int menu_select(struct cpuidle_driver *drv, struct cpuidle_device *dev)
 
 		if (s->disabled || su->disable)
 			continue;
-		if (s->target_residency > data->predicted_us)
+		if (s->target_residency > gov_stat->predicted_us)
 			break;
 		if (s->exit_latency > latency_req)
 			break;
