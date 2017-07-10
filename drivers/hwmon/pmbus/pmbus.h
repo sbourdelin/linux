@@ -345,6 +345,12 @@ enum pmbus_sensor_classes {
 enum pmbus_data_format { linear = 0, direct, vid };
 enum vrm_version { vr11 = 0, vr12 };
 
+struct pmbus_coeffs {
+	int m; /* mantissa for direct data format */
+	int b; /* offset */
+	int R; /* exponent */
+};
+
 struct pmbus_driver_info {
 	int pages;		/* Total number of pages */
 	enum pmbus_data_format format[PSC_NUM_CLASSES];
@@ -353,9 +359,7 @@ struct pmbus_driver_info {
 	 * Support one set of coefficients for each sensor type
 	 * Used for chips providing data in direct mode.
 	 */
-	int m[PSC_NUM_CLASSES];	/* mantissa for direct data format */
-	int b[PSC_NUM_CLASSES];	/* offset */
-	int R[PSC_NUM_CLASSES];	/* exponent */
+	struct pmbus_coeffs coeffs[PSC_NUM_CLASSES];
 
 	u32 func[PMBUS_PAGES];	/* Functionality, per page */
 	/*
@@ -382,6 +386,14 @@ struct pmbus_driver_info {
 	int (*identify)(struct i2c_client *client,
 			struct pmbus_driver_info *info);
 
+	/*
+	 * If a fan's coefficents change over time (e.g. between RPM and PWM
+	 * mode), then the driver can provide a function for retrieving the
+	 * currently applicable coefficients.
+	 */
+	const struct pmbus_coeffs *(*get_fan_coeffs)(
+			const struct pmbus_driver_info *info, int index,
+			enum pmbus_fan_mode mode, int command);
 	/* Allow the driver to interpret the fan command value */
 	int (*get_pwm_mode)(int id, u8 fan_config, u16 fan_command);
 	int (*set_pwm_mode)(int id, long mode, u8 *fan_config,
