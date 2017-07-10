@@ -1079,6 +1079,9 @@ struct intel_lspcon {
 	/* AVI IF setup function for LSPCON */
 	void (*set_infoframes)(struct drm_encoder *encoder,
 				const struct intel_crtc_state *crtc_state);
+	void (*write_infoframe)(struct drm_encoder *encoder,
+				const struct intel_crtc_state *crtc_state,
+				union hdmi_infoframe *frame);
 };
 
 struct intel_digital_port {

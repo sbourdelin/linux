@@ -31,6 +31,18 @@
 #define LSPCON_VENDOR_PARADE_OUI 0x001CF8
 #define LSPCON_VENDOR_MCA_OUI 0x0060AD
 
+/* AUX addresses to write AVI IF into */
+#define LSPCON_MCA_AVI_IF_WRITE_OFFSET 0x5C0
+#define LSPCON_MCA_AVI_IF_CTRL 0x5DF
+#define  LSPCON_MCA_AVI_IF_KICKOFF (1 << 0)
+#define  LSPCON_MCA_AVI_IF_HANDLED (1 << 1)
+
+#define LSPCON_PARADE_AVI_IF_WRITE_OFFSET 0x516
+#define LSPCON_PARADE_AVI_IF_CTRL 0x51E
+#define  LSPCON_PARADE_AVI_IF_KICKOFF (1 << 7)
+#define LSPCON_PARADE_AVI_IF_STATUS 0x51F
+#define  LSPCON_PARADE_AVI_IF_HANDLED (2 << 6)
+
 static struct intel_dp *lspcon_to_intel_dp(struct intel_lspcon *lspcon)
 {
 	struct intel_digital_port *dig_port =
@@ -217,6 +229,167 @@ bool lspcon_ycbcr420_config(struct drm_connector *connector,
 	return false;
 }
 
+static bool _lspcon_write_infoframe_parade(struct drm_dp_aux *aux,
+					   uint8_t *buffer, ssize_t len)
+{
+	u8 avi_if_ctrl;
+	u8 avi_if_status;
+	u8 count = 0;
+	u8 retry = 5;
+	u8 avi_buf[8] = {0, };
+	uint16_t reg;
+	ssize_t ret;
+
+	while (count++ < 4) {
+
+		do {
+			/* Is LSPCON FW ready */
+			reg = LSPCON_PARADE_AVI_IF_CTRL;
+			ret = drm_dp_dpcd_read(aux, reg, &avi_if_ctrl, 1);
+			if (ret < 0) {
+				DRM_ERROR("DPCD read failed, add:0x%x\n", reg);
+				return false;
+			}
+
+			if (avi_if_ctrl & LSPCON_PARADE_AVI_IF_KICKOFF)
+				break;
+			usleep_range(100, 200);
+		} while (--retry);
+
+		if (!(avi_if_ctrl & LSPCON_PARADE_AVI_IF_KICKOFF)) {
+			DRM_ERROR("LSPCON FW not ready for infoframes\n");
+			return false;
+		}
+
+		/*
+		 * AVI Infoframe contains 31 bytes of data:
+		 *	HB0 to HB2   (3 bytes header)
+		 *	PB0 to PB27 (28 bytes data)
+		 * As per Parade spec, while sending first block (8bytes),
+		 * byte 0 is kept for request token no, and byte1 - byte7
+		 * contain frame data. So we have to pack frame like this:
+		 *	first block of 8 bytes: <token> <HB0-HB2> <PB0-PB3>
+		 *	next 3 blocks: <PB4-PB27>
+		 */
+		if (count)
+			memcpy(avi_buf, buffer + count * 8 - 1, 8);
+		else {
+			avi_buf[0] = 1;
+			memcpy(&avi_buf[1], buffer, 7);
+		}
+
+		/* Write 8 bytes of data at a time */
+		reg = LSPCON_PARADE_AVI_IF_WRITE_OFFSET;
+		ret = drm_dp_dpcd_write(aux, reg, avi_buf, 8);
+		if (ret < 0) {
+			DRM_ERROR("DPCD write failed, add:0x%x\n", reg);
+			return false;
+		}
+
+		/*
+		 * While sending a block of 8 byes, we need to inform block
+		 * number to FW, by programming bits[1:0] of ctrl reg with
+		 * block number
+		 */
+		avi_if_ctrl = 0x80 + count;
+		reg = LSPCON_PARADE_AVI_IF_CTRL;
+		ret = drm_dp_dpcd_write(aux, reg, &avi_if_ctrl, 1);
+		if (ret < 0) {
+			DRM_ERROR("DPCD write failed, add:0x%x\n", reg);
+			return false;
+		}
+	}
+
+	/* Check LSPCON FW status */
+	reg = LSPCON_PARADE_AVI_IF_STATUS;
+	ret = drm_dp_dpcd_read(aux, reg, &avi_if_status, 1);
+	if (ret < 0) {
+		DRM_ERROR("DPCD write failed, address 0x%x\n", reg);
+		return false;
+	}
+
+	if (avi_if_status & LSPCON_PARADE_AVI_IF_HANDLED)
+		DRM_DEBUG_KMS("AVI IF handled by FW\n");
+
+	return true;
+}
+
+static bool _lspcon_write_infoframe_mca(struct drm_dp_aux *aux,
+					uint8_t *buffer, ssize_t len)
+{
+	int ret;
+	uint32_t val = 0;
+	uint16_t reg;
+	uint8_t *data = buffer;
+
+	reg = LSPCON_MCA_AVI_IF_WRITE_OFFSET;
+	while (val < len) {
+		ret = drm_dp_dpcd_write(aux, reg, data, 1);
+		if (ret < 0) {
+			DRM_ERROR("DPCD write failed, add:0x%x\n", reg);
+			return false;
+		}
+		val++; reg++; data++;
+	}
+
+	val = 0;
+	reg = LSPCON_MCA_AVI_IF_CTRL;
+	ret = drm_dp_dpcd_read(aux, reg, &val, 1);
+	if (ret < 0) {
+		DRM_ERROR("DPCD read failed, address 0x%x\n", reg);
+		return false;
+	}
+
+	/* Indicate LSPCON chip about infoframe, clear bit 1 and set bit 0 */
+	val &= ~LSPCON_MCA_AVI_IF_HANDLED;
+	val |= LSPCON_MCA_AVI_IF_KICKOFF;
+
+	ret = drm_dp_dpcd_write(aux, reg, &val, 1);
+	if (ret < 0) {
+		DRM_ERROR("DPCD read failed, address 0x%x\n", reg);
+		return false;
+	}
+
+	val = 0;
+	ret = drm_dp_dpcd_read(aux, reg, &val, 1);
+	if (ret < 0) {
+		DRM_ERROR("DPCD read failed, address 0x%x\n", reg);
+		return false;
+	}
+
+	if (val == LSPCON_MCA_AVI_IF_HANDLED)
+		DRM_DEBUG_KMS("AVI IF handled by FW\n");
+
+	return true;
+}
+
+void lspcon_write_infoframe(struct drm_encoder *encoder,
+				  const struct intel_crtc_state *crtc_state,
+				  union hdmi_infoframe *frame)
+{
+	bool ret;
+	ssize_t len;
+	uint8_t buf[VIDEO_DIP_DATA_SIZE];
+	struct intel_dp *intel_dp = enc_to_intel_dp(encoder);
+	struct intel_lspcon *lspcon = enc_to_intel_lspcon(encoder);
+
+	len = hdmi_infoframe_pack(frame, buf, sizeof(buf));
+	if (len < 0) {
+		DRM_ERROR("Failed to pack AVI IF\n");
+		return;
+	}
+
+	if (lspcon->vendor == LSPCON_VENDOR_MCA)
+		ret = _lspcon_write_infoframe_mca(&intel_dp->aux, buf, len);
+	else
+		ret = _lspcon_write_infoframe_parade(&intel_dp->aux, buf, len);
+
+	if (!ret)
+		DRM_ERROR("Failed to write AVI infoframes\n");
+	else
+		DRM_DEBUG_DRIVER("AVI infoframes updated successfully\n");
+}
+
 void lspcon_resume(struct intel_lspcon *lspcon)
 {
 	enum drm_lspcon_mode expected_mode;
@@ -282,6 +455,7 @@ bool lspcon_init(struct intel_digital_port *intel_dig_port)
 
 	connector->ycbcr_420_allowed = true;
 	lspcon->set_infoframes = intel_ddi_set_avi_infoframe;
+	lspcon->write_infoframe = lspcon_write_infoframe;
 	drm_dp_read_desc(&dp->aux, &dp->desc, drm_dp_is_branch(dp->dpcd));
 
 	DRM_DEBUG_KMS("Success: LSPCON init\n");

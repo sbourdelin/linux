@@ -2068,6 +2068,14 @@ void intel_ddi_set_avi_infoframe(struct drm_encoder *encoder,
 					   rgb_qrange_limited,
 					   rgb_qrange_selectable);
 
+	if (crtc_state->lspcon_active) {
+		struct intel_lspcon *lspcon = enc_to_intel_lspcon(encoder);
+
+		/* LSPCON writes infoframes via AUX */
+		lspcon->write_infoframe(encoder, crtc_state, &frame);
+		return;
+	}
+
 	intel_write_infoframe(encoder, crtc_state, &frame);
 }
 
