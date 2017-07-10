@@ -2003,8 +2003,76 @@ static void intel_ddi_clk_select(struct intel_encoder *encoder,
 	}
 }
 
+void intel_ddi_set_avi_infoframe(struct drm_encoder *encoder,
+				  const struct intel_crtc_state *crtc_state)
+{
+	int ret;
+	union hdmi_infoframe frame;
+	struct drm_connector *connector;
+	struct intel_hdmi *intel_hdmi = enc_to_intel_hdmi(encoder);
+	struct intel_dp *intel_dp = enc_to_intel_dp(encoder);
+	const struct drm_display_mode *adjusted_mode =
+					&crtc_state->base.adjusted_mode;
+	enum intel_output_type type = to_intel_encoder(encoder)->type;
+	bool is_hdmi2_sink = false;
+	bool rgb_qrange_selectable = false;
+	enum hdmi_colorspace colorspace = crtc_state->ycbcr420 ?
+					  HDMI_COLORSPACE_YUV420 :
+					  HDMI_COLORSPACE_RGB;
+	bool rgb_qrange_limited =  crtc_state->limited_color_range ?
+					HDMI_QUANTIZATION_RANGE_LIMITED :
+					HDMI_QUANTIZATION_RANGE_FULL;
+
+	switch (type) {
+	case INTEL_OUTPUT_HDMI:
+		connector = &intel_hdmi->attached_connector->base;
+		is_hdmi2_sink = connector->display_info.hdmi.scdc.supported;
+		rgb_qrange_selectable = intel_hdmi->rgb_quant_range_selectable;
+		break;
+
+	case INTEL_OUTPUT_DP:
+		/* We are here means its a LSPCON device, still be paranoid */
+		if (!crtc_state->lspcon_active) {
+			DRM_ERROR("No LSPCON, why am I here ?\n");
+			return;
+		}
+
+		connector = &intel_dp->attached_connector->base;
+		is_hdmi2_sink = connector->display_info.hdmi.scdc.supported;
+		if (crtc_state->ycbcr420)
+			rgb_qrange_limited = true;
+		break;
+
+	default:
+		DRM_ERROR("No other encoder allowed\n");
+		return;
+	}
+
+	ret = drm_hdmi_avi_infoframe_from_display_mode(&frame.avi,
+						       adjusted_mode,
+						       is_hdmi2_sink);
+	if (ret < 0) {
+		DRM_ERROR("couldn't fill AVI infoframe\n");
+		return;
+	}
+
+	ret = drm_hdmi_avi_infoframe_set_colorspace(&frame.avi,
+						    adjusted_mode,
+						    colorspace);
+	if (ret < 0) {
+		DRM_ERROR("couldn't fill AVI colorspace\n");
+		return;
+	}
+
+	drm_hdmi_avi_infoframe_quant_range(&frame.avi, adjusted_mode,
+					   rgb_qrange_limited,
+					   rgb_qrange_selectable);
+
+	intel_write_infoframe(encoder, crtc_state, &frame);
+}
+
 static void intel_ddi_pre_enable_dp(struct intel_encoder *encoder,
-				    int link_rate, uint32_t lane_count,
+				    const struct intel_crtc_state *pipe_config,
 				    struct intel_shared_dpll *pll,
 				    bool link_mst)
 {
@@ -2012,6 +2080,8 @@ static void intel_ddi_pre_enable_dp(struct intel_encoder *encoder,
 	struct drm_i915_private *dev_priv = to_i915(encoder->base.dev);
 	enum port port = intel_ddi_get_encoder_port(encoder);
 	struct intel_digital_port *dig_port = enc_to_dig_port(&encoder->base);
+	int link_rate = pipe_config->port_clock;
+	uint32_t lane_count = pipe_config->lane_count;
 
 	WARN_ON(link_mst && (port == PORT_A || port == PORT_E));
 
@@ -2030,6 +2100,14 @@ static void intel_ddi_pre_enable_dp(struct intel_encoder *encoder,
 	intel_dp_start_link_train(intel_dp);
 	if (port != PORT_A || INTEL_GEN(dev_priv) >= 9)
 		intel_dp_stop_link_train(intel_dp);
+
+	if (pipe_config->lspcon_active) {
+		struct drm_encoder *drm_encoder = &encoder->base;
+		struct intel_lspcon *lspcon = enc_to_intel_lspcon(drm_encoder);
+
+		if (lspcon->set_infoframes)
+			lspcon->set_infoframes(&encoder->base, pipe_config);
+	}
 }
 
 static void intel_ddi_pre_enable_hdmi(struct intel_encoder *encoder,
@@ -2072,8 +2150,7 @@ static void intel_ddi_pre_enable(struct intel_encoder *encoder,
 
 	if (type == INTEL_OUTPUT_DP || type == INTEL_OUTPUT_EDP) {
 		intel_ddi_pre_enable_dp(encoder,
-					pipe_config->port_clock,
-					pipe_config->lane_count,
+					pipe_config,
 					pipe_config->shared_dpll,
 					intel_crtc_has_type(pipe_config,
 							    INTEL_OUTPUT_DP_MST));
@@ -2628,17 +2705,17 @@ void intel_ddi_init(struct drm_i915_private *dev_priv, enum port port)
 	}
 
 	if (init_lspcon) {
-		if (lspcon_init(intel_dig_port))
-			/* TODO: handle hdmi info frame part */
+		if (lspcon_init(intel_dig_port)) {
 			DRM_DEBUG_KMS("LSPCON init success on port %c\n",
 				port_name(port));
-		else
+		} else {
 			/*
 			 * LSPCON init faied, but DP init was success, so
 			 * lets try to drive as DP++ port.
 			 */
 			DRM_ERROR("LSPCON init failed on port %c\n",
 				port_name(port));
+		}
 	}
 
 	return;

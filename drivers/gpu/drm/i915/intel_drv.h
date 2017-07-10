@@ -1075,6 +1075,10 @@ struct intel_lspcon {
 	bool active;
 	enum drm_lspcon_mode mode;
 	enum lspcon_vendor vendor;
+
+	/* AVI IF setup function for LSPCON */
+	void (*set_infoframes)(struct drm_encoder *encoder,
+				const struct intel_crtc_state *crtc_state);
 };
 
 struct intel_digital_port {
@@ -1320,6 +1324,8 @@ u8 intel_ddi_dp_voltage_max(struct intel_encoder *encoder);
 
 unsigned int intel_fb_align_height(const struct drm_framebuffer *fb,
 				   int plane, unsigned int height);
+void intel_ddi_set_avi_infoframe(struct drm_encoder *encoder,
+				 const struct intel_crtc_state *crtc_state);
 
 /* intel_audio.c */
 void intel_init_audio_hooks(struct drm_i915_private *dev_priv);
@@ -1690,6 +1696,9 @@ void intel_hdmi_handle_sink_scrambling(struct intel_encoder *intel_encoder,
 				       struct drm_connector *connector,
 				       bool high_tmds_clock_ratio,
 				       bool scrambling);
+void intel_write_infoframe(struct drm_encoder *encoder,
+			    const struct intel_crtc_state *crtc_state,
+			    union hdmi_infoframe *frame);
 void intel_dp_dual_mode_set_tmds_output(struct intel_hdmi *hdmi, bool enable);
 bool intel_hdmi_ycbcr420_config(struct drm_connector *connector,
 				struct intel_crtc_state *config,

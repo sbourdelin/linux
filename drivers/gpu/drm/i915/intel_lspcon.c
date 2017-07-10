@@ -281,6 +281,7 @@ bool lspcon_init(struct intel_digital_port *intel_dig_port)
 	}
 
 	connector->ycbcr_420_allowed = true;
+	lspcon->set_infoframes = intel_ddi_set_avi_infoframe;
 	drm_dp_read_desc(&dp->aux, &dp->desc, drm_dp_is_branch(dp->dpcd));
 
 	DRM_DEBUG_KMS("Success: LSPCON init\n");

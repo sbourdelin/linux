@@ -430,7 +430,7 @@ static bool hsw_infoframe_enabled(struct drm_encoder *encoder,
  * trick them by giving an offset into the buffer and moving back the header
  * bytes by one.
  */
-static void intel_write_infoframe(struct drm_encoder *encoder,
+void intel_write_infoframe(struct drm_encoder *encoder,
 				  const struct intel_crtc_state *crtc_state,
 				  union hdmi_infoframe *frame)
 {
@@ -451,46 +451,6 @@ static void intel_write_infoframe(struct drm_encoder *encoder,
 	len++;
 
 	intel_hdmi->write_infoframe(encoder, crtc_state, frame->any.type, buffer, len);
-}
-
-static void intel_hdmi_set_avi_infoframe(struct drm_encoder *encoder,
-					 const struct intel_crtc_state *crtc_state)
-{
-	struct intel_hdmi *intel_hdmi = enc_to_intel_hdmi(encoder);
-	const struct drm_display_mode *adjusted_mode =
-		&crtc_state->base.adjusted_mode;
-	struct drm_connector *connector = &intel_hdmi->attached_connector->base;
-	bool is_hdmi2_sink = connector->display_info.hdmi.scdc.supported;
-	enum hdmi_colorspace colorspace = HDMI_COLORSPACE_RGB;
-	union hdmi_infoframe frame;
-	int ret;
-
-	ret = drm_hdmi_avi_infoframe_from_display_mode(&frame.avi,
-						       adjusted_mode,
-						       is_hdmi2_sink);
-	if (ret < 0) {
-		DRM_ERROR("couldn't fill AVI infoframe\n");
-		return;
-	}
-
-	if (crtc_state->ycbcr420)
-		colorspace = HDMI_COLORSPACE_YUV420;
-
-	ret = drm_hdmi_avi_infoframe_set_colorspace(&frame.avi,
-						    adjusted_mode,
-						    colorspace);
-	if (ret < 0) {
-		DRM_ERROR("couldn't fill AVI colorspace\n");
-		return;
-	}
-
-	drm_hdmi_avi_infoframe_quant_range(&frame.avi, adjusted_mode,
-					   crtc_state->limited_color_range ?
-					   HDMI_QUANTIZATION_RANGE_LIMITED :
-					   HDMI_QUANTIZATION_RANGE_FULL,
-					   intel_hdmi->rgb_quant_range_selectable);
-
-	intel_write_infoframe(encoder, crtc_state, &frame);
 }
 
 static void intel_hdmi_set_spd_infoframe(struct drm_encoder *encoder,
@@ -582,7 +542,7 @@ static void g4x_set_infoframes(struct drm_encoder *encoder,
 	I915_WRITE(reg, val);
 	POSTING_READ(reg);
 
-	intel_hdmi_set_avi_infoframe(encoder, crtc_state);
+	intel_ddi_set_avi_infoframe(encoder, crtc_state);
 	intel_hdmi_set_spd_infoframe(encoder, crtc_state);
 	intel_hdmi_set_hdmi_infoframe(encoder, crtc_state);
 }
@@ -723,7 +683,7 @@ static void ibx_set_infoframes(struct drm_encoder *encoder,
 	I915_WRITE(reg, val);
 	POSTING_READ(reg);
 
-	intel_hdmi_set_avi_infoframe(encoder, crtc_state);
+	intel_ddi_set_avi_infoframe(encoder, crtc_state);
 	intel_hdmi_set_spd_infoframe(encoder, crtc_state);
 	intel_hdmi_set_hdmi_infoframe(encoder, crtc_state);
 }
@@ -766,7 +726,7 @@ static void cpt_set_infoframes(struct drm_encoder *encoder,
 	I915_WRITE(reg, val);
 	POSTING_READ(reg);
 
-	intel_hdmi_set_avi_infoframe(encoder, crtc_state);
+	intel_ddi_set_avi_infoframe(encoder, crtc_state);
 	intel_hdmi_set_spd_infoframe(encoder, crtc_state);
 	intel_hdmi_set_hdmi_infoframe(encoder, crtc_state);
 }
@@ -819,7 +779,7 @@ static void vlv_set_infoframes(struct drm_encoder *encoder,
 	I915_WRITE(reg, val);
 	POSTING_READ(reg);
 
-	intel_hdmi_set_avi_infoframe(encoder, crtc_state);
+	intel_ddi_set_avi_infoframe(encoder, crtc_state);
 	intel_hdmi_set_spd_infoframe(encoder, crtc_state);
 	intel_hdmi_set_hdmi_infoframe(encoder, crtc_state);
 }
@@ -852,7 +812,7 @@ static void hsw_set_infoframes(struct drm_encoder *encoder,
 	I915_WRITE(reg, val);
 	POSTING_READ(reg);
 
-	intel_hdmi_set_avi_infoframe(encoder, crtc_state);
+	intel_ddi_set_avi_infoframe(encoder, crtc_state);
 	intel_hdmi_set_spd_infoframe(encoder, crtc_state);
 	intel_hdmi_set_hdmi_infoframe(encoder, crtc_state);
 }
