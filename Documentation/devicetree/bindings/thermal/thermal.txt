@@ -175,6 +175,10 @@ Optional property:
 			2000mW, while on a 10'' tablet is around
 			4500mW.
 
+- hwmon:		Register the thermal zone in hwmon subsystems
+  Type: boolean 	(requires CONFIG_THERMAL_HWMON).
+  Size: one cell
+
 Note: The delay properties are bound to the maximum dT/dt (temperature
 derivative over time) in two situations for a thermal zone:
 (i)  - when passive cooling is activated (polling-delay-passive); and
@@ -555,6 +559,8 @@ thermal-zones {
 		coefficients =		<1200	-345	890>;
 
 		sustainable-power = <2500>;
+
+		hwmon;
 
 		trips {
 			/* Trips are based on resulting linear equation */
