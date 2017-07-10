@@ -659,22 +659,16 @@ static void fusb300_rdfifo(struct fusb300_ep *ep,
 
 static u8 fusb300_get_epnstall(struct fusb300 *fusb300, u8 ep)
 {
-	u8 value;
 	u32 reg = ioread32(fusb300->reg + FUSB300_OFFSET_EPSET0(ep));
 
-	value = reg & FUSB300_EPSET0_STL;
-
-	return value;
+	return reg & FUSB300_EPSET0_STL;
 }
 
 static u8 fusb300_get_cxstall(struct fusb300 *fusb300)
 {
-	u8 value;
 	u32 reg = ioread32(fusb300->reg + FUSB300_OFFSET_CSR);
 
-	value = (reg & FUSB300_CSR_STL) >> 1;
-
-	return value;
+	return (reg & FUSB300_CSR_STL) >> 1;
 }
 
 static void request_error(struct fusb300 *fusb300)
