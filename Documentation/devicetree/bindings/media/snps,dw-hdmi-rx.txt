@@ -1,0 +1,58 @@
+Synopsys DesignWare HDMI RX Decoder
+===================================
+
+This document defines device tree properties for the Synopsys DesignWare HDMI
+RX Decoder (DWC HDMI RX).
+
+The properties bellow belong to the Synopsys DesignWare HDMI RX Decoder node.
+
+Required properties:
+
+- compatible: Shall be "snps,dw-hdmi-rx".
+- reg: Memory mapped base address and length of the DWC HDMI RX registers.
+- interrupts: Reference to the DWC HDMI RX interrupt and the HDMI 5V sense
+interrupt.
+- clocks: Reference to the config clock.
+- clock-names: Shall be "cfg".
+- #address-cells: Shall be 1.
+- #size-cells: Shall be 0.
+
+Optional properties:
+
+- edid-phandle: Reference to the EDID handler block; if this property is not
+specified it is assumed that EDID is handled by device described by parent
+node of the HDMI RX node. You should not specify this property if your HDMI RX
+controller does not have CEC.
+
+You also have to create a subnode for the PHY device. PHY node properties are
+as follows.
+
+Required properties:
+
+- compatible: Shall be "snps,dw-hdmi-phy-e405".
+- reg: Shall be the JTAG address of the PHY.
+- clocks: Reference to the config clock.
+- clock-names: Shall be "cfg".
+
+Example:
+
+hdmi_rx: hdmi-rx@0 {
+	compatible = "snps,dw-hdmi-rx";
+	reg = <0x0 0x10000>;
+	interrupts = <1 2>;
+	edid-phandle = <&dw_hdmi_edid>;
+
+	clocks = <&dw_hdmi_refclk>;
+	clock-names = "cfg";
+
+	#address-cells = <1>;
+	#size-cells = <0>;
+
+	hdmi-phy@fc {
+		compatible = "snps,dw-hdmi-phy-e405";
+		reg = <0xfc>;
+
+		clocks = <&dw_hdmi_refclk>;
+		clock-names = "cfg";
+	};
+};
