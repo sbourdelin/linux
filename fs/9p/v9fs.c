@@ -137,8 +137,10 @@ int v9fs_show_options(struct seq_file *m, struct dentry *root)
 		seq_puts(m, ",nodevmap");
 	if (v9ses->cache)
 		seq_printf(m, ",%s", v9fs_cache_modes[v9ses->cache]);
+#ifdef CONFIG_9P_FSCACHE
 	if (v9ses->cachetag && v9ses->cache == CACHE_FSCACHE)
 		seq_printf(m, ",cachetag=%s", v9ses->cachetag);
+#endif
 
 	switch (v9ses->flags & V9FS_ACCESS_MASK) {
 	case V9FS_ACCESS_USER:
