@@ -1305,7 +1305,8 @@ intel_hdmi_mode_valid(struct drm_connector *connector,
 	return status;
 }
 
-static bool hdmi_12bpc_possible(struct intel_crtc_state *crtc_state)
+static bool hdmi_12bpc_possible(struct intel_crtc_state *crtc_state,
+				bool output_ycbcr420)
 {
 	struct drm_i915_private *dev_priv =
 		to_i915(crtc_state->base.crtc->dev);
@@ -1330,6 +1331,13 @@ static bool hdmi_12bpc_possible(struct intel_crtc_state *crtc_state)
 		if (connector_state->crtc != crtc_state->base.crtc)
 			continue;
 
+		if (output_ycbcr420) {
+			const struct drm_hdmi_info *hdmi = &info->hdmi;
+
+			if (!(hdmi->y420_dc_modes & DRM_EDID_YCBCR420_DC_36))
+				return false;
+		}
+
 		if ((info->edid_hdmi_dc_modes & DRM_EDID_HDMI_DC_36) == 0)
 			return false;
 	}
@@ -1342,6 +1350,25 @@ static bool hdmi_12bpc_possible(struct intel_crtc_state *crtc_state)
 	return true;
 }
 
+static bool
+intel_hdmi_ycbcr420_config(struct drm_connector *connector,
+			       struct intel_crtc_state *config,
+			       int *clock_12bpc, int *clock_8bpc)
+{
+
+	if (!connector->ycbcr_420_allowed) {
+		DRM_ERROR("Platform doesn't support YCBCR420 output\n");
+		return false;
+	}
+
+	/* YCBCR420 TMDS rate requirement is half the pixel clock */
+	config->port_clock /= 2;
+	*clock_12bpc /= 2;
+	*clock_8bpc /= 2;
+	config->ycbcr420 = true;
+	return true;
+}
+
 bool intel_hdmi_compute_config(struct intel_encoder *encoder,
 			       struct intel_crtc_state *pipe_config,
 			       struct drm_connector_state *conn_state)
@@ -1349,7 +1376,8 @@ bool intel_hdmi_compute_config(struct intel_encoder *encoder,
 	struct intel_hdmi *intel_hdmi = enc_to_intel_hdmi(&encoder->base);
 	struct drm_i915_private *dev_priv = to_i915(encoder->base.dev);
 	struct drm_display_mode *adjusted_mode = &pipe_config->base.adjusted_mode;
-	struct drm_scdc *scdc = &conn_state->connector->display_info.hdmi.scdc;
+	struct drm_connector *connector = conn_state->connector;
+	struct drm_scdc *scdc = &connector->display_info.hdmi.scdc;
 	struct intel_digital_connector_state *intel_conn_state =
 		to_intel_digital_connector_state(conn_state);
 	int clock_8bpc = pipe_config->base.adjusted_mode.crtc_clock;
@@ -1379,6 +1407,14 @@ bool intel_hdmi_compute_config(struct intel_encoder *encoder,
 		clock_12bpc *= 2;
 	}
 
+	if (drm_mode_is_420_only(&connector->display_info, adjusted_mode)) {
+		if (!intel_hdmi_ycbcr420_config(connector, pipe_config,
+						&clock_12bpc, &clock_8bpc)) {
+			DRM_ERROR("Can't support YCBCR420 output\n");
+			return false;
+		}
+	}
+
 	if (HAS_PCH_SPLIT(dev_priv) && !HAS_DDI(dev_priv))
 		pipe_config->has_pch_encoder = true;
 
@@ -1398,7 +1434,7 @@ bool intel_hdmi_compute_config(struct intel_encoder *encoder,
 	 */
 	if (pipe_config->pipe_bpp > 8*3 && pipe_config->has_hdmi_sink && !force_dvi &&
 	    hdmi_port_clock_valid(intel_hdmi, clock_12bpc, true, force_dvi) == MODE_OK &&
-	    hdmi_12bpc_possible(pipe_config)) {
+	    hdmi_12bpc_possible(pipe_config, pipe_config->ycbcr420)) {
 		DRM_DEBUG_KMS("picking bpc to 12 for HDMI output\n");
 		desired_bpp = 12*3;
 
