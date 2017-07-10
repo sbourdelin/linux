@@ -396,6 +396,30 @@ const char *drm_dp_get_dual_mode_type_name(enum drm_dp_dual_mode_type type)
 EXPORT_SYMBOL(drm_dp_get_dual_mode_type_name);
 
 /**
+ * drm_lspcon_get_vendor_oui: match vendor OUI signature
+ * @adapter: i2c adapter under action
+ * @vendor_id = 3 bytes of vendor OUI signature, LSB=lower byte
+ *
+ * Returns:
+ * Vendor OUI id if got one, 0 if not
+ */
+uint32_t drm_lspcon_get_vendor_oui(struct i2c_adapter *adapter)
+{
+	uint8_t sign[3] = {0, };
+	uint32_t oui = 0;
+
+	if (drm_dp_dual_mode_read(adapter, DP_DUAL_MODE_LSPCON_OUI_OFFSET,
+						sign, 3)) {
+		DRM_ERROR("Can't identify vendor sign\n");
+		return 0;
+	}
+
+	oui = (sign[0] << 16) | (sign[1] << 8) | sign[2];
+	return oui;
+}
+EXPORT_SYMBOL(drm_lspcon_get_vendor_oui);
+
+/**
  * drm_lspcon_get_mode: Get LSPCON's current mode of operation by
  * reading offset (0x80, 0x41)
  * @adapter: I2C-over-aux adapter

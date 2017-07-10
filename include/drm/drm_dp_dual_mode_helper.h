@@ -60,7 +60,8 @@
 /* LSPCON specific registers, defined by MCA */
 #define DP_DUAL_MODE_LSPCON_MODE_CHANGE		0x40
 #define DP_DUAL_MODE_LSPCON_CURRENT_MODE		0x41
-#define  DP_DUAL_MODE_LSPCON_MODE_PCON			0x1
+#define DP_DUAL_MODE_LSPCON_MODE_PCON			0x1
+#define DP_DUAL_MODE_LSPCON_OUI_OFFSET			0x11
 
 struct i2c_adapter;
 
@@ -116,4 +117,5 @@ int drm_lspcon_get_mode(struct i2c_adapter *adapter,
 			enum drm_lspcon_mode *current_mode);
 int drm_lspcon_set_mode(struct i2c_adapter *adapter,
 			enum drm_lspcon_mode reqd_mode);
+uint32_t drm_lspcon_get_vendor_oui(struct i2c_adapter *adapter);
 #endif
