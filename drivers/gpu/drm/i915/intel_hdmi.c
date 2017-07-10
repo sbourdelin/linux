@@ -1362,8 +1362,7 @@ static bool hdmi_12bpc_possible(struct intel_crtc_state *crtc_state,
 	return true;
 }
 
-static bool
-intel_hdmi_ycbcr420_config(struct drm_connector *connector,
+bool intel_hdmi_ycbcr420_config(struct drm_connector *connector,
 			       struct intel_crtc_state *config,
 			       int *clock_12bpc, int *clock_8bpc)
 {
@@ -1379,6 +1378,10 @@ intel_hdmi_ycbcr420_config(struct drm_connector *connector,
 	*clock_12bpc /= 2;
 	*clock_8bpc /= 2;
 	config->ycbcr420 = true;
+
+	/* LSPCON doesn't need scaler for YCBCR420 output */
+	if (config->lspcon_active)
+		return true;
 
 	/* YCBCR 420 output conversion needs a scaler */
 	if (skl_update_scaler_crtc_420_output(config)) {

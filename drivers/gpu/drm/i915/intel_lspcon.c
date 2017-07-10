@@ -202,6 +202,21 @@ static void lspcon_resume_in_pcon_wa(struct intel_lspcon *lspcon)
 	DRM_DEBUG_KMS("LSPCON DP descriptor mismatch after resume\n");
 }
 
+bool lspcon_ycbcr420_config(struct drm_connector *connector,
+			    struct intel_crtc_state *config,
+			    int *clock_12bpc, int *clock_8bpc)
+{
+	struct drm_display_info *info = &connector->display_info;
+	struct drm_display_mode *mode = &config->base.adjusted_mode;
+
+	if (drm_mode_is_420_only(info, mode)) {
+		return intel_hdmi_ycbcr420_config(connector, config,
+					  clock_12bpc, clock_8bpc);
+	}
+
+	return false;
+}
+
 void lspcon_resume(struct intel_lspcon *lspcon)
 {
 	enum drm_lspcon_mode expected_mode;
@@ -233,6 +248,7 @@ bool lspcon_init(struct intel_digital_port *intel_dig_port)
 	struct intel_lspcon *lspcon = &intel_dig_port->lspcon;
 	struct drm_device *dev = intel_dig_port->base.base.dev;
 	struct drm_i915_private *dev_priv = to_i915(dev);
+	struct drm_connector *connector = &dp->attached_connector->base;
 
 	if (!IS_GEN9(dev_priv)) {
 		DRM_ERROR("LSPCON is supported on GEN9 only\n");
@@ -264,6 +280,7 @@ bool lspcon_init(struct intel_digital_port *intel_dig_port)
 		return false;
 	}
 
+	connector->ycbcr_420_allowed = true;
 	drm_dp_read_desc(&dp->aux, &dp->desc, drm_dp_is_branch(dp->dpcd));
 
 	DRM_DEBUG_KMS("Success: LSPCON init\n");

@@ -8125,9 +8125,11 @@ static void haswell_set_pipemisc(struct drm_crtc *crtc)
 			val |= PIPEMISC_DITHER_ENABLE | PIPEMISC_DITHER_TYPE_SP;
 
 		if (config->ycbcr420) {
-			val |= PIPEMISC_OUTPUT_YCBCR |
-				PIPEMISC_YCBCR420_ENABLE |
-				PIPEMISC_YCBCR420_MODE_BLEND;
+			val |= PIPEMISC_OUTPUT_YCBCR;
+
+			if (!config->lspcon_active)
+				val |= PIPEMISC_YCBCR420_ENABLE |
+					PIPEMISC_YCBCR420_MODE_BLEND;
 		}
 
 		I915_WRITE(PIPEMISC(intel_crtc->pipe), val);
@@ -14205,11 +14207,13 @@ static void intel_setup_outputs(struct drm_i915_private *dev_priv)
 		 * DDI_BUF_CTL_A or SFUSE_STRAP registers, find another way to
 		 * detect the ports.
 		 */
+
 		intel_ddi_init(dev_priv, PORT_A);
 		intel_ddi_init(dev_priv, PORT_B);
 		intel_ddi_init(dev_priv, PORT_C);
 
 		intel_dsi_init(dev_priv);
+
 	} else if (HAS_DDI(dev_priv)) {
 		int found;
 

@@ -790,6 +790,9 @@ struct intel_crtc_state {
 
 	/* HDMI output type */
 	bool ycbcr420;
+
+	/* LSPCON is active on port */
+	bool lspcon_active;
 };
 
 struct intel_crtc {
@@ -1203,6 +1206,12 @@ enc_to_mst(struct drm_encoder *encoder)
 static inline struct intel_dp *enc_to_intel_dp(struct drm_encoder *encoder)
 {
 	return &enc_to_dig_port(encoder)->dp;
+}
+
+static inline struct intel_lspcon *
+enc_to_intel_lspcon(struct drm_encoder *encoder)
+{
+	return &enc_to_dig_port(encoder)->lspcon;
 }
 
 static inline struct intel_digital_port *
@@ -1675,14 +1684,16 @@ void intel_hdmi_init_connector(struct intel_digital_port *intel_dig_port,
 			       struct intel_connector *intel_connector);
 struct intel_hdmi *enc_to_intel_hdmi(struct drm_encoder *encoder);
 bool intel_hdmi_compute_config(struct intel_encoder *encoder,
-			       struct intel_crtc_state *pipe_config,
-			       struct drm_connector_state *conn_state);
+				struct intel_crtc_state *pipe_config,
+				struct drm_connector_state *conn_state);
 void intel_hdmi_handle_sink_scrambling(struct intel_encoder *intel_encoder,
 				       struct drm_connector *connector,
 				       bool high_tmds_clock_ratio,
 				       bool scrambling);
 void intel_dp_dual_mode_set_tmds_output(struct intel_hdmi *hdmi, bool enable);
-
+bool intel_hdmi_ycbcr420_config(struct drm_connector *connector,
+				struct intel_crtc_state *config,
+				int *clock_12bpc, int *clock_8bpc);
 
 /* intel_lvds.c */
 void intel_lvds_init(struct drm_i915_private *dev_priv);
@@ -2004,6 +2015,9 @@ void intel_color_load_luts(struct drm_crtc_state *crtc_state);
 bool lspcon_init(struct intel_digital_port *intel_dig_port);
 void lspcon_resume(struct intel_lspcon *lspcon);
 void lspcon_wait_pcon_mode(struct intel_lspcon *lspcon);
+bool lspcon_ycbcr420_config(struct drm_connector *connector,
+			    struct intel_crtc_state *config,
+			    int *clock_12bpc, int *clock_8bpc);
 
 /* intel_pipe_crc.c */
 int intel_pipe_crc_create(struct drm_minor *minor);

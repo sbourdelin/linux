@@ -1614,7 +1614,9 @@ intel_dp_compute_config(struct intel_encoder *encoder,
 	struct drm_i915_private *dev_priv = to_i915(encoder->base.dev);
 	struct drm_display_mode *adjusted_mode = &pipe_config->base.adjusted_mode;
 	struct intel_dp *intel_dp = enc_to_intel_dp(&encoder->base);
-	enum port port = dp_to_dig_port(intel_dp)->port;
+	struct intel_digital_port *dig_port = enc_to_dig_port(&encoder->base);
+	enum port port = dig_port->port;
+	struct intel_lspcon *lspcon = &dig_port->lspcon;
 	struct intel_crtc *intel_crtc = to_intel_crtc(pipe_config->base.crtc);
 	struct intel_connector *intel_connector = intel_dp->attached_connector;
 	struct intel_digital_connector_state *intel_conn_state =
@@ -1634,6 +1636,18 @@ intel_dp_compute_config(struct intel_encoder *encoder,
 
 	common_len = intel_dp_common_len_rate_limit(intel_dp,
 						    intel_dp->max_link_rate);
+
+	/* LSPCON needs special handling to drive YCBCR420 outputs */
+	if (lspcon->active) {
+		struct drm_connector *connector = &intel_connector->base;
+		int clock_8bpc = pipe_config->base.adjusted_mode.crtc_clock;
+		int clock_12bpc = clock_8bpc * 3 / 2;
+
+		pipe_config->lspcon_active = true;
+		pipe_config->ycbcr420 = lspcon_ycbcr420_config(connector,
+					     pipe_config, &clock_12bpc,
+					     &clock_8bpc);
+	}
 
 	/* No common link rates between source and sink */
 	WARN_ON(common_len <= 0);
