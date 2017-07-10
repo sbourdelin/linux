@@ -8081,6 +8081,7 @@ static void haswell_set_pipemisc(struct drm_crtc *crtc)
 {
 	struct drm_i915_private *dev_priv = to_i915(crtc->dev);
 	struct intel_crtc *intel_crtc = to_intel_crtc(crtc);
+	struct intel_crtc_state *config = intel_crtc->config;
 
 	if (IS_BROADWELL(dev_priv) || INTEL_INFO(dev_priv)->gen >= 9) {
 		u32 val = 0;
@@ -8105,6 +8106,12 @@ static void haswell_set_pipemisc(struct drm_crtc *crtc)
 
 		if (intel_crtc->config->dither)
 			val |= PIPEMISC_DITHER_ENABLE | PIPEMISC_DITHER_TYPE_SP;
+
+		if (config->ycbcr420) {
+			val |= PIPEMISC_OUTPUT_YCBCR |
+				PIPEMISC_YCBCR420_ENABLE |
+				PIPEMISC_YCBCR420_MODE_BLEND;
+		}
 
 		I915_WRITE(PIPEMISC(intel_crtc->pipe), val);
 	}
