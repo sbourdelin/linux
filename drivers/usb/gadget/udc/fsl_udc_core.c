@@ -1642,8 +1642,7 @@ static int process_ep_req(struct fsl_udc *udc, int pipe,
 		} else if (hc32_to_cpu(curr_td->size_ioc_sts)
 				& DTD_STATUS_ACTIVE) {
 			VDBG("Request not complete");
-			status = REQ_UNCOMPLETE;
-			return status;
+			return REQ_UNCOMPLETE;
 		} else if (remaining_length) {
 			if (direction) {
 				VDBG("Transmit dTD remaining length not zero");
