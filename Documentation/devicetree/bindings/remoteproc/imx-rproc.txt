@@ -1,0 +1,44 @@
+NXP iMX6SX/iMX7D Co-Processor Bindings
+----------------------------------------
+
+This binding provides support for ARM Cortex M4 Co-processor found on some
+NXP iMX SoCs.
+
+Required properties:
+- compatible		Should be one of:
+				"fsl,imx7d-rproc"
+				"fsl,imx6sx-rproc"
+- clocks		Clock for co-processor (See: ../clock/clock-bindings.txt)
+- syscfg		Phandle to syscon block which provide access to
+			System Reset Controller
+
+Optional properties:
+- reg:			Should contain the address ranges for some of internal
+			memory regions.
+- reg-names:		Contains the corresponding names for the memory
+			regions. These should be named "ddr", "ocram", "ocram-s",
+			"ocram-epdc" or "ocram-pxp".
+Fallowing memory ranges are expected:
+- For "fsl,imx7d-rproc"
+	<0x00900000 0x00020000> - "ocram"
+	<0x00920000 0x00020000> - "ocram-epdc"
+	<0x00940000 0x00008000> - "ocram-pxp"
+	<0x80000000 0x0FFF0000> - "ddr" (code area)
+	<0x80000000 0x60000000> - "ddr" (data area)
+- For "fsl,imx6sx-rproc"
+	<0x008F8000 0x00004000> - "ocram-s"
+	<0x80000000 0x0FFF8000> - "ddr" (code area)
+	<0x80000000 0x60000000> - "ddr" (data area)
+
+Note: the "ddr" code and data ranges are overlapping. Code area is smaller
+than data area.  So this range should be carefully chosen according to your
+system and application requirements.
+
+Example:
+	imx_rproc: imx7d-rp0@0 {
+		compatible	= "fsl,imx7d-rproc";
+		reg		= <0x80000000 0x80000>, <0x00900000 0x2000>;
+		reg-names	= "ddr", "ocram";
+		syscon		= <&src>;
+		clocks		= <&clks IMX7D_ARM_M4_ROOT_CLK>;
+	};
