@@ -122,7 +122,6 @@
 
 struct menu_device {
 	int		last_state_idx;
-	int             needs_update;
 
 	unsigned int	next_timer_us;
 	unsigned int	predicted_us;
@@ -190,91 +189,6 @@ static inline int performance_multiplier(unsigned long nr_iowaiters, unsigned lo
 
 static DEFINE_PER_CPU(struct menu_device, menu_devices);
 
-static void menu_update(struct cpuidle_driver *drv, struct cpuidle_device *dev);
-
-/*
- * Try detecting repeating patterns by keeping track of the last 8
- * intervals, and checking if the standard deviation of that set
- * of points is below a threshold. If it is... then use the
- * average of these 8 points as the estimated value.
- */
-static unsigned int get_typical_interval(struct menu_device *data)
-{
-	int i, divisor;
-	unsigned int max, thresh, avg;
-	uint64_t sum, variance;
-
-	thresh = UINT_MAX; /* Discard outliers above this value */
-
-again:
-
-	/* First calculate the average of past intervals */
-	max = 0;
-	sum = 0;
-	divisor = 0;
-	for (i = 0; i < INTERVALS; i++) {
-		unsigned int value = data->intervals[i];
-		if (value <= thresh) {
-			sum += value;
-			divisor++;
-			if (value > max)
-				max = value;
-		}
-	}
-	if (divisor == INTERVALS)
-		avg = sum >> INTERVAL_SHIFT;
-	else
-		avg = div_u64(sum, divisor);
-
-	/* Then try to determine variance */
-	variance = 0;
-	for (i = 0; i < INTERVALS; i++) {
-		unsigned int value = data->intervals[i];
-		if (value <= thresh) {
-			int64_t diff = (int64_t)value - avg;
-			variance += diff * diff;
-		}
-	}
-	if (divisor == INTERVALS)
-		variance >>= INTERVAL_SHIFT;
-	else
-		do_div(variance, divisor);
-
-	/*
-	 * The typical interval is obtained when standard deviation is
-	 * small (stddev <= 20 us, variance <= 400 us^2) or standard
-	 * deviation is small compared to the average interval (avg >
-	 * 6*stddev, avg^2 > 36*variance). The average is smaller than
-	 * UINT_MAX aka U32_MAX, so computing its square does not
-	 * overflow a u64. We simply reject this candidate average if
-	 * the standard deviation is greater than 715 s (which is
-	 * rather unlikely).
-	 *
-	 * Use this result only if there is no timer to wake us up sooner.
-	 */
-	if (likely(variance <= U64_MAX/36)) {
-		if ((((u64)avg*avg > variance*36) && (divisor * 4 >= INTERVALS * 3))
-							|| variance <= 400) {
-			return avg;
-		}
-	}
-
-	/*
-	 * If we have outliers to the upside in our distribution, discard
-	 * those by setting the threshold to exclude these outliers, then
-	 * calculate the average and standard deviation again. Once we get
-	 * down to the bottom 3/4 of our samples, stop excluding samples.
-	 *
-	 * This can deal with workloads that have long pauses interspersed
-	 * with sporadic activity with a bunch of short pauses.
-	 */
-	if ((divisor * 4) <= INTERVALS * 3)
-		return UINT_MAX;
-
-	thresh = max - 1;
-	goto again;
-}
-
 /**
  * menu_select - selects the next idle state to enter
  * @drv: cpuidle driver containing state data
@@ -290,11 +204,6 @@ static int menu_select(struct cpuidle_driver *drv, struct cpuidle_device *dev)
 	unsigned int expected_interval;
 	unsigned long nr_iowaiters, cpu_load;
 	int resume_latency = dev_pm_qos_raw_read_value(device);
-
-	if (data->needs_update) {
-		menu_update(drv, dev);
-		data->needs_update = 0;
-	}
 
 	/* resume_latency is 0 means no restriction */
 	if (resume_latency && resume_latency < latency_req)
@@ -389,78 +298,6 @@ static void menu_reflect(struct cpuidle_device *dev, int index)
 	struct menu_device *data = this_cpu_ptr(&menu_devices);
 
 	data->last_state_idx = index;
-	data->needs_update = 1;
-}
-
-/**
- * menu_update - attempts to guess what happened after entry
- * @drv: cpuidle driver containing state data
- * @dev: the CPU
- */
-static void menu_update(struct cpuidle_driver *drv, struct cpuidle_device *dev)
-{
-	struct menu_device *data = this_cpu_ptr(&menu_devices);
-	int last_idx = data->last_state_idx;
-	struct cpuidle_state *target = &drv->states[last_idx];
-	unsigned int measured_us;
-	unsigned int new_factor;
-
-	/*
-	 * Try to figure out how much time passed between entry to low
-	 * power state and occurrence of the wakeup event.
-	 *
-	 * If the entered idle state didn't support residency measurements,
-	 * we use them anyway if they are short, and if long,
-	 * truncate to the whole expected time.
-	 *
-	 * Any measured amount of time will include the exit latency.
-	 * Since we are interested in when the wakeup begun, not when it
-	 * was completed, we must subtract the exit latency. However, if
-	 * the measured amount of time is less than the exit latency,
-	 * assume the state was never reached and the exit latency is 0.
-	 */
-
-	/* measured value */
-	measured_us = cpuidle_get_last_residency(dev);
-
-	/* Deduct exit latency */
-	if (measured_us > 2 * target->exit_latency)
-		measured_us -= target->exit_latency;
-	else
-		measured_us /= 2;
-
-	/* Make sure our coefficients do not exceed unity */
-	if (measured_us > data->next_timer_us)
-		measured_us = data->next_timer_us;
-
-	/* Update our correction ratio */
-	new_factor = data->correction_factor[data->bucket];
-	new_factor -= new_factor / DECAY;
-
-	if (data->next_timer_us > 0 && measured_us < MAX_INTERESTING)
-		new_factor += RESOLUTION * measured_us / data->next_timer_us;
-	else
-		/*
-		 * we were idle so long that we count it as a perfect
-		 * prediction
-		 */
-		new_factor += RESOLUTION;
-
-	/*
-	 * We don't want 0 as factor; we always want at least
-	 * a tiny bit of estimated time. Fortunately, due to rounding,
-	 * new_factor will stay nonzero regardless of measured_us values
-	 * and the compiler can eliminate this test as long as DECAY > 1.
-	 */
-	if (DECAY == 1 && unlikely(new_factor == 0))
-		new_factor = 1;
-
-	data->correction_factor[data->bucket] = new_factor;
-
-	/* update the repeating-pattern data */
-	data->intervals[data->interval_ptr++] = measured_us;
-	if (data->interval_ptr >= INTERVALS)
-		data->interval_ptr = 0;
 }
 
 /**
