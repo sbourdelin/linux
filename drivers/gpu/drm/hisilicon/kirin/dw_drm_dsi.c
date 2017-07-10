@@ -603,6 +603,42 @@ static void dsi_encoder_enable(struct drm_encoder *encoder)
 	dsi->enable = true;
 }
 
+static enum drm_mode_status dsi_encoder_mode_valid(struct drm_encoder *crtc,
+					const struct drm_display_mode *mode)
+{
+	/*
+	 * kirin cannot generate all modes, so use the whitelist below
+	 */
+	DRM_DEBUG("%s: Checking mode %ix%i@%i clock: %i...", __func__,
+		mode->hdisplay, mode->vdisplay, drm_mode_vrefresh(mode), mode->clock);
+	if ((mode->hdisplay == 1920 && mode->vdisplay == 1080 && mode->clock == 148500) ||
+	    (mode->hdisplay == 1920 && mode->vdisplay == 1080 && mode->clock == 80192)  ||
+	    (mode->hdisplay == 1920 && mode->vdisplay == 1080 && mode->clock == 74250)  ||
+	    (mode->hdisplay == 1920 && mode->vdisplay == 1080 && mode->clock == 61855)  ||
+	    (mode->hdisplay == 1680 && mode->vdisplay == 1050 && mode->clock == 147116) ||
+	    (mode->hdisplay == 1680 && mode->vdisplay == 1050 && mode->clock == 146250) ||
+	    (mode->hdisplay == 1680 && mode->vdisplay == 1050 && mode->clock == 144589) ||
+	    (mode->hdisplay == 1600 && mode->vdisplay == 1200 && mode->clock == 160961) ||
+	    (mode->hdisplay == 1600 && mode->vdisplay == 900  && mode->clock == 118963) ||
+	    (mode->hdisplay == 1440 && mode->vdisplay == 900  && mode->clock == 126991) ||
+	    (mode->hdisplay == 1280 && mode->vdisplay == 1024 && mode->clock == 128946) ||
+	    (mode->hdisplay == 1280 && mode->vdisplay == 1024 && mode->clock == 98619)  ||
+	    (mode->hdisplay == 1280 && mode->vdisplay == 960  && mode->clock == 102081) ||
+	    (mode->hdisplay == 1280 && mode->vdisplay == 800  && mode->clock == 83496)  ||
+	    (mode->hdisplay == 1280 && mode->vdisplay == 720  && mode->clock == 74440)  ||
+	    (mode->hdisplay == 1280 && mode->vdisplay == 720  && mode->clock == 74250)  ||
+	    (mode->hdisplay == 1024 && mode->vdisplay == 768  && mode->clock == 78800)  ||
+	    (mode->hdisplay == 1024 && mode->vdisplay == 768  && mode->clock == 75000)  ||
+	    (mode->hdisplay == 1024 && mode->vdisplay == 768  && mode->clock == 81833)  ||
+	    (mode->hdisplay == 800  && mode->vdisplay == 600  && mode->clock == 48907)  ||
+	    (mode->hdisplay == 800  && mode->vdisplay == 600  && mode->clock == 40000)) {
+		DRM_DEBUG("OK\n");
+		return MODE_OK;
+	}
+	DRM_DEBUG("BAD\n");
+	return MODE_BAD;
+}
+
 static void dsi_encoder_mode_set(struct drm_encoder *encoder,
 				 struct drm_display_mode *mode,
 				 struct drm_display_mode *adj_mode)
@@ -622,6 +658,7 @@ static int dsi_encoder_atomic_check(struct drm_encoder *encoder,
 
 static const struct drm_encoder_helper_funcs dw_encoder_helper_funcs = {
 	.atomic_check	= dsi_encoder_atomic_check,
+	.mode_valid	= dsi_encoder_mode_valid,
 	.mode_set	= dsi_encoder_mode_set,
 	.enable		= dsi_encoder_enable,
 	.disable	= dsi_encoder_disable
