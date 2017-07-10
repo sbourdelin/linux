@@ -3,8 +3,10 @@
 
 #include <asm/mman.h>
 
-#define MREMAP_MAYMOVE	1
-#define MREMAP_FIXED	2
+#define MREMAP_MAYMOVE	1 /* VMA can move after remap and resize */
+#define MREMAP_FIXED	2 /* VMA can remap at particular address */
+
+/* NOTE: MREMAP_FIXED must be set with MREMAP_MAYMOVE, not alone */
 
 #define OVERCOMMIT_GUESS		0
 #define OVERCOMMIT_ALWAYS		1
