@@ -243,6 +243,8 @@ struct sas_discovery_event {
 	struct sas_work work;
 	struct asd_sas_port *port;
 	enum discover_event	type;
+	bool is_sync;
+	struct completion completion;
 };
 
 static inline struct sas_discovery_event *to_sas_discovery_event(struct work_struct *work)

@@ -134,6 +134,33 @@ static inline void sas_port_get(struct asd_sas_port *port)
 		kref_get(&port->ref);
 }
 
+static inline void sas_disc_cancel_sync(struct sas_discovery_event *event)
+{
+	event->is_sync = false;
+}
+
+static inline void sas_disc_wakeup(struct sas_discovery_event *event)
+{
+	if (event->is_sync)
+		complete(&event->completion);
+}
+
+static inline void sas_disc_wait_init(struct asd_sas_port *port,
+		enum discover_event event)
+{
+	port->disc.disc_work[event].is_sync = true;
+	init_completion(&port->disc.disc_work[event].completion);
+}
+
+static inline void sas_disc_wait_completion(struct asd_sas_port *port,
+		enum discover_event event)
+{
+	if (port->disc.disc_work[event].is_sync) {
+		wait_for_completion(&port->disc.disc_work[event].completion);
+		port->disc.disc_work[event].is_sync = false;
+	}
+}
+
 #ifdef CONFIG_SCSI_SAS_HOST_SMP
 extern int sas_smp_host_handler(struct Scsi_Host *shost, struct request *req,
 				struct request *rsp);

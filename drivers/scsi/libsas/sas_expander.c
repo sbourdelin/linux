@@ -822,14 +822,18 @@ static struct domain_device *sas_ex_discover_end_dev(
 
 		list_add_tail(&child->disco_list_node, &parent->port->disco_list);
 
+		sas_disc_wait_init(child->port, DISCE_PROBE);
 		res = sas_discover_sata(child);
 		if (res) {
+			sas_disc_cancel_sync(&child->port->disc.disc_work[DISCE_PROBE]);
 			SAS_DPRINTK("sas_discover_sata() for device %16llx at "
 				    "%016llx:0x%x returned 0x%x\n",
 				    SAS_ADDR(child->sas_addr),
 				    SAS_ADDR(parent->sas_addr), phy_id, res);
 			goto out_list_del;
 		}
+		sas_disc_wait_completion(child->port, DISCE_PROBE);
+
 	} else
 #endif
 	  if (phy->attached_tproto & SAS_PROTOCOL_SSP) {
@@ -847,14 +851,17 @@ static struct domain_device *sas_ex_discover_end_dev(
 
 		list_add_tail(&child->disco_list_node, &parent->port->disco_list);
 
+		sas_disc_wait_init(child->port, DISCE_PROBE);
 		res = sas_discover_end_dev(child);
 		if (res) {
+			sas_disc_cancel_sync(&child->port->disc.disc_work[DISCE_PROBE]);
 			SAS_DPRINTK("sas_discover_end_dev() for device %16llx "
 				    "at %016llx:0x%x returned 0x%x\n",
 				    SAS_ADDR(child->sas_addr),
 				    SAS_ADDR(parent->sas_addr), phy_id, res);
 			goto out_list_del;
 		}
+		sas_disc_wait_completion(child->port, DISCE_PROBE);
 	} else {
 		SAS_DPRINTK("target proto 0x%x at %016llx:0x%x not handled\n",
 			    phy->attached_tproto, SAS_ADDR(parent->sas_addr),
@@ -1890,8 +1897,11 @@ static void sas_unregister_devs_sas_addr(struct domain_device *parent,
 				if (child->dev_type == SAS_EDGE_EXPANDER_DEVICE ||
 				    child->dev_type == SAS_FANOUT_EXPANDER_DEVICE)
 					sas_unregister_ex_tree(parent->port, child);
-				else
+				else {
+					sas_disc_wait_init(parent->port, DISCE_DESTRUCT);
 					sas_unregister_dev(parent->port, child);
+					sas_disc_wait_completion(parent->port, DISCE_DESTRUCT);
+				}
 				found = child;
 				break;
 			}

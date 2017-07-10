@@ -378,6 +378,7 @@ void sas_unregister_dev(struct asd_sas_port *port, struct domain_device *dev)
 		list_del_init(&dev->disco_list_node);
 		sas_rphy_free(dev->rphy);
 		sas_unregister_common_dev(port, dev);
+		sas_disc_cancel_sync(&port->disc.disc_work[DISCE_DESTRUCT]);
 		return;
 	}
 
@@ -541,6 +542,7 @@ static void sas_discover_common_fn(struct work_struct *work)
 	struct asd_sas_port *port = ev->port;
 
 	sas_event_fns[ev->type](work);
+	sas_disc_wakeup(ev);
 	sas_port_put(port);
 }
 
@@ -571,8 +573,10 @@ static void sas_chain_work(struct sas_ha_struct *ha, struct sas_work *sw)
 	else
 		ret = scsi_queue_work(ha->core.shost, &sw->work);
 
-	if (ret != 1)
+	if (ret != 1) {
 		sas_port_put(port);
+		sas_disc_cancel_sync(ev);
+	}
 }
 
 static void sas_chain_event(int event, unsigned long *pending,
@@ -592,9 +596,9 @@ int sas_discover_event(struct asd_sas_port *port, enum discover_event ev)
 {
 	struct sas_discovery *disc;
 
+	disc = &port->disc;
 	if (!port)
 		return 0;
-	disc = &port->disc;
 
 	BUG_ON(ev >= DISC_NUM_EVENTS);
 
