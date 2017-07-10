@@ -1827,6 +1827,34 @@ config EFI_MIXED
 
 	   If unsure, say N.
 
+config SIGNER_NAME
+	string "Signer name"
+	default ""
+	---help---
+	   This option specifies who signs or releases this kernel.
+
+config DISTRO_VERSION
+	int "Distribution version"
+	default 0
+	range 0 4294967295
+	---help---
+	  This option specifies the distribution version which this
+	  kernel belongs to.
+
+config SECURITY_VERSION
+	int "Security version"
+	default 0
+	range 0 65535
+	---help---
+	   The security version is the version defined by the distribution
+	   to indicate the severe security fixes. The bootloader can maintain
+	   a list of the security versions of the current kernels. After
+	   fixing a severe vulnerability in the kernel, the distribution can
+	   increase the security version to notify the bootloader to update
+	   the list. When booting a kernel with a lower security version,
+	   the bootloader warns the user to avoid loading a vulnerable kernel
+	   accidentally.
+
 config SECCOMP
 	def_bool y
 	prompt "Enable seccomp to safely compute untrusted bytecode"
