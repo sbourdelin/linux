@@ -1355,6 +1355,7 @@ intel_hdmi_ycbcr420_config(struct drm_connector *connector,
 			       struct intel_crtc_state *config,
 			       int *clock_12bpc, int *clock_8bpc)
 {
+	struct intel_crtc *intel_crtc = to_intel_crtc(config->base.crtc);
 
 	if (!connector->ycbcr_420_allowed) {
 		DRM_ERROR("Platform doesn't support YCBCR420 output\n");
@@ -1366,6 +1367,17 @@ intel_hdmi_ycbcr420_config(struct drm_connector *connector,
 	*clock_12bpc /= 2;
 	*clock_8bpc /= 2;
 	config->ycbcr420 = true;
+
+	/* YCBCR 420 output conversion needs a scaler */
+	if (skl_update_scaler_crtc_420_output(config)) {
+		DRM_ERROR("Scaler allocation for output failed\n");
+		return false;
+	}
+
+	/* Bind this scaler to pipe */
+	intel_pch_panel_fitting(intel_crtc, config,
+				DRM_MODE_SCALE_FULLSCREEN);
+
 	return true;
 }
 

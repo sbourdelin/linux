@@ -264,6 +264,12 @@ int intel_atomic_setup_scalers(struct drm_i915_private *dev_priv,
 
 			/* panel fitter case: assign as a crtc scaler */
 			scaler_id = &scaler_state->scaler_id;
+		} else if (i == SKL_420_OUTPUT_INDEX) {
+			name = "YCBCR420-OUTPUT";
+			idx = intel_crtc->base.base.id;
+
+			/* YCBCR420 case: needs a pipe scaler */
+			scaler_id = &scaler_state->scaler_id;
 		} else {
 			name = "PLANE";
 

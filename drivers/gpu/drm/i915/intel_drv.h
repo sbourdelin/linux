@@ -471,7 +471,8 @@ struct intel_crtc_scaler_state {
 	 *
 	 *     If a bit is set, a user is using a scaler.
 	 *     Here user can be a plane or crtc as defined below:
-	 *       bits 0-30 - plane (bit position is index from drm_plane_index)
+	 *       bits 0-29 - plane (bit position is index from drm_plane_index)
+	 *       bit 30    - hdmi output
 	 *       bit 31    - crtc
 	 *
 	 * Instead of creating a new index to cover planes and crtc, using
@@ -484,6 +485,12 @@ struct intel_crtc_scaler_state {
 	 * avilability.
 	 */
 #define SKL_CRTC_INDEX 31
+
+	/*
+	 * YCBCR 420 output consume a scaler. So adding a user
+	 * for 420 output requirement.
+	 */
+#define SKL_420_OUTPUT_INDEX 30
 	unsigned scaler_users;
 
 	/* scaler used by crtc for panel fitting purpose */
@@ -1483,6 +1490,7 @@ void intel_mode_from_pipe_config(struct drm_display_mode *mode,
 				 struct intel_crtc_state *pipe_config);
 
 int skl_update_scaler_crtc(struct intel_crtc_state *crtc_state);
+int skl_update_scaler_crtc_420_output(struct intel_crtc_state *state);
 int skl_max_scale(struct intel_crtc *crtc, struct intel_crtc_state *crtc_state);
 
 static inline u32 intel_plane_ggtt_offset(const struct intel_plane_state *state)
