@@ -409,9 +409,7 @@ static const struct file_operations stack_trace_fops = {
 static int
 stack_trace_filter_open(struct inode *inode, struct file *file)
 {
-	struct ftrace_ops *ops = inode->i_private;
-
-	return ftrace_regex_open(ops, FTRACE_ITER_FILTER,
+	return ftrace_regex_open(inode->i_private, FTRACE_ITER_FILTER,
 				 inode, file);
 }
 
