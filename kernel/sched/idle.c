@@ -203,22 +203,39 @@ exit_idle:
 }
 
 /*
- * Generic idle loop implementation
- *
- * Called with polling cleared.
+ * fast idle loop implementation
  */
-static void do_idle(void)
+static void cpuidle_fast(void)
 {
-	/*
-	 * If the arch has a polling bit, we maintain an invariant:
-	 *
-	 * Our polling bit is clear if we're not scheduled (i.e. if rq->curr !=
-	 * rq->idle). This means that, if rq->idle has the polling bit set,
-	 * then setting need_resched is guaranteed to cause the CPU to
-	 * reschedule.
-	 */
+	while (!need_resched()) {
+		check_pgt_cache();
+		rmb();
 
-	__current_set_polling();
+		if (cpu_is_offline(smp_processor_id())) {
+			cpuhp_report_idle_dead();
+			arch_cpu_idle_dead();
+		}
+
+		local_irq_disable();
+		arch_cpu_idle_enter();
+
+		default_idle_call();
+
+		arch_cpu_idle_exit();
+	}
+
+	/*
+	 * Since we fell out of the loop above, we know TIF_NEED_RESCHED must
+	 * be set, propagate it into PREEMPT_NEED_RESCHED.
+	 *
+	 * This is required because for polling idle loops we will not have had
+	 * an IPI to fold the state for us.
+	 */
+	preempt_set_need_resched();
+}
+
+static void cpuidle_generic(void)
+{
 	tick_nohz_idle_enter();
 
 	while (!need_resched()) {
@@ -255,6 +272,28 @@ static void do_idle(void)
 	 */
 	preempt_set_need_resched();
 	tick_nohz_idle_exit();
+}
+
+/*
+ * Generic idle loop implementation
+ *
+ * Called with polling cleared.
+ */
+static void do_idle(void)
+{
+	/*
+	 * If the arch has a polling bit, we maintain an invariant:
+	 *
+	 * Our polling bit is clear if we're not scheduled (i.e. if rq->curr !=
+	 * rq->idle). This means that, if rq->idle has the polling bit set,
+	 * then setting need_resched is guaranteed to cause the CPU to
+	 * reschedule.
+	 */
+
+	__current_set_polling();
+
+	cpuidle_generic();
+
 	__current_clr_polling();
 
 	/*
