@@ -144,14 +144,10 @@ sh_css_load_blob_info(const char *fw, const struct ia_css_fw_info *bi, struct ia
 	)
 	{
 		char *namebuffer;
-		int namelength = (int)strlen(name);
 
-		namebuffer = (char *) kmalloc(namelength + 1, GFP_KERNEL);
-		if (namebuffer == NULL)
+		namebuffer = kstrdup(name, GFP_KERNEL);
+		if (!namebuffer)
 			return IA_CSS_ERR_CANNOT_ALLOCATE_MEMORY;
-
-		memcpy(namebuffer, name, namelength + 1);
-
 		bd->name = fw_minibuffer[index].name = namebuffer;
 	} else {
 		bd->name = name;
