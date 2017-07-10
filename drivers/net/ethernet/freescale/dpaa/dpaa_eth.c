@@ -2646,14 +2646,6 @@ static int dpaa_eth_probe(struct platform_device *pdev)
 	priv->buf_layout[RX].priv_data_size = DPAA_RX_PRIV_DATA_SIZE; /* Rx */
 	priv->buf_layout[TX].priv_data_size = DPAA_TX_PRIV_DATA_SIZE; /* Tx */
 
-	/* device used for DMA mapping */
-	set_dma_ops(dev, get_dma_ops(&pdev->dev));
-	err = dma_coerce_mask_and_coherent(dev, DMA_BIT_MASK(40));
-	if (err) {
-		dev_err(dev, "dma_coerce_mask_and_coherent() failed\n");
-		goto dev_mask_failed;
-	}
-
 	/* bp init */
 	for (i = 0; i < DPAA_BPS_NUM; i++) {
 		int err;
@@ -2665,7 +2657,8 @@ static int dpaa_eth_probe(struct platform_device *pdev)
 		dpaa_bps[i]->raw_size = bpool_buffer_raw_size(i, DPAA_BPS_NUM);
 		/* avoid runtime computations by keeping the usable size here */
 		dpaa_bps[i]->size = dpaa_bp_size(dpaa_bps[i]->raw_size);
-		dpaa_bps[i]->dev = dev;
+		/* DMA operations are done on the platform-provided device */
+		dpaa_bps[i]->dev = dev->parent;
 
 		err = dpaa_bp_alloc_pool(dpaa_bps[i]);
 		if (err < 0) {
