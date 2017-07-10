@@ -65,6 +65,7 @@ extern unsigned int sysctl_sched_autogroup_enabled;
 
 extern int sysctl_sched_rr_timeslice;
 extern int sched_rr_timeslice;
+extern unsigned int sysctl_fast_idle_threshold;
 
 extern int sched_rr_handler(struct ctl_table *table, int write,
 		void __user *buffer, size_t *lenp,

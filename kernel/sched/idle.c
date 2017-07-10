@@ -288,6 +288,8 @@ static void cpuidle_generic(void)
 	tick_nohz_idle_exit();
 }
 
+unsigned int sysctl_fast_idle_threshold = USEC_PER_SEC / HZ / 2;
+
 /*
  * Generic idle loop implementation
  *
@@ -296,7 +298,6 @@ static void cpuidle_generic(void)
 static void do_idle(void)
 {
 	unsigned int predicted_idle_us;
-	unsigned int short_idle_threshold = jiffies_to_usecs(1) / 2;
 	/*
 	 * If the arch has a polling bit, we maintain an invariant:
 	 *
@@ -310,7 +311,7 @@ static void do_idle(void)
 
 	predicted_idle_us = cpuidle_predict();
 
-	if (likely(predicted_idle_us < short_idle_threshold))
+	if (likely(predicted_idle_us < sysctl_fast_idle_threshold))
 		cpuidle_fast();
 	else
 		cpuidle_generic();
