@@ -13,6 +13,8 @@
 #include <linux/mutex.h>
 #include <linux/sched.h>
 #include <linux/sched/clock.h>
+#include <linux/sched/loadavg.h>
+#include <linux/sched/stat.h>
 #include <linux/notifier.h>
 #include <linux/pm_qos.h>
 #include <linux/cpu.h>
@@ -178,6 +180,169 @@ int cpuidle_enter_freeze(struct cpuidle_driver *drv, struct cpuidle_device *dev)
 	return index;
 }
 #endif /* CONFIG_SUSPEND */
+
+static inline int which_bucket(unsigned int duration,
+				unsigned long nr_iowaiters)
+{
+	int bucket = 0;
+
+	/*
+	 * We keep two groups of stats; one with no
+	 * IO pending, one without.
+	 * This allows us to calculate
+	 * E(duration)|iowait
+	 */
+	if (nr_iowaiters)
+		bucket = BUCKETS/2;
+
+	if (duration < 10)
+		return bucket;
+	if (duration < 100)
+		return bucket + 1;
+	if (duration < 1000)
+		return bucket + 2;
+	if (duration < 10000)
+		return bucket + 3;
+	if (duration < 100000)
+		return bucket + 4;
+	return bucket + 5;
+}
+
+/*
+ * Try detecting repeating patterns by keeping track of the last 8
+ * intervals, and checking if the standard deviation of that set
+ * of points is below a threshold. If it is... then use the
+ * average of these 8 points as the estimated value.
+ */
+static unsigned int get_typical_interval(struct cpuidle_device *dev)
+{
+	struct cpuidle_governor_stat *gov_stat =
+		(struct cpuidle_governor_stat *)&(dev->gov_stat);
+	int i, divisor;
+	unsigned int max, thresh, avg;
+	uint64_t sum, variance;
+
+	thresh = UINT_MAX; /* Discard outliers above this value */
+
+again:
+
+	/* First calculate the average of past intervals */
+	max = 0;
+	sum = 0;
+	divisor = 0;
+	for (i = 0; i < INTERVALS; i++) {
+		unsigned int value = gov_stat->intervals[i];
+
+		if (value <= thresh) {
+			sum += value;
+			divisor++;
+			if (value > max)
+				max = value;
+		}
+	}
+	if (divisor == INTERVALS)
+		avg = sum >> INTERVAL_SHIFT;
+	else
+		avg = div_u64(sum, divisor);
+
+	/* Then try to determine variance */
+	variance = 0;
+	for (i = 0; i < INTERVALS; i++) {
+		unsigned int value = gov_stat->intervals[i];
+
+		if (value <= thresh) {
+			int64_t diff = (int64_t)value - avg;
+
+			variance += diff * diff;
+		}
+	}
+	if (divisor == INTERVALS)
+		variance >>= INTERVAL_SHIFT;
+	else
+		do_div(variance, divisor);
+
+	/*
+	 * The typical interval is obtained when standard deviation is
+	 * small (stddev <= 20 us, variance <= 400 us^2) or standard
+	 * deviation is small compared to the average interval (avg >
+	 * 6*stddev, avg^2 > 36*variance). The average is smaller than
+	 * UINT_MAX aka U32_MAX, so computing its square does not
+	 * overflow a u64. We simply reject this candidate average if
+	 * the standard deviation is greater than 715 s (which is
+	 * rather unlikely).
+	 *
+	 * Use this result only if there is no timer to wake us up sooner.
+	 */
+	if (likely(variance <= U64_MAX/36)) {
+		if ((((u64)avg*avg > variance*36) &&
+			(divisor * 4 >= INTERVALS * 3)) || variance <= 400) {
+			return avg;
+		}
+	}
+
+	/*
+	 * If we have outliers to the upside in our distribution, discard
+	 * those by setting the threshold to exclude these outliers, then
+	 * calculate the average and standard deviation again. Once we get
+	 * down to the bottom 3/4 of our samples, stop excluding samples.
+	 *
+	 * This can deal with workloads that have long pauses interspersed
+	 * with sporadic activity with a bunch of short pauses.
+	 */
+	if ((divisor * 4) <= INTERVALS * 3)
+		return UINT_MAX;
+
+	thresh = max - 1;
+	goto again;
+}
+
+/**
+ * cpuidle_predict - predict the next idle duration, in micro-second.
+ * There are two factors in the cpu idle governor, taken from menu:
+ * 1) Energy break even point
+ * 2) Repeatable interval detector
+ *
+ * Based on the actual known "next timer event" time, and coordinate with
+ * the algorithm in the two factors, we'll make a prediction of how long
+ * we'll be idle
+ */
+unsigned int cpuidle_predict(void)
+{
+	struct cpuidle_device *dev = cpuidle_get_device();
+	struct cpuidle_driver *drv = cpuidle_get_cpu_driver(dev);
+	struct cpuidle_governor_stat *gov_stat;
+	unsigned int expected_interval;
+	unsigned long nr_iowaiters, cpu_load;
+
+	if (need_resched())
+		return 0;
+
+	if (cpuidle_not_available(drv, dev))
+		return -ENODEV;
+
+	gov_stat = (struct cpuidle_governor_stat *)&(dev->gov_stat);
+
+	gov_stat->next_timer_us = ktime_to_us(tick_nohz_get_sleep_length());
+	get_iowait_load(&nr_iowaiters, &cpu_load);
+	gov_stat->bucket = which_bucket(gov_stat->next_timer_us, nr_iowaiters);
+
+	/*
+	 * Force the result of multiplication to be 64 bits even if both
+	 * operands are 32 bits.
+	 * Make sure to round up for half microseconds.
+	 */
+	gov_stat->predicted_us = DIV_ROUND_CLOSEST_ULL(
+			(uint64_t)gov_stat->next_timer_us *
+			gov_stat->correction_factor[gov_stat->bucket],
+			RESOLUTION * DECAY);
+
+	expected_interval = get_typical_interval(dev);
+	expected_interval = min(expected_interval, gov_stat->next_timer_us);
+
+	gov_stat->predicted_us = min(gov_stat->predicted_us, expected_interval);
+
+	return gov_stat->predicted_us;
+}
 
 /**
  * cpuidle_enter_state - enter the state and update stats
