@@ -776,6 +776,7 @@ static struct domain_device *sas_ex_discover_end_dev(
 	struct ex_phy *phy = &parent_ex->ex_phy[phy_id];
 	struct domain_device *child = NULL;
 	struct sas_rphy *rphy;
+	bool prev_lock;
 	int res;
 
 	if (phy->attached_sata_host || phy->attached_sata_ps)
@@ -803,6 +804,7 @@ static struct domain_device *sas_ex_discover_end_dev(
 	sas_ex_get_linkrate(parent, child, phy);
 	sas_device_set_phy(child, phy->port);
 
+	prev_lock = mutex_is_locked(&child->port->ha->disco_mutex);
 #ifdef CONFIG_SCSI_SAS_ATA
 	if ((phy->attached_tproto & SAS_PROTOCOL_STP) || phy->attached_sata_dev) {
 		res = sas_get_ata_info(child, phy);
@@ -832,7 +834,11 @@ static struct domain_device *sas_ex_discover_end_dev(
 				    SAS_ADDR(parent->sas_addr), phy_id, res);
 			goto out_list_del;
 		}
+		if (prev_lock)
+			mutex_unlock(&child->port->ha->disco_mutex);
 		sas_disc_wait_completion(child->port, DISCE_PROBE);
+		if (prev_lock)
+			mutex_lock(&child->port->ha->disco_mutex);
 
 	} else
 #endif
@@ -861,7 +867,11 @@ static struct domain_device *sas_ex_discover_end_dev(
 				    SAS_ADDR(parent->sas_addr), phy_id, res);
 			goto out_list_del;
 		}
+		if (prev_lock)
+			mutex_unlock(&child->port->ha->disco_mutex);
 		sas_disc_wait_completion(child->port, DISCE_PROBE);
+		if (prev_lock)
+			mutex_lock(&child->port->ha->disco_mutex);
 	} else {
 		SAS_DPRINTK("target proto 0x%x at %016llx:0x%x not handled\n",
 			    phy->attached_tproto, SAS_ADDR(parent->sas_addr),
