@@ -138,7 +138,12 @@ static int of_platform_serial_setup(struct platform_device *ofdev,
 	if (IS_ERR(info->rst))
 		goto out;
 	ret = reset_control_deassert(info->rst);
-	if (ret)
+	/*
+	 * If the deassert operation is not supported, this could be because
+	 * the reset controller is self-deasserting and onlt supports the
+	 * .reset() operation, so this is not a probe error.
+	 */
+	if (ret && (ret != -ENOTSUPP))
 		goto out;
 
 	port->type = type;
@@ -235,10 +240,14 @@ out:
 static int of_platform_serial_remove(struct platform_device *ofdev)
 {
 	struct of_serial_info *info = platform_get_drvdata(ofdev);
+	int ret;
 
 	serial8250_unregister_port(info->line);
 
-	reset_control_assert(info->rst);
+	ret = reset_control_assert(info->rst);
+	/* If the assert operation is not supported, use pure reset() */
+	if (ret == -ENOTSUPP)
+		reset_control_reset(info->rst);
 	if (info->clk)
 		clk_disable_unprepare(info->clk);
 	kfree(info);
