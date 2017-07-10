@@ -306,8 +306,6 @@ static void cpuidle_update(struct cpuidle_driver *drv,
 {
 	struct cpuidle_governor_stat *gov_stat =
 		(struct cpuidle_governor_stat *)&(dev->gov_stat);
-	int last_idx = gov_stat->last_state_idx;
-	struct cpuidle_state *target = &drv->states[last_idx];
 	unsigned int measured_us;
 	unsigned int new_factor;
 
@@ -328,12 +326,6 @@ static void cpuidle_update(struct cpuidle_driver *drv,
 
 	/* measured value */
 	measured_us = cpuidle_get_last_residency(dev);
-
-	/* Deduct exit latency */
-	if (measured_us > 2 * target->exit_latency)
-		measured_us -= target->exit_latency;
-	else
-		measured_us /= 2;
 
 	/* Make sure our coefficients do not exceed unity */
 	if (measured_us > gov_stat->next_timer_us)
@@ -481,6 +473,11 @@ int cpuidle_enter_state(struct cpuidle_device *dev, struct cpuidle_driver *drv,
 	diff = ktime_us_delta(time_end, time_start);
 	if (diff > INT_MAX)
 		diff = INT_MAX;
+	else if (diff > 2 * target_state->exit_latency)
+		/* Deduct exit latency */
+		diff -= target_state->exit_latency;
+	else
+		diff /= 2;
 
 	dev->last_residency = (int) diff;
 
