@@ -200,10 +200,8 @@ static int audio_do_config(struct usb_configuration *c)
 
 #ifdef CONFIG_GADGET_UAC1
 	f_uac1 = usb_get_function(fi_uac1);
-	if (IS_ERR(f_uac1)) {
-		status = PTR_ERR(f_uac1);
-		return status;
-	}
+	if (IS_ERR(f_uac1))
+		return PTR_ERR(f_uac1);
 
 	status = usb_add_function(c, f_uac1);
 	if (status < 0) {
@@ -212,10 +210,8 @@ static int audio_do_config(struct usb_configuration *c)
 	}
 #else
 	f_uac2 = usb_get_function(fi_uac2);
-	if (IS_ERR(f_uac2)) {
-		status = PTR_ERR(f_uac2);
-		return status;
-	}
+	if (IS_ERR(f_uac2))
+		return PTR_ERR(f_uac2);
 
 	status = usb_add_function(c, f_uac2);
 	if (status < 0) {
