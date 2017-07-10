@@ -223,6 +223,8 @@ enum pmbus_regs {
 #define PB_FAN_1_RPM			BIT(6)
 #define PB_FAN_1_INSTALLED		BIT(7)
 
+enum pmbus_fan_mode { percent = 0, rpm };
+
 /*
  * STATUS_BYTE, STATUS_WORD (lower)
  */
@@ -379,6 +381,11 @@ struct pmbus_driver_info {
 	 */
 	int (*identify)(struct i2c_client *client,
 			struct pmbus_driver_info *info);
+
+	/* Allow the driver to interpret the fan command value */
+	int (*get_pwm_mode)(int id, u8 fan_config, u16 fan_command);
+	int (*set_pwm_mode)(int id, long mode, u8 *fan_config,
+			    u16 *fan_command);
 
 	/* Regulator functionality, if supported by this chip driver. */
 	int num_regulators;
