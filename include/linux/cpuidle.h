@@ -61,6 +61,34 @@ struct cpuidle_state {
 			      int index);
 };
 
+/*
+ * Please note when changing the tuning values:
+ * If (MAX_INTERESTING-1) * RESOLUTION > UINT_MAX, the result of
+ * a scaling operation multiplication may overflow on 32 bit platforms.
+ * In that case, #define RESOLUTION as ULL to get 64 bit result:
+ * #define RESOLUTION 1024ULL
+ *
+ * The default values do not overflow.
+ */
+#define	BUCKETS 12
+#define	INTERVAL_SHIFT 3
+#define	INTERVALS (1UL << INTERVAL_SHIFT)
+#define	RESOLUTION 1024
+#define	DECAY 8
+#define	MAX_INTERESTING 50000
+
+struct cpuidle_governor_stat {
+	int             last_state_idx;
+
+	unsigned int	next_timer_us;
+	unsigned int	predicted_us;
+	unsigned int	bucket;
+	unsigned int	correction_factor[BUCKETS];
+	unsigned int	intervals[INTERVALS];
+	int		interval_ptr;
+};
+
+
 /* Idle State Flags */
 #define CPUIDLE_FLAG_NONE       (0x00)
 #define CPUIDLE_FLAG_COUPLED	(0x02) /* state applies to multiple cpus */
@@ -89,7 +117,9 @@ struct cpuidle_device {
 	cpumask_t		coupled_cpus;
 	struct cpuidle_coupled	*coupled;
 #endif
+	struct cpuidle_governor_stat gov_stat;
 };
+
 
 DECLARE_PER_CPU(struct cpuidle_device *, cpuidle_devices);
 DECLARE_PER_CPU(struct cpuidle_device, cpuidle_dev);
