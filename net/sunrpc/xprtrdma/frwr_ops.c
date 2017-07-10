@@ -84,7 +84,7 @@ frwr_is_supported(struct rpcrdma_ia *ia)
 
 	if (!(attrs->device_cap_flags & IB_DEVICE_MEM_MGT_EXTENSIONS))
 		goto out_not_supported;
-	if (attrs->max_fast_reg_page_list_len == 0)
+	if (attrs->max_reg_page_list_len == 0)
 		goto out_not_supported;
 	return true;
 
@@ -215,7 +215,7 @@ frwr_op_open(struct rpcrdma_ia *ia, struct rpcrdma_ep *ep,
 
 	ia->ri_max_frmr_depth =
 			min_t(unsigned int, RPCRDMA_MAX_DATA_SEGS,
-			      attrs->max_fast_reg_page_list_len);
+			      attrs->max_reg_page_list_len);
 	dprintk("RPC:       %s: device's max FR page list len = %u\n",
 		__func__, ia->ri_max_frmr_depth);
 

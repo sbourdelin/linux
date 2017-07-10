@@ -83,7 +83,6 @@ enum srp_iu_type {
 /*
  * @mr_page_mask: HCA memory registration page mask.
  * @mr_page_size: HCA memory registration page size.
- * @mr_max_size: Maximum size in bytes of a single FMR / FR registration
  *   request.
  */
 struct srp_device {
@@ -92,7 +91,6 @@ struct srp_device {
 	struct ib_pd	       *pd;
 	u64			mr_page_mask;
 	int			mr_page_size;
-	int			mr_max_size;
 	int			max_pages_per_mr;
 	bool			has_fmr;
 	bool			has_fr;

@@ -3580,7 +3580,6 @@ static void srp_add_one(struct ib_device *device)
 	struct ib_device_attr *attr = &device->attrs;
 	struct srp_host *host;
 	int mr_page_shift, p;
-	u64 max_pages_per_mr;
 	unsigned int flags = 0;
 
 	srp_dev = kzalloc(sizeof(*srp_dev), GFP_KERNEL);
@@ -3595,13 +3594,8 @@ static void srp_add_one(struct ib_device *device)
 	mr_page_shift		= max(12, ffs(attr->page_size_cap) - 1);
 	srp_dev->mr_page_size	= 1 << mr_page_shift;
 	srp_dev->mr_page_mask	= ~((u64) srp_dev->mr_page_size - 1);
-	max_pages_per_mr	= attr->max_mr_size;
-	do_div(max_pages_per_mr, srp_dev->mr_page_size);
-	pr_debug("%s: %llu / %u = %llu <> %u\n", __func__,
-		 attr->max_mr_size, srp_dev->mr_page_size,
-		 max_pages_per_mr, SRP_MAX_PAGES_PER_MR);
 	srp_dev->max_pages_per_mr = min_t(u64, SRP_MAX_PAGES_PER_MR,
-					  max_pages_per_mr);
+					  attr->max_reg_page_list_len);
 
 	srp_dev->has_fmr = (device->alloc_fmr && device->dealloc_fmr &&
 			    device->map_phys_fmr && device->unmap_fmr);
@@ -3620,17 +3614,8 @@ static void srp_add_one(struct ib_device *device)
 	    (!srp_dev->has_fmr && !srp_dev->has_fr))
 		flags |= IB_PD_UNSAFE_GLOBAL_RKEY;
 
-	if (srp_dev->use_fast_reg) {
-		srp_dev->max_pages_per_mr =
-			min_t(u32, srp_dev->max_pages_per_mr,
-			      attr->max_fast_reg_page_list_len);
-	}
-	srp_dev->mr_max_size	= srp_dev->mr_page_size *
-				   srp_dev->max_pages_per_mr;
-	pr_debug("%s: mr_page_shift = %d, device->max_mr_size = %#llx, device->max_fast_reg_page_list_len = %u, max_pages_per_mr = %d, mr_max_size = %#x\n",
-		 device->name, mr_page_shift, attr->max_mr_size,
-		 attr->max_fast_reg_page_list_len,
-		 srp_dev->max_pages_per_mr, srp_dev->mr_max_size);
+	pr_debug("%s: mr_page_shift = %d, max_pages_per_mr = %d\n",
+		 device->name, mr_page_shift, srp_dev->max_pages_per_mr);
 
 	INIT_LIST_HEAD(&srp_dev->dev_list);
 

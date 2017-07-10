@@ -1112,7 +1112,7 @@ static int iwch_query_device(struct ib_device *ibdev, struct ib_device_attr *pro
 	props->max_mr = dev->attr.max_mem_regs;
 	props->max_pd = dev->attr.max_pds;
 	props->local_ca_ack_delay = 0;
-	props->max_fast_reg_page_list_len = T3_MAX_FASTREG_DEPTH;
+	props->max_reg_page_list_len = T3_MAX_FASTREG_DEPTH;
 
 	return 0;
 }

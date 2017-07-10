@@ -1298,7 +1298,7 @@ static void hfi1_fill_device_attr(struct hfi1_devdata *dd)
 	rdi->dparms.props.hw_ver = dd->minrev;
 	rdi->dparms.props.sys_image_guid = ib_hfi1_sys_image_guid;
 	rdi->dparms.props.max_mr_size = U64_MAX;
-	rdi->dparms.props.max_fast_reg_page_list_len = UINT_MAX;
+	rdi->dparms.props.max_reg_page_list_len = UINT_MAX;
 	rdi->dparms.props.max_qp = hfi1_max_qps;
 	rdi->dparms.props.max_qp_wr = hfi1_max_qp_wrs;
 	rdi->dparms.props.max_sge = hfi1_max_sges;

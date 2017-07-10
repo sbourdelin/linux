@@ -163,7 +163,7 @@ int qedr_query_device(struct ib_device *ibdev,
 	attr->max_srq_wr = qattr->max_srq_wr;
 
 	attr->local_ca_ack_delay = qattr->dev_ack_delay;
-	attr->max_fast_reg_page_list_len = qattr->max_mr / 8;
+	attr->max_reg_page_list_len = qattr->max_mr / 8;
 	attr->max_pkeys = QEDR_ROCE_PKEY_MAX;
 	attr->max_ah = qattr->max_ah;
 

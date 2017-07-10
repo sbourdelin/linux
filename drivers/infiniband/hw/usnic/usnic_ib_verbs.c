@@ -310,7 +310,7 @@ int usnic_ib_query_device(struct ib_device *ibdev,
 	props->max_srq = 0;
 	props->max_srq_wr = 0;
 	props->max_srq_sge = 0;
-	props->max_fast_reg_page_list_len = 0;
+	props->max_reg_page_list_len = 0;
 	props->max_mcast_grp = 0;
 	props->max_mcast_qp_attach = 0;
 	props->max_total_mcast_qp_attach = 0;

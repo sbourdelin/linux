@@ -61,7 +61,7 @@ static inline bool rdma_rw_io_needs_mr(struct ib_device *dev, u8 port_num,
 static inline u32 rdma_rw_fr_page_list_len(struct ib_device *dev)
 {
 	/* arbitrary limit to avoid allocating gigantic resources */
-	return min_t(u32, dev->attrs.max_fast_reg_page_list_len, 256);
+	return min_t(u32, dev->attrs.max_reg_page_list_len, 256);
 }
 
 /* Caller must have zero-initialized *reg. */

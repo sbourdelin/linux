@@ -160,8 +160,12 @@ static int
 fmr_op_open(struct rpcrdma_ia *ia, struct rpcrdma_ep *ep,
 	    struct rpcrdma_create_data_internal *cdata)
 {
+	struct ib_device_attr *attrs = &ia->ri_device->attrs;
+
+	ia->ri_max_frmr_depth = min_t(unsigned int, RPCRDMA_MAX_DATA_SEGS,
+			      attrs->max_reg_page_list_len);
 	ia->ri_max_segs = max_t(unsigned int, 1, RPCRDMA_MAX_DATA_SEGS /
-				RPCRDMA_MAX_FMR_SGES);
+				ia->ri_max_frmr_depth);
 	return 0;
 }
 
@@ -170,8 +174,10 @@ fmr_op_open(struct rpcrdma_ia *ia, struct rpcrdma_ep *ep,
 static size_t
 fmr_op_maxpages(struct rpcrdma_xprt *r_xprt)
 {
+	struct rpcrdma_ia *ia = &r_xprt->rx_ia;
+
 	return min_t(unsigned int, RPCRDMA_MAX_DATA_SEGS,
-		     RPCRDMA_MAX_HDR_SEGS * RPCRDMA_MAX_FMR_SGES);
+		     RPCRDMA_MAX_HDR_SEGS * ia->ri_max_frmr_depth);
 }
 
 /* Use the ib_map_phys_fmr() verb to register a memory region

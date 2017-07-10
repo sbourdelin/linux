@@ -116,6 +116,11 @@ static int mthca_query_device(struct ib_device *ibdev, struct ib_device_attr *pr
 	props->max_mcast_qp_attach = MTHCA_QP_PER_MGM;
 	props->max_total_mcast_qp_attach = props->max_mcast_qp_attach *
 					   props->max_mcast_grp;
+	if (mthca_is_memfree(mdev))
+		/* For Arbel, all MTTs must fit in the same page. */
+		props->max_reg_page_list_len = PAGE_SIZE / sizeof(u64);
+	else
+		props->max_reg_page_list_len = INT_MAX;
 	/*
 	 * If Sinai memory key optimization is being used, then only
 	 * the 8-bit key portion will change.  For other HCAs, the

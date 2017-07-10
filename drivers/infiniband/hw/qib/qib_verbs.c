@@ -1501,6 +1501,7 @@ static void qib_fill_device_attr(struct qib_devdata *dd)
 	rdi->dparms.props.max_total_mcast_qp_attach =
 					rdi->dparms.props.max_mcast_qp_attach *
 					rdi->dparms.props.max_mcast_grp;
+	rdi->dparms.props.max_reg_page_list_len = UINT_MAX;
 	/* post send table */
 	dd->verbs_dev.rdi.post_parms = qib_post_parms;
 }
