@@ -534,12 +534,14 @@ static int gmc_v8_0_mc_init(struct amdgpu_device *adev)
 		}
 		adev->mc.vram_width = numchan * chansize;
 	}
-	/* Could aper size report 0 ? */
-	adev->mc.aper_base = pci_resource_start(adev->pdev, 0);
-	adev->mc.aper_size = pci_resource_len(adev->pdev, 0);
 	/* size in MB on si */
 	adev->mc.mc_vram_size = RREG32(mmCONFIG_MEMSIZE) * 1024ULL * 1024ULL;
 	adev->mc.real_vram_size = RREG32(mmCONFIG_MEMSIZE) * 1024ULL * 1024ULL;
+
+	if (!(adev->flags & AMD_IS_APU))
+		amdgpu_device_resize_fb_bar(adev);
+	adev->mc.aper_base = pci_resource_start(adev->pdev, 0);
+	adev->mc.aper_size = pci_resource_len(adev->pdev, 0);
 
 #ifdef CONFIG_X86_64
 	if (adev->flags & AMD_IS_APU) {
