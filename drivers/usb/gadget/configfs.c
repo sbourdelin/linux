@@ -1502,12 +1502,9 @@ EXPORT_SYMBOL_GPL(unregister_gadget_item);
 
 static int __init gadget_cfs_init(void)
 {
-	int ret;
-
 	config_group_init(&gadget_subsys.su_group);
 
-	ret = configfs_register_subsystem(&gadget_subsys);
-	return ret;
+	return configfs_register_subsystem(&gadget_subsys);
 }
 module_init(gadget_cfs_init);
 
