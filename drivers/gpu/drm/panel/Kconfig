@@ -104,4 +104,13 @@ config DRM_PANEL_SITRONIX_ST7789V
 	  Say Y here if you want to enable support for the Sitronix
 	  ST7789V controller for 240x320 LCD panels
 
+config DRM_PANEL_ORISETECH_OTM8009A
+	tristate "Orise Tech otm8009a 480p dsi 2dl video mode panel"
+	depends on OF
+	depends on DRM_MIPI_DSI
+	depends on BACKLIGHT_CLASS_DEVICE
+	help
+	  Say Y here if you want to enable support for Orise Tech OTM8009A
+	  480x800 DSI panel
+
 endmenu
