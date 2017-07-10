@@ -27,6 +27,10 @@
 #include <drm/drm_dp_dual_mode_helper.h>
 #include "intel_drv.h"
 
+/* LSPCON OUI Vendor ID(signatures) */
+#define LSPCON_VENDOR_PARADE_OUI 0x001CF8
+#define LSPCON_VENDOR_MCA_OUI 0x0060AD
+
 static struct intel_dp *lspcon_to_intel_dp(struct intel_lspcon *lspcon)
 {
 	struct intel_digital_port *dig_port =
@@ -136,6 +140,7 @@ static bool lspcon_probe(struct intel_lspcon *lspcon)
 	enum drm_dp_dual_mode_type adaptor_type;
 	struct i2c_adapter *adapter = &lspcon_to_intel_dp(lspcon)->aux.ddc;
 	enum drm_lspcon_mode expected_mode;
+	uint32_t vendor_oui;
 
 	expected_mode = lspcon_wake_native_aux_ch(lspcon) ?
 			DRM_LSPCON_MODE_PCON : DRM_LSPCON_MODE_LS;
@@ -151,6 +156,25 @@ static bool lspcon_probe(struct intel_lspcon *lspcon)
 	/* Yay ... got a LSPCON device */
 	DRM_DEBUG_KMS("LSPCON detected\n");
 	lspcon->mode = lspcon_wait_mode(lspcon, expected_mode);
+
+	/* Check if this is a Parade LSPCON or MCA LSPCON */
+	vendor_oui = drm_lspcon_get_vendor_oui(adapter);
+	switch (vendor_oui) {
+	case LSPCON_VENDOR_MCA_OUI:
+		lspcon->vendor = LSPCON_VENDOR_MCA;
+		DRM_DEBUG_KMS("Vendor: Mega Chips\n");
+		break;
+
+	case LSPCON_VENDOR_PARADE_OUI:
+		lspcon->vendor = LSPCON_VENDOR_PARADE;
+		DRM_DEBUG_KMS("Vendor: Parade Tech\n");
+		break;
+
+	default:
+		DRM_ERROR("Can't read OUI /Invalid OUI\n");
+		return false;
+	}
+
 	lspcon->active = true;
 	return true;
 }
