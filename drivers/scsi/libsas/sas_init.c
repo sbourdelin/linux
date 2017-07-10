@@ -152,6 +152,13 @@ int sas_register_ha(struct sas_ha_struct *sas_ha)
 	if (!sas_ha->event_q)
 		goto Undo_ports;
 
+	snprintf(name, 64, "%s_disc_q", dev_name(sas_ha->dev));
+	sas_ha->disc_q = create_singlethread_workqueue(name);
+	if(!sas_ha->disc_q) {
+		destroy_workqueue(sas_ha->event_q);
+		goto Undo_ports;
+	}
+
 	INIT_LIST_HEAD(&sas_ha->eh_done_q);
 	INIT_LIST_HEAD(&sas_ha->eh_ata_q);
 
@@ -187,6 +194,7 @@ int sas_unregister_ha(struct sas_ha_struct *sas_ha)
 	__sas_drain_work(sas_ha);
 	mutex_unlock(&sas_ha->drain_mutex);
 	destroy_workqueue(sas_ha->event_q);
+	destroy_workqueue(sas_ha->disc_q);
 
 	return 0;
 }

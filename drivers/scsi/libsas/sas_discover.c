@@ -559,7 +559,18 @@ static void sas_chain_work(struct sas_ha_struct *ha, struct sas_work *sw)
 	 * not racing against draining
 	 */
 	sas_port_get(port);
-	ret = scsi_queue_work(ha->core.shost, &sw->work);
+	/*
+	 * discovery event probe and destruct would be called in other
+	 * discovery event like discover domain and revalidate domain
+	 * events, in some cases, we need to sync execute probe and destruct
+	 * events, so run probe and destruct discover events except in a new
+	 * workqueue.
+	 */
+	if (ev->type == DISCE_PROBE || ev->type == DISCE_DESTRUCT)
+		ret = queue_work(ha->disc_q, &sw->work);
+	else
+		ret = scsi_queue_work(ha->core.shost, &sw->work);
+
 	if (ret != 1)
 		sas_port_put(port);
 }
