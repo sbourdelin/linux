@@ -572,6 +572,30 @@ static void alua_rtpg_print_supported(struct scsi_device *sdev,
 }
 
 /*
+ * alua_rtpg_print_check - Whether to print RTPG state information
+ * 			   on particular state transitions.
+ * @old_state: the old state value.
+ * @new_state: the new state value.
+ */
+static bool alua_rtpg_print_check(int old_state, int new_state)
+{
+	/*
+	 * Do not print RTPG state information in case
+	 * state remains either unavailable or standby.
+	 *
+	 * Print it for everything else.
+	 */
+
+	switch (old_state) {
+	case SCSI_ACCESS_STATE_UNAVAILABLE:
+	case SCSI_ACCESS_STATE_STANDBY:
+		return old_state != new_state;
+	default:
+		return 1;
+	}
+}
+
+/*
  * alua_rtpg - Evaluate REPORT TARGET GROUP STATES
  * @sdev: the device to be evaluated.
  *
@@ -706,6 +730,7 @@ static int alua_rtpg(struct scsi_device *sdev, struct alua_port_group *pg)
 				if ((tmp_pg == pg) ||
 				    !(tmp_pg->flags & ALUA_PG_RUNNING)) {
 					struct alua_dh_data *h;
+					int tmp_pg_state_orig = tmp_pg->state;
 
 					tmp_pg->state = desc[0] & 0x0f;
 					tmp_pg->pref = desc[0] >> 7;
@@ -718,10 +743,12 @@ static int alua_rtpg(struct scsi_device *sdev, struct alua_port_group *pg)
 					}
 					rcu_read_unlock();
 
-					if (tmp_pg == pg)
-						alua_rtpg_print_supported(sdev, tmp_pg, desc[1]);
-					else
-						alua_rtpg_print(sdev, tmp_pg);
+					if (alua_rtpg_print_check(tmp_pg_state_orig, tmp_pg->state)) {
+						if (tmp_pg == pg)
+							alua_rtpg_print_supported(sdev, tmp_pg, desc[1]);
+						else
+							alua_rtpg_print(sdev, tmp_pg);
+					}
 				}
 				spin_unlock_irqrestore(&tmp_pg->lock, flags);
 			}
