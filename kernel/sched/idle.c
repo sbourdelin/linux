@@ -188,6 +188,7 @@ static void cpuidle_idle_call(void)
 		 * Give the governor an opportunity to reflect on the outcome
 		 */
 		cpuidle_reflect(dev, entered_state);
+		dev->gov_stat.needs_update = 1;
 	}
 
 exit_idle:
@@ -207,6 +208,10 @@ exit_idle:
  */
 static void cpuidle_fast(void)
 {
+	struct cpuidle_device *dev = cpuidle_get_device();
+	ktime_t time_start, time_end;
+	s64 diff;
+
 	while (!need_resched()) {
 		check_pgt_cache();
 		rmb();
@@ -219,7 +224,16 @@ static void cpuidle_fast(void)
 		local_irq_disable();
 		arch_cpu_idle_enter();
 
+		time_start = ns_to_ktime(local_clock());
 		default_idle_call();
+		time_end = ns_to_ktime(local_clock());
+
+		diff = ktime_us_delta(time_end, time_start);
+		if (diff > INT_MAX)
+		        diff = INT_MAX;
+
+		dev->last_residency = (int) diff;
+		dev->gov_stat.needs_update = 1;
 
 		arch_cpu_idle_exit();
 	}

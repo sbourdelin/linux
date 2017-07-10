@@ -387,9 +387,11 @@ unsigned int cpuidle_predict(void)
 	/*
 	 * Give the governor an opportunity to update on the outcome
 	 */
-	cpuidle_update(drv, dev);
-
 	gov_stat = (struct cpuidle_governor_stat *)&(dev->gov_stat);
+	if (gov_stat->needs_update) {
+		cpuidle_update(drv, dev);
+		gov_stat->needs_update = 0;
+	}
 
 	gov_stat->next_timer_us = ktime_to_us(tick_nohz_get_sleep_length());
 	get_iowait_load(&nr_iowaiters, &cpu_load);

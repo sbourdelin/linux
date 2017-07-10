@@ -79,6 +79,7 @@ struct cpuidle_state {
 
 struct cpuidle_governor_stat {
 	int             last_state_idx;
+	int		needs_update;
 
 	unsigned int	next_timer_us;
 	unsigned int	predicted_us;
