@@ -297,6 +297,79 @@ again:
 }
 
 /**
+ * cpuidle_update - attempts to guess what happened after entry
+ * @drv: cpuidle driver containing state data
+ * @dev: the CPU
+ */
+static void cpuidle_update(struct cpuidle_driver *drv,
+			struct cpuidle_device *dev)
+{
+	struct cpuidle_governor_stat *gov_stat =
+		(struct cpuidle_governor_stat *)&(dev->gov_stat);
+	int last_idx = gov_stat->last_state_idx;
+	struct cpuidle_state *target = &drv->states[last_idx];
+	unsigned int measured_us;
+	unsigned int new_factor;
+
+	/*
+	 * Try to figure out how much time passed between entry to low
+	 * power state and occurrence of the wakeup event.
+	 *
+	 * If the entered idle state didn't support residency measurements,
+	 * we use them anyway if they are short, and if long,
+	 * truncate to the whole expected time.
+	 *
+	 * Any measured amount of time will include the exit latency.
+	 * Since we are interested in when the wakeup begun, not when it
+	 * was completed, we must subtract the exit latency. However, if
+	 * the measured amount of time is less than the exit latency,
+	 * assume the state was never reached and the exit latency is 0.
+	 */
+
+	/* measured value */
+	measured_us = cpuidle_get_last_residency(dev);
+
+	/* Deduct exit latency */
+	if (measured_us > 2 * target->exit_latency)
+		measured_us -= target->exit_latency;
+	else
+		measured_us /= 2;
+
+	/* Make sure our coefficients do not exceed unity */
+	if (measured_us > gov_stat->next_timer_us)
+		measured_us = gov_stat->next_timer_us;
+
+	/* Update our correction ratio */
+	new_factor = gov_stat->correction_factor[gov_stat->bucket];
+	new_factor -= new_factor / DECAY;
+
+	if (gov_stat->next_timer_us > 0 && measured_us < MAX_INTERESTING)
+		new_factor += RESOLUTION * measured_us / gov_stat->next_timer_us;
+	else
+		/*
+		 * we were idle so long that we count it as a perfect
+		 * prediction
+		 */
+		new_factor += RESOLUTION;
+
+	/*
+	 * We don't want 0 as factor; we always want at least
+	 * a tiny bit of estimated time. Fortunately, due to rounding,
+	 * new_factor will stay nonzero regardless of measured_us values
+	 * and the compiler can eliminate this test as long as DECAY > 1.
+	 */
+	if (DECAY == 1 && unlikely(new_factor == 0))
+		new_factor = 1;
+
+	gov_stat->correction_factor[gov_stat->bucket] = new_factor;
+
+	/* update the repeating-pattern data */
+	gov_stat->intervals[gov_stat->interval_ptr++] = measured_us;
+	if (gov_stat->interval_ptr >= INTERVALS)
+		gov_stat->interval_ptr = 0;
+}
+
+/**
  * cpuidle_predict - predict the next idle duration, in micro-second.
  * There are two factors in the cpu idle governor, taken from menu:
  * 1) Energy break even point
@@ -319,6 +392,10 @@ unsigned int cpuidle_predict(void)
 
 	if (cpuidle_not_available(drv, dev))
 		return -ENODEV;
+	/*
+	 * Give the governor an opportunity to update on the outcome
+	 */
+	cpuidle_update(drv, dev);
 
 	gov_stat = (struct cpuidle_governor_stat *)&(dev->gov_stat);
 
