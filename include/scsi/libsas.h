@@ -263,8 +263,6 @@ struct sas_discovery {
 /* The port struct is Class:RW, driver:RO */
 struct asd_sas_port {
 /* private: */
-	struct completion port_gone_completion;
-
 	struct sas_discovery disc;
 	struct domain_device *port_dev;
 	spinlock_t dev_list_lock;
