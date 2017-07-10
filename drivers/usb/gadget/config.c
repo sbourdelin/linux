@@ -207,7 +207,7 @@ EXPORT_SYMBOL_GPL(usb_free_all_descriptors);
 struct usb_descriptor_header *usb_otg_descriptor_alloc(
 				struct usb_gadget *gadget)
 {
-	unsigned length = 0;
+	unsigned int length = 0;
 
 	if (gadget->otg_caps && (gadget->otg_caps->otg_rev >= 0x0200))
 		length = sizeof(struct usb_otg20_descriptor);
