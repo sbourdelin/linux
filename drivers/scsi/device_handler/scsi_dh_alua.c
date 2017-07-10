@@ -431,6 +431,26 @@ static int alua_check_sense(struct scsi_device *sdev,
 			alua_check(sdev, false);
 			return NEEDS_RETRY;
 		}
+		if (sense_hdr->asc == 0x04 && sense_hdr->ascq == 0x0b) {
+			/*
+			 * LUN Not Accessible - target port in standby state.
+			 *
+			 * Do not retry, so failover to another target port occur.
+			 * Schedule a recheck to update state for other functions.
+			 */
+			alua_check(sdev, true);
+			return SUCCESS;
+		}
+		if (sense_hdr->asc == 0x04 && sense_hdr->ascq == 0x0c) {
+			/*
+			 * LUN Not Accessible - target port in unavailable state.
+			 *
+			 * Do not retry, so failover to another target port occur.
+			 * Schedule a recheck to update state for other functions.
+			 */
+			alua_check(sdev, true);
+			return SUCCESS;
+		}
 		break;
 	case UNIT_ATTENTION:
 		if (sense_hdr->asc == 0x29 && sense_hdr->ascq == 0x00) {
@@ -1057,6 +1077,8 @@ static void alua_check(struct scsi_device *sdev, bool force)
  *
  * Fail I/O to all paths not in state
  * active/optimized or active/non-optimized.
+ * Allow I/O to paths in state unavailable/standby
+ * so path checkers can actually check them.
  */
 static int alua_prep_fn(struct scsi_device *sdev, struct request *req)
 {
@@ -1072,6 +1094,9 @@ static int alua_prep_fn(struct scsi_device *sdev, struct request *req)
 	rcu_read_unlock();
 	if (state == SCSI_ACCESS_STATE_TRANSITIONING)
 		ret = BLKPREP_DEFER;
+	else if (state == SCSI_ACCESS_STATE_UNAVAILABLE ||
+		 state == SCSI_ACCESS_STATE_STANDBY)
+		req->rq_flags |= RQF_QUIET;
 	else if (state != SCSI_ACCESS_STATE_OPTIMAL &&
 		 state != SCSI_ACCESS_STATE_ACTIVE &&
 		 state != SCSI_ACCESS_STATE_LBA) {
