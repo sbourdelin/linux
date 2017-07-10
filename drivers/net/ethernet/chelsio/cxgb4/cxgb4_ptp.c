@@ -441,7 +441,7 @@ void cxgb4_ptp_init(struct adapter *adapter)
 
 	adapter->ptp_clock = ptp_clock_register(&adapter->ptp_clock_info,
 						&adapter->pdev->dev);
-	if (!adapter->ptp_clock) {
+	if (IS_ERR(adapter->ptp_clock)) {
 		dev_err(adapter->pdev_dev,
 			"PTP %s Clock registration has failed\n", __func__);
 		return;
