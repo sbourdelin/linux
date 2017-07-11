@@ -6216,6 +6216,7 @@ static int handle_task_switch(struct kvm_vcpu *vcpu)
 	 * TODO: What about debug traps on tss switch?
 	 *       Are we supposed to inject them and update dr6?
 	 */
+	vmx->emulation_required = emulation_required(vcpu);
 
 	return 1;
 }
