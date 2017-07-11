@@ -1312,15 +1312,16 @@ static int __meminit vmemmap_populate_hugepages(unsigned long start,
 int __meminit vmemmap_populate(unsigned long start, unsigned long end, int node)
 {
 	struct vmem_altmap *altmap = to_vmem_altmap(start);
-	int err;
+	int err = -ENOMEM;
 
 	if (boot_cpu_has(X86_FEATURE_PSE))
 		err = vmemmap_populate_hugepages(start, end, node, altmap);
 	else if (altmap) {
 		pr_err_once("%s: no cpu support for altmap allocations\n",
 				__func__);
-		err = -ENOMEM;
-	} else
+		return err;
+	}
+	if (err)
 		err = vmemmap_populate_basepages(start, end, node);
 	if (!err)
 		sync_global_pgds(start, end - 1);
