@@ -840,6 +840,7 @@ tcmu_queue_cmd_ring(struct tcmu_cmd *tcmu_cmd)
 	}
 
 	entry = (void *) mb + CMDR_OFF + cmd_head;
+	memset(entry, 0, command_size);
 	tcmu_hdr_set_op(&entry->hdr.len_op, TCMU_OP_CMD);
 	entry->hdr.cmd_id = tcmu_cmd->cmd_id;
 	entry->hdr.kflags = 0;
@@ -865,8 +866,8 @@ tcmu_queue_cmd_ring(struct tcmu_cmd *tcmu_cmd)
 	entry->req.iov_dif_cnt = 0;
 
 	/* Handle BIDI commands */
+	iov_cnt = 0;
 	if (se_cmd->se_cmd_flags & SCF_BIDI) {
-		iov_cnt = 0;
 		iov++;
 		ret = scatter_data_area(udev, tcmu_cmd,
 					se_cmd->t_bidi_data_sg,
@@ -879,8 +880,8 @@ tcmu_queue_cmd_ring(struct tcmu_cmd *tcmu_cmd)
 			pr_err("tcmu: alloc and scatter bidi data failed\n");
 			return TCM_LOGICAL_UNIT_COMMUNICATION_FAILURE;
 		}
-		entry->req.iov_bidi_cnt = iov_cnt;
 	}
+	entry->req.iov_bidi_cnt = iov_cnt;
 
 	/*
 	 * Recalaulate the command's base size and size according
