@@ -1018,6 +1018,12 @@ static void guc_policies_init(struct guc_policies *policies)
 	policies->is_valid = 1;
 }
 
+/*
+ * The first 80 dwords of the register state context, containing the
+ * execlists and ppgtt registers.
+ */
+#define LR_HW_CONTEXT_SIZE	(80 * sizeof(u32))
+
 static int guc_ads_create(struct intel_guc *guc)
 {
 	struct drm_i915_private *dev_priv = guc_to_i915(guc);
@@ -1033,6 +1039,7 @@ static int guc_ads_create(struct intel_guc *guc)
 	struct intel_engine_cs *engine;
 	enum intel_engine_id id;
 	u32 base;
+	u32 lrca_offset = LRC_PPHWSP_PN * PAGE_SIZE;
 
 	GEM_BUG_ON(guc->ads_vma);
 
@@ -1062,13 +1069,15 @@ static int guc_ads_create(struct intel_guc *guc)
 	 * engines after a reset. Here we use the Render ring default
 	 * context, which must already exist and be pinned in the GGTT,
 	 * so its address won't change after we've told the GuC where
-	 * to find it.
+	 * to find it. GuC will skip the PPHWSP and 'Execlist Context',
+	 * thus reduce the size by 1 page (PPHWSP) and 80 dwords.
 	 */
 	blob->ads.golden_context_lrca =
-		dev_priv->engine[RCS]->status_page.ggtt_offset;
+		guc_ggtt_offset(dev_priv->kernel_context->engine[RCS].state) + lrca_offset;
 
+	/* context_size - PPHWSP - first 80 dwords */
 	for_each_engine(engine, dev_priv, id)
-		blob->ads.eng_state_size[engine->guc_id] = engine->context_size;
+		blob->ads.eng_state_size[engine->guc_id] = engine->context_size - lrca_offset - LR_HW_CONTEXT_SIZE;
 
 	base = guc_ggtt_offset(vma);
 	blob->ads.scheduler_policies = base + ptr_offset(blob, policies);
