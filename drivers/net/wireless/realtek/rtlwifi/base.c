@@ -1734,13 +1734,13 @@ void rtl_scan_list_expire(struct ieee80211_hw *hw)
 		if (jiffies_to_msecs(jiffies - entry->age) < 180000)
 			continue;
 
+		RT_TRACE(rtlpriv, COMP_SCAN, DBG_LOUD,
+			 "BSSID=%pM is expire in scan list (total=%d)\n",
+			 entry->bssid, rtlpriv->scan_list.num - 1);
+
 		list_del(&entry->list);
 		kfree(entry);
 		rtlpriv->scan_list.num--;
-
-		RT_TRACE(rtlpriv, COMP_SCAN, DBG_LOUD,
-			 "BSSID=%pM is expire in scan list (total=%d)\n",
-			 entry->bssid, rtlpriv->scan_list.num);
 	}
 
 	spin_unlock_irqrestore(&rtlpriv->locks.scan_list_lock, flags);
