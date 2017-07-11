@@ -422,7 +422,7 @@ static void tmio_mmc_transfer_data(struct tmio_mmc_host *host,
 		if (!(count & 0x3))
 			return;
 
-		buf8 = (u8 *)(buf + (count >> 2));
+		buf8 = (u8 *)buf + (count & ~3);
 		count %= 4;
 
 		if (is_read) {
