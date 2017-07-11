@@ -452,6 +452,7 @@ struct _internal_cmd {
 	struct completion done;
 	void	*reply;
 	void	*sense;
+	u64	*nvme_error_response;
 	u16	status;
 	u16	smid;
 };
@@ -1615,7 +1616,7 @@ void
 mpt3sas_scsi_direct_io_set(struct MPT3SAS_ADAPTER *ioc, u16 smid, u8 direct_io);
 void
 mpt3sas_setup_direct_io(struct MPT3SAS_ADAPTER *ioc, struct scsi_cmnd *scmd,
-	struct _raid_device *raid_device, Mpi2SCSIIORequest_t *mpi_request,
+	struct _raid_device *raid_device, Mpi25SCSIIORequest_t *mpi_request,
 	u16 smid);
 
 /* NCQ Prio Handling Check */
