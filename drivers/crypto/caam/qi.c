@@ -277,6 +277,7 @@ empty_fq:
 		dev_err(qidev, "OOS of FQID: %u failed\n", fq->fqid);
 
 	qman_destroy_fq(fq);
+	kfree(fq);
 
 	return ret;
 }
@@ -511,7 +512,6 @@ int caam_qi_shutdown(struct device *qidev)
 
 		if (kill_fq(qidev, per_cpu(pcpu_qipriv.rsp_fq, i)))
 			dev_err(qidev, "Rsp FQ kill failed, cpu: %d\n", i);
-		kfree(per_cpu(pcpu_qipriv.rsp_fq, i));
 	}
 
 	/*
