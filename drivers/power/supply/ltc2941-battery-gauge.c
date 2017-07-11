@@ -1,5 +1,5 @@
 /*
- * I2C client/driver for the Linear Technology LTC2941 and LTC2943
+ * I2C client/driver for the Linear Technology LTC2941, LTC2943 and LTC2944
  * Battery Gas Gauge IC
  *
  * Copyright (C) 2014 Topic Embedded Systems
@@ -145,7 +145,7 @@ static int ltc294x_reset(const struct ltc294x_info *info, int prescaler_exp)
 
 	control = LTC294X_REG_CONTROL_PRESCALER_SET(prescaler_exp) |
 				LTC294X_REG_CONTROL_ALCC_CONFIG_DISABLED;
-	/* Put the 2943 into "monitor" mode, so it measures every 10 sec */
+	/* Put the 2943/4 into "monitor" mode, so it measures every 10 sec */
 	if (info->num_regs == LTC2943_NUM_REGS)
 		control |= LTC2943_REG_CONTROL_MODE_SCAN;
 
@@ -494,6 +494,7 @@ static SIMPLE_DEV_PM_OPS(ltc294x_pm_ops, ltc294x_suspend, ltc294x_resume);
 static const struct i2c_device_id ltc294x_i2c_id[] = {
 	{"ltc2941", LTC2941_NUM_REGS},
 	{"ltc2943", LTC2943_NUM_REGS},
+	{"ltc2944", LTC2943_NUM_REGS},
 	{ },
 };
 MODULE_DEVICE_TABLE(i2c, ltc294x_i2c_id);
@@ -505,6 +506,10 @@ static const struct of_device_id ltc294x_i2c_of_match[] = {
 	},
 	{
 		.compatible = "lltc,ltc2943",
+		.data = (void *)LTC2943_NUM_REGS
+	},
+	{
+		.compatible = "lltc,ltc2944",
 		.data = (void *)LTC2943_NUM_REGS
 	},
 	{ },
@@ -525,5 +530,5 @@ module_i2c_driver(ltc294x_driver);
 
 MODULE_AUTHOR("Auryn Verwegen, Topic Embedded Systems");
 MODULE_AUTHOR("Mike Looijmans, Topic Embedded Products");
-MODULE_DESCRIPTION("LTC2941/LTC2943 Battery Gas Gauge IC driver");
+MODULE_DESCRIPTION("LTC2941/LTC2943/LTC2944 Battery Gas Gauge IC driver");
 MODULE_LICENSE("GPL");
