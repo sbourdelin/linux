@@ -1,5 +1,5 @@
 /*
- * I2C client/driver for the Linear Technology LTC2941 and LTC2943
+ * I2C client/driver for the Linear Technology LTC2941, LTC2943 and LTC2944
  * Battery Gas Gauge IC
  *
  * Copyright (C) 2014 Topic Embedded Systems
@@ -57,6 +57,12 @@ enum ltc294x_reg {
 #define LTC2941_NUM_REGS	0x08
 #define LTC2943_NUM_REGS	0x18
 
+enum ltc294x_id {
+	LTC2941_ID,
+	LTC2943_ID,
+	LTC2944_ID,
+};
+
 struct ltc294x_info {
 	struct i2c_client *client;	/* I2C Client pointer */
 	struct power_supply *supply;	/* Supply pointer */
@@ -66,6 +72,7 @@ struct ltc294x_info {
 	int charge;	/* Last charge register content */
 	int r_sense;	/* mOhm */
 	int Qlsb;	/* nAh */
+	enum ltc294x_id id;
 };
 
 static inline int convert_bin_to_uAh(
@@ -145,7 +152,7 @@ static int ltc294x_reset(const struct ltc294x_info *info, int prescaler_exp)
 
 	control = LTC294X_REG_CONTROL_PRESCALER_SET(prescaler_exp) |
 				LTC294X_REG_CONTROL_ALCC_CONFIG_DISABLED;
-	/* Put the 2943 into "monitor" mode, so it measures every 10 sec */
+	/* Put the 2943/4 into "monitor" mode, so it measures every 10 sec */
 	if (info->num_regs == LTC2943_NUM_REGS)
 		control |= LTC2943_REG_CONTROL_MODE_SCAN;
 
@@ -248,11 +255,16 @@ static int ltc294x_get_voltage(const struct ltc294x_info *info, int *val)
 	int ret;
 	u8 datar[2];
 	u32 value;
+	u32 full_scale;
 
 	ret = ltc294x_read_regs(info->client,
 		LTC294X_REG_VOLTAGE_MSB, &datar[0], 2);
 	value = (datar[0] << 8) | datar[1];
-	*val = ((value * 23600) / 0xFFFF) * 1000; /* in uV */
+	if (info->id == LTC2944_ID)
+		full_scale = 70800;
+	else
+		full_scale = 23600;
+	*val = ((value * full_scale) / 0xFFFF) * 1000; /* in uV */
 	return ret;
 }
 
@@ -261,15 +273,20 @@ static int ltc294x_get_current(const struct ltc294x_info *info, int *val)
 	int ret;
 	u8 datar[2];
 	s32 value;
+	u32 full_scale;
 
 	ret = ltc294x_read_regs(info->client,
 		LTC294X_REG_CURRENT_MSB, &datar[0], 2);
 	value = (datar[0] << 8) | datar[1];
 	value -= 0x7FFF;
+	if (info->id == LTC2944_ID)
+		full_scale = 64000;
+	else
+		full_scale = 60000;
 	/* Value is in range -32k..+32k, r_sense is usually 10..50 mOhm,
 	 * the formula below keeps everything in s32 range while preserving
 	 * enough digits */
-	*val = 1000 * ((60000 * value) / (info->r_sense * 0x7FFF)); /* in uA */
+	*val = 1000 * ((full_scale * value) / (info->r_sense * 0x7FFF)); /* in uA */
 	return ret;
 }
 
@@ -388,7 +405,11 @@ static int ltc294x_i2c_probe(struct i2c_client *client,
 
 	np = of_node_get(client->dev.of_node);
 
-	info->num_regs = (unsigned long)of_device_get_match_data(&client->dev);
+	info->id = (enum ltc294x_id)of_device_get_match_data(&client->dev);
+	if (info->id == LTC2941_ID)
+		info->num_regs = LTC2941_NUM_REGS;
+	else
+		info->num_regs = LTC2943_NUM_REGS;
 	info->supply_desc.name = np->name;
 
 	/* r_sense can be negative, when sense+ is connected to the battery
@@ -492,8 +513,9 @@ static SIMPLE_DEV_PM_OPS(ltc294x_pm_ops, ltc294x_suspend, ltc294x_resume);
 
 
 static const struct i2c_device_id ltc294x_i2c_id[] = {
-	{"ltc2941", LTC2941_NUM_REGS},
-	{"ltc2943", LTC2943_NUM_REGS},
+	{"ltc2941", LTC2941_ID},
+	{"ltc2943", LTC2943_ID},
+	{"ltc2944", LTC2944_ID},
 	{ },
 };
 MODULE_DEVICE_TABLE(i2c, ltc294x_i2c_id);
@@ -501,11 +523,15 @@ MODULE_DEVICE_TABLE(i2c, ltc294x_i2c_id);
 static const struct of_device_id ltc294x_i2c_of_match[] = {
 	{
 		.compatible = "lltc,ltc2941",
-		.data = (void *)LTC2941_NUM_REGS
+		.data = (void *)LTC2941_ID
 	},
 	{
 		.compatible = "lltc,ltc2943",
-		.data = (void *)LTC2943_NUM_REGS
+		.data = (void *)LTC2943_ID
+	},
+	{
+		.compatible = "lltc,ltc2944",
+		.data = (void *)LTC2944_ID
 	},
 	{ },
 };
@@ -525,5 +551,5 @@ module_i2c_driver(ltc294x_driver);
 
 MODULE_AUTHOR("Auryn Verwegen, Topic Embedded Systems");
 MODULE_AUTHOR("Mike Looijmans, Topic Embedded Products");
-MODULE_DESCRIPTION("LTC2941/LTC2943 Battery Gas Gauge IC driver");
+MODULE_DESCRIPTION("LTC2941/LTC2943/LTC2944 Battery Gas Gauge IC driver");
 MODULE_LICENSE("GPL");

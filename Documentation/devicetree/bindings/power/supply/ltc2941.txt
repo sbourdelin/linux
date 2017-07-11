@@ -1,9 +1,9 @@
-binding for LTC2941 and LTC2943 battery gauges
+binding for LTC2941, LTC2943 and LTC2944 battery gauges
 
-Both the LTC2941 and LTC2943 measure battery capacity.
-The LTC2943 is compatible with the LTC2941, it adds voltage and
-temperature monitoring, and uses a slightly different conversion
-formula for the charge counter.
+All the LTC2941, LTC2943 and LTC2944 measure battery capacity.
+The LTC2943 and LTC2944 are compatible with the LTC2941, they add voltage and
+temperature monitoring, and use a slightly different conversion formula for the
+charge counter.
 
 Required properties:
 - compatible: Should contain "lltc,ltc2941" or "lltc,ltc2943" which also
