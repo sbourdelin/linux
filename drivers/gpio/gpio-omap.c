@@ -917,13 +917,24 @@ static int omap_gpio_get_direction(struct gpio_chip *chip, unsigned offset)
 	struct gpio_bank *bank;
 	unsigned long flags;
 	void __iomem *reg;
-	int dir;
+	int error, dir;
 
 	bank = gpiochip_get_data(chip);
 	reg = bank->base + bank->regs->direction;
+	error = pm_runtime_get_sync(bank->chip.parent);
+	if (error < 0) {
+		dev_err(bank->chip.parent,
+			"Could not enable gpio bank %p: %d\n",
+			bank, error);
+		pm_runtime_put_noidle(bank->chip.parent);
+
+		return error;
+	}
 	raw_spin_lock_irqsave(&bank->lock, flags);
 	dir = !!(readl_relaxed(reg) & BIT(offset));
 	raw_spin_unlock_irqrestore(&bank->lock, flags);
+	pm_runtime_put_sync(bank->chip.parent);
+
 	return dir;
 }
 
