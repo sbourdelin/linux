@@ -563,6 +563,49 @@ struct _pcie_device {
 	u8	*serial_number;
 	struct kref refcount;
 };
+
+/**
+ * pcie_device_get - Increment the pcie device reference count
+ *
+ * @p: pcie_device object
+ *
+ * When ever this function called it will increment the
+ * reference count of the pcie device for which this function called.
+ *
+ */
+static inline void pcie_device_get(struct _pcie_device *p)
+{
+	kref_get(&p->refcount);
+}
+
+/**
+ * pcie_device_free - Release the pcie device object
+ * @r - kref object
+ *
+ * Free's the pcie device object. It will be called when reference count
+ * reaches to zero.
+ */
+static inline void pcie_device_free(struct kref *r)
+{
+	kfree(container_of(r, struct _pcie_device, refcount));
+}
+
+/**
+ * pcie_device_put - Decrement the pcie device reference count
+ *
+ * @p: pcie_device object
+ *
+ * When ever this function called it will decrement the
+ * reference count of the pcie device for which this function called.
+ *
+ * When refernce count reaches to Zero, this will call pcie_device_free to the
+ * pcie_device object.
+ */
+static inline void pcie_device_put(struct _pcie_device *p)
+{
+	kref_put(&p->refcount, pcie_device_free);
+}
+
 /**
  * struct _raid_device - raid volume link list
  * @list: sas device list
@@ -1417,6 +1460,10 @@ struct _sas_device *mpt3sas_get_sdev_by_addr(
 	 struct MPT3SAS_ADAPTER *ioc, u64 sas_address);
 struct _sas_device *__mpt3sas_get_sdev_by_addr(
 	 struct MPT3SAS_ADAPTER *ioc, u64 sas_address);
+struct _sas_device *mpt3sas_get_sdev_by_handle(struct MPT3SAS_ADAPTER *ioc,
+	u16 handle);
+struct _pcie_device *mpt3sas_get_pdev_by_handle(struct MPT3SAS_ADAPTER *ioc,
+	u16 handle);
 
 void mpt3sas_port_enable_complete(struct MPT3SAS_ADAPTER *ioc);
 struct _raid_device *
@@ -1454,6 +1501,12 @@ int mpt3sas_config_get_sas_device_pg0(struct MPT3SAS_ADAPTER *ioc,
 	u32 form, u32 handle);
 int mpt3sas_config_get_sas_device_pg1(struct MPT3SAS_ADAPTER *ioc,
 	Mpi2ConfigReply_t *mpi_reply, Mpi2SasDevicePage1_t *config_page,
+	u32 form, u32 handle);
+int mpt3sas_config_get_pcie_device_pg0(struct MPT3SAS_ADAPTER *ioc,
+	Mpi2ConfigReply_t *mpi_reply, Mpi26PCIeDevicePage0_t *config_page,
+	u32 form, u32 handle);
+int mpt3sas_config_get_pcie_device_pg2(struct MPT3SAS_ADAPTER *ioc,
+	Mpi2ConfigReply_t *mpi_reply, Mpi26PCIeDevicePage2_t *config_page,
 	u32 form, u32 handle);
 int mpt3sas_config_get_sas_iounit_pg0(struct MPT3SAS_ADAPTER *ioc,
 	Mpi2ConfigReply_t *mpi_reply, Mpi2SasIOUnitPage0_t *config_page,
