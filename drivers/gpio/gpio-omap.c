@@ -786,26 +786,6 @@ static void omap_gpio_irq_shutdown(struct irq_data *d)
 	raw_spin_unlock_irqrestore(&bank->lock, flags);
 }
 
-static void omap_gpio_irq_bus_lock(struct irq_data *data)
-{
-	struct gpio_bank *bank = omap_irq_data_get_bank(data);
-
-	if (!BANK_USED(bank))
-		pm_runtime_get_sync(bank->chip.parent);
-}
-
-static void gpio_irq_bus_sync_unlock(struct irq_data *data)
-{
-	struct gpio_bank *bank = omap_irq_data_get_bank(data);
-
-	/*
-	 * If this is the last IRQ to be freed in the bank,
-	 * disable the bank module.
-	 */
-	if (!BANK_USED(bank))
-		pm_runtime_put(bank->chip.parent);
-}
-
 static void omap_gpio_ack_irq(struct irq_data *d)
 {
 	struct gpio_bank *bank = omap_irq_data_get_bank(d);
@@ -1169,10 +1149,9 @@ static int omap_gpio_probe(struct platform_device *pdev)
 	irqc->irq_unmask = omap_gpio_unmask_irq,
 	irqc->irq_set_type = omap_gpio_irq_type,
 	irqc->irq_set_wake = omap_gpio_wake_enable,
-	irqc->irq_bus_lock = omap_gpio_irq_bus_lock,
-	irqc->irq_bus_sync_unlock = gpio_irq_bus_sync_unlock,
 	irqc->name = dev_name(&pdev->dev);
 	irqc->flags = IRQCHIP_MASK_ON_SUSPEND;
+	irqc->parent_device = dev;
 
 	bank->irq = platform_get_irq(pdev, 0);
 	if (bank->irq <= 0) {
