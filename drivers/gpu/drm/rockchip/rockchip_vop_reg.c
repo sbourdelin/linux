@@ -20,17 +20,25 @@
 #include "rockchip_drm_vop.h"
 #include "rockchip_vop_reg.h"
 
-#define VOP_REG(off, _mask, s) \
+#define VOP_REG_VER_MASK(off, _mask, s, _write_mask, _major, \
+			 _begin_minor, _end_minor) \
 		{.offset = off, \
 		 .mask = _mask, \
 		 .shift = s, \
-		 .write_mask = false,}
+		 .write_mask = _write_mask, \
+		 .major = _major, \
+		 .begin_minor = _begin_minor, \
+		 .end_minor = _end_minor,}
+
+#define VOP_REG_VER(off, _mask, s, _major, _begin_minor, _end_minor) \
+		VOP_REG_VER_MASK(off, _mask, s, false, \
+				 _major, _begin_minor, _end_minor)
+
+#define VOP_REG(off, _mask, s) \
+		VOP_REG_VER(off, _mask, s, 0, 0, -1)
 
 #define VOP_REG_MASK(off, _mask, s) \
-		{.offset = off, \
-		 .mask = _mask, \
-		 .shift = s, \
-		 .write_mask = true,}
+		VOP_REG_VER_MASK(off, _mask, s, true, 0, 0, -1)
 
 static const uint32_t formats_win_full[] = {
 	DRM_FORMAT_XRGB8888,
