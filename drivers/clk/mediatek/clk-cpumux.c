@@ -27,7 +27,6 @@ static inline struct mtk_clk_cpumux *to_mtk_clk_cpumux(struct clk_hw *_hw)
 static u8 clk_cpumux_get_parent(struct clk_hw *hw)
 {
 	struct mtk_clk_cpumux *mux = to_mtk_clk_cpumux(hw);
-	int num_parents = clk_hw_get_num_parents(hw);
 	unsigned int val;
 
 	regmap_read(mux->regmap, mux->reg, &val);
@@ -35,16 +34,17 @@ static u8 clk_cpumux_get_parent(struct clk_hw *hw)
 	val >>= mux->shift;
 	val &= mux->mask;
 
-	if (val >= num_parents)
-		return -EINVAL;
-
 	return val;
 }
 
 static int clk_cpumux_set_parent(struct clk_hw *hw, u8 index)
 {
 	struct mtk_clk_cpumux *mux = to_mtk_clk_cpumux(hw);
+	int num_parents = clk_hw_get_num_parents(hw);
 	u32 mask, val;
+
+	if (index >= num_parents)
+		return -EINVAL;
 
 	val = index << mux->shift;
 	mask = mux->mask << mux->shift;
