@@ -658,6 +658,10 @@ static int uncore_pmu_event_init(struct perf_event *event)
 	if (hwc->sample_period)
 		return -EINVAL;
 
+	/* Single fixed PMU only has fixed event */
+	if (pmu->type->single_fixed && (event->attr.config != UNCORE_FIXED_EVENT))
+		return -EINVAL;
+
 	/*
 	 * Place all uncore events for a particular physical package
 	 * onto a single cpu
@@ -681,12 +685,9 @@ static int uncore_pmu_event_init(struct perf_event *event)
 		/* no fixed counter */
 		if (!pmu->type->fixed_ctl)
 			return -EINVAL;
-		/*
-		 * if there is only one fixed counter, only the first pmu
-		 * can access the fixed counter
-		 */
-		if (pmu->type->single_fixed && pmu->pmu_idx > 0)
-			return -EINVAL;
+
+		if (pmu->type->single_fixed)
+			event->hw.idx = UNCORE_PMC_IDX_FIXED;
 
 		/* fixed counters have event field hardcoded to zero */
 		hwc->config = 0ULL;
