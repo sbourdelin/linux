@@ -74,6 +74,15 @@
 			interrupts = <50>;
 			clocks = <&timer_clk>;
 		};
+
+		vrefbuf: regulator@58003C00 {
+			compatible = "st,stm32-vrefbuf";
+			reg = <0x58003C00 0x8>;
+			clocks = <&timer_clk>;
+			regulator-min-microvolt = <1500000>;
+			regulator-max-microvolt = <2500000>;
+			status = "disabled";
+		};
 	};
 };
 
