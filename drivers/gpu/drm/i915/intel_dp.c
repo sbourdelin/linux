@@ -3906,6 +3906,14 @@ int intel_dp_sink_crc(struct intel_dp *intel_dp, u8 *crc)
 	u8 buf;
 	int count, ret;
 	int attempts = 6;
+	u8 old_crc[6];
+
+	if (crc != NULL) {
+		memset(crc, 0, 6);
+		memset(old_crc, 0xff, 6);
+	} else {
+		return -ENOMEM;
+	}
 
 	ret = intel_dp_sink_crc_start(intel_dp);
 	if (ret)
@@ -3929,11 +3937,35 @@ int intel_dp_sink_crc(struct intel_dp *intel_dp, u8 *crc)
 		goto stop;
 	}
 
-	if (drm_dp_dpcd_read(&intel_dp->aux, DP_TEST_CRC_R_CR, crc, 6) < 0) {
-		ret = -EIO;
-		goto stop;
-	}
+	attempts = 6;
 
+	/*
+	 * Sometimes it takes a while for the "real" CRC values to land in
+	 * the DPCD, so try several times until we get two reads in a row
+	 * that are the same.  If we're an eDP panel, delay between reads
+	 * for a while since the values take a bit longer to propagate.
+	 */
+	do {
+		intel_wait_for_vblank(dev_priv, intel_crtc->pipe);
+		if (is_edp(intel_dp))
+			usleep_range(20000, 25000);
+
+		if (drm_dp_dpcd_read(&intel_dp->aux, DP_TEST_CRC_R_CR,
+				     crc, 6) < 0) {
+			ret = -EIO;
+			goto stop;
+		}
+
+		if (memcmp(old_crc, crc, 6) == 0) {
+			ret = 0;
+			goto stop;
+		} else {
+			memcpy(old_crc, crc, 6);
+		}
+	} while (--attempts);
+
+	DRM_DEBUG_KMS("Failed to get CRC after 6 attempts.\n");
+	ret = -ETIMEDOUT;
 stop:
 	intel_dp_sink_crc_stop(intel_dp);
 	return ret;
