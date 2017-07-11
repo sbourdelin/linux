@@ -637,11 +637,33 @@ static bool should_defer_flush(struct mm_struct *mm, enum ttu_flags flags)
 		return false;
 
 	/* If remote CPUs need to be flushed then defer batch the flush */
-	if (cpumask_any_but(mm_cpumask(mm), get_cpu()) < nr_cpu_ids)
+	if (cpumask_any_but(mm_cpumask(mm), get_cpu()) < nr_cpu_ids) {
 		should_defer = true;
+		mm->tlb_flush_batched = true;
+	}
 	put_cpu();
 
 	return should_defer;
+}
+
+/*
+ * Reclaim unmaps pages under the PTL but does not flush the TLB prior to
+ * releasing the PTL if TLB flushes are batched. It's possible a parallel
+ * operation such as mprotect or munmap to race between reclaim unmapping
+ * the page and flushing the page If this race occurs, it potentially allows
+ * access to data via a stale TLB entry. Tracking all mm's that have TLB
+ * batching pending would be expensive during reclaim so instead track
+ * whether TLB batching occured in the past and if so then do a full mmi
+ * flush here. This will cost one additional flush per reclaim cycle paid
+ * by the first operation at risk such as mprotect and mumap. This assumes
+ * it's called under the PTL to synchronise access to mm->tlb_flush_batched.
+ */
+void flush_tlb_batched_pending(struct mm_struct *mm)
+{
+	if (mm->tlb_flush_batched) {
+		flush_tlb_mm(mm);
+		mm->tlb_flush_batched = false;
+	}
 }
 #else
 static void set_tlb_ubc_flush_pending(struct mm_struct *mm, bool writable)

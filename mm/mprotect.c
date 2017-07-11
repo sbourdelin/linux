@@ -61,6 +61,9 @@ static unsigned long change_pte_range(struct vm_area_struct *vma, pmd_t *pmd,
 	if (!pte)
 		return 0;
 
+	/* Guard against parallel reclaim batching a TLB flush without PTL */
+	flush_tlb_batched_pending(vma->vm_mm);
+
 	/* Get target node for single threaded private VMAs */
 	if (prot_numa && !(vma->vm_flags & VM_SHARED) &&
 	    atomic_read(&vma->vm_mm->mm_users) == 1)
