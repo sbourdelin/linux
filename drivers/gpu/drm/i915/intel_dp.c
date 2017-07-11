@@ -106,7 +106,7 @@ static const int default_rates[] = { 162000, 270000, 540000 };
  * If a CPU or PCH DP output is attached to an eDP panel, this function
  * will return true, and false otherwise.
  */
-static bool is_edp(struct intel_dp *intel_dp)
+bool is_edp(struct intel_dp *intel_dp)
 {
 	struct intel_digital_port *intel_dig_port = dp_to_dig_port(intel_dp);
 
@@ -4707,6 +4707,7 @@ intel_dp_long_pulse(struct intel_connector *intel_connector)
 		intel_dp->max_link_rate = intel_dp_max_common_rate(intel_dp);
 
 		intel_dp->reset_link_params = false;
+		intel_dp->train_set_valid = false;
 	}
 
 	intel_dp_print_rates(intel_dp);
@@ -5969,6 +5970,7 @@ intel_dp_init_connector(struct intel_digital_port *intel_dig_port,
 	intel_dp_set_source_rates(intel_dp);
 
 	intel_dp->reset_link_params = true;
+	intel_dp->train_set_valid = false;
 	intel_dp->pps_pipe = INVALID_PIPE;
 	intel_dp->active_pipe = INVALID_PIPE;
 

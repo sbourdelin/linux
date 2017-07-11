@@ -94,7 +94,8 @@ static bool
 intel_dp_reset_link_train(struct intel_dp *intel_dp,
 			uint8_t dp_train_pat)
 {
-	memset(intel_dp->train_set, 0, sizeof(intel_dp->train_set));
+	if (!intel_dp->train_set_valid)
+		memset(intel_dp->train_set, 0, sizeof(intel_dp->train_set));
 	intel_dp_set_signal_levels(intel_dp);
 	return intel_dp_set_link_train(intel_dp, dp_train_pat);
 }
@@ -162,6 +163,7 @@ intel_dp_link_training_clock_recovery(struct intel_dp *intel_dp)
 				       DP_TRAINING_PATTERN_1 |
 				       DP_LINK_SCRAMBLING_DISABLE)) {
 		DRM_ERROR("failed to enable link training\n");
+		intel_dp->train_set_valid = false;
 		return false;
 	}
 
@@ -174,21 +176,25 @@ intel_dp_link_training_clock_recovery(struct intel_dp *intel_dp)
 
 		if (!intel_dp_get_link_status(intel_dp, link_status)) {
 			DRM_ERROR("failed to get link status\n");
+			intel_dp->train_set_valid = false;
 			return false;
 		}
 
 		if (drm_dp_clock_recovery_ok(link_status, intel_dp->lane_count)) {
 			DRM_DEBUG_KMS("clock recovery OK\n");
+			intel_dp->train_set_valid = is_edp(intel_dp);
 			return true;
 		}
 
 		if (voltage_tries == 5) {
 			DRM_DEBUG_KMS("Same voltage tried 5 times\n");
+			intel_dp->train_set_valid = false;
 			return false;
 		}
 
 		if (max_vswing_tries == 1) {
 			DRM_DEBUG_KMS("Max Voltage Swing reached\n");
+			intel_dp->train_set_valid = false;
 			return false;
 		}
 
@@ -198,6 +204,7 @@ intel_dp_link_training_clock_recovery(struct intel_dp *intel_dp)
 		intel_get_adjust_train(intel_dp, link_status);
 		if (!intel_dp_update_link_train(intel_dp)) {
 			DRM_ERROR("failed to update link training\n");
+			intel_dp->train_set_valid = false;
 			return false;
 		}
 
@@ -256,6 +263,7 @@ intel_dp_link_training_channel_equalization(struct intel_dp *intel_dp)
 				     training_pattern |
 				     DP_LINK_SCRAMBLING_DISABLE)) {
 		DRM_ERROR("failed to start channel equalization\n");
+		intel_dp->train_set_valid = false;
 		return false;
 	}
 
@@ -296,6 +304,7 @@ intel_dp_link_training_channel_equalization(struct intel_dp *intel_dp)
 	/* Try 5 times, else fail and try at lower BW */
 	if (tries == 5) {
 		intel_dp_dump_link_status(link_status);
+		intel_dp->train_set_valid = false;
 		DRM_DEBUG_KMS("Channel equalization failed 5 times\n");
 	}
 
