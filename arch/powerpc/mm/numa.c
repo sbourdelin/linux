@@ -60,10 +60,27 @@ static int min_common_depth;
 static int n_mem_addr_cells, n_mem_size_cells;
 static int form1_affinity;
 
+#define TOPOLOGY_DEF_NUM_NODES	0
 #define MAX_DISTANCE_REF_POINTS 4
 static int distance_ref_points_depth;
 static const __be32 *distance_ref_points;
 static int distance_lookup_table[MAX_NUMNODES][MAX_DISTANCE_REF_POINTS];
+static int topology_num_nodes = TOPOLOGY_DEF_NUM_NODES;
+
+/*
+ * Topology-related early parameters
+ */
+static int __init early_num_nodes(char *p)
+{
+	if (!p)
+		return 1;
+
+	topology_num_nodes = memparse(p, &p);
+	dbg("topology num nodes = 0x%d\n", topology_num_nodes);
+
+	return 0;
+}
+early_param("numnodes", early_num_nodes);
 
 /*
  * Allocate node_to_cpumask_map based on number of available nodes
@@ -892,6 +909,18 @@ static void __init setup_node_data(int nid, u64 start_pfn, u64 end_pfn)
 	NODE_DATA(nid)->node_spanned_pages = spanned_pages;
 }
 
+static void __init setup_min_nodes(void)
+{
+	int i, l = topology_num_nodes;
+
+	for (i = 0; i < l; i++) {
+		if (!node_possible(i)) {
+			setup_node_data(i, 0, 0);
+			node_set(i, node_possible_map);
+		}
+	}
+}
+
 void __init initmem_init(void)
 {
 	int nid, cpu;
@@ -910,6 +939,8 @@ void __init initmem_init(void)
 	 * lower the maximum NUMA node ID to what is actually present.
 	 */
 	nodes_and(node_possible_map, node_possible_map, node_online_map);
+
+	setup_min_nodes();
 
 	for_each_online_node(nid) {
 		unsigned long start_pfn, end_pfn;
