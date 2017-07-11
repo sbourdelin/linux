@@ -148,6 +148,8 @@ static const struct pci_device_id hpsa_pci_device_id[] = {
 	{PCI_VENDOR_ID_HP, 0x333f, 0x103c, 0x333f},
 	{PCI_VENDOR_ID_HP,     PCI_ANY_ID,	PCI_ANY_ID, PCI_ANY_ID,
 		PCI_CLASS_STORAGE_RAID << 8, 0xffff << 8, 0},
+	{PCI_VENDOR_ID_COMPAQ,     PCI_ANY_ID,	PCI_ANY_ID, PCI_ANY_ID,
+		PCI_CLASS_STORAGE_RAID << 8, 0xffff << 8, 0},
 	{0,}
 };
 
@@ -158,6 +160,26 @@ MODULE_DEVICE_TABLE(pci, hpsa_pci_device_id);
  *  access = Address of the struct of function pointers
  */
 static struct board_type products[] = {
+	{0x40700E11, "Smart Array 5300", &SA5A_access},
+	{0x40800E11, "Smart Array 5i", &SA5B_access},
+	{0x40820E11, "Smart Array 532", &SA5B_access},
+	{0x40830E11, "Smart Array 5312", &SA5B_access},
+	{0x409A0E11, "Smart Array 641", &SA5A_access},
+	{0x409B0E11, "Smart Array 642", &SA5A_access},
+	{0x409C0E11, "Smart Array 6400", &SA5A_access},
+	{0x409D0E11, "Smart Array 6400 EM", &SA5A_access},
+	{0x40910E11, "Smart Array 6i", &SA5A_access},
+	{0x3225103C, "Smart Array P600", &SA5A_access},
+	{0x3223103C, "Smart Array P800", &SA5A_access},
+	{0x3234103C, "Smart Array P400", &SA5A_access},
+	{0x3235103C, "Smart Array P400i", &SA5A_access},
+	{0x3211103C, "Smart Array E200i", &SA5A_access},
+	{0x3212103C, "Smart Array E200", &SA5A_access},
+	{0x3213103C, "Smart Array E200i", &SA5A_access},
+	{0x3214103C, "Smart Array E200i", &SA5A_access},
+	{0x3215103C, "Smart Array E200i", &SA5A_access},
+	{0x3237103C, "Smart Array E500", &SA5A_access},
+	{0x323D103C, "Smart Array P700m", &SA5A_access},
 	{0x3241103C, "Smart Array P212", &SA5_access},
 	{0x3243103C, "Smart Array P410", &SA5_access},
 	{0x3245103C, "Smart Array P410i", &SA5_access},
@@ -7243,8 +7265,17 @@ static int hpsa_lookup_board_id(struct pci_dev *pdev, u32 *board_id)
 		    subsystem_vendor_id;
 
 	for (i = 0; i < ARRAY_SIZE(products); i++)
-		if (*board_id == products[i].board_id)
-			return i;
+		if (*board_id == products[i].board_id) {
+			if (products[i].access != &SA5A_access &&
+			    products[i].access != &SA5B_access)
+				return i;
+			if (hpsa_allow_any) {
+				dev_warn(&pdev->dev,
+					 "unsupported board ID: 0x%08x\n",
+					 *board_id);
+				return i;
+			}
+		}
 
 	if ((subsystem_vendor_id != PCI_VENDOR_ID_HP &&
 		subsystem_vendor_id != PCI_VENDOR_ID_COMPAQ) ||
