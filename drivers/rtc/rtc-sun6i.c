@@ -362,7 +362,7 @@ static int sun6i_rtc_setalarm(struct device *dev, struct rtc_wkalrm *wkalrm)
 	unsigned long time_now = 0;
 	unsigned long time_set = 0;
 	unsigned long time_gap = 0;
-	int ret = 0;
+	int ret;
 
 	ret = sun6i_rtc_gettime(dev, &tm_now);
 	if (ret < 0) {
