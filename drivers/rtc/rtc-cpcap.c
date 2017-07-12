@@ -58,24 +58,23 @@ struct cpcap_rtc {
 static void cpcap2rtc_time(struct rtc_time *rtc, struct cpcap_time *cpcap)
 {
 	unsigned long int tod;
-	unsigned long int time;
+	unsigned long long time;
 
 	tod = (cpcap->tod1 & TOD1_MASK) | ((cpcap->tod2 & TOD2_MASK) << 8);
 	time = tod + ((cpcap->day & DAY_MASK) * SECS_PER_DAY);
 
-	rtc_time_to_tm(time, rtc);
+	rtc_time64_to_tm(time, rtc);
 }
 
 static void rtc2cpcap_time(struct cpcap_time *cpcap, struct rtc_time *rtc)
 {
-	unsigned long time;
+	unsigned long long time, tod;
 
-	rtc_tm_to_time(rtc, &time);
-
-	cpcap->day = time / SECS_PER_DAY;
-	time %= SECS_PER_DAY;
-	cpcap->tod2 = (time >> 8) & TOD2_MASK;
-	cpcap->tod1 = time & TOD1_MASK;
+	time = rtc_tm_to_time64(rtc);
+	tod = do_div(time, SECS_PER_DAY);
+	cpcap->day = time;
+	cpcap->tod2 = (tod >> 8) & TOD2_MASK;
+	cpcap->tod1 = tod & TOD1_MASK;
 }
 
 static int cpcap_rtc_alarm_irq_enable(struct device *dev, unsigned int enabled)
