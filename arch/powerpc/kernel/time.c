@@ -695,16 +695,15 @@ notrace unsigned long long sched_clock(void)
 unsigned long long running_clock(void)
 {
 	/*
-	 * Don't read the VTB as a host since KVM does not switch in host
-	 * timebase into the VTB when it takes a guest off the CPU, reading the
-	 * VTB would result in reading 'last switched out' guest VTB.
+	 * Use get_tb instead of get_vtb for guest since the TB_OFFSET has been
+	 * well saved/restored when qemu does suspend/resume.
 	 *
 	 * Host kernels are often compiled with CONFIG_PPC_PSERIES checked, it
 	 * would be unsafe to rely only on the #ifdef above.
 	 */
 	if (firmware_has_feature(FW_FEATURE_LPAR) &&
 	    cpu_has_feature(CPU_FTR_ARCH_207S))
-		return mulhdu(get_vtb() - boot_tb, tb_to_ns_scale) << tb_to_ns_shift;
+		return mulhdu(get_tb() - boot_tb, tb_to_ns_scale) << tb_to_ns_shift;
 
 	/*
 	 * This is a next best approximation without a VTB.
