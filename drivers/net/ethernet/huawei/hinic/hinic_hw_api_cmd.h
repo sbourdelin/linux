@@ -132,6 +132,9 @@ struct hinic_api_cmd_chain {
 	struct hinic_api_cmd_cell	*curr_node;
 };
 
+int hinic_api_cmd_write(struct hinic_api_cmd_chain *chain,
+			enum hinic_node_id dest, void *cmd, u16 size);
+
 int hinic_api_cmd_init(struct hinic_hwif *hwif,
 		       struct hinic_api_cmd_chain **chain);
 
