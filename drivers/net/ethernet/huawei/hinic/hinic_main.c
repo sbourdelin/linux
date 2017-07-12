@@ -70,6 +70,179 @@ MODULE_PARM_DESC(rx_weight, "Number Rx packets for NAPI budget (default=64)");
 
 static int change_mac_addr(struct net_device *netdev, const u8 *addr);
 
+static int hinic_get_link_ksettings(struct net_device *netdev,
+				    struct ethtool_link_ksettings
+				    *link_ksettings)
+{
+	struct hinic_dev *nic_dev = netdev_priv(netdev);
+	struct hinic_port_cap port_cap;
+	enum hinic_autoneg_cap autoneg_cap;
+	enum hinic_autoneg_state autoneg_state;
+	enum hinic_port_link_state link_state;
+	int err;
+
+	ethtool_link_ksettings_zero_link_mode(link_ksettings, advertising);
+	ethtool_link_ksettings_add_link_mode(link_ksettings, supported,
+					     Autoneg);
+
+	link_ksettings->base.speed = SPEED_UNKNOWN;
+	link_ksettings->base.autoneg = AUTONEG_DISABLE;
+	link_ksettings->base.duplex = DUPLEX_UNKNOWN;
+
+	err = hinic_port_get_cap(nic_dev, &port_cap);
+	if (err) {
+		netif_err(nic_dev, drv, netdev, "Failed to get port capabilities\n");
+		return err;
+	}
+
+	err = hinic_port_link_state(nic_dev, &link_state);
+	if (err) {
+		netif_err(nic_dev, drv, netdev, "Failed to get port link state\n");
+		return err;
+	}
+
+	if (link_state != HINIC_LINK_STATE_UP) {
+		netif_info(nic_dev, drv, netdev, "No link\n");
+		return err;
+	}
+
+	switch (port_cap.speed) {
+	case HINIC_SPEED_10MB_LINK:
+		link_ksettings->base.speed = SPEED_10;
+		break;
+
+	case HINIC_SPEED_100MB_LINK:
+		link_ksettings->base.speed = SPEED_100;
+		break;
+
+	case HINIC_SPEED_1000MB_LINK:
+		link_ksettings->base.speed = SPEED_1000;
+		break;
+
+	case HINIC_SPEED_10GB_LINK:
+		link_ksettings->base.speed = SPEED_10000;
+		break;
+
+	case HINIC_SPEED_25GB_LINK:
+		link_ksettings->base.speed = SPEED_25000;
+		break;
+
+	case HINIC_SPEED_40GB_LINK:
+		link_ksettings->base.speed = SPEED_40000;
+		break;
+
+	case HINIC_SPEED_100GB_LINK:
+		link_ksettings->base.speed = SPEED_100000;
+		break;
+
+	default:
+		link_ksettings->base.speed = SPEED_UNKNOWN;
+		break;
+	}
+
+	autoneg_cap = port_cap.autoneg_cap;
+	autoneg_state = port_cap.autoneg_state;
+
+	if (!!(autoneg_cap & HINIC_AUTONEG_SUPPORTED))
+		ethtool_link_ksettings_add_link_mode(link_ksettings,
+						     advertising, Autoneg);
+
+	link_ksettings->base.autoneg = (autoneg_state == HINIC_AUTONEG_ACTIVE) ?
+				       AUTONEG_ENABLE : AUTONEG_DISABLE;
+	link_ksettings->base.duplex = (port_cap.duplex == HINIC_DUPLEX_FULL) ?
+				      DUPLEX_FULL : DUPLEX_HALF;
+
+	return 0;
+}
+
+static void hinic_get_drvinfo(struct net_device *netdev,
+			      struct ethtool_drvinfo *info)
+{
+	struct hinic_dev *nic_dev = netdev_priv(netdev);
+	struct hinic_hwdev *hwdev = nic_dev->hwdev;
+	struct hinic_hwif *hwif = hwdev->hwif;
+	struct pci_dev *pdev = hwif->pdev;
+
+	strlcpy(info->driver, HINIC_DRV_NAME, sizeof(info->driver));
+	strlcpy(info->version, HINIC_DRV_VERSION, sizeof(info->driver));
+	strlcpy(info->bus_info, pci_name(pdev), sizeof(info->bus_info));
+}
+
+static void hinic_get_ringparam(struct net_device *netdev,
+				struct ethtool_ringparam *ring)
+{
+	ring->rx_max_pending = HINIC_RQ_DEPTH;
+	ring->tx_max_pending = HINIC_SQ_DEPTH;
+	ring->rx_pending = HINIC_RQ_DEPTH;
+	ring->tx_pending = HINIC_SQ_DEPTH;
+}
+
+static void hinic_get_channels(struct net_device *netdev,
+			       struct ethtool_channels *channels)
+{
+	struct hinic_dev *nic_dev = netdev_priv(netdev);
+	struct hinic_hwdev *hwdev = nic_dev->hwdev;
+
+	channels->max_rx = hwdev->nic_cap.max_qps;
+	channels->max_tx = hwdev->nic_cap.max_qps;
+	channels->max_other = 0;
+	channels->max_combined = 0;
+	channels->rx_count = hinic_hwdev_num_qps(hwdev);
+	channels->tx_count = hinic_hwdev_num_qps(hwdev);
+	channels->other_count = 0;
+	channels->combined_count = 0;
+}
+
+static const struct ethtool_ops hinic_ethtool_ops = {
+	.get_link_ksettings = hinic_get_link_ksettings,
+	.get_drvinfo = hinic_get_drvinfo,
+	.get_link = ethtool_op_get_link,
+	.get_ringparam = hinic_get_ringparam,
+	.get_channels = hinic_get_channels,
+};
+
+static void update_nic_stats(struct hinic_dev *nic_dev)
+{
+	struct hinic_rxq_stats *nic_rx_stats = &nic_dev->rx_stats;
+	struct hinic_txq_stats *nic_tx_stats = &nic_dev->tx_stats;
+	struct hinic_hwdev *hwdev = nic_dev->hwdev;
+	int i, num_qps = hinic_hwdev_num_qps(hwdev);
+	struct hinic_rxq_stats rx_stats;
+	struct hinic_txq_stats tx_stats;
+
+	u64_stats_init(&tx_stats.syncp);
+	u64_stats_init(&rx_stats.syncp);
+
+	for (i = 0; i < num_qps; i++) {
+		struct hinic_rxq *rxq = &nic_dev->rxqs[i];
+
+		hinic_rxq_get_stats(rxq, &rx_stats);
+
+		u64_stats_update_begin(&nic_rx_stats->syncp);
+		nic_rx_stats->bytes += rx_stats.bytes;
+		nic_rx_stats->pkts += rx_stats.pkts;
+		u64_stats_update_end(&nic_rx_stats->syncp);
+
+		hinic_rxq_clean_stats(rxq);
+	}
+
+	for (i = 0; i < num_qps; i++) {
+		struct hinic_txq *txq = &nic_dev->txqs[i];
+
+		hinic_txq_get_stats(txq, &tx_stats);
+
+		u64_stats_update_begin(&nic_tx_stats->syncp);
+		nic_tx_stats->bytes += tx_stats.bytes;
+		nic_tx_stats->pkts += tx_stats.pkts;
+		nic_tx_stats->tx_busy += tx_stats.tx_busy;
+		nic_tx_stats->tx_wake += tx_stats.tx_wake;
+		nic_tx_stats->tx_dropped += tx_stats.tx_dropped;
+		u64_stats_update_end(&nic_tx_stats->syncp);
+
+		hinic_txq_clean_stats(txq);
+	}
+}
+
 /**
  * create_txqs - Create the Logical Tx Queues of specific NIC device
  * @nic_dev: the specific NIC device
@@ -299,6 +472,8 @@ static int hinic_close(struct net_device *netdev)
 
 	netif_carrier_off(netdev);
 	netif_tx_disable(netdev);
+
+	update_nic_stats(nic_dev);
 
 	up(&nic_dev->mgmt_lock);
 
@@ -580,6 +755,77 @@ static void hinic_set_rx_mode(struct net_device *netdev)
 	queue_work(nic_dev->workq, &rx_mode_work->work);
 }
 
+static u16 hinic_select_queue(struct net_device *netdev, struct sk_buff *skb,
+			      void *accel_priv,
+			      select_queue_fallback_t fallback)
+{
+	u16 qid;
+
+	if (skb_rx_queue_recorded(skb))
+		qid = skb_get_rx_queue(skb);
+	else
+		qid = fallback(netdev, skb);
+
+	return qid;
+}
+
+static void hinic_get_stats64(struct net_device *netdev,
+			      struct rtnl_link_stats64 *stats)
+{
+	struct hinic_dev *nic_dev = netdev_priv(netdev);
+	struct hinic_rxq_stats *nic_rx_stats = &nic_dev->rx_stats;
+	struct hinic_txq_stats *nic_tx_stats = &nic_dev->tx_stats;
+
+	stats->rx_bytes = nic_rx_stats->bytes;
+	stats->rx_packets = nic_rx_stats->pkts;
+
+	stats->tx_bytes = nic_tx_stats->bytes;
+	stats->tx_packets = nic_tx_stats->pkts;
+	stats->tx_errors = nic_tx_stats->tx_dropped;
+
+	down(&nic_dev->mgmt_lock);
+
+	if (!(nic_dev->flags & HINIC_INTF_UP)) {
+		up(&nic_dev->mgmt_lock);
+		return;
+	}
+
+	update_nic_stats(nic_dev);
+
+	up(&nic_dev->mgmt_lock);
+
+	stats->rx_bytes = nic_rx_stats->bytes;
+	stats->rx_packets = nic_rx_stats->pkts;
+
+	stats->tx_bytes = nic_tx_stats->bytes;
+	stats->tx_packets = nic_tx_stats->pkts;
+	stats->tx_errors = nic_tx_stats->tx_dropped;
+}
+
+static void hinic_tx_timeout(struct net_device *netdev)
+{
+	struct hinic_dev *nic_dev = netdev_priv(netdev);
+
+	netif_err(nic_dev, drv, netdev, "Tx timeout\n");
+}
+
+#ifdef CONFIG_NET_POLL_CONTROLLER
+static void hinic_netpoll(struct net_device *netdev)
+{
+	struct hinic_dev *nic_dev = netdev_priv(netdev);
+	struct hinic_hwdev *hwdev = nic_dev->hwdev;
+	int i, num_qps = hinic_hwdev_num_qps(hwdev);
+
+	for (i = 0; i < num_qps; i++) {
+		struct hinic_txq *txq = &nic_dev->txqs[i];
+		struct hinic_rxq *rxq = &nic_dev->rxqs[i];
+
+		napi_schedule(&txq->napi);
+		napi_schedule(&rxq->napi);
+	}
+}
+#endif
+
 static const struct net_device_ops hinic_netdev_ops = {
 	.ndo_open = hinic_open,
 	.ndo_stop = hinic_close,
@@ -590,7 +836,12 @@ static const struct net_device_ops hinic_netdev_ops = {
 	.ndo_vlan_rx_kill_vid = hinic_vlan_rx_kill_vid,
 	.ndo_set_rx_mode = hinic_set_rx_mode,
 	.ndo_start_xmit = hinic_xmit_frame,
-	/* more operations should be filled */
+	.ndo_select_queue = hinic_select_queue,
+	.ndo_get_stats64 = hinic_get_stats64,
+	.ndo_tx_timeout = hinic_tx_timeout,
+#ifdef CONFIG_NET_POLL_CONTROLLER
+	.ndo_poll_controller = hinic_netpoll,
+#endif
 };
 
 static void netdev_features_init(struct net_device *netdev)
@@ -665,6 +916,8 @@ static int nic_dev_init(struct pci_dev *pdev)
 	struct hinic_dev *nic_dev;
 	struct net_device *netdev;
 	struct hinic_hwdev *hwdev;
+	struct hinic_txq_stats *tx_stats;
+	struct hinic_rxq_stats *rx_stats;
 	struct hinic_rx_mode_work *rx_mode_work;
 	int err, num_qps;
 
@@ -689,6 +942,7 @@ static int nic_dev_init(struct pci_dev *pdev)
 	}
 
 	netdev->netdev_ops = &hinic_netdev_ops;
+	netdev->ethtool_ops = &hinic_ethtool_ops;
 
 	nic_dev = (struct hinic_dev *)netdev_priv(netdev);
 	nic_dev->hwdev = hwdev;
@@ -701,6 +955,12 @@ static int nic_dev_init(struct pci_dev *pdev)
 	nic_dev->rx_weight = rx_weight;
 
 	sema_init(&nic_dev->mgmt_lock, 1);
+
+	tx_stats = &nic_dev->tx_stats;
+	rx_stats = &nic_dev->rx_stats;
+
+	u64_stats_init(&tx_stats->syncp);
+	u64_stats_init(&rx_stats->syncp);
 
 	nic_dev->vlan_bitmap = kzalloc(VLAN_BITMAP_SIZE(nic_dev), GFP_KERNEL);
 	if (!nic_dev->vlan_bitmap) {
