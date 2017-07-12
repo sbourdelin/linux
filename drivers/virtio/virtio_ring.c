@@ -52,8 +52,13 @@
 			"%s:"fmt, (_vq)->vq.name, ##args);	\
 		(_vq)->broken = true;				\
 	} while (0)
-#define START_USE(vq)
-#define END_USE(vq)
+#define START_USE(_vq)						\
+	do {							\
+		while ((_vq)->in_use)				\
+			cpu_relax();				\
+		(_vq)->in_use = __LINE__;			\
+	} while (0)
+#define END_USE(_vq)	((_vq)->in_use = 0)
 #endif
 
 struct vring_desc_state {
@@ -101,9 +106,9 @@ struct vring_virtqueue {
 	size_t queue_size_in_bytes;
 	dma_addr_t queue_dma_addr;
 
-#ifdef DEBUG
 	/* They're supposed to lock for us. */
 	unsigned int in_use;
+#ifdef DEBUG
 
 	/* Figure out if their kicks are too delayed. */
 	bool last_add_time_valid;
@@ -845,6 +850,18 @@ static void detach_buf(struct vring_virtqueue *vq, unsigned int head,
 	}
 }
 
+void virtqueue_detach_buf(struct virtqueue *_vq, unsigned int head, void **ctx)
+{
+	struct vring_virtqueue *vq = to_vvq(_vq);
+
+	START_USE(vq);
+
+	detach_buf(vq, head, ctx);
+
+	END_USE(vq);
+}
+EXPORT_SYMBOL_GPL(virtqueue_detach_buf);
+
 static inline bool more_used(const struct vring_virtqueue *vq)
 {
 	return vq->last_used_idx != virtio16_to_cpu(vq->vq.vdev, vq->vring.used->idx);
@@ -1158,8 +1175,8 @@ struct virtqueue *__vring_new_virtqueue(unsigned int index,
 	vq->avail_idx_shadow = 0;
 	vq->num_added = 0;
 	list_add_tail(&vq->vq.list, &vdev->vqs);
+	vq->in_use = 0;
 #ifdef DEBUG
-	vq->in_use = false;
 	vq->last_add_time_valid = false;
 #endif
 
