@@ -4703,7 +4703,7 @@ int bnxt_hwrm_fw_set_time(struct bnxt *bp)
 		return -EOPNOTSUPP;
 
 	do_gettimeofday(&tv);
-	rtc_time_to_tm(tv.tv_sec, &tm);
+	rtc_time64_to_tm(tv.tv_sec, &tm);
 	bnxt_hwrm_cmd_hdr_init(bp, &req, HWRM_FW_SET_TIME, -1, -1);
 	req.year = cpu_to_le16(1900 + tm.tm_year);
 	req.month = 1 + tm.tm_mon;
