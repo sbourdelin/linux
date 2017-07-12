@@ -1,7 +1,9 @@
-* Texas Instruments SoC audio setups with TLV320AIC3X Codec
+* Texas Instruments SoC audio setups with TLV320AIC3X/WM89XX codecs
 
 Required properties:
 - compatible : "ti,da830-evm-audio" : forDM365/DA8xx/OMAPL1x/AM33xx
+	       "ti,dm8168-evm-audio" : for DM81xx with TLV320AIC3x
+	       "ti,dm8168-evm-audio-wm8978" : for DM81xx with WM897x
 - ti,model : The user-visible name of this sound complex.
 - ti,audio-codec : The phandle of the TLV320AIC3x audio codec
 - ti,mcasp-controller : The phandle of the McASP controller
@@ -14,6 +16,8 @@ Optional properties:
 - ti,codec-clock-rate : The Codec Clock rate (in Hz) applied to the Codec.
 - clocks : Reference to the master clock
 - clock-names : The clock should be named "mclk"
+- ti,cpu-clkdiv : CPU clock divisor (if codec and cpu are clocked at
+  different rates)
 - Either codec-clock-rate or the codec-clock reference has to be defined. If
   the both are defined the driver attempts to set referenced clock to the
   defined rate and takes the rate from the clock reference.

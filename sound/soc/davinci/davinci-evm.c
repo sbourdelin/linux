@@ -26,7 +26,8 @@
 
 struct snd_soc_card_drvdata_davinci {
 	struct clk *mclk;
-	unsigned sysclk;
+	unsigned int sysclk;
+	unsigned int clkdiv;
 };
 
 static int evm_startup(struct snd_pcm_substream *substream)
@@ -61,8 +62,11 @@ static int evm_hw_params(struct snd_pcm_substream *substream,
 	struct snd_soc_dai *cpu_dai = rtd->cpu_dai;
 	struct snd_soc_card *soc_card = rtd->card;
 	int ret = 0;
-	unsigned sysclk = ((struct snd_soc_card_drvdata_davinci *)
-			   snd_soc_card_get_drvdata(soc_card))->sysclk;
+	unsigned int sysclk = ((struct snd_soc_card_drvdata_davinci *)
+				snd_soc_card_get_drvdata(soc_card))->sysclk;
+	unsigned int clkdiv = ((struct snd_soc_card_drvdata_davinci *)
+				snd_soc_card_get_drvdata(soc_card))->clkdiv;
+
 
 	/* set the codec system clock */
 	ret = snd_soc_dai_set_sysclk(codec_dai, 0, sysclk, SND_SOC_CLOCK_OUT);
@@ -74,6 +78,13 @@ static int evm_hw_params(struct snd_pcm_substream *substream,
 	if (ret < 0)
 		return ret;
 
+	/* set the CPU system clock divisor */
+	if (clkdiv) {
+		ret = snd_soc_dai_set_clkdiv(cpu_dai, 0, clkdiv);
+		if (ret < 0)
+			return ret;
+	}
+
 	return 0;
 }
 
@@ -84,7 +95,7 @@ static struct snd_soc_ops evm_ops = {
 };
 
 /* davinci-evm machine dapm widgets */
-static const struct snd_soc_dapm_widget aic3x_dapm_widgets[] = {
+static const struct snd_soc_dapm_widget evm_dapm_widgets[] = {
 	SND_SOC_DAPM_HP("Headphone Jack", NULL),
 	SND_SOC_DAPM_LINE("Line Out", NULL),
 	SND_SOC_DAPM_MIC("Mic Jack", NULL),
@@ -121,8 +132,8 @@ static int evm_aic3x_init(struct snd_soc_pcm_runtime *rtd)
 	int ret;
 
 	/* Add davinci-evm specific widgets */
-	snd_soc_dapm_new_controls(&card->dapm, aic3x_dapm_widgets,
-				  ARRAY_SIZE(aic3x_dapm_widgets));
+	snd_soc_dapm_new_controls(&card->dapm, evm_dapm_widgets,
+				  ARRAY_SIZE(evm_dapm_widgets));
 
 	if (np) {
 		ret = snd_soc_of_parse_audio_routing(card, "ti,audio-routing");
@@ -133,6 +144,28 @@ static int evm_aic3x_init(struct snd_soc_pcm_runtime *rtd)
 		snd_soc_dapm_add_routes(&card->dapm, audio_map,
 					ARRAY_SIZE(audio_map));
 	}
+
+	/* not connected */
+	snd_soc_dapm_nc_pin(&card->dapm, "MONO_LOUT");
+	snd_soc_dapm_nc_pin(&card->dapm, "HPLCOM");
+	snd_soc_dapm_nc_pin(&card->dapm, "HPRCOM");
+
+	return 0;
+}
+
+/* Logic for a non-aic3x (e. g. wm89xx) connected to a davinci-evm */
+static int evm_simple_init(struct snd_soc_pcm_runtime *rtd)
+{
+	struct snd_soc_card *card = rtd->card;
+	struct device_node *np = card->dev->of_node;
+
+	/* Add davinci-evm specific widgets */
+	snd_soc_dapm_new_controls(&card->dapm, evm_dapm_widgets,
+				  ARRAY_SIZE(evm_dapm_widgets));
+
+	/* audio routing is optional here */
+	if (np)
+		snd_soc_of_parse_audio_routing(card, "ti,audio-routing");
 
 	/* not connected */
 	snd_soc_dapm_nc_pin(&card->dapm, "MONO_LOUT");
@@ -340,10 +373,28 @@ static struct snd_soc_dai_link evm_dai_tlv320aic3x = {
 		   SND_SOC_DAIFMT_IB_NF,
 };
 
+static struct snd_soc_dai_link evm_dai_wm8978 = {
+	.name		= "wm8978",
+	.stream_name	= "wm8978",
+	.codec_dai_name	= "wm8978-hifi",
+	.ops            = &evm_ops,
+	.init           = evm_simple_init,
+	.dai_fmt = SND_SOC_DAIFMT_I2S | SND_SOC_DAIFMT_CBM_CFM |
+		 SND_SOC_DAIFMT_IB_NF,
+};
+
 static const struct of_device_id davinci_evm_dt_ids[] = {
 	{
 		.compatible = "ti,da830-evm-audio",
 		.data = (void *) &evm_dai_tlv320aic3x,
+	},
+	{
+		.compatible = "ti,dm8168-evm-audio",
+		.data = (void *) &evm_dai_tlv320aic3x,
+	},
+	{
+		.compatible = "ti,dm8168-evm-audio-wm8978",
+		.data = (void *) &evm_dai_wm8978,
 	},
 	{ /* sentinel */ }
 };
@@ -421,6 +472,9 @@ static int davinci_evm_probe(struct platform_device *pdev)
 				 "Could not get requested rate %u using %u.\n",
 				 requestd_rate, drvdata->sysclk);
 	}
+
+	/* CPU clock divisor may need to be provided for e. g. wm897x */
+	of_property_read_u32(np, "ti,cpu-clkdiv", &drvdata->clkdiv);
 
 	snd_soc_card_set_drvdata(&evm_soc_card, drvdata);
 	ret = devm_snd_soc_register_card(&pdev->dev, &evm_soc_card);
