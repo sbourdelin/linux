@@ -57,7 +57,27 @@ int virtqueue_add_sgs(struct virtqueue *vq,
 		      void *data,
 		      gfp_t gfp);
 
+/* A desc with this init id is treated as an invalid desc */
+#define VIRTQUEUE_DESC_ID_INIT UINT_MAX
+int virtqueue_add_chain_desc(struct virtqueue *_vq,
+			     uint64_t addr,
+			     uint32_t len,
+			     unsigned int *head_id,
+			     unsigned int *prev_id,
+			     bool in);
+
+int virtqueue_add_chain(struct virtqueue *_vq,
+			unsigned int head,
+			bool indirect,
+			struct vring_desc *indirect_desc,
+			void *data,
+			void *ctx);
+
 bool virtqueue_kick(struct virtqueue *vq);
+
+bool virtqueue_kick_sync(struct virtqueue *vq);
+
+bool virtqueue_kick_async(struct virtqueue *vq, wait_queue_head_t wq);
 
 bool virtqueue_kick_prepare(struct virtqueue *vq);
 
