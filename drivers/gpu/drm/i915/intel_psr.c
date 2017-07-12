@@ -854,6 +854,7 @@ void intel_psr_single_frame_update(struct drm_i915_private *dev_priv,
  * intel_psr_invalidate - Invalidade PSR
  * @dev_priv: i915 device
  * @frontbuffer_bits: frontbuffer plane tracking bits
+ * @origin: which operation caused the invalidate
  *
  * Since the hardware frontbuffer tracking has gaps we need to integrate
  * with the software frontbuffer tracking. This function gets called every
@@ -863,10 +864,13 @@ void intel_psr_single_frame_update(struct drm_i915_private *dev_priv,
  * Dirty frontbuffers relevant to PSR are tracked in busy_frontbuffer_bits."
  */
 void intel_psr_invalidate(struct drm_i915_private *dev_priv,
-			  unsigned frontbuffer_bits)
+			  unsigned frontbuffer_bits, enum fb_op_origin origin)
 {
 	struct drm_crtc *crtc;
 	enum pipe pipe;
+
+	if (origin == ORIGIN_FLIP || origin == ORIGIN_CS)
+		return;
 
 	mutex_lock(&dev_priv->psr.lock);
 	if (!dev_priv->psr.enabled) {
@@ -904,6 +908,9 @@ void intel_psr_flush(struct drm_i915_private *dev_priv,
 {
 	struct drm_crtc *crtc;
 	enum pipe pipe;
+
+	if (origin == ORIGIN_FLIP || origin == ORIGIN_CS)
+		return;
 
 	mutex_lock(&dev_priv->psr.lock);
 	if (!dev_priv->psr.enabled) {
