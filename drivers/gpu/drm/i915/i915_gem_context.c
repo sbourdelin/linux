@@ -275,8 +275,10 @@ __create_hw_context(struct drm_i915_private *dev_priv,
 	ctx->vma_lut.ht = kcalloc(ctx->vma_lut.ht_size,
 				  sizeof(*ctx->vma_lut.ht),
 				  GFP_KERNEL);
-	if (!ctx->vma_lut.ht)
+	if (!ctx->vma_lut.ht) {
+		ret = -ENOMEM;
 		goto err_out;
+	}
 
 	INIT_WORK(&ctx->vma_lut.resize, resize_vma_ht);
 
