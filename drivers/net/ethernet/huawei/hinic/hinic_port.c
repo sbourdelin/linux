@@ -239,3 +239,104 @@ int hinic_port_del_vlan(struct hinic_dev *nic_dev, u16 vlan_id)
 
 	return 0;
 }
+
+/**
+ * hinic_port_set_rx_mode - set rx mode in the nic device
+ * @nic_dev: nic device
+ * @rx_mode: the rx mode to set
+ *
+ * Return 0 - Success, negative - Failure
+ **/
+int hinic_port_set_rx_mode(struct hinic_dev *nic_dev, u32 rx_mode)
+{
+	struct hinic_hwdev *hwdev = nic_dev->hwdev;
+	struct hinic_hwif *hwif = hwdev->hwif;
+	struct pci_dev *pdev = hwif->pdev;
+	struct hinic_port_rx_mode_cmd rx_mode_cmd;
+	int err;
+
+	rx_mode_cmd.func_idx = HINIC_HWIF_GLOB_IDX(hwif);
+	rx_mode_cmd.rx_mode = rx_mode;
+
+	err = hinic_port_msg_cmd(hwdev, HINIC_PORT_CMD_SET_RX_MODE,
+				 &rx_mode_cmd, sizeof(rx_mode_cmd),
+				 NULL, NULL);
+	if (err) {
+		dev_err(&pdev->dev, "Failed to set RX mode\n");
+		return err;
+	}
+
+	return 0;
+}
+
+/**
+ * hinic_port_link_state - get the link state
+ * @nic_dev: nic device
+ * @link_state: the returned link state
+ *
+ * Return 0 - Success, negative - Failure
+ **/
+int hinic_port_link_state(struct hinic_dev *nic_dev,
+			  enum hinic_port_link_state *link_state)
+{
+	struct hinic_hwdev *hwdev = nic_dev->hwdev;
+	struct hinic_hwif *hwif = hwdev->hwif;
+	struct pci_dev *pdev = hwif->pdev;
+	struct hinic_port_link_cmd link_cmd;
+	u16 out_size;
+	int err;
+
+	if (!HINIC_IS_PF(hwif) && !HINIC_IS_PPF(hwif)) {
+		pr_err("unsupported PCI Function type\n");
+		return -EINVAL;
+	}
+
+	link_cmd.func_idx = HINIC_HWIF_GLOB_IDX(hwif);
+
+	err = hinic_port_msg_cmd(hwdev, HINIC_PORT_CMD_GET_LINK_STATE,
+				 &link_cmd, sizeof(link_cmd),
+				 &link_cmd, &out_size);
+	if (err || (out_size != sizeof(link_cmd)) || link_cmd.status) {
+		dev_err(&pdev->dev, "Failed to get link state, ret = %d\n",
+			link_cmd.status);
+		return -EINVAL;
+	}
+
+	*link_state = link_cmd.state;
+	return 0;
+}
+
+/**
+ * hinic_port_set_state - set port state
+ * @nic_dev: nic device
+ * @state: the state to set
+ *
+ * Return 0 - Success, negative - Failure
+ **/
+int hinic_port_set_state(struct hinic_dev *nic_dev, enum hinic_port_state state)
+{
+	struct hinic_hwdev *hwdev = nic_dev->hwdev;
+	struct hinic_hwif *hwif = hwdev->hwif;
+	struct pci_dev *pdev = hwif->pdev;
+	struct hinic_port_state_cmd port_state;
+	u16 out_size;
+	int err;
+
+	if (!HINIC_IS_PF(hwif) && !HINIC_IS_PPF(hwif)) {
+		pr_err("unsupported PCI Function type\n");
+		return -EINVAL;
+	}
+
+	port_state.state = state;
+
+	err = hinic_port_msg_cmd(hwdev, HINIC_PORT_CMD_SET_PORT_STATE,
+				 &port_state, sizeof(port_state),
+				 &port_state, &out_size);
+	if (err || (out_size != sizeof(port_state)) || port_state.status) {
+		dev_err(&pdev->dev, "Failed to set port state, ret = %d\n",
+			port_state.status);
+		return -EFAULT;
+	}
+
+	return 0;
+}
