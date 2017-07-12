@@ -22,6 +22,7 @@
 #include <linux/init.h>
 #include <linux/slab.h>
 #include <linux/jiffies.h>
+#include <linux/interrupt.h>
 #include <linux/i2c.h>
 #include <linux/hwmon.h>
 #include <linux/hwmon-sysfs.h>
@@ -265,6 +266,17 @@ static void lm75_remove(void *data)
 	i2c_smbus_write_byte_data(client, LM75_REG_CONF, lm75->orig_conf);
 }
 
+static irqreturn_t lm75_process_interrupt(int irq, void *data)
+{
+	struct i2c_client *client = (struct i2c_client *)data;
+	int val;
+
+	/* Do a read to clear the interrupt */
+	val = i2c_smbus_read_byte_data(client, LM75_REG_CONF);
+
+	return IRQ_HANDLED;
+}
+
 static int
 lm75_probe(struct i2c_client *client, const struct i2c_device_id *id)
 {
@@ -275,6 +287,7 @@ lm75_probe(struct i2c_client *client, const struct i2c_device_id *id)
 	u8 set_mask, clr_mask;
 	int new;
 	enum lm75_type kind;
+	int ret;
 
 	if (client->dev.of_node)
 		kind = (enum lm75_type)of_device_get_match_data(&client->dev);
@@ -373,6 +386,21 @@ lm75_probe(struct i2c_client *client, const struct i2c_device_id *id)
 		data->resolution = 12;
 		data->sample_time = MSEC_PER_SEC / 4;
 		break;
+	}
+
+	if (client->irq) {
+		/* If requesting an interrupt then set to interrupt mode */
+		set_mask |= LM75_MODE_INTERRUPT;
+		ret = devm_request_threaded_irq(dev, client->irq, NULL,
+						lm75_process_interrupt,
+						IRQF_TRIGGER_LOW | IRQF_ONESHOT |
+							IRQF_SHARED,
+						dev_name(dev),
+						client);
+		if (ret) {
+			dev_err(dev, "Error requesting irq\n");
+			return ret;
+		}
 	}
 
 	/* configure as specified */
