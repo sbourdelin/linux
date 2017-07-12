@@ -215,6 +215,10 @@ static struct super_block *alloc_super(struct file_system_type *type, int flags,
 	spin_lock_init(&s->s_inode_list_lock);
 	INIT_LIST_HEAD(&s->s_inodes_wb);
 	spin_lock_init(&s->s_inode_wblist_lock);
+#if IS_ENABLED(CONFIG_FS_ENCRYPTION)
+	s->s_master_keys = RB_ROOT;
+	spin_lock_init(&s->s_master_keys_lock);
+#endif
 
 	if (list_lru_init_memcg(&s->s_dentry_lru))
 		goto fail;

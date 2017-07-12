@@ -88,11 +88,22 @@ fscrypt_valid_context_format(const struct fscrypt_context *ctx, int size)
 
 /*
  * fscrypt_master_key - an in-use master key
+ *
+ * This is referenced from each in-core inode that has been "unlocked" using a
+ * particular master key.  It's primarily used to cache the HMAC transform so
+ * that the per-inode encryption keys can be derived efficiently with HKDF.  It
+ * is securely erased once all inodes referencing it have been evicted.
+ *
+ * If the same master key is used on different filesystems (unusual, but
+ * possible), we'll create one of these structs for each filesystem.
  */
 struct fscrypt_master_key {
 	struct crypto_shash	*mk_hmac;
 	unsigned int		mk_size;
 	u8			mk_hash[FSCRYPT_KEY_HASH_SIZE];
+	refcount_t		mk_refcount;
+	struct rb_node		mk_node;
+	struct super_block	*mk_sb;
 };
 
 /*

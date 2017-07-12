@@ -176,6 +176,14 @@ static void put_master_key(struct fscrypt_master_key *k)
 	if (!k)
 		return;
 
+	if (refcount_read(&k->mk_refcount) != 0) { /* in ->s_master_keys? */
+		if (!refcount_dec_and_lock(&k->mk_refcount,
+					   &k->mk_sb->s_master_keys_lock))
+			return;
+		rb_erase(&k->mk_node, &k->mk_sb->s_master_keys);
+		spin_unlock(&k->mk_sb->s_master_keys_lock);
+	}
+
 	crypto_free_shash(k->mk_hmac);
 	kzfree(k);
 }
@@ -229,6 +237,87 @@ fail:
 	put_master_key(k);
 	k = ERR_PTR(err);
 	goto out;
+}
+
+/*
+ * ->s_master_keys is a map of master keys currently in use by in-core inodes on
+ * a given filesystem, identified by key_hash which is a cryptographically
+ * secure identifier for an actual key payload.
+ *
+ * Note that master_key_descriptor cannot be used to identify the keys because
+ * master_key_descriptor only identifies the "location" of a key in the keyring,
+ * not the actual key payload --- i.e., buggy or malicious userspace may provide
+ * different keys with the same master_key_descriptor.
+ */
+
+/*
+ * Search ->s_master_keys for the fscrypt_master_key having the specified hash.
+ * If found return it with a reference taken, otherwise return NULL.
+ */
+static struct fscrypt_master_key *
+get_cached_master_key(struct super_block *sb,
+		      const u8 hash[FSCRYPT_KEY_HASH_SIZE])
+{
+	struct rb_node *node;
+	struct fscrypt_master_key *k;
+	int res;
+
+	spin_lock(&sb->s_master_keys_lock);
+	node = sb->s_master_keys.rb_node;
+	while (node) {
+		k = rb_entry(node, struct fscrypt_master_key, mk_node);
+		res = memcmp(hash, k->mk_hash, FSCRYPT_KEY_HASH_SIZE);
+		if (res < 0)
+			node = node->rb_left;
+		else if (res > 0)
+			node = node->rb_right;
+		else {
+			refcount_inc(&k->mk_refcount);
+			goto out;
+		}
+	}
+	k = NULL;
+out:
+	spin_unlock(&sb->s_master_keys_lock);
+	return k;
+}
+
+/*
+ * Try to insert the specified fscrypt_master_key into ->s_master_keys.  If it
+ * already exists, then drop the key being inserted and take a reference to the
+ * existing one instead.
+ */
+static struct fscrypt_master_key *
+insert_master_key(struct super_block *sb, struct fscrypt_master_key *new)
+{
+	struct fscrypt_master_key *k;
+	struct rb_node *parent = NULL, **p;
+	int res;
+
+	spin_lock(&sb->s_master_keys_lock);
+	p = &sb->s_master_keys.rb_node;
+	while (*p) {
+		parent = *p;
+		k = rb_entry(parent, struct fscrypt_master_key, mk_node);
+		res = memcmp(new->mk_hash, k->mk_hash, FSCRYPT_KEY_HASH_SIZE);
+		if (res < 0)
+			p = &parent->rb_left;
+		else if (res > 0)
+			p = &parent->rb_right;
+		else {
+			refcount_inc(&k->mk_refcount);
+			spin_unlock(&sb->s_master_keys_lock);
+			put_master_key(new);
+			return k;
+		}
+	}
+
+	rb_link_node(&new->mk_node, parent, p);
+	rb_insert_color(&new->mk_node, &sb->s_master_keys);
+	refcount_set(&new->mk_refcount, 1);
+	new->mk_sb = sb;
+	spin_unlock(&sb->s_master_keys_lock);
+	return new;
 }
 
 static void release_keyring_key(struct key *keyring_key)
@@ -319,6 +408,47 @@ load_master_key_from_keyring(const struct inode *inode,
 	release_keyring_key(keyring_key);
 
 	return master_key;
+}
+
+/*
+ * Get the fscrypt_master_key identified by the specified v2+ encryption
+ * context, or create it if not found.
+ *
+ * Returns the fscrypt_master_key with a reference taken, or an ERR_PTR().
+ */
+static struct fscrypt_master_key *
+find_or_create_master_key(const struct inode *inode,
+			  const struct fscrypt_context *ctx,
+			  unsigned int min_keysize)
+{
+	struct fscrypt_master_key *master_key;
+
+	if (WARN_ON(ctx->version < FSCRYPT_CONTEXT_V2))
+		return ERR_PTR(-EINVAL);
+
+	/*
+	 * First try looking up the master key by its cryptographically secure
+	 * key_hash.  If it's already in memory, there's no need to do a keyring
+	 * search.  (Note that we don't enforce access control based on which
+	 * processes "have the key" and which don't, as encryption is meant to
+	 * be orthogonal to operating-system level access control.  Hence, it's
+	 * sufficient for anyone on the system to have added the needed key.)
+	 */
+	master_key = get_cached_master_key(inode->i_sb, ctx->key_hash);
+	if (master_key)
+		return master_key;
+
+	/*
+	 * The needed master key isn't in memory yet.  Load it from the keyring.
+	 */
+	master_key = load_master_key_from_keyring(inode,
+						  ctx->master_key_descriptor,
+						  min_keysize);
+	if (IS_ERR(master_key))
+		return master_key;
+
+	/* Cache the key for later */
+	return insert_master_key(inode->i_sb, master_key);
 }
 
 static void derive_crypt_complete(struct crypto_async_request *req, int rc)
@@ -638,9 +768,7 @@ int fscrypt_get_encryption_info(struct inode *inode)
 					     derived_keysize);
 	} else {
 		crypt_info->ci_master_key =
-			load_master_key_from_keyring(inode,
-						     ctx.master_key_descriptor,
-						     derived_keysize);
+			find_or_create_master_key(inode, &ctx, derived_keysize);
 		if (IS_ERR(crypt_info->ci_master_key)) {
 			res = PTR_ERR(crypt_info->ci_master_key);
 			crypt_info->ci_master_key = NULL;

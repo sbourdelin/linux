@@ -259,10 +259,7 @@ int fscrypt_has_permitted_context(struct inode *parent, struct inode *child)
 			(parent_ci->ci_filename_mode ==
 			 child_ci->ci_filename_mode) &&
 			(parent_ci->ci_flags == child_ci->ci_flags) &&
-			(parent_ci->ci_context_version == FSCRYPT_CONTEXT_V1 ||
-			 (memcmp(parent_ci->ci_master_key->mk_hash,
-				 child_ci->ci_master_key->mk_hash,
-				 FSCRYPT_KEY_HASH_SIZE) == 0));
+			(parent_ci->ci_master_key == child_ci->ci_master_key);
 	}
 
 	res = cops->get_context(parent, &parent_ctx, sizeof(parent_ctx));

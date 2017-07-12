@@ -1416,6 +1416,11 @@ struct super_block {
 
 	spinlock_t		s_inode_wblist_lock;
 	struct list_head	s_inodes_wb;	/* writeback inodes */
+
+#if IS_ENABLED(CONFIG_FS_ENCRYPTION)
+	spinlock_t		s_master_keys_lock;
+	struct rb_root		s_master_keys;	/* master crypto keys in use */
+#endif
 };
 
 /* Helper functions so that in most cases filesystems will
