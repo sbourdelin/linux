@@ -385,8 +385,7 @@ invalid:
 }
 
 static struct fscrypt_master_key *
-load_master_key_from_keyring(const struct inode *inode,
-			     const u8 descriptor[FS_KEY_DESCRIPTOR_SIZE],
+load_master_key_from_keyring(const u8 descriptor[FS_KEY_DESCRIPTOR_SIZE],
 			     unsigned int min_keysize)
 {
 	struct key *keyring_key;
@@ -395,11 +394,6 @@ load_master_key_from_keyring(const struct inode *inode,
 
 	keyring_key = find_and_lock_keyring_key(FS_KEY_DESC_PREFIX, descriptor,
 						min_keysize, &payload);
-	if (keyring_key == ERR_PTR(-ENOKEY) && inode->i_sb->s_cop->key_prefix) {
-		keyring_key = find_and_lock_keyring_key(
-					inode->i_sb->s_cop->key_prefix,
-					descriptor, min_keysize, &payload);
-	}
 	if (IS_ERR(keyring_key))
 		return ERR_CAST(keyring_key);
 
@@ -441,8 +435,7 @@ find_or_create_master_key(const struct inode *inode,
 	/*
 	 * The needed master key isn't in memory yet.  Load it from the keyring.
 	 */
-	master_key = load_master_key_from_keyring(inode,
-						  ctx->master_key_descriptor,
+	master_key = load_master_key_from_keyring(ctx->master_key_descriptor,
 						  min_keysize);
 	if (IS_ERR(master_key))
 		return master_key;
@@ -676,8 +669,7 @@ void __exit fscrypt_essiv_cleanup(void)
 	crypto_free_shash(essiv_hash_tfm);
 }
 
-int fscrypt_compute_key_hash(const struct inode *inode,
-			     const struct fscrypt_policy *policy,
+int fscrypt_compute_key_hash(const struct fscrypt_policy *policy,
 			     u8 hash[FSCRYPT_KEY_HASH_SIZE])
 {
 	struct fscrypt_master_key *k;
@@ -691,7 +683,7 @@ int fscrypt_compute_key_hash(const struct inode *inode,
 		max(available_modes[policy->contents_encryption_mode].keysize,
 		    available_modes[policy->filenames_encryption_mode].keysize);
 
-	k = load_master_key_from_keyring(inode, policy->master_key_descriptor,
+	k = load_master_key_from_keyring(policy->master_key_descriptor,
 					 min_keysize);
 	if (IS_ERR(k))
 		return PTR_ERR(k);

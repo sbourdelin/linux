@@ -117,7 +117,7 @@ int fscrypt_ioctl_set_policy(struct file *filp, const void __user *arg)
 		pr_warn_once("%s (pid %d) is setting less secure v0 encryption policy; recommend upgrading to v2.\n",
 			     current->comm, current->pid);
 	} else {
-		ret = fscrypt_compute_key_hash(inode, &policy, key_hash);
+		ret = fscrypt_compute_key_hash(&policy, key_hash);
 		if (ret)
 			return ret;
 	}

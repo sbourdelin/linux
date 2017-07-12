@@ -167,8 +167,7 @@ extern struct page *fscrypt_alloc_bounce_page(struct fscrypt_ctx *ctx,
 					      gfp_t gfp_flags);
 
 /* keyinfo.c */
-extern int fscrypt_compute_key_hash(const struct inode *inode,
-				    const struct fscrypt_policy *policy,
+extern int fscrypt_compute_key_hash(const struct fscrypt_policy *policy,
 				    u8 hash[FSCRYPT_KEY_HASH_SIZE]);
 extern void __exit fscrypt_essiv_cleanup(void);
 
