@@ -33,8 +33,11 @@
 #include <linux/delay.h>
 
 #include "hinic_pci_id_tbl.h"
+#include "hinic_hw_qp.h"
 #include "hinic_hw_dev.h"
 #include "hinic_port.h"
+#include "hinic_tx.h"
+#include "hinic_rx.h"
 #include "hinic_dev.h"
 
 MODULE_AUTHOR("Huawei Technologies CO., Ltd");
@@ -58,16 +61,162 @@ MODULE_LICENSE("GPL");
 
 static int change_mac_addr(struct net_device *netdev, const u8 *addr);
 
+/**
+ * create_txqs - Create the Logical Tx Queues of specific NIC device
+ * @nic_dev: the specific NIC device
+ *
+ * Return 0 - Success, negative - Failure
+ **/
+static int create_txqs(struct hinic_dev *nic_dev)
+{
+	struct net_device *netdev = nic_dev->netdev;
+	struct hinic_hwdev *hwdev = nic_dev->hwdev;
+	size_t txq_size;
+	int err, i, j, num_txqs = hinic_hwdev_num_qps(hwdev);
+
+	if (nic_dev->txqs)
+		return -EINVAL;
+
+	txq_size = num_txqs * sizeof(*nic_dev->txqs);
+	nic_dev->txqs = kzalloc(txq_size, GFP_KERNEL);
+	if (!nic_dev->txqs)
+		return -ENOMEM;
+
+	for (i = 0; i < num_txqs; i++) {
+		struct hinic_sq *sq = hinic_hwdev_get_sq(hwdev, i);
+
+		err = hinic_init_txq(&nic_dev->txqs[i], sq, nic_dev->netdev);
+		if (err) {
+			netif_err(nic_dev, drv, netdev, "Failed to init Txq\n");
+			goto init_txq_err;
+		}
+	}
+
+	return 0;
+
+init_txq_err:
+	for (j = 0; j < i; j++)
+		hinic_clean_txq(&nic_dev->txqs[j]);
+
+	kfree(nic_dev->txqs);
+	return err;
+}
+
+/**
+ * free_txqs - Free the Logical Tx Queues of specific NIC device
+ * @nic_dev: the specific NIC device
+ **/
+static void free_txqs(struct hinic_dev *nic_dev)
+{
+	struct hinic_hwdev *hwdev = nic_dev->hwdev;
+	int i, num_txqs = hinic_hwdev_num_qps(hwdev);
+
+	if (!nic_dev->txqs)
+		return;
+
+	for (i = 0; i < num_txqs; i++)
+		hinic_clean_txq(&nic_dev->txqs[i]);
+
+	kfree(nic_dev->txqs);
+	nic_dev->txqs = NULL;
+}
+
+/**
+ * create_txqs - Create the Logical Rx Queues of specific NIC device
+ * @nic_dev: the specific NIC device
+ *
+ * Return 0 - Success, negative - Failure
+ **/
+static int create_rxqs(struct hinic_dev *nic_dev)
+{
+	struct net_device *netdev = nic_dev->netdev;
+	struct hinic_hwdev *hwdev = nic_dev->hwdev;
+	size_t rxq_size;
+	int err, i, j, num_rxqs = hinic_hwdev_num_qps(hwdev);
+
+	if (nic_dev->rxqs)
+		return -EINVAL;
+
+	rxq_size = num_rxqs * sizeof(*nic_dev->rxqs);
+	nic_dev->rxqs = kzalloc(rxq_size, GFP_KERNEL);
+	if (!nic_dev->rxqs)
+		return -ENOMEM;
+
+	for (i = 0; i < num_rxqs; i++) {
+		struct hinic_rq *rq = hinic_hwdev_get_rq(hwdev, i);
+
+		err = hinic_init_rxq(&nic_dev->rxqs[i], rq, nic_dev->netdev);
+		if (err) {
+			netif_err(nic_dev, drv, netdev, "Failed to init rxq\n");
+			goto init_rxq_err;
+		}
+	}
+
+	return 0;
+
+init_rxq_err:
+	for (j = 0; j < i; j++)
+		hinic_clean_rxq(&nic_dev->rxqs[j]);
+
+	kfree(nic_dev->rxqs);
+	return err;
+}
+
+/**
+ * free_txqs - Free the Logical Rx Queues of specific NIC device
+ * @nic_dev: the specific NIC device
+ **/
+static void free_rxqs(struct hinic_dev *nic_dev)
+{
+	struct hinic_hwdev *hwdev = nic_dev->hwdev;
+	int i, num_rxqs = hinic_hwdev_num_qps(hwdev);
+
+	if (!nic_dev->rxqs)
+		return;
+
+	for (i = 0; i < num_rxqs; i++)
+		hinic_clean_rxq(&nic_dev->rxqs[i]);
+
+	kfree(nic_dev->rxqs);
+	nic_dev->rxqs = NULL;
+}
+
 static int hinic_open(struct net_device *netdev)
 {
 	struct hinic_dev *nic_dev = netdev_priv(netdev);
+	struct hinic_hwdev *hwdev = nic_dev->hwdev;
 	enum hinic_port_link_state link_state;
-	int err, ret;
+	int err, ret, num_qps = hinic_hwdev_num_qps(hwdev);
+
+	if (!(nic_dev->flags & HINIC_INTF_UP)) {
+		err = hinic_hwdev_ifup(hwdev);
+		if (err) {
+			netif_err(nic_dev, drv, netdev, "Failed - NIC HW if up\n");
+			return err;
+		}
+	}
+
+	err = create_txqs(nic_dev);
+	if (err) {
+		netif_err(nic_dev, drv, netdev,
+			  "Failed to create Tx queues\n");
+		goto create_txqs_err;
+	}
+
+	err = create_rxqs(nic_dev);
+	if (err) {
+		netif_err(nic_dev, drv, netdev,
+			  "Failed to create Rx queues\n");
+		goto create_rxqs_err;
+	}
+
+	netif_set_real_num_tx_queues(netdev, num_qps);
+	netif_set_real_num_rx_queues(netdev, num_qps);
 
 	err = hinic_port_set_state(nic_dev, HINIC_PORT_ENABLE);
 	if (err) {
 		netif_err(nic_dev, drv, netdev, "Failed to set port state\n");
-		return err;
+		goto port_state_err;
 	}
 
 	/* Wait up to 3 sec between port enable to link state */
@@ -104,12 +253,22 @@ port_link_err:
 	if (ret)
 		netif_warn(nic_dev, drv, netdev, "Failed to revert port state\n");
 
+port_state_err:
+	free_rxqs(nic_dev);
+
+create_rxqs_err:
+	free_txqs(nic_dev);
+
+create_txqs_err:
+	if (!(nic_dev->flags & HINIC_INTF_UP))
+		hinic_hwdev_ifdown(hwdev);
 	return err;
 }
 
 static int hinic_close(struct net_device *netdev)
 {
 	struct hinic_dev *nic_dev = netdev_priv(netdev);
+	struct hinic_hwdev *hwdev = nic_dev->hwdev;
 	unsigned int flags;
 	int err;
 
@@ -129,6 +288,12 @@ static int hinic_close(struct net_device *netdev)
 		nic_dev->flags |= (flags & HINIC_INTF_UP);
 		return err;
 	}
+
+	free_rxqs(nic_dev);
+	free_txqs(nic_dev);
+
+	if (flags & HINIC_INTF_UP)
+		hinic_hwdev_ifdown(hwdev);
 
 	netif_info(nic_dev, drv, netdev, "HINIC_INTF is DOWN\n");
 
@@ -508,6 +673,8 @@ static int nic_dev_init(struct pci_dev *pdev)
 	nic_dev->netdev = netdev;
 	nic_dev->msg_enable = MSG_ENABLE_DEFAULT;
 	nic_dev->flags = 0;
+	nic_dev->txqs = NULL;
+	nic_dev->rxqs = NULL;
 
 	sema_init(&nic_dev->mgmt_lock, 1);
 
