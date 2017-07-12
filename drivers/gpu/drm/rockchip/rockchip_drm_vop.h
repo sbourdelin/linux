@@ -15,6 +15,14 @@
 #ifndef _ROCKCHIP_DRM_VOP_H
 #define _ROCKCHIP_DRM_VOP_H
 
+/*
+ * major: IP major vertion, used for IP structure
+ * minor: big feature change under same structure
+ */
+#define VOP_VERSION(major, minor)	((major) << 8 | (minor))
+#define VOP_MAJOR(version)		((version) >> 8)
+#define VOP_MINOR(version)		((version) & 0xff)
+
 enum vop_data_format {
 	VOP_FMT_ARGB8888 = 0,
 	VOP_FMT_RGB888,
@@ -25,10 +33,13 @@ enum vop_data_format {
 };
 
 struct vop_reg {
-	uint32_t offset;
-	uint32_t shift;
 	uint32_t mask;
-	bool write_mask;
+	uint32_t offset:12;
+	uint32_t shift:5;
+	uint32_t begin_minor:4;
+	uint32_t end_minor:4;
+	uint32_t major:3;
+	uint32_t write_mask:1;
 };
 
 struct vop_ctrl {
@@ -134,6 +145,7 @@ struct vop_win_data {
 };
 
 struct vop_data {
+	uint32_t version;
 	const struct vop_ctrl *ctrl;
 	const struct vop_intr *intr;
 	const struct vop_win_data *win;
