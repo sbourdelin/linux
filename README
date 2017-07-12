@@ -1,17 +1,27 @@
 Linux kernel
 ============
 
-This file was moved to Documentation/admin-guide/README.rst
+Linux is a computer operating system kernel first released by Linus Torvalds
+in September of 1991. It runs on a wide variety of hardware architectures and
+has all expected features like multitasking, memory management, multistack
+networking and so on.
 
-Please notice that there are several guides for kernel developers and users.
-These guides can be rendered in a number of formats, like HTML and PDF.
+Device drivers are an integral part too, supporting the use of countless
+devices. Documentation/process/howto.rst describes how to include a new one.
 
-In order to build the documentation, use ``make htmldocs`` or
-``make pdfdocs``.
+Documentation
+-------------
 
-There are various text files in the Documentation/ subdirectory,
-several of them using the Restructured Text markup notation.
-See Documentation/00-INDEX for a list of what is contained in each file.
+Linux is documented in the Documentation/ subdirectory. Several of the text
+files use the Restructured Text markup notation.
+
+Documentation/admin-guide/README.rst may be what you are looking for and
+Documentation/00-INDEX has a list of what is contained in each file.
+
+The included guides for kernel developers and users can be rendered in a number
+of formats, like HTML and PDF.
+
+In order to build the documentation, use ``make htmldocs`` or ``make pdfdocs``.
 
 Please read the Documentation/process/changes.rst file, as it contains the
 requirements for building and running the kernel, and information about
