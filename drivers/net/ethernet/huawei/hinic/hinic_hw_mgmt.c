@@ -13,12 +13,15 @@
  *
  */
 
+#define pr_fmt(fmt) KBUILD_MODNAME ": " fmt
+
 #include <linux/kernel.h>
 #include <linux/types.h>
 #include <linux/errno.h>
 
 #include "hinic_hw_if.h"
 #include "hinic_hw_eqs.h"
+#include "hinic_hw_api_cmd.h"
 #include "hinic_hw_mgmt.h"
 #include "hinic_hw_dev.h"
 
@@ -70,8 +73,15 @@ int hinic_pf_to_mgmt_init(struct hinic_pf_to_mgmt *pf_to_mgmt,
 {
 	struct hinic_pfhwdev *pfhwdev = mgmt_to_pfhwdev(pf_to_mgmt);
 	struct hinic_hwdev *hwdev = &pfhwdev->hwdev;
+	int err;
 
 	pf_to_mgmt->hwif = hwif;
+
+	err = hinic_api_cmd_init(hwif, pf_to_mgmt->cmd_chain);
+	if (err) {
+		pr_err("Failed to initialize cmd chains\n");
+		return err;
+	}
 
 	hinic_aeq_register_hw_cb(&hwdev->aeqs, HINIC_MSG_FROM_MGMT_CPU,
 				 pf_to_mgmt,
@@ -90,4 +100,5 @@ void hinic_pf_to_mgmt_free(struct hinic_pf_to_mgmt *pf_to_mgmt)
 	struct hinic_hwdev *hwdev = &pfhwdev->hwdev;
 
 	hinic_aeq_unregister_hw_cb(&hwdev->aeqs, HINIC_MSG_FROM_MGMT_CPU);
+	hinic_api_cmd_free(pf_to_mgmt->cmd_chain);
 }
