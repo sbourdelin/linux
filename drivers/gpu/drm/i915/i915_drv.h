@@ -769,6 +769,7 @@ struct intel_csr {
 	func(has_pipe_cxsr); \
 	func(has_pooled_eu); \
 	func(has_psr); \
+	func(has_vlv_psr); \
 	func(has_rc6); \
 	func(has_rc6p); \
 	func(has_resource_streamer); \
@@ -2972,7 +2973,9 @@ intel_info(const struct drm_i915_private *dev_priv)
 
 #define HAS_DDI(dev_priv)		 ((dev_priv)->info.has_ddi)
 #define HAS_FPGA_DBG_UNCLAIMED(dev_priv) ((dev_priv)->info.has_fpga_dbg)
-#define HAS_PSR(dev_priv)		 ((dev_priv)->info.has_psr)
+#define HAS_PSR(dev_priv)		 ((dev_priv)->info.has_psr || \
+					  (dev_priv)->info.has_vlv_psr)
+#define HAS_VLV_PSR(dev_priv)		 ((dev_priv)->info.has_vlv_psr)
 #define HAS_RC6(dev_priv)		 ((dev_priv)->info.has_rc6)
 #define HAS_RC6p(dev_priv)		 ((dev_priv)->info.has_rc6p)
 

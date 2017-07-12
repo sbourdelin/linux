@@ -401,8 +401,7 @@ static bool intel_psr_match_conditions(struct intel_dp *intel_dp)
 		return false;
 	}
 
-	if ((IS_VALLEYVIEW(dev_priv) || IS_CHERRYVIEW(dev_priv)) &&
-	    !dev_priv->psr.link_standby) {
+	if (HAS_VLV_PSR(dev_priv) && !dev_priv->psr.link_standby) {
 		DRM_ERROR("PSR condition failed: Link off requested but not supported on this platform\n");
 		return false;
 	}
@@ -827,7 +826,7 @@ void intel_psr_single_frame_update(struct drm_i915_private *dev_priv,
 	 * Single frame update is already supported on BDW+ but it requires
 	 * many W/A and it isn't really needed.
 	 */
-	if (!IS_VALLEYVIEW(dev_priv) && !IS_CHERRYVIEW(dev_priv))
+	if (!HAS_VLV_PSR(dev_priv))
 		return;
 
 	mutex_lock(&dev_priv->psr.lock);
@@ -949,7 +948,7 @@ void intel_psr_init(struct drm_i915_private *dev_priv)
 	if (IS_HASWELL(dev_priv) || IS_BROADWELL(dev_priv))
 		/* HSW and BDW require workarounds that we don't implement. */
 		dev_priv->psr.link_standby = false;
-	else if (IS_VALLEYVIEW(dev_priv) || IS_CHERRYVIEW(dev_priv))
+	else if (HAS_VLV_PSR(dev_priv))
 		/* On VLV and CHV only standby mode is supported. */
 		dev_priv->psr.link_standby = true;
 	else
