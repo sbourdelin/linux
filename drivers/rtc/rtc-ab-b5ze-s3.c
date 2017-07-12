@@ -328,7 +328,7 @@ static int _abb5zes3_rtc_read_timer(struct device *dev,
 	struct abb5zes3_rtc_data *data = dev_get_drvdata(dev);
 	struct rtc_time rtc_tm, *alarm_tm = &alarm->time;
 	u8 regs[ABB5ZES3_TIMA_SEC_LEN + 1];
-	unsigned long rtc_secs;
+	unsigned long long rtc_secs;
 	unsigned int reg;
 	u8 timer_secs;
 	int ret;
@@ -352,9 +352,7 @@ static int _abb5zes3_rtc_read_timer(struct device *dev,
 		goto err;
 
 	/* ... convert to seconds ... */
-	ret = rtc_tm_to_time(&rtc_tm, &rtc_secs);
-	if (ret)
-		goto err;
+	rtc_secs = rtc_tm_to_time64(&rtc_tm);
 
 	/* ... add remaining timer A time ... */
 	ret = sec_from_timer_a(&timer_secs, regs[1], regs[2]);
@@ -362,7 +360,7 @@ static int _abb5zes3_rtc_read_timer(struct device *dev,
 		goto err;
 
 	/* ... and convert back. */
-	rtc_time_to_tm(rtc_secs + timer_secs, alarm_tm);
+	rtc_time64_to_tm(rtc_secs + timer_secs, alarm_tm);
 
 	ret = regmap_read(data->regmap, ABB5ZES3_REG_CTRL2, &reg);
 	if (ret) {
@@ -383,7 +381,7 @@ static int _abb5zes3_rtc_read_alarm(struct device *dev,
 {
 	struct abb5zes3_rtc_data *data = dev_get_drvdata(dev);
 	struct rtc_time rtc_tm, *alarm_tm = &alarm->time;
-	unsigned long rtc_secs, alarm_secs;
+	unsigned long long rtc_secs, alarm_secs;
 	u8 regs[ABB5ZES3_ALRM_SEC_LEN];
 	unsigned int reg;
 	int ret;
@@ -414,13 +412,8 @@ static int _abb5zes3_rtc_read_alarm(struct device *dev,
 	alarm_tm->tm_year = rtc_tm.tm_year;
 	alarm_tm->tm_mon = rtc_tm.tm_mon;
 
-	ret = rtc_tm_to_time(&rtc_tm, &rtc_secs);
-	if (ret)
-		goto err;
-
-	ret = rtc_tm_to_time(alarm_tm, &alarm_secs);
-	if (ret)
-		goto err;
+	rtc_secs = rtc_tm_to_time64(&rtc_tm);
+	alarm_secs = rtc_tm_to_time64(alarm_tm);
 
 	if (alarm_secs < rtc_secs) {
 		if (alarm_tm->tm_mon == 11) {
@@ -477,7 +470,7 @@ static int _abb5zes3_rtc_set_alarm(struct device *dev, struct rtc_wkalrm *alarm)
 {
 	struct abb5zes3_rtc_data *data = dev_get_drvdata(dev);
 	struct rtc_time *alarm_tm = &alarm->time;
-	unsigned long rtc_secs, alarm_secs;
+	unsigned long long rtc_secs, alarm_secs;
 	u8 regs[ABB5ZES3_ALRM_SEC_LEN];
 	struct rtc_time rtc_tm;
 	int ret, enable = 1;
@@ -486,13 +479,8 @@ static int _abb5zes3_rtc_set_alarm(struct device *dev, struct rtc_wkalrm *alarm)
 	if (ret)
 		goto err;
 
-	ret = rtc_tm_to_time(&rtc_tm, &rtc_secs);
-	if (ret)
-		goto err;
-
-	ret = rtc_tm_to_time(alarm_tm, &alarm_secs);
-	if (ret)
-		goto err;
+	rtc_secs = rtc_tm_to_time64(&rtc_tm);
+	alarm_secs = rtc_tm_to_time64(alarm_tm);
 
 	/* If alarm time is before current time, disable the alarm */
 	if (!alarm->enabled || alarm_secs <= rtc_secs) {
@@ -511,9 +499,7 @@ static int _abb5zes3_rtc_set_alarm(struct device *dev, struct rtc_wkalrm *alarm)
 			rtc_tm.tm_mon += 1;
 		}
 
-		ret = rtc_tm_to_time(&rtc_tm, &rtc_secs);
-		if (ret)
-			goto err;
+		rtc_secs = rtc_tm_to_time64(&rtc_tm);
 
 		if (alarm_secs > rtc_secs) {
 			dev_err(dev, "%s: alarm maximum is one month in the "
@@ -597,7 +583,7 @@ static int abb5zes3_rtc_set_alarm(struct device *dev, struct rtc_wkalrm *alarm)
 {
 	struct abb5zes3_rtc_data *data = dev_get_drvdata(dev);
 	struct rtc_time *alarm_tm = &alarm->time;
-	unsigned long rtc_secs, alarm_secs;
+	unsigned long long rtc_secs, alarm_secs;
 	struct rtc_time rtc_tm;
 	int ret;
 
@@ -606,13 +592,8 @@ static int abb5zes3_rtc_set_alarm(struct device *dev, struct rtc_wkalrm *alarm)
 	if (ret)
 		goto err;
 
-	ret = rtc_tm_to_time(&rtc_tm, &rtc_secs);
-	if (ret)
-		goto err;
-
-	ret = rtc_tm_to_time(alarm_tm, &alarm_secs);
-	if (ret)
-		goto err;
+	rtc_secs = rtc_tm_to_time64(&rtc_tm);
+	alarm_secs = rtc_tm_to_time64(alarm_tm);
 
 	/* Let's first disable both the alarm and the timer interrupts */
 	ret = _abb5zes3_rtc_update_alarm(dev, false);
