@@ -286,6 +286,7 @@ int hinic_hwdev_ifup(struct hinic_hwdev *hwdev)
 	struct pci_dev *pdev = hwif->pdev;
 	int num_qps = nic_cap->num_qps;
 	int max_qps = nic_cap->max_qps;
+	struct msix_entry *ceq_msix_entries;
 	struct msix_entry *sq_msix_entries;
 	struct msix_entry *rq_msix_entries;
 	u16 base_qpn;
@@ -299,7 +300,11 @@ int hinic_hwdev_ifup(struct hinic_hwdev *hwdev)
 
 	num_aeqs = HINIC_HWIF_NUM_AEQS(hwif);
 	num_ceqs = HINIC_HWIF_NUM_CEQS(hwif);
-	err = hinic_io_init(func_to_io, hwif, max_qps, 0, NULL);
+
+	ceq_msix_entries = &hwdev->msix_entries[num_aeqs];
+
+	err = hinic_io_init(func_to_io, hwif, max_qps, num_ceqs,
+			    ceq_msix_entries);
 	if (err) {
 		dev_err(&pdev->dev, "Failed to init IO channel\n");
 		return err;

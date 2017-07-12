@@ -26,6 +26,7 @@
 #include <linux/io.h>
 
 #include "hinic_hw_if.h"
+#include "hinic_hw_eqs.h"
 #include "hinic_hw_wq.h"
 #include "hinic_hw_cmdq.h"
 #include "hinic_hw_qp_ctxt.h"
@@ -459,10 +460,18 @@ int hinic_io_init(struct hinic_func_to_io *func_to_io,
 	func_to_io->qps = NULL;
 	func_to_io->max_qps = max_qps;
 
+	err = hinic_ceqs_init(&func_to_io->ceqs, hwif, num_ceqs,
+			      HINIC_DEFAULT_CEQ_LEN, HINIC_EQ_PAGE_SIZE,
+			      ceq_msix_entries);
+	if (err) {
+		pr_err("Failed to init CEQs\n");
+		return err;
+	}
+
 	err = hinic_wqs_alloc(&func_to_io->wqs, 2 * max_qps, hwif);
 	if (err) {
 		pr_err("Failed to allocate WQS for IO\n");
-		return err;
+		goto wqs_alloc_err;
 	}
 
 	func_to_io->db_base = pci_ioremap_bar(pdev, HINIC_PCI_DB_BAR);
@@ -500,6 +509,9 @@ db_area_err:
 
 db_ioremap_err:
 	hinic_wqs_free(&func_to_io->wqs);
+
+wqs_alloc_err:
+	hinic_ceqs_free(&func_to_io->ceqs);
 	return err;
 }
 
@@ -518,4 +530,5 @@ void hinic_io_free(struct hinic_func_to_io *func_to_io)
 
 	iounmap(func_to_io->db_base);
 	hinic_wqs_free(&func_to_io->wqs);
+	hinic_ceqs_free(&func_to_io->ceqs);
 }
