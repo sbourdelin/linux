@@ -68,6 +68,12 @@
 			};
 		};
 
+		cpcap_audio: audio-codec {
+			#sound-dai-cells = <1>;
+			compatible = "motorola,cpcap-audio-codec";
+			vdd-supply = <&vaudio>;
+		};
+
 		cpcap_rtc: rtc {
 			compatible = "motorola,cpcap-rtc";
 
