@@ -310,6 +310,19 @@ drm_pick_cmdline_mode(struct drm_fb_helper_connector *fb_helper_conn);
 int drm_fb_helper_add_one_connector(struct drm_fb_helper *fb_helper, struct drm_connector *connector);
 int drm_fb_helper_remove_one_connector(struct drm_fb_helper *fb_helper,
 				       struct drm_connector *connector);
+
+size_t drm_fb_helper_mode_cmd(struct drm_mode_fb_cmd2 *mode_cmd,
+			      struct drm_fb_helper_surface_size *sizes);
+int drm_fb_helper_simple_fb_probe(struct drm_fb_helper *helper,
+				  struct drm_fb_helper_surface_size *sizes,
+				  struct drm_framebuffer *fb,
+				  struct fb_ops *fbops, void *vaddr,
+				  unsigned long paddr, size_t size);
+int drm_fb_helper_simple_init(struct drm_device *dev,
+			      struct drm_fb_helper *helper, int bpp_sel,
+			      int max_conn_count,
+			      const struct drm_fb_helper_funcs *funcs);
+void drm_fb_helper_simple_fini(struct drm_fb_helper *helper);
 #else
 static inline void drm_fb_helper_prepare(struct drm_device *dev,
 					struct drm_fb_helper *helper,
@@ -505,6 +518,35 @@ drm_fb_helper_remove_one_connector(struct drm_fb_helper *fb_helper,
 				   struct drm_connector *connector)
 {
 	return 0;
+}
+
+static inline size_t
+drm_fb_helper_mode_cmd(struct drm_mode_fb_cmd2 *mode_cmd,
+		       struct drm_fb_helper_surface_size *sizes)
+{
+	return 0;
+}
+
+static inline int
+drm_fb_helper_simple_fb_probe(struct drm_fb_helper *helper,
+			      struct drm_fb_helper_surface_size *sizes,
+			      struct drm_framebuffer *fb,
+			      struct fb_ops *fbops, void *vaddr,
+			      unsigned long paddr, size_t size)
+{
+	return 0;
+}
+
+static inline int
+drm_fb_helper_simple_init(struct drm_device *dev, struct drm_fb_helper *helper,
+			  int bpp_sel, int max_conn_count,
+			  const struct drm_fb_helper_funcs *funcs)
+{
+	return 0;
+}
+
+static inline void drm_fb_helper_simple_fini(struct drm_fb_helper *helper)
+{
 }
 
 #endif

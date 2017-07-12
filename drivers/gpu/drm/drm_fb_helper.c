@@ -2476,3 +2476,211 @@ int __init drm_fb_helper_modinit(void)
 	return 0;
 }
 EXPORT_SYMBOL(drm_fb_helper_modinit);
+
+static int drm_fb_helper_defio_init(struct drm_fb_helper *helper)
+{
+	struct fb_info *fbi = helper->fbdev;
+	struct fb_deferred_io *fbdefio;
+	struct fb_ops *fbops;
+
+	/*
+	 * Per device structures are needed because:
+	 * fbops: fb_deferred_io_cleanup() clears fbops.fb_mmap
+	 * fbdefio: individual delays
+	 */
+	fbdefio = kzalloc(sizeof(*fbdefio), GFP_KERNEL);
+	fbops = kzalloc(sizeof(*fbops), GFP_KERNEL);
+	if (!fbdefio || !fbops) {
+		kfree(fbdefio);
+		kfree(fbops);
+		return -ENOMEM;
+	}
+
+	*fbops = *fbi->fbops;
+	fbi->fbops = fbops;
+
+	fbdefio->delay = msecs_to_jiffies(50);
+	fbdefio->deferred_io = drm_fb_helper_deferred_io;
+	fbi->fbdefio = fbdefio;
+	fb_deferred_io_init(fbi);
+
+	return 0;
+}
+
+static void drm_fb_helper_defio_fini(struct drm_fb_helper *helper)
+{
+	if (!helper->fbdev || !helper->fbdev->fbdefio)
+		return;
+
+	fb_deferred_io_cleanup(helper->fbdev);
+	kfree(helper->fbdev->fbdefio);
+	kfree(helper->fbdev->fbops);
+}
+
+/**
+ * @drm_fb_helper_mode_cmd - Convert fbdev to fb description
+ * @mode_cmd: addfb description
+ * @sizes: fbdev description
+ *
+ * Returns: Size of framebuffer.
+ */
+size_t drm_fb_helper_mode_cmd(struct drm_mode_fb_cmd2 *mode_cmd,
+			      struct drm_fb_helper_surface_size *sizes)
+{
+	memset(mode_cmd, 0, sizeof(*mode_cmd));
+	mode_cmd->width = sizes->surface_width;
+	mode_cmd->height = sizes->surface_height;
+	mode_cmd->pitches[0] = sizes->surface_width *
+			       DIV_ROUND_UP(sizes->surface_bpp, 8);
+	mode_cmd->pixel_format = drm_mode_legacy_fb_format(sizes->surface_bpp,
+							sizes->surface_depth);
+
+	return mode_cmd->pitches[0] * mode_cmd->height;
+}
+
+/**
+ * drm_fb_helper_simple_fb_probe - simple &drm_fb_helper_funcs->fb_probe helper
+ * @helper: fbdev emulation structure
+ * @sizes: fbdev description
+ * @fb: Attached DRM framebuffer
+ * @fbops: fbdev operations
+ * @vaddr: Virtual address for &fb_info->screen_buffer
+ * @paddr: Address for &fb_fix_screeninfo->smem_start.
+ * @size: Framebuffer size
+ *
+ * Drivers can use this in their &drm_fb_helper_funcs->fb_probe function.
+ *
+ * Returns:
+ * 0 on success or a negative error code on failure.
+ */
+int drm_fb_helper_simple_fb_probe(struct drm_fb_helper *helper,
+				  struct drm_fb_helper_surface_size *sizes,
+				  struct drm_framebuffer *fb,
+				  struct fb_ops *fbops, void *vaddr,
+				  unsigned long paddr, size_t size)
+{
+	struct fb_info *fbi;
+	int ret;
+
+	DRM_DEBUG_KMS("surface width(%d), height(%d) and bpp(%d)\n",
+		      sizes->surface_width, sizes->surface_height,
+		      sizes->surface_bpp);
+
+	fbi = drm_fb_helper_alloc_fbi(helper);
+	if (IS_ERR(fbi))
+		return PTR_ERR(fbi);
+
+	helper->fb = fb;
+	fbi->par = helper;
+	fbi->fbops = fbops;
+
+	drm_fb_helper_fill_fix(fbi, fb->pitches[0], fb->format->depth);
+	drm_fb_helper_fill_var(fbi, helper, sizes->fb_width, sizes->fb_height);
+
+	fbi->screen_base = vaddr;
+	fbi->fix.smem_start = paddr;
+	fbi->screen_size = size;
+	fbi->fix.smem_len = size;
+
+	if (fb->funcs->dirty) {
+		ret = drm_fb_helper_defio_init(helper);
+		if (ret)
+			goto err_helper_fini;
+	}
+
+	return 0;
+
+err_helper_fini:
+	drm_fb_helper_fini(helper);
+
+	return ret;
+}
+EXPORT_SYMBOL(drm_fb_helper_simple_fb_probe);
+
+/**
+ * drm_fb_helper_simple_init - Simple fbdev emulation init
+ * @dev: drm device
+ * @helper: driver-allocated fbdev helper structure to initialize
+ * @bpp_sel: bpp value to use for the framebuffer configuration
+ * @max_conn_count: max connector count
+ * @funcs: pointer to structure of functions associate with this helper
+ *
+ * Simple fbdev emulation initialization. This function calls:
+ * drm_fb_helper_prepare(), drm_fb_helper_init(),
+ * drm_fb_helper_single_add_all_connectors() and
+ * drm_fb_helper_initial_config().
+ *
+ * Returns:
+ * 0 on success or a negative error code on failure.
+ */
+int drm_fb_helper_simple_init(struct drm_device *dev,
+			      struct drm_fb_helper *helper, int bpp_sel,
+			      int max_conn_count,
+			      const struct drm_fb_helper_funcs *funcs)
+{
+	int ret;
+
+	drm_fb_helper_prepare(dev, helper, funcs);
+
+	ret = drm_fb_helper_init(dev, helper, max_conn_count);
+	if (ret < 0) {
+		DRM_DEV_ERROR(dev->dev, "Failed to initialize fb helper.\n");
+		return ret;
+	}
+
+	ret = drm_fb_helper_single_add_all_connectors(helper);
+	if (ret < 0) {
+		DRM_DEV_ERROR(dev->dev, "Failed to add connectors.\n");
+		goto err_drm_fb_helper_fini;
+
+	}
+
+	ret = drm_fb_helper_initial_config(helper, bpp_sel);
+	if (ret < 0) {
+		DRM_DEV_ERROR(dev->dev, "Failed to set initial hw config.\n");
+		goto err_drm_fb_helper_fini;
+	}
+
+	return 0;
+
+err_drm_fb_helper_fini:
+	drm_fb_helper_fini(helper);
+
+	return ret;
+}
+EXPORT_SYMBOL_GPL(drm_fb_helper_simple_init);
+
+/**
+ * drm_fb_helper_simple_fini - Simple fbdev cleanup
+ * @helper: fbdev emulation structure
+ *
+ * Simple fbdev emulation cleanup. This function unregisters fbdev, cleans up
+ * deferred io if necessary, removes framebuffer, frees shadow buffer if used
+ * and finally cleans up @helper. The driver if responsible for freeing the
+ * @helper structure.
+ */
+void drm_fb_helper_simple_fini(struct drm_fb_helper *helper)
+{
+	if (!helper)
+		return;
+
+	drm_fb_helper_unregister_fbi(helper);
+
+	drm_fb_helper_defio_fini(helper);
+
+	if (helper->fb) {
+		drm_framebuffer_remove(helper->fb);
+		/*
+		 * for some reason if drm_fb_helper_set_par() is called we end
+		 * up with an extra ref taken on the framebuffer...
+		 */
+		if (drm_framebuffer_read_refcount(helper->fb))
+			drm_framebuffer_put(helper->fb);
+	}
+
+	if (helper->defio_vaddr)
+		kvfree(helper->fbdev->screen_buffer);
+
+	drm_fb_helper_fini(helper);
+}
+EXPORT_SYMBOL_GPL(drm_fb_helper_simple_fini);
