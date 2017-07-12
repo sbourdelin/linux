@@ -1074,6 +1074,54 @@ static DEVICE_ATTR(queue_ramp_up_period, S_IRUGO | S_IWUSR,
 		   sdev_show_queue_ramp_up_period,
 		   sdev_store_queue_ramp_up_period);
 
+#ifdef CONFIG_SCSI_SENSE_UEVENT
+
+/*
+ * SCSI sense key could be 0x00 - 0x0f,
+ */
+#define SCSI_SENSE_EVENT_FILTER_MASK	0xffff
+
+static ssize_t
+sdev_show_sense_event_filter(struct device *dev,
+			     struct device_attribute *attr,
+			     char *buf)
+{
+	struct scsi_device *sdev;
+
+	sdev = to_scsi_device(dev);
+	return snprintf(buf, 20, "0x%04lx\n",
+			(sdev->sense_event_filter &
+			 SCSI_SENSE_EVENT_FILTER_MASK));
+}
+
+static ssize_t
+sdev_store_sense_event_filter(struct device *dev,
+			      struct device_attribute *attr,
+			      const char *buf, size_t count)
+{
+	struct scsi_device *sdev = to_scsi_device(dev);
+	unsigned long filter;
+	int i;
+
+	if (kstrtoul(buf, 0, &filter))
+		return -EINVAL;
+
+	if ((filter & 0xffff) != filter)
+		return -EINVAL;
+
+	for (i = 0; i < 16; i++)
+		if (filter & SCSI_SENSE_EVENT_FILTER_MASK  & (1 << i))
+			set_bit(i, &sdev->sense_event_filter);
+		else
+			clear_bit(i, &sdev->sense_event_filter);
+	return count;
+}
+
+static DEVICE_ATTR(sense_event_filter, 0644,
+		   sdev_show_sense_event_filter,
+		   sdev_store_sense_event_filter);
+#endif
+
 static umode_t scsi_sdev_attr_is_visible(struct kobject *kobj,
 					 struct attribute *attr, int i)
 {
@@ -1144,6 +1192,9 @@ static struct attribute *scsi_sdev_attrs[] = {
 	&dev_attr_preferred_path.attr,
 #endif
 	&dev_attr_queue_ramp_up_period.attr,
+#ifdef CONFIG_SCSI_SENSE_UEVENT
+	&dev_attr_sense_event_filter.attr,
+#endif
 	REF_EVT(media_change),
 	REF_EVT(inquiry_change_reported),
 	REF_EVT(capacity_change_reported),

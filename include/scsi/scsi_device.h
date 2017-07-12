@@ -64,12 +64,23 @@ enum scsi_device_event {
 	SDEV_EVT_MODE_PARAMETER_CHANGE_REPORTED,	/* 2A 01  UA reported */
 	SDEV_EVT_LUN_CHANGE_REPORTED,			/* 3F 0E  UA reported */
 	SDEV_EVT_ALUA_STATE_CHANGE_REPORTED,		/* 2A 06  UA reported */
+	SDEV_EVT_SCSI_SENSE,
 
 	SDEV_EVT_FIRST		= SDEV_EVT_MEDIA_CHANGE,
-	SDEV_EVT_LAST		= SDEV_EVT_ALUA_STATE_CHANGE_REPORTED,
+	SDEV_EVT_LAST		= SDEV_EVT_SCSI_SENSE,
 
 	SDEV_EVT_MAXBITS	= SDEV_EVT_LAST + 1
 };
+
+#ifdef CONFIG_SCSI_SENSE_UEVENT
+/* data for for SDEV_EVT_SCSI_SENSE */
+struct scsi_sense_uevent_data {
+	unsigned char		cmd_len;
+	unsigned char		*cmnd;
+	unsigned char		sb_len;
+	unsigned char		*sense_buffer;
+};
+#endif
 
 struct scsi_event {
 	enum scsi_device_event	evt_type;
@@ -78,6 +89,11 @@ struct scsi_event {
 	/* put union of data structures, for non-simple event types,
 	 * here
 	 */
+	union {
+#ifdef CONFIG_SCSI_SENSE_UEVENT
+		struct scsi_sense_uevent_data sense_evt_data;
+#endif
+	};
 };
 
 struct scsi_device {
@@ -195,6 +211,15 @@ struct scsi_device {
 	atomic_t iorequest_cnt;
 	atomic_t iodone_cnt;
 	atomic_t ioerr_cnt;
+
+#ifdef CONFIG_SCSI_SENSE_UEVENT
+	/*
+	 * filter of sense code uevent
+	 * setting bit X (0x00 - 0x0e) of sense_event_filter enables
+	 * uevent for sense key X
+	 */
+	unsigned long		sense_event_filter;
+#endif
 
 	struct device		sdev_gendev,
 				sdev_dev;

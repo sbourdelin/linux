@@ -2677,7 +2677,15 @@ EXPORT_SYMBOL(scsi_device_set_state);
 static void scsi_evt_emit(struct scsi_device *sdev, struct scsi_event *evt)
 {
 	int idx = 0;
-	char *envp[3];
+	char *envp[5];	/* SDEV_EVT_SCSI_SENSE needs most entries (4) */
+#ifdef CONFIG_SCSI_SENSE_UEVENT
+	char *buf = NULL;
+	int i;
+	int buf_size;
+	int offset;
+	struct scsi_sense_hdr sshdr;
+#endif
+
 
 	switch (evt->evt_type) {
 	case SDEV_EVT_MEDIA_CHANGE:
@@ -2702,6 +2710,49 @@ static void scsi_evt_emit(struct scsi_device *sdev, struct scsi_event *evt)
 	case SDEV_EVT_ALUA_STATE_CHANGE_REPORTED:
 		envp[idx++] = "SDEV_UA=ASYMMETRIC_ACCESS_STATE_CHANGED";
 		break;
+#ifdef CONFIG_SCSI_SENSE_UEVENT
+	case SDEV_EVT_SCSI_SENSE:
+		/*
+		 * buf is used to store 3 strings: SENSE_CODE, CDB and
+		 * SENSE_BUFFER. 4 bytes are needed for each byte in cdb
+		 * and sense buffer. So the total size required is:
+		 *
+		 *   19 (SENSE_CODE=X/XX/XX\0) + 5 (CDB=\0) +
+		 *       14 (SENSE_BUFFER=\0) + 4 * (cdb_len + sb_len);
+		 */
+		buf_size = (evt->sense_evt_data.cmd_len +
+			    evt->sense_evt_data.sb_len) * 4 + 38;
+		buf = kzalloc(buf_size, GFP_KERNEL);
+		if (!buf)
+			break;
+		offset = 0;
+
+		envp[idx++] = "SDEV_SENSE=1";
+		envp[idx++] = buf;
+		scsi_normalize_sense(evt->sense_evt_data.sense_buffer,
+				     evt->sense_evt_data.sb_len, &sshdr);
+		offset += snprintf(buf + offset, buf_size - offset,
+				   "SENSE_CODE=%1x/%02x/%02x",
+				   sshdr.sense_key, sshdr.asc, sshdr.ascq);
+		offset++;
+
+		envp[idx++] = buf + offset;
+		offset += snprintf(buf + offset, buf_size - offset, "CDB=");
+		for (i = 0; i < evt->sense_evt_data.cmd_len; i++)
+			offset += snprintf(
+				buf + offset, buf_size - offset,
+				"\\x%02x", evt->sense_evt_data.cmnd[i]);
+
+		offset++;
+		envp[idx++] = buf + offset;
+		offset += snprintf(buf + offset, buf_size - offset,
+				   "SENSE_BUFFER=");
+		for (i = 0; i < evt->sense_evt_data.sb_len; i++)
+			offset += snprintf(
+				buf + offset, buf_size - offset,
+				"\\x%02x", evt->sense_evt_data.sense_buffer[i]);
+		break;
+#endif
 	default:
 		/* do nothing */
 		break;
@@ -2710,6 +2761,10 @@ static void scsi_evt_emit(struct scsi_device *sdev, struct scsi_event *evt)
 	envp[idx++] = NULL;
 
 	kobject_uevent_env(&sdev->sdev_gendev.kobj, KOBJ_CHANGE, envp);
+
+#ifdef CONFIG_SCSI_SENSE_UEVENT
+	kfree(buf);
+#endif
 }
 
 /**
@@ -2806,6 +2861,7 @@ struct scsi_event *sdev_evt_alloc(enum scsi_device_event evt_type,
 	case SDEV_EVT_MODE_PARAMETER_CHANGE_REPORTED:
 	case SDEV_EVT_LUN_CHANGE_REPORTED:
 	case SDEV_EVT_ALUA_STATE_CHANGE_REPORTED:
+	case SDEV_EVT_SCSI_SENSE:
 	default:
 		/* do nothing */
 		break;
