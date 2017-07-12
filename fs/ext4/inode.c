@@ -1015,6 +1015,42 @@ struct buffer_head *ext4_bread(handle_t *handle, struct inode *inode,
 	return ERR_PTR(-EIO);
 }
 
+/* Read a contiguous batch of blocks. */
+int ext4_bread_batch(struct inode *inode, ext4_lblk_t block, int bh_count,
+		     struct buffer_head **bhs)
+{
+	int i, err;
+
+	for (i = 0; i < bh_count; i++) {
+		bhs[i] = ext4_getblk(NULL, inode, block + i, 0 /* map_flags */);
+		if (IS_ERR(bhs[i])) {
+			err = PTR_ERR(bhs[i]);
+			while (i--)
+				brelse(bhs[i]);
+			return err;
+		}
+	}
+
+	for (i = 0; i < bh_count; i++)
+		/* Note that NULL bhs[i] is valid because of holes. */
+		if (bhs[i] && !buffer_uptodate(bhs[i]))
+			ll_rw_block(REQ_OP_READ, REQ_META | REQ_PRIO, 1,
+				    &bhs[i]);
+
+	for (i = 0; i < bh_count; i++)
+		if (bhs[i])
+			wait_on_buffer(bhs[i]);
+
+	for (i = 0; i < bh_count; i++) {
+		if (bhs[i] && !buffer_uptodate(bhs[i])) {
+			for (i = 0; i < bh_count; i++)
+				brelse(bhs[i]);
+			return -EIO;
+		}
+	}
+	return 0;
+}
+
 int ext4_walk_page_buffers(handle_t *handle,
 			   struct buffer_head *head,
 			   unsigned from,
