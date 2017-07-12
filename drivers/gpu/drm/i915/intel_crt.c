@@ -204,6 +204,16 @@ static void pch_disable_crt(struct intel_encoder *encoder,
 			    struct intel_crtc_state *old_crtc_state,
 			    struct drm_connector_state *old_conn_state)
 {
+	struct drm_crtc *crtc = old_crtc_state->base.crtc;
+	struct drm_i915_private *dev_priv = to_i915(crtc->dev);
+	struct intel_crtc *intel_crtc = to_intel_crtc(crtc);
+
+	if (HAS_DDI(dev_priv)) {
+		WARN_ON(!intel_crtc->config->has_pch_encoder);
+
+		intel_set_pch_fifo_underrun_reporting(dev_priv, TRANSCODER_A,
+						      false);
+	}
 }
 
 static void pch_post_disable_crt(struct intel_encoder *encoder,
@@ -225,6 +235,10 @@ static void hsw_post_disable_crt(struct intel_encoder *encoder,
 	lpt_disable_iclkip(dev_priv);
 
 	intel_ddi_fdi_post_disable(encoder, old_crtc_state, old_conn_state);
+
+	WARN_ON(!old_crtc_state->has_pch_encoder);
+
+	intel_set_pch_fifo_underrun_reporting(dev_priv, TRANSCODER_A, true);
 }
 
 static void hsw_pre_pll_enable_crt(struct intel_encoder *encoder,
