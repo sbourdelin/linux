@@ -1,0 +1,19 @@
+Motorola CPCAP audio CODEC
+--------------------------
+
+This module is part of the CPCAP. For more details about the whole
+chip see Documentation/devicetree/bindings/mfd/motorola-cpcap.txt.
+
+Required properties:
+
+  - compatible : "motorola,cpcap-audio-codec"
+  - vdd-supply : Phandle to audio regulator
+
+Example:
+
+&cpcap {
+	audio-codec {
+		compatible = "motorola,cpcap-audio-codec";
+		vdd-supply = <&vaudio>;
+	};
+};
