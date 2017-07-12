@@ -90,16 +90,34 @@ static int powernv_flash_async_op(struct mtd_info *mtd, enum flash_op op,
 		goto out_success;
 
 	if (rc != OPAL_ASYNC_COMPLETION) {
-		dev_err(dev, "opal_flash_async_op(op=%d) failed (rc %d)\n",
+		if (rc != OPAL_BUSY)
+			dev_err(dev, "opal_flash_async_op(op=%d) failed (rc %d)\n",
 				op, rc);
-		rc = -EIO;
+		rc = opal_error_code(rc);
 		goto out;
 	}
 
-	rc = opal_async_wait_response(token, &msg);
+	rc = opal_async_wait_response_interruptible(token, &msg);
 	if (rc) {
-		dev_err(dev, "opal async wait failed (rc %d)\n", rc);
-		rc = -EIO;
+		/*
+		 * Awkward, we've been interrupted but we cannot return. If we
+		 * do return the mtd core will free the buffer we've just
+		 * passed to OPAL but OPAL will continue to read or write from
+		 * that memory.
+		 * Future work will introduce a call to tell OPAL to stop
+		 * using the buffer.
+		 * It may be tempting to ultimately return 0 if we're doing a
+		 * read or a write since we are going to end up waiting until
+		 * OPAL is done. However, because the MTD core sends us the
+		 * userspace request in chunks, we must report EINTR so that
+		 * it doesn't just send us the next chunk, thus defeating the
+		 * point of the _interruptible wait.
+		 */
+		rc = -EINTR;
+		if (op == FLASH_OP_READ || op == FLASH_OP_WRITE) {
+			if (opal_async_wait_response(token, &msg))
+				dev_err(dev, "opal async wait failed (rc %d)\n", rc);
+		}
 		goto out;
 	}
 
