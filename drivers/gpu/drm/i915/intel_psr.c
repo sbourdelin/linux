@@ -61,17 +61,6 @@ static bool is_edp_psr(struct intel_dp *intel_dp)
 	return intel_dp->psr_dpcd[0] & DP_PSR_IS_SUPPORTED;
 }
 
-static bool vlv_is_psr_active_on_pipe(struct drm_device *dev, int pipe)
-{
-	struct drm_i915_private *dev_priv = to_i915(dev);
-	uint32_t val;
-
-	val = I915_READ(VLV_PSRSTAT(pipe)) &
-	      VLV_EDP_PSR_CURR_STATE_MASK;
-	return (val == VLV_EDP_PSR_ACTIVE_NORFB_UP) ||
-	       (val == VLV_EDP_PSR_ACTIVE_SF_UPDATE);
-}
-
 static void intel_psr_write_vsc(struct intel_dp *intel_dp,
 				const struct edp_vsc_psr *vsc_psr)
 {
@@ -610,7 +599,10 @@ static void vlv_psr_disable(struct intel_dp *intel_dp)
 
 		dev_priv->psr.active = false;
 	} else {
-		WARN_ON(vlv_is_psr_active_on_pipe(dev, intel_crtc->pipe));
+		val = I915_READ(VLV_PSRSTAT(intel_crtc->pipe)) &
+			VLV_EDP_PSR_CURR_STATE_MASK;
+		WARN_ON(val == VLV_EDP_PSR_ACTIVE_NORFB_UP ||
+			val == VLV_EDP_PSR_ACTIVE_SF_UPDATE);
 	}
 }
 
