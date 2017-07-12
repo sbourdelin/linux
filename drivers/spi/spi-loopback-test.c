@@ -51,6 +51,14 @@ MODULE_PARM_DESC(loopback,
 		 "is checked to match tx_buf after the spi_message "	\
 		 "is executed");
 
+/* the device is jumpered for loopback - enabling some rx_buf tests */
+int loop_req;
+module_param(loop_req, int, 0);
+MODULE_PARM_DESC(loop_req,
+		 "if set enable controller will be asked to enable "	\
+		 "test loop mode. If supported, MISO and MOSI will be "  \
+		 "jumpered by SPI controller");
+
 /* run only a specific test */
 int run_only_test = -1;
 module_param(run_only_test, int, 0);
@@ -312,6 +320,16 @@ static struct spi_test spi_tests[] = {
 static int spi_loopback_test_probe(struct spi_device *spi)
 {
 	int ret;
+
+	if (loop_req) {
+		spi->mode = SPI_LOOP | spi->mode;
+		ret = spi_setup(spi);
+		if (ret) {
+			dev_err(&spi->dev, "SPI setup wasn't successful %d\n", ret);
+			dev_err(&spi->dev, "SPI_LOOP is not supported by SPI master.");
+			return -ENODEV;
+		}
+	}
 
 	dev_info(&spi->dev, "Executing spi-loopback-tests\n");
 
