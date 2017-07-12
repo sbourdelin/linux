@@ -694,7 +694,7 @@ static int __init sh_rtc_probe(struct platform_device *pdev)
 
 	/* reset rtc to epoch 0 if time is invalid */
 	if (rtc_read_time(rtc->rtc_dev, &r) < 0) {
-		rtc_time_to_tm(0, &r);
+		rtc_time64_to_tm(0, &r);
 		rtc_set_time(rtc->rtc_dev, &r);
 	}
 
