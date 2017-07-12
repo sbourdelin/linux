@@ -238,6 +238,21 @@ int do_page_fault(struct pt_regs *regs, unsigned long address,
 	}
 #endif /* CONFIG_PPC_ICSWX */
 
+#ifdef CONFIG_PPC_STD_MMU_64
+	/*
+	 * These faults indicate a copy/paste on an invalid memory type
+	 * or an incorrect AMO operation. They have been observed as not
+	 * properly updating the DAR, so handle them early
+	 */
+	if (error_code & (DSISR_BAD_COPYPASTE | DSISR_BAD_AMO)) {
+		if (user_mode(regs))
+			_exception(SIGBUS, regs, BUS_OBJERR, address);
+		else
+			rc = SIGBUS;
+		goto bail;
+	}
+#endif /* CONFIG_PPC_STD_MMU_64 */
+
 	if (notify_page_fault(regs))
 		goto bail;
 
