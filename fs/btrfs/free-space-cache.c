@@ -2091,24 +2091,13 @@ no_cluster_bitmap:
 		goto again;
 
 new_bitmap:
-	if (info && info->bitmap) {
+	if (info->bitmap) {
 		add_new_bitmap(ctl, info, offset);
 		added = 1;
 		info = NULL;
 		goto again;
 	} else {
 		spin_unlock(&ctl->tree_lock);
-
-		/* no pre-allocated info, allocate a new one */
-		if (!info) {
-			info = kmem_cache_zalloc(btrfs_free_space_cachep,
-						 GFP_NOFS);
-			if (!info) {
-				spin_lock(&ctl->tree_lock);
-				ret = -ENOMEM;
-				goto out;
-			}
-		}
 
 		/* allocate the bitmap */
 		info->bitmap = kzalloc(PAGE_SIZE, GFP_NOFS);
