@@ -108,42 +108,39 @@ static void vlv_psr_setup_vsc(struct intel_dp *intel_dp)
 	I915_WRITE(VLV_VSCSDP(pipe), val);
 }
 
-static void skl_psr_setup_su_vsc(struct intel_dp *intel_dp)
+static void hsw_psr_setup_vsc(struct intel_dp *intel_dp)
 {
-	struct edp_vsc_psr psr_vsc;
 	struct intel_digital_port *intel_dig_port = dp_to_dig_port(intel_dp);
 	struct drm_device *dev = intel_dig_port->base.base.dev;
 	struct drm_i915_private *dev_priv = to_i915(dev);
 
-	/* Prepare VSC Header for SU as per EDP 1.4 spec, Table 6.11 */
-	memset(&psr_vsc, 0, sizeof(psr_vsc));
-	psr_vsc.sdp_header.HB0 = 0;
-	psr_vsc.sdp_header.HB1 = 0x7;
-	if (dev_priv->psr.colorimetry_support &&
-		dev_priv->psr.y_cord_support) {
-		psr_vsc.sdp_header.HB2 = 0x5;
-		psr_vsc.sdp_header.HB3 = 0x13;
-	} else if (dev_priv->psr.y_cord_support) {
-		psr_vsc.sdp_header.HB2 = 0x4;
-		psr_vsc.sdp_header.HB3 = 0xe;
-	} else {
-		psr_vsc.sdp_header.HB2 = 0x3;
-		psr_vsc.sdp_header.HB3 = 0xc;
-	}
-
-	intel_psr_write_vsc(intel_dp, &psr_vsc);
-}
-
-static void hsw_psr_setup_vsc(struct intel_dp *intel_dp)
-{
 	struct edp_vsc_psr psr_vsc;
 
-	/* Prepare VSC packet as per EDP 1.3 spec, Table 3.10 */
-	memset(&psr_vsc, 0, sizeof(psr_vsc));
-	psr_vsc.sdp_header.HB0 = 0;
-	psr_vsc.sdp_header.HB1 = 0x7;
-	psr_vsc.sdp_header.HB2 = 0x2;
-	psr_vsc.sdp_header.HB3 = 0x8;
+	if (dev_priv->psr.psr2_support) {
+		/* Prepare VSC Header for SU as per EDP 1.4 spec, Table 6.11 */
+		memset(&psr_vsc, 0, sizeof(psr_vsc));
+		psr_vsc.sdp_header.HB0 = 0;
+		psr_vsc.sdp_header.HB1 = 0x7;
+		if (dev_priv->psr.colorimetry_support &&
+		    dev_priv->psr.y_cord_support) {
+			psr_vsc.sdp_header.HB2 = 0x5;
+			psr_vsc.sdp_header.HB3 = 0x13;
+		} else if (dev_priv->psr.y_cord_support) {
+			psr_vsc.sdp_header.HB2 = 0x4;
+			psr_vsc.sdp_header.HB3 = 0xe;
+		} else {
+			psr_vsc.sdp_header.HB2 = 0x3;
+			psr_vsc.sdp_header.HB3 = 0xc;
+		}
+	} else {
+		/* Prepare VSC packet as per EDP 1.3 spec, Table 3.10 */
+		memset(&psr_vsc, 0, sizeof(psr_vsc));
+		psr_vsc.sdp_header.HB0 = 0;
+		psr_vsc.sdp_header.HB1 = 0x7;
+		psr_vsc.sdp_header.HB2 = 0x2;
+		psr_vsc.sdp_header.HB3 = 0x8;
+	}
+
 	intel_psr_write_vsc(intel_dp, &psr_vsc);
 }
 
@@ -501,8 +498,10 @@ void intel_psr_enable(struct intel_dp *intel_dp)
 	dev_priv->psr.busy_frontbuffer_bits = 0;
 
 	if (HAS_DDI(dev_priv)) {
+
+		hsw_psr_setup_vsc(intel_dp);
+
 		if (dev_priv->psr.psr2_support) {
-			skl_psr_setup_su_vsc(intel_dp);
 			chicken = PSR2_VSC_ENABLE_PROG_HEADER;
 			if (dev_priv->psr.y_cord_support)
 				chicken |= PSR2_ADD_VERTICAL_LINE_COUNT;
@@ -514,8 +513,6 @@ void intel_psr_enable(struct intel_dp *intel_dp)
 				   EDP_PSR_DEBUG_MASK_MAX_SLEEP |
 				   EDP_PSR_DEBUG_MASK_DISP_REG_WRITE);
 		} else {
-			/* set up vsc header for psr1 */
-			hsw_psr_setup_vsc(intel_dp);
 			/*
 			 * Per Spec: Avoid continuous PSR exit by masking MEMUP
 			 * and HPD. also mask LPSP to avoid dependency on other
