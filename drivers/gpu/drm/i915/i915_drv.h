@@ -1145,6 +1145,7 @@ struct i915_psr {
 	bool colorimetry_support;
 	bool alpm;
 
+	void (*enable_source)(struct intel_dp *);
 	void (*disable_source)(struct intel_dp *);
 	void (*enable_sink)(struct intel_dp *);
 	void (*activate)(struct intel_dp *);
