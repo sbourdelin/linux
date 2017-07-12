@@ -436,10 +436,26 @@ static void scsi_send_sense_uevent(struct scsi_device *sdev,
 #ifdef CONFIG_SCSI_SENSE_UEVENT
 	struct scsi_event *evt;
 	unsigned char sb_len;
+	struct Scsi_Host *shost = sdev->host;
+	unsigned long flags;
+	u64 time_ns;
 
 	if (!test_bit(sshdr->sense_key & 0xf,
 		      &sdev->sense_event_filter))
 		return;
+
+	time_ns = ktime_to_ns(ktime_get());
+	spin_lock_irqsave(&shost->latest_event_lock, flags);
+	if (time_ns - shost->latest_event_times[shost->latest_event_idx] <
+	    NSEC_PER_SEC) {
+		spin_unlock_irqrestore(&shost->latest_event_lock, flags);
+		return;
+	}
+	shost->latest_event_times[shost->latest_event_idx] = time_ns;
+	shost->latest_event_idx = (shost->latest_event_idx + 1) %
+		MAX_SENSE_EVENT_PER_SECOND;
+	spin_unlock_irqrestore(&shost->latest_event_lock, flags);
+
 	evt = sdev_evt_alloc(SDEV_EVT_SCSI_SENSE, GFP_ATOMIC);
 	if (!evt)
 		return;

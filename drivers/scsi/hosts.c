@@ -408,6 +408,10 @@ struct Scsi_Host *scsi_host_alloc(struct scsi_host_template *sht, int privsize)
 	init_waitqueue_head(&shost->host_wait);
 	mutex_init(&shost->scan_mutex);
 
+#ifdef CONFIG_SCSI_SENSE_UEVENT
+	spin_lock_init(&shost->latest_event_lock);
+#endif
+
 	index = ida_simple_get(&host_index_ida, 0, 0, GFP_KERNEL);
 	if (index < 0)
 		goto fail_kfree;

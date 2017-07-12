@@ -731,6 +731,19 @@ struct Scsi_Host {
 	 */
 	struct device *dma_dev;
 
+#ifdef CONFIG_SCSI_SENSE_UEVENT
+#define MAX_SENSE_EVENT_PER_SECOND	64
+	/*
+	 * To rate limit uevents to MAX_SENSE_EVENT_PER_SECOND, we track
+	 * nano second time of MAX_SENSE_EVENT_PER_SECOND most recent
+	 * events. If there are already MAX_SENSE_EVENT_PER_SECOND in the
+	 * past seconds, new event is dropped.
+	 */
+	u64		latest_event_times[MAX_SENSE_EVENT_PER_SECOND];
+	int		latest_event_idx;
+	spinlock_t	latest_event_lock;
+#endif
+
 	/*
 	 * We should ensure that this is aligned, both for better performance
 	 * and also because some compilers (m68k) don't automatically force
