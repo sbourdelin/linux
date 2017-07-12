@@ -782,4 +782,7 @@ static inline struct page *resync_fetch_page(struct resync_pages *rp,
 		return NULL;
 	return rp->pages[idx];
 }
+
+void md_bio_reset_resync_pages(struct bio *bio, struct resync_pages *rp,
+			       int size);
 #endif /* _MD_MD_H */
