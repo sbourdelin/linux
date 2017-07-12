@@ -513,6 +513,10 @@ reiserfs_xattr_set_handle(struct reiserfs_transaction_handle *th,
 
 	if (!buffer) {
 		err = lookup_and_delete_xattr(inode, name);
+		if (flags & XATTR_REPLACE)
+			return err;
+		if (err == -ENODATA)
+			err = 0;
 		return err;
 	}
 

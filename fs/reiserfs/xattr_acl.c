@@ -237,14 +237,17 @@ __reiserfs_set_acl(struct reiserfs_transaction_handle *th, struct inode *inode,
 	void *value = NULL;
 	size_t size = 0;
 	int error;
+	int update_mode = 0;
+	umode_t mode = inode->i_mode;
 
 	switch (type) {
 	case ACL_TYPE_ACCESS:
 		name = XATTR_NAME_POSIX_ACL_ACCESS;
 		if (acl) {
-			error = posix_acl_update_mode(inode, &inode->i_mode, &acl);
+			error = posix_acl_update_mode(inode, &mode, &acl);
 			if (error)
 				return error;
+			update_mode = 1;
 		}
 		break;
 	case ACL_TYPE_DEFAULT:
@@ -264,25 +267,15 @@ __reiserfs_set_acl(struct reiserfs_transaction_handle *th, struct inode *inode,
 
 	error = reiserfs_xattr_set_handle(th, inode, name, value, size, 0);
 
-	/*
-	 * Ensure that the inode gets dirtied if we're only using
-	 * the mode bits and an old ACL didn't exist. We don't need
-	 * to check if the inode is hashed here since we won't get
-	 * called by reiserfs_inherit_default_acl().
-	 */
-	if (error == -ENODATA) {
-		error = 0;
-		if (type == ACL_TYPE_ACCESS) {
+	kfree(value);
+	if (!error) {
+		set_cached_acl(inode, type, acl);
+		if (update_mode) {
+			inode->i_mode = mode;
 			inode->i_ctime = current_time(inode);
 			mark_inode_dirty(inode);
 		}
 	}
-
-	kfree(value);
-
-	if (!error)
-		set_cached_acl(inode, type, acl);
-
 	return error;
 }
 
