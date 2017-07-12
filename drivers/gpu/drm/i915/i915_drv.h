@@ -1144,6 +1144,7 @@ struct i915_psr {
 	bool y_cord_support;
 	bool colorimetry_support;
 	bool alpm;
+	bool has_hw_tracking;
 
 	void (*enable_source)(struct intel_dp *);
 	void (*disable_source)(struct intel_dp *);
