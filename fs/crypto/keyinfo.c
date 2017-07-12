@@ -272,29 +272,27 @@ int fscrypt_get_encryption_info(struct inode *inode)
 			return res;
 		/* Fake up a context for an unencrypted directory */
 		memset(&ctx, 0, sizeof(ctx));
-		ctx.format = FS_ENCRYPTION_CONTEXT_FORMAT_V1;
+		ctx.version = FSCRYPT_CONTEXT_V1;
 		ctx.contents_encryption_mode = FS_ENCRYPTION_MODE_AES_256_XTS;
 		ctx.filenames_encryption_mode = FS_ENCRYPTION_MODE_AES_256_CTS;
 		memset(ctx.master_key_descriptor, 0x42, FS_KEY_DESCRIPTOR_SIZE);
-	} else if (res != sizeof(ctx)) {
-		return -EINVAL;
+		res = FSCRYPT_CONTEXT_V1_SIZE;
 	}
 
-	if (ctx.format != FS_ENCRYPTION_CONTEXT_FORMAT_V1)
+	if (!fscrypt_valid_context_format(&ctx, res))
 		return -EINVAL;
 
 	if (ctx.flags & ~FS_POLICY_FLAGS_VALID)
 		return -EINVAL;
 
-	crypt_info = kmem_cache_alloc(fscrypt_info_cachep, GFP_NOFS);
+	crypt_info = kmem_cache_zalloc(fscrypt_info_cachep, GFP_NOFS);
 	if (!crypt_info)
 		return -ENOMEM;
 
-	crypt_info->ci_flags = ctx.flags;
+	crypt_info->ci_context_version = ctx.version;
 	crypt_info->ci_data_mode = ctx.contents_encryption_mode;
 	crypt_info->ci_filename_mode = ctx.filenames_encryption_mode;
-	crypt_info->ci_ctfm = NULL;
-	crypt_info->ci_essiv_tfm = NULL;
+	crypt_info->ci_flags = ctx.flags;
 	memcpy(crypt_info->ci_master_key, ctx.master_key_descriptor,
 				sizeof(crypt_info->ci_master_key));
 

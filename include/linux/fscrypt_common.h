@@ -84,7 +84,7 @@ struct fscrypt_operations {
 };
 
 /* Maximum value for the third parameter of fscrypt_operations.set_context(). */
-#define FSCRYPT_SET_CONTEXT_MAX_SIZE	28
+#define FSCRYPT_SET_CONTEXT_MAX_SIZE	44
 
 static inline bool fscrypt_dummy_context_enabled(struct inode *inode)
 {

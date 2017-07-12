@@ -25,39 +25,88 @@
 #define FS_AES_256_XTS_KEY_SIZE		64
 
 #define FS_KEY_DERIVATION_NONCE_SIZE		16
+#define FSCRYPT_KEY_HASH_SIZE		16
 
 /**
- * Encryption context for inode
+ * fscrypt_context - the encryption context for an inode
  *
- * Protector format:
- *  1 byte: Protector format (1 = this version)
- *  1 byte: File contents encryption mode
- *  1 byte: File names encryption mode
- *  1 byte: Flags
- *  8 bytes: Master Key descriptor
- *  16 bytes: Encryption Key derivation nonce
+ * Filesystems usually store this in an extended attribute.  It identifies the
+ * encryption algorithm and key with which the file is encrypted.
  */
 struct fscrypt_context {
-	u8 format;
-	u8 contents_encryption_mode;
-	u8 filenames_encryption_mode;
-	u8 flags;
-	u8 master_key_descriptor[FS_KEY_DESCRIPTOR_SIZE];
-	u8 nonce[FS_KEY_DERIVATION_NONCE_SIZE];
-} __packed;
+	/* v1+ */
 
-#define FS_ENCRYPTION_CONTEXT_FORMAT_V1		1
+	/* Version of this structure */
+	u8 version;
+
+	/* Encryption mode for the contents of regular files */
+	u8 contents_encryption_mode;
+
+	/* Encryption mode for filenames in directories and symlink targets */
+	u8 filenames_encryption_mode;
+
+	/* Options that affect how encryption is done (e.g. padding amount) */
+	u8 flags;
+
+	/* Descriptor for this file's master key in the keyring */
+	u8 master_key_descriptor[FS_KEY_DESCRIPTOR_SIZE];
+
+	/*
+	 * A unique value used in combination with the master key to derive the
+	 * file's actual encryption key
+	 */
+	u8 nonce[FS_KEY_DERIVATION_NONCE_SIZE];
+
+	/* v2+ */
+
+	/* Cryptographically secure hash of the master key */
+	u8 key_hash[FSCRYPT_KEY_HASH_SIZE];
+};
+
+#define FSCRYPT_CONTEXT_V1	1
+#define FSCRYPT_CONTEXT_V1_SIZE	offsetof(struct fscrypt_context, key_hash)
+
+#define FSCRYPT_CONTEXT_V2	2
+#define FSCRYPT_CONTEXT_V2_SIZE	sizeof(struct fscrypt_context)
+
+static inline int fscrypt_context_size(const struct fscrypt_context *ctx)
+{
+	switch (ctx->version) {
+	case FSCRYPT_CONTEXT_V1:
+		return FSCRYPT_CONTEXT_V1_SIZE;
+	case FSCRYPT_CONTEXT_V2:
+		return FSCRYPT_CONTEXT_V2_SIZE;
+	}
+	return 0;
+}
+
+static inline bool
+fscrypt_valid_context_format(const struct fscrypt_context *ctx, int size)
+{
+	return size >= 1 && size == fscrypt_context_size(ctx);
+}
 
 /*
- * A pointer to this structure is stored in the file system's in-core
- * representation of an inode.
+ * fscrypt_info - the "encryption key" for an inode
+ *
+ * When an encrypted file's key is made available, an instance of this struct is
+ * allocated and stored in ->i_crypt_info.  Once created, it remains until the
+ * inode is evicted.
  */
 struct fscrypt_info {
+
+	/* The actual crypto transforms needed for encryption and decryption */
+	struct crypto_skcipher *ci_ctfm;
+	struct crypto_cipher *ci_essiv_tfm;
+
+	/*
+	 * Cached fields from the fscrypt_context needed for encryption policy
+	 * inheritance and enforcement
+	 */
+	u8 ci_context_version;
 	u8 ci_data_mode;
 	u8 ci_filename_mode;
 	u8 ci_flags;
-	struct crypto_skcipher *ci_ctfm;
-	struct crypto_cipher *ci_essiv_tfm;
 	u8 ci_master_key[FS_KEY_DESCRIPTOR_SIZE];
 };
 
