@@ -40,7 +40,8 @@ static u8 context_version_for_policy(const struct fscrypt_policy *policy)
  */
 static bool is_encryption_context_consistent_with_policy(
 				const struct fscrypt_context *ctx,
-				const struct fscrypt_policy *policy)
+				const struct fscrypt_policy *policy,
+				const u8 key_hash[FSCRYPT_KEY_HASH_SIZE])
 {
 	return (ctx->version == context_version_for_policy(policy)) &&
 		(memcmp(ctx->master_key_descriptor,
@@ -50,11 +51,14 @@ static bool is_encryption_context_consistent_with_policy(
 		(ctx->contents_encryption_mode ==
 		 policy->contents_encryption_mode) &&
 		(ctx->filenames_encryption_mode ==
-		 policy->filenames_encryption_mode);
+		 policy->filenames_encryption_mode) &&
+		(ctx->version == FSCRYPT_CONTEXT_V1 ||
+		 (memcmp(ctx->key_hash, key_hash, FSCRYPT_KEY_HASH_SIZE) == 0));
 }
 
 static int create_encryption_context_from_policy(struct inode *inode,
-				const struct fscrypt_policy *policy)
+				const struct fscrypt_policy *policy,
+				const u8 key_hash[FSCRYPT_KEY_HASH_SIZE])
 {
 	struct fscrypt_context ctx;
 
@@ -74,7 +78,7 @@ static int create_encryption_context_from_policy(struct inode *inode,
 	BUILD_BUG_ON(sizeof(ctx.nonce) != FS_KEY_DERIVATION_NONCE_SIZE);
 	get_random_bytes(ctx.nonce, FS_KEY_DERIVATION_NONCE_SIZE);
 	if (ctx.version != FSCRYPT_CONTEXT_V1)
-		memset(ctx.key_hash, 0, FSCRYPT_KEY_HASH_SIZE);
+		memcpy(ctx.key_hash, key_hash, FSCRYPT_KEY_HASH_SIZE);
 
 	return inode->i_sb->s_cop->set_context(inode, &ctx,
 					       fscrypt_context_size(&ctx),
@@ -87,6 +91,7 @@ int fscrypt_ioctl_set_policy(struct file *filp, const void __user *arg)
 	struct inode *inode = file_inode(filp);
 	int ret;
 	struct fscrypt_context ctx;
+	u8 key_hash[FSCRYPT_KEY_HASH_SIZE];
 
 	if (copy_from_user(&policy, arg, sizeof(policy)))
 		return -EFAULT;
@@ -97,6 +102,25 @@ int fscrypt_ioctl_set_policy(struct file *filp, const void __user *arg)
 	if (policy.version != FS_POLICY_VERSION_ORIGINAL &&
 	    policy.version != FS_POLICY_VERSION_HKDF)
 		return -EINVAL;
+
+	if (policy.version == FS_POLICY_VERSION_ORIGINAL) {
+		/*
+		 * Originally no key verification was implemented, which was
+		 * insufficient for scenarios where multiple users share
+		 * encrypted files.  The new encryption policy version fixes
+		 * this and also implements an improved key derivation function.
+		 * So as long as the key can be in the keyring at the time the
+		 * policy is set and compatibility with old kernels isn't
+		 * required, it's recommended to use the new policy version
+		 * (fscrypt_policy.version = 2).
+		 */
+		pr_warn_once("%s (pid %d) is setting less secure v0 encryption policy; recommend upgrading to v2.\n",
+			     current->comm, current->pid);
+	} else {
+		ret = fscrypt_compute_key_hash(inode, &policy, key_hash);
+		if (ret)
+			return ret;
+	}
 
 	ret = mnt_want_write_file(filp);
 	if (ret)
@@ -112,10 +136,12 @@ int fscrypt_ioctl_set_policy(struct file *filp, const void __user *arg)
 			ret = -ENOTEMPTY;
 		else
 			ret = create_encryption_context_from_policy(inode,
-								    &policy);
+								    &policy,
+								    key_hash);
 	} else if (ret >= 0 && fscrypt_valid_context_format(&ctx, ret) &&
 		   is_encryption_context_consistent_with_policy(&ctx,
-								&policy)) {
+								&policy,
+								key_hash)) {
 		/* The file already uses the same encryption policy. */
 		ret = 0;
 	} else if (ret >= 0 || ret == -ERANGE) {
@@ -232,7 +258,11 @@ int fscrypt_has_permitted_context(struct inode *parent, struct inode *child)
 			(parent_ci->ci_data_mode == child_ci->ci_data_mode) &&
 			(parent_ci->ci_filename_mode ==
 			 child_ci->ci_filename_mode) &&
-			(parent_ci->ci_flags == child_ci->ci_flags);
+			(parent_ci->ci_flags == child_ci->ci_flags) &&
+			(parent_ci->ci_context_version == FSCRYPT_CONTEXT_V1 ||
+			 (memcmp(parent_ci->ci_master_key->mk_hash,
+				 child_ci->ci_master_key->mk_hash,
+				 FSCRYPT_KEY_HASH_SIZE) == 0));
 	}
 
 	res = cops->get_context(parent, &parent_ctx, sizeof(parent_ctx));
@@ -251,7 +281,10 @@ int fscrypt_has_permitted_context(struct inode *parent, struct inode *child)
 		 child_ctx.contents_encryption_mode) &&
 		(parent_ctx.filenames_encryption_mode ==
 		 child_ctx.filenames_encryption_mode) &&
-		(parent_ctx.flags == child_ctx.flags);
+		(parent_ctx.flags == child_ctx.flags) &&
+		(parent_ctx.version == FSCRYPT_CONTEXT_V1 ||
+		 (memcmp(parent_ctx.key_hash, child_ctx.key_hash,
+			 FSCRYPT_KEY_HASH_SIZE) == 0));
 }
 EXPORT_SYMBOL(fscrypt_has_permitted_context);
 
@@ -286,8 +319,10 @@ int fscrypt_inherit_context(struct inode *parent, struct inode *child,
 	memcpy(ctx.master_key_descriptor, ci->ci_master_key_descriptor,
 	       FS_KEY_DESCRIPTOR_SIZE);
 	get_random_bytes(ctx.nonce, FS_KEY_DERIVATION_NONCE_SIZE);
-	if (ctx.version != FSCRYPT_CONTEXT_V1)
-		memset(ctx.key_hash, 0, FSCRYPT_KEY_HASH_SIZE);
+	if (ctx.version != FSCRYPT_CONTEXT_V1) {
+		memcpy(ctx.key_hash, ci->ci_master_key->mk_hash,
+		       FSCRYPT_KEY_HASH_SIZE);
+	}
 
 	BUILD_BUG_ON(sizeof(ctx) != FSCRYPT_SET_CONTEXT_MAX_SIZE);
 	res = parent->i_sb->s_cop->set_context(child, &ctx,

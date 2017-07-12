@@ -92,6 +92,7 @@ fscrypt_valid_context_format(const struct fscrypt_context *ctx, int size)
 struct fscrypt_master_key {
 	struct crypto_shash	*mk_hmac;
 	unsigned int		mk_size;
+	u8			mk_hash[FSCRYPT_KEY_HASH_SIZE];
 };
 
 /*
@@ -155,6 +156,9 @@ extern struct page *fscrypt_alloc_bounce_page(struct fscrypt_ctx *ctx,
 					      gfp_t gfp_flags);
 
 /* keyinfo.c */
+extern int fscrypt_compute_key_hash(const struct inode *inode,
+				    const struct fscrypt_policy *policy,
+				    u8 hash[FSCRYPT_KEY_HASH_SIZE]);
 extern void __exit fscrypt_essiv_cleanup(void);
 
 #endif /* _FSCRYPT_PRIVATE_H */

@@ -39,8 +39,11 @@ static struct crypto_shash *essiv_hash_tfm;
  *
  * Keys derived with different info strings are cryptographically isolated from
  * each other --- knowledge of one derived key doesn't reveal any others.
+ * (This property is particularly important for the derived key used as the
+ * "key hash", as that is stored in the clear.)
  */
 #define HKDF_CONTEXT_PER_FILE_KEY	1
+#define HKDF_CONTEXT_KEY_HASH		2
 
 /*
  * HKDF consists of two steps:
@@ -210,6 +213,12 @@ alloc_master_key(const struct fscrypt_key *payload)
 		goto fail;
 
 	err = crypto_shash_setkey(k->mk_hmac, prk, sizeof(prk));
+	if (err)
+		goto fail;
+
+	/* Calculate the "key hash" */
+	err = hkdf_expand(k->mk_hmac, HKDF_CONTEXT_KEY_HASH, NULL, 0,
+			  k->mk_hash, FSCRYPT_KEY_HASH_SIZE);
 	if (err)
 		goto fail;
 out:
@@ -537,6 +546,31 @@ void __exit fscrypt_essiv_cleanup(void)
 	crypto_free_shash(essiv_hash_tfm);
 }
 
+int fscrypt_compute_key_hash(const struct inode *inode,
+			     const struct fscrypt_policy *policy,
+			     u8 hash[FSCRYPT_KEY_HASH_SIZE])
+{
+	struct fscrypt_master_key *k;
+	unsigned int min_keysize;
+
+	/*
+	 * Require that the master key be long enough for both the
+	 * contents and filenames encryption modes.
+	 */
+	min_keysize =
+		max(available_modes[policy->contents_encryption_mode].keysize,
+		    available_modes[policy->filenames_encryption_mode].keysize);
+
+	k = load_master_key_from_keyring(inode, policy->master_key_descriptor,
+					 min_keysize);
+	if (IS_ERR(k))
+		return PTR_ERR(k);
+
+	memcpy(hash, k->mk_hash, FSCRYPT_KEY_HASH_SIZE);
+	put_master_key(k);
+	return 0;
+}
+
 int fscrypt_get_encryption_info(struct inode *inode)
 {
 	struct fscrypt_info *crypt_info;
@@ -610,6 +644,18 @@ int fscrypt_get_encryption_info(struct inode *inode)
 		if (IS_ERR(crypt_info->ci_master_key)) {
 			res = PTR_ERR(crypt_info->ci_master_key);
 			crypt_info->ci_master_key = NULL;
+			goto out;
+		}
+
+		/*
+		 * Make sure the master key we found has the correct hash.
+		 * Buggy or malicious userspace may provide the wrong key.
+		 */
+		if (memcmp(crypt_info->ci_master_key->mk_hash, ctx.key_hash,
+			   FSCRYPT_KEY_HASH_SIZE)) {
+			pr_warn_ratelimited("fscrypt: wrong encryption key supplied for inode %lu\n",
+					    inode->i_ino);
+			res = -ENOKEY;
 			goto out;
 		}
 
