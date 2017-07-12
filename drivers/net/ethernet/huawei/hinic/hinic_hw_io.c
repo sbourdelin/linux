@@ -22,6 +22,7 @@
 #include <linux/slab.h>
 
 #include "hinic_hw_if.h"
+#include "hinic_hw_wq.h"
 #include "hinic_hw_qp.h"
 #include "hinic_hw_io.h"
 
@@ -40,8 +41,31 @@ static int init_qp(struct hinic_func_to_io *func_to_io,
 		   struct msix_entry *sq_msix_entry,
 		   struct msix_entry *rq_msix_entry)
 {
-	/* should be implemented */
+	int err;
+
+	qp->q_id = q_id;
+
+	err = hinic_wq_allocate(&func_to_io->wqs, &func_to_io->sq_wq[q_id],
+				HINIC_SQ_WQEBB_SIZE, HINIC_SQ_PAGE_SIZE,
+				HINIC_SQ_DEPTH, HINIC_SQ_WQE_MAX_SIZE);
+	if (err) {
+		pr_err("Failed to allocate WQ for SQ\n");
+		return err;
+	}
+
+	err = hinic_wq_allocate(&func_to_io->wqs, &func_to_io->rq_wq[q_id],
+				HINIC_RQ_WQEBB_SIZE, HINIC_RQ_PAGE_SIZE,
+				HINIC_RQ_DEPTH, HINIC_RQ_WQE_SIZE);
+	if (err) {
+		pr_err("Failed to allocate WQ for RQ\n");
+		goto rq_alloc_err;
+	}
+
 	return 0;
+
+rq_alloc_err:
+	hinic_wq_free(&func_to_io->wqs, &func_to_io->sq_wq[q_id]);
+	return err;
 }
 
 /**
@@ -52,7 +76,10 @@ static int init_qp(struct hinic_func_to_io *func_to_io,
 static void destroy_qp(struct hinic_func_to_io *func_to_io,
 		       struct hinic_qp *qp)
 {
-	/* should be implemented */
+	int q_id = qp->q_id;
+
+	hinic_wq_free(&func_to_io->wqs, &func_to_io->rq_wq[q_id]);
+	hinic_wq_free(&func_to_io->wqs, &func_to_io->sq_wq[q_id]);
 }
 
 /**
@@ -70,13 +97,27 @@ int hinic_io_create_qps(struct hinic_func_to_io *func_to_io,
 			struct msix_entry *sq_msix_entries,
 			struct msix_entry *rq_msix_entries)
 {
-	size_t qps_size;
+	size_t qps_size, wq_size;
 	int i, j, err;
 
 	qps_size = num_qps * sizeof(*func_to_io->qps);
 	func_to_io->qps = kzalloc(qps_size, GFP_KERNEL);
 	if (!func_to_io->qps)
 		return -ENOMEM;
+
+	wq_size = num_qps * sizeof(*func_to_io->sq_wq);
+	func_to_io->sq_wq = kzalloc(wq_size, GFP_KERNEL);
+	if (!func_to_io->sq_wq) {
+		err = -ENOMEM;
+		goto sq_wq_err;
+	}
+
+	wq_size = num_qps * sizeof(*func_to_io->rq_wq);
+	func_to_io->rq_wq = kzalloc(wq_size, GFP_KERNEL);
+	if (!func_to_io->rq_wq) {
+		err = -ENOMEM;
+		goto rq_wq_err;
+	}
 
 	for (i = 0; i < num_qps; i++) {
 		err = init_qp(func_to_io, &func_to_io->qps[i], i,
@@ -93,6 +134,12 @@ init_qp_err:
 	for (j = 0; j < i; j++)
 		destroy_qp(func_to_io, &func_to_io->qps[j]);
 
+	kfree(func_to_io->rq_wq);
+
+rq_wq_err:
+	kfree(func_to_io->sq_wq);
+
+sq_wq_err:
 	kfree(func_to_io->qps);
 	return err;
 }
@@ -108,6 +155,9 @@ void hinic_io_destroy_qps(struct hinic_func_to_io *func_to_io, int num_qps)
 
 	for (i = 0; i < num_qps; i++)
 		destroy_qp(func_to_io, &func_to_io->qps[i]);
+
+	kfree(func_to_io->rq_wq);
+	kfree(func_to_io->sq_wq);
 
 	kfree(func_to_io->qps);
 }
@@ -126,9 +176,17 @@ int hinic_io_init(struct hinic_func_to_io *func_to_io,
 		  struct hinic_hwif *hwif, u16 max_qps, int num_ceqs,
 		  struct msix_entry *ceq_msix_entries)
 {
+	int err;
+
 	func_to_io->hwif = hwif;
 	func_to_io->qps = NULL;
 	func_to_io->max_qps = max_qps;
+
+	err = hinic_wqs_alloc(&func_to_io->wqs, 2 * max_qps, hwif);
+	if (err) {
+		pr_err("Failed to allocate WQS for IO\n");
+		return err;
+	}
 
 	return 0;
 }
@@ -139,4 +197,5 @@ int hinic_io_init(struct hinic_func_to_io *func_to_io,
  **/
 void hinic_io_free(struct hinic_func_to_io *func_to_io)
 {
+	hinic_wqs_free(&func_to_io->wqs);
 }
