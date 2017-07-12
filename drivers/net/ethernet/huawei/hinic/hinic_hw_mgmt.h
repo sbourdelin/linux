@@ -13,42 +13,33 @@
  *
  */
 
-#ifndef HINIC_HW_DEV_H
-#define HINIC_HW_DEV_H
+#ifndef HINIC_HW_MGMT_H
+#define HINIC_HW_MGMT_H
 
-#include <linux/pci.h>
 #include <linux/types.h>
 
 #include "hinic_hw_if.h"
-#include "hinic_hw_eqs.h"
-#include "hinic_hw_mgmt.h"
 
-#define HINIC_MAX_QPS   32
-
-struct hinic_cap {
-	u16	max_qps;
-	u16	num_qps;
+enum hinic_mgmt_msg_type {
+	HINIC_MGMT_MSG_SYNC = 1,
 };
 
-struct hinic_hwdev {
+enum hinic_cfg_cmd {
+	HINIC_CFG_NIC_CAP = 0,
+};
+
+struct hinic_pf_to_mgmt {
 	struct hinic_hwif		*hwif;
-	struct msix_entry		*msix_entries;
-
-	struct hinic_aeqs		aeqs;
-
-	struct hinic_cap		nic_cap;
 };
 
-struct hinic_pfhwdev {
-	struct hinic_hwdev		hwdev;
+int hinic_msg_to_mgmt(struct hinic_pf_to_mgmt *pf_to_mgmt,
+		      enum hinic_mod_type mod, u8 cmd,
+		      void *buf_in, u16 in_size, void *buf_out, u16 *out_size,
+		      enum hinic_mgmt_msg_type sync);
 
-	struct hinic_pf_to_mgmt		pf_to_mgmt;
-};
+int hinic_pf_to_mgmt_init(struct hinic_pf_to_mgmt *pf_to_mgmt,
+			  struct hinic_hwif *hwif);
 
-int hinic_init_hwdev(struct hinic_hwdev **hwdev, struct pci_dev *pdev);
-
-void hinic_free_hwdev(struct hinic_hwdev *hwdev);
-
-int hinic_hwdev_num_qps(struct hinic_hwdev *hwdev);
+void hinic_pf_to_mgmt_free(struct hinic_pf_to_mgmt *pf_to_mgmt);
 
 #endif
