@@ -957,6 +957,8 @@ struct macb {
 #ifdef CONFIG_ARCH_DMA_ADDR_T_64BIT
 	enum macb_hw_dma_cap hw_dma_cap;
 #endif
+
+	struct gen_pool		*sram_pool;
 };
 
 static inline bool macb_is_gem(struct macb *bp)

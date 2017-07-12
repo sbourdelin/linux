@@ -23,6 +23,7 @@
 #include <linux/interrupt.h>
 #include <linux/netdevice.h>
 #include <linux/etherdevice.h>
+#include <linux/genalloc.h>
 #include <linux/dma-mapping.h>
 #include <linux/platform_data/macb.h>
 #include <linux/platform_device.h>
@@ -40,9 +41,9 @@
 #define MACB_RX_BUFFER_SIZE	128
 #define RX_BUFFER_MULTIPLE	64  /* bytes */
 
-#define DEFAULT_RX_RING_SIZE	512 /* must be power of 2 */
+#define DEFAULT_RX_RING_SIZE	128 /* must be power of 2 */
 #define MIN_RX_RING_SIZE	64
-#define MAX_RX_RING_SIZE	8192
+#define MAX_RX_RING_SIZE	128
 #define RX_RING_BYTES(bp)	(macb_dma_desc_get_size(bp)	\
 				 * (bp)->rx_ring_size)
 
@@ -1660,9 +1661,14 @@ static void gem_free_rx_buffers(struct macb *bp)
 static void macb_free_rx_buffers(struct macb *bp)
 {
 	if (bp->rx_buffers) {
-		dma_free_coherent(&bp->pdev->dev,
-				  bp->rx_ring_size * bp->rx_buffer_size,
-				  bp->rx_buffers, bp->rx_buffers_dma);
+		if (bp->sram_pool)
+			gen_pool_free(bp->sram_pool,
+				      (unsigned long)bp->rx_buffers,
+				      bp->rx_ring_size * bp->rx_buffer_size);
+		else
+			dma_free_coherent(&bp->pdev->dev,
+					  bp->rx_ring_size * bp->rx_buffer_size,
+					  bp->rx_buffers, bp->rx_buffers_dma);
 		bp->rx_buffers = NULL;
 	}
 }
@@ -1674,8 +1680,12 @@ static void macb_free_consistent(struct macb *bp)
 
 	bp->macbgem_ops.mog_free_rx_buffers(bp);
 	if (bp->rx_ring) {
-		dma_free_coherent(&bp->pdev->dev, RX_RING_BYTES(bp),
-				  bp->rx_ring, bp->rx_ring_dma);
+		if (bp->sram_pool)
+			gen_pool_free(bp->sram_pool, (unsigned long)bp->rx_ring,
+				      RX_RING_BYTES(bp));
+		else
+			dma_free_coherent(&bp->pdev->dev, RX_RING_BYTES(bp),
+					  bp->rx_ring, bp->rx_ring_dma);
 		bp->rx_ring = NULL;
 	}
 
@@ -1688,6 +1698,28 @@ static void macb_free_consistent(struct macb *bp)
 			queue->tx_ring = NULL;
 		}
 	}
+}
+
+static void macb_init_sram(struct macb *bp)
+{
+	struct device_node *node;
+	struct platform_device *pdev = NULL;
+
+	for_each_compatible_node(node, NULL, "mmio-sram") {
+		pdev = of_find_device_by_node(node);
+		if (pdev) {
+			of_node_put(node);
+			break;
+		}
+	}
+
+	if (!pdev) {
+		netdev_warn(bp->dev, "Failed to find sram device!\n");
+		bp->sram_pool = NULL;
+		return;
+	}
+
+	bp->sram_pool = gen_pool_get(&pdev->dev, NULL);
 }
 
 static int gem_alloc_rx_buffers(struct macb *bp)
@@ -1710,14 +1742,20 @@ static int macb_alloc_rx_buffers(struct macb *bp)
 	int size;
 
 	size = bp->rx_ring_size * bp->rx_buffer_size;
-	bp->rx_buffers = dma_alloc_coherent(&bp->pdev->dev, size,
-					    &bp->rx_buffers_dma, GFP_KERNEL);
+	if (bp->sram_pool)
+		bp->rx_buffers = gen_pool_dma_alloc(bp->sram_pool, size,
+						    &bp->rx_buffers_dma);
+	else
+		bp->rx_buffers = dma_alloc_coherent(&bp->pdev->dev, size,
+						    &bp->rx_buffers_dma,
+						    GFP_KERNEL);
 	if (!bp->rx_buffers)
 		return -ENOMEM;
 
 	netdev_dbg(bp->dev,
 		   "Allocated RX buffers of %d bytes at %08lx (mapped %p)\n",
 		   size, (unsigned long)bp->rx_buffers_dma, bp->rx_buffers);
+
 	return 0;
 }
 
@@ -1746,8 +1784,12 @@ static int macb_alloc_consistent(struct macb *bp)
 	}
 
 	size = RX_RING_BYTES(bp);
-	bp->rx_ring = dma_alloc_coherent(&bp->pdev->dev, size,
-					 &bp->rx_ring_dma, GFP_KERNEL);
+	if (bp->sram_pool)
+		bp->rx_ring = gen_pool_dma_alloc(bp->sram_pool, size,
+						 &bp->rx_ring_dma);
+	else
+		bp->rx_ring = dma_alloc_coherent(&bp->pdev->dev, size,
+						 &bp->rx_ring_dma, GFP_KERNEL);
 	if (!bp->rx_ring)
 		goto out_err;
 	netdev_dbg(bp->dev,
@@ -2697,6 +2739,8 @@ static int macb_init(struct platform_device *pdev)
 	struct macb_queue *queue;
 	int err;
 	u32 val;
+
+	macb_init_sram(bp);
 
 	bp->tx_ring_size = DEFAULT_TX_RING_SIZE;
 	bp->rx_ring_size = DEFAULT_RX_RING_SIZE;
