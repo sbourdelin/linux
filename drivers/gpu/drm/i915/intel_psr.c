@@ -671,11 +671,7 @@ void intel_psr_disable(struct intel_dp *intel_dp)
 		return;
 	}
 
-	/* Disable PSR on Source */
-	if (HAS_DDI(dev_priv))
-		hsw_psr_disable(intel_dp);
-	else
-		vlv_psr_disable(intel_dp);
+	dev_priv->psr.disable_source(intel_dp);
 
 	/* Disable PSR on Sink */
 	drm_dp_dpcd_writeb(&intel_dp->aux, DP_PSR_EN_CFG, 0);
@@ -973,4 +969,10 @@ void intel_psr_init(struct drm_i915_private *dev_priv)
 
 	INIT_DELAYED_WORK(&dev_priv->psr.work, intel_psr_work);
 	mutex_init(&dev_priv->psr.lock);
+
+	if (IS_VALLEYVIEW(dev_priv) || IS_CHERRYVIEW(dev_priv)) {
+		dev_priv->psr.disable_source = vlv_psr_disable;
+	} else {
+		dev_priv->psr.disable_source = hsw_psr_disable;
+	}
 }
