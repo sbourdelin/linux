@@ -541,7 +541,8 @@ static int btrfs_dev_replace_finishing(struct btrfs_fs_info *fs_info,
 				 src_device->missing ? "<missing disk>" :
 				 rcu_str_deref(src_device->name),
 				 src_device->devid,
-				 rcu_str_deref(tgt_device->name), scrub_ret);
+				 tgt_device ? rcu_str_deref(tgt_device->name) :
+				 "<missing disk>", scrub_ret);
 		btrfs_dev_replace_unlock(dev_replace, 1);
 		mutex_unlock(&fs_info->chunk_mutex);
 		mutex_unlock(&fs_info->fs_devices->device_list_mutex);
