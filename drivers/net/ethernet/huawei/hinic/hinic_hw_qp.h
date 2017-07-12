@@ -16,6 +16,7 @@
 #ifndef HINIC_HW_QP_H
 #define HINIC_HW_QP_H
 
+#include <linux/kernel.h>
 #include <linux/types.h>
 #include <linux/sizes.h>
 #include <linux/pci.h>
@@ -24,6 +25,108 @@
 #include "hinic_hw_if.h"
 #include "hinic_hw_wq.h"
 #include "hinic_hw_qp_ctxt.h"
+
+#define	HINIC_SQ_CTRL_BUFDESC_SECT_LEN_SHIFT	0
+#define HINIC_SQ_CTRL_TASKSECT_LEN_SHIFT	16
+#define	HINIC_SQ_CTRL_DATA_FORMAT_SHIFT		22
+#define HINIC_SQ_CTRL_LEN_SHIFT			29
+
+#define	HINIC_SQ_CTRL_BUFDESC_SECT_LEN_MASK	0xFF
+#define HINIC_SQ_CTRL_TASKSECT_LEN_MASK		0x1F
+#define	HINIC_SQ_CTRL_DATA_FORMAT_MASK		0x1
+#define HINIC_SQ_CTRL_LEN_MASK			0x3
+
+#define HINIC_SQ_CTRL_QUEUE_INFO_MSS_SHIFT	13
+
+#define HINIC_SQ_CTRL_QUEUE_INFO_MSS_MASK	0x3FFF
+
+#define HINIC_SQ_CTRL_SET(val, member)		\
+		(((u32)(val) & HINIC_SQ_CTRL_##member##_MASK) \
+		 << HINIC_SQ_CTRL_##member##_SHIFT)
+
+#define HINIC_SQ_CTRL_GET(val, member)		\
+		(((val) >> HINIC_SQ_CTRL_##member##_SHIFT) \
+		 & HINIC_SQ_CTRL_##member##_MASK)
+
+#define HINIC_SQ_TASK_INFO0_L2HDR_LEN_SHIFT	0
+#define HINIC_SQ_TASK_INFO0_L4_OFFLOAD_SHIFT	8
+#define HINIC_SQ_TASK_INFO0_INNER_L3TYPE_SHIFT	10
+#define HINIC_SQ_TASK_INFO0_VLAN_OFFLOAD_SHIFT	12
+#define HINIC_SQ_TASK_INFO0_PARSE_FLAG_SHIFT	13
+/* 1 bit reserved */
+#define HINIC_SQ_TASK_INFO0_TSO_FLAG_SHIFT	15
+#define HINIC_SQ_TASK_INFO0_VLAN_TAG_SHIFT	16
+
+#define HINIC_SQ_TASK_INFO0_L2HDR_LEN_MASK	0xFF
+#define HINIC_SQ_TASK_INFO0_L4_OFFLOAD_MASK	0x3
+#define HINIC_SQ_TASK_INFO0_INNER_L3TYPE_MASK	0x3
+#define HINIC_SQ_TASK_INFO0_VLAN_OFFLOAD_MASK	0x1
+#define HINIC_SQ_TASK_INFO0_PARSE_FLAG_MASK	0x1
+/* 1 bit reserved */
+#define HINIC_SQ_TASK_INFO0_TSO_FLAG_MASK	0x1
+#define HINIC_SQ_TASK_INFO0_VLAN_TAG_MASK	0xFFFF
+
+#define HINIC_SQ_TASK_INFO0_SET(val, member)	\
+		(((u32)(val) & HINIC_SQ_TASK_INFO0_##member##_MASK) <<	\
+		 HINIC_SQ_TASK_INFO0_##member##_SHIFT)
+
+/* 8 bits reserved */
+#define HINIC_SQ_TASK_INFO1_MEDIA_TYPE_SHIFT	8
+#define HINIC_SQ_TASK_INFO1_INNER_L4_LEN_SHIFT	16
+#define HINIC_SQ_TASK_INFO1_INNER_L3_LEN_SHIFT	24
+
+/* 8 bits reserved */
+#define HINIC_SQ_TASK_INFO1_MEDIA_TYPE_MASK	0xFF
+#define HINIC_SQ_TASK_INFO1_INNER_L4_LEN_MASK	0xFF
+#define HINIC_SQ_TASK_INFO1_INNER_L3_LEN_MASK	0xFF
+
+#define HINIC_SQ_TASK_INFO1_SET(val, member)	\
+		(((u32)(val) & HINIC_SQ_TASK_INFO1_##member##_MASK) <<	\
+		 HINIC_SQ_TASK_INFO1_##member##_SHIFT)
+
+#define HINIC_SQ_TASK_INFO2_TUNNEL_L4_LEN_SHIFT	0
+#define HINIC_SQ_TASK_INFO2_OUTER_L3_LEN_SHIFT	12
+#define HINIC_SQ_TASK_INFO2_TUNNEL_L4TYPE_SHIFT	19
+/* 1 bit reserved */
+#define HINIC_SQ_TASK_INFO2_OUTER_L3TYPE_SHIFT	22
+/* 8 bits reserved */
+
+#define HINIC_SQ_TASK_INFO2_TUNNEL_L4_LEN_MASK	0xFFF
+#define HINIC_SQ_TASK_INFO2_OUTER_L3_LEN_MASK	0x7F
+#define HINIC_SQ_TASK_INFO2_TUNNEL_L4TYPE_MASK	0x3
+/* 1 bit reserved */
+#define HINIC_SQ_TASK_INFO2_OUTER_L3TYPE_MASK	0x3
+/* 8 bits reserved */
+
+#define HINIC_SQ_TASK_INFO2_SET(val, member)	\
+		(((u32)(val) & HINIC_SQ_TASK_INFO2_##member##_MASK) <<	\
+		 HINIC_SQ_TASK_INFO2_##member##_SHIFT)
+
+/* 31 bits reserved */
+#define HINIC_SQ_TASK_INFO4_L2TYPE_SHIFT	31
+
+/* 31 bits reserved */
+#define HINIC_SQ_TASK_INFO4_L2TYPE_MASK		0x1
+
+#define HINIC_SQ_TASK_INFO4_SET(val, member)	\
+		(((u32)(val) & HINIC_SQ_TASK_INFO4_##member##_MASK) << \
+		 HINIC_SQ_TASK_INFO4_##member##_SHIFT)
+
+#define HINIC_SQ_DB_INFO_PI_HI_SHIFT		0
+#define HINIC_SQ_DB_INFO_QID_SHIFT		8
+#define HINIC_SQ_DB_INFO_PATH_SHIFT		23
+#define HINIC_SQ_DB_INFO_COS_SHIFT		24
+#define HINIC_SQ_DB_INFO_TYPE_SHIFT		27
+
+#define HINIC_SQ_DB_INFO_PI_HI_MASK		0xFF
+#define HINIC_SQ_DB_INFO_QID_MASK		0x3FF
+#define HINIC_SQ_DB_INFO_PATH_MASK		0x1
+#define HINIC_SQ_DB_INFO_COS_MASK		0x7
+#define HINIC_SQ_DB_INFO_TYPE_MASK		0x1F
+
+#define HINIC_SQ_DB_INFO_SET(val, member)	\
+		(((u32)(val) & HINIC_SQ_DB_INFO_##member##_MASK) \
+		 << HINIC_SQ_DB_INFO_##member##_SHIFT)
 
 #define HINIC_RQ_CQE_STATUS_RXDONE_SHIFT	31
 
@@ -73,6 +176,55 @@
 
 #define HINIC_RX_BUF_SZ				2048
 
+#define HINIC_MAX_SQ_BUFDESCS			17
+
+#define HINIC_SQ_WQE_SIZE(nr_sges)		\
+		(sizeof(struct hinic_sq_ctrl) + \
+		 sizeof(struct hinic_sq_task) + \
+		 (nr_sges) * sizeof(struct hinic_sq_bufdesc))
+
+#define HINIC_MIN_TX_WQE_SIZE(wq)		\
+		ALIGN(HINIC_SQ_WQE_SIZE(1), (wq)->wqebb_size)
+
+#define HINIC_MIN_TX_NUM_WQEBBS(sq)		\
+		(HINIC_MIN_TX_WQE_SIZE((sq)->wq) / (sq)->wq->wqebb_size)
+
+enum hinic_l4offload_type {
+	HINIC_L4_OFF_DISABLE   = 0,
+	HINIC_TCP_OFFLOAD_ENABLE  = 1,
+	HINIC_SCTP_OFFLOAD_ENABLE = 2,
+	HINIC_UDP_OFFLOAD_ENABLE  = 3,
+};
+
+enum hinic_vlan_offload {
+	HINIC_VLAN_OFF_DISABLE = 0,
+	HINIC_VLAN_OFF_ENABLE  = 1,
+};
+
+enum hinic_pkt_parsed {
+	HINIC_PKT_NOT_PARSED = 0,
+	HINIC_PKT_PARSED     = 1,
+};
+
+enum hinic_outer_l3type {
+	HINIC_OUTER_L3TYPE_UNKNOWN = 0,
+	HINIC_OUTER_L3TYPE_IPV6 = 1,
+	HINIC_OUTER_L3TYPE_IPV4_NO_CHKSUM = 2,
+	HINIC_OUTER_L3TYPE_IPV4_CHKSUM = 3,
+};
+
+enum hinic_media_type {
+	HINIC_MEDIA_UNKNOWN = 0,
+};
+
+enum hinic_l2type {
+	HINIC_L2TYPE_ETH = 0,
+};
+
+enum hinc_tunnel_l4type {
+	HINIC_TUNNEL_L4TYPE_UNKNOWN = 0,
+};
+
 struct hinic_rq_cqe {
 	u32	status;
 	u32	len;
@@ -83,6 +235,31 @@ struct hinic_rq_cqe {
 	u32	rsvd5;
 	u32	rsvd6;
 	u32	rsvd7;
+};
+
+struct hinic_sq_ctrl {
+	u32	ctrl_info;
+	u32	queue_info;
+};
+
+struct hinic_sq_task {
+	u32	pkt_info0;
+	u32	pkt_info1;
+	u32	pkt_info2;
+	u32	ufo_v6_identify;
+	u32	pkt_info4;
+	u32	zero_pad;
+};
+
+struct hinic_sq_bufdesc {
+	struct hinic_sge sge;
+	u32	rsvd;
+};
+
+struct hinic_sq_wqe {
+	struct hinic_sq_ctrl		ctrl;
+	struct hinic_sq_task		task;
+	struct hinic_sq_bufdesc		buf_descs[HINIC_MAX_SQ_BUFDESCS];
 };
 
 struct hinic_rq_ctrl {
@@ -169,7 +346,27 @@ int hinic_init_rq(struct hinic_rq *rq, struct hinic_hwif *hwif,
 
 void hinic_clean_rq(struct hinic_rq *rq);
 
+int hinic_get_sq_free_wqebbs(struct hinic_sq *sq);
+
 int hinic_get_rq_free_wqebbs(struct hinic_rq *rq);
+
+void hinic_sq_prepare_wqe(struct hinic_sq *sq, u16 prod_idx, void *wqe,
+			  struct hinic_sge *sges, int nr_sges);
+
+void hinic_sq_write_db(struct hinic_sq *sq, u16 prod_idx, unsigned int cos);
+
+void *hinic_sq_get_wqe(struct hinic_sq *sq, unsigned int wqe_size,
+		       u16 *prod_idx);
+
+void hinic_sq_write_wqe(struct hinic_sq *sq, u16 prod_idx, void *wqe,
+			void *priv, unsigned int wqe_size);
+
+void *hinic_sq_read_wqe(struct hinic_sq *sq, void **priv,
+			unsigned int *wqe_size, u16 *cons_idx);
+
+void hinic_sq_put_wqe(struct hinic_sq *sq, unsigned int wqe_size);
+
+void hinic_sq_get_sges(void *wqe, struct hinic_sge *sges, int nr_sges);
 
 void *hinic_rq_get_wqe(struct hinic_rq *rq, unsigned int wqe_size,
 		       u16 *prod_idx);

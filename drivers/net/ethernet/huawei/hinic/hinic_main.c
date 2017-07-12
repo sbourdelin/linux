@@ -46,6 +46,10 @@ MODULE_DESCRIPTION("Huawei Intelligent NIC driver");
 MODULE_VERSION(HINIC_DRV_VERSION);
 MODULE_LICENSE("GPL");
 
+static unsigned int tx_weight = 64;
+module_param(tx_weight, uint, 0644);
+MODULE_PARM_DESC(tx_weight, "Number Tx packets for NAPI budget (default=64)");
+
 static unsigned int rx_weight = 64;
 module_param(rx_weight, uint, 0644);
 MODULE_PARM_DESC(rx_weight, "Number Rx packets for NAPI budget (default=64)");
@@ -576,11 +580,6 @@ static void hinic_set_rx_mode(struct net_device *netdev)
 	queue_work(nic_dev->workq, &rx_mode_work->work);
 }
 
-netdev_tx_t hinic_xmit_frame(struct sk_buff *skb, struct net_device *netdev)
-{
-	return NETDEV_TX_BUSY;
-}
-
 static const struct net_device_ops hinic_netdev_ops = {
 	.ndo_open = hinic_open,
 	.ndo_stop = hinic_close,
@@ -698,6 +697,7 @@ static int nic_dev_init(struct pci_dev *pdev)
 	nic_dev->flags = 0;
 	nic_dev->txqs = NULL;
 	nic_dev->rxqs = NULL;
+	nic_dev->tx_weight = tx_weight;
 	nic_dev->rx_weight = rx_weight;
 
 	sema_init(&nic_dev->mgmt_lock, 1);
