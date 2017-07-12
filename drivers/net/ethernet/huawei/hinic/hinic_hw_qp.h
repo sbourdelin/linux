@@ -22,6 +22,7 @@
 
 #include "hinic_hw_if.h"
 #include "hinic_hw_wq.h"
+#include "hinic_hw_qp_ctxt.h"
 
 #define HINIC_SQ_WQEBB_SIZE			64
 #define HINIC_RQ_WQEBB_SIZE			32
@@ -90,6 +91,16 @@ struct hinic_qp {
 
 	u16	q_id;
 };
+
+void hinic_qp_prepare_header(struct hinic_qp_ctxt_header *qp_ctxt_hdr,
+			     enum hinic_qp_ctxt_type ctxt_type,
+			     int num_queues, int max_queues);
+
+void hinic_sq_prepare_ctxt(struct hinic_sq *sq, u16 global_qid,
+			   struct hinic_sq_ctxt *sq_ctxt);
+
+void hinic_rq_prepare_ctxt(struct hinic_rq *rq, u16 global_qid,
+			   struct hinic_rq_ctxt *rq_ctxt);
 
 int hinic_init_sq(struct hinic_sq *sq, struct hinic_hwif *hwif,
 		  struct hinic_wq *wq, struct msix_entry *entry, void *ci_addr,
