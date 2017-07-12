@@ -18,6 +18,10 @@
 
 #include <linux/types.h>
 #include <linux/sizes.h>
+#include <linux/pci.h>
+
+#include "hinic_hw_if.h"
+#include "hinic_hw_wq.h"
 
 #define HINIC_SQ_WQEBB_SIZE			64
 #define HINIC_RQ_WQEBB_SIZE			32
@@ -31,12 +35,53 @@
 #define HINIC_SQ_WQE_MAX_SIZE			320
 #define HINIC_RQ_WQE_SIZE			32
 
+#define HINIC_RX_BUF_SZ				2048
+
+struct hinic_rq_cqe {
+	u32	status;
+	u32	len;
+
+	u32	rsvd2;
+	u32	rsvd3;
+	u32	rsvd4;
+	u32	rsvd5;
+	u32	rsvd6;
+	u32	rsvd7;
+};
+
 struct hinic_sq {
-	/* should be implemented */
+	struct hinic_hwif	*hwif;
+
+	struct hinic_wq		*wq;
+
+	u32			irq;
+	u16			msix_entry;
+
+	void			*hw_ci_addr;
+	dma_addr_t		hw_ci_dma_addr;
+
+	void __iomem		*db_base;
+
+	void			**priv;
 };
 
 struct hinic_rq {
-	/* should be implemented */
+	struct hinic_hwif	*hwif;
+
+	struct hinic_wq		*wq;
+
+	u32			irq;
+	u16			msix_entry;
+
+	size_t			buf_sz;
+
+	void			**priv;
+
+	struct hinic_rq_cqe	**cqe;
+	dma_addr_t		*cqe_dma;
+
+	u16			*pi_virt_addr;
+	dma_addr_t		pi_dma_addr;
 };
 
 struct hinic_qp {
@@ -45,5 +90,16 @@ struct hinic_qp {
 
 	u16	q_id;
 };
+
+int hinic_init_sq(struct hinic_sq *sq, struct hinic_hwif *hwif,
+		  struct hinic_wq *wq, struct msix_entry *entry, void *ci_addr,
+		  dma_addr_t ci_dma_addr, void __iomem *db_base);
+
+void hinic_clean_sq(struct hinic_sq *sq);
+
+int hinic_init_rq(struct hinic_rq *rq, struct hinic_hwif *hwif,
+		  struct hinic_wq *wq, struct msix_entry *entry);
+
+void hinic_clean_rq(struct hinic_rq *rq);
 
 #endif
