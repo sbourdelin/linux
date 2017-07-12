@@ -226,6 +226,7 @@ static void sugov_update_single(struct update_util_data *hook, u64 time,
 
 	busy = sugov_cpu_is_busy(sg_cpu);
 
+	raw_spin_lock(&sg_policy->update_lock);
 	if (flags & SCHED_CPUFREQ_RT_DL) {
 		next_f = policy->cpuinfo.max_freq;
 	} else {
@@ -240,6 +241,7 @@ static void sugov_update_single(struct update_util_data *hook, u64 time,
 			next_f = sg_policy->next_freq;
 	}
 	sugov_update_commit(sg_policy, time, next_f);
+	raw_spin_unlock(&sg_policy->update_lock);
 }
 
 static unsigned int sugov_next_freq_shared(struct sugov_cpu *sg_cpu, u64 time)
@@ -637,10 +639,14 @@ static void sugov_stop(struct cpufreq_policy *policy)
 static void sugov_limits(struct cpufreq_policy *policy)
 {
 	struct sugov_policy *sg_policy = policy->governor_data;
+	unsigned long flags;
 
 	if (!policy->fast_switch_enabled) {
 		mutex_lock(&sg_policy->work_lock);
 		cpufreq_policy_apply_limits(policy);
+		raw_spin_lock_irqsave(&sg_policy->update_lock, flags);
+		sg_policy->next_freq = policy->cur;
+		raw_spin_unlock_irqrestore(&sg_policy->update_lock, flags);
 		mutex_unlock(&sg_policy->work_lock);
 	}
 
