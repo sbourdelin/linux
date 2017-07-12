@@ -198,6 +198,14 @@ struct drm_fb_helper {
 	struct drm_clip_rect dirty_clip;
 	spinlock_t dirty_lock;
 	struct work_struct dirty_work;
+	/**
+	 * @defio_vaddr:
+	 *
+	 * Destination address for shadowed and deferred framebuffer. If this
+	 * is set, the dirty area is copied from &fb_info->screen_buffer to
+	 * this address before calling &drm_framebuffer_funcs->dirty.
+	 */
+	void *defio_vaddr;
 	struct work_struct resume_work;
 
 	/**

@@ -713,8 +713,25 @@ static void drm_fb_helper_dirty_work(struct work_struct *work)
 	spin_unlock_irqrestore(&helper->dirty_lock, flags);
 
 	/* call dirty callback only when it has been really touched */
-	if (clip_copy.x1 < clip_copy.x2 && clip_copy.y1 < clip_copy.y2)
-		helper->fb->funcs->dirty(helper->fb, NULL, 0, 0, &clip_copy, 1);
+	if (clip_copy.x1 > clip_copy.x2 || clip_copy.y1 > clip_copy.y2)
+		return;
+
+	/* using shadow buffer? */
+	if (helper->defio_vaddr) {
+		unsigned int pitch = helper->fb->pitches[0];
+		u8 cpp = helper->fb->format->cpp[0];
+		unsigned int y;
+
+		for (y = clip_copy.y1; y < clip_copy.y2; y++) {
+			size_t offset = (y * pitch) + (clip_copy.x1 * cpp);
+
+			memcpy(helper->defio_vaddr + offset,
+			       helper->fbdev->screen_buffer + offset,
+			       (clip_copy.x2 - clip_copy.x1) * cpp);
+		}
+	}
+
+	helper->fb->funcs->dirty(helper->fb, NULL, 0, 0, &clip_copy, 1);
 }
 
 /**
