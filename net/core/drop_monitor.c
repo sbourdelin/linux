@@ -32,6 +32,10 @@
 #include <trace/events/napi.h>
 
 #include <asm/unaligned.h>
+#include <net/sock.h>
+#include <net/net_namespace.h>
+#include <net/netns/generic.h>
+#include <linux/smp.h>
 
 #define TRACE_ON 1
 #define TRACE_OFF 0
@@ -41,6 +45,13 @@
  * and the work handle that will send up
  * netlink alerts
  */
+
+struct ns_pcpu_dm_data {
+};
+
+struct per_ns_dm_cb {
+};
+
 static int trace_state = TRACE_OFF;
 static DEFINE_MUTEX(trace_state_mutex);
 
@@ -59,6 +70,7 @@ struct dm_hw_stat_delta {
 	unsigned long last_drop_val;
 };
 
+static int dm_net_id __read_mostly;
 static struct genl_family net_drop_monitor_family;
 
 static DEFINE_PER_CPU(struct per_cpu_dm_data, dm_cpu_data);
@@ -382,6 +394,33 @@ static struct notifier_block dropmon_net_notifier = {
 	.notifier_call = dropmon_net_event
 };
 
+static int __net_init dm_net_init(struct net *net)
+{
+	struct per_ns_dm_cb *ns_dm_cb;
+
+	ns_dm_cb = net_generic(net, dm_net_id);
+	if (!ns_dm_cb)
+		return -ENOMEM;
+
+	return 0;
+}
+
+static void __net_exit dm_net_exit(struct net *net)
+{
+	struct per_ns_dm_cb *ns_dm_cb;
+
+	ns_dm_cb = net_generic(net, dm_net_id);
+	if (!ns_dm_cb)
+		return;
+}
+
+static struct pernet_operations dm_net_ops = {
+	.init = dm_net_init,
+	.exit = dm_net_exit,
+	.id   = &dm_net_id,
+	.size = sizeof(struct per_ns_dm_cb),
+};
+
 static int __init init_net_drop_monitor(void)
 {
 	struct per_cpu_dm_data *data;
@@ -393,6 +432,7 @@ static int __init init_net_drop_monitor(void)
 		pr_err("Unable to store program counters on this arch, Drop monitor failed\n");
 		return -ENOSPC;
 	}
+	rc = register_pernet_subsys(&dm_net_ops);
 
 	rc = genl_register_family(&net_drop_monitor_family);
 	if (rc) {
@@ -441,6 +481,7 @@ static void exit_net_drop_monitor(void)
 	 * or pending schedule calls
 	 */
 
+	unregister_pernet_subsys(&dm_net_ops);
 	for_each_possible_cpu(cpu) {
 		data = &per_cpu(dm_cpu_data, cpu);
 		del_timer_sync(&data->send_timer);
