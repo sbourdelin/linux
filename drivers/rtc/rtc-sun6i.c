@@ -197,14 +197,14 @@ static void __init sun6i_rtc_clk_init(struct device_node *node)
 	clk_data = kzalloc(sizeof(*clk_data) + sizeof(*clk_data->hws),
 			   GFP_KERNEL);
 	if (!clk_data)
-		return;
+		goto out_rtc_free;
 
 	spin_lock_init(&rtc->lock);
 
 	rtc->base = of_io_request_and_map(node, 0, of_node_full_name(node));
 	if (IS_ERR(rtc->base)) {
 		pr_crit("Can't map RTC registers");
-		return;
+		goto out_clk_data_free;
 	}
 
 	/* Switch to the external, more precise, oscillator */
@@ -216,7 +216,7 @@ static void __init sun6i_rtc_clk_init(struct device_node *node)
 
 	/* Deal with old DTs */
 	if (!of_get_property(node, "clocks", NULL))
-		return;
+		goto out_clk_data_free;
 
 	rtc->int_osc = clk_hw_register_fixed_rate_with_accuracy(NULL,
 								"rtc-int-osc",
@@ -225,7 +225,7 @@ static void __init sun6i_rtc_clk_init(struct device_node *node)
 								300000000);
 	if (IS_ERR(rtc->int_osc)) {
 		pr_crit("Couldn't register the internal oscillator\n");
-		return;
+		goto out_clk_data_free;
 	}
 
 	parents[0] = clk_hw_get_name(rtc->int_osc);
@@ -240,12 +240,19 @@ static void __init sun6i_rtc_clk_init(struct device_node *node)
 	rtc->losc = clk_register(NULL, &rtc->hw);
 	if (IS_ERR(rtc->losc)) {
 		pr_crit("Couldn't register the LOSC clock\n");
-		return;
+		goto out_clk_data_free;
 	}
 
 	clk_data->num = 1;
 	clk_data->hws[0] = &rtc->hw;
 	of_clk_add_hw_provider(node, of_clk_hw_onecell_get, clk_data);
+
+	return;
+
+out_clk_data_free:
+	kfree(clk_data);
+out_rtc_free:
+	kfree(rtc);
 }
 CLK_OF_DECLARE_DRIVER(sun6i_rtc_clk, "allwinner,sun6i-a31-rtc",
 		      sun6i_rtc_clk_init);
