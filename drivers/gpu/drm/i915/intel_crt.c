@@ -227,11 +227,53 @@ static void hsw_post_disable_crt(struct intel_encoder *encoder,
 	intel_ddi_fdi_post_disable(encoder, old_crtc_state, old_conn_state);
 }
 
+static void hsw_pre_pll_enable_crt(struct intel_encoder *encoder,
+				   struct intel_crtc_state *pipe_config,
+				   struct drm_connector_state *conn_state)
+{
+	struct drm_crtc *crtc = pipe_config->base.crtc;
+	struct drm_i915_private *dev_priv = to_i915(crtc->dev);
+	struct intel_crtc *intel_crtc = to_intel_crtc(crtc);
+
+	WARN_ON(!intel_crtc->config->has_pch_encoder);
+
+	intel_set_pch_fifo_underrun_reporting(dev_priv, TRANSCODER_A, false);
+}
+
+static void hsw_pre_enable_crt(struct intel_encoder *encoder,
+			       struct intel_crtc_state *pipe_config,
+			       struct drm_connector_state *conn_state)
+{
+	struct drm_crtc *crtc = pipe_config->base.crtc;
+	struct drm_i915_private *dev_priv = to_i915(crtc->dev);
+	struct intel_crtc *intel_crtc = to_intel_crtc(crtc);
+	int pipe = intel_crtc->pipe;
+
+	WARN_ON(!intel_crtc->config->has_pch_encoder);
+
+	intel_set_cpu_fifo_underrun_reporting(dev_priv, pipe, false);
+}
+
 static void intel_enable_crt(struct intel_encoder *encoder,
 			     struct intel_crtc_state *pipe_config,
 			     struct drm_connector_state *conn_state)
 {
+	struct drm_crtc *crtc = pipe_config->base.crtc;
+	struct drm_i915_private *dev_priv = to_i915(crtc->dev);
+	struct intel_crtc *intel_crtc = to_intel_crtc(crtc);
+	int pipe = intel_crtc->pipe;
+
 	intel_crt_set_dpms(encoder, pipe_config, DRM_MODE_DPMS_ON);
+
+	if (HAS_DDI(dev_priv)) {
+		WARN_ON(!intel_crtc->config->has_pch_encoder);
+
+		intel_wait_for_vblank(dev_priv, pipe);
+		intel_wait_for_vblank(dev_priv, pipe);
+		intel_set_cpu_fifo_underrun_reporting(dev_priv, pipe, true);
+		intel_set_pch_fifo_underrun_reporting(dev_priv, TRANSCODER_A,
+						      true);
+	}
 }
 
 static enum drm_mode_status
@@ -907,6 +949,8 @@ void intel_crt_init(struct drm_i915_private *dev_priv)
 		crt->base.port = PORT_E;
 		crt->base.get_config = hsw_crt_get_config;
 		crt->base.get_hw_state = intel_ddi_get_hw_state;
+		crt->base.pre_pll_enable = hsw_pre_pll_enable_crt;
+		crt->base.pre_enable = hsw_pre_enable_crt;
 		crt->base.post_disable = hsw_post_disable_crt;
 	} else {
 		crt->base.port = PORT_NONE;
