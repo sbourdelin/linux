@@ -44,6 +44,7 @@ struct hinic_dev {
 	struct hinic_hwdev		*hwdev;
 
 	u32				msg_enable;
+	unsigned int			rx_weight;
 
 	unsigned int			flags;
 

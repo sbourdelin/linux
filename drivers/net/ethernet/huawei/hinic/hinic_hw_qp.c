@@ -24,6 +24,7 @@
 #include <linux/errno.h>
 #include <linux/sizes.h>
 #include <linux/atomic.h>
+#include <asm/barrier.h>
 #include <asm/byteorder.h>
 
 #include "hinic_common.h"
@@ -53,6 +54,13 @@
 		 + (q_id) * Q_CTXT_SIZE)
 
 #define SIZE_16BYTES(size)	(ALIGN(size, 16) >> 4)
+#define SIZE_8BYTES(size)	(ALIGN(size, 8) >> 3)
+
+#define RQ_MASKED_IDX(rq, idx)	((idx) & (rq)->wq->mask)
+
+enum rq_completion_fmt {
+	RQ_COMPLETE_SGE = 1
+};
 
 void hinic_qp_prepare_header(struct hinic_qp_ctxt_header *qp_ctxt_hdr,
 			     enum hinic_qp_ctxt_type ctxt_type,
@@ -424,4 +432,191 @@ void hinic_clean_rq(struct hinic_rq *rq)
 
 	free_rq_cqe(rq);
 	free_rq_priv(rq);
+}
+
+/**
+ * hinic_get_rq_free_wqebbs - return number of free wqebbs for use
+ * @rq: recv queue
+ *
+ * Return number of free wqebbs
+ **/
+int hinic_get_rq_free_wqebbs(struct hinic_rq *rq)
+{
+	struct hinic_wq *wq = rq->wq;
+
+	return atomic_read(&wq->delta) - 1;
+}
+
+/**
+ * hinic_rq_get_wqe - get wqe ptr in the current pi and update the pi
+ * @rq: rq to get wqe from
+ * @wqe_size: wqe size
+ * @prod_idx: returned pi
+ *
+ * Return wqe pointer
+ **/
+void *hinic_rq_get_wqe(struct hinic_rq *rq, unsigned int wqe_size,
+		       u16 *prod_idx)
+{
+	return hinic_get_wqe(rq->wq, wqe_size, prod_idx);
+}
+
+/**
+ * hinic_rq_write_wqe - write the wqe to the rq
+ * @rq: recv queue
+ * @prod_idx: pi of the wqe
+ * @wqe: the wqe to write
+ * @priv: save private data
+ **/
+void hinic_rq_write_wqe(struct hinic_rq *rq, u16 prod_idx, void *wqe,
+			void *priv)
+{
+	rq->priv[prod_idx] =  priv;
+
+	/* The data in the HW should be in Big Endian Format */
+	hinic_cpu_to_be32(wqe, sizeof(struct hinic_rq_wqe));
+
+	hinic_write_wqe(rq->wq, wqe, sizeof(struct hinic_rq_wqe));
+}
+
+/**
+ * hinic_rq_read_wqe - read wqe ptr in the current ci and update the ci
+ * @rq: recv queue
+ * @wqe_size: the size of the wqe
+ * @priv: return private data that saved
+ * @cons_idx: consumer index of the wqe
+ *
+ * Return wqe in ci position
+ **/
+void *hinic_rq_read_wqe(struct hinic_rq *rq, unsigned int wqe_size, void **priv,
+			u16 *cons_idx)
+{
+	struct hinic_rq_wqe *rq_wqe;
+	struct hinic_rq_cqe *cqe;
+	u32 status;
+	int rx_done;
+
+	rq_wqe = hinic_read_wqe(rq->wq, wqe_size, cons_idx);
+
+	if (rq_wqe) {
+		cqe = rq->cqe[*cons_idx];
+
+		status = be32_to_cpu(cqe->status);
+
+		rx_done = HINIC_RQ_CQE_STATUS_GET(status, RXDONE);
+		if (!rx_done)
+			return NULL;
+
+		*priv = rq->priv[*cons_idx];
+	}
+
+	return rq_wqe;
+}
+
+/**
+ * hinic_rq_read_next_wqe - increment ci and read the wqe in ci position
+ * @rq: recv queue
+ * @wqe_size: the size of the wqe
+ * @priv: return private data that saved
+ * @cons_idx: consumer index in the wq
+ *
+ * Return wqe in incremented ci position
+ **/
+void *hinic_rq_read_next_wqe(struct hinic_rq *rq, unsigned int wqe_size,
+			     void **priv, u16 *cons_idx)
+{
+	struct hinic_wq *wq = rq->wq;
+	unsigned int num_wqebbs;
+
+	wqe_size = ALIGN(wqe_size, wq->wqebb_size);
+	num_wqebbs = wqe_size / wq->wqebb_size;
+
+	*cons_idx = RQ_MASKED_IDX(rq, *cons_idx + num_wqebbs);
+
+	*priv = rq->priv[*cons_idx];
+
+	return hinic_read_wqe_direct(wq, *cons_idx);
+}
+
+/**
+ * hinic_put_wqe - release the ci for new wqes
+ * @rq: recv queue
+ * @cons_idx: consumer index of the wqe
+ * @wqe_size: the size of the wqe
+ **/
+void hinic_rq_put_wqe(struct hinic_rq *rq, u16 cons_idx,
+		      unsigned int wqe_size)
+{
+	struct hinic_rq_cqe *cqe = rq->cqe[cons_idx];
+	u32 status = be32_to_cpu(cqe->status);
+
+	status = HINIC_RQ_CQE_STATUS_CLEAR(status, RXDONE);
+
+	/* Rx WQE size is 1 WQEBB, no wq shadow*/
+	cqe->status = cpu_to_be32(status);
+
+	wmb();		/* clear done flag */
+
+	hinic_put_wqe(rq->wq, wqe_size);
+}
+
+/**
+ * hinic_rq_get_sge - get sge from the wqe
+ * @rq: recv queue
+ * @wqe: wqe to get the sge from its buf address
+ * @cons_idx: consumer index
+ * @sge: returned sge
+ **/
+void hinic_rq_get_sge(struct hinic_rq *rq, void *wqe, u16 cons_idx,
+		      struct hinic_sge *sge)
+{
+	struct hinic_rq_wqe *rq_wqe = wqe;
+	struct hinic_rq_cqe *cqe = rq->cqe[cons_idx];
+	u32 len = be32_to_cpu(cqe->len);
+
+	sge->hi_addr = be32_to_cpu(rq_wqe->buf_desc.hi_addr);
+	sge->lo_addr = be32_to_cpu(rq_wqe->buf_desc.lo_addr);
+	sge->len = HINIC_RQ_CQE_SGE_GET(len, LEN);
+}
+
+/**
+ * hinic_rq_prepare_wqe - prepare wqe before insert to the queue
+ * @rq: recv queue
+ * @prod_idx: pi value
+ * @wqe: the wqe
+ * @sge: sge for use by the wqe for recv buf address
+ **/
+void hinic_rq_prepare_wqe(struct hinic_rq *rq, u16 prod_idx, void *wqe,
+			  struct hinic_sge *sge)
+{
+	struct hinic_rq_wqe *rq_wqe = (struct hinic_rq_wqe *)wqe;
+	struct hinic_rq_ctrl *ctrl = &rq_wqe->ctrl;
+	struct hinic_rq_cqe_sect *cqe_sect = &rq_wqe->cqe_sect;
+	struct hinic_rq_bufdesc *buf_desc = &rq_wqe->buf_desc;
+	dma_addr_t cqe_dma = rq->cqe_dma[prod_idx];
+
+	ctrl->ctrl_info =
+		HINIC_RQ_CTRL_SET(SIZE_8BYTES(sizeof(*ctrl)), LEN) |
+		HINIC_RQ_CTRL_SET(SIZE_8BYTES(sizeof(*cqe_sect)),
+				  COMPLETE_LEN) |
+		HINIC_RQ_CTRL_SET(SIZE_8BYTES(sizeof(*buf_desc)),
+				  BUFDESC_SECT_LEN) |
+		HINIC_RQ_CTRL_SET(RQ_COMPLETE_SGE, COMPLETE_FORMAT);
+
+	hinic_set_sge(&cqe_sect->sge, cqe_dma, sizeof(struct hinic_rq_cqe));
+
+	buf_desc->hi_addr = sge->hi_addr;
+	buf_desc->lo_addr = sge->lo_addr;
+}
+
+/**
+ * hinic_rq_update - update pi of the rq
+ * @rq: recv queue
+ * @prod_idx: pi value
+ **/
+void hinic_rq_update(struct hinic_rq *rq, u16 prod_idx)
+{
+	struct hinic_wq *wq = rq->wq;
+
+	*rq->pi_virt_addr = cpu_to_be16((prod_idx + 1) & wq->mask);
 }

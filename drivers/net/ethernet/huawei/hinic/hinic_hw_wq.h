@@ -104,6 +104,8 @@ void hinic_put_wqe(struct hinic_wq *wq, unsigned int wqe_size);
 
 void *hinic_read_wqe(struct hinic_wq *wq, unsigned int wqe_size, u16 *cons_idx);
 
+void *hinic_read_wqe_direct(struct hinic_wq *wq, u16 cons_idx);
+
 void hinic_write_wqe(struct hinic_wq *wq, void *wqe, unsigned int wqe_size);
 
 #endif
