@@ -1,13 +1,6 @@
 Linux kernel release 4.x <http://kernel.org/>
 =============================================
 
-These are the release notes for Linux version 4.  Read them carefully,
-as they tell you what this is all about, explain how to install the
-kernel, and what to do if something goes wrong.
-
-What is Linux?
---------------
-
   Linux is a clone of the operating system Unix, written from scratch by
   Linus Torvalds with assistance from a loosely-knit team of hackers across
   the Net. It aims towards POSIX and Single UNIX Specification compliance.
