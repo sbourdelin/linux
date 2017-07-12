@@ -373,7 +373,8 @@ static struct platform_driver vimc_sen_pdrv = {
 	},
 };
 
-static const struct platform_device_id vimc_sen_driver_ids[] = {
+static const __maybe_unused
+struct platform_device_id vimc_sen_driver_ids[] = {
 	{
 		.name           = VIMC_SEN_DRV_NAME,
 	},

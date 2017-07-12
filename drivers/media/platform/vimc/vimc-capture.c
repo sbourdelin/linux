@@ -525,7 +525,8 @@ static struct platform_driver vimc_cap_pdrv = {
 	},
 };
 
-static const struct platform_device_id vimc_cap_driver_ids[] = {
+static const __maybe_unused
+struct platform_device_id vimc_cap_driver_ids[] = {
 	{
 		.name           = VIMC_CAP_DRV_NAME,
 	},
