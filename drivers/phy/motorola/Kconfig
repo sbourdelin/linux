@@ -5,6 +5,8 @@ config PHY_CPCAP_USB
 	tristate "CPCAP PMIC USB PHY driver"
 	depends on USB_SUPPORT && IIO
 	depends on USB_MUSB_HDRC || USB_MUSB_HDRC=n
+	depends on MFD_CPCAP || COMPILE_TEST
+	default MFD_CPCAP
 	select GENERIC_PHY
 	select USB_PHY
 	help
