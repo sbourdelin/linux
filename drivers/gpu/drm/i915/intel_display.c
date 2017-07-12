@@ -5323,7 +5323,7 @@ static void haswell_crtc_enable(struct intel_crtc_state *pipe_config,
 	struct drm_crtc *crtc = pipe_config->base.crtc;
 	struct drm_i915_private *dev_priv = to_i915(crtc->dev);
 	struct intel_crtc *intel_crtc = to_intel_crtc(crtc);
-	int pipe = intel_crtc->pipe, hsw_workaround_pipe;
+	int hsw_workaround_pipe;
 	enum transcoder cpu_transcoder = intel_crtc->config->cpu_transcoder;
 	struct intel_atomic_state *old_intel_state =
 		to_intel_atomic_state(old_state);
@@ -5363,9 +5363,6 @@ static void haswell_crtc_enable(struct intel_crtc_state *pipe_config,
 	intel_color_set_csc(&pipe_config->base);
 
 	intel_crtc->active = true;
-
-	if (!intel_crtc->config->has_pch_encoder)
-		intel_set_cpu_fifo_underrun_reporting(dev_priv, pipe, true);
 
 	intel_encoders_pre_enable(crtc, pipe_config, old_state);
 
