@@ -156,10 +156,11 @@ EXPORT_SYMBOL(mipi_dbi_command_buf);
 static int mipi_dbi_buf_copy(void *dst, struct drm_framebuffer *fb,
 				struct drm_clip_rect *clip, bool swap)
 {
-	struct drm_gem_cma_object *cma_obj = drm_fb_cma_get_gem_obj(fb, 0);
-	struct dma_buf_attachment *import_attach = cma_obj->base.import_attach;
+	struct drm_gem_object *gem_obj = drm_fb_gem_get_obj(fb, 0);
+	struct drm_gem_shmem_object *obj = to_drm_gem_shmem_obj(gem_obj);
+	struct dma_buf_attachment *import_attach = gem_obj->import_attach;
 	struct drm_format_name_buf format_name;
-	void *src = cma_obj->vaddr;
+	void *src = obj->vaddr;
 	int ret = 0;
 
 	if (import_attach) {
@@ -198,7 +199,8 @@ static int mipi_dbi_fb_dirty(struct drm_framebuffer *fb,
 			     struct drm_clip_rect *clips,
 			     unsigned int num_clips)
 {
-	struct drm_gem_cma_object *cma_obj = drm_fb_cma_get_gem_obj(fb, 0);
+	struct drm_gem_object *gem_obj = drm_fb_gem_get_obj(fb, 0);
+	struct drm_gem_shmem_object *obj = to_drm_gem_shmem_obj(gem_obj);
 	struct tinydrm_device *tdev = fb->dev->dev_private;
 	struct mipi_dbi *mipi = mipi_dbi_from_tinydrm(tdev);
 	bool swap = mipi->swap_bytes;
@@ -216,6 +218,10 @@ static int mipi_dbi_fb_dirty(struct drm_framebuffer *fb,
 	if (tdev->pipe.plane.fb != fb)
 		goto out_unlock;
 
+	ret = drm_gem_shmem_vmap(obj);
+	if (ret)
+		goto out_unlock;
+
 	full = tinydrm_merge_clips(&clip, clips, num_clips, flags,
 				   fb->width, fb->height);
 
@@ -229,7 +235,7 @@ static int mipi_dbi_fb_dirty(struct drm_framebuffer *fb,
 		if (ret)
 			goto out_unlock;
 	} else {
-		tr = cma_obj->vaddr;
+		tr = obj->vaddr;
 	}
 
 	mipi_dbi_command(mipi, MIPI_DCS_SET_COLUMN_ADDRESS,
@@ -253,8 +259,8 @@ out_unlock:
 }
 
 static const struct drm_framebuffer_funcs mipi_dbi_fb_funcs = {
-	.destroy	= drm_fb_cma_destroy,
-	.create_handle	= drm_fb_cma_create_handle,
+	.destroy	= drm_fb_gem_destroy,
+	.create_handle	= drm_fb_gem_create_handle,
 	.dirty		= mipi_dbi_fb_dirty,
 };
 
@@ -807,29 +813,10 @@ int mipi_dbi_spi_init(struct spi_device *spi, struct mipi_dbi *mipi,
 {
 	size_t tx_size = tinydrm_spi_max_transfer_size(spi, 0);
 	struct device *dev = &spi->dev;
-	int ret;
 
 	if (tx_size < 16) {
 		DRM_ERROR("SPI transmit buffer too small: %zu\n", tx_size);
 		return -EINVAL;
-	}
-
-	/*
-	 * Even though it's not the SPI device that does DMA (the master does),
-	 * the dma mask is necessary for the dma_alloc_wc() in
-	 * drm_gem_cma_create(). The dma_addr returned will be a physical
-	 * adddress which might be different from the bus address, but this is
-	 * not a problem since the address will not be used.
-	 * The virtual address is used in the transfer and the SPI core
-	 * re-maps it on the SPI master device using the DMA streaming API
-	 * (spi_map_buf()).
-	 */
-	if (!dev->coherent_dma_mask) {
-		ret = dma_coerce_mask_and_coherent(dev, DMA_BIT_MASK(32));
-		if (ret) {
-			dev_warn(dev, "Failed to set dma mask %d\n", ret);
-			return ret;
-		}
 	}
 
 	mipi->spi = spi;
@@ -966,7 +953,7 @@ static const struct file_operations mipi_dbi_debugfs_command_fops = {
 };
 
 static const struct drm_info_list mipi_dbi_debugfs_list[] = {
-	{ "fb",   drm_fb_cma_debugfs_show, 0 },
+	{ "fb",   drm_fb_shmem_debugfs_show, 0 },
 };
 
 /**

@@ -10,8 +10,9 @@
 #ifndef __LINUX_TINYDRM_H
 #define __LINUX_TINYDRM_H
 
-#include <drm/drm_gem_cma_helper.h>
-#include <drm/drm_fb_cma_helper.h>
+#include <drm/drm_gem_shmem_helper.h>
+#include <drm/drm_fb_gem_helper.h>
+#include <drm/drm_fb_shmem_helper.h>
 #include <drm/drm_simple_kms_helper.h>
 
 /**
@@ -19,7 +20,7 @@
  * @drm: DRM device
  * @pipe: Display pipe structure
  * @dirty_lock: Serializes framebuffer flushing
- * @fbdev_cma: CMA fbdev structure
+ * @fbdev: fbdev helper
  * @suspend_state: Atomic state when suspended
  * @fb_funcs: Framebuffer functions used when creating framebuffers
  */
@@ -27,7 +28,7 @@ struct tinydrm_device {
 	struct drm_device *drm;
 	struct drm_simple_display_pipe pipe;
 	struct mutex dirty_lock;
-	struct drm_fbdev_cma *fbdev_cma;
+	struct drm_fb_helper *fbdev;
 	struct drm_atomic_state *suspend_state;
 	const struct drm_framebuffer_funcs *fb_funcs;
 };
@@ -45,20 +46,8 @@ pipe_to_tinydrm(struct drm_simple_display_pipe *pipe)
  * the &drm_driver structure.
  */
 #define TINYDRM_GEM_DRIVER_OPS \
-	.gem_free_object	= tinydrm_gem_cma_free_object, \
-	.gem_vm_ops		= &drm_gem_cma_vm_ops, \
-	.prime_handle_to_fd	= drm_gem_prime_handle_to_fd, \
-	.prime_fd_to_handle	= drm_gem_prime_fd_to_handle, \
-	.gem_prime_import	= drm_gem_prime_import, \
-	.gem_prime_export	= drm_gem_prime_export, \
-	.gem_prime_get_sg_table	= drm_gem_cma_prime_get_sg_table, \
-	.gem_prime_import_sg_table = tinydrm_gem_cma_prime_import_sg_table, \
-	.gem_prime_vmap		= drm_gem_cma_prime_vmap, \
-	.gem_prime_vunmap	= drm_gem_cma_prime_vunmap, \
-	.gem_prime_mmap		= drm_gem_cma_prime_mmap, \
-	.dumb_create		= drm_gem_cma_dumb_create, \
-	.dumb_map_offset	= drm_gem_cma_dumb_map_offset, \
-	.dumb_destroy		= drm_gem_dumb_destroy
+	.gem_create_object = tinydrm_gem_create_object, \
+	DRM_GEM_SHMEM_DRIVER_OPS
 
 /**
  * TINYDRM_MODE - tinydrm display mode
@@ -84,11 +73,8 @@ pipe_to_tinydrm(struct drm_simple_display_pipe *pipe)
 	.clock = 1 /* pass validation */
 
 void tinydrm_lastclose(struct drm_device *drm);
-void tinydrm_gem_cma_free_object(struct drm_gem_object *gem_obj);
-struct drm_gem_object *
-tinydrm_gem_cma_prime_import_sg_table(struct drm_device *drm,
-				      struct dma_buf_attachment *attach,
-				      struct sg_table *sgt);
+struct drm_gem_object *tinydrm_gem_create_object(struct drm_device *drm,
+						 size_t size);
 int devm_tinydrm_init(struct device *parent, struct tinydrm_device *tdev,
 		      const struct drm_framebuffer_funcs *fb_funcs,
 		      struct drm_driver *driver);

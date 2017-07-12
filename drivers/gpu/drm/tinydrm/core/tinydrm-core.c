@@ -10,6 +10,7 @@
 #include <drm/drm_atomic.h>
 #include <drm/drm_atomic_helper.h>
 #include <drm/drm_crtc_helper.h>
+#include <drm/drm_fb_helper.h>
 #include <drm/tinydrm/tinydrm.h>
 #include <linux/device.h>
 #include <linux/dma-buf.h>
@@ -21,7 +22,7 @@
  *
  * It is based on &drm_simple_display_pipe coupled with a &drm_connector which
  * has only one fixed &drm_display_mode. The framebuffers are backed by the
- * cma helper and have support for framebuffer flushing (dirty).
+ * shmem helper and have support for framebuffer flushing (dirty).
  * fbdev support is also included.
  *
  */
@@ -47,80 +48,33 @@ void tinydrm_lastclose(struct drm_device *drm)
 	struct tinydrm_device *tdev = drm->dev_private;
 
 	DRM_DEBUG_KMS("\n");
-	drm_fbdev_cma_restore_mode(tdev->fbdev_cma);
+	if (tdev->fbdev)
+		drm_fb_helper_restore_fbdev_mode_unlocked(tdev->fbdev);
 }
 EXPORT_SYMBOL(tinydrm_lastclose);
 
 /**
- * tinydrm_gem_cma_prime_import_sg_table - Produce a CMA GEM object from
- *     another driver's scatter/gather table of pinned pages
- * @drm: DRM device to import into
- * @attach: DMA-BUF attachment
- * @sgt: Scatter/gather table of pinned pages
+ * tinydrm_gem_create_object - Create shmem GEM object
+ * @drm: DRM device
+ * @size: Size
  *
- * This function imports a scatter/gather table exported via DMA-BUF by
- * another driver using drm_gem_cma_prime_import_sg_table(). It sets the
- * kernel virtual address on the CMA object. Drivers should use this as their
- * &drm_driver->gem_prime_import_sg_table callback if they need the virtual
- * address. tinydrm_gem_cma_free_object() should be used in combination with
- * this function.
- *
- * Returns:
- * A pointer to a newly created GEM object or an ERR_PTR-encoded negative
- * error code on failure.
+ * This function set cache mode to cached. Drivers should use this as their
+ * &drm_driver->gem_create_object callback.
  */
-struct drm_gem_object *
-tinydrm_gem_cma_prime_import_sg_table(struct drm_device *drm,
-				      struct dma_buf_attachment *attach,
-				      struct sg_table *sgt)
+struct drm_gem_object *tinydrm_gem_create_object(struct drm_device *drm,
+						 size_t size)
 {
-	struct drm_gem_cma_object *cma_obj;
-	struct drm_gem_object *obj;
-	void *vaddr;
+	struct drm_gem_shmem_object *obj;
 
-	vaddr = dma_buf_vmap(attach->dmabuf);
-	if (!vaddr) {
-		DRM_ERROR("Failed to vmap PRIME buffer\n");
+	obj = kzalloc(sizeof(*obj), GFP_KERNEL);
+	if (!obj)
 		return ERR_PTR(-ENOMEM);
-	}
 
-	obj = drm_gem_cma_prime_import_sg_table(drm, attach, sgt);
-	if (IS_ERR(obj)) {
-		dma_buf_vunmap(attach->dmabuf, vaddr);
-		return obj;
-	}
+	obj->cache_mode = DRM_GEM_SHMEM_BO_CACHED;
 
-	cma_obj = to_drm_gem_cma_obj(obj);
-	cma_obj->vaddr = vaddr;
-
-	return obj;
+	return &obj->base;
 }
-EXPORT_SYMBOL(tinydrm_gem_cma_prime_import_sg_table);
-
-/**
- * tinydrm_gem_cma_free_object - Free resources associated with a CMA GEM
- *                               object
- * @gem_obj: GEM object to free
- *
- * This function frees the backing memory of the CMA GEM object, cleans up the
- * GEM object state and frees the memory used to store the object itself using
- * drm_gem_cma_free_object(). It also handles PRIME buffers which has the kernel
- * virtual address set by tinydrm_gem_cma_prime_import_sg_table(). Drivers
- * can use this as their &drm_driver->gem_free_object callback.
- */
-void tinydrm_gem_cma_free_object(struct drm_gem_object *gem_obj)
-{
-	if (gem_obj->import_attach) {
-		struct drm_gem_cma_object *cma_obj;
-
-		cma_obj = to_drm_gem_cma_obj(gem_obj);
-		dma_buf_vunmap(gem_obj->import_attach->dmabuf, cma_obj->vaddr);
-		cma_obj->vaddr = NULL;
-	}
-
-	drm_gem_cma_free_object(gem_obj);
-}
-EXPORT_SYMBOL_GPL(tinydrm_gem_cma_free_object);
+EXPORT_SYMBOL(tinydrm_gem_create_object);
 
 static struct drm_framebuffer *
 tinydrm_fb_create(struct drm_device *drm, struct drm_file *file_priv,
@@ -128,7 +82,7 @@ tinydrm_fb_create(struct drm_device *drm, struct drm_file *file_priv,
 {
 	struct tinydrm_device *tdev = drm->dev_private;
 
-	return drm_fb_cma_create_with_funcs(drm, file_priv, mode_cmd,
+	return drm_fb_gem_create_with_funcs(drm, file_priv, mode_cmd,
 					    tdev->fb_funcs);
 }
 
@@ -210,38 +164,64 @@ int devm_tinydrm_init(struct device *parent, struct tinydrm_device *tdev,
 }
 EXPORT_SYMBOL(devm_tinydrm_init);
 
-static int tinydrm_register(struct tinydrm_device *tdev)
+static int tinydrm_fbdev_probe(struct drm_fb_helper *helper,
+			       struct drm_fb_helper_surface_size *sizes)
+{
+	struct tinydrm_device *tdev = helper->dev->dev_private;
+
+	return drm_fb_shmem_fbdev_probe(helper, sizes, tdev->fb_funcs);
+}
+
+static const struct drm_fb_helper_funcs tinydrm_fb_helper_funcs = {
+	.fb_probe = tinydrm_fbdev_probe,
+};
+
+static int tinydrm_fbdev_init(struct tinydrm_device *tdev)
 {
 	struct drm_device *drm = tdev->drm;
 	int bpp = drm->mode_config.preferred_depth;
-	struct drm_fbdev_cma *fbdev;
+	int ret;
+
+	tdev->fbdev = kzalloc(sizeof(*tdev->fbdev), GFP_KERNEL);
+	if (!tdev->fbdev)
+		return -ENOMEM;
+
+	ret = drm_fb_helper_simple_init(drm, tdev->fbdev, bpp ? bpp : 32,
+					drm->mode_config.num_connector,
+					&tinydrm_fb_helper_funcs);
+	if (ret) {
+		kfree(tdev->fbdev);
+		tdev->fbdev = NULL;
+		return ret;
+	}
+
+	return 0;
+}
+
+static int tinydrm_register(struct tinydrm_device *tdev)
+{
 	int ret;
 
 	ret = drm_dev_register(tdev->drm, 0);
 	if (ret)
 		return ret;
 
-	fbdev = drm_fbdev_cma_init_with_funcs(drm, bpp ? bpp : 32,
-					      drm->mode_config.num_connector,
-					      tdev->fb_funcs);
-	if (IS_ERR(fbdev))
-		DRM_ERROR("Failed to initialize fbdev: %ld\n", PTR_ERR(fbdev));
-	else
-		tdev->fbdev_cma = fbdev;
+	if (tinydrm_fbdev_init(tdev))
+		DRM_WARN("Failed to initialize fbdev\n");
 
-	return 0;
+	return ret;
 }
 
 static void tinydrm_unregister(struct tinydrm_device *tdev)
 {
-	struct drm_fbdev_cma *fbdev_cma = tdev->fbdev_cma;
+	struct drm_fb_helper *fbdev = tdev->fbdev;
 
-	drm_atomic_helper_shutdown(tdev->drm);
 	/* don't restore fbdev in lastclose, keep pipeline disabled */
-	tdev->fbdev_cma = NULL;
+	tdev->fbdev = NULL;
+	drm_atomic_helper_shutdown(tdev->drm);
+	drm_fb_helper_simple_fini(fbdev);
 	drm_dev_unregister(tdev->drm);
-	if (fbdev_cma)
-		drm_fbdev_cma_fini(fbdev_cma);
+	kfree(fbdev);
 }
 
 static void devm_tinydrm_register_release(void *data)
@@ -311,10 +291,12 @@ int tinydrm_suspend(struct tinydrm_device *tdev)
 		return -EINVAL;
 	}
 
-	drm_fbdev_cma_set_suspend_unlocked(tdev->fbdev_cma, 1);
+	if (tdev->fbdev)
+		drm_fb_helper_set_suspend_unlocked(tdev->fbdev, 1);
 	state = drm_atomic_helper_suspend(tdev->drm);
 	if (IS_ERR(state)) {
-		drm_fbdev_cma_set_suspend_unlocked(tdev->fbdev_cma, 0);
+		if (tdev->fbdev)
+			drm_fb_helper_set_suspend_unlocked(tdev->fbdev, 0);
 		return PTR_ERR(state);
 	}
 
@@ -352,7 +334,8 @@ int tinydrm_resume(struct tinydrm_device *tdev)
 		return ret;
 	}
 
-	drm_fbdev_cma_set_suspend_unlocked(tdev->fbdev_cma, 0);
+	if (tdev->fbdev)
+		drm_fb_helper_set_suspend_unlocked(tdev->fbdev, 0);
 
 	return 0;
 }

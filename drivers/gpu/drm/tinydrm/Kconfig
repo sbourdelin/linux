@@ -2,7 +2,7 @@ menuconfig DRM_TINYDRM
 	tristate "Support for simple displays"
 	depends on DRM
 	select DRM_KMS_HELPER
-	select DRM_KMS_CMA_HELPER
+	select DRM_KMS_SHMEM_HELPER
 	select BACKLIGHT_LCD_SUPPORT
 	select BACKLIGHT_CLASS_DEVICE
 	help
