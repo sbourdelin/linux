@@ -566,39 +566,39 @@ struct macb_dma_desc_64 {
 #define MACB_RX_WADDR_OFFSET			2
 #define MACB_RX_WADDR_SIZE			30
 
-#define MACB_RX_FRMLEN_OFFSET			0
+#define MACB_RX_FRMLEN_OFFSET			0  /* Length of frame */
 #define MACB_RX_FRMLEN_SIZE			12
-#define MACB_RX_OFFSET_OFFSET			12
+#define MACB_RX_OFFSET_OFFSET			12 /* Receive buffer offset */
 #define MACB_RX_OFFSET_SIZE			2
-#define MACB_RX_SOF_OFFSET			14
+#define MACB_RX_SOF_OFFSET			14 /* Start of frame */
 #define MACB_RX_SOF_SIZE			1
-#define MACB_RX_EOF_OFFSET			15
+#define MACB_RX_EOF_OFFSET			15 /* End of frame */
 #define MACB_RX_EOF_SIZE			1
-#define MACB_RX_CFI_OFFSET			16
+#define MACB_RX_CFI_OFFSET			16 /* Concatenation format indicator */
 #define MACB_RX_CFI_SIZE			1
-#define MACB_RX_VLAN_PRI_OFFSET			17
+#define MACB_RX_VLAN_PRI_OFFSET			17 /* VLAN priority */
 #define MACB_RX_VLAN_PRI_SIZE			3
-#define MACB_RX_PRI_TAG_OFFSET			20
+#define MACB_RX_PRI_TAG_OFFSET			20 /* Priority tag detected */
 #define MACB_RX_PRI_TAG_SIZE			1
-#define MACB_RX_VLAN_TAG_OFFSET			21
+#define MACB_RX_VLAN_TAG_OFFSET			21 /* VLAN tag detected */
 #define MACB_RX_VLAN_TAG_SIZE			1
-#define MACB_RX_TYPEID_MATCH_OFFSET		22
+#define MACB_RX_TYPEID_MATCH_OFFSET		22 /* Type ID match */
 #define MACB_RX_TYPEID_MATCH_SIZE		1
-#define MACB_RX_SA4_MATCH_OFFSET		23
+#define MACB_RX_SA4_MATCH_OFFSET		23 /* Specific address register 4 match */
 #define MACB_RX_SA4_MATCH_SIZE			1
-#define MACB_RX_SA3_MATCH_OFFSET		24
+#define MACB_RX_SA3_MATCH_OFFSET		24 /* Specific address register 3 match */
 #define MACB_RX_SA3_MATCH_SIZE			1
-#define MACB_RX_SA2_MATCH_OFFSET		25
+#define MACB_RX_SA2_MATCH_OFFSET		25 /* Specific address register 2 match */
 #define MACB_RX_SA2_MATCH_SIZE			1
-#define MACB_RX_SA1_MATCH_OFFSET		26
+#define MACB_RX_SA1_MATCH_OFFSET		26 /* Specific address register 1 match */
 #define MACB_RX_SA1_MATCH_SIZE			1
-#define MACB_RX_EXT_MATCH_OFFSET		28
+#define MACB_RX_EXT_MATCH_OFFSET		28 /* External address match */
 #define MACB_RX_EXT_MATCH_SIZE			1
-#define MACB_RX_UHASH_MATCH_OFFSET		29
+#define MACB_RX_UHASH_MATCH_OFFSET		29 /* Unicast hash match */
 #define MACB_RX_UHASH_MATCH_SIZE		1
-#define MACB_RX_MHASH_MATCH_OFFSET		30
+#define MACB_RX_MHASH_MATCH_OFFSET		30 /* Multicast hash match */
 #define MACB_RX_MHASH_MATCH_SIZE		1
-#define MACB_RX_BROADCAST_OFFSET		31
+#define MACB_RX_BROADCAST_OFFSET		31 /* Global all ones broadcast addr detected */
 #define MACB_RX_BROADCAST_SIZE			1
 
 #define MACB_RX_FRMLEN_MASK			0xFFF
@@ -612,11 +612,11 @@ struct macb_dma_desc_64 {
 #define GEM_RX_CSUM_OFFSET			22
 #define GEM_RX_CSUM_SIZE			2
 
-#define MACB_TX_FRMLEN_OFFSET			0
+#define MACB_TX_FRMLEN_OFFSET			0  /* Length of buffer */
 #define MACB_TX_FRMLEN_SIZE			11
-#define MACB_TX_LAST_OFFSET			15
+#define MACB_TX_LAST_OFFSET			15 /* Last buffer */
 #define MACB_TX_LAST_SIZE			1
-#define MACB_TX_NOCRC_OFFSET			16
+#define MACB_TX_NOCRC_OFFSET			16 /* No CRC */
 #define MACB_TX_NOCRC_SIZE			1
 #define MACB_MSS_MFS_OFFSET			16
 #define MACB_MSS_MFS_SIZE			14
@@ -624,15 +624,15 @@ struct macb_dma_desc_64 {
 #define MACB_TX_LSO_SIZE			2
 #define MACB_TX_TCP_SEQ_SRC_OFFSET		19
 #define MACB_TX_TCP_SEQ_SRC_SIZE		1
-#define MACB_TX_BUF_EXHAUSTED_OFFSET		27
+#define MACB_TX_BUF_EXHAUSTED_OFFSET		27 /* Buffers exhausted in mid frame */
 #define MACB_TX_BUF_EXHAUSTED_SIZE		1
-#define MACB_TX_UNDERRUN_OFFSET			28
+#define MACB_TX_UNDERRUN_OFFSET			28 /* Transmit underrun */
 #define MACB_TX_UNDERRUN_SIZE			1
-#define MACB_TX_ERROR_OFFSET			29
+#define MACB_TX_ERROR_OFFSET			29 /* Retry limit exceeded */
 #define MACB_TX_ERROR_SIZE			1
-#define MACB_TX_WRAP_OFFSET			30
+#define MACB_TX_WRAP_OFFSET			30 /* Wrap */
 #define MACB_TX_WRAP_SIZE			1
-#define MACB_TX_USED_OFFSET			31
+#define MACB_TX_USED_OFFSET			31 /* Used */
 #define MACB_TX_USED_SIZE			1
 
 #define GEM_TX_FRMLEN_OFFSET			0
