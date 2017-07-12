@@ -98,4 +98,12 @@ int hinic_wq_allocate(struct hinic_wqs *wqs, struct hinic_wq *wq,
 
 void hinic_wq_free(struct hinic_wqs *wqs, struct hinic_wq *wq);
 
+void *hinic_get_wqe(struct hinic_wq *wq, unsigned int wqe_size, u16 *prod_idx);
+
+void hinic_put_wqe(struct hinic_wq *wq, unsigned int wqe_size);
+
+void *hinic_read_wqe(struct hinic_wq *wq, unsigned int wqe_size, u16 *cons_idx);
+
+void hinic_write_wqe(struct hinic_wq *wq, void *wqe, unsigned int wqe_size);
+
 #endif

@@ -75,6 +75,25 @@
 		(((void *)((cmdq_pages)->shadow_page_vaddr)) \
 				+ (wq)->block_idx * CMDQ_BLOCK_SIZE)
 
+#define	WQE_PAGE_OFF(wq, idx)	(((idx) & ((wq)->num_wqebbs_per_page - 1)) * \
+					(wq)->wqebb_size)
+
+#define	WQE_PAGE_NUM(wq, idx)	(((idx) / ((wq)->num_wqebbs_per_page)) \
+					& ((wq)->num_q_pages - 1))
+
+#define WQ_PAGE_ADDR(wq, idx)		\
+			((wq)->shadow_block_vaddr[WQE_PAGE_NUM(wq, idx)])
+
+#define MASKED_WQE_IDX(wq, idx)		((idx) & (wq)->mask)
+
+#define WQE_IN_RANGE(wqe, start, end)	\
+		(((unsigned long)(wqe) >= (unsigned long)(start)) && \
+		 ((unsigned long)(wqe) < (unsigned long)(end)))
+
+#define WQE_SHADOW_PAGE(wq, wqe)	\
+		(((unsigned long)(wqe) - (unsigned long)(wq)->shadow_wqe) \
+			/ (wq)->max_wqe_size)
+
 /**
  * queue_alloc_page - allocate page for Queue
  * @hwif: HW interface for allocating DMA
@@ -659,4 +678,178 @@ void hinic_wqs_cmdq_free(struct hinic_cmdq_pages *cmdq_pages,
 		free_wq_pages(cmdq_pages->hwif, &wq[i], wq[i].num_q_pages);
 
 	cmdq_free_page(cmdq_pages);
+}
+
+static void copy_wqe_to_shadow(struct hinic_wq *wq, void *shadow_addr,
+			       int num_wqebbs, u16 idx)
+{
+	void *wqe_page_addr, *wqebb_addr;
+	int i;
+
+	for (i = 0; i < num_wqebbs; i++, idx++) {
+		idx = MASKED_WQE_IDX(wq, idx);
+		wqe_page_addr = WQ_PAGE_ADDR(wq, idx);
+		wqebb_addr = wqe_page_addr +
+				WQE_PAGE_OFF(wq, idx);
+
+		memcpy(shadow_addr, wqebb_addr, wq->wqebb_size);
+
+		shadow_addr += wq->wqebb_size;
+	}
+}
+
+static void copy_wqe_from_shadow(struct hinic_wq *wq, void *shadow_addr,
+				 int num_wqebbs, u16 idx)
+{
+	void *wqe_page_addr, *wqebb_addr;
+	int i;
+
+	for (i = 0; i < num_wqebbs; i++, idx++) {
+		idx = MASKED_WQE_IDX(wq, idx);
+		wqe_page_addr = WQ_PAGE_ADDR(wq, idx);
+		wqebb_addr = wqe_page_addr +
+				WQE_PAGE_OFF(wq, idx);
+
+		memcpy(wqebb_addr, shadow_addr, wq->wqebb_size);
+		shadow_addr += wq->wqebb_size;
+	}
+}
+
+/**
+ * hinic_get_wqe - get wqe ptr in the current pi and update the pi
+ * @wq: wq to get wqe from
+ * @wqe_size: wqe size
+ * @prod_idx: returned pi
+ *
+ * Return wqe pointer
+ **/
+void *hinic_get_wqe(struct hinic_wq *wq, unsigned int wqe_size, u16 *prod_idx)
+{
+	int curr_pg, end_pg, num_wqebbs;
+	u16 curr_prod_idx, end_prod_idx;
+
+	*prod_idx = MASKED_WQE_IDX(wq, atomic_read(&wq->prod_idx));
+
+	num_wqebbs = ALIGN(wqe_size, wq->wqebb_size) / wq->wqebb_size;
+
+	if (atomic_sub_return(num_wqebbs, &wq->delta) <= 0) {
+		atomic_add(num_wqebbs, &wq->delta);
+		return NULL;
+	}
+
+	end_prod_idx = atomic_add_return(num_wqebbs, &wq->prod_idx);
+
+	end_prod_idx = MASKED_WQE_IDX(wq, end_prod_idx);
+	curr_prod_idx = end_prod_idx - num_wqebbs;
+	curr_prod_idx = MASKED_WQE_IDX(wq, curr_prod_idx);
+
+	/* end prod index points to the next wqebb, therefore minus 1 */
+	end_prod_idx = MASKED_WQE_IDX(wq, end_prod_idx - 1);
+
+	curr_pg = WQE_PAGE_NUM(wq, curr_prod_idx);
+	end_pg = WQE_PAGE_NUM(wq, end_prod_idx);
+
+	*prod_idx = curr_prod_idx;
+
+	if (curr_pg != end_pg) {
+		void *shadow_addr = &wq->shadow_wqe[curr_pg * wq->max_wqe_size];
+
+		copy_wqe_to_shadow(wq, shadow_addr, num_wqebbs, *prod_idx);
+
+		wq->shadow_idx[curr_pg] = *prod_idx;
+		return shadow_addr;
+	}
+
+	return WQ_PAGE_ADDR(wq, *prod_idx) + WQE_PAGE_OFF(wq, *prod_idx);
+}
+
+/**
+ * hinic_put_wqe - return the wqe place to use for a new wqe
+ * @wq: wq to return wqe
+ * @wqe_size: wqe size
+ **/
+void hinic_put_wqe(struct hinic_wq *wq, unsigned int wqe_size)
+{
+	int num_wqebbs = ALIGN(wqe_size, wq->wqebb_size) / wq->wqebb_size;
+
+	atomic_add(num_wqebbs, &wq->cons_idx);
+
+	atomic_add(num_wqebbs, &wq->delta);
+}
+
+/**
+ * hinic_read_wqe - read wqe ptr in the current ci
+ * @wq: wq to get read from
+ * @wqe_size: wqe size
+ * @cons_idx: returned ci
+ *
+ * Return wqe pointer
+ **/
+void *hinic_read_wqe(struct hinic_wq *wq, unsigned int wqe_size, u16 *cons_idx)
+{
+	int num_wqebbs = ALIGN(wqe_size, wq->wqebb_size) / wq->wqebb_size;
+	int curr_pg, end_pg;
+	u16 curr_cons_idx, end_cons_idx;
+
+	if ((atomic_read(&wq->delta) + num_wqebbs) > wq->q_depth)
+		return NULL;
+
+	curr_cons_idx = atomic_read(&wq->cons_idx);
+
+	curr_cons_idx = MASKED_WQE_IDX(wq, curr_cons_idx);
+	end_cons_idx = MASKED_WQE_IDX(wq, curr_cons_idx + num_wqebbs - 1);
+
+	curr_pg = WQE_PAGE_NUM(wq, curr_cons_idx);
+	end_pg = WQE_PAGE_NUM(wq, end_cons_idx);
+
+	*cons_idx = curr_cons_idx;
+
+	if (curr_pg != end_pg) {
+		void *shadow_addr = &wq->shadow_wqe[curr_pg * wq->max_wqe_size];
+
+		copy_wqe_to_shadow(wq, shadow_addr, num_wqebbs, *cons_idx);
+		return shadow_addr;
+	}
+
+	return WQ_PAGE_ADDR(wq, *cons_idx) + WQE_PAGE_OFF(wq, *cons_idx);
+}
+
+/**
+ * wqe_shadow - check if a wqe is shadow
+ * @wq: wq of the wqe
+ * @wqe: the wqe for shadow checking
+ *
+ * Return true - shadow, false - Not shadow
+ **/
+static inline bool wqe_shadow(struct hinic_wq *wq, void *wqe)
+{
+	void *end_wqe_shadow_addr;
+	size_t wqe_shadow_size = wq->num_q_pages * wq->max_wqe_size;
+
+	end_wqe_shadow_addr = &wq->shadow_wqe[wqe_shadow_size];
+
+	return WQE_IN_RANGE(wqe, wq->shadow_wqe, end_wqe_shadow_addr);
+}
+
+/**
+ * hinic_write_wqe - write the wqe to the wq
+ * @wq: wq to write wqe to
+ * @wqe: wqe to write
+ * @wqe_size: wqe size
+ **/
+void hinic_write_wqe(struct hinic_wq *wq, void *wqe, unsigned int wqe_size)
+{
+	void *shadow_addr;
+	int curr_pg, num_wqebbs;
+	u16 prod_idx;
+
+	if (wqe_shadow(wq, wqe)) {
+		curr_pg = WQE_SHADOW_PAGE(wq, wqe);
+
+		prod_idx = wq->shadow_idx[curr_pg];
+		num_wqebbs = ALIGN(wqe_size, wq->wqebb_size) / wq->wqebb_size;
+		shadow_addr = &wq->shadow_wqe[curr_pg * wq->max_wqe_size];
+
+		copy_wqe_from_shadow(wq, shadow_addr, num_wqebbs, prod_idx);
+	}
 }
