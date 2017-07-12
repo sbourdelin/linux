@@ -87,6 +87,14 @@ fscrypt_valid_context_format(const struct fscrypt_context *ctx, int size)
 }
 
 /*
+ * fscrypt_master_key - an in-use master key
+ */
+struct fscrypt_master_key {
+	struct crypto_shash	*mk_hmac;
+	unsigned int		mk_size;
+};
+
+/*
  * fscrypt_info - the "encryption key" for an inode
  *
  * When an encrypted file's key is made available, an instance of this struct is
@@ -98,6 +106,12 @@ struct fscrypt_info {
 	/* The actual crypto transforms needed for encryption and decryption */
 	struct crypto_skcipher *ci_ctfm;
 	struct crypto_cipher *ci_essiv_tfm;
+
+	/*
+	 * The master key with which this inode was "unlocked"
+	 * (only set for inodes that use a v2+ encryption policy)
+	 */
+	struct fscrypt_master_key *ci_master_key;
 
 	/*
 	 * Cached fields from the fscrypt_context needed for encryption policy
