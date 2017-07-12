@@ -151,6 +151,14 @@ test_all_frequencies()
 	# Set all frequencies one-by-one
 	for freq in $freqs; do
 		set_cpu_frequency $1 $freq
+
+		local cur_freq
+		cur_freq=`cat $CPUFREQROOT/$1/cpuinfo_cur_freq`
+		if [ $freq -ne $cur_freq ]; then
+			printf "not ok - frequency set $freq but got $cur_freq instead!\n"
+		else
+			printf "ok - frequency check $freq\n"
+		fi
 	done
 
 	printf "\n"
