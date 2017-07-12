@@ -7985,6 +7985,29 @@ static int __igb_shutdown(struct pci_dev *pdev, bool *enable_wake,
 	return 0;
 }
 
+#ifdef CONFIG_PM
+#ifdef CONFIG_PM_SLEEP
+static int igb_suspend(struct device *dev)
+{
+	int retval;
+	bool wake;
+	struct pci_dev *pdev = to_pci_dev(dev);
+
+	retval = __igb_shutdown(pdev, &wake, 0);
+	if (retval)
+		return retval;
+
+	if (wake) {
+		pci_prepare_to_sleep(pdev);
+	} else {
+		pci_wake_from_d3(pdev, false);
+		pci_set_power_state(pdev, PCI_D3hot);
+	}
+
+	return 0;
+}
+#endif /* CONFIG_PM_SLEEP */
+
 static void igb_deliver_wake_packet(struct net_device *netdev)
 {
 	struct igb_adapter *adapter = netdev_priv(netdev);
@@ -8014,29 +8037,6 @@ static void igb_deliver_wake_packet(struct net_device *netdev)
 	skb->protocol = eth_type_trans(skb, netdev);
 	netif_rx(skb);
 }
-
-#ifdef CONFIG_PM
-#ifdef CONFIG_PM_SLEEP
-static int igb_suspend(struct device *dev)
-{
-	int retval;
-	bool wake;
-	struct pci_dev *pdev = to_pci_dev(dev);
-
-	retval = __igb_shutdown(pdev, &wake, 0);
-	if (retval)
-		return retval;
-
-	if (wake) {
-		pci_prepare_to_sleep(pdev);
-	} else {
-		pci_wake_from_d3(pdev, false);
-		pci_set_power_state(pdev, PCI_D3hot);
-	}
-
-	return 0;
-}
-#endif /* CONFIG_PM_SLEEP */
 
 static int igb_resume(struct device *dev)
 {
