@@ -1,8 +1,13 @@
-NOTE: this document is outdated and will eventually be removed.  See
-Documentation/doc-guide/ for current information.
-
+=====================
 kernel-doc nano-HOWTO
 =====================
+
+:Author: Tim <twaugh@redhat.com>
+
+.. note::
+
+   This document is outdated and will eventually be removed.  See
+   Documentation/doc-guide/ for current information.
 
 How to format kernel-doc comments
 ---------------------------------
@@ -41,35 +46,35 @@ discretion of the MAINTAINER of that kernel source file.
 Data structures visible in kernel include files should also be
 documented using kernel-doc formatted comments.
 
-The opening comment mark "/**" is reserved for kernel-doc comments.
+The opening comment mark ``/**`` is reserved for kernel-doc comments.
 Only comments so marked will be considered by the kernel-doc scripts,
 and any comment so marked must be in kernel-doc format.  Do not use
-"/**" to be begin a comment block unless the comment block contains
+``/**`` to be begin a comment block unless the comment block contains
 kernel-doc formatted comments.  The closing comment marker for
-kernel-doc comments can be either "*/" or "**/", but "*/" is
+kernel-doc comments can be either ``*/`` or ``**/``, but ``*/`` is
 preferred in the Linux kernel tree.
 
 Kernel-doc comments should be placed just before the function
 or data structure being described.
 
-Example kernel-doc function comment:
+Example kernel-doc function comment::
 
-/**
- * foobar() - short function description of foobar
- * @arg1:	Describe the first argument to foobar.
- * @arg2:	Describe the second argument to foobar.
- *		One can provide multiple line descriptions
- *		for arguments.
- *
- * A longer description, with more discussion of the function foobar()
- * that might be useful to those using or modifying it.  Begins with
- * empty comment line, and may include additional embedded empty
- * comment lines.
- *
- * The longer description can have multiple paragraphs.
- *
- * Return: Describe the return value of foobar.
- */
+ /**
+  * foobar() - short function description of foobar
+  * @arg1:	Describe the first argument to foobar.
+  * @arg2:	Describe the second argument to foobar.
+  *		One can provide multiple line descriptions
+  *		for arguments.
+  *
+  * A longer description, with more discussion of the function foobar()
+  * that might be useful to those using or modifying it.  Begins with
+  * empty comment line, and may include additional embedded empty
+  * comment lines.
+  *
+  * The longer description can have multiple paragraphs.
+  *
+  * Return: Describe the return value of foobar.
+  */
 
 The short description following the subject can span multiple lines
 and ends with an @argument description, an empty line or the end of
@@ -80,22 +85,23 @@ this opening short function description line, with no intervening
 empty comment lines.
 
 If a function parameter is "..." (varargs), it should be listed in
-kernel-doc notation as:
+kernel-doc notation as::
+
  * @...: description
 
 The return value, if any, should be described in a dedicated section
 named "Return".
 
-Example kernel-doc data structure comment.
+Example kernel-doc data structure comment::
 
-/**
- * struct blah - the basic blah structure
- * @mem1:	describe the first member of struct blah
- * @mem2:	describe the second member of struct blah,
- *		perhaps with more lines and words.
- *
- * Longer description of this structure.
- */
+ /**
+  * struct blah - the basic blah structure
+  * @mem1:	describe the first member of struct blah
+  * @mem2:	describe the second member of struct blah,
+  *		perhaps with more lines and words.
+  *
+  * Longer description of this structure.
+  */
 
 The kernel-doc function comments describe each parameter to the
 function, in order, with the @name lines.
@@ -150,64 +156,64 @@ If you just want to read the ready-made books on the various
 subsystems, just type 'make epubdocs', or 'make pdfdocs', or 'make htmldocs',
 depending on your preference.  If you would rather read a different format,
 you can type 'make xmldocs' and then use DocBook tools to convert
-Documentation/output/*.xml to a format of your choice (for example,
+``Documentation/output/*.xml`` to a format of your choice (for example,
 'db2html ...' if 'make htmldocs' was not defined).
 
-If you want to see man pages instead, you can do this:
+If you want to see man pages instead, you can do this::
 
-$ cd linux
-$ scripts/kernel-doc -man $(find -name '*.c') | split-man.pl /tmp/man
-$ scripts/kernel-doc -man $(find -name '*.h') | split-man.pl /tmp/man
+	$ cd linux
+	$ scripts/kernel-doc -man $(find -name '*.c') | split-man.pl /tmp/man
+	$ scripts/kernel-doc -man $(find -name '*.h') | split-man.pl /tmp/man
 
-Here is split-man.pl:
+Here is split-man.pl::
 
--->
-#!/usr/bin/perl
+    -->
+    #!/usr/bin/perl
 
-if ($#ARGV < 0) {
-   die "where do I put the results?\n";
-}
-
-mkdir $ARGV[0],0777;
-$state = 0;
-while (<STDIN>) {
-    if (/^\.TH \"[^\"]*\" 9 \"([^\"]*)\"/) {
-	if ($state == 1) { close OUT }
-	$state = 1;
-	$fn = "$ARGV[0]/$1.9";
-	print STDERR "Creating $fn\n";
-	open OUT, ">$fn" or die "can't open $fn: $!\n";
-	print OUT $_;
-    } elsif ($state != 0) {
-	print OUT $_;
+    if ($#ARGV < 0) {
+       die "where do I put the results?\n";
     }
-}
 
-close OUT;
-<--
+    mkdir $ARGV[0],0777;
+    $state = 0;
+    while (<STDIN>) {
+	if (/^\.TH \"[^\"]*\" 9 \"([^\"]*)\"/) {
+	    if ($state == 1) { close OUT }
+	    $state = 1;
+	    $fn = "$ARGV[0]/$1.9";
+	    print STDERR "Creating $fn\n";
+	    open OUT, ">$fn" or die "can't open $fn: $!\n";
+	    print OUT $_;
+	} elsif ($state != 0) {
+	    print OUT $_;
+	}
+    }
+
+    close OUT;
+    <--
 
 If you just want to view the documentation for one function in one
-file, you can do this:
+file, you can do this::
 
-$ scripts/kernel-doc -man -function fn file | nroff -man | less
+	$ scripts/kernel-doc -man -function fn file | nroff -man | less
 
-or this:
+or this::
 
-$ scripts/kernel-doc -text -function fn file
+	$ scripts/kernel-doc -text -function fn file
 
 
 How to add extractable documentation to your source files
 ---------------------------------------------------------
 
-The format of the block comment is like this:
+The format of the block comment is like this::
 
-/**
- * function_name(:)? (- short description)?
-(* @parameterx(space)*: (description of parameter x)?)*
-(* a blank line)?
- * (Description:)? (Description of function)?
- * (section header: (section description)? )*
-(*)?*/
+ /**
+  * function_name(:)? (- short description)?
+ (* @parameterx(space)*: (description of parameter x)?)*
+ (* a blank line)?
+  * (Description:)? (Description of function)?
+  * (section header: (section description)? )*
+ (*)?*/
 
 All "description" text can span multiple lines, although the
 function_name & its short description are traditionally on a single line.
@@ -233,21 +239,21 @@ patterns, which are highlighted appropriately.
 '%CONST' - name of a constant.
 
 NOTE 1:  The multi-line descriptive text you provide does *not* recognize
-line breaks, so if you try to format some text nicely, as in:
+line breaks, so if you try to format some text nicely, as in::
 
   Return:
     0 - cool
     1 - invalid arg
     2 - out of memory
 
-this will all run together and produce:
+this will all run together and produce::
 
   Return: 0 - cool 1 - invalid arg 2 - out of memory
 
 NOTE 2:  If the descriptive text you provide has lines that begin with
 some phrase followed by a colon, each of those phrases will be taken as
 a new section heading, which means you should similarly try to avoid text
-like:
+like::
 
   Return:
     0: cool
@@ -276,21 +282,21 @@ and "public:" tags must begin immediately following a "/*" comment
 marker.  They may optionally include comments between the ":" and the
 ending "*/" marker.
 
-Example:
+Example::
 
-/**
- * struct my_struct - short description
- * @a: first member
- * @b: second member
- *
- * Longer description
- */
-struct my_struct {
-    int a;
-    int b;
-/* private: internal use only */
-    int c;
-};
+ /**
+  * struct my_struct - short description
+  * @a: first member
+  * @b: second member
+  *
+  * Longer description
+  */
+ struct my_struct {
+     int a;
+     int b;
+ /* private: internal use only */
+     int c;
+ };
 
 
 Including documentation blocks in source files
@@ -302,21 +308,18 @@ instead of being kernel-doc for functions, structures, unions,
 enums, or typedefs.  This could be used for something like a
 theory of operation for a driver or library code, for example.
 
-This is done by using a DOC: section keyword with a section title.  E.g.:
+This is done by using a DOC: section keyword with a section title.  E.g.::
 
-/**
- * DOC: Theory of Operation
- *
- * The whizbang foobar is a dilly of a gizmo.  It can do whatever you
- * want it to do, at any time.  It reads your mind.  Here's how it works.
- *
- * foo bar splat
- *
- * The only drawback to this gizmo is that is can sometimes damage
- * hardware, software, or its subject(s).
- */
+ /**
+  * DOC: Theory of Operation
+  *
+  * The whizbang foobar is a dilly of a gizmo.  It can do whatever you
+  * want it to do, at any time.  It reads your mind.  Here's how it works.
+  *
+  * foo bar splat
+  *
+  * The only drawback to this gizmo is that is can sometimes damage
+  * hardware, software, or its subject(s).
+  */
 
 DOC: sections are used in ReST files.
-
-Tim.
-*/ <twaugh@redhat.com>
