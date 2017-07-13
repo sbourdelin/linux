@@ -652,6 +652,42 @@ static nokprobe_inline void do_bpermd(struct pt_regs *regs, unsigned long v1,
 	regs->gpr[ra] = 0 | perm;
 }
 
+static nokprobe_inline void do_prtyw(struct pt_regs *regs, unsigned long v,
+				int ra)
+{
+	unsigned long low, high, out;
+	unsigned int i;
+
+	high = 0;
+	low = 0;
+	out = 0;
+
+	for (i = 0; i < 8; i++) {
+		if (v & (1 << (i * 8)))
+			(i < 4) ? (low++) : (high++);
+	}
+
+	if (low % 2)
+		out |= low;
+	if (high % 2)
+		out |= (high << 32);
+
+	regs->gpr[ra] = out;
+}
+
+static nokprobe_inline void do_prtyd(struct pt_regs *regs, unsigned long v,
+				int ra)
+{
+	unsigned int count, i;
+
+	count = 0;
+	for (i = 0; i < 8; i++) {
+		if (v & (1 << (i * 8)))
+			count++;
+	}
+	regs->gpr[ra] = count % 2;
+}
+
 static nokprobe_inline int trap_compare(long v1, long v2)
 {
 	int ret = 0;
@@ -1278,6 +1314,24 @@ int analyse_instr(struct instruction_op *op, struct pt_regs *regs,
 			do_popcnt(regs, val, 8, ra);
 			goto logical_done;
 
+		case 2101768:	/* prtyw */
+			val = regs->gpr[rd];
+			do_prtyw(regs, val, ra);
+			goto logical_done;
+
+		case 2134536:	/* prtyd */
+			val = regs->gpr[rd];
+			do_prtyd(regs, val, ra);
+			goto logical_done;
+
+#ifdef __powerpc64__
+		case 2396736:	/* bpermd */
+			val = regs->gpr[rd];
+			val2 = regs->gpr[rb];
+			do_bpermd(regs, val, val2, ra);
+			goto logical_done;
+#endif
+
 		case 17076744:	/* popcntw */
 			val = regs->gpr[rd];
 			do_popcnt(regs, val, 32, ra);
@@ -1286,14 +1340,6 @@ int analyse_instr(struct instruction_op *op, struct pt_regs *regs,
 		case 19173896:	/* popcntd */
 			val = regs->gpr[rd];
 			do_popcnt(regs, val, 64, ra);
-			goto logical_done;
-#endif
-
-#ifdef __powerpc64__
-		case 2396736:	/* bpermd */
-			val = regs->gpr[rd];
-			val2 = regs->gpr[rb];
-			do_bpermd(regs, val, val2, ra);
 			goto logical_done;
 #endif
 
