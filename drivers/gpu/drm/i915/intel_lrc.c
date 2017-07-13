@@ -547,9 +547,16 @@ static void intel_lrc_irq_handler(unsigned long data)
 	while (test_bit(ENGINE_IRQ_EXECLIST, &engine->irq_posted)) {
 		u32 __iomem *csb_mmio =
 			dev_priv->regs + i915_mmio_reg_offset(RING_CONTEXT_STATUS_PTR(engine));
-		u32 __iomem *buf =
-			dev_priv->regs + i915_mmio_reg_offset(RING_CONTEXT_STATUS_BUF_LO(engine, 0));
+		/* The HWSP contains a (cacheable) mirror of the CSB */
+		const u32 *buf =
+			&engine->status_page.page_addr[I915_HWS_CSB_BUF0_INDEX];
 		unsigned int head, tail;
+
+		/* However GVT emulation depends upon intercepting CSB mmio */
+		if (unlikely(intel_vgpu_active(dev_priv))) {
+			buf = (u32 * __force)
+				(dev_priv->regs + i915_mmio_reg_offset(RING_CONTEXT_STATUS_PTR(engine)));
+		}
 
 		/* The write will be ordered by the uncached read (itself
 		 * a memory barrier), so we do not need another in the form
@@ -590,13 +597,12 @@ static void intel_lrc_irq_handler(unsigned long data)
 			 * status notifier.
 			 */
 
-			status = readl(buf + 2 * head);
+			status = buf[2 * head];
 			if (!(status & GEN8_CTX_STATUS_COMPLETED_MASK))
 				continue;
 
 			/* Check the context/desc id for this event matches */
-			GEM_DEBUG_BUG_ON(readl(buf + 2 * head + 1) !=
-					 port->context_id);
+			GEM_DEBUG_BUG_ON(buf[2 * head + 1] != port->context_id);
 
 			rq = port_unpack(port, &count);
 			GEM_BUG_ON(count == 0);
