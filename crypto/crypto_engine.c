@@ -15,6 +15,7 @@
 #include <linux/err.h>
 #include <linux/delay.h>
 #include <crypto/engine.h>
+#include <crypto/internal/aead.h>
 #include <crypto/internal/hash.h>
 #include <uapi/linux/sched/types.h>
 #include "internal.h"
@@ -35,6 +36,7 @@ static void crypto_pump_requests(struct crypto_engine *engine,
 {
 	struct crypto_async_request *async_req, *backlog;
 	struct ahash_request *hreq;
+	struct aead_request *areq;
 	struct ablkcipher_request *breq;
 	unsigned long flags;
 	bool was_busy = false;
@@ -122,6 +124,22 @@ static void crypto_pump_requests(struct crypto_engine *engine,
 			goto req_err;
 		}
 		return;
+	case CRYPTO_ALG_TYPE_AEAD:
+		areq = aead_request_cast(engine->cur_req);
+		if (engine->prepare_aead_request) {
+			ret = engine->prepare_aead_request(engine, areq);
+			if (ret) {
+				pr_err("failed to prepare request: %d\n", ret);
+				goto req_err;
+			}
+			engine->cur_req_prepared = true;
+		}
+		ret = engine->aead_one_request(engine, areq);
+		if (ret) {
+			pr_err("failed to do aead one request from queue\n");
+			goto req_err;
+		}
+		return;
 	case CRYPTO_ALG_TYPE_ABLKCIPHER:
 		breq = ablkcipher_request_cast(engine->cur_req);
 		if (engine->prepare_cipher_request) {
@@ -149,6 +167,10 @@ req_err:
 	case CRYPTO_ALG_TYPE_AHASH:
 		hreq = ahash_request_cast(engine->cur_req);
 		crypto_finalize_hash_request(engine, hreq, ret);
+		break;
+	case CRYPTO_ALG_TYPE_AEAD:
+		areq = aead_request_cast(engine->cur_req);
+		crypto_finalize_aead_request(engine, areq, ret);
 		break;
 	case CRYPTO_ALG_TYPE_ABLKCIPHER:
 		breq = ablkcipher_request_cast(engine->cur_req);
@@ -255,6 +277,48 @@ int crypto_transfer_hash_request_to_engine(struct crypto_engine *engine,
 EXPORT_SYMBOL_GPL(crypto_transfer_hash_request_to_engine);
 
 /**
+ * crypto_transfer_aead_request - transfer the new request into the
+ * enginequeue
+ * @engine: the hardware engine
+ * @req: the request need to be listed into the engine queue
+ */
+int crypto_transfer_aead_request(struct crypto_engine *engine,
+				 struct aead_request *req, bool need_pump)
+{
+	unsigned long flags;
+	int ret;
+
+	spin_lock_irqsave(&engine->queue_lock, flags);
+
+	if (!engine->running) {
+		spin_unlock_irqrestore(&engine->queue_lock, flags);
+		return -ESHUTDOWN;
+	}
+
+	ret = aead_enqueue_request((struct aead_queue *)&engine->queue, req);
+
+	if (!engine->busy && need_pump)
+		kthread_queue_work(engine->kworker, &engine->pump_requests);
+
+	spin_unlock_irqrestore(&engine->queue_lock, flags);
+	return ret;
+}
+EXPORT_SYMBOL_GPL(crypto_transfer_aead_request);
+
+/**
+ * crypto_transfer_aead_request_to_engine - transfer one request to list
+ * into the engine queue
+ * @engine: the hardware engine
+ * @req: the request need to be listed into the engine queue
+ */
+int crypto_transfer_aead_request_to_engine(struct crypto_engine *engine,
+					   struct aead_request *req)
+{
+	return crypto_transfer_aead_request(engine, req, true);
+}
+EXPORT_SYMBOL_GPL(crypto_transfer_aead_request_to_engine);
+
+/**
  * crypto_finalize_cipher_request - finalize one request if the request is done
  * @engine: the hardware engine
  * @req: the request need to be finalized
@@ -327,6 +391,43 @@ void crypto_finalize_hash_request(struct crypto_engine *engine,
 	kthread_queue_work(engine->kworker, &engine->pump_requests);
 }
 EXPORT_SYMBOL_GPL(crypto_finalize_hash_request);
+
+/**
+ * crypto_finalize_aead_request - finalize one request if the request is done
+ * @engine: the hardware engine
+ * @req: the request need to be finalized
+ * @err: error number
+ */
+void crypto_finalize_aead_request(struct crypto_engine *engine,
+				  struct aead_request *req, int err)
+{
+	unsigned long flags;
+	bool finalize_cur_req = false;
+	int ret;
+
+	spin_lock_irqsave(&engine->queue_lock, flags);
+	if (engine->cur_req == &req->base)
+		finalize_cur_req = true;
+	spin_unlock_irqrestore(&engine->queue_lock, flags);
+
+	if (finalize_cur_req) {
+		if (engine->cur_req_prepared &&
+		    engine->unprepare_aead_request) {
+			ret = engine->unprepare_aead_request(engine, req);
+			if (ret)
+				pr_err("failed to unprepare request\n");
+		}
+		spin_lock_irqsave(&engine->queue_lock, flags);
+		engine->cur_req = NULL;
+		engine->cur_req_prepared = false;
+		spin_unlock_irqrestore(&engine->queue_lock, flags);
+	}
+
+	req->base.complete(&req->base, err);
+
+	kthread_queue_work(engine->kworker, &engine->pump_requests);
+}
+EXPORT_SYMBOL_GPL(crypto_finalize_aead_request);
 
 /**
  * crypto_engine_start - start the hardware engine
