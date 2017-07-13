@@ -532,6 +532,21 @@ static inline void cpufreq_policy_apply_limits(struct cpufreq_policy *policy)
 		__cpufreq_driver_target(policy, policy->min, CPUFREQ_RELATION_L);
 }
 
+static inline unsigned int
+cpufreq_policy_transition_delay_us(struct cpufreq_policy *policy)
+{
+	unsigned int delay_us = LATENCY_MULTIPLIER, latency;
+
+	if (policy->transition_delay_us)
+		return policy->transition_delay_us;
+
+	latency = policy->cpuinfo.transition_latency / NSEC_PER_USEC;
+	if (latency)
+		delay_us *= latency;
+
+	return delay_us;
+}
+
 /* Governor attribute set */
 struct gov_attr_set {
 	struct kobject kobj;
