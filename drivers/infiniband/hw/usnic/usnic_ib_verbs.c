@@ -331,7 +331,9 @@ int usnic_ib_query_port(struct ib_device *ibdev, u8 port,
 	usnic_dbg("\n");
 
 	mutex_lock(&us_ibdev->usdev_lock);
+	rtnl_lock();
 	__ethtool_get_link_ksettings(us_ibdev->netdev, &cmd);
+	rtnl_unlock();
 	/* props being zeroed by the caller, avoid zeroing it here */
 
 	props->lid = 0;
