@@ -329,21 +329,23 @@ void intel_gvt_check_vblank_emulation(struct intel_gvt *gvt)
 	if (WARN_ON(!mutex_is_locked(&gvt->lock)))
 		return;
 
-	hrtimer_cancel(&irq->vblank_timer.timer);
-
 	for_each_active_vgpu(gvt, vgpu, id) {
 		for (pipe = 0; pipe < I915_MAX_PIPES; pipe++) {
 			have_enabled_pipe =
 				pipe_is_enabled(vgpu, pipe);
 			if (have_enabled_pipe)
-				break;
+				goto out;
 		}
 	}
 
+out:
 	if (have_enabled_pipe)
 		hrtimer_start(&irq->vblank_timer.timer,
 			ktime_add_ns(ktime_get(), irq->vblank_timer.period),
 			HRTIMER_MODE_ABS);
+	else
+		hrtimer_cancel(&irq->vblank_timer.timer);
+
 }
 
 static void emulate_vblank_on_pipe(struct intel_vgpu *vgpu, int pipe)
