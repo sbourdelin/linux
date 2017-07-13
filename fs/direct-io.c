@@ -258,6 +258,11 @@ static ssize_t dio_complete(struct dio *dio, ssize_t ret, bool is_async)
 	if (ret == 0)
 		ret = transferred;
 
+	if ((dio->op == REQ_OP_WRITE && dio->inode->i_mapping->nrpages))
+		invalidate_inode_pages2_range(dio->inode->i_mapping,
+					offset >> PAGE_SHIFT,
+					(offset + ret - 1) >> PAGE_SHIFT);
+
 	if (dio->end_io) {
 		int err;
 
@@ -304,6 +309,7 @@ static void dio_bio_end_aio(struct bio *bio)
 	struct dio *dio = bio->bi_private;
 	unsigned long remaining;
 	unsigned long flags;
+	bool defer_completion = false;
 
 	/* cleanup the bio */
 	dio_bio_complete(dio, bio);
@@ -315,7 +321,19 @@ static void dio_bio_end_aio(struct bio *bio)
 	spin_unlock_irqrestore(&dio->bio_lock, flags);
 
 	if (remaining == 0) {
-		if (dio->result && dio->defer_completion) {
+		/*
+		 * Defer completion when defer_completion is set or
+		 * when the inode has pages mapped and this is AIO write.
+		 * We need to invalidate those pages because there is a
+		 * chance they contain stale data in the case buffered IO
+		 * went in between AIO submission and completion into the
+		 * same region.
+		 */
+		if (dio->result)
+			defer_completion = dio->defer_completion ||
+					   (dio->op == REQ_OP_WRITE &&
+					    dio->inode->i_mapping->nrpages);
+		if (defer_completion) {
 			INIT_WORK(&dio->complete_work, dio_aio_complete_work);
 			queue_work(dio->inode->i_sb->s_dio_done_wq,
 				   &dio->complete_work);
@@ -1210,10 +1228,13 @@ do_blockdev_direct_IO(struct kiocb *iocb, struct inode *inode,
 	 * For AIO O_(D)SYNC writes we need to defer completions to a workqueue
 	 * so that we can call ->fsync.
 	 */
-	if (dio->is_async && iov_iter_rw(iter) == WRITE &&
-	    ((iocb->ki_filp->f_flags & O_DSYNC) ||
-	     IS_SYNC(iocb->ki_filp->f_mapping->host))) {
-		retval = dio_set_defer_completion(dio);
+	if (dio->is_async && iov_iter_rw(iter) == WRITE) {
+		retval = 0;
+		if ((iocb->ki_filp->f_flags & O_DSYNC) ||
+		    IS_SYNC(iocb->ki_filp->f_mapping->host))
+			retval = dio_set_defer_completion(dio);
+		else if (!dio->inode->i_sb->s_dio_done_wq)
+			retval = sb_init_dio_done_wq(dio->inode->i_sb);
 		if (retval) {
 			/*
 			 * We grab i_mutex only for reads so we don't have

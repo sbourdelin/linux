@@ -619,7 +619,14 @@ struct iomap_dio {
 static ssize_t iomap_dio_complete(struct iomap_dio *dio)
 {
 	struct kiocb *iocb = dio->iocb;
+	loff_t offset = iocb->ki_pos;
+	struct inode *inode = file_inode(iocb->ki_filp);
 	ssize_t ret;
+
+	if ((dio->flags & IOMAP_DIO_WRITE) && inode->i_mapping->nrpages)
+		invalidate_inode_pages2_range(inode->i_mapping,
+				offset >> PAGE_SHIFT,
+				(offset + dio->size + ret - 1) >> PAGE_SHIFT);
 
 	if (dio->end_io) {
 		ret = dio->end_io(iocb,
