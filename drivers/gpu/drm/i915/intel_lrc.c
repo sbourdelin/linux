@@ -556,6 +556,7 @@ static void intel_lrc_irq_handler(unsigned long data)
 		if (unlikely(intel_vgpu_active(dev_priv))) {
 			buf = (u32 * __force)
 				(dev_priv->regs + i915_mmio_reg_offset(RING_CONTEXT_STATUS_PTR(engine)));
+			engine->csb_head = -1;
 		}
 
 		/* The write will be ordered by the uncached read (itself
@@ -569,9 +570,19 @@ static void intel_lrc_irq_handler(unsigned long data)
 		 * is set and we do a new loop.
 		 */
 		__clear_bit(ENGINE_IRQ_EXECLIST, &engine->irq_posted);
-		head = readl(csb_mmio);
-		tail = GEN8_CSB_WRITE_PTR(head);
-		head = GEN8_CSB_READ_PTR(head);
+		if (unlikely(engine->csb_head == -1)) { /* following a reset */
+			head = readl(csb_mmio);
+			tail = GEN8_CSB_WRITE_PTR(head);
+			head = GEN8_CSB_READ_PTR(head);
+			engine->csb_head = head;
+		} else {
+			const int write_idx =
+				intel_hws_csb_write_index(dev_priv) -
+				I915_HWS_CSB_BUF0_INDEX;
+
+			head = engine->csb_head;
+			tail = buf[write_idx];
+		}
 		while (head != tail) {
 			struct drm_i915_gem_request *rq;
 			unsigned int status;
@@ -625,8 +636,11 @@ static void intel_lrc_irq_handler(unsigned long data)
 				   !(status & GEN8_CTX_STATUS_ACTIVE_IDLE));
 		}
 
-		writel(_MASKED_FIELD(GEN8_CSB_READ_PTR_MASK, head << 8),
-		       csb_mmio);
+		if (head != engine->csb_head) {
+			engine->csb_head = head;
+			writel(_MASKED_FIELD(GEN8_CSB_READ_PTR_MASK, head << 8),
+			       csb_mmio);
+		}
 	}
 
 	if (execlists_elsp_ready(engine))
@@ -1253,6 +1267,7 @@ static int gen8_init_common_ring(struct intel_engine_cs *engine)
 
 	/* After a GPU reset, we may have requests to replay */
 	clear_bit(ENGINE_IRQ_EXECLIST, &engine->irq_posted);
+	engine->csb_head = -1;
 
 	submit = false;
 	for (n = 0; n < ARRAY_SIZE(engine->execlist_port); n++) {

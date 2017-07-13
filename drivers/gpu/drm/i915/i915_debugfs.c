@@ -3367,8 +3367,10 @@ static int i915_engine_info(struct seq_file *m, void *unused)
 			ptr = I915_READ(RING_CONTEXT_STATUS_PTR(engine));
 			read = GEN8_CSB_READ_PTR(ptr);
 			write = GEN8_CSB_WRITE_PTR(ptr);
-			seq_printf(m, "\tExeclist CSB read %d, write %d\n",
-				   read, write);
+			seq_printf(m, "\tExeclist CSB read %d [%d cached], write %d [%d from hws]\n",
+				   read, engine->csb_head,
+				   write,
+				   intel_read_status_page(engine, intel_hws_csb_write_index(engine->i915)));
 			if (read >= GEN8_CSB_ENTRIES)
 				read = 0;
 			if (write >= GEN8_CSB_ENTRIES)
