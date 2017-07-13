@@ -4216,4 +4216,12 @@ static inline bool i915_gem_object_is_coherent(struct drm_i915_gem_object *obj)
 		HAS_LLC(to_i915(obj->base.dev)));
 }
 
+static inline int intel_hws_csb_write_index(struct drm_i915_private *i915)
+{
+	if (INTEL_GEN(i915) >= 10)
+		return CNL_HWS_CSB_WRITE_INDEX;
+	else
+		return I915_HWS_CSB_WRITE_INDEX;
+}
+
 #endif
