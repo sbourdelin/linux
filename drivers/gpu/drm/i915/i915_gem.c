@@ -2025,6 +2025,70 @@ err:
 }
 
 /**
+ * i915_gem_vm_access - Peek and poke at the backing store, used by ptrace()
+ * @area: the obj being inspected by userspace
+ * @addr: the address within @area being accessed
+ * @buf: the user provided buffer to read from or write to
+ * @len: the number of bytes to read/write
+ * @write: the direction, if false we read from @buf, if true we write to @buf
+ *
+ * ptrace() has a private interface (vm_ops->access) through which it can
+ * access, or even modify, memory of its target process. This is used by gdb
+ * for inspecting that memory, without providing the access routine it will
+ * simply report such mmaps (our GTT mmaps) as out-of-bounds.
+ *
+ * For safety, we try to avoid perturbing state of the target object, beyond
+ * reason at least!
+ */
+int i915_gem_vm_access(struct vm_area_struct *area, unsigned long addr,
+		       void *buf, int len, int write)
+{
+	struct drm_i915_gem_object *obj = to_intel_bo(area->vm_private_data);
+	unsigned int offset;
+	unsigned long pfn;
+	int ret;
+
+	if (!i915_gem_object_has_struct_page(obj))
+		return -EINVAL;
+
+	ret = i915_gem_object_pin_pages(obj);
+	if (ret)
+		return ret;
+
+	offset = offset_in_page(addr - area->vm_start);
+	pfn = (addr - area->vm_start) >> PAGE_SHIFT;
+	while (len) {
+		unsigned int this = min_t(unsigned int, len, PAGE_SIZE);
+		struct page *page;
+		void *vaddr;
+
+		page = i915_gem_object_get_page(obj, pfn);
+		vaddr = kmap(page);
+		if (!obj->cache_coherent)
+			drm_clflush_virt_range(vaddr + offset, this);
+		if (write)
+			memcpy(vaddr + offset, buf, this);
+		else
+			memcpy(buf, vaddr + offset, this);
+		if (!obj->cache_coherent)
+			drm_clflush_virt_range(vaddr + offset, this);
+		kunmap(page);
+
+		buf += this;
+		len -= this;
+		ret += this;
+
+		offset = 0;
+		pfn++;
+	}
+
+	obj->mm.dirty |= write;
+	i915_gem_object_unpin_pages(obj);
+
+	return ret;
+}
+
+/**
  * i915_gem_release_mmap - remove physical page mappings
  * @obj: obj in question
  *

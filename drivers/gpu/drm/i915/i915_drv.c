@@ -2579,6 +2579,7 @@ const struct dev_pm_ops i915_pm_ops = {
 };
 
 static const struct vm_operations_struct i915_gem_vm_ops = {
+	.access = i915_gem_vm_access,
 	.fault = i915_gem_fault,
 	.open = drm_gem_vm_open,
 	.close = drm_gem_vm_close,
