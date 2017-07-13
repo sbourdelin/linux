@@ -2496,10 +2496,10 @@ static inline int get_default_free_blocks_flags(struct inode *inode)
 	return 0;
 }
 
-static int ext4_remove_blocks(handle_t *handle, struct inode *inode,
-			      struct ext4_extent *ex,
-			      long long *partial_cluster,
-			      ext4_lblk_t from, ext4_lblk_t to)
+static void ext4_remove_blocks(handle_t *handle, struct inode *inode,
+			       struct ext4_extent *ex,
+			       long long *partial_cluster,
+			       ext4_lblk_t from, ext4_lblk_t to)
 {
 	struct ext4_sb_info *sbi = EXT4_SB(inode->i_sb);
 	unsigned short ee_len = ext4_ext_get_actual_len(ex);
@@ -2592,7 +2592,6 @@ static int ext4_remove_blocks(handle_t *handle, struct inode *inode,
 		ext4_error(sbi->s_sb, "strange request: removal(2) "
 			   "%u-%u from %u:%u",
 			   from, to, le32_to_cpu(ex->ee_block), ee_len);
-	return 0;
 }
 
 
@@ -2720,10 +2719,7 @@ ext4_ext_rm_leaf(handle_t *handle, struct inode *inode,
 		if (err)
 			goto out;
 
-		err = ext4_remove_blocks(handle, inode, ex, partial_cluster,
-					 a, b);
-		if (err)
-			goto out;
+		ext4_remove_blocks(handle, inode, ex, partial_cluster, a, b);
 
 		if (num == 0)
 			/* this extent is removed; mark slot entirely unused */
