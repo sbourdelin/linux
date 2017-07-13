@@ -2840,7 +2840,6 @@ static void mlxsw_sp_router_fib_event_work(struct work_struct *work)
 		rule = fib_work->fr_info.rule;
 		if (!fib4_rule_default(rule) && !rule->l3mdev)
 			mlxsw_sp_router_fib4_abort(mlxsw_sp);
-		fib_rule_put(rule);
 		break;
 	case FIB_EVENT_NH_ADD: /* fall through */
 	case FIB_EVENT_NH_DEL:
