@@ -364,6 +364,10 @@ static unsigned long clk_smd_rpm_recalc_rate(struct clk_hw *hw,
 {
 	struct clk_smd_rpm *r = to_clk_smd_rpm(hw);
 
+	/* Return the parent rate for branches */
+	if (r->branch)
+		return parent_rate;
+
 	/*
 	 * RPM handles rate rounding and we don't have a way to
 	 * know what the rate will be, so just return whatever
