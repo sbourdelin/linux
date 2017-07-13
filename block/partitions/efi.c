@@ -117,6 +117,15 @@ force_gpt_fn(char *str)
 }
 __setup("gpt", force_gpt_fn);
 
+static int overprovisioned_gpt;
+static int __init
+overprovisioned_gpt_fn(char *str)
+{
+	overprovisioned_gpt = 1;
+	return 1;
+}
+__setup("gpt_overprovisioned", overprovisioned_gpt_fn);
+
 
 /**
  * efi_crc32() - EFI version of crc32 function
@@ -420,7 +429,8 @@ static int is_gpt_valid(struct parsed_partitions *state, u64 lba,
 		pr_debug("GPT: last_usable_lba incorrect: %lld > %lld\n",
 			 (unsigned long long)le64_to_cpu((*gpt)->last_usable_lba),
 			 (unsigned long long)lastlba);
-		goto fail;
+		if (!overprovisioned_gpt)
+			goto fail;
 	}
 	if (le64_to_cpu((*gpt)->last_usable_lba) < le64_to_cpu((*gpt)->first_usable_lba)) {
 		pr_debug("GPT: last_usable_lba incorrect: %lld > %lld\n",
