@@ -1,0 +1,47 @@
+What:		LPI sysfs interface for processor devices and containers
+Date:		13-July-2017
+KernelVersion:	v4.13
+Contact:	linux-acpi@vger.kernel.org
+Description:	LPI(Low Power Idle) described in section 8.4.4 of ACPI spec 6.1
+		provides different methods to obtain idle statistics maintained
+		by the platform. These show a granular view of how each of the
+		LPI state is being used at different level of processor hierarchy.
+		sysfs data is exposed at each level in the hierarchy by creating
+		a directory named 'lpi' at each level and the LPI state
+		information is presented under it. Below is the representation
+		of LPI information at one such level in the hierarchy.
+
+		.../ACPI00XX: YY/lpi
+			|-> state0
+			|	|-> desc
+			|	|-> time
+			|	|-> usage
+			|	|-> latency
+			|	|-> min_residency
+			|
+			|-> state1
+			|	|-> desc
+			|	|-> time
+			|	|-> usage
+			|	|-> latency
+			|	|-> min_residency
+			|
+			<<more states>>
+
+		ACPI00XX can be ACPI0007(processor device) or ACPI0010(processor
+		container) and the sysfs nodes for these ACPI devices can be
+		found under /sys/devices/LNXSYSTM:00
+
+		stateX contains information related to a specific local LPI
+		state defined in the LPI ACPI tables under a owning hierarchy
+		node(ACPI0007 or ACPI0010).
+
+		desc	- Description/Name for the local LPI state
+		latency - Worst case wake up latency(in micro seconds) for the
+			owning hierarchy node to exit from this local idle state
+		min_residency - Time in microseconds after which a state becomes
+			more energy effecient than a shallower state
+		time	- Total time spent(in micro seconds) by the owning
+			hierarchy node in this local idle state
+		usage	- Number of times the owning hierarchy node entered this
+			local power state
