@@ -340,6 +340,39 @@ void arch_tlbbatch_flush(struct arch_tlbflush_unmap_batch *batch)
 	put_cpu();
 }
 
+/*
+ * Ensure that any arch_tlbbatch_add_mm calls on this mm are up to date when
+ * this returns. Using the current mm tlb_gen means the TLB will be up to date
+ * with respect to the tlb_gen set at arch_tlbbatch_add_mm. If a flush has
+ * happened since then the IPIs will still be sent but the actual flush is
+ * avoided. Unfortunately the IPIs are necessary as the per-cpu context
+ * tlb_gens cannot be safely accessed.
+ */
+void arch_tlbbatch_flush_one_mm(struct mm_struct *mm)
+{
+	int cpu;
+	struct flush_tlb_info info = {
+		.mm = mm,
+		.new_tlb_gen = atomic64_read(&mm->context.tlb_gen),
+		.start = 0,
+		.end = TLB_FLUSH_ALL,
+	};
+
+	cpu = get_cpu();
+
+	if (mm == this_cpu_read(cpu_tlbstate.loaded_mm)) {
+		VM_WARN_ON(irqs_disabled());
+		local_irq_disable();
+		flush_tlb_func_local(&info, TLB_LOCAL_MM_SHOOTDOWN);
+		local_irq_enable();
+	}
+
+	if (cpumask_any_but(mm_cpumask(mm), cpu) < nr_cpu_ids)
+		flush_tlb_others(mm_cpumask(mm), &info);
+
+	put_cpu();
+}
+
 static ssize_t tlbflush_read_file(struct file *file, char __user *user_buf,
 			     size_t count, loff_t *ppos)
 {

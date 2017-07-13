@@ -266,6 +266,7 @@ static inline void arch_tlbbatch_add_mm(struct arch_tlbflush_unmap_batch *batch,
 }
 
 extern void arch_tlbbatch_flush(struct arch_tlbflush_unmap_batch *batch);
+extern void arch_tlbbatch_flush_one_mm(struct mm_struct *mm);
 
 #ifndef CONFIG_PARAVIRT
 #define flush_tlb_others(mask, info)	\
