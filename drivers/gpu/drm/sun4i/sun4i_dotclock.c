@@ -77,7 +77,25 @@ static long sun4i_dclk_round_rate(struct clk_hw *hw, unsigned long rate,
 	u8 best_div = 1;
 	int i;
 
-	for (i = 6; i <= 127; i++) {
+	/*
+	 * There's something odd here.
+	 *
+	 * In the A13 user manual, this is stated to be >= 6 when
+	 * dclk1 and dclk2 are used (without any hint on how to use
+	 * them), and >= 4 when only dclk is used.
+	 *
+	 * In the A33 user manual, when only dclk is used, it is set
+	 * to be >= 6 in the former case, and >= 1 in the
+	 * latter. There's also some (obscure) explanations about the
+	 * dclk1 and dclk2 vs dclk that seems to be in the upper 4
+	 * bits. What those clocks are and what bit does what is not
+	 * really clear.
+	 *
+	 * On the A33 however, while something lower than 4 works, it
+	 * does have a few artifacts. Let's not use those values, and
+	 * see how it goes.
+	 */
+	for (i = 4; i <= 127; i++) {
 		unsigned long ideal = rate * i;
 		unsigned long rounded;
 
