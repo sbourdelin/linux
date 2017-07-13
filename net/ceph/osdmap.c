@@ -510,6 +510,7 @@ static struct crush_map *crush_decode(void *pbyval, void *end)
 		}
 	}
 
+	err = -EINVAL;
 	ceph_decode_skip_map(p, end, 32, string, bad); /* type_map */
 	ceph_decode_skip_map(p, end, 32, string, bad); /* name_map */
 	ceph_decode_skip_map(p, end, 32, string, bad); /* rule_name_map */
@@ -1825,9 +1826,9 @@ struct ceph_osdmap *osdmap_apply_incremental(void **p, void *end,
 	if (struct_v >= 3) {
 		/* new_erasure_code_profiles */
 		ceph_decode_skip_map_of_map(p, end, string, string, string,
-					    bad);
+					    e_inval);
 		/* old_erasure_code_profiles */
-		ceph_decode_skip_set(p, end, string, bad);
+		ceph_decode_skip_set(p, end, string, e_inval);
 	}
 
 	if (struct_v >= 4) {
