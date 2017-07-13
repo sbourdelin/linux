@@ -131,7 +131,7 @@ void ia_css_isys_ibuf_rmgr_release(
 	for (i = 0; i < ibuf_rsrc.num_allocated; i++) {
 		handle = getHandle(i);
 		if ((handle->start_addr == *start_addr)
-		    && ( true == handle->active)) {
+		    && (true == handle->active)) {
 			handle->active = false;
 			ibuf_rsrc.num_active--;
 			break;
