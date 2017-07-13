@@ -17,6 +17,7 @@ struct sunxi_engine;
 
 struct sunxi_engine_ops {
 	void (*commit)(struct sunxi_engine *engine);
+	int (*commit_poll)(struct sunxi_engine *engine);
 	struct drm_plane **(*layers_init)(struct drm_device *drm,
 					  struct sunxi_engine *engine);
 
@@ -52,6 +53,19 @@ sunxi_engine_commit(struct sunxi_engine *engine)
 {
 	if (engine->ops && engine->ops->commit)
 		engine->ops->commit(engine);
+}
+
+/**
+ * sunxi_engine_commit_poll() - wait for all changes to be committed
+ * @engine:	pointer to the engine
+ */
+static inline int
+sunxi_engine_commit_poll(struct sunxi_engine *engine)
+{
+	if (engine->ops && engine->ops->commit_poll)
+		return engine->ops->commit_poll(engine);
+
+	return 0;
 }
 
 /**

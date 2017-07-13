@@ -45,6 +45,8 @@ static void sun4i_crtc_atomic_begin(struct drm_crtc *crtc,
 		spin_unlock_irqrestore(&dev->event_lock, flags);
 		crtc->state->event = NULL;
 	 }
+
+	WARN_ON(sunxi_engine_commit_poll(engine));
 }
 
 static void sun4i_crtc_atomic_flush(struct drm_crtc *crtc,
