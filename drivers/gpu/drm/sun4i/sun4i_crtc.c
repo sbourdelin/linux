@@ -34,6 +34,7 @@ static void sun4i_crtc_atomic_begin(struct drm_crtc *crtc,
 				    struct drm_crtc_state *old_state)
 {
 	struct sun4i_crtc *scrtc = drm_crtc_to_sun4i_crtc(crtc);
+	struct sunxi_engine *engine = scrtc->engine;
 	struct drm_device *dev = crtc->dev;
 	unsigned long flags;
 

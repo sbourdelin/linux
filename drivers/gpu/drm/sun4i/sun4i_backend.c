@@ -67,6 +67,19 @@ static void sun4i_backend_commit(struct sunxi_engine *engine)
 		     SUN4I_BACKEND_REGBUFFCTL_LOADCTL);
 }
 
+static int sun4i_backend_commit_poll(struct sunxi_engine *engine)
+{
+	u32 val;
+
+	DRM_DEBUG_DRIVER("Polling for the commit to end\n");
+
+	return regmap_read_poll_timeout(engine->regs,
+					SUN4I_BACKEND_REGBUFFCTL_REG,
+					val,
+					!(val & SUN4I_BACKEND_REGBUFFCTL_LOADCTL),
+					100, 50000);
+}
+
 void sun4i_backend_layer_enable(struct sun4i_backend *backend,
 				int layer, bool enable)
 {
@@ -330,6 +343,7 @@ static int sun4i_backend_of_get_id(struct device_node *node)
 
 static const struct sunxi_engine_ops sun4i_backend_engine_ops = {
 	.commit				= sun4i_backend_commit,
+	.commit_poll			= sun4i_backend_commit_poll,
 	.layers_init			= sun4i_layers_init,
 	.apply_color_correction		= sun4i_backend_apply_color_correction,
 	.disable_color_correction	= sun4i_backend_disable_color_correction,
