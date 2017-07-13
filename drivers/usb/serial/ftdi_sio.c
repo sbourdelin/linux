@@ -92,6 +92,7 @@ static int   ftdi_stmclite_probe(struct usb_serial *serial);
 static int   ftdi_8u2232c_probe(struct usb_serial *serial);
 static void  ftdi_USB_UIRT_setup(struct ftdi_private *priv);
 static void  ftdi_HE_TIRA1_setup(struct ftdi_private *priv);
+static int   ftdi_ft232h_probe(struct usb_serial *serial);
 
 static const struct ftdi_sio_quirk ftdi_jtag_quirk = {
 	.probe	= ftdi_jtag_probe,
@@ -115,6 +116,10 @@ static const struct ftdi_sio_quirk ftdi_stmclite_quirk = {
 
 static const struct ftdi_sio_quirk ftdi_8u2232c_quirk = {
 	.probe	= ftdi_8u2232c_probe,
+};
+
+static const struct ftdi_sio_quirk ftdi_ft232h_quirk = {
+	.probe	= ftdi_ft232h_probe,
 };
 
 /*
@@ -173,7 +178,8 @@ static const struct usb_device_id id_table_combined[] = {
 	{ USB_DEVICE(FTDI_VID, FTDI_8U2232C_PID) ,
 		.driver_info = (kernel_ulong_t)&ftdi_8u2232c_quirk },
 	{ USB_DEVICE(FTDI_VID, FTDI_4232H_PID) },
-	{ USB_DEVICE(FTDI_VID, FTDI_232H_PID) },
+	{ USB_DEVICE(FTDI_VID, FTDI_232H_PID),
+		.driver_info = (kernel_ulong_t)&ftdi_ft232h_quirk },
 	{ USB_DEVICE(FTDI_VID, FTDI_FTX_PID) },
 	{ USB_DEVICE(FTDI_VID, FTDI_MICRO_CHAMELEON_PID) },
 	{ USB_DEVICE(FTDI_VID, FTDI_RELAIS_PID) },
@@ -1902,6 +1908,60 @@ static int ftdi_8u2232c_probe(struct usb_serial *serial)
 		return ftdi_jtag_probe(serial);
 
 	return 0;
+}
+
+/*
+ * Check this amount of FT232H EEPROM bytes. If all are 0xff,
+ * we assume that the EEPROM is erased or is not populated.
+ * Then, async. UART is the default interface mode.
+ */
+#define EEPROM_CHK_BUF_SZ	6
+
+static inline bool ftdi_sio_chk_erased(const void *buf, int size)
+{
+	const unsigned char *data = buf;
+	unsigned int i;
+
+	for (i = 0; i < size; i++)
+		if (data[i] != 0xff)
+			return false;
+	return true;
+}
+
+static int ftdi_ft232h_probe(struct usb_serial *serial)
+{
+	struct usb_device *udev = serial->dev;
+	unsigned char *buf;
+	unsigned int i;
+	int ret;
+
+	buf = kmalloc(EEPROM_CHK_BUF_SZ, GFP_KERNEL);
+	if (!buf)
+		return -ENOMEM;
+
+	/* Try to read the configured interface mode in EEPROM */
+	for (i = 0; i < EEPROM_CHK_BUF_SZ / 2; i++) {
+		ret = usb_control_msg(udev, usb_rcvctrlpipe(udev, 0),
+				      FTDI_SIO_READ_EEPROM_REQUEST,
+				      FTDI_SIO_READ_EEPROM_REQUEST_TYPE,
+				      0, i, buf + i * 2, 2,
+				      USB_CTRL_GET_TIMEOUT);
+		if (ret < 0) {
+			dev_err(&udev->dev, "reading EEPROM failed: %d\n", ret);
+			goto out;
+		}
+	}
+
+	ret = 0;
+	if (ftdi_sio_chk_erased(buf, EEPROM_CHK_BUF_SZ))
+		goto out;
+
+	/* Lower nibble contains interface mode bits, if zero -> UART mode */
+	if (buf[0] & 0x0f)
+		ret = -ENODEV; /* No UART, don't bind! */
+out:
+	kfree(buf);
+	return ret;
 }
 
 /*

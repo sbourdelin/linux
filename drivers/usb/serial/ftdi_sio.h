@@ -432,6 +432,18 @@ enum ftdi_sio_baudrate {
  *         1 = active
  */
 
+/*
+ *  BmRequestType:   1100 0000b
+ *  bRequest:        FTDI_SIO_READ_EEPROM_REQUEST
+ *  wValue:          0
+ *  wIndex:          Address of word to read
+ *  wLength:         2
+ *  Data:            return a word of data from EEPROM
+ *                   at address in wIndex
+ */
+#define FTDI_SIO_READ_EEPROM_REQUEST_TYPE \
+	(USB_TYPE_VENDOR | USB_RECIP_DEVICE | USB_DIR_IN)
+#define FTDI_SIO_READ_EEPROM_REQUEST	0x90
 
 
 /* Descriptors returned by the device
