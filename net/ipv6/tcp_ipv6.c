@@ -805,6 +805,13 @@ static void tcp_v6_send_response(const struct sock *sk, struct sk_buff *skb, u32
 	t1 = skb_push(buff, tot_len);
 	skb_reset_transport_header(buff);
 
+	if (sk) {
+		if (sk_fullsock(sk))
+			skb_set_hash_from_sk(buff, (struct sock *)sk);
+		else
+			skb_set_hash_from_twsk(buff, inet_twsk(sk));
+	}
+
 	/* Swap the send and the receive. */
 	memset(t1, 0, sizeof(*t1));
 	t1->dest = th->source;

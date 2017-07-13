@@ -190,6 +190,7 @@ struct inet_timewait_sock *inet_twsk_alloc(const struct sock *sk,
 		twsk_net_set(tw, sock_net(sk));
 		setup_pinned_timer(&tw->tw_timer, tw_timer_handler,
 				   (unsigned long)tw);
+		tw->tw_txhash	   = sk->sk_txhash;
 		/*
 		 * Because we use RCU lookups, we should not set tw_refcnt
 		 * to a non null value before everything is setup for this

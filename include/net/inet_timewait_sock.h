@@ -77,6 +77,7 @@ struct inet_timewait_sock {
 				tw_pad		: 2,	/* 2 bits hole */
 				tw_tos		: 8;
 	kmemcheck_bitfield_end(flags);
+	__u32			tw_txhash;
 	struct timer_list	tw_timer;
 	struct inet_bind_bucket	*tw_tb;
 };
@@ -85,6 +86,15 @@ struct inet_timewait_sock {
 static inline struct inet_timewait_sock *inet_twsk(const struct sock *sk)
 {
 	return (struct inet_timewait_sock *)sk;
+}
+
+static inline void skb_set_hash_from_twsk(struct sk_buff *skb,
+	struct inet_timewait_sock *twsk)
+{
+	if (twsk->tw_txhash) {
+		skb->l4_hash = 1;
+		skb->hash = twsk->tw_txhash;
+	}
 }
 
 void inet_twsk_free(struct inet_timewait_sock *tw);
