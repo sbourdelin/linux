@@ -544,7 +544,17 @@ cpufreq_policy_transition_delay_us(struct cpufreq_policy *policy)
 	if (latency)
 		delay_us *= latency;
 
-	return delay_us;
+	/*
+	 * For platforms that can change the frequency very fast (< 10 us),
+	 * the above formula gives a decent transition delay. But for platforms
+	 * where transition_latency is in milliseconds, it ends up giving
+	 * unrealistic values.
+	 *
+	 * Cap the default transition delay to 10 ms, which seems to be a
+	 * reasonable amount of time after which we should reevaluate the
+	 * frequency.
+	 */
+	return min(delay_us, (unsigned int)10000);
 }
 
 /* Governor attribute set */
