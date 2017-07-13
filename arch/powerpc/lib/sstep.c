@@ -1297,6 +1297,16 @@ int analyse_instr(struct instruction_op *op, struct pt_regs *regs,
 			regs->gpr[ra] = ~(regs->gpr[rd] & regs->gpr[rb]);
 			goto logical_done;
 
+		case 585:	/* isel */
+			mb = (instr >> 6) & 0x1f; /* bc */
+			val = (regs->ccr >> (mb + 32)) & 1;
+
+			if (val)
+				regs->gpr[rd] = regs->gpr[ra];
+			else
+				regs->gpr[rd] = regs->gpr[rb];
+			goto logical_done;
+
 		case 922:	/* extsh */
 			regs->gpr[ra] = (signed short) regs->gpr[rd];
 			goto logical_done;
