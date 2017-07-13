@@ -218,6 +218,10 @@ static void sugov_update_single(struct update_util_data *hook, u64 time,
 	unsigned int next_f;
 	bool busy;
 
+	/* Remote callbacks aren't allowed for policies which aren't shared */
+	if (smp_processor_id() != hook->cpu)
+		return;
+
 	sugov_set_iowait_boost(sg_cpu, time, flags);
 	sg_cpu->last_update = time;
 
@@ -289,6 +293,10 @@ static void sugov_update_shared(struct update_util_data *hook, u64 time,
 	struct sugov_policy *sg_policy = sg_cpu->sg_policy;
 	unsigned long util, max;
 	unsigned int next_f;
+
+	/* Don't allow remote callbacks */
+	if (smp_processor_id() != hook->cpu)
+		return;
 
 	sugov_get_util(&util, &max);
 

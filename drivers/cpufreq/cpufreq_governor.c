@@ -275,6 +275,10 @@ static void dbs_update_util_handler(struct update_util_data *data, u64 time,
 	struct policy_dbs_info *policy_dbs = cdbs->policy_dbs;
 	u64 delta_ns, lst;
 
+	/* Don't allow remote callbacks */
+	if (smp_processor_id() != data->cpu)
+		return;
+
 	/*
 	 * The work may not be allowed to be queued up right now.
 	 * Possible reasons:
