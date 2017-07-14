@@ -659,6 +659,7 @@ ENTRY(\sym)
 	interrupt \do_sym
 	jmp	ret_from_intr
 END(\sym)
+_ASM_NOKPROBE(\sym)
 .endm
 
 #ifdef CONFIG_TRACING
