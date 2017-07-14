@@ -1,0 +1,16 @@
+TS-4600 Technologic Systems Watchdog
+
+Required properties:
+- compatible: must be "technologic,ts4600-wdt"
+- reg: offset to the FPGA's watchdog register
+
+Optional property:
+- timeout-sec: contains the watchdog timeout in seconds.
+
+Example:
+
+watchdog {
+	compatible = "technologic,ts4600-wdt";
+	reg = <0x2a>;
+	timeout-sec = <10>;
+};
