@@ -53,12 +53,6 @@ int pid_max = PID_MAX_DEFAULT;
 int pid_max_min = RESERVED_PIDS + 1;
 int pid_max_max = PID_MAX_LIMIT;
 
-static inline int mk_pid(struct pid_namespace *pid_ns,
-		struct pidmap *map, int off)
-{
-	return (map - pid_ns->pidmap)*BITS_PER_PAGE + off;
-}
-
 #define find_next_offset(map, off)					\
 		find_next_zero_bit((map)->page, BITS_PER_PAGE, off)
 
@@ -100,45 +94,6 @@ EXPORT_SYMBOL_GPL(init_pid_ns);
  */
 
 static  __cacheline_aligned_in_smp DEFINE_SPINLOCK(pidmap_lock);
-
-/*
- * If we started walking pids at 'base', is 'a' seen before 'b'?
- */
-static int pid_before(int base, int a, int b)
-{
-	/*
-	 * This is the same as saying
-	 *
-	 * (a - base + MAXUINT) % MAXUINT < (b - base + MAXUINT) % MAXUINT
-	 * and that mapping orders 'a' and 'b' with respect to 'base'.
-	 */
-	return (unsigned)(a - base) < (unsigned)(b - base);
-}
-
-/*
- * We might be racing with someone else trying to set pid_ns->last_pid
- * at the pid allocation time (there's also a sysctl for this, but racing
- * with this one is OK, see comment in kernel/pid_namespace.c about it).
- * We want the winner to have the "later" value, because if the
- * "earlier" value prevails, then a pid may get reused immediately.
- *
- * Since pids rollover, it is not sufficient to just pick the bigger
- * value.  We have to consider where we started counting from.
- *
- * 'base' is the value of pid_ns->last_pid that we observed when
- * we started looking for a pid.
- *
- * 'pid' is the pid that we eventually found.
- */
-static void set_last_pid(struct pid_namespace *pid_ns, int base, int pid)
-{
-	int prev;
-	int last_write = base;
-	do {
-		prev = last_write;
-		last_write = cmpxchg(&pid_ns->last_pid, prev, pid);
-	} while ((prev != last_write) && (pid_before(base, last_write, pid)));
-}
 
 void put_pid(struct pid *pid)
 {
