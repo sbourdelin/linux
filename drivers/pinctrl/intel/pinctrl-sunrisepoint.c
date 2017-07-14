@@ -46,6 +46,13 @@ static struct irq_chip sptlp_gpio_irqchip = {
 	 * here to pinctrl-intel driver e.g.
 	 * .flags = IRQCHIP_MASK_ON_SUSPEND,
 	 */
+
+	/* mask non wake capable gpio pin inturrupts before suspend since
+	 * leaving them unmasked may cause undesired wake events such as
+	 * pluging in Audio Jack or SD Card will wake a KBL Sunrisepoint
+	 * based mobile device from suspend-to-idle.
+	 */
+	.flags = IRQCHIP_MASK_ON_SUSPEND,
 };
 
 static const struct pinctrl_pin_desc sptlp_pins[] = {
