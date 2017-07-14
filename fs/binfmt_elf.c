@@ -348,6 +348,7 @@ static unsigned long elf_map(struct file *filep, unsigned long addr,
 		unsigned long total_size)
 {
 	unsigned long map_addr;
+	unsigned long map_none_addr;
 	unsigned long size = eppnt->p_filesz + ELF_PAGEOFFSET(eppnt->p_vaddr);
 	unsigned long off = eppnt->p_offset - ELF_PAGEOFFSET(eppnt->p_vaddr);
 	addr = ELF_PAGESTART(addr);
@@ -363,14 +364,22 @@ static unsigned long elf_map(struct file *filep, unsigned long addr,
 	* The _first_ mmap needs to know the full size, otherwise
 	* randomization might put this image into an overlapping
 	* position with the ELF binary image. (since size < total_size)
-	* So we first map the 'big' image - and unmap the remainder at
-	* the end. (which unmap is needed for ELF images with holes.)
+	* So we first map the 'big' image - and remmap the remainder at
+	* the end with PROT_NONE. (which remmap is needed for ELF images
+	* with holes.)
 	*/
 	if (total_size) {
 		total_size = ELF_PAGEALIGN(total_size);
 		map_addr = vm_mmap(filep, addr, total_size, prot, type, off);
-		if (!BAD_ADDR(map_addr))
-			vm_munmap(map_addr+size, total_size-size);
+		if (!BAD_ADDR(map_addr)) {
+			map_none_addr =
+				vm_mmap(NULL, map_addr + size,
+					total_size - size, PROT_NONE,
+					MAP_PRIVATE | MAP_ANONYMOUS |
+					MAP_FIXED, off);
+			if (BAD_ADDR(map_none_addr))
+				return map_none_addr;
+		}
 	} else
 		map_addr = vm_mmap(filep, addr, size, prot, type, off);
 
