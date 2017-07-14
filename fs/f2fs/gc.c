@@ -178,6 +178,8 @@ static void select_policy(struct f2fs_sb_info *sbi, int gc_type,
 		p->offset = 0;
 	else
 		p->offset = SIT_I(sbi)->last_victim[p->gc_mode];
+
+	p->min_cost_r = UINT_MAX;
 }
 
 static unsigned int get_max_cost(struct f2fs_sb_info *sbi,
@@ -194,7 +196,7 @@ static unsigned int get_max_cost(struct f2fs_sb_info *sbi,
 		return 0;
 }
 
-static unsigned int check_bg_victims(struct f2fs_sb_info *sbi)
+static unsigned int check_bg_victims(struct f2fs_sb_info *sbi, struct victim_sel_policy *p)
 {
 	struct dirty_seglist_info *dirty_i = DIRTY_I(sbi);
 	unsigned int secno;
@@ -208,11 +210,12 @@ static unsigned int check_bg_victims(struct f2fs_sb_info *sbi)
 		if (sec_usage_check(sbi, secno))
 			continue;
 
-		if (no_fggc_candidate(sbi, secno))
+		p->cur_segno_r = GET_SEG_FROM_SEC(sbi, secno);
+		if (no_fggc_candidate(sbi, secno, p))
 			continue;
 
 		clear_bit(secno, dirty_i->victim_secmap);
-		return GET_SEG_FROM_SEC(sbi, secno);
+		return p->cur_segno_r;
 	}
 	return NULL_SEGNO;
 }
@@ -332,7 +335,7 @@ static int get_victim_by_default(struct f2fs_sb_info *sbi,
 
 	last_victim = sm->last_victim[p.gc_mode];
 	if (p.alloc_mode == LFS && gc_type == FG_GC) {
-		p.min_segno = check_bg_victims(sbi);
+		p.min_segno = check_bg_victims(sbi, &p);
 		if (p.min_segno != NULL_SEGNO)
 			goto got_it;
 	}
@@ -369,8 +372,9 @@ static int get_victim_by_default(struct f2fs_sb_info *sbi,
 			goto next;
 		if (gc_type == BG_GC && test_bit(secno, dirty_i->victim_secmap))
 			goto next;
+		p.cur_segno_r = segno;
 		if (gc_type == FG_GC && p.alloc_mode == LFS &&
-					no_fggc_candidate(sbi, secno))
+					no_fggc_candidate(sbi, secno, &p))
 			goto next;
 
 		cost = get_gc_cost(sbi, segno, &p);
@@ -403,6 +407,11 @@ got_it:
 		trace_f2fs_get_victim(sbi->sb, type, gc_type, &p,
 				sbi->cur_victim_sec,
 				prefree_segments(sbi), free_segments(sbi));
+	} else if (has_not_enough_free_secs(sbi, 0, 0)) {
+		p.min_segno = p.min_segno_r;
+		if (p.alloc_mode == LFS && gc_type == FG_GC)
+			clear_bit(GET_SEC_FROM_SEG(sbi, p.min_segno), dirty_i->victim_secmap);
+		goto got_it;
 	}
 out:
 	mutex_unlock(&dirty_i->seglist_lock);

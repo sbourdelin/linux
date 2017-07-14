@@ -169,6 +169,9 @@ struct victim_sel_policy {
 	unsigned int ofs_unit;		/* bitmap search unit */
 	unsigned int min_cost;		/* minimum cost */
 	unsigned int min_segno;		/* segment # having min. cost */
+	unsigned int min_cost_r;		/* rough minimum cost */
+	unsigned int min_segno_r;		/* segment # having rough min. cost */
+	unsigned int cur_segno_r;		/* segment # rough process is handling */
 };
 
 struct seg_entry {
@@ -742,11 +745,19 @@ static inline block_t sum_blk_addr(struct f2fs_sb_info *sbi, int base, int type)
 }
 
 static inline bool no_fggc_candidate(struct f2fs_sb_info *sbi,
-						unsigned int secno)
+						unsigned int secno, struct victim_sel_policy *p)
 {
-	if (get_valid_blocks(sbi, GET_SEG_FROM_SEC(sbi, secno), true) >=
-						sbi->fggc_threshold)
+	unsigned int cur_cost;
+
+	cur_cost = get_valid_blocks(sbi, GET_SEG_FROM_SEC(sbi, secno), true);
+	if (cur_cost >= sbi->fggc_threshold) {
+		if (p->min_cost_r > cur_cost) {
+			p->min_cost_r = cur_cost;
+			p->min_segno_r = p->cur_segno_r;
+		}
 		return true;
+	}
+
 	return false;
 }
 
