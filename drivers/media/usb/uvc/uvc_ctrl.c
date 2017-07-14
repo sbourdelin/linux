@@ -1613,6 +1613,9 @@ static void uvc_ctrl_fixup_xu_info(struct uvc_device *dev,
 			UVC_CTRL_FLAG_GET_MIN | UVC_CTRL_FLAG_GET_MAX |
 			UVC_CTRL_FLAG_GET_DEF | UVC_CTRL_FLAG_SET_CUR |
 			UVC_CTRL_FLAG_AUTO_UPDATE },
+		{ { USB_DEVICE(0x2833, 0x0211) }, 4, 12,
+			UVC_CTRL_FLAG_GET_RANGE | UVC_CTRL_FLAG_SET_CUR |
+			UVC_CTRL_FLAG_VARIABLE_LEN },
 	};
 
 	unsigned int i;
