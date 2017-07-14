@@ -1597,7 +1597,7 @@ static void uvc_ctrl_fixup_xu_info(struct uvc_device *dev,
 		struct usb_device_id id;
 		u8 entity;
 		u8 selector;
-		u8 flags;
+		u16 flags;
 	};
 
 	static const struct uvc_ctrl_fixup fixups[] = {
@@ -1797,6 +1797,30 @@ int uvc_xu_ctrl_query(struct uvc_video_chain *chain,
 	default:
 		ret = -EINVAL;
 		goto done;
+	}
+
+	if ((ctrl->info.flags & UVC_CTRL_FLAG_VARIABLE_LEN) && reqflags) {
+		data = kmalloc(2, GFP_KERNEL);
+		/* Check if the control length has changed */
+		ret = uvc_query_ctrl(chain->dev, UVC_GET_LEN, xqry->unit,
+				     chain->dev->intfnum, xqry->selector, data,
+				     2);
+		size = le16_to_cpup((__le16 *)data);
+		kfree(data);
+		if (ret < 0) {
+			uvc_trace(UVC_TRACE_CONTROL,
+				  "GET_LEN failed on control %pUl/%u (%d).\n",
+				  entity->extension.guidExtensionCode,
+				  xqry->selector, ret);
+			goto done;
+		}
+		if (ctrl->info.size != size) {
+			uvc_trace(UVC_TRACE_CONTROL,
+				  "XU control %pUl/%u queried: len %u -> %u\n",
+				  entity->extension.guidExtensionCode,
+				  xqry->selector, ctrl->info.size, size);
+			ctrl->info.size = size;
+		}
 	}
 
 	if (size != xqry->size) {
