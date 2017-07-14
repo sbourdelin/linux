@@ -139,7 +139,7 @@ static struct attribute *iscsi_transport_attrs[] = {
 	NULL,
 };
 
-static struct attribute_group iscsi_transport_group = {
+static const struct attribute_group iscsi_transport_group = {
 	.attrs = iscsi_transport_attrs,
 };
 
@@ -177,7 +177,7 @@ static struct attribute *iscsi_endpoint_attrs[] = {
 	NULL,
 };
 
-static struct attribute_group iscsi_endpoint_group = {
+static const struct attribute_group iscsi_endpoint_group = {
 	.attrs = iscsi_endpoint_attrs,
 };
 
@@ -680,7 +680,7 @@ static struct attribute *iscsi_iface_attrs[] = {
 	NULL,
 };
 
-static struct attribute_group iscsi_iface_group = {
+static const struct attribute_group iscsi_iface_group = {
 	.attrs = iscsi_iface_attrs,
 	.is_visible = iscsi_iface_attr_is_visible,
 };
@@ -3922,7 +3922,7 @@ static umode_t iscsi_conn_attr_is_visible(struct kobject *kobj,
 	return t->attr_is_visible(ISCSI_PARAM, param);
 }
 
-static struct attribute_group iscsi_conn_group = {
+static const struct attribute_group iscsi_conn_group = {
 	.attrs = iscsi_conn_attrs,
 	.is_visible = iscsi_conn_attr_is_visible,
 };
@@ -4217,7 +4217,7 @@ static umode_t iscsi_session_attr_is_visible(struct kobject *kobj,
 	return t->attr_is_visible(ISCSI_PARAM, param);
 }
 
-static struct attribute_group iscsi_session_group = {
+static const struct attribute_group iscsi_session_group = {
 	.attrs = iscsi_session_attrs,
 	.is_visible = iscsi_session_attr_is_visible,
 };
@@ -4285,7 +4285,7 @@ static umode_t iscsi_host_attr_is_visible(struct kobject *kobj,
 	return priv->iscsi_transport->attr_is_visible(ISCSI_HOST_PARAM, param);
 }
 
-static struct attribute_group iscsi_host_group = {
+static const struct attribute_group iscsi_host_group = {
 	.attrs = iscsi_host_attrs,
 	.is_visible = iscsi_host_attr_is_visible,
 };
