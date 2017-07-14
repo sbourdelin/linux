@@ -637,7 +637,7 @@ static __init void memory_setup(void)
 		/* Relocate MTD image to the top of memory after the uncached memory area */
 		uclinux_ram_map.phys = memory_mtd_start = memory_end;
 		uclinux_ram_map.size = mtd_size;
-		pr_info("Found mtd parition at 0x%p, (len=0x%lx), moving to 0x%p\n",
+		pr_info("Found mtd partition at 0x%p, (len=0x%lx), moving to 0x%p\n",
 			_end, mtd_size, (void *)memory_mtd_start);
 		dma_memcpy((void *)uclinux_ram_map.phys, _end, uclinux_ram_map.size);
 	}
