@@ -2028,6 +2028,25 @@ struct i915_perf_stream {
  */
 struct i915_oa_ops {
 	/**
+	 * @is_valid_b_counter_reg: Validates register's address for
+	 * programming boolean counters for a particular platform.
+	 */
+	bool (*is_valid_b_counter_reg)(struct drm_i915_private *dev_priv,
+				       u32 addr);
+
+	/**
+	 * @is_valid_mux_reg: Validates register's address for programming mux
+	 * for a particular platform.
+	 */
+	bool (*is_valid_mux_reg)(struct drm_i915_private *dev_priv, u32 addr);
+
+	/**
+	 * @is_valid_flex_reg: Validates register's address for programming
+	 * flex EU filtering for a particular platform.
+	 */
+	bool (*is_valid_flex_reg)(struct drm_i915_private *dev_priv, u32 addr);
+
+	/**
 	 * @init_oa_buffer: Resets the head and tail pointers of the
 	 * circular buffer for periodic OA reports.
 	 *
@@ -2415,6 +2434,8 @@ struct drm_i915_private {
 
 		struct mutex lock;
 		struct list_head streams;
+
+		struct idr metrics_idr;
 
 		struct {
 			struct i915_perf_stream *exclusive_stream;
@@ -3583,6 +3604,10 @@ i915_gem_context_lookup_timeline(struct i915_gem_context *ctx,
 
 int i915_perf_open_ioctl(struct drm_device *dev, void *data,
 			 struct drm_file *file);
+int i915_perf_add_config_ioctl(struct drm_device *dev, void *data,
+			       struct drm_file *file);
+int i915_perf_remove_config_ioctl(struct drm_device *dev, void *data,
+				  struct drm_file *file);
 void i915_oa_init_reg_state(struct intel_engine_cs *engine,
 			    struct i915_gem_context *ctx,
 			    uint32_t *reg_state);
