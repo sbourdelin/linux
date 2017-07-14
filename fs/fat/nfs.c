@@ -76,6 +76,7 @@ static struct inode *__fat_nfs_get_inode(struct super_block *sb,
 		struct msdos_dir_entry *de;
 		sector_t blocknr;
 		int offset;
+
 		fat_get_blknr_offset(MSDOS_SB(sb), i_pos, &blocknr, &offset);
 		bh = sb_bread(sb, blocknr);
 		if (!bh) {
@@ -230,6 +231,7 @@ struct inode *fat_rebuild_parent(struct super_block *sb, int parent_logstart)
 	struct msdos_sb_info *sbi = MSDOS_SB(sb);
 	sector_t blknr = fat_clus_to_blknr(sbi, parent_logstart);
 	struct buffer_head *parent_bh = sb_bread(sb, blknr);
+
 	if (!parent_bh) {
 		fat_msg(sb, KERN_ERR,
 			"unable to read cluster of parent directory");
@@ -278,6 +280,7 @@ static struct dentry *fat_get_parent(struct dentry *child_dir)
 
 	if (!fat_get_dotdot_entry(d_inode(child_dir), &bh, &de)) {
 		int parent_logstart = fat_get_start(sbi, de);
+
 		parent_inode = fat_dget(sb, parent_logstart);
 		if (!parent_inode && sbi->options.nfs == FAT_NFS_NOSTALE_RO)
 			parent_inode = fat_rebuild_parent(sb, parent_logstart);

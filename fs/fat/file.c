@@ -118,6 +118,7 @@ out:
 static int fat_ioctl_get_volume_id(struct inode *inode, u32 __user *user_attr)
 {
 	struct msdos_sb_info *sbi = MSDOS_SB(inode->i_sb);
+
 	return put_user(sbi->vol_id, user_attr);
 }
 
@@ -369,6 +370,7 @@ int fat_getattr(const struct path *path, struct kstat *stat,
 		u32 request_mask, unsigned int flags)
 {
 	struct inode *inode = d_inode(path->dentry);
+
 	generic_fillattr(inode, stat);
 	stat->blksize = MSDOS_SB(inode->i_sb)->cluster_size;
 

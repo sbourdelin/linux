@@ -582,6 +582,7 @@ error_inode:
 		 * shouldn't be serious corruption.
 		 */
 		int err2 = fat_remove_entries(new_dir, &sinfo);
+
 		if (corrupt)
 			corrupt |= err2;
 		sinfo.bh = NULL;

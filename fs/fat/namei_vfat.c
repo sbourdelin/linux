@@ -43,6 +43,7 @@ static inline void vfat_d_version_set(struct dentry *dentry,
 static int vfat_revalidate_shortname(struct dentry *dentry)
 {
 	int ret = 1;
+
 	spin_lock(&dentry->d_lock);
 	if (vfat_d_version(dentry) != d_inode(dentry->d_parent)->i_version)
 		ret = 0;
@@ -234,6 +235,7 @@ static int vfat_find_form(struct inode *dir, unsigned char *name)
 {
 	struct fat_slot_info sinfo;
 	int err = fat_scan(dir, name, &sinfo);
+
 	if (err)
 		return -ENOENT;
 	brelse(sinfo.bh);
@@ -703,6 +705,7 @@ static int vfat_find(struct inode *dir, const struct qstr *qname,
 		     struct fat_slot_info *sinfo)
 {
 	unsigned int len = vfat_striptail_len(qname);
+
 	if (len == 0)
 		return -ENOENT;
 	return fat_search_long(dir, qname->name, len, sinfo);
@@ -1033,6 +1036,7 @@ error_inode:
 		 * shouldn't be serious corruption.
 		 */
 		int err2 = fat_remove_entries(new_dir, &sinfo);
+
 		if (corrupt)
 			corrupt |= err2;
 		sinfo.bh = NULL;

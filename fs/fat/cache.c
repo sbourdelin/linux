@@ -166,6 +166,7 @@ static void fat_cache_add(struct inode *inode, struct fat_cache_id *new)
 			cache = tmp;
 		} else {
 			struct list_head *p = MSDOS_I(inode)->cache_lru.prev;
+
 			cache = list_entry(p, struct fat_cache, cache_list);
 		}
 		cache->fcluster = new->fcluster;

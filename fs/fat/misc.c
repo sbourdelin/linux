@@ -125,6 +125,7 @@ int fat_chain_add(struct inode *inode, int new_dclus, int nr_cluster)
 		ret = fat_ent_read(inode, &fatent, last);
 		if (ret >= 0) {
 			int wait = inode_needs_sync(inode);
+
 			ret = fat_ent_write(inode, &fatent, new_dclus, wait);
 			fatent_brelse(&fatent);
 		}
@@ -228,6 +229,7 @@ void fat_time_unix2fat(struct msdos_sb_info *sbi, struct timespec *ts,
 		       __le16 *time, __le16 *date, u8 *time_cs)
 {
 	struct tm tm;
+
 	time_to_tm(ts->tv_sec,
 		   (sbi->options.tz_set ? sbi->options.time_offset :
 		   -sys_tz.tz_minuteswest) * SECS_PER_MIN, &tm);

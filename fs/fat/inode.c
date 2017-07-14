@@ -233,6 +233,7 @@ static int fat_write_end(struct file *file, struct address_space *mapping,
 {
 	struct inode *inode = mapping->host;
 	int err;
+
 	err = generic_write_end(file, mapping, pos, len, copied, pagep, fsdata);
 	if (err < len)
 		fat_write_failed(mapping, pos + len);
@@ -408,6 +409,7 @@ void fat_attach(struct inode *inode, loff_t i_pos)
 	 */
 	if (S_ISDIR(inode->i_mode) && sbi->options.nfs) {
 		struct hlist_head *d_head = sbi->dir_hashtable;
+
 		d_head += fat_dir_hash(MSDOS_I(inode)->i_logstart);
 
 		spin_lock(&sbi->dir_hash_lock);
@@ -420,6 +422,7 @@ EXPORT_SYMBOL_GPL(fat_attach);
 void fat_detach(struct inode *inode)
 {
 	struct msdos_sb_info *sbi = MSDOS_SB(inode->i_sb);
+
 	spin_lock(&sbi->inode_hash_lock);
 	MSDOS_I(inode)->i_pos = 0;
 	hlist_del_init(&MSDOS_I(inode)->i_fat_hash);
@@ -699,6 +702,7 @@ static void fat_set_state(struct super_block *sb,
 static void delayed_free(struct rcu_head *p)
 {
 	struct msdos_sb_info *sbi = container_of(p, struct msdos_sb_info, rcu);
+
 	unload_nls(sbi->nls_disk);
 	unload_nls(sbi->nls_io);
 	if (sbi->options.iocharset != fat_default_iocharset)
@@ -723,6 +727,7 @@ static struct kmem_cache *fat_inode_cachep;
 static struct inode *fat_alloc_inode(struct super_block *sb)
 {
 	struct msdos_inode_info *ei;
+
 	ei = kmem_cache_alloc(fat_inode_cachep, GFP_NOFS);
 	if (!ei)
 		return NULL;
@@ -734,6 +739,7 @@ static struct inode *fat_alloc_inode(struct super_block *sb)
 static void fat_i_callback(struct rcu_head *head)
 {
 	struct inode *inode = container_of(head, struct inode, i_rcu);
+
 	kmem_cache_free(fat_inode_cachep, MSDOS_I(inode));
 }
 
@@ -805,6 +811,7 @@ static int fat_statfs(struct dentry *dentry, struct kstatfs *buf)
 	/* If the count of free cluster is still unknown, counts it here. */
 	if (sbi->free_clusters == -1 || !sbi->free_clus_valid) {
 		int err = fat_count_free_clusters(dentry->d_sb);
+
 		if (err)
 			return err;
 	}
@@ -1142,6 +1149,7 @@ static int parse_options(struct super_block *sb, char *options, int is_vfat,
 
 	while ((p = strsep(&options, ",")) != NULL) {
 		int token;
+
 		if (!*p)
 			continue;
 
@@ -1411,6 +1419,7 @@ static unsigned long calc_fat_clusters(struct super_block *sb)
 	/* Divide first to avoid overflow */
 	if (sbi->fat_bits != 12) {
 		unsigned long ent_per_sec = sb->s_blocksize * 8 / sbi->fat_bits;
+
 		return ent_per_sec * sbi->fat_length;
 	}
 
@@ -1845,6 +1854,7 @@ int fat_fill_super(struct super_block *sb, void *data, int silent, int isvfat,
 
 	if (sbi->options.discard) {
 		struct request_queue *q = bdev_get_queue(sb->s_bdev);
+
 		if (!blk_queue_discard(q))
 			fat_msg(sb, KERN_WARNING,
 					"mounting with \"discard\" option, but "
@@ -1907,6 +1917,7 @@ static int writeback_inode(struct inode *inode)
 int fat_flush_inodes(struct super_block *sb, struct inode *i1, struct inode *i2)
 {
 	int ret = 0;
+
 	if (!MSDOS_SB(sb)->options.flush)
 		return 0;
 	if (i1)
@@ -1915,6 +1926,7 @@ int fat_flush_inodes(struct super_block *sb, struct inode *i1, struct inode *i2)
 		ret = writeback_inode(i2);
 	if (!ret) {
 		struct address_space *mapping = sb->s_bdev->bd_inode->i_mapping;
+
 		ret = filemap_flush(mapping);
 	}
 	return ret;

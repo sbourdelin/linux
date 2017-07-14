@@ -23,6 +23,7 @@ static void fat12_ent_blocknr(struct super_block *sb, int entry,
 {
 	struct msdos_sb_info *sbi = MSDOS_SB(sb);
 	int bytes = entry + (entry >> 1);
+
 	WARN_ON(entry < FAT_START_ENT || sbi->max_cluster <= entry);
 	*offset = bytes & (sb->s_blocksize - 1);
 	*blocknr = sbi->fat_start + (bytes >> sb->s_blocksize_bits);
@@ -33,6 +34,7 @@ static void fat_ent_blocknr(struct super_block *sb, int entry,
 {
 	struct msdos_sb_info *sbi = MSDOS_SB(sb);
 	int bytes = (entry << sbi->fatent_shift);
+
 	WARN_ON(entry < FAT_START_ENT || sbi->max_cluster <= entry);
 	*offset = bytes & (sb->s_blocksize - 1);
 	*blocknr = sbi->fat_start + (bytes >> sb->s_blocksize_bits);
@@ -41,6 +43,7 @@ static void fat_ent_blocknr(struct super_block *sb, int entry,
 static void fat12_ent_set_ptr(struct fat_entry *fatent, int offset)
 {
 	struct buffer_head **bhs = fatent->bhs;
+
 	if (fatent->nr_bhs == 1) {
 		WARN_ON(offset >= (bhs[0]->b_size - 1));
 		fatent->u.ent12_p[0] = bhs[0]->b_data + offset;
@@ -135,6 +138,7 @@ static int fat12_ent_get(struct fat_entry *fatent)
 static int fat16_ent_get(struct fat_entry *fatent)
 {
 	int next = le16_to_cpu(*fatent->u.ent16_p);
+
 	WARN_ON((unsigned long)fatent->u.ent16_p & (2 - 1));
 	if (next >= BAD_FAT16)
 		next = FAT_ENT_EOF;
@@ -144,6 +148,7 @@ static int fat16_ent_get(struct fat_entry *fatent)
 static int fat32_ent_get(struct fat_entry *fatent)
 {
 	int next = le32_to_cpu(*fatent->u.ent32_p) & 0x0fffffff;
+
 	WARN_ON((unsigned long)fatent->u.ent32_p & (4 - 1));
 	if (next >= BAD_FAT32)
 		next = FAT_ENT_EOF;
@@ -225,6 +230,7 @@ static int fat12_ent_next(struct fat_entry *fatent)
 static int fat16_ent_next(struct fat_entry *fatent)
 {
 	const struct buffer_head *bh = fatent->bhs[0];
+
 	fatent->entry++;
 	if (fatent->u.ent16_p < (__le16 *)(bh->b_data + (bh->b_size - 2))) {
 		fatent->u.ent16_p++;
@@ -237,6 +243,7 @@ static int fat16_ent_next(struct fat_entry *fatent)
 static int fat32_ent_next(struct fat_entry *fatent)
 {
 	const struct buffer_head *bh = fatent->bhs[0];
+
 	fatent->entry++;
 	if (fatent->u.ent32_p < (__le32 *)(bh->b_data + (bh->b_size - 4))) {
 		fatent->u.ent32_p++;
@@ -669,6 +676,7 @@ int fat_count_free_clusters(struct super_block *sb)
 		/* readahead of fat blocks */
 		if ((cur_block & reada_mask) == 0) {
 			unsigned long rest = sbi->fat_length - cur_block;
+
 			fat_ent_reada(sb, &fatent, min(reada_blocks, rest));
 		}
 		cur_block++;

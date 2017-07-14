@@ -182,6 +182,7 @@ static inline int fat_uni_to_x8(struct super_block *sb, const wchar_t *uni,
 				unsigned char *buf, int size)
 {
 	struct msdos_sb_info *sbi = MSDOS_SB(sb);
+
 	if (sbi->options.utf8)
 		return utf16s_to_utf8s(uni, FAT_MAX_UNI_CHARS,
 				UTF16_HOST_ENDIAN, buf, size);
@@ -430,6 +431,7 @@ static int fat_parse_short(struct super_block *sb,
 			uni_len = j;
 			if (isvfat) {
 				int offset = min(chl, MSDOS_NAME-k);
+
 				k += offset;
 				i += offset;
 			} else {
@@ -668,6 +670,7 @@ start_filldir:
 		unsigned long inum;
 		loff_t i_pos = fat_make_i_pos(sb, bh, de);
 		struct inode *tmp = fat_iget(sb, i_pos);
+
 		if (tmp) {
 			inum = tmp->i_ino;
 			iput(tmp);
@@ -1337,6 +1340,7 @@ found:
 		/* Fill the long name slots. */
 		for (i = 0; i < long_bhs; i++) {
 			int copy = min_t(int, sb->s_blocksize - offset, size);
+
 			memcpy(bhs[i]->b_data + offset, slots, copy);
 			mark_buffer_dirty_inode(bhs[i], dir);
 			offset = 0;
@@ -1348,6 +1352,7 @@ found:
 		if (!err && i < nr_bhs) {
 			/* Fill the short name slot. */
 			int copy = min_t(int, sb->s_blocksize - offset, size);
+
 			memcpy(bhs[i]->b_data + offset, slots, copy);
 			mark_buffer_dirty_inode(bhs[i], dir);
 			if (IS_DIRSYNC(dir))
