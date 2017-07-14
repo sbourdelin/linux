@@ -456,7 +456,7 @@ static ssize_t dcon_freeze_store(struct device *dev,
 	if (ret)
 		return ret;
 
-	pr_info("dcon_freeze_store: %lu\n", output);
+	pr_info("%s: %lu\n", __func__, output);
 
 	switch (output) {
 	case 0:
