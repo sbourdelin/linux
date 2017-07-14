@@ -261,6 +261,8 @@ low-power-enable	- enable low power mode
 low-power-disable	- disable low power mode
 output-low		- set the pin to output mode with low level
 output-high		- set the pin to output mode with high level
+sleep-hardware-state	- indicate this is sleep related state which will be programmed
+			  into the registers for the sleep state.
 slew-rate		- set the slew rate
 
 For example:
