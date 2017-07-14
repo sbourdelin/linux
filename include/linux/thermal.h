@@ -47,6 +47,9 @@
 /* use value, which < 0K, to indicate an invalid/uninitialized temperature */
 #define THERMAL_TEMP_INVALID	-274000
 
+/* Maximum length of thermal zone description string */
+#define THERMAL_MAX_DESC_STR_LEN 32
+
 /* Unit conversion macros */
 #define DECI_KELVIN_TO_CELSIUS(t)	({			\
 	long _t = (t);						\
@@ -127,6 +130,7 @@ struct thermal_zone_device_ops {
 			  enum thermal_trend *);
 	int (*notify) (struct thermal_zone_device *, int,
 		       enum thermal_trip_type);
+	int (*get_desc) (struct thermal_zone_device *, char *, int);
 };
 
 struct thermal_cooling_device_ops {

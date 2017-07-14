@@ -34,6 +34,23 @@ type_show(struct device *dev, struct device_attribute *attr, char *buf)
 }
 
 static ssize_t
+desc_show(struct device *dev, struct device_attribute *attr, char *buf)
+{
+	struct thermal_zone_device *tz = to_thermal_zone(dev);
+	int ret;
+	char desc_str[THERMAL_MAX_DESC_STR_LEN];
+
+	if (!tz->ops->get_desc)
+		return scnprintf(buf, PAGE_SIZE, "<not supported>\n");
+
+	ret = tz->ops->get_desc(tz, desc_str, THERMAL_MAX_DESC_STR_LEN);
+	if (ret)
+		return ret;
+
+	return scnprintf(buf, THERMAL_MAX_DESC_STR_LEN, "%s\n", desc_str);
+}
+
+static ssize_t
 temp_show(struct device *dev, struct device_attribute *attr, char *buf)
 {
 	struct thermal_zone_device *tz = to_thermal_zone(dev);
@@ -397,6 +414,7 @@ create_s32_tzp_attr(offset);
  * present on the sysfs interface.
  */
 static DEVICE_ATTR(type, 0444, type_show, NULL);
+static DEVICE_ATTR(desc, 0444, desc_show, NULL);
 static DEVICE_ATTR(temp, 0444, temp_show, NULL);
 static DEVICE_ATTR(policy, S_IRUGO | S_IWUSR, policy_show, policy_store);
 static DEVICE_ATTR(available_policies, S_IRUGO, available_policies_show, NULL);
@@ -411,6 +429,7 @@ static DEVICE_ATTR(passive, S_IRUGO | S_IWUSR, passive_show, passive_store);
 static struct attribute *thermal_zone_dev_attrs[] = {
 	&dev_attr_type.attr,
 	&dev_attr_temp.attr,
+	&dev_attr_desc.attr,
 #if (IS_ENABLED(CONFIG_THERMAL_EMULATION))
 	&dev_attr_emul_temp.attr,
 #endif
