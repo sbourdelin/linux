@@ -1426,7 +1426,7 @@ static struct attribute *host_attributes[] = {
 	NULL
 };
 
-static struct attribute_group host_attribute_group = {
+static const struct attribute_group host_attribute_group = {
 	.attrs = host_attributes,
 };
 
@@ -1536,7 +1536,7 @@ static struct attribute *target_attributes[] = {
 	NULL
 };
 
-static struct attribute_group target_attribute_group = {
+static const struct attribute_group target_attribute_group = {
 	.attrs = target_attributes,
 	.is_visible = target_attribute_is_visible,
 };
