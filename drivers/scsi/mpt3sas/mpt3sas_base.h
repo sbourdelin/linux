@@ -54,6 +54,7 @@
 #include "mpi/mpi2_raid.h"
 #include "mpi/mpi2_tool.h"
 #include "mpi/mpi2_sas.h"
+#include "mpi/mpi2_pci.h"
 
 #include <scsi/scsi.h>
 #include <scsi/scsi_cmnd.h>
@@ -113,6 +114,7 @@
 #define MPT3SAS_RAID_QUEUE_DEPTH	128
 
 #define MPT3SAS_RAID_MAX_SECTORS	8192
+#define MPT3SAS_HOST_PAGE_SIZE_4K	12
 
 #define MPT_NAME_LENGTH			32	/* generic length of strings */
 #define MPT_STRING_LENGTH		64
@@ -129,6 +131,14 @@
 
 #define MAX_CHAIN_ELEMT_SZ		16
 #define DEFAULT_NUM_FWCHAIN_ELEMTS	8
+
+/*
+ * NVMe defines
+ */
+#define	NVME_PRP_SIZE			8	/* PRP size */
+#define	NVME_CMD_PRP1_OFFSET		24	/* PRP1 offset in NVMe cmd */
+#define	NVME_CMD_PRP2_OFFSET		32	/* PRP2 offset in NVMe cmd */
+#define	NVME_ERROR_RESPONSE_SIZE	16	/* Max NVME Error Response */
 
 /*
  * reset phases
@@ -731,6 +741,16 @@ enum reset_type {
 };
 
 /**
+ * struct pcie_sg_list - PCIe SGL buffer (contiguous per I/O)
+ * @pcie_sgl: PCIe native SGL for NVMe devices
+ * @pcie_sgl_dma: physical address
+ */
+struct pcie_sg_list {
+	void            *pcie_sgl;
+	dma_addr_t      pcie_sgl_dma;
+};
+
+/**
  * struct chain_tracker - firmware chain tracker
  * @chain_buffer: chain buffer
  * @chain_buffer_dma: physical address
@@ -756,6 +776,7 @@ struct scsiio_tracker {
 	struct scsi_cmnd *scmd;
 	u8	cb_idx;
 	u8	direct_io;
+	struct pcie_sg_list pcie_sg_list;
 	struct list_head chain_list;
 	struct list_head tracker_list;
 	u16     msix_io;
@@ -829,12 +850,18 @@ typedef void (*MPT_ADD_SGE)(void *paddr, u32 flags_length, dma_addr_t dma_addr);
 
 /* SAS3.0 support */
 typedef int (*MPT_BUILD_SG_SCMD)(struct MPT3SAS_ADAPTER *ioc,
-		struct scsi_cmnd *scmd, u16 smid);
+	struct scsi_cmnd *scmd, u16 smid, struct _pcie_device *pcie_device);
 typedef void (*MPT_BUILD_SG)(struct MPT3SAS_ADAPTER *ioc, void *psge,
 		dma_addr_t data_out_dma, size_t data_out_sz,
 		dma_addr_t data_in_dma, size_t data_in_sz);
 typedef void (*MPT_BUILD_ZERO_LEN_SGE)(struct MPT3SAS_ADAPTER *ioc,
 		void *paddr);
+
+/* SAS3.5 support */
+typedef void (*NVME_BUILD_PRP)(struct MPT3SAS_ADAPTER *ioc, u16 smid,
+	Mpi26NVMeEncapsulatedRequest_t *nvme_encap_request,
+	dma_addr_t data_out_dma, size_t data_out_sz, dma_addr_t data_in_dma,
+	size_t data_in_sz);
 
 /* To support atomic and non atomic descriptors*/
 typedef void (*PUT_SMID_IO_FP_HIP) (struct MPT3SAS_ADAPTER *ioc, u16 smid,
@@ -878,6 +905,7 @@ struct mpt3sas_facts {
 	u16			MaxDevHandle;
 	u16			MaxPersistentEntries;
 	u16			MinDevHandle;
+	u8			CurrentHostPageSize;
 };
 
 struct mpt3sas_port_facts {
@@ -1149,6 +1177,9 @@ struct MPT3SAS_ADAPTER {
 	MPT_BUILD_SG    build_sg_mpi;
 	MPT_BUILD_ZERO_LEN_SGE build_zero_len_sge_mpi;
 
+	/* function ptr for NVMe PRP elements only */
+	NVME_BUILD_PRP  build_nvme_prp;
+
 	/* event log */
 	u32		event_type[MPI2_EVENT_NOTIFY_EVENTMASK_WORDS];
 	u32		event_context;
@@ -1216,6 +1247,12 @@ struct MPT3SAS_ADAPTER {
 	struct list_head free_list;
 	int		pending_io_count;
 	wait_queue_head_t reset_wq;
+
+	/* PCIe SGL */
+	struct dma_pool *pcie_sgl_dma_pool;
+
+	/* Host Page Size */
+	u32		page_size;
 
 	/* chain */
 	struct chain_tracker *chain_lookup;
@@ -1350,7 +1387,8 @@ void *mpt3sas_base_get_msg_frame(struct MPT3SAS_ADAPTER *ioc, u16 smid);
 void *mpt3sas_base_get_sense_buffer(struct MPT3SAS_ADAPTER *ioc, u16 smid);
 __le32 mpt3sas_base_get_sense_buffer_dma(struct MPT3SAS_ADAPTER *ioc,
 	u16 smid);
-
+void *mpt3sas_base_get_pcie_sgl(struct MPT3SAS_ADAPTER *ioc, u16 smid);
+void *mpt3sas_base_get_pcie_sgl_dma(struct MPT3SAS_ADAPTER *ioc, u16 smid);
 void mpt3sas_base_sync_reply_irqs(struct MPT3SAS_ADAPTER *ioc);
 
 /* hi-priority queue */
@@ -1564,7 +1602,7 @@ void
 mpt3sas_scsi_direct_io_set(struct MPT3SAS_ADAPTER *ioc, u16 smid, u8 direct_io);
 void
 mpt3sas_setup_direct_io(struct MPT3SAS_ADAPTER *ioc, struct scsi_cmnd *scmd,
-	struct _raid_device *raid_device, Mpi2SCSIIORequest_t *mpi_request,
+	struct _raid_device *raid_device, Mpi25SCSIIORequest_t *mpi_request,
 	u16 smid);
 
 /* NCQ Prio Handling Check */
