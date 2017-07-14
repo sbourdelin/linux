@@ -1,0 +1,249 @@
+#!/usr/bin/perl
+use strict;
+
+#############
+# Static vars
+#############
+
+my @missing;
+my @opt_missing;
+my $system_release;
+
+##################################################
+# Subroutines used at the check missing deps logic
+##################################################
+
+sub catcheck($)
+{
+  my $res = "";
+  $res = qx(cat $_[0]) if (-r $_[0]);
+  return $res;
+}
+
+my $install;
+sub check_missing(%)
+{
+	my %map = %{$_[0]};
+
+	foreach my $prog (@missing) {
+		print "ERROR: please install \"$prog\", otherwise, build won't work.\n";
+		if (defined($map{$prog})) {
+			$install .= " " . $map{$prog};
+		} else {
+			$install .= " " . $prog;
+		}
+	}
+	foreach my $prog (@opt_missing) {
+		print "Warning: better to also install \"$prog\".\n";
+		if (defined($map{$prog})) {
+			$install .= " " . $map{$prog};
+		} else {
+			$install .= " " . $prog;
+		}
+	}
+
+	$install =~ s/^\s//;
+}
+
+sub give_ubuntu_hints()
+{
+	my %map = (
+		"sphinx-build"		=> "python3-sphinx python3-sphinx-rtd-theme",
+		"dot"			=> "graphviz",
+		"convert"		=> "imagemagick",
+		"Pod::Usage"		=> "perl-modules",
+		"xelatex"		=> "texlive-xetex",
+	);
+
+	check_missing(\%map);
+	printf("You should run:\n\n\tsudo apt-get install $install\n\n");
+}
+
+sub give_redhat_hints()
+{
+	my %map = (
+		"sphinx-build"		=> "python3-sphinx python3-sphinx_rtd_theme",
+		"dot"			=> "graphviz",
+		"convert"		=> "ImageMagick",
+		"Pod::Usage"		=> "perl-Pod-Usage",
+		"xelatex"		=> "texlive-xetex-bin",
+	);
+
+	check_missing(\%map);
+	printf("You should run:\n\n\tyum install -y $install\n\n");
+}
+
+sub give_opensuse_hints()
+{
+	my %map = (
+		# FIXME: add hints for SUSE here
+	);
+	
+	check_missing(\%map);
+	printf("You should run:\n\n\tsudo zypper install $install\n\n");
+}
+
+sub give_arch_linux_hints()
+{
+	my %map = (
+		# FIXME: add hints for arch-linux here
+	);
+
+	check_missing(\%map);
+	printf("You should install those package(s) (repository/package): $install\n\n");
+}
+
+sub give_gentoo_hints()
+{
+	my %map = (
+		# FIXME: add hints for Gentoo here
+	);
+
+	check_missing(\%map);
+	printf("You should emerge those package(s): $install\n\n");
+}
+
+sub give_hints()
+{
+	# Distro-specific hints
+	if ($system_release =~ /Red Hat Enterprise Linux/) {
+		give_redhat_hints;
+		return;
+	}
+	if ($system_release =~ /Fedora/) {
+		give_redhat_hints;
+		return;
+	}
+	if ($system_release =~ /Ubuntu/) {
+		give_ubuntu_hints;
+		return;
+	}
+	if ($system_release =~ /openSUSE/) {
+		give_opensuse_hints;
+		return;
+	}
+	if ($system_release =~ /Arch Linux/) {
+		give_arch_linux_hints;
+		return;
+	}
+	if ($system_release =~ /Debian/) {
+		give_ubuntu_hints;
+		return;
+	}
+	if ($system_release =~ /Gentoo/) {
+		give_gentoo_hints;
+		return;
+	}
+	# Fall-back to generic hint code
+	my %map = (
+		"sphinx-build" => "sphinx"
+	);
+	check_missing(\%map);
+	print "I don't know distro $system_release. So, I can't provide you a hint with the install procedure.\n";
+}
+
+my $need = 0;
+my $optional = 0;
+
+sub findprog($)
+{
+	foreach(split(/:/, $ENV{PATH})) {
+		return "$_/$_[0]" if(-x "$_/$_[0]");
+	}
+}
+
+sub need_program($)
+{
+	my $prog = shift;
+
+	return if findprog($prog);
+
+	push @missing, $prog;
+
+	$need++;
+}
+
+sub optional_program($)
+{
+	my $prog = shift;
+
+	return if findprog($prog);
+
+	push @opt_missing, $prog;
+
+	$optional++;
+}
+
+sub need_perl_module($)
+{
+	my $prog = shift;
+
+	my $err = system("perl -M$prog -e 1 2>/dev/null /dev/null");
+	return if ($err == 0);
+
+	push @missing, $prog;
+
+	$need++;
+}
+
+sub check_needs()
+{
+	if ($system_release) {
+		print "Checking if the needed tools for $system_release are available\n";
+	} else {
+		print "Checking if the needed tools are present\n";
+	}
+
+	# Check for needed programs/tools
+	need_perl_module "Pod::Usage";
+	need_program "make";
+	need_program "gcc";
+	need_program "sphinx-build";
+	optional_program "dot";
+	optional_program "convert";
+	optional_program "xelatex";
+
+	give_hints if ($need || $optional);
+
+	print "All optional dependenties are met.\n" if (!$optional);
+
+	die "Can't build as $need mandatory dependency is missing" if ($need == 1);
+	die "Can't build as $need mandatory dependencies are missing" if ($need);
+
+	print "Needed package dependencies are met.\n";
+}
+
+sub which($)
+{
+	my $file = shift;
+	my @path = split ":", $ENV{PATH};
+
+	foreach my $dir(@path) {
+		my $name = $dir.'/'.$file;
+		return $name if (-x $name );
+	}
+	return undef;
+}
+
+######
+# Main
+######
+
+# Determine the system type. There's no standard unique way that would
+# work with all distros with a minimal package install. So, several
+# methods are used here.
+#
+# By default, it will use lsb_release function. If not available, it will
+# fail back to reading the known different places where the distro name
+# is stored
+#
+$system_release = qx(lsb_release -d) if which("lsb_release");
+$system_release =~ s/Description:\s*// if ($system_release);
+$system_release = catcheck("/etc/system-release") if !$system_release;
+$system_release = catcheck("/etc/redhat-release") if !$system_release;
+$system_release = catcheck("/etc/lsb-release") if !$system_release;
+$system_release = catcheck("/etc/gentoo-release") if !$system_release;
+$system_release = catcheck("/etc/issue") if !$system_release;
+$system_release =~ s/\s+$//;
+
+check_needs;
