@@ -1673,8 +1673,8 @@ int fat_fill_super(struct super_block *sb, void *data, int silent, int isvfat,
 		/* Verify that the larger boot sector is fully readable */
 		bh_resize = sb_bread(sb, 0);
 		if (bh_resize == NULL) {
-			fat_msg(sb, KERN_ERR, "unable to read boot sector"
-			       " (logical sector size = %lu)",
+			fat_msg(sb, KERN_ERR,
+				"unable to read boot sector (logical sector size = %lu)",
 			       sb->s_blocksize);
 			goto out_fail;
 		}
@@ -1710,15 +1710,16 @@ int fat_fill_super(struct super_block *sb, void *data, int silent, int isvfat,
 
 		fsinfo_bh = sb_bread(sb, sbi->fsinfo_sector);
 		if (fsinfo_bh == NULL) {
-			fat_msg(sb, KERN_ERR, "bread failed, FSINFO block"
-			       " (sector = %lu)", sbi->fsinfo_sector);
+			fat_msg(sb, KERN_ERR,
+				"bread failed, FSINFO block (sector = %lu)",
+				sbi->fsinfo_sector);
 			goto out_fail;
 		}
 
 		fsinfo = (struct fat_boot_fsinfo *)fsinfo_bh->b_data;
 		if (!IS_FSINFO(fsinfo)) {
-			fat_msg(sb, KERN_WARNING, "Invalid FSINFO signature: "
-			       "0x%08x, 0x%08x (sector = %lu)",
+			fat_msg(sb, KERN_WARNING,
+				"Invalid FSINFO signature: 0x%08x, 0x%08x (sector = %lu)",
 			       le32_to_cpu(fsinfo->signature1),
 			       le32_to_cpu(fsinfo->signature2),
 			       sbi->fsinfo_sector);
@@ -1745,8 +1746,9 @@ int fat_fill_super(struct super_block *sb, void *data, int silent, int isvfat,
 	sbi->dir_entries = bpb.fat_dir_entries;
 	if (sbi->dir_entries & (sbi->dir_per_block - 1)) {
 		if (!silent)
-			fat_msg(sb, KERN_ERR, "bogus number of directory entries"
-			       " (%u)", sbi->dir_entries);
+			fat_msg(sb, KERN_ERR,
+				"bogus number of directory entries (%u)",
+				sbi->dir_entries);
 		goto out_invalid;
 	}
 

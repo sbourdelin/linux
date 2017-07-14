@@ -250,8 +250,8 @@ int fat_get_cluster(struct inode *inode, int cluster, int *fclus, int *dclus)
 		/* prevent the infinite loop of cluster chain */
 		if (*fclus > limit) {
 			fat_fs_error_ratelimit(sb,
-					"%s: detected the cluster chain loop"
-					" (i_pos %lld)", __func__,
+					"%s: detected the cluster chain loop (i_pos %lld)",
+					__func__,
 					MSDOS_I(inode)->i_pos);
 			nr = -EIO;
 			goto out;
