@@ -67,6 +67,7 @@
 #include <linux/kexec.h>
 #include <linux/bpf.h>
 #include <linux/mount.h>
+#include <linux/ktask_internal.h>
 
 #include <linux/uaccess.h>
 #include <asm/processor.h>
@@ -1848,6 +1849,15 @@ static struct ctl_table debug_table[] = {
 		.proc_handler	= proc_kprobes_optimization_handler,
 		.extra1		= &zero,
 		.extra2		= &one,
+	},
+#endif
+#if defined(CONFIG_KTASK)
+	{
+		.procname	= "ktask_max_threads",
+		.data		= &ktask_max_threads,
+		.maxlen		= sizeof(ktask_max_threads),
+		.mode		= 0644,
+		.proc_handler	= proc_dointvec,
 	},
 #endif
 	{ }
