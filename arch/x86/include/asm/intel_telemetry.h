@@ -17,7 +17,7 @@
 #define INTEL_TELEMETRY_H
 
 #define TELEM_MAX_EVENTS_SRAM		28
-#define TELEM_MAX_OS_ALLOCATED_EVENTS	20
+#define TELEM_MAX_OS_ALLOCATED_EVENTS	25
 
 enum telemetry_unit {
 	TELEM_PSS = 0,
