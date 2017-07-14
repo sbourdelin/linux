@@ -22,7 +22,7 @@
 static u32 cqm_max_rmid = -1;
 static unsigned int cqm_l3_scale; /* supposedly cacheline size */
 static bool cqm_enabled, mbm_enabled;
-unsigned int mbm_socket_max;
+static unsigned int mbm_socket_max;
 
 /*
  * The cached intel_pqr_state is strictly per CPU and can never be
