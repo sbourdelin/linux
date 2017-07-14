@@ -1157,13 +1157,7 @@ void __init sync_Arb_IDs(void)
 			APIC_INT_LEVELTRIG | APIC_DM_INIT);
 }
 
-enum apic_intr_mode {
-	APIC_PIC,
-	APIC_VIRTUAL_WIRE,
-	APIC_VIRTUAL_WIRE_NO_CONFIG,
-	APIC_SYMMETRIC_IO,
-	APIC_SYMMETRIC_IO_NO_ROUTING,
-};
+enum apic_intr_mode_id apic_intr_mode;
 
 static int __init apic_intr_mode_select(void)
 {
@@ -1289,7 +1283,9 @@ void __init apic_intr_mode_init(void)
 {
 	bool upmode = false;
 
-	switch (apic_intr_mode_select()) {
+	apic_intr_mode = apic_intr_mode_select();
+
+	switch (apic_intr_mode) {
 	case APIC_PIC:
 		pr_info("APIC: keep in PIC mode(8259)\n");
 		return;
