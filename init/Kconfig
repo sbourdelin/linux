@@ -332,6 +332,13 @@ config AUDIT_TREE
 	depends on AUDITSYSCALL
 	select FSNOTIFY
 
+config KTASK
+	bool "Multithread cpu-intensive kernel tasks"
+	depends on SMP
+	default n
+	help
+          Parallelize expensive kernel tasks such as zeroing huge pages.
+
 source "kernel/irq/Kconfig"
 source "kernel/time/Kconfig"
 
