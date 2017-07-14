@@ -665,6 +665,15 @@ static int i40e_get_link_ksettings(struct net_device *netdev,
 		ethtool_link_ksettings_add_link_mode(cmd, advertising,
 						     Asym_Pause);
 		break;
+	case I40E_PHY_TYPE_25GBASE_AOC:
+	case I40E_PHY_TYPE_25GBASE_ACC:
+		ethtool_link_ksettings_add_link_mode(ks, supported, Autoneg);
+		ethtool_link_ksettings_add_link_mode(ks, advertising, Autoneg);
+		ethtool_link_ksettings_add_link_mode(ks, supported,
+						     25000baseCR_Full);
+		ethtool_link_ksettings_add_link_mode(ks, advertising,
+						     25000baseCR_Full);
+		break;
 	default:
 		ethtool_convert_link_mode_to_legacy_u32(
 			&advertising, cmd->link_modes.advertising);
