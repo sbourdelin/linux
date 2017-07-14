@@ -24,6 +24,7 @@
 #include <drm/drm_connector.h>
 #include <drm/drm_edid.h>
 #include <drm/drm_encoder.h>
+#include <drm/drm_hdcp.h>
 
 #include "drm_crtc_internal.h"
 #include "drm_internal.h"
@@ -617,6 +618,13 @@ static const struct drm_prop_enum_list drm_link_status_enum_list[] = {
 };
 DRM_ENUM_NAME_FN(drm_get_link_status_name, drm_link_status_enum_list)
 
+static const struct drm_prop_enum_list drm_cp_enum_list[] = {
+	{ DRM_CP_UNSUPPORTED,	"CP Not Supported" },
+	{ DRM_CP_DISABLE,	"Disable CP" },
+	{ DRM_CP_ENABLE,	"Enable CP for Type0 content" },
+};
+DRM_ENUM_NAME_FN(drm_get_cp_status_name, drm_cp_enum_list)
+
 /**
  * drm_display_info_set_bus_formats - set the supported bus formats
  * @info: display info to store bus formats in
@@ -788,6 +796,12 @@ int drm_connector_create_standard_properties(struct drm_device *dev)
 	if (!prop)
 		return -ENOMEM;
 	dev->mode_config.link_status_property = prop;
+
+	prop = drm_property_create_enum(dev, 0, "cp", drm_cp_enum_list,
+					   ARRAY_SIZE(drm_cp_enum_list));
+	if (!prop)
+		return -ENOMEM;
+	dev->mode_config.cp_property = prop;
 
 	return 0;
 }
