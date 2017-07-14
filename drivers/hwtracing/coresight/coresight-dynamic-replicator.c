@@ -143,7 +143,7 @@ static int replicator_probe(struct amba_device *adev, const struct amba_id *id)
 	if (IS_ERR(drvdata->csdev))
 		return PTR_ERR(drvdata->csdev);
 
-	dev_info(dev, "%s initialized\n", (char *)id->data);
+	dev_info(dev, "initialized\n");
 	return 0;
 }
 
@@ -179,14 +179,13 @@ static struct amba_id replicator_ids[] = {
 	{
 		.id     = 0x0003b909,
 		.mask   = 0x0003ffff,
-		.data	= "REPLICATOR 1.0",
 	},
 	{ 0, 0 },
 };
 
 static struct amba_driver replicator_driver = {
 	.drv = {
-		.name	= "coresight-replicator-qcom",
+		.name	= "coresight-dynamic-replicator",
 		.pm	= &replicator_dev_pm_ops,
 		.suppress_bind_attrs = true,
 	},
