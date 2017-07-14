@@ -69,6 +69,9 @@
  */
 struct prtb_entry *process_tb;
 struct patb_entry *partition_tb;
+unsigned int mmu_pid_bits;
+unsigned int mmu_base_pid;
+
 /*
  * page table size
  */

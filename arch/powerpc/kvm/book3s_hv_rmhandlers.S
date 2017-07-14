@@ -1491,6 +1491,18 @@ END_FTR_SECTION_IFCLR(CPU_FTR_ARCH_207S)
 	std	r6, VCPU_BESCR(r9)
 	stw	r7, VCPU_GUEST_PID(r9)
 	std	r8, VCPU_WORT(r9)
+
+	/* Handle the case where the guest used an illegal PID */
+	LOAD_REG_ADDR(r4, mmu_base_pid)
+	lwz	r3, 0(r4)
+	cmpw	cr0,r7,r3
+	blt	1f
+
+	/* Illegal PID, flush the TLB */
+	bl	radix_flush_pid
+	ld	r9, HSTATE_KVM_VCPU(r13)
+1:
+
 BEGIN_FTR_SECTION
 	mfspr	r5, SPRN_TCSCR
 	mfspr	r6, SPRN_ACOP

@@ -25,6 +25,10 @@
 #include <asm/mmu_context.h>
 #include <asm/pgalloc.h>
 
+#ifdef CONFIG_KVM_BOOK3S_HV_POSSIBLE
+#include <asm/kvm_book3s_asm.h>
+#endif
+
 #include "icswx.h"
 
 static DEFINE_SPINLOCK(mmu_context_lock);
@@ -126,9 +130,10 @@ static int hash__init_new_context(struct mm_struct *mm)
 static int radix__init_new_context(struct mm_struct *mm)
 {
 	unsigned long rts_field;
-	int index;
+	int index, max_id;
 
-	index = alloc_context_id(1, PRTB_ENTRIES - 1);
+	max_id = (1 << mmu_pid_bits) - 1;
+	index = alloc_context_id(mmu_base_pid, max_id);
 	if (index < 0)
 		return index;
 
@@ -233,8 +238,40 @@ void destroy_context(struct mm_struct *mm)
 }
 
 #ifdef CONFIG_PPC_RADIX_MMU
-void radix__switch_mmu_context(struct mm_struct *prev, struct mm_struct *next)
+void radix__switch_mmu_context(struct mm_struct *prev, struct mm_struct *next,
+			       bool new_on_cpu)
 {
+	/*
+	 * If this context hasn't run on that CPU before and KVM is
+	 * around, there's a slim chance that the guest on another
+	 * CPU just brought in obsolete translation into the TLB of
+	 * this CPU due to a bad prefetch using the guest PID on
+	 * the way into the hypervisor.
+	 *
+	 * We work around this here. If KVM is possible, we check if
+	 * any sibling thread is in KVM. If it is, the window may exist
+	 * and thus we flush that PID from the core.
+	 *
+	 * A potential future improvement would be to mark which PIDs
+	 * have never been used on the system and avoid it if the PID
+	 * is new and the process has no other cpumask bit set.
+	 */
+#ifdef CONFIG_KVM_BOOK3S_HV_POSSIBLE
+	if (cpu_has_feature(CPU_FTR_HVMODE) && new_on_cpu) {
+		int cpu = smp_processor_id();
+		int sib = cpu_first_thread_sibling(cpu);
+		bool flush = false;
+
+		for (; sib <= cpu_last_thread_sibling(cpu) && !flush; sib++) {
+			if (sib == cpu)
+				continue;
+			if (paca[sib].kvm_hstate.kvm_vcpu)
+				flush = true;
+		}
+		if (flush)
+			radix__local_flush_all_mm(next);
+	}
+#endif /* CONFIG_KVM_BOOK3S_HV_POSSIBLE */
 
 	if (cpu_has_feature(CPU_FTR_POWER9_DD1)) {
 		isync();

@@ -45,13 +45,15 @@ extern void set_context(unsigned long id, pgd_t *pgd);
 
 #ifdef CONFIG_PPC_BOOK3S_64
 extern void radix__switch_mmu_context(struct mm_struct *prev,
-				     struct mm_struct *next);
+				      struct mm_struct *next,
+				      bool new_on_cpu);
 static inline void switch_mmu_context(struct mm_struct *prev,
 				      struct mm_struct *next,
-				      struct task_struct *tsk)
+				      struct task_struct *tsk,
+				      bool new_on_cpu)
 {
 	if (radix_enabled())
-		return radix__switch_mmu_context(prev, next);
+		return radix__switch_mmu_context(prev, next, new_on_cpu);
 	return switch_slb(tsk, next);
 }
 
@@ -60,8 +62,13 @@ extern void hash__reserve_context_id(int id);
 extern void __destroy_context(int context_id);
 static inline void mmu_context_init(void) { }
 #else
-extern void switch_mmu_context(struct mm_struct *prev, struct mm_struct *next,
-			       struct task_struct *tsk);
+extern void __switch_mmu_context(struct mm_struct *prev, struct mm_struct *next,
+				 struct task_struct *tsk);
+static inline void switch_mmu_context(struct mm_struct *prev, struct mm_struct *next,
+				      struct task_struct *tsk, bool new_on_cpu)
+{
+	__switch_mmu_context(prev, next, tsk);
+}
 extern unsigned long __init_new_context(void);
 extern void __destroy_context(unsigned long context_id);
 extern void mmu_context_init(void);
@@ -79,9 +86,13 @@ static inline void switch_mm_irqs_off(struct mm_struct *prev,
 				      struct mm_struct *next,
 				      struct task_struct *tsk)
 {
+	bool new_on_cpu = false;
+
 	/* Mark this context has been used on the new CPU */
-	if (!cpumask_test_cpu(smp_processor_id(), mm_cpumask(next)))
+	if (!cpumask_test_cpu(smp_processor_id(), mm_cpumask(next))) {
 		cpumask_set_cpu(smp_processor_id(), mm_cpumask(next));
+		new_on_cpu = true;
+	}
 
 	/* 32-bit keeps track of the current PGDIR in the thread struct */
 #ifdef CONFIG_PPC32
@@ -113,7 +124,7 @@ static inline void switch_mm_irqs_off(struct mm_struct *prev,
 	 * The actual HW switching method differs between the various
 	 * sub architectures. Out of line for now
 	 */
-	switch_mmu_context(prev, next, tsk);
+	switch_mmu_context(prev, next, tsk, new_on_cpu);
 }
 
 static inline void switch_mm(struct mm_struct *prev, struct mm_struct *next,

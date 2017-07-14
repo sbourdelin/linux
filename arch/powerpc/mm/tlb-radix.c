@@ -68,6 +68,12 @@ static inline void _tlbiel_pid(unsigned long pid, unsigned long ric)
 	asm volatile(PPC_INVALIDATE_ERAT "; isync" : : :"memory");
 }
 
+/* Used by KVM */
+void radix_flush_pid(unsigned long pid)
+{
+	_tlbiel_pid(pid, RIC_FLUSH_ALL);
+}
+
 static inline void _tlbie_pid(unsigned long pid, unsigned long ric)
 {
 	unsigned long rb,rs,prs,r;
@@ -143,8 +149,7 @@ void radix__local_flush_tlb_mm(struct mm_struct *mm)
 }
 EXPORT_SYMBOL(radix__local_flush_tlb_mm);
 
-#ifndef CONFIG_SMP
-static void radix__local_flush_all_mm(struct mm_struct *mm)
+void radix__local_flush_all_mm(struct mm_struct *mm)
 {
 	unsigned long pid;
 
@@ -154,7 +159,6 @@ static void radix__local_flush_all_mm(struct mm_struct *mm)
 		_tlbiel_pid(pid, RIC_FLUSH_ALL);
 	preempt_enable();
 }
-#endif /* CONFIG_SMP */
 
 void radix__local_flush_tlb_page_psize(struct mm_struct *mm, unsigned long vmaddr,
 				       int psize)
