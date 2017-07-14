@@ -1968,6 +1968,7 @@ int zs_page_migrate(struct address_space *mapping, struct page *newpage,
 	unsigned long old_obj, new_obj;
 	unsigned int obj_idx;
 	int ret = -EAGAIN;
+	int inuse;
 
 	VM_BUG_ON_PAGE(!PageMovable(page), page);
 	VM_BUG_ON_PAGE(!PageIsolated(page), page);
@@ -1982,21 +1983,24 @@ int zs_page_migrate(struct address_space *mapping, struct page *newpage,
 	offset = get_first_obj_offset(page);
 
 	spin_lock(&class->lock);
-	if (!get_zspage_inuse(zspage)) {
+	inuse = get_zspage_inuse(zspage);
+	if (mode == MIGRATE_ASYNC && !inuse) {
 		ret = -EBUSY;
 		goto unlock_class;
 	}
 
 	pos = offset;
 	s_addr = kmap_atomic(page);
-	while (pos < PAGE_SIZE) {
-		head = obj_to_head(page, s_addr + pos);
-		if (head & OBJ_ALLOCATED_TAG) {
-			handle = head & ~OBJ_ALLOCATED_TAG;
-			if (!trypin_tag(handle))
-				goto unpin_objects;
+	if (inuse) {
+		while (pos < PAGE_SIZE) {
+			head = obj_to_head(page, s_addr + pos);
+			if (head & OBJ_ALLOCATED_TAG) {
+				handle = head & ~OBJ_ALLOCATED_TAG;
+				if (!trypin_tag(handle))
+					goto unpin_objects;
+			}
+			pos += class->size;
 		}
-		pos += class->size;
 	}
 
 	/*
@@ -2006,20 +2010,22 @@ int zs_page_migrate(struct address_space *mapping, struct page *newpage,
 	memcpy(d_addr, s_addr, PAGE_SIZE);
 	kunmap_atomic(d_addr);
 
-	for (addr = s_addr + offset; addr < s_addr + pos;
-					addr += class->size) {
-		head = obj_to_head(page, addr);
-		if (head & OBJ_ALLOCATED_TAG) {
-			handle = head & ~OBJ_ALLOCATED_TAG;
-			if (!testpin_tag(handle))
-				BUG();
+	if (inuse) {
+		for (addr = s_addr + offset; addr < s_addr + pos;
+						addr += class->size) {
+			head = obj_to_head(page, addr);
+			if (head & OBJ_ALLOCATED_TAG) {
+				handle = head & ~OBJ_ALLOCATED_TAG;
+				if (!testpin_tag(handle))
+					BUG();
 
-			old_obj = handle_to_obj(handle);
-			obj_to_location(old_obj, &dummy, &obj_idx);
-			new_obj = (unsigned long)location_to_obj(newpage,
-								obj_idx);
-			new_obj |= BIT(HANDLE_PIN_BIT);
-			record_obj(handle, new_obj);
+				old_obj = handle_to_obj(handle);
+				obj_to_location(old_obj, &dummy, &obj_idx);
+				new_obj = (unsigned long)
+					location_to_obj(newpage, obj_idx);
+				new_obj |= BIT(HANDLE_PIN_BIT);
+				record_obj(handle, new_obj);
+			}
 		}
 	}
 
@@ -2041,14 +2047,16 @@ int zs_page_migrate(struct address_space *mapping, struct page *newpage,
 
 	ret = MIGRATEPAGE_SUCCESS;
 unpin_objects:
-	for (addr = s_addr + offset; addr < s_addr + pos;
+	if (inuse) {
+		for (addr = s_addr + offset; addr < s_addr + pos;
 						addr += class->size) {
-		head = obj_to_head(page, addr);
-		if (head & OBJ_ALLOCATED_TAG) {
-			handle = head & ~OBJ_ALLOCATED_TAG;
-			if (!testpin_tag(handle))
-				BUG();
-			unpin_tag(handle);
+			head = obj_to_head(page, addr);
+			if (head & OBJ_ALLOCATED_TAG) {
+				handle = head & ~OBJ_ALLOCATED_TAG;
+				if (!testpin_tag(handle))
+					BUG();
+				unpin_tag(handle);
+			}
 		}
 	}
 	kunmap_atomic(s_addr);
