@@ -192,7 +192,7 @@ static acpi_status acpi_gpiochip_request_interrupt(struct acpi_resource *ares,
 		char ev_name[5];
 		sprintf(ev_name, "_%c%02X",
 			agpio->triggering == ACPI_EDGE_SENSITIVE ? 'E' : 'L',
-			pin);
+			(u8)pin);
 		if (ACPI_SUCCESS(acpi_get_handle(handle, ev_name, &evt_handle)))
 			handler = acpi_gpio_irq_handler;
 	}
