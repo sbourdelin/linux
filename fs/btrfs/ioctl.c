@@ -4924,6 +4924,98 @@ drop_write:
 	return ret;
 }
 
+static long btrfs_ioctl_qgroup_create_v2(struct file *file, void __user *uargs)
+{
+	struct btrfs_ioctl_qgroup_args_v2 args;
+	struct btrfs_trans_handle *trans;
+	struct btrfs_fs_info *fs_info;
+	struct btrfs_root *root;
+	struct inode *inode;
+	int ret;
+	int err;
+
+	inode = file_inode(file);
+	fs_info = btrfs_sb(inode->i_sb);
+	root = BTRFS_I(inode)->root;
+
+	if (!capable(CAP_SYS_ADMIN))
+		return -EPERM;
+
+	ret = copy_from_user(&args, uargs, sizeof(args));
+	if (ret)
+		return ret;
+
+	if (!args.qgroupid)
+		return -EINVAL;
+
+	ret = mnt_want_write_file(file);
+	if (ret)
+		return ret;
+
+	trans = btrfs_join_transaction(root);
+	if (IS_ERR(trans)) {
+		ret = PTR_ERR(trans);
+		goto out;
+	}
+
+	ret = btrfs_create_qgroup(trans, fs_info, args.qgroupid, 1);
+	err = btrfs_end_transaction(trans);
+
+	if (err && !ret)
+		ret = err;
+
+out:
+	mnt_drop_write_file(file);
+	return ret;
+}
+
+static long btrfs_ioctl_qgroup_remove_v2(struct file *file, void __user *uargs)
+{
+	struct btrfs_ioctl_qgroup_args_v2 args;
+	struct btrfs_trans_handle *trans;
+	struct btrfs_fs_info *fs_info;
+	struct btrfs_root *root;
+	struct inode *inode;
+	int check;
+	int ret;
+	int err;
+
+	inode = file_inode(file);
+	fs_info = btrfs_sb(inode->i_sb);
+	root = BTRFS_I(inode)->root;
+
+	if (!capable(CAP_SYS_ADMIN))
+		return -EPERM;
+
+	ret = copy_from_user(&args, uargs, sizeof(args));
+	if (ret)
+		return ret;
+
+	if (!args.qgroupid)
+		return -EINVAL;
+	check = !(args.flags & BTRFS_QGROUP_NO_SUBVOL_CHECK);
+
+	ret = mnt_want_write_file(file);
+	if (ret)
+		return ret;
+
+	trans = btrfs_join_transaction(root);
+	if (IS_ERR(trans)) {
+		ret = PTR_ERR(trans);
+		goto out;
+	}
+
+	ret = btrfs_remove_qgroup(trans, fs_info, args.qgroupid, check);
+	err = btrfs_end_transaction(trans);
+
+	if (err && !ret)
+		ret = err;
+
+out:
+	mnt_drop_write_file(file);
+	return ret;
+}
+
 static long btrfs_ioctl_qgroup_create(struct file *file, void __user *arg)
 {
 	struct inode *inode = file_inode(file);
@@ -4959,9 +5051,9 @@ static long btrfs_ioctl_qgroup_create(struct file *file, void __user *arg)
 	}
 
 	if (sa->create) {
-		ret = btrfs_create_qgroup(trans, fs_info, sa->qgroupid);
+		ret = btrfs_create_qgroup(trans, fs_info, sa->qgroupid, 0);
 	} else {
-		ret = btrfs_remove_qgroup(trans, fs_info, sa->qgroupid);
+		ret = btrfs_remove_qgroup(trans, fs_info, sa->qgroupid, 0);
 	}
 
 	err = btrfs_end_transaction(trans);
@@ -5632,6 +5724,10 @@ long btrfs_ioctl(struct file *file, unsigned int
 		return btrfs_ioctl_get_features(file, argp);
 	case BTRFS_IOC_SET_FEATURES:
 		return btrfs_ioctl_set_features(file, argp);
+	case BTRFS_IOC_QGROUP_CREATE_V2:
+		return btrfs_ioctl_qgroup_create_v2(file, argp);
+	case BTRFS_IOC_QGROUP_REMOVE_V2:
+		return btrfs_ioctl_qgroup_remove_v2(file, argp);
 	}
 
 	return -ENOTTY;
