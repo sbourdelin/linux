@@ -983,7 +983,7 @@ static int vfat_rename(struct inode *old_dir, struct dentry *old_dentry,
 		}
 		drop_nlink(old_dir);
 		if (!new_inode)
- 			inc_nlink(new_dir);
+			inc_nlink(new_dir);
 	}
 
 	err = fat_remove_entries(old_dir, &old_sinfo);	/* and releases bh */
