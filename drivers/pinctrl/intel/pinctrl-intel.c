@@ -1027,18 +1027,9 @@ static irqreturn_t intel_gpio_irq(int irq, void *data)
 	return ret;
 }
 
-static struct irq_chip intel_gpio_irqchip = {
-	.name = "intel-gpio",
-	.irq_enable = intel_gpio_irq_enable,
-	.irq_ack = intel_gpio_irq_ack,
-	.irq_mask = intel_gpio_irq_mask,
-	.irq_unmask = intel_gpio_irq_unmask,
-	.irq_set_type = intel_gpio_irq_type,
-	.irq_set_wake = intel_gpio_irq_wake,
-};
-
 static int intel_gpio_probe(struct intel_pinctrl *pctrl, int irq)
 {
+	struct irq_chip *irqchip;
 	int ret;
 
 	pctrl->chip = intel_gpio_chip;
@@ -1048,6 +1039,14 @@ static int intel_gpio_probe(struct intel_pinctrl *pctrl, int irq)
 	pctrl->chip.parent = pctrl->dev;
 	pctrl->chip.base = -1;
 	pctrl->irq = irq;
+
+	irqchip = pctrl->soc->intel_gpio_irqchip;
+
+	irqchip->irq_ack = intel_gpio_irq_ack;
+	irqchip->irq_mask = intel_gpio_irq_mask;
+	irqchip->irq_unmask = intel_gpio_irq_unmask;
+	irqchip->irq_set_type = intel_gpio_irq_type;
+	irqchip->irq_set_wake = intel_gpio_irq_wake;
 
 	ret = devm_gpiochip_add_data(pctrl->dev, &pctrl->chip, pctrl);
 	if (ret) {
@@ -1075,14 +1074,14 @@ static int intel_gpio_probe(struct intel_pinctrl *pctrl, int irq)
 		return ret;
 	}
 
-	ret = gpiochip_irqchip_add(&pctrl->chip, &intel_gpio_irqchip, 0,
+	ret = gpiochip_irqchip_add(&pctrl->chip, irqchip, 0,
 				   handle_bad_irq, IRQ_TYPE_NONE);
 	if (ret) {
 		dev_err(pctrl->dev, "failed to add irqchip\n");
 		return ret;
 	}
 
-	gpiochip_set_chained_irqchip(&pctrl->chip, &intel_gpio_irqchip, irq,
+	gpiochip_set_chained_irqchip(&pctrl->chip, irqchip, irq,
 				     NULL);
 	return 0;
 }

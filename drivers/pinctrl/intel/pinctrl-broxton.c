@@ -14,6 +14,7 @@
 #include <linux/platform_device.h>
 #include <linux/pm.h>
 #include <linux/pinctrl/pinctrl.h>
+#include <linux/gpio.h>
 
 #include "pinctrl-intel.h"
 
@@ -34,6 +35,16 @@
 	}
 
 /* BXT */
+
+static struct irq_chip bxt_gpio_irqchip = {
+	.name = "intel-gpio",
+
+	/* pass optional platform specific flags or settings privately from
+	 * here to pinctrl-intel driver e.g.
+	 * .flags = IRQCHIP_MASK_ON_SUSPEND,
+	 */
+};
+
 static const struct pinctrl_pin_desc bxt_north_pins[] = {
 	PINCTRL_PIN(0, "GPIO_0"),
 	PINCTRL_PIN(1, "GPIO_1"),
@@ -1011,8 +1022,8 @@ static const struct platform_device_id bxt_pinctrl_platform_ids[] = {
 
 static int bxt_pinctrl_probe(struct platform_device *pdev)
 {
-	const struct intel_pinctrl_soc_data *soc_data = NULL;
 	const struct intel_pinctrl_soc_data **soc_table;
+	struct intel_pinctrl_soc_data *soc_data = NULL;
 	struct acpi_device *adev;
 	int i;
 
@@ -1047,6 +1058,9 @@ static int bxt_pinctrl_probe(struct platform_device *pdev)
 
 	if (!soc_data)
 		return -ENODEV;
+
+	/* pass private irq_chip common settings to pinctrl-intel driver */
+	soc_data->intel_gpio_irqchip = &bxt_gpio_irqchip;
 
 	return intel_pinctrl_probe(pdev, soc_data);
 }

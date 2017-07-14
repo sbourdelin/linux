@@ -14,6 +14,7 @@
 #include <linux/platform_device.h>
 #include <linux/pm.h>
 #include <linux/pinctrl/pinctrl.h>
+#include <linux/gpio.h>
 
 #include "pinctrl-intel.h"
 
@@ -34,6 +35,16 @@
 	}
 
 /* GLK */
+
+static struct irq_chip glk_gpio_irqchip = {
+	.name = "intel-gpio",
+
+	/* pass optional platform specific flags or settings privately from
+	 * here to pinctrl-intel driver e.g.
+	 * .flags = IRQCHIP_MASK_ON_SUSPEND,
+	 */
+};
+
 static const struct pinctrl_pin_desc glk_northwest_pins[] = {
 	PINCTRL_PIN(0, "TCK"),
 	PINCTRL_PIN(1, "TRST_B"),
@@ -477,6 +488,9 @@ static int glk_pinctrl_probe(struct platform_device *pdev)
 
 	if (!soc_data)
 		return -ENODEV;
+
+	/* pass private irq_chip common settings to pinctrl-intel driver */
+	soc_data->intel_gpio_irqchip = &glk_gpio_irqchip;
 
 	return intel_pinctrl_probe(pdev, soc_data);
 }

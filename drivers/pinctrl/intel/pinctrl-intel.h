@@ -166,6 +166,7 @@ struct intel_pinctrl_soc_data {
 	size_t nfunctions;
 	const struct intel_community *communities;
 	size_t ncommunities;
+	struct irq_chip *intel_gpio_irqchip;
 };
 
 int intel_pinctrl_probe(struct platform_device *pdev,

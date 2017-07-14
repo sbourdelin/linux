@@ -14,6 +14,7 @@
 #include <linux/platform_device.h>
 #include <linux/pm.h>
 #include <linux/pinctrl/pinctrl.h>
+#include <linux/gpio.h>
 
 #include "pinctrl-intel.h"
 
@@ -43,6 +44,16 @@
 	}
 
 /* Cannon Lake-LP */
+
+static struct irq_chip cnllp_gpio_irqchip = {
+	.name = "intel-gpio",
+
+	/* pass optional platform specific flags or settings privately from
+	 * here to pinctrl-intel driver e.g.
+	 * .flags = IRQCHIP_MASK_ON_SUSPEND,
+	 */
+};
+
 static const struct pinctrl_pin_desc cnllp_pins[] = {
 	/* GPP_A */
 	PINCTRL_PIN(0, "RCINB"),
@@ -400,6 +411,7 @@ static const struct intel_pinctrl_soc_data cnllp_soc_data = {
 	.nfunctions = ARRAY_SIZE(cnllp_functions),
 	.communities = cnllp_communities,
 	.ncommunities = ARRAY_SIZE(cnllp_communities),
+	.intel_gpio_irqchip = &cnllp_gpio_irqchip,
 };
 
 static const struct acpi_device_id cnl_pinctrl_acpi_match[] = {

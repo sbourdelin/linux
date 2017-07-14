@@ -15,6 +15,7 @@
 #include <linux/platform_device.h>
 #include <linux/pm.h>
 #include <linux/pinctrl/pinctrl.h>
+#include <linux/gpio.h>
 
 #include "pinctrl-intel.h"
 
@@ -37,6 +38,16 @@
 	}
 
 /* Sunrisepoint-LP */
+
+static struct irq_chip sptlp_gpio_irqchip = {
+	.name = "intel-gpio",
+
+	/* pass optional platform specific flags or settings privately from
+	 * here to pinctrl-intel driver e.g.
+	 * .flags = IRQCHIP_MASK_ON_SUSPEND,
+	 */
+};
+
 static const struct pinctrl_pin_desc sptlp_pins[] = {
 	/* GPP_A */
 	PINCTRL_PIN(0, "RCINB"),
@@ -284,9 +295,20 @@ static const struct intel_pinctrl_soc_data sptlp_soc_data = {
 	.nfunctions = ARRAY_SIZE(sptlp_functions),
 	.communities = sptlp_communities,
 	.ncommunities = ARRAY_SIZE(sptlp_communities),
+	.intel_gpio_irqchip = &sptlp_gpio_irqchip,
 };
 
 /* Sunrisepoint-H */
+
+static struct irq_chip spth_gpio_irqchip = {
+	.name = "intel-gpio",
+
+	/* pass optional platform specific flags or settings privately from
+	 * here to pinctrl-intel driver e.g.
+	 * .flags = IRQCHIP_MASK_ON_SUSPEND,
+	 */
+};
+
 static const struct pinctrl_pin_desc spth_pins[] = {
 	/* GPP_A */
 	PINCTRL_PIN(0, "RCINB"),
@@ -546,6 +568,7 @@ static const struct intel_pinctrl_soc_data spth_soc_data = {
 	.nfunctions = ARRAY_SIZE(spth_functions),
 	.communities = spth_communities,
 	.ncommunities = ARRAY_SIZE(spth_communities),
+	.intel_gpio_irqchip = &spth_gpio_irqchip,
 };
 
 static const struct acpi_device_id spt_pinctrl_acpi_match[] = {
