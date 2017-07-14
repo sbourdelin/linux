@@ -164,11 +164,9 @@ static void delayed_free_pidns(struct rcu_head *p)
 
 static void destroy_pid_namespace(struct pid_namespace *ns)
 {
-	int i;
-
 	ns_free_inum(&ns->ns);
-	for (i = 0; i < PIDMAP_ENTRIES; i++)
-		kfree(ns->pidmap[i].page);
+
+	idr_destroy(ns->idr);
 	call_rcu(&ns->rcu, delayed_free_pidns);
 }
 
