@@ -203,10 +203,11 @@ EXPORT_SYMBOL_GPL(put_pid_ns);
 
 void zap_pid_ns_processes(struct pid_namespace *pid_ns)
 {
-	int nr;
+	int nr = 2;
 	int rc;
 	struct task_struct *task, *me = current;
 	int init_pids = thread_group_leader(me) ? 1 : 2;
+	struct pid *pid;
 
 	/* Don't allow any more processes into the pid namespace */
 	disable_pid_allocation(pid_ns);
@@ -234,8 +235,8 @@ void zap_pid_ns_processes(struct pid_namespace *pid_ns)
 	 *
 	 */
 	read_lock(&tasklist_lock);
-	nr = next_pidmap(pid_ns, 1);
-	while (nr > 0) {
+	pid = idr_get_next(pid_ns->idr, &nr);
+	while (pid) {
 		rcu_read_lock();
 
 		task = pid_task(find_vpid(nr), PIDTYPE_PID);
@@ -244,7 +245,8 @@ void zap_pid_ns_processes(struct pid_namespace *pid_ns)
 
 		rcu_read_unlock();
 
-		nr = next_pidmap(pid_ns, nr);
+		nr++;
+		pid = idr_get_next(pid_ns->idr, &nr);
 	}
 	read_unlock(&tasklist_lock);
 
