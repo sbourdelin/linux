@@ -101,6 +101,7 @@ config ADB_PMU_LED_DISK
 config PMAC_SMU
 	bool "Support for SMU  based PowerMacs"
 	depends on PPC_PMAC64
+	default PPC_PMAC64
 	help
 	  This option adds support for the newer G5 iMacs and PowerMacs based
 	  on the "SMU" system control chip which replaces the old PMU.
@@ -194,11 +195,13 @@ config THERM_ADT746X
 config WINDFARM
 	tristate "New PowerMac thermal control infrastructure"
 	depends on PPC
+	default PPC_PMAC
 
 config WINDFARM_PM81
 	tristate "Support for thermal management on iMac G5"
 	depends on WINDFARM && I2C && CPU_FREQ_PMAC64 && PMAC_SMU
 	select I2C_POWERMAC
+	default CPU_FREQ_PMAC64
 	help
 	  This driver provides thermal control for the iMacG5
 
@@ -206,6 +209,7 @@ config WINDFARM_PM72
 	tristate "Support for thermal management on PowerMac G5 (AGP)"
 	depends on WINDFARM && I2C && CPU_FREQ_PMAC64 && ADB_PMU
 	select I2C_POWERMAC
+	default CPU_FREQ_PMAC64
 	help
 	  This driver provides thermal control for the PowerMac G5
 	  "AGP" variants (PowerMac 7,2 and 7,3)
@@ -214,6 +218,7 @@ config WINDFARM_RM31
 	tristate "Support for thermal management on Xserve G5"
 	depends on WINDFARM && I2C && CPU_FREQ_PMAC64 && ADB_PMU
 	select I2C_POWERMAC
+	default CPU_FREQ_PMAC64
 	help
 	  This driver provides thermal control for the Xserve G5
 	  (RackMac3,1)
@@ -222,6 +227,7 @@ config WINDFARM_PM91
 	tristate "Support for thermal management on PowerMac9,1"
 	depends on WINDFARM && I2C && CPU_FREQ_PMAC64 && PMAC_SMU
 	select I2C_POWERMAC
+	default CPU_FREQ_PMAC64
 	help
 	  This driver provides thermal control for the PowerMac9,1
           which is the recent (SMU based) single CPU desktop G5
