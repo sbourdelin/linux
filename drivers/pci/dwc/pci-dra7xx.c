@@ -145,22 +145,20 @@ static int dra7xx_pcie_establish_link(struct dw_pcie *pci)
 	}
 
 	if (dra7xx->link_gen == 1) {
-		dw_pcie_read(pci->dbi_base + exp_cap_off + PCI_EXP_LNKCAP,
-			     4, &reg);
+		reg = dw_pcie_readl_dbi(pci, exp_cap_off + PCI_EXP_LNKCAP);
 		if ((reg & PCI_EXP_LNKCAP_SLS) != PCI_EXP_LNKCAP_SLS_2_5GB) {
 			reg &= ~((u32)PCI_EXP_LNKCAP_SLS);
 			reg |= PCI_EXP_LNKCAP_SLS_2_5GB;
-			dw_pcie_write(pci->dbi_base + exp_cap_off +
-				      PCI_EXP_LNKCAP, 4, reg);
+			dw_pcie_writel_dbi(pci, exp_cap_off + PCI_EXP_LNKCAP,
+					   reg);
 		}
 
-		dw_pcie_read(pci->dbi_base + exp_cap_off + PCI_EXP_LNKCTL2,
-			     2, &reg);
+		reg = dw_pcie_readw_dbi(pci, exp_cap_off + PCI_EXP_LNKCTL2);
 		if ((reg & PCI_EXP_LNKCAP_SLS) != PCI_EXP_LNKCAP_SLS_2_5GB) {
 			reg &= ~((u32)PCI_EXP_LNKCAP_SLS);
 			reg |= PCI_EXP_LNKCAP_SLS_2_5GB;
-			dw_pcie_write(pci->dbi_base + exp_cap_off +
-				      PCI_EXP_LNKCTL2, 2, reg);
+			dw_pcie_writew_dbi(pci, exp_cap_off + PCI_EXP_LNKCTL2,
+					   reg);
 		}
 	}
 
