@@ -924,9 +924,11 @@ struct nvmet_subsys *nvmet_subsys_alloc(const char *subsysnqn,
 	if (!subsys)
 		return NULL;
 
+	down_write(&nvmet_config_sem);
 	subsys->ver = NVME_VS(1, 3, 0); /* NVMe 1.3.0 */
 	/* generate a random serial number as our controllers are ephemeral: */
 	get_random_bytes(&subsys->serial, sizeof(subsys->serial));
+	up_write(&nvmet_config_sem);
 
 	switch (type) {
 	case NVME_NQN_NVME:
