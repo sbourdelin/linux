@@ -236,6 +236,9 @@ static DEFINE_MUTEX(scan_mutex);
 static int kmemleak_skip_disable;
 /* If there are leaks that can be reported */
 static bool kmemleak_found_leaks;
+/* If disable kmemleak after out of memory */
+static bool kmemleak_oom_disable = true;
+
 
 /*
  * Early object allocation/freeing logging. Kmemleak is initialized after the
@@ -556,7 +559,8 @@ static struct kmemleak_object *create_object(unsigned long ptr, size_t size,
 	object = kmem_cache_alloc(object_cache, gfp_kmemleak_mask(gfp));
 	if (!object) {
 		pr_warn("Cannot allocate a kmemleak_object structure\n");
-		kmemleak_disable();
+		if (kmemleak_oom_disable)
+			kmemleak_disable();
 		return NULL;
 	}
 
@@ -1888,6 +1892,10 @@ static ssize_t kmemleak_write(struct file *file, const char __user *user_buf,
 		kmemleak_scan();
 	else if (strncmp(buf, "dump=", 5) == 0)
 		ret = dump_str_object_info(buf + 5);
+	else if (strncmp(buf, "oom=ignore", 10))
+		kmemleak_oom_disable = false;
+	else if (strncmp(buf, "oom=disable", 11))
+		kmemleak_oom_disable = true;
 	else
 		ret = -EINVAL;
 
