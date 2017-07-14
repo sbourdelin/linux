@@ -2384,8 +2384,6 @@ void __init apic_bsp_setup(bool upmode)
 #ifdef CONFIG_UP_LATE_INIT
 void __init up_late_init(void)
 {
-	x86_init.irqs.intr_mode_init();
-
 	if (apic_intr_mode == APIC_PIC)
 		return;
 
