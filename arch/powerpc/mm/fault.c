@@ -238,6 +238,27 @@ int do_page_fault(struct pt_regs *regs, unsigned long address,
 	}
 #endif /* CONFIG_PPC_ICSWX */
 
+#ifdef CONFIG_PPC_STD_MMU_64
+	/*
+	 * These faults indicate various errors that can't be recovered
+	 * by updating the PTE, there is no point handling them any later
+	 * than here. I also noticed in some case the DAR isn't being set
+	 * propertly (DSISR_BAD_COPYPASTE for example).
+	 */
+	if (error_code & (DSISR_ATT_CONFLICT |
+			  DSISR_BADACCESS |
+			  DSISR_UNSUPP_MMU |
+			  DSISR_BAD_COPYPASTE |
+			  DSISR_BAD_AMO |
+			  DSISR_BAD_CI_LDST)) {
+		if (user_mode(regs))
+			_exception(SIGBUS, regs, BUS_OBJERR, address);
+		else
+			rc = SIGBUS;
+		goto bail;
+	}
+#endif /* CONFIG_PPC_STD_MMU_64 */
+
 	if (notify_page_fault(regs))
 		goto bail;
 

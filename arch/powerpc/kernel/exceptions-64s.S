@@ -1452,8 +1452,10 @@ USE_TEXT_SECTION()
 	.balign	IFETCH_ALIGN_BYTES
 do_hash_page:
 #ifdef CONFIG_PPC_STD_MMU_64
-	andis.	r0,r4,0xa450		/* weird error? */
-	bne-	handle_page_fault	/* if not, try to insert a HPTE */
+	lis	r0,DSISR_DONT_HASH@h
+	ori	r0,r0,DSISR_DONT_HASH@l
+	and.	r0,r0,r4
+	bne-	handle_page_fault
 	CURRENT_THREAD_INFO(r11, r1)
 	lwz	r0,TI_PREEMPT(r11)	/* If we're in an "NMI" */
 	andis.	r0,r0,NMI_MASK@h	/* (i.e. an irq when soft-disabled) */

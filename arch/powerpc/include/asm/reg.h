@@ -272,16 +272,34 @@
 #define SPRN_DAR	0x013	/* Data Address Register */
 #define SPRN_DBCR	0x136	/* e300 Data Breakpoint Control Reg */
 #define SPRN_DSISR	0x012	/* Data Storage Interrupt Status Register */
+#define   DSISR_BAD_DIRECT_ST	0x80000000	/* Direct store error (obsolete) */
 #define   DSISR_NOHPTE		0x40000000	/* no translation found */
+#define   DSISR_ATT_CONFLICT	0x20000000	/* Attribute conflicts (P9) */
 #define   DSISR_PROTFAULT	0x08000000	/* protection fault */
 #define   DSISR_BADACCESS	0x04000000	/* bad access to CI or G */
 #define   DSISR_ISSTORE		0x02000000	/* access was a store */
 #define   DSISR_DABRMATCH	0x00400000	/* hit data breakpoint */
 #define   DSISR_NOSEGMENT	0x00200000	/* SLB miss */
 #define   DSISR_KEYFAULT	0x00200000	/* Key fault */
+#define   DSISR_BAD_EXT_CTRL	0x00100000	/* External control error (obsolete) */
 #define   DSISR_UNSUPP_MMU	0x00080000	/* Unsupported MMU config */
 #define   DSISR_SET_RC		0x00040000	/* Failed setting of R/C bits */
 #define   DSISR_PGDIRFAULT      0x00020000      /* Fault on page directory */
+#define   DSISR_BAD_COPYPASTE   0x00000008      /* Copy/Paste on wrong mem type */
+#define   DSISR_BAD_AMO		0x00000004	/* Incorrect AMO opcode */
+#define   DSISR_BAD_CI_LDST	0x00000002	/* CI load/store with DR=1 or in G=0 HV space */
+
+/* Don't bother going to hash_page for any of these */
+#define   DSISR_DONT_HASH	(DSISR_BAD_DIRECT_ST |	\
+				 DSISR_ATT_CONFLICT |	\
+				 DSISR_BADACCESS |	\
+				 DSISR_DABRMATCH |	\
+				 DSISR_BAD_EXT_CTRL |   \
+				 DSISR_UNSUPP_MMU |	\
+				 DSISR_BAD_COPYPASTE |	\
+				 DSISR_BAD_AMO |	\
+				 DSISR_BAD_CI_LDST)
+
 #define SPRN_TBRL	0x10C	/* Time Base Read Lower Register (user, R/O) */
 #define SPRN_TBRU	0x10D	/* Time Base Read Upper Register (user, R/O) */
 #define SPRN_CIR	0x11B	/* Chip Information Register (hyper, R/0) */
