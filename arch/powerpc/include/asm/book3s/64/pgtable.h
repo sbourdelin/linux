@@ -1192,5 +1192,12 @@ static inline const int pud_pfn(pud_t pud)
 	BUILD_BUG();
 	return 0;
 }
+
+#ifdef CONFIG_STRICT_KERNEL_RWX
+void mark_initmem_nx(void);
+#else
+static inline void mark_initmem_nx(void) { }
+#endif
+
 #endif /* __ASSEMBLY__ */
 #endif /* _ASM_POWERPC_BOOK3S_64_PGTABLE_H_ */
