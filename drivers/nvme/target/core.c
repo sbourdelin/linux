@@ -767,8 +767,10 @@ u16 nvmet_alloc_ctrl(const char *subsysnqn, const char *hostnqn,
 	memcpy(ctrl->subsysnqn, subsysnqn, NVMF_NQN_SIZE);
 	memcpy(ctrl->hostnqn, hostnqn, NVMF_NQN_SIZE);
 
+	down_read(&nvmet_config_sem);
 	if (!subsys->serial)
 		get_random_bytes(&subsys->serial, sizeof(subsys->serial));
+	up_read(&nvmet_config_sem);
 
 	kref_init(&ctrl->ref);
 	ctrl->subsys = subsys;
