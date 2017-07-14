@@ -75,8 +75,8 @@ struct pcxhr_mgr {
 	unsigned long port[3];
 
 	/* share the name */
-	char shortname[32];		/* short name of this soundcard */
-	char longname[96];		/* name of this soundcard */
+	char shortname[16];		/* short name of this soundcard */
+	char longname[40];		/* name of this soundcard */
 
 	struct pcxhr_rmh *prmh;
 

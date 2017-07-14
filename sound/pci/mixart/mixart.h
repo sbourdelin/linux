@@ -75,8 +75,8 @@ struct mixart_mgr {
 	struct mem_area mem[2];
 
 	/* share the name */
-	char shortname[32];         /* short name of this soundcard */
-	char longname[80];          /* name of this soundcard */
+	char shortname[16];         /* short name of this soundcard */
+	char longname[40];          /* name of this soundcard */
 
 	/* one and only blocking message or notification may be pending  */
 	u32 pending_event;

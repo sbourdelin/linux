@@ -2061,7 +2061,7 @@ static int snd_hdspm_create_midi(struct snd_card *card,
 				 struct hdspm *hdspm, int id)
 {
 	int err;
-	char buf[32];
+	char buf[64];
 
 	hdspm->midi[id].id = id;
 	hdspm->midi[id].hdspm = hdspm;
