@@ -98,7 +98,6 @@ static struct pid_namespace *create_pid_namespace(struct user_namespace *user_ns
 	struct pid_namespace *ns;
 	unsigned int level = parent_pid_ns->level + 1;
 	struct ucounts *ucounts;
-	int i;
 	int err;
 
 	err = -ENOSPC;
@@ -113,17 +112,15 @@ static struct pid_namespace *create_pid_namespace(struct user_namespace *user_ns
 	if (ns == NULL)
 		goto out_dec;
 
-	ns->pidmap[0].page = kzalloc(PAGE_SIZE, GFP_KERNEL);
-	if (!ns->pidmap[0].page)
-		goto out_free;
+	idr_init(ns->idr);
 
 	ns->pid_cachep = create_pid_cachep(level + 1);
 	if (ns->pid_cachep == NULL)
-		goto out_free_map;
+		goto out_free_idr;
 
 	err = ns_alloc_inum(&ns->ns);
 	if (err)
-		goto out_free_map;
+		goto out_free_idr;
 	ns->ns.ops = &pidns_operations;
 
 	kref_init(&ns->kref);
@@ -134,17 +131,10 @@ static struct pid_namespace *create_pid_namespace(struct user_namespace *user_ns
 	ns->nr_hashed = PIDNS_HASH_ADDING;
 	INIT_WORK(&ns->proc_work, proc_cleanup_work);
 
-	set_bit(0, ns->pidmap[0].page);
-	atomic_set(&ns->pidmap[0].nr_free, BITS_PER_PAGE - 1);
-
-	for (i = 1; i < PIDMAP_ENTRIES; i++)
-		atomic_set(&ns->pidmap[i].nr_free, BITS_PER_PAGE);
-
 	return ns;
 
-out_free_map:
-	kfree(ns->pidmap[0].page);
-out_free:
+out_free_idr:
+	idr_destroy(ns->idr);
 	kmem_cache_free(pid_ns_cachep, ns);
 out_dec:
 	dec_pid_namespaces(ucounts);
