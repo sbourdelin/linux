@@ -5064,10 +5064,7 @@ static void btrfs_async_reclaim_metadata_space(struct work_struct *work)
 
 	flush_state = FLUSH_DELAYED_ITEMS_NR;
 	do {
-		struct reserve_ticket *ticket;
-		int ret;
-
-		ret = flush_space(fs_info, space_info, to_reclaim, to_reclaim,
+		flush_space(fs_info, space_info, to_reclaim, to_reclaim,
 				  flush_state);
 		spin_lock(&space_info->lock);
 		if (list_empty(&space_info->tickets)) {
@@ -5078,8 +5075,6 @@ static void btrfs_async_reclaim_metadata_space(struct work_struct *work)
 		to_reclaim = btrfs_calc_reclaim_metadata_size(fs_info,
 							      space_info,
 							      false);
-		ticket = list_first_entry(&space_info->tickets,
-					  struct reserve_ticket, list);
 		if (last_tickets_id == space_info->tickets_id) {
 			flush_state++;
 		} else {
