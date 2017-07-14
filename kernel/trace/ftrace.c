@@ -36,6 +36,7 @@
 
 #include <trace/events/sched.h>
 
+#include <asm/kprobes.h>
 #include <asm/sections.h>
 #include <asm/setup.h>
 
@@ -5742,6 +5743,7 @@ static void ftrace_ops_assist_func(unsigned long ip, unsigned long parent_ip,
 	preempt_enable_notrace();
 	trace_clear_recursion(bit);
 }
+NOKPROBE_SYMBOL(ftrace_ops_assist_func);
 
 /**
  * ftrace_ops_get_func - get the function a trampoline should call
