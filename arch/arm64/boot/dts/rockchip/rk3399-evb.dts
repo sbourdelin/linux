@@ -198,6 +198,8 @@
 &pcie0 {
 	ep-gpios = <&gpio3 RK_PB5 GPIO_ACTIVE_HIGH>;
 	num-lanes = <4>;
+	phys = <&pcie_phy 0>, <&pcie_phy 1>, <&pcie_phy 2>, <&pcie_phy 3>;
+	phy-names = "pcie-phy-0", "pcie-phy-1", "pcie-phy-2", "pcie-phy-3";
 	pinctrl-names = "default";
 	pinctrl-0 = <&pcie_clkreqn>;
 	status = "disabled";
