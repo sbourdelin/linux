@@ -1808,7 +1808,7 @@ static struct attribute *fc_statistics_attrs[] = {
 	NULL
 };
 
-static struct attribute_group fc_statistics_group = {
+static const struct attribute_group fc_statistics_group = {
 	.name = "statistics",
 	.attrs = fc_statistics_attrs,
 };
