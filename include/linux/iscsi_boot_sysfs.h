@@ -74,7 +74,7 @@ struct attribute_group;
 
 struct iscsi_boot_kobj {
 	struct kobject kobj;
-	struct attribute_group *attr_group;
+	const struct attribute_group *attr_group;
 	struct list_head list;
 
 	/*

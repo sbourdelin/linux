@@ -157,7 +157,7 @@ static umode_t iscsi_boot_tgt_attr_is_visible(struct kobject *kobj,
 	return 0;
 }
 
-static struct attribute_group iscsi_boot_target_attr_group = {
+static const struct attribute_group iscsi_boot_target_attr_group = {
 	.attrs = target_attrs,
 	.is_visible = iscsi_boot_tgt_attr_is_visible,
 };
@@ -243,7 +243,7 @@ static umode_t iscsi_boot_eth_attr_is_visible(struct kobject *kobj,
 	return 0;
 }
 
-static struct attribute_group iscsi_boot_ethernet_attr_group = {
+static const struct attribute_group iscsi_boot_ethernet_attr_group = {
 	.attrs = ethernet_attrs,
 	.is_visible = iscsi_boot_eth_attr_is_visible,
 };
@@ -301,7 +301,7 @@ static umode_t iscsi_boot_ini_attr_is_visible(struct kobject *kobj,
 	return 0;
 }
 
-static struct attribute_group iscsi_boot_initiator_attr_group = {
+static const struct attribute_group iscsi_boot_initiator_attr_group = {
 	.attrs = initiator_attrs,
 	.is_visible = iscsi_boot_ini_attr_is_visible,
 };
@@ -337,14 +337,14 @@ static umode_t iscsi_boot_acpitbl_attr_is_visible(struct kobject *kobj,
 	return 0;
 }
 
-static struct attribute_group iscsi_boot_acpitbl_attr_group = {
+static const struct attribute_group iscsi_boot_acpitbl_attr_group = {
 	.attrs = acpitbl_attrs,
 	.is_visible = iscsi_boot_acpitbl_attr_is_visible,
 };
 
 static struct iscsi_boot_kobj *
 iscsi_boot_create_kobj(struct iscsi_boot_kset *boot_kset,
-		       struct attribute_group *attr_group,
+		       const struct attribute_group *attr_group,
 		       const char *name, int index, void *data,
 		       ssize_t (*show) (void *data, int type, char *buf),
 		       umode_t (*is_visible) (void *data, int type),
