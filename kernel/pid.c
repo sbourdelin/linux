@@ -64,9 +64,6 @@ int pid_max_max = PID_MAX_LIMIT;
  */
 struct pid_namespace init_pid_ns = {
 	.kref = KREF_INIT(2),
-	.pidmap = {
-		[ 0 ... PIDMAP_ENTRIES-1] = { ATOMIC_INIT(BITS_PER_PAGE), NULL }
-	},
 	.last_pid = 0,
 	.nr_hashed = PIDNS_HASH_ADDING,
 	.level = 0,
@@ -459,7 +456,7 @@ void __init pidhash_init(void)
 		INIT_HLIST_HEAD(&pid_hash[i]);
 }
 
-void __init pidmap_init(void)
+void __init pid_idr_init(void)
 {
 	/* Verify no one has done anything silly: */
 	BUILD_BUG_ON(PID_MAX_LIMIT >= PIDNS_HASH_ADDING);
@@ -471,10 +468,9 @@ void __init pidmap_init(void)
 				PIDS_PER_CPU_MIN * num_possible_cpus());
 	pr_info("pid_max: default: %u minimum: %u\n", pid_max, pid_max_min);
 
-	init_pid_ns.pidmap[0].page = kzalloc(PAGE_SIZE, GFP_KERNEL);
-	/* Reserve PID 0. We never call free_pidmap(0) */
-	set_bit(0, init_pid_ns.pidmap[0].page);
-	atomic_dec(&init_pid_ns.pidmap[0].nr_free);
+	idr_init(init_pid_ns.idr);
+	/* Reserve PID 0. */
+	idr_alloc_cyclic(init_pid_ns.idr, &init_pid_ns, 0, 0, GFP_KERNEL);
 
 	init_pid_ns.pid_cachep = KMEM_CACHE(pid,
 			SLAB_HWCACHE_ALIGN | SLAB_PANIC | SLAB_ACCOUNT);

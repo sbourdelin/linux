@@ -105,6 +105,6 @@ static inline int reboot_pid_ns(struct pid_namespace *pid_ns, int cmd)
 
 extern struct pid_namespace *task_active_pid_ns(struct task_struct *tsk);
 void pidhash_init(void);
-void pidmap_init(void);
+void pid_idr_init(void);
 
 #endif /* _LINUX_PID_NS_H */
