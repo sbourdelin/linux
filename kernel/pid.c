@@ -101,16 +101,6 @@ EXPORT_SYMBOL_GPL(init_pid_ns);
 
 static  __cacheline_aligned_in_smp DEFINE_SPINLOCK(pidmap_lock);
 
-static void free_pidmap(struct upid *upid)
-{
-	int nr = upid->nr;
-	struct pidmap *map = upid->ns->pidmap + nr / BITS_PER_PAGE;
-	int offset = nr & BITS_PER_PAGE_MASK;
-
-	clear_bit(offset, map->page);
-	atomic_inc(&map->nr_free);
-}
-
 /*
  * If we started walking pids at 'base', is 'a' seen before 'b'?
  */
@@ -148,89 +138,6 @@ static void set_last_pid(struct pid_namespace *pid_ns, int base, int pid)
 		prev = last_write;
 		last_write = cmpxchg(&pid_ns->last_pid, prev, pid);
 	} while ((prev != last_write) && (pid_before(base, last_write, pid)));
-}
-
-static int alloc_pidmap(struct pid_namespace *pid_ns)
-{
-	int i, offset, max_scan, pid, last = pid_ns->last_pid;
-	struct pidmap *map;
-
-	pid = last + 1;
-	if (pid >= pid_max)
-		pid = RESERVED_PIDS;
-	offset = pid & BITS_PER_PAGE_MASK;
-	map = &pid_ns->pidmap[pid/BITS_PER_PAGE];
-	/*
-	 * If last_pid points into the middle of the map->page we
-	 * want to scan this bitmap block twice, the second time
-	 * we start with offset == 0 (or RESERVED_PIDS).
-	 */
-	max_scan = DIV_ROUND_UP(pid_max, BITS_PER_PAGE) - !offset;
-	for (i = 0; i <= max_scan; ++i) {
-		if (unlikely(!map->page)) {
-			void *page = kzalloc(PAGE_SIZE, GFP_KERNEL);
-			/*
-			 * Free the page if someone raced with us
-			 * installing it:
-			 */
-			spin_lock_irq(&pidmap_lock);
-			if (!map->page) {
-				map->page = page;
-				page = NULL;
-			}
-			spin_unlock_irq(&pidmap_lock);
-			kfree(page);
-			if (unlikely(!map->page))
-				return -ENOMEM;
-		}
-		if (likely(atomic_read(&map->nr_free))) {
-			for ( ; ; ) {
-				if (!test_and_set_bit(offset, map->page)) {
-					atomic_dec(&map->nr_free);
-					set_last_pid(pid_ns, last, pid);
-					return pid;
-				}
-				offset = find_next_offset(map, offset);
-				if (offset >= BITS_PER_PAGE)
-					break;
-				pid = mk_pid(pid_ns, map, offset);
-				if (pid >= pid_max)
-					break;
-			}
-		}
-		if (map < &pid_ns->pidmap[(pid_max-1)/BITS_PER_PAGE]) {
-			++map;
-			offset = 0;
-		} else {
-			map = &pid_ns->pidmap[0];
-			offset = RESERVED_PIDS;
-			if (unlikely(last == offset))
-				break;
-		}
-		pid = mk_pid(pid_ns, map, offset);
-	}
-	return -EAGAIN;
-}
-
-int next_pidmap(struct pid_namespace *pid_ns, unsigned int last)
-{
-	int offset;
-	struct pidmap *map, *end;
-
-	if (last >= PID_MAX_LIMIT)
-		return -1;
-
-	offset = (last + 1) & BITS_PER_PAGE_MASK;
-	map = &pid_ns->pidmap[(last + 1)/BITS_PER_PAGE];
-	end = &pid_ns->pidmap[PIDMAP_ENTRIES];
-	for (; map < end; map++, offset = 0) {
-		if (unlikely(!map->page))
-			continue;
-		offset = find_next_bit((map)->page, BITS_PER_PAGE, offset);
-		if (offset < BITS_PER_PAGE)
-			return mk_pid(pid_ns, map, offset);
-	}
-	return -1;
 }
 
 void put_pid(struct pid *pid)
