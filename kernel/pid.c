@@ -574,13 +574,7 @@ struct pid *find_ge_pid(int nr, struct pid_namespace *ns)
 {
 	struct pid *pid;
 
-	do {
-		pid = find_pid_ns(nr, ns);
-		if (pid)
-			break;
-		nr = next_pidmap(ns, nr);
-	} while (nr > 0);
-
+	pid = idr_get_next(ns->idr, &nr);
 	return pid;
 }
 
