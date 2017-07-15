@@ -25,8 +25,9 @@ if [ ! -d $DIR ]; then
 fi
 
 # CONFIG_FW_LOADER_USER_HELPER has a sysfs class under /sys/class/firmware/
-# These days no one enables CONFIG_FW_LOADER_USER_HELPER so check for that
-# as an indicator for CONFIG_FW_LOADER_USER_HELPER.
+# These days most distros enable CONFIG_FW_LOADER_USER_HELPER but disable
+# CONFIG_FW_LOADER_USER_HELPER_FALLBACK. We use /sys/class/firmware/ as an
+# indicator for CONFIG_FW_LOADER_USER_HELPER.
 HAS_FW_LOADER_USER_HELPER=$(if [ -d /sys/class/firmware/ ]; then echo yes; else echo no; fi)
 
 if [ "$HAS_FW_LOADER_USER_HELPER" = "yes" ]; then
@@ -115,5 +116,105 @@ if ! diff -q "$FW" /dev/test_firmware >/dev/null ; then
 else
 	echo "$0: async filesystem loading works"
 fi
+
+### Batched requests tests
+test_config_present()
+{
+	if [ ! -f $DIR/reset ]; then
+		echo "Configuration triggers not present, ignoring test"
+		exit 0
+	fi
+}
+
+# Defaults:
+# send_uevent is 1
+# sync_direct is 0
+config_reset()
+{
+	echo 1 >  $DIR/reset
+}
+
+config_set_sync_direct()
+{
+	echo 1 >  $DIR/config_sync_direct
+}
+
+config_unset_sync_direct()
+{
+	echo 0 >  $DIR/config_sync_direct
+}
+
+config_set_uevent()
+{
+	echo 1 >  $DIR/config_send_uevent
+}
+
+config_unset_uevent()
+{
+	echo 0 >  $DIR/config_send_uevent
+}
+
+config_trigger_sync()
+{
+	echo -n 1 > $DIR/trigger_batched_requests 2>/dev/null
+}
+
+config_trigger_async()
+{
+	echo -n 1 > $DIR/trigger_batched_requests_async 2> /dev/null
+}
+
+test_batched_request_firmware()
+{
+	echo -n "Batched request_firmware() try #$1: "
+	config_reset
+	config_trigger_sync
+	echo "OK"
+}
+
+test_batched_request_firmware_direct()
+{
+	echo -n "Batched request_firmware_direct() try #$1: "
+	config_reset
+	config_set_sync_direct
+	config_trigger_sync
+	echo "OK"
+}
+
+test_request_firmware_nowait_uevent()
+{
+	echo -n "Batched request_firmware_nowait(uevent=true) try #$1: "
+	config_reset
+	config_trigger_async
+	echo "OK"
+}
+
+test_request_firmware_nowait_custom()
+{
+	echo -n "Batched request_firmware_nowait(uevent=false) try #$1: "
+	config_unset_uevent
+	config_trigger_async
+	echo "OK"
+}
+
+# Only continue if batched request triggers are present on the
+# test-firmware driver
+test_config_present
+
+for i in $(seq 1 5); do
+	test_batched_request_firmware $i
+done
+
+for i in $(seq 1 5); do
+	test_batched_request_firmware_direct $i
+done
+
+for i in $(seq 1 5); do
+	test_request_firmware_nowait_uevent $i
+done
+
+for i in $(seq 1 5); do
+	test_request_firmware_nowait_custom $i
+done
 
 exit 0
