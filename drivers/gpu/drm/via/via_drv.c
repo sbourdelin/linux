@@ -53,7 +53,7 @@ static void via_driver_postclose(struct drm_device *dev, struct drm_file *file)
 	kfree(file_priv);
 }
 
-static struct pci_device_id pciidlist[] = {
+static const struct pci_device_id pciidlist[] = {
 	viadrv_PCI_IDS
 };
 
