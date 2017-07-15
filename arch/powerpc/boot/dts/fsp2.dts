@@ -362,7 +362,7 @@
 	mmc0: sdhci@020c0000 {
 		compatible	= "st,sdhci-stih407", "st,sdhci";
 		status		= "disabled";
-		reg		= <0x020c0000 0x20000>;
+		reg		= <0x00000000 0x020c0000 0x20000>;
 		reg-names	= "mmc";
 		interrupt-parent = <&UIC1_3>;
 		interrupts	= <21 0x4 22 0x4>;
