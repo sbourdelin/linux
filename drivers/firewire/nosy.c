@@ -694,7 +694,7 @@ fail_disable:
 	return ret;
 }
 
-static struct pci_device_id pci_table[] = {
+static const struct pci_device_id pci_table[] = {
 	{
 		.vendor =    PCI_VENDOR_ID_TI,
 		.device =    PCI_DEVICE_ID_TI_PCILYNX,
