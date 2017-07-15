@@ -2194,8 +2194,7 @@ again:
 		size_t ext_len = 0;
 		size_t len;
 
-		printk_safe_enter_irqsave(flags);
-		raw_spin_lock(&logbuf_lock);
+		logbuf_lock_irqsave(flags);
 		if (seen_seq != log_next_seq) {
 			wake_klogd = true;
 			seen_seq = log_next_seq;
@@ -2267,8 +2266,7 @@ skip:
 	 */
 	raw_spin_lock(&logbuf_lock);
 	retry = console_seq != log_next_seq;
-	raw_spin_unlock(&logbuf_lock);
-	printk_safe_exit_irqrestore(flags);
+	logbuf_unlock_irqrestore(flags);
 
 	if (retry && console_trylock())
 		goto again;
