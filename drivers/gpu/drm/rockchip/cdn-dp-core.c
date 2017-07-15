@@ -807,6 +807,7 @@ static int cdn_dp_audio_hw_params(struct device *dev,  void *data,
 		.sample_rate = params->sample_rate,
 		.channels = params->channels,
 	};
+	u8 buffer[14];
 	int ret;
 
 	mutex_lock(&dp->lock);
@@ -827,6 +828,25 @@ static int cdn_dp_audio_hw_params(struct device *dev,  void *data,
 		ret = -EINVAL;
 		goto out;
 	}
+
+	memset(buffer, 0, sizeof(buffer));
+
+	ret = hdmi_audio_infoframe_pack(&params->cea, buffer, sizeof(buffer));
+	if (ret < 0) {
+		DRM_DEV_ERROR(dev, "Failed to pack audio infoframe: %d\n", ret);
+		goto out;
+	}
+
+	/*
+	 * Change the infoframe header to SDP header per DP 1.3 spec, Table
+	 * 2-98.
+	 */
+	buffer[0] = 0;
+	buffer[1] = HDMI_INFOFRAME_TYPE_AUDIO;
+	buffer[2] = 0x1b;
+	buffer[3] = 0x48;
+
+	cdn_dp_sdp_write(dp, 0, buffer, sizeof(buffer));
 
 	ret = cdn_dp_audio_config(dp, &audio);
 	if (!ret)

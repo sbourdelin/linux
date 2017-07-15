@@ -951,6 +951,25 @@ static void cdn_dp_audio_config_spdif(struct cdn_dp_device *dp)
 	clk_set_rate(dp->spdif_clk, CDN_DP_SPDIF_CLK);
 }
 
+void cdn_dp_sdp_write(struct cdn_dp_device *dp, int entry_id, u8 *buf, u32 len)
+{
+	int idx;
+	u32 *packet = (u32 *)buf;
+	u32 length = len / 4;
+	u8 type = buf[1];
+
+	for (idx = 0; idx < length; idx++)
+		writel(cpu_to_le32(*packet++), dp->regs + SOURCE_PIF_DATA_WR);
+
+	writel(entry_id, dp->regs + SOURCE_PIF_WR_ADDR);
+
+	writel(F_HOST_WR, dp->regs + SOURCE_PIF_WR_REQ);
+
+	writel(PIF_PKT_TYPE_VALID | F_PACKET_TYPE(type) | entry_id,
+	       dp->regs + SOURCE_PIF_PKT_ALLOC_REG);
+	writel(PIF_PKT_ALLOC_WR_EN, dp->regs + SOURCE_PIF_PKT_ALLOC_WR_EN);
+}
+
 int cdn_dp_audio_config(struct cdn_dp_device *dp, struct audio_info *audio)
 {
 	int ret;
