@@ -1019,7 +1019,7 @@ driver_stub = {
 	.patchlevel = DRIVER_PATCHLEVEL,
 };
 
-static struct pci_device_id
+static const struct pci_device_id
 nouveau_drm_pci_table[] = {
 	{
 		PCI_DEVICE(PCI_VENDOR_ID_NVIDIA, PCI_ANY_ID),
