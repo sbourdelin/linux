@@ -367,6 +367,10 @@
 	};
 };
 
+&rga {
+	status = "okay";
+};
+
 &usbphy {
 	status = "okay";
 };
