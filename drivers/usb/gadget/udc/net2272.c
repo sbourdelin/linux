@@ -2556,7 +2556,7 @@ net2272_pci_remove(struct pci_dev *pdev)
 }
 
 /* Table of matching PCI IDs */
-static struct pci_device_id pci_ids[] = {
+static const struct pci_device_id pci_ids[] = {
 	{	/* RDK 1 card */
 		.class       = ((PCI_CLASS_BRIDGE_OTHER << 8) | 0xfe),
 		.class_mask  = 0,
