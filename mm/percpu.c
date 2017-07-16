@@ -1597,6 +1597,8 @@ int __init pcpu_setup_first_chunk(const struct pcpu_alloc_info *ai,
 	PCPU_SETUP_BUG_ON(ai->unit_size < size_sum);
 	PCPU_SETUP_BUG_ON(offset_in_page(ai->unit_size));
 	PCPU_SETUP_BUG_ON(ai->unit_size < PCPU_MIN_UNIT_SIZE);
+	PCPU_SETUP_BUG_ON(ai->reserved_size &&
+			  !PAGE_ALIGNED(ai->static_size + ai->reserved_size));
 	PCPU_SETUP_BUG_ON(ai->dyn_size < PERCPU_DYNAMIC_EARLY_SIZE);
 	PCPU_SETUP_BUG_ON(pcpu_verify_alloc_info(ai) < 0);
 
@@ -1800,6 +1802,9 @@ early_param("percpu_alloc", percpu_alloc_setup);
  * @atom_size: allocation atom size
  * @cpu_distance_fn: callback to determine distance between cpus, optional
  *
+ * If there is a @reserved_size, it is expanded to ensure the end of the
+ * reserved region is page aligned.
+ *
  * This function determines grouping of units, their mappings to cpus
  * and other parameters considering needed percpu size, allocation
  * atom size and distances between CPUs.
@@ -1835,6 +1840,7 @@ static struct pcpu_alloc_info * __init pcpu_build_alloc_info(
 	memset(group_cnt, 0, sizeof(group_cnt));
 
 	/* calculate size_sum and ensure dyn_size is enough for early alloc */
+	reserved_size = pcpu_align_reserved_region(static_size, reserved_size);
 	size_sum = PFN_ALIGN(static_size + reserved_size +
 			    max_t(size_t, dyn_size, PERCPU_DYNAMIC_EARLY_SIZE));
 	dyn_size = size_sum - static_size - reserved_size;

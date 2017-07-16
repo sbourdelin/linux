@@ -130,4 +130,33 @@ extern phys_addr_t per_cpu_ptr_to_phys(void *addr);
 	(typeof(type) __percpu *)__alloc_percpu(sizeof(type),		\
 						__alignof__(type))
 
+/*
+ * pcpu_align_reserved_region - page align the end of the reserved region
+ * @static_size: the static region size
+ * @reserved_size: the minimum reserved region size
+ *
+ * This function calculates the size of the reserved region required to
+ * make the reserved region end page aligned.
+ *
+ * Percpu memory offers a maximum alignment of PAGE_SIZE.  Aligning this
+ * minimizes the metadata overhead of overlapping the static, reserved,
+ * and dynamic regions by allowing the metadata for the static region to
+ * not be allocated.  This lets the base_addr be moved up to a page
+ * aligned address and disregard the static region as offsets are allocated.
+ * The beginning of the reserved region will overlap with the static
+ * region if the end of the static region is not page aligned.
+ *
+ * RETURNS:
+ * Size of reserved region required to make static_size + reserved_size
+ * page aligned.
+ */
+static inline ssize_t pcpu_align_reserved_region(ssize_t static_size,
+						 ssize_t reserved_size)
+{
+	if (!reserved_size)
+		return 0;
+
+	return PFN_ALIGN(static_size + reserved_size) - static_size;
+}
+
 #endif /* __LINUX_PERCPU_H */

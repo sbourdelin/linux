@@ -164,7 +164,8 @@ setup_per_cpu_areas(void)
 
 	/* set parameters */
 	static_size = __per_cpu_end - __per_cpu_start;
-	reserved_size = PERCPU_MODULE_RESERVE;
+	reserved_size = pcpu_align_reserved_region(static_size,
+						   PERCPU_MODULE_RESERVE);
 	dyn_size = PERCPU_PAGE_SIZE - static_size - reserved_size;
 	if (dyn_size < 0)
 		panic("percpu area overflow static=%zd reserved=%zd\n",
