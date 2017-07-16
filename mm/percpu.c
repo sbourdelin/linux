@@ -885,6 +885,12 @@ static int pcpu_find_block_fit(struct pcpu_chunk *chunk, int bit_size,
 
 	lockdep_assert_held(&pcpu_lock);
 
+	/* check chunk->contig_hint to see if alloc can fit - see note above */
+	block_off = ALIGN(chunk->contig_hint_start, align) -
+		    chunk->contig_hint_start;
+	if (block_off + bit_size > chunk->contig_hint)
+		return -1;
+
 	cur_free = block_off = 0;
 	s_index = chunk->first_free_block;
 	for (i = chunk->first_free_block; i < pcpu_nr_pages_to_blocks(chunk);
@@ -973,19 +979,23 @@ static int pcpu_alloc_area(struct pcpu_chunk *chunk, int bit_size,
 			   size_t align, int start)
 {
 	size_t align_mask = (align) ? (align - 1) : 0;
-	int i, bit_off, oslot;
+	int i, bit_off, end, oslot;
 	struct pcpu_bitmap_md *block;
 
 	lockdep_assert_held(&pcpu_lock);
 
 	oslot = pcpu_chunk_slot(chunk);
 
-	/* search to find fit */
-	bit_off = bitmap_find_next_zero_area(chunk->alloc_map,
-					     pcpu_nr_pages_to_bits(chunk),
-					     start, bit_size, align_mask);
+	/*
+	 * Search to find fit.  The search for the start is limited to
+	 * be within a block_size, but should in reality never be hit
+	 * as the contig_hint should be a valid placement.
+	 */
+	end = start + bit_size + PCPU_BITMAP_BLOCK_SIZE;
+	bit_off = bitmap_find_next_zero_area(chunk->alloc_map, end, start,
+					     bit_size, align_mask);
 
-	if (bit_off >= pcpu_nr_pages_to_bits(chunk))
+	if (bit_off >= end)
 		return -1;
 
 	/* update alloc map */
