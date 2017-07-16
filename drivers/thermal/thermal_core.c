@@ -1232,7 +1232,7 @@ thermal_zone_device_register(const char *type, int trips, int mask,
 	/* Add nodes that are always present via .groups */
 	result = thermal_zone_create_device_groups(tz, mask);
 	if (result)
-		goto unregister;
+		goto remove_id;
 
 	/* A new thermal zone needs to be updated anyway. */
 	atomic_set(&tz->need_update, 1);
@@ -1294,8 +1294,9 @@ thermal_zone_device_register(const char *type, int trips, int mask,
 	return tz;
 
 unregister:
-	ida_simple_remove(&thermal_tz_ida, tz->id);
 	device_unregister(&tz->device);
+remove_id:
+	ida_simple_remove(&thermal_tz_ida, tz->id);
 	kfree(tz);
 	return ERR_PTR(result);
 }
