@@ -872,12 +872,11 @@ brcmf_sdiod_ramrw(struct brcmf_sdio_dev *sdiodev, bool write, u32 address,
 
 int brcmf_sdiod_abort(struct brcmf_sdio_dev *sdiodev, uint fn)
 {
-	char t_func = (char)fn;
 	brcmf_dbg(SDIO, "Enter\n");
 
 	/* issue abort cmd52 command through F0 */
-	brcmf_sdiod_request_data(sdiodev, SDIO_FUNC_0, SDIO_CCCR_ABORT,
-				 sizeof(t_func), &t_func, true);
+	brcmf_sdiod_f0_writeb(sdiodev->func[0], (u8)fn, SDIO_CCCR_ABORT);
+
 
 	brcmf_dbg(SDIO, "Exit\n");
 	return 0;
