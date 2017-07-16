@@ -2,6 +2,18 @@
 #define _ASM_PPC64_PKEYS_H
 
 extern bool pkey_inited;
+/* override any generic PKEY Permission defines */
+#undef  PKEY_DISABLE_ACCESS
+#define PKEY_DISABLE_ACCESS    0x1
+#undef  PKEY_DISABLE_WRITE
+#define PKEY_DISABLE_WRITE     0x2
+#undef  PKEY_DISABLE_EXECUTE
+#define PKEY_DISABLE_EXECUTE   0x4
+#undef  PKEY_ACCESS_MASK
+#define PKEY_ACCESS_MASK       (PKEY_DISABLE_ACCESS |\
+				PKEY_DISABLE_WRITE  |\
+				PKEY_DISABLE_EXECUTE)
+
 #define arch_max_pkey()  32
 #define AMR_RD_BIT 0x1UL
 #define AMR_WR_BIT 0x2UL
