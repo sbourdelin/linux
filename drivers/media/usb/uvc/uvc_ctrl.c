@@ -1597,7 +1597,7 @@ static void uvc_ctrl_fixup_xu_info(struct uvc_device *dev,
 		struct usb_device_id id;
 		u8 entity;
 		u8 selector;
-		u8 flags;
+		u16 flags;
 	};
 
 	static const struct uvc_ctrl_fixup fixups[] = {
@@ -1629,10 +1629,7 @@ static void uvc_ctrl_fixup_xu_info(struct uvc_device *dev,
 	}
 }
 
-/*
- * Query control information (size and flags) for XU controls.
- */
-static int uvc_ctrl_fill_xu_info(struct uvc_device *dev,
+static int uvc_ctrl_fill_xu_info_size(struct uvc_device *dev,
 	const struct uvc_control *ctrl, struct uvc_control_info *info)
 {
 	u8 *data;
@@ -1641,11 +1638,6 @@ static int uvc_ctrl_fill_xu_info(struct uvc_device *dev,
 	data = kmalloc(2, GFP_KERNEL);
 	if (data == NULL)
 		return -ENOMEM;
-
-	memcpy(info->entity, ctrl->entity->extension.guidExtensionCode,
-	       sizeof(info->entity));
-	info->index = ctrl->index;
-	info->selector = ctrl->index + 1;
 
 	/* Query and verify the control length (GET_LEN) */
 	ret = uvc_query_ctrl(dev, UVC_GET_LEN, ctrl->entity->id, dev->intfnum,
@@ -1658,6 +1650,21 @@ static int uvc_ctrl_fill_xu_info(struct uvc_device *dev,
 	}
 
 	info->size = le16_to_cpup((__le16 *)data);
+
+done:
+	kfree(data);
+	return ret;
+}
+
+static int uvc_ctrl_fill_xu_info_flags(struct uvc_device *dev,
+	const struct uvc_control *ctrl, struct uvc_control_info *info)
+{
+	u8 *data;
+	int ret;
+
+	data = kmalloc(1, GFP_KERNEL);
+	if (data == NULL)
+		return -ENOMEM;
 
 	/* Query the control information (GET_INFO) */
 	ret = uvc_query_ctrl(dev, UVC_GET_INFO, ctrl->entity->id, dev->intfnum,
@@ -1678,6 +1685,32 @@ static int uvc_ctrl_fill_xu_info(struct uvc_device *dev,
 		    | (data[0] & UVC_CONTROL_CAP_AUTOUPDATE ?
 		       UVC_CTRL_FLAG_AUTO_UPDATE : 0);
 
+done:
+	kfree(data);
+	return ret;
+}
+
+/*
+ * Query control information (size and flags) for XU controls.
+ */
+static int uvc_ctrl_fill_xu_info(struct uvc_device *dev,
+	const struct uvc_control *ctrl, struct uvc_control_info *info)
+{
+	int ret;
+
+	memcpy(info->entity, ctrl->entity->extension.guidExtensionCode,
+	       sizeof(info->entity));
+	info->index = ctrl->index;
+	info->selector = ctrl->index + 1;
+
+	ret = uvc_ctrl_fill_xu_info_size(dev, ctrl, info);
+	if (ret < 0)
+		return ret;
+
+	ret = uvc_ctrl_fill_xu_info_flags(dev, ctrl, info);
+	if (ret < 0)
+		return ret;
+
 	uvc_ctrl_fixup_xu_info(dev, ctrl, info);
 
 	uvc_trace(UVC_TRACE_CONTROL, "XU control %pUl/%u queried: len %u, "
@@ -1687,9 +1720,7 @@ static int uvc_ctrl_fill_xu_info(struct uvc_device *dev,
 		  (info->flags & UVC_CTRL_FLAG_SET_CUR) ? 1 : 0,
 		  (info->flags & UVC_CTRL_FLAG_AUTO_UPDATE) ? 1 : 0);
 
-done:
-	kfree(data);
-	return ret;
+	return 0;
 }
 
 static int uvc_ctrl_add_info(struct uvc_device *dev, struct uvc_control *ctrl,
@@ -1715,6 +1746,40 @@ static int uvc_ctrl_init_xu_ctrl(struct uvc_device *dev,
 			  info.selector, dev->udev->devpath, ctrl->entity->id);
 
 	return ret;
+}
+
+/*
+ * Update control size for variable length XU controls.
+ */
+static int uvc_ctrl_update_xu_info_size(struct uvc_device *dev,
+	struct uvc_control *ctrl)
+{
+	u16 size = ctrl->info.size;
+	int ret;
+
+	if (!(ctrl->info.flags & UVC_CTRL_FLAG_VARIABLE_LEN))
+		return 0;
+
+	/* Check if the control size has changed */
+	ret = uvc_ctrl_fill_xu_info_size(dev, ctrl, &ctrl->info);
+	if (ret < 0)
+		return ret;
+
+	if (ctrl->info.size != size) {
+		uvc_trace(UVC_TRACE_CONTROL,
+			  "XU control %pUl/%u queried: len %u -> %u\n",
+			  ctrl->info.entity, ctrl->info.selector,
+			  size, ctrl->info.size);
+
+		/* Resize array for saved control values */
+		kfree(ctrl->uvc_data);
+		ctrl->uvc_data = kzalloc(ctrl->info.size * UVC_CTRL_DATA_LAST +
+					 1, GFP_KERNEL);
+		if (ctrl->uvc_data == NULL)
+			return -ENOMEM;
+	}
+
+	return 0;
 }
 
 int uvc_xu_ctrl_query(struct uvc_video_chain *chain,
@@ -1797,6 +1862,13 @@ int uvc_xu_ctrl_query(struct uvc_video_chain *chain,
 	default:
 		ret = -EINVAL;
 		goto done;
+	}
+
+	if (reqflags) {
+		ret = uvc_ctrl_update_xu_info_size(chain->dev, ctrl);
+		if (ret < 0)
+			goto done;
+		size = ctrl->info.size;
 	}
 
 	if (size != xqry->size) {
