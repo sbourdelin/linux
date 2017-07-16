@@ -110,6 +110,7 @@ struct pt_regs {
 #define PT_RESULT 43
 #define PT_DSCR 44
 #define PT_REGS_COUNT 44
+#define PT_AMR	45
 
 #define PT_FPR0	48	/* each FP reg occupies 2 slots in this space */
 
