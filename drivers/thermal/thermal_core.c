@@ -1213,10 +1213,8 @@ thermal_zone_device_register(const char *type, int trips, int mask,
 	ida_init(&tz->ida);
 	mutex_init(&tz->lock);
 	result = ida_simple_get(&thermal_tz_ida, 0, 0, GFP_KERNEL);
-	if (result < 0) {
-		kfree(tz);
-		return ERR_PTR(result);
-	}
+	if (result < 0)
+		goto free_tz;
 
 	tz->id = result;
 	strlcpy(tz->type, type, sizeof(tz->type));
@@ -1239,11 +1237,8 @@ thermal_zone_device_register(const char *type, int trips, int mask,
 
 	dev_set_name(&tz->device, "thermal_zone%d", tz->id);
 	result = device_register(&tz->device);
-	if (result) {
-		ida_simple_remove(&thermal_tz_ida, tz->id);
-		kfree(tz);
-		return ERR_PTR(result);
-	}
+	if (result)
+		goto remove_id;
 
 	for (count = 0; count < trips; count++) {
 		if (tz->ops->get_trip_type(tz, count, &trip_type))
@@ -1297,6 +1292,7 @@ unregister:
 	device_unregister(&tz->device);
 remove_id:
 	ida_simple_remove(&thermal_tz_ida, tz->id);
+free_tz:
 	kfree(tz);
 	return ERR_PTR(result);
 }
