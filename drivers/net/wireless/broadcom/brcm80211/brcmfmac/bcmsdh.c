@@ -232,19 +232,23 @@ void brcmf_sdiod_change_state(struct brcmf_sdio_dev *sdiodev,
 }
 
 static int
-brcmf_sdiod_set_sbaddr_window(struct brcmf_sdio_dev *sdiodev, u32 address)
+brcmf_sdiod_set_backplane_window(struct brcmf_sdio_dev *sdiodev, u32 addr)
 {
+	u32 a, bar0 = addr & SBSDIO_SBWINDOW_MASK;
 	int err = 0, i;
-	u32 addr;
 
-	addr = (address & SBSDIO_SBWINDOW_MASK) >> 8;
+	if (bar0 == sdiodev->sbwad)
+		return 0;
 
-	for (i = 0 ; i < 3 && !err ; i++) {
-		u8 data = addr & 0xff;
-		addr = addr >> 8;
 
-		brcm_sdio_func1_wb(sdiodev, SBSDIO_FUNC1_SBADDRLOW + i, data, &err);
-	}
+	a = bar0 >> 8;
+
+	for (i = 0 ; i < 3 && !err ; i++, a>>=8)
+		brcm_sdio_func1_wb(sdiodev, SBSDIO_FUNC1_SBADDRLOW + i, a & 0xff, &err);
+
+
+	if(!err)
+		sdiodev->sbwad = bar0;
 
 	return err;
 }
@@ -257,17 +261,11 @@ brcmf_sdiod_set_sbaddr_window(struct brcmf_sdio_dev *sdiodev, u32 address)
 static int
 brcmf_sdiod_addrprep(struct brcmf_sdio_dev *sdiodev, u32 *addr)
 {
-	uint bar0 = *addr & SBSDIO_SBWINDOW_MASK;
 	int err = 0;
 
-	if (bar0 != sdiodev->sbwad) {
-		printk("WTAF? %08x %08x\n", bar0, sdiodev->sbwad);
-		err = brcmf_sdiod_set_sbaddr_window(sdiodev, bar0);
-		if (err)
-			return err;
-
-		sdiodev->sbwad = bar0;
-	}
+	err = brcmf_sdiod_set_backplane_window(sdiodev, *addr);
+	if (err)
+		return err;
 
 	*addr &= SBSDIO_SB_OFT_ADDR_MASK;
 	*addr |= SBSDIO_SB_ACCESS_2_4B_FLAG;
@@ -699,7 +697,7 @@ brcmf_sdiod_ramrw(struct brcmf_sdio_dev *sdiodev, bool write, u32 address,
 	while (size) {
 
 		/* Set the backplane window to include the start address */
-		err = brcmf_sdiod_set_sbaddr_window(sdiodev, address);
+		err = brcmf_sdiod_set_backplane_window(sdiodev, address);
 		if (err)
 			break;
 
@@ -742,11 +740,6 @@ brcmf_sdiod_ramrw(struct brcmf_sdio_dev *sdiodev, bool write, u32 address,
 	}
 
 	dev_kfree_skb(pkt);
-
-	/* Return the window to backplane enumeration space for core access */
-	if (brcmf_sdiod_set_sbaddr_window(sdiodev, sdiodev->sbwad))
-		brcmf_err("FAILED to set window back to 0x%x\n",
-			  sdiodev->sbwad);
 
 	sdio_release_host(sdiodev->func[1]);
 
